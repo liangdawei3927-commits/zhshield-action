@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { ToolAdapter, ToolResult, Issue, EventEmitter } from '@zh/shared';
+import type { ToolAdapter, Issue, EventEmitter } from '@zh/shared';
 import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER } from '@zh/shared';
 import type { Vulnerability, SecurityScanReport } from './types';
 import { calculateSecurityScore } from './types';
 import type { GarbageItem, MalwareItem } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
-import { scanGarbage, mapDepcheckIssuesToGarbage } from './garbage-scanner';
+import { GarbageScanner, mapDepcheckIssuesToGarbage } from './garbage-scanner';
 import { MalwareScanner, mapSemgrepIssuesToMalware } from './malware-scanner';
-import { scanNpmThreats } from './npm-threat-scanner';
-import { scanPypiThreats } from './pypi-threat-scanner';
 import { GrypeCrossValidator } from './cross-validator';
 import type { CrossValidationReport } from './cross-validator';
 
@@ -36,46 +34,12 @@ const TOOL_ISSUE_COLLECTORS: Record<string, (params: CollectIssuesByToolParams) 
   semgrep: (params) => params.semgrepIssues.push(...params.issues),
 };
 
-interface ToolIssueBuckets {
-  all: Issue[];
-  trivy: Issue[];
-  grype: Issue[];
-  depcheck: Issue[];
-  semgrep: Issue[];
-}
-
-interface RunToolScanParams {
-  adapter: ToolAdapter;
-  projectId: string;
-  projectPath: string;
-  result: ToolIssueBuckets;
-  toolStart: number;
-}
-
-interface HandleToolResultParams {
-  adapter: ToolAdapter;
-  projectId: string;
-  scanResult: ToolResult;
-  result: ToolIssueBuckets;
-  toolStart: number;
-}
-
-interface BuildFindingsParams {
-  crossReport: CrossValidationReport;
-  legacyVulns: Vulnerability[];
-  legacyGarbage: GarbageItem[];
-  legacyMalware: MalwareItem[];
-  npmThreats: MalwareItem[];
-  pypiThreats: MalwareItem[];
-  depcheckGarbage: GarbageItem[];
-  semgrepMalware: MalwareItem[];
-}
-
 export class SecurityEngine {
   private toolManager: ToolManager;
   private degradationManager: DegradationManager;
   private auditLogger: AuditLogger;
   private vulnerabilityScanner: VulnerabilityScanner;
+  private garbageScanner: GarbageScanner;
   private malwareScanner: MalwareScanner;
   private registeredAdapters = new Map<string, ToolAdapter>();
   private emitter: EventEmitter;
@@ -86,6 +50,7 @@ export class SecurityEngine {
     this.degradationManager = new DegradationManager();
     this.auditLogger = new AuditLogger();
     this.vulnerabilityScanner = new VulnerabilityScanner();
+    this.garbageScanner = new GarbageScanner();
     this.malwareScanner = new MalwareScanner();
     this.emitter = emitter ?? NOOP_EMITTER;
     this.crossValidator = new GrypeCrossValidator();
@@ -109,6 +74,7 @@ export class SecurityEngine {
 
     const { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues } =
       await this.runRegisteredAdapters(projectId, projectPath);
+
     const { garbage, malware, vulnerabilities } = await this.collectScannerFindings({
       projectPath,
       depcheckIssues,
@@ -119,23 +85,17 @@ export class SecurityEngine {
 
     await this.emitScanCompleted(projectId, start, allIssues, vulnerabilities);
 
-    return this.buildReport(projectId, vulnerabilities, garbage, malware);
-  }
+    const summary = this.summarizeFindings(vulnerabilities, garbage, malware);
+    const securityScore = calculateSecurityScore(vulnerabilities);
 
-  private buildReport(
-    projectId: string,
-    vulnerabilities: Vulnerability[],
-    garbage: GarbageItem[],
-    malware: MalwareItem[],
-  ): SecurityScanReport {
     return {
       projectId,
       timestamp: new Date(),
       vulnerabilities,
       garbage,
       malware,
-      securityScore: calculateSecurityScore(vulnerabilities, malware),
-      summary: this.summarizeFindings(vulnerabilities, garbage, malware),
+      securityScore,
+      summary,
     };
   }
 
@@ -174,77 +134,64 @@ export class SecurityEngine {
     adapter: ToolAdapter,
     projectId: string,
     projectPath: string,
-  ): Promise<ToolIssueBuckets> {
-    const result: ToolIssueBuckets = { all: [], trivy: [], grype: [], depcheck: [], semgrep: [] };
+  ): Promise<{
+    all: Issue[];
+    trivy: Issue[];
+    grype: Issue[];
+    depcheck: Issue[];
+    semgrep: Issue[];
+  }> {
+    const result = { all: [] as Issue[], trivy: [] as Issue[], grype: [] as Issue[], depcheck: [] as Issue[], semgrep: [] as Issue[] };
     const toolStart = Date.now();
 
-    await this.runToolScan({ adapter, projectId, projectPath, result, toolStart });
-
-    return result;
-  }
-
-  private async runToolScan(params: RunToolScanParams): Promise<void> {
-    const { adapter, projectId, projectPath, result, toolStart } = params;
     try {
       const scanResult = await adapter.scan({
         projectPath,
         projectId,
         timeout: 120000,
       });
-      await this.handleToolResult({ adapter, projectId, scanResult, result, toolStart });
+      const duration = Date.now() - toolStart;
+
+      result.all.push(...scanResult.issues);
+      this.collectIssuesByTool({
+        toolId: adapter.meta.id,
+        issues: scanResult.issues,
+        trivyIssues: result.trivy,
+        grypeIssues: result.grype,
+        depcheckIssues: result.depcheck,
+        semgrepIssues: result.semgrep,
+      });
+
+      await this.auditLogger.logToolExecution({
+        tool: adapter.meta.id,
+        duration,
+        fileCount: scanResult.metadata.fileCount,
+        issueCount: scanResult.issues.length,
+        status: scanResult.status,
+        projectId,
+      });
+
+      await this.emitter.emit({
+        type: 'tool:executed',
+        payload: {
+          tool: adapter.meta.id,
+          status: scanResult.status,
+          duration,
+          issueCount: scanResult.issues.length,
+          projectId,
+          timestamp: new Date(),
+        },
+      });
+
+      if (scanResult.status === 'error' || scanResult.status === 'unavailable') {
+        this.degradationManager.escalate(scanResult.error || 'Unknown error', adapter.meta.id);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.degradationManager.escalate(message || 'Unknown error', adapter.meta.id);
     }
-  }
 
-  private async handleToolResult(params: HandleToolResultParams): Promise<void> {
-    const { adapter, projectId, scanResult, result, toolStart } = params;
-    const duration = Date.now() - toolStart;
-
-    result.all.push(...scanResult.issues);
-    this.collectIssuesByTool({
-      toolId: adapter.meta.id,
-      issues: scanResult.issues,
-      trivyIssues: result.trivy,
-      grypeIssues: result.grype,
-      depcheckIssues: result.depcheck,
-      semgrepIssues: result.semgrep,
-    });
-
-    await this.logAndEmitToolExecution(adapter, projectId, scanResult, duration);
-
-    if (scanResult.status === 'error' || scanResult.status === 'unavailable') {
-      this.degradationManager.escalate(scanResult.error || 'Unknown error', adapter.meta.id);
-    }
-  }
-
-  private async logAndEmitToolExecution(
-    adapter: ToolAdapter,
-    projectId: string,
-    scanResult: ToolResult,
-    duration: number,
-  ): Promise<void> {
-    await this.auditLogger.logToolExecution({
-      tool: adapter.meta.id,
-      duration,
-      fileCount: scanResult.metadata.fileCount,
-      issueCount: scanResult.issues.length,
-      status: scanResult.status,
-      projectId,
-    });
-
-    await this.emitter.emit({
-      type: 'tool:executed',
-      payload: {
-        tool: adapter.meta.id,
-        status: scanResult.status,
-        duration,
-        issueCount: scanResult.issues.length,
-        projectId,
-        timestamp: new Date(),
-      },
-    });
+    return result;
   }
 
   private collectIssuesByTool(params: CollectIssuesByToolParams): void {
@@ -260,30 +207,22 @@ export class SecurityEngine {
   }: CollectScannerFindingsParams): Promise<{ garbage: GarbageItem[]; malware: MalwareItem[]; vulnerabilities: Vulnerability[] }> {
     const crossReport = this.crossValidator.validate(trivyIssues, grypeIssues);
 
-    const [legacyVulns, legacyGarbage, legacyMalware, npmThreats, pypiThreats] = await this.runLegacyScanners(projectPath);
+    const legacyVulns = await this.vulnerabilityScanner.scan(projectPath);
+    const legacyGarbage = await this.garbageScanner.scan(projectPath);
+    const legacyMalware = await this.malwareScanner.scan(projectPath);
+
     const depcheckGarbage = mapDepcheckIssuesToGarbage(depcheckIssues);
     const semgrepMalware = mapSemgrepIssuesToMalware(semgrepIssues);
 
-    return this.buildFindings({ crossReport, legacyVulns, legacyGarbage, legacyMalware, npmThreats, pypiThreats, depcheckGarbage, semgrepMalware });
-  }
+    const garbage = [...legacyGarbage, ...depcheckGarbage];
+    const malware = [...legacyMalware, ...semgrepMalware];
 
-  private async runLegacyScanners(projectPath: string): Promise<[Vulnerability[], GarbageItem[], MalwareItem[], MalwareItem[], MalwareItem[]]> {
-    return Promise.all([
-      this.vulnerabilityScanner.scan(projectPath),
-      scanGarbage(projectPath),
-      this.malwareScanner.scan(projectPath),
-      scanNpmThreats(projectPath),
-      scanPypiThreats(projectPath),
-    ]);
-  }
+    const vulnerabilities: Vulnerability[] = [
+      ...legacyVulns,
+      ...this.mapCrossEntries(crossReport),
+    ];
 
-  private buildFindings(params: BuildFindingsParams): { garbage: GarbageItem[]; malware: MalwareItem[]; vulnerabilities: Vulnerability[] } {
-    const { crossReport, legacyVulns, legacyGarbage, legacyMalware, npmThreats, pypiThreats, depcheckGarbage, semgrepMalware } = params;
-    return {
-      garbage: [...legacyGarbage, ...depcheckGarbage],
-      malware: [...legacyMalware, ...semgrepMalware, ...npmThreats, ...pypiThreats],
-      vulnerabilities: [...legacyVulns, ...this.mapCrossEntries(crossReport)],
-    };
+    return { garbage, malware, vulnerabilities };
   }
 
   private async emitScanCompleted(

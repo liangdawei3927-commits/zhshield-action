@@ -18,12 +18,9 @@
     "@typescript-eslint/parser": "^8.65.0",
     "@zh/db": "workspace:*",
     "@zh/shared": "workspace:*",
-    "archiver": "^7.0.1",
-    "js-yaml": "^4.1.0",
-    "@zh/i18n": "workspace:*"
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@types/archiver": "^6.0.3",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",

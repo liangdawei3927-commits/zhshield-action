@@ -95,12 +95,6 @@ describe('PipelineRunner — 端到端集成测试', () => {
     expect(p.passed).toBe(true);
     expect(p.guard).not.toBeNull();
     expect(p.inspect).not.toBeNull();
-    expect(p.profile).not.toBeNull();
-    expect(p.profile!.projectPath).toBe(SCAN_TARGET);
-    expect(p.security).not.toBeNull();
-    expect(p.security!.securityScore).toBeGreaterThanOrEqual(0);
-    expect(p.score).not.toBeNull();
-    expect(['A', 'B', 'C', 'D']).toContain(p.score!.grade);
   });
 
   it('7. 插件管理器', async () => {
@@ -114,8 +108,7 @@ describe('PipelineRunner — 端到端集成测试', () => {
 
   it('8. SOP Guard', async () => {
     const report = await scanRunner.runSopGuard({ dryRun: true });
-    // dryRun（只报告不阻断）下 ok 为 null
-    expect(report.ok).not.toBe(false);
+    expect(report.ok).toBe(true);
     expect(Array.isArray(report.evaluations)).toBe(true);
     for (const ev of report.evaluations) {
       expect(['passed', 'failed', 'error', 'skipped']).toContain(ev.status);

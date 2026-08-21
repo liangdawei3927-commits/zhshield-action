@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import type {
   SopRule,
-  RuleServes,
+  SopServes,
   GovernanceDomain,
   ActionType,
   DataSource,
@@ -14,6 +14,17 @@ import type {
 import { SopRegistry } from './sop-registry';
 
 const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
+
+/** 六大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
+ *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载 */
+const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
+  'guard',
+  'inspect',
+  'security',
+  'sentinel',
+  'evolve',
+  'refactor',
+]);
 
 /** priority → severity 映射表（替代 priorityToSeverity 中的 switch 分派） */
 const PRIORITY_TO_SEVERITY = new Map<string, SopRule['severity']>([
@@ -42,7 +53,6 @@ export interface SopLoaderOptions {
  * 2. 从知识库加载外部同步的规则
  * 3. 从经验库加载校准数据
  */
-// allow: SIZE_OK — 单文件职责为"规则加载"，基线已超 250 LOC，本任务约束仅允许最小增量、禁止拆分
 export class SopLoader {
   private registry: SopRegistry;
   private options: Required<SopLoaderOptions>;
@@ -91,6 +101,9 @@ export class SopLoader {
     const domainDirs = fs.readdirSync(dir, { withFileTypes: true });
     for (const dirent of domainDirs) {
       if (!dirent.isDirectory() || dirent.name.startsWith('_') || dirent.name.startsWith('.')) {
+        continue;
+      }
+      if (!GOVERNANCE_DOMAIN_DIRS.has(dirent.name)) {
         continue;
       }
       const domain = dirent.name as GovernanceDomain;
@@ -185,9 +198,33 @@ export class SopLoader {
     const meta = (parsed.metadata && typeof parsed.metadata === 'object')
       ? parsed.metadata as Record<string, unknown>
       : null;
-    return meta
+    const rule = meta
       ? this.buildWithMeta({ parsed, meta, domain, action, fileName })
       : this.buildSimple(parsed, domain, action, fileName);
+    const serves = this.parseServes(parsed.serves);
+    return serves ? { ...rule, serves } : rule;
+  }
+
+  /** 解析规则文件顶层 serves 声明（语言/产品形态/架构），空声明返回 undefined */
+  private parseServes(value: unknown): SopServes | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    const raw = value as Record<string, unknown>;
+    const readStrings = (key: string): string[] | undefined => {
+      const list = raw[key];
+      if (!Array.isArray(list)) return undefined;
+      const items = list.filter((item): item is string => typeof item === 'string');
+      return items.length > 0 ? items : undefined;
+    };
+    const languages = readStrings('languages');
+    const productForms = readStrings('productForms');
+    const architectures = readStrings('architectures');
+    if (!languages && !productForms && !architectures) return undefined;
+
+    const serves: SopServes = {};
+    if (languages) serves.languages = languages;
+    if (productForms) serves.productForms = productForms;
+    if (architectures) serves.architectures = architectures;
+    return serves;
   }
 
   private buildWithMeta({
@@ -230,7 +267,6 @@ export class SopLoader {
       applicableEngines: [gov.domain as string ?? domain],
       content: parsed,
       tags: (meta.tags as string[]) ?? [],
-      serves: this.parseServes(parsed),
       falsePositiveCount: 0,
       truePositiveCount: 0,
       createdAt: meta.created ? new Date(meta.created as string) : new Date(),
@@ -260,7 +296,6 @@ export class SopLoader {
       applicableEngines: (parsed.applicableEngines as string[]) ?? [domain],
       content: parsed,
       tags: (parsed.tags as string[]) ?? [],
-      serves: this.parseServes(parsed),
       falsePositiveCount: 0,
       truePositiveCount: 0,
       createdAt: new Date(),
@@ -270,21 +305,6 @@ export class SopLoader {
 
   private priorityToSeverity(priority?: string): SopRule['severity'] {
     return PRIORITY_TO_SEVERITY.get(priority ?? '') ?? 'medium';
-  }
-
-  /** 从规则文件顶层 serves 声明解析能力声明，未声明或全部为空时返回 undefined */
-  private parseServes(parsed: Record<string, unknown>): RuleServes | undefined {
-    if (typeof parsed.serves !== 'object' || parsed.serves === null) return undefined;
-    const raw = parsed.serves as Record<string, unknown>;
-    const serves: RuleServes = {};
-    for (const key of ['languages', 'productForms', 'architectures'] as const) {
-      const value = raw[key];
-      if (Array.isArray(value)) {
-        const items = value.filter((v): v is string => typeof v === 'string');
-        if (items.length > 0) serves[key] = items;
-      }
-    }
-    return Object.keys(serves).length > 0 ? serves : undefined;
   }
 
   // ─── 从知识库加载 ──────────────────────────────────────────

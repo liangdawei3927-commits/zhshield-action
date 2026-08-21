@@ -86,6 +86,10 @@ export class SopSigner {
     return { valid: true };
   }
 
+  static verifyPackageWithKey(pkg: SignedSopPackage, publicKey: string): VerifyResult {
+    return SopSigner.verifyPackage(pkg, publicKey);
+  }
+
   private static verifyTimestamp(timestamp: Date): VerifyResult {
     const now = Date.now();
     const pkgTime = timestamp.getTime();
@@ -96,82 +100,6 @@ export class SopSigner {
       return { valid: false, reason: 'timestamp_from_future' };
     }
     return { valid: true };
-  }
-
-  // ─── Ed25519 非对称签名（现行） ────────────────────────────
-
-  /**
-   * 生成 Ed25519 密钥对（PEM 格式）
-   * 私钥仅存于签名方（server），公钥随包分发供验证方（desktop/pipeline）使用
-   */
-  static generateKeyPair(): { publicKey: string; privateKey: string } {
-    const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-    return {
-      publicKey: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
-      privateKey: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
-    };
-  }
-
-  /**
-   * 用私钥签名规则包（Ed25519）
-   * 签名内容 = 规则内容 SHA-256 哈希，验签方只需公钥即可确认内容未被篡改
-   */
-  static signPackageWithKey(rules: SopRule[], privateKey: string, version?: string): SignedSopPackage {
-    const sorted = rules.toSorted((a, b) => a.id.localeCompare(b.id));
-    const content = JSON.stringify(sorted);
-    const hash = crypto.createHash('sha256').update(content).digest('hex');
-
-    const signature = crypto
-      .sign(null, Buffer.from(hash, 'utf-8'), crypto.createPrivateKey(privateKey))
-      .toString('hex');
-
-    const publicKey = crypto
-      .createPublicKey(crypto.createPrivateKey(privateKey))
-      .export({ type: 'spki', format: 'pem' })
-      .toString();
-
-    return {
-      version: version ?? '0.0.0',
-      rules: sorted,
-      signature,
-      hash,
-      timestamp: new Date(),
-      algorithm: 'ed25519',
-      publicKey,
-    };
-  }
-
-  /**
-   * 用公钥验证规则包（Ed25519）
-   * 双校验：内容哈希一致（防篡改）+ 签名有效（防伪造）
-   */
-  static verifyPackageWithKey(pkg: SignedSopPackage, publicKey: string): VerifyResult {
-    const sorted = pkg.rules.toSorted((a, b) => a.id.localeCompare(b.id));
-    const expectedHash = crypto.createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
-    if (pkg.hash !== expectedHash) {
-      return { valid: false, reason: 'hash_mismatch' };
-    }
-    const valid = crypto.verify(
-      null,
-      Buffer.from(pkg.hash, 'utf-8'),
-      crypto.createPublicKey(publicKey),
-      Buffer.from(pkg.signature, 'hex'),
-    );
-    if (!valid) {
-      return { valid: false, reason: 'signature_mismatch' };
-    }
-    return { valid: true };
-  }
-
-  /**
-   * 从私钥推导公钥（PEM）
-   * 供签名方（server）单独暴露公钥端点使用
-   */
-  static derivePublicKey(privateKey: string): string {
-    return crypto
-      .createPublicKey(crypto.createPrivateKey(privateKey))
-      .export({ type: 'spki', format: 'pem' })
-      .toString();
   }
 
   // ─── HMAC 签名 ─────────────────────────────────────────────

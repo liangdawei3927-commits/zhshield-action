@@ -1,7 +1,6 @@
 // @zh/kernel
 export const VERSION = '0.1.0';
 export { EventBus } from './bus';
-export type { KernelEventMap } from '@zh/shared';
 export { ConfigManager } from './config';
 export { Logger } from './log';
 export type { LogLevel } from './log';
@@ -38,7 +37,3 @@ export * from './backup/index';
 // ─── 通知服务 ──────────────────────────────────────────────
 export { NotificationService, notificationService } from './notification';
 export type { AppNotification, NotificationStore, NotificationListener } from './notification';
-
-// ─── 定时巡检调度器 ────────────────────────────────────────
-export { SchedulerService } from './scheduler';
-export type { SchedulerConfig, SchedulerJob, SchedulerRunResult, SchedulerTaskType, SchedulerFrequency, SchedulerStorage } from './scheduler';

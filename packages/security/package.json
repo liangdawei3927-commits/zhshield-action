@@ -13,10 +13,9 @@
     "lint": "eslint src --max-warnings 100"
   },
   "dependencies": {
-    "@zh/shared": "workspace:*",
     "@zh/kernel": "workspace:*",
-    "js-yaml": "^4.1.0",
-    "@zh/i18n": "workspace:*"
+    "@zh/shared": "workspace:*",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

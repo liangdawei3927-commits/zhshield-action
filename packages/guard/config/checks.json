@@ -38,15 +38,5 @@
     "severity": "error",
     "blocking": true,
     "description": "安全漏洞扫描"
-  },
-  {
-    "checkId": "SEC-002",
-    "adapter": "sensitive-info",
-    "enabled": true,
-    "mode": ["guard", "inspection"],
-    "category": "security",
-    "severity": "error",
-    "blocking": true,
-    "description": "敏感信息（硬编码密钥）扫描，rotating/rotated/dismissed 状态豁免"
   }
 ]

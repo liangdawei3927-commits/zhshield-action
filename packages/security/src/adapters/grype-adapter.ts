@@ -32,66 +32,63 @@ export class GrypeAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const source = this.resolveScanSource(options);
 
     try {
-      const output = await this.runGrype(source, options);
+      // 支持 docker 镜像扫描：config.rules[0] 作为镜像名，否则扫描目录
+      const source = options.config?.rules?.[0]
+        ? options.config.rules[0]
+        : `dir:${options.projectPath}`;
+      const { stdout } = await execFileAsync('grype', [
+        source,
+        '-o', 'json',
+      ], {
+        cwd: options.projectPath,
+        timeout: options.timeout || 120000,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+
+      const output = JSON.parse(stdout);
       const issues = this.mapOutput(output);
-      return this.buildSuccessResult(start, issues, output?.matches?.length || 0);
-    } catch (error) {
-      return this.buildErrorResult(start, error as ExecError);
-    }
-  }
 
-  /** 解析扫描目标：config.rules[0] 作为 docker 镜像名，否则扫描目录 */
-  private resolveScanSource(options: ToolScanOptions): string {
-    return options.config?.rules?.[0] ? options.config.rules[0] : `dir:${options.projectPath}`;
-  }
-
-  private async runGrype(source: string, options: ToolScanOptions): Promise<GrypeOutput> {
-    const { stdout } = await execFileAsync('grype', [source, '-o', 'json'], {
-      cwd: options.projectPath,
-      timeout: options.timeout || 120000,
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    return JSON.parse(stdout) as GrypeOutput;
-  }
-
-  private buildSuccessResult(start: number, issues: Issue[], fileCount: number): ToolResult {
-    return {
-      tool: 'grype',
-      status: 'available',
-      issues,
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount },
-    };
-  }
-
-  private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
-      return {
-        tool: 'grype',
-        status: 'unavailable',
-        issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: 'Grype 未安装',
-      };
-    }
-    const partialIssues = this.parsePartialOutput(err.stdout);
-    if (partialIssues) {
       return {
         tool: 'grype',
         status: 'available',
-        issues: partialIssues,
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        issues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: output?.matches?.length || 0,
+        },
+      };
+    } catch (error) {
+      const err = error as ExecError;
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'grype',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'Grype 未安装',
+        };
+      }
+      const partialIssues = this.parsePartialOutput(err.stdout);
+      if (partialIssues) {
+        return {
+          tool: 'grype',
+          status: 'available',
+          issues: partialIssues,
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        };
+      }
+      return {
+        tool: 'grype',
+        status: 'error',
+        issues: [],
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        error: err.stderr || err.message || 'Grype 执行失败',
       };
     }
-    return {
-      tool: 'grype',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'Grype 执行失败',
-    };
   }
 
   private parsePartialOutput(stdout: string | undefined): Issue[] | null {

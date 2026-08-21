@@ -13,10 +13,10 @@
     "lint": "eslint src --max-warnings 100"
   },
   "dependencies": {
-    "@zh/shared": "workspace:*",
-    "@zh/kernel": "workspace:*",
     "@zh/db": "workspace:*",
-    "@zh/i18n": "workspace:*"
+    "@zh/i18n": "workspace:*",
+    "@zh/kernel": "workspace:*",
+    "@zh/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

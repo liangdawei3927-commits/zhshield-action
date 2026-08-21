@@ -61,71 +61,56 @@ export class TrivyAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const scanTypes = this.resolveScanTypes(options);
+    const scanTypes: TrivyScanType[] = (options.config?.scanners as TrivyScanType[]) || ['dependency'];
 
     try {
-      const allIssues = await this.runAllScans(scanTypes, options);
-      return this.buildSuccessResult(start, allIssues);
-    } catch (error) {
-      return this.buildErrorResult(start, error as ExecError);
-    }
-  }
+      const allIssues: Issue[] = [];
 
-  private resolveScanTypes(options: ToolScanOptions): TrivyScanType[] {
-    return (options.config?.scanners as TrivyScanType[]) || ['dependency'];
-  }
+      for (const scanType of scanTypes) {
+        const args = this.buildArgs(scanType, options.projectPath, options);
+        if (!args) continue;
 
-  private async runAllScans(scanTypes: TrivyScanType[], options: ToolScanOptions): Promise<Issue[]> {
-    const allIssues: Issue[] = [];
+        const { stdout } = await execFileAsync('trivy', args, {
+          cwd: options.projectPath,
+          timeout: options.timeout || 120000,
+          maxBuffer: 20 * 1024 * 1024,
+        });
 
-    for (const scanType of scanTypes) {
-      const issues = await this.runSingleScan(scanType, options);
-      if (issues) allIssues.push(...issues);
-    }
+        const output = JSON.parse(stdout);
+        const issues = this.mapOutput(output);
+        allIssues.push(...issues);
+      }
 
-    return allIssues;
-  }
-
-  private async runSingleScan(scanType: TrivyScanType, options: ToolScanOptions): Promise<Issue[] | null> {
-    const args = this.buildArgs(scanType, options.projectPath, options);
-    if (!args) return null;
-
-    const { stdout } = await execFileAsync('trivy', args, {
-      cwd: options.projectPath,
-      timeout: options.timeout || 120000,
-      maxBuffer: 20 * 1024 * 1024,
-    });
-
-    const output = JSON.parse(stdout);
-    return this.mapOutput(output);
-  }
-
-  private buildSuccessResult(start: number, allIssues: Issue[]): ToolResult {
-    return {
-      tool: 'trivy',
-      status: 'available',
-      issues: allIssues,
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: allIssues.length },
-    };
-  }
-
-  private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
       return {
         tool: 'trivy',
-        status: 'unavailable',
+        status: 'available',
+        issues: allIssues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: allIssues.length,
+        },
+      };
+    } catch (error) {
+      const err = error as ExecError;
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'trivy',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'Trivy 未安装，请运行 trivy 安装命令',
+        };
+      }
+      return {
+        tool: 'trivy',
+        status: 'error',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: 'Trivy 未安装，请运行 trivy 安装命令',
+        error: err.stderr || err.message || 'Trivy 执行失败',
       };
     }
-    return {
-      tool: 'trivy',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'Trivy 执行失败',
-    };
   }
 
   private buildArgs(scanType: TrivyScanType, projectPath: string, options?: ToolScanOptions): string[] | null {

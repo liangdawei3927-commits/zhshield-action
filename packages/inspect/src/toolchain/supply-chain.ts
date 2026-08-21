@@ -210,7 +210,7 @@ export class LockfileLicenseAuditor implements LicenseAuditor {
 
   async audit(locale?: LanguageCode): Promise<LicenseMatrixReport> {
     const lockfile = await loadToolLockfile(this.lockfilePath);
-    const entries = Object.entries(lockfile?.tools ?? {});
+    const entries = Object.entries(lockfile?.tools ?? {}) as [string, { version: string }][];
     const tools: (ToolLicense & { toolId: string; version: string })[] = entries.map(
       ([toolId, record]) => {
         const license: ToolLicense =

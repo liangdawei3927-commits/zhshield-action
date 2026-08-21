@@ -3,17 +3,17 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
-const META: Omit<ToolMeta, 'description'> = {
+const META: ToolMeta = {
   id: 'dep-cruiser',
   name: 'Dependency Cruiser',
   category: 'inspect',
   priority: 'P1',
   installMode: 'builtin',
+  description: '架构边界与模块依赖检查',
   cliCommand: 'depcruise',
   homepage: 'https://github.com/sverweij/dependency-cruiser',
   license: 'MIT',
@@ -32,17 +32,7 @@ interface DepCruiserOutput {
 }
 
 export class DependencyCruiserAdapter implements ToolAdapter {
-  meta: ToolMeta;
-  private readonly locale: LanguageCode;
-
-  constructor(locale?: LanguageCode) {
-    this.locale = locale ?? DEFAULT_LANGUAGE;
-    this.meta = { ...META, description: translate('engine.inspect.tool.dep-cruiser.description', this.locale) };
-  }
-
-  private tr(key: string, params?: Record<string, unknown>): string {
-    return translate(key, this.locale, params);
-  }
+  meta = META;
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -59,63 +49,51 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     const targetDir = path.join(options.projectPath, 'src');
 
     try {
-      const stdout = await this.runDepCruise(options, configFile, targetDir);
+      const args: string[] = [];
+      if (configFile) {
+        args.push('--validate', configFile);
+      }
+      args.push('--output-type', 'json', targetDir);
+
+      const { stdout } = await execFileAsync('depcruise', args, {
+        cwd: options.projectPath,
+        timeout: options.timeout || 60000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
       const output = JSON.parse(stdout);
-      return this.buildAvailable(start, output);
-    } catch (error: unknown) {
-      return this.buildScanError(start, error);
-    }
-  }
+      const issues = this.mapOutput(output);
 
-  private async runDepCruise(options: ToolScanOptions, configFile: string | null, targetDir: string): Promise<string> {
-    const args: string[] = [];
-    if (configFile) {
-      args.push('--validate', configFile);
-    }
-    args.push('--output-type', 'json', targetDir);
-
-    const { stdout } = await execFileAsync('depcruise', args, {
-      cwd: options.projectPath,
-      timeout: options.timeout || 60000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return stdout;
-  }
-
-  private buildAvailable(start: number, output: unknown): ToolResult {
-    const issues = this.mapOutput(output, this.locale);
-    const modules = (output as { modules?: unknown[] }).modules;
-    return {
-      tool: 'dep-cruiser',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: modules?.length || 0,
-      },
-    };
-  }
-
-  private buildScanError(start: number, error: unknown): ToolResult {
-    const err = error as { code?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
       return {
         tool: 'dep-cruiser',
-        status: 'unavailable',
+        status: 'available',
+        issues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: output?.modules?.length || 0,
+        },
+      };
+    } catch (error: unknown) {
+      const err = error as { code?: string; stderr?: string; message?: string };
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'dep-cruiser',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'dependency-cruiser 未安装',
+        };
+      }
+      return {
+        tool: 'dep-cruiser',
+        status: 'error',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: this.tr('engine.inspect.tool.dep-cruiser.unavailable'),
+        error: err.stderr || err.message || 'dependency-cruiser 执行失败',
       };
     }
-    return {
-      tool: 'dep-cruiser',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || this.tr('engine.inspect.tool.dep-cruiser.runFailed'),
-    };
   }
 
   private resolveConfig(projectPath: string): string | null {
@@ -133,23 +111,23 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     return null;
   }
 
-  private mapOutput(output: unknown, locale?: LanguageCode): Issue[] {
+  private mapOutput(output: unknown): Issue[] {
     const out = output as DepCruiserOutput;
     if (!out?.summary?.violations || !Array.isArray(out.summary.violations)) return [];
-    return out.summary.violations.map((v) => this.mapViolationToIssue(v, locale));
+    return out.summary.violations.map((v) => this.mapViolationToIssue(v));
   }
 
-  private mapViolationToIssue(v: DepCruiserViolation, locale?: LanguageCode): Issue {
+  private mapViolationToIssue(v: DepCruiserViolation): Issue {
     return {
       id: randomUUID(),
       ruleId: v.rule?.name || 'dep-cruiser/violation',
       severity: this.mapSeverity(v.rule?.severity),
       category: 'architecture',
-      message: this.buildViolationMessage(v, locale),
+      message: this.buildViolationMessage(v),
       file: v.from?.path || '',
       line: v.from?.line || 0,
       column: 0,
-      suggestion: this.buildViolationSuggestion(v, locale),
+      suggestion: `模块 ${v.from?.path || ''} 不应引用 ${v.to?.path || ''}`,
       autoFixable: false,
       source: 'inspect',
       fingerprint: this.buildViolationFingerprint(v),
@@ -160,21 +138,8 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     return severity === 'error' ? 'error' : severity === 'warn' ? 'warning' : 'info';
   }
 
-  private buildViolationMessage(v: DepCruiserViolation, locale?: LanguageCode): string {
-    const lng = locale ?? DEFAULT_LANGUAGE;
-    const rule = v.rule?.name || translate('engine.inspect.unknownRule', lng);
-    return translate('engine.inspect.tool.dep-cruiser.architectureViolation', lng, {
-      rule,
-      from: v.from?.path || '?',
-      to: v.to?.path || '?',
-    });
-  }
-
-  private buildViolationSuggestion(v: DepCruiserViolation, locale?: LanguageCode): string {
-    return translate('engine.inspect.tool.dep-cruiser.noCrossReference', locale ?? DEFAULT_LANGUAGE, {
-      from: v.from?.path || '',
-      to: v.to?.path || '',
-    });
+  private buildViolationMessage(v: DepCruiserViolation): string {
+    return `架构边界违规: ${v.rule?.name || '未知规则'} - ${v.from?.path || '?'} → ${v.to?.path || '?'}`;
   }
 
   private buildViolationFingerprint(v: DepCruiserViolation): string {

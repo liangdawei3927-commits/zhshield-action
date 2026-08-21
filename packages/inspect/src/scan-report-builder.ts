@@ -1,4 +1,3 @@
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { AdapterResult, InspectionReport, Issue } from './types';
 import type { EventEmitter } from '@zh/shared';
 import { DegradationManager } from '@zh/shared';
@@ -53,22 +52,21 @@ export class ScanReportBuilder {
     return Object.fromEntries(SCAN_CATEGORIES.map((c) => [c, issues.filter((i) => i.category === c).length]));
   }
 
-  recommendations(issues: Issue[], locale?: LanguageCode): string[] {
-    const lng = locale ?? DEFAULT_LANGUAGE;
+  recommendations(issues: Issue[]): string[] {
     const recs: string[] = [];
     const byCategory = new Map<string, number>();
     for (const issue of issues) {
       byCategory.set(issue.category, (byCategory.get(issue.category) || 0) + 1);
     }
     for (const [cat, count] of byCategory) {
-      if (count > 5) recs.push(translate('engine.inspect.report.recommendations.category', lng, { count, category: cat }));
+      if (count > 5) recs.push(`发现 ${count} 个 ${cat} 类问题，建议优先处理`);
     }
     const degradedLevel = this.degradationManager.getLevel();
     if (degradedLevel > 0) {
-      recs.push(translate('engine.inspect.report.recommendations.degradedLevel', lng, { level: degradedLevel }));
+      recs.push(`当前降级等级: Level ${degradedLevel}，部分工具已跳过`);
       const errors = this.degradationManager.getToolErrors();
       for (const [tool, err] of errors) {
-        recs.push(translate('engine.inspect.report.recommendations.toolError', lng, { tool, error: err }));
+        recs.push(`工具 ${tool} 出错: ${err}`);
       }
     }
     return recs;
@@ -88,7 +86,7 @@ export class ScanReportBuilder {
     });
   }
 
-  buildReport(input: ScanReportInput, locale?: LanguageCode): InspectionReport {
+  buildReport(input: ScanReportInput): InspectionReport {
     const summary = this.summarize(input.issues);
     return {
       projectId: input.projectId,
@@ -99,7 +97,7 @@ export class ScanReportBuilder {
       issues: input.issues,
       summary,
       adapterResults: input.adapterResults,
-      recommendations: this.recommendations(input.issues, locale),
+      recommendations: this.recommendations(input.issues),
     };
   }
 }

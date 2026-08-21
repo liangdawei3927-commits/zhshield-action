@@ -1,14 +1,11 @@
 import * as ts from 'typescript';
 
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import { collectExternalCalls } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
 
 const UPPER_CASE_START = /^[A-Z0-9_]/;
-
-type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
 
 /** 统计方法的外部调用占比 */
 function computeExternalCallRatio(
@@ -24,10 +21,10 @@ function computeExternalCallRatio(
 }
 
 /** 找出被调用最多的外部目标 */
-function findTopTarget(externalCalls: Map<string, number>, tr: TranslateFn): string {
+function findTopTarget(externalCalls: Map<string, number>): string {
   const sortedEntries = [...externalCalls.entries()].sort((a, b) => b[1] - a[1]);
   const topTarget = sortedEntries.length > 0 ? sortedEntries[0] : null;
-  return topTarget ? topTarget[0] : tr('engine.refactor.smell.feature-envy.externalClass');
+  return topTarget ? topTarget[0] : '外部类';
 }
 
 /** 分析单个方法是否构成 Feature Envy，是则生成 CodeSmell */
@@ -36,7 +33,6 @@ function analyzeMethodForFeatureEnvy(
   cls: ParsedClass,
   method: ParsedClass['members']['methods'][number],
   config: RefactorConfig,
-  tr: TranslateFn,
 ): CodeSmell | null {
   const threshold = config.thresholds.featureEnvyRatio;
 
@@ -46,51 +42,19 @@ function analyzeMethodForFeatureEnvy(
   const { externalCount, totalStatements, ratio } = computeExternalCallRatio(parsed, cls, method);
   if (ratio <= threshold || externalCount <= 3) return null;
 
-  return buildFeatureEnvySmell({
-    parsed, cls, method, config,
-    externalCalls, externalCount, totalStatements, ratio, threshold,
-    tr,
-  });
-}
-
-/** buildFeatureEnvySmell 参数对象 */
-interface FeatureEnvySmellParams {
-  parsed: ParsedFile;
-  cls: ParsedClass;
-  method: ParsedClass['members']['methods'][number];
-  config: RefactorConfig;
-  externalCalls: Map<string, number>;
-  externalCount: number;
-  totalStatements: number;
-  ratio: number;
-  threshold: number;
-  tr: TranslateFn;
-}
-
-/** 构造 Feature Envy 代码异味 */
-function buildFeatureEnvySmell(params: FeatureEnvySmellParams): CodeSmell {
-  const { parsed, cls, method, config, externalCalls, externalCount, totalStatements, ratio, threshold, tr } = params;
-  const targetName = findTopTarget(externalCalls, tr);
+  const targetName = findTopTarget(externalCalls);
 
   return makeSmell({
     ruleId: 'feature-envy',
     severity: config.severities['feature-envy'],
-    message: tr('engine.refactor.smell.feature-envy.message', {
-      target: `${cls.name}.${method.name}()`,
-      targetName,
-      externalCount,
-      totalStatements,
-    }),
+    message: `${cls.name}.${method.name}() 大量调用 ${targetName} (${externalCount} 次外部引用 vs ${totalStatements} 行代码)`,
     filePath: parsed.filePath,
     line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
     column: 1,
     metric: 'externalCallRatio', value: Math.round(ratio * 100), threshold: Math.round(threshold * 100),
     suggestion: {
       type: 'Move Method',
-      description: tr('engine.refactor.smell.feature-envy.suggestion', {
-        methodName: `${method.name}()`,
-        targetClass: targetName.split('.')[0],
-      }),
+      description: `考虑将 ${method.name}() 移到 ${targetName.split('.')[0]} 类中`,
       priority: 'medium',
       effort: 'medium',
       autoFixable: false,
@@ -98,13 +62,12 @@ function buildFeatureEnvySmell(params: FeatureEnvySmellParams): CodeSmell {
   });
 }
 
-export function detectFeatureEnvy(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectFeatureEnvy(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
     for (const method of cls.members.methods) {
-      const smell = analyzeMethodForFeatureEnvy(parsed, cls, method, config, tr);
+      const smell = analyzeMethodForFeatureEnvy(parsed, cls, method, config);
       if (smell) smells.push(smell);
     }
   }
@@ -112,17 +75,16 @@ export function detectFeatureEnvy(parsed: ParsedFile, config: RefactorConfig, lo
   return smells;
 }
 
-export function detectShotgunSurgery(parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectShotgunSurgery(parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
-  detectExcessivePublicMethods(parsed, config, smells, tr);
-  detectSharedStringLiterals(parsed, collectRepeatedStringLiterals(allFiles), smells, tr);
+  detectExcessivePublicMethods(parsed, config, smells);
+  detectSharedStringLiterals(parsed, collectRepeatedStringLiterals(allFiles), smells);
 
   return smells;
 }
 
-function detectExcessivePublicMethods(parsed: ParsedFile, config: RefactorConfig, smells: CodeSmell[], tr: TranslateFn): void {
+function detectExcessivePublicMethods(parsed: ParsedFile, config: RefactorConfig, smells: CodeSmell[]): void {
   for (const cls of parsed.classes) {
     const publicMethods = cls.members.methods.filter(m => m.accessModifier === 'public');
     if (publicMethods.length <= 10) continue;
@@ -130,12 +92,12 @@ function detectExcessivePublicMethods(parsed: ParsedFile, config: RefactorConfig
     smells.push(makeSmell({
       ruleId: 'shotgun-surgery',
       severity: config.severities['shotgun-surgery'],
-      message: tr('engine.refactor.smell.shotgun-surgery.message.publicMethods', { className: cls.name, count: publicMethods.length }),
+      message: `${cls.name} 有 ${publicMethods.length} 个公共方法，修改某个功能可能需要改动多个方法`,
       filePath: parsed.filePath, line: cls.startLine, column: 1,
       metric: 'publicMethodCount', value: publicMethods.length, threshold: 10,
       suggestion: {
         type: 'Extract Class / Consolidate Responsibility',
-        description: tr('engine.refactor.smell.shotgun-surgery.suggestion.publicMethods'),
+        description: '按职责将类拆分为更小的类，减少修改波及范围',
         priority: 'medium',
         effort: 'large',
         autoFixable: false,
@@ -167,7 +129,6 @@ function detectSharedStringLiterals(
   parsed: ParsedFile,
   stringLiterals: Map<string, Set<string>>,
   smells: CodeSmell[],
-  tr: TranslateFn,
 ): void {
   for (const [literal, files] of stringLiterals) {
     if (files.size <= 3 || !files.has(parsed.filePath)) continue;
@@ -175,12 +136,12 @@ function detectSharedStringLiterals(
     smells.push(makeSmell({
       ruleId: 'shotgun-surgery',
       severity: 'info',
-      message: tr('engine.refactor.smell.shotgun-surgery.message.sharedLiterals', { literal, count: files.size }),
+      message: `字符串 "${literal}" 在 ${files.size} 个文件中出现，建议提取为共享常量`,
       filePath: parsed.filePath, line: 1, column: 1,
       metric: 'hardcodedStrings', value: files.size, threshold: 3,
       suggestion: {
         type: 'Extract Constant',
-        description: tr('engine.refactor.smell.shotgun-surgery.suggestion.sharedLiterals', { literal }),
+        description: `将 "${literal}" 提取为共享常量文件，集中管理一处修改`,
         priority: 'low',
         effort: 'small',
         autoFixable: true,
@@ -192,12 +153,6 @@ function detectSharedStringLiterals(
 
 /** 判断类是否为纯数据类候选：非框架托管、非测试夹具、字段多方法少 */
 function isDataClassCandidate(parsed: ParsedFile, cls: ParsedClass, config: RefactorConfig): boolean {
-  if (!isEligibleForDataClassCheck(parsed, cls)) return false;
-  return meetsDataClassThresholds(cls, config);
-}
-
-/** 数据类检查前置条件：跳过框架托管类与测试 fixtures */
-function isEligibleForDataClassCheck(parsed: ParsedFile, cls: ParsedClass): boolean {
   // 跳过框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger
   // DTO 等依赖类或成员装饰器的运行时元数据，转 interface 或内联方法会破坏
   // 框架契约，它们是合理的数据载体而非纯数据类反模式。
@@ -206,38 +161,28 @@ function isEligibleForDataClassCheck(parsed: ParsedFile, cls: ParsedClass): bool
   // 跳过测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式。
   if (isTestFixture(parsed.filePath)) return false;
 
-  return true;
-}
-
-/** 字段数达到下限且方法数不超过上限，才判定为纯数据类 */
-function meetsDataClassThresholds(cls: ParsedClass, config: RefactorConfig): boolean {
   const ownMethods = countNonTrivialMethods(cls);
   const fieldCount = cls.members.fields.length;
   return fieldCount >= config.thresholds.minDataClassFields && ownMethods <= config.thresholds.maxDataClassMethods;
 }
 
-/** buildDataClassSmell 参数对象 */
-interface DataClassSmellParams {
-  parsed: ParsedFile;
-  cls: ParsedClass;
-  fieldCount: number;
-  ownMethods: number;
-  config: RefactorConfig;
-  tr: TranslateFn;
-}
-
 /** 构造数据类 CodeSmell */
-function buildDataClassSmell(params: DataClassSmellParams): CodeSmell {
-  const { parsed, cls, fieldCount, ownMethods, config, tr } = params;
+function buildDataClassSmell(
+  parsed: ParsedFile,
+  cls: ParsedClass,
+  fieldCount: number,
+  ownMethods: number,
+  config: RefactorConfig,
+): CodeSmell {
   return makeSmell({
     ruleId: 'data-class',
     severity: config.severities['data-class'],
-    message: tr('engine.refactor.smell.data-class.message', { className: cls.name, fields: fieldCount, methods: ownMethods }),
+    message: `${cls.name} 有 ${fieldCount} 个字段但只有 ${ownMethods} 个方法，可能是纯数据类`,
     filePath: parsed.filePath, line: cls.startLine, column: 1,
     metric: 'fieldMethodRatio', value: fieldCount, threshold: ownMethods,
     suggestion: {
       type: 'Move Method to Data Class',
-      description: tr('engine.refactor.smell.data-class.suggestion', { className: cls.name }),
+      description: `将操作 ${cls.name} 字段的方法搬移到类中，或将其转为 TypeScript interface`,
       priority: 'medium',
       effort: 'medium',
       autoFixable: false,
@@ -246,8 +191,7 @@ function buildDataClassSmell(params: DataClassSmellParams): CodeSmell {
   });
 }
 
-export function detectDataClass(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectDataClass(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -255,7 +199,7 @@ export function detectDataClass(parsed: ParsedFile, config: RefactorConfig, loca
 
     const ownMethods = countNonTrivialMethods(cls);
     const fieldCount = cls.members.fields.length;
-    smells.push(buildDataClassSmell({ parsed, cls, fieldCount, ownMethods, config, tr }));
+    smells.push(buildDataClassSmell(parsed, cls, fieldCount, ownMethods, config));
   }
 
   return smells;
@@ -281,8 +225,7 @@ function countNonTrivialMethods(cls: ParsedClass): number {
   ).length;
 }
 
-export function detectGodObject(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectGodObject(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const methodThreshold = config.thresholds.maxGodObjectMethods;
 
@@ -293,12 +236,12 @@ export function detectGodObject(parsed: ParsedFile, config: RefactorConfig, loca
       smells.push(makeSmell({
         ruleId: 'god-object',
         severity: config.severities['god-object'],
-        message: tr('engine.refactor.smell.god-object.message', { className: cls.name, count: publicMethodCount, threshold: methodThreshold }),
+        message: `${cls.name} 有 ${publicMethodCount} 个公共方法 (阈值 ${methodThreshold})，可能是上帝对象`,
         filePath: parsed.filePath, line: cls.startLine, column: 1,
         metric: 'publicMethodCount', value: publicMethodCount, threshold: methodThreshold,
         suggestion: {
           type: 'Split God Class',
-          description: tr('engine.refactor.smell.god-object.suggestion', { className: cls.name }),
+          description: `将 ${cls.name} 按领域拆分为多个专注的 Service/Class`,
           priority: publicMethodCount > methodThreshold * 1.5 ? 'high' : 'medium',
           effort: publicMethodCount > methodThreshold * 1.5 ? 'large' : 'medium',
           autoFixable: false,
@@ -339,22 +282,17 @@ function buildDataClumpSmell(
   parsed: ParsedFile,
   group: { methods: string[]; params: string[] },
   config: RefactorConfig,
-  tr: TranslateFn,
 ): CodeSmell {
   const sampleMethods = group.methods.slice(0, 3);
   return makeSmell({
     ruleId: 'data-clumps',
     severity: config.severities['data-clumps'],
-    message: tr('engine.refactor.smell.data-clumps.message', {
-      params: group.params.slice(0, 3).join(', '),
-      count: group.methods.length,
-      methods: sampleMethods.join(', '),
-    }),
+    message: `参数组合 [${group.params.slice(0, 3).join(', ')}] 反复出现 (${group.methods.length} 次): ${sampleMethods.join(', ')}...`,
     filePath: parsed.filePath, line: 1, column: 1,
     metric: 'clumpFrequency', value: group.methods.length, threshold: 2,
     suggestion: {
       type: 'Extract Class / Parameter Object',
-      description: tr('engine.refactor.smell.data-clumps.suggestion'),
+      description: '将重复出现的参数组合封装为一个类',
       priority: 'low',
       effort: 'medium',
       autoFixable: false,
@@ -362,15 +300,14 @@ function buildDataClumpSmell(
   });
 }
 
-export function detectDataClumps(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectDataClumps(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   const paramGroups = collectParamGroups(parsed);
 
   for (const [, group] of paramGroups) {
     if (group.methods.length >= 3) {
-      smells.push(buildDataClumpSmell(parsed, group, config, tr));
+      smells.push(buildDataClumpSmell(parsed, group, config));
     }
   }
 
@@ -380,8 +317,7 @@ export function detectDataClumps(parsed: ParsedFile, config: RefactorConfig, loc
 const PRIMITIVE_TYPES = new Set(['string', 'number', 'boolean', 'any', 'void']);
 const PRIMITIVE_FIELD_THRESHOLD = 5;
 
-export function detectPrimitiveObsession(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectPrimitiveObsession(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const primitiveCounts = collectPrimitiveFieldCounts(parsed);
 
@@ -390,12 +326,12 @@ export function detectPrimitiveObsession(parsed: ParsedFile, config: RefactorCon
       smells.push(makeSmell({
         ruleId: 'primitive-obsession',
         severity: config.severities['primitive-obsession'],
-        message: tr('engine.refactor.smell.primitive-obsession.message', { className, count }),
+        message: `${className} 使用过多原始类型 (${count} 个字段)，建议为相关字段创建值对象`,
         filePath: parsed.filePath, line: 1, column: 1,
         metric: 'primitiveFieldCount', value: count, threshold: PRIMITIVE_FIELD_THRESHOLD,
         suggestion: {
           type: 'Replace Primitive with Object',
-          description: tr('engine.refactor.smell.primitive-obsession.suggestion'),
+          description: '将相关原始类型字段封装为值对象（Value Object）',
           priority: 'low',
           effort: 'medium',
           autoFixable: false,

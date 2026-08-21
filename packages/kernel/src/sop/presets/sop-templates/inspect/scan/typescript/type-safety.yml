@@ -1,0 +1,147 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · TypeScript 类型安全性扫描
+# =============================================================================
+# 规则 ID: inspect.scan.internal.type-safety
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect TS · type-safety
+# 内部标准源: IronNest#00 Non-negotiable · IronNest#13 ESLint+TypeScript · IronNest#25 No Clever TS
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.internal.type-safety"
+  name: "TypeScript 类型安全性扫描"
+  description: "扫描类型安全性违规：禁止使用 any、禁止不安全类型断言、公共方法必须有显式返回类型、检测隐式 any 泄露、检查类型 narrowing 完整性"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/00 · rules/13 · rules/25"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "typescript"
+
+execution:
+  mode: "async"
+  timeout: 60
+  maxConcurrency: 2
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+    - "**/generated/**"
+
+check:
+  tool: "custom-ast-scanner"
+  toolConfig:
+    rules:
+      - id: "no-explicit-any"
+        description: "禁止使用 any 类型，使用 unknown + narrowing 或具体类型"
+        severity: "error"
+        pattern:
+          type: "TSTypeReference"
+          typeName: "any"
+        excludePattern:
+          - "catch.*: any"
+          - 'any\['
+        cwe: "CWE-1104"
+      - id: "no-type-assertion"
+        description: "禁止 as 类型断言（除非有 Zod 等运行时验证保证）"
+        severity: "warning"
+        pattern:
+          type: "TSAsExpression"
+        excludePattern:
+          - "as const"
+          - "z.*parse.*as"
+        exceptionPolicy: "仅允许 DTO parsing 后的类型断言，且必须注明原因"
+      - id: "explicit-return-type"
+        description: "公共方法和导出函数必须有显式返回类型"
+        severity: "warning"
+        pattern:
+          type: "FunctionDeclaration"
+          isExported: true
+          hasReturnType: false
+        excludePattern:
+          - "constructor"
+          - "set.*"
+          - "middleware"
+      - id: "inferred-any-leak"
+        description: "检测从 any 类型隐式推断到具体类型的传播路径"
+        severity: "error"
+        pattern:
+          type: "any-propagation"
+          depth: 3
+      - id: "unsafe-generic"
+        description: "泛型约束不应退化为 any"
+        severity: "warning"
+        pattern:
+          type: "TSTypeParameter"
+          constraint: "any"
+      - id: "30-second-type-rule"
+        description: "类型定义应在 30 秒内可理解，禁止复杂条件类型嵌套超过 2 层"
+        severity: "warning"
+        pattern:
+          type: "conditional-type"
+          maxNesting: 2
+  severity: "warning"
+  categories:
+    - "type-safety"
+    - "typescript"
+    - "best-practice"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe:
+    - "CWE-1104"
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    发现类型安全性违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 规则: {ruleId}
+    ⚠️ 详情: {description}
+
+    修复建议：
+    1. any → unknown + 类型 narrowing（typeof / instanceof / 自定义 type guard）
+    2. as 断言 → 使用 Zod/class-validator parse 后由框架保证类型
+    3. 显式返回类型 → `public method(): ReturnType { ... }`
+    4. 复杂条件类型 → 拆分为具名类型，简化嵌套层级
+
+    📖 参考: IronNest #00 不可协商规则 · #13 ESLint/TS · #25 不玩花样 TS

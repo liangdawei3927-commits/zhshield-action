@@ -113,101 +113,28 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
     });
   });
 
-  // ─── guard 领域：外部派发规则（dryRun 实际评估，不再整体跳过）──────
+  // ─── guard 领域：外部派发规则（dryRun 跳过）─────────────
 
-  describe('guard — 外部派发规则（dryRun 实际评估）', () => {
-    it('security-scan: 无引擎/工具时给出真实跳过原因，而非 [dryRun] 跳过', async () => {
+  describe('guard — 外部派发规则（dryRun 跳过）', () => {
+    it('security-scan: scanner-dispatch 跳过', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('security-scan'));
       expect(evalResult).toBeDefined();
-      // dryRun 不再整体跳过 scanner-dispatch：未注册扫描器/InspectEngine 时按真实原因跳过
       expect(evalResult!.status).toBe('skipped');
-      expect(evalResult!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
     });
 
-    it('eslint-error: preset 在 dryRun 下不再跳过，注册工具后真实执行', async () => {
-      // 未注册工具/引擎时按真实原因跳过
-      const before = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
-      const beforeEval = before.evaluations.find((e) => e.rule.id.includes('eslint-error'));
-      expect(beforeEval).toBeDefined();
-      expect(beforeEval!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
-
-      // 注册 eslint 工具后，dryRun 下真实执行工具扫描
-      let scanned = 0;
-      engine.registerToolAdapter('eslint', {
-        meta: {
-          id: 'eslint', name: 'eslint', category: 'inspect', priority: 'P0',
-          installMode: 'builtin', description: 'mock', cliCommand: 'eslint',
-          homepage: '', license: 'MIT',
-        },
-        isAvailable: async () => true,
-        scan: async () => {
-          scanned += 1;
-          return {
-            tool: 'eslint',
-            status: 'available',
-            issues: [],
-            metadata: { version: '1.0.0', duration: 0, timestamp: new Date(), fileCount: 0 },
-          };
-        },
-      });
-      const after = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
-      expect(scanned).toBeGreaterThan(0);
-      const afterEval = after.evaluations.find((e) => e.rule.id.includes('eslint-error'));
-      expect(afterEval).toBeDefined();
-      expect(afterEval!.status).not.toBe('skipped');
-      expect(afterEval!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
+    it('eslint-error: preset 跳过', async () => {
+      const report = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
+      const evalResult = report.evaluations.find((e) => e.rule.id.includes('eslint-error'));
+      expect(evalResult).toBeDefined();
+      expect(evalResult!.status).toBe('skipped');
     });
 
-    it('typescript-error: check-list 在 dryRun 下不再跳过', async () => {
+    it('typescript-error: check-list 跳过', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('typescript-error'));
       expect(evalResult).toBeDefined();
-      expect(evalResult!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
-    });
-
-    it('health-score / test-coverage: threshold 规则在 dryRun 下实际评估', async () => {
-      const report = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
-      const healthEval = report.evaluations.find((e) => e.rule.id.includes('health-score'));
-      const coverageEval = report.evaluations.find((e) => e.rule.id.includes('test-coverage'));
-      expect(healthEval).toBeDefined();
-      expect(healthEval!.status).toBe('passed');
-      expect(healthEval!.message ?? '').toContain('阈值');
-      expect(coverageEval).toBeDefined();
-      expect(coverageEval!.status).toBe('passed');
-    });
-
-    it('dryRun 下失败仍如实上报（status=failed），但报告 ok 为 null（只报告不阻断）', async () => {
-      engine.registerToolAdapter('eslint', {
-        meta: {
-          id: 'eslint', name: 'eslint', category: 'inspect', priority: 'P0',
-          installMode: 'builtin', description: 'mock', cliCommand: 'eslint',
-          homepage: '', license: 'MIT',
-        },
-        isAvailable: async () => true,
-        scan: async () => ({
-          tool: 'eslint',
-          status: 'available',
-          issues: [{
-            id: 'e1',
-            ruleId: 'guard.block.official.eslint-error',
-            severity: 'error',
-            category: 'quality',
-            message: 'mock eslint error',
-            file: 'src/index.ts',
-            autoFixable: false,
-            source: 'inspect',
-            fingerprint: 'mock-1',
-          }],
-          metadata: { version: '1.0.0', duration: 0, timestamp: new Date(), fileCount: 0 },
-        }),
-      });
-      const report = await engine.runGuard({ repoRoot: tempDir, dryRun: true });
-      const eslintEval = report.evaluations.find((e) => e.rule.id.includes('eslint-error'));
-      expect(eslintEval).toBeDefined();
-      expect(eslintEval!.status).toBe('failed');
-      expect(eslintEval!.violations!.length).toBeGreaterThanOrEqual(1);
-      expect(report.ok).toBeNull();
+      expect(evalResult!.status).toBe('skipped');
     });
   });
 
@@ -220,7 +147,7 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       expect(securityRules.length).toBeGreaterThanOrEqual(10);
     });
 
-    it('helmet-check: check-list 在 dryRun 下给出真实原因，而非 [dryRun] 跳过', async () => {
+    it('helmet-check: check-list dryRun 跳过', async () => {
       const report = await engine.runInspect({
         repoRoot: tempDir,
         domain: 'security',
@@ -229,10 +156,9 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       const helmetEval = report.evaluations.find((e) => e.rule.id.includes('helmet-check'));
       expect(helmetEval).toBeDefined();
       expect(helmetEval!.status).toBe('skipped');
-      expect(helmetEval!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
     });
 
-    it('csrf-check: check-list 在 dryRun 下给出真实原因，而非 [dryRun] 跳过', async () => {
+    it('csrf-check: check-list dryRun 跳过', async () => {
       const report = await engine.runInspect({
         repoRoot: tempDir,
         domain: 'security',
@@ -241,7 +167,6 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       const csrfEval = report.evaluations.find((e) => e.rule.id.includes('csrf-check'));
       expect(csrfEval).toBeDefined();
       expect(csrfEval!.status).toBe('skipped');
-      expect(csrfEval!.message ?? '').not.toContain('[dryRun] 跳过外部工具');
     });
 
     it('sql-injection: 无可解释内容时默认 pattern-scan 评估（dryRun 不跳过）', async () => {
@@ -252,7 +177,7 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       });
       const sqliEval = report.evaluations.find((e) => e.rule.id.includes('sql-injection'));
       expect(sqliEval).toBeDefined();
-      // pattern-scan 为内联评估，dryRun 下仍会评估
+      // pattern-scan 不在 isExternalDispatch 中，dryRun 下仍会评估
       expect(sqliEval!.status).not.toBe('skipped');
     });
   });

@@ -1,0 +1,30 @@
+name: general-purpose
+description: 通用代码治理配置
+version: "1.0"
+domains:
+  - eslint:enabled
+  - semgrep:security
+  - dependency:license-check
+  - dependency:vulnerability-scan
+  - gitleaks:secret-detection
+tools:
+  eslint:
+    config: .eslintrc.js
+  semgrep:
+    rules: ["p/typescript"]
+  gitleaks:
+    enabled: true
+  trivy:
+    enabled: true
+severity:
+  block: [critical]
+  warn: [high, medium]
+  info: [low, info]
+guard:
+  pre_commit:
+    - eslint:lint-staged
+    - gitleaks:detect
+  pre_push:
+    - semgrep:scan
+performance:
+  max_scan_time_ms: 45000

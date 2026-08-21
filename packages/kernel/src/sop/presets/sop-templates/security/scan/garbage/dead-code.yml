@@ -1,0 +1,132 @@
+# =============================================================================
+# SOP 规则模板 — Cleanup · 死代码（未使用导出）检测
+# =============================================================================
+# 规则 ID: cleanup.scan.deadcode.unused-function
+# 治理域: 安全域 (security)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Cleanup · 死代码
+# 内部标准源: IronNest#27 No Token-Burning · #22 Reuse Before Creating
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SecurityRule
+metadata:
+  id: "security.scan.garbage.dead-code"
+  name: "死代码检测"
+  description: "检测导出的函数、变量、类、类型等在代码库中没有任何调用方。死代码增加维护成本、模糊代码意图、浪费 AI Token 上下文窗口"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/27 · rules/22 · ts-prune"
+
+governance:
+  domain: "security"
+  action: "scan"
+  module: "Security"
+  category: "garbage"
+
+execution:
+  mode: "async"
+  timeout: 120
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+    - "*.js"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+    - "**/generated/**"
+
+check:
+  tool: "ts-prune"
+  toolConfig:
+    configPath: "tsconfig.json"
+    skip:
+      - "(.*\\.module\\.ts)$"          # NestJS 模块自动发现
+      - "(.*\\.controller\\.ts)$"       # 控制由框架注册
+      - "(.*\\.resolver\\.ts)$"
+      - "(.*\\.gateway\\.ts)$"
+      - "(.*\\.decorator\\.ts)$"
+      - "(.*\\.guard\\.ts)$"
+      - "(.*\\.interceptor\\.ts)$"
+      - "(.*\\.pipe\\.ts)$"
+      - "(.*\\.filter\\.ts)$"
+      - "(.*\\.middleware\\.ts)$"
+      - "(^src/main\\.ts)$"
+      - "(.*\\.config\\.ts)$"
+      - "(index\\.ts)$"
+      - "(.*\\.enum\\.ts)$"
+      - "(.*\\.interface\\.ts)$"
+      - "(.*\\.type\\.ts)$"
+      - "(.*\\.d\\.ts)$"
+    additionalChecks:
+      - id: "unused-export"
+        description: "导出但无引用"
+        severity: "info"
+      - id: "unreachable-code"
+        description: "return/throw 后的死代码"
+        severity: "warning"
+      - id: "self-assignment"
+        description: "无意义的自身赋值"
+        severity: "info"
+    threshold:
+      maxDeadExports: 10
+  severity: "low"
+  categories:
+    - "cleanup"
+    - "dead-code"
+    - "maintainability"
+
+judgment:
+  passCondition: "deadExportCount < 10"
+  blockOn: "info"
+  priority: "low"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 120
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: true
+  suggestionTemplate: |
+    发现死代码（未使用的导出）：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 符号: {symbol}
+    ⚠️ 类型: {symbolType}
+    ⚠️ 严重性: {severity}
+
+    处置建议：
+    1. 确认无调用方 → 删除导出或删除整个定义
+    2. 如测试直接使用 → 确认测试是否使用了该导出（ts-prune 可能忽略测试文件中的引用）
+    3. 如为公共 API 但尚未被消费 → 添加 `@public` 注释标注
+    4. 批量清理时注意：一次删除一个符号，运行测试确认
+
+    📖 参考: IronNest #27 No Token-Burning · ts-prune

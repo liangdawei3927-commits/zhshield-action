@@ -10,5 +10,4 @@ forbidden:
   - as any
   - '@ts-ignore'
   - '@ts-expect-error'
-  - ': any'
-  - '<any>'
+  - any

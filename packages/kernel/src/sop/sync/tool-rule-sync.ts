@@ -77,7 +77,7 @@ export function buildDefaultToolRuleConfigs(apiBase?: string): ToolRuleSyncConfi
       localDir: 'dependency-cruiser-rules',
       remoteVersionUrl: `${base}/rules/dep-cruiser/version`,
       remoteDownloadUrl: `${base}/rules/dep-cruiser/download`,
-      syncIntervalMs: 30 * 24 * 60 * 60 * 1000,
+      syncIntervalMs: 24 * 60 * 60 * 1000, // 1天（30天超出32位整数上限会被截断为1ms）
     },
   ];
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'path';
 import { unlinkSync } from 'fs';
-import { DbConnection, createProject, getProjectByPath, getProject } from '@zh/db';
+import { DbConnection, createProject, getProjectByPath } from '@zh/db';
 import { ScoringEngine } from '../engine';
 
 function createScoringEngine(inMemory = true) {
@@ -164,35 +164,6 @@ describe('ScoringEngine (in-memory)', () => {
     expect(report.streak.direction).toBe('improving');
     expect(report.streak.count).toBeGreaterThanOrEqual(3);
   });
-
-  it('normalizes dimension weights that do not sum to 1', () => {
-    const engine = createScoringEngine(true);
-    const score = engine.calculate('pn', [
-      { name: 'a', score: 100, weight: 0.5, issues: 0 },
-      { name: 'b', score: 0, weight: 0.5, issues: 0 },
-    ]);
-    expect(score.overall).toBe(50);
-    expect(score.grade).toBe('D');
-  });
-
-  it('clamps overall score to 100 when weighted sum overflows', () => {
-    const engine = createScoringEngine(true);
-    const score = engine.calculate('pc', [
-      { name: 'a', score: 100, weight: 1, issues: 0 },
-      { name: 'b', score: 100, weight: 1, issues: 0 },
-    ]);
-    expect(score.overall).toBe(100);
-    expect(score.grade).toBe('A');
-  });
-
-  it('clamps overall score to 0 for negative dimension scores', () => {
-    const engine = createScoringEngine(true);
-    const score = engine.calculate('pn2', [
-      { name: 'a', score: -10, weight: 1, issues: 0 },
-    ]);
-    expect(score.overall).toBe(0);
-    expect(score.grade).toBe('D');
-  });
 });
 
 describe('ScoringEngine (persistent)', () => {
@@ -227,44 +198,6 @@ describe('ScoringEngine (persistent)', () => {
       engine.calculate('trend-proj', [{ name: 'x', score: 70, weight: 1, issues: 0 }]);
       const s2 = engine.calculate('trend-proj', [{ name: 'x', score: 85, weight: 1, issues: 0 }]);
       expect(s2.trend).toBe('improving');
-    } finally {
-      conn.close();
-      try { unlinkSync(dbPath); } catch {}
-    }
-  });
-
-  it('auto-creates project row when missing (FK constraint)', () => {
-    const { engine, db, conn, dbPath } = createScoringEngine(false);
-
-    try {
-      expect(getProject(db, 'unregistered-proj')).toBeUndefined();
-      expect(() => engine.calculate('unregistered-proj', [
-        { name: 'security', score: 80, weight: 1, issues: 2 },
-      ])).not.toThrow();
-
-      expect(getProject(db, 'unregistered-proj')).toBeDefined();
-      const current = engine.getCurrent('unregistered-proj');
-      expect(current?.overall).toBe(80);
-    } finally {
-      conn.close();
-      try { unlinkSync(dbPath); } catch {}
-    }
-  });
-
-  it('tolerates corrupted dimensions JSON in stored rows', () => {
-    const { engine, db, conn, dbPath } = createScoringEngine(false);
-
-    try {
-      ensureProject(db, 'corrupt-proj');
-      db.prepare(
-        `INSERT INTO scores (project_id, overall, grade, dimensions, trend)
-         VALUES (?, ?, ?, ?, ?)`,
-      ).run('corrupt-proj', 70, 'C', '{not-valid-json', 'stable');
-
-      expect(() => engine.getCurrent('corrupt-proj')).not.toThrow();
-      const current = engine.getCurrent('corrupt-proj');
-      expect(current?.overall).toBe(70);
-      expect(current?.dimensions).toEqual([]);
     } finally {
       conn.close();
       try { unlinkSync(dbPath); } catch {}

@@ -15,10 +15,7 @@ const LAYER_RULES: { name: string; patterns: RegExp[]; index: number }[] = [
   { name: 'presentation', patterns: [/\/presentation\//, /\/web\//, /\/api\//, /\/controllers?\//, /\/pages?\//], index: 3 },
 ];
 
-const EXCLUDED_DIRS = new Set([
-  'node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage', 'dist-electron',
-  'SOP标准资源', '00-项目文档', '__tests__', '__mocks__', '.zhshield',
-]);
+const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage']);
 
 const TS_FILE_EXT = /\.(ts|tsx)$/;
 const IMPORT_FROM = /import\s+.*\s+from\s+['"](\.\.?\/[^'"]+)['"]/;
@@ -136,7 +133,9 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     if (!importPath.startsWith('..') && !importPath.startsWith('./')) return null;
 
     const toLayer = this.resolveTargetLayer(file, importPath);
-    if (!toLayer || toLayer.index <= fromLayer.index) return null;
+    if (!toLayer) return null;
+
+    if (toLayer.index <= fromLayer.index) return null;
 
     return {
       file: path.relative(targetDir, file),

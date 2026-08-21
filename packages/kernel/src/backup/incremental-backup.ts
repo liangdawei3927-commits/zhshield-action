@@ -38,27 +38,6 @@ export interface BackupOptions {
   excludePatterns?: RegExp[];
 }
 
-interface PreparedRun {
-  manifest: BackupManifest | null;
-  files: string[];
-  timestamp: string;
-  backupDir: string;
-  isFullBackup: boolean;
-}
-
-interface CopyResult {
-  filesBackedUp: number;
-  filesSkipped: number;
-  errors: number;
-  totalSize: number;
-  fileEntries: BackupFileEntry[];
-}
-
-type CopyOutcome =
-  | { kind: 'skipped'; entry: BackupFileEntry }
-  | { kind: 'copied'; entry: BackupFileEntry; size: number }
-  | { kind: 'error' };
-
 const DEFAULT_INCLUDE: RegExp[] = [
   /\.json$/,
   /\.jsonl$/,
@@ -71,6 +50,7 @@ const DEFAULT_INCLUDE: RegExp[] = [
 const DEFAULT_EXCLUDE: RegExp[] = [
   /backups?\//,
   /node_modules\//,
+  /\.git\//,
 ];
 
 const MANIFEST_VERSION = '1.0';
@@ -91,14 +71,6 @@ export class BackupManager {
   }
 
   async run(): Promise<BackupResult> {
-    const prepared = await this.prepareRun();
-    const copyResult = await this.copyChangedFiles(prepared);
-    await this.finalizeBackup(prepared, copyResult.fileEntries);
-
-    return this.buildResult(prepared, copyResult);
-  }
-
-  private async prepareRun(): Promise<PreparedRun> {
     await fs.mkdir(this.backupRoot, { recursive: true });
 
     const manifest = await this.loadManifest();
@@ -106,95 +78,59 @@ export class BackupManager {
     const timestamp = new Date().toISOString();
     const backupDir = path.join(this.backupRoot, timestamp.replace(/[:.]/g, '-'));
 
-    return {
-      manifest,
-      files,
-      timestamp,
-      backupDir,
-      isFullBackup: !manifest || manifest.files.length === 0,
-    };
-  }
-
-  private async copyChangedFiles(prepared: PreparedRun): Promise<CopyResult> {
-    const { files, manifest, backupDir, timestamp, isFullBackup } = prepared;
     let filesBackedUp = 0;
     let filesSkipped = 0;
     let errors = 0;
     let totalSize = 0;
+
+    const isFullBackup = !manifest || manifest.files.length === 0;
     const fileEntries: BackupFileEntry[] = [];
 
     for (const filePath of files) {
-      const outcome = await this.copyOneFile(filePath, { manifest, backupDir, timestamp, isFullBackup });
-      if (outcome.kind === 'skipped') {
-        fileEntries.push(outcome.entry);
+      const relativePath = path.relative(this.sourceDir, filePath);
+      const stat = await fs.stat(filePath);
+      const hash = await hashFile(filePath);
+
+      const existing = manifest?.files.find((f) => f.relativePath === relativePath);
+
+      if (!isFullBackup && existing && existing.hash === hash) {
+        fileEntries.push(existing);
         filesSkipped++;
-      } else if (outcome.kind === 'copied') {
-        fileEntries.push(outcome.entry);
-        totalSize += outcome.size;
-        filesBackedUp++;
-      } else {
-        errors++;
+        continue;
       }
-    }
 
-    return { filesBackedUp, filesSkipped, errors, totalSize, fileEntries };
-  }
+      const targetPath = path.join(backupDir, relativePath);
+      try {
+        await fs.mkdir(path.dirname(targetPath), { recursive: true });
+        await fs.cp(filePath, targetPath, { preserveTimestamps: true });
+        totalSize += stat.size;
+        filesBackedUp++;
+      } catch {
+        errors++;
+        continue;
+      }
 
-  private async copyOneFile(
-    filePath: string,
-    params: { manifest: BackupManifest | null; backupDir: string; timestamp: string; isFullBackup: boolean },
-  ): Promise<CopyOutcome> {
-    const relativePath = path.relative(this.sourceDir, filePath);
-    const hash = await hashFile(filePath);
-    const existing = params.manifest?.files.find(
-      (f) => f.relativePath === relativePath,
-    );
-
-    if (!params.isFullBackup && existing && existing.hash === hash) {
-      return { kind: 'skipped', entry: existing };
-    }
-
-    return this.copyFileToBackup(filePath, hash, params.backupDir, params.timestamp);
-  }
-
-  private async copyFileToBackup(
-    filePath: string,
-    hash: string,
-    backupDir: string,
-    timestamp: string,
-  ): Promise<{ kind: 'copied'; entry: BackupFileEntry; size: number } | { kind: 'error' }> {
-    const relativePath = path.relative(this.sourceDir, filePath);
-    const stat = await fs.stat(filePath);
-    const targetPath = path.join(backupDir, relativePath);
-    try {
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.cp(filePath, targetPath, { preserveTimestamps: true });
-      return {
-        kind: 'copied',
+      fileEntries.push({
+        relativePath,
+        hash,
         size: stat.size,
-        entry: { relativePath, hash, size: stat.size, backedUpAt: timestamp },
-      };
-    } catch {
-      return { kind: 'error' };
+        backedUpAt: timestamp,
+      });
     }
-  }
 
-  private async finalizeBackup(prepared: PreparedRun, fileEntries: BackupFileEntry[]): Promise<void> {
-    await this.writeManifest(prepared.backupDir, prepared.timestamp, prepared.isFullBackup, fileEntries);
-    await this.updateManifestFile(fileEntries, prepared.timestamp, prepared.isFullBackup);
+    await this.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);
+    await this.updateManifestFile(fileEntries, timestamp, isFullBackup);
     await this.pruneOldBackups();
-  }
 
-  private buildResult(prepared: PreparedRun, copyResult: CopyResult): BackupResult {
     return {
-      fullBackup: prepared.isFullBackup,
-      filesBackedUp: copyResult.filesBackedUp,
-      filesSkipped: copyResult.filesSkipped,
-      errors: copyResult.errors,
-      totalSize: copyResult.totalSize,
-      backupDir: prepared.backupDir,
-      manifestPath: path.join(prepared.backupDir, 'BACKUP_MANIFEST.json'),
-      timestamp: prepared.timestamp,
+      fullBackup: isFullBackup,
+      filesBackedUp,
+      filesSkipped,
+      errors,
+      totalSize,
+      backupDir,
+      manifestPath: path.join(backupDir, 'BACKUP_MANIFEST.json'),
+      timestamp,
     };
   }
 

@@ -52,31 +52,6 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     expect(report.evaluations[0].status).toBe('failed');
   });
 
-  it('check-list: GuardEngine 无匹配检查项时降级为 skipped 而非 error', async () => {
-    // 模拟真实 CLI 门禁路径：规则 id 与 GuardEngine checks.json 中的 checkId 不对应，
-    // GuardEngine.run 抛出 'no checks matched the current filters'。
-    const mockGuard = {
-      run: async () => {
-        throw new Error('no checks matched the current filters');
-      },
-    };
-
-    const engineWithGuard = new SopRuleEngine(registry, { guardEngine: mockGuard });
-    registry.register(makeRule({
-      id: 'guard.block.official.typescript-error',
-      domain: 'guard',
-      content: {
-        checks: [{ strict: true }],
-      },
-    }));
-
-    const report = await engineWithGuard.evaluateRules({ repoRoot: '/tmp' });
-    const evalResult = report.evaluations[0];
-    expect(evalResult.status).toBe('skipped');
-    expect(evalResult.message).toContain('未配置匹配的检查项');
-    expect(report.errors ?? 0).toBe(0);
-  });
-
   it('scanner-dispatch: 派发到 InspectEngine', async () => {
     let inspectCalled = false;
     const mockInspect = {

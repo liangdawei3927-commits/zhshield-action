@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { SentinelService } from '../sentinel/sentinel.service';
 
 describe('SentinelService', () => {
@@ -118,31 +115,6 @@ describe('SentinelService', () => {
       const second = service.processWebhook('token', payload);
       expect(first.accepted).toBe(true);
       expect(first.eventId).toBe(second.eventId);
-    });
-  });
-
-  describe('startFileMonitor', () => {
-    it('默认排除依赖/测试产物目录，不产生噪音事件', async () => {
-      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-server-sentinel-'));
-      try {
-        await service.startFileMonitor('proj-1', [root]);
-        fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
-        fs.mkdirSync(path.join(root, 'test-results'), { recursive: true });
-        fs.writeFileSync(path.join(root, 'node_modules', 'dep.js'), 'x');
-        fs.writeFileSync(path.join(root, 'test-results', '.last-run.json'), '{}');
-        const realFile = path.join(root, 'src', 'app.ts');
-        fs.mkdirSync(path.dirname(realFile), { recursive: true });
-        fs.writeFileSync(realFile, 'console.log(1)');
-
-        await new Promise((r) => setTimeout(r, 300));
-
-        const events = service.listEvents();
-        expect(events.some((e) => e.context?.filePath?.toString().includes('node_modules'))).toBe(false);
-        expect(events.some((e) => e.context?.filePath?.toString().includes('test-results'))).toBe(false);
-        expect(events.some((e) => e.context?.filePath === realFile)).toBe(true);
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
     });
   });
 

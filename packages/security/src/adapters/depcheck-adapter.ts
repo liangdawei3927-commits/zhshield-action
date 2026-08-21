@@ -34,58 +34,48 @@ export class DepcheckAdapter implements ToolAdapter {
     const start = Date.now();
 
     try {
-      const output = await this.runDepcheck(options);
+      const { stdout } = await execFileAsync('depcheck', [
+        options.projectPath,
+        '--json',
+      ], {
+        cwd: options.projectPath,
+        timeout: options.timeout || 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const output = JSON.parse(stdout);
       const issues = this.mapOutput(output);
-      return this.buildSuccessResult(start, issues);
-    } catch (error) {
-      return this.buildErrorResult(start, error as ExecError);
-    }
-  }
 
-  /** 执行 depcheck 并解析 JSON 输出 */
-  private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
-    const { stdout } = await execFileAsync('depcheck', [
-      options.projectPath,
-      '--json',
-    ], {
-      cwd: options.projectPath,
-      timeout: options.timeout || 30000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return JSON.parse(stdout) as DepcheckOutput;
-  }
-
-  private buildSuccessResult(start: number, issues: Issue[]): ToolResult {
-    return {
-      tool: 'depcheck',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: 0,
-      },
-    };
-  }
-
-  private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
       return {
         tool: 'depcheck',
-        status: 'unavailable',
+        status: 'available',
+        issues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
+      };
+    } catch (error) {
+      const err = error as ExecError;
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'depcheck',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'depcheck 未安装',
+        };
+      }
+      return {
+        tool: 'depcheck',
+        status: 'error',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: 'depcheck 未安装',
+        error: err.stderr || err.message || 'depcheck 执行失败',
       };
     }
-    return {
-      tool: 'depcheck',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'depcheck 执行失败',
-    };
   }
 
   private mapOutput(output: DepcheckOutput): Issue[] {

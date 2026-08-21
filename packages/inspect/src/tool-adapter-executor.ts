@@ -53,73 +53,18 @@ export class ToolAdapterExecutor {
   private async runAdapter(adapter: ToolAdapter, projectId: string): Promise<AdapterResult> {
     const toolStart = Date.now();
     try {
-      return await this.completeAdapterScan(adapter, projectId);
-    } catch (error: unknown) {
-      this.degradationManager.escalate((error instanceof Error ? error.message : String(error)) || 'Unknown error', adapter.meta.id);
-      return this.makeErrorResult(adapter, error, toolStart);
-    }
-  }
+      const result = await adapter.scan({
+        projectPath: process.cwd(),
+        projectId,
+        timeout: 60000,
+      });
+      const duration = Date.now() - toolStart;
 
-  private async completeAdapterScan(adapter: ToolAdapter, projectId: string): Promise<AdapterResult> {
-    const { result, duration } = await this.runToolScan(adapter, projectId);
+      // 副作用（审计日志 / 事件发射）失败不应污染扫描结果：
+      // 单独捕获，避免被外层 catch 误判为 adapter 执行失败而重复 push error issue
+      await this.runSideEffects(adapter, result, duration, projectId);
 
-    await this.applyScanOutcomes(adapter, result, duration, projectId);
-
-    return this.buildAdapterResult(adapter, result, duration);
-  }
-
-  private async applyScanOutcomes(
-    adapter: ToolAdapter,
-    result: Awaited<ReturnType<ToolAdapter['scan']>>,
-    duration: number,
-    projectId: string,
-  ): Promise<void> {
-    // 副作用（审计日志 / 事件发射）失败不应污染扫描结果：
-    // 单独捕获，避免被外层 catch 误判为 adapter 执行失败而重复 push error issue
-    await this.runSideEffects(adapter, result, duration, projectId);
-
-    // ADR #7：unavailable 是覆盖率缺口而非工具故障，不再 escalate 进降级链路；
-    // 改由 buildAdapterResult 的 degraded 标记表达（C4 分域 fail 语义）
-    if (result.status === 'error') {
-      this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
-    }
-  }
-
-  private async runToolScan(
-    adapter: ToolAdapter,
-    projectId: string,
-  ): Promise<{ result: Awaited<ReturnType<ToolAdapter['scan']>>; duration: number }> {
-    const toolStart = Date.now();
-    const result = await adapter.scan({
-      projectPath: process.cwd(),
-      projectId,
-      timeout: 60000,
-    });
-    return { result, duration: Date.now() - toolStart };
-  }
-
-  private buildAdapterResult(
-    adapter: ToolAdapter,
-    result: Awaited<ReturnType<ToolAdapter['scan']>>,
-    duration: number,
-  ): AdapterResult {
-    const status = result.status;
-    // ADR #7：skipped（语言不适用/降级跳过）不计失败；
-    //         unavailable（适用但工具缺失）是覆盖率缺口 → degraded 标记
-    // C4 分域：安全类 fail-closed（unavailable 仍失败），其余 fail-open（通过但 degraded）
-    const failClosed = adapter.meta.category === 'security';
-    const passed = status === 'available'
-      || status === 'skipped'
-      || (status === 'unavailable' && !failClosed);
-
-    return {
-      adapterId: adapter.meta.id,
-      adapterName: adapter.meta.name,
-      duration,
-      issueCount: result.issues.length,
-      passed,
-      degraded: status === 'unavailable',
-      issues: result.issues.map((i) => ({
+      const issues = result.issues.map((i) => ({
         id: i.id,
         ruleId: i.ruleId,
         severity: i.severity,
@@ -132,8 +77,49 @@ export class ToolAdapterExecutor {
         autoFixable: i.autoFixable,
         source: i.source,
         fingerprint: i.fingerprint,
-      })),
-    };
+      }));
+
+      // ADR #7 + C4 分域：skipped / unavailable / error 语义分离
+      if (result.status === 'error') {
+        this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
+        return {
+          adapterId: adapter.meta.id,
+          adapterName: adapter.meta.name,
+          duration,
+          issueCount: result.issues.length,
+          passed: false,
+          degraded: false,
+          issues,
+        };
+      }
+
+      if (result.status === 'unavailable') {
+        // 覆盖率缺口而非故障：不 escalate；质量域 fail-open，安全域 fail-closed
+        const failClosed = adapter.meta.category === 'security';
+        return {
+          adapterId: adapter.meta.id,
+          adapterName: adapter.meta.name,
+          duration,
+          issueCount: result.issues.length,
+          passed: !failClosed,
+          degraded: true,
+          issues,
+        };
+      }
+
+      return {
+        adapterId: adapter.meta.id,
+        adapterName: adapter.meta.name,
+        duration,
+        issueCount: result.issues.length,
+        passed: true,
+        degraded: false,
+        issues,
+      };
+    } catch (error: unknown) {
+      this.degradationManager.escalate((error instanceof Error ? error.message : String(error)) || 'Unknown error', adapter.meta.id);
+      return this.makeErrorResult(adapter, error, toolStart);
+    }
   }
 
   private async runSideEffects(

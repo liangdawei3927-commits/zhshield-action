@@ -45,7 +45,7 @@ export class SopPipelineRunner {
       dryRun: context?.dryRun ?? false,
       domain: 'guard',
       ...context,
-    }, locale);
+    });
     this.logger.info(
       translate('engine.pipeline.log.sopGuardDone', locale ?? DEFAULT_LANGUAGE, {
         passed: report.passed,
@@ -61,7 +61,7 @@ export class SopPipelineRunner {
     const report = await this.sopRuleEngine.runInspect({
       repoRoot: this.repoRoot,
       ...context,
-    }, locale);
+    });
     this.logger.info(
       translate('engine.pipeline.log.sopInspectDone', locale ?? DEFAULT_LANGUAGE, {
         passed: report.passed,

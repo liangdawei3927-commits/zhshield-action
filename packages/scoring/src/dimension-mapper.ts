@@ -1,0 +1,61 @@
+import type { DimensionDefinition, ScoringConfig } from './types';
+import { getDefaultScoringConfig } from './scoring-config';
+
+/**
+ * 维度映射器
+ * 统一配置，消除与 pipeline-score.ts 的重复
+ */
+export class DimensionMapper {
+  private config: ScoringConfig;
+
+  constructor(config?: ScoringConfig) {
+    this.config = config ?? getDefaultScoringConfig();
+  }
+
+  getDimensions(): DimensionDefinition[] {
+    return this.config.dimensions;
+  }
+
+  getWeightMap(): Record<string, number> {
+    const map: Record<string, number> = {};
+    for (const dim of this.config.dimensions) {
+      map[dim.id] = dim.weight;
+    }
+    return map;
+  }
+
+  getNameMap(): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (const dim of this.config.dimensions) {
+      map[dim.id] = dim.name;
+    }
+    return map;
+  }
+
+  groupByDimension<T extends { category?: string }>(
+    items: T[],
+  ): Record<string, T[]> {
+    const grouped: Record<string, T[]> = {};
+    for (const dim of this.config.dimensions) {
+      grouped[dim.id] = [];
+    }
+
+    for (const item of items) {
+      const dim = item.category ?? 'unknown';
+      if (!grouped[dim]) grouped[dim] = [];
+      grouped[dim].push(item);
+    }
+
+    return grouped;
+  }
+
+  validateWeights(): { valid: boolean; sum: number; message?: string } {
+    const sum = this.config.dimensions.reduce((s, d) => s + d.weight, 0);
+    const valid = Math.abs(sum - 1) < 0.001;
+    return {
+      valid,
+      sum: Math.round(sum * 1000) / 1000,
+      message: valid ? undefined : `Dimension weights must sum to 1, got ${sum}`,
+    };
+  }
+}

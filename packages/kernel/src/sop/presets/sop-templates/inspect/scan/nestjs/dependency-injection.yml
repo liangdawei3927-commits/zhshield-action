@@ -1,0 +1,143 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · NestJS 依赖注入合规巡检
+# =============================================================================
+# 规则 ID: inspect.scan.ironnest.dependency-injection
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect NestJS · DI
+# 内部标准源: IronNest#04 (Repository) + IronNest#12 (Library Wrapping) + NestJS 最佳实践
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.ironnest.dependency-injection"
+  name: "NestJS 依赖注入合规巡检"
+  description: "检查 NestJS 模块的依赖注入合规性：Provider 作用域是否正确、循环依赖检测、外部库是否通过 Adapter 注入、禁止将 Vendor 类型直接注入业务层"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/04 · rules/12 · NestJS documentation"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "nestjs"
+
+execution:
+  mode: "async"
+  timeout: 60
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.ts"
+    - "**/*.spec.ts"
+    - "**/*.d.ts"
+
+check:
+  tool: "custom-ast-scanner"       # 智汇码盾 AST 分析引擎
+  toolConfig:
+    rules:
+      - ruleId: "provider-scope"
+        description: "Service/Repository/Adapter 应为 singleton（默认），避免意外的 REQUEST/SCOPED 导致状态污染"
+        severity: "warning"
+        check: "missing-@Injectable()-decorator"
+        patterns:
+          - "class.*Service"
+          - "class.*Repository"
+          - "class.*Adapter"
+        exceptions:
+          - "class.*ConfigService"         # 配置可能不同 scope
+          - "class.*CacheService"
+        fixCommand: "add @Injectable() decorator"
+
+      - ruleId: "circular-di"
+        description: "模块间循环依赖（Module A imports Module B，Module B imports Module A）"
+        severity: "error"
+        check: "circular-module-ref"
+        detectionStrategy: "import-graph-analyze"
+        maxDepth: 3
+
+      - ruleId: "adapter-vendor-separation"
+        description: "外部库必须通过 Adapter 注入业务层，禁止在 service/use-case 中直接注入 vendor SDK"
+        severity: "error"
+        check: "direct-vendor-injection"
+        vendorPatterns:
+          - "TypeORM.*Repository"
+          - "PrismaClient"
+          - "Client.*Redis"
+          - "amqplib.*Channel"
+          - "Stripe"
+          - "AWS.*Client"
+          - "OpenAI"
+          - "Anthropic"
+        allowedPatterns:
+          - "*.adapter.ts"                # Adapter 文件可以注入 vendor
+          - "app.module.ts"
+
+      - ruleId: "http-service-import"
+        description: "禁止在控制器/Service 中直接使用 HttpService/Axios，必须通过 Adapter"
+        severity: "warning"
+        check: "direct-http-client"
+        forbiddenProviders:
+          - "HttpService"
+          - "AxiosInstance"
+
+  severity: "warning"
+  categories:
+    - "dependency-injection"
+    - "nestjs"
+    - "provider-scope"
+    - "adapter-pattern"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-QS-03"    # Code Quality Standards
+    - "OSPS-SH-01"    # Secure Configuration
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    发现 NestJS 依赖注入违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 违规类型: {ruleId}
+    ⚠️ 详情: {detail}
+
+    修复建议：
+    1. Provider scope → 确认 `@Injectable()` 装饰器存在，无特殊需求使用默认 singleton
+    2. 循环依赖 → 使用 `forwardRef(() => Module)` 或重构模块边界消除循环
+    3. 外部库直注 → 创建 Adapter（如 `payment.adapter.ts`），接口定义在 `domain/`，实现在 `adapters/`
+    4. HTTP 客户端 → 通过 `HttpAdapter` 封装，业务层只依赖接口
+
+    📖 参考: IronNest #04 仓库模式 · #12 库封装与适配器

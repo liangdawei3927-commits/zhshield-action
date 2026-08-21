@@ -1,13 +1,10 @@
 import { EventBus } from '../bus';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
-import type { KernelEventMap } from '@zh/shared';
 import {
   type BackupResult,
   type BackupSubResult,
   type BackupTrigger,
   type BackupRecord,
   type BackupStatus,
-  type BackupConfig,
   type GitHubBackupSubResult,
   type LocalBackupSubResult,
   BACKUP_EVENTS,
@@ -45,88 +42,60 @@ export class BackupOrchestrator {
     this.localBackup = options?.localBackup ?? new LocalBackup();
   }
 
-  async execute(options: ExecuteOptions, locale?: LanguageCode): Promise<BackupResult> {
+  async execute(options: ExecuteOptions): Promise<BackupResult> {
     const { projectId, projectPath, trigger = 'manual', abortSignal } = options;
+    let { projectName } = options;
     const startTime = Date.now();
     const backupId = this.generateBackupId();
-    const projectName = options.projectName ?? projectId;
 
     this.emit(BACKUP_EVENTS.STARTED, { projectId, backupId, type: 'full' });
 
     const config = await this.configManager.loadProjectConfig(projectPath);
-    const results = await this.runBackupTargets({ projectId, projectPath, config, backupId, abortSignal }, locale);
+    if (!projectName) {
+      projectName = projectId;
+    }
 
-    const result = this.buildBackupResult({ projectId, projectName, trigger, results, startTime });
-    this.saveRecord(result, projectPath);
-    this.notifyCompletion(projectId, backupId, result, locale);
-
-    return result;
-  }
-
-  private async runBackupTargets(params: {
-    projectId: string;
-    projectPath: string;
-    config: BackupConfig;
-    backupId: string;
-    abortSignal?: AbortSignal;
-  }, locale?: LanguageCode): Promise<BackupSubResult[]> {
-    const { projectId, projectPath, config, backupId, abortSignal } = params;
     const results: BackupSubResult[] = [];
 
     if (config.github.enabled && !abortSignal?.aborted) {
-      this.emitProgress({
-        projectId, backupId, phase: 'github-commit', percent: 40,
-        message: translate('engine.kernel.backup.progressGitHubCommit', locale ?? DEFAULT_LANGUAGE),
-      });
-      const githubResult = await this.githubBackup.backup(projectPath, config.github, abortSignal, locale);
+      this.emitProgress({ projectId, backupId, phase: 'github-commit', percent: 40, message: '正在提交到 GitHub...' });
+      const githubResult = await this.githubBackup.backup(projectPath, config.github, abortSignal);
       results.push(githubResult);
     }
 
     if (config.local.enabled && !abortSignal?.aborted) {
-      this.emitProgress({
-        projectId, backupId, phase: 'local-copy', percent: 70,
-        message: translate('engine.kernel.backup.progressLocalCopy', locale ?? DEFAULT_LANGUAGE),
-      });
-      const localResult = await this.localBackup.backup({ projectPath, config: config.local, abortSignal }, locale);
+      this.emitProgress({ projectId, backupId, phase: 'local-copy', percent: 70, message: '正在复制到本地目录...' });
+      const localResult = await this.localBackup.backup(projectPath, config.local, abortSignal);
       results.push(localResult);
     }
 
-    return results;
-  }
-
-  private buildBackupResult(params: {
-    projectId: string;
-    projectName: string;
-    trigger: BackupTrigger;
-    results: BackupSubResult[];
-    startTime: number;
-  }): BackupResult {
-    const { projectId, projectName, trigger, results, startTime } = params;
     const overallStatus = this.calculateOverallStatus(results);
     const duration = Date.now() - startTime;
 
-    return {
+    const result: BackupResult = {
       projectId,
-      projectName,
-      trigger,
+      projectName: projectName ?? projectId,
+      trigger: trigger,
       results,
       overallStatus,
       timestamp: new Date(),
       duration,
     };
-  }
 
-  private notifyCompletion(projectId: string, backupId: string, result: BackupResult, locale?: LanguageCode): void {
-    if (result.overallStatus === 'failed') {
+    this.saveRecord(result, projectPath);
+
+    if (overallStatus === 'failed') {
       this.emit(BACKUP_EVENTS.FAILED, {
         projectId, backupId,
-        error: translate('engine.kernel.backup.allFailed', locale ?? DEFAULT_LANGUAGE),
+        error: '所有备份方式均失败',
         partialResult: result,
       });
     } else {
-      this.emitProgress({ projectId, backupId, phase: 'local-metadata', percent: 100, message: translate('engine.kernel.backup.done', locale ?? DEFAULT_LANGUAGE) });
+      this.emitProgress({ projectId, backupId, phase: 'local-metadata', percent: 100, message: '备份完成' });
       this.emit(BACKUP_EVENTS.COMPLETED, { projectId, backupId, result });
     }
+
+    return result;
   }
 
   async executeGitHubOnly(projectId: string, projectPath: string): Promise<BackupSubResult> {
@@ -136,7 +105,7 @@ export class BackupOrchestrator {
 
   async executeLocalOnly(projectId: string, projectPath: string): Promise<BackupSubResult> {
     const config = await this.configManager.loadProjectConfig(projectPath);
-    return this.localBackup.backup({ projectPath, config: config.local });
+    return this.localBackup.backup(projectPath, config.local);
   }
 
   getRecords(projectId?: string): BackupRecord[] {
@@ -216,7 +185,7 @@ export class BackupOrchestrator {
     this.emit(BACKUP_EVENTS.PROGRESS, info);
   }
 
-  private emit(event: keyof KernelEventMap & string, payload: KernelEventMap[typeof event]): void {
+  private emit(event: string, payload: unknown): void {
     this.eventBus?.emit(event, payload).catch(() => {});
   }
 

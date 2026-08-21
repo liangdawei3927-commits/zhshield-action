@@ -20,21 +20,21 @@
     "@zh/evolve": "workspace:*",
     "@zh/fingerprint": "workspace:*",
     "@zh/guard": "workspace:*",
+    "@zh/i18n": "workspace:*",
     "@zh/inspect": "workspace:*",
     "@zh/kernel": "workspace:*",
     "@zh/pipeline": "workspace:*",
-    "@zh/performance": "workspace:*",
     "@zh/refactor": "workspace:*",
-    "@zh/reporter": "workspace:*",
     "@zh/scoring": "workspace:*",
     "@zh/security": "workspace:*",
     "@zh/sentinel": "workspace:*",
     "@zh/shared": "workspace:*",
+    "electron-updater": "^6.3.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^4.4.3",
-    "@zh/i18n": "workspace:*",
-    "electron-updater": "^6.3.9"
+    "@zh/reporter": "workspace:*",
+    "@zh/performance": "workspace:*"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
@@ -44,7 +44,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.20",
     "electron": "^42.8.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^25.1.8",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.0",
@@ -81,11 +81,6 @@
     },
     "asarUnpack": [
       "dist-electron/zhshield-mcp.js"
-    ],
-    "publish": {
-      "provider": "github",
-      "owner": "zhiyan-codeshield",
-      "repo": "zhiyan-codeshield"
-    }
+    ]
   }
 }

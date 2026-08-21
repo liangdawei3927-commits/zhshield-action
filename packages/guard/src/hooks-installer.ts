@@ -19,7 +19,7 @@ if [ -z "$ZHSHIELD_BIN" ]; then
 fi
 
 if [ -n "$ZHSHIELD_BIN" ]; then
-  zhshield guard --hook=pre-commit --staged
+  zhshield guard --hook=pre-commit
   EXIT_CODE=$?
   if [ $EXIT_CODE -ne 0 ]; then
     echo "❌ 智汇码盾门禁检查未通过，请修复后重新提交"

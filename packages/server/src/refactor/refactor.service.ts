@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
-import type { LanguageCode } from '@zh/i18n';
 
 @Injectable()
 export class RefactorService {
@@ -12,13 +11,13 @@ export class RefactorService {
     this.engine = new RefactorEngine();
   }
 
-  async scanDirectory(projectPath: string, locale?: LanguageCode): Promise<RefactorReport> {
+  async scanDirectory(projectPath: string): Promise<RefactorReport> {
     this.logger.log(`Running refactor scan on: ${projectPath}`);
-    return this.engine.analyzeDirectory(projectPath, locale);
+    return this.engine.analyzeDirectory(projectPath);
   }
 
-  async scanStaged(projectPath: string, locale?: LanguageCode): Promise<RefactorReport> {
+  async scanStaged(projectPath: string): Promise<RefactorReport> {
     this.logger.log(`Running staged refactor scan on: ${projectPath}`);
-    return this.engine.analyzeStagedFiles(projectPath, locale);
+    return this.engine.analyzeStagedFiles(projectPath);
   }
 }

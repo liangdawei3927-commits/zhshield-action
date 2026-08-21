@@ -16,8 +16,7 @@
     "@zh/guard": "workspace:*",
     "@zh/inspect": "workspace:*",
     "@zh/pipeline": "workspace:*",
-    "@zh/refactor": "workspace:*",
-    "@zh/i18n": "workspace:*"
+    "@zh/refactor": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

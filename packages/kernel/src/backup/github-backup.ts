@@ -5,7 +5,6 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import { type GitHubBackupConfig, type GitHubBackupSubResult } from './types';
 import { matchesExcludePattern } from './utils';
 
@@ -51,87 +50,58 @@ export class GitHubBackup {
     projectPath: string,
     config: GitHubBackupConfig,
     abortSignal?: AbortSignal,
-    locale?: LanguageCode,
   ): Promise<GitHubBackupSubResult> {
     try {
-      return await this.completeBackup(projectPath, config, abortSignal, locale);
+      // 1. 检查认证
+      const token = await this.tokenStore.getToken();
+      if (!token) {
+        throw new Error('GitHub 未授权，请先在设置中授权 GitHub 账户');
+      }
+
+      // 2. 检查/创建仓库
+      const repoExists = await this.checkRepoExists(config.owner, config.repo, token, abortSignal);
+      if (!repoExists) {
+        await this.createRepo(config.owner, config.repo, token, abortSignal);
+      }
+
+      const ctx: GitHubApiContext = { owner: config.owner, repo: config.repo, token, abortSignal };
+
+      // 3. 获取默认分支最新 commit
+      let parentSha: string | undefined;
+      try {
+        const ref = await this.getRef(ctx, config.branch);
+        parentSha = ref.object.sha;
+      } catch {
+        // 空仓库或分支不存在，无 parent
+      }
+
+      // 4. 创建 Git Tree（包含所有文件变更）
+      const tree = await this.createTree(ctx, projectPath, config.excludePatterns);
+
+      // 5. 创建提交
+      const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+      const commitMessage = `${config.commitPrefix} 自动备份 - ${timestamp}`;
+      const commit = await this.createCommit(ctx, commitMessage, tree.sha, parentSha ? [parentSha] : []);
+
+      // 6. 更新分支引用
+      await this.updateRef(ctx, config.branch, commit.sha);
+
+      return {
+        type: 'github',
+        success: true,
+        commitHash: commit.sha,
+        commitMessage,
+        repoUrl: `https://github.com/${config.owner}/${config.repo}`,
+        branch: config.branch,
+      };
     } catch (err) {
-      return this.buildBackupError(err, locale);
+      const message = err instanceof Error ? err.message : '未知 GitHub 备份错误';
+      return {
+        type: 'github',
+        success: false,
+        error: message,
+      };
     }
-  }
-
-  private async completeBackup(
-    projectPath: string,
-    config: GitHubBackupConfig,
-    abortSignal?: AbortSignal,
-    locale?: LanguageCode,
-  ): Promise<GitHubBackupSubResult> {
-    const token = await this.authenticate(locale);
-    const ctx: GitHubApiContext = { owner: config.owner, repo: config.repo, token, abortSignal };
-    await this.ensureRepoExists(ctx, locale);
-
-    const parentSha = await this.getParentSha(ctx, config.branch);
-
-    const tree = await this.createTree(ctx, projectPath, config.excludePatterns);
-    const commitMessage = this.buildCommitMessage(config.commitPrefix, locale);
-    const commit = await this.createCommit(ctx, commitMessage, tree.sha, parentSha ? [parentSha] : []);
-    await this.updateRef(ctx, config.branch, commit.sha);
-
-    return this.buildSuccessResult(config, commit, commitMessage);
-  }
-
-  private async authenticate(locale?: LanguageCode): Promise<string> {
-    const token = await this.tokenStore.getToken();
-    if (!token) {
-      throw new Error(translate('engine.kernel.backup.githubNotAuthorized', locale ?? DEFAULT_LANGUAGE));
-    }
-    return token;
-  }
-
-  private async ensureRepoExists(ctx: GitHubApiContext, locale?: LanguageCode): Promise<void> {
-    const repoExists = await this.checkRepoExists(ctx);
-    if (!repoExists) {
-      await this.createRepo(ctx, locale);
-    }
-  }
-
-  private async getParentSha(ctx: GitHubApiContext, branch: string): Promise<string | undefined> {
-    try {
-      const ref = await this.getRef(ctx, branch);
-      return ref.object.sha;
-    } catch {
-      // 空仓库或分支不存在，无 parent
-      return undefined;
-    }
-  }
-
-  private buildCommitMessage(prefix: string, locale?: LanguageCode): string {
-    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-    return translate('engine.kernel.backup.commitMessage', locale ?? DEFAULT_LANGUAGE, { prefix, timestamp });
-  }
-
-  private buildSuccessResult(
-    config: GitHubBackupConfig,
-    commit: GitHubCommit,
-    commitMessage: string,
-  ): GitHubBackupSubResult {
-    return {
-      type: 'github',
-      success: true,
-      commitHash: commit.sha,
-      commitMessage,
-      repoUrl: `https://github.com/${config.owner}/${config.repo}`,
-      branch: config.branch,
-    };
-  }
-
-  private buildBackupError(err: unknown, locale?: LanguageCode): GitHubBackupSubResult {
-    const message = err instanceof Error ? err.message : translate('engine.kernel.backup.unknownGitHubError', locale ?? DEFAULT_LANGUAGE);
-    return {
-      type: 'github',
-      success: false,
-      error: message,
-    };
   }
 
   /**
@@ -196,29 +166,29 @@ export class GitHubBackup {
     return response.json() as Promise<T>;
   }
 
-  private async checkRepoExists(ctx: GitHubApiContext): Promise<boolean> {
+  private async checkRepoExists(owner: string, repo: string, token: string, abortSignal?: AbortSignal): Promise<boolean> {
     try {
-      await this.githubFetch(`https://api.github.com/repos/${ctx.owner}/${ctx.repo}`, ctx.token, {}, ctx.abortSignal);
+      await this.githubFetch(`https://api.github.com/repos/${owner}/${repo}`, token, {}, abortSignal);
       return true;
     } catch {
       return false;
     }
   }
 
-  private async createRepo(ctx: GitHubApiContext, locale?: LanguageCode): Promise<void> {
+  private async createRepo(owner: string, repo: string, token: string, abortSignal?: AbortSignal): Promise<void> {
     await this.githubFetch(
       'https://api.github.com/user/repos',
-      ctx.token,
+      token,
       {
         method: 'POST',
         body: JSON.stringify({
-          name: ctx.repo,
+          name: repo,
           private: true,
           auto_init: false,
-          description: translate('engine.kernel.backup.repoDescription', locale ?? DEFAULT_LANGUAGE),
+          description: '智汇码盾自动备份仓库',
         }),
       },
-      ctx.abortSignal,
+      abortSignal,
     );
   }
 
@@ -237,7 +207,33 @@ export class GitHubBackup {
     excludePatterns: string[],
   ): Promise<GitHubTree> {
     const tree: GitHubTreeItem[] = [];
-    await this.collectTreeItems({ ctx, dir: projectPath, prefix: '', excludePatterns, tree });
+
+    const walk = async (dir: string, prefix: string = '') => {
+      if (ctx.abortSignal?.aborted) return;
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (ctx.abortSignal?.aborted) return;
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+
+        if (matchesExcludePattern(relativePath, excludePatterns)) continue;
+
+        if (entry.isDirectory()) {
+          await walk(fullPath, relativePath);
+        } else if (entry.isFile()) {
+          const content = await fs.readFile(fullPath, 'base64');
+          tree.push({
+            path: relativePath,
+            mode: '100644',
+            type: 'blob',
+            content,
+          });
+        }
+      }
+    };
+
+    await walk(projectPath);
 
     return this.githubFetch<GitHubTree>(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees`,
@@ -248,38 +244,6 @@ export class GitHubBackup {
       },
       ctx.abortSignal,
     );
-  }
-
-  private async collectTreeItems(params: {
-    ctx: GitHubApiContext;
-    dir: string;
-    prefix: string;
-    excludePatterns: string[];
-    tree: GitHubTreeItem[];
-  }): Promise<void> {
-    const { ctx, dir, prefix, excludePatterns, tree } = params;
-    if (ctx.abortSignal?.aborted) return;
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (ctx.abortSignal?.aborted) return;
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-
-      if (matchesExcludePattern(relativePath, excludePatterns)) continue;
-
-      if (entry.isDirectory()) {
-        await this.collectTreeItems({ ctx, dir: fullPath, prefix: relativePath, excludePatterns, tree });
-      } else if (entry.isFile()) {
-        const content = await fs.readFile(fullPath, 'base64');
-        tree.push({
-          path: relativePath,
-          mode: '100644',
-          type: 'blob',
-          content,
-        });
-      }
-    }
   }
 
   private async createCommit(

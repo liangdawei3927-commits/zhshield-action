@@ -33,19 +33,16 @@ export class ToolsConfigLoader {
   }
 
   loadToolsConfig(): ToolsConfig | null {
-    const parsed = this.loadRawYaml('tools.yml', 'tools.yaml') as RawToolsYaml | null;
-    if (!parsed?.tools) return null;
-
-    return { tools: this.buildToolsConfig(parsed.tools) };
-  }
-
-  private loadRawYaml(...names: string[]): Record<string, unknown> | null {
-    const filePath = this.findConfigFile(...names);
+    const filePath = this.findConfigFile('tools.yml', 'tools.yaml');
     if (!filePath) return null;
 
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      return this.parseSimpleYaml(content);
+      const parsed = this.parseSimpleYaml(content) as RawToolsYaml;
+
+      if (!parsed.tools) return null;
+
+      return { tools: this.buildToolsConfig(parsed.tools) };
     } catch {
       return null;
     }
@@ -67,10 +64,19 @@ export class ToolsConfigLoader {
   }
 
   loadGuardConfig(): GuardConfig | null {
-    const parsed = this.loadRawYaml('guard.yml', 'guard.yaml') as RawGuardYaml | null;
-    if (!parsed?.guard) return null;
+    const filePath = this.findConfigFile('guard.yml', 'guard.yaml');
+    if (!filePath) return null;
 
-    return this.buildGuardConfig(parsed.guard);
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const parsed = this.parseSimpleYaml(content) as RawGuardYaml;
+
+      if (!parsed.guard) return null;
+
+      return this.buildGuardConfig(parsed.guard);
+    } catch {
+      return null;
+    }
   }
 
   /** 从解析后的 guard 段构建门禁配置（带默认值） */
@@ -129,42 +135,20 @@ export class ToolsConfigLoader {
     if (!line.trim() || line.trim().startsWith('#')) return;
 
     const indent = line.search(INDENT_PATTERN);
-    const kv = this.parseKeyValue(line.trim());
-    if (!kv) return;
+    const trimmed = line.trim();
 
-    this.popStack(stack, indent);
-
-    const currentObj = stack.length > 0 ? stack.at(-1)!.obj : result;
-    this.assignYamlValue({ currentObj, key: kv.key, value: kv.value, indent, stack });
-  }
-
-  private parseKeyValue(trimmed: string): { key: string; value: string } | null {
     const colonIdx = trimmed.indexOf(':');
-    if (colonIdx === -1) return null;
-    return {
-      key: trimmed.slice(0, colonIdx).trim(),
-      value: trimmed.slice(colonIdx + 1).trim(),
-    };
-  }
+    if (colonIdx === -1) return;
 
-  private popStack(
-    stack: { indent: number; key: string; obj: Record<string, unknown> }[],
-    indent: number,
-  ): void {
+    const key = trimmed.slice(0, colonIdx).trim();
+    const value = trimmed.slice(colonIdx + 1).trim();
+
     while (stack.length > 0 && stack.at(-1)!.indent >= indent) {
       stack.pop();
     }
-  }
 
-  /** assignYamlValue 参数对象 */
-  private assignYamlValue(params: {
-    currentObj: Record<string, unknown>;
-    key: string;
-    value: string;
-    indent: number;
-    stack: { indent: number; key: string; obj: Record<string, unknown> }[];
-  }): void {
-    const { currentObj, key, value, indent, stack } = params;
+    const currentObj = stack.length > 0 ? stack.at(-1)!.obj : result;
+
     if (value === '' || value === '|' || value === '>') {
       this.pushContainer(stack, currentObj, key, indent);
     } else if (key.startsWith('- ')) {

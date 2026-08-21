@@ -1,60 +1,46 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { sanitizeEnv } from '@zh/shared';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
-import { TestCommandDetector } from './test-command-detector';
 import type { TestResult } from './test-result';
 import { VitestOutputParser } from './vitest-output-parser';
 
 const execFileAsync = promisify(execFile);
 
+const WHITESPACE = /\s+/;
+const VITEST_SUMMARY = /Tests\s+(?:(\d+)\s+passed)?\s*(?:\|\s*)?(?:(\d+)\s+failed)?\s*(?:\((\d+)\))?/;
+
 /**
  * Test runner adapter — runs project tests and reports pass/fail counts.
  *
  * Strategy:
- * 1. Detect test framework from package.json scripts（TestCommandDetector）
+ * 1. Detect test framework from package.json scripts
  * 2. Run the test command
- * 3. Parse output for test result summary（VitestOutputParser）
+ * 3. Parse output for test result summary
  */
 export class TestRunnerAdapter implements Adapter {
-  private readonly commandDetector = new TestCommandDetector();
-  private readonly outputParser = new VitestOutputParser();
+  private outputParser = new VitestOutputParser();
 
   async run(
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
   ): Promise<{ result: TestResult | null; error?: string }> {
     const projectPath = context.repoRoot || context.projectPath || process.cwd();
-    const resolved = this.commandDetector.resolveProjectDir(projectPath);
-    if ('error' in resolved) {
-      return { result: null, error: resolved.error };
-    }
-
-    const detected = this.commandDetector.detectTestCommand(resolved.dir);
+    const detected = this.detectTestCommand(projectPath);
     if ('error' in detected) {
       return { result: null, error: detected.error };
     }
 
     const startTime = Date.now();
     try {
-      const { stdout, stderr } = await this.executeTestRun(detected.testCmd, detected.testArgs, resolved.dir);
+      const { stdout, stderr } = await this.executeTestRun(detected.testCmd, detected.testArgs, projectPath);
 
       const output = stdout + '\n' + stderr;
-      const result = this.outputParser.parseOutput(output, startTime);
-      return { result: this.applyDiskFallback(result, resolved.dir) };
+      return { result: this.withDiskFallback(this.parseOutput(output, startTime), projectPath) };
     } catch (error: unknown) {
-      return this.handleRunFailure(error, startTime, resolved.dir);
+      return this.handleRunFailure(error, startTime, projectPath);
     }
-  }
-
-  /** 输出中解析不到测试计数时，以磁盘真实测试文件数兜底（避免误报「未发现测试用例」） */
-  private applyDiskFallback(result: TestResult, projectPath: string): TestResult {
-    if (result.totalTests > 0) return result;
-    const onDisk = this.outputParser.countTestFilesOnDisk(projectPath);
-    if (onDisk > 0) {
-      return { ...result, totalTests: onDisk, passed: 0, failed: 0, unresolved: true };
-    }
-    return result;
   }
 
   /** 执行测试命令并返回标准输出 */
@@ -68,16 +54,14 @@ export class TestRunnerAdapter implements Adapter {
       testArgs.length > 0 ? testArgs : ['vitest', 'run'],
       {
         cwd: projectPath,
-        // 冷缓存下整套 turbo 测试耗时约 4 分钟，120s 超时会提前杀死测试进程，
-        // 导致 vitest 汇总行尚未输出而被误报「未发现测试用例」
-        timeout: 600000,
+        timeout: 120000,
         maxBuffer: 10 * 1024 * 1024,
-        env: sanitizeEnv(process.env, { CI: 'true' }),
+        env: { ...process.env, CI: 'true' },
       },
     );
   }
 
-  /** 处理测试执行失败：非零退出或有输出时仍解析结果，输出无汇总行时同样应用磁盘兜底 */
+  /** 处理测试执行失败：非零退出但有输出时仍解析结果 */
   private handleRunFailure(
     error: unknown,
     startTime: number,
@@ -87,10 +71,104 @@ export class TestRunnerAdapter implements Adapter {
     // Tests may exit non-zero when tests fail — that's OK, parse the output
     const output = (err.stdout || '') + '\n' + (err.stderr || '');
     if (output) {
-      const result = this.outputParser.parseOutput(output, startTime);
-      return { result: this.applyDiskFallback(result, projectPath) };
+      return { result: this.withDiskFallback(this.parseOutput(output, startTime), projectPath) };
     }
     return { result: null, error: err.message || 'Test execution failed' };
+  }
+
+  /** 输出解析不到测试计数时，以磁盘真实测试文件数兜底并标记 unresolved（测试存在但运行结果未知） */
+  private withDiskFallback(result: TestResult, projectPath: string): TestResult {
+    if (result.totalTests > 0) return result;
+    const testFilesOnDisk = this.outputParser.countTestFilesOnDisk(projectPath);
+    return { ...result, totalTests: testFilesOnDisk, unresolved: true };
+  }
+
+  private detectTestCommand(
+    projectPath: string,
+  ): { testCmd: string; testArgs: string[] } | { error: string } {
+    const pkg = this.loadPackageJson(projectPath);
+    if ('error' in pkg) return pkg as { error: string };
+
+    const testScript = this.findTestScript(pkg);
+    if (!testScript) {
+      return { error: 'No test script found in package.json' };
+    }
+
+    return this.toTestCommand(testScript);
+  }
+
+  /** 读取并解析 package.json */
+  private loadPackageJson(projectPath: string): Record<string, unknown> | { error: string } {
+    const pkgJsonPath = path.join(projectPath, 'package.json');
+    if (!fs.existsSync(pkgJsonPath)) {
+      return { error: 'package.json not found' };
+    }
+
+    try {
+      return JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+    } catch {
+      return { error: 'Invalid package.json' };
+    }
+  }
+
+  /** 从 package.json scripts 中查找测试脚本 */
+  private findTestScript(pkg: Record<string, unknown>): string | undefined {
+    const scripts = pkg.scripts as Record<string, string | undefined> | undefined;
+    return scripts?.test || scripts?.['test:run'] || scripts?.vitest;
+  }
+
+  /** 将测试脚本拆分为命令与参数 */
+  private toTestCommand(testScript: string): { testCmd: string; testArgs: string[] } {
+    const parts = testScript.split(WHITESPACE);
+    const bin = parts[0];
+    const args = parts.slice(1);
+
+    // If using pnpm/turbo, run the raw runner directly
+    return {
+      testCmd: bin === 'vitest' ? 'npx' : bin,
+      testArgs: bin === 'vitest' ? ['vitest', 'run', ...args] : args,
+    };
+  }
+
+  private parseOutput(output: string, startTime: number): TestResult {
+    const lines = output.split('\n');
+    const details: string[] = [];
+
+    // Try to parse vitest output: "Tests  12 passed | 2 failed (14)"
+    // Also try: "Tests  14 passed (14)"
+    // Also try: "Tests  14 passed"
+    let totalTests = 0;
+    let passed = 0;
+    let failed = 0;
+    const skipped = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // vitest summary: "Tests  12 passed | 2 failed (14)"
+      const vitestMatch = trimmed.match(VITEST_SUMMARY);
+      if (vitestMatch) {
+        passed = parseInt(vitestMatch[1] || '0', 10);
+        failed = parseInt(vitestMatch[2] || '0', 10);
+        totalTests = parseInt(vitestMatch[3] || String(passed + failed), 10);
+        continue;
+      }
+
+      if (trimmed.includes('FAIL') && trimmed.includes('__tests__')) {
+        details.push(trimmed);
+      }
+    }
+
+    // Fallback: if vitest parsing failed, look for test files
+    if (totalTests === 0) {
+      const testFileMatches = lines.filter(l => l.includes('__tests__') && l.includes('.test.'));
+      totalTests = testFileMatches.length;
+      passed = totalTests;
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    return { command: 'vitest run', totalTests, passed, failed, skipped, durationMs, details };
   }
 
   normalize(
@@ -107,43 +185,36 @@ export class TestRunnerAdapter implements Adapter {
       return this.makeResult(check, 'error', '测试未执行');
     }
 
-    return this.buildOutcomeResult(check, r);
-  }
-
-  private buildOutcomeResult(check: CheckConfig, r: TestResult): CheckResult {
+    // 输出解析失败（unresolved）时 totalTests 为磁盘兜底的测试文件数：
+    // 磁盘有测试 → 结果未知报 warning；磁盘也无测试 → 才是真正的「未发现测试用例」
     if (r.unresolved) {
-      return this.makeResult(
-        check,
-        'warning',
-        `检测到 ${r.totalTests} 个测试文件，但测试运行结果未能解析（进程输出异常或超时）`,
-        { totalTests: r.totalTests, passed: 0, failed: 0, skipped: 0, durationMs: r.durationMs, unresolved: true },
-      );
+      if (r.totalTests > 0) {
+        return this.makeResult(
+          check,
+          'warning',
+          `测试命令输出解析失败，磁盘发现 ${r.totalTests} 个测试文件，测试结果未知`,
+          { totalTests: r.totalTests, passed: r.passed, failed: r.failed, unresolved: true },
+        );
+      }
+      return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
     }
 
     if (r.failed > 0) {
-      return this.buildFailedResult(check, r);
+      const failDetail = r.details.length > 0
+        ? `\n失败用例:\n${r.details.slice(0, 5).join('\n')}`
+        : '';
+      return this.makeResult(
+        check,
+        'failed',
+        `测试 ${r.totalTests} 项: ${r.passed} 通过, ${r.failed} 失败 (${r.durationMs}ms)${failDetail}`,
+        { totalTests: r.totalTests, passed: r.passed, failed: r.failed, skipped: r.skipped, durationMs: r.durationMs },
+      );
     }
 
     if (r.totalTests === 0) {
       return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
     }
 
-    return this.buildPassedResult(check, r);
-  }
-
-  private buildFailedResult(check: CheckConfig, r: TestResult): CheckResult {
-    const failDetail = r.details.length > 0
-      ? `\n失败用例:\n${r.details.slice(0, 5).join('\n')}`
-      : '';
-    return this.makeResult(
-      check,
-      'failed',
-      `测试 ${r.totalTests} 项: ${r.passed} 通过, ${r.failed} 失败 (${r.durationMs}ms)${failDetail}`,
-      { totalTests: r.totalTests, passed: r.passed, failed: r.failed, skipped: r.skipped, durationMs: r.durationMs },
-    );
-  }
-
-  private buildPassedResult(check: CheckConfig, r: TestResult): CheckResult {
     return this.makeResult(
       check,
       'passed',

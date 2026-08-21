@@ -10,15 +10,15 @@ import type {
   SaveScanResultParams,
   UpsertRuleParams,
   SaveExperienceParams,
+  SaveDebtActionParams,
+  UpdateDebtActionStatusParams,
+  DebtActionRow,
+  SaveDebtSnapshotParams,
+  DebtSnapshotRow,
   CreateSentinelEventParams,
   UpdateSentinelEventParams,
   ListSentinelEventsFilter,
   SentinelEventRow,
-  DebtActionRow,
-  DebtSnapshotRow,
-  SaveDebtActionParams,
-  UpdateDebtActionStatusParams,
-  SaveDebtSnapshotParams,
 } from './types';
 
 // ─── Projects ─────────────────────────────────────────────
@@ -176,16 +176,6 @@ export function createSentinelEvent(db: Database.Database, params: CreateSentine
 }
 
 export function updateSentinelEvent(db: Database.Database, params: UpdateSentinelEventParams): void {
-  const updates = collectSentinelEventUpdates(params);
-  if (updates.sets.length === 0) return;
-
-  updates.sets.push("updated_at = datetime('now')");
-  updates.values.push(params.id);
-
-  db.prepare(`UPDATE sentinel_events SET ${updates.sets.join(', ')} WHERE id = ?`).run(...updates.values);
-}
-
-function collectSentinelEventUpdates(params: UpdateSentinelEventParams): { sets: string[]; values: unknown[] } {
   const sets: string[] = [];
   const values: unknown[] = [];
 
@@ -195,7 +185,12 @@ function collectSentinelEventUpdates(params: UpdateSentinelEventParams): { sets:
   if (params.occurrenceCount !== undefined) { sets.push('occurrence_count = ?'); values.push(params.occurrenceCount); }
   if (params.lastSeen !== undefined) { sets.push('last_seen = ?'); values.push(params.lastSeen.toISOString()); }
 
-  return { sets, values };
+  if (sets.length === 0) return;
+
+  sets.push("updated_at = datetime('now')");
+  values.push(params.id);
+
+  db.prepare(`UPDATE sentinel_events SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 }
 
 export function getSentinelEvent(db: Database.Database, id: string): SentinelEventRow | undefined {
@@ -207,41 +202,22 @@ export function findSentinelEventByDedupeKey(db: Database.Database, dedupeKey: s
 }
 
 export function listSentinelEvents(db: Database.Database, filter?: ListSentinelEventsFilter): SentinelEventRow[] {
-  const { sql, params } = buildListEventsQuery(filter);
-  return db.prepare(sql).all(...params) as SentinelEventRow[];
-}
-
-function buildListEventsQuery(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
-  const filters = buildEventFilterClauses(filter);
-  const paging = buildPagingClause(filter);
-
-  return {
-    sql: `SELECT * FROM sentinel_events WHERE 1=1${filters.sql} ORDER BY timestamp DESC${paging.sql}`,
-    params: [...filters.params, ...paging.params],
-  };
-}
-
-function buildEventFilterClauses(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
-  let sql = '';
+  let sql = 'SELECT * FROM sentinel_events WHERE 1=1';
   const params: unknown[] = [];
 
   if (filter?.projectId) { sql += ' AND project_id = ?'; params.push(filter.projectId); }
   if (filter?.status) { sql += ' AND status = ?'; params.push(filter.status); }
   if (filter?.severity) { sql += ' AND severity = ?'; params.push(filter.severity); }
 
-  return { sql, params };
-}
+  sql += ' ORDER BY timestamp DESC';
 
-function buildPagingClause(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
-  const clauses: string[] = [];
-  const params: unknown[] = [];
+  if (filter?.limit) sql += ' LIMIT ?';
+  else sql += ' LIMIT 100';
+  if (filter?.limit) params.push(filter.limit);
 
-  if (filter?.limit) { clauses.push(' LIMIT ?'); params.push(filter.limit); }
-  else { clauses.push(' LIMIT 100'); }
+  if (filter?.offset) { sql += ' OFFSET ?'; params.push(filter.offset); }
 
-  if (filter?.offset) { clauses.push(' OFFSET ?'); params.push(filter.offset); }
-
-  return { sql: clauses.join(''), params };
+  return db.prepare(sql).all(...params) as SentinelEventRow[];
 }
 
 export function deleteSentinelEvent(db: Database.Database, id: string): void {
@@ -265,7 +241,7 @@ export function getExperienceStats(db: Database.Database, ruleId: string): { tot
   return { total, truePositives, falsePositives };
 }
 
-// ─── Debt Actions ─────────────────────────────────────────
+// ─── Tech Debt Actions & Snapshots ────────────────────────
 
 export function saveDebtAction(db: Database.Database, params: SaveDebtActionParams): void {
   db.prepare(
@@ -283,21 +259,27 @@ export function saveDebtAction(db: Database.Database, params: SaveDebtActionPara
        gate = excluded.gate,
        updated_at = CURRENT_TIMESTAMP`,
   ).run(
-    params.projectId, params.actionId, params.status,
-    params.module, params.category, JSON.stringify(params.issueIds),
-    params.interestScore, params.principalEstimate, params.roi,
-    params.sprint ?? null, params.gate ?? null,
+    params.projectId,
+    params.actionId,
+    params.status,
+    params.module,
+    params.category,
+    JSON.stringify(params.issueIds),
+    params.interestScore,
+    params.principalEstimate,
+    params.roi,
+    params.sprint ?? null,
+    params.gate ?? null,
   );
 }
 
 export function updateDebtActionStatus(db: Database.Database, params: UpdateDebtActionStatusParams): void {
-  db.prepare(
-    'UPDATE debt_actions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND action_id = ?',
-  ).run(params.status, params.projectId, params.actionId);
+  db.prepare('UPDATE debt_actions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND action_id = ?')
+    .run(params.status, params.projectId, params.actionId);
 }
 
 export function getDebtActionsByProject(db: Database.Database, projectId: string): DebtActionRow[] {
-  return db.prepare('SELECT * FROM debt_actions WHERE project_id = ?').all(projectId) as DebtActionRow[];
+  return db.prepare('SELECT * FROM debt_actions WHERE project_id = ? ORDER BY created_at DESC').all(projectId) as DebtActionRow[];
 }
 
 export function saveDebtSnapshot(db: Database.Database, params: SaveDebtSnapshotParams): void {
@@ -305,7 +287,5 @@ export function saveDebtSnapshot(db: Database.Database, params: SaveDebtSnapshot
 }
 
 export function getLatestDebtSnapshot(db: Database.Database, projectId: string): DebtSnapshotRow | undefined {
-  return db.prepare(
-    'SELECT * FROM debt_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 1',
-  ).get(projectId) as DebtSnapshotRow | undefined;
+  return db.prepare('SELECT * FROM debt_snapshots WHERE project_id = ? ORDER BY id DESC LIMIT 1').get(projectId) as DebtSnapshotRow | undefined;
 }

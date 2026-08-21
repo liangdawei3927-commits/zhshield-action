@@ -459,8 +459,8 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
       schemaVersion: graph.schemaVersion,
       targetId: graph.targetId,
       ecosystem: graph.ecosystem,
-      direct: nodes.filter((node) => node.kind === 'direct').length,
-      transitive: nodes.filter((node) => node.kind === 'transitive').length,
+      direct: nodes.filter((node: { kind: string }) => node.kind === 'direct').length,
+      transitive: nodes.filter((node: { kind: string }) => node.kind === 'transitive').length,
       total: nodes.length,
       edgeCount: graph.edges.length,
       lockfile: graph.lockfile,
@@ -712,8 +712,8 @@ async function planDebtRepaymentHandler(manager: TaskManager, projectPath: strin
       interestScore: action.interestScore,
       principalEstimate: action.principalEstimate,
       roi: action.roi,
-      sprint: opts?.sprint ?? null,
-      gate: opts?.gate ?? null,
+      sprint: opts?.sprint ?? undefined,
+      gate: opts?.gate ?? undefined,
     });
   } catch (err) {
     console.warn('[engine:debt:planRepayment] 计划偿还失败:', err instanceof Error ? err.message : String(err));

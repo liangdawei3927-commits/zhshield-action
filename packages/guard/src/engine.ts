@@ -6,15 +6,6 @@ import { ConfigLoader } from './config-loader';
 import { AdapterRegistry } from './adapter-registry';
 import { ResultNormalizer } from './result-normalizer';
 
-/** buildReport 参数对象 */
-interface BuildReportParams {
-  results: CheckResult[];
-  options: CheckOptions;
-  failedCount: number;
-  errorsCount: number;
-  warningsCount: number;
-}
-
 export class GuardEngine {
   private configLoader: ConfigLoader;
   private adapterRegistry: AdapterRegistry;
@@ -56,7 +47,7 @@ export class GuardEngine {
     const errors = results.filter((r) => r.status === 'error');
     const warnings = results.filter((r) => r.status !== 'passed' && r.severity === 'warning').length;
 
-    return this.buildReport({ results, options, failedCount: failed.length, errorsCount: errors.length, warningsCount: warnings });
+    return this.buildReport(results, options, failed.length, errors.length, warnings);
   }
 
   async run(options: CheckOptions): Promise<GuardReport> {
@@ -199,11 +190,16 @@ export class GuardEngine {
     const errors = results.filter((r) => r.status === 'error');
     const warnings = results.filter((r) => r.status === 'warning').length;
 
-    return this.buildReport({ results, options, failedCount: failed.length, errorsCount: errors.length, warningsCount: warnings });
+    return this.buildReport(results, options, failed.length, errors.length, warnings);
   }
 
-  private buildReport(params: BuildReportParams): GuardReport {
-    const { results, options, failedCount, errorsCount, warningsCount } = params;
+  private buildReport(
+    results: CheckResult[],
+    options: CheckOptions,
+    failedCount: number,
+    errorsCount: number,
+    warningsCount: number,
+  ): GuardReport {
     return {
       contractVersion: 'p0.v1',
       mode: options.mode,

@@ -1,0 +1,153 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · 架构分层合规巡检
+# =============================================================================
+# 规则 ID: inspect.scan.depcruiser.layer-boundary
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect Arch · layer-boundary
+# 内部标准源: dependency-cruiser + IronNest#01 (Architecture) + IronNest#03 (Application Services)
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.depcruiser.layer-boundary"
+  name: "架构分层合规巡检"
+  description: "扫描全仓库的代码架构分层合规性，识别每一层的依赖方向违规、层间不合理的直接引用、模块内部私有路径泄露等架构异味"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "dependency-cruiser · IronNest rules/01 · rules/03 · rules/04"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "architecture"
+
+execution:
+  mode: "async"
+  timeout: 120
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"            # push 时触发
+
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.ts"
+    - "**/*.spec.ts"
+    - "**/*.d.ts"
+    - "**/generated/**"
+
+check:
+  tool: "dependency-cruiser"
+  toolConfig:
+    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    scanRules:
+      - ruleId: "layer-violation"
+        description: "违规：{sourceLayer} 直接依赖了 {targetLayer}，违反单向依赖约束"
+        severity: "error"
+        layers:
+          - name: "controller"
+            path: "**/controllers/**"
+            allowDeps: ["service", "use-case", "dto"]
+          - name: "use-case"
+            path: "**/use-cases/**"
+            allowDeps: ["service", "domain", "dto"]
+          - name: "service"
+            path: "**/services/**"
+            allowDeps: ["domain", "infrastructure", "shared"]
+          - name: "domain"
+            path: "**/domain/**"
+            allowDeps: ["shared"]
+          - name: "repository"
+            path: "**/repositories/**"
+            allowDeps: ["domain", "shared"]
+          - name: "adapter"
+            path: "**/adapters/**"
+            allowDeps: ["shared", "core"]
+          - name: "shared"
+            path: "**/shared/**"
+            allowDeps: []        # shared 不能依赖任何业务层
+
+      - ruleId: "service-cohesion"
+        description: "service 方法过长（超过 {maxLines} 行），应拆分为 focused capability"
+        severity: "warning"
+        maxMethodLines: 20
+        maxFileLines: 200
+
+      - ruleId: "use-case-purity"
+        description: "use-case 应仅为编排层，不应包含基础设施导入或领域逻辑"
+        severity: "warning"
+        forbiddenImports:
+          - "TypeORM"
+          - "PrismaClient"
+          - "axios"
+          - "got"
+          - "ioredis"
+
+      - ruleId: "controller-thickness"
+        description: "控制器方法包含业务逻辑，应委托给 use-case"
+        severity: "warning"
+        checkPatterns:
+          - "instanceof"
+          - "throw new (?!.*AppError)"
+          - 'await this.*Repository\.'
+          - ".save()"
+          - ".find("
+  severity: "warning"
+  categories:
+    - "architecture"
+    - "layer-compliance"
+    - "service-cohesion"
+    - "controller-thinness"
+
+judgment:
+  passCondition: "criticalErrorCount === 0"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-QS-03"    # Code Quality Standards
+    - "OSPS-AC-01"    # Access Control Policy
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    发现架构分层违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 违规类型: {ruleId}
+    ⚠️ 违规详情: {detail}
+
+    按 IronNest 架构规则修复：
+    1. 层次违规 → 检查目标层是否在允许的依赖列表中，不在则抽取到正确层
+    2. Service 过厚 → ≤20 行/方法，考虑提取 helper 或拆到 use-case
+    3. Controller 含逻辑 → 委托给 use-case，控制器仅做路由和参数提取
+    4. Use-case 含基础设施导入 → 包装在 adapter 中，use-case 只调用 adapter 接口
+
+    📖 参考: IronNest #01 架构边界 · #03 应用服务 · #04 仓库层

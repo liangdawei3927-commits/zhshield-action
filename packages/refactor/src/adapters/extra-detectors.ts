@@ -1,6 +1,5 @@
 import * as ts from 'typescript';
 
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
@@ -8,18 +7,14 @@ import { makeSmell } from './adapter-types';
 const IDENT_CHAR_PAREN = /[a-zA-Z0-9_$)]/;
 const IDENT_CHAR = /[a-zA-Z0-9_$]/;
 const IDENT_FULL = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-const COLLECTION_TYPE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
-type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
-
-export function detectInappropriateIntimacy(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectInappropriateIntimacy(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
     const publicFields = isIntimacyCandidate(cls, parsed);
     if (!publicFields) continue;
-    smells.push(buildIntimacySmell(cls, publicFields, parsed, config, tr));
+    smells.push(buildIntimacySmell(cls, publicFields, parsed, config));
   }
 
   return smells;
@@ -30,25 +25,14 @@ function isIntimacyCandidate(
   cls: ParsedClass,
   parsed: ParsedFile,
 ): ParsedClass['members']['fields'] | null {
-  if (!isEligibleForIntimacyCheck(cls, parsed)) return null;
-  return collectPublicFields(cls);
-}
-
-/** 封装性检查前置条件：跳过框架托管类与测试 fixtures */
-function isEligibleForIntimacyCheck(cls: ParsedClass, parsed: ParsedFile): boolean {
   // 跳过框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger
   // DTO 等依赖类或成员上装饰器的运行时元数据，改为 private 会破坏框架契约
   // （列映射、校验、OpenAPI 文档），它们是合理的数据载体而非封装性问题。
-  if (isFrameworkManagedClass(cls.node)) return false;
+  if (isFrameworkManagedClass(cls.node)) return null;
 
   // 跳过测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式。
-  if (isTestFixture(parsed.filePath)) return false;
+  if (isTestFixture(parsed.filePath)) return null;
 
-  return true;
-}
-
-/** 收集超过阈值(3)的公共字段，不足时返回 null */
-function collectPublicFields(cls: ParsedClass): ParsedClass['members']['fields'] | null {
   const publicFields = cls.members.fields.filter(f => f.accessModifier === 'public');
   if (publicFields.length <= 3) return null;
   return publicFields;
@@ -60,17 +44,16 @@ function buildIntimacySmell(
   publicFields: ParsedClass['members']['fields'],
   parsed: ParsedFile,
   config: RefactorConfig,
-  tr: TranslateFn,
 ): CodeSmell {
   return makeSmell({
     ruleId: 'inappropriate-intimacy',
     severity: config.severities['inappropriate-intimacy'],
-    message: tr('engine.refactor.smell.inappropriate-intimacy.message', { className: cls.name, count: publicFields.length }),
+    message: `${cls.name} 暴露过多公共字段 (${publicFields.length} 个)，破坏封装性`,
     filePath: parsed.filePath, line: cls.startLine, column: 1,
     metric: 'publicFieldCount', value: publicFields.length, threshold: 3,
     suggestion: {
       type: 'Encapsulate Field',
-      description: tr('engine.refactor.smell.inappropriate-intimacy.suggestion'),
+      description: '将 public 字段改为 private，通过 getter/setter 访问',
       priority: 'high',
       effort: 'small',
       autoFixable: true,
@@ -90,14 +73,13 @@ function isTestFixture(filePath: string): boolean {
   return filePath.includes('/__tests__/') || filePath.includes('/fixtures/');
 }
 
-export function detectMiddleMan(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectMiddleMan(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
     const stats = isMiddleManCandidate(cls, parsed);
     if (!stats) continue;
-    smells.push(buildMiddleManSmell(cls, parsed, stats, config, tr));
+    smells.push(buildMiddleManSmell(cls, parsed, stats, config));
   }
 
   return smells;
@@ -111,25 +93,16 @@ function isMiddleManCandidate(
   const totalMethods = cls.members.methods.length;
   // 与原有判定范围一致：仅对小类套用本规则；无方法类无意义
   if (totalMethods <= 0 || totalMethods > 5) return null;
+
   // 跳过框架托管类（装饰器类）：NestJS 服务/控制器等是框架要求的载体，
   // 其转发层不可移除，与 inappropriate-intimacy / lazy-class 的既有约定一致
   if (isFrameworkManagedClass(cls.node)) return null;
 
-  return computeDelegationStats(cls, parsed.sourceFile, totalMethods);
-}
+  const delegatingMethods = countDelegatingMethods(cls, parsed.sourceFile);
 
-/**
- * 统计类中纯转发方法的数量并计算判定阈值。
- * 仅当大部分方法（≥ 一半，且至少 2 个）是纯转发到协作者字段时才判定为中间人。
- * 旧实现对 fs./path./JSON./execFileAsync 等标准库与导入模块的调用计数，
- * 把"使用工具"误当成"委托"，导致大量误报；真正的委托签名是 this.<field>.<method>()。
- */
-function computeDelegationStats(
-  cls: ParsedClass,
-  sourceFile: ts.SourceFile,
-  totalMethods: number,
-): { delegatingMethods: number; totalMethods: number; delegationThreshold: number } | null {
-  const delegatingMethods = countDelegatingMethods(cls, sourceFile);
+  // 仅当大部分方法（≥ 一半，且至少 2 个）是纯转发到协作者字段时才判定为中间人。
+  // 旧实现对 fs./path./JSON./execFileAsync 等标准库与导入模块的调用计数，
+  // 把"使用工具"误当成"委托"，导致大量误报；真正的委托签名是 this.<field>.<method>()。
   const delegationThreshold = Math.max(2, Math.ceil(totalMethods / 2));
   if (delegatingMethods < delegationThreshold) return null;
   return { delegatingMethods, totalMethods, delegationThreshold };
@@ -141,21 +114,16 @@ function buildMiddleManSmell(
   parsed: ParsedFile,
   stats: { delegatingMethods: number; totalMethods: number; delegationThreshold: number },
   config: RefactorConfig,
-  tr: TranslateFn,
 ): CodeSmell {
   return makeSmell({
     ruleId: 'middle-man',
     severity: config.severities['middle-man'],
-    message: tr('engine.refactor.smell.middle-man.message', {
-      className: cls.name,
-      delegating: stats.delegatingMethods,
-      total: stats.totalMethods,
-    }),
+    message: `${cls.name} 大部分方法只是委托调用 (${stats.delegatingMethods} 次委托 / ${stats.totalMethods} 个方法)`,
     filePath: parsed.filePath, line: cls.startLine, column: 1,
     metric: 'delegationRatio', value: stats.delegatingMethods, threshold: stats.delegationThreshold,
     suggestion: {
       type: 'Remove Middle Man',
-      description: tr('engine.refactor.smell.middle-man.suggestion'),
+      description: '考虑移除中间层，让调用方直接使用委托目标',
       priority: 'low',
       effort: 'medium',
       autoFixable: false,
@@ -180,6 +148,7 @@ function countDelegatingMethods(cls: ParsedClass, sourceFile: ts.SourceFile): nu
 /** 收集类中被当作数据容器的字段（Map/Set/Array 等），对其方法调用不算委托 */
 function collectCollectionFields(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Set<string> {
   const result = new Set<string>();
+  const COLLECTION_TYPE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
   for (const member of cls.members) {
     if (!ts.isPropertyDeclaration(member) || !member.name) continue;
@@ -244,8 +213,7 @@ function isPureDelegationMethod(
   return !ownMethodNames.has(fieldName) && !collectionFields.has(fieldName);
 }
 
-export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -257,14 +225,14 @@ export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig, 
       smells.push(makeSmell({
         ruleId: 'message-chains',
         severity: config.severities['message-chains'],
-        message: tr('engine.refactor.smell.message-chains.message', { target: `${cls.name}.${method.name}()`, chains: uniqueMatches.join(', ') }),
+        message: `${cls.name}.${method.name}() 存在链式调用: ${uniqueMatches.join(', ')}`,
         filePath: parsed.filePath,
         line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
         column: 1,
         metric: 'chainCount', value: uniqueMatches.length, threshold: 1,
         suggestion: {
           type: 'Hide Delegate',
-          description: tr('engine.refactor.smell.message-chains.suggestion'),
+          description: '将链式调用封装为委托方法，降低调用方与被调用方的耦合',
           priority: 'medium',
           effort: 'small',
           autoFixable: false,
@@ -337,8 +305,7 @@ function measureChainLength(methodText: string, dotIdx: number): { length: numbe
   return { length: chainLen, endIdx: searchIdx };
 }
 
-export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -350,17 +317,12 @@ export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig,
         smells.push(makeSmell({
           ruleId: 'refused-bequest',
           severity: config.severities['refused-bequest'],
-          message: tr('engine.refactor.smell.refused-bequest.message', {
-            className: cls.name,
-            superClass: cls.extendsClass,
-            methods: ownMethods,
-            fields: ownFields,
-          }),
+          message: `${cls.name} 继承自 ${cls.extendsClass} 但几乎没有添加新成员 (${ownMethods} 方法, ${ownFields} 字段)，可能不需要继承`,
           filePath: parsed.filePath, line: cls.startLine, column: 1,
           metric: 'ownMethodCount', value: ownMethods, threshold: 3,
           suggestion: {
             type: 'Replace Inheritance with Delegation',
-            description: tr('engine.refactor.smell.refused-bequest.suggestion'),
+            description: `用组合 (Composition) 替换继承，减少继承层次`,
             priority: 'medium',
             effort: 'medium',
             autoFixable: false,
@@ -374,8 +336,7 @@ export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig,
   return smells;
 }
 
-export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const threshold = config.thresholds.minClassLines;
 
@@ -392,12 +353,12 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig, loca
       smells.push(makeSmell({
         ruleId: 'lazy-class',
         severity: config.severities['lazy-class'],
-        message: tr('engine.refactor.smell.lazy-class.message', { className: cls.name, lines: cls.lineCount, methods: cls.members.methods.length }),
+        message: `${cls.name} 太小 (${cls.lineCount} 行，${cls.members.methods.length} 个方法)，可能不值得作为独立类`,
         filePath: parsed.filePath, line: cls.startLine, column: 1,
         metric: 'classLineCount', value: cls.lineCount, threshold,
         suggestion: {
           type: 'Inline Class',
-          description: tr('engine.refactor.smell.lazy-class.suggestion'),
+          description: '将功能合并到调用它的类中，或直接移除',
           priority: 'low',
           effort: 'small',
           autoFixable: false,
@@ -410,8 +371,7 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig, loca
   return smells;
 }
 
-export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -429,14 +389,14 @@ export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig
         smells.push(makeSmell({
           ruleId: 'switch-statement',
           severity: config.severities['switch-statement'],
-          message: tr('engine.refactor.smell.switch-statement.message', { target: `${cls.name}.${method.name}()`, count: switchCount }),
+          message: `${cls.name}.${method.name}() 使用 ${switchCount} 处 switch 语句，建议用多态替代`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
           column: 1,
           metric: 'switchCount', value: switchCount, threshold: 0,
           suggestion: {
             type: 'Replace Conditional with Polymorphism',
-            description: tr('engine.refactor.smell.switch-statement.suggestion'),
+            description: '用策略模式或多态替换 switch/if-else if 链',
             priority: 'medium',
             effort: 'large',
             autoFixable: false,

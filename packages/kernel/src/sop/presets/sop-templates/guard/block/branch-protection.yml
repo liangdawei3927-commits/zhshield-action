@@ -1,0 +1,133 @@
+# =============================================================================
+# SOP 规则模板 — Guard · 分支保护规则检查（L2 pre-push）
+# =============================================================================
+# 规则 ID: guard.block.external.branch-protection
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Guard L2 pre-push
+# 外部标准源: IronNest#31 Version Control · GitHub branch protection
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.external.branch-protection"
+  name: "分支保护规则检查"
+  description: "在 pre-push 阶段验证目标分支的保护配置是否合规：禁止直接推送到受保护分支、必须签署提交、必须关联有效 PR、必须通过必要状态检查"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "external"
+  sourceRef: "GitHub branch protection · IronNest rules/31"
+
+governance:
+  domain: "guard"
+  action: "block"
+  module: "Guard"
+  level: "L2"
+  hook: "pre-push"
+
+execution:
+  mode: "sync"
+  timeout: 10
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "staged"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns:
+    - ".git/**"
+
+check:
+  tool: "custom-branch-protection-checker"
+  toolConfig:
+    branchPatterns:
+      - "main"
+      - "master"
+      - "release/*"
+      - "production"
+    rules:
+      - id: "direct-push-to-protected"
+        description: "禁止直接推送到受保护分支"
+        severity: "error"
+        check: "push-to-protected-branch"
+        requiredContext: "open-pull-request"
+        message: "直接推送到 {branch} 被禁止，请通过 PR 提交变更"
+      - id: "signed-commit"
+        description: "要求提交必须签名"
+        severity: "error"
+        check: "commit-signature"
+        requireSignature: true
+        message: "提交必须使用 GPG/SSH 签名"
+      - id: "status-checks-passed"
+        description: "要求所有必要的 CI 状态检查通过"
+        severity: "error"
+        check: "required-status-checks"
+        requiredChecks:
+          - "lint"
+          - "typecheck"
+          - "test"
+          - "test:coverage"
+          - "build"
+      - id: "linear-history"
+        description: "要求线性提交历史（禁止 merge commit）"
+        severity: "warning"
+        check: "linear-history"
+        suggestion: "使用 rebase 而非 merge 来整合分支"
+      - id: "codeowners-reviewed"
+        description: "影响 CODEOWNERS 文件的变更需 CODEOWNERS 审核"
+        severity: "error"
+        check: "code-owners-review"
+        files:
+          - "CODEOWNERS"
+          - ".github/CODEOWNERS"
+  severity: "error"
+  categories:
+    - "branch-protection"
+    - "git"
+    - "collaboration"
+    - "security"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-AC-01"
+    - "OSPS-PC-01"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 60
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    分支保护规则违规：
+
+    ⚠️ 规则: {ruleId}
+    ⚠️ 目标分支: {branch}
+    ⚠️ 详情: {message}
+
+    修复指引：
+    1. 直接推送到保护分支 → 创建 PR：`git checkout -b feature/xxx` → commit → push → create PR
+    2. 提交未签名 → `git config commit.gpgsign true` 或 `git commit -S`
+    3. 状态检查未通过 → 在 PR 中等待 CI 全部通过再合并
+    4. 线性历史 → `git rebase main` 而非 `git merge main`
+
+    📖 参考: GitHub 分支保护 · IronNest #31 版本控制检查点

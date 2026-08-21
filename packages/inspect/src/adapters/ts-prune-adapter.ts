@@ -2,17 +2,17 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
-const META: Omit<ToolMeta, 'description'> = {
+const META: ToolMeta = {
   id: 'ts-prune',
   name: 'ts-prune',
   category: 'inspect',
   priority: 'P1',
   installMode: 'builtin',
+  description: 'TypeScript 死代码/未导出检测',
   cliCommand: 'ts-prune',
   homepage: 'https://github.com/nadeesha/ts-prune',
   license: 'MIT',
@@ -21,17 +21,7 @@ const META: Omit<ToolMeta, 'description'> = {
 const TS_PRUNE_LINE = /^(.+?):(\d+):\s*(.+)$/;
 
 export class TsPruneAdapter implements ToolAdapter {
-  meta: ToolMeta;
-  private readonly locale: LanguageCode;
-
-  constructor(locale?: LanguageCode) {
-    this.locale = locale ?? DEFAULT_LANGUAGE;
-    this.meta = { ...META, description: translate('engine.inspect.tool.ts-prune.description', this.locale) };
-  }
-
-  private tr(key: string, params?: Record<string, unknown>): string {
-    return translate(key, this.locale, params);
-  }
+  meta = META;
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -47,69 +37,64 @@ export class TsPruneAdapter implements ToolAdapter {
     const tsConfigPath = path.join(options.projectPath, 'tsconfig.json');
 
     try {
-      const stdout = await this.runTsPrune(tsConfigPath, options);
+      const { stdout } = await execFileAsync('ts-prune', [
+        '-p', tsConfigPath,
+        '--json',
+      ], {
+        cwd: options.projectPath,
+        timeout: options.timeout || 60000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
       const issues = this.mapOutput(stdout);
-      return this.buildAvailable(start, issues);
-    } catch (error: unknown) {
-      return this.buildErrorResult(start, error);
-    }
-  }
 
-  private async runTsPrune(tsConfigPath: string, options: ToolScanOptions): Promise<string> {
-    const { stdout } = await execFileAsync('ts-prune', [
-      '-p', tsConfigPath,
-      '--json',
-    ], {
-      cwd: options.projectPath,
-      timeout: options.timeout || 60000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return stdout;
-  }
-
-  private buildAvailable(start: number, issues: Issue[]): ToolResult {
-    return {
-      tool: 'ts-prune',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-    };
-  }
-
-  private buildErrorResult(start: number, error: unknown): ToolResult {
-    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
       return {
         tool: 'ts-prune',
-        status: 'unavailable',
+        status: 'available',
+        issues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: issues.length,
+        },
+      };
+    } catch (error: unknown) {
+      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'ts-prune',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'ts-prune 未安装',
+        };
+      }
+
+      if (err.stdout) {
+        const issues = this.mapOutput(err.stdout);
+        if (issues.length > 0) {
+          return {
+            tool: 'ts-prune',
+            status: 'available',
+            issues,
+            metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: issues.length },
+          };
+        }
+      }
+
+      return {
+        tool: 'ts-prune',
+        status: 'error',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: this.tr('engine.inspect.tool.ts-prune.unavailable'),
+        error: err.stderr || err.message || 'ts-prune 执行失败',
       };
     }
-    if (err.stdout) {
-      const issues = this.mapOutput(err.stdout, this.locale);
-      if (issues.length > 0) {
-        return this.buildAvailable(start, issues);
-      }
-    }
-    return {
-      tool: 'ts-prune',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || this.tr('engine.inspect.tool.ts-prune.runFailed'),
-    };
   }
 
-  private mapOutput(raw: string, locale?: LanguageCode): Issue[] {
+  private mapOutput(raw: string): Issue[] {
     if (!raw || !raw.trim()) return [];
-    const lng = locale ?? DEFAULT_LANGUAGE;
     const lines = raw.trim().split('\n');
     const issues: Issue[] = [];
 
@@ -120,20 +105,19 @@ export class TsPruneAdapter implements ToolAdapter {
       const match = trimmed.match(TS_PRUNE_LINE);
       if (match) {
         const [, filePath, lineStr, symbol] = match;
-        const symbolName = symbol.trim();
         issues.push({
           id: randomUUID(),
           ruleId: 'ts-prune/unused-export',
           severity: 'info',
           category: 'quality',
-          message: translate('engine.inspect.tool.ts-prune.unusedExport', lng, { symbol: symbolName }),
+          message: `未使用的导出: ${symbol.trim()}`,
           file: filePath,
           line: parseInt(lineStr, 10) || 0,
           column: 0,
-          suggestion: translate('engine.inspect.tool.ts-prune.removeExport', lng, { symbol: symbolName }),
+          suggestion: `移除未使用的导出符号: ${symbol.trim()}`,
           autoFixable: false,
           source: 'inspect',
-          fingerprint: `ts-prune:${filePath}:${lineStr}:${symbolName}`,
+          fingerprint: `ts-prune:${filePath}:${lineStr}:${symbol.trim()}`,
         });
       }
     }

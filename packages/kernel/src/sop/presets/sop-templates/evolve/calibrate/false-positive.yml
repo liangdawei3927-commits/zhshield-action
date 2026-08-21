@@ -1,0 +1,113 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 误报校准规则
+# =============================================================================
+# 规则 ID: evolve.calibrate.internal.false-positive
+# 治理域: 演进域 (evolve)
+# 动作类型: 进化校准 (calibrate)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Evolve 规则自优化 · 误报校准
+# 外部标准源: OSPS-Scoring-design + 健康评分与进化系统设计
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.calibrate.internal.false-positive"
+  name: "误报自动校准"
+  description: "根据经验库的误报反馈自动调整规则严重度，误报率 > 10% 自动降级"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "internal"
+  sourceRef: "05-健康评分与进化系统.md — 3.2.1 误报校准"
+
+governance:
+  domain: "evolve"
+  action: "calibrate"
+  module: "Evolve"
+  category: "calibration"
+  subModule: "false-positive-calibration"
+
+execution:
+  mode: "periodic"
+  timeout: 30
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "0 3 * * *"         # 每天凌晨 3 点执行
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "calibration-controller"
+  toolConfig:
+    calibration:
+  trigger:
+    metric: "falsePositiveRate"
+    threshold: 0.10             # 误报率 > 10%
+    minSamples: 10              # 最少样本数
+  actions:
+    - action: "demote"
+      from: "active"
+      to: "trial"
+      reason: "误报率超过 10%，自动降级到试用阶段"
+    - action: "reduce-severity"
+      fromSeverity: "error"
+      toSeverity: "warning"
+      reason: "误报率高，降低严重度以减少干扰"
+  recovery:
+    metric: "falsePositiveRate"
+    threshold: 0.03             # 误报率恢复到 < 3%
+    minSamples: 20
+    actions:
+      - action: "promote"
+        from: "trial"
+        to: "active"
+        reason: "误报率已降至 3% 以下，恢复活跃状态"
+  escalation:
+    - condition: "falsePositiveRate > 0.50 && samples > 50"
+      action: "deprecate"       # 误报率 > 50% → 废弃规则
+    - condition: "noHitsForDays > 90"
+      action: "retire"          # 连续 90 天未命中 → 归隐
+
+judgment:
+  passCondition: "falsePositiveRate <= 0.10"
+  blockOn: "none"
+  priority: "medium"
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    误报校准结果
+
+    ⚠️ 规则: {ruleId}
+    ⚠️ 当前误报率: {falsePositiveRate}
+    ⚠️ 样本数: {samples}
+
+    触发动作: {action}
+    原因: {reason}
+
+    如需干预:
+    1. 如果误报率被高估 → 调整规则阈值或补充白名单
+    2. 如果校准过度 → 可在 recovery 条件满足后自动恢复
+    3. 误报率 > 50% → 规则将被废弃
+    4. 连续 90 天未命中 → 规则将被归隐
+
+    📖 参考: 05-健康评分与进化系统.md — 3.2.1 误报校准
+
+standards:
+  osps: []

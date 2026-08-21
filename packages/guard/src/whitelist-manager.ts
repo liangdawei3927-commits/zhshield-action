@@ -51,27 +51,19 @@ function parseWhitelistYaml(content: string): WhitelistEntry[] {
   const ctx: LineParseContext = { config, trimmed: '', current: null };
 
   for (const line of lines) {
-    const next = parseSectionLine(line, section);
-    if (next) {
-      section = next;
-      continue;
-    }
-    if (section) {
-      ctx.trimmed = line.trim();
-      SECTION_PARSERS[section](ctx);
-    }
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#')) continue;
+
+    if (trimmed.startsWith('project:')) { section = 'project'; continue; }
+    if (trimmed.startsWith('file:')) { section = 'file'; continue; }
+    if (trimmed.startsWith('rule:')) { section = 'rule'; continue; }
+
+    if (!section) continue;
+    ctx.trimmed = trimmed;
+    SECTION_PARSERS[section](ctx);
   }
 
   return configToEntries(config);
-}
-
-function parseSectionLine(line: string, section: WhitelistSection | null): WhitelistSection | null {
-  const trimmed = line.trim();
-  if (trimmed.startsWith('#')) return section;
-  if (trimmed.startsWith('project:')) return 'project';
-  if (trimmed.startsWith('file:')) return 'file';
-  if (trimmed.startsWith('rule:')) return 'rule';
-  return null;
 }
 
 function parseProjectLine(ctx: LineParseContext): void {

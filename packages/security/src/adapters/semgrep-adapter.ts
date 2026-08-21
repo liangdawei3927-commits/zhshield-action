@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, CodeFlow, CodeFlowThreadFlow, CodeFlowLocation } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, CodeFlow, CodeFlowThreadFlow } from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -36,85 +36,77 @@ export class SemgrepAdapter implements ToolAdapter {
     const start = Date.now();
     const rulesDir = this.resolveRulesDir(options.projectPath);
 
-    if (!rulesDir || !fs.existsSync(rulesDir)) {
-      return this.buildSkippedResult(start);
-    }
-
     try {
-      const output = await this.runSemgrep(rulesDir, options);
+      if (!rulesDir || !fs.existsSync(rulesDir)) {
+        return {
+          tool: 'semgrep',
+          status: 'skipped',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'Semgrep 规则目录不存在，请先同步云脑规则',
+        };
+      }
+
+      const isQuick = options.config?.severity?.includes('ERROR');
+      const configArg = isQuick
+        ? path.join(rulesDir, 'high-severity')
+        : rulesDir;
+
+      const args = ['scan', '--config', configArg, '--json'];
+      if (options.targetFiles && options.targetFiles.length > 0) {
+        args.push(...options.targetFiles);
+      } else {
+        args.push(options.projectPath);
+      }
+
+      const { stdout } = await execFileAsync('semgrep', args, {
+        cwd: options.projectPath,
+        timeout: options.timeout || 120000,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+
+      const output = JSON.parse(stdout);
       const issues = this.mapOutput(output);
-      return this.buildSuccessResult(start, issues, output?.results?.length || 0);
-    } catch (error) {
-      return this.buildErrorResult(start, error as ExecError);
-    }
-  }
 
-  private buildSkippedResult(start: number): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'skipped',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: 'Semgrep 规则目录不存在，请先同步云脑规则',
-    };
-  }
-
-  private async runSemgrep(rulesDir: string, options: ToolScanOptions): Promise<SemgrepOutput> {
-    const isQuick = options.config?.severity?.includes('ERROR');
-    const configArg = isQuick
-      ? path.join(rulesDir, 'high-severity')
-      : rulesDir;
-
-    const args = ['scan', '--config', configArg, '--json'];
-    if (options.targetFiles && options.targetFiles.length > 0) {
-      args.push(...options.targetFiles);
-    } else {
-      args.push(options.projectPath);
-    }
-
-    const { stdout } = await execFileAsync('semgrep', args, {
-      cwd: options.projectPath,
-      timeout: options.timeout || 120000,
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    return JSON.parse(stdout) as SemgrepOutput;
-  }
-
-  private buildSuccessResult(start: number, issues: Issue[], fileCount: number): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'available',
-      issues,
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount },
-    };
-  }
-
-  private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
-      return {
-        tool: 'semgrep',
-        status: 'unavailable',
-        issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: 'Semgrep 未安装或未在 PATH 中找到',
-      };
-    }
-    const partialIssues = this.parsePartialOutput(err.stdout);
-    if (partialIssues) {
       return {
         tool: 'semgrep',
         status: 'available',
-        issues: partialIssues,
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        issues,
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: output?.results?.length || 0,
+        },
+      };
+    } catch (error) {
+      const err = error as ExecError;
+      if (err.code === 'ENOENT') {
+        return {
+          tool: 'semgrep',
+          status: 'unavailable',
+          issues: [],
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          error: 'Semgrep 未安装或未在 PATH 中找到',
+        };
+      }
+      const partialIssues = this.parsePartialOutput(err.stdout);
+      if (partialIssues) {
+        return {
+          tool: 'semgrep',
+          status: 'available',
+          issues: partialIssues,
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        };
+      }
+      return {
+        tool: 'semgrep',
+        status: 'error',
+        issues: [],
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        error: err.stderr || err.message || 'Semgrep 执行失败',
       };
     }
-    return {
-      tool: 'semgrep',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'Semgrep 执行失败',
-    };
   }
 
   private parsePartialOutput(stdout: string | undefined): Issue[] | null {
@@ -157,37 +149,31 @@ export class SemgrepAdapter implements ToolAdapter {
       autoFixable: !!r.extra?.fix,
       source: 'security',
       fingerprint: `semgrep:${r.check_id || ''}:${r.path || ''}:${r.start?.line || 0}`,
-      codeFlows: this.mapCodeFlows(r.dataflow_trace),
+      codeFlows: this.mapDataflowTrace(r),
     }));
   }
 
-  private mapCodeFlows(trace: SemgrepResult['dataflow_trace']): CodeFlow[] | undefined {
-    if (!trace?.code_flows?.length) return undefined;
+  /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过） */
+  private mapDataflowTrace(result: SemgrepResult): CodeFlow[] | undefined {
+    const codeFlows = result.dataflow_trace?.code_flows;
+    if (!codeFlows || codeFlows.length === 0) return undefined;
     const flows: CodeFlow[] = [];
-    for (const cf of trace.code_flows) {
-      if (!cf.thread_flows?.length) continue;
+    for (const codeFlow of codeFlows) {
       const threadFlows: CodeFlowThreadFlow[] = [];
-      for (const tf of cf.thread_flows) {
-        if (!tf.locations?.length) continue;
-        const locations: CodeFlowLocation[] = [];
-        for (const loc of tf.locations) {
-          if (!loc.location) continue;
-          locations.push({
+      for (const threadFlow of codeFlow.thread_flows ?? []) {
+        const locations = (threadFlow.locations ?? [])
+          .filter((loc) => loc.location)
+          .map((loc) => ({
             location: {
-              file: loc.location.path || '',
-              line: loc.location.start?.line,
-              column: loc.location.start?.col,
+              file: loc.location?.path ?? '',
+              line: loc.location?.start?.line ?? 0,
+              column: loc.location?.start?.col ?? 0,
             },
             message: loc.message,
-          });
-        }
-        if (locations.length > 0) {
-          threadFlows.push({ locations });
-        }
+          }));
+        threadFlows.push({ locations });
       }
-      if (threadFlows.length > 0) {
-        flows.push({ threadFlows });
-      }
+      if (threadFlows.length > 0) flows.push({ threadFlows });
     }
     return flows.length > 0 ? flows : undefined;
   }

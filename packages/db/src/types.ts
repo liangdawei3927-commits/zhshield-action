@@ -148,14 +148,24 @@ export interface SaveExperienceParams {
   source?: string;
 }
 
-// ─── Debt Actions & Snapshots ─────────────────────────────
-
-export type DebtActionStatus = 'pending' | 'planned' | 'in-progress' | 'repaid' | 'dismissed';
+export interface SaveDebtActionParams {
+  projectId: string;
+  actionId: string;
+  status: 'pending' | 'planned' | 'in-progress' | 'repaid' | 'dismissed';
+  module: string;
+  category: string;
+  issueIds: string[];
+  interestScore: number;
+  principalEstimate: number;
+  roi: number;
+  sprint?: string;
+  gate?: string;
+}
 
 export interface DebtActionRow {
   project_id: string;
   action_id: string;
-  status: DebtActionStatus;
+  status: 'pending' | 'planned' | 'in-progress' | 'repaid' | 'dismissed';
   module: string;
   category: string;
   issue_ids: string;
@@ -168,34 +178,20 @@ export interface DebtActionRow {
   updated_at: string;
 }
 
-export interface DebtSnapshotRow {
-  id: number;
-  project_id: string;
-  debt_index: number;
-  created_at: string;
-}
-
-export interface SaveDebtActionParams {
-  projectId: string;
-  actionId: string;
-  status: DebtActionStatus;
-  module: string;
-  category: string;
-  issueIds: string[];
-  interestScore: number;
-  principalEstimate: number;
-  roi: number;
-  sprint?: string | null;
-  gate?: string | null;
-}
-
 export interface UpdateDebtActionStatusParams {
   projectId: string;
   actionId: string;
-  status: DebtActionStatus;
+  status: SaveDebtActionParams['status'];
 }
 
 export interface SaveDebtSnapshotParams {
   projectId: string;
   debtIndex: number;
+}
+
+export interface DebtSnapshotRow {
+  id: number;
+  project_id: string;
+  debt_index: number;
+  created_at: string;
 }

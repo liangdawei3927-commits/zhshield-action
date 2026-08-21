@@ -382,32 +382,6 @@ export function findDuplicateCodeBlocks(
   return findDuplicatePairs(blocks).slice(0, 50);
 }
 
-/** 可执行语句行特征：声明赋值/await/控制流/实质返回/调用等真实逻辑，区别于声明、类型注解、JSX、状态设置等样板行 */
-const EXECUTABLE_LINE_PATTERN =
-  /(^\s*(export\s+)?(const|let|var)\s+\w+\s*=)|(^\s*await\b)|(^\s*(if|for|while|switch)\s*\()|(^\s*}\s*else\b)|(^\s*throw\b)|(^\s*new\s+\w)|(^\s*return\s+(?!null\b|true\b|false\b|undefined\b|\(|<)[\w{'"`])|(^\s*(?!catch\b|return\b)[\w$.[\]]+\s*\()|(=>\s*([{([]|[a-zA-Z_$][\w$]*\s*\())|(\.\s*(map|filter|reduce|forEach|then|catch|finally)\s*\()|(^\s*(export\s+)?(async\s+)?function\b)|(^\s*(export\s+)?class\b)/;
-
-const JSX_ELEMENT_LINE = /^\s*</;
-const JSX_RETURN_LINE = /^\s*return\s*\(\s*$/;
-const JSX_SELF_CLOSE_LINE = /\/\s*>/;
-const FLOW_CONTROL_LINE = /^\s*(if|for|while|switch)\s*\(/;
-const STATE_SETTER_LINE = /^\s*set(?!(Timeout|Interval|Immediate)\b)[A-Z]\w*\s*(\(|:)/;
-const SIGNATURE_LINE = /^\s*\)\s*:/;
-const FACTORY_RETURN_LINE = /^\s*return\s+[\w$]+\s*\([^)]*\)\s*=>\s*\{/;
-const REFERENCE_AGGREGATE_LINE = /^\s*return\s*\{\s*[\w$]+(\s*,\s*[\w$]+)*\s*\};?\s*$/;
-
-/** 窗口是否含真实可执行逻辑：纯 JSX 渲染骨架、catch/finally 状态重置、类型声明等样板窗口不参与重复比较 */
-function hasRealLogic(lines: string[]): boolean {
-  const isJsxWindow = lines.some(l => JSX_ELEMENT_LINE.test(l) || JSX_SELF_CLOSE_LINE.test(l) || JSX_RETURN_LINE.test(l));
-  return lines.some(l => {
-    if (STATE_SETTER_LINE.test(l)) return false;
-    if (SIGNATURE_LINE.test(l)) return false;
-    if (FACTORY_RETURN_LINE.test(l)) return false;
-    if (REFERENCE_AGGREGATE_LINE.test(l)) return false;
-    if (isJsxWindow && FLOW_CONTROL_LINE.test(l)) return false;
-    return EXECUTABLE_LINE_PATTERN.test(l);
-  });
-}
-
 /** 滑动窗口收集各文件的归一化代码块 */
 function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
   const blocks: CodeBlock[] = [];
@@ -421,12 +395,6 @@ function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
       // 归一化后为空（纯注释 / 纯空白）的块不参与重复比较：
       // 两个文件的空块会因 '' === '' 被误判为重复
       if (normalized.length === 0) continue;
-      // 归一化后只剩少量标点的块（如右花括号 + 注释 → "}" / "}}")同样不参与：
-      // 这类片段在大量文件中普遍存在，会被误报为重复代码
-      if (normalized.length < 20) continue;
-      // 无可执行语句的窗口（catch 桩 / import 声明 / 类型字段 / 对象属性）不参与：
-      // 它们没有可提取的逻辑，跨文件一致只是样板，提取公共函数无意义
-      if (!hasRealLogic(block.split('\n'))) continue;
       blocks.push({ file: f.filePath, startLine: i + 1, endLine: i + minLines, normalized });
     }
   }

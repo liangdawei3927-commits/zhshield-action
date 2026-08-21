@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { EventCenter, FileMonitor, ProcessMonitor, LogCollector, AutoFixer, DEFAULT_IGNORE_DIRS, defaultFileWatchFilter } from '@zh/sentinel';
+import { EventCenter, FileMonitor, ProcessMonitor, LogCollector, AutoFixer } from '@zh/sentinel';
 import type { SentinelEvent, AlertPayload, EventStatus, EventSeverity } from '@zh/sentinel';
 import { DbConnection } from '@zh/db';
 import * as path from 'path';
@@ -102,13 +102,7 @@ export class SentinelService implements OnModuleDestroy {
   }
 
   async startFileMonitor(projectId: string, watchPaths: string[]): Promise<void> {
-    this.fileMonitor.start({
-      projectId,
-      watchPaths,
-      intervalMs: 5000,
-      ignoreDirs: DEFAULT_IGNORE_DIRS,
-      filter: defaultFileWatchFilter,
-    });
+    this.fileMonitor.start({ projectId, watchPaths });
     this.logger.log(`File monitor started for ${projectId}: ${watchPaths.join(', ')}`);
   }
 

@@ -1,0 +1,112 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 修复建议生成
+# =============================================================================
+# 规则 ID: evolve.suggest.internal.experience-match
+# 治理域: 演进域 (evolve)
+# 动作类型: 修复建议 (suggest)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Evolve 改进建议生成
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.suggest.internal.experience-match"
+  name: "经验库匹配修复"
+  description: "根据检查结果匹配经验库中历史修复方案，按优先级生成可执行的改进建议"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "internal"
+  sourceRef: "05-健康评分与进化系统.md — 3.3 改进建议生成"
+
+governance:
+  domain: "evolve"
+  action: "suggest"
+  module: "Evolve"
+  category: "suggestion"
+  subModule: "experience-matching"
+
+execution:
+  mode: "sync"
+  timeout: 10
+  maxConcurrency: 5
+  retryCount: 0
+  scope: "results"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "suggestion-matcher"
+  toolConfig:
+    matching:
+  algorithm: "rule-id-match"
+  priorityOrder:
+    - exact: true               # 精确匹配规则 ID
+    - partial: true             # 部分匹配规则分类
+    - fallback: "template"      # 兜底使用模板建议
+  maxSuggestions: 5
+
+priority:
+  levels:
+    - "immediate-fix"
+    - "quick-fix"
+    - "optimization"
+  rules:
+    - category: "security"
+      severity: "error"
+      priority: "immediate-fix"
+    - category: "architecture"
+      severity: "error"
+      priority: "immediate-fix"
+    - category: "type-safety"
+      severity: "error"
+      priority: "quick-fix"
+    - category: "quality"
+      severity: "warning"
+      priority: "optimization"
+  severity: "info"
+  categories:
+    - "suggestion"
+    - "experience-matching"
+    - "knowledge-base"
+
+judgment:
+  passCondition: "matchFound"
+  blockOn: "none"
+  priority: "medium"
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 30
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    经验库匹配结果
+
+    ⚠️ 匹配算法: {algorithm}
+    ⚠️ 匹配规则: {ruleId}
+    ⚠️ 建议数: {suggestionCount}
+
+    {suggestions}
+
+    修复优先级:
+    - immediate-fix: 立即修复（安全/架构错误）
+    - quick-fix: 快速修复（类型安全错误）
+    - optimization: 优化建议（质量警告）
+
+    📖 参考: 05-健康评分与进化系统.md — 3.3 改进建议生成
+
+standards:
+  osps: []

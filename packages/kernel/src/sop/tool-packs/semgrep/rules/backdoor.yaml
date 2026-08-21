@@ -1,0 +1,103 @@
+# Semgrep Security Rules - 智汇码盾 Tool Pack
+rules:
+  - id: detect-sql-injection
+    pattern: |
+      $QUERY = "..." + $INPUT
+      $DB.query($QUERY)
+    message: "Potential SQL injection via string concatenation"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-89"
+      
+  - id: detect-xss-vulnerability
+    pattern: |
+      $EL.innerHTML = $USER_INPUT
+    message: "XSS vulnerability: use textContent or sanitize input"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-79"
+      
+  - id: detect-command-injection
+    pattern: |
+      child_process.exec($USER_INPUT)
+    message: "Command injection: avoid exec with user input"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-78"
+
+  - id: detect-path-traversal
+    pattern: |
+      fs.readFile($USER_INPUT, ...)
+    message: "Potential path traversal: validate file path"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-22"
+
+  - id: detect-prototype-pollution
+    pattern: |
+      $OBJ[$KEY] = $VALUE
+    message: "Potential prototype pollution: validate key"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-1321"
+
+  - id: detect-open-redirect
+    pattern: |
+      res.redirect($USER_INPUT)
+    message: "Open redirect: validate redirect URL"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-601"
+
+  # NestJS Security Rules
+  - id: nestjs-disable-auto-serialize
+    pattern: |
+      @Controller('...')
+    message: "NestJS: Enable class-validator for DTO validation"
+    severity: INFO
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-validate-input
+    pattern: |
+      @Body() $BODY: any
+    message: "NestJS: Use typed DTO instead of 'any' for request body"
+    severity: WARNING
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-sql-injection
+    pattern: |
+      $QUERY = "SELECT * FROM " + $TABLE
+    message: "NestJS: Use parameterized queries"
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-unsafe-eval
+    pattern: |
+      eval($CODE)
+    message: "NestJS: Avoid eval() in server code"
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs

@@ -10,7 +10,7 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "lint": "eslint src --max-warnings 100",
+    "lint": "eslint src --max-warnings 50",
     "merge-fragments": "node scripts/merge-fragments.mjs"
   },
   "dependencies": {

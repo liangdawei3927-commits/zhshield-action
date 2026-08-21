@@ -1,9 +1,9 @@
 import type { EventBus } from '../../bus';
 import type {
   SopRule,
-  RuleServes,
   SopRuleFilter,
   SopRuleStats,
+  SopServes,
   GovernanceDomain,
   ActionType,
   RuleLifecycleStatus,
@@ -132,36 +132,32 @@ export class SopRegistry {
     return this.getAll().filter((r) => r.status === 'active');
   }
 
-  // ─── 能力声明查询 ────────────────────────────────────────
-
-  /**
-   * 聚合所有已注册规则的 serves 声明（语言/形态/架构去重合并）。
-   * 空注册表或全部未声明时返回空对象。
-   */
-  getAllServes(): RuleServes {
-    return this.mergeServes(this.getAll());
+  /** 聚合全部规则的能力声明（去重，空类别省略） */
+  getAllServes(): SopServes {
+    return this.aggregateServes(this.getAll());
   }
 
-  /**
-   * 按治理域聚合 serves 声明。
-   * 该域无规则声明 serves 时返回空对象。
-   */
-  getServes(domain: GovernanceDomain): RuleServes {
-    return this.mergeServes(this.getByDomain(domain));
+  /** 聚合指定治理域内规则的能力声明（去重，空类别省略） */
+  getServes(domain: GovernanceDomain): SopServes {
+    return this.aggregateServes(this.getByDomain(domain));
   }
 
-  private mergeServes(rules: SopRule[]): RuleServes {
-    const merged: RuleServes = {};
+  private aggregateServes(rules: SopRule[]): SopServes {
+    const languages = new Set<string>();
+    const productForms = new Set<string>();
+    const architectures = new Set<string>();
+
     for (const rule of rules) {
-      if (!rule.serves) continue;
-      for (const key of ['languages', 'productForms', 'architectures'] as const) {
-        const values = rule.serves[key];
-        if (values) {
-          merged[key] = [...new Set([...(merged[key] ?? []), ...values])];
-        }
-      }
+      for (const lang of rule.serves?.languages ?? []) languages.add(lang);
+      for (const form of rule.serves?.productForms ?? []) productForms.add(form);
+      for (const arch of rule.serves?.architectures ?? []) architectures.add(arch);
     }
-    return merged;
+
+    const serves: SopServes = {};
+    if (languages.size > 0) serves.languages = [...languages];
+    if (productForms.size > 0) serves.productForms = [...productForms];
+    if (architectures.size > 0) serves.architectures = [...architectures];
+    return serves;
   }
 
   // ─── 统计 ──────────────────────────────────────────────────

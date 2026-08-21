@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import { parseFile, type ParsedFile } from './ast-helper';
 import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
 import type {
@@ -56,24 +55,22 @@ export class RefactorEngine {
 
   async analyzeDirectory(
     projectRoot: string,
-    locale?: LanguageCode,
   ): Promise<RefactorReport> {
-    const tsFiles = this.collectTsFiles(projectRoot, locale);
-    return this.analyzeFiles(projectRoot, tsFiles, locale);
+    const tsFiles = this.collectTsFiles(projectRoot);
+    return this.analyzeFiles(projectRoot, tsFiles);
   }
 
   async analyzeFiles(
     projectRoot: string,
     filePaths: string[],
-    locale?: LanguageCode,
   ): Promise<RefactorReport> {
     const { parsedFiles, parseErrors } = await this.parseFiles(filePaths);
     if (parseErrors.length > 0) {
-      warn(translate('engine.refactor.warn.parseFailed', locale ?? DEFAULT_LANGUAGE, { count: parseErrors.length, example: parseErrors[0] }));
+      warn(`无法解析 ${parseErrors.length} 个文件 (如: ${parseErrors[0]})`);
     }
 
     const { fileReports, totalSmells, byCategory, bySeverity, suggestionsByType } =
-      await this.detectFileReports(parsedFiles, locale);
+      await this.detectFileReports(parsedFiles);
     fileReports.sort((a, b) => b.maintainabilityScore - a.maintainabilityScore);
 
     return {
@@ -129,11 +126,11 @@ export class RefactorEngine {
     return { parsedFiles, parseErrors };
   }
 
-  private async detectFileReports(parsedFiles: ParsedFile[], locale?: LanguageCode): Promise<ReportState> {
+  private async detectFileReports(parsedFiles: ParsedFile[]): Promise<ReportState> {
     const state = this.initReportState();
 
     for (let i = 0; i < parsedFiles.length; i++) {
-      this.processFileReport(parsedFiles[i], parsedFiles, state, locale);
+      this.processFileReport(parsedFiles[i], parsedFiles, state);
       // 每检测 5 个文件让出事件循环（每个文件跑 20 个检测器，比解析更耗时）
       if (i > 0 && i % 5 === 0) {
         await yieldToEventLoop();
@@ -159,9 +156,8 @@ export class RefactorEngine {
     parsed: ParsedFile,
     parsedFiles: ParsedFile[],
     state: ReportState,
-    locale?: LanguageCode,
   ): void {
-    const fileSmells = this.detectAllSmells(parsed, parsedFiles, locale);
+    const fileSmells = this.detectAllSmells(parsed, parsedFiles);
     if (fileSmells.length === 0) return;
 
     const maintainabilityScore = this.calculateMaintainability(fileSmells);
@@ -185,7 +181,6 @@ export class RefactorEngine {
 
   async analyzeStagedFiles(
     projectRoot: string,
-    locale?: LanguageCode,
   ): Promise<RefactorReport> {
     const { execSync } = await import('child_process');
     try {
@@ -197,21 +192,21 @@ export class RefactorEngine {
         .split('\n')
         .filter(f => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx')))
         .map(f => path.resolve(projectRoot, f));
-      return this.analyzeFiles(projectRoot, stagedFiles, locale);
+      return this.analyzeFiles(projectRoot, stagedFiles);
     } catch (e) {
-      warn(translate('engine.refactor.warn.gitDiffFailed', locale ?? DEFAULT_LANGUAGE, { error: String(e) }));
-      return this.analyzeFiles(projectRoot, [], locale);
+      warn(`Git diff 失败: ${e}`);
+      return this.analyzeFiles(projectRoot, []);
     }
   }
 
-  private detectAllSmells(parsed: ParsedFile, allFiles: ParsedFile[], locale?: LanguageCode): CodeSmell[] {
+  private detectAllSmells(parsed: ParsedFile, allFiles: ParsedFile[]): CodeSmell[] {
     const allSmells: CodeSmell[] = [];
     for (const detector of this.detectors) {
       try {
-        const found = detector.detect(parsed, allFiles, this.config, locale);
+        const found = detector.detect(parsed, allFiles, this.config);
         allSmells.push(...found);
       } catch (e) {
-        warn(translate('engine.refactor.warn.detectorFailed', locale ?? DEFAULT_LANGUAGE, { name: detector.name, error: String(e) }));
+        warn(`检测器 ${detector.name} 执行失败: ${e}`);
       }
     }
     return allSmells;
@@ -240,14 +235,14 @@ export class RefactorEngine {
   }
 
   /** 为指定代码异味生成自动修复建议 */
-  async generateFixes(projectRoot: string, smells?: CodeSmell[], locale?: LanguageCode): Promise<Fix[]> {
+  async generateFixes(projectRoot: string, smells?: CodeSmell[]): Promise<Fix[]> {
     if (smells) {
-      return generateFixes(smells, projectRoot, locale);
+      return generateFixes(smells, projectRoot);
     }
     // 若无指定，先扫描再生成
-    const report = await this.analyzeDirectory(projectRoot, locale);
+    const report = await this.analyzeDirectory(projectRoot);
     const allSmells = report.files.flatMap(f => f.smells);
-    return generateFixes(allSmells, projectRoot, locale);
+    return generateFixes(allSmells, projectRoot);
   }
 
   /** 应用修复编辑 */
@@ -255,19 +250,19 @@ export class RefactorEngine {
     return applyFixes(fixes);
   }
 
-  private collectTsFiles(dir: string, locale?: LanguageCode): string[] {
+  private collectTsFiles(dir: string): string[] {
     const files: string[] = [];
-    this.walkTsFiles(dir, files, locale);
+    this.walkTsFiles(dir, files);
     return files;
   }
 
   /** 递归遍历目录收集 TypeScript 源文件 */
-  private walkTsFiles(current: string, files: string[], locale?: LanguageCode): void {
+  private walkTsFiles(current: string, files: string[]): void {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(current, { withFileTypes: true });
     } catch (e) {
-      warn(translate('engine.refactor.warn.dirAccessFailed', locale ?? DEFAULT_LANGUAGE, { dir: current, error: String(e) }));
+      warn(`无法访问目录 ${current}: ${e}`);
       return;
     }
 
@@ -275,7 +270,7 @@ export class RefactorEngine {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
         if (this.isExcludedDir(entry.name)) continue;
-        this.walkTsFiles(fullPath, files, locale);
+        this.walkTsFiles(fullPath, files);
         continue;
       }
       if (entry.isFile() && this.isTsSourceFile(entry.name)) {

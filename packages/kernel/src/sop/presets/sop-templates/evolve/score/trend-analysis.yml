@@ -1,0 +1,138 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 评分趋势分析
+# =============================================================================
+# 规则 ID: evolve.score.internal.trend-analysis
+# 治理域: 演进域 (evolve)
+# 动作类型: 评分量化 (score)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Scoring · 趋势分析
+# 内部标准源: Palisade 30-day posture scoring · OSPS-QS
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.score.internal.trend-analysis"
+  name: "评分趋势分析"
+  description: "对代码质量评分进行 30 天趋势分析：检测评分趋势方向（上升/稳定/下降）、识别回归触发位置、计算改进速率、预测达到目标等级所需时间"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "Palisade posture trends · OSPS-QS"
+
+governance:
+  domain: "evolve"
+  action: "score"
+  module: "Evolve"
+  category: "scoring"
+
+execution:
+  mode: "periodic"
+  timeout: 60
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "daily"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "trend-analyzer"
+  toolConfig:
+    windowDays: 30
+    metrics:
+      - name: "overall-score"
+        type: "weighted-composite"
+        regressionThreshold: -5       # 30 天内下降超过 5 分触发回归告警
+      - name: "guard-block-rate"
+        type: "percentage"
+        direction: "upward-preferred"
+        regressionThreshold: -10
+      - name: "security-vuln-density"
+        type: "count-per-kloc"
+        direction: "downward-preferred"
+        regressionThreshold: 0.5
+      - name: "sentinel-mttr"
+        type: "minutes"
+        direction: "downward-preferred"
+        regressionThreshold: 30
+      - name: "evolve-calibration-accuracy"
+        type: "percentage"
+        direction: "upward-preferred"
+        regressionThreshold: -5
+    alerts:
+      regression:
+        severity: "high"
+        message: "评分趋势回归：{metric} 在 {window} 天内下降 {delta} 分"
+      improvement:
+        severity: "info"
+        message: "评分趋势上升：{metric} 在 {window} 天内上升 {delta} 分"
+      stagnation:
+        severity: "warning"
+        message: "评分趋势停滞：{metric} 在 {window} 天内变化小于 {threshold}"
+    prediction:
+      enabled: true
+      method: "linear-regression"
+      forecastDays: 30
+  severity: "info"
+  categories:
+    - "trend-analysis"
+    - "scoring"
+    - "analytics"
+    - "governance"
+
+judgment:
+  passCondition: "noRegressionFound"
+  blockOn: "none"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-01"
+    - "OSPS-QS-04"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 0
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    评分趋势报告 (30 天)
+
+    📊 综合评分:
+    - 当前: {currentScore} ( {trend} )
+    - 30 天前: {previousScore}
+    - 变化: {delta} 分
+    - 趋势方向: {direction}
+
+    📉 回归指标:
+    {regressionList}
+
+    📈 改进指标:
+    {improvementList}
+
+    🔮 预测:
+    - 30 天后预计评分: {predictedScore}
+    - 达到目标等级(S/A)预计还需: {estimatedDays} 天
+
+    建议:
+    1. 重点改进回归指标对应的域规则
+    2. 检查回归原因是否与近期代码变更相关
+    3. 校准规则阈值以减少误报
+
+    📖 参考: Palisade 30-day posture · OSPS-QS

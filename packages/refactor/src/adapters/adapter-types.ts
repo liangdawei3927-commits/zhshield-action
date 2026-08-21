@@ -1,11 +1,10 @@
 import type { IssueSeverity } from '@zh/shared';
-import type { LanguageCode } from '@zh/i18n';
 import type { ParsedFile } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 
 export interface DetectorSet {
   name: string;
-  detect: (parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig, locale?: LanguageCode) => CodeSmell[];
+  detect: (parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig) => CodeSmell[];
 }
 
 /** makeSmell 参数对象 — 替代 12 个位置参数 */

@@ -5,8 +5,7 @@ import type {
   RuleEngineReport,
   ContentInstruction,
 } from './sop/_meta/rule-evaluation';
-import type { ToolAdapter, KernelEventMap } from '@zh/shared';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
+import type { ToolAdapter } from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
@@ -15,14 +14,11 @@ import type { EngineHost, GuardEngineLike, InspectEngineLike } from './runner/ev
 import { evalPatternScan, evalForbidden, evalThreshold, evalLayerBoundary } from './runner/inline-evaluators';
 import { evalCheckList, evalScannerDispatch, evalToolDispatch, evalPreset } from './runner/dispatch-evaluators';
 
-/** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型。
- *  threshold 也在此列：evalThreshold → tryQueryThreshold → guardEngine.run 会重入引擎，
- *  若不拦截会形成 evaluateRules → threshold → run → evaluateRules 死循环。 */
-const ENGINE_DISPATCH_TYPES = new Set<ContentInstruction['type']>([
+/** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
+const ENGINE_DISPATCH_TYPES = new Set([
   'preset',
   'scanner-dispatch',
   'check-list',
-  'threshold',
 ]);
 
 /**
@@ -64,17 +60,16 @@ export class SopRuleEngine {
       rule: SopRule,
       instr: Extract<ContentInstruction, { type: K }>,
       context: RuleContext,
-      locale?: LanguageCode,
     ) => RuleEvaluation | Promise<RuleEvaluation>;
   }> = {
-    'pattern-scan': (rule, instr, ctx, locale) => evalPatternScan(rule, instr, ctx, locale),
-    'forbidden': (rule, instr, ctx, locale) => evalForbidden(rule, instr, ctx, locale),
-    'threshold': (rule, instr, ctx, locale) => evalThreshold(rule, instr, ctx, this.guardEngine, locale),
-    'check-list': (rule, instr, ctx, locale) => evalCheckList(this.host, rule, instr, ctx, locale),
-    'layer-boundary': (rule, instr, ctx, locale) => evalLayerBoundary(rule, instr, ctx, locale),
-    'scanner-dispatch': (rule, instr, ctx, locale) => evalScannerDispatch(this.host, rule, instr, ctx, locale),
-    'preset': (rule, instr, ctx, locale) => evalPreset(this.host, rule, instr, ctx, locale),
-    'tool-dispatch': (rule, instr, ctx, locale) => evalToolDispatch(this.host, rule, instr, ctx, locale),
+    'pattern-scan': (rule, instr, ctx) => evalPatternScan(rule, instr, ctx),
+    'forbidden': (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
+    'threshold': (rule, instr, ctx) => evalThreshold(rule, instr, ctx, this.guardEngine),
+    'check-list': (rule, instr, ctx) => evalCheckList(this.host, rule, instr, ctx),
+    'layer-boundary': (rule, instr, ctx) => evalLayerBoundary(rule, instr, ctx),
+    'scanner-dispatch': (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),
+    'preset': (rule, instr, ctx) => evalPreset(this.host, rule, instr, ctx),
+    'tool-dispatch': (rule, instr, ctx) => evalToolDispatch(this.host, rule, instr, ctx),
   };
 
   /**
@@ -128,7 +123,7 @@ export class SopRuleEngine {
   /**
    * 评估规则：按 context 过滤 → 解释 → 执行 → 聚合
    */
-  async evaluateRules(context: RuleContext, locale?: LanguageCode): Promise<RuleEngineReport> {
+  async evaluateRules(context: RuleContext): Promise<RuleEngineReport> {
     const start = Date.now();
     const nested = this.evalDepth > 0;
     this.evalDepth += 1;
@@ -137,9 +132,9 @@ export class SopRuleEngine {
       const rules = this.filterRulesByContext(context);
       const evaluations = rules.length === 0
         ? []
-        : await this.evaluateAll(rules, context, nested, locale);
+        : await this.evaluateAll(rules, context, nested);
 
-      const report = this.aggregate(evaluations, Date.now() - start, context.dryRun);
+      const report = this.aggregate(evaluations, Date.now() - start);
       await this.emit('rule-engine:evaluated', report);
       return report;
     } finally {
@@ -158,13 +153,13 @@ export class SopRuleEngine {
     return rules;
   }
 
-  private async evaluateAll(rules: SopRule[], context: RuleContext, nested: boolean, locale?: LanguageCode): Promise<RuleEvaluation[]> {
+  private async evaluateAll(rules: SopRule[], context: RuleContext, nested: boolean): Promise<RuleEvaluation[]> {
     const evaluations: RuleEvaluation[] = [];
     for (const rule of rules) {
       const evalStart = Date.now();
       const instruction = this.interpreter.interpret(rule);
       try {
-        const result = await this.evaluateOne(rule, instruction, context, nested, locale);
+        const result = await this.evaluateOne(rule, instruction, context, nested);
         result.durationMs = Date.now() - evalStart;
         evaluations.push(result);
       } catch (err) {
@@ -180,20 +175,25 @@ export class SopRuleEngine {
     instruction: ContentInstruction,
     context: RuleContext,
     nested: boolean,
-    locale?: LanguageCode,
   ): Promise<RuleEvaluation> {
     const engine = rule.domain === 'guard' ? ('guard' as const) : ('inspect' as const);
+    // dryRun 模式：跳过所有外部派发（scanner-dispatch / tool-dispatch / preset / check-list / threshold）
+    if (context.dryRun && this.isExternalDispatch(instruction.type)) {
+      return this.skipEvaluation(rule, `[dryRun] 跳过外部工具: ${instruction.type}`, engine);
+    }
+
     // 嵌套评估时跳过会回调用引擎的指令，切断
     // evaluateRules → preset/scanner/check-list → runScan/run → evaluateRules 死循环
     if (nested && ENGINE_DISPATCH_TYPES.has(instruction.type)) {
-      return this.skipEvaluation(
-        rule,
-        translate('engine.kernel.runner.skipNestedDispatch', locale ?? DEFAULT_LANGUAGE, { type: instruction.type }),
-        engine,
-      );
+      return this.skipEvaluation(rule, `跳过嵌套 ${instruction.type} 派发（防止规则引擎重入）`, engine);
     }
 
-    return this.evaluateSingle(rule, instruction, context, locale);
+    return this.evaluateSingle(rule, instruction, context);
+  }
+
+  private isExternalDispatch(type: ContentInstruction['type']): boolean {
+    return type === 'scanner-dispatch' || type === 'tool-dispatch'
+      || type === 'preset' || type === 'check-list' || type === 'threshold';
   }
 
   private skipEvaluation(rule: SopRule, message: string, targetEngine: 'guard' | 'inspect'): RuleEvaluation {
@@ -221,15 +221,15 @@ export class SopRuleEngine {
   /**
    * SOP 驱动型 Guard 检查 — 筛选 guard domain 规则执行
    */
-  async runGuard(context: RuleContext, locale?: LanguageCode): Promise<RuleEngineReport> {
-    return this.evaluateRules({ ...context, domain: 'guard' }, locale);
+  async runGuard(context: RuleContext): Promise<RuleEngineReport> {
+    return this.evaluateRules({ ...context, domain: 'guard' });
   }
 
   /**
    * SOP 驱动型 Inspect 巡检 — 筛选 inspect / security domain 规则执行
    */
-  async runInspect(context: RuleContext, locale?: LanguageCode): Promise<RuleEngineReport> {
-    return this.evaluateRules({ ...context, domain: context.domain ?? 'inspect' }, locale);
+  async runInspect(context: RuleContext): Promise<RuleEngineReport> {
+    return this.evaluateRules({ ...context, domain: context.domain ?? 'inspect' });
   }
 
   // ─── 单条规则评估 ──────────────────────────────────────
@@ -238,10 +238,9 @@ export class SopRuleEngine {
     rule: SopRule,
     instruction: ContentInstruction,
     context: RuleContext,
-    locale?: LanguageCode,
   ): Promise<RuleEvaluation> {
     const evaluator = this.evaluators[instruction.type] as
-      | ((rule: SopRule, instr: ContentInstruction, context: RuleContext, locale?: LanguageCode) => RuleEvaluation | Promise<RuleEvaluation>)
+      | ((rule: SopRule, instr: ContentInstruction, context: RuleContext) => RuleEvaluation | Promise<RuleEvaluation>)
       | undefined;
     if (!evaluator) {
       return {
@@ -253,17 +252,15 @@ export class SopRuleEngine {
         timestamp: new Date(),
       };
     }
-    return evaluator(rule, instruction, context, locale);
+    return evaluator(rule, instruction, context);
   }
 
   // ─── 辅助 ──────────────────────────────────────────────
 
   /**
    * 聚合评估结果
-   * dryRun（只报告不阻断）下 ok 置为 null，与 GuardReport.ok 语义对齐；
-   * 阻断判定（ok !== false）由调用方负责。
    */
-  private aggregate(evaluations: RuleEvaluation[], durationMs: number, dryRun?: boolean): RuleEngineReport {
+  private aggregate(evaluations: RuleEvaluation[], durationMs: number): RuleEngineReport {
     const passed = evaluations.filter((e) => e.status === 'passed').length;
     const failed = evaluations.filter((e) => e.status === 'failed').length;
     const errors = evaluations.filter((e) => e.status === 'error').length;
@@ -277,14 +274,14 @@ export class SopRuleEngine {
       failed,
       errors,
       skipped,
-      ok: dryRun ? null : failed === 0 && errors === 0,
+      ok: failed === 0 && errors === 0,
       evaluations,
       durationMs,
       timestamp: new Date(),
     };
   }
 
-  private async emit(event: keyof KernelEventMap & string, payload: RuleEngineReport): Promise<void> {
+  private async emit(event: string, payload: RuleEngineReport): Promise<void> {
     try {
       await this.eventBus.emit(event, payload);
     } catch {

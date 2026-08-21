@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { sanitizeEnv } from '@zh/shared';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
 
 const execFileAsync = promisify(execFile);
@@ -99,7 +98,6 @@ export class GuardESLintCheckAdapter implements Adapter {
         cwd: targetDir,
         timeout: 60000,
         maxBuffer: 10 * 1024 * 1024,
-        env: sanitizeEnv(),
       },
     );
   }

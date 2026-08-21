@@ -50,49 +50,6 @@ describe('SopSigner', () => {
     });
   });
 
-  // ─── Ed25519 非对称签名（现行） ─────────────────
-  describe('Ed25519 签名 / 验签', () => {
-    it('generateKeyPair 应返回 PEM 格式密钥对', () => {
-      const { publicKey, privateKey } = SopSigner.generateKeyPair();
-      expect(publicKey).toContain('BEGIN PUBLIC KEY');
-      expect(privateKey).toContain('BEGIN PRIVATE KEY');
-    });
-
-    it('signPackageWithKey / verifyPackageWithKey 往返应验证通过', () => {
-      const { publicKey, privateKey } = SopSigner.generateKeyPair();
-      const pkg = SopSigner.signPackageWithKey(rules, privateKey, '1.0.0');
-      expect(pkg.version).toBe('1.0.0');
-      expect(pkg.algorithm).toBe('ed25519');
-      expect(pkg.publicKey).toBe(publicKey);
-      expect(pkg.rules.map((r) => r.id)).toEqual(['rule-a', 'rule-b']);
-      const result = SopSigner.verifyPackageWithKey(pkg, publicKey);
-      expect(result.valid).toBe(true);
-    });
-
-    it('规则被篡改应拒绝（hash 不匹配，防篡改）', () => {
-      const { publicKey, privateKey } = SopSigner.generateKeyPair();
-      const pkg = SopSigner.signPackageWithKey(rules, privateKey);
-      const tampered = { ...pkg, rules: [...rules, makeRule({ id: 'injected' })] };
-      const result = SopSigner.verifyPackageWithKey(tampered, publicKey);
-      expect(result.valid).toBe(false);
-      expect(result.reason).toBe('hash_mismatch');
-    });
-
-    it('错误公钥应拒绝（签名不匹配，防伪造）', () => {
-      const { privateKey } = SopSigner.generateKeyPair();
-      const other = SopSigner.generateKeyPair();
-      const pkg = SopSigner.signPackageWithKey(rules, privateKey);
-      const result = SopSigner.verifyPackageWithKey(pkg, other.publicKey);
-      expect(result.valid).toBe(false);
-      expect(result.reason).toBe('signature_mismatch');
-    });
-
-    it('derivePublicKey 应与 generateKeyPair 的公钥一致', () => {
-      const { publicKey, privateKey } = SopSigner.generateKeyPair();
-      expect(SopSigner.derivePublicKey(privateKey)).toBe(publicKey);
-    });
-  });
-
   // ─── 请求签名 ─────────────────────────────────────
   describe('signRequest / verifyRequest', () => {
     it('有效请求签名应验证通过（往返）', () => {

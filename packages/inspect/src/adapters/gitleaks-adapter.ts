@@ -1,17 +1,17 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
-const META: Omit<ToolMeta, 'description'> = {
+const META: ToolMeta = {
   id: 'gitleaks',
   name: 'Gitleaks',
   category: 'inspect',
   priority: 'P0',
   installMode: 'builtin',
+  description: '硬编码密钥扫描',
   cliCommand: 'gitleaks',
   homepage: 'https://github.com/gitleaks/gitleaks',
   license: 'MIT',
@@ -27,17 +27,7 @@ interface GitleaksFinding {
 }
 
 export class GitleaksAdapter implements ToolAdapter {
-  meta: ToolMeta;
-  private readonly locale: LanguageCode;
-
-  constructor(locale?: LanguageCode) {
-    this.locale = locale ?? DEFAULT_LANGUAGE;
-    this.meta = { ...META, description: translate('engine.inspect.tool.gitleaks.description', this.locale) };
-  }
-
-  private tr(key: string, params?: Record<string, unknown>): string {
-    return translate(key, this.locale, params);
-  }
+  meta = META;
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -53,76 +43,28 @@ export class GitleaksAdapter implements ToolAdapter {
     const isStaged = !!(options.targetFiles && options.targetFiles.length > 0);
 
     try {
-      const stdout = await this.runGitleaks(options, isStaged);
-      const findings = this.parseGitleaksOutput(stdout);
+      const { stdout } = await execFileAsync('gitleaks', this.buildArgs(options, isStaged), {
+        cwd: options.projectPath,
+        timeout: options.timeout || 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const parsed = JSON.parse(stdout);
+      const findings = Array.isArray(parsed) ? parsed : (parsed?.findings || []);
       return this.buildAvailable(findings, start);
     } catch (error: unknown) {
-      return this.buildScanError(start, error);
-    }
-  }
+      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+      if (err.code === 'ENOENT') {
+        return this.buildUnavailable(start, 'Gitleaks 未安装或未在 PATH 中找到');
+      }
 
-  private async runGitleaks(options: ToolScanOptions, isStaged: boolean): Promise<string> {
-    // gitleaks v8.19+ 移除了 --staged 标志：暂存区扫描改为 git diff --staged | gitleaks detect --pipe
-    if (isStaged) {
-      const { stdout: diff } = await execFileAsync(
-        'git',
-        ['diff', '--staged', '--', ...(options.targetFiles ?? [])],
-        { cwd: options.projectPath, maxBuffer: 10 * 1024 * 1024 },
-      );
-      return this.runGitleaksPipe(diff, options);
+      // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
+      const partialFindings = this.parsePartialFindings(err.stdout ?? '');
+      if (partialFindings) {
+        return this.buildAvailable(partialFindings, start);
+      }
+      return this.buildError(start, err.stderr || err.message || 'Gitleaks 执行失败');
     }
-    const { stdout } = await execFileAsync('gitleaks', this.buildArgs(options), {
-      cwd: options.projectPath,
-      timeout: options.timeout || 30000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return stdout;
-  }
-
-  /** gitleaks detect --pipe 需要从 stdin 读取 diff，execFile 无法注入 stdin，改用 spawn */
-  private runGitleaksPipe(diff: string, options: ToolScanOptions): Promise<string> {
-    const args = ['detect', '--pipe', '--report-format', 'json', '--report-path', '-'];
-    if (options.config?.config) {
-      args.push('--config', options.config.config);
-    }
-    return new Promise((resolve, reject) => {
-      const child = spawn('gitleaks', args, { cwd: options.projectPath });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString();
-      });
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-      child.on('error', reject);
-      child.on('close', (code) => {
-        // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
-        if (code !== 0 && !stdout) reject(new Error(stderr || `gitleaks exited with code ${code}`));
-        else resolve(stdout);
-      });
-      child.stdin.on('error', reject);
-      child.stdin.end(diff);
-    });
-  }
-
-  private parseGitleaksOutput(stdout: string): Record<string, unknown>[] {
-    const parsed = JSON.parse(stdout);
-    return Array.isArray(parsed) ? parsed : (parsed?.findings || []);
-  }
-
-  private buildScanError(start: number, error: unknown): ToolResult {
-    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
-      return this.buildUnavailable(start, this.tr('engine.inspect.tool.gitleaks.unavailable'));
-    }
-
-    // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
-    const partialFindings = this.parsePartialFindings(err.stdout ?? '');
-    if (partialFindings) {
-      return this.buildAvailable(partialFindings, start);
-    }
-    return this.buildError(start, err.stderr || err.message || this.tr('engine.inspect.tool.gitleaks.runFailed'));
   }
 
   private parsePartialFindings(stdout: string): Record<string, unknown>[] | null {
@@ -136,17 +78,11 @@ export class GitleaksAdapter implements ToolAdapter {
     }
   }
 
-  private buildArgs(options: ToolScanOptions): string[] {
-    // gitleaks v8.16+ 使用 --report-format/--report-path，旧的 --format 已被移除
-    const args = [
-      'detect',
-      '--source',
-      options.projectPath,
-      '--report-format',
-      'json',
-      '--report-path',
-      '-',
-    ];
+  private buildArgs(options: ToolScanOptions, isStaged: boolean): string[] {
+    const args = ['detect', '--source', options.projectPath, '--format', 'json'];
+    if (isStaged) {
+      args.push('--staged');
+    }
     if (options.config?.config) {
       args.push('--config', options.config.config);
     }
@@ -157,7 +93,7 @@ export class GitleaksAdapter implements ToolAdapter {
     return {
       tool: 'gitleaks',
       status: 'available',
-      issues: this.mapOutput(findings, this.locale),
+      issues: this.mapOutput(findings),
       metadata: {
         version: '',
         duration: Date.now() - start,
@@ -187,9 +123,8 @@ export class GitleaksAdapter implements ToolAdapter {
     };
   }
 
-  private mapOutput(findings: Record<string, unknown>[], locale?: LanguageCode): Issue[] {
+  private mapOutput(findings: Record<string, unknown>[]): Issue[] {
     if (!Array.isArray(findings)) return [];
-    const lng = locale ?? DEFAULT_LANGUAGE;
     return findings.map((f) => {
       const finding = f as GitleaksFinding;
       return {
@@ -197,11 +132,11 @@ export class GitleaksAdapter implements ToolAdapter {
         ruleId: finding.RuleID || 'gitleaks-unknown',
         severity: 'error',
         category: 'security',
-        message: finding.Description || translate('engine.inspect.tool.gitleaks.hardcodedSecret', lng, { rule: finding.RuleID || translate('engine.inspect.unknown', lng) }),
+        message: finding.Description || `检测到硬编码密钥: ${finding.RuleID || '未知'}`,
         file: finding.File || '',
         line: finding.StartLine || 0,
         column: finding.StartColumn || 0,
-        suggestion: translate('engine.inspect.tool.gitleaks.removeSecret', lng),
+        suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
         autoFixable: false,
         source: 'inspect',
         fingerprint: `gitleaks:${finding.RuleID || ''}:${finding.File || ''}:${finding.StartLine || 0}`,

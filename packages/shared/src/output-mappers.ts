@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { Issue, ToolOutputMapper } from './types';
 
 // ─── 工具原始输出类型（仅声明 mapper 实际读取的字段）─────────
@@ -87,7 +86,7 @@ interface JscpdOutput { duplicates?: JscpdDuplicate[] }
 
 // ─── Mappers ──────────────────────────────────────────────
 
-export const eslintMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const eslintMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   if (!Array.isArray(output)) return [];
   const issues: Issue[] = [];
   for (const file of output as EslintFile[]) {
@@ -103,7 +102,7 @@ export const eslintMapper = (output: unknown, locale?: LanguageCode): Issue[] =>
         file: file.filePath || '',
         line: msg.line || 0,
         column: msg.column || 0,
-        suggestion: msg.fix ? translate('engine.output.autoFixable', locale ?? DEFAULT_LANGUAGE) : msg.suggestions?.map((s) => s.desc).join('; ') || undefined,
+        suggestion: msg.fix ? '可自动修复' : msg.suggestions?.map((s) => s.desc).join('; ') || undefined,
         autoFixable: !!msg.fix,
         source: 'inspect',
         fingerprint: `${msg.ruleId}:${file.filePath || ''}:${msg.line || 0}`,
@@ -132,7 +131,7 @@ export const semgrepMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   }));
 };
 
-export const trivyMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const trivyMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   const data = output as TrivyOutput | undefined;
   if (!data?.Results || !Array.isArray(data.Results)) return [];
   const issues: Issue[] = [];
@@ -149,7 +148,7 @@ export const trivyMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
           file: result.Target || '',
           line: 0,
           column: 0,
-          suggestion: vuln.FixedVersion ? translate('engine.output.upgradeTo', locale ?? DEFAULT_LANGUAGE, { version: vuln.FixedVersion }) : undefined,
+          suggestion: vuln.FixedVersion ? `升级到 ${vuln.FixedVersion}` : undefined,
           autoFixable: !!vuln.FixedVersion,
           source: 'security',
           fingerprint: `trivy:${vuln.VulnerabilityID || ''}:${result.Target || ''}:${vuln.PkgName || ''}`,
@@ -167,7 +166,7 @@ export const trivyMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
           file: secret.File || result.Target || '',
           line: secret.StartLine || 0,
           column: 0,
-          suggestion: translate('engine.output.removeHardcodedSecret', locale ?? DEFAULT_LANGUAGE),
+          suggestion: '移除硬编码的密钥，使用环境变量或密钥管理服务',
           autoFixable: false,
           source: 'security',
           fingerprint: `trivy-secret:${secret.RuleID || ''}:${secret.File || ''}:${secret.StartLine || 0}`,
@@ -178,7 +177,7 @@ export const trivyMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
   return issues;
 };
 
-export const grypeMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const grypeMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   const data = output as GrypeOutput | undefined;
   if (!data?.matches || !Array.isArray(data.matches)) return [];
   return data.matches.map((m) => {
@@ -192,7 +191,7 @@ export const grypeMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
       file: '',
       line: 0,
       column: 0,
-      suggestion: m.vulnerability?.fixedInVersion ? translate('engine.output.upgradeTo', locale ?? DEFAULT_LANGUAGE, { version: m.vulnerability.fixedInVersion }) : undefined,
+      suggestion: m.vulnerability?.fixedInVersion ? `升级到 ${m.vulnerability.fixedInVersion}` : undefined,
       autoFixable: !!m.vulnerability?.fixedInVersion,
       source: 'security',
       fingerprint: `grype:${m.vulnerability?.id || ''}:${m.artifact?.name || ''}`,
@@ -200,7 +199,7 @@ export const grypeMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
   });
 };
 
-export const gitleaksMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const gitleaksMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   if (!Array.isArray(output)) return [];
   return (output as GitleaksFinding[]).map((f) => ({
     id: randomUUID(),
@@ -211,14 +210,14 @@ export const gitleaksMapper = (output: unknown, locale?: LanguageCode): Issue[] 
     file: f.File || '',
     line: f.StartLine || 0,
     column: f.StartColumn || 0,
-    suggestion: translate('engine.output.removeHardcodedKey', locale ?? DEFAULT_LANGUAGE),
+    suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
     autoFixable: false,
     source: 'inspect',
     fingerprint: `gitleaks:${f.RuleID || ''}:${f.File || ''}:${f.StartLine || 0}`,
   }));
 };
 
-export const depcheckMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const depcheckMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   const data = output as DepcheckOutput | undefined;
   if (!data || typeof data !== 'object') return [];
   const issues: Issue[] = [];
@@ -230,11 +229,11 @@ export const depcheckMapper = (output: unknown, locale?: LanguageCode): Issue[] 
       ruleId: 'depcheck/unused-dep',
       severity: 'info',
       category: 'quality',
-      message: translate('engine.output.unusedProdDependency', locale ?? DEFAULT_LANGUAGE, { name }),
+      message: `未使用的生产依赖: ${name}`,
       file: 'package.json',
       line: 0,
       column: 0,
-      suggestion: translate('engine.output.removeDependency', locale ?? DEFAULT_LANGUAGE, { name }),
+      suggestion: `移除 ${name} 从 dependencies`,
       autoFixable: false,
       source: 'security',
       fingerprint: `depcheck:${name}:dependencies`,
@@ -246,11 +245,11 @@ export const depcheckMapper = (output: unknown, locale?: LanguageCode): Issue[] 
       ruleId: 'depcheck/unused-dev-dep',
       severity: 'info',
       category: 'quality',
-      message: translate('engine.output.unusedDevDependency', locale ?? DEFAULT_LANGUAGE, { name }),
+      message: `未使用的开发依赖: ${name}`,
       file: 'package.json',
       line: 0,
       column: 0,
-      suggestion: translate('engine.output.removeDevDependency', locale ?? DEFAULT_LANGUAGE, { name }),
+      suggestion: `移除 ${name} 从 devDependencies`,
       autoFixable: false,
       source: 'security',
       fingerprint: `depcheck:${name}:devDependencies`,
@@ -259,7 +258,7 @@ export const depcheckMapper = (output: unknown, locale?: LanguageCode): Issue[] 
   return issues;
 };
 
-export const depCruiserMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const depCruiserMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   const data = output as DepCruiserOutput | undefined;
   if (!data?.summary?.violations || !Array.isArray(data.summary.violations)) return [];
   return data.summary.violations.map((v) => ({
@@ -267,25 +266,18 @@ export const depCruiserMapper = (output: unknown, locale?: LanguageCode): Issue[
     ruleId: v.rule?.name || 'dep-cruiser/violation',
     severity: v.rule?.severity === 'error' ? 'error' : v.rule?.severity === 'warn' ? 'warning' : 'info',
     category: 'architecture',
-    message: translate('engine.output.architectureViolation', locale ?? DEFAULT_LANGUAGE, {
-      rule: v.rule?.name || translate('engine.output.unknownRule', locale ?? DEFAULT_LANGUAGE),
-      from: v.from?.path || '?',
-      to: v.to?.path || '?',
-    }),
+    message: `架构边界违规: ${v.rule?.name || '未知规则'} - ${v.from?.path || '?'} → ${v.to?.path || '?'}`,
     file: v.from?.path || '',
     line: v.from?.line || 0,
     column: 0,
-    suggestion: translate('engine.output.moduleShouldNotReference', locale ?? DEFAULT_LANGUAGE, {
-      from: v.from?.path || '',
-      to: v.to?.path || '',
-    }),
+    suggestion: `模块 ${v.from?.path || ''} 不应引用 ${v.to?.path || ''}`,
     autoFixable: false,
     source: 'inspect',
     fingerprint: `dep-cruiser:${v.rule?.name || ''}:${v.from?.path || ''}:${v.to?.path || ''}`,
   }));
 };
 
-export const jscpdMapper = (output: unknown, locale?: LanguageCode): Issue[] => {
+export const jscpdMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   const data = output as JscpdOutput | undefined;
   if (!data?.duplicates || !Array.isArray(data.duplicates)) return [];
   return data.duplicates.map((d, idx: number) => {
@@ -298,16 +290,11 @@ export const jscpdMapper = (output: unknown, locale?: LanguageCode): Issue[] => 
       ruleId: 'jscpd/duplicate',
       severity: 'warning',
       category: 'quality',
-      message: translate('engine.output.duplicateCode', locale ?? DEFAULT_LANGUAGE, {
-        format,
-        firstFile,
-        firstLines,
-        secondFile: secondFile || '?',
-      }),
+      message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}`,
       file: firstFile,
       line: firstLines,
       column: 0,
-      suggestion: translate('engine.output.extractSharedCode', locale ?? DEFAULT_LANGUAGE, { secondFile }),
+      suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile})`,
       autoFixable: false,
       source: 'inspect',
       fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,

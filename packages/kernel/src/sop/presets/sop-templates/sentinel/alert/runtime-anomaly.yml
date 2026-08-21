@@ -1,0 +1,175 @@
+# =============================================================================
+# SOP 规则模板 — Sentinel · 运行时异常行为告警
+# =============================================================================
+# 规则 ID: sentinel.alert.external.runtime-anomaly
+# 治理域: 监控域 (sentinel)
+# 动作类型: 告警响应 (alert)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Sentinel · 运行时异常
+# 外部标准源: InnerWarden · Kelan · Palisade · Adrian · SecureVector · OSPS-PC
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SentinelRule
+metadata:
+  id: "sentinel.alert.external.runtime-anomaly"
+  name: "运行时异常行为告警"
+  description: "监控 AI Agent、容器、CI/CD runner 等运行时的异常行为：内核级系统调用偏离、非预期网络出站、未授权文件访问、进程注入、反弹 shell 等。基于 eBPF 和行为基线分析，观察优先（默认 dry-run），捕获即告警。"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "trial"
+  source: "external"
+  sourceRef: "InnerWarden · Kelan AgentBound · Palisade · Adrian · SecureVector · OSPS-PC"
+
+governance:
+  domain: "sentinel"
+  action: "alert"
+  module: "Sentinel"
+  category: "runtime"
+
+execution:
+  mode: "event"               # 事件驱动，实时
+  timeout: 5
+  maxConcurrency: 10
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "runtime-sensor-aggregator"    # 聚合多个运行时传感器
+  toolConfig:
+    sensors:
+      - type: "ebpf-syscall"           # eBPF 系统调用监控
+        provider: "innerwarden"        # 可替换为其他 eBPF sensor
+        enabled: true
+        events:
+          - "execve"                   # 进程执行
+          - "connect"                  # 网络连接
+          - "openat"                   # 文件访问
+          - "bind"                     # 端口绑定
+          - "ptrace"                   # 进程注入
+        thresholds:
+          unexpectedExec: "critical"   # 非预期进程执行
+          reverseShell: "critical"     # 反弹 shell 序列检测
+          credentialAccess: "critical" # 访问 ~/.ssh, /etc/shadow
+          cryptominer: "high"
+          containerEscape: "critical"
+
+      - type: "network-egress"         # 网络出站监控
+        provider: "kelan"
+        enabled: true
+        allowlist:
+          - "*.npmjs.org"
+          - "*.github.com"
+          - "registry.npmjs.org"
+          - "api.github.com"
+          - "objects.githubusercontent.com"
+        monitoring:
+          unexpectedEgress: "critical" # 未在白名单中的出站连接
+          dataExfilPattern: "critical"  # 大量数据外泄模式
+          dnsTunneling: "high"
+
+      - type: "ai-agent-behavior"      # AI Agent 行为监控
+        provider: "adrian"
+        enabled: true
+        monitor:
+          sessionDeviation: "high"     # Agent 偏离声明意图
+          toolAbuse: "critical"        # 工具调用异常
+          promptInjection: "critical"  # 提示注入检测
+          credentialLeak: "critical"   # Agent 泄露凭据
+
+      - type: "file-integrity"         # 文件完整性监控
+        provider: "innerwarden"
+        enabled: true
+        watchPaths:
+          - "/etc/"
+          - "/usr/local/bin/"
+          - "~/.ssh/"
+          - "~/.aws/"
+          - "/var/run/secrets/"
+        events:
+          unexpectedModification: "high"
+          binaryReplacement: "critical"
+
+    alert:
+      mode: "observe-first"           # 默认观察模式，先记录后告警
+      escalateAfter: 3                 # 同类型重复 3 次后升级
+      channels:
+        - "p1-pager"
+        - "team-slack"
+        - "audit-log"
+      autoResponse: false              # 默认不自动响应（opt-in）
+    audit:
+      enabled: true
+      storeLocation: "${ZHSHIELD_HOME}/runtime-audit/"
+      retention: 90                    # 保留 90 天
+      tamperProof: true                # SHA-256 hash chain
+
+  severity: "critical"
+  categories:
+    - "runtime-monitoring"
+    - "behavioral-anomaly"
+    - "kernel-security"
+    - "ai-agent-security"
+    - "network-egress"
+
+judgment:
+  passCondition: "noCriticalFindings"
+  blockOn: "critical"
+  priority: "critical"
+
+standards:
+  osps:
+    - "OSPS-PC-01"    # Platform Control
+    - "OSPS-PC-02"    # Monitoring and Alerting
+    - "OSPS-SH-03"    # Runtime Protection
+  cwe:
+    - "CWE-78"        # OS Command Injection
+    - "CWE-200"       # Information Exposure
+    - "CWE-269"       # Improper Privilege Management
+  mitre-attack:
+    - "T1059"         # Command and Scripting Interpreter
+    - "T1071"         # Application Layer Protocol
+    - "T1078"         # Valid Accounts
+    - "T1204"         # User Execution
+    - "T1505"         # Server Software Component
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 900
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🚨 运行时异常行为告警
+
+    ⚠️ 类型: {detectionType}
+    ⚠️ 传感器: {sensor}
+    ⚠️ 目标: {target}
+    ⚠️ 严重性: {severity}
+    ⚠️ 时间: {timestamp}
+    ⚠️ 审计 ID: {auditId}
+
+    ⚪ 当前模式: 【观察模式】仅记录，未自动拦截
+    🔴 如需启用自动阻断：设置 `autoResponse: true`
+
+    建议处置：
+    1. 检查上下文: 此行为是否符合预期部署/变更活动？
+    2. 确认误报: 如为误报请在 Sentinel 仪表板标记
+    3. 如为真实威胁: 立即隔离受影响节点，保留审计链证据
+    4. 更新基线: 修正行为基线以减少后续误报
+
+    📖 参考: OSPS-PC · InnerWarden 运行指南 · Kelan AgentBound

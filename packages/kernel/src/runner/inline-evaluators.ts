@@ -4,7 +4,6 @@ import { relative } from 'node:path';
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type { GuardEngineLike } from './evaluator-host';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type {
   RuleEvaluation,
   Violation,
@@ -28,7 +27,6 @@ export async function evalPatternScan(
   rule: SopRule,
   instr: PatternScanInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   const files = resolveFiles(context, instr.fileExts);
   const violations: Violation[] = [];
@@ -38,7 +36,7 @@ export async function evalPatternScan(
     if (content === null) continue;
 
     const relativePath = relative(context.repoRoot, filePath);
-    violations.push(...scanPatternsInFile(content, relativePath, rule, instr.patterns, locale));
+    violations.push(...scanPatternsInFile(content, relativePath, rule, instr.patterns));
   }
 
   return {
@@ -47,10 +45,7 @@ export async function evalPatternScan(
     violations,
     files: [...new Set(violations.map((v) => v.file))],
     message: violations.length > 0
-      ? translate('engine.kernel.runner.patternMatchesFound', locale ?? DEFAULT_LANGUAGE, {
-          count: violations.length,
-          ruleId: rule.id,
-        })
+      ? `发现 ${violations.length} 处匹配 (${rule.id})`
       : undefined,
     durationMs: 0,
     targetEngine: 'guard',
@@ -64,7 +59,6 @@ export async function evalForbidden(
   rule: SopRule,
   instr: ForbiddenPatternInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   const files = resolveFiles(context);
   const violations: Violation[] = [];
@@ -74,7 +68,7 @@ export async function evalForbidden(
     if (content === null) continue;
 
     const relativePath = relative(context.repoRoot, filePath);
-    violations.push(...scanForbiddenInFile(content, relativePath, rule, instr.patterns, locale));
+    violations.push(...scanForbiddenInFile(content, relativePath, rule, instr.patterns));
   }
 
   return {
@@ -83,10 +77,7 @@ export async function evalForbidden(
     violations,
     files: [...new Set(violations.map((v) => v.file))],
     message: violations.length > 0
-      ? translate('engine.kernel.runner.forbiddenPatternsFound', locale ?? DEFAULT_LANGUAGE, {
-          count: violations.length,
-          ruleId: rule.id,
-        })
+      ? `发现 ${violations.length} 处禁止模式 (${rule.id})`
       : undefined,
     durationMs: 0,
     targetEngine: 'inspect',
@@ -101,31 +92,25 @@ export async function evalThreshold(
   instr: ThresholdInstruction,
   context: RuleContext,
   guardEngine?: GuardEngineLike,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
-  const summary = buildThresholdSummary(instr, locale);
+  const summary = buildThresholdSummary(instr);
   await tryQueryThreshold(guardEngine, rule, context);
 
   return {
     rule,
     status: 'passed',
-    message: translate('engine.kernel.runner.thresholdRule', locale ?? DEFAULT_LANGUAGE, { summary }),
+    message: `阈值规则 (需要外部数据): ${summary}`,
     durationMs: 0,
     targetEngine: 'guard',
     timestamp: new Date(),
   };
 }
 
-function buildThresholdSummary(instr: ThresholdInstruction, locale?: LanguageCode): string {
+function buildThresholdSummary(instr: ThresholdInstruction): string {
   const thresholdKeys = Object.keys(instr.thresholds);
   return thresholdKeys.length > 0
-    ? translate('engine.kernel.runner.thresholdList', locale ?? DEFAULT_LANGUAGE, {
-        entries: thresholdKeys.map((k) => `${k}=${instr.thresholds[k]}`).join(', '),
-      })
-    : translate('engine.kernel.runner.thresholdRaw', locale ?? DEFAULT_LANGUAGE, {
-        unit: instr.unit ?? '',
-        thresholds: JSON.stringify(instr.thresholds),
-      });
+    ? `阈值: ${thresholdKeys.map((k) => `${k}=${instr.thresholds[k]}`).join(', ')}`
+    : `阈值: ${instr.unit ?? ''} ${JSON.stringify(instr.thresholds)}`;
 }
 
 async function tryQueryThreshold(
@@ -154,7 +139,6 @@ export async function evalLayerBoundary(
   rule: SopRule,
   instr: LayerBoundaryInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   const files = resolveFiles(context, ['.ts', '.tsx', '.js', '.jsx']);
   const layerMap = buildLayerMap(instr.layers);
@@ -165,7 +149,7 @@ export async function evalLayerBoundary(
     if (content === null) continue;
 
     const relativePath = relative(context.repoRoot, filePath);
-    violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }, locale));
+    violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }));
   }
 
   return {
@@ -174,10 +158,8 @@ export async function evalLayerBoundary(
     violations,
     files: [...new Set(violations.map((v) => v.file))],
     message: violations.length > 0
-      ? translate('engine.kernel.runner.layerBoundaryViolations', locale ?? DEFAULT_LANGUAGE, {
-          count: violations.length,
-        })
-      : translate('engine.kernel.runner.layerBoundaryPassed', locale ?? DEFAULT_LANGUAGE),
+      ? `发现 ${violations.length} 处架构边界违规`
+      : '架构边界检查通过',
     durationMs: 0,
     targetEngine: 'guard',
     timestamp: new Date(),
@@ -204,7 +186,7 @@ function scanFileLayerBoundaries({
   rule: SopRule;
   instr: LayerBoundaryInstruction;
   layerMap: Map<string, LayerConfig>;
-}, locale?: LanguageCode): Violation[] {
+}): Violation[] {
   const fileLayer = detectLayer(relativePath, instr.layers);
   if (!fileLayer) return [];
   const violations: Violation[] = [];
@@ -223,15 +205,8 @@ function scanFileLayerBoundaries({
         severity: rule.severity,
         file: relativePath,
         line: i + 1,
-        message: translate('engine.kernel.runner.layerViolationMessage', locale ?? DEFAULT_LANGUAGE, {
-          fileLayer,
-          targetLayer,
-          imported,
-        }),
-        suggestion: translate('engine.kernel.runner.layerAllowedDeps', locale ?? DEFAULT_LANGUAGE, {
-          fileLayer,
-          deps: (layerMap.get(fileLayer)?.allowedDeps ?? []).join(', '),
-        }),
+        message: `层违规: "${fileLayer}" 不允许依赖 "${targetLayer}" (导入: ${imported})`,
+        suggestion: `${fileLayer} 层只能依赖: ${(layerMap.get(fileLayer)?.allowedDeps ?? []).join(', ')}`,
       });
     }
   }

@@ -1,0 +1,128 @@
+# =============================================================================
+# SOP 规则模板 — Sentinel · 自动回滚策略
+# =============================================================================
+# 规则 ID: sentinel.alert.internal.rollback
+# 治理域: 监控域 (sentinel)
+# 动作类型: 告警响应 (alert)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Sentinel · 回滚策略
+# 内部标准源: IronNest#10 Reliability · #31 Version Control
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SentinelRule
+metadata:
+  id: "sentinel.alert.internal.rollback"
+  name: "自动回滚策略"
+  description: "定义基于监控指标的自动回滚触发条件：P1 告警持续未响应、错误率突增、延迟显著恶化、安全漏洞被利用证据、合规检查持续失败。回滚策略包括自动回滚和手动批准两种模式"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/10 · rules/31"
+
+governance:
+  domain: "sentinel"
+  action: "alert"
+  module: "Sentinel"
+  category: "alerting"
+
+execution:
+  mode: "event"
+  timeout: 10
+  maxConcurrency: 5
+  retryCount: 1
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "sentinel-rollback-controller"
+  toolConfig:
+    rollbackModes:
+      - mode: "auto"
+        description: "自动回滚，无需人工干预"
+        triggers:
+          - "p1-alert-unacknowledged > 15m"
+          - "error-rate-increase > 300%"
+          - "security-breach-confirmed"
+          - "data-breach-detected"
+      - mode: "semi-auto"
+        description: "触发回滚需要人工确认"
+        triggers:
+          - "p2-alert-unacknowledged > 1h"
+          - "error-rate-increase > 100%"
+          - "p95-latency-increase > 200%"
+          - "test-coverage-drop > 20%"
+        approvalRequired: "tech-lead"
+      - mode: "manual"
+        description: "仅告警，回滚需手动执行"
+        triggers:
+          - "p1-alert-confirmed"
+          - "critical-vuln-published"
+          - "arch-violation-new"
+        approvalRequired: "engineering-manager"
+    versionControl:
+      rollbackCommand: "git revert <commit> && git push"
+      requireCleanStaged: true
+      hooksCheck: false           # 回滚时跳过钩子
+      branch: "main"
+    postRollback:
+      autoCreateTicket: true
+      notifyChannels:
+        - "engineering-all"
+        - "incident-response"
+  severity: "high"
+  categories:
+    - "rollback"
+    - "incident-response"
+    - "reliability"
+    - "automation"
+
+judgment:
+  passCondition: "rollbackNotRequired"
+  blockOn: "none"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-PC-02"
+    - "OSPS-SH-03"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🔴 回滚已触发/建议
+
+    ⚠️ 回滚模式: {mode}
+    ⚠️ 触发条件: {trigger}
+    ⚠️ 目标提交: {commit}
+    ⚠️ 回滚状态: {status}
+
+    当前动作：
+    1. {action}
+    2. 如需阻止回滚：立即联系 {approver}
+
+    回滚完成后：
+    1. 创建事故复盘文档
+    2. 分析根因避免复发
+    3. 确认是否需要在测试/CI 中添加回归防护
+
+    📖 参考: IronNest #10 可靠性 · #31 版本控制

@@ -59,16 +59,26 @@ export interface SemgrepResult {
     fix?: string;
     metadata?: { description?: string };
   };
-  dataflow_trace?: {
-    code_flows?: Array<{
-      thread_flows?: Array<{
-        locations?: Array<{
-          location?: { path?: string; start?: { line?: number; col?: number } };
-          message?: string;
-        }>;
-      }>;
-    }>;
-  };
+  /** 污点数据流链（SARIF codeFlows 子集），仅 join_mode/trace 规则输出 */
+  dataflow_trace?: SemgrepDataflowTrace;
+}
+
+export interface SemgrepDataflowTrace {
+  code_flows?: SemgrepCodeFlow[];
+}
+
+export interface SemgrepCodeFlow {
+  thread_flows?: SemgrepThreadFlow[];
+}
+
+export interface SemgrepThreadFlow {
+  locations?: SemgrepFlowLocation[];
+}
+
+export interface SemgrepFlowLocation {
+  /** 部分条目可能缺失 location 子对象，映射时需跳过 */
+  location?: { path?: string; start?: { line?: number; col?: number } };
+  message?: string;
 }
 
 // ─── Grype 输出 ────────────────────────────────────────
@@ -110,4 +120,31 @@ export interface NpmAuditVulnerability {
   isDirect?: boolean;
   fixAvailable?: string | boolean;
   via?: Array<{ title?: string } | string>;
+}
+
+// ─── poetry audit 输出 ────────────────────────────────
+
+export interface PoetryAuditOutput {
+  vulnerabilities?: Array<{
+    name?: string;
+    version?: string;
+    advisory?: string;
+    severity?: string;
+    fixed_versions?: string[];
+  }>;
+}
+
+// ─── pip-audit 输出 ───────────────────────────────────
+
+export interface PipAuditOutput {
+  dependencies?: Array<{
+    name?: string;
+    version?: string;
+    vulns?: Array<{
+      id?: string;
+      advisory?: string;
+      aliases?: string[];
+      fix_versions?: string[];
+    }>;
+  }>;
 }

@@ -1,0 +1,107 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · TypeScript 类型一致性检查
+# =============================================================================
+# 规则 ID: inspect.scan.internal.type-consistency
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect TypeScript 适配器 · type-consistency
+# 外部标准源: TypeScript strict mode + IronNest #3
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.internal.type-consistency"
+  name: "TypeScript 类型一致性检查"
+  description: "检查函数参数和返回值类型的一致性，确保类型定义严格完整"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "internal"
+  sourceRef: "TypeScript strict mode + IronNest #3 — strict type safety"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  adapter: "typescript"
+  checker: "type-consistency"
+  mode: "full"                 # full | incremental | focused | quick
+
+execution:
+  mode: "sync"
+  timeout: 30
+  maxConcurrency: 4
+  retryCount: 0
+  scope: "changed"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "*.d.ts"
+    - "*.generated.ts"
+    - "coverage/**"
+
+check:
+  rules:
+    - id: "no-implicit-any"
+      description: "禁止隐式 any 类型"
+      severity: "warning"
+      pattern: "function $FUNC($PARAM) { ... }"  # Semgrep 模式
+    - id: "strict-function-types"
+      description: "函数参数和返回值必须显式声明类型"
+      severity: "warning"
+      pattern: ":$TYPE"
+    - id: "no-type-assertion"
+      description: "禁止非安全类型断言（as any）"
+      severity: "warning"
+      pattern: "as any"
+  severity: "warning"
+  categories:
+    - "type-safety"
+    - "type-consistency"
+
+standards:
+  osps:
+    - "OSPS-QA-04"             # 代码库安全要求
+  ironnest:
+    - "Rule #3"                # Strict type safety — no any, full strict mode
+  semgrep:
+    - "typescript/lang/security/"  # 参考路径
+
+judgment:
+  passCondition: "errorCount === 0"
+  maxIssues: 50
+  priority: "medium"
+
+score:
+  impact: "code-quality"       # 影响评分维度
+  weight: 0.08                 # 在代码质量维度中的权重
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    类型一致性检查发现问题：
+    - 文件: {file}:{line}
+    - 问题: {issue}
+    - 建议: 为 {symbol} 添加显式类型声明
+
+    修改示例：
+    ```typescript
+    // ❌ 问题写法
+    function process(data) { ... }
+    const result = data as any;
+
+    // ✅ 正确写法
+    function process(data: InputData): OutputData { ... }
+    const result: OutputData = data;
+    ```

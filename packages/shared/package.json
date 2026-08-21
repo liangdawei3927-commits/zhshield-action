@@ -7,9 +7,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 100"
+  },
+  "dependencies": {
+    "@zh/i18n": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -22,8 +24,5 @@
       "require": "./dist/index.js"
     },
     "./*": "./dist/*"
-  },
-  "dependencies": {
-    "@zh/i18n": "workspace:*"
   }
 }

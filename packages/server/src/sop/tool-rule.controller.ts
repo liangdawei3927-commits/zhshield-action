@@ -1,8 +1,15 @@
 import { Controller, Get, Param, HttpCode, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { hashToolRuleFiles, type ToolRuleFile } from '@zh/kernel';
 
-type ToolName = 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser';
+const VALID_TOOLS = ['semgrep', 'trivy', 'eslint', 'dep-cruiser'] as const;
+
+type ToolName = (typeof VALID_TOOLS)[number];
+
+const VALID_TOOL_SET: ReadonlySet<string> = new Set<string>(VALID_TOOLS);
+
+function isToolName(value: string): value is ToolName {
+  return VALID_TOOL_SET.has(value);
+}
 
 interface ToolRuleVersion {
   toolId: ToolName;
@@ -11,8 +18,6 @@ interface ToolRuleVersion {
   size: number;
   publishedAt: string;
 }
-
-const VALID_TOOLS: ToolName[] = ['semgrep', 'trivy', 'eslint', 'dep-cruiser'];
 
 const RULE_PACKS: Record<ToolName, ToolRuleFile[]> = {
   semgrep: [
@@ -94,7 +99,6 @@ function buildVersion(toolId: ToolName): ToolRuleVersion {
   };
 }
 
-@ApiTags('Tool Rules')
 @Controller('rules')
 export class ToolRuleController {
   private readonly logger = new Logger(ToolRuleController.name);
@@ -107,9 +111,6 @@ export class ToolRuleController {
 
   @Get(':tool/version')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '获取工具规则版本' })
-  @ApiParam({ name: 'tool', description: '工具名称 (semgrep/trivy/eslint/dep-cruiser)' })
-  @ApiResponse({ status: 200, description: '返回工具规则版本信息' })
   getVersion(@Param('tool') tool: string): ToolRuleVersion {
     const t = this.resolveTool(tool);
     return this.versions[t];
@@ -117,29 +118,30 @@ export class ToolRuleController {
 
   @Get(':tool/download')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '下载工具规则文件' })
-  @ApiParam({ name: 'tool', description: '工具名称 (semgrep/trivy/eslint/dep-cruiser)' })
-  @ApiResponse({ status: 200, description: '返回工具规则文件列表' })
   getRules(@Param('tool') tool: string): ToolRuleFile[] {
     const t = this.resolveTool(tool);
-    this.logger.debug(`Serving ${RULE_PACKS[t].length} rule files for ${t}`);
+    const { version, hash } = this.versions[t];
+    this.logger.debug(`Serving rule pack tool=${t} version=${version} hash=${hash} files=${RULE_PACKS[t].length}`);
     return RULE_PACKS[t];
   }
 
   @Get(':tool/emergency')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '获取工具紧急规则' })
-  @ApiParam({ name: 'tool', description: '工具名称 (semgrep/trivy/eslint/dep-cruiser)' })
-  @ApiResponse({ status: 200, description: '返回工具紧急规则文件列表' })
   getEmergency(@Param('tool') tool: string): ToolRuleFile[] {
+    // TODO(rules-remote): once the remote rule registry ships (tier-3 sync),
+    // fetch dedicated emergency packs from it instead of mirroring the static
+    // local pack. Static RULE_PACKS remain the offline desktop fallback.
+    this.logger.warn(
+      `Emergency rule pack requested for ${tool}: serving static local pack (identical to regular rules)`,
+    );
     return this.getRules(tool);
   }
 
   private resolveTool(tool: string): ToolName {
-    const t = tool.toLowerCase() as ToolName;
-    if (!VALID_TOOLS.includes(t)) {
+    const normalized = tool.toLowerCase();
+    if (!isToolName(normalized)) {
       throw new NotFoundException(`Unknown tool: ${tool}`);
     }
-    return t;
+    return normalized;
   }
 }

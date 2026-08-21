@@ -40,7 +40,6 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   '.pytest_cache',
   '.opencode',
   '.zhshield',
-  'SOP标准资源',
 ]);
 
 /**

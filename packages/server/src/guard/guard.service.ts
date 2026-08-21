@@ -4,7 +4,6 @@ import type { GuardReport, CheckOptions } from '@zh/guard';
 import {
   GuardESLintCheckAdapter,
   GuardSensitiveInfoAdapter,
-  FileSecretStateLookup,
   ArchitectureBoundaryAdapter,
   TestRunnerAdapter,
   SecurityScanAdapter,
@@ -24,7 +23,7 @@ export class GuardService {
 
     // Register all guard adapters (checks.json adapter field ↔ class mapping)
     this.engine.registerAdapter('eslint-check',          new GuardESLintCheckAdapter());
-    this.engine.registerAdapter('sensitive-info',         new GuardSensitiveInfoAdapter(new FileSecretStateLookup()));
+    this.engine.registerAdapter('sensitive-info',         new GuardSensitiveInfoAdapter());
     this.engine.registerAdapter('architecture-boundary',  new ArchitectureBoundaryAdapter());
     this.engine.registerAdapter('test-runner',            new TestRunnerAdapter());
     this.engine.registerAdapter('security-scan',          new SecurityScanAdapter());

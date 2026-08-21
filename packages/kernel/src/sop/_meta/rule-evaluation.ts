@@ -85,8 +85,8 @@ export interface RuleEngineReport {
   /** 跳过数 */
   skipped: number;
 
-  /** 是否通过（无 blocking 级别失败）；dryRun（只报告不阻断）下为 null */
-  ok: boolean | null;
+  /** 是否通过（无 blocking 级别失败） */
+  ok: boolean;
 
   /** 各规则的详细评估 */
   evaluations: RuleEvaluation[];

@@ -1,0 +1,141 @@
+# =============================================================================
+# SOP 规则模板 — Guard · 容器安全基线阻断（L2 pre-push）
+# =============================================================================
+# 规则 ID: guard.block.external.container-security
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Guard L2 pre-push · Trivy · hadolint
+# 外部标准源: Docker Security Best Practices 2026 · Sysdig 21 Dockerfile 最佳实践 · OSPS-SH
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.external.container-security"
+  name: "容器安全基线阻断"
+  description: "在 pre-push 阶段检测 Dockerfile 和容器镜像安全违规：以 root 运行、未锁定 base image digest、缺少 .dockerignore、暴露非必要端口、缺少 HEALTHCHECK"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "trial"
+  source: "external"
+  sourceRef: "hadolint rules · Sysdig 21 best practices · Docker Scout · Trivy"
+
+governance:
+  domain: "guard"
+  action: "block"
+  module: "Guard"
+  level: "L2"
+  hook: "pre-push"
+
+execution:
+  mode: "sync"
+  timeout: 30
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "changed"
+
+conditions:
+  languages:
+    - "dockerfile"
+  filePatterns:
+    - "Dockerfile"
+    - "Dockerfile.*"
+    - "docker-compose*.yml"
+    - "docker-compose*.yaml"
+    - ".dockerignore"
+  excludePatterns: []
+
+check:
+  tool: "hadolint + trivy-config"
+  toolConfig:
+    hadolint:
+      configPath: "${ZHSHIELD_HOME}/.hadolint.yml"
+      rules:
+        - rule: "DL3000"
+          severity: "error"
+          description: "必须使用绝对 WORKDIR"
+        - rule: "DL3006"
+          severity: "error"
+          description: "FROM 必须指定标签（不可用 latest）"
+        - rule: "DL3008"
+          severity: "error"
+          description: "apt-get 版本必须锁定"
+        - rule: "DL3009"
+          severity: "error"
+          description: "禁止使用 sudo"
+        - rule: "DL4000"
+          severity: "error"
+          description: "必须指定 MAINTAINER 或 LABEL"
+        - rule: "user-last"
+          severity: "error"
+          description: "必须包含 USER 指令且非 root"
+        - rule: "no-root"
+          severity: "error"
+          description: "禁止以 root（UID 0）运行容器"
+        - rule: "digest-pinned"
+          severity: "error"
+          description: "FROM 必须使用 @sha256: digest，不可使用 mutable tag"
+        - rule: "healthcheck-present"
+          severity: "warning"
+          description: "建议包含 HEALTHCHECK 指令"
+        - rule: "expose-minimal"
+          severity: "warning"
+          description: "仅暴露应用所需的端口，不应暴露 SSH(22) 等管理端口"
+        - rule: "dockerignore-exists"
+          severity: "error"
+          description: "项目根目录必须存在 .dockerignore"
+        - rule: "no-env-secrets"
+          severity: "error"
+          description: "禁止在 Dockerfile 中通过 ENV 硬编码密钥（使用 Docker Secrets 或 BuildKit --secret）"
+    trivyConfig:
+      enabled: false     # 容器镜像构建扫描在 security 域执行
+      minSeverity: "HIGH"
+  severity: "error"
+  categories:
+    - "container-security"
+    - "dockerfile"
+    - "image-hardening"
+
+judgment:
+  passCondition: "errorCount === 0 && warningCount < 3"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-SH-01"    # Secure Configuration Hardening
+    - "OSPS-SH-02"    # Container Security
+    - "OSPS-CF-02"    # Configuration Management
+  cwe:
+    - "CWE-250"       # Execution with Unnecessary Privileges
+    - "CWE-1104"      # Use of Unmaintained Third-Party Components
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    检测到容器安全基线违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 规则: {rule}
+    ⚠️ 详情: {detail}
+
+    修复指引：
+    1. 非 root 运行 → 添加 `USER nonroot:nonroot` 或创建专用用户
+    2. Digest 锁定 → 将 `FROM image:tag` 改为 `FROM image@sha256:<digest>`
+    3. 缺少 .dockerignore → 创建，至少排除 `.env* node_modules/ .git dist/`
+    4. 密钥泄露 → 使用 `RUN --mount=type=secret` 或 Docker Secrets
+    5. 缺少 HEALTHCHECK → 添加 `HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health`
+
+    📖 参考: Docker Security 2026 · Sysdig 21 Dockerfile 最佳实践 · OSPS-SH

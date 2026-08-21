@@ -12,14 +12,12 @@
     "lint": "eslint src --max-warnings 100"
   },
   "dependencies": {
-    "@zh/shared": "workspace:*",
-    "@zh/kernel": "workspace:*",
     "@zh/guard": "workspace:*",
+    "@zh/i18n": "workspace:*",
     "@zh/inspect": "workspace:*",
+    "@zh/kernel": "workspace:*",
     "@zh/refactor": "workspace:*",
-    "@zh/security": "workspace:*",
-    "@zh/scoring": "workspace:*",
-    "@zh/i18n": "workspace:*"
+    "@zh/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

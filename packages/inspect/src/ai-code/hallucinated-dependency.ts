@@ -136,7 +136,7 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
     const candidateNames = [...candidates.keys()];
     const typosquatFindings =
       candidateNames.length > 0 ? await this.typosquat.detect(buildTyposquatGraph(projectPath, candidateNames)) : [];
-    const typosquatById = new Map(typosquatFindings.map((f) => [f.nodeId, f]));
+    const typosquatById = new Map(typosquatFindings.map((f: { nodeId: string; evidence: string[] }) => [f.nodeId, f]));
 
     const findings: HallucinatedDependencyFinding[] = [];
     for (const [pkg, sites] of candidates) {
@@ -150,7 +150,7 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
           evidence: [
             `imported from ${siteText}`,
             `locally absent from package.json, lockfile and node_modules`,
-            ...ts.evidence,
+            ...(ts as { evidence: string[] }).evidence,
           ],
         });
         continue;

@@ -1,118 +1,14 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import type { LanguageCode } from '@zh/i18n';
-import type { ProjectProfile } from '@zh/dependency';
-import type { InspectionReport, AdapterResult, Issue, IssueSeverity, InspectAdapter } from './types';
+import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './types';
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
 import type { SopRuleEngine } from '@zh/kernel';
+import type { ProjectProfile } from '@zh/dependency';
 import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER } from '@zh/shared';
 import { AdapterRunner } from './adapter-runner';
 import { ToolAdapterExecutor } from './tool-adapter-executor';
 import { ScanReportBuilder } from './scan-report-builder';
 import { SopReportMapper } from './sop-report-mapper';
 import { AiCodeReviewImpl } from './ai-code/review';
-import type { AiCodeVuln, AiVulnSeverity } from './ai-code/types';
-
-interface ScanContext {
-  projectId: string;
-  scanType: InspectionReport['scanType'];
-  startedAt: number;
-  locale?: LanguageCode;
-}
-
-/** 从文件系统读取最小 ProjectProfile，供 AI 审查使用（纯函数，无网络/执行） */
-export function buildProjectProfile(projectPath: string): ProjectProfile {
-  const language = detectLanguage(projectPath);
-  const framework = detectFramework(projectPath);
-  const packageManager = detectPackageManager(projectPath);
-  const hasTypeScript = detectTypeScript(projectPath);
-  return { projectPath, language, framework, packageManager, hasTypeScript };
-}
-
-function detectLanguage(projectPath: string): ProjectProfile['language'] {
-  try {
-    const raw = readFileSync(join(projectPath, 'package.json'), 'utf-8');
-    const pkg = JSON.parse(raw) as Record<string, unknown>;
-    const deps = pkg.dependencies as Record<string, unknown> | undefined;
-    const devDeps = pkg.devDependencies as Record<string, unknown> | undefined;
-    const allKeys = [
-      ...Object.keys(deps ?? {}),
-      ...Object.keys(devDeps ?? {}),
-    ];
-    if (allKeys.some((k) => k === 'typescript' || k === 'ts-node' || k.startsWith('ts-'))) {
-      return 'typescript';
-    }
-    return 'javascript';
-  } catch {
-    return 'unknown';
-  }
-}
-
-function detectFramework(projectPath: string): string | null {
-  try {
-    const raw = readFileSync(join(projectPath, 'package.json'), 'utf-8');
-    const pkg = JSON.parse(raw) as Record<string, unknown>;
-    const deps = pkg.dependencies as Record<string, unknown> | undefined;
-    const devDeps = pkg.devDependencies as Record<string, unknown> | undefined;
-    const allKeys = [
-      ...Object.keys(deps ?? {}),
-      ...Object.keys(devDeps ?? {}),
-    ];
-    if (allKeys.some((k) => k === 'next')) return 'next';
-    if (allKeys.some((k) => k === '@nestjs/core')) return 'nestjs';
-    if (allKeys.some((k) => k === 'react')) return 'react';
-    if (allKeys.some((k) => k === 'vue')) return 'vue';
-    if (allKeys.some((k) => k === 'express')) return 'express';
-    if (allKeys.some((k) => k === 'fastify')) return 'fastify';
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function detectPackageManager(projectPath: string): ProjectProfile['packageManager'] {
-  try {
-    const raw = readFileSync(join(projectPath, 'package.json'), 'utf-8');
-    const pkg = JSON.parse(raw) as Record<string, unknown>;
-    const pm = typeof pkg.packageManager === 'string' ? pkg.packageManager : '';
-    if (pm.startsWith('pnpm')) return 'pnpm';
-    if (pm.startsWith('yarn')) return 'yarn';
-    if (pm.startsWith('npm')) return 'npm';
-  } catch { /* fallthrough */ }
-  return 'unknown';
-}
-
-function detectTypeScript(projectPath: string): boolean {
-  try {
-    readFileSync(join(projectPath, 'tsconfig.json'), 'utf-8');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const VULN_SEVERITY_MAP: Record<AiVulnSeverity, IssueSeverity> = {
-  critical: 'error',
-  high: 'warning',
-  medium: 'warning',
-  low: 'info',
-};
-
-/** 将 AI 深度审查漏洞映射为巡检 Issue（category=security, source=ai-code-review） */
-export function aiVulnsToIssues(vulns: readonly AiCodeVuln[]): Issue[] {
-  return vulns.map((v) => ({
-    id: v.vulnId,
-    ruleId: v.ruleId,
-    severity: VULN_SEVERITY_MAP[v.severity],
-    category: 'security' as const,
-    message: v.description,
-    file: v.file,
-    line: v.line,
-    autoFixable: true,
-    source: 'ai-code-review',
-    fingerprint: v.vulnId,
-  }));
-}
+import type { AiCodeVuln } from './ai-code/types';
 
 /**
  * InspectEngine — 巡检引擎（门面）
@@ -136,6 +32,7 @@ export class InspectEngine {
   private adapterExecutor: ToolAdapterExecutor;
   private reportBuilder: ScanReportBuilder;
   private sopMapper: SopReportMapper;
+  private aiReview: AiCodeReviewImpl;
 
   constructor(emitter?: EventEmitter) {
     this.runner = new AdapterRunner();
@@ -150,6 +47,7 @@ export class InspectEngine {
     });
     this.reportBuilder = new ScanReportBuilder(this.emitter, this.degradationManager);
     this.sopMapper = new SopReportMapper();
+    this.aiReview = new AiCodeReviewImpl();
   }
 
   /** 切换至 SOP 驱动模式 — 从 SopRuleEngine 获取 inspect/security 域规则并执行 */
@@ -182,57 +80,90 @@ export class InspectEngine {
     return this.degradationManager;
   }
 
-  async runScan(
-    projectId: string,
-    scanType: InspectionReport['scanType'] = 'full',
-    locale?: LanguageCode,
-  ): Promise<InspectionReport> {
-    const ctx: ScanContext = { projectId, scanType, startedAt: Date.now(), locale };
+  async runScan(projectId: string, scanType: InspectionReport['scanType'] = 'full'): Promise<InspectionReport> {
+    const start = Date.now();
 
-    if (this.shouldRunWithSop()) {
-      return await this.runScanWithSopGuard(ctx);
-    }
-
-    return this.runScanWithDirect(ctx);
-  }
-
-  private shouldRunWithSop(): boolean {
     // SOP 驱动模式：通过 SopRuleEngine 评估 inspect/security 域规则
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
-    return !!(this.sopEngine && !this._sopScanning);
-  }
-
-  private async runScanWithSopGuard(ctx: ScanContext): Promise<InspectionReport> {
-    this._sopScanning = true;
-    try {
-      return await this.runScanWithSop(ctx);
-    } finally {
-      this._sopScanning = false;
+    if (this.sopEngine && !this._sopScanning) {
+      this._sopScanning = true;
+      try {
+        return await this.runScanWithSop(projectId, scanType, start);
+      } finally {
+        this._sopScanning = false;
+      }
     }
-  }
 
-  private async runScanWithDirect(ctx: ScanContext): Promise<InspectionReport> {
-    const { projectId, scanType, startedAt } = ctx;
     const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(this.registeredAdapters, projectId);
     const legacyResults = await this.runner.runAll({ projectId, scanType });
     adapterResults.push(...legacyResults);
 
-    const allIssues: Issue[] = adapterResults.flatMap((r) => r.issues);
-    await this.appendAiCodeReview(projectId, allIssues);
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - startedAt, allIssues);
+    const aiIssues = await this.runAiCodeReview(projectId);
+    const allIssues: Issue[] = [...aiIssues, ...adapterResults.flatMap((r) => r.issues)];
+    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, allIssues);
 
     return this.reportBuilder.buildReport({
       projectId,
       scanType,
-      duration: Date.now() - startedAt,
+      duration: Date.now() - start,
       issues: allIssues,
       adapterResults,
-    }, ctx.locale);
+    });
   }
 
-  private async runScanWithSop(ctx: ScanContext): Promise<InspectionReport> {
-    const { projectId, scanType, startedAt } = ctx;
+  /** 构建最小项目画像（AI 审查仅消费 projectPath 定位清单与源码） */
+  private buildAiProfile(projectId: string): ProjectProfile {
+    return { projectPath: projectId, language: 'typescript', framework: null, packageManager: 'pnpm', hasTypeScript: true };
+  }
+
+  private mapAiSeverity(severity: AiCodeVuln['severity']): Issue['severity'] {
+    switch (severity) {
+      case 'critical':
+      case 'high':
+        return 'error';
+      case 'medium':
+        return 'warning';
+      case 'low':
+        return 'info';
+    }
+  }
+
+  private aiVulnsToIssues(vulns: readonly AiCodeVuln[]): Issue[] {
+    return vulns.map((v) => ({
+      id: v.vulnId,
+      ruleId: v.ruleId,
+      severity: this.mapAiSeverity(v.severity),
+      category: 'security' as const,
+      message: v.description,
+      file: v.file,
+      line: v.line,
+      suggestion: v.fix,
+      autoFixable: false,
+      source: 'ai-code-review' as const,
+      fingerprint: `${v.ruleId}:${v.file}:${v.line}`,
+    }));
+  }
+
+  /**
+   * AI 代码审查（Pro 层 deepReview）：失败不阻断巡检 —— 记录警告并跳过 AI 问题
+   */
+  private async runAiCodeReview(projectId: string): Promise<Issue[]> {
+    try {
+      const vulns = await this.aiReview.deepReview(this.buildAiProfile(projectId));
+      return this.aiVulnsToIssues(vulns);
+    } catch {
+      console.warn('[inspect] AI code review skipped — error during deepReview');
+      return [];
+    }
+  }
+
+  private async runScanWithSop(
+    projectId: string,
+    scanType: InspectionReport['scanType'],
+    start: number,
+  ): Promise<InspectionReport> {
+    // 只评估 inspect / security 域，避免拉入 guard/evolve 等规则形成交叉重入
     const inspectReport = await this.sopEngine!.evaluateRules({
       repoRoot: projectId,
       domain: 'inspect',
@@ -246,27 +177,15 @@ export class InspectEngine {
     const issues = this.sopMapper.flattenViolations(sopReport);
     const adapterResults = this.sopMapper.buildAdapterResults(sopReport);
 
-    await this.appendAiCodeReview(projectId, issues);
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - startedAt, issues);
+    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, issues);
 
     return this.reportBuilder.buildReport({
       projectId,
       scanType,
-      duration: Date.now() - startedAt,
+      duration: Date.now() - start,
       issues,
       adapterResults,
       penalizeInfo: false,
-    }, ctx.locale);
-  }
-
-  private async appendAiCodeReview(projectId: string, issues: Issue[]): Promise<void> {
-    try {
-      const review = new AiCodeReviewImpl();
-      const profile = buildProjectProfile(projectId);
-      const vulns = await review.deepReview(profile);
-      issues.push(...aiVulnsToIssues(vulns));
-    } catch {
-      console.warn('[inspect] AI code review skipped — error during deepReview');
-    }
+    });
   }
 }

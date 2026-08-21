@@ -3,7 +3,6 @@
  *
  * 两层架构：GitHub API + 本地文件夹
  */
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 
 // ─── 备份类型 ─────────────────────────────────────────────
 
@@ -51,6 +50,7 @@ export interface BackupConfig {
 
 export const DEFAULT_EXCLUDE_PATTERNS = [
   'node_modules/',
+  '.git/',
   'dist/',
   'build/',
   '.next/',
@@ -63,23 +63,22 @@ export const DEFAULT_EXCLUDE_PATTERNS = [
   '.env.local',
 ];
 
-export function defaultBackupConfig(_projectId?: string, _projectName?: string, locale?: LanguageCode): BackupConfig {
+export function defaultBackupConfig(_projectId?: string, _projectName?: string): BackupConfig {
   return {
     github: {
       enabled: false,
       owner: '',
       repo: '',
       branch: 'main',
-      commitPrefix: translate('engine.kernel.backup.commitPrefix', locale ?? DEFAULT_LANGUAGE),
+      commitPrefix: '[智汇码盾]',
       excludePatterns: ['node_modules/', '.git/', 'dist/', '*.log'],
     },
     local: {
       enabled: true,
-      backupDir: '',           // Empty = use project's .zhshield/backups/
+      backupDir: '~/zhshield-backups',
       maxBackups: 10,
-      // 本地备份保留 .git/：恢复时才能带回完整提交历史（2026-08-20 事故教训）
-      excludePatterns: ['node_modules/', 'dist/', 'coverage/'],
-      compress: true,
+      excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/'],
+      compress: false,
     },
     schedule: {
       enabled: false,

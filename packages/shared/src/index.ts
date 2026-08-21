@@ -38,7 +38,6 @@ export type {
   ToolResult,
   ToolScanOptions,
   ToolAdapter,
-  FallbackStrategy,
   ToolVersionInfo,
   ToolErrorLog,
   AuditAction,
@@ -64,29 +63,30 @@ export type {
   SyncResult,
 } from './types';
 export { ToolManager } from './tool-manager';
-export {
-  TOOL_LICENSE_REGISTRY,
-  TOOL_LOCKFILE_SCHEMA_VERSION,
-  defaultToolLockfilePath,
-  defaultToolBinDir,
-  loadToolLockfile,
-  saveToolLockfile,
-} from './toolchain/types';
-export type {
-  ToolChannel,
-  ToolLicense,
-  ToolInstallRecord,
-  ToolLockfile,
-  ToolRequirement,
-  LicenseMatrixReport,
-  LicenseAuditor,
-} from './toolchain/types';
-export { sanitizeEnv } from './process-env';
 export { toolMappers, eslintMapper, semgrepMapper, trivyMapper, grypeMapper, gitleaksMapper, depcheckMapper, depCruiserMapper, jscpdMapper } from './output-mappers';
 export { DegradationManager } from './degradation-manager';
 export { BUILTIN_FALLBACK_RULES } from './builtin-rules';
 export { AuditLogger } from './audit-logger';
 export { ToolsConfigLoader } from './tools-config-loader';
+export {
+  TOOL_LICENSE_REGISTRY,
+  TOOL_LOCKFILE_SCHEMA_VERSION,
+  defaultToolBinDir,
+  defaultToolLockfilePath,
+  loadToolLockfile,
+  saveToolLockfile,
+} from './toolchain/types';
+export type {
+  LicenseAuditor,
+  LicenseMatrixReport,
+  ToolChannel,
+  ToolInstallRecord,
+  ToolLicense,
+  ToolLockfile,
+  ToolRequirement,
+} from './toolchain/types';
 export { getToolDimensions, mapIssuesToDimensions, computeOverallScore, scoreToGrade } from './dimension-mapper';
-export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEvent, GuardCheckRequestedEvent, GuardCheckCompletedEvent, GuardStage, KernelEventMap, KernelRuleEngineReport, KernelRuleChangeEvent } from './events';
+export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEvent, GuardCheckRequestedEvent, GuardCheckCompletedEvent, GuardStage } from './events';
 export { NOOP_EMITTER } from './events';
+
+export { sanitizeEnv } from './process-env';

@@ -1,5 +1,4 @@
 export { ESLintAdapter } from './eslint-adapter';
-export { TypeScriptAdapter } from './typescript-adapter';
 export { GitleaksAdapter } from './gitleaks-adapter';
 export { DependencyCruiserAdapter } from './dependency-cruiser-adapter';
 export { JscpdAdapter } from './jscpd-adapter';

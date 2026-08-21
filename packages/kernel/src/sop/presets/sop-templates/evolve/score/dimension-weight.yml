@@ -1,0 +1,177 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 维度权重配置
+# =============================================================================
+# 规则 ID: evolve.score.official.dimension-weight
+# 治理域: 演进域 (evolve)
+# 动作类型: 评分量化 (score)
+# 数据来源: 官方维护 (official)
+# 对应适配器: Scoring 维度权重
+# 外部标准源: 健康评分与进化系统设计文档 — 评分公式
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.score.official.dimension-weight"
+  name: "五维度权重配置"
+  description: "定义健康评分的五个维度、权重和评分公式"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "official"
+  sourceRef: "05-健康评分与进化系统.md — 评分维度与权重"
+
+governance:
+  domain: "evolve"
+  action: "score"
+  module: "Scoring"
+  category: "scoring"
+  subModule: "dimension-weight"
+
+execution:
+  mode: "sync"
+  timeout: 5
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-demand"        # on-demand | periodic | event
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "scoring-engine"
+  toolConfig:
+    dimensions:
+      - id: "code-quality"
+        name: "代码质量"
+        weight: 0.30
+        description: "代码规范性、类型安全、最佳实践遵循程度"
+        dataSources:
+          - "Inspect · 质量适配器"
+          - "ESLint 结果"
+          - "TypeScript 检查器"
+        minScore: 0
+        maxScore: 100
+        failingThreshold: 30
+
+      - id: "security"
+        name: "安全状况"
+        weight: 0.25
+        description: "漏洞数量、敏感信息泄露、供应链风险"
+        dataSources:
+          - "Security · 漏洞扫描"
+          - "Guard · 门禁拦截记录"
+          - "Trivy 结果"
+        minScore: 0
+        maxScore: 100
+        failingThreshold: 40
+        vetoRules:
+          - condition: "criticalVulnCount > 0"
+            action: "direct-grade-D"
+            description: "存在 CRITICAL 漏洞 → 直接降至 D 级"
+
+      - id: "test-coverage"
+        name: "测试覆盖"
+        weight: 0.20
+        description: "代码测试覆盖率、测试质量"
+        dataSources:
+          - "Inspect · 覆盖率检查器"
+          - "Vitest 报告"
+        minScore: 0
+        maxScore: 100
+        failingThreshold: 50
+        minRequired: 50
+
+      - id: "architecture"
+        name: "架构健康"
+        weight: 0.15
+        description: "模块边界、循环依赖、分层合规"
+        dataSources:
+          - "Inspect · 架构检查器"
+          - "dependency-cruiser 结果"
+        minScore: 0
+        maxScore: 100
+        failingThreshold: 40
+        penaltyRules:
+          - condition: "circularDependencyCount > 0"
+            penalty: 20
+
+      - id: "documentation"
+        name: "文档完整"
+        weight: 0.10
+        description: "README、注释、类型定义覆盖率"
+        dataSources:
+          - "Inspect · 文档检查器"
+        minScore: 0
+        maxScore: 100
+        failingThreshold: 30
+
+    formula:
+      type: "weighted-sum"
+      expression: "weighted_sum"
+      totalMin: 0
+      totalMax: 100
+      gradeBoundaries:
+        S: { min: 90, label: "卓越", action: "release-candidate" }
+        A: { min: 80, label: "优秀", action: "releasable" }
+        B: { min: 70, label: "良好", action: "fix-then-release" }
+        C: { min: 60, label: "需改进", action: "must-fix" }
+        D: { min: 0,  label: "不合格", action: "block-release" }
+
+    trend:
+      historySize: 5
+      predictionModel: "linear-regression"
+      alertThreshold: 10
+  severity: "info"
+  categories:
+    - "scoring"
+    - "dimension-weight"
+    - "health-score"
+
+judgment:
+  passCondition: "scoreCalculated"
+  blockOn: "none"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-QA-01"
+    - "OSPS-QA-04"
+    - "OSPS-DO-01"
+  ironnest:
+    - "Rule #10"
+    - "Rule #11"
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 60
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    维度权重配置
+
+    当前权重:
+    - 代码质量: 0.30
+    - 安全状况: 0.25
+    - 测试覆盖: 0.20
+    - 架构健康: 0.15
+    - 文档完整: 0.10
+
+    如需调整:
+    1. 检查各维度 weight 之和是否为 1.0
+    2. 调整 failingThreshold 控制不合格判定门槛
+    3. 安全维度 vetoRules 会直接降级到 D
+    4. 架构维度 penaltyRules 在已有评分上额外扣分
+
+    📖 参考: 05-健康评分与进化系统.md — 评分维度与权重

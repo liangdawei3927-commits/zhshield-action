@@ -8,51 +8,9 @@ import type {
   SyncResult,
   GovernanceDomain,
   ProjectFeature,
+  ProjectProfile,
+  SignedSopPackage,
 } from '../_meta/sop-types';
-
-/**
- * ProjectProfile 的最小投影输入（结构化类型，避免反向依赖 @zh/fingerprint）。
- * 架构文档 §11.1：syncForProject 支持接收 ProjectProfile 自动投影。
- *
- * 与 @zh/fingerprint 的 ProjectProfile 结构兼容：
- * schemaVersion / targets[{ language, frameworks, productForm }] / architecture / environments
- */
-interface ProfileProjectable {
-  readonly targets: readonly Readonly<{
-    readonly language: Readonly<{ readonly value: string }>;
-    readonly frameworks: readonly Readonly<{ readonly value: string }>[];
-    readonly productForm?: Readonly<{ readonly value: string }>;
-  }>[];
-  readonly architecture: Readonly<{ readonly value: string }>;
-  readonly environments: readonly Readonly<{ readonly value: string }>[];
-}
-
-function isProjectFeature(input: ProjectFeature | ProfileProjectable): input is ProjectFeature {
-  return 'features' in input && Array.isArray((input as ProjectFeature).features);
-}
-
-function projectToFeature(profile: ProfileProjectable): ProjectFeature {
-  const primary = profile.targets[0];
-  if (!primary) {
-    return { features: [] };
-  }
-
-  const language = primary.language.value !== 'unknown' ? primary.language.value : undefined;
-  const framework = primary.frameworks[0]?.value;
-  const features: string[] = [];
-
-  if (primary.productForm) {
-    features.push(primary.productForm.value);
-  }
-  if (profile.architecture.value !== 'unknown') {
-    features.push(profile.architecture.value);
-  }
-  for (const env of profile.environments) {
-    features.push(env.value);
-  }
-
-  return { language, framework, features };
-}
 import type { SopRegistry } from '../_meta/sop-registry';
 import type { ContentAddressableStore } from './content-addressable-store';
 import { SopLazyLoader } from './sop-lazy-loader';
@@ -61,24 +19,33 @@ import { resolveSopBase } from '../sync/api-base';
 import { createSyncPolicy } from './sop-sync-policy';
 import type { SyncPolicyOptions } from './sop-sync-policy';
 import { SopSqliteStore } from './sop-sqlite-store';
-import type { SopSqliteStoreEncryptionOptions } from './sop-sqlite-store';
 import { SopVersionStore } from './sop-version-store';
 import { SopSyncClient } from './sop-sync-client';
+import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
+import { SopSigner } from '../security/sop-signer';
 
 export { createSyncPolicy } from './sop-sync-policy';
 export type { SyncPolicyOptions } from './sop-sync-policy';
 
 export interface SopCacheManagerOptions {
+  /** 缓存根目录，默认 ~/.zhshield/sop-cache */
   cacheDir?: string;
+  /** 远程 API 基础 URL */
   remoteBaseUrl?: string;
+  /** 是否启用懒加载 */
   lazyLoading?: boolean;
+  /** 同步策略（同步间隔 + 过期阈值），省略时使用默认值 */
   syncPolicy?: SyncPolicyOptions;
+  /** 本地桌面端版本号（用于兼容性检查，例 '1.0.0'） */
   clientVersion?: string;
+  /** 事件总线（用于通知下游紧急更新等事件） */
   eventBus?: EventBus;
+  /** HMAC-SHA256 签名密钥（用于验证云端规则包完整性） */
+  secretKey?: string;
+  /** 验签公钥：字符串或异步解析函数；未配置时验签放行（向后兼容），配置后解析失败则 fail-closed */
   publicKey?: string | (() => Promise<string | null>);
-  encryption?: SopSqliteStoreEncryptionOptions;
 }
 
 /**
@@ -109,6 +76,9 @@ export class SopCacheManager {
   private versionStore: SopVersionStore;
   private scheduler: SopSyncScheduler;
   private coordinator: SopSyncCoordinator;
+  private eventBus?: EventBus;
+  private secretKey?: string;
+  private publicKey?: string | (() => Promise<string | null>);
 
   constructor(registry: SopRegistry, options: SopCacheManagerOptions = {}) {
     this.registry = registry;
@@ -116,19 +86,24 @@ export class SopCacheManager {
     const remoteBaseUrl = options.remoteBaseUrl ?? resolveSopBase();
     const clientVersion = options.clientVersion ?? '0.0.0';
     this.syncPolicy = createSyncPolicy(options.syncPolicy);
+    this.eventBus = options.eventBus;
+    this.secretKey = options.secretKey;
+    this.publicKey = options.publicKey;
 
     if (options.lazyLoading !== false) {
       this.lazyLoader = new SopLazyLoader(this);
     }
 
-    this.sqliteStore = new SopSqliteStore(path.join(this.cacheDir, 'rules.db'), options.encryption);
+    this.sqliteStore = new SopSqliteStore(path.join(this.cacheDir, 'rules.db'));
     this.versionStore = new SopVersionStore(this.cacheDir);
-    const syncClient = new SopSyncClient(remoteBaseUrl, undefined, options.publicKey);
+    const syncClient = this.publicKey !== undefined
+      ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => this.verifySignature(pkg))
+      : new SopSyncClient(remoteBaseUrl);
     this.scheduler = new SopSyncScheduler(this.syncPolicy);
     this.coordinator = new SopSyncCoordinator({
       registry,
       clientVersion,
-      eventBus: options.eventBus,
+      eventBus: this.eventBus,
       sqliteStore: this.sqliteStore,
       versionStore: this.versionStore,
       syncClient,
@@ -168,21 +143,49 @@ export class SopCacheManager {
    * 完整同步流程（文档 7.4 节）
    */
   async syncFromCloud(): Promise<SyncResult> {
-    return this.coordinator.syncFromCloud();
+    this.emit('sop:sync-started');
+    try {
+      const result = await this.coordinator.syncFromCloud();
+      this.emit('sop:sync-completed', { result, timestamp: new Date() });
+      return result;
+    } catch (err) {
+      this.emit('sop:sync-failed', {
+        error: err instanceof Error ? err.message : String(err),
+        timestamp: new Date(),
+      });
+      throw err;
+    }
   }
 
   /**
    * 应用增量更新（文档 13.3 节）
    */
   async applyDiff(diff: SopDiff): Promise<void> {
-    return this.coordinator.applyDiff(diff);
+    this.emit('sop:diff-started', {
+      fromVersion: diff.fromVersion,
+      toVersion: diff.version,
+      timestamp: new Date(),
+    });
+    await this.coordinator.applyDiff(diff);
+    this.emit('sop:diff-completed', {
+      fromVersion: diff.fromVersion,
+      toVersion: diff.version,
+      ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
+      timestamp: new Date(),
+    });
   }
 
   /**
    * 紧急更新（7.2 节）— 高危规则实时推送
    */
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
-    return this.coordinator.emergencyUpdate(rules);
+    this.emit('sop:emergency-started', { count: rules.length, timestamp: new Date() });
+    await this.coordinator.emergencyUpdate(rules);
+    this.emit('sop:emergency-completed', {
+      count: rules.length,
+      ruleIds: rules.map((r) => r.id),
+      timestamp: new Date(),
+    });
   }
 
   // ─── 本地缓存管理 ──────────────────────────────────────────
@@ -203,7 +206,8 @@ export class SopCacheManager {
    * 清理缓存
    */
   async clearCache(): Promise<void> {
-    return this.coordinator.clearCache();
+    await this.coordinator.clearCache();
+    this.emit('sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
   }
 
   // ─── 同步调度 ──────────────────────────────────────────────
@@ -255,12 +259,11 @@ export class SopCacheManager {
 
   // ─── 按项目特征同步（懒加载 9.5 节） ───────────────────────
 
-  async syncForProject(feature: ProjectFeature): Promise<void>;
-  async syncForProject(profile: ProfileProjectable): Promise<void>;
-  async syncForProject(input: ProjectFeature | ProfileProjectable): Promise<void> {
-    if (!this.lazyLoader) return;
-    const feature = isProjectFeature(input) ? input : projectToFeature(input);
-    await this.lazyLoader.syncForProject(feature);
+  async syncForProject(feature: ProjectFeature | ProjectProfile): Promise<void> {
+    if (this.lazyLoader) {
+      const normalized = isProjectProfile(feature) ? projectProfileToFeature(feature) : feature;
+      await this.lazyLoader.syncForProject(normalized);
+    }
   }
 
   getLazyLoader(): SopLazyLoader | undefined {
@@ -278,4 +281,58 @@ export class SopCacheManager {
   getRegistry(): SopRegistry {
     return this.registry;
   }
+
+  /**
+   * 获取验签公钥：字符串原样返回，函数取解析结果，未配置返回 null
+   */
+  async getPublicKey(): Promise<string | null> {
+    if (typeof this.publicKey === 'string') return this.publicKey;
+    if (typeof this.publicKey === 'function') return this.publicKey();
+    return null;
+  }
+
+  /**
+   * 校验规则包签名：
+   * - 未配置 publicKey → 放行（向后兼容）
+   * - 已配置但公钥解析失败 → fail-closed 拒绝
+   * - 其余按 HMAC-SHA256 验签
+   */
+  async verifySignature(pkg: SignedSopPackage): Promise<boolean> {
+    if (this.publicKey === undefined) return true;
+    const key = await this.getPublicKey();
+    if (!key) return false;
+    return SopSigner.verifyPackage(pkg, key).valid;
+  }
+
+  // ─── 事件发射 ──────────────────────────────────────────────
+
+  /**
+   * 发射事件（fire-and-forget：监听器异常不影响主流程）
+   */
+  private emit(event: string, data: Record<string, unknown> = {}): void {
+    if (this.eventBus) {
+      this.eventBus.emit(event, data).catch(() => {});
+    }
+  }
+}
+
+function isProjectProfile(input: ProjectFeature | ProjectProfile): input is ProjectProfile {
+  return Array.isArray((input as ProjectProfile).targets);
+}
+
+/** 结构化画像 → ProjectFeature 投影：language/framework 取首个 target，features 由 productForm/architecture/environments 组成 */
+function projectProfileToFeature(profile: ProjectProfile): ProjectFeature {
+  const target = profile.targets?.[0];
+  const features: string[] = [];
+  const addFeature = (value?: string) => {
+    if (value && value !== 'unknown' && !features.includes(value)) features.push(value);
+  };
+  addFeature(target?.productForm?.value);
+  addFeature(profile.architecture?.value);
+  for (const env of profile.environments ?? []) addFeature(env.value);
+  return {
+    language: target?.language?.value,
+    framework: target?.frameworks?.[0]?.value,
+    features,
+  };
 }

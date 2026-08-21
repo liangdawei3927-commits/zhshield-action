@@ -96,10 +96,6 @@ export class SopSyncCoordinator {
       return { updated: false, reason: 'network_error' };
     }
 
-    return this.resolveRemoteSync(remoteVersion);
-  }
-
-  private async resolveRemoteSync(remoteVersion: SopVersion): Promise<SyncResult> {
     const state = this.compareVersions(remoteVersion);
     if (state === 'latest') {
       this.scheduler.recordSync();
@@ -110,10 +106,6 @@ export class SopSyncCoordinator {
       await this.clearCache();
     }
 
-    return this.applyRemoteDiff(remoteVersion);
-  }
-
-  private async applyRemoteDiff(remoteVersion: SopVersion): Promise<SyncResult> {
     const fromVersion = this.localVersion?.version ?? '0.0.0';
     const diff = await this.syncClient.fetchDiff(fromVersion, remoteVersion.version);
 
@@ -121,14 +113,6 @@ export class SopSyncCoordinator {
       return this.fullSync(remoteVersion);
     }
 
-    return this.applyIncrementalOrFallback(diff, fromVersion, remoteVersion);
-  }
-
-  private async applyIncrementalOrFallback(
-    diff: SopDiff,
-    fromVersion: string,
-    remoteVersion: SopVersion,
-  ): Promise<SyncResult> {
     if (!this.checkCompatibility(diff.compatibility)) {
       return { updated: false, reason: 'compatibility_error' };
     }

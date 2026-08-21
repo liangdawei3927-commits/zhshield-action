@@ -1,0 +1,126 @@
+# =============================================================================
+# SOP 规则模板 — Sentinel · P2 高优先级告警策略
+# =============================================================================
+# 规则 ID: sentinel.alert.internal.p2-high
+# 治理域: 监控域 (sentinel)
+# 动作类型: 告警响应 (alert)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Sentinel · P2 告警
+# 内部标准源: 自定义 · IronNest#14 Observability
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SentinelRule
+metadata:
+  id: "sentinel.alert.internal.p2-high"
+  name: "P2 高优先级告警策略"
+  description: "定义 P2（高优先级）告警的路由、通知频率、升级路径和自动处置策略。P2 告警包括：高严重性安全发现、架构违规、测试覆盖率大幅下降、性能退化"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "Sentinel alert framework · IronNest rules/14"
+
+governance:
+  domain: "sentinel"
+  action: "alert"
+  module: "Sentinel"
+  category: "alerting"
+
+execution:
+  mode: "event"
+  timeout: 5
+  maxConcurrency: 10
+  retryCount: 2
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "sentinel-router"
+  toolConfig:
+    alert:
+      severity: "high"
+      priority: "P2"
+      aggregationWindow: "5m"      # 5 分钟内相同告警聚合
+      notification:
+        channels:
+          - "slack-team-alerts"
+          - "email-oncall"
+        throttleAfter: 3           # 同一告警重复 3 次后静默 1h
+        quietPeriod: "1h"
+      escalation:
+        - afterMinutes: 30         # 30 分钟未确认升级
+          target: "senior-engineer"
+        - afterMinutes: 60         # 60 分钟未修复升级
+          target: "tech-lead"
+      autoResponse:
+        enabled: false             # P2 默认不自动处置
+        availableActions:
+          - "create-jira-ticket"
+          - "notify-codeowner"
+    triggers:
+      scoring:
+        threshold: 70              # 模块评分低于 70 触发 P2
+        dimensions:
+          - "code-smell"
+          - "duplication"
+          - "test-coverage"
+      testCoverageDrop:
+        threshold: 5               # 覆盖率单次下降超过 5%
+        windowDays: 1
+      performance:
+        p95LatencyIncrease: 20     # P95 延迟增加 20%
+      architecture:
+        newViolations: 5           # 新增 5 个以上架构违规
+  severity: "high"
+  categories:
+    - "alerting"
+    - "p2"
+    - "notification"
+    - "escalation"
+
+judgment:
+  passCondition: "alertTriggered === false"
+  blockOn: "none"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-PC-02"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🔶 P2 高优先级告警
+
+    ⚠️ 告警类型: {alertType}
+    ⚠️ 触发源: {trigger}
+    ⚠️ 当前值: {currentValue}
+    ⚠️ 阈值: {threshold}
+    ⚠️ 影响范围: {scope}
+
+    建议响应：
+    1. 确认告警：查看详情确认是否真实
+    2. 标记误报：如为误报在 Dashboard 中标注
+    3. 创建修复任务：指派给模块负责人
+    4. 升级：如 30 分钟未确认会自动升级
+
+    ‍💻 通知渠道: {channels}

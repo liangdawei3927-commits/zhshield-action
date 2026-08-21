@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'node:fs/promises';
-import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import type { ExperienceEntry, RuleStateEntry, RuleWeightEntry, Suggestion, SyncPayload } from './types';
 
@@ -9,43 +8,16 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-/** 从 JSON 加载的状态中恢复 Date 字段（JSON 序列化后 Date 退化为 ISO string） */
-function reviveDates(payload: SyncPayload): SyncPayload {
-  return {
-    ...payload,
-    experiences: payload.experiences.map((e) => ({
-      ...e,
-      createdAt: new Date(e.createdAt),
-      updatedAt: new Date(e.updatedAt),
-    })),
-    weights: payload.weights.map((w) => ({
-      ...w,
-      lastAdjustedAt: new Date(w.lastAdjustedAt),
-    })),
-    ruleStates: payload.ruleStates.map((s) => ({
-      ...s,
-      changedAt: new Date(s.changedAt),
-    })),
-  };
-}
-
-export interface EvolveEngineOptions {
-  /** 状态文件路径；提供后所有变更自动落盘，重启后通过同一路径恢复 */
-  dataFile?: string;
-  clientId?: string;
-}
-
 export class EvolveEngine {
   private experiences = new Map<string, ExperienceEntry>();
   private ruleStates = new Map<string, RuleStateEntry>();
   private ruleWeights = new Map<string, RuleWeightEntry>();
   private clientId = '';
-  private readonly dataFile: string | null;
+  private engineOptions: { dataFile?: string; clientId?: string } = {};
 
-  constructor(options: EvolveEngineOptions = {}) {
-    this.clientId = options.clientId ?? '';
-    this.dataFile = options.dataFile ?? null;
-    if (this.dataFile) this.loadFromFile();
+  constructor(options: { dataFile?: string; clientId?: string } = {}) {
+    this.engineOptions = options;
+    if (options.clientId) this.clientId = options.clientId;
   }
 
   setClientId(id: string): void {
@@ -61,7 +33,6 @@ export class EvolveEngine {
       updatedAt: now,
     };
     this.experiences.set(experience.id, experience);
-    this.persist();
     return experience;
   }
 
@@ -97,7 +68,6 @@ export class EvolveEngine {
   changeRuleState(ruleId: string, state: RuleStateEntry['state'], reason: string, changedBy: string): RuleStateEntry {
     const entry: RuleStateEntry = { ruleId, state, reason, changedAt: new Date(), changedBy };
     this.ruleStates.set(ruleId, entry);
-    this.persist();
     return entry;
   }
 
@@ -140,7 +110,6 @@ export class EvolveEngine {
       results.push(entry);
     }
 
-    this.persist();
     return results;
   }
 
@@ -156,76 +125,41 @@ export class EvolveEngine {
     const id = clientId || this.clientId || randomUUID();
     if (!this.clientId) this.clientId = id;
 
-    const experiences = this.listExperiences();
     const weights = this.getRuleWeights();
     const states = [...this.ruleStates.values()];
 
     return {
       clientId: id,
       syncedAt: new Date().toISOString(),
-      experiences,
       weights,
       ruleStates: states,
-      totalSynced: weights.length + states.length + experiences.length,
+      totalSynced: weights.length + states.length,
     };
   }
 
-  syncFromCloud(payload: SyncPayload): { weightsImported: number; statesImported: number; experiencesImported: number } {
-    const revived = reviveDates(payload);
+  syncFromCloud(payload: SyncPayload): { weightsImported: number; statesImported: number } {
     let weightsImported = 0;
-    for (const w of revived.weights) {
+    for (const w of payload.weights) {
       this.ruleWeights.set(w.ruleId, w);
       weightsImported++;
     }
 
     let statesImported = 0;
-    for (const s of revived.ruleStates) {
+    for (const s of payload.ruleStates) {
       this.ruleStates.set(s.ruleId, s);
       statesImported++;
     }
 
-    let experiencesImported = 0;
-    for (const e of revived.experiences) {
-      this.experiences.set(e.id, e);
-      experiencesImported++;
-    }
-
-    if (revived.clientId) this.clientId = revived.clientId;
-    this.persist();
-    return { weightsImported, statesImported, experiencesImported };
+    return { weightsImported, statesImported };
   }
 
   async syncToFile(filePath: string): Promise<void> {
     await writeJsonFile(filePath, this.syncToCloud());
   }
 
-  async syncFromFile(filePath: string): Promise<{ weightsImported: number; statesImported: number; experiencesImported: number }> {
+  async syncFromFile(filePath: string): Promise<{ weightsImported: number; statesImported: number }> {
     const content = await fs.readFile(filePath, 'utf-8');
     const payload: SyncPayload = JSON.parse(content);
     return this.syncFromCloud(payload);
-  }
-
-  // ─── 文件持久化 ────────────────────────────────────────────
-
-  private persist(): void {
-    if (!this.dataFile) return;
-    try {
-      const dir = path.dirname(this.dataFile);
-      if (!fsSync.existsSync(dir)) fsSync.mkdirSync(dir, { recursive: true });
-      fsSync.writeFileSync(this.dataFile, JSON.stringify(this.syncToCloud(), null, 2), 'utf-8');
-    } catch {
-      // 持久化失败不阻断主流程（与 feedback.ts 落盘失败静默策略一致）
-    }
-  }
-
-  private loadFromFile(): void {
-    if (!this.dataFile) return;
-    try {
-      if (!fsSync.existsSync(this.dataFile)) return;
-      const content = fsSync.readFileSync(this.dataFile, 'utf-8');
-      this.syncFromCloud(JSON.parse(content) as SyncPayload);
-    } catch {
-      // 状态文件缺失 / 损坏时以空状态启动，不阻断引擎
-    }
   }
 }

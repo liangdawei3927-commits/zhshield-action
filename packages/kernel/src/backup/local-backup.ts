@@ -4,11 +4,11 @@
  * 基于现有 BackupManager 增强，支持配置化排除、压缩、元数据持久化。
  */
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { createWriteStream } from 'node:fs';
-import archiver from 'archiver';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
+import { createGzip } from 'node:zlib';
+import { pipeline } from 'node:stream/promises';
 import { type LocalBackupConfig, type LocalBackupSubResult } from './types';
 import { hashFile, matchesExcludePattern } from './utils';
 
@@ -29,32 +29,6 @@ export interface LocalBackupManifest {
   files: LocalBackupFileEntry[];
 }
 
-/** copyChangedFiles 参数对象 */
-interface CopyChangedFilesParams {
-  files: string[];
-  manifest: LocalBackupManifest | null;
-  isFullBackup: boolean;
-  backupDir: string;
-  projectPath: string;
-  timestamp: string;
-  abortSignal?: AbortSignal;
-}
-
-interface PreparedBackup {
-  resolvedBackupDir: string;
-  backupDir: string;
-  manifest: LocalBackupManifest | null;
-  files: string[];
-  timestamp: string;
-  isFullBackup: boolean;
-}
-
-interface LocalBackupContext {
-  projectPath: string;
-  config: LocalBackupConfig;
-  abortSignal?: AbortSignal;
-}
-
 export class LocalBackup {
   private backupRoot: string;
 
@@ -66,159 +40,57 @@ export class LocalBackup {
    * 执行本地备份
    * 创建带时间戳的备份目录 → 增量复制文件（hash 对比）→ 生成 manifest → 清理旧备份
    */
-  async backup(ctx: LocalBackupContext, locale?: LanguageCode): Promise<LocalBackupSubResult> {
+  async backup(
+    projectPath: string,
+    config: LocalBackupConfig,
+    abortSignal?: AbortSignal,
+  ): Promise<LocalBackupSubResult> {
     try {
-      return await this.completeBackup(ctx, locale);
-    } catch (err) {
-      return this.buildBackupError(err, locale);
-    }
-  }
+      const resolvedBackupDir = config.backupDir
+        ? config.backupDir.replace(TILDE_PREFIX, os.homedir())
+        : this.backupRoot;
 
-  private async completeBackup(ctx: LocalBackupContext, locale?: LanguageCode): Promise<LocalBackupSubResult> {
-    const { projectPath, config, abortSignal } = ctx;
-    const prepared = await this.prepareBackup(ctx);
+      await fs.mkdir(resolvedBackupDir, { recursive: true });
 
-    // If compress is enabled, create zip archive
-    if (config.compress) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const zipFileName = `backup_${timestamp}.zip`;
-      const backupFilePath = path.join(prepared.resolvedBackupDir, zipFileName);
+      const manifest = await this.loadManifest(resolvedBackupDir);
+      const files = await this.scanFiles(projectPath, config.excludePatterns, abortSignal);
+      const timestamp = new Date().toISOString();
+      const backupDir = path.join(resolvedBackupDir, timestamp.replace(/[:.]/g, '-'));
 
-      const { backedUp, errors, totalSize } = await this.createZipArchive({
-        files: prepared.files,
+      const isFullBackup = !manifest || manifest.files.length === 0;
+      const { backedUp, errors, totalSize, fileEntries } = await this.copyChangedFiles(
+        files,
+        manifest,
+        isFullBackup,
+        backupDir,
         projectPath,
-        backupFilePath,
+        timestamp,
         abortSignal,
-      });
+        config.compress,
+      );
 
       if (!abortSignal?.aborted) {
-        await this.pruneOldBackups(prepared.resolvedBackupDir, config.maxBackups);
+        await this.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);
+        await this.updateManifestFile(resolvedBackupDir, fileEntries, timestamp, isFullBackup);
+        await this.pruneOldBackups(resolvedBackupDir, config.maxBackups);
       }
 
       return {
         type: 'local',
         success: errors === 0 || backedUp > 0,
-        backupPath: backupFilePath,
+        backupPath: backupDir,
         size: totalSize,
         fileCount: backedUp,
-        ...(errors > 0 && backedUp === 0
-          ? { error: translate('engine.kernel.backup.localCopyFailed', locale ?? DEFAULT_LANGUAGE, { count: errors }) }
-          : {}),
+        ...(errors > 0 && backedUp === 0 ? { error: `${errors} 个文件复制失败` } : {}),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '未知本地备份错误';
+      return {
+        type: 'local',
+        success: false,
+        error: message,
       };
     }
-
-    // Original behavior: copy files without compression
-    const { backedUp, errors, totalSize, fileEntries } = await this.copyChangedFiles({
-      files: prepared.files,
-      manifest: prepared.manifest,
-      isFullBackup: prepared.isFullBackup,
-      backupDir: prepared.backupDir,
-      projectPath,
-      timestamp: prepared.timestamp,
-      abortSignal,
-    });
-
-    if (!abortSignal?.aborted) {
-      await this.finalizeBackup(prepared, fileEntries, config.maxBackups);
-    }
-
-    return {
-      type: 'local',
-      success: errors === 0 || backedUp > 0,
-      backupPath: prepared.backupDir,
-      size: totalSize,
-      fileCount: backedUp,
-      ...(errors > 0 && backedUp === 0
-        ? { error: translate('engine.kernel.backup.localCopyFailed', locale ?? DEFAULT_LANGUAGE, { count: errors }) }
-        : {}),
-    };
-  }
-
-  private async prepareBackup(ctx: LocalBackupContext): Promise<PreparedBackup> {
-    const { projectPath, config, abortSignal } = ctx;
-
-    // If backupDir is empty, use project's .zhshield/backups/
-    let resolvedBackupDir: string;
-    if (!config.backupDir || config.backupDir.trim() === '') {
-      resolvedBackupDir = path.join(projectPath, '.zhshield', 'backups');
-    } else {
-      resolvedBackupDir = config.backupDir.replace(TILDE_PREFIX, os.homedir());
-    }
-
-    await fs.mkdir(resolvedBackupDir, { recursive: true });
-
-    const manifest = await this.loadManifest(resolvedBackupDir);
-    const files = await this.scanFiles(projectPath, config.excludePatterns, abortSignal);
-    const timestamp = new Date().toISOString();
-    const backupDir = path.join(resolvedBackupDir, timestamp.replace(/[:.]/g, '-'));
-
-    return {
-      resolvedBackupDir,
-      backupDir,
-      manifest,
-      files,
-      timestamp,
-      isFullBackup: !manifest || manifest.files.length === 0,
-    };
-  }
-
-  private async finalizeBackup(
-    prepared: PreparedBackup,
-    fileEntries: LocalBackupFileEntry[],
-    maxBackups: number,
-  ): Promise<void> {
-    await this.writeManifest(prepared.backupDir, prepared.timestamp, prepared.isFullBackup, fileEntries);
-    await this.updateManifestFile(prepared.resolvedBackupDir, fileEntries, prepared.timestamp, prepared.isFullBackup);
-    await this.pruneOldBackups(prepared.resolvedBackupDir, maxBackups);
-  }
-
-  private buildBackupError(err: unknown, locale?: LanguageCode): LocalBackupSubResult {
-    const message = err instanceof Error ? err.message : translate('engine.kernel.backup.unknownLocalError', locale ?? DEFAULT_LANGUAGE);
-    return {
-      type: 'local',
-      success: false,
-      error: message,
-    };
-  }
-
-  private async createZipArchive(params: {
-    files: string[];
-    projectPath: string;
-    backupFilePath: string;
-    abortSignal?: AbortSignal;
-  }): Promise<{ backedUp: number; errors: number; totalSize: number }> {
-    const { files, projectPath, backupFilePath, abortSignal } = params;
-
-    await fs.mkdir(path.dirname(backupFilePath), { recursive: true });
-
-    return new Promise((resolve, reject) => {
-      const output = createWriteStream(backupFilePath);
-      const archive = archiver('zip', { zlib: { level: 6 } });
-
-      let backedUp = 0;
-      let errors = 0;
-
-      output.on('close', () => {
-        resolve({ backedUp, errors, totalSize: archive.pointer() });
-      });
-
-      archive.on('error', (err: Error) => reject(err));
-      archive.on('entry', () => { backedUp++; });
-
-      archive.pipe(output);
-
-      for (const file of files) {
-        if (abortSignal?.aborted) { archive.abort(); break; }
-        const relativePath = path.relative(projectPath, file);
-        try {
-          archive.file(file, { name: relativePath });
-        } catch {
-          errors++;
-        }
-      }
-
-      archive.finalize();
-    });
   }
 
   /**
@@ -256,15 +128,15 @@ export class LocalBackup {
     const dir = backupDir ?? this.backupRoot;
     try {
       const entries = await fs.readdir(dir);
-      const results: string[] = [];
+      const dirs: string[] = [];
       for (const entry of entries) {
         const fullPath = path.join(dir, entry);
         const stat = await fs.stat(fullPath).catch(() => null);
-        if (stat?.isDirectory() || entry.endsWith('.zip')) {
-          results.push(fullPath);
+        if (stat?.isDirectory()) {
+          dirs.push(fullPath);
         }
       }
-      return results.sort().reverse();
+      return dirs.sort().reverse();
     } catch {
       return [];
     }
@@ -278,34 +150,28 @@ export class LocalBackup {
     abortSignal?: AbortSignal,
   ): Promise<string[]> {
     const results: string[] = [];
-    await this.collectFiles({ dir: rootDir, rootDir, excludePatterns, abortSignal, results });
-    return results;
-  }
 
-  private async collectFiles(params: {
-    dir: string;
-    rootDir: string;
-    excludePatterns: string[];
-    abortSignal: AbortSignal | undefined;
-    results: string[];
-  }): Promise<void> {
-    const { dir, rootDir, excludePatterns, abortSignal, results } = params;
-    if (abortSignal?.aborted) return;
-    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
-
-    for (const entry of entries) {
+    const walk = async (dir: string) => {
       if (abortSignal?.aborted) return;
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(rootDir, fullPath);
+      const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
 
-      if (matchesExcludePattern(relativePath, excludePatterns)) continue;
+      for (const entry of entries) {
+        if (abortSignal?.aborted) return;
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = path.relative(rootDir, fullPath);
 
-      if (entry.isDirectory()) {
-        await this.collectFiles({ dir: fullPath, rootDir, excludePatterns, abortSignal, results });
-      } else if (entry.isFile()) {
-        results.push(fullPath);
+        if (matchesExcludePattern(relativePath, excludePatterns)) continue;
+
+        if (entry.isDirectory()) {
+          await walk(fullPath);
+        } else if (entry.isFile()) {
+          results.push(fullPath);
+        }
       }
-    }
+    };
+
+    await walk(rootDir);
+    return results;
   }
 
   private async loadManifest(backupRoot: string): Promise<LocalBackupManifest | null> {
@@ -384,8 +250,16 @@ export class LocalBackup {
    * 复制文件到备份目录，返回备份统计与文件清单。
    * 当前实现为每次全量复制，保证单个备份目录自包含、可直接恢复。
    */
-  private async copyChangedFiles(params: CopyChangedFilesParams): Promise<{ backedUp: number; errors: number; totalSize: number; fileEntries: LocalBackupFileEntry[] }> {
-    const { files, backupDir, projectPath, timestamp, abortSignal } = params;
+  private async copyChangedFiles(
+    files: string[],
+    _manifest: LocalBackupManifest | null,
+    _isFullBackup: boolean,
+    backupDir: string,
+    projectPath: string,
+    timestamp: string,
+    abortSignal?: AbortSignal,
+    compress?: boolean,
+  ): Promise<{ backedUp: number; errors: number; totalSize: number; fileEntries: LocalBackupFileEntry[] }> {
     const fileEntries: LocalBackupFileEntry[] = [];
     let backedUp = 0;
     let errors = 0;
@@ -396,9 +270,19 @@ export class LocalBackup {
       const relativePath = path.relative(projectPath, file);
       try {
         const [hash, stat] = await Promise.all([hashFile(file), fs.stat(file)]);
-        const targetPath = path.join(backupDir, relativePath);
+        const targetPath = compress
+          ? path.join(backupDir, `${relativePath}.gz`)
+          : path.join(backupDir, relativePath);
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
-        await fs.cp(file, targetPath, { preserveTimestamps: true });
+        if (compress) {
+          await pipeline(
+            fsSync.createReadStream(file),
+            createGzip(),
+            fsSync.createWriteStream(targetPath),
+          );
+        } else {
+          await fs.cp(file, targetPath, { preserveTimestamps: true });
+        }
         fileEntries.push({
           relativePath,
           hash,

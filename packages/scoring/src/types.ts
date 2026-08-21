@@ -36,3 +36,43 @@ export interface TrendReport {
   insights: string[];
   streak: { direction: ScoreTrend; count: number };
 }
+
+export interface ScoringRuleContext {
+  findings: Array<{ severity: string; category: string }>;
+  metrics: {
+    dependencyCount: number;
+    testCoverage?: number;
+    circularDependencies: number;
+    totalFiles: number;
+    documentationCoverage?: number;
+  };
+}
+
+export interface PositiveRule {
+  id: string;
+  name: string;
+  description: string;
+  dimension: string;
+  points: number;
+  condition: (ctx: ScoringRuleContext) => boolean;
+}
+
+export interface DimensionDefinition {
+  id: string;
+  name: string;
+  weight: number;
+  description: string;
+  penalties: {
+    dimension: string;
+    maxPenalty: number;
+    perIssuePenalty: number;
+    severityMultipliers: Record<string, number>;
+  };
+  positiveRules: PositiveRule[];
+}
+
+export interface ScoringConfig {
+  version: string;
+  lastUpdated: Date;
+  dimensions: DimensionDefinition[];
+}

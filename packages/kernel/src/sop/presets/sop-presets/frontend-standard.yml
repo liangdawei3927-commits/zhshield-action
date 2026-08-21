@@ -1,0 +1,31 @@
+name: frontend-standard
+description: 前端项目标准治理配置
+version: "1.0"
+domains:
+  - eslint:enabled
+  - semgrep:frontend-security
+  - dependency:license-check
+  - dependency:vulnerability-scan
+  - gitleaks:secret-detection
+tools:
+  eslint:
+    config: .eslintrc.js
+  semgrep:
+    rules: ["p/javascript", "p/typescript", "p/react"]
+  gitleaks:
+    enabled: true
+  trivy:
+    enabled: false
+severity:
+  block: [critical, high]
+  warn: [medium]
+  info: [low, info]
+guard:
+  pre_commit:
+    - eslint:lint-staged
+    - gitleaks:detect
+  pre_push:
+    - semgrep:scan
+    - dependency:check
+performance:
+  max_scan_time_ms: 30000

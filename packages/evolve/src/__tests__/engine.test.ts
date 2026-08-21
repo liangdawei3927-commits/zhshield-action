@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { EvolveEngine } from '../engine';
 
 describe('EvolveEngine', () => {
@@ -199,81 +196,6 @@ describe('EvolveEngine', () => {
 
       expect(newEngine.getRuleWeights()).toHaveLength(engine.getRuleWeights().length);
       expect(newEngine.getRuleState('R1')?.state).toBe('deprecated');
-    });
-  });
-
-  describe('File Persistence', () => {
-    let dataDir: string;
-    let dataFile: string;
-
-    beforeEach(() => {
-      dataDir = mkdtempSync(join(tmpdir(), 'evolve-test-'));
-      dataFile = join(dataDir, 'evolve-state.json');
-    });
-
-    afterEach(() => {
-      rmSync(dataDir, { recursive: true, force: true });
-    });
-
-    function recordFp(engine: EvolveEngine, ruleId: string, count: number): void {
-      for (let i = 0; i < count; i++) {
-        engine.recordExperience({ projectId: 'proj-1', ruleId, type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-      }
-    }
-
-    it('should persist experiences and reload them in a new engine', () => {
-      const engine = new EvolveEngine({ dataFile });
-      recordFp(engine, 'FP-RULE', 3);
-
-      const reloaded = new EvolveEngine({ dataFile });
-      const experiences = reloaded.listExperiences('proj-1');
-      expect(experiences).toHaveLength(3);
-      expect(experiences[0].ruleId).toBe('FP-RULE');
-    });
-
-    it('should restore Date fields as Date instances after reload', () => {
-      const engine = new EvolveEngine({ dataFile });
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'R1', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
-
-      const reloaded = new EvolveEngine({ dataFile });
-      const exp = reloaded.listExperiences('proj-1')[0];
-      expect(exp.createdAt).toBeInstanceOf(Date);
-      expect(exp.updatedAt).toBeInstanceOf(Date);
-    });
-
-    it('should persist rule weights and states', () => {
-      const engine = new EvolveEngine({ dataFile });
-      recordFp(engine, 'FP-RULE', 3);
-      engine.autoAdjustWeights();
-      engine.changeRuleState('FP-RULE', 'deprecated', 'Old rule', 'admin');
-
-      const reloaded = new EvolveEngine({ dataFile });
-      const weight = reloaded.getRuleWeight('FP-RULE');
-      expect(weight).toBeLessThan(1.0);
-      expect(reloaded.getRuleState('FP-RULE')?.state).toBe('deprecated');
-      expect(reloaded.getRuleState('FP-RULE')?.changedAt).toBeInstanceOf(Date);
-    });
-
-    it('should not write any file when no dataFile is provided', () => {
-      const engine = new EvolveEngine();
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'R1', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
-      engine.autoAdjustWeights();
-      engine.changeRuleState('R1', 'active', 'test', 'admin');
-
-      expect(existsSync(join(dataDir, 'evolve-state.json'))).toBe(false);
-    });
-
-    it('should start empty when dataFile is corrupted', () => {
-      writeFileSync(dataFile, '{not valid json');
-
-      const engine = new EvolveEngine({ dataFile });
-      expect(engine.listExperiences()).toHaveLength(0);
-      expect(engine.getRuleWeights()).toHaveLength(0);
-    });
-
-    it('should start empty when dataFile does not exist', () => {
-      const engine = new EvolveEngine({ dataFile });
-      expect(engine.listExperiences()).toHaveLength(0);
     });
   });
 });

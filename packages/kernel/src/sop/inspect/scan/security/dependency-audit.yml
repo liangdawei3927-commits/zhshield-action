@@ -7,5 +7,7 @@ source: external
 tags: [security, dependency, audit]
 applicableEngines: [inspect]
 scanners:
-  - depcheck
+  - npm-audit
+  - trivy
+  - grype
 schedule: daily

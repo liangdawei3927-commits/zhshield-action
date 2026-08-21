@@ -30,28 +30,6 @@ export type IssueCategory =
 
 export type IssueSource = 'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor';
 
-// ─── 污点/数据流链（SARIF-compatible 简化子集）─────────────
-
-/** 数据流链中的单个位置（SARIF threadFlowLocation 的子集，M4 SARIF 导出用） */
-export interface CodeFlowLocation {
-  location: {
-    file: string;
-    line?: number;
-    column?: number;
-  };
-  message?: string;
-}
-
-/** 数据流链中的一条线程流（SARIF threadFlow 的子集） */
-export interface CodeFlowThreadFlow {
-  locations: CodeFlowLocation[];
-}
-
-/** 污点/数据流链（SARIF codeFlow 的子集，如 Semgrep dataflow_trace 映射结果） */
-export interface CodeFlow {
-  threadFlows: CodeFlowThreadFlow[];
-}
-
 export interface Issue {
   id: string;
   ruleId: string;
@@ -65,12 +43,29 @@ export interface Issue {
   autoFixable: boolean;
   source: IssueSource;
   fingerprint: string;
-  /** 污点/数据流链（SARIF-compatible 形状，为 M4 SARIF 导出与污点链路展示打底） */
+
+  // ─── 可选扩展字段（SARIF 兼容，§11.3 / ADR #1）──────────
+  /** 污点传播链（source→sink 位置链） */
   codeFlows?: CodeFlow[];
-  /** 栈追踪行（如运行时异常 / 崩溃堆栈） */
+  /** 原始栈追踪行 */
   stack?: string[];
-  /** 分类标签（如 validation:NO_VALIDATOR、sca:reachable），供报告/门禁按标签聚合 */
+  /** 分类标签（如 validation:NO_VALIDATOR、sca:reachable） */
   taxonomies?: string[];
+}
+
+/** SARIF 兼容的污点链单条位置 */
+export interface CodeFlowLocation {
+  location: { file: string; line?: number; column?: number };
+  message?: string;
+}
+
+export interface CodeFlowThreadFlow {
+  locations: CodeFlowLocation[];
+}
+
+/** SARIF-compatible 污点流：source→sink 完整位置链 */
+export interface CodeFlow {
+  threadFlows: CodeFlowThreadFlow[];
 }
 
 // ─── 重构模板（RefactoringTemplate）────────────────────────
@@ -282,16 +277,10 @@ export interface ExperienceEntry {
 
 // ─── 开源工具集成（Tool Adapter）────────────────────────
 
-export type FallbackStrategy =
-  | 'skip'     // Skip this tool, continue with others
-  | 'retry'    // Retry once before skipping
-  | 'degrade'  // Return partial results from other tools
-  | 'fail';    // Fail the entire scan
-
 export type ToolId =
-  | 'eslint' | 'tsc' | 'semgrep' | 'trivy' | 'grype'
+  | 'eslint' | 'semgrep' | 'trivy' | 'grype'
   | 'gitleaks' | 'ort' | 'depcheck' | 'dep-cruiser' | 'jscpd'
-  | 'ts-prune';
+  | 'ts-prune' | 'tsc';
 
 export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
 
@@ -318,14 +307,13 @@ export interface ToolConfig {
   config?: string;
   /** 规则声明的 issue 分类，透传给适配器作为 mapOutput 的默认 category */
   category?: IssueCategory;
-  /** 规则声明的工具 CLI 参数（如 tsc 的 --strict），由适配器消费 */
-  flags?: string[];
   ignore?: string[];
   severity?: string[];
   scanners?: string[];
   rules?: string[];
   packageManagers?: string[];
   timeout?: number;
+  flags?: string[];
 }
 
 export interface ToolResult {
@@ -353,8 +341,6 @@ export interface ToolAdapter {
   meta: ToolMeta;
   isAvailable(): Promise<boolean>;
   scan(options: ToolScanOptions): Promise<ToolResult>;
-  healthCheck?(): Promise<{ healthy: boolean; message?: string }>;
-  fallbackStrategy?: FallbackStrategy;
 }
 
 export interface ToolVersionInfo {

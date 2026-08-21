@@ -1,5 +1,4 @@
 import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import type { ExperienceType as EvolveExperienceType } from '@zh/evolve';
 import { EvolveService } from '../evolve/evolve.service';
 
@@ -32,7 +31,6 @@ const TYPE_MAP: Record<ExperienceType, EvolveExperienceType> = {
   new_pattern: 'best-practice',
 };
 
-@ApiTags('Experience')
 @Controller('experience')
 export class ExperienceController {
   private readonly logger = new Logger(ExperienceController.name);
@@ -45,9 +43,6 @@ export class ExperienceController {
    */
   @Post()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '接收经验回写数据' })
-  @ApiBody({ schema: { properties: { records: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', description: '经验类型' }, ruleId: { type: 'string', description: '规则ID' }, toolId: { type: 'string', description: '工具ID' }, codePattern: { type: 'string', description: '代码模式' }, description: { type: 'string', description: '描述' }, fixSteps: { type: 'string', description: '修复步骤' }, projectId: { type: 'string', description: '项目ID' }, timestamp: { type: 'string', description: '时间戳' } } }, description: '经验记录列表' } }, required: ['records'] } })
-  @ApiResponse({ status: 200, description: '经验回写结果' })
   async receiveExperience(@Body() body: ExperienceBatchDto): Promise<ExperienceBatchResponse> {
     const { records } = body;
 

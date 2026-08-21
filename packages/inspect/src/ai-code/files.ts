@@ -31,7 +31,6 @@ const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
   '.nuxt',
   '.turbo',
   '.cache',
-  'SOP标准资源',
   '00-项目文档',
   '__tests__',
   '__mocks__',

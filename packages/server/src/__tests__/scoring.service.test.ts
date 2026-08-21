@@ -1,39 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import * as path from 'path';
 import { ScoringService } from '../scoring/scoring.service';
 import type { DimensionScore, ScoringEngine } from '@zh/scoring';
-import type { GuardReport } from '@zh/guard';
-import type { InspectionReport } from '@zh/inspect';
-
-function emptyGuardReport(): GuardReport {
-  return {
-    contractVersion: '1.0',
-    mode: 'guard',
-    profile: 'test',
-    target: '.',
-    ok: true,
-    dryRun: false,
-    summary: { total: 0, passed: 0, failed: 0, warnings: 0, blocking: 0, errors: 0 },
-    results: [],
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-function emptyInspectionReport(): InspectionReport {
-  return {
-    projectId: 'persist-proj',
-    timestamp: new Date(),
-    scanType: 'full',
-    duration: 0,
-    score: { overall: 100, grade: 'A' },
-    issues: [],
-    summary: { total: 0, error: 0, warning: 0, info: 0 },
-    adapterResults: [],
-    recommendations: [],
-  };
-}
 
 describe('ScoringService', () => {
   let service: ScoringService;
@@ -115,29 +82,6 @@ describe('ScoringService', () => {
       engine.calculate('proj-decline', [{ name: 's', weight: 1, score: 70, issues: 3 }]);
       const history = service.getHistory('proj-decline');
       expect(history[1].trend).toBe('declining');
-    });
-  });
-
-  describe('initialize', () => {
-    it('persists recorded scores across service restarts', async () => {
-      const dir = mkdtempSync(path.join(tmpdir(), 'zh-scoring-svc-'));
-      const dbPath = path.join(dir, 'test.db');
-      try {
-        const svc1 = new ScoringService();
-        await svc1.initialize(dbPath);
-        svc1.recordPipelineScore('persist-proj', emptyGuardReport(), emptyInspectionReport());
-        const recorded = svc1.getScore('persist-proj');
-        expect(recorded).toBeDefined();
-
-        const svc2 = new ScoringService();
-        await svc2.initialize(dbPath);
-        const loaded = svc2.getScore('persist-proj');
-        expect(loaded).toBeDefined();
-        expect(loaded!.overall).toBe(recorded!.overall);
-        expect(loaded!.grade).toBe(recorded!.grade);
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
     });
   });
 });

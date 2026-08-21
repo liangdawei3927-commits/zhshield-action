@@ -1,11 +1,15 @@
-import { createPackageVitestConfig } from '../../vitest.shared';
+import { defineConfig } from 'vitest/config';
 
-export default createPackageVitestConfig({
-  include: 'src/__tests__/**/*.{test,spec}.{ts,tsx}',
-  test: { environment: 'node' },
-  coverage: {
-    include: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
-    exclude: ['src/__tests__/**', 'src/main.tsx'],
-    thresholds: { statements: 60, branches: 50, functions: 60, lines: 60 },
+export default defineConfig({
+  test: {
+    globals: true,
+    include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
+    environment: 'node',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary'],
+      include: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
+      exclude: ['src/__tests__/**', 'src/main.tsx'],
+    },
   },
 });

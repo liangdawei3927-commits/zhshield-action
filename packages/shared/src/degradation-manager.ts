@@ -1,6 +1,5 @@
-import type { LanguageCode } from '@zh/i18n';
 import type { ToolId, DegradationLevel, BuiltinRule, Issue } from './types';
-import { buildFallbackRules } from './builtin-rules';
+import { BUILTIN_FALLBACK_RULES } from './builtin-rules';
 
 export class DegradationManager {
   private currentLevel: DegradationLevel = 0;
@@ -54,13 +53,13 @@ export class DegradationManager {
     return new Map(this.toolErrors);
   }
 
-  getFallbackRules(locale?: LanguageCode): BuiltinRule[] {
+  getFallbackRules(): BuiltinRule[] {
     if (this.currentLevel < 3) return [];
-    return buildFallbackRules(locale);
+    return BUILTIN_FALLBACK_RULES;
   }
 
-  getFallbackIssues(projectId: string, locale?: LanguageCode): Issue[] {
-    const rules = this.getFallbackRules(locale);
+  getFallbackIssues(projectId: string): Issue[] {
+    const rules = this.getFallbackRules();
     if (rules.length === 0) return [];
 
     return rules.map((rule, idx) => ({

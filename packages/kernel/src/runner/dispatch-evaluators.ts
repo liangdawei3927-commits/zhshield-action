@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Issue, ToolAdapter, ToolConfig, ToolResult } from '@zh/shared';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type {
@@ -26,22 +25,20 @@ export async function evalCheckList(
   rule: SopRule,
   _instr: CheckListInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   if (!host.guardEngine) {
-    return skippedResult(rule, translate('engine.kernel.runner.guardEngineNotRegistered', locale ?? DEFAULT_LANGUAGE), 'guard');
+    return skippedResult(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard');
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, translate('engine.kernel.runner.skipCheckListReentry', locale ?? DEFAULT_LANGUAGE), 'guard');
+    return skippedResult(rule, '跳过 check-list→GuardEngine.run（防止规则引擎重入）', 'guard');
   }
-  return runGuardCheck(host.guardEngine, rule, context, locale);
+  return runGuardCheck(host.guardEngine, rule, context);
 }
 
 async function runGuardCheck(
   guardEngine: NonNullable<EngineHost['guardEngine']>,
   rule: SopRule,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   try {
     const result = await guardEngine.run({
@@ -57,20 +54,14 @@ async function runGuardCheck(
       status: violations.length === 0 ? 'passed' : 'failed',
       violations,
       message: violations.length > 0
-        ? translate('engine.kernel.runner.guardFoundIssues', locale ?? DEFAULT_LANGUAGE, { count: violations.length })
-        : translate('engine.kernel.runner.guardPassed', locale ?? DEFAULT_LANGUAGE),
+        ? `Guard 检查发现 ${violations.length} 个问题`
+        : 'Guard 检查通过',
       durationMs: 0,
       targetEngine: 'guard',
       timestamp: new Date(),
     };
   } catch (err) {
-    const message = toMessage(err);
-    // check-list 规则指向的检查项在当前仓库的 GuardEngine 配置中不存在时，
-    // 属「未配置/不适用」而非执行失败——降级为跳过，避免空配置硬阻断全部提交。
-    if (message.includes('no checks matched the current filters')) {
-      return skippedResult(rule, translate('engine.kernel.runner.skipCheckListNoMatch', locale ?? DEFAULT_LANGUAGE), 'guard');
-    }
-    return errorResult(rule, translate('engine.kernel.runner.guardDispatchFailed', locale ?? DEFAULT_LANGUAGE, { error: message }), 'guard');
+    return errorResult(rule, `Guard 派发失败: ${toMessage(err)}`, 'guard');
   }
 }
 
@@ -102,18 +93,17 @@ export async function evalScannerDispatch(
   rule: SopRule,
   instr: ScannerDispatchInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
-  const viaAdapters = await runScannerAdapters(host, rule, instr, context, locale);
+  const viaAdapters = await runScannerAdapters(host, rule, instr, context);
   if (viaAdapters) return viaAdapters;
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, translate('engine.kernel.runner.inspectEngineNotRegistered', locale ?? DEFAULT_LANGUAGE), 'inspect');
+    return skippedResult(rule, 'InspectEngine 未注册，且无可用扫描器适配器', 'inspect');
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, translate('engine.kernel.runner.skipScannerReentry', locale ?? DEFAULT_LANGUAGE), 'inspect');
+    return skippedResult(rule, '跳过 scanner-dispatch→runScan（防止规则引擎重入）', 'inspect');
   }
-  return runInspectScan(host.inspectEngine, rule, context, translate('engine.kernel.runner.labelInspection', locale ?? DEFAULT_LANGUAGE), locale);
+  return runInspectScan(host.inspectEngine, rule, context, '巡检');
 }
 
 async function runScannerAdapters(
@@ -121,7 +111,6 @@ async function runScannerAdapters(
   rule: SopRule,
   instr: ScannerDispatchInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation | null> {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
@@ -143,11 +132,10 @@ async function runScannerAdapters(
         fix: {},
       },
       context,
-      locale,
     );
     if (one.violations?.length) violations.push(...one.violations);
     if (one.status === 'error' && !one.violations?.length) {
-      return { ...one, message: one.message ?? translate('engine.kernel.runner.scannerFailed', locale ?? DEFAULT_LANGUAGE, { tool: toolName }) };
+      return { ...one, message: one.message ?? `扫描器 ${toolName} 执行失败` };
     }
   }
   if (!anyRan) return null;
@@ -158,8 +146,8 @@ async function runScannerAdapters(
     violations,
     files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
     message: violations.length > 0
-      ? translate('engine.kernel.runner.scannerFoundIssues', locale ?? DEFAULT_LANGUAGE, { count: violations.length })
-      : translate('engine.kernel.runner.scannerPassed', locale ?? DEFAULT_LANGUAGE),
+      ? `扫描器发现 ${violations.length} 个问题`
+      : '扫描器检查通过',
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
@@ -173,27 +161,18 @@ export async function evalToolDispatch(
   rule: SopRule,
   instr: ToolDispatchInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    return skippedResult(
-      rule,
-      translate('engine.kernel.runner.toolAdapterNotRegistered', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool }),
-      targetEngineOf(rule),
-    );
+    return skippedResult(rule, `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`, targetEngineOf(rule));
   }
 
   const available = await adapter.isAvailable();
   if (!available) {
-    return skippedResult(
-      rule,
-      translate('engine.kernel.runner.toolUnavailable', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool }),
-      targetEngineOf(rule),
-    );
+    return skippedResult(rule, `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`, targetEngineOf(rule));
   }
 
-  return runToolScan(adapter, rule, instr, context, locale);
+  return runToolScan(adapter, rule, instr, context);
 }
 
 async function runToolScan(
@@ -201,7 +180,6 @@ async function runToolScan(
   rule: SopRule,
   instr: ToolDispatchInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   try {
     const toolConfig = instr.toolConfig ?? {};
@@ -227,20 +205,15 @@ async function runToolScan(
       violations,
       files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
       message: violations.length > 0
-        ? translate('engine.kernel.runner.toolFoundIssues', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool, count: violations.length })
-        : result.error
-          ? translate('engine.kernel.runner.toolError', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool, error: result.error })
-          : translate('engine.kernel.runner.toolPassed', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool }),
+        ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
+        : result.error ? `工具 ${instr.tool} 错误: ${result.error}`
+        : `工具 ${instr.tool} 检查通过`,
       durationMs: result.metadata.duration,
       targetEngine: targetEngineOf(rule),
       timestamp: new Date(),
     };
   } catch (err) {
-    return errorResult(
-      rule,
-      translate('engine.kernel.runner.toolExecuteFailed', locale ?? DEFAULT_LANGUAGE, { tool: instr.tool, error: toMessage(err) }),
-      targetEngineOf(rule),
-    );
+    return errorResult(rule, `工具 ${instr.tool} 执行失败: ${toMessage(err)}`, targetEngineOf(rule));
   }
 }
 
@@ -267,7 +240,6 @@ export async function evalPreset(
   rule: SopRule,
   instr: PresetInstruction,
   context: RuleContext,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   const tool = pickPresetTool(host, instr);
   if (tool) {
@@ -283,17 +255,16 @@ export async function evalPreset(
         fix: {},
       },
       context,
-      locale,
     );
   }
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, translate('engine.kernel.runner.presetInspectNotRegistered', locale ?? DEFAULT_LANGUAGE), 'inspect');
+    return skippedResult(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect');
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, translate('engine.kernel.runner.skipPresetReentry', locale ?? DEFAULT_LANGUAGE), 'inspect');
+    return skippedResult(rule, '跳过 preset→runScan（防止规则引擎重入）', 'inspect');
   }
-  return runInspectScan(host.inspectEngine, rule, context, translate('engine.kernel.runner.labelPreset', locale ?? DEFAULT_LANGUAGE), locale);
+  return runInspectScan(host.inspectEngine, rule, context, '预设检查');
 }
 
 function pickPresetTool(host: EngineHost, instr: PresetInstruction): string | null {
@@ -315,7 +286,6 @@ async function runInspectScan(
   rule: SopRule,
   context: RuleContext,
   label: string,
-  locale?: LanguageCode,
 ): Promise<RuleEvaluation> {
   try {
     const result = await inspectEngine.runScan(context.repoRoot, 'full');
@@ -324,13 +294,13 @@ async function runInspectScan(
     return {
       rule,
       status: total === 0 ? 'passed' : 'failed',
-      message: translate('engine.kernel.runner.labelDone', locale ?? DEFAULT_LANGUAGE, { label, count: total }),
+      message: `${label}完成: ${total} 个问题`,
       durationMs: 0,
       targetEngine: 'inspect',
       timestamp: new Date(),
     };
   } catch (err) {
-    return errorResult(rule, translate('engine.kernel.runner.inspectDispatchFailed', locale ?? DEFAULT_LANGUAGE, { error: toMessage(err) }), 'inspect');
+    return errorResult(rule, `Inspect 派发失败: ${toMessage(err)}`, 'inspect');
   }
 }
 

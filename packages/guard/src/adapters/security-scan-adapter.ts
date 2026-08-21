@@ -2,13 +2,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
 
-const COMMENT_RE = /^\s*(?:\/\/|\/\*|\*|#)/;
-const STRING_CONTENT_RE = /^\s*['"`].*['"`]\s*[,\]]?\s*$/;
-
-function isNonCodeLine(line: string): boolean {
-  return COMMENT_RE.test(line) || STRING_CONTENT_RE.test(line);
-}
-
 interface Finding {
   file: string;
   line: number;
@@ -17,16 +10,7 @@ interface Finding {
   message: string;
 }
 
-const EXCLUDED_DIRS = new Set([
-  'node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage', '.nyc_output', 'dist-electron',
-  'SOP标准资源', '00-项目文档', '__tests__', '__mocks__', '.zhshield',
-]);
-
-/** 测试文件名模式 — 测试文件中的硬编码密钥/eval 等是测试用途，不应报为安全问题 */
-const TEST_FILE_PATTERN = /\.(test|spec|mocks)\.(ts|tsx|js|jsx|mjs|cjs)$/;
-
-/** 第三方/参考资源路径片段 — 出现在路径中的任意一个即跳过 */
-const THIRD_PARTY_PATH_SEGMENTS = ['SOP标准资源', '00-项目文档'];
+const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage', '.nyc_output']);
 
 /**
  * Built-in security patterns for static analysis.
@@ -48,7 +32,7 @@ const SECURITY_PATTERNS: { type: string; severity: 'high' | 'medium' | 'low'; re
 
 const ALLOWED_EXTENSIONS = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
 
-function collectFiles(dir: string, rootDir: string): string[] {
+function collectFiles(dir: string): string[] {
   const files: string[] = [];
   let entries: fs.Dirent[];
   try {
@@ -58,14 +42,12 @@ function collectFiles(dir: string, rootDir: string): string[] {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (EXCLUDED_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
-      files.push(...collectFiles(fullPath, rootDir));
+      files.push(...collectFiles(fullPath));
       continue;
     }
-    if (!ALLOWED_EXTENSIONS.test(entry.name)) continue;
-    if (TEST_FILE_PATTERN.test(entry.name)) continue;
-    const relPath = path.relative(rootDir, fullPath);
-    if (THIRD_PARTY_PATH_SEGMENTS.some((seg) => relPath.includes(seg))) continue;
-    files.push(fullPath);
+    if (ALLOWED_EXTENSIONS.test(entry.name)) {
+      files.push(fullPath);
+    }
   }
   return files;
 }
@@ -91,7 +73,7 @@ export class SecurityScanAdapter implements Adapter {
   private scanProject(targetDir: string, findings: Finding[]): void {
     const srcDir = path.join(targetDir, 'src');
     const scanRoot = fs.existsSync(srcDir) ? srcDir : targetDir;
-    const files = collectFiles(scanRoot, targetDir);
+    const files = collectFiles(scanRoot);
 
     for (const file of files) {
       let content: string;
@@ -105,7 +87,6 @@ export class SecurityScanAdapter implements Adapter {
   private scanContent(content: string, relFile: string, findings: Finding[]): void {
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
-      if (isNonCodeLine(lines[i])) continue;
       const pattern = this.findPatternMatch(lines[i]);
       if (!pattern) continue;
       findings.push({

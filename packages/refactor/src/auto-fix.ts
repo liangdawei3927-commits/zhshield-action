@@ -1,8 +1,7 @@
 import * as fs from 'fs';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { CodeSmell, TextEdit, Fix, FixResult } from './types';
 
-type FixGenerator = (smell: CodeSmell, sourceDir: string, locale?: LanguageCode) => Fix | null;
+type FixGenerator = (smell: CodeSmell, sourceDir: string) => Fix | null;
 
 const FIELD_DECLARATION = /^(public\s+)?(static\s+|readonly\s+)*(?:\w+)\s*:\s/;
 const PUBLIC_PREFIX = /^public\s+/;
@@ -18,7 +17,7 @@ const METHOD_DECLARATION = /^((?:public|private|protected)\s+)?(static\s+)?([a-z
 
 // ─── Inappropriate-Intimacy: 将 public 字段改为 private ─────
 
-const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir, locale) => {
+const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir) => {
   const filePath = smell.location.filePath;
   const content = readFile(filePath);
   if (!content) return null;
@@ -46,14 +45,14 @@ const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir, locale) => {
   return {
     smellId: smell.id,
     ruleId: smell.ruleId,
-    description: translate('engine.refactor.fix.encapsulateField', locale ?? DEFAULT_LANGUAGE, { filePath: smell.location.filePath }),
+    description: `将 ${smell.location.filePath} 的 public 字段封装为 private`,
     edits,
   };
 };
 
 // ─── Callback-Hell: .then() 链 → async/await ────────────────
 
-const fixCallbackHell: FixGenerator = (smell, _sourceDir, locale) => {
+const fixCallbackHell: FixGenerator = (smell, _sourceDir) => {
   const filePath = smell.location.filePath;
   const content = readFile(filePath);
   if (!content) return null;
@@ -76,15 +75,13 @@ const fixCallbackHell: FixGenerator = (smell, _sourceDir, locale) => {
     endLine: methodSigLine + 1, endColumn: sigLine.length + 1,
     replacement: asyncSig,
   }];
-  const thenEdit = buildThenToAwaitTodo(lines, filePath, smell.location.line, methodText, locale);
+  const thenEdit = buildThenToAwaitTodo(lines, filePath, smell.location.line, methodText);
   if (thenEdit) edits.push(thenEdit);
 
   return {
     smellId: smell.id,
     ruleId: smell.ruleId,
-    description: translate('engine.refactor.fix.addAsync', locale ?? DEFAULT_LANGUAGE, {
-      methodName: `${smell.context.className}.${smell.context.methodName}()`,
-    }),
+    description: `为 ${smell.context.className}.${smell.context.methodName}() 添加 async 关键字`,
     edits,
   };
 };
@@ -120,7 +117,7 @@ function buildAsyncSignature(sigLine: string): string | null {
 }
 
 /** 复杂 .then().catch() 链在首个 .then 处补充手动转换 TODO 注释 */
-function buildThenToAwaitTodo(lines: string[], filePath: string, smellLine: number, methodText: string, locale?: LanguageCode): TextEdit | null {
+function buildThenToAwaitTodo(lines: string[], filePath: string, smellLine: number, methodText: string): TextEdit | null {
   if (!methodText.includes('.then(') || !methodText.includes('.catch(')) return null;
 
   const firstThenLine = smellLine + methodText.split('\n').findIndex(l => l.includes('.then('));
@@ -132,13 +129,13 @@ function buildThenToAwaitTodo(lines: string[], filePath: string, smellLine: numb
     filePath,
     startLine: firstThenLine, startColumn: 1,
     endLine: firstThenLine, endColumn: 1,
-    replacement: ' '.repeat(thenIndent) + translate('engine.refactor.fix.thenToAwaitTodo', locale ?? DEFAULT_LANGUAGE) + '\n',
+    replacement: ' '.repeat(thenIndent) + '// TODO: 将 .then() 链手动转换为 await (auto-fix 已添加 async 关键字)\n',
   };
 }
 
 // ─── Shotgun-Surgery: 提取硬编码字符串为常量 ─────────────────
 
-const fixShotgunSurgery: FixGenerator = (smell, sourceDir, locale) => {
+const fixShotgunSurgery: FixGenerator = (smell, sourceDir) => {
   const filePath = smell.location.filePath;
   const content = readFile(filePath);
   if (!content) return null;
@@ -148,14 +145,14 @@ const fixShotgunSurgery: FixGenerator = (smell, sourceDir, locale) => {
 
   const constantsFile = pathJoin(sourceDir, 'src', 'constants', 'shared-strings.ts');
   const varName = toConstantName(literal);
-  const existingContent = loadConstantsContent(constantsFile, locale);
+  const existingContent = loadConstantsContent(constantsFile);
   if (existingContent.includes(`export const ${varName} =`)) return null;
 
   const newEntry = `export const ${varName} = '${literal.replace(/'/g, "\\'")}';\n`;
   return {
     smellId: smell.id,
     ruleId: smell.ruleId,
-    description: translate('engine.refactor.fix.extractLiteral', locale ?? DEFAULT_LANGUAGE, { literal, filePath: constantsFile }),
+    description: `将 "${literal}" 提取到 ${constantsFile}`,
     edits: [{
       filePath: constantsFile,
       startLine: 1, startColumn: 1,
@@ -177,11 +174,11 @@ function toConstantName(literal: string): string {
     .toUpperCase();
 }
 
-function loadConstantsContent(constantsFile: string, locale?: LanguageCode): string {
+function loadConstantsContent(constantsFile: string): string {
   try {
     return fs.readFileSync(constantsFile, 'utf-8');
   } catch {
-    return translate('engine.refactor.fix.constantsHeader', locale ?? DEFAULT_LANGUAGE) + '\n\n';
+    return '// 共享字符串常量 — auto-fix 生成\n\n';
   }
 }
 
@@ -197,17 +194,17 @@ export function isFixable(ruleId: string): boolean {
   return ruleId in FIX_GENERATORS;
 }
 
-export function generateFix(smell: CodeSmell, sourceDir: string, locale?: LanguageCode): Fix | null {
+export function generateFix(smell: CodeSmell, sourceDir: string): Fix | null {
   const gen = FIX_GENERATORS[smell.ruleId];
   if (!gen) return null;
-  return gen(smell, sourceDir, locale);
+  return gen(smell, sourceDir);
 }
 
-export function generateFixes(smells: CodeSmell[], sourceDir: string, locale?: LanguageCode): Fix[] {
+export function generateFixes(smells: CodeSmell[], sourceDir: string): Fix[] {
   const fixes: Fix[] = [];
   for (const smell of smells) {
     if (!smell.suggestion.autoFixable) continue;
-    const fix = generateFix(smell, sourceDir, locale);
+    const fix = generateFix(smell, sourceDir);
     if (fix) fixes.push(fix);
   }
   return fixes;
@@ -269,10 +266,12 @@ function applyEdit(content: string, edit: TextEdit): { content: string; wroteFil
   const lines = content.split('\n');
   if (edit.startLine > lines.length) return null;
 
+  // Handle single-line replacement
   if (edit.startLine === edit.endLine) {
     return { content: applySingleLineEdit(lines, edit), wroteFile: false };
   }
 
+  // Multi-line: replace entire range
   return { content: applyMultiLineEdit(lines, edit), wroteFile: true };
 }
 

@@ -43,7 +43,6 @@ export interface Suggestion {
 export interface SyncPayload {
   clientId: string;
   syncedAt: string;
-  experiences: ExperienceEntry[];
   weights: RuleWeightEntry[];
   ruleStates: RuleStateEntry[];
   totalSynced: number;

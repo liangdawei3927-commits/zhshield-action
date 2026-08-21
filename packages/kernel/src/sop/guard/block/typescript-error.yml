@@ -6,11 +6,7 @@ status: active
 source: official
 tags: [typescript, type-check, frontend]
 applicableEngines: [guard]
-check:
-  tool: tsc
-  toolConfig:
-    flags:
-      - --strict
-      - --noImplicitAny
-      - --strictNullChecks
-    timeout: 120000
+checks:
+  - strict: true
+  - noImplicitAny: true
+  - strictNullChecks: true

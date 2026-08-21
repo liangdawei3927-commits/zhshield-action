@@ -1,4 +1,3 @@
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ParsedFile } from '../ast-helper';
 import { computeNestingDepth, findDuplicateCodeBlocks } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
@@ -6,10 +5,7 @@ import { makeSmell } from './adapter-types';
 
 const BLANK_LINE_BLOCK = /\n\s*\n/;
 
-type TranslateFn = (key: string, params?: Record<string, unknown>) => string;
-
-export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const threshold = config.thresholds.maxNestingDepth;
 
@@ -20,14 +16,14 @@ export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig, lo
         const sm = makeSmell({
           ruleId: 'deep-nesting',
           severity: config.severities['deep-nesting'],
-          message: tr('engine.refactor.smell.deep-nesting.message.method', { target: `${cls.name}.${method.name}()`, depth, threshold }),
+          message: `${cls.name}.${method.name}() 嵌套过深 (${depth} 层，阈值 ${threshold})，建议使用 guard clause 或提取方法`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
           column: 1,
           metric: 'nestingDepth', value: depth, threshold,
           suggestion: {
             type: 'Flatten / Early Return',
-            description: tr('engine.refactor.smell.deep-nesting.suggestion'),
+            description: `使用 guard clause 提前返回，或将深层分支提取为独立函数`,
             priority: depth > threshold * 1.5 ? 'high' : 'medium',
             effort: 'small',
             autoFixable: false,
@@ -44,12 +40,12 @@ export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig, lo
       smells.push(makeSmell({
         ruleId: 'deep-nesting',
         severity: config.severities['deep-nesting'],
-        message: tr('engine.refactor.smell.deep-nesting.message.function', { target: `${fn.name}()`, depth }),
+        message: `${fn.name}() 嵌套过深 (${depth} 层)`,
         filePath: parsed.filePath, line: fn.startLine, column: 1,
         metric: 'nestingDepth', value: depth, threshold,
         suggestion: {
           type: 'Flatten / Early Return',
-          description: tr('engine.refactor.smell.deep-nesting.suggestion'),
+          description: '使用 guard clause 提前返回，或将深层分支提取为独立函数',
           priority: depth > threshold * 1.5 ? 'high' : 'medium',
           effort: 'small',
           autoFixable: false,
@@ -61,8 +57,7 @@ export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig, lo
   return smells;
 }
 
-export function detectMixedResponsibilities(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectMixedResponsibilities(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const threshold = config.thresholds.minResponsibilities;
 
@@ -75,14 +70,14 @@ export function detectMixedResponsibilities(parsed: ParsedFile, config: Refactor
         smells.push(makeSmell({
           ruleId: 'mixed-responsibilities',
           severity: config.severities['mixed-responsibilities'],
-          message: tr('engine.refactor.smell.mixed-responsibilities.message.method', { target: `${cls.name}.${method.name}()`, count: responsibilityCount, threshold }),
+          message: `${cls.name}.${method.name}() 混合了约 ${responsibilityCount} 个职责 (阈值 ${threshold})，建议拆分为独立函数`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
           column: 1,
           metric: 'responsibilityCount', value: responsibilityCount, threshold,
           suggestion: {
             type: 'Extract Function per Responsibility',
-            description: tr('engine.refactor.smell.mixed-responsibilities.suggestion.method'),
+            description: `按注释分区 / 空行分隔 / try/catch 边界将方法拆分为多个独立函数`,
             priority: responsibilityCount > threshold + 2 ? 'high' : 'medium',
             effort: responsibilityCount > threshold + 3 ? 'large' : 'medium',
             autoFixable: false,
@@ -99,12 +94,12 @@ export function detectMixedResponsibilities(parsed: ParsedFile, config: Refactor
       smells.push(makeSmell({
         ruleId: 'mixed-responsibilities',
         severity: config.severities['mixed-responsibilities'],
-        message: tr('engine.refactor.smell.mixed-responsibilities.message.function', { target: `${fn.name}()`, count: responsibilityCount }),
+        message: `${fn.name}() 混合了约 ${responsibilityCount} 个职责`,
         filePath: parsed.filePath, line: fn.startLine, column: 1,
         metric: 'responsibilityCount', value: responsibilityCount, threshold,
         suggestion: {
           type: 'Extract Function per Responsibility',
-          description: tr('engine.refactor.smell.mixed-responsibilities.suggestion.function'),
+          description: '按职责将函数拆分为多个独立函数',
           priority: responsibilityCount > threshold + 2 ? 'high' : 'medium',
           effort: responsibilityCount > threshold + 3 ? 'large' : 'medium',
           autoFixable: false,
@@ -150,8 +145,7 @@ let _dupCache: ReturnType<typeof findDuplicateCodeBlocks> | null = null;
 let _dupCacheFiles: ParsedFile[] | null = null;
 let _dupCacheMinLines: number = 0;
 
-export function detectDuplicateCode(parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectDuplicateCode(parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const minLines = config.thresholds.minDuplicateLines;
 
@@ -164,34 +158,29 @@ export function detectDuplicateCode(parsed: ParsedFile, allFiles: ParsedFile[], 
   const fileDups = duplicates.filter(d => d.files[0] === parsed.filePath || d.files[1] === parsed.filePath);
 
   for (const dup of fileDups) {
-    // dup.files 与 dup.lines 按下标一一对应：files[0] 对应 lines[0]，files[1] 对应 lines[1]
-    const isFirst = dup.files[0] === parsed.filePath;
-    const otherFile = isFirst ? dup.files[1] : dup.files[0];
-    const line = isFirst ? dup.lines[0] : dup.lines[1];
-    const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
+    const otherFile = dup.files[0] === parsed.filePath ? dup.files[1] : dup.files[0];
 
     smells.push(makeSmell({
       ruleId: 'duplicated-code',
       severity: config.severities['duplicated-code'],
-      message: tr('engine.refactor.smell.duplicated-code.message', { file: otherFile, line: otherLine }),
-      filePath: parsed.filePath, line, column: 1,
+      message: `代码块与 ${otherFile}:${dup.lines[1]} 重复，建议提取为公共函数`,
+      filePath: parsed.filePath, line: dup.lines[0], column: 1,
       metric: 'duplicateLines', value: dup.code.length, threshold: minLines,
       suggestion: {
         type: 'Extract Common Function',
-        description: tr('engine.refactor.smell.duplicated-code.suggestion'),
+        description: `将重复代码提取为公共函数，通过参数化差异点统一调用`,
         priority: 'medium',
         effort: 'medium',
         autoFixable: false,
       },
-      endLine: line + minLines,
+      endLine: dup.lines[0] + minLines,
     }));
   }
 
   return smells;
 }
 
-export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig, locale?: LanguageCode): CodeSmell[] {
-  const tr: TranslateFn = (key, params) => translate(key, locale ?? DEFAULT_LANGUAGE, params);
+export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -203,14 +192,14 @@ export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig, l
         smells.push(makeSmell({
           ruleId: 'callback-hell',
           severity: config.severities['callback-hell'],
-          message: tr('engine.refactor.smell.callback-hell.message', { target: `${cls.name}.${method.name}()`, count: chainCount }),
+          message: `${cls.name}.${method.name}() 包含 ${chainCount} 层 .then() 链式回调，建议转换为 async/await`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
           column: 1,
           metric: 'thenChainCount', value: chainCount, threshold: 3,
           suggestion: {
             type: 'Convert to Async/Await',
-            description: tr('engine.refactor.smell.callback-hell.suggestion'),
+            description: '将 .then() 链式回调转换为 async/await 语法，保留 try/catch 错误处理',
             priority: chainCount > 5 ? 'high' : 'medium',
             effort: 'small',
             autoFixable: true,

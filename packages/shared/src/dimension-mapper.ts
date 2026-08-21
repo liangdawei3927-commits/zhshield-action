@@ -8,7 +8,6 @@ import type { ToolId, Issue, IssueCategory, DimensionScore } from './types';
  */
 const TOOL_DIMENSION_MAP: Record<ToolId, IssueCategory[]> = {
   eslint: ['quality', 'performance', 'documentation'],
-  tsc: ['quality'],
   semgrep: ['security'],
   trivy: ['security', 'dependency'],
   grype: ['security', 'dependency'],
@@ -18,6 +17,7 @@ const TOOL_DIMENSION_MAP: Record<ToolId, IssueCategory[]> = {
   'dep-cruiser': ['architecture'],
   jscpd: ['quality'],
   'ts-prune': ['quality'],
+  tsc: ['quality'],
 };
 
 export function getToolDimensions(toolId: ToolId): IssueCategory[] {

@@ -14,8 +14,7 @@
   },
   "dependencies": {
     "@zh/shared": "workspace:*",
-    "@zh/kernel": "workspace:*",
-    "@zh/i18n": "workspace:*"
+    "@zh/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

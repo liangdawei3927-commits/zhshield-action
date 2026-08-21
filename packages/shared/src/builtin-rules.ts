@@ -1,5 +1,4 @@
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
-import type { BuiltinRule, IssueCategory, IssueSeverity } from './types';
+import type { BuiltinRule } from './types';
 
 /**
  * Level 3 降级内置规则（~50 条）
@@ -7,156 +6,146 @@ import type { BuiltinRule, IssueCategory, IssueSeverity } from './types';
  * 当所有外部工具都失败时使用这些基础规则进行兜底扫描。
  * 规则覆盖三个维度：安全、质量、架构。
  */
-
-/** 内置规则定义：message 改为 messageKey（i18n 目录键），emit 时按语言翻译 */
-interface FallbackRuleDef {
-  ruleId: string;
-  severity: IssueSeverity;
-  category: IssueCategory;
-  messageKey: string;
-  pattern?: string;
-}
-
-const FALLBACK_RULE_DEFS: FallbackRuleDef[] = [
+export const BUILTIN_FALLBACK_RULES: BuiltinRule[] = [
   // ─── 安全规则 (20) ────────────────────────────────────
   {
     ruleId: 'fallback/security/hardcoded-password',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.hardcodedPassword',
+    message: '检测到硬编码密码',
     pattern: 'password\\s*[=:]\\s*["\'](?!\\$|process\\.env|import\\.meta)',
   },
   {
     ruleId: 'fallback/security/hardcoded-api-key',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.hardcodedApiKey',
+    message: '检测到硬编码 API 密钥',
     pattern: '(api[_-]?key|apikey|secret|token)\\s*[=:]\\s*["\'][A-Za-z0-9_\\-]{16,}',
   },
   {
     ruleId: 'fallback/security/sql-concat',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.sqlConcat',
+    message: '检测到 SQL 字符串拼接，请使用参数化查询',
     pattern: '(SELECT|INSERT|UPDATE|DELETE).*\\+\\s*(req\\.|body\\.|params\\.|query\\.)',
   },
   {
     ruleId: 'fallback/security/eval-usage',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.evalUsage',
+    message: '检测到 eval() 调用，存在代码注入风险',
     pattern: '\\beval\\s*\\(',
   },
   {
     ruleId: 'fallback/security/innerhtml',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.innerHtml',
+    message: '检测到 innerHTML 赋值，存在 XSS 风险',
     pattern: '\\.innerHTML\\s*=',
   },
   {
     ruleId: 'fallback/security/no-rate-limit',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noRateLimit',
+    message: 'API 路由未配置速率限制',
     pattern: 'app\\.(get|post|put|delete|patch)\\(',
   },
   {
     ruleId: 'fallback/security/insecure-random',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.insecureRandom',
+    message: '使用 Math.random() 做安全敏感操作，请用 crypto.randomBytes',
     pattern: 'Math\\.random\\(',
   },
   {
     ruleId: 'fallback/security/command-injection',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.commandInjection',
+    message: '检测到 shell 命令执行，存在命令注入风险',
     pattern: '(exec|spawn|execSync|spawnSync)\\s*\\(\\s*["\']',
   },
   {
     ruleId: 'fallback/security/prototype-pollution',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.prototypePollution',
+    message: '检测到原型链污染风险',
     pattern: '__proto__|constructor\\.prototype',
   },
   {
     ruleId: 'fallback/security/debug-endpoint',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.debugEndpoint',
+    message: '生产环境不应暴露调试接口',
     pattern: '(/debug|/__webpack|/sockjs-node)',
   },
   {
     ruleId: 'fallback/security/no-cors',
     severity: 'info',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noCors',
+    message: '未配置 CORS 中间件',
     pattern: 'cors\\(',
   },
   {
     ruleId: 'fallback/security/no-helmet',
     severity: 'info',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noHelmet',
+    message: '未检测到 Helmet 安全头中间件',
     pattern: 'helmet\\(',
   },
   {
     ruleId: 'fallback/security/path-traversal',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.pathTraversal',
+    message: '检测到路径遍历风险，请校验用户输入',
     pattern: 'readFile(Sync)?\\(.*\\+\\s*(req|params|body)',
   },
   {
     ruleId: 'fallback/security/no-tls',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noTls',
+    message: '检测到 HTTP 而非 HTTPS 服务',
     pattern: 'http\\.createServer',
   },
   {
     ruleId: 'fallback/security/insecure-deserialize',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.insecureDeserialize',
+    message: '检测到不安全的反序列化操作',
     pattern: 'JSON\\.parse|unserialize|pickle\\.loads',
   },
   {
     ruleId: 'fallback/security/no-csp',
     severity: 'info',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noCsp',
+    message: '未检测到 Content-Security-Policy 头',
     pattern: 'Content-Security-Policy',
   },
   {
     ruleId: 'fallback/security/console-log-secret',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.consoleLogSecret',
+    message: 'console.log 可能泄露敏感信息',
     pattern: 'console\\.(log|dir|info)\\s*\\(\\s*(password|secret|token|key)',
   },
   {
     ruleId: 'fallback/security/no-auth',
     severity: 'error',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noAuth',
+    message: '检测到未认证的修改操作',
     pattern: 'app\\.(post|put|delete|patch)\\(["\']/',
   },
   {
     ruleId: 'fallback/security/sensitive-files',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.sensitiveFiles',
+    message: '检测到敏感文件被包含',
     pattern: '(\\.env|\\.pem|\\.key|credentials\\.json|config\\.yml)',
   },
   {
     ruleId: 'fallback/security/no-https-redirect',
     severity: 'warning',
     category: 'security',
-    messageKey: 'engine.builtin-rules.security.noHttpsRedirect',
+    message: '未强制 HTTPS 重定向',
     pattern: 'https\\:',
   },
 
@@ -165,126 +154,126 @@ const FALLBACK_RULE_DEFS: FallbackRuleDef[] = [
     ruleId: 'fallback/quality/console-log',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.consoleLog',
+    message: '生产代码中不应包含 console.log',
     pattern: 'console\\.(log|debug|trace)\\(',
   },
   {
     ruleId: 'fallback/quality/debugger',
     severity: 'error',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.debugger',
+    message: '生产代码中不应包含 debugger 语句',
     pattern: '\\bdebugger\\b',
   },
   {
     ruleId: 'fallback/quality/todo-comment',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.todoComment',
+    message: '存在 TODO 待办项',
     pattern: '\\bTODO\\b|\\bFIXME\\b|\\bHACK\\b|\\bXXX\\b',
   },
   {
     ruleId: 'fallback/quality/empty-catch',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.emptyCatch',
+    message: '空的 catch 块会隐藏错误',
     pattern: 'catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}',
   },
   {
     ruleId: 'fallback/quality/duplicate-key',
     severity: 'error',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.duplicateKey',
+    message: '对象中存在重复键',
     pattern: '(\\w+):\\s*[^,]+,\\s*\\1:',
   },
   {
     ruleId: 'fallback/quality/missing-fallthrough',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.missingFallthrough',
+    message: 'switch case 缺少 break，可能意外贯穿',
     pattern: 'case\\s+[^:]+:\\s*\\n(?!\\s*break)',
   },
   {
     ruleId: 'fallback/quality/var-usage',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.varUsage',
+    message: '使用 var 而非 const/let',
     pattern: '\\bvar\\s+',
   },
   {
     ruleId: 'fallback/quality/eqeqeq',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.eqeqeq',
+    message: '使用 == 而非 ===，可能导致类型转换',
     pattern: '==\\s[^=]|==\\n',
   },
   {
     ruleId: 'fallback/quality/no-null-comparison',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.noNullComparison',
+    message: '使用 foo == null 而非 foo === null || foo === undefined',
     pattern: '===\\s*null|!==\\s*null',
   },
   {
     ruleId: 'fallback/quality/async-without-await',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.asyncWithoutAwait',
+    message: 'async 函数中未使用 await',
     pattern: 'async\\s+function\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*(?!await)',
   },
   {
     ruleId: 'fallback/quality/for-in-without-hasown',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.forInWithoutHasOwn',
+    message: 'for...in 未使用 hasOwnProperty 检查',
     pattern: 'for\\s*\\(\\s*(var|let|const)\\s+\\w+\\s+in\\s+',
   },
   {
     ruleId: 'fallback/quality/no-barrel-import',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.noBarrelImport',
+    message: '从 barrel (index) 文件导入可能导致循环依赖',
     pattern: "from\\s+['\"]\\.\\.?/[^'\"]*/index['\"]",
   },
   {
     ruleId: 'fallback/quality/large-function',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.largeFunction',
+    message: '函数过长，建议拆分为多个小函数',
     pattern: '',
   },
   {
     ruleId: 'fallback/quality/complex-condition',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.complexCondition',
+    message: '条件表达式过于复杂，建议提取为变量',
     pattern: '&&.*\\|\\|.*&&\\|\\|.*\\|\\|.*&&',
   },
   {
     ruleId: 'fallback/quality/nested-callback',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.nestedCallback',
+    message: '嵌套回调过深，建议使用 async/await',
     pattern: '',
   },
   {
     ruleId: 'fallback/quality/magic-number',
     severity: 'info',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.magicNumber',
+    message: '检测到魔术数字，建议定义为常量',
     pattern: '',
   },
   {
     ruleId: 'fallback/quality/type-any',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.typeAny',
+    message: '使用 any 类型会失去类型检查保护',
     pattern: ':\\s*any\\b',
   },
   {
     ruleId: 'fallback/quality/no-unused-variable',
     severity: 'warning',
     category: 'quality',
-    messageKey: 'engine.builtin-rules.quality.noUnusedVariable',
+    message: '检测到未使用的变量',
     pattern: '',
   },
 
@@ -293,98 +282,84 @@ const FALLBACK_RULE_DEFS: FallbackRuleDef[] = [
     ruleId: 'fallback/architecture/circular-dependency',
     severity: 'error',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.circularDependency',
+    message: '检测到循环依赖',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/layer-violation',
     severity: 'error',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.layerViolation',
+    message: '业务层不应直接引用数据访问层',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/no-entity-in-controller',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.noEntityInController',
+    message: 'Controller 不应直接引用 Entity',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/no-domain-in-infra',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.noDomainInInfra',
+    message: '基础设施层不应依赖领域层',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/cyclic-import',
     severity: 'error',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.cyclicImport',
+    message: '模块间存在循环导入',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/utils-everywhere',
     severity: 'info',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.utilsEverywhere',
+    message: 'utils 工具函数分散在各模块，建议统一管理',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/no-service-in-view',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.noServiceInView',
+    message: '视图层不应直接调用 Service',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/global-state',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.globalState',
+    message: '检测到全局状态/单例模式滥用',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/missing-abstraction',
     severity: 'info',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.missingAbstraction',
+    message: '模块缺少接口抽象，不利于测试和扩展',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/layer-skip',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.layerSkip',
+    message: '跳层调用：跨过中间层直接调用底层模块',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/fat-controller',
     severity: 'info',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.fatController',
+    message: 'Controller 过于臃肿，逻辑应移至 Service',
     pattern: '',
   },
   {
     ruleId: 'fallback/architecture/no-dto-in-entity',
     severity: 'warning',
     category: 'architecture',
-    messageKey: 'engine.builtin-rules.architecture.noDtoInEntity',
+    message: 'Entity 不应依赖 DTO',
     pattern: '',
   },
 ];
-
-/**
- * 按语言构建兜底规则数组。
- * message 字段在构建时翻译为本地化字符串（载荷字段名与结构不变）。
- */
-export function buildFallbackRules(locale?: LanguageCode): BuiltinRule[] {
-  return FALLBACK_RULE_DEFS.map(({ messageKey, ...def }) => ({
-    ...def,
-    message: translate(messageKey, locale ?? DEFAULT_LANGUAGE),
-  }));
-}
-
-/** 默认语言（zh-Hans）的兜底规则，保证既有调用方行为不变 */
-export const BUILTIN_FALLBACK_RULES: BuiltinRule[] = buildFallbackRules();

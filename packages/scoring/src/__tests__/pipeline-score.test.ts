@@ -9,7 +9,7 @@ describe('buildHealthDimensions', () => {
     const dims = buildHealthDimensions(cleanGuard, cleanInspect);
     expect(dims).toHaveLength(5);
     expect(dims.map((d) => d.name)).toEqual([
-      'security', 'architecture', 'performance', 'documentation', 'testing',
+      'security', 'quality', 'architecture', 'dependencies', 'documentation',
     ]);
     expect(dims.every((d) => d.score === 100)).toBe(true);
     expect(dims.every((d) => d.issues === 0)).toBe(true);
@@ -38,14 +38,14 @@ describe('buildHealthDimensions', () => {
     const byName = Object.fromEntries(dims.map((d) => [d.name, d]));
     expect(byName.security.score).toBe(92);
     expect(byName.security.issues).toBe(1);
+    expect(byName.quality.score).toBe(91);
+    expect(byName.quality.issues).toBe(2);
     expect(byName.architecture.score).toBe(88);
     expect(byName.architecture.issues).toBe(2);
-    expect(byName.performance.score).toBe(91);
-    expect(byName.performance.issues).toBe(2);
     expect(byName.documentation.score).toBe(99);
     expect(byName.documentation.issues).toBe(1);
-    expect(byName.testing.score).toBe(92);
-    expect(byName.testing.issues).toBe(2);
+    expect(byName.dependencies.score).toBe(92);
+    expect(byName.dependencies.issues).toBe(2);
   });
 
   it('counts only non-passed guard results as security issues', () => {
@@ -64,7 +64,7 @@ describe('buildHealthDimensions', () => {
     expect(byName.security.score).toBe(88);
     expect(byName.security.issues).toBe(2);
     expect(byName.architecture.score).toBe(100);
-    expect(byName.performance.score).toBe(100);
+    expect(byName.quality.score).toBe(100);
   });
 
   it('floors dimension score at 0', () => {

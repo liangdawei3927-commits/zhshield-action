@@ -1,13 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { SopRegistry, SopLoader, SopCacheManager, SopCompressor, CompressionFormat, SopSigner, EventBus } from '@zh/kernel';
-import type { SopRule, SopVersion, SopDiff, SopRuleFilter, SignedSopPackage } from '@zh/kernel';
+import type { SopRule, SopVersion, SopDiff, SopRuleFilter } from '@zh/kernel';
 import { SopDiffCalculator } from './sop-diff-calculator';
-
-const SIGNING_KEY_ENV = 'ZH_SOP_SIGNING_PRIVATE_KEY';
-const SIGNING_DIR = path.join(os.homedir(), '.zhshield', 'sop-signing');
 
 /**
  * SopService — 智汇云脑 SOP 规则服务
@@ -17,7 +11,7 @@ const SIGNING_DIR = path.join(os.homedir(), '.zhshield', 'sop-signing');
  * - 计算版本差异（增量更新）
  * - 处理紧急更新
  * - 规则查询与统计
- * - 规则包 Ed25519 签名（全量包 / 紧急更新）
+ * - 签名验证
  */
 @Injectable()
 export class SopService {
@@ -27,7 +21,6 @@ export class SopService {
   private cacheManager: SopCacheManager;
   private compressor: SopCompressor;
   private readonly diffCalculator = new SopDiffCalculator();
-  private signingPrivateKey: string;
 
   constructor() {
     const eventBus = new EventBus();
@@ -35,34 +28,6 @@ export class SopService {
     this.loader = new SopLoader(this.registry);
     this.cacheManager = new SopCacheManager(this.registry);
     this.compressor = new SopCompressor();
-    this.signingPrivateKey = this.loadOrCreateSigningKey();
-  }
-
-  /** 加载签名私钥：优先环境变量，否则生成并持久化到 ~/.zhshield/sop-signing/ */
-  private loadOrCreateSigningKey(): string {
-    const fromEnv = process.env[SIGNING_KEY_ENV];
-    if (fromEnv) return fromEnv;
-
-    const privatePath = path.join(SIGNING_DIR, 'private.pem');
-    try {
-      if (fs.existsSync(privatePath)) {
-        return fs.readFileSync(privatePath, 'utf-8');
-      }
-    } catch {
-      // 读取失败走生成分支
-    }
-
-    const { privateKey } = SopSigner.generateKeyPair();
-    try {
-      fs.mkdirSync(SIGNING_DIR, { recursive: true });
-      fs.writeFileSync(privatePath, privateKey, { mode: 0o600 });
-      this.logger.log(`Generated SOP signing key at ${privatePath}`);
-    } catch (err) {
-      this.logger.warn(
-        `Failed to persist SOP signing key (in-memory only): ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-    return privateKey;
   }
 
   // ─── 初始化 ────────────────────────────────────────────────
@@ -119,25 +84,18 @@ export class SopService {
 
   // ─── 全量包 ────────────────────────────────────────────────
 
-  /** 返回 Ed25519 签名的全量规则包（brotli 压缩的 SignedSopPackage JSON） */
-  async getFullPackage(version: string): Promise<Buffer> {
+  async getFullPackage(_version: string): Promise<Buffer> {
     const rules = this.registry.getAll();
-    const pkg = SopSigner.signPackageWithKey(rules, this.signingPrivateKey, version);
-    return this.compressor.compress(Buffer.from(JSON.stringify(pkg)), CompressionFormat.Brotli);
-  }
-
-  /** 返回当前签名公钥（PEM），供客户端验签使用 */
-  getPublicKey(): string {
-    return SopSigner.derivePublicKey(this.signingPrivateKey);
+    const json = JSON.stringify(rules);
+    return this.compressor.compress(Buffer.from(json), CompressionFormat.Brotli);
   }
 
   // ─── 紧急更新 ──────────────────────────────────────────────
 
-  /** 返回 critical 级规则（Ed25519 签名包，桌面端应用前验签） */
-  async getEmergencyRules(): Promise<SignedSopPackage> {
+  async getEmergencyRules(): Promise<SopRule[]> {
+    // 返回所有 critical 级别的安全规则
     const filter: SopRuleFilter = { severity: 'critical' as const };
-    const rules = this.registry.query(filter);
-    return SopSigner.signPackageWithKey(rules, this.signingPrivateKey, 'emergency');
+    return this.registry.query(filter);
   }
 
   // ─── 规则管理 ──────────────────────────────────────────────

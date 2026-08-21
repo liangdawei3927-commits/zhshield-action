@@ -1,0 +1,146 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 规则升级流程
+# =============================================================================
+# 规则 ID: evolve.calibrate.internal.rule-upgrade
+# 治理域: 演进域 (evolve)
+# 动作类型: 进化校准 (calibrate)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Evolve · 规则升级
+# 内部标准源: IronNest#29 Agent readiness · OSPS framework
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.calibrate.internal.rule-upgrade"
+  name: "规则升级流程"
+  description: "定义规则生命周期中从 trial → active 的晋升标准和自动化流程：误报率阈值、证据充分性、代码变更稳定性、测试覆盖率要求"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/29 · OSPS rule lifecycle"
+
+governance:
+  domain: "evolve"
+  action: "calibrate"
+  module: "Evolve"
+  category: "calibration"
+
+execution:
+  mode: "periodic"
+  timeout: 30
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "weekly"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "rule-lifecycle-manager"
+  toolConfig:
+    lifecycleStages:
+      - stage: "draft"
+        description: "规则定义完成，尚未启用"
+        promotionCriteria:
+          - "被至少 1 个适配器引用"
+          - "通过了格式验证"
+          - "拥有完整的 fix 建议模板"
+        automatic: true
+
+      - stage: "trial"
+        description: "规则在观察模式运行（不阻断，仅记录）"
+        promotionCriteria:
+          minActiveDays: 14
+          minTotalSamples: 100
+          maxFalsePositiveRate: 0.15       # 误报率 < 15%
+          minTruePositives: 10
+          minTestCoverage: 80
+          codeStabilityPeriod: "7d"        # 规则代码 7 天无变更
+          requiredReviews: 1
+        automaticAfter: "30d"
+        autoPromote: true
+
+      - stage: "active"
+        description: "规则正式启用，参与阻段和评分"
+        deprecationCriteria:
+          maxFalsePositiveRate: 0.30
+          minMonthlyHits: 5
+          reviewCycleDays: 90
+        downgradeAfter: "60d"              # 连续 60 天低于标准则降级
+
+    promotionActions:
+      - type: "notify"
+        channels:
+          - "slack-platform"
+      - type: "update-registry"
+        field: "status"
+        value: "active"
+      - type: "version-bump"
+        increment: "minor"
+      - type: "deploy-to-adapters"
+        adapters:
+          - "guard-l1"
+          - "guard-l2"
+          - "inspect-scan"
+
+    qualityGates:
+      falsePositiveReview: true
+      performanceTest: true
+      maxLatencyMs: 500
+      documentationComplete: true
+  severity: "info"
+  categories:
+    - "calibration"
+    - "lifecycle"
+    - "rule-management"
+    - "governance"
+
+judgment:
+  passCondition: "promotionCriteriaMet"
+  blockOn: "none"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-04"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    📦 规则升级评估
+
+    ⚠️ 规则: {ruleId}
+    ⚠️ 当前状态: {currentStatus}
+    ⚠️ 候选状态: {targetStatus}
+
+    评估结果: {assessmentResult}
+
+    📊 数据:
+    - 运行天数: {activeDays} / {requiredDays}
+    - 样本数: {totalSamples} / {requiredSamples}
+    - 误报率: {falsePositiveRate} / {maxFalsePositiveRate}
+    - 真阳性数: {truePositives} / {requiredTruePositives}
+    - 测试覆盖率: {testCoverage}%
+    - 代码稳定期: {stabilityDays} / {requiredStability}
+
+    ✅ 满足升级条件 → 将自动执行升级动作
+    ❌ 未满足 → 查看具体不达标项并改进

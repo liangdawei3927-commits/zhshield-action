@@ -1,0 +1,114 @@
+# =============================================================================
+# SOP 规则模板 — Guard · ESLint Error 级阻断
+# =============================================================================
+# 规则 ID: guard.block.external.eslint-error
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Guard L1 pre-commit
+# 外部标准源: typescript-eslint strict rules
+# 最后更新: 2026-07-29
+# =============================================================================
+
+# ---- 元数据 ----
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.external.eslint-error"
+  name: "ESLint Error 级规则阻断"
+  description: "在 pre-commit 阶段拦截 ESLint error 级别的代码规范违规，确保提交代码符合基本质量要求"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"             # draft | trial | active | deprecated
+  source: "external"           # external | internal | community | official
+  sourceRef: "typescript-eslint/recommended"
+
+# ---- 治理域映射 ----
+governance:
+  domain: "guard"              # guard | inspect | security | sentinel | evolve
+  action: "block"              # scan | block | score | alert | suggest | calibrate
+  module: "Guard"              # 对应桌面端引擎
+  level: "L1"                  # L1(pre-commit) | L2(pre-push) | L3(CI)
+  hook: "pre-commit"           # pre-commit | pre-push | ci
+
+# ---- 执行配置 ----
+execution:
+  mode: "sync"                 # sync | async | periodic | event
+  timeout: 5                   # 超时秒数
+  maxConcurrency: 1            # 同一规则最大并发
+  retryCount: 0                # 失败重试次数
+  scope: "staged"              # staged | all | changed
+
+# ---- 规则条件 ----
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+    - "*.js"
+    - "*.jsx"
+    - "*.mjs"
+    - "*.cjs"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - ".next/**"
+    - "*.generated.*"
+    - "coverage/**"
+
+# ---- 检查配置 ----
+check:
+  tool: "eslint"               # 工具名称
+  toolConfig:
+    configFile: ".eslintrc.cjs"
+    extends:
+      - "eslint:recommended"
+      - "plugin:@typescript-eslint/strict"
+      - "plugin:@typescript-eslint/stylistic"
+    rules:
+      "@typescript-eslint/no-explicit-any": "error"
+      "@typescript-eslint/strict-boolean-expressions": "error"
+      "no-console": "warn"
+  severity: "error"            # error | warning | info
+  categories:
+    - "code-style"
+    - "type-safety"
+    - "best-practice"
+
+# ---- 裁决逻辑 ----
+judgment:
+  passCondition: "errorCount === 0 && warningCount < 5"
+  blockOn: "error"             # error | warning | both
+  priority: "high"             # critical | high | medium | low
+
+# ---- 映射到外部标准 ----
+standards:
+  osps:
+    - "OSPS-QA-04"             # Enforce Security Requirements on All Codebases
+  cwe: []
+  semgrep: []
+  gitleaks: []
+
+# ---- 经验数据 ----
+experience:
+  totalHits: 0                 # 总命中次数
+  falsePositives: 0            # 误报次数
+  falsePositiveRate: 0.0       # 误报率
+  avgFixTime: 0                # 平均修复时间(秒)
+  lastCalibrated: "2026-07-29"
+
+# ---- 修复建议 ----
+fix:
+  autoFixAvailable: true       # 是否支持 --fix
+  suggestionTemplate: |
+    检测到 ESLint error 级别违规。建议：
+    1. 运行 `npx eslint --fix .` 自动修复可修复的问题
+    2. 手动修复剩余问题
+    3. 重新 `git add` 后再次提交
+  resources:
+    - "https://typescript-eslint.io/rules/"

@@ -1,11 +1,7 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import type { LanguageCode } from '@zh/i18n';
 import { PipelineService } from './pipeline.service';
 import type { PipelineReport } from '@zh/pipeline';
-import { RequestLocale } from '../i18n/request-locale';
 
-@ApiTags('Pipeline')
 @Controller('pipeline')
 export class PipelineController {
   private readonly logger = new Logger(PipelineController.name);
@@ -13,16 +9,12 @@ export class PipelineController {
   constructor(private readonly pipelineService: PipelineService) {}
 
   @Post('run')
-  @ApiOperation({ summary: '执行治理流水线' })
-  @ApiBody({ schema: { properties: { projectPath: { type: 'string', description: '项目路径' }, dryRun: { type: 'boolean', description: '试运行模式' }, sop: { type: 'boolean', description: '启用SOP规则' } }, required: ['projectPath'] } })
-  @ApiResponse({ status: 200, description: '流水线执行完成' })
   async run(
     @Body() body: { projectPath: string; dryRun?: boolean; sop?: boolean },
-    @RequestLocale() locale: LanguageCode,
   ) {
     this.logger.log(`Pipeline run request: ${body.projectPath}`);
 
-    const result = await this.pipelineService.runPipeline(body, locale);
+    const result = await this.pipelineService.runPipeline(body);
 
     const summary = this.buildSummary(result);
     return this.buildResponse(result, summary);

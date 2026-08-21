@@ -29,18 +29,15 @@ export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
 // ─── 执行模式 ────────────────────────────────────────────────
 export type ExecutionMode = 'sync' | 'async' | 'periodic' | 'event';
 
-// ─── 规则库能力声明 ──────────────────────────────────────────
-/**
- * 规则库能力声明（文档 §5.2）— 驱动画像按需追问：
- * 画像问卷只问规则库能服务的维度，无对应规则集就不问用户。
- * 全部字段可选，未声明 = 不参与该维度的画像问卷。
- */
-export interface RuleServes {
-  /** 能服务的语言（'typescript' | 'python' | 'go' ... 开放类型） */
+// ─── 能力声明 ────────────────────────────────────────────────
+export interface SopServes {
+  /** 支持的语言 */
   languages?: string[];
-  /** 能服务的交付物形态（'website' | 'admin' | 'mobile' | 'miniprogram' ...） */
+
+  /** 支持的产品形态 */
   productForms?: string[];
-  /** 能服务的架构形态（'monolith' | 'modular-monolith' | 'microservices' ...） */
+
+  /** 支持的架构 */
   architectures?: string[];
 }
 
@@ -79,11 +76,11 @@ export interface SopRule {
   /** 规则内容（适配器特定配置） */
   content: Record<string, unknown>;
 
+  /** 能力声明（语言/产品形态/架构） */
+  serves?: SopServes;
+
   /** 标签 */
   tags: string[];
-
-  /** 规则库能力声明（可选；未声明 = 该规则不参与画像问卷维度） */
-  serves?: RuleServes;
 
   /** 误报计数 */
   falsePositiveCount: number;
@@ -164,20 +161,12 @@ export interface SopDiffMetadata {
 }
 
 // ─── 签名的 SOP 包 ──────────────────────────────────────────
-
-/** 签名算法：HMAC-SHA256（旧，对称密钥）或 Ed25519（现行，非对称） */
-export type SopSignatureAlgorithm = 'hmac-sha256' | 'ed25519';
-
 export interface SignedSopPackage {
   version: string;
   rules: SopRule[];
-  signature: string;    // HMAC-SHA256 或 Ed25519 签名（hex）
+  signature: string;    // HMAC-SHA256 签名
   hash: string;         // 规则内容的 SHA-256 哈希
   timestamp: Date;      // 签名时间
-  /** 签名算法，缺省视为 hmac-sha256（旧格式） */
-  algorithm?: SopSignatureAlgorithm;
-  /** Ed25519 公钥（PEM），algorithm='ed25519' 时由签名方携带 */
-  publicKey?: string;
 }
 
 // ─── 同步结果 ────────────────────────────────────────────────
@@ -205,6 +194,22 @@ export interface ProjectFeature {
   framework?: string;
   language?: string;
   features: string[];
+}
+
+// ─── 结构化项目画像（与 @zh/fingerprint 的 ProjectProfile 结构兼容，
+//     kernel 不反向依赖 fingerprint，仅声明投影所需字段） ──────────
+export interface ProjectProfile {
+  schemaVersion?: number;
+  architecture?: { value?: string; confidence?: number; signals?: unknown[] };
+  targets?: Array<{
+    id?: string;
+    path?: string;
+    language?: { value?: string; confidence?: number; signals?: unknown[] };
+    frameworks?: Array<{ value?: string; confidence?: number; signals?: unknown[] }>;
+    productForm?: { value?: string; confidence?: number; signals?: unknown[] };
+    routeKey?: string;
+  }>;
+  environments?: Array<{ value?: string; confidence?: number; signals?: unknown[] }>;
 }
 
 // ─── 规则统计 ────────────────────────────────────────────────

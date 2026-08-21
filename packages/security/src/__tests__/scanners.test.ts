@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { MalwareScanner, mapSemgrepIssuesToMalware } from '../malware-scanner';
-import { scanGarbage, mapDepcheckIssuesToGarbage } from '../garbage-scanner';
+import { GarbageScanner, mapDepcheckIssuesToGarbage } from '../garbage-scanner';
 import type { Issue } from '@zh/shared';
 
 function makeIssue(partial: Partial<Issue> & Pick<Issue, 'ruleId' | 'message' | 'file'>): Issue {
@@ -27,20 +27,6 @@ describe('MalwareScanner', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('does not flag the scanner own source tree (self-scan false positive guard)', async () => {
-    const items = await new MalwareScanner().scan(path.resolve(__dirname, '..'));
-    expect(items).toEqual([]);
-  });
-
-  it('does not flag test fixture files even when scanned directly', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-fixture-'));
-    fs.writeFileSync(path.join(dir, 'evil.test.ts'), 'eval(atob("YWxlcnQoMSk="));\n');
-    fs.writeFileSync(path.join(dir, 'encrypt.spec.js'), 'fs.writeFileSync("/target/" + f, cipher.update("x"));\n');
-    const items = await new MalwareScanner().scan(dir);
-    expect(items).toEqual([]);
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
-
   it('maps semgrep issues to malware items', () => {
     const mapped = mapSemgrepIssuesToMalware([
       makeIssue({ ruleId: 'zh-backdoor-eval-atob', message: 'backdoor eval', file: 'a.ts' }),
@@ -50,12 +36,12 @@ describe('MalwareScanner', () => {
   });
 });
 
-describe('scanGarbage', () => {
+describe('GarbageScanner', () => {
   it('flags .log and .DS_Store files', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-garbage-'));
     fs.writeFileSync(path.join(dir, 'debug.log'), 'x');
     fs.writeFileSync(path.join(dir, '.DS_Store'), '');
-    const items = await scanGarbage(dir);
+    const items = await new GarbageScanner().scan(dir);
     expect(items.some((i) => i.path.endsWith('debug.log'))).toBe(true);
     expect(items.some((i) => i.path.endsWith('.DS_Store'))).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });

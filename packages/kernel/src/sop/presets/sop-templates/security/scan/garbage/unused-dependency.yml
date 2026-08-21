@@ -1,0 +1,127 @@
+# =============================================================================
+# SOP 规则模板 — Cleanup · 未使用依赖检测
+# =============================================================================
+# 规则 ID: cleanup.scan.dependency.unused
+# 治理域: 安全域 (security)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Cleanup · 未用依赖
+# 内部标准源: IronNest#27 No Token-Burning · IronNest#21 YAGNI
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SecurityRule
+metadata:
+  id: "security.scan.garbage.unused-dependency"
+  name: "未使用依赖检测"
+  description: "检测 package.json 中声明但代码中未导入的依赖包。冗余依赖增加安装时间、增大 node_modules 体积、引入不必要的 CVE 暴露面"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/27 · rules/21 · depcheck"
+
+governance:
+  domain: "security"
+  action: "scan"
+  module: "Security"
+  category: "garbage"
+
+execution:
+  mode: "async"
+  timeout: 60
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "weekly"
+
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+    - "python"
+    - "go"
+  filePatterns:
+    - "package.json"
+    - "requirements.txt"
+    - "Pipfile"
+    - "go.mod"
+    - "Cargo.toml"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+
+check:
+  tool: "depcheck"
+  toolConfig:
+    analysis:
+      method: "import-scan"
+      scope: "all-files"
+    specials:
+      - "eslint"
+      - "babel"
+      - "webpack"
+      - "vite"
+      - "jest"
+      - "typescript"
+      - "@types/*"
+    excludePackages:
+      - "typescript"            # 编译器，隐式使用
+      - "@types/*"              # 类型定义，隐式使用
+      - "ts-node"
+      - "tsx"
+    excludeDevDependencies: true
+    threshold:
+      severity: "medium"
+      maxUnusedDeps: 2          # 超过 2 个未使用依赖时警告
+  severity: "medium"
+  categories:
+    - "cleanup"
+    - "unused-dependency"
+    - "dependency-management"
+    - "supply-chain"
+
+judgment:
+  passCondition: "unusedCount < 3"
+  blockOn: "warning"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+    - "OSPS-SC-01"
+  cwe:
+    - "CWE-1104"
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 120
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: true
+  suggestionTemplate: |
+    检测到未使用的依赖：
+
+    ⚠️ 包名: {package}
+    ⚠️ 当前版本: {version}
+    ⚠️ 声明位置: {file}
+    ⚠️ 类型: {dependencyType}
+
+    建议操作：
+    1. 运行 `npm uninstall {package}` 移除
+    2. 如果后续计划使用但暂未接入 → 添加 `@todo` 注释并说明计划
+    3. 检查是否在非源码中使用（配置文件/构建脚本/文档等）
+
+    冗余依赖的影响：
+    - 增加 `npm install` 时间
+    - 引入不必要的 CVE 监控开销
+    - 增加 AI 上下文分析的噪声
+
+    📖 参考: IronNest #27 No Token-Burning · depcheck

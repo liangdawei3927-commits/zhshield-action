@@ -22,7 +22,7 @@ export interface AdapterResult {
   duration: number;
   issueCount: number;
   passed: boolean;
-  /** 覆盖率降级标记（ADR #7 / C4）：unavailable 时置位，质量类 fail-open 通过但 coverage 下降 */
+  /** 降级运行标记（ADR #7）：unavailable 覆盖率缺口时为 true，skipped/error 不标记 */
   degraded?: boolean;
   issues: Issue[];
 }

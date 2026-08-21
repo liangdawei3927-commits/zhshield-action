@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SopSyncClient } from '../sop/cache/sop-sync-client';
 import { SopCompressor, CompressionFormat } from '../sop/cache/sop-compressor';
-import { SopSigner } from '../sop/security/sop-signer';
 import type { SopVersion, SopDiff, SopRule } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
 
@@ -139,80 +138,20 @@ describe('SopSyncClient', () => {
 
   // ─── fetchFull ───────────────────────────────────
   describe('fetchFull', () => {
-    let keyPair: { publicKey: string; privateKey: string };
-
-    beforeEach(() => {
-      keyPair = SopSigner.generateKeyPair();
-    });
-
-    it('未配置公钥应拒绝（fail-closed）', async () => {
-      const rules: SopRule[] = [makeRule({ id: 'r-1' })];
-      const pkg = SopSigner.signPackageWithKey(rules, keyPair.privateKey, '3.0.0');
+    it('成功应返回解压后的规则数组（brotli）', async () => {
+      const rules: SopRule[] = [makeRule({ id: 'r-1' }), makeRule({ id: 'r-2' })];
       const compressor = new SopCompressor();
-      const compressed = await compressor.compress(
-        Buffer.from(JSON.stringify(pkg), 'utf-8'),
-        CompressionFormat.Brotli,
-      );
+      const json = JSON.stringify(rules);
+      const compressed = await compressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Brotli);
       const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));
       const result = await client.fetchFull('3.0.0');
-      expect(result).toBeNull();
-    });
-
-    it('验签通过应返回解压后的规则数组（brotli + Ed25519）', async () => {
-      const rules: SopRule[] = [makeRule({ id: 'r-1' }), makeRule({ id: 'r-2' })];
-      const pkg = SopSigner.signPackageWithKey(rules, keyPair.privateKey, '3.0.0');
-      const compressor = new SopCompressor();
-      const compressed = await compressor.compress(
-        Buffer.from(JSON.stringify(pkg), 'utf-8'),
-        CompressionFormat.Brotli,
-      );
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
-
-      const clientWithKey = new SopSyncClient(baseUrl, undefined, keyPair.publicKey);
-      fetchMock.mockResolvedValueOnce(makeResponse(buffer));
-      const result = await clientWithKey.fetchFull('3.0.0');
       expect(result).not.toBeNull();
       expect(result?.length).toBe(2);
       expect(result?.[0].id).toBe('r-1');
       // URL 应包含版本路径
       expect(fetchMock).toHaveBeenCalledWith(`${baseUrl}/full/3.0.0`);
-    });
-
-    it('规则被篡改（换包）应验签失败返回 null', async () => {
-      const pkg = SopSigner.signPackageWithKey([makeRule({ id: 'r-1' })], keyPair.privateKey, '3.0.0');
-      const tampered = {
-        ...pkg,
-        rules: [...pkg.rules, makeRule({ id: 'injected' })],
-      };
-      const compressor = new SopCompressor();
-      const compressed = await compressor.compress(
-        Buffer.from(JSON.stringify(tampered), 'utf-8'),
-        CompressionFormat.Brotli,
-      );
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
-
-      const clientWithKey = new SopSyncClient(baseUrl, undefined, keyPair.publicKey);
-      fetchMock.mockResolvedValueOnce(makeResponse(buffer));
-      const result = await clientWithKey.fetchFull('3.0.0');
-      expect(result).toBeNull();
-    });
-
-    it('错误公钥验签应失败返回 null', async () => {
-      const pkg = SopSigner.signPackageWithKey([makeRule({ id: 'r-1' })], keyPair.privateKey, '3.0.0');
-      const wrongKey = SopSigner.generateKeyPair();
-      const compressor = new SopCompressor();
-      const compressed = await compressor.compress(
-        Buffer.from(JSON.stringify(pkg), 'utf-8'),
-        CompressionFormat.Brotli,
-      );
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
-
-      const clientWithWrongKey = new SopSyncClient(baseUrl, undefined, wrongKey.publicKey);
-      fetchMock.mockResolvedValueOnce(makeResponse(buffer));
-      const result = await clientWithWrongKey.fetchFull('3.0.0');
-      expect(result).toBeNull();
     });
 
     it('HTTP 错误应返回 null', async () => {
@@ -228,35 +167,20 @@ describe('SopSyncClient', () => {
     it('解压失败应返回 null（容错）', async () => {
       // 提供非法压缩数据 → decompress 抛错 → catch 返回 null
       fetchMock.mockResolvedValueOnce(makeResponse(new ArrayBuffer(8)));
-      const clientWithKey = new SopSyncClient(baseUrl, undefined, keyPair.publicKey);
-      expect(await clientWithKey.fetchFull('3.0.0')).toBeNull();
-    });
-
-    it('fetch 已按 Content-Encoding 自动解压（返回 JSON 文本）时直接解析', async () => {
-      const rules: SopRule[] = [makeRule({ id: 'r-1' })];
-      const pkg = SopSigner.signPackageWithKey(rules, keyPair.privateKey, '3.0.0');
-      const jsonBuf = Buffer.from(JSON.stringify(pkg), 'utf-8');
-      const jsonBuffer = jsonBuf.buffer.slice(jsonBuf.byteOffset, jsonBuf.byteOffset + jsonBuf.byteLength);
-
-      const clientWithKey = new SopSyncClient(baseUrl, undefined, keyPair.publicKey);
-      fetchMock.mockResolvedValueOnce(makeResponse(jsonBuffer));
-      const result = await clientWithKey.fetchFull('3.0.0');
-      expect(result).not.toBeNull();
-      expect(result?.[0].id).toBe('r-1');
+      expect(await client.fetchFull('3.0.0')).toBeNull();
     });
   });
 
   // ─── 自定义 compressor 注入 ──────────────────────
   describe('自定义 compressor', () => {
     it('应支持注入自定义 compressor 实例', async () => {
-      const keyPair = SopSigner.generateKeyPair();
       const customCompressor = new SopCompressor();
       const spy = vi.spyOn(customCompressor, 'decompress');
-      const clientWithCustom = new SopSyncClient(baseUrl, customCompressor, keyPair.publicKey);
+      const clientWithCustom = new SopSyncClient(baseUrl, customCompressor);
 
       const rules: SopRule[] = [makeRule({ id: 'r-1' })];
-      const pkg = SopSigner.signPackageWithKey(rules, keyPair.privateKey, '1.0.0');
-      const compressed = await customCompressor.compress(Buffer.from(JSON.stringify(pkg), 'utf-8'), CompressionFormat.Brotli);
+      const json = JSON.stringify(rules);
+      const compressed = await customCompressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Brotli);
       const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));

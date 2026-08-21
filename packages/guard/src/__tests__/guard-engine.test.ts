@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createHash } from 'node:crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -9,7 +8,7 @@ import { AdapterRegistry } from '../adapter-registry';
 import { ResultNormalizer } from '../result-normalizer';
 import { GuardESLintCheckAdapter } from '../adapters/eslint-check-adapter';
 import { resolveEslintTargetDir } from '../adapters/eslint-check-adapter';
-import { GuardSensitiveInfoAdapter, FileSecretStateLookup } from '../adapters/sensitive-info-adapter';
+import { GuardSensitiveInfoAdapter } from '../adapters/sensitive-info-adapter';
 import { ArchitectureBoundaryAdapter } from '../adapters/architecture-boundary-adapter';
 import { SecurityScanAdapter } from '../adapters/security-scan-adapter';
 import type { CheckConfig, Adapter } from '../types';
@@ -302,128 +301,6 @@ describe('GuardSensitiveInfoAdapter', () => {
     const check = makeCheck({ checkId: 'si-check' });
     const result = adapter.normalize({ findings: [], error: 'permission denied' }, {}, check);
     expect(result.status).toBe('error');
-  });
-});
-
-// ─── FileSecretStateLookup ────────────────────────────────
-
-describe('FileSecretStateLookup', () => {
-  it('should return status for known hash', () => {
-    const dir = makeTempDir();
-    const hash = createHash('sha256').update('sk-test-value').digest('hex');
-    fs.mkdirSync(path.join(dir, '.zhshield'), { recursive: true });
-    fs.writeFileSync(
-      path.join(dir, '.zhshield', 'secrets-state.json'),
-      JSON.stringify({
-        lastScannedCommit: '',
-        secrets: { [hash]: { status: 'rotating', updatedAt: new Date().toISOString() } },
-      }),
-    );
-
-    const lookup = new FileSecretStateLookup();
-    expect(lookup.getStatus(hash, dir)).toBe('rotating');
-  });
-
-  it('should return undefined for missing state file', () => {
-    const dir = makeTempDir();
-    const lookup = new FileSecretStateLookup();
-    expect(lookup.getStatus('a'.repeat(64), dir)).toBeUndefined();
-  });
-
-  it('should return undefined for corrupted JSON', () => {
-    const dir = makeTempDir();
-    fs.mkdirSync(path.join(dir, '.zhshield'), { recursive: true });
-    fs.writeFileSync(path.join(dir, '.zhshield', 'secrets-state.json'), '{not json');
-
-    const lookup = new FileSecretStateLookup();
-    expect(lookup.getStatus('a'.repeat(64), dir)).toBeUndefined();
-  });
-});
-
-// ─── GuardSensitiveInfoAdapter 豁免（P0-3 门禁密钥分域） ──
-
-describe('GuardSensitiveInfoAdapter 豁免', () => {
-  function makeSecretProject(
-    lines: string[],
-    stateSecrets: Record<string, { status: string }>,
-  ): string {
-    const dir = makeTempDir();
-    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'src', 'secret.ts'), lines.join('\n'));
-    if (Object.keys(stateSecrets).length > 0) {
-      fs.mkdirSync(path.join(dir, '.zhshield'), { recursive: true });
-      fs.writeFileSync(
-        path.join(dir, '.zhshield', 'secrets-state.json'),
-        JSON.stringify({ lastScannedCommit: '', secrets: stateSecrets }),
-      );
-    }
-    return dir;
-  }
-
-  const check = makeCheck({ checkId: 'SEC-002' });
-
-  it('dismissed 状态密钥全部豁免 → passed + exemptedCount 1', () => {
-    const secret = `sk-${'a'.repeat(40)}`;
-    const hash = createHash('sha256').update(secret).digest('hex');
-    const dir = makeSecretProject([`const k = "${secret}";`], { [hash]: { status: 'dismissed' } });
-
-    const adapter = new GuardSensitiveInfoAdapter(new FileSecretStateLookup());
-    const result = adapter.normalize(adapter.run({ repoRoot: dir }, check), {}, check);
-    expect(result.status).toBe('passed');
-    expect(result.details.exemptedCount).toBe(1);
-    expect(result.details.count).toBe(0);
-
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  it('dismissed 密钥 + 活跃 AWS key → failed count 1 + exemptedCount 1', () => {
-    const secret = `sk-${'a'.repeat(40)}`;
-    const hash = createHash('sha256').update(secret).digest('hex');
-    const dir = makeSecretProject(
-      [`const k = "${secret}";`, 'const aws = "AKIA0123456789ABCDEF";'],
-      { [hash]: { status: 'dismissed' } },
-    );
-
-    const adapter = new GuardSensitiveInfoAdapter(new FileSecretStateLookup());
-    const result = adapter.normalize(adapter.run({ repoRoot: dir }, check), {}, check);
-    expect(result.status).toBe('failed');
-    expect(result.details.count).toBe(1);
-    expect(result.details.exemptedCount).toBe(1);
-
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  it('无状态查询注入 → 全部拦截 failed count 2', () => {
-    const secret = `sk-${'a'.repeat(40)}`;
-    const dir = makeSecretProject(
-      [`const k = "${secret}";`, 'const aws = "AKIA0123456789ABCDEF";'],
-      {},
-    );
-
-    const adapter = new GuardSensitiveInfoAdapter();
-    const result = adapter.normalize(adapter.run({ repoRoot: dir }, check), {}, check);
-    expect(result.status).toBe('failed');
-    expect(result.details.count).toBe(2);
-
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  it('rotating 状态在安全域 fail-closed 下放行并留审计记录', () => {
-    const secret = `sk-${'a'.repeat(40)}`;
-    const hash = createHash('sha256').update(secret).digest('hex');
-    const dir = makeSecretProject([`const k = "${secret}";`], { [hash]: { status: 'rotating' } });
-
-    const adapter = new GuardSensitiveInfoAdapter(new FileSecretStateLookup());
-    const result = adapter.normalize(adapter.run({ repoRoot: dir }, check), {}, check);
-    expect(result.status).toBe('passed');
-    expect(result.details.exemptedCount).toBe(1);
-    expect(result.details.exempted[0]).toMatchObject({
-      file: 'src/secret.ts',
-      line: 1,
-      status: 'rotating',
-    });
-
-    fs.rmSync(dir, { recursive: true });
   });
 });
 

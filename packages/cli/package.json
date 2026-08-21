@@ -16,11 +16,8 @@
     "lint": "eslint src bin --max-warnings 100"
   },
   "dependencies": {
-    "@zh/dependency": "workspace:*",
-    "@zh/guard": "workspace:*",
     "@zh/pipeline": "workspace:*",
-    "@zh/reporter": "workspace:*",
-    "@zh/i18n": "workspace:*"
+    "@zh/reporter": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

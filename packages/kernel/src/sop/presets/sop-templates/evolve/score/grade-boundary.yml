@@ -1,0 +1,156 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 评分等级分界
+# =============================================================================
+# 规则 ID: evolve.score.official.grade-boundary
+# 治理域: 演进域 (evolve)
+# 动作类型: 评分量化 (score)
+# 数据来源: 官方维护 (official)
+# 对应适配器: Scoring · 等级分界
+# 官方标准源: OSPS 8 控制域评分方法论 · 智汇码盾评分体系
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.score.official.grade-boundary"
+  name: "评分等级分界"
+  description: "定义代码治理评分的等级分界（S/A/B/C/D），将 5 个治理域的加权评分映射为综合等级。OSPS 8 控制域每个域独立评分后加权聚合"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "official"
+  sourceRef: "OSPS 8 控制域 · 智汇码盾治理体系"
+
+governance:
+  domain: "evolve"
+  action: "score"
+  module: "Evolve"
+  category: "scoring"
+
+execution:
+  mode: "sync"
+  timeout: 10
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "scoring-engine"
+  toolConfig:
+    domains:
+      guard:
+        weight: 0.25
+        metrics:
+          - "block-rate"
+          - "false-positive-rate"
+          - "coverage"
+        sources:
+          - "L1-pre-commit"
+          - "L2-pre-push"
+          - "L3-ci"
+      inspect:
+        weight: 0.20
+        metrics:
+          - "violation-density"
+          - "fix-rate"
+          - "type-coverage"
+      security:
+        weight: 0.25
+        metrics:
+          - "vuln-density"
+          - "critical-vuln-count"
+          - "supply-chain-score"
+          - "secret-hit-rate"
+      sentinel:
+        weight: 0.15
+        metrics:
+          - "alert-precision"
+          - "mean-time-to-acknowledge"
+          - "mean-time-to-resolve"
+      evolve:
+        weight: 0.15
+        metrics:
+          - "false-positive-rate-trend"
+          - "rule-adoption-rate"
+          - "calibration-accuracy"
+    gradeBoundaries:
+      S:
+        label: "优秀"
+        minScore: 95
+        description: "全面超越标准。零 critical 发现，所有规则 active，AI 校准率 > 95%"
+        color: "#0B7A52"
+      A:
+        label: "良好"
+        minScore: 85
+        description: "整体合规。偶有低严重性发现，响应及时"
+        color: "#0E9F6E"
+      B:
+        label: "合格"
+        minScore: 70
+        description: "基本满足标准。存在可管理的发现项，有改进空间"
+        color: "#B45309"
+      C:
+        label: "需改进"
+        minScore: 50
+        description: "部分不达标。存在明显的治理缺口需要系统性改进"
+        color: "#DC2626"
+      D:
+        label: "不合格"
+        minScore: 0
+        description: "严重不达标。存在 critical 风险项需立即处理"
+        color: "#9A1B1B"
+  severity: "info"
+  categories:
+    - "scoring"
+    - "grading"
+    - "governance"
+    - "quality"
+
+judgment:
+  passCondition: "overallGrade !== 'D'"
+  blockOn: "none"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-QS-01"
+    - "OSPS-QS-04"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 0
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    当前等级: {grade}
+    综合评分: {overallScore}
+
+    各域评分：
+    - Guard: {guardScore}/100
+    - Inspect: {inspectScore}/100
+    - Security: {securityScore}/100
+    - Sentinel: {sentinelScore}/100
+    - Evolve: {evolveScore}/100
+
+    提升建议：
+    1. 最低分域优先改进
+    2. 检查该域中 high/critical 级别的未处置发现
+    3. 审查该域规则的误报率，校准规则阈值
+
+    📖 参考: OSPS-QS · 评分维度权重 · 智汇码盾评级体系

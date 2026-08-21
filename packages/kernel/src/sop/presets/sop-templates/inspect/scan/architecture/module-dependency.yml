@@ -1,0 +1,141 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · 模块间依赖方向巡检
+# =============================================================================
+# 规则 ID: inspect.scan.depcruiser.module-dependency
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect Arch · module-dependency
+# 内部标准源: dependency-cruiser · IronNest#01 Architecture · #30 Declaration Ownership
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.depcruiser.module-dependency"
+  name: "模块间依赖方向巡检"
+  description: "扫描模块间的依赖方向合规性：禁止跨模块内部路径引用、确保 shared/ 模块被正确隔离、检测模块间循环依赖、验证有界上下文间的依赖方向"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "dependency-cruiser · IronNest rules/01 · rules/30"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "architecture"
+
+execution:
+  mode: "async"
+  timeout: 120
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+
+check:
+  tool: "dependency-cruiser"
+  toolConfig:
+    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    rules:
+      - ruleId: "cross-module-internal-path"
+        description: "模块 A 直接引用模块 B 的内部路径（如 module-b/src/internal/file.ts），应通过模块 B 的 index.ts 导出"
+        severity: "error"
+        pattern:
+          source: "src/modules/{module}/**"
+          target: "src/modules/{other-module}/src/**"
+        exception:
+          - "src/modules/shared/**"
+      - ruleId: "shared-module-isolation"
+        description: "shared/ 模块不能依赖任何业务模块（controller/service/repository）"
+        severity: "error"
+        pattern:
+          source: "src/shared/**"
+          target: "src/modules/**"
+        allowed:
+          - "src/shared/**"
+          - "src/core/**"
+      - ruleId: "module-circular"
+        description: "模块 A 依赖模块 B，模块 B 又依赖模块 A 构成循环"
+        severity: "error"
+        check: "circular"
+        maxCycleDepth: 3
+      - ruleId: "bounded-context-coupling"
+        description: "有界上下文间的依赖应通过事件或共享内核，禁止直接引用对方内部实体"
+        severity: "warning"
+        check:
+          source: "src/modules/{context-a}/**"
+          target: "src/modules/{context-b}/**"
+          couplingType: "structural"
+          allowedCoupling:
+            - "events"
+            - "shared-kernel"
+      - ruleId: "layer-skip"
+        description: "跳过中间层的依赖（如 controller 直接依赖 repository）"
+        severity: "warning"
+        pattern:
+          source: "src/**/controllers/**"
+          target: "src/**/repositories/**"
+      - ruleId: "module-folder-count"
+        description: "单模块内文件数不应超过 IronNest#23 限制"
+        severity: "info"
+        maxFilesPerModule: 50
+  severity: "warning"
+  categories:
+    - "architecture"
+    - "module-dependency"
+    - "bounded-context"
+    - "coupling"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 1200
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    发现模块依赖方向违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 违规类型: {ruleId}
+    ⚠️ 依赖链: {source} → {target}
+
+    修复指引：
+    1. 跨模块内部路径 → 通过 `index.ts` 导出公共 API，外部模块只引用 public API
+    2. Shared 隔离 → 将 shared 从业务模块中解耦，shared 仅依赖核心库
+    3. 循环依赖 → 提取公共接口到 shared-kernel，或通过事件解耦
+    4. 层跳过 → controller → use-case → service → domain → repository/adapter
+
+    📖 参考: dependency-cruiser 规则集 · IronNest #01 架构 · #30 声明所有权

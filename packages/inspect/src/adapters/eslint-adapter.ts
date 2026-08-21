@@ -3,9 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory } from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -66,44 +64,24 @@ function resolveEslintTargetDir(projectPath: string): string {
   return projectPath;
 }
 
-const META: Omit<ToolMeta, 'description'> = {
+const META: ToolMeta = {
   id: 'eslint',
   name: 'ESLint',
   category: 'inspect',
   priority: 'P0',
   installMode: 'builtin',
+  description: 'JS/TS 代码规范与质量检查',
   cliCommand: 'eslint',
   homepage: 'https://eslint.org',
   license: 'MIT',
 };
 
 export class ESLintAdapter implements ToolAdapter {
-  meta: ToolMeta;
-  private projectRoot?: string;
-  private commandPromise?: Promise<string>;
-  private readonly locale: LanguageCode;
-
-  constructor(projectRoot?: string, locale?: LanguageCode) {
-    this.projectRoot = projectRoot;
-    this.locale = locale ?? DEFAULT_LANGUAGE;
-    this.meta = { ...META, description: translate('engine.inspect.tool.eslint.description', this.locale) };
-  }
-
-  private tr(key: string, params?: Record<string, unknown>): string {
-    return translate(key, this.locale, params);
-  }
-
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('eslint', this.projectRoot);
-    }
-    return this.commandPromise;
-  }
+  meta = META;
 
   async isAvailable(): Promise<boolean> {
     try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
+      const { stdout } = await execFileAsync('eslint', ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -112,84 +90,47 @@ export class ESLintAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const targetDir = resolveEslintTargetDir(options.projectPath);
+    const defaultTarget = resolveEslintTargetDir(options.projectPath);
+    const targetFiles = options.targetFiles || [defaultTarget];
+    const defaultExts = ['--ext', '.ts,.tsx,.js,.jsx'];
+    // ESLint v9 从 cwd 向上查找配置：默认扫描时以解析出的目录为 cwd，确保找到嵌套仓库的配置
+    const cwd = options.targetFiles?.length ? options.projectPath : defaultTarget;
     const category: IssueCategory = options.config?.category ?? 'quality';
 
     try {
-      return await this.completeScan(options, targetDir, category, start);
+      // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
+      const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
+      const args: string[] = ['--format', 'json', ...defaultExts, ...relativeTargets];
+      if (options.config?.config) {
+        // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
+        args.unshift('--config', options.config.config);
+      }
+
+      const { stdout } = await execFileAsync('eslint', args, {
+        cwd,
+        timeout: options.timeout || 60000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const rawOutput = JSON.parse(stdout);
+      const issues = this.mapOutput(rawOutput, category);
+
+      return this.buildAvailable(start, rawOutput, issues);
     } catch (error: unknown) {
-      return this.buildScanError(start, category, error);
-    }
-  }
+      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+      if (err.code === 'ENOENT') {
+        return this.buildUnavailable(start, 'ESLint 未安装或未在 PATH 中找到');
+      }
 
-  private async completeScan(
-    options: ToolScanOptions,
-    targetDir: string,
-    category: IssueCategory,
-    start: number,
-  ): Promise<ToolResult> {
-    const { cwd, args } = this.prepareScan(options, targetDir);
-    const stdout = await this.runEslint(args, cwd, options);
+      let rawOutput: unknown = null;
+      if (err.stdout) {
+        try { rawOutput = JSON.parse(err.stdout); } catch { /* ignore */ }
+      }
+      if (rawOutput) {
+        return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
+      }
 
-    const rawOutput = JSON.parse(stdout);
-    const issues = this.mapOutput(rawOutput, category);
-
-    return this.buildAvailable(start, rawOutput, issues);
-  }
-
-  private prepareScan(options: ToolScanOptions, targetDir: string): { cwd: string; args: string[] } {
-    const targetFiles = options.targetFiles || [targetDir];
-    // ESLint v9 从 cwd 向上查找配置：默认扫描时以解析出的目录为 cwd，确保找到嵌套仓库的配置
-    const cwd = options.targetFiles?.length ? options.projectPath : targetDir;
-    const args = this.buildScanArgs(options, targetFiles, cwd);
-    return { cwd, args };
-  }
-
-  private buildScanArgs(options: ToolScanOptions, targetFiles: string[], cwd: string): string[] {
-    // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
-    const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
-    const args: string[] = ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', ...relativeTargets];
-    this.applyEslintConfig(args, options.config?.config);
-    return args;
-  }
-
-  private applyEslintConfig(args: string[], config: unknown): void {
-    if (config) {
-      // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
-      args.unshift('--config', config as string);
-    }
-  }
-
-  private async runEslint(args: string[], cwd: string, options: ToolScanOptions): Promise<string> {
-    const command = await this.resolveCommand();
-    const { stdout } = await execFileAsync(command, args, {
-      cwd,
-      timeout: options.timeout || 60000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return stdout;
-  }
-
-  private buildScanError(start: number, category: IssueCategory, error: unknown): ToolResult {
-    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
-      return this.buildUnavailable(start, this.tr('engine.inspect.tool.eslint.unavailable'));
-    }
-
-    const rawOutput = this.parsePartialOutput(err.stdout ?? '');
-    if (rawOutput) {
-      return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
-    }
-
-    return this.buildError(start, err.stderr || err.message || this.tr('engine.inspect.tool.eslint.runFailed'));
-  }
-
-  private parsePartialOutput(stdout: string): unknown | null {
-    if (!stdout) return null;
-    try {
-      return JSON.parse(stdout);
-    } catch {
-      return null;
+      return this.buildError(start, err.stderr || err.message || 'ESLint 执行失败');
     }
   }
 
@@ -251,7 +192,7 @@ export class ESLintAdapter implements ToolAdapter {
       file: file.filePath || '',
       line: msg.line || 0,
       column: msg.column || 0,
-      suggestion: msg.fix ? this.tr('engine.inspect.tool.eslint.autoFixable') : undefined,
+      suggestion: msg.fix ? '可自动修复' : undefined,
       autoFixable: !!msg.fix,
       source: 'inspect',
       fingerprint: `${msg.ruleId}:${file.filePath || ''}:${msg.line || 0}`,

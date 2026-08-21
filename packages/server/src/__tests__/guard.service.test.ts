@@ -1,34 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { GuardService } from '../guard/guard.service';
 import type { GuardEngine } from '@zh/guard';
-
-// 注入桩引擎，避免 runCheck 真实执行整套 guard 检查（其 test-runner 适配器
-// 会递归运行整个工作区测试套件，导致用例 60s 超时）。此处仅验证服务层
-// 组装与透传逻辑，引擎行为由 @zh/guard 自身测试覆盖。
-vi.mock('@zh/guard', () => {
-  class FakeEngine {
-    registerAdapter = vi.fn();
-    run = async (options: { dryRun?: boolean } = {}) => ({
-      contractVersion: 'p0.v1',
-      mode: 'guard',
-      ok: options.dryRun ? null : true,
-      dryRun: options.dryRun ?? false,
-      summary: { total: 4, passed: 4, failed: 0, warnings: 0, blocking: 0, errors: 0 },
-      results: [],
-      generatedAt: new Date().toISOString(),
-    });
-  }
-  class FakeAdapter {}
-  return {
-    GuardEngine: FakeEngine,
-    GuardESLintCheckAdapter: FakeAdapter,
-    GuardSensitiveInfoAdapter: FakeAdapter,
-    FileSecretStateLookup: FakeAdapter,
-    ArchitectureBoundaryAdapter: FakeAdapter,
-    TestRunnerAdapter: FakeAdapter,
-    SecurityScanAdapter: FakeAdapter,
-  };
-});
 
 describe('GuardService', () => {
   let service: GuardService;

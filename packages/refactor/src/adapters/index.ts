@@ -1,6 +1,5 @@
 import type { ParsedFile } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
-import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 
 import { detectLongMethod, detectLargeClass, detectLongParameterList, detectOversizedFile, detectOversizedComponent } from './scale-detectors';
 import { detectDeepNesting, detectMixedResponsibilities, detectDuplicateCode, detectCallbackHell } from './structure-detectors';
@@ -11,29 +10,29 @@ export interface DetectorSet {
   name: string;
   description: string;
   sopRuleId: string;
-  detect: (parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig, locale?: LanguageCode) => CodeSmell[];
+  detect: (parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig) => CodeSmell[];
 }
 
 export const ALL_DETECTORS: DetectorSet[] = [
-  { name: 'long-method',            description: translate('engine.refactor.smell.long-method.name', DEFAULT_LANGUAGE),            sopRuleId: 'refactor.R01', detect: (f, _a, c, l) => detectLongMethod(f, c, l) },
-  { name: 'oversized-file',         description: translate('engine.refactor.smell.oversized-file.name', DEFAULT_LANGUAGE),         sopRuleId: 'refactor.R02', detect: (f, _a, c, l) => detectOversizedFile(f, c, l) },
-  { name: 'long-parameter-list',    description: translate('engine.refactor.smell.long-parameter-list.name', DEFAULT_LANGUAGE),    sopRuleId: 'refactor.R03', detect: (f, _a, c, l) => detectLongParameterList(f, c, l) },
-  { name: 'mixed-responsibilities', description: translate('engine.refactor.smell.mixed-responsibilities.name', DEFAULT_LANGUAGE), sopRuleId: 'refactor.R04', detect: (f, _a, c, l) => detectMixedResponsibilities(f, c, l) },
-  { name: 'deep-nesting',           description: translate('engine.refactor.smell.deep-nesting.name', DEFAULT_LANGUAGE),           sopRuleId: 'refactor.R05', detect: (f, _a, c, l) => detectDeepNesting(f, c, l) },
-  { name: 'duplicated-code',        description: translate('engine.refactor.smell.duplicated-code.name', DEFAULT_LANGUAGE),        sopRuleId: 'refactor.R06', detect: (f, all, c, l) => detectDuplicateCode(f, all, c, l) },
-  { name: 'callback-hell',          description: translate('engine.refactor.smell.callback-hell.name', DEFAULT_LANGUAGE),          sopRuleId: 'refactor.R07', detect: (f, _a, c, l) => detectCallbackHell(f, c, l) },
-  { name: 'shotgun-surgery',        description: translate('engine.refactor.smell.shotgun-surgery.name', DEFAULT_LANGUAGE),        sopRuleId: 'refactor.R09', detect: (f, all, c, l) => detectShotgunSurgery(f, all, c, l) },
-  { name: 'data-class',             description: translate('engine.refactor.smell.data-class.name', DEFAULT_LANGUAGE),             sopRuleId: 'refactor.R10', detect: (f, _a, c, l) => detectDataClass(f, c, l) },
-  { name: 'oversized-component',    description: translate('engine.refactor.smell.oversized-component.name', DEFAULT_LANGUAGE),    sopRuleId: 'refactor.R11', detect: (f, _a, c, l) => detectOversizedComponent(f, c, l) },
-  { name: 'god-object',             description: translate('engine.refactor.smell.god-object.name', DEFAULT_LANGUAGE),             sopRuleId: 'refactor.R12', detect: (f, _a, c, l) => detectGodObject(f, c, l) },
-  { name: 'large-class',            description: translate('engine.refactor.smell.large-class.name', DEFAULT_LANGUAGE),            sopRuleId: 'refactor.R12', detect: (f, _a, c, l) => detectLargeClass(f, c, l) },
-  { name: 'feature-envy',           description: translate('engine.refactor.smell.feature-envy.name', DEFAULT_LANGUAGE),           sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectFeatureEnvy(f, c, l) },
-  { name: 'inappropriate-intimacy', description: translate('engine.refactor.smell.inappropriate-intimacy.name', DEFAULT_LANGUAGE), sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectInappropriateIntimacy(f, c, l) },
-  { name: 'middle-man',             description: translate('engine.refactor.smell.middle-man.name', DEFAULT_LANGUAGE),             sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectMiddleMan(f, c, l) },
-  { name: 'message-chains',         description: translate('engine.refactor.smell.message-chains.name', DEFAULT_LANGUAGE),         sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectMessageChains(f, c, l) },
-  { name: 'refused-bequest',        description: translate('engine.refactor.smell.refused-bequest.name', DEFAULT_LANGUAGE),        sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectRefusedBequest(f, c, l) },
-  { name: 'lazy-class',             description: translate('engine.refactor.smell.lazy-class.name', DEFAULT_LANGUAGE),             sopRuleId: 'refactor.R10', detect: (f, _a, c, l) => detectLazyClass(f, c, l) },
-  { name: 'switch-statement',       description: translate('engine.refactor.smell.switch-statement.name', DEFAULT_LANGUAGE),       sopRuleId: 'refactor.R08', detect: (f, _a, c, l) => detectSwitchStatement(f, c, l) },
-  { name: 'data-clumps',            description: translate('engine.refactor.smell.data-clumps.name', DEFAULT_LANGUAGE),            sopRuleId: 'refactor.R03', detect: (f, _a, c, l) => detectDataClumps(f, c, l) },
-  { name: 'primitive-obsession',    description: translate('engine.refactor.smell.primitive-obsession.name', DEFAULT_LANGUAGE),    sopRuleId: 'refactor.R10', detect: (f, _a, c, l) => detectPrimitiveObsession(f, c, l) },
+  { name: 'long-method',            description: '超大函数 (R01)',   sopRuleId: 'refactor.R01', detect: (f, _, c) => detectLongMethod(f, c) },
+  { name: 'oversized-file',         description: '超大文件 (R02)',   sopRuleId: 'refactor.R02', detect: (f, _, c) => detectOversizedFile(f, c) },
+  { name: 'long-parameter-list',    description: '过长参数 (R03)',   sopRuleId: 'refactor.R03', detect: (f, _, c) => detectLongParameterList(f, c) },
+  { name: 'mixed-responsibilities', description: '多职责混合 (R04)', sopRuleId: 'refactor.R04', detect: (f, _, c) => detectMixedResponsibilities(f, c) },
+  { name: 'deep-nesting',           description: '深层嵌套 (R05)',   sopRuleId: 'refactor.R05', detect: (f, _, c) => detectDeepNesting(f, c) },
+  { name: 'duplicated-code',        description: '重复代码 (R06)',   sopRuleId: 'refactor.R06', detect: (f, all, c) => detectDuplicateCode(f, all, c) },
+  { name: 'callback-hell',          description: '回调地狱 (R07)',   sopRuleId: 'refactor.R07', detect: (f, _, c) => detectCallbackHell(f, c) },
+  { name: 'shotgun-surgery',        description: '霰弹修改 (R09)',   sopRuleId: 'refactor.R09', detect: (f, all, c) => detectShotgunSurgery(f, all, c) },
+  { name: 'data-class',             description: '数据类 (R10)',     sopRuleId: 'refactor.R10', detect: (f, _, c) => detectDataClass(f, c) },
+  { name: 'oversized-component',    description: '超大组件 (R11)',   sopRuleId: 'refactor.R11', detect: (f, _, c) => detectOversizedComponent(f, c) },
+  { name: 'god-object',             description: '上帝对象 (R12)',   sopRuleId: 'refactor.R12', detect: (f, _, c) => detectGodObject(f, c) },
+  { name: 'large-class',            description: '上帝对象/大类',    sopRuleId: 'refactor.R12', detect: (f, _, c) => detectLargeClass(f, c) },
+  { name: 'feature-envy',           description: '依恋情结',         sopRuleId: 'refactor.R08', detect: (f, _, c) => detectFeatureEnvy(f, c) },
+  { name: 'inappropriate-intimacy', description: '不恰当的亲密',     sopRuleId: 'refactor.R08', detect: (f, _, c) => detectInappropriateIntimacy(f, c) },
+  { name: 'middle-man',             description: '中间人',           sopRuleId: 'refactor.R08', detect: (f, _, c) => detectMiddleMan(f, c) },
+  { name: 'message-chains',         description: '消息链',           sopRuleId: 'refactor.R08', detect: (f, _, c) => detectMessageChains(f, c) },
+  { name: 'refused-bequest',        description: '拒绝继承',         sopRuleId: 'refactor.R08', detect: (f, _, c) => detectRefusedBequest(f, c) },
+  { name: 'lazy-class',             description: '冗余类',           sopRuleId: 'refactor.R10', detect: (f, _, c) => detectLazyClass(f, c) },
+  { name: 'switch-statement',       description: 'Switch 语句',      sopRuleId: 'refactor.R08', detect: (f, _, c) => detectSwitchStatement(f, c) },
+  { name: 'data-clumps',            description: '数据泥团',         sopRuleId: 'refactor.R03', detect: (f, _, c) => detectDataClumps(f, c) },
+  { name: 'primitive-obsession',    description: '基本类型偏执',     sopRuleId: 'refactor.R10', detect: (f, _, c) => detectPrimitiveObsession(f, c) },
 ];

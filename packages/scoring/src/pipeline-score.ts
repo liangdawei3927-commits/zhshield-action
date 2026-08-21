@@ -1,4 +1,5 @@
 import type { DimensionScore } from './types';
+import { DimensionMapper } from './dimension-mapper';
 
 /** guard 检查的最小结构 — 与 @zh/guard CheckResult 字段兼容，避免包间依赖 */
 export interface GuardCheckLike {
@@ -23,13 +24,15 @@ export interface InspectionReportLike {
   issues: InspectIssueLike[];
 }
 
-const DIMENSION_SPECS: { name: string; weight: number; categories: string[] }[] = [
-  { name: 'security', weight: 0.3, categories: ['security'] },
-  { name: 'architecture', weight: 0.2, categories: ['architecture', 'refactoring'] },
-  { name: 'performance', weight: 0.15, categories: ['performance', 'quality'] },
-  { name: 'documentation', weight: 0.15, categories: ['documentation'] },
-  { name: 'testing', weight: 0.2, categories: ['test', 'dependency'] },
-];
+const DIMENSION_CATEGORIES: Record<string, string[]> = {
+  security: ['security'],
+  quality: ['performance', 'quality'],
+  architecture: ['architecture', 'refactoring'],
+  dependencies: ['test', 'dependency'],
+  documentation: ['documentation'],
+};
+
+const dimensionMapper = new DimensionMapper();
 
 const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
   error: 8,
@@ -64,7 +67,10 @@ export function buildHealthDimensions(
   guard: GuardReportLike,
   inspect: InspectionReportLike,
 ): DimensionScore[] {
-  return DIMENSION_SPECS.map(({ name, weight, categories }) => {
+  const weightMap = dimensionMapper.getWeightMap();
+
+  return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) => {
+    const weight = weightMap[name] ?? 0;
     const matched = inspect.issues.filter((issue) => categories.includes(issue.category));
     const issues = matched.length + (name === 'security' ? guardIssueCount(guard.results) : 0);
     let penalty = penaltyForIssues(matched);

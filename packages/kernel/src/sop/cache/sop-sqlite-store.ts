@@ -1,16 +1,5 @@
 import { DbConnection } from '@zh/db';
 import type { SopRule } from '../_meta/sop-types';
-import type { EncryptedData } from '../security/sop-signer';
-
-/**
- * 加密配置（可选）：提供此选项时，规则将以 AES-256-GCM 加密后写入 SQLite。
- */
-export interface SopSqliteStoreEncryptionOptions {
-  /** 机器硬件指纹（用于密钥派生） */
-  machineFingerprint: string;
-  /** 用户 ID（用于密钥派生） */
-  userId: string;
-}
 
 // better-sqlite3 类型内联，避免 native 模块在非 Electron 环境下的构建问题
 interface Database {
@@ -34,10 +23,7 @@ interface Statement {
 export class SopSqliteStore {
   private db: Database | null = null;
 
-  constructor(
-    private readonly dbPath: string,
-    private readonly encryption?: SopSqliteStoreEncryptionOptions,
-  ) {}
+  constructor(private readonly dbPath: string) {}
 
   /**
    * 初始化数据库连接和表结构
@@ -66,7 +52,7 @@ export class SopSqliteStore {
     if (!this.db) return [];
     try {
       const rows = this.db.prepare('SELECT data FROM sop_rules').all() as { data: string }[];
-      return rows.map((r) => this.parseRow(r.data)).filter((r): r is SopRule => r !== null);
+      return rows.map((r) => JSON.parse(r.data)) as SopRule[];
     } catch (err) {
       console.log('[SopCacheManager] Failed to load from SQLite cache, using built-in rules:', err);
       return [];
@@ -80,7 +66,7 @@ export class SopSqliteStore {
     if (!this.db) return [];
     try {
       const rows = this.db.prepare('SELECT data FROM sop_rules WHERE domain = ?').all(module) as { data: string }[];
-      return rows.map((r) => this.parseRow(r.data)).filter((r): r is SopRule => r !== null);
+      return rows.map((r) => JSON.parse(r.data)) as SopRule[];
     } catch {
       return [];
     }
@@ -96,51 +82,10 @@ export class SopSqliteStore {
     );
     const tx = this.db.transaction((items: SopRule[]) => {
       for (const rule of items) {
-        insert.run(rule.id, rule.domain, rule.action, this.serializeRule(rule));
+        insert.run(rule.id, rule.domain, rule.action, JSON.stringify(rule));
       }
     });
     tx(rules);
-  }
-
-  private serializeRule(rule: SopRule): string {
-    if (!this.encryption) return JSON.stringify(rule);
-    try {
-      const { SopSigner } = require('../security/sop-signer') as typeof import('../security/sop-signer');
-      const encrypted = SopSigner.encryptRules([rule], this.encryption.machineFingerprint, this.encryption.userId);
-      return JSON.stringify(encrypted);
-    } catch {
-      return JSON.stringify(rule);
-    }
-  }
-
-  private parseRow(data: string): SopRule | null {
-    try {
-      const parsed: unknown = JSON.parse(data);
-      if (SopSqliteStore.isEncryptedData(parsed) && this.encryption) {
-        try {
-          const { SopSigner } = require('../security/sop-signer') as typeof import('../security/sop-signer');
-          const decrypted = SopSigner.decryptRules(parsed, this.encryption.machineFingerprint, this.encryption.userId);
-          return decrypted[0] ?? null;
-        } catch {
-          // Decryption failed — data may be corrupted or key mismatch; skip
-          return null;
-        }
-      }
-      return parsed as SopRule;
-    } catch {
-      return null;
-    }
-  }
-
-  private static isEncryptedData(obj: unknown): obj is EncryptedData {
-    return (
-      typeof obj === 'object' &&
-      obj !== null &&
-      'iv' in obj &&
-      'encrypted' in obj &&
-      'authTag' in obj &&
-      'algorithm' in obj
-    );
   }
 
   /**

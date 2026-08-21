@@ -1,0 +1,540 @@
+// ─── 通用类型 ─────────────────────────────────────────────
+
+export type PagedResult<T> = {
+  items: T[];
+  total: number;
+};
+
+export type ApiErrorDTO = {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  traceId?: string;
+};
+
+export type ApiResponseEnvelope<T> = {
+  code: number;
+  message?: string;
+  data: T;
+  traceId?: string;
+};
+
+// ─── 问题（Issue）─────────────────────────────────────────
+
+export type IssueSeverity = 'error' | 'warning' | 'info';
+
+export type IssueCategory =
+  | 'architecture' | 'security' | 'quality'
+  | 'performance' | 'documentation' | 'test' | 'dependency'
+  | 'refactoring';
+
+export type IssueSource = 'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor';
+
+// ─── 污点/数据流链（SARIF-compatible 简化子集）─────────────
+
+/** 数据流链中的单个位置（SARIF threadFlowLocation 的子集，M4 SARIF 导出用） */
+export interface CodeFlowLocation {
+  location: {
+    file: string;
+    line?: number;
+    column?: number;
+  };
+  message?: string;
+}
+
+/** 数据流链中的一条线程流（SARIF threadFlow 的子集） */
+export interface CodeFlowThreadFlow {
+  locations: CodeFlowLocation[];
+}
+
+/** 污点/数据流链（SARIF codeFlow 的子集，如 Semgrep dataflow_trace 映射结果） */
+export interface CodeFlow {
+  threadFlows: CodeFlowThreadFlow[];
+}
+
+export interface Issue {
+  id: string;
+  ruleId: string;
+  severity: IssueSeverity;
+  category: IssueCategory;
+  message: string;
+  file: string;
+  line?: number;
+  column?: number;
+  suggestion?: string;
+  autoFixable: boolean;
+  source: IssueSource;
+  fingerprint: string;
+  /** 污点/数据流链（SARIF-compatible 形状，为 M4 SARIF 导出与污点链路展示打底） */
+  codeFlows?: CodeFlow[];
+  /** 栈追踪行（如运行时异常 / 崩溃堆栈） */
+  stack?: string[];
+  /** 分类标签（如 validation:NO_VALIDATOR、sca:reachable），供报告/门禁按标签聚合 */
+  taxonomies?: string[];
+}
+
+// ─── 重构模板（RefactoringTemplate）────────────────────────
+
+export interface ExtractionSuggestion {
+  name: string;
+  sourceLines: [number, number] | null;
+  type: 'function' | 'class' | 'component' | 'module' | 'type' | 'config';
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+  parameters?: string[];
+  returns?: string;
+}
+
+export interface RefactoringTemplate {
+  ruleId: string;
+  target: {
+    file: string;
+    lines: [number, number];
+    symbol?: string;
+    type: 'function' | 'class' | 'module' | 'component' | 'type';
+  };
+  diagnosis: {
+    summary: string;
+    details?: string;
+    metrics: { lines: number; cyclomaticComplexity: number; responsibilityCount: number };
+    hotspots?: Array<{ lines: [number, number]; complexity: number; reason?: string }>;
+  };
+  plan: {
+    extractions: ExtractionSuggestion[];
+    expectedImprovement?: { linesAfter: number; complexityAfter: number };
+  };
+  aiPayload?: {
+    systemPrompt: string;
+    sourceCode: string;
+    constraints: string[];
+    acceptanceCriteria?: string[];
+  };
+  confidence: 'high' | 'medium' | 'low';
+}
+
+// ─── 检查结果（CheckResult）──────────────────────────────
+
+export interface CheckResult {
+  projectId: string;
+  timestamp: Date;
+  duration: number;
+  passed: boolean;
+  issues: Issue[];
+  summary: { total: number; error: number; warning: number; info: number };
+  blockedFiles?: string[];
+}
+
+// ─── 健康评分（HealthScore）──────────────────────────────
+
+export interface DimensionScore {
+  name: string;
+  weight: number;
+  score: number;
+  issues: number;
+}
+
+export interface HealthScore {
+  projectId: string;
+  timestamp: Date;
+  overall: number;
+  grade: 'A' | 'B' | 'C' | 'D';
+  dimensions: DimensionScore[];
+  trend: 'improving' | 'stable' | 'declining';
+}
+
+// ─── 巡检报告（InspectionReport）─────────────────────────
+
+export interface AdapterResult {
+  adapterId: string;
+  adapterName: string;
+  duration: number;
+  issueCount: number;
+  passed: boolean;
+  issues: Issue[];
+}
+
+export interface InspectionReport {
+  projectId: string;
+  timestamp: Date;
+  scanType: 'full' | 'incremental' | 'scheduled';
+  duration: number;
+  score: HealthScore;
+  issues: Issue[];
+  summary: { total: number; error: number; warning: number; info: number };
+  adapterResults: AdapterResult[];
+  recommendations: string[];
+  diff?: {
+    newIssues: Issue[];
+    resolvedIssues: Issue[];
+    scoreChange: number;
+  };
+}
+
+// ─── 哨兵事件（SentinelEvent）────────────────────────────
+
+export type EventType =
+  | 'runtime-exception' | 'http-error' | 'performance-degradation'
+  | 'crash' | 'frontend-error' | 'white-screen' | 'security-incident'
+  | 'memory-leak' | 'timeout';
+
+export type EventSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type EventSource = 'backend' | 'frontend' | 'middleware' | 'infrastructure';
+
+export interface CodeLocation {
+  file: string;
+  line?: number;
+  column?: number;
+  function?: string;
+  module?: string;
+  stackTrace?: string;
+}
+
+export interface EventContext {
+  request?: { method: string; path: string; statusCode?: number; duration?: number };
+  environment?: string;
+  version?: string;
+}
+
+export interface Diagnosis {
+  category: string;
+  impact: string;
+  suggestion: string;
+  autoFixable: boolean;
+}
+
+export interface SentinelEvent {
+  id: string;
+  projectId: string;
+  timestamp: Date;
+  type: EventType;
+  severity: EventSeverity;
+  source: EventSource;
+  location: CodeLocation;
+  context: EventContext;
+  diagnosis: Diagnosis;
+  fingerprint: string;
+  occurrenceCount: number;
+  firstSeen: Date;
+  lastSeen: Date;
+}
+
+// ─── 漏洞信息（Vulnerability）────────────────────────────
+
+export interface Vulnerability {
+  id: string;
+  cveId?: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  package: string;
+  currentVersion: string;
+  vulnerableRange: string;
+  fixedVersion?: string;
+  dependencyPath: string[];
+  isDirectDependency: boolean;
+  cvssScore?: number;
+  recommendation: string;
+  autoFixable: boolean;
+}
+
+// ─── 恶意代码（MalwareItem）──────────────────────────────
+
+export interface MalwareItem {
+  id: string;
+  type: 'reverse-shell' | 'data-exfiltration' | 'privilege-escalation'
+    | 'crypto-ransomware' | 'backdoor' | 'supply-chain' | 'suspicious-behavior';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  file: string;
+  line: number;
+  pattern: string;
+  evidence: string;
+}
+
+// ─── 垃圾项（GarbageItem）────────────────────────────────
+
+export interface GarbageItem {
+  id: string;
+  type: 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code';
+  path: string;
+  size: number;
+  reason: string;
+}
+
+// ─── 经验记录（ExperienceEntry）──────────────────────────
+
+export interface ExperienceEntry {
+  id: string;
+  projectId: string;
+  type: 'true-positive' | 'false-positive' | 'fix-applied' | 'best-practice';
+  ruleId: string;
+  issueId?: string;
+  pattern: string;
+  message: string;
+  feedback: string;
+  source: 'user' | 'auto';
+  confidence: number;
+  verified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── 开源工具集成（Tool Adapter）────────────────────────
+
+export type FallbackStrategy =
+  | 'skip'     // Skip this tool, continue with others
+  | 'retry'    // Retry once before skipping
+  | 'degrade'  // Return partial results from other tools
+  | 'fail';    // Fail the entire scan
+
+export type ToolId =
+  | 'eslint' | 'tsc' | 'semgrep' | 'trivy' | 'grype'
+  | 'gitleaks' | 'ort' | 'depcheck' | 'dep-cruiser' | 'jscpd'
+  | 'ts-prune';
+
+export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
+
+export type ToolPriority = 'P0' | 'P1' | 'P2';
+
+export type ToolInstallMode = 'builtin' | 'on-demand';
+
+export type ToolStatus = 'available' | 'unavailable' | 'error' | 'skipped';
+
+export interface ToolMeta {
+  id: ToolId;
+  name: string;
+  category: ToolCategory;
+  priority: ToolPriority;
+  installMode: ToolInstallMode;
+  description: string;
+  cliCommand: string;
+  homepage: string;
+  license: string;
+}
+
+export interface ToolConfig {
+  enabled: boolean;
+  config?: string;
+  /** 规则声明的 issue 分类，透传给适配器作为 mapOutput 的默认 category */
+  category?: IssueCategory;
+  /** 规则声明的工具 CLI 参数（如 tsc 的 --strict），由适配器消费 */
+  flags?: string[];
+  ignore?: string[];
+  severity?: string[];
+  scanners?: string[];
+  rules?: string[];
+  packageManagers?: string[];
+  timeout?: number;
+}
+
+export interface ToolResult {
+  tool: ToolId;
+  status: ToolStatus;
+  issues: Issue[];
+  metadata: {
+    version: string;
+    duration: number;
+    timestamp: Date;
+    fileCount: number;
+  };
+  error?: string;
+}
+
+export interface ToolScanOptions {
+  projectPath: string;
+  projectId: string;
+  targetFiles?: string[];
+  config?: ToolConfig;
+  timeout?: number;
+}
+
+export interface ToolAdapter {
+  meta: ToolMeta;
+  isAvailable(): Promise<boolean>;
+  scan(options: ToolScanOptions): Promise<ToolResult>;
+  healthCheck?(): Promise<{ healthy: boolean; message?: string }>;
+  fallbackStrategy?: FallbackStrategy;
+}
+
+export interface ToolVersionInfo {
+  tool: ToolId;
+  installedVersion: string | null;
+  recommendedVersion: string;
+  binaryPath: string | null;
+}
+
+// ─── 工具错误日志（ToolErrorLog）────────────────────────
+
+export interface ToolErrorLog {
+  timestamp: Date;
+  tool: ToolId;
+  error: string;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  projectId: string;
+  hookType?: string;
+}
+
+// ─── 审计日志（AuditLog）────────────────────────────────
+
+export type AuditAction =
+  | 'tool-executed' | 'tool-skipped' | 'tool-failed'
+  | 'guard-blocked' | 'guard-passed'
+  | 'whitelist-granted' | 'experience-recorded';
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: Date;
+  action: AuditAction;
+  projectId: string;
+  tool?: ToolId;
+  details: Record<string, unknown>;
+}
+
+// ─── 白名单（Whitelist）─────────────────────────────────
+
+export type WhitelistScope = 'project' | 'file' | 'rule';
+
+export interface WhitelistEntry {
+  id: string;
+  projectId: string;
+  scope: WhitelistScope;
+  target: string;
+  ruleId?: string;
+  reason: string;
+  operator: string;
+  expiresAt?: Date;
+  createdAt: Date;
+}
+
+// ─── 工具配置文件（tools.yml 对应类型）─────────────────
+
+export interface ToolsConfig {
+  tools: {
+    eslint: ToolConfig;
+    semgrep: ToolConfig;
+    trivy: ToolConfig;
+    gitleaks: ToolConfig;
+    grype: ToolConfig;
+    ort: ToolConfig;
+    depcheck: ToolConfig;
+    'dependency-cruiser': ToolConfig;
+    'ts-prune': ToolConfig;
+  };
+}
+
+// ─── 降级等级 ───────────────────────────────────────────
+
+export type DegradationLevel = 0 | 1 | 2 | 3 | 4;
+
+// ─── SOP 类型（智汇云脑 — 三维分类体系） ──────────────────
+
+export type GovernanceDomain =
+  | 'guard'     // 拦截域
+  | 'inspect'   // 巡检域
+  | 'security'  // 安全域
+  | 'sentinel'  // 监控域
+  | 'evolve';   // 演进域
+
+export type ActionType =
+  | 'scan'       // 扫描检测
+  | 'block'      // 拦截阻断
+  | 'score'      // 评分量化
+  | 'alert'      // 告警响应
+  | 'suggest'    // 修复建议
+  | 'calibrate'; // 进化校准
+
+export type DataSource =
+  | 'external'   // 外部标准
+  | 'internal'   // 内部模式
+  | 'community'  // 社区贡献
+  | 'official';  // 官方维护
+
+export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
+
+export interface SopVersion {
+  version: string;
+  knowledge: string;
+  experience: string;
+  malware: string;
+  publishedAt: Date;
+  hash: string;
+  size: number;
+}
+
+export interface SopDiff {
+  version: string;
+  fromVersion: string;
+  compatibility: string;
+  added: unknown[];
+  removed: string[];
+  modified: unknown[];
+  unchanged: string[];
+  metadata: {
+    totalRules: number;
+    diffSize: number;
+    hash: string;
+  };
+}
+
+export interface SyncResult {
+  updated: boolean;
+  reason?: 'already_latest' | 'compatibility_error' | 'hash_mismatch' | 'network_error';
+  fromVersion?: string;
+  toVersion?: string;
+  ruleCount?: number;
+}
+
+// ─── 输出映射器（Output Mapper）──────────────────────────
+
+export type ToolOutputMapper = (rawOutput: unknown) => Issue[];
+
+export interface ToolMapperRegistry {
+  [toolId: string]: ToolOutputMapper;
+}
+
+// ─── 门禁配置（GuardConfig）────────────────────────────
+
+export interface GuardCheckItem {
+  enabled: boolean;
+  checks: string[];
+  timeout: number;
+}
+
+export interface GuardConfig {
+  guard: {
+    'pre-commit': GuardCheckItem;
+    'pre-push': GuardCheckItem;
+    ci: GuardCheckItem;
+  };
+}
+
+// ─── Git Hook 类型 ─────────────────────────────────────
+
+export type HookType = 'pre-commit' | 'pre-push' | 'post-commit' | 'post-merge';
+
+// ─── 备用规则（Built-in fallback rules）────────────────
+
+export interface BuiltinRule {
+  ruleId: string;
+  severity: IssueSeverity;
+  category: IssueCategory;
+  message: string;
+  pattern?: string;
+}
+
+// ─── 云脑同步（Cloud Sync）────────────────────────────
+
+export interface CloudSyncRule {
+  tool: ToolId;
+  sourcePath: string;
+  updateFrequency: 'daily' | 'weekly' | 'monthly' | 'emergency';
+  localPath: string;
+}
+
+export interface CloudSyncConfig {
+  rules: CloudSyncRule[];
+}

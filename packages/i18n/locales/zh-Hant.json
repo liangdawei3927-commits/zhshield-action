@@ -1,0 +1,1746 @@
+{
+  "ai": {
+    "autoFix": {
+      "promptIntro": "你是智匯碼盾的自動修復助手。",
+      "readDiagnostics": "請先讀取診斷檔案 {{diagPath}}，按 error → warning → info 的優先順序修復其中列出的問題。",
+      "requirement1": "1. 逐條理解 issue 的 ruleId、message、file、line、column、suggestion，再定位程式碼",
+      "requirement2": "2. 沒有 file 欄位的條目屬於工具/配置類問題（如 ESLint 掃描目錄配置錯誤），應檢查並修復對應工具配置，不要假裝修了程式碼",
+      "requirement3": "3. source 為 \"guard\" 的條目屬於門禁/預防類問題，**跳過不要修復**（只自動修復巡檢/重構類問題）",
+      "requirement4": "4. 只做最小必要的修改，不要重構無關程式碼",
+      "requirement5": "5. 不要修改診斷檔案本身（.zhshield/diagnostics/latest.json）",
+      "requirement6": "6. 全部處理完後，用一句話彙報修改了哪些檔案",
+      "requirementsTitle": "要求："
+    },
+    "copyFix": {
+      "issueHeader": "【問題 {{number}}】（{{source}}）",
+      "locationLabel": "- 位置: {{location}}",
+      "messageLabel": "- 描述: {{message}}",
+      "projectPathLabel": "專案路徑: {{projectPath}}",
+      "promptIntro": "你是智匯碼盾的程式碼修復助手。請修復以下程式碼問題：",
+      "requirement1": "1. 呼叫技能，逐條定位程式碼故障的真實性。",
+      "requirement2": "2. 理解問題後再修改，不要敷衍假裝修復。",
+      "requirement3": "3. 只做最小必要的修改，不要重構無關程式碼。",
+      "requirement4": "4. 修復後要保證可測試、可驗證、可迴歸、可執行。",
+      "requirement5": "5. 修復完成後用一句話彙報修改了哪些檔案。",
+      "requirementsTitle": "修復要求：",
+      "ruleLabel": "- 規則: {{ruleId}}",
+      "severityLabel": "- 嚴重度: {{severity}}",
+      "suggestionLabel": "- 建議: {{suggestion}}"
+    },
+    "toolConfig": {
+      "openCodeCommand": {
+        "description": "description: 讀取智匯碼盾診斷並修復程式碼問題",
+        "step1": "1. 讀取專案根目錄 `.zhshield/diagnostics/latest.json`（不存在則提示使用者先執行體檢）",
+        "step2": "2. 按 error → warning → info 優先順序排序問題",
+        "step3": "3. 逐條理解問題、定位程式碼、生成並應用修復",
+        "step4": "4. 修復後執行 `zhshield issue resolve --fingerprint=\"<fingerprint>\"` 標記已解決（可選）",
+        "title": "# 智匯碼盾診斷修復"
+      }
+    }
+  },
+  "cli": {
+    "command": {
+      "deps": "依賴盤點（SBOM + 許可矩陣）",
+      "guard": "執行 Guard 門禁檢查",
+      "help": "顯示此幫助",
+      "inspect": "執行 Inspect 巡檢",
+      "pipeline": "執行完整流水線",
+      "refactor": "執行 Refactor 重構檢測"
+    },
+    "depsEcosystem": "生態: {{ecosystem}}",
+    "depsHeader": "── 依賴盤點 ──",
+    "depsLockfile": "鎖檔案: {{status}}",
+    "depsNotFound": "依賴盤點: 未發現依賴清單（package-lock.json / pnpm-lock.yaml / yarn.lock / requirements.txt / pyproject.toml / Pipfile.lock / poetry.lock）",
+    "depsProject": "專案: {{path}}",
+    "depsTotal": "依賴總數: {{count}}（直接 {{direct}} / 傳遞 {{transitive}}）",
+    "directDepsHeader": "── 直接依賴 ──",
+    "highRiskLicenses": "高風險許可: {{list}}",
+    "licenseMatrixHeader": "── 許可矩陣 ──",
+    "licenseRiskHigh": "高風險",
+    "licenseRiskLow": "低風險",
+    "licenseRiskMedium": "中風險",
+    "licenseRiskUnknown": "中風險 — 需人工確認",
+    "lockfileMissing": "✗ 缺失",
+    "lockfilePresentUnverified": "✓ 存在（一致性未校驗）",
+    "lockfilePresentVerified": "✓ 存在（一致性已校驗）",
+    "option": {
+      "dir": "專案根目錄（預設: 當前目錄）",
+      "dryRun": "Guard 模式：只報告不阻斷",
+      "hook": "Guard 模式：門禁觸發來源（pre-commit / pre-push）",
+      "json": "deps: 輸出完整依賴圖譜 JSON",
+      "lang": "介面語言（zh-Hans / zh-Hant / en / ko / ja；預設: zh-Hans 或 ZH_LANG 環境變數）",
+      "noColor": "停用顏色輸出",
+      "sbom": "deps: 匯出 CycloneDX SBOM 到檔案",
+      "sop": "使用 SOP 規則驅動模式（預設: checks.json 模式）",
+      "staged": "Guard 模式：僅檢查暫存區變更",
+      "verbose": "顯示詳細資訊"
+    },
+    "optionsTitle": "選項:",
+    "rulesLoaded": "[CLI] 已載入 {{count}} 條 SOP 規則",
+    "sbomWriteFailed": "❌ SBOM 寫入失敗: {{error}}",
+    "sbomWritten": "✅ SBOM 已寫入: {{path}}",
+    "stagedSkipped": "✅ 暫存區無變更，門禁檢查跳過",
+    "title": "zhshield — 智匯碼盾 程式碼質量治理",
+    "unknownCommand": "未知命令: {{command}}",
+    "usageTitle": "用法:"
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "關閉",
+    "confirm": "確認",
+    "copied": "已複製",
+    "copy": "複製",
+    "copyAllToAi": "全部複製到 AI",
+    "copyToAi": "複製到AI",
+    "delete": "刪除",
+    "loading": "載入中",
+    "no": "否",
+    "refresh": "重新整理",
+    "remove": "移除",
+    "retry": "重試",
+    "save": "儲存",
+    "search": "搜尋",
+    "yes": "是"
+  },
+  "electron": {
+    "appTitle": "智匯碼盾",
+    "cleanFailed": "清理失敗，請稍後重試",
+    "diagnostics": {
+      "ruleFailed": "{{ruleId}} 未通過"
+    },
+    "feedbackIncomplete": "反饋內容不完整",
+    "hooksExist": "已有鉤子檔案 {{hooks}}，為避免覆蓋請手動確認",
+    "invalidParams": "引數無效",
+    "invalidProjectPath": "專案路徑無效",
+    "notGitRepo": "專案不是 git 倉庫",
+    "restoreFailed": "恢復失敗，請稍後重試",
+    "scoringUnavailable": "本地資料庫不可用，評分功能降級（請使用 HTTP 模式連線服務端）",
+    "writeFailed": "寫入失敗"
+  },
+  "engine": {
+    "backupModuleUnavailable": "備份模組不可用",
+    "builtin-rules": {
+      "architecture": {
+        "circularDependency": "檢測到迴圈依賴",
+        "cyclicImport": "模組間存在迴圈匯入",
+        "fatController": "Controller 過於臃腫，邏輯應移至 Service",
+        "globalState": "檢測到全域性狀態/單例模式濫用",
+        "layerSkip": "跳層呼叫：跨過中間層直接呼叫底層模組",
+        "layerViolation": "業務層不應直接引用資料訪問層",
+        "missingAbstraction": "模組缺少介面抽象，不利於測試和擴充套件",
+        "noDomainInInfra": "基礎設施層不應依賴領域層",
+        "noDtoInEntity": "Entity 不應依賴 DTO",
+        "noEntityInController": "Controller 不應直接引用 Entity",
+        "noServiceInView": "檢視層不應直接呼叫 Service",
+        "utilsEverywhere": "utils 工具函式分散在各模組，建議統一管理"
+      },
+      "quality": {
+        "asyncWithoutAwait": "async 函式中未使用 await",
+        "complexCondition": "條件表示式過於複雜，建議提取為變數",
+        "consoleLog": "生產程式碼中不應包含 console.log",
+        "debugger": "生產程式碼中不應包含 debugger 語句",
+        "duplicateKey": "物件中存在重複鍵",
+        "emptyCatch": "空的 catch 塊會隱藏錯誤",
+        "eqeqeq": "使用 == 而非 ===，可能導致型別轉換",
+        "forInWithoutHasOwn": "for...in 未使用 hasOwnProperty 檢查",
+        "largeFunction": "函式過長，建議拆分為多個小函式",
+        "magicNumber": "檢測到魔術數字，建議定義為常量",
+        "missingFallthrough": "switch case 缺少 break，可能意外貫穿",
+        "nestedCallback": "巢狀回撥過深，建議使用 async/await",
+        "noBarrelImport": "從 barrel (index) 檔案匯入可能導致迴圈依賴",
+        "noNullComparison": "使用 foo == null 而非 foo === null || foo === undefined",
+        "noUnusedVariable": "檢測到未使用的變數",
+        "todoComment": "存在 TODO 待辦項",
+        "typeAny": "使用 any 型別會失去型別檢查保護",
+        "varUsage": "使用 var 而非 const/let"
+      },
+      "security": {
+        "commandInjection": "檢測到 shell 命令執行，存在命令注入風險",
+        "consoleLogSecret": "console.log 可能洩露敏感資訊",
+        "debugEndpoint": "生產環境不應暴露除錯介面",
+        "evalUsage": "檢測到 eval() 呼叫，存在程式碼注入風險",
+        "hardcodedApiKey": "檢測到硬編碼 API 金鑰",
+        "hardcodedPassword": "檢測到硬編碼密碼",
+        "innerHtml": "檢測到 innerHTML 賦值，存在 XSS 風險",
+        "insecureDeserialize": "檢測到不安全的反序列化操作",
+        "insecureRandom": "使用 Math.random() 做安全敏感操作，請用 crypto.randomBytes",
+        "noAuth": "檢測到未認證的修改操作",
+        "noCors": "未配置 CORS 中介軟體",
+        "noCsp": "未檢測到 Content-Security-Policy 頭",
+        "noHelmet": "未檢測到 Helmet 安全頭中介軟體",
+        "noHttpsRedirect": "未強制 HTTPS 重定向",
+        "noRateLimit": "API 路由未配置速率限制",
+        "noTls": "檢測到 HTTP 而非 HTTPS 服務",
+        "pathTraversal": "檢測到路徑遍歷風險，請校驗使用者輸入",
+        "prototypePollution": "檢測到原型鏈汙染風險",
+        "sensitiveFiles": "檢測到敏感檔案被包含",
+        "sqlConcat": "檢測到 SQL 字串拼接，請使用引數化查詢"
+      }
+    },
+    "dependency": {
+      "license": {
+        "unknownReason": "無法識別的許可證，需人工確認"
+      }
+    },
+    "engineUnavailable": "引擎不可用",
+    "feedbackUnavailable": "反饋通道不可用",
+    "guard": {
+      "architecture": {
+        "foundViolations": "發現 {{count}} 處跨層違規引用:\n{{details}}",
+        "passed": "模組邊界檢查通過，未發現跨層違規引用",
+        "scanFailed": "模組邊界檢查失敗: {{error}}"
+      },
+      "eslint": {
+        "execFailed": "ESLint 執行失敗",
+        "foundErrors": "ESLint 發現 {{count}} 個錯誤:\n{{errors}}",
+        "foundWarnings": "ESLint 發現 {{count}} 個警告:\n{{warnings}}",
+        "notInstalled": "ESLint 未安裝或未在 PATH 中找到",
+        "passed": "ESLint 檢查通過（{{count}} 個檔案）",
+        "passedNoOutput": "ESLint 檢查通過（無輸出）"
+      },
+      "hook": {
+        "guardFailed": "❌ 智匯碼盾門禁檢查未通過，請修復後{{action}}"
+      },
+      "securityScan": {
+        "commandInjection": "可能的命令注入: 使用 execFile 替代 exec",
+        "consoleLog": "生產環境應移除 console 語句",
+        "debugger": "生產環境應移除 debugger 語句",
+        "evalUsage": "避免使用 eval(): 可能導致程式碼注入",
+        "foundIssues": "發現 {{count}} 個安全問題 ({{high}} {{highCount}}, {{medium}} {{mediumCount}}, {{low}} {{lowCount}}):\n{{details}}",
+        "hardcodedPort": "檢查硬編碼埠號是否應改為配置項",
+        "innerHtml": "使用 innerHTML 可能導致 XSS, 優先使用 textContent",
+        "noNewFunc": "避免 new Function(): 可能導致程式碼注入",
+        "passed": "安全掃描通過，未發現明顯安全問題",
+        "scanFailed": "安全掃描失敗: {{error}}",
+        "sqlInjection": "可能的 SQL 注入: 使用了字串拼接而非引數化查詢",
+        "todoFixme": "存在未處理的代辦事項 (TODO/FIXME)"
+      },
+      "sensitiveInfo": {
+        "foundIssues": "發現 {{count}} 處疑似敏感資訊:\n{{details}}",
+        "matchedLine": "{{file}}:{{line}} 匹配 {{pattern}}: {{match}}",
+        "passed": "敏感資訊檢查通過，未發現洩露",
+        "scanFailed": "敏感資訊掃描失敗: {{error}}"
+      },
+      "testDetector": {
+        "noTestScriptDir": "未找到含 test 指令碼的專案目錄"
+      },
+      "testRunner": {
+        "execFailed": "測試執行失敗: {{error}}",
+        "failedList": "失敗用例:",
+        "noTests": "未發現測試用例",
+        "notExecuted": "測試未執行",
+        "passedAll": "全部 {{passed}} 項測試通過 ({{durationMs}}ms)",
+        "summary": "測試 {{totalTests}} 項: {{passed}} 通過, {{failed}} 失敗 ({{durationMs}}ms){{failDetail}}",
+        "unresolved": "檢測到 {{totalTests}} 個測試檔案，但測試執行結果未能解析（程式輸出異常或超時）"
+      },
+      "unknownRule": "未知規則"
+    },
+    "hooksUnavailable": "guardHooks IPC 不可用",
+    "inspect": {
+      "report": {
+        "recommendations": {
+          "category": "發現 {{count}} 個 {{category}} 類問題，建議優先處理",
+          "degradedLevel": "當前降級等級: Level {{level}}，部分工具已跳過",
+          "toolError": "工具 {{tool}} 出錯: {{error}}"
+        }
+      },
+      "supplyChain": {
+        "downloadAllFailed": "[supply-chain] {{toolId}} 所有渠道下載失敗（{{attempts}} 次嘗試）",
+        "sha256Mismatch": "[supply-chain] {{toolId}} sha256 校驗失敗: 期望 {{expected}}, 實際 {{actual}}",
+        "unregisteredLicense": "未登記許可，禁止釋出"
+      },
+      "tool": {
+        "dep-cruiser": {
+          "architectureViolation": "架構邊界違規: {{rule}} - {{from}} → {{to}}",
+          "description": "架構邊界與模組依賴檢查",
+          "noCrossReference": "模組 {{from}} 不應引用 {{to}}",
+          "runFailed": "dependency-cruiser 執行失敗",
+          "unavailable": "dependency-cruiser 未安裝"
+        },
+        "depcheck": {
+          "description": "未使用依賴檢測",
+          "moveDevDependency": "將 {{dep}} 移入 dependencies 或執行 npm uninstall -D {{dep}}",
+          "runFailed": "depcheck 執行失敗",
+          "unavailable": "depcheck 未安裝",
+          "uninstallDependency": "執行 npm uninstall {{dep}} 移除未使用的依賴",
+          "unusedDependency": "未使用的依賴: {{dep}}",
+          "unusedDevDependency": "未使用的 dev 依賴: {{dep}}"
+        },
+        "eslint": {
+          "autoFixable": "可自動修復",
+          "description": "JS/TS 程式碼規範與質量檢查",
+          "runFailed": "ESLint 執行失敗",
+          "unavailable": "ESLint 未安裝或未在 PATH 中找到"
+        },
+        "gitleaks": {
+          "description": "硬編碼金鑰掃描",
+          "hardcodedSecret": "檢測到硬編碼金鑰: {{rule}}",
+          "removeSecret": "移除硬編碼金鑰，使用環境變數或金鑰管理服務",
+          "runFailed": "Gitleaks 執行失敗",
+          "unavailable": "Gitleaks 未安裝或未在 PATH 中找到"
+        },
+        "jscpd": {
+          "description": "重複程式碼檢測",
+          "duplicateFound": "發現重複程式碼 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+          "extractShared": "提取公共程式碼到共享模組 (重複位置: {{secondFile}})",
+          "runFailed": "jscpd 執行失敗",
+          "unavailable": "jscpd 未安裝"
+        },
+        "semgrep": {
+          "description": "SAST 程式碼漏洞掃描（SQL 注入、XSS、CSRF、命令注入、路徑遍歷等）",
+          "runFailed": "Semgrep 執行失敗",
+          "timeout": "Semgrep 掃描超時",
+          "unavailable": "Semgrep 未安裝或未在 PATH 中找到"
+        },
+        "ts-prune": {
+          "description": "TypeScript 死程式碼/未匯出檢測",
+          "removeExport": "移除未使用的匯出符號: {{symbol}}",
+          "runFailed": "ts-prune 執行失敗",
+          "unavailable": "ts-prune 未安裝",
+          "unusedExport": "未使用的匯出: {{symbol}}"
+        },
+        "tsc": {
+          "description": "TypeScript 型別錯誤檢查",
+          "fixSuggestion": "修復 TypeScript {{level}}: {{code}}",
+          "runFailed": "tsc 執行失敗",
+          "unavailable": "tsc 未安裝或未在 PATH 中找到"
+        }
+      },
+      "unknown": "未知",
+      "unknownRule": "未知規則"
+    },
+    "kernel": {
+      "backup": {
+        "allFailed": "所有備份方式均失敗",
+        "commitMessage": "{{prefix}} 自動備份 - {{timestamp}}",
+        "commitPrefix": "[智匯碼盾]",
+        "done": "備份完成",
+        "githubNotAuthorized": "GitHub 未授權，請先在設定中授權 GitHub 賬戶",
+        "localCopyFailed": "{{count}} 個檔案複製失敗",
+        "progressGitHubCommit": "正在提交到 GitHub...",
+        "progressLocalCopy": "正在複製到本地目錄...",
+        "repoDescription": "智匯碼盾自動備份倉庫",
+        "unknownGitHubError": "未知 GitHub 備份錯誤",
+        "unknownLocalError": "未知本地備份錯誤"
+      },
+      "runner": {
+        "forbiddenPatternsFound": "發現 {{count}} 處禁止模式 ({{ruleId}})",
+        "forbiddenUsage": "禁止使用: \"{{pattern}}\"",
+        "guardDispatchFailed": "Guard 派發失敗: {{error}}",
+        "guardEngineNotRegistered": "GuardEngine 未註冊，無法執行 check-list",
+        "guardFoundIssues": "Guard 檢查發現 {{count}} 個問題",
+        "guardPassed": "Guard 檢查通過",
+        "inspectDispatchFailed": "Inspect 派發失敗: {{error}}",
+        "inspectEngineNotRegistered": "InspectEngine 未註冊，且無可用掃描器介面卡",
+        "labelDone": "{{label}}完成: {{count}} 個問題",
+        "labelInspection": "巡檢",
+        "labelPreset": "預設檢查",
+        "layerAllowedDeps": "{{fileLayer}} 層只能依賴: {{deps}}",
+        "layerBoundaryPassed": "架構邊界檢查通過",
+        "layerBoundaryViolations": "發現 {{count}} 處架構邊界違規",
+        "layerViolationMessage": "層違規: \"{{fileLayer}}\" 不允許依賴 \"{{targetLayer}}\" (匯入: {{imported}})",
+        "patternMatchesFound": "發現 {{count}} 處匹配 ({{ruleId}})",
+        "presetInspectNotRegistered": "InspectEngine 未註冊，且無可用 preset 工具介面卡",
+        "removeHardcodedValue": "移除或使用環境變數替代硬編碼值",
+        "replaceForbidden": "移除或替換 \"{{pattern}}\" 為型別安全的替代方案",
+        "scannerFailed": "掃描器 {{tool}} 執行失敗",
+        "scannerFoundIssues": "掃描器發現 {{count}} 個問題",
+        "scannerPassed": "掃描器檢查通過",
+        "sensitivePatternMatch": "匹配到敏感模式: {{match}}",
+        "skipCheckListNoMatch": "跳過 check-list→GuardEngine：倉庫未配置匹配的檢查項",
+        "skipCheckListReentry": "跳過 check-list→GuardEngine.run（防止規則引擎重入）",
+        "skipNestedDispatch": "跳過巢狀 {{type}} 派發（防止規則引擎重入）",
+        "skipPresetReentry": "跳過 preset→runScan（防止規則引擎重入）",
+        "skipScannerReentry": "跳過 scanner-dispatch→runScan（防止規則引擎重入）",
+        "thresholdList": "閾值: {{entries}}",
+        "thresholdRaw": "閾值: {{unit}} {{thresholds}}",
+        "thresholdRule": "閾值規則 (需要外部資料): {{summary}}",
+        "toolAdapterNotRegistered": "未註冊工具介面卡: {{tool}}，無法執行 tool-dispatch",
+        "toolError": "工具 {{tool}} 錯誤: {{error}}",
+        "toolExecuteFailed": "工具 {{tool}} 執行失敗: {{error}}",
+        "toolFoundIssues": "工具 {{tool}} 發現 {{count}} 個問題",
+        "toolPassed": "工具 {{tool}} 檢查通過",
+        "toolUnavailable": "工具不可用: {{tool}}（未安裝或在 PATH 中未找到）"
+      }
+    },
+    "output": {
+      "architectureViolation": "架構邊界違規: {{rule}} - {{from}} → {{to}}",
+      "autoFixable": "可自動修復",
+      "duplicateCode": "發現重複程式碼 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+      "extractSharedCode": "提取公共程式碼到共享模組 (重複位置: {{secondFile}})",
+      "moduleShouldNotReference": "模組 {{from}} 不應引用 {{to}}",
+      "removeDependency": "移除 {{name}} 從 dependencies",
+      "removeDevDependency": "移除 {{name}} 從 devDependencies",
+      "removeHardcodedKey": "移除硬編碼金鑰，使用環境變數或金鑰管理服務",
+      "removeHardcodedSecret": "移除硬編碼的金鑰，使用環境變數或金鑰管理服務",
+      "unknownRule": "未知規則",
+      "unusedDevDependency": "未使用的開發依賴: {{name}}",
+      "unusedProdDependency": "未使用的生產依賴: {{name}}",
+      "upgradeTo": "升級到 {{version}}"
+    },
+    "pipeline": {
+      "log": {
+        "guardBlocked": "Guard 阻斷, 流水線終止 ({{failed}} 項失敗)",
+        "guardCheckFailed": "Guard 檢查失敗: {{error}}",
+        "guardDone": "Guard 檢查完成: {{passed}} passed, {{failed}} failed",
+        "guardPassedToInspect": "Guard 通過, 進入 Inspect 巡檢階段...",
+        "guardStart": "開始 Guard 門禁檢查...",
+        "inspectDone": "巡檢完成: {{total}} 個問題 ({{error}} error, {{warning}} warning, {{info}} info)",
+        "inspectFailed": "Inspect 巡檢失敗: {{error}}",
+        "inspectStart": "開始 Inspect 引擎巡檢...",
+        "pipelineClosed": "流水線已關閉",
+        "pipelineDone": "========== 智匯碼盾全流水線完成（不含重構） ==========",
+        "pipelineStart": "========== 智匯碼盾全流水線開始 ==========",
+        "pluginLoaded": "外掛已載入: {{name}}@{{version}}",
+        "profileDone": "專案畫像: {{language}}{{framework}} ({{packageManager}})",
+        "profileStart": "開始分析專案畫像...",
+        "refactorDone": "重構檢測完成: {{totalSmells}} 處異味 ({{criticalFiles}} 個檔案需要關注)",
+        "refactorStart": "開始 Refactor 重構檢測...",
+        "scoringDone": "評分完成: {{overall}} (等級 {{grade}})",
+        "scoringStart": "開始健康評分...",
+        "securityDone": "安全掃描完成: {{vulnTotal}} 個漏洞, {{malwareTotal}} 個惡意包, {{garbageTotal}} 個垃圾檔案",
+        "securityFailed": "安全掃描失敗: {{error}}",
+        "securityStart": "開始安全掃描...",
+        "sopGuardBlocked": "SOP Guard 阻斷, 流水線終止 ({{failed}} 項失敗)",
+        "sopGuardDone": "SOP Guard 檢查完成: {{passed}} passed, {{failed}} failed, {{errors}} errors",
+        "sopGuardFailed": "SOP Guard 檢查失敗: {{error}}",
+        "sopGuardPassed": "SOP Guard 通過, 進入 SOP Inspect 巡檢階段...",
+        "sopGuardStart": "開始 SOP 驅動型 Guard 門禁檢查...",
+        "sopInspectDone": "SOP Inspect 完成: {{passed}} passed, {{failed}} failed, {{skipped}} skipped",
+        "sopInspectFailed": "SOP Inspect 巡檢失敗: {{error}}",
+        "sopInspectStart": "開始 SOP 驅動型 Inspect 巡檢...",
+        "sopPipelineDone": "========== SOP 驅動型全流水線完成（不含重構） ==========",
+        "sopPipelineStart": "========== SOP 驅動型全流水線開始 ==========",
+        "sopRulesLoaded": "SOP 規則已載入: {{count}} 條 (活躍: {{active}})"
+      }
+    },
+    "refactor": {
+      "fix": {
+        "addAsync": "為 {{methodName}} 新增 async 關鍵字",
+        "constantsHeader": "// 共享字串常量 — auto-fix 生成",
+        "encapsulateField": "將 {{filePath}} 的 public 欄位封裝為 private",
+        "extractLiteral": "將 \"{{literal}}\" 提取到 {{filePath}}",
+        "thenToAwaitTodo": "// TODO: 將 .then() 鏈手動轉換為 await (auto-fix 已新增 async 關鍵字)"
+      },
+      "smell": {
+        "callback-hell": {
+          "message": "{{target}} 包含 {{count}} 層 .then() 鏈式回撥，建議轉換為 async/await",
+          "name": "回撥地獄 (R07)",
+          "suggestion": "將 .then() 鏈式回撥轉換為 async/await 語法，保留 try/catch 錯誤處理"
+        },
+        "data-class": {
+          "message": "{{className}} 有 {{fields}} 個欄位但只有 {{methods}} 個方法，可能是純資料類",
+          "name": "資料類 (R10)",
+          "suggestion": "將操作 {{className}} 欄位的方法搬移到類中，或將其轉為 TypeScript interface"
+        },
+        "data-clumps": {
+          "message": "引陣列合 [{{params}}] 反覆出現 ({{count}} 次): {{methods}}...",
+          "name": "資料泥團",
+          "suggestion": "將重複出現的引陣列合封裝為一個類"
+        },
+        "deep-nesting": {
+          "message": {
+            "function": "{{target}} 巢狀過深 ({{depth}} 層)",
+            "method": "{{target}} 巢狀過深 ({{depth}} 層，閾值 {{threshold}})，建議使用 guard clause 或提取方法"
+          },
+          "name": "深層巢狀 (R05)",
+          "suggestion": "使用 guard clause 提前返回，或將深層分支提取為獨立函式"
+        },
+        "duplicated-code": {
+          "message": "程式碼塊與 {{file}}:{{line}} 重複，建議提取為公共函式",
+          "name": "重複程式碼 (R06)",
+          "suggestion": "將重複程式碼提取為公共函式，通過引數化差異點統一呼叫"
+        },
+        "feature-envy": {
+          "externalClass": "外部類",
+          "message": "{{target}} 大量呼叫 {{targetName}} ({{externalCount}} 次外部引用 vs {{totalStatements}} 行程式碼)",
+          "name": "依戀情結",
+          "suggestion": "考慮將 {{methodName}} 移到 {{targetClass}} 類中"
+        },
+        "god-object": {
+          "message": "{{className}} 有 {{count}} 個公共方法 (閾值 {{threshold}})，可能是上帝物件",
+          "name": "上帝物件 (R12)",
+          "suggestion": "將 {{className}} 按領域拆分為多個專注的 Service/Class"
+        },
+        "inappropriate-intimacy": {
+          "message": "{{className}} 暴露過多公共欄位 ({{count}} 個)，破壞封裝性",
+          "name": "不恰當的親密",
+          "suggestion": "將 public 欄位改為 private，通過 getter/setter 訪問"
+        },
+        "large-class": {
+          "issue": {
+            "lines": "{{lines}} 行 (閾值 {{threshold}})",
+            "methods": "{{methods}} 個方法 (閾值 {{threshold}})"
+          },
+          "message": "{{className}} 過大 ({{issues}})，建議按職責拆分",
+          "name": "上帝物件/大類",
+          "suggestion": "將 {{className}} 按職責拆分為多個類，每個類聚焦單一職責"
+        },
+        "lazy-class": {
+          "message": "{{className}} 太小 ({{lines}} 行，{{methods}} 個方法)，可能不值得作為獨立類",
+          "name": "冗餘類",
+          "suggestion": "將功能合併到呼叫它的類中，或直接移除"
+        },
+        "long-method": {
+          "issue": {
+            "complexity": "圈複雜度 {{complexity}} (閾值 {{threshold}})",
+            "lines": "{{lines}} 行 (閾值 {{threshold}})"
+          },
+          "message": "{{container}}{{name}} 過大 ({{issues}})，建議拆分為更小的函式",
+          "name": "超大函式 (R01)",
+          "suggestion": "將 {{container}}{{name}} 按職責拆分為多個小函式，每個不超過 {{threshold}} 行"
+        },
+        "long-parameter-list": {
+          "message": "{{container}} 引數過多 ({{count}} 個，閾值 {{threshold}})，建議封裝為引數物件",
+          "name": "過長引數 (R03)",
+          "suggestion": "將 {{count}} 個引數封裝為一個 interface/type 引數物件"
+        },
+        "message-chains": {
+          "message": "{{target}} 存在鏈式呼叫: {{chains}}",
+          "name": "訊息鏈",
+          "suggestion": "將鏈式呼叫封裝為委託方法，降低呼叫方與被呼叫方的耦合"
+        },
+        "middle-man": {
+          "message": "{{className}} 大部分方法只是委託呼叫 ({{delegating}} 次委託 / {{total}} 個方法)",
+          "name": "中間人",
+          "suggestion": "考慮移除中間層，讓呼叫方直接使用委託目標"
+        },
+        "mixed-responsibilities": {
+          "message": {
+            "function": "{{target}} 混合了約 {{count}} 個職責",
+            "method": "{{target}} 混合了約 {{count}} 個職責 (閾值 {{threshold}})，建議拆分為獨立函式"
+          },
+          "name": "多職責混合 (R04)",
+          "suggestion": {
+            "function": "按職責將函式拆分為多個獨立函式",
+            "method": "按註釋分割槽 / 空行分隔 / try/catch 邊界將方法拆分為多個獨立函式"
+          }
+        },
+        "oversized-component": {
+          "issue": {
+            "handlers": "{{handlers}} 個事件處理函式",
+            "jsxDepth": "JSX 巢狀 {{depth}} 層",
+            "lines": "{{lines}} 行程式碼"
+          },
+          "message": "元件過大 ({{issues}})，建議拆分為子元件",
+          "name": "超大元件 (R11)",
+          "suggestion": "將 UI 部分拆分為子元件，將狀態邏輯提取為自定義 Hook"
+        },
+        "oversized-file": {
+          "issue": {
+            "exports": "{{exports}} 個頂層匯出 (閾值 {{threshold}})",
+            "linesCode": "{{lines}} 行程式碼 (閾值 {{threshold}})"
+          },
+          "message": "檔案過大 ({{issues}})，建議按功能拆分",
+          "name": "超大檔案 (R02)",
+          "suggestion": "按功能領域將檔案拆分為多個檔案，每個檔案聚焦單一職責"
+        },
+        "primitive-obsession": {
+          "message": "{{className}} 使用過多原始型別 ({{count}} 個欄位)，建議為相關欄位建立值物件",
+          "name": "基本型別偏執",
+          "suggestion": "將相關原始型別欄位封裝為值物件（Value Object）"
+        },
+        "refused-bequest": {
+          "message": "{{className}} 繼承自 {{superClass}} 但幾乎沒有新增新成員 ({{methods}} 方法, {{fields}} 欄位)，可能不需要繼承",
+          "name": "拒絕繼承",
+          "suggestion": "用組合 (Composition) 替換繼承，減少繼承層次"
+        },
+        "shotgun-surgery": {
+          "message": {
+            "publicMethods": "{{className}} 有 {{count}} 個公共方法，修改某個功能可能需要改動多個方法",
+            "sharedLiterals": "字串 \"{{literal}}\" 在 {{count}} 個檔案中出現，建議提取為共享常量"
+          },
+          "name": "霰彈修改 (R09)",
+          "suggestion": {
+            "publicMethods": "按職責將類拆分為更小的類，減少修改波及範圍",
+            "sharedLiterals": "將 \"{{literal}}\" 提取為共享常量檔案，集中管理一處修改"
+          }
+        },
+        "switch-statement": {
+          "message": "{{target}} 使用 {{count}} 處 switch 語句，建議用多型替代",
+          "name": "Switch 語句",
+          "suggestion": "用策略模式或多型替換 switch/if-else if 鏈"
+        }
+      },
+      "warn": {
+        "detectorFailed": "檢測器 {{name}} 執行失敗: {{error}}",
+        "dirAccessFailed": "無法訪問目錄 {{dir}}: {{error}}",
+        "gitDiffFailed": "Git diff 失敗: {{error}}",
+        "parseFailed": "無法解析 {{count}} 個檔案 (如: {{example}})"
+      }
+    },
+    "remoteCleanUnsupported": "遠端模式暫不支援本地清理",
+    "remoteRestoreUnsupported": "遠端模式暫不支援恢復",
+    "scoring": {
+      "insight": {
+        "decliningDimensions": "需要關注的維度: {{dimensions}}",
+        "empty": "暫無歷史資料，無法生成趨勢分析",
+        "health": {
+          "a": "專案健康度優秀（A 級），保持當前實踐",
+          "b": "專案健康度良好（B 級），有提升空間",
+          "c": "專案健康度一般（C 級），建議關注薄弱環節",
+          "d": "專案健康度較差（D 級），需要立即改進"
+        },
+        "streak": {
+          "count": "{{direction}}已持續 {{count}} 次評估",
+          "declining": "連續退化",
+          "improving": "連續改善",
+          "stable": "保持穩定"
+        },
+        "velocity": {
+          "declining": "評分持續下降（速度 {{velocity}}/次），需要關注",
+          "rising": "評分上升趨勢明顯（速度 +{{velocity}}/次）"
+        },
+        "volatility": {
+          "high": "評分波動較大，說明改進不穩定",
+          "low": "評分變化平穩，專案狀態穩定"
+        }
+      }
+    },
+    "security": {
+      "auditFailed": "audit 命令執行失敗: {{error}}",
+      "auditInvalidOutput": "audit 輸出不是合法 JSON",
+      "fixSoon": "請儘快修復",
+      "garbage": {
+        "batchMissingOrCorrupt": "回收站批次不存在或已損壞: {{batchId}}",
+        "fileMissingOrNotFile": "{{path}}（檔案不存在或非普通檔案）",
+        "pathOutOfBounds": "{{path}}（路徑越界，已拒絕）",
+        "restoreDestinationConflict": "{{path}}（原位置已有檔案，已跳過）",
+        "restoreOutOfBounds": "{{path}}（路徑越界，已拒絕恢復）",
+        "trashFileMissing": "{{path}}（回收站檔案缺失）",
+        "trashNameConflict": "{{path}}（回收站已存在同名檔案）",
+        "typeNotAutoCleanable": "{{path}}（{{type}} 型別不可自動清理）"
+      },
+      "knownMaliciousNpmTitle": "已知惡意 npm 包（供應鏈投毒黑名單）",
+      "knownMaliciousPypiTitle": "已知惡意 PyPI 包（供應鏈投毒黑名單）",
+      "meta": {
+        "depcheck": "未使用依賴檢測",
+        "grype": "依賴漏洞交叉複核",
+        "ort": "許可證合規掃描",
+        "semgrep": "自定義安全 SOP 規則掃描",
+        "trivy": "依賴/檔案/構建產物/映象漏洞掃描"
+      },
+      "ortEvaluateLicense": "評估 {{package}} 的許可證 {{licenses}} 是否與專案相容",
+      "ortRestrictedLicense": "{{package}} 使用了需要關注的許可證: {{licenses}}",
+      "referencedBlacklistPackage": "{{file}} 引用了黑名單包 {{name}}",
+      "supplyChainThreat": "檢測到供應鏈威脅：{{name}}",
+      "suspectedTyposquatTitle": "疑似仿冒包（typosquatting）",
+      "tool": {
+        "depcheckExecFailed": "depcheck 執行失敗",
+        "depcheckNotInstalled": "depcheck 未安裝",
+        "grypeExecFailed": "Grype 執行失敗",
+        "grypeNotInstalled": "Grype 未安裝",
+        "ortExecFailed": "ORT 執行失敗",
+        "ortNotInstalled": "ORT 未安裝",
+        "semgrepExecFailed": "Semgrep 執行失敗",
+        "semgrepNotInstalled": "Semgrep 未安裝或未在 PATH 中找到",
+        "semgrepRulesDirMissing": "Semgrep 規則目錄不存在，請先同步雲腦規則",
+        "trivyExecFailed": "Trivy 執行失敗",
+        "trivyNotInstalled": "Trivy 未安裝，請執行 trivy 安裝命令"
+      },
+      "typosquatEvidence": "包名 {{name}} 與流行包 {{popular}} 編輯距離為 {{distance}}"
+    },
+    "toolchain": {
+      "license": {
+        "ortRedistributionNote": "傳遞依賴需審計",
+        "semgrepRedistributionNote": "Python 執行時依賴需審查更新通道（不自更新）",
+        "trivyRedistributionNote": "子程式呼叫不修改可分發；內建安裝包需法務審查 + 許可宣告"
+      }
+    },
+    "unknownProject": "未知專案"
+  },
+  "layout": {
+    "about": "關於",
+    "aboutVersion": "智匯碼盾 {{version}}",
+    "addProject": "新增專案",
+    "aiTool": "AI 工具",
+    "aiToolDesc": "Linter 協議 · 診斷監聽",
+    "aiToolEnableHintPrefix": "啟用後向專案寫入 ",
+    "aiToolEnableHintSuffix": " 與 OpenCode 命令檔案，AI 可自動讀取診斷並修復",
+    "aiToolEnabled": "已啟用：檢查結果將寫入 .zhshield/diagnostics/",
+    "aiToolToggle": "切換 OpenCode 整合",
+    "brandName": "智匯碼盾",
+    "brandSlogan": "程式碼界的智慧衛士",
+    "cancelTask": "取消任務",
+    "collapseSidebar": "收回側邊欄",
+    "deleteProject": "刪除專案 {{name}}",
+    "engineBusy": "引擎忙碌：{{count}} 個任務進行中",
+    "engineIdle": "引擎執行中",
+    "engineOn": "智慧引擎已開啟",
+    "engineStatus": "引擎狀態",
+    "expandSidebar": "展開側邊欄",
+    "language": "語言管理",
+    "noProject": "未新增專案",
+    "noProjects": "暫無專案",
+    "projectManagement": "專案管理",
+    "queuePosition": "（排隊 {{position}}）",
+    "removeProjectMessage1": "確定要從守護列表移除「{{name}}」嗎？",
+    "removeProjectMessage2": "僅移除專案記錄，不會刪除專案檔案。",
+    "removeProjectTitle": "移除專案",
+    "sidebarTitle": "設定",
+    "subprocessIsolation": "重掃任務已隔離至子程式（避免介面卡頓）",
+    "taskKind": {
+      "garbageClean": "垃圾清理",
+      "garbageRestore": "回收站恢復",
+      "guard": "門禁掃描",
+      "inspect": "質量巡檢",
+      "performance": "最佳化加速",
+      "pipeline": "一鍵體檢",
+      "refactor": "程式碼重構",
+      "security": "安全掃描"
+    },
+    "taskStatus": {
+      "cancelled": "已取消",
+      "done": "已完成",
+      "failed": "失敗",
+      "queued": "排隊中",
+      "running": "執行中"
+    },
+    "theme": "主題管理",
+    "themeDracula": "墨紫黑",
+    "themeLegacy": "經典深綠",
+    "themeTeal": "青藍",
+    "toolsDegraded": "外部工具降級：缺少 {{tools}}",
+    "toolsPathHint": "安裝到系統 PATH 後可消除此提示"
+  },
+  "lifecycle": {
+    "archive": "歸檔",
+    "detect": "發現",
+    "fix": "修復",
+    "validate": "驗證"
+  },
+  "mcp": {
+    "categoryFilterDesc": "按類別過濾（如 performance / security / quality / architecture）",
+    "cliNotFound": "未找到 zhshield CLI，請先執行 pnpm build",
+    "commandDoneNoOutput": "{{command}} 完成（無輸出）",
+    "commandFailed": "{{command}} 執行失敗",
+    "diagnosticsUnparseable": "診斷檔案無法解析",
+    "fileNotFound": "檔案不存在: .zhshield/{{relativePath}}",
+    "getDiagnosticsDesc": "讀取智匯碼盾最近一次體檢的診斷結果（.zhshield/diagnostics/latest.json）",
+    "getIntegrationDesc": "讀取智匯碼盾的整合配置（.zhshield/integration.json），含自動觸發、過濾器、自動修復等設定",
+    "getIssuesDesc": "獲取智匯碼盾最近一次體檢的 issues（支援按嚴重等級/類別/來源過濾），返回 {ok,total,issues} JSON",
+    "guardProjectPathDesc": "要檢查的專案根目錄",
+    "guardSopModeDesc": "使用 SOP 規則驅動模式",
+    "inspectProjectPathDesc": "要巡檢的專案根目錄",
+    "projectPathDesc": "專案根目錄；預設為當前工作目錄",
+    "runGuardDesc": "觸發智匯碼盾門禁檢查（呼叫 zhshield guard --dry-run），以只報告不阻斷模式檢查程式碼",
+    "runInspectDesc": "觸發智匯碼盾巡檢（呼叫 zhshield inspect），掃描程式碼質量問題並返回報告",
+    "severityFilterDesc": "按嚴重等級過濾",
+    "sopModeDesc": "使用 SOP 規則驅動模式（預設 checks.json 模式）",
+    "sourceFilterDesc": "按來源引擎過濾"
+  },
+  "nav": {
+    "backup": "備份中心",
+    "dashboard": "專案體檢",
+    "deps": "依賴盤點",
+    "evolve": "規則進化",
+    "garbage": "垃圾清理",
+    "guard": "門禁檢查",
+    "inspect": "智慧巡檢",
+    "performance": "效能優化",
+    "refactor": "程式碼重構",
+    "reports": "報告中心",
+    "security": "安全掃描",
+    "sentinel": "哨兵監控",
+    "techdebt": "技術債務"
+  },
+  "page": {
+    "backup": {
+      "backingUp": "備份中...",
+      "deleteMessage": "確定要刪除這條備份記錄嗎？此操作不可撤銷。",
+      "deleteTitle": "刪除備份記錄",
+      "detail": {
+        "backupId": "備份 ID：{{id}}",
+        "commit": "提交：{{hash}}",
+        "error": "錯誤：{{error}}",
+        "fileCount": "檔案數：{{count}}",
+        "github": "GitHub：",
+        "localPath": "本地路徑：{{path}}",
+        "size": "大小：{{size}}",
+        "trigger": "觸發方式：{{mode}}"
+      },
+      "empty": {
+        "feature": {
+          "config": {
+            "desc": "備份掃描規則、專案配置與環境設定",
+            "title": "配置備份"
+          },
+          "restore": {
+            "desc": "從備份記錄快速恢復環境與配置",
+            "title": "資料恢復"
+          },
+          "rules": {
+            "desc": "匯出自定義規則集，防止規則丟失",
+            "title": "規則備份"
+          },
+          "sync": {
+            "desc": "定時備份到本地安全目錄，降低丟失風險",
+            "title": "自動同步"
+          }
+        },
+        "lastBackup": "上次備份：{{date}}",
+        "title": "保護重要配置，資料永不丟失"
+      },
+      "noRecords": "暫無備份記錄",
+      "oneClickBackup": "一鍵備份",
+      "openFolder": "打開資料夾",
+      "recordCount": "{{count}} 條備份記錄",
+      "recordsTitle": "備份記錄",
+      "result": {
+        "duration": "{{time}} · 耗時 {{duration}}ms"
+      },
+      "status": {
+        "failed": "失敗",
+        "partial": "部分成功",
+        "success": "成功"
+      },
+      "title": "資料備份",
+      "toast": {
+        "completed": "備份完成: {{status}}",
+        "deleteFailed": "刪除失敗",
+        "deleted": "備份記錄已刪除",
+        "failed": "備份執行失敗",
+        "success": "備份成功"
+      },
+      "trigger": {
+        "manual": "手動",
+        "schedule": "定時"
+      },
+      "type": {
+        "full": "全部",
+        "githubOnly": "僅 GitHub",
+        "localOnly": "僅本地"
+      }
+    },
+    "dashboard": {
+      "autoFix": "🤖 自動修復",
+      "axis": {
+        "governance": {
+          "desc": "把控程式碼質量與規範",
+          "label": "治理"
+        },
+        "ops": {
+          "desc": "保障專案長期健康執行",
+          "label": "運維"
+        },
+        "security": {
+          "desc": "守護程式碼與供應鏈安全",
+          "label": "安全"
+        }
+      },
+      "check": "一鍵體檢",
+      "copy": {
+        "guardSource": "門禁·預防",
+        "inspectSource": "巡檢"
+      },
+      "feature": {
+        "backup": {
+          "desc": "一鍵備份配置和規則，防止資料丟失"
+        },
+        "inspect": {
+          "desc": "定期檢查程式碼質量、檔案、依賴健康度"
+        },
+        "performance": {
+          "desc": "發現執行時效能反模式，最佳化執行效率"
+        },
+        "refactor": {
+          "desc": "檢測程式碼異味，消除技術債務"
+        },
+        "reports": {
+          "desc": "檢視歷史檢查報告和健康趨勢"
+        },
+        "security": {
+          "desc": "漏洞、敏感資訊、惡意程式碼一鍵排查"
+        }
+      },
+      "guardSlogan": "智慧衛士：安全 · 治理 · 運維",
+      "productIntro": {
+        "subtitle": "以安全、治理、運維為核心，守護每一行程式碼",
+        "title": "程式碼界的智慧衛士"
+      },
+      "progress": "進度 {{progress}}%",
+      "result": {
+        "allPassed": "已執行的檢查項均通過。若跳過項較多，可安裝 ESLint / Semgrep 等工具後重新體檢以獲得更完整結果。",
+        "backHome": "返回首頁",
+        "header": {
+          "configureHint": "門禁檢查與哨兵監控請在頂部對應入口單獨配置開關。",
+          "coverage": "本次覆蓋質量巡檢 {{inspectTotal}} 項。",
+          "failed": "體檢發現問題",
+          "passed": "一鍵體檢完成",
+          "skipped": "其中 {{skipped}} 項因工具未安裝已跳過。"
+        },
+        "issuesTitle": "需關注的問題",
+        "rerun": "再次體檢",
+        "scopeTitle": "本次體檢範圍",
+        "stage": {
+          "guard": "門禁",
+          "inspect": "巡檢"
+        },
+        "stats": {
+          "issues": "問題",
+          "passed": "通過",
+          "skipped": "跳過",
+          "total": "檢查項"
+        }
+      },
+      "ring": {
+        "healthScore": "健康分",
+        "notChecked": "尚未體檢"
+      },
+      "running": "體檢進行中…",
+      "sanitize": {
+        "autoFixStarted": "已啟動 OpenCode 自動修復",
+        "autoFixing": "自動修復中…",
+        "done": "體檢完成",
+        "guarding": "門禁檢查中…",
+        "inspecting": "質量巡檢中…",
+        "loadingRules": "載入體檢規則…"
+      },
+      "scope": {
+        "inspect": "質量巡檢",
+        "item": {
+          "complexity": "程式碼複雜度/規範",
+          "deps": "依賴審計",
+          "docs": "檔案完整性",
+          "nest": "Nest/模組規範",
+          "tsType": "TypeScript 型別安全"
+        }
+      },
+      "stageGuard": "· 門禁",
+      "stageInspect": "· 巡檢",
+      "toast": {
+        "addProjectFirst": "請先新增要體檢的專案",
+        "completed": "體檢完成：{{total}} 項檢查，{{passed}} 項通過",
+        "copiedIssues": "已複製 {{count}} 條問題，可貼上到 AI 修復",
+        "copyFailed": "複製失敗",
+        "executionFailed": "體檢執行失敗",
+        "failed": "體檢執行失敗: {{error}}",
+        "foundIssues": "體檢完成：發現 {{count}} 項問題",
+        "noValidItems": "體檢完成，但未執行到有效檢查項（請確認專案路徑）"
+      },
+      "welcome": "歡迎使用智匯碼盾"
+    },
+    "deps": {
+      "checking": "盤點中...",
+      "done": "依賴盤點完成",
+      "ecosystem": "生態",
+      "empty": {
+        "start": "開始盤點",
+        "subtitle": "解析鎖檔案與依賴清單，繪製依賴圖譜並校驗完整性",
+        "title": "盤點依賴，看清圖譜"
+      },
+      "errorTitle": "盤點失敗",
+      "feature": {
+        "graph": {
+          "desc": "直接 / 傳遞依賴與邊關係一目瞭然",
+          "title": "依賴圖譜"
+        },
+        "license": {
+          "desc": "四類許可分類與高風險清單",
+          "title": "許可證矩陣"
+        },
+        "lockfile": {
+          "desc": "存在性 / 一致性 / 雜湊完整性三重核驗",
+          "title": "鎖檔案校驗"
+        }
+      },
+      "license": "許可證矩陣",
+      "license.permissive": "寬鬆許可",
+      "license.risk.high": "高風險",
+      "license.risk.low": "低風險",
+      "license.risk.medium": "中風險",
+      "license.risk.unknown": "風險未知",
+      "license.strongCopyleft": "強左版",
+      "license.unknown": "未知許可",
+      "license.weakCopyleft": "弱左版",
+      "licenseHighRisk": "高風險清單",
+      "licenseNoRisks": "未發現高風險許可",
+      "licenseTotal": "共 {{count}} 個許可證",
+      "lockfile": "鎖檔案狀態",
+      "lockfile.consistent": "與清單宣告一致",
+      "lockfile.integrityFailed": "雜湊校驗失敗",
+      "lockfile.integrityVerified": "雜湊校驗通過",
+      "lockfile.notConsistent": "與清單宣告不一致",
+      "lockfile.notPresent": "鎖檔案缺失",
+      "lockfile.present": "鎖檔案存在且可解析",
+      "overview": "依賴總覽",
+      "overviewDirect": "直接依賴",
+      "overviewEdges": "依賴邊數",
+      "overviewTotal": "依賴總數",
+      "overviewTransitive": "傳遞依賴",
+      "rescan": "重新盤點",
+      "summary": "{{direct}} 直接依賴 · {{transitive}} 傳遞依賴 · {{edges}} 條依賴邊",
+      "trust": "信任狀態",
+      "trust.compromised": "已失陷",
+      "trust.suspicious": "可疑",
+      "trust.unknown": "未知",
+      "trust.verified": "已信任"
+    },
+    "evolve": {
+      "analyze": "架構分析",
+      "archScore": "架構健康度",
+      "empty": {
+        "feature": {
+          "coupling": {
+            "desc": "識別高耦合模組與迴圈依賴",
+            "title": "耦合度分析"
+          },
+          "directory": {
+            "desc": "評估包目錄劃分與邊界合理性",
+            "title": "目錄結構"
+          },
+          "graph": {
+            "desc": "視覺化模組引用關係與層級結構",
+            "title": "依賴圖譜"
+          },
+          "suggest": {
+            "desc": "給出架構拆分、收斂與最佳化方向",
+            "title": "演進建議"
+          }
+        },
+        "subtitle": "架構健康度評分：--",
+        "title": "洞察專案架構，規劃演進路徑"
+      },
+      "emptyAnalyzing": "正在分析專案架構...",
+      "emptyDone": "分析完成，暫無需調整的規則",
+      "emptyHint": "在門禁檢查或哨兵監控中，將誤報問題標記反饋後，演進引擎會自動校準規則權重並生成最佳化建議。",
+      "header": {
+        "count": "{{suggestions}} 條最佳化建議 · {{weights}} 條追蹤規則"
+      },
+      "stats": {
+        "adjusted": "已調權",
+        "highFp": "高誤報",
+        "suggestions": "最佳化建議",
+        "weights": "追蹤規則"
+      },
+      "suggestion": {
+        "confidence": "置信度: {{confidence}}%"
+      },
+      "title": "演進引擎",
+      "weight": {
+        "fpRate": "誤報率: {{rate}}%",
+        "samples": "樣本: {{samples}}"
+      },
+      "weights": "規則權重"
+    },
+    "garbage": {
+      "cleanButton": "一鍵清理",
+      "cleanButtonCount": "一鍵清理 ({{count}})",
+      "cleanFailed": "清理失敗，請重試",
+      "cleanFailedCount": "{{count}} 項未能清理（路徑越界 / 檔案佔用等）",
+      "cleaned": "已清理 {{count}} 項 · 釋放 {{size}}",
+      "cleaning": "清理中...",
+      "dependencyHint": "未用依賴不自動刪除，確認無引用後可從 package.json 手動移除",
+      "done": "垃圾清理完成",
+      "empty": {
+        "subtitle": "掃描未使用檔案、冗餘依賴與死程式碼",
+        "title": "清理無用檔案，為專案減負"
+      },
+      "emptyList": "專案很乾淨，沒有可清理的垃圾",
+      "feature": {
+        "deadCode": {
+          "desc": "檢測無法到達的程式碼分支"
+        },
+        "duplicateCode": {
+          "desc": "定位可合併的重複實現"
+        },
+        "unusedDependency": {
+          "desc": "找出清單中未被引用的依賴包"
+        },
+        "unusedFile": {
+          "desc": "識別未引用的資源與殘留檔案"
+        }
+      },
+      "rescan": "重新掃描",
+      "restore": "恢復",
+      "restoreFailed": "恢復失敗，請重試",
+      "restoreFailedCount": "{{count}} 項恢復失敗（原位置可能已存在檔案）",
+      "restored": "已恢復 {{count}} 項 · {{size}}，清單已重新整理",
+      "restoring": "恢復中...",
+      "scanning": "掃描中...",
+      "selectAll": "全選",
+      "selectedCount": "已選 {{count}} 項",
+      "startScan": "開始掃描",
+      "stats": {
+        "freeable": "可釋放空間",
+        "items": "垃圾項"
+      },
+      "summary": "{{count}} 項垃圾 · 可釋放 {{size}}",
+      "type": {
+        "deadCode": "死程式碼",
+        "duplicateCode": "重複程式碼",
+        "unusedDependency": "未用依賴",
+        "unusedFile": "無用檔案"
+      }
+    },
+    "guard": {
+      "banner": {
+        "fail": "門禁攔截 · 有未通過項",
+        "pass": "門禁正常 · 守護中",
+        "warn": "存在警告 · 需關注"
+      },
+      "blockedCount": "攔截 {{count}}",
+      "blockingCount": "{{count}} 次攔截",
+      "checkCount": "檢查 {{count}} 項",
+      "copiedAll": "已複製全部 {{count}} 條問題，可貼上到 AI 修復",
+      "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
+      "duration": "掃描耗時 {{duration}}ms",
+      "falsePositiveCount": "誤報反饋 {{count}} 條",
+      "falsePositiveSubmitted": "已提交誤報反饋，將用於校準規則",
+      "history": {
+        "subtitle": "hook 自動觸發 + 手動掃描落庫",
+        "title": "最近攔截記錄"
+      },
+      "idleSubtitle": "即時守護程式碼變更，在提交/推送/CI 關卡自動攔截",
+      "lastBlockAt": "最近 {{time}}",
+      "lastScan": "上次掃描 · {{time}}",
+      "level": {
+        "L3": "CI 門禁"
+      },
+      "markFalsePositive": "標記誤報",
+      "reportFailed": "提交失敗",
+      "scan": "立即掃描",
+      "scanning": "掃描中...",
+      "source": "門禁·預防",
+      "stats": {
+        "blocked": "攔截",
+        "passed": "通過",
+        "totalChecks": "檢查項",
+        "warnings": "警告"
+      },
+      "status": {
+        "fail": "攔截",
+        "idle": "未觸發",
+        "pass": "通過",
+        "warn": "警告"
+      },
+      "statusShort": {
+        "fail": "門禁攔截",
+        "idle": "守護中",
+        "pass": "門禁正常",
+        "warn": "存在警告"
+      },
+      "table": {
+        "colCheck": "檢查項",
+        "colDetail": "詳情",
+        "colResult": "結果",
+        "colSeverity": "嚴重等級"
+      },
+      "trigger": {
+        "manual": "手動掃描",
+        "preCommit": "提交門禁",
+        "prePush": "推送門禁"
+      },
+      "warningCount": "警告 {{count}}"
+    },
+    "inspect": {
+      "checksPassed": "檢查通過",
+      "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
+      "done": "巡檢完成",
+      "empty": {
+        "subtitle": "每日 0 點後自動巡檢構建產物、License、依賴與垃圾清理，也可點選馬上巡檢",
+        "title": "檢查構建產物，確保交付質量"
+      },
+      "feature": {
+        "build": {
+          "desc": "校驗 dist 產物規範、完整性及輸出目錄",
+          "title": "構建產物檢查"
+        },
+        "dependency": {
+          "desc": "檢測冗餘、未使用及版本衝突依賴",
+          "title": "依賴分析"
+        },
+        "garbage": {
+          "desc": "發現並清理臨時檔案、快取與無用產物",
+          "title": "垃圾清理"
+        },
+        "license": {
+          "desc": "識別開源許可證相容性與合規風險",
+          "title": "License 掃描"
+        }
+      },
+      "passedCount": "{{passed}}/{{total}} 項通過",
+      "scanNow": "馬上巡檢",
+      "scanning": "巡檢中...",
+      "source": "巡檢",
+      "status": {
+        "fail": "失敗",
+        "pass": "通過",
+        "warn": "警告"
+      }
+    },
+    "performance": {
+      "autoFixable": "可自動修復",
+      "copyAllHint": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
+      "detecting": "檢測中...",
+      "header": {
+        "issueCount": "{{count}} 處效能問題",
+        "title": "效能檢測完成"
+      },
+      "noIssues": "未發現效能問題",
+      "rescan": "重新檢測",
+      "scanning": "效能檢測中...",
+      "score": {
+        "fixable": "可修復 {{count}}",
+        "health": "效能健康度"
+      },
+      "severity": {
+        "high": "高優",
+        "low": "低優",
+        "medium": "中優"
+      },
+      "shell": {
+        "featureComplexity": {
+          "desc": "檢測低效迴圈、巢狀遍歷與冗餘計算",
+          "title": "執行時複雜度"
+        },
+        "featureModernApi": {
+          "desc": "推薦 .at、spread 等高效能寫法替代舊 API",
+          "title": "現代化 API"
+        },
+        "featureReDoS": {
+          "desc": "識別正規表示式災難性回溯風險",
+          "title": "ReDoS 檢測"
+        },
+        "featureTimer": {
+          "desc": "檢測 setTimeout / setInterval 濫用與記憶體洩漏",
+          "title": "定時器最佳化"
+        },
+        "start": "開始效能檢測",
+        "subtitle": "掃描低效陣列遍歷、正則重複編譯、冗餘分配等效能問題",
+        "title": "檢測執行時效能反模式，最佳化執行效率"
+      },
+      "source": "效能",
+      "suggestion": "建議：{{suggestion}}"
+    },
+    "refactor": {
+      "addProjectFirst": "請先在儀表盤新增專案",
+      "groupedIssues": "重構問題（按型別分組）",
+      "groupsSummary": "{{groups}} 類 · {{total}} 處",
+      "header": {
+        "lastAutoCheck": " · 上次自動檢查 {{time}}",
+        "summary": "{{totalSmells}} 處異味 · {{files}} 個檔案待重構",
+        "title": "重構分析完成"
+      },
+      "noSmells": "✓ 未檢測到程式碼異味",
+      "scanFailed": "掃描失敗: {{message}}",
+      "scanNow": "馬上檢查",
+      "scanning": "掃描中...",
+      "scanningEllipsis": "重構掃描中…",
+      "severity": {
+        "error": "阻斷",
+        "warning": "建議"
+      },
+      "shell": {
+        "featureAutoFix": {
+          "desc": "一鍵應用推薦重構方案，減少技術債務",
+          "title": "自動修復"
+        },
+        "featureDaily": {
+          "desc": "每天 0 點後自動掃描，持續跟蹤程式碼質量",
+          "title": "每日自動檢查"
+        },
+        "featureGrouping": {
+          "desc": "按類別檢視不同重構問題與修復建議",
+          "title": "規則分組"
+        },
+        "featureSmell": {
+          "desc": "檢測重複程式碼、過長函式、高圈複雜度等問題",
+          "title": "程式碼異味"
+        },
+        "subtitle": "每日自動檢查程式碼重複、程式碼異味、過長函式等，一鍵應用推薦重構方案",
+        "title": "最佳化程式碼結構，消除技術債務"
+      },
+      "smell": {
+        "callbackHell": "回撥地獄",
+        "dataClass": "資料類",
+        "dataClumps": "資料泥團",
+        "deepNesting": "深層巢狀",
+        "duplicatedCode": "重複程式碼",
+        "featureEnvy": "依戀情結",
+        "godObject": "上帝物件",
+        "inappropriateIntimacy": "不恰當的親密",
+        "largeClass": "上帝物件/大類",
+        "lazyClass": "冗餘類",
+        "longMethod": "超大函式",
+        "longParameterList": "過長引數",
+        "messageChains": "訊息鏈",
+        "middleMan": "中間人",
+        "mixedResponsibilities": "多職責混合",
+        "oversizedComponent": "超大元件",
+        "oversizedFile": "超大檔案",
+        "primitiveObsession": "基本型別偏執",
+        "refusedBequest": "拒絕繼承",
+        "shotgunSurgery": "霰彈修改",
+        "switchStatement": "Switch 語句"
+      },
+      "smellCount": "{{count}} 處",
+      "source": "重構",
+      "stats": {
+        "files": "需重構檔案",
+        "highPriority": "高優先順序",
+        "smells": "程式碼異味"
+      },
+      "suggestion": "建議: {{suggestion}}"
+    },
+    "reports": {
+      "empty": {
+        "feature": {
+          "email": {
+            "desc": "將報告一鍵傳送給團隊成員",
+            "title": "郵件傳送"
+          },
+          "pdf": {
+            "desc": "生成可分享的專業質量報告",
+            "title": "PDF 匯出"
+          },
+          "scoring": {
+            "desc": "彙總安全、效能、質量、架構健康得分",
+            "title": "多維度評分"
+          },
+          "trend": {
+            "desc": "追蹤歷次掃描評分變化曲線",
+            "title": "趨勢對比"
+          }
+        },
+        "subtitle": "已生成 {{count}} 份報告，最近更新於 {{date}}",
+        "title": "多維度分析報告，決策更有依據"
+      },
+      "generate": "生成報告",
+      "header": {
+        "count": "共 {{count}} 份報告 · 最近更新於 {{date}}",
+        "generate": "📊 生成報告"
+      },
+      "scoreLabel": {
+        "danger": "危險",
+        "excellent": "優秀",
+        "good": "良好",
+        "needsImprovement": "待改進"
+      },
+      "table": {
+        "abnormal": "異常",
+        "col": {
+          "date": "日期",
+          "dimension": "維度",
+          "score": "評分",
+          "status": "狀態",
+          "summary": "摘要"
+        },
+        "healthy": "健康"
+      },
+      "title": "分析報告"
+    },
+    "security": {
+      "checking": "檢查中...",
+      "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
+      "done": "安全檢查完成",
+      "empty": {
+        "subtitle": "已檢查 0 個檔案，發現 0 個高危漏洞",
+        "title": "深度掃描漏洞，修復安全隱患"
+      },
+      "feature": {
+        "dependency": {
+          "desc": "識別存在已知 CVE 的過期或不安全依賴",
+          "title": "依賴檢查"
+        },
+        "malware": {
+          "desc": "掃描反彈Shell、後門、供應鏈投毒等惡意程式碼特徵"
+        },
+        "standard": {
+          "desc": "校驗安全編碼規範與合規基線",
+          "title": "規範檢查"
+        },
+        "vuln": {
+          "desc": "檢測程式碼注入、XSS、SSRF 等常見安全漏洞"
+        }
+      },
+      "fixAll": "一鍵修復",
+      "lowRisk": "低風險 {{count}}",
+      "malware": {
+        "backdoor": "後門",
+        "cryptoRansomware": "勒索病毒",
+        "dataExfiltration": "資料外洩",
+        "privilegeEscalation": "許可權提升",
+        "reverseShell": "反彈Shell",
+        "supplyChain": "供應鏈投毒",
+        "suspiciousBehavior": "可疑行為"
+      },
+      "malwareCount": "惡意程式碼 {{count}}",
+      "noFindings": "未發現安全問題",
+      "noMalware": "未發現惡意程式碼",
+      "recommendation": "建議：{{recommendation}}",
+      "rescan": "重新檢查",
+      "scoreLabel": "安全評分",
+      "source": "安全",
+      "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼 · {{garbage}} 項垃圾",
+      "tab": {
+        "malware": "病毒查殺",
+        "vuln": "漏洞掃描"
+      }
+    },
+    "sentinel": {
+      "aiFixSource": "哨兵·監控",
+      "copyAllHint": "共 {{count}} 個事件，可一鍵複製全部到 AI 修復",
+      "falsePositiveSubmitted": "已提交誤報反饋，將用於校準規則",
+      "headerSummary": "監控 {{count}} 個事件 · {{activeCount}} 個待處理",
+      "markFalsePositive": "標記誤報",
+      "occurrenceCount": "發生 {{count}} 次",
+      "refreshing": "重新整理中...",
+      "shell": {
+        "buttonRunning": "監控執行中",
+        "buttonStart": "啟動監控",
+        "featureAlert": {
+          "desc": "高危 / Critical 事件觸發通知提醒",
+          "title": "自動告警"
+        },
+        "featureHistory": {
+          "desc": "檢視過往異常明細與處理記錄",
+          "title": "歷史回溯"
+        },
+        "featureRealtime": {
+          "desc": "持續監聽程式碼變更，異常事件即時上報",
+          "title": "即時監控"
+        },
+        "featureScope": {
+          "desc": "自定義監聽檔案、目錄與規則範圍",
+          "title": "監控範圍"
+        },
+        "subtitleIdle": "當前監控 0 個檔案，點選下方按鈕啟動",
+        "subtitleMonitoring": "監控中（自動，7×24）——正在守護當前專案",
+        "titleIdle": "24小時無間斷監控，異常無所遁形",
+        "titleMonitoring": "監控已啟動，異常無所遁形"
+      },
+      "source": {
+        "backend": "後端",
+        "frontend": "前端",
+        "infrastructure": "基礎設施",
+        "middleware": "中介軟體"
+      },
+      "stackLabel": "堆疊",
+      "stats": {
+        "active": "待處理",
+        "falsePositive": "誤報反饋",
+        "total": "總事件"
+      },
+      "submitFailed": "提交失敗",
+      "type": {
+        "crash": "崩潰",
+        "frontendError": "前端錯誤",
+        "httpError": "HTTP 錯誤",
+        "memoryLeak": "記憶體洩漏",
+        "performanceDegradation": "效能下降",
+        "runtimeException": "執行時異常",
+        "securityIncident": "安全事件",
+        "timeout": "超時",
+        "whiteScreen": "白屏"
+      }
+    },
+    "techdebt": {
+      "byCategory": "債務構成",
+      "byModule": "債務分佈",
+      "category": {
+        "architecture": "架構問題",
+        "dependency": "依賴問題",
+        "duplication": "重複程式碼",
+        "quality": "質量問題",
+        "security": "安全問題"
+      },
+      "categoryDesc": {
+        "security": "安全漏洞 — 程式碼中存在的安全隱患，如未處理的異常、不安全的配置等",
+        "architecture": "架構問題 — 程式碼結構不合理，如循環依賴、模組耦合過高等",
+        "quality": "程式碼質量 — 不符合編碼規範，如過長函數、命名不規範等",
+        "duplication": "重複程式碼 — 相同或相似的程式碼片段，增加維護成本",
+        "dependency": "依賴問題 — 過時或存在風險的依賴包"
+      },
+      "categoryTotal": "共 {{count}} 個問題",
+      "categoryWeight": "權重 {{weight}}%",
+      "checking": "盤點中...",
+      "debtIndex": "債務指數",
+      "done": "技術債儀表盤",
+      "intro": {
+        "title": "債務構成說明"
+      },
+      "empty": {
+        "start": "開始盤點",
+        "subtitle": "分析掃描問題與模組熱度，估算利息與本金，按 ROI 排序給出償還建議",
+        "title": "量化技術債，把評分變成行動"
+      },
+      "errorTitle": "盤點失敗",
+      "factor": {
+        "density": "密度",
+        "exposure": "敞口",
+        "hotness": "熱度",
+        "severity": "嚴重度"
+      },
+      "feature": {
+        "action": {
+          "desc": "利息 ÷ 本金排序，聚焦高 ROI 行動",
+          "title": "償還建議"
+        },
+        "composition": {
+          "desc": "安全、架構、品質、重複、依賴五類債務詳解",
+          "title": "債務構成"
+        },
+        "index": {
+          "desc": "0-100 量化技術債總體負擔",
+          "title": "債務指數"
+        },
+        "module": {
+          "desc": "按模組與類別定位債務熱點",
+          "title": "債務分佈"
+        }
+      },
+      "interestBreakdown": "利息構成",
+      "interestScore": "利息 {{score}}",
+      "moduleHint": "模組名 · 佔比 · 改動次數",
+      "moduleHotness": "{{count}} 次改動",
+      "noDebt": "未發現技術債，繼續保持",
+      "overview": "債務總覽",
+      "overviewActions": "償還建議",
+      "overviewCategories": "債務類別",
+      "overviewModules": "債務模組",
+      "principalEstimate": "本金約 {{value}} 人天（估算）",
+      "recommended": "推薦",
+      "rescan": "重新盤點",
+      "roi": "ROI {{roi}}",
+      "status": {
+        "dismissed": "已忽略",
+        "inProgress": "進行中",
+        "pending": "待處理",
+        "planned": "已計劃",
+        "repaid": "已償還"
+      },
+      "source": "技術債",
+      "summary": "債務指數 {{index}} · {{actions}} 條償還建議",
+      "topActions": "Top 建議清單",
+      "topActionsHint": "按利息 ÷ 本金排序",
+      "trend": {
+        "better": "較上期改善 {{delta}}",
+        "flat": "與上期持平",
+        "period": {
+          "month": "近一月",
+          "quarter": "近一季度",
+          "week": "近一週"
+        },
+        "worse": "較上期惡化 {{delta}}"
+      },
+      "trendLabel": "債務趨勢"
+    },
+    "welcome": {
+      "addProject": "+ 新增專案，開啟守護",
+      "axis": {
+        "governance": "治理",
+        "ops": "運維",
+        "security": "安全"
+      },
+      "brand": "智匯碼盾",
+      "cloudOn": "智匯雲大腦已開啟",
+      "engineOn": "智慧引擎已開啟",
+      "sloganTitle": "程式碼界的智慧衛士",
+      "stat": {
+        "healthScore": "健康評分",
+        "protectedProjects": "已守護專案",
+        "times": "{{count}} 次",
+        "totalBlocked": "累計攔截"
+      }
+    }
+  },
+  "pipeline": {
+    "autofix": {
+      "started": "發現問題，已啟動 OpenCode 自動修復（{{errors}} error / {{warnings}} warning）"
+    },
+    "complete": {
+      "done": "體檢完成",
+      "foundIssues": "體檢發現 {{count}} 項問題",
+      "total": "體檢完成：{{count}} 項檢查"
+    },
+    "exitError": {
+      "logHintPrefix": "；子程式日誌: ",
+      "message": "引擎子程式異常退出 (code={{code}}, signal={{signal}})",
+      "stageHintPrefix": "，最後進度: "
+    },
+    "garbage": {
+      "cleaning": "清理垃圾檔案中…",
+      "done": "清理完成：{{count}} 項",
+      "restoreDone": "恢復完成：{{count}} 項",
+      "restoring": "恢復清理檔案中…"
+    },
+    "guard": {
+      "failed": "門禁未通過：{{count}} 項需處理",
+      "failedBrief": "門禁未通過：{{count}} 項",
+      "jobDone": "門禁掃描完成",
+      "jobScanning": "門禁掃描中…",
+      "scanning": "門禁檢查中…",
+      "sopScanning": "門禁檢查中（敏感資訊 / ESLint / 架構 / 安全）…"
+    },
+    "inspect": {
+      "fullScanning": "質量巡檢中…",
+      "jobDone": "巡檢完成",
+      "jobScanning": "智慧巡檢中…",
+      "sopScanning": "質量巡檢中（型別安全 / 依賴 / 規範）…"
+    },
+    "jobTimeout": "操作超時 ({{timeoutMs}}ms)",
+    "loadingRules": "載入體檢規則…",
+    "performance": {
+      "done": "效能檢測完成：發現 {{count}} 個效能問題",
+      "loadingRules": "載入效能檢測規則…",
+      "scanning": "效能巡檢中（ESLint 效能規則 / ReDoS）…"
+    },
+    "refactor": {
+      "analyzing": "重構異味分析中…",
+      "collecting": "正在收集原始碼檔案…",
+      "done": "重構分析完成：{{count}} 處異味"
+    },
+    "report": {
+      "executionError": "執行出錯",
+      "failed": "未通過",
+      "scopeGuard": "門禁檢查",
+      "scopeInspect": "質量巡檢",
+      "unknownRule": "未知規則"
+    },
+    "security": {
+      "done": "安全掃描完成",
+      "scanning": "安全掃描中…"
+    },
+    "shuttingDown": "應用正在退出",
+    "workerTimeout": "子程式啟動超時",
+    "workerUnavailable": "子程式不可用"
+  },
+  "reporter": {
+    "andMore": "... 及另外 {{count}} 項",
+    "blocking": "阻斷: {{value}}",
+    "blockingDryRun": "幹執行",
+    "blockingNo": "否",
+    "blockingYes": "是",
+    "category": "分類",
+    "checkCount": "{{count}} 項檢查",
+    "criticalFiles": "高危檔案: {{count}}",
+    "criticalFilesTitle": "需關注的檔案:",
+    "duration": "耗時: {{duration}}ms",
+    "engineDryRun": "◐ 引擎檢查完成（dry-run 只報告不阻斷）",
+    "engineFailed": "✗ 引擎檢查失敗",
+    "enginePassed": "✓ 引擎檢查通過",
+    "error": "錯誤: {{error}}",
+    "errorRules": "錯誤規則:",
+    "errors": "錯誤",
+    "failed": "失敗",
+    "failedRules": "失敗規則:",
+    "filesInvolved": "涉及檔案: {{count}} 個",
+    "garbage": "垃圾檔案",
+    "guardSection": "Guard 門禁檢查",
+    "inspectSection": "Inspect 巡檢",
+    "issueCount": "{{count}} 個問題",
+    "issuesCount": "({{count}} 問題)",
+    "line": "(行 {{line}})",
+    "malware": "惡意程式碼",
+    "needsImmediateAction": "需立即處理: {{count}}",
+    "noMatchingRules": "(無匹配規則)",
+    "noSmells": "✓ 未檢測到程式碼異味",
+    "notCalculated": "  (未計算)",
+    "notExecuted": "  (未執行)",
+    "overall": "綜合",
+    "passed": "通過",
+    "passedRules": "通過規則:",
+    "pipelineFailed": "✗ 流水線失敗",
+    "pipelinePassed": "✓ 流水線通過",
+    "profileTitle": "專案識別",
+    "refactorSection": "Refactor 重構檢測",
+    "reportTitle": "智匯碼盾 — 程式碼質量管理報告",
+    "ruleCount": "{{count}} 條規則",
+    "ruleEngineTitle": "SOP 規則引擎報告",
+    "scanCount": "掃描: {{scanned}}/{{files}} 檔案",
+    "score": "評分: {{score}} ({{grade}})",
+    "scoreSection": "健康評分",
+    "securityScore": "安全評分",
+    "securitySection": "安全掃描",
+    "severity": "嚴重度",
+    "skipped": "跳過",
+    "smellCount": "{{count}} 個程式碼異味",
+    "smellSummary": "{{count}} 個異味, 可維護性評分: {{score}}",
+    "stage": "階段: {{stage}}",
+    "status": "狀態: {{status}}",
+    "statusFailed": "❌ 失敗",
+    "statusPassed": "✅ 通過",
+    "suggestion": "建議:",
+    "summary": "彙總",
+    "time": "時間: {{timestamp}}",
+    "timestamp": "時間: {{timestamp}}",
+    "vulnerabilities": "漏洞"
+  },
+  "score": {
+    "gradeBadge": "{{letter}}級 · {{grade}}",
+    "gradeExcellent": "優秀",
+    "gradeGood": "良好",
+    "gradePass": "及格",
+    "gradeWarning": "警告"
+  },
+  "server": {
+    "bootstrap": {
+      "running": "智匯碼盾服務端執行在 http://localhost:{{port}}"
+    },
+    "pipeline": {
+      "scoreRecordFailed": "健康評分記錄失敗: {{error}}"
+    },
+    "scoring": {
+      "persistenceEnabled": "健康評分持久化已啟用: {{dbPath}}",
+      "persistenceUnavailable": "健康評分持久化不可用，執行於記憶體模式: {{error}}",
+      "scoreRecorded": "健康評分已記錄: {{score}} ({{grade}})"
+    }
+  },
+  "severity": {
+    "critical": "嚴重",
+    "high": "高風險",
+    "info": "提示",
+    "low": "低風險",
+    "medium": "中風險"
+  },
+  "status": {
+    "assigned": "處理中",
+    "deployed": "已上線",
+    "detected": "已偵測",
+    "failed": "驗證失敗",
+    "fixing": "修復中",
+    "manual_taken_over": "人工接管",
+    "merged": "已合併",
+    "passed": "已解決",
+    "pr_opened": "已提PR",
+    "rolled_back": "已回滾",
+    "validating": "驗證中"
+  },
+  "task": {
+    "cancelled": "任務已取消",
+    "executionFailed": "任務執行失敗",
+    "kind": {
+      "garbageClean": "清理",
+      "garbageRestore": "恢復",
+      "guard": "門禁掃描",
+      "inspect": "巡檢",
+      "performance": "檢測",
+      "pipeline": "體檢",
+      "refactor": "重構掃描",
+      "security": "檢查"
+    },
+    "notCompleted": "任務未完成",
+    "notFound": "任務不存在",
+    "queuedLabel": "排隊中（第 {{position}} 位）...",
+    "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
+    "schedulerUnavailable": "任務排程不可用（非桌面環境）"
+  },
+  "toast": {
+    "aiToolDisabled": "已停用 OpenCode 整合（專案內整合檔案保留）",
+    "aiToolEnabledNoProjects": "已啟用 OpenCode 整合（新增專案後自動寫入配置）",
+    "aiToolEnabledWritten": "已啟用 OpenCode 整合，寫入 {{written}}/{{total}} 個專案",
+    "aiToolSaveFailed": "AI 工具配置儲存失敗",
+    "copiedToAi": "已複製問題，可貼上到 AI 修復",
+    "copyAllCopiedToAi": "已複製全部 {{count}} 條問題，可貼上到 AI 修復",
+    "copyAllManualTrae": "已複製全部 {{count}} 條問題，請手動貼上到 Trae",
+    "copyAllOpenedTrae": "已複製全部 {{count}} 條問題，並開啟 Trae，請貼上",
+    "copyFailed": "複製失敗",
+    "copyFixManualTrae": "已複製修復提示，請手動貼上到 Trae",
+    "copyFixOpenedTrae": "已複製修復提示，並開啟 Trae，請貼上",
+    "desktopOnlyFolderPicker": "請在桌面端執行，瀏覽器無法選擇資料夾",
+    "issuesCopied": "已複製問題，可貼上到 AI 修復",
+    "projectAdded": "專案「{{projectName}}」已新增，開始守護",
+    "projectRemoved": "專案「{{projectName}}」已移除"
+  }
+}

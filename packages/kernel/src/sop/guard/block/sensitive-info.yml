@@ -1,0 +1,8 @@
+name: Sensitive Info Blocking
+description: L1 门禁 — 硬编码密钥/密码/Token 阻断
+severity: error
+executionMode: sync
+status: active
+source: external
+tags: [security, secret, credential]
+applicableEngines: [guard]

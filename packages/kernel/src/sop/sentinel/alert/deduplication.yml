@@ -1,0 +1,15 @@
+name: Event Deduplication Strategy
+description: 事件去重策略 — 10 分钟窗口内相同事件自动合并
+severity: info
+executionMode: event
+status: active
+source: official
+tags: [sentinel, dedup, event]
+applicableEngines: [sentinel]
+window: 600000  # 10 分钟（毫秒）
+strategy: fingerprint-based
+fields:
+  - fingerprint
+  - type
+  - source
+maxOccurrences: 100

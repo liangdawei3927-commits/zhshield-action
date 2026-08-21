@@ -1,0 +1,12 @@
+name: ESLint Rules Check
+description: 检查 ESLint 规则配置和执行结果
+severity: warning
+executionMode: async
+status: active
+source: external
+tags: [eslint, quality, lint]
+applicableEngines: [inspect]
+presets:
+  - recommended
+  - typescript-recommended
+  - prettier

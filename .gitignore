@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-electron/
+build/Release/
+*.tsbuildinfo
+.turbo/
+
+# Stale compiled artifacts in source directories (tsconfig outputs to dist/)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+packages/*/electron/**/*.js
+packages/*/electron/**/*.js.map
+packages/*/electron/**/*.d.ts
+packages/*/electron/**/*.d.ts.map
+packages/*/vitest.config.js
+packages/*/vitest.config.js.map
+packages/*/vitest.config.d.ts
+packages/*/vitest.config.d.ts.map
+packages/*/vite.config.js
+packages/*/vite.config.js.map
+packages/*/vite.config.d.ts
+packages/*/vite.config.d.ts.map
+scripts/*.js
+scripts/*.js.map
+scripts/*.d.ts
+scripts/*.d.ts.map
+vitest.workspace.js
+vitest.workspace.js.map
+vitest.workspace.d.ts
+vitest.workspace.d.ts.map
+
+# Test / coverage
+coverage/
+coverage-summary.json
+*.lcov
+test-results/
+playwright-report/
+*.zip
+
+# Electron / packaging
+packages/desktop/release/
+*.dmg
+*.app
+*.exe
+*.AppImage
+*.blockmap
+*.snap
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Logs & caches
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.eslintcache
+.cache/
+.vite/
+*.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Temp / scratch
+_tmp_*
+.tmp/
+.temp/
+.zhshield/
+
+# Vitest
+.vitest/

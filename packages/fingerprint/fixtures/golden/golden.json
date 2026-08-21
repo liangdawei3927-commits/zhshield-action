@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "description": "Golden test fixtures for @zh/fingerprint accuracy validation",
+  "fixtures": [
+    {
+      "name": "ts-monorepo",
+      "path": "ts-monorepo",
+      "description": "TypeScript monorepo with Next.js + React packages",
+      "expected": [
+        { "path": ".", "language": "typescript", "framework": "Next.js" },
+        { "path": "packages/core", "language": "typescript", "framework": "React" }
+      ]
+    },
+    {
+      "name": "python-fastapi",
+      "path": "python-fastapi",
+      "description": "Python FastAPI backend with requirements.txt + pyproject.toml",
+      "expected": [
+        { "path": ".", "language": "python", "framework": "FastAPI" }
+      ]
+    },
+    {
+      "name": "go-module",
+      "path": "go-module",
+      "description": "Go module with Gin framework",
+      "expected": [
+        { "path": ".", "language": "go", "framework": "Gin" }
+      ]
+    },
+    {
+      "name": "java-maven",
+      "path": "java-maven",
+      "description": "Java Maven project with Spring Boot",
+      "expected": [
+        { "path": ".", "language": "java", "framework": "Spring Boot" }
+      ]
+    },
+    {
+      "name": "adversarial-multitarget",
+      "path": "adversarial-multitarget",
+      "description": "Multi-target repo: root TS, web=Vite+h5, miniapp=JS+miniapp. Tests drift detection and form detection.",
+      "expected": [
+        { "path": ".", "language": "typescript" },
+        { "path": "web", "language": "typescript", "framework": "Vite", "productForm": "h5" },
+        { "path": "miniapp", "language": "javascript", "productForm": "miniapp" }
+      ]
+    }
+  ]
+}

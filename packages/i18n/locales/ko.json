@@ -1,0 +1,1746 @@
+{
+  "ai": {
+    "autoFix": {
+      "promptIntro": "당신은 ZhiYun Shield의 자동 수정 어시스턴트입니다.",
+      "readDiagnostics": "먼저 진단 파일 {{diagPath}}을(를) 읽고 error → warning → info 우선순위로 나열된 문제를 수정하세요.",
+      "requirement1": "1. issue의 ruleId, message, file, line, column, suggestion을 하나씩 이해한 뒤 코드를 찾으세요.",
+      "requirement2": "2. file 필드가 없는 항목은 도구/설정 관련 문제(예: ESLint 스캔 디렉터리 설정 오류)이므로 해당 도구 설정을 확인하고 수정하세요. 코드를 수정한 척 하지 마세요.",
+      "requirement3": "3. source가 \"guard\"인 항목은 게이트/예방 관련 문제이며 **건너뛰고 수정하지 마세요** (점검/리팩토링 계열 문제만 자동 수정).",
+      "requirement4": "4. 최소한의 필수 수정만 수행하고, 무관한 코드를 리팩토링하지 마세요.",
+      "requirement5": "5. 진단 파일 자체(.zhshield/diagnostics/latest.json)를 수정하지 마세요.",
+      "requirement6": "6. 모두 처리한 후 한 문장으로 어떤 파일을 수정했는지 보고하세요.",
+      "requirementsTitle": "요구 사항:"
+    },
+    "copyFix": {
+      "issueHeader": "【문제 {{number}}】({{source}})",
+      "locationLabel": "- 위치: {{location}}",
+      "messageLabel": "- 설명: {{message}}",
+      "projectPathLabel": "프로젝트 경로: {{projectPath}}",
+      "promptIntro": "당신은 ZhiYun Shield의 코드 수정 어시스턴트입니다. 다음 코드 문제를 수정하세요:",
+      "requirement1": "1. 스킬을 호출해 각 문제의 코드 결함 실재성을 하나씩 검증하세요.",
+      "requirement2": "2. 문제를 이해한 뒤 수정하세요. 수정한 척 하지 마세요.",
+      "requirement3": "3. 최소한의 필수 수정만 수행하고, 무관한 코드를 리팩토링하지 마세요.",
+      "requirement4": "4. 수정 후 테스트 가능, 검증 가능, 회귀 가능, 실행 가능함을 보장하세요.",
+      "requirement5": "5. 수정을 마친 후 한 문장으로 어떤 파일을 수정했는지 보고하세요.",
+      "requirementsTitle": "수정 요구 사항:",
+      "ruleLabel": "- 규칙: {{ruleId}}",
+      "severityLabel": "- 심각도: {{severity}}",
+      "suggestionLabel": "- 제안: {{suggestion}}"
+    },
+    "toolConfig": {
+      "openCodeCommand": {
+        "description": "description: ZhiYun Shield 진단을 읽고 코드 문제를 수정합니다",
+        "step1": "1. 프로젝트 루트의 `.zhshield/diagnostics/latest.json`을 읽습니다 (없으면 사용자에게 먼저 점검 실행을 안내).",
+        "step2": "2. 문제를 error → warning → info 우선순위로 정렬합니다.",
+        "step3": "3. 문제를 하나씩 이해하고 코드를 찾아 수정안을 생성하고 적용합니다.",
+        "step4": "4. 수정 후 `zhshield issue resolve --fingerprint=\"<fingerprint>\"`를 실행해 해결 처리합니다 (선택 사항).",
+        "title": "# ZhiYun Shield 진단 수정"
+      }
+    }
+  },
+  "cli": {
+    "command": {
+      "deps": "의존성 점검 (SBOM + 라이선스 매트릭스)",
+      "guard": "Guard 게이트 검사 실행",
+      "help": "이 도움말 표시",
+      "inspect": "Inspect 점검 실행",
+      "pipeline": "전체 파이프라인 실행",
+      "refactor": "Refactor 리팩토링 감지 실행"
+    },
+    "depsEcosystem": "생태계: {{ecosystem}}",
+    "depsHeader": "── 의존성 점검 ──",
+    "depsLockfile": "잠금 파일: {{status}}",
+    "depsNotFound": "의존성 점검: 의존성 매니페스트를 찾지 못했습니다 (package-lock.json / pnpm-lock.yaml / yarn.lock / requirements.txt / pyproject.toml / Pipfile.lock / poetry.lock)",
+    "depsProject": "프로젝트: {{path}}",
+    "depsTotal": "총 의존성 수: {{count}} (직접 {{direct}} / 전이 {{transitive}})",
+    "directDepsHeader": "── 직접 의존성 ──",
+    "highRiskLicenses": "고위험 라이선스: {{list}}",
+    "licenseMatrixHeader": "── 라이선스 매트릭스 ──",
+    "licenseRiskHigh": "고위험",
+    "licenseRiskLow": "저위험",
+    "licenseRiskMedium": "중간 위험",
+    "licenseRiskUnknown": "중간 위험 — 수동 확인 필요",
+    "lockfileMissing": "✗ 없음",
+    "lockfilePresentUnverified": "✓ 있음 (일관성 미검증)",
+    "lockfilePresentVerified": "✓ 있음 (일관성 검증됨)",
+    "option": {
+      "dir": "프로젝트 루트 디렉터리 (기본값: 현재 디렉터리)",
+      "dryRun": "Guard 모드: 보고만 하고 차단하지 않음",
+      "hook": "Guard 모드: 게이트 트리거 소스 (pre-commit / pre-push)",
+      "json": "deps: 전체 의존성 그래프를 JSON으로 출력",
+      "lang": "UI 언어 (zh-Hans / zh-Hant / en / ko / ja; 기본값: zh-Hans 또는 ZH_LANG 환경 변수)",
+      "noColor": "컬러 출력 비활성화",
+      "sbom": "deps: CycloneDX SBOM을 파일로 내보내기",
+      "sop": "SOP 규칙 기반 모드 사용 (기본값: checks.json 모드)",
+      "staged": "Guard 모드: 스테이징 영역 변경만 검사",
+      "verbose": "상세 정보 표시"
+    },
+    "optionsTitle": "옵션:",
+    "rulesLoaded": "[CLI] SOP 규칙 {{count}}개 로드됨",
+    "sbomWriteFailed": "❌ SBOM 쓰기 실패: {{error}}",
+    "sbomWritten": "✅ SBOM 작성 완료: {{path}}",
+    "stagedSkipped": "✅ 스테이징 영역에 변경이 없어 게이트 검사를 건너뜁니다",
+    "title": "zhshield — ZhiYun Shield 코드 품질 관리",
+    "unknownCommand": "알 수 없는 명령: {{command}}",
+    "usageTitle": "사용법:"
+  },
+  "common": {
+    "cancel": "취소",
+    "close": "닫기",
+    "confirm": "확인",
+    "copied": "복사됨",
+    "copy": "복사",
+    "copyAllToAi": "전체를 AI로 복사",
+    "copyToAi": "AI로 복사",
+    "delete": "삭제",
+    "loading": "로딩 중…",
+    "no": "아니요",
+    "refresh": "새로고침",
+    "remove": "제거",
+    "retry": "다시 시도",
+    "save": "저장",
+    "search": "검색",
+    "yes": "예"
+  },
+  "electron": {
+    "appTitle": "ZhiYun Shield",
+    "cleanFailed": "정리 실패, 잠시 후 다시 시도해 주세요",
+    "diagnostics": {
+      "ruleFailed": "{{ruleId}} 통과하지 못했습니다"
+    },
+    "feedbackIncomplete": "피드백 내용이 불완전합니다",
+    "hooksExist": "후크 파일 {{hooks}}이(가) 이미 있습니다. 덮어쓰지 않도록 수동으로 확인해 주세요",
+    "invalidParams": "매개변수가 유효하지 않습니다",
+    "invalidProjectPath": "프로젝트 경로가 유효하지 않습니다",
+    "notGitRepo": "프로젝트가 git 저장소가 아닙니다",
+    "restoreFailed": "복원 실패, 잠시 후 다시 시도해 주세요",
+    "scoringUnavailable": "로컬 데이터베이스를 사용할 수 없어 채점 기능이 축소됩니다 (HTTP 모드로 서버에 연결해 주세요)",
+    "writeFailed": "쓰기 실패"
+  },
+  "engine": {
+    "backupModuleUnavailable": "백업 모듈을 사용할 수 없습니다",
+    "builtin-rules": {
+      "architecture": {
+        "circularDependency": "순환 의존성이 감지되었습니다",
+        "cyclicImport": "모듈 간 순환 import가 존재합니다",
+        "fatController": "Controller가 지나치게 비대합니다. 로직을 Service로 옮겨야 합니다",
+        "globalState": "전역 상태/싱글턴 패턴 남용이 감지되었습니다",
+        "layerSkip": "계층 건너뛰기: 중간 계층을 건너뛰고 하위 모듈을 직접 호출하고 있습니다",
+        "layerViolation": "비즈니스 계층은 데이터 접근 계층을 직접 참조해서는 안 됩니다",
+        "missingAbstraction": "모듈에 인터페이스 추상화가 없어 테스트와 확장이 어렵습니다",
+        "noDomainInInfra": "인프라 계층은 도메인 계층에 의존해서는 안 됩니다",
+        "noDtoInEntity": "Entity는 DTO에 의존해서는 안 됩니다",
+        "noEntityInController": "Controller는 Entity를 직접 참조해서는 안 됩니다",
+        "noServiceInView": "뷰 계층은 Service를 직접 호출해서는 안 됩니다",
+        "utilsEverywhere": "utils 도구 함수가 여러 모듈에 흩어져 있습니다. 통합 관리를 권장합니다"
+      },
+      "quality": {
+        "asyncWithoutAwait": "async 함수에서 await를 사용하지 않았습니다",
+        "complexCondition": "조건식이 너무 복잡합니다. 변수로 추출하는 것을 권장합니다",
+        "consoleLog": "프로덕션 코드에 console.log가 포함되어서는 안 됩니다",
+        "debugger": "프로덕션 코드에 debugger 문이 포함되어서는 안 됩니다",
+        "duplicateKey": "객체에 중복 키가 존재합니다",
+        "emptyCatch": "빈 catch 블록은 오류를 숨깁니다",
+        "eqeqeq": "== 대신 ===을 사용하세요. 타입 변환을 유발할 수 있습니다",
+        "forInWithoutHasOwn": "for...in에서 hasOwnProperty 검사를 사용하지 않았습니다",
+        "largeFunction": "함수가 너무 깁니다. 여러 개의 작은 함수로 분리하는 것을 권장합니다",
+        "magicNumber": "매직 넘버가 감지되었습니다. 상수로 정의하는 것을 권장합니다",
+        "missingFallthrough": "switch case에 break가 없어 의도치 않게 관통할 수 있습니다",
+        "nestedCallback": "중첩 콜백이 너무 깊습니다. async/await 사용을 권장합니다",
+        "noBarrelImport": "barrel (index) 파일에서 import하면 순환 의존성이 발생할 수 있습니다",
+        "noNullComparison": "foo == null 대신 foo === null || foo === undefined를 사용하세요",
+        "noUnusedVariable": "사용하지 않는 변수가 감지되었습니다",
+        "todoComment": "TODO 항목이 존재합니다",
+        "typeAny": "any 타입을 사용하면 타입 검사 보호를 잃습니다",
+        "varUsage": "const/let 대신 var를 사용하고 있습니다"
+      },
+      "security": {
+        "commandInjection": "셸 명령 실행이 감지되었습니다. 명령 주입 위험이 있습니다",
+        "consoleLogSecret": "console.log가 민감한 정보를 유출할 수 있습니다",
+        "debugEndpoint": "프로덕션 환경에서 디버그 엔드포인트를 노출해서는 안 됩니다",
+        "evalUsage": "eval() 호출이 감지되었습니다. 코드 주입 위험이 있습니다",
+        "hardcodedApiKey": "하드코딩된 API 키가 감지되었습니다",
+        "hardcodedPassword": "하드코딩된 비밀번호가 감지되었습니다",
+        "innerHtml": "innerHTML 할당이 감지되었습니다. XSS 위험이 있습니다",
+        "insecureDeserialize": "안전하지 않은 역직렬화 작업이 감지되었습니다",
+        "insecureRandom": "보안에 민감한 작업에 Math.random()을 사용하고 있습니다. crypto.randomBytes를 사용하세요",
+        "noAuth": "인증되지 않은 수정 작업이 감지되었습니다",
+        "noCors": "CORS 미들웨어가 구성되어 있지 않습니다",
+        "noCsp": "Content-Security-Policy 헤더가 감지되지 않았습니다",
+        "noHelmet": "Helmet 보안 헤더 미들웨어가 감지되지 않았습니다",
+        "noHttpsRedirect": "HTTPS 리다이렉트가 강제되어 있지 않습니다",
+        "noRateLimit": "API 라우트에 속도 제한이 구성되어 있지 않습니다",
+        "noTls": "HTTPS가 아닌 HTTP 서비스가 감지되었습니다",
+        "pathTraversal": "경로 탐색 위험이 감지되었습니다. 사용자 입력을 검증하세요",
+        "prototypePollution": "프로토타입 오염 위험이 감지되었습니다",
+        "sensitiveFiles": "민감한 파일이 포함된 것이 감지되었습니다",
+        "sqlConcat": "SQL 문자열 연결이 감지되었습니다. 파라미터화된 쿼리를 사용하세요"
+      }
+    },
+    "dependency": {
+      "license": {
+        "unknownReason": "인식할 수 없는 라이선스로, 수동 확인이 필요합니다"
+      }
+    },
+    "engineUnavailable": "엔진을 사용할 수 없습니다",
+    "feedbackUnavailable": "피드백 채널을 사용할 수 없습니다",
+    "guard": {
+      "architecture": {
+        "foundViolations": "계층 간 위반 참조가 {{count}}곳 발견되었습니다:\n{{details}}",
+        "passed": "모듈 경계 검사를 통과했습니다. 계층 간 위반 참조가 없습니다",
+        "scanFailed": "모듈 경계 검사 실패: {{error}}"
+      },
+      "eslint": {
+        "execFailed": "ESLint 실행 실패",
+        "foundErrors": "ESLint에서 오류 {{count}}개 발견:\n{{errors}}",
+        "foundWarnings": "ESLint에서 경고 {{count}}개 발견:\n{{warnings}}",
+        "notInstalled": "ESLint가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다",
+        "passed": "ESLint 검사 통과 (파일 {{count}}개)",
+        "passedNoOutput": "ESLint 검사 통과 (출력 없음)"
+      },
+      "hook": {
+        "guardFailed": "❌ ZhiYun Shield 게이트 검사에 통과하지 못했습니다. 수정 후 {{action}}"
+      },
+      "securityScan": {
+        "commandInjection": "가능한 명령 주입: exec 대신 execFile을 사용하세요",
+        "consoleLog": "프로덕션 환경에서는 console 문을 제거해야 합니다",
+        "debugger": "프로덕션 환경에서는 debugger 문을 제거해야 합니다",
+        "evalUsage": "eval() 사용을 피하세요: 코드 주입을 유발할 수 있습니다",
+        "foundIssues": "보안 문제 {{count}}개 발견 ({{high}} {{highCount}}, {{medium}} {{mediumCount}}, {{low}} {{lowCount}}):\n{{details}}",
+        "hardcodedPort": "하드코딩된 포트 번호를 설정 항목으로 변경해야 하는지 확인하세요",
+        "innerHtml": "innerHTML 사용은 XSS를 유발할 수 있습니다. textContent를 우선 사용하세요",
+        "noNewFunc": "new Function() 사용을 피하세요: 코드 주입을 유발할 수 있습니다",
+        "passed": "보안 스캔 통과. 뚜렷한 보안 문제가 없습니다",
+        "scanFailed": "보안 스캔 실패: {{error}}",
+        "sqlInjection": "가능한 SQL 주입: 파라미터화된 쿼리 대신 문자열 연결을 사용했습니다",
+        "todoFixme": "처리되지 않은 대기 항목이 존재합니다 (TODO/FIXME)"
+      },
+      "sensitiveInfo": {
+        "foundIssues": "민감한 정보로 의심되는 항목이 {{count}}곳 발견되었습니다:\n{{details}}",
+        "matchedLine": "{{file}}:{{line}}에서 {{pattern}} 일치: {{match}}",
+        "passed": "민감 정보 검사 통과. 유출이 발견되지 않았습니다",
+        "scanFailed": "민감 정보 스캔 실패: {{error}}"
+      },
+      "testDetector": {
+        "noTestScriptDir": "test 스크립트가 포함된 프로젝트 디렉터리를 찾지 못했습니다"
+      },
+      "testRunner": {
+        "execFailed": "테스트 실행 실패: {{error}}",
+        "failedList": "실패 케이스:",
+        "noTests": "테스트 케이스를 찾지 못했습니다",
+        "notExecuted": "테스트가 실행되지 않았습니다",
+        "passedAll": "전체 테스트 {{passed}}개 통과 ({{durationMs}}ms)",
+        "summary": "테스트 {{totalTests}}개: {{passed}} 통과, {{failed}} 실패 ({{durationMs}}ms){{failDetail}}",
+        "unresolved": "테스트 파일 {{totalTests}}개를 감지했지만 테스트 실행 결과를 분석할 수 없습니다 (프로세스 출력 이상 또는 시간 초과)"
+      },
+      "unknownRule": "알 수 없는 규칙"
+    },
+    "hooksUnavailable": "guardHooks IPC를 사용할 수 없습니다",
+    "inspect": {
+      "report": {
+        "recommendations": {
+          "category": "{{count}}개 {{category}} 유형 문제가 발견되었습니다. 우선 처리하는 것을 권장합니다",
+          "degradedLevel": "현재 축소 등급: Level {{level}}. 일부 도구가 건너뛰어졌습니다",
+          "toolError": "도구 {{tool}} 오류: {{error}}"
+        }
+      },
+      "supplyChain": {
+        "downloadAllFailed": "[supply-chain] {{toolId}} 모든 채널에서 다운로드 실패 ({{attempts}}회 시도)",
+        "sha256Mismatch": "[supply-chain] {{toolId}} sha256 검증 실패: 기대값 {{expected}}, 실제값 {{actual}}",
+        "unregisteredLicense": "등록되지 않은 라이선스입니다. 배포가 금지됩니다"
+      },
+      "tool": {
+        "dep-cruiser": {
+          "architectureViolation": "아키텍처 경계 위반: {{rule}} - {{from}} → {{to}}",
+          "description": "아키텍처 경계 및 모듈 의존성 검사",
+          "noCrossReference": "모듈 {{from}}은(는) {{to}}를 참조해서는 안 됩니다",
+          "runFailed": "dependency-cruiser 실행 실패",
+          "unavailable": "dependency-cruiser가 설치되어 있지 않습니다"
+        },
+        "depcheck": {
+          "description": "사용하지 않는 의존성 감지",
+          "moveDevDependency": "{{dep}}을(를) dependencies로 옮기거나 npm uninstall -D {{dep}}를 실행하세요",
+          "runFailed": "depcheck 실행 실패",
+          "unavailable": "depcheck가 설치되어 있지 않습니다",
+          "uninstallDependency": "npm uninstall {{dep}}를 실행해 사용하지 않는 의존성을 제거하세요",
+          "unusedDependency": "사용하지 않는 의존성: {{dep}}",
+          "unusedDevDependency": "사용하지 않는 dev 의존성: {{dep}}"
+        },
+        "eslint": {
+          "autoFixable": "자동 수정 가능",
+          "description": "JS/TS 코드 규범 및 품질 검사",
+          "runFailed": "ESLint 실행 실패",
+          "unavailable": "ESLint가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다"
+        },
+        "gitleaks": {
+          "description": "하드코딩된 키 스캔",
+          "hardcodedSecret": "하드코딩된 키 감지: {{rule}}",
+          "removeSecret": "하드코딩된 키를 제거하고 환경 변수 또는 키 관리 서비스를 사용하세요",
+          "runFailed": "Gitleaks 실행 실패",
+          "unavailable": "Gitleaks가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다"
+        },
+        "jscpd": {
+          "description": "중복 코드 감지",
+          "duplicateFound": "중복 코드 발견 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+          "extractShared": "공통 코드를 공유 모듈로 추출하세요 (중복 위치: {{secondFile}})",
+          "runFailed": "jscpd 실행 실패",
+          "unavailable": "jscpd가 설치되어 있지 않습니다"
+        },
+        "semgrep": {
+          "description": "SAST 코드 취약점 스캔 (SQL 주입, XSS, CSRF, 명령 주입, 경로 탐색 등)",
+          "runFailed": "Semgrep 실행 실패",
+          "timeout": "Semgrep 스캔 시간 초과",
+          "unavailable": "Semgrep가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다"
+        },
+        "ts-prune": {
+          "description": "TypeScript 죽은 코드/미사용 export 감지",
+          "removeExport": "사용하지 않는 export 심볼을 제거하세요: {{symbol}}",
+          "runFailed": "ts-prune 실행 실패",
+          "unavailable": "ts-prune이 설치되어 있지 않습니다",
+          "unusedExport": "사용하지 않는 export: {{symbol}}"
+        },
+        "tsc": {
+          "description": "TypeScript 타입 오류 검사",
+          "fixSuggestion": "TypeScript {{level}} 수정: {{code}}",
+          "runFailed": "tsc 실행 실패",
+          "unavailable": "tsc가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다"
+        }
+      },
+      "unknown": "알 수 없음",
+      "unknownRule": "알 수 없는 규칙"
+    },
+    "kernel": {
+      "backup": {
+        "allFailed": "모든 백업 방식이 실패했습니다",
+        "commitMessage": "{{prefix}} 자동 백업 - {{timestamp}}",
+        "commitPrefix": "[ZhiYun Shield]",
+        "done": "백업 완료",
+        "githubNotAuthorized": "GitHub가 인증되지 않았습니다. 먼저 설정에서 GitHub 계정을 인증하세요",
+        "localCopyFailed": "파일 {{count}}개 복사 실패",
+        "progressGitHubCommit": "GitHub에 커밋하는 중...",
+        "progressLocalCopy": "로컬 디렉터리에 복사하는 중...",
+        "repoDescription": "ZhiYun Shield 자동 백업 저장소",
+        "unknownGitHubError": "알 수 없는 GitHub 백업 오류",
+        "unknownLocalError": "알 수 없는 로컬 백업 오류"
+      },
+      "runner": {
+        "forbiddenPatternsFound": "금지 패턴이 {{count}}곳 발견되었습니다 ({{ruleId}})",
+        "forbiddenUsage": "사용 금지: \"{{pattern}}\"",
+        "guardDispatchFailed": "Guard 디스패치 실패: {{error}}",
+        "guardEngineNotRegistered": "GuardEngine이 등록되지 않아 check-list를 실행할 수 없습니다",
+        "guardFoundIssues": "Guard 검사에서 문제 {{count}}개 발견",
+        "guardPassed": "Guard 검사 통과",
+        "inspectDispatchFailed": "Inspect 디스패치 실패: {{error}}",
+        "inspectEngineNotRegistered": "InspectEngine이 등록되지 않았고 사용 가능한 스캐너 어댑터도 없습니다",
+        "labelDone": "{{label}} 완료: 문제 {{count}}개",
+        "labelInspection": "점검",
+        "labelPreset": "프리셋 검사",
+        "layerAllowedDeps": "{{fileLayer}} 계층은 다음 항목에만 의존할 수 있습니다: {{deps}}",
+        "layerBoundaryPassed": "아키텍처 경계 검사 통과",
+        "layerBoundaryViolations": "아키텍처 경계 위반이 {{count}}곳 발견되었습니다",
+        "layerViolationMessage": "계층 위반: \"{{fileLayer}}\"은(는) \"{{targetLayer}}\"에 의존할 수 없습니다 (import: {{imported}})",
+        "patternMatchesFound": "일치 항목이 {{count}}곳 발견되었습니다 ({{ruleId}})",
+        "presetInspectNotRegistered": "InspectEngine이 등록되지 않았고 사용 가능한 preset 도구 어댑터도 없습니다",
+        "removeHardcodedValue": "하드코딩된 값을 제거하거나 환경 변수로 대체하세요",
+        "replaceForbidden": "\"{{pattern}}\"을(를) 제거하거나 타입 안전한 대안으로 교체하세요",
+        "scannerFailed": "스캐너 {{tool}} 실행 실패",
+        "scannerFoundIssues": "스캐너에서 문제 {{count}}개 발견",
+        "scannerPassed": "스캐너 검사 통과",
+        "sensitivePatternMatch": "민감 패턴 일치: {{match}}",
+        "skipCheckListNoMatch": "check-list→GuardEngine 건너뜀: 저장소에 일치하는 검사 항목이 구성되어 있지 않습니다",
+        "skipCheckListReentry": "check-list→GuardEngine.run 건너뜀 (규칙 엔진 재진입 방지)",
+        "skipNestedDispatch": "중첩 {{type}} 디스패치 건너뜀 (규칙 엔진 재진입 방지)",
+        "skipPresetReentry": "preset→runScan 건너뜀 (규칙 엔진 재진입 방지)",
+        "skipScannerReentry": "scanner-dispatch→runScan 건너뜀 (규칙 엔진 재진입 방지)",
+        "thresholdList": "임계값: {{entries}}",
+        "thresholdRaw": "임계값: {{unit}} {{thresholds}}",
+        "thresholdRule": "임계값 규칙 (외부 데이터 필요): {{summary}}",
+        "toolAdapterNotRegistered": "도구 어댑터가 등록되지 않았습니다: {{tool}}. tool-dispatch를 실행할 수 없습니다",
+        "toolError": "도구 {{tool}} 오류: {{error}}",
+        "toolExecuteFailed": "도구 {{tool}} 실행 실패: {{error}}",
+        "toolFoundIssues": "도구 {{tool}}에서 문제 {{count}}개 발견",
+        "toolPassed": "도구 {{tool}} 검사 통과",
+        "toolUnavailable": "도구를 사용할 수 없음: {{tool}} (설치되지 않았거나 PATH에서 찾을 수 없음)"
+      }
+    },
+    "output": {
+      "architectureViolation": "아키텍처 경계 위반: {{rule}} - {{from}} → {{to}}",
+      "autoFixable": "자동 수정 가능",
+      "duplicateCode": "중복 코드 발견 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+      "extractSharedCode": "공통 코드를 공유 모듈로 추출하세요 (중복 위치: {{secondFile}})",
+      "moduleShouldNotReference": "모듈 {{from}}은(는) {{to}}를 참조해서는 안 됩니다",
+      "removeDependency": "{{name}}을(를) dependencies에서 제거하세요",
+      "removeDevDependency": "{{name}}을(를) devDependencies에서 제거하세요",
+      "removeHardcodedKey": "하드코딩된 키를 제거하고 환경 변수 또는 키 관리 서비스를 사용하세요",
+      "removeHardcodedSecret": "하드코딩된 키를 제거하고 환경 변수 또는 키 관리 서비스를 사용하세요",
+      "unknownRule": "알 수 없는 규칙",
+      "unusedDevDependency": "사용하지 않는 개발 의존성: {{name}}",
+      "unusedProdDependency": "사용하지 않는 프로덕션 의존성: {{name}}",
+      "upgradeTo": "{{version}}(으)로 업그레이드"
+    },
+    "pipeline": {
+      "log": {
+        "guardBlocked": "Guard 차단, 파이프라인 종료 ({{failed}}개 실패)",
+        "guardCheckFailed": "Guard 검사 실패: {{error}}",
+        "guardDone": "Guard 검사 완료: 통과 {{passed}}건, 실패 {{failed}}건",
+        "guardPassedToInspect": "Guard 통과, Inspect 점검 단계로 진입...",
+        "guardStart": "Guard 게이트 검사 시작...",
+        "inspectDone": "점검 완료: 문제 {{total}}개 (오류 {{error}}건, 경고 {{warning}}건, 정보 {{info}}건)",
+        "inspectFailed": "Inspect 점검 실패: {{error}}",
+        "inspectStart": "Inspect 엔진 점검 시작...",
+        "pipelineClosed": "파이프라인이 종료되었습니다",
+        "pipelineDone": "========== ZhiYun Shield 전체 파이프라인 완료 (리팩토링 제외) ==========",
+        "pipelineStart": "========== ZhiYun Shield 전체 파이프라인 시작 ==========",
+        "pluginLoaded": "플러그인 로드됨: {{name}}@{{version}}",
+        "profileDone": "프로젝트 프로필: {{language}}{{framework}} ({{packageManager}})",
+        "profileStart": "프로젝트 프로필 분석 시작...",
+        "refactorDone": "리팩토링 감지 완료: 코드 악취 {{totalSmells}}곳 (주목할 파일 {{criticalFiles}}개)",
+        "refactorStart": "Refactor 리팩토링 감지 시작...",
+        "scoringDone": "채점 완료: {{overall}} (등급 {{grade}})",
+        "scoringStart": "건강 점수 산정 시작...",
+        "securityDone": "보안 스캔 완료: 취약점 {{vulnTotal}}개, 악성 패키지 {{malwareTotal}}개, 쓰레기 파일 {{garbageTotal}}개",
+        "securityFailed": "보안 스캔 실패: {{error}}",
+        "securityStart": "보안 스캔 시작...",
+        "sopGuardBlocked": "SOP Guard 차단, 파이프라인 종료 ({{failed}}개 실패)",
+        "sopGuardDone": "SOP Guard 검사 완료: 통과 {{passed}}건, 실패 {{failed}}건, 오류 {{errors}}건",
+        "sopGuardFailed": "SOP Guard 검사 실패: {{error}}",
+        "sopGuardPassed": "SOP Guard 통과, SOP Inspect 점검 단계로 진입...",
+        "sopGuardStart": "SOP 기반 Guard 게이트 검사 시작...",
+        "sopInspectDone": "SOP Inspect 완료: 통과 {{passed}}건, 실패 {{failed}}건, 건너뜀 {{skipped}}건",
+        "sopInspectFailed": "SOP Inspect 점검 실패: {{error}}",
+        "sopInspectStart": "SOP 기반 Inspect 점검 시작...",
+        "sopPipelineDone": "========== SOP 기반 전체 파이프라인 완료 (리팩토링 제외) ==========",
+        "sopPipelineStart": "========== SOP 기반 전체 파이프라인 시작 ==========",
+        "sopRulesLoaded": "SOP 규칙 로드됨: {{count}}개 (활성: {{active}})"
+      }
+    },
+    "refactor": {
+      "fix": {
+        "addAsync": "{{methodName}}에(에) async 키워드를 추가하세요",
+        "constantsHeader": "// 공유 문자열 상수 — auto-fix 생성",
+        "encapsulateField": "{{filePath}}의 public 필드를 private로 캡슐화하세요",
+        "extractLiteral": "\"{{literal}}\"을(를) {{filePath}}(으)로 추출하세요",
+        "thenToAwaitTodo": "// TODO: .then() 체인을 수동으로 await로 변환하세요 (auto-fix가 async 키워드를 추가했습니다)"
+      },
+      "smell": {
+        "callback-hell": {
+          "message": "{{target}}에 .then() 체인 콜백이 {{count}}겹 중첩되어 있습니다. async/await로 변환하는 것을 권장합니다",
+          "name": "콜백 지옥 (R07)",
+          "suggestion": ".then() 체인 콜백을 async/await 문법으로 변환하고 try/catch 오류 처리를 유지하세요"
+        },
+        "data-class": {
+          "message": "{{className}}은(는) 필드가 {{fields}}개인데 메서드가 {{methods}}개뿐입니다. 순수 데이터 클래스일 수 있습니다",
+          "name": "데이터 클래스 (R10)",
+          "suggestion": "{{className}}의 필드를 조작하는 메서드를 클래스로 옮기거나 TypeScript interface로 변환하세요"
+        },
+        "data-clumps": {
+          "message": "매개변수 조합 [{{params}}]이(가) 반복적으로 나타납니다 ({{count}}회): {{methods}}...",
+          "name": "데이터 뭉치",
+          "suggestion": "반복되는 매개변수 조합을 하나의 클래스로 캡슐화하세요"
+        },
+        "deep-nesting": {
+          "message": {
+            "function": "{{target}}이(가) 너무 깊게 중첩되었습니다 ({{depth}}겹)",
+            "method": "{{target}}이(가) 너무 깊게 중첩되었습니다 ({{depth}}겹, 임계값 {{threshold}}). guard clause 사용 또는 메서드 추출을 권장합니다"
+          },
+          "name": "깊은 중첩 (R05)",
+          "suggestion": "guard clause로 조기 반환하거나 깊은 분기를 독립 함수로 추출하세요"
+        },
+        "duplicated-code": {
+          "message": "코드 블록이 {{file}}:{{line}}과(와) 중복됩니다. 공용 함수로 추출하는 것을 권장합니다",
+          "name": "중복 코드 (R06)",
+          "suggestion": "중복 코드를 공용 함수로 추출하고 차이점을 파라미터화해 하나로 호출하세요"
+        },
+        "feature-envy": {
+          "externalClass": "외부 클래스",
+          "message": "{{target}}이(가) {{targetName}}을(를) 많이 호출합니다 (외부 참조 {{externalCount}}회 대 코드 {{totalStatements}}줄)",
+          "name": "기능 선망",
+          "suggestion": "{{methodName}}을(를) {{targetClass}} 클래스로 옮기는 것을 고려하세요"
+        },
+        "god-object": {
+          "message": "{{className}}에 공용 메서드가 {{count}}개 있습니다 (임계값 {{threshold}}). 갓 오브젝트일 수 있습니다",
+          "name": "갓 오브젝트 (R12)",
+          "suggestion": "{{className}}을(를) 도메인별로 여러 개의 전문화된 Service/Class로 분리하세요"
+        },
+        "inappropriate-intimacy": {
+          "message": "{{className}}이(가) public 필드를 너무 많이 노출합니다 ({{count}}개). 캡슐화를 해칩니다",
+          "name": "부적절한 친밀감",
+          "suggestion": "public 필드를 private로 바꾸고 getter/setter로 접근하세요"
+        },
+        "large-class": {
+          "issue": {
+            "lines": "{{lines}}줄 (임계값 {{threshold}})",
+            "methods": "메서드 {{methods}}개 (임계값 {{threshold}})"
+          },
+          "message": "{{className}}이(가) 너무 큽니다 ({{issues}}). 책임별로 분리하는 것을 권장합니다",
+          "name": "갓 오브젝트/대형 클래스",
+          "suggestion": "{{className}}을(를) 책임별로 여러 클래스로 분리하고 각 클래스가 단일 책임에 집중하게 하세요"
+        },
+        "lazy-class": {
+          "message": "{{className}}이(가) 너무 작습니다 ({{lines}}줄, 메서드 {{methods}}개). 독립 클래스로 유지할 가치가 없을 수 있습니다",
+          "name": "잉여 클래스",
+          "suggestion": "기능을 호출하는 클래스로 통합하거나 바로 제거하세요"
+        },
+        "long-method": {
+          "issue": {
+            "complexity": "순환 복잡도 {{complexity}} (임계값 {{threshold}})",
+            "lines": "{{lines}}줄 (임계값 {{threshold}})"
+          },
+          "message": "{{container}}{{name}}이(가) 너무 큽니다 ({{issues}}). 더 작은 함수로 분리하는 것을 권장합니다",
+          "name": "초대형 함수 (R01)",
+          "suggestion": "{{container}}{{name}}을(를) 책임별로 여러 개의 작은 함수로 분리하고 각각이 {{threshold}}줄을 넘지 않게 하세요"
+        },
+        "long-parameter-list": {
+          "message": "{{container}}의 매개변수가 너무 많습니다 ({{count}}개, 임계값 {{threshold}}). 매개변수 객체로 캡슐화하는 것을 권장합니다",
+          "name": "과다한 매개변수 (R03)",
+          "suggestion": "매개변수 {{count}}개를 하나의 interface/type 매개변수 객체로 캡슐화하세요"
+        },
+        "message-chains": {
+          "message": "{{target}}에 체인 호출이 존재합니다: {{chains}}",
+          "name": "메시지 체인",
+          "suggestion": "체인 호출을 위임 메서드로 캡슐화해 호출자와 피호출자의 결합도를 낮추세요"
+        },
+        "middle-man": {
+          "message": "{{className}}의 대부분 메서드는 단순 위임 호출입니다 (위임 {{delegating}}회 / 메서드 {{total}}개)",
+          "name": "중간자",
+          "suggestion": "중간 계층을 제거하고 호출자가 위임 대상을 직접 사용하도록 고려하세요"
+        },
+        "mixed-responsibilities": {
+          "message": {
+            "function": "{{target}}에 약 {{count}}개의 책임이 혼합되어 있습니다",
+            "method": "{{target}}에 약 {{count}}개의 책임이 혼합되어 있습니다 (임계값 {{threshold}}). 독립 함수로 분리하는 것을 권장합니다"
+          },
+          "name": "다중 책임 혼합 (R04)",
+          "suggestion": {
+            "function": "책임별로 함수를 여러 개의 독립 함수로 분리하세요",
+            "method": "주석 구역 / 빈 줄 구분 / try/catch 경계를 기준으로 메서드를 여러 개의 독립 함수로 분리하세요"
+          }
+        },
+        "oversized-component": {
+          "issue": {
+            "handlers": "이벤트 핸들러 {{handlers}}개",
+            "jsxDepth": "JSX 중첩 {{depth}}겹",
+            "lines": "코드 {{lines}}줄"
+          },
+          "message": "컴포넌트가 너무 큽니다 ({{issues}}). 하위 컴포넌트로 분리하는 것을 권장합니다",
+          "name": "초대형 컴포넌트 (R11)",
+          "suggestion": "UI 부분을 하위 컴포넌트로 분리하고 상태 로직을 커스텀 Hook으로 추출하세요"
+        },
+        "oversized-file": {
+          "issue": {
+            "exports": "최상위 export {{exports}}개 (임계값 {{threshold}})",
+            "linesCode": "코드 {{lines}}줄 (임계값 {{threshold}})"
+          },
+          "message": "파일이 너무 큽니다 ({{issues}}). 기능별로 분리하는 것을 권장합니다",
+          "name": "초대형 파일 (R02)",
+          "suggestion": "기능 영역별로 파일을 여러 개로 분리하고 각 파일이 단일 책임에 집중하게 하세요"
+        },
+        "primitive-obsession": {
+          "message": "{{className}}이(가) 기본 타입을 너무 많이 사용합니다 (필드 {{count}}개). 관련 필드에 값 객체를 만드는 것을 권장합니다",
+          "name": "기본 타입 집착",
+          "suggestion": "관련 기본 타입 필드를 값 객체(Value Object)로 캡슐화하세요"
+        },
+        "refused-bequest": {
+          "message": "{{className}}이(가) {{superClass}}에서 상속받았지만 새 멤버를 거의 추가하지 않았습니다 (메서드 {{methods}}개, 필드 {{fields}}개). 상속이 필요 없을 수 있습니다",
+          "name": "상속 거부",
+          "suggestion": "상속을 합성(Composition)으로 대체해 상속 계층을 줄이세요"
+        },
+        "shotgun-surgery": {
+          "message": {
+            "publicMethods": "{{className}}에 공용 메서드가 {{count}}개 있습니다. 특정 기능을 수정하면 여러 메서드를 변경해야 할 수 있습니다",
+            "sharedLiterals": "문자열 \"{{literal}}\"이(가) 파일 {{count}}개에 나타납니다. 공유 상수로 추출하는 것을 권장합니다"
+          },
+          "name": "산탄총 수술 (R09)",
+          "suggestion": {
+            "publicMethods": "책임별로 클래스를 더 작은 클래스로 분리해 수정 영향 범위를 줄이세요",
+            "sharedLiterals": "\"{{literal}}\"을(를) 공유 상수 파일로 추출해 한 곳에서만 수정하도록 관리하세요"
+          }
+        },
+        "switch-statement": {
+          "message": "{{target}}에서 switch 문을 {{count}}곳 사용합니다. 다형성으로 대체하는 것을 권장합니다",
+          "name": "Switch 문",
+          "suggestion": "switch/if-else if 체인을 전략 패턴 또는 다형성으로 교체하세요"
+        }
+      },
+      "warn": {
+        "detectorFailed": "감지기 {{name}} 실행 실패: {{error}}",
+        "dirAccessFailed": "디렉터리 {{dir}}에(에) 접근할 수 없습니다: {{error}}",
+        "gitDiffFailed": "Git diff 실패: {{error}}",
+        "parseFailed": "파일 {{count}}개를 분석할 수 없습니다 (예: {{example}})"
+      }
+    },
+    "remoteCleanUnsupported": "원격 모드에서는 로컬 정리를 지원하지 않습니다",
+    "remoteRestoreUnsupported": "원격 모드에서는 복원을 지원하지 않습니다",
+    "scoring": {
+      "insight": {
+        "decliningDimensions": "주목해야 할 차원: {{dimensions}}",
+        "empty": "기록 데이터가 없어 추세 분석을 생성할 수 없습니다",
+        "health": {
+          "a": "프로젝트 건강도가 우수합니다 (A 등급). 현재 방식을 유지하세요",
+          "b": "프로젝트 건강도가 양호합니다 (B 등급). 개선 여지가 있습니다",
+          "c": "프로젝트 건강도가 보통입니다 (C 등급). 취약한 부분에 주목하는 것을 권장합니다",
+          "d": "프로젝트 건강도가 낮습니다 (D 등급). 즉시 개선이 필요합니다"
+        },
+        "streak": {
+          "count": "{{direction}}이(가) {{count}}회 평가 동안 지속되었습니다",
+          "declining": "연속 하락",
+          "improving": "연속 개선",
+          "stable": "안정 유지"
+        },
+        "velocity": {
+          "declining": "점수가 지속 하락 중입니다 (속도 {{velocity}}/회). 주의가 필요합니다",
+          "rising": "점수 상승 추세가 뚜렷합니다 (속도 +{{velocity}}/회)"
+        },
+        "volatility": {
+          "high": "점수 변동이 큽니다. 개선이 안정적이지 않다는 뜻입니다",
+          "low": "점수 변화가 완만해 프로젝트 상태가 안정적입니다"
+        }
+      }
+    },
+    "security": {
+      "auditFailed": "audit 명령 실행 실패: {{error}}",
+      "auditInvalidOutput": "audit 출력이 유효한 JSON이 아닙니다",
+      "fixSoon": "가능한 빨리 수정하세요",
+      "garbage": {
+        "batchMissingOrCorrupt": "휴지통 배치가 없거나 손상되었습니다: {{batchId}}",
+        "fileMissingOrNotFile": "{{path}} (파일이 없거나 일반 파일이 아님)",
+        "pathOutOfBounds": "{{path}} (경로가 범위를 벗어나 거부됨)",
+        "restoreDestinationConflict": "{{path}} (원래 위치에 파일이 있어 건너뜀)",
+        "restoreOutOfBounds": "{{path}} (경로가 범위를 벗어나 복원 거부됨)",
+        "trashFileMissing": "{{path}} (휴지통 파일 없음)",
+        "trashNameConflict": "{{path}} (휴지통에 동일한 이름의 파일이 이미 존재함)",
+        "typeNotAutoCleanable": "{{path}} ({{type}} 유형은 자동 정리할 수 없음)"
+      },
+      "knownMaliciousNpmTitle": "알려진 악성 npm 패키지 (공급망 중독 블랙리스트)",
+      "knownMaliciousPypiTitle": "알려진 악성 PyPI 패키지 (공급망 중독 블랙리스트)",
+      "meta": {
+        "depcheck": "사용하지 않는 의존성 감지",
+        "grype": "의존성 취약점 교차 검증",
+        "ort": "라이선스 규정 준수 스캔",
+        "semgrep": "커스텀 보안 SOP 규칙 스캔",
+        "trivy": "의존성/파일/빌드 산출물/이미지 취약점 스캔"
+      },
+      "ortEvaluateLicense": "{{package}}의 라이선스 {{licenses}}이(가) 프로젝트와 호환되는지 평가합니다",
+      "ortRestrictedLicense": "{{package}}에 주의가 필요한 라이선스가 사용되었습니다: {{licenses}}",
+      "referencedBlacklistPackage": "{{file}}에서 블랙리스트 패키지 {{name}}을(를) 참조하고 있습니다",
+      "supplyChainThreat": "공급망 위협 감지: {{name}}",
+      "suspectedTyposquatTitle": "의심되는 사칭 패키지 (typosquatting)",
+      "tool": {
+        "depcheckExecFailed": "depcheck 실행 실패",
+        "depcheckNotInstalled": "depcheck가 설치되어 있지 않습니다",
+        "grypeExecFailed": "Grype 실행 실패",
+        "grypeNotInstalled": "Grype가 설치되어 있지 않습니다",
+        "ortExecFailed": "ORT 실행 실패",
+        "ortNotInstalled": "ORT가 설치되어 있지 않습니다",
+        "semgrepExecFailed": "Semgrep 실행 실패",
+        "semgrepNotInstalled": "Semgrep가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다",
+        "semgrepRulesDirMissing": "Semgrep 규칙 디렉터리가 없습니다. 먼저 클라우드 브레인 규칙을 동기화하세요",
+        "trivyExecFailed": "Trivy 실행 실패",
+        "trivyNotInstalled": "Trivy가 설치되어 있지 않습니다. trivy 설치 명령을 실행하세요"
+      },
+      "typosquatEvidence": "패키지 이름 {{name}}과(와) 인기 패키지 {{popular}}의 편집 거리가 {{distance}}입니다"
+    },
+    "toolchain": {
+      "license": {
+        "ortRedistributionNote": "전이 의존성 감사 필요",
+        "semgrepRedistributionNote": "Python 런타임 의존성의 업데이트 경로를 검토해야 합니다 (자체 업데이트 없음)",
+        "trivyRedistributionNote": "하위 프로세스 호출은 배포 가능 대상을 수정하지 않습니다. 내장 설치 패키지는 법무 검토 + 라이선스 고지가 필요합니다"
+      }
+    },
+    "unknownProject": "알 수 없는 프로젝트"
+  },
+  "layout": {
+    "about": "정보",
+    "aboutVersion": "ZhiYun Shield {{version}}",
+    "addProject": "프로젝트 추가",
+    "aiTool": "AI 도구",
+    "aiToolDesc": "Linter 프로토콜 · 진단 모니터링",
+    "aiToolEnableHintPrefix": "활성화하면 프로젝트에 ",
+    "aiToolEnableHintSuffix": " 및 OpenCode 명령 파일을 작성합니다. AI가 진단을 자동으로 읽고 수정할 수 있습니다",
+    "aiToolEnabled": "활성화됨: 검사 결과가 .zhshield/diagnostics/에 기록됩니다",
+    "aiToolToggle": "OpenCode 통합 전환",
+    "brandName": "ZhiYun Shield",
+    "brandSlogan": "코드 세계의 지능형 수호자",
+    "cancelTask": "작업 취소",
+    "collapseSidebar": "사이드바 접기",
+    "deleteProject": "프로젝트 {{name}} 삭제",
+    "engineBusy": "엔진 사용 중: 작업 {{count}}개 실행 중",
+    "engineIdle": "엔진 실행 중",
+    "engineOn": "지능형 엔진이 켜져 있습니다",
+    "engineStatus": "엔진 상태",
+    "expandSidebar": "사이드바 펼치기",
+    "language": "언어 관리",
+    "noProject": "추가된 프로젝트가 없습니다",
+    "noProjects": "프로젝트가 없습니다",
+    "projectManagement": "프로젝트 관리",
+    "queuePosition": "(대기 {{position}})",
+    "removeProjectMessage1": "보호 목록에서「{{name}}」을(를) 제거하시겠습니까?",
+    "removeProjectMessage2": "프로젝트 기록만 제거되며 프로젝트 파일은 삭제되지 않습니다.",
+    "removeProjectTitle": "프로젝트 제거",
+    "sidebarTitle": "설정",
+    "subprocessIsolation": "재스캔 작업이 하위 프로세스로 격리되었습니다 (UI 끊김 방지)",
+    "taskKind": {
+      "garbageClean": "쓰레기 정리",
+      "garbageRestore": "휴지통 복원",
+      "guard": "게이트 스캔",
+      "inspect": "품질 점검",
+      "performance": "성능 최적화",
+      "pipeline": "원클릭 점검",
+      "refactor": "코드 리팩토링",
+      "security": "보안 스캔"
+    },
+    "taskStatus": {
+      "cancelled": "취소됨",
+      "done": "완료됨",
+      "failed": "실패",
+      "queued": "대기 중",
+      "running": "실행 중"
+    },
+    "theme": "테마 관리",
+    "themeDracula": "잉크 블랙",
+    "themeLegacy": "클래식 그린",
+    "themeTeal": "청록",
+    "toolsDegraded": "외부 도구 축소: {{tools}} 없음",
+    "toolsPathHint": "시스템 PATH에 설치하면 이 알림이 사라집니다"
+  },
+  "lifecycle": {
+    "archive": "보관",
+    "detect": "감지",
+    "fix": "수정",
+    "validate": "검증"
+  },
+  "mcp": {
+    "categoryFilterDesc": "카테고리별 필터링 (예: performance / security / quality / architecture)",
+    "cliNotFound": "zhshield CLI를 찾을 수 없습니다. 먼저 pnpm build를 실행하세요",
+    "commandDoneNoOutput": "{{command}} 완료 (출력 없음)",
+    "commandFailed": "{{command}} 실행 실패",
+    "diagnosticsUnparseable": "진단 파일을 분석할 수 없습니다",
+    "fileNotFound": "파일이 없습니다: .zhshield/{{relativePath}}",
+    "getDiagnosticsDesc": "ZhiYun Shield의 가장 최근 점검 진단 결과를 읽습니다 (.zhshield/diagnostics/latest.json)",
+    "getIntegrationDesc": "ZhiYun Shield의 통합 설정을 읽습니다 (.zhshield/integration.json). 자동 트리거, 필터, 자동 수정 등의 설정이 포함됩니다",
+    "getIssuesDesc": "ZhiYun Shield의 가장 최근 점검 issues를 가져옵니다 (심각도/카테고리/소스별 필터 지원). {ok,total,issues} JSON을 반환합니다",
+    "guardProjectPathDesc": "검사할 프로젝트 루트 디렉터리",
+    "guardSopModeDesc": "SOP 규칙 기반 모드 사용",
+    "inspectProjectPathDesc": "점검할 프로젝트 루트 디렉터리",
+    "projectPathDesc": "프로젝트 루트 디렉터리. 기본값은 현재 작업 디렉터리",
+    "runGuardDesc": "ZhiYun Shield 게이트 검사를 트리거합니다 (zhshield guard --dry-run 호출). 보고만 하고 차단하지 않는 모드로 코드를 검사합니다",
+    "runInspectDesc": "ZhiYun Shield 점검을 트리거합니다 (zhshield inspect 호출). 코드 품질 문제를 스캔하고 보고서를 반환합니다",
+    "severityFilterDesc": "심각도별 필터링",
+    "sopModeDesc": "SOP 규칙 기반 모드 사용 (기본값: checks.json 모드)",
+    "sourceFilterDesc": "소스 엔진별 필터링"
+  },
+  "nav": {
+    "backup": "백업 센터",
+    "dashboard": "프로젝트 점검",
+    "deps": "의존성 점검",
+    "evolve": "규칙 진화",
+    "garbage": "쓰레기 정리",
+    "guard": "게이트 점검",
+    "inspect": "지능형 점검",
+    "performance": "성능 최적화",
+    "refactor": "코드 리팩토링",
+    "reports": "보고서 센터",
+    "security": "보안 스캔",
+    "sentinel": "센티넬 모니터링",
+    "techdebt": "기술 부채"
+  },
+  "page": {
+    "backup": {
+      "backingUp": "백업 중...",
+      "deleteMessage": "이 백업 기록을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "deleteTitle": "백업 기록 삭제",
+      "detail": {
+        "backupId": "백업 ID: {{id}}",
+        "commit": "커밋: {{hash}}",
+        "error": "오류: {{error}}",
+        "fileCount": "파일 수: {{count}}",
+        "github": "GitHub: ",
+        "localPath": "로컬 경로: {{path}}",
+        "size": "크기: {{size}}",
+        "trigger": "트리거 방식: {{mode}}"
+      },
+      "empty": {
+        "feature": {
+          "config": {
+            "desc": "스캔 규칙, 프로젝트 설정 및 환경 설정 백업",
+            "title": "설정 백업"
+          },
+          "restore": {
+            "desc": "백업 기록에서 환경과 설정을 빠르게 복원",
+            "title": "데이터 복원"
+          },
+          "rules": {
+            "desc": "커스텀 규칙 세트를 내보내 규칙 유실을 방지",
+            "title": "규칙 백업"
+          },
+          "sync": {
+            "desc": "로컬 안전 디렉터리에 정기 백업하여 유실 위험을 줄임",
+            "title": "자동 동기화"
+          }
+        },
+        "lastBackup": "마지막 백업: {{date}}",
+        "title": "중요한 설정을 보호해 데이터를 잃지 마세요"
+      },
+      "noRecords": "백업 기록이 없습니다",
+      "oneClickBackup": "원클릭 백업",
+      "openFolder": "폴더 열기",
+      "recordCount": "백업 기록 {{count}}건",
+      "recordsTitle": "백업 기록",
+      "result": {
+        "duration": "{{time}} · 소요 시간 {{duration}}ms"
+      },
+      "status": {
+        "failed": "실패",
+        "partial": "부분 성공",
+        "success": "성공"
+      },
+      "title": "데이터 백업",
+      "toast": {
+        "completed": "백업 완료: {{status}}",
+        "deleteFailed": "삭제 실패",
+        "deleted": "백업 기록이 삭제되었습니다",
+        "failed": "백업 실행 실패",
+        "success": "백업 성공"
+      },
+      "trigger": {
+        "manual": "수동",
+        "schedule": "정기"
+      },
+      "type": {
+        "full": "전체",
+        "githubOnly": "GitHub만",
+        "localOnly": "로컬만"
+      }
+    },
+    "dashboard": {
+      "autoFix": "🤖 자동 수정",
+      "axis": {
+        "governance": {
+          "desc": "코드 품질과 규범 관리",
+          "label": "거버넌스"
+        },
+        "ops": {
+          "desc": "프로젝트의 장기적인 건강한 운영 보장",
+          "label": "운영"
+        },
+        "security": {
+          "desc": "코드와 공급망 보안 수호",
+          "label": "보안"
+        }
+      },
+      "check": "원클릭 점검",
+      "copy": {
+        "guardSource": "게이트·예방",
+        "inspectSource": "점검"
+      },
+      "feature": {
+        "backup": {
+          "desc": "설정과 규칙을 원클릭으로 백업해 데이터 유실 방지"
+        },
+        "inspect": {
+          "desc": "코드 품질, 문서, 의존성 건강도를 정기적으로 검사"
+        },
+        "performance": {
+          "desc": "런타임 성능 안티패턴을 발견해 실행 효율 최적화"
+        },
+        "refactor": {
+          "desc": "코드 악취를 감지해 기술 부채 제거"
+        },
+        "reports": {
+          "desc": "과거 검사 보고서와 건강 추세 확인"
+        },
+        "security": {
+          "desc": "취약점, 민감 정보, 악성 코드를 원클릭으로 점검"
+        }
+      },
+      "guardSlogan": "지능형 수호자: 보안 · 거버넌스 · 운영",
+      "productIntro": {
+        "subtitle": "보안, 거버넌스, 운영을 핵심으로 모든 코드 라인을 수호합니다",
+        "title": "코드 세계의 지능형 수호자"
+      },
+      "progress": "진행률 {{progress}}%",
+      "result": {
+        "allPassed": "실행된 검사 항목이 모두 통과했습니다. 건너뛴 항목이 많다면 ESLint / Semgrep 등의 도구를 설치한 후 다시 점검하면 더 완전한 결과를 얻을 수 있습니다.",
+        "backHome": "홈으로 돌아가기",
+        "header": {
+          "configureHint": "게이트 검사와 센티넬 모니터링은 상단의 해당 메뉴에서 개별적으로 켜고 끌 수 있습니다.",
+          "coverage": "이번 점검은 품질 검사 {{inspectTotal}}개 항목을 포함합니다.",
+          "failed": "점검에서 문제 발견",
+          "passed": "원클릭 점검 완료",
+          "skipped": "그중 {{skipped}}개 항목은 도구가 설치되지 않아 건너뛰었습니다."
+        },
+        "issuesTitle": "주목할 문제",
+        "rerun": "다시 점검",
+        "scopeTitle": "이번 점검 범위",
+        "stage": {
+          "guard": "게이트",
+          "inspect": "점검"
+        },
+        "stats": {
+          "issues": "문제",
+          "passed": "통과",
+          "skipped": "건너뜀",
+          "total": "검사 항목"
+        }
+      },
+      "ring": {
+        "healthScore": "건강 점수",
+        "notChecked": "아직 점검하지 않음"
+      },
+      "running": "점검 진행 중…",
+      "sanitize": {
+        "autoFixStarted": "OpenCode 자동 수정이 시작되었습니다",
+        "autoFixing": "자동 수정 중…",
+        "done": "점검 완료",
+        "guarding": "게이트 검사 중…",
+        "inspecting": "품질 점검 중…",
+        "loadingRules": "점검 규칙 로드 중…"
+      },
+      "scope": {
+        "inspect": "품질 점검",
+        "item": {
+          "complexity": "코드 복잡도/규범",
+          "deps": "의존성 감사",
+          "docs": "문서 완전성",
+          "nest": "Nest/모듈 규범",
+          "tsType": "TypeScript 타입 안전성"
+        }
+      },
+      "stageGuard": "· 게이트",
+      "stageInspect": "· 점검",
+      "toast": {
+        "addProjectFirst": "먼저 점검할 프로젝트를 추가하세요",
+        "completed": "점검 완료: 검사 {{total}}개, 통과 {{passed}}개",
+        "copiedIssues": "문제 {{count}}건이 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+        "copyFailed": "복사 실패",
+        "executionFailed": "점검 실행 실패",
+        "failed": "점검 실행 실패: {{error}}",
+        "foundIssues": "점검 완료: 문제 {{count}}건 발견",
+        "noValidItems": "점검이 완료되었지만 유효한 검사 항목이 실행되지 않았습니다 (프로젝트 경로를 확인하세요)"
+      },
+      "welcome": "ZhiYun Shield에 오신 것을 환영합니다"
+    },
+    "deps": {
+      "checking": "점검 중...",
+      "done": "의존성 점검 완료",
+      "ecosystem": "생태계",
+      "empty": {
+        "start": "점검 시작",
+        "subtitle": "잠금 파일과 의존성 매니페스트를 분석해 의존성 그래프를 그리고 완전성을 검증합니다",
+        "title": "의존성을 점검해 그래프를 파악하세요"
+      },
+      "errorTitle": "점검 실패",
+      "feature": {
+        "graph": {
+          "desc": "직접/전이 의존성과 엣지 관계를 한눈에 파악",
+          "title": "의존성 그래프"
+        },
+        "license": {
+          "desc": "네 가지 라이선스 분류와 고위험 목록",
+          "title": "라이선스 매트릭스"
+        },
+        "lockfile": {
+          "desc": "존재성/일관성/해시 무결성 3중 검증",
+          "title": "잠금 파일 검증"
+        }
+      },
+      "license": "라이선스 매트릭스",
+      "license.permissive": "관대한 라이선스",
+      "license.risk.high": "고위험",
+      "license.risk.low": "저위험",
+      "license.risk.medium": "중간 위험",
+      "license.risk.unknown": "위험도 알 수 없음",
+      "license.strongCopyleft": "강한 카피레프트",
+      "license.unknown": "알 수 없는 라이선스",
+      "license.weakCopyleft": "약한 카피레프트",
+      "licenseHighRisk": "고위험 목록",
+      "licenseNoRisks": "고위험 라이선스가 발견되지 않았습니다",
+      "licenseTotal": "라이선스 총 {{count}}개",
+      "lockfile": "잠금 파일 상태",
+      "lockfile.consistent": "매니페스트 선언과 일치",
+      "lockfile.integrityFailed": "해시 검증 실패",
+      "lockfile.integrityVerified": "해시 검증 통과",
+      "lockfile.notConsistent": "매니페스트 선언과 불일치",
+      "lockfile.notPresent": "잠금 파일 없음",
+      "lockfile.present": "잠금 파일이 존재하고 분석 가능",
+      "overview": "의존성 개요",
+      "overviewDirect": "직접 의존성",
+      "overviewEdges": "의존성 엣지 수",
+      "overviewTotal": "총 의존성 수",
+      "overviewTransitive": "전이 의존성",
+      "rescan": "다시 점검",
+      "summary": "직접 의존성 {{direct}}개 · 전이 의존성 {{transitive}}개 · 의존성 엣지 {{edges}}개",
+      "trust": "신뢰 상태",
+      "trust.compromised": "손상됨",
+      "trust.suspicious": "의심됨",
+      "trust.unknown": "알 수 없음",
+      "trust.verified": "신뢰됨"
+    },
+    "evolve": {
+      "analyze": "아키텍처 분석",
+      "archScore": "아키텍처 건강도",
+      "empty": {
+        "feature": {
+          "coupling": {
+            "desc": "높은 결합도 모듈과 순환 의존성 식별",
+            "title": "결합도 분석"
+          },
+          "directory": {
+            "desc": "패키지 디렉터리 구분과 경계의 합리성 평가",
+            "title": "디렉터리 구조"
+          },
+          "graph": {
+            "desc": "모듈 참조 관계와 계층 구조 시각화",
+            "title": "의존성 그래프"
+          },
+          "suggest": {
+            "desc": "아키텍처 분리, 수렴, 최적화 방향 제시",
+            "title": "진화 제안"
+          }
+        },
+        "subtitle": "아키텍처 건강도 점수: --",
+        "title": "프로젝트 아키텍처를 파악하고 진화 경로를 계획하세요"
+      },
+      "emptyAnalyzing": "프로젝트 아키텍처를 분석하는 중...",
+      "emptyDone": "분석 완료. 현재 조정할 규칙이 없습니다",
+      "emptyHint": "게이트 검사나 센티넬 모니터링에서 오탐 문제를 오탐으로 표시해 피드백하면, 진화 엔진이 규칙 가중치를 자동 보정하고 최적화 제안을 생성합니다.",
+      "header": {
+        "count": "최적화 제안 {{suggestions}}건 · 추적 규칙 {{weights}}건"
+      },
+      "stats": {
+        "adjusted": "가중치 조정됨",
+        "highFp": "오탐 많음",
+        "suggestions": "최적화 제안",
+        "weights": "추적 규칙"
+      },
+      "suggestion": {
+        "confidence": "신뢰도: {{confidence}}%"
+      },
+      "title": "진화 엔진",
+      "weight": {
+        "fpRate": "오탐률: {{rate}}%",
+        "samples": "샘플: {{samples}}"
+      },
+      "weights": "규칙 가중치"
+    },
+    "garbage": {
+      "cleanButton": "원클릭 정리",
+      "cleanButtonCount": "원클릭 정리 ({{count}})",
+      "cleanFailed": "정리 실패, 다시 시도해 주세요",
+      "cleanFailedCount": "{{count}}개 항목을 정리하지 못했습니다 (경로 범위 초과 / 파일 사용 중 등)",
+      "cleaned": "{{count}}개 항목 정리됨 · {{size}} 확보",
+      "cleaning": "정리 중...",
+      "dependencyHint": "사용하지 않는 의존성은 자동 삭제되지 않습니다. 참조가 없음을 확인한 뒤 package.json에서 수동으로 제거할 수 있습니다",
+      "done": "쓰레기 정리 완료",
+      "empty": {
+        "subtitle": "사용하지 않는 파일, 중복 의존성, 죽은 코드 스캔",
+        "title": "쓸모없는 파일을 정리해 프로젝트 부담을 줄이세요"
+      },
+      "emptyList": "프로젝트가 깨끗합니다. 정리할 쓰레기가 없습니다",
+      "feature": {
+        "deadCode": {
+          "desc": "도달할 수 없는 코드 분기 감지"
+        },
+        "duplicateCode": {
+          "desc": "병합 가능한 중복 구현 위치 파악"
+        },
+        "unusedDependency": {
+          "desc": "매니페스트에서 참조되지 않는 의존성 패키지 찾기"
+        },
+        "unusedFile": {
+          "desc": "참조되지 않는 리소스와 잔여 파일 식별"
+        }
+      },
+      "rescan": "다시 스캔",
+      "restore": "복원",
+      "restoreFailed": "복원 실패, 다시 시도해 주세요",
+      "restoreFailedCount": "{{count}}개 항목 복원 실패 (원래 위치에 파일이 이미 존재할 수 있음)",
+      "restored": "{{count}}개 항목 복원됨 · {{size}}, 목록이 갱신되었습니다",
+      "restoring": "복원 중...",
+      "scanning": "스캔 중...",
+      "selectAll": "전체 선택",
+      "selectedCount": "선택된 항목 {{count}}개",
+      "startScan": "스캔 시작",
+      "stats": {
+        "freeable": "확보 가능한 공간",
+        "items": "쓰레기 항목"
+      },
+      "summary": "쓰레기 {{count}}개 · 확보 가능 {{size}}",
+      "type": {
+        "deadCode": "죽은 코드",
+        "duplicateCode": "중복 코드",
+        "unusedDependency": "미사용 의존성",
+        "unusedFile": "쓸모없는 파일"
+      }
+    },
+    "guard": {
+      "banner": {
+        "fail": "게이트 차단 · 미통과 항목 있음",
+        "pass": "게이트 정상 · 보호 중",
+        "warn": "경고 존재 · 주의 필요"
+      },
+      "blockedCount": "차단 {{count}}",
+      "blockingCount": "차단 {{count}}회",
+      "checkCount": "검사 {{count}}개",
+      "copiedAll": "문제 {{count}}건이 모두 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+      "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "duration": "스캔 소요 시간 {{duration}}ms",
+      "falsePositiveCount": "오탐 피드백 {{count}}건",
+      "falsePositiveSubmitted": "오탐 피드백이 제출되었습니다. 규칙 보정에 사용됩니다",
+      "history": {
+        "subtitle": "hook 자동 트리거 + 수동 스캔 저장",
+        "title": "최근 차단 기록"
+      },
+      "idleSubtitle": "코드 변경을 실시간 보호하며 커밋/푸시/CI 단계에서 자동 차단",
+      "lastBlockAt": "최근 {{time}}",
+      "lastScan": "마지막 스캔 · {{time}}",
+      "level": {
+        "L3": "CI 게이트"
+      },
+      "markFalsePositive": "오탐으로 표시",
+      "reportFailed": "제출 실패",
+      "scan": "즉시 스캔",
+      "scanning": "스캔 중...",
+      "source": "게이트·예방",
+      "stats": {
+        "blocked": "차단",
+        "passed": "통과",
+        "totalChecks": "검사 항목",
+        "warnings": "경고"
+      },
+      "status": {
+        "fail": "차단",
+        "idle": "미발동",
+        "pass": "통과",
+        "warn": "경고"
+      },
+      "statusShort": {
+        "fail": "게이트 차단",
+        "idle": "보호 중",
+        "pass": "게이트 정상",
+        "warn": "경고 존재"
+      },
+      "table": {
+        "colCheck": "검사 항목",
+        "colDetail": "상세",
+        "colResult": "결과",
+        "colSeverity": "심각도"
+      },
+      "trigger": {
+        "manual": "수동 스캔",
+        "preCommit": "커밋 게이트",
+        "prePush": "푸시 게이트"
+      },
+      "warningCount": "경고 {{count}}"
+    },
+    "inspect": {
+      "checksPassed": "검사 통과",
+      "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "done": "점검 완료",
+      "empty": {
+        "subtitle": "매일 자정 이후 빌드 산출물, License, 의존성, 쓰레기 정리를 자동 점검합니다. 바로 점검 버튼으로 실행할 수도 있습니다",
+        "title": "빌드 산출물을 검사해 납품 품질을 보장하세요"
+      },
+      "feature": {
+        "build": {
+          "desc": "dist 산출물의 규범, 완전성, 출력 디렉터리 검증",
+          "title": "빌드 산출물 검사"
+        },
+        "dependency": {
+          "desc": "중복, 미사용, 버전 충돌 의존성 감지",
+          "title": "의존성 분석"
+        },
+        "garbage": {
+          "desc": "임시 파일, 캐시, 쓸모없는 산출물 발견 및 정리",
+          "title": "쓰레기 정리"
+        },
+        "license": {
+          "desc": "오픈소스 라이선스 호환성과 규정 준수 위험 식별",
+          "title": "License 스캔"
+        }
+      },
+      "passedCount": "{{passed}}/{{total}}개 항목 통과",
+      "scanNow": "지금 점검",
+      "scanning": "점검 중...",
+      "source": "점검",
+      "status": {
+        "fail": "실패",
+        "pass": "통과",
+        "warn": "경고"
+      }
+    },
+    "performance": {
+      "autoFixable": "자동 수정 가능",
+      "copyAllHint": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "detecting": "감지 중...",
+      "header": {
+        "issueCount": "성능 문제 {{count}}곳",
+        "title": "성능 감지 완료"
+      },
+      "noIssues": "성능 문제가 발견되지 않았습니다",
+      "rescan": "다시 감지",
+      "scanning": "성능 감지 중...",
+      "score": {
+        "fixable": "수정 가능 {{count}}",
+        "health": "성능 건강도"
+      },
+      "severity": {
+        "high": "높은 우선순위",
+        "low": "낮은 우선순위",
+        "medium": "중간 우선순위"
+      },
+      "shell": {
+        "featureComplexity": {
+          "desc": "비효율적 루프, 중첩 순회, 중복 계산 감지",
+          "title": "런타임 복잡도"
+        },
+        "featureModernApi": {
+          "desc": ".at, spread 등 고성능 기법으로 기존 API를 대체하는 것을 권장",
+          "title": "모던 API"
+        },
+        "featureReDoS": {
+          "desc": "정규식 치명적 역추적 위험 식별",
+          "title": "ReDoS 감지"
+        },
+        "featureTimer": {
+          "desc": "setTimeout / setInterval 남용과 메모리 누수 감지",
+          "title": "타이머 최적화"
+        },
+        "start": "성능 감지 시작",
+        "subtitle": "비효율적인 배열 순회, 정규식 반복 컴파일, 중복 할당 등 성능 문제 스캔",
+        "title": "런타임 성능 안티패턴을 감지해 실행 효율을 최적화하세요"
+      },
+      "source": "성능",
+      "suggestion": "제안: {{suggestion}}"
+    },
+    "refactor": {
+      "addProjectFirst": "먼저 대시보드에서 프로젝트를 추가하세요",
+      "groupedIssues": "리팩토링 문제 (유형별 그룹)",
+      "groupsSummary": "유형 {{groups}}개 · {{total}}곳",
+      "header": {
+        "lastAutoCheck": " · 마지막 자동 검사 {{time}}",
+        "summary": "코드 악취 {{totalSmells}}곳 · 리팩토링할 파일 {{files}}개",
+        "title": "리팩토링 분석 완료"
+      },
+      "noSmells": "✓ 코드 악취가 감지되지 않았습니다",
+      "scanFailed": "스캔 실패: {{message}}",
+      "scanNow": "지금 검사",
+      "scanning": "스캔 중...",
+      "scanningEllipsis": "리팩토링 스캔 중…",
+      "severity": {
+        "error": "차단",
+        "warning": "권장"
+      },
+      "shell": {
+        "featureAutoFix": {
+          "desc": "권장 리팩토링 방안을 원클릭 적용해 기술 부채 감소",
+          "title": "자동 수정"
+        },
+        "featureDaily": {
+          "desc": "매일 자정 이후 자동 스캔으로 코드 품질 지속 추적",
+          "title": "매일 자동 검사"
+        },
+        "featureGrouping": {
+          "desc": "유형별로 다양한 리팩토링 문제와 수정 제안 확인",
+          "title": "규칙 그룹화"
+        },
+        "featureSmell": {
+          "desc": "중복 코드, 과도하게 긴 함수, 높은 순환 복잡도 등 문제 감지",
+          "title": "코드 악취"
+        },
+        "subtitle": "매일 코드 중복, 코드 악취, 과도하게 긴 함수 등을 자동 검사하고 권장 리팩토링 방안을 원클릭 적용",
+        "title": "코드 구조를 최적화해 기술 부채를 제거하세요"
+      },
+      "smell": {
+        "callbackHell": "콜백 지옥",
+        "dataClass": "데이터 클래스",
+        "dataClumps": "데이터 뭉치",
+        "deepNesting": "깊은 중첩",
+        "duplicatedCode": "중복 코드",
+        "featureEnvy": "기능 선망",
+        "godObject": "갓 오브젝트",
+        "inappropriateIntimacy": "부적절한 친밀감",
+        "largeClass": "갓 오브젝트/대형 클래스",
+        "lazyClass": "잉여 클래스",
+        "longMethod": "초대형 함수",
+        "longParameterList": "과다한 매개변수",
+        "messageChains": "메시지 체인",
+        "middleMan": "중간자",
+        "mixedResponsibilities": "다중 책임 혼합",
+        "oversizedComponent": "초대형 컴포넌트",
+        "oversizedFile": "초대형 파일",
+        "primitiveObsession": "기본 타입 집착",
+        "refusedBequest": "상속 거부",
+        "shotgunSurgery": "산탄총 수술",
+        "switchStatement": "Switch 문"
+      },
+      "smellCount": "{{count}}곳",
+      "source": "리팩토링",
+      "stats": {
+        "files": "리팩토링 필요 파일",
+        "highPriority": "높은 우선순위",
+        "smells": "코드 악취"
+      },
+      "suggestion": "제안: {{suggestion}}"
+    },
+    "reports": {
+      "empty": {
+        "feature": {
+          "email": {
+            "desc": "보고서를 팀원에게 원클릭 전송",
+            "title": "이메일 전송"
+          },
+          "pdf": {
+            "desc": "공유 가능한 전문 품질 보고서 생성",
+            "title": "PDF 내보내기"
+          },
+          "scoring": {
+            "desc": "보안, 성능, 품질, 아키텍처 건강 점수 종합",
+            "title": "다차원 채점"
+          },
+          "trend": {
+            "desc": "각 스캔의 점수 변화 추이 추적",
+            "title": "추세 비교"
+          }
+        },
+        "subtitle": "보고서 {{count}}건이 생성되었습니다. 최근 업데이트: {{date}}",
+        "title": "다차원 분석 보고서로 더 근거 있는 의사결정을 하세요"
+      },
+      "generate": "보고서 생성",
+      "header": {
+        "count": "보고서 총 {{count}}건 · 최근 업데이트 {{date}}",
+        "generate": "📊 보고서 생성"
+      },
+      "scoreLabel": {
+        "danger": "위험",
+        "excellent": "우수",
+        "good": "양호",
+        "needsImprovement": "개선 필요"
+      },
+      "table": {
+        "abnormal": "이상",
+        "col": {
+          "date": "날짜",
+          "dimension": "차원",
+          "score": "점수",
+          "status": "상태",
+          "summary": "요약"
+        },
+        "healthy": "건강"
+      },
+      "title": "분석 보고서"
+    },
+    "security": {
+      "checking": "검사 중...",
+      "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "done": "보안 검사 완료",
+      "empty": {
+        "subtitle": "파일 0개 검사, 고위험 취약점 0개 발견",
+        "title": "취약점을 심층 스캔하고 보안 위험을 수정하세요"
+      },
+      "feature": {
+        "dependency": {
+          "desc": "알려진 CVE가 있는 오래되었거나 안전하지 않은 의존성 식별",
+          "title": "의존성 검사"
+        },
+        "malware": {
+          "desc": "리버스 셸, 백도어, 공급망 중독 등 악성 코드 특성 스캔"
+        },
+        "standard": {
+          "desc": "안전한 코딩 규범과 규정 준수 기준선 검증",
+          "title": "규범 검사"
+        },
+        "vuln": {
+          "desc": "코드 주입, XSS, SSRF 등 일반적인 보안 취약점 감지"
+        }
+      },
+      "fixAll": "원클릭 수정",
+      "lowRisk": "저위험 {{count}}",
+      "malware": {
+        "backdoor": "백도어",
+        "cryptoRansomware": "랜섬웨어",
+        "dataExfiltration": "데이터 유출",
+        "privilegeEscalation": "권한 상승",
+        "reverseShell": "리버스 셸",
+        "supplyChain": "공급망 중독",
+        "suspiciousBehavior": "의심스러운 동작"
+      },
+      "malwareCount": "악성 코드 {{count}}",
+      "noFindings": "보안 문제가 발견되지 않았습니다",
+      "noMalware": "악성 코드가 발견되지 않았습니다",
+      "recommendation": "제안: {{recommendation}}",
+      "rescan": "다시 검사",
+      "scoreLabel": "보안 점수",
+      "source": "보안",
+      "summary": "취약점 {{vulns}}건 · 악성 코드 {{malware}}곳 · 쓰레기 {{garbage}}건",
+      "tab": {
+        "malware": "바이러스 검사",
+        "vuln": "취약점 스캔"
+      }
+    },
+    "sentinel": {
+      "aiFixSource": "센티넬·모니터링",
+      "copyAllHint": "이벤트 총 {{count}}건. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "falsePositiveSubmitted": "오탐 피드백이 제출되었습니다. 규칙 보정에 사용됩니다",
+      "headerSummary": "이벤트 {{count}}건 모니터링 · 처리 대기 {{activeCount}}건",
+      "markFalsePositive": "오탐으로 표시",
+      "occurrenceCount": "발생 {{count}}회",
+      "refreshing": "새로고침 중...",
+      "shell": {
+        "buttonRunning": "모니터링 실행 중",
+        "buttonStart": "모니터링 시작",
+        "featureAlert": {
+          "desc": "고위험 / Critical 이벤트 발생 시 알림",
+          "title": "자동 알림"
+        },
+        "featureHistory": {
+          "desc": "과거 이상 항목 상세와 처리 기록 확인",
+          "title": "기록 추적"
+        },
+        "featureRealtime": {
+          "desc": "코드 변경을 지속 모니터링하고 이상 이벤트를 즉시 보고",
+          "title": "실시간 모니터링"
+        },
+        "featureScope": {
+          "desc": "모니터링할 파일, 디렉터리, 규칙 범위 커스터마이징",
+          "title": "모니터링 범위"
+        },
+        "subtitleIdle": "현재 0개 파일을 모니터링 중입니다. 아래 버튼을 눌러 시작하세요",
+        "subtitleMonitoring": "모니터링 중 (자동, 24/7) — 현재 프로젝트를 보호하고 있습니다",
+        "titleIdle": "24시간 무중단 모니터링으로 이상을 놓치지 마세요",
+        "titleMonitoring": "모니터링이 시작되었습니다. 이상을 놓치지 않습니다"
+      },
+      "source": {
+        "backend": "백엔드",
+        "frontend": "프론트엔드",
+        "infrastructure": "인프라",
+        "middleware": "미들웨어"
+      },
+      "stackLabel": "스택",
+      "stats": {
+        "active": "처리 대기",
+        "falsePositive": "오탐 피드백",
+        "total": "총 이벤트"
+      },
+      "submitFailed": "제출 실패",
+      "type": {
+        "crash": "크래시",
+        "frontendError": "프론트엔드 오류",
+        "httpError": "HTTP 오류",
+        "memoryLeak": "메모리 누수",
+        "performanceDegradation": "성능 저하",
+        "runtimeException": "런타임 예외",
+        "securityIncident": "보안 사고",
+        "timeout": "시간 초과",
+        "whiteScreen": "흰 화면"
+      }
+    },
+    "techdebt": {
+      "byCategory": "부채 구성",
+      "byModule": "부채 분포",
+      "category": {
+        "architecture": "아키텍처 문제",
+        "dependency": "의존성 문제",
+        "duplication": "중복 코드",
+        "quality": "품질 문제",
+        "security": "보안 문제"
+      },
+      "categoryDesc": {
+        "security": "보안 취약점 — 미처리 예외, 안전하지 않은 설정 등 코드에 존재하는 보안 위험",
+        "architecture": "아키텍처 문제 — 순환 의존성, 높은 모듈 결합도 등 비합리적인 코드 구조",
+        "quality": "코드 품질 — 과도하게 긴 함수, 부적절한 네이밍 등 코딩 규범 미준수",
+        "duplication": "중복 코드 — 동일하거나 유사한 코드 조각이 유지보수 비용을 증가시킴",
+        "dependency": "의존성 문제 — 오래되었거나 위험성이 있는 의존 패키지"
+      },
+      "categoryTotal": "문제 총 {{count}}건",
+      "categoryWeight": "가중치 {{weight}}%",
+      "checking": "점검 중...",
+      "debtIndex": "부채 지수",
+      "done": "기술 부채 대시보드",
+      "intro": {
+        "title": "부채 구성 안내"
+      },
+      "empty": {
+        "start": "점검 시작",
+        "subtitle": "스캔 문제와 모듈 활동성을 분석해 이자와 원금을 추정하고 ROI 순으로 상환 제안을 제공합니다",
+        "title": "기술 부채를 정량화해 점수를 행동으로 바꾸세요"
+      },
+      "errorTitle": "점검 실패",
+      "factor": {
+        "density": "밀도",
+        "exposure": "노출",
+        "hotness": "활동성",
+        "severity": "심각도"
+      },
+      "feature": {
+        "action": {
+          "desc": "이자 ÷ 원금 순서로 정렬해 높은 ROI 조치에 집중",
+          "title": "상환 제안"
+        },
+        "composition": {
+          "desc": "보안, 아키텍처, 품질, 중복, 의존성 5가지 부채 유형 안내",
+          "title": "부채 구성"
+        },
+        "index": {
+          "desc": "0-100으로 기술 부채의 총 부담 정량화",
+          "title": "부채 지수"
+        },
+        "module": {
+          "desc": "모듈과 유형별로 부채 핫스팟 파악",
+          "title": "부채 분포"
+        }
+      },
+      "interestBreakdown": "이자 구성",
+      "interestScore": "이자 {{score}}",
+      "moduleHint": "모듈 이름 · 비율 · 변경 횟수",
+      "moduleHotness": "변경 {{count}}회",
+      "noDebt": "기술 부채가 발견되지 않았습니다. 계속 유지하세요",
+      "overview": "부채 개요",
+      "overviewActions": "상환 제안",
+      "overviewCategories": "부채 유형",
+      "overviewModules": "부채 모듈",
+      "principalEstimate": "원금 약 {{value}}인일 (추정)",
+      "recommended": "추천",
+      "rescan": "다시 점검",
+      "roi": "ROI {{roi}}",
+      "status": {
+        "dismissed": "무시됨",
+        "inProgress": "진행 중",
+        "pending": "처리 대기",
+        "planned": "계획됨",
+        "repaid": "상환됨"
+      },
+      "source": "기술 부채",
+      "summary": "부채 지수 {{index}} · 상환 제안 {{actions}}건",
+      "topActions": "Top 제안 목록",
+      "topActionsHint": "이자 ÷ 원금 순서로 정렬",
+      "trend": {
+        "better": "이전 기간보다 {{delta}} 개선",
+        "flat": "이전 기간과 동일",
+        "period": {
+          "month": "최근 1개월",
+          "quarter": "최근 1분기",
+          "week": "최근 1주"
+        },
+        "worse": "이전 기간보다 {{delta}} 악화"
+      },
+      "trendLabel": "부채 추세"
+    },
+    "welcome": {
+      "addProject": "+ 프로젝트 추가, 보호 시작",
+      "axis": {
+        "governance": "거버넌스",
+        "ops": "운영",
+        "security": "보안"
+      },
+      "brand": "ZhiYun Shield",
+      "cloudOn": "클라우드 브레인이 활성화되었습니다",
+      "engineOn": "지능형 엔진이 활성화되었습니다",
+      "sloganTitle": "코드 세계의 지능형 수호자",
+      "stat": {
+        "healthScore": "건강 점수",
+        "protectedProjects": "보호 중인 프로젝트",
+        "times": "{{count}}회",
+        "totalBlocked": "누적 차단"
+      }
+    }
+  },
+  "pipeline": {
+    "autofix": {
+      "started": "문제가 발견되어 OpenCode 자동 수정이 시작되었습니다 (오류 {{errors}}건 / 경고 {{warnings}}건)"
+    },
+    "complete": {
+      "done": "점검 완료",
+      "foundIssues": "점검에서 문제 {{count}}건 발견",
+      "total": "점검 완료: 검사 {{count}}건"
+    },
+    "exitError": {
+      "logHintPrefix": "; 하위 프로세스 로그: ",
+      "message": "엔진 하위 프로세스가 비정상 종료되었습니다 (code={{code}}, signal={{signal}})",
+      "stageHintPrefix": ", 마지막 진행률: "
+    },
+    "garbage": {
+      "cleaning": "쓰레기 파일 정리 중…",
+      "done": "정리 완료: {{count}}개",
+      "restoreDone": "복원 완료: {{count}}개",
+      "restoring": "정리 파일 복원 중…"
+    },
+    "guard": {
+      "failed": "게이트 미통과: 처리할 항목 {{count}}개",
+      "failedBrief": "게이트 미통과: {{count}}개",
+      "jobDone": "게이트 스캔 완료",
+      "jobScanning": "게이트 스캔 중…",
+      "scanning": "게이트 검사 중…",
+      "sopScanning": "게이트 검사 중 (민감 정보 / ESLint / 아키텍처 / 보안)…"
+    },
+    "inspect": {
+      "fullScanning": "품질 점검 중…",
+      "jobDone": "점검 완료",
+      "jobScanning": "지능형 점검 중…",
+      "sopScanning": "품질 점검 중 (타입 안전성 / 의존성 / 규범)…"
+    },
+    "jobTimeout": "작업 시간 초과 ({{timeoutMs}}ms)",
+    "loadingRules": "점검 규칙 로드 중…",
+    "performance": {
+      "done": "성능 감지 완료: 성능 문제 {{count}}개 발견",
+      "loadingRules": "성능 감지 규칙 로드 중…",
+      "scanning": "성능 점검 중 (ESLint 성능 규칙 / ReDoS)…"
+    },
+    "refactor": {
+      "analyzing": "리팩토링 악취 분석 중…",
+      "collecting": "소스 파일 수집 중…",
+      "done": "리팩토링 분석 완료: 코드 악취 {{count}}곳"
+    },
+    "report": {
+      "executionError": "실행 오류",
+      "failed": "미통과",
+      "scopeGuard": "게이트 검사",
+      "scopeInspect": "품질 점검",
+      "unknownRule": "알 수 없는 규칙"
+    },
+    "security": {
+      "done": "보안 스캔 완료",
+      "scanning": "보안 스캔 중…"
+    },
+    "shuttingDown": "앱이 종료되고 있습니다",
+    "workerTimeout": "하위 프로세스 시작 시간 초과",
+    "workerUnavailable": "하위 프로세스를 사용할 수 없습니다"
+  },
+  "reporter": {
+    "andMore": "... 외 {{count}}개",
+    "blocking": "차단: {{value}}",
+    "blockingDryRun": "드라이 런",
+    "blockingNo": "아니요",
+    "blockingYes": "예",
+    "category": "분류",
+    "checkCount": "검사 {{count}}개",
+    "criticalFiles": "고위험 파일: {{count}}",
+    "criticalFilesTitle": "주목할 파일:",
+    "duration": "소요 시간: {{duration}}ms",
+    "engineDryRun": "◐ 엔진 검사 완료 (dry-run: 보고만 하고 차단하지 않음)",
+    "engineFailed": "✗ 엔진 검사 실패",
+    "enginePassed": "✓ 엔진 검사 통과",
+    "error": "오류: {{error}}",
+    "errorRules": "오류 규칙:",
+    "errors": "오류",
+    "failed": "실패",
+    "failedRules": "실패 규칙:",
+    "filesInvolved": "관련 파일: {{count}}개",
+    "garbage": "쓰레기 파일",
+    "guardSection": "Guard 게이트 검사",
+    "inspectSection": "Inspect 점검",
+    "issueCount": "문제 {{count}}개",
+    "issuesCount": "(문제 {{count}}건)",
+    "line": "({{line}}행)",
+    "malware": "악성 코드",
+    "needsImmediateAction": "즉시 처리 필요: {{count}}",
+    "noMatchingRules": "(일치하는 규칙 없음)",
+    "noSmells": "✓ 코드 악취가 감지되지 않았습니다",
+    "notCalculated": "  (미계산)",
+    "notExecuted": "  (미실행)",
+    "overall": "종합",
+    "passed": "통과",
+    "passedRules": "통과 규칙:",
+    "pipelineFailed": "✗ 파이프라인 실패",
+    "pipelinePassed": "✓ 파이프라인 통과",
+    "profileTitle": "프로젝트 식별",
+    "refactorSection": "Refactor 리팩토링 감지",
+    "reportTitle": "ZhiYun Shield — 코드 품질 관리 보고서",
+    "ruleCount": "규칙 {{count}}개",
+    "ruleEngineTitle": "SOP 규칙 엔진 보고서",
+    "scanCount": "스캔: 파일 {{scanned}}/{{files}}",
+    "score": "점수: {{score}} ({{grade}})",
+    "scoreSection": "건강 점수",
+    "securityScore": "보안 점수",
+    "securitySection": "보안 스캔",
+    "severity": "심각도",
+    "skipped": "건너뜀",
+    "smellCount": "코드 악취 {{count}}개",
+    "smellSummary": "코드 악취 {{count}}개, 유지보수성 점수: {{score}}",
+    "stage": "단계: {{stage}}",
+    "status": "상태: {{status}}",
+    "statusFailed": "❌ 실패",
+    "statusPassed": "✅ 통과",
+    "suggestion": "제안:",
+    "summary": "요약",
+    "time": "시간: {{timestamp}}",
+    "timestamp": "시간: {{timestamp}}",
+    "vulnerabilities": "취약점"
+  },
+  "score": {
+    "gradeBadge": "{{letter}}등급 · {{grade}}",
+    "gradeExcellent": "우수",
+    "gradeGood": "양호",
+    "gradePass": "합격",
+    "gradeWarning": "경고"
+  },
+  "server": {
+    "bootstrap": {
+      "running": "ZhiYun Shield 서버가 http://localhost:{{port}}에서 실행 중입니다"
+    },
+    "pipeline": {
+      "scoreRecordFailed": "건강 점수 기록 실패: {{error}}"
+    },
+    "scoring": {
+      "persistenceEnabled": "건강 점수 영속화가 활성화되었습니다: {{dbPath}}",
+      "persistenceUnavailable": "건강 점수 영속화를 사용할 수 없어 메모리 모드로 실행합니다: {{error}}",
+      "scoreRecorded": "건강 점수 기록됨: {{score}} ({{grade}})"
+    }
+  },
+  "severity": {
+    "critical": "심각",
+    "high": "높음",
+    "info": "정보",
+    "low": "낮음",
+    "medium": "중간"
+  },
+  "status": {
+    "assigned": "처리 중",
+    "deployed": "배포됨",
+    "detected": "감지됨",
+    "failed": "검증 실패",
+    "fixing": "수정 중",
+    "manual_taken_over": "수동 처리",
+    "merged": "병합됨",
+    "passed": "해결됨",
+    "pr_opened": "PR 제출됨",
+    "rolled_back": "롤백됨",
+    "validating": "검증 중"
+  },
+  "task": {
+    "cancelled": "작업이 취소되었습니다",
+    "executionFailed": "작업 실행 실패",
+    "kind": {
+      "garbageClean": "정리",
+      "garbageRestore": "복원",
+      "guard": "게이트 스캔",
+      "inspect": "점검",
+      "performance": "감지",
+      "pipeline": "점검",
+      "refactor": "리팩토링 스캔",
+      "security": "검사"
+    },
+    "notCompleted": "작업이 완료되지 않았습니다",
+    "notFound": "작업이 존재하지 않습니다",
+    "queuedLabel": "대기 중 ({{position}}번째)...",
+    "runningLabel": "{{kind}} 중... {{percent}}%{{suffix}}",
+    "schedulerUnavailable": "작업 스케줄러를 사용할 수 없습니다 (데스크톱 환경이 아님)"
+  },
+  "toast": {
+    "aiToolDisabled": "OpenCode 통합이 비활성화되었습니다 (프로젝트 내 통합 파일은 유지됨)",
+    "aiToolEnabledNoProjects": "OpenCode 통합이 활성화되었습니다 (프로젝트 추가 시 설정이 자동으로 작성됨)",
+    "aiToolEnabledWritten": "OpenCode 통합이 활성화되었습니다. 프로젝트 {{written}}/{{total}}개에 작성됨",
+    "aiToolSaveFailed": "AI 도구 설정 저장 실패",
+    "copiedToAi": "문제가 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+    "copyAllCopiedToAi": "문제 {{count}}건이 모두 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+    "copyAllManualTrae": "문제 {{count}}건이 모두 복사되었습니다. Trae에 직접 붙여넣어 주세요",
+    "copyAllOpenedTrae": "문제 {{count}}건이 모두 복사되고 Trae가 열렸습니다. 붙여넣어 주세요",
+    "copyFailed": "복사 실패",
+    "copyFixManualTrae": "수정 안내가 복사되었습니다. Trae에 직접 붙여넣어 주세요",
+    "copyFixOpenedTrae": "수정 안내가 복사되고 Trae가 열렸습니다. 붙여넣어 주세요",
+    "desktopOnlyFolderPicker": "데스크톱 앱에서 실행해 주세요. 브라우저에서는 폴더를 선택할 수 없습니다",
+    "issuesCopied": "문제가 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+    "projectAdded": "프로젝트「{{projectName}}」이(가) 추가되었습니다. 보호를 시작합니다",
+    "projectRemoved": "프로젝트「{{projectName}}」이(가) 제거되었습니다"
+  }
+}

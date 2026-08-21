@@ -1,0 +1,13 @@
+name: Type Definitions Documentation
+description: 检查 TypeScript 类型定义是否文档化
+severity: info
+executionMode: async
+status: active
+source: official
+tags: [documentation, typescript, types]
+applicableEngines: [inspect]
+requirements:
+  - exported-interfaces-documented
+  - public-type-aliases-documented
+  - generics-documented
+  - edge-cases-noted

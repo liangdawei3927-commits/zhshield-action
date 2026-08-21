@@ -1,0 +1,50 @@
+# 智汇码盾 — Semgrep ReDoS 性能检测规则
+#
+# 被 SOP 规则 inspect.scan.performance.semgrep-redos 通过
+# `check.toolConfig.config` 引用，经 SemgrepAdapter 以 `--config <本文件>` 注入扫描。
+#
+# 规则改编自 Semgrep 官方规则库（MIT / LGPL-2.1，semgrep/semgrep-rules）：
+#   javascript/lang/security/audit/detect-redos.yaml
+# 使用官方 metavariable-analysis redos 分析器，检测可导致灾难性回溯的
+# 正则表达式（ReDoS — 正则表达式拒绝服务，CWE-1333）。
+
+rules:
+  - id: detect-redos
+    message: >-
+      检测到正则表达式 `$REDOS` 疑似存在 ReDoS（正则表达式拒绝服务）风险。
+      建议复核该正则是否存在灾难性回溯（catastrophic backtracking），
+      如无法避免，请使用内置 ReDoS 防护的正则库（如 re2、safe-regex）。
+    metadata:
+      owasp:
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      cwe:
+        - "CWE-1333: Inefficient Regular Expression Complexity"
+      references:
+        - https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS
+        - https://www.regular-expressions.info/redos.html
+      category: performance
+      technology:
+        - javascript
+      confidence: LOW
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: |
+              new RegExp(/$REDOS/,...)
+          - pattern: |
+              new RegExp("$REDOS",...)
+          - pattern: |
+              /$REDOS/.test(...)
+          - pattern: |
+              "$REDOS".test(...)
+          - pattern: |
+              $X.match(/$REDOS/)
+          - pattern: |
+              $X.match("$REDOS")
+      - metavariable-analysis:
+          analyzer: redos
+          metavariable: $REDOS

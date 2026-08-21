@@ -1,0 +1,12 @@
+name: NestJS Module Boundary
+description: 检查 NestJS 模块边界 — 确保模块间依赖关系正确
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [nestjs, module, boundary]
+applicableEngines: [inspect]
+rules:
+  - module-import-correctness
+  - circular-module-import
+  - provider-scope

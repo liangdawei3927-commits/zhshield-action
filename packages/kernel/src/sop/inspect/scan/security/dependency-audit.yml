@@ -1,0 +1,11 @@
+name: Dependency Security Audit
+description: 检查依赖安全性 — 扫描已知漏洞依赖
+severity: error
+executionMode: async
+status: active
+source: external
+tags: [security, dependency, audit]
+applicableEngines: [inspect]
+scanners:
+  - depcheck
+schedule: daily

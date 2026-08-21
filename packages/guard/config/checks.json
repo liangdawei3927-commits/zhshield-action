@@ -1,0 +1,52 @@
+[
+  {
+    "checkId": "ARCH-001",
+    "adapter": "architecture-boundary",
+    "enabled": true,
+    "mode": ["guard", "inspection"],
+    "category": "architecture",
+    "severity": "error",
+    "blocking": true,
+    "description": "检查模块边界是否违规（上层禁止反向引用下层）"
+  },
+  {
+    "checkId": "LINT-001",
+    "adapter": "eslint-check",
+    "enabled": true,
+    "mode": ["guard", "inspection"],
+    "category": "quality",
+    "severity": "warning",
+    "blocking": false,
+    "description": "ESLint 代码质量检查"
+  },
+  {
+    "checkId": "TEST-001",
+    "adapter": "test-runner",
+    "enabled": true,
+    "mode": ["guard"],
+    "category": "quality",
+    "severity": "error",
+    "blocking": true,
+    "description": "单元测试通过率检查"
+  },
+  {
+    "checkId": "SEC-001",
+    "adapter": "security-scan",
+    "enabled": true,
+    "mode": ["guard", "inspection"],
+    "category": "security",
+    "severity": "error",
+    "blocking": true,
+    "description": "安全漏洞扫描"
+  },
+  {
+    "checkId": "SEC-002",
+    "adapter": "sensitive-info",
+    "enabled": true,
+    "mode": ["guard", "inspection"],
+    "category": "security",
+    "severity": "error",
+    "blocking": true,
+    "description": "敏感信息（硬编码密钥）扫描，rotating/rotated/dismissed 状态豁免"
+  }
+]

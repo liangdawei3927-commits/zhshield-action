@@ -1,0 +1,37 @@
+{
+  "name": "zhiyan-codeshield",
+  "version": "0.1.0",
+  "private": true,
+  "description": "智汇码盾 - 模块化单体代码治理平台",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "lint:root": "eslint . --max-warnings 250",
+    "typecheck": "node scripts/typecheck.mjs",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,cjs,js}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,cjs,js}\"",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "check": "node scripts/zhcheck.mjs --all",
+    "check:ci": "node scripts/zhcheck.mjs --all --ci",
+    "check:staged": "node scripts/zhcheck.mjs --refactor --inspect --staged --ci",
+    "check:refactor": "node scripts/zhcheck.mjs --refactor",
+    "hooks:install": "node scripts/zhcheck.mjs --install-hooks"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.22.0",
+    "globals": "^17.8.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.26.0"
+  },
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

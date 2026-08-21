@@ -1,0 +1,8 @@
+name: Switch Statement
+description: 检测 switch 语句 — 建议用多态/策略模式替换条件分支
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, polymorphism]
+applicableEngines: [refactor]

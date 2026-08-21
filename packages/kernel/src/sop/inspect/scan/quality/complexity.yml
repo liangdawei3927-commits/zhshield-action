@@ -1,0 +1,14 @@
+name: Code Complexity Check
+description: 检查代码复杂度 — 圈复杂度、函数长度、嵌套深度
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [complexity, quality, maintainability]
+applicableEngines: [inspect]
+thresholds:
+  cyclomaticComplexity: 10
+  functionLength: 50
+  fileLength: 300
+  nestingDepth: 4
+  parameterCount: 5

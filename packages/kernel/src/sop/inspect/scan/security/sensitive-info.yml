@@ -1,0 +1,8 @@
+name: Sensitive Information Detection
+description: 检测代码中的敏感信息泄露
+severity: error
+executionMode: async
+status: active
+source: external
+tags: [security, secret, credential]
+applicableEngines: [inspect]

@@ -1,0 +1,21 @@
+name: Architecture Boundary Blocking
+description: L3 门禁 — 架构边界违规阻断，防止模块间非法依赖
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [architecture, boundary, dependency]
+applicableEngines: [guard]
+rules:
+  - no-cross-layer-import
+  - module-boundary-enforce
+  - circular-dependency-prevent
+layers:
+  - name: presentation
+    allowedDependencies: [application]
+  - name: application
+    allowedDependencies: [domain, infrastructure]
+  - name: domain
+    allowedDependencies: []
+  - name: infrastructure
+    allowedDependencies: [domain]

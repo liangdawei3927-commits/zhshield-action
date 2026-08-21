@@ -1,0 +1,5 @@
+{
+  "error": { "level": "error", "blocking": true },
+  "warning": { "level": "warning", "blocking": false },
+  "info": { "level": "info", "blocking": false }
+}

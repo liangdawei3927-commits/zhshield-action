@@ -1,0 +1,10 @@
+name: Feature Envy
+description: 检测方法对外部类的依赖超过自身 — 建议移动方法到更合适的类
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, cohesion]
+applicableEngines: [refactor]
+thresholds:
+  featureEnvyRatio: 0.5

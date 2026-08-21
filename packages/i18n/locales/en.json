@@ -1,0 +1,1874 @@
+{
+  "ai": {
+    "autoFix": {
+      "promptIntro": "You are the auto-fix assistant for ZhiYan CodeShield.",
+      "readDiagnostics": "First read the diagnostics file {{diagPath}}, then fix the issues listed in it in priority order: error → warning → info.",
+      "requirement1": "1. Understand each issue's ruleId, message, file, line, column, and suggestion, then locate the code",
+      "requirement2": "2. Entries without a file field are tool/config issues (e.g., an ESLint scan directory misconfiguration); check and fix the relevant tool config, don't pretend to fix code",
+      "requirement3": "3. Entries whose source is \"guard\" are gate/prevention issues; **skip them, don't fix** (only auto-fix inspection/refactor issues)",
+      "requirement4": "4. Make only the minimal necessary changes; don't refactor unrelated code",
+      "requirement5": "5. Don't modify the diagnostics file itself (.zhshield/diagnostics/latest.json)",
+      "requirement6": "6. When everything is done, report in one sentence which files were changed",
+      "requirementsTitle": "Requirements:"
+    },
+    "copyFix": {
+      "issueHeader": "Issue {{number}} ({{source}})",
+      "locationLabel": "- Location: {{location}}",
+      "messageLabel": "- Description: {{message}}",
+      "projectPathLabel": "Project path: {{projectPath}}",
+      "promptIntro": "You are the code-fix assistant for ZhiYan CodeShield. Please fix the following code issues:",
+      "requirement1": "1. Use the skill to verify each code fault is real.",
+      "requirement2": "2. Understand the problem before modifying; don't fake a fix.",
+      "requirement3": "3. Make only the minimal necessary changes; don't refactor unrelated code.",
+      "requirement4": "4. After fixing, make sure it is testable, verifiable, regression-safe, and runnable.",
+      "requirement5": "5. When done, report in one sentence which files were changed.",
+      "requirementsTitle": "Fix requirements:",
+      "ruleLabel": "- Rule: {{ruleId}}",
+      "severityLabel": "- Severity: {{severity}}",
+      "suggestionLabel": "- Suggestion: {{suggestion}}"
+    },
+    "toolConfig": {
+      "openCodeCommand": {
+        "description": "description: Read ZhiYan CodeShield diagnostics and fix code issues",
+        "step1": "1. Read the project root `.zhshield/diagnostics/latest.json` (if missing, tell the user to run an inspection first)",
+        "step2": "2. Sort issues by error → warning → info priority",
+        "step3": "3. Understand each issue, locate the code, generate and apply a fix",
+        "step4": "4. After fixing, run `zhshield issue resolve --fingerprint=\"<fingerprint>\"` to mark it resolved (optional)",
+        "title": "# ZhiYan CodeShield diagnostics fix"
+      }
+    }
+  },
+  "cli": {
+    "command": {
+      "deps": "Dependency Manager (SBOM + license matrix)",
+      "guard": "Run Guard gate check",
+      "help": "Show this help",
+      "inspect": "Run Inspect scan",
+      "pipeline": "Run full pipeline",
+      "refactor": "Run Refactor smell detection"
+    },
+    "depsEcosystem": "Ecosystem: {{ecosystem}}",
+    "depsHeader": "── Dependency Manager ──",
+    "depsLockfile": "Lockfile: {{status}}",
+    "depsNotFound": "Dependency Manager: no dependency manifest found (package-lock.json / pnpm-lock.yaml / yarn.lock / requirements.txt / pyproject.toml / Pipfile.lock / poetry.lock)",
+    "depsProject": "Project: {{path}}",
+    "depsTotal": "Total dependencies: {{count}} (direct {{direct}} / transitive {{transitive}})",
+    "directDepsHeader": "── Direct Dependencies ──",
+    "highRiskLicenses": "High-risk licenses: {{list}}",
+    "licenseMatrixHeader": "── License Matrix ──",
+    "licenseRiskHigh": "High risk",
+    "licenseRiskLow": "Low risk",
+    "licenseRiskMedium": "Medium risk",
+    "licenseRiskUnknown": "Medium risk (manual review required)",
+    "lockfileMissing": "✗ Missing",
+    "lockfilePresentUnverified": "✓ Present (consistency not verified)",
+    "lockfilePresentVerified": "✓ Present (consistency verified)",
+    "option": {
+      "dir": "Project root directory (default: current directory)",
+      "dryRun": "Guard mode: report only, do not block",
+      "hook": "Guard mode: gate trigger source (pre-commit / pre-push)",
+      "json": "deps: output full dependency graph as JSON",
+      "lang": "Interface language (zh-Hans / zh-Hant / en / ko / ja; default: zh-Hans or ZH_LANG env var)",
+      "noColor": "Disable colored output",
+      "sbom": "deps: export CycloneDX SBOM to a file",
+      "sop": "Use SOP rule-driven mode (default: checks.json mode)",
+      "staged": "Guard mode: only check staged changes",
+      "verbose": "Show verbose details"
+    },
+    "optionsTitle": "Options:",
+    "rulesLoaded": "[CLI] Loaded {{count}} SOP rules",
+    "sbomWriteFailed": "❌ SBOM write failed: {{error}}",
+    "sbomWritten": "✅ SBOM written: {{path}}",
+    "stagedSkipped": "✅ No staged changes, gate check skipped",
+    "title": "zhshield - ZhiYan CodeShield: Code Quality Governance",
+    "unknownCommand": "Unknown command: {{command}}",
+    "usageTitle": "Usage:"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "copied": "Copied",
+    "copy": "Copy",
+    "copyAllToAi": "Copy all to AI",
+    "copyToAi": "Copy to AI",
+    "delete": "Delete",
+    "loading": "Loading…",
+    "no": "No",
+    "refresh": "Refresh",
+    "remove": "Remove",
+    "retry": "Retry",
+    "save": "Save",
+    "search": "Search",
+    "yes": "Yes"
+  },
+  "electron": {
+    "appTitle": "ZhiYan CodeShield",
+    "cleanFailed": "Cleanup failed, please try again later",
+    "diagnostics": {
+      "ruleFailed": "{{ruleId}} failed"
+    },
+    "feedbackIncomplete": "Feedback is incomplete",
+    "hooksExist": "Hook file {{hooks}} already exists; confirm manually to avoid overwriting",
+    "invalidParams": "Invalid parameters",
+    "invalidProjectPath": "Invalid project path",
+    "notGitRepo": "Project is not a git repository",
+    "restoreFailed": "Restore failed, please try again later",
+    "scoringUnavailable": "Local database unavailable, scoring degraded (use HTTP mode to connect to the server)",
+    "writeFailed": "Write failed"
+  },
+  "engine": {
+    "backupModuleUnavailable": "Backup module unavailable",
+    "builtin-rules": {
+      "architecture": {
+        "circularDependency": "Circular dependency detected",
+        "cyclicImport": "Circular imports exist between modules",
+        "fatController": "Controller is too bloated; logic should move to Service",
+        "globalState": "Global state / singleton misuse detected",
+        "layerSkip": "Layer skipping: calling a low-level module directly, bypassing the middle layer",
+        "layerViolation": "The business layer should not directly reference the data access layer",
+        "missingAbstraction": "Module lacks an interface abstraction, hurting testability and extensibility",
+        "noDomainInInfra": "The infrastructure layer should not depend on the domain layer",
+        "noDtoInEntity": "Entity should not depend on DTO",
+        "noEntityInController": "Controller should not directly reference Entity",
+        "noServiceInView": "The view layer should not directly call Service",
+        "utilsEverywhere": "Utils functions are scattered across modules; consider centralizing them"
+      },
+      "quality": {
+        "asyncWithoutAwait": "async function does not use await",
+        "complexCondition": "Conditional expression is too complex; consider extracting it to a variable",
+        "consoleLog": "Production code should not contain console.log",
+        "debugger": "Production code should not contain debugger statements",
+        "duplicateKey": "Duplicate key found in object",
+        "emptyCatch": "An empty catch block hides errors",
+        "eqeqeq": "Uses == instead of ===, which may cause type coercion",
+        "forInWithoutHasOwn": "for...in loop without hasOwnProperty check",
+        "largeFunction": "Function is too long; consider splitting it into smaller functions",
+        "magicNumber": "Magic number detected; consider defining it as a constant",
+        "missingFallthrough": "switch case is missing break, may fall through unexpectedly",
+        "nestedCallback": "Callbacks nested too deeply; consider using async/await",
+        "noBarrelImport": "Importing from a barrel (index) file may cause circular dependencies",
+        "noNullComparison": "Uses foo == null instead of foo === null || foo === undefined",
+        "noUnusedVariable": "Unused variable detected",
+        "todoComment": "TODO item found",
+        "typeAny": "Using the any type loses type-checking protection",
+        "varUsage": "Uses var instead of const/let"
+      },
+      "security": {
+        "commandInjection": "Shell command execution detected; risk of command injection",
+        "consoleLogSecret": "console.log may leak sensitive information",
+        "debugEndpoint": "Debug endpoints should not be exposed in production",
+        "evalUsage": "eval() call detected; risk of code injection",
+        "hardcodedApiKey": "Hardcoded API key detected",
+        "hardcodedPassword": "Hardcoded password detected",
+        "innerHtml": "innerHTML assignment detected; risk of XSS",
+        "insecureDeserialize": "Insecure deserialization detected",
+        "insecureRandom": "Uses Math.random() for security-sensitive operations; use crypto.randomBytes instead",
+        "noAuth": "Unauthenticated modification operation detected",
+        "noCors": "CORS middleware not configured",
+        "noCsp": "Content-Security-Policy header not found",
+        "noHelmet": "Helmet security headers middleware not found",
+        "noHttpsRedirect": "HTTPS redirect not enforced",
+        "noRateLimit": "API routes do not have rate limiting configured",
+        "noTls": "HTTP service detected instead of HTTPS",
+        "pathTraversal": "Path traversal risk detected; validate user input",
+        "prototypePollution": "Prototype pollution risk detected",
+        "sensitiveFiles": "Sensitive files detected in the bundle",
+        "sqlConcat": "SQL string concatenation detected; use parameterized queries"
+      }
+    },
+    "dependency": {
+      "license": {
+        "unknownReason": "Unrecognized license; needs manual review"
+      }
+    },
+    "engineUnavailable": "Engine unavailable",
+    "feedbackUnavailable": "Feedback channel unavailable",
+    "guard": {
+      "architecture": {
+        "foundViolations": "Found {{count}} cross-layer violations:\n{{details}}",
+        "passed": "Module boundary check passed, no cross-layer violations found",
+        "scanFailed": "Module boundary check failed: {{error}}"
+      },
+      "eslint": {
+        "execFailed": "ESLint execution failed",
+        "foundErrors": "ESLint found {{count}} errors:\n{{errors}}",
+        "foundWarnings": "ESLint found {{count}} warnings:\n{{warnings}}",
+        "notInstalled": "ESLint is not installed or not found in PATH",
+        "passed": "ESLint check passed ({{count}} files)",
+        "passedNoOutput": "ESLint check passed (no output)"
+      },
+      "hook": {
+        "guardFailed": "❌ ZhiYan CodeShield gate check failed; please fix the issues then {{action}}"
+      },
+      "securityScan": {
+        "commandInjection": "Possible command injection: use execFile instead of exec",
+        "consoleLog": "Production code should remove console statements",
+        "debugger": "Production code should remove debugger statements",
+        "evalUsage": "Avoid eval(): may lead to code injection",
+        "foundIssues": "Found {{count}} security issues ({{high}} {{highCount}}, {{medium}} {{mediumCount}}, {{low}} {{lowCount}}):\n{{details}}",
+        "hardcodedPort": "Check whether the hardcoded port should be a config option",
+        "innerHtml": "Using innerHTML may lead to XSS; prefer textContent",
+        "noNewFunc": "Avoid new Function(): may lead to code injection",
+        "passed": "Security scan passed, no obvious issues found",
+        "scanFailed": "Security scan failed: {{error}}",
+        "sqlInjection": "Possible SQL injection: string concatenation used instead of parameterized queries",
+        "todoFixme": "Unresolved TODO/FIXME items found"
+      },
+      "sensitiveInfo": {
+        "foundIssues": "Found {{count}} possible sensitive information leaks:\n{{details}}",
+        "matchedLine": "{{file}}:{{line}} matches {{pattern}}: {{match}}",
+        "passed": "Sensitive information check passed, no leaks found",
+        "scanFailed": "Sensitive information scan failed: {{error}}"
+      },
+      "testDetector": {
+        "noTestScriptDir": "No project directory with test scripts found"
+      },
+      "testRunner": {
+        "execFailed": "Test execution failed: {{error}}",
+        "failedList": "Failed tests:",
+        "noTests": "No test cases found",
+        "notExecuted": "Tests not executed",
+        "passedAll": "All {{passed}} tests passed ({{durationMs}}ms)",
+        "summary": "Tests: {{totalTests}} total, {{passed}} passed, {{failed}} failed ({{durationMs}}ms){{failDetail}}",
+        "unresolved": "{{totalTests}} test files detected, but test run results could not be parsed (abnormal process output or timeout)"
+      },
+      "unknownRule": "Unknown rule"
+    },
+    "hooksUnavailable": "guardHooks IPC unavailable",
+    "inspect": {
+      "report": {
+        "recommendations": {
+          "category": "Found {{count}} {{category}} issues; consider handling them first",
+          "degradedLevel": "Current degradation level: Level {{level}}, some tools were skipped",
+          "toolError": "Tool {{tool}} error: {{error}}"
+        }
+      },
+      "supplyChain": {
+        "downloadAllFailed": "[supply-chain] {{toolId}} download failed on all channels ({{attempts}} attempts)",
+        "sha256Mismatch": "[supply-chain] {{toolId}} sha256 verification failed: expected {{expected}}, got {{actual}}",
+        "unregisteredLicense": "Unregistered license; publishing is blocked"
+      },
+      "tool": {
+        "dep-cruiser": {
+          "architectureViolation": "Architecture boundary violation: {{rule}} - {{from}} → {{to}}",
+          "description": "Architecture boundary and module dependency check",
+          "noCrossReference": "Module {{from}} should not reference {{to}}",
+          "runFailed": "dependency-cruiser execution failed",
+          "unavailable": "dependency-cruiser is not installed"
+        },
+        "depcheck": {
+          "description": "Unused dependency detection",
+          "moveDevDependency": "Move {{dep}} to dependencies or run npm uninstall -D {{dep}}",
+          "runFailed": "depcheck execution failed",
+          "unavailable": "depcheck is not installed",
+          "uninstallDependency": "Run npm uninstall {{dep}} to remove the unused dependency",
+          "unusedDependency": "Unused dependency: {{dep}}",
+          "unusedDevDependency": "Unused dev dependency: {{dep}}"
+        },
+        "eslint": {
+          "autoFixable": "Auto-fixable",
+          "description": "JS/TS code standards and quality check",
+          "runFailed": "ESLint execution failed",
+          "unavailable": "ESLint is not installed or not found in PATH"
+        },
+        "gitleaks": {
+          "description": "Hardcoded secret scan",
+          "hardcodedSecret": "Hardcoded secret detected: {{rule}}",
+          "removeSecret": "Remove the hardcoded secret; use environment variables or a secret management service",
+          "runFailed": "Gitleaks execution failed",
+          "unavailable": "Gitleaks is not installed or not found in PATH"
+        },
+        "jscpd": {
+          "description": "Duplicate code detection",
+          "duplicateFound": "Duplicate code found ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+          "extractShared": "Extract shared code into a common module (duplicated at: {{secondFile}})",
+          "runFailed": "jscpd execution failed",
+          "unavailable": "jscpd is not installed"
+        },
+        "semgrep": {
+          "description": "SAST code vulnerability scan (SQL injection, XSS, CSRF, command injection, path traversal, etc.)",
+          "runFailed": "Semgrep execution failed",
+          "timeout": "Semgrep scan timed out",
+          "unavailable": "Semgrep is not installed or not found in PATH"
+        },
+        "ts-prune": {
+          "description": "TypeScript dead code / unused export detection",
+          "removeExport": "Remove unused export: {{symbol}}",
+          "runFailed": "ts-prune execution failed",
+          "unavailable": "ts-prune is not installed",
+          "unusedExport": "Unused export: {{symbol}}"
+        },
+        "tsc": {
+          "description": "TypeScript type error check",
+          "fixSuggestion": "Fix TypeScript {{level}}: {{code}}",
+          "runFailed": "tsc execution failed",
+          "unavailable": "tsc is not installed or not found in PATH"
+        }
+      },
+      "unknown": "Unknown",
+      "unknownRule": "Unknown rule"
+    },
+    "kernel": {
+      "backup": {
+        "allFailed": "All backup methods failed",
+        "commitMessage": "{{prefix}} auto backup - {{timestamp}}",
+        "commitPrefix": "[ZhiYan CodeShield]",
+        "done": "Backup complete",
+        "githubNotAuthorized": "GitHub is not authorized; authorize your GitHub account in settings first",
+        "localCopyFailed": "{{count}} files failed to copy",
+        "progressGitHubCommit": "Committing to GitHub...",
+        "progressLocalCopy": "Copying to local directory...",
+        "repoDescription": "ZhiYan CodeShield auto backup repository",
+        "unknownGitHubError": "Unknown GitHub backup error",
+        "unknownLocalError": "Unknown local backup error"
+      },
+      "runner": {
+        "forbiddenPatternsFound": "Found {{count}} forbidden patterns ({{ruleId}})",
+        "forbiddenUsage": "Forbidden usage: \"{{pattern}}\"",
+        "guardDispatchFailed": "Guard dispatch failed: {{error}}",
+        "guardEngineNotRegistered": "GuardEngine not registered; cannot run check-list",
+        "guardFoundIssues": "Guard check found {{count}} issues",
+        "guardPassed": "Guard check passed",
+        "inspectDispatchFailed": "Inspect dispatch failed: {{error}}",
+        "inspectEngineNotRegistered": "InspectEngine not registered and no scanner adapter available",
+        "labelDone": "{{label}} done: {{count}} issues",
+        "labelInspection": "Inspection",
+        "labelPreset": "Preset checks",
+        "layerAllowedDeps": "{{fileLayer}} layer may only depend on: {{deps}}",
+        "layerBoundaryPassed": "Architecture boundary check passed",
+        "layerBoundaryViolations": "Found {{count}} architecture boundary violations",
+        "layerViolationMessage": "Layer violation: \"{{fileLayer}}\" is not allowed to depend on \"{{targetLayer}}\" (import: {{imported}})",
+        "patternMatchesFound": "Found {{count}} matches ({{ruleId}})",
+        "presetInspectNotRegistered": "InspectEngine not registered and no preset tool adapter available",
+        "removeHardcodedValue": "Remove the hardcoded value or replace it with an environment variable",
+        "replaceForbidden": "Remove \"{{pattern}}\" or replace it with a type-safe alternative",
+        "scannerFailed": "Scanner {{tool}} execution failed",
+        "scannerFoundIssues": "Scanner found {{count}} issues",
+        "scannerPassed": "Scanner check passed",
+        "sensitivePatternMatch": "Sensitive pattern matched: {{match}}",
+        "skipCheckListNoMatch": "Skipping check-list→GuardEngine: no matching check items configured for this repo",
+        "skipCheckListReentry": "Skipping check-list→GuardEngine.run (prevent rule engine re-entry)",
+        "skipNestedDispatch": "Skipping nested {{type}} dispatch (prevent rule engine re-entry)",
+        "skipPresetReentry": "Skipping preset→runScan (prevent rule engine re-entry)",
+        "skipScannerReentry": "Skipping scanner-dispatch→runScan (prevent rule engine re-entry)",
+        "thresholdList": "Threshold: {{entries}}",
+        "thresholdRaw": "Threshold: {{unit}} {{thresholds}}",
+        "thresholdRule": "Threshold rule (requires external data): {{summary}}",
+        "toolAdapterNotRegistered": "No tool adapter registered for {{tool}}; cannot run tool-dispatch",
+        "toolError": "Tool {{tool}} error: {{error}}",
+        "toolExecuteFailed": "Tool {{tool}} execution failed: {{error}}",
+        "toolFoundIssues": "Tool {{tool}} found {{count}} issues",
+        "toolPassed": "Tool {{tool}} check passed",
+        "toolUnavailable": "Tool unavailable: {{tool}} (not installed or not found in PATH)"
+      }
+    },
+    "output": {
+      "architectureViolation": "Architecture boundary violation: {{rule}} - {{from}} → {{to}}",
+      "autoFixable": "Auto-fixable",
+      "duplicateCode": "Duplicate code found ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+      "extractSharedCode": "Extract shared code into a common module (duplicated at: {{secondFile}})",
+      "moduleShouldNotReference": "Module {{from}} should not reference {{to}}",
+      "removeDependency": "Remove {{name}} from dependencies",
+      "removeDevDependency": "Remove {{name}} from devDependencies",
+      "removeHardcodedKey": "Remove the hardcoded key; use environment variables or a secret management service",
+      "removeHardcodedSecret": "Remove the hardcoded secret; use environment variables or a secret management service",
+      "unknownRule": "Unknown rule",
+      "unusedDevDependency": "Unused dev dependency: {{name}}",
+      "unusedProdDependency": "Unused production dependency: {{name}}",
+      "upgradeTo": "Upgrade to {{version}}"
+    },
+    "pipeline": {
+      "log": {
+        "guardBlocked": "Guard blocked, pipeline terminated ({{failed}} failed)",
+        "guardCheckFailed": "Guard check failed: {{error}}",
+        "guardDone": "Guard check done: {{passed}} passed, {{failed}} failed",
+        "guardPassedToInspect": "Guard passed, entering Inspect phase...",
+        "guardStart": "Starting Guard gate check...",
+        "inspectDone": "Inspect done: {{total}} issues ({{error}} errors, {{warning}} warnings, {{info}} info)",
+        "inspectFailed": "Inspect failed: {{error}}",
+        "inspectStart": "Starting Inspect engine scan...",
+        "pipelineClosed": "Pipeline closed",
+        "pipelineDone": "========== ZhiYan CodeShield full pipeline complete (excluding refactor) ==========",
+        "pipelineStart": "========== ZhiYan CodeShield full pipeline start ==========",
+        "pluginLoaded": "Plugin loaded: {{name}}@{{version}}",
+        "profileDone": "Project profile: {{language}}{{framework}} ({{packageManager}})",
+        "profileStart": "Starting project profile analysis...",
+        "refactorDone": "Refactor detection done: {{totalSmells}} smells ({{criticalFiles}} files need attention)",
+        "refactorStart": "Starting Refactor smell detection...",
+        "scoringDone": "Scoring done: {{overall}} (grade {{grade}})",
+        "scoringStart": "Starting health scoring...",
+        "securityDone": "Security scan done: {{vulnTotal}} vulnerabilities, {{malwareTotal}} malicious packages, {{garbageTotal}} garbage files",
+        "securityFailed": "Security scan failed: {{error}}",
+        "securityStart": "Starting security scan...",
+        "sopGuardBlocked": "SOP Guard blocked, pipeline terminated ({{failed}} failed)",
+        "sopGuardDone": "SOP Guard check done: {{passed}} passed, {{failed}} failed, {{errors}} errors",
+        "sopGuardFailed": "SOP Guard check failed: {{error}}",
+        "sopGuardPassed": "SOP Guard passed, entering SOP Inspect phase...",
+        "sopGuardStart": "Starting SOP-driven Guard gate check...",
+        "sopInspectDone": "SOP Inspect done: {{passed}} passed, {{failed}} failed, {{skipped}} skipped",
+        "sopInspectFailed": "SOP Inspect failed: {{error}}",
+        "sopInspectStart": "Starting SOP-driven Inspect scan...",
+        "sopPipelineDone": "========== SOP-driven full pipeline complete (excluding refactor) ==========",
+        "sopPipelineStart": "========== SOP-driven full pipeline start ==========",
+        "sopRulesLoaded": "SOP rules loaded: {{count}} (active: {{active}})"
+      }
+    },
+    "refactor": {
+      "fix": {
+        "addAsync": "Add the async keyword to {{methodName}}",
+        "constantsHeader": "// Shared string constants - generated by auto-fix",
+        "encapsulateField": "Encapsulate the public fields of {{filePath}} as private",
+        "extractLiteral": "Extract \"{{literal}}\" to {{filePath}}",
+        "thenToAwaitTodo": "// TODO: manually convert the .then() chain to await (auto-fix added the async keyword)"
+      },
+      "smell": {
+        "callback-hell": {
+          "message": "{{target}} contains {{count}} levels of .then() chained callbacks; consider converting to async/await",
+          "name": "Callback Hell (R07)",
+          "suggestion": "Convert .then() chains to async/await syntax, keeping try/catch error handling"
+        },
+        "data-class": {
+          "message": "{{className}} has {{fields}} fields but only {{methods}} methods; it may be a pure data class",
+          "name": "Data Class (R10)",
+          "suggestion": "Move methods that operate on {{className}}'s fields into the class, or convert it to a TypeScript interface"
+        },
+        "data-clumps": {
+          "message": "Parameter group [{{params}}] recurs ({{count}} times): {{methods}}...",
+          "name": "Data Clumps",
+          "suggestion": "Encapsulate the recurring parameter group into a class"
+        },
+        "deep-nesting": {
+          "message": {
+            "function": "{{target}} is nested too deeply ({{depth}} levels)",
+            "method": "{{target}} is nested too deeply ({{depth}} levels, threshold {{threshold}}); consider using a guard clause or extracting methods"
+          },
+          "name": "Deep Nesting (R05)",
+          "suggestion": "Return early with guard clauses, or extract deep branches into separate functions"
+        },
+        "duplicated-code": {
+          "message": "Code block duplicates {{file}}:{{line}}; consider extracting a shared function",
+          "name": "Duplicate Code (R06)",
+          "suggestion": "Extract the duplicated code into a shared function, parameterizing the differences"
+        },
+        "feature-envy": {
+          "externalClass": "External class",
+          "message": "{{target}} heavily calls {{targetName}} ({{externalCount}} external references vs {{totalStatements}} statements)",
+          "name": "Feature Envy",
+          "suggestion": "Consider moving {{methodName}} into {{targetClass}}"
+        },
+        "god-object": {
+          "message": "{{className}} has {{count}} public methods (threshold {{threshold}}); it may be a god object",
+          "name": "God Object (R12)",
+          "suggestion": "Split {{className}} into focused Services/Classes by domain"
+        },
+        "inappropriate-intimacy": {
+          "message": "{{className}} exposes too many public fields ({{count}}), breaking encapsulation",
+          "name": "Inappropriate Intimacy",
+          "suggestion": "Make public fields private and access them through getters/setters"
+        },
+        "large-class": {
+          "issue": {
+            "lines": "{{lines}} lines (threshold {{threshold}})",
+            "methods": "{{methods}} methods (threshold {{threshold}})"
+          },
+          "message": "{{className}} is too large ({{issues}}); consider splitting by responsibility",
+          "name": "God Object / Large Class",
+          "suggestion": "Split {{className}} into multiple classes by responsibility, each focused on a single concern"
+        },
+        "lazy-class": {
+          "message": "{{className}} is too small ({{lines}} lines, {{methods}} methods); it may not deserve to be its own class",
+          "name": "Lazy Class",
+          "suggestion": "Merge its functionality into the class that uses it, or remove it"
+        },
+        "long-method": {
+          "issue": {
+            "complexity": "Cyclomatic complexity {{complexity}} (threshold {{threshold}})",
+            "lines": "{{lines}} lines (threshold {{threshold}})"
+          },
+          "message": "{{container}}{{name}} is too large ({{issues}}); consider splitting into smaller functions",
+          "name": "Long Method (R01)",
+          "suggestion": "Split {{container}}{{name}} into smaller functions by responsibility, each no more than {{threshold}} lines"
+        },
+        "long-parameter-list": {
+          "message": "{{container}} has too many parameters ({{count}}, threshold {{threshold}}); consider an argument object",
+          "name": "Long Parameter List (R03)",
+          "suggestion": "Wrap the {{count}} parameters into an interface/type argument object"
+        },
+        "message-chains": {
+          "message": "{{target}} contains a chain of calls: {{chains}}",
+          "name": "Message Chains",
+          "suggestion": "Wrap the chain in a delegating method to reduce coupling between caller and callee"
+        },
+        "middle-man": {
+          "message": "Most of {{className}}'s methods are just delegations ({{delegating}} delegations / {{total}} methods)",
+          "name": "Middle Man",
+          "suggestion": "Consider removing the middle layer and letting callers use the delegate directly"
+        },
+        "mixed-responsibilities": {
+          "message": {
+            "function": "{{target}} mixes about {{count}} responsibilities",
+            "method": "{{target}} mixes about {{count}} responsibilities (threshold {{threshold}}); consider splitting into separate functions"
+          },
+          "name": "Mixed Responsibilities (R04)",
+          "suggestion": {
+            "function": "Split the function into separate functions by responsibility",
+            "method": "Split the method by comment sections, blank-line separations, or try/catch boundaries"
+          }
+        },
+        "oversized-component": {
+          "issue": {
+            "handlers": "{{handlers}} event handlers",
+            "jsxDepth": "JSX nesting depth {{depth}}",
+            "lines": "{{lines}} lines of code"
+          },
+          "message": "Component is too large ({{issues}}); consider splitting into child components",
+          "name": "Oversized Component (R11)",
+          "suggestion": "Split the UI into child components and extract state logic into custom Hooks"
+        },
+        "oversized-file": {
+          "issue": {
+            "exports": "{{exports}} top-level exports (threshold {{threshold}})",
+            "linesCode": "{{lines}} lines of code (threshold {{threshold}})"
+          },
+          "message": "File is too large ({{issues}}); consider splitting by functionality",
+          "name": "Oversized File (R02)",
+          "suggestion": "Split the file into multiple files by functional area, each focused on a single concern"
+        },
+        "primitive-obsession": {
+          "message": "{{className}} uses too many primitive types ({{count}} fields); consider creating value objects for related fields",
+          "name": "Primitive Obsession",
+          "suggestion": "Wrap the related primitive fields in a Value Object"
+        },
+        "refused-bequest": {
+          "message": "{{className}} inherits from {{superClass}} but adds almost no new members ({{methods}} methods, {{fields}} fields); inheritance may be unnecessary",
+          "name": "Refused Bequest",
+          "suggestion": "Replace inheritance with composition to reduce the inheritance hierarchy"
+        },
+        "shotgun-surgery": {
+          "message": {
+            "publicMethods": "{{className}} has {{count}} public methods; changing a feature may require editing several methods",
+            "sharedLiterals": "The string \"{{literal}}\" appears in {{count}} files; consider extracting it as a shared constant"
+          },
+          "name": "Shotgun Surgery (R09)",
+          "suggestion": {
+            "publicMethods": "Split the class into smaller classes by responsibility to limit the blast radius of changes",
+            "sharedLiterals": "Extract \"{{literal}}\" into a shared constants file so changes happen in one place"
+          }
+        },
+        "switch-statement": {
+          "message": "{{target}} uses {{count}} switch statements; consider polymorphism instead",
+          "name": "Switch Statement",
+          "suggestion": "Replace switch/if-else-if chains with strategy pattern or polymorphism"
+        }
+      },
+      "warn": {
+        "detectorFailed": "Detector {{name}} execution failed: {{error}}",
+        "dirAccessFailed": "Cannot access directory {{dir}}: {{error}}",
+        "gitDiffFailed": "Git diff failed: {{error}}",
+        "parseFailed": "Failed to parse {{count}} files (e.g., {{example}})"
+      }
+    },
+    "remoteCleanUnsupported": "Remote mode does not support local cleanup",
+    "remoteRestoreUnsupported": "Remote mode does not support restore",
+    "scoring": {
+      "insight": {
+        "decliningDimensions": "Dimensions to watch: {{dimensions}}",
+        "empty": "No historical data yet; cannot generate trend analysis",
+        "health": {
+          "a": "Project health is excellent (grade A); keep up the current practices",
+          "b": "Project health is good (grade B); there is room for improvement",
+          "c": "Project health is average (grade C); pay attention to the weak areas",
+          "d": "Project health is poor (grade D); immediate improvement is needed"
+        },
+        "streak": {
+          "count": "{{direction}} for {{count}} consecutive assessments",
+          "declining": "Steadily declining",
+          "improving": "Steadily improving",
+          "stable": "Stable"
+        },
+        "velocity": {
+          "declining": "Score keeps dropping (rate {{velocity}}/run); needs attention",
+          "rising": "Score is clearly trending up (rate +{{velocity}}/run)"
+        },
+        "volatility": {
+          "high": "Score fluctuates a lot, meaning improvements are inconsistent",
+          "low": "Score is steady; project state is stable"
+        }
+      }
+    },
+    "security": {
+      "auditFailed": "audit command execution failed: {{error}}",
+      "auditInvalidOutput": "audit output is not valid JSON",
+      "fixSoon": "Please fix soon",
+      "garbage": {
+        "batchMissingOrCorrupt": "Trash batch is missing or corrupt: {{batchId}}",
+        "fileMissingOrNotFile": "{{path}} (file missing or not a regular file)",
+        "pathOutOfBounds": "{{path}} (path out of bounds, rejected)",
+        "restoreDestinationConflict": "{{path}} (a file already exists at the original location, skipped)",
+        "restoreOutOfBounds": "{{path}} (path out of bounds, restore rejected)",
+        "trashFileMissing": "{{path}} (trash file missing)",
+        "trashNameConflict": "{{path}} (a file with the same name already exists in the trash)",
+        "typeNotAutoCleanable": "{{path}} ({{type}} type cannot be auto-cleaned)"
+      },
+      "knownMaliciousNpmTitle": "Known malicious npm packages (supply-chain poisoning blacklist)",
+      "knownMaliciousPypiTitle": "Known malicious PyPI packages (supply-chain poisoning blacklist)",
+      "meta": {
+        "depcheck": "Unused dependency detection",
+        "grype": "Dependency vulnerability cross-check",
+        "ort": "License compliance scan",
+        "semgrep": "Custom security SOP rules scan",
+        "trivy": "Dependency/file/build artifact/image vulnerability scan"
+      },
+      "ortEvaluateLicense": "Evaluate whether {{package}}'s license {{licenses}} is compatible with the project",
+      "ortRestrictedLicense": "{{package}} uses a license that needs attention: {{licenses}}",
+      "referencedBlacklistPackage": "{{file}} references blacklisted package {{name}}",
+      "supplyChainThreat": "Supply-chain threat detected: {{name}}",
+      "suspectedTyposquatTitle": "Suspected typosquatting packages",
+      "tool": {
+        "depcheckExecFailed": "depcheck execution failed",
+        "depcheckNotInstalled": "depcheck is not installed",
+        "grypeExecFailed": "Grype execution failed",
+        "grypeNotInstalled": "Grype is not installed",
+        "ortExecFailed": "ORT execution failed",
+        "ortNotInstalled": "ORT is not installed",
+        "semgrepExecFailed": "Semgrep execution failed",
+        "semgrepNotInstalled": "Semgrep is not installed or not found in PATH",
+        "semgrepRulesDirMissing": "Semgrep rules directory does not exist; sync the cloud brain rules first",
+        "trivyExecFailed": "Trivy execution failed",
+        "trivyNotInstalled": "Trivy is not installed; run the trivy install command"
+      },
+      "typosquatEvidence": "Package name {{name}} has an edit distance of {{distance}} from popular package {{popular}}"
+    },
+    "toolchain": {
+      "license": {
+        "ortRedistributionNote": "Transitive dependencies need auditing",
+        "semgrepRedistributionNote": "Python runtime dependencies need their update channels reviewed (no self-update)",
+        "trivyRedistributionNote": "Subprocess calls don't change redistributability; bundled installers require legal review and license notices"
+      }
+    },
+    "unknownProject": "Unknown project"
+  },
+  "layout": {
+    "about": "About",
+    "aboutVersion": "ZhiYan CodeShield {{version}}",
+    "addProject": "Add project",
+    "aiTool": "AI tools",
+    "aiToolDesc": "Linter protocol · diagnostics listener",
+    "aiToolEnableHintPrefix": "When enabled, writes ",
+    "aiToolEnableHintSuffix": " and OpenCode command files to the project, letting AI read diagnostics and fix issues automatically",
+    "aiToolEnabled": "Enabled: check results will be written to .zhshield/diagnostics/",
+    "aiToolToggle": "Toggle OpenCode integration",
+    "brandName": "ZhiYan CodeShield",
+    "brandSlogan": "The smart guardian of the code world",
+    "cancelTask": "Cancel task",
+    "collapseSidebar": "Collapse sidebar",
+    "deleteProject": "Delete project {{name}}",
+    "engineBusy": "Engine busy: {{count}} tasks in progress",
+    "engineIdle": "Engine running",
+    "engineOn": "Smart engine enabled",
+    "engineStatus": "Engine status",
+    "expandSidebar": "Expand sidebar",
+    "language": "Language settings",
+    "noProject": "No project added",
+    "noProjects": "No projects yet",
+    "projectManagement": "Project management",
+    "queuePosition": "(queued {{position}})",
+    "removeProjectMessage1": "Are you sure you want to remove \"{{name}}\" from the guard list?",
+    "removeProjectMessage2": "Only the project record is removed; project files are not deleted.",
+    "removeProjectTitle": "Remove project",
+    "sidebarTitle": "Settings",
+    "subprocessIsolation": "Rescan tasks are isolated in a subprocess (to avoid UI lag)",
+    "taskKind": {
+      "garbageClean": "Garbage cleanup",
+      "garbageRestore": "Trash restore",
+      "guard": "Gate scan",
+      "inspect": "Quality inspection",
+      "performance": "Performance optimization",
+      "pipeline": "One-click checkup",
+      "refactor": "Code refactor",
+      "security": "Security scan"
+    },
+    "taskStatus": {
+      "cancelled": "Cancelled",
+      "done": "Done",
+      "failed": "Failed",
+      "queued": "Queued",
+      "running": "Running"
+    },
+    "theme": "Theme settings",
+    "themeDracula": "Ink Black",
+    "themeLegacy": "Classic Green",
+    "themeTeal": "Teal",
+    "toolsDegraded": "External tools degraded: missing {{tools}}",
+    "toolsPathHint": "Installing them to the system PATH will remove this hint"
+  },
+  "lifecycle": {
+    "archive": "Archive",
+    "detect": "Detect",
+    "fix": "Fix",
+    "validate": "Validate"
+  },
+  "mcp": {
+    "categoryFilterDesc": "Filter by category (e.g., performance / security / quality / architecture)",
+    "cliNotFound": "zhshield CLI not found; run pnpm build first",
+    "commandDoneNoOutput": "{{command}} completed (no output)",
+    "commandFailed": "{{command}} execution failed",
+    "diagnosticsUnparseable": "Diagnostics file cannot be parsed",
+    "fileNotFound": "File not found: .zhshield/{{relativePath}}",
+    "getDiagnosticsDesc": "Read the diagnostics from ZhiYan CodeShield's most recent checkup (.zhshield/diagnostics/latest.json)",
+    "getIntegrationDesc": "Read ZhiYan CodeShield's integration config (.zhshield/integration.json), including auto-trigger, filters, and auto-fix settings",
+    "getIssuesDesc": "Get issues from ZhiYan CodeShield's most recent checkup (filterable by severity/category/source); returns a {ok,total,issues} JSON",
+    "guardProjectPathDesc": "Project root directory to check",
+    "guardSopModeDesc": "Use SOP rule-driven mode",
+    "inspectProjectPathDesc": "Project root directory to inspect",
+    "projectPathDesc": "Project root directory; defaults to the current working directory",
+    "runGuardDesc": "Trigger a ZhiYan CodeShield gate check (calls zhshield guard --dry-run) to examine code in report-only, non-blocking mode",
+    "runInspectDesc": "Trigger a ZhiYan CodeShield inspection (calls zhshield inspect) to scan for code quality issues and return a report",
+    "severityFilterDesc": "Filter by severity",
+    "sopModeDesc": "Use SOP rule-driven mode (default: checks.json mode)",
+    "sourceFilterDesc": "Filter by source engine"
+  },
+  "nav": {
+    "backup": "Backup",
+    "dashboard": "Dashboard",
+    "deps": "Dependencies",
+    "evolve": "Evolve",
+    "garbage": "Garbage Cleanup",
+    "guard": "Gate Check",
+    "inspect": "Inspect",
+    "performance": "Performance",
+    "refactor": "Refactor",
+    "reports": "Reports",
+    "security": "Security Center",
+    "sentinel": "Sentinel",
+    "techdebt": "Tech Debt"
+  },
+  "page": {
+    "backup": {
+      "backingUp": "Backing up...",
+      "deleteMessage": "Delete this backup record? This action cannot be undone.",
+      "deleteTitle": "Delete backup record",
+      "detail": {
+        "backupId": "Backup ID: {{id}}",
+        "commit": "Commit: {{hash}}",
+        "error": "Error: {{error}}",
+        "fileCount": "Files: {{count}}",
+        "github": "GitHub: ",
+        "localPath": "Local path: {{path}}",
+        "size": "Size: {{size}}",
+        "trigger": "Trigger: {{mode}}"
+      },
+      "empty": {
+        "feature": {
+          "config": {
+            "desc": "Backs up scan rules, project config, and environment settings",
+            "title": "Config backup"
+          },
+          "restore": {
+            "desc": "Quickly restore environment and config from backup records",
+            "title": "Data restore"
+          },
+          "rules": {
+            "desc": "Exports custom rule sets to prevent losing rules",
+            "title": "Rules backup"
+          },
+          "sync": {
+            "desc": "Schedules backups to a secure local directory to reduce loss risk",
+            "title": "Auto sync"
+          }
+        },
+        "lastBackup": "Last backup: {{date}}",
+        "title": "Protect important config; your data never gets lost"
+      },
+      "noRecords": "No backup records yet",
+      "oneClickBackup": "One-click backup",
+      "openFolder": "Open Folder",
+      "recordCount": "{{count}} backup records",
+      "recordsTitle": "Backup records",
+      "result": {
+        "duration": "{{time}} · took {{duration}}ms"
+      },
+      "status": {
+        "failed": "Failed",
+        "partial": "Partially successful",
+        "success": "Success"
+      },
+      "title": "Data backup",
+      "toast": {
+        "completed": "Backup complete: {{status}}",
+        "deleteFailed": "Delete failed",
+        "deleted": "Backup record deleted",
+        "failed": "Backup execution failed",
+        "success": "Backup succeeded"
+      },
+      "trigger": {
+        "manual": "Manual",
+        "schedule": "Scheduled"
+      },
+      "type": {
+        "full": "Full",
+        "githubOnly": "GitHub only",
+        "localOnly": "Local only"
+      }
+    },
+    "dashboard": {
+      "autoFix": "🤖 Auto fix",
+      "axis": {
+        "governance": {
+          "desc": "Keep code quality and standards in check",
+          "label": "Governance"
+        },
+        "ops": {
+          "desc": "Keep projects running healthy long term",
+          "label": "Operations"
+        },
+        "security": {
+          "desc": "Protect code and supply-chain security",
+          "label": "Security"
+        }
+      },
+      "check": "One-click checkup",
+      "copy": {
+        "guardSource": "Gate · Prevention",
+        "inspectSource": "Inspection"
+      },
+      "feature": {
+        "backup": {
+          "desc": "One-click backup of config and rules to prevent data loss"
+        },
+        "inspect": {
+          "desc": "Regularly checks code quality, docs, and dependency health"
+        },
+        "performance": {
+          "desc": "Finds runtime performance anti-patterns and optimizes execution"
+        },
+        "refactor": {
+          "desc": "Detects code smells and pays down technical debt"
+        },
+        "reports": {
+          "desc": "View past check reports and health trends"
+        },
+        "security": {
+          "desc": "One-click scan for vulnerabilities, sensitive info, and malicious code"
+        }
+      },
+      "guardSlogan": "Smart guardian: security · governance · operations",
+      "productIntro": {
+        "subtitle": "Built around security, governance, and operations, guarding every line of code",
+        "title": "The smart guardian of the code world"
+      },
+      "progress": "Progress {{progress}}%",
+      "result": {
+        "allPassed": "All executed checks passed. If many were skipped, install tools like ESLint / Semgrep and rerun the checkup for more complete results.",
+        "backHome": "Back to home",
+        "header": {
+          "configureHint": "Configure the gate check and sentinel monitoring switches separately at the top entries.",
+          "coverage": "This run covered {{inspectTotal}} quality inspections.",
+          "failed": "Checkup found issues",
+          "passed": "One-click checkup complete",
+          "skipped": "Of these, {{skipped}} were skipped because the tools aren't installed."
+        },
+        "issuesTitle": "Issues to watch",
+        "rerun": "Rerun checkup",
+        "scopeTitle": "Checkup scope",
+        "stage": {
+          "guard": "Gate",
+          "inspect": "Inspection"
+        },
+        "stats": {
+          "issues": "Issues",
+          "passed": "Passed",
+          "skipped": "Skipped",
+          "total": "Checks"
+        }
+      },
+      "ring": {
+        "healthScore": "Health score",
+        "notChecked": "Not checked yet"
+      },
+      "running": "Checkup in progress…",
+      "sanitize": {
+        "autoFixStarted": "OpenCode auto fix started",
+        "autoFixing": "Auto fixing…",
+        "done": "Checkup complete",
+        "guarding": "Running gate check…",
+        "inspecting": "Running quality inspection…",
+        "loadingRules": "Loading checkup rules…"
+      },
+      "scope": {
+        "inspect": "Quality inspection",
+        "item": {
+          "complexity": "Code complexity / standards",
+          "deps": "Dependency audit",
+          "docs": "Documentation completeness",
+          "nest": "Nest / module standards",
+          "tsType": "TypeScript type safety"
+        }
+      },
+      "stageGuard": "· Gate",
+      "stageInspect": "· Inspection",
+      "toast": {
+        "addProjectFirst": "Add a project to check first",
+        "completed": "Checkup complete: {{total}} checks, {{passed}} passed",
+        "copiedIssues": "Copied {{count}} issues; paste them into AI to fix",
+        "copyFailed": "Copy failed",
+        "executionFailed": "Checkup execution failed",
+        "failed": "Checkup execution failed: {{error}}",
+        "foundIssues": "Checkup complete: found {{count}} issues",
+        "noValidItems": "Checkup complete, but no valid checks ran (check the project path)"
+      },
+      "welcome": "Welcome to ZhiYan CodeShield"
+    },
+    "deps": {
+      "checking": "Taking inventory...",
+      "done": "Dependency Manager complete",
+      "ecosystem": "Ecosystem",
+      "empty": {
+        "start": "Start inventory",
+        "subtitle": "Parses lockfiles and manifests, builds the dependency graph, and verifies integrity",
+        "title": "Inventory dependencies, see the full picture"
+      },
+      "env": "Environment consistency",
+      "env.actual": "Actual: {{value}}",
+      "env.checkFailed": "Environment consistency check failed",
+      "env.expected": "Expected: {{value}}",
+      "env.kind.ci-vs-local": "CI vs local mismatch",
+      "env.kind.env-file-diff": "Env file differences",
+      "env.kind.lockfile-drift": "Lockfile drift",
+      "env.kind.runtime-version": "Runtime version",
+      "env.none": "No environment deviations found",
+      "env.severity.error": "Blocking",
+      "env.severity.info": "Info",
+      "env.severity.warning": "Warning",
+      "env.total": "{{count}} entries",
+      "errorTitle": "Inventory failed",
+      "feature": {
+        "graph": {
+          "desc": "Direct / transitive dependencies and edge relations at a glance",
+          "title": "Dependency graph"
+        },
+        "license": {
+          "desc": "Four license categories and a high-risk list",
+          "title": "License matrix"
+        },
+        "lockfile": {
+          "desc": "Triple verification: presence / consistency / hash integrity",
+          "title": "Lockfile check"
+        },
+        "security": {
+          "desc": "Typosquat detection, security updates, and trust status assessment",
+          "title": "Security check"
+        }
+      },
+      "license": "License matrix",
+      "license.permissive": "Permissive",
+      "license.risk.high": "High risk",
+      "license.risk.low": "Low risk",
+      "license.risk.medium": "Medium risk",
+      "license.risk.unknown": "Unknown risk",
+      "license.strongCopyleft": "Strong copyleft",
+      "license.unknown": "Unknown license",
+      "license.weakCopyleft": "Weak copyleft",
+      "licenseHighRisk": "High-risk list",
+      "licenseNoRisks": "No high-risk licenses found",
+      "licenseTotal": "{{count}} licenses total",
+      "lockfile": "Lockfile status",
+      "lockfile.consistent": "Consistent with the manifest",
+      "lockfile.integrityFailed": "Hash verification failed",
+      "lockfile.integrityVerified": "Hash verified",
+      "lockfile.notConsistent": "Inconsistent with the manifest",
+      "lockfile.notPresent": "Lockfile missing",
+      "lockfile.present": "Lockfile present and parseable",
+      "lockfileVerify": "Lockfile integrity verification",
+      "lockfileVerify.checkFailed": "Lockfile verification failed",
+      "lockfileVerify.clean": "Verified: declarations match the lockfile, integrity intact",
+      "lockfileVerify.diffs": "Declared vs locked differences ({{count}})",
+      "lockfileVerify.integrity": "Integrity failures ({{count}})",
+      "lockfileVerify.missing": "No lockfile found",
+      "lockfileVerify.modified": "Verification found inconsistencies",
+      "overview": "Overview",
+      "overviewDirect": "Direct dependencies",
+      "overviewEdges": "Dependency edges",
+      "overviewTotal": "Total dependencies",
+      "overviewTransitive": "Transitive dependencies",
+      "rescan": "Rescan",
+      "risk.high": "High",
+      "risk.low": "Low",
+      "risk.medium": "Medium",
+      "summary": "{{direct}} direct · {{transitive}} transitive · {{edges}} edges",
+      "trust": "Trust status",
+      "trust.compromised": "Compromised",
+      "trust.suspicious": "Suspicious",
+      "trust.unknown": "Unknown",
+      "trust.verified": "Verified",
+      "typosquat": "Typosquat detection",
+      "typosquat.checkFailed": "Typosquat detection failed",
+      "typosquat.none": "No typosquatting dependencies found",
+      "typosquat.resembles": "Resembles well-known package {{target}} (similarity {{score}})",
+      "typosquat.total": "{{count}} suspicious",
+      "upgrade": "Upgrade assessment",
+      "upgrade.breaking": "Breaking changes",
+      "upgrade.checkFailed": "Upgrade assessment failed",
+      "upgrade.none": "No known major-version upgrades pending",
+      "upgrade.security": "Security fix",
+      "upgrade.total": "{{count}} items",
+      "outdated": "Dependency version check",
+      "outdated.total": "{{count}} can be updated",
+      "outdated.none": "All dependencies are up to date",
+      "outdated.security": "Security update"
+    },
+    "evolve": {
+      "analyze": "Architecture analysis",
+      "archScore": "Architecture health",
+      "empty": {
+        "feature": {
+          "coupling": {
+            "desc": "Identifies tightly coupled modules and circular dependencies",
+            "title": "Coupling analysis"
+          },
+          "directory": {
+            "desc": "Assesses package directory layout and boundary sanity",
+            "title": "Directory structure"
+          },
+          "graph": {
+            "desc": "Visualizes module reference relations and layering",
+            "title": "Dependency graph"
+          },
+          "suggest": {
+            "desc": "Suggests directions for splitting, converging, and optimizing architecture",
+            "title": "Evolution suggestions"
+          }
+        },
+        "subtitle": "Architecture health score: --",
+        "title": "Understand your project's architecture, plan its evolution path"
+      },
+      "emptyAnalyzing": "Analyzing project architecture...",
+      "emptyDone": "Analysis complete, no rules need adjusting",
+      "emptyHint": "When you mark false positives in the gate check or sentinel monitoring, the evolution engine automatically recalibrates rule weights and generates optimization suggestions.",
+      "header": {
+        "count": "{{suggestions}} optimization suggestions · {{weights}} tracked rules"
+      },
+      "stats": {
+        "adjusted": "Weight adjusted",
+        "highFp": "High false positive",
+        "suggestions": "Suggestions",
+        "weights": "Tracked rules"
+      },
+      "suggestion": {
+        "confidence": "Confidence: {{confidence}}%"
+      },
+      "title": "Evolution engine",
+      "weight": {
+        "fpRate": "False positive rate: {{rate}}%",
+        "samples": "Samples: {{samples}}"
+      },
+      "weights": "Rule weights"
+    },
+    "garbage": {
+      "cleanButton": "Clean up",
+      "cleanButtonCount": "Clean up ({{count}})",
+      "cleanFailed": "Cleanup failed, please retry",
+      "cleanFailedCount": "{{count}} items could not be cleaned (path out of bounds / file in use, etc.)",
+      "cleaned": "Cleaned {{count}} items · freed {{size}}",
+      "cleaning": "Cleaning...",
+      "dependencyHint": "Unused dependencies are not deleted automatically; remove them manually from package.json once you've confirmed they're unreferenced",
+      "done": "Garbage cleanup complete",
+      "empty": {
+        "subtitle": "Scans for unused files, redundant dependencies, and dead code",
+        "title": "Clear out useless files, lighten your project"
+      },
+      "emptyList": "The project is clean; nothing to clean up",
+      "feature": {
+        "deadCode": {
+          "desc": "Detects unreachable code branches"
+        },
+        "duplicateCode": {
+          "desc": "Locates duplicate implementations that can be merged"
+        },
+        "unusedDependency": {
+          "desc": "Finds dependency packages never referenced in the manifest"
+        },
+        "unusedFile": {
+          "desc": "Identifies unreferenced assets and leftover files"
+        }
+      },
+      "rescan": "Rescan",
+      "restore": "Restore",
+      "restoreFailed": "Restore failed, please retry",
+      "restoreFailedCount": "{{count}} items could not be restored (a file may already exist at the original location)",
+      "restored": "Restored {{count}} items · {{size}}, list refreshed",
+      "restoring": "Restoring...",
+      "scanning": "Scanning...",
+      "selectAll": "Select all",
+      "selectedCount": "{{count}} selected",
+      "startScan": "Start scan",
+      "stats": {
+        "freeable": "Releasable space",
+        "items": "Garbage items"
+      },
+      "summary": "{{count}} items · {{size}} releasable",
+      "type": {
+        "deadCode": "Dead code",
+        "duplicateCode": "Duplicate code",
+        "unusedDependency": "Unused dependency",
+        "unusedFile": "Unused file"
+      }
+    },
+    "guard": {
+      "banner": {
+        "fail": "Gate blocked · items failed",
+        "pass": "Gate healthy · guarding",
+        "warn": "Warnings present · needs attention"
+      },
+      "blockedCount": "Blocked {{count}}",
+      "blockingCount": "{{count}} blocks",
+      "checkCount": "{{count}} checks",
+      "copiedAll": "Copied all {{count}} issues; paste them into AI to fix",
+      "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
+      "duration": "Scan took {{duration}}ms",
+      "falsePositiveCount": "{{count}} false positive reports",
+      "falsePositiveSubmitted": "False positive report submitted; it will be used to calibrate rules",
+      "history": {
+        "subtitle": "Hook auto-trigger + manual scans persisted to DB",
+        "title": "Recent blocks"
+      },
+      "idleSubtitle": "Watches code changes in real time, auto-blocks at commit/push/CI checkpoints",
+      "lastBlockAt": "Last {{time}}",
+      "lastScan": "Last scan · {{time}}",
+      "level": {
+        "L3": "CI gate"
+      },
+      "markFalsePositive": "Mark false positive",
+      "reportFailed": "Submission failed",
+      "scan": "Scan now",
+      "scanning": "Scanning...",
+      "source": "Gate · Prevention",
+      "stats": {
+        "blocked": "Blocked",
+        "passed": "Passed",
+        "totalChecks": "Checks",
+        "warnings": "Warnings"
+      },
+      "status": {
+        "fail": "Blocked",
+        "idle": "Not triggered",
+        "pass": "Passed",
+        "warn": "Warnings"
+      },
+      "statusShort": {
+        "fail": "Gate blocked",
+        "idle": "Guarding",
+        "pass": "Gate healthy",
+        "warn": "Has warnings"
+      },
+      "table": {
+        "colCheck": "Check",
+        "colDetail": "Detail",
+        "colResult": "Result",
+        "colSeverity": "Severity"
+      },
+      "trigger": {
+        "manual": "Manual scan",
+        "preCommit": "Commit gate",
+        "prePush": "Push gate"
+      },
+      "warningCount": "{{count}} warnings"
+    },
+    "inspect": {
+      "aiReviewBadge": "AI Deep Review",
+      "checksPassed": "Checks passed",
+      "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
+      "done": "Inspection complete",
+      "empty": {
+        "subtitle": "After midnight, build artifacts, licenses, dependencies, and garbage cleanup are auto-inspected daily; you can also inspect now",
+        "title": "Check build artifacts, ensure delivery quality"
+      },
+      "feature": {
+        "build": {
+          "desc": "Validates dist artifact conventions, integrity, and output directories",
+          "title": "Build artifact check"
+        },
+        "dependency": {
+          "desc": "Detects redundant, unused, and version-conflicting dependencies",
+          "title": "Dependency analysis"
+        },
+        "garbage": {
+          "desc": "Finds and cleans temp files, caches, and useless artifacts",
+          "title": "Garbage cleanup"
+        },
+        "license": {
+          "desc": "Identifies open-source license compatibility and compliance risks",
+          "title": "License scan"
+        }
+      },
+      "passedCount": "{{passed}}/{{total}} passed",
+      "scanNow": "Inspect now",
+      "scanning": "Inspecting...",
+      "source": "Inspection",
+      "status": {
+        "fail": "Failed",
+        "pass": "Passed",
+        "warn": "Warnings"
+      }
+    },
+    "performance": {
+      "autoFixable": "Auto-fixable",
+      "copyAllHint": "{{count}} items need attention; copy them all to AI in one click to fix",
+      "detecting": "Detecting...",
+      "header": {
+        "issueCount": "{{count}} performance issues",
+        "title": "Performance detection complete"
+      },
+      "noIssues": "No performance issues found",
+      "rescan": "Rescan",
+      "scanning": "Running performance detection...",
+      "score": {
+        "fixable": "{{count}} fixable",
+        "health": "Performance health"
+      },
+      "severity": {
+        "high": "High priority",
+        "low": "Low priority",
+        "medium": "Medium priority"
+      },
+      "shell": {
+        "featureComplexity": {
+          "desc": "Detects inefficient loops, nested traversals, and redundant computation",
+          "title": "Runtime complexity"
+        },
+        "featureModernApi": {
+          "desc": "Recommends high-performance APIs like .at and spread over legacy ones",
+          "title": "Modern APIs"
+        },
+        "featureReDoS": {
+          "desc": "Identifies catastrophic regex backtracking risks",
+          "title": "ReDoS detection"
+        },
+        "featureTimer": {
+          "desc": "Detects setTimeout / setInterval misuse and memory leaks",
+          "title": "Timer optimization"
+        },
+        "start": "Start performance detection",
+        "subtitle": "Scans for inefficient array traversal, repeated regex compilation, redundant allocations, and other performance issues",
+        "title": "Detect runtime performance anti-patterns, optimize execution efficiency"
+      },
+      "source": "Performance",
+      "suggestion": "Suggestion: {{suggestion}}"
+    },
+    "refactor": {
+      "addProjectFirst": "Add a project on the dashboard first",
+      "groupedIssues": "Refactor issues (grouped by type)",
+      "groupsSummary": "{{groups}} types · {{total}} items",
+      "header": {
+        "lastAutoCheck": " · Last auto check {{time}}",
+        "summary": "{{totalSmells}} smells · {{files}} files to refactor",
+        "title": "Refactor analysis complete"
+      },
+      "noSmells": "✓ No code smells detected",
+      "scanFailed": "Scan failed: {{message}}",
+      "scanNow": "Check now",
+      "scanning": "Scanning...",
+      "scanningEllipsis": "Running refactor scan…",
+      "severity": {
+        "error": "Blocking",
+        "warning": "Suggestion"
+      },
+      "shell": {
+        "featureAutoFix": {
+          "desc": "Apply recommended refactorings in one click to reduce technical debt",
+          "title": "Auto fix"
+        },
+        "featureDaily": {
+          "desc": "Auto-scans after midnight daily, continuously tracking code quality",
+          "title": "Daily auto check"
+        },
+        "featureGrouping": {
+          "desc": "View different refactor issues and fix suggestions by category",
+          "title": "Rule grouping"
+        },
+        "featureSmell": {
+          "desc": "Detects duplicate code, oversized functions, high cyclomatic complexity, and more",
+          "title": "Code smells"
+        },
+        "subtitle": "Daily auto checks for code duplication, smells, oversized functions, etc.; apply recommended refactorings in one click",
+        "title": "Optimize code structure, eliminate technical debt"
+      },
+      "smell": {
+        "callbackHell": "Callback Hell",
+        "dataClass": "Data Class",
+        "dataClumps": "Data Clumps",
+        "deepNesting": "Deep Nesting",
+        "duplicatedCode": "Duplicate Code",
+        "featureEnvy": "Feature Envy",
+        "godObject": "God Object",
+        "inappropriateIntimacy": "Inappropriate Intimacy",
+        "largeClass": "God Object / Large Class",
+        "lazyClass": "Lazy Class",
+        "longMethod": "Long Method",
+        "longParameterList": "Long Parameter List",
+        "messageChains": "Message Chains",
+        "middleMan": "Middle Man",
+        "mixedResponsibilities": "Mixed Responsibilities",
+        "oversizedComponent": "Oversized Component",
+        "oversizedFile": "Oversized File",
+        "primitiveObsession": "Primitive Obsession",
+        "refusedBequest": "Refused Bequest",
+        "shotgunSurgery": "Shotgun Surgery",
+        "switchStatement": "Switch Statement"
+      },
+      "smellCount": "{{count}} items",
+      "source": "Refactor",
+      "stats": {
+        "files": "Files to refactor",
+        "highPriority": "High priority",
+        "smells": "Code smells"
+      },
+      "suggestion": "Suggestion: {{suggestion}}"
+    },
+    "reports": {
+      "empty": {
+        "feature": {
+          "email": {
+            "desc": "Send reports to team members in one click",
+            "title": "Email"
+          },
+          "pdf": {
+            "desc": "Generate shareable professional quality reports",
+            "title": "PDF export"
+          },
+          "scoring": {
+            "desc": "Aggregates security, performance, quality, and architecture health scores",
+            "title": "Multi-dimension scoring"
+          },
+          "trend": {
+            "desc": "Tracks score curves across past scans",
+            "title": "Trend comparison"
+          }
+        },
+        "subtitle": "{{count}} reports generated, last updated {{date}}",
+        "title": "Multi-dimension analysis reports, better decisions"
+      },
+      "generate": "Generate report",
+      "header": {
+        "count": "{{count}} reports · last updated {{date}}",
+        "generate": "📊 Generate report"
+      },
+      "scoreLabel": {
+        "danger": "Danger",
+        "excellent": "Excellent",
+        "good": "Good",
+        "needsImprovement": "Needs improvement"
+      },
+      "table": {
+        "abnormal": "Abnormal",
+        "col": {
+          "date": "Date",
+          "dimension": "Dimension",
+          "score": "Score",
+          "status": "Status",
+          "summary": "Summary"
+        },
+        "healthy": "Healthy"
+      },
+      "title": "Analysis reports"
+    },
+    "secrets": {
+      "action": {
+        "dismiss": "Dismiss",
+        "dismissConfirm": "Dismissal stops alerts and records it in the experience pool",
+        "markRotating": "Mark as rotating",
+        "markRotatingConfirm": "Mark this secret as rotating? Gate will temporarily pass it",
+        "verifyRotated": "Confirm rotated",
+        "verifyRotatedConfirm": "Confirm rotation complete? This will trigger a re-scan"
+      },
+      "badge": {
+        "active": "Active references",
+        "historyOnly": "History only",
+        "pushedToRemote": "Pushed to remote"
+      },
+      "checking": "Scanning...",
+      "done": "Secret Lifecycle",
+      "empty": {
+        "start": "Start scan",
+        "subtitle": "Scans the workspace and git history for hardcoded secrets, locates files and commits, and guides rotation and verification",
+        "title": "Discover secrets, track the full lifecycle"
+      },
+      "errorTitle": "Scan failed",
+      "feature": {
+        "locate": {
+          "desc": "Pinpoints the file, line number, and introducing commit for quick action",
+          "title": "Precise location"
+        },
+        "rotate": {
+          "desc": "Mark rotating → confirm rotated → dismiss after verification, fully trackable",
+          "title": "Rotation & verification"
+        },
+        "scan": {
+          "desc": "Covers workspace and git history; values are redacted",
+          "title": "Dual-mode scan"
+        }
+      },
+      "list": {
+        "empty": "No hardcoded secrets found",
+        "hint": "Sorted by severity · values redacted (first 4 and last 4 characters)",
+        "title": "Secret inventory"
+      },
+      "remoteNote": "Remote status is based on local git remote config only; it does not mean the secret has been publicly crawled",
+      "rescan": "Rescan",
+      "severity": {
+        "critical": "Critical",
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium"
+      },
+      "status": {
+        "active": "Unresolved",
+        "dismissed": "Dismissed",
+        "rotated": "Rotated",
+        "rotating": "Rotating"
+      },
+      "summary": "{{total}} secrets found · {{critical}} critical · {{active}} unresolved",
+      "summaryChip": {
+        "active": "Unresolved",
+        "critical": "Critical",
+        "historyOnly": "History only",
+        "total": "Total"
+      },
+      "type": {
+        "awsAccessKey": "AWS Access Key",
+        "awsSecretKey": "AWS Secret Key",
+        "databasePassword": "Database password",
+        "genericApiKey": "Generic API Key",
+        "githubToken": "GitHub Token",
+        "gitlabToken": "GitLab Token",
+        "privateKey": "Private key",
+        "redisPassword": "Redis password",
+        "stripeKey": "Stripe Key",
+        "twilioKey": "Twilio Key"
+      }
+    },
+    "security": {
+      "checking": "Checking...",
+      "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
+      "done": "Security check complete",
+      "empty": {
+        "subtitle": "Checked 0 files, found 0 high-risk vulnerabilities",
+        "title": "Deep-scan vulnerabilities, fix security issues"
+      },
+      "feature": {
+        "dependency": {
+          "desc": "Identifies outdated or unsafe dependencies with known CVEs",
+          "title": "Dependency check"
+        },
+        "malware": {
+          "desc": "Scans for reverse shells, backdoors, supply-chain poisoning, and other malicious code patterns"
+        },
+        "standard": {
+          "desc": "Validates secure coding standards and compliance baselines",
+          "title": "Standards check"
+        },
+        "vuln": {
+          "desc": "Detects common vulnerabilities like code injection, XSS, and SSRF"
+        }
+      },
+      "fixAll": "Scan all",
+      "lowRisk": "{{count}} low risk",
+      "malware": {
+        "backdoor": "Backdoor",
+        "cryptoRansomware": "Ransomware",
+        "dataExfiltration": "Data exfiltration",
+        "privilegeEscalation": "Privilege escalation",
+        "reverseShell": "Reverse shell",
+        "supplyChain": "Supply-chain poisoning",
+        "suspiciousBehavior": "Suspicious behavior"
+      },
+      "malwareCount": "{{count}} malicious",
+      "noFindings": "No security issues found",
+      "noMalware": "No malicious code found",
+      "recommendation": "Recommendation: {{recommendation}}",
+      "rescan": "Rescan",
+      "scoreLabel": "Security score",
+      "source": "Security",
+      "summary": "{{vulns}} vulnerabilities · {{malware}} malicious code · {{garbage}} garbage items",
+      "tab": {
+        "malware": "Malware scan",
+        "secrets": "Secret management",
+        "vuln": "Vulnerability scan"
+      }
+    },
+    "sentinel": {
+      "aiFixSource": "Sentinel · Monitor",
+      "copyAllHint": "{{count}} events total; copy them all to AI in one click to fix",
+      "falsePositiveSubmitted": "False positive report submitted; it will be used to calibrate rules",
+      "headerSummary": "Monitoring {{count}} events · {{activeCount}} pending",
+      "markFalsePositive": "Mark false positive",
+      "occurrenceCount": "Occurred {{count}} times",
+      "refreshing": "Refreshing...",
+      "shell": {
+        "buttonRunning": "Monitoring active",
+        "buttonStart": "Start monitoring",
+        "featureAlert": {
+          "desc": "High / Critical events trigger notifications",
+          "title": "Auto alerting"
+        },
+        "featureHistory": {
+          "desc": "View past anomaly details and handling records",
+          "title": "History review"
+        },
+        "featureRealtime": {
+          "desc": "Continuously watches code changes and reports anomalies instantly",
+          "title": "Real-time monitoring"
+        },
+        "featureScope": {
+          "desc": "Customize monitored files, directories, and rule scope",
+          "title": "Monitor scope"
+        },
+        "subtitleIdle": "Currently monitoring 0 files; click the button below to start",
+        "subtitleMonitoring": "Monitoring (automatic, 7×24) — guarding the current project",
+        "titleIdle": "24/7 uninterrupted monitoring, nothing escapes",
+        "titleMonitoring": "Monitoring started, nothing escapes"
+      },
+      "source": {
+        "backend": "Backend",
+        "frontend": "Frontend",
+        "infrastructure": "Infrastructure",
+        "middleware": "Middleware"
+      },
+      "stackLabel": "Stack",
+      "stats": {
+        "active": "Pending",
+        "falsePositive": "False positives",
+        "total": "Total events"
+      },
+      "submitFailed": "Submission failed",
+      "type": {
+        "crash": "Crash",
+        "frontendError": "Frontend error",
+        "httpError": "HTTP error",
+        "memoryLeak": "Memory leak",
+        "performanceDegradation": "Performance degradation",
+        "runtimeException": "Runtime exception",
+        "securityIncident": "Security incident",
+        "timeout": "Timeout",
+        "whiteScreen": "White screen"
+      }
+    },
+    "techdebt": {
+      "byCategory": "Debt composition",
+      "byModule": "Debt distribution",
+      "action": {
+        "plan": "Plan repayment",
+        "planning": "Planning...",
+        "verify": "Verify repaid",
+        "verifying": "Verifying...",
+        "verified": "Verified — repaid",
+        "notCleared": "Related issues not yet cleared",
+        "dismiss": "Dismiss"
+      },
+      "category": {
+        "architecture": "Architecture issues",
+        "dependency": "Dependency issues",
+        "duplication": "Duplicate code",
+        "quality": "Quality issues",
+        "security": "Security issues"
+      },
+      "categoryDesc": {
+        "security": "Security vulnerabilities — hidden risks in code such as unhandled exceptions, insecure configurations, etc.",
+        "architecture": "Architecture issues — unreasonable code structure such as circular dependencies, high module coupling, etc.",
+        "quality": "Code quality — non-compliance with coding standards such as overly long functions, improper naming, etc.",
+        "duplication": "Duplicate code — identical or similar code snippets that increase maintenance cost",
+        "dependency": "Dependency issues — outdated or risky dependency packages"
+      },
+      "categoryTotal": "{{count}} issues total",
+      "categoryWeight": "Weight {{weight}}%",
+      "checking": "Taking inventory...",
+      "debtIndex": "Debt index",
+      "done": "Tech Debt Dashboard",
+      "intro": {
+        "title": "Debt Composition Guide"
+      },
+      "empty": {
+        "start": "Start inventory",
+        "subtitle": "Analyzes scan issues and module hotness, estimates interest and principal, and ranks repayment suggestions by ROI",
+        "title": "Quantify tech debt, turn scores into action"
+      },
+      "errorTitle": "Inventory failed",
+      "factor": {
+        "density": "Density",
+        "exposure": "Exposure",
+        "hotness": "Hotness",
+        "severity": "Severity"
+      },
+      "feature": {
+        "action": {
+          "desc": "Sorted by interest ÷ principal, focused on high-ROI actions",
+          "title": "Repayment suggestions"
+        },
+        "composition": {
+          "desc": "Guide to 5 debt types: security, architecture, quality, duplication, dependency",
+          "title": "Debt composition"
+        },
+        "index": {
+          "desc": "0-100 quantitative measure of overall tech debt burden",
+          "title": "Debt index"
+        },
+        "module": {
+          "desc": "Locates debt hotspots by module and category",
+          "title": "Debt distribution"
+        }
+      },
+      "interestBreakdown": "Interest breakdown",
+      "interestScore": "Interest {{score}}",
+      "moduleHint": "Module name · share · change count",
+      "moduleHotness": "{{count}} changes",
+      "noDebt": "No tech debt found, keep it up",
+      "overview": "Debt overview",
+      "overviewActions": "Repayment suggestions",
+      "overviewCategories": "Debt categories",
+      "overviewModules": "Debt modules",
+      "principalEstimate": "Principal ~{{value}} person-days (estimate)",
+      "recommended": "Recommended",
+      "rescan": "Rescan",
+      "roi": "ROI {{roi}}",
+      "status": {
+        "dismissed": "Dismissed",
+        "inProgress": "In progress",
+        "pending": "Pending",
+        "planned": "Planned",
+        "repaid": "Repaid"
+      },
+      "source": "Tech Debt",
+      "summary": "Debt index {{index}} · {{actions}} repayment suggestions",
+      "topActions": "Top actions",
+      "topActionsHint": "Sorted by interest ÷ principal",
+      "trend": {
+        "better": "Improved {{delta}} vs last period",
+        "flat": "Flat vs last period",
+        "period": {
+          "month": "Last month",
+          "quarter": "Last quarter",
+          "week": "Last week"
+        },
+        "worse": "Worsened {{delta}} vs last period"
+      },
+      "trendLabel": "Debt trend"
+    },
+    "welcome": {
+      "addProject": "+ Add project, start guarding",
+      "axis": {
+        "governance": "Governance",
+        "ops": "Operations",
+        "security": "Security"
+      },
+      "brand": "ZhiYan CodeShield",
+      "cloudOn": "ZhiYan Cloud Brain enabled",
+      "engineOn": "Smart engine enabled",
+      "sloganTitle": "The smart guardian of the code world",
+      "stat": {
+        "healthScore": "Health score",
+        "protectedProjects": "Projects guarded",
+        "times": "{{count}} times",
+        "totalBlocked": "Total blocked"
+      }
+    }
+  },
+  "pipeline": {
+    "autofix": {
+      "started": "Issues found; OpenCode auto fix started ({{errors}} error / {{warnings}} warning)"
+    },
+    "complete": {
+      "done": "Checkup complete",
+      "foundIssues": "Checkup found {{count}} issues",
+      "total": "Checkup complete: {{count}} checks"
+    },
+    "exitError": {
+      "logHintPrefix": "; subprocess log: ",
+      "message": "Engine subprocess exited abnormally (code={{code}}, signal={{signal}})",
+      "stageHintPrefix": ", last progress: "
+    },
+    "garbage": {
+      "cleaning": "Cleaning garbage files…",
+      "done": "Cleanup complete: {{count}} items",
+      "restoreDone": "Restore complete: {{count}} items",
+      "restoring": "Restoring cleaned files…"
+    },
+    "guard": {
+      "failed": "Gate failed: {{count}} items need attention",
+      "failedBrief": "Gate failed: {{count}} items",
+      "jobDone": "Gate scan complete",
+      "jobScanning": "Running gate scan…",
+      "scanning": "Running gate check…",
+      "sopScanning": "Running gate check (sensitive info / ESLint / architecture / security)…"
+    },
+    "inspect": {
+      "fullScanning": "Running quality inspection…",
+      "jobDone": "Inspection complete",
+      "jobScanning": "Running smart inspection…",
+      "sopScanning": "Running quality inspection (type safety / dependencies / standards)…"
+    },
+    "jobTimeout": "Operation timed out ({{timeoutMs}}ms)",
+    "loadingRules": "Loading checkup rules…",
+    "performance": {
+      "done": "Performance detection complete: {{count}} performance issues found",
+      "loadingRules": "Loading performance detection rules…",
+      "scanning": "Running performance scan (ESLint performance rules / ReDoS)…"
+    },
+    "refactor": {
+      "analyzing": "Analyzing refactor smells…",
+      "collecting": "Collecting source files…",
+      "done": "Refactor analysis complete: {{count}} smells"
+    },
+    "report": {
+      "executionError": "Execution error",
+      "failed": "Failed",
+      "scopeGuard": "Gate check",
+      "scopeInspect": "Quality inspection",
+      "unknownRule": "Unknown rule"
+    },
+    "security": {
+      "done": "Security scan complete",
+      "scanning": "Running security scan…"
+    },
+    "shuttingDown": "Application is exiting",
+    "workerTimeout": "Subprocess startup timed out",
+    "workerUnavailable": "Subprocess unavailable"
+  },
+  "reporter": {
+    "andMore": "... and {{count}} more",
+    "blocking": "Blocking: {{value}}",
+    "blockingDryRun": "dry run",
+    "blockingNo": "No",
+    "blockingYes": "Yes",
+    "category": "Category",
+    "checkCount": "{{count}} checks",
+    "criticalFiles": "Critical files: {{count}}",
+    "criticalFilesTitle": "Files needing attention:",
+    "duration": "Duration: {{duration}}ms",
+    "engineDryRun": "◐ Engine check complete (dry-run reports only, no blocking)",
+    "engineFailed": "✗ Engine check failed",
+    "enginePassed": "✓ Engine check passed",
+    "error": "Error: {{error}}",
+    "errorRules": "Rules with errors:",
+    "errors": "Errors",
+    "failed": "Failed",
+    "failedRules": "Failed rules:",
+    "filesInvolved": "Files involved: {{count}}",
+    "garbage": "Garbage files",
+    "guardSection": "Guard gate check",
+    "inspectSection": "Inspect inspection",
+    "issueCount": "{{count}} issues",
+    "issuesCount": "({{count}} issues)",
+    "line": "(line {{line}})",
+    "malware": "Malicious code",
+    "needsImmediateAction": "Needs immediate action: {{count}}",
+    "noMatchingRules": "(no matching rules)",
+    "noSmells": "✓ No code smells detected",
+    "notCalculated": "  (not calculated)",
+    "notExecuted": "  (not executed)",
+    "overall": "Overall",
+    "passed": "Passed",
+    "passedRules": "Passed rules:",
+    "pipelineFailed": "✗ Pipeline failed",
+    "pipelinePassed": "✓ Pipeline passed",
+    "profileTitle": "Project profile",
+    "refactorSection": "Refactor smell detection",
+    "reportTitle": "ZhiYan CodeShield - Code Quality Management Report",
+    "ruleCount": "{{count}} rules",
+    "ruleEngineTitle": "SOP rule engine report",
+    "scanCount": "Scanned: {{scanned}}/{{files}} files",
+    "score": "Score: {{score}} ({{grade}})",
+    "scoreSection": "Health score",
+    "securityScore": "Security score",
+    "securitySection": "Security scan",
+    "severity": "Severity",
+    "skipped": "Skipped",
+    "smellCount": "{{count}} code smells",
+    "smellSummary": "{{count}} smells, maintainability score: {{score}}",
+    "stage": "Stage: {{stage}}",
+    "status": "Status: {{status}}",
+    "statusFailed": "❌ Failed",
+    "statusPassed": "✅ Passed",
+    "suggestion": "Suggestion:",
+    "summary": "Summary",
+    "time": "Time: {{timestamp}}",
+    "timestamp": "Time: {{timestamp}}",
+    "vulnerabilities": "Vulnerabilities"
+  },
+  "score": {
+    "gradeBadge": "{{letter}} grade · {{grade}}",
+    "gradeExcellent": "Excellent",
+    "gradeGood": "Good",
+    "gradePass": "Pass",
+    "gradeWarning": "Warning"
+  },
+  "server": {
+    "bootstrap": {
+      "running": "ZhiYan CodeShield server running at http://localhost:{{port}}"
+    },
+    "pipeline": {
+      "scoreRecordFailed": "Health score recording failed: {{error}}"
+    },
+    "scoring": {
+      "persistenceEnabled": "Health score persistence enabled: {{dbPath}}",
+      "persistenceUnavailable": "Health score persistence unavailable, running in memory mode: {{error}}",
+      "scoreRecorded": "Health score recorded: {{score}} ({{grade}})"
+    }
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "info": "Info",
+    "low": "Low",
+    "medium": "Medium"
+  },
+  "status": {
+    "assigned": "In progress",
+    "deployed": "Deployed",
+    "detected": "Detected",
+    "failed": "Verification failed",
+    "fixing": "Fixing",
+    "manual_taken_over": "Manual takeover",
+    "merged": "Merged",
+    "passed": "Resolved",
+    "pr_opened": "PR opened",
+    "rolled_back": "Rolled back",
+    "validating": "Validating"
+  },
+  "task": {
+    "cancelled": "Task cancelled",
+    "executionFailed": "Task execution failed",
+    "kind": {
+      "garbageClean": "Clean",
+      "garbageRestore": "Restore",
+      "guard": "Gate scan",
+      "inspect": "Inspection",
+      "performance": "Detection",
+      "pipeline": "Checkup",
+      "refactor": "Refactor scan",
+      "security": "Check"
+    },
+    "notCompleted": "Task not completed",
+    "notFound": "Task not found",
+    "queuedLabel": "Queued (position {{position}})...",
+    "runningLabel": "{{kind}} in progress... {{percent}}%{{suffix}}",
+    "schedulerUnavailable": "Task scheduler unavailable (non-desktop environment)"
+  },
+  "toast": {
+    "aiToolDisabled": "OpenCode integration disabled (integration files kept in the project)",
+    "aiToolEnabledNoProjects": "OpenCode integration enabled (config will be written once projects are added)",
+    "aiToolEnabledWritten": "OpenCode integration enabled, written to {{written}}/{{total}} projects",
+    "aiToolSaveFailed": "AI tool config save failed",
+    "copiedToAi": "Issues copied; paste them into AI to fix",
+    "copyAllCopiedToAi": "Copied all {{count}} issues; paste them into AI to fix",
+    "copyAllManualTrae": "Copied all {{count}} issues; paste them into Trae manually",
+    "copyAllOpenedTrae": "Copied all {{count}} issues and opened Trae; paste them in",
+    "copyFailed": "Copy failed",
+    "copyFixManualTrae": "Fix hint copied; paste it into Trae manually",
+    "copyFixOpenedTrae": "Fix hint copied and Trae opened; paste it in",
+    "desktopOnlyFolderPicker": "Run the desktop app to pick folders; browsers cannot",
+    "issuesCopied": "Issues copied; paste them into AI to fix",
+    "projectAdded": "Project \"{{projectName}}\" added, guarding started",
+    "projectRemoved": "Project \"{{projectName}}\" removed"
+  }
+}

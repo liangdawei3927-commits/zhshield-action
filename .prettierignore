@@ -1,0 +1,42 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建产物
+dist/
+dist-electron/
+build/
+release/
+*.tsbuildinfo
+.turbo/
+
+# 测试 / 覆盖率
+coverage/
+coverage-summary.json
+*.lcov
+.vitest/
+
+# 大型生成文件
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Electron / 打包
+packages/desktop/release/
+*.dmg
+*.app
+
+# 资源 / 非代码
+*.md
+*.yml
+*.yaml
+*.json
+!.*.json
+sop-templates/
+SOP标准资源/
+.github/
+
+# 脚本产物
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.map

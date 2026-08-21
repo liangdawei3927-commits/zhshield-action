@@ -1,0 +1,27 @@
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      next:
+        specifier: ^14.2.0
+        version: 14.2.5
+      react:
+        specifier: ^18.3.0
+        version: 18.3.1
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.4.5
+
+  packages/core:
+    dependencies:
+      react:
+        specifier: ^18.3.0
+        version: 18.3.1
+
+packages:
+  next@14.2.5:
+    resolution: {integrity: sha512-sha512}
+    engines: {node: '>=18.17.0'}

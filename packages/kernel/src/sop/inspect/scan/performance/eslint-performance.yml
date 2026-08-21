@@ -1,0 +1,20 @@
+name: ESLint Performance Check
+description: 检测 JavaScript/TypeScript 运行时性能反模式 — 不可变 reduce、低效数组遍历、复杂可选链等，
+  基于 @eslint-performance/plugin-runtime-complexity 与 @e18e/eslint-plugin 两个性能规则插件
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [eslint, performance, javascript, typescript]
+applicableEngines: [inspect]
+check:
+  tool: eslint
+  toolConfig:
+    config: node_modules/@zh/kernel/dist/assets/eslint/eslint-performance.config.mjs
+    category: performance
+conditions:
+  languages: [javascript, typescript]
+  filePatterns: ['**/*.{js,jsx,mjs,cjs}']
+judgment:
+  passCondition: 'issueCount === 0'
+  priority: medium

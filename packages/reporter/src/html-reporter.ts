@@ -1,0 +1,132 @@
+
+export interface HtmlReportOptions {
+  title?: string;
+  lang?: string;
+  includeStyles?: boolean;
+}
+
+export interface HtmlReportData {
+  timestamp: string;
+  projectName?: string;
+  summary: {
+    total: number;
+    passed: number;
+    warnings: number;
+    failures: number;
+  };
+  sections: Array<{
+    title: string;
+    items: Array<{
+      status: 'pass' | 'warn' | 'fail';
+      message: string;
+      file?: string;
+      line?: number;
+      severity?: string;
+    }>;
+  }>;
+}
+
+const DEFAULT_STYLES = `
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+  .header { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .header h1 { font-size: 24px; margin-bottom: 8px; }
+  .header .meta { color: #666; font-size: 14px; }
+  .stats { display: flex; gap: 16px; margin-bottom: 16px; }
+  .stat-card { flex: 1; background: #fff; border-radius: 8px; padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .stat-value { font-size: 32px; font-weight: bold; }
+  .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+  .section { background: #fff; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+  .section-header { padding: 16px; border-bottom: 1px solid #eee; font-weight: 600; }
+  .section-item { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 12px; }
+  .section-item:last-child { border-bottom: none; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-pass { background: #22c55e; }
+  .status-warn { background: #f59e0b; }
+  .status-fail { background: #ef4444; }
+  .item-message { flex: 1; font-size: 14px; }
+  .item-location { font-size: 12px; color: #666; font-family: monospace; }
+  .item-severity { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+  .severity-high { background: #fef2f2; color: #dc2626; }
+  .severity-medium { background: #fffbeb; color: #d97706; }
+  .severity-low { background: #eff6ff; color: #2563eb; }
+  .footer { text-align: center; color: #999; font-size: 12px; margin-top: 24px; }
+</style>`;
+
+export function generateHtmlReport(data: HtmlReportData, options: HtmlReportOptions = {}): string {
+  const { title = 'CodeShield Report', includeStyles = true } = options;
+  const passRate = data.summary.total > 0 ? Math.round((data.summary.passed / data.summary.total) * 100) : 0;
+
+  const sectionsHtml = data.sections.map(section => `
+    <div class="section">
+      <div class="section-header">${escapeHtml(section.title)}</div>
+      ${section.items.length === 0 ? '<div class="section-item"><span class="item-message">No issues found</span></div>' : ''}
+      ${section.items.map(item => `
+        <div class="section-item">
+          <span class="status-dot status-${item.status}"></span>
+          <span class="item-message">${escapeHtml(item.message)}</span>
+          ${item.file ? `<span class="item-location">${escapeHtml(item.file)}${item.line ? `:${item.line}` : ''}</span>` : ''}
+          ${item.severity ? `<span class="item-severity severity-${item.severity}">${escapeHtml(item.severity)}</span>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="${options.lang ?? 'en'}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  ${includeStyles ? DEFAULT_STYLES : ''}
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${escapeHtml(title)}</h1>
+      <div class="meta">
+        ${data.projectName ? `Project: ${escapeHtml(data.projectName)} · ` : ''}
+        Generated: ${escapeHtml(data.timestamp)}
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" style="color: #3b82f6">${data.summary.total}</div>
+        <div class="stat-label">Total Checks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: #22c55e">${data.summary.passed}</div>
+        <div class="stat-label">Passed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: #f59e0b">${data.summary.warnings}</div>
+        <div class="stat-label">Warnings</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: #ef4444">${data.summary.failures}</div>
+        <div class="stat-label">Failures</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${passRate}%</div>
+        <div class="stat-label">Pass Rate</div>
+      </div>
+    </div>
+    ${sectionsHtml}
+    <div class="footer">
+      Generated by CodeShield · ${escapeHtml(data.timestamp)}
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

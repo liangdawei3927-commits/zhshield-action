@@ -1,0 +1,13 @@
+name: Circular Dependency Detection
+description: 检测循环依赖 — 防止模块间循环引用
+severity: error
+executionMode: async
+status: active
+source: official
+tags: [architecture, circular, dependency]
+applicableEngines: [inspect]
+detection:
+  maxDepth: 20
+  excludePatterns:
+    - '*.test.ts'
+    - '**/node_modules/**'

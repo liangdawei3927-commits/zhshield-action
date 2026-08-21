@@ -1,0 +1,6 @@
+# Known false positives (test fixtures)
+# rule-engine 测试故意写入 sk- 格式伪密钥到临时目录，用于验证引擎可检测敏感信息。
+# 当前源码已将伪密钥分片拼接（['sk-', '...'].join('')）规避字面量命中；
+# 此处仅豁免初始提交(8c485c76)中遗留的历史 finding（工作区文件已无字面量密钥）。
+8c485c76a90db2c8777edabebf34e7b9fc6664a0:packages/kernel/src/__tests__/rule-engine.context.test.ts:generic-api-key:67
+8c485c76a90db2c8777edabebf34e7b9fc6664a0:packages/kernel/src/__tests__/rule-engine.inline.test.ts:generic-api-key:29

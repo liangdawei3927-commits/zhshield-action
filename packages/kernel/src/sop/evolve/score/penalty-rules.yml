@@ -1,0 +1,25 @@
+name: Penalty Rules Configuration
+description: 扣分规则 — 各类问题的扣分权重
+severity: info
+executionMode: sync
+status: active
+source: official
+tags: [evolve, score, penalty]
+applicableEngines: [evolve, scoring]
+penalties:
+  critical:
+    security: -30
+    architecture: -20
+    quality: -15
+  error:
+    security: -15
+    architecture: -10
+    quality: -8
+  warning:
+    security: -8
+    architecture: -5
+    quality: -3
+  info:
+    security: -2
+    architecture: -1
+    quality: -0.5

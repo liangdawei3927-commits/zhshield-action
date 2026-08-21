@@ -1,0 +1,1874 @@
+{
+  "ai": {
+    "autoFix": {
+      "promptIntro": "你是智汇码盾的自动修复助手。",
+      "readDiagnostics": "请先读取诊断文件 {{diagPath}}，按 error → warning → info 的优先级修复其中列出的问题。",
+      "requirement1": "1. 逐条理解 issue 的 ruleId、message、file、line、column、suggestion，再定位代码",
+      "requirement2": "2. 没有 file 字段的条目属于工具/配置类问题（如 ESLint 扫描目录配置错误），应检查并修复对应工具配置，不要假装修了代码",
+      "requirement3": "3. source 为 \"guard\" 的条目属于门禁/预防类问题，**跳过不要修复**（只自动修复巡检/重构类问题）",
+      "requirement4": "4. 只做最小必要的修改，不要重构无关代码",
+      "requirement5": "5. 不要修改诊断文件本身（.zhshield/diagnostics/latest.json）",
+      "requirement6": "6. 全部处理完后，用一句话汇报修改了哪些文件",
+      "requirementsTitle": "要求："
+    },
+    "copyFix": {
+      "issueHeader": "【问题 {{number}}】（{{source}}）",
+      "locationLabel": "- 位置: {{location}}",
+      "messageLabel": "- 描述: {{message}}",
+      "projectPathLabel": "项目路径: {{projectPath}}",
+      "promptIntro": "你是智汇码盾的代码修复助手。请修复以下代码问题：",
+      "requirement1": "1. 调用技能，逐条定位代码故障的真实性。",
+      "requirement2": "2. 理解问题后再修改，不要敷衍假装修复。",
+      "requirement3": "3. 只做最小必要的修改，不要重构无关代码。",
+      "requirement4": "4. 修复后要保证可测试、可验证、可回归、可运行。",
+      "requirement5": "5. 修复完成后用一句话汇报修改了哪些文件。",
+      "requirementsTitle": "修复要求：",
+      "ruleLabel": "- 规则: {{ruleId}}",
+      "severityLabel": "- 严重度: {{severity}}",
+      "suggestionLabel": "- 建议: {{suggestion}}"
+    },
+    "toolConfig": {
+      "openCodeCommand": {
+        "description": "description: 读取智汇码盾诊断并修复代码问题",
+        "step1": "1. 读取项目根目录 `.zhshield/diagnostics/latest.json`（不存在则提示用户先运行体检）",
+        "step2": "2. 按 error → warning → info 优先级排序问题",
+        "step3": "3. 逐条理解问题、定位代码、生成并应用修复",
+        "step4": "4. 修复后运行 `zhshield issue resolve --fingerprint=\"<fingerprint>\"` 标记已解决（可选）",
+        "title": "# 智汇码盾诊断修复"
+      }
+    }
+  },
+  "cli": {
+    "command": {
+      "deps": "依赖管家（SBOM + 许可矩阵）",
+      "guard": "执行 Guard 门禁检查",
+      "help": "显示此帮助",
+      "inspect": "执行 Inspect 巡检",
+      "pipeline": "执行完整流水线",
+      "refactor": "执行 Refactor 重构检测"
+    },
+    "depsEcosystem": "生态: {{ecosystem}}",
+    "depsHeader": "── 依赖管家 ──",
+    "depsLockfile": "锁文件: {{status}}",
+    "depsNotFound": "依赖管家: 未发现依赖清单（package-lock.json / pnpm-lock.yaml / yarn.lock / requirements.txt / pyproject.toml / Pipfile.lock / poetry.lock）",
+    "depsProject": "项目: {{path}}",
+    "depsTotal": "依赖总数: {{count}}（直接 {{direct}} / 传递 {{transitive}}）",
+    "directDepsHeader": "── 直接依赖 ──",
+    "highRiskLicenses": "高风险许可: {{list}}",
+    "licenseMatrixHeader": "── 许可矩阵 ──",
+    "licenseRiskHigh": "高风险",
+    "licenseRiskLow": "低风险",
+    "licenseRiskMedium": "中风险",
+    "licenseRiskUnknown": "中风险 — 需人工确认",
+    "lockfileMissing": "✗ 缺失",
+    "lockfilePresentUnverified": "✓ 存在（一致性未校验）",
+    "lockfilePresentVerified": "✓ 存在（一致性已校验）",
+    "option": {
+      "dir": "项目根目录（默认: 当前目录）",
+      "dryRun": "Guard 模式：只报告不阻断",
+      "hook": "Guard 模式：门禁触发来源（pre-commit / pre-push）",
+      "json": "deps: 输出完整依赖图谱 JSON",
+      "lang": "界面语言（zh-Hans / zh-Hant / en / ko / ja；默认: zh-Hans 或 ZH_LANG 环境变量）",
+      "noColor": "禁用颜色输出",
+      "sbom": "deps: 导出 CycloneDX SBOM 到文件",
+      "sop": "使用 SOP 规则驱动模式（默认: checks.json 模式）",
+      "staged": "Guard 模式：仅检查暂存区变更",
+      "verbose": "显示详细信息"
+    },
+    "optionsTitle": "选项:",
+    "rulesLoaded": "[CLI] 已加载 {{count}} 条 SOP 规则",
+    "sbomWriteFailed": "❌ SBOM 写入失败: {{error}}",
+    "sbomWritten": "✅ SBOM 已写入: {{path}}",
+    "stagedSkipped": "✅ 暂存区无变更，门禁检查跳过",
+    "title": "zhshield — 智汇码盾 代码质量治理",
+    "unknownCommand": "未知命令: {{command}}",
+    "usageTitle": "用法:"
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "关闭",
+    "confirm": "确认",
+    "copied": "已复制",
+    "copy": "复制",
+    "copyAllToAi": "全部复制到 AI",
+    "copyToAi": "复制到AI",
+    "delete": "删除",
+    "loading": "加载中",
+    "no": "否",
+    "refresh": "刷新",
+    "remove": "移除",
+    "retry": "重试",
+    "save": "保存",
+    "search": "搜索",
+    "yes": "是"
+  },
+  "electron": {
+    "appTitle": "智汇码盾",
+    "cleanFailed": "清理失败，请稍后重试",
+    "diagnostics": {
+      "ruleFailed": "{{ruleId}} 未通过"
+    },
+    "feedbackIncomplete": "反馈内容不完整",
+    "hooksExist": "已有钩子文件 {{hooks}}，为避免覆盖请手动确认",
+    "invalidParams": "参数无效",
+    "invalidProjectPath": "项目路径无效",
+    "notGitRepo": "项目不是 git 仓库",
+    "restoreFailed": "恢复失败，请稍后重试",
+    "scoringUnavailable": "本地数据库不可用，评分功能降级（请使用 HTTP 模式连接服务端）",
+    "writeFailed": "写入失败"
+  },
+  "engine": {
+    "backupModuleUnavailable": "备份模块不可用",
+    "builtin-rules": {
+      "architecture": {
+        "circularDependency": "检测到循环依赖",
+        "cyclicImport": "模块间存在循环导入",
+        "fatController": "Controller 过于臃肿，逻辑应移至 Service",
+        "globalState": "检测到全局状态/单例模式滥用",
+        "layerSkip": "跳层调用：跨过中间层直接调用底层模块",
+        "layerViolation": "业务层不应直接引用数据访问层",
+        "missingAbstraction": "模块缺少接口抽象，不利于测试和扩展",
+        "noDomainInInfra": "基础设施层不应依赖领域层",
+        "noDtoInEntity": "Entity 不应依赖 DTO",
+        "noEntityInController": "Controller 不应直接引用 Entity",
+        "noServiceInView": "视图层不应直接调用 Service",
+        "utilsEverywhere": "utils 工具函数分散在各模块，建议统一管理"
+      },
+      "quality": {
+        "asyncWithoutAwait": "async 函数中未使用 await",
+        "complexCondition": "条件表达式过于复杂，建议提取为变量",
+        "consoleLog": "生产代码中不应包含 console.log",
+        "debugger": "生产代码中不应包含 debugger 语句",
+        "duplicateKey": "对象中存在重复键",
+        "emptyCatch": "空的 catch 块会隐藏错误",
+        "eqeqeq": "使用 == 而非 ===，可能导致类型转换",
+        "forInWithoutHasOwn": "for...in 未使用 hasOwnProperty 检查",
+        "largeFunction": "函数过长，建议拆分为多个小函数",
+        "magicNumber": "检测到魔术数字，建议定义为常量",
+        "missingFallthrough": "switch case 缺少 break，可能意外贯穿",
+        "nestedCallback": "嵌套回调过深，建议使用 async/await",
+        "noBarrelImport": "从 barrel (index) 文件导入可能导致循环依赖",
+        "noNullComparison": "使用 foo == null 而非 foo === null || foo === undefined",
+        "noUnusedVariable": "检测到未使用的变量",
+        "todoComment": "存在 TODO 待办项",
+        "typeAny": "使用 any 类型会失去类型检查保护",
+        "varUsage": "使用 var 而非 const/let"
+      },
+      "security": {
+        "commandInjection": "检测到 shell 命令执行，存在命令注入风险",
+        "consoleLogSecret": "console.log 可能泄露敏感信息",
+        "debugEndpoint": "生产环境不应暴露调试接口",
+        "evalUsage": "检测到 eval() 调用，存在代码注入风险",
+        "hardcodedApiKey": "检测到硬编码 API 密钥",
+        "hardcodedPassword": "检测到硬编码密码",
+        "innerHtml": "检测到 innerHTML 赋值，存在 XSS 风险",
+        "insecureDeserialize": "检测到不安全的反序列化操作",
+        "insecureRandom": "使用 Math.random() 做安全敏感操作，请用 crypto.randomBytes",
+        "noAuth": "检测到未认证的修改操作",
+        "noCors": "未配置 CORS 中间件",
+        "noCsp": "未检测到 Content-Security-Policy 头",
+        "noHelmet": "未检测到 Helmet 安全头中间件",
+        "noHttpsRedirect": "未强制 HTTPS 重定向",
+        "noRateLimit": "API 路由未配置速率限制",
+        "noTls": "检测到 HTTP 而非 HTTPS 服务",
+        "pathTraversal": "检测到路径遍历风险，请校验用户输入",
+        "prototypePollution": "检测到原型链污染风险",
+        "sensitiveFiles": "检测到敏感文件被包含",
+        "sqlConcat": "检测到 SQL 字符串拼接，请使用参数化查询"
+      }
+    },
+    "dependency": {
+      "license": {
+        "unknownReason": "无法识别的许可证，需人工确认"
+      }
+    },
+    "engineUnavailable": "引擎不可用",
+    "feedbackUnavailable": "反馈通道不可用",
+    "guard": {
+      "architecture": {
+        "foundViolations": "发现 {{count}} 处跨层违规引用:\n{{details}}",
+        "passed": "模块边界检查通过，未发现跨层违规引用",
+        "scanFailed": "模块边界检查失败: {{error}}"
+      },
+      "eslint": {
+        "execFailed": "ESLint 执行失败",
+        "foundErrors": "ESLint 发现 {{count}} 个错误:\n{{errors}}",
+        "foundWarnings": "ESLint 发现 {{count}} 个警告:\n{{warnings}}",
+        "notInstalled": "ESLint 未安装或未在 PATH 中找到",
+        "passed": "ESLint 检查通过（{{count}} 个文件）",
+        "passedNoOutput": "ESLint 检查通过（无输出）"
+      },
+      "hook": {
+        "guardFailed": "❌ 智汇码盾门禁检查未通过，请修复后{{action}}"
+      },
+      "securityScan": {
+        "commandInjection": "可能的命令注入: 使用 execFile 替代 exec",
+        "consoleLog": "生产环境应移除 console 语句",
+        "debugger": "生产环境应移除 debugger 语句",
+        "evalUsage": "避免使用 eval(): 可能导致代码注入",
+        "foundIssues": "发现 {{count}} 个安全问题 ({{high}} {{highCount}}, {{medium}} {{mediumCount}}, {{low}} {{lowCount}}):\n{{details}}",
+        "hardcodedPort": "检查硬编码端口号是否应改为配置项",
+        "innerHtml": "使用 innerHTML 可能导致 XSS, 优先使用 textContent",
+        "noNewFunc": "避免 new Function(): 可能导致代码注入",
+        "passed": "安全扫描通过，未发现明显安全问题",
+        "scanFailed": "安全扫描失败: {{error}}",
+        "sqlInjection": "可能的 SQL 注入: 使用了字符串拼接而非参数化查询",
+        "todoFixme": "存在未处理的代办事项 (TODO/FIXME)"
+      },
+      "sensitiveInfo": {
+        "foundIssues": "发现 {{count}} 处疑似敏感信息:\n{{details}}",
+        "matchedLine": "{{file}}:{{line}} 匹配 {{pattern}}: {{match}}",
+        "passed": "敏感信息检查通过，未发现泄露",
+        "scanFailed": "敏感信息扫描失败: {{error}}"
+      },
+      "testDetector": {
+        "noTestScriptDir": "未找到含 test 脚本的项目目录"
+      },
+      "testRunner": {
+        "execFailed": "测试执行失败: {{error}}",
+        "failedList": "失败用例:",
+        "noTests": "未发现测试用例",
+        "notExecuted": "测试未执行",
+        "passedAll": "全部 {{passed}} 项测试通过 ({{durationMs}}ms)",
+        "summary": "测试 {{totalTests}} 项: {{passed}} 通过, {{failed}} 失败 ({{durationMs}}ms){{failDetail}}",
+        "unresolved": "检测到 {{totalTests}} 个测试文件，但测试运行结果未能解析（进程输出异常或超时）"
+      },
+      "unknownRule": "未知规则"
+    },
+    "hooksUnavailable": "guardHooks IPC 不可用",
+    "inspect": {
+      "report": {
+        "recommendations": {
+          "category": "发现 {{count}} 个 {{category}} 类问题，建议优先处理",
+          "degradedLevel": "当前降级等级: Level {{level}}，部分工具已跳过",
+          "toolError": "工具 {{tool}} 出错: {{error}}"
+        }
+      },
+      "supplyChain": {
+        "downloadAllFailed": "[supply-chain] {{toolId}} 所有渠道下载失败（{{attempts}} 次尝试）",
+        "sha256Mismatch": "[supply-chain] {{toolId}} sha256 校验失败: 期望 {{expected}}, 实际 {{actual}}",
+        "unregisteredLicense": "未登记许可，禁止发布"
+      },
+      "tool": {
+        "dep-cruiser": {
+          "architectureViolation": "架构边界违规: {{rule}} - {{from}} → {{to}}",
+          "description": "架构边界与模块依赖检查",
+          "noCrossReference": "模块 {{from}} 不应引用 {{to}}",
+          "runFailed": "dependency-cruiser 执行失败",
+          "unavailable": "dependency-cruiser 未安装"
+        },
+        "depcheck": {
+          "description": "未使用依赖检测",
+          "moveDevDependency": "将 {{dep}} 移入 dependencies 或运行 npm uninstall -D {{dep}}",
+          "runFailed": "depcheck 执行失败",
+          "unavailable": "depcheck 未安装",
+          "uninstallDependency": "运行 npm uninstall {{dep}} 移除未使用的依赖",
+          "unusedDependency": "未使用的依赖: {{dep}}",
+          "unusedDevDependency": "未使用的 dev 依赖: {{dep}}"
+        },
+        "eslint": {
+          "autoFixable": "可自动修复",
+          "description": "JS/TS 代码规范与质量检查",
+          "runFailed": "ESLint 执行失败",
+          "unavailable": "ESLint 未安装或未在 PATH 中找到"
+        },
+        "gitleaks": {
+          "description": "硬编码密钥扫描",
+          "hardcodedSecret": "检测到硬编码密钥: {{rule}}",
+          "removeSecret": "移除硬编码密钥，使用环境变量或密钥管理服务",
+          "runFailed": "Gitleaks 执行失败",
+          "unavailable": "Gitleaks 未安装或未在 PATH 中找到"
+        },
+        "jscpd": {
+          "description": "重复代码检测",
+          "duplicateFound": "发现重复代码 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+          "extractShared": "提取公共代码到共享模块 (重复位置: {{secondFile}})",
+          "runFailed": "jscpd 执行失败",
+          "unavailable": "jscpd 未安装"
+        },
+        "semgrep": {
+          "description": "SAST 代码漏洞扫描（SQL 注入、XSS、CSRF、命令注入、路径遍历等）",
+          "runFailed": "Semgrep 执行失败",
+          "timeout": "Semgrep 扫描超时",
+          "unavailable": "Semgrep 未安装或未在 PATH 中找到"
+        },
+        "ts-prune": {
+          "description": "TypeScript 死代码/未导出检测",
+          "removeExport": "移除未使用的导出符号: {{symbol}}",
+          "runFailed": "ts-prune 执行失败",
+          "unavailable": "ts-prune 未安装",
+          "unusedExport": "未使用的导出: {{symbol}}"
+        },
+        "tsc": {
+          "description": "TypeScript 类型错误检查",
+          "fixSuggestion": "修复 TypeScript {{level}}: {{code}}",
+          "runFailed": "tsc 执行失败",
+          "unavailable": "tsc 未安装或未在 PATH 中找到"
+        }
+      },
+      "unknown": "未知",
+      "unknownRule": "未知规则"
+    },
+    "kernel": {
+      "backup": {
+        "allFailed": "所有备份方式均失败",
+        "commitMessage": "{{prefix}} 自动备份 - {{timestamp}}",
+        "commitPrefix": "[智汇码盾]",
+        "done": "备份完成",
+        "githubNotAuthorized": "GitHub 未授权，请先在设置中授权 GitHub 账户",
+        "localCopyFailed": "{{count}} 个文件复制失败",
+        "progressGitHubCommit": "正在提交到 GitHub...",
+        "progressLocalCopy": "正在复制到本地目录...",
+        "repoDescription": "智汇码盾自动备份仓库",
+        "unknownGitHubError": "未知 GitHub 备份错误",
+        "unknownLocalError": "未知本地备份错误"
+      },
+      "runner": {
+        "forbiddenPatternsFound": "发现 {{count}} 处禁止模式 ({{ruleId}})",
+        "forbiddenUsage": "禁止使用: \"{{pattern}}\"",
+        "guardDispatchFailed": "Guard 派发失败: {{error}}",
+        "guardEngineNotRegistered": "GuardEngine 未注册，无法执行 check-list",
+        "guardFoundIssues": "Guard 检查发现 {{count}} 个问题",
+        "guardPassed": "Guard 检查通过",
+        "inspectDispatchFailed": "Inspect 派发失败: {{error}}",
+        "inspectEngineNotRegistered": "InspectEngine 未注册，且无可用扫描器适配器",
+        "labelDone": "{{label}}完成: {{count}} 个问题",
+        "labelInspection": "巡检",
+        "labelPreset": "预设检查",
+        "layerAllowedDeps": "{{fileLayer}} 层只能依赖: {{deps}}",
+        "layerBoundaryPassed": "架构边界检查通过",
+        "layerBoundaryViolations": "发现 {{count}} 处架构边界违规",
+        "layerViolationMessage": "层违规: \"{{fileLayer}}\" 不允许依赖 \"{{targetLayer}}\" (导入: {{imported}})",
+        "patternMatchesFound": "发现 {{count}} 处匹配 ({{ruleId}})",
+        "presetInspectNotRegistered": "InspectEngine 未注册，且无可用 preset 工具适配器",
+        "removeHardcodedValue": "移除或使用环境变量替代硬编码值",
+        "replaceForbidden": "移除或替换 \"{{pattern}}\" 为类型安全的替代方案",
+        "scannerFailed": "扫描器 {{tool}} 执行失败",
+        "scannerFoundIssues": "扫描器发现 {{count}} 个问题",
+        "scannerPassed": "扫描器检查通过",
+        "sensitivePatternMatch": "匹配到敏感模式: {{match}}",
+        "skipCheckListNoMatch": "跳过 check-list→GuardEngine：仓库未配置匹配的检查项",
+        "skipCheckListReentry": "跳过 check-list→GuardEngine.run（防止规则引擎重入）",
+        "skipNestedDispatch": "跳过嵌套 {{type}} 派发（防止规则引擎重入）",
+        "skipPresetReentry": "跳过 preset→runScan（防止规则引擎重入）",
+        "skipScannerReentry": "跳过 scanner-dispatch→runScan（防止规则引擎重入）",
+        "thresholdList": "阈值: {{entries}}",
+        "thresholdRaw": "阈值: {{unit}} {{thresholds}}",
+        "thresholdRule": "阈值规则 (需要外部数据): {{summary}}",
+        "toolAdapterNotRegistered": "未注册工具适配器: {{tool}}，无法执行 tool-dispatch",
+        "toolError": "工具 {{tool}} 错误: {{error}}",
+        "toolExecuteFailed": "工具 {{tool}} 执行失败: {{error}}",
+        "toolFoundIssues": "工具 {{tool}} 发现 {{count}} 个问题",
+        "toolPassed": "工具 {{tool}} 检查通过",
+        "toolUnavailable": "工具不可用: {{tool}}（未安装或在 PATH 中未找到）"
+      }
+    },
+    "output": {
+      "architectureViolation": "架构边界违规: {{rule}} - {{from}} → {{to}}",
+      "autoFixable": "可自动修复",
+      "duplicateCode": "发现重复代码 ({{format}}): {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+      "extractSharedCode": "提取公共代码到共享模块 (重复位置: {{secondFile}})",
+      "moduleShouldNotReference": "模块 {{from}} 不应引用 {{to}}",
+      "removeDependency": "移除 {{name}} 从 dependencies",
+      "removeDevDependency": "移除 {{name}} 从 devDependencies",
+      "removeHardcodedKey": "移除硬编码密钥，使用环境变量或密钥管理服务",
+      "removeHardcodedSecret": "移除硬编码的密钥，使用环境变量或密钥管理服务",
+      "unknownRule": "未知规则",
+      "unusedDevDependency": "未使用的开发依赖: {{name}}",
+      "unusedProdDependency": "未使用的生产依赖: {{name}}",
+      "upgradeTo": "升级到 {{version}}"
+    },
+    "pipeline": {
+      "log": {
+        "guardBlocked": "Guard 阻断, 流水线终止 ({{failed}} 项失败)",
+        "guardCheckFailed": "Guard 检查失败: {{error}}",
+        "guardDone": "Guard 检查完成: {{passed}} passed, {{failed}} failed",
+        "guardPassedToInspect": "Guard 通过, 进入 Inspect 巡检阶段...",
+        "guardStart": "开始 Guard 门禁检查...",
+        "inspectDone": "巡检完成: {{total}} 个问题 ({{error}} error, {{warning}} warning, {{info}} info)",
+        "inspectFailed": "Inspect 巡检失败: {{error}}",
+        "inspectStart": "开始 Inspect 引擎巡检...",
+        "pipelineClosed": "流水线已关闭",
+        "pipelineDone": "========== 智汇码盾全流水线完成（不含重构） ==========",
+        "pipelineStart": "========== 智汇码盾全流水线开始 ==========",
+        "pluginLoaded": "插件已加载: {{name}}@{{version}}",
+        "profileDone": "项目画像: {{language}}{{framework}} ({{packageManager}})",
+        "profileStart": "开始分析项目画像...",
+        "refactorDone": "重构检测完成: {{totalSmells}} 处异味 ({{criticalFiles}} 个文件需要关注)",
+        "refactorStart": "开始 Refactor 重构检测...",
+        "scoringDone": "评分完成: {{overall}} (等级 {{grade}})",
+        "scoringStart": "开始健康评分...",
+        "securityDone": "安全扫描完成: {{vulnTotal}} 个漏洞, {{malwareTotal}} 个恶意包, {{garbageTotal}} 个垃圾文件",
+        "securityFailed": "安全扫描失败: {{error}}",
+        "securityStart": "开始安全扫描...",
+        "sopGuardBlocked": "SOP Guard 阻断, 流水线终止 ({{failed}} 项失败)",
+        "sopGuardDone": "SOP Guard 检查完成: {{passed}} passed, {{failed}} failed, {{errors}} errors",
+        "sopGuardFailed": "SOP Guard 检查失败: {{error}}",
+        "sopGuardPassed": "SOP Guard 通过, 进入 SOP Inspect 巡检阶段...",
+        "sopGuardStart": "开始 SOP 驱动型 Guard 门禁检查...",
+        "sopInspectDone": "SOP Inspect 完成: {{passed}} passed, {{failed}} failed, {{skipped}} skipped",
+        "sopInspectFailed": "SOP Inspect 巡检失败: {{error}}",
+        "sopInspectStart": "开始 SOP 驱动型 Inspect 巡检...",
+        "sopPipelineDone": "========== SOP 驱动型全流水线完成（不含重构） ==========",
+        "sopPipelineStart": "========== SOP 驱动型全流水线开始 ==========",
+        "sopRulesLoaded": "SOP 规则已加载: {{count}} 条 (活跃: {{active}})"
+      }
+    },
+    "refactor": {
+      "fix": {
+        "addAsync": "为 {{methodName}} 添加 async 关键字",
+        "constantsHeader": "// 共享字符串常量 — auto-fix 生成",
+        "encapsulateField": "将 {{filePath}} 的 public 字段封装为 private",
+        "extractLiteral": "将 \"{{literal}}\" 提取到 {{filePath}}",
+        "thenToAwaitTodo": "// TODO: 将 .then() 链手动转换为 await (auto-fix 已添加 async 关键字)"
+      },
+      "smell": {
+        "callback-hell": {
+          "message": "{{target}} 包含 {{count}} 层 .then() 链式回调，建议转换为 async/await",
+          "name": "回调地狱 (R07)",
+          "suggestion": "将 .then() 链式回调转换为 async/await 语法，保留 try/catch 错误处理"
+        },
+        "data-class": {
+          "message": "{{className}} 有 {{fields}} 个字段但只有 {{methods}} 个方法，可能是纯数据类",
+          "name": "数据类 (R10)",
+          "suggestion": "将操作 {{className}} 字段的方法搬移到类中，或将其转为 TypeScript interface"
+        },
+        "data-clumps": {
+          "message": "参数组合 [{{params}}] 反复出现 ({{count}} 次): {{methods}}...",
+          "name": "数据泥团",
+          "suggestion": "将重复出现的参数组合封装为一个类"
+        },
+        "deep-nesting": {
+          "message": {
+            "function": "{{target}} 嵌套过深 ({{depth}} 层)",
+            "method": "{{target}} 嵌套过深 ({{depth}} 层，阈值 {{threshold}})，建议使用 guard clause 或提取方法"
+          },
+          "name": "深层嵌套 (R05)",
+          "suggestion": "使用 guard clause 提前返回，或将深层分支提取为独立函数"
+        },
+        "duplicated-code": {
+          "message": "代码块与 {{file}}:{{line}} 重复，建议提取为公共函数",
+          "name": "重复代码 (R06)",
+          "suggestion": "将重复代码提取为公共函数，通过参数化差异点统一调用"
+        },
+        "feature-envy": {
+          "externalClass": "外部类",
+          "message": "{{target}} 大量调用 {{targetName}} ({{externalCount}} 次外部引用 vs {{totalStatements}} 行代码)",
+          "name": "依恋情结",
+          "suggestion": "考虑将 {{methodName}} 移到 {{targetClass}} 类中"
+        },
+        "god-object": {
+          "message": "{{className}} 有 {{count}} 个公共方法 (阈值 {{threshold}})，可能是上帝对象",
+          "name": "上帝对象 (R12)",
+          "suggestion": "将 {{className}} 按领域拆分为多个专注的 Service/Class"
+        },
+        "inappropriate-intimacy": {
+          "message": "{{className}} 暴露过多公共字段 ({{count}} 个)，破坏封装性",
+          "name": "不恰当的亲密",
+          "suggestion": "将 public 字段改为 private，通过 getter/setter 访问"
+        },
+        "large-class": {
+          "issue": {
+            "lines": "{{lines}} 行 (阈值 {{threshold}})",
+            "methods": "{{methods}} 个方法 (阈值 {{threshold}})"
+          },
+          "message": "{{className}} 过大 ({{issues}})，建议按职责拆分",
+          "name": "上帝对象/大类",
+          "suggestion": "将 {{className}} 按职责拆分为多个类，每个类聚焦单一职责"
+        },
+        "lazy-class": {
+          "message": "{{className}} 太小 ({{lines}} 行，{{methods}} 个方法)，可能不值得作为独立类",
+          "name": "冗余类",
+          "suggestion": "将功能合并到调用它的类中，或直接移除"
+        },
+        "long-method": {
+          "issue": {
+            "complexity": "圈复杂度 {{complexity}} (阈值 {{threshold}})",
+            "lines": "{{lines}} 行 (阈值 {{threshold}})"
+          },
+          "message": "{{container}}{{name}} 过大 ({{issues}})，建议拆分为更小的函数",
+          "name": "超大函数 (R01)",
+          "suggestion": "将 {{container}}{{name}} 按职责拆分为多个小函数，每个不超过 {{threshold}} 行"
+        },
+        "long-parameter-list": {
+          "message": "{{container}} 参数过多 ({{count}} 个，阈值 {{threshold}})，建议封装为参数对象",
+          "name": "过长参数 (R03)",
+          "suggestion": "将 {{count}} 个参数封装为一个 interface/type 参数对象"
+        },
+        "message-chains": {
+          "message": "{{target}} 存在链式调用: {{chains}}",
+          "name": "消息链",
+          "suggestion": "将链式调用封装为委托方法，降低调用方与被调用方的耦合"
+        },
+        "middle-man": {
+          "message": "{{className}} 大部分方法只是委托调用 ({{delegating}} 次委托 / {{total}} 个方法)",
+          "name": "中间人",
+          "suggestion": "考虑移除中间层，让调用方直接使用委托目标"
+        },
+        "mixed-responsibilities": {
+          "message": {
+            "function": "{{target}} 混合了约 {{count}} 个职责",
+            "method": "{{target}} 混合了约 {{count}} 个职责 (阈值 {{threshold}})，建议拆分为独立函数"
+          },
+          "name": "多职责混合 (R04)",
+          "suggestion": {
+            "function": "按职责将函数拆分为多个独立函数",
+            "method": "按注释分区 / 空行分隔 / try/catch 边界将方法拆分为多个独立函数"
+          }
+        },
+        "oversized-component": {
+          "issue": {
+            "handlers": "{{handlers}} 个事件处理函数",
+            "jsxDepth": "JSX 嵌套 {{depth}} 层",
+            "lines": "{{lines}} 行代码"
+          },
+          "message": "组件过大 ({{issues}})，建议拆分为子组件",
+          "name": "超大组件 (R11)",
+          "suggestion": "将 UI 部分拆分为子组件，将状态逻辑提取为自定义 Hook"
+        },
+        "oversized-file": {
+          "issue": {
+            "exports": "{{exports}} 个顶层导出 (阈值 {{threshold}})",
+            "linesCode": "{{lines}} 行代码 (阈值 {{threshold}})"
+          },
+          "message": "文件过大 ({{issues}})，建议按功能拆分",
+          "name": "超大文件 (R02)",
+          "suggestion": "按功能领域将文件拆分为多个文件，每个文件聚焦单一职责"
+        },
+        "primitive-obsession": {
+          "message": "{{className}} 使用过多原始类型 ({{count}} 个字段)，建议为相关字段创建值对象",
+          "name": "基本类型偏执",
+          "suggestion": "将相关原始类型字段封装为值对象（Value Object）"
+        },
+        "refused-bequest": {
+          "message": "{{className}} 继承自 {{superClass}} 但几乎没有添加新成员 ({{methods}} 方法, {{fields}} 字段)，可能不需要继承",
+          "name": "拒绝继承",
+          "suggestion": "用组合 (Composition) 替换继承，减少继承层次"
+        },
+        "shotgun-surgery": {
+          "message": {
+            "publicMethods": "{{className}} 有 {{count}} 个公共方法，修改某个功能可能需要改动多个方法",
+            "sharedLiterals": "字符串 \"{{literal}}\" 在 {{count}} 个文件中出现，建议提取为共享常量"
+          },
+          "name": "霰弹修改 (R09)",
+          "suggestion": {
+            "publicMethods": "按职责将类拆分为更小的类，减少修改波及范围",
+            "sharedLiterals": "将 \"{{literal}}\" 提取为共享常量文件，集中管理一处修改"
+          }
+        },
+        "switch-statement": {
+          "message": "{{target}} 使用 {{count}} 处 switch 语句，建议用多态替代",
+          "name": "Switch 语句",
+          "suggestion": "用策略模式或多态替换 switch/if-else if 链"
+        }
+      },
+      "warn": {
+        "detectorFailed": "检测器 {{name}} 执行失败: {{error}}",
+        "dirAccessFailed": "无法访问目录 {{dir}}: {{error}}",
+        "gitDiffFailed": "Git diff 失败: {{error}}",
+        "parseFailed": "无法解析 {{count}} 个文件 (如: {{example}})"
+      }
+    },
+    "remoteCleanUnsupported": "远程模式暂不支持本地清理",
+    "remoteRestoreUnsupported": "远程模式暂不支持恢复",
+    "scoring": {
+      "insight": {
+        "decliningDimensions": "需要关注的维度: {{dimensions}}",
+        "empty": "暂无历史数据，无法生成趋势分析",
+        "health": {
+          "a": "项目健康度优秀（A 级），保持当前实践",
+          "b": "项目健康度良好（B 级），有提升空间",
+          "c": "项目健康度一般（C 级），建议关注薄弱环节",
+          "d": "项目健康度较差（D 级），需要立即改进"
+        },
+        "streak": {
+          "count": "{{direction}}已持续 {{count}} 次评估",
+          "declining": "连续退化",
+          "improving": "连续改善",
+          "stable": "保持稳定"
+        },
+        "velocity": {
+          "declining": "评分持续下降（速度 {{velocity}}/次），需要关注",
+          "rising": "评分上升趋势明显（速度 +{{velocity}}/次）"
+        },
+        "volatility": {
+          "high": "评分波动较大，说明改进不稳定",
+          "low": "评分变化平稳，项目状态稳定"
+        }
+      }
+    },
+    "security": {
+      "auditFailed": "audit 命令执行失败: {{error}}",
+      "auditInvalidOutput": "audit 输出不是合法 JSON",
+      "fixSoon": "请尽快修复",
+      "garbage": {
+        "batchMissingOrCorrupt": "回收站批次不存在或已损坏: {{batchId}}",
+        "fileMissingOrNotFile": "{{path}}（文件不存在或非普通文件）",
+        "pathOutOfBounds": "{{path}}（路径越界，已拒绝）",
+        "restoreDestinationConflict": "{{path}}（原位置已有文件，已跳过）",
+        "restoreOutOfBounds": "{{path}}（路径越界，已拒绝恢复）",
+        "trashFileMissing": "{{path}}（回收站文件缺失）",
+        "trashNameConflict": "{{path}}（回收站已存在同名文件）",
+        "typeNotAutoCleanable": "{{path}}（{{type}} 类型不可自动清理）"
+      },
+      "knownMaliciousNpmTitle": "已知恶意 npm 包（供应链投毒黑名单）",
+      "knownMaliciousPypiTitle": "已知恶意 PyPI 包（供应链投毒黑名单）",
+      "meta": {
+        "depcheck": "未使用依赖检测",
+        "grype": "依赖漏洞交叉复核",
+        "ort": "许可证合规扫描",
+        "semgrep": "自定义安全 SOP 规则扫描",
+        "trivy": "依赖/文件/构建产物/镜像漏洞扫描"
+      },
+      "ortEvaluateLicense": "评估 {{package}} 的许可证 {{licenses}} 是否与项目兼容",
+      "ortRestrictedLicense": "{{package}} 使用了需要关注的许可证: {{licenses}}",
+      "referencedBlacklistPackage": "{{file}} 引用了黑名单包 {{name}}",
+      "supplyChainThreat": "检测到供应链威胁：{{name}}",
+      "suspectedTyposquatTitle": "疑似仿冒包（typosquatting）",
+      "tool": {
+        "depcheckExecFailed": "depcheck 执行失败",
+        "depcheckNotInstalled": "depcheck 未安装",
+        "grypeExecFailed": "Grype 执行失败",
+        "grypeNotInstalled": "Grype 未安装",
+        "ortExecFailed": "ORT 执行失败",
+        "ortNotInstalled": "ORT 未安装",
+        "semgrepExecFailed": "Semgrep 执行失败",
+        "semgrepNotInstalled": "Semgrep 未安装或未在 PATH 中找到",
+        "semgrepRulesDirMissing": "Semgrep 规则目录不存在，请先同步云脑规则",
+        "trivyExecFailed": "Trivy 执行失败",
+        "trivyNotInstalled": "Trivy 未安装，请运行 trivy 安装命令"
+      },
+      "typosquatEvidence": "包名 {{name}} 与流行包 {{popular}} 编辑距离为 {{distance}}"
+    },
+    "toolchain": {
+      "license": {
+        "ortRedistributionNote": "传递依赖需审计",
+        "semgrepRedistributionNote": "Python 运行时依赖需审查更新通道（不自更新）",
+        "trivyRedistributionNote": "子进程调用不修改可分发；内置安装包需法务审查 + 许可声明"
+      }
+    },
+    "unknownProject": "未知项目"
+  },
+  "layout": {
+    "about": "关于",
+    "aboutVersion": "智汇码盾 {{version}}",
+    "addProject": "添加项目",
+    "aiTool": "AI 工具",
+    "aiToolDesc": "Linter 协议 · 诊断监听",
+    "aiToolEnableHintPrefix": "启用后向项目写入 ",
+    "aiToolEnableHintSuffix": " 与 OpenCode 命令文件，AI 可自动读取诊断并修复",
+    "aiToolEnabled": "已启用：检查结果将写入 .zhshield/diagnostics/",
+    "aiToolToggle": "切换 OpenCode 集成",
+    "brandName": "智汇码盾",
+    "brandSlogan": "代码界的智能卫士",
+    "cancelTask": "取消任务",
+    "collapseSidebar": "收回侧边栏",
+    "deleteProject": "删除项目 {{name}}",
+    "engineBusy": "引擎忙碌：{{count}} 个任务进行中",
+    "engineIdle": "引擎运行中",
+    "engineOn": "智能引擎已开启",
+    "engineStatus": "引擎状态",
+    "expandSidebar": "展开侧边栏",
+    "language": "语言管理",
+    "noProject": "未添加项目",
+    "noProjects": "暂无项目",
+    "projectManagement": "项目管理",
+    "queuePosition": "（排队 {{position}}）",
+    "removeProjectMessage1": "确定要从守护列表移除「{{name}}」吗？",
+    "removeProjectMessage2": "仅移除项目记录，不会删除项目文件。",
+    "removeProjectTitle": "移除项目",
+    "sidebarTitle": "设置",
+    "subprocessIsolation": "重扫任务已隔离至子进程（避免界面卡顿）",
+    "taskKind": {
+      "garbageClean": "垃圾清理",
+      "garbageRestore": "回收站恢复",
+      "guard": "门禁扫描",
+      "inspect": "质量巡检",
+      "performance": "优化加速",
+      "pipeline": "一键体检",
+      "refactor": "代码重构",
+      "security": "安全扫描"
+    },
+    "taskStatus": {
+      "cancelled": "已取消",
+      "done": "已完成",
+      "failed": "失败",
+      "queued": "排队中",
+      "running": "执行中"
+    },
+    "theme": "主题管理",
+    "themeDracula": "墨紫黑",
+    "themeLegacy": "经典深绿",
+    "themeTeal": "青蓝",
+    "toolsDegraded": "外部工具降级：缺少 {{tools}}",
+    "toolsPathHint": "安装到系统 PATH 后可消除此提示"
+  },
+  "lifecycle": {
+    "archive": "归档",
+    "detect": "发现",
+    "fix": "修复",
+    "validate": "验证"
+  },
+  "mcp": {
+    "categoryFilterDesc": "按类别过滤（如 performance / security / quality / architecture）",
+    "cliNotFound": "未找到 zhshield CLI，请先运行 pnpm build",
+    "commandDoneNoOutput": "{{command}} 完成（无输出）",
+    "commandFailed": "{{command}} 执行失败",
+    "diagnosticsUnparseable": "诊断文件无法解析",
+    "fileNotFound": "文件不存在: .zhshield/{{relativePath}}",
+    "getDiagnosticsDesc": "读取智汇码盾最近一次体检的诊断结果（.zhshield/diagnostics/latest.json）",
+    "getIntegrationDesc": "读取智汇码盾的集成配置（.zhshield/integration.json），含自动触发、过滤器、自动修复等设置",
+    "getIssuesDesc": "获取智汇码盾最近一次体检的 issues（支持按严重等级/类别/来源过滤），返回 {ok,total,issues} JSON",
+    "guardProjectPathDesc": "要检查的项目根目录",
+    "guardSopModeDesc": "使用 SOP 规则驱动模式",
+    "inspectProjectPathDesc": "要巡检的项目根目录",
+    "projectPathDesc": "项目根目录；缺省为当前工作目录",
+    "runGuardDesc": "触发智汇码盾门禁检查（调用 zhshield guard --dry-run），以只报告不阻断模式检查代码",
+    "runInspectDesc": "触发智汇码盾巡检（调用 zhshield inspect），扫描代码质量问题并返回报告",
+    "severityFilterDesc": "按严重等级过滤",
+    "sopModeDesc": "使用 SOP 规则驱动模式（默认 checks.json 模式）",
+    "sourceFilterDesc": "按来源引擎过滤"
+  },
+  "nav": {
+    "backup": "备份中心",
+    "dashboard": "项目体检",
+    "deps": "依赖管家",
+    "evolve": "规则进化",
+    "garbage": "垃圾清理",
+    "guard": "门禁检查",
+    "inspect": "智能巡检",
+    "performance": "性能优化",
+    "refactor": "代码重构",
+    "reports": "报告中心",
+    "security": "安全中心",
+    "sentinel": "哨兵监控",
+    "techdebt": "技术债务"
+  },
+  "page": {
+    "backup": {
+      "backingUp": "备份中...",
+      "deleteMessage": "确定要删除这条备份记录吗？此操作不可撤销。",
+      "deleteTitle": "删除备份记录",
+      "detail": {
+        "backupId": "备份 ID：{{id}}",
+        "commit": "提交：{{hash}}",
+        "error": "错误：{{error}}",
+        "fileCount": "文件数：{{count}}",
+        "github": "GitHub：",
+        "localPath": "本地路径：{{path}}",
+        "size": "大小：{{size}}",
+        "trigger": "触发方式：{{mode}}"
+      },
+      "empty": {
+        "feature": {
+          "config": {
+            "desc": "备份扫描规则、项目配置与环境设置",
+            "title": "配置备份"
+          },
+          "restore": {
+            "desc": "从备份记录快速恢复环境与配置",
+            "title": "数据恢复"
+          },
+          "rules": {
+            "desc": "导出自定义规则集，防止规则丢失",
+            "title": "规则备份"
+          },
+          "sync": {
+            "desc": "定时备份到本地安全目录，降低丢失风险",
+            "title": "自动同步"
+          }
+        },
+        "lastBackup": "上次备份：{{date}}",
+        "title": "保护重要配置，数据永不丢失"
+      },
+      "noRecords": "暂无备份记录",
+      "oneClickBackup": "一键备份",
+      "openFolder": "打开文件夹",
+      "recordCount": "{{count}} 条备份记录",
+      "recordsTitle": "备份记录",
+      "result": {
+        "duration": "{{time}} · 耗时 {{duration}}ms"
+      },
+      "status": {
+        "failed": "失败",
+        "partial": "部分成功",
+        "success": "成功"
+      },
+      "title": "数据备份",
+      "toast": {
+        "completed": "备份完成: {{status}}",
+        "deleteFailed": "删除失败",
+        "deleted": "备份记录已删除",
+        "failed": "备份执行失败",
+        "success": "备份成功"
+      },
+      "trigger": {
+        "manual": "手动",
+        "schedule": "定时"
+      },
+      "type": {
+        "full": "全部",
+        "githubOnly": "仅 GitHub",
+        "localOnly": "仅本地"
+      }
+    },
+    "dashboard": {
+      "autoFix": "🤖 自动修复",
+      "axis": {
+        "governance": {
+          "desc": "把控代码质量与规范",
+          "label": "治理"
+        },
+        "ops": {
+          "desc": "保障项目长期健康运行",
+          "label": "运维"
+        },
+        "security": {
+          "desc": "守护代码与供应链安全",
+          "label": "安全"
+        }
+      },
+      "check": "一键体检",
+      "copy": {
+        "guardSource": "门禁·预防",
+        "inspectSource": "巡检"
+      },
+      "feature": {
+        "backup": {
+          "desc": "一键备份配置和规则，防止数据丢失"
+        },
+        "inspect": {
+          "desc": "定期检查代码质量、文档、依赖健康度"
+        },
+        "performance": {
+          "desc": "发现运行时性能反模式，优化执行效率"
+        },
+        "refactor": {
+          "desc": "检测代码异味，消除技术债务"
+        },
+        "reports": {
+          "desc": "查看历史检查报告和健康趋势"
+        },
+        "security": {
+          "desc": "漏洞、敏感信息、恶意代码一键排查"
+        }
+      },
+      "guardSlogan": "智能卫士：安全 · 治理 · 运维",
+      "productIntro": {
+        "subtitle": "以安全、治理、运维为核心，守护每一行代码",
+        "title": "代码界的智能卫士"
+      },
+      "progress": "进度 {{progress}}%",
+      "result": {
+        "allPassed": "已执行的检查项均通过。若跳过项较多，可安装 ESLint / Semgrep 等工具后重新体检以获得更完整结果。",
+        "backHome": "返回首页",
+        "header": {
+          "configureHint": "门禁检查与哨兵监控请在顶部对应入口单独配置开关。",
+          "coverage": "本次覆盖质量巡检 {{inspectTotal}} 项。",
+          "failed": "体检发现问题",
+          "passed": "一键体检完成",
+          "skipped": "其中 {{skipped}} 项因工具未安装已跳过。"
+        },
+        "issuesTitle": "需关注的问题",
+        "rerun": "再次体检",
+        "scopeTitle": "本次体检范围",
+        "stage": {
+          "guard": "门禁",
+          "inspect": "巡检"
+        },
+        "stats": {
+          "issues": "问题",
+          "passed": "通过",
+          "skipped": "跳过",
+          "total": "检查项"
+        }
+      },
+      "ring": {
+        "healthScore": "健康分",
+        "notChecked": "尚未体检"
+      },
+      "running": "体检进行中…",
+      "sanitize": {
+        "autoFixStarted": "已启动 OpenCode 自动修复",
+        "autoFixing": "自动修复中…",
+        "done": "体检完成",
+        "guarding": "门禁检查中…",
+        "inspecting": "质量巡检中…",
+        "loadingRules": "加载体检规则…"
+      },
+      "scope": {
+        "inspect": "质量巡检",
+        "item": {
+          "complexity": "代码复杂度/规范",
+          "deps": "依赖审计",
+          "docs": "文档完整性",
+          "nest": "Nest/模块规范",
+          "tsType": "TypeScript 类型安全"
+        }
+      },
+      "stageGuard": "· 门禁",
+      "stageInspect": "· 巡检",
+      "toast": {
+        "addProjectFirst": "请先添加要体检的项目",
+        "completed": "体检完成：{{total}} 项检查，{{passed}} 项通过",
+        "copiedIssues": "已复制 {{count}} 条问题，可粘贴到 AI 修复",
+        "copyFailed": "复制失败",
+        "executionFailed": "体检执行失败",
+        "failed": "体检执行失败: {{error}}",
+        "foundIssues": "体检完成：发现 {{count}} 项问题",
+        "noValidItems": "体检完成，但未执行到有效检查项（请确认项目路径）"
+      },
+      "welcome": "欢迎使用智汇码盾"
+    },
+    "deps": {
+      "checking": "盘点中...",
+      "done": "依赖管家盘点完成",
+      "ecosystem": "生态",
+      "empty": {
+        "start": "开始盘点",
+        "subtitle": "解析锁文件与依赖清单，绘制依赖图谱并校验完整性",
+        "title": "管家盘点，看清图谱"
+      },
+      "env": "环境一致性",
+      "env.actual": "实际：{{value}}",
+      "env.checkFailed": "环境一致性检查失败",
+      "env.expected": "期望：{{value}}",
+      "env.kind.ci-vs-local": "CI 与本地不一致",
+      "env.kind.env-file-diff": "环境变量差异",
+      "env.kind.lockfile-drift": "锁文件漂移",
+      "env.kind.runtime-version": "运行时版本",
+      "env.none": "未发现环境偏差",
+      "env.severity.error": "阻断",
+      "env.severity.info": "信息",
+      "env.severity.warning": "提示",
+      "env.total": "共 {{count}} 条",
+      "errorTitle": "管家盘点失败",
+      "feature": {
+        "graph": {
+          "desc": "直接 / 传递依赖与边关系一目了然",
+          "title": "依赖图谱"
+        },
+        "license": {
+          "desc": "四类许可分类与高风险清单",
+          "title": "许可证矩阵"
+        },
+        "lockfile": {
+          "desc": "存在性 / 一致性 / 哈希完整性三重核验",
+          "title": "锁文件校验"
+        },
+        "security": {
+          "desc": "投毒检测、安全更新与信任状态评估",
+          "title": "安全检测"
+        }
+      },
+      "license": "许可证矩阵",
+      "license.permissive": "宽松许可",
+      "license.risk.high": "高风险",
+      "license.risk.low": "低风险",
+      "license.risk.medium": "中风险",
+      "license.risk.unknown": "风险未知",
+      "license.strongCopyleft": "强左版",
+      "license.unknown": "未知许可",
+      "license.weakCopyleft": "弱左版",
+      "licenseHighRisk": "高风险清单",
+      "licenseNoRisks": "未发现高风险许可",
+      "licenseTotal": "共 {{count}} 个许可证",
+      "lockfile": "锁文件状态",
+      "lockfile.consistent": "与清单声明一致",
+      "lockfile.integrityFailed": "哈希校验失败",
+      "lockfile.integrityVerified": "哈希校验通过",
+      "lockfile.notConsistent": "与清单声明不一致",
+      "lockfile.notPresent": "锁文件缺失",
+      "lockfile.present": "锁文件存在且可解析",
+      "lockfileVerify": "锁文件完整性校验",
+      "lockfileVerify.checkFailed": "锁文件校验失败",
+      "lockfileVerify.clean": "校验通过：声明与锁定一致，完整性完好",
+      "lockfileVerify.diffs": "声明与锁定差异（{{count}}）",
+      "lockfileVerify.integrity": "完整性异常（{{count}}）",
+      "lockfileVerify.missing": "未发现锁文件",
+      "lockfileVerify.modified": "校验发现不一致",
+      "overview": "依赖总览",
+      "overviewDirect": "直接依赖",
+      "overviewEdges": "依赖边数",
+      "overviewTotal": "依赖总数",
+      "overviewTransitive": "传递依赖",
+      "rescan": "重新盘点",
+      "risk.high": "高危",
+      "risk.low": "低危",
+      "risk.medium": "中危",
+      "summary": "{{direct}} 直接依赖 · {{transitive}} 传递依赖 · {{edges}} 条依赖边",
+      "trust": "信任状态",
+      "trust.compromised": "已失陷",
+      "trust.suspicious": "可疑",
+      "trust.unknown": "未知",
+      "trust.verified": "已信任",
+      "typosquat": "投毒检测",
+      "typosquat.checkFailed": "投毒检测失败",
+      "typosquat.none": "未发现投毒依赖",
+      "typosquat.resembles": "与知名包 {{target}} 相似（相似度 {{score}}）",
+      "typosquat.total": "共 {{count}} 项可疑",
+      "upgrade": "升级评估",
+      "upgrade.breaking": "破坏性变更",
+      "upgrade.checkFailed": "升级评估失败",
+      "upgrade.none": "没有待升级的已知大版本依赖",
+      "upgrade.security": "安全修复",
+      "upgrade.total": "共 {{count}} 项",
+      "outdated": "依赖版本检查",
+      "outdated.total": "{{count}} 个可更新",
+      "outdated.none": "所有依赖已是最新版本",
+      "outdated.security": "安全更新"
+    },
+    "evolve": {
+      "analyze": "架构分析",
+      "archScore": "架构健康度",
+      "empty": {
+        "feature": {
+          "coupling": {
+            "desc": "识别高耦合模块与循环依赖",
+            "title": "耦合度分析"
+          },
+          "directory": {
+            "desc": "评估包目录划分与边界合理性",
+            "title": "目录结构"
+          },
+          "graph": {
+            "desc": "可视化模块引用关系与层级结构",
+            "title": "依赖图谱"
+          },
+          "suggest": {
+            "desc": "给出架构拆分、收敛与优化方向",
+            "title": "演进建议"
+          }
+        },
+        "subtitle": "架构健康度评分：--",
+        "title": "洞察项目架构，规划演进路径"
+      },
+      "emptyAnalyzing": "正在分析项目架构...",
+      "emptyDone": "分析完成，暂无需调整的规则",
+      "emptyHint": "在门禁检查或哨兵监控中，将误报问题标记反馈后，演进引擎会自动校准规则权重并生成优化建议。",
+      "header": {
+        "count": "{{suggestions}} 条优化建议 · {{weights}} 条追踪规则"
+      },
+      "stats": {
+        "adjusted": "已调权",
+        "highFp": "高误报",
+        "suggestions": "优化建议",
+        "weights": "追踪规则"
+      },
+      "suggestion": {
+        "confidence": "置信度: {{confidence}}%"
+      },
+      "title": "演进引擎",
+      "weight": {
+        "fpRate": "误报率: {{rate}}%",
+        "samples": "样本: {{samples}}"
+      },
+      "weights": "规则权重"
+    },
+    "garbage": {
+      "cleanButton": "一键清理",
+      "cleanButtonCount": "一键清理 ({{count}})",
+      "cleanFailed": "清理失败，请重试",
+      "cleanFailedCount": "{{count}} 项未能清理（路径越界 / 文件占用等）",
+      "cleaned": "已清理 {{count}} 项 · 释放 {{size}}",
+      "cleaning": "清理中...",
+      "dependencyHint": "未用依赖不自动删除，确认无引用后可从 package.json 手动移除",
+      "done": "垃圾清理完成",
+      "empty": {
+        "subtitle": "扫描未使用文件、冗余依赖与死代码",
+        "title": "清理无用文件，为项目减负"
+      },
+      "emptyList": "项目很干净，没有可清理的垃圾",
+      "feature": {
+        "deadCode": {
+          "desc": "检测无法到达的代码分支"
+        },
+        "duplicateCode": {
+          "desc": "定位可合并的重复实现"
+        },
+        "unusedDependency": {
+          "desc": "找出清单中未被引用的依赖包"
+        },
+        "unusedFile": {
+          "desc": "识别未引用的资源与残留文件"
+        }
+      },
+      "rescan": "重新扫描",
+      "restore": "恢复",
+      "restoreFailed": "恢复失败，请重试",
+      "restoreFailedCount": "{{count}} 项恢复失败（原位置可能已存在文件）",
+      "restored": "已恢复 {{count}} 项 · {{size}}，清单已刷新",
+      "restoring": "恢复中...",
+      "scanning": "扫描中...",
+      "selectAll": "全选",
+      "selectedCount": "已选 {{count}} 项",
+      "startScan": "开始扫描",
+      "stats": {
+        "freeable": "可释放空间",
+        "items": "垃圾项"
+      },
+      "summary": "{{count}} 项垃圾 · 可释放 {{size}}",
+      "type": {
+        "deadCode": "死代码",
+        "duplicateCode": "重复代码",
+        "unusedDependency": "未用依赖",
+        "unusedFile": "无用文件"
+      }
+    },
+    "guard": {
+      "banner": {
+        "fail": "门禁拦截 · 有未通过项",
+        "pass": "门禁正常 · 守护中",
+        "warn": "存在警告 · 需关注"
+      },
+      "blockedCount": "拦截 {{count}}",
+      "blockingCount": "{{count}} 次拦截",
+      "checkCount": "检查 {{count}} 项",
+      "copiedAll": "已复制全部 {{count}} 条问题，可粘贴到 AI 修复",
+      "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
+      "duration": "扫描耗时 {{duration}}ms",
+      "falsePositiveCount": "误报反馈 {{count}} 条",
+      "falsePositiveSubmitted": "已提交误报反馈，将用于校准规则",
+      "history": {
+        "subtitle": "hook 自动触发 + 手动扫描落库",
+        "title": "最近拦截记录"
+      },
+      "idleSubtitle": "实时守护代码变更，在提交/推送/CI 关卡自动拦截",
+      "lastBlockAt": "最近 {{time}}",
+      "lastScan": "上次扫描 · {{time}}",
+      "level": {
+        "L3": "CI 门禁"
+      },
+      "markFalsePositive": "标记误报",
+      "reportFailed": "提交失败",
+      "scan": "立即扫描",
+      "scanning": "扫描中...",
+      "source": "门禁·预防",
+      "stats": {
+        "blocked": "拦截",
+        "passed": "通过",
+        "totalChecks": "检查项",
+        "warnings": "警告"
+      },
+      "status": {
+        "fail": "拦截",
+        "idle": "未触发",
+        "pass": "通过",
+        "warn": "警告"
+      },
+      "statusShort": {
+        "fail": "门禁拦截",
+        "idle": "守护中",
+        "pass": "门禁正常",
+        "warn": "存在警告"
+      },
+      "table": {
+        "colCheck": "检查项",
+        "colDetail": "详情",
+        "colResult": "结果",
+        "colSeverity": "严重等级"
+      },
+      "trigger": {
+        "manual": "手动扫描",
+        "preCommit": "提交门禁",
+        "prePush": "推送门禁"
+      },
+      "warningCount": "警告 {{count}}"
+    },
+    "inspect": {
+      "aiReviewBadge": "AI 深度审查",
+      "checksPassed": "检查通过",
+      "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
+      "done": "巡检完成",
+      "empty": {
+        "subtitle": "每日 0 点后自动巡检构建产物、License、依赖与垃圾清理，也可点击马上巡检",
+        "title": "检查构建产物，确保交付质量"
+      },
+      "feature": {
+        "build": {
+          "desc": "校验 dist 产物规范、完整性及输出目录",
+          "title": "构建产物检查"
+        },
+        "dependency": {
+          "desc": "检测冗余、未使用及版本冲突依赖",
+          "title": "依赖分析"
+        },
+        "garbage": {
+          "desc": "发现并清理临时文件、缓存与无用产物",
+          "title": "垃圾清理"
+        },
+        "license": {
+          "desc": "识别开源许可证兼容性与合规风险",
+          "title": "License 扫描"
+        }
+      },
+      "passedCount": "{{passed}}/{{total}} 项通过",
+      "scanNow": "马上巡检",
+      "scanning": "巡检中...",
+      "source": "巡检",
+      "status": {
+        "fail": "失败",
+        "pass": "通过",
+        "warn": "警告"
+      }
+    },
+    "performance": {
+      "autoFixable": "可自动修复",
+      "copyAllHint": "{{count}} 项需处理，可一键复制全部到 AI 修复",
+      "detecting": "检测中...",
+      "header": {
+        "issueCount": "{{count}} 处性能问题",
+        "title": "性能检测完成"
+      },
+      "noIssues": "未发现性能问题",
+      "rescan": "重新检测",
+      "scanning": "性能检测中...",
+      "score": {
+        "fixable": "可修复 {{count}}",
+        "health": "性能健康度"
+      },
+      "severity": {
+        "high": "高优",
+        "low": "低优",
+        "medium": "中优"
+      },
+      "shell": {
+        "featureComplexity": {
+          "desc": "检测低效循环、嵌套遍历与冗余计算",
+          "title": "运行时复杂度"
+        },
+        "featureModernApi": {
+          "desc": "推荐 .at、spread 等高性能写法替代旧 API",
+          "title": "现代化 API"
+        },
+        "featureReDoS": {
+          "desc": "识别正则表达式灾难性回溯风险",
+          "title": "ReDoS 检测"
+        },
+        "featureTimer": {
+          "desc": "检测 setTimeout / setInterval 滥用与内存泄漏",
+          "title": "定时器优化"
+        },
+        "start": "开始性能检测",
+        "subtitle": "扫描低效数组遍历、正则重复编译、冗余分配等性能问题",
+        "title": "检测运行时性能反模式，优化执行效率"
+      },
+      "source": "性能",
+      "suggestion": "建议：{{suggestion}}"
+    },
+    "refactor": {
+      "addProjectFirst": "请先在仪表盘添加项目",
+      "groupedIssues": "重构问题（按类型分组）",
+      "groupsSummary": "{{groups}} 类 · {{total}} 处",
+      "header": {
+        "lastAutoCheck": " · 上次自动检查 {{time}}",
+        "summary": "{{totalSmells}} 处异味 · {{files}} 个文件待重构",
+        "title": "重构分析完成"
+      },
+      "noSmells": "✓ 未检测到代码异味",
+      "scanFailed": "扫描失败: {{message}}",
+      "scanNow": "马上检查",
+      "scanning": "扫描中...",
+      "scanningEllipsis": "重构扫描中…",
+      "severity": {
+        "error": "阻断",
+        "warning": "建议"
+      },
+      "shell": {
+        "featureAutoFix": {
+          "desc": "一键应用推荐重构方案，减少技术债务",
+          "title": "自动修复"
+        },
+        "featureDaily": {
+          "desc": "每天 0 点后自动扫描，持续跟踪代码质量",
+          "title": "每日自动检查"
+        },
+        "featureGrouping": {
+          "desc": "按类别查看不同重构问题与修复建议",
+          "title": "规则分组"
+        },
+        "featureSmell": {
+          "desc": "检测重复代码、过长函数、高圈复杂度等问题",
+          "title": "代码异味"
+        },
+        "subtitle": "每日自动检查代码重复、代码异味、过长函数等，一键应用推荐重构方案",
+        "title": "优化代码结构，消除技术债务"
+      },
+      "smell": {
+        "callbackHell": "回调地狱",
+        "dataClass": "数据类",
+        "dataClumps": "数据泥团",
+        "deepNesting": "深层嵌套",
+        "duplicatedCode": "重复代码",
+        "featureEnvy": "依恋情结",
+        "godObject": "上帝对象",
+        "inappropriateIntimacy": "不恰当的亲密",
+        "largeClass": "上帝对象/大类",
+        "lazyClass": "冗余类",
+        "longMethod": "超大函数",
+        "longParameterList": "过长参数",
+        "messageChains": "消息链",
+        "middleMan": "中间人",
+        "mixedResponsibilities": "多职责混合",
+        "oversizedComponent": "超大组件",
+        "oversizedFile": "超大文件",
+        "primitiveObsession": "基本类型偏执",
+        "refusedBequest": "拒绝继承",
+        "shotgunSurgery": "霰弹修改",
+        "switchStatement": "Switch 语句"
+      },
+      "smellCount": "{{count}} 处",
+      "source": "重构",
+      "stats": {
+        "files": "需重构文件",
+        "highPriority": "高优先级",
+        "smells": "代码异味"
+      },
+      "suggestion": "建议: {{suggestion}}"
+    },
+    "reports": {
+      "empty": {
+        "feature": {
+          "email": {
+            "desc": "将报告一键发送给团队成员",
+            "title": "邮件发送"
+          },
+          "pdf": {
+            "desc": "生成可分享的专业质量报告",
+            "title": "PDF 导出"
+          },
+          "scoring": {
+            "desc": "汇总安全、性能、质量、架构健康得分",
+            "title": "多维度评分"
+          },
+          "trend": {
+            "desc": "追踪历次扫描评分变化曲线",
+            "title": "趋势对比"
+          }
+        },
+        "subtitle": "已生成 {{count}} 份报告，最近更新于 {{date}}",
+        "title": "多维度分析报告，决策更有依据"
+      },
+      "generate": "生成报告",
+      "header": {
+        "count": "共 {{count}} 份报告 · 最近更新于 {{date}}",
+        "generate": "📊 生成报告"
+      },
+      "scoreLabel": {
+        "danger": "危险",
+        "excellent": "优秀",
+        "good": "良好",
+        "needsImprovement": "待改进"
+      },
+      "table": {
+        "abnormal": "异常",
+        "col": {
+          "date": "日期",
+          "dimension": "维度",
+          "score": "评分",
+          "status": "状态",
+          "summary": "摘要"
+        },
+        "healthy": "健康"
+      },
+      "title": "分析报告"
+    },
+    "secrets": {
+      "action": {
+        "dismiss": "忽略",
+        "dismissConfirm": "忽略后不再告警，将记入经验池",
+        "markRotating": "标记轮换",
+        "markRotatingConfirm": "标记该密钥正在轮换？门禁将暂时放行",
+        "verifyRotated": "确认已轮换",
+        "verifyRotatedConfirm": "确认已轮换完成？将触发复核扫描"
+      },
+      "badge": {
+        "active": "活跃引用",
+        "historyOnly": "仅历史",
+        "pushedToRemote": "已推送远程"
+      },
+      "checking": "扫描中...",
+      "done": "密钥全生命周期",
+      "empty": {
+        "start": "开始扫描",
+        "subtitle": "扫描工作区与 git 历史中的硬编码密钥，定位文件与提交，引导轮换与复核",
+        "title": "发现密钥，追踪全生命周期"
+      },
+      "errorTitle": "扫描失败",
+      "feature": {
+        "locate": {
+          "desc": "定位到文件、行号与引入提交，快速下手处理",
+          "title": "精准定位"
+        },
+        "rotate": {
+          "desc": "标记轮换 → 确认已轮换 → 复核忽略，全程可追踪",
+          "title": "轮换与复核"
+        },
+        "scan": {
+          "desc": "覆盖工作区与 git 历史，值已脱敏展示",
+          "title": "双模式扫描"
+        }
+      },
+      "list": {
+        "empty": "未发现硬编码密钥",
+        "hint": "按严重度排序 · 值已脱敏（仅前 4 后 4）",
+        "title": "密钥清单"
+      },
+      "remoteNote": "远程状态仅基于本地 git remote 配置判断，不代表已被公开爬取",
+      "rescan": "重新扫描",
+      "severity": {
+        "critical": "严重",
+        "high": "高危",
+        "low": "低危",
+        "medium": "中危"
+      },
+      "status": {
+        "active": "未处理",
+        "dismissed": "已忽略",
+        "rotated": "已轮换",
+        "rotating": "轮换中"
+      },
+      "summary": "共发现 {{total}} 项密钥 · {{critical}} 项严重 · {{active}} 项未处理",
+      "summaryChip": {
+        "active": "未处理",
+        "critical": "严重",
+        "historyOnly": "仅历史",
+        "total": "总计"
+      },
+      "type": {
+        "awsAccessKey": "AWS Access Key",
+        "awsSecretKey": "AWS Secret Key",
+        "databasePassword": "数据库密码",
+        "genericApiKey": "通用 API Key",
+        "githubToken": "GitHub Token",
+        "gitlabToken": "GitLab Token",
+        "privateKey": "私钥",
+        "redisPassword": "Redis 密码",
+        "stripeKey": "Stripe Key",
+        "twilioKey": "Twilio Key"
+      }
+    },
+    "security": {
+      "checking": "检查中...",
+      "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
+      "done": "安全检查完成",
+      "empty": {
+        "subtitle": "已检查 0 个文件，发现 0 个高危漏洞",
+        "title": "深度扫描漏洞，修复安全隐患"
+      },
+      "feature": {
+        "dependency": {
+          "desc": "识别存在已知 CVE 的过期或不安全依赖",
+          "title": "依赖检查"
+        },
+        "malware": {
+          "desc": "扫描反弹Shell、后门、供应链投毒等恶意代码特征"
+        },
+        "standard": {
+          "desc": "校验安全编码规范与合规基线",
+          "title": "规范检查"
+        },
+        "vuln": {
+          "desc": "检测代码注入、XSS、SSRF 等常见安全漏洞"
+        }
+      },
+      "fixAll": "一键扫描",
+      "lowRisk": "低风险 {{count}}",
+      "malware": {
+        "backdoor": "后门",
+        "cryptoRansomware": "勒索病毒",
+        "dataExfiltration": "数据外泄",
+        "privilegeEscalation": "权限提升",
+        "reverseShell": "反弹Shell",
+        "supplyChain": "供应链投毒",
+        "suspiciousBehavior": "可疑行为"
+      },
+      "malwareCount": "恶意代码 {{count}}",
+      "noFindings": "未发现安全问题",
+      "noMalware": "未发现恶意代码",
+      "recommendation": "建议：{{recommendation}}",
+      "rescan": "重新检查",
+      "scoreLabel": "安全评分",
+      "source": "安全",
+      "summary": "{{vulns}} 项漏洞 · {{malware}} 处恶意代码 · {{garbage}} 项垃圾",
+      "tab": {
+        "malware": "病毒查杀",
+        "secrets": "密钥管理",
+        "vuln": "漏洞扫描"
+      }
+    },
+    "sentinel": {
+      "aiFixSource": "哨兵·监控",
+      "copyAllHint": "共 {{count}} 个事件，可一键复制全部到 AI 修复",
+      "falsePositiveSubmitted": "已提交误报反馈，将用于校准规则",
+      "headerSummary": "监控 {{count}} 个事件 · {{activeCount}} 个待处理",
+      "markFalsePositive": "标记误报",
+      "occurrenceCount": "发生 {{count}} 次",
+      "refreshing": "刷新中...",
+      "shell": {
+        "buttonRunning": "监控运行中",
+        "buttonStart": "启动监控",
+        "featureAlert": {
+          "desc": "高危 / Critical 事件触发通知提醒",
+          "title": "自动告警"
+        },
+        "featureHistory": {
+          "desc": "查看过往异常明细与处理记录",
+          "title": "历史回溯"
+        },
+        "featureRealtime": {
+          "desc": "持续监听代码变更，异常事件即时上报",
+          "title": "实时监控"
+        },
+        "featureScope": {
+          "desc": "自定义监听文件、目录与规则范围",
+          "title": "监控范围"
+        },
+        "subtitleIdle": "当前监控 0 个文件，点击下方按钮启动",
+        "subtitleMonitoring": "监控中（自动，7×24）——正在守护当前项目",
+        "titleIdle": "24小时无间断监控，异常无所遁形",
+        "titleMonitoring": "监控已启动，异常无所遁形"
+      },
+      "source": {
+        "backend": "后端",
+        "frontend": "前端",
+        "infrastructure": "基础设施",
+        "middleware": "中间件"
+      },
+      "stackLabel": "堆栈",
+      "stats": {
+        "active": "待处理",
+        "falsePositive": "误报反馈",
+        "total": "总事件"
+      },
+      "submitFailed": "提交失败",
+      "type": {
+        "crash": "崩溃",
+        "frontendError": "前端错误",
+        "httpError": "HTTP 错误",
+        "memoryLeak": "内存泄漏",
+        "performanceDegradation": "性能下降",
+        "runtimeException": "运行时异常",
+        "securityIncident": "安全事件",
+        "timeout": "超时",
+        "whiteScreen": "白屏"
+      }
+    },
+    "techdebt": {
+      "byCategory": "债务构成",
+      "byModule": "债务分布",
+      "action": {
+        "plan": "计划偿还",
+        "planning": "计划中...",
+        "verify": "验证完成",
+        "verifying": "验证中...",
+        "verified": "已验证通过",
+        "notCleared": "关联问题尚未清零",
+        "dismiss": "忽略"
+      },
+      "category": {
+        "architecture": "架构问题",
+        "dependency": "依赖问题",
+        "duplication": "重复代码",
+        "quality": "质量问题",
+        "security": "安全问题"
+      },
+      "categoryDesc": {
+        "security": "安全漏洞 — 代码中存在的安全隐患，如未处理的异常、不安全的配置等",
+        "architecture": "架构问题 — 代码结构不合理，如循环依赖、模块耦合过高等",
+        "quality": "代码质量 — 不符合编码规范，如过长函数、命名不规范等",
+        "duplication": "重复代码 — 相同或相似的代码片段，增加维护成本",
+        "dependency": "依赖问题 — 过时或存在风险的依赖包"
+      },
+      "categoryTotal": "共 {{count}} 个问题",
+      "categoryWeight": "权重 {{weight}}%",
+      "checking": "盘点中...",
+      "debtIndex": "债务指数",
+      "done": "技术债仪表盘",
+      "intro": {
+        "title": "债务构成说明"
+      },
+      "empty": {
+        "start": "开始盘点",
+        "subtitle": "分析扫描问题与模块热度，估算利息与本金，按 ROI 排序给出偿还建议",
+        "title": "量化技术债，把评分变成行动"
+      },
+      "errorTitle": "盘点失败",
+      "factor": {
+        "density": "密度",
+        "exposure": "敞口",
+        "hotness": "热度",
+        "severity": "严重度"
+      },
+      "feature": {
+        "action": {
+          "desc": "利息 ÷ 本金排序，聚焦高 ROI 行动",
+          "title": "偿还建议"
+        },
+        "composition": {
+          "desc": "安全、架构、质量、重复、依赖五类债务详解",
+          "title": "债务构成"
+        },
+        "index": {
+          "desc": "0-100 量化技术债总体负担",
+          "title": "债务指数"
+        },
+        "module": {
+          "desc": "按模块与类别定位债务热点",
+          "title": "债务分布"
+        }
+      },
+      "interestBreakdown": "利息构成",
+      "interestScore": "利息 {{score}}",
+      "moduleHint": "模块名 · 占比 · 改动次数",
+      "moduleHotness": "{{count}} 次改动",
+      "noDebt": "未发现技术债，继续保持",
+      "overview": "债务总览",
+      "overviewActions": "偿还建议",
+      "overviewCategories": "债务类别",
+      "overviewModules": "债务模块",
+      "principalEstimate": "本金约 {{value}} 人天（估算）",
+      "recommended": "推荐",
+      "rescan": "重新盘点",
+      "roi": "ROI {{roi}}",
+      "status": {
+        "dismissed": "已忽略",
+        "inProgress": "进行中",
+        "pending": "待处理",
+        "planned": "已计划",
+        "repaid": "已偿还"
+      },
+      "source": "技术债",
+      "summary": "债务指数 {{index}} · {{actions}} 条偿还建议",
+      "topActions": "Top 建议清单",
+      "topActionsHint": "按利息 ÷ 本金排序",
+      "trend": {
+        "better": "较上期改善 {{delta}}",
+        "flat": "与上期持平",
+        "period": {
+          "month": "近一月",
+          "quarter": "近一季度",
+          "week": "近一周"
+        },
+        "worse": "较上期恶化 {{delta}}"
+      },
+      "trendLabel": "债务趋势"
+    },
+    "welcome": {
+      "addProject": "+ 添加项目，开启守护",
+      "axis": {
+        "governance": "治理",
+        "ops": "运维",
+        "security": "安全"
+      },
+      "brand": "智汇码盾",
+      "cloudOn": "智汇云大脑已开启",
+      "engineOn": "智能引擎已开启",
+      "sloganTitle": "代码界的智能卫士",
+      "stat": {
+        "healthScore": "健康评分",
+        "protectedProjects": "已守护项目",
+        "times": "{{count}} 次",
+        "totalBlocked": "累计拦截"
+      }
+    }
+  },
+  "pipeline": {
+    "autofix": {
+      "started": "发现问题，已启动 OpenCode 自动修复（{{errors}} error / {{warnings}} warning）"
+    },
+    "complete": {
+      "done": "体检完成",
+      "foundIssues": "体检发现 {{count}} 项问题",
+      "total": "体检完成：{{count}} 项检查"
+    },
+    "exitError": {
+      "logHintPrefix": "；子进程日志: ",
+      "message": "引擎子进程异常退出 (code={{code}}, signal={{signal}})",
+      "stageHintPrefix": "，最后进度: "
+    },
+    "garbage": {
+      "cleaning": "清理垃圾文件中…",
+      "done": "清理完成：{{count}} 项",
+      "restoreDone": "恢复完成：{{count}} 项",
+      "restoring": "恢复清理文件中…"
+    },
+    "guard": {
+      "failed": "门禁未通过：{{count}} 项需处理",
+      "failedBrief": "门禁未通过：{{count}} 项",
+      "jobDone": "门禁扫描完成",
+      "jobScanning": "门禁扫描中…",
+      "scanning": "门禁检查中…",
+      "sopScanning": "门禁检查中（敏感信息 / ESLint / 架构 / 安全）…"
+    },
+    "inspect": {
+      "fullScanning": "质量巡检中…",
+      "jobDone": "巡检完成",
+      "jobScanning": "智能巡检中…",
+      "sopScanning": "质量巡检中（类型安全 / 依赖 / 规范）…"
+    },
+    "jobTimeout": "操作超时 ({{timeoutMs}}ms)",
+    "loadingRules": "加载体检规则…",
+    "performance": {
+      "done": "性能检测完成：发现 {{count}} 个性能问题",
+      "loadingRules": "加载性能检测规则…",
+      "scanning": "性能巡检中（ESLint 性能规则 / ReDoS）…"
+    },
+    "refactor": {
+      "analyzing": "重构异味分析中…",
+      "collecting": "正在收集源码文件…",
+      "done": "重构分析完成：{{count}} 处异味"
+    },
+    "report": {
+      "executionError": "执行出错",
+      "failed": "未通过",
+      "scopeGuard": "门禁检查",
+      "scopeInspect": "质量巡检",
+      "unknownRule": "未知规则"
+    },
+    "security": {
+      "done": "安全扫描完成",
+      "scanning": "安全扫描中…"
+    },
+    "shuttingDown": "应用正在退出",
+    "workerTimeout": "子进程启动超时",
+    "workerUnavailable": "子进程不可用"
+  },
+  "reporter": {
+    "andMore": "... 及另外 {{count}} 项",
+    "blocking": "阻断: {{value}}",
+    "blockingDryRun": "干运行",
+    "blockingNo": "否",
+    "blockingYes": "是",
+    "category": "分类",
+    "checkCount": "{{count}} 项检查",
+    "criticalFiles": "高危文件: {{count}}",
+    "criticalFilesTitle": "需关注的文件:",
+    "duration": "耗时: {{duration}}ms",
+    "engineDryRun": "◐ 引擎检查完成（dry-run 只报告不阻断）",
+    "engineFailed": "✗ 引擎检查失败",
+    "enginePassed": "✓ 引擎检查通过",
+    "error": "错误: {{error}}",
+    "errorRules": "错误规则:",
+    "errors": "错误",
+    "failed": "失败",
+    "failedRules": "失败规则:",
+    "filesInvolved": "涉及文件: {{count}} 个",
+    "garbage": "垃圾文件",
+    "guardSection": "Guard 门禁检查",
+    "inspectSection": "Inspect 巡检",
+    "issueCount": "{{count}} 个问题",
+    "issuesCount": "({{count}} 问题)",
+    "line": "(行 {{line}})",
+    "malware": "恶意代码",
+    "needsImmediateAction": "需立即处理: {{count}}",
+    "noMatchingRules": "(无匹配规则)",
+    "noSmells": "✓ 未检测到代码异味",
+    "notCalculated": "  (未计算)",
+    "notExecuted": "  (未执行)",
+    "overall": "综合",
+    "passed": "通过",
+    "passedRules": "通过规则:",
+    "pipelineFailed": "✗ 流水线失败",
+    "pipelinePassed": "✓ 流水线通过",
+    "profileTitle": "项目识别",
+    "refactorSection": "Refactor 重构检测",
+    "reportTitle": "智汇码盾 — 代码质量管理报告",
+    "ruleCount": "{{count}} 条规则",
+    "ruleEngineTitle": "SOP 规则引擎报告",
+    "scanCount": "扫描: {{scanned}}/{{files}} 文件",
+    "score": "评分: {{score}} ({{grade}})",
+    "scoreSection": "健康评分",
+    "securityScore": "安全评分",
+    "securitySection": "安全扫描",
+    "severity": "严重度",
+    "skipped": "跳过",
+    "smellCount": "{{count}} 个代码异味",
+    "smellSummary": "{{count}} 个异味, 可维护性评分: {{score}}",
+    "stage": "阶段: {{stage}}",
+    "status": "状态: {{status}}",
+    "statusFailed": "❌ 失败",
+    "statusPassed": "✅ 通过",
+    "suggestion": "建议:",
+    "summary": "汇总",
+    "time": "时间: {{timestamp}}",
+    "timestamp": "时间: {{timestamp}}",
+    "vulnerabilities": "漏洞"
+  },
+  "score": {
+    "gradeBadge": "{{letter}}级 · {{grade}}",
+    "gradeExcellent": "优秀",
+    "gradeGood": "良好",
+    "gradePass": "及格",
+    "gradeWarning": "警告"
+  },
+  "server": {
+    "bootstrap": {
+      "running": "智汇码盾服务端运行在 http://localhost:{{port}}"
+    },
+    "pipeline": {
+      "scoreRecordFailed": "健康评分记录失败: {{error}}"
+    },
+    "scoring": {
+      "persistenceEnabled": "健康评分持久化已启用: {{dbPath}}",
+      "persistenceUnavailable": "健康评分持久化不可用，运行于内存模式: {{error}}",
+      "scoreRecorded": "健康评分已记录: {{score}} ({{grade}})"
+    }
+  },
+  "severity": {
+    "critical": "严重",
+    "high": "高危",
+    "info": "提示",
+    "low": "低危",
+    "medium": "中危"
+  },
+  "status": {
+    "assigned": "处理中",
+    "deployed": "已上线",
+    "detected": "已检测",
+    "failed": "验证失败",
+    "fixing": "修复中",
+    "manual_taken_over": "人工接管",
+    "merged": "已合并",
+    "passed": "已解决",
+    "pr_opened": "已提PR",
+    "rolled_back": "已回滚",
+    "validating": "验证中"
+  },
+  "task": {
+    "cancelled": "任务已取消",
+    "executionFailed": "任务执行失败",
+    "kind": {
+      "garbageClean": "清理",
+      "garbageRestore": "恢复",
+      "guard": "门禁扫描",
+      "inspect": "巡检",
+      "performance": "检测",
+      "pipeline": "体检",
+      "refactor": "重构扫描",
+      "security": "检查"
+    },
+    "notCompleted": "任务未完成",
+    "notFound": "任务不存在",
+    "queuedLabel": "排队中（第 {{position}} 位）...",
+    "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
+    "schedulerUnavailable": "任务调度不可用（非桌面环境）"
+  },
+  "toast": {
+    "aiToolDisabled": "已停用 OpenCode 集成（项目内集成文件保留）",
+    "aiToolEnabledNoProjects": "已启用 OpenCode 集成（添加项目后自动写入配置）",
+    "aiToolEnabledWritten": "已启用 OpenCode 集成，写入 {{written}}/{{total}} 个项目",
+    "aiToolSaveFailed": "AI 工具配置保存失败",
+    "copiedToAi": "已复制问题，可粘贴到 AI 修复",
+    "copyAllCopiedToAi": "已复制全部 {{count}} 条问题，可粘贴到 AI 修复",
+    "copyAllManualTrae": "已复制全部 {{count}} 条问题，请手动粘贴到 Trae",
+    "copyAllOpenedTrae": "已复制全部 {{count}} 条问题，并打开 Trae，请粘贴",
+    "copyFailed": "复制失败",
+    "copyFixManualTrae": "已复制修复提示，请手动粘贴到 Trae",
+    "copyFixOpenedTrae": "已复制修复提示，并打开 Trae，请粘贴",
+    "desktopOnlyFolderPicker": "请在桌面端运行，浏览器无法选择文件夹",
+    "issuesCopied": "已复制问题，可粘贴到 AI 修复",
+    "projectAdded": "项目「{{projectName}}」已添加，开始守护",
+    "projectRemoved": "项目「{{projectName}}」已移除"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  { "path": ".", "language": "typescript" },
+  { "path": "web", "language": "typescript", "framework": "Vite", "productForm": "h5" },
+  { "path": "miniapp", "language": "javascript", "productForm": "miniapp" }
+]

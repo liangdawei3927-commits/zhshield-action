@@ -1,0 +1,10 @@
+name: Refused Bequest
+description: 检测子类几乎没有添加新功能 — 可能不需要继承
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, inheritance, composition-over-inheritance]
+applicableEngines: [refactor]
+thresholds:
+  minOwnMethods: 3

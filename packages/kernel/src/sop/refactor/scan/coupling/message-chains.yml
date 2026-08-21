@@ -1,0 +1,10 @@
+name: Message Chains
+description: 检测链条式调用 (a.b.c.d()) — 违反最少知识原则
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, law-of-demeter]
+applicableEngines: [refactor]
+thresholds:
+  maxChainLength: 3

@@ -1,0 +1,12 @@
+name: TypeScript Null Safety
+description: 检查 TypeScript 空安全 — 避免 null/undefined 引发的运行时错误
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [typescript, null, safety]
+applicableEngines: [inspect]
+checks:
+  - strictNullChecks
+  - no-unnecessary-optional-chain
+  - prefer-nullish-coalescing

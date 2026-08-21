@@ -1,0 +1,13 @@
+name: Security Vulnerability Blocking
+description: L2 门禁 — 安全漏洞阻断，阻止包含安全漏洞的代码提交
+severity: error
+executionMode: sync
+status: active
+source: external
+tags: [security, vulnerability, audit]
+applicableEngines: [guard]
+scanners:
+  - semgrep
+  - trivy
+  - gitleaks
+autoFix: false

@@ -1,0 +1,10 @@
+name: Commit Message Convention Check
+description: L2 门禁 — 提交规范检查，确保 commit message 符合约定
+severity: warning
+executionMode: sync
+status: active
+source: official
+tags: [git, commit, convention]
+applicableEngines: [guard]
+pattern: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+'
+maxSubjectLength: 72

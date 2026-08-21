@@ -1,0 +1,291 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── 主题 token 注册表 ───────────────────────────────────────
+ * 三主题: teal(默认·青蓝) / legacy(经典深绿) / dracula
+ * 颜色一律 RGB 三元组, Tailwind 通过 rgb(var(--x) / <alpha-value>) 引用;
+ * 直接使用语义变量时包裹为 rgb(var(--x)) 或 rgb(var(--x) / a)。
+ * 非颜色 token (圆角/间距/字号/header 高度) 留在 :root, 三主题共享。 */
+
+:root {
+  /* ── 品牌色阶 (teal) ── */
+  --zh-brand-50: 234 245 243;
+  --zh-brand-100: 210 234 230;
+  --zh-brand-200: 169 214 208;
+  --zh-brand-300: 123 192 184;
+  --zh-brand-400: 79 167 158;
+  --zh-brand-500: 46 152 140;
+  --zh-brand-600: 14 140 127;
+  --zh-brand-700: 10 107 97;
+  --zh-brand-800: 8 78 71;
+  --zh-brand-900: 6 54 48;
+
+  /* ── 成功色阶 (teal) ── */
+  --zh-success-50: 224 244 236;
+  --zh-success-100: 198 234 217;
+  --zh-success-200: 154 219 184;
+  --zh-success-300: 108 201 152;
+  --zh-success-400: 65 181 125;
+  --zh-success-500: 32 168 110;
+  --zh-success-600: 14 159 110;
+  --zh-success-700: 11 122 82;
+  --zh-success-800: 10 94 65;
+  --zh-success-900: 8 78 58;
+
+  /* ── 信息色阶 (teal) ── */
+  --zh-info-50: 230 234 253;
+  --zh-info-100: 212 219 251;
+  --zh-info-200: 179 190 248;
+  --zh-info-300: 141 155 242;
+  --zh-info-400: 107 127 240;
+  --zh-info-500: 90 115 238;
+  --zh-info-600: 79 107 237;
+  --zh-info-700: 62 85 201;
+  --zh-info-800: 49 68 163;
+  --zh-info-900: 39 55 126;
+
+  /* ── 语义色 (teal) ── */
+  --zh-brand: 14 140 127;
+  --zh-brand-hover: 10 107 97;
+  --zh-brand-light: 210 234 230;
+  --zh-brand-lighter: 234 245 243;
+  --zh-brand-dark: 8 78 71;
+  --zh-success: 14 159 110;
+  --zh-warning: 180 83 9;
+  --zh-danger: 220 38 38;
+  --zh-danger-dark: 154 27 27;
+  --zh-info: 79 107 237;
+  --zh-ink: 15 31 30;
+  --zh-ink-2: 75 94 92;
+  --zh-muted: 123 139 136;
+  --zh-text-on-brand: 255 255 255;
+  --zh-bg-primary: 245 248 247;
+  --zh-bg-secondary: 234 245 243;
+  --zh-bg-tertiary: 255 255 255;
+  --zh-bg-brand: 14 140 127;
+  --zh-bg-brand-light: 210 234 230;
+  --zh-line: 226 235 232;
+  --zh-line-light: 210 234 230;
+  --zh-line-default: 226 235 232;
+  --zh-scrollbar-thumb: 169 214 208;
+  --zh-scrollbar-thumb-hover: 123 139 136;
+
+  /* ── 非颜色 token (三主题共享) ── */
+
+  /* 圆角 */
+  --zh-radius-sm: 6px;
+  --zh-radius-md: 8px;
+  --zh-radius-lg: 12px;
+  --zh-radius-xl: 16px;
+  --zh-radius-pill: 24px;
+
+  /* 间距 */
+  --zh-space-xs: 4px;
+  --zh-space-sm: 8px;
+  --zh-space-md: 16px;
+  --zh-space-lg: 24px;
+  --zh-space-xl: 32px;
+
+  /* Header 高度 */
+  --zh-header-title-h: 40px;
+  --zh-header-nav-h: 60px;
+
+  /* 字号 */
+  --zh-font-xs: 11px;
+  --zh-font-sm: 12px;
+  --zh-font-base: 13px;
+  --zh-font-md: 14px;
+  --zh-font-lg: 15px;
+  --zh-font-xl: 22px;
+  --zh-font-2xl: 26px;
+}
+
+/* ── legacy (经典深绿): 只覆盖颜色, 成功/信息色阶沿用 teal ── */
+[data-theme="legacy"] {
+  /* 品牌色阶 */
+  --zh-brand-50: 234 245 236;
+  --zh-brand-100: 211 233 215;
+  --zh-brand-200: 169 212 178;
+  --zh-brand-300: 124 189 136;
+  --zh-brand-400: 81 168 100;
+  --zh-brand-500: 47 143 71;
+  --zh-brand-600: 26 107 54;
+  --zh-brand-700: 20 85 44;
+  --zh-brand-800: 15 61 34;
+  --zh-brand-900: 10 46 26;
+
+  /* 语义色 */
+  --zh-brand: 26 107 54;
+  --zh-brand-hover: 20 85 44;
+  --zh-brand-light: 211 233 215;
+  --zh-brand-lighter: 234 245 236;
+  --zh-brand-dark: 15 61 34;
+  --zh-bg-primary: 245 248 246;
+  --zh-bg-secondary: 234 245 236;
+  --zh-bg-brand: 26 107 54;
+  --zh-bg-brand-light: 211 233 215;
+  --zh-line: 220 232 223;
+  --zh-line-light: 211 233 215;
+  --zh-line-default: 220 232 223;
+  --zh-scrollbar-thumb: 169 212 178;
+}
+
+/* ── dracula (墨紫黑·夜间): 只覆盖颜色; 成功/信息色阶沿用 :root teal/智靛 ── */
+[data-theme="dracula"] {
+  /* 品牌色阶 (提亮青蓝, VI §6.1 暗色档: 主色用 #2DD4BF) */
+  --zh-brand-50: 20 45 41;
+  --zh-brand-100: 24 55 50;
+  --zh-brand-200: 28 66 60;
+  --zh-brand-300: 32 78 70;
+  --zh-brand-400: 36 95 85;
+  --zh-brand-500: 40 200 180;
+  --zh-brand-600: 10 118 106;
+  --zh-brand-700: 45 212 191;
+  --zh-brand-800: 8 92 82;
+  --zh-brand-900: 8 70 62;
+
+  /* 语义色 (提亮档) */
+  --zh-brand: 45 212 191;
+  --zh-brand-hover: 16 115 103;
+  --zh-brand-light: 24 55 50;
+  --zh-brand-lighter: 42 88 80;
+  --zh-brand-dark: 12 88 79;
+  --zh-success: 52 211 153;
+  --zh-warning: 240 162 59;
+  --zh-danger: 248 113 113;
+  --zh-danger-dark: 255 105 105;
+  --zh-ink: 232 240 238;
+  --zh-ink-2: 159 176 172;
+  --zh-muted: 107 124 120;
+  --zh-text-on-brand: 248 248 242;
+  --zh-bg-primary: 29 30 40;
+  --zh-bg-secondary: 36 37 47;
+  --zh-bg-tertiary: 41 42 52;
+  --zh-bg-brand: 14 100 90;
+  --zh-bg-brand-light: 24 55 50;
+  --zh-line: 55 68 64;
+  --zh-line-light: 50 62 58;
+  --zh-line-default: 55 68 64;
+  --zh-scrollbar-thumb: 74 88 84;
+  --zh-scrollbar-thumb-hover: 108 124 118;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: rgb(var(--zh-bg-primary));
+  color: rgb(var(--zh-ink));
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--zh-scrollbar-thumb));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--zh-scrollbar-thumb-hover));
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── 分类导航内容块：悬停/选中同为「顶部圆角 + 底部直角 + 向下溢出连页面」色块 ─── */
+.zh-nav-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 14px;
+  height: calc(100% + 4px);
+  margin-top: 2px;
+  position: relative;
+  z-index: 10;
+  border-radius: var(--zh-radius-md) var(--zh-radius-md) 0 0;
+  transition: background-color 0.15s ease;
+  color: rgb(var(--zh-text-on-brand));
+}
+
+.zh-nav-block:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.zh-nav-block--active {
+  background: rgb(var(--zh-bg-primary));
+  color: rgb(var(--zh-brand));
+}
+
+/* ─── 卡片弹跳：入场 mount 弹一次 + 按压快缩/松开回弹（对齐 tianyin BouncePressable） ─── */
+@keyframes zh-bounce-enter {
+  0% { transform: translateZ(0) scale(1); }
+  15% { transform: translateZ(0) scale(0.9); }
+  50% { transform: translateZ(0) scale(1.06); }
+  72% { transform: translateZ(0) scale(0.98); }
+  88% { transform: translateZ(0) scale(1.02); }
+  100% { transform: translateZ(0) scale(1); }
+}
+
+@keyframes zh-bounce-enter-inner {
+  0% { transform: translateZ(0) scale(1); }
+  12% { transform: translateZ(0) scale(0.9); }
+  55% { transform: translateZ(0) scale(1.08); }
+  75% { transform: translateZ(0) scale(0.97); }
+  90% { transform: translateZ(0) scale(1.03); }
+  100% { transform: translateZ(0) scale(1); }
+}
+
+.zh-bounce {
+  transform: translateZ(0);
+  will-change: transform;
+  animation: zh-bounce-enter 0.45s ease backwards;
+  transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  transition-duration: 0.4s, 0.15s, 0.15s, 0.15s, 0.15s, 0.15s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1), ease, ease, ease, ease, ease;
+}
+
+/* 按压态由 Bounce 组件 JS 注入 .zh-bounce-pressed（不能用 :active：其沿祖先链激活嵌套全部 Bounce，
+   父级缩放位移内部按钮，mouseup 落在按钮外致 click 丢失） */
+.zh-bounce-pressed {
+  transform: scale(0.94);
+  transition-duration: 0.08s, 0.15s, 0.15s, 0.15s, 0.15s, 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1), ease, ease, ease, ease, ease;
+}
+
+.zh-bounce > * {
+  transform: translateZ(0);
+  animation: zh-bounce-enter-inner 0.5s ease backwards;
+  transition-property: transform, background-color, color;
+  transition-duration: 0.5s, 0.15s, 0.15s;
+  transition-timing-function: cubic-bezier(0.3, 1.8, 0.5, 1), ease, ease;
+}
+
+.zh-bounce-pressed > * {
+  transform: scale(0.96);
+  transition-duration: 0.1s, 0.15s, 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1), ease, ease;
+}

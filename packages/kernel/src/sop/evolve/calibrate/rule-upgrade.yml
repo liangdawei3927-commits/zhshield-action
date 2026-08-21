@@ -1,0 +1,12 @@
+name: Rule Auto Upgrade
+description: 规则自动升级 — 确认案例 ≥ 3 且误报率低时自动升级 trial → active
+severity: info
+executionMode: periodic
+status: active
+source: internal
+tags: [evolve, calibrate, upgrade]
+applicableEngines: [evolve]
+conditions:
+  minConfirmedCases: 3
+  maxFalsePositiveRate: 0.05
+  minDaysInTrial: 14

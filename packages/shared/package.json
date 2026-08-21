@@ -1,0 +1,29 @@
+{
+  "name": "@zh/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "lint": "eslint src --max-warnings 100"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./*": "./dist/*"
+  },
+  "dependencies": {
+    "@zh/i18n": "workspace:*"
+  }
+}

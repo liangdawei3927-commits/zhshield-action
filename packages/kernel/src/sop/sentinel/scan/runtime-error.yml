@@ -1,0 +1,14 @@
+name: Runtime Error Detection
+description: 运行时错误检测 — 监控应用运行时异常
+severity: high
+executionMode: periodic
+status: active
+source: internal
+tags: [sentinel, runtime, error]
+applicableEngines: [sentinel]
+interval: 60000  # 60 秒（毫秒）
+categories:
+  - uncaught-exception
+  - unhandled-rejection
+  - middleware-error
+  - api-timeout

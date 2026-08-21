@@ -1,0 +1,1746 @@
+{
+  "ai": {
+    "autoFix": {
+      "promptIntro": "あなたはCodeShieldの自動修復アシスタントです。",
+      "readDiagnostics": "まず診断ファイル {{diagPath}} を読み、error → warning → info の優先度で記載されている問題を修正してください。",
+      "requirement1": "1. issue の ruleId、message、file、line、column、suggestion を一つずつ理解してから、コードの該当箇所を特定してください",
+      "requirement2": "2. file フィールドがない項目はツール/設定類の問題（例: ESLint のスキャン対象ディレクトリ設定ミス）のため、対応するツール設定を確認・修正してください。コードを修正したふりをしないでください",
+      "requirement3": "3. source が \"guard\" の項目はゲート/予防類の問題のため、**スキップして修正しないでください**（自動修正するのは巡回/リファクタリング類の問題のみ）",
+      "requirement4": "4. 必要最小限の変更のみ行い、無関係なコードをリファクタリングしないでください",
+      "requirement5": "5. 診断ファイル自体（.zhshield/diagnostics/latest.json）は変更しないでください",
+      "requirement6": "6. すべて処理した後、変更したファイルを一文で報告してください",
+      "requirementsTitle": "要求："
+    },
+    "copyFix": {
+      "issueHeader": "【問題 {{number}}】（{{source}}）",
+      "locationLabel": "- 場所: {{location}}",
+      "messageLabel": "- 説明: {{message}}",
+      "projectPathLabel": "プロジェクトパス: {{projectPath}}",
+      "promptIntro": "あなたはCodeShieldのコード修正アシスタントです。以下のコード問題を修正してください：",
+      "requirement1": "1. スキルを呼び出し、コードの不具合の実在性を一つずつ特定してください。",
+      "requirement2": "2. 問題を理解してから修正し、いい加減な修正をしないでください。",
+      "requirement3": "3. 必要最小限の変更のみ行い、無関係なコードをリファクタリングしないでください。",
+      "requirement4": "4. 修正後はテスト可能・検証可能・回帰確認可能・実行可能であることを保証してください。",
+      "requirement5": "5. 修正完了後、変更したファイルを一文で報告してください。",
+      "requirementsTitle": "修正要求：",
+      "ruleLabel": "- ルール: {{ruleId}}",
+      "severityLabel": "- 深刻度: {{severity}}",
+      "suggestionLabel": "- 提案: {{suggestion}}"
+    },
+    "toolConfig": {
+      "openCodeCommand": {
+        "description": "description: CodeShield の診断結果を読み取り、コード問題を修正する",
+        "step1": "1. プロジェクトルートの `.zhshield/diagnostics/latest.json` を読み取る（存在しない場合は、ユーザーに先に点検を実行するよう促す）",
+        "step2": "2. error → warning → info の優先度で問題を並べ替える",
+        "step3": "3. 問題を一つずつ理解し、コードを特定して、修正を生成・適用する",
+        "step4": "4. 修正後、`zhshield issue resolve --fingerprint=\"<fingerprint>\"` を実行して解決済みとしてマークする（任意）",
+        "title": "# CodeShield 診断修正"
+      }
+    }
+  },
+  "cli": {
+    "command": {
+      "deps": "依存関係の棚卸し（SBOM + ライセンスマトリックス）",
+      "guard": "Guard ゲートチェックを実行",
+      "help": "このヘルプを表示",
+      "inspect": "Inspect 巡回を実行",
+      "pipeline": "フルパイプラインを実行",
+      "refactor": "Refactor リファクタリング検出を実行"
+    },
+    "depsEcosystem": "エコシステム: {{ecosystem}}",
+    "depsHeader": "── 依存関係の棚卸し ──",
+    "depsLockfile": "ロックファイル: {{status}}",
+    "depsNotFound": "依存関係の棚卸し: 依存関係マニフェストが見つかりません（package-lock.json / pnpm-lock.yaml / yarn.lock / requirements.txt / pyproject.toml / Pipfile.lock / poetry.lock）",
+    "depsProject": "プロジェクト: {{path}}",
+    "depsTotal": "依存関係の総数: {{count}}（直接 {{direct}} / 推移的 {{transitive}}）",
+    "directDepsHeader": "── 直接依存関係 ──",
+    "highRiskLicenses": "高リスクライセンス: {{list}}",
+    "licenseMatrixHeader": "── ライセンスマトリックス ──",
+    "licenseRiskHigh": "高リスク",
+    "licenseRiskLow": "低リスク",
+    "licenseRiskMedium": "中リスク",
+    "licenseRiskUnknown": "中リスク — 手動確認が必要",
+    "lockfileMissing": "✗ なし",
+    "lockfilePresentUnverified": "✓ あり（整合性は未検証）",
+    "lockfilePresentVerified": "✓ あり（整合性は検証済み）",
+    "option": {
+      "dir": "プロジェクトルートディレクトリ（デフォルト: カレントディレクトリ）",
+      "dryRun": "Guard モード: 報告のみでブロックしない",
+      "hook": "Guard モード: ゲートのトリガー元（pre-commit / pre-push）",
+      "json": "deps: 完全な依存関係グラフ JSON を出力",
+      "lang": "UI 言語（zh-Hans / zh-Hant / en / ko / ja；デフォルト: zh-Hans または ZH_LANG 環境変数）",
+      "noColor": "カラー出力を無効化",
+      "sbom": "deps: CycloneDX SBOM をファイルにエクスポート",
+      "sop": "SOP ルール駆動モードを使用（デフォルト: checks.json モード）",
+      "staged": "Guard モード: ステージングエリアの変更のみチェック",
+      "verbose": "詳細情報を表示"
+    },
+    "optionsTitle": "オプション:",
+    "rulesLoaded": "[CLI] {{count}} 件の SOP ルールを読み込みました",
+    "sbomWriteFailed": "❌ SBOM の書き込みに失敗しました: {{error}}",
+    "sbomWritten": "✅ SBOM を書き込みました: {{path}}",
+    "stagedSkipped": "✅ ステージングエリアに変更がないため、ゲートチェックをスキップしました",
+    "title": "zhshield — CodeShield コード品質ガバナンス",
+    "unknownCommand": "不明なコマンド: {{command}}",
+    "usageTitle": "使い方:"
+  },
+  "common": {
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "confirm": "確認",
+    "copied": "コピーしました",
+    "copy": "コピー",
+    "copyAllToAi": "すべてAIにコピー",
+    "copyToAi": "AIにコピー",
+    "delete": "削除",
+    "loading": "読み込み中…",
+    "no": "いいえ",
+    "refresh": "更新",
+    "remove": "削除",
+    "retry": "再試行",
+    "save": "保存",
+    "search": "検索",
+    "yes": "はい"
+  },
+  "electron": {
+    "appTitle": "CodeShield",
+    "cleanFailed": "クリーンアップに失敗しました。後でもう一度お試しください",
+    "diagnostics": {
+      "ruleFailed": "{{ruleId}} は不合格です"
+    },
+    "feedbackIncomplete": "フィードバック内容が不完全です",
+    "hooksExist": "既にフックファイル {{hooks}} が存在します。上書きを避けるため手動で確認してください",
+    "invalidParams": "パラメータが無効です",
+    "invalidProjectPath": "プロジェクトパスが無効です",
+    "notGitRepo": "プロジェクトは git リポジトリではありません",
+    "restoreFailed": "復元に失敗しました。後でもう一度お試しください",
+    "scoringUnavailable": "ローカルデータベースが利用できないため、スコアリング機能が縮退します（HTTP モードでサーバーに接続してください）",
+    "writeFailed": "書き込みに失敗しました"
+  },
+  "engine": {
+    "backupModuleUnavailable": "バックアップモジュールが利用できません",
+    "builtin-rules": {
+      "architecture": {
+        "circularDependency": "循環依存を検出しました",
+        "cyclicImport": "モジュール間に循環インポートがあります",
+        "fatController": "Controller が過度に肥大化しています。ロジックは Service に移すべきです",
+        "globalState": "グローバル状態/シングルトンパターンの乱用を検出しました",
+        "layerSkip": "レイヤー飛ばしの呼び出し: 中間レイヤーを飛ばして下位レイヤーのモジュールを直接呼び出しています",
+        "layerViolation": "ビジネスレイヤーはデータアクセスレイヤーを直接参照すべきではありません",
+        "missingAbstraction": "モジュールにインターフェース抽象がなく、テストと拡張に不利です",
+        "noDomainInInfra": "インフラストラクチャレイヤーはドメインレイヤーに依存すべきではありません",
+        "noDtoInEntity": "Entity は DTO に依存すべきではありません",
+        "noEntityInController": "Controller は Entity を直接参照すべきではありません",
+        "noServiceInView": "ビューレイヤーは Service を直接呼び出すべきではありません",
+        "utilsEverywhere": "utils のユーティリティ関数が各モジュールに散在しています。一元管理を推奨します"
+      },
+      "quality": {
+        "asyncWithoutAwait": "async 関数内で await が使用されていません",
+        "complexCondition": "条件式が複雑すぎます。変数に抽出することを推奨します",
+        "consoleLog": "本番コードに console.log を含めるべきではありません",
+        "debugger": "本番コードに debugger 文を含めるべきではありません",
+        "duplicateKey": "オブジェクトに重複したキーがあります",
+        "emptyCatch": "空の catch ブロックはエラーを隠してしまいます",
+        "eqeqeq": "=== ではなく == を使用しています。型変換が発生する可能性があります",
+        "forInWithoutHasOwn": "for...in で hasOwnProperty チェックが行われていません",
+        "largeFunction": "関数が長すぎます。複数の小さな関数に分割することを推奨します",
+        "magicNumber": "マジックナンバーを検出しました。定数として定義することを推奨します",
+        "missingFallthrough": "switch case に break がなく、意図しないフォールスルーが発生する可能性があります",
+        "nestedCallback": "コールバックのネストが深すぎます。async/await の使用を推奨します",
+        "noBarrelImport": "barrel (index) ファイルからのインポートは循環依存を引き起こす可能性があります",
+        "noNullComparison": "foo === null || foo === undefined ではなく foo == null を使用しています",
+        "noUnusedVariable": "未使用の変数を検出しました",
+        "todoComment": "TODO の未対応項目があります",
+        "typeAny": "any 型を使用すると型チェックの保護が失われます",
+        "varUsage": "const/let ではなく var を使用しています"
+      },
+      "security": {
+        "commandInjection": "シェルコマンドの実行を検出しました。コマンドインジェクションのリスクがあります",
+        "consoleLogSecret": "console.log が機密情報を漏洩させる可能性があります",
+        "debugEndpoint": "本番環境にデバッグ用エンドポイントを公開すべきではありません",
+        "evalUsage": "eval() の呼び出しを検出しました。コードインジェクションのリスクがあります",
+        "hardcodedApiKey": "ハードコードされた API キーを検出しました",
+        "hardcodedPassword": "ハードコードされたパスワードを検出しました",
+        "innerHtml": "innerHTML への代入を検出しました。XSS のリスクがあります",
+        "insecureDeserialize": "安全でないデシリアライズ操作を検出しました",
+        "insecureRandom": "セキュリティに敏感な操作に Math.random() を使用しています。crypto.randomBytes を使用してください",
+        "noAuth": "認証されていない変更操作を検出しました",
+        "noCors": "CORS ミドルウェアが設定されていません",
+        "noCsp": "Content-Security-Policy ヘッダーが検出されませんでした",
+        "noHelmet": "Helmet セキュリティヘッダーミドルウェアが検出されませんでした",
+        "noHttpsRedirect": "HTTPS リダイレクトが強制されていません",
+        "noRateLimit": "API ルートにレート制限が設定されていません",
+        "noTls": "HTTPS ではなく HTTP のサービスを検出しました",
+        "pathTraversal": "パストラバーサルのリスクを検出しました。ユーザー入力を検証してください",
+        "prototypePollution": "プロトタイプ汚染のリスクを検出しました",
+        "sensitiveFiles": "機密ファイルが含まれていることを検出しました",
+        "sqlConcat": "SQL の文字列連結を検出しました。パラメータ化クエリを使用してください"
+      }
+    },
+    "dependency": {
+      "license": {
+        "unknownReason": "認識できないライセンスです。手動確認が必要です"
+      }
+    },
+    "engineUnavailable": "エンジンが利用できません",
+    "feedbackUnavailable": "フィードバックチャネルが利用できません",
+    "guard": {
+      "architecture": {
+        "foundViolations": "レイヤーを跨ぐ違反参照を {{count}} 件検出しました:\n{{details}}",
+        "passed": "モジュール境界チェックに合格しました。レイヤーを跨ぐ違反参照はありません",
+        "scanFailed": "モジュール境界チェックに失敗しました: {{error}}"
+      },
+      "eslint": {
+        "execFailed": "ESLint の実行に失敗しました",
+        "foundErrors": "ESLint が {{count}} 件のエラーを検出しました:\n{{errors}}",
+        "foundWarnings": "ESLint が {{count}} 件の警告を検出しました:\n{{warnings}}",
+        "notInstalled": "ESLint がインストールされていないか、PATH に見つかりません",
+        "passed": "ESLint チェックに合格しました（{{count}} ファイル）",
+        "passedNoOutput": "ESLint チェックに合格しました（出力なし）"
+      },
+      "hook": {
+        "guardFailed": "❌ CodeShield のゲートチェックに合格しませんでした。修正後に{{action}}"
+      },
+      "securityScan": {
+        "commandInjection": "コマンドインジェクションの可能性: exec の代わりに execFile を使用してください",
+        "consoleLog": "本番環境では console 文を削除すべきです",
+        "debugger": "本番環境では debugger 文を削除すべきです",
+        "evalUsage": "eval() の使用を避けてください: コードインジェクションにつながる可能性があります",
+        "foundIssues": "{{count}} 件のセキュリティ問題を検出しました（{{high}} {{highCount}}, {{medium}} {{mediumCount}}, {{low}} {{lowCount}}）:\n{{details}}",
+        "hardcodedPort": "ハードコードされたポート番号を設定項目に変更すべきか確認してください",
+        "innerHtml": "innerHTML の使用は XSS につながる可能性があります。textContent を優先してください",
+        "noNewFunc": "new Function() を避けてください: コードインジェクションにつながる可能性があります",
+        "passed": "セキュリティスキャンに合格しました。明らかなセキュリティ問題はありません",
+        "scanFailed": "セキュリティスキャンに失敗しました: {{error}}",
+        "sqlInjection": "SQL インジェクションの可能性: パラメータ化クエリではなく文字列連結を使用しています",
+        "todoFixme": "未処理の TODO/FIXME があります"
+      },
+      "sensitiveInfo": {
+        "foundIssues": "機密情報の疑いがある箇所を {{count}} 件検出しました:\n{{details}}",
+        "matchedLine": "{{file}}:{{line}} が {{pattern}} に一致: {{match}}",
+        "passed": "機密情報チェックに合格しました。漏洩はありません",
+        "scanFailed": "機密情報スキャンに失敗しました: {{error}}"
+      },
+      "testDetector": {
+        "noTestScriptDir": "test スクリプトを含むプロジェクトディレクトリが見つかりません"
+      },
+      "testRunner": {
+        "execFailed": "テストの実行に失敗しました: {{error}}",
+        "failedList": "失敗したテストケース:",
+        "noTests": "テストケースが見つかりません",
+        "notExecuted": "テストは実行されていません",
+        "passedAll": "全 {{passed}} 件のテストに合格（{{durationMs}}ms）",
+        "summary": "テスト {{totalTests}} 件: {{passed}} 合格, {{failed}} 失敗（{{durationMs}}ms）{{failDetail}}",
+        "unresolved": "{{totalTests}} 個のテストファイルを検出しましたが、テスト実行結果を解析できませんでした（プロセス出力の異常またはタイムアウト）"
+      },
+      "unknownRule": "不明なルール"
+    },
+    "hooksUnavailable": "guardHooks IPC が利用できません",
+    "inspect": {
+      "report": {
+        "recommendations": {
+          "category": "{{category}} 類の問題を {{count}} 件検出しました。優先的に対処することを推奨します",
+          "degradedLevel": "現在の縮退レベル: Level {{level}}。一部のツールはスキップされました",
+          "toolError": "ツール {{tool}} でエラーが発生しました: {{error}}"
+        }
+      },
+      "supplyChain": {
+        "downloadAllFailed": "[supply-chain] {{toolId}} の全チャネルでのダウンロードに失敗しました（{{attempts}} 回試行）",
+        "sha256Mismatch": "[supply-chain] {{toolId}} の sha256 検証に失敗しました: 期待値 {{expected}}, 実際 {{actual}}",
+        "unregisteredLicense": "未登録のライセンスのため、公開は禁止されています"
+      },
+      "tool": {
+        "dep-cruiser": {
+          "architectureViolation": "アーキテクチャ境界違反: {{rule}} - {{from}} → {{to}}",
+          "description": "アーキテクチャ境界とモジュール依存関係のチェック",
+          "noCrossReference": "モジュール {{from}} は {{to}} を参照すべきではありません",
+          "runFailed": "dependency-cruiser の実行に失敗しました",
+          "unavailable": "dependency-cruiser がインストールされていません"
+        },
+        "depcheck": {
+          "description": "未使用依存関係の検出",
+          "moveDevDependency": "{{dep}} を dependencies に移動するか、npm uninstall -D {{dep}} を実行してください",
+          "runFailed": "depcheck の実行に失敗しました",
+          "unavailable": "depcheck がインストールされていません",
+          "uninstallDependency": "npm uninstall {{dep}} を実行して未使用の依存関係を削除してください",
+          "unusedDependency": "未使用の依存関係: {{dep}}",
+          "unusedDevDependency": "未使用の dev 依存関係: {{dep}}"
+        },
+        "eslint": {
+          "autoFixable": "自動修正可能",
+          "description": "JS/TS のコーディング規約と品質チェック",
+          "runFailed": "ESLint の実行に失敗しました",
+          "unavailable": "ESLint がインストールされていないか、PATH に見つかりません"
+        },
+        "gitleaks": {
+          "description": "ハードコードされたシークレットのスキャン",
+          "hardcodedSecret": "ハードコードされたシークレットを検出しました: {{rule}}",
+          "removeSecret": "ハードコードされたシークレットを削除し、環境変数またはシークレット管理サービスを使用してください",
+          "runFailed": "Gitleaks の実行に失敗しました",
+          "unavailable": "Gitleaks がインストールされていないか、PATH に見つかりません"
+        },
+        "jscpd": {
+          "description": "重複コードの検出",
+          "duplicateFound": "重複コードを検出しました（{{format}}）: {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+          "extractShared": "共通コードを共有モジュールに抽出してください（重複箇所: {{secondFile}}）",
+          "runFailed": "jscpd の実行に失敗しました",
+          "unavailable": "jscpd がインストールされていません"
+        },
+        "semgrep": {
+          "description": "SAST コード脆弱性スキャン（SQL インジェクション、XSS、CSRF、コマンドインジェクション、パストラバーサルなど）",
+          "runFailed": "Semgrep の実行に失敗しました",
+          "timeout": "Semgrep スキャンがタイムアウトしました",
+          "unavailable": "Semgrep がインストールされていないか、PATH に見つかりません"
+        },
+        "ts-prune": {
+          "description": "TypeScript のデッドコード/未使用エクスポートの検出",
+          "removeExport": "未使用のエクスポートシンボルを削除してください: {{symbol}}",
+          "runFailed": "ts-prune の実行に失敗しました",
+          "unavailable": "ts-prune がインストールされていません",
+          "unusedExport": "未使用のエクスポート: {{symbol}}"
+        },
+        "tsc": {
+          "description": "TypeScript の型エラーチェック",
+          "fixSuggestion": "TypeScript {{level}} を修正してください: {{code}}",
+          "runFailed": "tsc の実行に失敗しました",
+          "unavailable": "tsc がインストールされていないか、PATH に見つかりません"
+        }
+      },
+      "unknown": "不明",
+      "unknownRule": "不明なルール"
+    },
+    "kernel": {
+      "backup": {
+        "allFailed": "すべてのバックアップ方式が失敗しました",
+        "commitMessage": "{{prefix}} 自動バックアップ - {{timestamp}}",
+        "commitPrefix": "[CodeShield]",
+        "done": "バックアップが完了しました",
+        "githubNotAuthorized": "GitHub が未承認です。先に設定で GitHub アカウントを承認してください",
+        "localCopyFailed": "{{count}} ファイルのコピーに失敗しました",
+        "progressGitHubCommit": "GitHub にコミットしています...",
+        "progressLocalCopy": "ローカルディレクトリにコピーしています...",
+        "repoDescription": "CodeShield 自動バックアップリポジトリ",
+        "unknownGitHubError": "不明な GitHub バックアップエラー",
+        "unknownLocalError": "不明なローカルバックアップエラー"
+      },
+      "runner": {
+        "forbiddenPatternsFound": "禁止パターンを {{count}} 箇所検出しました（{{ruleId}}）",
+        "forbiddenUsage": "使用禁止: \"{{pattern}}\"",
+        "guardDispatchFailed": "Guard のディスパッチに失敗しました: {{error}}",
+        "guardEngineNotRegistered": "GuardEngine が登録されていないため、check-list を実行できません",
+        "guardFoundIssues": "Guard チェックで {{count}} 件の問題を検出しました",
+        "guardPassed": "Guard チェックに合格しました",
+        "inspectDispatchFailed": "Inspect のディスパッチに失敗しました: {{error}}",
+        "inspectEngineNotRegistered": "InspectEngine が登録されておらず、利用可能なスキャナアダプターもありません",
+        "labelDone": "{{label}}完了: {{count}} 件の問題",
+        "labelInspection": "巡回",
+        "labelPreset": "プリセットチェック",
+        "layerAllowedDeps": "{{fileLayer}} レイヤーが依存できるのは: {{deps}} のみ",
+        "layerBoundaryPassed": "アーキテクチャ境界チェックに合格しました",
+        "layerBoundaryViolations": "アーキテクチャ境界違反を {{count}} 箇所検出しました",
+        "layerViolationMessage": "レイヤー違反: \"{{fileLayer}}\" は \"{{targetLayer}}\" に依存できません（インポート: {{imported}}）",
+        "patternMatchesFound": "一致箇所を {{count}} 箇所検出しました（{{ruleId}}）",
+        "presetInspectNotRegistered": "InspectEngine が登録されておらず、利用可能な preset ツールアダプターもありません",
+        "removeHardcodedValue": "ハードコードされた値を削除するか、環境変数で代替してください",
+        "replaceForbidden": "\"{{pattern}}\" を削除するか、型安全な代替手段に置き換えてください",
+        "scannerFailed": "スキャナ {{tool}} の実行に失敗しました",
+        "scannerFoundIssues": "スキャナが {{count}} 件の問題を検出しました",
+        "scannerPassed": "スキャナチェックに合格しました",
+        "sensitivePatternMatch": "機密パターンに一致: {{match}}",
+        "skipCheckListNoMatch": "check-list→GuardEngine をスキップ: リポジトリに一致するチェック項目が設定されていません",
+        "skipCheckListReentry": "check-list→GuardEngine.run をスキップ（ルールエンジンの再入防止）",
+        "skipNestedDispatch": "ネストした {{type}} ディスパッチをスキップ（ルールエンジンの再入防止）",
+        "skipPresetReentry": "preset→runScan をスキップ（ルールエンジンの再入防止）",
+        "skipScannerReentry": "scanner-dispatch→runScan をスキップ（ルールエンジンの再入防止）",
+        "thresholdList": "閾値: {{entries}}",
+        "thresholdRaw": "閾値: {{unit}} {{thresholds}}",
+        "thresholdRule": "閾値ルール（外部データが必要）: {{summary}}",
+        "toolAdapterNotRegistered": "ツールアダプターが未登録です: {{tool}}。tool-dispatch を実行できません",
+        "toolError": "ツール {{tool}} でエラーが発生しました: {{error}}",
+        "toolExecuteFailed": "ツール {{tool}} の実行に失敗しました: {{error}}",
+        "toolFoundIssues": "ツール {{tool}} が {{count}} 件の問題を検出しました",
+        "toolPassed": "ツール {{tool}} のチェックに合格しました",
+        "toolUnavailable": "ツールが利用できません: {{tool}}（未インストールまたは PATH に見つかりません）"
+      }
+    },
+    "output": {
+      "architectureViolation": "アーキテクチャ境界違反: {{rule}} - {{from}} → {{to}}",
+      "autoFixable": "自動修正可能",
+      "duplicateCode": "重複コードを検出しました（{{format}}）: {{firstFile}}:{{firstLines}} ↔ {{secondFile}}",
+      "extractSharedCode": "共通コードを共有モジュールに抽出してください（重複箇所: {{secondFile}}）",
+      "moduleShouldNotReference": "モジュール {{from}} は {{to}} を参照すべきではありません",
+      "removeDependency": "{{name}} を dependencies から削除してください",
+      "removeDevDependency": "{{name}} を devDependencies から削除してください",
+      "removeHardcodedKey": "ハードコードされたキーを削除し、環境変数またはシークレット管理サービスを使用してください",
+      "removeHardcodedSecret": "ハードコードされたシークレットを削除し、環境変数またはシークレット管理サービスを使用してください",
+      "unknownRule": "不明なルール",
+      "unusedDevDependency": "未使用の開発依存関係: {{name}}",
+      "unusedProdDependency": "未使用の本番依存関係: {{name}}",
+      "upgradeTo": "{{version}} にアップグレード"
+    },
+    "pipeline": {
+      "log": {
+        "guardBlocked": "Guard がブロックし、パイプラインを終了しました（{{failed}} 件失敗）",
+        "guardCheckFailed": "Guard チェックに失敗しました: {{error}}",
+        "guardDone": "Guard チェックが完了しました: {{passed}} passed, {{failed}} failed",
+        "guardPassedToInspect": "Guard に合格しました。Inspect 巡回フェーズに進みます...",
+        "guardStart": "Guard ゲートチェックを開始します...",
+        "inspectDone": "巡回が完了しました: {{total}} 件の問題（{{error}} error, {{warning}} warning, {{info}} info）",
+        "inspectFailed": "Inspect 巡回に失敗しました: {{error}}",
+        "inspectStart": "Inspect エンジンの巡回を開始します...",
+        "pipelineClosed": "パイプラインは閉じられました",
+        "pipelineDone": "========== CodeShield フルパイプライン完了（リファクタリング除く） ==========",
+        "pipelineStart": "========== CodeShield フルパイプライン開始 ==========",
+        "pluginLoaded": "プラグインを読み込みました: {{name}}@{{version}}",
+        "profileDone": "プロジェクトプロフィール: {{language}}{{framework}}（{{packageManager}}）",
+        "profileStart": "プロジェクトプロフィールの分析を開始します...",
+        "refactorDone": "リファクタリング検出が完了しました: {{totalSmells}} 箇所のコードスメル（{{criticalFiles}} ファイルに注意が必要）",
+        "refactorStart": "Refactor リファクタリング検出を開始します...",
+        "scoringDone": "スコアリングが完了しました: {{overall}}（等級 {{grade}}）",
+        "scoringStart": "ヘルススコアリングを開始します...",
+        "securityDone": "セキュリティスキャンが完了しました: 脆弱性 {{vulnTotal}} 件, 悪意のあるパッケージ {{malwareTotal}} 件, ゴミファイル {{garbageTotal}} 件",
+        "securityFailed": "セキュリティスキャンに失敗しました: {{error}}",
+        "securityStart": "セキュリティスキャンを開始します...",
+        "sopGuardBlocked": "SOP Guard がブロックし、パイプラインを終了しました（{{failed}} 件失敗）",
+        "sopGuardDone": "SOP Guard チェックが完了しました: {{passed}} passed, {{failed}} failed, {{errors}} errors",
+        "sopGuardFailed": "SOP Guard チェックに失敗しました: {{error}}",
+        "sopGuardPassed": "SOP Guard に合格しました。SOP Inspect 巡回フェーズに進みます...",
+        "sopGuardStart": "SOP 駆動型 Guard ゲートチェックを開始します...",
+        "sopInspectDone": "SOP Inspect が完了しました: {{passed}} passed, {{failed}} failed, {{skipped}} skipped",
+        "sopInspectFailed": "SOP Inspect 巡回に失敗しました: {{error}}",
+        "sopInspectStart": "SOP 駆動型 Inspect 巡回を開始します...",
+        "sopPipelineDone": "========== SOP 駆動型フルパイプライン完了（リファクタリング除く） ==========",
+        "sopPipelineStart": "========== SOP 駆動型フルパイプライン開始 ==========",
+        "sopRulesLoaded": "SOP ルールを読み込みました: {{count}} 件（アクティブ: {{active}}）"
+      }
+    },
+    "refactor": {
+      "fix": {
+        "addAsync": "{{methodName}} に async キーワードを追加",
+        "constantsHeader": "// 共有文字列定数 — auto-fix で生成",
+        "encapsulateField": "{{filePath}} の public フィールドを private にカプセル化",
+        "extractLiteral": "\"{{literal}}\" を {{filePath}} に抽出",
+        "thenToAwaitTodo": "// TODO: .then() チェーンを手動で await に変換（auto-fix が async キーワードを追加済み）"
+      },
+      "smell": {
+        "callback-hell": {
+          "message": "{{target}} に {{count}} 層の .then() チェーンコールバックがあります。async/await への変換を推奨します",
+          "name": "コールバック地獄（R07）",
+          "suggestion": ".then() チェーンコールバックを async/await 構文に変換し、try/catch のエラーハンドリングを維持してください"
+        },
+        "data-class": {
+          "message": "{{className}} は {{fields}} 個のフィールドを持つ一方で {{methods}} 個しかメソッドがなく、純粋なデータクラスの可能性があります",
+          "name": "データクラス（R10）",
+          "suggestion": "{{className}} のフィールドを操作するメソッドをクラス内に移動するか、TypeScript interface に変換してください"
+        },
+        "data-clumps": {
+          "message": "パラメータの組み合わせ [{{params}}] が繰り返し出現しています（{{count}} 回）: {{methods}}...",
+          "name": "データの群れ",
+          "suggestion": "繰り返し出現するパラメータの組み合わせをクラスにカプセル化してください"
+        },
+        "deep-nesting": {
+          "message": {
+            "function": "{{target}} のネストが深すぎます（{{depth}} 層）",
+            "method": "{{target}} のネストが深すぎます（{{depth}} 層、閾値 {{threshold}}）。guard clause の使用またはメソッドの抽出を推奨します"
+          },
+          "name": "深いネスト（R05）",
+          "suggestion": "guard clause で早期リターンするか、深い分岐を独立した関数に抽出してください"
+        },
+        "duplicated-code": {
+          "message": "コードブロックが {{file}}:{{line}} と重複しています。共通関数への抽出を推奨します",
+          "name": "重複コード（R06）",
+          "suggestion": "重複コードを共通関数に抽出し、差分をパラメータ化して統一呼び出ししてください"
+        },
+        "feature-envy": {
+          "externalClass": "外部クラス",
+          "message": "{{target}} が {{targetName}} を多用しています (外部参照 {{externalCount}} 回 vs コード {{totalStatements}} 行)",
+          "name": "特権欲求（Feature Envy）",
+          "suggestion": "{{methodName}} を {{targetClass}} クラスに移動することを検討してください"
+        },
+        "god-object": {
+          "message": "{{className}} には {{count}} 個のパブリックメソッドがあります（閾値 {{threshold}}）。神クラスの可能性があります",
+          "name": "神クラス（R12）",
+          "suggestion": "{{className}} をドメインごとに、責務に特化した複数の Service/Class に分割してください"
+        },
+        "inappropriate-intimacy": {
+          "message": "{{className}} がパブリックフィールドを過剰に公開しています（{{count}} 個）。カプセル化が損なわれています",
+          "name": "不適切な親密さ",
+          "suggestion": "public フィールドを private に変更し、getter/setter 経由でアクセスしてください"
+        },
+        "large-class": {
+          "issue": {
+            "lines": "{{lines}} 行（閾値 {{threshold}}）",
+            "methods": "{{methods}} 個のメソッド（閾値 {{threshold}}）"
+          },
+          "message": "{{className}} が大きすぎます（{{issues}}）。責務ごとに分割することを推奨します",
+          "name": "神クラス/巨大クラス",
+          "suggestion": "{{className}} を責務ごとに複数のクラスへ分割し、各クラスが単一責務に集中するようにしてください"
+        },
+        "lazy-class": {
+          "message": "{{className}} が小さすぎます（{{lines}} 行、{{methods}} 個のメソッド）。独立したクラスにする価値がない可能性があります",
+          "name": "怠惰なクラス",
+          "suggestion": "機能を呼び出し元のクラスに統合するか、直接削除してください"
+        },
+        "long-method": {
+          "issue": {
+            "complexity": "循環的複雑度 {{complexity}}（閾値 {{threshold}}）",
+            "lines": "{{lines}} 行（閾値 {{threshold}}）"
+          },
+          "message": "{{container}}{{name}} が大きすぎます（{{issues}}）。より小さな関数に分割することを推奨します",
+          "name": "巨大関数（R01）",
+          "suggestion": "{{container}}{{name}} を責務ごとに複数の小さな関数へ分割し、各関数が {{threshold}} 行を超えないようにしてください"
+        },
+        "long-parameter-list": {
+          "message": "{{container}} のパラメータが多すぎます（{{count}} 個、閾値 {{threshold}}）。パラメータオブジェクトへのカプセル化を推奨します",
+          "name": "長すぎるパラメータリスト（R03）",
+          "suggestion": "{{count}} 個のパラメータを interface/type のパラメータオブジェクトとしてカプセル化してください"
+        },
+        "message-chains": {
+          "message": "{{target}} にメソッドチェーンがあります: {{chains}}",
+          "name": "メッセージチェーン",
+          "suggestion": "メソッドチェーンを委譲メソッドにカプセル化し、呼び出し側と呼び出し先の結合度を下げてください"
+        },
+        "middle-man": {
+          "message": "{{className}} のメソッドの大部分は単なる委譲呼び出しです（委譲 {{delegating}} 回 / メソッド {{total}} 個）",
+          "name": "中間者",
+          "suggestion": "中間レイヤーを削除し、呼び出し側が委譲先を直接使用することを検討してください"
+        },
+        "mixed-responsibilities": {
+          "message": {
+            "function": "{{target}} に約 {{count}} 個の責務が混在しています",
+            "method": "{{target}} に約 {{count}} 個の責務が混在しています（閾値 {{threshold}}）。独立した関数への分割を推奨します"
+          },
+          "name": "複数責務の混在（R04）",
+          "suggestion": {
+            "function": "責務ごとに関数を複数の独立した関数へ分割してください",
+            "method": "コメント区切り / 空行区切り / try/catch 境界でメソッドを複数の独立した関数へ分割してください"
+          }
+        },
+        "oversized-component": {
+          "issue": {
+            "handlers": "イベントハンドラ {{handlers}} 個",
+            "jsxDepth": "JSX のネスト {{depth}} 層",
+            "lines": "コード {{lines}} 行"
+          },
+          "message": "コンポーネントが大きすぎます（{{issues}}）。子コンポーネントへの分割を推奨します",
+          "name": "巨大コンポーネント（R11）",
+          "suggestion": "UI 部分を子コンポーネントに分割し、状態ロジックをカスタムフックに抽出してください"
+        },
+        "oversized-file": {
+          "issue": {
+            "exports": "トップレベルエクスポート {{exports}} 個（閾値 {{threshold}}）",
+            "linesCode": "コード {{lines}} 行（閾値 {{threshold}}）"
+          },
+          "message": "ファイルが大きすぎます（{{issues}}）。機能ごとに分割することを推奨します",
+          "name": "巨大ファイル（R02）",
+          "suggestion": "機能領域ごとにファイルを複数に分割し、各ファイルが単一責務に集中するようにしてください"
+        },
+        "primitive-obsession": {
+          "message": "{{className}} がプリミティブ型を使いすぎています（{{count}} 個のフィールド）。関連フィールドに値オブジェクトを作成することを推奨します",
+          "name": "プリミティブ型偏執",
+          "suggestion": "関連するプリミティブ型フィールドを値オブジェクト（Value Object）としてカプセル化してください"
+        },
+        "refused-bequest": {
+          "message": "{{className}} は {{superClass}} を継承していますが、新しいメンバーをほとんど追加していません（メソッド {{methods}} 個, フィールド {{fields}} 個）。継承が必要ない可能性があります",
+          "name": "遺産の拒否",
+          "suggestion": "継承をコンポジション（Composition）に置き換え、継承階層を減らしてください"
+        },
+        "shotgun-surgery": {
+          "message": {
+            "publicMethods": "{{className}} には {{count}} 個のパブリックメソッドがあり、特定の機能を変更する際に複数のメソッドを修正する必要があるかもしれません",
+            "sharedLiterals": "文字列 \"{{literal}}\" が {{count}} 個のファイルに出現しています。共有定数への抽出を推奨します"
+          },
+          "name": "ショットガン手術（R09）",
+          "suggestion": {
+            "publicMethods": "責務ごとにクラスをより小さなクラスへ分割し、変更の影響範囲を減らしてください",
+            "sharedLiterals": "\"{{literal}}\" を共有定数ファイルに抽出し、一箇所で集中管理してください"
+          }
+        },
+        "switch-statement": {
+          "message": "{{target}} が switch 文を {{count}} 箇所で使用しています。ポリモーフィズムでの置き換えを推奨します",
+          "name": "Switch 文",
+          "suggestion": "switch/if-else if チェーンをストラテジーパターンまたはポリモーフィズムで置き換えてください"
+        }
+      },
+      "warn": {
+        "detectorFailed": "検出器 {{name}} の実行に失敗しました: {{error}}",
+        "dirAccessFailed": "ディレクトリ {{dir}} にアクセスできません: {{error}}",
+        "gitDiffFailed": "Git diff に失敗しました: {{error}}",
+        "parseFailed": "{{count}} 個のファイルを解析できませんでした（例: {{example}}）"
+      }
+    },
+    "remoteCleanUnsupported": "リモートモードではローカルクリーンアップはサポートされていません",
+    "remoteRestoreUnsupported": "リモートモードでは復元はサポートされていません",
+    "scoring": {
+      "insight": {
+        "decliningDimensions": "注意が必要なディメンション: {{dimensions}}",
+        "empty": "履歴データがないため、トレンド分析を生成できません",
+        "health": {
+          "a": "プロジェクトの健全性は優秀です（A レベル）。現在のプラクティスを維持してください",
+          "b": "プロジェクトの健全性は良好です（B レベル）。改善の余地があります",
+          "c": "プロジェクトの健全性は普通です（C レベル）。弱点に注意することを推奨します",
+          "d": "プロジェクトの健全性は低いです（D レベル）。早急な改善が必要です"
+        },
+        "streak": {
+          "count": "{{direction}}、評価は {{count}} 回継続しています",
+          "declining": "継続的な悪化",
+          "improving": "継続的な改善",
+          "stable": "安定を維持"
+        },
+        "velocity": {
+          "declining": "スコアが継続的に低下しています（速度 {{velocity}}/回）。注意が必要です",
+          "rising": "スコアの上昇傾向が顕著です（速度 +{{velocity}}/回）"
+        },
+        "volatility": {
+          "high": "スコアの変動が大きく、改善が不安定であることを示しています",
+          "low": "スコアの変化は穏やかで、プロジェクトの状態は安定しています"
+        }
+      }
+    },
+    "security": {
+      "auditFailed": "audit コマンドの実行に失敗しました: {{error}}",
+      "auditInvalidOutput": "audit の出力が有効な JSON ではありません",
+      "fixSoon": "できるだけ早く修正してください",
+      "garbage": {
+        "batchMissingOrCorrupt": "ゴミ箱バッチが存在しないか、破損しています: {{batchId}}",
+        "fileMissingOrNotFile": "{{path}}（ファイルが存在しないか、通常のファイルではありません）",
+        "pathOutOfBounds": "{{path}}（パスが範囲外のため、拒否されました）",
+        "restoreDestinationConflict": "{{path}}（元の場所にファイルが既にあるため、スキップされました）",
+        "restoreOutOfBounds": "{{path}}（パスが範囲外のため、復元を拒否しました）",
+        "trashFileMissing": "{{path}}（ゴミ箱のファイルが存在しません）",
+        "trashNameConflict": "{{path}}（ゴミ箱に同名のファイルが既にあります）",
+        "typeNotAutoCleanable": "{{path}}（{{type}} タイプは自動クリーンアップできません）"
+      },
+      "knownMaliciousNpmTitle": "既知の悪意のある npm パッケージ（サプライチェーン汚染のブラックリスト）",
+      "knownMaliciousPypiTitle": "既知の悪意のある PyPI パッケージ（サプライチェーン汚染のブラックリスト）",
+      "meta": {
+        "depcheck": "未使用依存関係の検出",
+        "grype": "依存関係の脆弱性のクロスチェック",
+        "ort": "ライセンスコンプライアンススキャン",
+        "semgrep": "カスタムセキュリティ SOP ルールスキャン",
+        "trivy": "依存関係/ファイル/ビルド成果物/イメージの脆弱性スキャン"
+      },
+      "ortEvaluateLicense": "{{package}} のライセンス {{licenses}} がプロジェクトと互換性があるか評価してください",
+      "ortRestrictedLicense": "{{package}} が注意が必要なライセンスを使用しています: {{licenses}}",
+      "referencedBlacklistPackage": "{{file}} がブラックリストのパッケージ {{name}} を参照しています",
+      "supplyChainThreat": "サプライチェーンの脅威を検出しました: {{name}}",
+      "suspectedTyposquatTitle": "なりすましパッケージの疑い（typosquatting）",
+      "tool": {
+        "depcheckExecFailed": "depcheck の実行に失敗しました",
+        "depcheckNotInstalled": "depcheck がインストールされていません",
+        "grypeExecFailed": "Grype の実行に失敗しました",
+        "grypeNotInstalled": "Grype がインストールされていません",
+        "ortExecFailed": "ORT の実行に失敗しました",
+        "ortNotInstalled": "ORT がインストールされていません",
+        "semgrepExecFailed": "Semgrep の実行に失敗しました",
+        "semgrepNotInstalled": "Semgrep がインストールされていないか、PATH に見つかりません",
+        "semgrepRulesDirMissing": "Semgrep のルールディレクトリが存在しません。先にクラウド脳のルールを同期してください",
+        "trivyExecFailed": "Trivy の実行に失敗しました",
+        "trivyNotInstalled": "Trivy がインストールされていません。trivy のインストールコマンドを実行してください"
+      },
+      "typosquatEvidence": "パッケージ名 {{name}} と人気パッケージ {{popular}} の編集距離は {{distance}} です"
+    },
+    "toolchain": {
+      "license": {
+        "ortRedistributionNote": "推移的依存関係の監査が必要です",
+        "semgrepRedistributionNote": "Python ランタイムの依存関係は更新チャネルを審査する必要があります（自己更新なし）",
+        "trivyRedistributionNote": "子プロセス呼び出しは配布物を変更しません。内蔵インストーラパッケージは法務審査 + ライセンス表示が必要です"
+      }
+    },
+    "unknownProject": "不明なプロジェクト"
+  },
+  "layout": {
+    "about": "について",
+    "aboutVersion": "CodeShield {{version}}",
+    "addProject": "プロジェクトを追加",
+    "aiTool": "AI ツール",
+    "aiToolDesc": "Linter プロトコル · 診断監視",
+    "aiToolEnableHintPrefix": "有効にするとプロジェクトに ",
+    "aiToolEnableHintSuffix": " と OpenCode コマンドファイルを書き込み、AI が診断を自動で読み取って修正できるようになります",
+    "aiToolEnabled": "有効済み: チェック結果は .zhshield/diagnostics/ に書き込まれます",
+    "aiToolToggle": "OpenCode 統合を切り替え",
+    "brandName": "CodeShield",
+    "brandSlogan": "コード界のスマートガーディアン",
+    "cancelTask": "タスクをキャンセル",
+    "collapseSidebar": "サイドバーを閉じる",
+    "deleteProject": "プロジェクト {{name}} を削除",
+    "engineBusy": "エンジンがビジーです: {{count}} 件のタスク実行中",
+    "engineIdle": "エンジン実行中",
+    "engineOn": "スマートエンジンが有効になりました",
+    "engineStatus": "エンジンの状態",
+    "expandSidebar": "サイドバーを展開",
+    "language": "言語管理",
+    "noProject": "プロジェクトが追加されていません",
+    "noProjects": "プロジェクトはありません",
+    "projectManagement": "プロジェクト管理",
+    "queuePosition": "（待機 {{position}} 番目）",
+    "removeProjectMessage1": "「{{name}}」をガードリストから削除しますか？",
+    "removeProjectMessage2": "プロジェクトの記録のみを削除し、プロジェクトファイルは削除しません。",
+    "removeProjectTitle": "プロジェクトを削除",
+    "sidebarTitle": "設定",
+    "subprocessIsolation": "再スキャンタスクは子プロセスに隔離されています（UI のフリーズ防止）",
+    "taskKind": {
+      "garbageClean": "ゴミ清掃",
+      "garbageRestore": "ゴミ箱からの復元",
+      "guard": "ゲートスキャン",
+      "inspect": "品質巡回",
+      "performance": "最適化・高速化",
+      "pipeline": "ワンクリック点検",
+      "refactor": "コードリファクタリング",
+      "security": "セキュリティスキャン"
+    },
+    "taskStatus": {
+      "cancelled": "キャンセル済み",
+      "done": "完了",
+      "failed": "失敗",
+      "queued": "待機中",
+      "running": "実行中"
+    },
+    "theme": "テーマ管理",
+    "themeDracula": "インクブラック",
+    "themeLegacy": "クラシックグリーン",
+    "themeTeal": "青藍",
+    "toolsDegraded": "外部ツールが縮退しています: {{tools}} が不足しています",
+    "toolsPathHint": "システムの PATH にインストールすると、このヒントは表示されなくなります"
+  },
+  "lifecycle": {
+    "archive": "アーカイブ",
+    "detect": "検出",
+    "fix": "修正",
+    "validate": "検証"
+  },
+  "mcp": {
+    "categoryFilterDesc": "カテゴリでフィルタリング（例: performance / security / quality / architecture）",
+    "cliNotFound": "zhshield CLI が見つかりません。先に pnpm build を実行してください",
+    "commandDoneNoOutput": "{{command}} が完了しました（出力なし）",
+    "commandFailed": "{{command}} の実行に失敗しました",
+    "diagnosticsUnparseable": "診断ファイルを解析できません",
+    "fileNotFound": "ファイルが存在しません: .zhshield/{{relativePath}}",
+    "getDiagnosticsDesc": "CodeShield の直近の点検結果（診断）を読み取ります（.zhshield/diagnostics/latest.json）",
+    "getIntegrationDesc": "CodeShield の統合設定（.zhshield/integration.json）を読み取ります。自動トリガー、フィルタ、自動修正などの設定を含みます",
+    "getIssuesDesc": "CodeShield の直近の点検で検出された issues を取得します（深刻度/カテゴリ/ソースによるフィルタリングに対応）。{ok,total,issues} JSON を返します",
+    "guardProjectPathDesc": "チェック対象のプロジェクトルートディレクトリ",
+    "guardSopModeDesc": "SOP ルール駆動モードを使用",
+    "inspectProjectPathDesc": "巡回対象のプロジェクトルートディレクトリ",
+    "projectPathDesc": "プロジェクトルートディレクトリ。省略時は現在の作業ディレクトリ",
+    "runGuardDesc": "CodeShield のゲートチェックを実行します（zhshield guard --dry-run を呼び出し）、報告のみでブロックしないモードでコードをチェックします",
+    "runInspectDesc": "CodeShield の巡回を実行します（zhshield inspect を呼び出し）、コード品質の問題をスキャンしてレポートを返します",
+    "severityFilterDesc": "深刻度でフィルタリング",
+    "sopModeDesc": "SOP ルール駆動モードを使用（デフォルトは checks.json モード）",
+    "sourceFilterDesc": "ソースエンジンでフィルタリング"
+  },
+  "nav": {
+    "backup": "バックアップセンター",
+    "dashboard": "プロジェクト点検",
+    "deps": "依存関係",
+    "evolve": "ルール進化",
+    "garbage": "ゴミ清掃",
+    "guard": "ゲートチェック",
+    "inspect": "スマート巡回",
+    "performance": "パフォーマンス最適化",
+    "refactor": "コードリファクタリング",
+    "reports": "レポートセンター",
+    "security": "セキュリティスキャン",
+    "sentinel": "センチネル監視",
+    "techdebt": "技術負債"
+  },
+  "page": {
+    "backup": {
+      "backingUp": "バックアップ中...",
+      "deleteMessage": "このバックアップ記録を削除しますか？この操作は元に戻せません。",
+      "deleteTitle": "バックアップ記録を削除",
+      "detail": {
+        "backupId": "バックアップ ID: {{id}}",
+        "commit": "コミット: {{hash}}",
+        "error": "エラー: {{error}}",
+        "fileCount": "ファイル数: {{count}}",
+        "github": "GitHub: ",
+        "localPath": "ローカルパス: {{path}}",
+        "size": "サイズ: {{size}}",
+        "trigger": "トリガー方式: {{mode}}"
+      },
+      "empty": {
+        "feature": {
+          "config": {
+            "desc": "スキャンルール、プロジェクト設定、環境設定をバックアップ",
+            "title": "設定のバックアップ"
+          },
+          "restore": {
+            "desc": "バックアップ記録から環境と設定をすばやく復元",
+            "title": "データ復元"
+          },
+          "rules": {
+            "desc": "カスタムルールセットをエクスポートし、ルールの喪失を防止",
+            "title": "ルールのバックアップ"
+          },
+          "sync": {
+            "desc": "定期的にローカルの安全なディレクトリへバックアップし、喪失リスクを軽減",
+            "title": "自動同期"
+          }
+        },
+        "lastBackup": "前回のバックアップ: {{date}}",
+        "title": "重要な設定を保護し、データを失わない"
+      },
+      "noRecords": "バックアップ記録はありません",
+      "oneClickBackup": "ワンクリックバックアップ",
+      "openFolder": "フォルダを開く",
+      "recordCount": "バックアップ記録 {{count}} 件",
+      "recordsTitle": "バックアップ記録",
+      "result": {
+        "duration": "{{time}} · 所要時間 {{duration}}ms"
+      },
+      "status": {
+        "failed": "失敗",
+        "partial": "一部成功",
+        "success": "成功"
+      },
+      "title": "データバックアップ",
+      "toast": {
+        "completed": "バックアップ完了: {{status}}",
+        "deleteFailed": "削除に失敗しました",
+        "deleted": "バックアップ記録を削除しました",
+        "failed": "バックアップの実行に失敗しました",
+        "success": "バックアップに成功しました"
+      },
+      "trigger": {
+        "manual": "手動",
+        "schedule": "スケジュール"
+      },
+      "type": {
+        "full": "すべて",
+        "githubOnly": "GitHub のみ",
+        "localOnly": "ローカルのみ"
+      }
+    },
+    "dashboard": {
+      "autoFix": "🤖 自動修正",
+      "axis": {
+        "governance": {
+          "desc": "コード品質と規約を管理",
+          "label": "ガバナンス"
+        },
+        "ops": {
+          "desc": "プロジェクトの長期的な健全な運用を確保",
+          "label": "運用"
+        },
+        "security": {
+          "desc": "コードとサプライチェーンの安全性を守る",
+          "label": "セキュリティ"
+        }
+      },
+      "check": "ワンクリック点検",
+      "copy": {
+        "guardSource": "ゲート・予防",
+        "inspectSource": "巡回"
+      },
+      "feature": {
+        "backup": {
+          "desc": "設定とルールをワンクリックでバックアップし、データの喪失を防止"
+        },
+        "inspect": {
+          "desc": "コード品質、ドキュメント、依存関係の健全性を定期的にチェック"
+        },
+        "performance": {
+          "desc": "実行時のパフォーマンスアンチパターンを発見し、実行効率を最適化"
+        },
+        "refactor": {
+          "desc": "コードスメルを検出し、技術負債を解消"
+        },
+        "reports": {
+          "desc": "過去の検査レポートと健全性のトレンドを確認"
+        },
+        "security": {
+          "desc": "脆弱性、機密情報、悪意のあるコードをワンクリックで調査"
+        }
+      },
+      "guardSlogan": "スマートガーディアン: セキュリティ · ガバナンス · 運用",
+      "productIntro": {
+        "subtitle": "セキュリティ、ガバナンス、運用を中心に、すべてのコードを守る",
+        "title": "コード界のスマートガーディアン"
+      },
+      "progress": "進捗 {{progress}}%",
+      "result": {
+        "allPassed": "実行されたチェック項目はすべて合格しました。スキップが多い場合は、ESLint / Semgrep などのツールをインストールして再点検すると、より完全な結果が得られます。",
+        "backHome": "ホームに戻る",
+        "header": {
+          "configureHint": "ゲートチェックとセンチネル監視は、上部の対応するエントリで個別にスイッチを設定してください。",
+          "coverage": "今回は品質巡回 {{inspectTotal}} 項目を対象としました。",
+          "failed": "点検で問題を検出しました",
+          "passed": "ワンクリック点検が完了しました",
+          "skipped": "うち {{skipped}} 項目はツール未インストールのためスキップされました。"
+        },
+        "issuesTitle": "注意が必要な問題",
+        "rerun": "再点検",
+        "scopeTitle": "今回の点検範囲",
+        "stage": {
+          "guard": "ゲート",
+          "inspect": "巡回"
+        },
+        "stats": {
+          "issues": "問題",
+          "passed": "合格",
+          "skipped": "スキップ",
+          "total": "チェック項目"
+        }
+      },
+      "ring": {
+        "healthScore": "ヘルススコア",
+        "notChecked": "まだ点検していません"
+      },
+      "running": "点検を実行中…",
+      "sanitize": {
+        "autoFixStarted": "OpenCode 自動修正を開始しました",
+        "autoFixing": "自動修正中…",
+        "done": "点検完了",
+        "guarding": "ゲートチェック中…",
+        "inspecting": "品質巡回中…",
+        "loadingRules": "点検ルールを読み込み中…"
+      },
+      "scope": {
+        "inspect": "品質巡回",
+        "item": {
+          "complexity": "コード複雑度/規約",
+          "deps": "依存関係監査",
+          "docs": "ドキュメントの完全性",
+          "nest": "Nest/モジュール規約",
+          "tsType": "TypeScript 型安全性"
+        }
+      },
+      "stageGuard": "· ゲート",
+      "stageInspect": "· 巡回",
+      "toast": {
+        "addProjectFirst": "点検対象のプロジェクトを先に追加してください",
+        "completed": "点検完了: {{total}} 項目のチェック、{{passed}} 項目合格",
+        "copiedIssues": "{{count}} 件の問題をコピーしました。AI に貼り付けて修正できます",
+        "copyFailed": "コピーに失敗しました",
+        "executionFailed": "点検の実行に失敗しました",
+        "failed": "点検の実行に失敗しました: {{error}}",
+        "foundIssues": "点検完了: {{count}} 件の問題を検出しました",
+        "noValidItems": "点検は完了しましたが、有効なチェック項目が実行されませんでした（プロジェクトパスを確認してください）"
+      },
+      "welcome": "CodeShield へようこそ"
+    },
+    "deps": {
+      "checking": "棚卸し中...",
+      "done": "依存関係の棚卸しが完了しました",
+      "ecosystem": "エコシステム",
+      "empty": {
+        "start": "棚卸しを開始",
+        "subtitle": "ロックファイルと依存関係マニフェストを解析し、依存関係グラフを作成して完全性を検証します",
+        "title": "依存関係を棚卸しし、グラフを把握する"
+      },
+      "errorTitle": "棚卸しに失敗しました",
+      "feature": {
+        "graph": {
+          "desc": "直接/推移的依存関係とエッジの関係を一目で把握",
+          "title": "依存関係グラフ"
+        },
+        "license": {
+          "desc": "4 種類のライセンス分類と高リスクリスト",
+          "title": "ライセンスマトリックス"
+        },
+        "lockfile": {
+          "desc": "存在性 / 整合性 / ハッシュ完全性の三重検証",
+          "title": "ロックファイル検証"
+        }
+      },
+      "license": "ライセンスマトリックス",
+      "license.permissive": "寛容なライセンス",
+      "license.risk.high": "高リスク",
+      "license.risk.low": "低リスク",
+      "license.risk.medium": "中リスク",
+      "license.risk.unknown": "リスク不明",
+      "license.strongCopyleft": "強いコピーレフト",
+      "license.unknown": "不明なライセンス",
+      "license.weakCopyleft": "弱いコピーレフト",
+      "licenseHighRisk": "高リスクリスト",
+      "licenseNoRisks": "高リスクのライセンスは見つかりませんでした",
+      "licenseTotal": "ライセンス合計 {{count}} 件",
+      "lockfile": "ロックファイルの状態",
+      "lockfile.consistent": "マニフェストの宣言と一致",
+      "lockfile.integrityFailed": "ハッシュ検証に失敗",
+      "lockfile.integrityVerified": "ハッシュ検証に合格",
+      "lockfile.notConsistent": "マニフェストの宣言と不一致",
+      "lockfile.notPresent": "ロックファイルが存在しない",
+      "lockfile.present": "ロックファイルは存在し、解析可能",
+      "overview": "依存関係の概要",
+      "overviewDirect": "直接依存関係",
+      "overviewEdges": "依存関係エッジ数",
+      "overviewTotal": "依存関係の総数",
+      "overviewTransitive": "推移的依存関係",
+      "rescan": "再棚卸し",
+      "summary": "直接依存 {{direct}} · 推移的依存 {{transitive}} · 依存エッジ {{edges}} 件",
+      "trust": "信頼状態",
+      "trust.compromised": "侵害済み",
+      "trust.suspicious": "疑わしい",
+      "trust.unknown": "不明",
+      "trust.verified": "信頼済み"
+    },
+    "evolve": {
+      "analyze": "アーキテクチャ分析",
+      "archScore": "アーキテクチャ健全性",
+      "empty": {
+        "feature": {
+          "coupling": {
+            "desc": "高結合モジュールと循環依存を識別",
+            "title": "結合度分析"
+          },
+          "directory": {
+            "desc": "パッケージディレクトリの区分と境界の妥当性を評価",
+            "title": "ディレクトリ構造"
+          },
+          "graph": {
+            "desc": "モジュールの参照関係と階層構造を可視化",
+            "title": "依存関係グラフ"
+          },
+          "suggest": {
+            "desc": "アーキテクチャの分割、収束、最適化の方向性を提示",
+            "title": "進化の提案"
+          }
+        },
+        "subtitle": "アーキテクチャ健全性スコア: --",
+        "title": "プロジェクトのアーキテクチャを洞察し、進化の道筋を計画する"
+      },
+      "emptyAnalyzing": "プロジェクトのアーキテクチャを分析中...",
+      "emptyDone": "分析が完了しました。調整が必要なルールはありません",
+      "emptyHint": "ゲートチェックまたはセンチネル監視で誤検出問題をフィードバックとしてマークすると、進化エンジンがルールの重みを自動調整し、最適化の提案を生成します。",
+      "header": {
+        "count": "最適化の提案 {{suggestions}} 件 · 追跡ルール {{weights}} 件"
+      },
+      "stats": {
+        "adjusted": "重み調整済み",
+        "highFp": "誤検出が多い",
+        "suggestions": "最適化の提案",
+        "weights": "追跡ルール"
+      },
+      "suggestion": {
+        "confidence": "信頼度: {{confidence}}%"
+      },
+      "title": "進化エンジン",
+      "weight": {
+        "fpRate": "誤検出率: {{rate}}%",
+        "samples": "サンプル: {{samples}}"
+      },
+      "weights": "ルールの重み"
+    },
+    "garbage": {
+      "cleanButton": "ワンクリックでクリーンアップ",
+      "cleanButtonCount": "ワンクリックでクリーンアップ ({{count}})",
+      "cleanFailed": "クリーンアップに失敗しました。もう一度お試しください",
+      "cleanFailedCount": "{{count}} 項目をクリーンアップできませんでした（パス範囲外 / ファイル使用中など）",
+      "cleaned": "{{count}} 項目をクリーンアップしました · {{size}} 解放",
+      "cleaning": "クリーンアップ中...",
+      "dependencyHint": "未使用の依存関係は自動削除されません。参照がないことを確認した上で package.json から手動で削除できます",
+      "done": "ゴミ清掃が完了しました",
+      "empty": {
+        "subtitle": "未使用ファイル、冗長な依存関係、デッドコードをスキャン",
+        "title": "不要なファイルをクリーンアップし、プロジェクトを軽くする"
+      },
+      "emptyList": "プロジェクトはきれいで、クリーンアップ対象のゴミはありません",
+      "feature": {
+        "deadCode": {
+          "desc": "到達不能なコード分岐を検出"
+        },
+        "duplicateCode": {
+          "desc": "統合可能な重複実装を特定"
+        },
+        "unusedDependency": {
+          "desc": "マニフェスト内で参照されていない依存パッケージを見つける"
+        },
+        "unusedFile": {
+          "desc": "未参照のリソースと残存ファイルを識別"
+        }
+      },
+      "rescan": "再スキャン",
+      "restore": "復元",
+      "restoreFailed": "復元に失敗しました。もう一度お試しください",
+      "restoreFailedCount": "{{count}} 項目の復元に失敗しました（元の場所にファイルが既に存在する可能性があります）",
+      "restored": "{{count}} 項目を復元しました · {{size}}。リストを更新しました",
+      "restoring": "復元中...",
+      "scanning": "スキャン中...",
+      "selectAll": "すべて選択",
+      "selectedCount": "{{count}} 項目を選択中",
+      "startScan": "スキャンを開始",
+      "stats": {
+        "freeable": "解放可能な容量",
+        "items": "ゴミ項目"
+      },
+      "summary": "ゴミ {{count}} 項目 · 解放可能 {{size}}",
+      "type": {
+        "deadCode": "デッドコード",
+        "duplicateCode": "重複コード",
+        "unusedDependency": "未使用の依存関係",
+        "unusedFile": "不要なファイル"
+      }
+    },
+    "guard": {
+      "banner": {
+        "fail": "ゲートでブロック · 不合格の項目があります",
+        "pass": "ゲート正常 · ガード中",
+        "warn": "警告あり · 注意が必要"
+      },
+      "blockedCount": "ブロック {{count}}",
+      "blockingCount": "{{count}} 回のブロック",
+      "checkCount": "チェック {{count}} 項目",
+      "copiedAll": "全 {{count}} 件の問題をコピーしました。AI に貼り付けて修正できます",
+      "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
+      "duration": "スキャン所要時間 {{duration}}ms",
+      "falsePositiveCount": "誤検出フィードバック {{count}} 件",
+      "falsePositiveSubmitted": "誤検出フィードバックを送信しました。ルールの調整に使用されます",
+      "history": {
+        "subtitle": "hook 自動トリガー + 手動スキャンを記録",
+        "title": "最近のブロック記録"
+      },
+      "idleSubtitle": "コードの変更をリアルタイムでガードし、コミット/プッシュ/CI の関所で自動ブロック",
+      "lastBlockAt": "直近 {{time}}",
+      "lastScan": "前回スキャン · {{time}}",
+      "level": {
+        "L3": "CI ゲート"
+      },
+      "markFalsePositive": "誤検出としてマーク",
+      "reportFailed": "送信に失敗しました",
+      "scan": "今すぐスキャン",
+      "scanning": "スキャン中...",
+      "source": "ゲート・予防",
+      "stats": {
+        "blocked": "ブロック",
+        "passed": "合格",
+        "totalChecks": "チェック項目",
+        "warnings": "警告"
+      },
+      "status": {
+        "fail": "ブロック",
+        "idle": "未トリガー",
+        "pass": "合格",
+        "warn": "警告"
+      },
+      "statusShort": {
+        "fail": "ゲートブロック",
+        "idle": "ガード中",
+        "pass": "ゲート正常",
+        "warn": "警告あり"
+      },
+      "table": {
+        "colCheck": "チェック項目",
+        "colDetail": "詳細",
+        "colResult": "結果",
+        "colSeverity": "深刻度"
+      },
+      "trigger": {
+        "manual": "手動スキャン",
+        "preCommit": "コミットゲート",
+        "prePush": "プッシュゲート"
+      },
+      "warningCount": "警告 {{count}}"
+    },
+    "inspect": {
+      "checksPassed": "チェックに合格",
+      "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
+      "done": "巡回完了",
+      "empty": {
+        "subtitle": "毎日 0 時以降にビルド成果物、License、依存関係、ゴミ清掃を自動巡回します。「すぐ巡回」をクリックしても実行できます",
+        "title": "ビルド成果物をチェックし、納品品質を確保する"
+      },
+      "feature": {
+        "build": {
+          "desc": "dist 成果物の規約、完全性、出力ディレクトリを検証",
+          "title": "ビルド成果物チェック"
+        },
+        "dependency": {
+          "desc": "冗長な依存関係、未使用の依存関係、バージョン衝突を検出",
+          "title": "依存関係分析"
+        },
+        "garbage": {
+          "desc": "一時ファイル、キャッシュ、不要な成果物を発見してクリーンアップ",
+          "title": "ゴミ清掃"
+        },
+        "license": {
+          "desc": "オープンソースライセンスの互換性とコンプライアンスリスクを識別",
+          "title": "License スキャン"
+        }
+      },
+      "passedCount": "{{passed}}/{{total}} 項目合格",
+      "scanNow": "すぐ巡回",
+      "scanning": "巡回中...",
+      "source": "巡回",
+      "status": {
+        "fail": "失敗",
+        "pass": "合格",
+        "warn": "警告"
+      }
+    },
+    "performance": {
+      "autoFixable": "自動修正可能",
+      "copyAllHint": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
+      "detecting": "検出中...",
+      "header": {
+        "issueCount": "パフォーマンス問題 {{count}} 箇所",
+        "title": "パフォーマンス検出が完了しました"
+      },
+      "noIssues": "パフォーマンス問題は見つかりませんでした",
+      "rescan": "再検出",
+      "scanning": "パフォーマンス検出中...",
+      "score": {
+        "fixable": "修正可能 {{count}}",
+        "health": "パフォーマンス健全性"
+      },
+      "severity": {
+        "high": "優先度高",
+        "low": "優先度低",
+        "medium": "優先度中"
+      },
+      "shell": {
+        "featureComplexity": {
+          "desc": "非効率なループ、ネストした走査、冗長な計算を検出",
+          "title": "実行時複雑度"
+        },
+        "featureModernApi": {
+          "desc": ".at、spread などの高性能な書き方を推奨し、旧 API を代替",
+          "title": "モダン API"
+        },
+        "featureReDoS": {
+          "desc": "正規表現の破滅的バックトラッキングのリスクを識別",
+          "title": "ReDoS 検出"
+        },
+        "featureTimer": {
+          "desc": "setTimeout / setInterval の乱用とメモリリークを検出",
+          "title": "タイマー最適化"
+        },
+        "start": "パフォーマンス検出を開始",
+        "subtitle": "非効率な配列走査、正規表現の繰り返しコンパイル、冗長なアロケーションなどのパフォーマンス問題をスキャン",
+        "title": "実行時のパフォーマンスアンチパターンを検出し、実行効率を最適化"
+      },
+      "source": "パフォーマンス",
+      "suggestion": "提案: {{suggestion}}"
+    },
+    "refactor": {
+      "addProjectFirst": "先にダッシュボードでプロジェクトを追加してください",
+      "groupedIssues": "リファクタリング問題（タイプ別グループ）",
+      "groupsSummary": "{{groups}} 種類 · {{total}} 箇所",
+      "header": {
+        "lastAutoCheck": " · 前回の自動チェック {{time}}",
+        "summary": "コードスメル {{totalSmells}} 箇所 · リファクタリング対象ファイル {{files}} 個",
+        "title": "リファクタリング分析が完了しました"
+      },
+      "noSmells": "✓ コードスメルは検出されませんでした",
+      "scanFailed": "スキャンに失敗しました: {{message}}",
+      "scanNow": "すぐチェック",
+      "scanning": "スキャン中...",
+      "scanningEllipsis": "リファクタリングスキャン中…",
+      "severity": {
+        "error": "ブロック",
+        "warning": "推奨"
+      },
+      "shell": {
+        "featureAutoFix": {
+          "desc": "推奨されるリファクタリング案をワンクリックで適用し、技術負債を削減",
+          "title": "自動修正"
+        },
+        "featureDaily": {
+          "desc": "毎日 0 時以降に自動スキャンし、コード品質を継続的に追跡",
+          "title": "毎日の自動チェック"
+        },
+        "featureGrouping": {
+          "desc": "カテゴリ別にさまざまなリファクタリング問題と修正提案を確認",
+          "title": "ルールグループ化"
+        },
+        "featureSmell": {
+          "desc": "重複コード、長すぎる関数、高い循環的複雑度などの問題を検出",
+          "title": "コードスメル"
+        },
+        "subtitle": "毎日、コード重複、コードスメル、長すぎる関数などを自動チェックし、推奨されるリファクタリング案をワンクリックで適用",
+        "title": "コード構造を最適化し、技術負債を解消する"
+      },
+      "smell": {
+        "callbackHell": "コールバック地獄",
+        "dataClass": "データクラス",
+        "dataClumps": "データの群れ",
+        "deepNesting": "深いネスト",
+        "duplicatedCode": "重複コード",
+        "featureEnvy": "特権欲求",
+        "godObject": "神クラス",
+        "inappropriateIntimacy": "不適切な親密さ",
+        "largeClass": "神クラス/巨大クラス",
+        "lazyClass": "怠惰なクラス",
+        "longMethod": "巨大関数",
+        "longParameterList": "長すぎるパラメータリスト",
+        "messageChains": "メッセージチェーン",
+        "middleMan": "中間者",
+        "mixedResponsibilities": "複数責務の混在",
+        "oversizedComponent": "巨大コンポーネント",
+        "oversizedFile": "巨大ファイル",
+        "primitiveObsession": "プリミティブ型偏執",
+        "refusedBequest": "遺産の拒否",
+        "shotgunSurgery": "ショットガン手術",
+        "switchStatement": "Switch 文"
+      },
+      "smellCount": "{{count}} 箇所",
+      "source": "リファクタリング",
+      "stats": {
+        "files": "リファクタリング対象ファイル",
+        "highPriority": "優先度高",
+        "smells": "コードスメル"
+      },
+      "suggestion": "提案: {{suggestion}}"
+    },
+    "reports": {
+      "empty": {
+        "feature": {
+          "email": {
+            "desc": "レポートをチームメンバーにワンクリックで送信",
+            "title": "メール送信"
+          },
+          "pdf": {
+            "desc": "共有可能なプロフェッショナルな品質レポートを生成",
+            "title": "PDF エクスポート"
+          },
+          "scoring": {
+            "desc": "セキュリティ、パフォーマンス、品質、アーキテクチャの健全性スコアを集計",
+            "title": "多次元スコアリング"
+          },
+          "trend": {
+            "desc": "各スキャンのスコア変化の曲線を追跡",
+            "title": "トレンド比較"
+          }
+        },
+        "subtitle": "{{count}} 件のレポートを生成済み。最終更新: {{date}}",
+        "title": "多次元分析レポートで、意思決定の根拠に"
+      },
+      "generate": "レポートを生成",
+      "header": {
+        "count": "レポート合計 {{count}} 件 · 最終更新: {{date}}",
+        "generate": "📊 レポートを生成"
+      },
+      "scoreLabel": {
+        "danger": "危険",
+        "excellent": "優秀",
+        "good": "良好",
+        "needsImprovement": "改善が必要"
+      },
+      "table": {
+        "abnormal": "異常",
+        "col": {
+          "date": "日付",
+          "dimension": "ディメンション",
+          "score": "スコア",
+          "status": "ステータス",
+          "summary": "概要"
+        },
+        "healthy": "健全"
+      },
+      "title": "分析レポート"
+    },
+    "security": {
+      "checking": "チェック中...",
+      "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
+      "done": "セキュリティチェックが完了しました",
+      "empty": {
+        "subtitle": "0 個のファイルをチェックし、高リスク脆弱性 0 件を検出しました",
+        "title": "脆弱性を深くスキャンし、セキュリティ上の問題を修正する"
+      },
+      "feature": {
+        "dependency": {
+          "desc": "既知の CVE を持つ古い、または安全でない依存関係を識別",
+          "title": "依存関係チェック"
+        },
+        "malware": {
+          "desc": "リバースシェル、バックドア、サプライチェーン汚染などの悪意のあるコードの特徴をスキャン"
+        },
+        "standard": {
+          "desc": "安全なコーディング規約とコンプライアンスのベースラインを検証",
+          "title": "規約チェック"
+        },
+        "vuln": {
+          "desc": "コードインジェクション、XSS、SSRF などの一般的なセキュリティ脆弱性を検出"
+        }
+      },
+      "fixAll": "ワンクリックで修正",
+      "lowRisk": "低リスク {{count}}",
+      "malware": {
+        "backdoor": "バックドア",
+        "cryptoRansomware": "ランサムウェア",
+        "dataExfiltration": "データ流出",
+        "privilegeEscalation": "権限昇格",
+        "reverseShell": "リバースシェル",
+        "supplyChain": "サプライチェーン汚染",
+        "suspiciousBehavior": "不審な挙動"
+      },
+      "malwareCount": "悪意のあるコード {{count}}",
+      "noFindings": "セキュリティ問題は見つかりませんでした",
+      "noMalware": "悪意のあるコードは見つかりませんでした",
+      "recommendation": "提案: {{recommendation}}",
+      "rescan": "再チェック",
+      "scoreLabel": "セキュリティスコア",
+      "source": "セキュリティ",
+      "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所 · ゴミ {{garbage}} 件",
+      "tab": {
+        "malware": "ウイルス駆除",
+        "vuln": "脆弱性スキャン"
+      }
+    },
+    "sentinel": {
+      "aiFixSource": "センチネル・監視",
+      "copyAllHint": "イベント合計 {{count}} 件。ワンクリックですべてコピーして AI に修正させられます",
+      "falsePositiveSubmitted": "誤検出フィードバックを送信しました。ルールの調整に使用されます",
+      "headerSummary": "イベント監視 {{count}} 件 · 未処理 {{activeCount}} 件",
+      "markFalsePositive": "誤検出としてマーク",
+      "occurrenceCount": "発生 {{count}} 回",
+      "refreshing": "更新中...",
+      "shell": {
+        "buttonRunning": "監視実行中",
+        "buttonStart": "監視を開始",
+        "featureAlert": {
+          "desc": "高リスク / Critical のイベントで通知アラートを発火",
+          "title": "自動アラート"
+        },
+        "featureHistory": {
+          "desc": "過去の異常の詳細と対応記録を確認",
+          "title": "履歴の遡及"
+        },
+        "featureRealtime": {
+          "desc": "コードの変更を継続的に監視し、異常イベントを即時報告",
+          "title": "リアルタイム監視"
+        },
+        "featureScope": {
+          "desc": "監視するファイル、ディレクトリ、ルール範囲をカスタマイズ",
+          "title": "監視範囲"
+        },
+        "subtitleIdle": "現在 0 個のファイルを監視しています。下のボタンをクリックして開始してください",
+        "subtitleMonitoring": "監視中（自動、7×24）——現在のプロジェクトをガードしています",
+        "titleIdle": "24 時間途切れのない監視で、異常を逃さない",
+        "titleMonitoring": "監視を開始しました。異常を逃しません"
+      },
+      "source": {
+        "backend": "バックエンド",
+        "frontend": "フロントエンド",
+        "infrastructure": "インフラストラクチャ",
+        "middleware": "ミドルウェア"
+      },
+      "stackLabel": "スタック",
+      "stats": {
+        "active": "未処理",
+        "falsePositive": "誤検出フィードバック",
+        "total": "総イベント"
+      },
+      "submitFailed": "送信に失敗しました",
+      "type": {
+        "crash": "クラッシュ",
+        "frontendError": "フロントエンドエラー",
+        "httpError": "HTTP エラー",
+        "memoryLeak": "メモリリーク",
+        "performanceDegradation": "パフォーマンス低下",
+        "runtimeException": "実行時例外",
+        "securityIncident": "セキュリティインシデント",
+        "timeout": "タイムアウト",
+        "whiteScreen": "白画面"
+      }
+    },
+    "techdebt": {
+      "byCategory": "負債の構成",
+      "byModule": "負債の分布",
+      "category": {
+        "architecture": "アーキテクチャ問題",
+        "dependency": "依存関係問題",
+        "duplication": "重複コード",
+        "quality": "品質問題",
+        "security": "セキュリティ問題"
+      },
+      "categoryDesc": {
+        "security": "セキュリティ脆弱性 — 未処理の例外、安全でない設定など、コードに潜むセキュリティリスク",
+        "architecture": "アーキテクチャ問題 — 循環依存、高いモジュール結合度など、不適切なコード構造",
+        "quality": "コード品質 — 過度に長い関数、不適切な命名など、コーディング規範に準拠していないコード",
+        "duplication": "重複コード — 同一または類似のコードスニペットが保守コストを増加させる",
+        "dependency": "依存関係問題 — 古くなった、またはリスクのある依存パッケージ"
+      },
+      "categoryTotal": "問題合計 {{count}} 件",
+      "categoryWeight": "重み {{weight}}%",
+      "checking": "棚卸し中...",
+      "debtIndex": "負債指数",
+      "done": "技術負債ダッシュボード",
+      "intro": {
+        "title": "負債構成ガイド"
+      },
+      "empty": {
+        "start": "棚卸しを開始",
+        "subtitle": "スキャン問題とモジュールのホットネスを分析し、利息と元本を推定して、ROI 順に返済の提案を提示",
+        "title": "技術負債を定量化し、スコアをアクションに変える"
+      },
+      "errorTitle": "棚卸しに失敗しました",
+      "factor": {
+        "density": "密度",
+        "exposure": "エクスポージャー",
+        "hotness": "ホットネス",
+        "severity": "深刻度"
+      },
+      "feature": {
+        "action": {
+          "desc": "利息 ÷ 元本で並べ替え、高 ROI のアクションに集中",
+          "title": "返済の提案"
+        },
+        "composition": {
+          "desc": "セキュリティ、アーキテクチャ、品質、重複、依存の5種類の負債ガイド",
+          "title": "負債の構成"
+        },
+        "index": {
+          "desc": "技術負債の総負担を 0-100 で定量化",
+          "title": "負債指数"
+        },
+        "module": {
+          "desc": "モジュールとカテゴリ別に負債のホットスポットを特定",
+          "title": "負債の分布"
+        }
+      },
+      "interestBreakdown": "利息の内訳",
+      "interestScore": "利息 {{score}}",
+      "moduleHint": "モジュール名 · 割合 · 変更回数",
+      "moduleHotness": "{{count}} 回の変更",
+      "noDebt": "技術負債は見つかりませんでした。この調子を維持してください",
+      "overview": "負債の概要",
+      "overviewActions": "返済の提案",
+      "overviewCategories": "負債カテゴリ",
+      "overviewModules": "負債モジュール",
+      "principalEstimate": "元本約 {{value}} 人日（推定）",
+      "recommended": "推奨",
+      "rescan": "再棚卸し",
+      "roi": "ROI {{roi}}",
+      "status": {
+        "dismissed": "無視済み",
+        "inProgress": "進行中",
+        "pending": "未処理",
+        "planned": "計画済み",
+        "repaid": "返済済み"
+      },
+      "source": "技術負債",
+      "summary": "負債指数 {{index}} · 返済の提案 {{actions}} 件",
+      "topActions": "Top 提案リスト",
+      "topActionsHint": "利息 ÷ 元本で並べ替え",
+      "trend": {
+        "better": "前回比で改善 {{delta}}",
+        "flat": "前回と横ばい",
+        "period": {
+          "month": "直近 1 ヶ月",
+          "quarter": "直近 1 四半期",
+          "week": "直近 1 週間"
+        },
+        "worse": "前回比で悪化 {{delta}}"
+      },
+      "trendLabel": "負債のトレンド"
+    },
+    "welcome": {
+      "addProject": "+ プロジェクトを追加してガードを開始",
+      "axis": {
+        "governance": "ガバナンス",
+        "ops": "運用",
+        "security": "セキュリティ"
+      },
+      "brand": "CodeShield",
+      "cloudOn": "クラウドブレインが有効になりました",
+      "engineOn": "スマートエンジンが有効になりました",
+      "sloganTitle": "コード界のスマートガーディアン",
+      "stat": {
+        "healthScore": "健全性スコア",
+        "protectedProjects": "ガード中プロジェクト",
+        "times": "{{count}} 回",
+        "totalBlocked": "累計ブロック"
+      }
+    }
+  },
+  "pipeline": {
+    "autofix": {
+      "started": "問題を検出し、OpenCode 自動修正を開始しました（{{errors}} error / {{warnings}} warning）"
+    },
+    "complete": {
+      "done": "点検完了",
+      "foundIssues": "点検で {{count}} 件の問題を検出しました",
+      "total": "点検完了: {{count}} 項目のチェック"
+    },
+    "exitError": {
+      "logHintPrefix": "；子プロセスのログ: ",
+      "message": "エンジン子プロセスが異常終了しました (code={{code}}, signal={{signal}})",
+      "stageHintPrefix": "、最終進捗: "
+    },
+    "garbage": {
+      "cleaning": "ゴミファイルをクリーンアップ中…",
+      "done": "クリーンアップ完了: {{count}} 項目",
+      "restoreDone": "復元完了: {{count}} 項目",
+      "restoring": "クリーンアップしたファイルを復元中…"
+    },
+    "guard": {
+      "failed": "ゲートに合格しませんでした: {{count}} 項目の処理が必要です",
+      "failedBrief": "ゲートに合格しませんでした: {{count}} 項目",
+      "jobDone": "ゲートスキャン完了",
+      "jobScanning": "ゲートスキャン中…",
+      "scanning": "ゲートチェック中…",
+      "sopScanning": "ゲートチェック中（機密情報 / ESLint / アーキテクチャ / セキュリティ）…"
+    },
+    "inspect": {
+      "fullScanning": "品質巡回中…",
+      "jobDone": "巡回完了",
+      "jobScanning": "スマート巡回中…",
+      "sopScanning": "品質巡回中（型安全性 / 依存関係 / 規約）…"
+    },
+    "jobTimeout": "操作がタイムアウトしました（{{timeoutMs}}ms）",
+    "loadingRules": "点検ルールを読み込み中…",
+    "performance": {
+      "done": "パフォーマンス検出完了: {{count}} 件のパフォーマンス問題を検出しました",
+      "loadingRules": "パフォーマンス検出ルールを読み込み中…",
+      "scanning": "パフォーマンス巡回中（ESLint パフォーマンスルール / ReDoS）…"
+    },
+    "refactor": {
+      "analyzing": "リファクタリングスメル分析中…",
+      "collecting": "ソースコードファイルを収集中…",
+      "done": "リファクタリング分析完了: {{count}} 箇所のスメル"
+    },
+    "report": {
+      "executionError": "実行エラー",
+      "failed": "不合格",
+      "scopeGuard": "ゲートチェック",
+      "scopeInspect": "品質巡回",
+      "unknownRule": "不明なルール"
+    },
+    "security": {
+      "done": "セキュリティスキャン完了",
+      "scanning": "セキュリティスキャン中…"
+    },
+    "shuttingDown": "アプリケーションを終了しています",
+    "workerTimeout": "子プロセスの起動がタイムアウトしました",
+    "workerUnavailable": "子プロセスが利用できません"
+  },
+  "reporter": {
+    "andMore": "... ほか {{count}} 項目",
+    "blocking": "ブロック: {{value}}",
+    "blockingDryRun": "ドライラン",
+    "blockingNo": "いいえ",
+    "blockingYes": "はい",
+    "category": "カテゴリ",
+    "checkCount": "チェック {{count}} 項目",
+    "criticalFiles": "要注意ファイル: {{count}}",
+    "criticalFilesTitle": "注意が必要なファイル:",
+    "duration": "所要時間: {{duration}}ms",
+    "engineDryRun": "◐ エンジンチェック完了（dry-run は報告のみでブロックしない）",
+    "engineFailed": "✗ エンジンチェック失敗",
+    "enginePassed": "✓ エンジンチェック合格",
+    "error": "エラー: {{error}}",
+    "errorRules": "エラールール:",
+    "errors": "エラー",
+    "failed": "失敗",
+    "failedRules": "失敗ルール:",
+    "filesInvolved": "関連ファイル: {{count}} 個",
+    "garbage": "ゴミファイル",
+    "guardSection": "Guard ゲートチェック",
+    "inspectSection": "Inspect 巡回",
+    "issueCount": "{{count}} 件の問題",
+    "issuesCount": "（{{count}} 件の問題）",
+    "line": "（{{line}} 行目）",
+    "malware": "悪意のあるコード",
+    "needsImmediateAction": "至急対応が必要: {{count}}",
+    "noMatchingRules": "（一致するルールなし）",
+    "noSmells": "✓ コードスメルは検出されませんでした",
+    "notCalculated": "  （未計算）",
+    "notExecuted": "  （未実行）",
+    "overall": "総合",
+    "passed": "合格",
+    "passedRules": "合格ルール:",
+    "pipelineFailed": "✗ パイプライン失敗",
+    "pipelinePassed": "✓ パイプライン合格",
+    "profileTitle": "プロジェクト識別",
+    "refactorSection": "Refactor リファクタリング検出",
+    "reportTitle": "CodeShield — コード品質管理レポート",
+    "ruleCount": "ルール {{count}} 件",
+    "ruleEngineTitle": "SOP ルールエンジンレポート",
+    "scanCount": "スキャン: {{scanned}}/{{files}} ファイル",
+    "score": "スコア: {{score}}（{{grade}}）",
+    "scoreSection": "健全性スコア",
+    "securityScore": "セキュリティスコア",
+    "securitySection": "セキュリティスキャン",
+    "severity": "深刻度",
+    "skipped": "スキップ",
+    "smellCount": "コードスメル {{count}} 個",
+    "smellSummary": "スメル {{count}} 個、保守性スコア: {{score}}",
+    "stage": "フェーズ: {{stage}}",
+    "status": "ステータス: {{status}}",
+    "statusFailed": "❌ 失敗",
+    "statusPassed": "✅ 合格",
+    "suggestion": "提案:",
+    "summary": "サマリー",
+    "time": "時間: {{timestamp}}",
+    "timestamp": "時間: {{timestamp}}",
+    "vulnerabilities": "脆弱性"
+  },
+  "score": {
+    "gradeBadge": "{{letter}}級 · {{grade}}",
+    "gradeExcellent": "優秀",
+    "gradeGood": "良好",
+    "gradePass": "合格",
+    "gradeWarning": "警告"
+  },
+  "server": {
+    "bootstrap": {
+      "running": "CodeShield サーバーが http://localhost:{{port}} で稼働中です"
+    },
+    "pipeline": {
+      "scoreRecordFailed": "健全性スコアの記録に失敗しました: {{error}}"
+    },
+    "scoring": {
+      "persistenceEnabled": "健全性スコアの永続化が有効です: {{dbPath}}",
+      "persistenceUnavailable": "健全性スコアの永続化が利用できないため、メモリモードで実行します: {{error}}",
+      "scoreRecorded": "健全性スコアを記録しました: {{score}}（{{grade}}）"
+    }
+  },
+  "severity": {
+    "critical": "重大",
+    "high": "高",
+    "info": "情報",
+    "low": "低",
+    "medium": "中"
+  },
+  "status": {
+    "assigned": "処理中",
+    "deployed": "デプロイ済み",
+    "detected": "検出済み",
+    "failed": "検証失敗",
+    "fixing": "修正中",
+    "manual_taken_over": "手動対応",
+    "merged": "マージ済み",
+    "passed": "解決済み",
+    "pr_opened": "PR提出済み",
+    "rolled_back": "ロールバック済み",
+    "validating": "検証中"
+  },
+  "task": {
+    "cancelled": "タスクはキャンセルされました",
+    "executionFailed": "タスクの実行に失敗しました",
+    "kind": {
+      "garbageClean": "クリーンアップ",
+      "garbageRestore": "復元",
+      "guard": "ゲートスキャン",
+      "inspect": "巡回",
+      "performance": "検出",
+      "pipeline": "点検",
+      "refactor": "リファクタリングスキャン",
+      "security": "チェック"
+    },
+    "notCompleted": "タスクは未完了です",
+    "notFound": "タスクが存在しません",
+    "queuedLabel": "待機中（{{position}} 番目）...",
+    "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
+    "schedulerUnavailable": "タスクスケジューラが利用できません（デスクトップ環境以外）"
+  },
+  "toast": {
+    "aiToolDisabled": "OpenCode 統合を無効にしました（プロジェクト内の統合ファイルは保持されます）",
+    "aiToolEnabledNoProjects": "OpenCode 統合を有効にしました（プロジェクト追加後に設定を自動的に書き込みます）",
+    "aiToolEnabledWritten": "OpenCode 統合を有効にし、{{written}}/{{total}} プロジェクトに書き込みました",
+    "aiToolSaveFailed": "AI ツール設定の保存に失敗しました",
+    "copiedToAi": "問題をコピーしました。AI に貼り付けて修正できます",
+    "copyAllCopiedToAi": "全 {{count}} 件の問題をコピーしました。AI に貼り付けて修正できます",
+    "copyAllManualTrae": "全 {{count}} 件の問題をコピーしました。Trae に手動で貼り付けてください",
+    "copyAllOpenedTrae": "全 {{count}} 件の問題をコピーし、Trae を開きました。貼り付けてください",
+    "copyFailed": "コピーに失敗しました",
+    "copyFixManualTrae": "修正プロンプトをコピーしました。Trae に手動で貼り付けてください",
+    "copyFixOpenedTrae": "修正プロンプトをコピーし、Trae を開きました。貼り付けてください",
+    "desktopOnlyFolderPicker": "デスクトップ版で実行してください。ブラウザではフォルダを選択できません",
+    "issuesCopied": "問題をコピーしました。AI に貼り付けて修正できます",
+    "projectAdded": "プロジェクト「{{projectName}}」を追加しました。ガードを開始します",
+    "projectRemoved": "プロジェクト「{{projectName}}」を削除しました"
+  }
+}

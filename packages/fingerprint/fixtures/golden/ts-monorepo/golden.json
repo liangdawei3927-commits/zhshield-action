@@ -1,0 +1,4 @@
+[
+  { "path": ".", "language": "typescript", "framework": "Next.js" },
+  { "path": "packages/core", "language": "typescript", "framework": "React" }
+]

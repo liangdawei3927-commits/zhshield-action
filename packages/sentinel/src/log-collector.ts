@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { EventCenter } from './event-center';
-import { locateCrash, type SourceLocation } from './stack-locator';
+import { locateCrash } from './stack-locator';
+import type { SourceLocation } from './stack-locator';
 
 export interface LogPattern {
   name: string;
@@ -12,15 +13,9 @@ export interface LogPattern {
 export interface LogCollectorConfig {
   projectId: string;
   logPaths: string[];
+  projectPath?: string;
   patterns?: LogPattern[];
   pollIntervalMs?: number;
-  /** 项目根目录：用于 sourcemap 反混淆与源码片段读取 */
-  projectPath?: string;
-}
-
-interface LogTarget {
-  projectId: string;
-  logPath: string;
 }
 
 const DEFAULT_PATTERNS: LogPattern[] = [
@@ -34,8 +29,16 @@ const DEFAULT_PATTERNS: LogPattern[] = [
   { name: 'refused', regex: /ECONNREFUSED|connection refused|ConnectionRefused/i, severity: 'p2' },
 ];
 
-/** 堆栈帧行：`    at function (file:line:col)` */
-const STACK_FRAME_LINE_RE = /^\s*at\s+/i;
+interface PendingCrash {
+  projectId: string;
+  logPath: string;
+  projectPath?: string;
+  line: string;
+  pattern: LogPattern;
+  stackLines: string[];
+}
+
+const STACK_FRAME_RE = /^\s+at\s/;
 
 export class LogCollector {
   private eventCenter: EventCenter;
@@ -43,7 +46,8 @@ export class LogCollector {
   private timers = new Map<string, ReturnType<typeof setInterval>>();
   private running = false;
   private patterns: LogPattern[];
-  private projectPath: string | null = null;
+  private pendingCrash: PendingCrash | null = null;
+  private logProjects = new Map<string, string>();
 
   constructor(eventCenter: EventCenter, customPatterns?: LogPattern[]) {
     this.eventCenter = eventCenter;
@@ -52,24 +56,24 @@ export class LogCollector {
 
   start(config: LogCollectorConfig): void {
     this.running = true;
-    this.projectPath = config.projectPath ?? null;
     const interval = config.pollIntervalMs || 3000;
 
     for (const logPath of config.logPaths) {
-      if (!this.startLogPath({ projectId: config.projectId, logPath }, interval)) {
+      if (!this.startLogPath(config, logPath, interval)) {
         console.warn(`[LogCollector] Log path does not exist, skipping: ${logPath}`);
       }
     }
   }
 
   /** 初始化单个日志文件的监听（记录大小并抓取初始尾部） */
-  private startLogPath(target: LogTarget, intervalMs: number): boolean {
-    if (!fs.existsSync(target.logPath)) return false;
+  private startLogPath(config: LogCollectorConfig, logPath: string, intervalMs: number): boolean {
+    if (!fs.existsSync(logPath)) return false;
 
-    const stat = fs.statSync(target.logPath);
-    this.fileSizes.set(target.logPath, stat.size);
-    this.tailInitial(target);
-    this.watchLog(target, intervalMs);
+    const stat = fs.statSync(logPath);
+    this.fileSizes.set(logPath, stat.size);
+    if (config.projectPath) this.logProjects.set(logPath, config.projectPath);
+    this.tailInitial(config.projectId, logPath);
+    this.watchLog(config.projectId, logPath, intervalMs);
     return true;
   }
 
@@ -82,64 +86,52 @@ export class LogCollector {
     this.fileSizes.clear();
   }
 
-  private watchLog(target: LogTarget, intervalMs: number): void {
+  private watchLog(projectId: string, logPath: string, intervalMs: number): void {
     const timer = setInterval(() => {
       if (!this.running) return;
-      this.tailNew(target);
+      this.tailNew(projectId, logPath);
     }, intervalMs);
-    this.timers.set(target.logPath, timer);
+    this.timers.set(logPath, timer);
   }
 
-  private tailInitial(target: LogTarget): void {
+  private tailInitial(projectId: string, logPath: string): void {
     try {
-      const content = fs.readFileSync(target.logPath, 'utf-8');
+      const content = fs.readFileSync(logPath, 'utf-8');
       const lines = content.split('\n');
       // Only scan last 200 lines on initial load to avoid flooding
-      this.scanLines(target, lines.slice(-200));
+      const tailLines = lines.slice(-200);
+      for (const line of tailLines) {
+        this.checkLine(projectId, logPath, line);
+      }
+      this.flushPendingCrash();
     } catch {
       // File may be binary or locked
     }
   }
 
-  private tailNew(target: LogTarget): void {
-    const currentSize = this.readCurrentSize(target.logPath);
-    if (currentSize === null) return;
-
-    this.processSizeDelta(target, currentSize);
-  }
-
-  private processSizeDelta(target: LogTarget, currentSize: number): void {
-    const previousSize = this.fileSizes.get(target.logPath) || 0;
-
-    if (currentSize < previousSize) {
-      this.handleLogRotation(target, currentSize);
-      return;
-    }
-
-    if (currentSize === previousSize) return;
-
-    this.consumeNewBytes(target, previousSize, currentSize);
-  }
-
-  private readCurrentSize(logPath: string): number | null {
+  private tailNew(projectId: string, logPath: string): void {
     try {
-      return fs.statSync(logPath).size;
+      const stat = fs.statSync(logPath);
+      const previousSize = this.fileSizes.get(logPath) || 0;
+      const currentSize = stat.size;
+
+      if (currentSize < previousSize) {
+        // File was rotated or truncated
+        this.fileSizes.set(logPath, currentSize);
+        this.tailInitial(projectId, logPath);
+        return;
+      }
+
+      if (currentSize === previousSize) return;
+
+      const content = this.readNewBytes(logPath, previousSize, currentSize);
+      if (content === null) return;
+
+      this.processLines(projectId, logPath, content);
+      this.fileSizes.set(logPath, currentSize);
     } catch {
       // File may be temporarily inaccessible
-      return null;
     }
-  }
-
-  private handleLogRotation(target: LogTarget, currentSize: number): void {
-    this.fileSizes.set(target.logPath, currentSize);
-    this.tailInitial(target);
-  }
-
-  private consumeNewBytes(target: LogTarget, previousSize: number, currentSize: number): void {
-    const content = this.readNewBytes(target.logPath, previousSize, currentSize);
-    if (content === null) return;
-    this.processLines(target, content);
-    this.fileSizes.set(target.logPath, currentSize);
   }
 
   /** 读取自上次大小以来的新字节（上限 1MB） */
@@ -160,41 +152,51 @@ export class LogCollector {
     }
   }
 
-  private processLines(target: LogTarget, content: string): void {
-    this.scanLines(target, content.split('\n'));
+  private processLines(projectId: string, logPath: string, content: string): void {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      this.checkLine(projectId, logPath, line);
+    }
+    this.flushPendingCrash();
   }
 
-  private scanLines(target: LogTarget, lines: string[]): void {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
+  private checkLine(projectId: string, logPath: string, line: string): void {
+    if (!line.trim()) return;
 
-      const pattern = this.findMatchingPattern(line);
-      if (!pattern) continue;
-
-      if (pattern.severity === 'p1') {
-        const frames = this.collectStackFrames(lines, i);
-        this.emitLogMatch(target, line, pattern, frames);
-        i += frames.length;
-      } else {
-        this.emitLogMatch(target, line, pattern);
-      }
+    if (STACK_FRAME_RE.test(line)) {
+      if (this.pendingCrash) this.pendingCrash.stackLines.push(line.trimEnd());
+      return;
     }
+
+    if (this.pendingCrash) this.flushPendingCrash();
+
+    const pattern = this.findMatchingPattern(line);
+    if (!pattern) return;
+    if (pattern.severity === 'p1') {
+      this.pendingCrash = {
+        projectId,
+        logPath,
+        projectPath: this.logProjects.get(logPath),
+        line,
+        pattern,
+        stackLines: [],
+      };
+      return;
+    }
+    this.emitLogMatch(projectId, logPath, line, pattern);
   }
 
-  private collectStackFrames(lines: string[], startIndex: number): string[] {
-    const frames: string[] = [];
-    for (let j = startIndex + 1; j < lines.length && frames.length < 20; j++) {
-      const next = lines[j];
-      if (STACK_FRAME_LINE_RE.test(next)) {
-        frames.push(next.trim());
-      } else if (next.trim() === '') {
-        continue;
-      } else {
-        break;
-      }
+  private flushPendingCrash(): void {
+    const pending = this.pendingCrash;
+    this.pendingCrash = null;
+    if (!pending) return;
+    if (pending.stackLines.length === 0) {
+      this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern);
+      return;
     }
-    return frames;
+    const stack = pending.stackLines.join('\n');
+    const location = locateCrash(stack, { projectPath: pending.projectPath });
+    this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern, { stack, location });
   }
 
   private findMatchingPattern(line: string): LogPattern | null {
@@ -204,23 +206,23 @@ export class LogCollector {
     return null;
   }
 
-  private emitLogMatch(target: LogTarget, line: string, pattern: LogPattern, stackFrames: string[] = []): void {
-    const relativePath = path.relative(process.cwd(), target.logPath);
+  private emitLogMatch(
+    projectId: string,
+    logPath: string,
+    line: string,
+    pattern: LogPattern,
+    extra?: { stack: string; location: SourceLocation | null },
+  ): void {
+    const relativePath = path.relative(process.cwd(), logPath);
     const context: Record<string, unknown> = {
       pattern: pattern.name,
       logFile: relativePath,
       matchedLine: line.slice(0, 300),
     };
-
-    if (stackFrames.length > 0) {
-      const stack = [line, ...stackFrames].join('\n').slice(0, 4000);
-      context.stack = stack;
-      const location = this.locateStack(stack);
-      if (location) context.location = location;
-    }
-
+    if (extra?.stack) context.stack = extra.stack;
+    if (extra?.location) context.location = extra.location;
     this.eventCenter.createEvent({
-      projectId: target.projectId,
+      projectId,
       title: `Log match: ${pattern.name}`,
       service: 'sentinel',
       module: 'log-collector',
@@ -230,13 +232,5 @@ export class LogCollector {
       action: 'log-pattern-matched',
       detail: `[${pattern.name}] ${relativePath}: ${line.slice(0, 200)}`,
     });
-  }
-
-  private locateStack(stackText: string): SourceLocation | null {
-    try {
-      return locateCrash(stackText, { projectPath: this.projectPath ?? undefined });
-    } catch {
-      return null;
-    }
   }
 }

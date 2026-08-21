@@ -5,50 +5,39 @@ import { EventCenter } from './event-center';
 export type FileChangeType = 'add' | 'change' | 'unlink';
 export type FileWatchFilter = (filePath: string) => boolean;
 
-/**
- * 默认排除的目录名（poll 遍历时按目录名整段跳过）。
- * 覆盖依赖树、构建产物、测试产物（Playwright）与工具状态（opencode/omo/zhshield），
- * 避免 `ses_*.json`、`test-results/`、`trace.zip` 等产生海量噪音事件。
- */
 export const DEFAULT_IGNORE_DIRS = [
   'node_modules',
   '.git',
   'dist',
   'dist-electron',
-  '.next',
   'build',
   'coverage',
-  '.cache',
-  '.turbo',
-  'release',
   'test-results',
-  '.playwright-artifacts',
   '.playwright-mcp',
   '.opencode',
   '.omo',
   '.zhshield',
+  '.turbo',
 ];
 
-/**
- * 文件级忽略：目录产物之外，还要排除临时文件、TypeScript 构建缓存
- * 与编辑器锁/临时文件（Vim 交换 `.!name`、Emacs 锁 `.#name`、Vim swap `*.swp`、
- * macOS Finder 元数据 `.DS_Store`），避免原子保存/打开编辑时产生噪音事件。
- */
-export const DEFAULT_IGNORE_RE =
-  /(^|\/)(node_modules|\.git|dist|dist-electron|\.next|build|coverage|release|test-results|\.playwright-artifacts-\d*|\.playwright-mcp|\.opencode|\.omo|\.zhshield|\.cache|\.turbo)(\/|$)|(^|\/)_tmp_[^/]*$|\.tsbuildinfo$|(^|\/)\.![^/]*$|(^|\/)\.#[^/]*$|\.DS_Store$|\.swp$|\.swo$|\.swx$/;
+export const DEFAULT_IGNORE_RE = new RegExp(
+  '(?:^|[\\\\/])(?:node_modules|dist-electron|coverage|test-results|\\.playwright-mcp|\\.playwright-artifacts-\\d+|\\.omo|\\.opencode|\\.zhshield)(?:[\\\\/]|$)' +
+    '|(?:^|[\\\\/])_tmp_\\d+_' +
+    '|\\.tsbuildinfo$' +
+    '|(?:^|[\\\\/])\\.!\\d+!' +
+    '|(?:^|[\\\\/])\\.#' +
+    '|\\.sw[po]?$' +
+    '|(?:^|[\\\\/])\\.DS_Store$',
+);
 
-/** 默认文件级过滤：路径命中排除规则则跳过监控 */
 export function defaultFileWatchFilter(filePath: string): boolean {
   return !DEFAULT_IGNORE_RE.test(filePath);
 }
 
-/**
- * 归一化 fs.watch 事件类型：macOS 上 fs.watch 对任何变更都发 `rename`，
- * 需结合磁盘状态解析为语义化类型，避免产生伪造的 "File rename" 事件。
- */
-export function resolveChangeType(changeType: string, exists: boolean, wasKnown: boolean): FileChangeType {
-  if (changeType === 'unlink' || !exists) return 'unlink';
-  if (changeType === 'rename') return wasKnown ? 'change' : 'add';
+export function resolveChangeType(eventType: string, existsOnDisk: boolean, wasKnown: boolean): FileChangeType {
+  if (eventType === 'unlink') return 'unlink';
+  if (!existsOnDisk) return 'unlink';
+  if (eventType === 'rename') return wasKnown ? 'change' : 'add';
   return 'change';
 }
 
@@ -113,20 +102,13 @@ export class FileMonitor {
       const watcher = fs.watch(watchPath, { recursive: true }, (eventType, filename) => {
         if (!this.running || !filename) return;
         const fullPath = path.join(watchPath, filename);
-        if (this.isIgnored(fullPath, config)) return;
+        if (config.filter && !config.filter(fullPath)) return;
         this.handleChange(config.projectId, fullPath, eventType as FileChangeType);
       });
       this.watchers.set(watchPath, watcher);
     } catch (err) {
       console.error(`[FileMonitor] Failed to watch ${watchPath}:`, err);
     }
-  }
-
-  /** 命中 filter 排除规则或位于 ignoreDirs 目录下时返回 true（watch 回调与 poll 共用） */
-  private isIgnored(fullPath: string, config: FileMonitorConfig): boolean {
-    if (config.filter && !config.filter(fullPath)) return true;
-    if (!config.ignoreDirs || config.ignoreDirs.length === 0) return false;
-    return fullPath.split(path.sep).some((seg) => config.ignoreDirs!.includes(seg));
   }
 
   private pollPath(watchPath: string, config: FileMonitorConfig): void {
@@ -196,25 +178,30 @@ export class FileMonitor {
     });
   }
 
-  private handleChange(projectId: string, fullPath: string, changeType: FileChangeType): void {
-    const stat = fs.existsSync(fullPath) ? fs.statSync(fullPath) : null;
-    // fs.watch 递归在 macOS 上会对目录自身触发 change 事件（子项增删/元数据变化时），
-    // 目录不是文件监控目标，跳过避免产生 "File change: <目录名>" 噪声事件
-    if (stat?.isDirectory()) return;
+  private handleChange(projectId: string, fullPath: string, eventType: FileChangeType): void {
+    let stat: fs.Stats | null = null;
+    try {
+      stat = fs.statSync(fullPath);
+    } catch {
+      stat = null;
+    }
+    if (stat && !stat.isFile()) return;
+
     const wasKnown = this.lastMtimes.has(fullPath);
-    // 目录被删除/重命名时 stat 为 null 且此前从未被当作文件跟踪，
-    // 跳过避免为目录删除产生 "File unlink: <目录名>" 噪声事件
-    if (!stat && !wasKnown) return;
-    const mtime = stat ? stat.mtimeMs : Date.now();
-    // macOS 上编辑器原子保存（写临时文件后 rename 覆盖）会对同一写入触发多次 fs.watch 回调，
-    // 文件 mtime 未变化时跳过，避免同一变更产生重复事件（如 "File change: runner.ts" ×6）
-    if (stat && wasKnown && mtime <= (this.lastMtimes.get(fullPath) ?? 0)) return;
-    this.lastMtimes.set(fullPath, mtime);
-    if (!stat) {
+    const changeType = resolveChangeType(eventType, !!stat, wasKnown);
+
+    if (changeType === 'unlink') {
+      if (!wasKnown) return;
       this.lastMtimes.delete(fullPath);
+      this.emitFileChangeEvent(projectId, fullPath, 'unlink');
+      return;
     }
 
-    this.emitFileChangeEvent(projectId, fullPath, resolveChangeType(changeType, !!stat, wasKnown));
+    const mtime = stat!.mtimeMs;
+    const prev = this.lastMtimes.get(fullPath);
+    this.lastMtimes.set(fullPath, mtime);
+    if (prev !== undefined && mtime <= prev) return;
+    this.emitFileChangeEvent(projectId, fullPath, changeType);
   }
 
   private emitFileChangeEvent(projectId: string, fullPath: string, changeType: FileChangeType): void {

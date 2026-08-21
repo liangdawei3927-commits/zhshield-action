@@ -16,8 +16,7 @@
     "@zh/db": "workspace:*",
     "@zh/shared": "workspace:*",
     "@zh/kernel": "workspace:*",
-    "better-sqlite3": "^13.0.2",
-    "@zh/i18n": "workspace:*"
+    "better-sqlite3": "^13.0.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",

@@ -98,24 +98,17 @@ export class ProcessMonitor {
     const args = this.config.args || [];
     const cwd = this.config.cwd;
 
-    const proc = this.spawnProcess(cmd, args, cwd);
-    if (!proc) return;
-
-    this.proc = proc;
-    this.attachProcessHandlers(cmd, proc.pid);
-    this.startHealthCheck();
-  }
-
-  private spawnProcess(cmd: string, args: string[], cwd: string): ChildProcess | null {
     try {
-      return spawn(cmd, args, {
+      this.proc = spawn(cmd, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,
       });
+
+      this.attachProcessHandlers(cmd, this.proc.pid);
+      this.startHealthCheck();
     } catch (err: unknown) {
       this.emitProcessLaunchFailed(cmd, err);
-      return null;
     }
   }
 

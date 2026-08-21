@@ -104,32 +104,24 @@ export class AutoFixer {
     for (const rule of this.config.rules) {
       if (!rule.eventFilter(event)) continue;
 
-      const outcome = this.processRule(rule, event);
-      if (outcome === 'exhausted') return false;
-      if (outcome === 'success') return true;
+      const maxAttempts = rule.maxAttempts ?? 3;
+      const attempts = this.attemptCount.get(event.dedupeKey) || 0;
+
+      if (this.isAttemptExhausted(rule, event, attempts, maxAttempts)) {
+        return false;
+      }
+
+      this.attemptCount.set(event.dedupeKey, attempts + 1);
+      this.eventCenter.updateStatus(event.id, 'fixing', 'auto-fixer');
+
+      const allSucceeded = this.applyRuleActions(rule, event);
+      this.emitFixOutcome(rule, event, allSucceeded, attempts);
+
+      if (allSucceeded) {
+        return true;
+      }
     }
     return false;
-  }
-
-  private processRule(rule: AutoFixRule, event: SentinelEvent): 'success' | 'continue' | 'exhausted' {
-    const maxAttempts = rule.maxAttempts ?? 3;
-    const attempts = this.attemptCount.get(event.dedupeKey) || 0;
-
-    if (this.isAttemptExhausted(rule, event, attempts, maxAttempts)) {
-      return 'exhausted';
-    }
-
-    return this.runRuleActions(rule, event, attempts);
-  }
-
-  private runRuleActions(rule: AutoFixRule, event: SentinelEvent, attempts: number): 'success' | 'continue' {
-    this.attemptCount.set(event.dedupeKey, attempts + 1);
-    this.eventCenter.updateStatus(event.id, 'fixing', 'auto-fixer');
-
-    const allSucceeded = this.applyRuleActions(rule, event);
-    this.emitFixOutcome(rule, event, allSucceeded, attempts);
-
-    return allSucceeded ? 'success' : 'continue';
   }
 
   /** 尝试次数耗尽时标记失败并上报 */

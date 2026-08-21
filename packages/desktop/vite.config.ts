@@ -74,9 +74,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@zh/kernel': path.resolve(__dirname, '../kernel/src/browser.ts'),
-      '@zh/reporter': path.resolve(__dirname, '../reporter/src/index.ts'),
-      '@zh/fingerprint': path.resolve(__dirname, '../fingerprint/src/index.ts'),
     },
   },
   server: {
@@ -90,10 +87,21 @@ export default defineConfig({
   optimizeDeps: {
     exclude: [
       'electron',
+      '@zh/kernel',
+      '@zh/guard',
+      '@zh/inspect',
+      '@zh/security',
+      '@zh/refactor',
+      '@zh/pipeline',
+      '@zh/sentinel',
+      '@zh/evolve',
     ],
   },
   build: {
     outDir: 'dist',
+    commonjsOptions: {
+      include: [/node_modules/, /[\\/]packages[\\/][^\\/]+[\\/]dist[\\/]/],
+    },
     rollupOptions: {
       output: {
         manualChunks: {

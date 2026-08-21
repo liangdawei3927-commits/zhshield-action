@@ -51,7 +51,6 @@ export interface BackupConfig {
 
 export const DEFAULT_EXCLUDE_PATTERNS = [
   'node_modules/',
-  '.git/',
   'dist/',
   'build/',
   '.next/',
@@ -78,7 +77,8 @@ export function defaultBackupConfig(_projectId?: string, _projectName?: string, 
       enabled: true,
       backupDir: '',           // Empty = use project's .zhshield/backups/
       maxBackups: 10,
-      excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/'],
+      // 本地备份保留 .git/：恢复时才能带回完整提交历史（2026-08-20 事故教训）
+      excludePatterns: ['node_modules/', 'dist/', 'coverage/'],
       compress: true,
     },
     schedule: {

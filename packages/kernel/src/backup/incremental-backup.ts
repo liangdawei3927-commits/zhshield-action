@@ -71,7 +71,6 @@ const DEFAULT_INCLUDE: RegExp[] = [
 const DEFAULT_EXCLUDE: RegExp[] = [
   /backups?\//,
   /node_modules\//,
-  /\.git\//,
 ];
 
 const MANIFEST_VERSION = '1.0';

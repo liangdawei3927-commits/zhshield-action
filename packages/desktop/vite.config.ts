@@ -74,6 +74,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // 渲染进程为沙箱环境（nodeIntegration:false）：@zh 包必须解析到浏览器安全入口，
+      // 不能落到 CommonJS + Node 内置模块的 dist 产物（会导致 ESM 链接失败 → 白屏）
+      '@zh/kernel': path.resolve(__dirname, '../kernel/src/browser.ts'),
+      '@zh/reporter': path.resolve(__dirname, '../reporter/src/index.ts'),
+      '@zh/fingerprint': path.resolve(__dirname, '../fingerprint/src/index.ts'),
     },
   },
   server: {

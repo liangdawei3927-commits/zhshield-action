@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { SopCacheManager } from '../sop/cache/sop-cache-manager';
 import { VerifiedSopSyncClient } from '../sop/cache/sop-verified-sync-client';
+import { SopSignatureVerifier } from '../sop/cache/sop-signature-verifier';
 import { SopCompressor, CompressionFormat } from '../sop/cache/sop-compressor';
 import { SopSigner } from '../sop/security/sop-signer';
 import type { SopRegistry } from '../sop/_meta/sop-registry';
@@ -56,7 +57,7 @@ async function brotliBody(value: unknown): Promise<ArrayBuffer> {
   );
 }
 
-describe('SopCacheManager.verifySignature / getPublicKey', () => {
+describe('SopSignatureVerifier.getPublicKey / verifySignature', () => {
   let cacheDir: string;
 
   beforeEach(() => {
@@ -68,45 +69,45 @@ describe('SopCacheManager.verifySignature / getPublicKey', () => {
     fs.rmSync(cacheDir, { recursive: true, force: true });
   });
 
-  function makeManager(
+  function makeVerifier(
     publicKey?: string | (() => Promise<string | null>),
-  ): SopCacheManager {
-    return new SopCacheManager(makeRegistryMock(), { cacheDir, publicKey });
+  ): SopSignatureVerifier {
+    return new SopSignatureVerifier(publicKey);
   }
 
   describe('getPublicKey', () => {
     it('GIVEN 未配置 publicKey WHEN getPublicKey THEN 返回 null', async () => {
-      expect(await makeManager().getPublicKey()).toBeNull();
+      expect(await makeVerifier().getPublicKey()).toBeNull();
     });
 
     it('GIVEN publicKey 为字符串 WHEN getPublicKey THEN 返回该字符串', async () => {
-      expect(await makeManager(SECRET).getPublicKey()).toBe(SECRET);
+      expect(await makeVerifier(SECRET).getPublicKey()).toBe(SECRET);
     });
 
     it('GIVEN publicKey 为函数 WHEN getPublicKey THEN 返回解析结果', async () => {
-      expect(await makeManager(async () => SECRET).getPublicKey()).toBe(SECRET);
+      expect(await makeVerifier(async () => SECRET).getPublicKey()).toBe(SECRET);
     });
   });
 
   describe('verifySignature', () => {
     it('GIVEN 未配置 publicKey WHEN 验证任意包 THEN 返回 true（向后兼容）', async () => {
       const pkg = SopSigner.signPackage(makeRules(), OTHER_SECRET);
-      expect(await makeManager().verifySignature(pkg)).toBe(true);
+      expect(await makeVerifier().verifySignature(pkg)).toBe(true);
     });
 
     it('GIVEN 公钥函数返回 null WHEN 验证 THEN 返回 false（fail-closed）', async () => {
       const pkg = SopSigner.signPackage(makeRules(), SECRET);
-      expect(await makeManager(async () => null).verifySignature(pkg)).toBe(false);
+      expect(await makeVerifier(async () => null).verifySignature(pkg)).toBe(false);
     });
 
     it('GIVEN 字符串公钥与合法签名包 WHEN 验证 THEN 返回 true', async () => {
       const pkg = SopSigner.signPackage(makeRules(), SECRET, '1.2.0');
-      expect(await makeManager(SECRET).verifySignature(pkg)).toBe(true);
+      expect(await makeVerifier(SECRET).verifySignature(pkg)).toBe(true);
     });
 
     it('GIVEN 函数公钥与合法签名包 WHEN 验证 THEN 返回 true', async () => {
       const pkg = SopSigner.signPackage(makeRules(), SECRET);
-      expect(await makeManager(async () => SECRET).verifySignature(pkg)).toBe(true);
+      expect(await makeVerifier(async () => SECRET).verifySignature(pkg)).toBe(true);
     });
 
     it('GIVEN 规则内容被篡改 WHEN 验证 THEN 返回 false（哈希不匹配）', async () => {
@@ -115,12 +116,12 @@ describe('SopCacheManager.verifySignature / getPublicKey', () => {
         ...pkg,
         rules: [{ ...pkg.rules[0], content: { injected: true } }, ...pkg.rules.slice(1)],
       };
-      expect(await makeManager(SECRET).verifySignature(tampered)).toBe(false);
+      expect(await makeVerifier(SECRET).verifySignature(tampered)).toBe(false);
     });
 
     it('GIVEN 密钥不匹配 WHEN 验证 THEN 返回 false（签名不匹配）', async () => {
       const pkg = SopSigner.signPackage(makeRules(), SECRET);
-      expect(await makeManager(OTHER_SECRET).verifySignature(pkg)).toBe(false);
+      expect(await makeVerifier(OTHER_SECRET).verifySignature(pkg)).toBe(false);
     });
   });
 });
@@ -128,15 +129,15 @@ describe('SopCacheManager.verifySignature / getPublicKey', () => {
 describe('VerifiedSopSyncClient.fetchFull — 远程数据验签拦截', () => {
   const baseUrl = 'https://sop.example.com/api/sop';
   let cacheDir: string;
-  let manager: SopCacheManager;
+  let verifier: SopSignatureVerifier;
   let client: VerifiedSopSyncClient;
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     cacheDir = path.join(os.tmpdir(), `zh-cache-vclient-${crypto.randomUUID()}`);
     fs.mkdirSync(cacheDir, { recursive: true });
-    manager = new SopCacheManager(makeRegistryMock(), { cacheDir, publicKey: SECRET });
-    client = new VerifiedSopSyncClient(baseUrl, (pkg) => manager.verifySignature(pkg));
+    verifier = new SopSignatureVerifier(SECRET);
+    client = new VerifiedSopSyncClient(baseUrl, (pkg) => verifier.verifySignature(pkg));
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
   });

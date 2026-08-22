@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { buildAiFixPrompt, type AiFixIssue } from '../utils/copyToAi';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
 
 describe('buildAiFixPrompt', () => {
   it('包含项目路径与修复要求', () => {
@@ -38,5 +38,54 @@ describe('buildAiFixPrompt', () => {
       { source: '巡检', ruleId: 'tool/conf', message: '工具配置错误' },
     ]);
     expect(prompt).not.toContain('- 位置:');
+  });
+});
+
+describe('copyTextToClipboard', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubDocument(execCommandImpl: () => boolean) {
+    const textarea = {
+      value: '',
+      style: {} as Record<string, string>,
+      setAttribute: vi.fn(),
+      select: vi.fn(),
+    };
+    const document = {
+      createElement: vi.fn(() => textarea),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+      execCommand: vi.fn(execCommandImpl),
+    };
+    vi.stubGlobal('document', document);
+    return { document, textarea };
+  }
+
+  it('Async Clipboard API 可用时直接写入并返回 true', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    stubDocument(() => true);
+
+    await expect(copyTextToClipboard('hello')).resolves.toBe(true);
+    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(document.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('writeText 被拒绝（NotAllowedError）时降级 execCommand 复制成功返回 true', async () => {
+    const writeText = vi.fn().mockRejectedValue(new DOMException('Write permission denied.', 'NotAllowedError'));
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    const { textarea } = stubDocument(() => true);
+
+    await expect(copyTextToClipboard('fallback-text')).resolves.toBe(true);
+    expect(textarea.value).toBe('fallback-text');
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
+  });
+
+  it('clipboard API 不存在且 execCommand 复制失败时返回 false', async () => {
+    vi.stubGlobal('navigator', {});
+    stubDocument(() => false);
+
+    await expect(copyTextToClipboard('hello')).resolves.toBe(false);
   });
 });

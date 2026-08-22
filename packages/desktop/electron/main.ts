@@ -313,8 +313,11 @@ app.whenReady().then(async () => {
   }
 
   // ─── 安全：拒绝所有不必要的权限请求（camera / mic / geolocation 等）──
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
+  // 仅放行 clipboard-sanitized-write（navigator.clipboard.writeText 必需，一刀切拒绝会让
+  // 所有页面「复制到AI」报复制失败）与 notifications（桌面通知必需），勿删。
+  const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write', 'notifications']);
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(ALLOWED_PERMISSIONS.has(permission));
   });
 
   await initSopCache();

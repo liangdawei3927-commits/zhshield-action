@@ -3,6 +3,7 @@
  *
  * 两层架构：GitHub API + 本地文件夹
  */
+import { projectBackupSegment } from './utils';
 
 // ─── 备份类型 ─────────────────────────────────────────────
 
@@ -63,7 +64,18 @@ export const DEFAULT_EXCLUDE_PATTERNS = [
   '.env.local',
 ];
 
-export function defaultBackupConfig(_projectId?: string, _projectName?: string): BackupConfig {
+export interface BackupIdentity {
+  projectId?: string;
+  projectName?: string;
+  projectPath?: string;
+}
+
+export function defaultBackupConfig(identity?: BackupIdentity): BackupConfig {
+  const segment = projectBackupSegment(
+    identity?.projectPath ?? identity?.projectId,
+    identity?.projectName,
+  );
+  const backupDir = segment ? `~/zhshield-backups/${segment}` : '~/zhshield-backups';
   return {
     github: {
       enabled: false,
@@ -75,7 +87,7 @@ export function defaultBackupConfig(_projectId?: string, _projectName?: string):
     },
     local: {
       enabled: true,
-      backupDir: '~/zhshield-backups',
+      backupDir,
       maxBackups: 10,
       excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/'],
       compress: false,

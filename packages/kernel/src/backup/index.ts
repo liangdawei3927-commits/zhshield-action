@@ -53,3 +53,5 @@ export type {
 } from './types';
 
 export { defaultBackupConfig, DEFAULT_EXCLUDE_PATTERNS } from './types';
+export type { BackupIdentity } from './types';
+export { sanitizeDirSegment, projectBackupSegment } from './utils';

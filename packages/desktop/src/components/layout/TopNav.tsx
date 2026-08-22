@@ -18,7 +18,7 @@ interface NavItem {
   label?: string;
 }
 
-/** 13 个分类导航（360 风格：大图标 + 底部文字） */
+/** 12 个分类导航（360 风格：大图标 + 底部文字） */
 const navItems: NavItem[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard' },
   { id: 'guard', labelKey: 'nav.guard' },
@@ -32,8 +32,6 @@ const navItems: NavItem[] = [
   { id: 'refactor', labelKey: 'nav.refactor' },
   { id: 'backup', labelKey: 'nav.backup' },
   { id: 'reports', labelKey: 'nav.reports' },
-  { id: 'evolve', labelKey: 'nav.evolve' },
-  { id: 'profile', labelKey: 'nav.profile', label: '画像' },
 ];
 
 interface CategoryNavItemProps {

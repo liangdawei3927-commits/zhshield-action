@@ -97,8 +97,8 @@ function toConfigData(config: BackupConfig): BackupConfigDataShape {
   };
 }
 
-function fromConfigData(data: Record<string, unknown>): BackupConfig {
-  const def = defaultBackupConfig();
+function fromConfigData(data: Record<string, unknown>, projectPath?: string): BackupConfig {
+  const def = defaultBackupConfig(projectPath ? { projectPath } : undefined);
   const github = data.github as Partial<BackupConfig['github']> | undefined;
   const local = data.local as Partial<BackupConfig['local']> | undefined;
   const schedule = data.schedule as Partial<BackupConfig['schedule']> | undefined;
@@ -167,7 +167,7 @@ function registerConfigHandlers(configManager: BackupConfigManager): void {
     'backup:saveConfig',
     async (_event, projectPath: string, config: Record<string, unknown>): Promise<void> => {
       if (!projectPath || typeof projectPath !== 'string' || !config || typeof config !== 'object') return;
-      await configManager.saveProjectConfig(projectPath, fromConfigData(config));
+      await configManager.saveProjectConfig(projectPath, fromConfigData(config, projectPath));
     },
   );
 }

@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, relative, sep } from 'node:path';
 
 export interface ToolRule {
   id: string;
@@ -10,6 +10,12 @@ export interface ToolRule {
   filePath: string;
 }
 
+/** 与远端同步契约一致的规则文件条目（结构兼容 @zh/kernel 的 ToolRuleFile） */
+export interface ToolRuleFileEntry {
+  filename: string;
+  content: string;
+}
+
 /**
  * 从 tool-packs 目录加载工具规则文件
  * 支持 semgrep、trivy、eslint、dep-cruiser 等工具的规则包
@@ -18,7 +24,8 @@ export class ToolRuleLoader {
   private packsDir: string;
 
   constructor(packsDir?: string) {
-    this.packsDir = packsDir ?? join(__dirname, '..', '..', 'kernel', 'src', 'sop', 'tool-packs');
+    // 默认指向 packages/kernel/src/sop/tool-packs（从 <server>/{src,dist}/sop 上溯三级到 packages/）
+    this.packsDir = packsDir ?? join(__dirname, '..', '..', '..', 'kernel', 'src', 'sop', 'tool-packs');
   }
 
   /**
@@ -56,18 +63,36 @@ export class ToolRuleLoader {
     return rules;
   }
 
+  /**
+   * 加载指定工具的规则包，输出远端同步契约的 {filename, content} 列表。
+   * filename 为工具目录下的 POSIX 相对路径（如 rules/backdoor.yaml），
+   * 与客户端 extractRules 写盘及 hashToolRuleFiles 的相对路径口径一致。
+   * 目录不存在或文件不可读时按 loader 语义优雅降级为空/跳过。
+   */
+  loadToolRuleFiles(toolId: string): ToolRuleFileEntry[] {
+    const toolDir = join(this.packsDir, toolId);
+    return this.loadToolRules(toolId)
+      .map((rule) => ({
+        filename: relative(toolDir, rule.filePath).split(sep).join('/'),
+        content: rule.content,
+      }))
+      .sort((a, b) => a.filename.localeCompare(b.filename));
+  }
+
   private walkDirectory(dir: string, toolId: string, rules: ToolRule[]): void {
     const entries = readdirSync(dir, { withFileTypes: true });
     
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      
+
       if (entry.isDirectory()) {
         this.walkDirectory(fullPath, toolId, rules);
-      } else if (this.isRuleFile(entry.name)) {
-        const rule = this.loadRuleFile(fullPath, toolId);
-        if (rule) rules.push(rule);
+        continue;
       }
+      if (!this.isRuleFile(entry.name)) continue;
+
+      const rule = this.loadRuleFile(fullPath, toolId);
+      if (rule) rules.push(rule);
     }
   }
 

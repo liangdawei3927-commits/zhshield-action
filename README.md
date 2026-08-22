@@ -58,6 +58,36 @@ packages/
 
 依赖方向：客户端 → 引擎 → `kernel` / `shared` / `db`。引擎之间不互相 import，横向通信走 EventBus。
 
+## 工具规则包三层架构
+
+工具规则（semgrep / trivy / eslint / dep-cruiser 的扫描规则文件）采用三层流转，规则内容只维护在 YAML 源文件中，任何一层都不再硬编码：
+
+```
+① 规则包源文件（YAML）          ② 加载器                     ③ API 服务
+packages/kernel/src/sop/        packages/server/src/sop/      packages/server/src/sop/
+  tool-packs/<tool>/…            tool-rule-loader.ts           tool-rule.controller.ts
+        │                            │  loadToolRuleFiles()        │  GET /api/v1/rules/:tool/…
+        └──────── load ──────────────┴───────── 注入 ──────────────┘
+                                                             │
+                                             packages/kernel/src/sop/sync/tool-rule-sync.ts
+                                             （桌面端客户端：比对 version → 下载 → 哈希校验落盘）
+```
+
+- **第 1 层 · 规则包源文件**：`packages/kernel/src/sop/tool-packs/<tool>/` 下按工具分目录存放 YAML（如 `semgrep/rules/backdoor.yaml`、`trivy/policy/ignore.yml`）。这是规则的唯一事实来源。
+- **第 2 层 · ToolRuleLoader**：`packages/server/src/sop/tool-rule-loader.ts` 扫描 tool-packs 目录，输出与同步契约一致的 `{ filename, content }[]`（filename 为工具目录下的 POSIX 相对路径）。目录缺失或单个文件不可读时优雅降级（跳过 / 返回空）。
+- **第 3 层 · ToolRuleController**：`packages/server/src/sop/tool-rule.controller.ts` 构造时通过 loader 一次性快照各工具的规则包，对外提供：
+  - `GET /rules/:tool/version` — `{ toolId, version, hash, size, publishedAt }`；`hash` 为 `hashToolRuleFiles(payload)`，`version = 1.<hash 前 12 位>` 由内容派生，**规则文件一改，version 自动变化**，桌面端才会触发增量同步；
+  - `GET /rules/:tool/download` — 规则文件数组（JSON），客户端写盘后按同一哈希算法校验；
+  - `GET /rules/:tool/emergency` — 应急通道，当前镜像本地规则包。
+
+### 如何新增 / 修改一个规则包
+
+1. 在 `packages/kernel/src/sop/tool-packs/<tool>/` 下新增或编辑 YAML 文件（目录名须为 `semgrep` / `trivy` / `eslint` / `dep-cruiser` 之一）。
+2. 重启后端（controller 在启动时快照规则包）：`pnpm --filter @zh/server dev`。
+3. 验证：`curl http://localhost:3010/api/v1/rules/<tool>/version`，确认 `version`/`hash` 已随内容变化；桌面端下次同步即拉取新规则。
+
+> 注意：新增工具 ID 需同步扩展 controller 的 `VALID_TOOLS` 与 kernel `buildDefaultToolRuleConfigs()` 的同步配置。
+
 ## 文档
 
 产品与架构说明见仓库上级目录 [`00-项目文档`](../00-项目文档/README.md)。

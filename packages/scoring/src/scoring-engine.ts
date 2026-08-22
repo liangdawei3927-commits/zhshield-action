@@ -5,7 +5,7 @@ import type {
   ScoringConfig,
   ScoringResult,
 } from './types';
-import { getDefaultScoringConfig } from './scoring-config';
+import { resolveScoringConfig } from './project-scoring-config';
 
 /**
  * 上下文评分引擎（导出为 ContextScoringEngine，与 engine.ts 的趋势引擎互补）
@@ -14,8 +14,12 @@ import { getDefaultScoringConfig } from './scoring-config';
 export class ScoringEngine {
   private config: ScoringConfig;
 
+  /**
+   * @param config 显式配置；缺省时加载项目级覆盖配置
+   * （`.zhshield/scoring.yml`，见 {@link resolveScoringConfig}），无覆盖文件时等价于默认配置
+   */
   constructor(config?: ScoringConfig) {
-    this.config = config ?? getDefaultScoringConfig();
+    this.config = config ?? resolveScoringConfig();
   }
 
   score(context: ScoringRuleContext): ScoringResult {

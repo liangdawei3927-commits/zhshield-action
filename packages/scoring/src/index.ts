@@ -4,6 +4,23 @@ export { ScoringEngine } from './engine';
 export { ScoringEngine as ContextScoringEngine } from './scoring-engine';
 export { DimensionMapper } from './dimension-mapper';
 export { getDefaultScoringConfig, getDimensionConfig, getDimensionIds } from './scoring-config';
+export {
+  findProjectScoringConfigFile,
+  parseProjectScoringOverrides,
+  validateScoringOverrides,
+  mergeScoringOverrides,
+  loadProjectScoringConfig,
+  resolveScoringConfig,
+  PROJECT_SCORING_CONFIG_DIR,
+  PROJECT_SCORING_CONFIG_FILENAMES,
+  ProjectScoringConfigError,
+} from './project-scoring-config';
+export type {
+  ScoringOverrides,
+  DimensionOverride,
+  PenaltyOverride,
+  PositiveRuleOverride,
+} from './project-scoring-config';
 export type { HealthScore, DimensionScore, ScoreTrend } from './types';
 export type {
   PositiveRule,

@@ -68,6 +68,7 @@ export { DegradationManager } from './degradation-manager';
 export { BUILTIN_FALLBACK_RULES } from './builtin-rules';
 export { AuditLogger } from './audit-logger';
 export { ToolsConfigLoader } from './tools-config-loader';
+export { parseSimpleYaml } from './simple-yaml';
 export {
   TOOL_LICENSE_REGISTRY,
   TOOL_LOCKFILE_SCHEMA_VERSION,

@@ -32,8 +32,6 @@ const DIMENSION_CATEGORIES: Record<string, string[]> = {
   documentation: ['documentation'],
 };
 
-const dimensionMapper = new DimensionMapper();
-
 const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
   error: 8,
   warning: 4,
@@ -62,11 +60,19 @@ function guardIssueCount(results: GuardCheckLike[]): number {
  * 由 guard + inspect 报告构建健康维度分（权重和为 1）。
  * 每个维度满分 100：error 扣 8、warning 扣 4、info 扣 1，下限 0；
  * security 维度额外计入 guard 的失败/阻塞检查。
+ *
+ * 权重来自项目级评分配置（默认配置 + `.zhshield/scoring.yml` 覆盖，见
+ * {@link resolveScoringConfig}）；无覆盖文件时与内置默认权重一致。
+ *
+ * @param projectRoot 项目根目录，缺省为 process.cwd()；传入可显式指定被扫描项目
+ * @throws {ProjectScoringConfigError} 项目覆盖文件存在但内容非法时（fail-fast）
  */
 export function buildHealthDimensions(
   guard: GuardReportLike,
   inspect: InspectionReportLike,
+  projectRoot?: string,
 ): DimensionScore[] {
+  const dimensionMapper = new DimensionMapper(undefined, projectRoot);
   const weightMap = dimensionMapper.getWeightMap();
 
   return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) => {

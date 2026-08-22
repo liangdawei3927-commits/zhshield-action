@@ -1,5 +1,5 @@
 import type { DimensionDefinition, ScoringConfig } from './types';
-import { getDefaultScoringConfig } from './scoring-config';
+import { resolveScoringConfig } from './project-scoring-config';
 
 /**
  * 维度映射器
@@ -8,8 +8,13 @@ import { getDefaultScoringConfig } from './scoring-config';
 export class DimensionMapper {
   private config: ScoringConfig;
 
-  constructor(config?: ScoringConfig) {
-    this.config = config ?? getDefaultScoringConfig();
+  /**
+   * @param config 显式配置（优先级最高）
+   * @param projectRoot 项目根目录 — 仅在未显式传入 config 时生效，
+   *   用于加载 `.zhshield/scoring.yml` 项目级覆盖；缺省为 process.cwd()
+   */
+  constructor(config?: ScoringConfig, projectRoot?: string) {
+    this.config = config ?? resolveScoringConfig(projectRoot);
   }
 
   getDimensions(): DimensionDefinition[] {

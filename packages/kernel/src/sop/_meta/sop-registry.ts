@@ -80,6 +80,11 @@ export class SopRegistry {
     return this.rules.get(id);
   }
 
+  /** 显式存在性检查：调用方据此走 register/update 分支，而非依赖 register 抛错 */
+  has(id: string): boolean {
+    return this.rules.has(id);
+  }
+
   getAll(): SopRule[] {
     return [...this.rules.values()];
   }

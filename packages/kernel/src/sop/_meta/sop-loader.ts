@@ -15,6 +15,13 @@ import { SopRegistry } from './sop-registry';
 
 const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 
+/** 预期缺失判定：ENOENT/ENOTDIR 属「文件不存在」的可恢复场景，与解析失败区分处理 */
+function isNotFoundErr(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
 /** 六大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
  *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载 */
 const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
@@ -137,10 +144,10 @@ export class SopLoader {
       return;
     }
     for (const rule of rules) {
-      try {
-        this.registry.register(rule);
-      } catch {
+      if (this.registry.has(rule.id)) {
         this.registry.update(rule.id, rule);
+      } else {
+        this.registry.register(rule);
       }
     }
   }
@@ -177,12 +184,19 @@ export class SopLoader {
         parsed = JSON.parse(raw);
       } else {
         const loaded = yaml.load(raw);
-        if (!loaded || typeof loaded !== 'object') return null;
+        if (!loaded || typeof loaded !== 'object') {
+          console.warn(`[SopLoader] Rule file has no object root, skipped: ${filePath}`);
+          return null;
+        }
         parsed = loaded as Record<string, unknown>;
       }
 
       return this.buildRule(parsed, domain, action, filePath);
     } catch (err) {
+      if (isNotFoundErr(err)) {
+        console.warn(`[SopLoader] Rule file not found, skipped: ${filePath}`);
+        return null;
+      }
       console.error(`[SopLoader] Failed to parse rule file: ${filePath}`, err);
       return null;
     }
@@ -311,11 +325,11 @@ export class SopLoader {
 
   async loadFromKnowledgeBase(rules: SopRule[]): Promise<void> {
     for (const rule of rules) {
-      try {
-        this.registry.register(rule);
-      } catch {
+      if (this.registry.has(rule.id)) {
         // 已存在则更新
         this.registry.update(rule.id, rule);
+      } else {
+        this.registry.register(rule);
       }
     }
   }

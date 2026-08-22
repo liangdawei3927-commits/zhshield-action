@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { resolveApiBase } from './api-base';
+import { HttpError, withRetry } from './retry';
 
 // ─── 类型 ────────────────────────────────────────────────────
 
@@ -172,13 +173,18 @@ export class ExperienceReporter {
   // ─── 私有 ──────────────────────────────────────────────────
 
   private async sendBatch(records: ExperienceRecord[]): Promise<boolean> {
-    const res = await fetch(this.remoteUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ records }),
-      signal: AbortSignal.timeout(15_000),
+    // 瞬态失败（网络故障/429/5xx）由 withRetry 退避重试；其余 4xx 直接失败
+    await withRetry(async () => {
+      const res = await fetch(this.remoteUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new HttpError(res.status);
+      return res;
     });
-    return res.ok;
+    return true;
   }
 
   private async loadQueue(): Promise<void> {

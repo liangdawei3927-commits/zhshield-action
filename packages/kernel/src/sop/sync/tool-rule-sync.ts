@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { resolveApiBase } from './api-base';
+import { HttpError, withRetry } from './retry';
 
 export type ToolId = 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser';
 
@@ -169,11 +170,15 @@ export class ToolRuleSync {
       return { toolId, updated: false, reason: 'network_error' };
     }
     this.versionCache.delete(toolId);
+    const emergencyUrl = cfg.remoteEmergencyUrl;
     try {
-      const res = await fetch(cfg.remoteEmergencyUrl, {
-        signal: AbortSignal.timeout(30_000),
+      const res = await withRetry(async () => {
+        const r = await fetch(emergencyUrl, {
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!r.ok) throw new HttpError(r.status);
+        return r;
       });
-      if (!res.ok) return { toolId, updated: false, reason: 'network_error' };
       const buf = new Uint8Array(await res.arrayBuffer());
       const localDir = path.join(this.baseDir, cfg.localDir);
       await this.extractRules(buf, localDir);
@@ -242,12 +247,14 @@ export class ToolRuleSync {
 
   private async fetchRemoteVersion(cfg: ToolRuleSyncConfig): Promise<ToolRuleVersion | null> {
     try {
-      const res = await fetch(cfg.remoteVersionUrl, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(10_000),
+      return await withRetry(async () => {
+        const res = await fetch(cfg.remoteVersionUrl, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!res.ok) throw new HttpError(res.status);
+        return (await res.json()) as ToolRuleVersion;
       });
-      if (!res.ok) return null;
-      return (await res.json()) as ToolRuleVersion;
     } catch {
       return null;
     }
@@ -255,11 +262,13 @@ export class ToolRuleSync {
 
   private async downloadRules(cfg: ToolRuleSyncConfig): Promise<Uint8Array | null> {
     try {
-      const res = await fetch(cfg.remoteDownloadUrl, {
-        signal: AbortSignal.timeout(30_000),
+      return await withRetry(async () => {
+        const res = await fetch(cfg.remoteDownloadUrl, {
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) throw new HttpError(res.status);
+        return new Uint8Array(await res.arrayBuffer());
       });
-      if (!res.ok) return null;
-      return new Uint8Array(await res.arrayBuffer());
     } catch {
       return null;
     }

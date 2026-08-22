@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // 经验回写队列文件路径硬编码为 ~/.zhshield/experience-queue.json，无法注入，
 // 故用内存 fs 隔离测试，避免污染用户主目录。
@@ -97,23 +97,43 @@ describe('ExperienceReporter', () => {
     expect(reporter.getQueueLength()).toBe(0);
   });
 
-  it('flush 失败（!ok）应保留队列并计入 failed', async () => {
+  it('flush 失败（5xx）应退避重试至多 3 次后计入 failed 并保留队列', async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(makeResponse(false));
     await reporter.submit(makeRecord());
     await reporter.submit(makeRecord());
-    const r = await reporter.flush();
+    const pending = reporter.flush();
+    const assertion = expect(pending).resolves.toEqual({ sent: 0, queued: 2, failed: 2 });
+    await vi.advanceTimersByTimeAsync(10_000);
+    const r = await pending;
+    expect(fetchMock).toHaveBeenCalledTimes(3); // 5xx 瞬态 → 重试满 3 次
     expect(r.sent).toBe(0);
     expect(r.failed).toBe(2);
-    expect(r.queued).toBe(2); // 保留待重试
     expect(reporter.getQueueLength()).toBe(2);
+    await assertion;
   });
 
-  it('flush 抛错应计入 failed 并保留队列', async () => {
-    fetchMock.mockRejectedValue(new Error('network down'));
+  it('flush 对 4xx 客户端错误不重试，直接计入 failed', async () => {
+    fetchMock.mockResolvedValue(makeResponse(false, 400));
     await reporter.submit(makeRecord());
     const r = await reporter.flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(r.failed).toBe(1);
     expect(r.queued).toBe(1);
+  });
+
+  it('flush 网络异常应退避重试至多 3 次后计入 failed 并保留队列', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockRejectedValue(new TypeError('network down'));
+    await reporter.submit(makeRecord());
+    const pending = reporter.flush();
+    const assertion = expect(pending).resolves.toEqual({ sent: 0, queued: 1, failed: 1 });
+    await vi.advanceTimersByTimeAsync(10_000);
+    const r = await pending;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(r.failed).toBe(1);
+    expect(r.queued).toBe(1);
+    await assertion;
   });
 
   it('离线时 flush 不发送，返回 queued 计数', async () => {
@@ -157,9 +177,14 @@ describe('ExperienceReporter', () => {
 
   // ─── 持久化往返 ──────────────────────────────────────────
   it('队列应在 persist/load 间往返（重启恢复）', async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(makeResponse(false)); // 发送失败 → 保留
     await reporter.submit(makeRecord({ ruleId: 'persist-1' }));
-    await reporter.flush();
+    const flushPromise = reporter.flush();
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await flushPromise;
+    expect(result.failed).toBe(1); // 重试满 3 次后仍失败 → 保留队列
+    vi.useRealTimers();
 
     // 模拟重启：新实例读取同一队列文件（内存 fs 共享）
     const reborn = new ExperienceReporter({ batchSize: 3 });

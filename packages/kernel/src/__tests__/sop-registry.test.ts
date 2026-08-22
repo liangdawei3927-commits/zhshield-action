@@ -42,6 +42,13 @@ describe('SopRegistry', () => {
       expect(new SopRegistry().get('nope')).toBeUndefined();
     });
 
+    it('has 对已注册 id 返回 true，未注册返回 false', () => {
+      const reg = new SopRegistry();
+      expect(reg.has('r-1')).toBe(false);
+      reg.register(makeRule({ id: 'r-1' }));
+      expect(reg.has('r-1')).toBe(true);
+    });
+
     it('getAll 应返回当前所有规则的数组', () => {
       const reg = new SopRegistry();
       reg.register(makeRule({ id: 'r-1' }));

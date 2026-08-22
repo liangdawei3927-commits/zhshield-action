@@ -9,11 +9,10 @@ import type {
   GovernanceDomain,
   ProjectFeature,
   ProjectProfile,
-  SignedSopPackage,
 } from '../_meta/sop-types';
 import type { SopRegistry } from '../_meta/sop-registry';
-import type { ContentAddressableStore } from './content-addressable-store';
 import { SopLazyLoader } from './sop-lazy-loader';
+import { SopSignatureVerifier } from './sop-signature-verifier';
 import type { EventBus } from '../../bus';
 import { resolveSopBase } from '../sync/api-base';
 import { createSyncPolicy } from './sop-sync-policy';
@@ -24,7 +23,6 @@ import { SopSyncClient } from './sop-sync-client';
 import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
-import { SopSigner } from '../security/sop-signer';
 
 export { createSyncPolicy } from './sop-sync-policy';
 export type { SyncPolicyOptions } from './sop-sync-policy';
@@ -63,13 +61,12 @@ export interface SopCacheManagerOptions {
  * 对外保持以下职责：
  * - 管理本地缓存与云端同步
  * - 支持紧急更新推送
- * - 校验规则包完整性和签名
+ * - 签名校验由 SopSignatureVerifier 承担（经 VerifiedSopSyncClient 接入同步链路）
  * - 降级策略（Level 0-4）
  */
 export class SopCacheManager {
   private cacheDir: string;
   private registry: SopRegistry;
-  private cas?: ContentAddressableStore;
   private lazyLoader?: SopLazyLoader;
   private syncPolicy: Required<SyncPolicyOptions>;
   private sqliteStore: SopSqliteStore;
@@ -78,7 +75,6 @@ export class SopCacheManager {
   private coordinator: SopSyncCoordinator;
   private eventBus?: EventBus;
   private secretKey?: string;
-  private publicKey?: string | (() => Promise<string | null>);
 
   constructor(registry: SopRegistry, options: SopCacheManagerOptions = {}) {
     this.registry = registry;
@@ -88,7 +84,6 @@ export class SopCacheManager {
     this.syncPolicy = createSyncPolicy(options.syncPolicy);
     this.eventBus = options.eventBus;
     this.secretKey = options.secretKey;
-    this.publicKey = options.publicKey;
 
     if (options.lazyLoading !== false) {
       this.lazyLoader = new SopLazyLoader(this);
@@ -96,8 +91,9 @@ export class SopCacheManager {
 
     this.sqliteStore = new SopSqliteStore(path.join(this.cacheDir, 'rules.db'));
     this.versionStore = new SopVersionStore(this.cacheDir);
-    const syncClient = this.publicKey !== undefined
-      ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => this.verifySignature(pkg))
+    const signatureVerifier = new SopSignatureVerifier(options.publicKey);
+    const syncClient = options.publicKey !== undefined
+      ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
       : new SopSyncClient(remoteBaseUrl);
     this.scheduler = new SopSyncScheduler(this.syncPolicy);
     this.coordinator = new SopSyncCoordinator({
@@ -173,6 +169,13 @@ export class SopCacheManager {
       ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
       timestamp: new Date(),
     });
+    this.emit('sop:cache-synced', {
+      type: 'diff',
+      fromVersion: diff.fromVersion,
+      toVersion: diff.version,
+      ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
+      timestamp: new Date(),
+    });
   }
 
   /**
@@ -184,6 +187,11 @@ export class SopCacheManager {
     this.emit('sop:emergency-completed', {
       count: rules.length,
       ruleIds: rules.map((r) => r.id),
+      timestamp: new Date(),
+    });
+    this.emit('sop:cache-synced', {
+      type: 'emergency',
+      ruleCount: rules.length,
       timestamp: new Date(),
     });
   }
@@ -208,6 +216,7 @@ export class SopCacheManager {
   async clearCache(): Promise<void> {
     await this.coordinator.clearCache();
     this.emit('sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
+    this.emit('sop:cache-synced', { type: 'cleared', timestamp: new Date() });
   }
 
   // ─── 同步调度 ──────────────────────────────────────────────
@@ -270,38 +279,12 @@ export class SopCacheManager {
     return this.lazyLoader;
   }
 
-  setContentAddressableStore(store: ContentAddressableStore): void {
-    this.cas = store;
-  }
-
   getCacheDir(): string {
     return this.cacheDir;
   }
 
   getRegistry(): SopRegistry {
     return this.registry;
-  }
-
-  /**
-   * 获取验签公钥：字符串原样返回，函数取解析结果，未配置返回 null
-   */
-  async getPublicKey(): Promise<string | null> {
-    if (typeof this.publicKey === 'string') return this.publicKey;
-    if (typeof this.publicKey === 'function') return this.publicKey();
-    return null;
-  }
-
-  /**
-   * 校验规则包签名：
-   * - 未配置 publicKey → 放行（向后兼容）
-   * - 已配置但公钥解析失败 → fail-closed 拒绝
-   * - 其余按 HMAC-SHA256 验签
-   */
-  async verifySignature(pkg: SignedSopPackage): Promise<boolean> {
-    if (this.publicKey === undefined) return true;
-    const key = await this.getPublicKey();
-    if (!key) return false;
-    return SopSigner.verifyPackage(pkg, key).valid;
   }
 
   // ─── 事件发射 ──────────────────────────────────────────────

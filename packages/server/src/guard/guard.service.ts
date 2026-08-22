@@ -7,6 +7,7 @@ import {
   ArchitectureBoundaryAdapter,
   TestRunnerAdapter,
   SecurityScanAdapter,
+  GuardTrivyAdapter,
 } from '@zh/guard';
 import { EventBus } from '@zh/kernel';
 
@@ -27,6 +28,7 @@ export class GuardService {
     this.engine.registerAdapter('architecture-boundary',  new ArchitectureBoundaryAdapter());
     this.engine.registerAdapter('test-runner',            new TestRunnerAdapter());
     this.engine.registerAdapter('security-scan',          new SecurityScanAdapter());
+    this.engine.registerAdapter('trivy',                  new GuardTrivyAdapter());
   }
 
   async runCheck(projectPath: string, options?: Partial<CheckOptions>): Promise<GuardReport> {

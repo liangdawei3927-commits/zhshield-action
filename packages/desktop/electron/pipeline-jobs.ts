@@ -41,6 +41,7 @@ export async function runGuardJob(
     ArchitectureBoundaryAdapter,
     TestRunnerAdapter,
     SecurityScanAdapter,
+    GuardTrivyAdapter,
   } = await import('@zh/guard');
   const engine = new GuardEngine(projectPath, undefined, { emit: () => undefined });
   engine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
@@ -48,6 +49,7 @@ export async function runGuardJob(
   engine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
   engine.registerAdapter('test-runner', new TestRunnerAdapter());
   engine.registerAdapter('security-scan', new SecurityScanAdapter());
+  engine.registerAdapter('trivy', new GuardTrivyAdapter());
   try {
     const report = await engine.run({
       mode: 'guard',

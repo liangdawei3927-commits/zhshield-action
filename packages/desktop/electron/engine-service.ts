@@ -2,7 +2,7 @@ import { app } from 'electron';
 import path from 'node:path';
 import { DbConnection } from '@zh/db';
 import { ScoringEngine } from '@zh/scoring';
-import { GuardEngine } from '@zh/guard';
+import { GuardEngine, GuardTrivyAdapter } from '@zh/guard';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { InspectEngine } from '@zh/inspect';
 import type { InspectionReport } from '@zh/inspect';
@@ -31,6 +31,7 @@ export class EngineService {
     this.guard = new GuardEngine(process.cwd(), undefined, {
       emit: (event) => this.eventBus!.emit(event.type, event.payload),
     });
+    this.guard.registerAdapter('trivy', new GuardTrivyAdapter());
     this.inspect = new InspectEngine({
       emit: (event) => this.eventBus!.emit(event.type, event.payload),
     });

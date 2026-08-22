@@ -5,6 +5,7 @@ import {
   ArchitectureBoundaryAdapter,
   TestRunnerAdapter,
   SecurityScanAdapter,
+  GuardTrivyAdapter,
 } from '@zh/guard';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import {
@@ -89,6 +90,7 @@ export class PipelineRunner {
     this.guardEngine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
     this.guardEngine.registerAdapter('test-runner', new TestRunnerAdapter());
     this.guardEngine.registerAdapter('security-scan', new SecurityScanAdapter());
+    this.guardEngine.registerAdapter('trivy', new GuardTrivyAdapter());
     // 注册 Inspect ToolAdapter → 经 useSopEngine 连线自动注入 SopRuleEngine
     this.inspectEngine.registerAdapter(new ESLintAdapter());
     this.inspectEngine.registerAdapter(new GitleaksAdapter());

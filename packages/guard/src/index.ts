@@ -14,6 +14,7 @@ export {
   ArchitectureBoundaryAdapter,
   TestRunnerAdapter,
   SecurityScanAdapter,
+  GuardTrivyAdapter,
 } from './adapters';
 export type { CheckResult, CheckOptions, GuardReport, CheckConfig, Adapter } from './types';
 export {

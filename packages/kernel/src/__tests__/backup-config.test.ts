@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
@@ -7,6 +7,9 @@ import * as crypto from 'node:crypto';
 import { defaultBackupConfig } from '../backup/types';
 import { BackupConfigManager } from '../backup/config';
 import { sanitizeDirSegment, projectBackupSegment } from '../backup/utils';
+import { BackupOrchestrator } from '../backup/orchestrator';
+import { LocalBackup } from '../backup/local-backup';
+import type { LocalBackupSubResult } from '../backup/types';
 
 function pathHash(p: string): string {
   return crypto.createHash('sha1').update(p).digest('hex').slice(0, 8);
@@ -104,5 +107,74 @@ describe('BackupConfigManager.loadProjectConfig 隔离与显式配置优先级',
   it('projectName 影响可读名但不影响哈希', async () => {
     const cfg = await manager.loadProjectConfig(projectDir, '自定义 名');
     expect(cfg.local.backupDir).toBe(`~/zhshield-backups/自定义-名-${pathHash(projectDir)}`);
+  });
+});
+
+describe('BackupOrchestrator 接线与真实落盘（端到端）', () => {
+  let workRoot: string;
+  let projectDir: string;
+  let backupRoot: string;
+  let manager: BackupConfigManager;
+
+  beforeEach(async () => {
+    workRoot = path.join(os.tmpdir(), `zhshield-e2e-${crypto.randomUUID()}`);
+    projectDir = path.join(workRoot, 'proj-a');
+    backupRoot = path.join(workRoot, 'backups');
+    await fs.mkdir(path.join(projectDir, 'src'), { recursive: true });
+    await fs.writeFile(path.join(projectDir, 'src', 'index.ts'), 'export {};\n', 'utf-8');
+    const zhDir = path.join(projectDir, '.zhshield');
+    await fs.mkdir(zhDir, { recursive: true });
+    await fs.writeFile(
+      path.join(zhDir, 'backup.yml'),
+      ['backup:', '  local:', `    backupDir: ${backupRoot}`, '    maxBackups: 3'].join('\n'),
+      'utf-8',
+    );
+    manager = new BackupConfigManager();
+  });
+
+  afterEach(() => {
+    fsSync.rmSync(workRoot, { recursive: true, force: true });
+  });
+
+  function buildOrchestrator(): BackupOrchestrator {
+    return new BackupOrchestrator({
+      configManager: manager,
+      localBackup: new LocalBackup(backupRoot),
+    });
+  }
+
+  it('显式 projectName 透传配置层，备份真实落盘到指定目录', async () => {
+    const spy = vi.spyOn(manager, 'loadProjectConfig');
+    const result = await buildOrchestrator().execute({
+      projectId: projectDir,
+      projectPath: projectDir,
+      projectName: '项目 甲',
+      trigger: 'manual',
+    });
+
+    expect(spy).toHaveBeenCalledWith(projectDir, '项目 甲');
+    expect(result.overallStatus).toBe('success');
+
+    const local = result.results.find((r): r is LocalBackupSubResult => r.type === 'local');
+    expect(local?.success).toBe(true);
+    expect(local?.backupPath?.startsWith(backupRoot)).toBe(true);
+    expect(local?.fileCount).toBeGreaterThan(0);
+
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(local!.backupPath!, 'BACKUP_MANIFEST.json'), 'utf-8'),
+    ) as { files: Array<{ relativePath: string }> };
+    expect(manifest.files.some((f) => f.relativePath === path.join('src', 'index.ts'))).toBe(true);
+  });
+
+  it('未提供 projectName 时以 undefined 透传（还原接线即此用例失败）', async () => {
+    const spy = vi.spyOn(manager, 'loadProjectConfig');
+    const result = await buildOrchestrator().execute({
+      projectId: projectDir,
+      projectPath: projectDir,
+      trigger: 'manual',
+    });
+
+    expect(spy).toHaveBeenCalledWith(projectDir, undefined);
+    expect(result.overallStatus).toBe('success');
   });
 });

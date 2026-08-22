@@ -2,10 +2,13 @@ import * as crypto from 'node:crypto';
 import type { SopRule, SopVersion, SopDiff, SyncResult } from '../_meta/sop-types';
 import type { SopRegistry } from '../_meta/sop-registry';
 import type { EventBus } from '../../bus';
+import type { SyncConflictResolver, ConflictResolution } from '../sync-conflict';
 import type { SopSqliteStore } from './sop-sqlite-store';
 import type { SopVersionStore } from './sop-version-store';
 import type { SopSyncClient } from './sop-sync-client';
 import type { SopSyncScheduler } from './sop-sync-scheduler';
+import type { SopCacheMetrics } from './sop-cache-metrics';
+import { SopConflictPolicy } from './sop-conflict-policy';
 
 const MAJOR_VERSION = /^(\d+)\./;
 
@@ -17,6 +20,12 @@ export interface SopSyncCoordinatorOptions {
   versionStore: SopVersionStore;
   syncClient: SopSyncClient;
   scheduler: SopSyncScheduler;
+  /** 云端/本地规则冲突解决器（sync-conflict 模块接入点）；缺省时保持既有覆盖语义 */
+  conflictResolver?: SyncConflictResolver;
+  /** 冲突自动解决策略，默认 REMOTE_WINS（与既有「云端覆盖本地」行为一致） */
+  conflictStrategy?: ConflictResolution;
+  /** 缓存业务指标（可选） */
+  metrics?: SopCacheMetrics;
 }
 
 /**
@@ -33,6 +42,7 @@ export class SopSyncCoordinator {
   private versionStore: SopVersionStore;
   private syncClient: SopSyncClient;
   private scheduler: SopSyncScheduler;
+  private conflictPolicy: SopConflictPolicy;
 
   private localVersion: SopVersion | null = null;
 
@@ -44,6 +54,13 @@ export class SopSyncCoordinator {
     this.versionStore = options.versionStore;
     this.syncClient = options.syncClient;
     this.scheduler = options.scheduler;
+    this.conflictPolicy = new SopConflictPolicy({
+      registry: options.registry,
+      resolver: options.conflictResolver,
+      strategy: options.conflictStrategy,
+      metrics: options.metrics,
+      eventBus: options.eventBus,
+    });
   }
 
   // ─── 初始化 ────────────────────────────────────────────────
@@ -232,17 +249,18 @@ export class SopSyncCoordinator {
       this.registry.remove(ruleId);
     }
     for (const rule of diff.modified) {
-      this.registry.update(rule.id, rule);
+      this.registry.update(rule.id, this.conflictPolicy.resolveIncoming(rule));
     }
     this.upsertRules(diff.added);
   }
 
   private upsertRules(rules: SopRule[]): void {
     for (const rule of rules) {
+      const effective = this.conflictPolicy.resolveIncoming(rule);
       try {
-        this.registry.register(rule);
+        this.registry.register(effective);
       } catch {
-        this.registry.update(rule.id, rule);
+        this.registry.update(effective.id, effective);
       }
     }
   }

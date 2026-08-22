@@ -20,11 +20,10 @@ export interface SyncConflict {
 
 export class SyncConflictResolver {
   /**
-   * 计算内容的 SHA-256 哈希
+   * 计算内容的 SHA-256 哈希（深度稳定序列化：递归排序对象键，哈希只反映内容不反映键序）
    */
   computeContentHash(content: unknown): string {
-    const data = JSON.stringify(content, Object.keys(content as Record<string, unknown>).sort());
-    return createHash('sha256').update(data).digest('hex');
+    return createHash('sha256').update(stableStringify(content)).digest('hex');
   }
 
   /**
@@ -89,4 +88,18 @@ export class SyncConflictResolver {
 
     return merged;
   }
+}
+
+/** 深度稳定序列化：对象键递归排序（数组保序），undefined/函数折叠为 null */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
 }

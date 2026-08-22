@@ -23,6 +23,14 @@ import { SopSyncClient } from './sop-sync-client';
 import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
+import { SyncConflictResolver, ConflictResolution } from '../sync-conflict';
+import { SmartCompressor } from '../smart-compressor';
+import { DataCleanup } from '../data-cleanup';
+import type { CleanupConfig } from '../data-cleanup';
+import type { MetricsCollector } from '../../metrics/metrics-collector';
+import { SopCacheMetrics } from './sop-cache-metrics';
+import type { SopCacheMetricsSnapshot } from './sop-cache-metrics';
+import { SopCacheMaintenance } from './sop-cache-maintenance';
 
 export { createSyncPolicy } from './sop-sync-policy';
 export type { SyncPolicyOptions } from './sop-sync-policy';
@@ -44,6 +52,12 @@ export interface SopCacheManagerOptions {
   secretKey?: string;
   /** 验签公钥：字符串或异步解析函数；未配置时验签放行（向后兼容），配置后解析失败则 fail-closed */
   publicKey?: string | (() => Promise<string | null>);
+  /** 云端/本地规则冲突自动解决策略，默认 REMOTE_WINS（与既有「云端覆盖本地」行为一致） */
+  conflictStrategy?: ConflictResolution;
+  /** 外部指标收集器（注入后可与外部仪表盘共享同一份数据） */
+  metricsCollector?: MetricsCollector;
+  /** 数据清理配置（条目上限/日志时间淘汰/保留下限），省略时使用默认值 */
+  cleanup?: Partial<CleanupConfig>;
 }
 
 /**
@@ -75,6 +89,8 @@ export class SopCacheManager {
   private coordinator: SopSyncCoordinator;
   private eventBus?: EventBus;
   private secretKey?: string;
+  private metrics: SopCacheMetrics;
+  private maintenance: SopCacheMaintenance;
 
   constructor(registry: SopRegistry, options: SopCacheManagerOptions = {}) {
     this.registry = registry;
@@ -89,8 +105,20 @@ export class SopCacheManager {
       this.lazyLoader = new SopLazyLoader(this);
     }
 
-    this.sqliteStore = new SopSqliteStore(path.join(this.cacheDir, 'rules.db'));
+    this.sqliteStore = new SopSqliteStore(path.join(this.cacheDir, 'rules.db'), {
+      compressor: new SmartCompressor(),
+    });
     this.versionStore = new SopVersionStore(this.cacheDir);
+    this.metrics = new SopCacheMetrics(options.metricsCollector);
+    this.maintenance = new SopCacheMaintenance({
+      registry,
+      sqliteStore: this.sqliteStore,
+      versionStore: this.versionStore,
+      cleanup: new DataCleanup(options.cleanup),
+      cleanupConfig: options.cleanup,
+      metrics: this.metrics,
+      eventBus: this.eventBus,
+    });
     const signatureVerifier = new SopSignatureVerifier(options.publicKey);
     const syncClient = options.publicKey !== undefined
       ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
@@ -104,6 +132,9 @@ export class SopCacheManager {
       versionStore: this.versionStore,
       syncClient,
       scheduler: this.scheduler,
+      conflictResolver: new SyncConflictResolver(),
+      conflictStrategy: options.conflictStrategy ?? ConflictResolution.REMOTE_WINS,
+      metrics: this.metrics,
     });
   }
 
@@ -118,6 +149,9 @@ export class SopCacheManager {
 
     // 读取本地版本号并加载本地缓存的规则
     await this.coordinator.initialize();
+
+    // 启动时自动维护（大小裁剪 + 日志清理），失败不阻塞初始化
+    await this.maintenance.run('init');
   }
 
   // ─── 版本管理 ──────────────────────────────────────────────
@@ -139,12 +173,15 @@ export class SopCacheManager {
    * 完整同步流程（文档 7.4 节）
    */
   async syncFromCloud(): Promise<SyncResult> {
+    const startedAt = Date.now();
     this.emit('sop:sync-started');
     try {
       const result = await this.coordinator.syncFromCloud();
+      this.metrics.recordSyncSuccess(Date.now() - startedAt);
       this.emit('sop:sync-completed', { result, timestamp: new Date() });
       return result;
     } catch (err) {
+      this.metrics.recordSyncFailure(Date.now() - startedAt);
       this.emit('sop:sync-failed', {
         error: err instanceof Error ? err.message : String(err),
         timestamp: new Date(),
@@ -176,6 +213,11 @@ export class SopCacheManager {
       ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
       timestamp: new Date(),
     });
+    this.metrics.recordRulesApplied(
+      diff.added.length + diff.modified.length + diff.removed.length,
+      'diff',
+    );
+    await this.maintenance.run('diff');
   }
 
   /**
@@ -194,6 +236,8 @@ export class SopCacheManager {
       ruleCount: rules.length,
       timestamp: new Date(),
     });
+    this.metrics.recordRulesApplied(rules.length, 'emergency');
+    await this.maintenance.run('emergency');
   }
 
   // ─── 本地缓存管理 ──────────────────────────────────────────
@@ -204,10 +248,15 @@ export class SopCacheManager {
   async loadRules(module: string): Promise<SopRule[]> {
     // 先尝试从注册中心获取活跃规则
     const cached = this.registry.getByDomain(module as GovernanceDomain);
-    if (cached.length > 0) return cached;
+    if (cached.length > 0) {
+      this.metrics.recordCacheLookup(module, true);
+      return cached;
+    }
 
     // 尝试从 SQLite 按 domain 查询
-    return this.sqliteStore.loadByDomain(module);
+    const fromStore = await this.sqliteStore.loadByDomain(module);
+    this.metrics.recordCacheLookup(module, fromStore.length > 0);
+    return fromStore;
   }
 
   /**
@@ -217,6 +266,7 @@ export class SopCacheManager {
     await this.coordinator.clearCache();
     this.emit('sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
     this.emit('sop:cache-synced', { type: 'cleared', timestamp: new Date() });
+    this.metrics.recordCleanup(0, 0);
   }
 
   // ─── 同步调度 ──────────────────────────────────────────────
@@ -285,6 +335,13 @@ export class SopCacheManager {
 
   getRegistry(): SopRegistry {
     return this.registry;
+  }
+
+  /**
+   * 获取缓存业务指标快照（MetricsCollector 接入点）
+   */
+  getMetricsSnapshot(): SopCacheMetricsSnapshot {
+    return this.metrics.snapshot();
   }
 
   // ─── 事件发射 ──────────────────────────────────────────────

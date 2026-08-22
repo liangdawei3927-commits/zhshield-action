@@ -2,6 +2,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SopVersion } from '../_meta/sop-types';
 
+export interface SyncLogEntry {
+  timestamp: string;
+  [key: string]: unknown;
+}
+
 /**
  * SopVersionStore — 本地版本号与同步日志存储
  *
@@ -52,5 +57,43 @@ export class SopVersionStore {
     } catch {
       // 日志写入失败不阻塞主流程
     }
+  }
+
+  /**
+   * 读取同步日志（逐行解析，坏行跳过；文件不存在返回空数组）
+   */
+  async readSyncLog(): Promise<SyncLogEntry[]> {
+    let raw: string;
+    try {
+      raw = await fs.promises.readFile(this.logPath, 'utf-8');
+    } catch {
+      return [];
+    }
+    const entries: SyncLogEntry[] = [];
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const parsed: unknown = JSON.parse(line);
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          typeof (parsed as Record<string, unknown>)['timestamp'] === 'string'
+        ) {
+          entries.push(parsed as SyncLogEntry);
+        }
+      } catch {
+        // 跳过损坏行
+      }
+    }
+    return entries;
+  }
+
+  /**
+   * 整体重写同步日志（维护裁剪用）
+   */
+  async writeSyncLog(entries: SyncLogEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const content = entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n';
+    await this.atomicWriteFile(this.logPath, content);
   }
 }

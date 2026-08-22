@@ -41,3 +41,7 @@ export type { AppNotification, NotificationStore, NotificationListener } from '.
 // ─── 审计日志（智汇大脑 — 链式哈希完整性） ──────────────────
 export { AuditLogger } from './audit';
 export type { AuditEntry, AuditQuery, AuditStats } from './audit';
+
+// ─── 指标收集（智汇大脑 — Counter/Gauge/Histogram） ─────────
+export { MetricsCollector } from './metrics/metrics-collector';
+export type { CounterMetric, GaugeMetric, HistogramMetric } from './metrics/metrics-collector';

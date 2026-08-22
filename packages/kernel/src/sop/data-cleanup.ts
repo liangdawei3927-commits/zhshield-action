@@ -4,12 +4,14 @@ export interface CleanupConfig {
   keepMinimum: number;
 }
 
-export interface CleanupResult {
+export interface CleanupResult<T = unknown> {
   totalBefore: number;
   totalAfter: number;
   removed: number;
   preserved: number;
   errors: string[];
+  /** 清理后保留的条目（按保留顺序），供调用方回写/裁剪存储 */
+  kept: T[];
 }
 
 export class DataCleanup {
@@ -29,7 +31,7 @@ export class DataCleanup {
   cleanup<T extends { timestamp: Date | string }>(
     entries: T[],
     options?: { maxEntries?: number; maxAgeDays?: number },
-  ): CleanupResult {
+  ): CleanupResult<T> {
     const maxEntries = options?.maxEntries ?? this.config.maxEntries;
     const maxAgeDays = options?.maxAgeDays ?? this.config.maxAgeDays;
     const cutoffDate = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
@@ -62,6 +64,7 @@ export class DataCleanup {
       removed,
       preserved: totalAfter,
       errors,
+      kept: filtered,
     };
   }
 

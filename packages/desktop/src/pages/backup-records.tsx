@@ -3,11 +3,18 @@ import { Bounce, BounceCard } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
 import { STATUS_LABEL, TYPE_LABEL, formatSize, formatTime } from './backup-logic';
 import { openBackupFolder } from '../services/engineApi';
+import { NavIcon } from '../components/ui/Icons';
+import { useToast } from '../components/ui/Toast';
 import { useT } from '../i18n';
 
 function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: BackupRecordData; isExpanded: boolean; onToggle: () => void; onDelete: () => void }) {
   const t = useT();
+  const { toast } = useToast();
   const info = STATUS_LABEL[record.status] ?? { textKey: record.status, color: 'rgb(var(--zh-muted))' };
+  const openFolder = async (): Promise<void> => {
+    const ok = await openBackupFolder(record.localBackupPath!);
+    if (!ok) toast(t('page.backup.toast.openFailed'), 'error');
+  };
   return (
     <BounceCard className="rounded-lg overflow-hidden">
       <div
@@ -24,6 +31,17 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-zh-muted">{record.duration}ms</span>
+          {record.localBackupPath && (
+            <Bounce
+              as="button"
+              title={t('page.backup.openFolderTip', { path: record.localBackupPath })}
+              aria-label={t('page.backup.openFolder')}
+              onClick={(e) => { e.stopPropagation(); void openFolder(); }}
+              className="flex items-center justify-center w-7 h-7 rounded hover:bg-brand/10 transition-colors text-zh-muted hover:text-zh-brand cursor-pointer border-none bg-transparent"
+            >
+              <NavIcon id="folder" size={16} />
+            </Bounce>
+          )}
           <Bounce
             as="button"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -44,9 +62,10 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
               <div className="flex items-center gap-2">
                 <span>{t('page.backup.detail.localPath', { path: record.localBackupPath })}</span>
                 <button
-                  onClick={() => openBackupFolder(record.localBackupPath!)}
-                  className="text-xs text-blue-500 hover:underline cursor-pointer border-none bg-transparent"
+                  onClick={() => { void openFolder(); }}
+                  className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline cursor-pointer border-none bg-transparent"
                 >
+                  <NavIcon id="folder" size={14} />
                   {t('page.backup.openFolder')}
                 </button>
               </div>

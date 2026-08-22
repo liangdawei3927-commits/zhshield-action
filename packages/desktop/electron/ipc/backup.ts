@@ -181,12 +181,19 @@ function registerOpenFolderHandler(): void {
   ipcMain.handle('backup:openFolder', async (_event, folderPath: string): Promise<boolean> => {
     if (!folderPath || typeof folderPath !== 'string') return false;
     const { shell } = await import('electron');
-    try {
-      await shell.openPath(folderPath);
-      return true;
-    } catch {
-      return false;
+    const { homedir } = await import('node:os');
+
+    // 快照目录可能已被 maxBackups 轮换清理：回退打开其所在备份根目录，保证“查看备份”仍可用
+    let target = folderPath.startsWith('~') ? join(homedir(), folderPath.slice(1)) : folderPath;
+    if (!existsSync(target)) {
+      const parent = join(target, '..');
+      if (!existsSync(parent)) return false;
+      target = parent;
     }
+
+    // shell.openPath 失败不抛异常而是 resolve 错误字符串，必须检查返回值而非 try/catch
+    const errMsg = await shell.openPath(target);
+    return !errMsg;
   });
 }
 

@@ -785,6 +785,7 @@
       "noRecords": "No backup records yet",
       "oneClickBackup": "One-click backup",
       "openFolder": "Open Folder",
+      "openFolderTip": "Open backup folder to view archives: {{path}}",
       "recordCount": "{{count}} backup records",
       "recordsTitle": "Backup records",
       "result": {
@@ -801,6 +802,7 @@
         "deleteFailed": "Delete failed",
         "deleted": "Backup record deleted",
         "failed": "Backup execution failed",
+        "openFailed": "Could not open the backup folder. It may have been cleaned up.",
         "success": "Backup succeeded"
       },
       "trigger": {

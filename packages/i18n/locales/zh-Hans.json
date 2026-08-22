@@ -785,6 +785,7 @@
       "noRecords": "暂无备份记录",
       "oneClickBackup": "一键备份",
       "openFolder": "打开文件夹",
+      "openFolderTip": "打开备份文件夹查看压缩文件：{{path}}",
       "recordCount": "{{count}} 条备份记录",
       "recordsTitle": "备份记录",
       "result": {
@@ -801,6 +802,7 @@
         "deleteFailed": "删除失败",
         "deleted": "备份记录已删除",
         "failed": "备份执行失败",
+        "openFailed": "无法打开备份文件夹，路径可能已被清理",
         "success": "备份成功"
       },
       "trigger": {

@@ -48,6 +48,13 @@ export interface ScoringRuleContext {
   };
 }
 
+export interface PenaltyConfig {
+  dimension: string;
+  maxPenalty: number;
+  perIssuePenalty: number;
+  severityMultipliers: Record<string, number>;
+}
+
 export interface PositiveRule {
   id: string;
   name: string;
@@ -62,12 +69,7 @@ export interface DimensionDefinition {
   name: string;
   weight: number;
   description: string;
-  penalties: {
-    dimension: string;
-    maxPenalty: number;
-    perIssuePenalty: number;
-    severityMultipliers: Record<string, number>;
-  };
+  penalties: PenaltyConfig;
   positiveRules: PositiveRule[];
 }
 
@@ -75,4 +77,22 @@ export interface ScoringConfig {
   version: string;
   lastUpdated: Date;
   dimensions: DimensionDefinition[];
+}
+
+export interface DimensionScoreDetail {
+  dimension: string;
+  score: number;
+  weight: number;
+  positive: number;
+  negative: number;
+  issues: number;
+}
+
+export interface ScoringResult {
+  overall: number;
+  grade: ScoreGrade;
+  dimensions: DimensionScore[];
+  positivePoints: number;
+  negativePoints: number;
+  details: DimensionScoreDetail[];
 }

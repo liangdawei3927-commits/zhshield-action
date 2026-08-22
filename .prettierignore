@@ -33,7 +33,6 @@ packages/desktop/release/
 *.json
 !.*.json
 sop-templates/
-SOP标准资源/
 .github/
 
 # 脚本产物

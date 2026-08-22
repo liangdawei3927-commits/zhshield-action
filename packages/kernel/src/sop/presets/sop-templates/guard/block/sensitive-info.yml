@@ -6,7 +6,8 @@
 # 动作类型: 拦截阻断 (block)
 # 数据来源: 外部标准 (external)
 # 对应适配器: Guard L1 pre-commit
-# 外部标准源: Gitleaks 222 条规则 → SOP标准资源/gitleaks/config/gitleaks.toml
+# 外部标准源: Gitleaks 默认规则 222 条（https://github.com/gitleaks/gitleaks），
+# 运行时配置位于 ${ZHSHIELD_HOME}/gitleaks.toml
 # =============================================================================
 
 apiVersion: sop/v1

@@ -105,4 +105,22 @@ describe('FormDetector', () => {
       cleanupTempProject(root);
     }
   });
+
+  it('GIVEN 深层嵌套形态文件（apps/native/ios/Podfile 与 packages/app/App.xcodeproj，≥3 层路径）WHEN detect THEN 深层信号与 bundle 均被发现', async () => {
+    const root = makeTempProject({
+      'apps/native/ios/Podfile': "platform :ios, '15.0'\ntarget 'App' do\nend\n",
+      'packages/app/App.xcodeproj/project.pbxproj': '// pbxproj placeholder\n',
+    });
+    try {
+      const signals = await detector.detect(root);
+
+      const podfile = signals.find((s) => s.ruleId === 'form:podfile');
+      expect(podfile?.file).toBe('apps/native/ios/Podfile');
+
+      const bundle = signals.find((s) => s.ruleId === 'form:xcodeproj');
+      expect(bundle?.file).toBe('packages/app/App.xcodeproj');
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
 });

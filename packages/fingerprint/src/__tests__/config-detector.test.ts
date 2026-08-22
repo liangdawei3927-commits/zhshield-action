@@ -87,4 +87,25 @@ describe('ConfigDetector', () => {
       cleanupTempProject(root);
     }
   });
+
+  it('GIVEN 嵌套 workspace 的 apps/web/tsconfig.json（3 层路径）WHEN detect THEN 深层配置被发现且 file 为相对路径', async () => {
+    const root = makeTempProject({
+      'package.json': '{"name":"monorepo","private":true,"workspaces":["apps/*"]}',
+      'apps/web/tsconfig.json': '{"compilerOptions":{"strict":true}}',
+      'apps/web/src/main.tsx': "import { createRoot } from 'react-dom/client';\n",
+      'apps/web/vite.config.ts': "export default {};\n",
+    });
+    try {
+      const signals = await detector.detect(root);
+
+      const tsconfig = signals.find((s) => s.ruleId === 'config:tsconfig');
+      expect(tsconfig).toBeDefined();
+      expect(tsconfig?.file).toBe('apps/web/tsconfig.json');
+
+      const vite = signals.find((s) => s.ruleId === 'config:vite');
+      expect(vite?.file).toBe('apps/web/vite.config.ts');
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
 });

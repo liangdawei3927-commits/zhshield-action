@@ -27,10 +27,20 @@ export function listRootFiles(projectRoot: string): string[] {
     .sort();
 }
 
+/** 递归遍历默认深度上限（目录层级；防止符号链接环之外的病态深树拖垮扫描）。 */
+export const DEFAULT_MAX_DEPTH = 12;
+
+export interface WalkOptions {
+  /** 目录层级上限（根目录=0 层）；达到上限不再下钻。默认 DEFAULT_MAX_DEPTH。 */
+  readonly maxDepth?: number;
+}
+
 /** 递归收集项目内全部相对路径（posix），跳过噪声目录与符号链接，输出按字典序排序（确定性）。 */
-export function walkFiles(projectRoot: string): string[] {
+export function walkFiles(projectRoot: string, options?: WalkOptions): string[] {
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
   const out: string[] = [];
-  const walk = (relDir: string): void => {
+  const walk = (relDir: string, depth: number): void => {
+    if (depth > maxDepth) return;
     const absDir = relDir === '' ? projectRoot : path.join(projectRoot, ...relDir.split('/'));
     let entries: fs.Dirent[] = [];
     try {
@@ -44,13 +54,49 @@ export function walkFiles(projectRoot: string): string[] {
       const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
       if (entry.isDirectory()) {
         if (isNoiseDir(entry.name)) continue;
-        walk(rel);
+        walk(rel, depth + 1);
       } else if (entry.isFile()) {
         out.push(rel);
       }
     }
   };
-  walk('');
+  walk('', 0);
+  return out;
+}
+
+/**
+ * 递归收集匹配条件的子目录相对路径（posix，字典序）。命中即收且不再下钻
+ * （macOS bundle 目录如 .xcodeproj 是叶子整体，不遍历内部），噪声目录与符号链接跳过。
+ * 与 walkFiles 共用同一套忽略规则（SKIP_DIRS）与深度上限 —— 全包唯一递归遍历实现。
+ */
+export function findDirsMatching(
+  projectRoot: string,
+  match: (dirName: string) => boolean,
+  options?: WalkOptions,
+): string[] {
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const out: string[] = [];
+  const walk = (relDir: string, depth: number): void => {
+    if (depth > maxDepth) return;
+    const absDir = relDir === '' ? projectRoot : path.join(projectRoot, ...relDir.split('/'));
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink() || isNoiseDir(entry.name)) continue;
+      const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
+      if (match(entry.name)) {
+        out.push(rel);
+      } else {
+        walk(rel, depth + 1);
+      }
+    }
+  };
+  walk('', 0);
   return out;
 }
 

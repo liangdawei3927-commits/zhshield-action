@@ -6,7 +6,8 @@ import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
 import { FRAMEWORK_KEYWORDS } from '../framework-map';
-import { listRootFiles, readText, relDirname, isRecord } from '../fs-utils';
+import { listRootFiles, readText, relDirname, isRecord, isNoiseDir } from '../fs-utils';
+import { SKIP_DIRS } from '../detector';
 import { makeSignal, readDependencyNames, frameworkSignalsFromDeps } from './types';
 import {
   normalizePackageName,
@@ -48,10 +49,11 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
 
 function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[] {
   const dirs: string[] = [];
+  const isNoiseRel = (rel: string): boolean => rel.split('/').some((segment) => isNoiseDir(segment));
   for (const pattern of patterns) {
     if (!pattern.includes('*')) {
       const absDir = path.join(projectRoot, pattern);
-      if (fs.existsSync(absDir) && fs.statSync(absDir).isDirectory()) {
+      if (fs.existsSync(absDir) && fs.statSync(absDir).isDirectory() && !isNoiseRel(pattern)) {
         dirs.push(pattern);
       }
       continue;
@@ -68,6 +70,7 @@ function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[]
         const candidate = rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
         if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
           const rel = path.relative(projectRoot, candidate);
+          if (isNoiseRel(rel)) continue;
           dirs.push(rel);
         }
       }
@@ -76,6 +79,21 @@ function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[]
     }
   }
   return dirs;
+}
+
+/** 解析根 package.json 的 workspaces 字段（npm/yarn 风格）获取 workspace glob patterns。 */
+function readPackageJsonWorkspacePatterns(projectRoot: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readText(projectRoot, 'package.json'));
+  } catch {
+    return [];
+  }
+  if (!isRecord(parsed)) return [];
+  const workspaces = parsed.workspaces;
+  const raw: unknown = isRecord(workspaces) ? workspaces.packages : workspaces;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === 'string');
 }
 
 const KIND: SignalKind = 'manifest';
@@ -104,8 +122,6 @@ function packageManagerSignals(projectRoot: string, manifestRelPath: string, man
   return signals;
 }
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.opencode']);
-
 function findProjectRoot(projectPath: string): string {
   const manifestNames = ['package.json', 'pyproject.toml', 'requirements.txt', 'Cargo.toml', 'go.mod', 'pom.xml', 'Gemfile'];
   for (const name of listRootFiles(projectPath)) {
@@ -119,7 +135,6 @@ function findProjectRoot(projectPath: string): string {
   }
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.isSymbolicLink() || SKIP_DIRS.has(entry.name)) continue;
-    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist' || entry.name === 'build') continue;
     const sub = path.join(projectPath, entry.name);
     for (const name of listRootFiles(sub)) {
       if (manifestNames.includes(name)) return sub;
@@ -143,10 +158,12 @@ export class ManifestDetector implements Detector {
       signals.push(...this.detectManifest(projectPath, rel, name, rule.ruleId, rule.language));
     }
 
-    const workspacePatterns = readPnpmWorkspacePatterns(root);
+    const workspacePatterns = [
+      ...new Set([...readPnpmWorkspacePatterns(root), ...readPackageJsonWorkspacePatterns(root)]),
+    ];
     if (workspacePatterns.length > 0) {
       const workspaceDirs = expandWorkspaceGlobs(root, workspacePatterns);
-      for (const dir of workspaceDirs) {
+      for (const dir of new Set(workspaceDirs)) {
         for (const name of listRootFiles(path.join(root, dir))) {
           if (name !== 'package.json') continue;
           const rel = (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;

@@ -111,4 +111,72 @@ describe('ManifestDetector', () => {
       cleanupTempProject(root);
     }
   });
+
+  it('GIVEN 根 package.json workspaces（npm/yarn 风格）嵌套 workspace 清单 WHEN detect THEN 深层 package.json 被发现（≥3 层路径）', async () => {
+    const root = makeTempProject({
+      'package.json': JSON.stringify({
+        name: 'monorepo',
+        private: true,
+        workspaces: ['apps/*', 'packages/*'],
+        dependencies: { next: '^14.0.0' },
+      }),
+      'apps/web/package.json': JSON.stringify({
+        name: '@demo/web',
+        dependencies: { react: '^18.0.0', 'react-dom': '^18.0.0' },
+      }),
+      'apps/web/src/index.tsx': "import { createRoot } from 'react-dom/client';\n",
+      'packages/core/package.json': JSON.stringify({
+        name: '@demo/core',
+        dependencies: { react: '^18.0.0' },
+      }),
+      'packages/core/src/lib.ts': 'export const lib = 1;\n',
+    });
+    try {
+      const signals = await detector.detect(root);
+
+      const web = signals.find((s) => s.ruleId === 'manifest:package-json' && s.file === 'apps/web/package.json');
+      const core = signals.find((s) => s.ruleId === 'manifest:package-json' && s.file === 'packages/core/package.json');
+      expect(web).toBeDefined();
+      expect(core).toBeDefined();
+
+      const webFrameworks = signals.filter((s) => s.ruleId.startsWith('manifest:framework:') && s.file === 'apps/web/package.json');
+      expect(webFrameworks.map((s) => s.ruleId)).toContain('manifest:framework:react');
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
+
+  it('GIVEN pnpm-workspace.yaml 与 package.json workspaces 声明相同 glob WHEN detect THEN 同一 workspace 只出一份信号', async () => {
+    const root = makeTempProject({
+      'package.json': JSON.stringify({
+        name: 'monorepo',
+        private: true,
+        workspaces: ['packages/*'],
+      }),
+      'pnpm-workspace.yaml': 'packages:\n  - packages/*\n',
+      'packages/core/package.json': JSON.stringify({ name: '@demo/core', dependencies: { lodash: '^4.0.0' } }),
+    });
+    try {
+      const signals = await detector.detect(root);
+      const coreManifests = signals.filter(
+        (s) => s.ruleId === 'manifest:package-json' && s.file === 'packages/core/package.json',
+      );
+      expect(coreManifests).toHaveLength(1);
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
+
+  it('GIVEN workspaces glob 仅命中噪声目录内清单 WHEN detect THEN 不产出信号', async () => {
+    const root = makeTempProject({
+      'package.json': JSON.stringify({ name: 'monorepo', private: true, workspaces: ['dist/*'] }),
+      'dist/bundle/package.json': JSON.stringify({ name: 'generated', dependencies: { react: '^18.0.0' } }),
+    });
+    try {
+      const signals = await detector.detect(root);
+      expect(signals.filter((s) => s.file.startsWith('dist/'))).toEqual([]);
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
 });

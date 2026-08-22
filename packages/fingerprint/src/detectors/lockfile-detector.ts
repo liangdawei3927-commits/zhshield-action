@@ -2,6 +2,7 @@
 // 包管理器归属由 manifest-detector 的 manifest:package-manager 信号负责）。
 
 import type { Detector } from '../detector';
+import { SKIP_DIRS } from '../detector';
 import type { Signal, SignalKind } from '../types';
 import { listRootFiles } from '../fs-utils';
 import { makeSignal } from './types';
@@ -11,7 +12,6 @@ import * as path from 'node:path';
 
 const KIND: SignalKind = 'lockfile';
 const LOCKFILE_NAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'go.sum', 'Cargo.lock', 'poetry.lock', 'uv.lock', 'pom.xml', 'Pipfile.lock']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'vendor', '.venv', 'venv', '.opencode']);
 
 function findProjectRoot(projectPath: string): string {
   for (const name of listRootFiles(projectPath)) {

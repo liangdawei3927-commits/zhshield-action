@@ -1,13 +1,11 @@
 // form-detector（权重 0.5）：只采集"形态特征文件存在性"原始信号（架构文档 C10），
 // 不做任何语义判定——形态语义判定在 Profiler 第二阶段（消费语言结果 + 交叉验证）。
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { Detector } from '../detector';
 import type { Signal, SignalKind } from '../types';
 import { FORM_FILE_RULES } from '../language-map';
 import { SERVER_FRAMEWORK_DEP_KEYWORDS } from '../framework-map';
-import { walkFiles, readText, isNoiseDir } from '../fs-utils';
+import { walkFiles, readText, findDirsMatching } from '../fs-utils';
 import { makeSignal, readManifestDepNames, conventionDirSignals } from './types';
 
 const KIND: SignalKind = 'form';
@@ -36,31 +34,9 @@ function hasDbConfigMarker(content: string): boolean {
   return /\b(datasource|jdbc:|mongodb:|postgres:|mysql:|redis:)/i.test(content);
 }
 
-/** .xcodeproj/.xcworkspace 是 macOS bundle 目录，walkFiles 不遍历，需递归扫描。 */
+/** .xcodeproj/.xcworkspace 是 macOS bundle 目录，作为叶子整体收集（不下钻内部），复用 fs-utils 共享递归遍历。 */
 function findXcodeBundles(projectRoot: string): string[] {
-  const bundles: string[] = [];
-  const walk = (dir: string, relPrefix: string): void => {
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.isSymbolicLink()) continue;
-      const rel = relPrefix === '' ? entry.name : `${relPrefix}/${entry.name}`;
-      if (entry.isDirectory()) {
-        if (isNoiseDir(entry.name)) continue;
-        if (entry.name.endsWith('.xcodeproj') || entry.name.endsWith('.xcworkspace')) {
-          bundles.push(rel);
-        } else {
-          walk(path.join(dir, entry.name), rel);
-        }
-      }
-    }
-  };
-  walk(projectRoot, '');
-  return bundles;
+  return findDirsMatching(projectRoot, (name) => name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace'));
 }
 
 /**

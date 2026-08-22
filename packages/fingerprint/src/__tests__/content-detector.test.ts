@@ -86,4 +86,21 @@ describe('ContentDetector', () => {
       cleanupTempProject(root);
     }
   });
+
+  it('GIVEN 深层嵌套脚本（tools/ci/deploy.py，3 层路径）WHEN detect THEN shebang 信号被发现且 file 为相对路径', async () => {
+    const root = makeTempProject({
+      'tools/ci/deploy.py': '#!/usr/bin/env python3\nimport sys\n\nsys.exit(0)\n',
+    });
+    try {
+      const signals = await detector.detect(root);
+
+      const signal = signals.find((s) => s.ruleId === 'content:shebang' && s.file === 'tools/ci/deploy.py');
+      expect(signal).toBeDefined();
+      if (signal !== undefined) {
+        expect(languageOf(signal)).toBe('python');
+      }
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
 });

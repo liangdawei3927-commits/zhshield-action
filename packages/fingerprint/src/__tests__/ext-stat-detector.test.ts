@@ -81,6 +81,27 @@ describe('ExtStatDetector', () => {
     }
   });
 
+  it('GIVEN 嵌套 workspace 深层源码（apps/web/src，3 层路径）WHEN detect THEN byDir 含深层目录', async () => {
+    const root = makeTempProject({
+      'package.json': '{"name":"monorepo","private":true,"workspaces":["apps/*"]}',
+      'apps/web/src/a.ts': 'export {}',
+      'apps/web/src/b.ts': 'export {}',
+      'apps/web/vite.config.ts': 'export default {};',
+    });
+    try {
+      const signals = await detector.detect(root);
+      const ts = signalByRuleId(signals, 'ext-stat:typescript');
+
+      const tsPayload = ts.payload;
+      expect(isRecord(tsPayload)).toBe(true);
+      if (isRecord(tsPayload)) {
+        expect(tsPayload.byDir).toEqual({ 'apps/web/src': 2, 'apps/web': 1 });
+      }
+    } finally {
+      cleanupTempProject(root);
+    }
+  });
+
   it('GIVEN 无可统计源码（仅文档/无扩展名文件）WHEN detect THEN 不产出任何信号', async () => {
     const root = makeTempProject({
       'README.md': '# demo',

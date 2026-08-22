@@ -944,6 +944,9 @@
       "env.severity.warning": "提示",
       "env.total": "共 {{count}} 条",
       "errorTitle": "管家盘点失败",
+      "exportFailed": "导出失败",
+      "exportReport": "导出报告",
+      "exportSuccess": "报告已导出",
       "feature": {
         "graph": {
           "desc": "直接 / 传递依赖与边关系一目了然",
@@ -988,6 +991,10 @@
       "lockfileVerify.integrity": "完整性异常（{{count}}）",
       "lockfileVerify.missing": "未发现锁文件",
       "lockfileVerify.modified": "校验发现不一致",
+      "outdated": "依赖版本检查",
+      "outdated.none": "所有依赖已是最新版本",
+      "outdated.security": "安全更新",
+      "outdated.total": "{{count}} 个可更新",
       "overview": "依赖总览",
       "overviewDirect": "直接依赖",
       "overviewEdges": "依赖边数",
@@ -1013,11 +1020,7 @@
       "upgrade.checkFailed": "升级评估失败",
       "upgrade.none": "没有待升级的已知大版本依赖",
       "upgrade.security": "安全修复",
-      "upgrade.total": "共 {{count}} 项",
-      "outdated": "依赖版本检查",
-      "outdated.total": "{{count}} 个可更新",
-      "outdated.none": "所有依赖已是最新版本",
-      "outdated.security": "安全更新"
+      "upgrade.total": "共 {{count}} 项"
     },
     "evolve": {
       "analyze": "架构分析",

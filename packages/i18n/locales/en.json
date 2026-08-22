@@ -944,6 +944,9 @@
       "env.severity.warning": "Warning",
       "env.total": "{{count}} entries",
       "errorTitle": "Inventory failed",
+      "exportFailed": "Export failed",
+      "exportReport": "Export Report",
+      "exportSuccess": "Report exported",
       "feature": {
         "graph": {
           "desc": "Direct / transitive dependencies and edge relations at a glance",
@@ -988,6 +991,10 @@
       "lockfileVerify.integrity": "Integrity failures ({{count}})",
       "lockfileVerify.missing": "No lockfile found",
       "lockfileVerify.modified": "Verification found inconsistencies",
+      "outdated": "Dependency version check",
+      "outdated.none": "All dependencies are up to date",
+      "outdated.security": "Security update",
+      "outdated.total": "{{count}} can be updated",
       "overview": "Overview",
       "overviewDirect": "Direct dependencies",
       "overviewEdges": "Dependency edges",
@@ -1013,11 +1020,7 @@
       "upgrade.checkFailed": "Upgrade assessment failed",
       "upgrade.none": "No known major-version upgrades pending",
       "upgrade.security": "Security fix",
-      "upgrade.total": "{{count}} items",
-      "outdated": "Dependency version check",
-      "outdated.total": "{{count}} can be updated",
-      "outdated.none": "All dependencies are up to date",
-      "outdated.security": "Security update"
+      "upgrade.total": "{{count}} items"
     },
     "evolve": {
       "analyze": "Architecture analysis",

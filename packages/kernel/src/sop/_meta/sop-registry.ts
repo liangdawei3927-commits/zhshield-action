@@ -8,6 +8,7 @@ import type {
   ActionType,
   RuleLifecycleStatus,
 } from './sop-types';
+import { RuleIndex } from './sop-rule-index';
 
 export interface RuleChangeEvent {
   type: 'added' | 'removed' | 'modified' | 'status-changed';
@@ -25,8 +26,38 @@ interface EvaluateActiveContext {
   deprecated: string[];
 }
 
+function idsToRules(ids: Set<string> | undefined, rules: Map<string, SopRule>): SopRule[] {
+  if (!ids) return [];
+  const out: SopRule[] = [];
+  for (const id of ids) {
+    const rule = rules.get(id);
+    if (rule) out.push(rule);
+  }
+  return out;
+}
+
+/** 聚合规则集的能力声明（去重，空类别省略） */
+function aggregateServes(rules: SopRule[]): SopServes {
+  const languages = new Set<string>();
+  const productForms = new Set<string>();
+  const architectures = new Set<string>();
+
+  for (const rule of rules) {
+    for (const lang of rule.serves?.languages ?? []) languages.add(lang);
+    for (const form of rule.serves?.productForms ?? []) productForms.add(form);
+    for (const arch of rule.serves?.architectures ?? []) architectures.add(arch);
+  }
+
+  const serves: SopServes = {};
+  if (languages.size > 0) serves.languages = [...languages];
+  if (productForms.size > 0) serves.productForms = [...productForms];
+  if (architectures.size > 0) serves.architectures = [...architectures];
+  return serves;
+}
+
 export class SopRegistry {
   private rules = new Map<string, SopRule>();
+  private index = new RuleIndex();
   private eventBus?: EventBus;
 
   constructor(eventBus?: EventBus) {
@@ -39,8 +70,10 @@ export class SopRegistry {
     if (this.rules.has(rule.id)) {
       throw new Error(`SOP rule already registered: ${rule.id}`);
     }
-    this.rules.set(rule.id, { ...rule });
-    this.emitChange({ type: 'added', ruleId: rule.id, rule, timestamp: new Date() });
+    const stored: SopRule = { ...rule };
+    this.rules.set(stored.id, stored);
+    this.index.add(stored);
+    this.emitChange({ type: 'added', ruleId: stored.id, rule: stored, timestamp: new Date() });
   }
 
   get(id: string): SopRule | undefined {
@@ -59,7 +92,9 @@ export class SopRegistry {
 
     const previousStatus = existing.status;
     const updated: SopRule = { ...existing, ...partial, updatedAt: new Date() };
+    this.index.remove(existing);
     this.rules.set(id, updated);
+    this.index.add(updated);
 
     if (partial.status && partial.status !== previousStatus) {
       this.emitChange({
@@ -77,36 +112,21 @@ export class SopRegistry {
   }
 
   remove(id: string): boolean {
-    const existed = this.rules.delete(id);
-    if (existed) {
-      this.emitChange({ type: 'removed', ruleId: id, timestamp: new Date() });
-    }
-    return existed;
+    const existing = this.rules.get(id);
+    if (!existing) return false;
+    this.index.remove(existing);
+    this.rules.delete(id);
+    this.emitChange({ type: 'removed', ruleId: id, timestamp: new Date() });
+    return true;
   }
 
   // ─── 查询 ──────────────────────────────────────────────────
 
   query(filter: SopRuleFilter): SopRule[] {
-    let results = this.getAll();
+    const candidateIds = this.index.candidates(filter);
 
-    if (filter.domain) {
-      results = results.filter((r) => r.domain === filter.domain);
-    }
-    if (filter.action) {
-      results = results.filter((r) => r.action === filter.action);
-    }
-    if (filter.source) {
-      results = results.filter((r) => r.source === filter.source);
-    }
-    if (filter.status) {
-      results = results.filter((r) => r.status === filter.status);
-    }
-    if (filter.severity) {
-      results = results.filter((r) => r.severity === filter.severity);
-    }
-    if (filter.tags && filter.tags.length > 0) {
-      results = results.filter((r) => filter.tags!.some((t) => r.tags.includes(t)));
-    }
+    let results = candidateIds !== null ? idsToRules(candidateIds, this.rules) : this.getAll();
+
     if (filter.search) {
       const q = filter.search.toLowerCase();
       results = results.filter(
@@ -121,43 +141,25 @@ export class SopRegistry {
   }
 
   getByDomain(domain: GovernanceDomain): SopRule[] {
-    return this.getAll().filter((r) => r.domain === domain);
+    return idsToRules(this.index.byDomain(domain), this.rules);
   }
 
   getByAction(action: ActionType): SopRule[] {
-    return this.getAll().filter((r) => r.action === action);
+    return idsToRules(this.index.byAction(action), this.rules);
   }
 
   getActive(): SopRule[] {
-    return this.getAll().filter((r) => r.status === 'active');
+    return idsToRules(this.index.byStatus('active'), this.rules);
   }
 
   /** 聚合全部规则的能力声明（去重，空类别省略） */
   getAllServes(): SopServes {
-    return this.aggregateServes(this.getAll());
+    return aggregateServes(this.getAll());
   }
 
   /** 聚合指定治理域内规则的能力声明（去重，空类别省略） */
   getServes(domain: GovernanceDomain): SopServes {
-    return this.aggregateServes(this.getByDomain(domain));
-  }
-
-  private aggregateServes(rules: SopRule[]): SopServes {
-    const languages = new Set<string>();
-    const productForms = new Set<string>();
-    const architectures = new Set<string>();
-
-    for (const rule of rules) {
-      for (const lang of rule.serves?.languages ?? []) languages.add(lang);
-      for (const form of rule.serves?.productForms ?? []) productForms.add(form);
-      for (const arch of rule.serves?.architectures ?? []) architectures.add(arch);
-    }
-
-    const serves: SopServes = {};
-    if (languages.size > 0) serves.languages = [...languages];
-    if (productForms.size > 0) serves.productForms = [...productForms];
-    if (architectures.size > 0) serves.architectures = [...architectures];
-    return serves;
+    return aggregateServes(this.getByDomain(domain));
   }
 
   // ─── 统计 ──────────────────────────────────────────────────
@@ -240,14 +242,18 @@ export class SopRegistry {
   // ─── 批量操作 ──────────────────────────────────────────────
 
   loadAll(rules: SopRule[]): void {
+    this.index.clear();
     this.rules.clear();
     for (const rule of rules) {
-      this.rules.set(rule.id, { ...rule });
+      const stored: SopRule = { ...rule };
+      this.rules.set(stored.id, stored);
+      this.index.add(stored);
     }
   }
 
   clear(): void {
     this.rules.clear();
+    this.index.clear();
   }
 
   count(): number {

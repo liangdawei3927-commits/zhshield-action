@@ -40,8 +40,8 @@ afterEach(() => {
 });
 
 describe('appendFalsePositive 误报反馈落库', () => {
-  it('追加到 <project>/.zhshield/false-positives.jsonl 并生成 id/timestamp', () => {
-    const absPath = appendFalsePositive(tmpDir, makeItem());
+  it('追加到 <project>/.zhshield/false-positives.jsonl 并生成 id/timestamp', async () => {
+    const absPath = await appendFalsePositive(tmpDir, makeItem());
 
     expect(absPath).toBe(falsePositivesPath(tmpDir));
     expect(fs.existsSync(absPath)).toBe(true);
@@ -58,9 +58,9 @@ describe('appendFalsePositive 误报反馈落库', () => {
     expect(record.timestamp).toBeTruthy();
   });
 
-  it('多次追加按行累积', () => {
-    appendFalsePositive(tmpDir, makeItem({ ruleId: 'a' }));
-    appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 'b', message: 'timeout' }));
+  it('多次追加按行累积', async () => {
+    await appendFalsePositive(tmpDir, makeItem({ ruleId: 'a' }));
+    await appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 'b', message: 'timeout' }));
 
     const lines = fs.readFileSync(falsePositivesPath(tmpDir), 'utf-8').trim().split('\n');
     expect(lines).toHaveLength(2);
@@ -69,34 +69,34 @@ describe('appendFalsePositive 误报反馈落库', () => {
 });
 
 describe('listFalsePositives 误报反馈读取', () => {
-  it('文件不存在返回空数组', () => {
-    expect(listFalsePositives(tmpDir)).toEqual([]);
-    expect(listFalsePositives(tmpDir, 'guard')).toEqual([]);
+  it('文件不存在返回空数组', async () => {
+    expect(await listFalsePositives(tmpDir)).toEqual([]);
+    expect(await listFalsePositives(tmpDir, 'guard')).toEqual([]);
   });
 
-  it('返回全部记录，最近在前', () => {
-    appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 's1', message: 'a' }));
-    appendFalsePositive(tmpDir, makeItem({ source: 'guard', ruleId: 'g1', message: 'b' }));
+  it('返回全部记录，最近在前', async () => {
+    await appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 's1', message: 'a' }));
+    await appendFalsePositive(tmpDir, makeItem({ source: 'guard', ruleId: 'g1', message: 'b' }));
 
-    const records = listFalsePositives(tmpDir);
+    const records = await listFalsePositives(tmpDir);
     expect(records).toHaveLength(2);
     expect(records[0].ruleId).toBe('g1');
     expect(records[1].ruleId).toBe('s1');
   });
 
-  it('按 source 过滤', () => {
-    appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 's1', message: 'a' }));
-    appendFalsePositive(tmpDir, makeItem({ source: 'guard', ruleId: 'g1', message: 'b' }));
+  it('按 source 过滤', async () => {
+    await appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 's1', message: 'a' }));
+    await appendFalsePositive(tmpDir, makeItem({ source: 'guard', ruleId: 'g1', message: 'b' }));
 
-    expect(listFalsePositives(tmpDir, 'guard').map((r) => r.ruleId)).toEqual(['g1']);
-    expect(listFalsePositives(tmpDir, 'sentinel').map((r) => r.ruleId)).toEqual(['s1']);
+    expect((await listFalsePositives(tmpDir, 'guard')).map((r) => r.ruleId)).toEqual(['g1']);
+    expect((await listFalsePositives(tmpDir, 'sentinel')).map((r) => r.ruleId)).toEqual(['s1']);
   });
 
-  it('损坏行静默跳过', () => {
-    appendFalsePositive(tmpDir, makeItem({ ruleId: 'g1', message: 'ok' }));
+  it('损坏行静默跳过', async () => {
+    await appendFalsePositive(tmpDir, makeItem({ ruleId: 'g1', message: 'ok' }));
     fs.appendFileSync(falsePositivesPath(tmpDir), 'not-json\n', 'utf-8');
 
-    const records = listFalsePositives(tmpDir);
+    const records = await listFalsePositives(tmpDir);
     expect(records).toHaveLength(1);
     expect(records[0].ruleId).toBe('g1');
   });

@@ -54,6 +54,22 @@ export default defineConfig({
         },
       },
       {
+        // 画像 worker 线程：独立入口，由 profile-host 以 worker_threads 启动
+        entry: 'electron/profile-worker.ts',
+        onstart(options) {
+          // 不重启 Electron 主进程；初始构建若最后完成则由此拉起
+          options.reload();
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+            rollupOptions: {
+              external: ['electron', /^@zh\//],
+            },
+          },
+        },
+      },
+      {
         // OpenCode MCP server：独立入口，由 OpenCode 以 node 启动（stdio）
         entry: 'electron/zhshield-mcp.ts',
         onstart(options) {

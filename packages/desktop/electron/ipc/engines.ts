@@ -7,7 +7,8 @@
 
 import { ipcMain } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
+import { constants as FS_CONSTANTS } from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
@@ -20,7 +21,7 @@ import type { InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/security';
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
-import { createReport, detectProjectProfile, type PipelineReport } from '@zh/pipeline';
+import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
 import {
   buildDependencyGraph,
   buildLicenseMatrix,
@@ -50,6 +51,7 @@ import {
 } from '../zh-diagnostics';
 import { shouldAutoFix, countFixableIssues, buildFixPrompt, resolveOpenCodeBin, resolveOpenCodeModel } from '../ai-auto-fix';
 import { getScoring, getDb, sendProgress } from '../ipc-context';
+import { collectExposedFilesInWorker, detectProfileInWorker, runProfileInWorker } from '../profile-host';
 import type { TaskManager } from '../task-manager';
 import {
   toGuardReportData,
@@ -64,9 +66,9 @@ import {
 } from './report-format';
 import type { DependencyReportData, TechDebtReportData, SecretReportData } from '../../src/types/electron';
 
-function isExecutable(p: string): boolean {
+async function isExecutable(p: string): Promise<boolean> {
   try {
-    fs.accessSync(p, fs.constants.X_OK);
+    await access(p, FS_CONSTANTS.X_OK);
     return true;
   } catch {
     return false;
@@ -74,30 +76,31 @@ function isExecutable(p: string): boolean {
 }
 
 /** 读取诊断报告并解析为可判定 JSON */
-function readDiagnosticsReport(diagnosticsPath: string): {
+async function readDiagnosticsReport(diagnosticsPath: string): Promise<{
   summary: { error: number; warning: number };
   issues?: Array<{ source?: string; severity?: string }>;
-} {
-  return JSON.parse(fs.readFileSync(diagnosticsPath, 'utf-8')) as {
+}> {
+  const raw = await readFile(diagnosticsPath, 'utf-8');
+  return JSON.parse(raw) as {
     summary: { error: number; warning: number };
     issues?: Array<{ source?: string; severity?: string }>;
   };
 }
 
 /** 收集 opencode CLI 候选路径：环境变量 / PATH / ~/.local/bin */
-function collectOpenCodeCandidates(): Array<{ path: string; executable: boolean }> {
+async function collectOpenCodeCandidates(): Promise<Array<{ path: string; executable: boolean }>> {
   const envBin = process.env.ZH_OPENCODE_BIN;
   const candidates: Array<{ path: string; executable: boolean }> = [];
   if (envBin) {
-    candidates.push({ path: envBin, executable: isExecutable(envBin) });
+    candidates.push({ path: envBin, executable: await isExecutable(envBin) });
   }
   for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
     const p = path.join(dir, 'opencode');
-    candidates.push({ path: p, executable: isExecutable(p) });
+    candidates.push({ path: p, executable: await isExecutable(p) });
   }
   const homeLocalBin = path.join(os.homedir(), '.local', 'bin', 'opencode');
   if (!candidates.some((c) => c.path === homeLocalBin)) {
-    candidates.push({ path: homeLocalBin, executable: isExecutable(homeLocalBin) });
+    candidates.push({ path: homeLocalBin, executable: await isExecutable(homeLocalBin) });
   }
   return candidates;
 }
@@ -119,14 +122,15 @@ function spawnOpenCodeFix(bin: string, projectPath: string, fixableError: number
  * 体检发现问题后自动触发 opencode CLI 修复（非阻塞）。
  * 仅当诊断含 error/warning 时触发；门禁（guard/预防）类问题不自动触发，
  * 只保留手动「复制到AI」能力；opencode 不在 PATH 时静默跳过，不打扰用户。
+ * 内部全量捕获，返回的 Promise 永不 reject，调用方可安全 fire-and-forget。
  */
-function triggerOpenCodeAutoFix(projectPath: string, diagnosticsPath: string): void {
+async function triggerOpenCodeAutoFix(projectPath: string, diagnosticsPath: string): Promise<void> {
   try {
-    const report = readDiagnosticsReport(diagnosticsPath);
+    const report = await readDiagnosticsReport(diagnosticsPath);
     if (!shouldAutoFix(report)) return;
 
     const { error: fixableError, warning: fixableWarning } = countFixableIssues(report);
-    const bin = resolveOpenCodeBin(process.env.ZH_OPENCODE_BIN, collectOpenCodeCandidates());
+    const bin = resolveOpenCodeBin(process.env.ZH_OPENCODE_BIN, await collectOpenCodeCandidates());
     if (!bin) {
       console.warn('[ai:autofix] 未找到 opencode CLI，跳过自动修复');
       return;
@@ -523,11 +527,11 @@ async function runUpgradeChecks(nodes: readonly DependencyNode[]): Promise<{ ass
   }
 }
 
-/** 环境一致性检查接线：从 projectPath 推导 ProjectProfile（复用 @zh/pipeline detectProjectProfile） */
+/** 环境一致性检查接线：从 projectPath 推导 ProjectProfile（detectProjectProfile 同步 fs，移入 profile worker 执行） */
 async function runEnvConsistencyChecks(projectPath: string): Promise<{ entries: EnvEntry[]; error?: string }> {
   try {
     const checker = new EnvConsistencyCheckerImpl();
-    const profile = detectProjectProfile(projectPath);
+    const profile = (await detectProfileInWorker(projectPath)) as ProjectProfile;
     const report = await checker.check(profile);
     return { entries: report.entries };
   } catch (err) {
@@ -581,57 +585,11 @@ function collectModuleHotness(projectPath: string): Promise<ModuleHotnessInput[]
   });
 }
 
-/** 递归收集目录下常见源码文件（相对项目根的 posix 路径） */
-function collectFilesRecursively(absDir: string, relPrefix: string, acc: string[]): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(absDir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
-    const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      collectFilesRecursively(path.join(absDir, entry.name), rel, acc);
-    } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
-      acc.push(rel);
-    }
-  }
-}
-
-/** 扫描项目对外接口入口（API 路由/控制器/服务入口文件），目录缺失或不可读 → 跳过 */
-function collectExposedFiles(projectPath: string): string[] {
-  const exposed: string[] = [];
-  const dirs = ['src/api', 'src/routes', 'src/controllers', 'src/rest', 'api', 'routes', 'controllers'];
-  for (const dir of dirs) {
-    const abs = path.join(projectPath, dir);
-    try {
-      if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) {
-        collectFilesRecursively(abs, dir, exposed);
-      }
-    } catch {
-      // 目录不可读时跳过
-    }
-  }
-  const entryFiles = [
-    'src/main.ts', 'src/app.ts', 'src/server.ts', 'src/index.ts',
-    'main.ts', 'app.ts', 'server.ts', 'index.ts',
-  ];
-  for (const file of entryFiles) {
-    try {
-      if (fs.existsSync(path.join(projectPath, file))) exposed.push(file);
-    } catch {
-      // 忽略 stat 失败
-    }
-  }
-  return Array.from(new Set(exposed));
-}
-
 /**
  * 技术债仪表盘（engine:runTechDebt）：直连主进程，不注册 TaskManager 任务类型。
  * 复用 inspect 巡检产出 issues，叠加 git 模块热度 + 对外接口清单，
  * 由 @zh/scoring buildTechDebtDashboard 生成 ROI 排序报告。
+ * 对外接口清单的同步扫盘已移入 profile worker（collectExposedFilesInWorker）。
  */
 async function runTechDebtHandler(manager: TaskManager, projectPath: string): Promise<TechDebtReportData> {
   try {
@@ -646,7 +604,7 @@ async function runTechDebtHandler(manager: TaskManager, projectPath: string): Pr
       file: issue.file,
     }));
     const moduleHotness = await collectModuleHotness(projectPath);
-    const exposedFiles = collectExposedFiles(projectPath);
+    const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({
       projectId: inspectReport.projectId,
       issues,
@@ -694,7 +652,7 @@ async function planDebtRepaymentHandler(manager: TaskManager, projectPath: strin
       file: issue.file,
     }));
     const moduleHotness = await collectModuleHotness(projectPath);
-    const exposedFiles = collectExposedFiles(projectPath);
+    const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({ projectId: inspectReport.projectId, issues, moduleHotness, exposedFiles });
     const action = snapshot.actionList.find((a) => a.actionId === actionId);
     if (!action) {
@@ -731,7 +689,7 @@ async function verifyDebtRepaidHandler(manager: TaskManager, projectPath: string
       file: issue.file,
     }));
     const moduleHotness = await collectModuleHotness(projectPath);
-    const exposedFiles = collectExposedFiles(projectPath);
+    const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({ projectId: inspectReport.projectId, issues, moduleHotness, exposedFiles });
     const stillPresent = snapshot.actionList.some((a) => a.actionId === actionId);
     if (stillPresent) return false;
@@ -848,7 +806,7 @@ async function runPipelineHandler(
     if (!options?.dryRun) {
       try {
         const diagnosticsPath = persistDiagnostics(projectPath, report);
-        triggerOpenCodeAutoFix(projectPath, diagnosticsPath);
+        void triggerOpenCodeAutoFix(projectPath, diagnosticsPath);
       } catch (err) {
         console.warn('[engine:runPipeline] 诊断文件写入失败:', err instanceof Error ? err.message : String(err));
       }
@@ -866,12 +824,11 @@ async function runPipelineHandler(
 }
 
 async function runProfileHandler(projectPath: string): Promise<unknown> {
-  const { profileProject } = await import('@zh/fingerprint');
   if (!projectPath || typeof projectPath !== 'string') {
     throw new Error(t('electron.invalidProjectPath'));
   }
-  const result = await profileProject(projectPath);
-  return { profile: result.profile, questions: result.questions, drift: result.drift };
+  // 画像探测含全量同步扫盘（@zh/fingerprint detectors），必须离主进程，否则 macOS 彩球
+  return runProfileInWorker(projectPath);
 }
 
 async function getScoreHandler(_event: Electron.IpcMainInvokeEvent, projectId: string): Promise<HealthScoreData | null> {

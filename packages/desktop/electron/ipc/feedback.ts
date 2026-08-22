@@ -8,7 +8,7 @@
 
 import { ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { t } from '@zh/i18n';
 import { getEvolve } from '../ipc-context';
@@ -40,25 +40,25 @@ export function falsePositivesPath(projectPath: string): string {
 }
 
 /** 追加一条误报反馈，返回落盘绝对路径；写入失败静默（不阻断用户主流程） */
-export function appendFalsePositive(projectPath: string, item: FalsePositiveFeedbackItem): string {
+export async function appendFalsePositive(projectPath: string, item: FalsePositiveFeedbackItem): Promise<string> {
   const record: FalsePositiveFeedbackRecord = {
     ...item,
     id: randomUUID(),
     timestamp: new Date().toISOString(),
   };
   const absPath = falsePositivesPath(projectPath);
-  mkdirSync(join(projectPath, '.zhshield'), { recursive: true });
-  appendFileSync(absPath, `${JSON.stringify(record)}\n`, 'utf-8');
-  trimToLimit(absPath);
+  await mkdir(join(projectPath, '.zhshield'), { recursive: true });
+  await appendFile(absPath, `${JSON.stringify(record)}\n`, 'utf-8');
+  await trimToLimit(absPath);
   return absPath;
 }
 
 /** 文件超过上限时截断，只保留最近 MAX_RECORDS 条 */
-function trimToLimit(absPath: string): void {
+async function trimToLimit(absPath: string): Promise<void> {
   try {
-    const lines = readFileSync(absPath, 'utf-8').split('\n').filter(Boolean);
+    const lines = (await readFile(absPath, 'utf-8')).split('\n').filter(Boolean);
     if (lines.length <= MAX_RECORDS) return;
-    writeFileSync(absPath, `${lines.slice(-MAX_RECORDS).join('\n')}\n`, 'utf-8');
+    await writeFile(absPath, `${lines.slice(-MAX_RECORDS).join('\n')}\n`, 'utf-8');
   } catch {
     // 截断失败不影响主流程
   }
@@ -89,23 +89,24 @@ async function recordFeedbackExperience(projectPath: string, item: FalsePositive
 }
 
 /** 读取误报反馈记录（按 source 过滤，最近在前）；文件不存在返回空数组，损坏行跳过 */
-export function listFalsePositives(projectPath: string, source?: 'guard' | 'sentinel'): FalsePositiveFeedbackRecord[] {
+export async function listFalsePositives(projectPath: string, source?: 'guard' | 'sentinel'): Promise<FalsePositiveFeedbackRecord[]> {
   const absPath = falsePositivesPath(projectPath);
-  if (!existsSync(absPath)) return [];
+  let content: string;
   try {
-    const records: FalsePositiveFeedbackRecord[] = [];
-    for (const line of readFileSync(absPath, 'utf-8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        records.push(JSON.parse(line) as FalsePositiveFeedbackRecord);
-      } catch {
-        // 损坏行跳过，不影响其余记录
-      }
-    }
-    return records.filter((record) => !source || record.source === source).reverse();
+    content = await readFile(absPath, 'utf-8');
   } catch {
     return [];
   }
+  const records: FalsePositiveFeedbackRecord[] = [];
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      records.push(JSON.parse(line) as FalsePositiveFeedbackRecord);
+    } catch {
+      // 损坏行跳过，不影响其余记录
+    }
+  }
+  return records.filter((record) => !source || record.source === source).reverse();
 }
 
 export function registerFeedbackIpc(): void {
@@ -119,9 +120,10 @@ export function registerFeedbackIpc(): void {
         return { ok: false, reason: t('electron.feedbackIncomplete') };
       }
       try {
-        const absPath = appendFalsePositive(projectPath, item);
+        const absPath = await appendFalsePositive(projectPath, item);
         await recordFeedbackExperience(projectPath, item);
-        const record = readFileSync(absPath, 'utf-8').split('\n').filter(Boolean).pop();
+        const lines = (await readFile(absPath, 'utf-8')).split('\n').filter(Boolean);
+        const record = lines.pop();
         return { ok: true, id: record ? (JSON.parse(record) as FalsePositiveFeedbackRecord).id : undefined };
       } catch {
         return { ok: false, reason: t('electron.writeFailed') };
@@ -135,5 +137,4 @@ export function registerFeedbackIpc(): void {
       if (!projectPath || typeof projectPath !== 'string') return [];
       return listFalsePositives(projectPath, source);
     },
-  );
-}
+  );}

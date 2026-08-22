@@ -1,13 +1,24 @@
-import { parentPort, workerData } from 'node:worker_threads';
-import { readdirSync, statSync } from 'node:fs';
+/**
+ * Profile worker 线程入口（profile-worker.ts）
+ *
+ * 在独立 worker_threads 线程中执行项目画像 / 文件扫描类文件系统工作，
+ * 避免 Electron 主进程（CrBrowserMain）被同步扫盘阻塞，导致 macOS 彩球。
+ *
+ * 协议（与 profile-host.ts 配对）：
+ *   入站  { id, type, projectPath, options? }
+ *   出站  { id, ok: true, result } | { id, ok: false, error }
+ *
+ * 职责：collectFiles（目录盘点）/ detectProfile（@zh/pipeline 项目画像）/
+ *       runProfile（@zh/fingerprint 完整画像 + 问题集 + 漂移）/
+ *       collectExposedFiles（技术债对外接口扫描）。
+ */
+import { parentPort, type MessagePort } from 'node:worker_threads';
+import { readdirSync, statSync, type Dirent } from 'node:fs';
 import { join, extname } from 'node:path';
 
-interface ProfileWorkerData {
-  projectPath: string;
-  options?: {
-    excludeDirs?: string[];
-    includeExtensions?: string[];
-  };
+interface ProfileWorkerOptions {
+  excludeDirs?: string[];
+  includeExtensions?: string[];
 }
 
 interface ProfileResult {
@@ -19,13 +30,26 @@ interface ProfileResult {
   };
 }
 
+/** 入站请求（id 由主进程生成，响应原样回传用于关联） */
+export interface ProfileWorkerRequest {
+  id: string;
+  type: 'collectFiles' | 'detectProfile' | 'runProfile' | 'collectExposedFiles';
+  projectPath: string;
+  options?: ProfileWorkerOptions;
+}
+
+/** 出站响应（result 恒为可结构化克隆的纯 JSON） */
+export type ProfileWorkerResponse =
+  | { id: string; ok: true; result: unknown }
+  | { id: string; ok: false; error: string };
+
 /**
  * Worker thread for project profiling
  * Moves heavy filesystem operations off the main Electron thread
  */
 function collectProjectFiles(
   projectPath: string,
-  options?: ProfileWorkerData['options'],
+  options?: ProfileWorkerOptions,
 ): ProfileResult {
   const excludeDirs = options?.excludeDirs ?? [
     'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
@@ -78,14 +102,106 @@ function collectProjectFiles(
   };
 }
 
-// Worker entry point: read from workerData, do work, post result
-try {
-  const data = workerData as ProfileWorkerData;
-  const result = collectProjectFiles(data.projectPath, data.options);
-  parentPort?.postMessage({ success: true, result });
-} catch (err) {
-  parentPort?.postMessage({
-    success: false,
-    error: err instanceof Error ? err.message : String(err),
+/** 递归收集目录下常见源码文件（相对项目根的 posix 路径）；逻辑与原 engines.ts 主线程版逐行一致 */
+function collectFilesRecursively(absDir: string, relPrefix: string, acc: string[]): void {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue;
+    const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      collectFilesRecursively(join(absDir, entry.name), rel, acc);
+    } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+      acc.push(rel);
+    }
+  }
+}
+
+/** 扫描项目对外接口入口（API 路由/控制器/服务入口文件），目录缺失或不可读 → 跳过 */
+function collectExposedFiles(projectPath: string): string[] {
+  const exposed: string[] = [];
+  const dirs = ['src/api', 'src/routes', 'src/controllers', 'src/rest', 'api', 'routes', 'controllers'];
+  for (const dir of dirs) {
+    const abs = join(projectPath, dir);
+    try {
+      if (statSync(abs).isDirectory()) {
+        collectFilesRecursively(abs, dir, exposed);
+      }
+    } catch {
+      // 目录不可读时跳过
+    }
+  }
+  const entryFiles = [
+    'src/main.ts', 'src/app.ts', 'src/server.ts', 'src/index.ts',
+    'main.ts', 'app.ts', 'server.ts', 'index.ts',
+  ];
+  for (const file of entryFiles) {
+    try {
+      statSync(join(projectPath, file));
+      exposed.push(file);
+    } catch {
+      // 忽略 stat 失败
+    }
+  }
+  return Array.from(new Set(exposed));
+}
+
+/** @zh/pipeline 项目画像识别（同步 fs，现移入 worker 执行） */
+async function detectProjectProfileInWorker(projectPath: string): Promise<unknown> {
+  const { detectProjectProfile } = await import('@zh/pipeline');
+  return detectProjectProfile(projectPath);
+}
+
+/** @zh/fingerprint 完整画像流程：探测 + 落盘 + 问题集 + 漂移 */
+async function runFingerprintProfile(projectPath: string): Promise<unknown> {
+  const { profileProject } = await import('@zh/fingerprint');
+  const result = await profileProject(projectPath);
+  return { profile: result.profile, questions: result.questions, drift: result.drift };
+}
+
+async function dispatchRequest(req: ProfileWorkerRequest): Promise<unknown> {
+  switch (req.type) {
+    case 'collectFiles':
+      return collectProjectFiles(req.projectPath, req.options);
+    case 'detectProfile':
+      return detectProjectProfileInWorker(req.projectPath);
+    case 'runProfile':
+      return runFingerprintProfile(req.projectPath);
+    case 'collectExposedFiles':
+      return collectExposedFiles(req.projectPath);
+    default: {
+      const exhaustive: never = req.type;
+      throw new Error(`[profile-worker] 未知请求类型: ${String(exhaustive)}`);
+    }
+  }
+}
+
+function attachMessageHandler(port: MessagePort): void {
+  port.on('message', (raw: ProfileWorkerRequest) => {
+    if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string') return;
+    void dispatchRequest(raw)
+      .then((result) => {
+        const res: ProfileWorkerResponse = { id: raw.id, ok: true, result };
+        port.postMessage(res);
+      })
+      .catch((err: unknown) => {
+        const res: ProfileWorkerResponse = {
+          id: raw.id,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+        port.postMessage(res);
+      });
   });
+}
+
+const port = parentPort;
+if (port) {
+  attachMessageHandler(port);
+} else {
+  throw new Error('[profile-worker] 必须以 worker_threads 方式启动（缺少 parentPort）');
 }

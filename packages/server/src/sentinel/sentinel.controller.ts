@@ -1,8 +1,10 @@
 import { Controller, Post, Get, Param, Query, Body, HttpCode, HttpStatus, UseGuards, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SentinelService } from './sentinel.service';
 import { SentinelWebhookGuard } from './sentinel.guard';
 import type { SentinelEvent, AlertPayload } from '@zh/sentinel';
 
+@ApiTags('sentinel')
 @Controller('system/sentinel')
 export class SentinelController {
   private readonly logger = new Logger(SentinelController.name);

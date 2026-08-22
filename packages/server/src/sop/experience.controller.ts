@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { ExperienceType as EvolveExperienceType } from '@zh/evolve';
 import { EvolveService } from '../evolve/evolve.service';
 
@@ -31,6 +32,7 @@ const TYPE_MAP: Record<ExperienceType, EvolveExperienceType> = {
   new_pattern: 'best-practice',
 };
 
+@ApiTags('experience')
 @Controller('experience')
 export class ExperienceController {
   private readonly logger = new Logger(ExperienceController.name);

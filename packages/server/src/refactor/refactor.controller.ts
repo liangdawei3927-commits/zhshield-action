@@ -1,6 +1,8 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { RefactorService } from './refactor.service';
 
+@ApiTags('refactor')
 @Controller('refactor')
 export class RefactorController {
   private readonly logger = new Logger(RefactorController.name);

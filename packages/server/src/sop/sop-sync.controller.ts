@@ -9,9 +9,11 @@ import {
   Logger,
   StreamableFile,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SopService } from './sop.service';
 import type { DiffQueryDto, EmergencyPullDto } from './dto/version-params.dto';
 
+@ApiTags('sop')
 @Controller('sop')
 export class SopSyncController {
   private readonly logger = new Logger(SopSyncController.name);

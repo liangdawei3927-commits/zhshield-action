@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Body, Param, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { EvolveService } from './evolve.service';
 import type { ExperienceType, RuleState } from '@zh/evolve';
 
+@ApiTags('evolve')
 @Controller('evolve')
 export class EvolveController {
   private readonly logger = new Logger(EvolveController.name);

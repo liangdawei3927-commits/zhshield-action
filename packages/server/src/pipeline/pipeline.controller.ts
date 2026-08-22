@@ -1,7 +1,9 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { PipelineService } from './pipeline.service';
 import type { PipelineReport } from '@zh/pipeline';
 
+@ApiTags('pipeline')
 @Controller('pipeline')
 export class PipelineController {
   private readonly logger = new Logger(PipelineController.name);

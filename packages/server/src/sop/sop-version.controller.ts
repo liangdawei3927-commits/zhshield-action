@@ -1,7 +1,9 @@
 import { Controller, Get, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SopService } from './sop.service';
 import type { VersionQueryDto } from './dto/version-params.dto';
 
+@ApiTags('sop')
 @Controller('sop')
 export class SopVersionController {
   constructor(private readonly sopService: SopService) {}

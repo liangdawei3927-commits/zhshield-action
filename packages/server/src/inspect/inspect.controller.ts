@@ -1,6 +1,8 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { InspectService } from './inspect.service';
 
+@ApiTags('inspect')
 @Controller('inspect')
 export class InspectController {
   private readonly logger = new Logger(InspectController.name);

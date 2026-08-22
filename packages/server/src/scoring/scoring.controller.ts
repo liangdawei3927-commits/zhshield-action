@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { ScoringService } from './scoring.service';
 
+@ApiTags('scoring')
 @Controller('scoring')
 export class ScoringController {
   private readonly logger = new Logger(ScoringController.name);

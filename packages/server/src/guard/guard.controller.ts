@@ -1,6 +1,8 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { GuardService } from './guard.service';
 
+@ApiTags('guard')
 @Controller('guard')
 export class GuardController {
   private readonly logger = new Logger(GuardController.name);

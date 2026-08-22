@@ -153,9 +153,10 @@ export class SemgrepAdapter implements ToolAdapter {
     }));
   }
 
-  /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过） */
+  /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过）。顶层与 extra 嵌套两种落点都接受 */
   private mapDataflowTrace(result: SemgrepResult): CodeFlow[] | undefined {
-    const codeFlows = result.dataflow_trace?.code_flows;
+    const trace = result.dataflow_trace ?? result.extra?.dataflow_trace;
+    const codeFlows = trace?.code_flows;
     if (!codeFlows || codeFlows.length === 0) return undefined;
     const flows: CodeFlow[] = [];
     for (const codeFlow of codeFlows) {

@@ -58,6 +58,8 @@ export interface SemgrepResult {
     message?: string;
     fix?: string;
     metadata?: { description?: string };
+    /** dataflow_trace 的 extra 嵌套变体（部分包装器输出），兼容读取 */
+    dataflow_trace?: SemgrepDataflowTrace;
   };
   /** 污点数据流链（SARIF codeFlows 子集），仅 join_mode/trace 规则输出 */
   dataflow_trace?: SemgrepDataflowTrace;

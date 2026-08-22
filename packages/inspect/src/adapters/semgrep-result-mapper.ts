@@ -14,12 +14,21 @@ export interface SemgrepResult {
   severity?: string;
   path?: string;
   start?: { line?: number; col?: number; column?: number };
+  /**
+   * taint 数据流追踪：source → intermediate_vars → sink。
+   * 真实 Semgrep JSON 把 dataflow_trace 放在 result 顶层；部分包装器会嵌到 extra 下，两处都接受。
+   */
+  dataflow_trace?: {
+    taint_source?: { location?: SemgrepLocation };
+    intermediate_vars?: Array<{ var_name?: string; location?: SemgrepLocation }>;
+    taint_sink?: { location?: SemgrepLocation };
+  };
   extra?: {
     severity?: string;
     message?: string;
     fix?: string;
     metadata?: { fix?: string };
-    /** taint 数据流追踪：source → intermediate_vars → sink（Semgrep taint mode 输出） */
+    /** taint 数据流追踪（extra 嵌套变体，兼容读取） */
     dataflow_trace?: {
       taint_source?: { location?: SemgrepLocation };
       intermediate_vars?: Array<{ var_name?: string; location?: SemgrepLocation }>;
@@ -89,7 +98,7 @@ export class SemgrepResultMapper {
    * taint_source → intermediate_vars → taint_sink 的 locations 链
    */
   private resolveCodeFlows(r: SemgrepResult): CodeFlow[] | undefined {
-    const trace = r.extra?.dataflow_trace;
+    const trace = r.dataflow_trace ?? r.extra?.dataflow_trace;
     if (!trace) return undefined;
 
     const locations: CodeFlowLocation[] = [];

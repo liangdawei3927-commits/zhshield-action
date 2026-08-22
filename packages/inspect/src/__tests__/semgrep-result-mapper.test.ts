@@ -76,6 +76,29 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
     expect(issues[0].codeFlows).toBeUndefined();
   });
 
+  it('Given dataflow_trace 位于 result 顶层（真实 Semgrep JSON 落点），When mapOutput，Then 同样映射为 codeFlows', () => {
+    const output: SemgrepOutput = {
+      results: [{
+        check_id: 'r1',
+        path: 'a.py',
+        dataflow_trace: {
+          taint_source: { location: { path: 'a.py', start: { line: 10, col: 5 } } },
+          intermediate_vars: [{ var_name: 'tmp', location: { path: 'a.py', start: { line: 11, col: 5 } } }],
+          taint_sink: { location: { path: 'b.py', start: { line: 20, col: 9 } } },
+        },
+        extra: { severity: 'ERROR', message: 'x' },
+      }],
+    };
+
+    const issues = mapper.mapOutput(output);
+    expect(issues[0].codeFlows).toBeDefined();
+    expect(issues[0].codeFlows).toHaveLength(1);
+    const locations = issues[0].codeFlows![0].threadFlows[0].locations;
+    expect(locations).toHaveLength(3);
+    expect(locations[0].location.file).toBe('a.py');
+    expect(locations[2].location.file).toBe('b.py');
+  });
+
   it('Given validation_state=NO_VALIDATOR，When mapOutput，Then taxonomies 含 validation:NO_VALIDATOR', () => {
     const issues = mapper.mapOutput({
       results: [{

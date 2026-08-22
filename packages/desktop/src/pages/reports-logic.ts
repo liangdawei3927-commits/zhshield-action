@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getScoreHistory, runGuard } from '../services/engineApi';
+import { getScoreHistory, runPipeline } from '../services/engineApi';
 import type { HealthScoreData } from '../types/electron';
 
 /** 预别名类型 — 避免 .tsx 中出现泛型尖括号（会被 JSX 深度检测误判） */
@@ -66,7 +66,7 @@ export function useReportsPage(projectPath: string) {
   const { data, loading, load } = useScoreHistory(projectPath);
 
   const handleNewReport = useCallback(async () => {
-    await runGuard(projectPath);
+    await runPipeline(projectPath, { dryRun: false, sop: true });
     await load();
   }, [projectPath, load]);
 

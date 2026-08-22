@@ -11,14 +11,35 @@ import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
 import { type LocalBackupConfig, type LocalBackupSubResult } from './types';
 import { hashFile, matchesExcludePattern } from './utils';
+import { restoreStoredEntry } from './restore-entry';
 
 const TILDE_PREFIX = /^~/;
+
+/** 备份条目落盘压缩格式（写入 BACKUP_MANIFEST.json，恢复时按此解压） */
+export type LocalBackupCompression = 'none' | 'gzip';
 
 export interface LocalBackupFileEntry {
   relativePath: string;
   hash: string;
   size: number;
   backedUpAt: string;
+  /**
+   * 实际落盘文件名（备份目录内相对路径）。
+   * 旧版清单缺省此字段：视为与 relativePath 相同。
+   */
+  storedAs?: string;
+  /**
+   * 落盘压缩格式。旧版清单缺省此字段时按 'none' 处理，
+   * 恢复阶段对缺失文件用 gzip 魔数嗅探兜底（兼容旧版 compress:true 目录）。
+   */
+  compression?: LocalBackupCompression;
+}
+
+/** restore() 结果：成功/失败计数与逐条失败原因（匹配 orchestrator 的错误聚合风格） */
+export interface LocalBackupRestoreResult {
+  restored: number;
+  failed: number;
+  problems: string[];
 }
 
 export interface LocalBackupManifest {
@@ -95,30 +116,34 @@ export class LocalBackup {
 
   /**
    * 从备份恢复项目
+   *
+   * 按清单 recorded 的 storedAs/compression 解压还原；旧版清单（无格式字段）
+   * 通过「期望文件缺失 → 尝试 .gz 后缀 → gzip 魔数嗅探」兜底。
    */
   async restore(
     backupPath: string,
     targetDir: string,
     abortSignal?: AbortSignal,
-  ): Promise<number> {
+  ): Promise<LocalBackupRestoreResult> {
     const manifest = await this.readManifest(backupPath);
     const files = manifest?.files ?? [];
     let restored = 0;
+    let failed = 0;
+    const problems: string[] = [];
 
     for (const entry of files) {
       if (abortSignal?.aborted) break;
-      const sourcePath = path.join(backupPath, entry.relativePath);
       const targetPath = path.join(targetDir, entry.relativePath);
       try {
-        await fs.mkdir(path.dirname(targetPath), { recursive: true });
-        await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
+        await restoreStoredEntry(backupPath, targetPath, entry);
         restored++;
-      } catch {
-        // skip individual file errors
+      } catch (err) {
+        failed++;
+        problems.push(`${entry.relativePath}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    return restored;
+    return { restored, failed, problems };
   }
 
   /**
@@ -270,9 +295,8 @@ export class LocalBackup {
       const relativePath = path.relative(projectPath, file);
       try {
         const [hash, stat] = await Promise.all([hashFile(file), fs.stat(file)]);
-        const targetPath = compress
-          ? path.join(backupDir, `${relativePath}.gz`)
-          : path.join(backupDir, relativePath);
+        const storedAs = compress ? `${relativePath}.gz` : relativePath;
+        const targetPath = path.join(backupDir, storedAs);
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
         if (compress) {
           await pipeline(
@@ -288,6 +312,8 @@ export class LocalBackup {
           hash,
           size: stat.size,
           backedUpAt: timestamp,
+          storedAs,
+          compression: compress ? 'gzip' : 'none',
         });
         totalSize += stat.size;
         backedUp++;

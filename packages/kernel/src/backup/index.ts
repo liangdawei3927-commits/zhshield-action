@@ -11,7 +11,12 @@ export { DEFAULT_GLOBAL_CONFIG } from './config';
 export { GitHubBackup } from './github-backup';
 export type { TokenStore } from './github-backup';
 export { LocalBackup } from './local-backup';
-export type { LocalBackupFileEntry, LocalBackupManifest } from './local-backup';
+export type {
+  LocalBackupCompression,
+  LocalBackupFileEntry,
+  LocalBackupManifest,
+  LocalBackupRestoreResult,
+} from './local-backup';
 
 export { BackupScheduler } from './scheduler';
 

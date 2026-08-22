@@ -18,21 +18,31 @@ export function SectionTitle({ icon, label }: { icon: ReactNode; label: string }
   );
 }
 
-function ProjectRow({ project, onNavigate, onClose, onRequestDelete }: { project: ProjectInfo; onNavigate: (page: string) => void; onClose: () => void; onRequestDelete: (p: ProjectInfo) => void }) {
+function ProjectRow({ project, index, isActive, onNavigate, onClose, onRequestDelete, onSwitchProject }: { project: ProjectInfo; index: number; isActive: boolean; onNavigate: (page: string) => void; onClose: () => void; onRequestDelete: (p: ProjectInfo) => void; onSwitchProject: (index: number) => void }) {
   const t = useT();
   return (
     <Bounce
       as="div"
-      className="w-full flex items-center gap-1 rounded-lg transition-colors hover:bg-zh-panel"
+      className={`w-full flex items-center gap-1 rounded-lg transition-colors hover:bg-zh-panel ${isActive ? 'bg-zh-panel/50' : ''}`}
     >
       <button
-        onClick={() => { onNavigate('dashboard'); onClose(); }}
+        onClick={() => { onSwitchProject(index); onNavigate('dashboard'); onClose(); }}
         className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-1 py-2 rounded-lg text-left border-none cursor-pointer bg-transparent"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-zh-muted">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={`shrink-0 ${isActive ? 'text-zh-brand' : 'text-zh-muted'}`}>
           <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span className="text-xs text-zh-ink-2 truncate">{project.name}</span>
+        <span className={`text-xs truncate ${isActive ? 'text-zh-ink font-medium' : 'text-zh-ink-2'}`}>{project.name}</span>
+      </button>
+      <button
+        onClick={() => { onSwitchProject(index); onNavigate('profile'); onClose(); }}
+        aria-label={t('layout.profile')}
+        className="shrink-0 flex items-center justify-center w-7 h-7 rounded-md border-none cursor-pointer text-zh-muted hover:text-zh-ink-2 hover:bg-zh-panel transition-colors"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
       </button>
       <button
         onClick={() => onRequestDelete(project)}
@@ -68,7 +78,7 @@ export function SidebarHeader({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function ProjectsSection({ projects, onNavigate, onClose, onAddProject, onRequestDelete }: { projects: ProjectInfo[]; onNavigate: (page: string) => void; onClose: () => void; onAddProject: () => void; onRequestDelete: (p: ProjectInfo) => void }) {
+export function ProjectsSection({ projects, currentProjectIndex, onSwitchProject, onNavigate, onClose, onAddProject, onRequestDelete }: { projects: ProjectInfo[]; currentProjectIndex: number; onSwitchProject: (index: number) => void; onNavigate: (page: string) => void; onClose: () => void; onAddProject: () => void; onRequestDelete: (p: ProjectInfo) => void }) {
   const t = useT();
   return (
     <section>
@@ -84,10 +94,13 @@ export function ProjectsSection({ projects, onNavigate, onClose, onAddProject, o
         {projects.length === 0 ? (
           <div className="text-xs text-zh-muted py-2 text-center">{t('layout.noProjects')}</div>
         ) : (
-          projects.map((p) => (
+          projects.map((p, i) => (
             <ProjectRow
               key={p.path}
               project={p}
+              index={i}
+              isActive={i === currentProjectIndex}
+              onSwitchProject={onSwitchProject}
               onNavigate={onNavigate}
               onClose={onClose}
               onRequestDelete={onRequestDelete}

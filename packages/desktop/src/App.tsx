@@ -17,18 +17,22 @@ import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
+import { ScreensaverPage } from './pages/ScreensaverPage';
+import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboardingPage';
+import { useInactivityTimer } from './hooks/useInactivityTimer';
 
 /** 根据当前页面渲染对应内容区（欢迎页 / 各功能页） */
-function PageView({ currentPage, projects, onNavigate, onAddProject }: {
+function PageView({ currentPage, projects, activeProjectPath, onNavigate, onAddProject }: {
   currentPage: Page;
   projects: ProjectInfo[];
+  activeProjectPath?: string;
   onNavigate: (page: string) => void;
   onAddProject: () => void;
 }) {
   if (projects.length === 0 && currentPage === 'welcome') {
     return <WelcomePage onAddProject={onAddProject} />;
   }
-  const projectPath = projects[0]?.path ?? '';
+  const projectPath = activeProjectPath || projects[0]?.path || '';
   switch (currentPage) {
     case 'dashboard':
       return <DashboardPage projectPath={projectPath} />;
@@ -78,15 +82,29 @@ function App() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
+    onboardingProject,
+    setOnboardingProject,
+    currentProjectIndex,
+    switchCurrentProject,
   } = useAppState();
+
+  const { idle, reset: resetInactivity } = useInactivityTimer(7 * 60 * 1000);
 
   if (!loaded) {
     return <div className="h-screen" style={{ background: 'rgb(var(--zh-bg-tertiary))' }} />;
   }
 
+  const activeProject = projects[currentProjectIndex] ?? projects[0];
+
+  const handleOnboardingComplete = () => {
+    setOnboardingProject(null);
+    setCurrentPage('dashboard');
+  };
+
   const viewProps = {
     currentPage,
     projects,
+    activeProjectPath: activeProject?.path,
     onNavigate: (p: string) => setCurrentPage(p as Page),
     onAddProject: openFolderAndAddProject,
   } as const;
@@ -101,6 +119,8 @@ function App() {
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             projects={projects}
+            currentProjectIndex={currentProjectIndex}
+            onSwitchProject={switchCurrentProject}
             currentPage={currentPage}
             onNavigate={(p) => setCurrentPage(p as Page)}
             onAddProject={openFolderAndAddProject}
@@ -113,13 +133,23 @@ function App() {
             currentPage={currentPage}
             onNavigate={(p) => setCurrentPage(p as Page)}
             onOpenSettings={() => setSidebarOpen((v) => !v)}
-            projectName={projects[0]?.name}
+            projectName={activeProject?.name}
             sidebarOpen={sidebarOpen}
           />
           <main className="flex-1 overflow-auto bg-zh-bg">
             <PageView {...viewProps} />
           </main>
         </>
+      )}
+
+      {idle && projects.length > 0 && <ScreensaverPage onDismiss={resetInactivity} />}
+
+      {onboardingProject && (
+        <ProjectOnboardingPage
+          projectName={onboardingProject}
+          projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
+          onComplete={handleOnboardingComplete}
+        />
       )}
     </div>
   );

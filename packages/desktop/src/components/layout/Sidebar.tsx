@@ -11,6 +11,8 @@ interface SidebarProps {
   open: boolean;
   onClose: () => void;
   projects: ProjectInfo[];
+  currentProjectIndex: number;
+  onSwitchProject: (index: number) => void;
   currentPage: string;
   onNavigate: (page: string) => void;
   onAddProject: () => void;
@@ -20,7 +22,7 @@ interface SidebarProps {
   onToggleAiTool: (enabled: boolean) => void;
 }
 
-export function Sidebar({ open, onClose, projects, currentPage: _currentPage, onNavigate, onAddProject, onRemoveProject, aiTool, aiApplying, onToggleAiTool }: SidebarProps) {
+export function Sidebar({ open, onClose, projects, currentProjectIndex, onSwitchProject, currentPage: _currentPage, onNavigate, onAddProject, onRemoveProject, aiTool, aiApplying, onToggleAiTool }: SidebarProps) {
   const t = useT();
   const [pendingDelete, setPendingDelete] = useState<ProjectInfo | null>(null);
 
@@ -43,7 +45,7 @@ export function Sidebar({ open, onClose, projects, currentPage: _currentPage, on
 
         {/* 内容 — key 绑定 open：每次打开时重挂载，重播卡片入场弹跳 */}
         <div key={open ? 'sidebar-open' : 'sidebar-closed'} className="flex-1 overflow-y-auto px-4 py-5 space-y-8">
-          <ProjectsSection projects={projects} onNavigate={onNavigate} onClose={onClose} onAddProject={onAddProject} onRequestDelete={setPendingDelete} />
+          <ProjectsSection projects={projects} currentProjectIndex={currentProjectIndex} onSwitchProject={onSwitchProject} onNavigate={onNavigate} onClose={onClose} onAddProject={onAddProject} onRequestDelete={setPendingDelete} />
           <EngineStatusSection />
           <AiToolSection aiTool={aiTool} aiApplying={aiApplying} onToggleAiTool={onToggleAiTool} />
           <ThemeSection />

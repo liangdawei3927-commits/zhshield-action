@@ -98,6 +98,7 @@ function useAddProject(
   setProjects: Dispatch<SetStateAction<ProjectInfo[]>>,
   setCurrentPage: Dispatch<SetStateAction<Page>>,
   toast: (msg: string, variant?: ToastVariant) => void,
+  setOnboardingProject: (name: string | null) => void,
 ): { openFolderAndAddProject: () => Promise<void> } {
   const openFolderAndAddProject = useCallback(async () => {
     const api = window.electronAPI;
@@ -109,11 +110,11 @@ function useAddProject(
     if (!path) return; // 用户主动取消对话框，保持静默
     const name = path.split('/').pop() || path.split('\\').pop() || '';
     setProjects((prev) => [...prev, { name, path }]);
-    setCurrentPage('dashboard');
+    setOnboardingProject(name);
     toast(t('toast.projectAdded', { projectName: name }), 'success');
     void installGuardHooks(path).catch(() => {});
     void startSentinelMonitoring(path).catch(() => {});
-  }, [toast, setProjects, setCurrentPage]);
+  }, [toast, setProjects, setCurrentPage, setOnboardingProject]);
 
   return { openFolderAndAddProject };
 }
@@ -128,8 +129,18 @@ export function useAppState() {
   const { aiTool, setAiTool, aiApplying, toggleAiTool } = useAiToolConfig(projects, toast);
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
-  const { openFolderAndAddProject } = useAddProject(setProjects, setCurrentPage, toast);
+  const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
+  const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
+  const { openFolderAndAddProject } = useAddProject(setProjects, setCurrentPage, toast, setOnboardingProject);
   const { removeProject } = useRemoveProject(projects, setProjects, setCurrentPage, toast);
+
+  useEffect(() => {
+    setCurrentProjectIndex((idx) => Math.min(idx, Math.max(projects.length - 1, 0)));
+  }, [projects.length]);
+
+  const switchCurrentProject = useCallback((index: number) => {
+    setCurrentProjectIndex(index);
+  }, []);
 
   return {
     currentPage,
@@ -143,6 +154,10 @@ export function useAppState() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
+    onboardingProject,
+    setOnboardingProject,
+    currentProjectIndex,
+    switchCurrentProject,
   };
 }
 

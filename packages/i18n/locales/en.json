@@ -664,6 +664,7 @@
     "cancelTask": "Cancel task",
     "collapseSidebar": "Collapse sidebar",
     "deleteProject": "Delete project {{name}}",
+    "profile": "Project Profile",
     "engineBusy": "Engine busy: {{count}} tasks in progress",
     "engineIdle": "Engine running",
     "engineOn": "Smart engine enabled",
@@ -1671,6 +1672,16 @@
         "times": "{{count}} times",
         "totalBlocked": "Total blocked"
       }
+    },
+    "onboarding": {
+      "hint": "Configuring the best guard solution for your project",
+      "step": {
+        "analyze": "Analyzing project structure & tech stack",
+        "profile": "Generating project capability profile",
+        "skills": "Loading exclusive skill pack",
+        "preset": "Applying guard presets",
+        "ready": "Guard solution ready"
+      }
     }
   },
   "pipeline": {
@@ -1870,5 +1881,23 @@
     "issuesCopied": "Issues copied; paste them into AI to fix",
     "projectAdded": "Project \"{{projectName}}\" added, guarding started",
     "projectRemoved": "Project \"{{projectName}}\" removed"
+  },
+  "onboarding": {
+    "preparing": "Preparing project...",
+    "steps": {
+      "analyzing": "Analyzing tech stack",
+      "profiling": "Generating project profile",
+      "loading": "Loading capability pack",
+      "ready": "Protection ready"
+    },
+    "hint": "Please wait while ZhiYan CodeShield configures your optimal protection"
+  },
+  "screensaver": {
+    "engineActive": "Smart engine active",
+    "security": "Security",
+    "governance": "Governance",
+    "operations": "Operations",
+    "privacy": "Privacy protected",
+    "wisdomBrain": "Wisdom Brain"
   }
 }

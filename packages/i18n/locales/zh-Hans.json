@@ -664,6 +664,7 @@
     "cancelTask": "取消任务",
     "collapseSidebar": "收回侧边栏",
     "deleteProject": "删除项目 {{name}}",
+    "profile": "项目画像",
     "engineBusy": "引擎忙碌：{{count}} 个任务进行中",
     "engineIdle": "引擎运行中",
     "engineOn": "智能引擎已开启",
@@ -1671,6 +1672,16 @@
         "times": "{{count}} 次",
         "totalBlocked": "累计拦截"
       }
+    },
+    "onboarding": {
+      "hint": "正在为您的项目配置最佳守护方案",
+      "step": {
+        "analyze": "分析项目结构与技术栈",
+        "profile": "生成项目能力画像",
+        "skills": "加载专属技能包",
+        "preset": "应用守护预设",
+        "ready": "守护方案就绪"
+      }
     }
   },
   "pipeline": {
@@ -1870,5 +1881,23 @@
     "issuesCopied": "已复制问题，可粘贴到 AI 修复",
     "projectAdded": "项目「{{projectName}}」已添加，开始守护",
     "projectRemoved": "项目「{{projectName}}」已移除"
+  },
+  "onboarding": {
+    "preparing": "正在准备项目...",
+    "steps": {
+      "analyzing": "分析技术栈",
+      "profiling": "生成项目画像",
+      "loading": "加载能力包",
+      "ready": "守护就绪"
+    },
+    "hint": "请稍候，智汇码盾正在为您配置最佳守护方案"
+  },
+  "screensaver": {
+    "engineActive": "智能引擎已开启",
+    "security": "安全",
+    "governance": "治理",
+    "operations": "运维",
+    "privacy": "隐私保护中",
+    "wisdomBrain": "智汇大脑"
   }
 }

@@ -664,6 +664,7 @@
     "cancelTask": "取消任務",
     "collapseSidebar": "收回側邊欄",
     "deleteProject": "刪除專案 {{name}}",
+    "profile": "專案畫像",
     "engineBusy": "引擎忙碌：{{count}} 個任務進行中",
     "engineIdle": "引擎執行中",
     "engineOn": "智慧引擎已開啟",
@@ -1543,6 +1544,16 @@
         "times": "{{count}} 次",
         "totalBlocked": "累計攔截"
       }
+    },
+    "onboarding": {
+      "hint": "正在為您的專案配置最佳守護方案",
+      "step": {
+        "analyze": "分析專案結構與技術棧",
+        "profile": "生成專案能力畫像",
+        "skills": "載入專屬技能包",
+        "preset": "套用守護預設",
+        "ready": "守護方案就緒"
+      }
     }
   },
   "pipeline": {
@@ -1742,5 +1753,23 @@
     "issuesCopied": "已複製問題，可貼上到 AI 修復",
     "projectAdded": "專案「{{projectName}}」已新增，開始守護",
     "projectRemoved": "專案「{{projectName}}」已移除"
+  },
+  "onboarding": {
+    "preparing": "正在準備專案...",
+    "steps": {
+      "analyzing": "分析技術堆疊",
+      "profiling": "生成專案畫像",
+      "loading": "載入能力包",
+      "ready": "守護就緒"
+    },
+    "hint": "請稍候，智匯碼盾正在為您配置最佳守護方案"
+  },
+  "screensaver": {
+    "engineActive": "智慧引擎已開啟",
+    "security": "安全",
+    "governance": "治理",
+    "operations": "運維",
+    "privacy": "隱私保護中",
+    "wisdomBrain": "智匯大腦"
   }
 }

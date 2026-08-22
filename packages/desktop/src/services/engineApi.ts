@@ -375,7 +375,7 @@ export async function runRefactor(projectPath: string): Promise<RefactorReportDa
 
 // ─── Pipeline 流水线引擎 ──────────────────────────────────
 
-export async function runPipeline(projectPath: string, options?: { dryRun?: boolean; sop?: boolean }): Promise<PipelineReportData> {
+export async function runPipeline(projectPath: string, options?: { dryRun?: boolean; sop?: boolean; presetName?: string }): Promise<PipelineReportData> {
   if (isHttpMode()) return runPipelineViaHttp(projectPath, options);
   const api = getAPI();
   if (!api?.engine) {

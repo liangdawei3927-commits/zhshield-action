@@ -664,6 +664,7 @@
     "cancelTask": "タスクをキャンセル",
     "collapseSidebar": "サイドバーを閉じる",
     "deleteProject": "プロジェクト {{name}} を削除",
+    "profile": "プロジェクトプロファイル",
     "engineBusy": "エンジンがビジーです: {{count}} 件のタスク実行中",
     "engineIdle": "エンジン実行中",
     "engineOn": "スマートエンジンが有効になりました",
@@ -1543,6 +1544,16 @@
         "times": "{{count}} 回",
         "totalBlocked": "累計ブロック"
       }
+    },
+    "onboarding": {
+      "hint": "プロジェクトに最適なガードソリューションを構成中",
+      "step": {
+        "analyze": "プロジェクト構造と技術スタックを分析",
+        "profile": "プロジェクト能力プロファイルを生成",
+        "skills": "専用スキルパックを読み込み",
+        "preset": "ガードプリセットを適用",
+        "ready": "ガードソリューションの準備完了"
+      }
     }
   },
   "pipeline": {
@@ -1742,5 +1753,23 @@
     "issuesCopied": "問題をコピーしました。AI に貼り付けて修正できます",
     "projectAdded": "プロジェクト「{{projectName}}」を追加しました。ガードを開始します",
     "projectRemoved": "プロジェクト「{{projectName}}」を削除しました"
+  },
+  "onboarding": {
+    "preparing": "プロジェクトを準備中...",
+    "steps": {
+      "analyzing": "技術スタックを分析",
+      "profiling": "プロジェクトプロファイルを生成",
+      "loading": "能力パックを読み込み",
+      "ready": "保護準備完了"
+    },
+    "hint": "ZhiYan CodeShield が最適な保護を設定しています。しばらくお待ちください"
+  },
+  "screensaver": {
+    "engineActive": "スマートエンジンが有効",
+    "security": "セキュリティ",
+    "governance": "ガバナンス",
+    "operations": "運用",
+    "privacy": "プライバシー保護中",
+    "wisdomBrain": "ウィズダムブレイン"
   }
 }

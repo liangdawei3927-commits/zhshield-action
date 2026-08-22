@@ -10,7 +10,7 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --max-warnings 100"
+    "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {
     "@zh/shared": "workspace:*",

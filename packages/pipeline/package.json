@@ -9,7 +9,7 @@
     "dev": "tsc --watch",
     "test": "NODE_OPTIONS='--max-old-space-size=16384' vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "lint": "eslint src --max-warnings 100"
+    "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {
     "@zh/guard": "workspace:*",

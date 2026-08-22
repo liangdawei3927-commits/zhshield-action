@@ -13,7 +13,7 @@
     "pipeline": "tsx src/index.ts pipeline",
     "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "lint": "eslint src bin --max-warnings 100"
+    "lint": "eslint src bin --max-warnings 50"
   },
   "dependencies": {
     "@zh/pipeline": "workspace:*",

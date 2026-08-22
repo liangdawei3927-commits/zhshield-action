@@ -46,17 +46,18 @@ export class BackupConfigManager {
 
   /**
    * 从项目根目录加载备份配置
-   * 如果文件不存在，返回默认配置
+   * 如果文件不存在，返回按项目隔离的默认配置（projectName 仅影响子目录可读名）
    */
-  async loadProjectConfig(projectRoot: string): Promise<BackupConfig> {
+  async loadProjectConfig(projectRoot: string, projectName?: string): Promise<BackupConfig> {
     const configPath = this.projectConfigPath(projectRoot);
+    const def = defaultBackupConfig({ projectPath: projectRoot, projectName });
     try {
       const raw = await fs.readFile(configPath, 'utf-8');
       const parsed = yaml.load(raw) as Record<string, unknown>;
-      if (!parsed?.backup) return defaultBackupConfig();
-      return this.normalizeConfig(parsed.backup as Record<string, unknown>);
+      if (!parsed?.backup) return def;
+      return this.normalizeConfig(parsed.backup as Record<string, unknown>, def);
     } catch {
-      return defaultBackupConfig();
+      return def;
     }
   }
 
@@ -109,8 +110,7 @@ export class BackupConfigManager {
     return path.join(projectRoot, ZH_SHIELD_DIR, BACKUP_CONFIG_FILE);
   }
 
-  private normalizeConfig(raw: Record<string, unknown>): BackupConfig {
-    const def = defaultBackupConfig();
+  private normalizeConfig(raw: Record<string, unknown>, def: BackupConfig): BackupConfig {
     return {
       github: this.normalizeGitHub(raw.github as Partial<GitHubBackupConfig> | undefined, def.github),
       local: this.normalizeLocal(raw.local as Partial<LocalBackupConfig> | undefined, def.local),

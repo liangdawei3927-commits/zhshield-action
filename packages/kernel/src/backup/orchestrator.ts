@@ -50,7 +50,7 @@ export class BackupOrchestrator {
 
     this.emit(BACKUP_EVENTS.STARTED, { projectId, backupId, type: 'full' });
 
-    const config = await this.configManager.loadProjectConfig(projectPath);
+    const config = await this.configManager.loadProjectConfig(projectPath, options.projectName);
     if (!projectName) {
       projectName = projectId;
     }

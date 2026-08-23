@@ -42,9 +42,13 @@ packages/
   kernel     SOP 规则引擎 / EventBus / 同步缓存
   shared     共享类型与 ToolAdapter 契约
   db         SQLite + migrations
+  i18n       五语种目录 + i18next 实例 + 语言解析
+  fingerprint 项目画像探测（技术栈指纹 / 评分画像 profileSync）
   guard      Git Hook / CI 门禁
   inspect    质量扫描适配器
   security   漏洞 / 垃圾 / 恶意代码
+  dependency 依赖治理（依赖图 / SBOM / 许可证矩阵）
+  performance 前端性能静态分析（包体积 / 构建配置 / tree-shaking）
   refactor   AST 异味与自动修复
   sentinel   监控告警
   scoring    健康评分

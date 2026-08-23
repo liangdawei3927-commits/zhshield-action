@@ -76,6 +76,19 @@ function profileModule(scan: ScanResult, moduleRel: string): ModuleProfile | nul
 /**
  * 发现 monorepo 子模块路径（packages/* 或 apps/* 或 services/*）
  */
+// 模块目录下的噪声子目录：依赖/构建产物/缓存，绝不能当作子包
+const MODULE_SCAN_SKIP = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.turbo',
+  '.next',
+  '.nuxt',
+  '.output',
+]);
+
 function discoverModules(scan: ScanResult): string[] {
   const moduleDirs = ['packages', 'apps', 'services', 'libs', 'modules'];
   const result: string[] = [];
@@ -85,9 +98,10 @@ function discoverModules(scan: ScanResult): string[] {
     try {
       const entries = fs.readdirSync(abs, { withFileTypes: true });
       for (const e of entries) {
-        if (e.isDirectory() && !e.name.startsWith('.')) {
-          result.push(`${dir}/${e.name}`);
-        }
+        if (!e.isDirectory()) continue;
+        if (e.name.startsWith('.')) continue;
+        if (MODULE_SCAN_SKIP.has(e.name)) continue;
+        result.push(`${dir}/${e.name}`);
       }
     } catch {
       // ignore

@@ -117,6 +117,30 @@ describe('ProjectProfiler', () => {
     expect(result.profile.modules!.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('Monorepo 模块探测排除 node_modules/dist 等噪声目录', () => {
+    writeFile('pnpm-workspace.yaml', 'packages:\n  - "packages/*"\n');
+    writeFile('packages/server/package.json', JSON.stringify({
+      name: '@demo/server',
+      dependencies: { '@nestjs/core': '^10.0.0' },
+    }));
+    writeFile('packages/web/package.json', JSON.stringify({
+      name: '@demo/web',
+      dependencies: { react: '^18.0.0' },
+    }));
+    // 噪声目录：pnpm 会把依赖提升到 packages/node_modules，构建产物也可能落在 packages/dist
+    writeFile('packages/node_modules/some-lib/index.js', 'module.exports = 1;');
+    writeFile('packages/dist/bundle.js', 'console.log(1);');
+    writeFile('packages/.turbo/cache', '');
+
+    const result = profiler.profileSync(tmpDir);
+    const paths = result.profile.modules!.map((m) => m.path);
+    expect(paths).toContain('packages/server');
+    expect(paths).toContain('packages/web');
+    expect(paths).not.toContain('packages/node_modules');
+    expect(paths).not.toContain('packages/dist');
+    expect(paths).not.toContain('packages/.turbo');
+  });
+
   it('不存在的目录降级为 unknown', () => {
     const result = profiler.profileSync('/nonexistent/path/xyz');
     expect(result.profile.language).toBe('unknown');

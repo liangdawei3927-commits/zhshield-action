@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { bucketFindingsByModule, scoreProjectModules, scoreProjectByModules } from '../module-score';
-import type { ProjectProfile } from '@zh/profiler';
+import type { ScoringProjectProfile } from '@zh/fingerprint';
 
-function makeProfile(type: ProjectProfile['type']): ProjectProfile {
+function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
   return {
     version: '1.0.0',
     projectRoot: '/p',

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { buildHealthDimensions } from '../pipeline-score';
 import { resolveProfileScoring, applyWeightDeltas } from '../profile-scoring-resolver';
-import type { ProjectProfile } from '@zh/profiler';
+import type { ScoringProjectProfile } from '@zh/fingerprint';
 
 /** 构造最小测试画像 */
-function makeProfile(type: ProjectProfile['type']): ProjectProfile {
+function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
   return {
     version: '1.0.0',
     projectRoot: '/test',

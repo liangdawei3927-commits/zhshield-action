@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildHealthDimensions } from '../pipeline-score';
 import { ScoringEngine } from '../engine';
-import type { ProjectProfile } from '@zh/profiler';
+import type { ScoringProjectProfile } from '@zh/fingerprint';
 
 /** 最小测试画像 */
-function makeProfile(type: ProjectProfile['type']): ProjectProfile {
+function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
   return {
     version: '1.0.0',
     projectRoot: '/test',

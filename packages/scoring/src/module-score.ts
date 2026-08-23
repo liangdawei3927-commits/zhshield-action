@@ -1,6 +1,6 @@
 import type { DimensionScore, HealthScore } from './types';
 import type { GuardCheckLike, InspectIssueLike } from './pipeline-score';
-import type { ProjectProfile, ProjectType, ModuleProfile } from '@zh/profiler';
+import type { ScoringProjectProfile, ProjectType, ModuleProfile } from '@zh/fingerprint';
 import { buildHealthDimensions } from './pipeline-score';
 import { ScoringEngine } from './engine';
 
@@ -17,7 +17,7 @@ export interface ModuleInspectInput {
 /** 单个模块的评分输入：路径 + 画像（含类型）+ 该模块自身的 guard/inspect 报告 */
 export interface ModuleScoreInput {
   path: string;
-  profile: ProjectProfile;
+  profile: ScoringProjectProfile;
   guard: ModuleGuardInput;
   inspect: ModuleInspectInput;
 }
@@ -38,8 +38,8 @@ export interface ProjectScoreAggregate {
   grade: HealthScore['grade'];
 }
 
-/** ModuleProfile → 最小 ProjectProfile（供 buildHealthDimensions 按模块类型取权重） */
-function moduleToProfile(m: ModuleProfile): ProjectProfile {
+/** ModuleProfile → 最小 ScoringProjectProfile（供 buildHealthDimensions 按模块类型取权重） */
+function moduleToProfile(m: ModuleProfile): ScoringProjectProfile {
   return {
     version: '1.0.0',
     projectRoot: m.path,
@@ -69,7 +69,7 @@ function gradeOf(score: number): HealthScore['grade'] {
  * 匹配规则：file 等于模块路径或以 `模块路径/` 开头，取最长前缀匹配。
  */
 export function bucketFindingsByModule(
-  root: ProjectProfile,
+  root: ScoringProjectProfile,
   guard: ModuleGuardInput,
   inspect: ModuleInspectInput,
 ): ModuleScoreInput[] {
@@ -127,7 +127,7 @@ export function scoreProjectModules(modules: ModuleScoreInput[]): ProjectScoreAg
 
 /** 组合分桶 + 逐模块评分：直接对准「根画像 + 原始 guard/inspect findings」给出模块级聚合分 */
 export function scoreProjectByModules(
-  root: ProjectProfile,
+  root: ScoringProjectProfile,
   guard: ModuleGuardInput,
   inspect: ModuleInspectInput,
 ): ProjectScoreAggregate {

@@ -16,7 +16,7 @@
     "@zh/db": "workspace:*",
     "@zh/i18n": "workspace:*",
     "@zh/kernel": "workspace:*",
-    "@zh/profiler": "workspace:*",
+    "@zh/fingerprint": "workspace:*",
     "@zh/shared": "workspace:*"
   },
   "devDependencies": {

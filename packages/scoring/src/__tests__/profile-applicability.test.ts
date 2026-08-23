@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { buildHealthDimensions } from '../pipeline-score';
 import { ScoringEngine } from '../engine';
 import { resolveProfileScoring, applyDisabledDimensions } from '../profile-scoring-resolver';
-import type { ProjectProfile } from '@zh/profiler';
+import type { ScoringProjectProfile } from '@zh/fingerprint';
 
-function makeProfile(type: ProjectProfile['type']): ProjectProfile {
+function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
   return {
     version: '1.0.0',
     projectRoot: '/test',

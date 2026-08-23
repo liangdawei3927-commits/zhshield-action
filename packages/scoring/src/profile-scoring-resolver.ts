@@ -1,4 +1,4 @@
-import type { ProjectProfile, ProjectType } from '@zh/profiler';
+import type { ScoringProjectProfile, ProjectType } from '@zh/fingerprint';
 
 /**
  * 画像驱动评分适配解析器
@@ -63,7 +63,7 @@ const TYPE_DISABLED_DIMENSIONS: Record<ProjectType, string[]> = {
  * 解析画像 → 评分覆盖。
  * profile 为空或 type=unknown 时返回空对象（向后兼容）。
  */
-export function resolveProfileScoring(profile?: ProjectProfile | null): ProfileScoringOverrides {
+export function resolveProfileScoring(profile?: ScoringProjectProfile | null): ProfileScoringOverrides {
   if (!profile || profile.type === 'unknown') return {};
   const deltas = TYPE_WEIGHT_DELTAS[profile.type];
   const disabled = TYPE_DISABLED_DIMENSIONS[profile.type];

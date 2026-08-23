@@ -387,18 +387,6 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@22.20.1)(jiti@1.21.7)(tsx@4.23.1))
 
-  packages/profiler:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.10(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@22.20.1)(jiti@1.21.7)(tsx@4.23.1))
-
   packages/refactor:
     dependencies:
       '@zh/kernel':

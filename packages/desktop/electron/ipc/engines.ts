@@ -66,7 +66,7 @@ import {
   type PerformanceReportData,
   type HealthScoreData,
 } from './report-format';
-import type { DependencyReportData, TechDebtReportData, SecretReportData } from '../../src/types/electron';
+import type { DependencyReportData, TechDebtReportData, SecretReportData, ProjectProfileData } from '../../src/types/electron';
 
 async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -233,6 +233,7 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runPipeline', (_e, projectPath: string, options?: { dryRun?: boolean; sop?: boolean }) => runPipelineHandler(manager, projectPath, options));
   ipcMain.handle('engine:getScore', getScoreHandler);
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
+  ipcMain.handle('engine:getProfile', getProfileHandler);
   ipcMain.handle('engine:runProfile', (_e, projectPath: string) => runProfileHandler(projectPath));
 }
 
@@ -824,5 +825,19 @@ async function getScoreHistoryHandler(_event: Electron.IpcMainInvokeEvent, proje
   } catch (err) {
     console.warn('[engine:getScoreHistory] 评分历史读取失败:', err instanceof Error ? err.message : String(err));
     return [];
+  }
+}
+
+/** 项目画像（含子模块列表）：供报告页列出模块用于模块级评分卡展示；探测失败时返回 null */
+async function getProfileHandler(_event: Electron.IpcMainInvokeEvent, projectPath: string): Promise<ProjectProfileData | null> {
+  try {
+    const profilingResult = profiler.profileSync(projectPath).profile;
+    return {
+      type: profilingResult.type,
+      modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),
+    };
+  } catch (err) {
+    console.warn('[engine:getProfile] 画像探测失败:', err instanceof Error ? err.message : String(err));
+    return null;
   }
 }

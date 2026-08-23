@@ -15,6 +15,7 @@ import type {
   SecurityScanReportData,
   PerformanceReportData,
   HealthScoreData,
+  ProjectProfileData,
   RefactorReportData,
   PipelineReportData,
   SuggestionData,
@@ -349,6 +350,18 @@ export async function getScoreHistory(projectId: string): Promise<HealthScoreDat
     return await api.engine.getScoreHistory(projectId);
   } catch {
     return [];
+  }
+}
+
+/** 项目画像（含子模块列表），供报告页展示模块级评分卡；HTTP 模式服务端未暴露画像接口时返回 null */
+export async function getProfile(projectPath: string): Promise<ProjectProfileData | null> {
+  if (isHttpMode()) return null;
+  const api = getAPI();
+  if (!api?.engine) return null;
+  try {
+    return await api.engine.getProfile(projectPath);
+  } catch {
+    return null;
   }
 }
 

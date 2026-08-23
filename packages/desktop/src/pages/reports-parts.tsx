@@ -4,6 +4,7 @@ import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useT } from '../i18n';
+import type { ModuleScoreView } from './module-scores-logic';
 
 function SparklineChart({ data }: { data: HealthScoreData[] }) {
   if (data.length < 2) return null;
@@ -115,6 +116,36 @@ export function DimensionCards({ dimensions }: { dimensions: HealthScoreData['di
           </div>
         </ResultCard>
       ))}
+    </div>
+  );
+}
+
+/** 模块级评分卡：monorepo 各子模块独立评分，按模块渲染（无子模块时不渲染） */
+export function ModuleScoreCards({ modules }: { modules: ModuleScoreView[] }) {
+  if (modules.length === 0) return null;
+  return (
+    <div className="flex gap-4 flex-wrap mb-6">
+      {modules.map((m) => {
+        const color = m.score == null ? 'rgb(var(--zh-muted))' : getScoreColor(m.score);
+        const label = m.score == null ? '—' : getScoreLabel(m.score);
+        return (
+          <ResultCard key={m.path} variant="stats" className="min-w-[150px]">
+            <div className="text-xs text-zh-muted mb-1 truncate" title={m.path}>{m.name}</div>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: color }}
+              >
+                {m.score == null ? '–' : m.score}
+              </div>
+              <div>
+                <div className="text-xs font-semibold" style={{ color }}>{label}</div>
+                <div className="text-[10px] text-zh-muted">{m.type}</div>
+              </div>
+            </div>
+          </ResultCard>
+        );
+      })}
     </div>
   );
 }

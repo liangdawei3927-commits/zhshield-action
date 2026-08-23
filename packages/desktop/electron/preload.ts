@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('engine:getScore', projectId),
     getScoreHistory: (projectId: string) =>
       ipcRenderer.invoke('engine:getScoreHistory', projectId),
+    getProfile: (projectPath: string) =>
+      ipcRenderer.invoke('engine:getProfile', projectPath),
     runRefactor: (projectPath: string) =>
       ipcRenderer.invoke('engine:runRefactor', projectPath),
     runDeps: (projectPath: string) =>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getScoreHistory, runPipeline } from '../services/engineApi';
+import { getProfile, getScore, getScoreHistory, runPipeline } from '../services/engineApi';
+import { collectModuleScores, type ModuleScoreView } from './module-scores-logic';
 import type { HealthScoreData } from '../types/electron';
 
 /** 预别名类型 — 避免 .tsx 中出现泛型尖括号（会被 JSX 深度检测误判） */
@@ -71,4 +72,27 @@ export function useReportsPage(projectPath: string) {
   }, [projectPath, load]);
 
   return { data, loading, handleNewReport };
+}
+
+/** 报告页模块级评分：拉取项目画像子模块 + 各模块评分，汇集为视图；无子模块时返回空 */
+export function useModuleScores(projectPath: string) {
+  const [modules, setModules] = useState<ModuleScoreView[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const profile = await getProfile(projectPath);
+      if (cancelled || !profile?.modules?.length) {
+        if (!cancelled) setModules([]);
+        setLoading(false);
+        return;
+      }
+      const views = await collectModuleScores(profile.modules, getScore);
+      if (!cancelled) setModules(views);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [projectPath]);
+  return { modules, loading };
 }

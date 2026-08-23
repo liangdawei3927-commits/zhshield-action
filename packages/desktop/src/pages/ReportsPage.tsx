@@ -1,6 +1,6 @@
 import { PageShell } from '../components/business/PageShell';
-import { useReportsPage } from './reports-logic';
-import { StackedDocs, ReportsHeader, LatestScoreCard, DimensionCards } from './reports-parts';
+import { useReportsPage, useModuleScores } from './reports-logic';
+import { StackedDocs, ReportsHeader, LatestScoreCard, DimensionCards, ModuleScoreCards } from './reports-parts';
 import { HistoryTable } from './reports-table';
 import { useT } from '../i18n';
 
@@ -10,6 +10,7 @@ interface ReportsPageProps {
 
 export function ReportsPage({ projectPath }: ReportsPageProps) {
   const { data, loading, handleNewReport } = useReportsPage(projectPath);
+  const { modules } = useModuleScores(projectPath);
   const t = useT();
 
   if (data.length > 0) {
@@ -20,6 +21,7 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
           <ReportsHeader count={data.length} latest={latest} onNewReport={handleNewReport} />
           <LatestScoreCard latest={latest} data={data} />
           <DimensionCards dimensions={latest.dimensions} />
+          <ModuleScoreCards modules={modules} />
           <HistoryTable data={data} />
         </div>
       </div>

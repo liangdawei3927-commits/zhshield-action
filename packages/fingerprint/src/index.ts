@@ -60,6 +60,20 @@ export { LockfileDetector } from './detectors/lockfile-detector';
 export { toFeature } from './projection';
 export type { ProjectFeatureLike } from './projection';
 
+// ─── 评分契约导出（由 @zh/profiler 合并而来：供 scoring 使用的轻量同步画像，不依赖 worker） ───
+export { profileSync } from './scoring/profiler';
+export type {
+  ScoringProjectProfile,
+  ScoringProfileResult,
+  ModuleProfile,
+  ProjectType,
+  ProjectLanguage,
+  ProjectFramework,
+  PackageManager,
+  Runtime,
+  ProfileSignal,
+} from './scoring/types';
+
 // ─── 常量导出 ───
 export { DETECTOR_IDS, SKIP_DIRS } from './detector';
 export {

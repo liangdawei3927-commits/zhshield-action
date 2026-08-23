@@ -124,3 +124,12 @@ export function scoreProjectModules(modules: ModuleScoreInput[]): ProjectScoreAg
     : 0;
   return { modules: cards, overall, grade: gradeOf(overall) };
 }
+
+/** 组合分桶 + 逐模块评分：直接对准「根画像 + 原始 guard/inspect findings」给出模块级聚合分 */
+export function scoreProjectByModules(
+  root: ProjectProfile,
+  guard: ModuleGuardInput,
+  inspect: ModuleInspectInput,
+): ProjectScoreAggregate {
+  return scoreProjectModules(bucketFindingsByModule(root, guard, inspect));
+}

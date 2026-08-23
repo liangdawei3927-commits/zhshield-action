@@ -16,7 +16,7 @@ export {
   ProjectScoringConfigError,
 } from './project-scoring-config';
 export { resolveProfileScoring, applyWeightDeltas, applyDisabledDimensions } from './profile-scoring-resolver';
-export { bucketFindingsByModule, scoreProjectModules } from './module-score';
+export { bucketFindingsByModule, scoreProjectModules, scoreProjectByModules } from './module-score';
 export type {
   ModuleScoreInput,
   ModuleGuardInput,

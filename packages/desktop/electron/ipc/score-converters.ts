@@ -5,9 +5,14 @@
  * 而不用加载主进程 IPC 模块。引擎层 engines.ts 与本文件测试都从这里导入。
  */
 
-export function convertGuardEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean }> {
+/** 从 SOP RuleEvaluation 抽取文件路径（files[0] 优先，回退到首条违规的 file），用于模块级分桶 */
+function firstFileOf(ev: { files?: string[]; violations?: Array<{ file?: string }> }): string | undefined {
+  return ev.files?.[0] ?? ev.violations?.[0]?.file;
+}
+
+export function convertGuardEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }> {
   return evaluations.map((ev) => {
-    const e = ev as { status?: string; rule?: { severity?: string } };
+    const e = ev as { status?: string; rule?: { severity?: string }; files?: string[]; violations?: Array<{ file?: string }> };
     const statusMap: Record<string, 'passed' | 'failed' | 'error' | 'warning'> = {
       passed: 'passed',
       failed: 'failed',
@@ -25,18 +30,19 @@ export function convertGuardEvaluations(evaluations: unknown[]): Array<{ severit
       severity: severityMap[e.rule?.severity ?? ''] ?? 'warning',
       status: statusMap[e.status ?? ''] ?? 'error',
       blocking: e.status === 'failed',
+      file: firstFileOf(e),
     };
   });
 }
 
-export function convertInspectEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; category: string }> {
+export function convertInspectEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }> {
   return evaluations
     .filter((ev) => {
       const s = (ev as { status?: string }).status;
       return s !== 'passed' && s !== 'skipped';
     })
     .map((ev) => {
-      const e = ev as { status?: string; rule?: { severity?: string; tags?: string[] } };
+      const e = ev as { status?: string; rule?: { severity?: string; tags?: string[] }; files?: string[]; violations?: Array<{ file?: string }> };
       const severityMap: Record<string, 'error' | 'warning' | 'info'> = {
         critical: 'error',
         high: 'error',
@@ -56,6 +62,7 @@ export function convertInspectEvaluations(evaluations: unknown[]): Array<{ sever
       return {
         severity: severityMap[e.rule?.severity ?? ''] ?? 'warning',
         category,
+        file: firstFileOf(e),
       };
     });
 }

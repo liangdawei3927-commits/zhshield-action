@@ -13,7 +13,7 @@ import os from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
 
-import { buildHealthDimensions, buildTechDebtDashboard, mergeActionStatuses, computeTrendDelta } from '@zh/scoring';
+import { buildHealthDimensions, buildTechDebtDashboard, mergeActionStatuses, computeTrendDelta, scoreProjectByModules } from '@zh/scoring';
 import type { DebtIssueInput, ModuleHotnessInput } from '@zh/scoring';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
@@ -160,8 +160,8 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     const inspectReport = report.inspect;
     if (!guardReport || !inspectReport) return;
 
-    let guardResults: Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean }>;
-    let inspectIssues: Array<{ severity: 'error' | 'warning' | 'info'; category: string }>;
+    let guardResults: Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }>;
+    let inspectIssues: Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }>;
 
     if (isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport)) {
       // SOP 模式：从 evaluations 转换
@@ -193,6 +193,21 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     );
     const score = scoring.calculate(projectPath, dimensions);
     console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
+
+    // 模块级独立评分（monorepo）：画像含子模块时，按模块目录分桶、各模块用自身类型权重评分后逐模块落库。
+    // 跳过根级兜底卡（path === projectPath），其 findings 已计入上方项目整体分，避免覆盖。
+    if (profilingResult?.modules?.length) {
+      const aggregate = scoreProjectByModules(
+        profilingResult,
+        { results: guardResults },
+        { issues: inspectIssues },
+      );
+      for (const card of aggregate.modules) {
+        if (card.path === projectPath) continue;
+        const moduleScore = scoring.calculate(card.path, card.dimensions);
+        console.log(`[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`);
+      }
+    }
   } catch (err) {
     console.warn('[engine:runPipeline] 健康评分落库失败:', err instanceof Error ? err.message : String(err));
   }

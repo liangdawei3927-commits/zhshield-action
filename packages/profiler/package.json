@@ -1,7 +1,8 @@
 {
-  "name": "@zh/scoring",
+  "name": "@zh/profiler",
   "version": "0.1.0",
   "private": true,
+  "description": "项目画像探测器 — 识别语言/框架/类型/运行时/包管理器，为评分与治理调度提供画像",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
@@ -12,16 +13,9 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 50"
   },
-  "dependencies": {
-    "@zh/db": "workspace:*",
-    "@zh/i18n": "workspace:*",
-    "@zh/kernel": "workspace:*",
-    "@zh/profiler": "workspace:*",
-    "@zh/shared": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/better-sqlite3": "^7.6.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"
   },

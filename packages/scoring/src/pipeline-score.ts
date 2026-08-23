@@ -1,5 +1,7 @@
 import type { DimensionScore } from './types';
 import { DimensionMapper } from './dimension-mapper';
+import type { ProjectProfile } from '@zh/profiler';
+import { resolveProfileScoring, applyWeightDeltas } from './profile-scoring-resolver';
 
 /** guard 检查的最小结构 — 与 @zh/guard CheckResult 字段兼容，避免包间依赖 */
 export interface GuardCheckLike {
@@ -65,15 +67,26 @@ function guardIssueCount(results: GuardCheckLike[]): number {
  * {@link resolveScoringConfig}）；无覆盖文件时与内置默认权重一致。
  *
  * @param projectRoot 项目根目录，缺省为 process.cwd()；传入可显式指定被扫描项目
+ * @param profile 项目画像（来自 @zh/profiler）；传入时按项目类型自动微调维度权重，
+ *   不传则走默认配置（向后兼容）。profile 增量在项目级 .zhshield/scoring.yml 之上叠加。
  * @throws {ProjectScoringConfigError} 项目覆盖文件存在但内容非法时（fail-fast）
  */
 export function buildHealthDimensions(
   guard: GuardReportLike,
   inspect: InspectionReportLike,
   projectRoot?: string,
+  profile?: ProjectProfile | null,
 ): DimensionScore[] {
   const dimensionMapper = new DimensionMapper(undefined, projectRoot);
-  const weightMap = dimensionMapper.getWeightMap();
+  let weightMap = dimensionMapper.getWeightMap();
+
+  // 画像驱动权重适配：增量叠加 + 归一化，向后兼容
+  if (profile) {
+    const overrides = resolveProfileScoring(profile);
+    if (overrides.weightDeltas) {
+      weightMap = applyWeightDeltas(weightMap, overrides.weightDeltas);
+    }
+  }
 
   return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) => {
     const weight = weightMap[name] ?? 0;

@@ -24,6 +24,7 @@
     "@zh/inspect": "workspace:*",
     "@zh/kernel": "workspace:*",
     "@zh/pipeline": "workspace:*",
+    "@zh/profiler": "workspace:*",
     "@zh/refactor": "workspace:*",
     "@zh/scoring": "workspace:*",
     "@zh/security": "workspace:*",

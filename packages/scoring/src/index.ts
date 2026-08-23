@@ -15,7 +15,7 @@ export {
   PROJECT_SCORING_CONFIG_FILENAMES,
   ProjectScoringConfigError,
 } from './project-scoring-config';
-export { resolveProfileScoring, applyWeightDeltas } from './profile-scoring-resolver';
+export { resolveProfileScoring, applyWeightDeltas, applyDisabledDimensions } from './profile-scoring-resolver';
 export type { ProfileScoringOverrides } from './profile-scoring-resolver';
 export type {
   ScoringOverrides,

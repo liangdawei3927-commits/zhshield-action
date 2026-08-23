@@ -46,6 +46,19 @@ const TYPE_WEIGHT_DELTAS: Record<ProjectType, Partial<Record<string, number>>> =
   unknown: {},
 };
 
+// 按项目类型剔除「本质上不适用」的维度（保守默认，集中此表便于产品校准）；被剔维度权重置 0、其余归一化
+const TYPE_DISABLED_DIMENSIONS: Record<ProjectType, string[]> = {
+  backend: [],
+  frontend: [],
+  app: [],
+  'mini-program': ['architecture'],
+  desktop: [],
+  library: [],
+  cli: ['architecture'],
+  monorepo: [],
+  unknown: [],
+};
+
 /**
  * 解析画像 → 评分覆盖。
  * profile 为空或 type=unknown 时返回空对象（向后兼容）。
@@ -53,8 +66,11 @@ const TYPE_WEIGHT_DELTAS: Record<ProjectType, Partial<Record<string, number>>> =
 export function resolveProfileScoring(profile?: ProjectProfile | null): ProfileScoringOverrides {
   if (!profile || profile.type === 'unknown') return {};
   const deltas = TYPE_WEIGHT_DELTAS[profile.type];
-  if (!deltas || Object.keys(deltas).length === 0) return {};
-  return { weightDeltas: { ...deltas } };
+  const disabled = TYPE_DISABLED_DIMENSIONS[profile.type];
+  const overrides: ProfileScoringOverrides = {};
+  if (deltas && Object.keys(deltas).length > 0) overrides.weightDeltas = { ...deltas };
+  if (disabled && disabled.length > 0) overrides.disabledDimensions = [...disabled];
+  return overrides;
 }
 
 /**
@@ -74,7 +90,24 @@ export function applyWeightDeltas(
   const sum = Object.values(adjusted).reduce((a, b) => a + b, 0);
   if (sum > 0) {
     for (const k of Object.keys(adjusted)) {
-      adjusted[k] = Math.round((adjusted[k] / sum) * 1000) / 1000;
+      adjusted[k] = Math.round((adjusted[k] / sum) * 1e6) / 1e6;
+    }
+  }
+  return adjusted;
+}
+
+// 将不适用维度权重置 0，其余维度权重重新归一化到和为 1（返回新对象，不修改原对象）
+export function applyDisabledDimensions(
+  weightMap: Record<string, number>,
+  disabled?: string[] | undefined,
+): Record<string, number> {
+  if (!disabled || disabled.length === 0) return weightMap;
+  const adjusted: Record<string, number> = { ...weightMap };
+  for (const d of disabled) adjusted[d] = 0;
+  const activeSum = Object.values(adjusted).reduce((a, b) => a + b, 0);
+  if (activeSum > 0) {
+    for (const k of Object.keys(adjusted)) {
+      if (adjusted[k] > 0) adjusted[k] = Math.round((adjusted[k] / activeSum) * 1e6) / 1e6;
     }
   }
   return adjusted;

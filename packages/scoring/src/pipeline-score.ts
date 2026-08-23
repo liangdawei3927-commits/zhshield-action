@@ -1,7 +1,7 @@
 import type { DimensionScore } from './types';
 import { DimensionMapper } from './dimension-mapper';
 import type { ProjectProfile } from '@zh/profiler';
-import { resolveProfileScoring, applyWeightDeltas } from './profile-scoring-resolver';
+import { resolveProfileScoring, applyWeightDeltas, applyDisabledDimensions } from './profile-scoring-resolver';
 
 /** guard 检查的最小结构 — 与 @zh/guard CheckResult 字段兼容，避免包间依赖 */
 export interface GuardCheckLike {
@@ -80,11 +80,14 @@ export function buildHealthDimensions(
   const dimensionMapper = new DimensionMapper(undefined, projectRoot);
   let weightMap = dimensionMapper.getWeightMap();
 
-  // 画像驱动权重适配：增量叠加 + 归一化，向后兼容
+  // 画像驱动权重适配：增量叠加 + 不适用维度剔除 + 归一化，向后兼容
   if (profile) {
     const overrides = resolveProfileScoring(profile);
     if (overrides.weightDeltas) {
       weightMap = applyWeightDeltas(weightMap, overrides.weightDeltas);
+    }
+    if (overrides.disabledDimensions?.length) {
+      weightMap = applyDisabledDimensions(weightMap, overrides.disabledDimensions);
     }
   }
 

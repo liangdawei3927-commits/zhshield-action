@@ -785,7 +785,7 @@
       "noRecords": "暂无备份记录",
       "oneClickBackup": "一键备份",
       "openFolder": "打开文件夹",
-      "openFolderTip": "打开备份文件夹查看压缩文件：{{path}}",
+      "openFolderTip": "打开备份目录，查看该项目全部历史快照：{{path}}",
       "recordCount": "{{count}} 条备份记录",
       "recordsTitle": "备份记录",
       "result": {

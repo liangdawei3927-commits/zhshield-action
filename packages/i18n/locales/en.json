@@ -785,7 +785,7 @@
       "noRecords": "No backup records yet",
       "oneClickBackup": "One-click backup",
       "openFolder": "Open Folder",
-      "openFolderTip": "Open backup folder to view archives: {{path}}",
+      "openFolderTip": "Open backup directory with all snapshots of this project: {{path}}",
       "recordCount": "{{count}} backup records",
       "recordsTitle": "Backup records",
       "result": {

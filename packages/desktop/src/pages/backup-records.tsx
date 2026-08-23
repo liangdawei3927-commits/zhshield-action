@@ -11,10 +11,14 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
   const t = useT();
   const { toast } = useToast();
   const info = STATUS_LABEL[record.status] ?? { textKey: record.status, color: 'rgb(var(--zh-muted))' };
-  const openFolder = async (): Promise<void> => {
-    const ok = await openBackupFolder(record.localBackupPath!);
+
+  const openFolder = async (target: string): Promise<void> => {
+    const ok = await openBackupFolder(target);
     if (!ok) toast(t('page.backup.toast.openFailed'), 'error');
   };
+  // 行图标打开备份根目录（可见该项目全部历史快照）；详情内链接直达本次快照本身。
+  const snapshot = record.localBackupPath ?? null;
+  const backupRoot = snapshot ? snapshot.slice(0, snapshot.lastIndexOf('/')) || snapshot : null;
   return (
     <BounceCard className="rounded-lg overflow-hidden">
       <div
@@ -31,12 +35,12 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-zh-muted">{record.duration}ms</span>
-          {record.localBackupPath && (
+          {backupRoot && (
             <Bounce
               as="button"
-              title={t('page.backup.openFolderTip', { path: record.localBackupPath })}
+              title={t('page.backup.openFolderTip', { path: backupRoot })}
               aria-label={t('page.backup.openFolder')}
-              onClick={(e) => { e.stopPropagation(); void openFolder(); }}
+              onClick={(e) => { e.stopPropagation(); void openFolder(backupRoot); }}
               className="flex items-center justify-center w-7 h-7 rounded hover:bg-brand/10 transition-colors text-zh-muted hover:text-zh-brand cursor-pointer border-none bg-transparent"
             >
               <NavIcon id="folder" size={16} />
@@ -58,11 +62,11 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
             <div>{t('page.backup.detail.trigger', { mode: record.trigger === 'manual' ? t('page.backup.trigger.manual') : record.trigger === 'schedule' ? t('page.backup.trigger.schedule') : 'API' })}</div>
             {record.githubRepoUrl && <div>{t('page.backup.detail.github')}<a href={record.githubRepoUrl} target="_blank" className="text-blue-500">{record.githubRepoUrl}</a></div>}
             {record.githubCommitHash && <div>{t('page.backup.detail.commit', { hash: record.githubCommitHash.slice(0, 7) })}</div>}
-            {record.localBackupPath && (
+            {snapshot && (
               <div className="flex items-center gap-2">
-                <span>{t('page.backup.detail.localPath', { path: record.localBackupPath })}</span>
+                <span>{t('page.backup.detail.localPath', { path: snapshot })}</span>
                 <button
-                  onClick={() => { void openFolder(); }}
+                  onClick={() => { void openFolder(snapshot); }}
                   className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline cursor-pointer border-none bg-transparent"
                 >
                   <NavIcon id="folder" size={14} />

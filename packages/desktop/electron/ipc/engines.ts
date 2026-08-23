@@ -22,7 +22,7 @@ import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } fro
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
-import { profiler } from '@zh/profiler';
+import { profileSync } from '@zh/fingerprint';
 import { convertGuardEvaluations, convertInspectEvaluations } from './score-converters';
 import {
   buildDependencyGraph,
@@ -181,7 +181,7 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     // 画像驱动评分：探测项目画像（语言/框架/类型），失败时降级为默认配置
     let profilingResult = null;
     try {
-      profilingResult = profiler.profileSync(projectPath).profile;
+      profilingResult = profileSync(projectPath).profile;
     } catch (err) {
       console.warn('[engine:runPipeline] 画像探测失败，降级默认评分配置:', err instanceof Error ? err.message : String(err));
     }
@@ -831,7 +831,7 @@ async function getScoreHistoryHandler(_event: Electron.IpcMainInvokeEvent, proje
 /** 项目画像（含子模块列表）：供报告页列出模块用于模块级评分卡展示；探测失败时返回 null */
 async function getProfileHandler(_event: Electron.IpcMainInvokeEvent, projectPath: string): Promise<ProjectProfileData | null> {
   try {
-    const profilingResult = profiler.profileSync(projectPath).profile;
+    const profilingResult = profileSync(projectPath).profile;
     return {
       type: profilingResult.type,
       modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),

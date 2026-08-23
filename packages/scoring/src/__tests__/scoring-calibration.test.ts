@@ -144,10 +144,9 @@ describe('评分校准 — 类型区分度（Task C）', () => {
     const archInspect = {
       issues: [{ severity: 'error' as const, category: 'architecture' }],
     };
-    const withArch = overallOf(makeRealisticProfile('mini-program'), emptyGuard, archInspect);
+    const withIssue = overallOf(makeRealisticProfile('mini-program'), emptyGuard, archInspect);
     const without = overallOf(makeRealisticProfile('mini-program'));
-    expect(withArch).toBe(withArch); // 架构维度权重为 0，不影响总分
-    expect(withArch).toBeCloseTo(without, 5);
+    expect(withIssue).toBeCloseTo(without, 5);
   });
 });
 

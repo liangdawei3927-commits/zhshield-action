@@ -23,7 +23,7 @@ import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
 import { profileSync } from '@zh/fingerprint';
-import { convertGuardEvaluations, convertInspectEvaluations } from './score-converters';
+import { convertGuardEvaluations, convertInspectEvaluations, convertTraditionalGuardResults } from './score-converters';
 import {
   buildDependencyGraph,
   buildLicenseMatrix,
@@ -159,11 +159,12 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     const guardReport = report.guard;
     const inspectReport = report.inspect;
     if (!guardReport || !inspectReport) return;
+    const isSop = isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport);
 
     let guardResults: Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }>;
     let inspectIssues: Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }>;
 
-    if (isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport)) {
+    if (isSop) {
       // SOP 模式：从 evaluations 转换
       guardResults = convertGuardEvaluations(guardReport.evaluations);
       inspectIssues = convertInspectEvaluations(inspectReport.evaluations);
@@ -197,9 +198,14 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     // 模块级独立评分（monorepo）：画像含子模块时，按模块目录分桶、各模块用自身类型权重评分后逐模块落库。
     // 跳过根级兜底卡（path === projectPath），其 findings 已计入上方项目整体分，避免覆盖。
     if (profilingResult?.modules?.length) {
+      // 模块级分桶：传统模式把聚合 CheckResult 按文件路径拆成逐文件结果，使其正确归属子模块；
+      // SOP 模式 evaluate 已带 file，直接复用。项目整体分（上方 buildHealthDimensions）仍用聚合结果，行为不变。
+      const moduleGuardResults = isSop
+        ? guardResults
+        : convertTraditionalGuardResults((guardReport as GuardReport).results);
       const aggregate = scoreProjectByModules(
         profilingResult,
-        { results: guardResults },
+        { results: moduleGuardResults },
         { issues: inspectIssues },
       );
       for (const card of aggregate.modules) {

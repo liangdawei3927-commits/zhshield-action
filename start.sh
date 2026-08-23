@@ -47,15 +47,15 @@ check_env() {
 # ── 命令实现 ──────────────────────────────────────
 cmd_init()      { banner; info "安装依赖..."; check_env; pnpm install; ok "依赖安装完成"; }
 cmd_build()     { banner; check_env; info "构建全部包..."; pnpm build; ok "构建完成"; }
-cmd_dev()       { banner; check_env; info "启动全量开发 (Ctrl+C 停止)..."; pnpm --filter @zh/desktop dev; }
+cmd_dev()       { banner; check_env; info "启动桌面端开发（先由 turbo 构建依赖包）..."; pnpm exec turbo run dev --filter=@zh/desktop; }
 cmd_lint()      { banner; check_env; info "代码检查..."; pnpm lint; }
 cmd_test()      { banner; check_env; info "运行测试..."; pnpm test; }
 cmd_clean()     { banner; info "清理构建产物..."; pnpm clean; ok "清理完成"; }
 
-cmd_dev_desktop() { banner; check_env; info "启动桌面端开发 (Ctrl+C 停止)..."; pnpm --filter @zh/desktop dev; }
+cmd_dev_desktop() { banner; check_env; info "启动桌面端开发（先由 turbo 构建依赖包）..."; pnpm exec turbo run dev --filter=@zh/desktop; }
 cmd_dev_server()  { banner; check_env; info "启动后端服务开发 (Ctrl+C 停止)..."; pnpm --filter @zh/server dev; }
 
-cmd_build_mac() { banner; check_env; info "构建桌面端 macOS DMG..."; pnpm --filter @zh/desktop build:mac; ok "桌面端构建完成 → packages/desktop/release/"; }
+cmd_build_mac() { banner; check_env; info "构建依赖包..."; pnpm exec turbo run build --filter=@zh/desktop^...; info "构建桌面端 macOS DMG..."; pnpm --filter @zh/desktop build:mac; ok "桌面端构建完成 → packages/desktop/release/"; }
 
 cmd_check()           { banner; check_env; info "运行智汇码盾自检..."; pnpm check; }
 cmd_check_staged()    { banner; check_env; info "检查暂存区..."; pnpm check:staged; }

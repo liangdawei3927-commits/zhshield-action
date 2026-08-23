@@ -22,6 +22,8 @@ import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } fro
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
+import { profiler } from '@zh/profiler';
+import { convertGuardEvaluations, convertInspectEvaluations } from './score-converters';
 import {
   buildDependencyGraph,
   buildLicenseMatrix,
@@ -176,66 +178,24 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     }
 
     const scoring = await getScoring();
+    // 画像驱动评分：探测项目画像（语言/框架/类型），失败时降级为默认配置
+    let profilingResult = null;
+    try {
+      profilingResult = profiler.profileSync(projectPath).profile;
+    } catch (err) {
+      console.warn('[engine:runPipeline] 画像探测失败，降级默认评分配置:', err instanceof Error ? err.message : String(err));
+    }
     const dimensions = buildHealthDimensions(
       { results: guardResults },
       { issues: inspectIssues },
+      projectPath,        // 修复：传 projectPath 让项目级 .zhshield/scoring.yml 生效
+      profilingResult,    // 画像驱动：按项目类型自动微调维度权重
     );
     const score = scoring.calculate(projectPath, dimensions);
     console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
   } catch (err) {
     console.warn('[engine:runPipeline] 健康评分落库失败:', err instanceof Error ? err.message : String(err));
   }
-}
-
-/** 将 SOP guard evaluations 转换为 GuardReport.results 格式 */
-function convertGuardEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean }> {
-  return evaluations.map((ev) => {
-    const e = ev as { status?: string; rule?: { severity?: string } };
-    const statusMap: Record<string, 'passed' | 'failed' | 'error' | 'warning'> = {
-      passed: 'passed',
-      failed: 'failed',
-      error: 'error',
-      skipped: 'warning',
-    };
-    const severityMap: Record<string, 'error' | 'warning' | 'info'> = {
-      critical: 'error',
-      high: 'error',
-      medium: 'warning',
-      low: 'info',
-      info: 'info',
-    };
-    return {
-      severity: severityMap[e.rule?.severity ?? ''] ?? 'warning',
-      status: statusMap[e.status ?? ''] ?? 'error',
-      blocking: e.status === 'failed',
-    };
-  });
-}
-
-/** 将 SOP inspect evaluations 转换为 InspectionReport.issues 格式 */
-function convertInspectEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; category: string }> {
-  return evaluations.map((ev) => {
-    const e = ev as { status?: string; rule?: { severity?: string; tags?: string[] } };
-    const severityMap: Record<string, 'error' | 'warning' | 'info'> = {
-      critical: 'error',
-      high: 'error',
-      medium: 'warning',
-      low: 'info',
-      info: 'info',
-    };
-    const tags = e.rule?.tags ?? [];
-    let category = 'quality';
-    if (tags.includes('security')) category = 'security';
-    else if (tags.includes('performance')) category = 'performance';
-    else if (tags.includes('documentation')) category = 'documentation';
-    else if (tags.includes('test') || tags.includes('dependency')) category = 'testing';
-    else if (tags.includes('architecture') || tags.includes('refactoring')) category = 'architecture';
-
-    return {
-      severity: severityMap[e.rule?.severity ?? ''] ?? 'warning',
-      category,
-    };
-  });
 }
 
 export function registerEnginesIpc(manager: TaskManager): void {

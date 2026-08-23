@@ -18,6 +18,7 @@ import {
   buildDefaultToolRuleConfigs, resolveApiBase, resolveSopBase,
 } from '@zh/kernel';
 import { DbConnection } from '@zh/db';
+import type { ScoringEngine } from '@zh/scoring';
 
 /** 当前主窗口引用（由 main.ts createWindow 维护，供进度推送使用） */
 let mainWindow: BrowserWindow | null = null;
@@ -96,10 +97,12 @@ try {
 }
 
 // ─── 引擎懒初始化（按需加载，不占用启动时间） ────────────
+let cachedScoring: ScoringEngine | null = null;
 export async function getScoring() {
   const { ScoringEngine } = await import('@zh/scoring');
   if (!db) throw new Error(t('electron.scoringUnavailable'));
-  return new ScoringEngine(db);
+  if (!cachedScoring) cachedScoring = new ScoringEngine(db);
+  return cachedScoring;
 }
 
 export function getDb(): ReturnType<DbConnection['connect']> {

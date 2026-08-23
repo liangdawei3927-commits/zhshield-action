@@ -141,6 +141,30 @@ describe('ProjectProfiler', () => {
     expect(paths).not.toContain('packages/.turbo');
   });
 
+  it('无框架的私有 TS 包按入口字段判定为 library（不再因 private 误判 unknown）', () => {
+    writeFile('package.json', JSON.stringify({
+      name: '@demo/lib',
+      private: true,
+      main: 'dist/index.js',
+      types: 'dist/index.d.ts',
+    }));
+    writeFile('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true } }));
+
+    const result = profiler.profileSync(tmpDir);
+    expect(result.profile.type).toBe('library');
+  });
+
+  it('仅有 bin 的包判定为 cli，不被 library 覆盖', () => {
+    writeFile('package.json', JSON.stringify({
+      name: 'demo-cli',
+      bin: { 'demo-cli': './bin/cli.js' },
+      main: 'dist/index.js',
+    }));
+
+    const result = profiler.profileSync(tmpDir);
+    expect(result.profile.type).toBe('cli');
+  });
+
   it('不存在的目录降级为 unknown', () => {
     const result = profiler.profileSync('/nonexistent/path/xyz');
     expect(result.profile.language).toBe('unknown');

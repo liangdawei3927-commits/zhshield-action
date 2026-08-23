@@ -8,7 +8,7 @@ import { hasFile, readConfig } from '../file-scanner';
  * 优先级：
  * 1. monorepo 标志文件 → monorepo
  * 2. 框架映射（framework → type）
- * 3. package.json bin 字段 → cli；private:false + exports → library
+ * 3. package.json bin 字段 → cli；无框架且有入口字段(main/exports/types/module) → library（含私有包）
  * 4. 兜底 unknown
  */
 const FRAMEWORK_TYPE_MAP: Record<ProjectFramework, ProjectType | undefined> = {
@@ -65,13 +65,14 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
     });
   }
 
-  // --- package.json bin / private ---
+  // --- package.json bin / 入口 ---
   const pkgContent = readConfig(scan, 'package.json');
   if (pkgContent) {
     try {
       const pkg = JSON.parse(pkgContent);
+      const hasBin = pkg.bin && (typeof pkg.bin === 'string' || Object.keys(pkg.bin).length > 0);
       // bin 字段 → cli
-      if (pkg.bin && (typeof pkg.bin === 'string' || Object.keys(pkg.bin).length > 0)) {
+      if (hasBin) {
         signals.push({
           file: 'package.json',
           kind: 'config-file',
@@ -79,12 +80,12 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
           inferred: { type: 'cli' },
         });
       }
-      // 非私有 + 有 exports → library（仅在没有框架映射时作为兜底）
-      if (!mappedType && pkg.private === false && (pkg.exports || pkg.main)) {
+      // 无框架 + 非 cli + 有入口字段 → library（含 monorepo 内部 private 包，不再要求已发布）
+      if (!mappedType && !hasBin && (pkg.exports || pkg.main || pkg.types || pkg.module)) {
         signals.push({
           file: 'package.json',
           kind: 'config-file',
-          matched: 'private:false + exports',
+          matched: 'has entry field',
           inferred: { type: 'library' },
         });
       }

@@ -208,4 +208,4 @@ F0  Hook/Audit 地基（原方案二，升为 P0 地基）
 - [x] 24. F4-2 CI 集成（`turbo run test` 含生成用例）；F4 单测 + 验证
 
 ## Final Verification Wave
-- [ ] F1. 全仓 `turbo run test` 全绿 + `pnpm build` 通过 + `pnpm lint` 零错 + `tsc` 零错（无 as any/@ts-ignore）
+- [x] F1. 全仓 `turbo run test` 全绿 + `pnpm build` 通过 + `pnpm lint` 零错 + `tsc` 零错（无 as any/@ts-ignore）

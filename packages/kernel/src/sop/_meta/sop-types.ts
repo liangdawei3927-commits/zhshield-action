@@ -29,6 +29,10 @@ export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
 // ─── 执行模式 ────────────────────────────────────────────────
 export type ExecutionMode = 'sync' | 'async' | 'periodic' | 'event';
 
+// ─── 严重级别 ────────────────────────────────────────────────
+/** 规则严重级别（F1 起含 'error'：对齐 ESLint/semgrep 的 ERROR 档，使存量 YAML 首次成为一等合法值） */
+export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'error';
+
 // ─── 能力声明 ────────────────────────────────────────────────
 export interface SopServes {
   /** 支持的语言 */
@@ -68,7 +72,20 @@ export interface SopRule {
   executionMode: ExecutionMode;
 
   /** 严重级别 */
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  severity: Severity;
+
+  /** 动态升级策略（F1）：同类 warning 连续命中 threshold 次后，severity 升级为 escalateTo */
+  accumulationPolicy?: {
+    /** 触发升级所需的连续同类命中次数（缺省 3） */
+    threshold?: number;
+    /** 升级目标严重级（必须高于规则静态 severity） */
+    escalateTo: Severity;
+    /** 统计窗口（按 ruleId+contentKey 计数；预留字段，本期仅计数） */
+    window?: number;
+  };
+
+  /** 阻断阈值（F1-4 消费）：评估失败且 effective severity >= 此值时 evaluation.blocking=true；缺省不改变现状（undefined = 不阻断） */
+  blockingThreshold?: Severity;
 
   /** 引擎可见范围（哪些引擎执行此规则） */
   applicableEngines: string[];

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Issue, ToolAdapter, ToolConfig, ToolResult } from '@zh/shared';
+import type { Issue, ToolAdapter, ToolConfig, ToolResult, ToolId } from '@zh/shared';
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type {
@@ -172,10 +172,11 @@ export async function evalToolDispatch(
     return skippedResult(rule, `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`, targetEngineOf(rule));
   }
 
-  return runToolScan(adapter, rule, instr, context);
+  return runToolScan(host, adapter, rule, instr, context);
 }
 
 async function runToolScan(
+  host: EngineHost,
   adapter: ToolAdapter,
   rule: SopRule,
   instr: ToolDispatchInstruction,
@@ -193,6 +194,8 @@ async function runToolScan(
       } as ToolConfig,
       timeout: (toolConfig.timeout as number) ?? undefined,
     });
+
+    await logToolExecutionAudit(host.auditLogger, adapter.meta.id, result, context.repoRoot);
 
     const violations = toolScanViolations(result, rule);
     const status = result.status === 'available' && result.issues.length === 0 ? 'passed'
@@ -280,6 +283,28 @@ function pickPresetTool(host: EngineHost, instr: PresetInstruction): string | nu
 }
 
 // ─── 共享辅助 ──────────────────────────────────────────
+
+/** 记录 tool-execution 审计（F0-4）。审计为副作用：缺失或写入失败均不得影响扫描结果 */
+async function logToolExecutionAudit(
+  auditLogger: EngineHost['auditLogger'],
+  tool: ToolId,
+  result: ToolResult,
+  projectId: string,
+): Promise<void> {
+  if (!auditLogger) return;
+  try {
+    await auditLogger.logToolExecution({
+      tool,
+      duration: result.metadata.duration,
+      fileCount: result.metadata.fileCount,
+      issueCount: result.issues.length,
+      status: result.status,
+      projectId,
+    });
+  } catch {
+    // 审计日志失败不影响扫描结果
+  }
+}
 
 async function runInspectScan(
   inspectEngine: NonNullable<EngineHost['inspectEngine']>,

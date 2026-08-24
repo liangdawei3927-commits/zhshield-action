@@ -1,4 +1,4 @@
-import type { ToolAdapter } from '@zh/shared';
+import type { ToolAdapter, AuditLogger } from '@zh/shared';
 
 /**
  * GuardEngine 的最小结构契约 — kernel 不反向依赖 @zh/guard，
@@ -27,11 +27,14 @@ export interface InspectEngineLike {
  * 拆分出的评估函数（inline-evaluators / dispatch-evaluators）通过它访问：
  * - toolAdapters：tool-dispatch 指令的工具适配器注册表
  * - guardEngine / inspectEngine：check-list / scanner-dispatch / preset 的外部引擎
+ * - auditLogger：tool-dispatch 扫描后的审计日志（F0-4，对齐 inspect/security 调用点）
  * - evalDepth：当前评估重入深度（>1 表示已处于嵌套评估中，应切断回调避免死循环）
  */
 export interface EngineHost {
   toolAdapters: Map<string, ToolAdapter>;
   guardEngine?: GuardEngineLike;
   inspectEngine?: InspectEngineLike;
+  /** 审计日志为副作用依赖：缺失或写入失败均不得影响扫描结果 */
+  auditLogger?: AuditLogger;
   evalDepth: number;
 }

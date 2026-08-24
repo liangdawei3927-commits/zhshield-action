@@ -5,7 +5,10 @@ import type {
   RuleEngineReport,
   ContentInstruction,
 } from './sop/_meta/rule-evaluation';
-import type { ToolAdapter } from '@zh/shared';
+import { resolveEffectiveRule, trackConsecutiveFailures } from './sop/_meta/adaptive-severity';
+import { computeBlocking } from './sop/_meta/rule-evaluation';
+import type { ToolAdapter, ToolCallHook, GovernanceEvent } from '@zh/shared';
+import { AuditLogger, wrapAdapter } from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
@@ -13,6 +16,7 @@ import { Logger } from './log';
 import type { EngineHost, GuardEngineLike, InspectEngineLike } from './runner/evaluator-host';
 import { evalPatternScan, evalForbidden, evalThreshold, evalLayerBoundary } from './runner/inline-evaluators';
 import { evalCheckList, evalScannerDispatch, evalToolDispatch, evalPreset } from './runner/dispatch-evaluators';
+import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-builders';
 
 /** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
 const ENGINE_DISPATCH_TYPES = new Set([
@@ -33,6 +37,7 @@ const ENGINE_DISPATCH_TYPES = new Set([
  * 评估逻辑按功能领域拆分：
  * - 内联评估（pattern-scan / forbidden / threshold / layer-boundary）→ runner/inline-evaluators
  * - 派发评估（check-list / scanner-dispatch / tool-dispatch / preset）→ runner/dispatch-evaluators
+ * - 评估结果构造与聚合（skipped/error/aggregate）→ runner/evaluation-builders
  * - 文件扫描工具 → runner/scan-utils
  *
  * 长期架构定位：
@@ -51,6 +56,18 @@ export class SopRuleEngine {
 
   /** ToolAdapter 注册表 — 用于 tool-dispatch 指令 */
   private toolAdapters = new Map<string, ToolAdapter>();
+
+  /** 注册时织入适配器的调用钩子（F0-3；F1/F5 注入实际钩子，缺省空数组纯透传） */
+  private readonly toolCallHooks: ToolCallHook[];
+
+  /** 审计日志 — tool-dispatch 扫描后补记（F0-4，对齐 inspect/security 调用点） */
+  private auditLogger: AuditLogger;
+
+  /** F1-3：实例级连续失败计数器（ruleId → 连续 failed/error 次数；passed 归零，skipped 不动） */
+  private readonly consecutiveFailures = new Map<string, number>();
+
+  /** F1-3：项目健康基线分（@zh/scoring 注入；缺省 undefined = 基线升档关闭） */
+  private readonly healthBaseline?: number;
 
   /** 指令类型 → 评估器策略表（替代 evaluateSingle 中的 switch 分派）。
    *  映射类型保证每个 handler 收到对应判别联合变体，类型安全；
@@ -87,6 +104,12 @@ export class SopRuleEngine {
       inspectEngine?: InspectEngineLike;
       /** 预注册的 ToolAdapter 列表 */
       toolAdapters?: Array<{ name: string; adapter: ToolAdapter }>;
+      /** 审计日志注入点 — 缺省用 @zh/shared AuditLogger（写 ~/.zhshield/audit） */
+      auditLogger?: AuditLogger;
+      /** 工具调用钩子（F0-3）— 注册时织入 wrapAdapter；缺省空数组（纯透传） */
+      hooks?: ToolCallHook[];
+      /** 项目健康基线分（F1-3）— <60 时有效严重级整体上移一档；缺省 undefined = 关闭 */
+      healthBaseline?: number;
     },
   ) {
     this.registry = registry;
@@ -95,16 +118,38 @@ export class SopRuleEngine {
     this.logger = new Logger('SopRuleEngine', 'info');
     this.guardEngine = options?.guardEngine;
     this.inspectEngine = options?.inspectEngine;
+    this.auditLogger = options?.auditLogger ?? new AuditLogger();
+    this.toolCallHooks = options?.hooks ?? [];
+    this.healthBaseline = options?.healthBaseline;
     if (options?.toolAdapters) {
       for (const { name, adapter } of options.toolAdapters) {
-        this.toolAdapters.set(name, adapter);
+        this.toolAdapters.set(name, this.wrapWithScopeGuard(adapter));
       }
     }
   }
 
   /** 注册单个 ToolAdapter */
   registerToolAdapter(name: string, adapter: ToolAdapter): void {
-    this.toolAdapters.set(name, adapter);
+    this.toolAdapters.set(name, this.wrapWithScopeGuard(adapter));
+  }
+
+  /** F0-3 Hook 包装 + F5-2 越界事件转发（warn-only，经 EventBus 供 sentinel 消费） */
+  private wrapWithScopeGuard(adapter: ToolAdapter): ToolAdapter {
+    return wrapAdapter(adapter, this.toolCallHooks, {
+      onScopeViolation: (violation, { options }) => {
+        const payload: GovernanceEvent = {
+          type: 'tool:scope-violation',
+          payload: {
+            tool: adapter.meta.id,
+            projectId: options.projectId,
+            file: violation.file,
+            reason: violation.reason,
+            timestamp: new Date(),
+          },
+        };
+        void this.eventBus.emit(payload.type, payload.payload);
+      },
+    });
   }
 
   /** 派发评估函数的运行时视图（evalDepth 实时读取，保持重入判断与原行为一致） */
@@ -114,6 +159,7 @@ export class SopRuleEngine {
       toolAdapters: this.toolAdapters,
       guardEngine: this.guardEngine,
       inspectEngine: this.inspectEngine,
+      auditLogger: this.auditLogger,
       get evalDepth() { return readEvalDepth(); },
     };
   }
@@ -134,7 +180,7 @@ export class SopRuleEngine {
         ? []
         : await this.evaluateAll(rules, context, nested);
 
-      const report = this.aggregate(evaluations, Date.now() - start);
+      const report = aggregate(evaluations, Date.now() - start);
       await this.emit('rule-engine:evaluated', report);
       return report;
     } finally {
@@ -158,13 +204,19 @@ export class SopRuleEngine {
     for (const rule of rules) {
       const evalStart = Date.now();
       const instruction = this.interpreter.interpret(rule);
+      // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
+      const effectiveRule = resolveEffectiveRule(rule, this.consecutiveFailures, this.healthBaseline);
       try {
-        const result = await this.evaluateOne(rule, instruction, context, nested);
+        const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
         result.durationMs = Date.now() - evalStart;
+        // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值，阈值取 registry 原规则
+        result.blocking = computeBlocking(result.status, result.rule.severity, rule.blockingThreshold);
+        trackConsecutiveFailures(this.consecutiveFailures, rule.id, result.status);
         evaluations.push(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        evaluations.push(this.errorEvaluation(rule, message, Date.now() - evalStart));
+        trackConsecutiveFailures(this.consecutiveFailures, rule.id, 'error');
+        evaluations.push(errorEvaluation(effectiveRule, message, Date.now() - evalStart));
       }
     }
     return evaluations;
@@ -179,13 +231,13 @@ export class SopRuleEngine {
     const engine = rule.domain === 'guard' ? ('guard' as const) : ('inspect' as const);
     // dryRun 模式：跳过所有外部派发（scanner-dispatch / tool-dispatch / preset / check-list / threshold）
     if (context.dryRun && this.isExternalDispatch(instruction.type)) {
-      return this.skipEvaluation(rule, `[dryRun] 跳过外部工具: ${instruction.type}`, engine);
+      return skipEvaluation(rule, `[dryRun] 跳过外部工具: ${instruction.type}`, engine);
     }
 
     // 嵌套评估时跳过会回调用引擎的指令，切断
     // evaluateRules → preset/scanner/check-list → runScan/run → evaluateRules 死循环
     if (nested && ENGINE_DISPATCH_TYPES.has(instruction.type)) {
-      return this.skipEvaluation(rule, `跳过嵌套 ${instruction.type} 派发（防止规则引擎重入）`, engine);
+      return skipEvaluation(rule, `跳过嵌套 ${instruction.type} 派发（防止规则引擎重入）`, engine);
     }
 
     return this.evaluateSingle(rule, instruction, context);
@@ -194,28 +246,6 @@ export class SopRuleEngine {
   private isExternalDispatch(type: ContentInstruction['type']): boolean {
     return type === 'scanner-dispatch' || type === 'tool-dispatch'
       || type === 'preset' || type === 'check-list' || type === 'threshold';
-  }
-
-  private skipEvaluation(rule: SopRule, message: string, targetEngine: 'guard' | 'inspect'): RuleEvaluation {
-    return {
-      rule,
-      status: 'skipped',
-      message,
-      durationMs: 0,
-      targetEngine,
-      timestamp: new Date(),
-    };
-  }
-
-  private errorEvaluation(rule: SopRule, message: string, durationMs: number): RuleEvaluation {
-    return {
-      rule,
-      status: 'error',
-      message,
-      durationMs,
-      targetEngine: rule.domain === 'guard' ? 'guard' : 'inspect',
-      timestamp: new Date(),
-    };
   }
 
   /**
@@ -256,30 +286,6 @@ export class SopRuleEngine {
   }
 
   // ─── 辅助 ──────────────────────────────────────────────
-
-  /**
-   * 聚合评估结果
-   */
-  private aggregate(evaluations: RuleEvaluation[], durationMs: number): RuleEngineReport {
-    const passed = evaluations.filter((e) => e.status === 'passed').length;
-    const failed = evaluations.filter((e) => e.status === 'failed').length;
-    const errors = evaluations.filter((e) => e.status === 'error').length;
-    const skipped = evaluations.filter((e) => e.status === 'skipped').length;
-
-    // 有任何 blocking 级别的规则失败 → pipeline 不应 ok
-    // 但 SOP 规则的 blocking 由触发方决定，这里只汇报数字
-    return {
-      total: evaluations.length,
-      passed,
-      failed,
-      errors,
-      skipped,
-      ok: failed === 0 && errors === 0,
-      evaluations,
-      durationMs,
-      timestamp: new Date(),
-    };
-  }
 
   private async emit(event: string, payload: RuleEngineReport): Promise<void> {
     try {

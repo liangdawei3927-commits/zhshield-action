@@ -12,6 +12,12 @@ export function makeRule(overrides: Partial<SopRule> & { id: string }): SopRule 
     status: overrides.status ?? 'active',
     executionMode: overrides.executionMode ?? 'sync',
     severity: overrides.severity ?? 'medium',
+    ...(overrides.accumulationPolicy !== undefined
+      ? { accumulationPolicy: overrides.accumulationPolicy }
+      : {}),
+    ...(overrides.blockingThreshold !== undefined
+      ? { blockingThreshold: overrides.blockingThreshold }
+      : {}),
     applicableEngines: overrides.applicableEngines ?? ['guard'],
     content: overrides.content ?? {},
     serves: overrides.serves,

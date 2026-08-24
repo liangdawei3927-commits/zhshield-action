@@ -12,6 +12,7 @@ import type {
   ProjectFeature,
 } from './sop-types';
 import { SopRegistry } from './sop-registry';
+import { SopRuleConfigError, parseDynamicSeverityConfig } from './dynamic-severity-config';
 
 const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 
@@ -39,7 +40,10 @@ const PRIORITY_TO_SEVERITY = new Map<string, SopRule['severity']>([
   ['high', 'high'],
   ['medium', 'medium'],
   ['low', 'low'],
+  ['error', 'error'],
 ]);
+
+export { SopRuleConfigError } from './dynamic-severity-config';
 
 export interface SopLoaderOptions {
   /** SOP 规则文件的根目录，默认从 __dirname 向上查找 */
@@ -193,6 +197,10 @@ export class SopLoader {
 
       return this.buildRule(parsed, domain, action, filePath);
     } catch (err) {
+      if (err instanceof SopRuleConfigError) {
+        // F1：动态严重级配置非法必须加载期失败，不能降级成「跳过该文件」
+        throw err;
+      }
       if (isNotFoundErr(err)) {
         console.warn(`[SopLoader] Rule file not found, skipped: ${filePath}`);
         return null;
@@ -285,6 +293,7 @@ export class SopLoader {
       truePositiveCount: 0,
       createdAt: meta.created ? new Date(meta.created as string) : new Date(),
       updatedAt: meta.updated ? new Date(meta.updated as string) : new Date(),
+      ...parseDynamicSeverityConfig(parsed, severity, ruleId),
     };
   }
 
@@ -296,6 +305,7 @@ export class SopLoader {
   ): SopRule {
     const source = (parsed.source as string) ?? 'official';
     const ruleId = `${domain}.${action}.${source}.${fileName}`;
+    const severity = (parsed.severity as SopRule['severity']) ?? 'medium';
 
     return {
       id: ruleId,
@@ -306,7 +316,7 @@ export class SopLoader {
       description: (parsed.description as string) ?? '',
       status: (parsed.status as RuleLifecycleStatus) ?? 'draft',
       executionMode: (parsed.executionMode as ExecutionMode) ?? 'sync',
-      severity: (parsed.severity as SopRule['severity']) ?? 'medium',
+      severity,
       applicableEngines: (parsed.applicableEngines as string[]) ?? [domain],
       content: parsed,
       tags: (parsed.tags as string[]) ?? [],
@@ -314,6 +324,7 @@ export class SopLoader {
       truePositiveCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
+      ...parseDynamicSeverityConfig(parsed, severity, ruleId),
     };
   }
 

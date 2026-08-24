@@ -1,4 +1,5 @@
-import type { SopRule } from './sop-types';
+import type { SopRule, Severity } from './sop-types';
+import { severityRank } from './adaptive-severity';
 import type { IssueCategory } from '@zh/shared';
 
 // ─── 评估状态 ──────────────────────────────────────────
@@ -31,6 +32,10 @@ export interface RuleEvaluation {
 
   /** 时间戳 */
   timestamp: Date;
+
+  /** 阻断判定（F1-4）：failed 且有效严重级达到规则声明的 blockingThreshold；未声明阈值的规则保持旧行为（failed 即阻断）。
+   *  可选字段：由 SopRuleEngine.evaluateAll 统一附加；外部/存量评估缺省时消费方按 status==='failed' 回退。 */
+  blocking?: boolean;
 }
 
 // ─── 单条违规 ──────────────────────────────────────────
@@ -43,7 +48,7 @@ export interface Violation {
   ruleId: string;
 
   /** 严重级别 */
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  severity: Severity;
 
   /** 文件路径 */
   file: string;
@@ -88,6 +93,9 @@ export interface RuleEngineReport {
   /** 是否通过（无 blocking 级别失败） */
   ok: boolean;
 
+  /** 阻断评估数（F1-4） */
+  blockingCount?: number;
+
   /** 各规则的详细评估 */
   evaluations: RuleEvaluation[];
 
@@ -96,6 +104,28 @@ export interface RuleEngineReport {
 
   /** 时间戳 */
   timestamp: Date;
+}
+
+// ─── 阻断判定（F1-4）────────────────────────────────────
+
+/**
+ * computeBlocking — 纯函数：单次评估是否构成「阻断」。
+ *
+ * - 非 failed（passed / skipped / error）一律不阻断；
+ * - 规则未声明 blockingThreshold → 保持旧行为：failed 即阻断；
+ * - 声明了阈值 → 有效严重级秩 >= 阈值秩才阻断（severityRank 单一事实源；未知值秩 -1 永不达标）。
+ *
+ * 结果仅作为附加元数据写入 RuleEvaluation.blocking，
+ * 不参与 RuleEngineReport.ok 的计算（ok 保持纯状态驱动：failed===0 && errors===0）。
+ */
+export function computeBlocking(
+  status: EvaluationStatus,
+  effectiveSeverity: Severity,
+  threshold?: Severity,
+): boolean {
+  if (status !== 'failed') return false;
+  if (threshold === undefined) return true;
+  return severityRank(effectiveSeverity) >= severityRank(threshold);
 }
 
 // ─── 规则内容解释器输出 ─────────────────────────────────

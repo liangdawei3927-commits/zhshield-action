@@ -1,6 +1,5 @@
 import type { EventBus } from '../../bus';
 import type { SopRegistry } from '../_meta/sop-registry';
-import type { SopRule } from '../_meta/sop-types';
 import type { DataCleanup, CleanupConfig } from '../data-cleanup';
 import type { SopSqliteStore } from './sop-sqlite-store';
 import type { SopVersionStore } from './sop-version-store';

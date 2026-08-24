@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // 经验回写队列文件路径硬编码为 ~/.zhshield/experience-queue.json，无法注入，
 // 故用内存 fs 隔离测试，避免污染用户主目录。

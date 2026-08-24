@@ -101,3 +101,40 @@ rules:
     metadata:
       category: security
       framework: nestjs
+
+  # Adversarial Injection Rules (F2 对抗性注入检测)
+  - id: suspicious-comment-instruction
+    pattern-regex: '(?i)(?:\/\/|#|\/\*|<!--)[^\n]*(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?|disregard\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|rules)|system\s+prompt|you\s+are\s+now\s+(?:a|an|the)\s+)'
+    message: "AI-prompt-style instruction embedded in comment (prompt injection)"
+    severity: WARNING
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-74"
+
+  - id: dependency-script-injection
+    pattern-regex: '"[^"]+"\s*:\s*"[^"]*(?:\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b|\bbase64\s+(?:-d|-D|--decode)\b|\beval\b|\brm\s+-rf\b)[^"]*"'
+    message: "Suspicious shell command in package.json script (remote pipe/decode/eval/force-delete)"
+    severity: ERROR
+    languages: [json]
+    metadata:
+      category: security
+      cwe: "CWE-78"
+
+  - id: env-file-exfiltration
+    pattern-regex: '(?i)(?:(?:fetch|axios)\s*\([^)]*(?:process\.env\.|\.env\b)|(?:curl|wget)\b[^;&|]*--data[^;&|]*@\.env)'
+    message: "Environment values sent to outbound request (.env exfiltration)"
+    severity: ERROR
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-200"
+
+  - id: markdown-hidden-link
+    pattern-regex: '(?i)<a\s[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px)?\s*[;''"])[^>]*>|\[[^\]]*\]\([^)]*[\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}][^)]*\)'
+    message: "Hidden or misleading link in markdown (invisible anchor / zero-width link target)"
+    severity: WARNING
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-451"

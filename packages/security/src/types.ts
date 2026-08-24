@@ -1,3 +1,5 @@
+import type { RuleConflictReport } from './rule-conflict-resolver';
+
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
 export type MalwareType = 'reverse-shell' | 'data-exfiltration' | 'privilege-escalation'
   | 'crypto-ransomware' | 'backdoor' | 'supply-chain' | 'suspicious-behavior';
@@ -63,6 +65,8 @@ export interface SecurityScanReport {
   garbage: GarbageItem[];
   malware: MalwareItem[];
   securityScore: number;
+  /** F3 二次校验报告 — malware lane 的 confirmed/falsePositives/conflicts 分流明细 */
+  conflictReport?: RuleConflictReport;
   summary: {
     vulnTotal: number;
     vulnCritical: number;

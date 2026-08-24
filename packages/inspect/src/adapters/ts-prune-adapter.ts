@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +22,12 @@ const TS_PRUNE_LINE = /^(.+?):(\d+):\s*(.+)$/;
 
 export class TsPruneAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：ts-prune 基于 tsconfig 分析 TS 源码的未导出符号 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/*.{ts,tsx}', '**/tsconfig.json'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {

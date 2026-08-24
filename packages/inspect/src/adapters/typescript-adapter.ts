@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -113,6 +113,12 @@ export class TypeScriptAdapter implements ToolAdapter {
   private projectRoot?: string;
   private commandPromise?: Promise<string>;
   private readonly locale: LanguageCode;
+
+  /** F5：tsc 按 tsconfig 编译检查全部 TS 源文件 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/*.{ts,tsx,mts,cts}', '**/tsconfig.json'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   constructor(projectRoot?: string, locale?: LanguageCode) {
     this.projectRoot = projectRoot;

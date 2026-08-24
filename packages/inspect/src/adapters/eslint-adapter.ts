@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -78,6 +78,12 @@ const META: ToolMeta = {
 
 export class ESLintAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：ESLint 以 --ext .ts/.tsx/.js/.jsx 扫描 JS/TS 源码 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {

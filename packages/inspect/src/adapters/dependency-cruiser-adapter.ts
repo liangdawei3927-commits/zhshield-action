@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +33,12 @@ interface DepCruiserOutput {
 
 export class DependencyCruiserAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：dep-cruiser 校验 src/ 目录内模块依赖边界 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['src/**', 'package.json'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {

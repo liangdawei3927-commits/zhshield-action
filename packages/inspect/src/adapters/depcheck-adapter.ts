@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -27,6 +27,12 @@ interface DepcheckResult {
 
 export class DepcheckAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：depcheck 读 package.json 并静态解析源码 import 判断未使用依赖 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/package.json', '**/*.{ts,tsx,js,jsx}'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {

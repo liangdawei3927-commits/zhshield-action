@@ -2,7 +2,7 @@ import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './t
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
 import type { SopRuleEngine } from '@zh/kernel';
 import type { ProjectProfile } from '@zh/dependency';
-import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER } from '@zh/shared';
+import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER, wrapAdapter } from '@zh/shared';
 import { AdapterRunner } from './adapter-runner';
 import { ToolAdapterExecutor } from './tool-adapter-executor';
 import { ScanReportBuilder } from './scan-report-builder';
@@ -61,7 +61,21 @@ export class InspectEngine {
 
   registerAdapter(adapter: ToolAdapter | InspectAdapter): void {
     if ('meta' in adapter && 'scan' in adapter) {
-      const toolAdapter = adapter as ToolAdapter;
+      // F0-3：注册时包装 Hook 层；F5-2：越界访问经 emitter 发出 tool:scope-violation（warn-only）
+      const toolAdapter = wrapAdapter(adapter as ToolAdapter, [], {
+        onScopeViolation: (violation, { options }) => {
+          void this.emitter.emit({
+            type: 'tool:scope-violation',
+            payload: {
+              tool: toolAdapter.meta.id,
+              projectId: options.projectId,
+              file: violation.file,
+              reason: violation.reason,
+              timestamp: new Date(),
+            },
+          });
+        },
+      });
       this.registeredAdapters.set(toolAdapter.meta.id, toolAdapter);
       this.toolManager.register(toolAdapter);
       if (this.sopEngine) {

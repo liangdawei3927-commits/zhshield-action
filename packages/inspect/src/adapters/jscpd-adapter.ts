@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 import { FileHelper } from '@zh/kernel';
 
 const execFileAsync = promisify(execFile);
@@ -46,6 +46,12 @@ interface JscpdReport {
 
 export class JscpdAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标） */
+  readonly accessScope: AccessScope = {
+    readPaths: ['src/**/*.{ts,tsx,js,jsx}'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +28,12 @@ interface GitleaksFinding {
 
 export class GitleaksAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：gitleaks 读取仓库文本文件找硬编码密钥；依赖目录排除 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/*.{env,ts,js,json,yaml,yml}'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -79,9 +85,12 @@ export class GitleaksAdapter implements ToolAdapter {
   }
 
   private buildArgs(options: ToolScanOptions, isStaged: boolean): string[] {
-    const args = ['detect', '--source', options.projectPath, '--format', 'json'];
+    // gitleaks v8.28+ 移除了 detect 的 --format/--staged：JSON 输出统一走全局
+    // --report-format/--report-path（"-"=stdout）；暂存扫描走 `git --staged` 子命令（仓库路径为位置参数，不支持 --source）。
+    const args = isStaged ? ['git', '--staged'] : ['detect', '--source', options.projectPath];
+    args.push('--report-format', 'json', '--report-path', '-');
     if (isStaged) {
-      args.push('--staged');
+      args.push(options.projectPath);
     }
     if (options.config?.config) {
       args.push('--config', options.config.config);

@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -76,6 +76,12 @@ interface SemgrepRuleYaml {
 
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
+
+  /** F5：semgrep 对源码做 SAST 规则匹配 */
+  readonly accessScope: AccessScope = {
+    readPaths: ['**/*.{ts,tsx,js,jsx,py,go,java,rb,php,c,cpp,h}'],
+    excludePaths: ['**/node_modules/**'],
+  };
 
   async isAvailable(): Promise<boolean> {
     try {
@@ -299,52 +305,48 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private mapResult(r: SemgrepResult, category: IssueCategory): Issue {
-    const ruleId = this.resolveRuleId(r);
-    const fix = this.resolveFix(r);
-    const loc = this.resolveLocation(r);
+    const ruleId = resolveRuleId(r);
+    const fix = resolveFix(r);
+    const loc = resolveLocation(r);
 
     return {
       id: randomUUID(),
       ruleId,
-      severity: this.normalizeSeverity(r.extra?.severity || r.severity || 'WARNING'),
+      severity: normalizeSeverity(r.extra?.severity || r.severity || 'WARNING'),
       category,
-      message: this.resolveMessage(r, ruleId),
+      message: resolveMessage(r, ruleId),
       file: loc.file,
       line: loc.line,
       column: loc.column,
       suggestion: fix,
       autoFixable: !!fix,
       source: 'inspect',
-      fingerprint: this.resolveFingerprint(ruleId, loc),
+      fingerprint: `semgrep:${ruleId}:${loc.file}:${loc.line}`,
     };
   }
+}
 
-  private resolveRuleId(r: SemgrepResult): string {
-    return r.check_id || r.rule?.id || 'semgrep-unknown';
-  }
+function resolveRuleId(r: SemgrepResult): string {
+  return r.check_id || r.rule?.id || 'semgrep-unknown';
+}
 
-  private resolveFix(r: SemgrepResult): string | undefined {
-    return r.extra?.fix || r.extra?.metadata?.fix || undefined;
-  }
+function resolveFix(r: SemgrepResult): string | undefined {
+  return r.extra?.fix || r.extra?.metadata?.fix || undefined;
+}
 
-  private resolveMessage(r: SemgrepResult, ruleId: string): string {
-    return r.extra?.message || r.message || `Semgrep: ${ruleId}`;
-  }
+function resolveMessage(r: SemgrepResult, ruleId: string): string {
+  return r.extra?.message || r.message || `Semgrep: ${ruleId}`;
+}
 
-  private resolveLocation(r: SemgrepResult): { file: string; line: number; column: number } {
-    return {
-      file: r.path || '',
-      line: r.start?.line || 0,
-      column: r.start?.col || r.start?.column || 0,
-    };
-  }
+function resolveLocation(r: SemgrepResult): { file: string; line: number; column: number } {
+  return {
+    file: r.path || '',
+    line: r.start?.line || 0,
+    column: r.start?.col || r.start?.column || 0,
+  };
+}
 
-  private resolveFingerprint(ruleId: string, loc: { file: string; line: number }): string {
-    return `semgrep:${ruleId}:${loc.file}:${loc.line}`;
-  }
-
-  private normalizeSeverity(sev: string): 'error' | 'warning' | 'info' {
-    const lower = sev.toLowerCase();
-    return lower === 'error' ? 'error' : lower === 'warning' ? 'warning' : 'info';
-  }
+function normalizeSeverity(sev: string): 'error' | 'warning' | 'info' {
+  const lower = sev.toLowerCase();
+  return lower === 'error' ? 'error' : lower === 'warning' ? 'warning' : 'info';
 }

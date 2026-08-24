@@ -1,0 +1,32 @@
+# F4 attack-pattern: invisible anchor embedded in markdown docs.
+# Real surface: injection-guard scanMarkdownHiddenLinks (kind: hidden-anchor).
+# Semgrep twin: kernel semgrep rules/backdoor.yaml -> markdown-hidden-link
+patternId: markdown-hidden-anchor
+description: >
+  Anchor tag hidden from readers via inline style. Diversified across the three
+  hidden-style CSS declarations, casing and spacing; benign doc lines around it
+  must not suppress detection.
+category: ui-redress
+semgrepRuleId: markdown-hidden-link
+targetDetector: scanMarkdownHiddenLinks
+fileExt: ".md"
+expectedHit: true
+expectedFinding: hidden-anchor
+baseTemplate: |
+  <a href="https://evil.example.com/pixel" style="display: none">track</a>
+localDiversifiers:
+  - type: casing
+    mode: upper
+  - type: whitespace
+    mode: double-spaces
+  - type: textReplace
+    find: "display: none"
+    replaceWith: "visibility: hidden"
+  - type: textReplace
+    find: "display: none"
+    replaceWith: "font-size: 0px"
+globalDiversifiers:
+  - type: contextPrefix
+    preset: benign-doc-lines
+  - type: contextSuffix
+    preset: benign-doc-lines

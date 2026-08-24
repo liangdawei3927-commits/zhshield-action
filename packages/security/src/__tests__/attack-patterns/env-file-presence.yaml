@@ -1,0 +1,29 @@
+# F4 attack-pattern: secret-bearing .env file present in the scanned tree.
+# Real surface: injection-guard isEnvFile (file-name membership) -- the local
+# guard counterpart of the env exfiltration family; diversification rotates the
+# tracked env file names and appends benign content lines.
+# Semgrep twin: kernel semgrep rules/backdoor.yaml -> env-file-exfiltration
+patternId: env-file-presence
+description: >
+  Environment file carrying credentials checked into the scan set. Variants
+  rotate through every tracked .env* file name the detector recognises.
+category: secret-exfiltration
+semgrepRuleId: env-file-exfiltration
+targetDetector: isEnvFile
+defaultFileName: ".env"
+expectedHit: true
+baseTemplate: |
+  DATABASE_URL=postgres://admin:s3cret@db.internal/prod
+  API_KEY=sk-live-test-0001
+localDiversifiers:
+  - type: fileName
+    name: ".env.local"
+  - type: fileName
+    name: ".env.development"
+  - type: fileName
+    name: ".env.production"
+  - type: fileName
+    name: ".env.test"
+globalDiversifiers:
+  - type: contextSuffix
+    preset: benign-doc-lines

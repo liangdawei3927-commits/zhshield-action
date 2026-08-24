@@ -1,0 +1,17 @@
+# F4 negative control: ordinary comments must never trip the instruction scan.
+patternId: clean-comment-retry-budget
+description: >
+  Benign engineering note in comments; guards against false positives on
+  routine prose that merely talks about process.
+category: prompt-injection
+semgrepRuleId: suspicious-comment-instruction
+targetDetector: scanCommentInstructions
+fileExt: ".ts"
+expectedHit: false
+baseTemplate: |
+  bump the retry budget after the next latency review
+localDiversifiers:
+  - type: commentStyle
+    style: line-hash
+  - type: casing
+    mode: upper

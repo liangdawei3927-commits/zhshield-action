@@ -1,0 +1,21 @@
+# F4 negative control: an env-adjacent file name must not be flagged.
+patternId: clean-env-adjacent-name
+description: >
+  Files whose names merely resemble env files (env.example, environment.ts)
+  are not tracked secrets; guards the exact-membership behaviour of isEnvFile.
+category: secret-exfiltration
+semgrepRuleId: env-file-exfiltration
+targetDetector: isEnvFile
+defaultFileName: "environment.ts"
+expectedHit: false
+baseTemplate: |
+  # copy me to .env and fill in real values
+  API_KEY=
+localDiversifiers:
+  - type: fileName
+    name: "env.example"
+  - type: fileName
+    name: "dotenv.config.js"
+globalDiversifiers:
+  - type: contextSuffix
+    preset: benign-doc-lines

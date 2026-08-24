@@ -1,0 +1,18 @@
+# F4 negative control: routine build scripts must stay classified safe.
+patternId: clean-package-json-scripts
+description: >
+  Standard toolchain scripts; guards against false positives on everyday
+  package.json content.
+category: supply-chain
+semgrepRuleId: dependency-script-injection
+targetDetector: classifyPackageJsonScripts
+expectedHit: false
+baseTemplate: |
+  tsc -p tsconfig.json
+localDiversifiers:
+  - type: textReplace
+    find: "tsc -p tsconfig.json"
+    replaceWith: "vitest run --coverage"
+globalDiversifiers:
+  - type: contextPrefix
+    preset: benign-extra-script

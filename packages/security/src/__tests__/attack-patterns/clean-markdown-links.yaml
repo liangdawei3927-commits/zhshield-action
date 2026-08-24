@@ -1,0 +1,19 @@
+# F4 negative control: visible links and plain anchors must stay clean.
+patternId: clean-markdown-links
+description: >
+  Ordinary markdown link and a fully visible anchor; guards against false
+  positives on normal documentation.
+category: ui-redress
+semgrepRuleId: markdown-hidden-link
+targetDetector: scanMarkdownHiddenLinks
+fileExt: ".md"
+expectedHit: false
+baseTemplate: |
+  [user guide](https://docs.example.com/setup)
+localDiversifiers:
+  - type: textReplace
+    find: "[user guide](https://docs.example.com/setup)"
+    replaceWith: '<a href="https://docs.example.com">home</a>'
+globalDiversifiers:
+  - type: contextSuffix
+    preset: benign-doc-lines

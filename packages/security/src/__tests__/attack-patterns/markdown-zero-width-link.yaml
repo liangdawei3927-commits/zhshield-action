@@ -1,0 +1,29 @@
+# F4 attack-pattern: zero-width characters smuggled inside a markdown link target.
+# Real surface: injection-guard scanMarkdownHiddenLinks (kind: zero-width-target).
+# The baseline template carries a literal U+200B escape (\u200B, YAML double-quoted
+# scalar); each zeroWidth diversifier rewrites every zero-width char / {ZW} token
+# to one specific codepoint from the detector's family.
+# Semgrep twin: kernel semgrep rules/backdoor.yaml -> markdown-hidden-link
+patternId: markdown-zero-width-link
+description: >
+  Markdown link whose URL contains an invisible zero-width character used to
+  disguise the real target. One variant per codepoint the detector recognises.
+category: ui-redress
+semgrepRuleId: markdown-hidden-link
+targetDetector: scanMarkdownHiddenLinks
+fileExt: ".md"
+expectedHit: true
+expectedFinding: zero-width-target
+baseTemplate: "[release notes](https://telemetry.example.com\u200B/docs)"
+localDiversifiers:
+  - type: zeroWidth
+    codepoint: "200C"
+  - type: zeroWidth
+    codepoint: "200D"
+  - type: zeroWidth
+    codepoint: "2060"
+  - type: zeroWidth
+    codepoint: "FEFF"
+globalDiversifiers:
+  - type: contextPrefix
+    preset: benign-doc-lines

@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "active_work_id": "simula-hardening",
+  "works": {
+    "simula-hardening": {
+      "work_id": "simula-hardening",
+      "active_plan": ".omo/plans/zhcodeshield-simula-hardening.md",
+      "plan_name": "zhcodeshield-simula-hardening",
+      "session_ids": ["opencode:simula-hardening"],
+      "status": "active",
+      "worktree_path": null
+    }
+  }
+}

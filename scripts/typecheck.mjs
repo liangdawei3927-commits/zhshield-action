@@ -19,7 +19,7 @@ const pkgs = readdirSync(pkgsDir).filter(
 
 console.log(`\n类型检查 ${pkgs.length} 个包：${pkgs.join(', ')}\n`);
 
-let failed = [];
+const failed = [];
 for (const pkg of pkgs) {
   process.stdout.write(`  ${pkg.padEnd(14)} `);
   try {

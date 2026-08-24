@@ -245,7 +245,8 @@ export class GuardEngine {
       adapter: 'sop-engine',
       status: statusMap[ev.status] ?? 'error',
       severity,
-      blocking: ev.status === 'failed',
+      // F1-4：优先消费 kernel 附加的阻断判定；存量/外部评估缺省该字段时回退旧行为（failed 即阻断）
+      blocking: ev.blocking ?? (ev.status === 'failed'),
       message: ev.message || `${ev.status}: ${ev.rule?.name || ev.rule?.id || '未知规则'}`,
       details: ev.violations
         ? { violations: ev.violations, files: ev.files }

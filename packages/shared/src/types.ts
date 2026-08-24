@@ -337,10 +337,32 @@ export interface ToolScanOptions {
   timeout?: number;
 }
 
+/**
+ * 工具适配器访问边界声明（F5）。glob 模式为 micromatch 风格（支持 `**` / `*` / `?` / `{a,b}`），
+ * 匹配对象是 scan 入参中的路径（相对或绝对均可，分隔符统一为 `/`）。
+ */
+export interface AccessScope {
+  /** 允许读取的路径模式；声明后范围外 targetFiles 记越界告警（不阻断） */
+  readPaths?: string[];
+  /** 显式排除的路径模式（优先级高于 readPaths，如 node_modules） */
+  excludePaths?: string[];
+  /** 敏感路径模式：命中即额外告警（仅按路径判断，不读文件内容） */
+  sensitivePatterns?: string[];
+}
+
 export interface ToolAdapter {
   meta: ToolMeta;
+  /** 可选访问边界（F5）：未声明则不做任何 scope 校验，行为与旧版完全一致 */
+  accessScope?: AccessScope;
   isAvailable(): Promise<boolean>;
   scan(options: ToolScanOptions): Promise<ToolResult>;
+}
+
+/** 扫描前后钩子（F0 Hook/Audit 地基）：before 返回 null 表示阻断本次扫描 */
+export interface ToolCallHook {
+  before(adapter: ToolAdapter, options: ToolScanOptions): ToolScanOptions | null;
+  /** 可改写扫描结果（返回新对象即视为改写） */
+  after(adapter: ToolAdapter, result: ToolResult): ToolResult;
 }
 
 export interface ToolVersionInfo {
@@ -378,6 +400,18 @@ export interface AuditLogEntry {
   projectId: string;
   tool?: ToolId;
   details: Record<string, unknown>;
+}
+
+/** 工具调用审计条目（F0）：由调用点在 wrapAdapter 包装的 scan 前后构造 */
+export interface AuditEntry {
+  timestamp: number;
+  adapterName: string;
+  sopRuleId?: string;
+  action: 'scan' | 'block' | 'skip';
+  input: ToolScanOptions;
+  output: ToolResult;
+  duration: number;
+  hookModifications?: string[];
 }
 
 // ─── 白名单（Whitelist）─────────────────────────────────

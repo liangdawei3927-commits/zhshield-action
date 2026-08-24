@@ -38,10 +38,13 @@ export type {
   ToolResult,
   ToolScanOptions,
   ToolAdapter,
+  AccessScope,
+  ToolCallHook,
   ToolVersionInfo,
   ToolErrorLog,
   AuditAction,
   AuditLogEntry,
+  AuditEntry,
   WhitelistScope,
   WhitelistEntry,
   ToolsConfig,
@@ -63,6 +66,9 @@ export type {
   SyncResult,
 } from './types';
 export { ToolManager } from './tool-manager';
+export { wrapAdapter, evaluateAccessScope } from './tool-adapter-decorator';
+export type { HookedToolResult, ScopeViolation, ScopeViolationContext, WrapAdapterOptions } from './tool-adapter-decorator';
+export { matchGlobPath } from './scope-matcher';
 export { toolMappers, eslintMapper, semgrepMapper, trivyMapper, grypeMapper, gitleaksMapper, depcheckMapper, depCruiserMapper, jscpdMapper } from './output-mappers';
 export { DegradationManager } from './degradation-manager';
 export { BUILTIN_FALLBACK_RULES } from './builtin-rules';
@@ -87,7 +93,7 @@ export type {
   ToolRequirement,
 } from './toolchain/types';
 export { getToolDimensions, mapIssuesToDimensions, computeOverallScore, scoreToGrade } from './dimension-mapper';
-export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEvent, GuardCheckRequestedEvent, GuardCheckCompletedEvent, GuardStage } from './events';
+export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEvent, GuardCheckRequestedEvent, GuardCheckCompletedEvent, GuardStage, ScopeViolationEvent } from './events';
 export { NOOP_EMITTER } from './events';
 
 export { sanitizeEnv } from './process-env';

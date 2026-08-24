@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 50"
   },

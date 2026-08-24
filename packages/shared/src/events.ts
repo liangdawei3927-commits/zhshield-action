@@ -43,6 +43,15 @@ export interface GuardCheckCompletedEvent {
   timestamp: Date;
 }
 
+/** F5：工具适配器越界访问事件（warn-only；注册点转发到事件总线供 sentinel 消费） */
+export interface ScopeViolationEvent {
+  tool: ToolId;
+  projectId: string;
+  file: string;
+  reason: string;
+  timestamp: Date;
+}
+
 /**
  * 所有治理引擎事件的联合类型
  */
@@ -50,7 +59,8 @@ export type GovernanceEvent =
   | { type: 'tool:executed'; payload: ToolExecutedEvent }
   | { type: 'scan:completed'; payload: ScanCompletedEvent }
   | { type: 'guard:check-requested'; payload: GuardCheckRequestedEvent }
-  | { type: 'guard:check-completed'; payload: GuardCheckCompletedEvent };
+  | { type: 'guard:check-completed'; payload: GuardCheckCompletedEvent }
+  | { type: 'tool:scope-violation'; payload: ScopeViolationEvent };
 
 /**
  * 最小事件发射器接口 — 各引擎依赖此接口而非直接依赖 EventBus 实现

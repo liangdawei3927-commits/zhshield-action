@@ -179,6 +179,7 @@ function mapViolationSeverity(severity: NonNullable<RuleEvaluation['violations']
   switch (severity) {
     case 'critical':
     case 'high':
+    case 'error':
       return 'error';
     case 'medium':
     case 'low':

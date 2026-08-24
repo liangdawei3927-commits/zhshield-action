@@ -1,6 +1,7 @@
 export const VERSION = '0.2.0';
 
 export { EventCenter } from './event-center';
+export { subscribeScopeViolations, SCOPE_VIOLATION_EVENT } from './scope-violation-consumer';
 export { AlertHandler } from './alert-handler';
 export { FileMonitor } from './file-monitor';
 export type { FileMonitorConfig, FileChangeType, FileWatchFilter } from './file-monitor';

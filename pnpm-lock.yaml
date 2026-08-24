@@ -296,6 +296,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@zh/sentinel':
+        specifier: workspace:*
+        version: link:../sentinel
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -495,6 +498,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@zh/sentinel':
+        specifier: workspace:*
+        version: link:../sentinel
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

@@ -18,7 +18,7 @@ interface NavItem {
   label?: string;
 }
 
-/** 12 个分类导航（360 风格：大图标 + 底部文字） */
+/** 11 个分类导航（360 风格：大图标 + 底部文字）；备份中心入口已移至 TitleBar 右侧 */
 const navItems: NavItem[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard' },
   { id: 'guard', labelKey: 'nav.guard' },
@@ -30,7 +30,6 @@ const navItems: NavItem[] = [
   { id: 'performance', labelKey: 'nav.performance' },
   { id: 'techdebt', labelKey: 'nav.techdebt' },
   { id: 'refactor', labelKey: 'nav.refactor' },
-  { id: 'backup', labelKey: 'nav.backup' },
   { id: 'reports', labelKey: 'nav.reports' },
 ];
 
@@ -93,7 +92,7 @@ export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, s
   return (
     <header className="shrink-0 select-none">
       {/* 第一行：统一品牌色 title bar */}
-      <TitleBar onOpenSettings={onOpenSettings} projectName={projectName} sidebarOpen={sidebarOpen} />
+      <TitleBar onOpenSettings={onOpenSettings} projectName={projectName} sidebarOpen={sidebarOpen} currentPage={currentPage} onNavigate={onNavigate} />
       {/* 第二行：大图标分类导航 */}
       <CategoryNav currentPage={currentPage} onNavigate={onNavigate} />
     </header>

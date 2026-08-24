@@ -785,6 +785,7 @@
       "noRecords": "バックアップ記録はありません",
       "oneClickBackup": "ワンクリックバックアップ",
       "openFolder": "フォルダを開く",
+      "openFolderTip": "バックアップフォルダを開いて圧縮ファイルを表示：{{path}}",
       "recordCount": "バックアップ記録 {{count}} 件",
       "recordsTitle": "バックアップ記録",
       "result": {

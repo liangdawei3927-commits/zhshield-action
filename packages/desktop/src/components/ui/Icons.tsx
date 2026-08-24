@@ -106,6 +106,11 @@ const NAV_ICON_CONTENT: Record<string, ReactNode> = {
       <path d="M9 16l3 3 3-3" />
     </>
   ),
+  folder: ( // 打开备份文件夹：文件夹
+    <>
+      <path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
+    </>
+  ),
   reports: ( // 报告中心：文档
     <>
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />

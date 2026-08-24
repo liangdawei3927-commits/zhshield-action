@@ -785,6 +785,7 @@
       "noRecords": "백업 기록이 없습니다",
       "oneClickBackup": "원클릭 백업",
       "openFolder": "폴더 열기",
+      "openFolderTip": "백업 폴더 열어 압축 파일 보기: {{path}}",
       "recordCount": "백업 기록 {{count}}건",
       "recordsTitle": "백업 기록",
       "result": {

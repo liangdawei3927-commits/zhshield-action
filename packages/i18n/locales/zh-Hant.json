@@ -785,6 +785,7 @@
       "noRecords": "暫無備份記錄",
       "oneClickBackup": "一鍵備份",
       "openFolder": "打開資料夾",
+      "openFolderTip": "打開備份資料夾檢視壓縮檔案：{{path}}",
       "recordCount": "{{count}} 條備份記錄",
       "recordsTitle": "備份記錄",
       "result": {

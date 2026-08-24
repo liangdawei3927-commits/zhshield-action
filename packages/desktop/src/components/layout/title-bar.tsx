@@ -1,15 +1,17 @@
 import { useMacOSTrafficLightInset, TRAFFIC_LIGHT_OFFSET } from '../../hooks/useMacOSTrafficLightInset';
-import { ShieldLogo } from '../ui/Icons';
+import { ShieldLogo, NavIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 
 interface TitleBarProps {
   onOpenSettings: () => void;
   projectName?: string;
   sidebarOpen?: boolean;
+  currentPage?: string;
+  onNavigate?: (page: string) => void;
 }
 
-/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，设置居右 */
-export function TitleBar({ onOpenSettings, projectName, sidebarOpen }: TitleBarProps) {
+/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，备份中心+侧边栏开关居右 */
+export function TitleBar({ onOpenSettings, projectName, sidebarOpen, currentPage, onNavigate }: TitleBarProps) {
   const maximized = useMacOSTrafficLightInset();
   const t = useT();
 
@@ -44,22 +46,22 @@ export function TitleBar({ onOpenSettings, projectName, sidebarOpen }: TitleBarP
         )}
       </div>
 
-      {/* 右：引擎状态标签 + 侧边栏按钮（折叠图标：关闭时箭头朝左=展开，展开时箭头朝右=收回） */}
+      {/* 右：备份中心入口 + 侧边栏按钮（折叠图标：关闭时箭头朝左=展开，展开时箭头朝右=收回） */}
       <div className="flex items-center gap-2 pr-3" style={{ WebkitAppRegion: 'no-drag' as const }}>
-        <div
-          className="flex items-center gap-1.5"
+        <button
+          onClick={() => onNavigate?.('backup')}
+          className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"
           style={{
+            width: 28,
             height: 24,
-            padding: '0 10px',
             borderRadius: 'var(--zh-radius-sm)',
-            background: 'rgba(255,255,255,0.15)',
+            background: currentPage === 'backup' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.15)',
             color: 'rgb(var(--zh-text-on-brand))',
           }}
-          title={t('layout.engineOn')}
+          title={t('nav.backup')}
         >
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgb(var(--zh-success))', boxShadow: '0 0 5px rgb(var(--zh-success) / 0.9)' }} />
-          <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{t('layout.engineOn')}</span>
-        </div>
+          <NavIcon id="backup" size={14} />
+        </button>
         <button
           onClick={onOpenSettings}
           className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"

@@ -6,7 +6,7 @@
  * 备份记录持久化到 <userData>/backup-records.json，重启应用后仍可查看历史记录。
  */
 import { app, ipcMain } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { t } from '@zh/i18n';
 import {
@@ -189,6 +189,12 @@ function registerOpenFolderHandler(): void {
       const parent = join(target, '..');
       if (!existsSync(parent)) return false;
       target = parent;
+    }
+
+    // zip 归档快照是文件而非目录：在 Finder 中高亮显示，避免 openPath 触发解压
+    if (statSync(target).isFile()) {
+      shell.showItemInFolder(target);
+      return true;
     }
 
     // shell.openPath 失败不抛异常而是 resolve 错误字符串，必须检查返回值而非 try/catch

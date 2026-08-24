@@ -1,4 +1,4 @@
-import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { Component, type ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -20,9 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
-  }
+  // 故意不实现 componentDidCatch（门禁 SEC-001 禁止 console）：错误状态由 getDerivedStateFromError 捕获，dev 详情走 render 内 UI
 
   handleReset = () => {
     this.setState({ hasError: false, error: null });

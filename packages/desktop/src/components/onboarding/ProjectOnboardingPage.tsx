@@ -126,8 +126,8 @@ export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: 
         setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
         setCurrentStepIndex((prev) => prev + 1);
       })
-      .catch((err) => {
-        console.warn(`[onboarding] Step ${step.id} failed:`, err instanceof Error ? err.message : String(err));
+      // 单步失败不阻断引导流程（门禁 SEC-001 禁止 console，失败细节不落日志）
+      .catch(() => {
         setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
         setCurrentStepIndex((prev) => prev + 1);
       });

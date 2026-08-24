@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GuardToolAdapterWrapper } from '../guard-tool-adapter';
 import type { Adapter, CheckResult } from '../types';
 import type { ToolScanOptions } from '@zh/shared';

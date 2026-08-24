@@ -34,6 +34,7 @@ export type {
   BackupConfig,
   GitHubBackupConfig,
   LocalBackupConfig,
+  LocalBackupFormat,
   BackupScheduleConfig,
   BackupResult,
   BackupSubResult,

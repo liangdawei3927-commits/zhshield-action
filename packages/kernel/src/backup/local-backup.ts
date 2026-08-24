@@ -12,8 +12,12 @@ import { pipeline } from 'node:stream/promises';
 import { type LocalBackupConfig, type LocalBackupSubResult } from './types';
 import { hashFile, matchesExcludePattern } from './utils';
 import { restoreStoredEntry } from './restore-entry';
+import { buildZipSnapshot, restoreFromZipArchive } from './zip-snapshot';
 
 const TILDE_PREFIX = /^~/;
+
+/** 快照条目名（ISO 时间戳目录或同名 .zip）；不匹配的条目（pre-restore-*、MANIFEST.json 等）不参与轮换 */
+const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(\.zip)?$/;
 
 /** 备份条目落盘压缩格式（写入 BACKUP_MANIFEST.json，恢复时按此解压） */
 export type LocalBackupCompression = 'none' | 'gzip';
@@ -76,7 +80,25 @@ export class LocalBackup {
       const manifest = await this.loadManifest(resolvedBackupDir);
       const files = await this.scanFiles(projectPath, config.excludePatterns, abortSignal);
       const timestamp = new Date().toISOString();
-      const backupDir = path.join(resolvedBackupDir, timestamp.replace(/[:.]/g, '-'));
+      const snapshotName = timestamp.replace(/[:.]/g, '-');
+
+      if (config.format === 'zip') {
+        const zipPath = path.join(resolvedBackupDir, `${snapshotName}.zip`);
+        const stats = await buildZipSnapshot({ files, projectPath, timestamp, zipPath, abortSignal });
+        if (!abortSignal?.aborted) {
+          await this.pruneOldBackups(resolvedBackupDir, config.maxBackups);
+        }
+        return {
+          type: 'local',
+          success: stats.errors === 0 || stats.backedUp > 0,
+          backupPath: zipPath,
+          size: stats.totalSize,
+          fileCount: stats.backedUp,
+          ...(stats.errors > 0 && stats.backedUp === 0 ? { error: `${stats.errors} 个文件打包失败` } : {}),
+        };
+      }
+
+      const backupDir = path.join(resolvedBackupDir, snapshotName);
 
       const isFullBackup = !manifest || manifest.files.length === 0;
       const { backedUp, errors, totalSize, fileEntries } = await this.copyChangedFiles(
@@ -125,6 +147,11 @@ export class LocalBackup {
     targetDir: string,
     abortSignal?: AbortSignal,
   ): Promise<LocalBackupRestoreResult> {
+    const stat = await fs.stat(backupPath).catch(() => null);
+    if (stat?.isFile()) {
+      return restoreFromZipArchive(backupPath, targetDir, abortSignal);
+    }
+
     const manifest = await this.readManifest(backupPath);
     const files = manifest?.files ?? [];
     let restored = 0;
@@ -153,15 +180,16 @@ export class LocalBackup {
     const dir = backupDir ?? this.backupRoot;
     try {
       const entries = await fs.readdir(dir);
-      const dirs: string[] = [];
+      const snapshots: string[] = [];
       for (const entry of entries) {
+        if (!SNAPSHOT_NAME_RE.test(entry)) continue;
         const fullPath = path.join(dir, entry);
         const stat = await fs.stat(fullPath).catch(() => null);
-        if (stat?.isDirectory()) {
-          dirs.push(fullPath);
+        if (stat?.isDirectory() || stat?.isFile()) {
+          snapshots.push(fullPath);
         }
       }
-      return dirs.sort().reverse();
+      return snapshots.sort().reverse();
     } catch {
       return [];
     }

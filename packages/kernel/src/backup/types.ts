@@ -27,12 +27,16 @@ export interface GitHubBackupConfig {
   excludePatterns: string[];
 }
 
+/** 快照载体形态：zip 为单文件归档，directory 为目录镜像（旧行为） */
+export type LocalBackupFormat = 'zip' | 'directory';
+
 export interface LocalBackupConfig {
   enabled: boolean;
   backupDir: string;
   maxBackups: number;
   excludePatterns: string[];
   compress: boolean;
+  format: LocalBackupFormat;
 }
 
 export interface BackupScheduleConfig {
@@ -91,6 +95,7 @@ export function defaultBackupConfig(identity?: BackupIdentity): BackupConfig {
       maxBackups: 10,
       excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/'],
       compress: false,
+      format: 'zip',
     },
     schedule: {
       enabled: false,

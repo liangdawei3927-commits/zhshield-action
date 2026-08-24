@@ -136,6 +136,7 @@ export class BackupConfigManager {
       maxBackups: raw?.maxBackups ?? def.maxBackups,
       excludePatterns: raw?.excludePatterns ?? def.excludePatterns,
       compress: raw?.compress ?? def.compress,
+      format: raw?.format === 'directory' ? 'directory' : 'zip',
     };
   }
 
@@ -166,6 +167,7 @@ export class BackupConfigManager {
           maxBackups: config.local.maxBackups,
           excludePatterns: config.local.excludePatterns,
           compress: config.local.compress,
+          format: config.local.format,
         },
         schedule: {
           enabled: config.schedule.enabled,

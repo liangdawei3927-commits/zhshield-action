@@ -18,11 +18,15 @@
     "@typescript-eslint/parser": "^8.65.0",
     "@zh/db": "workspace:*",
     "@zh/shared": "workspace:*",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"
   },

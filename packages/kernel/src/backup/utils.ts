@@ -31,7 +31,7 @@ export function sanitizeDirSegment(input: string): string {
   const cleaned = input
     .replace(/[/\\:*?"<>|]/g, '-')
     .replace(/\s+/g, '-')
-    .replace(/^[.\-]+|[.\-]+$/g, '')
+    .replace(/^[.-]+|[.-]+$/g, '')
     .trim();
   return (cleaned.slice(0, 64) || 'project');
 }

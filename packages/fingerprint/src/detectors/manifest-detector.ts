@@ -2,6 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeJoin } from '@zh/shared';
 import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
@@ -49,12 +50,17 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
   return patterns;
 }
 
-function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[] {
+export function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[] {
   const dirs: string[] = [];
   const isNoiseRel = (rel: string): boolean => rel.split('/').some((segment) => isNoiseDir(segment));
   for (const pattern of patterns) {
     if (!pattern.includes('*')) {
-      const absDir = path.join(projectRoot, pattern);
+      let absDir: string;
+      try {
+        absDir = safeJoin(projectRoot, pattern);
+      } catch {
+        continue; // 越界 pattern（含 .. 或绝对路径），跳过
+      }
       if (fs.existsSync(absDir) && fs.statSync(absDir).isDirectory() && !isNoiseRel(pattern)) {
         dirs.push(pattern);
       }
@@ -63,7 +69,12 @@ function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[]
     const parts = pattern.split('/');
     const globIdx = parts.findIndex((p) => p === '*');
     if (globIdx === -1) continue;
-    const baseDir = path.join(projectRoot, ...parts.slice(0, globIdx));
+    let baseDir: string;
+    try {
+      baseDir = safeJoin(projectRoot, ...parts.slice(0, globIdx));
+    } catch {
+      continue;
+    }
     if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) continue;
     try {
       for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {

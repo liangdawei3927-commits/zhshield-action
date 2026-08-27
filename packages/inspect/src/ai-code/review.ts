@@ -136,8 +136,7 @@ export class AiCodeReviewImpl implements AiCodeReview {
       const module = v.file.split('/')[0] ?? '';
       byModule.set(module, (byModule.get(module) ?? 0) + 1);
     }
-    const riskByModule = [...byModule.entries()]
-      .map(([module, vulnCount]) => ({ module, vulnCount }))
+    const riskByModule = Array.from(byModule.entries(), ([module, vulnCount]) => ({ module, vulnCount }))
       .sort((a, b) => b.vulnCount - a.vulnCount || a.module.localeCompare(b.module));
 
     // 审计日志：谁 / 何时 / 哪些文件被审查

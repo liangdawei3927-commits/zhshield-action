@@ -6,6 +6,10 @@
  * 本模块只做特征提取，不做"AI 判定"——避免伪科学（边界 1）。
  */
 
+const COMMENT_LINE_RE = /^\s*(\/\/|\/\*|\*|#|--|<!--)/;
+const NEWLINE_RE = /\r?\n/;
+const INDENT_RE = /^[ \t]+/;
+
 /** 风格指纹类型 */
 export type StyleSignalKind = 'comment-marker' | 'mixed-indent' | 'templated-naming';
 
@@ -27,12 +31,12 @@ const AI_COMMENT_PATTERNS: readonly RegExp[] = [
 
 /** 是否注释行（// /* * # -- <!--） */
 function isCommentLine(line: string): boolean {
-  return /^\s*(\/\/|\/\*|\*|#|--|<!--)/.test(line);
+  return COMMENT_LINE_RE.test(line);
 }
 
 /** comment-marker：注释中出现 AI 工具典型标记 → 强风格信号 */
 function commentMarkerSignal(content: string): StyleSignal | null {
-  const lines = content.split(/\r?\n/);
+  const lines = content.split(NEWLINE_RE);
   for (const line of lines) {
     if (!isCommentLine(line)) continue;
     for (const re of AI_COMMENT_PATTERNS) {
@@ -54,9 +58,9 @@ function commentMarkerSignal(content: string): StyleSignal | null {
 function mixedIndentSignal(content: string): StyleSignal | null {
   const indentCounts = new Map<number, number>();
   let zeroIndentLines = 0;
-  for (const line of content.split(/\r?\n/)) {
+  for (const line of content.split(NEWLINE_RE)) {
     if (line.trim() === '') continue;
-    const m = /^[ \t]+/.exec(line);
+    const m = INDENT_RE.exec(line);
     if (m === null) {
       zeroIndentLines += 1;
     } else {

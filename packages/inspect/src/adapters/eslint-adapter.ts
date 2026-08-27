@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -78,6 +79,8 @@ const META: ToolMeta = {
 
 export class ESLintAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：ESLint 以 --ext .ts/.tsx/.js/.jsx 扫描 JS/TS 源码 */
   readonly accessScope: AccessScope = {
@@ -85,9 +88,21 @@ export class ESLintAdapter implements ToolAdapter {
     excludePaths: ['**/node_modules/**'],
   };
 
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('eslint', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('eslint', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -104,6 +119,7 @@ export class ESLintAdapter implements ToolAdapter {
     const category: IssueCategory = options.config?.category ?? 'quality';
 
     try {
+      const command = await this.resolveCommand();
       // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
       const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
       const args: string[] = ['--format', 'json', ...defaultExts, ...relativeTargets];
@@ -112,7 +128,7 @@ export class ESLintAdapter implements ToolAdapter {
         args.unshift('--config', options.config.config);
       }
 
-      const { stdout } = await execFileAsync('eslint', args, {
+      const { stdout } = await execFileAsync(command, args, {
         cwd,
         timeout: options.timeout || 60000,
         maxBuffer: 10 * 1024 * 1024,

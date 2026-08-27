@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +29,8 @@ interface GitleaksFinding {
 
 export class GitleaksAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：gitleaks 读取仓库文本文件找硬编码密钥；依赖目录排除 */
   readonly accessScope: AccessScope = {
@@ -35,9 +38,21 @@ export class GitleaksAdapter implements ToolAdapter {
     excludePaths: ['**/node_modules/**'],
   };
 
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('gitleaks', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('gitleaks', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -49,7 +64,8 @@ export class GitleaksAdapter implements ToolAdapter {
     const isStaged = !!(options.targetFiles && options.targetFiles.length > 0);
 
     try {
-      const { stdout } = await execFileAsync('gitleaks', this.buildArgs(options, isStaged), {
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
         cwd: options.projectPath,
         timeout: options.timeout || 30000,
         maxBuffer: 10 * 1024 * 1024,

@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
 import { FileHelper } from '@zh/kernel';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -46,6 +47,8 @@ interface JscpdReport {
 
 export class JscpdAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标） */
   readonly accessScope: AccessScope = {
@@ -53,9 +56,21 @@ export class JscpdAdapter implements ToolAdapter {
     excludePaths: ['**/node_modules/**'],
   };
 
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('jscpd', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('jscpd', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -68,11 +83,12 @@ export class JscpdAdapter implements ToolAdapter {
     const target = options.targetFiles?.[0] || path.join(options.projectPath, 'src');
 
     try {
+      const command = await this.resolveCommand();
       await FileHelper.ensureDir(path.dirname(reportPath));
 
       const args = ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
 
-      await execFileAsync('jscpd', args, {
+      await execFileAsync(command, args, {
         cwd: options.projectPath,
         timeout: options.timeout || 60000,
         maxBuffer: 10 * 1024 * 1024,

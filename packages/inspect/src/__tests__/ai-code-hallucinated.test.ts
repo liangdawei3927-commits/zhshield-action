@@ -32,6 +32,7 @@ packages:
 overrides:
   qs@^6: 6.15.3
 `;
+    // Set 没有 toSorted，需要展开排序
     expect([...collectPnpmPackages(yaml)].sort()).toEqual(['@babel/core', 'lodash']);
   });
 
@@ -46,6 +47,7 @@ overrides:
         'node_modules/foo/node_modules/bar': { version: '1.0.0' },
       },
     });
+    // Set 没有 toSorted
     expect([...collectNpmPackages(lock)].sort()).toEqual(['@babel/core', 'bar', 'lodash']);
   });
 
@@ -55,6 +57,7 @@ overrides:
       version: '1.0.0',
       dependencies: { lodash: { version: '4.17.21' }, '@babel/core': { version: '7.24.0' } },
     });
+    // Set 没有 toSorted
     expect([...collectNpmPackages(lock)].sort()).toEqual(['@babel/core', 'lodash']);
   });
 
@@ -70,6 +73,7 @@ lodash@^4.17.21:
   version "7.24.0"
   resolved "https://registry.yarnpkg.com/@babel/core/-/core-7.24.0.tgz#def"
 `;
+    // Set 没有 toSorted
     expect([...collectYarnPackages(yarn)].sort()).toEqual(['@babel/core', 'lodash']);
   });
 });
@@ -100,6 +104,7 @@ describe('listNodeModules', () => {
   });
 
   it('枚举顶层已装包，跳过 .bin 等元数据目录', () => {
+    // Set 没有 toSorted
     expect([...listNodeModules(tmpDir)].sort()).toEqual(['@scope/foo', 'lodash']);
   });
 });

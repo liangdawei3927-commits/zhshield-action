@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +34,8 @@ interface DepCruiserOutput {
 
 export class DependencyCruiserAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：dep-cruiser 校验 src/ 目录内模块依赖边界 */
   readonly accessScope: AccessScope = {
@@ -40,9 +43,21 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     excludePaths: ['**/node_modules/**'],
   };
 
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('depcruise', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('depcruise', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -55,13 +70,14 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     const targetDir = path.join(options.projectPath, 'src');
 
     try {
+      const command = await this.resolveCommand();
       const args: string[] = [];
       if (configFile) {
         args.push('--validate', configFile);
       }
       args.push('--output-type', 'json', targetDir);
 
-      const { stdout } = await execFileAsync('depcruise', args, {
+      const { stdout } = await execFileAsync(command, args, {
         cwd: options.projectPath,
         timeout: options.timeout || 60000,
         maxBuffer: 10 * 1024 * 1024,

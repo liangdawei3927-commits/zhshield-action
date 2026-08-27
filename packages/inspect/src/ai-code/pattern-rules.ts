@@ -7,6 +7,9 @@
  */
 import type { AiCodeVulnRuleId, AiVulnSeverity } from './types';
 
+const NEWLINE_RE = /\r?\n/;
+const ANY_WORD_RE = /\bany\b/g;
+
 /** 规则唯一 id */
 export type PatternRuleId =
   | 'ai-ts-suppression'
@@ -39,7 +42,7 @@ const ANY_FLOOD_THRESHOLD = 5;
 
 function matchLineNumbers(content: string, regex: RegExp): PatternHit[] {
   const hits: PatternHit[] = [];
-  const lines = content.split(/\r?\n/);
+  const lines = content.split(NEWLINE_RE);
   lines.forEach((line, i) => {
     regex.lastIndex = 0;
     if (regex.test(line)) hits.push({ line: i + 1, snippet: line.trim().slice(0, 80) });
@@ -64,8 +67,8 @@ const MATCHERS: Record<Exclude<PatternRuleId, 'ai-any-flood'>, (content: string)
 
 /** any-flood：文件级统计，命中一次输出一条（行号为首个命中） */
 function matchAnyFlood(content: string): readonly PatternHit[] {
-  const re = /\bany\b/g;
-  const lines = content.split(/\r?\n/);
+  const re = ANY_WORD_RE;
+  const lines = content.split(NEWLINE_RE);
   let count = 0;
   let firstLine = 0;
   lines.forEach((line, i) => {

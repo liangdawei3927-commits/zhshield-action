@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -76,16 +77,30 @@ interface SemgrepRuleYaml {
 
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：semgrep 对源码做 SAST 规则匹配 */
   readonly accessScope: AccessScope = {
     readPaths: ['**/*.{ts,tsx,js,jsx,py,go,java,rb,php,c,cpp,h}'],
-    excludePaths: ['**/node_modules/**'],
+    excludePaths: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.semgrep/**'],
   };
+
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('semgrep', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
 
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('semgrep', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -115,10 +130,16 @@ export class SemgrepAdapter implements ToolAdapter {
       if (rulePath) args.push('--config', rulePath);
     }
 
+    // 排除生成目录，避免扫描 dist/assets 下的规则文件触发自身误报
+    for (const excl of ['node_modules', 'dist', 'build', '.semgrep', 'coverage']) {
+      args.push('--exclude', excl);
+    }
+
     args.push(targetDir);
 
     try {
-      const { stdout } = await execFileAsync('semgrep', args, {
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, args, {
         cwd: options.projectPath,
         timeout: options.timeout || 120000,
         maxBuffer: 10 * 1024 * 1024,

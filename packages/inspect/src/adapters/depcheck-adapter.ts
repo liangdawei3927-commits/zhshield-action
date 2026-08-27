@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
 
@@ -27,6 +28,8 @@ interface DepcheckResult {
 
 export class DepcheckAdapter implements ToolAdapter {
   meta = META;
+  private commandPromise?: Promise<string>;
+  private readonly projectRoot?: string;
 
   /** F5：depcheck 读 package.json 并静态解析源码 import 判断未使用依赖 */
   readonly accessScope: AccessScope = {
@@ -34,9 +37,21 @@ export class DepcheckAdapter implements ToolAdapter {
     excludePaths: ['**/node_modules/**'],
   };
 
+  constructor(projectRoot?: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  private resolveCommand(): Promise<string> {
+    if (!this.commandPromise) {
+      this.commandPromise = resolveToolCommand('depcheck', this.projectRoot);
+    }
+    return this.commandPromise;
+  }
+
   async isAvailable(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('depcheck', ['--version'], { timeout: 5000 });
+      const command = await this.resolveCommand();
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
       return stdout.length > 0;
     } catch {
       return false;
@@ -48,6 +63,7 @@ export class DepcheckAdapter implements ToolAdapter {
     const projectPath = options.projectPath;
 
     try {
+      const command = await this.resolveCommand();
       const args = [projectPath, '--json'];
       const cfg = options.config as Record<string, unknown> | undefined;
       if (cfg?.skip) {
@@ -57,7 +73,7 @@ export class DepcheckAdapter implements ToolAdapter {
         for (const ig of cfg.ignore as string[]) args.push('--ignore', ig);
       }
 
-      const { stdout } = await execFileAsync('depcheck', args, {
+      const { stdout } = await execFileAsync(command, args, {
         cwd: projectPath,
         timeout: options.timeout || 60000,
         maxBuffer: 10 * 1024 * 1024,

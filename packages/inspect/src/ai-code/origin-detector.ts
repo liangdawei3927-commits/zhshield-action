@@ -18,6 +18,9 @@ import { readTextFileSafe, walkSourceFiles } from './files';
 import { analyzeStyleSignature } from './style-signature';
 import type { AiEvidence, AiOriginFinding, AiStrength, AiToolReport, AiUserTag } from './types';
 
+const BLOCK_SPLIT_RE = /\n\s*\n/;
+const NEWLINE_RE = /\r?\n/;
+
 const execFileAsync = promisify(execFile);
 
 /** git 提交证据：解析 git log 输出的单条提交 */
@@ -63,10 +66,10 @@ export interface AiOriginDetector {
  * 为提交证据列表。块 = 空行分隔；首行为头，其余为文件名。
  */
 export function commitEvidenceFromLog(output: string): CommitEvidence[] {
-  const blocks = output.split(/\n\s*\n/);
+  const blocks = output.split(BLOCK_SPLIT_RE);
   const commits: CommitEvidence[] = [];
   for (const block of blocks) {
-    const lines = block.split(/\r?\n/).filter((l) => l.length > 0);
+    const lines = block.split(NEWLINE_RE).filter((l) => l.length > 0);
     const header = lines[0];
     if (header === undefined) continue;
     const parts = header.split('\x1f');
@@ -97,7 +100,7 @@ function burstCommitIndexes(commits: readonly CommitEvidence[]): ReadonlySet<num
     else arr.push(i);
   });
   for (const indexes of byAuthor.values()) {
-    const sorted = [...indexes].sort((a, b) => commits[a].timestamp - commits[b].timestamp);
+    const sorted = indexes.toSorted((a, b) => commits[a].timestamp - commits[b].timestamp);
     for (let i = 0; i < sorted.length; i++) {
       const start = sorted[i];
       let count = 1;
@@ -136,7 +139,7 @@ export function classifyStrength(evidence: readonly AiEvidence[]): AiStrength {
   if (evidence.some((e) => e.kind === 'user-tagged')) return 'strong'; // 唯一确定性信号
   const kinds = new Set(evidence.map((e) => e.kind));
   if (kinds.size >= 2) return 'strong'; // 多类证据一致
-  const kind = [...kinds][0];
+  const kind = kinds.values().next().value;
   if (kind === undefined) return 'uncertain';
   if (kind === 'commit-meta' || kind === 'tool-report') return 'suggestive';
   // 单一 style-signature 类：高置信特征 → suggestive；否则看弱特征组合

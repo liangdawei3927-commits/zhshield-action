@@ -71,7 +71,7 @@ function makeConfig(overrides?: Partial<ProcessMonitorConfig>): ProcessMonitorCo
 
 function latestProc(): MockChildProcess {
   const procs = getProcs();
-  return procs[procs.length - 1];
+  return procs.at(-1);
 }
 
 // ─── 测试 ──────────────────────────────────────────────
@@ -112,6 +112,12 @@ describe('ProcessMonitor — 进程监控', () => {
   it('3. start(): 获取进程 PID', () => {
     monitor.start(makeConfig());
     expect(monitor.getPid()).toBe(12345);
+  });
+
+  it('3b. start(): spawn 不启用 shell（shell:false，防命令注入）', () => {
+    monitor.start(makeConfig());
+    const opts = spawnSpy.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
+    expect(opts?.shell).toBe(false);
   });
 
   it('4. stop(): 停止后 isRunning 为 false', () => {

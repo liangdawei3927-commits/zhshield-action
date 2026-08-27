@@ -1,6 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { execFileSync, spawn } from 'child_process';
 import { EventCenter } from '../event-center';
 import { AutoFixer } from '../auto-fixer';
+
+vi.mock('child_process', () => ({
+  execFileSync: vi.fn(() => Buffer.from('')),
+  execSync: vi.fn(() => Buffer.from('')),
+  spawn: vi.fn(() => ({ unref: vi.fn() })),
+}));
+
+const mockedExecFileSync = vi.mocked(execFileSync);
+const mockedSpawn = vi.mocked(spawn);
 
 describe('AutoFixer', () => {
   let ec: EventCenter;
@@ -83,6 +93,83 @@ describe('AutoFixer', () => {
 
       const result = fixer.evaluateAndFix(event);
       expect(result).toBe(false);
+    });
+  });
+
+  describe('command injection 防护', () => {
+    beforeEach(() => {
+      mockedExecFileSync.mockClear();
+      mockedSpawn.mockClear();
+    });
+
+    it('restart-process：恶意进程名（含 shell 元字符）被拒绝，不 spawn', () => {
+      const event = ec.createEvent({ projectId: 'proj-1', title: 'Injection', dedupeKey: 'dk-inj-restart' });
+      fixer.start({
+        projectId: 'proj-1',
+        projectPath: '/tmp',
+        rules: [{
+          name: 'restart-evil',
+          eventFilter: () => true,
+          actions: [{ type: 'restart-process', params: { process: 'dev; rm -rf /' } }],
+        }],
+      });
+
+      const result = fixer.evaluateAndFix(event);
+      expect(result).toBe(false);
+      expect(mockedSpawn).not.toHaveBeenCalled();
+    });
+
+    it('run-script：含 shell 元字符的脚本被拒绝，不执行', () => {
+      const event = ec.createEvent({ projectId: 'proj-1', title: 'Injection', dedupeKey: 'dk-inj-script' });
+      fixer.start({
+        projectId: 'proj-1',
+        projectPath: '/tmp',
+        rules: [{
+          name: 'run-evil',
+          eventFilter: () => true,
+          actions: [{ type: 'run-script', params: { script: 'npm install; curl http://evil' } }],
+        }],
+      });
+
+      const result = fixer.evaluateAndFix(event);
+      expect(result).toBe(false);
+      expect(mockedExecFileSync).not.toHaveBeenCalled();
+    });
+
+    it('run-script：白名单命令正常执行（行为保持），参数不经 shell', () => {
+      const event = ec.createEvent({ projectId: 'proj-1', title: 'Safe', dedupeKey: 'dk-safe-script' });
+      fixer.start({
+        projectId: 'proj-1',
+        projectPath: '/tmp',
+        rules: [{
+          name: 'run-safe',
+          eventFilter: () => true,
+          actions: [{ type: 'run-script', params: { script: 'node --version' } }],
+        }],
+      });
+
+      const result = fixer.evaluateAndFix(event);
+      expect(result).toBe(true);
+      expect(mockedExecFileSync).toHaveBeenCalledWith('node', ['--version'], expect.objectContaining({ timeout: 30000 }));
+    });
+
+    it('restart-process：合法进程名正常 spawn，且不启用 shell', () => {
+      const event = ec.createEvent({ projectId: 'proj-1', title: 'Restart', dedupeKey: 'dk-safe-restart' });
+      fixer.start({
+        projectId: 'proj-1',
+        projectPath: '/tmp',
+        rules: [{
+          name: 'restart-safe',
+          eventFilter: () => true,
+          actions: [{ type: 'restart-process', params: { process: 'dev' } }],
+        }],
+      });
+
+      const result = fixer.evaluateAndFix(event);
+      expect(result).toBe(true);
+      expect(mockedSpawn).toHaveBeenCalledWith('npm', ['run', 'dev'], expect.objectContaining({ detached: true }));
+      const spawnOpts = mockedSpawn.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
+      expect(spawnOpts?.shell).not.toBe(true);
     });
   });
 });

@@ -102,7 +102,7 @@ export class ProcessMonitor {
       this.proc = spawn(cmd, args, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
+        shell: false,
       });
 
       this.attachProcessHandlers(cmd, this.proc.pid);

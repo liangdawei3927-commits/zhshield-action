@@ -11,6 +11,7 @@
  */
 import { PipelineRunner } from '@zh/pipeline';
 import { ConsoleReporter } from '@zh/reporter';
+import { augmentProcessPath } from '@zh/shared';
 
 function printUsage(): void {
   console.log(`
@@ -92,6 +93,8 @@ function parseArgs(argv: string[]): CLIOptions {
 }
 
 async function main(): Promise<void> {
+  augmentProcessPath();
+
   const opts = parseArgs(process.argv);
 
   if (opts.help || opts.command === 'help') {

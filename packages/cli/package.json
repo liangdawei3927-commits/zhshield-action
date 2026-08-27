@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@zh/pipeline": "workspace:*",
-    "@zh/reporter": "workspace:*"
+    "@zh/reporter": "workspace:*",
+    "@zh/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -9,14 +9,16 @@
 #   2) allowlist：paths.exclude 排除"非发布 / 测试 fixture / 受控补全器"等已知项，
 #      对应安全分诊报告中 12 个 P3 项，使 recurring 扫描基线收敛。
 #
-# ⚠️ 状态：report-only（severity: WARNING），尚未在 CI 用真实语料验证误报率。
-#   提升为阻断前，需在 CI 跑一次 semgrep 并据此收敛（见底部 tuning 说明）。
-#   当前本文件未被任何 SOP 规则引用（草稿态）；接入方式见底部。
+# 状态：report-only（severity: WARNING），已通过 SOP 规则
+#   src/sop/inspect/scan/security/path-traversal.yml 接入 inspect 引擎
+#   （toolConfig.config 指向 dist/assets/semgrep/path-traversal.yml）。
+#   提升为阻断前，需在 CI 跑一次 semgrep 统计误报率并据此收敛。
+#   注意：join(...)/resolve(...) 解构写法可能误报（如 Array.prototype.join），当前 report-only 可接受。
 
 rules:
   - id: detect-path-traversal
     message: >-
-      检测到 `path.join` / `path.resolve` 调用。若任一片段可能来自外部/不可信输入
+       检测到 `path.join` / `path.resolve` 调用（含解构写法 `import { join } from 'path'` 后的 `join(...)` / `resolve(...)`）。若任一片段可能来自外部/不可信输入
       （用户、HTTP 请求、文件名、仓库名、扫描目标等），存在路径穿越（CWE-22）风险。
       请改用 @zh/shared 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，
       二者在目标逃出 base 时会抛出 PathTraversalError。
@@ -38,6 +40,8 @@ rules:
       - pattern-either:
           - pattern: path.join(...)
           - pattern: path.resolve(...)
+          - pattern: join(...)
+          - pattern: resolve(...)
     paths:
       exclude:
         - "**/__tests__/**"
@@ -50,10 +54,10 @@ rules:
         - "packages/kernel/scripts/copy-sop-rules.cjs"
 
 # ───────────────────────────────────────────────────────────────────────────
-# 接入方式（草稿，待 CI 验证后启用）：
-#   在 SOP 规则中新增一项，复用 SemgrepAdapter，将 config 指向本文件，例如：
-#     inspect.scan.security.path-traversal:
-#       check.toolConfig.config: "packages/kernel/assets/semgrep/path-traversal.yml"
-#   先以 severity WARNING（report-only）运行若干次，统计误报；误报收敛后再考虑
-#   提升为 ERROR/阻断。本地开发机若无 semgrep，本规则不会被触发，不影响 pnpm lint/build。
+# 接入方式（已实现）：已新增 SOP 规则 src/sop/inspect/scan/security/path-traversal.yml，
+#   复用 SemgrepAdapter，toolConfig.config 指向
+#   node_modules/@zh/kernel/dist/assets/semgrep/path-traversal.yml（由 copy-sop-rules.cjs
+#   从本文件拷贝到 dist/assets/semgrep/）。先以 severity WARNING（report-only）运行，
+#   统计误报；误报收敛后再考虑提升为 ERROR/阻断。本地若无 semgrep 则本规则不触发，
+#   不影响 pnpm lint/build。
 # ───────────────────────────────────────────────────────────────────────────

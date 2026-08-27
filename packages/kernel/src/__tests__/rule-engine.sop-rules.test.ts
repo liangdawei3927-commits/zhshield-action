@@ -306,12 +306,12 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
     it('加载 guard/inspect/security/sentinel/evolve/refactor 六个领域规则', () => {
       const byDomain = (d: string) => registry.getActive().filter((r) => r.domain === d);
       expect(byDomain('guard').length).toBe(9);
-      expect(byDomain('inspect').length).toBe(23);
+      expect(byDomain('inspect').length).toBe(24);
       expect(byDomain('security').length).toBe(27);
       expect(byDomain('sentinel').length).toBe(6);
       expect(byDomain('evolve').length).toBe(9);
       expect(byDomain('refactor').length).toBe(14);
-      expect(registry.getActive().length).toBe(88);
+      expect(registry.getActive().length).toBe(89);
     });
   });
 });

@@ -160,6 +160,7 @@ export class SopRuleEngine {
       guardEngine: this.guardEngine,
       inspectEngine: this.inspectEngine,
       auditLogger: this.auditLogger,
+      eventBus: this.eventBus,
       get evalDepth() { return readEvalDepth(); },
     };
   }
@@ -209,8 +210,8 @@ export class SopRuleEngine {
       try {
         const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
         result.durationMs = Date.now() - evalStart;
-        // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值，阈值取 registry 原规则
-        result.blocking = computeBlocking(result.status, result.rule.severity, rule.blockingThreshold);
+        // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值（effectiveRule.severity），阈值取 registry 原规则
+        result.blocking = computeBlocking(result.status, effectiveRule.severity, rule.blockingThreshold);
         trackConsecutiveFailures(this.consecutiveFailures, rule.id, result.status);
         evaluations.push(result);
       } catch (err) {

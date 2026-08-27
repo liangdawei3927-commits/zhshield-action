@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventBus } from '../bus';
 
 describe('EventBus', () => {
@@ -63,5 +63,24 @@ describe('EventBus', () => {
     bus.removeAllListeners();
     expect(bus.listenerCount('a')).toBe(0);
     expect(bus.listenerCount('b')).toBe(0);
+  });
+
+  it('listener 抛错时日志注入防护：常量模板 + 事件名净化（剥离换行）', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      bus.on('evil\nevent', () => {
+        throw new Error('boom');
+      });
+      await bus.emit('evil\nevent', null);
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const [format, eventArg] = errorSpy.mock.calls[0] as [string, unknown];
+      expect(format).toBe('[EventBus] Error in listener for "%s":');
+      expect(String(eventArg)).not.toContain('\n');
+      expect(String(eventArg)).not.toContain('\r');
+      expect(String(eventArg)).toContain('evil event');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

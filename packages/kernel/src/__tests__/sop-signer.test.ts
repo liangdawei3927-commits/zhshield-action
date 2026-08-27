@@ -112,5 +112,12 @@ describe('SopSigner', () => {
       const tampered = { ...encrypted, authTag: '00'.repeat(16) };
       expect(() => SopSigner.decryptRules(tampered, 'fp', 'user-1')).toThrow();
     });
+
+    it('GCM 解密显式校验 16 字节 authTag：截断标签必须被拒绝', () => {
+      const encrypted = SopSigner.encryptRules(rules, 'fp', 'user-1');
+      // 将 authTag 截断为 8 字节（32 hex → 16 hex）：显式 authTagLength:16 下必须失败
+      const truncated = { ...encrypted, authTag: encrypted.authTag.slice(0, 16) };
+      expect(() => SopSigner.decryptRules(truncated, 'fp', 'user-1')).toThrow();
+    });
   });
 });

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
+import { sanitizeLogField } from '@zh/shared';
 import type {
   SopRule,
   SopServes,
@@ -205,7 +206,7 @@ export class SopLoader {
         console.warn(`[SopLoader] Rule file not found, skipped: ${filePath}`);
         return null;
       }
-      console.error(`[SopLoader] Failed to parse rule file: ${filePath}`, err);
+      console.error('[SopLoader] Failed to parse rule file: %s', sanitizeLogField(filePath), err);
       return null;
     }
   }

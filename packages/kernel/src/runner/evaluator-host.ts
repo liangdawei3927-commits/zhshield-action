@@ -1,4 +1,5 @@
 import type { ToolAdapter, AuditLogger } from '@zh/shared';
+import type { EventBus } from '../bus';
 
 /**
  * GuardEngine 的最小结构契约 — kernel 不反向依赖 @zh/guard，
@@ -36,5 +37,7 @@ export interface EngineHost {
   inspectEngine?: InspectEngineLike;
   /** 审计日志为副作用依赖：缺失或写入失败均不得影响扫描结果 */
   auditLogger?: AuditLogger;
+  /** EventBus — 用于 tool:executed 等事件发射；缺失或发射失败均不得影响扫描结果 */
+  eventBus?: EventBus;
   evalDepth: number;
 }

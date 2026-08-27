@@ -93,7 +93,7 @@ export class SopCacheMaintenance {
       return { before, after: before, removed: 0 };
     }
 
-    const sorted = [...rules].sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
+    const sorted = rules.toSorted((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
     const kept = this.cleanup.trimVersions(
       sorted.map((rule) => ({ version: rule.updatedAt.getTime(), rule })),
       this.config.maxEntries,

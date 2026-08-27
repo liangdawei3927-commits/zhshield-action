@@ -39,7 +39,7 @@ type SleepResult = 'done' | 'aborted';
 function sleep(ms: number, signal?: AbortSignal): Promise<SleepResult> {
   if (signal?.aborted) return Promise.resolve('aborted');
   return new Promise((resolve) => {
-    const timer = setTimeout(() => finish('done'), ms);
+    const timer = setTimeout(finish, ms, 'done');
     const onAbort = () => finish('aborted');
     function finish(result: SleepResult): void {
       clearTimeout(timer);

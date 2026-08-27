@@ -1,6 +1,7 @@
 name: Env File Exfiltration Detection
 description: 检测 .env 被纳入扫描集以及代码将环境变量外发（fetch/axios/curl 携带 env 值）
 severity: high
+blockingThreshold: high
 executionMode: async
 status: active
 source: internal

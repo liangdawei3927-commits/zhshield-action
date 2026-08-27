@@ -10,6 +10,8 @@ import { SyncConflictResolver, ConflictResolution } from '../sop/sync-conflict';
 import type { SopDiff, SopRule } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
 
+const MANUAL_RESOLUTION_RE = /manual resolution/;
+
 interface ConflictResolvedEvent {
   ruleId?: string;
   strategy?: string;
@@ -50,7 +52,7 @@ describe('SyncConflictResolver（SHA-256 内容哈希）', () => {
 
   it('GIVEN MANUAL 策略 WHEN resolve THEN 抛出需人工处理异常', () => {
     const conflict = resolver.detectConflict('r1', 1, 2, { v: 1 }, { v: 2 })!;
-    expect(() => resolver.resolve(conflict, ConflictResolution.MANUAL)).toThrow(/manual resolution/);
+    expect(() => resolver.resolve(conflict, ConflictResolution.MANUAL)).toThrow(MANUAL_RESOLUTION_RE);
   });
 });
 
@@ -160,7 +162,7 @@ describe('SopCacheManager 冲突解决接入（syncFromCloud/applyDiff 共用链
     const incoming = makeRule({ id: 'guard.manual', severity: 'critical' });
     createManager(ConflictResolution.MANUAL, [local]);
 
-    await expect(manager.applyDiff(makeDiff([incoming]))).rejects.toThrow(/manual resolution/);
+    await expect(manager.applyDiff(makeDiff([incoming]))).rejects.toThrow(MANUAL_RESOLUTION_RE);
   });
 
   it('GIVEN 紧急推送与本地规则冲突 WHEN emergencyUpdate THEN 同样走冲突解决策略', async () => {

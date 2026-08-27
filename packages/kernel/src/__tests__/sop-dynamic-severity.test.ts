@@ -6,6 +6,12 @@ import * as path from 'node:path';
 import { SopLoader } from '../sop/_meta/sop-loader';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 
+const GUARD_SCAN_OFFICIAL_DYN_EQUAL_RE = /guard\.scan\.official\.dyn-equal/;
+const T_META_BAD_RE = /t\.meta-bad/;
+const DYN_THRESHOLD_RE = /dyn-threshold.*blockingThreshold/s;
+const DYN_ESCALATE_RE = /dyn-escalate.*escalateTo/s;
+const THRESHOLD_RE = /threshold/;
+
 /** 真实 SOP 规则目录（F1-5：全部存量 YAML 必须零错误加载） */
 const SOP_RULES_DIR = path.resolve(__dirname, '../sop');
 
@@ -132,7 +138,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
       ['severity: high', 'accumulate:', '  escalateTo: high'].join('\n'),
     );
 
-    await expect(loadRoot(root)).rejects.toThrow(/guard\.scan\.official\.dyn-equal/);
+    await expect(loadRoot(root)).rejects.toThrow(GUARD_SCAN_OFFICIAL_DYN_EQUAL_RE);
   });
 
   it('escalateTo 低于静态 severity 时加载失败（meta schema 按 judgment.priority 判定）', async () => {
@@ -150,7 +156,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
       ].join('\n'),
     );
 
-    await expect(loadRoot(root)).rejects.toThrow(/t\.meta-bad/);
+    await expect(loadRoot(root)).rejects.toThrow(T_META_BAD_RE);
   });
 
   // ─── 校验：非法 Severity 值 → 抛错含规则 id ─────────────
@@ -162,7 +168,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
       ['severity: low', 'blockingThreshold: fatal'].join('\n'),
     );
 
-    await expect(loadRoot(root)).rejects.toThrow(/dyn-threshold.*blockingThreshold/s);
+    await expect(loadRoot(root)).rejects.toThrow(DYN_THRESHOLD_RE);
   });
 
   it('escalateTo 非法值时加载失败，错误信息含规则 id', async () => {
@@ -173,7 +179,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
       ['severity: low', 'accumulationPolicy:', '  escalateTo: fatal'].join('\n'),
     );
 
-    await expect(loadRoot(root)).rejects.toThrow(/dyn-escalate.*escalateTo/s);
+    await expect(loadRoot(root)).rejects.toThrow(DYN_ESCALATE_RE);
   });
 
   it('threshold 为非正整数时加载失败', async () => {
@@ -184,7 +190,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
       ['severity: low', 'accumulationPolicy:', '  threshold: 0', '  escalateTo: high'].join('\n'),
     );
 
-    await expect(loadRoot(root)).rejects.toThrow(/threshold/);
+    await expect(loadRoot(root)).rejects.toThrow(THRESHOLD_RE);
   });
 
   // ─── 未知 accumulate 键：warn 告知而非静默忽略 ──────────

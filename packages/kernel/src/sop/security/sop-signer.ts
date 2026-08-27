@@ -207,6 +207,7 @@ export class SopSigner {
       'aes-256-gcm',
       key,
       Buffer.from(data.iv, 'hex'),
+      { authTagLength: 16 },
     );
     decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
 

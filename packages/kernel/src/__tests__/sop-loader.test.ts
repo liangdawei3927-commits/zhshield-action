@@ -127,7 +127,9 @@ describe('SopLoader 异常控制流（not-found 与真实失败的区分）', ()
     expect(loaded).toBe(1);
     expect(registry.get('t.good')).toBeDefined();
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(String(errorSpy.mock.calls[0]?.[0])).toContain('broken.yml');
+    // 日志注入防护：格式串为常量模板，文件路径作为净化后的参数传入
+    expect(String(errorSpy.mock.calls[0]?.[0])).toBe('[SopLoader] Failed to parse rule file: %s');
+    expect(String(errorSpy.mock.calls[0]?.[1])).toContain('broken.yml');
   });
 
   it('YAML 顶层为标量：warn 跳过而非静默吞掉', async () => {

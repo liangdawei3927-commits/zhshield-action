@@ -10,6 +10,8 @@ import { SopRegistry } from '../sop/_meta/sop-registry';
 import type { SopDiff, SopRule } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
 
+const UNKNOWN_STRATEGY_RE = /Unknown compression strategy/;
+
 class SpyCompressor extends SmartCompressor {
   compressCalls = 0;
 
@@ -66,7 +68,7 @@ describe('SmartCompressor（策略选择 API）', () => {
   it('GIVEN 未知策略标记 WHEN decompress THEN 抛出异常', () => {
     expect(() =>
       compressor.decompress({ strategy: 'nope', originalSize: 1, compressedSize: 1, data: '{}' }),
-    ).toThrow(/Unknown compression strategy/);
+    ).toThrow(UNKNOWN_STRATEGY_RE);
   });
 });
 

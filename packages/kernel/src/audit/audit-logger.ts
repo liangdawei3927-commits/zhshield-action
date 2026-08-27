@@ -44,7 +44,7 @@ export class AuditLogger {
    */
   async log(action: string, userId: string, details: Record<string, unknown>): Promise<AuditEntry> {
     const entries = await this.loadAllEntries();
-    const last = entries[entries.length - 1];
+    const last = entries.at(-1);
     if (
       last !== undefined &&
       last.action === action &&
@@ -154,7 +154,7 @@ export class AuditLogger {
 
   private async getLastHash(): Promise<string> {
     const entries = await this.loadAllEntries();
-    return entries.length > 0 ? entries[entries.length - 1]!.hash : '';
+    return entries.length > 0 ? entries.at(-1)!.hash : '';
   }
 
   private async appendEntry(entry: AuditEntry): Promise<void> {
@@ -175,7 +175,7 @@ export class AuditLogger {
 
     if (files.length === 0) return join(this.logDir, 'audit-001.jsonl');
 
-    const lastFile = join(this.logDir, files[files.length - 1]!);
+    const lastFile = join(this.logDir, files.at(-1)!);
     const stats = statSync(lastFile);
 
     if (stats.size >= this.maxFileSize) {

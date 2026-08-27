@@ -9,6 +9,35 @@ import type { Violation } from '../sop/_meta/rule-evaluation';
 /** 跳过的大文件阈值 (1MB) */
 const MAX_FILE_SIZE = 1_048_576;
 
+/** 正则模式最大长度（防超长输入撑爆回溯） */
+const MAX_PATTERN_LENGTH = 512;
+
+/** 层名安全字符集：仅允许目录名常见字符（字母/数字/连字符/下划线/点） */
+const SAFE_LAYER_NAME_RE = /^[a-zA-Z0-9._-]{1,64}$/;
+
+/** 转义正则特殊字符（层名来自配置，按不可信输入处理） */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * 正则模式安全校验：拒绝可能导致灾难性回溯（ReDoS）的模式。
+ * 仅允许长度受限、括号配对、且不含「含量词分组后紧跟量词」
+ * （(a+)+ / (a*)* / (a?)* 等经典灾难性回溯形态）的模式。
+ */
+export function isSafeRegexPattern(pattern: string): boolean {
+  if (pattern.length > MAX_PATTERN_LENGTH) return false;
+  const stripped = pattern.replace(/\\[^]/g, '').replace(/\[[^\]]*\]/g, 'X');
+  if (/\([^()]*[+*?{][^()]*\)[+*?{]/.test(stripped)) return false;
+  let depth = 0;
+  for (const c of stripped) {
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+
 /**
  * 解析待扫描的文件列表
  */
@@ -71,6 +100,7 @@ export function scanPatternsInFile(content: string, relativePath: string, rule: 
   for (const patternStr of patterns) {
     let regex: RegExp;
     try {
+      if (!isSafeRegexPattern(patternStr)) continue;
       regex = new RegExp(patternStr, 'g');
     } catch {
       // 正则无效则跳过
@@ -130,7 +160,8 @@ export function scanForbiddenInFile(content: string, relativePath: string, rule:
 export function detectLayer(filePath: string, layers: Array<{ name: string; allowedDependencies: string[] }>): string | null {
   const normalized = filePath.replace(/\\/g, '/');
   for (const layer of layers) {
-    if (new RegExp(`/${layer.name}/`, 'i').test(normalized)) {
+    if (!SAFE_LAYER_NAME_RE.test(layer.name)) continue;
+    if (new RegExp(`/${escapeRegExp(layer.name)}/`, 'i').test(normalized)) {
       return layer.name;
     }
   }

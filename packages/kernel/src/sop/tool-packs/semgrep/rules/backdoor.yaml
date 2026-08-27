@@ -107,6 +107,7 @@ rules:
     pattern-regex: '(?i)(?:\/\/|#|\/\*|<!--)[^\n]*(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?|disregard\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|rules)|system\s+prompt|you\s+are\s+now\s+(?:a|an|the)\s+)'
     message: "AI-prompt-style instruction embedded in comment (prompt injection)"
     severity: WARNING
+    blockingThreshold: WARNING
     languages: [generic]
     metadata:
       category: security
@@ -116,6 +117,7 @@ rules:
     pattern-regex: '"[^"]+"\s*:\s*"[^"]*(?:\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b|\bbase64\s+(?:-d|-D|--decode)\b|\beval\b|\brm\s+-rf\b)[^"]*"'
     message: "Suspicious shell command in package.json script (remote pipe/decode/eval/force-delete)"
     severity: ERROR
+    blockingThreshold: ERROR
     languages: [json]
     metadata:
       category: security
@@ -125,6 +127,7 @@ rules:
     pattern-regex: '(?i)(?:(?:fetch|axios)\s*\([^)]*(?:process\.env\.|\.env\b)|(?:curl|wget)\b[^;&|]*--data[^;&|]*@\.env)'
     message: "Environment values sent to outbound request (.env exfiltration)"
     severity: ERROR
+    blockingThreshold: ERROR
     languages: [generic]
     metadata:
       category: security
@@ -134,6 +137,7 @@ rules:
     pattern-regex: '(?i)<a\s[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px)?\s*[;''"])[^>]*>|\[[^\]]*\]\([^)]*[\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}][^)]*\)'
     message: "Hidden or misleading link in markdown (invisible anchor / zero-width link target)"
     severity: WARNING
+    blockingThreshold: WARNING
     languages: [generic]
     metadata:
       category: security

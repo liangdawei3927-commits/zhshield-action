@@ -1,3 +1,5 @@
+import { sanitizeLogField } from '@zh/shared';
+
 type EventCallback<T = unknown> = (payload: T) => void | Promise<void>;
 
 interface EventEntry {
@@ -44,7 +46,7 @@ export class EventBus {
       try {
         await entry.callback(payload);
       } catch (err) {
-        console.error(`[EventBus] Error in listener for "${event}":`, err);
+        console.error('[EventBus] Error in listener for "%s":', sanitizeLogField(event), err);
       }
       if (entry.once) toRemove.push(entry);
     }

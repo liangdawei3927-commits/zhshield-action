@@ -8,6 +8,8 @@ import type { SopRegistry } from '../sop/_meta/sop-registry';
 import type { SopRule, ProjectFeature } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
 
+const DB_EXT_RE = /\.db$/;
+
 function makeRegistryMock(rules: SopRule[]): SopRegistry {
   return { getAll: () => rules } as unknown as SopRegistry;
 }
@@ -190,7 +192,7 @@ function getLoadedModules(cacheDir: string): string[] {
     return fs
       .readdirSync(modulesDir)
       .filter((f) => f.endsWith('.db'))
-      .map((f) => f.replace(/\.db$/, ''));
+      .map((f) => f.replace(DB_EXT_RE, ''));
   } catch {
     return [];
   }

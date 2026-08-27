@@ -167,6 +167,11 @@ export async function evalToolDispatch(
     return skippedResult(rule, `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`, targetEngineOf(rule));
   }
 
+  // 防御性检查：适配器接口不完整（如 guard 旧 Adapter 缺少 isAvailable/scan）时跳过，而非崩溃
+  if (typeof adapter.isAvailable !== 'function' || typeof adapter.scan !== 'function') {
+    return skippedResult(rule, `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`, targetEngineOf(rule));
+  }
+
   const available = await adapter.isAvailable();
   if (!available) {
     return skippedResult(rule, `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`, targetEngineOf(rule));
@@ -196,6 +201,16 @@ async function runToolScan(
     });
 
     await logToolExecutionAudit(host.auditLogger, adapter.meta.id, result, context.repoRoot);
+
+    void host.eventBus?.emit('tool:executed', {
+      tool: adapter.meta.id,
+      status: result.status,
+      duration: result.metadata.duration,
+      issueCount: result.issues.length,
+      projectId: context.repoRoot,
+      sopRuleId: rule.id,
+      timestamp: new Date(),
+    });
 
     const violations = toolScanViolations(result, rule);
     const status = result.status === 'available' && result.issues.length === 0 ? 'passed'

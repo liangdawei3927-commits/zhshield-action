@@ -99,11 +99,11 @@ const NAV_ICON_CONTENT: Record<string, ReactNode> = {
       <path d="M10 20h2a5 5 0 005-5v-2" />
     </>
   ),
-  backup: ( // 备份中心：云下载
+  backup: ( // 备份中心：历史快照（时钟 + 回滚箭头，对应本地快照与恢复能力）
     <>
-      <path d="M18 16a4 4 0 000-8 5 5 0 00-9-2 5 5 0 00-9 2 4 4 0 000 8" />
-      <path d="M12 12v7" />
-      <path d="M9 16l3 3 3-3" />
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 4" />
     </>
   ),
   folder: ( // 打开备份文件夹：文件夹

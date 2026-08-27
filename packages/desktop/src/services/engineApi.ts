@@ -121,6 +121,7 @@ export async function listGuardReports(projectPath: string, limit = 20): Promise
 }
 
 const DEFAULT_GUARD_CONFIG: GuardConfig = {
+  enabled: true,
   preCommit: true,
   prePush: true,
   blockOnCritical: true,
@@ -411,11 +412,27 @@ export async function getSentinelEvents(options?: { status?: string; severity?: 
   return api.sentinel.getEvents(options);
 }
 
-export async function startSentinelMonitoring(projectPath: string): Promise<{ ok: boolean; started: string[] }> {
+export async function startSentinelMonitoring(projectPath: string): Promise<{ ok: boolean; started: string[]; disabled?: boolean }> {
   if (isHttpMode()) return startSentinelViaHttp(projectPath);
   const api = getAPI();
   if (!api?.sentinel) return { ok: false, started: [] };
   return api.sentinel.startMonitoring(projectPath, projectPath);
+}
+
+export async function getSentinelState(): Promise<{ enabled: boolean }> {
+  const api = getAPI();
+  if (!api?.sentinel) return { enabled: true };
+  try {
+    return await api.sentinel.getState();
+  } catch {
+    return { enabled: true };
+  }
+}
+
+export async function setSentinelEnabled(enabled: boolean): Promise<{ ok: boolean }> {
+  const api = getAPI();
+  if (!api?.sentinel) return { ok: false };
+  return api.sentinel.setEnabled(enabled);
 }
 
 // ─── Evolve 演进引擎 ──────────────────────────────────────

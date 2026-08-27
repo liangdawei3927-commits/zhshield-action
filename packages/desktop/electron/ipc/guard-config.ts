@@ -1,14 +1,17 @@
 import { ipcMain, app } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
+import fsAsync from 'node:fs/promises';
 
-interface GuardConfig {
+export interface GuardConfig {
+  readonly enabled: boolean;
   readonly preCommit: boolean;
   readonly prePush: boolean;
   readonly blockOnCritical: boolean;
 }
 
-const DEFAULT_CONFIG: GuardConfig = {
+export const DEFAULT_CONFIG: GuardConfig = {
+  enabled: true,
   preCommit: true,
   prePush: true,
   blockOnCritical: true,
@@ -21,14 +24,15 @@ function getConfigPath(): string {
 }
 
 async function ensureDir(): Promise<void> {
-  await fs.mkdir(app.getPath('userData'), { recursive: true });
+  await fsAsync.mkdir(app.getPath('userData'), { recursive: true });
 }
 
-async function readConfig(): Promise<GuardConfig> {
+export async function readConfig(): Promise<GuardConfig> {
   try {
-    const data = await fs.readFile(getConfigPath(), 'utf-8');
+    const data = await fsAsync.readFile(getConfigPath(), 'utf-8');
     const parsed = JSON.parse(data) as Partial<GuardConfig>;
     return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_CONFIG.enabled,
       preCommit: typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
       prePush: typeof parsed.prePush === 'boolean' ? parsed.prePush : DEFAULT_CONFIG.prePush,
       blockOnCritical: typeof parsed.blockOnCritical === 'boolean' ? parsed.blockOnCritical : DEFAULT_CONFIG.blockOnCritical,
@@ -40,7 +44,23 @@ async function readConfig(): Promise<GuardConfig> {
 
 async function writeConfig(config: GuardConfig): Promise<void> {
   await ensureDir();
-  await fs.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+  await fsAsync.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+}
+
+/** 同步读取门禁配置（供流水线子进程等无法使用 IPC 的场景调用） */
+export function readGuardConfigFile(): GuardConfig {
+  try {
+    const data = fs.readFileSync(getConfigPath(), 'utf-8');
+    const parsed = JSON.parse(data) as Partial<GuardConfig>;
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_CONFIG.enabled,
+      preCommit: typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
+      prePush: typeof parsed.prePush === 'boolean' ? parsed.prePush : DEFAULT_CONFIG.prePush,
+      blockOnCritical: typeof parsed.blockOnCritical === 'boolean' ? parsed.blockOnCritical : DEFAULT_CONFIG.blockOnCritical,
+    };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
 }
 
 export function registerGuardConfigIpc(): void {

@@ -82,6 +82,12 @@ function App() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
+    gateEnabled,
+    setGateEnabled,
+    gateLoading,
+    sentinelEnabled,
+    setSentinelEnabledState,
+    sentinelLoading,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,
@@ -135,6 +141,12 @@ function App() {
             onOpenSettings={() => setSidebarOpen((v) => !v)}
             projectName={activeProject?.name}
             sidebarOpen={sidebarOpen}
+            gateEnabled={gateEnabled}
+            onToggleGate={setGateEnabled}
+            gateLoading={gateLoading}
+            sentinelEnabled={sentinelEnabled}
+            onToggleSentinel={setSentinelEnabledState}
+            sentinelLoading={sentinelLoading}
           />
           <main className="flex-1 overflow-auto bg-zh-bg">
             <PageView {...viewProps} />

@@ -1,5 +1,7 @@
 import type { HealthScoreData, ModuleProfileData } from '../types/electron';
 
+const PATH_SEP_RE = /[\\/]/;
+
 /** 模块级评分视图（供报告页渲染；score 为 null 表示该模块暂无评分） */
 export interface ModuleScoreView {
   path: string;
@@ -22,7 +24,7 @@ export async function collectModuleScores(
       const s = await getScore(m.path);
       return {
         path: m.path,
-        name: m.path.split(/[\\/]/).pop() || m.path,
+        name: m.path.split(PATH_SEP_RE).pop() || m.path,
         type: m.type,
         score: s?.score ?? null,
         summary: s?.summary ?? null,

@@ -31,7 +31,7 @@ initI18n({ lng: resolveLanguage(process.env.LNG ?? null, null).value });
 async function runPipeline(
   id: string,
   projectPath: string,
-  options?: { dryRun?: boolean; sop?: boolean },
+  options?: { dryRun?: boolean; sop?: boolean; guardEnabled?: boolean },
 ): Promise<void> {
   const { PipelineRunner } = await import('@zh/pipeline');
   const runner = new PipelineRunner(projectPath);
@@ -41,10 +41,12 @@ async function runPipeline(
     progress(id, 'sop', '加载体检规则…', 0.05);
     await runner.loadSopRules();
 
+    const guardEnabled = opts.guardEnabled !== false;
+
     if (opts.sop) {
-      await runSopJob(id, runner, opts.dryRun);
+      await runSopJob(id, runner, opts.dryRun, guardEnabled);
     } else {
-      await runFullPipelineJob(id, runner, opts.dryRun);
+      await runFullPipelineJob(id, runner, opts.dryRun, guardEnabled);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

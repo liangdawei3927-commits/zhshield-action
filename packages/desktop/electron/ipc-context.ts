@@ -120,9 +120,10 @@ export interface SentinelRuntime {
 let sentinelRuntime: SentinelRuntime | null = null;
 export async function getSentinel(): Promise<SentinelRuntime> {
   if (sentinelRuntime) return sentinelRuntime;
-  const { EventCenter, FileMonitor, LogCollector, ProcessMonitor } = await import('@zh/sentinel');
+  const { EventCenter, FileMonitor, LogCollector, ProcessMonitor, subscribeScopeViolations } = await import('@zh/sentinel');
   const eventCenter = new EventCenter();
   if (db) eventCenter.setDb(db);
+  subscribeScopeViolations(eventBus, eventCenter);
   sentinelRuntime = {
     eventCenter,
     fileMonitor: new FileMonitor(eventCenter),
@@ -132,13 +133,18 @@ export async function getSentinel(): Promise<SentinelRuntime> {
   return sentinelRuntime;
 }
 
-/** 退出前停止哨兵监控（存在才停止） */
-export function shutdownSentinel(): void {
+/** 停止所有哨兵监控实例（文件监控 / 日志采集 / 进程监控） */
+export function stopAllMonitoring(): void {
   if (sentinelRuntime) {
     sentinelRuntime.fileMonitor.stop();
     sentinelRuntime.logCollector.stop();
     sentinelRuntime.processMonitor.stop();
   }
+}
+
+/** 退出前停止哨兵监控（行为与 stopAllMonitoring 一致） */
+export function shutdownSentinel(): void {
+  stopAllMonitoring();
 }
 
 let evolveEngine: import('@zh/evolve').EvolveEngine | null = null;

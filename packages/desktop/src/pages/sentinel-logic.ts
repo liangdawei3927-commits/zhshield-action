@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getSentinelEvents, startSentinelMonitoring, type FalsePositiveFeedbackItem } from '../services/engineApi';
+import { getSentinelEvents, startSentinelMonitoring, getSentinelState, type FalsePositiveFeedbackItem } from '../services/engineApi';
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { AiFixIssue } from '../utils/copyToAi';
 
@@ -121,6 +121,10 @@ function useSentinelMonitoring(
 
   const startMonitoring = useCallback(async () => {
     const result = await startSentinelMonitoring(projectPath);
+    if (result.disabled) {
+      setMonitoring(false);
+      return;
+    }
     if (result.ok) {
       setMonitoring(true);
       await refreshEvents();
@@ -128,7 +132,15 @@ function useSentinelMonitoring(
   }, [projectPath, refreshEvents]);
 
   useEffect(() => {
-    void startMonitoring();
+    let cancelled = false;
+    getSentinelState().then((state) => {
+      if (!cancelled && state.enabled) {
+        void startMonitoring();
+      }
+    }).catch(() => {
+      if (!cancelled) void startMonitoring();
+    });
+    return () => { cancelled = true; };
   }, [startMonitoring]);
 
   return { monitoring, startMonitoring };

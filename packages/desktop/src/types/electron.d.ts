@@ -432,7 +432,9 @@ export interface SyncAPI {
 export interface SentinelAPI {
   getEvents: (options?: { status?: string; severity?: string }) => Promise<SentinelEvent[]>;
   getEvent: (id: string) => Promise<SentinelEvent | undefined>;
-  startMonitoring: (projectId: string, projectPath: string) => Promise<{ ok: boolean; started: string[]; skipped: string[] }>;
+  startMonitoring: (projectId: string, projectPath: string) => Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }>;
+  getState: () => Promise<{ enabled: boolean }>;
+  setEnabled: (enabled: boolean) => Promise<{ ok: boolean }>;
 }
 
 export interface SuggestionData {
@@ -648,6 +650,7 @@ export interface FeedbackAPI {
 
 /** 门禁配置（持久化到 .zhshield/guard-config.json） */
 export interface GuardConfig {
+  readonly enabled: boolean;
   readonly preCommit: boolean;
   readonly prePush: boolean;
   readonly blockOnCritical: boolean;

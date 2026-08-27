@@ -1,3 +1,7 @@
+// PATH 补全必须在所有 import 之前执行，确保后续模块和子进程继承完整路径
+import { augmentProcessPath } from './env';
+augmentProcessPath();
+
 import { app, BrowserWindow, ipcMain, dialog, shell, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -232,7 +236,12 @@ ipcMain.on('i18n:set-language', (_event, lng: string) => {
   getMainWindow()?.webContents.send('i18n:language-changed', lng);
 });
 
-/** 外部扫描 CLI 可用性（桌面降级提示） */
+/**
+ * 外部扫描 CLI 可用性（桌面降级提示）。
+ * PATH 补全已在进程启动早期通过 augmentProcessPath() 完成，
+ * 覆盖 nvm、Homebrew、~/.local/bin 及 workspace node_modules/.bin，
+ * 此处 execFile 探测可直接命中这些目录下的工具。
+ */
 ipcMain.handle('tools:availability', async (): Promise<Array<{ id: string; available: boolean }>> => {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');

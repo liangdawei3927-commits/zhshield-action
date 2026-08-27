@@ -436,7 +436,7 @@ export function TechDebtActionsCard({
   verifyLoading?: string | null;
 }) {
   const t = useT();
-  const sorted = [...actions].sort((a, b) => b.roi - a.roi);
+  const sorted = actions.toSorted((a, b) => b.roi - a.roi);
   return (
     <ResultCard variant="score">
       <SectionTitle

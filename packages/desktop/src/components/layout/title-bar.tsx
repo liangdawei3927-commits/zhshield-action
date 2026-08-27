@@ -8,10 +8,16 @@ interface TitleBarProps {
   sidebarOpen?: boolean;
   currentPage?: string;
   onNavigate?: (page: string) => void;
+  gateEnabled?: boolean | null;
+  onToggleGate?: (enabled: boolean) => void;
+  gateLoading?: boolean;
+  sentinelEnabled?: boolean | null;
+  onToggleSentinel?: (enabled: boolean) => void;
+  sentinelLoading?: boolean;
 }
 
 /** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，备份中心+侧边栏开关居右 */
-export function TitleBar({ onOpenSettings, projectName, sidebarOpen, currentPage, onNavigate }: TitleBarProps) {
+export function TitleBar({ onOpenSettings, projectName, sidebarOpen, currentPage, onNavigate, gateEnabled, onToggleGate, gateLoading, sentinelEnabled, onToggleSentinel, sentinelLoading }: TitleBarProps) {
   const maximized = useMacOSTrafficLightInset();
   const t = useT();
 
@@ -46,8 +52,38 @@ export function TitleBar({ onOpenSettings, projectName, sidebarOpen, currentPage
         )}
       </div>
 
-      {/* 右：备份中心入口 + 侧边栏按钮（折叠图标：关闭时箭头朝左=展开，展开时箭头朝右=收回） */}
+      {/* 右：门禁/哨兵开关 + 备份中心入口 + 侧边栏按钮 */}
       <div className="flex items-center gap-2 pr-3" style={{ WebkitAppRegion: 'no-drag' as const }}>
+        {onToggleGate && (
+          <button
+            type="button"
+            onClick={() => onToggleGate(gateEnabled === false)}
+            disabled={gateLoading}
+            className={`flex items-center gap-1 px-2 h-6 rounded-full border-none cursor-pointer transition-colors text-xs ${
+              gateLoading ? 'opacity-50 cursor-not-allowed' : ''
+            } ${gateEnabled !== false ? 'bg-white/25' : 'bg-white/10'}`}
+            title={t('layout.toggleGate')}
+            style={{ color: 'rgb(var(--zh-text-on-brand))' }}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${gateEnabled !== false ? 'bg-green-300' : 'bg-white/40'}`} />
+            {t('layout.toggleGateLabel')}
+          </button>
+        )}
+        {onToggleSentinel && (
+          <button
+            type="button"
+            onClick={() => onToggleSentinel(sentinelEnabled === false)}
+            disabled={sentinelLoading}
+            className={`flex items-center gap-1 px-2 h-6 rounded-full border-none cursor-pointer transition-colors text-xs ${
+              sentinelLoading ? 'opacity-50 cursor-not-allowed' : ''
+            } ${sentinelEnabled !== false ? 'bg-white/25' : 'bg-white/10'}`}
+            title={t('layout.toggleSentinel')}
+            style={{ color: 'rgb(var(--zh-text-on-brand))' }}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${sentinelEnabled !== false ? 'bg-green-300' : 'bg-white/40'}`} />
+            {t('layout.toggleSentinelLabel')}
+          </button>
+        )}
         <button
           onClick={() => onNavigate?.('backup')}
           className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"

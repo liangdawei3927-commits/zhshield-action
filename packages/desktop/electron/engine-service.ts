@@ -9,6 +9,7 @@ import type { InspectionReport } from '@zh/inspect';
 import { SecurityEngine } from '@zh/security';
 import type { SecurityScanReport } from '@zh/security';
 import { EventBus } from '@zh/kernel';
+import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 
 export class EngineService {
   private db: ReturnType<DbConnection['connect']> | null = null;
@@ -18,6 +19,7 @@ export class EngineService {
   private inspect: InspectEngine | null = null;
   private security: SecurityEngine | null = null;
   private eventBus: EventBus | null = null;
+  private eventCenter: EventCenter | null = null;
 
   async init(): Promise<void> {
     const dbPath = path.join(app.getPath('userData'), 'zh-codeshield.db');
@@ -27,6 +29,8 @@ export class EngineService {
 
     this.db = db;
     this.eventBus = new EventBus();
+    this.eventCenter = new EventCenter();
+    subscribeScopeViolations(this.eventBus, this.eventCenter);
     this.scoring = new ScoringEngine(db);
     this.guard = new GuardEngine(process.cwd(), undefined, {
       emit: (event) => this.eventBus!.emit(event.type, event.payload),

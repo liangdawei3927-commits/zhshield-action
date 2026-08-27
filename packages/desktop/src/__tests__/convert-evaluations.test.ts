@@ -72,15 +72,42 @@ describe('convertInspectEvaluations', () => {
 });
 
 describe('convertGuardEvaluations', () => {
-  it('passed 不计入失败/阻塞，skipped 映射为 warning', () => {
+  it('passed 不计入失败/阻塞', () => {
     const evals = [
       { status: 'passed', rule: { severity: 'high' } },
       { status: 'failed', rule: { severity: 'critical' } },
-      { status: 'skipped', rule: { severity: 'medium' } },
     ];
     const out = convertGuardEvaluations(evals);
+    expect(out).toHaveLength(2);
     expect(out[0]).toEqual({ severity: 'error', status: 'passed', blocking: false });
     expect(out[1]).toEqual({ severity: 'error', status: 'failed', blocking: true });
-    expect(out[2]).toEqual({ severity: 'warning', status: 'warning', blocking: false });
+  });
+
+  it('skipped 评估被过滤，不产生输出条目（工具未安装不应扣分）', () => {
+    const evals = [
+      { status: 'passed', rule: { severity: 'high' } },
+      { status: 'skipped', rule: { severity: 'medium' } },
+      { status: 'skipped', rule: { severity: 'critical' } },
+    ];
+    const out = convertGuardEvaluations(evals);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ severity: 'error', status: 'passed', blocking: false });
+  });
+
+  it('全 skipped 输入返回空数组', () => {
+    const evals = [
+      { status: 'skipped', rule: { severity: 'high' } },
+      { status: 'skipped', rule: { severity: 'medium' } },
+    ];
+    expect(convertGuardEvaluations(evals)).toEqual([]);
+  });
+
+  it('error 状态保留并映射', () => {
+    const evals = [
+      { status: 'error', rule: { severity: 'low' } },
+    ];
+    const out = convertGuardEvaluations(evals);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ severity: 'info', status: 'error', blocking: false });
   });
 });

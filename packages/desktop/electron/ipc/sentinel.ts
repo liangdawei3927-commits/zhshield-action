@@ -5,15 +5,61 @@
  * 监控启动为幂等操作：同一项目重复调用不重复启动（避免多轮 ProcessMonitor 双跑）。
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
+import path from 'node:path';
 import fs from 'node:fs';
 
 import type { SentinelEvent, EventStatus, EventSeverity } from '@zh/sentinel';
 import { detectRunCommand, discoverLogPaths, defaultFileWatchFilter, DEFAULT_IGNORE_DIRS } from '@zh/sentinel';
-import { getSentinel, type SentinelRuntime } from '../ipc-context';
+import { getSentinel, stopAllMonitoring, type SentinelRuntime } from '../ipc-context';
+
+const STATE_FILE = 'sentinel-state.json';
+
+interface SentinelState {
+  enabled: boolean;
+}
+
+const DEFAULT_STATE: SentinelState = { enabled: true };
+
+function getStatePath(): string {
+  return path.join(app.getPath('userData'), STATE_FILE);
+}
+
+function readStateSync(): SentinelState {
+  try {
+    const data = fs.readFileSync(getStatePath(), 'utf-8');
+    const parsed = JSON.parse(data) as Partial<SentinelState>;
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_STATE.enabled,
+    };
+  } catch {
+    return DEFAULT_STATE;
+  }
+}
+
+function writeStateSync(state: SentinelState): void {
+  try {
+    const dir = app.getPath('userData');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(getStatePath(), JSON.stringify(state, null, 2), 'utf-8');
+  } catch { /* best-effort persistence */ }
+}
 
 // 已启动监控的项目（幂等保护：重复 startMonitoring 不重复启动进程/日志监听）
 const monitoredProjects = new Set<string>();
+
+function registerStateIpc(): void {
+  ipcMain.handle('sentinel:getState', (): SentinelState => readStateSync());
+
+  ipcMain.handle('sentinel:setEnabled', (_event, enabled: boolean): { ok: boolean } => {
+    writeStateSync({ enabled });
+    if (!enabled) {
+      stopAllMonitoring();
+      monitoredProjects.clear();
+    }
+    return { ok: true };
+  });
+}
 
 /** 启动文件监控：项目目录存在时挂载哨兵，返回启动/跳过说明 */
 function startFileMonitoring(fileMonitor: SentinelRuntime['fileMonitor'], projectId: string, projectPath: string): string[] {
@@ -67,7 +113,12 @@ function registerEventQuery(): void {
 function registerMonitoringStart(): void {
   ipcMain.handle(
     'sentinel:startMonitoring',
-    async (_event, projectId: string, projectPath: string): Promise<{ ok: boolean; started: string[]; skipped: string[] }> => {
+    async (_event, projectId: string, projectPath: string): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> => {
+      const state = readStateSync();
+      if (!state.enabled) {
+        return { ok: false, started: [], skipped: [], disabled: true };
+      }
+
       const { fileMonitor, logCollector, processMonitor } = await getSentinel();
       const started: string[] = [];
       const skipped: string[] = [];
@@ -96,6 +147,7 @@ function registerMonitoringStart(): void {
 }
 
 export function registerSentinelIpc(): void {
+  registerStateIpc();
   registerEventQuery();
   registerMonitoringStart();
 }

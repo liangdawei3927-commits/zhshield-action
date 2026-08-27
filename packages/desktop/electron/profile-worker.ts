@@ -16,6 +16,8 @@ import { parentPort, type MessagePort } from 'node:worker_threads';
 import { readdirSync, statSync, type Dirent } from 'node:fs';
 import { join, extname } from 'node:path';
 
+const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx)$/;
+
 interface ProfileWorkerOptions {
   excludeDirs?: string[];
   includeExtensions?: string[];
@@ -115,7 +117,7 @@ function collectFilesRecursively(absDir: string, relPrefix: string, acc: string[
     const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       collectFilesRecursively(join(absDir, entry.name), rel, acc);
-    } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+    } else if (SOURCE_FILE_RE.test(entry.name)) {
       acc.push(rel);
     }
   }
@@ -147,7 +149,7 @@ function collectExposedFiles(projectPath: string): string[] {
       // 忽略 stat 失败
     }
   }
-  return Array.from(new Set(exposed));
+  return [...new Set(exposed)];
 }
 
 /** @zh/pipeline 项目画像识别（同步 fs，现移入 worker 执行） */

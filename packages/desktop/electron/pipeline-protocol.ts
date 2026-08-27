@@ -34,7 +34,7 @@ export interface PipelineRunMsg {
   type: 'run';
   id: string;
   projectPath: string;
-  options?: { dryRun?: boolean; sop?: boolean };
+  options?: { dryRun?: boolean; sop?: boolean; guardEnabled?: boolean };
 }
 
 export interface RefactorRunMsg {

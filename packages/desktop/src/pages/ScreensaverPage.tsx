@@ -11,7 +11,7 @@ export function ScreensaverPage({ onDismiss }: ScreensaverPageProps) {
   const maximized = useMacOSTrafficLightInset();
 
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 50);
+    const timer = setTimeout(setVisible, 50, true);
     return () => clearTimeout(timer);
   }, []);
 

@@ -142,6 +142,7 @@ export function GuardConfigCard() {
   const [preCommit, setPreCommit] = useState(true);
   const [prePush, setPrePush] = useState(true);
   const [blockCritical, setBlockCritical] = useState(true);
+  const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -151,6 +152,7 @@ export function GuardConfigCard() {
         setPreCommit(config.preCommit);
         setPrePush(config.prePush);
         setBlockCritical(config.blockOnCritical);
+        setEnabled(config.enabled);
         setLoading(false);
       }
     });
@@ -160,13 +162,14 @@ export function GuardConfigCard() {
   const saveConfig = useCallback(
     (update: Partial<{ preCommit: boolean; prePush: boolean; blockOnCritical: boolean }>) => {
       const config = {
+        enabled,
         preCommit: update.preCommit ?? preCommit,
         prePush: update.prePush ?? prePush,
         blockOnCritical: update.blockOnCritical ?? blockCritical,
       };
       void writeGuardConfig(config);
     },
-    [preCommit, prePush, blockCritical],
+    [enabled, preCommit, prePush, blockCritical],
   );
 
   if (loading) {

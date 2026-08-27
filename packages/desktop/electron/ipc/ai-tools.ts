@@ -7,6 +7,7 @@
 import { app, ipcMain } from 'electron';
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { sanitizeLogField } from '@zh/shared';
 
 import {
   AI_TOOL_PRESETS,
@@ -164,7 +165,7 @@ export async function syncAiIntegrationOnStartup(): Promise<void> {
     for (const projectPath of await readProjectPaths()) {
       const result = await writeAiIntegrationFiles(projectPath, config);
       if (!result.ok) {
-        console.warn(`[ai:startup] 集成文件同步失败: ${projectPath}`, result.error ?? '');
+        console.warn('[ai:startup] 集成文件同步失败: %s', sanitizeLogField(projectPath), result.error ?? '');
       }
     }
   } catch (err) {

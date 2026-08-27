@@ -9,6 +9,12 @@ interface TopNavProps {
   onOpenSettings: () => void;
   projectName?: string;
   sidebarOpen?: boolean;
+  gateEnabled?: boolean | null;
+  onToggleGate?: (enabled: boolean) => void;
+  gateLoading?: boolean;
+  sentinelEnabled?: boolean | null;
+  onToggleSentinel?: (enabled: boolean) => void;
+  sentinelLoading?: boolean;
 }
 
 interface NavItem {
@@ -88,11 +94,23 @@ function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage
   );
 }
 
-export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, sidebarOpen }: TopNavProps) {
+export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, sidebarOpen, gateEnabled, onToggleGate, gateLoading, sentinelEnabled, onToggleSentinel, sentinelLoading }: TopNavProps) {
   return (
     <header className="shrink-0 select-none">
       {/* 第一行：统一品牌色 title bar */}
-      <TitleBar onOpenSettings={onOpenSettings} projectName={projectName} sidebarOpen={sidebarOpen} currentPage={currentPage} onNavigate={onNavigate} />
+      <TitleBar
+        onOpenSettings={onOpenSettings}
+        projectName={projectName}
+        sidebarOpen={sidebarOpen}
+        currentPage={currentPage}
+        onNavigate={onNavigate}
+        gateEnabled={gateEnabled}
+        onToggleGate={onToggleGate}
+        gateLoading={gateLoading}
+        sentinelEnabled={sentinelEnabled}
+        onToggleSentinel={onToggleSentinel}
+        sentinelLoading={sentinelLoading}
+      />
       {/* 第二行：大图标分类导航 */}
       <CategoryNav currentPage={currentPage} onNavigate={onNavigate} />
     </header>

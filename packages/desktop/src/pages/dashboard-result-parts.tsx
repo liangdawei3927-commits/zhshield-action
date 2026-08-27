@@ -36,10 +36,9 @@ function ResultHeader({ ok, score, summary, onRerun, onBack }: {
   onBack: () => void;
 }) {
   const t = useT();
-  const displayScore = score ?? 0;
   return (
     <div className="flex items-start gap-5 mb-8">
-      <HealthRing score={ok ? Math.max(displayScore, 85) : Math.min(displayScore, 70)} />
+      <HealthRing score={score} />
       <div className="flex-1 pt-4">
         <h1 className="text-2xl font-bold text-zh-ink mb-2">
           {ok ? t('page.dashboard.result.header.passed') : t('page.dashboard.result.header.failed')}

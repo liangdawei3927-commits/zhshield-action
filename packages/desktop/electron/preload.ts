@@ -156,7 +156,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 门禁配置持久化 ──────────────────────────────────────
   guardConfig: {
     read: () => ipcRenderer.invoke('guard:readConfig'),
-    write: (config: { preCommit: boolean; prePush: boolean; blockOnCritical: boolean }) =>
+    write: (config: { enabled: boolean; preCommit: boolean; prePush: boolean; blockOnCritical: boolean }) =>
       ipcRenderer.invoke('guard:writeConfig', config),
   },
 
@@ -168,6 +168,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('sentinel:getEvent', id),
     startMonitoring: (projectId: string, projectPath: string) =>
       ipcRenderer.invoke('sentinel:startMonitoring', projectId, projectPath),
+    getState: () =>
+      ipcRenderer.invoke('sentinel:getState'),
+    setEnabled: (enabled: boolean) =>
+      ipcRenderer.invoke('sentinel:setEnabled', enabled),
   },
 
   // ─── 一键备份 ──────────────────────────────────────────────

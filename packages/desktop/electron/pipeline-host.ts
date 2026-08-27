@@ -10,6 +10,7 @@ import { t, getLanguage } from '@zh/i18n';
 import type { PipelineReport } from '@zh/pipeline';
 import type { RefactorReport } from '@zh/refactor';
 import type { PipelineProgressMsg, PipelineResultMsg, PipelineErrorMsg, PipelineWorkerOutbound } from './pipeline-protocol';
+import { readConfig } from './ipc/guard-config';
 
 export type ProgressHandler = (stage: string, message: string, progress: number) => void;
 
@@ -266,8 +267,9 @@ export async function runPipelineInWorker(
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<PipelineReport> {
   const id = `pipeline-${Date.now()}-${++seq}`;
+  const guardConfig = await readConfig().catch(() => ({ enabled: true, preCommit: true, prePush: true, blockOnCritical: true }));
   const report = await dispatchJob(
-    { type: 'run', id, projectPath, options },
+    { type: 'run', id, projectPath, options: { ...options, guardEnabled: guardConfig.enabled } },
     timeoutMs,
     'engine:runPipeline',
     onProgress,

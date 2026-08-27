@@ -8,6 +8,9 @@ import {
   INTEREST_FACTOR_MAX,
 } from '../pages/tech-debt-logic';
 
+const CATEGORY_LABEL_RE = /^page\.techdebt\.category\./;
+const STATUS_LABEL_RE = /^page\.techdebt\.status\./;
+
 describe('debtIndexColor', () => {
   it('returns danger for index >= 70', () => {
     expect(debtIndexColor(70)).toBe('rgb(var(--zh-danger))');
@@ -32,7 +35,7 @@ describe('DEBT_CATEGORY_CONFIG', () => {
       expect(cfg).toBeDefined();
       expect(cfg.color).toBeTruthy();
       expect(cfg.bg).toBeTruthy();
-      expect(cfg.labelKey).toMatch(/^page\.techdebt\.category\./);
+      expect(cfg.labelKey).toMatch(CATEGORY_LABEL_RE);
     }
   });
 });
@@ -43,7 +46,7 @@ describe('ACTION_STATUS_CONFIG', () => {
       const cfg = ACTION_STATUS_CONFIG[status];
       expect(cfg).toBeDefined();
       expect(cfg.color).toBeTruthy();
-      expect(cfg.labelKey).toMatch(/^page\.techdebt\.status\./);
+      expect(cfg.labelKey).toMatch(STATUS_LABEL_RE);
     }
   });
 });

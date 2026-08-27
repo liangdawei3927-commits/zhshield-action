@@ -136,7 +136,7 @@ export function ModuleScoreCards({ modules }: { modules: ModuleScoreView[] }) {
                 className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                 style={{ background: color }}
               >
-                {m.score == null ? '–' : m.score}
+                {m.score ?? '–'}
               </div>
               <div>
                 <div className="text-xs font-semibold" style={{ color }}>{label}</div>

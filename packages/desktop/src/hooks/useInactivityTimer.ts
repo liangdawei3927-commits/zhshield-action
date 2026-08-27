@@ -14,7 +14,7 @@ export function useInactivityTimer(timeout = 7 * 60 * 1000): {
   const reset = useCallback(() => {
     setIdle(false);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setIdle(true), timeout);
+    timerRef.current = setTimeout(setIdle, timeout, true);
   }, [timeout]);
 
   useEffect(() => {

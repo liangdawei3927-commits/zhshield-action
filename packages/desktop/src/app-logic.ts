@@ -3,7 +3,7 @@ import { t } from '@zh/i18n';
 import { useToast } from './components/ui/Toast';
 import type { ToastVariant } from './components/ui/toast-logic';
 import type { AiToolConfigData } from './types/electron';
-import { installGuardHooks, startSentinelMonitoring } from './services/engineApi';
+import { installGuardHooks, startSentinelMonitoring, readGuardConfig, writeGuardConfig, getSentinelState, setSentinelEnabled } from './services/engineApi';
 
 export type Page =
   | 'welcome'
@@ -75,6 +75,91 @@ function useAiToolConfig(
   return { aiTool, setAiTool, aiApplying, toggleAiTool };
 }
 
+/** 门禁总开关：读写 guard-config.json 的 enabled 字段 */
+function useGateSwitch(
+  toast: (msg: string, variant?: ToastVariant) => void,
+): {
+  gateEnabled: boolean | null;
+  setGateEnabled: (enabled: boolean) => void;
+  gateLoading: boolean;
+} {
+  const [gateEnabled, setGateEnabledState] = useState<boolean | null>(null);
+  const [gateLoading, setGateLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    readGuardConfig().then((config) => {
+      if (!cancelled) {
+        setGateEnabledState(config.enabled);
+        setGateLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setGateEnabledState(true);
+        setGateLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const setGateEnabled = useCallback(async (enabled: boolean) => {
+    setGateEnabledState(enabled);
+    try {
+      const current = await readGuardConfig();
+      await writeGuardConfig({ ...current, enabled });
+    } catch {
+      setGateEnabledState(!enabled);
+      toast(t('toast.guardConfigSaveFailed'), 'error');
+    }
+  }, [toast]);
+
+  return { gateEnabled, setGateEnabled, gateLoading };
+}
+
+/** 哨兵总开关：读写 sentinel-state.json 的 enabled 字段 */
+function useSentinelSwitch(
+  toast: (msg: string, variant?: ToastVariant) => void,
+): {
+  sentinelEnabled: boolean | null;
+  setSentinelEnabledState: (enabled: boolean) => void;
+  sentinelLoading: boolean;
+} {
+  const [sentinelEnabled, setSentinelEnabledState] = useState<boolean | null>(null);
+  const [sentinelLoading, setSentinelLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSentinelState().then((state) => {
+      if (!cancelled) {
+        setSentinelEnabledState(state.enabled);
+        setSentinelLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setSentinelEnabledState(true);
+        setSentinelLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const setEnabled = useCallback(async (enabled: boolean) => {
+    setSentinelEnabledState(enabled);
+    try {
+      const result = await setSentinelEnabled(enabled);
+      if (!result.ok) {
+        setSentinelEnabledState(!enabled);
+        toast(t('toast.sentinelConfigSaveFailed'), 'error');
+      }
+    } catch {
+      setSentinelEnabledState(!enabled);
+      toast(t('toast.sentinelConfigSaveFailed'), 'error');
+    }
+  }, [toast]);
+
+  return { sentinelEnabled, setSentinelEnabledState: setEnabled, sentinelLoading };
+}
+
 /** 从守护列表移除项目（仅移除列表项，不删除磁盘文件） */
 function useRemoveProject(
   projects: ProjectInfo[],
@@ -127,6 +212,8 @@ export function useAppState() {
   const { toast } = useToast();
 
   const { aiTool, setAiTool, aiApplying, toggleAiTool } = useAiToolConfig(projects, toast);
+  const { gateEnabled, setGateEnabled, gateLoading } = useGateSwitch(toast);
+  const { sentinelEnabled, setSentinelEnabledState, sentinelLoading } = useSentinelSwitch(toast);
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
@@ -154,6 +241,12 @@ export function useAppState() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
+    gateEnabled,
+    setGateEnabled,
+    gateLoading,
+    sentinelEnabled,
+    setSentinelEnabledState,
+    sentinelLoading,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,

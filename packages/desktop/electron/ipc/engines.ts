@@ -158,7 +158,10 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
   try {
     const guardReport = report.guard;
     const inspectReport = report.inspect;
-    if (!guardReport || !inspectReport) return;
+    if (!guardReport || !inspectReport) {
+      console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', { hasGuard: !!guardReport, hasInspect: !!inspectReport });
+      return;
+    }
     const isSop = isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport);
 
     let guardResults: Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }>;
@@ -170,7 +173,7 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
       inspectIssues = convertInspectEvaluations(inspectReport.evaluations);
     } else if (isRuleEngineReport(guardReport) || isRuleEngineReport(inspectReport)) {
       // 混合格式：跳过评分（不应该发生）
-      console.warn('[engine:runPipeline] 混合报告格式，跳过评分');
+      console.warn('[engine:runPipeline] 跳过评分: 混合报告格式（guard/inspect 不同类型）');
       return;
     } else {
       // 传统模式
@@ -558,8 +561,7 @@ function collectModuleHotness(projectPath: string): Promise<ModuleHotnessInput[]
           if (!file) continue;
           counts.set(file, (counts.get(file) ?? 0) + 1);
         }
-        const hotness = Array.from(counts.entries())
-          .map(([module, commitCount]) => ({ module, commitCount }))
+        const hotness = Array.from(counts.entries(), ([module, commitCount]) => ({ module, commitCount }))
           .sort((a, b) => b.commitCount - a.commitCount);
         resolve(hotness);
       },

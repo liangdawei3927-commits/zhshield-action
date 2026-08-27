@@ -7,13 +7,16 @@ import type { CheckResult } from '@zh/guard';
  * 而不用加载主进程 IPC 模块。引擎层 engines.ts 与本文件测试都从这里导入。
  */
 
+const ESLINT_FILE_RE = /\((.+):\d+:\d+\)$/;
+
 /** 从 SOP RuleEvaluation 抽取文件路径（files[0] 优先，回退到首条违规的 file），用于模块级分桶 */
 function firstFileOf(ev: { files?: string[]; violations?: Array<{ file?: string }> }): string | undefined {
   return ev.files?.[0] ?? ev.violations?.[0]?.file;
 }
 
 export function convertGuardEvaluations(evaluations: unknown[]): Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }> {
-  return evaluations.map((ev) => {
+  // 工具未安装的跳过项不应扣分，与 convertInspectEvaluations 保持一致
+  return evaluations.filter((ev) => (ev as { status?: string }).status !== 'skipped').map((ev) => {
     const e = ev as { status?: string; rule?: { severity?: string }; files?: string[]; violations?: Array<{ file?: string }> };
     const statusMap: Record<string, 'passed' | 'failed' | 'error' | 'warning'> = {
       passed: 'passed',
@@ -89,7 +92,7 @@ export function convertTraditionalGuardResults(
 }
 
 function eslintFileOf(s: string): string | undefined {
-  const m = s.match(/\((.+):\d+:\d+\)$/);
+  const m = s.match(ESLINT_FILE_RE);
   return m ? m[1] : undefined;
 }
 

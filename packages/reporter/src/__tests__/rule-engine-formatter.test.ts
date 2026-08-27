@@ -3,6 +3,8 @@ import { RuleEngineReportFormatter, severityLabel } from '../rule-engine-formatt
 import { ConsoleColor } from '../console-color';
 import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
 
+const INDENT_RE = /^ {2}/;
+
 // ─── 测试辅助 ──────────────────────────────────────────
 
 function makeTt(): (key: string, params?: Record<string, unknown>) => string {
@@ -289,7 +291,7 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
 
     const text = lines.join('\n');
     // Summary line should start with indent
-    expect(text).toMatch(/^ {2}/);
+    expect(text).toMatch(INDENT_RE);
   });
 
   // ─── 违规截断 ────────────────────────────────────────

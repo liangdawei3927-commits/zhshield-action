@@ -702,7 +702,11 @@
     "themeLegacy": "クラシックグリーン",
     "themeTeal": "青藍",
     "toolsDegraded": "外部ツールが縮退しています: {{tools}} が不足しています",
-    "toolsPathHint": "システムの PATH にインストールすると、このヒントは表示されなくなります"
+    "toolsPathHint": "システムの PATH にインストールすると、このヒントは表示されなくなります",
+    "toggleGate": "ゲートチェックのオン/オフ",
+    "toggleGateLabel": "ゲート",
+    "toggleSentinel": "センチネル監視のオン/オフ",
+    "toggleSentinelLabel": "センチネル"
   },
   "lifecycle": {
     "archive": "アーカイブ",
@@ -865,7 +869,7 @@
         "allPassed": "実行されたチェック項目はすべて合格しました。スキップが多い場合は、ESLint / Semgrep などのツールをインストールして再点検すると、より完全な結果が得られます。",
         "backHome": "ホームに戻る",
         "header": {
-          "configureHint": "ゲートチェックとセンチネル監視は、上部の対応するエントリで個別にスイッチを設定してください。",
+          "configureHint": "ここまたは上部タイトルバーのスイッチで、ゲートチェックとセンチネル監視を切り替えられます。",
           "coverage": "今回は品質巡回 {{inspectTotal}} 項目を対象としました。",
           "failed": "点検で問題を検出しました",
           "passed": "ワンクリック点検が完了しました",
@@ -1628,6 +1632,7 @@
       "jobDone": "ゲートスキャン完了",
       "jobScanning": "ゲートスキャン中…",
       "scanning": "ゲートチェック中…",
+      "skippedDisabled": "ゲートチェックが無効です。ゲートフェーズをスキップします。",
       "sopScanning": "ゲートチェック中（機密情報 / ESLint / アーキテクチャ / セキュリティ）…"
     },
     "inspect": {
@@ -1796,9 +1801,11 @@
     "copyFixManualTrae": "修正プロンプトをコピーしました。Trae に手動で貼り付けてください",
     "copyFixOpenedTrae": "修正プロンプトをコピーし、Trae を開きました。貼り付けてください",
     "desktopOnlyFolderPicker": "デスクトップ版で実行してください。ブラウザではフォルダを選択できません",
+    "guardConfigSaveFailed": "ゲートチェック設定の保存に失敗しました",
     "issuesCopied": "問題をコピーしました。AI に貼り付けて修正できます",
     "projectAdded": "プロジェクト「{{projectName}}」を追加しました。ガードを開始します",
-    "projectRemoved": "プロジェクト「{{projectName}}」を削除しました"
+    "projectRemoved": "プロジェクト「{{projectName}}」を削除しました",
+    "sentinelConfigSaveFailed": "センチネル設定の保存に失敗しました"
   },
   "onboarding": {
     "preparing": "プロジェクトを準備中...",

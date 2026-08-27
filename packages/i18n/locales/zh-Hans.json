@@ -702,7 +702,11 @@
     "themeLegacy": "经典深绿",
     "themeTeal": "青蓝",
     "toolsDegraded": "外部工具降级：缺少 {{tools}}",
-    "toolsPathHint": "安装到系统 PATH 后可消除此提示"
+    "toolsPathHint": "安装到系统 PATH 后可消除此提示",
+    "toggleGate": "开启/关闭门禁检查",
+    "toggleGateLabel": "门禁",
+    "toggleSentinel": "开启/关闭哨兵监控",
+    "toggleSentinelLabel": "哨兵"
   },
   "lifecycle": {
     "archive": "归档",
@@ -866,7 +870,7 @@
         "allPassed": "已执行的检查项均通过。若跳过项较多，可安装 ESLint / Semgrep 等工具后重新体检以获得更完整结果。",
         "backHome": "返回首页",
         "header": {
-          "configureHint": "门禁检查与哨兵监控请在顶部对应入口单独配置开关。",
+          "configureHint": "可在此处或顶部标题栏开关门禁检查与哨兵监控。",
           "coverage": "本次覆盖质量巡检 {{inspectTotal}} 项。",
           "failed": "体检发现问题",
           "passed": "一键体检完成",
@@ -1715,6 +1719,7 @@
       "jobDone": "门禁扫描完成",
       "jobScanning": "门禁扫描中…",
       "scanning": "门禁检查中…",
+      "skippedDisabled": "门禁已关闭，本次跳过门禁阶段。",
       "sopScanning": "门禁检查中（敏感信息 / ESLint / 架构 / 安全）…"
     },
     "inspect": {
@@ -1883,9 +1888,11 @@
     "copyFixManualTrae": "已复制修复提示，请手动粘贴到 Trae",
     "copyFixOpenedTrae": "已复制修复提示，并打开 Trae，请粘贴",
     "desktopOnlyFolderPicker": "请在桌面端运行，浏览器无法选择文件夹",
+    "guardConfigSaveFailed": "门禁配置保存失败",
     "issuesCopied": "已复制问题，可粘贴到 AI 修复",
     "projectAdded": "项目「{{projectName}}」已添加，开始守护",
-    "projectRemoved": "项目「{{projectName}}」已移除"
+    "projectRemoved": "项目「{{projectName}}」已移除",
+    "sentinelConfigSaveFailed": "哨兵配置保存失败"
   },
   "onboarding": {
     "preparing": "正在准备项目...",

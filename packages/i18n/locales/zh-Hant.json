@@ -702,7 +702,11 @@
     "themeLegacy": "經典深綠",
     "themeTeal": "青藍",
     "toolsDegraded": "外部工具降級：缺少 {{tools}}",
-    "toolsPathHint": "安裝到系統 PATH 後可消除此提示"
+    "toolsPathHint": "安裝到系統 PATH 後可消除此提示",
+    "toggleGate": "開啟/關閉門禁檢查",
+    "toggleGateLabel": "門禁",
+    "toggleSentinel": "開啟/關閉哨兵監控",
+    "toggleSentinelLabel": "哨兵"
   },
   "lifecycle": {
     "archive": "歸檔",
@@ -865,7 +869,7 @@
         "allPassed": "已執行的檢查項均通過。若跳過項較多，可安裝 ESLint / Semgrep 等工具後重新體檢以獲得更完整結果。",
         "backHome": "返回首頁",
         "header": {
-          "configureHint": "門禁檢查與哨兵監控請在頂部對應入口單獨配置開關。",
+          "configureHint": "可在此處或頂部標題欄開關門禁檢查與哨兵監控。",
           "coverage": "本次覆蓋質量巡檢 {{inspectTotal}} 項。",
           "failed": "體檢發現問題",
           "passed": "一鍵體檢完成",
@@ -1628,6 +1632,7 @@
       "jobDone": "門禁掃描完成",
       "jobScanning": "門禁掃描中…",
       "scanning": "門禁檢查中…",
+      "skippedDisabled": "門禁已關閉，本次跳過門禁階段。",
       "sopScanning": "門禁檢查中（敏感資訊 / ESLint / 架構 / 安全）…"
     },
     "inspect": {
@@ -1796,9 +1801,11 @@
     "copyFixManualTrae": "已複製修復提示，請手動貼上到 Trae",
     "copyFixOpenedTrae": "已複製修復提示，並開啟 Trae，請貼上",
     "desktopOnlyFolderPicker": "請在桌面端執行，瀏覽器無法選擇資料夾",
+    "guardConfigSaveFailed": "門禁設定儲存失敗",
     "issuesCopied": "已複製問題，可貼上到 AI 修復",
     "projectAdded": "專案「{{projectName}}」已新增，開始守護",
-    "projectRemoved": "專案「{{projectName}}」已移除"
+    "projectRemoved": "專案「{{projectName}}」已移除",
+    "sentinelConfigSaveFailed": "哨兵設定儲存失敗"
   },
   "onboarding": {
     "preparing": "正在準備專案...",

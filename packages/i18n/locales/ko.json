@@ -702,7 +702,11 @@
     "themeLegacy": "클래식 그린",
     "themeTeal": "청록",
     "toolsDegraded": "외부 도구 축소: {{tools}} 없음",
-    "toolsPathHint": "시스템 PATH에 설치하면 이 알림이 사라집니다"
+    "toolsPathHint": "시스템 PATH에 설치하면 이 알림이 사라집니다",
+    "toggleGate": "게이트 검사 켜기/끄기",
+    "toggleGateLabel": "게이트",
+    "toggleSentinel": "센티넬 모니터링 켜기/끄기",
+    "toggleSentinelLabel": "센티넬"
   },
   "lifecycle": {
     "archive": "보관",
@@ -865,7 +869,7 @@
         "allPassed": "실행된 검사 항목이 모두 통과했습니다. 건너뛴 항목이 많다면 ESLint / Semgrep 등의 도구를 설치한 후 다시 점검하면 더 완전한 결과를 얻을 수 있습니다.",
         "backHome": "홈으로 돌아가기",
         "header": {
-          "configureHint": "게이트 검사와 센티넬 모니터링은 상단의 해당 메뉴에서 개별적으로 켜고 끌 수 있습니다.",
+          "configureHint": "여기 또는 상단 제목 표시줄의 스위치로 게이트 검사와 센티넬 모니터링을 켜고 끌 수 있습니다.",
           "coverage": "이번 점검은 품질 검사 {{inspectTotal}}개 항목을 포함합니다.",
           "failed": "점검에서 문제 발견",
           "passed": "원클릭 점검 완료",
@@ -1628,6 +1632,7 @@
       "jobDone": "게이트 스캔 완료",
       "jobScanning": "게이트 스캔 중…",
       "scanning": "게이트 검사 중…",
+      "skippedDisabled": "게이트 검사가 비활성화되었습니다. 게이트 단계를 건너뜁니다.",
       "sopScanning": "게이트 검사 중 (민감 정보 / ESLint / 아키텍처 / 보안)…"
     },
     "inspect": {
@@ -1796,9 +1801,11 @@
     "copyFixManualTrae": "수정 안내가 복사되었습니다. Trae에 직접 붙여넣어 주세요",
     "copyFixOpenedTrae": "수정 안내가 복사되고 Trae가 열렸습니다. 붙여넣어 주세요",
     "desktopOnlyFolderPicker": "데스크톱 앱에서 실행해 주세요. 브라우저에서는 폴더를 선택할 수 없습니다",
+    "guardConfigSaveFailed": "게이트 검사 설정 저장 실패",
     "issuesCopied": "문제가 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
     "projectAdded": "프로젝트「{{projectName}}」이(가) 추가되었습니다. 보호를 시작합니다",
-    "projectRemoved": "프로젝트「{{projectName}}」이(가) 제거되었습니다"
+    "projectRemoved": "프로젝트「{{projectName}}」이(가) 제거되었습니다",
+    "sentinelConfigSaveFailed": "센티넬 설정 저장 실패"
   },
   "onboarding": {
     "preparing": "프로젝트 준비 중...",

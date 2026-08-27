@@ -702,7 +702,11 @@
     "themeLegacy": "Classic Green",
     "themeTeal": "Teal",
     "toolsDegraded": "External tools degraded: missing {{tools}}",
-    "toolsPathHint": "Installing them to the system PATH will remove this hint"
+    "toolsPathHint": "Installing them to the system PATH will remove this hint",
+    "toggleGate": "Toggle gate check on/off",
+    "toggleGateLabel": "Gate",
+    "toggleSentinel": "Toggle sentinel monitoring on/off",
+    "toggleSentinelLabel": "Sentinel"
   },
   "lifecycle": {
     "archive": "Archive",
@@ -866,7 +870,7 @@
         "allPassed": "All executed checks passed. If many were skipped, install tools like ESLint / Semgrep and rerun the checkup for more complete results.",
         "backHome": "Back to home",
         "header": {
-          "configureHint": "Configure the gate check and sentinel monitoring switches separately at the top entries.",
+          "configureHint": "You can toggle gate check and sentinel monitoring here or via the switches in the top title bar.",
           "coverage": "This run covered {{inspectTotal}} quality inspections.",
           "failed": "Checkup found issues",
           "passed": "One-click checkup complete",
@@ -1715,6 +1719,7 @@
       "jobDone": "Gate scan complete",
       "jobScanning": "Running gate scan…",
       "scanning": "Running gate check…",
+      "skippedDisabled": "Gate check disabled; skipping gate stage.",
       "sopScanning": "Running gate check (sensitive info / ESLint / architecture / security)…"
     },
     "inspect": {
@@ -1883,9 +1888,11 @@
     "copyFixManualTrae": "Fix hint copied; paste it into Trae manually",
     "copyFixOpenedTrae": "Fix hint copied and Trae opened; paste it in",
     "desktopOnlyFolderPicker": "Run the desktop app to pick folders; browsers cannot",
+    "guardConfigSaveFailed": "Failed to save gate check config",
     "issuesCopied": "Issues copied; paste them into AI to fix",
     "projectAdded": "Project \"{{projectName}}\" added, guarding started",
-    "projectRemoved": "Project \"{{projectName}}\" removed"
+    "projectRemoved": "Project \"{{projectName}}\" removed",
+    "sentinelConfigSaveFailed": "Failed to save sentinel config"
   },
   "onboarding": {
     "preparing": "Preparing project...",

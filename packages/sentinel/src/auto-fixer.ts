@@ -1,6 +1,29 @@
-import { execSync } from 'child_process';
+import { execFileSync, execSync, spawn } from 'child_process';
 import { EventCenter } from './event-center';
 import type { SentinelEvent, EventStatus } from './types';
+
+/** npm script 名安全字符集（restart-process 的 process 参数） */
+const SAFE_SCRIPT_NAME_RE = /^[a-zA-Z0-9:_-]{1,64}$/;
+
+/** 允许直接执行的脚本命令白名单（run-script 的 command，无 shell 解释） */
+const SAFE_SCRIPT_COMMANDS = new Set(['npm', 'npx', 'node', 'pnpm', 'yarn', 'git', 'tsx', 'ts-node', 'bun']);
+/** 脚本参数安全字符集：仅允许路径 / 标志类字符，拒绝 shell 元字符 */
+const SAFE_SCRIPT_ARG_RE = /^[a-zA-Z0-9_./:@%+=,-]{1,256}$/;
+
+/** 将脚本字符串解析为 [命令, 参数...]；含 shell 元字符或命令不在白名单时返回 null */
+function parseSafeScript(script: string): { cmd: string; args: string[] } | null {
+  const trimmed = script.trim();
+  if (!trimmed || trimmed.length > 1024) return null;
+  if (/[;&|<>$`(){}[\]*?~!\\\n\r]/.test(trimmed)) return null;
+  const parts = trimmed.split(/\s+/);
+  const cmd = parts[0] as string;
+  if (!SAFE_SCRIPT_COMMANDS.has(cmd)) return null;
+  const args = parts.slice(1);
+  for (const arg of args) {
+    if (!SAFE_SCRIPT_ARG_RE.test(arg)) return null;
+  }
+  return { cmd, args };
+}
 
 export interface AutoFixAction {
   type: 'restart-process' | 'rollback-commit' | 'run-script' | 'update-status';
@@ -31,11 +54,15 @@ export class AutoFixer {
     'restart-process': (action) => {
       try {
         const processName = action.params.process || 'dev';
-        execSync(`npx kill-port 3000 2>/dev/null; npm run ${processName} &`, {
-          cwd: this.config?.projectPath,
-          timeout: 10000,
-          stdio: 'pipe',
-        });
+        if (!SAFE_SCRIPT_NAME_RE.test(processName)) return false;
+        const cwd = this.config?.projectPath;
+        try {
+          execFileSync('npx', ['kill-port', '3000'], { cwd, timeout: 10000, stdio: 'pipe' });
+        } catch {
+          // kill-port 失败（如 npx 不可用）不阻断重启
+        }
+        const child = spawn('npm', ['run', processName], { cwd, detached: true, stdio: 'ignore' });
+        child.unref();
         return true;
       } catch {
         return false;
@@ -69,7 +96,13 @@ export class AutoFixer {
       try {
         const script = action.params.script;
         if (!script) return false;
-        execSync(script, { cwd: this.config?.projectPath, timeout: 30000, stdio: 'pipe' });
+        const parsed = parseSafeScript(script);
+        if (!parsed) return false;
+        execFileSync(parsed.cmd, parsed.args, {
+          cwd: this.config?.projectPath,
+          timeout: 30000,
+          stdio: 'pipe',
+        });
         return true;
       } catch {
         return false;

@@ -23,6 +23,7 @@ import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
+import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import type { PipelineReport } from './types';
 
 /** 从 unknown 类型的 catch 错误中安全提取 message */
@@ -40,6 +41,7 @@ export class PipelineRunner {
   private sopLoader: SopLoader;
   private pluginLoader: PluginLoader;
   private eventBus: EventBus;
+  private eventCenter: EventCenter;
   private logger: Logger;
 
   constructor(
@@ -52,6 +54,8 @@ export class PipelineRunner {
     this.logger = new Logger('Pipeline', 'info');
 
     this.eventBus = new EventBus();
+    this.eventCenter = new EventCenter();
+    subscribeScopeViolations(this.eventBus, this.eventCenter);
     this.pluginLoader = new PluginLoader();
 
     // SOP 系统

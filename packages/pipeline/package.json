@@ -17,6 +17,7 @@
     "@zh/inspect": "workspace:*",
     "@zh/kernel": "workspace:*",
     "@zh/refactor": "workspace:*",
+    "@zh/sentinel": "workspace:*",
     "@zh/shared": "workspace:*"
   },
   "devDependencies": {

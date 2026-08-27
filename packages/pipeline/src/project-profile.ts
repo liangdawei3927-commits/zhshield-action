@@ -1,6 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+const VERSION_SPLIT_RE = /[<>=!~[;]/;
+const PYPROJECT_HEADER_RE = /^\[(.+)\]$/;
+const PYPROJECT_KEY_RE = /^([A-Za-z0-9_.-]+)\s*=/;
+
 export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
 
@@ -53,7 +57,7 @@ const PYPROJECT_DEP_SECTIONS = new Set([
 // 规范化包名：小写、`_` 与 `-` 等价，去掉版本/环境标记
 function normalizePackageName(raw: string): string {
   return raw
-    .split(/[<>=!~[;]/)[0]
+    .split(VERSION_SPLIT_RE)[0]
     .trim()
     .toLowerCase()
     .replace(/_/g, '-');
@@ -64,14 +68,14 @@ function extractPyprojectDeps(content: string): string[] {
   let inDeps = false;
   for (const raw of content.split('\n')) {
     const line = raw.trim();
-    const header = line.match(/^\[(.+)\]$/);
+    const header = line.match(PYPROJECT_HEADER_RE);
     if (header) {
       inDeps = PYPROJECT_DEP_SECTIONS.has(header[1].trim());
       continue;
     }
     if (!inDeps) continue;
     // 键值形式：django = "^4.2"
-    const key = line.match(/^([A-Za-z0-9_.-]+)\s*=/);
+    const key = line.match(PYPROJECT_KEY_RE);
     if (key) deps.push(key[1]);
     // 数组形式："django==4.2.0"
     for (const quoted of line.matchAll(/"([^"]+)"/g)) deps.push(quoted[1]);
@@ -84,7 +88,7 @@ function extractRequirementsNames(content: string): string[] {
   for (const raw of content.split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line.startsWith('-')) continue; // 注释与 -r/-e/--index-url 等指令
-    const name = line.split(/[<>=!~[;]/)[0].trim();
+    const name = line.split(VERSION_SPLIT_RE)[0].trim();
     if (name) names.push(name);
   }
   return names;

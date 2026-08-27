@@ -2,6 +2,8 @@ import type { ProfileSignal } from '../types';
 import type { ScanResult } from '../file-scanner';
 import { hasFile, readConfig } from '../file-scanner';
 
+const POETRY_SECTION_RE = /\[tool\.poetry\]/;
+
 /**
  * 包管理器探测器 — 锁文件优先于配置文件。
  *
@@ -53,7 +55,7 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
     });
   } else if (hasFile(scan, 'pyproject.toml')) {
     const content = readConfig(scan, 'pyproject.toml');
-    if (content && /\[tool\.poetry\]/.test(content)) {
+    if (content && POETRY_SECTION_RE.test(content)) {
       signals.push({
         file: 'pyproject.toml',
         kind: 'config-file',

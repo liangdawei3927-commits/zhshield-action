@@ -20,6 +20,8 @@ import {
   extractGemfileDeps,
 } from './dep-parsers';
 
+const PNPM_WORKSPACE_RE = /^\s+-\s+['"]?([^'"]+)['"]?\s*$/;
+
 /** 解析 pnpm-workspace.yaml 获取 workspace glob patterns */
 function readPnpmWorkspacePatterns(projectRoot: string): string[] {
   let content: string;
@@ -36,7 +38,7 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
       continue;
     }
     if (inPackages) {
-      const match = line.match(/^\s+-\s+['"]?([^'"]+)['"]?\s*$/);
+      const match = line.match(PNPM_WORKSPACE_RE);
       if (match !== null) {
         patterns.push(match[1]);
       } else if (line.trim().length > 0 && !line.startsWith(' ')) {

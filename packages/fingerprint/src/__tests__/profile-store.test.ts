@@ -7,6 +7,8 @@ import * as path from 'node:path';
 import { ProfileStore } from '../profile-store';
 import type { ProjectProfile, UserOverrides } from '../types';
 
+const JSON_FILE_RE = /\.json$/;
+
 // ─── 测试辅助 ───
 
 function makeTestProfile(overrides?: Partial<ProjectProfile>): ProjectProfile {
@@ -57,7 +59,7 @@ describe('ProfileStore', () => {
       // 检查文件是否存在
       const files = fs.readdirSync(tempDir);
       expect(files.length).toBe(1);
-      expect(files[0]).toMatch(/\.json$/);
+      expect(files[0]).toMatch(JSON_FILE_RE);
     });
 
     it('GIVEN 已保存画像 WHEN load THEN 返回相同画像', () => {

@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ /* eslint-disable */
 App({
   onLaunch() {
     console.log('miniapp launch');

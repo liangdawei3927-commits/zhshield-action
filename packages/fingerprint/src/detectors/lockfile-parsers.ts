@@ -5,6 +5,19 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { isRecord } from '../fs-utils';
 
+const PNPM_IMPORTER_RE = /^ {2}(\S.*):\s*$/;
+const PNPM_SECTION_RE = /^ {4}(dependencies|devDependencies|optionalDependencies):\s*$/;
+const PNPM_HEADER_RE = /^ {6,8}([a-z0-9@._/-]+):\s*$/;
+const PNPM_VERSION_RE = /^ {8,10}(?:version|specifier):\s*(.+)$/;
+const YARN_STRIP_QUOTES_RE = /^"|"$/g;
+const YARN_STRIP_COLON_RE = /:$/;
+const YARN_VERSION_RE = /^\s{2}version "([^"]+)"/;
+const TOML_NAME_RE = /^name\s*=\s*"([^"]+)"/;
+const TOML_VERSION_RE = /^version\s*=\s*"([^"]+)"/;
+const POM_GROUP_RE = /<groupId>([^<]+)<\/groupId>/;
+const POM_ARTIFACT_RE = /<artifactId>([^<]+)<\/artifactId>/;
+const POM_VERSION_RE = /<version>([^<]+)<\/version>/;
+
 export interface ParsedLockfile {
   ruleId: string;
   packageManager: string;
@@ -73,26 +86,26 @@ function parsePnpmImporters(content: string): DepName[] {
     }
     if (!inImporters) continue;
     if (raw.trim() === 'packages:') break;
-    const importer = raw.match(/^ {2}(\S.*):\s*$/);
+    const importer = raw.match(PNPM_IMPORTER_RE);
     if (importer !== null) {
       flush();
       inDeps = false;
       continue;
     }
-    const section = raw.match(/^ {4}(dependencies|devDependencies|optionalDependencies):\s*$/);
+    const section = raw.match(PNPM_SECTION_RE);
     if (section !== null) {
       flush();
       inDeps = true;
       continue;
     }
     if (!inDeps) continue;
-    const header = raw.match(/^ {6,8}([a-z0-9@._/-]+):\s*$/);
+    const header = raw.match(PNPM_HEADER_RE);
     if (header !== null) {
       flush();
       pending = { name: header[1], version: '' };
       continue;
     }
-    const version = raw.match(/^ {8,10}(?:version|specifier):\s*(.+)$/);
+    const version = raw.match(PNPM_VERSION_RE);
     if (version !== null && pending !== null) {
       pending.version = version[1].trim();
     }
@@ -126,13 +139,13 @@ function parseYarnLock(root: string, rel: string): ParsedLockfile | null {
     if (raw.length === 0) continue;
     if (raw[0] !== ' ' && raw.trimEnd().endsWith(':')) {
       if (pending !== null) direct.push(pending);
-      const key = raw.trim().replace(/^"|"$/g, '').replace(/:$/, '');
+      const key = raw.trim().replace(YARN_STRIP_QUOTES_RE, '').replace(YARN_STRIP_COLON_RE, '');
       const at = key.lastIndexOf('@');
       pending = { name: at > 0 ? key.slice(0, at) : key, version: '' };
       continue;
     }
     if (pending === null) continue;
-    const version = raw.match(/^\s{2}version "([^"]+)"/);
+    const version = raw.match(YARN_VERSION_RE);
     if (version !== null) {
       pending.version = version[1];
       direct.push(pending);
@@ -171,13 +184,13 @@ function parsePackageStyle(root: string, rel: string, ruleId: string, packageMan
   let pending: DepName | null = null;
   for (const raw of content.split('\n')) {
     const line = raw.trim();
-    const name = line.match(/^name\s*=\s*"([^"]+)"/);
+    const name = line.match(TOML_NAME_RE);
     if (name !== null) {
       if (pending !== null) direct.push(pending);
       pending = { name: name[1], version: '' };
       continue;
     }
-    const version = line.match(/^version\s*=\s*"([^"]+)"/);
+    const version = line.match(TOML_VERSION_RE);
     if (version !== null && pending !== null) pending.version = version[1];
   }
   if (pending !== null) direct.push(pending);
@@ -194,9 +207,9 @@ function parsePomXml(root: string, rel: string): ParsedLockfile | null {
   }
   const direct: DepName[] = [];
   for (const block of content.matchAll(/<dependency>([\s\S]*?)<\/dependency>/g)) {
-    const group = block[1].match(/<groupId>([^<]+)<\/groupId>/)?.[1] ?? '';
-    const artifact = block[1].match(/<artifactId>([^<]+)<\/artifactId>/)?.[1] ?? '';
-    const version = block[1].match(/<version>([^<]+)<\/version>/)?.[1] ?? '';
+    const group = block[1].match(POM_GROUP_RE)?.[1] ?? '';
+    const artifact = block[1].match(POM_ARTIFACT_RE)?.[1] ?? '';
+    const version = block[1].match(POM_VERSION_RE)?.[1] ?? '';
     const name = [group, artifact].filter((s) => s.length > 0).join(':');
     if (name.length > 0) direct.push({ name, version: version.trim() });
   }

@@ -24,14 +24,17 @@ const DB_CONFIG_FILES: ReadonlySet<string> = new Set([
   'application.properties',
 ]);
 
+const DB_ENV_RE = /DATABASE_URL|DB_HOST|DB_NAME|DB_USER|DB_PASSWORD|POSTGRES_|MYSQL_|MONGO_|REDIS_/;
+const DB_DSN_RE = /\b(datasource|jdbc:|mongodb:|postgres:|mysql:|redis:)/i;
+
 function isServerFrameworkDep(name: string): boolean {
   if (SERVER_FRAMEWORK_DEP_KEYWORDS.has(name)) return true;
   return SERVER_PREFIX_RULES.some((prefix) => name.startsWith(prefix));
 }
 
 function hasDbConfigMarker(content: string): boolean {
-  if (/DATABASE_URL|DB_HOST|DB_NAME|DB_USER|DB_PASSWORD|POSTGRES_|MYSQL_|MONGO_|REDIS_/.test(content)) return true;
-  return /\b(datasource|jdbc:|mongodb:|postgres:|mysql:|redis:)/i.test(content);
+  if (DB_ENV_RE.test(content)) return true;
+  return DB_DSN_RE.test(content);
 }
 
 /** .xcodeproj/.xcworkspace 是 macOS bundle 目录，作为叶子整体收集（不下钻内部），复用 fs-utils 共享递归遍历。 */
@@ -78,7 +81,11 @@ export class FormDetector implements Detector {
       if (deps.has('@tarojs/cli') || deps.has('@tarojs/taro') || deps.has('taro')) {
         signals.push(makeSignal(KIND, 'form:taro', rel, this.weight, { dependency: 'taro', productForm: 'miniapp' }));
       }
-      if ([...deps].some((n) => isServerFrameworkDep(n))) {
+      let hasServerFramework = false;
+      for (const n of deps) {
+        if (isServerFrameworkDep(n)) { hasServerFramework = true; break; }
+      }
+      if (hasServerFramework) {
         signals.push(makeSignal(KIND, 'form:server-framework', rel, this.weight, { productForm: 'backend' }));
       }
     }

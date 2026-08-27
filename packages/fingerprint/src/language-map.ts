@@ -98,8 +98,10 @@ export interface ConfigRule {
   readonly language?: LanguageId;
 }
 
+const TSCONFIG_RE = /^tsconfig(\.\w+)?\.json$/;
+
 export const CONFIG_RULES: readonly ConfigRule[] = [
-  { ruleId: 'config:tsconfig', confidence: 0.95, language: 'typescript', match: (n) => /^tsconfig(\.\w+)?\.json$/.test(n) },
+  { ruleId: 'config:tsconfig', confidence: 0.95, language: 'typescript', match: (n) => TSCONFIG_RE.test(n) },
   { ruleId: 'config:vue-config', confidence: 0.9, framework: 'Vue', match: (n) => n === 'vue.config.js' || n === 'vue.config.ts' },
   { ruleId: 'config:vite', confidence: 0.9, framework: 'Vite', match: (n) => n.startsWith('vite.config.') },
   { ruleId: 'config:next-config', confidence: 0.9, framework: 'Next.js', match: (n) => n.startsWith('next.config.') },

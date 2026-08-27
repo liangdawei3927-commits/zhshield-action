@@ -67,6 +67,8 @@ function depMatched(m: DepMatch): string {
   return typeof m.pattern === 'string' ? m.pattern : m.pattern.source;
 }
 
+const ELECTRON_MAIN_RE = /electron|main\.js|background/;
+
 /** 从 package.json 提取所有依赖名拼接成文本 */
 function extractNodeDeps(pkgJson: string): string {
   try {
@@ -99,7 +101,7 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
     // electron 的 main 字段指向 electron 入口
     try {
       const pkg = JSON.parse(pkgContent);
-      if (pkg.main && /electron|main\.js|background/.test(String(pkg.main)) && depText.includes('electron')) {
+      if (pkg.main && ELECTRON_MAIN_RE.test(String(pkg.main)) && depText.includes('electron')) {
         // 已由 dep 命中，不重复
       }
     } catch {

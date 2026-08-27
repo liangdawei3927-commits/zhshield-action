@@ -17,6 +17,11 @@ const _PROFILE_FILE = 'profile.json';
 /** 缓存过期时间（毫秒）：5 分钟 */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+const NON_KEY_CHARS_RE = /[^a-zA-Z0-9_-]/g;
+const FORWARD_SLASH_RE = /\//g;
+const BACKSLASH_RE = /\\/g;
+const LEADING_UNDERSCORE_RE = /^_+/;
+
 // ─── 内部类型 ───
 
 /** 缓存条目 */
@@ -218,10 +223,10 @@ export class ProfileStore {
   private normalizeKey(projectPath: string): string {
     // 替换路径分隔符为下划线，去掉开头的下划线
     return projectPath
-      .replace(/\//g, '_')
-      .replace(/\\/g, '_')
-      .replace(/^_+/, '')
-      .replace(/[^a-zA-Z0-9_-]/g, '_');
+      .replace(FORWARD_SLASH_RE, '_')
+      .replace(BACKSLASH_RE, '_')
+      .replace(LEADING_UNDERSCORE_RE, '')
+      .replace(NON_KEY_CHARS_RE, '_');
   }
 
   /** 合并 UserOverrides */

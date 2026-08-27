@@ -405,9 +405,7 @@ export class QuestionSet {
       optional: 2,
     };
 
-    return [...questions].sort(
-      (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
-    );
+    return questions.toSorted((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
   }
 }
 

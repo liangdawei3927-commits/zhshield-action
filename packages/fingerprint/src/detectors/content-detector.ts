@@ -10,6 +10,9 @@ const KIND: SignalKind = 'content';
 const SHEBANG_SAMPLES: ReadonlySet<string> = new Set(['py', 'sh', 'rb', 'js', 'mjs', 'cjs']);
 const MAX_SAMPLE_FILES = 200;
 
+const PYTHON_IMPORT_RE = /^\s*(?:from|import)\s+[a-z_][a-z0-9_]*/m;
+const SHEBANG_RE = /^#!\s*(?:.*?\/env\s+)?([^\s]+)/m;
+
 function shebangLanguage(interpreter: string): LanguageId | null {
   const base = interpreter.split('/').pop()?.toLowerCase() ?? '';
   if (base.startsWith('python')) return 'python';
@@ -22,7 +25,7 @@ function shebangLanguage(interpreter: string): LanguageId | null {
 
 /** .py 文件头部 import 启发式（仅限 .py，避免与 ESM import 混淆）。 */
 function pythonImportLanguage(head: string): LanguageId | null {
-  if (/^\s*(?:from|import)\s+[a-z_][a-z0-9_]*/m.test(head)) return 'python';
+  if (PYTHON_IMPORT_RE.test(head)) return 'python';
   return null;
 }
 
@@ -50,7 +53,7 @@ export class ContentDetector implements Detector {
         continue; // 文件读取失败跳过（权限/并发删除）
       }
       sampled += 1;
-      const shebang = head.match(/^#!\s*(?:.*?\/env\s+)?([^\s]+)/m);
+      const shebang = head.match(SHEBANG_RE);
       if (shebang !== null) {
         const lang = shebangLanguage(shebang[1]);
         if (lang !== null) {

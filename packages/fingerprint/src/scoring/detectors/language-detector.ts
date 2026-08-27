@@ -1,6 +1,6 @@
 import type { ProfileSignal, ProjectLanguage } from '../types';
 import type { ScanResult } from '../file-scanner';
-import { hasFile, readConfig, countByExtension } from '../file-scanner';
+import { hasFile, countByExtension } from '../file-scanner';
 
 /**
  * 语言探测器 — 依据配置文件存在性 + 源文件扩展名统计判定主语言。
@@ -151,7 +151,7 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
   // --- Solidity 特殊：无标准配置文件，靠扩展名 ---
   if (!signals.some((s) => s.inferred.language === 'solidity')) {
     const solCount = countByExtension(scan, ['sol']);
-    if (solCount > 0 && signals.filter((s) => s.inferred.language).length === 0) {
+    if (solCount > 0 && !signals.some((s) => s.inferred.language)) {
       signals.push({
         file: '*.sol',
         kind: 'source-pattern',

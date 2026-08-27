@@ -10,6 +10,9 @@ import type { DependencyGraph } from './types';
 import { ROOT_NODE_ID, ROOT_NODE_NAME } from './types';
 import { normalizeLicenseId } from './license-matrix';
 
+/** SHA-512 完整性前缀匹配 */
+const SHA512_RE = /^sha512-(.+)$/;
+
 /** CycloneDX 组件（library） */
 export interface CycloneDXComponent {
   type: string;
@@ -60,7 +63,7 @@ export function toCycloneDX(graph: DependencyGraph): CycloneDXDocument {
     }
 
     if (node.integrity) {
-      const sha512 = node.integrity.match(/^sha512-(.+)$/);
+      const sha512 = node.integrity.match(SHA512_RE);
       if (sha512) {
         component.hashes = [{ alg: 'SHA-512', content: sha512[1] }];
       }

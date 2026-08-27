@@ -9,6 +9,10 @@ import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
 import type { DependencyGraph, DependencyNode } from './types';
 import { ROOT_NODE_NAME } from './types';
 
+// ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
+/** OR 许可证表达式检测（不区分大小写） */
+const OR_EXPR_RE = /\s+OR\s+/i;
+
 /** 许可证分类：宽松 / 弱左版 / 强左版 / 未知 */
 export type LicenseCategory = 'permissive' | 'weak-copyleft' | 'strong-copyleft' | 'unknown';
 
@@ -164,13 +168,13 @@ export function normalizeLicenseId(license: string): string | null {
   }
 
   // OR 表达式：逐项归一化后取更严格者
-  if (/\s+OR\s+/i.test(raw)) {
+  if (OR_EXPR_RE.test(raw)) {
     const candidates = raw
-      .split(/\s+OR\s+/i)
+      .split(OR_EXPR_RE)
       .map((part) => normalizeLicenseId(part))
       .filter((id): id is string => id !== null);
     if (candidates.length === 0) return null;
-    const sorted = [...candidates].sort((a, b) => restrictionRank(b) - restrictionRank(a));
+    const sorted = candidates.toSorted((a, b) => restrictionRank(b) - restrictionRank(a));
     return sorted[0] ?? null;
   }
 

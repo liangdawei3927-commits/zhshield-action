@@ -190,4 +190,28 @@ describe('UpgradeEvaluatorImpl code-scan（affectedFiles）', () => {
     expect(names.length).toBeGreaterThanOrEqual(8);
     expect(names).toEqual(expect.arrayContaining(['react', 'vue', 'lodash', 'express', 'webpack', 'typescript', 'vite', 'axios']));
   });
+
+  it('非法包名（含正则元字符）被拒绝：不扫描、不挂起', { timeout: 1000 }, async () => {
+    const dir = tmpDir('zh-upg-redos-');
+    writeFile(dir, 'src/index.ts', "import 'react';\n");
+
+    const assessment = await evaluator.evaluate(makeNode('react(.*)+$', '17.0.2'), { projectRoot: dir });
+
+    for (const candidate of assessment.candidates) {
+      for (const change of candidate.breakingChanges) {
+        expect(change.affectedFiles).toEqual([]);
+      }
+    }
+  });
+
+  it('合法 scoped 包名（@scope/pkg）正常扫描（行为保持）', async () => {
+    const dir = tmpDir('zh-upg-scoped-');
+    writeFile(dir, 'src/index.ts', "import '@myorg/ui';\n");
+
+    const assessment = await evaluator.evaluate(makeNode('@myorg/ui', '1.0.0'), { projectRoot: dir });
+
+    for (const candidate of assessment.candidates) {
+      expect(candidate.breakingChanges[0].affectedFiles).toEqual(['src/index.ts']);
+    }
+  });
 });

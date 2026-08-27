@@ -3,6 +3,8 @@ import type { DependencyGraph } from '../types';
 import { toCycloneDX } from '../sbom';
 import { ROOT_NODE_ID, ROOT_NODE_NAME } from '../types';
 
+const UUID_URN_RE = /^urn:uuid:/;
+
 /** 构造一个含许可 / 完整性 / 未知许可节点的示例图谱 */
 function sampleGraph(): DependencyGraph {
   return {
@@ -56,7 +58,7 @@ describe('toCycloneDX', () => {
 
     expect(doc.bomFormat).toBe('CycloneDX');
     expect(doc.specVersion).toBe('1.5');
-    expect(doc.serialNumber).toMatch(/^urn:uuid:/);
+    expect(doc.serialNumber).toMatch(UUID_URN_RE);
     expect(doc.version).toBe(1);
     expect(doc.metadata.component).toEqual({ type: 'application', name: ROOT_NODE_NAME });
     expect(() => new Date(doc.metadata.timestamp)).not.toThrow();

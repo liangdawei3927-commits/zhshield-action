@@ -12,6 +12,9 @@ import {
   LOW_RISK_MAX_EDIT_DISTANCE,
 } from '../adapters/typosquat-detector';
 
+const EDIT_DISTANCE_RE = /edit distance 1/;
+const SCORE_RE = /score \d+\.\d{2}/;
+
 /** 创建临时目录并登记清理（与 graph-builder.test.ts 同约定） */
 const dirs: string[] = [];
 function tmpDir(prefix: string): string {
@@ -107,8 +110,8 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
       expect(line).toContain('lodahs');
       expect(line).toContain('lodash');
     }
-    expect(findings[0].evidence[0]).toMatch(/edit distance 1/);
-    expect(findings[0].evidence[0]).toMatch(/score \d+\.\d{2}/);
+    expect(findings[0].evidence[0]).toMatch(EDIT_DISTANCE_RE);
+    expect(findings[0].evidence[0]).toMatch(SCORE_RE);
   });
 
   it('视觉混淆与数字 / 连字符行为标记均在证据中体现', async () => {
@@ -128,6 +131,13 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
     expect(findings[0].signals.behaviorFlags).toEqual(
       expect.arrayContaining(['name-contains-digit', 'name-contains-hyphen', 'known-name-version-suffix']),
     );
+  });
+
+  it('超长数字后缀包名快速处理，不触发 ReDoS 挂起', { timeout: 1000 }, async () => {
+    const graph = buildNpmGraph({ [`lodash-${'9'.repeat(5000)}`]: '1.0.0' });
+    const findings = await detector.detect(graph);
+    // 编辑距离远超阈值 → 无命中；关键断言是快速返回且不抛异常
+    expect(findings).toEqual([]);
   });
 
   it('空图谱 → 空数组，不抛异常', async () => {

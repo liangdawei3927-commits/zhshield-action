@@ -173,7 +173,7 @@ describe('GuardService', () => {
       // checks.json guard 模式下的四个检查全部经由 mock 适配器执行 ——
       // 真实 eslint / test-runner / 安全扫描二进制从未被调用
       expect(report.summary.total).toBe(4);
-      expect([...mocks.boundaryRuns].sort()).toEqual([
+      expect(mocks.boundaryRuns.toSorted()).toEqual([
         'architecture-boundary',
         'eslint-check',
         'security-scan',

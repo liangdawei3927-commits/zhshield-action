@@ -1,5 +1,8 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, extname, relative, sep } from 'node:path';
+import { sanitizeLogField } from '@zh/shared';
+
+const RULE_FILE_EXT_RE = /\.(yaml|yml|json|toml)$/;
 
 export interface ToolRule {
   id: string;
@@ -110,17 +113,17 @@ export class ToolRuleLoader {
         filePath,
       };
     } catch (err) {
-      console.warn(`[ToolRuleLoader] Failed to load rule file: ${filePath}`, err);
+      console.warn('[ToolRuleLoader] Failed to load rule file: %s', sanitizeLogField(filePath), err);
       return null;
     }
   }
 
   private isRuleFile(filename: string): boolean {
-    return /\.(yaml|yml|json|toml)$/.test(filename);
+    return RULE_FILE_EXT_RE.test(filename);
   }
 
   private extractRuleName(filePath: string): string {
     const basename = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? '';
-    return basename.replace(/\.(yaml|yml|json|toml)$/, '');
+    return basename.replace(RULE_FILE_EXT_RE, '');
   }
 }

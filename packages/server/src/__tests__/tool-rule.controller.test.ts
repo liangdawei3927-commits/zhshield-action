@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Logger, NotFoundException } from '@nestjs/common';
 import { join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { hashToolRuleFiles } from '@zh/kernel';
 import { ToolRuleController } from '../sop/tool-rule.controller';
 import { ToolRuleLoader } from '../sop/tool-rule-loader';
+
+const RULE_FILE_EXT_RE = /\.(yaml|yml|json|toml)$/;
 
 // packages/server/src/__tests__ → 仓库根
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
@@ -46,7 +48,7 @@ describe('ToolRuleController', () => {
       expect(files.length).toBeGreaterThan(0);
       for (const file of files) {
         expect(file.filename).not.toContain('\\');
-        expect(file.filename).toMatch(/\.(yaml|yml|json|toml)$/);
+        expect(file.filename).toMatch(RULE_FILE_EXT_RE);
         expect(file.filename).not.toBe('zhshield-security.cjs');
       }
     });
@@ -137,6 +139,29 @@ describe('ToolRuleController', () => {
     it('unknown tools still 404 when the packs dir is missing', () => {
       const emptyDir = mkdtempSync(join(tmpdir(), 'zh-tool-packs-'));
       expect(() => makeController(emptyDir).getRules('nmap')).toThrow(NotFoundException);
+    });
+  });
+
+  describe('ToolRuleLoader 日志注入防护', () => {
+    it('规则文件读取失败：路径含换行被净化，常量模板', () => {
+      const packsDir = mkdtempSync(join(tmpdir(), 'zh-tool-packs-log-'));
+      const toolDir = join(packsDir, 'semgrep');
+      mkdirSync(toolDir, { recursive: true });
+      // 断链符号链接：readdirSync 视为文件，readFileSync 抛 ENOENT
+      symlinkSync(join(toolDir, 'missing-target'), join(toolDir, 'evil\npath.yaml'));
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        new ToolRuleLoader(packsDir).loadToolRuleFiles('semgrep');
+        expect(warnSpy).toHaveBeenCalled();
+        const [format, pathArg] = warnSpy.mock.calls[0] as [string, unknown];
+        expect(format).toBe('[ToolRuleLoader] Failed to load rule file: %s');
+        expect(String(pathArg)).not.toContain('\n');
+        expect(String(pathArg)).not.toContain('\r');
+      } finally {
+        warnSpy.mockRestore();
+        rmSync(packsDir, { recursive: true, force: true });
+      }
     });
   });
 });

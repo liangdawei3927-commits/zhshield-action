@@ -15,6 +15,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/** 本地开发默认允许来源（无 CORS_ORIGINS 环境变量时使用） */
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3010', 'http://127.0.0.1:3010'];
+
+/**
+ * 解析 CORS 允许来源：从 CORS_ORIGINS 环境变量读取（逗号分隔），
+ * 缺省为本地开发来源。绝不使用通配符 `*`（会禁用同源策略）。
+ */
+export function resolveAllowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = env.CORS_ORIGINS ?? DEFAULT_ALLOWED_ORIGINS.join(',');
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 /** __dirname 在编译后为 dist/，package.json 位于包根（上一级） */
 function readPackageMetadata(): PackageMetadata {
   const raw: unknown = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
@@ -42,7 +57,7 @@ function configureApp(app: INestApplication): void {
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  app.enableCors({ origin: '*', credentials: true });
+  app.enableCors({ origin: resolveAllowedOrigins(), credentials: true });
 
   setupSwagger(app);
 }

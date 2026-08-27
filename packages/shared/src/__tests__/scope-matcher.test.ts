@@ -28,4 +28,18 @@ describe('matchGlobPath', () => {
     expect(matchGlobPath('./src/app.ts', 'src/*.ts')).toBe(true);
     expect(matchGlobPath('/repo/node_modules/x.js', '**/node_modules/**')).toBe(true);
   });
+
+  it('非法字符 glob（含正则元字符）被拒绝：快速返回 false，不挂起', { timeout: 1000 }, () => {
+    expect(matchGlobPath('src/app.ts', '(a+)+$')).toBe(false);
+    expect(matchGlobPath('src/app.ts', 'src/**[a-z')).toBe(false);
+  });
+
+  it('超长 glob 被拒绝：快速返回 false，不挂起', { timeout: 1000 }, () => {
+    expect(matchGlobPath('src/app.ts', `src/${'a'.repeat(600)}`)).toBe(false);
+  });
+
+  it('合法 glob 行为保持（含 ? 与 {} 分支）', () => {
+    expect(matchGlobPath('tsconfigs.json', 'tsconfig?.json')).toBe(true);
+    expect(matchGlobPath('src/app.ts', '**/*.{ts,js}')).toBe(true);
+  });
 });

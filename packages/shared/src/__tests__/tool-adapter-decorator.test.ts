@@ -185,3 +185,31 @@ describe('wrapAdapter', () => {
     expect(result.hookModifications).toEqual(['after:rewrote', 'after:rewrote']);
   });
 });
+
+describe('wrapAdapter — 原型方法保留（回归）', () => {
+  it('wrapped adapter keeps isAvailable when the source adapter defines it on the class prototype', async () => {
+    class ProtoAdapter implements ToolAdapter {
+      meta = {
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'guard',
+        priority: 'P0',
+        installMode: 'builtin',
+        description: 'mock adapter',
+        cliCommand: 'eslint',
+        homepage: 'https://eslint.org',
+        license: 'MIT',
+      } as ToolAdapter['meta'];
+      async isAvailable(): Promise<boolean> {
+        return true;
+      }
+      async scan(): Promise<ToolResult> {
+        return makeResult();
+      }
+    }
+
+    const wrapped = wrapAdapter(new ProtoAdapter());
+    expect(typeof wrapped.isAvailable).toBe('function');
+    await expect(wrapped.isAvailable()).resolves.toBe(true);
+  });
+});

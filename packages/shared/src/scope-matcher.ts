@@ -1,6 +1,16 @@
 // ─── 路径范围匹配器（F5 权限边界）────────────────────────
 
+const ALNUM_RE = /[a-zA-Z0-9_-]/;
 const regexCache = new Map<string, RegExp[]>();
+
+/** glob 最大长度（防超长输入撑爆正则编译 / 回溯） */
+const MAX_GLOB_LENGTH = 512;
+/** glob 安全字符集：仅允许常见 glob 元字符与路径字符 */
+const SAFE_GLOB_RE = /^[a-zA-Z0-9_*?{}/,.-]+$/;
+
+function isSafeGlob(glob: string): boolean {
+  return glob.length <= MAX_GLOB_LENGTH && SAFE_GLOB_RE.test(glob);
+}
 
 function normalizePath(p: string): string {
   let out = p.replace(/\\/g, '/');
@@ -49,13 +59,14 @@ function globToRegExp(glob: string): RegExp {
       i += 1;
       continue;
     }
-    re += /[a-zA-Z0-9_-]/.test(c) ? c : '\\' + c;
+    re += ALNUM_RE.test(c) ? c : '\\' + c;
     i += 1;
   }
   return new RegExp(`^${re}$`);
 }
 
 function compilePattern(pattern: string): RegExp[] {
+  if (!isSafeGlob(pattern)) return [];
   const cached = regexCache.get(pattern);
   if (cached) return cached;
   const regexes = expandBraces(pattern).map(globToRegExp);

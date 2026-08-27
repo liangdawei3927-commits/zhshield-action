@@ -76,6 +76,8 @@ export function wrapAdapter(
 ): ToolAdapter {
   return {
     ...adapter,
+    // 原型方法不会被展开运算符拷贝，必须显式转发，否则下游 typeof isAvailable 校验误判接口不完整
+    isAvailable: () => adapter.isAvailable(),
     async scan(scanOptions: ToolScanOptions): Promise<HookedToolResult> {
       let currentOptions = scanOptions;
       for (const hook of hooks) {

@@ -3,7 +3,7 @@ import type { CodeSmell, TextEdit, Fix, FixResult } from './types';
 
 type FixGenerator = (smell: CodeSmell, sourceDir: string) => Fix | null;
 
-const FIELD_DECLARATION = /^(public\s+)?(static\s+|readonly\s+)*(?:\w+)\s*:\s/;
+const FIELD_DECLARATION = /^(public\s+)?(?:static readonly|readonly static|static|readonly)?\s*(?:\w+)\s*:\s/;
 const PUBLIC_PREFIX = /^public\s+/;
 const THEN_CHAIN = /\.then\(/;
 const METHOD_SIG = /^\s*(public|private|protected)?\s*(static\s+)?\w+\s*\(/;

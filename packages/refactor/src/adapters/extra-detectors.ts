@@ -7,6 +7,7 @@ import { makeSmell } from './adapter-types';
 const IDENT_CHAR_PAREN = /[a-zA-Z0-9_$)]/;
 const IDENT_CHAR = /[a-zA-Z0-9_$]/;
 const IDENT_FULL = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+const COLLECTION_TYPE_RE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
 export function detectInappropriateIntimacy(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
@@ -148,14 +149,13 @@ function countDelegatingMethods(cls: ParsedClass, sourceFile: ts.SourceFile): nu
 /** 收集类中被当作数据容器的字段（Map/Set/Array 等），对其方法调用不算委托 */
 function collectCollectionFields(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Set<string> {
   const result = new Set<string>();
-  const COLLECTION_TYPE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
   for (const member of cls.members) {
     if (!ts.isPropertyDeclaration(member) || !member.name) continue;
     const fieldName = member.name.getText(sourceFile);
 
     const typeText = member.type?.getText(sourceFile) ?? '';
-    if (COLLECTION_TYPE.test(typeText)) {
+    if (COLLECTION_TYPE_RE.test(typeText)) {
       result.add(fieldName);
       continue;
     }

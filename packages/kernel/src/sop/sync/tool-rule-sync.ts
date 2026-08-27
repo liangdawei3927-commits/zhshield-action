@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
+import { safeJoin, PathTraversalError } from '@zh/shared';
 import { resolveApiBase } from './api-base';
 import { HttpError, withRetry } from './retry';
 
@@ -279,7 +280,17 @@ export class ToolRuleSync {
     await fs.promises.rm(targetDir, { recursive: true, force: true });
     await fs.promises.mkdir(targetDir, { recursive: true });
     for (const record of records) {
-      const filePath = path.join(targetDir, record.filename);
+      let filePath: string;
+      try {
+        filePath = safeJoin(targetDir, record.filename);
+      } catch (err) {
+        if (err instanceof PathTraversalError) {
+          // 拒绝路径穿越：越界条目不写盘到 targetDir 之外
+          console.warn(`[tool-rule-sync] skipping unsafe rule filename: ${record.filename}`);
+          continue;
+        }
+        throw err;
+      }
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(filePath, record.content, 'utf-8');
     }

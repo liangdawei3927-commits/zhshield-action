@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as yazl from 'yazl';
+import { safeJoin, PathTraversalError } from '@zh/shared';
 import { pipeline } from 'node:stream/promises';
 import { hashFile } from './utils';
 import { openZipArchive, toZipEntryName } from './zip-archive';
@@ -122,7 +123,18 @@ export async function restoreFromZipArchive(
 
     for (const entry of files) {
       if (abortSignal?.aborted) break;
-      const targetPath = path.join(targetDir, entry.relativePath);
+      let targetPath: string;
+      try {
+        targetPath = safeJoin(targetDir, entry.relativePath);
+      } catch (err) {
+        if (err instanceof PathTraversalError) {
+          // 防御纵深：即使底层 zip 库未拦截，也绝不写盘到 targetDir 之外
+          failed++;
+          problems.push(`${entry.relativePath}: path traversal blocked`);
+          continue;
+        }
+        throw err;
+      }
       try {
         await extractZipEntry(archive, entry.relativePath, targetPath);
         restored++;

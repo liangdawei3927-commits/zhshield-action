@@ -17,6 +17,10 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
+const SCHEME_RE = /^[a-z]+:\/\//i;
+const USER_RE = /^[^@]+@/;
+const HOST_SPLIT_RE = /[:/]/;
+
 /** gitleaks RuleID → 归一化 SecretType（未知规则 → generic-api-key） */
 const RULE_TO_TYPE: Record<string, SecretType> = {
   'aws-access-token': 'aws-access-key',
@@ -106,7 +110,7 @@ export function classifySeverity(params: {
 
 /** 排序：critical→high→medium→low；同级 stillReferenced 优先（附 C.4） */
 export function sortFindings(findings: SecretFinding[]): SecretFinding[] {
-  return [...findings].sort((a, b) => {
+  return findings.toSorted((a, b) => {
     const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
     if (sev !== 0) return sev;
     return Number(b.stillReferenced) - Number(a.stillReferenced);
@@ -117,9 +121,9 @@ export function sortFindings(findings: SecretFinding[]): SecretFinding[] {
 export function parseRemoteHost(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
-  const withoutScheme = trimmed.replace(/^[a-z]+:\/\//i, '');
-  const withoutUser = withoutScheme.replace(/^[^@]+@/, '');
-  const host = withoutUser.split(/[:/]/)[0];
+  const withoutScheme = trimmed.replace(SCHEME_RE, '');
+  const withoutUser = withoutScheme.replace(USER_RE, '');
+  const host = withoutUser.split(HOST_SPLIT_RE)[0];
   return host || '';
 }
 
@@ -127,7 +131,7 @@ export function parseRemoteHost(url: string): string {
 export function isPublicRemoteUrl(url: string): boolean {
   const host = parseRemoteHost(url);
   if (!host) return false;
-  return PUBLIC_HOSTS.has(host) || [...PUBLIC_HOSTS].some((h) => host.endsWith(`.${h}`));
+  return PUBLIC_HOSTS.has(host) || [...PUBLIC_HOSTS].some((h: string) => host.endsWith(`.${h}`));
 }
 
 /** 默认命令执行器：gitleaks 检出密钥时退出码非 0 但 stdout 含有效 JSON，需保留 stdout */

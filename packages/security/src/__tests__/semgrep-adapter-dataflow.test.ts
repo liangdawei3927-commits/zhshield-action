@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({ mockStdout: '' }));
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
-    const cb = args[args.length - 1] as (
+    const cb = args.at(-1) as (
       err: Error | null,
       result: { stdout: string; stderr: string },
     ) => void;

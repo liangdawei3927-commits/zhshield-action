@@ -37,7 +37,8 @@ const SCRIPT_SUSPICIOUS_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 const HIDDEN_STYLE_PATTERN = /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px)?\s*[;'"}]/i;
 const ANCHOR_TAG_PATTERN = /<a\b[^>]*>/gi;
 const MD_LINK_TARGET_PATTERN = /\[[^\]]*\]\(([^)]*)\)/g;
-const ZERO_WIDTH_PATTERN = /(?:\u200B|\u200C|\u200D|\u2060|\uFEFF)/;
+ 
+const ZERO_WIDTH_PATTERN = new RegExp('\\u200B|\\u200C|\\u200D|\\u2060|\\uFEFF');
 
 export interface ScriptVerdict {
   script: string;

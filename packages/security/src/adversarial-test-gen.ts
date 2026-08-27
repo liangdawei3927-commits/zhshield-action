@@ -16,6 +16,8 @@
 //     benign-code-footer|benign-doc-lines|benign-extra-script}
 import { load as loadYaml } from 'js-yaml';
 
+const HEX4_RE = /^[0-9A-Fa-f]{4}$/;
+
 export type AttackCategory = 'prompt-injection' | 'supply-chain' | 'secret-exfiltration' | 'ui-redress';
 
 export type TargetDetector =
@@ -69,7 +71,8 @@ const CATEGORIES: readonly AttackCategory[] = ['prompt-injection', 'supply-chain
 const DETECTORS: readonly TargetDetector[] = ['scanCommentInstructions', 'classifyPackageJsonScripts', 'scanMarkdownHiddenLinks', 'isEnvFile'];
 const COMMENT_STYLES: readonly CommentStyle[] = ['line-slash', 'line-hash', 'block', 'html'];
 const CONTEXT_PRESETS: readonly ContextPreset[] = ['benign-code-header', 'benign-doc-lines', 'benign-extra-script', 'benign-code-footer'];
-const ZERO_WIDTH_FAMILY = /(?:\u200B|\u200C|\u200D|\u2060|\uFEFF)/g;
+ 
+const ZERO_WIDTH_FAMILY = new RegExp('\\u200B|\\u200C|\\u200D|\\u2060|\\uFEFF', 'g');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -116,7 +119,7 @@ function parseDiversifier(raw: unknown, source: string): Diversifier {
       return { type, find: requireString(raw, 'find', source), replaceWith: requireString(raw, 'replaceWith', source) };
     case 'zeroWidth': {
       const codepoint = requireString(raw, 'codepoint', source);
-      if (!/^[0-9A-Fa-f]{4}$/.test(codepoint)) return fail(source, `zeroWidth.codepoint must be 4 hex digits, got '${codepoint}'`);
+      if (!HEX4_RE.test(codepoint)) return fail(source, `zeroWidth.codepoint must be 4 hex digits, got '${codepoint}'`);
       return { type, codepoint };
     }
     case 'fileName':

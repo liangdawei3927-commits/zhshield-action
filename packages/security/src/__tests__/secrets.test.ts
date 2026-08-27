@@ -12,10 +12,12 @@ import {
 } from '../index';
 import type { CommandRunner, SecretFinding } from '../secrets/types';
 
+const SHA256_RE = /^[0-9a-f]{64}$/;
+
 describe('secrets 纯函数', () => {
   it('hashSecret 确定性且不落明文', () => {
     expect(hashSecret('sk-abc123')).toBe(hashSecret('sk-abc123'));
-    expect(hashSecret('sk-abc123')).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashSecret('sk-abc123')).toMatch(SHA256_RE);
     expect(hashSecret('sk-abc123')).not.toContain('sk-abc123');
   });
 
@@ -105,7 +107,7 @@ describe('SecretLifecycleManager', () => {
     expect(f.stillReferenced).toBe(true);
     expect(f.status).toBe('active');
     expect(f.displayValue).toContain('****');
-    expect(f.secretId).toMatch(/^[0-9a-f]{64}$/);
+    expect(f.secretId).toMatch(SHA256_RE);
     expect(report.lastScannedCommit).toBe('');
   });
 

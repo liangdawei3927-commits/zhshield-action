@@ -18,6 +18,10 @@ import {
   scanMarkdownHiddenLinks,
 } from '../injection-guard';
 
+const DESCRIPTION_ERR_RE = /description/;
+const BASE_TEMPLATE_ERR_RE = /baseTemplate/;
+const BENIGN_DOC_LINES_ERR_RE = /benign-doc-lines/;
+
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PATTERN_DIR = path.join(TEST_DIR, 'attack-patterns');
 const HANDWRITTEN_FIXTURE_ROOT = path.join(TEST_DIR, 'fixtures', 'injection');
@@ -91,13 +95,13 @@ describe('F4-1 attack-pattern corpus', () => {
   });
 
   it('rejects malformed patterns instead of guessing', () => {
-    expect(() => loadAttackPatternsFromSources(['patternId: only-id'])).toThrow(/description/);
+    expect(() => loadAttackPatternsFromSources(['patternId: only-id'])).toThrow(DESCRIPTION_ERR_RE);
     expect(() => loadAttackPatternsFromSources([
       'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\n',
-    ])).toThrow(/baseTemplate/);
+    ])).toThrow(BASE_TEMPLATE_ERR_RE);
     expect(() => loadAttackPatternsFromSources([
       'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\nbaseTemplate: t\nlocalDiversifiers:\n  - type: contextPrefix\n    preset: benign-doc-lines\n',
-    ])).toThrow(/benign-doc-lines/);
+    ])).toThrow(BENIGN_DOC_LINES_ERR_RE);
   });
 });
 

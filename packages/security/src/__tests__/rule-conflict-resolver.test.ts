@@ -21,7 +21,7 @@ function makeIssue(overrides: Partial<Issue> & { ruleId: string; fingerprint: st
 
 /** 测试专用破坏器：给合法 finding 打上缺字段/坏字段的补丁（无类型断言） */
 function corrupt(finding: RuleFinding, patch: Record<string, unknown>): RuleFinding {
-  return Object.assign({ ...finding }, patch);
+  return { ...finding , ...patch};
 }
 
 const SEMGREP_BACKDOOR = makeIssue({

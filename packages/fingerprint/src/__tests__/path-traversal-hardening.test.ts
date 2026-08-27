@@ -52,4 +52,18 @@ describe('expandWorkspaceGlobs path-traversal hardening', () => {
     const dirs = expandWorkspaceGlobs(root, ['packages/app']);
     expect(dirs).toEqual(['packages/app']);
   });
+
+  it('GIVEN workspace pattern 指向 projectRoot 外的 symlink WHEN expandWorkspaceGlobs THEN symlink 逃逸被阻断且合法目录仍返回', () => {
+    const root = makeTempRoot();
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-pt-hardening-outside-'));
+    fs.mkdirSync(path.join(root, 'packages', 'app'), { recursive: true });
+    fs.symlinkSync(outsideDir, path.join(root, 'escape-link'));
+    try {
+      const dirs = expandWorkspaceGlobs(root, ['escape-link', 'packages/app']);
+      expect(dirs).not.toContain('escape-link');
+      expect(dirs).toContain('packages/app');
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
 });

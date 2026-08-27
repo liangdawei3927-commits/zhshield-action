@@ -2,7 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeJoin } from '@zh/shared';
+import { safeJoinReal } from '@zh/shared';
 import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
@@ -57,7 +57,7 @@ export function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): s
     if (!pattern.includes('*')) {
       let absDir: string;
       try {
-        absDir = safeJoin(projectRoot, pattern);
+        absDir = safeJoinReal(projectRoot, pattern);
       } catch {
         continue; // 越界 pattern（含 .. 或绝对路径），跳过
       }
@@ -71,7 +71,7 @@ export function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): s
     if (globIdx === -1) continue;
     let baseDir: string;
     try {
-      baseDir = safeJoin(projectRoot, ...parts.slice(0, globIdx));
+      baseDir = safeJoinReal(projectRoot, ...parts.slice(0, globIdx));
     } catch {
       continue;
     }

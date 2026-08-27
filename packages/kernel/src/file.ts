@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 
 export class FileHelper {
   static async readJSON(filePath: string): Promise<unknown> {
@@ -25,11 +26,11 @@ export class FileHelper {
     const results: string[] = [];
     const dirEntries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of dirEntries) {
-      const fullPath = path.join(dir, entry.name);
+      const fullPath = safeJoin(dir, entry.name);
       if (entry.isDirectory()) {
         const sub = await this.glob(pattern, fullPath);
         results.push(...sub);
-      } else if (entry.name.includes(pattern.replace('*', ''))) {
+      } else if (entry.name.includes(pattern.replace(/\*/g, ''))) {
         results.push(fullPath);
       }
     }

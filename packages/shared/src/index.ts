@@ -97,3 +97,6 @@ export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEve
 export { NOOP_EMITTER } from './events';
 
 export { sanitizeEnv } from './process-env';
+export { augmentProcessPath } from './path-augment';
+export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';
+export { safeJoin, safeResolve, PathTraversalError } from './security/safe-path';

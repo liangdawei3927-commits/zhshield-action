@@ -10,6 +10,15 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { MalwareItem } from './types';
+import { safeJoin } from '@zh/shared';
+
+const EXTRAS_RE = /\[.*?\]/g;
+const NEWLINE_RE = /\r?\n/;
+const COMMENT_RE = /#.*/;
+const SECTION_HEADER_RE = /^\s*\[/m;
+const HEADER_NAME_RE = /^([^\]]+)\]/;
+const DEPS_BLOCK_RE = /dependencies\s*=\s*\[/;
+const PYPROJECT_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
 
 /** 已知恶意 / 仿冒 PyPI 包（社区确认并已从 PyPI 移除，仅收录整名即为恶意的包） */
 const KNOWN_MALICIOUS_PACKAGES = new Set<string>([
@@ -34,8 +43,8 @@ function normalizePyName(name: string): string {
   return name.toLowerCase().replace(/-/g, '_');
 }
 
-const MALICIOUS_LOOKUP = new Set<string>([...KNOWN_MALICIOUS_PACKAGES].map(normalizePyName));
-const POPULAR_LOOKUP = new Set<string>([...KNOWN_POPULAR_PACKAGES].map(normalizePyName));
+const MALICIOUS_LOOKUP = new Set<string>(Array.from(KNOWN_MALICIOUS_PACKAGES, normalizePyName));
+const POPULAR_LOOKUP = new Set<string>(Array.from(KNOWN_POPULAR_PACKAGES, normalizePyName));
 
 /** 编辑距离阈值：短包名更宽松（仿冒通常只差一两个字符） */
 function typosquatThreshold(name: string): number {
@@ -63,18 +72,20 @@ function levenshtein(a: string, b: string): number {
   return prev[n];
 }
 
+const PACKAGE_NAME_RE = /^[A-Za-z0-9_.-]+/;
+
 /** 从引号值中提取包名（剥离 extras 与版本说明符；如 "flask[async]>=2.0" → flask） */
 function quotedPackageName(value: string): string | null {
-  const withoutExtras = value.replace(/\[.*?\]/g, '');
-  const m = withoutExtras.match(/^[A-Za-z0-9_.-]+/);
+  const withoutExtras = value.replace(EXTRAS_RE, '');
+  const m = withoutExtras.match(PACKAGE_NAME_RE);
   return m ? m[0] : null;
 }
 
 /** requirements.txt：逐行剥离 # 注释，跳过空行与以 - 开头的选项行，extras 与版本说明符由 quotedPackageName 剥离 */
 function extractRequirementsNames(content: string): string[] {
   const names = new Set<string>();
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*/, '').trim();
+  for (const rawLine of content.split(NEWLINE_RE)) {
+    const line = rawLine.replace(COMMENT_RE, '').trim();
     if (line === '' || line.startsWith('-')) continue;
     const name = quotedPackageName(line);
     if (name) names.add(name);
@@ -105,13 +116,13 @@ function extractPipfileNames(content: string): string[] {
  */
 function extractPyprojectNames(content: string): string[] {
   const names = new Set<string>();
-  const sections = content.split(/^\s*\[/m);
+  const sections = content.split(SECTION_HEADER_RE);
   for (const section of sections) {
-    const header = section.match(/^([^\]]+)\]/);
+    const header = section.match(HEADER_NAME_RE);
     if (!header) continue;
     const sectionName = header[1].trim().toLowerCase();
     if (sectionName === 'project') {
-      const depsBlock = section.match(/dependencies\s*=\s*\[/);
+      const depsBlock = section.match(DEPS_BLOCK_RE);
       if (!depsBlock) continue;
       const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
       for (const m of block.matchAll(/"([^"]+)"/g)) {
@@ -119,9 +130,9 @@ function extractPyprojectNames(content: string): string[] {
         if (name) names.add(name);
       }
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
-      for (const line of section.split(/\r?\n/)) {
+      for (const line of section.split(NEWLINE_RE)) {
         if (line.trim().startsWith('[')) continue;
-        const key = line.match(/^\s*([A-Za-z0-9_.-]+)\s*=/);
+        const key = line.match(PYPROJECT_KEY_RE);
         if (key) names.add(key[1]);
       }
     }
@@ -131,15 +142,15 @@ function extractPyprojectNames(content: string): string[] {
 
 /** 按优先级探测 Python 依赖清单（requirements.txt → Pipfile.lock → pyproject.toml），无清单时返回 null */
 function findPythonManifest(projectPath: string): { file: string; names: string[] } | null {
-  const requirementsPath = path.join(projectPath, 'requirements.txt');
+  const requirementsPath = safeJoin(projectPath, 'requirements.txt');
   if (fs.existsSync(requirementsPath)) {
     return { file: requirementsPath, names: extractRequirementsNames(fs.readFileSync(requirementsPath, 'utf-8')) };
   }
-  const pipfilePath = path.join(projectPath, 'Pipfile.lock');
+  const pipfilePath = safeJoin(projectPath, 'Pipfile.lock');
   if (fs.existsSync(pipfilePath)) {
     return { file: pipfilePath, names: extractPipfileNames(fs.readFileSync(pipfilePath, 'utf-8')) };
   }
-  const pyprojectPath = path.join(projectPath, 'pyproject.toml');
+  const pyprojectPath = safeJoin(projectPath, 'pyproject.toml');
   if (fs.existsSync(pyprojectPath)) {
     return { file: pyprojectPath, names: extractPyprojectNames(fs.readFileSync(pyprojectPath, 'utf-8')) };
   }

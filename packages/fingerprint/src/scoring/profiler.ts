@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 import type {
   ScoringProfileResult,
   ScoringProjectProfile,
@@ -11,7 +11,7 @@ import type {
   Runtime,
   ModuleProfile,
 } from './types';
-import { scanProject, readConfig, hasFile, type ScanResult } from './file-scanner';
+import { scanProject, type ScanResult } from './file-scanner';
 import { detectLanguage } from './detectors/language-detector';
 import { detectFramework } from './detectors/framework-detector';
 import { detectProjectType } from './detectors/type-detector';
@@ -56,7 +56,7 @@ function hasConfigFileEvidence(signals: ProfileSignal[], field: InferableField):
  * 不递归嵌套 monorepo，不收集完整 signals（控制成本）。
  */
 function profileModule(scan: ScanResult, moduleRel: string): ModuleProfile | null {
-  const moduleRoot = path.join(scan.projectRoot, moduleRel);
+  const moduleRoot = safeJoin(scan.projectRoot, moduleRel);
   if (!fs.existsSync(moduleRoot)) return null;
 
   const subScan = scanProject(moduleRoot, { maxDepth: 8, maxFiles: 5000 });
@@ -93,7 +93,7 @@ function discoverModules(scan: ScanResult): string[] {
   const moduleDirs = ['packages', 'apps', 'services', 'libs', 'modules'];
   const result: string[] = [];
   for (const dir of moduleDirs) {
-    const abs = path.join(scan.projectRoot, dir);
+    const abs = safeJoin(scan.projectRoot, dir);
     if (!fs.existsSync(abs)) continue;
     try {
       const entries = fs.readdirSync(abs, { withFileTypes: true });
@@ -239,7 +239,7 @@ export class ProjectProfiler {
       const l = s.inferred.language;
       if (l && l !== primary && l !== 'unknown') langs.add(l);
     }
-    return Array.from(langs);
+    return [...langs];
   }
 
   private collectDetectedFiles(signals: ProfileSignal[]): string[] {
@@ -249,7 +249,7 @@ export class ProjectProfiler {
         files.add(s.file);
       }
     }
-    return Array.from(files).sort();
+    return [...files].sort();
   }
 }
 

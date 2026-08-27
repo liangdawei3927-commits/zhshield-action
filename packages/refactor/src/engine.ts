@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { safeJoin, safeResolve } from '@zh/shared';
 import { parseFile, type ParsedFile } from './ast-helper';
 import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
 import type {
@@ -191,7 +191,7 @@ export class RefactorEngine {
       const stagedFiles = output
         .split('\n')
         .filter(f => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx')))
-        .map(f => path.resolve(projectRoot, f));
+        .map(f => safeResolve(projectRoot, f));
       return this.analyzeFiles(projectRoot, stagedFiles);
     } catch (e) {
       warn(`Git diff 失败: ${e}`);
@@ -267,7 +267,8 @@ export class RefactorEngine {
     }
 
     for (const entry of entries) {
-      const fullPath = path.join(current, entry.name);
+      if (entry.name === '.' || entry.name === '..') continue;
+      const fullPath = safeJoin(current, entry.name);
       if (entry.isDirectory()) {
         if (this.isExcludedDir(entry.name)) continue;
         this.walkTsFiles(fullPath, files);

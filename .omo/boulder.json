@@ -1,13 +1,37 @@
 {
   "schema_version": 2,
-  "active_work_id": "simula-hardening",
+  "active_work_id": "zhshield-security-remediation",
   "works": {
     "simula-hardening": {
       "work_id": "simula-hardening",
       "active_plan": ".omo/plans/zhcodeshield-simula-hardening.md",
       "plan_name": "zhcodeshield-simula-hardening",
       "session_ids": ["opencode:simula-hardening"],
-      "status": "active",
+      "status": "completed",
+      "worktree_path": null
+    },
+    "zhshield-healthcheck-fixes": {
+      "work_id": "zhshield-healthcheck-fixes",
+      "active_plan": ".omo/plans/zhshield-healthcheck-fixes.md",
+      "plan_name": "zhshield-healthcheck-fixes",
+      "session_ids": ["opencode:zhshield-healthcheck-fixes-2026-08-27"],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "zhshield-security-triage": {
+      "work_id": "zhshield-security-triage",
+      "active_plan": ".omo/plans/zhshield-security-triage.md",
+      "plan_name": "zhshield-security-triage",
+      "session_ids": ["opencode:zhshield-security-triage-2026-08-27"],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "zhshield-security-remediation": {
+      "work_id": "zhshield-security-remediation",
+      "active_plan": ".omo/plans/zhshield-security-remediation.md",
+      "plan_name": "zhshield-security-remediation",
+      "session_ids": ["opencode:zhshield-security-remediation-2026-08-27"],
+      "status": "completed",
       "worktree_path": null
     }
   }

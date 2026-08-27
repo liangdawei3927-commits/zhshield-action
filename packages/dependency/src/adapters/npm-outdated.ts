@@ -12,8 +12,8 @@
  */
 import { execFile as execFileCb } from 'child_process';
 import * as fs from 'fs';
-import * as path from 'path';
 import { promisify } from 'util';
+import { safeJoin } from '@zh/shared';
 
 const execFileAsync = promisify(execFileCb);
 
@@ -117,7 +117,7 @@ function toErrorMessage(error: unknown): string {
  */
 export async function checkOutdated(projectPath: string): Promise<OutdatedDependencyInfo[]> {
   // 1. 校验 package.json 存在
-  const pkgJsonPath = path.join(projectPath, 'package.json');
+  const pkgJsonPath = safeJoin(projectPath, 'package.json');
   if (!fs.existsSync(pkgJsonPath)) {
     throw new NpmOutdatedError(
       `未找到 package.json：${pkgJsonPath}`,

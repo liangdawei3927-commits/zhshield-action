@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { EventCenter, FileMonitor, ProcessMonitor, LogCollector, AutoFixer } from '@zh/sentinel';
 import type { SentinelEvent, AlertPayload, EventStatus, EventSeverity } from '@zh/sentinel';
 import { DbConnection } from '@zh/db';
+import { safeJoin } from '@zh/shared';
 import * as path from 'path';
 
 @Injectable()
@@ -28,7 +29,7 @@ export class SentinelService implements OnModuleDestroy {
         this.dbConn = new DbConnection({ dbPath, walMode: true });
         const db = this.dbConn.connect();
         this.dbConn.migrate(
-          path.join(path.dirname(dbPath), '..', 'migrations'),
+          safeJoin(path.dirname(dbPath), '..', 'migrations'),
         );
         this.eventCenter.setDb(db);
         this.logger.log('Sentinel persistence initialized');

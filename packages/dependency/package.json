@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "@zh/i18n": "workspace:*"
+    "@zh/i18n": "workspace:*",
+    "@zh/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

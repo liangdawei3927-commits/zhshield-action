@@ -10,6 +10,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
 
 /** 已知体积较大的第三方库（全量引入会显著增大产物 / 阻塞摇树） */
@@ -91,8 +92,8 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
     const issues: PerformanceIssue[] = [];
 
-    const pkg = readJsonSafe(path.join(projectRoot, 'package.json'));
-    const srcRoot = path.join(projectRoot, SOURCE_DIRS[0]);
+    const pkg = readJsonSafe(safeJoin(projectRoot, 'package.json'));
+    const srcRoot = safeJoin(projectRoot, SOURCE_DIRS[0]);
 
     // ── A) tree-shaking 维度 ──
     if (pkg) {
@@ -200,9 +201,10 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       } catch {
         return;
       }
-      for (const entry of entries) {
+       for (const entry of entries) {
+        if (entry.name === '.' || entry.name === '..') continue;
         if (files.length >= limit) return;
-        const full = path.join(current, entry.name);
+        const full = safeJoin(current, entry.name);
         if (entry.isDirectory()) {
           // 跳过 node_modules 与产物目录，避免误扫依赖自身源码
           if (entry.name === 'node_modules' || ARTIFACT_DIRS.includes(entry.name)) continue;
@@ -226,14 +228,15 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       } catch {
         return;
       }
-      for (const entry of entries) {
-        const full = path.join(dir, entry.name);
+       for (const entry of entries) {
+        if (entry.name === '.' || entry.name === '..') continue;
+        const full = safeJoin(dir, entry.name);
         if (entry.isDirectory()) {
-          visit(full, path.join(prefix, entry.name));
+          visit(full, safeJoin(prefix, entry.name));
         } else if (entry.isFile() && entry.name.endsWith('.js') && !entry.name.endsWith('.map')) {
           try {
             const size = fs.statSync(full).size;
-            chunks.push({ file: path.join(prefix, entry.name).split(path.sep).join('/'), size });
+            chunks.push({ file: safeJoin(prefix, entry.name).split(path.sep).join('/'), size });
           } catch {
             // 文件不可读时跳过
           }
@@ -241,7 +244,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       }
     };
     for (const dirName of ARTIFACT_DIRS) {
-      const dir = path.join(projectRoot, dirName);
+      const dir = safeJoin(projectRoot, dirName);
       if (fs.existsSync(dir)) visit(dir, dirName);
     }
     return chunks;

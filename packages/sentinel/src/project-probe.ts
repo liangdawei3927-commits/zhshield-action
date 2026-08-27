@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 
 /** 项目运行命令识别结果 */
 export interface DetectedRunCommand {
@@ -32,7 +32,7 @@ export function parseRunCommand(packageJson: string): DetectedRunCommand | null 
 
 /** 读取项目 package.json 并识别运行命令 */
 export function detectRunCommand(projectPath: string): DetectedRunCommand | null {
-  const pkgPath = path.join(projectPath, 'package.json');
+  const pkgPath = safeJoin(projectPath, 'package.json');
   if (!fs.existsSync(pkgPath)) return null;
   try {
     return parseRunCommand(fs.readFileSync(pkgPath, 'utf-8'));
@@ -54,7 +54,7 @@ export function discoverLogPaths(projectPath: string, limit = 20): string[] {
     }
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(extension)) continue;
-      const file = path.join(dir, entry.name);
+      const file = safeJoin(dir, entry.name);
       try {
         candidates.push({ file, mtimeMs: fs.statSync(file).mtimeMs });
       } catch {
@@ -63,7 +63,7 @@ export function discoverLogPaths(projectPath: string, limit = 20): string[] {
     }
   };
 
-  collect(path.join(projectPath, 'logs'), '.log');
+  collect(safeJoin(projectPath, 'logs'), '.log');
   collect(projectPath, '.log');
 
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);

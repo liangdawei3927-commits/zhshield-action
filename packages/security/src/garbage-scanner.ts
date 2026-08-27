@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { GarbageItem, GarbageCleanResult, GarbageRestoreResult, GarbageType } from './types';
 import type { Issue } from '@zh/shared';
+import { safeJoin, safeResolve } from '@zh/shared';
 
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.turbo',
@@ -47,7 +48,7 @@ export class GarbageScanner {
         return;
       }
       for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
+        const fullPath = safeJoin(dir, entry.name);
         if (entry.isDirectory()) {
           if (!IGNORE_DIRS.has(entry.name)) scanDir(fullPath, depth + 1);
           continue;
@@ -106,7 +107,7 @@ export const scanGarbage = (projectPath: string): Promise<GarbageItem[]> =>
   new GarbageScanner().scan(projectPath);
 
 export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): GarbageCleanResult {
-  const root = path.resolve(projectPath);
+  const root = safeResolve(projectPath, '.');
   const cleaned: GarbageItem[] = [];
   const failed: string[] = [];
   let batchId = '';
@@ -122,18 +123,20 @@ export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): G
       failed.push(`${item.id}: unused-dependency 需通过包管理器移除，已跳过`);
       continue;
     }
-    const absPath = path.resolve(root, item.path);
-    if (!absPath.startsWith(root + path.sep)) {
+    let absPath: string;
+    try {
+      absPath = safeResolve(root, item.path);
+    } catch {
       failed.push(`${item.id}: 越界路径 ${item.path}`);
       continue;
     }
     try {
       if (!batchId) {
         batchId = randomUUID();
-        trashDir = path.join(root, '.zhshield', 'trash', batchId);
+        trashDir = safeJoin(root, '.zhshield', 'trash', batchId);
         fs.mkdirSync(trashDir, { recursive: true });
       }
-      const dest = path.join(trashDir, item.path);
+      const dest = safeJoin(trashDir, item.path);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.renameSync(absPath, dest);
       freedBytes += item.size;
@@ -151,8 +154,8 @@ export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): G
 }
 
 export function restoreGarbage(projectPath: string, batchId: string): GarbageRestoreResult {
-  const root = path.resolve(projectPath);
-  const batchDir = path.join(root, '.zhshield', 'trash', batchId);
+  const root = safeResolve(projectPath, '.');
+  const batchDir = safeJoin(root, '.zhshield', 'trash', batchId);
   if (!fs.existsSync(batchDir)) {
     throw new Error(`trash batch 不存在: ${batchId}`);
   }
@@ -163,13 +166,13 @@ export function restoreGarbage(projectPath: string, batchId: string): GarbageRes
 
   const restoreDir = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
+      const full = safeJoin(dir, entry.name);
       if (entry.isDirectory()) {
         restoreDir(full);
         continue;
       }
       const rel = path.relative(batchDir, full);
-      const dest = path.join(root, rel);
+      const dest = safeJoin(root, rel);
       if (fs.existsSync(dest)) {
         failed.push(`${rel}: 目标位置已有文件，跳过恢复`);
         continue;

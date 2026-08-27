@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { sanitizeLogField, safeJoin } from '@zh/shared';
 import { EventCenter } from './event-center';
 
 export type FileChangeType = 'add' | 'change' | 'unlink';
@@ -101,13 +102,13 @@ export class FileMonitor {
     try {
       const watcher = fs.watch(watchPath, { recursive: true }, (eventType, filename) => {
         if (!this.running || !filename) return;
-        const fullPath = path.join(watchPath, filename);
+        const fullPath = safeJoin(watchPath, filename);
         if (config.filter && !config.filter(fullPath)) return;
         this.handleChange(config.projectId, fullPath, eventType as FileChangeType);
       });
       this.watchers.set(watchPath, watcher);
     } catch (err) {
-      console.error(`[FileMonitor] Failed to watch ${watchPath}:`, err);
+      console.error('[FileMonitor] Failed to watch %s:', sanitizeLogField(watchPath), err);
     }
   }
 
@@ -137,11 +138,11 @@ export class FileMonitor {
     }
     for (const entry of entries) {
       if (entry.isDirectory() && !state.ignoreSet.has(entry.name)) {
-        state.stack.push(path.join(dir, entry.name));
+        state.stack.push(safeJoin(dir, entry.name));
         continue;
       }
       if (!entry.isFile()) continue;
-      this.inspectFileEntry(path.join(dir, entry.name), state.watchPath, state.config);
+      this.inspectFileEntry(safeJoin(dir, entry.name), state.watchPath, state.config);
     }
   }
 

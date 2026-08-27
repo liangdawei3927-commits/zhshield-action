@@ -12,6 +12,18 @@
  */
 import type { DependencyGraph } from '../types';
 
+// ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
+/** 数字检测 */
+const CONTAINS_DIGIT_RE = /\d/;
+
+/** 知名包名安全字符集（target 来自常量清单，仍按不可信输入校验） */
+const SAFE_TARGET_RE = /^[a-z0-9._-]{1,64}$/i;
+
+/** 转义正则特殊字符（target 为常量清单项，转义后作为字面量匹配） */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ────────────────────────────── 公开接口（附 B.3 ①） ──────────────────────────────
 
 /** 投毒检测器：输入依赖图谱 → 输出可疑包列表（含可解释证据） */
@@ -205,10 +217,12 @@ function visualConfusionTarget(variantSet: Set<string>): string | null {
 /** 名称中的数字 / 连字符等可疑异常，输出可解释行为标记 */
 function collectBehaviorFlags(name: string, target: string): string[] {
   const flags: string[] = [];
-  if (/\d/.test(name)) flags.push('name-contains-digit');
+  if (CONTAINS_DIGIT_RE.test(name)) flags.push('name-contains-digit');
   if (name.includes('-')) flags.push('name-contains-hyphen');
   // 知名包名 + '-<数字>' 后缀（如 'lodash-2'）：疑似冒名版本号
-  if (new RegExp(`^${target}-\\d+$`).test(name)) flags.push('known-name-version-suffix');
+  if (SAFE_TARGET_RE.test(target) && new RegExp(`^${escapeRegExp(target)}-\\d+$`).test(name)) {
+    flags.push('known-name-version-suffix');
+  }
   return flags;
 }
 

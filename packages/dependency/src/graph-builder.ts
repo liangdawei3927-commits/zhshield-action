@@ -15,6 +15,43 @@ import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
 import type { DependencyEdge, DependencyGraph, DependencyNode, Ecosystem, LockfileStatus, TrustStatus } from './types';
 import { ROOT_NODE_ID } from './types';
+import { safeJoin } from '@zh/shared';
+
+// ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
+/** 换行符拆分 */
+const NEWLINE_RE = /\r?\n/;
+/** 行首缩进检测 */
+const INDENT_RE = /^\s*/;
+/** yarn块字段行 'key value' */
+const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
+/** 精确版本约束：'==2.3.2' / '===2.3.2' */
+const EXACT_CONSTRAINT_RE = /^(?:==|===)\s*(.+)$/;
+/** 非数字前缀剥离 */
+const NON_DIGIT_PREFIX_RE = /^[^0-9]*/;
+/** PEP 508 入口：包名 + 剩余约束 */
+const PEP508_ENTRY_RE = /^([A-Za-z0-9_.-]+)(.*)$/;
+/** 行注释剥离（#...） */
+const COMMENT_STRIPPING_RE = /#.*/;
+/** PEP 508 包名 */
+const PEP508_NAME_RE = /^[A-Za-z0-9_.-]+/;
+/** 版本约束操作符匹配 */
+const CONSTRAINT_RE = /(?:==|>=|<=|!=|~=|===|>|<)\s*[^\s]+/;
+/** poetry 约束值 version = "..." */
+const POETRY_VERSION_VALUE_RE = /version\s*=\s*["']([^"']+)["']/;
+/** TOML 节头拆分 */
+const TOML_SECTION_RE = /^\s*\[/m;
+/** TOML 节标题提取 */
+const TOML_HEADER_RE = /^([^\]]+)\]/;
+/** TOML dependencies 数组起始 */
+const TOML_DEPS_ARRAY_RE = /dependencies\s*=\s*\[/;
+/** poetry.toml 键行 */
+const POETRY_TOML_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
+/** poetry.lock 包块分隔 */
+const POETRY_BLOCK_RE = /^\s*\[\[package\]\]\s*$/m;
+/** poetry.lock name 字段 */
+const POETRY_NAME_FIELD_RE = /^\s*name\s*=\s*["']([^"']+)["']/m;
+/** poetry.lock version 字段 */
+const POETRY_VERSION_FIELD_RE = /^\s*version\s*=\s*["']([^"']+)["']/m;
 
 /** 构建结果：节点 + 边 + 锁文件是否可解析 */
 interface BuildResult {
@@ -68,7 +105,7 @@ function readTextSafe(filePath: string): string | null {
 
 /** 读取 package.json 的 dependencies / devDependencies 声明 */
 function readPackageJson(projectPath: string): DirectDeps | null {
-  const data = readJsonSafe(path.join(projectPath, 'package.json'));
+  const data = readJsonSafe(safeJoin(projectPath, 'package.json'));
   if (!data) return null;
 
   const dependencies: Record<string, string> = {};
@@ -373,10 +410,10 @@ function parseYarnLock(content: string): YarnBlock[] {
   const blocks: YarnBlock[] = [];
   let current: YarnBlock | null = null;
 
-  for (const rawLine of content.split(/\r?\n/)) {
+  for (const rawLine of content.split(NEWLINE_RE)) {
     const trimmed = rawLine.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(/^\s*/)?.[0].length ?? 0;
+    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
 
     if (indent === 0 && trimmed.endsWith(':')) {
       // 块头：剥离整体引号后再按逗号拆分键
@@ -391,7 +428,7 @@ function parseYarnLock(content: string): YarnBlock[] {
 
     // yarn.lock v1 字段行无冒号：`  version "4.17.21"`（键与值空白分隔）
     if (current) {
-      const m = trimmed.match(/^(\S+)\s+(.+)$/);
+      const m = trimmed.match(YARN_FIELD_RE);
       if (m) {
         let value = m[2].trim();
         if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
@@ -486,15 +523,15 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
 function versionFromConstraint(constraint: string): string {
   const trimmed = constraint.trim();
   const first = trimmed.split(',')[0].trim();
-  const exact = first.match(/^(?:==|===)\s*(.+)$/);
+  const exact = first.match(EXACT_CONSTRAINT_RE);
   if (exact) return exact[1].trim();
-  return first.replace(/^[^0-9]*/, '').trim();
+  return first.replace(NON_DIGIT_PREFIX_RE, '').trim();
 }
 
 /** 从引号值中提取包名与约束（剥离 extras；如 'flask[async]>=2.0' → flask + >=2.0） */
 function parsePep508(entry: string): { name: string; constraint: string } | null {
   const withoutExtras = entry.replace(/\[.*?\]/g, '');
-  const m = withoutExtras.match(/^([A-Za-z0-9_.-]+)(.*)$/);
+  const m = withoutExtras.match(PEP508_ENTRY_RE);
   if (!m) return null;
   return { name: m[1], constraint: m[2].trim() };
 }
@@ -502,16 +539,16 @@ function parsePep508(entry: string): { name: string; constraint: string } | null
 /** requirements.txt：逐行剥离 # 注释、环境标记、extras，跳过空行与 - 开头的选项行 */
 function parseRequirements(content: string): Array<{ name: string; constraint: string }> {
   const deps: Array<{ name: string; constraint: string }> = [];
-  for (const rawLine of content.split(/\r?\n/)) {
-    let line = rawLine.replace(/#.*/, '').trim();
+  for (const rawLine of content.split(NEWLINE_RE)) {
+    let line = rawLine.replace(COMMENT_STRIPPING_RE, '').trim();
     if (line === '' || line.startsWith('-')) continue;
     line = line.split(';')[0].trim();
     line = line.replace(/\[.*?\]/g, '');
-    const m = line.match(/^[A-Za-z0-9_.-]+/);
+    const m = line.match(PEP508_NAME_RE);
     if (!m) continue;
     const name = m[0];
     const rest = line.slice(name.length).trim();
-    const constraint = rest.match(/(?:==|>=|<=|!=|~=|===|>|<)\s*[^\s]+/)?.[0] ?? '';
+    const constraint = rest.match(CONSTRAINT_RE)?.[0] ?? '';
     deps.push({ name, constraint });
   }
   return deps;
@@ -521,7 +558,7 @@ function parseRequirements(content: string): Array<{ name: string; constraint: s
 function parsePoetryConstraint(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith('{')) {
-    const m = trimmed.match(/version\s*=\s*["']([^"']+)["']/);
+    const m = trimmed.match(POETRY_VERSION_VALUE_RE);
     return m ? m[1] : '';
   }
   let result = trimmed;
@@ -543,15 +580,15 @@ function parsePoetryConstraint(value: string): string {
 function parsePyproject(content: string): { dependencies: Map<string, string>; devDependencies: Map<string, string> } {
   const dependencies = new Map<string, string>();
   const devDependencies = new Map<string, string>();
-  const sections = content.split(/^\s*\[/m);
+  const sections = content.split(TOML_SECTION_RE);
 
   for (const section of sections) {
-    const header = section.match(/^([^\]]+)\]/);
+    const header = section.match(TOML_HEADER_RE);
     if (!header) continue;
     const sectionName = header[1].trim().toLowerCase();
 
     if (sectionName === 'project') {
-      const depsBlock = section.match(/dependencies\s*=\s*\[/);
+      const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
       if (!depsBlock) continue;
       const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
       for (const m of block.matchAll(/"([^"]+)"/g)) {
@@ -559,9 +596,9 @@ function parsePyproject(content: string): { dependencies: Map<string, string>; d
         if (parsed) dependencies.set(parsed.name, parsed.constraint);
       }
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
-      for (const line of section.split(/\r?\n/)) {
+      for (const line of section.split(NEWLINE_RE)) {
         if (line.trim().startsWith('[')) continue;
-        const key = line.match(/^\s*([A-Za-z0-9_.-]+)\s*=/);
+        const key = line.match(POETRY_TOML_KEY_RE);
         if (!key) continue;
         const name = key[1];
         if (name === 'python') continue; // poetry 特殊键，非依赖
@@ -602,10 +639,10 @@ function parsePipfileLock(content: string): Array<{ name: string; declaredRange:
 /** poetry.lock：[[package]] 块的 name / version 字段 */
 function parsePoetryLock(content: string): Array<{ name: string; version: string }> {
   const packages: Array<{ name: string; version: string }> = [];
-  const blocks = content.split(/^\s*\[\[package\]\]\s*$/m);
+  const blocks = content.split(POETRY_BLOCK_RE);
   for (const block of blocks) {
-    const nameMatch = block.match(/^\s*name\s*=\s*["']([^"']+)["']/m);
-    const versionMatch = block.match(/^\s*version\s*=\s*["']([^"']+)["']/m);
+    const nameMatch = block.match(POETRY_NAME_FIELD_RE);
+    const versionMatch = block.match(POETRY_VERSION_FIELD_RE);
     if (nameMatch && versionMatch) {
       packages.push({ name: nameMatch[1], version: versionMatch[1] });
     }
@@ -620,7 +657,7 @@ function buildPoetryGraph(poetryLockPath: string, projectPath: string): BuildRes
   const packages = parsePoetryLock(content);
 
   let declared = new Map<string, string>();
-  const pyprojectContent = readTextSafe(path.join(projectPath, 'pyproject.toml'));
+  const pyprojectContent = readTextSafe(safeJoin(projectPath, 'pyproject.toml'));
   if (pyprojectContent !== null) {
     const parsed = parsePyproject(pyprojectContent);
     declared = new Map<string, string>([...parsed.dependencies, ...parsed.devDependencies]);
@@ -750,13 +787,13 @@ export function buildDependencyGraph(projectPath: string, options?: { targetId?:
   const generatedAt = new Date().toISOString();
   const pkgJson = readPackageJson(projectPath);
 
-  const pnpmLockPath = path.join(projectPath, 'pnpm-lock.yaml');
-  const npmLockPath = path.join(projectPath, 'package-lock.json');
-  const yarnLockPath = path.join(projectPath, 'yarn.lock');
-  const poetryLockPath = path.join(projectPath, 'poetry.lock');
-  const pipfileLockPath = path.join(projectPath, 'Pipfile.lock');
-  const pyprojectPath = path.join(projectPath, 'pyproject.toml');
-  const requirementsPath = path.join(projectPath, 'requirements.txt');
+  const pnpmLockPath = safeJoin(projectPath, 'pnpm-lock.yaml');
+  const npmLockPath = safeJoin(projectPath, 'package-lock.json');
+  const yarnLockPath = safeJoin(projectPath, 'yarn.lock');
+  const poetryLockPath = safeJoin(projectPath, 'poetry.lock');
+  const pipfileLockPath = safeJoin(projectPath, 'Pipfile.lock');
+  const pyprojectPath = safeJoin(projectPath, 'pyproject.toml');
+  const requirementsPath = safeJoin(projectPath, 'requirements.txt');
 
   let result: BuildResult | null = null;
   let ecosystem: Ecosystem = 'npm';

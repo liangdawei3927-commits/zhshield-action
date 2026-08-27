@@ -16,6 +16,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { DependencyNode } from '../types';
+import { safeJoin } from '@zh/shared';
 
 /** 升级评估器：对单个依赖节点产出升级评估 */
 export interface UpgradeEvaluator {
@@ -188,6 +189,16 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** npm 包名安全字符集：支持 scoped（@scope/name）与普通名，仅允许安全字符 */
+const SAFE_PACKAGE_NAME_RE = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
+/** npm 包名最大长度（npm 规范上限 214） */
+const MAX_PACKAGE_NAME_LENGTH = 214;
+
+/** 包名安全校验：不合法则拒绝构建正则（防 ReDoS / 注入） */
+function isSafePackageName(name: string): boolean {
+  return name.length <= MAX_PACKAGE_NAME_LENGTH && SAFE_PACKAGE_NAME_RE.test(name);
+}
+
 /** 解析版本号为数值段（major, minor, patch；缺失补 0，无法解析视为 0） */
 function parseVersion(version: string): number[] {
   const nums = version.split('.');
@@ -223,7 +234,8 @@ function behindDistance(current: string, target: string): number {
  * 约束；任何读取失败按缺失处理。返回相对 projectRoot 的文件路径。
  */
 function scanAffectedFiles(projectRoot: string, packageName: string, scanLimit: number): string[] {
-  const srcDir = path.join(projectRoot, 'src');
+  if (!isSafePackageName(packageName)) return [];
+  const srcDir = safeJoin(projectRoot, 'src');
   const affected: string[] = [];
   let scanned = 0;
   const importRe = new RegExp(
@@ -242,7 +254,7 @@ function scanAffectedFiles(projectRoot: string, packageName: string, scanLimit: 
     for (const entry of entries) {
       if (scanned >= scanLimit) return;
       if (SKIP_DIRS.has(entry.name)) continue;
-      const full = path.join(dir, entry.name);
+      const full = safeJoin(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
         continue;

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin, safeResolve } from '@zh/shared';
 
 /** 单帧堆栈位置 */
 export interface StackFrame {
@@ -131,7 +132,7 @@ function resolveLocalPath(file: string, projectPath?: string): string | null {
   if (local.startsWith('file://')) local = local.slice('file://'.length);
   else if (local.startsWith('webpack:///')) {
     local = local.slice('webpack:///'.length);
-    if (projectPath) local = path.join(projectPath, local);
+    if (projectPath) local = safeJoin(projectPath, local);
   } else if (REMOTE_URL_RE.test(local)) {
     return null;
   }
@@ -140,7 +141,7 @@ function resolveLocalPath(file: string, projectPath?: string): string | null {
 
 /** 定位源码片段（优先项目内相对路径，其次绝对路径） */
 function readSnippet(file: string, line: number, projectPath?: string): string | undefined {
-  const candidates = projectPath ? [path.join(projectPath, file), file] : [file];
+  const candidates = projectPath ? [safeJoin(projectPath, file), file] : [file];
   for (const candidate of candidates) {
     try {
       if (!fs.existsSync(candidate)) continue;
@@ -190,7 +191,7 @@ function loadSourceMap(file: string, projectPath?: string): SourceMapData | null
       const content = fs.readFileSync(localPath, 'utf-8');
       const mappingMatch = SOURCE_MAPPING_URL_RE.exec(content.slice(-1000));
       if (!mappingMatch) return null;
-      const mapPath = path.resolve(path.dirname(localPath), mappingMatch[1]);
+      const mapPath = safeResolve(path.dirname(localPath), mappingMatch[1]);
       if (fs.existsSync(mapPath)) raw = fs.readFileSync(mapPath, 'utf-8');
     } catch {
       return null;

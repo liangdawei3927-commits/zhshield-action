@@ -11,8 +11,39 @@
  * - ci-vs-local：.github/workflows/*.yml 中 Node / 包管理器版本 vs 本地清单（不一致 → warning，无 CI → 不产出）
  */
 import * as fs from 'fs';
-import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
+import { safeJoin } from '@zh/shared';
+
+// ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
+
+/** v 前缀剥离（不区分大小写） */
+const V_PREFIX_RE = /^v/i;
+/** semver major.minor.patch 捕获（前缀不限） */
+const SEMVER_MMP_RE = /^(\d+)\.(\d+)\.(\d+)/;
+/** 精确版本匹配 x.y.z */
+const EXACT_VERSION_RE = /^(\d+)\.(\d+)\.(\d+)$/;
+/** ^ 范围匹配 */
+const CARET_RANGE_RE = /^\^(\d+)\.(\d+)\.(\d+)$/;
+/** ~ 范围匹配 */
+const TILDE_RANGE_RE = /^~(\d+)\.(\d+)\.(\d+)$/;
+/** 带前缀的版本匹配 */
+const PREFIXED_VERSION_RE = /^[v~^]*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
+/** npm package-lock.json packages 键 */
+const NPM_PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
+/** 换行符拆分 */
+const NEWLINE_RE = /\r?\n/;
+/** 行首缩进检测 */
+const INDENT_RE = /^\s*/;
+/** yarn 包名提取 'name@' */
+const YARN_PKG_NAME_RE = /^(@[^/]+\/)?([^@]+)@/;
+/** 空白拆分 */
+const WHITESPACE_RE = /\s+/;
+/** 环境变量名校验 */
+const ENV_VAR_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** 版本号提取（前 3 段） */
+const VERSION_EXTRACT_RE = /(\d+)(?:\.\d+){0,2}/;
+/** YAML 工作流文件名匹配 */
+const YAML_FILE_RE = /\.ya?ml$/i;
 
 /** 项目语言（与 pipeline 的 ProjectLanguage 结构对齐，本地定义不跨包引用） */
 export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
@@ -101,7 +132,7 @@ function readTextSafe(filePath: string): string | null {
 
 /** 去除版本号前后空白与首尾 v 前缀（'  v18.20.2\n' → '18.20.2'） */
 function normalizeVersion(raw: string): string {
-  return raw.trim().replace(/^v/i, '');
+  return raw.trim().replace(V_PREFIX_RE, '');
 }
 
 /**
@@ -113,28 +144,28 @@ function satisfiesRange(range: string, version: string): boolean {
   const r = range.trim();
   if (r === '' || r === '*' || r === 'x' || r === 'latest' || r.includes('workspace:')) return true;
 
-  const m = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+  const m = version.match(SEMVER_MMP_RE);
   if (!m) return true;
   const [major, minor, patch] = [Number(m[1]), Number(m[2]), Number(m[3])];
 
-  const exact = r.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  const exact = r.match(EXACT_VERSION_RE);
   if (exact) {
     return exact[1] === String(major) && exact[2] === String(minor) && exact[3] === String(patch);
   }
 
-  const caret = r.match(/^\^(\d+)\.(\d+)\.(\d+)$/);
+  const caret = r.match(CARET_RANGE_RE);
   if (caret) {
     const [cM, cm, cP] = [Number(caret[1]), Number(caret[2]), Number(caret[3])];
     if (cM !== major) return false;
     return cM > 0 ? minor >= cm : (minor === cm && patch >= cP) || minor > cm;
   }
 
-  const tilde = r.match(/^~(\d+)\.(\d+)\.(\d+)$/);
+  const tilde = r.match(TILDE_RANGE_RE);
   if (tilde) {
     return Number(tilde[1]) === major && Number(tilde[2]) === minor && patch >= Number(tilde[3]);
   }
 
-  const star = r.match(/^[v~^]*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/);
+  const star = r.match(PREFIXED_VERSION_RE);
   if (star) {
     const [sM, sm, sP] = [Number(star[1]), Number(star[2] ?? '0'), Number(star[3] ?? '0')];
     if (sM !== major) return false;
@@ -167,7 +198,7 @@ function collectNpmVersions(lock: Record<string, unknown>): Map<string, string> 
   const packages = lock.packages;
   if (isRecord(packages)) {
     for (const [key, meta] of Object.entries(packages)) {
-      const m = key.match(/^node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
+      const m = key.match(NPM_PACKAGE_KEY_RE);
       if (!m) continue;
       if (!isRecord(meta)) continue;
       if (typeof meta.version !== 'string') continue;
@@ -212,17 +243,17 @@ function collectPnpmVersions(lock: Record<string, unknown>): Map<string, string>
 function collectYarnVersions(content: string): Map<string, string> {
   const versions = new Map<string, string>();
   let currentName: string | null = null;
-  for (const rawLine of content.split(/\r?\n/)) {
+  for (const rawLine of content.split(NEWLINE_RE)) {
     const trimmed = rawLine.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(/^\s*/)?.[0].length ?? 0;
+    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
     if (indent === 0 && trimmed.endsWith(':')) {
       let keysText = trimmed.slice(0, -1).trim();
       if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
         keysText = keysText.slice(1, -1);
       }
       const first = keysText.split(',')[0].trim();
-      const m = first.match(/^(@[^/]+\/)?([^@]+)@/);
+      const m = first.match(YARN_PKG_NAME_RE);
       currentName = m ? `${m[1] ?? ''}${m[2]}` : null;
       continue;
     }
@@ -244,9 +275,9 @@ function checkLockfileDrift(projectRoot: string, pkgJson: Record<string, unknown
 
   let resolved: Map<string, string> | null = null;
 
-  const pnpmPath = path.join(projectRoot, 'pnpm-lock.yaml');
-  const npmPath = path.join(projectRoot, 'package-lock.json');
-  const yarnPath = path.join(projectRoot, 'yarn.lock');
+  const pnpmPath = safeJoin(projectRoot, 'pnpm-lock.yaml');
+  const npmPath = safeJoin(projectRoot, 'package-lock.json');
+  const yarnPath = safeJoin(projectRoot, 'yarn.lock');
 
   if (fs.existsSync(pnpmPath)) {
     const lock = readYamlSafe(pnpmPath);
@@ -289,9 +320,9 @@ function collectRuntimeSources(projectRoot: string, pkgJson: Record<string, unkn
   const sources: RuntimeSource[] = [];
 
   for (const file of ['.nvmrc', '.node-version']) {
-    const content = readTextSafe(path.join(projectRoot, file));
+    const content = readTextSafe(safeJoin(projectRoot, file));
     if (content === null) continue;
-    const firstLine = content.split(/\r?\n/).find((line) => line.trim() !== '');
+    const firstLine = content.split(NEWLINE_RE).find((line) => line.trim() !== '');
     if (firstLine) sources.push({ source: file, value: normalizeVersion(firstLine) });
   }
 
@@ -302,12 +333,12 @@ function collectRuntimeSources(projectRoot: string, pkgJson: Record<string, unkn
     }
   }
 
-  const toolVersions = readTextSafe(path.join(projectRoot, '.tool-versions'));
+  const toolVersions = readTextSafe(safeJoin(projectRoot, '.tool-versions'));
   if (toolVersions !== null) {
-    for (const rawLine of toolVersions.split(/\r?\n/)) {
+    for (const rawLine of toolVersions.split(NEWLINE_RE)) {
       const line = rawLine.trim();
       if (line === '' || line.startsWith('#')) continue;
-      const parts = line.split(/\s+/);
+      const parts = line.split(WHITESPACE_RE);
       if (parts[0] === 'nodejs' && parts[1]) {
         sources.push({ source: '.tool-versions (nodejs)', value: normalizeVersion(parts[1]) });
       }
@@ -355,23 +386,23 @@ function checkRuntimeVersion(projectRoot: string, pkgJson: Record<string, unknow
 /** 解析 .env 文件为键集合（支持 # 注释与 KEY=VALUE 形式） */
 function parseEnvKeys(content: string): string[] {
   const keys: string[] = [];
-  for (const rawLine of content.split(/\r?\n/)) {
+  for (const rawLine of content.split(NEWLINE_RE)) {
     const line = rawLine.trim();
     if (line === '' || line.startsWith('#')) continue;
     const key = line.split('=')[0]?.trim();
-    if (key && /^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) keys.push(key);
+    if (key && ENV_VAR_NAME_RE.test(key)) keys.push(key);
   }
   return keys;
 }
 
 /** 环境变量文件差异检查：.env.example 键 vs .env 键 */
 function checkEnvFileDiff(projectRoot: string): EnvEntry[] {
-  const examplePath = path.join(projectRoot, '.env.example');
+  const examplePath = safeJoin(projectRoot, '.env.example');
   const exampleContent = readTextSafe(examplePath);
   if (exampleContent === null) return [];
 
   const exampleKeys = new Set(parseEnvKeys(exampleContent));
-  const envPath = path.join(projectRoot, '.env');
+  const envPath = safeJoin(projectRoot, '.env');
   const envContent = readTextSafe(envPath);
   const envKeys = new Set(envContent === null ? [] : parseEnvKeys(envContent));
 
@@ -410,16 +441,16 @@ interface CiWorkflowInfo {
 
 /** 从字符串值中提取版本号（'node-version: 20' → '20'，'18.20.2' → '18.20.2'） */
 function extractVersion(value: string): string | null {
-  const m = value.match(/(\d+)(?:\.\d+){0,2}/);
+  const m = value.match(VERSION_EXTRACT_RE);
   return m ? m[0] : null;
 }
 
 /** 读取 .github/workflows/*.yml 中声明的 Node / 包管理器版本 */
 function readCiWorkflows(projectRoot: string): CiWorkflowInfo[] {
-  const workflowsDir = path.join(projectRoot, '.github', 'workflows');
+  const workflowsDir = safeJoin(projectRoot, '.github', 'workflows');
   let files: string[];
   try {
-    files = fs.readdirSync(workflowsDir).filter((f) => /\.ya?ml$/i.test(f));
+    files = fs.readdirSync(workflowsDir).filter((f) => YAML_FILE_RE.test(f));
   } catch {
     // 无 workflows 目录：视为无 CI
     return [];
@@ -427,7 +458,7 @@ function readCiWorkflows(projectRoot: string): CiWorkflowInfo[] {
 
   const infos: CiWorkflowInfo[] = [];
   for (const file of files) {
-    const data = readYamlSafe(path.join(workflowsDir, file));
+    const data = readYamlSafe(safeJoin(workflowsDir, file));
     if (!isRecord(data)) continue;
     const jobs = data.jobs;
     if (!isRecord(jobs)) continue;
@@ -539,7 +570,7 @@ export class EnvConsistencyCheckerImpl implements EnvConsistencyChecker {
   async check(profile: ProjectProfile, options?: EnvConsistencyOptions): Promise<EnvConsistencyReport> {
     const projectRoot = options?.projectRoot ?? profile.projectPath;
 
-    const pkgJson = readJsonSafe(path.join(projectRoot, 'package.json'));
+    const pkgJson = readJsonSafe(safeJoin(projectRoot, 'package.json'));
     const entries: EnvEntry[] = [
       ...checkLockfileDrift(projectRoot, pkgJson),
       ...checkRuntimeVersion(projectRoot, pkgJson),

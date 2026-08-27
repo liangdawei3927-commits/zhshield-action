@@ -9,6 +9,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
 
 /** 产物根目录候选名（前端构建常见输出目录） */
@@ -56,7 +57,7 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
 
     for (const dirName of ARTIFACT_DIR_NAMES) {
       if (state.scanned >= cfg.scanLimit) break;
-      const root = path.join(projectRoot, dirName);
+      const root = safeJoin(projectRoot, dirName);
       if (!fs.existsSync(root)) continue;
       this.walk(root, projectRoot, cfg, issues, state);
     }
@@ -100,8 +101,9 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
     entries.sort((a, b) => a.name.localeCompare(b.name));
 
     for (const entry of entries) {
+      if (entry.name === '.' || entry.name === '..') continue;
       if (state.scanned >= cfg.scanLimit) return;
-      const fullPath = path.join(dir, entry.name);
+      const fullPath = safeJoin(dir, entry.name);
       if (entry.isDirectory()) {
         if (SKIP_DIR_NAMES.has(entry.name)) continue;
         this.walk(fullPath, projectRoot, cfg, issues, state);

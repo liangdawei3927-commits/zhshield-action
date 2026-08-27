@@ -7,6 +7,9 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin } from '@zh/shared';
+
+const NEWLINE_RE = /\r?\n/;
 
 /** 扫描的源码扩展名（MVP 聚焦 TS/JS 生态） */
 export const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -57,7 +60,7 @@ export interface ImportReference {
  */
 export function readTextFileSafe(projectPath: string, relPath: string): string | null {
   try {
-    return fs.readFileSync(path.join(projectPath, relPath), 'utf-8');
+    return fs.readFileSync(safeJoin(projectPath, relPath), 'utf-8');
   } catch {
     return null;
   }
@@ -83,10 +86,10 @@ function walkDir(dir: string, base: string, out: string[]): void {
   }
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue; // 隐藏项（含 .git）
-    const rel = path.join(base, entry.name);
+    const rel = safeJoin(base, entry.name);
     if (entry.isDirectory()) {
       if (EXCLUDED_DIRS.has(entry.name)) continue;
-      walkDir(path.join(dir, entry.name), rel, out);
+      walkDir(safeJoin(dir, entry.name), rel, out);
     } else if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
       if (TEST_FILE_PATTERN.test(entry.name)) continue;
       out.push(rel.split(path.sep).join('/'));
@@ -190,7 +193,7 @@ export function extractImportReferences(projectPath: string, scope?: readonly st
     if (!isInScope(file, scope)) continue;
     const content = readTextFileSafe(projectPath, file);
     if (content === null) continue;
-    const lines = content.split(/\r?\n/);
+    const lines = content.split(NEWLINE_RE);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line === undefined) continue;
@@ -215,7 +218,7 @@ const NODE_MODULES_SKIP: ReadonlySet<string> = new Set([
 /** 枚举本地 node_modules 顶层已装包名（含 @scope 下的 scoped 包）；无 node_modules 返回空集 */
 export function listNodeModules(projectPath: string): ReadonlySet<string> {
   const names = new Set<string>();
-  const nm = path.join(projectPath, 'node_modules');
+  const nm = safeJoin(projectPath, 'node_modules');
   let topLevel: string[];
   try {
     topLevel = fs.readdirSync(nm);
@@ -227,7 +230,7 @@ export function listNodeModules(projectPath: string): ReadonlySet<string> {
     if (entry.startsWith('@')) {
       let scoped: string[];
       try {
-        scoped = fs.readdirSync(path.join(nm, entry));
+        scoped = fs.readdirSync(safeJoin(nm, entry));
       } catch {
         continue;
       }

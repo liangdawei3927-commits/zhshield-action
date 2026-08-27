@@ -5,7 +5,7 @@
  * 纯静态分析，绝不执行项目代码（与 P0-2 禁令一致）；零网络；不抛异常。
  */
 import * as fs from 'fs';
-import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 import type {
   PerformanceIssue,
   PerformanceReport,
@@ -18,7 +18,7 @@ import { TreeShakingDetectorImpl } from './adapters/tree-shaking-detector';
 
 /** 判断给定路径是否为项目根（存在 package.json / 任意构建配置 / 源码目录） */
 function isProjectRoot(root: string): boolean {
-  return fs.existsSync(path.join(root, 'package.json')) || fs.existsSync(path.join(root, 'src'));
+  return fs.existsSync(safeJoin(root, 'package.json')) || fs.existsSync(safeJoin(root, 'src'));
 }
 
 /** 严重度权重（用于排序：critical=0 最高） */

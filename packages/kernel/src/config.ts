@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { safeJoin, safeResolve } from '@zh/shared';
 
 type ConfigValue = string | number | boolean | undefined;
 
@@ -76,11 +77,11 @@ export class ConfigManager {
   }
 
   loadFromDir(dirName: string = 'config'): void {
-    const dir = path.resolve(this.configDir, dirName);
+    const dir = safeResolve(this.configDir, dirName);
     if (!fs.existsSync(dir)) return;
     const files = fs.readdirSync(dir).filter((f) => this.isConfigFile(f));
     for (const file of files) {
-      this.loadConfigFile(path.join(dir, file));
+      this.loadConfigFile(safeJoin(dir, file));
     }
   }
 

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { safeJoin } from '@zh/shared';
 
 /**
  * 文件扫描器 — 递归扫描项目目录，过滤构建产物与依赖目录。
@@ -73,12 +73,13 @@ export function scanProject(projectRoot: string, opts: ScanOptions = {}): ScanRe
     }
 
     for (const entry of entries) {
+      if (entry.name === '.' || entry.name === '..') continue;
       if (files.length >= maxFiles) break;
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
 
       if (entry.isDirectory()) {
         if (ignoreDirs.has(entry.name) || depth >= maxDepth) continue;
-        stack.push({ dir: path.join(dir, entry.name), rel: childRel, depth: depth + 1 });
+        stack.push({ dir: safeJoin(dir, entry.name), rel: childRel, depth: depth + 1 });
       } else if (entry.isFile()) {
         files.push(childRel);
         fileSet.add(childRel);
@@ -101,7 +102,7 @@ export function readConfig(scan: ScanResult, relPath: string): string | null {
     return null;
   }
   try {
-    const abs = path.join(scan.projectRoot, relPath);
+    const abs = safeJoin(scan.projectRoot, relPath);
     const content = fs.readFileSync(abs, 'utf-8');
     scan.configCache.set(relPath, content);
     return content;

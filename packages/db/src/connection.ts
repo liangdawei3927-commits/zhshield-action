@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
+import { safeJoin } from '@zh/shared';
 
 export interface DbConfig {
   dbPath: string;
@@ -81,7 +82,7 @@ export class DbConnection {
 
     for (const file of files) {
       if (applied.has(file)) continue;
-      const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
+      const sql = fs.readFileSync(safeJoin(migrationsDir, file), 'utf-8');
       runMigration(sql, file);
     }
   }

@@ -9,8 +9,63 @@
  * 零网络请求、不执行安装命令；解析失败按缺失/已修改处理，绝不抛异常。
  */
 import * as fs from 'fs';
-import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
+import { safeJoin } from '@zh/shared';
+
+// ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
+
+/** 完整版本号解析：'1.2.3-beta.1' */
+const VERSION_FULL_RE = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
+/** 纯数字检测 */
+const DIGITS_RE = /^\d+$/;
+/** 部分版本号：'1.2.x' / '1.2' / '1' */
+const PARTIAL_VERSION_RE = /^(\d+)(?:\.(\d+|\*|x|X))?(?:\.(\d+|\*|x|X))?$/;
+/** 通配符分量（x / X / *） */
+const WILDCARD_COMPONENT_RE = /^[xX*]$/;
+/** 完整三段语义版本 x.y.z */
+const FULL_SEMVER_RE = /^(\d+\.){2}\d+$/;
+/** 连字符范围 '1.0.0 - 2.0.0' */
+const HYPHEN_RANGE_RE = /^\s*(\S+)\s+-\s+(\S+)\s*$/;
+/** 替代集合拆分（逗号/空白） */
+const ALT_SPLITTER_RE = /[\s,]+/;
+/** 精确版本约束：'==2.3.2' / '===2.3.2' */
+const EXACT_CONSTRAINT_RE = /^(?:==|===)\s*(.+)$/;
+/** 非数字前缀剥离 */
+const NON_DIGIT_PREFIX_RE = /^[^0-9]*/;
+/** npm package-lock.json packages 键 */
+const PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
+/** pnpm-lock.yaml packages 键 */
+const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
+/** 换行符拆分 */
+const NEWLINE_RE = /\r?\n/;
+/** 行首缩进检测 */
+const INDENT_RE = /^\s*/;
+/** yarn块字段行 'key value' */
+const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
+/** poetry 约束值 version = "..." */
+const POETRY_VERSION_VALUE_RE = /version\s*=\s*["']([^"']+)["']/;
+/** TOML 节头拆分 */
+const TOML_SECTION_RE = /^\s*\[/m;
+/** TOML 节标题提取 */
+const TOML_HEADER_RE = /^([^\]]+)\]/;
+/** TOML dependencies 数组起始 */
+const TOML_DEPS_ARRAY_RE = /dependencies\s*=\s*\[/;
+/** TOML 双引号字符串（matchAll） */
+const TOML_QUOTED_RE = /"([^"]+)"/g;
+/** 剥离 extras [...] */
+const BRACKET_EXTRAS_RE = /\[.*?\]/g;
+/** PEP 508 包名 */
+const PEP508_NAME_RE = /^[A-Za-z0-9_.-]+/;
+/** poetry.toml 键行 */
+const POETRY_TOML_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
+/** poetry.lock 包块分隔 */
+const POETRY_BLOCK_RE = /^\s*\[\[package\]\]\s*$/m;
+/** poetry.lock name 字段 */
+const POETRY_NAME_FIELD_RE = /^\s*name\s*=\s*["']([^"']+)["']/m;
+/** poetry.lock version 字段 */
+const POETRY_VERSION_FIELD_RE = /^\s*version\s*=\s*["']([^"']+)["']/m;
+/** poetry.lock hash 存在检测 */
+const POETRY_HASH_RE = /\bhash\s*=/;
 
 /** 锁文件校验器契约：离线静态校验，不联网 */
 export interface LockfileVerifier {
@@ -89,7 +144,7 @@ const ZERO: ParsedVersion = { nums: [0, 0, 0], pre: '' };
 
 /** 解析完整版本号 '1.2.3-beta.1' → { nums, pre }；无法解析返回 null */
 function parseVersion(input: string): ParsedVersion | null {
-  const m = input.trim().match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+  const m = input.trim().match(VERSION_FULL_RE);
   if (!m) return null;
   return { nums: [Number(m[1] ?? 0), Number(m[2] ?? 0), Number(m[3] ?? 0)], pre: m[4] ?? '' };
 }
@@ -117,8 +172,8 @@ function compareFull(a: ParsedVersion, b: ParsedVersion): number {
     if (x === undefined) return -1;
     if (y === undefined) return 1;
     if (x === y) continue;
-    const xn = /^\d+$/.test(x);
-    const yn = /^\d+$/.test(y);
+    const xn = DIGITS_RE.test(x);
+    const yn = DIGITS_RE.test(y);
     if (xn && yn) return Number(x) < Number(y) ? -1 : 1;
     if (xn) return -1; // 数字标识 < 字母标识（semver 规则）
     if (yn) return 1;
@@ -129,11 +184,11 @@ function compareFull(a: ParsedVersion, b: ParsedVersion): number {
 
 /** 解析部分版本 '1.2.x' / '1.2' / '1' → 已确定的数值段数量 */
 function parsePartial(spec: string): number[] | null {
-  const m = spec.match(/^(\d+)(?:\.(\d+|\*|x|X))?(?:\.(\d+|\*|x|X))?$/);
+  const m = spec.match(PARTIAL_VERSION_RE);
   if (!m) return null;
   const nums: number[] = [Number(m[1])];
-  if (m[2] !== undefined && !/^[xX*]$/.test(m[2])) nums.push(Number(m[2]));
-  if (m[3] !== undefined && !/^[xX*]$/.test(m[3])) nums.push(Number(m[3]));
+  if (m[2] !== undefined && !WILDCARD_COMPONENT_RE.test(m[2])) nums.push(Number(m[2]));
+  if (m[3] !== undefined && !WILDCARD_COMPONENT_RE.test(m[3])) nums.push(Number(m[3]));
   return nums;
 }
 
@@ -188,7 +243,7 @@ function satisfiesComparator(ver: ParsedVersion, token: string): boolean {
   if (op === '') {
     // 裸版本：完整 x.y.z 精确匹配；部分版本按 x.y / x 区间处理
     const full = parseVersion(spec);
-    if (full && /^(\d+\.){2}\d+$/.test(spec)) return compareFull(ver, full) === 0;
+    if (full && FULL_SEMVER_RE.test(spec)) return compareFull(ver, full) === 0;
     return partialSatisfies(ver, spec);
   }
 
@@ -217,13 +272,13 @@ function satisfiesComparator(ver: ParsedVersion, token: string): boolean {
 function satisfiesAlternative(ver: ParsedVersion, alt: string): boolean {
   // 预发布版本仅当范围本身带预发布标识时才可能满足（npm 语义）
   if (ver.pre !== '' && !alt.includes('-')) return false;
-  const hyphen = alt.match(/^\s*(\S+)\s+-\s+(\S+)\s*$/);
+  const hyphen = alt.match(HYPHEN_RANGE_RE);
   if (hyphen) {
     const lo = parseVersion(hyphen[1]) ?? ZERO;
     const hi = parseVersion(hyphen[2]) ?? ZERO;
     return compareFull(ver, lo) >= 0 && compareFull(ver, hi) <= 0;
   }
-  const tokens = alt.split(/[\s,]+/).filter((t) => t.length > 0);
+  const tokens = alt.split(ALT_SPLITTER_RE).filter((t) => t.length > 0);
   return tokens.every((token) => satisfiesComparator(ver, token));
 }
 
@@ -242,15 +297,15 @@ function satisfiesVersion(version: string, range: string): boolean {
 function versionFromConstraint(constraint: string): string {
   const trimmed = constraint.trim();
   const first = trimmed.split(',')[0].trim();
-  const exact = first.match(/^(?:==|===)\s*(.+)$/);
+  const exact = first.match(EXACT_CONSTRAINT_RE);
   if (exact) return exact[1].trim();
-  return first.replace(/^[^0-9]*/, '').trim();
+  return first.replace(NON_DIGIT_PREFIX_RE, '').trim();
 }
 
 /** package.json 声明范围（dependencies + devDependencies） */
 function readDeclaredRanges(projectRoot: string, failures: string[]): Map<string, string> {
   const declared = new Map<string, string>();
-  const data = readJsonSafe(path.join(projectRoot, 'package.json'));
+  const data = readJsonSafe(safeJoin(projectRoot, 'package.json'));
   if (!data) {
     failures.push('缺少可解析的 package.json，无法核对声明范围');
     return declared;
@@ -304,7 +359,6 @@ function parseNpmLock(projectRoot: string, lockfilePath: string): { declared: Ma
   }
 
   // v2/v3：packages 映射，直接依赖取 node_modules/<name>
-  const PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
   const packages = lock.packages;
   if (!isRecord(packages)) {
     failures.push('package-lock.json packages 区块缺失，无法校验');
@@ -335,7 +389,7 @@ function parsePnpmLock(projectRoot: string, lockfilePath: string): { declared: M
   const locked = new Map<string, string>();
   const integrity = new Map<string, string>();
 
-  if (!fs.existsSync(path.join(projectRoot, 'package.json'))) {
+  if (!fs.existsSync(safeJoin(projectRoot, 'package.json'))) {
     failures.push('缺少 package.json 清单');
   }
 
@@ -345,7 +399,6 @@ function parsePnpmLock(projectRoot: string, lockfilePath: string): { declared: M
     return { declared, locked, integrity, failures };
   }
 
-  const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
   const packages = data.packages;
   if (isRecord(packages)) {
     for (const [key, meta] of Object.entries(packages)) {
@@ -404,10 +457,10 @@ const YARN_KEY_RE = /^(@[^/]+\/)?([^@]+)@(.*)$/;
 function parseYarnLock(content: string): YarnBlock[] {
   const blocks: YarnBlock[] = [];
   let current: YarnBlock | null = null;
-  for (const rawLine of content.split(/\r?\n/)) {
+  for (const rawLine of content.split(NEWLINE_RE)) {
     const trimmed = rawLine.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(/^\s*/)?.[0].length ?? 0;
+    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
     if (indent === 0 && trimmed.endsWith(':')) {
       let keysText = trimmed.slice(0, -1).trim();
       if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
@@ -418,7 +471,7 @@ function parseYarnLock(content: string): YarnBlock[] {
       continue;
     }
     if (current) {
-      const m = trimmed.match(/^(\S+)\s+(.+)$/);
+      const m = trimmed.match(YARN_FIELD_RE);
       if (m) {
         let value = m[2].trim();
         if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
@@ -468,7 +521,7 @@ function parseYarnLockFile(projectRoot: string, lockfilePath: string): { declare
 function parsePoetryConstraint(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith('{')) {
-    const m = trimmed.match(/version\s*=\s*["']([^"']+)["']/);
+    const m = trimmed.match(POETRY_VERSION_VALUE_RE);
     return m ? m[1] : '';
   }
   let result = trimmed;
@@ -485,26 +538,26 @@ function parsePoetryConstraint(value: string): string {
 /** pyproject.toml：[project].dependencies（PEP 621）与 [tool.poetry.dependencies] / [tool.uv.dependencies] */
 function parsePyproject(content: string): Map<string, string> {
   const declared = new Map<string, string>();
-  const sections = content.split(/^\s*\[/m);
+  const sections = content.split(TOML_SECTION_RE);
   for (const section of sections) {
-    const header = section.match(/^([^\]]+)\]/);
+    const header = section.match(TOML_HEADER_RE);
     if (!header) continue;
     const sectionName = header[1].trim().toLowerCase();
     if (sectionName === 'project') {
-      const depsBlock = section.match(/dependencies\s*=\s*\[/);
+      const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
       if (!depsBlock) continue;
       const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-      for (const m of block.matchAll(/"([^"]+)"/g)) {
-        const entry = m[1].replace(/\[.*?\]/g, '');
-        const name = entry.match(/^[A-Za-z0-9_.-]+/)?.[0];
+      for (const m of block.matchAll(TOML_QUOTED_RE)) {
+        const entry = m[1].replace(BRACKET_EXTRAS_RE, '');
+        const name = entry.match(PEP508_NAME_RE)?.[0];
         if (!name) continue;
         const rest = entry.slice(name.length).trim();
         declared.set(name, rest);
       }
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
-      for (const line of section.split(/\r?\n/)) {
+      for (const line of section.split(NEWLINE_RE)) {
         if (line.trim().startsWith('[')) continue;
-        const key = line.match(/^\s*([A-Za-z0-9_.-]+)\s*=/);
+        const key = line.match(POETRY_TOML_KEY_RE);
         if (!key) continue;
         const name = key[1];
         if (name === 'python') continue;
@@ -518,13 +571,13 @@ function parsePyproject(content: string): Map<string, string> {
 /** poetry.lock：[[package]] 块 → name / version / 是否带 [files] 哈希 */
 function parsePoetryLock(content: string): Array<{ name: string; version: string; hasHashes: boolean }> {
   const packages: Array<{ name: string; version: string; hasHashes: boolean }> = [];
-  for (const block of content.split(/^\s*\[\[package\]\]\s*$/m)) {
-    const nameMatch = block.match(/^\s*name\s*=\s*["']([^"']+)["']/m);
-    const versionMatch = block.match(/^\s*version\s*=\s*["']([^"']+)["']/m);
+  for (const block of content.split(POETRY_BLOCK_RE)) {
+    const nameMatch = block.match(POETRY_NAME_FIELD_RE);
+    const versionMatch = block.match(POETRY_VERSION_FIELD_RE);
     if (!nameMatch || !versionMatch) continue;
     const idx = block.indexOf('[files]');
     const filesSection = idx >= 0 ? block.slice(idx) : '';
-    const hasHashes = filesSection !== '' && /\bhash\s*=/.test(filesSection);
+    const hasHashes = filesSection !== '' && POETRY_HASH_RE.test(filesSection);
     packages.push({ name: nameMatch[1], version: versionMatch[1], hasHashes });
   }
   return packages;
@@ -537,7 +590,7 @@ function parsePoetryProject(projectRoot: string, lockfilePath: string): { declar
   const locked = new Map<string, string>();
   const integrity = new Map<string, string>();
 
-  const pyprojectContent = readTextSafe(path.join(projectRoot, 'pyproject.toml'));
+  const pyprojectContent = readTextSafe(safeJoin(projectRoot, 'pyproject.toml'));
   if (pyprojectContent === null) {
     failures.push('缺少可解析的 pyproject.toml，无法核对声明范围');
   } else {
@@ -604,20 +657,20 @@ export class LockfileVerifierImpl implements LockfileVerifier {
   async verify(projectRoot: string, options?: LockfileVerifierOptions): Promise<LockfileVerification> {
     // 探测锁文件（与图谱构建器探测优先级一致：pnpm → npm → yarn → poetry → Pipfile）
     const candidates: Array<{ kind: string; file: string; parser: () => ParsedLockfile }> = [
-      { kind: 'pnpm', file: 'pnpm-lock.yaml', parser: () => parsePnpmLock(projectRoot, path.join(projectRoot, 'pnpm-lock.yaml')) },
-      { kind: 'npm', file: 'package-lock.json', parser: () => parseNpmLock(projectRoot, path.join(projectRoot, 'package-lock.json')) },
-      { kind: 'yarn', file: 'yarn.lock', parser: () => parseYarnLockFile(projectRoot, path.join(projectRoot, 'yarn.lock')) },
-      { kind: 'poetry', file: 'poetry.lock', parser: () => parsePoetryProject(projectRoot, path.join(projectRoot, 'poetry.lock')) },
-      { kind: 'pipfile', file: 'Pipfile.lock', parser: () => parsePipfileLockFile(path.join(projectRoot, 'Pipfile.lock')) },
+      { kind: 'pnpm', file: 'pnpm-lock.yaml', parser: () => parsePnpmLock(projectRoot, safeJoin(projectRoot, 'pnpm-lock.yaml')) },
+      { kind: 'npm', file: 'package-lock.json', parser: () => parseNpmLock(projectRoot, safeJoin(projectRoot, 'package-lock.json')) },
+      { kind: 'yarn', file: 'yarn.lock', parser: () => parseYarnLockFile(projectRoot, safeJoin(projectRoot, 'yarn.lock')) },
+      { kind: 'poetry', file: 'poetry.lock', parser: () => parsePoetryProject(projectRoot, safeJoin(projectRoot, 'poetry.lock')) },
+      { kind: 'pipfile', file: 'Pipfile.lock', parser: () => parsePipfileLockFile(safeJoin(projectRoot, 'Pipfile.lock')) },
     ];
 
-    const found = candidates.find((c) => fs.existsSync(path.join(projectRoot, c.file)));
+    const found = candidates.find((c) => fs.existsSync(safeJoin(projectRoot, c.file)));
     if (!found) {
       // 无锁文件（含无任何清单）→ missing
       return { status: 'missing', diffs: [], integrityFailures: [] };
     }
 
-    const lockfilePath = path.join(projectRoot, found.file);
+    const lockfilePath = safeJoin(projectRoot, found.file);
     const parsed = found.parser();
     const integrityFailures = [...parsed.failures];
 

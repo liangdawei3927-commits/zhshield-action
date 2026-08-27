@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { CheckConfig } from './types';
+import { safeJoin } from '@zh/shared';
 
 export class ConfigLoader {
   private configDir: string;
@@ -18,7 +19,7 @@ export class ConfigLoader {
   }
 
   private resolveConfigPath(fileName: string): string {
-    return path.join(this.configDir, fileName);
+    return safeJoin(this.configDir, fileName);
   }
 
   private loadJson<T>(fileName: string): T | null {

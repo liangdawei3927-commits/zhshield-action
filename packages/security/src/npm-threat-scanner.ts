@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
 import type { MalwareItem } from './types';
+import { safeJoin } from '@zh/shared';
 
 /** 已知恶意 / 仿冒 npm 包（社区确认，仅收录整名即为恶意的包，不含版本投毒事件） */
 const KNOWN_MALICIOUS_PACKAGES = new Set<string>([  'flatmap-stream',   // event-stream 供应链投毒（2018，已移除）
@@ -135,8 +136,8 @@ function collectImporterDeps(importers: Record<string, unknown>, names: Set<stri
 
 /** 扫描项目锁文件（pnpm-lock.yaml 优先，其次 package-lock.json），返回命中供应链威胁的 MalwareItem 列表 */
 export async function scanNpmThreats(projectPath: string): Promise<MalwareItem[]> {
-  const pnpmLockPath = path.join(projectPath, 'pnpm-lock.yaml');
-  const npmLockPath = path.join(projectPath, 'package-lock.json');
+  const pnpmLockPath = safeJoin(projectPath, 'pnpm-lock.yaml');
+  const npmLockPath = safeJoin(projectPath, 'package-lock.json');
   const isPnpm = fs.existsSync(pnpmLockPath);
   const lockPath = isPnpm ? pnpmLockPath : npmLockPath;
   if (!fs.existsSync(lockPath)) return [];

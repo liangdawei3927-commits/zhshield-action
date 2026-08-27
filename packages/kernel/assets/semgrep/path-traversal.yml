@@ -18,10 +18,10 @@
 rules:
   - id: detect-path-traversal
     message: >-
-       检测到 `path.join` / `path.resolve` 调用（含解构写法 `import { join } from 'path'` 后的 `join(...)` / `resolve(...)`）。若任一片段可能来自外部/不可信输入
-      （用户、HTTP 请求、文件名、仓库名、扫描目标等），存在路径穿越（CWE-22）风险。
-      请改用 @zh/shared 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，
-      二者在目标逃出 base 时会抛出 PathTraversalError。
+        检测到 `path.join` / `path.resolve` 调用（含解构写法 `import { join } from 'path'` 后的 `join(...)` / `resolve(...)`）。若任一片段可能来自外部/不可信输入
+        （用户、HTTP 请求、文件名、仓库名、扫描目标等），存在路径穿越（CWE-22）风险。
+        请改用 @zh/shared 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，
+        二者在目标逃出 base 时会抛出 PathTraversalError。
     metadata:
       owasp:
         - A01:2021 - Broken Access Control

@@ -7,6 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { BundleSizeDetectorImpl, formatBytes } from '../adapters/bundle-size-detector';
 
+const ID_RE = /^bundle-size-\d+$/;
+
 /** 创建临时目录并登记清理 */
 const dirs: string[] = [];
 function tmpDir(prefix: string): string {
@@ -38,7 +40,7 @@ describe('bundle-size-detector 大文件检测', () => {
 
     expect(issues).toHaveLength(1);
     const issue = issues[0];
-    expect(issue.id).toMatch(/^bundle-size-\d+$/);
+    expect(issue.id).toMatch(ID_RE);
     expect(issue.ruleId).toBe('bundle-size.large-file');
     expect(issue.category).toBe('bundle-size');
     expect(issue.severity).toBe('medium');

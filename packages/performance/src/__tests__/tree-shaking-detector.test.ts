@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { TreeShakingDetectorImpl, LARGE_CHUNK_THRESHOLD } from '../adapters/tree-shaking-detector';
 
+const CJK_RE = /[\u4e00-\u9fff]/;
+
 const detector = new TreeShakingDetectorImpl();
 
 /** 创建临时目录并登记清理 */
@@ -44,7 +46,7 @@ describe('tree-shaking-detector', () => {
     expect(issues[0].category).toBe('tree-shaking');
     expect(issues[0].file).toBe('package.json');
     expect(issues[0].message).toContain('sideEffects');
-    expect(issues[0].message).toMatch(/[\u4e00-\u9fa5]/);
+    expect(issues[0].message).toMatch(CJK_RE);
     expect(issues[0].autoFixable).toBe(false);
   });
 
@@ -77,7 +79,7 @@ describe('tree-shaking-detector', () => {
     expect(hit?.category).toBe('tree-shaking');
     expect(hit?.file).toBe('src/index.ts');
     expect(hit?.message).toContain('lodash');
-    expect(hit?.message).toMatch(/[\u4e00-\u9fa5]/);
+    expect(hit?.message).toMatch(CJK_RE);
   });
 
   it('子路径引入 lodash/debounce → 不产生 whole-library 问题', () => {
@@ -147,7 +149,7 @@ describe('tree-shaking-detector', () => {
       expect(['tree-shaking', 'chunk-splitting']).toContain(issue.category);
       expect(typeof issue.file).toBe('string');
       expect(typeof issue.message).toBe('string');
-      expect(issue.message).toMatch(/[\u4e00-\u9fa5]/);
+      expect(issue.message).toMatch(CJK_RE);
       expect(typeof issue.autoFixable).toBe('boolean');
     }
     const high = issues.findIndex((i) => i.severity === 'high');

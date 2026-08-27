@@ -14,6 +14,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { PerformanceConfig, PerformanceIssue, PerformanceSeverity } from '../types';
 
+const VITE_MINIFY_RE = /minify\s*:\s*false\b/;
+const VITE_SOURCEMAP_RE = /sourcemap\s*:\s*(?:true|'inline'|"inline")/;
+const CHUNK_SIZE_LIMIT_RE = /chunkSizeWarningLimit\s*:\s*(\d+)/;
+const WEBPACK_MODE_RE = /mode\s*:\s*['"]([^'"]+)['"]/;
+const WEBPACK_MINIMIZE_RE = /minimize\s*:\s*false\b/;
+const WEBPACK_DEVTOOL_RE = /devtool\s*:\s*['"](?:source-map|inline-source-map)['"]/;
+const NODE_ENV_DEV_RE = /NODE_ENV\s*=\s*development/;
+
 /** 构建配置检测器契约：离线静态检测，不联网不执行 */
 export interface BuildConfigDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[];
@@ -154,7 +162,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
   /** vite 配置：minify 显式关闭 / sourcemap 开启 / chunkSizeWarningLimit 过大 */
   private scanViteConfig(issues: PerformanceIssue[], configFile: string, content: string): void {
     // minify 默认开启（esbuild），仅当显式关闭时告警
-    if (/minify\s*:\s*false\b/.test(content)) {
+    if (VITE_MINIFY_RE.test(content)) {
       issues.push(this.makeIssue(
         'build-config.vite-minify-disabled',
         'high',
@@ -164,7 +172,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
       ));
     }
     // sourcemap：生产环境开启（true / 'inline'）建议关闭
-    if (/sourcemap\s*:\s*(?:true|'inline'|"inline")/.test(content)) {
+    if (VITE_SOURCEMAP_RE.test(content)) {
       issues.push(this.makeIssue(
         'build-config.vite-sourcemap-enabled',
         'info',
@@ -174,7 +182,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
       ));
     }
     // chunkSizeWarningLimit：阈值过高会掩盖大 chunk 告警
-    const limitMatch = content.match(/chunkSizeWarningLimit\s*:\s*(\d+)/);
+    const limitMatch = content.match(CHUNK_SIZE_LIMIT_RE);
     if (limitMatch) {
       const limitKb = Number(limitMatch[1]);
       if (limitKb > 1000) {
@@ -192,7 +200,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
   /** webpack 配置：mode 未设 production / optimization.minimize 显式关闭 / devtool 泄漏源码 */
   private scanWebpackConfig(issues: PerformanceIssue[], configFile: string, content: string): void {
     // mode 缺失时 webpack 默认 development（不压缩）——未显式设置即视为高危
-    const modeMatch = content.match(/mode\s*:\s*['"]([^'"]+)['"]/);
+    const modeMatch = content.match(WEBPACK_MODE_RE);
     if (!modeMatch) {
       issues.push(this.makeIssue(
         'build-config.webpack-mode-missing',
@@ -211,7 +219,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
       ));
     }
     // optimization.minimize 显式关闭
-    if (/minimize\s*:\s*false\b/.test(content)) {
+    if (WEBPACK_MINIMIZE_RE.test(content)) {
       issues.push(this.makeIssue(
         'build-config.webpack-minimize-disabled',
         'high',
@@ -221,7 +229,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
       ));
     }
     // devtool 完整 sourcemap 在产物中内嵌/外挂源码
-    if (/devtool\s*:\s*['"](?:source-map|inline-source-map)['"]/.test(content)) {
+    if (WEBPACK_DEVTOOL_RE.test(content)) {
       issues.push(this.makeIssue(
         'build-config.webpack-devtool-sourcemap',
         'info',
@@ -243,7 +251,7 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
         '移除该标志，让构建工具以默认配置压缩产物',
       ));
     }
-    if (/NODE_ENV\s*=\s*development/.test(script)) {
+    if (NODE_ENV_DEV_RE.test(script)) {
       issues.push(this.makeIssue(
         'build-config.script-node-env-development',
         'high',

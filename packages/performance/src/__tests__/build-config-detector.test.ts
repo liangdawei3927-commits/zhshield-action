@@ -4,6 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { BuildConfigDetectorImpl } from '../adapters/build-config-detector';
 
+const ID_RE = /^build-config-\d+$/;
+const CJK_RE = /[\u4e00-\u9fa5]/;
+
 /** 创建临时目录并登记清理 */
 const dirs: string[] = [];
 function tmpDir(prefix: string): string {
@@ -176,7 +179,7 @@ describe('BuildConfigDetectorImpl 边界', () => {
     const issues = detector.detect(dir);
     expect(issues).toHaveLength(1);
     const issue = issues[0];
-    expect(issue.id).toMatch(/^build-config-\d+$/);
+    expect(issue.id).toMatch(ID_RE);
     expect(issue.ruleId).toBe('build-config.vite-minify-disabled');
     expect(issue.category).toBe('build-config');
     expect(issue.severity).toBe('high');
@@ -184,8 +187,8 @@ describe('BuildConfigDetectorImpl 边界', () => {
     expect(typeof issue.message).toBe('string');
     expect(typeof issue.suggestion).toBe('string');
     expect(issue.autoFixable).toBe(false);
-    expect(issue.message).toMatch(/[\u4e00-\u9fa5]/);
-    expect(issue.suggestion).toMatch(/[\u4e00-\u9fa5]/);
+    expect(issue.message).toMatch(CJK_RE);
+    expect(issue.suggestion).toMatch(CJK_RE);
   });
 
   it('多个问题按严重度降序排列（high > medium > low > info）', () => {

@@ -39,3 +39,11 @@ pnpm + Turborepo monorepo，19 个 `@zh/*` 包。依赖方向：客户端 → �
 | `pnpm test` | 全部 Vitest |
 | `pnpm lint` | ESLint（各包 src） |
 | `pnpm --filter @zh/<pkg> exec tsc --noEmit -p tsconfig.json` | 单包类型检查 |
+
+## 编码规范
+
+- **注释语言**：所有代码注释统一使用中文（与已有代码风格一致）
+- **错误信息**：面向用户的 i18n 文案走 `translate()`，开发者日志/注释用中文
+- **PATH 补全**：`packages/shared/src/path-augment.ts` 的 `augmentProcessPath()`，由 Electron 主进程（`desktop/electron/env.ts` 薄壳传入 `__dirname`）与 CLI 入口（`cli/src/index.ts` 的 `main()` 顶部）在启动最早期调用，确保子进程继承完整 PATH（覆盖 nvm / Homebrew / ~/.local/bin / workspace .bin）
+- **工具探测**：inspect adapters 使用 `packages/inspect/src/adapters/tool-bin.ts` 的 `resolveToolCommand()` 做 PATH + node_modules/.bin 二级解析
+- **无新依赖**：不引入任何新的 npm 包，所有功能使用 Node.js 内置 API

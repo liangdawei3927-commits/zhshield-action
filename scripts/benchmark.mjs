@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 
 const RESULTS = [];
+const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 
 function countLOC(dir) {
   let count = 0;
@@ -19,7 +20,7 @@ function countLOC(dir) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory() && !['node_modules', 'dist', '.git', 'coverage', '.turbo'].includes(entry.name)) {
         count += countLOC(fullPath);
-      } else if (entry.isFile() && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name)) {
+      } else if (entry.isFile() && SOURCE_FILE_RE.test(entry.name)) {
         count += fs.readFileSync(fullPath, 'utf-8').split('\n').length;
       }
     }

@@ -46,4 +46,5 @@ pnpm + Turborepo monorepo，19 个 `@zh/*` 包。依赖方向：客户端 → �
 - **错误信息**：面向用户的 i18n 文案走 `translate()`，开发者日志/注释用中文
 - **PATH 补全**：`packages/shared/src/path-augment.ts` 的 `augmentProcessPath()`，由 Electron 主进程（`desktop/electron/env.ts` 薄壳传入 `__dirname`）与 CLI 入口（`cli/src/index.ts` 的 `main()` 顶部）在启动最早期调用，确保子进程继承完整 PATH（覆盖 nvm / Homebrew / ~/.local/bin / workspace .bin）
 - **工具探测**：inspect adapters 使用 `packages/inspect/src/adapters/tool-bin.ts` 的 `resolveToolCommand()` 做 PATH + node_modules/.bin 二级解析
+- **路径拼接安全（防路径穿越 CWE-22）**：任何拼接可能涉及外部/不可信片段（用户输入、HTTP 请求参数、文件名、仓库名、扫描目标等）的文件路径，必须使用 `@zh/shared` 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，**禁止**直接用 `path.join` / `path.resolve` 拼接不可信片段。`safeJoin`/`safeResolve` 在目标逃出 `base` 时抛出 `PathTraversalError`。回归用例见各包 `src/__tests__/safe-path-regression.test.ts`；CI 巡检由 `packages/kernel/assets/semgrep/path-traversal.yml` 规则抽查（report-only）。
 - **无新依赖**：不引入任何新的 npm 包，所有功能使用 Node.js 内置 API

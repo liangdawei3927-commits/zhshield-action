@@ -16,6 +16,9 @@ import type {
   TechDebtSnapshot,
 } from './types';
 
+const BACKSLASH_RE = /\\/g;
+const DOT_SLASH_RE = /^\.\//;
+
 /** 单条 Issue 按 severity 的利息权重（安全 > 架构 > 质量 > 重复 的近似：error > warning > info） */
 const SEVERITY_WEIGHT: Record<'error' | 'warning' | 'info', number> = {
   error: 3,
@@ -76,7 +79,7 @@ function densityFactor(count: number): number {
 
 /** 模块提取：取 issue.file 的顶层目录 + 文件名（相对路径，无 file 归 '(root)'） */
 export function moduleOf(file: string): string {
-  const cleaned = file.replace(/\\/g, '/').replace(/^\.\//, '');
+  const cleaned = file.replace(BACKSLASH_RE, '/').replace(DOT_SLASH_RE, '');
   if (!cleaned) return '(root)';
   return cleaned;
 }
@@ -84,7 +87,7 @@ export function moduleOf(file: string): string {
 /** 计算安全敞口因子：文件出现在对外接口清单 → 1.5，否则 1.0 */
 function exposureFactor(file: string, exposedFiles: Set<string>): number {
   if (!exposedFiles.size) return 1;
-  const normalized = file.replace(/\\/g, '/');
+  const normalized = file.replace(BACKSLASH_RE, '/');
   return exposedFiles.has(normalized) ? 1.5 : 1;
 }
 
@@ -178,10 +181,9 @@ export function buildTechDebtDashboard(input: TechDebtInput): TechDebtSnapshot {
     moduleMap.set(action.module, cur);
   }
   const totalInterest = moduleMap.size
-    ? Array.from(moduleMap.values()).reduce((acc, m) => acc + m.interest, 0)
+    ? [...moduleMap.values()].reduce((acc, m) => acc + m.interest, 0)
     : 0;
-  const byModule: ModuleDebt[] = Array.from(moduleMap.entries())
-    .map(([module, { interest, hotness }]) => ({
+  const byModule: ModuleDebt[] = Array.from(moduleMap.entries(), ([module, { interest, hotness }]) => ({
       module,
       debtShare: totalInterest > 0 ? round2(interest / totalInterest) : 0,
       hotness,
@@ -197,8 +199,7 @@ export function buildTechDebtDashboard(input: TechDebtInput): TechDebtSnapshot {
     cur.interest += action.interestScore;
     categoryMap.set(action.category, cur);
   }
-  const byCategory: CategoryDebt[] = Array.from(categoryMap.entries())
-    .map(([category, { count, interest }]) => ({
+  const byCategory: CategoryDebt[] = Array.from(categoryMap.entries(), ([category, { count, interest }]) => ({
       category,
       count,
       weight: totalInterest > 0 ? round2(interest / totalInterest) : 0,

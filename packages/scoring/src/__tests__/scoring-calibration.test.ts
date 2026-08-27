@@ -200,9 +200,9 @@ describe('评分校准 — 真实跑分（Task C）', () => {
       };
     });
 
-    // eslint-disable-next-line no-console
+     
     console.log('\n=== 评分校准表（标准化 findings：1 安全失败 + 1 警告；4 条 inspect）===');
-    // eslint-disable-next-line no-console
+     
     console.table(rows);
 
     for (const r of rows) {

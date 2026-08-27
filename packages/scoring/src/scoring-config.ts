@@ -28,7 +28,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
         description: '项目没有严重安全漏洞',
         dimension: 'security',
         points: 10,
-        condition: (ctx) => ctx.findings.filter(f => f.severity === 'critical').length === 0,
+        condition: (ctx) => !ctx.findings.some(f => f.severity === 'critical'),
       },
       {
         id: 'security-tools-configured',
@@ -130,7 +130,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
         description: '没有严重过期的依赖',
         dimension: 'dependencies',
         points: 5,
-        condition: (ctx) => ctx.findings.filter(f => f.category === 'dependency' && f.severity === 'high').length === 0,
+        condition: (ctx) => !ctx.findings.some(f => f.category === 'dependency' && f.severity === 'high'),
       },
     ],
   },

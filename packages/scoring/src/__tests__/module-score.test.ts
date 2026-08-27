@@ -131,7 +131,6 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
     expect(agg.modules).toHaveLength(3);
     const serverCard = agg.modules.find((m) => m.path === '/p/packages/server')!;
     const webCard = agg.modules.find((m) => m.path === '/p/packages/web')!;
-    const rootCard = agg.modules.find((m) => m.path === '/p')!;
     expect(serverCard.type).toBe('backend');
     expect(webCard.type).toBe('frontend');
     // backend 更看重 security，同份安全问题时整体分更低

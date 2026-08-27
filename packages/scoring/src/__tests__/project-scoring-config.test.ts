@@ -15,6 +15,16 @@ import { DimensionMapper } from '../dimension-mapper';
 import { buildHealthDimensions } from '../pipeline-score';
 import { ScoringEngine } from '../scoring-engine';
 
+const WEIGHT_NOT_NUMBER_RE = /weight 必须是有限数字/;
+const UNKNOWN_DIMENSION_RE = /未知维度 "seo"/;
+const SECURITY_RE = /security/;
+const WEIGHT_SUM_RE = /权重之和必须为 1/;
+const SUM_1_15_RE = /1\.15/;
+const UNKNOWN_BONUS_RULE_RE = /未知加分规则 "made-up-rule"/;
+const UNKNOWN_FIELD_RE = /未知字段 "weights"/;
+const NOT_LESS_THAN_ZERO_RE = /不能小于 0/;
+const TOP_MUST_BE_MAP_RE = /顶层必须是映射/;
+
 /** 创建带可选文件的临时项目目录，测试结束后统一清理 */
 const tempRoots: string[] = [];
 
@@ -191,7 +201,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
     });
 
     expect(() => loadProjectScoringConfig(root)).toThrow(ProjectScoringConfigError);
-    expect(() => loadProjectScoringConfig(root)).toThrow(/weight 必须是有限数字/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(WEIGHT_NOT_NUMBER_RE);
   });
 
   it('未知维度 → 报错并列出可用维度', () => {
@@ -199,8 +209,8 @@ describe('非法覆盖 — fail-fast 策略', () => {
       '.zhshield/scoring.yml': ['dimensions:', '  seo:', '    weight: 0.1', ''].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(/未知维度 "seo"/);
-    expect(() => loadProjectScoringConfig(root)).toThrow(/security/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(UNKNOWN_DIMENSION_RE);
+    expect(() => loadProjectScoringConfig(root)).toThrow(SECURITY_RE);
   });
 
   it('权重和 ≠ 1 → 报错并给出当前总和', () => {
@@ -210,8 +220,8 @@ describe('非法覆盖 — fail-fast 策略', () => {
 
     // 0.5 + 0.25 + 0.20 + 0.15 + 0.05 = 1.15
     expect(() => loadProjectScoringConfig(root)).toThrow(ProjectScoringConfigError);
-    expect(() => loadProjectScoringConfig(root)).toThrow(/权重之和必须为 1/);
-    expect(() => loadProjectScoringConfig(root)).toThrow(/1\.15/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(WEIGHT_SUM_RE);
+    expect(() => loadProjectScoringConfig(root)).toThrow(SUM_1_15_RE);
   });
 
   it('未知加分规则 id → 报错', () => {
@@ -226,7 +236,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
       ].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(/未知加分规则 "made-up-rule"/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(UNKNOWN_BONUS_RULE_RE);
   });
 
   it('未知顶层字段 → 报错（防止拼写错误静默失效）', () => {
@@ -234,7 +244,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
       '.zhshield/scoring.yml': ['weights:', '  security: 0.9', ''].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(/未知字段 "weights"/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(UNKNOWN_FIELD_RE);
   });
 
   it('负数 perIssuePenalty → 报错', () => {
@@ -248,13 +258,13 @@ describe('非法覆盖 — fail-fast 策略', () => {
       ].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(/不能小于 0/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(NOT_LESS_THAN_ZERO_RE);
   });
 
   it('validateScoringOverrides 拒绝非映射顶层输入', () => {
     expect(() => validateScoringOverrides(null)).toThrow(ProjectScoringConfigError);
-    expect(() => validateScoringOverrides([1, 2])).toThrow(/顶层必须是映射/);
-    expect(() => validateScoringOverrides('dimensions')).toThrow(/顶层必须是映射/);
+    expect(() => validateScoringOverrides([1, 2])).toThrow(TOP_MUST_BE_MAP_RE);
+    expect(() => validateScoringOverrides('dimensions')).toThrow(TOP_MUST_BE_MAP_RE);
   });
 });
 

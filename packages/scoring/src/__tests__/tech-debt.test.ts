@@ -95,7 +95,7 @@ describe('tech-debt: buildTechDebtDashboard', () => {
 
     // ROI 降序
     const rois = snap.actionList.map((a) => a.roi);
-    expect([...rois].sort((x, y) => y - x)).toEqual(rois);
+    expect(rois.toSorted((x, y) => y - x)).toEqual(rois);
     expect(snap.actionList[0].recommended).toBe(true);
   });
 

@@ -90,7 +90,7 @@
 ### 2.4 已知落差（必须在 P0 闭合）
 1. **Trivy 在 security 生产路径未接上**：`@zh/security` 的 trivy/grype 等适配器在生产实例化时未注册（死代码）；Trivy 目前仅 `guard` 的 `GuardTrivyAdapter` 使用。
 2. **规则疑似运行时从后端同步**（如 `startPeriodicSync` 拉 SOP 缓存 / wisdom brain）。离线 CI 无法依赖此机制。
-3. **CLI 不可独立安装**：依赖 `tsx` 跑源码、依赖整个 monorepo 树，CI 中无法 `npx zhshield`。
+3. **CLI 不可独立安装**：依赖 `tsx` 跑源码、依赖整个 monorepo 树，CI 中无法 `npx zhshield`。（已由 P0-1 闭合：自包含 bundle 随仓库 `packages/cli/dist` 分发，官方 Action 从 Action 仓库 GitHub 直装，绕开 npm。）
 
 ### 2.5 零 Token 边界（引用 `00-项目文档/00-总览/零Token模式能力边界图.md`）
 **✅ 可检测（零 Token，全本地/开源 CLI）：**
@@ -133,12 +133,12 @@ P2    (可选) 后端服务 + token 体系 + AI review 增值
 ## 5. P0 规格与验收标准
 
 ### P0-1 CLI 可独立安装化
-- **目标**：CI 中可通过 `npx zhshield@x` 或 Action 内置方式调用，无需整个 monorepo 源码。
-- **要求**：
-  - 发布 `zhshield-cli` 到 npm（移除 `"private": true`），或产出 standalone 可执行 build。
-  - `bin/zhshield` 不再依赖 `tsx` 现场跑 TS 源码；打包为可执行产物。
-  - 核心引擎（guard/inspect/security）随 CLI 发行，不依赖仓库其余包开发态。
-- **验收**：在干净容器（无 monorepo）中 `npx zhshield guard --dir . --dry-run` 可运行并产出报告。
+- **目标**：CI 中可通过官方 GitHub Action 内置方式调用，无需整个 monorepo 源码。
+- **实现（现状，GitHub 直装，绕开 npm）**：
+  - 自包含可执行 bundle 随仓库分发包：`packages/cli/dist/zhshield.js`（含 shebang，无外部 require）+ `dist/sop/`（SOP 规则）。
+  - 官方 Action `action.yml` 的 Install 步骤：下载本 Action 所在仓库 `<ref>.tar.gz` → 提取 `packages/cli/dist` → 装到 `/usr/local/lib/zhshield-cli` → 软链 `/usr/local/bin/zhshield`。**不依赖 npm 注册表 / 登录 / 令牌 / 邮箱验证码**。
+  - 经 npm 发布 `zhshield-cli` 为可选增量（npm registry 恢复后进行），非必需。
+- **验收**：在干净容器（无 monorepo、无 npm 发布）中，action 安装后可运行 `zhshield guard --dir . --dry-run` 并产出报告。（已实测：远程 `v1` tag tarball 安装后 `inspect` 正常出报告。）
 
 ### P0-2 0Token 规则自包含
 - **目标**：离线 CI 不依赖后端即可获得完整规则。

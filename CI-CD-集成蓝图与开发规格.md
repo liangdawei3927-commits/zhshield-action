@@ -135,7 +135,7 @@ P2    (可选) 后端服务 + token 体系 + AI review 增值
 ### P0-1 CLI 可独立安装化
 - **目标**：CI 中可通过 `npx zhshield@x` 或 Action 内置方式调用，无需整个 monorepo 源码。
 - **要求**：
-  - 发布 `@zh/cli` 到 npm（移除 `"private": true`），或产出 standalone 可执行 build。
+  - 发布 `zhshield-cli` 到 npm（移除 `"private": true`），或产出 standalone 可执行 build。
   - `bin/zhshield` 不再依赖 `tsx` 现场跑 TS 源码；打包为可执行产物。
   - 核心引擎（guard/inspect/security）随 CLI 发行，不依赖仓库其余包开发态。
 - **验收**：在干净容器（无 monorepo）中 `npx zhshield guard --dir . --dry-run` 可运行并产出报告。

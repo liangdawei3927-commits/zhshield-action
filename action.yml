@@ -43,7 +43,7 @@ runs:
     # 用户 0 配置：Action 内部负责安装 CLI 与开源工具
     - name: Install ZHCodeShield CLI
       shell: bash
-      run: npm install -g @zh/cli
+      run: npm install -g zhshield-cli
 
     # 0Token 开源扫描器（用户无需手动安装/配置）。单工具失败不阻断整体，CLI 自动降级。
     - name: Install open-source scanners

@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: zhishield/zhshield-action@v1   # 官方 Action（P1 产出）
+      - uses: liangdawei3927-commits/zhshield-action@v1   # 官方 Action（P1 产出）
         with:
           mode: guard
           format: sarif

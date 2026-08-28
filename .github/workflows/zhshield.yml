@@ -19,7 +19,7 @@ jobs:
 
       # 官方 Action（P1 产出）：安装 CLI + 开源工具，只检查不修复
       - name: ZHCodeShield Guard
-        uses: zhishield/zhshield-action@v1
+        uses: liangdawei3927-commits/zhshield-action@v1
         with:
           mode: guard
           format: sarif

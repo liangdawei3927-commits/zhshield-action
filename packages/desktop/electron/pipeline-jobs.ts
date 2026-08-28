@@ -101,6 +101,7 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
   progress(id, 'security', t('pipeline.security.scanning'), 0.1);
   const { SecurityEngine } = await import('@zh/security');
   const engine = new SecurityEngine({ emit: () => undefined });
+  engine.registerDefaultAdapters();
   try {
     const report = await engine.runSecurityScan(projectPath, projectPath);
     progress(id, 'done', t('pipeline.security.done'), 1.0);

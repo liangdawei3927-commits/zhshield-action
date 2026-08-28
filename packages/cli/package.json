@@ -1,13 +1,17 @@
 {
   "name": "@zh/cli",
   "version": "0.1.0",
-  "private": true,
-  "main": "./src/index.ts",
+  "private": false,
+  "main": "./dist/zhshield.js",
   "types": "./src/index.ts",
   "bin": {
-    "zhshield": "./bin/zhshield.mjs"
+    "zhshield": "./dist/zhshield.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "node scripts/build-cli.mjs",
     "guard": "tsx src/index.ts guard",
     "inspect": "tsx src/index.ts inspect",
     "pipeline": "tsx src/index.ts pipeline",
@@ -15,22 +19,22 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src bin --max-warnings 50"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@zh/pipeline": "workspace:*",
     "@zh/reporter": "workspace:*",
-    "@zh/shared": "workspace:*"
-  },
-  "devDependencies": {
+    "@zh/shared": "workspace:*",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "esbuild": "^0.24.0"
   },
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/zhshield.js",
+      "require": "./dist/zhshield.js"
     }
   }
 }

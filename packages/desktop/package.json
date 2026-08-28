@@ -56,6 +56,16 @@
   "build": {
     "appId": "com.zhiyan.codeshield",
     "productName": "智汇码盾",
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "build/**",
+      "package.json",
+      "!**/.turbo",
+      "!**/.turbo/**",
+      "!**/node_modules/.cache",
+      "!**/*.log"
+    ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [

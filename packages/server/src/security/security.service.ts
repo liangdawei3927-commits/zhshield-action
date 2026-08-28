@@ -16,6 +16,7 @@ export class SecurityService {
     this.engine = new SecurityEngine({
       emit: (event) => eventBus.emit(event.type, event.payload),
     });
+    this.engine.registerDefaultAdapters();
   }
 
   async runScan(projectPath: string): Promise<SecurityScanReport> {

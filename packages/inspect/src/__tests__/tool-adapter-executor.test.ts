@@ -125,3 +125,31 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
     expect(results[0].issueCount).toBe(0);
   });
 });
+
+describe('ToolAdapterExecutor 硬上限保护（防 CI 卡死）', () => {
+  it('Given 适配器 scan 永不 settle，When runAll，Then 在硬上限内降级为 error 而非无限挂起', async () => {
+    const { deps, escalation } = makeDeps();
+    const executor = new ToolAdapterExecutor({ ...deps, hardTimeoutMs: 150 });
+    const hanging: ToolAdapter = {
+      meta: {
+        id: 'hang',
+        name: 'Hang',
+        category: 'inspect',
+        priority: 'P0',
+        installMode: 'builtin',
+        description: '',
+        cliCommand: 'hang',
+        homepage: '',
+        license: 'MIT',
+      },
+      isAvailable: vi.fn().mockResolvedValue(true),
+      scan: vi.fn().mockReturnValue(new Promise<ToolResult>(() => {})),
+    };
+    const adapters = new Map<string, ToolAdapter>([['hang', hanging]]);
+
+    const results = await executor.runAll(adapters, 'proj-1');
+
+    expect(results[0].passed).toBe(false);
+    expect(escalation).toHaveBeenCalled();
+  }, 5000);
+});

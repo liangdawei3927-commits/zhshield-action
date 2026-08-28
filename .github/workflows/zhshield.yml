@@ -1,0 +1,32 @@
+name: ZHCodeShield Guard
+
+# 门禁触发：push + pull_request
+on:
+  push:
+  pull_request:
+
+# SARIF 上传需要 security-events 写权限（自动 GITHUB_TOKEN，非用户 token）
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+jobs:
+  shield:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 官方 Action（P1 产出）：安装 CLI + 开源工具，只检查不修复
+      - name: ZHCodeShield Guard
+        uses: zhishield/zhshield-action@v1
+        with:
+          mode: guard
+          format: sarif
+
+      # error 级问题导致合并被状态检查阻断；始终上传 SARIF 以便 Security 面板 / PR 展示
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: zhshield.sarif

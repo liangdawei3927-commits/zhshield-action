@@ -6,6 +6,8 @@ export interface ToolAdapterExecutorDeps {
   degradationManager: DegradationManager;
   auditLogger: AuditLogger;
   emitter: EventEmitter;
+  /** 单次适配器扫描硬上限（ms），防止异常工具无限挂起巡检任务；默认 120000 */
+  hardTimeoutMs?: number;
 }
 
 /**
@@ -18,11 +20,13 @@ export class ToolAdapterExecutor {
   private degradationManager: DegradationManager;
   private auditLogger: AuditLogger;
   private emitter: EventEmitter;
+  private hardTimeoutMs: number;
 
   constructor(deps: ToolAdapterExecutorDeps) {
     this.degradationManager = deps.degradationManager;
     this.auditLogger = deps.auditLogger;
     this.emitter = deps.emitter;
+    this.hardTimeoutMs = deps.hardTimeoutMs ?? 120_000;
   }
 
   async runAll(adapters: Map<string, ToolAdapter>, projectId: string): Promise<AdapterResult[]> {
@@ -50,14 +54,41 @@ export class ToolAdapterExecutor {
     };
   }
 
+  /**
+   * 硬上限保护：即便某适配器未遵守 options.timeout（进程未退出），单次扫描也绝不会
+   * 无限挂起整个巡检任务。超时即 reject，由 runAdapter 的 catch 降级为该适配器 error。
+   */
+  private static withHardTimeout<T>(promise: Promise<T>, ms: number, toolId: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`[inspect] ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`)),
+        ms,
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+  }
+
   private async runAdapter(adapter: ToolAdapter, projectId: string): Promise<AdapterResult> {
     const toolStart = Date.now();
     try {
-      const result = await adapter.scan({
-        projectPath: process.cwd(),
-        projectId,
-        timeout: 60000,
-      });
+      const result = await ToolAdapterExecutor.withHardTimeout(
+        adapter.scan({
+          projectPath: process.cwd(),
+          projectId,
+          timeout: 60000,
+        }),
+        this.hardTimeoutMs,
+        adapter.meta.id,
+      );
       const duration = Date.now() - toolStart;
 
       // 副作用（审计日志 / 事件发射）失败不应污染扫描结果：

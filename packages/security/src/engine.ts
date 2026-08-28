@@ -11,6 +11,7 @@ import { MalwareScanner, mapSemgrepIssuesToMalware } from './malware-scanner';
 import { GrypeCrossValidator } from './cross-validator';
 import type { CrossValidationReport } from './cross-validator';
 import { InjectionGuard } from './injection-guard';
+import { TrivyAdapter, GrypeAdapter, DepcheckAdapter, SemgrepAdapter, ORTAdapter } from './adapters';
 import { RuleConflictResolver } from './rule-conflict-resolver';
 import type { RuleConflictReport, RuleFinding } from './rule-conflict-resolver';
 
@@ -101,6 +102,19 @@ export class SecurityEngine {
     });
     this.registeredAdapters.set(wrapped.meta.id, wrapped);
     this.toolManager.register(wrapped);
+  }
+
+  /**
+   * 注册生产路径默认安全适配器（Trivy/Grype/Depcheck/Semgrep/ORT）。
+   * 不放构造函数，以保留「无适配器」测试构造路径（security-engine.test 断言）。
+   * 消除 guard 侧用 GuardTrivyAdapter 而 security 侧 TrivyAdapter 闲置的分裂。
+   */
+  registerDefaultAdapters(): void {
+    this.registerAdapter(new TrivyAdapter());
+    this.registerAdapter(new GrypeAdapter());
+    this.registerAdapter(new DepcheckAdapter());
+    this.registerAdapter(new SemgrepAdapter());
+    this.registerAdapter(new ORTAdapter());
   }
 
   getToolManager(): ToolManager {

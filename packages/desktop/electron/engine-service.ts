@@ -42,6 +42,7 @@ export class EngineService {
     this.security = new SecurityEngine({
       emit: (event) => this.eventBus!.emit(event.type, event.payload),
     });
+    this.security.registerDefaultAdapters();
   }
 
   async runGuard(projectPath: string, options?: Partial<CheckOptions>): Promise<GuardReport> {

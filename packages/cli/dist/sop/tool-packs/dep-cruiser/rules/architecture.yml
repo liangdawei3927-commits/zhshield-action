@@ -1,0 +1,41 @@
+# Dependency Cruiser Architecture Rules - 智汇码盾 Tool Pack
+# 5条架构规则：循环依赖、跨层依赖
+forbidden:
+  - name: "no-circular-dependencies"
+    severity: "error"
+    from: {}
+    to: {}
+    circular: true
+    # 循环依赖检测：任何模块间的循环引用都是禁止的
+    
+  - name: "no-cross-layer-imports"
+    severity: "error"
+    from:
+      path: "^packages/(desktop|server)/"
+    to:
+      path: "^packages/(kernel|shared|db)/"
+    # 跨层依赖：desktop/server 不应直接导入底层模块（应通过 API）
+    
+  - name: "no-kernel-importing-desktop"
+    severity: "error"
+    from:
+      path: "^packages/kernel/"
+    to:
+      path: "^packages/(desktop|server)/"
+    # 内核层不应依赖桌面端/服务端
+    
+  - name: "no-circular-packages"
+    severity: "error"
+    from:
+      path: "^packages/"
+    to:
+      path: "^packages/"
+    # 包间循环依赖检测
+    
+  - name: "enforce-layer-boundaries"
+    severity: "warn"
+    from:
+      path: "^packages/shared/"
+    to:
+      path: "^packages/(desktop|server)/"
+    # 共享层不应依赖应用层（仅定义接口和类型）

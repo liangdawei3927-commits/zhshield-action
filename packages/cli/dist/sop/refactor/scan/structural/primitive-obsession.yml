@@ -1,0 +1,10 @@
+name: Primitive Obsession
+description: 检测类中使用过多原始类型字段 — 建议创建值对象
+severity: info
+executionMode: async
+status: active
+source: official
+tags: [refactor, structural, domain-modeling]
+applicableEngines: [refactor]
+thresholds:
+  maxPrimitiveFields: 5

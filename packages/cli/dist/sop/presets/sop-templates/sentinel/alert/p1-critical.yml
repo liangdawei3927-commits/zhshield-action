@@ -1,0 +1,140 @@
+# =============================================================================
+# SOP 规则模板 — Sentry · P1 严重告警策略
+# =============================================================================
+# 规则 ID: sentinel.alert.internal.p1-critical
+# 治理域: 监控域 (sentinel)
+# 动作类型: 告警响应 (alert)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Sentinel 告警分级 · P1
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SentinelRule
+metadata:
+  id: "sentinel.alert.internal.p1-critical"
+  name: "P1 严重告警策略"
+  description: "致命级告警，需要 15 分钟内响应，触发即时通知 + 自动修复"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "internal"
+  sourceRef: "全链路哨兵监控系统详细设计.md — 告警分级"
+
+governance:
+  domain: "sentinel"
+  action: "alert"
+  module: "Sentinel"
+  category: "alerting"
+  level: "P1"
+
+execution:
+  mode: "event"
+  timeout: 5
+  maxConcurrency: 5
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  triggers:
+    - type: "resource"
+      metric: "cpu_usage"
+      operator: ">"
+      threshold: 90
+      unit: "percent"
+      duration: "5m"
+    - type: "resource"
+      metric: "memory_usage"
+      operator: ">"
+      threshold: 1024
+      unit: "MB"
+      duration: "5m"
+    - type: "business"
+      metric: "api_success_rate"
+      operator: "<"
+      threshold: 99.0
+      unit: "percent"
+      duration: "3m"
+    - type: "business"
+      metric: "api_p99_latency"
+      operator: ">"
+      threshold: 2000
+      unit: "ms"
+      duration: "5m"
+    - type: "business"
+      metric: "error_rate"
+      operator: ">"
+      threshold: 5
+      unit: "percent"
+      duration: "3m"
+    - type: "dependency"
+      metric: "database_connection"
+      operator: "=="
+      threshold: 0
+      description: "数据库连接池耗尽"
+
+check:
+  tool: "sentinel-alert-controller"
+  toolConfig:
+    severity: "P1"
+    label: "critical"
+    responseSLA: "15min"
+    channels:
+      - "event-center"
+      - "desktop-notification"
+      - "community-broadcast"
+    actions:
+      - "immediate-notify"
+      - "auto-remediation"
+      - "create-incident"
+    dedup:
+      window: "10m"
+      key: "fingerprint"
+  severity: "critical"
+  categories:
+    - "alerting"
+    - "p1"
+    - "incident"
+    - "reliability"
+
+standards:
+  osps:
+    - "OSPS-VM-01"             # Vulnerability Disclosure Policy
+    - "OSPS-Sentinel-design"   # 自研 Sentinel 告警设计
+
+judgment:
+  passCondition: "alertTriggered"
+  blockOn: "none"
+  priority: "critical"
+  autoRemediation: true
+  escalationAfter: "15min"
+  escalationChannel: "phone-call"
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🔴 P1 严重告警已触发
+
+    ⚠️ 指标: {metric} {operator} {threshold} 持续 {duration}
+    ⚠️ SLA: 15 分钟内必须响应
+
+    自动动作：
+    1. 即时通知已发送至所有应急通道
+    2. 自动修复流程已启动
+    3. 事故工单已创建
+
+    负责人需：
+    1. 立即确认告警（acknowledge）
+    2. 检查自动修复是否生效
+    3. 如修复失败 → 启动降级/回滚方案
+    4. 15 分钟内未响应 → 自动升级到电话通知
+
+    📖 参考: 全链路哨兵监控系统 — 告警分级

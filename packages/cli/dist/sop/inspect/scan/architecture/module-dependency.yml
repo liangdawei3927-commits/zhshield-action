@@ -1,0 +1,12 @@
+name: Module Dependency Check
+description: 检查模块依赖关系 — 确保依赖方向正确
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [architecture, dependency, module]
+applicableEngines: [inspect]
+forbidden:
+  - core -> ui
+  - domain -> infrastructure
+  - shared -> feature

@@ -1,0 +1,12 @@
+name: TypeScript Error Blocking
+description: L1 门禁 — TS 类型错误阻断，阻止有 TypeScript 类型错误的代码提交
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [typescript, type-check, frontend]
+applicableEngines: [guard]
+checks:
+  - strict: true
+  - noImplicitAny: true
+  - strictNullChecks: true

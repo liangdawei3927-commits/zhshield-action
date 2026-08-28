@@ -1,0 +1,135 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · TypeScript 空安全扫描
+# =============================================================================
+# 规则 ID: inspect.scan.internal.null-safety
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect TS · null-safety
+# 内部标准源: IronNest#00 rules 7 + 47 · IronNest#08 Database · CWE-476
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.internal.null-safety"
+  name: "TypeScript 空安全扫描"
+  description: "扫描空安全违规：禁止非空断言运算符(!)、检测可选链使用机会、变量解引用前空值检查、禁止 definite assignment assertion"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/00 (7, 47) · rules/08"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "typescript"
+
+execution:
+  mode: "async"
+  timeout: 60
+  maxConcurrency: 2
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+
+check:
+  tool: "custom-ast-scanner"
+  toolConfig:
+    rules:
+      - id: "no-non-null-assertion"
+        description: "禁止非空断言运算符 !（postfix !），应使用类型守卫或 ?? 运算符"
+        severity: "error"
+        pattern:
+          type: "TSNonNullExpression"
+        excludePattern:
+          - "declare.*!"
+          - ".*.d.ts"
+        message: "非空断言会在运行时静默跳过 null 检查，掩盖潜在的 TypeError"
+        cwe: "CWE-476"
+      - id: "no-definite-assignment"
+        description: "禁止 definite assignment assertion (!:)，应使用构造函数初始化"
+        severity: "warning"
+        pattern:
+          type: "TSDefiniteAssignmentAssertion"
+        message: "Definite assignment 告诉编译器'我已初始化'但无运行时保证"
+      - id: "optional-chaining-opportunity"
+        description: "检测 xxx && xxx.property 模式，可替换为 xxx?.property"
+        severity: "info"
+        pattern:
+          type: "LogicalExpression"
+          operator: "&&"
+          depth: "2-levels"
+        autoFix: "?. 可选链"
+      - id: "nullable-deref"
+        description: "检测可能的 null/undefined 解引用（基于类型推断）"
+        severity: "warning"
+        pattern:
+          type: "MemberAccess"
+          nullableTarget: true
+        message: "该值可能为 null/undefined 但未做空值检查"
+      - id: "guard-before-access"
+        description: "建议在解引用前使用 if-guard 或 ?? 确保值存在"
+        severity: "info"
+        pattern:
+          type: "CallExpression"
+          nullableReceiver: true
+  severity: "warning"
+  categories:
+    - "null-safety"
+    - "typescript"
+    - "best-practice"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe:
+    - "CWE-476"
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: true
+  suggestionTemplate: |
+    发现空安全违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 规则: {ruleId}
+    ⚠️ 详情: {message}
+
+    修复指引：
+    1. `variable!` → `if (variable !== null && variable !== undefined) { variable }` 或 `variable ?? fallback`
+    2. `property!: Type` → 在构造函数中初始化或使用 DTO 声明语法
+    3. `a && a.b.c` → `a?.b?.c`
+    4. 集合元素访问 → `arr[i]` → `arr.at(i)` 或 `if (arr[i] !== undefined)`
+
+    📖 参考: IronNest #00 规则 7 · 规则 47 · CWE-476 空指针解引用

@@ -1,0 +1,17 @@
+name: P1 Critical Alert
+description: P1 严重告警策略 — 需要立即处理的运行时异常
+severity: critical
+executionMode: event
+status: active
+source: official
+tags: [sentinel, alert, p1]
+applicableEngines: [sentinel]
+response:
+  notification: [email, sms, slack]
+  responseTime: '15min'
+  autoCreateIncident: true
+  escalateAfter: '30min'
+eventTypes:
+  - crash
+  - security-incident
+  - white-screen

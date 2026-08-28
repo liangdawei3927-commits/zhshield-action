@@ -1,0 +1,108 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · NestJS 模块边界检查
+# =============================================================================
+# 规则 ID: inspect.scan.ironnest.module-boundary
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: IronNest (外部标准)
+# 对应适配器: Inspect NestJS 适配器 · module-boundary
+# 外部标准源: IronNest #1 — module isolation + barrel export
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.ironnest.module-boundary"
+  name: "NestJS 模块边界检查"
+  description: "检查 NestJS 模块间是否通过 index.ts (barrel) 导出，禁止直接跨模块 import 内部文件"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "external"
+  sourceRef: "IronNest AGENTS.md — Rule #1: Module isolation + barrel exports"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  adapter: "nestjs"
+  checker: "module-boundary"
+  mode: "full"
+
+execution:
+  mode: "sync"
+  timeout: 30
+  maxConcurrency: 4
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "src/features/*/.ts"
+    - "src/modules/*/.ts"
+  excludePatterns:
+    - "**/index.ts"
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+
+check:
+  rules:
+    - id: "no-direct-cross-module-import"
+      description: "禁止模块间直接 import 内部文件，必须通过模块的 index.ts"
+      severity: "error"
+      violationPattern: |
+        // ❌ 违规：直接 import 另一个模块的内部文件
+        import { Something } from '../other-module/internal.service'
+
+        // ✅ 正确：通过 barrel export 导入
+        import { Something } from '../other-module'
+    - id: "enforce-barrel-export"
+      description: "每个模块必须有 index.ts 作为公共 API"
+      severity: "error"
+    - id: "no-circular-module-ref"
+      description: "禁止循环模块引用（forwardRef 是坏味道）"
+      severity: "warning"
+    - id: "feature-module-organization"
+      description: "按特性模块组织，不按技术层组织（不混合 controllers/services 在同一个目录）"
+      severity: "warning"
+  severity: "error"
+
+standards:
+  ironnest:
+    - "Rule #1: Module isolation + barrel exports"
+    - "Rule #4: No circular imports — forwardRef is a code smell"
+    - "Rule #11: Organize by feature, not by layer"
+  osps: []
+  semgrep:
+    - "typescript/nestjs/security/audit/"
+
+judgment:
+  passCondition: "errorCount === 0"
+  maxIssues: 20
+  priority: "high"
+
+score:
+  impact: "architecture"
+  weight: 0.10
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    NestJS 模块边界违规：
+    - 文件: {file}
+    - 问题: {issue}
+    - 模块: {fromModule} → {toModule}
+
+    修复建议：
+    1. 确保 {toModule} 有 index.ts 导出公共 API
+    2. 修改 import 为：`import ... from '{toModule}'`
+    3. 如需跨模块共享类型 → 提取到 @zh/shared
+    4. 如出现循环引用 → 提取公共逻辑到共享模块，删除 forwardRef()
+
+    📖 参考: IronNest #1 (module isolation), #4 (no circular imports)

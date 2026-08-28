@@ -1,0 +1,328 @@
+# =============================================================================
+# 智汇码盾 SOP 规则注册索引
+# =============================================================================
+# 文件: _registry.yml
+# 用途: 知识库规则目录索引——所有规则版本的唯一入口
+# 格式: 每个规则 ID + 元数据 + 文件路径
+# 生成: 由智汇云脑自动维护，每晚 cron 更新
+# =============================================================================
+
+apiVersion: sop/v1
+kind: RuleRegistry
+metadata:
+  version: "1.2026.07.29.002"
+  publishedAt: "2026-07-29T00:00:00Z"
+  hash: "sha256-..."
+  totalRules: 215               # 当前注册的规则总数（含43条SOP模板规则）
+  status: "active"
+
+# ---- 规则索引 ----
+rules:
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Guard (拦截域) — L1/L2/L3 门禁规则                        ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  - id: "guard.block.external.eslint-error"
+    file: "guard/block/eslint-error.yml"
+    adapter: "Guard L1 pre-commit"
+    priority: "high"
+    status: "active"
+
+  - id: "guard.block.external.sensitive-info"
+    file: "guard/block/sensitive-info.yml"
+    adapter: "Guard L1 pre-commit · Gitleaks"
+    priority: "critical"
+    status: "active"
+
+  - id: "guard.block.external.critical-vulnerability"
+    file: "guard/block/critical-vulnerability.yml"
+    adapter: "Guard L2 pre-push · Trivy"
+    priority: "critical"
+    status: "active"
+
+  - id: "guard.block.external.branch-protection"
+    file: "guard/block/branch-protection.yml"
+    adapter: "Guard L2 pre-push"
+    priority: "high"
+    status: "draft"
+
+  - id: "guard.block.depcruiser.architecture"
+    file: "guard/block/architecture-boundary.yml"
+    adapter: "Guard L3 CI · depcruiser"
+    priority: "high"
+    status: "draft"
+
+  # 全新：容器安全基线（Dockerfile）
+  - id: "guard.block.external.container-security"
+    file: "guard/block/container-security.yml"
+    adapter: "Guard L2 pre-push · hadolint"
+    priority: "high"
+    status: "trial"
+
+  # 全新：GitHub Actions SHA 锁定
+  - id: "guard.block.external.actions-pinning"
+    file: "guard/block/actions-pinning.yml"
+    adapter: "Guard L2 pre-push · actionlint"
+    priority: "critical"
+    status: "trial"
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Inspect (巡检域) — 20+ 适配器扫描规则                      ║
+  # ╚══════════════════════════════════════════════════════════════╝
+
+  # TypeScript 适配器组
+  - id: "inspect.scan.internal.type-consistency"
+    file: "inspect/scan/typescript/type-consistency.yml"
+    adapter: "Inspect TS · type-consistency"
+    priority: "medium"
+    status: "active"
+
+  - id: "inspect.scan.internal.strict-mode"
+    file: "inspect/scan/typescript/strict-mode.yml"
+    adapter: "Inspect TS · strict-mode"
+    priority: "high"
+    status: "draft"
+
+  - id: "inspect.scan.internal.type-safety"
+    file: "inspect/scan/typescript/type-safety.yml"
+    adapter: "Inspect TS · type-safety"
+    priority: "medium"
+    status: "draft"
+
+  - id: "inspect.scan.internal.null-safety"
+    file: "inspect/scan/typescript/null-safety.yml"
+    adapter: "Inspect TS · null-safety"
+    priority: "medium"
+    status: "draft"
+
+  - id: "inspect.scan.internal.enum-usage"
+    file: "inspect/scan/typescript/enum-usage.yml"
+    adapter: "Inspect TS · enum-usage"
+    priority: "low"
+    status: "draft"
+
+  # NestJS 适配器组
+  - id: "inspect.scan.ironnest.module-boundary"
+    file: "inspect/scan/nestjs/module-boundary.yml"
+    adapter: "Inspect NestJS · module-boundary"
+    priority: "high"
+    status: "active"
+
+  - id: "inspect.scan.ironnest.dependency-injection"
+    file: "inspect/scan/nestjs/dependency-injection.yml"
+    adapter: "Inspect NestJS · DI"
+    priority: "high"
+    status: "draft"
+
+  # 架构适配器组
+  - id: "inspect.scan.depcruiser.circular-dependency"
+    file: "inspect/scan/architecture/circular-dependency.yml"
+    adapter: "Inspect Arch · circular-dependency"
+    priority: "high"
+    status: "active"
+
+  - id: "inspect.scan.depcruiser.layer-boundary"
+    file: "inspect/scan/architecture/layer-boundary.yml"
+    adapter: "Inspect Arch · layer-boundary"
+    priority: "high"
+    status: "draft"
+
+  - id: "inspect.scan.depcruiser.module-dependency"
+    file: "inspect/scan/architecture/module-dependency.yml"
+    adapter: "Inspect Arch · module-dependency"
+    priority: "medium"
+    status: "draft"
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Security (安全域) — 漏洞/病毒/垃圾扫描规则                  ║
+  # ╚══════════════════════════════════════════════════════════════╝
+
+  # 漏洞扫描
+  - id: "security.scan.semgrep.sql-injection"
+    file: "security/scan/vulnerability/sql-injection.yml"
+    adapter: "Security SAST · SQL 注入"
+    priority: "critical"
+    status: "active"
+
+  - id: "security.scan.semgrep.xss"
+    file: "security/scan/vulnerability/xss.yml"
+    adapter: "Security SAST · XSS"
+    priority: "critical"
+    status: "draft"
+
+  - id: "security.scan.semgrep.csrf"
+    file: "security/scan/vulnerability/csrf.yml"
+    adapter: "Security SAST · CSRF"
+    priority: "high"
+    status: "draft"
+
+  - id: "security.scan.semgrep.command-injection"
+    file: "security/scan/vulnerability/command-injection.yml"
+    adapter: "Security SAST · 命令注入"
+    priority: "critical"
+    status: "draft"
+
+  - id: "security.scan.semgrep.path-traversal"
+    file: "security/scan/vulnerability/path-traversal.yml"
+    adapter: "Security SAST · 路径遍历"
+    priority: "high"
+    status: "draft"
+
+  - id: "security.scan.gitleaks.hardcoded-key"
+    file: "security/scan/vulnerability/hardcoded-key.yml"
+    adapter: "Security · 硬编码密钥"
+    priority: "critical"
+    status: "draft"
+
+  # 病毒查杀
+  - id: "security.scan.malware.reverse-shell"
+    file: "security/scan/malware/reverse-shell.yml"
+    adapter: "Security Malware · 反弹 Shell"
+    priority: "critical"
+    status: "draft"
+
+  - id: "security.scan.malware.backdoor"
+    file: "security/scan/malware/backdoor.yml"
+    adapter: "Security Malware · 后门检测"
+    priority: "critical"
+    status: "draft"
+
+  - id: "security.scan.malware.supply-chain"
+    file: "security/scan/malware/supply-chain.yml"
+    adapter: "Security Malware · 供应链攻击"
+    priority: "critical"
+    status: "draft"
+
+  # 垃圾清理
+  - id: "security.scan.garbage.unused-file"
+    file: "security/scan/garbage/unused-file.yml"
+    adapter: "Security · 无用文件清理"
+    priority: "low"
+    status: "draft"
+
+  - id: "security.scan.garbage.unused-dependency"
+    file: "security/scan/garbage/unused-dependency.yml"
+    adapter: "Security · 未用依赖清理"
+    priority: "medium"
+    status: "draft"
+
+  - id: "security.scan.garbage.dead-code"
+    file: "security/scan/garbage/dead-code.yml"
+    adapter: "Security · 死代码清理"
+    priority: "low"
+    status: "draft"
+
+  - id: "security.scan.garbage.duplicate-code"
+    file: "security/scan/garbage/duplicate-code.yml"
+    adapter: "Security · 重复代码清理"
+    priority: "low"
+    status: "draft"
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Sentinel (监控域) — 告警策略规则                            ║
+  # ╚══════════════════════════════════════════════════════════════╝
+
+  - id: "sentinel.alert.internal.p1-critical"
+    file: "sentinel/alert/p1-critical.yml"
+    adapter: "Sentinel · P1 告警"
+    priority: "critical"
+    status: "active"
+
+  - id: "sentinel.alert.internal.p2-high"
+    file: "sentinel/alert/p2-high.yml"
+    adapter: "Sentinel · P2 告警"
+    priority: "high"
+    status: "draft"
+
+  - id: "sentinel.alert.internal.deduplication"
+    file: "sentinel/alert/deduplication.yml"
+    adapter: "Sentinel · 去重策略"
+    priority: "high"
+    status: "active"
+
+  - id: "sentinel.alert.internal.rollback"
+    file: "sentinel/alert/rollback.yml"
+    adapter: "Sentinel · 回滚策略"
+    priority: "high"
+    status: "draft"
+
+  # 全新：运行时异常行为告警
+  - id: "sentinel.alert.external.runtime-anomaly"
+    file: "sentinel/alert/runtime-anomaly.yml"
+    adapter: "Sentinel · 运行时异常"
+    priority: "critical"
+    status: "trial"
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Evolve (演进域) — 评分/建议/校准规则                         ║
+  # ╚══════════════════════════════════════════════════════════════╝
+
+  # 评分规则
+  - id: "evolve.score.official.dimension-weight"
+    file: "evolve/score/dimension-weight.yml"
+    adapter: "Scoring · 维度权重"
+    priority: "high"
+    status: "active"
+
+  - id: "evolve.score.official.grade-boundary"
+    file: "evolve/score/grade-boundary.yml"
+    adapter: "Scoring · 等级分界"
+    priority: "high"
+    status: "draft"
+
+  - id: "evolve.score.internal.trend-analysis"
+    file: "evolve/score/trend-analysis.yml"
+    adapter: "Scoring · 趋势分析"
+    priority: "medium"
+    status: "draft"
+
+  # 建议规则
+  - id: "evolve.suggest.internal.experience-match"
+    file: "evolve/suggest/experience-match.yml"
+    adapter: "Evolve · 经验匹配"
+    priority: "medium"
+    status: "active"
+
+  - id: "evolve.suggest.internal.fix-generation"
+    file: "evolve/suggest/fix-generation.yml"
+    adapter: "Evolve · 修复生成"
+    priority: "medium"
+    status: "draft"
+
+  # 校准规则
+  - id: "evolve.calibrate.internal.false-positive"
+    file: "evolve/calibrate/false-positive.yml"
+    adapter: "Evolve · 误报校准"
+    priority: "high"
+    status: "active"
+
+  - id: "evolve.calibrate.internal.rule-upgrade"
+    file: "evolve/calibrate/rule-upgrade.yml"
+    adapter: "Evolve · 规则升级"
+    priority: "medium"
+    status: "draft"
+
+  - id: "evolve.calibrate.internal.rule-deprecation"
+    file: "evolve/calibrate/rule-deprecation.yml"
+    adapter: "Evolve · 规则废弃"
+    priority: "medium"
+    status: "draft"
+
+# ---- 统计 ----
+statistics:
+  totalRegistered: 191
+  active: 14
+  draft: 31
+  trial: 3
+  deprecated: 0
+  byDomain:
+    guard: 58
+    inspect: 74
+    security: 38
+    sentinel: 9
+    evolve: 12
+  bySource:
+    external: 101
+    internal: 56
+    community: 12
+    official: 20

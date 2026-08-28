@@ -1,0 +1,150 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 规则废弃流程
+# =============================================================================
+# 规则 ID: evolve.calibrate.internal.rule-deprecation
+# 治理域: 演进域 (evolve)
+# 动作类型: 进化校准 (calibrate)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Evolve · 规则废弃
+# 内部标准源: IronNest#27 No Token-Burning · OSPS framework
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.calibrate.internal.rule-deprecation"
+  name: "规则废弃流程"
+  description: "定义规则废弃的条件和生命周期终止流程：零命中超过 N 天、被新规则取代后无新增发现、误报率过高无法校准、规则适用范围已不存在"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/27 · OSPS lifecycle"
+
+governance:
+  domain: "evolve"
+  action: "calibrate"
+  module: "Evolve"
+  category: "calibration"
+
+execution:
+  mode: "periodic"
+  timeout: 30
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "monthly"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "rule-lifecycle-manager"
+  toolConfig:
+    deprecationAssessment:
+      checkIntervalDays: 30
+      criteria:
+        - id: "zero-hits"
+          description: "连续 N 天零命中"
+          severity: "deprecation-candidate"
+          thresholdDays: 90
+          excludeWeekends: true
+          action: "review-and-deprecate"
+        - id: "superseded"
+          description: "被新规则完全覆盖且无新增发现"
+          severity: "deprecation-candidate"
+          check: "overlap-analysis"
+          thresholdDays: 30
+          action: "mark-superseded"
+        - id: "high-false-positive"
+          description: "误报率超过阈值"
+          severity: "deprecation-candidate"
+          threshold: 0.50
+          sustainedDays: 30
+          action: "deprecate-after-calibration-fail"
+        - id: "scope-removed"
+          description: "规则适用的代码/框架已不再使用"
+          severity: "deprecation-candidate"
+          check: "scope-exists"
+          action: "immediate-deprecation"
+    deprecationProcess:
+      steps:
+        - action: "notify-codeowner"
+          timing: "T+0"
+          message: "规则 {ruleId} 满足废弃条件，请在 14 天内确认"
+        - action: "change-status"
+          timing: "T+7"
+          status: "deprecated"
+          message: "规则 {ruleId} 已标记为 deprecated，将在 30 天后移除"
+        - action: "remove-from-active-adapters"
+          timing: "T+7"
+        - action: "notify-adapters"
+          timing: "T+7"
+        - action: "remove-from-registry"
+          timing: "T+37"
+          final: true
+        - action: "archive-template"
+          timing: "T+37"
+          archivePath: "${ZHSHIELD_HOME}/archive/rules/"
+    reversalCriteria:
+      description: "废弃后可以反转的条件"
+      conditions:
+        - "废弃后发现新用例"
+        - "误报率通过调参降至 20% 以下"
+        - "安全形势变化需要重新启用"
+      process: "reopen-ticket → recalibrate → trial → active"
+  severity: "info"
+  categories:
+    - "calibration"
+    - "lifecycle"
+    - "rule-management"
+    - "cleanup"
+
+judgment:
+  passCondition: "deprecationNotRequired"
+  blockOn: "none"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-04"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 120
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🗑️ 规则废弃评估
+
+    ⚠️ 规则: {ruleId}
+    ⚠️ 当前状态: {currentStatus}
+    ⚠️ 废弃原因: {reason}
+    ⚠️ 满足条件: {criteriaMet}
+
+    废弃影响分析:
+    - 引用此规则的适配器: {adapterList}
+    - 替代规则: {replacementRule}
+    - 最后命中日期: {lastHitDate}
+    - 累计命中: {totalHits}
+
+    废弃时间线:
+    - 通知负责人: T+0
+    - 标记 deprecated: T+7
+    - 从适配器移除: T+7
+    - 完全删除: T+37（如有误报可在此期间反转）
+
+    📖 参考: IronNest #27 No Token-Burning Code · OSPS 规则生命周期

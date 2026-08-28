@@ -1,0 +1,154 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · TypeScript 严格模式配置检查
+# =============================================================================
+# 规则 ID: inspect.scan.internal.strict-mode
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect TS · strict-mode
+# 内部标准源: TypeScript strict config · IronNest#13 ESLint+TypeScript
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.internal.strict-mode"
+  name: "TypeScript 严格模式配置检查"
+  description: "检查 tsconfig.json 中是否启用全部推荐严格标志（strict、strictNullChecks、noUncheckedIndexedAccess、exactOptionalPropertyTypes 等），确保项目在最高类型安全级别下编译"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "TypeScript strict · IronNest rules/13"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "typescript"
+
+execution:
+  mode: "async"
+  timeout: 30
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+    - "json"
+  filePatterns:
+    - "tsconfig.json"
+    - "tsconfig.build.json"
+    - "tsconfig.base.json"
+  excludePatterns: []
+
+check:
+  tool: "tsc-config-validator"
+  toolConfig:
+    requiredFlags:
+      strict:
+        description: "启用所有严格类型检查"
+        value: true
+        severity: "error"
+        cwe: "CWE-1104"
+      strictNullChecks:
+        description: "启用严格的空值检查，防止 null/undefined 被隐式接受"
+        value: true
+        severity: "error"
+        cwe: "CWE-476"
+      noUncheckedIndexedAccess:
+        description: "对索引访问进行未定义检查"
+        value: true
+        severity: "error"
+      exactOptionalPropertyTypes:
+        description: "精确检查可选属性类型，防止 undefined 代替缺失属性"
+        value: true
+        severity: "error"
+      strictFunctionTypes:
+        description: "严格函数类型检查（逆变参数类型）"
+        value: true
+        severity: "warning"
+      strictBindCallApply:
+        description: "严格 bind/call/apply 类型检查"
+        value: true
+        severity: "warning"
+      noImplicitReturns:
+        description: "禁止函数中隐式返回 undefined"
+        value: true
+        severity: "warning"
+      noFallthroughCasesInSwitch:
+        description: "禁止 switch 语句穿透"
+        value: true
+        severity: "warning"
+      forceConsistentCasingInFileNames:
+        description: "强制文件名大小写一致性"
+        value: true
+        severity: "warning"
+    allowed:
+      "noUnusedLocals": false
+      "noUnusedParameters": false
+  severity: "error"
+  categories:
+    - "typescript"
+    - "strict-mode"
+    - "compiler-config"
+
+judgment:
+  passCondition: "criticalErrorCount === 0"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe:
+    - "CWE-1104"
+    - "CWE-476"
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: true
+  suggestionTemplate: |
+    检测到 TypeScript 严格模式标志未启用：
+
+    ⚠️ 文件: {file}
+    ⚠️ 缺失标志: {missingFlag}
+    ⚠️ 描述: {description}
+
+    修复方法：在 tsconfig.json 中添加缺失标志：
+
+    {
+      "compilerOptions": {
+        "{missingFlag}": true
+      }
+    }
+
+    推荐的最小严格配置：
+    {
+      "compilerOptions": {
+        "strict": true,
+        "strictNullChecks": true,
+        "noUncheckedIndexedAccess": true,
+        "exactOptionalPropertyTypes": true,
+        "strictFunctionTypes": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true
+      }
+    }
+
+    启用后运行 `npx tsc --noEmit` 确认无新增错误。
+
+    📖 参考: TypeScript Strict Mode · IronNest #13

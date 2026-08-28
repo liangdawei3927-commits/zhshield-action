@@ -1,0 +1,13 @@
+name: Unused File Detection
+description: 检测未使用的文件 — 清理无引用的源文件
+severity: info
+executionMode: async
+status: active
+source: internal
+tags: [security, garbage, cleanup]
+applicableEngines: [security]
+tool: ts-prune
+ignore:
+  - index.ts
+  - '*.config.ts'
+  - '**/types.ts'

@@ -1,0 +1,105 @@
+# =============================================================================
+# SOP 规则模板 — Guard · Gitleaks 密钥检测阻断
+# =============================================================================
+# 规则 ID: guard.block.external.sensitive-info
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Guard L1 pre-commit
+# 外部标准源: Gitleaks 默认规则 222 条（https://github.com/gitleaks/gitleaks），
+# 运行时配置位于 ${ZHSHIELD_HOME}/gitleaks.toml
+# =============================================================================
+
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.external.sensitive-info"
+  name: "密钥/敏感信息提交阻断"
+  description: "在 pre-commit 阶段检测并拦截提交中包含的硬编码密钥、Token、密码等敏感信息"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "external"
+  sourceRef: "Gitleaks default config (222 rules)"
+
+governance:
+  domain: "guard"
+  action: "block"
+  module: "Guard"
+  level: "L1"
+  hook: "pre-commit"
+
+execution:
+  mode: "sync"
+  timeout: 5
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "staged"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - ".next/**"
+    - "*.lock"
+    - "*.sum"
+    - "pnpm-lock.yaml"
+    - "package-lock.json"
+    - "yarn.lock"
+
+check:
+  tool: "gitleaks"
+  toolConfig:
+    configPath: "${ZHSHIELD_HOME}/gitleaks.toml"
+    mode: "detect"
+    target: "staged"
+    verbose: true
+  severity: "error"
+  categories:
+    - "secret-detection"
+    - "credential-leak"
+    - "hardcoded-secret"
+
+standards:
+  osps:
+    - "OSPS-BR-02"             # Automatically Detect and Prevent Secrets
+  cwe:
+    - "CWE-798"                # Use of Hard-coded Credentials
+    - "CWE-259"                # Use of Hard-coded Password
+  gitleaks:
+    - "aws-access-token"
+    - "github-pat"
+    - "stripe-api-key"
+    - "generic-api-key"
+    - "private-ssh-key"
+    - "jwt-token"
+    - "database-connection-string"
+
+judgment:
+  passCondition: "leakCount === 0"
+  blockOn: "error"
+  priority: "critical"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    检测到疑似密钥/敏感信息被添加到暂存区：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 匹配规则: {rule}
+    ⚠️ 内容: {match}
+    ⚠️ 熵值: {entropy}
+
+    请检查：
+    1. 如果是真实密钥 → 立即撤销提交，使用环境变量或密钥管理服务
+    2. 如果是误报 → 在 .gitleaks.toml 中添加白名单规则
+    3. 运行 `git reset HEAD {file}` 撤销暂存后修正
+
+    📖 参考: https://github.com/gitleaks/gitleaks#pre-commit

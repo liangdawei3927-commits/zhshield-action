@@ -1,0 +1,119 @@
+# =============================================================================
+# SOP 规则模板 — Guard · 架构边界阻断（L3 CI）
+# =============================================================================
+# 规则 ID: guard.block.depcruiser.architecture
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Guard L3 CI · depcruiser
+# 内部标准源: dependency-cruiser 规则 + IronNest#01 架构边界规则 + IronNest#02 控制器规则
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.depcruiser.architecture"
+  name: "架构边界阻断"
+  description: "在 CI 阶段拦截架构违规：跨层反向依赖、模块间违规引用、控制器包含业务逻辑、服务层越权调用基础设施"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "dependency-cruiser .dependency-cruiser.mjs · IronNest rules/01 · rules/02"
+
+governance:
+  domain: "guard"
+  action: "block"
+  module: "Guard"
+  level: "L3"
+  hook: "ci"
+
+execution:
+  mode: "sync"
+  timeout: 60
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+
+check:
+  tool: "dependency-cruiser"
+  toolConfig:
+    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    rules:
+      layerViolation:
+        description: "禁止反向依赖（controller → service → domain → repository → adapter，单向）"
+        severity: "error"
+        patterns:
+          - "controller 直接 import repository / adapter"
+          - "service 直接 import 另一个 module 的 controller"
+          - "domain 层 import 基础设施层（repository/adapter/http）"
+      moduleBoundary:
+        description: "禁止跨模块内部引用（只能通过 index.ts 导出）"
+        severity: "error"
+        patterns:
+          - "module-a/src/internal 被 module-b 引用"
+          - "shared/ 包引用了非 shared/ 的内容"
+      controllerThickness:
+        description: "控制器必须薄（单一委托，不应包含分支/转换/基础设施导入）"
+        severity: "error"
+        checkAnnotations: true
+        maxControllerMethodLines: 5
+  severity: "error"
+  categories:
+    - "architecture"
+    - "layer-violation"
+    - "module-boundary"
+    - "dependecy-direction"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-AC-01"    # Access Control Policy
+    - "OSPS-QS-03"    # Code Quality Standards
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 900
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    检测到架构边界违规：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 违规类型: {violationType}
+    ⚠️ 依赖链: {source} → {target}
+
+    建议修复：
+    1. 层次违规 → 确认依赖方向是否符合 controller → service → domain → repository → adapter 的单向约束
+    2. 模块间违规 → 通过目标模块的 `index.ts` 导出引用，不要深入内部路径
+    3. 控制器过厚 → 将业务逻辑抽取到 use-case 或 service，控制器只做委托
+    4. 共享包违规 → `shared/` 只能引用 `shared/`，不能引用其他模块
+
+    📖 参考: IronNest #01 架构边界 · #02 控制器 · dependency-cruiser 规则集

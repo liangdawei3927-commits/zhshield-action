@@ -1,0 +1,125 @@
+# =============================================================================
+# SOP 规则模板 — Evolve · 修复建议生成
+# =============================================================================
+# 规则 ID: evolve.suggest.internal.fix-generation
+# 治理域: 演进域 (evolve)
+# 动作类型: 修复建议 (suggest)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Evolve · 修复生成
+# 内部标准源: IronNest 技能库 · OSPS 经验库
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: EvolveRule
+metadata:
+  id: "evolve.suggest.internal.fix-generation"
+  name: "修复建议生成"
+  description: "基于检测结果的类型和严重性，从经验库中匹配最合适的修复方案模板和参考资源链接。支持 AI 增强的修复建议生成"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest skills · OSPS experience base"
+
+governance:
+  domain: "evolve"
+  action: "suggest"
+  module: "Evolve"
+  category: "suggestion"
+
+execution:
+  mode: "async"
+  timeout: 30
+  maxConcurrency: 5
+  retryCount: 1
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "suggestion-matcher"
+  toolConfig:
+    suggestSources:
+      - source: "ironnest-skills"
+        priority: 1
+        matchFields:
+          - "ruleId"
+          - "violationType"
+          - "cwe"
+        skillMap:
+          "no-any": "skills/review-for-type-safety.md"
+          "no-non-null": "skills/review-for-null-safety.md"
+          "controller-logic": "skills/review-for-architecture.md"
+          "missing-dto": "skills/create-dto-validation.md"
+          "missing-auth": "skills/security-review.md"
+          "missing-adapter": "skills/add-library-adapter.md"
+          "message-key-missing": "skills/add-i18n-message-key.md"
+          "process-env": "skills/add-config-value.md"
+          "no-test": "skills/write-unit-tests.md"
+          "coverage-drop": "skills/write-integration-tests.md"
+          "circular-dep": "skills/decompose-large-file.md"
+      - source: "osps-experience"
+        priority: 2
+        matchFields:
+          - "osps-domain"
+      - source: "community-fixes"
+        priority: 3
+        matchFields:
+          - "tag"
+          - "category"
+      - source: "ai-generated"
+        priority: 4
+        enabled: true
+        provider: "internal-llm"
+        model: "code-fix-model"
+        maxTokens: 500
+        temperature: 0.2
+    fallback:
+      message: "未找到精确匹配的修复方案，建议手动审查"
+      suggestDocs: true
+  severity: "info"
+  categories:
+    - "suggestion"
+    - "fix-generation"
+    - "experience-base"
+    - "knowledge"
+
+judgment:
+  passCondition: "matchFound"
+  blockOn: "none"
+  priority: "medium"
+
+standards:
+  osps:
+    - "OSPS-QS-04"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 30
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    🔧 自动修复建议
+
+    ⚠️ 检测发现: {violationType}
+    ⚠️ 文件: {file}:{line}
+
+    📋 修复方案（来自 {source}）:
+    {fixSuggestion}
+
+    📖 参考资源:
+    {resources}

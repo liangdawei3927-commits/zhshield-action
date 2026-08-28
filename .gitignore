@@ -9,6 +9,15 @@ build/Release/
 *.tsbuildinfo
 .turbo/
 
+# 分布式 CLI（zhshield-cli）需随仓库分发自包含 bundle，供 GitHub Action 直装、
+# 绕开 npm。仅提交 dist/zhshield.js 与 dist/sop/（运行时必需）；源映射与
+# .mjs 变体体积大且非必需，仍忽略。
+!packages/cli/dist/
+!packages/cli/dist/**
+packages/cli/dist/*.map
+packages/cli/dist/zhshield.mjs
+packages/cli/dist/zhshield.mjs.map
+
 # Stale compiled artifacts in source directories (tsconfig outputs to dist/)
 packages/*/src/**/*.js
 packages/*/src/**/*.js.map

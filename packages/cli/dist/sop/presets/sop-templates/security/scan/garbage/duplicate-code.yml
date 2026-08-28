@@ -1,0 +1,142 @@
+# =============================================================================
+# SOP 规则模板 — Cleanup · 重复代码检测
+# =============================================================================
+# 规则 ID: cleanup.scan.duplicate.code
+# 治理域: 安全域 (security)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Cleanup · 重复代码
+# 内部标准源: IronNest#22 Reuse Before Creating · #26 Helper-Driven Maintainability
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SecurityRule
+metadata:
+  id: "security.scan.garbage.duplicate-code"
+  name: "重复代码检测"
+  description: "检测代码库中的重复代码块：相似或相同的代码段跨文件重复出现，应提取为共享 Helper。重复代码增加维护成本、不一致风险、和人工智能上下文噪声"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/22 · rules/26 · jscpd"
+
+governance:
+  domain: "security"
+  action: "scan"
+  module: "Security"
+  category: "garbage"
+
+execution:
+  mode: "async"
+  timeout: 180
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "weekly"
+
+conditions:
+  languages:
+    - "typescript"
+    - "javascript"
+    - "python"
+    - "go"
+    - "rust"
+    - "shell"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+    - "*.js"
+    - "*.py"
+    - "*.go"
+    - "*.rs"
+    - "*.sh"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - "coverage/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+    - "**/generated/**"
+    - "**/*.min.*"
+    - "*.lock"
+    - "*.sum"
+
+check:
+  tool: "jscpd"
+  toolConfig:
+    threshold:
+      default: 0.3               # 重复率低于 30% 不报告
+    languages:
+      - "typescript"
+      - "javascript"
+      - "python"
+      - "go"
+    minLines: 6                  # 最少 6 行才算重复
+    maxLines: 300                # 超过 300 行不检测（可能为自动生成）
+    minTokens: 50                # 最少 50 个 token
+    reporters:
+      - "console"
+      - "json"
+    ignorePattern:
+      - "import "
+      - "export "
+      - "// @ts-"
+      - "@Injectable()"
+      - "@Module("
+      - "@Controller("
+      - "@Service()"
+    suggestExtraction: true
+    extractionSuggestion:
+      minOccurrences: 3          # 出现 3 次以上建议提取 Helper
+  severity: "low"
+  categories:
+    - "cleanup"
+    - "duplicate"
+    - "maintainability"
+    - "refactoring"
+
+judgment:
+  passCondition: "duplicateRate < 0.3"
+  blockOn: "info"
+  priority: "low"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe:
+    - "CWE-1104"
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 600
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    检测到重复代码：
+
+    ⚠️ 文件 A: {fileA}:{lineA}
+    ⚠️ 文件 B: {fileB}:{lineB}
+    ⚠️ 重复行数: {lines}
+    ⚠️ 重复片段: {fragment}
+
+    修复建议：
+    1. 提取公共逻辑到共享 Helper（参考 IronNest #26）
+       - 函数提取 → `lib/` 或 `helpers/` 目录
+       - 多段重复 → 搜索已有 Helper 优先扩展
+    2. 不应提取的场景（见 #26 §Do not extract）：
+       - 仅 1-2 行简单比较
+       - 包装后反而不清晰的抽象
+       - 接受 repository/SDK 参数试图掩盖层级违规
+
+    📖 参考: IronNest #22 复用优先 · #26 Helper 维护性 · jscpd

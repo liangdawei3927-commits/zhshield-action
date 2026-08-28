@@ -1,0 +1,28 @@
+# Trivy Ignore Policy - 智汇码盾 Tool Pack
+# 漏洞扫描忽略策略：测试文件、开发依赖、低危漏洞
+vulnerability:
+  # 测试文件中的漏洞忽略
+  - id: TEST-001
+    path: ".*\\.test\\.ts$"
+    reason: "Test files - not deployed to production"
+    
+  - id: TEST-002
+    path: ".*\\.spec\\.ts$"
+    reason: "Test files - not deployed to production"
+    
+  # 开发依赖漏洞忽略（不影响生产环境）
+  - id: DEV-001
+    path: "node_modules/.*"
+    severity: LOW
+    reason: "Development dependencies - not bundled in production"
+    
+  # 低危漏洞忽略（需要时手动启用）
+  - id: LOW-001
+    severity: LOW
+    fixAvailable: false
+    reason: "Low severity with no available fix - accepted risk"
+    
+  # 已知误报
+  - id: FP-001
+    vulnerability-id: "CVE-2024-XXXXX"
+    reason: "Known false positive - code path not reachable"

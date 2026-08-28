@@ -1,0 +1,14 @@
+name: Quality Score Calculation
+description: 巡检结果到健康评分的映射规则
+severity: info
+executionMode: periodic
+status: active
+source: official
+tags: [score, quality, inspect]
+applicableEngines: [inspect, scoring]
+mapping:
+  error: -10
+  warning: -5
+  info: -1
+  baseScore: 100
+  minScore: 0

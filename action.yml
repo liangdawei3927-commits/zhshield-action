@@ -40,10 +40,32 @@ runs:
       with:
         node-version: '20'
 
-    # 用户 0 配置：Action 内部负责安装 CLI 与开源工具
-    - name: Install ZHCodeShield CLI
+    # 用户 0 配置：Action 内部负责安装 CLI 与开源工具。
+    # zhshield-cli 自包含 bundle 随本仓库分发包（packages/cli/dist），此处从本 Action
+    # 所在的 GitHub 仓库直接下载并安装，绕开 npm 注册表（无需登录/令牌/验证码）。
+    - name: Install ZHCodeShield CLI (GitHub direct)
       shell: bash
-      run: npm install -g zhshield-cli
+      run: |
+        set -euo pipefail
+        REPO="${{ github.action_repository }}"
+        RAWREF="${{ github.action_ref }}"
+        case "$RAWREF" in
+          refs/tags/*|refs/heads/*) ARCHREF="$RAWREF" ;;
+          *) ARCHREF="refs/tags/$RAWREF" ;;
+        esac
+        ARCHIVE="https://github.com/${REPO}/archive/${ARCHREF}.tar.gz"
+        echo "::group::fetch zhshield-cli bundle from ${REPO}@${RAWREF:-v1}"
+        rm -rf /tmp/zhshield-src
+        mkdir -p /tmp/zhshield-src /usr/local/lib/zhshield-cli
+        curl -fsSL "$ARCHIVE" -o /tmp/zhshield-src.tgz
+        tar -xzf /tmp/zhshield-src.tgz -C /tmp/zhshield-src --strip-components=1
+        cp -f /tmp/zhshield-src/packages/cli/dist/zhshield.js /usr/local/lib/zhshield-cli/zhshield.js
+        rm -rf /usr/local/lib/zhshield-cli/sop
+        cp -r /tmp/zhshield-src/packages/cli/dist/sop /usr/local/lib/zhshield-cli/sop
+        chmod +x /usr/local/lib/zhshield-cli/zhshield.js
+        ln -sf /usr/local/lib/zhshield-cli/zhshield.js /usr/local/bin/zhshield
+        echo "::endgroup::"
+        zhshield 2>/dev/null | head -1 || true
 
     # 0Token 开源扫描器（用户无需手动安装/配置）。单工具失败不阻断整体，CLI 自动降级。
     - name: Install open-source scanners

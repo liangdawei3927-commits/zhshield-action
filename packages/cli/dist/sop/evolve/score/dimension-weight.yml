@@ -1,0 +1,14 @@
+name: Dimension Weight Configuration
+description: 健康评分五维度权重配置
+severity: info
+executionMode: sync
+status: active
+source: official
+tags: [evolve, score, weight]
+applicableEngines: [evolve, scoring]
+weights:
+  codeQuality: 25
+  security: 25
+  architecture: 20
+  testing: 15
+  performance: 15

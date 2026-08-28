@@ -1,0 +1,12 @@
+name: Rule Deprecation
+description: 规则废弃 — 连续 90 天未使用的规则自动废弃 active → deprecated
+severity: info
+executionMode: periodic
+status: active
+source: internal
+tags: [evolve, calibrate, deprecation]
+applicableEngines: [evolve]
+conditions:
+  unusedDays: 90
+  noRecentConfirmations: true
+cleanupAfterDays: 180  # deprecated 180 天后清理

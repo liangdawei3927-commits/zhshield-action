@@ -1,0 +1,13 @@
+name: Dead Code Detection
+description: 检测死代码 — 从未被调用的函数/变量/导出
+severity: info
+executionMode: async
+status: active
+source: internal
+tags: [security, garbage, dead-code]
+applicableEngines: [security]
+checks:
+  - unused-exports
+  - unused-variables
+  - unreachable-code
+  - empty-functions

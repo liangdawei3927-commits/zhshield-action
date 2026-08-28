@@ -1,0 +1,126 @@
+# =============================================================================
+# SOP 规则模板 — Guard · GitHub Actions SHA 锁定阻断（L2 pre-push）
+# =============================================================================
+# 规则 ID: guard.block.external.actions-pinning
+# 治理域: 拦截域 (guard)
+# 动作类型: 拦截阻断 (block)
+# 数据来源: 外部标准 (external)
+# 对应适配器: Guard L2 pre-push · actionlint
+# 外部标准源: GitHub Actions Security 2026 Roadmap · Stingrai 25 项控制清单 · OpenSSF Scorecard
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: GuardRule
+metadata:
+  id: "guard.block.external.actions-pinning"
+  name: "GitHub Actions SHA 锁定阻断"
+  description: "检测并阻止未锁定完整 commit SHA 的 GitHub Actions 引用。tags（@v1）和 branches（@main）在 CI/CD 供应链攻击中可被重定向，必须使用完整不可变的 commit SHA。参考 CVE-2025-30066（tj-actions/changed-files）"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "trial"
+  source: "external"
+  sourceRef: "GitHub Actions Security 2026 · Stingrai 25 Controls · OpenSSF Scorecard"
+
+governance:
+  domain: "guard"
+  action: "block"
+  module: "Guard"
+  level: "L2"
+  hook: "pre-push"
+
+execution:
+  mode: "sync"
+  timeout: 10
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "changed"
+
+conditions:
+  languages:
+    - "yaml"
+  filePatterns:
+    - ".github/workflows/*.yml"
+    - ".github/workflows/*.yaml"
+    - "action.yml"
+    - "action.yaml"
+  excludePatterns: []
+
+check:
+  tool: "actionlint + custom-pin-checker"
+  toolConfig:
+    pinningRule:
+      severity: "error"
+      description: "所有第三方 Action 必须锁定完整 40/64 位 commit SHA，不允许使用 major-version tag（如 @v4）或 branch（如 @main）"
+    exceptions:
+      allowFirstParty: true        # actions/* 和 github/* 可豁免（由 GitHub 背书）
+      allowList:
+        - "actions/*"
+        - "github/codeql-action/*"
+        - "slsa-framework/slsa-github-generator/*"
+    allowedPattern:
+      - "uses: [^@]+@[0-9a-f]{40}$"   # 完整 SHA 引用
+      - "uses: [^@]+@[0-9a-f]{64}$"   # 完整 SHA（未来）
+    blockedPattern:
+      - "uses: [^@]+@v[0-9]+"         # @v1, @v2, ...
+      - "uses: [^@]+@[a-z]+"          # @main, @master, @dev, ...
+      - "uses: [^@]+@[a-z]+/[a-z]+"   # @feature/branch
+    reusableWorkflowPinning:
+      enabled: true
+      description: "复用工作流（uses: org/repo/.github/workflows/）也必须锁定 SHA"
+      severity: "error"
+    secretsInheritCheck:
+      enabled: true
+      description: "外部组织的可复用工作流不应使用 secrets: inherit"
+      severity: "warning"
+  severity: "error"
+  categories:
+    - "ci-cd"
+    - "supply-chain"
+    - "actions-security"
+    - "pinning"
+
+judgment:
+  passCondition: "errorCount === 0"
+  blockOn: "error"
+  priority: "critical"
+
+standards:
+  osps:
+    - "OSPS-SC-02"    # Dependency Integrity Verification
+    - "OSPS-SC-03"    # Build Provenance and Attestation
+    - "OSPS-PC-01"    # Platform Control
+  cwe:
+    - "CWE-829"       # Inclusion of Functionality from Untrusted Control Sphere
+    - "CWE-494"       # Download of Code Without Integrity Check
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 120
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: true
+  suggestionTemplate: |
+    检测到未锁定 SHA 的 GitHub Action：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 当前引用: {currentRef}
+    ⚠️ 风险: tag/branch 可被重定向，引发供应链攻击（参考 CVE-2025-30066）
+
+    修复方法：
+    1. 通过 Dependabot 或 Renovate 更新（会自动锁定 SHA + 保留版本注释）
+    2. 手动查找当前 tag 对应的 commit SHA，替换为：
+       `uses: owner/repo@<full-commit-sha>  # vX.Y.Z`
+    3. 对于 GitHub 官方 actions（actions/*），可使用 major version（@v4）
+
+    示例：
+        - uses: actions/checkout@v4
+      → - uses: actions/checkout@<sha>  # v4.2.0
+
+    📖 参考: GitHub Actions Security 2026 Roadmap · Stingrai 25 Controls

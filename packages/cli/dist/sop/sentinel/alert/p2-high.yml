@@ -1,0 +1,17 @@
+name: P2 High Alert
+description: P2 高危告警策略 — 需要快速响应的性能问题
+severity: high
+executionMode: event
+status: active
+source: official
+tags: [sentinel, alert, p2]
+applicableEngines: [sentinel]
+response:
+  notification: [email, slack]
+  responseTime: '1h'
+  autoCreateIncident: false
+  escalateAfter: '2h'
+eventTypes:
+  - runtime-exception
+  - http-error
+  - memory-leak

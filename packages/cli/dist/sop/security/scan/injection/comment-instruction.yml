@@ -1,0 +1,14 @@
+name: Prompt Instruction Comment Detection
+description: 检测源码注释中嵌入的 AI 提示词注入指令（ignore previous instructions / system prompt 等）
+severity: high
+blockingThreshold: high
+executionMode: async
+status: active
+source: internal
+tags: [security, injection, prompt-injection]
+applicableEngines: [security]
+checks:
+  - ignore-previous-instructions
+  - disregard-rules
+  - system-prompt-reference
+  - identity-takeover

@@ -1,0 +1,13 @@
+name: Duplicate File Detection
+description: 检测完全重复的文件 — 内容完全相同的源文件
+severity: info
+executionMode: async
+status: active
+source: internal
+tags: [security, garbage, duplicate]
+applicableEngines: [security]
+method: hash-comparison
+ignore:
+  - '*.json'
+  - '*.lock'
+  - '*.svg'

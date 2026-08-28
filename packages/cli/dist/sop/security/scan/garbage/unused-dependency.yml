@@ -1,0 +1,14 @@
+name: Unused Dependency Detection
+description: 检测未使用的依赖 — 清理 package.json 中无用的包
+severity: info
+executionMode: async
+status: active
+source: internal
+tags: [security, garbage, dependency]
+applicableEngines: [security]
+tool: depcheck
+ignore:
+  - '@types/*'
+  - typescript
+  - eslint
+  - prettier

@@ -1,0 +1,106 @@
+# =============================================================================
+# SOP 规则模板 — Sentry · 告警去重策略
+# =============================================================================
+# 规则 ID: sentinel.alert.internal.deduplication
+# 治理域: 监控域 (sentinel)
+# 动作类型: 告警响应 (alert)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Sentinel 事件中心 · 去重机制
+# =============================================================================
+
+apiVersion: sop/v1
+kind: SentinelRule
+metadata:
+  id: "sentinel.alert.internal.deduplication"
+  name: "告警去重策略"
+  description: "10 分钟窗口内相同 fingerprint 的告警自动去重，仅累加计数，不重复发送"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "active"
+  source: "internal"
+  sourceRef: "全链路哨兵监控系统.md — 5.2 去重机制"
+
+governance:
+  domain: "sentinel"
+  action: "alert"
+  module: "Sentinel"
+  category: "alerting"
+  subModule: "event-center"
+
+execution:
+  mode: "event"
+  timeout: 1
+  maxConcurrency: 5
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "any"
+  filePatterns:
+    - "*"
+  excludePatterns: []
+
+check:
+  tool: "sentinel-dedup-controller"
+  toolConfig:
+    dedup:
+      window: 600000              # 10 分钟 (ms)
+      keySource: "fingerprint"    # 去重 key 来源
+      accumulate: true            # 累加计数而非丢弃
+      maxAccumulation: 100        # 最大累加次数
+      fields:
+        - "ruleId"
+        - "source"
+        - "metric"
+        - "severity"
+    fingerprint:
+      algorithm: "sha256"
+      fields:
+        - "title"
+        - "source"
+        - "metric"
+        - "severity"
+  severity: "info"
+  categories:
+    - "deduplication"
+    - "alerting"
+    - "monitoring"
+
+judgment:
+  passCondition: "dedupConfigured"
+  blockOn: "none"
+  priority: "high"
+
+standards:
+  osps:
+    - "OSPS-VM-01"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 60
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    告警去重配置
+    
+    ✅ 当前配置:
+    - 窗口: {window}ms
+    - 去重 Key: {keySource}
+    - 累加上限: {maxAccumulation}
+    - Fingerprint: {algorithm}
+    
+    如需调整去重策略:
+    1. 修改 window 值（建议 600000ms = 10min）
+    2. 调整 maxAccumulation 根据告警量级
+    3. fingerprint 字段选择影响去重精度
+    
+    📖 参考: 全链路哨兵监控系统 — 5.2 去重机制

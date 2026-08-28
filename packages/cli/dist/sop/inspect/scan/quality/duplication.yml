@@ -1,0 +1,16 @@
+name: Code Duplication Detection
+description: 检测重复代码 — 避免 Copy-Paste 导致的维护问题
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [duplication, quality, dry]
+applicableEngines: [inspect]
+thresholds:
+  minLines: 10
+  minTokens: 50
+  minSimilarity: 80
+  ignore:
+    - '*.test.ts'
+    - '*.spec.ts'
+    - '**/__tests__/**'

@@ -1,0 +1,156 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · 枚举/常量使用规范
+# =============================================================================
+# 规则 ID: inspect.scan.internal.enum-usage
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部模式 (internal)
+# 对应适配器: Inspect TS · enum-usage
+# 内部标准源: IronNest#06 Types/Enums/Constants · #30 Declaration Ownership
+# 最后更新: 2026-07-29
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.internal.enum-usage"
+  name: "枚举/常量使用规范检查"
+  description: "检查枚举和常量声明的所有权合规性：枚举必须在声明所有者文件中、禁止魔法字符串替代枚举、常量必须有命名空间前缀、enum 成员必须显式赋值"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-07-29"
+  updated: "2026-07-29"
+  status: "draft"
+  source: "internal"
+  sourceRef: "IronNest rules/06 · rules/30"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  category: "typescript"
+
+execution:
+  mode: "async"
+  timeout: 60
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+  schedule: "on-push"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/*.d.ts"
+    - "**/enums/**"        # 枚举声明文件自身不检查
+    - "**/constants/**"     # 常量声明文件自身不检查
+    - "**/generated/**"
+
+check:
+  tool: "custom-ast-scanner"
+  toolConfig:
+    rules:
+      - id: "enum-in-logic-file"
+        description: "enum/const 声明在控制器/Service/Repository 文件中，应移至声明所有者文件"
+        severity: "warning"
+        checkFiles:
+          - "**/*.controller.ts"
+          - "**/*.service.ts"
+          - "**/*.repository.ts"
+          - "**/*.use-case.ts"
+          - "**/*.adapter.ts"
+          - "**/*.guard.ts"
+          - "**/*.interceptor.ts"
+          - "**/*.pipe.ts"
+          - "**/*.filter.ts"
+        detect:
+          - "enum "
+          - "const enum "
+          - "type Status = 'active' | 'inactive'"
+        excludePattern:
+          - "export type {"
+          - "import {"
+      - id: "magic-string"
+        description: "字符串字面量比较（如 status === 'active'），应使用枚举成员"
+        severity: "warning"
+        pattern:
+          type: "BinaryExpression"
+          operator: "=== | !== | == | !="
+          leftType: "string"
+          rightType: "string-literal"
+        excludePattern:
+          - "=== ''"
+          - "=== ' '"
+          - "path.*=== '"
+          - "NODE_ENV"
+          - "process.env"
+      - id: "enum-no-explicit-value"
+        description: "enum 成员应显式赋值"
+        severity: "warning"
+        pattern:
+          type: "EnumDeclaration"
+          hasExplicitValues: false
+        message: "隐式赋值的 enum 在值顺序变化时可能导致兼容性问题"
+      - id: "enum-naming-convention"
+        description: "enum 命名应为 PascalCase，成员为 UPPER_CASE"
+        severity: "info"
+        pattern:
+          type: "EnumDeclaration"
+          namingConvention:
+            enum: "PascalCase"
+            members: "UPPER_CASE"
+      - id: "inline-type-def"
+        description: "在业务逻辑文件中内联定义 type/interface"
+        severity: "warning"
+        pattern:
+          type: "TSTypeAliasDeclaration | TSInterfaceDeclaration"
+          fileContext: "controller|service|repository"
+  severity: "warning"
+  categories:
+    - "enums"
+    - "constants"
+    - "typescript"
+    - "best-practice"
+
+judgment:
+  passCondition: "warningCount < 5"
+  blockOn: "warning"
+  priority: "low"
+
+standards:
+  osps:
+    - "OSPS-QS-03"
+  cwe: []
+  gitleaks: []
+
+experience:
+  totalHits: 0
+  falsePositives: 0
+  falsePositiveRate: 0.0
+  avgFixTime: 300
+  lastCalibrated: "2026-07-29"
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    发现枚举/常量使用不规范：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 规则: {ruleId}
+    ⚠️ 详情: {detail}
+
+    修复指引：
+    1. 枚举/常量在逻辑文件中 → 移至 `@shared/enums` 或 `model/<feature>.enums.ts`
+    2. 魔法字符串 → 使用已定义的枚举成员
+    3. 枚举无显式值 → `enum Status { ACTIVE = 'active', INACTIVE = 'inactive' }`
+    4. 内联类型 → 在 `model/` 或 `interfaces/` 中声明后 import
+
+    📖 参考: IronNest #06 类型/枚举/常量 · #30 声明所有权

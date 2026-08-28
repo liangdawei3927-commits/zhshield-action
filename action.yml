@@ -58,14 +58,16 @@ runs:
         ARCHIVE="https://github.com/${REPO}/archive/${ARCHREF}.tar.gz"
         echo "::group::fetch zhshield-cli bundle from ${REPO}@${RAWREF}"
         rm -rf /tmp/zhshield-src
-        mkdir -p /tmp/zhshield-src /usr/local/lib/zhshield-cli
+        mkdir -p /tmp/zhshield-src
         curl -fsSL "$ARCHIVE" -o /tmp/zhshield-src.tgz
         tar -xzf /tmp/zhshield-src.tgz -C /tmp/zhshield-src --strip-components=1
-        cp -f /tmp/zhshield-src/packages/cli/dist/zhshield.js /usr/local/lib/zhshield-cli/zhshield.js
-        rm -rf /usr/local/lib/zhshield-cli/sop
-        cp -r /tmp/zhshield-src/packages/cli/dist/sop /usr/local/lib/zhshield-cli/sop
-        chmod +x /usr/local/lib/zhshield-cli/zhshield.js
-        ln -sf /usr/local/lib/zhshield-cli/zhshield.js /usr/local/bin/zhshield
+        # /usr/local 由 root 拥有，runner 需 sudo 写入（GitHub hosted runner 有免密 sudo）
+        sudo mkdir -p /usr/local/lib/zhshield-cli
+        sudo cp -f /tmp/zhshield-src/packages/cli/dist/zhshield.js /usr/local/lib/zhshield-cli/zhshield.js
+        sudo rm -rf /usr/local/lib/zhshield-cli/sop
+        sudo cp -r /tmp/zhshield-src/packages/cli/dist/sop /usr/local/lib/zhshield-cli/sop
+        sudo chmod +x /usr/local/lib/zhshield-cli/zhshield.js
+        sudo ln -sf /usr/local/lib/zhshield-cli/zhshield.js /usr/local/bin/zhshield
         echo "::endgroup::"
         zhshield 2>/dev/null | head -1 || true
 
@@ -79,10 +81,10 @@ runs:
         echo "::endgroup::"
         echo "::group::gitleaks"
         curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz -o /tmp/gitleaks.tgz 2>/dev/null \
-          && tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks 2>/dev/null || true
+          && sudo tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks 2>/dev/null || true
         echo "::endgroup::"
         echo "::group::trivy"
-        curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true
+        curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin 2>/dev/null || true
         echo "::endgroup::"
         echo "::group::semgrep"
         pip3 install --quiet semgrep 2>/dev/null || true

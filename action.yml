@@ -47,14 +47,16 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        REPO="${{ github.action_repository }}"
-        RAWREF="${{ github.action_ref }}"
+        # 官方 Action 仓库是固定的；github.action_repository 在部分 runner/首次调用
+        # 时可能为空，故给默认值并仅在非空时使用上下文，避免下载 URL 缺仓库名而失败。
+        REPO="${GITHUB_ACTION_REPOSITORY:-liangdawei3927-commits/zhshield-action}"
+        RAWREF="${GITHUB_ACTION_REF:-v1}"
         case "$RAWREF" in
           refs/tags/*|refs/heads/*) ARCHREF="$RAWREF" ;;
           *) ARCHREF="refs/tags/$RAWREF" ;;
         esac
         ARCHIVE="https://github.com/${REPO}/archive/${ARCHREF}.tar.gz"
-        echo "::group::fetch zhshield-cli bundle from ${REPO}@${RAWREF:-v1}"
+        echo "::group::fetch zhshield-cli bundle from ${REPO}@${RAWREF}"
         rm -rf /tmp/zhshield-src
         mkdir -p /tmp/zhshield-src /usr/local/lib/zhshield-cli
         curl -fsSL "$ARCHIVE" -o /tmp/zhshield-src.tgz

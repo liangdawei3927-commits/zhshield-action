@@ -5,7 +5,6 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { MANIFEST_PATH } from './constants.mjs';
 
 /** 读取并校验 tools.json */

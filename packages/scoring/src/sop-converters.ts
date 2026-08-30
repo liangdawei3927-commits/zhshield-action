@@ -136,7 +136,7 @@ function explodeTraditionalResult(r: GuardCheckResultLike): ConvertedGuardResult
     | undefined;
   const exploded: ConvertedGuardResult[] = [
     ...explodeErrors(d, r),
-    ...explodeWarnings(d, r),
+    ...explodeWarnings(d),
   ];
   if (exploded.length === 0) {
     exploded.push(...explodeFindings(d, r));
@@ -157,7 +157,7 @@ function explodeErrors(d: { errors?: string[] } | undefined, r: GuardCheckResult
   return exploded;
 }
 
-function explodeWarnings(d: { warnings?: string[] } | undefined, r: GuardCheckResultLike): ConvertedGuardResult[] {
+function explodeWarnings(d: { warnings?: string[] } | undefined): ConvertedGuardResult[] {
   if (!d || !Array.isArray(d.warnings)) return [];
   const exploded: ConvertedGuardResult[] = [];
   for (const s of d.warnings) {

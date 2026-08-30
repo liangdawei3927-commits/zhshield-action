@@ -1,11 +1,6 @@
 /**
  * constants.mjs — install-tools 共享常量与输出辅助
- *
- * 目录约定:
- *   ~/.zhshield/bin/          二进制与 npm bin 软链（加入 PATH 即可被消费）
- *   ~/.zhshield/tools/<tool>/ npm 工具私有安装目录（npm install --prefix）
- *
- * 依赖: 仅 node 内置模块（node:path/node:os），node 20+。
+ * 目录约定详见 install-tools.mjs 文件头注释；依赖仅 node 内置模块，node 20+。
  */
 
 import { dirname, join } from 'node:path';

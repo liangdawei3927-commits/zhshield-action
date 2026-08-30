@@ -33,6 +33,17 @@ function expandBraces(pattern: string): string[] {
     .flatMap((alt) => expandBraces(head + alt + tail));
 }
 
+/** 处理 '*' 通配：globstar「双星」匹配零层或多层目录，「双星」跨段，「星」单段；返回 [追加片段, 新索引] */
+function appendStar(re: string, glob: string, i: number): [string, number] {
+  if (glob[i + 1] === '*') {
+    if ((i === 0 || glob[i - 1] === '/') && glob[i + 2] === '/') {
+      return [re + '(?:[^/]*/)*', i + 3];
+    }
+    return [re + '.*', i + 2];
+  }
+  return [re + '[^/]*', i + 1];
+}
+
 /** 单个 glob → 锚定正则：globstar「双星」匹配零层或多层目录，「双星」跨段，「星」单段，「问号」单字符 */
 function globToRegExp(glob: string): RegExp {
   let re = '';
@@ -40,18 +51,7 @@ function globToRegExp(glob: string): RegExp {
   while (i < glob.length) {
     const c = glob[i] as string;
     if (c === '*') {
-      if (glob[i + 1] === '*') {
-        if ((i === 0 || glob[i - 1] === '/') && glob[i + 2] === '/') {
-          re += '(?:[^/]*/)*';
-          i += 3;
-        } else {
-          re += '.*';
-          i += 2;
-        }
-      } else {
-        re += '[^/]*';
-        i += 1;
-      }
+      [re, i] = appendStar(re, glob, i);
       continue;
     }
     if (c === '?') {

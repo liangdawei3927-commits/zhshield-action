@@ -33,7 +33,7 @@ export const BUILTIN_FALLBACK_RULES: BuiltinRule[] = [
     ruleId: 'fallback/security/eval-usage',
     severity: 'error',
     category: 'security',
-    message: '检测到 eval() 调用，存在代码注入风险',
+    message: '检测到 eval 调用，存在代码注入风险',
     pattern: '\\beval\\s*\\(',
   },
   {

@@ -28,21 +28,54 @@ function parseYamlLine(
 ): void {
   if (!line.trim() || line.trim().startsWith('#')) return;
 
-  const indent = line.search(INDENT_PATTERN);
-  const trimmed = line.trim();
+  const indent = computeIndent(line);
+  const kv = splitKeyValue(line.trim());
+  if (!kv) return;
 
+  popToIndent(stack, indent);
+  const currentObj = resolveCurrentObj(stack, result);
+  applyValue(currentObj, kv.key, kv.value, stack, indent);
+}
+
+function computeIndent(line: string): number {
+  return line.search(INDENT_PATTERN);
+}
+
+/** 拆分 key: value，无冒号返回 null */
+function splitKeyValue(trimmed: string): { key: string; value: string } | null {
   const colonIdx = trimmed.indexOf(':');
-  if (colonIdx === -1) return;
+  if (colonIdx === -1) return null;
+  return {
+    key: trimmed.slice(0, colonIdx).trim(),
+    value: trimmed.slice(colonIdx + 1).trim(),
+  };
+}
 
-  const key = trimmed.slice(0, colonIdx).trim();
-  const value = trimmed.slice(colonIdx + 1).trim();
-
+/** 弹出缩进不小于当前行的栈顶容器 */
+function popToIndent(
+  stack: { indent: number; key: string; obj: Record<string, unknown> }[],
+  indent: number,
+): void {
   while (stack.length > 0 && stack.at(-1)!.indent >= indent) {
     stack.pop();
   }
+}
 
-  const currentObj = stack.length > 0 ? stack.at(-1)!.obj : result;
+function resolveCurrentObj(
+  stack: { indent: number; key: string; obj: Record<string, unknown> }[],
+  result: Record<string, unknown>,
+): Record<string, unknown> {
+  return stack.length > 0 ? stack.at(-1)!.obj : result;
+}
 
+/** 按值类型分发：容器 / 数组项 / 标量 */
+function applyValue(
+  currentObj: Record<string, unknown>,
+  key: string,
+  value: string,
+  stack: { indent: number; key: string; obj: Record<string, unknown> }[],
+  indent: number,
+): void {
   if (value === '' || value === '|' || value === '>') {
     pushContainer(stack, currentObj, key, indent);
   } else if (key.startsWith('- ')) {

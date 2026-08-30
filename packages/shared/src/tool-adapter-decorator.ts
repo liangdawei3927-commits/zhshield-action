@@ -79,44 +79,75 @@ export function wrapAdapter(
     // 原型方法不会被展开运算符拷贝，必须显式转发，否则下游 typeof isAvailable 校验误判接口不完整
     isAvailable: () => adapter.isAvailable(),
     async scan(scanOptions: ToolScanOptions): Promise<HookedToolResult> {
-      let currentOptions = scanOptions;
-      for (const hook of hooks) {
-        const next = hook.before(adapter, currentOptions);
-        if (next === null) {
-          return createBlockedResult(adapter);
-        }
-        currentOptions = next;
+      const before = runBeforeHooks(adapter, hooks, scanOptions);
+      if (before.blocked) {
+        return createBlockedResult(adapter);
       }
 
-      const violations = adapter.accessScope
-        ? evaluateAccessScope(adapter.accessScope, currentOptions)
-        : [];
-      const violationContext = { adapter, options: currentOptions };
-      for (const violation of violations) {
-        options?.onScopeViolation?.(violation, violationContext);
-      }
+      const violations = evaluateAndNotifyViolations(adapter, before.options, options?.onScopeViolation);
+      const after = await runAfterHooks(adapter, hooks, await adapter.scan(before.options));
 
-      let currentResult: HookedToolResult = await adapter.scan(currentOptions);
-      const modifications: string[] = [];
-      for (const hook of hooks) {
-        try {
-          const next = hook.after(adapter, currentResult);
-          if (next !== currentResult) {
-            modifications.push('after:rewrote');
-          }
-          currentResult = next;
-        } catch {
-          // 钩子异常不得影响调用方：保留当前结果，继续执行后续钩子
-        }
-      }
-      if (violations.length > 0 || modifications.length > 0) {
+      if (violations.length > 0 || after.modifications.length > 0) {
         return {
-          ...currentResult,
-          ...(modifications.length > 0 ? { hookModifications: modifications } : {}),
+          ...after.result,
+          ...(after.modifications.length > 0 ? { hookModifications: after.modifications } : {}),
           ...(violations.length > 0 ? { scopeViolations: violations } : {}),
         };
       }
-      return currentResult;
+      return after.result;
     },
   };
+}
+
+/** 依次执行 hooks 的 before；任一返回 null 即阻断 */
+function runBeforeHooks(
+  adapter: ToolAdapter,
+  hooks: ToolCallHook[],
+  scanOptions: ToolScanOptions,
+): { blocked: boolean; options: ToolScanOptions } {
+  let currentOptions = scanOptions;
+  for (const hook of hooks) {
+    const next = hook.before(adapter, currentOptions);
+    if (next === null) {
+      return { blocked: true, options: currentOptions };
+    }
+    currentOptions = next;
+  }
+  return { blocked: false, options: currentOptions };
+}
+
+/** 校验越界路径并触发回调，返回越界记录 */
+function evaluateAndNotifyViolations(
+  adapter: ToolAdapter,
+  options: ToolScanOptions,
+  onScopeViolation?: WrapAdapterOptions['onScopeViolation'],
+): ScopeViolation[] {
+  const violations = adapter.accessScope ? evaluateAccessScope(adapter.accessScope, options) : [];
+  const violationContext = { adapter, options };
+  for (const violation of violations) {
+    onScopeViolation?.(violation, violationContext);
+  }
+  return violations;
+}
+
+/** 依次执行 hooks 的 after 并串联改写结果 */
+async function runAfterHooks(
+  adapter: ToolAdapter,
+  hooks: ToolCallHook[],
+  currentResult: HookedToolResult,
+): Promise<{ result: HookedToolResult; modifications: string[] }> {
+  let result = currentResult;
+  const modifications: string[] = [];
+  for (const hook of hooks) {
+    try {
+      const next = hook.after(adapter, result);
+      if (next !== result) {
+        modifications.push('after:rewrote');
+      }
+      result = next;
+    } catch {
+      // 钩子异常不得影响调用方：保留当前结果，继续执行后续钩子
+    }
+  }
+  return { result, modifications };
 }

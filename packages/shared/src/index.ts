@@ -99,4 +99,4 @@ export { NOOP_EMITTER } from './events';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';
-export { safeJoin, safeJoinReal, safeResolve, PathTraversalError } from './security/safe-path';
+export { safeJoin, safeJoinReal, safeResolve, safeResolveReal, PathTraversalError } from './security/safe-path';

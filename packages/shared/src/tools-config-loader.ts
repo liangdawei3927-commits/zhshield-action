@@ -33,7 +33,11 @@ export class ToolsConfigLoader {
   loadToolsConfig(): ToolsConfig | null {
     const filePath = this.findConfigFile('tools.yml', 'tools.yaml');
     if (!filePath) return null;
+    return this.parseToolsFile(filePath);
+  }
 
+  /** 读取并解析 tools 配置文件（异常时返回 null） */
+  private parseToolsFile(filePath: string): ToolsConfig | null {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = parseSimpleYaml(content) as RawToolsYaml;
@@ -64,7 +68,11 @@ export class ToolsConfigLoader {
   loadGuardConfig(): GuardConfig | null {
     const filePath = this.findConfigFile('guard.yml', 'guard.yaml');
     if (!filePath) return null;
+    return this.parseGuardFile(filePath);
+  }
 
+  /** 读取并解析 guard 配置文件（异常时返回 null） */
+  private parseGuardFile(filePath: string): GuardConfig | null {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = parseSimpleYaml(content) as RawGuardYaml;

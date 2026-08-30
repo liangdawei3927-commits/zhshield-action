@@ -67,6 +67,22 @@ export class SopSyncController {
   }
 
   /**
+   * GET /api/v1/sop/public-key
+   * 返回 SOP 规则包验签公钥（Ed25519 SPKI PEM）。
+   * 仅暴露公钥，绝不返回 HMAC 对称密钥或私钥。
+   */
+  @Get('public-key')
+  @HttpCode(HttpStatus.OK)
+  @Header('Content-Type', 'application/json')
+  async getPublicKey() {
+    const publicKey = this.sopService.getPublicKeyPem();
+    if (!publicKey) {
+      return { publicKey: null };
+    }
+    return { publicKey };
+  }
+
+  /**
    * GET /api/v1/sop/emergency
    * 紧急更新（文档 7.5 节 触发方式 3）
    * 获取最新的紧急安全规则

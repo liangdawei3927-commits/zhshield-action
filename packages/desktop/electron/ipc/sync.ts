@@ -80,7 +80,7 @@ async function verifySopPackage(pkgJson: string): Promise<{ pkg?: SignedSopPacka
     return { reason: 'no_public_key' };
   }
 
-  const verify = SopSigner.verifyPackageWithKey(pkg, publicKey);
+  const verify = SopSigner.verifyPackageWithPublicKey(pkg, publicKey);
   if (!verify.valid) {
     return { reason: verify.reason ?? 'verification_failed' };
   }

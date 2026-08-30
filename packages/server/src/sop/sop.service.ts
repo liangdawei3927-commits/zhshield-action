@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as crypto from 'node:crypto';
 import { SopRegistry, SopLoader, SopCacheManager, SopCompressor, CompressionFormat, SopSigner, EventBus } from '@zh/kernel';
-import type { SopRule, SopVersion, SopDiff, SopRuleFilter } from '@zh/kernel';
+import type { SopRule, SopVersion, SopDiff, SopRuleFilter, SignedSopPackage } from '@zh/kernel';
 import { SopDiffCalculator } from './sop-diff-calculator';
 
 /**
@@ -21,6 +22,10 @@ export class SopService {
   private cacheManager: SopCacheManager;
   private compressor: SopCompressor;
   private readonly diffCalculator = new SopDiffCalculator();
+  /** Ed25519 私钥（PEM PKCS8，来自 ZH_SOP_PRIVATE_KEY）；未配置为 null */
+  private readonly privateKey: string | null;
+  /** Ed25519 公钥（PEM SPKI），由私钥派生；未配置为 null */
+  private readonly publicKeyPem: string | null;
 
   constructor() {
     const eventBus = new EventBus();
@@ -28,6 +33,19 @@ export class SopService {
     this.loader = new SopLoader(this.registry);
     this.cacheManager = new SopCacheManager(this.registry);
     this.compressor = new SopCompressor();
+
+    const envKey = process.env.ZH_SOP_PRIVATE_KEY;
+    if (envKey) {
+      const key = crypto.createPrivateKey(envKey);
+      this.privateKey = envKey;
+      this.publicKeyPem = crypto
+        .createPublicKey(key)
+        .export({ type: 'spki', format: 'pem' })
+        .toString();
+    } else {
+      this.privateKey = null;
+      this.publicKeyPem = null;
+    }
   }
 
   // ─── 初始化 ────────────────────────────────────────────────
@@ -126,13 +144,22 @@ export class SopService {
 
   // ─── 签名与验证 ────────────────────────────────────────────
 
-  signPackage(secretKey: string) {
+  /** 用 Ed25519 私钥（ZH_SOP_PRIVATE_KEY）签名当前规则包；未配置私钥时抛错（fail-closed） */
+  signPackage(): SignedSopPackage {
+    if (!this.privateKey) {
+      throw new Error('ZH_SOP_PRIVATE_KEY 未配置，无法签名 SOP 规则包');
+    }
     const rules = this.registry.getAll();
-    return SopSigner.signPackage(rules, secretKey);
+    return SopSigner.signPackage(rules, this.privateKey);
   }
 
-  verifyPackage(signedPkg: Parameters<typeof SopSigner.verifyPackage>[0], secretKey: string) {
-    return SopSigner.verifyPackage(signedPkg, secretKey);
+  /** 返回 Ed25519 公钥（PEM SPKI），供桌面端验签；未配置私钥时返回 null */
+  getPublicKeyPem(): string | null {
+    return this.publicKeyPem;
+  }
+
+  verifyPackage(signedPkg: Parameters<typeof SopSigner.verifyPackage>[0], publicKey: string) {
+    return SopSigner.verifyPackage(signedPkg, publicKey);
   }
 
   // ─── 暴露内部组件 ──────────────────────────────────────────

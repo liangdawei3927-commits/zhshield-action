@@ -40,21 +40,28 @@ export const sopRegistry = new SopRegistry(eventBus);
 const SOP_BASE = resolveSopBase(API_BASE);
 
 let cachedSopPublicKey: string | null | undefined;
+/** 将公钥归一化为 SPKI PEM：已是 PEM 原样返回，否则按 raw base64 包裹 PEM 头 */
+function normalizePublicKeyPem(key: string): string {
+  if (key.includes('-----BEGIN PUBLIC KEY-----')) return key;
+  const body = key.replace(/\s+/g, '');
+  const lines = body.match(/.{1,64}/g) ?? [body];
+  return ['-----BEGIN PUBLIC KEY-----', ...lines, '-----END PUBLIC KEY-----'].join('\n');
+}
 /** 解析 SOP 规则包验签公钥：优先环境变量 ZH_SOP_PUBLIC_KEY，否则从服务端 /public-key 发现 */
 export async function resolveSopPublicKey(): Promise<string | null> {
   if (cachedSopPublicKey !== undefined) return cachedSopPublicKey;
 
   const pinned = process.env.ZH_SOP_PUBLIC_KEY;
   if (pinned) {
-    cachedSopPublicKey = pinned;
-    return pinned;
+    cachedSopPublicKey = normalizePublicKeyPem(pinned);
+    return cachedSopPublicKey;
   }
 
   try {
     const res = await fetch(`${SOP_BASE}/public-key`, { signal: AbortSignal.timeout(10_000) });
     if (res.ok) {
       const data = (await res.json()) as { publicKey?: string };
-      cachedSopPublicKey = data.publicKey ?? null;
+      cachedSopPublicKey = data.publicKey ? normalizePublicKeyPem(data.publicKey) : null;
     } else {
       cachedSopPublicKey = null;
     }

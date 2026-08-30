@@ -178,12 +178,18 @@ export interface SopDiffMetadata {
 }
 
 // ─── 签名的 SOP 包 ──────────────────────────────────────────
+
+/** 规则包签名算法：缺省（无 alg 字段）视为 hmac-sha256（旧缓存包兼容） */
+export type SignedSopAlg = 'hmac-sha256' | 'ed25519';
+
 export interface SignedSopPackage {
   version: string;
   rules: SopRule[];
-  signature: string;    // HMAC-SHA256 签名
+  signature: string;    // 签名（HMAC-SHA256 hex 或 Ed25519 base64）
   hash: string;         // 规则内容的 SHA-256 哈希
   timestamp: Date;      // 签名时间
+  /** 签名算法；可选，缺省 = 'hmac-sha256'（旧缓存包无此字段） */
+  alg?: SignedSopAlg;
 }
 
 // ─── 同步结果 ────────────────────────────────────────────────

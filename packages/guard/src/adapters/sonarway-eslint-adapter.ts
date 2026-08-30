@@ -43,13 +43,15 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     check: CheckConfig,
   ): Promise<{ results: LintResult[]; error?: string }> {
     const projectPath = context.projectPath || process.cwd();
-
-    // 目标文件：显式传入则用之，否则扫描项目源码目录
     const target =
       context.targetFiles && context.targetFiles.length > 0
         ? context.targetFiles
         : this.resolveSourceTarget(projectPath);
+    return this.lintWithConfig(projectPath, target);
+  }
 
+  /** 用内置 SonarWay config 执行 ESLint 扫描，返回有消息的文件（失败降级为空结果 + error） */
+  private async lintWithConfig(projectPath: string, target: string | string[]): Promise<{ results: LintResult[]; error?: string }> {
     try {
       const eslint = new ESLint({
         cwd: projectPath,
@@ -87,7 +89,15 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     }
 
     const { errors, warnings } = this.collectMessages(rawResult.results);
+    return this.buildNormalizedResult(check, errors, warnings);
+  }
 
+  /** 按错误/警告/通过聚合出最终 CheckResult（基于已收集的消息） */
+  private buildNormalizedResult(
+    check: CheckConfig,
+    errors: (string | undefined)[],
+    warnings: (string | undefined)[],
+  ): CheckResult {
     if (errors.length > 0) {
       return this.makeResult(
         check,

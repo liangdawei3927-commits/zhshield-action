@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, IssueCategory, AccessScope } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
+import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
+import { SemgrepScanRunner } from './semgrep-scan-runner';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,42 +21,6 @@ const META: ToolMeta = {
   license: 'LGPL-2.1',
 };
 
-/** Semgrep JSON 输出中的单条结果 */
-interface SemgrepResult {
-  check_id?: string;
-  rule?: { id?: string };
-  severity?: string;
-  path?: string;
-  start?: { line?: number; col?: number; column?: number };
-  extra?: {
-    severity?: string;
-    message?: string;
-    fix?: string;
-    metadata?: { fix?: string };
-  };
-  message?: string;
-}
-
-/** Semgrep JSON 输出中的单条错误 */
-interface SemgrepErrorEntry {
-  code?: number | string;
-  level?: string;
-  type?: string;
-  message?: string;
-}
-
-/** Semgrep JSON 输出结构 */
-interface SemgrepOutput {
-  results?: SemgrepResult[];
-  errors?: SemgrepErrorEntry[];
-}
-
-/** 本机 semgrep-core（OCaml 运行时）每次启动都会打印的无害告警，非扫描失败原因 */
-const RUNTIME_NOISE_PATTERNS: readonly RegExp[] = [
-  /Failed to register segfault signal handler/,
-  /Failed to register unwind handler/,
-];
-
 /** 内联规则声明（来自 config.rules，原始声明为 string[]，此处按对象结构访问） */
 interface SemgrepRule {
   id?: string;
@@ -63,16 +28,15 @@ interface SemgrepRule {
   language?: string;
   languages?: string[];
   pattern?: string;
+  /** pattern-either：多个候选 pattern，任一匹配即命中（如 const/let 赋值、直接内联拼接等变体） */
+  patternEither?: string[];
+  /** pattern-not：排除项，匹配则不算命中（如纯字符串字面量参数的无害调用） */
+  patternNot?: string[];
+  /** pattern-regex：正则匹配（generic 语言场景，如 CORS 配置串） */
+  patternRegex?: string;
   message?: string;
-}
-
-/** 规范化后用于生成 YAML 的规则 */
-interface SemgrepRuleYaml {
-  id: string;
-  severity: string;
-  languages: string[];
-  pattern?: string;
-  message: string;
+  /** semgrep 元变量约束（metavariable-regex）：按绑定文本收紧 pattern，避免元变量匹配任意表达式造成误报 */
+  metavariableRegex?: Array<{ metavariable: string; regex: string }>;
 }
 
 export class SemgrepAdapter implements ToolAdapter {
@@ -83,8 +47,21 @@ export class SemgrepAdapter implements ToolAdapter {
   /** F5：semgrep 对源码做 SAST 规则匹配 */
   readonly accessScope: AccessScope = {
     readPaths: ['**/*.{ts,tsx,js,jsx,py,go,java,rb,php,c,cpp,h}'],
-    excludePaths: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.semgrep/**'],
+    excludePaths: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.semgrep/**',
+      // 测试夹具：刻意构造的恶意样例（如 conflict-resolver/evil.ts）用于驱动规则测试，不是生产代码（对齐 refactor 引擎约定）
+      '**/__tests__/**',
+      '**/__fixtures__/**',
+      '**/fixtures/**',
+      '**/__mocks__/**',
+    ],
   };
+
+  private readonly argsBuilder = new SemgrepScanArgsBuilder();
+  private readonly runner = new SemgrepScanRunner();
 
   constructor(projectRoot?: string) {
     this.projectRoot = projectRoot;
@@ -109,68 +86,50 @@ export class SemgrepAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
+    const { targetDir, category, configs, rules } = this.resolveScanSetup(options);
+
+    const unavailable = this.checkConfigAvailability(options, configs, rules);
+    if (unavailable) return this.runner.buildUnavailable(start, unavailable);
+
+    const args = await this.argsBuilder.build(options, configs, targetDir);
+    const command = await this.resolveCommand();
+    return this.runner.run(command, options, args, category, start);
+  }
+
+  /** 解析扫描目标、类别与规则配置 */
+  private resolveScanSetup(options: ToolScanOptions): {
+    targetDir: string;
+    category: IssueCategory;
+    configs: string[];
+    rules: SemgrepRule[] | undefined;
+  } {
     const targetDir = options.targetFiles?.[0] ?? this.resolveTargetDir(options.projectPath);
     const category: IssueCategory = options.config?.category ?? 'security';
-
     const configs = this.resolveConfigs(options);
     const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
+    return { targetDir, category, configs, rules };
+  }
 
-    const args: string[] = [
-      'scan',
-      '--json',
-      '--optimizations', 'all',
-    ];
-
-    for (const c of configs) {
-      args.push('--config', c);
+  /** 校验 config / 内联 rules 可用性，缺失时返回 unavailable 原因 */
+  private checkConfigAvailability(options: ToolScanOptions, configs: string[], rules: SemgrepRule[] | undefined): string | null {
+    // 注入的 config 多为规则声明的仓库内部相对路径（node_modules/@zh/kernel/dist/assets/...），
+    // 仅在目标项目安装了对应依赖时才存在。对缺失该依赖的外部项目直接 --config 会让
+    // semgrep 报 "unable to find a config" 并令整次巡检失败；此处探测并按 cwd 解析，
+    // 全部 config 缺失时退化为 unavailable（映射为 skipped），而非硬错误。
+    const existingConfigs = configs.filter((c) => fs.existsSync(path.resolve(options.projectPath, c)));
+    if (configs.length > 0 && existingConfigs.length === 0) {
+      return `Semgrep 配置不存在，跳过该规则: ${configs.join(', ')}`;
     }
 
-    if (rules && rules.length > 0) {
-      const rulePath = await this.writeInlineRules(targetDir, rules);
-      if (rulePath) args.push('--config', rulePath);
+    // 既无显式 config 也无内联 rules 时禁止裸跑 semgrep scan：不带 --config 会回退到
+    // semgrep 官方 registry auto 规则集（英文通用规则，如 detect-non-literal-regexp 等），
+    // 产生与受控规则语义不一致的误报（典型：guard.security-scan 的 scanners 派发
+    // toolConfig 为空导致 9+ 个误报阻断）。未配置规则集即视为检测不可用（映射为 skipped）。
+    if (configs.length === 0 && !(rules && rules.length > 0)) {
+      return 'Semgrep 未配置规则集（无 config 或无内联 rules），跳过扫描';
     }
 
-    // 排除生成目录，避免扫描 dist/assets 下的规则文件触发自身误报
-    for (const excl of ['node_modules', 'dist', 'build', '.semgrep', 'coverage']) {
-      args.push('--exclude', excl);
-    }
-
-    args.push(targetDir);
-
-    try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, args, {
-        cwd: options.projectPath,
-        timeout: options.timeout || 120000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const output = JSON.parse(stdout);
-      return this.buildAvailable(output, this.mapOutput(output, category), start);
-    } catch (error: unknown) {
-      const err = error as { code?: number | string; stdout?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return this.buildUnavailable(start, 'Semgrep 未安装或未在 PATH 中找到');
-      }
-      if (err.code === 'ETIMEDOUT') {
-        return this.buildError(start, 'Semgrep 扫描超时');
-      }
-
-      // 优先报告 JSON errors 中的真实错误，而非 OCaml 运行时噪音
-      const jsonError = this.extractJsonError(err.stdout);
-      if (jsonError) {
-        return this.buildError(start, jsonError);
-      }
-
-      // semgrep 存在 findings 时退出码为 1；stdout 仍为有效 JSON
-      const partial = this.parsePartialOutput(err.stdout ?? '', category, err.stderr);
-      if (partial) {
-        return this.buildAvailable(partial.output, partial.issues, start);
-      }
-
-      // 兜底：剔除 OCaml 运行时噪音后使用 stderr / message
-      return this.buildError(start, this.stripRuntimeNoise(err.stderr) || err.message || 'Semgrep 执行失败');
-    }
+    return null;
   }
 
   /** 目标目录解析：src → packages → 项目根；容器根项目下探嵌套代码仓库的 packages 目录，避免全量扫描 */
@@ -194,78 +153,6 @@ export class SemgrepAdapter implements ToolAdapter {
     return projectPath;
   }
 
-  private extractJsonError(stdout?: string): string | null {
-    if (!stdout) return null;
-    try {
-      const output = JSON.parse(stdout) as SemgrepOutput;
-      const first = output.errors?.find((e) => typeof e.message === 'string' && e.message.length > 0);
-      return first?.message ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  private stripRuntimeNoise(stderr?: string): string {
-    if (!stderr) return '';
-    return stderr
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !RUNTIME_NOISE_PATTERNS.some((pattern) => pattern.test(line)))
-      .join('\n');
-  }
-
-  private parsePartialOutput(
-    stdout: string,
-    category: IssueCategory,
-    stderr?: string,
-  ): { output: SemgrepOutput; issues: Issue[] } | null {
-    if (!stdout) return null;
-    try {
-      const output = JSON.parse(stdout);
-      const issues = this.mapOutput(output, category);
-      if (issues.length > 0 || !stderr) {
-        return { output, issues };
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
-  private buildAvailable(output: SemgrepOutput, issues: Issue[], start: number): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: Array.isArray(output.results) ? output.results.length : 0,
-      },
-    };
-  }
-
-  private buildUnavailable(start: number, error: string): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'unavailable',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error,
-    };
-  }
-
-  private buildError(start: number, error: string): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error,
-    };
-  }
-
   private resolveConfigs(options: ToolScanOptions): string[] {
     const cfgs = options.config?.config;
     if (!cfgs) return [];
@@ -273,101 +160,4 @@ export class SemgrepAdapter implements ToolAdapter {
     if (typeof cfgs === 'string') return [cfgs];
     return [];
   }
-
-  private async writeInlineRules(targetDir: string, rules: SemgrepRule[]): Promise<string | null> {
-    if (rules.length === 0) return null;
-
-    const semgrepRules: SemgrepRuleYaml[] = rules.map((r, i) => ({
-      id: r.id || `inline-rule-${i}`,
-      severity: (r.severity || 'WARNING').toUpperCase(),
-      languages: this.detectLanguages(r),
-      pattern: r.pattern,
-      message: r.message || `Semgrep: ${r.id || `rule-${i}`}`,
-    }));
-
-    const ruleDir = path.join(targetDir, '.semgrep');
-    try {
-      await fs.promises.mkdir(ruleDir, { recursive: true });
-      const rulePath = path.join(ruleDir, `inline-${Date.now()}.yml`);
-      const yamlContent = this.buildRuleYaml(semgrepRules);
-      await fs.promises.writeFile(rulePath, yamlContent, 'utf-8');
-      return rulePath;
-    } catch {
-      return null;
-    }
-  }
-
-  private detectLanguages(rule: SemgrepRule): string[] {
-    if (rule.language) return [rule.language];
-    if (rule.languages) return rule.languages;
-    return ['typescript'];
-  }
-
-  private buildRuleYaml(rules: SemgrepRuleYaml[]): string {
-    const lines: string[] = ['rules:'];
-    for (const r of rules) {
-      lines.push(`  - id: ${r.id}`);
-      lines.push(`    severity: ${r.severity}`);
-      lines.push(`    languages: [${r.languages.join(', ')}]`);
-      lines.push(`    message: ${r.message}`);
-      lines.push(`    pattern: |`);
-      for (const line of (r.pattern || '').split('\n')) {
-        lines.push(`      ${line}`);
-      }
-    }
-    return lines.join('\n');
-  }
-
-  private mapOutput(output: SemgrepOutput, category: IssueCategory = 'security'): Issue[] {
-    const results = output?.results;
-    if (!Array.isArray(results)) return [];
-
-    return results.map((r) => this.mapResult(r, category));
-  }
-
-  private mapResult(r: SemgrepResult, category: IssueCategory): Issue {
-    const ruleId = resolveRuleId(r);
-    const fix = resolveFix(r);
-    const loc = resolveLocation(r);
-
-    return {
-      id: randomUUID(),
-      ruleId,
-      severity: normalizeSeverity(r.extra?.severity || r.severity || 'WARNING'),
-      category,
-      message: resolveMessage(r, ruleId),
-      file: loc.file,
-      line: loc.line,
-      column: loc.column,
-      suggestion: fix,
-      autoFixable: !!fix,
-      source: 'inspect',
-      fingerprint: `semgrep:${ruleId}:${loc.file}:${loc.line}`,
-    };
-  }
-}
-
-function resolveRuleId(r: SemgrepResult): string {
-  return r.check_id || r.rule?.id || 'semgrep-unknown';
-}
-
-function resolveFix(r: SemgrepResult): string | undefined {
-  return r.extra?.fix || r.extra?.metadata?.fix || undefined;
-}
-
-function resolveMessage(r: SemgrepResult, ruleId: string): string {
-  return r.extra?.message || r.message || `Semgrep: ${ruleId}`;
-}
-
-function resolveLocation(r: SemgrepResult): { file: string; line: number; column: number } {
-  return {
-    file: r.path || '',
-    line: r.start?.line || 0,
-    column: r.start?.col || r.start?.column || 0,
-  };
-}
-
-function normalizeSeverity(sev: string): 'error' | 'warning' | 'info' {
-  const lower = sev.toLowerCase();
-  return lower === 'error' ? 'error' : lower === 'warning' ? 'warning' : 'info';
 }

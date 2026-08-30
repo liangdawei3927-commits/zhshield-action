@@ -9,8 +9,13 @@ import { expandWorkspaceGlobs } from '../detectors/manifest-detector';
 const tmpRoots: string[] = [];
 
 function makeTempRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-pt-hardening-'));
-  tmpRoots.push(root);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-pt-hardening-'));
+  tmpRoots.push(tmp);
+  // 固定在 tmp 下嵌套 2 层再放项目根，保证 `project/../../escape-dir`
+  // 仍落在可写的 tmp 子树内——不依赖 os.tmpdir() 的深度（浅 tmpdir 如
+  // CI 的 /tmp 下 `../..` 会越过可写根目录导致 mkdir 失败）。
+  const root = path.join(tmp, 'outer', 'inner', 'project');
+  fs.mkdirSync(path.join(tmp, 'outer', 'inner'), { recursive: true });
   return root;
 }
 

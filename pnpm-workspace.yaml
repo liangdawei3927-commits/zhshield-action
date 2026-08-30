@@ -10,12 +10,22 @@ overrides:
   multer: '>=2.2.0'
   hono: '>=4.12.34'
   nanoid: '>=3.3.18'
+  # ── 依赖安全审计修复（inspect.scan.external.dependency-audit）──
+  # @nestjs 10→11 升级（packages/server/package.json）消除 file-type@20.4.1，无需 override
+  # depcheck / typescript-eslint / @electron/universal 经 minimatch 引入 brace-expansion<5.0.9（GHSA-x895）
+  # depcheck / typescript-eslint 经 minimatch 引入 brace-expansion 1.x/5.x（GHSA-gvg9/GHSA-x895）
+  'minimatch@5.1.9>brace-expansion': '5.0.9'
+  'minimatch@7.4.9>brace-expansion': '5.0.9'
+  'minimatch@9.0.9>brace-expansion': '5.0.9'
+  # electron-builder 25 工具链引入 tar@6.2.1（11 项 node-tar 告警），统一强制到补丁版
+  tar: '>=7.5.22'
 
 allowBuilds:
   '@nestjs/core': false
   '@scarf/scarf': false
   better-sqlite3: true
   electron: true
+  electron-winstaller: false
   esbuild: false
 
 onlyBuiltDependencies:

@@ -1,0 +1,179 @@
+{
+  "$comment": "智汇码盾外部工具版本清单 — 由 scripts/install-tools.mjs 消费。枚举 packages/inspect 与 packages/guard 各 adapter 实际调用的外部工具，锁定具体版本号。",
+  "version": "1.0.0",
+  "checked": "2026-08-30",
+  "binDir": "~/.zhshield/bin",
+  "toolsDir": "~/.zhshield/tools",
+  "tools": [
+    {
+      "name": "semgrep",
+      "displayName": "Semgrep",
+      "category": "security",
+      "install": "binary",
+      "version": "1.175.0",
+      "desc": "静态应用安全测试（SAST），inspect 侧 semgrep-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "GitHub release v1.175.0（无 release 二进制资产）+ PyPI semgrep 1.175.0"
+      },
+      "binary": {
+        "binName": "semgrep",
+        "downloadSource": "pypi",
+        "pypiPackage": "semgrep",
+        "note": "semgrep 官方不再发布 GitHub release 二进制，官方分发渠道为 PyPI（pipx/uv/pip）。安装脚本优先 pipx/uv 并让 bin 落到 ~/.zhshield/bin，pip --user 为兜底。"
+      }
+    },
+    {
+      "name": "gitleaks",
+      "displayName": "Gitleaks",
+      "category": "security",
+      "install": "binary",
+      "version": "8.30.1",
+      "desc": "密钥/敏感信息泄露扫描，inspect 侧 gitleaks-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "GitHub release v8.30.1，资产 gitleaks_8.30.1_{os}_{arch}.tar.gz/.zip + gitleaks_8.30.1_checksums.txt"
+      },
+      "binary": {
+        "binName": "gitleaks",
+        "downloadSource": "github-release",
+        "repo": "gitleaks/gitleaks",
+        "urlTemplate": "https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_{os}_{arch}.{ext}",
+        "checksumTemplate": "https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_checksums.txt",
+        "archive": "tar.gz",
+        "osMap": { "darwin": "darwin", "linux": "linux", "win32": "windows" },
+        "archMap": { "arm64": "arm64", "x64": "x64" },
+        "extMap": { "darwin": "tar.gz", "linux": "tar.gz", "win32": "zip" }
+      }
+    },
+    {
+      "name": "trivy",
+      "displayName": "Trivy",
+      "category": "security",
+      "install": "binary",
+      "version": "0.74.0",
+      "desc": "依赖/容器漏洞扫描，guard 侧 trivy-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "GitHub release v0.74.0，资产 trivy_0.74.0_{OS}-{ARCH}.tar.gz/.zip + trivy_0.74.0_checksums.txt"
+      },
+      "binary": {
+        "binName": "trivy",
+        "downloadSource": "github-release",
+        "repo": "aquasecurity/trivy",
+        "urlTemplate": "https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_{os}-{arch}.{ext}",
+        "checksumTemplate": "https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_checksums.txt",
+        "archive": "tar.gz",
+        "osMap": { "darwin": "macOS", "linux": "Linux", "win32": "windows" },
+        "archMap": { "arm64": "ARM64", "x64": "64bit" },
+        "extMap": { "darwin": "tar.gz", "linux": "tar.gz", "win32": "zip" },
+        "unsupported": ["win32/arm64"]
+      }
+    },
+    {
+      "name": "depcruise",
+      "displayName": "Dependency Cruiser",
+      "category": "quality",
+      "install": "npm",
+      "version": "18.2.0",
+      "desc": "依赖关系/架构边界检查，inspect 侧 dependency-cruiser-adapter 调用（命令名 depcruise）",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "npm view dependency-cruiser version"
+      },
+      "npm": {
+        "package": "dependency-cruiser",
+        "binName": "depcruise"
+      }
+    },
+    {
+      "name": "depcheck",
+      "displayName": "Depcheck",
+      "category": "quality",
+      "install": "npm",
+      "version": "1.4.7",
+      "desc": "未使用依赖/缺失依赖检查，inspect 侧 depcheck-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "npm view depcheck version"
+      },
+      "npm": {
+        "package": "depcheck",
+        "binName": "depcheck"
+      }
+    },
+    {
+      "name": "ts-prune",
+      "displayName": "ts-prune",
+      "category": "quality",
+      "install": "npm",
+      "version": "0.10.3",
+      "desc": "未使用导出/死代码检查，inspect 侧 ts-prune-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "npm view ts-prune version"
+      },
+      "npm": {
+        "package": "ts-prune",
+        "binName": "ts-prune",
+        "versionFlag": false
+      }
+    },
+    {
+      "name": "eslint",
+      "displayName": "ESLint",
+      "category": "quality",
+      "install": "npm",
+      "version": "10.9.1",
+      "desc": "代码规范检查，inspect 侧 eslint-adapter 与 guard 侧 eslint-check-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "npm view eslint version"
+      },
+      "npm": {
+        "package": "eslint",
+        "binName": "eslint"
+      }
+    },
+    {
+      "name": "jscpd",
+      "displayName": "jscpd",
+      "category": "quality",
+      "install": "npm",
+      "version": "5.1.0",
+      "desc": "重复代码检测，inspect 侧 jscpd-adapter 调用",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "npm view jscpd version"
+      },
+      "npm": {
+        "package": "jscpd",
+        "binName": "jscpd"
+      }
+    },
+    {
+      "name": "tsc",
+      "displayName": "TypeScript (tsc)",
+      "category": "quality",
+      "install": "builtin",
+      "version": "builtin",
+      "desc": "TypeScript 编译检查，inspect 侧 typescript-adapter 调用。由项目自身 typescript 依赖提供（node_modules/.bin/tsc），无需安装",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "仓库根 package.json devDependencies typescript ^5.7.0"
+      }
+    },
+    {
+      "name": "vitest",
+      "displayName": "Vitest",
+      "category": "quality",
+      "install": "builtin",
+      "version": "builtin",
+      "desc": "测试运行，guard 侧 test-runner-adapter 通过 npx vitest 调用。由项目自身 vitest 依赖提供，无需安装",
+      "checked": {
+        "date": "2026-08-30",
+        "source": "仓库根 package.json devDependencies vitest ^4.1.10"
+      }
+    }
+  ]
+}

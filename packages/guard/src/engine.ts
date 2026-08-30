@@ -6,6 +6,23 @@ import { ConfigLoader } from './config-loader';
 import { AdapterRegistry } from './adapter-registry';
 import { ResultNormalizer } from './result-normalizer';
 
+/** SOP 评估状态 → CheckResult 状态映射 */
+const EVAL_STATUS_MAP: Record<string, CheckResult['status']> = {
+  passed: 'passed',
+  failed: 'failed',
+  error: 'error',
+  skipped: 'warning',
+};
+
+/** 规则严重级 → CheckResult 严重级映射 */
+const EVAL_SEVERITY_MAP: Record<string, CheckResult['severity']> = {
+  critical: 'error',
+  high: 'error',
+  medium: 'warning',
+  low: 'info',
+  info: 'info',
+};
+
 export class GuardEngine {
   private configLoader: ConfigLoader;
   private adapterRegistry: AdapterRegistry;
@@ -221,30 +238,11 @@ export class GuardEngine {
   }
 
   private evalToCheckResult(ev: RuleEvaluation): CheckResult {
-    const statusMap: Record<string, CheckResult['status']> = {
-      passed: 'passed',
-      failed: 'failed',
-      error: 'error',
-      skipped: 'warning',
-    };
-
-    const severityMap: Record<string, CheckResult['severity']> = {
-      critical: 'error',
-      high: 'error',
-      medium: 'warning',
-      low: 'info',
-      info: 'info',
-    };
-
-    const severity = ev.rule
-      ? severityMap[ev.rule.severity] ?? 'warning'
-      : 'warning';
-
     return {
       checkId: ev.rule?.id || 'unknown',
       adapter: 'sop-engine',
-      status: statusMap[ev.status] ?? 'error',
-      severity,
+      status: EVAL_STATUS_MAP[ev.status] ?? 'error',
+      severity: this.resolveEvalSeverity(ev),
       // F1-4：优先消费 kernel 附加的阻断判定；存量/外部评估缺省该字段时回退旧行为（failed 即阻断）
       blocking: ev.blocking ?? (ev.status === 'failed'),
       message: ev.message || `${ev.status}: ${ev.rule?.name || ev.rule?.id || '未知规则'}`,
@@ -253,5 +251,12 @@ export class GuardEngine {
         : undefined,
       duration: ev.durationMs,
     };
+  }
+
+  /** 解析评估的严重级：规则严重级映射，缺省回退 warning */
+  private resolveEvalSeverity(ev: RuleEvaluation): CheckResult['severity'] {
+    return ev.rule
+      ? EVAL_SEVERITY_MAP[ev.rule.severity] ?? 'warning'
+      : 'warning';
   }
 }

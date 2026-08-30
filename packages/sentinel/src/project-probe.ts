@@ -44,28 +44,27 @@ export function detectRunCommand(projectPath: string): DetectedRunCommand | null
 /** 扫描项目内常见日志位置（logs/ 目录 + 根目录 *.log），按 mtime 倒序，最多返回 limit 条 */
 export function discoverLogPaths(projectPath: string, limit = 20): string[] {
   const candidates: Array<{ file: string; mtimeMs: number }> = [];
-
-  const collect = (dir: string, extension: string): void => {
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(extension)) continue;
-      const file = safeJoin(dir, entry.name);
-      try {
-        candidates.push({ file, mtimeMs: fs.statSync(file).mtimeMs });
-      } catch {
-        // 文件可能被占用或刚被轮转删除
-      }
-    }
-  };
-
-  collect(safeJoin(projectPath, 'logs'), '.log');
-  collect(projectPath, '.log');
-
+  collectLogCandidates(safeJoin(projectPath, 'logs'), '.log', candidates);
+  collectLogCandidates(projectPath, '.log', candidates);
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return candidates.slice(0, limit).map((c) => c.file);
+}
+
+/** 收集目录内匹配扩展名的日志文件（记录 mtime 供排序） */
+function collectLogCandidates(dir: string, extension: string, candidates: Array<{ file: string; mtimeMs: number }>): void {
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(extension)) continue;
+    const file = safeJoin(dir, entry.name);
+    try {
+      candidates.push({ file, mtimeMs: fs.statSync(file).mtimeMs });
+    } catch {
+      // 文件可能被占用或刚被轮转删除
+    }
+  }
 }

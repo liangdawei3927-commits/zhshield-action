@@ -94,59 +94,18 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
     // 每次调用重置 id 计数，保证同次检测内 id 稳定连续
     this.counter = 0;
     const issues: PerformanceIssue[] = [];
-
-    // 1. 读取 package.json 的 build 脚本
-    const pkg = readPackageJson(projectRoot);
-    let buildScript = '';
-    if (pkg !== null) {
-      const scripts = pkg['scripts'];
-      if (typeof scripts === 'object' && scripts !== null) {
-        const scriptValue = (scripts as Record<string, unknown>)['build'];
-        if (typeof scriptValue === 'string') {
-          buildScript = scriptValue;
-        }
-      }
-    }
-
-    // 2. 探测配置文件（文件存在优先；无配置时回退到 package.json 构建脚本）
-    let tool: BuildTool | null = null;
-    let configFile = '';
-    for (const candidate of CONFIG_CANDIDATES) {
-      const filePath = path.join(projectRoot, candidate.filename);
-      if (fs.existsSync(filePath)) {
-        tool = candidate.tool;
-        configFile = candidate.filename;
-        break;
-      }
-    }
-
-    // 3. 无配置文件 → 从构建脚本反推构建工具
-    if (tool === null) {
-      for (const marker of BUILD_SCRIPT_MARKERS) {
-        if (marker.marker.test(buildScript)) {
-          tool = marker.tool;
-          break;
-        }
-      }
-    }
-
-    // 4. 既无构建配置也无构建脚本 → 未知项目类型，返回空（非错误）
+    const buildScript = readBuildScript(projectRoot);
+    const { tool, configFile } = detectBuildTool(projectRoot, buildScript);
     if (tool === null && buildScript === '') {
       return [];
     }
-
-    // 5. 按工具扫描配置文本（TS 配置仅正则匹配，不执行不转译）
     if (tool !== null && configFile !== '') {
       const content = readTextSafe(path.join(projectRoot, configFile)) ?? '';
       this.scanConfig(issues, tool, configFile, content);
     }
-
-    // 6. 扫描 package.json 构建脚本可疑标志
     if (buildScript !== '') {
       this.scanBuildScript(issues, buildScript);
     }
-
-    // 7. 按严重度降序排列（high > medium > low > info），同级别按检出顺序
     return issues.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
   }
 
@@ -295,3 +254,40 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
 
 /** 便捷入口：同步语义的检测器单例 */
 export const buildConfigDetector: BuildConfigDetector = new BuildConfigDetectorImpl();
+
+/** 读取 package.json 的 build 脚本；缺失时返回空串 */
+function readBuildScript(projectRoot: string): string {
+  const pkg = readPackageJson(projectRoot);
+  if (pkg === null) return '';
+  const scripts = pkg['scripts'];
+  if (typeof scripts === 'object' && scripts !== null) {
+    const scriptValue = (scripts as Record<string, unknown>)['build'];
+    if (typeof scriptValue === 'string') {
+      return scriptValue;
+    }
+  }
+  return '';
+}
+
+/** 探测构建工具：配置文件存在优先，无配置时从构建脚本反推 */
+function detectBuildTool(projectRoot: string, buildScript: string): { tool: BuildTool | null; configFile: string } {
+  let tool: BuildTool | null = null;
+  let configFile = '';
+  for (const candidate of CONFIG_CANDIDATES) {
+    const filePath = path.join(projectRoot, candidate.filename);
+    if (fs.existsSync(filePath)) {
+      tool = candidate.tool;
+      configFile = candidate.filename;
+      break;
+    }
+  }
+  if (tool === null) {
+    for (const marker of BUILD_SCRIPT_MARKERS) {
+      if (marker.marker.test(buildScript)) {
+        tool = marker.tool;
+        break;
+      }
+    }
+  }
+  return { tool, configFile };
+}

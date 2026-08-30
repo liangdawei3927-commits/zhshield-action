@@ -180,25 +180,36 @@ export class FileMonitor {
   }
 
   private handleChange(projectId: string, fullPath: string, eventType: FileChangeType): void {
-    let stat: fs.Stats | null = null;
-    try {
-      stat = fs.statSync(fullPath);
-    } catch {
-      stat = null;
-    }
+    const stat = this.statIfFile(fullPath);
     if (stat && !stat.isFile()) return;
-
     const wasKnown = this.lastMtimes.has(fullPath);
     const changeType = resolveChangeType(eventType, !!stat, wasKnown);
-
     if (changeType === 'unlink') {
-      if (!wasKnown) return;
-      this.lastMtimes.delete(fullPath);
-      this.emitFileChangeEvent(projectId, fullPath, 'unlink');
+      this.handleUnlink(projectId, fullPath, wasKnown);
       return;
     }
+    this.recordMtimeChange(projectId, fullPath, stat!, changeType);
+  }
 
-    const mtime = stat!.mtimeMs;
+  /** 读取文件状态；不存在或读取失败返回 null */
+  private statIfFile(fullPath: string): fs.Stats | null {
+    try {
+      return fs.statSync(fullPath);
+    } catch {
+      return null;
+    }
+  }
+
+  /** 处理 unlink：仅当此前已知该文件时上报删除事件 */
+  private handleUnlink(projectId: string, fullPath: string, wasKnown: boolean): void {
+    if (!wasKnown) return;
+    this.lastMtimes.delete(fullPath);
+    this.emitFileChangeEvent(projectId, fullPath, 'unlink');
+  }
+
+  /** 记录 mtime 变化；仅当 mtime 前进时上报变更事件 */
+  private recordMtimeChange(projectId: string, fullPath: string, stat: fs.Stats, changeType: FileChangeType): void {
+    const mtime = stat.mtimeMs;
     const prev = this.lastMtimes.get(fullPath);
     this.lastMtimes.set(fullPath, mtime);
     if (prev !== undefined && mtime <= prev) return;

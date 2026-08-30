@@ -42,43 +42,56 @@ export class GuardTrivyAdapter implements Adapter {
   async check(projectPath: string): Promise<GuardTrivyResult> {
     try {
       if (!(await this.isAvailable())) {
-        return {
-          adapterId: this.id,
-          status: 'error',
-          severity: 'low',
-          message: 'Trivy is not installed or not in PATH',
-          findings: [],
-          summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
-        };
+        return this.unavailableResult();
       }
-
       const result = await this.adapter.scan(projectPath);
-
-      const hasCritical = result.summary.critical > 0;
-      const hasHigh = result.summary.high > 0;
-
-      return {
-        adapterId: this.id,
-        status: hasCritical ? 'failed' : hasHigh ? 'failed' : 'passed',
-        severity: hasCritical ? 'critical' : hasHigh ? 'high' : result.summary.medium > 0 ? 'medium' : 'low',
-        message: hasCritical
-          ? `Found ${result.summary.critical} critical vulnerabilities`
-          : hasHigh
-            ? `Found ${result.summary.high} high severity vulnerabilities`
-            : `No critical or high severity issues found`,
-        findings: [...result.vulnerabilities, ...result.misconfigurations],
-        summary: result.summary,
-      };
+      return this.buildScanResult(result);
     } catch (err) {
-      return {
-        adapterId: this.id,
-        status: 'error',
-        severity: 'low',
-        message: `Trivy scan failed: ${err instanceof Error ? err.message : String(err)}`,
-        findings: [],
-        summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
-      };
+      return this.scanErrorResult(err);
     }
+  }
+
+  /** 构造 Trivy 未安装时的错误结果 */
+  private unavailableResult(): GuardTrivyResult {
+    return {
+      adapterId: this.id,
+      status: 'error',
+      severity: 'low',
+      message: 'Trivy is not installed or not in PATH',
+      findings: [],
+      summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
+    };
+  }
+
+  /** 根据扫描结果构造门禁判定 */
+  private buildScanResult(result: Awaited<ReturnType<TrivyAdapter['scan']>>): GuardTrivyResult {
+    const hasCritical = result.summary.critical > 0;
+    const hasHigh = result.summary.high > 0;
+
+    return {
+      adapterId: this.id,
+      status: hasCritical ? 'failed' : hasHigh ? 'failed' : 'passed',
+      severity: hasCritical ? 'critical' : hasHigh ? 'high' : result.summary.medium > 0 ? 'medium' : 'low',
+      message: hasCritical
+        ? `Found ${result.summary.critical} critical vulnerabilities`
+        : hasHigh
+          ? `Found ${result.summary.high} high severity vulnerabilities`
+          : `No critical or high severity issues found`,
+      findings: [...result.vulnerabilities, ...result.misconfigurations],
+      summary: result.summary,
+    };
+  }
+
+  /** 构造扫描异常时的错误结果 */
+  private scanErrorResult(err: unknown): GuardTrivyResult {
+    return {
+      adapterId: this.id,
+      status: 'error',
+      severity: 'low',
+      message: `Trivy scan failed: ${err instanceof Error ? err.message : String(err)}`,
+      findings: [],
+      summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
+    };
   }
 
   // --- Adapter interface methods ---

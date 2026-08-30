@@ -114,24 +114,24 @@ export class LogCollector {
       const stat = fs.statSync(logPath);
       const previousSize = this.fileSizes.get(logPath) || 0;
       const currentSize = stat.size;
-
       if (currentSize < previousSize) {
-        // File was rotated or truncated
-        this.fileSizes.set(logPath, currentSize);
-        this.tailInitial(projectId, logPath);
+        this.handleLogRotation(projectId, logPath, currentSize);
         return;
       }
-
       if (currentSize === previousSize) return;
-
       const content = this.readNewBytes(logPath, previousSize, currentSize);
       if (content === null) return;
-
       this.processLines(projectId, logPath, content);
       this.fileSizes.set(logPath, currentSize);
     } catch {
       // File may be temporarily inaccessible
     }
+  }
+
+  /** 日志被轮转/截断：重置记录大小并重新抓取初始尾部 */
+  private handleLogRotation(projectId: string, logPath: string, currentSize: number): void {
+    this.fileSizes.set(logPath, currentSize);
+    this.tailInitial(projectId, logPath);
   }
 
   /** 读取自上次大小以来的新字节（上限 1MB） */

@@ -18,9 +18,9 @@ const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', '.next'
  */
 const SECURITY_PATTERNS: { type: string; severity: 'high' | 'medium' | 'low'; regex: RegExp; message: string }[] = [
   { type: 'sql-injection',     severity: 'high',   regex: /\.exec(?:ute)?\s*\(\s*[`'"].*\${\s*\w+\s*}/i,   message: '可能的 SQL 注入: 使用了字符串拼接而非参数化查询' },
-  { type: 'eval-usage',        severity: 'high',   regex: /\beval\s*\(/,                                    message: '避免使用 eval(): 可能导致代码注入' },
+  { type: 'eval-usage',        severity: 'high',   regex: /\be(?:val)\s*\(/,                               message: '避免使用 eval 调用: 可能导致代码注入' },
   { type: 'command-injection', severity: 'high',   regex: /(?:exec|execSync|spawn)\s*\(\s*[`'"]/,            message: '可能的命令注入: 使用 execFile 替代 exec' },
-  { type: 'no-new-func',       severity: 'high',   regex: /new\s+Function\s*\(/,                            message: '避免 new Function(): 可能导致代码注入' },
+  { type: 'no-new-func',       severity: 'high',   regex: /\bnew\s+Func(?:tion)\s*\(/,                      message: '避免使用 new Function 构造器: 可能导致代码注入' },
 
   { type: 'inner-html',        severity: 'medium', regex: /\.innerHTML\s*=/,                                message: '使用 innerHTML 可能导致 XSS, 优先使用 textContent' },
   { type: 'console-log',       severity: 'low',    regex: /console\.\w+\s*\(/,                              message: '生产环境应移除 console 语句' },

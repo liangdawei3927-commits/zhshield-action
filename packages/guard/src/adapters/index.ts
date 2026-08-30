@@ -1,4 +1,6 @@
 export { GuardESLintCheckAdapter } from './eslint-check-adapter';
+export { GuardSonarwayESLintAdapter } from './sonarway-eslint-adapter';
+export { buildSonarwayConfig } from './eslint-sonarway-config';
 export { GuardSensitiveInfoAdapter } from './sensitive-info-adapter';
 export { ArchitectureBoundaryAdapter } from './architecture-boundary-adapter';
 export { TestRunnerAdapter } from './test-runner-adapter';

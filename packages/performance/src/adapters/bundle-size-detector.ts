@@ -54,34 +54,14 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
 
     const state: { scanned: number; totalBytes: number; seq: number } = { scanned: 0, totalBytes: 0, seq: 0 };
     const issues: PerformanceIssue[] = [];
-
     for (const dirName of ARTIFACT_DIR_NAMES) {
       if (state.scanned >= cfg.scanLimit) break;
       const root = safeJoin(projectRoot, dirName);
       if (!fs.existsSync(root)) continue;
       this.walk(root, projectRoot, cfg, issues, state);
     }
-
-    // 产物总量告警（低优先级，单独规则）
-    if (state.totalBytes > TOTAL_ARTIFACT_WARN_BYTES) {
-      issues.push({
-        id: `bundle-size-${state.seq++}`,
-        ruleId: 'bundle-size.total-artifacts',
-        category: 'bundle-size',
-        severity: 'low',
-        file: '',
-        message: `产物总大小 ${formatBytes(state.totalBytes)} — 建议评估分包策略`,
-        suggestion: '建议评估分包策略：按路由 / 页面拆分产物，减小首屏加载体积',
-        autoFixable: false,
-      });
-    }
-
-    // 排序：严重度降序，其次文件路径升序
-    return issues.sort((a, b) => {
-      const bySeverity = SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity];
-      if (bySeverity !== 0) return bySeverity;
-      return a.file.localeCompare(b.file);
-    });
+    pushTotalWarning(state, issues);
+    return sortBundleIssues(issues);
   }
 
   /** 递归遍历产物目录（受 scanLimit 约束），累计体积并收集大文件问题 */
@@ -96,10 +76,9 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
-      return; // 读取失败静默跳过
+      return;
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
-
     for (const entry of entries) {
       if (entry.name === '.' || entry.name === '..') continue;
       if (state.scanned >= cfg.scanLimit) return;
@@ -111,32 +90,67 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
       }
       if (!entry.isFile()) continue;
       if (SKIP_FILE_RE.test(entry.name)) continue;
-
-      state.scanned += 1;
-      let size: number;
-      try {
-        size = fs.statSync(fullPath).size;
-      } catch {
-        continue; // stat 失败静默跳过
-      }
-      state.totalBytes += size;
-
-      if (size > cfg.largeFileThresholdBytes) {
-        const rel = path.relative(projectRoot, fullPath);
-        const severity = size > cfg.largeChunkThresholdBytes ? 'high' : 'medium';
-        issues.push({
-          id: `bundle-size-${state.seq++}`,
-          ruleId: 'bundle-size.large-file',
-          category: 'bundle-size',
-          severity,
-          file: rel,
-          message: `${rel} 体积 ${formatBytes(size)}，超过阈值 ${formatBytes(cfg.largeFileThresholdBytes)}`,
-          suggestion: '建议开启代码分割 / 懒加载 / tree-shaking / 压缩，减小单文件体积',
-          autoFixable: false,
-        });
-      }
+      this.collectFileSize(entry, fullPath, projectRoot, cfg, issues, state);
     }
   }
+
+  /** 统计单文件体积并收集大文件问题 */
+  private collectFileSize(
+    entry: fs.Dirent,
+    fullPath: string,
+    projectRoot: string,
+    cfg: PerformanceConfig,
+    issues: PerformanceIssue[],
+    state: { scanned: number; totalBytes: number; seq: number },
+  ): void {
+    state.scanned += 1;
+    let size: number;
+    try {
+      size = fs.statSync(fullPath).size;
+    } catch {
+      return;
+    }
+    state.totalBytes += size;
+    if (size > cfg.largeFileThresholdBytes) {
+      const rel = path.relative(projectRoot, fullPath);
+      const severity = size > cfg.largeChunkThresholdBytes ? 'high' : 'medium';
+      issues.push({
+        id: `bundle-size-${state.seq++}`,
+        ruleId: 'bundle-size.large-file',
+        category: 'bundle-size',
+        severity,
+        file: rel,
+        message: `${rel} 体积 ${formatBytes(size)}，超过阈值 ${formatBytes(cfg.largeFileThresholdBytes)}`,
+        suggestion: '建议开启代码分割 / 懒加载 / tree-shaking / 压缩，减小单文件体积',
+        autoFixable: false,
+      });
+    }
+  }
+}
+
+/** 产物总量告警（低优先级，单独规则） */
+function pushTotalWarning(state: { scanned: number; totalBytes: number; seq: number }, issues: PerformanceIssue[]): void {
+  if (state.totalBytes > TOTAL_ARTIFACT_WARN_BYTES) {
+    issues.push({
+      id: `bundle-size-${state.seq++}`,
+      ruleId: 'bundle-size.total-artifacts',
+      category: 'bundle-size',
+      severity: 'low',
+      file: '',
+      message: `产物总大小 ${formatBytes(state.totalBytes)} — 建议评估分包策略`,
+      suggestion: '建议评估分包策略：按路由 / 页面拆分产物，减小首屏加载体积',
+      autoFixable: false,
+    });
+  }
+}
+
+/** 排序：严重度降序，其次文件路径升序 */
+function sortBundleIssues(issues: PerformanceIssue[]): PerformanceIssue[] {
+  return issues.sort((a, b) => {
+    const bySeverity = SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity];
+    if (bySeverity !== 0) return bySeverity;
+    return a.file.localeCompare(b.file);
+  });
 }
 
 /** 便捷入口 */

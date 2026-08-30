@@ -1,11 +1,26 @@
 import type {
   DimensionScore,
+  DimensionScoreDetail,
   ScoreGrade,
   ScoringRuleContext,
   ScoringConfig,
   ScoringResult,
+  DimensionDefinition,
 } from './types';
 import { resolveScoringConfig } from './project-scoring-config';
+
+function computeOverall(dimensionResults: readonly DimensionScoreDetail[]): number {
+  return dimensionResults.reduce((sum, d) => sum + d.score * d.weight, 0);
+}
+
+function buildDimensions(dimensionResults: readonly DimensionScoreDetail[]): DimensionScore[] {
+  return dimensionResults.map(d => ({
+    name: d.dimension,
+    weight: d.weight,
+    score: d.score,
+    issues: d.issues,
+  }));
+}
 
 /**
  * 上下文评分引擎（导出为 ContextScoringEngine，与 engine.ts 的趋势引擎互补）
@@ -23,37 +38,11 @@ export class ScoringEngine {
   }
 
   score(context: ScoringRuleContext): ScoringResult {
-    const dimensionResults = this.config.dimensions.map(dim => {
-      const baseScore = 100;
-      const negativePoints = this.calculateNegativePoints(dim.id, context);
-      const positivePoints = this.calculatePositivePoints(dim.id, context);
-      const score = Math.max(0, Math.min(100, baseScore - negativePoints + positivePoints));
-
-      return {
-        dimension: dim.id,
-        score,
-        weight: dim.weight,
-        positive: positivePoints,
-        negative: negativePoints,
-        issues: context.findings.filter(f => f.category === dim.id).length,
-      };
-    });
-
-    const overall = dimensionResults.reduce(
-      (sum, d) => sum + d.score * d.weight,
-      0,
-    );
-
+    const dimensionResults = this.config.dimensions.map(dim => this.scoreDimension(dim, context));
+    const overall = computeOverall(dimensionResults);
     const positivePoints = dimensionResults.reduce((sum, d) => sum + d.positive, 0);
     const negativePoints = dimensionResults.reduce((sum, d) => sum + d.negative, 0);
-
-    const dimensions: DimensionScore[] = dimensionResults.map(d => ({
-      name: d.dimension,
-      weight: d.weight,
-      score: d.score,
-      issues: d.issues,
-    }));
-
+    const dimensions = buildDimensions(dimensionResults);
     return {
       overall: Math.round(overall * 100) / 100,
       grade: this.toGrade(overall),
@@ -61,6 +50,22 @@ export class ScoringEngine {
       positivePoints,
       negativePoints,
       details: dimensionResults,
+    };
+  }
+
+  private scoreDimension(dim: DimensionDefinition, context: ScoringRuleContext): DimensionScoreDetail {
+    const baseScore = 100;
+    const negativePoints = this.calculateNegativePoints(dim.id, context);
+    const positivePoints = this.calculatePositivePoints(dim.id, context);
+    const score = Math.max(0, Math.min(100, baseScore - negativePoints + positivePoints));
+
+    return {
+      dimension: dim.id,
+      score,
+      weight: dim.weight,
+      positive: positivePoints,
+      negative: negativePoints,
+      issues: context.findings.filter(f => f.category === dim.id).length,
     };
   }
 

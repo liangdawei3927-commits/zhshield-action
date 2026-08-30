@@ -78,9 +78,18 @@ export function buildHealthDimensions(
   profile?: ScoringProjectProfile | null,
 ): DimensionScore[] {
   const dimensionMapper = new DimensionMapper(undefined, projectRoot);
-  let weightMap = dimensionMapper.getWeightMap();
+  const weightMap = resolveWeightMap(profile, dimensionMapper);
+  return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) =>
+    scoreDimension(name, categories, weightMap, guard, inspect),
+  );
+}
 
-  // 画像驱动权重适配：增量叠加 + 不适用维度剔除 + 归一化，向后兼容
+/** 画像驱动权重适配：增量叠加 + 不适用维度剔除 + 归一化，向后兼容 */
+function resolveWeightMap(
+  profile: ScoringProjectProfile | null | undefined,
+  dimensionMapper: DimensionMapper,
+): Record<string, number> {
+  let weightMap = dimensionMapper.getWeightMap();
   if (profile) {
     const overrides = resolveProfileScoring(profile);
     if (overrides.weightDeltas) {
@@ -90,19 +99,26 @@ export function buildHealthDimensions(
       weightMap = applyDisabledDimensions(weightMap, overrides.disabledDimensions);
     }
   }
+  return weightMap;
+}
 
-  return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) => {
-    const weight = weightMap[name] ?? 0;
-    const matched = inspect.issues.filter((issue) => categories.includes(issue.category));
-    const issues = matched.length + (name === 'security' ? guardIssueCount(guard.results) : 0);
-    let penalty = penaltyForIssues(matched);
-    if (name === 'security') penalty += guardPenalty(guard.results);
+function scoreDimension(
+  name: string,
+  categories: string[],
+  weightMap: Record<string, number>,
+  guard: GuardReportLike,
+  inspect: InspectionReportLike,
+): DimensionScore {
+  const weight = weightMap[name] ?? 0;
+  const matched = inspect.issues.filter((issue) => categories.includes(issue.category));
+  const issues = matched.length + (name === 'security' ? guardIssueCount(guard.results) : 0);
+  let penalty = penaltyForIssues(matched);
+  if (name === 'security') penalty += guardPenalty(guard.results);
 
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
-      issues,
-    };
-  });
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    issues,
+  };
 }

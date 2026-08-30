@@ -91,61 +91,77 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
     const issues: PerformanceIssue[] = [];
-
     const pkg = readJsonSafe(safeJoin(projectRoot, 'package.json'));
     const srcRoot = safeJoin(projectRoot, SOURCE_DIRS[0]);
-
-    // ── A) tree-shaking 维度 ──
     if (pkg) {
-      const isNpmPackage =
-        typeof pkg.name === 'string' &&
-        typeof pkg.version === 'string' &&
-        (typeof pkg.main === 'string' || isRecord(pkg.exports));
-      const sideEffects = pkg.sideEffects;
-
-      if (isNpmPackage && sideEffects === undefined) {
-        issues.push({
-          id: 'tree-shaking-side-effects-missing',
-          ruleId: 'tree-shaking.side-effects-missing',
-          category: 'tree-shaking',
-          severity: 'low',
-          file: 'package.json',
-          message: 'package.json 未声明 sideEffects 字段 — 建议声明 sideEffects 以启用摇树优化',
-          suggestion: '在 package.json 中添加 "sideEffects": false 或列出含副作用的文件白名单',
-          autoFixable: false,
-        });
-      } else if (sideEffects === true) {
-        issues.push({
-          id: 'tree-shaking-side-effects-true',
-          ruleId: 'tree-shaking.side-effects-true',
-          category: 'tree-shaking',
-          severity: 'high',
-          file: 'package.json',
-          message: 'package.json 将 sideEffects 显式设为 true — 彻底关闭摇树，全部模块均会被打包',
-          suggestion: '改为 "sideEffects": false 或仅对真正有副作用的文件（如 polyfill、样式）列出白名单',
-          autoFixable: false,
-        });
-      }
-
-      // 扫描源码目录，检测对已知大库的全量引入
-      const sourceFiles = this.collectFiles(srcRoot, SOURCE_EXTS, cfg.scanLimit);
-      const wholeLibraryHits = this.findWholeLibraryImports(projectRoot, sourceFiles, cfg.scanLimit);
-      for (const hit of wholeLibraryHits) {
-        issues.push({
-          id: `tree-shaking-whole-library-${hit.library}`,
-          ruleId: 'tree-shaking.whole-library-import',
-          category: 'tree-shaking',
-          severity: 'medium',
-          file: hit.file,
-          message: `${hit.file} 全量引入 ${hit.library} — 建议改为按需引入（import { debounce } from "${hit.library}/es"）或改用更轻量的替代库`,
-          suggestion: '改为子路径按需引入，或对 moment/dayjs 等改为 tree-shakable 的替代方案',
-          autoFixable: false,
-        });
-      }
+      this.collectTreeShakingIssues(projectRoot, pkg, srcRoot, cfg, issues);
     }
-
-    // ── B) chunk-splitting 维度 ──
     const chunkFiles = this.collectArtifactChunks(projectRoot);
+    this.collectChunkIssues(chunkFiles, cfg, issues);
+    if (pkg) {
+      this.collectNoCodeSplitIssue(pkg, chunkFiles, issues);
+    }
+    return sortTreeShakingIssues(issues);
+  }
+
+  /** tree-shaking 维度：sideEffects 缺失/显式关闭 + 大库全量引入 */
+  private collectTreeShakingIssues(
+    projectRoot: string,
+    pkg: Record<string, unknown>,
+    srcRoot: string,
+    cfg: PerformanceConfig,
+    issues: PerformanceIssue[],
+  ): void {
+    const isNpmPackage =
+      typeof pkg.name === 'string' &&
+      typeof pkg.version === 'string' &&
+      (typeof pkg.main === 'string' || isRecord(pkg.exports));
+    const sideEffects = pkg.sideEffects;
+    if (isNpmPackage && sideEffects === undefined) {
+      issues.push({
+        id: 'tree-shaking-side-effects-missing',
+        ruleId: 'tree-shaking.side-effects-missing',
+        category: 'tree-shaking',
+        severity: 'low',
+        file: 'package.json',
+        message: 'package.json 未声明 sideEffects 字段 — 建议声明 sideEffects 以启用摇树优化',
+        suggestion: '在 package.json 中添加 "sideEffects": false 或列出含副作用的文件白名单',
+        autoFixable: false,
+      });
+    } else if (sideEffects === true) {
+      issues.push({
+        id: 'tree-shaking-side-effects-true',
+        ruleId: 'tree-shaking.side-effects-true',
+        category: 'tree-shaking',
+        severity: 'high',
+        file: 'package.json',
+        message: 'package.json 将 sideEffects 显式设为 true — 彻底关闭摇树，全部模块均会被打包',
+        suggestion: '改为 "sideEffects": false 或仅对真正有副作用的文件（如 polyfill、样式）列出白名单',
+        autoFixable: false,
+      });
+    }
+    const sourceFiles = this.collectFiles(srcRoot, SOURCE_EXTS, cfg.scanLimit);
+    const wholeLibraryHits = this.findWholeLibraryImports(projectRoot, sourceFiles, cfg.scanLimit);
+    for (const hit of wholeLibraryHits) {
+      issues.push({
+        id: `tree-shaking-whole-library-${hit.library}`,
+        ruleId: 'tree-shaking.whole-library-import',
+        category: 'tree-shaking',
+        severity: 'medium',
+        file: hit.file,
+        message: `${hit.file} 全量引入 ${hit.library} — 建议改为按需引入（import { debounce } from "${hit.library}/es"）或改用更轻量的替代库`,
+        suggestion: '改为子路径按需引入，或对 moment/dayjs 等改为 tree-shakable 的替代方案',
+        autoFixable: false,
+      });
+    }
+  }
+
+  /** chunk-splitting 维度：超大 chunk 告警 */
+  private collectChunkIssues(
+    chunkFiles: Array<{ file: string; size: number }>,
+    cfg: PerformanceConfig,
+    issues: PerformanceIssue[],
+  ): void {
     for (const chunk of chunkFiles) {
       if (chunk.size > cfg.largeChunkThresholdBytes) {
         issues.push({
@@ -160,33 +176,28 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         });
       }
     }
+  }
 
-    if (pkg) {
-      const deps = pkg.dependencies;
-      const depCount = isRecord(deps) ? Object.keys(deps).length : 0;
-      if (chunkFiles.length === 1 && depCount >= 5) {
-        issues.push({
-          id: 'chunk-splitting-no-code-split',
-          ruleId: 'chunk-splitting.no-code-split',
-          category: 'chunk-splitting',
-          severity: 'medium',
-          file: chunkFiles[0].file,
-          message: '检测到单一 bundle 且依赖超过 5 个 — 建议启用路由级代码分割',
-          suggestion: '按路由懒加载页面，或按需拆分第三方依赖为独立 chunk',
-          autoFixable: false,
-        });
-      }
+  /** chunk-splitting 维度：单一 bundle 且依赖众多（缺代码分割） */
+  private collectNoCodeSplitIssue(
+    pkg: Record<string, unknown>,
+    chunkFiles: Array<{ file: string; size: number }>,
+    issues: PerformanceIssue[],
+  ): void {
+    const deps = pkg.dependencies;
+    const depCount = isRecord(deps) ? Object.keys(deps).length : 0;
+    if (chunkFiles.length === 1 && depCount >= 5) {
+      issues.push({
+        id: 'chunk-splitting-no-code-split',
+        ruleId: 'chunk-splitting.no-code-split',
+        category: 'chunk-splitting',
+        severity: 'medium',
+        file: chunkFiles[0].file,
+        message: '检测到单一 bundle 且依赖超过 5 个 — 建议启用路由级代码分割',
+        suggestion: '按路由懒加载页面，或按需拆分第三方依赖为独立 chunk',
+        autoFixable: false,
+      });
     }
-
-    // 排序：严重度降序，其次文件路径升序
-    const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-    issues.sort((a, b) => {
-      const sa = severityOrder[a.severity] ?? 5;
-      const sb = severityOrder[b.severity] ?? 5;
-      if (sa !== sb) return sa - sb;
-      return a.file.localeCompare(b.file);
-    });
-    return issues;
   }
 
   /** 递归收集源码目录下的 ts/tsx/js/jsx 文件（受 scanLimit 约束） */
@@ -234,12 +245,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         if (entry.isDirectory()) {
           visit(full, safeJoin(prefix, entry.name));
         } else if (entry.isFile() && entry.name.endsWith('.js') && !entry.name.endsWith('.map')) {
-          try {
-            const size = fs.statSync(full).size;
-            chunks.push({ file: safeJoin(prefix, entry.name).split(path.sep).join('/'), size });
-          } catch {
-            // 文件不可读时跳过
-          }
+          this.collectChunkFile(chunks, full, prefix, entry.name);
         }
       }
     };
@@ -248,6 +254,21 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       if (fs.existsSync(dir)) visit(dir, dirName);
     }
     return chunks;
+  }
+
+  /** 记录单个 JS chunk 文件（排除 .map）的体积；文件不可读时静默跳过 */
+  private collectChunkFile(
+    chunks: Array<{ file: string; size: number }>,
+    full: string,
+    prefix: string,
+    name: string,
+  ): void {
+    try {
+      const size = fs.statSync(full).size;
+      chunks.push({ file: safeJoin(prefix, name).split(path.sep).join('/'), size });
+    } catch {
+      // 文件不可读时跳过
+    }
   }
 
   /** 统计每个文件对已知大库的全量引入（排除子路径引入），按 (file, library) 去重 */
@@ -262,21 +283,43 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       if (content === null) continue;
       // 匹配 import ... from 'xxx' / "xxx" 或 require('xxx')
       for (const m of content.matchAll(/(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g)) {
-        const specifier = m[1];
-        for (const lib of KNOWN_LARGE_PACKAGES) {
-          // 仅全量引入（包名精确匹配），子路径如 'lodash/debounce' 不命中
-          if (specifier !== lib) continue;
-          const key = `${filePath}\u0000${lib}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
-          hits.push({ file: rel, library: lib });
-        }
+        this.recordWholeLibraryHit(hits, seen, projectRoot, filePath, m[1]);
       }
     }
     return hits;
+  }
+
+  /** 记录单个 specifier 对已知大库的全量引入（排除子路径引入），按 (file, library) 去重 */
+  private recordWholeLibraryHit(
+    hits: Array<{ file: string; library: string }>,
+    seen: Set<string>,
+    projectRoot: string,
+    filePath: string,
+    specifier: string,
+  ): void {
+    for (const lib of KNOWN_LARGE_PACKAGES) {
+      // 仅全量引入（包名精确匹配），子路径如 'lodash/debounce' 不命中
+      if (specifier !== lib) continue;
+      const key = `${filePath}\u0000${lib}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
+      hits.push({ file: rel, library: lib });
+    }
   }
 }
 
 /** 便捷入口：单例类实例 */
 export const treeShakingDetector: TreeShakingDetector = new TreeShakingDetectorImpl();
+
+/** 排序：严重度降序，其次文件路径升序 */
+function sortTreeShakingIssues(issues: PerformanceIssue[]): PerformanceIssue[] {
+  const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  issues.sort((a, b) => {
+    const sa = severityOrder[a.severity] ?? 5;
+    const sb = severityOrder[b.severity] ?? 5;
+    if (sa !== sb) return sa - sb;
+    return a.file.localeCompare(b.file);
+  });
+  return issues;
+}

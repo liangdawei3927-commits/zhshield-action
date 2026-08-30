@@ -182,14 +182,7 @@ function detectPythonPackageManager(projectPath: string): PackageManager {
 export function detectProjectProfile(projectPath: string): ProjectProfile {
   const pkgPath = path.join(projectPath, 'package.json');
   const hasTsConfig = fs.existsSync(path.join(projectPath, 'tsconfig.json'));
-
-  let pkg: Record<string, unknown> = {};
-  try {
-    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    // 无 package.json 或解析失败：按未知语言处理
-  }
-
+  const pkg = readPackageJson(pkgPath);
   const isPython = !fs.existsSync(pkgPath) && hasPythonManifest(projectPath);
 
   return {
@@ -199,4 +192,14 @@ export function detectProjectProfile(projectPath: string): ProjectProfile {
     packageManager: isPython ? detectPythonPackageManager(projectPath) : detectPackageManager(projectPath),
     hasTypeScript: !isPython && (hasTsConfig || detectLanguage(pkg, hasTsConfig) === 'typescript'),
   };
+}
+
+/** 读取并解析 package.json，无文件或解析失败时返回空对象 */
+function readPackageJson(pkgPath: string): Record<string, unknown> {
+  try {
+    return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    // 无 package.json 或解析失败：按未知语言处理
+    return {};
+  }
 }

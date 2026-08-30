@@ -266,12 +266,15 @@ function applyEdit(content: string, edit: TextEdit): { content: string; wroteFil
   const lines = content.split('\n');
   if (edit.startLine > lines.length) return null;
 
-  // Handle single-line replacement
+  return applyEditToLines(lines, edit);
+}
+
+/** 按单行/多行分派编辑应用：单行替换不落盘，多行整段替换 */
+function applyEditToLines(lines: string[], edit: TextEdit): { content: string; wroteFile: boolean } {
   if (edit.startLine === edit.endLine) {
     return { content: applySingleLineEdit(lines, edit), wroteFile: false };
   }
 
-  // Multi-line: replace entire range
   return { content: applyMultiLineEdit(lines, edit), wroteFile: true };
 }
 

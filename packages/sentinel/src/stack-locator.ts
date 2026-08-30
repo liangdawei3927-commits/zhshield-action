@@ -53,29 +53,31 @@ const SOURCE_MAPPING_URL_RE = /sourceMappingURL=([^\s]+)/;
 export function parseV8Stack(stack: string): StackFrame[] {
   const frames: StackFrame[] = [];
   for (const rawLine of stack.split('\n')) {
-    const match = FRAME_RE.exec(rawLine);
-    if (!match) continue;
-
-    let text = match[1];
-    let functionName: string | undefined;
-
-    const parenMatch = PAREN_FRAME_RE.exec(text);
-    if (parenMatch) {
-      functionName = parenMatch[1].trim() || undefined;
-      text = parenMatch[2];
-    }
-
-    const loc = LOCATION_RE.exec(text);
-    if (!loc) continue;
-
-    frames.push({
-      functionName,
-      file: loc[1],
-      line: Number(loc[2]),
-      column: Number(loc[3]),
-    });
+    const frame = parseStackLine(rawLine);
+    if (frame) frames.push(frame);
   }
   return frames;
+}
+
+/** 解析单行堆栈帧；非帧行返回 null */
+function parseStackLine(rawLine: string): StackFrame | null {
+  const match = FRAME_RE.exec(rawLine);
+  if (!match) return null;
+  let text = match[1];
+  let functionName: string | undefined;
+  const parenMatch = PAREN_FRAME_RE.exec(text);
+  if (parenMatch) {
+    functionName = parenMatch[1].trim() || undefined;
+    text = parenMatch[2];
+  }
+  const loc = LOCATION_RE.exec(text);
+  if (!loc) return null;
+  return {
+    functionName,
+    file: loc[1],
+    line: Number(loc[2]),
+    column: Number(loc[3]),
+  };
 }
 
 const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -176,29 +178,39 @@ export function deriveModule(file: string): string {
 function loadSourceMap(file: string, projectPath?: string): SourceMapData | null {
   const localPath = resolveLocalPath(file, projectPath);
   if (!localPath) return null;
+  const raw = readSiblingMap(localPath) ?? readSourceMappingUrlMap(localPath);
+  if (raw === null) return null;
+  return parseSourceMap(raw);
+}
 
-  let raw: string | null = null;
+/** 读取同级 .map 文件；不存在或读取失败返回 null */
+function readSiblingMap(localPath: string): string | null {
   const siblingMap = `${localPath}.map`;
   try {
-    if (fs.existsSync(siblingMap)) raw = fs.readFileSync(siblingMap, 'utf-8');
+    if (fs.existsSync(siblingMap)) return fs.readFileSync(siblingMap, 'utf-8');
   } catch {
     // 读取失败则尝试 sourceMappingURL
   }
+  return null;
+}
 
-  if (raw === null) {
-    try {
-      if (!fs.existsSync(localPath)) return null;
-      const content = fs.readFileSync(localPath, 'utf-8');
-      const mappingMatch = SOURCE_MAPPING_URL_RE.exec(content.slice(-1000));
-      if (!mappingMatch) return null;
-      const mapPath = safeResolve(path.dirname(localPath), mappingMatch[1]);
-      if (fs.existsSync(mapPath)) raw = fs.readFileSync(mapPath, 'utf-8');
-    } catch {
-      return null;
-    }
+/** 从文件尾部 sourceMappingURL 注释定位并读取 sourcemap；失败返回 null */
+function readSourceMappingUrlMap(localPath: string): string | null {
+  try {
+    if (!fs.existsSync(localPath)) return null;
+    const content = fs.readFileSync(localPath, 'utf-8');
+    const mappingMatch = SOURCE_MAPPING_URL_RE.exec(content.slice(-1000));
+    if (!mappingMatch) return null;
+    const mapPath = safeResolve(path.dirname(localPath), mappingMatch[1]);
+    if (fs.existsSync(mapPath)) return fs.readFileSync(mapPath, 'utf-8');
+  } catch {
+    return null;
   }
+  return null;
+}
 
-  if (raw === null) return null;
+/** 校验并解析 sourcemap JSON；非法内容返回 null */
+function parseSourceMap(raw: string): SourceMapData | null {
   try {
     const parsed = JSON.parse(raw) as SourceMapData;
     if (parsed.version === 3 && Array.isArray(parsed.sources)) return parsed;

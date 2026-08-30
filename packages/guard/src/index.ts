@@ -10,6 +10,8 @@ export { GuardToolAdapterWrapper } from './guard-tool-adapter';
 export { FileSecretStateLookup } from './file-secret-state-lookup';
 export {
   GuardESLintCheckAdapter,
+  GuardSonarwayESLintAdapter,
+  buildSonarwayConfig,
   GuardSensitiveInfoAdapter,
   ArchitectureBoundaryAdapter,
   TestRunnerAdapter,

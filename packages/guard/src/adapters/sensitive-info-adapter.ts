@@ -107,22 +107,27 @@ export class GuardSensitiveInfoAdapter implements Adapter {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (this.isExcludedDir(entry.name)) {
-          continue;
-        }
-        this.scanDir(fullPath, findings, rootDir);
-        continue;
-      }
-
-      if (!SCAN_FILE_EXT.test(entry.name)) {
-        continue;
-      }
-
-      this.scanFile(fullPath, rootDir, findings);
+      this.scanEntry(dir, entry, findings, rootDir);
     }
+  }
+
+  /** 扫描单个目录项：目录递归、文件按扩展名过滤 */
+  private scanEntry(dir: string, entry: fs.Dirent, findings: Finding[], rootDir: string): void {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      if (this.isExcludedDir(entry.name)) {
+        return;
+      }
+      this.scanDir(fullPath, findings, rootDir);
+      return;
+    }
+
+    if (!SCAN_FILE_EXT.test(entry.name)) {
+      return;
+    }
+
+    this.scanFile(fullPath, rootDir, findings);
   }
 
   /** 判断目录是否被排除（依赖/构建产物/隐藏目录） */

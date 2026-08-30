@@ -34,14 +34,22 @@ export class TestRunnerAdapter implements Adapter {
       return { result: null, error: detected.error };
     }
 
+    return this.runDetectedTest(detected, resolved.dir);
+  }
+
+  /** 执行已检测到的测试命令并解析输出，失败时走兜底解析 */
+  private async runDetectedTest(
+    detected: { testCmd: string; testArgs: string[] },
+    projectPath: string,
+  ): Promise<{ result: TestResult | null; error?: string }> {
     const startTime = Date.now();
     try {
-      const { stdout, stderr } = await this.executeTestRun(detected.testCmd, detected.testArgs, resolved.dir);
+      const { stdout, stderr } = await this.executeTestRun(detected.testCmd, detected.testArgs, projectPath);
 
       const output = stdout + '\n' + stderr;
-      return { result: this.withDiskFallback(this.outputParser.parseOutput(output, startTime), resolved.dir) };
+      return { result: this.withDiskFallback(this.outputParser.parseOutput(output, startTime), projectPath) };
     } catch (error: unknown) {
-      return this.handleRunFailure(error, startTime, resolved.dir);
+      return this.handleRunFailure(error, startTime, projectPath);
     }
   }
 
@@ -95,47 +103,50 @@ export class TestRunnerAdapter implements Adapter {
     if (rawResult.error) {
       return this.makeResult(check, 'error', `测试执行失败: ${rawResult.error}`);
     }
-
     const r = rawResult.result;
     if (!r) {
       return this.makeResult(check, 'error', '测试未执行');
     }
-
-    // 输出解析失败（unresolved）时 totalTests 为磁盘兜底的测试文件数：
-    // 磁盘有测试 → 结果未知报 warning；磁盘也无测试 → 才是真正的「未发现测试用例」
     if (r.unresolved) {
-      if (r.totalTests > 0) {
-        return this.makeResult(
-          check,
-          'warning',
-          `测试命令输出解析失败，磁盘发现 ${r.totalTests} 个测试文件，测试结果未知`,
-          { totalTests: r.totalTests, passed: r.passed, failed: r.failed, unresolved: true },
-        );
-      }
-      return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
+      return this.normalizeUnresolved(check, r);
     }
-
     if (r.failed > 0) {
-      const failDetail = r.details.length > 0
-        ? `\n失败用例:\n${r.details.slice(0, 5).join('\n')}`
-        : '';
-      return this.makeResult(
-        check,
-        'failed',
-        `测试 ${r.totalTests} 项: ${r.passed} 通过, ${r.failed} 失败 (${r.durationMs}ms)${failDetail}`,
-        { totalTests: r.totalTests, passed: r.passed, failed: r.failed, skipped: r.skipped, durationMs: r.durationMs },
-      );
+      return this.normalizeFailed(check, r);
     }
-
     if (r.totalTests === 0) {
       return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
     }
-
     return this.makeResult(
       check,
       'passed',
       `全部 ${r.passed} 项测试通过 (${r.durationMs}ms)`,
       { totalTests: r.totalTests, passed: r.passed, durationMs: r.durationMs },
+    );
+  }
+
+  /** 输出解析失败（unresolved）时 totalTests 为磁盘兜底的测试文件数：磁盘有测试 → 结果未知报 warning；磁盘也无测试 → 才是真正的「未发现测试用例」 */
+  private normalizeUnresolved(check: CheckConfig, r: TestResult): CheckResult {
+    if (r.totalTests > 0) {
+      return this.makeResult(
+        check,
+        'warning',
+        `测试命令输出解析失败，磁盘发现 ${r.totalTests} 个测试文件，测试结果未知`,
+        { totalTests: r.totalTests, passed: r.passed, failed: r.failed, unresolved: true },
+      );
+    }
+    return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
+  }
+
+  /** 有失败用例时归一化为 failed 结果 */
+  private normalizeFailed(check: CheckConfig, r: TestResult): CheckResult {
+    const failDetail = r.details.length > 0
+      ? `\n失败用例:\n${r.details.slice(0, 5).join('\n')}`
+      : '';
+    return this.makeResult(
+      check,
+      'failed',
+      `测试 ${r.totalTests} 项: ${r.passed} 通过, ${r.failed} 失败 (${r.durationMs}ms)${failDetail}`,
+      { totalTests: r.totalTests, passed: r.passed, failed: r.failed, skipped: r.skipped, durationMs: r.durationMs },
     );
   }
 

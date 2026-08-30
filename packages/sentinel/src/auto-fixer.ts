@@ -9,13 +9,17 @@ const SAFE_SCRIPT_NAME_RE = /^[a-zA-Z0-9:_-]{1,64}$/;
 const SAFE_SCRIPT_COMMANDS = new Set(['npm', 'npx', 'node', 'pnpm', 'yarn', 'git', 'tsx', 'ts-node', 'bun']);
 /** 脚本参数安全字符集：仅允许路径 / 标志类字符，拒绝 shell 元字符 */
 const SAFE_SCRIPT_ARG_RE = /^[a-zA-Z0-9_./:@%+=,-]{1,256}$/;
+/** shell 元字符（出现在脚本即拒绝执行） */
+const SHELL_METACHAR_RE = /[;&|<>$`(){}[\]*?~!\\\n\r]/;
+/** 脚本按空白切分为 [命令, ...参数] */
+const SCRIPT_WHITESPACE_RE = /\s+/;
 
 /** 将脚本字符串解析为 [命令, 参数...]；含 shell 元字符或命令不在白名单时返回 null */
 function parseSafeScript(script: string): { cmd: string; args: string[] } | null {
   const trimmed = script.trim();
   if (!trimmed || trimmed.length > 1024) return null;
-  if (/[;&|<>$`(){}[\]*?~!\\\n\r]/.test(trimmed)) return null;
-  const parts = trimmed.split(/\s+/);
+  if (SHELL_METACHAR_RE.test(trimmed)) return null;
+  const parts = trimmed.split(SCRIPT_WHITESPACE_RE);
   const cmd = parts[0] as string;
   if (!SAFE_SCRIPT_COMMANDS.has(cmd)) return null;
   const args = parts.slice(1);
@@ -133,28 +137,25 @@ export class AutoFixer {
 
   evaluateAndFix(event: SentinelEvent): boolean {
     if (!this.running || !this.config) return false;
-
     for (const rule of this.config.rules) {
       if (!rule.eventFilter(event)) continue;
-
-      const maxAttempts = rule.maxAttempts ?? 3;
-      const attempts = this.attemptCount.get(event.dedupeKey) || 0;
-
-      if (this.isAttemptExhausted(rule, event, attempts, maxAttempts)) {
-        return false;
-      }
-
-      this.attemptCount.set(event.dedupeKey, attempts + 1);
-      this.eventCenter.updateStatus(event.id, 'fixing', 'auto-fixer');
-
-      const allSucceeded = this.applyRuleActions(rule, event);
-      this.emitFixOutcome(rule, event, allSucceeded, attempts);
-
-      if (allSucceeded) {
-        return true;
-      }
+      if (this.evaluateRule(rule, event)) return true;
     }
     return false;
+  }
+
+  /** 评估单条规则：尝试次数内顺序执行全部动作，全部成功即返回 true */
+  private evaluateRule(rule: AutoFixRule, event: SentinelEvent): boolean {
+    const maxAttempts = rule.maxAttempts ?? 3;
+    const attempts = this.attemptCount.get(event.dedupeKey) || 0;
+    if (this.isAttemptExhausted(rule, event, attempts, maxAttempts)) {
+      return false;
+    }
+    this.attemptCount.set(event.dedupeKey, attempts + 1);
+    this.eventCenter.updateStatus(event.id, 'fixing', 'auto-fixer');
+    const allSucceeded = this.applyRuleActions(rule, event);
+    this.emitFixOutcome(rule, event, allSucceeded, attempts);
+    return allSucceeded;
   }
 
   /** 尝试次数耗尽时标记失败并上报 */

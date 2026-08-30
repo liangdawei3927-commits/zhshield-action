@@ -141,73 +141,95 @@ export function validateScoringOverrides(raw: unknown, filePath: string | null =
 
   const defaultDimensions = getDefaultScoringConfig().dimensions;
   for (const [dimId, dimOverride] of Object.entries(dimensions)) {
-    const defaultDim = defaultDimensions.find((d) => d.id === dimId);
-    if (!defaultDim) {
-      throw new ProjectScoringConfigError(
-        filePath,
-        `未知维度 "${dimId}"，可用维度：${defaultDimensions.map((d) => d.id).join('、')}`,
-      );
-    }
-    if (!isPlainObject(dimOverride)) {
-      throw new ProjectScoringConfigError(filePath, `维度 "${dimId}" 的覆盖项必须是映射`);
-    }
-    rejectUnknownKeys(dimOverride, ['weight', 'penalties', 'positiveRules'], `维度 "${dimId}"`, filePath);
-
-    requireNumber(dimOverride, 'weight', `维度 "${dimId}"`, filePath, { min: 0, max: 1 });
-
-    const penalties = dimOverride.penalties;
-    if (penalties !== undefined) {
-      if (!isPlainObject(penalties)) {
-        throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties 必须是映射`);
-      }
-      rejectUnknownKeys(
-        penalties,
-        ['maxPenalty', 'perIssuePenalty', 'severityMultipliers'],
-        `维度 "${dimId}".penalties`,
-        filePath,
-      );
-      requireNumber(penalties, 'maxPenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
-      requireNumber(penalties, 'perIssuePenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
-
-      const multipliers = penalties.severityMultipliers;
-      if (multipliers !== undefined) {
-        if (!isPlainObject(multipliers)) {
-          throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties.severityMultipliers 必须是映射`);
-        }
-        for (const [severity, multiplier] of Object.entries(multipliers)) {
-          if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier < 0) {
-            throw new ProjectScoringConfigError(
-              filePath,
-              `维度 "${dimId}".penalties.severityMultipliers.${severity} 必须是不小于 0 的有限数字，实际为 ${JSON.stringify(multiplier)}`,
-            );
-          }
-        }
-      }
-    }
-
-    const positiveRules = dimOverride.positiveRules;
-    if (positiveRules !== undefined) {
-      if (!isPlainObject(positiveRules)) {
-        throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules 必须是「规则id → 覆盖项」的映射`);
-      }
-      for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
-        const defaultRule = defaultDim.positiveRules.find((r) => r.id === ruleId);
-        if (!defaultRule) {
-          throw new ProjectScoringConfigError(
-            filePath,
-            `维度 "${dimId}" 下未知加分规则 "${ruleId}"，可用规则：${defaultDim.positiveRules.map((r) => r.id).join('、') || '（无）'}`,
-          );
-        }
-        if (!isPlainObject(ruleOverride)) {
-          throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules.${ruleId} 必须是映射`);
-        }
-        rejectUnknownKeys(ruleOverride, ['points'], `维度 "${dimId}".positiveRules.${ruleId}`, filePath);
-        requireNumber(ruleOverride, 'points', `维度 "${dimId}".positiveRules.${ruleId}`, filePath, { min: 0 });
-      }
-    }
+    validateDimensionOverride(dimId, dimOverride, defaultDimensions, filePath);
   }
 
   return raw as ScoringOverrides;
+}
+
+function validateDimensionOverride(
+  dimId: string,
+  dimOverride: unknown,
+  defaultDimensions: DimensionDefinition[],
+  filePath: string | null,
+): void {
+  const defaultDim = defaultDimensions.find((d) => d.id === dimId);
+  if (!defaultDim) {
+    throw new ProjectScoringConfigError(
+      filePath,
+      `未知维度 "${dimId}"，可用维度：${defaultDimensions.map((d) => d.id).join('、')}`,
+    );
+  }
+  if (!isPlainObject(dimOverride)) {
+    throw new ProjectScoringConfigError(filePath, `维度 "${dimId}" 的覆盖项必须是映射`);
+  }
+  rejectUnknownKeys(dimOverride, ['weight', 'penalties', 'positiveRules'], `维度 "${dimId}"`, filePath);
+
+  requireNumber(dimOverride, 'weight', `维度 "${dimId}"`, filePath, { min: 0, max: 1 });
+
+  const penalties = dimOverride.penalties;
+  if (penalties !== undefined) {
+    validatePenaltyOverrides(dimId, penalties, filePath);
+  }
+
+  const positiveRules = dimOverride.positiveRules;
+  if (positiveRules !== undefined) {
+    validatePositiveRuleOverrides(dimId, defaultDim, positiveRules, filePath);
+  }
+}
+
+function validatePenaltyOverrides(dimId: string, penalties: unknown, filePath: string | null): void {
+  if (!isPlainObject(penalties)) {
+    throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties 必须是映射`);
+  }
+  rejectUnknownKeys(
+    penalties,
+    ['maxPenalty', 'perIssuePenalty', 'severityMultipliers'],
+    `维度 "${dimId}".penalties`,
+    filePath,
+  );
+  requireNumber(penalties, 'maxPenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
+  requireNumber(penalties, 'perIssuePenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
+
+  const multipliers = penalties.severityMultipliers;
+  if (multipliers !== undefined) {
+    if (!isPlainObject(multipliers)) {
+      throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties.severityMultipliers 必须是映射`);
+    }
+    for (const [severity, multiplier] of Object.entries(multipliers)) {
+      if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier < 0) {
+        throw new ProjectScoringConfigError(
+          filePath,
+          `维度 "${dimId}".penalties.severityMultipliers.${severity} 必须是不小于 0 的有限数字，实际为 ${JSON.stringify(multiplier)}`,
+        );
+      }
+    }
+  }
+}
+
+function validatePositiveRuleOverrides(
+  dimId: string,
+  defaultDim: DimensionDefinition,
+  positiveRules: unknown,
+  filePath: string | null,
+): void {
+  if (!isPlainObject(positiveRules)) {
+    throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules 必须是「规则id → 覆盖项」的映射`);
+  }
+  for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
+    const defaultRule = defaultDim.positiveRules.find((r) => r.id === ruleId);
+    if (!defaultRule) {
+      throw new ProjectScoringConfigError(
+        filePath,
+        `维度 "${dimId}" 下未知加分规则 "${ruleId}"，可用规则：${defaultDim.positiveRules.map((r) => r.id).join('、') || '（无）'}`,
+      );
+    }
+    if (!isPlainObject(ruleOverride)) {
+      throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules.${ruleId} 必须是映射`);
+    }
+    rejectUnknownKeys(ruleOverride, ['points'], `维度 "${dimId}".positiveRules.${ruleId}`, filePath);
+    requireNumber(ruleOverride, 'points', `维度 "${dimId}".positiveRules.${ruleId}`, filePath, { min: 0 });
+  }
 }
 
 /** 深拷贝单个维度定义（PositiveRule.condition 为函数引用，浅拷贝共享即可） */
@@ -237,30 +259,48 @@ export function mergeScoringOverrides(overrides: ScoringOverrides, base?: Scorin
     if (!dim) {
       throw new ProjectScoringConfigError(null, `未知维度 "${dimId}"，无法合并覆盖`);
     }
-
-    if (dimOverride.weight !== undefined) dim.weight = dimOverride.weight;
-
-    if (dimOverride.penalties) {
-      const p: PenaltyConfig = dim.penalties;
-      if (dimOverride.penalties.maxPenalty !== undefined) p.maxPenalty = dimOverride.penalties.maxPenalty;
-      if (dimOverride.penalties.perIssuePenalty !== undefined) {
-        p.perIssuePenalty = dimOverride.penalties.perIssuePenalty;
-      }
-      // severityMultipliers 按 key 合并：覆盖 key 优先，未提及的 severity 保留默认
-      Object.assign(p.severityMultipliers, dimOverride.penalties.severityMultipliers ?? {});
-    }
-
-    if (dimOverride.positiveRules) {
-      for (const [ruleId, ruleOverride] of Object.entries(dimOverride.positiveRules)) {
-        const rule = dim.positiveRules.find((r) => r.id === ruleId);
-        if (!rule) {
-          throw new ProjectScoringConfigError(null, `维度 "${dimId}" 下未知加分规则 "${ruleId}"，无法合并覆盖`);
-        }
-        if (ruleOverride.points !== undefined) rule.points = ruleOverride.points;
-      }
-    }
+    mergeDimensionOverride(dim, dimOverride);
   }
 
+  assertWeightsNormalized(mergedDimensions);
+
+  return {
+    version: source.version,
+    lastUpdated: new Date(),
+    dimensions: mergedDimensions,
+  };
+}
+
+function mergeDimensionOverride(dim: DimensionDefinition, dimOverride: DimensionOverride): void {
+  if (dimOverride.weight !== undefined) dim.weight = dimOverride.weight;
+  if (dimOverride.penalties) {
+    mergePenaltyOverride(dim.penalties, dimOverride.penalties);
+  }
+  if (dimOverride.positiveRules) {
+    mergePositiveRules(dim, dimOverride.positiveRules);
+  }
+}
+
+function mergePenaltyOverride(p: PenaltyConfig, penaltyOverride: PenaltyOverride): void {
+  if (penaltyOverride.maxPenalty !== undefined) p.maxPenalty = penaltyOverride.maxPenalty;
+  if (penaltyOverride.perIssuePenalty !== undefined) {
+    p.perIssuePenalty = penaltyOverride.perIssuePenalty;
+  }
+  // severityMultipliers 按 key 合并：覆盖 key 优先，未提及的 severity 保留默认
+  Object.assign(p.severityMultipliers, penaltyOverride.severityMultipliers ?? {});
+}
+
+function mergePositiveRules(dim: DimensionDefinition, positiveRules: Record<string, PositiveRuleOverride>): void {
+  for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
+    const rule = dim.positiveRules.find((r) => r.id === ruleId);
+    if (!rule) {
+      throw new ProjectScoringConfigError(null, `维度 "${dim.id}" 下未知加分规则 "${ruleId}"，无法合并覆盖`);
+    }
+    if (ruleOverride.points !== undefined) rule.points = ruleOverride.points;
+  }
+}
+
+function assertWeightsNormalized(mergedDimensions: DimensionDefinition[]): void {
   const sum = mergedDimensions.reduce((s, d) => s + d.weight, 0);
   if (Math.abs(sum - 1) > WEIGHT_SUM_TOLERANCE) {
     const detail = mergedDimensions.map((d) => `${d.id}=${d.weight}`).join(', ');
@@ -269,12 +309,6 @@ export function mergeScoringOverrides(overrides: ScoringOverrides, base?: Scorin
       `合并后维度权重之和必须为 1（容差 ${WEIGHT_SUM_TOLERANCE}），实际为 ${sum}（${detail}）。请同步调整各维度权重使其归一。`,
     );
   }
-
-  return {
-    version: source.version,
-    lastUpdated: new Date(),
-    dimensions: mergedDimensions,
-  };
 }
 
 /**

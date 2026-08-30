@@ -93,23 +93,25 @@ export class ProcessMonitor {
 
   private launchProcess(): void {
     if (!this.config) return;
-
     const cmd = this.config.command;
     const args = this.config.args || [];
     const cwd = this.config.cwd;
-
     try {
-      this.proc = spawn(cmd, args, {
-        cwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false,
-      });
-
+      this.proc = this.spawnProcess(cmd, args, cwd);
       this.attachProcessHandlers(cmd, this.proc.pid);
       this.startHealthCheck();
     } catch (err: unknown) {
       this.emitProcessLaunchFailed(cmd, err);
     }
+  }
+
+  /** 以管道 stdio 启动子进程（不继承终端） */
+  private spawnProcess(cmd: string, args: string[], cwd: string): ChildProcess {
+    return spawn(cmd, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
   }
 
   /** 挂接子进程输出/退出/错误回调并上报启动事件 */

@@ -42,5 +42,6 @@ export type {
   DimensionScoreDetail,
 } from './types';
 export * from './pipeline-score';
+export * from './sop-converters';
 export * from './tech-debt/dashboard';
 export * from './tech-debt/types';

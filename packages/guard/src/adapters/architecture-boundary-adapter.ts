@@ -129,14 +129,22 @@ export class ArchitectureBoundaryAdapter implements Adapter {
   }: ResolveImportContext): Violation | null {
     const importPath = this.extractImportPath(line);
     if (!importPath) return null;
-
     if (!importPath.startsWith('..') && !importPath.startsWith('./')) return null;
-
     const toLayer = this.resolveTargetLayer(file, importPath);
     if (!toLayer) return null;
-
     if (toLayer.index <= fromLayer.index) return null;
+    return this.buildViolation(file, lineNo, fromLayer, toLayer, importPath, targetDir);
+  }
 
+  /** 构造跨层违规记录 */
+  private buildViolation(
+    file: string,
+    lineNo: number,
+    fromLayer: { name: string; index: number },
+    toLayer: { name: string; index: number },
+    importPath: string,
+    targetDir: string,
+  ): Violation {
     return {
       file: path.relative(targetDir, file),
       line: lineNo,

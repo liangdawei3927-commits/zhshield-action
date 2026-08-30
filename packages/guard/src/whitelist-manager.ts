@@ -46,24 +46,33 @@ const SECTION_PARSERS: Record<WhitelistSection, (ctx: LineParseContext) => void>
 /** 解析 YAML-like 白名单内容为 WhitelistEntry 列表 */
 function parseWhitelistYaml(content: string): WhitelistEntry[] {
   const config: WhitelistConfig = { whitelist: {} };
-  const lines = content.split('\n');
-  let section: WhitelistSection | null = null;
   const ctx: LineParseContext = { config, trimmed: '', current: null };
+  let section: WhitelistSection | null = null;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) continue;
-
-    if (trimmed.startsWith('project:')) { section = 'project'; continue; }
-    if (trimmed.startsWith('file:')) { section = 'file'; continue; }
-    if (trimmed.startsWith('rule:')) { section = 'rule'; continue; }
-
-    if (!section) continue;
-    ctx.trimmed = trimmed;
-    SECTION_PARSERS[section](ctx);
+  for (const line of content.split('\n')) {
+    section = parseWhitelistLine(ctx, section, line);
   }
 
   return configToEntries(config);
+}
+
+/** 解析单行：跳过注释与 section 头，其余交给对应 section 解析器，返回更新后的 section */
+function parseWhitelistLine(
+  ctx: LineParseContext,
+  section: WhitelistSection | null,
+  line: string,
+): WhitelistSection | null {
+  const trimmed = line.trim();
+  if (trimmed.startsWith('#')) return section;
+
+  if (trimmed.startsWith('project:')) return 'project';
+  if (trimmed.startsWith('file:')) return 'file';
+  if (trimmed.startsWith('rule:')) return 'rule';
+
+  if (!section) return section;
+  ctx.trimmed = trimmed;
+  SECTION_PARSERS[section](ctx);
+  return section;
 }
 
 function parseProjectLine(ctx: LineParseContext): void {

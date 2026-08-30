@@ -34,24 +34,34 @@ function analyzeMethodForFeatureEnvy(
   method: ParsedClass['members']['methods'][number],
   config: RefactorConfig,
 ): CodeSmell | null {
-  const threshold = config.thresholds.featureEnvyRatio;
-
   const externalCalls = collectExternalCalls(method.node, cls.name, parsed.sourceFile);
   if (externalCalls.size === 0) return null;
 
-  const { externalCount, totalStatements, ratio } = computeExternalCallRatio(parsed, cls, method);
-  if (ratio <= threshold || externalCount <= 3) return null;
+  const stats = computeExternalCallRatio(parsed, cls, method);
+  if (stats.ratio <= config.thresholds.featureEnvyRatio || stats.externalCount <= 3) return null;
 
   const targetName = findTopTarget(externalCalls);
+  return buildFeatureEnvySmell(parsed, cls, method, config, stats, targetName);
+}
 
+/** 构造 Feature Envy CodeSmell */
+function buildFeatureEnvySmell(
+  parsed: ParsedFile,
+  cls: ParsedClass,
+  method: ParsedClass['members']['methods'][number],
+  config: RefactorConfig,
+  stats: { externalCount: number; totalStatements: number; ratio: number },
+  targetName: string,
+): CodeSmell {
+  const threshold = config.thresholds.featureEnvyRatio;
   return makeSmell({
     ruleId: 'feature-envy',
     severity: config.severities['feature-envy'],
-    message: `${cls.name}.${method.name}() 大量调用 ${targetName} (${externalCount} 次外部引用 vs ${totalStatements} 行代码)`,
+    message: `${cls.name}.${method.name}() 大量调用 ${targetName} (${stats.externalCount} 次外部引用 vs ${stats.totalStatements} 行代码)`,
     filePath: parsed.filePath,
     line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
     column: 1,
-    metric: 'externalCallRatio', value: Math.round(ratio * 100), threshold: Math.round(threshold * 100),
+    metric: 'externalCallRatio', value: Math.round(stats.ratio * 100), threshold: Math.round(threshold * 100),
     suggestion: {
       type: 'Move Method',
       description: `考虑将 ${method.name}() 移到 ${targetName.split('.')[0]} 类中`,
@@ -153,14 +163,13 @@ function detectSharedStringLiterals(
 
 /** 判断类是否为纯数据类候选：非框架托管、非测试夹具、字段多方法少 */
 function isDataClassCandidate(parsed: ParsedFile, cls: ParsedClass, config: RefactorConfig): boolean {
-  // 跳过框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger
-  // DTO 等依赖类或成员装饰器的运行时元数据，转 interface 或内联方法会破坏
-  // 框架契约，它们是合理的数据载体而非纯数据类反模式。
   if (isFrameworkManagedClass(cls.node)) return false;
-
-  // 跳过测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式。
   if (isTestFixture(parsed.filePath)) return false;
+  return isFieldHeavyMethodLight(cls, config);
+}
 
+/** 字段数达标且方法数不超限时判定为数据类 */
+function isFieldHeavyMethodLight(cls: ParsedClass, config: RefactorConfig): boolean {
   const ownMethods = countNonTrivialMethods(cls);
   const fieldCount = cls.members.fields.length;
   return fieldCount >= config.thresholds.minDataClassFields && ownMethods <= config.thresholds.maxDataClassMethods;
@@ -205,6 +214,7 @@ export function detectDataClass(parsed: ParsedFile, config: RefactorConfig): Cod
   return smells;
 }
 
+/** 判断类是否为框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger DTO 等依赖类或成员装饰器的运行时元数据，转 interface 或内联方法会破坏框架契约，它们是合理的数据载体而非纯数据类反模式 */
 function isFrameworkManagedClass(node: ts.ClassDeclaration): boolean {
   const classDecorators = ts.canHaveDecorators(node) ? ts.getDecorators(node) : undefined;
   const hasMemberDecorators = node.members.some(m => {
@@ -215,6 +225,7 @@ function isFrameworkManagedClass(node: ts.ClassDeclaration): boolean {
   return (classDecorators && classDecorators.length > 0) || hasMemberDecorators;
 }
 
+/** 判断文件是否为测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式 */
 function isTestFixture(filePath: string): boolean {
   return filePath.includes('/__tests__/') || filePath.includes('/fixtures/');
 }

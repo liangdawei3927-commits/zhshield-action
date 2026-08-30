@@ -97,7 +97,16 @@ function buildActions(
   hotnessByModule: Map<string, number>,
   exposedFiles: Set<string>,
 ): DebtAction[] {
-  // 分组：module + category
+  const groups = groupIssuesByModule(issues);
+  const actions: DebtAction[] = [];
+  for (const [key, group] of groups) {
+    actions.push(buildActionFromGroup(key, group, hotnessByModule, exposedFiles));
+  }
+  markRecommended(actions);
+  return actions;
+}
+
+function groupIssuesByModule(issues: DebtIssueInput[]): Map<string, { issues: DebtIssueInput[]; category: DebtCategory }> {
   const groups = new Map<string, { issues: DebtIssueInput[]; category: DebtCategory }>();
   for (const issue of issues) {
     const module = moduleOf(issue.file);
@@ -110,54 +119,59 @@ function buildActions(
       groups.set(key, { issues: [issue], category });
     }
   }
+  return groups;
+}
 
-  const actions: DebtAction[] = [];
-  for (const [key, { issues: groupIssues, category }] of groups) {
-    const module = key.split('::')[0];
-    // 四因子
-    const severitySum = groupIssues.reduce((acc, i) => acc + SEVERITY_WEIGHT[i.severity], 0);
-    const avgSeverity = severitySum / groupIssues.length;
-    const severityFactor = avgSeverity;
-    const hotnessFactorValue = hotnessFactor(hotnessByModule.get(module) ?? 0);
-    const densityFactorValue = densityFactor(groupIssues.length);
-    const maxExposure = Math.max(
-      ...groupIssues.map((i) => exposureFactor(i.file, exposedFiles)),
-      1,
-    );
-    const exposureFactorValue = maxExposure;
+function buildActionFromGroup(
+  key: string,
+  group: { issues: DebtIssueInput[]; category: DebtCategory },
+  hotnessByModule: Map<string, number>,
+  exposedFiles: Set<string>,
+): DebtAction {
+  const { issues: groupIssues, category } = group;
+  const module = key.split('::')[0];
+  const severitySum = groupIssues.reduce((acc, i) => acc + SEVERITY_WEIGHT[i.severity], 0);
+  const avgSeverity = severitySum / groupIssues.length;
+  const severityFactor = avgSeverity;
+  const hotnessFactorValue = hotnessFactor(hotnessByModule.get(module) ?? 0);
+  const densityFactorValue = densityFactor(groupIssues.length);
+  const maxExposure = Math.max(
+    ...groupIssues.map((i) => exposureFactor(i.file, exposedFiles)),
+    1,
+  );
+  const exposureFactorValue = maxExposure;
 
-    const interestScore =
-      severityFactor * hotnessFactorValue * densityFactorValue * exposureFactorValue * CATEGORY_WEIGHT[category];
+  const interestScore =
+    severityFactor * hotnessFactorValue * densityFactorValue * exposureFactorValue * CATEGORY_WEIGHT[category];
 
-    const principalEstimate = PRINCIPAL_DAYS[category] * groupIssues.length;
-    const roi = principalEstimate > 0 ? interestScore / principalEstimate : interestScore;
+  const principalEstimate = PRINCIPAL_DAYS[category] * groupIssues.length;
+  const roi = principalEstimate > 0 ? interestScore / principalEstimate : interestScore;
 
-    actions.push({
-      actionId: `td-${category}-${Buffer.from(module).toString('base64url').slice(0, 12)}`,
-      issueIds: groupIssues.map((i) => i.id),
-      module,
-      category,
-      interestScore: round2(interestScore),
-      interestBreakdown: {
-        severityFactor: round2(severityFactor),
-        hotnessFactor: round2(hotnessFactorValue),
-        densityFactor: round2(densityFactorValue),
-        exposureFactor: round2(exposureFactorValue),
-      },
-      principalEstimate,
-      roi: round2(roi),
-      recommended: false,
-      status: 'pending',
-    });
-  }
+  return {
+    actionId: `td-${category}-${Buffer.from(module).toString('base64url').slice(0, 12)}`,
+    issueIds: groupIssues.map((i) => i.id),
+    module,
+    category,
+    interestScore: round2(interestScore),
+    interestBreakdown: {
+      severityFactor: round2(severityFactor),
+      hotnessFactor: round2(hotnessFactorValue),
+      densityFactor: round2(densityFactorValue),
+      exposureFactor: round2(exposureFactorValue),
+    },
+    principalEstimate,
+    roi: round2(roi),
+    recommended: false,
+    status: 'pending',
+  };
+}
 
-  // ROI 降序，前 10 条标 recommended
+function markRecommended(actions: DebtAction[]): void {
   actions.sort((a, b) => b.roi - a.roi);
   const topCount = Math.min(10, actions.length);
   for (let i = 0; i < topCount; i += 1) {
     actions[i].recommended = true;
   }
-  return actions;
 }
 
 function round2(n: number): number {
@@ -171,8 +185,25 @@ export function buildTechDebtDashboard(input: TechDebtInput): TechDebtSnapshot {
   const exposedSet = new Set(exposedFiles.map((f) => f.replace(/\\/g, '/')));
 
   const actions = buildActions(issues, hotnessByModule, exposedSet);
+  const { byModule, totalInterest } = aggregateByModule(actions, hotnessByModule);
+  const byCategory = aggregateByCategory(actions, totalInterest);
+  const debtIndex = computeDebtIndex(issues);
 
-  // byModule：按模块聚合利息，算占比
+  return {
+    projectId,
+    generatedAt: new Date().toISOString(),
+    debtIndex,
+    trend: { period: 'week', delta: 0 },
+    byModule,
+    byCategory,
+    actionList: actions,
+  };
+}
+
+function aggregateByModule(
+  actions: DebtAction[],
+  hotnessByModule: Map<string, number>,
+): { byModule: ModuleDebt[]; totalInterest: number } {
   const moduleMap = new Map<string, { interest: number; hotness: number }>();
   for (const action of actions) {
     const cur = moduleMap.get(action.module) ?? { interest: 0, hotness: 0 };
@@ -190,8 +221,10 @@ export function buildTechDebtDashboard(input: TechDebtInput): TechDebtSnapshot {
       interestTotal: round2(interest),
     }))
     .sort((a, b) => b.interestTotal - a.interestTotal);
+  return { byModule, totalInterest };
+}
 
-  // byCategory
+function aggregateByCategory(actions: DebtAction[], totalInterest: number): CategoryDebt[] {
   const categoryMap = new Map<DebtCategory, { count: number; interest: number }>();
   for (const action of actions) {
     const cur = categoryMap.get(action.category) ?? { count: 0, interest: 0 };
@@ -199,25 +232,12 @@ export function buildTechDebtDashboard(input: TechDebtInput): TechDebtSnapshot {
     cur.interest += action.interestScore;
     categoryMap.set(action.category, cur);
   }
-  const byCategory: CategoryDebt[] = Array.from(categoryMap.entries(), ([category, { count, interest }]) => ({
+  return Array.from(categoryMap.entries(), ([category, { count, interest }]) => ({
       category,
       count,
       weight: totalInterest > 0 ? round2(interest / totalInterest) : 0,
     }))
     .sort((a, b) => b.weight - a.weight);
-
-  // 债务指数 0-100：基于 issues 数量 + severity 加权 + 类别权重，归一化到 0-100
-  const debtIndex = computeDebtIndex(issues);
-
-  return {
-    projectId,
-    generatedAt: new Date().toISOString(),
-    debtIndex,
-    trend: { period: 'week', delta: 0 },
-    byModule,
-    byCategory,
-    actionList: actions,
-  };
 }
 
 /** 债务指数：issues 加权和 → 0-100（0=无债，100=满债）。与健康评分同源互补（评分越高越健康，债务指数越高越重）。 */

@@ -41,12 +41,16 @@ export class PerformanceEngine {
   scan(projectRoot: string): PerformanceReport {
     const startedAt = Date.now();
     const issues: PerformanceIssue[] = [];
-
-    // 项目根不存在或不是前端项目时静默返回空报告（不抛异常）
     if (!fs.existsSync(projectRoot) || !isProjectRoot(projectRoot)) {
       return this.buildReport(issues, Date.now() - startedAt);
     }
+    this.collectIssues(projectRoot, issues);
+    sortIssues(issues);
+    return this.buildReport(issues, Date.now() - startedAt);
+  }
 
+  /** 聚合四个探测器（内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描） */
+  private collectIssues(projectRoot: string, issues: PerformanceIssue[]): void {
     try {
       issues.push(...new BuildConfigDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new BundleSizeDetectorImpl().detect(projectRoot, this.config));
@@ -54,16 +58,6 @@ export class PerformanceEngine {
     } catch {
       // 探测器内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描
     }
-
-    // 统一排序：严重度降序，同严重度按类别与文件排序
-    issues.sort((a, b) => {
-      const w = (SEVERITY_WEIGHT[a.severity] ?? 9) - (SEVERITY_WEIGHT[b.severity] ?? 9);
-      if (w !== 0) return w;
-      if (a.category !== b.category) return a.category.localeCompare(b.category);
-      return a.file.localeCompare(b.file);
-    });
-
-    return this.buildReport(issues, Date.now() - startedAt);
   }
 
   private buildReport(issues: PerformanceIssue[], duration: number): PerformanceReport {
@@ -84,4 +78,14 @@ export class PerformanceEngine {
       },
     };
   }
+}
+
+/** 统一排序：严重度降序，同严重度按类别与文件排序 */
+function sortIssues(issues: PerformanceIssue[]): void {
+  issues.sort((a, b) => {
+    const w = (SEVERITY_WEIGHT[a.severity] ?? 9) - (SEVERITY_WEIGHT[b.severity] ?? 9);
+    if (w !== 0) return w;
+    if (a.category !== b.category) return a.category.localeCompare(b.category);
+    return a.file.localeCompare(b.file);
+  });
 }

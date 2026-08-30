@@ -26,14 +26,13 @@ function isIntimacyCandidate(
   cls: ParsedClass,
   parsed: ParsedFile,
 ): ParsedClass['members']['fields'] | null {
-  // 跳过框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger
-  // DTO 等依赖类或成员上装饰器的运行时元数据，改为 private 会破坏框架契约
-  // （列映射、校验、OpenAPI 文档），它们是合理的数据载体而非封装性问题。
   if (isFrameworkManagedClass(cls.node)) return null;
-
-  // 跳过测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式。
   if (isTestFixture(parsed.filePath)) return null;
+  return collectExcessivePublicFields(cls);
+}
 
+/** 收集超过 3 个的公共字段，未超过时返回 null */
+function collectExcessivePublicFields(cls: ParsedClass): ParsedClass['members']['fields'] | null {
   const publicFields = cls.members.fields.filter(f => f.accessModifier === 'public');
   if (publicFields.length <= 3) return null;
   return publicFields;
@@ -63,6 +62,7 @@ function buildIntimacySmell(
   });
 }
 
+/** 判断类是否为框架托管类（装饰器类）：TypeORM entity、class-validator DTO、Swagger DTO 等依赖类或成员上装饰器的运行时元数据，改为 private 会破坏框架契约（列映射、校验、OpenAPI 文档），它们是合理的数据载体而非封装性问题 */
 function isFrameworkManagedClass(node: ts.ClassDeclaration): boolean {
   const hasDecorators =
     (ts.canHaveDecorators(node) && (ts.getDecorators(node)?.length ?? 0) > 0) ||
@@ -70,6 +70,7 @@ function isFrameworkManagedClass(node: ts.ClassDeclaration): boolean {
   return hasDecorators;
 }
 
+/** 判断文件是否为测试 fixtures：刻意构造的样例代码，用于驱动规则测试，不是生产反模式 */
 function isTestFixture(filePath: string): boolean {
   return filePath.includes('/__tests__/') || filePath.includes('/fixtures/');
 }
@@ -91,19 +92,27 @@ function isMiddleManCandidate(
   cls: ParsedClass,
   parsed: ParsedFile,
 ): { delegatingMethods: number; totalMethods: number; delegationThreshold: number } | null {
-  const totalMethods = cls.members.methods.length;
-  // 与原有判定范围一致：仅对小类套用本规则；无方法类无意义
-  if (totalMethods <= 0 || totalMethods > 5) return null;
-
-  // 跳过框架托管类（装饰器类）：NestJS 服务/控制器等是框架要求的载体，
-  // 其转发层不可移除，与 inappropriate-intimacy / lazy-class 的既有约定一致
+  if (!isSmallEnoughForDelegation(cls)) return null;
   if (isFrameworkManagedClass(cls.node)) return null;
+  return computeDelegationStats(cls, parsed);
+}
 
+/** 仅对小类套用中间人规则：无方法类无意义 */
+function isSmallEnoughForDelegation(cls: ParsedClass): boolean {
+  const totalMethods = cls.members.methods.length;
+  return totalMethods > 0 && totalMethods <= 5;
+}
+
+/** 统计委托方法数并计算判定阈值，未达阈值时返回 null。
+ *  仅当大部分方法（≥ 一半，且至少 2 个）是纯转发到协作者字段时才判定为中间人；
+ *  旧实现对 fs./path./JSON./execFileAsync 等标准库与导入模块的调用计数，把"使用工具"误当成"委托"，
+ *  导致大量误报；真正的委托签名是 this.<field>.<method>()。 */
+function computeDelegationStats(
+  cls: ParsedClass,
+  parsed: ParsedFile,
+): { delegatingMethods: number; totalMethods: number; delegationThreshold: number } | null {
+  const totalMethods = cls.members.methods.length;
   const delegatingMethods = countDelegatingMethods(cls, parsed.sourceFile);
-
-  // 仅当大部分方法（≥ 一半，且至少 2 个）是纯转发到协作者字段时才判定为中间人。
-  // 旧实现对 fs./path./JSON./execFileAsync 等标准库与导入模块的调用计数，
-  // 把"使用工具"误当成"委托"，导致大量误报；真正的委托签名是 this.<field>.<method>()。
   const delegationThreshold = Math.max(2, Math.ceil(totalMethods / 2));
   if (delegatingMethods < delegationThreshold) return null;
   return { delegatingMethods, totalMethods, delegationThreshold };

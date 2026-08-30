@@ -72,18 +72,7 @@ export class TrivyAdapter {
     projectPath: string,
     options?: { severity?: string; format?: string },
   ): Promise<TrivyFinding[]> {
-    const args = [
-      'fs',
-      '--format', 'json',
-      '--vuln-type', 'os,library',
-    ];
-
-    if (options?.severity) {
-      args.push('--severity', options.severity);
-    }
-
-    args.push(projectPath);
-
+    const args = this.buildScanArgs(projectPath, options);
     try {
       const { stdout } = await execFileAsync(this.trivyPath, args, {
         timeout: 120_000, // 2 minutes
@@ -96,6 +85,22 @@ export class TrivyAdapter {
       console.warn('[TrivyAdapter] Vulnerability scan failed:', err);
       return [];
     }
+  }
+
+  /** 组装 trivy fs 漏洞扫描参数 */
+  private buildScanArgs(projectPath: string, options?: { severity?: string; format?: string }): string[] {
+    const args = [
+      'fs',
+      '--format', 'json',
+      '--vuln-type', 'os,library',
+    ];
+
+    if (options?.severity) {
+      args.push('--severity', options.severity);
+    }
+
+    args.push(projectPath);
+    return args;
   }
 
   /**

@@ -28,6 +28,12 @@ rules:
     priority: "high"
     status: "active"
 
+  - id: "guard.block.external.sonarway"
+    file: "guard/block/sonarway-bug.yml"
+    adapter: "Guard L1 pre-commit · SonarWay"
+    priority: "high"
+    status: "active"
+
   - id: "guard.block.external.sensitive-info"
     file: "guard/block/sensitive-info.yml"
     adapter: "Guard L1 pre-commit · Gitleaks"

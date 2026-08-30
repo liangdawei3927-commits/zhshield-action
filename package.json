@@ -11,7 +11,7 @@
     "typecheck": "node scripts/typecheck.mjs",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,cjs,js}\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.{mjs,cjs,js}\"",
-    "test": "turbo run test",
+    "test": "turbo run test --concurrency=1",
     "bench": "node scripts/benchmark.mjs",
     "clean": "turbo run clean",
     "check": "node scripts/zhcheck.mjs --all",

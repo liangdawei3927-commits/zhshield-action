@@ -131,7 +131,7 @@ export function parseRemoteHost(url: string): string {
 export function isPublicRemoteUrl(url: string): boolean {
   const host = parseRemoteHost(url);
   if (!host) return false;
-  return PUBLIC_HOSTS.has(host) || [...PUBLIC_HOSTS].some((h: string) => host.endsWith(`.${h}`));
+  return PUBLIC_HOSTS.has(host) || Array.from(PUBLIC_HOSTS, (h) => h).some((h) => host.endsWith(`.${h}`));
 }
 
 /** 默认命令执行器：gitleaks 检出密钥时退出码非 0 但 stdout 含有效 JSON，需保留 stdout */
@@ -243,9 +243,27 @@ export class SecretLifecycleManager {
     this.lastProjectPath = projectPath;
     const state = await this.store.load();
     const remote = await this.getRemoteInfo(projectPath);
-
     const workspaceFindings = await this.runGitleaksDetect(projectPath, undefined);
+    const { historyFindings, lastScannedCommit } = await this.collectHistoryFindings(projectPath, opts, state);
+    const findings = this.mergeFindings({
+      workspaceFindings,
+      historyFindings,
+      remote,
+      state,
+    });
+    const nextState: SecretPersistState = {
+      lastScannedCommit,
+      secrets: state.secrets,
+    };
+    await this.store.save(nextState);
+    return this.buildReport(findings, lastScannedCommit);
+  }
 
+  private async collectHistoryFindings(
+    projectPath: string,
+    opts: { history: boolean },
+    state: SecretPersistState,
+  ): Promise<{ historyFindings: GitleaksFinding[]; lastScannedCommit: string }> {
     let historyFindings: GitleaksFinding[] = [];
     let lastScannedCommit = state.lastScannedCommit;
     if (opts.history) {
@@ -253,20 +271,10 @@ export class SecretLifecycleManager {
       historyFindings = await this.runGitleaksDetect(projectPath, logOpts);
       lastScannedCommit = await this.getHeadCommit(projectPath).catch(() => state.lastScannedCommit);
     }
+    return { historyFindings, lastScannedCommit };
+  }
 
-    const findings = this.mergeFindings({
-      workspaceFindings,
-      historyFindings,
-      remote,
-      state,
-    });
-
-    const nextState: SecretPersistState = {
-      lastScannedCommit,
-      secrets: state.secrets,
-    };
-    await this.store.save(nextState);
-
+  private buildReport(findings: SecretFinding[], lastScannedCommit: string): SecretScanReport {
     const sorted = sortFindings(findings);
     return {
       findings: sorted,

@@ -3,7 +3,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { MalwareItem, MalwareType } from './types';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'dist-electron', 'build', 'coverage', '.turbo', '.next', '.cache', 'release']);
+// 排除生成目录与测试目录/夹具（刻意构造的攻击样本仅用于驱动规则测试，非生产代码），
+// 对齐 inspect 包 semgrep-adapter 的 excludePaths 约定（见 semgrep-adapter.ts）
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'dist-electron', 'build', 'coverage', '.turbo', '.next', '.cache', 'release', '.zhshield',
+  '__tests__', 'fixtures', '__fixtures__', '__mocks__',
+]);
 const MAX_DEPTH = 12;
 const PACKAGE_JSON = 'package.json';
 const MARKDOWN_EXT = '.md';
@@ -33,6 +38,24 @@ const SCRIPT_SUSPICIOUS_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['eval-usage', /\beval\b/],
   ['force-delete', /\brm\s+-rf\b/],
 ];
+
+// npm 惯例 clean 类脚本允许删除的构建产物目标（纯产物目录/文件），
+// 其余 rm -rf 目标（.、/、~、*、../../、./tmp 等）维持 force-delete 告警
+const SAFE_RM_RF_TARGET = /^(?:\.\/)?(?:dist(?:-\w+)?|build|coverage|\.turbo|\.next|\.cache|release|node_modules|lib|out|esm|cjs)(?:\/)?(?:\/\*)?$|^.*\.tsbuildinfo$/;
+
+const COMMAND_SEGMENT_SPLIT_RE = /[&|;]/;
+const TOKEN_SPLIT_RE = /\s+/;
+
+function isRoutineCleanCommand(command: string): boolean {
+  for (const segment of command.split(COMMAND_SEGMENT_SPLIT_RE)) {
+    const tokens = segment.trim().split(TOKEN_SPLIT_RE);
+    const rfIdx = tokens.findIndex((t) => t === '-rf' || t === '-fr');
+    if (rfIdx < 0) continue;
+    const targets = tokens.slice(rfIdx + 1).filter((t) => t !== '' && !t.startsWith('-'));
+    if (targets.length === 0 || !targets.every((t) => SAFE_RM_RF_TARGET.test(t))) return false;
+  }
+  return true;
+}
 
 const HIDDEN_STYLE_PATTERN = /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px)?\s*[;'"}]/i;
 const ANCHOR_TAG_PATTERN = /<a\b[^>]*>/gi;
@@ -132,7 +155,9 @@ export function classifyPackageJsonScripts(raw: string): ScriptVerdict[] {
   return Object.entries(parsed.scripts)
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
     .map(([script, command]) => {
-      const matched = SCRIPT_SUSPICIOUS_PATTERNS.find(([, pattern]) => pattern.test(command));
+      const matched = SCRIPT_SUSPICIOUS_PATTERNS.find(
+        ([name, pattern]) => pattern.test(command) && !(name === 'force-delete' && isRoutineCleanCommand(command)),
+      );
       return matched
         ? { script, command, verdict: 'suspicious' as const, matchedPattern: matched[0] }
         : { script, command, verdict: 'safe' as const };
@@ -216,61 +241,75 @@ export class InjectionGuard {
       return;
     }
 
-    let content: string;
-    try {
-      content = fs.readFileSync(filePath, 'utf-8');
-    } catch {
-      return;
-    }
-
+    const content = this.readFileContent(filePath);
+    if (content === null) return;
     const relFile = path.relative(projectPath, filePath);
 
     if (fileName === PACKAGE_JSON) {
-      for (const verdict of classifyPackageJsonScripts(content)) {
-        if (verdict.verdict !== 'suspicious' || !verdict.matchedPattern) continue;
-        items.push(toFinding({
-          type: 'supply-chain',
-          severity: 'high',
-          title: `Suspicious package.json script: ${verdict.script}`,
-          description: `Script '${verdict.script}' matched suspicious shell pattern (${verdict.matchedPattern})`,
-          file: filePath,
-          line: 0,
-          pattern: verdict.matchedPattern,
-          evidence: verdict.command.slice(0, 160),
-        }));
-      }
+      this.scanPackageJsonScripts(filePath, content, items);
       return;
     }
 
     const ext = path.extname(fileName).toLowerCase();
     if (ext === MARKDOWN_EXT) {
-      for (const hit of scanMarkdownHiddenLinks(content)) {
-        items.push(toFinding({
-          type: 'suspicious-behavior',
-          severity: 'medium',
-          title: `Hidden markdown link (${hit.kind})`,
-          description: `Markdown doc embeds hidden/misleading link in ${relFile}`,
-          file: filePath,
-          line: hit.line,
-          pattern: hit.kind,
-          evidence: hit.evidence,
-        }));
-      }
+      this.scanMarkdownFile(filePath, relFile, content, items);
     }
-
     if (LINE_COMMENT_PREFIX.has(ext) || BLOCK_COMMENT_DELIMS.has(ext)) {
-      for (const hit of scanCommentInstructions(content, ext)) {
-        items.push(toFinding({
-          type: 'suspicious-behavior',
-          severity: 'high',
-          title: 'Prompt-instruction embedded in comment',
-          description: `Comment matches AI instruction pattern (${hit.matchedPattern}) in ${relFile}`,
-          file: filePath,
-          line: hit.line,
-          pattern: hit.matchedPattern,
-          evidence: hit.evidence,
-        }));
-      }
+      this.scanCommentHits(filePath, relFile, content, ext, items);
+    }
+  }
+
+  private readFileContent(filePath: string): string | null {
+    try {
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  private scanPackageJsonScripts(filePath: string, content: string, items: MalwareItem[]): void {
+    for (const verdict of classifyPackageJsonScripts(content)) {
+      if (verdict.verdict !== 'suspicious' || !verdict.matchedPattern) continue;
+      items.push(toFinding({
+        type: 'supply-chain',
+        severity: 'high',
+        title: `Suspicious package.json script: ${verdict.script}`,
+        description: `Script '${verdict.script}' matched suspicious shell pattern (${verdict.matchedPattern})`,
+        file: filePath,
+        line: 0,
+        pattern: verdict.matchedPattern,
+        evidence: verdict.command.slice(0, 160),
+      }));
+    }
+  }
+
+  private scanMarkdownFile(filePath: string, relFile: string, content: string, items: MalwareItem[]): void {
+    for (const hit of scanMarkdownHiddenLinks(content)) {
+      items.push(toFinding({
+        type: 'suspicious-behavior',
+        severity: 'medium',
+        title: `Hidden markdown link (${hit.kind})`,
+        description: `Markdown doc embeds hidden/misleading link in ${relFile}`,
+        file: filePath,
+        line: hit.line,
+        pattern: hit.kind,
+        evidence: hit.evidence,
+      }));
+    }
+  }
+
+  private scanCommentHits(filePath: string, relFile: string, content: string, ext: string, items: MalwareItem[]): void {
+    for (const hit of scanCommentInstructions(content, ext)) {
+      items.push(toFinding({
+        type: 'suspicious-behavior',
+        severity: 'high',
+        title: 'Prompt-instruction embedded in comment',
+        description: `Comment matches AI instruction pattern (${hit.matchedPattern}) in ${relFile}`,
+        file: filePath,
+        line: hit.line,
+        pattern: hit.matchedPattern,
+        evidence: hit.evidence,
+      }));
     }
   }
 }

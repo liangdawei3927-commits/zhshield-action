@@ -127,32 +127,42 @@ function collectImporterDeps(importers: Record<string, unknown>, names: Set<stri
       devDependencies?: Record<string, unknown>;
     });
     for (const depMap of [deps.dependencies, deps.devDependencies]) {
-      if (depMap && typeof depMap === 'object') {
-        for (const name of Object.keys(depMap)) names.add(name);
-      }
+      if (!depMap || typeof depMap !== 'object') continue;
+      for (const name of Object.keys(depMap)) names.add(name);
     }
   }
 }
 
 /** 扫描项目锁文件（pnpm-lock.yaml 优先，其次 package-lock.json），返回命中供应链威胁的 MalwareItem 列表 */
 export async function scanNpmThreats(projectPath: string): Promise<MalwareItem[]> {
+  const lockfile = resolveLockfile(projectPath);
+  if (!lockfile) return [];
+  const names = extractLockfileNames(lockfile.lockPath, lockfile.isPnpm);
+  if (names.length === 0) return [];
+  return scanPackageNames(names, lockfile.lockPath);
+}
+
+function resolveLockfile(projectPath: string): { lockPath: string; isPnpm: boolean } | null {
   const pnpmLockPath = safeJoin(projectPath, 'pnpm-lock.yaml');
   const npmLockPath = safeJoin(projectPath, 'package-lock.json');
   const isPnpm = fs.existsSync(pnpmLockPath);
   const lockPath = isPnpm ? pnpmLockPath : npmLockPath;
-  if (!fs.existsSync(lockPath)) return [];
+  if (!fs.existsSync(lockPath)) return null;
+  return { lockPath, isPnpm };
+}
 
-  let names: string[];
+function extractLockfileNames(lockPath: string, isPnpm: boolean): string[] {
   try {
     if (isPnpm) {
-      names = extractPnpmPackageNames(loadYaml(fs.readFileSync(pnpmLockPath, 'utf-8')));
-    } else {
-      names = extractPackageNames(JSON.parse(fs.readFileSync(npmLockPath, 'utf-8')));
+      return extractPnpmPackageNames(loadYaml(fs.readFileSync(lockPath, 'utf-8')));
     }
+    return extractPackageNames(JSON.parse(fs.readFileSync(lockPath, 'utf-8')));
   } catch {
     return [];
   }
+}
 
+function scanPackageNames(names: string[], lockPath: string): MalwareItem[] {
   const items: MalwareItem[] = [];
   for (const name of names) {
     const short = name.startsWith('@') ? name.replace(SCOPED_NAME_RE, '') : name;

@@ -158,6 +158,15 @@ export class RuleConflictResolver {
     findings: readonly RuleFinding[],
     dismissals: readonly RuleDismissal[] = [],
   ): RuleConflictReport {
+    const { invalid, byFingerprint, dismissalByKey } = this.collectInvalidAndIndex(findings, dismissals);
+    const { confirmed, falsePositives, conflicts } = this.classifyGroups(byFingerprint, dismissalByKey);
+    return this.buildReport(confirmed, falsePositives, conflicts, invalid);
+  }
+
+  private collectInvalidAndIndex(
+    findings: readonly RuleFinding[],
+    dismissals: readonly RuleDismissal[],
+  ): { invalid: InvalidEntry[]; byFingerprint: Map<string, RuleFinding[]>; dismissalByKey: Map<string, RuleDismissal> } {
     const invalid: InvalidEntry[] = [];
     const byFingerprint = new Map<string, RuleFinding[]>();
 
@@ -188,53 +197,76 @@ export class RuleConflictResolver {
       }
     });
 
+    return { invalid, byFingerprint, dismissalByKey };
+  }
+
+  private classifyGroups(
+    byFingerprint: Map<string, RuleFinding[]>,
+    dismissalByKey: Map<string, RuleDismissal>,
+  ): { confirmed: ConfirmedFinding[]; falsePositives: FalsePositiveEntry[]; conflicts: ConflictEntry[] } {
     const confirmed: ConfirmedFinding[] = [];
     const falsePositives: FalsePositiveEntry[] = [];
     const conflicts: ConflictEntry[] = [];
-
     const fingerprints = [...byFingerprint.keys()].sort();
     for (const fingerprint of fingerprints) {
       const group = byFingerprint.get(fingerprint) ?? [];
-      const dismissal = dismissalByKey.get(fingerprint);
+      this.classifyGroup(fingerprint, group, dismissalByKey.get(fingerprint), confirmed, falsePositives, conflicts);
+    }
+    return { confirmed, falsePositives, conflicts };
+  }
 
-      if (dismissal) {
-        falsePositives.push({
-          fingerprint,
-          verdicts: sortedUnique(group.map((f) => f.verdict)),
-          dismissedBy: dismissal.source,
-          reason: dismissal.reason,
-          issues: group.map((f) => f.issue),
-        });
-        continue;
-      }
-
-      const verdicts = sortedUnique(group.map((f) => f.verdict));
-      if (verdicts.length > 1) {
-        conflicts.push({
-          fingerprint,
-          sides: verdicts.map((verdict) => {
-            const sideFindings = group.filter((f) => f.verdict === verdict);
-            return {
-              verdict,
-              sources: sortedUnique(sideFindings.map((f) => f.source)),
-              issues: sideFindings.map((f) => f.issue),
-            };
-          }),
-        });
-        continue;
-      }
-
-      const sources = sortedUnique(group.map((f) => f.source));
-      confirmed.push({
+  private classifyGroup(
+    fingerprint: string,
+    group: RuleFinding[],
+    dismissal: RuleDismissal | undefined,
+    confirmed: ConfirmedFinding[],
+    falsePositives: FalsePositiveEntry[],
+    conflicts: ConflictEntry[],
+  ): void {
+    if (dismissal) {
+      falsePositives.push({
         fingerprint,
-        verdict: verdicts[0] ?? '',
-        confidence: sources.length >= 2 ? 'corroborated' : 'unopposed',
-        sources,
+        verdicts: sortedUnique(group.map((f) => f.verdict)),
+        dismissedBy: dismissal.source,
+        reason: dismissal.reason,
         issues: group.map((f) => f.issue),
-        suggestedSeverity: maxSeverity(group.map((f) => f.issue)),
       });
+      return;
     }
 
+    const verdicts = sortedUnique(group.map((f) => f.verdict));
+    if (verdicts.length > 1) {
+      conflicts.push({
+        fingerprint,
+        sides: verdicts.map((verdict) => {
+          const sideFindings = group.filter((f) => f.verdict === verdict);
+          return {
+            verdict,
+            sources: sortedUnique(sideFindings.map((f) => f.source)),
+            issues: sideFindings.map((f) => f.issue),
+          };
+        }),
+      });
+      return;
+    }
+
+    const sources = sortedUnique(group.map((f) => f.source));
+    confirmed.push({
+      fingerprint,
+      verdict: verdicts[0] ?? '',
+      confidence: sources.length >= 2 ? 'corroborated' : 'unopposed',
+      sources,
+      issues: group.map((f) => f.issue),
+      suggestedSeverity: maxSeverity(group.map((f) => f.issue)),
+    });
+  }
+
+  private buildReport(
+    confirmed: ConfirmedFinding[],
+    falsePositives: FalsePositiveEntry[],
+    conflicts: ConflictEntry[],
+    invalid: InvalidEntry[],
+  ): RuleConflictReport {
     return {
       confirmed,
       falsePositives,

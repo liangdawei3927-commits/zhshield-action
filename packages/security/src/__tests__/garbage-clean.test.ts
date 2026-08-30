@@ -102,3 +102,67 @@ describe('restoreGarbage', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('cleanGarbage 符号链接逃逸防护', () => {
+  it('拒绝经符号链接指向 base 外的清理目标，不移动外部文件', () => {
+    const dir = tmpProject();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-outside-'));
+    try {
+      fs.writeFileSync(path.join(outside, 'secret.txt'), 'x');
+      fs.symlinkSync(outside, path.join(dir, 'link'));
+
+      const result = cleanGarbage(dir, [
+        { id: 's1', type: 'unused-file', path: 'link/secret.txt', size: 1, reason: 'x' },
+      ]);
+
+      expect(result.cleaned).toHaveLength(0);
+      expect(result.failed.some((m) => m.includes('link/secret.txt'))).toBe(true);
+      expect(fs.existsSync(path.join(outside, 'secret.txt'))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('restoreGarbage 符号链接逃逸防护', () => {
+  it('拒绝经符号链接把文件恢复到 base 之外', () => {
+    const dir = tmpProject();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-outside-'));
+    try {
+      fs.symlinkSync(outside, path.join(dir, 'link'));
+      const batchId = 'escape-batch';
+      const batchDir = path.join(dir, '.zhshield', 'trash', batchId);
+      fs.mkdirSync(path.join(batchDir, 'link'), { recursive: true });
+      fs.writeFileSync(path.join(batchDir, 'link', 'evil.txt'), 'x');
+
+      const restored = restoreGarbage(dir, batchId);
+
+      expect(fs.existsSync(path.join(outside, 'evil.txt'))).toBe(false);
+      expect(restored.failed.some((m) => m.includes('link/evil.txt'))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('拒绝恢复 trash 内指向 base 外的符号链接条目', () => {
+    const dir = tmpProject();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-outside-'));
+    try {
+      fs.writeFileSync(path.join(outside, 'secret.txt'), 'x');
+      const batchId = 'escape-batch-2';
+      const batchDir = path.join(dir, '.zhshield', 'trash', batchId);
+      fs.mkdirSync(batchDir, { recursive: true });
+      fs.symlinkSync(outside, path.join(batchDir, 'link'));
+
+      const restored = restoreGarbage(dir, batchId);
+
+      expect(fs.existsSync(path.join(outside, 'secret.txt'))).toBe(true);
+      expect(restored.failed.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});

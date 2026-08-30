@@ -68,32 +68,9 @@ export class ORTAdapter implements ToolAdapter {
     const outputDir = path.join(options.projectPath, '.zhshield', '.ort-output');
 
     try {
-      await fs.promises.mkdir(outputDir, { recursive: true });
-
-      const pm = options.config?.packageManagers?.[0] || 'NPM';
-
-      await execFileAsync('ort', [
-        'analyze',
-        '-i', options.projectPath,
-        '-o', outputDir,
-        '--package-managers', pm,
-      ], {
-        cwd: options.projectPath,
-        timeout: options.timeout || ORT_TIMEOUT,
-        maxBuffer: 50 * 1024 * 1024,
-      });
-
-      const resultFile = path.join(outputDir, 'analyzer-result.yml');
-      let issues: Issue[] = [];
-
-      if (fs.existsSync(resultFile)) {
-        const content = await fs.promises.readFile(resultFile, 'utf-8');
-        issues = this.mapOutput(content);
-      }
-
-      try {
-        await fs.promises.rm(outputDir, { recursive: true, force: true });
-      } catch { /* ignore cleanup failure */ }
+      await this.runOrtAnalyze(options, outputDir);
+      const issues = await this.readAnalyzerResult(outputDir);
+      await this.cleanupOutputDir(outputDir);
 
       return {
         tool: 'ort',
@@ -107,28 +84,59 @@ export class ORTAdapter implements ToolAdapter {
         },
       };
     } catch (error) {
-      const err = error as ExecError;
-      try {
-        await fs.promises.rm(outputDir, { recursive: true, force: true });
-      } catch { /* ignore */ }
+      return this.buildErrorResult(start, error as ExecError, outputDir);
+    }
+  }
 
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'ort',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'ORT 未安装',
-        };
-      }
+  private async runOrtAnalyze(options: ToolScanOptions, outputDir: string): Promise<void> {
+    await fs.promises.mkdir(outputDir, { recursive: true });
+    const pm = options.config?.packageManagers?.[0] || 'NPM';
+    await execFileAsync('ort', [
+      'analyze',
+      '-i', options.projectPath,
+      '-o', outputDir,
+      '--package-managers', pm,
+    ], {
+      cwd: options.projectPath,
+      timeout: options.timeout || ORT_TIMEOUT,
+      maxBuffer: 50 * 1024 * 1024,
+    });
+  }
+
+  private async readAnalyzerResult(outputDir: string): Promise<Issue[]> {
+    const resultFile = path.join(outputDir, 'analyzer-result.yml');
+    if (!fs.existsSync(resultFile)) return [];
+    const content = await fs.promises.readFile(resultFile, 'utf-8');
+    return this.mapOutput(content);
+  }
+
+  private async cleanupOutputDir(outputDir: string): Promise<void> {
+    try {
+      await fs.promises.rm(outputDir, { recursive: true, force: true });
+    } catch { /* ignore cleanup failure */ }
+  }
+
+  private async buildErrorResult(start: number, err: ExecError, outputDir: string): Promise<ToolResult> {
+    try {
+      await fs.promises.rm(outputDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+
+    if (err.code === 'ENOENT') {
       return {
         tool: 'ort',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'ORT 执行失败',
+        error: 'ORT 未安装',
       };
     }
+    return {
+      tool: 'ort',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'ORT 执行失败',
+    };
   }
 
   private mapOutput(yamlContent: string): Issue[] {
@@ -140,31 +148,33 @@ export class ORTAdapter implements ToolAdapter {
     if (!packages || !Array.isArray(packages)) return issues;
 
     for (const pkg of packages) {
-      const licenses = pkg.declared_licenses || [];
-      const hasRestricted = licenses.some((l) => RESTRICTED_LICENSES.has(l));
+      const hasRestricted = (pkg.declared_licenses || []).some((l) => RESTRICTED_LICENSES.has(l));
       if (!hasRestricted) continue;
-
-      const pkgName = pkg.id || 'unknown';
-      const restrictedLicenses = licenses.filter((l) => RESTRICTED_LICENSES.has(l));
-
-      issues.push({
-        id: randomUUID(),
-        ruleId: 'ort/restricted-license',
-        severity: restrictedLicenses.some((l) => l.startsWith('GPL') || l.startsWith('AGPL'))
-          ? 'error' : 'warning',
-        category: 'dependency',
-        message: `${pkgName} 使用了需要关注的许可证: ${restrictedLicenses.join(', ')}`,
-        file: '',
-        line: 0,
-        column: 0,
-        suggestion: `评估 ${pkgName} 的许可证 ${restrictedLicenses.join(', ')} 是否与项目兼容`,
-        autoFixable: false,
-        source: 'security',
-        fingerprint: `ort:license:${pkgName}`,
-      });
+      issues.push(this.buildRestrictedLicenseIssue(pkg));
     }
 
     return issues;
+  }
+
+  private buildRestrictedLicenseIssue(pkg: OrtPackageEntry): Issue {
+    const licenses = pkg.declared_licenses || [];
+    const pkgName = pkg.id || 'unknown';
+    const restrictedLicenses = licenses.filter((l) => RESTRICTED_LICENSES.has(l));
+    return {
+      id: randomUUID(),
+      ruleId: 'ort/restricted-license',
+      severity: restrictedLicenses.some((l) => l.startsWith('GPL') || l.startsWith('AGPL'))
+        ? 'error' : 'warning',
+      category: 'dependency',
+      message: `${pkgName} 使用了需要关注的许可证: ${restrictedLicenses.join(', ')}`,
+      file: '',
+      line: 0,
+      column: 0,
+      suggestion: `评估 ${pkgName} 的许可证 ${restrictedLicenses.join(', ')} 是否与项目兼容`,
+      autoFixable: false,
+      source: 'security',
+      fingerprint: `ort:license:${pkgName}`,
+    };
   }
 
   /**
@@ -173,28 +183,25 @@ export class ORTAdapter implements ToolAdapter {
   private parseOrtYaml(content: string): OrtAnalyzerResult | null {
     try {
       const lines = content.split('\n');
-      const result: OrtAnalyzerResult = {};
       const packages: OrtPackageEntry[] = [];
       const state: OrtParseState = { currentPkg: null, inPackages: false, indentDepth: 0 };
-
       for (const line of lines) {
         this.parseOrtLine(line, lines, packages, state);
       }
-
-      if (state.currentPkg) {
-        packages.push(state.currentPkg as unknown as OrtPackageEntry);
-      }
-
-      if (packages.length > 0) {
-        result.analyzer = {
-          result: { packages },
-        };
-      }
-
-      return packages.length > 0 ? result : null;
+      return this.buildAnalyzerResult(packages, state);
     } catch {
       return null;
     }
+  }
+
+  private buildAnalyzerResult(packages: OrtPackageEntry[], state: OrtParseState): OrtAnalyzerResult | null {
+    if (state.currentPkg) {
+      packages.push(state.currentPkg as unknown as OrtPackageEntry);
+    }
+    if (packages.length > 0) {
+      return { analyzer: { result: { packages } } };
+    }
+    return null;
   }
 
   private parseOrtLine(
@@ -205,7 +212,6 @@ export class ORTAdapter implements ToolAdapter {
   ): void {
     const trimmed = line.trimEnd();
     if (!trimmed || trimmed.trimStart().startsWith('#')) return;
-
     const indent = trimmed.length - trimmed.trimStart().length;
 
     if (this.isPackageStartLine(trimmed)) {
@@ -221,12 +227,16 @@ export class ORTAdapter implements ToolAdapter {
     }
 
     if (state.inPackages && indent <= state.indentDepth) {
-      if (state.currentPkg) {
-        packages.push(state.currentPkg as unknown as OrtPackageEntry);
-      }
-      state.currentPkg = null;
-      state.inPackages = false;
+      this.closePackage(packages, state);
     }
+  }
+
+  private closePackage(packages: OrtPackageEntry[], state: OrtParseState): void {
+    if (state.currentPkg) {
+      packages.push(state.currentPkg as unknown as OrtPackageEntry);
+    }
+    state.currentPkg = null;
+    state.inPackages = false;
   }
 
   private isPackageStartLine(trimmed: string): boolean {

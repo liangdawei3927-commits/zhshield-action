@@ -65,20 +65,9 @@ export class TrivyAdapter implements ToolAdapter {
 
     try {
       const allIssues: Issue[] = [];
-
       for (const scanType of scanTypes) {
-        const args = this.buildArgs(scanType, options.projectPath, options);
-        if (!args) continue;
-
-        const { stdout } = await execFileAsync('trivy', args, {
-          cwd: options.projectPath,
-          timeout: options.timeout || 120000,
-          maxBuffer: 20 * 1024 * 1024,
-        });
-
-        const output = JSON.parse(stdout);
-        const issues = this.mapOutput(output);
-        allIssues.push(...issues);
+        const issues = await this.runTrivyScan(scanType, options);
+        if (issues) allIssues.push(...issues);
       }
 
       return {
@@ -93,24 +82,39 @@ export class TrivyAdapter implements ToolAdapter {
         },
       };
     } catch (error) {
-      const err = error as ExecError;
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'trivy',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'Trivy 未安装，请运行 trivy 安装命令',
-        };
-      }
+      return this.buildErrorResult(start, error as ExecError);
+    }
+  }
+
+  private async runTrivyScan(scanType: TrivyScanType, options: ToolScanOptions): Promise<Issue[] | null> {
+    const args = this.buildArgs(scanType, options.projectPath, options);
+    if (!args) return null;
+    const { stdout } = await execFileAsync('trivy', args, {
+      cwd: options.projectPath,
+      timeout: options.timeout || 120000,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    const output = JSON.parse(stdout);
+    return this.mapOutput(output);
+  }
+
+  private buildErrorResult(start: number, err: ExecError): ToolResult {
+    if (err.code === 'ENOENT') {
       return {
         tool: 'trivy',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'Trivy 执行失败',
+        error: 'Trivy 未安装，请运行 trivy 安装命令',
       };
     }
+    return {
+      tool: 'trivy',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'Trivy 执行失败',
+    };
   }
 
   private buildArgs(scanType: TrivyScanType, projectPath: string, options?: ToolScanOptions): string[] | null {

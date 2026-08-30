@@ -46,26 +46,8 @@ export class SemgrepAdapter implements ToolAdapter {
           error: 'Semgrep 规则目录不存在，请先同步云脑规则',
         };
       }
-
-      const isQuick = options.config?.severity?.includes('ERROR');
-      const configArg = isQuick
-        ? path.join(rulesDir, 'high-severity')
-        : rulesDir;
-
-      const args = ['scan', '--config', configArg, '--json'];
-      if (options.targetFiles && options.targetFiles.length > 0) {
-        args.push(...options.targetFiles);
-      } else {
-        args.push(options.projectPath);
-      }
-
-      const { stdout } = await execFileAsync('semgrep', args, {
-        cwd: options.projectPath,
-        timeout: options.timeout || 120000,
-        maxBuffer: 20 * 1024 * 1024,
-      });
-
-      const output = JSON.parse(stdout);
+      const args = this.buildScanArgs(rulesDir, options);
+      const output = await this.runSemgrep(args, options);
       const issues = this.mapOutput(output);
 
       return {
@@ -80,33 +62,57 @@ export class SemgrepAdapter implements ToolAdapter {
         },
       };
     } catch (error) {
-      const err = error as ExecError;
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'semgrep',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'Semgrep 未安装或未在 PATH 中找到',
-        };
-      }
-      const partialIssues = this.parsePartialOutput(err.stdout);
-      if (partialIssues) {
-        return {
-          tool: 'semgrep',
-          status: 'available',
-          issues: partialIssues,
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
-        };
-      }
+      return this.buildErrorResult(start, error as ExecError);
+    }
+  }
+
+  private buildScanArgs(rulesDir: string, options: ToolScanOptions): string[] {
+    const isQuick = options.config?.severity?.includes('ERROR');
+    const configArg = isQuick ? path.join(rulesDir, 'high-severity') : rulesDir;
+    const args = ['scan', '--config', configArg, '--json'];
+    if (options.targetFiles && options.targetFiles.length > 0) {
+      args.push(...options.targetFiles);
+    } else {
+      args.push(options.projectPath);
+    }
+    return args;
+  }
+
+  private async runSemgrep(args: string[], options: ToolScanOptions): Promise<SemgrepOutput> {
+    const { stdout } = await execFileAsync('semgrep', args, {
+      cwd: options.projectPath,
+      timeout: options.timeout || 120000,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    return JSON.parse(stdout);
+  }
+
+  private buildErrorResult(start: number, err: ExecError): ToolResult {
+    if (err.code === 'ENOENT') {
       return {
         tool: 'semgrep',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'Semgrep 执行失败',
+        error: 'Semgrep 未安装或未在 PATH 中找到',
       };
     }
+    const partialIssues = this.parsePartialOutput(err.stdout);
+    if (partialIssues) {
+      return {
+        tool: 'semgrep',
+        status: 'available',
+        issues: partialIssues,
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+      };
+    }
+    return {
+      tool: 'semgrep',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'Semgrep 执行失败',
+    };
   }
 
   private parsePartialOutput(stdout: string | undefined): Issue[] | null {

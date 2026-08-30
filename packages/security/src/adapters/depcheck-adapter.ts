@@ -34,16 +34,7 @@ export class DepcheckAdapter implements ToolAdapter {
     const start = Date.now();
 
     try {
-      const { stdout } = await execFileAsync('depcheck', [
-        options.projectPath,
-        '--json',
-      ], {
-        cwd: options.projectPath,
-        timeout: options.timeout || 30000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const output = JSON.parse(stdout);
+      const output = await this.runDepcheck(options);
       const issues = this.mapOutput(output);
 
       return {
@@ -58,24 +49,39 @@ export class DepcheckAdapter implements ToolAdapter {
         },
       };
     } catch (error) {
-      const err = error as ExecError;
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'depcheck',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'depcheck 未安装',
-        };
-      }
+      return this.buildErrorResult(start, error as ExecError);
+    }
+  }
+
+  private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
+    const { stdout } = await execFileAsync('depcheck', [
+      options.projectPath,
+      '--json',
+    ], {
+      cwd: options.projectPath,
+      timeout: options.timeout || 30000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return JSON.parse(stdout);
+  }
+
+  private buildErrorResult(start: number, err: ExecError): ToolResult {
+    if (err.code === 'ENOENT') {
       return {
         tool: 'depcheck',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'depcheck 执行失败',
+        error: 'depcheck 未安装',
       };
     }
+    return {
+      tool: 'depcheck',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'depcheck 执行失败',
+    };
   }
 
   private mapOutput(output: DepcheckOutput): Issue[] {

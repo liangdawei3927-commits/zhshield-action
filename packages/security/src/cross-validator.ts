@@ -96,7 +96,25 @@ export class GrypeCrossValidator {
   validate(trivyIssues: Issue[], grypeIssues: Issue[]): CrossValidationReport {
     const trivyMap = this.indexByKey(trivyIssues, 'trivy');
     const grypeMap = this.indexByKey(grypeIssues, 'grype');
+    const { highConfidence, trivyOnly, grypeOnly } = this.classifyEntries(trivyMap, grypeMap);
+    const pending = trivyOnly.length + grypeOnly.length;
 
+    return {
+      highConfidence,
+      trivyOnly,
+      grypeOnly,
+      summary: {
+        total: highConfidence.length + pending,
+        highConfidence: highConfidence.length,
+        pendingConfirmation: pending,
+      },
+    };
+  }
+
+  private classifyEntries(
+    trivyMap: Map<string, { cveId: string; issues: Issue[] }>,
+    grypeMap: Map<string, { cveId: string; issues: Issue[] }>,
+  ): { highConfidence: CrossValidationEntry[]; trivyOnly: CrossValidationEntry[]; grypeOnly: CrossValidationEntry[] } {
     const allKeys = new Set([...trivyMap.keys(), ...grypeMap.keys()]);
     const highConfidence: CrossValidationEntry[] = [];
     const trivyOnly: CrossValidationEntry[] = [];
@@ -118,19 +136,7 @@ export class GrypeCrossValidator {
         grypeOnly.push(this.buildSingleSourceEntry(grypeEntry, 'grype', key));
       }
     }
-
-    const pending = trivyOnly.length + grypeOnly.length;
-
-    return {
-      highConfidence,
-      trivyOnly,
-      grypeOnly,
-      summary: {
-        total: highConfidence.length + pending,
-        highConfidence: highConfidence.length,
-        pendingConfirmation: pending,
-      },
-    };
+    return { highConfidence, trivyOnly, grypeOnly };
   }
 
   private buildHighConfidenceEntry(

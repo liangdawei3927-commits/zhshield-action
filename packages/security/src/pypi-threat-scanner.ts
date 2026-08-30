@@ -99,10 +99,10 @@ function extractPipfileNames(content: string): string[] {
   const names = new Set<string>();
   for (const section of ['default', 'develop']) {
     const deps = data[section];
-    if (deps && typeof deps === 'object') {
-      for (const name of Object.keys(deps as Record<string, unknown>)) {
-        if (name !== '_meta') names.add(name);
-      }
+    if (!deps || typeof deps !== 'object') continue;
+    for (const name of Object.keys(deps as Record<string, unknown>)) {
+      if (name === '_meta') continue;
+      names.add(name);
     }
   }
   return [...names];
@@ -127,13 +127,15 @@ function extractPyprojectNames(content: string): string[] {
       const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
       for (const m of block.matchAll(/"([^"]+)"/g)) {
         const name = quotedPackageName(m[1]);
-        if (name) names.add(name);
+        if (!name) continue;
+        names.add(name);
       }
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
       for (const line of section.split(NEWLINE_RE)) {
         if (line.trim().startsWith('[')) continue;
         const key = line.match(PYPROJECT_KEY_RE);
-        if (key) names.add(key[1]);
+        if (!key) continue;
+        names.add(key[1]);
       }
     }
   }
@@ -159,14 +161,20 @@ function findPythonManifest(projectPath: string): { file: string; names: string[
 
 /** 扫描项目 Python 依赖清单（requirements.txt 优先，其次 Pipfile.lock / pyproject.toml），返回命中供应链威胁的 MalwareItem 列表 */
 export async function scanPypiThreats(projectPath: string): Promise<MalwareItem[]> {
-  let manifest: { file: string; names: string[] } | null;
-  try {
-    manifest = findPythonManifest(projectPath);
-  } catch {
-    return [];
-  }
+  const manifest = loadManifest(projectPath);
   if (!manifest || manifest.names.length === 0) return [];
+  return scanManifestNames(manifest);
+}
 
+function loadManifest(projectPath: string): { file: string; names: string[] } | null {
+  try {
+    return findPythonManifest(projectPath);
+  } catch {
+    return null;
+  }
+}
+
+function scanManifestNames(manifest: { file: string; names: string[] }): MalwareItem[] {
   const items: MalwareItem[] = [];
   for (const name of manifest.names) {
     const norm = normalizePyName(name);

@@ -155,7 +155,7 @@ function useSentinelEvents(projectPath: string): {
   startMonitoring: () => Promise<void>;
 } {
   const [loading, setLoading] = useState(true);
-  const markLoaded = useCallback(() => setLoading(false), []);
+  const markLoaded = useCallback(() => setLoading(false), [setLoading]);
   const { events, refreshEvents } = useSentinelEventData(markLoaded);
   const { monitoring, startMonitoring } = useSentinelMonitoring(projectPath, refreshEvents);
   const startWithLoading = useSentinelStartWithLoading(startMonitoring, setLoading);

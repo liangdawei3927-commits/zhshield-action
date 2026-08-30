@@ -15,20 +15,8 @@ interface Step {
   icon: JSX.Element;
 }
 
-export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: ProjectOnboardingPageProps) {
-  const t = useT();
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
-  const [presetConfirmed, setPresetConfirmed] = useState(false);
-
-  const presets = [
-    { id: 'nestjs-backend', label: 'NestJS 后端模板', desc: 'Node.js / TypeScript', icon: '🔧' },
-    { id: 'frontend-standard', label: '前端标准模板', desc: 'React / Vue / TypeScript', icon: '🎨' },
-    { id: 'general-purpose', label: '通用配置模板', desc: '所有项目类型', icon: '⚙️' },
-  ];
-
-  const steps: Step[] = [
+function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPreset: string | null): Step[] {
+  return [
     {
       id: 'analyze',
       labelKey: 'page.onboarding.step.analyze',
@@ -108,181 +96,357 @@ export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: 
       ),
     },
   ];
+}
+
+function runStep(step: Step, onDone: () => void): void {
+  step.execute()
+    .then(onDone)
+    .catch(onDone);
+}
+
+function runCurrentStep(steps: Step[], index: number, presetConfirmed: boolean, onDone: () => void): void {
+  const step = steps[index];
+  if (step.id === 'preset' && !presetConfirmed) {
+    return;
+  }
+  runStep(step, onDone);
+}
+
+const ONBOARDING_PRESETS = [
+  { id: 'nestjs-backend', label: 'NestJS 后端模板', desc: 'Node.js / TypeScript', icon: '🔧' },
+  { id: 'frontend-standard', label: '前端标准模板', desc: 'React / Vue / TypeScript', icon: '🎨' },
+  { id: 'general-purpose', label: '通用配置模板', desc: '所有项目类型', icon: '⚙️' },
+];
+
+function useStepAdvance(steps: Step[], presetConfirmed: boolean, onComplete: () => void) {
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (currentStepIndex >= steps.length) {
       const timer = setTimeout(onComplete, 500);
       return () => clearTimeout(timer);
     }
-
-    const step = steps[currentStepIndex];
-
-    if (step.id === 'preset' && !presetConfirmed) {
-      return;
-    }
-
-    step.execute()
-      .then(() => {
-        setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
-        setCurrentStepIndex((prev) => prev + 1);
-      })
-      // 单步失败不阻断引导流程（门禁 SEC-001 禁止 console，失败细节不落日志）
-      .catch(() => {
-        setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
-        setCurrentStepIndex((prev) => prev + 1);
-      });
+    runCurrentStep(steps, currentStepIndex, presetConfirmed, () => {
+      setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
+      setCurrentStepIndex((prev) => prev + 1);
+    });
   }, [currentStepIndex, steps.length, onComplete, presetConfirmed]);
 
-  const progress = Math.min((currentStepIndex / steps.length) * 100, 100);
+  return { currentStepIndex, completedSteps };
+}
 
+function OnboardingLogo({ t }: { t: (key: string) => string }) {
+  return (
+    <div className="absolute top-4 left-5 flex items-center gap-2" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <ShieldLogo size={22} />
+      <span className="text-white text-sm font-semibold tracking-wide">{t('page.welcome.brand')}</span>
+    </div>
+  );
+}
+
+function OnboardingShield({ projectName }: { projectName: string }) {
+  return (
+    <>
+      <div className="relative mb-8" style={{ width: 160, height: 160 }}>
+        <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgb(var(--zh-brand) / 0.25) 0%, rgb(var(--zh-brand) / 0.05) 60%, transparent 80%)' }} />
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            border: '2px solid rgb(var(--zh-brand) / 0.3)',
+            borderTop: '2px solid rgba(255,255,255,0.6)',
+            animation: 'spin 2s linear infinite',
+          }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ShieldLogo size={60} />
+        </div>
+      </div>
+      <div className="text-white text-xl font-bold mb-2" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.35)' }}>
+        {projectName}
+      </div>
+    </>
+  );
+}
+
+function OnboardingProgressBar({ progress }: { progress: number }) {
+  return (
+    <div className="w-64 h-1.5 rounded-full overflow-hidden mb-8" style={{ background: 'rgba(255,255,255,0.15)' }}>
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{
+          width: `${progress}%`,
+          background: 'linear-gradient(90deg, rgb(var(--zh-brand)) 0%, rgba(255,255,255,0.9) 100%)',
+          boxShadow: '0 0 10px rgba(255,255,255,0.5)',
+        }}
+      />
+    </div>
+  );
+}
+
+function OnboardingStepList({
+  steps,
+  completedSteps,
+  currentStepIndex,
+  t,
+}: {
+  steps: Step[];
+  completedSteps: Set<number>;
+  currentStepIndex: number;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 w-72">
+      {steps.map((step, index) => {
+        const isCompleted = completedSteps.has(index);
+        const isCurrent = index === currentStepIndex;
+
+        return (
+          <div
+            key={step.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
+              isCurrent
+                ? 'bg-white/15 border border-white/30'
+                : isCompleted
+                ? 'bg-white/8 border border-white/15'
+                : 'bg-white/5 border border-white/10 opacity-40'
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                isCurrent
+                  ? 'bg-white/20 text-white'
+                  : isCompleted
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-white/10 text-white/50'
+              }`}
+            >
+              {isCompleted ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                step.icon
+              )}
+            </div>
+            <span
+              className={`text-sm font-medium ${
+                isCurrent ? 'text-white' : isCompleted ? 'text-white/80' : 'text-white/50'
+              }`}
+            >
+              {t(step.labelKey)}
+            </span>
+            {isCurrent && (
+              <div className="ml-auto">
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full" style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OnboardingPresetSelector({
+  presets,
+  selectedPreset,
+  onSelect,
+  onConfirm,
+}: {
+  presets: { id: string; label: string; desc: string; icon: string }[];
+  selectedPreset: string | null;
+  onSelect: (id: string) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mt-6 w-80">
+      <div
+        className="rounded-xl p-5"
+        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
+      >
+        <div className="text-white text-sm font-semibold mb-4 text-center">
+          选择治理预设
+        </div>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => onSelect(preset.id)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200 cursor-pointer ${
+                selectedPreset === preset.id
+                  ? 'bg-white/20 border border-white/50'
+                  : 'bg-white/5 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              <span className="text-2xl">{preset.icon}</span>
+              <span className="text-white text-xs font-medium leading-tight text-center">{preset.label}</span>
+              <span className="text-white/50 text-[10px] leading-tight text-center">{preset.desc}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          确认选择
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingSteps({
+  steps,
+  completedSteps,
+  currentStepIndex,
+  t,
+  showPreset,
+  selectedPreset,
+  onSelectPreset,
+  onConfirmPreset,
+}: {
+  steps: Step[];
+  completedSteps: Set<number>;
+  currentStepIndex: number;
+  t: (key: string) => string;
+  showPreset: boolean;
+  selectedPreset: string | null;
+  onSelectPreset: (id: string) => void;
+  onConfirmPreset: () => void;
+}) {
+  return (
+    <>
+      <OnboardingStepList steps={steps} completedSteps={completedSteps} currentStepIndex={currentStepIndex} t={t} />
+      {showPreset && (
+        <OnboardingPresetSelector
+          presets={ONBOARDING_PRESETS}
+          selectedPreset={selectedPreset}
+          onSelect={onSelectPreset}
+          onConfirm={onConfirmPreset}
+        />
+      )}
+    </>
+  );
+}
+
+function OnboardingCenter({
+  projectName,
+  progress,
+  steps,
+  completedSteps,
+  currentStepIndex,
+  t,
+  showPreset,
+  selectedPreset,
+  onSelectPreset,
+  onConfirmPreset,
+}: {
+  projectName: string;
+  progress: number;
+  steps: Step[];
+  completedSteps: Set<number>;
+  currentStepIndex: number;
+  t: (key: string) => string;
+  showPreset: boolean;
+  selectedPreset: string | null;
+  onSelectPreset: (id: string) => void;
+  onConfirmPreset: () => void;
+}) {
+  return (
+    <div className="relative flex flex-col items-center">
+      <OnboardingShield projectName={projectName} />
+      <OnboardingProgressBar progress={progress} />
+      <OnboardingSteps
+        steps={steps}
+        completedSteps={completedSteps}
+        currentStepIndex={currentStepIndex}
+        t={t}
+        showPreset={showPreset}
+        selectedPreset={selectedPreset}
+        onSelectPreset={onSelectPreset}
+        onConfirmPreset={onConfirmPreset}
+      />
+    </div>
+  );
+}
+
+function OnboardingContent({
+  t,
+  projectName,
+  steps,
+  currentStepIndex,
+  completedSteps,
+  progress,
+  selectedPreset,
+  onSelectPreset,
+  onConfirmPreset,
+  showPreset,
+}: {
+  t: (key: string) => string;
+  projectName: string;
+  steps: Step[];
+  currentStepIndex: number;
+  completedSteps: Set<number>;
+  progress: number;
+  selectedPreset: string | null;
+  onSelectPreset: (id: string) => void;
+  onConfirmPreset: () => void;
+  showPreset: boolean;
+}) {
   return (
     <div
       className="flex flex-col items-center justify-center h-full w-full relative"
       style={{ background: 'linear-gradient(180deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-dark)) 30%, rgb(var(--zh-brand-hover)) 60%, rgb(var(--zh-brand-600)) 100%)' }}
     >
-      {/* 左上角 Logo */}
-      <div className="absolute top-4 left-5 flex items-center gap-2" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-        <ShieldLogo size={22} />
-        <span className="text-white text-sm font-semibold tracking-wide">{t('page.welcome.brand')}</span>
-      </div>
-
-      {/* 中央动画区域 */}
-      <div className="relative flex flex-col items-center">
-        {/* 盾牌动画 */}
-        <div className="relative mb-8" style={{ width: 160, height: 160 }}>
-          <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgb(var(--zh-brand) / 0.25) 0%, rgb(var(--zh-brand) / 0.05) 60%, transparent 80%)' }} />
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              border: '2px solid rgb(var(--zh-brand) / 0.3)',
-              borderTop: '2px solid rgba(255,255,255,0.6)',
-              animation: 'spin 2s linear infinite',
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <ShieldLogo size={60} />
-          </div>
-        </div>
-
-        {/* 项目名称 */}
-        <div className="text-white text-xl font-bold mb-2" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.35)' }}>
-          {projectName}
-        </div>
-
-        {/* 进度条 */}
-        <div className="w-64 h-1.5 rounded-full overflow-hidden mb-8" style={{ background: 'rgba(255,255,255,0.15)' }}>
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${progress}%`,
-              background: 'linear-gradient(90deg, rgb(var(--zh-brand)) 0%, rgba(255,255,255,0.9) 100%)',
-              boxShadow: '0 0 10px rgba(255,255,255,0.5)',
-            }}
-          />
-        </div>
-
-        {/* 步骤列表 */}
-        <div className="flex flex-col gap-3 w-72">
-          {steps.map((step, index) => {
-            const isCompleted = completedSteps.has(index);
-            const isCurrent = index === currentStepIndex;
-
-            return (
-              <div
-                key={step.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                  isCurrent
-                    ? 'bg-white/15 border border-white/30'
-                    : isCompleted
-                    ? 'bg-white/8 border border-white/15'
-                    : 'bg-white/5 border border-white/10 opacity-40'
-                }`}
-              >
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    isCurrent
-                      ? 'bg-white/20 text-white'
-                      : isCompleted
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-white/10 text-white/50'
-                  }`}
-                >
-                  {isCompleted ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    step.icon
-                  )}
-                </div>
-                <span
-                  className={`text-sm font-medium ${
-                    isCurrent ? 'text-white' : isCompleted ? 'text-white/80' : 'text-white/50'
-                  }`}
-                >
-                  {t(step.labelKey)}
-                </span>
-                {isCurrent && (
-                  <div className="ml-auto">
-                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full" style={{ animation: 'spin 1s linear infinite' }} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {currentStepIndex < steps.length && steps[currentStepIndex].id === 'preset' && !presetConfirmed && (
-          <div className="mt-6 w-80">
-            <div
-              className="rounded-xl p-5"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
-            >
-              <div className="text-white text-sm font-semibold mb-4 text-center">
-                选择治理预设
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {presets.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setSelectedPreset(preset.id)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200 cursor-pointer ${
-                      selectedPreset === preset.id
-                        ? 'bg-white/20 border border-white/50'
-                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="text-2xl">{preset.icon}</span>
-                    <span className="text-white text-xs font-medium leading-tight text-center">{preset.label}</span>
-                    <span className="text-white/50 text-[10px] leading-tight text-center">{preset.desc}</span>
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setPresetConfirmed(true)}
-                className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
-                style={{
-                  background: 'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-              >
-                确认选择
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 底部提示 */}
+      <OnboardingLogo t={t} />
+      <OnboardingCenter
+        projectName={projectName}
+        progress={progress}
+        steps={steps}
+        completedSteps={completedSteps}
+        currentStepIndex={currentStepIndex}
+        t={t}
+        showPreset={showPreset}
+        selectedPreset={selectedPreset}
+        onSelectPreset={onSelectPreset}
+        onConfirmPreset={onConfirmPreset}
+      />
       <div className="absolute bottom-6 text-white/40 text-xs">
         {t('page.onboarding.hint')}
       </div>
-
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: ProjectOnboardingPageProps) {
+  const t = useT();
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [presetConfirmed, setPresetConfirmed] = useState(false);
+  const steps = buildSteps(projectPath, presetConfirmed, selectedPreset);
+  const { currentStepIndex, completedSteps } = useStepAdvance(steps, presetConfirmed, onComplete);
+
+  return (
+    <OnboardingContent
+      t={t}
+      projectName={projectName}
+      steps={steps}
+      currentStepIndex={currentStepIndex}
+      completedSteps={completedSteps}
+      progress={Math.min((currentStepIndex / steps.length) * 100, 100)}
+      selectedPreset={selectedPreset}
+      onSelectPreset={setSelectedPreset}
+      onConfirmPreset={() => setPresetConfirmed(true)}
+      showPreset={currentStepIndex < steps.length && steps[currentStepIndex].id === 'preset' && !presetConfirmed}
+    />
   );
 }

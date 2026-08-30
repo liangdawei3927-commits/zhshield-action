@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import type { GuardReport } from '@zh/guard';
@@ -12,6 +12,7 @@ import {
   buildDiagnosticsReport,
   writeDiagnosticsFile,
   persistDiagnostics,
+  persistDiagnosticsFromEntries,
   type DiagnosticEntry,
 } from '../../electron/zh-diagnostics';
 
@@ -273,15 +274,76 @@ describe('writeDiagnosticsFile', () => {
 });
 
 describe('persistDiagnostics', () => {
-  it('一步完成归一化并落盘，返回绝对路径', () => {
+  it('一步完成归一化并落盘，返回绝对路径', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-persist-'));
     try {
-      const absPath = persistDiagnostics(project, makePipeline({ inspect: makeInspectionReport() }));
+      const absPath = await persistDiagnostics(project, makePipeline({ inspect: makeInspectionReport() }));
       expect(absPath).toBe(join(project, '.zhshield', 'diagnostics', 'latest.json'));
       const parsed = JSON.parse(readFileSync(absPath, 'utf-8'));
       expect(parsed.project.name).toBe(basename(project));
       expect(parsed.summary.total).toBe(1);
       expect(parsed.issues[0]).toMatchObject({ ruleId: 'typescript/no-any', file: 'src/app.service.ts' });
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('persistDiagnosticsFromEntries whitelist 压制自检误报', () => {
+  const entry = (ruleId: string, file: string, line?: number): DiagnosticEntry => ({
+    ruleId,
+    severity: 'error',
+    category: 'security',
+    message: ruleId,
+    file,
+    line,
+    autoFixable: false,
+    source: 'inspect',
+    fingerprint: `${ruleId}:${file}:${line ?? 0}`,
+  });
+
+  it('白名单命中（rule+file）的误报被过滤，未命中条目保留', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-wl-'));
+    try {
+      // 构造与仓库自检一致的误报 + 一条不应被压制的真实条目
+      mkdirSync(join(project, '.zhshield'), { recursive: true });
+      writeFileSync(
+        join(project, '.zhshield', 'whitelist.yml'),
+        [
+          'whitelist:',
+          '  rule:',
+          '    - rule: "ai-unsafe-default"',
+          '      pattern: "src/adapters/security-scan-adapter.ts"',
+          '      reason: "自检误报"',
+        ].join('\n'),
+      );
+      const absPath = await persistDiagnosticsFromEntries(project, [
+        entry('ai-unsafe-default', 'src/adapters/security-scan-adapter.ts', 21),
+        entry('ai-hallucinated-dependency', 'packages/cli/vitest.config.js', 6),
+        entry('ai-unsafe-default', 'src/real-bug.ts', 10),
+      ]);
+      const parsed = JSON.parse(readFileSync(absPath, 'utf-8'));
+      expect(parsed.summary.total).toBe(2);
+      expect(parsed.issues.map((i: { ruleId: string }) => i.ruleId)).toEqual([
+        'ai-hallucinated-dependency',
+        'ai-unsafe-default',
+      ]);
+      expect(parsed.issues.map((i: { file: string }) => i.file)).not.toContain(
+        'src/adapters/security-scan-adapter.ts',
+      );
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('无 whitelist.yml 时不过滤任何条目（保持原行为）', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-wl-none-'));
+    try {
+      const absPath = await persistDiagnosticsFromEntries(project, [
+        entry('ai-unsafe-default', 'src/adapters/security-scan-adapter.ts', 21),
+      ]);
+      const parsed = JSON.parse(readFileSync(absPath, 'utf-8'));
+      expect(parsed.summary.total).toBe(1);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

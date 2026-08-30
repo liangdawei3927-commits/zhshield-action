@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
+import { Logger } from '@zh/kernel';
 import { dismissSecret, markSecretRotating, runSecrets, verifySecretRotated } from '../services/engineApi';
 import type { SecretReportData } from '../types/electron';
+
+const logger = new Logger('secrets-logic');
 
 export const SECRET_SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
   critical: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', labelKey: 'page.secrets.severity.critical' },
@@ -45,6 +48,31 @@ export const SECRET_TYPE_LABEL: Record<string, string> = {
 
 export const SECRET_DISMISS_REASON = 'user-dismissed';
 
+async function scanSecrets(projectPath: string): Promise<SecretReportData | null> {
+  try {
+    return await runSecrets(projectPath);
+  } catch {
+    return null;
+  }
+}
+
+async function refreshSecrets(projectPath: string): Promise<SecretReportData | null> {
+  try {
+    return await runSecrets(projectPath);
+  } catch (err) {
+    logger.error('密钥扫描刷新失败:', err);
+    return null;
+  }
+}
+
+async function runSecretAction(action: () => Promise<void>, refresh: () => Promise<void>): Promise<void> {
+  try {
+    await action();
+  } finally {
+    await refresh();
+  }
+}
+
 function useSecretsRun(projectPath: string): {
   loading: boolean;
   report: SecretReportData | null;
@@ -56,62 +84,50 @@ function useSecretsRun(projectPath: string): {
 
   const handleScan = useCallback(async () => {
     setLoading(true);
-    try {
-      const result = await runSecrets(projectPath);
-      setReport(result);
-    } catch {
-      setReport(null);
-    } finally {
-      setLoading(false);
-    }
+    const result = await scanSecrets(projectPath);
+    setReport(result);
+    setLoading(false);
   }, [projectPath]);
 
   const refresh = useCallback(async () => {
-    try {
-      const result = await runSecrets(projectPath);
-      setReport(result);
-    } catch {
-    }
+    const result = await refreshSecrets(projectPath);
+    if (result !== null) setReport(result);
   }, [projectPath]);
 
   return { loading, report, handleScan, refresh };
 }
 
-export function useSecretsPage(projectPath: string) {
-  const { loading, report, handleScan, refresh } = useSecretsRun(projectPath);
-
+function useSecretActions(refresh: () => Promise<void>): {
+  handleMarkRotating: (secretId: string) => Promise<void>;
+  handleVerifyRotated: (secretId: string) => Promise<void>;
+  handleDismiss: (secretId: string) => Promise<void>;
+} {
   const handleMarkRotating = useCallback(
     async (secretId: string) => {
-      try {
-        await markSecretRotating(secretId);
-      } finally {
-        await refresh();
-      }
+      await runSecretAction(() => markSecretRotating(secretId), refresh);
     },
     [refresh],
   );
 
   const handleVerifyRotated = useCallback(
     async (secretId: string) => {
-      try {
-        await verifySecretRotated(secretId);
-      } finally {
-        await refresh();
-      }
+      await runSecretAction(() => verifySecretRotated(secretId), refresh);
     },
     [refresh],
   );
 
   const handleDismiss = useCallback(
     async (secretId: string) => {
-      try {
-        await dismissSecret(secretId, SECRET_DISMISS_REASON);
-      } finally {
-        await refresh();
-      }
+      await runSecretAction(() => dismissSecret(secretId, SECRET_DISMISS_REASON), refresh);
     },
     [refresh],
   );
 
+  return { handleMarkRotating, handleVerifyRotated, handleDismiss };
+}
+
+export function useSecretsPage(projectPath: string) {
+  const { loading, report, handleScan, refresh } = useSecretsRun(projectPath);
+  const { handleMarkRotating, handleVerifyRotated, handleDismiss } = useSecretActions(refresh);
   return { loading, report, handleScan, handleMarkRotating, handleVerifyRotated, handleDismiss };
 }

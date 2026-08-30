@@ -36,6 +36,24 @@
     "react-dom": "^18.3.1",
     "zod": "^4.4.3"
   },
+  "dependenciesMeta": {
+    "@zh/db": { "injected": true },
+    "@zh/dependency": { "injected": true },
+    "@zh/evolve": { "injected": true },
+    "@zh/fingerprint": { "injected": true },
+    "@zh/guard": { "injected": true },
+    "@zh/i18n": { "injected": true },
+    "@zh/inspect": { "injected": true },
+    "@zh/kernel": { "injected": true },
+    "@zh/performance": { "injected": true },
+    "@zh/pipeline": { "injected": true },
+    "@zh/refactor": { "injected": true },
+    "@zh/reporter": { "injected": true },
+    "@zh/scoring": { "injected": true },
+    "@zh/security": { "injected": true },
+    "@zh/sentinel": { "injected": true },
+    "@zh/shared": { "injected": true }
+  },
   "devDependencies": {
     "@electron/windows-sign": "^2.0.6",
     "@playwright/test": "^1.62.1",
@@ -44,7 +62,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.20",
     "electron": "^42.8.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.0",
@@ -64,7 +82,14 @@
       "!**/.turbo",
       "!**/.turbo/**",
       "!**/node_modules/.cache",
-      "!**/*.log"
+      "!**/*.log",
+      "!**/src",
+      "!**/src/**",
+      "!**/tsconfig*.json",
+      "!**/*.tsbuildinfo",
+      "!**/vitest.config.*",
+      "!**/*.map",
+      "!**/packages/**"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
@@ -91,7 +116,8 @@
       "output": "release"
     },
     "asarUnpack": [
-      "dist-electron/zhshield-mcp.js"
+      "dist-electron/zhshield-mcp.js",
+      "**/*.node"
     ],
     "npmRebuild": false
   }

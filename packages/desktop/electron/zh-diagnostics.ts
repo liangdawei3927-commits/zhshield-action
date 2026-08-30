@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { t } from '@zh/i18n';
+import { WhitelistManager } from '@zh/guard';
 import type { GuardReport } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
@@ -268,9 +269,21 @@ export function writeDiagnosticsFile(report: DiagnosticsReport): string {
   return absPath;
 }
 
+/** 依据 <project>/.zhshield/whitelist.yml 过滤被白名单压制的误报条目（rule+file 精确匹配） */
+function filterWhitelisted(
+  whitelist: WhitelistManager,
+  entries: readonly DiagnosticEntry[],
+): readonly DiagnosticEntry[] {
+  return entries.filter(
+    (entry) => !(entry.file && whitelist.isWhitelisted(entry.ruleId, entry.file).whitelisted),
+  );
+}
+
 /** pipeline 报告一键归一化并落盘（dryRun 由调用方决定是否跳过） */
-export function persistDiagnostics(projectPath: string, report: PipelineReport): string {
-  const issues = normalizePipelineReport(report);
+export async function persistDiagnostics(projectPath: string, report: PipelineReport): Promise<string> {
+  const whitelist = new WhitelistManager(projectPath);
+  await whitelist.load();
+  const issues = filterWhitelisted(whitelist, normalizePipelineReport(report));
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
     issues,
@@ -284,13 +297,15 @@ export function persistDiagnostics(projectPath: string, report: PipelineReport):
  * 供 runInspect/runGuard/runRefactor/runPerformance 单独扫描时复用，
  * 避免每次单独扫描都走 PipelineReport 形状。
  */
-export function persistDiagnosticsFromEntries(
+export async function persistDiagnosticsFromEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
-): string {
+): Promise<string> {
+  const whitelist = new WhitelistManager(projectPath);
+  await whitelist.load();
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
-    entries,
+    filterWhitelisted(whitelist, entries),
     new Date().toISOString(),
   );
   return writeDiagnosticsFile(diagnostics);

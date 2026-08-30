@@ -71,57 +71,63 @@ function requestBrowserPermission(): void {
 // Provider
 // ---------------------------------------------------------------------------
 
-export function NotificationProvider({ children }: { children: React.ReactNode }) {
+function useNotificationService(): NotificationService {
   const serviceRef = useRef<NotificationService>(null!);
   if (serviceRef.current === null) {
     serviceRef.current = new NotificationService({ browserNotification: true });
   }
-  const service = serviceRef.current;
+  return serviceRef.current;
+}
 
+function useNotificationPrefs(): {
+  preferences: NotificationPreferences;
+  setPreferences: (prefs: NotificationPreferences) => void;
+} {
   const [preferences, setPreferencesState] = useState<NotificationPreferences>(readPrefs);
-
-  // Request browser notification permission once on mount
-  useEffect(() => {
-    requestBrowserPermission();
-  }, []);
-
-  // Persist preferences on change
   const setPreferences = useCallback((prefs: NotificationPreferences) => {
     setPreferencesState(prefs);
     writePrefs(prefs);
   }, []);
+  return { preferences, setPreferences };
+}
 
-  // Core notify: route to service helper based on type, gated by preference
+function routeNotification(service: NotificationService, notification: AppNotification): void {
+  switch (notification.type) {
+    case 'info':
+      service.info(notification.title, notification.message);
+      break;
+    case 'success':
+      service.success(notification.title, notification.message);
+      break;
+    case 'warning':
+      service.warning(notification.title, notification.message);
+      break;
+    case 'error':
+      service.error(notification.title, notification.message);
+      break;
+    default:
+      service.info(notification.title, notification.message);
+      break;
+  }
+}
+
+export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const service = useNotificationService();
+  const { preferences, setPreferences } = useNotificationPrefs();
+  useEffect(() => {
+    requestBrowserPermission();
+  }, []);
   const notify = useCallback(
     (notification: AppNotification) => {
       if (!preferences.enabled) return;
-
-      switch (notification.type) {
-        case 'info':
-          service.info(notification.title, notification.message);
-          break;
-        case 'success':
-          service.success(notification.title, notification.message);
-          break;
-        case 'warning':
-          service.warning(notification.title, notification.message);
-          break;
-        case 'error':
-          service.error(notification.title, notification.message);
-          break;
-        default:
-          service.info(notification.title, notification.message);
-          break;
-      }
+      routeNotification(service, notification);
     },
     [service, preferences.enabled],
   );
-
   const value = useMemo<NotificationContextValue>(
     () => ({ notify, preferences, setPreferences }),
     [notify, preferences, setPreferences],
   );
-
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 

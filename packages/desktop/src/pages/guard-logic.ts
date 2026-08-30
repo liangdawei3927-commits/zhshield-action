@@ -35,20 +35,35 @@ const LEVEL_TRIGGERS: Array<{ level: 'L1' | 'L2' | 'L3'; labelKey: string; trigg
   { level: 'L3', labelKey: 'page.guard.level.L3', triggerSource: 'ci' },
 ];
 
-/** 历史记录 → 三级拦截关卡聚合：每个关卡取最近一次记录的状态与拦截数 */
+/**
+ * 历史记录 → 三级拦截关卡聚合：
+ * 三关（L1/L2/L3）统一由【全局最近一次扫描记录】驱动状态、拦截数与时间，
+ * 不再按 triggerSource 过滤、也不再累加历史。手动扫描同样计入，
+ * 因此问题修复后重新扫描即可让三关同步反映最新状态。
+ */
 export function buildGuardLevels(history: GuardReportRecordData[]): GuardLevelInfo[] {
-  return LEVEL_TRIGGERS.map(({ level, labelKey, triggerSource }) => {
-    const records = history.filter((r) => r.triggerSource === triggerSource);
-    if (records.length === 0) {
-      return { level, labelKey, triggerSource, status: 'idle', blockingCount: 0, lastAt: null };
-    }
-    const latest = records.toSorted(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    )[0];
-    const status: GuardLevelInfo['status'] = latest.summary.blocking > 0 ? 'fail' : latest.summary.warnings > 0 ? 'warn' : 'pass';
-    const blockingCount = records.reduce((acc, r) => acc + r.summary.blocking, 0);
-    return { level, labelKey, triggerSource, status, blockingCount, lastAt: latest.timestamp };
-  });
+  if (history.length === 0) {
+    return LEVEL_TRIGGERS.map(({ level, labelKey, triggerSource }) => ({
+      level,
+      labelKey,
+      triggerSource,
+      status: 'idle',
+      blockingCount: 0,
+      lastAt: null,
+    }));
+  }
+  const latest = history.toSorted(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  )[0];
+  const status: GuardLevelInfo['status'] = latest.summary.blocking > 0 ? 'fail' : latest.summary.warnings > 0 ? 'warn' : 'pass';
+  return LEVEL_TRIGGERS.map(({ level, labelKey, triggerSource }) => ({
+    level,
+    labelKey,
+    triggerSource,
+    status,
+    blockingCount: latest.summary.blocking,
+    lastAt: latest.timestamp,
+  }));
 }
 
 /** 门禁整体状态：任一关卡拦截 → 拦截；有警告 → 警告；否则通过 */
@@ -79,6 +94,16 @@ export function toGuardReportDataFromRecord(record: GuardReportRecordData): Guar
   };
 }
 
+/** 拉取最近一次门禁报告（无记录返回 null） */
+async function loadLatestGuardReport(projectPath: string): Promise<GuardReportData | null> {
+  try {
+    const records = await listGuardReports(projectPath, 1);
+    return records.length === 0 ? null : toGuardReportDataFromRecord(records[0]);
+  } catch {
+    return null;
+  }
+}
+
 /** 门禁扫描运行：loading/进度来自任务中心，状态 + 报告 */
 function useGuardRun(projectPath: string): {
   loading: boolean;
@@ -91,12 +116,9 @@ function useGuardRun(projectPath: string): {
 
   useEffect(() => {
     let cancelled = false;
-    void listGuardReports(projectPath, 1)
-      .then((records) => {
-        if (cancelled || records.length === 0) return;
-        setReport(toGuardReportDataFromRecord(records[0]));
-      })
-      .catch(() => {});
+    void loadLatestGuardReport(projectPath).then((latest) => {
+      if (!cancelled && latest) setReport(latest);
+    });
     return () => {
       cancelled = true;
     };
@@ -104,13 +126,11 @@ function useGuardRun(projectPath: string): {
 
   const handleScan = useCallback(async () => {
     try {
-      const result = await runGuard(projectPath);
-      setReport(result);
+      setReport(await runGuard(projectPath));
     } catch {
       setReport(null);
     }
   }, [projectPath]);
-
   return { loading, progressLabel, report, handleScan };
 }
 
@@ -158,6 +178,15 @@ function useGuardCopyToAi(projectPath: string): {
   return { copyToAi, copyAllToAi };
 }
 
+/** 拉取门禁历史拦截记录（失败返回空数组） */
+async function loadGuardHistory(projectPath: string): Promise<GuardReportRecordData[]> {
+  try {
+    return await listGuardReports(projectPath);
+  } catch {
+    return [];
+  }
+}
+
 /** 门禁历史拦截记录：落库的最近报告（hook 触发 + 手动扫描） */
 function useGuardHistory(projectPath: string): {
   history: GuardReportRecordData[];
@@ -166,11 +195,7 @@ function useGuardHistory(projectPath: string): {
   const [history, setHistory] = useState<GuardReportRecordData[]>([]);
 
   const refreshHistory = useCallback(async () => {
-    try {
-      setHistory(await listGuardReports(projectPath));
-    } catch {
-      setHistory([]);
-    }
+    setHistory(await loadGuardHistory(projectPath));
   }, [projectPath]);
 
   useEffect(() => {

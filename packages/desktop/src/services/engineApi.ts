@@ -27,6 +27,7 @@ import type {
   GarbageRestoreResultData,
   FalsePositiveFeedbackRecord,
   DependencyReportData,
+  DepsRelockResult,
   TechDebtReportData,
   SecretReportData,
 } from '../types/electron';
@@ -258,6 +259,15 @@ export async function runDeps(projectPath: string): Promise<DependencyReportData
     };
   }
   return api.engine.runDeps(projectPath);
+}
+
+/** 显式重锁依赖哈希基线（引擎无可用时返回错误，不 throw） */
+export async function depsRelockBaseline(projectPath: string): Promise<DepsRelockResult> {
+  const api = getAPI();
+  if (!api?.engine) {
+    return { ok: false, error: t('engine.engineUnavailable') };
+  }
+  return api.engine.depsRelockBaseline(projectPath);
 }
 
 // ─── Tech Debt 技术债仪表盘引擎 ────────────────────────────

@@ -28,6 +28,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
     toggleAll,
     handleClean,
     handleRestore,
+    copyAllToAi,
   } = useGarbagePage(projectPath);
 
   if (report) {
@@ -43,6 +44,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
             selected={selected}
             onToggleAll={toggleAll}
             onClean={handleClean}
+            onCopyAllToAi={() => copyAllToAi(report.garbage)}
             cleaning={cleaning}
           />
           <GarbageList items={report.garbage} selected={selected} onToggle={toggleSelect} />

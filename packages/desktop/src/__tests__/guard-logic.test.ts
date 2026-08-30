@@ -47,7 +47,7 @@ describe('buildGuardLevels 三级拦截关卡聚合', () => {
     expect(levels.every((l) => l.status === 'idle' && l.blockingCount === 0)).toBe(true);
   });
 
-  it('按 triggerSource 归类 L1/L2/L3 并聚合拦截数', () => {
+  it('三关统一由全局最近一次扫描驱动：不复用 triggerSource 过滤、不累加历史', () => {
     const levels = buildGuardLevels([
       { timestamp: '2026-08-07T08:00:00.000Z', triggerSource: 'pre-commit', ok: false, riskLevel: 'high', summary: { total: 3, passed: 1, failed: 2, warnings: 0, blocking: 2, errors: 0 }, checks: [] },
       { timestamp: '2026-08-07T09:00:00.000Z', triggerSource: 'pre-commit', ok: true, riskLevel: 'low', summary: { total: 2, passed: 2, failed: 0, warnings: 0, blocking: 0, errors: 0 }, checks: [] },
@@ -59,24 +59,27 @@ describe('buildGuardLevels 三级拦截关卡聚合', () => {
     const l2 = levels.find((l) => l.level === 'L2')!;
     const l3 = levels.find((l) => l.level === 'L3')!;
 
+    // 全局最近一次是 manual 11:00（通过）→ 三关一致为 pass / 0 / 该时间
     expect(l1.status).toBe('pass');
-    expect(l1.blockingCount).toBe(2);
-    expect(l1.lastAt).toBe('2026-08-07T09:00:00.000Z');
-    expect(l2.status).toBe('fail');
-    expect(l2.blockingCount).toBe(1);
-    expect(l2.lastAt).toBe('2026-08-07T10:00:00.000Z');
-    expect(l3.status).toBe('idle');
+    expect(l1.blockingCount).toBe(0);
+    expect(l1.lastAt).toBe('2026-08-07T11:00:00.000Z');
+    expect(l2.status).toBe('pass');
+    expect(l2.blockingCount).toBe(0);
+    expect(l2.lastAt).toBe('2026-08-07T11:00:00.000Z');
+    expect(l3.status).toBe('pass');
     expect(l3.blockingCount).toBe(0);
+    expect(l3.lastAt).toBe('2026-08-07T11:00:00.000Z');
   });
 
-  it('取最近一次记录判定关卡状态', () => {
+  it('最近一次记录含警告 → 三关 warn，blockingCount 取该次 blocking 而非累加', () => {
     const levels = buildGuardLevels([
-      { timestamp: '2026-08-07T08:00:00.000Z', triggerSource: 'pre-commit', ok: false, riskLevel: 'high', summary: { total: 1, passed: 0, failed: 1, warnings: 0, blocking: 1, errors: 0 }, checks: [] },
-      { timestamp: '2026-08-07T09:00:00.000Z', triggerSource: 'pre-commit', ok: true, riskLevel: 'low', summary: { total: 1, passed: 1, failed: 0, warnings: 1, blocking: 0, errors: 1 }, checks: [] },
+      { timestamp: '2026-08-07T08:00:00.000Z', triggerSource: 'pre-commit', ok: true, riskLevel: 'low', summary: { total: 1, passed: 1, failed: 0, warnings: 0, blocking: 1, errors: 0 }, checks: [] },
+      { timestamp: '2026-08-07T09:00:00.000Z', triggerSource: 'manual', ok: true, riskLevel: 'low', summary: { total: 1, passed: 1, failed: 0, warnings: 1, blocking: 0, errors: 1 }, checks: [] },
     ]);
 
     const l1 = levels.find((l) => l.level === 'L1')!;
     expect(l1.status).toBe('warn');
+    expect(l1.blockingCount).toBe(0);
     expect(l1.lastAt).toBe('2026-08-07T09:00:00.000Z');
   });
 });

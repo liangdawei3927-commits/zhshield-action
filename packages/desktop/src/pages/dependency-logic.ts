@@ -27,16 +27,33 @@ export const TRUST_STATUS_CONFIG: Record<string, { color: string; bg: string; la
 /** 信任状态展示顺序（统计四宫格） */
 export const TRUST_STATUS_ORDER: string[] = ['verified', 'suspicious', 'compromised', 'unknown'];
 
-/** 锁文件三态配置：勾选（通过）/ 叉号（未通过） */
+/** 锁文件三态配置：勾选（通过）/ 叉号（未通过）/ 灰态（无法评估，锁文件缺失时）；naKey 逐行独立 */
 export const LOCKFILE_CHECKS: Array<{
   key: 'present' | 'consistent' | 'integrityVerified';
   okKey: string;
   failKey: string;
+  naKey: string;
 }> = [
-  { key: 'present', okKey: 'page.deps.lockfile.present', failKey: 'page.deps.lockfile.notPresent' },
-  { key: 'consistent', okKey: 'page.deps.lockfile.consistent', failKey: 'page.deps.lockfile.notConsistent' },
-  { key: 'integrityVerified', okKey: 'page.deps.lockfile.integrityVerified', failKey: 'page.deps.lockfile.integrityFailed' },
+  { key: 'present', okKey: 'page.deps.lockfile.present', failKey: 'page.deps.lockfile.notPresent', naKey: 'page.deps.lockfile.notEvaluable' },
+  { key: 'consistent', okKey: 'page.deps.lockfile.consistent', failKey: 'page.deps.lockfile.notConsistent', naKey: 'page.deps.lockfile.notEvaluableConsistency' },
+  { key: 'integrityVerified', okKey: 'page.deps.lockfile.integrityVerified', failKey: 'page.deps.lockfile.integrityFailed', naKey: 'page.deps.lockfile.notEvaluableIntegrity' },
 ];
+
+/** 锁文件检查三态：ok 通过 / fail 校验失败 / na 无法评估 */
+export type LockfileCheckState = 'ok' | 'fail' | 'na';
+
+/**
+ * 锁文件勾选状态判定：present 恒可判定；consistent / integrityVerified
+ * 在锁文件缺失（present=false）时不可评估（na），不与其他失败混淆。
+ */
+export function resolveLockfileCheck(
+  lockfile: Pick<DependencyReportData['lockfile'], 'present' | 'consistent' | 'integrityVerified'>,
+  key: 'present' | 'consistent' | 'integrityVerified',
+): LockfileCheckState {
+  if (key === 'present') return lockfile.present ? 'ok' : 'fail';
+  if (!lockfile.present) return 'na';
+  return lockfile[key] ? 'ok' : 'fail';
+}
 
 /** 风险等级徽章配置（投毒检测 / 升级评估共用）：high 红 / medium 橙 / low 灰 */
 export const RISK_BADGE_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {

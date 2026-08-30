@@ -45,6 +45,49 @@ export type ProfileWorkerResponse =
   | { id: string; ok: true; result: unknown }
   | { id: string; ok: false; error: string };
 
+/** 收集单个源码文件条目（扩展名匹配 + 大小统计；不可读文件跳过） */
+function collectFileEntry(
+  fullPath: string,
+  name: string,
+  includeExtensions: string[],
+  files: ProfileResult['files'],
+  byExtension: Record<string, number>,
+  state: { totalSize: number },
+): void {
+  const ext = extname(name).toLowerCase();
+  if (!includeExtensions.includes(ext)) return;
+  try {
+    const stat = statSync(fullPath);
+    files.push({ path: fullPath, size: stat.size, ext });
+    byExtension[ext] = (byExtension[ext] ?? 0) + 1;
+    state.totalSize += stat.size;
+  } catch { /* skip unreadable files */ }
+}
+
+function walkProjectFiles(
+  dir: string,
+  excludeDirs: string[],
+  includeExtensions: string[],
+  files: ProfileResult['files'],
+  byExtension: Record<string, number>,
+  state: { totalSize: number },
+): void {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch { /* skip unreadable directories */ return; }
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      if (excludeDirs.includes(entry.name)) continue;
+      walkProjectFiles(fullPath, excludeDirs, includeExtensions, files, byExtension, state);
+    } else if (entry.isFile()) {
+      collectFileEntry(fullPath, entry.name, includeExtensions, files, byExtension, state);
+    }
+  }
+}
+
 /**
  * Worker thread for project profiling
  * Moves heavy filesystem operations off the main Electron thread
@@ -65,40 +108,15 @@ function collectProjectFiles(
 
   const files: ProfileResult['files'] = [];
   const byExtension: Record<string, number> = {};
-  let totalSize = 0;
+  const state = { totalSize: 0 };
 
-  function walkDir(dir: string): void {
-    try {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = join(dir, entry.name);
-
-        if (entry.isDirectory()) {
-          if (!excludeDirs.includes(entry.name)) {
-            walkDir(fullPath);
-          }
-        } else if (entry.isFile()) {
-          const ext = extname(entry.name).toLowerCase();
-          if (includeExtensions.includes(ext)) {
-            try {
-              const stat = statSync(fullPath);
-              files.push({ path: fullPath, size: stat.size, ext });
-              byExtension[ext] = (byExtension[ext] ?? 0) + 1;
-              totalSize += stat.size;
-            } catch { /* skip unreadable files */ }
-          }
-        }
-      }
-    } catch { /* skip unreadable directories */ }
-  }
-
-  walkDir(projectPath);
+  walkProjectFiles(projectPath, excludeDirs, includeExtensions, files, byExtension, state);
 
   return {
     files,
     stats: {
       totalFiles: files.length,
-      totalSize,
+      totalSize: state.totalSize,
       byExtension,
     },
   };

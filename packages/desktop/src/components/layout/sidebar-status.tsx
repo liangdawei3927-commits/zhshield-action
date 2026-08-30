@@ -52,7 +52,7 @@ function loadMissingTools(onResult: (missing: string[]) => void): () => void {
 function useToolAvailability(): string[] {
   const [missingTools, setMissingTools] = useState<string[]>([]);
 
-  useEffect(() => loadMissingTools(setMissingTools), []);
+  useEffect(() => loadMissingTools(setMissingTools), [setMissingTools]);
 
   return missingTools;
 }

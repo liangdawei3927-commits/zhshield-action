@@ -96,6 +96,33 @@ function startProcessMonitoring(processMonitor: SentinelRuntime['processMonitor'
   return [`process-monitor (npm run ${runCommand.script})`];
 }
 
+/** 按跳过标记把启动说明归入 started / skipped 桶 */
+function classifyStartupNotes(notes: string[], started: string[], skipped: string[]): void {
+  for (const note of notes) {
+    if (note.includes('path not found') || note.includes('no log files') || note.includes('no dev/start/build')) {
+      skipped.push(note);
+    } else {
+      started.push(note);
+    }
+  }
+}
+
+/** 依次启动文件监控、日志采集与进程监控，返回启动/跳过说明 */
+async function startMonitors(runtime: SentinelRuntime, projectId: string, projectPath: string): Promise<{ started: string[]; skipped: string[] }> {
+  const started: string[] = [];
+  const skipped: string[] = [];
+  classifyStartupNotes(
+    [
+      ...startFileMonitoring(runtime.fileMonitor, projectId, projectPath),
+      ...startLogCollecting(runtime.logCollector, projectId, projectPath),
+      ...startProcessMonitoring(runtime.processMonitor, projectId, projectPath),
+    ],
+    started,
+    skipped,
+  );
+  return { started, skipped };
+}
+
 /** 事件查询 IPC：列表 + 单条查询 */
 function registerEventQuery(): void {
   ipcMain.handle('sentinel:getEvents', async (_event, options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> => {
@@ -109,39 +136,33 @@ function registerEventQuery(): void {
   });
 }
 
+/** 启动文件监控、日志采集与进程监控（幂等），返回启动/跳过说明 */
+async function startMonitoringForProject(
+  projectId: string,
+  projectPath: string,
+): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> {
+  const state = readStateSync();
+  if (!state.enabled) {
+    return { ok: false, started: [], skipped: [], disabled: true };
+  }
+
+  const runtime = await getSentinel();
+  if (monitoredProjects.has(projectId)) {
+    return { ok: true, started: ['already-running'], skipped: [] };
+  }
+
+  const { started, skipped } = await startMonitors(runtime, projectId, projectPath);
+  if (started.length > 0) monitoredProjects.add(projectId);
+
+  return { ok: started.length > 0, started, skipped };
+}
+
 /** 监控启停 IPC：启动文件监控、日志采集与进程监控（幂等） */
 function registerMonitoringStart(): void {
   ipcMain.handle(
     'sentinel:startMonitoring',
     async (_event, projectId: string, projectPath: string): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> => {
-      const state = readStateSync();
-      if (!state.enabled) {
-        return { ok: false, started: [], skipped: [], disabled: true };
-      }
-
-      const { fileMonitor, logCollector, processMonitor } = await getSentinel();
-      const started: string[] = [];
-      const skipped: string[] = [];
-
-      if (monitoredProjects.has(projectId)) {
-        return { ok: true, started: ['already-running'], skipped: [] };
-      }
-
-      for (const note of [
-        ...startFileMonitoring(fileMonitor, projectId, projectPath),
-        ...startLogCollecting(logCollector, projectId, projectPath),
-        ...startProcessMonitoring(processMonitor, projectId, projectPath),
-      ]) {
-        if (note.includes('path not found') || note.includes('no log files') || note.includes('no dev/start/build')) {
-          skipped.push(note);
-        } else {
-          started.push(note);
-        }
-      }
-
-      if (started.length > 0) monitoredProjects.add(projectId);
-
-      return { ok: started.length > 0, started, skipped };
+      return startMonitoringForProject(projectId, projectPath);
     },
   );
 }

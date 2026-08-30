@@ -7,6 +7,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useToast } from '../components/ui/Toast';
 import { exportHtmlReport } from '../utils/htmlExport';
 import type { HtmlReportData } from '@zh/reporter';
+import type { AppNotification } from '@zh/kernel';
 
 interface SentinelPageProps {
   projectPath: string;
@@ -41,65 +42,109 @@ function sentinelEventsToHtmlData(events: SentinelEventItem[], projectPath: stri
   };
 }
 
-export function SentinelPage({ projectPath }: SentinelPageProps) {
-  const t = useT();
-  const { events, loading, monitoring, activeCount, highCount, criticalCount, falsePositiveCount, sorted, startMonitoring } = useSentinelPage(projectPath);
-  const { notify } = useNotification();
-  const notifiedIdsRef = useRef<Set<string>>(new Set());
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const newCritical = events.filter(
-      (e) => e.severity === 'critical' && !notifiedIdsRef.current.has(e.id),
-    );
-    for (const event of newCritical) {
-      notifiedIdsRef.current.add(event.id);
-      notify({
-        id: `sentinel-critical-${event.id}`,
-        type: 'error',
-        title: 'Sentinel Alert',
-        message: `${event.title} (${event.type})`,
-        timestamp: event.lastSeen,
-        read: false,
-      });
-    }
-  }, [events, notify]);
-
-  const handleExport = useCallback(async () => {
-    if (events.length === 0) return;
-    try {
-      const ok = await exportHtmlReport(sentinelEventsToHtmlData(events, projectPath), 'sentinel-report.html');
-      if (ok) toast(t('page.sentinel.exportSuccess', { defaultValue: 'Report exported' }), 'success');
-    } catch {
-      toast(t('page.sentinel.exportFailed', { defaultValue: 'Export failed' }), 'error');
-    }
-  }, [events, projectPath, toast, t]);
-
-  if (events.length > 0) {
-    return (
-      <div className="h-full w-full bg-zh-bg overflow-auto">
-        <div className="w-full px-8 py-10">
-          <SentinelHeader count={events.length} activeCount={activeCount} loading={loading} onRefresh={startMonitoring} />
-          <div className="flex justify-end mb-4">
-            <button
-              type="button"
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {t('page.sentinel.exportReport', { defaultValue: 'Export Report' })}
-            </button>
-          </div>
-          <SentinelStats total={events.length} active={activeCount} high={highCount} critical={criticalCount} falsePositive={falsePositiveCount} />
-          <SentinelTimeline events={sorted} />
-          <EventsPanel events={sorted} projectPath={projectPath} />
-        </div>
-      </div>
-    );
+function notifyCriticalEvents(
+  events: SentinelEventItem[],
+  notify: (n: AppNotification) => void,
+  notifiedIdsRef: React.MutableRefObject<Set<string>>,
+): void {
+  const newCritical = events.filter((e) => e.severity === 'critical' && !notifiedIdsRef.current.has(e.id));
+  for (const event of newCritical) {
+    notifiedIdsRef.current.add(event.id);
+    notify({
+      id: `sentinel-critical-${event.id}`,
+      type: 'error',
+      title: 'Sentinel Alert',
+      message: `${event.title} (${event.type})`,
+      timestamp: event.lastSeen,
+      read: false,
+    });
   }
+}
 
+async function exportSentinelReport(
+  events: SentinelEventItem[],
+  projectPath: string,
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+  t: (key: string, opts?: { defaultValue?: string }) => string,
+): Promise<void> {
+  if (events.length === 0) return;
+  try {
+    const ok = await exportHtmlReport(sentinelEventsToHtmlData(events, projectPath), 'sentinel-report.html');
+    if (ok) toast(t('page.sentinel.exportSuccess', { defaultValue: 'Report exported' }), 'success');
+  } catch {
+    toast(t('page.sentinel.exportFailed', { defaultValue: 'Export failed' }), 'error');
+  }
+}
+
+function SentinelExportButton({ onClick, disabled, t }: { onClick?: () => void; disabled?: boolean; t: (key: string, opts?: { defaultValue?: string }) => string }) {
+  return (
+    <div className="flex justify-end mb-4">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white ${
+          disabled ? 'text-zh-muted cursor-not-allowed opacity-50' : 'hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors'
+        }`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {t('page.sentinel.exportReport', { defaultValue: 'Export Report' })}
+      </button>
+    </div>
+  );
+}
+
+function SentinelReportView({
+  events,
+  sorted,
+  activeCount,
+  highCount,
+  criticalCount,
+  falsePositiveCount,
+  loading,
+  onRefresh,
+  onExport,
+  projectPath,
+  t,
+}: {
+  events: SentinelEventItem[];
+  sorted: SentinelEventItem[];
+  activeCount: number;
+  highCount: number;
+  criticalCount: number;
+  falsePositiveCount: number;
+  loading: boolean;
+  onRefresh: () => void;
+  onExport: () => void;
+  projectPath: string;
+  t: (key: string, opts?: { defaultValue?: string }) => string;
+}) {
+  return (
+    <div className="h-full w-full bg-zh-bg overflow-auto">
+      <div className="w-full px-8 py-10">
+        <SentinelHeader count={events.length} activeCount={activeCount} loading={loading} onRefresh={onRefresh} />
+        <SentinelExportButton onClick={onExport} t={t} />
+        <SentinelStats total={events.length} active={activeCount} high={highCount} critical={criticalCount} falsePositive={falsePositiveCount} />
+        <SentinelTimeline events={sorted} />
+        <EventsPanel events={sorted} projectPath={projectPath} />
+      </div>
+    </div>
+  );
+}
+
+function SentinelEmptyView({
+  monitoring,
+  loading,
+  onAction,
+  t,
+}: {
+  monitoring: boolean;
+  loading: boolean;
+  onAction: () => void;
+  t: (key: string, opts?: { defaultValue?: string }) => string;
+}) {
   return (
     <PageShell
       illustration={<RadarScan />}
@@ -144,8 +189,52 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         },
       ]}
       buttonText={monitoring ? t('page.sentinel.shell.buttonRunning') : t('page.sentinel.shell.buttonStart')}
-      onAction={startMonitoring}
+      onAction={onAction}
       loading={loading}
     />
   );
+}
+
+function useSentinelCriticalNotification(events: SentinelEventItem[], notify: (n: AppNotification) => void): void {
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    notifyCriticalEvents(events, notify, notifiedIdsRef);
+  }, [events, notify]);
+}
+
+function useSentinelExport(events: SentinelEventItem[], projectPath: string): () => Promise<void> {
+  const { toast } = useToast();
+  const t = useT();
+  const handleExport = useCallback(async () => {
+    await exportSentinelReport(events, projectPath, toast, t);
+  }, [events, projectPath, toast, t]);
+  return handleExport;
+}
+
+export function SentinelPage({ projectPath }: SentinelPageProps) {
+  const t = useT();
+  const { events, loading, monitoring, activeCount, highCount, criticalCount, falsePositiveCount, sorted, startMonitoring } = useSentinelPage(projectPath);
+  const { notify } = useNotification();
+  useSentinelCriticalNotification(events, notify);
+  const handleExport = useSentinelExport(events, projectPath);
+
+  if (events.length > 0) {
+    return (
+      <SentinelReportView
+        events={events}
+        sorted={sorted}
+        activeCount={activeCount}
+        highCount={highCount}
+        criticalCount={criticalCount}
+        falsePositiveCount={falsePositiveCount}
+        loading={loading}
+        onRefresh={startMonitoring}
+        onExport={handleExport}
+        projectPath={projectPath}
+        t={t}
+      />
+    );
+  }
+
+  return <SentinelEmptyView monitoring={monitoring} loading={loading} onAction={startMonitoring} t={t} />;
 }

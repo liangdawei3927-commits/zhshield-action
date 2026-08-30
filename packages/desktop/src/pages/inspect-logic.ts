@@ -46,37 +46,42 @@ function useInspectRun(projectPath: string): {
 }
 
 /** 复制单个检查项到 AI 修复 */
+function copyIssuesToAi(
+  projectPath: string,
+  issues: AiFixIssue[],
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+): void {
+  const text = buildAiFixPrompt(projectPath, issues);
+  void copyTextToClipboard(text).then(
+    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
+    () => toast(t('toast.copyFailed'), 'error'),
+  );
+}
+
 function useInspectCopyToAi(projectPath: string): {
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
 } {
   const { toast } = useToast();
 
-  const runCopy = useCallback(
-    (issues: AiFixIssue[]) => {
-      const text = buildAiFixPrompt(projectPath, issues);
-      void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-        () => toast(t('toast.copyFailed'), 'error'),
-      );
-    },
-    [projectPath, toast],
-  );
-
   const copyToAi = useCallback(
     (item: InspectionReportData['checks'][number]) => {
-      runCopy([{ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` }]);
+      copyIssuesToAi(projectPath, [{ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` }], toast);
     },
-    [runCopy],
+    [projectPath, toast],
   );
 
   const copyAllToAi = useCallback(
     (items: InspectionReportData['checks']) => {
       const failed = items.filter((i) => i.status !== 'pass');
       if (failed.length === 0) return;
-      runCopy(failed.map((item) => ({ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` })));
+      copyIssuesToAi(
+        projectPath,
+        failed.map((item) => ({ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` })),
+        toast,
+      );
     },
-    [runCopy],
+    [projectPath, toast],
   );
 
   return { copyToAi, copyAllToAi };

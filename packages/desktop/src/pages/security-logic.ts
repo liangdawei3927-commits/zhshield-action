@@ -56,44 +56,47 @@ function useSecurityRun(projectPath: string): {
 }
 
 /** 复制单个发现到 AI 修复 */
+function toAiIssue(issue: SecurityIssue): AiFixIssue {
+  return {
+    source: t('page.security.source'),
+    ruleId: issue.id,
+    severity: t(SEVERITY_CONFIG[issue.severity]?.labelKey ?? issue.severity),
+    file: issue.file,
+    line: issue.line,
+    message: `${issue.title} — ${issue.description}`,
+    suggestion: issue.recommendation,
+  };
+}
+
+function copyIssuesToAi(
+  projectPath: string,
+  issues: AiFixIssue[],
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+): void {
+  const text = buildAiFixPrompt(projectPath, issues);
+  void copyTextToClipboard(text).then(
+    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
+    () => toast(t('toast.copyFailed'), 'error'),
+  );
+}
+
 function useSecurityCopyToAi(projectPath: string): {
   copyToAi: (issue: SecurityIssue) => void;
   copyAllToAi: (issues: SecurityIssue[]) => void;
 } {
   const { toast } = useToast();
 
-  const toAiIssue = useCallback(
-    (issue: SecurityIssue): AiFixIssue => ({
-      source: t('page.security.source'),
-      ruleId: issue.id,
-      severity: t(SEVERITY_CONFIG[issue.severity]?.labelKey ?? issue.severity),
-      file: issue.file,
-      line: issue.line,
-      message: `${issue.title} — ${issue.description}`,
-      suggestion: issue.recommendation,
-    }),
-    [],
-  );
-
-  const runCopy = useCallback(
-    (issues: AiFixIssue[]) => {
-      const text = buildAiFixPrompt(projectPath, issues);
-      void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-        () => toast(t('toast.copyFailed'), 'error'),
-      );
-    },
+  const copyToAi = useCallback(
+    (issue: SecurityIssue) => copyIssuesToAi(projectPath, [toAiIssue(issue)], toast),
     [projectPath, toast],
   );
-
-  const copyToAi = useCallback((issue: SecurityIssue) => runCopy([toAiIssue(issue)]), [runCopy, toAiIssue]);
 
   const copyAllToAi = useCallback(
     (issues: SecurityIssue[]) => {
       if (issues.length === 0) return;
-      runCopy(issues.map(toAiIssue));
+      copyIssuesToAi(projectPath, issues.map(toAiIssue), toast);
     },
-    [runCopy, toAiIssue],
+    [projectPath, toast],
   );
 
   return { copyToAi, copyAllToAi };

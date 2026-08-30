@@ -230,6 +230,12 @@ export interface OutdatedDependencyData {
   description?: string;
 }
 
+/** 依赖管家显式重锁基线的结果 */
+export interface DepsRelockResult {
+  ok: boolean;
+  error?: string;
+}
+
 /** 依赖管家结果（serializable，来自 @zh/dependency 依赖管家引擎） */
 export interface DependencyReportData {
   schemaVersion: number;
@@ -406,6 +412,7 @@ export interface EngineAPI {
   runPerformance: (projectPath: string) => Promise<PerformanceReportData>;
   runRefactor: (projectPath: string) => Promise<RefactorReportData>;
   runDeps: (projectPath: string) => Promise<DependencyReportData>;
+  depsRelockBaseline: (projectPath: string) => Promise<DepsRelockResult>;
   runTechDebt: (projectPath: string) => Promise<TechDebtReportData>;
   planDebtRepayment: (projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
   verifyDebtRepaid: (projectPath: string, actionId: string) => Promise<boolean>;

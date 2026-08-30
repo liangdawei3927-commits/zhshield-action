@@ -1,10 +1,47 @@
 import { useDashboardPage } from './dashboard-logic';
+import type { CheckSummary } from './dashboard-logic';
+import type { PipelineReportData } from '../types/electron';
 import { CheckResultView } from './dashboard-result';
 import { HomeView } from './dashboard-parts';
 import { useT } from '../i18n';
 
 interface DashboardPageProps {
   projectPath: string;
+}
+
+interface ResultViewProps {
+  summary: CheckSummary;
+  lastReport: PipelineReportData;
+  score: number | null;
+  autoFixNotice: string | null;
+  handleOneClickCheck: () => Promise<void>;
+  copyFailedIssues: (items: CheckSummary['failedItems']) => void;
+  clearReport: () => void;
+}
+
+function renderResultView({
+  summary,
+  lastReport,
+  score,
+  autoFixNotice,
+  handleOneClickCheck,
+  copyFailedIssues,
+  clearReport,
+}: ResultViewProps) {
+  const issueCount = summary.failed + summary.errors;
+  const ok = lastReport.passed && issueCount === 0;
+
+  return (
+    <CheckResultView
+      summary={summary}
+      ok={ok}
+      score={score}
+      autoFixNotice={autoFixNotice}
+      onRerun={() => void handleOneClickCheck()}
+      onBack={clearReport}
+      onCopyIssues={copyFailedIssues}
+    />
+  );
 }
 
 export function DashboardPage({ projectPath }: DashboardPageProps) {
@@ -24,20 +61,15 @@ export function DashboardPage({ projectPath }: DashboardPageProps) {
   } = useDashboardPage(projectPath);
 
   if (summary && lastReport && !running) {
-    const issueCount = summary.failed + summary.errors;
-    const ok = lastReport.passed && issueCount === 0;
-
-    return (
-      <CheckResultView
-        summary={summary}
-        ok={ok}
-        score={score}
-        autoFixNotice={autoFixNotice}
-        onRerun={() => void handleOneClickCheck()}
-        onBack={clearReport}
-        onCopyIssues={copyFailedIssues}
-      />
-    );
+    return renderResultView({
+      summary,
+      lastReport,
+      score,
+      autoFixNotice,
+      handleOneClickCheck,
+      copyFailedIssues,
+      clearReport,
+    });
   }
 
   return (

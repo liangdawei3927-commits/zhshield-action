@@ -22,12 +22,14 @@ import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } fro
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
-import { profileSync } from '@zh/fingerprint';
+import { profileSync, type ScoringProjectProfile } from '@zh/fingerprint';
 import { convertGuardEvaluations, convertInspectEvaluations, convertTraditionalGuardResults } from './score-converters';
+import { loadDepsBaseline, saveDepsBaseline, integritySnapshot, extractMismatchedNodeIds, applyMismatchedTrust } from './deps-baseline';
 import {
   buildDependencyGraph,
   buildLicenseMatrix,
   lockfileVerifier,
+  resolveProjectRoot,
   TyposquatDetectorImpl,
   UpgradeEvaluatorImpl,
   EnvConsistencyCheckerImpl,
@@ -66,7 +68,7 @@ import {
   type PerformanceReportData,
   type HealthScoreData,
 } from './report-format';
-import type { DependencyReportData, TechDebtReportData, SecretReportData, ProjectProfileData } from '../../src/types/electron';
+import type { DependencyReportData, TechDebtReportData, SecretReportData, ProjectProfileData, DepsRelockResult } from '../../src/types/electron';
 
 async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -148,6 +150,55 @@ function isRuleEngineReport(r: unknown): r is { total: number; evaluations: unkn
   return !!r && typeof r === 'object' && 'total' in r && 'evaluations' in r;
 }
 
+/** 模块级独立评分：跳过根级兜底卡（path === projectPath），各模块用自身类型权重评分后逐模块落库 */
+function scoreProjectModules(
+  scoring: Awaited<ReturnType<typeof getScoring>>,
+  aggregate: ReturnType<typeof scoreProjectByModules>,
+  projectPath: string,
+): void {
+  for (const card of aggregate.modules) {
+    if (card.path === projectPath) continue;
+    const moduleScore = scoring.calculate(card.path, card.dimensions);
+    console.log(`[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`);
+  }
+}
+
+/** 解析评分输入的报告格式：SOP/传统；缺报告或格式混合时跳过评分（返回 null） */
+function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports | null {
+  const inspectReport = report.inspect;
+  if (!guardReport || !inspectReport) {
+    console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', { hasGuard: !!guardReport, hasInspect: !!inspectReport });
+    return null;
+  }
+  const isSop = isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport);
+  if (isSop) {
+    return {
+      isSop: true,
+      guardResults: convertGuardEvaluations(guardReport.evaluations),
+      inspectIssues: convertInspectEvaluations(inspectReport.evaluations),
+    };
+  }
+  if (isRuleEngineReport(guardReport) || isRuleEngineReport(inspectReport)) {
+    console.warn('[engine:runPipeline] 跳过评分: 混合报告格式（guard/inspect 不同类型）');
+    return null;
+  }
+  return {
+    isSop: false,
+    guardResults: (guardReport as GuardReport).results,
+    inspectIssues: (inspectReport as InspectionReport).issues,
+  };
+}
+
+/** 探测项目画像，失败时降级为 null（采用默认评分配置） */
+async function probeProjectProfile(projectPath: string): Promise<ScoringProjectProfile | null> {
+  try {
+    return profileSync(projectPath).profile;
+  } catch (err) {
+    console.warn('[engine:runPipeline] 画像探测失败，降级默认评分配置:', err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
+
 /**
  * 体检完成后将 guard + inspect 报告转化为健康维度分并落库。
  * 支持两种报告格式：
@@ -156,66 +207,30 @@ function isRuleEngineReport(r: unknown): r is { total: number; evaluations: unkn
  */
 async function recordPipelineScore(projectPath: string, report: PipelineReport): Promise<void> {
   try {
-    const guardReport = report.guard;
-    const inspectReport = report.inspect;
-    if (!guardReport || !inspectReport) {
-      console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', { hasGuard: !!guardReport, hasInspect: !!inspectReport });
-      return;
-    }
-    const isSop = isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport);
-
-    let guardResults: Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }>;
-    let inspectIssues: Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }>;
-
-    if (isSop) {
-      // SOP 模式：从 evaluations 转换
-      guardResults = convertGuardEvaluations(guardReport.evaluations);
-      inspectIssues = convertInspectEvaluations(inspectReport.evaluations);
-    } else if (isRuleEngineReport(guardReport) || isRuleEngineReport(inspectReport)) {
-      // 混合格式：跳过评分（不应该发生）
-      console.warn('[engine:runPipeline] 跳过评分: 混合报告格式（guard/inspect 不同类型）');
-      return;
-    } else {
-      // 传统模式
-      guardResults = (guardReport as GuardReport).results;
-      inspectIssues = (inspectReport as InspectionReport).issues;
-    }
+    const resolved = resolvePipelineReports(report);
+    if (!resolved) return;
 
     const scoring = await getScoring();
-    // 画像驱动评分：探测项目画像（语言/框架/类型），失败时降级为默认配置
-    let profilingResult = null;
-    try {
-      profilingResult = profileSync(projectPath).profile;
-    } catch (err) {
-      console.warn('[engine:runPipeline] 画像探测失败，降级默认评分配置:', err instanceof Error ? err.message : String(err));
-    }
+    const profilingResult = await probeProjectProfile(projectPath);
     const dimensions = buildHealthDimensions(
-      { results: guardResults },
-      { issues: inspectIssues },
-      projectPath,        // 修复：传 projectPath 让项目级 .zhshield/scoring.yml 生效
-      profilingResult,    // 画像驱动：按项目类型自动微调维度权重
+      { results: resolved.guardResults },
+      { issues: resolved.inspectIssues },
+      projectPath,
+      profilingResult,
     );
     const score = scoring.calculate(projectPath, dimensions);
     console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
 
-    // 模块级独立评分（monorepo）：画像含子模块时，按模块目录分桶、各模块用自身类型权重评分后逐模块落库。
-    // 跳过根级兜底卡（path === projectPath），其 findings 已计入上方项目整体分，避免覆盖。
     if (profilingResult?.modules?.length) {
-      // 模块级分桶：传统模式把聚合 CheckResult 按文件路径拆成逐文件结果，使其正确归属子模块；
-      // SOP 模式 evaluate 已带 file，直接复用。项目整体分（上方 buildHealthDimensions）仍用聚合结果，行为不变。
-      const moduleGuardResults = isSop
-        ? guardResults
-        : convertTraditionalGuardResults((guardReport as GuardReport).results);
+      const moduleGuardResults = resolved.isSop
+        ? resolved.guardResults
+        : convertTraditionalGuardResults((report.guard as GuardReport).results);
       const aggregate = scoreProjectByModules(
         profilingResult,
         { results: moduleGuardResults },
-        { issues: inspectIssues },
+        { issues: resolved.inspectIssues },
       );
-      for (const card of aggregate.modules) {
-        if (card.path === projectPath) continue;
-        const moduleScore = scoring.calculate(card.path, card.dimensions);
-        console.log(`[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`);
-      }
+      scoreProjectModules(scoring, aggregate, projectPath);
     }
   } catch (err) {
     console.warn('[engine:runPipeline] 健康评分落库失败:', err instanceof Error ? err.message : String(err));
@@ -231,6 +246,7 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runPerformance', (_e, projectPath: string) => runPerformanceHandler(manager, projectPath));
   ipcMain.handle('engine:runRefactor', (_e, projectPath: string) => runRefactorHandler(manager, projectPath));
   ipcMain.handle('engine:runDeps', (_e, projectPath: string) => runDepsHandler(projectPath));
+  ipcMain.handle('engine:depsRelockBaseline', (_e, projectPath: string) => depsRelockBaselineHandler(projectPath));
   ipcMain.handle('engine:runTechDebt', (_e, projectPath: string) => runTechDebtHandler(manager, projectPath));
   ipcMain.handle('debt:planRepayment', (_e, projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => planDebtRepaymentHandler(manager, projectPath, actionId, opts));
   ipcMain.handle('debt:verifyRepaid', (_e, projectPath: string, actionId: string) => verifyDebtRepaidHandler(manager, projectPath, actionId));
@@ -258,7 +274,7 @@ async function runGuardHandler(
     const task = manager.start('guard', projectPath, options);
     const report = await manager.waitFor(task.id) as GuardReport;
     try {
-      persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report));
     } catch (e) {
       console.warn('[engine:runGuard] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -287,7 +303,7 @@ async function runInspectHandler(manager: TaskManager, projectPath: string): Pro
   try {
     const report = await runInspectTask(manager, projectPath);
     try {
-      persistDiagnosticsFromEntries(projectPath, normalizeInspectSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeInspectSource(report));
     } catch (e) {
       console.warn('[engine:runInspect] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -363,7 +379,7 @@ async function runPerformanceHandler(manager: TaskManager, projectPath: string):
     const task = manager.start('performance', projectPath);
     const result = await manager.waitFor(task.id) as PerformanceReportData;
     try {
-      persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result));
+      await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result));
     } catch (e) {
       console.warn('[engine:runPerformance] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -383,7 +399,7 @@ async function runRefactorHandler(manager: TaskManager, projectPath: string): Pr
     const task = manager.start('refactor', projectPath);
     const report = await manager.waitFor(task.id) as RefactorReport;
     try {
-      persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report));
     } catch (e) {
       console.warn('[engine:runRefactor] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -435,15 +451,25 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const graph = buildDependencyGraph(projectPath);
+    const projectRoot = resolveProjectRoot(projectPath);
+    const baseline = loadDepsBaseline(projectRoot);
+    const graph = buildDependencyGraph(projectRoot);
     const matrix = buildLicenseMatrix(graph);
-    const nodes = graph.nodes;
+    let nodes = graph.nodes;
     const [typosquat, lockfileCheck, upgrade, env] = await Promise.all([
       runTyposquatChecks(graph),
-      runLockfileChecks(projectPath),
+      runLockfileChecks(projectRoot, baseline?.integrity),
       runUpgradeChecks(nodes),
-      runEnvConsistencyChecks(projectPath),
+      runEnvConsistencyChecks(projectRoot),
     ]);
+    // 与基线哈希不符的节点 → 最高危 trust（须在 countTrustCounts 之前覆盖；浅拷贝替换，不原地改）
+    // mismatchedNodeIds 由 verify() 的 actual !== undefined 语义保证：仅同版本哈希真实改变才命中，
+    // 升级（版本号变化）天然免疫，不误报。
+    nodes = applyMismatchedTrust(nodes, lockfileCheck.mismatchedNodeIds);
+    // 首次盘点（无基线）且校验 clean → 自动建基线（幂等；后续仅显式 relock 更新）
+    if (!baseline && lockfileCheck.verification.status === 'clean') {
+      saveDepsBaseline(projectRoot, integritySnapshot(nodes));
+    }
     return {
       schemaVersion: graph.schemaVersion,
       targetId: graph.targetId,
@@ -472,6 +498,25 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
   }
 }
 
+/** 显式重锁基线：仅当锁文件哈希完整（integrityVerified，全部节点带哈希）时才允许，防止把残缺哈希锁成基线 */
+async function depsRelockBaselineHandler(projectPath: string): Promise<DepsRelockResult> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    const projectRoot = resolveProjectRoot(projectPath);
+    const graph = buildDependencyGraph(projectRoot);
+    if (!graph.lockfile.integrityVerified) {
+      return { ok: false, error: t('electron.depsRelock.integrityIncomplete') };
+    }
+    saveDepsBaseline(projectRoot, integritySnapshot(graph.nodes));
+    return { ok: true };
+  } catch (err) {
+    console.error('[engine:depsRelockBaseline] Error:', err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** 投毒检测接线：单适配器失败 → 空数组 + error，不阻断整个盘点 */
 async function runTyposquatChecks(graph: DependencyGraph): Promise<{ findings: TyposquatFinding[]; error?: string }> {
   try {
@@ -483,14 +528,19 @@ async function runTyposquatChecks(graph: DependencyGraph): Promise<{ findings: T
   }
 }
 
-/** 锁文件完整性校验接线：校验器契约不抛异常，兜底为 missing + error */
-async function runLockfileChecks(projectPath: string): Promise<{ verification: LockfileVerification; error?: string }> {
+/** 锁文件完整性校验接线：校验器契约不抛异常，兜底为 missing + error；返回与基线哈希不符的节点 id 列表 */
+async function runLockfileChecks(
+  projectPath: string,
+  expectedIntegrity?: Record<string, string>,
+): Promise<{ verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string }> {
   try {
-    return { verification: await lockfileVerifier.verify(projectPath) };
+    const verification = await lockfileVerifier.verify(projectPath, expectedIntegrity ? { expectedIntegrity } : undefined);
+    return { verification, mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures) };
   } catch (err) {
     console.warn('[engine:runDeps] 锁文件校验失败:', err instanceof Error ? err.message : String(err));
     return {
       verification: { status: 'missing', diffs: [], integrityFailures: [] },
+      mismatchedNodeIds: [],
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -789,7 +839,7 @@ async function runPipelineHandler(
     const report = await manager.waitFor(task.id) as PipelineReport;
     if (!options?.dryRun) {
       try {
-        const diagnosticsPath = persistDiagnostics(projectPath, report);
+        const diagnosticsPath = await persistDiagnostics(projectPath, report);
         void triggerOpenCodeAutoFix(projectPath, diagnosticsPath);
       } catch (err) {
         console.warn('[engine:runPipeline] 诊断文件写入失败:', err instanceof Error ? err.message : String(err));

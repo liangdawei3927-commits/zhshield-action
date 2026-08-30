@@ -2,6 +2,8 @@ import type { SecurityScanReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
+import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
+import { isCleanableType } from './garbage-logic';
 
 export const GARBAGE_TYPE_LABEL: Record<string, string> = {
   'unused-file': 'page.garbage.type.unusedFile',
@@ -60,7 +62,7 @@ function GarbageCard({
   onToggle: (id: string) => void;
 }) {
   const t = useT();
-  const cleanable = item.type === 'unused-file';
+  const cleanable = isCleanableType(item.type);
   return (
     <ResultCard>
       <div className="flex items-center gap-3">
@@ -109,17 +111,21 @@ interface GarbageActionBarProps {
   selected: Set<string>;
   onToggleAll: () => void;
   onClean: () => void;
+  onCopyAllToAi: () => void;
   cleaning: boolean;
 }
 
-export function GarbageActionBar({ items, selected, onToggleAll, onClean, cleaning }: GarbageActionBarProps) {
+export function GarbageActionBar({ items, selected, onToggleAll, onClean, onCopyAllToAi, cleaning }: GarbageActionBarProps) {
   const t = useT();
-  const cleanable = items.filter((i) => i.type === 'unused-file');
+  const cleanable = items.filter((i) => isCleanableType(i.type));
   const selectedCount = cleanable.filter((i) => selected.has(i.id)).length;
   const allChecked = cleanable.length > 0 && selectedCount === cleanable.length;
   return (
     <ResultCard variant="item" className="flex items-center gap-4 mb-4">
-      <label className={`flex items-center gap-2 text-sm text-zh-ink-2 ${cleanable.length === 0 ? 'opacity-40' : 'cursor-pointer'}`}>
+      <label
+        className={`flex items-center gap-2 text-sm text-zh-ink-2 ${cleanable.length === 0 ? 'opacity-40' : 'cursor-pointer'}`}
+        title={cleanable.length === 0 ? t('page.garbage.selectAllDisabledHint') : undefined}
+      >
         <input
           type="checkbox"
           checked={allChecked}
@@ -130,8 +136,8 @@ export function GarbageActionBar({ items, selected, onToggleAll, onClean, cleani
         {t('page.garbage.selectAll')}
       </label>
       <span className="text-sm text-zh-muted">{t('page.garbage.selectedCount', { count: selectedCount })}</span>
+      <CopyAllToAiButton className="ml-auto" label={t('page.garbage.copyAllToAi')} onClick={onCopyAllToAi} />
       <PrimaryButton
-        className="ml-auto"
         onClick={onClean}
         disabled={selectedCount === 0}
         loading={cleaning}

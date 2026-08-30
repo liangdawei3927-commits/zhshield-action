@@ -49,6 +49,79 @@ export function debtIndexColor(index: number): string {
 }
 
 /** 技术债盘点运行：loading 本地状态（engine:runTechDebt 直连主进程，不经任务中心） */
+async function scanTechDebt(projectPath: string): Promise<TechDebtReportData | null> {
+  try {
+    return await runTechDebt(projectPath);
+  } catch {
+    return null;
+  }
+}
+
+function markActionStatus(
+  report: TechDebtReportData | null,
+  actionId: string,
+  status: TechDebtReportData['actionList'][number]['status'],
+): TechDebtReportData | null {
+  if (!report) return report;
+  return {
+    ...report,
+    actionList: report.actionList.map((a) => (a.actionId === actionId ? { ...a, status } : a)),
+  };
+}
+
+async function runDebtAction(
+  actionId: string,
+  setLoading: (id: string | null) => void,
+  action: () => Promise<void>,
+): Promise<void> {
+  setLoading(actionId);
+  try {
+    await action();
+  } finally {
+    setLoading(null);
+  }
+}
+
+function useTechDebtActions(
+  projectPath: string,
+  setReport: React.Dispatch<React.SetStateAction<TechDebtReportData | null>>,
+): {
+  planLoading: string | null;
+  verifyLoading: string | null;
+  handlePlan: (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
+  handleVerify: (actionId: string) => Promise<void>;
+  handleDismiss: (actionId: string) => Promise<void>;
+} {
+  const [planLoading, setPlanLoading] = useState<string | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
+  const handlePlan = useCallback(
+    async (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => {
+      await runDebtAction(actionId, setPlanLoading, async () => {
+        await planDebtRepayment(projectPath, actionId, opts);
+        setReport((prev) => markActionStatus(prev, actionId, 'planned'));
+      });
+    },
+    [projectPath, setReport],
+  );
+  const handleVerify = useCallback(
+    async (actionId: string) => {
+      await runDebtAction(actionId, setVerifyLoading, async () => {
+        const success = await verifyDebtRepaid(projectPath, actionId);
+        setReport((prev) => markActionStatus(prev, actionId, success ? 'repaid' : prev?.actionList.find((a) => a.actionId === actionId)?.status ?? 'pending'));
+      });
+    },
+    [projectPath, setReport],
+  );
+  const handleDismiss = useCallback(
+    async (actionId: string) => {
+      await dismissDebtAction(projectPath, actionId);
+      setReport((prev) => markActionStatus(prev, actionId, 'dismissed'));
+    },
+    [projectPath, setReport],
+  );
+  return { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss };
+}
+
 function useTechDebtRun(projectPath: string): {
   loading: boolean;
   report: TechDebtReportData | null;
@@ -61,130 +134,68 @@ function useTechDebtRun(projectPath: string): {
 } {
   const [report, setReport] = useState<TechDebtReportData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [planLoading, setPlanLoading] = useState<string | null>(null);
-  const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
+  const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } = useTechDebtActions(projectPath, setReport);
 
   const handleScan = useCallback(async () => {
     setLoading(true);
-    try {
-      const result = await runTechDebt(projectPath);
-      setReport(result);
-    } catch {
-      setReport(null);
-    } finally {
-      setLoading(false);
-    }
+    const result = await scanTechDebt(projectPath);
+    setReport(result);
+    setLoading(false);
   }, [projectPath]);
-
-  const handlePlan = useCallback(
-    async (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => {
-      setPlanLoading(actionId);
-      try {
-        await planDebtRepayment(projectPath, actionId, opts);
-        setReport((prev) =>
-          prev
-            ? {
-                ...prev,
-                actionList: prev.actionList.map((a) =>
-                  a.actionId === actionId ? { ...a, status: 'planned' as const } : a,
-                ),
-              }
-            : prev,
-        );
-      } finally {
-        setPlanLoading(null);
-      }
-    },
-    [projectPath],
-  );
-
-  const handleVerify = useCallback(
-    async (actionId: string) => {
-      setVerifyLoading(actionId);
-      try {
-        const success = await verifyDebtRepaid(projectPath, actionId);
-        setReport((prev) =>
-          prev
-            ? {
-                ...prev,
-                actionList: prev.actionList.map((a) =>
-                  a.actionId === actionId
-                    ? { ...a, status: success ? ('repaid' as const) : a.status }
-                    : a,
-                ),
-              }
-            : prev,
-        );
-      } finally {
-        setVerifyLoading(null);
-      }
-    },
-    [projectPath],
-  );
-
-  const handleDismiss = useCallback(
-    async (actionId: string) => {
-      await dismissDebtAction(projectPath, actionId);
-      setReport((prev) =>
-        prev
-          ? {
-              ...prev,
-              actionList: prev.actionList.map((a) =>
-                a.actionId === actionId ? { ...a, status: 'dismissed' as const } : a,
-              ),
-            }
-          : prev,
-      );
-    },
-    [projectPath],
-  );
 
   return { loading, report, planLoading, verifyLoading, handleScan, handlePlan, handleVerify, handleDismiss };
 }
 
 /** 复制单个技术债偿还建议到 AI 修复 */
+function copyIssuesToAi(
+  projectPath: string,
+  issues: AiFixIssue[],
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+): void {
+  const text = buildAiFixPrompt(projectPath, issues);
+  void copyTextToClipboard(text).then(
+    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
+    () => toast(t('toast.copyFailed'), 'error'),
+  );
+}
+
 function useTechDebtCopyToAi(projectPath: string): {
   copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
   copyAllToAi: (actions: TechDebtReportData['actionList']) => void;
 } {
   const { toast } = useToast();
 
-  const runCopy = useCallback(
-    (issues: AiFixIssue[]) => {
-      const text = buildAiFixPrompt(projectPath, issues);
-      void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-        () => toast(t('toast.copyFailed'), 'error'),
+  const copyToAi = useCallback(
+    (action: TechDebtReportData['actionList'][number]) => {
+      copyIssuesToAi(
+        projectPath,
+        [
+          {
+            source: t('page.techdebt.source'),
+            ruleId: action.actionId,
+            message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
+          },
+        ],
+        toast,
       );
     },
     [projectPath, toast],
   );
 
-  const copyToAi = useCallback(
-    (action: TechDebtReportData['actionList'][number]) => {
-      runCopy([
-        {
-          source: t('page.techdebt.source'),
-          ruleId: action.actionId,
-          message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
-        },
-      ]);
-    },
-    [runCopy],
-  );
-
   const copyAllToAi = useCallback(
     (actions: TechDebtReportData['actionList']) => {
       if (actions.length === 0) return;
-      runCopy(
+      copyIssuesToAi(
+        projectPath,
         actions.map((action) => ({
           source: t('page.techdebt.source'),
           ruleId: action.actionId,
           message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
         })),
+        toast,
       );
     },
-    [runCopy],
+    [projectPath, toast],
   );
 
   return { copyToAi, copyAllToAi };

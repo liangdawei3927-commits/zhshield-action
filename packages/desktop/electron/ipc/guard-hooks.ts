@@ -40,14 +40,16 @@ function existingHookFiles(projectPath: string): string[] {
   }
 }
 
-export function registerGuardHooksIpc(): void {
+function registerHooksStatusHandler(): void {
   ipcMain.handle('guard:hooksStatus', (_event, projectPath: string): GuardHooksStatus => {
     if (!projectPath || typeof projectPath !== 'string') {
       return { hasGitDir: false, installed: [] };
     }
     return getStatus(createInstaller(projectPath));
   });
+}
 
+function registerListReportsHandler(): void {
   ipcMain.handle(
     'guard:listReports',
     (_event, projectPath: string, limit?: number): GuardReportRecord[] => {
@@ -55,7 +57,9 @@ export function registerGuardHooksIpc(): void {
       return listGuardReports(projectPath, limit ?? 20);
     },
   );
+}
 
+function registerInstallHooksHandler(): void {
   ipcMain.handle(
     'guard:installHooks',
     async (
@@ -84,7 +88,9 @@ export function registerGuardHooksIpc(): void {
       return { ok: installed.length > 0, installed, skipped: [] };
     },
   );
+}
 
+function registerUninstallHooksHandler(): void {
   ipcMain.handle(
     'guard:uninstallHooks',
     async (_event, projectPath: string): Promise<{ ok: boolean; removed: string[] }> => {
@@ -96,4 +102,11 @@ export function registerGuardHooksIpc(): void {
       return { ok: removed.length > 0, removed };
     },
   );
+}
+
+export function registerGuardHooksIpc(): void {
+  registerHooksStatusHandler();
+  registerListReportsHandler();
+  registerInstallHooksHandler();
+  registerUninstallHooksHandler();
 }

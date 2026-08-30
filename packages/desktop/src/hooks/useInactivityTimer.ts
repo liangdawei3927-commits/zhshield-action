@@ -18,26 +18,25 @@ export function useInactivityTimer(timeout = 7 * 60 * 1000): {
   }, [timeout]);
 
   useEffect(() => {
-    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
-
-    const handleActivity = () => {
-      reset();
-    };
-
-    for (const event of events) {
-      document.addEventListener(event, handleActivity, { passive: true });
-    }
-
-    // Start the timer
+    const cleanup = setupActivityListeners(reset);
     reset();
-
     return () => {
-      for (const event of events) {
-        document.removeEventListener(event, handleActivity);
-      }
+      cleanup();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [reset]);
 
   return { idle, reset };
+}
+
+function setupActivityListeners(onActivity: () => void): () => void {
+  const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+  for (const event of events) {
+    document.addEventListener(event, onActivity, { passive: true });
+  }
+  return () => {
+    for (const event of events) {
+      document.removeEventListener(event, onActivity);
+    }
+  };
 }

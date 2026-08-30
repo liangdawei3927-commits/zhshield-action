@@ -10,7 +10,7 @@
  * 报告构建见 pipeline-report，IPC 发送见 pipeline-ipc。
  */
 import { initI18n, resolveLanguage } from '@zh/i18n';
-import { createReport } from '@zh/pipeline';
+import { createReport, type PipelineRunner } from '@zh/pipeline';
 import { serializePipelineReport, type PipelineWorkerInbound } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
 import { attachSummary } from './pipeline-report';
@@ -28,6 +28,20 @@ import {
 // 子进程独立 i18n 实例：语言由主进程 fork 时通过 LNG 环境变量传入
 initI18n({ lng: resolveLanguage(process.env.LNG ?? null, null).value });
 
+// 按运行模式分派到 SOP 或完整流水线 Job
+async function runPipelineByMode(
+  id: string,
+  runner: PipelineRunner,
+  opts: { dryRun?: boolean; sop?: boolean; guardEnabled: boolean },
+): Promise<void> {
+  await runner.loadSopRules();
+  if (opts.sop) {
+    await runSopJob(id, runner, opts.dryRun, opts.guardEnabled);
+  } else {
+    await runFullPipelineJob(id, runner, opts.dryRun, opts.guardEnabled);
+  }
+}
+
 async function runPipeline(
   id: string,
   projectPath: string,
@@ -35,19 +49,15 @@ async function runPipeline(
 ): Promise<void> {
   const { PipelineRunner } = await import('@zh/pipeline');
   const runner = new PipelineRunner(projectPath);
-  const opts = options ?? {};
+  const opts = options ?? { guardEnabled: true };
 
   try {
     progress(id, 'sop', '加载体检规则…', 0.05);
-    await runner.loadSopRules();
-
-    const guardEnabled = opts.guardEnabled !== false;
-
-    if (opts.sop) {
-      await runSopJob(id, runner, opts.dryRun, guardEnabled);
-    } else {
-      await runFullPipelineJob(id, runner, opts.dryRun, guardEnabled);
-    }
+    await runPipelineByMode(id, runner, {
+      dryRun: opts.dryRun,
+      sop: opts.sop,
+      guardEnabled: opts.guardEnabled !== false,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[pipeline-worker] 流水线异常:', err instanceof Error ? err.stack || message : message);

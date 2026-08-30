@@ -101,7 +101,18 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/dist-electron/**'],
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/dist-electron/**',
+        // 翻译目录由 merge-fragments 等脚本批量写入（一次写 5 个 JSON）。
+        // 若不忽略：每次写入都会触发 HMR 风暴 → i18n.tsx 无法 Fast Refresh
+        // （导出 useI18n hook）被 invalidate → 整页 reload 竞态中新旧模块并存,
+        // 旧 I18nProvider + 新 useI18n 的 context 引用断裂 → “useI18n 必须在
+        // I18nProvider 内使用” 白屏。翻译变更低频，改后手动刷新页面生效（可接受）。
+        '**/packages/i18n/locales/**',
+      ],
       followSymlinks: false,
     },
   },

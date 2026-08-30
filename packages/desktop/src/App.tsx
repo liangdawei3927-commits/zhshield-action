@@ -69,6 +69,95 @@ function PageView({ currentPage, projects, activeProjectPath, onNavigate, onAddP
   }
 }
 
+function AppLoadingView() {
+  return <div className="h-screen" style={{ background: 'rgb(var(--zh-bg-tertiary))' }} />;
+}
+
+function AppShell({
+  sidebarOpen,
+  setSidebarOpen,
+  projects,
+  currentProjectIndex,
+  switchCurrentProject,
+  currentPage,
+  setCurrentPage,
+  openFolderAndAddProject,
+  removeProject,
+  aiTool,
+  aiApplying,
+  toggleAiTool,
+  activeProject,
+  gateEnabled,
+  setGateEnabled,
+  gateLoading,
+  sentinelEnabled,
+  setSentinelEnabledState,
+  sentinelLoading,
+  viewProps,
+}: {
+  sidebarOpen: boolean;
+  setSidebarOpen: (v: boolean) => void;
+  projects: ProjectInfo[];
+  currentProjectIndex: number;
+  switchCurrentProject: (i: number) => void;
+  currentPage: Page;
+  setCurrentPage: (p: Page) => void;
+  openFolderAndAddProject: () => void;
+  removeProject: (path: string) => void;
+  aiTool: string | null;
+  aiApplying: boolean;
+  toggleAiTool: () => void;
+  activeProject?: ProjectInfo;
+  gateEnabled: boolean;
+  setGateEnabled: (v: boolean) => void;
+  gateLoading: boolean;
+  sentinelEnabled: boolean;
+  setSentinelEnabledState: (v: boolean) => void;
+  sentinelLoading: boolean;
+  viewProps: {
+    currentPage: Page;
+    projects: ProjectInfo[];
+    activeProjectPath?: string;
+    onNavigate: (page: string) => void;
+    onAddProject: () => void;
+  };
+}) {
+  return (
+    <>
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        projects={projects}
+        currentProjectIndex={currentProjectIndex}
+        onSwitchProject={switchCurrentProject}
+        currentPage={currentPage}
+        onNavigate={(p) => setCurrentPage(p as Page)}
+        onAddProject={openFolderAndAddProject}
+        onRemoveProject={removeProject}
+        aiTool={aiTool}
+        aiApplying={aiApplying}
+        onToggleAiTool={toggleAiTool}
+      />
+      <TopNav
+        currentPage={currentPage}
+        onNavigate={(p) => setCurrentPage(p as Page)}
+        onOpenSettings={() => setSidebarOpen((v) => !v)}
+        projectName={activeProject?.name}
+        sidebarOpen={sidebarOpen}
+        gateEnabled={gateEnabled}
+        onToggleGate={setGateEnabled}
+        gateLoading={gateLoading}
+        sentinelEnabled={sentinelEnabled}
+        onToggleSentinel={setSentinelEnabledState}
+        sentinelLoading={sentinelLoading}
+      />
+      <main className="flex-1 overflow-auto bg-zh-bg">
+        <PageView {...viewProps} />
+      </main>
+    </>
+  );
+}
+
 function App() {
   const {
     currentPage,
@@ -93,20 +182,13 @@ function App() {
     currentProjectIndex,
     switchCurrentProject,
   } = useAppState();
-
   const { idle, reset: resetInactivity } = useInactivityTimer(7 * 60 * 1000);
-
-  if (!loaded) {
-    return <div className="h-screen" style={{ background: 'rgb(var(--zh-bg-tertiary))' }} />;
-  }
-
+  if (!loaded) return <AppLoadingView />;
   const activeProject = projects[currentProjectIndex] ?? projects[0];
-
   const handleOnboardingComplete = () => {
     setOnboardingProject(null);
     setCurrentPage('dashboard');
   };
-
   const viewProps = {
     currentPage,
     projects,
@@ -120,38 +202,28 @@ function App() {
       {projects.length === 0 && currentPage === 'welcome' ? (
         <PageView {...viewProps} />
       ) : (
-        <>
-          <Sidebar
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            projects={projects}
-            currentProjectIndex={currentProjectIndex}
-            onSwitchProject={switchCurrentProject}
-            currentPage={currentPage}
-            onNavigate={(p) => setCurrentPage(p as Page)}
-            onAddProject={openFolderAndAddProject}
-            onRemoveProject={removeProject}
-            aiTool={aiTool}
-            aiApplying={aiApplying}
-            onToggleAiTool={toggleAiTool}
-          />
-          <TopNav
-            currentPage={currentPage}
-            onNavigate={(p) => setCurrentPage(p as Page)}
-            onOpenSettings={() => setSidebarOpen((v) => !v)}
-            projectName={activeProject?.name}
-            sidebarOpen={sidebarOpen}
-            gateEnabled={gateEnabled}
-            onToggleGate={setGateEnabled}
-            gateLoading={gateLoading}
-            sentinelEnabled={sentinelEnabled}
-            onToggleSentinel={setSentinelEnabledState}
-            sentinelLoading={sentinelLoading}
-          />
-          <main className="flex-1 overflow-auto bg-zh-bg">
-            <PageView {...viewProps} />
-          </main>
-        </>
+        <AppShell
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          projects={projects}
+          currentProjectIndex={currentProjectIndex}
+          switchCurrentProject={switchCurrentProject}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          openFolderAndAddProject={openFolderAndAddProject}
+          removeProject={removeProject}
+          aiTool={aiTool}
+          aiApplying={aiApplying}
+          toggleAiTool={toggleAiTool}
+          activeProject={activeProject}
+          gateEnabled={gateEnabled}
+          setGateEnabled={setGateEnabled}
+          gateLoading={gateLoading}
+          sentinelEnabled={sentinelEnabled}
+          setSentinelEnabledState={setSentinelEnabledState}
+          sentinelLoading={sentinelLoading}
+          viewProps={viewProps}
+        />
       )}
 
       {idle && projects.length > 0 && <ScreensaverPage onDismiss={resetInactivity} />}

@@ -38,7 +38,7 @@ function subscribeToMaximizedState(setMaximized: (m: boolean) => void): () => vo
 export function useMacOSTrafficLightInset(): boolean {
   const [maximized, setMaximized] = useState<boolean | null>(null);
 
-  useEffect(() => subscribeToMaximizedState(setMaximized), []);
+  useEffect(() => subscribeToMaximizedState(setMaximized), [setMaximized]);
 
   // 尚未确定窗口状态时保守处理（先认为全屏，渲染后快速修正）
   return maximized ?? true;

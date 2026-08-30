@@ -11,6 +11,7 @@ import {
   TRUST_STATUS_CONFIG,
   TRUST_STATUS_ORDER,
   LOCKFILE_CHECKS,
+  resolveLockfileCheck,
   RISK_BADGE_CONFIG,
   ENV_SEVERITY_CONFIG,
 } from './dependency-logic';
@@ -174,21 +175,27 @@ export function DependencyLockfileCard({ lockfile }: { lockfile: DependencyRepor
       />
       <div className="space-y-3">
         {LOCKFILE_CHECKS.map((check) => {
-          const ok = Boolean(lockfile[check.key]);
+          const state = resolveLockfileCheck(lockfile, check.key);
+          const ok = state === 'ok';
+          const na = state === 'na';
           return (
             <div key={check.key} className="flex items-center gap-3">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-green-50' : 'bg-red-50'}`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-green-50' : na ? 'bg-zh-panel' : 'bg-red-50'}`}>
                 {ok ? (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-success-700))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
+                ) : na ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-zh-muted" />
                 ) : (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 6L6 18M6 6l12 12" />
                   </svg>
                 )}
               </span>
-              <span className={`text-sm ${ok ? 'text-green-700' : 'text-red-600'}`}>{t(ok ? check.okKey : check.failKey)}</span>
+              <span className={`text-sm ${ok ? 'text-green-700' : na ? 'text-zh-muted' : 'text-red-600'}`}>
+                {t(ok ? check.okKey : na ? check.naKey : check.failKey)}
+              </span>
             </div>
           );
         })}

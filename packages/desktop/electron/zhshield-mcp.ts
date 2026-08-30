@@ -24,43 +24,55 @@ function readZhshieldJson(root: string, relativePath: string): string {
   return readFileSync(filePath, 'utf-8');
 }
 
+// ─── 辅助：探测 zhshield CLI 启动方式（dist 优先，否则 src + 本地 tsx） ──
+interface CliInvocation {
+  cmd: string;
+  args: string[];
+  cwd: string;
+}
+
+function resolveCliInvocation(
+  command: 'inspect' | 'guard' | 'refactor' | 'pipeline',
+  projectPath: string,
+): CliInvocation | null {
+  const cliDist = join(__dirname, '..', '..', 'cli', 'dist', 'index.js');
+  const cliSrc = join(__dirname, '..', '..', 'cli', 'src', 'index.ts');
+  // monorepo 根（node_modules 与本地 tsx 所在），npx 需在此目录解析本地工具
+  const repoRoot = join(__dirname, '..', '..', '..');
+
+  if (existsSync(cliDist)) {
+    return { cmd: 'node', args: [cliDist, command, '--dir', projectPath], cwd: projectPath };
+  }
+  if (existsSync(cliSrc)) {
+    // --no-install 且 cwd=repoRoot：强制使用 monorepo 本地 tsx，避免 npx 从
+    // npm 缓存下载另一版本 tsx 导致 @zh/* workspace 包解析失败（MODULE_NOT_FOUND）
+    return { cmd: 'npx', args: ['--no-install', 'tsx', cliSrc, command, '--dir', projectPath], cwd: repoRoot };
+  }
+  return null;
+}
+
 // ─── 辅助：调用 zhshield CLI（自动探测 dist/src） ──────────
 async function runCli(
   command: 'inspect' | 'guard' | 'refactor' | 'pipeline',
   projectPath: string,
   opts: { sop?: boolean; dryRun?: boolean } = {},
 ): Promise<string> {
-  const cliDist = join(__dirname, '..', '..', 'cli', 'dist', 'index.js');
-  const cliSrc = join(__dirname, '..', '..', 'cli', 'src', 'index.ts');
-  // monorepo 根（node_modules 与本地 tsx 所在），npx 需在此目录解析本地工具
-  const repoRoot = join(__dirname, '..', '..', '..');
-
-  let cmd: string;
-  let args: string[];
-  let cwd: string;
-  if (existsSync(cliDist)) {
-    cmd = 'node';
-    args = [cliDist, command, '--dir', projectPath];
-    cwd = projectPath;
-  } else if (existsSync(cliSrc)) {
-    cmd = 'npx';
-    // --no-install 且 cwd=repoRoot：强制使用 monorepo 本地 tsx，避免 npx 从
-    // npm 缓存下载另一版本 tsx 导致 @zh/* workspace 包解析失败（MODULE_NOT_FOUND）
-    args = ['--no-install', 'tsx', cliSrc, command, '--dir', projectPath];
-    cwd = repoRoot;
-  } else {
+  const invocation = resolveCliInvocation(command, projectPath);
+  if (!invocation) {
     return JSON.stringify({ ok: false, error: t('mcp.cliNotFound') });
   }
+
+  const args = [...invocation.args];
   if (opts.sop) args.push('--sop');
   if (opts.dryRun) args.push('--dry-run');
 
   try {
-    const { stdout } = await execFileAsync(cmd, args, {
+    const { stdout } = await execFileAsync(invocation.cmd, args, {
       // guard 的 TEST-001 会真实执行整套测试（冷缓存约 4 分钟），60s 超时会把
       // 尚未完成的检查整体杀死，导致诊断误报「未发现测试用例」
       timeout: 600_000,
       maxBuffer: 2 * 1024 * 1024,
-      cwd,
+      cwd: invocation.cwd,
       env: sanitizeEnv(),
     });
     return stdout || JSON.stringify({ ok: true, message: t('mcp.commandDoneNoOutput', { command }) });
@@ -176,7 +188,7 @@ server.tool(
       try {
         const records = listGuardReports(projectPath, 1);
         if (records.length > 0) {
-          persistDiagnosticsFromEntries(projectPath, guardRecordToDiagnostics(records[0]));
+          await persistDiagnosticsFromEntries(projectPath, guardRecordToDiagnostics(records[0]));
         }
       } catch (e) {
         console.warn('[zhshield-mcp] 诊断落盘失败:', e instanceof Error ? e.message : String(e));

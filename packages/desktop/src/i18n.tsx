@@ -5,7 +5,9 @@ import {
   useEffect,
   useMemo,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import {
   getLanguage,
@@ -46,17 +48,13 @@ function navigatorLanguage(): string | null {
   return typeof navigator !== 'undefined' ? navigator.language : null;
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<LanguageCode>(() => {
-    const resolved = resolveLanguage(readSavedLanguage(), navigatorLanguage());
-    initI18n({ lng: resolved.value });
-    return resolved.value;
-  });
-
+function useDocumentLang(language: LanguageCode): void {
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+}
 
+function useSystemLocaleSync(setLanguageState: Dispatch<SetStateAction<LanguageCode>>): void {
   useEffect(() => {
     if (readSavedLanguage()) return;
     let cancelled = false;
@@ -72,14 +70,26 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+}
 
+async function applyLanguageChange(lng: LanguageCode, setLanguageState: Dispatch<SetStateAction<LanguageCode>>): Promise<void> {
+  writeSavedLanguage(lng);
+  await setI18nLanguage(lng);
+  window.electronAPI?.setLanguage?.(lng);
+  setLanguageState(lng);
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<LanguageCode>(() => {
+    const resolved = resolveLanguage(readSavedLanguage(), navigatorLanguage());
+    initI18n({ lng: resolved.value });
+    return resolved.value;
+  });
+  useDocumentLang(language);
+  useSystemLocaleSync(setLanguageState);
   const changeLanguage = useCallback(async (lng: LanguageCode) => {
-    writeSavedLanguage(lng);
-    await setI18nLanguage(lng);
-    window.electronAPI?.setLanguage?.(lng);
-    setLanguageState(lng);
+    await applyLanguageChange(lng, setLanguageState);
   }, []);
-
   const value = useMemo<I18nContextValue>(() => {
     return {
       language,
@@ -87,7 +97,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       t: (key: string, params?: Record<string, unknown>) => translate(key, params),
     };
   }, [language, changeLanguage]);
-
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

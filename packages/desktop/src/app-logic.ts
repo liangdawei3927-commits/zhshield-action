@@ -76,16 +76,10 @@ function useAiToolConfig(
 }
 
 /** 门禁总开关：读写 guard-config.json 的 enabled 字段 */
-function useGateSwitch(
-  toast: (msg: string, variant?: ToastVariant) => void,
-): {
-  gateEnabled: boolean | null;
-  setGateEnabled: (enabled: boolean) => void;
-  gateLoading: boolean;
-} {
-  const [gateEnabled, setGateEnabledState] = useState<boolean | null>(null);
-  const [gateLoading, setGateLoading] = useState(true);
-
+function useLoadGateConfig(
+  setGateEnabledState: Dispatch<SetStateAction<boolean | null>>,
+  setGateLoading: Dispatch<SetStateAction<boolean>>,
+): void {
   useEffect(() => {
     let cancelled = false;
     readGuardConfig().then((config) => {
@@ -101,32 +95,44 @@ function useGateSwitch(
     });
     return () => { cancelled = true; };
   }, []);
+}
 
+async function saveGateConfig(
+  enabled: boolean,
+  setGateEnabledState: Dispatch<SetStateAction<boolean | null>>,
+  toast: (msg: string, variant?: ToastVariant) => void,
+): Promise<void> {
+  try {
+    const current = await readGuardConfig();
+    await writeGuardConfig({ ...current, enabled });
+  } catch {
+    setGateEnabledState(!enabled);
+    toast(t('toast.guardConfigSaveFailed'), 'error');
+  }
+}
+
+function useGateSwitch(
+  toast: (msg: string, variant?: ToastVariant) => void,
+): {
+  gateEnabled: boolean | null;
+  setGateEnabled: (enabled: boolean) => void;
+  gateLoading: boolean;
+} {
+  const [gateEnabled, setGateEnabledState] = useState<boolean | null>(null);
+  const [gateLoading, setGateLoading] = useState(true);
+  useLoadGateConfig(setGateEnabledState, setGateLoading);
   const setGateEnabled = useCallback(async (enabled: boolean) => {
     setGateEnabledState(enabled);
-    try {
-      const current = await readGuardConfig();
-      await writeGuardConfig({ ...current, enabled });
-    } catch {
-      setGateEnabledState(!enabled);
-      toast(t('toast.guardConfigSaveFailed'), 'error');
-    }
+    await saveGateConfig(enabled, setGateEnabledState, toast);
   }, [toast]);
-
   return { gateEnabled, setGateEnabled, gateLoading };
 }
 
 /** 哨兵总开关：读写 sentinel-state.json 的 enabled 字段 */
-function useSentinelSwitch(
-  toast: (msg: string, variant?: ToastVariant) => void,
-): {
-  sentinelEnabled: boolean | null;
-  setSentinelEnabledState: (enabled: boolean) => void;
-  sentinelLoading: boolean;
-} {
-  const [sentinelEnabled, setSentinelEnabledState] = useState<boolean | null>(null);
-  const [sentinelLoading, setSentinelLoading] = useState(true);
-
+function useLoadSentinelConfig(
+  setSentinelEnabledState: Dispatch<SetStateAction<boolean | null>>,
+  setSentinelLoading: Dispatch<SetStateAction<boolean>>,
+): void {
   useEffect(() => {
     let cancelled = false;
     getSentinelState().then((state) => {
@@ -142,21 +148,39 @@ function useSentinelSwitch(
     });
     return () => { cancelled = true; };
   }, []);
+}
 
-  const setEnabled = useCallback(async (enabled: boolean) => {
-    setSentinelEnabledState(enabled);
-    try {
-      const result = await setSentinelEnabled(enabled);
-      if (!result.ok) {
-        setSentinelEnabledState(!enabled);
-        toast(t('toast.sentinelConfigSaveFailed'), 'error');
-      }
-    } catch {
+async function saveSentinelConfig(
+  enabled: boolean,
+  setSentinelEnabledState: Dispatch<SetStateAction<boolean | null>>,
+  toast: (msg: string, variant?: ToastVariant) => void,
+): Promise<void> {
+  try {
+    const result = await setSentinelEnabled(enabled);
+    if (!result.ok) {
       setSentinelEnabledState(!enabled);
       toast(t('toast.sentinelConfigSaveFailed'), 'error');
     }
-  }, [toast]);
+  } catch {
+    setSentinelEnabledState(!enabled);
+    toast(t('toast.sentinelConfigSaveFailed'), 'error');
+  }
+}
 
+function useSentinelSwitch(
+  toast: (msg: string, variant?: ToastVariant) => void,
+): {
+  sentinelEnabled: boolean | null;
+  setSentinelEnabledState: (enabled: boolean) => void;
+  sentinelLoading: boolean;
+} {
+  const [sentinelEnabled, setSentinelEnabledState] = useState<boolean | null>(null);
+  const [sentinelLoading, setSentinelLoading] = useState(true);
+  useLoadSentinelConfig(setSentinelEnabledState, setSentinelLoading);
+  const setEnabled = useCallback(async (enabled: boolean) => {
+    setSentinelEnabledState(enabled);
+    await saveSentinelConfig(enabled, setSentinelEnabledState, toast);
+  }, [toast]);
   return { sentinelEnabled, setSentinelEnabledState: setEnabled, sentinelLoading };
 }
 
@@ -204,30 +228,35 @@ function useAddProject(
   return { openFolderAndAddProject };
 }
 
+function useCurrentProjectIndex(projectCount: number): {
+  currentProjectIndex: number;
+  switchCurrentProject: (index: number) => void;
+} {
+  const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
+  useEffect(() => {
+    setCurrentProjectIndex((idx) => Math.min(idx, Math.max(projectCount - 1, 0)));
+  }, [projectCount]);
+  const switchCurrentProject = useCallback((index: number) => {
+    setCurrentProjectIndex(index);
+  }, []);
+  return { currentProjectIndex, switchCurrentProject };
+}
+
 export function useAppState() {
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
-
   const { aiTool, setAiTool, aiApplying, toggleAiTool } = useAiToolConfig(projects, toast);
   const { gateEnabled, setGateEnabled, gateLoading } = useGateSwitch(toast);
   const { sentinelEnabled, setSentinelEnabledState, sentinelLoading } = useSentinelSwitch(toast);
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
-  const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
   const { openFolderAndAddProject } = useAddProject(setProjects, setCurrentPage, toast, setOnboardingProject);
   const { removeProject } = useRemoveProject(projects, setProjects, setCurrentPage, toast);
-
-  useEffect(() => {
-    setCurrentProjectIndex((idx) => Math.min(idx, Math.max(projects.length - 1, 0)));
-  }, [projects.length]);
-
-  const switchCurrentProject = useCallback((index: number) => {
-    setCurrentProjectIndex(index);
-  }, []);
+  const { currentProjectIndex, switchCurrentProject } = useCurrentProjectIndex(projects.length);
 
   return {
     currentPage,

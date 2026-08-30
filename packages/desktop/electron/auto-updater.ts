@@ -4,11 +4,13 @@ import { BrowserWindow, ipcMain } from 'electron';
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
-export function setupAutoUpdater(mainWindow: BrowserWindow): void {
+function scheduleInitialCheck(): void {
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 30000);
+}
 
+function registerCheckHandler(): void {
   ipcMain.handle('update:check', async () => {
     try {
       const result = await autoUpdater.checkForUpdates();
@@ -17,7 +19,9 @@ export function setupAutoUpdater(mainWindow: BrowserWindow): void {
       return { available: false, error: String(err) };
     }
   });
+}
 
+function registerDownloadHandler(): void {
   ipcMain.handle('update:download', async () => {
     try {
       await autoUpdater.downloadUpdate();
@@ -26,11 +30,15 @@ export function setupAutoUpdater(mainWindow: BrowserWindow): void {
       return { success: false, error: String(err) };
     }
   });
+}
 
+function registerInstallHandler(): void {
   ipcMain.handle('update:install', () => {
     autoUpdater.quitAndInstall();
   });
+}
 
+function registerStatusListeners(mainWindow: BrowserWindow): void {
   autoUpdater.on('checking-for-update', () => {
     mainWindow.webContents.send('update:status', { state: 'checking' });
   });
@@ -49,4 +57,12 @@ export function setupAutoUpdater(mainWindow: BrowserWindow): void {
   autoUpdater.on('error', (err) => {
     mainWindow.webContents.send('update:status', { state: 'error', message: String(err) });
   });
+}
+
+export function setupAutoUpdater(mainWindow: BrowserWindow): void {
+  scheduleInitialCheck();
+  registerCheckHandler();
+  registerDownloadHandler();
+  registerInstallHandler();
+  registerStatusListeners(mainWindow);
 }

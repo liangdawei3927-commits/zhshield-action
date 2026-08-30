@@ -67,31 +67,43 @@ function registerSopVersionQuery(): void {
 }
 
 /** SOP 同步动作 IPC：手动同步与紧急更新 */
+async function verifySopPackage(pkgJson: string): Promise<{ pkg?: SignedSopPackage; reason?: string }> {
+  let pkg: SignedSopPackage;
+  try {
+    pkg = JSON.parse(pkgJson) as SignedSopPackage;
+  } catch {
+    return { reason: 'invalid_payload' };
+  }
+
+  const publicKey = await resolveSopPublicKey();
+  if (!publicKey) {
+    return { reason: 'no_public_key' };
+  }
+
+  const verify = SopSigner.verifyPackageWithKey(pkg, publicKey);
+  if (!verify.valid) {
+    return { reason: verify.reason ?? 'verification_failed' };
+  }
+
+  return { pkg };
+}
+
+async function handleSopEmergencyUpdate(pkgJson: string): Promise<{ success: boolean; reason?: string }> {
+  const { pkg, reason } = await verifySopPackage(pkgJson);
+  if (!pkg) {
+    return { success: false, reason };
+  }
+  await sopCache.emergencyUpdate(pkg.rules);
+  return { success: true };
+}
+
 function registerSopSyncActions(): void {
   ipcMain.handle('sop:syncNow', async () => {
     return sopCache.syncFromCloud();
   });
 
   ipcMain.handle('sop:emergencyUpdate', async (_event, pkgJson: string) => {
-    let pkg: SignedSopPackage;
-    try {
-      pkg = JSON.parse(pkgJson) as SignedSopPackage;
-    } catch {
-      return { success: false, reason: 'invalid_payload' };
-    }
-
-    const publicKey = await resolveSopPublicKey();
-    if (!publicKey) {
-      return { success: false, reason: 'no_public_key' };
-    }
-
-    const verify = SopSigner.verifyPackageWithKey(pkg, publicKey);
-    if (!verify.valid) {
-      return { success: false, reason: verify.reason ?? 'verification_failed' };
-    }
-
-    await sopCache.emergencyUpdate(pkg.rules);
-    return { success: true };
+    return handleSopEmergencyUpdate(pkgJson);
   });
 }
 

@@ -14,7 +14,7 @@ import { execFile, spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
 
 import { buildHealthDimensions, buildTechDebtDashboard, mergeActionStatuses, computeTrendDelta, scoreProjectByModules } from '@zh/scoring';
-import type { DebtIssueInput, ModuleHotnessInput } from '@zh/scoring';
+import type { DebtIssueInput, ModuleHotnessInput, ConvertedGuardResult, ConvertedInspectIssue } from '@zh/scoring';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
@@ -164,7 +164,14 @@ function scoreProjectModules(
 }
 
 /** 解析评分输入的报告格式：SOP/传统；缺报告或格式混合时跳过评分（返回 null） */
+type ResolvedPipelineReports = {
+  isSop: boolean;
+  guardResults: ConvertedGuardResult[];
+  inspectIssues: ConvertedInspectIssue[];
+};
+
 function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports | null {
+  const guardReport = report.guard;
   const inspectReport = report.inspect;
   if (!guardReport || !inspectReport) {
     console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', { hasGuard: !!guardReport, hasInspect: !!inspectReport });

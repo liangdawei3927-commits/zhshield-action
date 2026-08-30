@@ -65,7 +65,7 @@ async function refreshSecrets(projectPath: string): Promise<SecretReportData | n
   }
 }
 
-async function runSecretAction(action: () => Promise<void>, refresh: () => Promise<void>): Promise<void> {
+async function runSecretAction(action: () => Promise<unknown>, refresh: () => Promise<void>): Promise<void> {
   try {
     await action();
   } finally {

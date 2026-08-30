@@ -1,5 +1,6 @@
 import { useAppState } from './app-logic';
 import type { Page, ProjectInfo } from './app-logic';
+import type { AiToolConfigData } from './types/electron';
 import { WelcomePage } from './pages/WelcomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { GuardPage } from './pages/GuardPage';
@@ -96,7 +97,7 @@ function AppShell({
   viewProps,
 }: {
   sidebarOpen: boolean;
-  setSidebarOpen: (v: boolean) => void;
+  setSidebarOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   projects: ProjectInfo[];
   currentProjectIndex: number;
   switchCurrentProject: (i: number) => void;
@@ -104,14 +105,14 @@ function AppShell({
   setCurrentPage: (p: Page) => void;
   openFolderAndAddProject: () => void;
   removeProject: (path: string) => void;
-  aiTool: string | null;
+  aiTool: AiToolConfigData | null;
   aiApplying: boolean;
-  toggleAiTool: () => void;
+  toggleAiTool: (enabled: boolean) => Promise<void>;
   activeProject?: ProjectInfo;
-  gateEnabled: boolean;
+  gateEnabled: boolean | null;
   setGateEnabled: (v: boolean) => void;
   gateLoading: boolean;
-  sentinelEnabled: boolean;
+  sentinelEnabled: boolean | null;
   setSentinelEnabledState: (v: boolean) => void;
   sentinelLoading: boolean;
   viewProps: {

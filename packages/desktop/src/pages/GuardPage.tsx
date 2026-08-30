@@ -67,7 +67,7 @@ async function exportGuardReport(
   report: GuardReportData,
   projectPath: string,
   toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-  t: (key: string, opts?: { defaultValue?: string }) => string,
+  t: (key: string, params?: Record<string, unknown>) => string,
 ): Promise<void> {
   try {
     const ok = await exportHtmlReport(guardReportToHtmlData(report, projectPath), 'guard-report.html');
@@ -77,7 +77,7 @@ async function exportGuardReport(
   }
 }
 
-function GuardExportButton({ onClick, disabled, t }: { onClick?: () => void; disabled?: boolean; t: (key: string, opts?: { defaultValue?: string }) => string }) {
+function GuardExportButton({ onClick, disabled, t }: { onClick?: () => void; disabled?: boolean; t: (key: string, params?: Record<string, unknown>) => string }) {
   return (
     <div className="flex justify-end mb-4">
       <button
@@ -124,7 +124,7 @@ function GuardReportView({
   reportFalsePositive: (check: GuardReportData['checks'][number]) => void;
   history: GuardReportRecordData[];
   falsePositiveCount: number;
-  t: (key: string, opts?: { defaultValue?: string }) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
     <div className="h-full w-full bg-zh-bg overflow-auto">
@@ -165,7 +165,7 @@ function GuardEmptyView({
   reportFalsePositive: (check: GuardReportData['checks'][number]) => void;
   history: GuardReportRecordData[];
   falsePositiveCount: number;
-  t: (key: string, opts?: { defaultValue?: string }) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
     <div className="h-full w-full bg-zh-bg overflow-auto">

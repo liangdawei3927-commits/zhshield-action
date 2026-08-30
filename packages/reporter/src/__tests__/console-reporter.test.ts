@@ -317,4 +317,71 @@ describe('ConsoleReporter — 报告格式化', () => {
     expect(result.text).toContain('semgrep');
     expect(result.text).toContain('gitleaks');
   });
+
+  // ─── 工具可用性矩阵 ──────────────────────────────────
+
+  it('9. format: 含 unavailable adapterResult 时输出工具不可用告警', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: null,
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 85, grade: 'B' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [
+          { adapterId: 'semgrep', adapterName: 'semgrep', duration: 2100, issueCount: 3, passed: true, status: 'passed', issues: [] },
+          { adapterId: 'gitleaks', adapterName: 'gitleaks', duration: 0, issueCount: 0, passed: false, status: 'unavailable', issues: [] },
+          { adapterId: 'trivy', adapterName: 'trivy', duration: 0, issueCount: 0, passed: false, status: 'unavailable', issues: [] },
+        ],
+        recommendations: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('工具不可用');
+    expect(result.text).toContain('gitleaks');
+    expect(result.text).toContain('trivy');
+    expect(result.text).toContain('未安装');
+    expect(result.text).toContain('⚠');
+  });
+
+  it('10. format: 全部 passed 的 adapterResults 输出工具行且无告警', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: null,
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 90, grade: 'A' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [
+          { adapterId: 'semgrep', adapterName: 'semgrep', duration: 2100, issueCount: 3, passed: true, status: 'passed', issues: [] },
+          { adapterId: 'eslint', adapterName: 'eslint', duration: 300, issueCount: 1, passed: true, status: 'passed', issues: [] },
+        ],
+        recommendations: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('工具');
+    expect(result.text).toContain('semgrep');
+    expect(result.text).toContain('eslint');
+    expect(result.text).not.toContain('不可用');
+    expect(result.text).not.toContain('⚠');
+  });
 });

@@ -90,6 +90,49 @@ export class StageSectionFormatter {
         report.score.grade === 'B' ? this.fmt.yellow(report.score.grade) : this.fmt.red(report.score.grade);
       lines.push(`${indent}${this.fmt.dim(`评分: ${this.fmt.bold(String(report.score.overall))} (${gradeS})`)}`);
     }
+
+    this.formatToolAvailability(report, lines, indent);
+  }
+
+  /** 渲染工具可用性矩阵：显式上报每个外部扫描工具的可用状态，消除"工具缺失静默跳过"盲区 */
+  private formatToolAvailability(report: InspectionReport, lines: string[], indent: string): void {
+    const results = report.adapterResults;
+    if (!results || results.length === 0) return;
+
+    const unavailable = results.filter(r => r.status === 'unavailable');
+    const errors = results.filter(r => r.status === 'error' || r.status === 'failed');
+    const skipped = results.filter(r => r.status === 'skipped');
+    const normal = results.filter(r => r.status === 'passed' || r.status === undefined);
+
+    if (unavailable.length === 0 && errors.length === 0 && skipped.length === 0) {
+      const parts = normal.map(r =>
+        `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`
+      );
+      lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
+      return;
+    }
+
+    if (unavailable.length > 0) {
+      const names = unavailable.map(r => this.fmt.yellow(r.adapterName)).join('、');
+      lines.push(`${indent}${this.fmt.yellow('⚠ 工具不可用')}: ${names}（未安装，可用 zhshield tools install 安装）`);
+    }
+
+    if (errors.length > 0) {
+      const names = errors.map(r => this.fmt.red(r.adapterName)).join('、');
+      lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${names} (错误详情已在 issues 中)`);
+    }
+
+    if (skipped.length > 0) {
+      const names = skipped.map(r => this.fmt.gray(r.adapterName)).join('、');
+      lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${names}（语言不适用）`);
+    }
+
+    if (normal.length > 0) {
+      const parts = normal.map(r =>
+        `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`
+      );
+      lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
+    }
   }
 
   private isRuleEngineReport(r: unknown): r is RuleEngineReport {

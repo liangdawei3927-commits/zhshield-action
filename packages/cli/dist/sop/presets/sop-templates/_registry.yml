@@ -145,13 +145,13 @@ rules:
     status: "active"
 
   - id: "security.scan.semgrep.xss"
-    file: "security/scan/vulnerability/xss.yml"
+    file: "security/scan/vulnerability/xss-detection.yml"
     adapter: "Security SAST · XSS"
     priority: "critical"
-    status: "draft"
+    status: "active"
 
   - id: "security.scan.semgrep.csrf"
-    file: "security/scan/vulnerability/csrf.yml"
+    file: "security/scan/vulnerability/csrf-check.yml"
     adapter: "Security SAST · CSRF"
     priority: "high"
     status: "draft"
@@ -160,13 +160,13 @@ rules:
     file: "security/scan/vulnerability/command-injection.yml"
     adapter: "Security SAST · 命令注入"
     priority: "critical"
-    status: "draft"
+    status: "active"
 
   - id: "security.scan.semgrep.path-traversal"
     file: "security/scan/vulnerability/path-traversal.yml"
     adapter: "Security SAST · 路径遍历"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   - id: "security.scan.gitleaks.hardcoded-key"
     file: "security/scan/vulnerability/hardcoded-key.yml"

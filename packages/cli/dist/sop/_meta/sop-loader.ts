@@ -181,34 +181,41 @@ export class SopLoader {
     action: ActionType,
   ): Promise<SopRule | null> {
     try {
-      const ext = path.extname(filePath).toLowerCase();
-      const raw = await fs.promises.readFile(filePath, 'utf-8');
-
-      let parsed: Record<string, unknown>;
-      if (ext === '.json') {
-        parsed = JSON.parse(raw);
-      } else {
-        const loaded = yaml.load(raw);
-        if (!loaded || typeof loaded !== 'object') {
-          console.warn(`[SopLoader] Rule file has no object root, skipped: ${filePath}`);
-          return null;
-        }
-        parsed = loaded as Record<string, unknown>;
-      }
-
+      const parsed = await this.readAndParseFile(filePath);
+      if (parsed === null) return null;
       return this.buildRule(parsed, domain, action, filePath);
     } catch (err) {
-      if (err instanceof SopRuleConfigError) {
-        // F1：动态严重级配置非法必须加载期失败，不能降级成「跳过该文件」
-        throw err;
-      }
-      if (isNotFoundErr(err)) {
-        console.warn(`[SopLoader] Rule file not found, skipped: ${filePath}`);
-        return null;
-      }
-      console.error('[SopLoader] Failed to parse rule file: %s', sanitizeLogField(filePath), err);
+      return this.handleParseError(err, filePath);
+    }
+  }
+
+  /** 读取并按扩展名解析规则文件（JSON 或 YAML）；无对象根时返回 null */
+  private async readAndParseFile(filePath: string): Promise<Record<string, unknown> | null> {
+    const ext = path.extname(filePath).toLowerCase();
+    const raw = await fs.promises.readFile(filePath, 'utf-8');
+
+    if (ext === '.json') {
+      return JSON.parse(raw);
+    }
+    const loaded = yaml.load(raw);
+    if (!loaded || typeof loaded !== 'object') {
+      console.warn(`[SopLoader] Rule file has no object root, skipped: ${filePath}`);
       return null;
     }
+    return loaded as Record<string, unknown>;
+  }
+
+  /** 解析错误分类处理：配置错误必须上抛，文件缺失/解析失败降级为跳过 */
+  private handleParseError(err: unknown, filePath: string): SopRule | null {
+    if (err instanceof SopRuleConfigError) {
+      throw err;
+    }
+    if (isNotFoundErr(err)) {
+      console.warn(`[SopLoader] Rule file not found, skipped: ${filePath}`);
+      return null;
+    }
+    console.error('[SopLoader] Failed to parse rule file: %s', sanitizeLogField(filePath), err);
+    return null;
   }
 
   private buildRule(

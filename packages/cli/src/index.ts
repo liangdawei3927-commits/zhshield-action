@@ -78,7 +78,23 @@ interface CLIOptions {
 }
 
 function parseArgs(argv: string[]): CLIOptions {
-  const opts: CLIOptions = {
+  const opts = createDefaultOptions();
+
+  const args = argv.slice(2);
+  if (args.length === 0) {
+    opts.help = true;
+    return opts;
+  }
+
+  parseCommand(args, opts);
+  const explicitFailOn = parseFlags(args, opts);
+  applyCommandDefaults(opts, explicitFailOn);
+
+  return opts;
+}
+
+function createDefaultOptions(): CLIOptions {
+  return {
     command: '',
     dir: process.cwd(),
     dryRun: false,
@@ -90,20 +106,17 @@ function parseArgs(argv: string[]): CLIOptions {
     report: '',
     failOn: 'error',
   };
+}
 
-  const args = argv.slice(2);
-  if (args.length === 0) {
-    opts.help = true;
-    return opts;
-  }
-
-  let explicitFailOn = false;
-
+function parseCommand(args: string[], opts: CLIOptions): void {
   opts.command = args[0];
   if (opts.command === 'help') {
     opts.help = true;
   }
+}
 
+function parseFlags(args: string[], opts: CLIOptions): boolean {
+  let explicitFailOn = false;
   for (let i = 1; i < args.length; i++) {
     switch (args[i]) {
       case '--dir':
@@ -137,13 +150,14 @@ function parseArgs(argv: string[]): CLIOptions {
         break;
     }
   }
+  return explicitFailOn;
+}
 
+function applyCommandDefaults(opts: CLIOptions, explicitFailOn: boolean): void {
   // inspect 默认仅报告（不阻断门禁）；guard/refactor/pipeline 默认 error 级门禁
   if (!explicitFailOn && opts.command === 'inspect') {
     opts.failOn = 'none';
   }
-
-  return opts;
 }
 
 function shouldBlock(report: unknown, failOn: FailOn, dryRun: boolean): { findings: Finding[]; blocked: boolean } {
@@ -171,46 +185,52 @@ function writeReportFile(opts: CLIOptions, report: unknown, findings: Finding[])
 
 async function main(): Promise<void> {
   augmentProcessPath();
-
   const opts = parseArgs(process.argv);
-
   if (opts.help || opts.command === 'help') {
     printUsage();
     process.exit(0);
   }
-
   const reporter = new ConsoleReporter({ color: opts.color, verbose: opts.verbose });
-
   try {
-    const sopDir = resolveBundledSopDir();
-    const runner = new PipelineRunner(opts.dir, sopDir ? { configDir: sopDir } : undefined);
-    const ruleCount = await runner.loadSopRules();
-    console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
-
-    switch (opts.command) {
-      case 'guard': await runGuardCommand(runner, opts, reporter); break;
-      case 'inspect': await runInspectCommand(runner, opts, reporter); break;
-      case 'refactor': await runRefactorCommand(runner, opts, reporter); break;
-      case 'pipeline': await runPipelineCommand(runner, opts, reporter); break;
-      default:
-        console.error(`未知命令: ${opts.command}`);
-        printUsage();
-        process.exit(1);
-    }
-
-    await runner.destroy();
+    await runPipeline(opts, reporter);
   } catch (err: unknown) {
-    console.error(reporter.format({
-      timestamp: new Date(),
-      guard: null,
-      inspect: null,
-      refactor: null,
-      passed: false,
-      stage: 'complete',
-      error: err instanceof Error ? err.message : String(err),
-    }).text);
-    process.exit(1);
+    handleError(reporter, err);
   }
+}
+
+/** 加载 SOP 规则并按命令分发执行 */
+async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+  const sopDir = resolveBundledSopDir();
+  const runner = new PipelineRunner(opts.dir, sopDir ? { configDir: sopDir } : undefined);
+  const ruleCount = await runner.loadSopRules();
+  console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
+
+  switch (opts.command) {
+    case 'guard': await runGuardCommand(runner, opts, reporter); break;
+    case 'inspect': await runInspectCommand(runner, opts, reporter); break;
+    case 'refactor': await runRefactorCommand(runner, opts, reporter); break;
+    case 'pipeline': await runPipelineCommand(runner, opts, reporter); break;
+    default:
+      console.error(`未知命令: ${opts.command}`);
+      printUsage();
+      process.exit(1);
+  }
+
+  await runner.destroy();
+}
+
+/** 输出错误报告并退出 */
+function handleError(reporter: ConsoleReporter, err: unknown): void {
+  console.error(reporter.format({
+    timestamp: new Date(),
+    guard: null,
+    inspect: null,
+    refactor: null,
+    passed: false,
+    stage: 'complete',
+    error: err instanceof Error ? err.message : String(err),
+  }).text);
+  process.exit(1);
 }
 
 async function runGuardCommand(runner: PipelineRunner, opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {

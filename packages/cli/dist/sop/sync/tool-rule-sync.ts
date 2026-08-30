@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
-import { safeJoin, PathTraversalError } from '@zh/shared';
+import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { resolveApiBase } from './api-base';
 import { HttpError, withRetry } from './retry';
 
@@ -282,7 +282,7 @@ export class ToolRuleSync {
     for (const record of records) {
       let filePath: string;
       try {
-        filePath = safeJoin(targetDir, record.filename);
+        filePath = safeJoinReal(targetDir, record.filename);
       } catch (err) {
         if (err instanceof PathTraversalError) {
           // 拒绝路径穿越：越界条目不写盘到 targetDir 之外

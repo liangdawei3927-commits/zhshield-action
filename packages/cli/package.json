@@ -12,12 +12,13 @@
   ],
   "scripts": {
     "build": "node scripts/build-cli.mjs",
+    "verify:sop": "node scripts/verify-sop-sync.mjs",
     "guard": "tsx src/index.ts guard",
     "inspect": "tsx src/index.ts inspect",
     "pipeline": "tsx src/index.ts pipeline",
     "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "lint": "eslint src bin --max-warnings 50"
+    "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {},
   "devDependencies": {
@@ -28,7 +29,7 @@
     "typescript": "^5.7.0",
     "vitest": "^4.1.10",
     "tsx": "^4.19.0",
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.25.0"
   },
   "exports": {
     ".": {

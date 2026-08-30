@@ -175,6 +175,10 @@ export interface ThresholdInstruction {
 export interface ForbiddenPatternInstruction {
   type: 'forbidden';
   patterns: string[];
+  /** 扫描文件扩展名过滤（与 PatternScanInstruction.fileExts 对齐） */
+  fileExts?: string[];
+  /** 排除模式（相对路径 glob，支持 ** 跨目录与 * 单段通配），如测试文件与构建产物 */
+  excludePatterns?: string[];
 }
 
 export interface LayerBoundaryInstruction {

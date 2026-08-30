@@ -6,6 +6,13 @@ status: active
 source: official
 tags: [typescript, safety, strict]
 applicableEngines: [inspect]
+fileExts: [.ts, .tsx]
+excludePatterns:
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - '**/__tests__/**'
+  - '**/dist*/**'
+  - '**/node_modules/**'
 forbidden:
   - as any
   - '@ts-ignore'

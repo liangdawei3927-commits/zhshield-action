@@ -26,25 +26,33 @@ export class VerifiedSopSyncClient extends SopSyncClient {
    */
   async fetchFull(version: string): Promise<SopRule[] | null> {
     try {
-      const res = await fetch(`${this.baseUrl}/full/${version}`);
-      if (!res.ok) return null;
-
-      const compressed = await res.arrayBuffer();
-      const decompressed = await this.compressor.decompress(
-        new Uint8Array(compressed),
-        CompressionFormat.Brotli,
-      );
-      const parsed: unknown = JSON.parse(new TextDecoder().decode(decompressed));
-
-      if (Array.isArray(parsed)) return parsed as SopRule[];
-      if (!isSignedSopPackage(parsed)) return null;
-
-      const pkg = revivePackageDates(parsed);
-      const valid = await this.verifyPackage(pkg);
-      return valid ? pkg.rules : null;
+      const parsed = await this.fetchAndParsePayload(version);
+      if (parsed === null) return null;
+      return await this.verifyParsedPayload(parsed);
     } catch {
       return null;
     }
+  }
+
+  /** 下载并解压全量包，解析为 JSON；网络/解压失败返回 null */
+  private async fetchAndParsePayload(version: string): Promise<unknown | null> {
+    const res = await fetch(`${this.baseUrl}/full/${version}`);
+    if (!res.ok) return null;
+    const compressed = await res.arrayBuffer();
+    const decompressed = await this.compressor.decompress(
+      new Uint8Array(compressed),
+      CompressionFormat.Brotli,
+    );
+    return JSON.parse(new TextDecoder().decode(decompressed));
+  }
+
+  /** 校验解析结果：裸规则数组直接放行，签名包验签通过才返回包内规则 */
+  private async verifyParsedPayload(parsed: unknown): Promise<SopRule[] | null> {
+    if (Array.isArray(parsed)) return parsed as SopRule[];
+    if (!isSignedSopPackage(parsed)) return null;
+    const pkg = revivePackageDates(parsed);
+    const valid = await this.verifyPackage(pkg);
+    return valid ? pkg.rules : null;
   }
 }
 

@@ -20,6 +20,9 @@ import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
 
+// 工作区包说明符：@zh/<pkg> 或 @zh/<pkg>/<subpath>（模块级常量避免每次 onResolve 重复编译）
+const ZH_SPEC_RE = /^@zh\//;
+
 // 把 @zh/* 工作区包直接解析到其 src/index.ts（而非 dist）。
 // 原因：packages 的 package.json 通过 exports.require 指向 ./dist/index.js，
 // 若只改源码而不重新构建每个包的 dist，bundle 会打进过期代码（曾导致
@@ -28,7 +31,7 @@ const pkgRoot = resolve(__dirname, '..');
 const zhSourcePlugin = {
   name: 'zh-source',
   setup(b) {
-    b.onResolve({ filter: /^@zh\// }, (args) => {
+    b.onResolve({ filter: ZH_SPEC_RE }, (args) => {
       const spec = args.path.slice('@zh/'.length); // 'reporter' 或 'shared/foo'
       const [pkg, ...rest] = spec.split('/');
       const rel = rest.length ? join('src', ...rest) : 'src/index.ts';

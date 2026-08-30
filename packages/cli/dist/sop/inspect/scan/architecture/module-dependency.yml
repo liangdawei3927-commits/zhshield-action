@@ -6,6 +6,14 @@ status: active
 source: official
 tags: [architecture, dependency, module]
 applicableEngines: [inspect]
+excludePatterns:
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - '**/__tests__/**'
+  - '**/*.yml'
+  - '**/*.yaml'
+  - '**/dist*/**'
+  - '**/node_modules/**'
 forbidden:
   - core -> ui
   - domain -> infrastructure

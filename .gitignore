@@ -93,5 +93,11 @@ _tmp_*
 .temp/
 .zhshield/
 
+# Semgrep inline 临时规则（semgrep ci --config inline 生成）
+**/.semgrep/
+
+# 重复代码报告（jscpd）
+report/
+
 # Vitest
 .vitest/

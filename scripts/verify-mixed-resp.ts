@@ -2,9 +2,10 @@
  * 临时复验脚本：仅运行 mixed-responsibilities 检测器扫描指定文件。
  * 用法: tsx scripts/verify-mixed-resp.ts <file1> <file2> ...
  */
+import path from 'node:path';
 import { RefactorEngine } from '../packages/refactor/src/engine';
 
-const PROJECT_ROOT = '/Users/dawei/Desktop/ZHCodeShieid/zhiyan-codeshield';
+const PROJECT_ROOT = path.resolve(import.meta.dirname, '..');
 
 async function main(): Promise<void> {
   const files = process.argv.slice(2);

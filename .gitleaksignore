@@ -4,3 +4,12 @@
 # 此处仅豁免初始提交(8c485c76)中遗留的历史 finding（工作区文件已无字面量密钥）。
 8c485c76a90db2c8777edabebf34e7b9fc6664a0:packages/kernel/src/__tests__/rule-engine.context.test.ts:generic-api-key:67
 8c485c76a90db2c8777edabebf34e7b9fc6664a0:packages/kernel/src/__tests__/rule-engine.inline.test.ts:generic-api-key:29
+# scan-utils/secrets 测试夹具使用伪 AWS Key（AKIA1234567890ABCDEF，非真实凭证）
+# 用于验证引擎可检测 AKIA 前缀模式；工作区源码已无字面量密钥，此处仅豁免历史提交遗留 finding。
+a2d02e372aa886e068d7b76890be1dd63f58ffb3:packages/kernel/src/__tests__/scan-utils.test.ts:generic-api-key:47
+78d42046b0fe3b11c07755d5434312d40b7ecce8:packages/security/src/__tests__/secrets.test.ts:generic-api-key:74
+# desktop 打包产物 app.asar（.gitignore 已忽略 release/）内捆绑 @typescript-eslint/eslint-visitor-keys
+# 压缩代码：visitorKeys / getKeys 为变量与导出名，非真实密钥；gitleaks dir 全量扫描工作树时误报。
+packages/desktop/release/mac/智汇码盾.app/Contents/Resources/app.asar:generic-api-key:52719
+packages/desktop/release/mac/智汇码盾.app/Contents/Resources/app.asar:generic-api-key:67871
+packages/desktop/release/mac/智汇码盾.app/Contents/Resources/app.asar:generic-api-key:68407

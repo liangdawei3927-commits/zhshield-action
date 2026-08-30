@@ -38,6 +38,9 @@ jobs:
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
+      - name: Verify dist/sop sync with kernel source
+        run: pnpm --filter zhshield-cli verify:sop
+
       - name: Full typecheck (15 packages)
         run: pnpm typecheck
 

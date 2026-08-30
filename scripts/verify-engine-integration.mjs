@@ -3,7 +3,10 @@
  * 验证 6 大治理引擎跨包集成 + SopRegistry CRUD
  */
 
-const KERNEL = '/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/kernel/dist';
+import { resolve } from 'node:path';
+
+const ROOT = resolve(import.meta.dirname, '..');
+const KERNEL = `${ROOT}/packages/kernel/dist`;
 
 async function main() {
   console.log('='.repeat(60));
@@ -54,8 +57,8 @@ async function main() {
   // ── 2. GuardEngine 验证 ───────────────────────────────────
   console.log('\n[2/5] GuardEngine 验证');
   try {
-    const { GuardEngine } = await import(`/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/guard/dist/engine.js`);
-    const guardConfigDir = '/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/guard/config';
+    const { GuardEngine } = await import(`${ROOT}/packages/guard/dist/engine.js`);
+    const guardConfigDir = `${ROOT}/packages/guard/config`;
     const engine = new GuardEngine('/tmp/test-repo', guardConfigDir);
     const report = await engine.run({
       mode: 'guard',
@@ -70,7 +73,7 @@ async function main() {
   // ── 3. InspectEngine 验证 ─────────────────────────────────
   console.log('\n[3/5] InspectEngine 验证');
   try {
-    const { InspectEngine } = await import(`/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/inspect/dist/engine.js`);
+    const { InspectEngine } = await import(`${ROOT}/packages/inspect/dist/engine.js`);
     const engine = new InspectEngine();
     const report = await engine.runScan('test-project', 'quick');
     console.log(`  Inspect report: ${report.issues.length} issues, score: ${report.score.overall}`);
@@ -82,8 +85,8 @@ async function main() {
   // ── 4. ScoringEngine + EvolveEngine 验证 ──────────────────
   console.log('\n[4/5] ScoringEngine + EvolveEngine 验证');
   try {
-    const { ScoringEngine } = await import(`/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/scoring/dist/engine.js`);
-    const { EvolveEngine } = await import(`/Users/dawei/Desktop/智研码盾文档/zhiyan-codeshield/packages/evolve/dist/engine.js`);
+    const { ScoringEngine } = await import(`${ROOT}/packages/scoring/dist/engine.js`);
+    const { EvolveEngine } = await import(`${ROOT}/packages/evolve/dist/engine.js`);
 
     const scoring = new ScoringEngine();
     const score = scoring.calculate('test-project', [

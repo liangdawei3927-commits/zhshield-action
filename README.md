@@ -111,3 +111,44 @@ ZH_API_BASE=http://localhost:3010/api/v1 pnpm --filter @zh/desktop dev
 环境变量：
 - `ZH_API_BASE` — 优先（Electron 主进程与 kernel 同步客户端）
 - `VITE_API_BASE` — 渲染进程 HTTP 模式备用
+
+---
+
+## GitHub Action — 0Token 门禁（已交付）
+
+智汇码盾已打包成 GitHub Action，任何仓库只需几行 YAML 即可启用门禁，全程 0 Token（不耗 CodeQL / 额外 Token）。
+
+### 使用方式
+
+在目标仓库新增 `.github/workflows/zhshield.yml`：
+
+```yaml
+name: zhshield-guard
+on: [push, pull_request]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # 用于上传 SARIF 到安全面板
+    steps:
+      - uses: actions/checkout@v4
+      - name: 智汇码盾门禁
+        uses: liangdawei3927-commits/zhshield-action@v1
+        # 0 Token：无需任何 token 配置
+```
+
+### 实现要点
+
+- **不依赖 npm**：命令行打包进仓库，action 从 GitHub 自动下载安装（`GITHUB_ACTION_REPOSITORY` 识别仓库，默认 `liangdawei3927-commits/zhshield-action` + `v1`）。
+- **云端适配**：GitHub runner 需 `sudo` 才能写 `/usr/local`（已修）；自动识别仓库名与版本。
+- **结果上报**：SARIF 漏洞报告自动上传到 GitHub Security（需 `security-events: write` 权限）。
+
+### 已验证
+
+在真实仓库 `zhshield-demo` 中实测：action 自动安装 → 执行智汇码盾 → 生成报告 → SARIF 上传安全面板，全程 0 Token，流程真实可用。
+
+### 待补足（产品缺口）
+
+云端 CI 的「密钥/漏洞自动拦截（报红阻断）」目前只接在本地 pre-commit 检测中，云端门禁的拦截编排尚未配全 —— 这是后续要补的产品功能，非演示脚本问题。

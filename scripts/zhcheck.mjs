@@ -22,7 +22,7 @@
 
 import { parseArgs } from 'node:util';
 import { resolve, relative } from 'path';
-import { existsSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, writeFileSync, chmodSync, statSync } from 'fs';
 import { execSync } from 'child_process';
 
 const PKGS_ROOT = resolve(import.meta.dirname, '..', 'packages');
@@ -209,6 +209,16 @@ function getStagedFiles() {
     return out
       .split('\n')
       .filter(f => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.mjs')))
+      // 跳过构建产物：dist/dist-electron 为自包含 bundle 与 SOP 拷贝（随仓库分发的发布物，非可分析源码）
+      .filter(f => !/(^|\/)dist(\/|$)/.test(f) && !/(^|\/)dist-electron(\/|$)/.test(f))
+      // 跳过超大文件（压缩 bundle 无法做有意义的静态分析）
+      .filter(f => {
+        try {
+          return existsSync(f) && statSync(f).size <= 2 * 1024 * 1024; // ≤ 2MB
+        } catch {
+          return false;
+        }
+      })
       .map(f => resolve(PROJECT_ROOT, f));
   } catch {
     return [];

@@ -52,7 +52,7 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     expect(report.evaluations[0].status).toBe('failed');
   });
 
-  it('scanner-dispatch: 派发到 InspectEngine', async () => {
+  it('scanner-dispatch: 全部扫描器未注册时返回 skipped 并附原因（不再回退 InspectEngine）', async () => {
     let inspectCalled = false;
     const mockInspect = {
       runScan: async (_projectId: string) => {
@@ -79,7 +79,70 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
       domain: 'inspect',
     });
     expect(report.total).toBe(1);
-    expect(inspectCalled).toBe(true);
+    expect(inspectCalled).toBe(false);
+    const evalResult = report.evaluations[0];
+    expect(evalResult.status).toBe('skipped');
+    expect(evalResult.message).toContain('npm-audit');
+    expect(evalResult.message).toContain('trivy');
+    expect(evalResult.message).toContain('未注册');
+  });
+
+  it('scanner-dispatch: 扫描器不可用/未注册混合时返回 skipped 并逐项列出原因', async () => {
+    const unavailableAdapter = {
+      meta: { id: 'semgrep', name: 'Semgrep', category: 'security' as const, priority: 'P1' as const, installMode: 'external' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      isAvailable: async () => false,
+      scan: async () => { throw new Error('should not be called'); },
+    };
+
+    const engineWithAdapters = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'semgrep', adapter: unavailableAdapter }],
+    });
+
+    registry.register(makeRule({
+      id: 'inspect.security.semgrep-scan',
+      domain: 'inspect',
+      action: 'scan',
+      applicableEngines: ['inspect'],
+      content: { scanners: ['semgrep', 'gitleaks'] },
+    }));
+
+    const report = await engineWithAdapters.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const evalResult = report.evaluations[0];
+    expect(evalResult.status).toBe('skipped');
+    expect(evalResult.message).toContain('semgrep');
+    expect(evalResult.message).toContain('gitleaks');
+    expect(evalResult.message).toContain('未安装或在 PATH 中未找到');
+    expect(evalResult.message).toContain('未注册');
+  });
+
+  it('scanner-dispatch: 至少一个扫描器可用且零违规时仍为 passed', async () => {
+    const availableAdapter = {
+      meta: { id: 'semgrep', name: 'Semgrep', category: 'security' as const, priority: 'P1' as const, installMode: 'external' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      isAvailable: async () => true,
+      scan: async () => ({
+        tool: 'semgrep' as const,
+        status: 'available' as const,
+        issues: [],
+        metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 0 },
+      }),
+    };
+
+    const engineWithAdapters = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'semgrep', adapter: availableAdapter }],
+    });
+
+    registry.register(makeRule({
+      id: 'inspect.security.semgrep-scan',
+      domain: 'inspect',
+      action: 'scan',
+      applicableEngines: ['inspect'],
+      content: { scanners: ['semgrep', 'gitleaks'] },
+    }));
+
+    const report = await engineWithAdapters.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const evalResult = report.evaluations[0];
+    expect(evalResult.status).toBe('passed');
+    expect(report.passed).toBe(1);
   });
 
   it('GuardEngine 未注册时 check-list 返回 skipped', async () => {
@@ -173,6 +236,37 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     const report = await unavailableEngine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
     expect(report.evaluations[0].status).toBe('skipped');
     expect(report.evaluations[0].message).toContain('不可用');
+  });
+
+  it('tool-dispatch: scan() 返回 unavailable 时映射为 skipped（如注入 config 缺失）', async () => {
+    const unavailableScanAdapter = {
+      meta: { id: 'eslint', name: 'ESLint', category: 'guard' as const, priority: 'P1' as const, installMode: 'builtin' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      isAvailable: async () => true,
+      scan: async () => ({
+        tool: 'eslint' as const,
+        status: 'unavailable' as const,
+        issues: [],
+        metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 0 },
+        error: 'ESLint 性能配置不存在，跳过该规则',
+      }),
+    };
+
+    const e2eEngine = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'eslint', adapter: unavailableScanAdapter }],
+    });
+
+    registry.register(makeRule({
+      id: 'inspect.scan.official.eslint-performance',
+      domain: 'inspect',
+      action: 'scan',
+      applicableEngines: ['inspect'],
+      content: { check: { tool: 'eslint', toolConfig: { config: 'node_modules/@zh/kernel/dist/assets/eslint/eslint-performance.config.mjs' } } },
+    }));
+
+    const report = await e2eEngine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const evalResult = report.evaluations[0];
+    expect(evalResult.status).toBe('skipped');
+    expect(report.skipped).toBe(1);
   });
 
   it('tool-dispatch: scan() 抛出异常时返回 error', async () => {

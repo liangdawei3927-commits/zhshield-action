@@ -3,6 +3,7 @@ import type { Dirent } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { hashFile } from './utils';
+import { safeJoinReal } from '@zh/shared';
 
 export interface BackupFileEntry {
   relativePath: string;
@@ -72,52 +73,15 @@ export class BackupManager {
 
   async run(): Promise<BackupResult> {
     await fs.mkdir(this.backupRoot, { recursive: true });
-
     const manifest = await this.loadManifest();
     const files = await this.scanFiles();
     const timestamp = new Date().toISOString();
     const backupDir = path.join(this.backupRoot, timestamp.replace(/[:.]/g, '-'));
 
-    let filesBackedUp = 0;
-    let filesSkipped = 0;
-    let errors = 0;
-    let totalSize = 0;
-
     const isFullBackup = !manifest || manifest.files.length === 0;
-    const fileEntries: BackupFileEntry[] = [];
-
-    for (const filePath of files) {
-      const relativePath = path.relative(this.sourceDir, filePath);
-      const stat = await fs.stat(filePath);
-      const hash = await hashFile(filePath);
-
-      const existing = manifest?.files.find((f) => f.relativePath === relativePath);
-
-      if (!isFullBackup && existing && existing.hash === hash) {
-        fileEntries.push(existing);
-        filesSkipped++;
-        continue;
-      }
-
-      const targetPath = path.join(backupDir, relativePath);
-      try {
-        await fs.mkdir(path.dirname(targetPath), { recursive: true });
-        await fs.cp(filePath, targetPath, { preserveTimestamps: true });
-        totalSize += stat.size;
-        filesBackedUp++;
-      } catch {
-        errors++;
-        continue;
-      }
-
-      fileEntries.push({
-        relativePath,
-        hash,
-        size: stat.size,
-        backedUpAt: timestamp,
-      });
-    }
-
+    const { fileEntries, filesBackedUp, filesSkipped, errors, totalSize } = await this.copyChangedFiles(
+      files, manifest, isFullBackup, backupDir, timestamp,
+    );
     await this.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);
     await this.updateManifestFile(fileEntries, timestamp, isFullBackup);
     await this.pruneOldBackups();
@@ -134,6 +98,71 @@ export class BackupManager {
     };
   }
 
+  /** 增量复制变更文件：hash 相同跳过，其余复制并记录条目 */
+  private async copyChangedFiles(
+    files: string[],
+    manifest: BackupManifest | null,
+    isFullBackup: boolean,
+    backupDir: string,
+    timestamp: string,
+  ): Promise<{ fileEntries: BackupFileEntry[]; filesBackedUp: number; filesSkipped: number; errors: number; totalSize: number }> {
+    let filesBackedUp = 0;
+    let filesSkipped = 0;
+    let errors = 0;
+    let totalSize = 0;
+    const fileEntries: BackupFileEntry[] = [];
+
+    for (const filePath of files) {
+      const result = await this.copyOneFile(filePath, manifest, isFullBackup, backupDir, timestamp);
+      if (result === null) {
+        errors++;
+        continue;
+      }
+      fileEntries.push(result.entry);
+      if (result.skipped) {
+        filesSkipped++;
+      } else {
+        totalSize += result.entry.size;
+        filesBackedUp++;
+      }
+    }
+
+    return { fileEntries, filesBackedUp, filesSkipped, errors, totalSize };
+  }
+
+  /** 复制单个文件到备份目录；hash 相同返回 skipped 标记，复制失败返回 null */
+  private async copyOneFile(
+    filePath: string,
+    manifest: BackupManifest | null,
+    isFullBackup: boolean,
+    backupDir: string,
+    timestamp: string,
+  ): Promise<{ entry: BackupFileEntry; skipped: boolean } | null> {
+    const relativePath = path.relative(this.sourceDir, filePath);
+    const stat = await fs.stat(filePath);
+    const hash = await hashFile(filePath);
+    const existing = manifest?.files.find((f) => f.relativePath === relativePath);
+    if (!isFullBackup && existing && existing.hash === hash) {
+      return { entry: existing, skipped: true };
+    }
+    try {
+      const targetPath = safeJoinReal(backupDir, relativePath);
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.cp(filePath, targetPath, { preserveTimestamps: true });
+    } catch {
+      return null;
+    }
+    return {
+      entry: {
+        relativePath,
+        hash,
+        size: stat.size,
+        backedUpAt: timestamp,
+      },
+      skipped: false,
+    };
+  }
+
   async restore(targetDir?: string): Promise<number> {
     const manifest = await this.loadManifest();
     if (!manifest || manifest.files.length === 0) {
@@ -146,9 +175,9 @@ export class BackupManager {
 
     let restored = 0;
     for (const entry of manifest.files) {
-      const sourcePath = path.join(latestBackup, entry.relativePath);
-      const targetPath = path.join(restoreTo, entry.relativePath);
       try {
+        const sourcePath = safeJoinReal(latestBackup, entry.relativePath);
+        const targetPath = safeJoinReal(restoreTo, entry.relativePath);
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
         await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
         restored++;
@@ -274,7 +303,8 @@ export class BackupManager {
     for (const dir of toRemove) {
       try {
         await fs.rm(dir, { recursive: true, force: true });
-      } catch {
+      } catch (err) {
+        console.warn('[incremental-backup] 清理旧备份失败:', dir, err);
       }
     }
   }

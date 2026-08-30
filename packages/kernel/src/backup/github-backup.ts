@@ -52,56 +52,83 @@ export class GitHubBackup {
     abortSignal?: AbortSignal,
   ): Promise<GitHubBackupSubResult> {
     try {
-      // 1. 检查认证
-      const token = await this.tokenStore.getToken();
-      if (!token) {
-        throw new Error('GitHub 未授权，请先在设置中授权 GitHub 账户');
-      }
-
-      // 2. 检查/创建仓库
-      const repoExists = await this.checkRepoExists(config.owner, config.repo, token, abortSignal);
-      if (!repoExists) {
-        await this.createRepo(config.owner, config.repo, token, abortSignal);
-      }
-
+      const token = await this.ensureAuthenticated();
+      await this.ensureRepoExists(config, token, abortSignal);
       const ctx: GitHubApiContext = { owner: config.owner, repo: config.repo, token, abortSignal };
-
-      // 3. 获取默认分支最新 commit
-      let parentSha: string | undefined;
-      try {
-        const ref = await this.getRef(ctx, config.branch);
-        parentSha = ref.object.sha;
-      } catch {
-        // 空仓库或分支不存在，无 parent
-      }
-
-      // 4. 创建 Git Tree（包含所有文件变更）
+      const parentSha = await this.getParentSha(ctx, config.branch);
       const tree = await this.createTree(ctx, projectPath, config.excludePatterns);
-
-      // 5. 创建提交
-      const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-      const commitMessage = `${config.commitPrefix} 自动备份 - ${timestamp}`;
-      const commit = await this.createCommit(ctx, commitMessage, tree.sha, parentSha ? [parentSha] : []);
-
-      // 6. 更新分支引用
+      const { commitMessage, commit } = await this.createBackupCommit(ctx, config, tree.sha, parentSha);
       await this.updateRef(ctx, config.branch, commit.sha);
-
-      return {
-        type: 'github',
-        success: true,
-        commitHash: commit.sha,
-        commitMessage,
-        repoUrl: `https://github.com/${config.owner}/${config.repo}`,
-        branch: config.branch,
-      };
+      return this.buildSuccessResult(config, commit, commitMessage);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '未知 GitHub 备份错误';
-      return {
-        type: 'github',
-        success: false,
-        error: message,
-      };
+      return this.buildFailureResult(err);
     }
+  }
+
+  /** 检查认证：未授权时抛出错误 */
+  private async ensureAuthenticated(): Promise<string> {
+    const token = await this.tokenStore.getToken();
+    if (!token) {
+      throw new Error('GitHub 未授权，请先在设置中授权 GitHub 账户');
+    }
+    return token;
+  }
+
+  /** 检查/创建仓库 */
+  private async ensureRepoExists(config: GitHubBackupConfig, token: string, abortSignal?: AbortSignal): Promise<void> {
+    const repoExists = await this.checkRepoExists(config.owner, config.repo, token, abortSignal);
+    if (!repoExists) {
+      await this.createRepo(config.owner, config.repo, token, abortSignal);
+    }
+  }
+
+  /** 获取默认分支最新 commit；空仓库或分支不存在时返回 undefined */
+  private async getParentSha(ctx: GitHubApiContext, branch: string): Promise<string | undefined> {
+    try {
+      const ref = await this.getRef(ctx, branch);
+      return ref.object.sha;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** 创建提交：生成时间戳消息并调用 GitHub API */
+  private async createBackupCommit(
+    ctx: GitHubApiContext,
+    config: GitHubBackupConfig,
+    treeSha: string,
+    parentSha: string | undefined,
+  ): Promise<{ commitMessage: string; commit: GitHubCommit }> {
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    const commitMessage = `${config.commitPrefix} 自动备份 - ${timestamp}`;
+    const commit = await this.createCommit(ctx, commitMessage, treeSha, parentSha ? [parentSha] : []);
+    return { commitMessage, commit };
+  }
+
+  /** 组装成功结果 */
+  private buildSuccessResult(
+    config: GitHubBackupConfig,
+    commit: GitHubCommit,
+    commitMessage: string,
+  ): GitHubBackupSubResult {
+    return {
+      type: 'github',
+      success: true,
+      commitHash: commit.sha,
+      commitMessage,
+      repoUrl: `https://github.com/${config.owner}/${config.repo}`,
+      branch: config.branch,
+    };
+  }
+
+  /** 组装失败结果 */
+  private buildFailureResult(err: unknown): GitHubBackupSubResult {
+    const message = err instanceof Error ? err.message : '未知 GitHub 备份错误';
+    return {
+      type: 'github',
+      success: false,
+      error: message,
+    };
   }
 
   /**
@@ -207,34 +234,7 @@ export class GitHubBackup {
     excludePatterns: string[],
   ): Promise<GitHubTree> {
     const tree: GitHubTreeItem[] = [];
-
-    const walk = async (dir: string, prefix: string = '') => {
-      if (ctx.abortSignal?.aborted) return;
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (ctx.abortSignal?.aborted) return;
-        const fullPath = path.join(dir, entry.name);
-        const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-
-        if (matchesExcludePattern(relativePath, excludePatterns)) continue;
-
-        if (entry.isDirectory()) {
-          await walk(fullPath, relativePath);
-        } else if (entry.isFile()) {
-          const content = await fs.readFile(fullPath, 'base64');
-          tree.push({
-            path: relativePath,
-            mode: '100644',
-            type: 'blob',
-            content,
-          });
-        }
-      }
-    };
-
-    await walk(projectPath);
-
+    await this.collectTreeItems(ctx, projectPath, '', excludePatterns, tree);
     return this.githubFetch<GitHubTree>(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees`,
       ctx.token,
@@ -244,6 +244,36 @@ export class GitHubBackup {
       },
       ctx.abortSignal,
     );
+  }
+
+  /** 递归收集目录树条目（跳过排除项与中止信号） */
+  private async collectTreeItems(
+    ctx: GitHubApiContext,
+    dir: string,
+    prefix: string,
+    excludePatterns: string[],
+    tree: GitHubTreeItem[],
+  ): Promise<void> {
+    if (ctx.abortSignal?.aborted) return;
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (ctx.abortSignal?.aborted) return;
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (matchesExcludePattern(relativePath, excludePatterns)) continue;
+      if (entry.isDirectory()) {
+        await this.collectTreeItems(ctx, fullPath, relativePath, excludePatterns, tree);
+      } else if (entry.isFile()) {
+        const content = await fs.readFile(fullPath, 'base64');
+        tree.push({
+          path: relativePath,
+          mode: '100644',
+          type: 'blob',
+          content,
+        });
+      }
+    }
   }
 
   private async createCommit(

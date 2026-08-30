@@ -14,6 +14,7 @@ import {
   type BackupScheduleConfig,
   defaultBackupConfig,
 } from './types';
+import { safeJoinReal } from '@zh/shared';
 
 export interface BackupGlobalConfig {
   defaultBackupDir: string;
@@ -65,7 +66,7 @@ export class BackupConfigManager {
    * 保存备份配置到项目根目录
    */
   async saveProjectConfig(projectRoot: string, config: BackupConfig): Promise<void> {
-    const dir = path.join(projectRoot, ZH_SHIELD_DIR);
+    const dir = safeJoinReal(projectRoot, ZH_SHIELD_DIR);
     await fs.mkdir(dir, { recursive: true });
 
     const yamlContent = this.serializeConfig(config);
@@ -107,7 +108,7 @@ export class BackupConfigManager {
   // ─── 私有 ───────────────────────────────────────────────
 
   private projectConfigPath(projectRoot: string): string {
-    return path.join(projectRoot, ZH_SHIELD_DIR, BACKUP_CONFIG_FILE);
+    return safeJoinReal(projectRoot, ZH_SHIELD_DIR, BACKUP_CONFIG_FILE);
   }
 
   private normalizeConfig(raw: Record<string, unknown>, def: BackupConfig): BackupConfig {

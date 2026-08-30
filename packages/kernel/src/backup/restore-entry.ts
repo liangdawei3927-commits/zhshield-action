@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { createGunzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
 import type { LocalBackupCompression, LocalBackupFileEntry } from './local-backup';
+import { safeJoinReal } from '@zh/shared';
 
 /** gzip 魔数（RFC 1952：0x1f 0x8b） */
 const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
@@ -44,7 +45,7 @@ async function locateStoredFile(
   entry: LocalBackupFileEntry,
 ): Promise<{ sourcePath: string; compression: LocalBackupCompression }> {
   const storedName = entry.storedAs ?? entry.relativePath;
-  const primary = path.join(backupPath, storedName);
+  const primary = safeJoinReal(backupPath, storedName);
 
   if (await pathExists(primary)) {
     return { sourcePath: primary, compression: entry.compression ?? 'none' };

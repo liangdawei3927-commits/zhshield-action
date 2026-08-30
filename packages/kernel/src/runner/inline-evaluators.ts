@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { relative } from 'node:path';
+import { relative, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
@@ -17,6 +18,7 @@ import {
   readFileSafe,
   scanPatternsInFile,
   scanForbiddenInFile,
+  matchesExcludePatterns,
   detectLayer,
   detectLayerByName,
 } from './scan-utils';
@@ -55,21 +57,65 @@ export async function evalPatternScan(
 
 // ─── 内联评估：forbidden ───────────────────────────────
 
+// 规则级白名单条目（.zhshield/whitelist.yml 的 rule 段），用于压制自检误报
+interface WhitelistRuleEntry {
+  ruleId: string;
+  pattern: string;
+}
+
+// 复用常量避免每次调用重复创建（eslint-performance）；
+// 与 guard WhitelistManager 的解析语义一致（键名不锚定行首，可匹配 "- rule: ..."）
+const YAML_SECTION_HEADER_RE = /^[a-zA-Z]+:$/;
+const RULE_KEY_VALUE_RE = /rule:\s*['"]?(.+?)['"]?$/;
+const PATTERN_KEY_VALUE_RE = /pattern:\s*['"]?(.+?)['"]?$/;
+
+/** 加载项目根目录 .zhshield/whitelist.yml 的 rule 段条目（文件缺失时为 []） */
+function loadRuleWhitelist(repoRoot: string): WhitelistRuleEntry[] {
+  const filePath = join(repoRoot, '.zhshield', 'whitelist.yml');
+  let content: string;
+  try {
+    content = readFileSync(filePath, 'utf-8');
+  } catch {
+    return [];
+  }
+
+  const entries: WhitelistRuleEntry[] = [];
+  let section = '';
+  let current: WhitelistRuleEntry | null = null;
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (YAML_SECTION_HEADER_RE.test(line)) {
+      section = line.slice(0, -1);
+      current = null;
+      continue;
+    }
+    if (section !== 'rule') continue;
+    const ruleMatch = line.match(RULE_KEY_VALUE_RE);
+    if (ruleMatch) {
+      current = { ruleId: ruleMatch[1], pattern: '' };
+      entries.push(current);
+      continue;
+    }
+    const patternMatch = line.match(PATTERN_KEY_VALUE_RE);
+    if (patternMatch && current) current.pattern = patternMatch[1];
+  }
+  return entries;
+}
+
+/** 规则级白名单匹配：ruleId 一致且文件路径包含 pattern（与 guard WhitelistManager 语义一致） */
+function isRuleWhitelisted(entries: WhitelistRuleEntry[], ruleId: string, filePath: string): boolean {
+  return entries.some((e) => e.ruleId === ruleId && (!e.pattern || filePath.includes(e.pattern)));
+}
+
 export async function evalForbidden(
   rule: SopRule,
   instr: ForbiddenPatternInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
-  const files = resolveFiles(context);
-  const violations: Violation[] = [];
-
-  for (const filePath of files) {
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
-
-    const relativePath = relative(context.repoRoot, filePath);
-    violations.push(...scanForbiddenInFile(content, relativePath, rule, instr.patterns));
-  }
+  const files = resolveFiles(context, instr.fileExts);
+  const whitelist = loadRuleWhitelist(context.repoRoot);
+  const violations = scanForbiddenFiles(files, whitelist, rule, instr, context);
 
   return {
     rule,
@@ -83,6 +129,29 @@ export async function evalForbidden(
     targetEngine: 'inspect',
     timestamp: new Date(),
   };
+}
+
+/** 扫描文件列表中的禁止模式，应用排除与规则级白名单 */
+function scanForbiddenFiles(
+  files: string[],
+  whitelist: WhitelistRuleEntry[],
+  rule: SopRule,
+  instr: ForbiddenPatternInstruction,
+  context: RuleContext,
+): Violation[] {
+  const violations: Violation[] = [];
+  for (const filePath of files) {
+    const content = readFileSafe(filePath);
+    if (content === null) continue;
+
+    const relativePath = relative(context.repoRoot, filePath);
+    if (matchesExcludePatterns(relativePath, instr.excludePatterns)) continue;
+
+    for (const v of scanForbiddenInFile(content, relativePath, rule, instr.patterns)) {
+      if (!isRuleWhitelisted(whitelist, rule.id, v.file)) violations.push(v);
+    }
+  }
+  return violations;
 }
 
 // ─── 内联评估：threshold ───────────────────────────────

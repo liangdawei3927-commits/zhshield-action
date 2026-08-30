@@ -1,5 +1,6 @@
 import type { EventBus } from '../../bus';
 import type { SopRegistry } from '../_meta/sop-registry';
+import type { SopRule } from '../_meta/sop-types';
 import type { DataCleanup, CleanupConfig } from '../data-cleanup';
 import type { SopSqliteStore } from './sop-sqlite-store';
 import type { SopVersionStore } from './sop-version-store';
@@ -66,24 +67,30 @@ export class SopCacheMaintenance {
     try {
       const rulePrune = await this.pruneRules();
       const logPrune = await this.pruneSyncLog();
-
-      const outcome: MaintenanceOutcome = {
-        trigger,
-        rulesBefore: rulePrune.before,
-        rulesAfter: rulePrune.after,
-        rulesRemoved: rulePrune.removed,
-        logEntriesBefore: logPrune.before,
-        logEntriesAfter: logPrune.after,
-        logEntriesRemoved: logPrune.removed,
-      };
-
+      const outcome = this.buildOutcome(trigger, rulePrune, logPrune);
       this.metrics?.recordCleanup(outcome.rulesRemoved + outcome.logEntriesRemoved, outcome.rulesAfter);
       this.eventBus?.emit('sop:maintenance-completed', { ...outcome, timestamp: new Date() }).catch(() => {});
-
       return outcome;
     } catch {
       return null;
     }
+  }
+
+  /** 组装维护结果 */
+  private buildOutcome(
+    trigger: MaintenanceTrigger,
+    rulePrune: { before: number; after: number; removed: number },
+    logPrune: { before: number; after: number; removed: number },
+  ): MaintenanceOutcome {
+    return {
+      trigger,
+      rulesBefore: rulePrune.before,
+      rulesAfter: rulePrune.after,
+      rulesRemoved: rulePrune.removed,
+      logEntriesBefore: logPrune.before,
+      logEntriesAfter: logPrune.after,
+      logEntriesRemoved: logPrune.removed,
+    };
   }
 
   private async pruneRules(): Promise<{ before: number; after: number; removed: number }> {
@@ -93,25 +100,33 @@ export class SopCacheMaintenance {
       return { before, after: before, removed: 0 };
     }
 
-    const sorted = rules.toSorted((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
-    const kept = this.cleanup.trimVersions(
-      sorted.map((rule) => ({ version: rule.updatedAt.getTime(), rule })),
-      this.config.maxEntries,
-    );
-
-    // keepMinimum 下限保护：裁剪后剩余不足下限时放弃本次裁剪
+    const kept = this.selectRulesToKeep(rules);
     if (kept.length < this.config.keepMinimum) {
       return { before, after: before, removed: 0 };
     }
 
-    const keptIds = new Set(kept.map((entry) => entry.rule.id));
+    const removedRules = this.removeUnkeptRules(rules, kept);
+    return { before, after: kept.length, removed: removedRules.length };
+  }
+
+  /** 按更新时间排序并裁剪到 maxEntries 上限 */
+  private selectRulesToKeep(rules: SopRule[]): SopRule[] {
+    const sorted = rules.toSorted((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
+    return this.cleanup.trimVersions(
+      sorted.map((rule) => ({ version: rule.updatedAt.getTime(), rule })),
+      this.config.maxEntries,
+    ).map((entry) => entry.rule);
+  }
+
+  /** 从注册表与 sqlite 中移除未保留的规则 */
+  private removeUnkeptRules(rules: SopRule[], kept: SopRule[]): SopRule[] {
+    const keptIds = new Set(kept.map((rule) => rule.id));
     const removedRules = rules.filter((rule) => !keptIds.has(rule.id));
     for (const rule of removedRules) {
       this.registry.remove(rule.id);
     }
     this.sqliteStore.remove(removedRules.map((rule) => rule.id));
-
-    return { before, after: kept.length, removed: removedRules.length };
+    return removedRules;
   }
 
   private async pruneSyncLog(): Promise<{ before: number; after: number; removed: number }> {

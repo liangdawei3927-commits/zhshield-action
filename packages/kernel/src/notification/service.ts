@@ -31,16 +31,19 @@ export class NotificationService {
     this.listeners.forEach((l) => l(notification));
 
     if (this.useBrowserNotification) {
-      const BrowserNotification = getBrowserNotification();
-      if (BrowserNotification) {
-        if (BrowserNotification.permission === 'granted') {
-          new BrowserNotification(notification.title, {
-            body: notification.message,
-          });
-        } else if (BrowserNotification.permission !== 'denied') {
-          BrowserNotification.requestPermission();
-        }
-      }
+      this.showBrowserNotification(notification);
+    }
+  }
+
+  private showBrowserNotification(notification: AppNotification): void {
+    const BrowserNotification = getBrowserNotification();
+    if (!BrowserNotification) return;
+    if (BrowserNotification.permission === 'granted') {
+      new BrowserNotification(notification.title, {
+        body: notification.message,
+      });
+    } else if (BrowserNotification.permission !== 'denied') {
+      BrowserNotification.requestPermission();
     }
   }
 

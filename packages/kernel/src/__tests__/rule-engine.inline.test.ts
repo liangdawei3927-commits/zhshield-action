@@ -83,6 +83,32 @@ describe('SopRuleEngine — 内联评估（pattern-scan / forbidden / threshold 
     expect(report.ok).toBe(true);
   });
 
+  it('pattern-scan: 非 src 布局（packages/）仍能命中', async () => {
+    // 无 src/ 目录，源码放在 packages/ 下，验证候选源码根回退
+    const pkgDir = path.join(tempDir, 'packages', 'core');
+    mkdirSync(pkgDir, { recursive: true });
+    const fakeApiKey = ['sk-', 'fedcba9876543210'].join('');
+    writeFileSync(path.join(pkgDir, 'config.ts'), [
+      `const API_KEY = "${fakeApiKey}";`,
+    ].join('\n'), 'utf-8');
+
+    registry.register(makeRule({
+      id: 'guard.block.sensitive-pkg',
+      domain: 'guard',
+      action: 'block',
+      severity: 'critical',
+      applicableEngines: ['guard'],
+      content: { patterns: ['sk-[a-zA-Z0-9]{16,}'] },
+    }));
+
+    const report = await engine.evaluateRules({ repoRoot: tempDir, domain: 'guard' });
+    expect(report.total).toBe(1);
+    expect(report.failed).toBe(1);
+    const violations = report.evaluations[0].violations!;
+    expect(violations.some((v) => v.message.includes('sk-'))).toBe(true);
+    expect(violations.some((v) => v.file.includes('packages'))).toBe(true);
+  });
+
   it('forbidden: 检测 as any / ts-ignore', async () => {
     const srcDir = path.join(tempDir, 'src');
     mkdirSync(srcDir, { recursive: true });

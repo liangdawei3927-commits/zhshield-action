@@ -115,11 +115,15 @@ async function runScannerAdapters(
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
   const violations: Violation[] = [];
+  const reasons: string[] = [];
   let anyRan = false;
   for (const tool of scanners) {
     const toolName = String(tool);
-    if (!host.toolAdapters.has(toolName)) continue;
-    anyRan = true;
+    // 未注册的扫描器不再静默跳过：计入原因汇总，避免「工具缺失 = 未检测」被误报为通过
+    if (!host.toolAdapters.has(toolName)) {
+      reasons.push(`${toolName}(未注册工具适配器: ${toolName})`);
+      continue;
+    }
     const one = await evalToolDispatch(
       host,
       rule,
@@ -137,8 +141,28 @@ async function runScannerAdapters(
     if (one.status === 'error' && !one.violations?.length) {
       return { ...one, message: one.message ?? `扫描器 ${toolName} 执行失败` };
     }
+    if (one.status === 'skipped') {
+      const msg = one.message ?? '扫描器不可用';
+      // 形如「工具不可用: semgrep（未安装或在 PATH 中未找到）」→ 提取括号内原因
+      const prefix = `工具不可用: ${toolName}（`;
+      const reason = msg.startsWith(prefix) && msg.endsWith('）')
+        ? msg.slice(prefix.length, -1)
+        : msg;
+      reasons.push(`${toolName}(${reason})`);
+      continue;
+    }
+    anyRan = true;
   }
-  if (!anyRan) return null;
+  // 所有扫描器均未运行（未注册 / 不可用 / 被跳过）→ 显式上报 skipped 并附各工具原因
+  if (!anyRan) {
+    return skippedResult(
+      rule,
+      reasons.length > 0
+        ? `所有扫描器不可用: ${reasons.join(', ')}`
+        : '所有扫描器不可用（未配置任何可用扫描器）',
+      'inspect',
+    );
+  }
 
   return {
     rule,
@@ -166,18 +190,19 @@ export async function evalToolDispatch(
   if (!adapter) {
     return skippedResult(rule, `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`, targetEngineOf(rule));
   }
-
-  // 防御性检查：适配器接口不完整（如 guard 旧 Adapter 缺少 isAvailable/scan）时跳过，而非崩溃
-  if (typeof adapter.isAvailable !== 'function' || typeof adapter.scan !== 'function') {
+  if (!isAdapterUsable(adapter)) {
     return skippedResult(rule, `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`, targetEngineOf(rule));
   }
-
   const available = await adapter.isAvailable();
   if (!available) {
     return skippedResult(rule, `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`, targetEngineOf(rule));
   }
-
   return runToolScan(host, adapter, rule, instr, context);
+}
+
+/** 防御性检查：适配器接口不完整（如 guard 旧 Adapter 缺少 isAvailable/scan）时跳过，而非崩溃 */
+function isAdapterUsable(adapter: ToolAdapter): boolean {
+  return typeof adapter.isAvailable === 'function' && typeof adapter.scan === 'function';
 }
 
 async function runToolScan(
@@ -199,9 +224,7 @@ async function runToolScan(
       } as ToolConfig,
       timeout: (toolConfig.timeout as number) ?? undefined,
     });
-
     await logToolExecutionAudit(host.auditLogger, adapter.meta.id, result, context.repoRoot);
-
     void host.eventBus?.emit('tool:executed', {
       tool: adapter.meta.id,
       status: result.status,
@@ -211,28 +234,37 @@ async function runToolScan(
       sopRuleId: rule.id,
       timestamp: new Date(),
     });
-
-    const violations = toolScanViolations(result, rule);
-    const status = result.status === 'available' && result.issues.length === 0 ? 'passed'
-      : result.status === 'error' ? 'error'
-      : 'failed';
-
-    return {
-      rule,
-      status,
-      violations,
-      files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
-      message: violations.length > 0
-        ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
-        : result.error ? `工具 ${instr.tool} 错误: ${result.error}`
-        : `工具 ${instr.tool} 检查通过`,
-      durationMs: result.metadata.duration,
-      targetEngine: targetEngineOf(rule),
-      timestamp: new Date(),
-    };
+    return buildToolScanResult(rule, instr, result);
   } catch (err) {
     return errorResult(rule, `工具 ${instr.tool} 执行失败: ${toMessage(err)}`, targetEngineOf(rule));
   }
+}
+
+/** 组装工具扫描结果：状态映射 + 违规收集 */
+function buildToolScanResult(
+  rule: SopRule,
+  instr: ToolDispatchInstruction,
+  result: ToolResult,
+): RuleEvaluation {
+  const violations = toolScanViolations(result, rule);
+  const status = result.status === 'available' && result.issues.length === 0 ? 'passed'
+    : result.status === 'error' ? 'error'
+    : result.status === 'unavailable' ? 'skipped'
+    : 'failed';
+
+  return {
+    rule,
+    status,
+    violations,
+    files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
+    message: violations.length > 0
+      ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
+      : result.error ? `工具 ${instr.tool} 错误: ${result.error}`
+      : `工具 ${instr.tool} 检查通过`,
+    durationMs: result.metadata.duration,
+    targetEngine: targetEngineOf(rule),
+    timestamp: new Date(),
+  };
 }
 
 function toolScanViolations(result: ToolResult, rule: SopRule): Violation[] {

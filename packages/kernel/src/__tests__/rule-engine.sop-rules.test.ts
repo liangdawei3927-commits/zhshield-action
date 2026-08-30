@@ -169,7 +169,7 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       expect(csrfEval!.status).toBe('skipped');
     });
 
-    it('sql-injection: 无可解释内容时默认 pattern-scan 评估（dryRun 不跳过）', async () => {
+    it('sql-injection: 重写为 tool-dispatch 后 dryRun 跳过外部派发', async () => {
       const report = await engine.runInspect({
         repoRoot: tempDir,
         domain: 'security',
@@ -177,8 +177,8 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       });
       const sqliEval = report.evaluations.find((e) => e.rule.id.includes('sql-injection'));
       expect(sqliEval).toBeDefined();
-      // pattern-scan 不在 isExternalDispatch 中，dryRun 下仍会评估
-      expect(sqliEval!.status).not.toBe('skipped');
+      // tool-dispatch 属于外部派发，dryRun 下跳过（不再静默 passed）
+      expect(sqliEval!.status).toBe('skipped');
     });
   });
 

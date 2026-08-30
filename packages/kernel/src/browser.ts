@@ -2,3 +2,7 @@
 // Do NOT import anything from db/sop/runner here — those pull in Node.js deps (SQLite etc.)
 export { NotificationService, notificationService } from './notification';
 export type { AppNotification, NotificationStore, NotificationListener } from './notification';
+
+// Logger is dependency-free (console + Date only) — safe for the sandboxed renderer.
+export { Logger } from './log';
+export type { LogLevel } from './log';

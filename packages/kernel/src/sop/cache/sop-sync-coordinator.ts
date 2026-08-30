@@ -104,16 +104,31 @@ export class SopSyncCoordinator {
    * 5. 校验完整性
    */
   async syncFromCloud(): Promise<SyncResult> {
-    if (!this.scheduler.isOnline) {
-      return { updated: false, reason: 'network_error' };
-    }
-
-    const remoteVersion = await this.checkRemoteVersion();
+    const remoteVersion = await this.resolveRemoteVersion();
     if (!remoteVersion) {
       return { updated: false, reason: 'network_error' };
     }
 
     const state = this.compareVersions(remoteVersion);
+    const stateResult = await this.handleVersionState(state, remoteVersion);
+    if (stateResult) return stateResult;
+
+    return this.syncDiffOrFull(remoteVersion);
+  }
+
+  /** 检查在线状态并获取云端版本；不可用返回 null */
+  private async resolveRemoteVersion(): Promise<SopVersion | null> {
+    if (!this.scheduler.isOnline) {
+      return null;
+    }
+    return this.checkRemoteVersion();
+  }
+
+  /** 处理版本对比结果：latest 直接返回，reset 先清缓存；proceed 返回 null 继续 */
+  private async handleVersionState(
+    state: 'latest' | 'reset' | 'proceed',
+    remoteVersion: SopVersion,
+  ): Promise<SyncResult | null> {
     if (state === 'latest') {
       this.scheduler.recordSync();
       return { updated: false, reason: 'already_latest' };
@@ -122,18 +137,19 @@ export class SopSyncCoordinator {
       console.warn('[SopCacheManager] Local version > remote version, resetting');
       await this.clearCache();
     }
+    return null;
+  }
 
+  /** 拉取增量 diff；不可用或兼容性不满足时降级为全量同步 */
+  private async syncDiffOrFull(remoteVersion: SopVersion): Promise<SyncResult> {
     const fromVersion = this.localVersion?.version ?? '0.0.0';
     const diff = await this.syncClient.fetchDiff(fromVersion, remoteVersion.version);
-
     if (!diff) {
       return this.fullSync(remoteVersion);
     }
-
     if (!this.checkCompatibility(diff.compatibility)) {
       return { updated: false, reason: 'compatibility_error' };
     }
-
     try {
       return await this.applyIncremental(diff, fromVersion, remoteVersion);
     } catch (err) {

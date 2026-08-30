@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as yazl from 'yazl';
-import { safeJoin, PathTraversalError } from '@zh/shared';
+import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { pipeline } from 'node:stream/promises';
 import { hashFile } from './utils';
 import { openZipArchive, toZipEntryName } from './zip-archive';
@@ -41,6 +41,23 @@ export async function buildZipSnapshot(request: ZipSnapshotRequest): Promise<Zip
   const { files, projectPath, timestamp, zipPath, abortSignal } = request;
   const tmpZipPath = `${zipPath}.tmp`;
   const zip = new yazl.ZipFile();
+
+  const { fileEntries, backedUp, errors, totalSize } = await addFilesToZip(
+    zip, files, projectPath, timestamp, abortSignal,
+  );
+  await finalizeZip(zip, fileEntries, timestamp, tmpZipPath, zipPath, abortSignal);
+
+  return { backedUp, errors, totalSize, fileEntries };
+}
+
+/** 逐个文件写入 zip：计算哈希与大小，记录清单条目 */
+async function addFilesToZip(
+  zip: yazl.ZipFile,
+  files: string[],
+  projectPath: string,
+  timestamp: string,
+  abortSignal?: AbortSignal,
+): Promise<{ fileEntries: LocalBackupFileEntry[]; backedUp: number; errors: number; totalSize: number }> {
   const fileEntries: LocalBackupFileEntry[] = [];
   let backedUp = 0;
   let errors = 0;
@@ -66,7 +83,18 @@ export async function buildZipSnapshot(request: ZipSnapshotRequest): Promise<Zip
       errors++;
     }
   }
+  return { fileEntries, backedUp, errors, totalSize };
+}
 
+/** 写入清单并落盘：先写 .tmp 再原子改名，失败清理临时文件 */
+async function finalizeZip(
+  zip: yazl.ZipFile,
+  fileEntries: LocalBackupFileEntry[],
+  timestamp: string,
+  tmpZipPath: string,
+  zipPath: string,
+  abortSignal?: AbortSignal,
+): Promise<void> {
   try {
     const manifest: LocalBackupManifest = {
       version: '1.0',
@@ -87,8 +115,6 @@ export async function buildZipSnapshot(request: ZipSnapshotRequest): Promise<Zip
     await fs.rm(tmpZipPath, { force: true }).catch(() => {});
     throw err;
   }
-
-  return { backedUp, errors, totalSize, fileEntries };
 }
 
 async function extractZipEntry(
@@ -110,42 +136,62 @@ export async function restoreFromZipArchive(
   abortSignal?: AbortSignal,
 ): Promise<LocalBackupRestoreResult> {
   const archive = await openZipArchive(zipPath);
+  try {
+    const files = await readManifestFiles(archive);
+    return await restoreEntries(archive, files, targetDir, abortSignal);
+  } finally {
+    archive.close();
+  }
+}
+
+/** 从归档内读取 BACKUP_MANIFEST.json 清单；缺失时按空清单处理 */
+async function readManifestFiles(
+  archive: Awaited<ReturnType<typeof openZipArchive>>,
+): Promise<LocalBackupFileEntry[]> {
+  const manifestEntry = archive.entriesByName.get('BACKUP_MANIFEST.json');
+  const manifestBuf = manifestEntry ? await archive.readEntry(manifestEntry) : null;
+  return manifestBuf
+    ? (JSON.parse(manifestBuf.toString('utf-8')) as LocalBackupManifest).files
+    : [];
+}
+
+/** 解析还原目标路径；路径穿越被拦截时返回 null（调用方计数失败），其他错误原样抛出 */
+function resolveRestoreTarget(targetDir: string, relativePath: string): string | null {
+  try {
+    return safeJoinReal(targetDir, relativePath);
+  } catch (err) {
+    if (err instanceof PathTraversalError) return null;
+    throw err;
+  }
+}
+
+/** 逐条还原：路径穿越拦截 + 解压失败计数 */
+async function restoreEntries(
+  archive: Awaited<ReturnType<typeof openZipArchive>>,
+  files: LocalBackupFileEntry[],
+  targetDir: string,
+  abortSignal?: AbortSignal,
+): Promise<{ restored: number; failed: number; problems: string[] }> {
   let restored = 0;
   let failed = 0;
   const problems: string[] = [];
 
-  try {
-    const manifestEntry = archive.entriesByName.get('BACKUP_MANIFEST.json');
-    const manifestBuf = manifestEntry ? await archive.readEntry(manifestEntry) : null;
-    const files = manifestBuf
-      ? (JSON.parse(manifestBuf.toString('utf-8')) as LocalBackupManifest).files
-      : [];
-
-    for (const entry of files) {
-      if (abortSignal?.aborted) break;
-      let targetPath: string;
-      try {
-        targetPath = safeJoin(targetDir, entry.relativePath);
-      } catch (err) {
-        if (err instanceof PathTraversalError) {
-          // 防御纵深：即使底层 zip 库未拦截，也绝不写盘到 targetDir 之外
-          failed++;
-          problems.push(`${entry.relativePath}: path traversal blocked`);
-          continue;
-        }
-        throw err;
-      }
-      try {
-        await extractZipEntry(archive, entry.relativePath, targetPath);
-        restored++;
-      } catch (err) {
-        failed++;
-        problems.push(`${entry.relativePath}: ${err instanceof Error ? err.message : String(err)}`);
-      }
+  for (const entry of files) {
+    if (abortSignal?.aborted) break;
+    const targetPath = resolveRestoreTarget(targetDir, entry.relativePath);
+    if (targetPath === null) {
+      // 防御纵深：即使底层 zip 库未拦截，也绝不写盘到 targetDir 之外
+      failed++;
+      problems.push(`${entry.relativePath}: path traversal blocked`);
+      continue;
     }
-  } finally {
-    archive.close();
+    try {
+      await extractZipEntry(archive, entry.relativePath, targetPath);
+      restored++;
+    } catch (err) {
+      failed++;
+      problems.push(`${entry.relativePath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
-
   return { restored, failed, problems };
 }

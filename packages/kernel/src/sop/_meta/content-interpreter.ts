@@ -139,6 +139,10 @@ export class ContentInterpreter {
     return {
       type: 'forbidden',
       patterns: (c.forbidden as string[]).map(String),
+      fileExts: Array.isArray(c.fileExts) ? (c.fileExts as string[]).map(String) : undefined,
+      excludePatterns: Array.isArray(c.excludePatterns)
+        ? (c.excludePatterns as string[]).map(String)
+        : undefined,
     };
   }
 

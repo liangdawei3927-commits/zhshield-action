@@ -44,38 +44,20 @@ export class BackupOrchestrator {
 
   async execute(options: ExecuteOptions): Promise<BackupResult> {
     const { projectId, projectPath, trigger = 'manual', abortSignal } = options;
-    let { projectName } = options;
     const startTime = Date.now();
     const backupId = this.generateBackupId();
+    const projectName = options.projectName ?? projectId;
 
     this.emit(BACKUP_EVENTS.STARTED, { projectId, backupId, type: 'full' });
 
     const config = await this.configManager.loadProjectConfig(projectPath, options.projectName);
-    if (!projectName) {
-      projectName = projectId;
-    }
-
-    const results: BackupSubResult[] = [];
-
-    if (config.github.enabled && !abortSignal?.aborted) {
-      this.emitProgress({ projectId, backupId, phase: 'github-commit', percent: 40, message: '正在提交到 GitHub...' });
-      const githubResult = await this.githubBackup.backup(projectPath, config.github, abortSignal);
-      results.push(githubResult);
-    }
-
-    if (config.local.enabled && !abortSignal?.aborted) {
-      this.emitProgress({ projectId, backupId, phase: 'local-copy', percent: 70, message: '正在复制到本地目录...' });
-      const localResult = await this.localBackup.backup(projectPath, config.local, abortSignal);
-      results.push(localResult);
-    }
-
+    const results = await this.runEnabledBackups(config, projectPath, projectId, backupId, abortSignal);
     const overallStatus = this.calculateOverallStatus(results);
     const duration = Date.now() - startTime;
-
     const result: BackupResult = {
       projectId,
-      projectName: projectName ?? projectId,
-      trigger: trigger,
+      projectName,
+      trigger,
       results,
       overallStatus,
       timestamp: new Date(),
@@ -83,7 +65,38 @@ export class BackupOrchestrator {
     };
 
     this.saveRecord(result, projectPath);
+    this.emitCompletionEvents(result, projectId, backupId, overallStatus);
 
+    return result;
+  }
+
+  /** 依次执行已启用的备份方式（GitHub → 本地），返回子结果列表 */
+  private async runEnabledBackups(
+    config: Awaited<ReturnType<BackupConfigManager['loadProjectConfig']>>,
+    projectPath: string,
+    projectId: string,
+    backupId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<BackupSubResult[]> {
+    const results: BackupSubResult[] = [];
+    if (config.github.enabled && !abortSignal?.aborted) {
+      this.emitProgress({ projectId, backupId, phase: 'github-commit', percent: 40, message: '正在提交到 GitHub...' });
+      results.push(await this.githubBackup.backup(projectPath, config.github, abortSignal));
+    }
+    if (config.local.enabled && !abortSignal?.aborted) {
+      this.emitProgress({ projectId, backupId, phase: 'local-copy', percent: 70, message: '正在复制到本地目录...' });
+      results.push(await this.localBackup.backup(projectPath, config.local, abortSignal));
+    }
+    return results;
+  }
+
+  /** 按整体状态发出完成/失败事件 */
+  private emitCompletionEvents(
+    result: BackupResult,
+    projectId: string,
+    backupId: string,
+    overallStatus: BackupStatus,
+  ): void {
     if (overallStatus === 'failed') {
       this.emit(BACKUP_EVENTS.FAILED, {
         projectId, backupId,
@@ -94,8 +107,6 @@ export class BackupOrchestrator {
       this.emitProgress({ projectId, backupId, phase: 'local-metadata', percent: 100, message: '备份完成' });
       this.emit(BACKUP_EVENTS.COMPLETED, { projectId, backupId, result });
     }
-
-    return result;
   }
 
   async executeGitHubOnly(projectId: string, projectPath: string): Promise<BackupSubResult> {

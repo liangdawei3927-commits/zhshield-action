@@ -35,29 +35,15 @@ export class DataCleanup {
     const maxEntries = options?.maxEntries ?? this.config.maxEntries;
     const maxAgeDays = options?.maxAgeDays ?? this.config.maxAgeDays;
     const cutoffDate = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
-
     const totalBefore = entries.length;
     const errors: string[] = [];
 
-    // 按时间过滤
-    let filtered = entries.filter(e => {
-      const ts = e.timestamp instanceof Date ? e.timestamp : new Date(e.timestamp);
-      return ts >= cutoffDate;
-    });
-
-    // 按大小限制（保留最新的）
-    if (filtered.length > maxEntries) {
-      filtered = filtered.slice(-maxEntries);
-    }
-
-    // 确保至少保留 keepMinimum 条
-    if (filtered.length < this.config.keepMinimum && entries.length >= this.config.keepMinimum) {
-      filtered = entries.slice(-this.config.keepMinimum);
-    }
+    let filtered = this.filterByCutoff(entries, cutoffDate);
+    filtered = this.limitByMaxEntries(filtered, maxEntries);
+    filtered = this.ensureKeepMinimum(filtered, entries);
 
     const totalAfter = filtered.length;
     const removed = totalBefore - totalAfter;
-
     return {
       totalBefore,
       totalAfter,
@@ -66,6 +52,30 @@ export class DataCleanup {
       errors,
       kept: filtered,
     };
+  }
+
+  /** 按时间过滤：丢弃早于截止日期的条目 */
+  private filterByCutoff<T extends { timestamp: Date | string }>(
+    entries: T[],
+    cutoffDate: Date,
+  ): T[] {
+    return entries.filter(e => {
+      const ts = e.timestamp instanceof Date ? e.timestamp : new Date(e.timestamp);
+      return ts >= cutoffDate;
+    });
+  }
+
+  /** 按大小限制：超出上限时保留最新的 */
+  private limitByMaxEntries<T>(filtered: T[], maxEntries: number): T[] {
+    return filtered.length > maxEntries ? filtered.slice(-maxEntries) : filtered;
+  }
+
+  /** 确保至少保留 keepMinimum 条 */
+  private ensureKeepMinimum<T>(filtered: T[], entries: T[]): T[] {
+    if (filtered.length < this.config.keepMinimum && entries.length >= this.config.keepMinimum) {
+      return entries.slice(-this.config.keepMinimum);
+    }
+    return filtered;
   }
 
   /**

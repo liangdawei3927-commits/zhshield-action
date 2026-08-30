@@ -40,7 +40,7 @@ export class GuardSonarwayESLintAdapter implements Adapter {
 
   async run(
     context: { targetFiles?: string[]; projectPath?: string },
-    check: CheckConfig,
+    _check: CheckConfig,
   ): Promise<{ results: LintResult[]; error?: string }> {
     const projectPath = context.projectPath || process.cwd();
     const target =

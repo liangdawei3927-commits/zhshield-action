@@ -6,7 +6,6 @@ import { VulnerabilityScanner } from './vulnerability-scanner';
 import { GarbageScanner } from './garbage-scanner';
 import { MalwareScanner } from './malware-scanner';
 import { GrypeCrossValidator } from './cross-validator';
-import type { CrossValidationReport } from './cross-validator';
 import { RuleConflictResolver } from './rule-conflict-resolver';
 import type { RuleConflictReport } from './rule-conflict-resolver';
 import { TrivyAdapter, GrypeAdapter, DepcheckAdapter, SemgrepAdapter, ORTAdapter } from './adapters';

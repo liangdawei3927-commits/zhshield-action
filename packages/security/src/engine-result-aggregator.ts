@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Issue } from '@zh/shared';
-import type { Vulnerability, SecurityScanReport, GarbageItem, MalwareItem } from './types';
+import type { Vulnerability, GarbageItem, MalwareItem } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
 import { GarbageScanner, mapDepcheckIssuesToGarbage } from './garbage-scanner';
 import { MalwareScanner, mapSemgrepIssuesToMalware } from './malware-scanner';
@@ -73,22 +73,6 @@ function mapCrossEntries(report: CrossValidationReport): Vulnerability[] {
   }
 
   return result;
-}
-
-function summarizeFindings(
-  vulnerabilities: Vulnerability[],
-  garbage: GarbageItem[],
-  malware: MalwareItem[],
-): SecurityScanReport['summary'] {
-  return {
-    vulnTotal: vulnerabilities.length,
-    vulnCritical: vulnerabilities.filter((v) => v.severity === 'critical').length,
-    vulnHigh: vulnerabilities.filter((v) => v.severity === 'high').length,
-    vulnMedium: vulnerabilities.filter((v) => v.severity === 'medium').length,
-    vulnLow: vulnerabilities.filter((v) => v.severity === 'low').length,
-    garbageTotal: garbage.length,
-    malwareTotal: malware.length,
-  };
 }
 
 export interface ResultAggregatorResult {

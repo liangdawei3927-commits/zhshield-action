@@ -12,6 +12,7 @@
       "install": "binary",
       "version": "1.175.0",
       "desc": "静态应用安全测试（SAST），inspect 侧 semgrep-adapter 调用",
+      "probeTimeoutMs": 30000,
       "checked": {
         "date": "2026-08-30",
         "source": "GitHub release v1.175.0（无 release 二进制资产）+ PyPI semgrep 1.175.0"

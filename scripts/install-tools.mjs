@@ -51,7 +51,7 @@ import { existsSync } from 'node:fs';
 import { BIN_DIR, TOOLS_DIR, IS_WIN, log, warn, ok, fail } from './lib/install-tools/constants.mjs';
 import { readManifest, binNameFor } from './lib/install-tools/manifest.mjs';
 import {
-  findInPath, getToolVersion, getNpmInstalledVersion, versionsMatch, supportsVersionFlag,
+  findInPath, getToolVersion, getNpmInstalledVersion, versionsMatch, supportsVersionFlag, probeTimeoutFor,
 } from './lib/install-tools/detect.mjs';
 import { installTool } from './lib/install-tools/installers.mjs';
 
@@ -96,7 +96,7 @@ function checkPath(tool, label, binName) {
     ok(`${label} 可用（PATH: ${pathHit}）`);
     return { tool, status: 'path' };
   }
-  const actual = getToolVersion(pathHit);
+  const actual = getToolVersion(pathHit, probeTimeoutFor(tool));
   if (actual && versionsMatch(actual, tool.version)) {
     ok(`${label} 可用（PATH: ${pathHit}）`);
   } else {
@@ -109,7 +109,7 @@ function checkPath(tool, label, binName) {
 function checkLocal(tool, label, binName, force) {
   const localBin = join(BIN_DIR, IS_WIN ? `${binName}.cmd` : binName);
   if (!existsSync(localBin) || force) return null;
-  const actual = tool.install === 'npm' ? getNpmInstalledVersion(tool) : getToolVersion(localBin);
+  const actual = tool.install === 'npm' ? getNpmInstalledVersion(tool) : getToolVersion(localBin, probeTimeoutFor(tool));
   if (actual && versionsMatch(actual, tool.version)) {
     ok(`${label} 可用（${localBin}）`);
     return { tool, status: 'local' };

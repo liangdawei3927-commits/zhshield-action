@@ -21,10 +21,10 @@ export function findInPath(binName) {
   return null;
 }
 
-/** 运行 <bin> --version 并提取首个 semver 三元组 */
-export function getToolVersion(binPath) {
+/** 运行 <bin> --version 并提取首个 semver 三元组（timeoutMs 缺省 10s，慢启动工具由清单 probeTimeoutMs 覆盖） */
+export function getToolVersion(binPath, timeoutMs = 10000) {
   try {
-    const res = spawnSync(binPath, ['--version'], { encoding: 'utf-8', timeout: 10000 });
+    const res = spawnSync(binPath, ['--version'], { encoding: 'utf-8', timeout: timeoutMs });
     if (res.status !== 0) return null;
     const out = `${res.stdout || ''}${res.stderr || ''}`;
     const m = out.match(/\d+\.\d+\.\d+/);
@@ -32,6 +32,11 @@ export function getToolVersion(binPath) {
   } catch {
     return null;
   }
+}
+
+/** 单工具探测超时：清单可配 probeTimeoutMs（如 Python 系慢启动工具），缺省 10s */
+export function probeTimeoutFor(tool) {
+  return tool.probeTimeoutMs ?? 10000;
 }
 
 export function versionsMatch(actual, expected) {

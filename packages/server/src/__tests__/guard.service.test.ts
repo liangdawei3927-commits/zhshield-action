@@ -76,6 +76,7 @@ vi.mock('@zh/guard', async (importOriginal) => {
   return {
     ...actual,
     GuardESLintCheckAdapter: makePassedAdapter('eslint-check'),
+    GuardSonarwayESLintAdapter: makePassedAdapter('sonarway-eslint'),
     GuardSensitiveInfoAdapter: makePassedAdapter('sensitive-info'),
     ArchitectureBoundaryAdapter: makePassedAdapter('architecture-boundary'),
     TestRunnerAdapter: makePassedAdapter('test-runner'),

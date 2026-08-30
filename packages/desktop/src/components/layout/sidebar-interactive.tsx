@@ -157,14 +157,11 @@ export function AiToolSection({ aiTool, aiApplying, onToggleAiTool }: { aiTool: 
           </button>
         </div>
         {aiTool?.enabled && (
-          <div className="mt-2.5 text-[11px] text-green-800 bg-green-50 border border-green-100 rounded-md px-2 py-1.5">
+          <div className="mt-2 text-[11px] leading-relaxed text-zh-success-fg">
             {t('layout.aiToolEnabled')}
           </div>
         )}
       </BounceCard>
-      <p className="text-[11px] text-zh-muted px-1 mt-2 leading-relaxed">
-        {t('layout.aiToolEnableHintPrefix')}<span className="font-mono">integration.json</span>{t('layout.aiToolEnableHintSuffix')}
-      </p>
     </section>
   );
 }

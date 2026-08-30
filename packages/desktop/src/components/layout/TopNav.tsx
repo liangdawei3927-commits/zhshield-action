@@ -9,12 +9,6 @@ interface TopNavProps {
   onOpenSettings: () => void;
   projectName?: string;
   sidebarOpen?: boolean;
-  gateEnabled?: boolean | null;
-  onToggleGate?: (enabled: boolean) => void;
-  gateLoading?: boolean;
-  sentinelEnabled?: boolean | null;
-  onToggleSentinel?: (enabled: boolean) => void;
-  sentinelLoading?: boolean;
 }
 
 interface NavItem {
@@ -24,7 +18,7 @@ interface NavItem {
   label?: string;
 }
 
-/** 11 个分类导航（360 风格：大图标 + 底部文字）；备份中心入口已移至 TitleBar 右侧 */
+/** 10 个分类导航（360 风格：大图标 + 底部文字）；备份中心、报告中心入口已移至 TitleBar 右侧 */
 const navItems: NavItem[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard' },
   { id: 'guard', labelKey: 'nav.guard' },
@@ -36,7 +30,6 @@ const navItems: NavItem[] = [
   { id: 'performance', labelKey: 'nav.performance' },
   { id: 'techdebt', labelKey: 'nav.techdebt' },
   { id: 'refactor', labelKey: 'nav.refactor' },
-  { id: 'reports', labelKey: 'nav.reports' },
 ];
 
 interface CategoryNavItemProps {
@@ -61,10 +54,10 @@ function CategoryNavItem({ item, active, onNavigate }: CategoryNavItemProps) {
     >
       {/* 内容块：格子均分整行，悬停/选中同为「圆角+底部连页面」色块，仅透明度不同 */}
       <span className={`zh-nav-block ${active ? 'zh-nav-block--active' : ''}`}>
-        <span className="flex items-center justify-center" style={{ width: 26, height: 26 }}>
-          <NavIcon id={item.id} size={24} />
+        <span className="flex items-center justify-center" style={{ width: 30, height: 30 }}>
+          <NavIcon id={item.id} size={28} />
         </span>
-        <span style={{ fontSize: 12, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' }}>{item.label ?? t(item.labelKey)}</span>
+        <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' }}>{item.label ?? t(item.labelKey)}</span>
       </span>
     </Bounce>
   );
@@ -94,7 +87,7 @@ function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage
   );
 }
 
-export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, sidebarOpen, gateEnabled, onToggleGate, gateLoading, sentinelEnabled, onToggleSentinel, sentinelLoading }: TopNavProps) {
+export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, sidebarOpen }: TopNavProps) {
   return (
     <header className="shrink-0 select-none">
       {/* 第一行：统一品牌色 title bar */}
@@ -104,12 +97,6 @@ export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, s
         sidebarOpen={sidebarOpen}
         currentPage={currentPage}
         onNavigate={onNavigate}
-        gateEnabled={gateEnabled}
-        onToggleGate={onToggleGate}
-        gateLoading={gateLoading}
-        sentinelEnabled={sentinelEnabled}
-        onToggleSentinel={onToggleSentinel}
-        sentinelLoading={sentinelLoading}
       />
       {/* 第二行：大图标分类导航 */}
       <CategoryNav currentPage={currentPage} onNavigate={onNavigate} />

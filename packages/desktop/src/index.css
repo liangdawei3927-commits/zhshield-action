@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 /* ─── 主题 token 注册表 ───────────────────────────────────────
- * 三主题: teal(默认·青蓝) / legacy(经典深绿) / dracula
+ * 模式映射: light→teal(青蓝·浅色) / dark→dracula(深墨青·深色) / system→按系统偏好
  * 颜色一律 RGB 三元组, Tailwind 通过 rgb(var(--x) / <alpha-value>) 引用;
  * 直接使用语义变量时包裹为 rgb(var(--x)) 或 rgb(var(--x) / a)。
- * 非颜色 token (圆角/间距/字号/header 高度) 留在 :root, 三主题共享。 */
+ * 非颜色 token (圆角/间距/字号/header 高度) 留在 :root, 两主题共享。 */
 
 :root {
   /* ── 品牌色阶 (teal) ── */
@@ -52,6 +52,7 @@
   --zh-brand-lighter: 234 245 243;
   --zh-brand-dark: 8 78 71;
   --zh-success: 14 159 110;
+  --zh-success-fg: 10 94 65;
   --zh-warning: 180 83 9;
   --zh-danger: 220 38 38;
   --zh-danger-dark: 154 27 27;
@@ -101,37 +102,7 @@
   --zh-font-2xl: 26px;
 }
 
-/* ── legacy (经典深绿): 只覆盖颜色, 成功/信息色阶沿用 teal ── */
-[data-theme="legacy"] {
-  /* 品牌色阶 */
-  --zh-brand-50: 234 245 236;
-  --zh-brand-100: 211 233 215;
-  --zh-brand-200: 169 212 178;
-  --zh-brand-300: 124 189 136;
-  --zh-brand-400: 81 168 100;
-  --zh-brand-500: 47 143 71;
-  --zh-brand-600: 26 107 54;
-  --zh-brand-700: 20 85 44;
-  --zh-brand-800: 15 61 34;
-  --zh-brand-900: 10 46 26;
-
-  /* 语义色 */
-  --zh-brand: 26 107 54;
-  --zh-brand-hover: 20 85 44;
-  --zh-brand-light: 211 233 215;
-  --zh-brand-lighter: 234 245 236;
-  --zh-brand-dark: 15 61 34;
-  --zh-bg-primary: 245 248 246;
-  --zh-bg-secondary: 234 245 236;
-  --zh-bg-brand: 26 107 54;
-  --zh-bg-brand-light: 211 233 215;
-  --zh-line: 220 232 223;
-  --zh-line-light: 211 233 215;
-  --zh-line-default: 220 232 223;
-  --zh-scrollbar-thumb: 169 212 178;
-}
-
-/* ── dracula (墨紫黑·夜间): 只覆盖颜色; 成功/信息色阶沿用 :root teal/智靛 ── */
+/* ── dracula (深墨青·夜间): 只覆盖颜色; 成功/信息色阶沿用 :root teal/智靛 ── */
 [data-theme="dracula"] {
   /* 品牌色阶 (提亮青蓝, VI §6.1 暗色档: 主色用 #2DD4BF) */
   --zh-brand-50: 20 45 41;
@@ -152,6 +123,7 @@
   --zh-brand-lighter: 42 88 80;
   --zh-brand-dark: 12 88 79;
   --zh-success: 52 211 153;
+  --zh-success-fg: 52 211 153;
   --zh-warning: 240 162 59;
   --zh-danger: 248 113 113;
   --zh-danger-dark: 255 105 105;
@@ -159,16 +131,16 @@
   --zh-ink-2: 159 176 172;
   --zh-muted: 107 124 120;
   --zh-text-on-brand: 248 248 242;
-  --zh-bg-primary: 29 30 40;
-  --zh-bg-secondary: 36 37 47;
-  --zh-bg-tertiary: 41 42 52;
+  --zh-bg-primary: 21 34 32;
+  --zh-bg-secondary: 26 40 38;
+  --zh-bg-tertiary: 31 45 43;
   --zh-bg-brand: 14 100 90;
   --zh-bg-brand-light: 24 55 50;
-  --zh-line: 55 68 64;
-  --zh-line-light: 50 62 58;
-  --zh-line-default: 55 68 64;
-  --zh-scrollbar-thumb: 74 88 84;
-  --zh-scrollbar-thumb-hover: 108 124 118;
+  --zh-line: 40 54 51;
+  --zh-line-light: 35 48 45;
+  --zh-line-default: 40 54 51;
+  --zh-scrollbar-thumb: 58 74 70;
+  --zh-scrollbar-thumb-hover: 92 106 101;
 }
 
 * {
@@ -261,7 +233,6 @@ body {
 
 .zh-bounce {
   transform: translateZ(0);
-  will-change: transform;
   animation: zh-bounce-enter 0.45s ease backwards;
   transition-property: transform, background-color, border-color, color, box-shadow, opacity;
   transition-duration: 0.4s, 0.15s, 0.15s, 0.15s, 0.15s, 0.15s;

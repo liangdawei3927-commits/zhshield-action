@@ -179,8 +179,9 @@ function ScreensaverFooter({ visible }: { visible: boolean }) {
       style={{ opacity: visible ? 0.6 : 0, transitionDelay: '600ms' }}
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2C9 2 7 4 7 7c0 2 1 3 2 4l-3 5c0 3 2 6 6 6s6-3 6-6l-3-5c1-1 2-2 2-4 0-3-2-5-5-5z" />
-        <path d="M12 2v20" />
+        <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+        <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+        <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
       </svg>
       <span className="text-sm text-white/70">智汇大脑</span>
     </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AiToolConfigData } from '../../types/electron';
 import { SidebarHeader, ProjectsSection, AiToolSection } from './sidebar-interactive';
 import { ThemeSection, LanguageSection, AboutSection } from './sidebar-about';
-import { EngineStatusSection } from './sidebar-status';
+import { EngineStatusSection, WisdomBrainCard, type EngineCardProps } from './sidebar-status';
 import type { ProjectInfo } from './sidebar-interactive';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useT } from '../../i18n';
@@ -20,6 +20,9 @@ interface SidebarProps {
   aiTool: AiToolConfigData | null;
   aiApplying: boolean;
   onToggleAiTool: (enabled: boolean) => void;
+  intelligentEnabled: boolean;
+  setIntelligentEnabled: (enabled: boolean) => void;
+  intelligentLoading: boolean;
 }
 
 function SidebarOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -38,6 +41,9 @@ function SidebarPanel({
   aiTool,
   aiApplying,
   onToggleAiTool,
+  intelligentEnabled,
+  setIntelligentEnabled,
+  intelligentLoading,
 }: {
   open: boolean;
   onClose: () => void;
@@ -50,7 +56,7 @@ function SidebarPanel({
   aiTool: AiToolConfigData | null;
   aiApplying: boolean;
   onToggleAiTool: (enabled: boolean) => void;
-}) {
+} & EngineCardProps) {
   return (
     <aside
       className="fixed top-0 right-0 z-50 h-full bg-zh-card shadow-2xl flex flex-col transition-transform duration-300 ease-out"
@@ -63,7 +69,12 @@ function SidebarPanel({
 
       <div key={open ? 'sidebar-open' : 'sidebar-closed'} className="flex-1 overflow-y-auto px-4 py-5 space-y-8">
         <ProjectsSection projects={projects} currentProjectIndex={currentProjectIndex} onSwitchProject={onSwitchProject} onNavigate={onNavigate} onClose={onClose} onAddProject={onAddProject} onRequestDelete={onRequestDelete} />
-        <EngineStatusSection />
+        <WisdomBrainCard />
+        <EngineStatusSection
+          intelligentEnabled={intelligentEnabled}
+          setIntelligentEnabled={setIntelligentEnabled}
+          intelligentLoading={intelligentLoading}
+        />
         <AiToolSection aiTool={aiTool} aiApplying={aiApplying} onToggleAiTool={onToggleAiTool} />
         <ThemeSection />
         <LanguageSection />
@@ -107,7 +118,7 @@ function SidebarDeleteDialog({
   );
 }
 
-export function Sidebar({ open, onClose, projects, currentProjectIndex, onSwitchProject, currentPage: _currentPage, onNavigate, onAddProject, onRemoveProject, aiTool, aiApplying, onToggleAiTool }: SidebarProps) {
+export function Sidebar({ open, onClose, projects, currentProjectIndex, onSwitchProject, currentPage: _currentPage, onNavigate, onAddProject, onRemoveProject, aiTool, aiApplying, onToggleAiTool, intelligentEnabled, setIntelligentEnabled, intelligentLoading }: SidebarProps) {
   const [pendingDelete, setPendingDelete] = useState<ProjectInfo | null>(null);
 
   return (
@@ -125,6 +136,9 @@ export function Sidebar({ open, onClose, projects, currentProjectIndex, onSwitch
         aiTool={aiTool}
         aiApplying={aiApplying}
         onToggleAiTool={onToggleAiTool}
+        intelligentEnabled={intelligentEnabled}
+        setIntelligentEnabled={setIntelligentEnabled}
+        intelligentLoading={intelligentLoading}
       />
       {/* 确认弹窗必须渲染在 aside 之外：aside 带 transform，会作为 fixed 后代的包含块，导致遮罩只盖住侧边栏 */}
       <SidebarDeleteDialog pendingDelete={pendingDelete} onRemoveProject={onRemoveProject} onClose={() => setPendingDelete(null)} />

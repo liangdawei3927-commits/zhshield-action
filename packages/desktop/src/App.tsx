@@ -88,12 +88,9 @@ function AppShell({
   aiApplying,
   toggleAiTool,
   activeProject,
-  gateEnabled,
-  setGateEnabled,
-  gateLoading,
-  sentinelEnabled,
-  setSentinelEnabledState,
-  sentinelLoading,
+  intelligentEnabled,
+  setIntelligentEnabled,
+  intelligentLoading,
   viewProps,
 }: {
   sidebarOpen: boolean;
@@ -109,12 +106,9 @@ function AppShell({
   aiApplying: boolean;
   toggleAiTool: (enabled: boolean) => Promise<void>;
   activeProject?: ProjectInfo;
-  gateEnabled: boolean | null;
-  setGateEnabled: (v: boolean) => void;
-  gateLoading: boolean;
-  sentinelEnabled: boolean | null;
-  setSentinelEnabledState: (v: boolean) => void;
-  sentinelLoading: boolean;
+  intelligentEnabled: boolean;
+  setIntelligentEnabled: (v: boolean) => void;
+  intelligentLoading: boolean;
   viewProps: {
     currentPage: Page;
     projects: ProjectInfo[];
@@ -138,6 +132,9 @@ function AppShell({
         aiTool={aiTool}
         aiApplying={aiApplying}
         onToggleAiTool={toggleAiTool}
+        intelligentEnabled={intelligentEnabled}
+        setIntelligentEnabled={setIntelligentEnabled}
+        intelligentLoading={intelligentLoading}
       />
       <TopNav
         currentPage={currentPage}
@@ -145,12 +142,6 @@ function AppShell({
         onOpenSettings={() => setSidebarOpen((v) => !v)}
         projectName={activeProject?.name}
         sidebarOpen={sidebarOpen}
-        gateEnabled={gateEnabled}
-        onToggleGate={setGateEnabled}
-        gateLoading={gateLoading}
-        sentinelEnabled={sentinelEnabled}
-        onToggleSentinel={setSentinelEnabledState}
-        sentinelLoading={sentinelLoading}
       />
       <main className="flex-1 overflow-auto bg-zh-bg">
         <PageView {...viewProps} />
@@ -172,12 +163,9 @@ function App() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
-    gateEnabled,
-    setGateEnabled,
-    gateLoading,
-    sentinelEnabled,
-    setSentinelEnabledState,
-    sentinelLoading,
+    intelligentEnabled,
+    setIntelligentEnabled,
+    intelligentLoading,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,
@@ -217,12 +205,9 @@ function App() {
           aiApplying={aiApplying}
           toggleAiTool={toggleAiTool}
           activeProject={activeProject}
-          gateEnabled={gateEnabled}
-          setGateEnabled={setGateEnabled}
-          gateLoading={gateLoading}
-          sentinelEnabled={sentinelEnabled}
-          setSentinelEnabledState={setSentinelEnabledState}
-          sentinelLoading={sentinelLoading}
+          intelligentEnabled={intelligentEnabled}
+          setIntelligentEnabled={setIntelligentEnabled}
+          intelligentLoading={intelligentLoading}
           viewProps={viewProps}
         />
       )}

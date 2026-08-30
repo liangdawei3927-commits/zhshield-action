@@ -1,17 +1,17 @@
 import { SectionTitle } from './sidebar-interactive';
 import { BounceCard } from '../ui/Bounce';
 import { useT, useI18n, SUPPORTED_LANGUAGES } from '../../i18n';
-import { useTheme, type ThemeName } from '../../hooks/useTheme';
+import { useTheme, type ThemeMode } from '../../hooks/useTheme';
 
-const THEME_OPTIONS: { value: ThemeName; labelKey: string; icon: string }[] = [
-  { value: 'teal', labelKey: 'layout.themeTeal', icon: '💠' },
-  { value: 'legacy', labelKey: 'layout.themeLegacy', icon: '🌲' },
-  { value: 'dracula', labelKey: 'layout.themeDracula', icon: '🌙' },
+const THEME_OPTIONS: { value: ThemeMode; labelKey: string; icon: string }[] = [
+  { value: 'light', labelKey: 'layout.themeLight', icon: '☀️' },
+  { value: 'dark', labelKey: 'layout.themeDark', icon: '🌙' },
+  { value: 'system', labelKey: 'layout.themeSystem', icon: '💻' },
 ];
 
 export function ThemeSection() {
   const t = useT();
-  const { theme, setTheme } = useTheme();
+  const { mode, setMode } = useTheme();
   return (
     <section>
       <SectionTitle
@@ -32,14 +32,14 @@ export function ThemeSection() {
             <span className="text-sm">{option.icon}</span>
             <span className="text-xs text-zh-ink-2 flex-1">{t(option.labelKey)}</span>
             <div className="w-4 h-4 rounded-full border-2 border-zh-line flex items-center justify-center">
-              {theme === option.value && <div className="w-2 h-2 rounded-full bg-[rgb(var(--zh-brand))]" />}
+              {mode === option.value && <div className="w-2 h-2 rounded-full bg-[rgb(var(--zh-brand))]" />}
             </div>
             <input
               type="radio"
               name="theme"
               value={option.value}
-              checked={theme === option.value}
-              onChange={() => setTheme(option.value)}
+              checked={mode === option.value}
+              onChange={() => setMode(option.value)}
               className="sr-only"
             />
           </label>

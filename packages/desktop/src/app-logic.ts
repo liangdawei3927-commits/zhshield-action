@@ -184,6 +184,36 @@ function useSentinelSwitch(
   return { sentinelEnabled, setSentinelEnabledState: setEnabled, sentinelLoading };
 }
 
+/**
+ * 智能引擎总开关：一个开关联动「门禁系统 + 哨兵监控」两侧。
+ * 「完全合并」模式——门禁/哨兵不再单独可开关，均由本开关驱动。
+ */
+function useIntelligentEngineSwitch(
+  gate: { gateEnabled: boolean | null; setGateEnabled: (v: boolean) => void; gateLoading: boolean },
+  sentinel: { sentinelEnabled: boolean | null; setSentinelEnabledState: (v: boolean) => void; sentinelLoading: boolean },
+): {
+  intelligentEnabled: boolean;
+  setIntelligentEnabled: (enabled: boolean) => void;
+  intelligentLoading: boolean;
+} {
+  const [toggling, setToggling] = useState(false);
+  // 未加载完按「开」处理，避免启动时闪烁（与原来各子开关默认常开一致）
+  const intelligentEnabled = (gate.gateEnabled ?? true) && (sentinel.sentinelEnabled ?? true);
+  const setIntelligentEnabled = useCallback((enabled: boolean) => {
+    setToggling(true);
+    gate.setGateEnabled(enabled);
+    sentinel.setSentinelEnabledState(enabled);
+    // 乐观更新后，底层异步落盘；短暂标记加载态保持观感一致
+    const timer = setTimeout(() => setToggling(false), 120);
+    return () => clearTimeout(timer);
+  }, [gate, sentinel]);
+  return {
+    intelligentEnabled,
+    setIntelligentEnabled,
+    intelligentLoading: toggling || gate.gateLoading || sentinel.sentinelLoading,
+  };
+}
+
 /** 从守护列表移除项目（仅移除列表项，不删除磁盘文件） */
 function useRemoveProject(
   projects: ProjectInfo[],
@@ -251,6 +281,14 @@ export function useAppState() {
   const { aiTool, setAiTool, aiApplying, toggleAiTool } = useAiToolConfig(projects, toast);
   const { gateEnabled, setGateEnabled, gateLoading } = useGateSwitch(toast);
   const { sentinelEnabled, setSentinelEnabledState, sentinelLoading } = useSentinelSwitch(toast);
+  const {
+    intelligentEnabled,
+    setIntelligentEnabled,
+    intelligentLoading,
+  } = useIntelligentEngineSwitch(
+    { gateEnabled, setGateEnabled, gateLoading },
+    { sentinelEnabled, setSentinelEnabledState, sentinelLoading },
+  );
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
@@ -270,12 +308,9 @@ export function useAppState() {
     openFolderAndAddProject,
     removeProject,
     toggleAiTool,
-    gateEnabled,
-    setGateEnabled,
-    gateLoading,
-    sentinelEnabled,
-    setSentinelEnabledState,
-    sentinelLoading,
+    intelligentEnabled,
+    setIntelligentEnabled,
+    intelligentLoading,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,

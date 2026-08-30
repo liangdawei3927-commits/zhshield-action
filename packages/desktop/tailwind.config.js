@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
-/** 三主题 token 注册表：颜色一律引用 CSS 变量 RGB 三元组 (rgb(var(--zh-x) / <alpha-value>))，
- *  由 src/index.css 的 :root / [data-theme="legacy"] / [data-theme="dracula"] 驱动换肤。
+/** 主题 token 注册表：颜色一律引用 CSS 变量 RGB 三元组 (rgb(var(--zh-x) / <alpha-value>))，
+ *  由 src/index.css 的 :root / [data-theme="dracula"] 驱动换肤。
  *  色值溯源 VI 规范 07-品牌视觉规范.md §6 暗色模式 / §7 报告 Token；emerald 与 green 完全一致（成功绿家族）。 */
 const successScale = {
   50: 'rgb(var(--zh-success-50) / <alpha-value>)',
@@ -71,6 +71,7 @@ export default {
           'ink-2': 'rgb(var(--zh-ink-2) / <alpha-value>)',
           muted: 'rgb(var(--zh-muted) / <alpha-value>)',
           line: 'rgb(var(--zh-line) / <alpha-value>)',
+          'success-fg': 'rgb(var(--zh-success-fg) / <alpha-value>)',
         },
       },
     },

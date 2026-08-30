@@ -11,9 +11,9 @@ const ratio = (a, b) => {
   const [hi, lo] = [lum(...a), lum(...b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
-const bg = [29, 30, 40]; // #1d1e28 墨紫黑底
-const card = [36, 37, 47]; // bg-secondary
-const card3 = [41, 42, 52]; // bg-tertiary
+const bg = [21, 34, 32]; // #152220 深墨青底
+const card = [26, 40, 38]; // bg-secondary
+const card3 = [31, 45, 43]; // bg-tertiary
 const W = [255, 255, 255];
 const _B = [0, 0, 0];
 
@@ -58,14 +58,14 @@ add('success #34D399 on 卡片', [52, 211, 153], card3);
 add('success-700 浅绿chip字', [11, 122, 82], [239, 253, 244]);
 add('warning #F0A23B on 卡片', [240, 162, 59], card3);
 add('danger #F87171 on 卡片', [248, 113, 113], card3);
-add('danger 警戒字 on tint底', [248, 113, 113], [52, 38, 40]); // danger/0.1 over 底近似
-add('danger-dark 严重字 on tint底', [255, 105, 105], [52, 38, 40]);
+add('danger 警戒字 on tint底', [248, 113, 113], [38, 35, 34]); // danger/0.1 over 底近似
+add('danger-dark 严重字 on tint底', [255, 105, 105], [38, 35, 34]);
 add('info #4F6BED 智靛 on 卡片', [79, 107, 237], card3, 'large');
 
 // 4) 线/滚动条
-add('line 分隔线 on 底', [55, 68, 64], bg, 'large');
-add('scrollbar thumb on 底', [74, 88, 84], bg, 'large');
-add('scrollbar thumb hover on 底', [108, 124, 118], bg, 'large');
+add('line 分隔线 on 底', [40, 54, 51], bg, 'large');
+add('scrollbar thumb on 底', [58, 74, 70], bg, 'large');
+add('scrollbar thumb hover on 底', [92, 106, 101], bg, 'large');
 
 // 5) 浅底 chip 硬编码复核
 add('text-red-700 on bg-red-50', [185, 28, 28], [254, 242, 242]);

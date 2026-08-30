@@ -141,54 +141,36 @@ export class ToolAdapterExecutor {
   ): AdapterResult {
     if (result.status === 'error') {
       this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
-      return {
-        adapterId: adapter.meta.id,
-        adapterName: adapter.meta.name,
-        duration,
-        issueCount: result.issues.length,
-        passed: false,
-        degraded: false,
-        status: 'error',
-        issues,
-      };
+      return this.buildStatusResult(adapter, result, duration, issues, 'error', false, false);
     }
-
     if (result.status === 'unavailable') {
-      // 覆盖率缺口而非故障：不 escalate；质量域 fail-open，安全域 fail-closed
       const failClosed = adapter.meta.category === 'security';
-      return {
-        adapterId: adapter.meta.id,
-        adapterName: adapter.meta.name,
-        duration,
-        issueCount: result.issues.length,
-        passed: !failClosed,
-        degraded: true,
-        status: 'unavailable',
-        issues,
-      };
+      return this.buildStatusResult(adapter, result, duration, issues, 'unavailable', !failClosed, true);
     }
-
     if (result.status === 'skipped') {
-      return {
-        adapterId: adapter.meta.id,
-        adapterName: adapter.meta.name,
-        duration,
-        issueCount: result.issues.length,
-        passed: true,
-        degraded: false,
-        status: 'skipped',
-        issues,
-      };
+      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false);
     }
+    return this.buildStatusResult(adapter, result, duration, issues, 'passed', true, false);
+  }
 
+  /** 构造各状态的统一结果（未命中分支的错误升格由调用方负责） */
+  private buildStatusResult(
+    adapter: ToolAdapter,
+    result: Awaited<ReturnType<ToolAdapter['scan']>>,
+    duration: number,
+    issues: AdapterResult['issues'],
+    status: AdapterResult['status'],
+    passed: boolean,
+    degraded: boolean,
+  ): AdapterResult {
     return {
       adapterId: adapter.meta.id,
       adapterName: adapter.meta.name,
       duration,
       issueCount: result.issues.length,
-      passed: true,
-      degraded: false,
-      status: 'passed',
+      passed,
+      degraded,
+      status,
       issues,
     };
   }

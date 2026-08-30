@@ -1,8 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-import { findLocalToolBin } from '../adapters/tool-bin';
+import * as os from 'node:os';
+
+/**
+ * os.homedir 为只读 getter（不可 spyOn）——整体 mock 以隔离 ~/.zhshield 路径，
+ * 便于在测试中替换为临时目录。
+ */
+vi.mock('node:os', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('node:os')>();
+  return { ...mod, homedir: vi.fn(() => tmpdir()) };
+});
+
+import { findLocalToolBin, getZhshieldToolBinDir, findZhshieldToolBin } from '../adapters/tool-bin';
 
 describe('findLocalToolBin — 本地 node_modules/.bin 工具解析', () => {
   let tempDir: string;
@@ -47,5 +58,39 @@ describe('findLocalToolBin — 本地 node_modules/.bin 工具解析', () => {
     expect(existsSync(missing)).toBe(false);
     expect(() => findLocalToolBin('eslint', missing)).not.toThrow();
     expect(findLocalToolBin('eslint', missing)).toBeNull();
+  });
+});
+
+describe('findZhshieldToolBin — ~/.zhshield/bin 共享工具目录解析', () => {
+  let fakeHome: string;
+
+  beforeEach(() => {
+    fakeHome = mkdtempSync(path.join(tmpdir(), 'zhshield-home-'));
+    vi.spyOn(os, 'homedir').mockReturnValue(fakeHome);
+  });
+
+  afterEach(() => {
+    rmSync(fakeHome, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('getZhshieldToolBinDir 指向 ~/.zhshield/bin', () => {
+    expect(getZhshieldToolBinDir()).toBe(path.join(fakeHome, '.zhshield', 'bin'));
+  });
+
+  it('共享目录中存在工具时返回绝对路径', () => {
+    const bin = path.join(fakeHome, '.zhshield', 'bin', 'semgrep');
+    mkdirSync(path.dirname(bin), { recursive: true });
+    writeFileSync(bin, '#!/usr/bin/env node\n', { mode: 0o755 });
+    expect(findZhshieldToolBin('semgrep')).toBe(bin);
+  });
+
+  it('共享目录不存在时返回 null 而非抛错', () => {
+    expect(findZhshieldToolBin('gitleaks')).toBeNull();
+  });
+
+  it('目录存在但工具缺失时返回 null', () => {
+    mkdirSync(path.join(fakeHome, '.zhshield', 'bin'), { recursive: true });
+    expect(findZhshieldToolBin('trivy')).toBeNull();
   });
 });

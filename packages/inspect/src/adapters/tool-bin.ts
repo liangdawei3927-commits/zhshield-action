@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 const execFileAsync = promisify(execFile);
@@ -71,10 +72,26 @@ export function findLocalToolBin(tool: string, startDir: string): string | null 
   return null;
 }
 
+/** 用户级共享工具目录（install-tools.mjs 的安装目标，CLI/桌面端共用） */
+export function getZhshieldToolBinDir(): string {
+  return path.join(os.homedir(), '.zhshield', 'bin');
+}
+
+/** 查找 zhshield 共享工具目录中的工具，未找到返回 null（目录缺失/无权限时静默跳过） */
+export function findZhshieldToolBin(tool: string): string | null {
+  const bin = path.join(getZhshieldToolBinDir(), tool);
+  try {
+    return fs.existsSync(bin) ? bin : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * 解析工具命令：优先 PATH 中的全局工具，否则回退到项目本地 node_modules/.bin
- * （pnpm/yarn 等将工具安装为项目本地依赖，未进入全局 PATH）。
- * 返回裸命令名或本地 .bin 的绝对路径；两者都不可用时返回裸命令名，由调用方按 ENOENT 处理。
+ * 解析工具命令：优先 PATH 中的全局工具，其次项目本地 node_modules/.bin
+ * （pnpm/yarn 等将工具安装为项目本地依赖，未进入全局 PATH），
+ * 最后回退到 zhshield 共享工具目录 ~/.zhshield/bin（install-tools.mjs 安装目标）。
+ * 均不可用时返回裸命令名，由调用方按 ENOENT 处理。
  */
 export async function resolveToolCommand(tool: string, startDir?: string): Promise<string> {
   try {
@@ -83,6 +100,8 @@ export async function resolveToolCommand(tool: string, startDir?: string): Promi
   } catch {
     const local = findLocalToolBin(tool, startDir ?? process.cwd());
     if (local) return local;
+    const shared = findZhshieldToolBin(tool);
+    if (shared) return shared;
   }
   return tool;
 }

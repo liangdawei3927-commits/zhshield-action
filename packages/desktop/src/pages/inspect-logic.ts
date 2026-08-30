@@ -11,6 +11,7 @@ export const STATUS_CONFIG: Record<string, { labelKey: string; color: string; bg
   pass: { labelKey: 'page.inspect.status.pass', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.1)', icon: '✓' },
   warn: { labelKey: 'page.inspect.status.warn', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)', icon: '!' },
   fail: { labelKey: 'page.inspect.status.fail', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', icon: '✗' },
+  attention: { labelKey: 'page.inspect.status.attention', color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.1)', icon: '?' },
 };
 
 /** 巡检报告状态：执行巡检并保存结果 */

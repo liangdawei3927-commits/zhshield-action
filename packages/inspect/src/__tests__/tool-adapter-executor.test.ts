@@ -52,6 +52,7 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
 
     expect(results[0].passed).toBe(true);
     expect(results[0].degraded).toBe(true);
+    expect(results[0].status).toBe('unavailable');
     expect(escalation).not.toHaveBeenCalled();
   });
 
@@ -66,10 +67,11 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
 
     expect(results[0].passed).toBe(false);
     expect(results[0].degraded).toBe(true);
+    expect(results[0].status).toBe('unavailable');
     expect(escalation).not.toHaveBeenCalled();
   });
 
-  it('Given 工具返回 skipped（语言不适用），When runAll，Then 不计失败：passed=true 且不标记 degraded', async () => {
+  it('Given 工具返回 skipped（语言不适用），When runAll，Then 不计失败：passed=true 且不标记 degraded，status=skipped', async () => {
     const { deps, escalation } = makeDeps();
     const executor = new ToolAdapterExecutor(deps);
     const adapters = new Map<string, ToolAdapter>([
@@ -80,6 +82,7 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
 
     expect(results[0].passed).toBe(true);
     expect(results[0].degraded).toBe(false);
+    expect(results[0].status).toBe('skipped');
     expect(escalation).not.toHaveBeenCalled();
   });
 

@@ -50,6 +50,7 @@ export class ToolAdapterExecutor {
       issueCount: 0,
       passed: true,
       degraded: false,
+      status: 'skipped',
       issues: [],
     };
   }
@@ -80,64 +81,94 @@ export class ToolAdapterExecutor {
   private async runAdapter(adapter: ToolAdapter, projectId: string): Promise<AdapterResult> {
     const toolStart = Date.now();
     try {
-      const result = await ToolAdapterExecutor.withHardTimeout(
-        adapter.scan({
-          projectPath: process.cwd(),
-          projectId,
-          timeout: 60000,
-        }),
-        this.hardTimeoutMs,
-        adapter.meta.id,
-      );
-      const duration = Date.now() - toolStart;
+      return await this.runAdapterCore(adapter, projectId, toolStart);
+    } catch (error: unknown) {
+      this.degradationManager.escalate((error instanceof Error ? error.message : String(error)) || 'Unknown error', adapter.meta.id);
+      return this.makeErrorResult(adapter, error, toolStart);
+    }
+  }
 
-      // 副作用（审计日志 / 事件发射）失败不应污染扫描结果：
-      // 单独捕获，避免被外层 catch 误判为 adapter 执行失败而重复 push error issue
-      await this.runSideEffects(adapter, result, duration, projectId);
+  /** 执行扫描、副作用与结果构建（副作用失败不污染扫描结果） */
+  private async runAdapterCore(adapter: ToolAdapter, projectId: string, toolStart: number): Promise<AdapterResult> {
+    const result = await this.executeAdapter(adapter, projectId);
+    const duration = Date.now() - toolStart;
 
-      const issues = result.issues.map((i) => ({
-        id: i.id,
-        ruleId: i.ruleId,
-        severity: i.severity,
-        category: i.category,
-        message: i.message,
-        file: i.file,
-        line: i.line,
-        column: i.column,
-        suggestion: i.suggestion,
-        autoFixable: i.autoFixable,
-        source: i.source,
-        fingerprint: i.fingerprint,
-      }));
+    // 副作用（审计日志 / 事件发射）失败不应污染扫描结果：
+    // 单独捕获，避免被外层 catch 误判为 adapter 执行失败而重复 push error issue
+    await this.runSideEffects(adapter, result, duration, projectId);
 
-      // ADR #7 + C4 分域：skipped / unavailable / error 语义分离
-      if (result.status === 'error') {
-        this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
-        return {
-          adapterId: adapter.meta.id,
-          adapterName: adapter.meta.name,
-          duration,
-          issueCount: result.issues.length,
-          passed: false,
-          degraded: false,
-          issues,
-        };
-      }
+    const issues = this.mapIssues(result);
+    return this.buildResult(adapter, result, duration, issues);
+  }
 
-      if (result.status === 'unavailable') {
-        // 覆盖率缺口而非故障：不 escalate；质量域 fail-open，安全域 fail-closed
-        const failClosed = adapter.meta.category === 'security';
-        return {
-          adapterId: adapter.meta.id,
-          adapterName: adapter.meta.name,
-          duration,
-          issueCount: result.issues.length,
-          passed: !failClosed,
-          degraded: true,
-          issues,
-        };
-      }
+  /** 执行适配器扫描并施加硬上限保护 */
+  private async executeAdapter(adapter: ToolAdapter, projectId: string): Promise<Awaited<ReturnType<ToolAdapter['scan']>>> {
+    return ToolAdapterExecutor.withHardTimeout(
+      adapter.scan({
+        projectPath: process.cwd(),
+        projectId,
+        timeout: 60000,
+      }),
+      this.hardTimeoutMs,
+      adapter.meta.id,
+    );
+  }
 
+  /** 将扫描结果 issues 映射为 AdapterResult 的 issues 结构 */
+  private mapIssues(result: Awaited<ReturnType<ToolAdapter['scan']>>): AdapterResult['issues'] {
+    return result.issues.map((i) => ({
+      id: i.id,
+      ruleId: i.ruleId,
+      severity: i.severity,
+      category: i.category,
+      message: i.message,
+      file: i.file,
+      line: i.line,
+      column: i.column,
+      suggestion: i.suggestion,
+      autoFixable: i.autoFixable,
+      source: i.source,
+      fingerprint: i.fingerprint,
+    }));
+  }
+
+  /** 依据扫描状态构建结果（ADR #7 + C4 分域：skipped / unavailable / error 语义分离） */
+  private buildResult(
+    adapter: ToolAdapter,
+    result: Awaited<ReturnType<ToolAdapter['scan']>>,
+    duration: number,
+    issues: AdapterResult['issues'],
+  ): AdapterResult {
+    if (result.status === 'error') {
+      this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
+      return {
+        adapterId: adapter.meta.id,
+        adapterName: adapter.meta.name,
+        duration,
+        issueCount: result.issues.length,
+        passed: false,
+        degraded: false,
+        status: 'error',
+        issues,
+      };
+    }
+
+    if (result.status === 'unavailable') {
+      // 覆盖率缺口而非故障：不 escalate；质量域 fail-open，安全域 fail-closed
+      const failClosed = adapter.meta.category === 'security';
+      return {
+        adapterId: adapter.meta.id,
+        adapterName: adapter.meta.name,
+        duration,
+        issueCount: result.issues.length,
+        passed: !failClosed,
+        degraded: true,
+        status: 'unavailable',
+        issues,
+      };
+    }
+
+    if (result.status === 'skipped') {
       return {
         adapterId: adapter.meta.id,
         adapterName: adapter.meta.name,
@@ -145,12 +176,21 @@ export class ToolAdapterExecutor {
         issueCount: result.issues.length,
         passed: true,
         degraded: false,
+        status: 'skipped',
         issues,
       };
-    } catch (error: unknown) {
-      this.degradationManager.escalate((error instanceof Error ? error.message : String(error)) || 'Unknown error', adapter.meta.id);
-      return this.makeErrorResult(adapter, error, toolStart);
     }
+
+    return {
+      adapterId: adapter.meta.id,
+      adapterName: adapter.meta.name,
+      duration,
+      issueCount: result.issues.length,
+      passed: true,
+      degraded: false,
+      status: 'passed',
+      issues,
+    };
   }
 
   private async runSideEffects(

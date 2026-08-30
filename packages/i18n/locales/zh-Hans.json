@@ -1219,7 +1219,8 @@
       "status": {
         "fail": "失败",
         "pass": "通过",
-        "warn": "警告"
+        "warn": "警告",
+        "attention": "未检测"
       }
     },
     "performance": {

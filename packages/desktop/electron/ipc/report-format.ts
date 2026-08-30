@@ -5,7 +5,7 @@
  */
 
 import type { GuardReport } from '@zh/guard';
-import type { InspectionReport } from '@zh/inspect';
+import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport } from '@zh/security';
 import type { HealthScore } from '@zh/scoring';
 
@@ -17,7 +17,7 @@ export interface GuardReportData {
 
 export interface InspectionReportData {
   summary: { total: number; passed: number; warnings: number; failures: number };
-  checks: Array<{ id: string; name: string; status: 'pass' | 'warn' | 'fail'; detail: string; category?: string }>;
+  checks: Array<{ id: string; name: string; status: 'pass' | 'warn' | 'fail' | 'attention'; detail: string; category?: string }>;
   metadata: { duration: number; timestamp: string };
 }
 
@@ -91,6 +91,27 @@ export function toGuardReportData(r: GuardReport): GuardReportData {
 }
 
 export function toInspectionReportData(r: InspectionReport): InspectionReportData {
+  const issueChecks = r.issues.map((issue) => ({
+    id: issue.id,
+    name: issue.ruleId,
+    status: issue.severity === 'info' ? 'pass' as const : issue.severity === 'warning' ? 'warn' as const : 'fail' as const,
+    detail: issue.message,
+    category: issue.category,
+    source: issue.source,
+  }));
+
+  const knownNames = new Set(r.issues.map((i) => i.source));
+  const attentionChecks = r.adapterResults
+    .filter((a) => getCoverageGap(a) && !knownNames.has(a.adapterId))
+    .map((a) => ({
+      id: `adapter:${a.adapterId}`,
+      name: a.adapterName,
+      status: 'attention' as const,
+      detail: `${a.adapterName} 未检测（工具不可用或已跳过，覆盖率缺口）`,
+      category: undefined,
+      source: a.adapterId,
+    }));
+
   return {
     summary: {
       total: r.summary.total,
@@ -98,19 +119,16 @@ export function toInspectionReportData(r: InspectionReport): InspectionReportDat
       warnings: r.summary.warning,
       failures: r.summary.error,
     },
-    checks: r.issues.map((issue) => ({
-      id: issue.id,
-      name: issue.ruleId,
-      status: issue.severity === 'info' ? 'pass' as const : issue.severity === 'warning' ? 'warn' as const : 'fail' as const,
-      detail: issue.message,
-      category: issue.category,
-      source: issue.source,
-    })),
+    checks: [...issueChecks, ...attentionChecks],
     metadata: {
       duration: r.duration,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
     },
   };
+}
+
+function getCoverageGap(a: Pick<AdapterResult, 'adapterId' | 'status' | 'degraded'>): boolean {
+  return a.status === 'unavailable' || a.status === 'skipped' || a.degraded === true;
 }
 
 export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanReportData {

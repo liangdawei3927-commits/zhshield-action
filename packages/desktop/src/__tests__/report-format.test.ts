@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toHealthScoreData, toSecurityScanReportData } from '../../electron/ipc/report-format';
+import { toHealthScoreData, toInspectionReportData, toSecurityScanReportData } from '../../electron/ipc/report-format';
 
 describe('toSecurityScanReportData 映射', () => {
   const report = {
@@ -96,6 +96,90 @@ describe('toSecurityScanReportData 映射', () => {
       garbageTotal: 1,
       garbageSize: 2048,
     });
+  });
+});
+
+describe('toInspectionReportData 覆盖率缺口显式上报', () => {
+  const baseReport = {
+    projectId: 'proj-1',
+    timestamp: new Date('2026-08-06T08:00:00.000Z'),
+    scanType: 'full',
+    duration: 500,
+    score: { overall: 100, grade: 'A' },
+    summary: { total: 1, error: 0, warning: 1, info: 0 },
+    issues: [
+      {
+        id: 'issue-1',
+        ruleId: 'no-var',
+        severity: 'warning',
+        category: 'quality',
+        message: 'Use let/const',
+        file: 'src/app.ts',
+        line: 10,
+        column: 5,
+        autoFixable: true,
+        source: 'eslint',
+        fingerprint: 'no-var:src/app.ts:10',
+      },
+    ],
+    adapterResults: [
+      {
+        adapterId: 'semgrep',
+        adapterName: 'Semgrep',
+        duration: 0,
+        issueCount: 0,
+        passed: true,
+        degraded: true,
+        status: 'unavailable',
+        issues: [],
+      },
+      {
+        adapterId: 'eslint',
+        adapterName: 'ESLint',
+        duration: 300,
+        issueCount: 1,
+        passed: true,
+        status: 'passed',
+        issues: [],
+      },
+    ],
+    recommendations: [],
+  };
+
+  it('maps skipped/unavailable adapterResults to attention checks (previously dropped)', () => {
+    const data = toInspectionReportData(baseReport as never);
+    const attentionChecks = data.checks.filter((c) => c.status === 'attention');
+    expect(attentionChecks).toHaveLength(1);
+    expect(attentionChecks[0]).toMatchObject({
+      id: 'adapter:semgrep',
+      name: 'Semgrep',
+      detail: expect.stringContaining('未检测'),
+      source: 'semgrep',
+    });
+  });
+
+  it('keeps pass adapterResults out of attention checks', () => {
+    const data = toInspectionReportData(baseReport as never);
+    expect(data.checks.filter((c) => c.name === 'ESLint' && c.status === 'attention')).toHaveLength(0);
+  });
+
+  it('does not duplicate adapter attention when adapter has issues', () => {
+    const withIssues = {
+      ...baseReport,
+      adapterResults: [
+        {
+          adapterId: 'gitleaks',
+          adapterName: 'Gitleaks',
+          duration: 100,
+          issueCount: 2,
+          passed: false,
+          status: 'available',
+          issues: [{ id: 'g-1' }, { id: 'g-2' }],
+        },
+      ],
+    };
+    const data = toInspectionReportData(withIssues as never);
+    expect(data.checks.filter((c) => c.status === 'attention')).toHaveLength(0);
   });
 });
 

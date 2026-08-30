@@ -1217,7 +1217,8 @@
       "status": {
         "fail": "실패",
         "pass": "통과",
-        "warn": "경고"
+        "warn": "경고",
+        "attention": "미검사"
       }
     },
     "performance": {

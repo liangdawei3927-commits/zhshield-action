@@ -16,6 +16,8 @@ export interface Issue {
   fingerprint: string;
 }
 
+export type AdapterResultStatus = 'passed' | 'failed' | 'error' | 'unavailable' | 'skipped';
+
 export interface AdapterResult {
   adapterId: string;
   adapterName: string;
@@ -24,6 +26,8 @@ export interface AdapterResult {
   passed: boolean;
   /** 降级运行标记（ADR #7）：unavailable 覆盖率缺口时为 true，skipped/error 不标记 */
   degraded?: boolean;
+  /** 工具执行状态透传：unavailable/skipped 表示"未检测"（覆盖率缺口），报告层据此显式上报而非视为通过 */
+  status?: AdapterResultStatus;
   issues: Issue[];
 }
 

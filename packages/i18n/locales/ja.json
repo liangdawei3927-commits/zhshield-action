@@ -1217,7 +1217,8 @@
       "status": {
         "fail": "失敗",
         "pass": "合格",
-        "warn": "警告"
+        "warn": "警告",
+        "attention": "未検出"
       }
     },
     "performance": {

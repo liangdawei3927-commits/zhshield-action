@@ -58,6 +58,7 @@ export class SopReportMapper {
       duration: ev.durationMs,
       issueCount: ev.violations?.length ?? 0,
       passed: ev.status === 'passed',
+      status: ev.status === 'passed' ? 'passed' as const : ev.status,
       issues: ev.violations
         ? ev.violations.map((v) => ({
             id: v.id,

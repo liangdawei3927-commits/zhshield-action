@@ -61,7 +61,7 @@ export interface InspectionReportData {
   checks: Array<{
     id: string;
     name: string;
-    status: 'pass' | 'warn' | 'fail';
+    status: 'pass' | 'warn' | 'fail' | 'attention';
     detail: string;
     category?: string;
     /** 来源引擎/适配器标识（如 'ai-code-review' / 'semgrep' / 'eslint'） */

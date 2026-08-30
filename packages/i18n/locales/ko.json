@@ -16,13 +16,13 @@
       "locationLabel": "- 위치: {{location}}",
       "messageLabel": "- 설명: {{message}}",
       "projectPathLabel": "프로젝트 경로: {{projectPath}}",
-      "promptIntro": "당신은 ZhiYun Shield의 코드 수정 어시스턴트입니다. 다음 코드 문제를 수정하세요:",
-      "requirement1": "1. 스킬을 호출해 각 문제의 코드 결함 실재성을 하나씩 검증하세요.",
-      "requirement2": "2. 문제를 이해한 뒤 수정하세요. 수정한 척 하지 마세요.",
-      "requirement3": "3. 최소한의 필수 수정만 수행하고, 무관한 코드를 리팩토링하지 마세요.",
-      "requirement4": "4. 수정 후 테스트 가능, 검증 가능, 회귀 가능, 실행 가능함을 보장하세요.",
-      "requirement5": "5. 수정을 마친 후 한 문장으로 어떤 파일을 수정했는지 보고하세요.",
-      "requirementsTitle": "수정 요구 사항:",
+      "promptIntro": "당신은 ZhiYun Shield의 코드 수정 어시스턴트입니다. 다음 문제들을 하나씩 검증하고 처리하세요:",
+      "requirement1": "1. 각 문제가 실제로 존재하고, 참조되지 않으며, 안전하게 처리할 수 있는지 확인한 후 진행하세요.",
+      "requirement2": "2. 영향 범위를 이해한 후 수정하세요. 모르는 것은 질문하고, 수리한 척 하지 마세요.",
+      "requirement3": "3. 필요 최소한의 변경만 하고, 리팩터링이나 목록 밖 항목을 처리하지 마세요.",
+      "requirement4": "4. 처리 후 검증 가능한 증거(코드는 테스트/타입 검사, 정리는 존재 확인)와 복구 경로를 제시하세요. 검증에 실패하면 정직하게 보고하세요.",
+      "requirement5": "5. 보고: 변경한 파일 + 근거 + 결과(3줄 이내).",
+      "requirementsTitle": "처리 요구 사항:",
       "ruleLabel": "- 규칙: {{ruleId}}",
       "severityLabel": "- 심각도: {{severity}}",
       "suggestionLabel": "- 제안: {{suggestion}}"
@@ -105,6 +105,7 @@
   "electron": {
     "appTitle": "ZhiYun Shield",
     "cleanFailed": "정리 실패, 잠시 후 다시 시도해 주세요",
+    "depsRelock.integrityIncomplete": "잠금 파일 해시 불완전(해시 누락 노드 존재). 재잠금 거부",
     "diagnostics": {
       "ruleFailed": "{{ruleId}} 통과하지 못했습니다"
     },
@@ -987,6 +988,9 @@
       "lockfile.integrityFailed": "해시 검증 실패",
       "lockfile.integrityVerified": "해시 검증 통과",
       "lockfile.notConsistent": "매니페스트 선언과 불일치",
+      "lockfile.notEvaluable": "잠금 파일 없음 — 평가 불가",
+      "lockfile.notEvaluableConsistency": "일관성 평가 불가",
+      "lockfile.notEvaluableIntegrity": "무결성 평가 불가",
       "lockfile.notPresent": "잠금 파일 없음",
       "lockfile.present": "잠금 파일이 존재하고 분석 가능",
       "lockfileVerify": "잠금 파일 무결성 검증",
@@ -1077,10 +1081,13 @@
     "garbage": {
       "cleanButton": "원클릭 정리",
       "cleanButtonCount": "원클릭 정리 ({{count}})",
+      "cleanableLabel": "정리 가능",
       "cleanFailed": "정리 실패, 다시 시도해 주세요",
       "cleanFailedCount": "{{count}}개 항목을 정리하지 못했습니다 (경로 범위 초과 / 파일 사용 중 등)",
       "cleaned": "{{count}}개 항목 정리됨 · {{size}} 확보",
       "cleaning": "정리 중...",
+      "copiedAll": "쓰레기 전체 목록이 복사되었습니다. AI에 붙여넣어 안전하게 삭제할 수 있는지 확인하세요",
+      "copyAllToAi": "AI로 복사하여 확인",
       "dependencyHint": "사용하지 않는 의존성은 자동 삭제되지 않습니다. 참조가 없음을 확인한 뒤 package.json에서 수동으로 제거할 수 있습니다",
       "done": "쓰레기 정리 완료",
       "empty": {
@@ -1102,15 +1109,18 @@
           "desc": "참조되지 않는 리소스와 잔여 파일 식별"
         }
       },
+      "manualLabel": "수동 처리 필요",
       "rescan": "다시 스캔",
       "restore": "복원",
       "restoreFailed": "복원 실패, 다시 시도해 주세요",
       "restoreFailedCount": "{{count}}개 항목 복원 실패 (원래 위치에 파일이 이미 존재할 수 있음)",
       "restored": "{{count}}개 항목 복원됨 · {{size}}, 목록이 갱신되었습니다",
       "restoring": "복원 중...",
+      "safetySuggestion": "삭제 대상 파일이 여전히 참조되고 있는지 확인한 뒤 정리하세요. 삭제된 파일은 휴지통에서 복원할 수 있습니다",
       "scanning": "스캔 중...",
       "selectAll": "전체 선택",
       "selectedCount": "선택된 항목 {{count}}개",
+      "source": "쓰레기 정리",
       "startScan": "스캔 시작",
       "stats": {
         "freeable": "확보 가능한 공간",
@@ -1122,7 +1132,8 @@
         "duplicateCode": "중복 코드",
         "unusedDependency": "미사용 의존성",
         "unusedFile": "쓸모없는 파일"
-      }
+      },
+      "selectAllDisabledHint": "선택 가능한 항목이 없습니다(미사용 의존성은 패키지 매니저로 제거하세요 — 「AI 검토에 복사」 사용)"
     },
     "guard": {
       "banner": {

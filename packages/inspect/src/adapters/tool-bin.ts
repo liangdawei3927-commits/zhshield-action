@@ -9,28 +9,56 @@ const execFileAsync = promisify(execFile);
  * 在 startDir 自身、其一层子目录（嵌套仓库，如外层 guard 目录下的 monorepo）及各级父目录中
  * 查找 node_modules/.bin/<tool>，返回绝对路径；未找到返回 null。
  */
-export function findLocalToolBin(tool: string, startDir: string): string | null {
+/** 单个目录项：若是目录则加入候选集（stat 失败忽略） */
+function addSubdirCandidate(startDir: string, entry: string, candidates: Set<string>): void {
+  try {
+    if (fs.statSync(path.join(startDir, entry)).isDirectory()) {
+      candidates.add(path.join(startDir, entry));
+    }
+  } catch {
+    // 忽略损坏的符号链接 / 无权限目录
+  }
+}
+
+/** 收集 startDir 自身及其一层子目录作为候选 */
+function collectSubdirCandidates(startDir: string): Set<string> {
   const candidates = new Set<string>([startDir]);
 
   try {
     for (const entry of fs.readdirSync(startDir)) {
-      try {
-        if (fs.statSync(path.join(startDir, entry)).isDirectory()) {
-          candidates.add(path.join(startDir, entry));
-        }
-      } catch {
-        // 忽略损坏的符号链接 / 无权限目录
-      }
+      addSubdirCandidate(startDir, entry, candidates);
     }
   } catch {
     // startDir 不可读时仅保留自身
   }
+
+  return candidates;
+}
+
+/** 收集 startDir 各级父目录作为候选 */
+function collectParentCandidates(startDir: string): Set<string> {
+  const candidates = new Set<string>();
 
   let dir = path.dirname(startDir);
   while (dir !== path.dirname(dir)) {
     candidates.add(dir);
     dir = path.dirname(dir);
   }
+
+  return candidates;
+}
+
+/** 合并子目录与父目录候选 */
+function collectCandidateDirs(startDir: string): Set<string> {
+  const candidates = collectSubdirCandidates(startDir);
+  for (const dir of collectParentCandidates(startDir)) {
+    candidates.add(dir);
+  }
+  return candidates;
+}
+
+export function findLocalToolBin(tool: string, startDir: string): string | null {
+  const candidates = collectCandidateDirs(startDir);
 
   for (const dir of candidates) {
     const bin = path.join(dir, 'node_modules', '.bin', tool);

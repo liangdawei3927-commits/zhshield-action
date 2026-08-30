@@ -266,4 +266,55 @@ describe('ConsoleReporter — 报告格式化', () => {
     expect(result.text).toContain('使用 .at() 代替下标访问');
     expect(result.text).toContain('src/App.tsx:42');
   });
+
+  // ─── 跳过规则明细可见性 ────────────────────────────────
+
+  it('8. formatRuleEngine: skipped 规则逐条明细可见（工具未安装可观测）', () => {
+    const skippedEval: RuleEvaluation = {
+      rule: {
+        id: 'inspect.scan.security.semgrep',
+        name: 'Semgrep 扫描',
+        domain: 'inspect',
+        action: 'scan',
+        source: 'official',
+        description: '',
+        status: 'active',
+        executionMode: 'sync',
+        severity: 'medium',
+        applicableEngines: ['inspect'],
+        content: {},
+        tags: [],
+        falsePositiveCount: 0,
+        truePositiveCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      status: 'skipped',
+      message: '所有扫描器不可用: semgrep(未安装或在 PATH 中未找到), gitleaks(未注册工具适配器: gitleaks)',
+      durationMs: 0,
+      targetEngine: 'inspect',
+      timestamp: new Date(),
+    };
+
+    const report: RuleEngineReport = {
+      total: 1,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      evaluations: [skippedEval],
+      durationMs: 5,
+      timestamp: new Date(),
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.formatRuleEngine(report);
+
+    expect(result.text).toContain('跳过规则:');
+    expect(result.text).toContain('inspect.scan.security.semgrep');
+    expect(result.text).toContain('所有扫描器不可用');
+    expect(result.text).toContain('semgrep');
+    expect(result.text).toContain('gitleaks');
+  });
 });

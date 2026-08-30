@@ -18,34 +18,53 @@ export function collectPnpmPackages(content: string): Set<string> {
   return names;
 }
 
-/** 解析 package-lock.json：v2/v3 走 packages 键，v1 走 dependencies 键 */
-export function collectNpmPackages(content: string): Set<string> {
-  const names = new Set<string>();
+/** 解析 package-lock.json 为对象；损坏或非对象返回 null */
+function parseLockfileJson(content: string): Record<string, unknown> | null {
   let data: unknown;
   try {
     data = JSON.parse(content);
   } catch {
-    return names; // 锁文件损坏：视为无（边界 fallback）
+    return null; // 锁文件损坏：视为无（边界 fallback）
   }
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return names;
-  const root = data as Record<string, unknown>;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  return data as Record<string, unknown>;
+}
+
+/** 从 packages 键提取包名（v2/v3） */
+function collectFromPackages(packages: Record<string, unknown>): Set<string> {
+  const names = new Set<string>();
+  for (const key of Object.keys(packages)) {
+    if (!key.startsWith('node_modules/')) continue;
+    const idx = key.lastIndexOf('node_modules/');
+    const name = key.slice(idx + 'node_modules/'.length);
+    if (name === '') continue;
+    if (name.startsWith('@')) names.add(name); // scoped：@scope/pkg 名称含 '/'，合法
+    else if (!name.includes('/')) names.add(name);
+  }
+  return names;
+}
+
+/** 从 dependencies 键提取包名（v1） */
+function collectFromDependencies(deps: Record<string, unknown>): Set<string> {
+  const names = new Set<string>();
+  for (const name of Object.keys(deps)) names.add(name);
+  return names;
+}
+
+/** 解析 package-lock.json：v2/v3 走 packages 键，v1 走 dependencies 键 */
+export function collectNpmPackages(content: string): Set<string> {
+  const names = new Set<string>();
+  const root = parseLockfileJson(content);
+  if (root === null) return names;
 
   const packages = root['packages'];
   if (typeof packages === 'object' && packages !== null) {
-    for (const key of Object.keys(packages as Record<string, unknown>)) {
-      if (!key.startsWith('node_modules/')) continue;
-      const idx = key.lastIndexOf('node_modules/');
-      const name = key.slice(idx + 'node_modules/'.length);
-      if (name === '') continue;
-      if (name.startsWith('@')) names.add(name); // scoped：@scope/pkg 名称含 '/'，合法
-      else if (!name.includes('/')) names.add(name);
-    }
-    return names;
+    return collectFromPackages(packages as Record<string, unknown>);
   }
 
   const deps = root['dependencies'];
   if (typeof deps === 'object' && deps !== null) {
-    for (const name of Object.keys(deps as Record<string, unknown>)) names.add(name);
+    return collectFromDependencies(deps as Record<string, unknown>);
   }
   return names;
 }

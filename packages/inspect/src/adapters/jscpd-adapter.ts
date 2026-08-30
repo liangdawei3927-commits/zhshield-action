@@ -80,57 +80,78 @@ export class JscpdAdapter implements ToolAdapter {
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
     const reportPath = path.join(options.projectPath, '.zhshield', '.jscpd-report.json');
-    const target = options.targetFiles?.[0] || path.join(options.projectPath, 'src');
 
     try {
-      const command = await this.resolveCommand();
-      await FileHelper.ensureDir(path.dirname(reportPath));
-
-      const args = ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
-
-      await execFileAsync(command, args, {
-        cwd: options.projectPath,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const content = (await FileHelper.readJSON(reportPath)) as JscpdReport;
-      const issues = this.mapOutput(content);
-
-      await this.cleanupReport(reportPath);
-
-      return {
-        tool: 'jscpd',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: content?.statistics?.detection?.total?.count || 0,
-        },
-      };
+      return await this.runJscpd(options, start, reportPath);
     } catch (error: unknown) {
-      await this.cleanupReport(reportPath);
+      return this.handleJscpdError(error, start, reportPath);
+    }
+  }
 
-      const err = error as { code?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'jscpd',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'jscpd 未安装',
-        };
-      }
+  /** 执行 jscpd、读取报告并映射为可用结果 */
+  private async runJscpd(options: ToolScanOptions, start: number, reportPath: string): Promise<ToolResult> {
+    const target = options.targetFiles?.[0] || path.join(options.projectPath, 'src');
+    await this.executeJscpd(options, target, reportPath);
+    const content = await this.readJscpdReport(reportPath);
+    const issues = this.mapOutput(content);
+    return this.buildJscpdAvailable(content, issues, start);
+  }
+
+  /** 运行 jscpd 命令并输出 JSON 报告到 reportPath */
+  private async executeJscpd(options: ToolScanOptions, target: string, reportPath: string): Promise<void> {
+    const command = await this.resolveCommand();
+    await FileHelper.ensureDir(path.dirname(reportPath));
+    const args = ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
+    await execFileAsync(command, args, {
+      cwd: options.projectPath,
+      timeout: options.timeout || 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  }
+
+  /** 读取 jscpd 报告并清理临时文件 */
+  private async readJscpdReport(reportPath: string): Promise<JscpdReport> {
+    const content = (await FileHelper.readJSON(reportPath)) as JscpdReport;
+    await this.cleanupReport(reportPath);
+    return content;
+  }
+
+  /** 组装 jscpd 可用结果 */
+  private buildJscpdAvailable(content: JscpdReport, issues: Issue[], start: number): ToolResult {
+    return {
+      tool: 'jscpd',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: content?.statistics?.detection?.total?.count || 0,
+      },
+    };
+  }
+
+  /** 处理 jscpd 执行错误：清理报告 / 未安装 / 失败 */
+  private async handleJscpdError(error: unknown, start: number, reportPath: string): Promise<ToolResult> {
+    await this.cleanupReport(reportPath);
+
+    const err = error as { code?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
       return {
         tool: 'jscpd',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'jscpd 执行失败',
+        error: 'jscpd 未安装',
       };
     }
+    return {
+      tool: 'jscpd',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'jscpd 执行失败',
+    };
   }
 
   private async cleanupReport(reportPath: string): Promise<void> {

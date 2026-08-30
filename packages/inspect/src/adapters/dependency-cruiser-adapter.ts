@@ -66,56 +66,65 @@ export class DependencyCruiserAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
+    try {
+      return await this.runDepCruiser(options, start);
+    } catch (error: unknown) {
+      return this.handleDepCruiserError(error, start);
+    }
+  }
+
+  /** 执行 dependency-cruiser 并映射输出为可用结果 */
+  private async runDepCruiser(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const configFile = this.resolveConfig(options.projectPath);
     const targetDir = path.join(options.projectPath, 'src');
+    const command = await this.resolveCommand();
+    const args: string[] = [];
+    if (configFile) {
+      args.push('--validate', configFile);
+    }
+    args.push('--output-type', 'json', targetDir);
 
-    try {
-      const command = await this.resolveCommand();
-      const args: string[] = [];
-      if (configFile) {
-        args.push('--validate', configFile);
-      }
-      args.push('--output-type', 'json', targetDir);
+    const { stdout } = await execFileAsync(command, args, {
+      cwd: options.projectPath,
+      timeout: options.timeout || 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
 
-      const { stdout } = await execFileAsync(command, args, {
-        cwd: options.projectPath,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
+    const output = JSON.parse(stdout);
+    const issues = this.mapOutput(output);
 
-      const output = JSON.parse(stdout);
-      const issues = this.mapOutput(output);
+    return {
+      tool: 'dep-cruiser',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: output?.modules?.length || 0,
+      },
+    };
+  }
 
+  /** 处理 dependency-cruiser 执行错误：未安装 / 失败 */
+  private handleDepCruiserError(error: unknown, start: number): ToolResult {
+    const err = error as { code?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
       return {
         tool: 'dep-cruiser',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: output?.modules?.length || 0,
-        },
-      };
-    } catch (error: unknown) {
-      const err = error as { code?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'dep-cruiser',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'dependency-cruiser 未安装',
-        };
-      }
-      return {
-        tool: 'dep-cruiser',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'dependency-cruiser 执行失败',
+        error: 'dependency-cruiser 未安装',
       };
     }
+    return {
+      tool: 'dep-cruiser',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'dependency-cruiser 执行失败',
+    };
   }
 
   private resolveConfig(projectPath: string): string | null {

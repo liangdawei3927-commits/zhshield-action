@@ -16,13 +16,13 @@
       "locationLabel": "- 場所: {{location}}",
       "messageLabel": "- 説明: {{message}}",
       "projectPathLabel": "プロジェクトパス: {{projectPath}}",
-      "promptIntro": "あなたはCodeShieldのコード修正アシスタントです。以下のコード問題を修正してください：",
-      "requirement1": "1. スキルを呼び出し、コードの不具合の実在性を一つずつ特定してください。",
-      "requirement2": "2. 問題を理解してから修正し、いい加減な修正をしないでください。",
-      "requirement3": "3. 必要最小限の変更のみ行い、無関係なコードをリファクタリングしないでください。",
-      "requirement4": "4. 修正後はテスト可能・検証可能・回帰確認可能・実行可能であることを保証してください。",
-      "requirement5": "5. 修正完了後、変更したファイルを一文で報告してください。",
-      "requirementsTitle": "修正要求：",
+      "promptIntro": "あなたはCodeShieldのコード修正アシスタントです。以下の問題を一つずつ検証し、対応してください：",
+      "requirement1": "1. 各問題が実際に存在し、参照されておらず、安全に対応できることを確認してから対処してください。",
+      "requirement2": "2. 影響範囲を理解してから対応してください。不明な点は質問し、適当な修正でごまかさないでください。",
+      "requirement3": "3. 必要最小限の変更のみ行い、リファクタリングやリスト外の項目への対応はしないでください。",
+      "requirement4": "4. 対応後は検証可能な証拠（コードはテスト・型チェック、クリーンアップは存在確認）と復元手順を示してください。検証できない場合は正直に報告してください。",
+      "requirement5": "5. 報告：変更したファイル＋根拠＋結果（3行以内）。",
+      "requirementsTitle": "対応要件：",
       "ruleLabel": "- ルール: {{ruleId}}",
       "severityLabel": "- 深刻度: {{severity}}",
       "suggestionLabel": "- 提案: {{suggestion}}"
@@ -105,6 +105,7 @@
   "electron": {
     "appTitle": "CodeShield",
     "cleanFailed": "クリーンアップに失敗しました。後でもう一度お試しください",
+    "depsRelock.integrityIncomplete": "ロックファイルのハッシュが不完全（ハッシュ欠落ノードあり）。再ロックを拒否",
     "diagnostics": {
       "ruleFailed": "{{ruleId}} は不合格です"
     },
@@ -987,6 +988,9 @@
       "lockfile.integrityFailed": "ハッシュ検証に失敗",
       "lockfile.integrityVerified": "ハッシュ検証に合格",
       "lockfile.notConsistent": "マニフェストの宣言と不一致",
+      "lockfile.notEvaluable": "ロックファイルが存在しない — 評価不可",
+      "lockfile.notEvaluableConsistency": "整合性は評価不可",
+      "lockfile.notEvaluableIntegrity": "完全性は評価不可",
       "lockfile.notPresent": "ロックファイルが存在しない",
       "lockfile.present": "ロックファイルは存在し、解析可能",
       "lockfileVerify": "ロックファイル整合性検証",
@@ -1077,10 +1081,13 @@
     "garbage": {
       "cleanButton": "ワンクリックでクリーンアップ",
       "cleanButtonCount": "ワンクリックでクリーンアップ ({{count}})",
+      "cleanableLabel": "クリーンアップ可",
       "cleanFailed": "クリーンアップに失敗しました。もう一度お試しください",
       "cleanFailedCount": "{{count}} 項目をクリーンアップできませんでした（パス範囲外 / ファイル使用中など）",
       "cleaned": "{{count}} 項目をクリーンアップしました · {{size}} 解放",
       "cleaning": "クリーンアップ中...",
+      "copiedAll": "ゴミの全リストをコピーしました。AI に貼り付けて安全に削除できるか確認してください",
+      "copyAllToAi": "AIにコピーして確認",
       "dependencyHint": "未使用の依存関係は自動削除されません。参照がないことを確認した上で package.json から手動で削除できます",
       "done": "ゴミ清掃が完了しました",
       "empty": {
@@ -1102,15 +1109,18 @@
           "desc": "未参照のリソースと残存ファイルを識別"
         }
       },
+      "manualLabel": "手動対応が必要",
       "rescan": "再スキャン",
       "restore": "復元",
       "restoreFailed": "復元に失敗しました。もう一度お試しください",
       "restoreFailedCount": "{{count}} 項目の復元に失敗しました（元の場所にファイルが既に存在する可能性があります）",
       "restored": "{{count}} 項目を復元しました · {{size}}。リストを更新しました",
       "restoring": "復元中...",
+      "safetySuggestion": "削除対象のファイルがまだ参照されていないか確認してからクリーンアップしてください。削除後もゴミ箱から復元できます",
       "scanning": "スキャン中...",
       "selectAll": "すべて選択",
       "selectedCount": "{{count}} 項目を選択中",
+      "source": "ゴミ清掃",
       "startScan": "スキャンを開始",
       "stats": {
         "freeable": "解放可能な容量",
@@ -1122,7 +1132,8 @@
         "duplicateCode": "重複コード",
         "unusedDependency": "未使用の依存関係",
         "unusedFile": "不要なファイル"
-      }
+      },
+      "selectAllDisabledHint": "選択可能な項目がありません（未使用の依存関係はパッケージマネージャーで削除してください — 「AI検査にコピー」を使用）"
     },
     "guard": {
       "banner": {

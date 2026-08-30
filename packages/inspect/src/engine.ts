@@ -96,19 +96,26 @@ export class InspectEngine {
 
   async runScan(projectId: string, scanType: InspectionReport['scanType'] = 'full'): Promise<InspectionReport> {
     const start = Date.now();
+    if (this.sopEngine && !this._sopScanning) {
+      return this.runSopGuarded(projectId, scanType, start);
+    }
+    return this.runDirectScan(projectId, scanType, start);
+  }
 
-    // SOP 驱动模式：通过 SopRuleEngine 评估 inspect/security 域规则
+  /** SOP 驱动模式：评估 inspect/security 域规则（带重入保护） */
+  private async runSopGuarded(projectId: string, scanType: InspectionReport['scanType'], start: number): Promise<InspectionReport> {
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
-    if (this.sopEngine && !this._sopScanning) {
-      this._sopScanning = true;
-      try {
-        return await this.runScanWithSop(projectId, scanType, start);
-      } finally {
-        this._sopScanning = false;
-      }
+    this._sopScanning = true;
+    try {
+      return await this.runScanWithSop(projectId, scanType, start);
+    } finally {
+      this._sopScanning = false;
     }
+  }
 
+  /** 直接执行模式：运行全部适配器 + AI 审查并构建报告 */
+  private async runDirectScan(projectId: string, scanType: InspectionReport['scanType'], start: number): Promise<InspectionReport> {
     const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(this.registeredAdapters, projectId);
     const legacyResults = await this.runner.runAll({ projectId, scanType });
     adapterResults.push(...legacyResults);

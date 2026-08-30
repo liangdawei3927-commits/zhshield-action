@@ -11,7 +11,7 @@
  */
 import type { GuardReport } from '@zh/guard';
 import type { RuleEngineReport, Violation } from '@zh/kernel';
-import type { InspectionReport, Issue } from '@zh/inspect';
+import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { PipelineReport } from '@zh/pipeline';
 
@@ -91,6 +91,107 @@ function isPipelineReport(r: unknown): r is PipelineReport {
 
 // ─── 归一化 ───────────────────────────────────────────
 
+function guardFindings(report: GuardReport): Finding[] {
+  const findings: Finding[] = [];
+  for (const res of report.results) {
+    if (res.status === 'passed') continue;
+    const details = res.details as { violations?: Violation[] } | undefined;
+    if (details?.violations?.length) {
+      for (const v of details.violations) {
+        findings.push({
+          ruleId: v.ruleId ?? res.checkId,
+          severity: toFindingSeverity(v.severity),
+          message: v.message,
+          file: v.file,
+          line: v.line,
+          column: v.column,
+          category: v.category,
+          source: 'guard',
+          suggestion: v.suggestion,
+        });
+      }
+    } else {
+      findings.push({
+        ruleId: res.checkId,
+        severity: res.severity,
+        message: res.message,
+        source: 'guard',
+      });
+    }
+  }
+  return findings;
+}
+
+function ruleEngineFindings(report: RuleEngineReport): Finding[] {
+  const findings: Finding[] = [];
+  for (const ev of report.evaluations) {
+    if (ev.status === 'passed' || ev.status === 'skipped') continue;
+    const source: FindingSource = ev.targetEngine === 'inspect' ? 'inspect' : 'guard';
+    const ruleId = ev.rule?.id ?? 'unknown';
+    if (ev.violations?.length) {
+      for (const v of ev.violations) {
+        findings.push({
+          ruleId: v.ruleId ?? ruleId,
+          severity: toFindingSeverity(v.severity),
+          message: v.message,
+          file: v.file,
+          line: v.line,
+          column: v.column,
+          category: v.category,
+          source,
+          suggestion: v.suggestion,
+        });
+      }
+    } else {
+      findings.push({
+        ruleId,
+        severity: 'error',
+        message: ev.message ?? `${ev.status}: ${ev.rule?.name ?? ruleId}`,
+        source,
+      });
+    }
+  }
+  return findings;
+}
+
+function inspectionFindings(report: InspectionReport): Finding[] {
+  const findings: Finding[] = [];
+  for (const issue of report.issues) {
+    findings.push({
+      ruleId: issue.ruleId,
+      severity: issue.severity,
+      message: issue.message,
+      file: issue.file,
+      line: issue.line,
+      column: issue.column,
+      category: issue.category,
+      source: (issue.source as FindingSource) || 'inspect',
+      suggestion: issue.suggestion,
+    });
+  }
+  return findings;
+}
+
+function refactorFindings(report: RefactorReport): Finding[] {
+  const findings: Finding[] = [];
+  for (const file of report.files) {
+    for (const smell of file.smells) {
+      findings.push({
+        ruleId: smell.ruleId,
+        severity: smell.severity,
+        message: smell.message,
+        file: smell.location.filePath,
+        line: smell.location.line,
+        column: smell.location.column,
+        category: smell.category,
+        source: 'refactor',
+        suggestion: smell.suggestion?.description,
+      });
+    }
+  }
+  return findings;
+}
+
 /**
  * 把任意报告对象抽取为统一的 Finding 列表（只包含「未通过」的条目，
  * 即 status !== passed）。passed 的检查不产生 Finding，避免 SARIF 噪声。
@@ -99,102 +200,10 @@ export function buildFindings(report: unknown): Finding[] {
   const findings: Finding[] = [];
   if (!report) return findings;
 
-  if (isGuardReport(report)) {
-    for (const res of report.results) {
-      if (res.status === 'passed') continue;
-      const details = res.details as { violations?: Violation[] } | undefined;
-      if (details?.violations?.length) {
-        for (const v of details.violations) {
-          findings.push({
-            ruleId: v.ruleId ?? res.checkId,
-            severity: toFindingSeverity(v.severity),
-            message: v.message,
-            file: v.file,
-            line: v.line,
-            column: v.column,
-            category: v.category,
-            source: 'guard',
-            suggestion: v.suggestion,
-          });
-        }
-      } else {
-        findings.push({
-          ruleId: res.checkId,
-          severity: res.severity,
-          message: res.message,
-          source: 'guard',
-        });
-      }
-    }
-    return findings;
-  }
-
-  if (isRuleEngineReport(report)) {
-    for (const ev of report.evaluations) {
-      if (ev.status === 'passed' || ev.status === 'skipped') continue;
-      const source: FindingSource = ev.targetEngine === 'inspect' ? 'inspect' : 'guard';
-      const ruleId = ev.rule?.id ?? 'unknown';
-      if (ev.violations?.length) {
-        for (const v of ev.violations) {
-          findings.push({
-            ruleId: v.ruleId ?? ruleId,
-            severity: toFindingSeverity(v.severity),
-            message: v.message,
-            file: v.file,
-            line: v.line,
-            column: v.column,
-            category: v.category,
-            source,
-            suggestion: v.suggestion,
-          });
-        }
-      } else {
-        findings.push({
-          ruleId,
-          severity: 'error',
-          message: ev.message ?? `${ev.status}: ${ev.rule?.name ?? ruleId}`,
-          source,
-        });
-      }
-    }
-    return findings;
-  }
-
-  if (isInspectionReport(report)) {
-    for (const issue of report.issues) {
-      findings.push({
-        ruleId: issue.ruleId,
-        severity: issue.severity,
-        message: issue.message,
-        file: issue.file,
-        line: issue.line,
-        column: issue.column,
-        category: issue.category,
-        source: (issue.source as FindingSource) || 'inspect',
-        suggestion: issue.suggestion,
-      });
-    }
-    return findings;
-  }
-
-  if (isRefactorReport(report)) {
-    for (const file of report.files) {
-      for (const smell of file.smells) {
-        findings.push({
-          ruleId: smell.ruleId,
-          severity: smell.severity,
-          message: smell.message,
-          file: smell.location.filePath,
-          line: smell.location.line,
-          column: smell.location.column,
-          category: smell.category,
-          source: 'refactor',
-          suggestion: smell.suggestion?.description,
-        });
-      }
-    }
-    return findings;
-  }
+  if (isGuardReport(report)) return guardFindings(report);
+  if (isRuleEngineReport(report)) return ruleEngineFindings(report);
+  if (isInspectionReport(report)) return inspectionFindings(report);
+  if (isRefactorReport(report)) return refactorFindings(report);
 
   if (isPipelineReport(report)) {
     if (report.guard) findings.push(...buildFindings(report.guard));
@@ -245,7 +254,7 @@ export function toSarif(findings: Finding[], toolName = 'zhshield'): string {
         driver: {
           name: toolName,
           informationUri: 'https://github.com/zhishield/zhshield',
-          rules: [...rules.values()].map((r) => ({
+          rules: Array.from(rules.values(), (r) => ({
             id: r.id,
             shortDescription: { text: r.short },
           })),

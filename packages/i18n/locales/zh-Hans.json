@@ -16,13 +16,13 @@
       "locationLabel": "- 位置: {{location}}",
       "messageLabel": "- 描述: {{message}}",
       "projectPathLabel": "项目路径: {{projectPath}}",
-      "promptIntro": "你是智汇码盾的代码修复助手。请修复以下代码问题：",
-      "requirement1": "1. 调用技能，逐条定位代码故障的真实性。",
-      "requirement2": "2. 理解问题后再修改，不要敷衍假装修复。",
-      "requirement3": "3. 只做最小必要的修改，不要重构无关代码。",
-      "requirement4": "4. 修复后要保证可测试、可验证、可回归、可运行。",
-      "requirement5": "5. 修复完成后用一句话汇报修改了哪些文件。",
-      "requirementsTitle": "修复要求：",
+      "promptIntro": "你是智汇码盾的代码修复助手。请逐项核实并处理以下问题：",
+      "requirement1": "1. 逐一核实问题真实存在、无引用、可安全处理，再动手。",
+      "requirement2": "2. 理解影响面后再修改；不懂就问，禁止假装修复。",
+      "requirement3": "3. 只做最小必要的修改，不重构、不连带处理清单外的内容。",
+      "requirement4": "4. 处理完给出验证证据（代码跑测试/类型检查，清理做存在性检查）与恢复路径；验证不过如实报告。",
+      "requirement5": "5. 汇报：改了哪些文件 + 依据 + 验证结果（3 行内）。",
+      "requirementsTitle": "处理要求：",
       "ruleLabel": "- 规则: {{ruleId}}",
       "severityLabel": "- 严重度: {{severity}}",
       "suggestionLabel": "- 建议: {{suggestion}}"
@@ -105,6 +105,7 @@
   "electron": {
     "appTitle": "智汇码盾",
     "cleanFailed": "清理失败，请稍后重试",
+    "depsRelock.integrityIncomplete": "锁文件哈希不完整（存在无哈希节点），拒绝重锁",
     "diagnostics": {
       "ruleFailed": "{{ruleId}} 未通过"
     },
@@ -988,6 +989,9 @@
       "lockfile.integrityFailed": "哈希校验失败",
       "lockfile.integrityVerified": "哈希校验通过",
       "lockfile.notConsistent": "与清单声明不一致",
+      "lockfile.notEvaluable": "锁文件缺失，无法评估",
+      "lockfile.notEvaluableConsistency": "一致性无法评估",
+      "lockfile.notEvaluableIntegrity": "完整性无法评估",
       "lockfile.notPresent": "锁文件缺失",
       "lockfile.present": "锁文件存在且可解析",
       "lockfileVerify": "锁文件完整性校验",
@@ -1078,10 +1082,13 @@
     "garbage": {
       "cleanButton": "一键清理",
       "cleanButtonCount": "一键清理 ({{count}})",
+      "cleanableLabel": "可清理",
       "cleanFailed": "清理失败，请重试",
       "cleanFailedCount": "{{count}} 项未能清理（路径越界 / 文件占用等）",
       "cleaned": "已清理 {{count}} 项 · 释放 {{size}}",
       "cleaning": "清理中...",
+      "copiedAll": "已复制全部垃圾清单，可粘贴到 AI 检查是否可安全删除",
+      "copyAllToAi": "复制到AI检查",
       "dependencyHint": "未用依赖不自动删除，确认无引用后可从 package.json 手动移除",
       "done": "垃圾清理完成",
       "empty": {
@@ -1103,15 +1110,18 @@
           "desc": "识别未引用的资源与残留文件"
         }
       },
+      "manualLabel": "需手动处理",
       "rescan": "重新扫描",
       "restore": "恢复",
       "restoreFailed": "恢复失败，请重试",
       "restoreFailedCount": "{{count}} 项恢复失败（原位置可能已存在文件）",
       "restored": "已恢复 {{count}} 项 · {{size}}，清单已刷新",
       "restoring": "恢复中...",
+      "safetySuggestion": "请确认待删除文件是否仍被引用，确认无误后再执行清理；文件删除后可在回收站恢复",
       "scanning": "扫描中...",
       "selectAll": "全选",
       "selectedCount": "已选 {{count}} 项",
+      "source": "垃圾清理",
       "startScan": "开始扫描",
       "stats": {
         "freeable": "可释放空间",
@@ -1123,7 +1133,8 @@
         "duplicateCode": "重复代码",
         "unusedDependency": "未用依赖",
         "unusedFile": "无用文件"
-      }
+      },
+      "selectAllDisabledHint": "当前无可勾选清理项（未用依赖需通过包管理器处理，请使用「复制到AI检查」）"
     },
     "guard": {
       "banner": {

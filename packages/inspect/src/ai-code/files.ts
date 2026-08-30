@@ -90,7 +90,9 @@ function walkDir(dir: string, base: string, out: string[]): void {
     if (entry.isDirectory()) {
       if (EXCLUDED_DIRS.has(entry.name)) continue;
       walkDir(safeJoin(dir, entry.name), rel, out);
-    } else if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
+      continue;
+    }
+    if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
       if (TEST_FILE_PATTERN.test(entry.name)) continue;
       out.push(rel.split(path.sep).join('/'));
     }
@@ -186,6 +188,15 @@ export function packageNameFromSpecifier(specifier: string): string | null {
   return first; // 'lodash/fp' → 'lodash'
 }
 
+/** 单行内提取的 import/require 引用追加到 refs（保持行内出现顺序） */
+function collectLineRefs(refs: ImportReference[], file: string, lineNumber: number, line: string): void {
+  for (const spec of extractSpecifiers(line)) {
+    const pkg = packageNameFromSpecifier(spec);
+    if (pkg === null) continue;
+    refs.push({ packageName: pkg, file, line: lineNumber });
+  }
+}
+
 /** 扫描项目全部源码文件，提取外部包 import/require 引用 */
 export function extractImportReferences(projectPath: string, scope?: readonly string[]): ImportReference[] {
   const refs: ImportReference[] = [];
@@ -197,11 +208,7 @@ export function extractImportReferences(projectPath: string, scope?: readonly st
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line === undefined) continue;
-      for (const spec of extractSpecifiers(line)) {
-        const pkg = packageNameFromSpecifier(spec);
-        if (pkg === null) continue;
-        refs.push({ packageName: pkg, file, line: i + 1 });
-      }
+      collectLineRefs(refs, file, i + 1, line);
     }
   }
   return refs;

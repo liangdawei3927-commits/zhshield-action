@@ -55,64 +55,73 @@ export class TsPruneAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const tsConfigPath = path.join(options.projectPath, 'tsconfig.json');
-
     try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, [
-        '-p', tsConfigPath,
-        '--json',
-      ], {
-        cwd: options.projectPath,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const issues = this.mapOutput(stdout);
-
-      return {
-        tool: 'ts-prune',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: issues.length,
-        },
-      };
+      return await this.runTsPrune(options, start);
     } catch (error: unknown) {
-      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'ts-prune',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'ts-prune 未安装',
-        };
-      }
+      return this.handleTsPruneError(error, start);
+    }
+  }
 
-      if (err.stdout) {
-        const issues = this.mapOutput(err.stdout);
-        if (issues.length > 0) {
-          return {
-            tool: 'ts-prune',
-            status: 'available',
-            issues,
-            metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: issues.length },
-          };
-        }
-      }
+  /** 执行 ts-prune 并映射输出为可用结果 */
+  private async runTsPrune(options: ToolScanOptions, start: number): Promise<ToolResult> {
+    const tsConfigPath = path.join(options.projectPath, 'tsconfig.json');
+    const command = await this.resolveCommand();
+    const { stdout } = await execFileAsync(command, [
+      '-p', tsConfigPath,
+      '--json',
+    ], {
+      cwd: options.projectPath,
+      timeout: options.timeout || 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
 
+    const issues = this.mapOutput(stdout);
+
+    return {
+      tool: 'ts-prune',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: issues.length,
+      },
+    };
+  }
+
+  /** 处理 ts-prune 执行错误：未安装 / 部分输出 / 失败 */
+  private handleTsPruneError(error: unknown, start: number): ToolResult {
+    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
       return {
         tool: 'ts-prune',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'ts-prune 执行失败',
+        error: 'ts-prune 未安装',
       };
     }
+
+    if (err.stdout) {
+      const issues = this.mapOutput(err.stdout);
+      if (issues.length > 0) {
+        return {
+          tool: 'ts-prune',
+          status: 'available',
+          issues,
+          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: issues.length },
+        };
+      }
+    }
+
+    return {
+      tool: 'ts-prune',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'ts-prune 执行失败',
+    };
   }
 
   private mapOutput(raw: string): Issue[] {

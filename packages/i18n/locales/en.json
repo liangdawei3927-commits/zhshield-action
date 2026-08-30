@@ -16,13 +16,13 @@
       "locationLabel": "- Location: {{location}}",
       "messageLabel": "- Description: {{message}}",
       "projectPathLabel": "Project path: {{projectPath}}",
-      "promptIntro": "You are the code-fix assistant for ZhiYan CodeShield. Please fix the following code issues:",
-      "requirement1": "1. Use the skill to verify each code fault is real.",
-      "requirement2": "2. Understand the problem before modifying; don't fake a fix.",
-      "requirement3": "3. Make only the minimal necessary changes; don't refactor unrelated code.",
-      "requirement4": "4. After fixing, make sure it is testable, verifiable, regression-safe, and runnable.",
-      "requirement5": "5. When done, report in one sentence which files were changed.",
-      "requirementsTitle": "Fix requirements:",
+      "promptIntro": "You are the code-fix assistant for ZhiYan CodeShield. Please verify and handle the following issues one by one:",
+      "requirement1": "1. Verify each issue is real, unreferenced, and safe to handle before acting.",
+      "requirement2": "2. Understand the impact before making changes; ask instead of faking a fix.",
+      "requirement3": "3. Make only minimal necessary changes; don't refactor or handle anything outside the list.",
+      "requirement4": "4. Provide verifiable evidence afterward (run tests/type check for code; existence checks for cleanups) and a restore path; report honestly if verification fails.",
+      "requirement5": "5. Report: files changed + rationale + results (within 3 lines).",
+      "requirementsTitle": "Handling requirements:",
       "ruleLabel": "- Rule: {{ruleId}}",
       "severityLabel": "- Severity: {{severity}}",
       "suggestionLabel": "- Suggestion: {{suggestion}}"
@@ -105,6 +105,7 @@
   "electron": {
     "appTitle": "ZhiYan CodeShield",
     "cleanFailed": "Cleanup failed, please try again later",
+    "depsRelock.integrityIncomplete": "Lockfile hashes incomplete (nodes missing hashes); relock refused",
     "diagnostics": {
       "ruleFailed": "{{ruleId}} failed"
     },
@@ -988,6 +989,9 @@
       "lockfile.integrityFailed": "Hash verification failed",
       "lockfile.integrityVerified": "Hash verified",
       "lockfile.notConsistent": "Inconsistent with the manifest",
+      "lockfile.notEvaluable": "Lockfile missing — not evaluable",
+      "lockfile.notEvaluableConsistency": "Consistency not evaluable",
+      "lockfile.notEvaluableIntegrity": "Integrity not evaluable",
       "lockfile.notPresent": "Lockfile missing",
       "lockfile.present": "Lockfile present and parseable",
       "lockfileVerify": "Lockfile integrity verification",
@@ -1078,10 +1082,13 @@
     "garbage": {
       "cleanButton": "Clean up",
       "cleanButtonCount": "Clean up ({{count}})",
+      "cleanableLabel": "Cleanable",
       "cleanFailed": "Cleanup failed, please retry",
       "cleanFailedCount": "{{count}} items could not be cleaned (path out of bounds / file in use, etc.)",
       "cleaned": "Cleaned {{count}} items · freed {{size}}",
       "cleaning": "Cleaning...",
+      "copiedAll": "Full garbage list copied; paste it into AI to check whether it's safe to delete",
+      "copyAllToAi": "Copy to AI to inspect",
       "dependencyHint": "Unused dependencies are not deleted automatically; remove them manually from package.json once you've confirmed they're unreferenced",
       "done": "Garbage cleanup complete",
       "empty": {
@@ -1103,15 +1110,18 @@
           "desc": "Identifies unreferenced assets and leftover files"
         }
       },
+      "manualLabel": "Needs manual handling",
       "rescan": "Rescan",
       "restore": "Restore",
       "restoreFailed": "Restore failed, please retry",
       "restoreFailedCount": "{{count}} items could not be restored (a file may already exist at the original location)",
       "restored": "Restored {{count}} items · {{size}}, list refreshed",
       "restoring": "Restoring...",
+      "safetySuggestion": "Check whether the files to delete are still referenced before cleaning; deleted files can be restored from the recycle bin",
       "scanning": "Scanning...",
       "selectAll": "Select all",
       "selectedCount": "{{count}} selected",
+      "source": "Garbage cleanup",
       "startScan": "Start scan",
       "stats": {
         "freeable": "Releasable space",
@@ -1123,7 +1133,8 @@
         "duplicateCode": "Duplicate code",
         "unusedDependency": "Unused dependency",
         "unusedFile": "Unused file"
-      }
+      },
+      "selectAllDisabledHint": "No selectable items (unused dependencies must be removed via package manager — use \"Copy to AI review\")"
     },
     "guard": {
       "banner": {

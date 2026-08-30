@@ -64,29 +64,39 @@ export class GitleaksAdapter implements ToolAdapter {
     const isStaged = !!(options.targetFiles && options.targetFiles.length > 0);
 
     try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
-        cwd: options.projectPath,
-        timeout: options.timeout || 30000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const parsed = JSON.parse(stdout);
-      const findings = Array.isArray(parsed) ? parsed : (parsed?.findings || []);
-      return this.buildAvailable(findings, start);
+      return await this.runGitleaks(options, start, isStaged);
     } catch (error: unknown) {
-      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return this.buildUnavailable(start, 'Gitleaks 未安装或未在 PATH 中找到');
-      }
-
-      // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
-      const partialFindings = this.parsePartialFindings(err.stdout ?? '');
-      if (partialFindings) {
-        return this.buildAvailable(partialFindings, start);
-      }
-      return this.buildError(start, err.stderr || err.message || 'Gitleaks 执行失败');
+      return this.handleGitleaksError(error, start);
     }
+  }
+
+  /** 执行 gitleaks 并映射输出为可用结果 */
+  private async runGitleaks(options: ToolScanOptions, start: number, isStaged: boolean): Promise<ToolResult> {
+    const command = await this.resolveCommand();
+    const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
+      cwd: options.projectPath,
+      timeout: options.timeout || 30000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const parsed = JSON.parse(stdout);
+    const findings = Array.isArray(parsed) ? parsed : (parsed?.findings || []);
+    return this.buildAvailable(findings, start);
+  }
+
+  /** 处理 gitleaks 执行错误：未安装 / 部分输出 / 失败 */
+  private handleGitleaksError(error: unknown, start: number): ToolResult {
+    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
+      return this.buildUnavailable(start, 'Gitleaks 未安装或未在 PATH 中找到');
+    }
+
+    // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
+    const partialFindings = this.parsePartialFindings(err.stdout ?? '');
+    if (partialFindings) {
+      return this.buildAvailable(partialFindings, start);
+    }
+    return this.buildError(start, err.stderr || err.message || 'Gitleaks 执行失败');
   }
 
   private parsePartialFindings(stdout: string): Record<string, unknown>[] | null {

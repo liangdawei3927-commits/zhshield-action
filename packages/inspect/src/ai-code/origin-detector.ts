@@ -90,6 +90,21 @@ export function isAiMarkedCommit(subject: string): boolean {
   return AI_COMMIT_MARKERS.some((re) => re.test(subject));
 }
 
+/** 对单个作者的提交索引（已按时间排序）统计 600 秒内 ≥5 次的批量提交，命中索引加入 burst */
+function addBurstIndexes(commits: readonly CommitEvidence[], sorted: number[], burst: Set<number>): void {
+  for (let i = 0; i < sorted.length; i++) {
+    const start = sorted[i];
+    let count = 1;
+    for (let j = i + 1; j < sorted.length; j++) {
+      if (commits[sorted[j]].timestamp - commits[start].timestamp > BURST_WINDOW_SECONDS) break;
+      count += 1;
+    }
+    if (count >= BURST_MIN_COMMITS) {
+      for (let k = i; k < i + count; k++) burst.add(sorted[k]);
+    }
+  }
+}
+
 /** 同作者 600 秒内提交数 ≥ 5（按索引输出命中提交集） */
 function burstCommitIndexes(commits: readonly CommitEvidence[]): ReadonlySet<number> {
   const burst = new Set<number>();
@@ -100,18 +115,7 @@ function burstCommitIndexes(commits: readonly CommitEvidence[]): ReadonlySet<num
     else arr.push(i);
   });
   for (const indexes of byAuthor.values()) {
-    const sorted = indexes.toSorted((a, b) => commits[a].timestamp - commits[b].timestamp);
-    for (let i = 0; i < sorted.length; i++) {
-      const start = sorted[i];
-      let count = 1;
-      for (let j = i + 1; j < sorted.length; j++) {
-        if (commits[sorted[j]].timestamp - commits[start].timestamp > BURST_WINDOW_SECONDS) break;
-        count += 1;
-      }
-      if (count >= BURST_MIN_COMMITS) {
-        for (let k = i; k < i + count; k++) burst.add(sorted[k]);
-      }
-    }
+    addBurstIndexes(commits, indexes.toSorted((a, b) => commits[a].timestamp - commits[b].timestamp), burst);
   }
   return burst;
 }
@@ -194,14 +198,34 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
       else arr.push(evidence);
     };
 
-    // 1) commit-meta：git 提交元数据（批量快速提交 + AI 工具标记）
+    await this.collectCommitEvidenceForFiles(projectPath, maxCommits, files, addEvidence);
+    this.collectStyleEvidence(projectPath, files, addEvidence);
+    this.collectUserTagEvidence(options, files, addEvidence);
+    this.collectToolReportEvidence(options, files, addEvidence);
+
+    return this.buildFindings(evidenceByFile, includeUncertain);
+  }
+
+  /** 1) commit-meta：git 提交元数据（批量快速提交 + AI 工具标记） */
+  private async collectCommitEvidenceForFiles(
+    projectPath: string,
+    maxCommits: number,
+    files: ReadonlySet<string>,
+    addEvidence: (file: string, evidence: AiEvidence) => void,
+  ): Promise<void> {
     const commitEvidence = await collectCommitEvidence(projectPath, maxCommits);
     for (const [file, evidence] of commitEvidence) {
       if (!files.has(file)) continue;
       for (const e of evidence) addEvidence(file, e);
     }
+  }
 
-    // 2) style-signature：风格突变 / 模板化命名 / AI 典型注释
+  /** 2) style-signature：风格突变 / 模板化命名 / AI 典型注释 */
+  private collectStyleEvidence(
+    projectPath: string,
+    files: ReadonlySet<string>,
+    addEvidence: (file: string, evidence: AiEvidence) => void,
+  ): void {
     for (const file of files) {
       const content = readTextFileSafe(projectPath, file);
       if (content === null) continue;
@@ -213,8 +237,14 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
         });
       }
     }
+  }
 
-    // 3) user-tagged：用户主动标注（唯一确定性信号）
+  /** 3) user-tagged：用户主动标注（唯一确定性信号） */
+  private collectUserTagEvidence(
+    options: AiOriginDetectorOptions,
+    files: ReadonlySet<string>,
+    addEvidence: (file: string, evidence: AiEvidence) => void,
+  ): void {
     for (const tag of options.userTags ?? []) {
       if (!files.has(tag.file)) continue;
       addEvidence(tag.file, {
@@ -223,8 +253,14 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
         confidence: 1,
       });
     }
+  }
 
-    // 4) tool-report：IDE/AI 工具生成物报告
+  /** 4) tool-report：IDE/AI 工具生成物报告 */
+  private collectToolReportEvidence(
+    options: AiOriginDetectorOptions,
+    files: ReadonlySet<string>,
+    addEvidence: (file: string, evidence: AiEvidence) => void,
+  ): void {
     for (const report of options.toolReports ?? []) {
       if (!files.has(report.file)) continue;
       addEvidence(report.file, {
@@ -233,7 +269,10 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
         confidence: 0.6,
       });
     }
+  }
 
+  /** 聚合证据为分级结果并按强度排序 */
+  private buildFindings(evidenceByFile: Map<string, AiEvidence[]>, includeUncertain: boolean): AiOriginFinding[] {
     const findings: AiOriginFinding[] = [];
     for (const [file, evidence] of evidenceByFile) {
       const strength = classifyStrength(evidence);

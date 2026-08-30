@@ -152,28 +152,44 @@ export class TypeScriptAdapter implements ToolAdapter {
     const category: IssueCategory = options.config?.category ?? 'quality';
 
     try {
-      const command = await this.resolveCommand();
-      const projects = resolveTscProjects(options.projectPath);
-      if (projects.length === 0) {
-        // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
-        return this.buildResult(start, category, []);
-      }
-
-      const flags = this.buildFlags(options);
-      const issues: Issue[] = [];
-      let infraError: string | undefined;
-      for (const tsconfig of projects) {
-        const one = await this.runTsc(command, tsconfig, flags, options, category);
-        issues.push(...one.issues);
-        if (one.infraError && !infraError) infraError = one.infraError;
-      }
-      if (infraError && issues.length === 0) {
-        return this.buildResult(start, category, [], infraError);
-      }
-      return this.buildResult(start, category, issues);
+      return await this.runTscScan(options, start, category);
     } catch (error: unknown) {
       return this.buildResult(start, category, [], (error as Error).message || this.tr('engine.inspect.tool.tsc.runFailed'));
     }
+  }
+
+  /** 解析项目并逐个运行 tsc，聚合结果 */
+  private async runTscScan(options: ToolScanOptions, start: number, category: IssueCategory): Promise<ToolResult> {
+    const command = await this.resolveCommand();
+    const projects = resolveTscProjects(options.projectPath);
+    if (projects.length === 0) {
+      // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
+      return this.buildResult(start, category, []);
+    }
+    const flags = this.buildFlags(options);
+    const { issues, infraError } = await this.runAllProjects(command, projects, flags, options, category);
+    if (infraError && issues.length === 0) {
+      return this.buildResult(start, category, [], infraError);
+    }
+    return this.buildResult(start, category, issues);
+  }
+
+  /** 逐个 tsconfig 运行 tsc 并聚合 issues 与首个基础设施错误 */
+  private async runAllProjects(
+    command: string,
+    projects: string[],
+    flags: string[],
+    options: ToolScanOptions,
+    category: IssueCategory,
+  ): Promise<{ issues: Issue[]; infraError?: string }> {
+    const issues: Issue[] = [];
+    let infraError: string | undefined;
+    for (const tsconfig of projects) {
+      const one = await this.runTsc(command, tsconfig, flags, options, category);
+      issues.push(...one.issues);
+      if (one.infraError && !infraError) infraError = one.infraError;
+    }
+    return { issues, infraError };
   }
 
   private buildFlags(options: ToolScanOptions): string[] {

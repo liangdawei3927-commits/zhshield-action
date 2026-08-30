@@ -55,7 +55,7 @@ describe('AiCodeReviewImpl', () => {
     const critical = hallucinated.find((v) => v.severity === 'critical');
     expect(critical?.description).toContain('lodahs');
 
-    const tsSuppression = vulns.find((v) => v.ruleId === 'ai-unsafe-default' && v.description.includes('@ts-ignore'));
+    const tsSuppression = vulns.find((v) => v.ruleId === 'ai-unsafe-default' && v.description.includes('ts-ignore'));
     expect(tsSuppression?.line).toBe(4);
     expect(vulns.find((v) => v.description.includes('eval'))?.severity).toBe('high');
     expect(vulns.find((v) => v.description.includes('catch'))?.severity).toBe('medium');
@@ -99,5 +99,28 @@ describe('AiCodeReviewImpl', () => {
     await writeFile('src/plain.ts', 'export const a = 1;\n');
     const review = new AiCodeReviewImpl();
     expect(await review.detectOrigin(profile(tmpDir))).toHaveLength(0);
+  });
+
+  it('ai-empty-hooks-deps：命中真实空依赖数组，且不误报类型注解 X[]', async () => {
+    await writeFile(
+      'src/hooks.ts',
+      [
+        'export function useIssue(issues: AiFixIssue[]) {',
+        '  const copyIssues = useCallback((list: AiFixIssue[]) => list, [issues]);',
+        '  useEffect(() => { void refresh(); }, []);',
+        '  const memo = useMemo(() => compute(), []);',
+        '  return { copyIssues, memo };',
+        '}',
+      ].join('\n'),
+    );
+    const review = new AiCodeReviewImpl();
+    const vulns = await review.deepReview(profile(tmpDir), {});
+    const emptyDepsHits = vulns.filter(
+      (v) => v.ruleId === 'ai-boundary-miss' && v.description.includes('empty dependency array'),
+    );
+    // 两处真实空依赖数组命中（useEffect / useMemo）
+    expect(emptyDepsHits.map((v) => v.line).sort()).toEqual([3, 4]);
+    // 类型注解 AiFixIssue[] 不应被误判为"空依赖数组"
+    expect(emptyDepsHits.some((v) => v.line === 1 || v.line === 2)).toBe(false);
   });
 });

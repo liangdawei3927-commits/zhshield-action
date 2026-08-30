@@ -16,13 +16,13 @@
       "locationLabel": "- 位置: {{location}}",
       "messageLabel": "- 描述: {{message}}",
       "projectPathLabel": "專案路徑: {{projectPath}}",
-      "promptIntro": "你是智匯碼盾的程式碼修復助手。請修復以下程式碼問題：",
-      "requirement1": "1. 呼叫技能，逐條定位程式碼故障的真實性。",
-      "requirement2": "2. 理解問題後再修改，不要敷衍假裝修復。",
-      "requirement3": "3. 只做最小必要的修改，不要重構無關程式碼。",
-      "requirement4": "4. 修復後要保證可測試、可驗證、可迴歸、可執行。",
-      "requirement5": "5. 修復完成後用一句話彙報修改了哪些檔案。",
-      "requirementsTitle": "修復要求：",
+      "promptIntro": "你是智匯碼盾的程式碼修復助手。請逐項核實並處理以下問題：",
+      "requirement1": "1. 逐一核實問題真實存在、無引用、可安全處理，再動手。",
+      "requirement2": "2. 理解影響範圍後再修改；不懂就問，禁止假裝修復。",
+      "requirement3": "3. 只做最小必要的修改，不重構、不連帶處理清單外的內容。",
+      "requirement4": "4. 處理完給出驗證證據（程式碼跑測試/型別檢查，清理做存在性檢查）與復原路徑；驗證不過如實報告。",
+      "requirement5": "5. 彙報：改了哪些檔案 + 依據 + 驗證結果（3 行內）。",
+      "requirementsTitle": "處理要求：",
       "ruleLabel": "- 規則: {{ruleId}}",
       "severityLabel": "- 嚴重度: {{severity}}",
       "suggestionLabel": "- 建議: {{suggestion}}"
@@ -105,6 +105,7 @@
   "electron": {
     "appTitle": "智匯碼盾",
     "cleanFailed": "清理失敗，請稍後重試",
+    "depsRelock.integrityIncomplete": "鎖檔案雜湊不完整（存在無雜湊節點），拒絕重鎖",
     "diagnostics": {
       "ruleFailed": "{{ruleId}} 未通過"
     },
@@ -987,6 +988,9 @@
       "lockfile.integrityFailed": "雜湊校驗失敗",
       "lockfile.integrityVerified": "雜湊校驗通過",
       "lockfile.notConsistent": "與清單宣告不一致",
+      "lockfile.notEvaluable": "鎖檔案缺失，無法評估",
+      "lockfile.notEvaluableConsistency": "一致性無法評估",
+      "lockfile.notEvaluableIntegrity": "完整性無法評估",
       "lockfile.notPresent": "鎖檔案缺失",
       "lockfile.present": "鎖檔案存在且可解析",
       "lockfileVerify": "鎖檔案完整性校驗",
@@ -1077,10 +1081,13 @@
     "garbage": {
       "cleanButton": "一鍵清理",
       "cleanButtonCount": "一鍵清理 ({{count}})",
+      "cleanableLabel": "可清理",
       "cleanFailed": "清理失敗，請重試",
       "cleanFailedCount": "{{count}} 項未能清理（路徑越界 / 檔案佔用等）",
       "cleaned": "已清理 {{count}} 項 · 釋放 {{size}}",
       "cleaning": "清理中...",
+      "copiedAll": "已複製全部垃圾清單，可貼上到 AI 檢查是否可安全刪除",
+      "copyAllToAi": "複製到AI檢查",
       "dependencyHint": "未用依賴不自動刪除，確認無引用後可從 package.json 手動移除",
       "done": "垃圾清理完成",
       "empty": {
@@ -1102,15 +1109,18 @@
           "desc": "識別未引用的資源與殘留檔案"
         }
       },
+      "manualLabel": "需手動處理",
       "rescan": "重新掃描",
       "restore": "恢復",
       "restoreFailed": "恢復失敗，請重試",
       "restoreFailedCount": "{{count}} 項恢復失敗（原位置可能已存在檔案）",
       "restored": "已恢復 {{count}} 項 · {{size}}，清單已重新整理",
       "restoring": "恢復中...",
+      "safetySuggestion": "請確認待刪除檔案是否仍被引用，確認無誤後再執行清理；檔案刪除後可在回收站恢復",
       "scanning": "掃描中...",
       "selectAll": "全選",
       "selectedCount": "已選 {{count}} 項",
+      "source": "垃圾清理",
       "startScan": "開始掃描",
       "stats": {
         "freeable": "可釋放空間",
@@ -1122,7 +1132,8 @@
         "duplicateCode": "重複程式碼",
         "unusedDependency": "未用依賴",
         "unusedFile": "無用檔案"
-      }
+      },
+      "selectAllDisabledHint": "當前無可勾選清理項（未用依賴需透過套件管理器處理，請使用「複製到AI檢查」）"
     },
     "guard": {
       "banner": {

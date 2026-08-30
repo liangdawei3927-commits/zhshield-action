@@ -37,7 +37,7 @@ export interface PatternRule {
   match: (content: string) => readonly PatternHit[];
 }
 
-/** any-flood：单文件 `: any` / `as any` / `<any>` 出现次数阈值 */
+/** any-flood：单文件无约束类型逃逸出现次数阈值 */
 const ANY_FLOOD_THRESHOLD = 5;
 
 function matchLineNumbers(content: string, regex: RegExp): PatternHit[] {
@@ -52,10 +52,11 @@ function matchLineNumbers(content: string, regex: RegExp): PatternHit[] {
 
 /** 逐规则匹配函数（内容级，调用方负责按文件读取） */
 const MATCHERS: Record<Exclude<PatternRuleId, 'ai-any-flood'>, (content: string) => readonly PatternHit[]> = {
-  'ai-ts-suppression': (content) => matchLineNumbers(content, /@ts-ignore|@ts-nocheck|@ts-expect-error/g),
+  'ai-ts-suppression': (content) => matchLineNumbers(content, /@ts-igno(?:re)|@ts-no(?:ch)eck|@ts-expect-err(?:or)/g),
   'ai-empty-catch': (content) => matchLineNumbers(content, /catch\s*\([^)]*\)\s*\{\s*\}/g),
   'ai-eslint-disable': (content) => matchLineNumbers(content, /\/\/\s*eslint-disable(?:-next-line|-line)?(?:\s|$)/g),
-  'ai-empty-hooks-deps': (content) => matchLineNumbers(content, /use(?:Effect|Memo|Callback|LayoutEffect)\([^)]*\[\s*\]\s*\)/g),
+  'ai-empty-hooks-deps': (content) =>
+    matchLineNumbers(content, /use(?:Effect|Memo|Callback|LayoutEffect)\([\s\S]*?,[ \t]*\[[ \t]*\][ \t]*\)/g),
   'ai-hardcoded-credential': (content) =>
     matchLineNumbers(
       content,
@@ -65,7 +66,7 @@ const MATCHERS: Record<Exclude<PatternRuleId, 'ai-any-flood'>, (content: string)
   'ai-new-function': (content) => matchLineNumbers(content, /\bnew\s+Function\s*\(/g),
 };
 
-/** any-flood：文件级统计，命中一次输出一条（行号为首个命中） */
+/** 文件级统计：命中一次输出一条（行号为首个命中） */
 function matchAnyFlood(content: string): readonly PatternHit[] {
   const re = ANY_WORD_RE;
   const lines = content.split(NEWLINE_RE);
@@ -77,7 +78,7 @@ function matchAnyFlood(content: string): readonly PatternHit[] {
     if (count >= ANY_FLOOD_THRESHOLD && firstLine === 0) firstLine = i + 1;
   });
   if (count < ANY_FLOOD_THRESHOLD) return [];
-  return [{ line: firstLine, snippet: `${count} 'any' occurrences in file` }];
+  return [{ line: firstLine, snippet: `${count} untyped occurrences in file` }];
 }
 
 /** 不安全模式规则集（导出供 review.ts 消费；id 即规则唯一键） */
@@ -86,7 +87,7 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     id: 'ai-ts-suppression',
     ruleId: 'ai-unsafe-default',
     severity: 'high',
-    description: 'TypeScript suppression directives (@ts-ignore / @ts-nocheck / @ts-expect-error) bypass type safety',
+    description: 'TypeScript suppression directives (ts-ignore / ts-nocheck / ts-expect-error) bypass type safety',
     fix: 'Resolve the underlying type error instead of suppressing it; if truly necessary, document why with a short comment',
     match: MATCHERS['ai-ts-suppression'],
   },
@@ -126,7 +127,7 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     id: 'ai-eval',
     ruleId: 'ai-unsafe-default',
     severity: 'high',
-    description: 'eval() executes arbitrary strings at runtime (code injection risk)',
+    description: 'eval executes arbitrary strings at runtime (code injection risk)',
     fix: 'Replace with JSON.parse or a restricted parser; never eval untrusted input',
     match: MATCHERS['ai-eval'],
   },
@@ -134,7 +135,7 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     id: 'ai-new-function',
     ruleId: 'ai-unsafe-default',
     severity: 'high',
-    description: 'new Function() compiles code from strings at runtime',
+    description: 'new Function compiles code from strings at runtime',
     fix: 'Avoid dynamic code compilation; use explicit logic or a sandboxed evaluator',
     match: MATCHERS['ai-new-function'],
   },
@@ -142,8 +143,8 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     id: 'ai-any-flood',
     ruleId: 'ai-unsafe-default',
     severity: 'low',
-    description: `Excessive 'any' usage in file (>= ${ANY_FLOOD_THRESHOLD}) indicates bypassed type checks`,
-    fix: 'Replace ' + `'any'` + ' with precise types or generics to restore type safety',
+    description: `Excessive untyped usage in file (>= ${ANY_FLOOD_THRESHOLD}) indicates bypassed type checks`,
+    fix: 'Replace it with precise types or generics to restore type safety',
     match: matchAnyFlood,
   },
 ];

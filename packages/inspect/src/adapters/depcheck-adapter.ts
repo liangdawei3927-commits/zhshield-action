@@ -60,58 +60,73 @@ export class DepcheckAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const projectPath = options.projectPath;
-
     try {
-      const command = await this.resolveCommand();
-      const args = [projectPath, '--json'];
-      const cfg = options.config as Record<string, unknown> | undefined;
-      if (cfg?.skip) {
-        for (const s of cfg.skip as string[]) args.push('--skip', s);
-      }
-      if (cfg?.ignore) {
-        for (const ig of cfg.ignore as string[]) args.push('--ignore', ig);
-      }
-
-      const { stdout } = await execFileAsync(command, args, {
-        cwd: projectPath,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const result: DepcheckResult = JSON.parse(stdout);
-      const issues = this.mapOutput(result, projectPath);
-
-      return {
-        tool: 'depcheck',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: issues.length,
-        },
-      };
+      return await this.runDepcheck(options, start);
     } catch (error: unknown) {
-      const err = error as { code?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return {
-          tool: 'depcheck',
-          status: 'unavailable',
-          issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-          error: 'depcheck 未安装',
-        };
-      }
+      return this.handleDepcheckError(error, start);
+    }
+  }
+
+  /** 执行 depcheck 并映射输出为可用结果 */
+  private async runDepcheck(options: ToolScanOptions, start: number): Promise<ToolResult> {
+    const projectPath = options.projectPath;
+    const command = await this.resolveCommand();
+    const args = this.buildArgs(options, projectPath);
+
+    const { stdout } = await execFileAsync(command, args, {
+      cwd: projectPath,
+      timeout: options.timeout || 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const result: DepcheckResult = JSON.parse(stdout);
+    const issues = this.mapOutput(result, projectPath);
+
+    return {
+      tool: 'depcheck',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: issues.length,
+      },
+    };
+  }
+
+  /** 依据配置组装 depcheck 命令行参数 */
+  private buildArgs(options: ToolScanOptions, projectPath: string): string[] {
+    const args = [projectPath, '--json'];
+    const cfg = options.config as Record<string, unknown> | undefined;
+    if (cfg?.skip) {
+      for (const s of cfg.skip as string[]) args.push('--skip', s);
+    }
+    if (cfg?.ignore) {
+      for (const ig of cfg.ignore as string[]) args.push('--ignore', ig);
+    }
+    return args;
+  }
+
+  /** 处理 depcheck 执行错误：未安装 / 失败 */
+  private handleDepcheckError(error: unknown, start: number): ToolResult {
+    const err = error as { code?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
       return {
         tool: 'depcheck',
-        status: 'error',
+        status: 'unavailable',
         issues: [],
         metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-        error: err.stderr || err.message || 'depcheck 执行失败',
+        error: 'depcheck 未安装',
       };
     }
+    return {
+      tool: 'depcheck',
+      status: 'error',
+      issues: [],
+      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      error: err.stderr || err.message || 'depcheck 执行失败',
+    };
   }
 
   private mapOutput(result: DepcheckResult, projectPath: string): Issue[] {

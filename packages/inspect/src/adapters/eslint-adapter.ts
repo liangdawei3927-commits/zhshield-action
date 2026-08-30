@@ -113,47 +113,82 @@ export class ESLintAdapter implements ToolAdapter {
     const start = Date.now();
     const defaultTarget = resolveEslintTargetDir(options.projectPath);
     const targetFiles = options.targetFiles || [defaultTarget];
-    const defaultExts = ['--ext', '.ts,.tsx,.js,.jsx'];
     // ESLint v9 从 cwd 向上查找配置：默认扫描时以解析出的目录为 cwd，确保找到嵌套仓库的配置
     const cwd = options.targetFiles?.length ? options.projectPath : defaultTarget;
     const category: IssueCategory = options.config?.category ?? 'quality';
 
     try {
-      const command = await this.resolveCommand();
-      // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
-      const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
-      const args: string[] = ['--format', 'json', ...defaultExts, ...relativeTargets];
-      if (options.config?.config) {
-        // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
-        args.unshift('--config', options.config.config);
-      }
-
-      const { stdout } = await execFileAsync(command, args, {
-        cwd,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      const rawOutput = JSON.parse(stdout);
-      const issues = this.mapOutput(rawOutput, category);
-
-      return this.buildAvailable(start, rawOutput, issues);
+      return await this.runEslintScan(options, start, category, cwd, targetFiles);
     } catch (error: unknown) {
-      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-      if (err.code === 'ENOENT') {
-        return this.buildUnavailable(start, 'ESLint 未安装或未在 PATH 中找到');
-      }
-
-      let rawOutput: unknown = null;
-      if (err.stdout) {
-        try { rawOutput = JSON.parse(err.stdout); } catch { /* ignore */ }
-      }
-      if (rawOutput) {
-        return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
-      }
-
-      return this.buildError(start, err.stderr || err.message || 'ESLint 执行失败');
+      return this.handleEslintError(error, start, category);
     }
+  }
+
+  /** 执行 ESLint 扫描并映射输出为可用结果 */
+  private async runEslintScan(
+    options: ToolScanOptions,
+    start: number,
+    category: IssueCategory,
+    cwd: string,
+    targetFiles: string[],
+  ): Promise<ToolResult> {
+    const command = await this.resolveCommand();
+    const { args, unavailable } = this.buildEslintArgs(options, cwd, targetFiles);
+    if (unavailable) return this.buildUnavailable(start, unavailable);
+
+    const { stdout } = await execFileAsync(command, args, {
+      cwd,
+      timeout: options.timeout || 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const rawOutput = JSON.parse(stdout);
+    const issues = this.mapOutput(rawOutput, category);
+
+    return this.buildAvailable(start, rawOutput, issues);
+  }
+
+  /** 组装 ESLint 命令行参数（含注入 flat config 的可用性探测） */
+  private buildEslintArgs(options: ToolScanOptions, cwd: string, targetFiles: string[]): { args: string[]; unavailable?: string } {
+    const defaultExts = ['--ext', '.ts,.tsx,.js,.jsx'];
+    // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
+    const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
+    const args: string[] = ['--format', 'json', ...defaultExts, ...relativeTargets];
+
+    // 注入的 flat config 为规则声明（如 node_modules/@zh/kernel/dist/assets/...），
+    // 仅在被扫描项目内部安装了对应依赖时才存在。对于未安装该依赖的外部项目，
+    // 直接传入 --config 会让 ESLint 因 ENOENT 崩溃并使整次巡检失败；此处探测该
+    // config 文件是否真实存在（按规则声明的相对路径相对 cwd 解析），缺失时退化为
+    // unavailable（跳过该规则），而非硬错误。
+    const injectedConfig = options.config?.config;
+    if (injectedConfig) {
+      const configPath = path.resolve(cwd, injectedConfig);
+      if (!fs.existsSync(configPath)) {
+        return { args, unavailable: `ESLint 性能配置不存在，跳过该规则: ${configPath}` };
+      }
+      // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
+      args.unshift('--config', configPath);
+    }
+
+    return { args };
+  }
+
+  /** 处理 ESLint 执行错误：未安装 / 部分输出 / 失败 */
+  private handleEslintError(error: unknown, start: number, category: IssueCategory): ToolResult {
+    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') {
+      return this.buildUnavailable(start, 'ESLint 未安装或未在 PATH 中找到');
+    }
+
+    let rawOutput: unknown = null;
+    if (err.stdout) {
+      try { rawOutput = JSON.parse(err.stdout); } catch { /* ignore */ }
+    }
+    if (rawOutput) {
+      return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
+    }
+
+    return this.buildError(start, err.stderr || err.message || 'ESLint 执行失败');
   }
 
   private buildAvailable(start: number, rawOutput: unknown, issues: Issue[]): ToolResult {

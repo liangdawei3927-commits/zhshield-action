@@ -82,7 +82,7 @@ for (const file of fragmentFiles) {
 }
 
 const after = new Set(collectLeaves(target));
-const added = [...after].filter((k) => !before.has(k));
+const added = Array.from(after, (k) => k).toSorted().filter((k) => !before.has(k));
 
 // 合并后再排序写回，保证确定性 diff
 writeFileSync(TARGET, `${JSON.stringify(sortKeys(target), null, 2)}\n`, 'utf8');

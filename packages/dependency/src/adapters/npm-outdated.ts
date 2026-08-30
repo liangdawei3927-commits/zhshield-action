@@ -116,7 +116,14 @@ function toErrorMessage(error: unknown): string {
  * ```
  */
 export async function checkOutdated(projectPath: string): Promise<OutdatedDependencyInfo[]> {
-  // 1. 校验 package.json 存在
+  assertPackageJson(projectPath);
+  const stdout = await runNpmOutdated(projectPath);
+  const parsed = parseOutdatedJson(stdout);
+  return mapOutdatedEntries(parsed);
+}
+
+/** 校验 package.json 存在 */
+function assertPackageJson(projectPath: string): void {
   const pkgJsonPath = safeJoin(projectPath, 'package.json');
   if (!fs.existsSync(pkgJsonPath)) {
     throw new NpmOutdatedError(
@@ -124,41 +131,40 @@ export async function checkOutdated(projectPath: string): Promise<OutdatedDepend
       'NO_PACKAGE_JSON',
     );
   }
+}
 
-  // 2. 执行 npm outdated --json
-  let stdout: string;
+/** 执行 npm outdated --json；exit code 1 且带输出属预期行为 */
+async function runNpmOutdated(projectPath: string): Promise<string> {
   try {
     const result = await execFileAsync('npm', ['outdated', '--json'], {
       cwd: projectPath,
       timeout: 30_000,
       encoding: 'utf-8',
     });
-    stdout = result.stdout;
+    return result.stdout;
   } catch (error: unknown) {
-    // npm outdated 在发现过期依赖时以 exit code 1 退出——这是预期行为
     if (isExecErrorWithOutput(error) && error.stdout && error.stdout.trim() !== '') {
-      stdout = error.stdout;
-    } else if (isExecErrorWithOutput(error) && isNpmNotFound(error)) {
+      return error.stdout;
+    }
+    if (isExecErrorWithOutput(error) && isNpmNotFound(error)) {
       throw new NpmOutdatedError(
         'npm 未安装或不在 PATH 中',
         'NPM_NOT_FOUND',
       );
-    } else {
-      throw new NpmOutdatedError(
-        `npm outdated 命令执行失败：${toErrorMessage(error)}`,
-        'NPM_COMMAND_FAILED',
-      );
     }
+    throw new NpmOutdatedError(
+      `npm outdated 命令执行失败：${toErrorMessage(error)}`,
+      'NPM_COMMAND_FAILED',
+    );
   }
+}
 
-  // 3. 空输出 → 无过期依赖
+/** 解析 npm outdated 输出：空输出返回空对象，JSON 非法抛错 */
+function parseOutdatedJson(stdout: string): Record<string, unknown> {
   const trimmed = stdout.trim();
   if (trimmed === '' || trimmed === '{}') {
-    return [];
+    return {};
   }
-
-  // 4. 解析 JSON
-  let parsed: Record<string, unknown>;
   try {
     const raw: unknown = JSON.parse(trimmed);
     if (!isRecord(raw)) {
@@ -167,7 +173,7 @@ export async function checkOutdated(projectPath: string): Promise<OutdatedDepend
         'JSON_PARSE_ERROR',
       );
     }
-    parsed = raw;
+    return raw;
   } catch (error: unknown) {
     if (error instanceof NpmOutdatedError) throw error;
     throw new NpmOutdatedError(
@@ -175,21 +181,16 @@ export async function checkOutdated(projectPath: string): Promise<OutdatedDepend
       'JSON_PARSE_ERROR',
     );
   }
+}
 
-  // 5. 映射为 OutdatedDependencyInfo[]
+/** 映射为 OutdatedDependencyInfo[]：跳过缺版本或已是最新的条目 */
+function mapOutdatedEntries(parsed: Record<string, unknown>): OutdatedDependencyInfo[] {
   const results: OutdatedDependencyInfo[] = [];
-
   for (const [name, entry] of Object.entries(parsed)) {
     if (!isNpmOutdatedEntry(entry)) continue;
-
     const { current, latest } = entry;
-
-    // 跳过缺少版本信息的条目
     if (current == null || latest == null) continue;
-
-    // 跳过已是最新版本的包
     if (current === latest) continue;
-
     results.push({
       name,
       current,
@@ -197,7 +198,6 @@ export async function checkOutdated(projectPath: string): Promise<OutdatedDepend
       isSecurityUpdate: false,
     });
   }
-
   return results;
 }
 

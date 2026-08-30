@@ -41,6 +41,18 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
   const signals: ProfileSignal[] = [];
 
   // --- monorepo 标志 ---
+  if (pushMonorepoSignal(scan, signals)) {
+    return signals; // monorepo 优先级最高，直接返回
+  }
+  // --- 框架映射 ---
+  const mappedType = pushFrameworkMappedSignal(framework, signals);
+  // --- package.json bin / 入口 ---
+  pushPackageJsonTypeSignals(scan, mappedType, signals);
+
+  return signals;
+}
+
+function pushMonorepoSignal(scan: ScanResult, signals: ProfileSignal[]): boolean {
   const monorepoFiles = ['pnpm-workspace.yaml', 'lerna.json', 'turbo.json', 'nx.json'];
   for (const f of monorepoFiles) {
     if (hasFile(scan, f)) {
@@ -50,11 +62,13 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
         matched: f,
         inferred: { type: 'monorepo' },
       });
-      return signals; // monorepo 优先级最高，直接返回
+      return true;
     }
   }
+  return false;
+}
 
-  // --- 框架映射 ---
+function pushFrameworkMappedSignal(framework: ProjectFramework, signals: ProfileSignal[]): ProjectType | undefined {
   const mappedType = FRAMEWORK_TYPE_MAP[framework];
   if (mappedType) {
     signals.push({
@@ -64,8 +78,10 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
       inferred: { type: mappedType },
     });
   }
+  return mappedType;
+}
 
-  // --- package.json bin / 入口 ---
+function pushPackageJsonTypeSignals(scan: ScanResult, mappedType: ProjectType | undefined, signals: ProfileSignal[]): void {
   const pkgContent = readConfig(scan, 'package.json');
   if (pkgContent) {
     try {
@@ -93,6 +109,4 @@ export function detectProjectType(scan: ScanResult, framework: ProjectFramework)
       // ignore parse error
     }
   }
-
-  return signals;
 }

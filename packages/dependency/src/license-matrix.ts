@@ -161,25 +161,30 @@ function restrictionRank(id: string): number {
 export function normalizeLicenseId(license: string): string | null {
   let raw = license.trim();
   if (raw === '') return null;
-
-  // 剥离外围括号（可能多层，如 '((MIT))'）
-  while (raw.startsWith('(') && raw.endsWith(')')) {
-    raw = raw.slice(1, -1).trim();
-  }
-
-  // OR 表达式：逐项归一化后取更严格者
-  if (OR_EXPR_RE.test(raw)) {
-    const candidates = raw
-      .split(OR_EXPR_RE)
-      .map((part) => normalizeLicenseId(part))
-      .filter((id): id is string => id !== null);
-    if (candidates.length === 0) return null;
-    const sorted = candidates.toSorted((a, b) => restrictionRank(b) - restrictionRank(a));
-    return sorted[0] ?? null;
-  }
-
+  raw = stripOuterParens(raw);
+  if (OR_EXPR_RE.test(raw)) return resolveOrExpression(raw);
   const key = raw.toLowerCase().replace(/\s+/g, ' ').trim();
   return LICENSE_ALIASES[key] ?? null;
+}
+
+/** 剥离外围括号（可能多层，如 '((MIT))'） */
+function stripOuterParens(raw: string): string {
+  let result = raw;
+  while (result.startsWith('(') && result.endsWith(')')) {
+    result = result.slice(1, -1).trim();
+  }
+  return result;
+}
+
+/** OR 表达式：逐项归一化后取更严格者 */
+function resolveOrExpression(raw: string): string | null {
+  const candidates = raw
+    .split(OR_EXPR_RE)
+    .map((part) => normalizeLicenseId(part))
+    .filter((id): id is string => id !== null);
+  if (candidates.length === 0) return null;
+  const sorted = candidates.toSorted((a, b) => restrictionRank(b) - restrictionRank(a));
+  return sorted[0] ?? null;
 }
 
 /**

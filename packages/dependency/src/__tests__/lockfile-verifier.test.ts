@@ -183,4 +183,138 @@ describe('LockfileVerifierImpl 缺失场景', () => {
     expect(result.status).toBe('clean');
     expect(result.diffs).toEqual([]);
   });
+
+  it('pnpm 本地 workspace 包（file:/link:、resolution.type=directory）无 integrity → 不误报，status clean', async () => {
+    const dir = tmpDir('zh-lock-pnpm-workspace-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'pnpm-lock.yaml', [
+      "lockfileVersion: '9.0'",
+      'importers:',
+      '  .:',
+      '    dependencies:',
+      '      lodash:',
+      '        specifier: ^4.17.21',
+      '        version: 4.17.21',
+      "      '@zh/db':",
+      '        specifier: file:packages/db',
+      '        version: file:packages/db',
+      'packages:',
+      '  /lodash@4.17.21:',
+      '    resolution: {integrity: sha512-pnpm-lodash}',
+      "  '@zh/db@file:packages/db':",
+      '    resolution: {directory: packages/db, type: directory}',
+    ].join('\n'));
+
+    const result = await lockfileVerifier.verify(dir);
+
+    expect(result.status).toBe('clean');
+    expect(result.integrityFailures).toEqual([]);
+  });
+
+  it('pnpm 注册表包缺少 integrity → 仍正常报缺失（不受本地包豁免影响）', async () => {
+    const dir = tmpDir('zh-lock-pnpm-registry-missing-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'pnpm-lock.yaml', [
+      "lockfileVersion: '9.0'",
+      'importers:',
+      '  .:',
+      '    dependencies:',
+      '      lodash:',
+      '        specifier: ^4.17.21',
+      '        version: 4.17.21',
+      'packages:',
+      '  /lodash@4.17.21:',
+      '    resolution: {integrity: ""}',
+    ].join('\n'));
+
+    const result = await lockfileVerifier.verify(dir);
+
+    expect(result.status).toBe('modified');
+    expect(result.integrityFailures).toContain('[pnpm] lodash@4.17.21 缺少 resolution.integrity 完整性字段');
+  });
+});
+
+describe('LockfileVerifierImpl 基线比对（expectedIntegrity）', () => {
+  const lockfile = {
+    name: 'app',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'app' },
+      'node_modules/lodash': { version: '4.17.21', integrity: 'sha512-lodash-hash' },
+      'node_modules/react': { version: '18.2.0', integrity: 'sha512-react-hash' },
+    },
+  };
+
+  it('基线哈希与锁文件一致 → integrityFailures 空、status clean', async () => {
+    const dir = tmpDir('zh-lock-baseline-ok-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21', react: '^18.2.0' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify(lockfile));
+
+    const result = await lockfileVerifier.verify(dir, {
+      expectedIntegrity: {
+        'lodash@4.17.21': 'sha512-lodash-hash',
+        'react@18.2.0': 'sha512-react-hash',
+      },
+    });
+
+    expect(result.status).toBe('clean');
+    expect(result.integrityFailures).toEqual([]);
+  });
+
+  it('同版本哈希被篡改 → mismatch 命中，消息含「校验和不匹配」', async () => {
+    const dir = tmpDir('zh-lock-baseline-mismatch-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21', react: '^18.2.0' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify(lockfile));
+
+    const result = await lockfileVerifier.verify(dir, {
+      expectedIntegrity: {
+        // 基线里 lodash 的哈希被改（同版本，模拟篡改）
+        'lodash@4.17.21': 'sha512-original-hash',
+        'react@18.2.0': 'sha512-react-hash',
+      },
+    });
+
+    expect(result.status).toBe('modified');
+    expect(result.integrityFailures).toEqual([
+      '[npm] lodash@4.17.21 校验和不匹配：期望 sha512-original-hash，实际 sha512-lodash-hash',
+    ]);
+  });
+
+  it('升级版本（旧基线条目丢失）→ 不误报', async () => {
+    const dir = tmpDir('zh-lock-baseline-upgrade-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify({
+      name: 'app',
+      lockfileVersion: 3,
+      packages: { 'node_modules/lodash': { version: '4.18.0', integrity: 'sha512-lodash-new' } },
+    }));
+
+    const result = await lockfileVerifier.verify(dir, {
+      expectedIntegrity: { 'lodash@4.17.21': 'sha512-lodash-old' },
+    });
+
+    // actual === undefined（当前节点是 4.18.0，基线条目是 4.17.21）→ 跳过，不报
+    expect(result.status).toBe('clean');
+    expect(result.integrityFailures).toEqual([]);
+  });
+
+  it('基线含不在锁文件中的条目 → 不报（忽略幽灵条目）', async () => {
+    const dir = tmpDir('zh-lock-baseline-ghost-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify({
+      name: 'app',
+      lockfileVersion: 3,
+      packages: { 'node_modules/lodash': { version: '4.17.21', integrity: 'sha512-lodash-hash' } },
+    }));
+
+    const result = await lockfileVerifier.verify(dir, {
+      expectedIntegrity: {
+        'lodash@4.17.21': 'sha512-lodash-hash',
+        'ghost@1.0.0': 'sha512-ghost',
+      },
+    });
+
+    expect(result.status).toBe('clean');
+    expect(result.integrityFailures).toEqual([]);
+  });
 });

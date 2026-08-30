@@ -14,6 +14,25 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
   const signals: ProfileSignal[] = [];
 
   // --- 明确配置文件特征 ---
+  pushTsConfigSignal(scan, signals);
+  pushGoModSignal(scan, signals);
+  pushCargoSignal(scan, signals);
+  pushPythonSignal(scan, signals);
+  pushJavaSignal(scan, signals);
+  pushGradleSignal(scan, signals);
+  pushPhpSignal(scan, signals);
+  pushRubySignal(scan, signals);
+  pushCsprojSignal(scan, signals);
+  pushPackageJsonSignal(scan, signals);
+  // --- 扩展名统计作为佐证 ---
+  pushExtensionSignals(scan, signals);
+  // --- Solidity 特殊：无标准配置文件，靠扩展名 ---
+  pushSoliditySignal(scan, signals);
+
+  return signals;
+}
+
+function pushTsConfigSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'tsconfig.json')) {
     signals.push({
       file: 'tsconfig.json',
@@ -22,7 +41,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'typescript', runtime: 'node' },
     });
   }
+}
 
+function pushGoModSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'go.mod')) {
     signals.push({
       file: 'go.mod',
@@ -31,7 +52,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'go', runtime: 'go', packageManager: 'go-mod' },
     });
   }
+}
 
+function pushCargoSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'Cargo.toml')) {
     signals.push({
       file: 'Cargo.toml',
@@ -40,7 +63,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'rust', runtime: 'rust', packageManager: 'cargo' },
     });
   }
+}
 
+function pushPythonSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   for (const pyFile of ['pyproject.toml', 'requirements.txt', 'setup.py']) {
     if (hasFile(scan, pyFile)) {
       signals.push({
@@ -52,7 +77,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       break;
     }
   }
+}
 
+function pushJavaSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'pom.xml')) {
     signals.push({
       file: 'pom.xml',
@@ -61,7 +88,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'java', runtime: 'jvm', packageManager: 'maven' },
     });
   }
+}
 
+function pushGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'build.gradle') || hasFile(scan, 'build.gradle.kts')) {
     const f = hasFile(scan, 'build.gradle.kts') ? 'build.gradle.kts' : 'build.gradle';
     signals.push({
@@ -71,7 +100,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: hasFile(scan, 'src/main/kotlin') ? 'kotlin' : 'java', runtime: 'jvm', packageManager: 'gradle' },
     });
   }
+}
 
+function pushPhpSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'composer.json')) {
     signals.push({
       file: 'composer.json',
@@ -80,7 +111,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'php', packageManager: 'composer' },
     });
   }
+}
 
+function pushRubySignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'Gemfile')) {
     signals.push({
       file: 'Gemfile',
@@ -89,8 +122,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'ruby' },
     });
   }
+}
 
-  // *.csproj 检测
+function pushCsprojSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   const csprojFile = scan.files.find((f) => f.endsWith('.csproj'));
   if (csprojFile) {
     signals.push({
@@ -100,8 +134,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       inferred: { language: 'csharp', runtime: 'dotnet' },
     });
   }
+}
 
-  // package.json — ts 或 js 取决于是否有 tsconfig 或 .ts 文件占比
+function pushPackageJsonSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'package.json')) {
     const hasTsConfig = signals.some((s) => s.matched === 'tsconfig.json');
     const tsCount = countByExtension(scan, ['ts', 'tsx']);
@@ -122,8 +157,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
-  // --- 扩展名统计作为佐证 ---
+function pushExtensionSignals(scan: ScanResult, signals: ProfileSignal[]): void {
   const extSignals: Array<{ exts: string[]; lang: ProjectLanguage }> = [
     { exts: ['ts', 'tsx'], lang: 'typescript' },
     { exts: ['go'], lang: 'go' },
@@ -147,8 +183,9 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
-  // --- Solidity 特殊：无标准配置文件，靠扩展名 ---
+function pushSoliditySignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (!signals.some((s) => s.inferred.language === 'solidity')) {
     const solCount = countByExtension(scan, ['sol']);
     if (solCount > 0 && !signals.some((s) => s.inferred.language)) {
@@ -160,6 +197,4 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
-
-  return signals;
 }

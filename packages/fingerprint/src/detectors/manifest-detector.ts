@@ -23,6 +23,8 @@ import {
 
 const PNPM_WORKSPACE_RE = /^\s+-\s+['"]?([^'"]+)['"]?\s*$/;
 
+const isNoiseRel = (rel: string): boolean => rel.split('/').some((segment) => isNoiseDir(segment));
+
 /** 解析 pnpm-workspace.yaml 获取 workspace glob patterns */
 function readPnpmWorkspacePatterns(projectRoot: string): string[] {
   let content: string;
@@ -38,57 +40,59 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
       inPackages = true;
       continue;
     }
-    if (inPackages) {
-      const match = line.match(PNPM_WORKSPACE_RE);
-      if (match !== null) {
-        patterns.push(match[1]);
-      } else if (line.trim().length > 0 && !line.startsWith(' ')) {
-        break;
-      }
+    if (!inPackages) continue;
+    const match = line.match(PNPM_WORKSPACE_RE);
+    if (match !== null) {
+      patterns.push(match[1]);
+    } else if (line.trim().length > 0 && !line.startsWith(' ')) {
+      break;
     }
   }
   return patterns;
 }
 
+function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]): void {
+  const parts = pattern.split('/');
+  const globIdx = parts.findIndex((p) => p === '*');
+  if (globIdx === -1) return;
+  let baseDir: string;
+  try {
+    baseDir = safeJoinReal(projectRoot, ...parts.slice(0, globIdx));
+  } catch {
+    return;
+  }
+  if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) return;
+  try {
+    for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const rest = parts.slice(globIdx + 1).join('/');
+      const candidate = rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        const rel = path.relative(projectRoot, candidate);
+        if (isNoiseRel(rel)) continue;
+        dirs.push(rel);
+      }
+    }
+  } catch {
+    // skip unreadable dirs
+  }
+}
+
 export function expandWorkspaceGlobs(projectRoot: string, patterns: string[]): string[] {
   const dirs: string[] = [];
-  const isNoiseRel = (rel: string): boolean => rel.split('/').some((segment) => isNoiseDir(segment));
   for (const pattern of patterns) {
-    if (!pattern.includes('*')) {
-      let absDir: string;
-      try {
-        absDir = safeJoinReal(projectRoot, pattern);
-      } catch {
-        continue; // 越界 pattern（含 .. 或绝对路径），跳过
-      }
-      if (fs.existsSync(absDir) && fs.statSync(absDir).isDirectory() && !isNoiseRel(pattern)) {
-        dirs.push(pattern);
-      }
+    if (pattern.includes('*')) {
+      collectGlobMatches(projectRoot, pattern, dirs);
       continue;
     }
-    const parts = pattern.split('/');
-    const globIdx = parts.findIndex((p) => p === '*');
-    if (globIdx === -1) continue;
-    let baseDir: string;
+    let absDir: string;
     try {
-      baseDir = safeJoinReal(projectRoot, ...parts.slice(0, globIdx));
+      absDir = safeJoinReal(projectRoot, pattern);
     } catch {
-      continue;
+      continue; // 越界 pattern（含 .. 或绝对路径），跳过
     }
-    if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) continue;
-    try {
-      for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        const rest = parts.slice(globIdx + 1).join('/');
-        const candidate = rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
-        if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-          const rel = path.relative(projectRoot, candidate);
-          if (isNoiseRel(rel)) continue;
-          dirs.push(rel);
-        }
-      }
-    } catch {
-      // skip unreadable dirs
+    if (fs.existsSync(absDir) && fs.statSync(absDir).isDirectory() && !isNoiseRel(pattern)) {
+      dirs.push(pattern);
     }
   }
   return dirs;
@@ -175,17 +179,21 @@ export class ManifestDetector implements Detector {
       ...new Set([...readPnpmWorkspacePatterns(root), ...readPackageJsonWorkspacePatterns(root)]),
     ];
     if (workspacePatterns.length > 0) {
-      const workspaceDirs = expandWorkspaceGlobs(root, workspacePatterns);
-      for (const dir of new Set(workspaceDirs)) {
-        for (const name of listRootFiles(path.join(root, dir))) {
-          if (name !== 'package.json') continue;
-          const rel = (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;
-          signals.push(...this.detectManifest(projectPath, rel, name, 'manifest:package-json', 'typescript'));
-        }
-      }
+      this.collectWorkspaceManifests(projectPath, root, workspacePatterns, signals);
     }
 
     return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+  }
+
+  private collectWorkspaceManifests(projectPath: string, root: string, workspacePatterns: string[], signals: Signal[]): void {
+    const workspaceDirs = expandWorkspaceGlobs(root, workspacePatterns);
+    for (const dir of new Set(workspaceDirs)) {
+      for (const name of listRootFiles(path.join(root, dir))) {
+        if (name !== 'package.json') continue;
+        const rel = (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;
+        signals.push(...this.detectManifest(projectPath, rel, name, 'manifest:package-json', 'typescript'));
+      }
+    }
   }
 
   private detectManifest(projectRoot: string, rel: string, name: string, ruleId: string, _language: LanguageId): Signal[] {

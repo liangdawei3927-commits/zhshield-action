@@ -124,6 +124,33 @@ describe('buildDependencyGraph npm', () => {
     expect(graph.lockfile.present).toBe(false);
     expect(graph.lockfile.consistent).toBe(false);
   });
+
+  it('锁定版本满足声明范围 → consistent=true（真实比对，非 present 别名）', () => {
+    const dir = tmpDir('zh-dep-npm-consistent-ok-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify({
+      lockfileVersion: 3,
+      packages: { 'node_modules/lodash': { version: '4.17.21', integrity: 'sha512-lodash-hash' } },
+    }));
+
+    const graph = buildDependencyGraph(dir);
+
+    expect(graph.lockfile.consistent).toBe(true);
+  });
+
+  it('锁定版本违反声明范围 → consistent=false', () => {
+    const dir = tmpDir('zh-dep-npm-consistent-bad-');
+    writeFile(dir, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
+    writeFile(dir, 'package-lock.json', JSON.stringify({
+      lockfileVersion: 3,
+      packages: { 'node_modules/lodash': { version: '5.0.0', integrity: 'sha512-lodash-tampered' } },
+    }));
+
+    const graph = buildDependencyGraph(dir);
+
+    expect(graph.lockfile.present).toBe(true);
+    expect(graph.lockfile.consistent).toBe(false);
+  });
 });
 
 describe('buildDependencyGraph pnpm', () => {

@@ -49,38 +49,8 @@ export interface CycloneDXDocument {
  * - hashes 仅当节点带 sha512 integrity 时输出（剥离 'sha512-' 前缀）
  */
 export function toCycloneDX(graph: DependencyGraph): CycloneDXDocument {
-  const components: CycloneDXComponent[] = graph.nodes.map((node) => {
-    const component: CycloneDXComponent = {
-      type: 'library',
-      'bom-ref': node.id,
-      name: node.name,
-      version: node.version,
-    };
-
-    const licenseId = node.license ? normalizeLicenseId(node.license) : null;
-    if (licenseId) {
-      component.licenses = [{ license: { id: licenseId } }];
-    }
-
-    if (node.integrity) {
-      const sha512 = node.integrity.match(SHA512_RE);
-      if (sha512) {
-        component.hashes = [{ alg: 'SHA-512', content: sha512[1] }];
-      }
-    }
-
-    return component;
-  });
-
-  const directRefs = graph.edges
-    .filter((edge) => edge.from === ROOT_NODE_ID)
-    .map((edge) => edge.to);
-
-  const dependencies: CycloneDXDocument['dependencies'] = [
-    { ref: ROOT_NODE_ID, dependsOn: directRefs },
-    ...graph.nodes.map((node) => ({ ref: node.id, dependsOn: [] as string[] })),
-  ];
-
+  const components = graph.nodes.map(buildComponent);
+  const dependencies = buildDependencies(graph);
   return {
     bomFormat: 'CycloneDX',
     specVersion: '1.5',
@@ -93,4 +63,36 @@ export function toCycloneDX(graph: DependencyGraph): CycloneDXDocument {
     components,
     dependencies,
   };
+}
+
+/** 将单个依赖节点映射为 CycloneDX 组件（含许可证与完整性哈希） */
+function buildComponent(node: DependencyGraph['nodes'][number]): CycloneDXComponent {
+  const component: CycloneDXComponent = {
+    type: 'library',
+    'bom-ref': node.id,
+    name: node.name,
+    version: node.version,
+  };
+  const licenseId = node.license ? normalizeLicenseId(node.license) : null;
+  if (licenseId) {
+    component.licenses = [{ license: { id: licenseId } }];
+  }
+  if (node.integrity) {
+    const sha512 = node.integrity.match(SHA512_RE);
+    if (sha512) {
+      component.hashes = [{ alg: 'SHA-512', content: sha512[1] }];
+    }
+  }
+  return component;
+}
+
+/** 构建依赖关系：根 ref 指向直接依赖，其余节点依赖为空数组 */
+function buildDependencies(graph: DependencyGraph): CycloneDXDocument['dependencies'] {
+  const directRefs = graph.edges
+    .filter((edge) => edge.from === ROOT_NODE_ID)
+    .map((edge) => edge.to);
+  return [
+    { ref: ROOT_NODE_ID, dependsOn: directRefs },
+    ...graph.nodes.map((node) => ({ ref: node.id, dependsOn: [] as string[] })),
+  ];
 }

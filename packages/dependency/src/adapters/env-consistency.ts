@@ -143,40 +143,45 @@ function normalizeVersion(raw: string): string {
 function satisfiesRange(range: string, version: string): boolean {
   const r = range.trim();
   if (r === '' || r === '*' || r === 'x' || r === 'latest' || r.includes('workspace:')) return true;
-
   const m = version.match(SEMVER_MMP_RE);
   if (!m) return true;
   const [major, minor, patch] = [Number(m[1]), Number(m[2]), Number(m[3])];
-
   const exact = r.match(EXACT_VERSION_RE);
-  if (exact) {
-    return exact[1] === String(major) && exact[2] === String(minor) && exact[3] === String(patch);
-  }
-
+  if (exact) return matchesExact(exact, major, minor, patch);
   const caret = r.match(CARET_RANGE_RE);
-  if (caret) {
-    const [cM, cm, cP] = [Number(caret[1]), Number(caret[2]), Number(caret[3])];
-    if (cM !== major) return false;
-    return cM > 0 ? minor >= cm : (minor === cm && patch >= cP) || minor > cm;
-  }
-
+  if (caret) return matchesCaret(caret, major, minor, patch);
   const tilde = r.match(TILDE_RANGE_RE);
-  if (tilde) {
-    return Number(tilde[1]) === major && Number(tilde[2]) === minor && patch >= Number(tilde[3]);
-  }
-
+  if (tilde) return matchesTilde(tilde, major, minor, patch);
   const star = r.match(PREFIXED_VERSION_RE);
-  if (star) {
-    const [sM, sm, sP] = [Number(star[1]), Number(star[2] ?? '0'), Number(star[3] ?? '0')];
-    if (sM !== major) return false;
-    if (star[2] === undefined) return true;
-    if (sm !== minor) return false;
-    if (star[3] === undefined) return true;
-    return patch >= sP;
-  }
-
-  // 无法识别的范围（含 || 、>= 等）不做强判断
+  if (star) return matchesPrefixed(star, major, minor, patch);
   return true;
+}
+
+/** 精确版本 x.y.z 匹配 */
+function matchesExact(exact: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+  return exact[1] === String(major) && exact[2] === String(minor) && exact[3] === String(patch);
+}
+
+/** ^x.y.z 范围匹配 */
+function matchesCaret(caret: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+  const [cM, cm, cP] = [Number(caret[1]), Number(caret[2]), Number(caret[3])];
+  if (cM !== major) return false;
+  return cM > 0 ? minor >= cm : (minor === cm && patch >= cP) || minor > cm;
+}
+
+/** ~x.y.z 范围匹配 */
+function matchesTilde(tilde: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+  return Number(tilde[1]) === major && Number(tilde[2]) === minor && patch >= Number(tilde[3]);
+}
+
+/** 带前缀版本（v/~ /^ 前缀 + 1-3 段）匹配 */
+function matchesPrefixed(star: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+  const [sM, sm, sP] = [Number(star[1]), Number(star[2] ?? '0'), Number(star[3] ?? '0')];
+  if (sM !== major) return false;
+  if (star[2] === undefined) return true;
+  if (sm !== minor) return false;
+  if (star[3] === undefined) return true;
+  return patch >= sP;
 }
 
 /** package.json 直接依赖声明：name → 范围 */
@@ -273,25 +278,35 @@ function checkLockfileDrift(projectRoot: string, pkgJson: Record<string, unknown
   const declared = readDeclaredDeps(pkgJson);
   if (declared.size === 0) return [];
 
-  let resolved: Map<string, string> | null = null;
+  const resolved = resolveLockfileVersions(projectRoot);
+  if (!resolved) return [];
 
+  return buildDriftEntries(declared, resolved);
+}
+
+/** 按优先级读取锁文件（pnpm → npm → yarn）并解析版本映射 */
+function resolveLockfileVersions(projectRoot: string): Map<string, string> | null {
   const pnpmPath = safeJoin(projectRoot, 'pnpm-lock.yaml');
   const npmPath = safeJoin(projectRoot, 'package-lock.json');
   const yarnPath = safeJoin(projectRoot, 'yarn.lock');
 
   if (fs.existsSync(pnpmPath)) {
     const lock = readYamlSafe(pnpmPath);
-    if (isRecord(lock)) resolved = collectPnpmVersions(lock);
-  } else if (fs.existsSync(npmPath)) {
-    const lock = readJsonSafe(npmPath);
-    if (lock) resolved = collectNpmVersions(lock);
-  } else if (fs.existsSync(yarnPath)) {
-    const content = readTextSafe(yarnPath);
-    if (content !== null) resolved = collectYarnVersions(content);
+    return isRecord(lock) ? collectPnpmVersions(lock) : null;
   }
+  if (fs.existsSync(npmPath)) {
+    const lock = readJsonSafe(npmPath);
+    return lock ? collectNpmVersions(lock) : null;
+  }
+  if (fs.existsSync(yarnPath)) {
+    const content = readTextSafe(yarnPath);
+    return content !== null ? collectYarnVersions(content) : null;
+  }
+  return null;
+}
 
-  if (!resolved) return [];
-
+/** 对比声明范围与锁定版本，产出漂移条目 */
+function buildDriftEntries(declared: Map<string, string>, resolved: Map<string, string>): EnvEntry[] {
   const entries: EnvEntry[] = [];
   for (const [name, range] of declared) {
     const locked = resolved.get(name);
@@ -447,65 +462,76 @@ function extractVersion(value: string): string | null {
 
 /** 读取 .github/workflows/*.yml 中声明的 Node / 包管理器版本 */
 function readCiWorkflows(projectRoot: string): CiWorkflowInfo[] {
-  const workflowsDir = safeJoin(projectRoot, '.github', 'workflows');
-  let files: string[];
-  try {
-    files = fs.readdirSync(workflowsDir).filter((f) => YAML_FILE_RE.test(f));
-  } catch {
-    // 无 workflows 目录：视为无 CI
-    return [];
-  }
-
+  const files = listWorkflowFiles(projectRoot);
   const infos: CiWorkflowInfo[] = [];
   for (const file of files) {
-    const data = readYamlSafe(safeJoin(workflowsDir, file));
-    if (!isRecord(data)) continue;
-    const jobs = data.jobs;
-    if (!isRecord(jobs)) continue;
-
-    let nodeVersion: string | null = null;
-    let packageManager: string | null = null;
-
-    const scanStep = (step: unknown): void => {
-      if (!isRecord(step)) return;
-      const uses = typeof step.uses === 'string' ? step.uses : '';
-      if (uses.startsWith('actions/setup-node')) {
-        const withBlock = step.with;
-        if (isRecord(withBlock)) {
-          if (typeof withBlock['node-version'] === 'string') {
-            nodeVersion = extractVersion(withBlock['node-version']) ?? withBlock['node-version'].trim();
-          } else if (typeof withBlock['node-version-file'] === 'string') {
-            nodeVersion = `@${withBlock['node-version-file']}`;
-          }
-        }
-      }
-      const withBlock = step.with;
-      if (isRecord(withBlock) && typeof withBlock['package-manager'] === 'string') {
-        packageManager = withBlock['package-manager'].trim();
-      }
-    };
-
-    const scanJob = (job: unknown): void => {
-      if (!isRecord(job)) return;
-      const steps = job.steps;
-      if (Array.isArray(steps)) steps.forEach(scanStep);
-      const strategy = job.strategy;
-      if (isRecord(strategy)) {
-        const matrix = strategy.matrix;
-        if (isRecord(matrix) && typeof matrix['node-version'] === 'string') {
-          nodeVersion = extractVersion(matrix['node-version']) ?? matrix['node-version'].trim();
-        }
-      }
-    };
-
-    for (const job of Object.values(jobs)) {
-      if (isRecord(job)) scanJob(job);
-      else if (Array.isArray(job)) job.forEach(scanJob);
-    }
-
-    infos.push({ file, nodeVersion, packageManager });
+    const info = scanWorkflowFile(safeJoin(projectRoot, '.github', 'workflows'), file);
+    if (info) infos.push(info);
   }
   return infos;
+}
+
+/** 列出 workflows 目录下的 YAML 文件；目录缺失视为无 CI */
+function listWorkflowFiles(projectRoot: string): string[] {
+  const workflowsDir = safeJoin(projectRoot, '.github', 'workflows');
+  try {
+    return fs.readdirSync(workflowsDir).filter((f) => YAML_FILE_RE.test(f));
+  } catch {
+    return [];
+  }
+}
+
+/** 扫描单个工作流文件，提取 Node / 包管理器版本 */
+function scanWorkflowFile(workflowsDir: string, file: string): CiWorkflowInfo | null {
+  const data = readYamlSafe(safeJoin(workflowsDir, file));
+  if (!isRecord(data)) return null;
+  const jobs = data.jobs;
+  if (!isRecord(jobs)) return null;
+  let nodeVersion: string | null = null;
+  let packageManager: string | null = null;
+  const scanStep = (step: unknown): void => {
+    if (!isRecord(step)) return;
+    const uses = typeof step.uses === 'string' ? step.uses : '';
+    if (uses.startsWith('actions/setup-node')) {
+      const withBlock = step.with;
+      if (isRecord(withBlock)) {
+        const version = extractSetupNodeVersion(withBlock);
+        if (version !== null) nodeVersion = version;
+      }
+    }
+    const withBlock = step.with;
+    if (isRecord(withBlock) && typeof withBlock['package-manager'] === 'string') {
+      packageManager = withBlock['package-manager'].trim();
+    }
+  };
+  const scanJob = (job: unknown): void => {
+    if (!isRecord(job)) return;
+    const steps = job.steps;
+    if (Array.isArray(steps)) steps.forEach(scanStep);
+    const strategy = job.strategy;
+    if (isRecord(strategy)) {
+      const matrix = strategy.matrix;
+      if (isRecord(matrix) && typeof matrix['node-version'] === 'string') {
+        nodeVersion = extractVersion(matrix['node-version']) ?? matrix['node-version'].trim();
+      }
+    }
+  };
+  for (const job of Object.values(jobs)) {
+    if (isRecord(job)) scanJob(job);
+    else if (Array.isArray(job)) job.forEach(scanJob);
+  }
+  return { file, nodeVersion, packageManager };
+}
+
+/** 从 setup-node 的 with 块提取 Node 版本（node-version 优先，其次 node-version-file） */
+function extractSetupNodeVersion(withBlock: Record<string, unknown>): string | null {
+  if (typeof withBlock['node-version'] === 'string') {
+    return extractVersion(withBlock['node-version']) ?? withBlock['node-version'].trim();
+  }
+  if (typeof withBlock['node-version-file'] === 'string') {
+    return `@${withBlock['node-version-file']}`;
+  }
+  return null;
 }
 
 /** CI 与本地清单一致性检查：无 CI 工作流时不产出 */

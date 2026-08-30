@@ -139,28 +139,38 @@ export async function profileProject(
   questions: ReturnType<QuestionSet['generate']>;
   drift: ReturnType<DriftDetector['detect']>;
 }> {
-  // 1. 创建组件
+  const { profiler, profileStore, driftDetector, questionSet } = createPipelineComponents(projectPath, options);
+  const drift = detectDrift(profileStore, driftDetector, projectPath);
+  const profile = await profiler.profile(projectPath, options?.overrides);
+  profileStore.save(projectPath, profile);
+  const questions = questionSet.generate(profile);
+  return { profile, questions, drift };
+}
+
+function createPipelineComponents(
+  projectPath: string,
+  options?: {
+    detectors?: ReturnType<typeof createDefaultDetectors>;
+    serves?: RuleServes;
+  },
+) {
   const detectors = options?.detectors ?? createDefaultDetectors();
   const serves = options?.serves ?? createDefaultServes();
-  const profiler = createProfiler(detectors);
-  const profileStore = createProfileStore();
-  const driftDetector = createDriftDetector(projectPath);
-  const questionSet = createQuestionSet(serves);
+  return {
+    profiler: createProfiler(detectors),
+    profileStore: createProfileStore(),
+    driftDetector: createDriftDetector(projectPath),
+    questionSet: createQuestionSet(serves),
+  };
+}
 
-  // 2. 检查漂移
+function detectDrift(
+  profileStore: ReturnType<typeof createProfileStore>,
+  driftDetector: DriftDetector,
+  projectPath: string,
+): ReturnType<DriftDetector['detect']> {
   const existingProfile = profileStore.load(projectPath);
-  const drift = driftDetector.detect(existingProfile);
-
-  // 3. 执行画像探测
-  const profile = await profiler.profile(projectPath, options?.overrides);
-
-  // 4. 保存画像
-  profileStore.save(projectPath, profile);
-
-  // 5. 生成问题集
-  const questions = questionSet.generate(profile);
-
-  return { profile, questions, drift };
+  return driftDetector.detect(existingProfile);
 }
 
 /**

@@ -45,14 +45,19 @@ export function toFeature(profile: ProjectProfile): ProjectFeatureLike {
     return { features: [] };
   }
 
-  const language =
-    primary.language.value !== 'unknown' ? primary.language.value : undefined;
+  return {
+    language: extractLanguage(primary),
+    framework: extractFramework(primary),
+    features: collectFeatures(primary, profile),
+  };
+}
 
-  const framework = primary.frameworks[0]?.value;
+function extractLanguage(primary: ProjectProfile['targets'][number]): string | undefined {
+  return primary.language.value !== 'unknown' ? primary.language.value : undefined;
+}
 
-  const features = collectFeatures(primary, profile);
-
-  return { language, framework, features };
+function extractFramework(primary: ProjectProfile['targets'][number]): string | undefined {
+  return primary.frameworks[0]?.value;
 }
 
 // ─── 特性聚合 ───────────────────────────────────────────────────

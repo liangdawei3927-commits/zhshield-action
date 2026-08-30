@@ -10,7 +10,7 @@
  *
  * 失败语义：信息不足的节点直接跳过，绝不抛异常。
  */
-import type { DependencyGraph } from '../types';
+import type { DependencyGraph, DependencyNode } from '../types';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 /** 数字检测 */
@@ -239,86 +239,99 @@ export class TyposquatDetectorImpl implements TyposquatDetector {
    */
   async detect(graph: DependencyGraph): Promise<TyposquatFinding[]> {
     const findings: TyposquatFinding[] = [];
-
     for (const node of graph.nodes) {
-      // scoped 包（@scope/name）不在知名清单范围内，跳过
-      if (node.name.startsWith('@')) continue;
-
-      const name = node.name.toLowerCase();
-      if (KNOWN_PACKAGES.includes(name)) continue; // 合法知名包名，不判定
-
-      const variantSet = new Set(visualConfusionVariants(name));
-      const visualTarget = visualConfusionTarget(variantSet);
-
-      // 逐一比对知名包，取编辑距离最小者（同距离时视觉混淆优先）
-      let bestTarget = '';
-      let bestDist = Infinity;
-      let bestVisual = false;
-      for (const known of KNOWN_PACKAGES) {
-        const dist = editDistance(name, known);
-        const visual = visualTarget === known;
-        if (dist > LOW_RISK_MAX_EDIT_DISTANCE && !visual) continue;
-        if (
-          dist < bestDist ||
-          (dist === bestDist && visual && !bestVisual)
-        ) {
-          bestTarget = known;
-          bestDist = dist;
-          bestVisual = visual;
-        }
-      }
-      if (bestTarget === '') continue;
-
-      // 风险定级：≤1 或视觉混淆 → high；≤2 → medium；≤3 且常见目标 → low
-      let risk: TyposquatFinding['risk'] | null = null;
-      if (bestVisual || bestDist <= HIGH_RISK_MAX_EDIT_DISTANCE) {
-        risk = 'high';
-      } else if (bestDist <= MEDIUM_RISK_MAX_EDIT_DISTANCE) {
-        risk = 'medium';
-      } else if (bestDist <= LOW_RISK_MAX_EDIT_DISTANCE && COMMON_TARGETS.has(bestTarget)) {
-        risk = 'low';
-      }
-      if (risk === null) continue;
-
-      const score = normalizedSimilarity(name, bestTarget, bestDist);
-      const evidence: string[] = [];
-      if (bestVisual) {
-        evidence.push(
-          `name '${node.name}' visually resembles known '${bestTarget}' (edit distance ${bestDist}, score ${score.toFixed(2)})`,
-        );
-      } else {
-        evidence.push(
-          `name '${node.name}' vs known '${bestTarget}': edit distance ${bestDist} (score ${score.toFixed(2)})`,
-        );
-      }
-
-      const behaviorFlags = collectBehaviorFlags(node.name, bestTarget);
-      for (const flag of behaviorFlags) {
-        evidence.push(`behavior flag: ${flag}`);
-      }
-
-      findings.push({
-        nodeId: node.id,
-        risk,
-        signals: {
-          nameSimilarity: { target: bestTarget, score: Number(score.toFixed(2)) },
-          ...(behaviorFlags.length > 0 ? { behaviorFlags } : {}),
-        },
-        evidence,
-      });
+      const finding = evaluateNode(node);
+      if (finding) findings.push(finding);
     }
-
-    // 风险降序：high → medium → low；同级按相似度降序，再按包名字典序
-    const riskRank: Record<TyposquatFinding['risk'], number> = { high: 0, medium: 1, low: 2 };
-    findings.sort((a, b) => {
-      const rankDiff = riskRank[a.risk] - riskRank[b.risk];
-      if (rankDiff !== 0) return rankDiff;
-      const scoreA = a.signals.nameSimilarity?.score ?? 0;
-      const scoreB = b.signals.nameSimilarity?.score ?? 0;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return a.nodeId.localeCompare(b.nodeId);
-    });
-
-    return findings;
+    return sortFindings(findings);
   }
+}
+
+/** 评估单个节点：scoped / 合法知名包跳过，命中则产出 finding */
+function evaluateNode(node: DependencyNode): TyposquatFinding | null {
+  if (node.name.startsWith('@')) return null;
+  const name = node.name.toLowerCase();
+  if (KNOWN_PACKAGES.includes(name)) return null;
+
+  const variantSet = new Set(visualConfusionVariants(name));
+  const visualTarget = visualConfusionTarget(variantSet);
+  const best = findBestMatch(name, visualTarget);
+  if (!best) return null;
+  const risk = classifyRisk(best);
+  if (risk === null) return null;
+  return buildFinding(node, name, best, risk);
+}
+
+/** 逐一比对知名包，取编辑距离最小者（同距离时视觉混淆优先） */
+function findBestMatch(name: string, visualTarget: string | null): { target: string; dist: number; visual: boolean } | null {
+  let bestTarget = '';
+  let bestDist = Infinity;
+  let bestVisual = false;
+  for (const known of KNOWN_PACKAGES) {
+    const dist = editDistance(name, known);
+    const visual = visualTarget === known;
+    if (dist > LOW_RISK_MAX_EDIT_DISTANCE && !visual) continue;
+    if (dist < bestDist || (dist === bestDist && visual && !bestVisual)) {
+      bestTarget = known;
+      bestDist = dist;
+      bestVisual = visual;
+    }
+  }
+  if (bestTarget === '') return null;
+  return { target: bestTarget, dist: bestDist, visual: bestVisual };
+}
+
+/** 风险定级：≤1 或视觉混淆 → high；≤2 → medium；≤3 且常见目标 → low */
+function classifyRisk(best: { target: string; dist: number; visual: boolean }): TyposquatFinding['risk'] | null {
+  if (best.visual || best.dist <= HIGH_RISK_MAX_EDIT_DISTANCE) return 'high';
+  if (best.dist <= MEDIUM_RISK_MAX_EDIT_DISTANCE) return 'medium';
+  if (best.dist <= LOW_RISK_MAX_EDIT_DISTANCE && COMMON_TARGETS.has(best.target)) return 'low';
+  return null;
+}
+
+/** 组装 finding：证据 + 行为标记 + 信号 */
+function buildFinding(
+  node: DependencyNode,
+  name: string,
+  best: { target: string; dist: number; visual: boolean },
+  risk: TyposquatFinding['risk'],
+): TyposquatFinding {
+  const score = normalizedSimilarity(name, best.target, best.dist);
+  const evidence: string[] = [];
+  if (best.visual) {
+    evidence.push(
+      `name '${node.name}' visually resembles known '${best.target}' (edit distance ${best.dist}, score ${score.toFixed(2)})`,
+    );
+  } else {
+    evidence.push(
+      `name '${node.name}' vs known '${best.target}': edit distance ${best.dist} (score ${score.toFixed(2)})`,
+    );
+  }
+  const behaviorFlags = collectBehaviorFlags(node.name, best.target);
+  for (const flag of behaviorFlags) {
+    evidence.push(`behavior flag: ${flag}`);
+  }
+  return {
+    nodeId: node.id,
+    risk,
+    signals: {
+      nameSimilarity: { target: best.target, score: Number(score.toFixed(2)) },
+      ...(behaviorFlags.length > 0 ? { behaviorFlags } : {}),
+    },
+    evidence,
+  };
+}
+
+/** 风险降序：high → medium → low；同级按相似度降序，再按包名字典序 */
+function sortFindings(findings: TyposquatFinding[]): TyposquatFinding[] {
+  const riskRank: Record<TyposquatFinding['risk'], number> = { high: 0, medium: 1, low: 2 };
+  findings.sort((a, b) => {
+    const rankDiff = riskRank[a.risk] - riskRank[b.risk];
+    if (rankDiff !== 0) return rankDiff;
+    const scoreA = a.signals.nameSimilarity?.score ?? 0;
+    const scoreB = b.signals.nameSimilarity?.score ?? 0;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return a.nodeId.localeCompare(b.nodeId);
+  });
+  return findings;
 }

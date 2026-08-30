@@ -16,6 +16,7 @@ import { load as loadYaml } from 'js-yaml';
 import type { DependencyEdge, DependencyGraph, DependencyNode, Ecosystem, LockfileStatus, TrustStatus } from './types';
 import { ROOT_NODE_ID } from './types';
 import { safeJoin } from '@zh/shared';
+import { satisfiesVersion } from './adapters/lockfile-verifier';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 /** 换行符拆分 */
@@ -165,54 +166,68 @@ function collectNpmPackagesMap(
 ): { nodes: DependencyNode[]; edges: DependencyEdge[] } {
   const byId = new Map<string, DependencyNode>();
   const firstIdByName = new Map<string, string>();
-
   for (const [key, meta] of Object.entries(packages)) {
-    const m = key.match(PACKAGE_KEY_RE);
-    if (!m) continue;
-    if (!isRecord(meta)) continue;
-    const name = m[1];
-    const version = typeof meta.version === 'string' ? meta.version : '';
-    if (version === '') continue;
-    const id = `${name}@${version}`;
-    if (byId.has(id)) continue;
-
-    const integrity = typeof meta.integrity === 'string' ? meta.integrity : undefined;
-    const license = typeof meta.license === 'string' ? meta.license : undefined;
-    const deprecated = typeof meta.deprecated === 'string' ? true : undefined;
-    const node = makeNode({
-      name,
-      version,
-      declaredRange: '',
-      kind: 'transitive',
-      integrity,
-      trust: trustFromIntegrity(integrity),
-      deprecated,
-      license,
-    });
-    byId.set(id, node);
-    if (!firstIdByName.has(name)) firstIdByName.set(name, id);
+    collectNpmPackageEntry(key, meta, byId, firstIdByName);
   }
-
-  // 直接依赖：以 package.json 声明为准（声明范围 + direct 标记 + 根边）
-  const edges: DependencyEdge[] = [];
-  if (pkgJson) {
-    const declared = new Map<string, string>([
-      ...Object.entries(pkgJson.dependencies),
-      ...Object.entries(pkgJson.devDependencies),
-    ]);
-    for (const [name, range] of declared) {
-      const targetId = firstIdByName.get(name);
-      if (!targetId) continue;
-      const node = byId.get(targetId);
-      if (node) {
-        node.kind = 'direct';
-        node.declaredRange = range;
-      }
-      edges.push({ from: ROOT_NODE_ID, to: targetId, requirement: range });
-    }
-  }
-
+  const edges = buildNpmDirectEdges(pkgJson, byId, firstIdByName);
   return { nodes: [...byId.values()], edges };
+}
+
+/** 单个 packages 条目 → 节点（含 license / integrity / deprecated） */
+function collectNpmPackageEntry(
+  key: string,
+  meta: unknown,
+  byId: Map<string, DependencyNode>,
+  firstIdByName: Map<string, string>,
+): void {
+  const m = key.match(PACKAGE_KEY_RE);
+  if (!m) return;
+  if (!isRecord(meta)) return;
+  const name = m[1];
+  const version = typeof meta.version === 'string' ? meta.version : '';
+  if (version === '') return;
+  const id = `${name}@${version}`;
+  if (byId.has(id)) return;
+  const integrity = typeof meta.integrity === 'string' ? meta.integrity : undefined;
+  const license = typeof meta.license === 'string' ? meta.license : undefined;
+  const deprecated = typeof meta.deprecated === 'string' ? true : undefined;
+  const node = makeNode({
+    name,
+    version,
+    declaredRange: '',
+    kind: 'transitive',
+    integrity,
+    trust: trustFromIntegrity(integrity),
+    deprecated,
+    license,
+  });
+  byId.set(id, node);
+  if (!firstIdByName.has(name)) firstIdByName.set(name, id);
+}
+
+/** 直接依赖：以 package.json 声明为准（声明范围 + direct 标记 + 根边） */
+function buildNpmDirectEdges(
+  pkgJson: DirectDeps | null,
+  byId: Map<string, DependencyNode>,
+  firstIdByName: Map<string, string>,
+): DependencyEdge[] {
+  const edges: DependencyEdge[] = [];
+  if (!pkgJson) return edges;
+  const declared = new Map<string, string>([
+    ...Object.entries(pkgJson.dependencies),
+    ...Object.entries(pkgJson.devDependencies),
+  ]);
+  for (const [name, range] of declared) {
+    const targetId = firstIdByName.get(name);
+    if (!targetId) continue;
+    const node = byId.get(targetId);
+    if (node) {
+      node.kind = 'direct';
+      node.declaredRange = range;
+    }
+    edges.push({ from: ROOT_NODE_ID, to: targetId, requirement: range });
+  }
+  return edges;
 }
 
 /** 递归收集 npm v1 dependencies 嵌套结构 */
@@ -300,63 +315,77 @@ function collectPnpm(lock: Record<string, unknown>): { nodes: DependencyNode[]; 
   const nodes: DependencyNode[] = [];
   const byId = new Map<string, DependencyNode>();
   const edges: DependencyEdge[] = [];
+  const integrityById = collectPnpmIntegrity(lock);
+  collectPnpmImporters(lock, nodes, byId, edges, integrityById);
+  collectPnpmTransitives(integrityById, nodes, byId);
+  return { nodes, edges };
+}
 
-  // packages 区块：/name@version → integrity
+/** packages 区块：/name@version → integrity */
+function collectPnpmIntegrity(lock: Record<string, unknown>): Map<string, string> {
   const integrityById = new Map<string, string>();
   const packages = lock.packages;
-  if (isRecord(packages)) {
-    for (const [key, meta] of Object.entries(packages)) {
-      const m = key.match(PNPM_PACKAGE_KEY_RE);
-      if (!m) continue;
+  if (!isRecord(packages)) return integrityById;
+  for (const [key, meta] of Object.entries(packages)) {
+    const m = key.match(PNPM_PACKAGE_KEY_RE);
+    if (!m) continue;
+    if (!isRecord(meta)) continue;
+    const name = m[1];
+    const version = m[2].split('(')[0];
+    if (!version) continue;
+    const id = `${name}@${version}`;
+    const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
+    const integrity =
+      typeof resolution?.integrity === 'string'
+        ? resolution.integrity
+        : typeof meta.integrity === 'string'
+          ? meta.integrity
+          : undefined;
+    if (integrity) integrityById.set(id, integrity);
+  }
+  return integrityById;
+}
+
+/** importers 区块：直接依赖（specifier = 声明范围，version = 锁定版本） */
+function collectPnpmImporters(
+  lock: Record<string, unknown>,
+  nodes: DependencyNode[],
+  byId: Map<string, DependencyNode>,
+  edges: DependencyEdge[],
+  integrityById: Map<string, string>,
+): void {
+  const importers = lock.importers;
+  if (!isRecord(importers)) return;
+  const rootImporter = importers['.'] ?? Object.values(importers)[0];
+  if (!isRecord(rootImporter)) return;
+  for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
+    const section = rootImporter[sectionKey];
+    if (!isRecord(section)) continue;
+    for (const [name, meta] of Object.entries(section)) {
       if (!isRecord(meta)) continue;
-      const name = m[1];
-      const version = m[2].split('(')[0];
+      const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
+      const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
       if (!version) continue;
       const id = `${name}@${version}`;
-      const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
-      const integrity =
-        typeof resolution?.integrity === 'string'
-          ? resolution.integrity
-          : typeof meta.integrity === 'string'
-            ? meta.integrity
-            : undefined;
-      if (integrity) integrityById.set(id, integrity);
+      if (byId.has(id)) continue;
+      const integrity = integrityById.get(id);
+      const node = makeNode({
+        name,
+        version,
+        declaredRange: specifier,
+        kind: 'direct',
+        integrity,
+        trust: trustFromIntegrity(integrity),
+      });
+      nodes.push(node);
+      byId.set(id, node);
+      edges.push({ from: ROOT_NODE_ID, to: id, requirement: specifier });
     }
   }
+}
 
-  // importers 区块：直接依赖（specifier = 声明范围，version = 锁定版本）
-  const importers = lock.importers;
-  if (isRecord(importers)) {
-    const rootImporter = importers['.'] ?? Object.values(importers)[0];
-    if (isRecord(rootImporter)) {
-      for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
-        const section = rootImporter[sectionKey];
-        if (!isRecord(section)) continue;
-        for (const [name, meta] of Object.entries(section)) {
-          if (!isRecord(meta)) continue;
-          const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
-          const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
-          if (!version) continue;
-          const id = `${name}@${version}`;
-          if (byId.has(id)) continue;
-          const integrity = integrityById.get(id);
-          const node = makeNode({
-            name,
-            version,
-            declaredRange: specifier,
-            kind: 'direct',
-            integrity,
-            trust: trustFromIntegrity(integrity),
-          });
-          nodes.push(node);
-          byId.set(id, node);
-          edges.push({ from: ROOT_NODE_ID, to: id, requirement: specifier });
-        }
-      }
-    }
-  }
-
-  // 其余 packages 为传递依赖
+/** 其余 packages 为传递依赖 */
+function collectPnpmTransitives(integrityById: Map<string, string>, nodes: DependencyNode[], byId: Map<string, DependencyNode>): void {
   for (const [id, integrity] of integrityById) {
     if (byId.has(id)) continue;
     const at = id.lastIndexOf('@');
@@ -373,8 +402,6 @@ function collectPnpm(lock: Record<string, unknown>): { nodes: DependencyNode[]; 
     nodes.push(node);
     byId.set(id, node);
   }
-
-  return { nodes, edges };
 }
 
 /** 解析 pnpm-lock.yaml */
@@ -409,37 +436,41 @@ function parseYarnKey(key: string): { name: string; range: string } | null {
 function parseYarnLock(content: string): YarnBlock[] {
   const blocks: YarnBlock[] = [];
   let current: YarnBlock | null = null;
-
   for (const rawLine of content.split(NEWLINE_RE)) {
     const trimmed = rawLine.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
     const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
-
     if (indent === 0 && trimmed.endsWith(':')) {
-      // 块头：剥离整体引号后再按逗号拆分键
-      let keysText = trimmed.slice(0, -1).trim();
-      if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
-        keysText = keysText.slice(1, -1);
-      }
-      current = { keys: keysText.split(',').map((k) => k.trim()), fields: new Map() };
-      blocks.push(current);
+      current = startYarnBlock(trimmed, blocks);
       continue;
     }
-
-    // yarn.lock v1 字段行无冒号：`  version "4.17.21"`（键与值空白分隔）
     if (current) {
-      const m = trimmed.match(YARN_FIELD_RE);
-      if (m) {
-        let value = m[2].trim();
-        if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1);
-        }
-        current.fields.set(m[1], value);
-      }
+      collectYarnField(current, trimmed);
     }
   }
-
   return blocks;
+}
+
+/** 块头：剥离整体引号后再按逗号拆分键 */
+function startYarnBlock(trimmed: string, blocks: YarnBlock[]): YarnBlock {
+  let keysText = trimmed.slice(0, -1).trim();
+  if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
+    keysText = keysText.slice(1, -1);
+  }
+  const block: YarnBlock = { keys: keysText.split(',').map((k) => k.trim()), fields: new Map() };
+  blocks.push(block);
+  return block;
+}
+
+/** yarn.lock v1 字段行无冒号：`  version "4.17.21"`（键与值空白分隔） */
+function collectYarnField(current: YarnBlock, trimmed: string): void {
+  const m = trimmed.match(YARN_FIELD_RE);
+  if (!m) return;
+  let value = m[2].trim();
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    value = value.slice(1, -1);
+  }
+  current.fields.set(m[1], value);
 }
 
 /** 解析 yarn.lock v1：直接依赖来自 package.json，锁定版本来自块 */
@@ -447,17 +478,27 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
   const content = readTextSafe(yarnLockPath);
   if (content === null) return { nodes: [], edges: [], present: false };
   const blocks = parseYarnLock(content);
-
   const declared = new Map<string, string>([
     ...(pkgJson ? Object.entries(pkgJson.dependencies) : []),
     ...(pkgJson ? Object.entries(pkgJson.devDependencies) : []),
   ]);
-
   const nodes: DependencyNode[] = [];
   const byId = new Map<string, DependencyNode>();
   const byName = new Map<string, DependencyNode>();
+  collectYarnDirects(blocks, declared, nodes, byId, byName);
+  collectYarnTransitives(blocks, nodes, byId);
+  const edges = buildRootEdges(declared, byName);
+  return { nodes, edges, present: true };
+}
 
-  // 第一遍：直接依赖（声明范围精确匹配块键）
+/** 第一遍：直接依赖（声明范围精确匹配块键） */
+function collectYarnDirects(
+  blocks: YarnBlock[],
+  declared: Map<string, string>,
+  nodes: DependencyNode[],
+  byId: Map<string, DependencyNode>,
+  byName: Map<string, DependencyNode>,
+): void {
   for (const block of blocks) {
     const version = block.fields.get('version');
     if (!version) continue;
@@ -485,8 +526,10 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
     byId.set(id, node);
     if (!byName.has(resolved.name)) byName.set(resolved.name, node);
   }
+}
 
-  // 第二遍：其余块为传递依赖
+/** 第二遍：其余块为传递依赖 */
+function collectYarnTransitives(blocks: YarnBlock[], nodes: DependencyNode[], byId: Map<string, DependencyNode>): void {
   for (const block of blocks) {
     const version = block.fields.get('version');
     if (!version) continue;
@@ -506,15 +549,16 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
     nodes.push(node);
     byId.set(id, node);
   }
+}
 
-  // 边：根 → 直接依赖
+/** 边：根 → 直接依赖 */
+function buildRootEdges(declared: Map<string, string>, byName: Map<string, DependencyNode>): DependencyEdge[] {
   const edges: DependencyEdge[] = [];
   for (const [name, range] of declared) {
     const node = byName.get(name);
     if (node) edges.push({ from: ROOT_NODE_ID, to: node.id, requirement: range });
   }
-
-  return { nodes, edges, present: true };
+  return edges;
 }
 
 // ────────────────────────────── Python ──────────────────────────────
@@ -588,27 +632,37 @@ function parsePyproject(content: string): { dependencies: Map<string, string>; d
     const sectionName = header[1].trim().toLowerCase();
 
     if (sectionName === 'project') {
-      const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
-      if (!depsBlock) continue;
-      const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-      for (const m of block.matchAll(/"([^"]+)"/g)) {
-        const parsed = parsePep508(m[1]);
-        if (parsed) dependencies.set(parsed.name, parsed.constraint);
-      }
+      collectProjectDeps(section, dependencies);
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
-      for (const line of section.split(NEWLINE_RE)) {
-        if (line.trim().startsWith('[')) continue;
-        const key = line.match(POETRY_TOML_KEY_RE);
-        if (!key) continue;
-        const name = key[1];
-        if (name === 'python') continue; // poetry 特殊键，非依赖
-        const value = line.slice(line.indexOf('=') + 1);
-        dependencies.set(name, parsePoetryConstraint(value));
-      }
+      collectPoetryDeps(section, dependencies);
     }
   }
 
   return { dependencies, devDependencies };
+}
+
+/** [project].dependencies 数组（PEP 621）：双引号包名 + 附带约束 */
+function collectProjectDeps(section: string, dependencies: Map<string, string>): void {
+  const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
+  if (!depsBlock) return;
+  const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
+  for (const m of block.matchAll(/"([^"]+)"/g)) {
+    const parsed = parsePep508(m[1]);
+    if (parsed) dependencies.set(parsed.name, parsed.constraint);
+  }
+}
+
+/** [tool.poetry.dependencies] / [tool.uv.dependencies]：表键即包名 */
+function collectPoetryDeps(section: string, dependencies: Map<string, string>): void {
+  for (const line of section.split(NEWLINE_RE)) {
+    if (line.trim().startsWith('[')) continue;
+    const key = line.match(POETRY_TOML_KEY_RE);
+    if (!key) continue;
+    const name = key[1];
+    if (name === 'python') continue; // poetry 特殊键，非依赖
+    const value = line.slice(line.indexOf('=') + 1);
+    dependencies.set(name, parsePoetryConstraint(value));
+  }
 }
 
 /** Pipfile.lock JSON：default / develop 两个区块的键即包名，version 字段为声明范围 */
@@ -655,42 +709,47 @@ function buildPoetryGraph(poetryLockPath: string, projectPath: string): BuildRes
   const content = readTextSafe(poetryLockPath);
   if (content === null) return { nodes: [], edges: [], present: false };
   const packages = parsePoetryLock(content);
-
-  let declared = new Map<string, string>();
-  const pyprojectContent = readTextSafe(safeJoin(projectPath, 'pyproject.toml'));
-  if (pyprojectContent !== null) {
-    const parsed = parsePyproject(pyprojectContent);
-    declared = new Map<string, string>([...parsed.dependencies, ...parsed.devDependencies]);
-  }
-
+  const declared = readPoetryDeclared(projectPath);
   const nodes: DependencyNode[] = [];
   const byId = new Map<string, DependencyNode>();
   const byName = new Map<string, DependencyNode>();
-
   for (const pkg of packages) {
-    const isDirect = declared.has(pkg.name);
-    const range = declared.get(pkg.name) ?? '';
-    const id = `${pkg.name}@${pkg.version}`;
-    if (byId.has(id)) continue;
-    const node = makeNode({
-      name: pkg.name,
-      version: pkg.version,
-      declaredRange: range,
-      kind: isDirect ? 'direct' : 'transitive',
-      trust: 'unknown',
-    });
-    nodes.push(node);
-    byId.set(id, node);
-    if (isDirect && !byName.has(pkg.name)) byName.set(pkg.name, node);
+    collectPoetryPackage(pkg, declared, nodes, byId, byName);
   }
-
-  const edges: DependencyEdge[] = [];
-  for (const [name, range] of declared) {
-    const node = byName.get(name);
-    if (node) edges.push({ from: ROOT_NODE_ID, to: node.id, requirement: range });
-  }
-
+  const edges = buildRootEdges(declared, byName);
   return { nodes, edges, present: true };
+}
+
+/** 读取 pyproject.toml 声明（dependencies + devDependencies） */
+function readPoetryDeclared(projectPath: string): Map<string, string> {
+  const pyprojectContent = readTextSafe(safeJoin(projectPath, 'pyproject.toml'));
+  if (pyprojectContent === null) return new Map<string, string>();
+  const parsed = parsePyproject(pyprojectContent);
+  return new Map<string, string>([...parsed.dependencies, ...parsed.devDependencies]);
+}
+
+/** 单个 poetry.lock 包 → 节点（直接依赖标记 + 根边） */
+function collectPoetryPackage(
+  pkg: { name: string; version: string },
+  declared: Map<string, string>,
+  nodes: DependencyNode[],
+  byId: Map<string, DependencyNode>,
+  byName: Map<string, DependencyNode>,
+): void {
+  const isDirect = declared.has(pkg.name);
+  const range = declared.get(pkg.name) ?? '';
+  const id = `${pkg.name}@${pkg.version}`;
+  if (byId.has(id)) return;
+  const node = makeNode({
+    name: pkg.name,
+    version: pkg.version,
+    declaredRange: range,
+    kind: isDirect ? 'direct' : 'transitive',
+    trust: 'unknown',
+  });
+  nodes.push(node);
+  byId.set(id, node);
+  if (isDirect && !byName.has(pkg.name)) byName.set(pkg.name, node);
 }
 
 /** Pipfile.lock 图谱：全部为直接依赖（锁定版本来自 version 字段） */
@@ -786,7 +845,20 @@ export function buildDependencyGraph(projectPath: string, options?: { targetId?:
   const targetId = options?.targetId ?? path.basename(projectPath);
   const generatedAt = new Date().toISOString();
   const pkgJson = readPackageJson(projectPath);
+  const { result, ecosystem, lockfilePath } = detectLockfileSource(projectPath, pkgJson);
+  if (!result) {
+    const emptyLockfile: LockfileStatus = { present: false, consistent: false, integrityVerified: false };
+    return { schemaVersion: 1, targetId, ecosystem, nodes: [], edges: [], lockfile: emptyLockfile, generatedAt };
+  }
+  const lockfile = buildLockfileStatus(result, lockfilePath);
+  return { schemaVersion: 1, targetId, ecosystem, nodes: result.nodes, edges: result.edges, lockfile, generatedAt };
+}
 
+/** 探测锁文件来源并构建图谱（优先级：pnpm → npm → yarn → poetry → Pipfile → pyproject → requirements） */
+function detectLockfileSource(
+  projectPath: string,
+  pkgJson: DirectDeps | null,
+): { result: BuildResult | null; ecosystem: Ecosystem; lockfilePath: string | null } {
   const pnpmLockPath = safeJoin(projectPath, 'pnpm-lock.yaml');
   const npmLockPath = safeJoin(projectPath, 'package-lock.json');
   const yarnLockPath = safeJoin(projectPath, 'yarn.lock');
@@ -795,46 +867,37 @@ export function buildDependencyGraph(projectPath: string, options?: { targetId?:
   const pyprojectPath = safeJoin(projectPath, 'pyproject.toml');
   const requirementsPath = safeJoin(projectPath, 'requirements.txt');
 
-  let result: BuildResult | null = null;
-  let ecosystem: Ecosystem = 'npm';
-  let lockfilePath: string | null = null;
-
   if (fs.existsSync(pnpmLockPath)) {
-    lockfilePath = pnpmLockPath;
-    result = buildPnpmGraph(pnpmLockPath);
-  } else if (fs.existsSync(npmLockPath)) {
-    lockfilePath = npmLockPath;
-    result = buildNpmLockGraph(npmLockPath, pkgJson);
-  } else if (fs.existsSync(yarnLockPath)) {
-    lockfilePath = yarnLockPath;
-    result = buildYarnGraph(yarnLockPath, pkgJson);
-  } else if (fs.existsSync(poetryLockPath)) {
-    ecosystem = 'pip';
-    lockfilePath = poetryLockPath;
-    result = buildPoetryGraph(poetryLockPath, projectPath);
-  } else if (fs.existsSync(pipfileLockPath)) {
-    ecosystem = 'pip';
-    lockfilePath = pipfileLockPath;
-    result = buildPipfileGraph(pipfileLockPath);
-  } else if (fs.existsSync(pyprojectPath)) {
-    ecosystem = 'pip';
-    result = buildPyprojectGraph(pyprojectPath);
-  } else if (fs.existsSync(requirementsPath)) {
-    ecosystem = 'pip';
-    result = buildRequirementsGraph(requirementsPath);
-  } else {
-    ecosystem = pkgJson ? 'npm' : 'mixed';
+    return { result: buildPnpmGraph(pnpmLockPath), ecosystem: 'npm', lockfilePath: pnpmLockPath };
   }
-
-  if (!result) {
-    const emptyLockfile: LockfileStatus = { present: false, consistent: false, integrityVerified: false };
-    return { schemaVersion: 1, targetId, ecosystem, nodes: [], edges: [], lockfile: emptyLockfile, generatedAt };
+  if (fs.existsSync(npmLockPath)) {
+    return { result: buildNpmLockGraph(npmLockPath, pkgJson), ecosystem: 'npm', lockfilePath: npmLockPath };
   }
+  if (fs.existsSync(yarnLockPath)) {
+    return { result: buildYarnGraph(yarnLockPath, pkgJson), ecosystem: 'npm', lockfilePath: yarnLockPath };
+  }
+  if (fs.existsSync(poetryLockPath)) {
+    return { result: buildPoetryGraph(poetryLockPath, projectPath), ecosystem: 'pip', lockfilePath: poetryLockPath };
+  }
+  if (fs.existsSync(pipfileLockPath)) {
+    return { result: buildPipfileGraph(pipfileLockPath), ecosystem: 'pip', lockfilePath: pipfileLockPath };
+  }
+  if (fs.existsSync(pyprojectPath)) {
+    return { result: buildPyprojectGraph(pyprojectPath), ecosystem: 'pip', lockfilePath: null };
+  }
+  if (fs.existsSync(requirementsPath)) {
+    return { result: buildRequirementsGraph(requirementsPath), ecosystem: 'pip', lockfilePath: null };
+  }
+  return { result: null, ecosystem: pkgJson ? 'npm' : 'mixed', lockfilePath: null };
+}
 
-  // 完整性校验：全部节点均带 integrity 视为通过
+/** 组装 LockfileStatus：完整性 / 一致性 / lastModified */
+function buildLockfileStatus(result: BuildResult, lockfilePath: string | null): LockfileStatus {
   const integrityVerified =
     result.nodes.length > 0 && result.nodes.every((node) => node.integrity !== undefined);
-
+  const consistent =
+    result.present &&
+    result.nodes.filter((node) => node.kind === 'direct').every((node) => satisfiesVersion(node.version, node.declaredRange));
   let lastModified: string | undefined;
   if (result.present && lockfilePath) {
     try {
@@ -843,13 +906,10 @@ export function buildDependencyGraph(projectPath: string, options?: { targetId?:
       // 无法 stat 时省略 lastModified
     }
   }
-
-  const lockfile: LockfileStatus = {
+  return {
     present: result.present,
-    consistent: result.present,
+    consistent,
     integrityVerified,
     ...(lastModified !== undefined ? { lastModified } : {}),
   };
-
-  return { schemaVersion: 1, targetId, ecosystem, nodes: result.nodes, edges: result.edges, lockfile, generatedAt };
 }

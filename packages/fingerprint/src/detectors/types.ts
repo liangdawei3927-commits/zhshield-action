@@ -49,20 +49,17 @@ export function frameworkSignalsFromDeps(
   const signals: Signal[] = [];
   for (const entry of frameworksByLanguage) {
     for (const candidate of entry.frameworks) {
-      for (const keyword of candidate.keywords) {
-        if (deps.has(keyword)) {
-          signals.push(
-            makeSignal(
-              'manifest',
-              `manifest:framework:${slugify(candidate.name)}`,
-              manifestRelPath,
-              weight,
-              { framework: candidate.name, dependency: keyword, language: entry.language },
-            ),
-          );
-          break; // 每框架只出一条信号
-        }
-      }
+      const keyword = candidate.keywords.find((kw) => deps.has(kw));
+      if (keyword === undefined) continue;
+      signals.push(
+        makeSignal(
+          'manifest',
+          `manifest:framework:${slugify(candidate.name)}`,
+          manifestRelPath,
+          weight,
+          { framework: candidate.name, dependency: keyword, language: entry.language },
+        ),
+      );
     }
   }
   return signals;

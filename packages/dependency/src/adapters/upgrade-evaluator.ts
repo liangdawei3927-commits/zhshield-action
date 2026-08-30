@@ -248,7 +248,6 @@ function scanAffectedFiles(projectRoot: string, packageName: string, scanLimit: 
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
-      // 目录不可读时跳过
       return;
     }
     for (const entry of entries) {
@@ -261,19 +260,23 @@ function scanAffectedFiles(projectRoot: string, packageName: string, scanLimit: 
       }
       if (scanned >= scanLimit) return;
       scanned++;
-      let content: string;
-      try {
-        content = fs.readFileSync(full, 'utf-8');
-      } catch {
-        // 文件不可读时跳过
-        continue;
-      }
-      if (importRe.test(content)) affected.push(path.relative(projectRoot, full));
+      collectIfImports(full, importRe, affected, projectRoot);
     }
   };
 
   walk(srcDir);
   return affected;
+}
+
+/** 读取文件并检测是否 import 目标包；命中则记录相对路径 */
+function collectIfImports(full: string, importRe: RegExp, affected: string[], projectRoot: string): void {
+  let content: string;
+  try {
+    content = fs.readFileSync(full, 'utf-8');
+  } catch {
+    return;
+  }
+  if (importRe.test(content)) affected.push(path.relative(projectRoot, full));
 }
 
 /** 按附 B.4 排序：securityRelevant 置顶 → 风险低者优先 → 落后最久优先 */
@@ -293,24 +296,32 @@ export class UpgradeEvaluatorImpl implements UpgradeEvaluator {
     const entries = this.catalog[node.name] ?? [];
     const scanLimit = options?.scanLimit ?? DEFAULT_SCAN_LIMIT;
     const projectRoot = options?.projectRoot;
-
-    // code-scan：仅在提供 projectRoot 且 scanLimit > 0 时执行（防 DoS）
-    let affectedFiles: string[] = [];
-    if (projectRoot && scanLimit > 0) {
-      affectedFiles = scanAffectedFiles(projectRoot, node.name, scanLimit);
-    }
-
-    const candidates: UpgradeCandidate[] = entries
-      .filter((entry) => compareVersions(node.version, entry.targetVersion) < 0)
-      .map((entry) => ({
-        targetVersion: entry.targetVersion,
-        risk: entry.risk,
-        securityRelevant: entry.securityRelevant,
-        reason: entry.reason,
-        breakingChanges: entry.breakingChanges.map((note) => ({ ...note, affectedFiles })),
-      }))
-      .sort((a, b) => compareCandidates(node.version, a, b));
-
+    const affectedFiles = collectAffectedFiles(projectRoot, node.name, scanLimit);
+    const candidates = buildCandidates(node, entries, affectedFiles);
     return { nodeId: node.id, candidates };
   }
+}
+
+/** code-scan：仅在提供 projectRoot 且 scanLimit > 0 时执行（防 DoS） */
+function collectAffectedFiles(projectRoot: string | undefined, packageName: string, scanLimit: number): string[] {
+  if (!projectRoot || scanLimit <= 0) return [];
+  return scanAffectedFiles(projectRoot, packageName, scanLimit);
+}
+
+/** 过滤落后版本条目并映射为候选，按附 B.4 排序 */
+function buildCandidates(
+  node: DependencyNode,
+  entries: CatalogEntry[],
+  affectedFiles: string[],
+): UpgradeCandidate[] {
+  return entries
+    .filter((entry) => compareVersions(node.version, entry.targetVersion) < 0)
+    .map((entry) => ({
+      targetVersion: entry.targetVersion,
+      risk: entry.risk,
+      securityRelevant: entry.securityRelevant,
+      reason: entry.reason,
+      breakingChanges: entry.breakingChanges.map((note) => ({ ...note, affectedFiles })),
+    }))
+    .sort((a, b) => compareCandidates(node.version, a, b));
 }

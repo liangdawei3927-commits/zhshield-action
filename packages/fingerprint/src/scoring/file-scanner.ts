@@ -55,39 +55,48 @@ export function scanProject(projectRoot: string, opts: ScanOptions = {}): ScanRe
   const maxFiles = opts.maxFiles ?? DEFAULT_MAX_FILES;
   const ignoreDirs = new Set([...DEFAULT_IGNORE_DIRS, ...(opts.ignoreDirs ?? [])]);
 
+  const { files, fileSet } = walkDirectoryTree(projectRoot, { maxDepth, maxFiles, ignoreDirs });
+
+  return { projectRoot, files, fileSet, configCache: new Map() };
+}
+
+function walkDirectoryTree(
+  projectRoot: string,
+  limits: { maxDepth: number; maxFiles: number; ignoreDirs: Set<string> },
+): { files: string[]; fileSet: Set<string> } {
   const files: string[] = [];
   const fileSet = new Set<string>();
-  const configCache = new Map<string, string | null>();
-
   const stack: Array<{ dir: string; rel: string; depth: number }> = [
     { dir: projectRoot, rel: '', depth: 0 },
   ];
 
-  while (stack.length > 0 && files.length < maxFiles) {
+  while (stack.length > 0 && files.length < limits.maxFiles) {
     const { dir, rel, depth } = stack.pop()!;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
+    const entries = readDirEntries(dir);
+    if (!entries) continue;
     for (const entry of entries) {
       if (entry.name === '.' || entry.name === '..') continue;
-      if (files.length >= maxFiles) break;
+      if (files.length >= limits.maxFiles) break;
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-
-      if (entry.isDirectory()) {
-        if (ignoreDirs.has(entry.name) || depth >= maxDepth) continue;
+      if (entry.isDirectory() && !limits.ignoreDirs.has(entry.name) && depth < limits.maxDepth) {
         stack.push({ dir: safeJoin(dir, entry.name), rel: childRel, depth: depth + 1 });
-      } else if (entry.isFile()) {
-        files.push(childRel);
-        fileSet.add(childRel);
+        continue;
       }
+      if (!entry.isFile()) continue;
+      files.push(childRel);
+      fileSet.add(childRel);
     }
   }
 
-  return { projectRoot, files, fileSet, configCache };
+  return { files, fileSet };
+}
+
+function readDirEntries(dir: string): fs.Dirent[] | null {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
 }
 
 /**

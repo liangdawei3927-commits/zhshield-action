@@ -84,6 +84,19 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
   const signals: ProfileSignal[] = [];
 
   // --- Node 生态 ---
+  pushNodeFrameworkSignals(scan, signals);
+  // --- 小程序特征文件 ---
+  pushWeappSignal(scan, signals);
+  // --- 其他语言依赖（Go / Python / Rust / JVM）---
+  pushGoFrameworkSignal(scan, signals);
+  pushPythonFrameworkSignal(scan, signals);
+  pushRustFrameworkSignal(scan, signals);
+  pushJvmFrameworkSignal(scan, signals);
+
+  return signals;
+}
+
+function pushNodeFrameworkSignals(scan: ScanResult, signals: ProfileSignal[]): void {
   const pkgContent = readConfig(scan, 'package.json');
   if (pkgContent) {
     const depText = extractNodeDeps(pkgContent);
@@ -108,8 +121,9 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       // ignore
     }
   }
+}
 
-  // --- 小程序特征文件 ---
+function pushWeappSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'project.config.json')) {
     signals.push({
       file: 'project.config.json',
@@ -118,8 +132,9 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       inferred: { framework: 'weapp', type: 'mini-program' },
     });
   }
+}
 
-  // --- Go ---
+function pushGoFrameworkSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   const goMod = readConfig(scan, 'go.mod');
   if (goMod) {
     const fw = matchDeps(goMod, GO_DEPS);
@@ -132,8 +147,9 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
-  // --- Python ---
+function pushPythonFrameworkSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   const pyConfig = readConfig(scan, 'requirements.txt') ?? readConfig(scan, 'pyproject.toml');
   if (pyConfig) {
     const pyFile = hasFile(scan, 'requirements.txt') ? 'requirements.txt' : 'pyproject.toml';
@@ -147,8 +163,9 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
-  // --- Rust ---
+function pushRustFrameworkSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   const cargo = readConfig(scan, 'Cargo.toml');
   if (cargo) {
     const fw = matchDeps(cargo, RUST_DEPS);
@@ -161,8 +178,9 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
-  // --- JVM ---
+function pushJvmFrameworkSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   const pom = readConfig(scan, 'pom.xml');
   if (pom) {
     const fw = matchDeps(pom, JVM_DEPS);
@@ -175,6 +193,4 @@ export function detectFramework(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
-
-  return signals;
 }

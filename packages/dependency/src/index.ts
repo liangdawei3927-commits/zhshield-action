@@ -17,6 +17,7 @@ export type {
   TyposquatFinding,
   TyposquatSignals,
 } from './adapters/typosquat-detector';
+export { resolveProjectRoot } from './adapters/project-root';
 export { LockfileVerifierImpl, lockfileVerifier } from './adapters/lockfile-verifier';
 export type {
   LockfileVerifier,

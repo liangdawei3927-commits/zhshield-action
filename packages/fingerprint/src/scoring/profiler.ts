@@ -51,6 +51,79 @@ function hasConfigFileEvidence(signals: ProfileSignal[], field: InferableField):
   return signals.some((s) => s.kind === 'config-file' && s.inferred[field] !== undefined);
 }
 
+/** 运行单个探测器并对其字段做加权投票 */
+function detectField<T extends string>(
+  scan: ScanResult,
+  detector: (s: ScanResult) => ProfileSignal[],
+  field: InferableField,
+  fallback: T,
+): { value: T; signals: ProfileSignal[] } {
+  const signals = detector(scan);
+  return { value: voteField<T>(signals, field) ?? fallback, signals };
+}
+
+interface DetectedFields {
+  allSignals: ProfileSignal[];
+  language: ProjectLanguage;
+  framework: ProjectFramework;
+  type: ProjectType;
+  packageManager: PackageManager;
+  runtime: Runtime;
+}
+
+/** 依次探测语言 / 框架 / 类型 / 包管理器 / 运行时，并汇总全部信号 */
+function detectFieldSignals(scan: ScanResult): DetectedFields {
+  const allSignals: ProfileSignal[] = [];
+  const language = detectField<ProjectLanguage>(scan, detectLanguage, 'language', 'unknown');
+  allSignals.push(...language.signals);
+  const framework = detectField<ProjectFramework>(scan, detectFramework, 'framework', 'none');
+  allSignals.push(...framework.signals);
+  const type = detectField<ProjectType>(scan, (s) => detectProjectType(s, framework.value), 'type', 'unknown');
+  allSignals.push(...type.signals);
+  const packageManager = detectField<PackageManager>(scan, detectPackageManager, 'packageManager', 'unknown');
+  allSignals.push(...packageManager.signals);
+  const runtime = detectField<Runtime>(scan, (s) => detectRuntime(s, language.value, framework.value), 'runtime', 'unknown');
+  allSignals.push(...runtime.signals);
+  return {
+    allSignals,
+    language: language.value,
+    framework: framework.value,
+    type: type.value,
+    packageManager: packageManager.value,
+    runtime: runtime.value,
+  };
+}
+
+/** monorepo 下对每个子包做轻量画像；非 monorepo 返回 undefined */
+function detectModules(scan: ScanResult, type: ProjectType): ModuleProfile[] | undefined {
+  if (type !== 'monorepo') return undefined;
+  const modulePaths = discoverModules(scan);
+  return modulePaths
+    .map((p) => profileModule(scan, p))
+    .filter((m): m is ModuleProfile => m !== null);
+}
+
+/** 置信度：有 config-file 铁证的字段占比 */
+function computeConfidence(allSignals: ProfileSignal[]): number {
+  const evidencedFields = ALL_FIELDS.filter((f) => hasConfigFileEvidence(allSignals, f)).length;
+  return Math.round((evidencedFields / ALL_FIELDS.length) * 10) / 10;
+}
+
+/** 低置信 / 未识别字段告警 */
+function buildWarnings(
+  language: ProjectLanguage,
+  framework: ProjectFramework,
+  type: ProjectType,
+  confidence: number,
+): string[] {
+  const warnings: string[] = [];
+  if (language === 'unknown') warnings.push('未能识别项目主语言');
+  if (framework === 'none') warnings.push('未探测到具体框架');
+  if (type === 'unknown') warnings.push('未能判定项目类型');
+  if (confidence < 0.4) warnings.push(`探测置信度偏低 (${confidence})，建议人工核对画像`);
+  return warnings;
+}
+
 /**
  * 轻量模块画像 — monorepo 下对每个子包做 language/framework/type 探测。
  * 不递归嵌套 monorepo，不收集完整 signals（控制成本）。
@@ -60,17 +133,26 @@ function profileModule(scan: ScanResult, moduleRel: string): ModuleProfile | nul
   if (!fs.existsSync(moduleRoot)) return null;
 
   const subScan = scanProject(moduleRoot, { maxDepth: 8, maxFiles: 5000 });
-  const langSignals = detectLanguage(subScan);
-  const language = voteField<ProjectLanguage>(langSignals, 'language') ?? 'unknown';
-
-  // framework 需要先有 language，再探测
-  const fwSignals = detectFramework(subScan);
-  const framework = voteField<ProjectFramework>(fwSignals, 'framework') ?? 'none';
-
-  const typeSignals = detectProjectType(subScan, framework);
-  const type = voteField<ProjectType>(typeSignals, 'type') ?? 'unknown';
+  const language = detectModuleLanguage(subScan);
+  const framework = detectModuleFramework(subScan);
+  const type = detectModuleType(subScan, framework);
 
   return { path: moduleRel, language, framework, type };
+}
+
+function detectModuleLanguage(subScan: ScanResult): ProjectLanguage {
+  const langSignals = detectLanguage(subScan);
+  return voteField<ProjectLanguage>(langSignals, 'language') ?? 'unknown';
+}
+
+function detectModuleFramework(subScan: ScanResult): ProjectFramework {
+  const fwSignals = detectFramework(subScan);
+  return voteField<ProjectFramework>(fwSignals, 'framework') ?? 'none';
+}
+
+function detectModuleType(subScan: ScanResult, framework: ProjectFramework): ProjectType {
+  const typeSignals = detectProjectType(subScan, framework);
+  return voteField<ProjectType>(typeSignals, 'type') ?? 'unknown';
 }
 
 /**
@@ -89,6 +171,15 @@ const MODULE_SCAN_SKIP = new Set([
   '.output',
 ]);
 
+function collectModuleEntries(dir: string, entries: fs.Dirent[], result: string[]): void {
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    if (e.name.startsWith('.')) continue;
+    if (MODULE_SCAN_SKIP.has(e.name)) continue;
+    result.push(`${dir}/${e.name}`);
+  }
+}
+
 function discoverModules(scan: ScanResult): string[] {
   const moduleDirs = ['packages', 'apps', 'services', 'libs', 'modules'];
   const result: string[] = [];
@@ -96,13 +187,7 @@ function discoverModules(scan: ScanResult): string[] {
     const abs = safeJoin(scan.projectRoot, dir);
     if (!fs.existsSync(abs)) continue;
     try {
-      const entries = fs.readdirSync(abs, { withFileTypes: true });
-      for (const e of entries) {
-        if (!e.isDirectory()) continue;
-        if (e.name.startsWith('.')) continue;
-        if (MODULE_SCAN_SKIP.has(e.name)) continue;
-        result.push(`${dir}/${e.name}`);
-      }
+      collectModuleEntries(dir, fs.readdirSync(abs, { withFileTypes: true }), result);
     } catch {
       // ignore
     }
@@ -116,8 +201,6 @@ export class ProjectProfiler {
    * 错误容忍：任何异常都不抛出，降级为 unknown 画像 + warning。
    */
   profileSync(projectRoot: string): ScoringProfileResult {
-    const warnings: string[] = [];
-
     // 根目录不存在 → 降级
     if (!fs.existsSync(projectRoot)) {
       return {
@@ -125,7 +208,6 @@ export class ProjectProfiler {
         warnings: [`项目根目录不存在: ${projectRoot}`],
       };
     }
-
     let scan: ScanResult;
     try {
       scan = scanProject(projectRoot);
@@ -135,54 +217,10 @@ export class ProjectProfiler {
         warnings: [`文件扫描失败: ${err instanceof Error ? err.message : String(err)}`],
       };
     }
-
-    const allSignals: ProfileSignal[] = [];
-
-    // 1. 语言
-    const langSignals = detectLanguage(scan);
-    allSignals.push(...langSignals);
-    const language = voteField<ProjectLanguage>(langSignals, 'language') ?? 'unknown';
-
-    // 2. 框架（需先有 language，部分框架探测依赖语言上下文）
-    const fwSignals = detectFramework(scan);
-    allSignals.push(...fwSignals);
-    const framework = voteField<ProjectFramework>(fwSignals, 'framework') ?? 'none';
-
-    // 3. 项目类型（需先有 framework）
-    const typeSignals = detectProjectType(scan, framework);
-    allSignals.push(...typeSignals);
-    const type = voteField<ProjectType>(typeSignals, 'type') ?? 'unknown';
-
-    // 4. 包管理器
-    const pmSignals = detectPackageManager(scan);
-    allSignals.push(...pmSignals);
-    const packageManager = voteField<PackageManager>(pmSignals, 'packageManager') ?? 'unknown';
-
-    // 5. 运行时（需先有 language + framework）
-    const rtSignals = detectRuntime(scan, language, framework);
-    allSignals.push(...rtSignals);
-    const runtime = voteField<Runtime>(rtSignals, 'runtime') ?? 'unknown';
-
-    // 6. monorepo 判定
-    const isMonorepo = type === 'monorepo';
-    let modules: ModuleProfile[] | undefined;
-    if (isMonorepo) {
-      const modulePaths = discoverModules(scan);
-      modules = modulePaths
-        .map((p) => profileModule(scan, p))
-        .filter((m): m is ModuleProfile => m !== null);
-    }
-
-    // 7. 置信度：有 config-file 铁证的字段占比
-    const evidencedFields = ALL_FIELDS.filter((f) => hasConfigFileEvidence(allSignals, f)).length;
-    const confidence = Math.round((evidencedFields / ALL_FIELDS.length) * 10) / 10;
-
-    // 8. 低置信/未识别告警
-    if (language === 'unknown') warnings.push('未能识别项目主语言');
-    if (framework === 'none') warnings.push('未探测到具体框架');
-    if (type === 'unknown') warnings.push('未能判定项目类型');
-    if (confidence < 0.4) warnings.push(`探测置信度偏低 (${confidence})，建议人工核对画像`);
-
+    const { allSignals, language, framework, type, packageManager, runtime } = detectFieldSignals(scan);
+    const modules = detectModules(scan, type);
+    const confidence = computeConfidence(allSignals);
+    const warnings = buildWarnings(language, framework, type, confidence);
     const profile: ScoringProjectProfile = {
       version: PROFILE_VERSION,
       projectRoot,
@@ -192,14 +230,13 @@ export class ProjectProfiler {
       type,
       runtime,
       packageManager,
-      isMonorepo,
+      isMonorepo: type === 'monorepo',
       detectedFiles: this.collectDetectedFiles(allSignals),
       confidence,
       detectedAt: new Date(),
       modules,
       signals: allSignals,
     };
-
     return { profile, warnings };
   }
 
@@ -249,7 +286,7 @@ export class ProjectProfiler {
         files.add(s.file);
       }
     }
-    return [...files].sort();
+    return Array.from(files, (f) => f).toSorted();
   }
 }
 

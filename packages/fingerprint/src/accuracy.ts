@@ -60,6 +60,17 @@ function evaluateDetector(
   assertions: readonly GoldenAssertion[],
   detections: ReadonlyArray<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
 ): DetectorEvaluation {
+  const { truePositives, matchedCount } = countTruePositives(detections, assertions);
+  const falsePositives = detections.length - truePositives;
+  const falseNegatives = assertions.length - matchedCount;
+  const { precision, recall } = computeRates(truePositives, detections.length, assertions.length);
+  return { detectorId, truePositives, falsePositives, falseNegatives, precision, recall };
+}
+
+function countTruePositives(
+  detections: ReadonlyArray<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
+  assertions: readonly GoldenAssertion[],
+): { truePositives: number; matchedCount: number } {
   const matchedAssertionIndices = new Set<number>();
   let truePositives = 0;
 
@@ -73,13 +84,17 @@ function evaluateDetector(
     }
   }
 
-  const falsePositives = detections.length - truePositives;
-  const falseNegatives = assertions.length - matchedAssertionIndices.size;
+  return { truePositives, matchedCount: matchedAssertionIndices.size };
+}
 
-  const precision = detections.length > 0 ? truePositives / detections.length : 0;
-  const recall = assertions.length > 0 ? truePositives / assertions.length : 0;
-
-  return { detectorId, truePositives, falsePositives, falseNegatives, precision, recall };
+function computeRates(
+  truePositives: number,
+  totalDetections: number,
+  totalAssertions: number,
+): { precision: number; recall: number } {
+  const precision = totalDetections > 0 ? truePositives / totalDetections : 0;
+  const recall = totalAssertions > 0 ? truePositives / totalAssertions : 0;
+  return { precision, recall };
 }
 
 /** 计算评估列表的宏平均值 */
@@ -103,7 +118,16 @@ export function evaluateAccuracy(
   assertions: readonly GoldenAssertion[],
   detected: ReadonlyArray<{ readonly file: string; readonly detectorId: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
 ): AccuracyReport {
-  // 按 detectorId 分组
+  const grouped = groupByDetector(detected);
+  const evaluations = evaluateAll(grouped, assertions);
+  const { precision: overallPrecision, recall: overallRecall } = macroAverage(evaluations);
+  const passesThresholds = computeThresholds(evaluations);
+  return { evaluations, overallPrecision, overallRecall, passesThresholds };
+}
+
+function groupByDetector(
+  detected: ReadonlyArray<{ readonly file: string; readonly detectorId: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
+): Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>> {
   const grouped = new Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>>();
   for (const det of detected) {
     const group = grouped.get(det.detectorId);
@@ -113,30 +137,30 @@ export function evaluateAccuracy(
       grouped.set(det.detectorId, [det]);
     }
   }
+  return grouped;
+}
 
-  // 逐探测器计算
+function evaluateAll(
+  grouped: Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>>,
+  assertions: readonly GoldenAssertion[],
+): DetectorEvaluation[] {
   const evaluations: DetectorEvaluation[] = [];
   for (const [detectorId, detections] of grouped) {
     evaluations.push(evaluateDetector(detectorId, assertions, detections));
   }
+  return evaluations;
+}
 
-  // 宏平均
-  const { precision: overallPrecision, recall: overallRecall } = macroAverage(evaluations);
-
-  // 阈值判定（分类：语言 vs 形态）
+function computeThresholds(evaluations: readonly DetectorEvaluation[]): boolean {
   const langEvals = evaluations.filter((e) => !isFormDetector(e.detectorId));
   const formEvals = evaluations.filter((e) => isFormDetector(e.detectorId));
-
-  // 无对应评估时视为 vacuous truth（通过）
   const langAvg = langEvals.length > 0 ? macroAverage(langEvals) : { precision: 1, recall: 1 };
   const formAvg = formEvals.length > 0 ? macroAverage(formEvals) : { precision: 1, recall: 1 };
-
-  const passesThresholds =
+  return (
     langAvg.precision >= LANGUAGE_PRECISION_THRESHOLD &&
     langAvg.recall >= LANGUAGE_RECALL_THRESHOLD &&
-    formAvg.precision >= FORM_PRECISION_THRESHOLD;
-
-  return { evaluations, overallPrecision, overallRecall, passesThresholds };
+    formAvg.precision >= FORM_PRECISION_THRESHOLD
+  );
 }
 
 /**
@@ -152,12 +176,10 @@ export function loadGoldenDir(dirPath: string): GoldenAssertion[] {
     const goldenPath = path.join(dirPath, entry.name, 'golden.json');
     if (!fs.existsSync(goldenPath)) continue;
     const raw: unknown = JSON.parse(fs.readFileSync(goldenPath, 'utf-8'));
-    if (Array.isArray(raw)) {
-      for (const item of raw) {
-        if (isGoldenAssertion(item)) {
-          assertions.push(item);
-        }
-      }
+    if (!Array.isArray(raw)) continue;
+    for (const item of raw) {
+      if (!isGoldenAssertion(item)) continue;
+      assertions.push(item);
     }
   }
 

@@ -319,15 +319,23 @@ describe('Sentinel Events CRUD', () => {
   });
 });
 
-describe('Foreign key enforcement', () => {
+describe('Foreign key relaxation', () => {
   let db: Database.Database;
 
   beforeEach(() => { db = createTestDb(); });
 
-  it('should reject score for non-existent project', () => {
+  it('should accept score for project without projects row (008_relax_fk)', () => {
+    saveScore(db, { projectId: 'nonexistent', overall: 85, grade: 'B', dimensions: '{}', trend: 'improving' });
+
+    const score = getLatestScore(db, 'nonexistent');
+    expect(score).toBeDefined();
+    expect(score!.overall).toBe(85);
+  });
+
+  it('should accept scanning result for project without projects row (008_relax_fk)', () => {
     expect(() => {
-      saveScore(db, { projectId: 'nonexistent', overall: 85, grade: 'B', dimensions: '{}', trend: 'improving' });
-    }).toThrow();
+      saveScanResult(db, { projectId: 'nonexistent', source: 'eslint', passed: true, summary: 'OK' });
+    }).not.toThrow();
   });
 });
 

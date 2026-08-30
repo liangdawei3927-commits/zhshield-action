@@ -6,6 +6,7 @@ import type {
   LanguageId,
   ProductFormId,
   ArchitectureForm,
+  MatchResult,
 } from './types';
 
 // ─── 常量 ───
@@ -75,6 +76,128 @@ export interface RuleServes {
   readonly architectures: readonly ArchitectureForm[];
 }
 
+// ─── 问题构建辅助（纯函数） ───
+
+function buildArchitectureOptions(architecture: MatchResult<ArchitectureForm>): QuestionOption[] {
+  const options: QuestionOption[] = [
+    { value: 'monolith', label: '单体架构', description: '所有代码在一个部署单元中' },
+    { value: 'modular-monolith', label: '模块化单体', description: '代码在一个部署单元中，但模块边界清晰' },
+    { value: 'microservices', label: '微服务架构', description: '多个独立部署的服务' },
+  ];
+  const recommendedIndex = options.findIndex((o) => o.value === architecture.value);
+  if (recommendedIndex >= 0) {
+    options[recommendedIndex] = { ...options[recommendedIndex], recommended: true };
+  }
+  return options;
+}
+
+function buildArchitectureQuestion(
+  profile: ProjectProfile,
+  architecture: MatchResult<ArchitectureForm>,
+  options: QuestionOption[],
+): Question {
+  return {
+    id: 'architecture-confirm',
+    type: 'architecture',
+    title: '项目架构形态',
+    description: '请选择项目的主要架构形态',
+    priority: 'required',
+    options,
+    currentValue: architecture.value,
+    signals: architecture.signals.map((s) => s.ruleId),
+    reason: profile.lastConfirmedAt === undefined
+      ? '首次注册，需要确认架构形态'
+      : `架构形态置信度较低 (${(architecture.confidence * 100).toFixed(0)}%)`,
+  };
+}
+
+function buildFormOptions(forms: readonly ProductFormId[], current: ProductFormId): QuestionOption[] {
+  return forms.map((form) => ({
+    value: form,
+    label: getFormLabel(form),
+    recommended: form === current,
+  }));
+}
+
+function buildFormQuestion(productForm: MatchResult<ProductFormId>, options: QuestionOption[]): Question {
+  return {
+    id: 'form-confirm',
+    type: 'form',
+    title: '项目交付物形态',
+    description: '请选择项目的主要交付物形态',
+    priority: 'optional',
+    options,
+    currentValue: productForm.value,
+    signals: productForm.signals.map((s) => s.ruleId),
+    reason: `形态判定置信度较低 (${(productForm.confidence * 100).toFixed(0)}%)，可选确认`,
+  };
+}
+
+function buildFrameworkQuestion(frameworks: readonly MatchResult<string>[]): Question {
+  const options: QuestionOption[] = frameworks.map((f) => ({
+    value: f.value,
+    label: f.value,
+    recommended: true,
+  }));
+  return {
+    id: 'framework-confirm',
+    type: 'framework',
+    title: '项目框架',
+    description: '以下框架判定置信度较低，请确认',
+    priority: 'recommended',
+    options,
+    signals: frameworks.flatMap((f) => f.signals.map((s) => s.ruleId)),
+    reason: `框架判定置信度较低`,
+  };
+}
+
+function getLanguageLabel(language: LanguageId): string {
+  const labels: Record<string, string> = {
+    typescript: 'TypeScript',
+    javascript: 'JavaScript',
+    python: 'Python',
+    java: 'Java',
+    go: 'Go',
+    rust: 'Rust',
+    csharp: 'C#',
+    php: 'PHP',
+    ruby: 'Ruby',
+    kotlin: 'Kotlin',
+    swift: 'Swift',
+    c: 'C',
+    cpp: 'C++',
+    dart: 'Dart',
+    shell: 'Shell',
+  };
+  return labels[language] ?? language;
+}
+
+function getFormLabel(form: ProductFormId): string {
+  const labels: Record<string, string> = {
+    website: '官网',
+    admin: '后台管理',
+    mobile: '移动端',
+    miniapp: '小程序',
+    pc: 'PC 桌面端',
+    ios: 'iOS',
+    android: 'Android',
+    h5: 'H5/Web',
+    backend: '后端服务',
+  };
+  return labels[form] ?? form;
+}
+
+function getEnvironmentLabel(env: string): string {
+  const labels: Record<string, string> = {
+    node: 'Node.js',
+    python: 'Python',
+    docker: 'Docker',
+    ci: 'CI/CD',
+    browser: '浏览器',
+  };
+  return labels[env] ?? env;
+}
+
 // ─── QuestionSet 类 ───
 
 export class QuestionSet {
@@ -91,39 +214,22 @@ export class QuestionSet {
    */
   generate(profile: ProjectProfile): readonly Question[] {
     const questions: Question[] = [];
-
     // 1. 架构形态问题（首次注册必选；或置信度 < 0.7）
-    const architectureQuestion = this.generateArchitectureQuestion(profile);
-    if (architectureQuestion !== undefined) {
-      questions.push(architectureQuestion);
-    }
-
+    this.pushIfDefined(questions, this.generateArchitectureQuestion(profile));
     // 2. 语言问题（置信度阶梯触发）
-    const languageQuestion = this.generateLanguageQuestion(profile);
-    if (languageQuestion !== undefined) {
-      questions.push(languageQuestion);
-    }
-
+    this.pushIfDefined(questions, this.generateLanguageQuestion(profile));
     // 3. 产品形态问题（高置信直接判定不确认；低置信可选确认）
-    const formQuestion = this.generateFormQuestion(profile);
-    if (formQuestion !== undefined) {
-      questions.push(formQuestion);
-    }
-
+    this.pushIfDefined(questions, this.generateFormQuestion(profile));
     // 4. 环境问题（非阻断）
-    const environmentQuestion = this.generateEnvironmentQuestion(profile);
-    if (environmentQuestion !== undefined) {
-      questions.push(environmentQuestion);
-    }
-
+    this.pushIfDefined(questions, this.generateEnvironmentQuestion(profile));
     // 5. 框架问题（低置信度时）
-    const frameworkQuestion = this.generateFrameworkQuestion(profile);
-    if (frameworkQuestion !== undefined) {
-      questions.push(frameworkQuestion);
-    }
-
+    this.pushIfDefined(questions, this.generateFrameworkQuestion(profile));
     // 按优先级排序：required > recommended > optional
     return this.sortByPriority(questions);
+  }
+
+  private pushIfDefined(questions: Question[], question: Question | undefined): void {
+    if (question !== undefined) questions.push(question);
   }
 
   /**
@@ -150,70 +256,23 @@ export class QuestionSet {
   /** 生成架构形态问题 */
   private generateArchitectureQuestion(profile: ProjectProfile): Question | undefined {
     const { architecture } = profile;
-
-    // 首次注册必选；或置信度 < 0.7（架构文档 §7.1）
     const needsQuestion = profile.lastConfirmedAt === undefined || architecture.confidence < 0.7;
-
     if (!needsQuestion) return undefined;
-
-    // 检查规则库是否支持架构维度
     if (this.serves.architectures.length === 0) return undefined;
-
-    const options: QuestionOption[] = [
-      { value: 'monolith', label: '单体架构', description: '所有代码在一个部署单元中' },
-      { value: 'modular-monolith', label: '模块化单体', description: '代码在一个部署单元中，但模块边界清晰' },
-      { value: 'microservices', label: '微服务架构', description: '多个独立部署的服务' },
-    ];
-
-    // 标记推荐值
-    const recommendedIndex = options.findIndex((o) => o.value === architecture.value);
-    if (recommendedIndex >= 0) {
-      options[recommendedIndex] = { ...options[recommendedIndex], recommended: true };
-    }
-
-    return {
-      id: 'architecture-confirm',
-      type: 'architecture',
-      title: '项目架构形态',
-      description: '请选择项目的主要架构形态',
-      priority: 'required',
-      options,
-      currentValue: architecture.value,
-      signals: architecture.signals.map((s) => s.ruleId),
-      reason: profile.lastConfirmedAt === undefined
-        ? '首次注册，需要确认架构形态'
-        : `架构形态置信度较低 (${(architecture.confidence * 100).toFixed(0)}%)`,
-    };
+    const options = buildArchitectureOptions(architecture);
+    return buildArchitectureQuestion(profile, architecture, options);
   }
 
   /** 生成语言问题 */
   private generateLanguageQuestion(profile: ProjectProfile): Question | undefined {
     const primaryTarget = profile.targets[0];
     if (primaryTarget === undefined) return undefined;
-
     const { language } = primaryTarget;
-
-    // 置信度阶梯触发（架构文档 §7.1）
-    // >= 0.9 高置信度：只展示不确认
-    if (language.confidence >= CONFIDENCE_THRESHOLDS.high) {
-      return undefined;
-    }
-
-    // < 0.6 低置信度：强制确认
+    if (language.confidence >= CONFIDENCE_THRESHOLDS.high) return undefined;
     if (language.confidence < CONFIDENCE_THRESHOLDS.medium) {
-      return this.makeLanguageQuestion(
-        profile,
-        'required',
-        `语言判定置信度较低 (${(language.confidence * 100).toFixed(0)}%)，需要人工确认`,
-      );
+      return this.makeLanguageQuestion(profile, 'required', `语言判定置信度较低 (${(language.confidence * 100).toFixed(0)}%)，需要人工确认`);
     }
-
-    // 0.6 ~ 0.9 中置信度：建议确认
-    return this.makeLanguageQuestion(
-      profile,
-      'recommended',
-      `语言判定置信度中等 (${(language.confidence * 100).toFixed(0)}%)，建议确认`,
-    );
+    return this.makeLanguageQuestion(profile, 'recommended', `语言判定置信度中等 (${(language.confidence * 100).toFixed(0)}%)，建议确认`);
   }
 
   /** 构建语言问题 */
@@ -225,13 +284,12 @@ export class QuestionSet {
     const primaryTarget = profile.targets[0];
     if (primaryTarget === undefined) return undefined;
 
-    // 检查规则库是否支持当前语言
     const supportedLanguages = this.serves.languages;
     if (supportedLanguages.length === 0) return undefined;
 
     const options: QuestionOption[] = supportedLanguages.map((lang) => ({
       value: lang,
-      label: this.getLanguageLabel(lang),
+      label: getLanguageLabel(lang),
       recommended: lang === primaryTarget.language.value,
     }));
 
@@ -252,42 +310,12 @@ export class QuestionSet {
   private generateFormQuestion(profile: ProjectProfile): Question | undefined {
     const primaryTarget = profile.targets[0];
     if (primaryTarget === undefined) return undefined;
-
     const { productForm } = primaryTarget;
-    if (productForm === undefined) {
-      // 无形态信号：判定 unknown，走通用检查，不确认（架构文档 §7.1）
-      return undefined;
-    }
-
-    // 检查规则库是否支持当前形态
-    if (!this.serves.productForms.includes(productForm.value)) {
-      // 规则库不支持当前形态，不确认（架构文档 §7.1）
-      return undefined;
-    }
-
-    // 高置信度：直接判定不确认（架构文档 §7.1）
-    if (productForm.confidence >= CONFIDENCE_THRESHOLDS.high) {
-      return undefined;
-    }
-
-    // 低置信度：可选确认（非阻断）
-    const options: QuestionOption[] = this.serves.productForms.map((form) => ({
-      value: form,
-      label: this.getFormLabel(form),
-      recommended: form === productForm.value,
-    }));
-
-    return {
-      id: 'form-confirm',
-      type: 'form',
-      title: '项目交付物形态',
-      description: '请选择项目的主要交付物形态',
-      priority: 'optional',
-      options,
-      currentValue: productForm.value,
-      signals: productForm.signals.map((s) => s.ruleId),
-      reason: `形态判定置信度较低 (${(productForm.confidence * 100).toFixed(0)}%)，可选确认`,
-    };
+    if (productForm === undefined) return undefined;
+    if (!this.serves.productForms.includes(productForm.value)) return undefined;
+    if (productForm.confidence >= CONFIDENCE_THRESHOLDS.high) return undefined;
+    const options = buildFormOptions(this.serves.productForms, productForm.value);
+    return buildFormQuestion(productForm, options);
   }
 
   /** 生成环境问题 */
@@ -305,7 +333,7 @@ export class QuestionSet {
       priority: 'optional',
       options: environments.map((env) => ({
         value: env,
-        label: this.getEnvironmentLabel(env),
+        label: getEnvironmentLabel(env),
       })),
       signals: profile.environments.flatMap((e) => e.signals.map((s) => s.ruleId)),
       reason: '首次扫描，展示检测到的环境',
@@ -316,86 +344,16 @@ export class QuestionSet {
   private generateFrameworkQuestion(profile: ProjectProfile): Question | undefined {
     const primaryTarget = profile.targets[0];
     if (primaryTarget === undefined) return undefined;
-
     const { frameworks } = primaryTarget;
     if (frameworks.length === 0) return undefined;
-
-    // 检查是否有低置信度的框架
     const lowConfidenceFrameworks = frameworks.filter(
       (f) => f.confidence < CONFIDENCE_THRESHOLDS.medium,
     );
-
     if (lowConfidenceFrameworks.length === 0) return undefined;
-
-    const options: QuestionOption[] = lowConfidenceFrameworks.map((f) => ({
-      value: f.value,
-      label: f.value,
-      recommended: true,
-    }));
-
-    return {
-      id: 'framework-confirm',
-      type: 'framework',
-      title: '项目框架',
-      description: '以下框架判定置信度较低，请确认',
-      priority: 'recommended',
-      options,
-      signals: lowConfidenceFrameworks.flatMap((f) => f.signals.map((s) => s.ruleId)),
-      reason: `框架判定置信度较低`,
-    };
+    return buildFrameworkQuestion(lowConfidenceFrameworks);
   }
 
   // ─── 辅助方法 ───
-
-  /** 获取语言标签 */
-  private getLanguageLabel(language: LanguageId): string {
-    const labels: Record<string, string> = {
-      typescript: 'TypeScript',
-      javascript: 'JavaScript',
-      python: 'Python',
-      java: 'Java',
-      go: 'Go',
-      rust: 'Rust',
-      csharp: 'C#',
-      php: 'PHP',
-      ruby: 'Ruby',
-      kotlin: 'Kotlin',
-      swift: 'Swift',
-      c: 'C',
-      cpp: 'C++',
-      dart: 'Dart',
-      shell: 'Shell',
-    };
-    return labels[language] ?? language;
-  }
-
-  /** 获取产品形态标签 */
-  private getFormLabel(form: ProductFormId): string {
-    const labels: Record<string, string> = {
-      website: '官网',
-      admin: '后台管理',
-      mobile: '移动端',
-      miniapp: '小程序',
-      pc: 'PC 桌面端',
-      ios: 'iOS',
-      android: 'Android',
-      h5: 'H5/Web',
-      backend: '后端服务',
-    };
-    return labels[form] ?? form;
-  }
-
-  /** 获取环境标签 */
-  private getEnvironmentLabel(env: string): string {
-    const labels: Record<string, string> = {
-      node: 'Node.js',
-      python: 'Python',
-      docker: 'Docker',
-      ci: 'CI/CD',
-      browser: '浏览器',
-    };
-    return labels[env] ?? env;
-  }
 
   /** 按优先级排序 */
   private sortByPriority(questions: readonly Question[]): readonly Question[] {

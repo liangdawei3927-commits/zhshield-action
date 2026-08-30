@@ -36,6 +36,10 @@ const NON_DIGIT_PREFIX_RE = /^[^0-9]*/;
 const PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
 /** pnpm-lock.yaml packages 键 */
 const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
+/** pnpm 本地 workspace 引用前缀：file: / link: / workspace: */
+const PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
+/** pnpm 本地目录/链接类型 resolution（本地包天然无 integrity） */
+const LOCAL_RESOLUTION_TYPES = new Set(['directory', 'link', 'workspace']);
 /** 换行符拆分 */
 const NEWLINE_RE = /\r?\n/;
 /** 行首缩进检测 */
@@ -236,20 +240,23 @@ function satisfiesComparator(ver: ParsedVersion, token: string): boolean {
   const op = m[1] ?? '';
   const spec = m[2].trim();
   if (spec === '' || spec === '*' || spec === 'latest') return true;
-
   if (op === '^') return caretSatisfies(ver, spec);
   if (op === '~') return tildeSatisfies(ver, spec);
+  if (op === '') return satisfiesBare(ver, spec);
+  return satisfiesOperator(ver, op, spec);
+}
 
-  if (op === '') {
-    // 裸版本：完整 x.y.z 精确匹配；部分版本按 x.y / x 区间处理
-    const full = parseVersion(spec);
-    if (full && FULL_SEMVER_RE.test(spec)) return compareFull(ver, full) === 0;
-    return partialSatisfies(ver, spec);
-  }
+/** 裸版本：完整 x.y.z 精确匹配；部分版本按 x.y / x 区间处理 */
+function satisfiesBare(ver: ParsedVersion, spec: string): boolean {
+  const full = parseVersion(spec);
+  if (full && FULL_SEMVER_RE.test(spec)) return compareFull(ver, full) === 0;
+  return partialSatisfies(ver, spec);
+}
 
+/** 带比较符约束：'>=1.2' 这类部分版本按填零下界比较 */
+function satisfiesOperator(ver: ParsedVersion, op: string, spec: string): boolean {
   const target = parseVersion(spec);
   if (!target) {
-    // '>=1.2' 这类部分版本按填零下界比较
     if (op === '>=' || op === '>') {
       const lower = toLowerBound(parsePartial(spec) ?? []);
       return op === '>=' ? compareFull(ver, lower) >= 0 : compareFull(ver, lower) > 0;
@@ -283,7 +290,7 @@ function satisfiesAlternative(ver: ParsedVersion, alt: string): boolean {
 }
 
 /** 版本是否满足声明范围（支持 ^ ~ >= <= > < = == 精确、x 通配、连字符、|| 与 && 组合） */
-function satisfiesVersion(version: string, range: string): boolean {
+export function satisfiesVersion(version: string, range: string): boolean {
   const ver = parseVersion(version);
   if (!ver) return false;
   const trimmed = range.trim();
@@ -321,48 +328,52 @@ function readDeclaredRanges(projectRoot: string, failures: string[]): Map<string
 }
 
 /** npm package-lock.json（v1 / v2 / v3）→ 声明范围 / 锁定版本 / 完整性 */
-function parseNpmLock(projectRoot: string, lockfilePath: string): { declared: Map<string, string>; locked: Map<string, string>; integrity: Map<string, string>; failures: string[] } {
+function parseNpmLock(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
   const declared = readDeclaredRanges(projectRoot, failures);
   const locked = new Map<string, string>();
   const integrity = new Map<string, string>();
-
   const lock = readJsonSafe(lockfilePath);
   if (!lock) {
     failures.push('package-lock.json 解析失败，无法校验');
     return { declared, locked, integrity, failures };
   }
-
   const lockfileVersion = lock.lockfileVersion;
   const isV1 =
     lockfileVersion === 1 ||
     (lockfileVersion === undefined && isRecord(lock.dependencies) && !isRecord(lock.packages));
-
   if (isV1) {
-    // v1：dependencies 顶层即直接依赖（含 integrity）
-    const deps = lock.dependencies;
-    if (isRecord(deps)) {
-      for (const [name, meta] of Object.entries(deps)) {
-        if (!isRecord(meta)) continue;
-        const version = typeof meta.version === 'string' ? meta.version : '';
-        if (version === '') continue;
-        locked.set(name, version);
-        const integrityValue = typeof meta.integrity === 'string' ? meta.integrity : '';
-        if (integrityValue === '' && typeof meta.resolved !== 'string') {
-          failures.push(`[npm] ${name}@${version} 缺少 integrity/resolved 完整性字段`);
-        } else {
-          integrity.set(`${name}@${version}`, integrityValue || (typeof meta.resolved === 'string' ? meta.resolved : ''));
-        }
-      }
-    }
+    collectNpmV1(lock, locked, integrity, failures);
     return { declared, locked, integrity, failures };
   }
+  collectNpmPackages(lock, locked, integrity, failures);
+  return { declared, locked, integrity, failures };
+}
 
-  // v2/v3：packages 映射，直接依赖取 node_modules/<name>
+/** v1：dependencies 顶层即直接依赖（含 integrity） */
+function collectNpmV1(lock: Record<string, unknown>, locked: Map<string, string>, integrity: Map<string, string>, failures: string[]): void {
+  const deps = lock.dependencies;
+  if (!isRecord(deps)) return;
+  for (const [name, meta] of Object.entries(deps)) {
+    if (!isRecord(meta)) continue;
+    const version = typeof meta.version === 'string' ? meta.version : '';
+    if (version === '') continue;
+    locked.set(name, version);
+    const integrityValue = typeof meta.integrity === 'string' ? meta.integrity : '';
+    if (integrityValue === '' && typeof meta.resolved !== 'string') {
+      failures.push(`[npm] ${name}@${version} 缺少 integrity/resolved 完整性字段`);
+    } else {
+      integrity.set(`${name}@${version}`, integrityValue || (typeof meta.resolved === 'string' ? meta.resolved : ''));
+    }
+  }
+}
+
+/** v2/v3：packages 映射，直接依赖取 node_modules/<name> */
+function collectNpmPackages(lock: Record<string, unknown>, locked: Map<string, string>, integrity: Map<string, string>, failures: string[]): void {
   const packages = lock.packages;
   if (!isRecord(packages)) {
     failures.push('package-lock.json packages 区块缺失，无法校验');
-    return { declared, locked, integrity, failures };
+    return;
   }
   for (const [key, meta] of Object.entries(packages)) {
     const m = key.match(PACKAGE_KEY_RE);
@@ -379,11 +390,10 @@ function parseNpmLock(projectRoot: string, lockfilePath: string): { declared: Ma
       integrity.set(`${name}@${version}`, integrityValue);
     }
   }
-  return { declared, locked, integrity, failures };
 }
 
 /** pnpm-lock.yaml → importers 声明范围 + packages 完整性 */
-function parsePnpmLock(projectRoot: string, lockfilePath: string): { declared: Map<string, string>; locked: Map<string, string>; integrity: Map<string, string>; failures: string[] } {
+function parsePnpmLock(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
   const declared = new Map<string, string>();
   const locked = new Map<string, string>();
@@ -399,49 +409,61 @@ function parsePnpmLock(projectRoot: string, lockfilePath: string): { declared: M
     return { declared, locked, integrity, failures };
   }
 
-  const packages = data.packages;
-  if (isRecord(packages)) {
-    for (const [key, meta] of Object.entries(packages)) {
-      const m = key.match(PNPM_PACKAGE_KEY_RE);
-      if (!m) continue;
-      if (!isRecord(meta)) continue;
-      const name = m[1];
-      const version = m[2].split('(')[0];
-      if (!version) continue;
-      const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
-      const integrityValue =
-        typeof resolution?.integrity === 'string'
-          ? resolution.integrity
-          : typeof meta.integrity === 'string'
-            ? meta.integrity
-            : '';
-      if (integrityValue === '') {
-        failures.push(`[pnpm] ${name}@${version} 缺少 resolution.integrity 完整性字段`);
-      } else {
-        integrity.set(`${name}@${version}`, integrityValue);
-      }
-    }
-  }
-
-  const importers = data.importers;
-  if (isRecord(importers)) {
-    const rootImporter = importers['.'] ?? Object.values(importers)[0];
-    if (isRecord(rootImporter)) {
-      for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
-        const section = rootImporter[sectionKey];
-        if (!isRecord(section)) continue;
-        for (const [name, meta] of Object.entries(section)) {
-          if (!isRecord(meta)) continue;
-          const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
-          const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
-          if (version === '') continue;
-          declared.set(name, specifier);
-          locked.set(name, version);
-        }
-      }
-    }
-  }
+  collectPnpmPackages(data, locked, integrity, failures);
+  collectPnpmImporters(data, declared, locked);
   return { declared, locked, integrity, failures };
+}
+
+/** packages 区块：解析锁定版本与 resolution.integrity */
+function collectPnpmPackages(data: Record<string, unknown>, locked: Map<string, string>, integrity: Map<string, string>, failures: string[]): void {
+  const packages = data.packages;
+  if (!isRecord(packages)) return;
+  for (const [key, meta] of Object.entries(packages)) {
+    const m = key.match(PNPM_PACKAGE_KEY_RE);
+    if (!m) continue;
+    if (!isRecord(meta)) continue;
+    const name = m[1];
+    const version = m[2].split('(')[0];
+    if (!version) continue;
+    const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
+    const integrityValue =
+      typeof resolution?.integrity === 'string'
+        ? resolution.integrity
+        : typeof meta.integrity === 'string'
+          ? meta.integrity
+          : '';
+    if (integrityValue === '') {
+      const isLocalPackage =
+        PNPM_LOCAL_REF_PREFIX_RE.test(version) ||
+        (resolution !== undefined && typeof resolution.type === 'string' && LOCAL_RESOLUTION_TYPES.has(resolution.type));
+      if (!isLocalPackage) {
+        failures.push(`[pnpm] ${name}@${version} 缺少 resolution.integrity 完整性字段`);
+      }
+    } else {
+      integrity.set(`${name}@${version}`, integrityValue);
+    }
+  }
+}
+
+/** importers 区块：根 importer 的声明范围与锁定版本 */
+function collectPnpmImporters(data: Record<string, unknown>, declared: Map<string, string>, locked: Map<string, string>): void {
+  const importers = data.importers;
+  if (!isRecord(importers)) return;
+  const rootImporter = importers['.'] ?? Object.values(importers)[0];
+  if (!isRecord(rootImporter)) return;
+  for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
+    const section = rootImporter[sectionKey];
+    if (!isRecord(section)) continue;
+    for (const [name, meta] of Object.entries(section)) {
+      if (!isRecord(meta)) continue;
+      const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
+      const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
+      if (version === '') continue;
+      if (PNPM_LOCAL_REF_PREFIX_RE.test(specifier) || PNPM_LOCAL_REF_PREFIX_RE.test(version)) continue;
+      declared.set(name, specifier);
+      locked.set(name, version);
+    }
+  }
 }
 
 /** yarn.lock v1 块 */
@@ -471,17 +493,21 @@ function parseYarnLock(content: string): YarnBlock[] {
       continue;
     }
     if (current) {
-      const m = trimmed.match(YARN_FIELD_RE);
-      if (m) {
-        let value = m[2].trim();
-        if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1);
-        }
-        current.fields.set(m[1], value);
-      }
+      collectYarnField(current, trimmed);
     }
   }
   return blocks;
+}
+
+/** yarn.lock v1 字段行：`  version "4.17.21"`（键与值空白分隔） */
+function collectYarnField(current: YarnBlock, trimmed: string): void {
+  const m = trimmed.match(YARN_FIELD_RE);
+  if (!m) return;
+  let value = m[2].trim();
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    value = value.slice(1, -1);
+  }
+  current.fields.set(m[1], value);
 }
 
 /** yarn.lock v1 → package.json 声明范围 + 块锁定版本 */
@@ -498,23 +524,28 @@ function parseYarnLockFile(projectRoot: string, lockfilePath: string): { declare
   }
 
   for (const block of parseYarnLock(content)) {
-    const version = block.fields.get('version');
-    if (!version) continue;
-    for (const key of block.keys) {
-      const m = key.trim().match(YARN_KEY_RE);
-      if (!m) continue;
-      const scope = m[1] ?? '';
-      const name = `${scope}${m[2]}`;
-      if (!locked.has(name)) locked.set(name, version);
-      const integrityValue = block.fields.get('integrity') ?? '';
-      if (integrityValue === '') {
-        failures.push(`[yarn] ${name}@${version} 缺少 integrity 完整性字段`);
-      } else if (!integrity.has(`${name}@${version}`)) {
-        integrity.set(`${name}@${version}`, integrityValue);
-      }
-    }
+    collectYarnBlock(block, locked, integrity, failures);
   }
   return { declared, locked, integrity, failures };
+}
+
+/** 单个 yarn 块：锁定版本 + 完整性（缺失 integrity 记入 failures） */
+function collectYarnBlock(block: YarnBlock, locked: Map<string, string>, integrity: Map<string, string>, failures: string[]): void {
+  const version = block.fields.get('version');
+  if (!version) return;
+  for (const key of block.keys) {
+    const m = key.trim().match(YARN_KEY_RE);
+    if (!m) continue;
+    const scope = m[1] ?? '';
+    const name = `${scope}${m[2]}`;
+    if (!locked.has(name)) locked.set(name, version);
+    const integrityValue = block.fields.get('integrity') ?? '';
+    if (integrityValue === '') {
+      failures.push(`[yarn] ${name}@${version} 缺少 integrity 完整性字段`);
+    } else if (!integrity.has(`${name}@${version}`)) {
+      integrity.set(`${name}@${version}`, integrityValue);
+    }
+  }
 }
 
 /** poetry 依赖约束值解析：'^2.0' / '{ version = "^2.0", ... }' → 版本约束字符串 */
@@ -544,28 +575,38 @@ function parsePyproject(content: string): Map<string, string> {
     if (!header) continue;
     const sectionName = header[1].trim().toLowerCase();
     if (sectionName === 'project') {
-      const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
-      if (!depsBlock) continue;
-      const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-      for (const m of block.matchAll(TOML_QUOTED_RE)) {
-        const entry = m[1].replace(BRACKET_EXTRAS_RE, '');
-        const name = entry.match(PEP508_NAME_RE)?.[0];
-        if (!name) continue;
-        const rest = entry.slice(name.length).trim();
-        declared.set(name, rest);
-      }
+      collectProjectDeps(section, declared);
     } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
-      for (const line of section.split(NEWLINE_RE)) {
-        if (line.trim().startsWith('[')) continue;
-        const key = line.match(POETRY_TOML_KEY_RE);
-        if (!key) continue;
-        const name = key[1];
-        if (name === 'python') continue;
-        declared.set(name, parsePoetryConstraint(line.slice(line.indexOf('=') + 1)));
-      }
+      collectPoetryDeps(section, declared);
     }
   }
   return declared;
+}
+
+/** [project].dependencies 数组（PEP 621）：双引号包名 + 附带约束 */
+function collectProjectDeps(section: string, declared: Map<string, string>): void {
+  const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
+  if (!depsBlock) return;
+  const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
+  for (const m of block.matchAll(TOML_QUOTED_RE)) {
+    const entry = m[1].replace(BRACKET_EXTRAS_RE, '');
+    const name = entry.match(PEP508_NAME_RE)?.[0];
+    if (!name) continue;
+    const rest = entry.slice(name.length).trim();
+    declared.set(name, rest);
+  }
+}
+
+/** [tool.poetry.dependencies] / [tool.uv.dependencies]：表键即包名 */
+function collectPoetryDeps(section: string, declared: Map<string, string>): void {
+  for (const line of section.split(NEWLINE_RE)) {
+    if (line.trim().startsWith('[')) continue;
+    const key = line.match(POETRY_TOML_KEY_RE);
+    if (!key) continue;
+    const name = key[1];
+    if (name === 'python') continue;
+    declared.set(name, parsePoetryConstraint(line.slice(line.indexOf('=') + 1)));
+  }
 }
 
 /** poetry.lock：[[package]] 块 → name / version / 是否带 [files] 哈希 */
@@ -655,51 +696,62 @@ interface ParsedLockfile {
 /** 锁文件校验器具体实现：离线静态，绝不抛异常 */
 export class LockfileVerifierImpl implements LockfileVerifier {
   async verify(projectRoot: string, options?: LockfileVerifierOptions): Promise<LockfileVerification> {
-    // 探测锁文件（与图谱构建器探测优先级一致：pnpm → npm → yarn → poetry → Pipfile）
-    const candidates: Array<{ kind: string; file: string; parser: () => ParsedLockfile }> = [
-      { kind: 'pnpm', file: 'pnpm-lock.yaml', parser: () => parsePnpmLock(projectRoot, safeJoin(projectRoot, 'pnpm-lock.yaml')) },
-      { kind: 'npm', file: 'package-lock.json', parser: () => parseNpmLock(projectRoot, safeJoin(projectRoot, 'package-lock.json')) },
-      { kind: 'yarn', file: 'yarn.lock', parser: () => parseYarnLockFile(projectRoot, safeJoin(projectRoot, 'yarn.lock')) },
-      { kind: 'poetry', file: 'poetry.lock', parser: () => parsePoetryProject(projectRoot, safeJoin(projectRoot, 'poetry.lock')) },
-      { kind: 'pipfile', file: 'Pipfile.lock', parser: () => parsePipfileLockFile(safeJoin(projectRoot, 'Pipfile.lock')) },
-    ];
-
-    const found = candidates.find((c) => fs.existsSync(safeJoin(projectRoot, c.file)));
+    const found = detectLockfile(projectRoot);
     if (!found) {
-      // 无锁文件（含无任何清单）→ missing
       return { status: 'missing', diffs: [], integrityFailures: [] };
     }
 
     const lockfilePath = safeJoin(projectRoot, found.file);
     const parsed = found.parser();
     const integrityFailures = [...parsed.failures];
-
-    // 完整性基线比对（options.expectedIntegrity）
-    if (options?.expectedIntegrity) {
-      for (const [nodeId, expected] of Object.entries(options.expectedIntegrity)) {
-        const actual = parsed.integrity.get(nodeId);
-        if (actual !== undefined && actual !== expected) {
-          integrityFailures.push(`[${found.kind}] ${nodeId} 校验和不匹配：期望 ${expected}，实际 ${actual}`);
-        }
-      }
-    }
-
-    // 声明范围 vs 锁定版本
-    const diffs: LockfileDiff[] = [];
-    for (const [name, range] of parsed.declared) {
-      const lockedVersion = parsed.locked.get(name);
-      if (lockedVersion === undefined) {
-        diffs.push({ name, declaredVersion: range, lockedVersion: '' });
-      } else if (!satisfiesVersion(lockedVersion, range)) {
-        diffs.push({ name, declaredVersion: range, lockedVersion });
-      }
-    }
-
+    checkExpectedIntegrity(options, parsed.integrity, integrityFailures, found.kind);
+    const diffs = buildDiffs(parsed.declared, parsed.locked);
     const status: LockfileVerification['status'] =
       diffs.length > 0 || integrityFailures.length > 0 ? 'modified' : 'clean';
-
     return { status, lockfilePath, diffs, integrityFailures };
   }
+}
+
+/** 探测锁文件（与图谱构建器探测优先级一致：pnpm → npm → yarn → poetry → Pipfile） */
+function detectLockfile(projectRoot: string): { kind: string; file: string; parser: () => ParsedLockfile } | null {
+  const candidates: Array<{ kind: string; file: string; parser: () => ParsedLockfile }> = [
+    { kind: 'pnpm', file: 'pnpm-lock.yaml', parser: () => parsePnpmLock(projectRoot, safeJoin(projectRoot, 'pnpm-lock.yaml')) },
+    { kind: 'npm', file: 'package-lock.json', parser: () => parseNpmLock(projectRoot, safeJoin(projectRoot, 'package-lock.json')) },
+    { kind: 'yarn', file: 'yarn.lock', parser: () => parseYarnLockFile(projectRoot, safeJoin(projectRoot, 'yarn.lock')) },
+    { kind: 'poetry', file: 'poetry.lock', parser: () => parsePoetryProject(projectRoot, safeJoin(projectRoot, 'poetry.lock')) },
+    { kind: 'pipfile', file: 'Pipfile.lock', parser: () => parsePipfileLockFile(safeJoin(projectRoot, 'Pipfile.lock')) },
+  ];
+  return candidates.find((c) => fs.existsSync(safeJoin(projectRoot, c.file))) ?? null;
+}
+
+/** 完整性基线比对（options.expectedIntegrity） */
+function checkExpectedIntegrity(
+  options: LockfileVerifierOptions | undefined,
+  integrity: Map<string, string>,
+  integrityFailures: string[],
+  kind: string,
+): void {
+  if (!options?.expectedIntegrity) return;
+  for (const [nodeId, expected] of Object.entries(options.expectedIntegrity)) {
+    const actual = integrity.get(nodeId);
+    if (actual !== undefined && actual !== expected) {
+      integrityFailures.push(`[${kind}] ${nodeId} 校验和不匹配：期望 ${expected}，实际 ${actual}`);
+    }
+  }
+}
+
+/** 声明范围 vs 锁定版本 */
+function buildDiffs(declared: Map<string, string>, locked: Map<string, string>): LockfileDiff[] {
+  const diffs: LockfileDiff[] = [];
+  for (const [name, range] of declared) {
+    const lockedVersion = locked.get(name);
+    if (lockedVersion === undefined) {
+      diffs.push({ name, declaredVersion: range, lockedVersion: '' });
+    } else if (!satisfiesVersion(lockedVersion, range)) {
+      diffs.push({ name, declaredVersion: range, lockedVersion });
+    }
+  }
+  return diffs;
 }
 
 /** 便捷入口：同步语义的异步包装（实现为单例类实例方法） */

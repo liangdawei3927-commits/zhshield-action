@@ -14,6 +14,22 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
   const signals: ProfileSignal[] = [];
 
   // --- 锁文件铁证（优先级最高）---
+  if (pushLockFileSignal(scan, signals)) {
+    return signals; // 锁文件唯一确定，直接返回
+  }
+  // --- 配置文件次级证据 ---
+  pushGoModSignal(scan, signals);
+  pushPythonPackageManagerSignal(scan, signals);
+  pushCargoSignal(scan, signals);
+  pushMavenOrGradleSignal(scan, signals);
+  pushComposerSignal(scan, signals);
+  // package.json 无锁文件时默认 npm（最低置信）
+  pushDefaultNpmSignal(scan, signals);
+
+  return signals;
+}
+
+function pushLockFileSignal(scan: ScanResult, signals: ProfileSignal[]): boolean {
   const lockFiles: Array<[string, ProfileSignal['inferred']['packageManager']]> = [
     ['pnpm-lock.yaml', 'pnpm'],
     ['package-lock.json', 'npm'],
@@ -32,11 +48,13 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
         matched: file,
         inferred: { packageManager: pm! },
       });
-      return signals; // 锁文件唯一确定，直接返回
+      return true;
     }
   }
+  return false;
+}
 
-  // --- 配置文件次级证据 ---
+function pushGoModSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'go.mod')) {
     signals.push({
       file: 'go.mod',
@@ -45,7 +63,9 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       inferred: { packageManager: 'go-mod' },
     });
   }
+}
 
+function pushPythonPackageManagerSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'requirements.txt')) {
     signals.push({
       file: 'requirements.txt',
@@ -64,7 +84,9 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       });
     }
   }
+}
 
+function pushCargoSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'Cargo.toml')) {
     signals.push({
       file: 'Cargo.toml',
@@ -73,7 +95,9 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       inferred: { packageManager: 'cargo' },
     });
   }
+}
 
+function pushMavenOrGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'pom.xml')) {
     signals.push({
       file: 'pom.xml',
@@ -89,7 +113,9 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       inferred: { packageManager: 'gradle' },
     });
   }
+}
 
+function pushComposerSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'composer.json')) {
     signals.push({
       file: 'composer.json',
@@ -98,8 +124,9 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       inferred: { packageManager: 'composer' },
     });
   }
+}
 
-  // package.json 无锁文件时默认 npm（最低置信）
+function pushDefaultNpmSignal(scan: ScanResult, signals: ProfileSignal[]): void {
   if (hasFile(scan, 'package.json') && signals.length === 0) {
     signals.push({
       file: 'package.json',
@@ -108,6 +135,4 @@ export function detectPackageManager(scan: ScanResult): ProfileSignal[] {
       inferred: { packageManager: 'npm' },
     });
   }
-
-  return signals;
 }

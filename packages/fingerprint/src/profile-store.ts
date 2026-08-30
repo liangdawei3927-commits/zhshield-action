@@ -55,30 +55,31 @@ export class ProfileStore {
   load(projectPath: string): ProjectProfile | undefined {
     const key = this.normalizeKey(projectPath);
 
-    // 检查缓存
+    const cached = this.readFromCache(key);
+    if (cached !== undefined) return cached;
+
+    const filePath = this.getFilePath(projectPath);
+    return this.readFromDisk(filePath, key);
+  }
+
+  private readFromCache(key: string): ProjectProfile | undefined {
     const cached = this.cache.get(key);
     if (cached !== undefined && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return cached.profile;
     }
+    return undefined;
+  }
 
-    // 从文件系统读取
-    const filePath = this.getFilePath(projectPath);
+  private readFromDisk(filePath: string, key: string): ProjectProfile | undefined {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const profile = JSON.parse(content) as ProjectProfile;
-
-      // 验证 schema 版本
       if (profile.schemaVersion !== 1) {
-        // 版本不兼容，返回 undefined
         return undefined;
       }
-
-      // 更新缓存
       this.cache.set(key, { profile, timestamp: Date.now() });
-
       return profile;
     } catch {
-      // 文件不存在或解析失败
       return undefined;
     }
   }
@@ -187,28 +188,36 @@ export class ProfileStore {
       if (!fs.existsSync(this.baseDir)) {
         return result;
       }
-
-      const files = fs.readdirSync(this.baseDir);
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue;
-
-        const filePath = path.join(this.baseDir, file);
-        try {
-          const content = fs.readFileSync(filePath, 'utf-8');
-          const profile = JSON.parse(content) as ProjectProfile;
-
-          // 从文件名反推项目路径（简化版：使用文件名作为 key）
-          const projectPath = file.replace('.json', '');
-          result.set(projectPath, profile);
-        } catch {
-          // 解析失败，跳过
-        }
-      }
+      this.collectProfilesFromDir(result);
     } catch {
       // 目录不存在，返回空映射
     }
 
     return result;
+  }
+
+  private collectProfilesFromDir(result: Map<string, ProjectProfile>): void {
+    const files = fs.readdirSync(this.baseDir);
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+
+      const filePath = path.join(this.baseDir, file);
+      const profile = this.readProfileFile(filePath);
+      if (profile === null) continue;
+
+      // 从文件名反推项目路径（简化版：使用文件名作为 key）
+      const projectPath = file.replace('.json', '');
+      result.set(projectPath, profile);
+    }
+  }
+
+  private readProfileFile(filePath: string): ProjectProfile | null {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(content) as ProjectProfile;
+    } catch {
+      return null;
+    }
   }
 
   // ─── 内部方法 ───

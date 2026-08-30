@@ -57,34 +57,59 @@ export class DbConnection {
 
   migrate(migrationsDir: string): void {
     const db = this.getDb();
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS _migrations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    const applied = new Set(
-      db.prepare('SELECT name FROM _migrations').all().map((r) => (r as { name: string }).name),
-    );
-
+    ensureMigrationsTable(db);
+    const applied = loadAppliedMigrations(db);
     if (!fs.existsSync(migrationsDir)) return;
+    const files = listMigrationFiles(migrationsDir);
+    const runMigration = createMigrationRunner(db);
+    applyPendingMigrations(migrationsDir, files, applied, runMigration);
+  }
+}
 
-    const files = fs.readdirSync(migrationsDir)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
+/** 创建迁移记录表（幂等） */
+function ensureMigrationsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
 
-    const runMigration = db.transaction((sql: string, name: string) => {
-      db.exec(sql);
-      db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
-    });
+/** 读取已应用的迁移名集合 */
+function loadAppliedMigrations(db: Database.Database): Set<string> {
+  return new Set(
+    db.prepare('SELECT name FROM _migrations').all().map((r) => (r as { name: string }).name),
+  );
+}
 
-    for (const file of files) {
-      if (applied.has(file)) continue;
-      const sql = fs.readFileSync(safeJoin(migrationsDir, file), 'utf-8');
-      runMigration(sql, file);
-    }
+/** 列出迁移目录下按名称排序的 .sql 文件 */
+function listMigrationFiles(migrationsDir: string): string[] {
+  return fs.readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+}
+
+/** 创建事务化的迁移执行器 */
+function createMigrationRunner(db: Database.Database): (sql: string, name: string) => void {
+  return db.transaction((sql: string, name: string) => {
+    db.exec(sql);
+    db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
+  });
+}
+
+/** 逐个执行未应用的迁移 */
+function applyPendingMigrations(
+  migrationsDir: string,
+  files: string[],
+  applied: Set<string>,
+  runMigration: (sql: string, name: string) => void,
+): void {
+  for (const file of files) {
+    if (applied.has(file)) continue;
+    const sql = fs.readFileSync(safeJoin(migrationsDir, file), 'utf-8');
+    runMigration(sql, file);
   }
 }
 

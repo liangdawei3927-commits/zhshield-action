@@ -34,8 +34,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
+        # 版本由根 package.json 的 packageManager 字段决定，勿重复声明避免冲突
 
       - uses: actions/setup-node@v4
         with:

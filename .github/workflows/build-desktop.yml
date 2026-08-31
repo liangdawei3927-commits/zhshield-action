@@ -46,9 +46,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages (include desktop itself)
-        # 注意：必须含 desktop 自身（tsc && vite build 产出 dist/ 与 dist-electron/），
-        # 用 ^... 只构建依赖会导致 electron-builder 打包到空目录
+      - name: Build dependency packages
+        run: pnpm turbo run build --filter=@zh/desktop^...
+
+      # desktop 的 injected 依赖副本在 install 时快照（早于构建，副本内无 dist），
+      # 删除后重装让副本带上依赖构建产物，desktop 自身 tsc 才能解析 @zh/* 声明
+      - name: Refresh desktop injected dependency copies
+        run: rm -rf packages/desktop/node_modules && pnpm install --frozen-lockfile
+
+      - name: Build desktop app (tsc && vite build)
         run: pnpm turbo run build --filter=@zh/desktop
 
       - name: Build desktop macOS artifacts

@@ -47,6 +47,13 @@ jobs:
       - name: Run all tests
         run: pnpm test
 
+      - name: Format check (Prettier)
+        run: pnpm format:check
+
+      - name: Dependency audit (continue on error)
+        continue-on-error: true
+        run: pnpm audit --prod --audit-level=high
+
       - name: Run tests with coverage
         if: matrix.node-version == 22
         continue-on-error: true

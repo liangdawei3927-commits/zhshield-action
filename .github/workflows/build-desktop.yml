@@ -1,0 +1,93 @@
+name: Build Desktop (macOS)
+
+# 可复用 workflow：被 release.yml 调用，也可手动触发
+# 注意：不监听 tag push —— 发布统一走 release.yml，避免同一 tag 触发两条流水线重复构建
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: '构建目标 ref（分支/tag/SHA），默认为触发 ref'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '构建目标 ref（分支/tag/SHA）'
+        required: false
+        type: string
+
+# 同一 ref 的并发构建互斥
+concurrency:
+  group: build-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build macOS artifacts (x64 + arm64)
+    # 单 runner 一次构建双架构：electron-builder 会在同一 run 内生成
+    # 一份同时覆盖 x64/arm64 的 latest-mac.yml，避免双 job 各自产出同名清单互相覆盖
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages (include desktop itself)
+        # 注意：必须含 desktop 自身（tsc && vite build 产出 dist/ 与 dist-electron/），
+        # 用 ^... 只构建依赖会导致 electron-builder 打包到空目录
+        run: pnpm turbo run build --filter=@zh/desktop
+
+      - name: Build desktop macOS artifacts
+        working-directory: packages/desktop
+        env:
+          # 签名证书（base64 编码的 .p12）。未配置时产出未签名 DMG 供内部测试。
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # 公证凭据：electron-builder 26 内置公证（无需 afterSign 脚本），三者需齐全
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # 确定性门控：凭据是否齐全用 shell 判定（step 的 if 里读不到 secrets）
+          NOTARIZE_ARGS=""
+          if [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "签名与公证凭据齐全，启用公证（-c.mac.notarize=true）"
+            NOTARIZE_ARGS="-c.mac.notarize=true"
+          else
+            echo "凭据不全，产出未签名产物（公证关闭）"
+          fi
+          # 双架构一次构建：生成单一 latest-mac.yml（含 x64/arm64 两条更新记录）
+          pnpm exec electron-builder --mac --x64 --arm64 $NOTARIZE_ARGS
+
+      - name: Collect artifacts
+        working-directory: packages/desktop
+        run: |
+          mkdir -p artifacts
+          # dmg 用于首次安装分发；zip 供 electron-updater 自动更新下载（mac 更新走 zip）
+          cp release/*.dmg artifacts/ 2>/dev/null || true
+          cp release/*.zip artifacts/ 2>/dev/null || true
+          cp release/latest-mac.yml artifacts/ 2>/dev/null || true
+          ls -la artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhiyan-codeshield-macos-${{ github.run_id }}
+          path: packages/desktop/artifacts/*
+          if-no-files-found: error
+          retention-days: 30

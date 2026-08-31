@@ -1,0 +1,140 @@
+name: Release
+
+# 触发：推送 v* 开头的 tag（如 v0.2.0）
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布对应 tag（必须已存在）'
+        required: true
+        type: string
+
+permissions:
+  contents: write   # 创建 GitHub Release 需要
+  packages: write   # 预留：未来发包到 GHCR
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: 质量门禁（lint + typecheck + test）
+  # 复用 CI 关键路径，确保发版构建前代码质量达标
+  # ─────────────────────────────────────────────
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 版本一致性校验：tag 必须与 desktop 包版本一致，
+      # 否则 latest-mac.yml 版本与客户端版本错位，electron-updater 永远不触发更新
+      - name: Verify tag matches desktop package version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          PKG_VERSION=$(node -p "require('./packages/desktop/package.json').version")
+          if [ "v${PKG_VERSION}" != "${TAG}" ]; then
+            echo "::error::tag ${TAG} 与 packages/desktop/package.json 版本 v${PKG_VERSION} 不一致，发版中止"
+            echo "请先更新 package.json 版本（pnpm --filter @zh/desktop exec npm version ${TAG#v} --no-git-tag-version）并随 tag 一并提交"
+            exit 1
+          fi
+
+      - name: Build (exclude desktop)
+        run: pnpm turbo run build --filter='!@zh/desktop'
+
+      - name: Verify SOP sync
+        run: pnpm --filter zhshield-cli verify:sop
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+  # ─────────────────────────────────────────────
+  # Job 2: 构建桌面端 DMG（Intel + Apple Silicon）
+  # 调用可复用 workflow，签名/公证由 secrets 自动门控
+  # ─────────────────────────────────────────────
+  build-desktop:
+    name: Build Desktop
+    needs: quality
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      ref: ${{ inputs.tag || github.ref }}
+    secrets: inherit
+
+  # ─────────────────────────────────────────────
+  # Job 3: 创建 GitHub Release 并上传 DMG + 自动更新清单
+  # ─────────────────────────────────────────────
+  publish:
+    name: Publish GitHub Release
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Download all DMG artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # 匹配 build-desktop 产出的两个架构 artifact
+          pattern: zhiyan-codeshield-*-${{ github.run_id }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      - name: Generate release notes
+        id: notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: 智研码盾 ${{ inputs.tag || github.ref_name }}
+          files: |
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/latest-mac.yml
+          body: |
+            ## 智研码盾 ${{ inputs.tag || github.ref_name }}
+
+            ### 安装
+            - **Intel Mac**：下载 `-x64.dmg`
+            - **Apple Silicon (M1/M2/M3/M4)**：下载 `-arm64.dmg`
+
+            ### 自动更新
+            本版本已上传 `latest-mac.yml` 与各架构 `.zip` 更新包，桌面端 `electron-updater` 将自动检查并提示更新（`.zip` 供更新通道使用，无需手动安装）。
+
+            ### 校验
+            详见附件 DMG。签名/公证状态取决于仓库是否配置 `CSC_LINK` / `APPLE_*` secrets：
+            - 已配置：DMG 已签名 + 公证，Gatekeeper 直接放行
+            - 未配置：DMG 未签名，首次打开需在「系统设置 → 隐私与安全性」点击「仍要打开」
+
+            ---
+            完整变更请见 [提交历史](https://github.com/${{ github.repository }}/commits/${{ inputs.tag || github.ref_name }})。
+          draft: false
+          prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

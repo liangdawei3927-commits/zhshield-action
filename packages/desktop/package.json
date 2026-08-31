@@ -1,6 +1,6 @@
 {
   "name": "@zh/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -94,6 +94,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
+        "zip",
         "dmg"
       ],
       "icon": "build/icon.icns"
@@ -114,6 +115,11 @@
     },
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "liangdawei3927-commits",
+      "repo": "zhshield-action"
     },
     "asarUnpack": [
       "dist-electron/zhshield-mcp.js",

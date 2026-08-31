@@ -59,6 +59,11 @@ jobs:
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
+      # desktop 的 injected 依赖副本在 install 时快照（早于构建，副本内无 dist），
+      # 删除后重装让副本带上构建产物，desktop 类型检查才能解析 @zh/* 声明
+      - name: Refresh desktop injected dependency copies
+        run: rm -rf packages/desktop/node_modules && pnpm install --frozen-lockfile
+
       - name: Verify SOP sync
         run: pnpm --filter zhshield-cli verify:sop
 

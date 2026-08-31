@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 export interface SopAPI {
   getVersion: () => Promise<{
     version: string;
@@ -710,6 +712,7 @@ export interface ElectronAPI {
   engine: EngineAPI;
   tasks: TaskAPI;
   guardHooks?: GuardHooksAPI;
+  guardConfig?: GuardConfigAPI;
   sentinel: SentinelAPI;
   evolve: EvolveAPI;
   backup?: BackupAPI;
@@ -720,6 +723,13 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
+  }
+}
+
+/** Electron 无边框窗口拖拽区域（-webkit-app-region）在 React CSSProperties 中的类型补充 */
+declare module 'react' {
+  interface CSSProperties {
+    WebkitAppRegion?: 'drag' | 'no-drag' | 'none';
   }
 }
 

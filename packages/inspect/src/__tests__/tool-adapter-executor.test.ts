@@ -156,3 +156,45 @@ describe('ToolAdapterExecutor 硬上限保护（防 CI 卡死）', () => {
     expect(escalation).toHaveBeenCalled();
   }, 5000);
 });
+
+describe('ToolAdapterExecutor 并行池（P0-1）', () => {
+  it('Given 多个适配器，When runAll，Then 并行执行且结果保持 Map 插入顺序', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const events: string[] = [];
+    const slow = makeAdapter('eslint', 'inspect', 'available');
+    vi.mocked(slow.scan).mockImplementation(async () => {
+      events.push('eslint:start');
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      events.push('eslint:end');
+      return {
+        tool: 'eslint',
+        status: 'available',
+        issues: [],
+        metadata: { version: '', duration: 1, timestamp: new Date(), fileCount: 0 },
+      };
+    });
+    const fast = makeAdapter('gitleaks', 'security', 'available');
+    vi.mocked(fast.scan).mockImplementation(async () => {
+      events.push('gitleaks:start');
+      events.push('gitleaks:end');
+      return {
+        tool: 'gitleaks',
+        status: 'available',
+        issues: [],
+        metadata: { version: '', duration: 1, timestamp: new Date(), fileCount: 0 },
+      };
+    });
+
+    const results = await executor.runAll(
+      new Map<string, ToolAdapter>([
+        ['eslint', slow],
+        ['gitleaks', fast],
+      ]),
+      'proj-1',
+    );
+
+    expect(results.map((r) => r.adapterId)).toEqual(['eslint', 'gitleaks']);
+    expect(events.indexOf('gitleaks:start')).toBeLessThan(events.indexOf('eslint:end'));
+  });
+});

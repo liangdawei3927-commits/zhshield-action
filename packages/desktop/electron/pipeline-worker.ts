@@ -60,12 +60,17 @@ async function runPipeline(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 流水线异常:', err instanceof Error ? err.stack || message : message);
-    const report = attachSummary(createReport({
-      stage: 'failed',
-      passed: false,
-      error: message,
-    }));
+    console.error(
+      '[pipeline-worker] 流水线异常:',
+      err instanceof Error ? err.stack || message : message,
+    );
+    const report = attachSummary(
+      createReport({
+        stage: 'failed',
+        passed: false,
+        error: message,
+      }),
+    );
     send({ type: 'result', id, report: serializePipelineReport(report) });
   } finally {
     await runner.destroy().catch(() => undefined);

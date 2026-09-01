@@ -65,7 +65,9 @@ if (!existsSync(FRAGMENTS_DIR)) {
   process.exit(0);
 }
 
-const fragmentFiles = readdirSync(FRAGMENTS_DIR).filter((f) => f.endsWith('.json')).sort();
+const fragmentFiles = readdirSync(FRAGMENTS_DIR)
+  .filter((f) => f.endsWith('.json'))
+  .sort();
 if (fragmentFiles.length === 0) {
   console.log('[merge-fragments] 无片段文件，跳过');
   process.exit(0);
@@ -82,7 +84,9 @@ for (const file of fragmentFiles) {
 }
 
 const after = new Set(collectLeaves(target));
-const added = Array.from(after, (k) => k).toSorted().filter((k) => !before.has(k));
+const added = Array.from(after, (k) => k)
+  .toSorted()
+  .filter((k) => !before.has(k));
 
 // 合并后再排序写回，保证确定性 diff
 writeFileSync(TARGET, `${JSON.stringify(sortKeys(target), null, 2)}\n`, 'utf8');
@@ -93,4 +97,6 @@ for (const file of fragmentFiles) {
 }
 
 console.log(`[merge-fragments] 合并 ${applied.length} 个片段：${applied.join(', ')}`);
-console.log(`[merge-fragments] 新增 ${added.length} 个叶子键，zh-Hans.json 现有 ${after.size} 个叶子键`);
+console.log(
+  `[merge-fragments] 新增 ${added.length} 个叶子键，zh-Hans.json 现有 ${after.size} 个叶子键`,
+);

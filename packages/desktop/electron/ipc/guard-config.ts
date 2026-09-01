@@ -1,6 +1,5 @@
 import { ipcMain, app } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
 import fsAsync from 'node:fs/promises';
 
 export interface GuardConfig {
@@ -33,9 +32,13 @@ export async function readConfig(): Promise<GuardConfig> {
     const parsed = JSON.parse(data) as Partial<GuardConfig>;
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_CONFIG.enabled,
-      preCommit: typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
+      preCommit:
+        typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
       prePush: typeof parsed.prePush === 'boolean' ? parsed.prePush : DEFAULT_CONFIG.prePush,
-      blockOnCritical: typeof parsed.blockOnCritical === 'boolean' ? parsed.blockOnCritical : DEFAULT_CONFIG.blockOnCritical,
+      blockOnCritical:
+        typeof parsed.blockOnCritical === 'boolean'
+          ? parsed.blockOnCritical
+          : DEFAULT_CONFIG.blockOnCritical,
     };
   } catch {
     return DEFAULT_CONFIG;
@@ -47,16 +50,20 @@ async function writeConfig(config: GuardConfig): Promise<void> {
   await fsAsync.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
 }
 
-/** 同步读取门禁配置（供流水线子进程等无法使用 IPC 的场景调用） */
-export function readGuardConfigFile(): GuardConfig {
+/** 异步读取门禁配置（供流水线子进程等无法使用 IPC 的场景调用） */
+export async function readGuardConfigFile(): Promise<GuardConfig> {
   try {
-    const data = fs.readFileSync(getConfigPath(), 'utf-8');
+    const data = await fsAsync.readFile(getConfigPath(), 'utf-8');
     const parsed = JSON.parse(data) as Partial<GuardConfig>;
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_CONFIG.enabled,
-      preCommit: typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
+      preCommit:
+        typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
       prePush: typeof parsed.prePush === 'boolean' ? parsed.prePush : DEFAULT_CONFIG.prePush,
-      blockOnCritical: typeof parsed.blockOnCritical === 'boolean' ? parsed.blockOnCritical : DEFAULT_CONFIG.blockOnCritical,
+      blockOnCritical:
+        typeof parsed.blockOnCritical === 'boolean'
+          ? parsed.blockOnCritical
+          : DEFAULT_CONFIG.blockOnCritical,
     };
   } catch {
     return DEFAULT_CONFIG;
@@ -65,5 +72,7 @@ export function readGuardConfigFile(): GuardConfig {
 
 export function registerGuardConfigIpc(): void {
   ipcMain.handle('guard:readConfig', (): Promise<GuardConfig> => readConfig());
-  ipcMain.handle('guard:writeConfig', (_event, config: GuardConfig): Promise<void> => writeConfig(config));
+  ipcMain.handle('guard:writeConfig', (_event, config: GuardConfig): Promise<void> =>
+    writeConfig(config),
+  );
 }

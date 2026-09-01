@@ -71,7 +71,13 @@ export class GuardTrivyAdapter implements Adapter {
     return {
       adapterId: this.id,
       status: hasCritical ? 'failed' : hasHigh ? 'failed' : 'passed',
-      severity: hasCritical ? 'critical' : hasHigh ? 'high' : result.summary.medium > 0 ? 'medium' : 'low',
+      severity: hasCritical
+        ? 'critical'
+        : hasHigh
+          ? 'high'
+          : result.summary.medium > 0
+            ? 'medium'
+            : 'low',
       message: hasCritical
         ? `Found ${result.summary.critical} critical vulnerabilities`
         : hasHigh
@@ -96,24 +102,18 @@ export class GuardTrivyAdapter implements Adapter {
 
   // --- Adapter interface methods ---
 
-  async run(
-    context: { projectPath?: string },
-    _check: CheckConfig,
-  ): Promise<GuardTrivyResult> {
+  async run(context: { projectPath?: string }, _check: CheckConfig): Promise<GuardTrivyResult> {
     const projectPath = context.projectPath || process.cwd();
     return this.check(projectPath);
   }
 
-  normalize(
-    rawResult: GuardTrivyResult,
-    _context: unknown,
-    check: CheckConfig,
-  ): CheckResult {
+  normalize(rawResult: GuardTrivyResult, _context: unknown, check: CheckConfig): CheckResult {
     return {
       checkId: check.checkId,
       adapter: check.adapter,
       status: rawResult.status,
-      severity: rawResult.status === 'failed' || rawResult.status === 'error' ? check.severity : 'info',
+      severity:
+        rawResult.status === 'failed' || rawResult.status === 'error' ? check.severity : 'info',
       blocking: check.blocking && (rawResult.status === 'failed' || rawResult.status === 'error'),
       message: rawResult.message,
       details: rawResult,

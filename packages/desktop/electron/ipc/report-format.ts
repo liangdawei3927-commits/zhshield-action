@@ -11,13 +11,25 @@ import type { HealthScore } from '@zh/scoring';
 
 export interface GuardReportData {
   summary: { totalChecks: number; passed: number; blocked: number; warnings: number };
-  checks: Array<{ id: string; name: string; status: 'pass' | 'warn' | 'fail'; message: string; severity?: string }>;
+  checks: Array<{
+    id: string;
+    name: string;
+    status: 'pass' | 'warn' | 'fail';
+    message: string;
+    severity?: string;
+  }>;
   metadata: { duration: number; timestamp: string };
 }
 
 export interface InspectionReportData {
   summary: { total: number; passed: number; warnings: number; failures: number };
-  checks: Array<{ id: string; name: string; status: 'pass' | 'warn' | 'fail' | 'attention'; detail: string; category?: string }>;
+  checks: Array<{
+    id: string;
+    name: string;
+    status: 'pass' | 'warn' | 'fail' | 'attention';
+    detail: string;
+    category?: string;
+  }>;
   metadata: { duration: number; timestamp: string };
 }
 
@@ -33,7 +45,14 @@ export interface SecurityScanReportData {
     garbageSize: number;
   };
   /** 漏洞扫描（依赖 CVE） */
-  findings: Array<{ id: string; title: string; severity: string; file: string; description: string; recommendation?: string }>;
+  findings: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    file: string;
+    description: string;
+    recommendation?: string;
+  }>;
   /** 病毒查杀（恶意代码特征） */
   malware: Array<{
     id: string;
@@ -79,7 +98,12 @@ export function toGuardReportData(r: GuardReport): GuardReportData {
     checks: r.results.map((cr) => ({
       id: cr.checkId,
       name: cr.checkId,
-      status: cr.status === 'passed' ? 'pass' as const : cr.status === 'failed' || cr.status === 'error' ? 'fail' as const : 'warn' as const,
+      status:
+        cr.status === 'passed'
+          ? ('pass' as const)
+          : cr.status === 'failed' || cr.status === 'error'
+            ? ('fail' as const)
+            : ('warn' as const),
       message: cr.message,
       severity: cr.severity === 'warning' ? 'medium' : cr.severity === 'error' ? 'high' : 'low',
     })),
@@ -94,7 +118,12 @@ export function toInspectionReportData(r: InspectionReport): InspectionReportDat
   const issueChecks = r.issues.map((issue) => ({
     id: issue.id,
     name: issue.ruleId,
-    status: issue.severity === 'info' ? 'pass' as const : issue.severity === 'warning' ? 'warn' as const : 'fail' as const,
+    status:
+      issue.severity === 'info'
+        ? ('pass' as const)
+        : issue.severity === 'warning'
+          ? ('warn' as const)
+          : ('fail' as const),
     detail: issue.message,
     category: issue.category,
     source: issue.source,
@@ -190,6 +219,7 @@ export function toHealthScoreData(score: HealthScore): HealthScoreData {
     score: score.overall,
     dimensions: score.dimensions,
     summary: score.grade,
-    timestamp: score.timestamp instanceof Date ? score.timestamp.toISOString() : String(score.timestamp),
+    timestamp:
+      score.timestamp instanceof Date ? score.timestamp.toISOString() : String(score.timestamp),
   };
 }

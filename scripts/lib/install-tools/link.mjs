@@ -5,7 +5,12 @@
  */
 
 import {
-  mkdirSync, unlinkSync, writeFileSync, symlinkSync, copyFileSync, chmodSync,
+  mkdirSync,
+  unlinkSync,
+  writeFileSync,
+  symlinkSync,
+  copyFileSync,
+  chmodSync,
 } from 'node:fs';
 import { join, relative } from 'node:path';
 import { BIN_DIR, IS_WIN, warn } from './constants.mjs';
@@ -15,7 +20,11 @@ export function linkBin(shimPath, binName) {
   mkdirSync(BIN_DIR, { recursive: true });
   const targetName = IS_WIN ? `${binName}.cmd` : binName;
   const target = join(BIN_DIR, targetName);
-  try { unlinkSync(target); } catch { /* 不存在则忽略 */ }
+  try {
+    unlinkSync(target);
+  } catch {
+    /* 不存在则忽略 */
+  }
 
   if (IS_WIN) {
     // 转发 shim：调用 tools 目录下 npm 生成的 .cmd（其内部 %~dp0 相对路径仍正确）

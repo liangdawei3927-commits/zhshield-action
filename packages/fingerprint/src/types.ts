@@ -38,7 +38,9 @@ export interface MatchResult<T = string> {
 /** 人工修正记录（与自动检测分离存储，永不丢失）。 */
 export interface UserOverrides {
   readonly architecture?: ArchitectureForm;
-  readonly targets?: Readonly<Record<string, { readonly language?: LanguageId; readonly productForm?: ProductFormId }>>;
+  readonly targets?: Readonly<
+    Record<string, { readonly language?: LanguageId; readonly productForm?: ProductFormId }>
+  >;
   readonly updatedAt?: string;
 }
 

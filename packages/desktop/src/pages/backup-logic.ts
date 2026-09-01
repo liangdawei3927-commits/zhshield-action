@@ -11,7 +11,9 @@ export const STATUS_LABEL: Record<string, { textKey: string; color: string }> = 
 };
 
 export const TYPE_LABEL: Record<string, string> = {
-  full: 'page.backup.type.full', 'github-only': 'page.backup.type.githubOnly', 'local-only': 'page.backup.type.localOnly',
+  full: 'page.backup.type.full',
+  'github-only': 'page.backup.type.githubOnly',
+  'local-only': 'page.backup.type.localOnly',
 };
 
 export function formatSize(bytes?: number): string {
@@ -22,7 +24,11 @@ export function formatSize(bytes?: number): string {
 }
 
 export function formatTime(iso: string): string {
-  try { return new Date(iso).toLocaleString('zh-CN'); } catch { return iso; }
+  try {
+    return new Date(iso).toLocaleString('zh-CN');
+  } catch {
+    return iso;
+  }
 }
 
 /** 备份记录数据：列表状态 + 拉取 */
@@ -37,7 +43,9 @@ function useBackupRecordData(): {
     try {
       const data = await getBackupRecords();
       setRecords(data);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   return { records, setRecords, fetchRecords };
@@ -51,7 +59,9 @@ function useBackupRecords(): {
 } {
   const { records, setRecords, fetchRecords } = useBackupRecordData();
 
-  useEffect(() => { void fetchRecords(); }, [fetchRecords]);
+  useEffect(() => {
+    void fetchRecords();
+  }, [fetchRecords]);
 
   return { records, setRecords, loadRecords: fetchRecords };
 }
@@ -80,7 +90,9 @@ function useBackupRun(
       setLastResult(result);
       await loadRecords();
       toast(
-        result.overallStatus === 'success' ? t('page.backup.toast.success') : t('page.backup.toast.completed', { status: result.overallStatus }),
+        result.overallStatus === 'success'
+          ? t('page.backup.toast.success')
+          : t('page.backup.toast.completed', { status: result.overallStatus }),
         result.overallStatus === 'failed' ? 'error' : 'success',
       );
     } catch (err) {
@@ -123,8 +135,8 @@ function useBackupDelete(onDeleted: (id: string) => void): {
 export function useBackupPage(projectPath: string) {
   const { records, setRecords, loadRecords } = useBackupRecords();
   const { isBackingUp, lastResult, error, handleBackup } = useBackupRun(projectPath, loadRecords);
-  const { deleteTarget, setDeleteTarget, handleDeleteConfirm } = useBackupDelete(
-    (id) => setRecords((prev) => prev.filter((r) => r.id !== id)),
+  const { deleteTarget, setDeleteTarget, handleDeleteConfirm } = useBackupDelete((id) =>
+    setRecords((prev) => prev.filter((r) => r.id !== id)),
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

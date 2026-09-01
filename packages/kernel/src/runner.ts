@@ -14,16 +14,22 @@ import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
 import { Logger } from './log';
 import type { EngineHost, GuardEngineLike, InspectEngineLike } from './runner/evaluator-host';
-import { evalPatternScan, evalForbidden, evalThreshold, evalLayerBoundary } from './runner/inline-evaluators';
-import { evalCheckList, evalScannerDispatch, evalToolDispatch, evalPreset } from './runner/dispatch-evaluators';
+import {
+  evalPatternScan,
+  evalForbidden,
+  evalThreshold,
+  evalLayerBoundary,
+} from './runner/inline-evaluators';
+import {
+  evalCheckList,
+  evalScannerDispatch,
+  evalToolDispatch,
+  evalPreset,
+} from './runner/dispatch-evaluators';
 import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-builders';
 
 /** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
-const ENGINE_DISPATCH_TYPES = new Set([
-  'preset',
-  'scanner-dispatch',
-  'check-list',
-]);
+const ENGINE_DISPATCH_TYPES = new Set(['preset', 'scanner-dispatch', 'check-list']);
 
 /**
  * SopRuleEngine — SOP 规则引擎（runner.ts）
@@ -80,12 +86,12 @@ export class SopRuleEngine {
     ) => RuleEvaluation | Promise<RuleEvaluation>;
   }> = {
     'pattern-scan': (rule, instr, ctx) => evalPatternScan(rule, instr, ctx),
-    'forbidden': (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
-    'threshold': (rule, instr, ctx) => evalThreshold(rule, instr, ctx, this.guardEngine),
+    forbidden: (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
+    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx, this.guardEngine),
     'check-list': (rule, instr, ctx) => evalCheckList(this.host, rule, instr, ctx),
     'layer-boundary': (rule, instr, ctx) => evalLayerBoundary(rule, instr, ctx),
     'scanner-dispatch': (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),
-    'preset': (rule, instr, ctx) => evalPreset(this.host, rule, instr, ctx),
+    preset: (rule, instr, ctx) => evalPreset(this.host, rule, instr, ctx),
     'tool-dispatch': (rule, instr, ctx) => evalToolDispatch(this.host, rule, instr, ctx),
   };
 
@@ -161,7 +167,9 @@ export class SopRuleEngine {
       inspectEngine: this.inspectEngine,
       auditLogger: this.auditLogger,
       eventBus: this.eventBus,
-      get evalDepth() { return readEvalDepth(); },
+      get evalDepth() {
+        return readEvalDepth();
+      },
     };
   }
 
@@ -177,9 +185,7 @@ export class SopRuleEngine {
 
     try {
       const rules = this.filterRulesByContext(context);
-      const evaluations = rules.length === 0
-        ? []
-        : await this.evaluateAll(rules, context, nested);
+      const evaluations = rules.length === 0 ? [] : await this.evaluateAll(rules, context, nested);
 
       const report = aggregate(evaluations, Date.now() - start);
       await this.emit('rule-engine:evaluated', report);
@@ -200,18 +206,32 @@ export class SopRuleEngine {
     return rules;
   }
 
-  private async evaluateAll(rules: SopRule[], context: RuleContext, nested: boolean): Promise<RuleEvaluation[]> {
+  private async evaluateAll(
+    rules: SopRule[],
+    context: RuleContext,
+    nested: boolean,
+  ): Promise<RuleEvaluation[]> {
     const evaluations: RuleEvaluation[] = [];
     for (const rule of rules) {
       const evalStart = Date.now();
       const instruction = this.interpreter.interpret(rule);
       // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
-      const effectiveRule = resolveEffectiveRule(rule, this.consecutiveFailures, this.healthBaseline);
+      const effectiveRule = resolveEffectiveRule(
+        rule,
+        this.consecutiveFailures,
+        this.healthBaseline,
+      );
       try {
+        // perf rule false positive: arg depends on loop var via dataflow
+        // eslint-disable-next-line perf/perf-no-serial-await
         const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
         result.durationMs = Date.now() - evalStart;
         // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值（effectiveRule.severity），阈值取 registry 原规则
-        result.blocking = computeBlocking(result.status, effectiveRule.severity, rule.blockingThreshold);
+        result.blocking = computeBlocking(
+          result.status,
+          effectiveRule.severity,
+          rule.blockingThreshold,
+        );
         trackConsecutiveFailures(this.consecutiveFailures, rule.id, result.status);
         evaluations.push(result);
       } catch (err) {
@@ -245,8 +265,13 @@ export class SopRuleEngine {
   }
 
   private isExternalDispatch(type: ContentInstruction['type']): boolean {
-    return type === 'scanner-dispatch' || type === 'tool-dispatch'
-      || type === 'preset' || type === 'check-list' || type === 'threshold';
+    return (
+      type === 'scanner-dispatch' ||
+      type === 'tool-dispatch' ||
+      type === 'preset' ||
+      type === 'check-list' ||
+      type === 'threshold'
+    );
   }
 
   /**
@@ -271,7 +296,11 @@ export class SopRuleEngine {
     context: RuleContext,
   ): Promise<RuleEvaluation> {
     const evaluator = this.evaluators[instruction.type] as
-      | ((rule: SopRule, instr: ContentInstruction, context: RuleContext) => RuleEvaluation | Promise<RuleEvaluation>)
+      | ((
+          rule: SopRule,
+          instr: ContentInstruction,
+          context: RuleContext,
+        ) => RuleEvaluation | Promise<RuleEvaluation>)
       | undefined;
     if (!evaluator) {
       return {
@@ -297,7 +326,12 @@ export class SopRuleEngine {
   }
 }
 
-export type { RuleEvaluation, RuleEngineReport, ContentInstruction, ToolDispatchInstruction } from './sop/_meta/rule-evaluation';
+export type {
+  RuleEvaluation,
+  RuleEngineReport,
+  ContentInstruction,
+  ToolDispatchInstruction,
+} from './sop/_meta/rule-evaluation';
 export type { RuleContext } from './sop/_meta/rule-context';
 export type { ToolAdapter } from '@zh/shared';
 export { ContentInterpreter } from './sop/_meta/content-interpreter';

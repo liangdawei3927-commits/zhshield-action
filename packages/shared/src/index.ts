@@ -67,9 +67,24 @@ export type {
 } from './types';
 export { ToolManager } from './tool-manager';
 export { wrapAdapter, evaluateAccessScope } from './tool-adapter-decorator';
-export type { HookedToolResult, ScopeViolation, ScopeViolationContext, WrapAdapterOptions } from './tool-adapter-decorator';
+export type {
+  HookedToolResult,
+  ScopeViolation,
+  ScopeViolationContext,
+  WrapAdapterOptions,
+} from './tool-adapter-decorator';
 export { matchGlobPath } from './scope-matcher';
-export { toolMappers, eslintMapper, semgrepMapper, trivyMapper, grypeMapper, gitleaksMapper, depcheckMapper, depCruiserMapper, jscpdMapper } from './output-mappers';
+export {
+  toolMappers,
+  eslintMapper,
+  semgrepMapper,
+  trivyMapper,
+  grypeMapper,
+  gitleaksMapper,
+  depcheckMapper,
+  depCruiserMapper,
+  jscpdMapper,
+} from './output-mappers';
 export { DegradationManager } from './degradation-manager';
 export { BUILTIN_FALLBACK_RULES } from './builtin-rules';
 export { AuditLogger } from './audit-logger';
@@ -92,11 +107,33 @@ export type {
   ToolLockfile,
   ToolRequirement,
 } from './toolchain/types';
-export { getToolDimensions, mapIssuesToDimensions, computeOverallScore, scoreToGrade } from './dimension-mapper';
-export type { EventEmitter, GovernanceEvent, ToolExecutedEvent, ScanCompletedEvent, GuardCheckRequestedEvent, GuardCheckCompletedEvent, GuardStage, ScopeViolationEvent } from './events';
+export {
+  getToolDimensions,
+  mapIssuesToDimensions,
+  computeOverallScore,
+  scoreToGrade,
+} from './dimension-mapper';
+export type {
+  EventEmitter,
+  GovernanceEvent,
+  ToolExecutedEvent,
+  ScanCompletedEvent,
+  GuardCheckRequestedEvent,
+  GuardCheckCompletedEvent,
+  GuardStage,
+  ScopeViolationEvent,
+} from './events';
 export { NOOP_EMITTER } from './events';
 
+export { detectMachineProfile, type MachineProfile } from './machine-profile';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';
-export { safeJoin, safeJoinReal, safeResolve, safeResolveReal, PathTraversalError } from './security/safe-path';
+export {
+  safeJoin,
+  safeJoinReal,
+  safeResolve,
+  safeResolveReal,
+  PathTraversalError,
+} from './security/safe-path';
+export { hasEslintConfig, resolveEslintTargetDir } from './eslint-config';

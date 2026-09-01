@@ -23,7 +23,11 @@ function makeReport(
   };
 }
 
-function entry(ruleId: string, severity: 'error' | 'warning' | 'info', source: 'guard' | 'inspect' | 'refactor'): DiagnosticsReport['issues'][number] {
+function entry(
+  ruleId: string,
+  severity: 'error' | 'warning' | 'info',
+  source: 'guard' | 'inspect' | 'refactor',
+): DiagnosticsReport['issues'][number] {
   return {
     ruleId,
     severity,
@@ -43,21 +47,31 @@ const guardWarning = entry('g/warn', 'warning', 'guard');
 
 describe('shouldAutoFix', () => {
   it('巡检（inspect）有 error 时触发', () => {
-    expect(shouldAutoFix(makeReport({ total: 1, error: 1, warning: 0, info: 0 }, [inspectError]))).toBe(true);
+    expect(
+      shouldAutoFix(makeReport({ total: 1, error: 1, warning: 0, info: 0 }, [inspectError])),
+    ).toBe(true);
   });
 
   it('巡检（inspect）有 warning 时触发', () => {
-    expect(shouldAutoFix(makeReport({ total: 1, error: 0, warning: 1, info: 0 }, [inspectWarning]))).toBe(true);
+    expect(
+      shouldAutoFix(makeReport({ total: 1, error: 0, warning: 1, info: 0 }, [inspectWarning])),
+    ).toBe(true);
   });
 
   it('门禁（guard/预防）有 error 或 warning 时不触发自动修复', () => {
-    expect(shouldAutoFix(makeReport({ total: 1, error: 1, warning: 0, info: 0 }, [guardError]))).toBe(false);
-    expect(shouldAutoFix(makeReport({ total: 1, error: 0, warning: 1, info: 0 }, [guardWarning]))).toBe(false);
+    expect(
+      shouldAutoFix(makeReport({ total: 1, error: 1, warning: 0, info: 0 }, [guardError])),
+    ).toBe(false);
+    expect(
+      shouldAutoFix(makeReport({ total: 1, error: 0, warning: 1, info: 0 }, [guardWarning])),
+    ).toBe(false);
   });
 
   it('guard 与 inspect 混合时，只要有非 guard 的 error/warning 就触发', () => {
     const mixed = [guardError, inspectWarning];
-    expect(shouldAutoFix(makeReport({ total: 2, error: 1, warning: 1, info: 0 }, mixed))).toBe(true);
+    expect(shouldAutoFix(makeReport({ total: 2, error: 1, warning: 1, info: 0 }, mixed))).toBe(
+      true,
+    );
   });
 
   it('只有 info 或 0 问题时不触发', () => {
@@ -119,9 +133,12 @@ describe('resolveOpenCodeBin', () => {
     paths.map((path) => ({ path, executable: true }));
 
   it('环境变量指定的可执行路径优先', () => {
-    expect(resolveOpenCodeBin('/custom/opencode', candidates(['/usr/local/bin/opencode', '/custom/opencode']))).toBe(
-      '/custom/opencode',
-    );
+    expect(
+      resolveOpenCodeBin(
+        '/custom/opencode',
+        candidates(['/usr/local/bin/opencode', '/custom/opencode']),
+      ),
+    ).toBe('/custom/opencode');
   });
 
   it('环境变量不可执行时回退到候选列表第一个可执行项', () => {
@@ -134,7 +151,9 @@ describe('resolveOpenCodeBin', () => {
   });
 
   it('无任何可执行项时返回 null', () => {
-    expect(resolveOpenCodeBin('OPENCODE_BIN_TEST', [{ path: '/bin/opencode', executable: false }])).toBeNull();
+    expect(
+      resolveOpenCodeBin('OPENCODE_BIN_TEST', [{ path: '/bin/opencode', executable: false }]),
+    ).toBeNull();
   });
 });
 

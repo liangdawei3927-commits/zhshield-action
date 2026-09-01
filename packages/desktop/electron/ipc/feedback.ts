@@ -40,7 +40,10 @@ export function falsePositivesPath(projectPath: string): string {
 }
 
 /** 追加一条误报反馈，返回落盘绝对路径；写入失败静默（不阻断用户主流程） */
-export async function appendFalsePositive(projectPath: string, item: FalsePositiveFeedbackItem): Promise<string> {
+export async function appendFalsePositive(
+  projectPath: string,
+  item: FalsePositiveFeedbackItem,
+): Promise<string> {
   const record: FalsePositiveFeedbackRecord = {
     ...item,
     id: randomUUID(),
@@ -68,7 +71,10 @@ async function trimToLimit(absPath: string): Promise<void> {
  * 误报反馈同步写入演进引擎经验池（type=false-positive）并重算规则权重。
  * 供「规则进化 / 架构分析」页积累真实数据；失败静默，不阻断反馈主流程。
  */
-async function recordFeedbackExperience(projectPath: string, item: FalsePositiveFeedbackItem): Promise<void> {
+async function recordFeedbackExperience(
+  projectPath: string,
+  item: FalsePositiveFeedbackItem,
+): Promise<void> {
   try {
     const evolve = await getEvolve();
     evolve.recordExperience({
@@ -89,7 +95,10 @@ async function recordFeedbackExperience(projectPath: string, item: FalsePositive
 }
 
 /** 读取误报反馈记录（按 source 过滤，最近在前）；文件不存在返回空数组，损坏行跳过 */
-export async function listFalsePositives(projectPath: string, source?: 'guard' | 'sentinel'): Promise<FalsePositiveFeedbackRecord[]> {
+export async function listFalsePositives(
+  projectPath: string,
+  source?: 'guard' | 'sentinel',
+): Promise<FalsePositiveFeedbackRecord[]> {
   const absPath = falsePositivesPath(projectPath);
   let content: string;
   try {
@@ -112,7 +121,11 @@ export async function listFalsePositives(projectPath: string, source?: 'guard' |
 export function registerFeedbackIpc(): void {
   ipcMain.handle(
     'feedback:reportFalsePositive',
-    async (_event, projectPath: string, item: FalsePositiveFeedbackItem): Promise<{ ok: boolean; id?: string; reason?: string }> => {
+    async (
+      _event,
+      projectPath: string,
+      item: FalsePositiveFeedbackItem,
+    ): Promise<{ ok: boolean; id?: string; reason?: string }> => {
       if (!projectPath || typeof projectPath !== 'string') {
         return { ok: false, reason: t('electron.invalidProjectPath') };
       }
@@ -124,7 +137,10 @@ export function registerFeedbackIpc(): void {
         await recordFeedbackExperience(projectPath, item);
         const lines = (await readFile(absPath, 'utf-8')).split('\n').filter(Boolean);
         const record = lines.pop();
-        return { ok: true, id: record ? (JSON.parse(record) as FalsePositiveFeedbackRecord).id : undefined };
+        return {
+          ok: true,
+          id: record ? (JSON.parse(record) as FalsePositiveFeedbackRecord).id : undefined,
+        };
       } catch {
         return { ok: false, reason: t('electron.writeFailed') };
       }
@@ -133,8 +149,13 @@ export function registerFeedbackIpc(): void {
 
   ipcMain.handle(
     'feedback:listFalsePositives',
-    async (_event, projectPath: string, source?: 'guard' | 'sentinel'): Promise<FalsePositiveFeedbackRecord[]> => {
+    async (
+      _event,
+      projectPath: string,
+      source?: 'guard' | 'sentinel',
+    ): Promise<FalsePositiveFeedbackRecord[]> => {
       if (!projectPath || typeof projectPath !== 'string') return [];
       return listFalsePositives(projectPath, source);
     },
-  );}
+  );
+}

@@ -42,17 +42,19 @@ describe('AlertHandler', () => {
 
     it('should accept valid webhook and create event', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-webhook-1',
-          labels: {
-            alertname: 'WebhookAlert',
-            service: 'api',
-            module: 'gateway',
-            severity: 'critical',
-            repo: 'proj-1',
+        alerts: [
+          {
+            fingerprint: 'fp-webhook-1',
+            labels: {
+              alertname: 'WebhookAlert',
+              service: 'api',
+              module: 'gateway',
+              severity: 'critical',
+              repo: 'proj-1',
+            },
+            annotations: { summary: 'Webhook test alert' },
           },
-          annotations: { summary: 'Webhook test alert' },
-        }],
+        ],
       };
       const result = handler.handleWebhook(TOKEN, payload);
       expect(result.accepted).toBe(true);
@@ -61,17 +63,19 @@ describe('AlertHandler', () => {
 
     it('should deduplicate alerts via webhook', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-dedup-wh',
-          labels: {
-            alertname: 'DedupWH',
-            service: 'api',
-            module: 'core',
-            severity: 'high',
-            repo: 'proj-1',
+        alerts: [
+          {
+            fingerprint: 'fp-dedup-wh',
+            labels: {
+              alertname: 'DedupWH',
+              service: 'api',
+              module: 'core',
+              severity: 'high',
+              repo: 'proj-1',
+            },
+            annotations: { summary: 'Dedup webhook test' },
           },
-          annotations: { summary: 'Dedup webhook test' },
-        }],
+        ],
       };
       const first = handler.handleWebhook(TOKEN, payload);
       const second = handler.handleWebhook(TOKEN, payload);

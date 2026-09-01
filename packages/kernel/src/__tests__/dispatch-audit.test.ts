@@ -32,15 +32,17 @@ function makeFakeAdapter(resultOverrides?: Partial<ToolResult>): ToolAdapter {
 }
 
 function registerDispatchRule(registry: SopRegistry, tool: string): void {
-  registry.register(makeRule({
-    id: `guard.block.external.${tool}`,
-    domain: 'guard',
-    action: 'block',
-    severity: 'high',
-    content: {
-      check: { tool, toolConfig: {} },
-    },
-  }));
+  registry.register(
+    makeRule({
+      id: `guard.block.external.${tool}`,
+      domain: 'guard',
+      action: 'block',
+      severity: 'high',
+      content: {
+        check: { tool, toolConfig: {} },
+      },
+    }),
+  );
 }
 
 describe('tool-dispatch 审计（F0-4）— kernel SOP 派发扫描补记 audit log', () => {

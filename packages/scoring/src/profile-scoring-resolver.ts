@@ -36,7 +36,7 @@ export interface ProfileScoringOverrides {
  */
 const TYPE_WEIGHT_DELTAS: Record<ProjectType, Partial<Record<string, number>>> = {
   backend: {},
-  frontend: { security: -0.10, quality: +0.10 },
+  frontend: { security: -0.1, quality: +0.1 },
   app: { security: -0.05, quality: +0.05 },
   'mini-program': { dependencies: -0.08, quality: +0.08 },
   desktop: { security: +0.05, documentation: -0.05 },
@@ -63,7 +63,9 @@ const TYPE_DISABLED_DIMENSIONS: Record<ProjectType, string[]> = {
  * 解析画像 → 评分覆盖。
  * profile 为空或 type=unknown 时返回空对象（向后兼容）。
  */
-export function resolveProfileScoring(profile?: ScoringProjectProfile | null): ProfileScoringOverrides {
+export function resolveProfileScoring(
+  profile?: ScoringProjectProfile | null,
+): ProfileScoringOverrides {
   if (!profile || profile.type === 'unknown') return {};
   const deltas = TYPE_WEIGHT_DELTAS[profile.type];
   const disabled = TYPE_DISABLED_DIMENSIONS[profile.type];

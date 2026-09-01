@@ -15,7 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        # pnpm 11 要求 Node ≥22.13（node:sqlite 内置模块），Node 20 已 EOL 不可用
+        node-version: [22, 24]
 
     steps:
       - name: Checkout

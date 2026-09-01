@@ -150,7 +150,10 @@ function parseOpenCodeConfig(raw: string | null): Record<string, unknown> | null
  * - mcpBlock 非空时写入 mcp.zhshield；为 null 时移除 zhshield（停用）
  * - 既有配置无法解析时返回 null，调用方应跳过写入（避免破坏用户文件）
  */
-export function buildOpenCodeConfigJson(existing: string | null, mcpBlock: OpenCodeMcpBlock | null): string | null {
+export function buildOpenCodeConfigJson(
+  existing: string | null,
+  mcpBlock: OpenCodeMcpBlock | null,
+): string | null {
   const base = parseOpenCodeConfig(existing);
   if (base === null) return null;
 

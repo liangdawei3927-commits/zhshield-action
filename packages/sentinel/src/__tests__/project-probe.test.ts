@@ -23,7 +23,9 @@ describe('parseRunCommand', () => {
   });
 
   it('falls back to start then build when dev is absent', () => {
-    expect(parseRunCommand(JSON.stringify({ scripts: { start: 'node server.js', build: 'tsc' } }))).toEqual({
+    expect(
+      parseRunCommand(JSON.stringify({ scripts: { start: 'node server.js', build: 'tsc' } })),
+    ).toEqual({
       script: 'start',
       command: 'npm run start',
     });

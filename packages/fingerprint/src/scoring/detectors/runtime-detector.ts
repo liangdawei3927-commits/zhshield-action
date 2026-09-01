@@ -30,7 +30,11 @@ export function detectRuntime(
   const signals: ProfileSignal[] = [];
 
   // electron 优先（覆盖 node/browser）
-  if (framework === 'electron' || hasFile(scan, 'electron/main.ts') || hasFile(scan, 'electron/main.js')) {
+  if (
+    framework === 'electron' ||
+    hasFile(scan, 'electron/main.ts') ||
+    hasFile(scan, 'electron/main.js')
+  ) {
     signals.push({
       file: '(framework-inferred)',
       kind: 'source-pattern',

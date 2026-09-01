@@ -14,7 +14,18 @@ interface TechDebtPageProps {
 }
 
 export function TechDebtPage({ projectPath }: TechDebtPageProps) {
-  const { loading, report, planLoading, verifyLoading, handleScan, handlePlan, handleVerify, handleDismiss, copyToAi, copyAllToAi } = useTechDebtPage(projectPath);
+  const {
+    loading,
+    report,
+    planLoading,
+    verifyLoading,
+    handleScan,
+    handlePlan,
+    handleVerify,
+    handleDismiss,
+    copyToAi,
+    copyAllToAi,
+  } = useTechDebtPage(projectPath);
 
   if (report) {
     return (

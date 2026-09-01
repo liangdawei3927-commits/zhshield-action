@@ -51,7 +51,12 @@ import { existsSync } from 'node:fs';
 import { BIN_DIR, TOOLS_DIR, IS_WIN, log, warn, ok, fail } from './lib/install-tools/constants.mjs';
 import { readManifest, binNameFor } from './lib/install-tools/manifest.mjs';
 import {
-  findInPath, getToolVersion, getNpmInstalledVersion, versionsMatch, supportsVersionFlag, probeTimeoutFor,
+  findInPath,
+  getToolVersion,
+  getNpmInstalledVersion,
+  versionsMatch,
+  supportsVersionFlag,
+  probeTimeoutFor,
 } from './lib/install-tools/detect.mjs';
 import { installTool } from './lib/install-tools/installers.mjs';
 
@@ -100,7 +105,9 @@ function checkPath(tool, label, binName) {
   if (actual && versionsMatch(actual, tool.version)) {
     ok(`${label} 可用（PATH: ${pathHit}）`);
   } else {
-    warn(`${label} PATH 命中但版本不符（${actual || '未知'} ≠ ${tool.version}），PATH 工具由用户管理，跳过`);
+    warn(
+      `${label} PATH 命中但版本不符（${actual || '未知'} ≠ ${tool.version}），PATH 工具由用户管理，跳过`,
+    );
   }
   return { tool, status: 'path' };
 }
@@ -109,7 +116,10 @@ function checkPath(tool, label, binName) {
 function checkLocal(tool, label, binName, force) {
   const localBin = join(BIN_DIR, IS_WIN ? `${binName}.cmd` : binName);
   if (!existsSync(localBin) || force) return null;
-  const actual = tool.install === 'npm' ? getNpmInstalledVersion(tool) : getToolVersion(localBin, probeTimeoutFor(tool));
+  const actual =
+    tool.install === 'npm'
+      ? getNpmInstalledVersion(tool)
+      : getToolVersion(localBin, probeTimeoutFor(tool));
   if (actual && versionsMatch(actual, tool.version)) {
     ok(`${label} 可用（${localBin}）`);
     return { tool, status: 'local' };
@@ -153,15 +163,21 @@ function printSummary(rows, installedCount, missingCount, values) {
   log('');
   const byStatus = (s) => rows.filter((r) => r.status === s).length;
   const available = byStatus('path') + byStatus('local') + byStatus('builtin');
-  log(`[zhshield tools] 汇总: ${available} 可用 / ${installedCount} 新安装 / ${missingCount} 缺失或失败`);
+  log(
+    `[zhshield tools] 汇总: ${available} 可用 / ${installedCount} 新安装 / ${missingCount} 缺失或失败`,
+  );
   if (values.check) {
-    log(missingCount === 0
-      ? '[zhshield tools] 全部工具可用。'
-      : `[zhshield tools] ${missingCount} 个工具缺失，请运行 node scripts/install-tools.mjs 安装。`);
+    log(
+      missingCount === 0
+        ? '[zhshield tools] 全部工具可用。'
+        : `[zhshield tools] ${missingCount} 个工具缺失，请运行 node scripts/install-tools.mjs 安装。`,
+    );
     process.exit(missingCount > 0 ? 1 : 0);
   }
   if (installedCount > 0) {
-    log(`已将 ${installedCount} 个工具安装到 ${BIN_DIR}，请将其加入 PATH（或使用 zhshield tools install 的等效入口）`);
+    log(
+      `已将 ${installedCount} 个工具安装到 ${BIN_DIR}，请将其加入 PATH（或使用 zhshield tools install 的等效入口）`,
+    );
   } else if (missingCount === 0) {
     log('无需安装：全部工具已可用。');
   } else {
@@ -206,7 +222,14 @@ if (isMain) {
 
 // 导出供测试/复用（各职责域实现见 scripts/lib/install-tools/）
 export {
-  readManifest, binNameFor, findInPath, getToolVersion, getNpmInstalledVersion,
-  versionsMatch, supportsVersionFlag, installTool,
-  BIN_DIR, TOOLS_DIR,
+  readManifest,
+  binNameFor,
+  findInPath,
+  getToolVersion,
+  getNpmInstalledVersion,
+  versionsMatch,
+  supportsVersionFlag,
+  installTool,
+  BIN_DIR,
+  TOOLS_DIR,
 };

@@ -84,7 +84,10 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       securityRelevant: false,
       reason: '从 17 升级至 18：并发特性（Concurrent）稳定，需将 ReactDOM.render 迁移为 createRoot',
       breakingChanges: [
-        { type: 'API 变更', description: 'ReactDOM.render / unmountComponentAtNode 移除，改用 createRoot' },
+        {
+          type: 'API 变更',
+          description: 'ReactDOM.render / unmountComponentAtNode 移除，改用 createRoot',
+        },
         { type: '行为变更', description: '自动批处理覆盖更多场景，副作用时序可能变化' },
       ],
     },
@@ -92,10 +95,14 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       targetVersion: '19',
       risk: 'medium',
       securityRelevant: false,
-      reason: '从 17/18 升级至 19：移除遗留 API，需使用 react-dom 的 createRoot 并检查 ref 回调语义',
+      reason:
+        '从 17/18 升级至 19：移除遗留 API，需使用 react-dom 的 createRoot 并检查 ref 回调语义',
       breakingChanges: [
         { type: 'API 变更', description: '移除对 IE 的支持与部分遗留 props（如 string ref）' },
-        { type: '行为变更', description: 'ref 回调在清理阶段不再以 null 调用，HMR 相关生命周期调整' },
+        {
+          type: '行为变更',
+          description: 'ref 回调在清理阶段不再以 null 调用，HMR 相关生命周期调整',
+        },
       ],
     },
   ],
@@ -116,7 +123,9 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       risk: 'low',
       securityRelevant: true,
       reason: '锁定安全修复版本：4.17.21 修复原型污染（prototype pollution）等已知漏洞',
-      breakingChanges: [{ type: '安全修复', description: '修复 prototype pollution（CVE 相关），行为与 4.x 兼容' }],
+      breakingChanges: [
+        { type: '安全修复', description: '修复 prototype pollution（CVE 相关），行为与 4.x 兼容' },
+      ],
     },
   ],
   express: [
@@ -127,7 +136,10 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       reason: '升级至 Express 5：修复 path-to-regexp ReDoS 等安全缺陷，路由通配语法有破坏性变化',
       breakingChanges: [
         { type: '路由语法', description: '通配符 * 改为具名通配 {*splat}，正则路由写法变更' },
-        { type: 'API 变更', description: 'res.send(status) 移除，需改为 res.status(status).send()' },
+        {
+          type: 'API 变更',
+          description: 'res.send(status) 移除，需改为 res.status(status).send()',
+        },
       ],
     },
   ],
@@ -150,7 +162,10 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       securityRelevant: false,
       reason: '升级至 TypeScript 5：更快的构建与更精确的推断，个别类型推断结果可能变化',
       breakingChanges: [
-        { type: '行为变更', description: '部分 lib 类型收紧（如 NodeJS.Timeout），个别第三方声明需调整' },
+        {
+          type: '行为变更',
+          description: '部分 lib 类型收紧（如 NodeJS.Timeout），个别第三方声明需调整',
+        },
       ],
     },
   ],
@@ -160,9 +175,7 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       risk: 'medium',
       securityRelevant: false,
       reason: '升级至 Vite 5：基于 Rollup 4，Node 版本要求提升，插件需检查兼容性',
-      breakingChanges: [
-        { type: '环境要求', description: '要求 Node.js 18+，部分旧插件需升级' },
-      ],
+      breakingChanges: [{ type: '环境要求', description: '要求 Node.js 18+，部分旧插件需升级' }],
     },
   ],
   axios: [
@@ -172,7 +185,11 @@ export const DEFAULT_UPGRADE_CATALOG: UpgradeCatalog = {
       securityRelevant: true,
       reason: '升级至 axios 1.x：修复原型污染 / SSRF 等安全缺陷，默认适配器与请求体序列化行为调整',
       breakingChanges: [
-        { type: '行为变更', description: '默认 adapter 从 XHR 切换（Node 下自动选择），FormData / URLSearchParams 序列化差异' },
+        {
+          type: '行为变更',
+          description:
+            '默认 adapter 从 XHR 切换（Node 下自动选择），FormData / URLSearchParams 序列化差异',
+        },
       ],
     },
   ],
@@ -269,7 +286,12 @@ function scanAffectedFiles(projectRoot: string, packageName: string, scanLimit: 
 }
 
 /** 读取文件并检测是否 import 目标包；命中则记录相对路径 */
-function collectIfImports(full: string, importRe: RegExp, affected: string[], projectRoot: string): void {
+function collectIfImports(
+  full: string,
+  importRe: RegExp,
+  affected: string[],
+  projectRoot: string,
+): void {
   let content: string;
   try {
     content = fs.readFileSync(full, 'utf-8');
@@ -292,7 +314,10 @@ function compareCandidates(current: string, a: UpgradeCandidate, b: UpgradeCandi
 export class UpgradeEvaluatorImpl implements UpgradeEvaluator {
   constructor(private readonly catalog: UpgradeCatalog = DEFAULT_UPGRADE_CATALOG) {}
 
-  async evaluate(node: DependencyNode, options?: UpgradeEvaluatorOptions): Promise<UpgradeAssessment> {
+  async evaluate(
+    node: DependencyNode,
+    options?: UpgradeEvaluatorOptions,
+  ): Promise<UpgradeAssessment> {
     const entries = this.catalog[node.name] ?? [];
     const scanLimit = options?.scanLimit ?? DEFAULT_SCAN_LIMIT;
     const projectRoot = options?.projectRoot;
@@ -303,7 +328,11 @@ export class UpgradeEvaluatorImpl implements UpgradeEvaluator {
 }
 
 /** code-scan：仅在提供 projectRoot 且 scanLimit > 0 时执行（防 DoS） */
-function collectAffectedFiles(projectRoot: string | undefined, packageName: string, scanLimit: number): string[] {
+function collectAffectedFiles(
+  projectRoot: string | undefined,
+  packageName: string,
+  scanLimit: number,
+): string[] {
   if (!projectRoot || scanLimit <= 0) return [];
   return scanAffectedFiles(projectRoot, packageName, scanLimit);
 }

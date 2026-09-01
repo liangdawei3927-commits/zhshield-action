@@ -2,7 +2,11 @@ import { describe, expect, it, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { UpgradeEvaluatorImpl, DEFAULT_UPGRADE_CATALOG, type UpgradeCatalog } from '../adapters/upgrade-evaluator';
+import {
+  UpgradeEvaluatorImpl,
+  DEFAULT_UPGRADE_CATALOG,
+  type UpgradeCatalog,
+} from '../adapters/upgrade-evaluator';
 import type { DependencyNode } from '../types';
 
 /** 创建临时目录并登记清理（沿用 graph-builder.test.ts 约定） */
@@ -64,8 +68,20 @@ describe('UpgradeEvaluatorImpl 候选生成', () => {
   it('目录注入：securityRelevant 置顶，低风险先于高风险', async () => {
     const catalog: UpgradeCatalog = {
       react: [
-        { targetVersion: '18', risk: 'low', securityRelevant: false, reason: '低风险升级', breakingChanges: [] },
-        { targetVersion: '19', risk: 'high', securityRelevant: true, reason: '修复漏洞', breakingChanges: [] },
+        {
+          targetVersion: '18',
+          risk: 'low',
+          securityRelevant: false,
+          reason: '低风险升级',
+          breakingChanges: [],
+        },
+        {
+          targetVersion: '19',
+          risk: 'high',
+          securityRelevant: true,
+          reason: '修复漏洞',
+          breakingChanges: [],
+        },
       ],
     };
     const injected = new UpgradeEvaluatorImpl(catalog);
@@ -79,8 +95,20 @@ describe('UpgradeEvaluatorImpl 候选生成', () => {
   it('目录注入：无 securityRelevant 时低风险先于高风险', async () => {
     const catalog: UpgradeCatalog = {
       react: [
-        { targetVersion: '18', risk: 'medium', securityRelevant: false, reason: '中风险', breakingChanges: [] },
-        { targetVersion: '19', risk: 'low', securityRelevant: false, reason: '低风险', breakingChanges: [] },
+        {
+          targetVersion: '18',
+          risk: 'medium',
+          securityRelevant: false,
+          reason: '中风险',
+          breakingChanges: [],
+        },
+        {
+          targetVersion: '19',
+          risk: 'low',
+          securityRelevant: false,
+          reason: '低风险',
+          breakingChanges: [],
+        },
       ],
     };
     const injected = new UpgradeEvaluatorImpl(catalog);
@@ -93,8 +121,20 @@ describe('UpgradeEvaluatorImpl 候选生成', () => {
   it('目录注入：同风险时落后最久者优先', async () => {
     const catalog: UpgradeCatalog = {
       react: [
-        { targetVersion: '18', risk: 'low', securityRelevant: false, reason: '落后1个大版本', breakingChanges: [] },
-        { targetVersion: '19', risk: 'low', securityRelevant: false, reason: '落后2个大版本', breakingChanges: [] },
+        {
+          targetVersion: '18',
+          risk: 'low',
+          securityRelevant: false,
+          reason: '落后1个大版本',
+          breakingChanges: [],
+        },
+        {
+          targetVersion: '19',
+          risk: 'low',
+          securityRelevant: false,
+          reason: '落后2个大版本',
+          breakingChanges: [],
+        },
       ],
     };
     const injected = new UpgradeEvaluatorImpl(catalog);
@@ -169,7 +209,10 @@ describe('UpgradeEvaluatorImpl code-scan（affectedFiles）', () => {
     const dir = tmpDir('zh-upg-zero-');
     writeFile(dir, 'src/index.ts', "import 'react';\n");
 
-    const assessment = await evaluator.evaluate(makeNode('react', '17.0.2'), { projectRoot: dir, scanLimit: 0 });
+    const assessment = await evaluator.evaluate(makeNode('react', '17.0.2'), {
+      projectRoot: dir,
+      scanLimit: 0,
+    });
 
     for (const candidate of assessment.candidates) {
       expect(candidate.breakingChanges[0].affectedFiles).toEqual([]);
@@ -188,14 +231,27 @@ describe('UpgradeEvaluatorImpl code-scan（affectedFiles）', () => {
   it('默认目录覆盖 >=8 个知名包', () => {
     const names = Object.keys(DEFAULT_UPGRADE_CATALOG);
     expect(names.length).toBeGreaterThanOrEqual(8);
-    expect(names).toEqual(expect.arrayContaining(['react', 'vue', 'lodash', 'express', 'webpack', 'typescript', 'vite', 'axios']));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'react',
+        'vue',
+        'lodash',
+        'express',
+        'webpack',
+        'typescript',
+        'vite',
+        'axios',
+      ]),
+    );
   });
 
   it('非法包名（含正则元字符）被拒绝：不扫描、不挂起', { timeout: 1000 }, async () => {
     const dir = tmpDir('zh-upg-redos-');
     writeFile(dir, 'src/index.ts', "import 'react';\n");
 
-    const assessment = await evaluator.evaluate(makeNode('react(.*)+$', '17.0.2'), { projectRoot: dir });
+    const assessment = await evaluator.evaluate(makeNode('react(.*)+$', '17.0.2'), {
+      projectRoot: dir,
+    });
 
     for (const candidate of assessment.candidates) {
       for (const change of candidate.breakingChanges) {
@@ -208,7 +264,9 @@ describe('UpgradeEvaluatorImpl code-scan（affectedFiles）', () => {
     const dir = tmpDir('zh-upg-scoped-');
     writeFile(dir, 'src/index.ts', "import '@myorg/ui';\n");
 
-    const assessment = await evaluator.evaluate(makeNode('@myorg/ui', '1.0.0'), { projectRoot: dir });
+    const assessment = await evaluator.evaluate(makeNode('@myorg/ui', '1.0.0'), {
+      projectRoot: dir,
+    });
 
     for (const candidate of assessment.candidates) {
       expect(candidate.breakingChanges[0].affectedFiles).toEqual(['src/index.ts']);

@@ -199,6 +199,7 @@ export class ProfileStore {
   private collectProfilesFromDir(result: Map<string, ProjectProfile>): void {
     const files = fs.readdirSync(this.baseDir);
     for (const file of files) {
+      if (file === 'node_modules') continue;
       if (!file.endsWith('.json')) continue;
 
       const filePath = path.join(this.baseDir, file);
@@ -239,10 +240,7 @@ export class ProfileStore {
   }
 
   /** 合并 UserOverrides */
-  private mergeUserOverrides(
-    existing: UserOverrides,
-    incoming: UserOverrides,
-  ): UserOverrides {
+  private mergeUserOverrides(existing: UserOverrides, incoming: UserOverrides): UserOverrides {
     const mergedTargets =
       existing.targets !== undefined || incoming.targets !== undefined
         ? { ...existing.targets, ...incoming.targets }

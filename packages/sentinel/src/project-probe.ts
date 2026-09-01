@@ -51,7 +51,11 @@ export function discoverLogPaths(projectPath: string, limit = 20): string[] {
 }
 
 /** 收集目录内匹配扩展名的日志文件（记录 mtime 供排序） */
-function collectLogCandidates(dir: string, extension: string, candidates: Array<{ file: string; mtimeMs: number }>): void {
+function collectLogCandidates(
+  dir: string,
+  extension: string,
+  candidates: Array<{ file: string; mtimeMs: number }>,
+): void {
   let entries: fs.Dirent[] = [];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -59,6 +63,7 @@ function collectLogCandidates(dir: string, extension: string, candidates: Array<
     return;
   }
   for (const entry of entries) {
+    if (entry.isDirectory() && entry.name === 'node_modules') continue;
     if (!entry.isFile() || !entry.name.endsWith(extension)) continue;
     const file = safeJoin(dir, entry.name);
     try {

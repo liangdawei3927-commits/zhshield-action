@@ -28,7 +28,11 @@ export class SemgrepScanArgsBuilder {
   }
 
   /** 写入内联规则并追加 --config 参数 */
-  private async appendInlineRuleArgs(args: string[], options: ToolScanOptions, targetDir: string): Promise<void> {
+  private async appendInlineRuleArgs(
+    args: string[],
+    options: ToolScanOptions,
+    targetDir: string,
+  ): Promise<void> {
     const rulePath = await this.ruleWriter.writeInlineRuleConfig(options, targetDir);
     if (rulePath) args.push('--config', rulePath);
   }
@@ -37,7 +41,17 @@ export class SemgrepScanArgsBuilder {
   private appendExcludeArgs(args: string[]): void {
     // 排除生成目录与测试夹具目录，避免扫描 dist/assets 下的规则文件触发自身误报，
     // 以及把刻意构造的恶意测试样例（如 __tests__/fixtures/conflict-resolver/evil.ts）当生产代码上报（对齐 refactor 引擎约定）
-    for (const excl of ['node_modules', 'dist', 'build', '.semgrep', 'coverage', '__tests__', 'fixtures', '__fixtures__', '__mocks__']) {
+    for (const excl of [
+      'node_modules',
+      'dist',
+      'build',
+      '.semgrep',
+      'coverage',
+      '__tests__',
+      'fixtures',
+      '__fixtures__',
+      '__mocks__',
+    ]) {
       args.push('--exclude', excl);
     }
   }

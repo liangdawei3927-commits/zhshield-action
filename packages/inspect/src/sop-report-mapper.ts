@@ -10,7 +10,10 @@ import type { RuleEngineReport } from '@zh/kernel';
  */
 export class SopReportMapper {
   /** 合并 inspect / security 两个域的评估报告 */
-  mergeReports(inspectReport: RuleEngineReport, securityReport: RuleEngineReport): RuleEngineReport {
+  mergeReports(
+    inspectReport: RuleEngineReport,
+    securityReport: RuleEngineReport,
+  ): RuleEngineReport {
     return {
       ...inspectReport,
       total: inspectReport.total + securityReport.total,
@@ -32,9 +35,12 @@ export class SopReportMapper {
           issues.push({
             id: v.id,
             ruleId: v.ruleId,
-            severity: v.severity === 'critical' || v.severity === 'high' ? 'error'
-              : v.severity === 'medium' ? 'warning'
-              : 'info',
+            severity:
+              v.severity === 'critical' || v.severity === 'high'
+                ? 'error'
+                : v.severity === 'medium'
+                  ? 'warning'
+                  : 'info',
             category: v.category ?? 'quality',
             message: v.message,
             file: v.file,
@@ -58,14 +64,17 @@ export class SopReportMapper {
       duration: ev.durationMs,
       issueCount: ev.violations?.length ?? 0,
       passed: ev.status === 'passed',
-      status: ev.status === 'passed' ? 'passed' as const : ev.status,
+      status: ev.status === 'passed' ? ('passed' as const) : ev.status,
       issues: ev.violations
         ? ev.violations.map((v) => ({
             id: v.id,
             ruleId: v.ruleId,
-            severity: v.severity === 'critical' || v.severity === 'high' ? 'error' as const
-              : v.severity === 'medium' ? 'warning' as const
-              : 'info' as const,
+            severity:
+              v.severity === 'critical' || v.severity === 'high'
+                ? ('error' as const)
+                : v.severity === 'medium'
+                  ? ('warning' as const)
+                  : ('info' as const),
             category: (v.category ?? 'quality') as IssueCategory,
             message: v.message,
             file: v.file,

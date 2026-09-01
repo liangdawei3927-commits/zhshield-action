@@ -13,7 +13,19 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PKGS = ['shared', 'db', 'kernel', 'guard', 'sentinel', 'inspect', 'scoring', 'evolve', 'security', 'desktop', 'server'];
+const PKGS = [
+  'shared',
+  'db',
+  'kernel',
+  'guard',
+  'sentinel',
+  'inspect',
+  'scoring',
+  'evolve',
+  'security',
+  'desktop',
+  'server',
+];
 const BASE = 'http://localhost:3010';
 const BASE_API = `${BASE}/api/v1`;
 
@@ -33,7 +45,11 @@ function header(title) {
 // ── 1. 构建验证 ─────────────────────────────────────────────
 header('[1/6] 构建验证');
 try {
-  const out = execSync('pnpm build 2>&1', { cwd: ROOT, maxBuffer: 10 * 1024 * 1024, timeout: 180_000 }).toString();
+  const out = execSync('pnpm build 2>&1', {
+    cwd: ROOT,
+    maxBuffer: 10 * 1024 * 1024,
+    timeout: 180_000,
+  }).toString();
   const match = out.match(/Tasks:\s+(\d+) successful/);
   if (match && parseInt(match[1]) >= 11) {
     ok(`pnpm build: ${match[0]}`);
@@ -53,7 +69,11 @@ try {
         fail(`${pkg}: missing expected dist output`);
       }
     } else {
-      const jsFiles = execSync(`find dist -name '*.js' 2>/dev/null | head -1`, { cwd: resolve(ROOT, 'packages', pkg) }).toString().trim();
+      const jsFiles = execSync(`find dist -name '*.js' 2>/dev/null | head -1`, {
+        cwd: resolve(ROOT, 'packages', pkg),
+      })
+        .toString()
+        .trim();
       if (existsSync(distDir) && jsFiles) {
         ok(`${pkg}: dist/ has JS output`);
       } else {
@@ -68,11 +88,15 @@ try {
 // ── 2. 测试验证 ─────────────────────────────────────────────
 header('[2/6] 测试验证');
 try {
-  const out = execSync('pnpm test 2>&1', { cwd: ROOT, maxBuffer: 10 * 1024 * 1024, timeout: 120_000 }).toString();
+  const out = execSync('pnpm test 2>&1', {
+    cwd: ROOT,
+    maxBuffer: 10 * 1024 * 1024,
+    timeout: 120_000,
+  }).toString();
   if (out.includes('Tests ')) {
     // extract summary line
-    const lines = out.split('\n').filter(l => l.includes('Tests '));
-    lines.forEach(l => ok(`Test result: ${l.trim()}`));
+    const lines = out.split('\n').filter((l) => l.includes('Tests '));
+    lines.forEach((l) => ok(`Test result: ${l.trim()}`));
     if (out.includes('FAIL') || out.includes('failed')) {
       fail('Some tests failed (check output above)');
     }
@@ -98,7 +122,7 @@ for (const pkg of PKGS) {
   } catch (e) {
     const stderr = e.stderr?.toString() || '';
     const stdout = e.stdout?.toString() || '';
-    const errs = (stderr + stdout).split('\n').filter(l => l.includes('error TS')).length;
+    const errs = (stderr + stdout).split('\n').filter((l) => l.includes('error TS')).length;
     if (errs > 0) {
       fail(`${pkg}: ${errs} TS errors`);
     } else {
@@ -112,7 +136,9 @@ header('[4/6] 服务器启动与健康检查');
 let serverProcess = null;
 try {
   // Kill any existing server
-  try { execSync('kill $(lsof -t -i:3010) 2>/dev/null || true'); } catch {}
+  try {
+    execSync('kill $(lsof -t -i:3010) 2>/dev/null || true');
+  } catch {}
 
   // Start server
   serverProcess = spawn('node', ['dist/main.js'], {
@@ -138,7 +164,12 @@ try {
     });
     serverProcess.stderr.on('data', (data) => {
       output += data.toString();
-      if (output.includes('listening') || output.includes('started') || output.includes('Server') || output.includes('Nest')) {
+      if (
+        output.includes('listening') ||
+        output.includes('started') ||
+        output.includes('Server') ||
+        output.includes('Nest')
+      ) {
         clearTimeout(timeout);
         resolveTimeout();
       }
@@ -168,7 +199,6 @@ try {
   } else {
     fail(`Ready check returned ${ready.status}`);
   }
-
 } catch (e) {
   fail(`Server start/health failed: ${e.message}`);
 }
@@ -176,16 +206,22 @@ try {
 // ── 5. API 端点验证 ─────────────────────────────────────────
 header('[5/6] API 端点验证');
 const apiTests = [
-  { name: 'sop version',     url: `${BASE_API}/sop/version`,              method: 'GET' },
-  { name: 'sop emergency',   url: `${BASE_API}/sop/emergency`,            method: 'GET' },
-  { name: 'sop diff',        url: `${BASE_API}/sop/diff?from=1.0.0&to=2.0.0`, method: 'GET' },
-  { name: 'sop full',        url: `${BASE_API}/sop/full/1.0.0`,           method: 'GET' },
-  { name: 'rules eslint v',  url: `${BASE_API}/rules/eslint/version`,     method: 'GET' },
-  { name: 'rules eslint em', url: `${BASE_API}/rules/eslint/emergency`,   method: 'GET' },
-  { name: 'experience post', url: `${BASE_API}/experience`,               method: 'POST', body: { accepted: 1, rejected: 0 } },
+  { name: 'sop version', url: `${BASE_API}/sop/version`, method: 'GET' },
+  { name: 'sop emergency', url: `${BASE_API}/sop/emergency`, method: 'GET' },
+  { name: 'sop diff', url: `${BASE_API}/sop/diff?from=1.0.0&to=2.0.0`, method: 'GET' },
+  { name: 'sop full', url: `${BASE_API}/sop/full/1.0.0`, method: 'GET' },
+  { name: 'rules eslint v', url: `${BASE_API}/rules/eslint/version`, method: 'GET' },
+  { name: 'rules eslint em', url: `${BASE_API}/rules/eslint/emergency`, method: 'GET' },
+  {
+    name: 'experience post',
+    url: `${BASE_API}/experience`,
+    method: 'POST',
+    body: { accepted: 1, rejected: 0 },
+  },
 ];
 
-let apiPassed = 0, apiFailed = 0;
+let apiPassed = 0,
+  apiFailed = 0;
 for (const t of apiTests) {
   try {
     const opts = { method: t.method, headers: { 'Content-Type': 'application/json' } };
@@ -242,7 +278,8 @@ await testEngine('SopRegistry CRUD', async () => {
     const updated = registry.update(first.id, { severity: 'critical' });
     if (!updated) throw new Error('update returned null');
     registry.remove(first.id);
-    if (registry.count() !== count - 1) throw new Error(`remove failed: count ${registry.count()} != ${count - 1}`);
+    if (registry.count() !== count - 1)
+      throw new Error(`remove failed: count ${registry.count()} != ${count - 1}`);
   }
   const stats = registry.getStats();
   if (!stats) throw new Error('getStats returned null');
@@ -276,9 +313,27 @@ await testEngine('ScoringEngine', async () => {
 await testEngine('EvolveEngine', async () => {
   const { EvolveEngine } = await import(`${EVOLVE_DIST}/engine.js`);
   const engine = new EvolveEngine();
-  engine.recordExperience({ projectId: 'test', ruleId: 'test', type: 'true-positive', detail: 'test', source: 'regression' });
-  engine.recordExperience({ projectId: 'test', ruleId: 'test', type: 'false-positive', detail: 'test', source: 'regression' });
-  engine.recordExperience({ projectId: 'test', ruleId: 'test', type: 'false-positive', detail: 'test', source: 'regression' });
+  engine.recordExperience({
+    projectId: 'test',
+    ruleId: 'test',
+    type: 'true-positive',
+    detail: 'test',
+    source: 'regression',
+  });
+  engine.recordExperience({
+    projectId: 'test',
+    ruleId: 'test',
+    type: 'false-positive',
+    detail: 'test',
+    source: 'regression',
+  });
+  engine.recordExperience({
+    projectId: 'test',
+    ruleId: 'test',
+    type: 'false-positive',
+    detail: 'test',
+    source: 'regression',
+  });
   const weights = engine.autoAdjustWeights();
   if (!weights || !Array.isArray(weights)) throw new Error('autoAdjustWeights failed');
 });
@@ -296,7 +351,9 @@ console.log('='.repeat(60));
 // Cleanup server
 if (serverProcess) {
   serverProcess.kill();
-  try { execSync('kill $(lsof -t -i:3010) 2>/dev/null || true'); } catch {}
+  try {
+    execSync('kill $(lsof -t -i:3010) 2>/dev/null || true');
+  } catch {}
 }
 
-process.exit((pass && apiFailed === 0) ? 0 : 1);
+process.exit(pass && apiFailed === 0 ? 0 : 1);

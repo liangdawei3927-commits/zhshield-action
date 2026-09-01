@@ -93,13 +93,24 @@ describe('SemgrepAdapter', () => {
         stdout: JSON.stringify({
           version: '1.172.0',
           results: [],
-          errors: [{ code: 2, level: 'error', type: 'SemgrepError', message: 'Invalid scanning root: src' }],
+          errors: [
+            {
+              code: 2,
+              level: 'error',
+              type: 'SemgrepError',
+              message: 'Invalid scanning root: src',
+            },
+          ],
         }),
         stderr: OCAML_NOISE_STDERR,
         message: 'Command failed: semgrep scan',
       });
 
-      const result = await adapter.scan({ projectPath: project, projectId: project, config: { enabled: true, config: 'redos.yml' } });
+      const result = await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true, config: 'redos.yml' },
+      });
 
       expect(result.status).toBe('error');
       expect(result.error).toBe('Invalid scanning root: src');
@@ -113,9 +124,18 @@ describe('SemgrepAdapter', () => {
     const project = tempProject(true);
     writeDefaultConfig(project);
     try {
-      mockFailure({ code: 1, stdout: '', stderr: OCAML_NOISE_STDERR, message: 'Command failed: semgrep scan' });
+      mockFailure({
+        code: 1,
+        stdout: '',
+        stderr: OCAML_NOISE_STDERR,
+        message: 'Command failed: semgrep scan',
+      });
 
-      const result = await adapter.scan({ projectPath: project, projectId: project, config: { enabled: true, config: 'redos.yml' } });
+      const result = await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true, config: 'redos.yml' },
+      });
 
       expect(result.status).toBe('error');
       expect(result.error).toBe('Command failed: semgrep scan');
@@ -132,7 +152,11 @@ describe('SemgrepAdapter', () => {
     try {
       mockFailure({ code: 'ETIMEDOUT', stdout: '', stderr: '', message: 'ETIMEDOUT' });
 
-      const result = await adapter.scan({ projectPath: project, projectId: project, config: { enabled: true, config: 'redos.yml' } });
+      const result = await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true, config: 'redos.yml' },
+      });
 
       expect(result.status).toBe('error');
       expect(result.error).toBe('Semgrep 扫描超时');
@@ -144,7 +168,11 @@ describe('SemgrepAdapter', () => {
   it('未配置规则集（无 config 且无内联 rules）时返回 unavailable，禁止裸跑 registry auto', async () => {
     const project = tempProject(true);
     try {
-      const result = await adapter.scan({ projectPath: project, projectId: project, config: { enabled: true } });
+      const result = await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true },
+      });
 
       expect(result.status).toBe('unavailable');
       expect(result.error).toContain('未配置规则集');
@@ -162,12 +190,14 @@ describe('SemgrepAdapter', () => {
         code: 1,
         stdout: JSON.stringify({
           version: '1.172.0',
-          results: [{
-            check_id: 'detect-redos',
-            path: 'src/a.js',
-            start: { line: 2, col: 1 },
-            extra: { severity: 'WARNING', message: 'ReDoS risk' },
-          }],
+          results: [
+            {
+              check_id: 'detect-redos',
+              path: 'src/a.js',
+              start: { line: 2, col: 1 },
+              extra: { severity: 'WARNING', message: 'ReDoS risk' },
+            },
+          ],
           errors: [],
         }),
         stderr: OCAML_NOISE_STDERR,
@@ -194,7 +224,11 @@ describe('SemgrepAdapter', () => {
     writeDefaultConfig(withSrc);
     try {
       mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
-      await adapter.scan({ projectPath: withSrc, projectId: withSrc, config: { enabled: true, config: 'redos.yml' } });
+      await adapter.scan({
+        projectPath: withSrc,
+        projectId: withSrc,
+        config: { enabled: true, config: 'redos.yml' },
+      });
       expect(lastTargetArg()).toBe(path.join(withSrc, 'src'));
     } finally {
       rmSync(withSrc, { recursive: true, force: true });
@@ -205,7 +239,11 @@ describe('SemgrepAdapter', () => {
     try {
       execFileMock.mockReset();
       mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
-      await adapter.scan({ projectPath: withPackages, projectId: withPackages, config: { enabled: true, config: 'redos.yml' } });
+      await adapter.scan({
+        projectPath: withPackages,
+        projectId: withPackages,
+        config: { enabled: true, config: 'redos.yml' },
+      });
       expect(lastTargetArg()).toBe(path.join(withPackages, 'packages'));
     } finally {
       rmSync(withPackages, { recursive: true, force: true });
@@ -216,7 +254,11 @@ describe('SemgrepAdapter', () => {
     try {
       execFileMock.mockReset();
       mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
-      await adapter.scan({ projectPath: bare, projectId: bare, config: { enabled: true, config: 'redos.yml' } });
+      await adapter.scan({
+        projectPath: bare,
+        projectId: bare,
+        config: { enabled: true, config: 'redos.yml' },
+      });
       expect(lastTargetArg()).toBe(bare);
     } finally {
       rmSync(bare, { recursive: true, force: true });
@@ -229,7 +271,11 @@ describe('SemgrepAdapter', () => {
     writeDefaultConfig(container.root);
     try {
       mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
-      await adapter.scan({ projectPath: container.root, projectId: container.root, config: { enabled: true, config: 'redos.yml' } });
+      await adapter.scan({
+        projectPath: container.root,
+        projectId: container.root,
+        config: { enabled: true, config: 'redos.yml' },
+      });
       expect(lastTargetArg()).toBe(nestedPkg);
     } finally {
       rmSync(container.root, { recursive: true, force: true });
@@ -258,7 +304,11 @@ describe('SemgrepAdapter', () => {
     writeDefaultConfig(project);
     try {
       mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
-      await adapter.scan({ projectPath: project, projectId: project, config: { enabled: true, config: 'redos.yml' } });
+      await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true, config: 'redos.yml' },
+      });
 
       const args = execFileMock.mock.calls[0][1] as string[];
       const excludes: string[] = [];
@@ -266,7 +316,9 @@ describe('SemgrepAdapter', () => {
         if (args[i] === '--exclude') excludes.push(args[i + 1]);
       }
 
-      expect(excludes).toEqual(expect.arrayContaining(['__tests__', 'fixtures', '__fixtures__', '__mocks__']));
+      expect(excludes).toEqual(
+        expect.arrayContaining(['__tests__', 'fixtures', '__fixtures__', '__mocks__']),
+      );
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
@@ -281,16 +333,21 @@ describe('SemgrepAdapter', () => {
         projectId: project,
         config: {
           enabled: true,
-          rules: [{
-            id: 'path-join-user-input',
-            pattern: 'path.join($BASE_DIR, $USER_INPUT)',
-            severity: 'error',
-            message: '用户输入直接用于路径拼接可能导致路径遍历',
-            metavariableRegex: [{
-              metavariable: '$USER_INPUT',
-              regex: '^(req|request|ctx|context|query|params|body|input|userInput|user_input|argv|form|process\\.env)[\\.\\w]*$',
-            }],
-          }],
+          rules: [
+            {
+              id: 'path-join-user-input',
+              pattern: 'path.join($BASE_DIR, $USER_INPUT)',
+              severity: 'error',
+              message: '用户输入直接用于路径拼接可能导致路径遍历',
+              metavariableRegex: [
+                {
+                  metavariable: '$USER_INPUT',
+                  regex:
+                    '^(req|request|ctx|context|query|params|body|input|userInput|user_input|argv|form|process\\.env)[\\.\\w]*$',
+                },
+              ],
+            },
+          ],
         },
       });
 
@@ -317,16 +374,18 @@ describe('SemgrepAdapter', () => {
         projectId: project,
         config: {
           enabled: true,
-          rules: [{
-            id: 'sql-injection-concat',
-            patternEither: [
-              'const $QUERY = "..." + $INPUT\n$DB.query($QUERY)',
-              '$DB.query("..." + $INPUT)',
-            ],
-            patternNot: ['$DB.query("...")'],
-            severity: 'error',
-            message: 'SQL 注入',
-          }],
+          rules: [
+            {
+              id: 'sql-injection-concat',
+              patternEither: [
+                'const $QUERY = "..." + $INPUT\n$DB.query($QUERY)',
+                '$DB.query("..." + $INPUT)',
+              ],
+              patternNot: ['$DB.query("...")'],
+              severity: 'error',
+              message: 'SQL 注入',
+            },
+          ],
         },
       });
 
@@ -355,13 +414,15 @@ describe('SemgrepAdapter', () => {
         projectId: project,
         config: {
           enabled: true,
-          rules: [{
-            id: 'child-process-exec',
-            pattern: 'exec($VAR)',
-            patternNot: ['exec("...")'],
-            severity: 'error',
-            message: '命令注入',
-          }],
+          rules: [
+            {
+              id: 'child-process-exec',
+              pattern: 'exec($VAR)',
+              patternNot: ['exec("...")'],
+              severity: 'error',
+              message: '命令注入',
+            },
+          ],
         },
       });
 
@@ -388,13 +449,15 @@ describe('SemgrepAdapter', () => {
         projectId: project,
         config: {
           enabled: true,
-          rules: [{
-            id: 'cors-wildcard',
-            patternRegex: 'Access-Control-Allow-Origin\\s*[:=]\\s*[*]',
-            severity: 'warning',
-            message: 'CORS 通配符',
-            languages: ['generic'],
-          }],
+          rules: [
+            {
+              id: 'cors-wildcard',
+              patternRegex: 'Access-Control-Allow-Origin\\s*[:=]\\s*[*]',
+              severity: 'warning',
+              message: 'CORS 通配符',
+              languages: ['generic'],
+            },
+          ],
         },
       });
 

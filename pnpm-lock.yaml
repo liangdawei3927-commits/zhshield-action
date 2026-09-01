@@ -56,6 +56,31 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
+  packages/autoperf:
+    dependencies:
+      '@zh/evolve':
+        specifier: workspace:*
+        version: link:../evolve
+      '@zh/shared':
+        specifier: workspace:*
+        version: link:../shared
+      js-yaml:
+        specifier: '>=4.3.1'
+        version: 5.4.0
+    devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/cli:
     devDependencies:
       '@types/node':
@@ -296,6 +321,9 @@ importers:
 
   packages/fingerprint:
     dependencies:
+      '@zh/db':
+        specifier: workspace:*
+        version: link:../db
       '@zh/shared':
         specifier: workspace:*
         version: link:../shared
@@ -402,6 +430,9 @@ importers:
       js-yaml:
         specifier: '>=4.3.1'
         version: 5.4.0
+      picomatch:
+        specifier: ^4.0.5
+        version: 4.0.5
       yauzl:
         specifier: ^3.4.0
         version: 3.4.0
@@ -415,6 +446,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/picomatch':
+        specifier: ^4.0.3
+        version: 4.0.3
       '@types/yauzl':
         specifier: ^3.4.0
         version: 3.4.0
@@ -449,6 +483,9 @@ importers:
 
   packages/pipeline:
     dependencies:
+      '@zh/autoperf':
+        specifier: workspace:*
+        version: link:../autoperf
       '@zh/guard':
         specifier: workspace:*
         version: link:../guard
@@ -1666,6 +1703,9 @@ packages:
 
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
+
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -4927,6 +4967,8 @@ snapshots:
 
   '@types/parse-json@4.0.2': {}
 
+  '@types/picomatch@4.0.3': {}
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@18.3.7(@types/react@18.3.31)':
@@ -4968,10 +5010,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@1.21.7)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.65.0(eslint@9.39.5(jiti@1.21.7)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.65.0
       '@typescript-eslint/type-utils': 8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/utils': 8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
@@ -5118,7 +5160,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      vitest: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@vitest/expect@4.1.10':
     dependencies:
@@ -5231,6 +5273,7 @@ snapshots:
 
   '@zh/fingerprint@file:packages/fingerprint':
     dependencies:
+      '@zh/db': link:packages/db
       '@zh/shared': link:packages/shared
 
   '@zh/guard@file:packages/guard':
@@ -5253,6 +5296,7 @@ snapshots:
       '@zh/db': link:packages/db
       '@zh/shared': link:packages/shared
       js-yaml: 5.4.0
+      picomatch: 4.0.5
       yauzl: 3.4.0
       yazl: 3.3.1
     transitivePeerDependencies:
@@ -5268,6 +5312,7 @@ snapshots:
 
   '@zh/pipeline@file:packages/pipeline':
     dependencies:
+      '@zh/autoperf': link:packages/autoperf
       '@zh/guard': link:packages/guard
       '@zh/i18n': link:packages/i18n
       '@zh/inspect': link:packages/inspect
@@ -7527,7 +7572,7 @@ snapshots:
 
   typescript-eslint@8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.65.0(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@1.21.7)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/parser': 8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/typescript-estree': 8.65.0(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/utils': 8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)

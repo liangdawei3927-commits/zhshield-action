@@ -68,8 +68,13 @@ export class SopCacheMaintenance {
       const rulePrune = await this.pruneRules();
       const logPrune = await this.pruneSyncLog();
       const outcome = this.buildOutcome(trigger, rulePrune, logPrune);
-      this.metrics?.recordCleanup(outcome.rulesRemoved + outcome.logEntriesRemoved, outcome.rulesAfter);
-      this.eventBus?.emit('sop:maintenance-completed', { ...outcome, timestamp: new Date() }).catch(() => {});
+      this.metrics?.recordCleanup(
+        outcome.rulesRemoved + outcome.logEntriesRemoved,
+        outcome.rulesAfter,
+      );
+      this.eventBus
+        ?.emit('sop:maintenance-completed', { ...outcome, timestamp: new Date() })
+        .catch(() => {});
       return outcome;
     } catch {
       return null;
@@ -112,10 +117,12 @@ export class SopCacheMaintenance {
   /** 按更新时间排序并裁剪到 maxEntries 上限 */
   private selectRulesToKeep(rules: SopRule[]): SopRule[] {
     const sorted = rules.toSorted((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
-    return this.cleanup.trimVersions(
-      sorted.map((rule) => ({ version: rule.updatedAt.getTime(), rule })),
-      this.config.maxEntries,
-    ).map((entry) => entry.rule);
+    return this.cleanup
+      .trimVersions(
+        sorted.map((rule) => ({ version: rule.updatedAt.getTime(), rule })),
+        this.config.maxEntries,
+      )
+      .map((entry) => entry.rule);
   }
 
   /** 从注册表与 sqlite 中移除未保留的规则 */

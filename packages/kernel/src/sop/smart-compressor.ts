@@ -41,7 +41,7 @@ export class SmartCompressor {
    * 解压缩
    */
   decompress(compressed: CompressedData): string {
-    const strategy = this.strategies.find(s => s.name === compressed.strategy);
+    const strategy = this.strategies.find((s) => s.name === compressed.strategy);
     if (!strategy) throw new Error(`Unknown compression strategy: ${compressed.strategy}`);
     return strategy.decompress(compressed.data);
   }

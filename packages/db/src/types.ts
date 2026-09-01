@@ -94,9 +94,9 @@ export interface SentinelEventRow {
   module: string;
   severity: 'p1' | 'p2' | 'p3';
   status: string;
-  validation: string;   // JSON
-  context: string;      // JSON
-  history: string;      // JSON
+  validation: string; // JSON
+  context: string; // JSON
+  history: string; // JSON
   occurrence_count: number;
   first_seen: string;
   last_seen: string;

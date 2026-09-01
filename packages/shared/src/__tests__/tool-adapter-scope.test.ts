@@ -1,6 +1,11 @@
 // F5-3 单测：wrapAdapter 的 accessScope 校验（warn-only，不阻断）
 import { describe, it, expect } from 'vitest';
-import { wrapAdapter, evaluateAccessScope, type HookedToolResult, type ScopeViolation } from '../tool-adapter-decorator';
+import {
+  wrapAdapter,
+  evaluateAccessScope,
+  type HookedToolResult,
+  type ScopeViolation,
+} from '../tool-adapter-decorator';
 import type { AccessScope, ToolAdapter, ToolCallHook, ToolResult, ToolScanOptions } from '../types';
 
 const baseOptions: ToolScanOptions = { projectPath: '/tmp/proj', projectId: 'proj-1' };
@@ -55,7 +60,9 @@ describe('evaluateAccessScope', () => {
       { readPaths: ['**/*.ts'], excludePaths: ['**/node_modules/**'] },
       { ...baseOptions, targetFiles: ['node_modules/pkg/a.ts'] },
     );
-    expect(violations).toEqual([{ file: 'node_modules/pkg/a.ts', reason: 'excluded-by-scope:**/node_modules/**' }]);
+    expect(violations).toEqual([
+      { file: 'node_modules/pkg/a.ts', reason: 'excluded-by-scope:**/node_modules/**' },
+    ]);
   });
 
   it('treats missing readPaths as unrestricted but still honors sensitivePatterns', () => {

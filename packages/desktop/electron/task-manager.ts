@@ -60,7 +60,10 @@ interface QueuedJob {
  */
 export class TaskManager {
   private readonly tasks = new Map<string, TaskInfo>();
-  private readonly waiters = new Map<string, Set<{ resolve: (v: unknown) => void; reject: (e: Error) => void }>>();
+  private readonly waiters = new Map<
+    string,
+    Set<{ resolve: (v: unknown) => void; reject: (e: Error) => void }>
+  >();
   private readonly queue: QueuedJob[] = [];
   private readonly lastBroadcast = new Map<string, number>();
   private running = 0;
@@ -108,7 +111,8 @@ export class TaskManager {
     const task = this.tasks.get(id);
     if (!task) return Promise.reject(new Error(t('task.notFound')));
     if (task.status === 'done') return Promise.resolve(task.result);
-    if (task.status === 'failed') return Promise.reject(new Error(task.error ?? t('task.executionFailed')));
+    if (task.status === 'failed')
+      return Promise.reject(new Error(task.error ?? t('task.executionFailed')));
     if (task.status === 'cancelled') return Promise.reject(new Error(t('task.cancelled')));
     return new Promise((resolve, reject) => {
       const set = this.waiters.get(id) ?? new Set();
@@ -216,14 +220,23 @@ export class TaskManager {
 export function buildTaskManager(): TaskManager {
   const runnerByKind: Record<TaskKind, TaskRunner> = {
     pipeline: (task, request, onProgress) =>
-      runPipelineInWorker(task.projectPath, (request ?? {}) as { dryRun?: boolean; sop?: boolean }, onProgress),
+      runPipelineInWorker(
+        task.projectPath,
+        (request ?? {}) as { dryRun?: boolean; sop?: boolean },
+        onProgress,
+      ),
     inspect: (task, _request, onProgress) => runInspectInWorker(task.projectPath, onProgress),
     security: (task, _request, onProgress) => runSecurityInWorker(task.projectPath, onProgress),
     garbageClean: (task, request) =>
-      runGarbageCleanInWorker(task.projectPath, (request as { items: Array<{ id: string; path: string; size: number; type: string }> }).items),
+      runGarbageCleanInWorker(
+        task.projectPath,
+        (request as { items: Array<{ id: string; path: string; size: number; type: string }> })
+          .items,
+      ),
     garbageRestore: (task, request) =>
       runGarbageRestoreInWorker(task.projectPath, (request as { batchId: string }).batchId),
-    performance: (task, _request, onProgress) => runPerformanceInWorker(task.projectPath, onProgress),
+    performance: (task, _request, onProgress) =>
+      runPerformanceInWorker(task.projectPath, onProgress),
     guard: (task, request, onProgress) =>
       runGuardInWorker(task.projectPath, (request ?? {}) as Record<string, unknown>, onProgress),
     refactor: (task, _request, onProgress) => runRefactorInWorker(task.projectPath, onProgress),

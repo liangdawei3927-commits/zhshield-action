@@ -106,8 +106,12 @@ export class VitestOutputParser {
     return details;
   }
 
-  private estimateFromTestFiles(lines: string[]): { totalTests: number; passed: number; failed: number } {
-    const testFileMatches = lines.filter(l => l.includes('__tests__') && l.includes('.test.'));
+  private estimateFromTestFiles(lines: string[]): {
+    totalTests: number;
+    passed: number;
+    failed: number;
+  } {
+    const testFileMatches = lines.filter((l) => l.includes('__tests__') && l.includes('.test.'));
     const totalTests = testFileMatches.length;
     return { totalTests, passed: totalTests, failed: 0 };
   }

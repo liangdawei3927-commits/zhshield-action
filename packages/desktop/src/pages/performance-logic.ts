@@ -12,11 +12,31 @@ export type ElectronApiWithExternal = ElectronAPI & {
 };
 
 export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; textKey: string }> = {
-  critical: { color: 'rgb(var(--zh-danger-dark))', bg: 'rgb(var(--zh-danger) / 0.1)', textKey: 'severity.critical' },
-  high: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', textKey: 'page.performance.severity.high' },
-  medium: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)', textKey: 'page.performance.severity.medium' },
-  low: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)', textKey: 'page.performance.severity.low' },
-  info: { color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-bg-primary))', textKey: 'severity.info' },
+  critical: {
+    color: 'rgb(var(--zh-danger-dark))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    textKey: 'severity.critical',
+  },
+  high: {
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    textKey: 'page.performance.severity.high',
+  },
+  medium: {
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+    textKey: 'page.performance.severity.medium',
+  },
+  low: {
+    color: 'rgb(var(--zh-info))',
+    bg: 'rgb(var(--zh-info) / 0.1)',
+    textKey: 'page.performance.severity.low',
+  },
+  info: {
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-bg-primary))',
+    textKey: 'severity.info',
+  },
 };
 
 /** 将性能问题映射为 AI 修复提示项 */
@@ -24,7 +44,9 @@ function toPerformanceAiIssue(issue: PerformanceReportData['issues'][number]) {
   return {
     source: t('page.performance.source'),
     ruleId: issue.ruleId,
-    severity: SEVERITY_CONFIG[issue.severity] ? t(SEVERITY_CONFIG[issue.severity].textKey) : issue.severity,
+    severity: SEVERITY_CONFIG[issue.severity]
+      ? t(SEVERITY_CONFIG[issue.severity].textKey)
+      : issue.severity,
     file: issue.file,
     line: issue.line,
     message: issue.message,

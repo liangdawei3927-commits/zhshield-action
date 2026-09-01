@@ -9,11 +9,7 @@ export type ScoreDimension = 'language' | 'framework' | 'form';
 export type CandidateMap = Map<string, { score: number; signals: Signal[] }>;
 
 /** 向候选 Map 累加信号权重（加权投票核心，语言/框架聚合共用） */
-export function accumulateCandidate(
-  candidates: CandidateMap,
-  key: string,
-  signal: Signal,
-): void {
+export function accumulateCandidate(candidates: CandidateMap, key: string, signal: Signal): void {
   const existing = candidates.get(key);
   if (existing) {
     existing.score += signal.weight;
@@ -26,10 +22,7 @@ export function accumulateCandidate(
 /** 信号计分器：跨聚合器共享的纯计分逻辑 */
 export class SignalScorer {
   /** 计算某维度下所有信号的最大可能得分 */
-  static calculateMaxPossibleScore(
-    signals: readonly Signal[],
-    dimension: ScoreDimension,
-  ): number {
+  static calculateMaxPossibleScore(signals: readonly Signal[], dimension: ScoreDimension): number {
     let maxScore = 0;
     for (const signal of signals) {
       if (SignalScorer.countsForDimension(signal, dimension)) {

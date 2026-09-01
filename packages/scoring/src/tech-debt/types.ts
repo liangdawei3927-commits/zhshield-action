@@ -11,12 +11,7 @@
  */
 
 /** 债务类别：与既有 IssueCategory 的映射关系见 buildCategoryWeight */
-export type DebtCategory =
-  | 'security'
-  | 'quality'
-  | 'architecture'
-  | 'duplication'
-  | 'dependency';
+export type DebtCategory = 'security' | 'quality' | 'architecture' | 'duplication' | 'dependency';
 
 /** 债务动作状态：pending 未处理 → planned 已计划（门禁联动 allow-with-record）→ in-progress → repaid 已偿还 / dismissed 忽略 */
 export type DebtActionStatus = 'pending' | 'planned' | 'in-progress' | 'repaid' | 'dismissed';

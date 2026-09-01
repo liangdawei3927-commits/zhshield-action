@@ -25,11 +25,14 @@ export function useToastStore() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = useCallback((message: string, variant: ToastVariant = 'info') => {
-    const id = `toast-${++toastId}`;
-    setToasts((prev) => [...prev, { id, message, variant }]);
-    setTimeout(dismiss, 3500, id);
-  }, [dismiss]);
+  const toast = useCallback(
+    (message: string, variant: ToastVariant = 'info') => {
+      const id = `toast-${++toastId}`;
+      setToasts((prev) => [...prev, { id, message, variant }]);
+      setTimeout(dismiss, 3500, id);
+    },
+    [dismiss],
+  );
 
   return { toasts, toast, dismiss };
 }

@@ -107,6 +107,8 @@ describe('SopCacheManager 缓存失效事件（三条变更路径）', () => {
   it('GIVEN 未配置 eventBus WHEN applyDiff THEN 静默跳过且不抛出', async () => {
     const bare = new SopCacheManager(new SopRegistry(), { cacheDir });
 
-    await expect(bare.applyDiff(makeDiff([makeRule({ id: 'guard.quiet' })]))).resolves.toBeUndefined();
+    await expect(
+      bare.applyDiff(makeDiff([makeRule({ id: 'guard.quiet' })])),
+    ).resolves.toBeUndefined();
   });
 });

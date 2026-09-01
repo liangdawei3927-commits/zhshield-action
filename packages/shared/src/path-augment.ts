@@ -24,9 +24,7 @@ export function augmentProcessPath(workspaceStartDir?: string): void {
 }
 
 function collectPrependDirs(workspaceStartDir: string, existingPath: string): string[] {
-  const existingDirs = new Set(
-    existingPath.split(path.delimiter).filter((d) => d.length > 0),
-  );
+  const existingDirs = new Set(existingPath.split(path.delimiter).filter((d) => d.length > 0));
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
 
   const toPrepend: string[] = [];
@@ -121,7 +119,7 @@ function listNvmVersionDirs(nvmVersionsDir: string): string[] {
 
 /** 按版本号降序排序（v 前缀忽略，数值比较） */
 function sortNvmVersionsDesc(versionDirs: string[]): string[] {
-  return [...versionDirs].sort((a, b) => {
+  return versionDirs.toSorted((a, b) => {
     const va = a.startsWith('v') ? a.slice(1) : a;
     const vb = b.startsWith('v') ? b.slice(1) : b;
     return vb.localeCompare(va, undefined, { numeric: true, sensitivity: 'base' });

@@ -25,13 +25,19 @@ const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js');
  * 因此需要「完整布局」的用例通过 seedProject 提前写入 userData/projects.json，
  * 启动后即进入 dashboard 布局。
  */
-async function launchApp(opts: { seedProject?: boolean } = {}): Promise<{ app: ElectronApplication; page: Page }> {
+async function launchApp(
+  opts: { seedProject?: boolean } = {},
+): Promise<{ app: ElectronApplication; page: Page }> {
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'zh-e2e-'));
   if (opts.seedProject) {
     mkdirSync(userDataDir, { recursive: true });
     writeFileSync(
       path.join(userDataDir, 'projects.json'),
-      JSON.stringify([{ name: 'demo', path: '/Users/dawei/Desktop/ZHCodeShieid/zhiyan-codeshield' }], null, 2),
+      JSON.stringify(
+        [{ name: 'demo', path: '/Users/dawei/Desktop/ZHCodeShieid/zhiyan-codeshield' }],
+        null,
+        2,
+      ),
       'utf-8',
     );
   }

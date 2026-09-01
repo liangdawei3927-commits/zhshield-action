@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { saveScore, getLatestScore, getScoreHistory, } from '@zh/db';
+import { saveScore, getLatestScore, getScoreHistory } from '@zh/db';
 import type { HealthScore, DimensionScore, ScoreTrend, TrendReport } from './types';
 
 function emptyTrendReport(projectId: string): TrendReport {
@@ -42,11 +42,18 @@ function volatilityInsight(volatility: number): string | undefined {
 
 function streakInsight(streak: TrendReport['streak']): string | undefined {
   if (streak.count < 3) return undefined;
-  const dir = streak.direction === 'improving' ? '连续改善' : streak.direction === 'declining' ? '连续退化' : '保持稳定';
+  const dir =
+    streak.direction === 'improving'
+      ? '连续改善'
+      : streak.direction === 'declining'
+        ? '连续退化'
+        : '保持稳定';
   return `${dir}已持续 ${streak.count} 次评估`;
 }
 
-function decliningDimensionsInsight(dimensionTrends: TrendReport['dimensionTrends']): string | undefined {
+function decliningDimensionsInsight(
+  dimensionTrends: TrendReport['dimensionTrends'],
+): string | undefined {
   const declining = dimensionTrends.filter((d) => d.trend === 'declining');
   if (declining.length === 0) return undefined;
   return `需要关注的维度: ${declining.map((d) => d.name).join('、')}`;
@@ -65,7 +72,8 @@ export class ScoringEngine {
 
   calculate(projectId: string, dimensionScores: DimensionScore[]): HealthScore {
     const overall = dimensionScores.reduce((sum, d) => sum + d.score * d.weight, 0);
-    const grade: HealthScore['grade'] = overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+    const grade: HealthScore['grade'] =
+      overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
     const trend = this.computeTrend(projectId, overall);
 
     const score: HealthScore = {
@@ -123,7 +131,13 @@ export class ScoringEngine {
     const metrics = this.computeTrendMetrics(window);
     const streak = this.computeStreak(history);
     const dimensionTrends = this.computeDimensionTrends(history, windowSize);
-    const insights = this.generateInsights({ scores: metrics.scores, velocity: metrics.velocity, volatility: metrics.volatility, streak, dimensionTrends });
+    const insights = this.generateInsights({
+      scores: metrics.scores,
+      velocity: metrics.velocity,
+      volatility: metrics.volatility,
+      streak,
+      dimensionTrends,
+    });
     return {
       projectId,
       current,
@@ -131,7 +145,8 @@ export class ScoringEngine {
       velocity: Math.round(metrics.velocity * 1000) / 1000,
       acceleration: Math.round(metrics.acceleration * 1000) / 1000,
       volatility: Math.round(metrics.volatility * 1000) / 1000,
-      projectedScore: metrics.projectedScore !== null ? Math.round(metrics.projectedScore * 100) / 100 : null,
+      projectedScore:
+        metrics.projectedScore !== null ? Math.round(metrics.projectedScore * 100) / 100 : null,
       dimensionTrends,
       insights,
       streak,
@@ -159,8 +174,12 @@ export class ScoringEngine {
   }
 
   private rowToScore(row: {
-    project_id: string; overall: number; grade: string;
-    dimensions: string; trend: string; created_at: string;
+    project_id: string;
+    overall: number;
+    grade: string;
+    dimensions: string;
+    trend: string;
+    created_at: string;
   }): HealthScore {
     return {
       projectId: row.project_id,
@@ -199,7 +218,10 @@ export class ScoringEngine {
   private linearRegressionSlope(values: number[]): number {
     const n = values.length;
     if (n < 2) return 0;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
     for (let i = 0; i < n; i++) {
       sumX += i;
       sumY += values[i];
@@ -263,7 +285,10 @@ export class ScoringEngine {
   }
 
   /** 维度级趋势 */
-  private computeDimensionTrends(history: HealthScore[], windowSize: number): TrendReport['dimensionTrends'] {
+  private computeDimensionTrends(
+    history: HealthScore[],
+    windowSize: number,
+  ): TrendReport['dimensionTrends'] {
     if (history.length < 2) return [];
 
     const window = history.slice(-windowSize);
@@ -279,8 +304,7 @@ export class ScoringEngine {
     const trends: TrendReport['dimensionTrends'] = [];
     for (const [name, scores] of dimMap) {
       const slope = this.linearRegressionSlope(scores);
-      const trend: ScoreTrend =
-        slope > 0.5 ? 'improving' : slope < -0.5 ? 'declining' : 'stable';
+      const trend: ScoreTrend = slope > 0.5 ? 'improving' : slope < -0.5 ? 'declining' : 'stable';
       const current = scores.at(-1)!;
       trends.push({ name, current, trend, slope: Math.round(slope * 1000) / 1000 });
     }

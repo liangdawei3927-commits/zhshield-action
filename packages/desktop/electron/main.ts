@@ -31,6 +31,10 @@ import { registerBackupIpc } from './ipc/backup';
 import { registerSchedulerIpc } from './ipc/scheduler';
 import { preheatPipelineWorker, disposePipelineWorker } from './pipeline-host';
 import { setupAutoUpdater } from './auto-updater';
+import { enforceTrustedIpcSender } from './ipc-security';
+
+// ─── 安全：IPC sender 来源校验（须在注册任何 handler 之前调用）────
+enforceTrustedIpcSender();
 
 // 仅在 GPU 崩溃时回退到软件渲染（默认使用系统 GPU 后端，macOS 为 Metal）
 app.on('child-process-gone', (_event, details) => {
@@ -126,7 +130,10 @@ ipcMain.on('window:maximize', () => {
 });
 ipcMain.on('window:close', () => getMainWindow()?.close());
 
-ipcMain.handle('window:isMaximized', () => (getMainWindow()?.isMaximized() || getMainWindow()?.isFullScreen()) ?? false);
+ipcMain.handle(
+  'window:isMaximized',
+  () => (getMainWindow()?.isMaximized() || getMainWindow()?.isFullScreen()) ?? false,
+);
 
 // 对话框：打开原生文件夹选择器
 ipcMain.handle('dialog:openFolder', async () => {
@@ -137,13 +144,19 @@ ipcMain.handle('dialog:openFolder', async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('dialog:showSave', async (_event, options: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> }) => {
-  const result = await dialog.showSaveDialog({
-    defaultPath: options.defaultPath,
-    filters: options.filters,
-  });
-  return { canceled: result.canceled, filePath: result.filePath };
-});
+ipcMain.handle(
+  'dialog:showSave',
+  async (
+    _event,
+    options: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> },
+  ) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: options.defaultPath,
+      filters: options.filters,
+    });
+    return { canceled: result.canceled, filePath: result.filePath };
+  },
+);
 
 ipcMain.handle('dialog:writeFile', async (_event, filePath: string, content: string) => {
   const resolvedPath = path.resolve(filePath);
@@ -156,11 +169,11 @@ ipcMain.handle('dialog:writeFile', async (_event, filePath: string, content: str
   const allowedRoots = [userData];
   try {
     const projectsFile = path.join(app.getPath('userData'), 'projects.json');
-    if (fs.existsSync(projectsFile)) {
-      const projects = JSON.parse(fs.readFileSync(projectsFile, 'utf-8')) as Array<{ path: string }>;
-      for (const p of projects) {
-        allowedRoots.push(path.normalize(p.path));
-      }
+    const projects = JSON.parse(await fs.promises.readFile(projectsFile, 'utf-8')) as Array<{
+      path: string;
+    }>;
+    for (const p of projects) {
+      allowedRoots.push(path.normalize(p.path));
     }
   } catch {
     // projects.json unreadable — restrict to userData only
@@ -204,34 +217,40 @@ function languageFilePath(): string {
   return path.join(app.getPath('userData'), LANGUAGE_FILE);
 }
 
-function readSavedLanguage(): string | null {
+async function readSavedLanguage(): Promise<string | null> {
   try {
-    if (!fs.existsSync(languageFilePath())) return null;
-    const parsed = JSON.parse(fs.readFileSync(languageFilePath(), 'utf-8')) as { language?: unknown };
+    const parsed = JSON.parse(await fs.promises.readFile(languageFilePath(), 'utf-8')) as {
+      language?: unknown;
+    };
     return typeof parsed.language === 'string' && parsed.language !== '' ? parsed.language : null;
   } catch {
     return null;
   }
 }
 
-function writeSavedLanguage(lng: string): void {
+async function writeSavedLanguage(lng: string): Promise<void> {
   try {
-    fs.mkdirSync(app.getPath('userData'), { recursive: true });
-    fs.writeFileSync(languageFilePath(), `${JSON.stringify({ language: lng }, null, 2)}\n`, 'utf-8');
+    await fs.promises.mkdir(app.getPath('userData'), { recursive: true });
+    await fs.promises.writeFile(
+      languageFilePath(),
+      `${JSON.stringify({ language: lng }, null, 2)}\n`,
+      'utf-8',
+    );
   } catch (err) {
     console.warn('[i18n] 语言偏好持久化失败:', err instanceof Error ? err.message : String(err));
   }
 }
 
 // 启动即初始化主进程 i18n：用户偏好优先，否则跟随系统语言（独立于渲染进程的实例）
-initI18n({ lng: resolveLanguage(readSavedLanguage(), app.getLocale()).value });
-
+// 延迟到 app.whenReady 内执行（readSavedLanguage 现为异步），IPC 处理器仅在窗口创建后触发，不受影响
 let _currentLanguage: string | null = null;
 ipcMain.handle('app:getLocale', () => app.getLocale());
 ipcMain.on('i18n:set-language', (_event, lng: string) => {
   _currentLanguage = lng;
   // 持久化偏好并同步主进程翻译语言，使菜单/对话框/进度文案跟随渲染进程选择
-  writeSavedLanguage(lng);
+  void writeSavedLanguage(lng).catch((err) => {
+    console.warn('[i18n] 保存语言偏好失败:', err instanceof Error ? err.message : String(err));
+  });
   void setLanguage(resolveLanguage(lng, null).value);
   getMainWindow()?.webContents.send('i18n:language-changed', lng);
 });
@@ -242,24 +261,27 @@ ipcMain.on('i18n:set-language', (_event, lng: string) => {
  * 覆盖 nvm、Homebrew、~/.local/bin 及 workspace node_modules/.bin，
  * 此处 execFile 探测可直接命中这些目录下的工具。
  */
-ipcMain.handle('tools:availability', async (): Promise<Array<{ id: string; available: boolean }>> => {
-  const { execFile } = await import('node:child_process');
-  const { promisify } = await import('node:util');
-  const execFileAsync = promisify(execFile);
-  const tools = ['eslint', 'semgrep', 'trivy', 'gitleaks', 'depcruise', 'jscpd'];
-  // semgrep 启动需加载大量 Python 依赖（--version 实测约 13s），远超默认 3s 超时，需单独放宽
-  const TOOL_TIMEOUT_MS: Record<string, number> = { semgrep: 30000 };
-  const results: Array<{ id: string; available: boolean }> = [];
-  for (const id of tools) {
-    try {
-      await execFileAsync(id, ['--version'], { timeout: TOOL_TIMEOUT_MS[id] ?? 3000 });
-      results.push({ id, available: true });
-    } catch {
-      results.push({ id, available: false });
+ipcMain.handle(
+  'tools:availability',
+  async (): Promise<Array<{ id: string; available: boolean }>> => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    const tools = ['eslint', 'semgrep', 'trivy', 'gitleaks', 'depcruise', 'jscpd'];
+    // semgrep 启动需加载大量 Python 依赖（--version 实测约 13s），远超默认 3s 超时，需单独放宽
+    const TOOL_TIMEOUT_MS: Record<string, number> = { semgrep: 30000 };
+    const results: Array<{ id: string; available: boolean }> = [];
+    for (const id of tools) {
+      try {
+        await execFileAsync(id, ['--version'], { timeout: TOOL_TIMEOUT_MS[id] ?? 3000 });
+        results.push({ id, available: true });
+      } catch {
+        results.push({ id, available: false });
+      }
     }
-  }
-  return results;
-});
+    return results;
+  },
+);
 
 // ─── 各功能域 IPC 注册 ─────────────────────────────────────
 registerProjectsIpc();
@@ -284,14 +306,20 @@ async function initSopCache() {
     await sopCache.initialize();
     initialized = true;
   } catch (err) {
-    console.warn('[sop] 缓存初始化失败，降级为内置规则只读模式:', err instanceof Error ? err.message : err);
+    console.warn(
+      '[sop] 缓存初始化失败，降级为内置规则只读模式:',
+      err instanceof Error ? err.message : err,
+    );
   }
   if (!initialized) return;
   sopCache.startPeriodicSync();
   // 云端同步放到下一轮事件循环，失败不影响本地体检
   setImmediate(() => {
     void sopCache.checkOnStartup().catch((err) => {
-      console.warn('[sop] 启动同步失败（将使用本地规则）:', err instanceof Error ? err.message : err);
+      console.warn(
+        '[sop] 启动同步失败（将使用本地规则）:',
+        err instanceof Error ? err.message : err,
+      );
     });
   });
 }
@@ -314,7 +342,8 @@ app.whenReady().then(async () => {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.zhishield.com http://localhost:*; img-src 'self' data:; font-src 'self'",
+            // 生产模式 CSP：不放行 http://localhost:*，防止渲染进程被利用连接本机任意端口
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.zhishield.com; img-src 'self' data:; font-src 'self'",
           ],
         },
       });
@@ -324,7 +353,10 @@ app.whenReady().then(async () => {
   // ─── 安全：拒绝所有不必要的权限请求（camera / mic / geolocation 等）──
   // 仅放行 clipboard-sanitized-write（navigator.clipboard.writeText 必需，一刀切拒绝会让
   // 所有页面「复制到AI」报复制失败）与 notifications（桌面通知必需），勿删。
-  const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write', 'notifications']);
+  const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set([
+    'clipboard-sanitized-write',
+    'notifications',
+  ]);
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(ALLOWED_PERMISSIONS.has(permission));
   });
@@ -334,6 +366,8 @@ app.whenReady().then(async () => {
   void initWisdomBrainSync().catch((err) => {
     console.warn('[wisdom] 初始化失败:', err instanceof Error ? err.message : err);
   });
+  // 主进程 i18n 初始化（readSavedLanguage 为异步，须在 whenReady 内 await）
+  initI18n({ lng: resolveLanguage(await readSavedLanguage(), app.getLocale()).value });
   createWindow();
   const mainWindow = getMainWindow();
   if (mainWindow) setupAutoUpdater(mainWindow);

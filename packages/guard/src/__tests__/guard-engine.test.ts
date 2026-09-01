@@ -138,7 +138,7 @@ describe('GuardEngine', () => {
     ];
 
     const filtered = engine.filterChecks(checks, { mode: 'guard' });
-    expect(filtered.map(c => c.checkId)).toEqual(['c1', 'c3']);
+    expect(filtered.map((c) => c.checkId)).toEqual(['c1', 'c3']);
   });
 
   it('should filter out disabled checks', () => {
@@ -174,16 +174,44 @@ describe('GuardEngine', () => {
     ];
 
     const filtered = engine.filterChecks(checks, { mode: 'guard', checks: ['c1', 'c3'] });
-    expect(filtered.map(c => c.checkId)).toEqual(['c1', 'c3']);
+    expect(filtered.map((c) => c.checkId)).toEqual(['c1', 'c3']);
   });
 
   it('should aggregate report correctly', () => {
     const engine = new GuardEngine('/tmp');
     const results = [
-      { checkId: 'c1', adapter: 'a', status: 'passed' as const, severity: 'info' as const, blocking: false, message: 'ok' },
-      { checkId: 'c2', adapter: 'a', status: 'failed' as const, severity: 'error' as const, blocking: true, message: 'fail' },
-      { checkId: 'c3', adapter: 'a', status: 'error' as const, severity: 'error' as const, blocking: true, message: 'err' },
-      { checkId: 'c4', adapter: 'a', status: 'warning' as const, severity: 'warning' as const, blocking: false, message: 'warn' },
+      {
+        checkId: 'c1',
+        adapter: 'a',
+        status: 'passed' as const,
+        severity: 'info' as const,
+        blocking: false,
+        message: 'ok',
+      },
+      {
+        checkId: 'c2',
+        adapter: 'a',
+        status: 'failed' as const,
+        severity: 'error' as const,
+        blocking: true,
+        message: 'fail',
+      },
+      {
+        checkId: 'c3',
+        adapter: 'a',
+        status: 'error' as const,
+        severity: 'error' as const,
+        blocking: true,
+        message: 'err',
+      },
+      {
+        checkId: 'c4',
+        adapter: 'a',
+        status: 'warning' as const,
+        severity: 'warning' as const,
+        blocking: false,
+        message: 'warn',
+      },
     ];
 
     const report = engine.aggregateReport(results, { mode: 'guard' });
@@ -199,7 +227,14 @@ describe('GuardEngine', () => {
   it('should report ok=true when no failures', () => {
     const engine = new GuardEngine('/tmp');
     const results = [
-      { checkId: 'c1', adapter: 'a', status: 'passed' as const, severity: 'info' as const, blocking: false, message: 'ok' },
+      {
+        checkId: 'c1',
+        adapter: 'a',
+        status: 'passed' as const,
+        severity: 'info' as const,
+        blocking: false,
+        message: 'ok',
+      },
     ];
 
     const report = engine.aggregateReport(results, { mode: 'guard' });
@@ -209,7 +244,14 @@ describe('GuardEngine', () => {
   it('should return null ok when dryRun', () => {
     const engine = new GuardEngine('/tmp');
     const results = [
-      { checkId: 'c1', adapter: 'a', status: 'failed' as const, severity: 'error' as const, blocking: true, message: 'fail' },
+      {
+        checkId: 'c1',
+        adapter: 'a',
+        status: 'failed' as const,
+        severity: 'error' as const,
+        blocking: true,
+        message: 'fail',
+      },
     ];
 
     const report = engine.aggregateReport(results, { mode: 'guard', dryRun: true });
@@ -318,7 +360,17 @@ describe('ArchitectureBoundaryAdapter', () => {
     const adapter = new ArchitectureBoundaryAdapter();
     const check = makeCheck({ checkId: 'ab-check' });
     const result = adapter.normalize(
-      { violations: [{ file: 'src/web/page.ts', line: 1, fromLayer: 'presentation', toLayer: 'domain', importPath: '../../domain' }] },
+      {
+        violations: [
+          {
+            file: 'src/web/page.ts',
+            line: 1,
+            fromLayer: 'presentation',
+            toLayer: 'domain',
+            importPath: '../../domain',
+          },
+        ],
+      },
       {},
       check,
     );
@@ -348,9 +400,17 @@ describe('SecurityScanAdapter', () => {
     const adapter = new SecurityScanAdapter();
     const check = makeCheck({ checkId: 'ss-check' });
     const result = adapter.normalize(
-      { findings: [
-        { file: 'src/db.ts', line: 10, type: 'sql-injection', severity: 'high', message: 'SQL injection' },
-      ]},
+      {
+        findings: [
+          {
+            file: 'src/db.ts',
+            line: 10,
+            type: 'sql-injection',
+            severity: 'high',
+            message: 'SQL injection',
+          },
+        ],
+      },
       {},
       check,
     );
@@ -362,9 +422,17 @@ describe('SecurityScanAdapter', () => {
     const adapter = new SecurityScanAdapter();
     const check = makeCheck({ checkId: 'ss-check' });
     const result = adapter.normalize(
-      { findings: [
-        { file: 'src/app.ts', line: 5, type: 'debugger', severity: 'medium', message: 'debugger found' },
-      ]},
+      {
+        findings: [
+          {
+            file: 'src/app.ts',
+            line: 5,
+            type: 'debugger',
+            severity: 'medium',
+            message: 'debugger found',
+          },
+        ],
+      },
       {},
       check,
     );
@@ -393,10 +461,14 @@ describe('GuardESLintCheckAdapter normalize', () => {
     const adapter = new GuardESLintCheckAdapter();
     const check = makeCheck({ checkId: 'lint-check' });
     const raw = {
-      files: [{
-        filePath: '/src/app.ts',
-        messages: [{ ruleId: 'no-unused-vars', message: 'x unused', line: 1, column: 1, severity: 2 }],
-      }],
+      files: [
+        {
+          filePath: '/src/app.ts',
+          messages: [
+            { ruleId: 'no-unused-vars', message: 'x unused', line: 1, column: 1, severity: 2 },
+          ],
+        },
+      ],
     };
     const result = adapter.normalize(raw, {}, check);
     expect(result.status).toBe('failed');
@@ -407,10 +479,14 @@ describe('GuardESLintCheckAdapter normalize', () => {
     const adapter = new GuardESLintCheckAdapter();
     const check = makeCheck({ checkId: 'lint-check', severity: 'warning' });
     const raw = {
-      files: [{
-        filePath: '/src/app.ts',
-        messages: [{ ruleId: 'no-console', message: 'console.log', line: 1, column: 1, severity: 1 }],
-      }],
+      files: [
+        {
+          filePath: '/src/app.ts',
+          messages: [
+            { ruleId: 'no-console', message: 'console.log', line: 1, column: 1, severity: 1 },
+          ],
+        },
+      ],
     };
     const result = adapter.normalize(raw, {}, check);
     expect(result.status).toBe('warning');

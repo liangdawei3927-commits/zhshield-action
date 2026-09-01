@@ -23,11 +23,13 @@ describe('SopRuleEngine — 上下文过滤与边界场景', () => {
   });
 
   it('无匹配规则时返回空报告', async () => {
-    registry.register(makeRule({
-      id: 'guard.some-rule',
-      domain: 'guard',
-      status: 'active',
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.some-rule',
+        domain: 'guard',
+        status: 'active',
+      }),
+    );
 
     // 过滤 domain 不存在的
     const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
@@ -36,18 +38,22 @@ describe('SopRuleEngine — 上下文过滤与边界场景', () => {
   });
 
   it('按 action 过滤规则', async () => {
-    registry.register(makeRule({
-      id: 'guard.block.some',
-      domain: 'guard',
-      action: 'block',
-      content: { patterns: ['MUST_NOT_EXIST_XYZ'] },
-    }));
-    registry.register(makeRule({
-      id: 'guard.scan.some',
-      domain: 'guard',
-      action: 'scan',
-      content: { patterns: ['ALSO_NOT_EXIST'] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.some',
+        domain: 'guard',
+        action: 'block',
+        content: { patterns: ['MUST_NOT_EXIST_XYZ'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'guard.scan.some',
+        domain: 'guard',
+        action: 'scan',
+        content: { patterns: ['ALSO_NOT_EXIST'] },
+      }),
+    );
 
     // 只执行 block action
     const report = await engine.evaluateRules({
@@ -65,22 +71,27 @@ describe('SopRuleEngine — 上下文过滤与边界场景', () => {
     // 伪密钥分片拼接，避免源码出现可被 secret 扫描(zhshield generic-api-key)命中的字面量；
     // 写入临时目录的内容仍是完整 sk- 格式，用于验证引擎可检测敏感信息
     const fakeApiKey = ['sk-', 'test12345678901234'].join('');
-    writeFileSync(path.join(srcDir, 'test.ts'), [
-      'const x: string = y as any;',
-      `const apiKey = "${fakeApiKey}";`,
-    ].join('\n'), 'utf-8');
+    writeFileSync(
+      path.join(srcDir, 'test.ts'),
+      ['const x: string = y as any;', `const apiKey = "${fakeApiKey}";`].join('\n'),
+      'utf-8',
+    );
 
-    registry.register(makeRule({
-      id: 'guard.block.sensitive',
-      domain: 'guard',
-      content: { patterns: ['sk-[a-zA-Z0-9]{16,}'] },
-    }));
-    registry.register(makeRule({
-      id: 'inspect.type-safety',
-      domain: 'inspect',
-      applicableEngines: ['inspect'],
-      content: { forbidden: ['as any'] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.sensitive',
+        domain: 'guard',
+        content: { patterns: ['sk-[a-zA-Z0-9]{16,}'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'inspect.type-safety',
+        domain: 'inspect',
+        applicableEngines: ['inspect'],
+        content: { forbidden: ['as any'] },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: tempDir });
     expect(report.total).toBe(2);
@@ -96,11 +107,13 @@ describe('SopRuleEngine — 上下文过滤与边界场景', () => {
     const emptyDir = path.join(tempDir, 'empty-project');
     mkdirSync(emptyDir, { recursive: true });
 
-    registry.register(makeRule({
-      id: 'guard.block.sensitive',
-      domain: 'guard',
-      content: { patterns: ['password\\s*='] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.sensitive',
+        domain: 'guard',
+        content: { patterns: ['password\\s*='] },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: emptyDir, domain: 'guard' });
     expect(report.total).toBe(1);

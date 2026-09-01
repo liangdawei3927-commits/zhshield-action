@@ -17,12 +17,21 @@ import {
 } from './dep-parsers';
 
 /** 构造信号（ruleId/kind/file/weight/payload；weight = 产出探测器的权重）。 */
-export function makeSignal(kind: SignalKind, ruleId: string, file: string, weight: number, payload: unknown): Signal {
+export function makeSignal(
+  kind: SignalKind,
+  ruleId: string,
+  file: string,
+  weight: number,
+  payload: unknown,
+): Signal {
   return { ruleId, kind, file, weight, payload };
 }
 
 /** 读取 package.json 的依赖名字集合（依赖 + 开发依赖 + peer 依赖）。解析失败返回空集（空 catch 禁止 → 用返回值表达失败）。 */
-export function readDependencyNames(projectRoot: string, manifestRelPath: string): ReadonlySet<string> {
+export function readDependencyNames(
+  projectRoot: string,
+  manifestRelPath: string,
+): ReadonlySet<string> {
   try {
     const content = fs.readFileSync(path.join(projectRoot, ...manifestRelPath.split('/')), 'utf-8');
     const parsed: unknown = JSON.parse(content);
@@ -44,7 +53,10 @@ export function frameworkSignalsFromDeps(
   deps: ReadonlySet<string>,
   manifestRelPath: string,
   weight: number,
-  frameworksByLanguage: ReadonlyArray<{ readonly language: string; readonly frameworks: readonly { readonly name: string; readonly keywords: readonly string[] }[] }>,
+  frameworksByLanguage: ReadonlyArray<{
+    readonly language: string;
+    readonly frameworks: readonly { readonly name: string; readonly keywords: readonly string[] }[];
+  }>,
 ): Signal[] {
   const signals: Signal[] = [];
   for (const entry of frameworksByLanguage) {
@@ -79,7 +91,12 @@ export function conventionDirSignals(projectRoot: string, weight: number): Signa
     if (!entry.isDirectory() || isNoiseDir(entry.name)) continue;
     const form: ProductFormId | undefined = FORM_DIR_RULES[entry.name];
     if (form === undefined) continue;
-    signals.push(makeSignal('form', `form:dir-${entry.name}`, entry.name, weight, { dirPath: entry.name, form }));
+    signals.push(
+      makeSignal('form', `form:dir-${entry.name}`, entry.name, weight, {
+        dirPath: entry.name,
+        form,
+      }),
+    );
   }
   return signals;
 }
@@ -91,11 +108,15 @@ const MANIFEST_DEP_READERS: Readonly<Record<string, (content: string) => string[
   'go.mod': extractGoModRequires,
   'Cargo.toml': extractCargoDeps,
   'composer.json': extractComposerRequire,
-  'Gemfile': extractGemfileDeps,
+  Gemfile: extractGemfileDeps,
 };
 
 /** 按清单类型读取依赖名集合（与 manifest-detector 同源解析，供 form-detector 独立判断服务端框架原始信号）。 */
-export function readManifestDepNames(projectRoot: string, rel: string, name: string): ReadonlySet<string> {
+export function readManifestDepNames(
+  projectRoot: string,
+  rel: string,
+  name: string,
+): ReadonlySet<string> {
   if (name === 'package.json') return readDependencyNames(projectRoot, rel);
   const reader = MANIFEST_DEP_READERS[name];
   if (reader === undefined) return new Set();

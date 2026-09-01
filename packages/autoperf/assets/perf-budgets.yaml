@@ -1,0 +1,95 @@
+/**
+ * 冷启动 / 千文件扫描 / 事件循环延迟 / 哨兵空闲 CPU / 内存峰值
+ * 性能预算即规则（与 SOP 规则同构，flat form）：
+ * name/description/severity/executionMode/status/source/tags/applicableEngines
+ * + content.check: { tool, budgetConfig: { ruleId, thresholdMs, severity } }
+ *
+ * 单位约定（统一走 elapsedMs vs thresholdMs 比较）：
+ * - 冷启动 / 千文件扫描 / 事件循环延迟：毫秒
+ * - 哨兵空闲 CPU：百分比（0-100，estimate）
+ * - 内存峰值：MB（4096 = 4GB）
+ */
+- name: 冷启动
+  description: 应用冷启动耗时预算，超过 5000ms 视为性能退化
+  severity: error
+  executionMode: async
+  status: active
+  source: official
+  tags: [autoperf, cold-start, startup]
+  applicableEngines: [autoperf]
+  content:
+    check:
+      tool: autoperf
+      budgetConfig:
+        ruleId: perf.budget.cold-start
+        thresholdMs: 5000
+        anchorMs: 3000
+        severity: error
+
+- name: 千文件扫描
+  description: 千文件规模扫描耗时预算，超过 30000ms 视为扫描性能退化
+  severity: warning
+  executionMode: async
+  status: active
+  source: official
+  tags: [autoperf, scan, throughput]
+  applicableEngines: [autoperf]
+  content:
+    check:
+      tool: autoperf
+      budgetConfig:
+        ruleId: perf.budget.scan-thousand-files
+        thresholdMs: 30000
+        anchorMs: 15000
+        severity: warning
+
+- name: 事件循环延迟
+  description: 主进程事件循环延迟预算，超过 16ms 视为阻塞
+  severity: warning
+  executionMode: async
+  status: active
+  source: official
+  tags: [autoperf, event-loop, latency]
+  applicableEngines: [autoperf]
+  content:
+    check:
+      tool: autoperf
+      budgetConfig:
+        ruleId: perf.budget.event-loop-delay
+        thresholdMs: 16
+        anchorMs: 8
+        severity: warning
+
+- name: 哨兵空闲 CPU
+  description: 哨兵空闲态 CPU 占用预算，超过 2% 视为异常（estimate）
+  severity: warning
+  executionMode: async
+  status: active
+  source: official
+  tags: [autoperf, sentinel, cpu]
+  applicableEngines: [autoperf]
+  content:
+    check:
+      tool: autoperf
+      budgetConfig:
+        ruleId: perf.budget.sentinel-idle-cpu
+        thresholdMs: 2
+        anchorMs: 1
+        severity: warning
+
+- name: 内存峰值
+  description: 进程内存峰值预算，超过 4096MB (4GB) 视为内存异常
+  severity: error
+  executionMode: async
+  status: active
+  source: official
+  tags: [autoperf, memory, peak]
+  applicableEngines: [autoperf]
+  content:
+    check:
+      tool: autoperf
+      budgetConfig:
+        ruleId: perf.budget.memory-peak
+        thresholdMs: 4096
+        anchorMs: 2048
+        severity: error

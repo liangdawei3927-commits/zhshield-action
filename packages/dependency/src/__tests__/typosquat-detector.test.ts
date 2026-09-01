@@ -48,7 +48,11 @@ function buildNpmGraph(deps: Record<string, string>): ReturnType<typeof buildDep
       license: 'MIT',
     };
   }
-  writeFile(dir, 'package-lock.json', JSON.stringify({ name: 'app', lockfileVersion: 3, packages }));
+  writeFile(
+    dir,
+    'package-lock.json',
+    JSON.stringify({ name: 'app', lockfileVersion: 3, packages }),
+  );
   return buildDependencyGraph(dir);
 }
 
@@ -94,7 +98,7 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
     expect(findings[0].signals.behaviorFlags).toContain('name-contains-digit');
   });
 
-  it("合法知名包 lodash / express 不被标记", async () => {
+  it('合法知名包 lodash / express 不被标记', async () => {
     const graph = buildNpmGraph({ lodash: '4.17.21', express: '4.18.2' });
     const findings = await detector.detect(graph);
 
@@ -119,7 +123,9 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
     const findings = await detector.detect(graph);
 
     expect(findings[0].evidence.some((l) => l.includes('visually resembles'))).toBe(true);
-    expect(findings[0].evidence.some((l) => l.includes('behavior flag: name-contains-digit'))).toBe(true);
+    expect(findings[0].evidence.some((l) => l.includes('behavior flag: name-contains-digit'))).toBe(
+      true,
+    );
   });
 
   it("'lodash-2' → 版本后缀冒名：risk=medium，行为标记齐全", async () => {
@@ -129,7 +135,11 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
     expect(findings).toHaveLength(1);
     expect(findings[0].risk).toBe('medium');
     expect(findings[0].signals.behaviorFlags).toEqual(
-      expect.arrayContaining(['name-contains-digit', 'name-contains-hyphen', 'known-name-version-suffix']),
+      expect.arrayContaining([
+        'name-contains-digit',
+        'name-contains-hyphen',
+        'known-name-version-suffix',
+      ]),
     );
   });
 

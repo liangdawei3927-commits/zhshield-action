@@ -37,10 +37,12 @@ const REFACTOR_KEYWORD = /重构/;
 
 export function sanitizeProgress(message?: string, stage?: string): string {
   if (stage === 'sop') return t('page.dashboard.sanitize.loadingRules');
-  if (stage === 'guard') return message?.includes('未通过') ? message : t('page.dashboard.sanitize.guarding');
+  if (stage === 'guard')
+    return message?.includes('未通过') ? message : t('page.dashboard.sanitize.guarding');
   if (stage === 'inspect') return t('page.dashboard.sanitize.inspecting');
   if (stage === 'autofix') return message || t('page.dashboard.sanitize.autoFixing');
-  if (stage === 'done') return message && !REFACTOR_KEYWORD.test(message) ? message : t('page.dashboard.sanitize.done');
+  if (stage === 'done')
+    return message && !REFACTOR_KEYWORD.test(message) ? message : t('page.dashboard.sanitize.done');
   if (!message || REFACTOR_KEYWORD.test(message)) return t('page.dashboard.running');
   return message;
 }
@@ -56,7 +58,9 @@ export function extractSummary(report: PipelineReportData): CheckSummary {
       failed: Number(s.failed) || 0,
       skipped: Number(s.skipped) || 0,
       errors: Number(s.errors) || 0,
-      failedItems: Array.isArray(s.failedItems) ? (s.failedItems as CheckSummary['failedItems']) : [],
+      failedItems: Array.isArray(s.failedItems)
+        ? (s.failedItems as CheckSummary['failedItems'])
+        : [],
       guardTotal: Number(guard.total) || 0,
       inspectTotal: Number(inspect.total) || 0,
     };
@@ -100,11 +104,15 @@ export function usePipelineProgress(projectPath: string) {
 
   useEffect(() => {
     if (task && (task.status === 'queued' || task.status === 'running')) {
-      const message = task.message && REFACTOR_KEYWORD.test(task.message)
-        ? sanitizeProgress(task.message, task.stage)
-        : (task.message ?? '');
+      const message =
+        task.message && REFACTOR_KEYWORD.test(task.message)
+          ? sanitizeProgress(task.message, task.stage)
+          : (task.message ?? '');
       setPipelineProgress({ stage: task.stage ?? 'running', message, progress: task.progress });
-    } else if (task && (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled')) {
+    } else if (
+      task &&
+      (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled')
+    ) {
       setPipelineProgress(null);
     }
   }, [task]);
@@ -122,15 +130,25 @@ export function usePipelineProgress(projectPath: string) {
   return { pipelineProgress, autoFixNotice, setPipelineProgress, setAutoFixNotice };
 }
 
-function notifyCheckResult(report: PipelineReportData, summary: CheckSummary, toast: (msg: string, variant?: ToastVariant) => void) {
+function notifyCheckResult(
+  report: PipelineReportData,
+  summary: CheckSummary,
+  toast: (msg: string, variant?: ToastVariant) => void,
+) {
   if (report.error) {
     toast(t('page.dashboard.toast.failed', { error: report.error }), 'error');
   } else if (summary.failed > 0 || summary.errors > 0) {
-    toast(t('page.dashboard.toast.foundIssues', { count: summary.failed + summary.errors }), 'warning');
+    toast(
+      t('page.dashboard.toast.foundIssues', { count: summary.failed + summary.errors }),
+      'warning',
+    );
   } else if (summary.total === 0) {
     toast(t('page.dashboard.toast.noValidItems'), 'warning');
   } else {
-    toast(t('page.dashboard.toast.completed', { total: summary.total, passed: summary.passed }), 'success');
+    toast(
+      t('page.dashboard.toast.completed', { total: summary.total, passed: summary.passed }),
+      'success',
+    );
   }
 }
 
@@ -150,7 +168,11 @@ export function useOneClickCheck(
       return;
     }
     setRunning(true);
-    setPipelineProgress({ stage: 'sop', message: t('page.dashboard.sanitize.loadingRules'), progress: 0.05 });
+    setPipelineProgress({
+      stage: 'sop',
+      message: t('page.dashboard.sanitize.loadingRules'),
+      progress: 0.05,
+    });
     setAutoFixNotice(null);
     setLastReport(null);
     try {
@@ -173,23 +195,29 @@ export function useOneClickCheck(
 export function useCopyFailedIssues(projectPath: string) {
   const { toast } = useToast();
 
-  const copyFailedIssues = useCallback((items: CheckSummary['failedItems']) => {
-    const text = buildAiFixPrompt(
-      projectPath,
-      items.map((it) => ({
-        source: it.stage === 'guard' ? t('page.dashboard.copy.guardSource') : t('page.dashboard.copy.inspectSource'),
-        ruleId: it.id,
-        message: `${it.name} — ${it.message}`,
-      })),
-    );
-    void copyTextToClipboard(text).then(
-      (ok) =>
-        ok
-          ? toast(t('page.dashboard.toast.copiedIssues', { count: items.length }))
-          : toast(t('page.dashboard.toast.copyFailed'), 'error'),
-      () => toast(t('page.dashboard.toast.copyFailed'), 'error'),
-    );
-  }, [projectPath, toast]);
+  const copyFailedIssues = useCallback(
+    (items: CheckSummary['failedItems']) => {
+      const text = buildAiFixPrompt(
+        projectPath,
+        items.map((it) => ({
+          source:
+            it.stage === 'guard'
+              ? t('page.dashboard.copy.guardSource')
+              : t('page.dashboard.copy.inspectSource'),
+          ruleId: it.id,
+          message: `${it.name} — ${it.message}`,
+        })),
+      );
+      void copyTextToClipboard(text).then(
+        (ok) =>
+          ok
+            ? toast(t('page.dashboard.toast.copiedIssues', { count: items.length }))
+            : toast(t('page.dashboard.toast.copyFailed'), 'error'),
+        () => toast(t('page.dashboard.toast.copyFailed'), 'error'),
+      );
+    },
+    [projectPath, toast],
+  );
 
   return { copyFailedIssues };
 }
@@ -198,7 +226,8 @@ export function useCopyFailedIssues(projectPath: string) {
 export function useDashboardPage(projectPath: string) {
   const { toast } = useToast();
   const { healthScore, refreshScore } = useDashboardStatus(projectPath);
-  const { pipelineProgress, autoFixNotice, setPipelineProgress, setAutoFixNotice } = usePipelineProgress(projectPath);
+  const { pipelineProgress, autoFixNotice, setPipelineProgress, setAutoFixNotice } =
+    usePipelineProgress(projectPath);
   const { running, lastReport, clearReport, handleOneClickCheck } = useOneClickCheck(
     projectPath,
     toast,

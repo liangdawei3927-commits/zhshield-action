@@ -8,14 +8,14 @@ interface FakeCacheManager {
   getSyncHealthLevel(): 0 | 1 | 2 | 3 | 4;
 }
 
-function makeSopStub(overrides: Partial<{ rules: unknown[]; level: 0 | 1 | 2 | 3 | 4; cache: FakeCacheManager }> = {}): SopService {
-  const cache: FakeCacheManager =
-    overrides.cache ??
-    {
-      loadRules: async () => [{ id: 'guard.x' }],
-      getLocalVersion: async () => ({ version: '1.2026.08.20.001' }),
-      getSyncHealthLevel: () => overrides.level ?? 0,
-    };
+function makeSopStub(
+  overrides: Partial<{ rules: unknown[]; level: 0 | 1 | 2 | 3 | 4; cache: FakeCacheManager }> = {},
+): SopService {
+  const cache: FakeCacheManager = overrides.cache ?? {
+    loadRules: async () => [{ id: 'guard.x' }],
+    getLocalVersion: async () => ({ version: '1.2026.08.20.001' }),
+    getSyncHealthLevel: () => overrides.level ?? 0,
+  };
   return {
     getAllRules: () => overrides.rules ?? [{}],
     getCacheManager: () => cache,

@@ -26,8 +26,12 @@ function toConflictFinding(source: string, verdict: string, item: MalwareItem): 
   return RuleConflictResolver.finding(source, verdict, {
     id: item.id,
     ruleId: item.pattern,
-    severity: item.severity === 'critical' || item.severity === 'high' ? 'error'
-      : item.severity === 'medium' ? 'warning' : 'info',
+    severity:
+      item.severity === 'critical' || item.severity === 'high'
+        ? 'error'
+        : item.severity === 'medium'
+          ? 'warning'
+          : 'info',
     category: 'security',
     message: item.title,
     file: item.file,
@@ -41,11 +45,7 @@ function toConflictFinding(source: string, verdict: string, item: MalwareItem): 
 /** 将交叉验证结果映射为 Vulnerability 列表 */
 function mapCrossEntries(report: CrossValidationReport): Vulnerability[] {
   const result: Vulnerability[] = [];
-  const all = [
-    ...report.highConfidence,
-    ...report.trivyOnly,
-    ...report.grypeOnly,
-  ];
+  const all = [...report.highConfidence, ...report.trivyOnly, ...report.grypeOnly];
 
   for (const entry of all) {
     const first = entry.issues[0];
@@ -54,8 +54,12 @@ function mapCrossEntries(report: CrossValidationReport): Vulnerability[] {
     result.push({
       id: randomUUID(),
       cveId: entry.cveId || undefined,
-      severity: entry.suggestedSeverity === 'error' ? 'high'
-        : entry.suggestedSeverity === 'warning' ? 'medium' : 'low',
+      severity:
+        entry.suggestedSeverity === 'error'
+          ? 'high'
+          : entry.suggestedSeverity === 'warning'
+            ? 'medium'
+            : 'low',
       title: first.message,
       description: first.message,
       package: first.file || entry.packageKey,
@@ -116,7 +120,8 @@ export class ResultAggregator {
     grypeIssues,
   }: CollectScannerFindingsParams): Promise<ResultAggregatorResult> {
     const crossReport = this.crossValidator.validate(trivyIssues, grypeIssues);
-    const { legacyVulns, legacyGarbage, legacyMalware, injectionMalware } = await this.collectLegacyFindings(projectPath);
+    const { legacyVulns, legacyGarbage, legacyMalware, injectionMalware } =
+      await this.collectLegacyFindings(projectPath);
     const depcheckGarbage = mapDepcheckIssuesToGarbage(depcheckIssues);
     const semgrepMalware = mapSemgrepIssuesToMalware(semgrepIssues);
     const garbage = [...legacyGarbage, ...depcheckGarbage];
@@ -159,26 +164,31 @@ export class ResultAggregator {
     malwareLanes: Array<{ source: string; verdict: string; items: MalwareItem[] }>,
   ): { conflictReport: RuleConflictReport; malware: MalwareItem[] } {
     const conflictReport = this.ruleConflictResolver.resolve(
-      malwareLanes.flatMap((lane) => lane.items.map((item) => toConflictFinding(lane.source, lane.verdict, item))),
+      malwareLanes.flatMap((lane) =>
+        lane.items.map((item) => toConflictFinding(lane.source, lane.verdict, item)),
+      ),
     );
     const excludedFingerprints = new Set([
       ...conflictReport.falsePositives.map((entry) => entry.fingerprint),
       ...conflictReport.conflicts.map((entry) => entry.fingerprint),
     ]);
     const seenFingerprints = new Set<string>();
-    const malware = malwareLanes.flatMap((lane) => lane.items).filter((item) => {
-      const fingerprint = malwareFingerprint(item);
-      if (excludedFingerprints.has(fingerprint) || seenFingerprints.has(fingerprint)) return false;
-      seenFingerprints.add(fingerprint);
-      return true;
-    });
+    const malware = malwareLanes
+      .flatMap((lane) => lane.items)
+      .filter((item) => {
+        const fingerprint = malwareFingerprint(item);
+        if (excludedFingerprints.has(fingerprint) || seenFingerprints.has(fingerprint))
+          return false;
+        seenFingerprints.add(fingerprint);
+        return true;
+      });
     return { conflictReport, malware };
   }
 
-  private buildVulnerabilities(legacyVulns: Vulnerability[], crossReport: CrossValidationReport): Vulnerability[] {
-    return [
-      ...legacyVulns,
-      ...mapCrossEntries(crossReport),
-    ];
+  private buildVulnerabilities(
+    legacyVulns: Vulnerability[],
+    crossReport: CrossValidationReport,
+  ): Vulnerability[] {
+    return [...legacyVulns, ...mapCrossEntries(crossReport)];
   }
 }

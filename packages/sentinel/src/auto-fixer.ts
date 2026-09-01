@@ -6,7 +6,17 @@ import type { SentinelEvent, EventStatus } from './types';
 const SAFE_SCRIPT_NAME_RE = /^[a-zA-Z0-9:_-]{1,64}$/;
 
 /** 允许直接执行的脚本命令白名单（run-script 的 command，无 shell 解释） */
-const SAFE_SCRIPT_COMMANDS = new Set(['npm', 'npx', 'node', 'pnpm', 'yarn', 'git', 'tsx', 'ts-node', 'bun']);
+const SAFE_SCRIPT_COMMANDS = new Set([
+  'npm',
+  'npx',
+  'node',
+  'pnpm',
+  'yarn',
+  'git',
+  'tsx',
+  'ts-node',
+  'bun',
+]);
 /** 脚本参数安全字符集：仅允许路径 / 标志类字符，拒绝 shell 元字符 */
 const SAFE_SCRIPT_ARG_RE = /^[a-zA-Z0-9_./:@%+=,-]{1,256}$/;
 /** shell 元字符（出现在脚本即拒绝执行） */
@@ -54,7 +64,9 @@ export class AutoFixer {
   private running = false;
 
   /** 动作类型 → 执行处理器策略表（替代 executeAction 中的 switch 分派） */
-  private readonly actionHandlers: Partial<Record<AutoFixAction['type'], (action: AutoFixAction, event: SentinelEvent) => boolean>> = {
+  private readonly actionHandlers: Partial<
+    Record<AutoFixAction['type'], (action: AutoFixAction, event: SentinelEvent) => boolean>
+  > = {
     'restart-process': (action) => {
       try {
         const processName = action.params.process || 'dev';
@@ -79,7 +91,10 @@ export class AutoFixer {
         // Get the last commit hash for potential rollback
         execSync('git log --oneline -1', { cwd, timeout: 5000 });
         // Attempt a soft rollback (revert, not reset)
-        execSync('git revert --no-commit HEAD~1..HEAD 2>/dev/null || true', { cwd, timeout: 15000 });
+        execSync('git revert --no-commit HEAD~1..HEAD 2>/dev/null || true', {
+          cwd,
+          timeout: 15000,
+        });
         this.eventCenter.createEvent({
           projectId: this.config!.projectId,
           title: 'Rollback executed',
@@ -193,7 +208,12 @@ export class AutoFixer {
   }
 
   /** 按成败结果更新事件状态并上报结果事件 */
-  private emitFixOutcome(rule: AutoFixRule, event: SentinelEvent, succeeded: boolean, attempts: number): void {
+  private emitFixOutcome(
+    rule: AutoFixRule,
+    event: SentinelEvent,
+    succeeded: boolean,
+    attempts: number,
+  ): void {
     const projectId = this.config!.projectId;
     if (succeeded) {
       this.eventCenter.updateStatus(event.id, 'pr_opened', 'auto-fixer');

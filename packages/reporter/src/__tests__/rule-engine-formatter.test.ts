@@ -78,7 +78,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 5, passed: 3, failed: 1, errors: 1, skipped: 0,
+      total: 5,
+      passed: 3,
+      failed: 1,
+      errors: 1,
+      skipped: 0,
       ok: false,
       evaluations: [],
       durationMs: 100,
@@ -96,7 +100,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 10, passed: 6, failed: 2, errors: 1, skipped: 1,
+      total: 10,
+      passed: 6,
+      failed: 2,
+      errors: 1,
+      skipped: 1,
       ok: false,
       evaluations: [],
       durationMs: 50,
@@ -106,10 +114,10 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     formatter.format({ report, lines, indent: '' });
 
     const text = lines.join('\n');
-    expect(text).toContain('6');  // passed
-    expect(text).toContain('2');  // failed
-    expect(text).toContain('1');  // errors
-    expect(text).toContain('1');  // skipped
+    expect(text).toContain('6'); // passed
+    expect(text).toContain('2'); // failed
+    expect(text).toContain('1'); // errors
+    expect(text).toContain('1'); // skipped
     expect(text).toContain('通过');
     expect(text).toContain('失败');
     expect(text).toContain('错误');
@@ -120,7 +128,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 1, failed: 0, errors: 0, skipped: 0,
+      total: 1,
+      passed: 1,
+      failed: 0,
+      errors: 0,
+      skipped: 0,
       ok: true,
       evaluations: [],
       durationMs: 250,
@@ -140,7 +152,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 0, passed: 0, failed: 0, errors: 0, skipped: 0,
+      total: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 0,
       ok: true,
       evaluations: [],
       durationMs: 0,
@@ -159,22 +175,54 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 2, passed: 0, failed: 2, errors: 0, skipped: 0,
+      total: 2,
+      passed: 0,
+      failed: 2,
+      errors: 0,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({
           status: 'failed',
           violations: [
-            { id: 'v1', ruleId: 'r1', severity: 'high', file: 'a.ts', message: 'issue1', category: 'security' },
-            { id: 'v2', ruleId: 'r1', severity: 'medium', file: 'b.ts', message: 'issue2', category: 'security' },
-            { id: 'v3', ruleId: 'r2', severity: 'low', file: 'c.ts', message: 'issue3', category: 'quality' },
+            {
+              id: 'v1',
+              ruleId: 'r1',
+              severity: 'high',
+              file: 'a.ts',
+              message: 'issue1',
+              category: 'security',
+            },
+            {
+              id: 'v2',
+              ruleId: 'r1',
+              severity: 'medium',
+              file: 'b.ts',
+              message: 'issue2',
+              category: 'security',
+            },
+            {
+              id: 'v3',
+              ruleId: 'r2',
+              severity: 'low',
+              file: 'c.ts',
+              message: 'issue3',
+              category: 'quality',
+            },
           ],
         }),
         makeEvaluation({
           rule: makeRule('r2'),
           status: 'failed',
           violations: [
-            { id: 'v4', ruleId: 'r2', severity: 'low', file: 'c.ts', message: 'issue4', category: 'quality' },
+            {
+              id: 'v4',
+              ruleId: 'r2',
+              severity: 'low',
+              file: 'c.ts',
+              message: 'issue4',
+              category: 'quality',
+            },
           ],
         }),
       ],
@@ -196,14 +244,27 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 0, failed: 1, errors: 0, skipped: 0,
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({
           status: 'failed',
           message: '发现 3 处问题',
           violations: [
-            { id: 'v1', ruleId: 'r1', severity: 'critical', file: 'src/app.ts', line: 10, message: 'Critical bug', suggestion: 'Fix it', category: 'security' },
+            {
+              id: 'v1',
+              ruleId: 'r1',
+              severity: 'critical',
+              file: 'src/app.ts',
+              line: 10,
+              message: 'Critical bug',
+              suggestion: 'Fix it',
+              category: 'security',
+            },
           ],
           files: ['src/app.ts'],
         }),
@@ -229,7 +290,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 0, failed: 0, errors: 1, skipped: 0,
+      total: 1,
+      passed: 0,
+      failed: 0,
+      errors: 1,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({
@@ -255,7 +320,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 2, passed: 2, failed: 0, errors: 0, skipped: 0,
+      total: 2,
+      passed: 2,
+      failed: 0,
+      errors: 0,
+      skipped: 0,
       ok: true,
       evaluations: [
         makeEvaluation({ status: 'passed', message: '检查通过' }),
@@ -280,7 +349,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 0, passed: 0, failed: 0, errors: 0, skipped: 0,
+      total: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 0,
       ok: true,
       evaluations: [],
       durationMs: 0,
@@ -308,7 +381,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 0, failed: 1, errors: 0, skipped: 0,
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({
@@ -332,7 +409,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 0, failed: 1, errors: 0, skipped: 0,
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({
@@ -356,7 +437,11 @@ describe('RuleEngineReportFormatter — 规则引擎报告格式化', () => {
     const formatter = makeFormatter();
     const lines: string[] = [];
     const report: RuleEngineReport = {
-      total: 1, passed: 0, failed: 1, errors: 0, skipped: 0,
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
       ok: false,
       evaluations: [
         makeEvaluation({

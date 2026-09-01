@@ -36,13 +36,14 @@ export class TargetBuilder {
       path: projectPath,
       language,
       frameworks,
-      productForm: primaryForm !== undefined
-        ? {
-            value: primaryForm.form,
-            confidence: calculateFormConfidence(primaryForm.score, primaryForm.isDecisive),
-            signals: primaryForm.signals,
-          }
-        : undefined,
+      productForm:
+        primaryForm !== undefined
+          ? {
+              value: primaryForm.form,
+              confidence: calculateFormConfidence(primaryForm.score, primaryForm.isDecisive),
+              signals: primaryForm.signals,
+            }
+          : undefined,
       packageManager,
       routeKey,
     };
@@ -51,9 +52,7 @@ export class TargetBuilder {
   /** 架构形态判定（简化版） */
   determineArchitecture(signals: readonly Signal[]): MatchResult<ArchitectureForm> {
     // 检查 monorepo 信号
-    const hasWorkspaceSignal = signals.some(
-      (s) => s.ruleId === 'manifest:workspace',
-    );
+    const hasWorkspaceSignal = signals.some((s) => s.ruleId === 'manifest:workspace');
 
     if (hasWorkspaceSignal) {
       return {

@@ -36,9 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex flex-col items-center justify-center h-screen bg-zh-bg p-8">
           <div className="max-w-md text-center">
             <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl font-bold text-zh-ink mb-2">
-              出现了一些问题
-            </h2>
+            <h2 className="text-xl font-bold text-zh-ink mb-2">出现了一些问题</h2>
             <p className="text-sm text-zh-muted mb-4">
               应用遇到了一个错误，但不用担心，这不会影响其他功能。
             </p>

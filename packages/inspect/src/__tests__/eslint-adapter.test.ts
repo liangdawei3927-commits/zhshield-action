@@ -60,7 +60,9 @@ describe('ESLintAdapter 注入 config 缺失时的行为', () => {
     expect(result.status).toBe('unavailable');
     expect(result.error).toContain('不存在');
     // 仅 --version 探测被调用，未对缺失的 config 发起真实扫描
-    const scanCallArgs = execFileMock.mock.calls.map((c) => c[1] as string[]).filter((a) => a.includes('--config'));
+    const scanCallArgs = execFileMock.mock.calls
+      .map((c) => c[1] as string[])
+      .filter((a) => a.includes('--config'));
     expect(scanCallArgs).toHaveLength(0);
   });
 

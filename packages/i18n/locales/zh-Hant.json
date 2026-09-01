@@ -652,6 +652,7 @@
   },
   "layout": {
     "about": "關於",
+    "navigation": "導覽",
     "aboutVersion": "智匯碼盾 {{version}}",
     "addProject": "新增專案",
     "aiTool": "AI 工具",

@@ -1,7 +1,11 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { t } from '@zh/i18n';
 import { runSecurity, cleanGarbage, restoreGarbage } from '../services/engineApi';
-import type { SecurityScanReportData, GarbageCleanResultData, GarbageRestoreResultData } from '../types/electron';
+import type {
+  SecurityScanReportData,
+  GarbageCleanResultData,
+  GarbageRestoreResultData,
+} from '../types/electron';
 import { useTaskRun } from '../task-store';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
@@ -10,7 +14,11 @@ import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils
  * 引擎可移入回收站的垃圾类型（与 @zh/security garbage-scanner 的 cleanGarbage 能力对齐）：
  * unused-dependency 需通过包管理器移除，引擎不会物理移动，故不在可勾选集合内。
  */
-export const CLEANABLE_TYPES: ReadonlySet<string> = new Set(['unused-file', 'dead-code', 'duplicate-code']);
+export const CLEANABLE_TYPES: ReadonlySet<string> = new Set([
+  'unused-file',
+  'dead-code',
+  'duplicate-code',
+]);
 
 export function isCleanableType(type: string): boolean {
   return CLEANABLE_TYPES.has(type);
@@ -42,7 +50,10 @@ function useSelectionHandlers(
   toggleAll: () => void;
   clearSelection: () => void;
 } {
-  const toggleSelect = useCallback((id: string) => setSelected((prev) => toggleIdInSet(prev, id)), [setSelected]);
+  const toggleSelect = useCallback(
+    (id: string) => setSelected((prev) => toggleIdInSet(prev, id)),
+    [setSelected],
+  );
   const toggleAll = useCallback(() => {
     if (!report) return;
     setSelected((prev) => toggleAllSelection(report, prev));
@@ -70,7 +81,11 @@ interface CleanSetters {
   onSelectionCleared: () => void;
 }
 
-async function performClean(projectPath: string, items: SecurityScanReportData['garbage'], setters: CleanSetters): Promise<void> {
+async function performClean(
+  projectPath: string,
+  items: SecurityScanReportData['garbage'],
+  setters: CleanSetters,
+): Promise<void> {
   setters.setCleaning(true);
   try {
     const result = await cleanGarbage(projectPath, items);
@@ -81,7 +96,12 @@ async function performClean(projectPath: string, items: SecurityScanReportData['
     );
     setters.onSelectionCleared();
   } catch {
-    setters.setCleanResult({ batchId: '', cleaned: [], freedBytes: 0, failed: [t('page.garbage.cleanFailed')] });
+    setters.setCleanResult({
+      batchId: '',
+      cleaned: [],
+      freedBytes: 0,
+      failed: [t('page.garbage.cleanFailed')],
+    });
   } finally {
     setters.setCleaning(false);
   }
@@ -94,7 +114,11 @@ interface RestoreSetters {
   onRefresh: () => Promise<void>;
 }
 
-async function performRestore(projectPath: string, batchId: string, setters: RestoreSetters): Promise<void> {
+async function performRestore(
+  projectPath: string,
+  batchId: string,
+  setters: RestoreSetters,
+): Promise<void> {
   setters.setRestoring(true);
   try {
     const result = await restoreGarbage(projectPath, batchId);
@@ -102,7 +126,11 @@ async function performRestore(projectPath: string, batchId: string, setters: Res
     setters.onRestored();
     await setters.onRefresh();
   } catch {
-    setters.setRestoreResult({ restored: 0, restoredBytes: 0, failed: [t('page.garbage.restoreFailed')] });
+    setters.setRestoreResult({
+      restored: 0,
+      restoredBytes: 0,
+      failed: [t('page.garbage.restoreFailed')],
+    });
   } finally {
     setters.setRestoring(false);
   }
@@ -134,7 +162,12 @@ function useGarbageClean(
   const handleClean = useCallback(async () => {
     if (!report || selected.size === 0) return;
     const items = report.garbage.filter((g) => selected.has(g.id));
-    await performClean(projectPath, items, { setCleaning, setCleanResult, onReportChange, onSelectionCleared });
+    await performClean(projectPath, items, {
+      setCleaning,
+      setCleanResult,
+      onReportChange,
+      onSelectionCleared,
+    });
   }, [projectPath, report, selected, onReportChange, onSelectionCleared]);
   return { cleaning, cleanResult, handleClean, setCleanResult };
 }
@@ -154,7 +187,12 @@ function useGarbageRestore(
   const [restoreResult, setRestoreResult] = useState<GarbageRestoreResultData | null>(null);
   const handleRestore = useCallback(async () => {
     if (!cleanResult?.batchId) return;
-    await performRestore(projectPath, cleanResult.batchId, { setRestoring, setRestoreResult, onRestored, onRefresh });
+    await performRestore(projectPath, cleanResult.batchId, {
+      setRestoring,
+      setRestoreResult,
+      onRestored,
+      onRefresh,
+    });
   }, [projectPath, cleanResult, onRestored, onRefresh]);
   return { restoring, restoreResult, handleRestore, setRestoreResult };
 }
@@ -177,8 +215,19 @@ function useGarbageActions(params: {
   clearResults: (clearRestore: boolean) => void;
 } {
   const { projectPath, report, selected, onReportChange, onSelectionCleared, onRefresh } = params;
-  const { cleaning, cleanResult, handleClean, setCleanResult } = useGarbageClean(projectPath, report, selected, onReportChange, onSelectionCleared);
-  const { restoring, restoreResult, handleRestore, setRestoreResult } = useGarbageRestore(projectPath, cleanResult, onRefresh, () => setCleanResult(null));
+  const { cleaning, cleanResult, handleClean, setCleanResult } = useGarbageClean(
+    projectPath,
+    report,
+    selected,
+    onReportChange,
+    onSelectionCleared,
+  );
+  const { restoring, restoreResult, handleRestore, setRestoreResult } = useGarbageRestore(
+    projectPath,
+    cleanResult,
+    onRefresh,
+    () => setCleanResult(null),
+  );
   const clearResults = useCallback((clearRestore: boolean) => {
     clearGarbageResults(setCleanResult, setRestoreResult, clearRestore);
   }, []);
@@ -218,7 +267,9 @@ function useGarbageCopyToAi(projectPath: string): {
           source: t('page.garbage.source'),
           ruleId: g.type,
           file: g.path,
-          severity: isCleanableType(g.type) ? t('page.garbage.cleanableLabel') : t('page.garbage.manualLabel'),
+          severity: isCleanableType(g.type)
+            ? t('page.garbage.cleanableLabel')
+            : t('page.garbage.manualLabel'),
           message: g.reason || g.path,
           suggestion: t('page.garbage.safetySuggestion'),
         })),
@@ -284,10 +335,13 @@ export function useGarbagePage(projectPath: string): {
     onSelectionCleared: clearSelection,
     onRefresh: refreshReport,
   });
-  const handleScan = useCallback(async (keepBanner = false) => {
-    clearResults(!keepBanner);
-    await refreshReport();
-  }, [refreshReport, clearResults]);
+  const handleScan = useCallback(
+    async (keepBanner = false) => {
+      clearResults(!keepBanner);
+      await refreshReport();
+    },
+    [refreshReport, clearResults],
+  );
   const { copyAllToAi } = useGarbageCopyToAi(projectPath);
 
   return {

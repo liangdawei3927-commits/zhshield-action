@@ -13,7 +13,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /** 与 graph-builder / lockfile-verifier 探测一致的可识别锁文件名 */
-const LOCKFILE_NAMES = ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'poetry.lock', 'Pipfile.lock'] as const;
+const LOCKFILE_NAMES = [
+  'pnpm-lock.yaml',
+  'package-lock.json',
+  'yarn.lock',
+  'poetry.lock',
+  'Pipfile.lock',
+] as const;
 
 /** 向上查找的保守边界（层数）：workspace 嵌套通常 ≤ 3 层，10 层足够且避免误伤无关祖先 */
 const MAX_UPWARD_LEVELS = 10;

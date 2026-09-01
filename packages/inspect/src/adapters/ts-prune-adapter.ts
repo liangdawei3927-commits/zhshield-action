@@ -2,7 +2,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -66,10 +73,7 @@ export class TsPruneAdapter implements ToolAdapter {
   private async runTsPrune(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const tsConfigPath = path.join(options.projectPath, 'tsconfig.json');
     const command = await this.resolveCommand();
-    const { stdout } = await execFileAsync(command, [
-      '-p', tsConfigPath,
-      '--json',
-    ], {
+    const { stdout } = await execFileAsync(command, ['-p', tsConfigPath, '--json'], {
       cwd: options.projectPath,
       timeout: options.timeout || 60000,
       maxBuffer: 10 * 1024 * 1024,
@@ -98,7 +102,12 @@ export class TsPruneAdapter implements ToolAdapter {
         tool: 'ts-prune',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'ts-prune 未安装',
       };
     }
@@ -110,7 +119,12 @@ export class TsPruneAdapter implements ToolAdapter {
           tool: 'ts-prune',
           status: 'available',
           issues,
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: issues.length },
+          metadata: {
+            version: '',
+            duration: Date.now() - start,
+            timestamp: new Date(),
+            fileCount: issues.length,
+          },
         };
       }
     }

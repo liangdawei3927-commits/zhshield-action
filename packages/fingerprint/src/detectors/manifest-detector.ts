@@ -66,7 +66,8 @@ function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]
     for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const rest = parts.slice(globIdx + 1).join('/');
-      const candidate = rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
+      const candidate =
+        rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
       if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
         const rel = path.relative(projectRoot, candidate);
         if (isNoiseRel(rel)) continue;
@@ -123,24 +124,47 @@ const RUST_FRAMEWORKS = [{ language: 'rust', frameworks: FRAMEWORK_KEYWORDS.rust
 const PHP_FRAMEWORKS = [{ language: 'php', frameworks: FRAMEWORK_KEYWORDS.php }];
 const RUBY_FRAMEWORKS = [{ language: 'ruby', frameworks: FRAMEWORK_KEYWORDS.ruby }];
 
-const JS_MANIFEST_NAMES = new Set(['package.json', 'pyproject.toml', 'requirements.txt', 'Pipfile']);
+const JS_MANIFEST_NAMES = new Set([
+  'package.json',
+  'pyproject.toml',
+  'requirements.txt',
+  'Pipfile',
+]);
 
 /** 在 manifest 所在目录找 lockfile → 包管理器信号（package.json / Python 清单附带）。 */
-function packageManagerSignals(projectRoot: string, manifestRelPath: string, manifestName: string, weight: number): Signal[] {
+function packageManagerSignals(
+  projectRoot: string,
+  manifestRelPath: string,
+  manifestName: string,
+  weight: number,
+): Signal[] {
   if (!JS_MANIFEST_NAMES.has(manifestName)) return [];
   const dir = relDirname(manifestRelPath);
   const signals: Signal[] = [];
   for (const [lockName, manager] of Object.entries(LOCKFILE_MANAGERS)) {
     const rel = dir === '.' ? lockName : `${dir}/${lockName}`;
     if (fs.existsSync(path.join(projectRoot, ...rel.split('/')))) {
-      signals.push(makeSignal(KIND, `manifest:package-manager:${manager}`, rel, weight, { manager, packageManager: manager }));
+      signals.push(
+        makeSignal(KIND, `manifest:package-manager:${manager}`, rel, weight, {
+          manager,
+          packageManager: manager,
+        }),
+      );
     }
   }
   return signals;
 }
 
 function findProjectRoot(projectPath: string): string {
-  const manifestNames = ['package.json', 'pyproject.toml', 'requirements.txt', 'Cargo.toml', 'go.mod', 'pom.xml', 'Gemfile'];
+  const manifestNames = [
+    'package.json',
+    'pyproject.toml',
+    'requirements.txt',
+    'Cargo.toml',
+    'go.mod',
+    'pom.xml',
+    'Gemfile',
+  ];
   for (const name of listRootFiles(projectPath)) {
     if (manifestNames.includes(name)) return projectPath;
   }
@@ -182,21 +206,37 @@ export class ManifestDetector implements Detector {
       this.collectWorkspaceManifests(projectPath, root, workspacePatterns, signals);
     }
 
-    return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+    return signals.sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+    );
   }
 
-  private collectWorkspaceManifests(projectPath: string, root: string, workspacePatterns: string[], signals: Signal[]): void {
+  private collectWorkspaceManifests(
+    projectPath: string,
+    root: string,
+    workspacePatterns: string[],
+    signals: Signal[],
+  ): void {
     const workspaceDirs = expandWorkspaceGlobs(root, workspacePatterns);
     for (const dir of new Set(workspaceDirs)) {
       for (const name of listRootFiles(path.join(root, dir))) {
         if (name !== 'package.json') continue;
-        const rel = (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;
-        signals.push(...this.detectManifest(projectPath, rel, name, 'manifest:package-json', 'typescript'));
+        const rel =
+          (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;
+        signals.push(
+          ...this.detectManifest(projectPath, rel, name, 'manifest:package-json', 'typescript'),
+        );
       }
     }
   }
 
-  private detectManifest(projectRoot: string, rel: string, name: string, ruleId: string, _language: LanguageId): Signal[] {
+  private detectManifest(
+    projectRoot: string,
+    rel: string,
+    name: string,
+    ruleId: string,
+    _language: LanguageId,
+  ): Signal[] {
     switch (ruleId) {
       case 'manifest:package-json':
         return this.detectPackageJson(projectRoot, rel);
@@ -206,7 +246,10 @@ export class ManifestDetector implements Detector {
         return this.detectPythonText(projectRoot, rel, ruleId, 'requirements');
       case 'manifest:setup-py':
       case 'manifest:pipfile':
-        return [makeSignal(KIND, ruleId, rel, this.weight, { deps: [] }), ...packageManagerSignals(projectRoot, rel, name, this.weight)];
+        return [
+          makeSignal(KIND, ruleId, rel, this.weight, { deps: [] }),
+          ...packageManagerSignals(projectRoot, rel, name, this.weight),
+        ];
       case 'manifest:pom-xml':
         return this.detectPom(projectRoot, rel);
       case 'manifest:go-mod':
@@ -225,9 +268,13 @@ export class ManifestDetector implements Detector {
   private detectPackageJson(projectRoot: string, rel: string): Signal[] {
     const signals: Signal[] = [];
     const names = readDependencyNames(projectRoot, rel);
-    signals.push(makeSignal(KIND, 'manifest:package-json', rel, this.weight, { dependencies: [...names] }));
+    signals.push(
+      makeSignal(KIND, 'manifest:package-json', rel, this.weight, { dependencies: [...names] }),
+    );
     if (names.has('typescript') || names.has('ts-node')) {
-      signals.push(makeSignal(KIND, 'manifest:typescript-dep', rel, this.weight, { dependency: 'typescript' }));
+      signals.push(
+        makeSignal(KIND, 'manifest:typescript-dep', rel, this.weight, { dependency: 'typescript' }),
+      );
     }
     if (readHasWorkspaces(projectRoot, rel)) {
       signals.push(makeSignal(KIND, 'manifest:workspace', rel, this.weight, {}));
@@ -235,18 +282,28 @@ export class ManifestDetector implements Detector {
     signals.push(...frameworkSignalsFromDeps(names, rel, this.weight, JS_FRAMEWORKS));
     signals.push(...packageManagerSignals(projectRoot, rel, 'package.json', this.weight));
     const engines = readEngines(projectRoot, rel);
-    if (engines !== null) signals.push(makeSignal(KIND, 'manifest:node-engine', rel, this.weight, { version: engines }));
+    if (engines !== null)
+      signals.push(
+        makeSignal(KIND, 'manifest:node-engine', rel, this.weight, { version: engines }),
+      );
     return signals;
   }
 
-  private detectPythonText(projectRoot: string, rel: string, ruleId: string, kind: 'pyproject' | 'requirements'): Signal[] {
+  private detectPythonText(
+    projectRoot: string,
+    rel: string,
+    ruleId: string,
+    kind: 'pyproject' | 'requirements',
+  ): Signal[] {
     const content = readText(projectRoot, rel);
     const rawDeps =
       kind === 'pyproject' ? extractPyprojectDeps(content) : extractRequirementsNames(content);
     const deps = [...new Set(rawDeps.map(normalizePackageName))].filter((d) => d.length > 0);
     const signals: Signal[] = [makeSignal(KIND, ruleId, rel, this.weight, { deps })];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, PYTHON_FRAMEWORKS));
-    signals.push(...packageManagerSignals(projectRoot, rel, rel.slice(rel.lastIndexOf('/') + 1), this.weight));
+    signals.push(
+      ...packageManagerSignals(projectRoot, rel, rel.slice(rel.lastIndexOf('/') + 1), this.weight),
+    );
     return signals;
   }
 
@@ -273,7 +330,9 @@ export class ManifestDetector implements Detector {
 
   private detectComposer(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractComposerRequire(readText(projectRoot, rel)))];
-    const signals: Signal[] = [makeSignal(KIND, 'manifest:composer-json', rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal(KIND, 'manifest:composer-json', rel, this.weight, { deps }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, PHP_FRAMEWORKS));
     return signals;
   }

@@ -65,7 +65,11 @@ export interface ManifestRule {
 export const MANIFEST_RULES: readonly ManifestRule[] = [
   { ruleId: 'manifest:package-json', language: 'javascript', match: (n) => n === 'package.json' },
   { ruleId: 'manifest:pyproject', language: 'python', match: (n) => n === 'pyproject.toml' },
-  { ruleId: 'manifest:requirements-txt', language: 'python', match: (n) => n === 'requirements.txt' },
+  {
+    ruleId: 'manifest:requirements-txt',
+    language: 'python',
+    match: (n) => n === 'requirements.txt',
+  },
   { ruleId: 'manifest:setup-py', language: 'python', match: (n) => n === 'setup.py' },
   { ruleId: 'manifest:pipfile', language: 'python', match: (n) => n === 'Pipfile' },
   { ruleId: 'manifest:pom-xml', language: 'java', match: (n) => n === 'pom.xml' },
@@ -101,18 +105,83 @@ export interface ConfigRule {
 const TSCONFIG_RE = /^tsconfig(\.\w+)?\.json$/;
 
 export const CONFIG_RULES: readonly ConfigRule[] = [
-  { ruleId: 'config:tsconfig', confidence: 0.95, language: 'typescript', match: (n) => TSCONFIG_RE.test(n) },
-  { ruleId: 'config:vue-config', confidence: 0.9, framework: 'Vue', match: (n) => n === 'vue.config.js' || n === 'vue.config.ts' },
-  { ruleId: 'config:vite', confidence: 0.9, framework: 'Vite', match: (n) => n.startsWith('vite.config.') },
-  { ruleId: 'config:next-config', confidence: 0.9, framework: 'Next.js', match: (n) => n.startsWith('next.config.') },
-  { ruleId: 'config:nuxt-config', confidence: 0.9, framework: 'Nuxt', match: (n) => n.startsWith('nuxt.config.') },
-  { ruleId: 'config:svelte-config', confidence: 0.9, framework: 'Svelte', match: (n) => n.startsWith('svelte.config.') },
-  { ruleId: 'config:angular', confidence: 0.9, framework: 'Angular', match: (n) => n === 'angular.json' },
-  { ruleId: 'config:nest-cli', confidence: 0.9, framework: 'NestJS', match: (n) => n === 'nest-cli.json' },
-  { ruleId: 'config:node-version', confidence: 1, environment: 'node', match: (n) => n === '.nvmrc' || n === '.node-version' },
-  { ruleId: 'config:python-version', confidence: 1, environment: 'python', match: (n) => n === '.python-version' },
-  { ruleId: 'config:docker', confidence: 1, environment: 'docker', match: (n) => n === 'Dockerfile' || n === 'docker-compose.yml' || n === 'docker-compose.yaml' || n === 'compose.yaml' || n === 'compose.yml' },
-  { ruleId: 'config:ci', confidence: 1, environment: 'ci', match: (n) => n.startsWith('.github/workflows/') },
+  {
+    ruleId: 'config:tsconfig',
+    confidence: 0.95,
+    language: 'typescript',
+    match: (n) => TSCONFIG_RE.test(n),
+  },
+  {
+    ruleId: 'config:vue-config',
+    confidence: 0.9,
+    framework: 'Vue',
+    match: (n) => n === 'vue.config.js' || n === 'vue.config.ts',
+  },
+  {
+    ruleId: 'config:vite',
+    confidence: 0.9,
+    framework: 'Vite',
+    match: (n) => n.startsWith('vite.config.'),
+  },
+  {
+    ruleId: 'config:next-config',
+    confidence: 0.9,
+    framework: 'Next.js',
+    match: (n) => n.startsWith('next.config.'),
+  },
+  {
+    ruleId: 'config:nuxt-config',
+    confidence: 0.9,
+    framework: 'Nuxt',
+    match: (n) => n.startsWith('nuxt.config.'),
+  },
+  {
+    ruleId: 'config:svelte-config',
+    confidence: 0.9,
+    framework: 'Svelte',
+    match: (n) => n.startsWith('svelte.config.'),
+  },
+  {
+    ruleId: 'config:angular',
+    confidence: 0.9,
+    framework: 'Angular',
+    match: (n) => n === 'angular.json',
+  },
+  {
+    ruleId: 'config:nest-cli',
+    confidence: 0.9,
+    framework: 'NestJS',
+    match: (n) => n === 'nest-cli.json',
+  },
+  {
+    ruleId: 'config:node-version',
+    confidence: 1,
+    environment: 'node',
+    match: (n) => n === '.nvmrc' || n === '.node-version',
+  },
+  {
+    ruleId: 'config:python-version',
+    confidence: 1,
+    environment: 'python',
+    match: (n) => n === '.python-version',
+  },
+  {
+    ruleId: 'config:docker',
+    confidence: 1,
+    environment: 'docker',
+    match: (n) =>
+      n === 'Dockerfile' ||
+      n === 'docker-compose.yml' ||
+      n === 'docker-compose.yaml' ||
+      n === 'compose.yaml' ||
+      n === 'compose.yml',
+  },
+  {
+    ruleId: 'config:ci',
+    confidence: 1,
+    environment: 'ci',
+    match: (n) => n.startsWith('.github/workflows/'),
+  },
 ];
 
 /** 环境信号规则 ID → 环境名（用于 content/其它聚合）。 */
@@ -134,12 +203,32 @@ export interface FormFileRule {
 export const FORM_FILE_RULES: readonly FormFileRule[] = [
   { ruleId: 'form:tauri', productForm: 'pc', match: (n) => n === 'tauri.conf.json' },
   { ruleId: 'form:podfile', productForm: 'ios', match: (n) => n === 'Podfile' },
-  { ruleId: 'form:xcodeproj', productForm: 'ios', match: (n) => n.endsWith('.xcodeproj') || n.endsWith('.xcworkspace') },
-  { ruleId: 'form:android-gradle', productForm: 'android', match: (n) => n === 'build.gradle' || n === 'build.gradle.kts' || n === 'settings.gradle' },
-  { ruleId: 'form:android-manifest', productForm: 'android', match: (n) => n === 'AndroidManifest.xml' },
-  { ruleId: 'form:miniapp-project-config', productForm: 'miniapp', match: (n) => n === 'project.config.json' },
+  {
+    ruleId: 'form:xcodeproj',
+    productForm: 'ios',
+    match: (n) => n.endsWith('.xcodeproj') || n.endsWith('.xcworkspace'),
+  },
+  {
+    ruleId: 'form:android-gradle',
+    productForm: 'android',
+    match: (n) => n === 'build.gradle' || n === 'build.gradle.kts' || n === 'settings.gradle',
+  },
+  {
+    ruleId: 'form:android-manifest',
+    productForm: 'android',
+    match: (n) => n === 'AndroidManifest.xml',
+  },
+  {
+    ruleId: 'form:miniapp-project-config',
+    productForm: 'miniapp',
+    match: (n) => n === 'project.config.json',
+  },
   { ruleId: 'form:index-html', productForm: 'h5', match: (n) => n === 'index.html' },
-  { ruleId: 'form:web-bundler', productForm: 'h5', match: (n) => n.startsWith('vite.config.') || n.startsWith('webpack.config.') },
+  {
+    ruleId: 'form:web-bundler',
+    productForm: 'h5',
+    match: (n) => n.startsWith('vite.config.') || n.startsWith('webpack.config.'),
+  },
 ];
 
 /** 目录约定形态信号（中文生态目录命名，只出候选）。 */

@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SKIP_DIRS } from './detector';
+import { cachedWalkFiles } from './walk-cache';
 
 /** 相对路径统一为 posix 风格（'/' 分隔），保证跨平台可复现。 */
 export function toPosix(p: string): string {
@@ -38,30 +39,9 @@ export interface WalkOptions {
 /** 递归收集项目内全部相对路径（posix），跳过噪声目录与符号链接，输出按字典序排序（确定性）。 */
 export function walkFiles(projectRoot: string, options?: WalkOptions): string[] {
   const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
-  const out: string[] = [];
-  const walk = (relDir: string, depth: number): void => {
-    if (depth > maxDepth) return;
-    const absDir = relDir === '' ? projectRoot : path.join(projectRoot, ...relDir.split('/'));
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = fs.readdirSync(absDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    for (const entry of entries) {
-      if (entry.isSymbolicLink()) continue;
-      const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
-      if (entry.isDirectory()) {
-        if (isNoiseDir(entry.name)) continue;
-        walk(rel, depth + 1);
-      } else if (entry.isFile()) {
-        out.push(rel);
-      }
-    }
-  };
-  walk('', 0);
-  return out;
+  // 经 walk-cache 走增量缓存 + 单飞记忆化；返回与冷全量遍历完全一致的文件列表，
+  // 任何缓存失败都静默回退全量遍历（fail-open），不改变签名/排序/SKIP_DIRS 语义。
+  return cachedWalkFiles(projectRoot, maxDepth);
 }
 
 /**

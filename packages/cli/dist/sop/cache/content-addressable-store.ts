@@ -45,7 +45,9 @@ export class ContentAddressableStore {
     const key = `sha256-${hash}`;
     const objectPath = path.join(this.objectsDir, `${key}.json`);
 
-    if (!fs.existsSync(objectPath)) {
+    try {
+      await fs.promises.access(objectPath);
+    } catch {
       await fs.promises.writeFile(objectPath, content, 'utf-8');
     }
 
@@ -188,7 +190,9 @@ export class ContentAddressableStore {
     let totalSizeBytes = 0;
     let objectCount = 0;
     try {
-      const files = await fs.promises.readdir(this.objectsDir);
+      const files = (await fs.promises.readdir(this.objectsDir)).filter(
+        (f) => f !== 'node_modules',
+      );
       for (const file of files) {
         const stat = await fs.promises.stat(path.join(this.objectsDir, file));
         totalSizeBytes += stat.size;
@@ -203,7 +207,9 @@ export class ContentAddressableStore {
   private async estimateDedupSavings(objectCount: number): Promise<number> {
     let dedupSavingsPercent = 0;
     try {
-      const manifestFiles = await fs.promises.readdir(this.manifestsDir);
+      const manifestFiles = (await fs.promises.readdir(this.manifestsDir)).filter(
+        (f) => f !== 'node_modules',
+      );
       if (manifestFiles.length <= 1) return 0;
       let totalRuleRefs = 0;
       for (const mf of manifestFiles) {
@@ -212,9 +218,7 @@ export class ContentAddressableStore {
         totalRuleRefs += Object.keys(manifest.rules).length;
       }
       if (totalRuleRefs > 0) {
-        dedupSavingsPercent = Math.round(
-          ((totalRuleRefs - objectCount) / totalRuleRefs) * 100,
-        );
+        dedupSavingsPercent = Math.round(((totalRuleRefs - objectCount) / totalRuleRefs) * 100);
       }
     } catch {
       // 忽略
@@ -227,6 +231,11 @@ export class ContentAddressableStore {
    */
   async exists(hashKey: string): Promise<boolean> {
     const objectPath = path.join(this.objectsDir, `${hashKey}.json`);
-    return fs.existsSync(objectPath);
+    try {
+      await fs.promises.access(objectPath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

@@ -28,7 +28,15 @@ interface PageShellProps {
 }
 
 /** 中心插图 + 标题区 */
-function PageHeading({ illustration, title, subtitle }: { illustration: ReactNode; title: string; subtitle: string }) {
+function PageHeading({
+  illustration,
+  title,
+  subtitle,
+}: {
+  illustration: ReactNode;
+  title: string;
+  subtitle: string;
+}) {
   return (
     <>
       {/* 中心插图 */}
@@ -60,7 +68,12 @@ function ActionButton({
   progressLabel?: string;
 }) {
   return (
-    <PrimaryButton onClick={onClick} disabled={disabled} loading={loading} loadingLabel={progressLabel}>
+    <PrimaryButton
+      onClick={onClick}
+      disabled={disabled}
+      loading={loading}
+      loadingLabel={progressLabel}
+    >
       {buttonText}
     </PrimaryButton>
   );
@@ -72,11 +85,7 @@ function FeatureList({ features }: { features: FeatureItem[] }) {
     <div className="w-full flex flex-col items-center mt-auto mb-6">
       <div className="grid grid-cols-4 gap-4 w-full px-6">
         {features.map((feature, i) => (
-          <ResultCard
-            key={i}
-            variant="item"
-            className="flex items-center gap-3"
-          >
+          <ResultCard key={i} variant="item" className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-lg flex items-center justify-center text-brand-700 bg-zh-card shadow-sm shrink-0">
               {feature.icon}
             </span>

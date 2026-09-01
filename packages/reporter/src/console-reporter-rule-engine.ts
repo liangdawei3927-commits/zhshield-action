@@ -39,9 +39,13 @@ export class RuleEngineSectionFormatter {
     const errors = report.errors;
     const skipped = report.skipped;
 
-    lines.push(`${indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('条规则')}`}`);
-    lines.push(`${indent}  通过: ${this.fmt.green(String(passed))}  失败: ${this.fmt.red(String(failed))}  ` +
-      `错误: ${this.fmt.yellow(String(errors))}  跳过: ${this.fmt.gray(String(skipped))}`);
+    lines.push(
+      `${indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('条规则')}`}`,
+    );
+    lines.push(
+      `${indent}  通过: ${this.fmt.green(String(passed))}  失败: ${this.fmt.red(String(failed))}  ` +
+        `错误: ${this.fmt.yellow(String(errors))}  跳过: ${this.fmt.gray(String(skipped))}`,
+    );
   }
 
   /** 渲染按 issue category 统计的违规分类汇总 */
@@ -93,7 +97,9 @@ export class RuleEngineSectionFormatter {
       lines.push('');
       lines.push(`${indent}${this.fmt.bold(this.fmt.gray('跳过规则:'))}`);
       for (const eval_ of skippedEvals) {
-        lines.push(`${indent}  ${this.fmt.gray('-')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`);
+        lines.push(
+          `${indent}  ${this.fmt.gray('-')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
+        );
       }
     }
   }
@@ -105,7 +111,9 @@ export class RuleEngineSectionFormatter {
       lines.push('');
       lines.push(`${indent}${this.fmt.bold('通过规则:')}`);
       for (const eval_ of passedEvals) {
-        lines.push(`${indent}  ${this.fmt.green('✓')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`);
+        lines.push(
+          `${indent}  ${this.fmt.green('✓')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
+        );
       }
     }
   }
@@ -119,9 +127,14 @@ export class RuleEngineSectionFormatter {
 
   /** 渲染规则状态图标与规则 ID 行 */
   private formatRuleStatusLine(eval_: RuleEvaluation, lines: string[], indent: string): void {
-    const statusIcon = eval_.status === 'passed' ? this.fmt.green('✓') :
-      eval_.status === 'failed' ? this.fmt.red('✗') :
-      eval_.status === 'error' ? this.fmt.yellow('⚠') : this.fmt.gray('-');
+    const statusIcon =
+      eval_.status === 'passed'
+        ? this.fmt.green('✓')
+        : eval_.status === 'failed'
+          ? this.fmt.red('✗')
+          : eval_.status === 'error'
+            ? this.fmt.yellow('⚠')
+            : this.fmt.gray('-');
 
     lines.push(`${indent}${statusIcon} ${this.fmt.bold(eval_.rule.id)} (${eval_.rule.severity})`);
   }
@@ -154,11 +167,11 @@ export class RuleEngineSectionFormatter {
   }
 
   private formatViolation(violation: Violation, lines: string[], indent: string): void {
-    const location = violation.line
-      ? `${violation.file}:${violation.line}`
-      : violation.file;
-    const locColor = violation.severity === 'critical' || violation.severity === 'high'
-      ? this.fmt.red(location) : this.fmt.yellow(location);
+    const location = violation.line ? `${violation.file}:${violation.line}` : violation.file;
+    const locColor =
+      violation.severity === 'critical' || violation.severity === 'high'
+        ? this.fmt.red(location)
+        : this.fmt.yellow(location);
 
     const catTag = violation.category ? `${this.fmt.magenta(`[${violation.category}]`)} ` : '';
     lines.push(`${indent}${this.fmt.dim('•')} ${locColor}`);

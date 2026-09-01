@@ -10,7 +10,12 @@ export type CronCallback = () => void | Promise<void>;
 const WHITESPACE = /\s+/;
 
 /** 频率 → cron 表达式构建策略表（替代 toCron 中的 switch 分派） */
-const CRON_BUILDERS: Partial<Record<BackupScheduleConfig['frequency'], (hour: number, minute: number, schedule: BackupScheduleConfig) => string>> = {
+const CRON_BUILDERS: Partial<
+  Record<
+    BackupScheduleConfig['frequency'],
+    (hour: number, minute: number, schedule: BackupScheduleConfig) => string
+  >
+> = {
   daily: (hour, minute) => `${minute} ${hour} * * *`,
   weekly: (hour, minute, schedule) => `${minute} ${hour} * * ${schedule.dayOfWeek ?? 0}`,
   monthly: (hour, minute, schedule) => `${minute} ${hour} ${schedule.dayOfMonth ?? 1} * *`,
@@ -177,7 +182,7 @@ export class BackupScheduler {
       if (part.includes('/')) {
         const [range, step] = part.split('/');
         const start = range === '*' ? 0 : parseInt(range, 10);
-        return (value - start) >= 0 && (value - start) % parseInt(step, 10) === 0;
+        return value - start >= 0 && (value - start) % parseInt(step, 10) === 0;
       }
       // 处理范围
       if (part.includes('-')) {

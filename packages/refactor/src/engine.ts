@@ -2,12 +2,7 @@ import * as fs from 'fs';
 import { safeJoin, safeResolve } from '@zh/shared';
 import { parseFile, type ParsedFile } from './ast-helper';
 import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
-import type {
-  CodeSmell,
-  FileSmellReport,
-  RefactorReport,
-  RefactorConfig,
-} from './types';
+import type { CodeSmell, FileSmellReport, RefactorReport, RefactorConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
 import { generateFixes, applyFixes } from './auto-fix';
 import type { Fix, FixResult } from './types';
@@ -19,12 +14,23 @@ const TS_FILE_PATTERN = /\.tsx?$/;
 // 修改它们会破坏各自测试套件。SOP 规则源已迁移至 @zh/kernel 的
 // src/sop/presets/（sop-presets/sop-templates）与 src/sop/tool-packs/。
 const EXCLUDED_DIRS = new Set([
-  'node_modules', 'dist', '.git', '.turbo', 'build', 'coverage',
-  '__mocks__', '__tests__', 'test', 'tests', 'fixtures', '__fixtures__', 'spec',
+  'node_modules',
+  'dist',
+  '.git',
+  '.turbo',
+  'build',
+  'coverage',
+  '__mocks__',
+  '__tests__',
+  'test',
+  'tests',
+  'fixtures',
+  '__fixtures__',
+  'spec',
 ]);
 
 function yieldToEventLoop(): Promise<void> {
-  return new Promise(resolve => setImmediate(resolve));
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 function warn(msg: string): void {
@@ -47,23 +53,20 @@ export class RefactorEngine {
   private detectors: DetectorSet[];
 
   constructor(config?: Partial<RefactorConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config, thresholds: { ...DEFAULT_CONFIG.thresholds, ...config?.thresholds } };
-    this.detectors = ALL_DETECTORS.filter(d =>
-      this.config.enabledRules.includes(d.name)
-    );
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...config,
+      thresholds: { ...DEFAULT_CONFIG.thresholds, ...config?.thresholds },
+    };
+    this.detectors = ALL_DETECTORS.filter((d) => this.config.enabledRules.includes(d.name));
   }
 
-  async analyzeDirectory(
-    projectRoot: string,
-  ): Promise<RefactorReport> {
+  async analyzeDirectory(projectRoot: string): Promise<RefactorReport> {
     const tsFiles = this.collectTsFiles(projectRoot);
     return this.analyzeFiles(projectRoot, tsFiles);
   }
 
-  async analyzeFiles(
-    projectRoot: string,
-    filePaths: string[],
-  ): Promise<RefactorReport> {
+  async analyzeFiles(projectRoot: string, filePaths: string[]): Promise<RefactorReport> {
     const { parsedFiles, parseErrors } = await this.parseFiles(filePaths);
     if (parseErrors.length > 0) {
       warn(`无法解析 ${parseErrors.length} 个文件 (如: ${parseErrors[0]})`);
@@ -91,9 +94,9 @@ export class RefactorEngine {
     fileReports: FileSmellReport[],
     suggestionsByType: Record<string, number>,
   ): RefactorReport['summary'] {
-    const criticalFiles = fileReports.filter(f => f.refactorPriority === 'critical').length;
-    const needsImmediateAction = fileReports.filter(f =>
-      f.refactorPriority === 'critical' || f.refactorPriority === 'high'
+    const criticalFiles = fileReports.filter((f) => f.refactorPriority === 'critical').length;
+    const needsImmediateAction = fileReports.filter(
+      (f) => f.refactorPriority === 'critical' || f.refactorPriority === 'high',
     ).length;
 
     return {
@@ -119,6 +122,7 @@ export class RefactorEngine {
       }
       // 每处理 10 个文件让出事件循环，避免阻塞 IPC 等主进程任务
       if (i > 0 && i % 10 === 0) {
+        // eslint-disable-next-line perf/perf-no-serial-await -- 有意的协作式让出事件循环，非可删除的串行依赖
         await yieldToEventLoop();
       }
     }
@@ -133,6 +137,7 @@ export class RefactorEngine {
       this.processFileReport(parsedFiles[i], parsedFiles, state);
       // 每检测 5 个文件让出事件循环（每个文件跑 20 个检测器，比解析更耗时）
       if (i > 0 && i % 5 === 0) {
+        // eslint-disable-next-line perf/perf-no-serial-await -- 有意的协作式让出事件循环，非可删除的串行依赖
         await yieldToEventLoop();
       }
     }
@@ -179,9 +184,7 @@ export class RefactorEngine {
     }
   }
 
-  async analyzeStagedFiles(
-    projectRoot: string,
-  ): Promise<RefactorReport> {
+  async analyzeStagedFiles(projectRoot: string): Promise<RefactorReport> {
     const { execSync } = await import('child_process');
     try {
       const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
@@ -190,8 +193,8 @@ export class RefactorEngine {
       });
       const stagedFiles = output
         .split('\n')
-        .filter(f => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx')))
-        .map(f => safeResolve(projectRoot, f));
+        .filter((f) => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx')))
+        .map((f) => safeResolve(projectRoot, f));
       return this.analyzeFiles(projectRoot, stagedFiles);
     } catch (e) {
       warn(`Git diff 失败: ${e}`);
@@ -223,11 +226,9 @@ export class RefactorEngine {
     return Math.max(0, Math.min(100, Math.round(score)));
   }
 
-  private calculatePriority(
-    smells: CodeSmell[],
-  ): 'critical' | 'high' | 'medium' | 'low' {
-    const errorCount = smells.filter(s => s.severity === 'error').length;
-    const warningCount = smells.filter(s => s.severity === 'warning').length;
+  private calculatePriority(smells: CodeSmell[]): 'critical' | 'high' | 'medium' | 'low' {
+    const errorCount = smells.filter((s) => s.severity === 'error').length;
+    const warningCount = smells.filter((s) => s.severity === 'warning').length;
     if (errorCount >= 3) return 'critical';
     if (errorCount >= 1 || warningCount >= 5) return 'high';
     if (warningCount >= 2) return 'medium';
@@ -241,7 +242,7 @@ export class RefactorEngine {
     }
     // 若无指定，先扫描再生成
     const report = await this.analyzeDirectory(projectRoot);
-    const allSmells = report.files.flatMap(f => f.smells);
+    const allSmells = report.files.flatMap((f) => f.smells);
     return generateFixes(allSmells, projectRoot);
   }
 

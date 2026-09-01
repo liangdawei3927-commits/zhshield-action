@@ -35,10 +35,9 @@ describe('HooksInstaller', () => {
   describe('install', () => {
     it('should create hooks directory before writing', async () => {
       await installer.install();
-      expect(fs.promises.mkdir).toHaveBeenCalledWith(
-        expect.stringContaining('.git/hooks'),
-        { recursive: true },
-      );
+      expect(fs.promises.mkdir).toHaveBeenCalledWith(expect.stringContaining('.git/hooks'), {
+        recursive: true,
+      });
     });
 
     it('should write pre-commit hook script with zhshield command', async () => {
@@ -92,9 +91,7 @@ describe('HooksInstaller', () => {
     it('should remove matching hook file', async () => {
       const removed = await installer.uninstall('pre-commit');
       expect(removed).toEqual(['pre-commit']);
-      expect(fs.promises.unlink).toHaveBeenCalledWith(
-        expect.stringContaining('pre-commit'),
-      );
+      expect(fs.promises.unlink).toHaveBeenCalledWith(expect.stringContaining('pre-commit'));
     });
 
     it('should remove all hooks when no name specified', async () => {
@@ -151,7 +148,11 @@ describe('HooksInstaller', () => {
   describe('listInstalledHooks', () => {
     it('should return hook names that match known hooks', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['pre-commit', 'pre-push', 'other-file'] as unknown as fs.Dirent[]);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'pre-commit',
+        'pre-push',
+        'other-file',
+      ] as unknown as fs.Dirent[]);
       const hooks = installer.listInstalledHooks();
       expect(hooks).toEqual(['pre-commit', 'pre-push']);
     });
@@ -164,7 +165,9 @@ describe('HooksInstaller', () => {
 
     it('should return empty array on read error', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockImplementation(() => { throw new Error('permission denied'); });
+      vi.mocked(fs.readdirSync).mockImplementation(() => {
+        throw new Error('permission denied');
+      });
       const hooks = installer.listInstalledHooks();
       expect(hooks).toEqual([]);
     });

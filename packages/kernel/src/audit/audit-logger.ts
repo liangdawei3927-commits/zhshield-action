@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, appendFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import fs from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface AuditEntry {
@@ -68,9 +69,7 @@ export class AuditLogger {
    */
   async query(filter: AuditQuery): Promise<AuditEntry[]> {
     const entries = await this.loadAllEntries();
-    return entries
-      .filter(e => this.matchesFilter(e, filter))
-      .slice(0, filter.limit ?? 1000);
+    return entries.filter((e) => this.matchesFilter(e, filter)).slice(0, filter.limit ?? 1000);
   }
 
   /**
@@ -158,19 +157,22 @@ export class AuditLogger {
   }
 
   private async appendEntry(entry: AuditEntry): Promise<void> {
-    if (!existsSync(this.logDir)) {
-      const { mkdirSync } = await import('node:fs');
-      mkdirSync(this.logDir, { recursive: true });
+    try {
+      await fs.promises.access(this.logDir);
+    } catch {
+      await fs.promises.mkdir(this.logDir, { recursive: true });
     }
 
     const currentFile = this.getCurrentLogFile();
     const line = JSON.stringify(entry) + '\n';
-    appendFileSync(currentFile, line, 'utf-8');
+    await fs.promises.appendFile(currentFile, line, 'utf-8');
   }
 
   private getCurrentLogFile(): string {
     const files = existsSync(this.logDir)
-      ? readdirSync(this.logDir).filter(f => f.endsWith('.jsonl')).sort()
+      ? readdirSync(this.logDir)
+          .filter((f) => f.endsWith('.jsonl'))
+          .sort()
       : [];
 
     if (files.length === 0) return join(this.logDir, 'audit-001.jsonl');
@@ -187,20 +189,28 @@ export class AuditLogger {
   }
 
   private async loadAllEntries(): Promise<AuditEntry[]> {
-    if (!existsSync(this.logDir)) return [];
+    try {
+      await fs.promises.access(this.logDir);
+    } catch {
+      return [];
+    }
 
-    const files = readdirSync(this.logDir).filter(f => f.endsWith('.jsonl')).sort();
+    const files = (await fs.promises.readdir(this.logDir))
+      .filter((f) => f.endsWith('.jsonl'))
+      .sort();
     const entries: AuditEntry[] = [];
 
     for (const file of files) {
-      const content = readFileSync(join(this.logDir, file), 'utf-8');
-      const lines = content.split('\n').filter(l => l.trim());
+      const content = await fs.promises.readFile(join(this.logDir, file), 'utf-8');
+      const lines = content.split('\n').filter((l) => l.trim());
       for (const line of lines) {
         try {
           const entry = JSON.parse(line) as AuditEntry;
           entry.timestamp = new Date(entry.timestamp);
           entries.push(entry);
-        } catch { /* skip malformed lines */ }
+        } catch {
+          /* skip malformed lines */
+        }
       }
     }
 

@@ -94,7 +94,9 @@ describe('ContentDetector', () => {
     try {
       const signals = await detector.detect(root);
 
-      const signal = signals.find((s) => s.ruleId === 'content:shebang' && s.file === 'tools/ci/deploy.py');
+      const signal = signals.find(
+        (s) => s.ruleId === 'content:shebang' && s.file === 'tools/ci/deploy.py',
+      );
       expect(signal).toBeDefined();
       if (signal !== undefined) {
         expect(languageOf(signal)).toBe('python');

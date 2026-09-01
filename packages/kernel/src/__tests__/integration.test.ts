@@ -22,9 +22,37 @@ describe('Module Integration', () => {
     const payload: AlertPayload = {
       receiver: 'webhook',
       status: 'firing',
-      commonLabels: { alertname: 'TestAlert', service: 'api', module: 'test', severity: 'high', repo: 'test-repo', branch: 'main', actor: 'ci', pullRequestNumber: '', runbook: '', instance: '' },
+      commonLabels: {
+        alertname: 'TestAlert',
+        service: 'api',
+        module: 'test',
+        severity: 'high',
+        repo: 'test-repo',
+        branch: 'main',
+        actor: 'ci',
+        pullRequestNumber: '',
+        runbook: '',
+        instance: '',
+      },
       commonAnnotations: { summary: 'Test alert', description: 'Integration test' },
-      alerts: [{ status: 'firing', labels: { alertname: 'TestAlert', service: 'api', module: 'test', severity: 'high', repo: 'test-repo', branch: 'main', actor: 'ci', pullRequestNumber: '', instance: 'test' }, annotations: { summary: 'Test', description: 'Test' }, fingerprint: 'fp-001' }],
+      alerts: [
+        {
+          status: 'firing',
+          labels: {
+            alertname: 'TestAlert',
+            service: 'api',
+            module: 'test',
+            severity: 'high',
+            repo: 'test-repo',
+            branch: 'main',
+            actor: 'ci',
+            pullRequestNumber: '',
+            instance: 'test',
+          },
+          annotations: { summary: 'Test', description: 'Test' },
+          fingerprint: 'fp-001',
+        },
+      ],
     };
 
     const result = handler.handleWebhook('test-token', payload);
@@ -57,11 +85,61 @@ describe('Module Integration', () => {
   it('EvolveEngine: record and suggest', () => {
     const engine = new EvolveEngine();
 
-    engine.recordExperience({ projectId: 'p1', type: 'true-positive', ruleId: 'R1', pattern: 'x', message: 'ok', feedback: '', source: 'user', confidence: 1, verified: true });
-    engine.recordExperience({ projectId: 'p1', type: 'true-positive', ruleId: 'R1', pattern: 'x', message: 'ok', feedback: '', source: 'user', confidence: 1, verified: true });
-    engine.recordExperience({ projectId: 'p1', type: 'false-positive', ruleId: 'R2', pattern: 'y', message: 'bad', feedback: '', source: 'user', confidence: 0, verified: false });
-    engine.recordExperience({ projectId: 'p1', type: 'false-positive', ruleId: 'R2', pattern: 'y', message: 'bad', feedback: '', source: 'user', confidence: 0, verified: false });
-    engine.recordExperience({ projectId: 'p1', type: 'false-positive', ruleId: 'R2', pattern: 'y', message: 'bad', feedback: '', source: 'user', confidence: 0, verified: false });
+    engine.recordExperience({
+      projectId: 'p1',
+      type: 'true-positive',
+      ruleId: 'R1',
+      pattern: 'x',
+      message: 'ok',
+      feedback: '',
+      source: 'user',
+      confidence: 1,
+      verified: true,
+    });
+    engine.recordExperience({
+      projectId: 'p1',
+      type: 'true-positive',
+      ruleId: 'R1',
+      pattern: 'x',
+      message: 'ok',
+      feedback: '',
+      source: 'user',
+      confidence: 1,
+      verified: true,
+    });
+    engine.recordExperience({
+      projectId: 'p1',
+      type: 'false-positive',
+      ruleId: 'R2',
+      pattern: 'y',
+      message: 'bad',
+      feedback: '',
+      source: 'user',
+      confidence: 0,
+      verified: false,
+    });
+    engine.recordExperience({
+      projectId: 'p1',
+      type: 'false-positive',
+      ruleId: 'R2',
+      pattern: 'y',
+      message: 'bad',
+      feedback: '',
+      source: 'user',
+      confidence: 0,
+      verified: false,
+    });
+    engine.recordExperience({
+      projectId: 'p1',
+      type: 'false-positive',
+      ruleId: 'R2',
+      pattern: 'y',
+      message: 'bad',
+      feedback: '',
+      source: 'user',
+      confidence: 0,
+      verified: false,
+    });
 
     const suggestions = engine.getSuggestions('p1');
     expect(suggestions.length).toBeGreaterThan(0);
@@ -74,7 +152,17 @@ describe('Module Integration', () => {
       id: 'test-adapter',
       name: 'Test',
       run: async () => [
-        { id: '1', ruleId: 'T1', severity: 'warning', category: 'quality', message: 'test issue', file: 'test.ts', autoFixable: false, source: 'test', fingerprint: 'fp1' },
+        {
+          id: '1',
+          ruleId: 'T1',
+          severity: 'warning',
+          category: 'quality',
+          message: 'test issue',
+          file: 'test.ts',
+          autoFixable: false,
+          source: 'test',
+          fingerprint: 'fp1',
+        },
       ],
     });
 

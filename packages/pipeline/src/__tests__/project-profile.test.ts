@@ -16,11 +16,14 @@ describe('detectProjectProfile — M0 项目识别', () => {
   });
 
   it('识别 TypeScript + NestJS + pnpm 项目', () => {
-    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
-      name: 'demo',
-      dependencies: { '@nestjs/core': '^10', rxjs: '^7' },
-      devDependencies: { typescript: '^5' },
-    }));
+    fs.writeFileSync(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({
+        name: 'demo',
+        dependencies: { '@nestjs/core': '^10', rxjs: '^7' },
+        devDependencies: { typescript: '^5' },
+      }),
+    );
     fs.writeFileSync(path.join(tmpDir, 'tsconfig.json'), '{}');
     fs.writeFileSync(path.join(tmpDir, 'pnpm-lock.yaml'), '');
 
@@ -34,10 +37,13 @@ describe('detectProjectProfile — M0 项目识别', () => {
   it('识别 JavaScript + Express + npm 项目', () => {
     const jsDir = path.join(tmpDir, 'js-express');
     fs.mkdirSync(jsDir, { recursive: true });
-    fs.writeFileSync(path.join(jsDir, 'package.json'), JSON.stringify({
-      name: 'js-demo',
-      dependencies: { express: '^4' },
-    }));
+    fs.writeFileSync(
+      path.join(jsDir, 'package.json'),
+      JSON.stringify({
+        name: 'js-demo',
+        dependencies: { express: '^4' },
+      }),
+    );
     fs.writeFileSync(path.join(jsDir, 'package-lock.json'), '');
 
     const profile = detectProjectProfile(jsDir);
@@ -61,10 +67,10 @@ describe('detectProjectProfile — M0 项目识别', () => {
   it('识别 Python + Django + Poetry 项目', () => {
     const pyDir = path.join(tmpDir, 'py-django');
     fs.mkdirSync(pyDir, { recursive: true });
-    fs.writeFileSync(path.join(pyDir, 'pyproject.toml'), [
-      '[project]',
-      'dependencies = ["django==4.2.0", "gunicorn==21.2.0"]',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(pyDir, 'pyproject.toml'),
+      ['[project]', 'dependencies = ["django==4.2.0", "gunicorn==21.2.0"]'].join('\n'),
+    );
     fs.writeFileSync(path.join(pyDir, 'poetry.lock'), '');
 
     const profile = detectProjectProfile(pyDir);
@@ -101,10 +107,10 @@ describe('detectProjectProfile — M0 项目识别', () => {
   it('uv.lock + pyproject.toml 时包管理器为 uv', () => {
     const pyDir = path.join(tmpDir, 'py-uv');
     fs.mkdirSync(pyDir, { recursive: true });
-    fs.writeFileSync(path.join(pyDir, 'pyproject.toml'), [
-      '[project]',
-      'dependencies = ["flask>=3.0"]',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(pyDir, 'pyproject.toml'),
+      ['[project]', 'dependencies = ["flask>=3.0"]'].join('\n'),
+    );
     fs.writeFileSync(path.join(pyDir, 'uv.lock'), '');
 
     const profile = detectProjectProfile(pyDir);

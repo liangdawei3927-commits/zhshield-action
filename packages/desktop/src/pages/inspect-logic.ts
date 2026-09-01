@@ -7,11 +7,34 @@ import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useTaskRun } from '../task-store';
 
-export const STATUS_CONFIG: Record<string, { labelKey: string; color: string; bg: string; icon: string }> = {
-  pass: { labelKey: 'page.inspect.status.pass', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.1)', icon: '✓' },
-  warn: { labelKey: 'page.inspect.status.warn', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)', icon: '!' },
-  fail: { labelKey: 'page.inspect.status.fail', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', icon: '✗' },
-  attention: { labelKey: 'page.inspect.status.attention', color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.1)', icon: '?' },
+export const STATUS_CONFIG: Record<
+  string,
+  { labelKey: string; color: string; bg: string; icon: string }
+> = {
+  pass: {
+    labelKey: 'page.inspect.status.pass',
+    color: 'rgb(var(--zh-success))',
+    bg: 'rgb(var(--zh-success) / 0.1)',
+    icon: '✓',
+  },
+  warn: {
+    labelKey: 'page.inspect.status.warn',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+    icon: '!',
+  },
+  fail: {
+    labelKey: 'page.inspect.status.fail',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    icon: '✗',
+  },
+  attention: {
+    labelKey: 'page.inspect.status.attention',
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-muted) / 0.1)',
+    icon: '?',
+  },
 };
 
 /** 巡检报告状态：执行巡检并保存结果 */
@@ -66,7 +89,17 @@ function useInspectCopyToAi(projectPath: string): {
 
   const copyToAi = useCallback(
     (item: InspectionReportData['checks'][number]) => {
-      copyIssuesToAi(projectPath, [{ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` }], toast);
+      copyIssuesToAi(
+        projectPath,
+        [
+          {
+            source: t('page.inspect.source'),
+            ruleId: item.id,
+            message: `${item.name} — ${item.detail}`,
+          },
+        ],
+        toast,
+      );
     },
     [projectPath, toast],
   );
@@ -77,7 +110,11 @@ function useInspectCopyToAi(projectPath: string): {
       if (failed.length === 0) return;
       copyIssuesToAi(
         projectPath,
-        failed.map((item) => ({ source: t('page.inspect.source'), ruleId: item.id, message: `${item.name} — ${item.detail}` })),
+        failed.map((item) => ({
+          source: t('page.inspect.source'),
+          ruleId: item.id,
+          message: `${item.name} — ${item.detail}`,
+        })),
         toast,
       );
     },

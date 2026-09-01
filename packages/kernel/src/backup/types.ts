@@ -10,11 +10,7 @@ import { projectBackupSegment } from './utils';
 export type BackupType = 'full' | 'github-only' | 'local-only';
 export type BackupStatus = 'success' | 'partial' | 'failed';
 export type BackupTrigger = 'manual' | 'schedule' | 'api';
-export type BackupPhase =
-  | 'github-commit'
-  | 'github-push'
-  | 'local-copy'
-  | 'local-metadata';
+export type BackupPhase = 'github-commit' | 'github-push' | 'local-copy' | 'local-metadata';
 
 // ─── 配置 ─────────────────────────────────────────────────
 
@@ -42,9 +38,9 @@ export interface LocalBackupConfig {
 export interface BackupScheduleConfig {
   enabled: boolean;
   frequency: 'daily' | 'weekly' | 'monthly';
-  time: string;            // HH:mm
-  dayOfWeek?: number;      // 0=Sun, weekly
-  dayOfMonth?: number;     // monthly
+  time: string; // HH:mm
+  dayOfWeek?: number; // 0=Sun, weekly
+  dayOfMonth?: number; // monthly
 }
 
 export interface BackupConfig {
@@ -126,9 +122,7 @@ export interface LocalBackupSubResult {
   error?: string;
 }
 
-export type BackupSubResult =
-  | GitHubBackupSubResult
-  | LocalBackupSubResult;
+export type BackupSubResult = GitHubBackupSubResult | LocalBackupSubResult;
 
 // ─── 总结果 ───────────────────────────────────────────────
 
@@ -139,7 +133,7 @@ export interface BackupResult {
   results: BackupSubResult[];
   overallStatus: BackupStatus;
   timestamp: Date;
-  duration: number;     // ms
+  duration: number; // ms
   error?: string;
 }
 
@@ -148,15 +142,15 @@ export interface BackupResult {
 export type BackupTypeTag = 'github' | 'local';
 
 export interface BackupRecord {
-  id: string;                    // bk_yyyymmdd_hhmmss
+  id: string; // bk_yyyymmdd_hhmmss
   projectId: string;
   projectName: string;
   projectPath: string;
-  timestamp: string;             // ISO
+  timestamp: string; // ISO
   type: BackupType;
   status: BackupStatus;
   trigger: BackupTrigger;
-  duration: number;              // ms
+  duration: number; // ms
 
   // GitHub
   githubCommitHash?: string;
@@ -225,5 +219,3 @@ export const BACKUP_EVENTS = {
   GET_DETAIL: 'backup:get-detail',
   DELETE_RECORD: 'backup:delete-record',
 } as const;
-
-

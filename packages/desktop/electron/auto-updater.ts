@@ -49,7 +49,10 @@ function registerStatusListeners(mainWindow: BrowserWindow): void {
     mainWindow.webContents.send('update:status', { state: 'not-available' });
   });
   autoUpdater.on('download-progress', (progress) => {
-    mainWindow.webContents.send('update:status', { state: 'downloading', percent: progress.percent });
+    mainWindow.webContents.send('update:status', {
+      state: 'downloading',
+      percent: progress.percent,
+    });
   });
   autoUpdater.on('update-downloaded', () => {
     mainWindow.webContents.send('update:status', { state: 'downloaded' });

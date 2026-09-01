@@ -1,23 +1,64 @@
 import { useCallback, useState } from 'react';
 import { Logger } from '@zh/kernel';
-import { dismissSecret, markSecretRotating, runSecrets, verifySecretRotated } from '../services/engineApi';
+import {
+  dismissSecret,
+  markSecretRotating,
+  runSecrets,
+  verifySecretRotated,
+} from '../services/engineApi';
 import type { SecretReportData } from '../types/electron';
 
 const logger = new Logger('secrets-logic');
 
-export const SECRET_SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
-  critical: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', labelKey: 'page.secrets.severity.critical' },
-  high: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.secrets.severity.high' },
-  medium: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.08)', labelKey: 'page.secrets.severity.medium' },
-  low: { color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.08)', labelKey: 'page.secrets.severity.low' },
+export const SECRET_SEVERITY_CONFIG: Record<
+  string,
+  { color: string; bg: string; labelKey: string }
+> = {
+  critical: {
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    labelKey: 'page.secrets.severity.critical',
+  },
+  high: {
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.12)',
+    labelKey: 'page.secrets.severity.high',
+  },
+  medium: {
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.08)',
+    labelKey: 'page.secrets.severity.medium',
+  },
+  low: {
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-muted) / 0.08)',
+    labelKey: 'page.secrets.severity.low',
+  },
 };
 
-export const SECRET_STATUS_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
-  active: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.secrets.status.active' },
-  rotating: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)', labelKey: 'page.secrets.status.rotating' },
-  rotated: { color: 'rgb(var(--zh-success-700))', bg: 'rgb(var(--zh-success) / 0.08)', labelKey: 'page.secrets.status.rotated' },
-  dismissed: { color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.08)', labelKey: 'page.secrets.status.dismissed' },
-};
+export const SECRET_STATUS_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> =
+  {
+    active: {
+      color: 'rgb(var(--zh-warning))',
+      bg: 'rgb(var(--zh-warning) / 0.12)',
+      labelKey: 'page.secrets.status.active',
+    },
+    rotating: {
+      color: 'rgb(var(--zh-info))',
+      bg: 'rgb(var(--zh-info) / 0.1)',
+      labelKey: 'page.secrets.status.rotating',
+    },
+    rotated: {
+      color: 'rgb(var(--zh-success-700))',
+      bg: 'rgb(var(--zh-success) / 0.08)',
+      labelKey: 'page.secrets.status.rotated',
+    },
+    dismissed: {
+      color: 'rgb(var(--zh-muted))',
+      bg: 'rgb(var(--zh-muted) / 0.08)',
+      labelKey: 'page.secrets.status.dismissed',
+    },
+  };
 
 export const SECRET_TYPE_LABEL: Record<string, string> = {
   'aws-access-key': 'page.secrets.type.awsAccessKey',
@@ -65,7 +106,10 @@ async function refreshSecrets(projectPath: string): Promise<SecretReportData | n
   }
 }
 
-async function runSecretAction(action: () => Promise<unknown>, refresh: () => Promise<void>): Promise<void> {
+async function runSecretAction(
+  action: () => Promise<unknown>,
+  refresh: () => Promise<void>,
+): Promise<void> {
   try {
     await action();
   } finally {

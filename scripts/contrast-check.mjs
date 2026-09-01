@@ -74,4 +74,8 @@ add('text-blue-700 on bg-blue-50', [29, 78, 216], [239, 246, 255]);
 
 console.table(rows);
 const fails = rows.filter((r) => !r.pass);
-console.log(fails.length ? `\n❌ FAIL ${fails.length}:\n` + fails.map((f) => `  ${f.name} (${f.ratio})`).join('\n') : '\n✅ 全部通过');
+console.log(
+  fails.length
+    ? `\n❌ FAIL ${fails.length}:\n` + fails.map((f) => `  ${f.name} (${f.ratio})`).join('\n')
+    : '\n✅ 全部通过',
+);

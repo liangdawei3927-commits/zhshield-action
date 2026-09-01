@@ -23,12 +23,28 @@ export function TechDebtIllustration() {
       <circle cx="75" cy="75" r="65" fill="rgb(var(--zh-brand) / 0.05)" />
       <circle cx="75" cy="75" r="55" fill="rgb(var(--zh-brand) / 0.03)" />
       {/* 债务仪表：半圆弧刻度 */}
-      <path d="M35 105 A40 40 0 0 1 115 105" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="8" strokeLinecap="round" />
+      <path
+        d="M35 105 A40 40 0 0 1 115 105"
+        stroke="rgb(var(--zh-brand-lighter))"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
       {/* 仪表指针（指向高位 = 债务偏重） */}
-      <path d="M75 105 L87 72" stroke="rgb(var(--zh-danger))" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M75 105 L87 72"
+        stroke="rgb(var(--zh-danger))"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
       <circle cx="75" cy="105" r="5" fill="rgb(var(--zh-brand))" />
       {/* 上升债务箭头 */}
-      <path d="M52 38h24M52 38l10-10M52 38l10 10" stroke="rgb(var(--zh-warning))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M52 38h24M52 38l10-10M52 38l10 10"
+        stroke="rgb(var(--zh-warning))"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       {/* 底座金币堆 */}
       <circle cx="55" cy="120" r="6" fill="rgb(var(--zh-warning) / 0.25)" />
       <circle cx="75" cy="122" r="6" fill="rgb(var(--zh-warning) / 0.35)" />
@@ -40,7 +56,16 @@ export function TechDebtIllustration() {
 /** 技术债仪表小图标（24×24，线性风格） */
 function TechDebtGaugeIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-brand))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgb(var(--zh-brand))"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 19A8 8 0 0 1 20 19" />
       <path d="M12 13V8" />
       <circle cx="12" cy="6" r="1.5" />
@@ -69,16 +94,33 @@ export function TechDebtHeader({
         <div>
           <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.techdebt.done')}</h1>
           <p className="text-sm text-zh-muted">
-            {t('page.techdebt.summary', { index: report.debtIndex, actions: report.actionList.length })}
+            {t('page.techdebt.summary', {
+              index: report.debtIndex,
+              actions: report.actionList.length,
+            })}
           </p>
         </div>
-        <PrimaryButton className="ml-auto" onClick={onRescan} loading={loading} loadingLabel={t('page.techdebt.checking')}>
+        <PrimaryButton
+          className="ml-auto"
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={t('page.techdebt.checking')}
+        >
           {t('page.techdebt.rescan')}
         </PrimaryButton>
       </div>
       {report.error && (
         <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-danger))"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4" />
             <path d="M12 16h.01" />
@@ -93,10 +135,20 @@ export function TechDebtHeader({
   );
 }
 
-function SectionTitle({ icon, label, right }: { icon: ReactNode; label: string; right?: ReactNode }) {
+function SectionTitle({
+  icon,
+  label,
+  right,
+}: {
+  icon: ReactNode;
+  label: string;
+  right?: ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">{icon}</span>
+      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+        {icon}
+      </span>
       <span className="text-sm font-semibold text-zh-ink-2">{label}</span>
       {right && <span className="ml-auto">{right}</span>}
     </div>
@@ -116,13 +168,19 @@ function TrendBadge({ trend }: { trend: TechDebtReportData['trend'] }) {
   }
   if (delta < 0) {
     return (
-      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50" style={{ color: 'rgb(var(--zh-success-700))' }}>
+      <span
+        className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50"
+        style={{ color: 'rgb(var(--zh-success-700))' }}
+      >
         ↓ {t('page.techdebt.trend.better', { delta: Math.abs(delta) })}
       </span>
     );
   }
   return (
-    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel" style={{ color: 'rgb(var(--zh-muted))' }}>
+    <span
+      className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
+      style={{ color: 'rgb(var(--zh-muted))' }}
+    >
       {t('page.techdebt.trend.flat')}
     </span>
   );
@@ -135,10 +193,27 @@ function DebtGauge({ index }: { index: number }) {
   const offset = circumference - (index / 100) * circumference;
   const color = debtIndexColor(index);
   return (
-    <div className="relative flex items-center justify-center shrink-0" style={{ width: 160, height: 160 }}>
+    <div
+      className="relative flex items-center justify-center shrink-0"
+      style={{ width: 160, height: 160 }}
+    >
       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="8" />
-        <circle cx="50" cy="50" r="38" fill="none" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="3" />
+        <circle
+          cx="50"
+          cy="50"
+          r="45"
+          fill="none"
+          stroke="rgb(var(--zh-brand-lighter))"
+          strokeWidth="8"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r="38"
+          fill="none"
+          stroke="rgb(var(--zh-brand-lighter))"
+          strokeWidth="3"
+        />
         <circle
           cx="50"
           cy="50"
@@ -152,7 +227,9 @@ function DebtGauge({ index }: { index: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-bold leading-none" style={{ fontSize: 35, color }}>{index}</span>
+        <span className="font-bold leading-none" style={{ fontSize: 35, color }}>
+          {index}
+        </span>
         <span className="text-xs text-zh-muted mt-1.5">{t('page.techdebt.debtIndex')}</span>
       </div>
     </div>
@@ -163,12 +240,25 @@ function DebtGauge({ index }: { index: number }) {
 export function TechDebtOverviewCard({ report }: { report: TechDebtReportData }) {
   const t = useT();
   const periodKey =
-    report.trend.period === 'quarter' ? 'page.techdebt.trend.period.quarter' : report.trend.period === 'month' ? 'page.techdebt.trend.period.month' : 'page.techdebt.trend.period.week';
+    report.trend.period === 'quarter'
+      ? 'page.techdebt.trend.period.quarter'
+      : report.trend.period === 'month'
+        ? 'page.techdebt.trend.period.month'
+        : 'page.techdebt.trend.period.week';
   return (
     <ResultCard variant="score" className="mb-6">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M4 19A8 8 0 0 1 20 19" />
             <path d="M12 13V8" />
             <circle cx="12" cy="6" r="1.5" />
@@ -182,21 +272,35 @@ export function TechDebtOverviewCard({ report }: { report: TechDebtReportData })
         <DebtGauge index={report.debtIndex} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm font-semibold text-zh-ink-2">{t('page.techdebt.trendLabel')}</span>
+            <span className="text-sm font-semibold text-zh-ink-2">
+              {t('page.techdebt.trendLabel')}
+            </span>
             <TrendBadge trend={report.trend} />
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <div className="text-2xl font-bold text-zh-ink leading-none">{report.byModule.length}</div>
-              <div className="text-xs text-zh-muted mt-1.5">{t('page.techdebt.overviewModules')}</div>
+              <div className="text-2xl font-bold text-zh-ink leading-none">
+                {report.byModule.length}
+              </div>
+              <div className="text-xs text-zh-muted mt-1.5">
+                {t('page.techdebt.overviewModules')}
+              </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-zh-ink leading-none">{report.byCategory.length}</div>
-              <div className="text-xs text-zh-muted mt-1.5">{t('page.techdebt.overviewCategories')}</div>
+              <div className="text-2xl font-bold text-zh-ink leading-none">
+                {report.byCategory.length}
+              </div>
+              <div className="text-xs text-zh-muted mt-1.5">
+                {t('page.techdebt.overviewCategories')}
+              </div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-zh-ink leading-none">{report.actionList.length}</div>
-              <div className="text-xs text-zh-muted mt-1.5">{t('page.techdebt.overviewActions')}</div>
+              <div className="text-2xl font-bold text-zh-ink leading-none">
+                {report.actionList.length}
+              </div>
+              <div className="text-xs text-zh-muted mt-1.5">
+                {t('page.techdebt.overviewActions')}
+              </div>
             </div>
           </div>
         </div>
@@ -212,7 +316,16 @@ export function TechDebtModuleCard({ modules }: { modules: TechDebtReportData['b
     <ResultCard variant="score" className="mb-6">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
           </svg>
@@ -229,13 +342,20 @@ export function TechDebtModuleCard({ modules }: { modules: TechDebtReportData['b
         <div className="space-y-3">
           {modules.map((m) => (
             <div key={m.module} className="flex items-center gap-3">
-              <span className="text-xs text-zh-ink-2 font-medium truncate shrink-0" style={{ width: '38%' }} title={m.module}>
+              <span
+                className="text-xs text-zh-ink-2 font-medium truncate shrink-0"
+                style={{ width: '38%' }}
+                title={m.module}
+              >
                 {m.module}
               </span>
               <div className="flex-1 h-2.5 rounded-full bg-zh-panel overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, m.debtShare * 100)}%`, background: 'rgb(var(--zh-brand))' }}
+                  style={{
+                    width: `${Math.min(100, m.debtShare * 100)}%`,
+                    background: 'rgb(var(--zh-brand))',
+                  }}
                 />
               </div>
               <span className="text-[11px] text-zh-muted shrink-0">
@@ -253,20 +373,37 @@ export function TechDebtModuleCard({ modules }: { modules: TechDebtReportData['b
 }
 
 /** 债务构成卡片：按类型占比条（类别 + count + weight） */
-export function TechDebtCategoryCard({ categories }: { categories: TechDebtReportData['byCategory'] }) {
+export function TechDebtCategoryCard({
+  categories,
+}: {
+  categories: TechDebtReportData['byCategory'];
+}) {
   const t = useT();
   const totalCount = categories.reduce((acc, c) => acc + c.count, 0);
   return (
     <ResultCard variant="score" className="mb-6">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M3 3v18h18" />
             <path d="M7 14l4-5 4 3 5-7" />
           </svg>
         }
         label={t('page.techdebt.byCategory')}
-        right={<span className="text-xs text-zh-muted">{t('page.techdebt.categoryTotal', { count: totalCount })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.techdebt.categoryTotal', { count: totalCount })}
+          </span>
+        }
       />
       <div className="space-y-3.5">
         {DEBT_CATEGORY_ORDER.map((cat) => {
@@ -283,7 +420,9 @@ export function TechDebtCategoryCard({ categories }: { categories: TechDebtRepor
                   style={{ width: `${Math.min(100, weight * 100)}%`, background: cfg.color }}
                 />
               </div>
-              <span className="text-sm font-semibold text-zh-ink shrink-0 w-8 text-right">{count}</span>
+              <span className="text-sm font-semibold text-zh-ink shrink-0 w-8 text-right">
+                {count}
+              </span>
               <span className="text-[11px] text-zh-muted shrink-0 w-16 text-right">
                 {t('page.techdebt.categoryWeight', { weight: Math.round(weight * 100) })}
               </span>
@@ -320,8 +459,13 @@ function TechDebtActionItem({
   return (
     <ResultCard>
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-zh-ink-2 truncate" title={action.module}>{action.module}</span>
-        <span className="px-2 py-0.5 rounded text-xs font-medium shrink-0" style={{ background: catCfg.bg, color: catCfg.color }}>
+        <span className="text-sm font-medium text-zh-ink-2 truncate" title={action.module}>
+          {action.module}
+        </span>
+        <span
+          className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
+          style={{ background: catCfg.bg, color: catCfg.color }}
+        >
           {t(catCfg.labelKey)}
         </span>
         {action.recommended && (
@@ -335,9 +479,15 @@ function TechDebtActionItem({
         </span>
       </div>
       <div className="mt-2 flex items-center gap-4">
-        <span className="text-sm font-bold text-zh-ink">{t('page.techdebt.roi', { roi: action.roi })}</span>
-        <span className="text-xs text-zh-muted">{t('page.techdebt.interestScore', { score: action.interestScore })}</span>
-        <span className="text-xs text-zh-muted">{t('page.techdebt.principalEstimate', { value: action.principalEstimate })}</span>
+        <span className="text-sm font-bold text-zh-ink">
+          {t('page.techdebt.roi', { roi: action.roi })}
+        </span>
+        <span className="text-xs text-zh-muted">
+          {t('page.techdebt.interestScore', { score: action.interestScore })}
+        </span>
+        <span className="text-xs text-zh-muted">
+          {t('page.techdebt.principalEstimate', { value: action.principalEstimate })}
+        </span>
         <button
           onClick={() => setOpen((v) => !v)}
           className="ml-auto flex items-center gap-1 text-xs font-medium text-zh-ink-2 bg-zh-panel px-2.5 py-1 rounded-lg border-none cursor-pointer hover:bg-zh-line transition-colors"
@@ -359,14 +509,20 @@ function TechDebtActionItem({
         </button>
       </div>
       {/* 操作按钮区域：pending → 计划偿还，planned/in-progress → 验证完成，repaid/dismissed → 不显示 */}
-      {(action.status === 'pending' || action.status === 'planned' || action.status === 'in-progress') && (
+      {(action.status === 'pending' ||
+        action.status === 'planned' ||
+        action.status === 'in-progress') && (
         <div className="mt-3 pt-3 border-t border-zh-line flex items-center gap-2">
           {action.status === 'pending' && (
             <button
               onClick={() => onPlan?.(action.actionId)}
               disabled={planLoading}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
-              style={{ background: 'rgb(var(--zh-info) / 0.1)', color: 'rgb(var(--zh-info))', opacity: planLoading ? 0.6 : 1 }}
+              style={{
+                background: 'rgb(var(--zh-info) / 0.1)',
+                color: 'rgb(var(--zh-info))',
+                opacity: planLoading ? 0.6 : 1,
+              }}
             >
               {planLoading ? t('page.techdebt.action.planning') : t('page.techdebt.action.plan')}
             </button>
@@ -376,9 +532,15 @@ function TechDebtActionItem({
               onClick={() => onVerify?.(action.actionId)}
               disabled={verifyLoading}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
-              style={{ background: 'rgb(var(--zh-success) / 0.1)', color: 'rgb(var(--zh-success-700))', opacity: verifyLoading ? 0.6 : 1 }}
+              style={{
+                background: 'rgb(var(--zh-success) / 0.1)',
+                color: 'rgb(var(--zh-success-700))',
+                opacity: verifyLoading ? 0.6 : 1,
+              }}
             >
-              {verifyLoading ? t('page.techdebt.action.verifying') : t('page.techdebt.action.verify')}
+              {verifyLoading
+                ? t('page.techdebt.action.verifying')
+                : t('page.techdebt.action.verify')}
             </button>
           )}
           <button
@@ -398,12 +560,17 @@ function TechDebtActionItem({
               <div key={factor.key}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-[11px] text-zh-muted">{t(factor.labelKey)}</span>
-                  <span className="text-xs font-semibold" style={{ color: factor.color }}>{value}</span>
+                  <span className="text-xs font-semibold" style={{ color: factor.color }}>
+                    {value}
+                  </span>
                 </div>
                 <div className="mt-1 h-1 rounded-full bg-zh-panel overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${Math.min(100, (value / INTEREST_FACTOR_MAX) * 100)}%`, background: factor.color }}
+                    style={{
+                      width: `${Math.min(100, (value / INTEREST_FACTOR_MAX) * 100)}%`,
+                      background: factor.color,
+                    }}
                   />
                 </div>
               </div>
@@ -429,7 +596,10 @@ export function TechDebtActionsCard({
   actions: TechDebtReportData['actionList'];
   onCopyToAi?: (action: TechDebtReportData['actionList'][number]) => void;
   onCopyAllToAi?: (actions: TechDebtReportData['actionList']) => void;
-  onPlan?: (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
+  onPlan?: (
+    actionId: string,
+    opts?: { sprint?: string; gate?: 'allow-with-record' },
+  ) => Promise<void>;
   onVerify?: (actionId: string) => Promise<void>;
   onDismiss?: (actionId: string) => Promise<void>;
   planLoading?: string | null;
@@ -441,7 +611,16 @@ export function TechDebtActionsCard({
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M9 18h6M10 22h4" />
             <path d="M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z" />
           </svg>
@@ -487,7 +666,16 @@ export function TechDebtCompositionIntroCard() {
     <ResultCard variant="score" className="mt-6">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 16v-4M12 8h.01" />
           </svg>
@@ -505,7 +693,9 @@ export function TechDebtCompositionIntroCard() {
               />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-zh-ink-2">{t(cfg.labelKey)}</div>
-                <div className="text-xs text-zh-muted mt-0.5 leading-relaxed">{t(`page.techdebt.categoryDesc.${cat}`)}</div>
+                <div className="text-xs text-zh-muted mt-0.5 leading-relaxed">
+                  {t(`page.techdebt.categoryDesc.${cat}`)}
+                </div>
               </div>
             </div>
           );
@@ -531,7 +721,16 @@ export function TechDebtEmptyState({ loading, onScan }: { loading: boolean; onSc
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
             </svg>
@@ -541,7 +740,16 @@ export function TechDebtEmptyState({ loading, onScan }: { loading: boolean; onSc
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M21.21 15.89A10 10 0 118 2.83" />
               <path d="M22 12A10 10 0 0012 2v10z" />
             </svg>
@@ -551,7 +759,16 @@ export function TechDebtEmptyState({ loading, onScan }: { loading: boolean; onSc
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M9 18h6M10 22h4" />
               <path d="M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z" />
             </svg>

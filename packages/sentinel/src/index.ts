@@ -11,11 +11,7 @@ export { LogCollector } from './log-collector';
 export type { LogCollectorConfig, LogPattern } from './log-collector';
 export { AutoFixer } from './auto-fixer';
 export type { AutoFixerConfig, AutoFixRule, AutoFixAction } from './auto-fixer';
-export {
-  parseRunCommand,
-  detectRunCommand,
-  discoverLogPaths,
-} from './project-probe';
+export { parseRunCommand, detectRunCommand, discoverLogPaths } from './project-probe';
 export type { DetectedRunCommand } from './project-probe';
 export {
   defaultFileWatchFilter,

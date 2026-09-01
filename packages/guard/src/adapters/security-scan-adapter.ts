@@ -10,24 +10,83 @@ interface Finding {
   message: string;
 }
 
-const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage', '.nyc_output']);
+const EXCLUDED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  '.git',
+  '.turbo',
+  '.next',
+  'build',
+  'coverage',
+  '.nyc_output',
+]);
 
 /**
  * Built-in security patterns for static analysis.
  * Each pattern checks for common vulnerabilities in source code.
  */
-const SECURITY_PATTERNS: { type: string; severity: 'high' | 'medium' | 'low'; regex: RegExp; message: string }[] = [
-  { type: 'sql-injection',     severity: 'high',   regex: /\.exec(?:ute)?\s*\(\s*[`'"].*\${\s*\w+\s*}/i,   message: '可能的 SQL 注入: 使用了字符串拼接而非参数化查询' },
-  { type: 'eval-usage',        severity: 'high',   regex: /\be(?:val)\s*\(/,                               message: '避免使用 eval 调用: 可能导致代码注入' },
-  { type: 'command-injection', severity: 'high',   regex: /(?:exec|execSync|spawn)\s*\(\s*[`'"]/,            message: '可能的命令注入: 使用 execFile 替代 exec' },
-  { type: 'no-new-func',       severity: 'high',   regex: /\bnew\s+Func(?:tion)\s*\(/,                      message: '避免使用 new Function 构造器: 可能导致代码注入' },
+const SECURITY_PATTERNS: {
+  type: string;
+  severity: 'high' | 'medium' | 'low';
+  regex: RegExp;
+  message: string;
+}[] = [
+  {
+    type: 'sql-injection',
+    severity: 'high',
+    regex: /\.exec(?:ute)?\s*\(\s*[`'"].*\${\s*\w+\s*}/i,
+    message: '可能的 SQL 注入: 使用了字符串拼接而非参数化查询',
+  },
+  {
+    type: 'eval-usage',
+    severity: 'high',
+    regex: /\be(?:val)\s*\(/,
+    message: '避免使用 eval 调用: 可能导致代码注入',
+  },
+  {
+    type: 'command-injection',
+    severity: 'high',
+    regex: /(?:exec|execSync|spawn)\s*\(\s*[`'"]/,
+    message: '可能的命令注入: 使用 execFile 替代 exec',
+  },
+  {
+    type: 'no-new-func',
+    severity: 'high',
+    regex: /\bnew\s+Func(?:tion)\s*\(/,
+    message: '避免使用 new Function 构造器: 可能导致代码注入',
+  },
 
-  { type: 'inner-html',        severity: 'medium', regex: /\.innerHTML\s*=/,                                message: '使用 innerHTML 可能导致 XSS, 优先使用 textContent' },
-  { type: 'console-log',       severity: 'low',    regex: /console\.\w+\s*\(/,                              message: '生产环境应移除 console 语句' },
-  { type: 'todo-fixme',        severity: 'low',    regex: /\/\/\s*(TODO|FIXME|HACK|XXX)\b/,                message: '存在未处理的代办事项 (TODO/FIXME)' },
-  { type: 'debugger',          severity: 'medium', regex: /\bdebugger\s*;?$/,                              message: '生产环境应移除 debugger 语句' },
+  {
+    type: 'inner-html',
+    severity: 'medium',
+    regex: /\.innerHTML\s*=/,
+    message: '使用 innerHTML 可能导致 XSS, 优先使用 textContent',
+  },
+  {
+    type: 'console-log',
+    severity: 'low',
+    regex: /console\.\w+\s*\(/,
+    message: '生产环境应移除 console 语句',
+  },
+  {
+    type: 'todo-fixme',
+    severity: 'low',
+    regex: /\/\/\s*(TODO|FIXME|HACK|XXX)\b/,
+    message: '存在未处理的代办事项 (TODO/FIXME)',
+  },
+  {
+    type: 'debugger',
+    severity: 'medium',
+    regex: /\bdebugger\s*;?$/,
+    message: '生产环境应移除 debugger 语句',
+  },
 
-  { type: 'hardcoded-port',    severity: 'low',    regex: /(?:port|PORT)\s*[:=]\s*\d{4,5}\b/,              message: '检查硬编码端口号是否应改为配置项' },
+  {
+    type: 'hardcoded-port',
+    severity: 'low',
+    regex: /(?:port|PORT)\s*[:=]\s*\d{4,5}\b/,
+    message: '检查硬编码端口号是否应改为配置项',
+  },
 ];
 
 const ALLOWED_EXTENSIONS = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
@@ -37,7 +96,9 @@ function collectFiles(dir: string): string[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch { return files; }
+  } catch {
+    return files;
+  }
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -79,7 +140,9 @@ export class SecurityScanAdapter implements Adapter {
       let content: string;
       try {
         content = fs.readFileSync(file, 'utf-8');
-      } catch { continue; }
+      } catch {
+        continue;
+      }
       this.scanContent(content, path.relative(targetDir, file), findings);
     }
   }
@@ -99,7 +162,9 @@ export class SecurityScanAdapter implements Adapter {
     }
   }
 
-  private findPatternMatch(line: string): { type: string; severity: 'high' | 'medium' | 'low'; message: string } | null {
+  private findPatternMatch(
+    line: string,
+  ): { type: string; severity: 'high' | 'medium' | 'low'; message: string } | null {
     for (const pattern of SECURITY_PATTERNS) {
       if (pattern.regex.test(line)) return pattern;
     }
@@ -123,13 +188,11 @@ export class SecurityScanAdapter implements Adapter {
       return this.makeResult(check, 'passed', '安全扫描通过，未发现明显安全问题');
     }
 
-    const highCount = findings.filter(f => f.severity === 'high').length;
-    const medCount = findings.filter(f => f.severity === 'medium').length;
-    const lowCount = findings.filter(f => f.severity === 'low').length;
+    const highCount = findings.filter((f) => f.severity === 'high').length;
+    const medCount = findings.filter((f) => f.severity === 'medium').length;
+    const lowCount = findings.filter((f) => f.severity === 'low').length;
 
-    const details = findings.map(f =>
-      `[${f.severity}] ${f.file}:${f.line} ${f.message}`
-    );
+    const details = findings.map((f) => `[${f.severity}] ${f.file}:${f.line} ${f.message}`);
 
     const status: CheckStatus = highCount > 0 ? 'failed' : 'warning';
     return this.makeResult(
@@ -140,7 +203,12 @@ export class SecurityScanAdapter implements Adapter {
     );
   }
 
-  private makeResult(check: CheckConfig, status: CheckStatus, message: string, details?: unknown): CheckResult {
+  private makeResult(
+    check: CheckConfig,
+    status: CheckStatus,
+    message: string,
+    details?: unknown,
+  ): CheckResult {
     return {
       checkId: check.checkId,
       adapter: check.adapter,

@@ -7,7 +7,7 @@
 
 import { ipcMain } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import { t } from '@zh/i18n';
 import { HooksInstaller, listGuardReports } from '@zh/guard';
 import type { GuardReportRecord } from '@zh/guard';
@@ -29,12 +29,11 @@ function getStatus(installer: HooksInstaller): GuardHooksStatus {
 }
 
 /** 已存在的钩子文件清单（含第三方钩子），这些文件不能被覆盖 */
-function existingHookFiles(projectPath: string): string[] {
+async function existingHookFiles(projectPath: string): Promise<string[]> {
   const hooksDir = path.join(projectPath, '.git', 'hooks');
-  if (!fs.existsSync(hooksDir)) return [];
   const known = ['pre-commit', 'pre-push', 'post-commit'];
   try {
-    return fs.readdirSync(hooksDir).filter((f) => known.includes(f));
+    return (await fs.readdir(hooksDir)).filter((f) => known.includes(f));
   } catch {
     return [];
   }
@@ -74,7 +73,7 @@ function registerInstallHooksHandler(): void {
         return { ok: false, installed: [], skipped: [], reason: t('electron.notGitRepo') };
       }
 
-      const existing = existingHookFiles(projectPath);
+      const existing = await existingHookFiles(projectPath);
       if (existing.length > 0) {
         return {
           ok: false,

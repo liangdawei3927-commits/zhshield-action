@@ -39,7 +39,10 @@ function hasDbConfigMarker(content: string): boolean {
 
 /** .xcodeproj/.xcworkspace 是 macOS bundle 目录，作为叶子整体收集（不下钻内部），复用 fs-utils 共享递归遍历。 */
 function findXcodeBundles(projectRoot: string): string[] {
-  return findDirsMatching(projectRoot, (name) => name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace'));
+  return findDirsMatching(
+    projectRoot,
+    (name) => name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace'),
+  );
 }
 
 /**
@@ -62,7 +65,9 @@ export class FormDetector implements Detector {
       const name = rel.slice(rel.lastIndexOf('/') + 1);
       for (const rule of FORM_FILE_RULES) {
         if (rule.match(name)) {
-          signals.push(makeSignal(KIND, rule.ruleId, rel, this.weight, { productForm: rule.productForm }));
+          signals.push(
+            makeSignal(KIND, rule.ruleId, rel, this.weight, { productForm: rule.productForm }),
+          );
         }
       }
       if (DB_CONFIG_FILES.has(name)) {
@@ -72,24 +77,49 @@ export class FormDetector implements Detector {
         } catch {
           continue;
         }
-        if (hasDbConfigMarker(content)) signals.push(makeSignal(KIND, 'form:db-config', rel, this.weight, {}));
+        if (hasDbConfigMarker(content))
+          signals.push(makeSignal(KIND, 'form:db-config', rel, this.weight, {}));
       }
       const deps = readManifestDepNames(projectPath, rel, name);
       if (deps.size === 0) continue;
-      if (deps.has('electron')) signals.push(makeSignal(KIND, 'form:electron', rel, this.weight, { dependency: 'electron', productForm: 'pc' }));
-      if (deps.has('react-native')) signals.push(makeSignal(KIND, 'form:react-native', rel, this.weight, { dependency: 'react-native', productForm: 'mobile' }));
+      if (deps.has('electron'))
+        signals.push(
+          makeSignal(KIND, 'form:electron', rel, this.weight, {
+            dependency: 'electron',
+            productForm: 'pc',
+          }),
+        );
+      if (deps.has('react-native'))
+        signals.push(
+          makeSignal(KIND, 'form:react-native', rel, this.weight, {
+            dependency: 'react-native',
+            productForm: 'mobile',
+          }),
+        );
       if (deps.has('@tarojs/cli') || deps.has('@tarojs/taro') || deps.has('taro')) {
-        signals.push(makeSignal(KIND, 'form:taro', rel, this.weight, { dependency: 'taro', productForm: 'miniapp' }));
+        signals.push(
+          makeSignal(KIND, 'form:taro', rel, this.weight, {
+            dependency: 'taro',
+            productForm: 'miniapp',
+          }),
+        );
       }
       let hasServerFramework = false;
       for (const n of deps) {
-        if (isServerFrameworkDep(n)) { hasServerFramework = true; break; }
+        if (isServerFrameworkDep(n)) {
+          hasServerFramework = true;
+          break;
+        }
       }
       if (hasServerFramework) {
-        signals.push(makeSignal(KIND, 'form:server-framework', rel, this.weight, { productForm: 'backend' }));
+        signals.push(
+          makeSignal(KIND, 'form:server-framework', rel, this.weight, { productForm: 'backend' }),
+        );
       }
     }
     signals.push(...conventionDirSignals(projectPath, this.weight));
-    return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+    return signals.sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+    );
   }
 }

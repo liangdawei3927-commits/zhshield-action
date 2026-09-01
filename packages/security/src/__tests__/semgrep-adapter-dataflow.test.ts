@@ -139,12 +139,8 @@ describe('SemgrepAdapter dataflow_trace → codeFlows', () => {
     const result = await new SemgrepAdapter().scan({ projectPath: '/test' });
 
     expect(result.issues[0].codeFlows).toHaveLength(1);
-    expect(
-      result.issues[0].codeFlows![0].threadFlows[0].locations,
-    ).toHaveLength(1);
-    expect(
-      result.issues[0].codeFlows![0].threadFlows[0].locations[0].location.file,
-    ).toBe('a.ts');
+    expect(result.issues[0].codeFlows![0].threadFlows[0].locations).toHaveLength(1);
+    expect(result.issues[0].codeFlows![0].threadFlows[0].locations[0].location.file).toBe('a.ts');
   });
 
   it('maps extra.dataflow_trace (nested variant) to codeFlows as well', async () => {
@@ -160,8 +156,14 @@ describe('SemgrepAdapter dataflow_trace → codeFlows', () => {
                   thread_flows: [
                     {
                       locations: [
-                        { location: { path: 'src/source.ts', start: { line: 2, col: 3 } }, message: 'entry' },
-                        { location: { path: 'src/vuln.ts', start: { line: 10, col: 5 } }, message: 'sink' },
+                        {
+                          location: { path: 'src/source.ts', start: { line: 2, col: 3 } },
+                          message: 'entry',
+                        },
+                        {
+                          location: { path: 'src/vuln.ts', start: { line: 10, col: 5 } },
+                          message: 'sink',
+                        },
                       ],
                     },
                   ],

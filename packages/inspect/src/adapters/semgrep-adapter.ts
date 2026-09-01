@@ -2,7 +2,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, IssueCategory, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  IssueCategory,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
@@ -111,12 +118,18 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   /** 校验 config / 内联 rules 可用性，缺失时返回 unavailable 原因 */
-  private checkConfigAvailability(options: ToolScanOptions, configs: string[], rules: SemgrepRule[] | undefined): string | null {
+  private checkConfigAvailability(
+    options: ToolScanOptions,
+    configs: string[],
+    rules: SemgrepRule[] | undefined,
+  ): string | null {
     // 注入的 config 多为规则声明的仓库内部相对路径（node_modules/@zh/kernel/dist/assets/...），
     // 仅在目标项目安装了对应依赖时才存在。对缺失该依赖的外部项目直接 --config 会让
     // semgrep 报 "unable to find a config" 并令整次巡检失败；此处探测并按 cwd 解析，
     // 全部 config 缺失时退化为 unavailable（映射为 skipped），而非硬错误。
-    const existingConfigs = configs.filter((c) => fs.existsSync(path.resolve(options.projectPath, c)));
+    const existingConfigs = configs.filter((c) =>
+      fs.existsSync(path.resolve(options.projectPath, c)),
+    );
     if (configs.length > 0 && existingConfigs.length === 0) {
       return `Semgrep 配置不存在，跳过该规则: ${configs.join(', ')}`;
     }
@@ -142,8 +155,12 @@ export class SemgrepAdapter implements ToolAdapter {
     try {
       for (const entry of fs.readdirSync(projectPath, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
+        if (entry.name === 'node_modules') continue;
         const child = path.join(projectPath, entry.name);
-        if (fs.existsSync(path.join(child, 'package.json')) && fs.existsSync(path.join(child, 'packages'))) {
+        if (
+          fs.existsSync(path.join(child, 'package.json')) &&
+          fs.existsSync(path.join(child, 'packages'))
+        ) {
           return path.join(child, 'packages');
         }
       }

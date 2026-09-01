@@ -9,7 +9,12 @@ import path from 'node:path';
 import { t, getLanguage } from '@zh/i18n';
 import type { PipelineReport } from '@zh/pipeline';
 import type { RefactorReport } from '@zh/refactor';
-import type { PipelineProgressMsg, PipelineResultMsg, PipelineErrorMsg, PipelineWorkerOutbound } from './pipeline-protocol';
+import type {
+  PipelineProgressMsg,
+  PipelineResultMsg,
+  PipelineErrorMsg,
+  PipelineWorkerOutbound,
+} from './pipeline-protocol';
 import { readConfig } from './ipc/guard-config';
 
 export type ProgressHandler = (stage: string, message: string, progress: number) => void;
@@ -129,7 +134,10 @@ function handleWorkerMessage(msg: PipelineWorkerOutbound): void {
   dispatchWorkerMessage(job, msg);
 }
 
-function dispatchWorkerMessage(job: PendingJob, msg: PipelineProgressMsg | PipelineResultMsg | PipelineErrorMsg): void {
+function dispatchWorkerMessage(
+  job: PendingJob,
+  msg: PipelineProgressMsg | PipelineResultMsg | PipelineErrorMsg,
+): void {
   if (msg.type === 'progress') {
     handleProgressMessage(job, msg);
     return;
@@ -177,7 +185,9 @@ export function ensurePipelineWorker(): ChildProcess {
       ...process.env,
       LNG: getLanguage(),
       ELECTRON_RUN_AS_NODE: '1',
-      NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=4096'].filter(Boolean).join(' '),
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=4096']
+        .filter(Boolean)
+        .join(' '),
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
@@ -229,7 +239,11 @@ function sendJob(
   return new Promise<unknown>((resolve, reject) => {
     const timer = setTimeout(() => {
       handleJobTimeout(child, id);
-      reject(new Error(`[${options.timeoutLabel}] ${t('pipeline.jobTimeout', { timeoutMs: options.timeoutMs })}`));
+      reject(
+        new Error(
+          `[${options.timeoutLabel}] ${t('pipeline.jobTimeout', { timeoutMs: options.timeoutMs })}`,
+        ),
+      );
     }, options.timeoutMs);
 
     pending.set(id, { resolve, reject, onProgress: options.onProgress, timer });
@@ -267,7 +281,12 @@ export async function runPipelineInWorker(
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<PipelineReport> {
   const id = `pipeline-${Date.now()}-${++seq}`;
-  const guardConfig = await readConfig().catch(() => ({ enabled: true, preCommit: true, prePush: true, blockOnCritical: true }));
+  const guardConfig = await readConfig().catch(() => ({
+    enabled: true,
+    preCommit: true,
+    prePush: true,
+    blockOnCritical: true,
+  }));
   const report = await dispatchJob(
     { type: 'run', id, projectPath, options: { ...options, guardEnabled: guardConfig.enabled } },
     timeoutMs,

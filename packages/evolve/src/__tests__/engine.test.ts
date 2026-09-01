@@ -28,8 +28,28 @@ describe('EvolveEngine', () => {
     });
 
     it('should list experiences for a project', () => {
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'R1', type: 'true-positive', pattern: 'a', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
-      engine.recordExperience({ projectId: 'proj-2', ruleId: 'R2', type: 'false-positive', pattern: 'b', message: 'm', feedback: 'f', source: 'auto', confidence: 0.5, verified: false });
+      engine.recordExperience({
+        projectId: 'proj-1',
+        ruleId: 'R1',
+        type: 'true-positive',
+        pattern: 'a',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'proj-2',
+        ruleId: 'R2',
+        type: 'false-positive',
+        pattern: 'b',
+        message: 'm',
+        feedback: 'f',
+        source: 'auto',
+        confidence: 0.5,
+        verified: false,
+      });
 
       const proj1 = engine.listExperiences('proj-1');
       expect(proj1).toHaveLength(1);
@@ -40,9 +60,29 @@ describe('EvolveEngine', () => {
     });
 
     it('should list experiences sorted by createdAt descending', async () => {
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'true-positive', pattern: 'a', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'true-positive',
+        pattern: 'a',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
       await new Promise((r) => setTimeout(r, 5));
-      engine.recordExperience({ projectId: 'p', ruleId: 'R2', type: 'false-positive', pattern: 'b', message: 'm', feedback: 'f', source: 'auto', confidence: 0.5, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R2',
+        type: 'false-positive',
+        pattern: 'b',
+        message: 'm',
+        feedback: 'f',
+        source: 'auto',
+        confidence: 0.5,
+        verified: false,
+      });
 
       const all = engine.listExperiences();
       expect(all[0].ruleId).toBe('R2');
@@ -53,7 +93,17 @@ describe('EvolveEngine', () => {
   describe('Suggestions', () => {
     it('should generate suggestions for rules with high false-positive rate', () => {
       for (let i = 0; i < 5; i++) {
-        engine.recordExperience({ projectId: 'proj-1', ruleId: 'FP-RULE', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+        engine.recordExperience({
+          projectId: 'proj-1',
+          ruleId: 'FP-RULE',
+          type: 'false-positive',
+          pattern: 'x',
+          message: 'm',
+          feedback: 'f',
+          source: 'user',
+          confidence: 0.8,
+          verified: false,
+        });
       }
 
       const suggestions = engine.getSuggestions('proj-1');
@@ -64,7 +114,17 @@ describe('EvolveEngine', () => {
     });
 
     it('should not suggest for rules with few samples', () => {
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+      engine.recordExperience({
+        projectId: 'proj-1',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
 
       const suggestions = engine.getSuggestions('proj-1');
       const r1 = suggestions.find((s) => s.ruleId === 'R1');
@@ -72,9 +132,39 @@ describe('EvolveEngine', () => {
     });
 
     it('should not suggest for rules with low false-positive rate', () => {
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'GOOD-RULE', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'GOOD-RULE', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
-      engine.recordExperience({ projectId: 'proj-1', ruleId: 'GOOD-RULE', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
+      engine.recordExperience({
+        projectId: 'proj-1',
+        ruleId: 'GOOD-RULE',
+        type: 'true-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'proj-1',
+        ruleId: 'GOOD-RULE',
+        type: 'true-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'proj-1',
+        ruleId: 'GOOD-RULE',
+        type: 'true-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
 
       const suggestions = engine.getSuggestions('proj-1');
       const s = suggestions.find((s) => s.ruleId === 'GOOD-RULE');
@@ -83,8 +173,28 @@ describe('EvolveEngine', () => {
 
     it('should filter suggestions by ruleId', () => {
       for (let i = 0; i < 3; i++) {
-        engine.recordExperience({ projectId: 'proj-1', ruleId: 'A', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-        engine.recordExperience({ projectId: 'proj-1', ruleId: 'B', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+        engine.recordExperience({
+          projectId: 'proj-1',
+          ruleId: 'A',
+          type: 'false-positive',
+          pattern: 'x',
+          message: 'm',
+          feedback: 'f',
+          source: 'user',
+          confidence: 0.8,
+          verified: false,
+        });
+        engine.recordExperience({
+          projectId: 'proj-1',
+          ruleId: 'B',
+          type: 'false-positive',
+          pattern: 'x',
+          message: 'm',
+          feedback: 'f',
+          source: 'user',
+          confidence: 0.8,
+          verified: false,
+        });
       }
 
       const aOnly = engine.getSuggestions('proj-1', { ruleId: 'A' });
@@ -95,7 +205,12 @@ describe('EvolveEngine', () => {
 
   describe('Rule State Management', () => {
     it('should change rule state', () => {
-      const entry = engine.changeRuleState('RULE-001', 'deprecated', 'Superseded by RULE-002', 'admin');
+      const entry = engine.changeRuleState(
+        'RULE-001',
+        'deprecated',
+        'Superseded by RULE-002',
+        'admin',
+      );
       expect(entry.ruleId).toBe('RULE-001');
       expect(entry.state).toBe('deprecated');
       expect(entry.changedBy).toBe('admin');
@@ -116,9 +231,29 @@ describe('EvolveEngine', () => {
   describe('Auto-Adjust Weights', () => {
     it('should compute weights based on false-positive rate', () => {
       for (let i = 0; i < 5; i++) {
-        engine.recordExperience({ projectId: 'p', ruleId: 'FP-RULE', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+        engine.recordExperience({
+          projectId: 'p',
+          ruleId: 'FP-RULE',
+          type: 'false-positive',
+          pattern: 'x',
+          message: 'm',
+          feedback: 'f',
+          source: 'user',
+          confidence: 0.8,
+          verified: false,
+        });
       }
-      engine.recordExperience({ projectId: 'p', ruleId: 'FP-RULE', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'FP-RULE',
+        type: 'true-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
 
       const results = engine.autoAdjustWeights();
       const fpRule = results.find((r) => r.ruleId === 'FP-RULE');
@@ -129,7 +264,17 @@ describe('EvolveEngine', () => {
     });
 
     it('should keep weight at 1.0 for rules with few samples', () => {
-      engine.recordExperience({ projectId: 'p', ruleId: 'NEW-RULE', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'NEW-RULE',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
 
       const results = engine.autoAdjustWeights();
       const rule = results.find((r) => r.ruleId === 'NEW-RULE');
@@ -147,9 +292,39 @@ describe('EvolveEngine', () => {
     });
 
     it('should get all rule weights', () => {
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
 
       engine.autoAdjustWeights();
       const all = engine.getRuleWeights();
@@ -159,7 +334,17 @@ describe('EvolveEngine', () => {
 
   describe('Cloud Sync', () => {
     it('should sync to cloud with auto-generated clientId', () => {
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'true-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 1, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'true-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 1,
+        verified: false,
+      });
       engine.changeRuleState('R1', 'active', 'test', 'admin');
       engine.autoAdjustWeights();
 
@@ -184,9 +369,39 @@ describe('EvolveEngine', () => {
     });
 
     it('should round-trip sync correctly', () => {
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
-      engine.recordExperience({ projectId: 'p', ruleId: 'R1', type: 'false-positive', pattern: 'x', message: 'm', feedback: 'f', source: 'user', confidence: 0.8, verified: false });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
+      engine.recordExperience({
+        projectId: 'p',
+        ruleId: 'R1',
+        type: 'false-positive',
+        pattern: 'x',
+        message: 'm',
+        feedback: 'f',
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
       engine.changeRuleState('R1', 'deprecated', 'Old rule', 'admin');
       engine.autoAdjustWeights();
 

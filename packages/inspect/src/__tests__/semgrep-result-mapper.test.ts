@@ -7,26 +7,28 @@ const mapper = new SemgrepResultMapper();
 /** Semgrep taint mode 输出：dataflow_trace 含 taint_source → intermediate_vars → taint_sink */
 function taintOutput(): SemgrepOutput {
   return {
-    results: [{
-      check_id: 'python.lang.security.audit.dangerous-exec.dangerous-exec',
-      path: 'src/a.py',
-      start: { line: 5, col: 1 },
-      extra: {
-        severity: 'WARNING',
-        message: 'Detected dangerous exec',
-        dataflow_trace: {
-          taint_source: {
-            location: { path: 'src/a.py', start: { line: 1, col: 2 } },
-          },
-          intermediate_vars: [
-            { var_name: 'cmd', location: { path: 'src/a.py', start: { line: 3, col: 4 } } },
-          ],
-          taint_sink: {
-            location: { path: 'src/a.py', start: { line: 5, col: 1 } },
+    results: [
+      {
+        check_id: 'python.lang.security.audit.dangerous-exec.dangerous-exec',
+        path: 'src/a.py',
+        start: { line: 5, col: 1 },
+        extra: {
+          severity: 'WARNING',
+          message: 'Detected dangerous exec',
+          dataflow_trace: {
+            taint_source: {
+              location: { path: 'src/a.py', start: { line: 1, col: 2 } },
+            },
+            intermediate_vars: [
+              { var_name: 'cmd', location: { path: 'src/a.py', start: { line: 3, col: 4 } } },
+            ],
+            taint_sink: {
+              location: { path: 'src/a.py', start: { line: 5, col: 1 } },
+            },
           },
         },
       },
-    }],
+    ],
   };
 }
 
@@ -52,16 +54,18 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
 
   it('Given dataflow_trace 缺 sink，When mapOutput，Then 保留已有 source/intermediate 链', () => {
     const output: SemgrepOutput = {
-      results: [{
-        check_id: 'r1',
-        path: 'a.py',
-        extra: {
-          dataflow_trace: {
-            taint_source: { location: { path: 'a.py', start: { line: 1, col: 1 } } },
-            intermediate_vars: [],
+      results: [
+        {
+          check_id: 'r1',
+          path: 'a.py',
+          extra: {
+            dataflow_trace: {
+              taint_source: { location: { path: 'a.py', start: { line: 1, col: 1 } } },
+              intermediate_vars: [],
+            },
           },
         },
-      }],
+      ],
     };
 
     const issues = mapper.mapOutput(output);
@@ -78,16 +82,20 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
 
   it('Given dataflow_trace 位于 result 顶层（真实 Semgrep JSON 落点），When mapOutput，Then 同样映射为 codeFlows', () => {
     const output: SemgrepOutput = {
-      results: [{
-        check_id: 'r1',
-        path: 'a.py',
-        dataflow_trace: {
-          taint_source: { location: { path: 'a.py', start: { line: 10, col: 5 } } },
-          intermediate_vars: [{ var_name: 'tmp', location: { path: 'a.py', start: { line: 11, col: 5 } } }],
-          taint_sink: { location: { path: 'b.py', start: { line: 20, col: 9 } } },
+      results: [
+        {
+          check_id: 'r1',
+          path: 'a.py',
+          dataflow_trace: {
+            taint_source: { location: { path: 'a.py', start: { line: 10, col: 5 } } },
+            intermediate_vars: [
+              { var_name: 'tmp', location: { path: 'a.py', start: { line: 11, col: 5 } } },
+            ],
+            taint_sink: { location: { path: 'b.py', start: { line: 20, col: 9 } } },
+          },
+          extra: { severity: 'ERROR', message: 'x' },
         },
-        extra: { severity: 'ERROR', message: 'x' },
-      }],
+      ],
     };
 
     const issues = mapper.mapOutput(output);
@@ -101,11 +109,13 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
 
   it('Given validation_state=NO_VALIDATOR，When mapOutput，Then taxonomies 含 validation:NO_VALIDATOR', () => {
     const issues = mapper.mapOutput({
-      results: [{
-        check_id: 'r1',
-        path: 'a.py',
-        extra: { severity: 'ERROR', message: 'x', validation_state: 'NO_VALIDATOR' },
-      }],
+      results: [
+        {
+          check_id: 'r1',
+          path: 'a.py',
+          extra: { severity: 'ERROR', message: 'x', validation_state: 'NO_VALIDATOR' },
+        },
+      ],
     });
 
     expect(issues[0].taxonomies).toContain('validation:NO_VALIDATOR');
@@ -113,15 +123,17 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
 
   it('Given sca_info（reachable + transitive），When mapOutput，Then taxonomies 含 sca:reachable 与 sca:transitive', () => {
     const issues = mapper.mapOutput({
-      results: [{
-        check_id: 'r1',
-        path: 'a.py',
-        extra: {
-          severity: 'WARNING',
-          message: 'vuln dep',
-          sca_info: { reachable: true, sca_kind: 'transitive' },
+      results: [
+        {
+          check_id: 'r1',
+          path: 'a.py',
+          extra: {
+            severity: 'WARNING',
+            message: 'vuln dep',
+            sca_info: { reachable: true, sca_kind: 'transitive' },
+          },
         },
-      }],
+      ],
     });
 
     expect(issues[0].taxonomies).toContain('sca:reachable');
@@ -130,11 +142,13 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
 
   it('Given sca_info 不可达，When mapOutput，Then taxonomies 含 sca:unreachable', () => {
     const issues = mapper.mapOutput({
-      results: [{
-        check_id: 'r1',
-        path: 'a.py',
-        extra: { severity: 'WARNING', message: 'vuln dep', sca_info: { reachable: false } },
-      }],
+      results: [
+        {
+          check_id: 'r1',
+          path: 'a.py',
+          extra: { severity: 'WARNING', message: 'vuln dep', sca_info: { reachable: false } },
+        },
+      ],
     });
 
     expect(issues[0].taxonomies).toContain('sca:unreachable');
@@ -156,6 +170,8 @@ describe('SemgrepResultMapper dataflow 映射（附录 B #1：安全核心信息
     expect(issue.severity).toBe('warning');
     expect(issue.message).toBe('Detected dangerous exec');
     expect(issue.file).toBe('src/a.py');
-    expect(issue.fingerprint).toBe('semgrep:python.lang.security.audit.dangerous-exec.dangerous-exec:src/a.py:5');
+    expect(issue.fingerprint).toBe(
+      'semgrep:python.lang.security.audit.dangerous-exec.dangerous-exec:src/a.py:5',
+    );
   });
 });

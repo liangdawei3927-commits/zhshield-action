@@ -60,7 +60,10 @@ describe('appendFalsePositive 误报反馈落库', () => {
 
   it('多次追加按行累积', async () => {
     await appendFalsePositive(tmpDir, makeItem({ ruleId: 'a' }));
-    await appendFalsePositive(tmpDir, makeItem({ source: 'sentinel', ruleId: 'b', message: 'timeout' }));
+    await appendFalsePositive(
+      tmpDir,
+      makeItem({ source: 'sentinel', ruleId: 'b', message: 'timeout' }),
+    );
 
     const lines = fs.readFileSync(falsePositivesPath(tmpDir), 'utf-8').trim().split('\n');
     expect(lines).toHaveLength(2);

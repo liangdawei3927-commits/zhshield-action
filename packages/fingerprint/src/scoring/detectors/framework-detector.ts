@@ -43,9 +43,7 @@ const PY_DEPS: DepMatch[] = [
   { pattern: 'fastapi', framework: 'fastapi' },
 ];
 
-const RUST_DEPS: DepMatch[] = [
-  { pattern: 'actix-web', framework: 'actix' },
-];
+const RUST_DEPS: DepMatch[] = [{ pattern: 'actix-web', framework: 'actix' }];
 
 const JVM_DEPS: DepMatch[] = [
   { pattern: 'spring-boot', framework: 'spring' },

@@ -160,11 +160,28 @@ function applyCommandDefaults(opts: CLIOptions, explicitFailOn: boolean): void {
   }
 }
 
-function shouldBlock(report: unknown, failOn: FailOn, dryRun: boolean): { findings: Finding[]; blocked: boolean } {
+function shouldBlock(
+  report: unknown,
+  failOn: FailOn,
+  dryRun: boolean,
+): { findings: Finding[]; blocked: boolean } {
   const findings = buildFindings(report);
-  const blocked = !dryRun && failOn !== 'none' &&
+  relativizeFindings(findings);
+  const blocked =
+    !dryRun &&
+    failOn !== 'none' &&
     findings.some((f) => severityRank(f.severity) >= failOnRank(failOn));
   return { findings, blocked };
+}
+
+/** SARIF artifactLocation 要求仓库相对路径；引擎产出多为绝对路径，
+ *  统一转为相对 cwd，否则 GitHub Code Scanning 无法映射到仓库文件 */
+function relativizeFindings(findings: Finding[]): void {
+  for (const f of findings) {
+    if (f.file && path.isAbsolute(f.file)) {
+      f.file = path.relative(process.cwd(), f.file);
+    }
+  }
 }
 
 function writeReportFile(opts: CLIOptions, report: unknown, findings: Finding[]): void {
@@ -206,10 +223,18 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
   console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
 
   switch (opts.command) {
-    case 'guard': await runGuardCommand(runner, opts, reporter); break;
-    case 'inspect': await runInspectCommand(runner, opts, reporter); break;
-    case 'refactor': await runRefactorCommand(runner, opts, reporter); break;
-    case 'pipeline': await runPipelineCommand(runner, opts, reporter); break;
+    case 'guard':
+      await runGuardCommand(runner, opts, reporter);
+      break;
+    case 'inspect':
+      await runInspectCommand(runner, opts, reporter);
+      break;
+    case 'refactor':
+      await runRefactorCommand(runner, opts, reporter);
+      break;
+    case 'pipeline':
+      await runPipelineCommand(runner, opts, reporter);
+      break;
     default:
       console.error(`未知命令: ${opts.command}`);
       printUsage();
@@ -221,19 +246,25 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
 
 /** 输出错误报告并退出 */
 function handleError(reporter: ConsoleReporter, err: unknown): void {
-  console.error(reporter.format({
-    timestamp: new Date(),
-    guard: null,
-    inspect: null,
-    refactor: null,
-    passed: false,
-    stage: 'complete',
-    error: err instanceof Error ? err.message : String(err),
-  }).text);
+  console.error(
+    reporter.format({
+      timestamp: new Date(),
+      guard: null,
+      inspect: null,
+      refactor: null,
+      passed: false,
+      stage: 'complete',
+      error: err instanceof Error ? err.message : String(err),
+    }).text,
+  );
   process.exit(1);
 }
 
-async function runGuardCommand(runner: PipelineRunner, opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+async function runGuardCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  reporter: ConsoleReporter,
+): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopGuard({ dryRun: opts.dryRun });
     const formatted = reporter.formatRuleEngine(report);
@@ -258,7 +289,11 @@ async function runGuardCommand(runner: PipelineRunner, opts: CLIOptions, reporte
   }
 }
 
-async function runInspectCommand(runner: PipelineRunner, opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+async function runInspectCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  reporter: ConsoleReporter,
+): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopInspect();
     const formatted = reporter.formatRuleEngine(report);
@@ -283,7 +318,11 @@ async function runInspectCommand(runner: PipelineRunner, opts: CLIOptions, repor
   }
 }
 
-async function runRefactorCommand(runner: PipelineRunner, opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+async function runRefactorCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  reporter: ConsoleReporter,
+): Promise<void> {
   const report = await runner.runRefactor();
   const { findings, blocked } = shouldBlock(report, opts.failOn, false);
   const formatted = reporter.format({
@@ -299,7 +338,11 @@ async function runRefactorCommand(runner: PipelineRunner, opts: CLIOptions, repo
   process.exit(blocked ? 1 : 0);
 }
 
-async function runPipelineCommand(runner: PipelineRunner, opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+async function runPipelineCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  reporter: ConsoleReporter,
+): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopDrivenPipeline();
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun);

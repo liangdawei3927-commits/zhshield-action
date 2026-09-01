@@ -33,14 +33,18 @@ const detector = new BuildConfigDetectorImpl();
 describe('BuildConfigDetectorImpl vite', () => {
   it('vite.config.ts 显式 minify: false → high 问题，ruleId 为 build-config.vite-minify-disabled', () => {
     const dir = tmpDir('zh-perf-vite-minify-');
-    writeFile(dir, 'vite.config.ts', [
-      'import { defineConfig } from \'vite\';',
-      'export default defineConfig({',
-      '  build: {',
-      '    minify: false,',
-      '  },',
-      '});',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'vite.config.ts',
+      [
+        "import { defineConfig } from 'vite';",
+        'export default defineConfig({',
+        '  build: {',
+        '    minify: false,',
+        '  },',
+        '});',
+      ].join('\n'),
+    );
 
     const issues = detector.detect(dir);
     expect(issues).toHaveLength(1);
@@ -51,14 +55,18 @@ describe('BuildConfigDetectorImpl vite', () => {
 
   it('vite 开启 sourcemap 与过大 chunkSizeWarningLimit → info + medium 问题', () => {
     const dir = tmpDir('zh-perf-vite-sourcemap-');
-    writeFile(dir, 'vite.config.ts', [
-      'export default {',
-      '  build: {',
-      '    sourcemap: true,',
-      '    chunkSizeWarningLimit: 2000,',
-      '  },',
-      '};',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'vite.config.ts',
+      [
+        'export default {',
+        '  build: {',
+        '    sourcemap: true,',
+        '    chunkSizeWarningLimit: 2000,',
+        '  },',
+        '};',
+      ].join('\n'),
+    );
 
     const issues = detector.detect(dir);
     expect(issues.map((i) => i.severity)).toEqual(['medium', 'info']);
@@ -78,7 +86,7 @@ describe('BuildConfigDetectorImpl vite', () => {
 describe('BuildConfigDetectorImpl webpack', () => {
   it('webpack.config.js 无 mode → high 问题 build-config.webpack-mode-missing', () => {
     const dir = tmpDir('zh-perf-wp-nomode-');
-    writeFile(dir, 'webpack.config.js', 'module.exports = { entry: \'./src/index.js\' };');
+    writeFile(dir, 'webpack.config.js', "module.exports = { entry: './src/index.js' };");
 
     const issues = detector.detect(dir);
     expect(issues).toHaveLength(1);
@@ -86,9 +94,9 @@ describe('BuildConfigDetectorImpl webpack', () => {
     expect(issues[0].severity).toBe('high');
   });
 
-  it('webpack mode: \'production\' → 无 mode 问题', () => {
+  it("webpack mode: 'production' → 无 mode 问题", () => {
     const dir = tmpDir('zh-perf-wp-prod-');
-    writeFile(dir, 'webpack.config.js', 'module.exports = { mode: \'production\' };');
+    writeFile(dir, 'webpack.config.js', "module.exports = { mode: 'production' };");
 
     const issues = detector.detect(dir);
     expect(issues.some((i) => i.ruleId === 'build-config.webpack-mode-missing')).toBe(false);
@@ -97,7 +105,7 @@ describe('BuildConfigDetectorImpl webpack', () => {
 
   it('webpack mode 非 production → high 问题', () => {
     const dir = tmpDir('zh-perf-wp-dev-');
-    writeFile(dir, 'webpack.config.js', 'module.exports = { mode: \'development\' };');
+    writeFile(dir, 'webpack.config.js', "module.exports = { mode: 'development' };");
 
     const issues = detector.detect(dir);
     expect(issues[0].ruleId).toBe('build-config.webpack-mode-not-production');
@@ -106,13 +114,17 @@ describe('BuildConfigDetectorImpl webpack', () => {
 
   it('webpack minimize: false + devtool source-map → high + info 问题', () => {
     const dir = tmpDir('zh-perf-wp-minimize-');
-    writeFile(dir, 'webpack.config.js', [
-      'module.exports = {',
-      '  mode: \'production\',',
-      '  optimization: { minimize: false },',
-      '  devtool: \'source-map\',',
-      '};',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'webpack.config.js',
+      [
+        'module.exports = {',
+        "  mode: 'production',",
+        '  optimization: { minimize: false },',
+        "  devtool: 'source-map',",
+        '};',
+      ].join('\n'),
+    );
 
     const issues = detector.detect(dir);
     expect(issues.map((i) => i.ruleId)).toContain('build-config.webpack-minimize-disabled');
@@ -123,9 +135,13 @@ describe('BuildConfigDetectorImpl webpack', () => {
 describe('BuildConfigDetectorImpl package.json 构建脚本', () => {
   it('build 脚本含 NODE_ENV=development → high 问题', () => {
     const dir = tmpDir('zh-perf-script-dev-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      scripts: { build: 'NODE_ENV=development vite build' },
-    }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        scripts: { build: 'NODE_ENV=development vite build' },
+      }),
+    );
 
     const issues = detector.detect(dir);
     expect(issues).toHaveLength(1);
@@ -135,9 +151,13 @@ describe('BuildConfigDetectorImpl package.json 构建脚本', () => {
 
   it('build 脚本含 --no-minify 与 --sourcemap → high + info 问题', () => {
     const dir = tmpDir('zh-perf-script-flags-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      scripts: { build: 'vite build --no-minify --sourcemap' },
-    }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        scripts: { build: 'vite build --no-minify --sourcemap' },
+      }),
+    );
 
     const issues = detector.detect(dir);
     expect(issues.map((i) => i.severity)).toEqual(['high', 'info']);
@@ -193,19 +213,25 @@ describe('BuildConfigDetectorImpl 边界', () => {
 
   it('多个问题按严重度降序排列（high > medium > low > info）', () => {
     const dir = tmpDir('zh-perf-sort-');
-    writeFile(dir, 'webpack.config.js', [
-      'module.exports = {',
-      '  mode: \'production\',',
-      '  optimization: { minimize: false },',
-      '  devtool: \'source-map\',',
-      '};',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'webpack.config.js',
+      [
+        'module.exports = {',
+        "  mode: 'production',",
+        '  optimization: { minimize: false },',
+        "  devtool: 'source-map',",
+        '};',
+      ].join('\n'),
+    );
 
     const issues = detector.detect(dir);
     expect(issues.length).toBeGreaterThanOrEqual(2);
     const order = ['high', 'medium', 'low', 'info'];
     for (let i = 1; i < issues.length; i++) {
-      expect(order.indexOf(issues[i - 1].severity)).toBeLessThanOrEqual(order.indexOf(issues[i].severity));
+      expect(order.indexOf(issues[i - 1].severity)).toBeLessThanOrEqual(
+        order.indexOf(issues[i].severity),
+      );
     }
   });
 });

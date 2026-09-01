@@ -21,7 +21,15 @@ import type { ScoringProjectProfile, ProjectType } from '@zh/fingerprint';
  * 此处断言会捕获回退。
  */
 
-const TYPES: ProjectType[] = ['backend', 'frontend', 'app', 'mini-program', 'desktop', 'library', 'cli'];
+const TYPES: ProjectType[] = [
+  'backend',
+  'frontend',
+  'app',
+  'mini-program',
+  'desktop',
+  'library',
+  'cli',
+];
 
 /** 构造贴近真实技术栈的画像（仅 type/framework 影响评分适配，其余字段填最小合理值） */
 function makeRealisticProfile(type: ProjectType): ScoringProjectProfile {
@@ -64,8 +72,16 @@ function makeRealisticProfile(type: ProjectType): ScoringProjectProfile {
   };
 }
 
-const emptyGuard = { results: [] as Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean }> };
-const emptyInspect = { issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string }> };
+const emptyGuard = {
+  results: [] as Array<{
+    severity: 'error' | 'warning' | 'info';
+    status: 'passed' | 'failed' | 'error' | 'warning';
+    blocking: boolean;
+  }>,
+};
+const emptyInspect = {
+  issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string }>,
+};
 
 function overallOf(
   profile: ScoringProjectProfile,
@@ -200,9 +216,8 @@ describe('评分校准 — 真实跑分（Task C）', () => {
       };
     });
 
-     
     console.log('\n=== 评分校准表（标准化 findings：1 安全失败 + 1 警告；4 条 inspect）===');
-     
+
     console.table(rows);
 
     for (const r of rows) {

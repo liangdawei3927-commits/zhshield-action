@@ -3,24 +3,19 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  IssueCategory,
+  AccessScope,
+} from '@zh/shared';
+import { resolveEslintTargetDir } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
-
-const ESLINT_CONFIG_NAMES = [
-  'eslint.config.js',
-  'eslint.config.mjs',
-  'eslint.config.cjs',
-  '.eslintrc.js',
-  '.eslintrc.cjs',
-  '.eslintrc.json',
-  '.eslintrc',
-] as const;
-
-function hasEslintConfig(dir: string): boolean {
-  return ESLINT_CONFIG_NAMES.some((name) => fs.existsSync(path.join(dir, name)));
-}
 
 /** ESLint JSON 输出中的单条消息 */
 interface EslintOutputMessage {
@@ -36,33 +31,6 @@ interface EslintOutputMessage {
 interface EslintOutputFile {
   filePath?: string;
   messages?: EslintOutputMessage[];
-}
-
-/**
- * 探测 ESLint 应扫描的目录（ESLint v9 从 cwd 向上查找配置）：
- * 1. 项目根含 eslint 配置 → 项目根
- * 2. 一层子目录含 eslint 配置（嵌套仓库，如 zhiyan-codeshield/）→ 该子目录
- * 3. 有 src / packages → 对应源码目录
- * 4. 兜底项目根
- */
-function resolveEslintTargetDir(projectPath: string): string {
-  if (hasEslintConfig(projectPath)) return projectPath;
-
-  const entries = fs.existsSync(projectPath) ? fs.readdirSync(projectPath) : [];
-  for (const entry of entries) {
-    const child = path.join(projectPath, entry);
-    try {
-      if (fs.statSync(child).isDirectory() && hasEslintConfig(child)) return child;
-    } catch {
-      // 忽略损坏的符号链接 / 无权限目录
-    }
-  }
-
-  for (const candidate of ['src', 'packages']) {
-    const dir = path.join(projectPath, candidate);
-    if (fs.existsSync(dir)) return dir;
-  }
-  return projectPath;
 }
 
 const META: ToolMeta = {
@@ -149,7 +117,11 @@ export class ESLintAdapter implements ToolAdapter {
   }
 
   /** 组装 ESLint 命令行参数（含注入 flat config 的可用性探测） */
-  private buildEslintArgs(options: ToolScanOptions, cwd: string, targetFiles: string[]): { args: string[]; unavailable?: string } {
+  private buildEslintArgs(
+    options: ToolScanOptions,
+    cwd: string,
+    targetFiles: string[],
+  ): { args: string[]; unavailable?: string } {
     const defaultExts = ['--ext', '.ts,.tsx,.js,.jsx'];
     // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
     const relativeTargets = targetFiles.map((target) => path.relative(cwd, target) || '.');
@@ -182,7 +154,11 @@ export class ESLintAdapter implements ToolAdapter {
 
     let rawOutput: unknown = null;
     if (err.stdout) {
-      try { rawOutput = JSON.parse(err.stdout); } catch { /* ignore */ }
+      try {
+        rawOutput = JSON.parse(err.stdout);
+      } catch {
+        /* ignore */
+      }
     }
     if (rawOutput) {
       return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
@@ -239,7 +215,11 @@ export class ESLintAdapter implements ToolAdapter {
     return issues;
   }
 
-  private mapEslintMessage(msg: EslintOutputMessage, file: EslintOutputFile, category: IssueCategory): Issue {
+  private mapEslintMessage(
+    msg: EslintOutputMessage,
+    file: EslintOutputFile,
+    category: IssueCategory,
+  ): Issue {
     return {
       id: randomUUID(),
       ruleId: msg.ruleId as string,

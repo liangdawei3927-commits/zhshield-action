@@ -103,7 +103,7 @@
 }
 
 /* ── dracula (深墨青·夜间): 只覆盖颜色; 成功/信息色阶沿用 :root teal/智靛 ── */
-[data-theme="dracula"] {
+[data-theme='dracula'] {
   /* 品牌色阶 (提亮青蓝, VI §6.1 暗色档: 主色用 #2DD4BF) */
   --zh-brand-50: 20 45 41;
   --zh-brand-100: 24 55 50;
@@ -150,7 +150,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: rgb(var(--zh-bg-primary));
@@ -214,21 +216,45 @@ body {
 
 /* ─── 卡片弹跳：入场 mount 弹一次 + 按压快缩/松开回弹（对齐 tianyin BouncePressable） ─── */
 @keyframes zh-bounce-enter {
-  0% { transform: translateZ(0) scale(1); }
-  15% { transform: translateZ(0) scale(0.9); }
-  50% { transform: translateZ(0) scale(1.06); }
-  72% { transform: translateZ(0) scale(0.98); }
-  88% { transform: translateZ(0) scale(1.02); }
-  100% { transform: translateZ(0) scale(1); }
+  0% {
+    transform: translateZ(0) scale(1);
+  }
+  15% {
+    transform: translateZ(0) scale(0.9);
+  }
+  50% {
+    transform: translateZ(0) scale(1.06);
+  }
+  72% {
+    transform: translateZ(0) scale(0.98);
+  }
+  88% {
+    transform: translateZ(0) scale(1.02);
+  }
+  100% {
+    transform: translateZ(0) scale(1);
+  }
 }
 
 @keyframes zh-bounce-enter-inner {
-  0% { transform: translateZ(0) scale(1); }
-  12% { transform: translateZ(0) scale(0.9); }
-  55% { transform: translateZ(0) scale(1.08); }
-  75% { transform: translateZ(0) scale(0.97); }
-  90% { transform: translateZ(0) scale(1.03); }
-  100% { transform: translateZ(0) scale(1); }
+  0% {
+    transform: translateZ(0) scale(1);
+  }
+  12% {
+    transform: translateZ(0) scale(0.9);
+  }
+  55% {
+    transform: translateZ(0) scale(1.08);
+  }
+  75% {
+    transform: translateZ(0) scale(0.97);
+  }
+  90% {
+    transform: translateZ(0) scale(1.03);
+  }
+  100% {
+    transform: translateZ(0) scale(1);
+  }
 }
 
 .zh-bounce {

@@ -66,13 +66,11 @@ export class LanguageAggregator {
 
   private computeConfidence(bestCandidate: LanguageCandidate, signals: readonly Signal[]): number {
     const maxPossibleScore = SignalScorer.calculateMaxPossibleScore(signals, 'language');
-    const baseConfidence = maxPossibleScore > 0
-      ? Math.min(bestCandidate.score / maxPossibleScore, 1)
-      : 0;
-    const avgWeight = bestCandidate.signals.length > 0
-      ? bestCandidate.score / bestCandidate.signals.length
-      : 0;
-    return (bestCandidate.signals.length <= 1 && avgWeight < 0.8)
+    const baseConfidence =
+      maxPossibleScore > 0 ? Math.min(bestCandidate.score / maxPossibleScore, 1) : 0;
+    const avgWeight =
+      bestCandidate.signals.length > 0 ? bestCandidate.score / bestCandidate.signals.length : 0;
+    return bestCandidate.signals.length <= 1 && avgWeight < 0.8
       ? Math.min(baseConfidence, 0.5)
       : baseConfidence;
   }
@@ -96,7 +94,13 @@ export class LanguageAggregator {
   private extractLanguageFromManifest(signal: Signal): LanguageId | undefined {
     if (signal.ruleId === 'manifest:package-json') return 'javascript';
     if (signal.ruleId === 'manifest:typescript-dep') return 'typescript';
-    if (signal.ruleId === 'manifest:pyproject' || signal.ruleId === 'manifest:requirements-txt' || signal.ruleId === 'manifest:setup-py' || signal.ruleId === 'manifest:pipfile') return 'python';
+    if (
+      signal.ruleId === 'manifest:pyproject' ||
+      signal.ruleId === 'manifest:requirements-txt' ||
+      signal.ruleId === 'manifest:setup-py' ||
+      signal.ruleId === 'manifest:pipfile'
+    )
+      return 'python';
     if (signal.ruleId === 'manifest:pom-xml') return 'java';
     if (signal.ruleId === 'manifest:go-mod') return 'go';
     if (signal.ruleId === 'manifest:cargo-toml') return 'rust';
@@ -132,10 +136,7 @@ export class LanguageAggregator {
   }
 
   /** 构建 unknown 结果 */
-  private makeUnknownResult(
-    value: string,
-    signals: readonly Signal[],
-  ): MatchResult<LanguageId> {
+  private makeUnknownResult(value: string, signals: readonly Signal[]): MatchResult<LanguageId> {
     return {
       value: value as LanguageId,
       confidence: 0,

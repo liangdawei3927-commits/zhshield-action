@@ -39,10 +39,5 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
     );
   }
 
-  return (
-    <BackupEmptyState
-      isBackingUp={isBackingUp}
-      onBackup={handleBackup}
-    />
-  );
+  return <BackupEmptyState isBackingUp={isBackingUp} onBackup={handleBackup} />;
 }

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { ProjectProfile } from './profile-parts';
-import { StaleBadge, SectionCard, DataRow, ConfidenceBadge, SignalList, TargetCard, OverridesPanel } from './profile-parts';
+import {
+  StaleBadge,
+  SectionCard,
+  DataRow,
+  ConfidenceBadge,
+  SignalList,
+  TargetCard,
+  OverridesPanel,
+} from './profile-parts';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface ProfilePageProps {
@@ -47,7 +55,13 @@ function ProfileHeader({ profile }: { profile: ProjectProfile }) {
   );
 }
 
-function ProfileOverview({ profile, signalCount }: { profile: ProjectProfile; signalCount: number }) {
+function ProfileOverview({
+  profile,
+  signalCount,
+}: {
+  profile: ProjectProfile;
+  signalCount: number;
+}) {
   return (
     <SectionCard title="概览">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -62,7 +76,9 @@ function ProfileOverview({ profile, signalCount }: { profile: ProjectProfile; si
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
           <div className="text-[11px] text-zh-muted mb-1">运行环境</div>
-          <div className="text-sm font-semibold text-zh-ink">{profile.environments.map((e) => e.value).join(', ')}</div>
+          <div className="text-sm font-semibold text-zh-ink">
+            {profile.environments.map((e) => e.value).join(', ')}
+          </div>
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
           <div className="text-[11px] text-zh-muted mb-1">信号总数</div>
@@ -107,12 +123,17 @@ function ProfileDependencies({ profile }: { profile: ProjectProfile }) {
       <DataRow label="锁文件" value={profile.dependencies.lockfilePath ?? '未检测'} />
       <DataRow
         label="直接依赖"
-        value={<span className="text-[11px] font-mono">{profile.dependencies.direct.length} 个</span>}
+        value={
+          <span className="text-[11px] font-mono">{profile.dependencies.direct.length} 个</span>
+        }
       />
       {profile.dependencies.direct.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {profile.dependencies.direct.map((dep) => (
-            <span key={dep.name} className="inline-flex items-center gap-1 px-2 py-0.5 bg-zh-bg rounded text-[11px] font-mono text-zh-ink">
+            <span
+              key={dep.name}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-zh-bg rounded text-[11px] font-mono text-zh-ink"
+            >
               {dep.name}
               <span className="text-zh-muted">@{dep.version}</span>
             </span>
@@ -131,7 +152,11 @@ function ProfileOverrides({ profile }: { profile: ProjectProfile }) {
   );
 }
 
-function ProfileSignals({ signals }: { signals: ProjectProfile['targets'][number]['language']['signals'] }) {
+function ProfileSignals({
+  signals,
+}: {
+  signals: ProjectProfile['targets'][number]['language']['signals'];
+}) {
   return (
     <SectionCard title="信号追溯">
       <SignalList signals={signals} />
@@ -139,13 +164,7 @@ function ProfileSignals({ signals }: { signals: ProjectProfile['targets'][number
   );
 }
 
-function ProfileNotifications({
-  enabled,
-  onToggle,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-}) {
+function ProfileNotifications({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
   return (
     <SectionCard title="通知设置">
       <div className="flex items-center justify-between py-2">
@@ -205,7 +224,8 @@ function fetchProfile(
   projectPath: string,
   handlers: { onSuccess: (p: ProjectProfile) => void; onError: (msg: string) => void },
 ): void {
-  window.electronAPI!.engine!.runProfile(projectPath)
+  window
+    .electronAPI!.engine!.runProfile(projectPath)
     .then((result) => handlers.onSuccess(result.profile as ProjectProfile))
     .catch((err: unknown) => handlers.onError(err instanceof Error ? err.message : String(err)));
 }
@@ -233,7 +253,9 @@ function useProfileData(projectPath: string) {
         }
       },
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectPath]);
 
   return { profile, loading, error };
@@ -251,5 +273,7 @@ export function ProfilePage({ projectPath }: ProfilePageProps) {
     return <ProfileErrorView error={error} />;
   }
 
-  return <ProfileContent profile={profile} preferences={preferences} setPreferences={setPreferences} />;
+  return (
+    <ProfileContent profile={profile} preferences={preferences} setPreferences={setPreferences} />
+  );
 }

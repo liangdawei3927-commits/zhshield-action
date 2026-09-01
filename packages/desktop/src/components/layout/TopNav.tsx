@@ -57,7 +57,9 @@ function CategoryNavItem({ item, active, onNavigate }: CategoryNavItemProps) {
         <span className="flex items-center justify-center" style={{ width: 30, height: 30 }}>
           <NavIcon id={item.id} size={28} />
         </span>
-        <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' }}>{item.label ?? t(item.labelKey)}</span>
+        <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' }}>
+          {item.label ?? t(item.labelKey)}
+        </span>
       </span>
     </Bounce>
   );
@@ -87,7 +89,13 @@ function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage
   );
 }
 
-export function TopNav({ currentPage, onNavigate, onOpenSettings, projectName, sidebarOpen }: TopNavProps) {
+export function TopNav({
+  currentPage,
+  onNavigate,
+  onOpenSettings,
+  projectName,
+  sidebarOpen,
+}: TopNavProps) {
   return (
     <header className="shrink-0 select-none">
       {/* 第一行：统一品牌色 title bar */}

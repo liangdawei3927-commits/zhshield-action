@@ -80,7 +80,9 @@ describe('GuardTrivyAdapter — registry path integration', () => {
     expect(registry.list()).toContain('trivy');
 
     const adapter = registry.get('trivy');
-    const raw = (await Promise.resolve(adapter.run({ projectPath: '/tmp/demo-project' }, makeCheck()))) as {
+    const raw = (await Promise.resolve(
+      adapter.run({ projectPath: '/tmp/demo-project' }, makeCheck()),
+    )) as {
       status: string;
       summary: { total: number; critical: number; high: number };
     };

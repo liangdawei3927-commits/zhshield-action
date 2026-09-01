@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { runGuard, listGuardReports, reportFalsePositive as submitFalsePositive } from '../services/engineApi';
+import {
+  runGuard,
+  listGuardReports,
+  reportFalsePositive as submitFalsePositive,
+} from '../services/engineApi';
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
 import { useTaskRun } from '../task-store';
 
-export const SEVERITY_LABELS: Record<string, string> = { critical: 'severity.critical', high: 'severity.high', medium: 'severity.medium', low: 'severity.low' };
+export const SEVERITY_LABELS: Record<string, string> = {
+  critical: 'severity.critical',
+  high: 'severity.high',
+  medium: 'severity.medium',
+  low: 'severity.low',
+};
 export const SEVERITY_COLORS: Record<string, { color: string; bg: string }> = {
   critical: { color: 'rgb(var(--zh-danger-dark))', bg: 'rgb(var(--zh-danger) / 0.1)' },
   high: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)' },
@@ -15,9 +24,21 @@ export const SEVERITY_COLORS: Record<string, { color: string; bg: string }> = {
   low: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)' },
 };
 export const STATUS_LABELS: Record<string, { textKey: string; color: string; bg: string }> = {
-  pass: { textKey: 'page.guard.status.pass', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.1)' },
-  warn: { textKey: 'page.guard.status.warn', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)' },
-  fail: { textKey: 'page.guard.status.fail', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)' },
+  pass: {
+    textKey: 'page.guard.status.pass',
+    color: 'rgb(var(--zh-success))',
+    bg: 'rgb(var(--zh-success) / 0.1)',
+  },
+  warn: {
+    textKey: 'page.guard.status.warn',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+  },
+  fail: {
+    textKey: 'page.guard.status.fail',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+  },
 };
 
 export interface GuardLevelInfo {
@@ -29,7 +50,11 @@ export interface GuardLevelInfo {
   lastAt: string | null;
 }
 
-const LEVEL_TRIGGERS: Array<{ level: 'L1' | 'L2' | 'L3'; labelKey: string; triggerSource: string }> = [
+const LEVEL_TRIGGERS: Array<{
+  level: 'L1' | 'L2' | 'L3';
+  labelKey: string;
+  triggerSource: string;
+}> = [
   { level: 'L1', labelKey: 'page.guard.trigger.preCommit', triggerSource: 'pre-commit' },
   { level: 'L2', labelKey: 'page.guard.trigger.prePush', triggerSource: 'pre-push' },
   { level: 'L3', labelKey: 'page.guard.level.L3', triggerSource: 'ci' },
@@ -53,9 +78,10 @@ export function buildGuardLevels(history: GuardReportRecordData[]): GuardLevelIn
     }));
   }
   const latest = history.toSorted(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   )[0];
-  const status: GuardLevelInfo['status'] = latest.summary.blocking > 0 ? 'fail' : latest.summary.warnings > 0 ? 'warn' : 'pass';
+  const status: GuardLevelInfo['status'] =
+    latest.summary.blocking > 0 ? 'fail' : latest.summary.warnings > 0 ? 'warn' : 'pass';
   return LEVEL_TRIGGERS.map(({ level, labelKey, triggerSource }) => ({
     level,
     labelKey,
@@ -67,10 +93,16 @@ export function buildGuardLevels(history: GuardReportRecordData[]): GuardLevelIn
 }
 
 /** 门禁整体状态：任一关卡拦截 → 拦截；有警告 → 警告；否则通过 */
-export function deriveGuardStatus(levels: GuardLevelInfo[]): { status: 'pass' | 'warn' | 'fail'; label: string } {
-  if (levels.some((l) => l.status === 'fail')) return { status: 'fail', label: t('page.guard.statusShort.fail') };
-  if (levels.some((l) => l.status === 'warn')) return { status: 'warn', label: t('page.guard.statusShort.warn') };
-  if (levels.some((l) => l.status === 'pass')) return { status: 'pass', label: t('page.guard.statusShort.pass') };
+export function deriveGuardStatus(levels: GuardLevelInfo[]): {
+  status: 'pass' | 'warn' | 'fail';
+  label: string;
+} {
+  if (levels.some((l) => l.status === 'fail'))
+    return { status: 'fail', label: t('page.guard.statusShort.fail') };
+  if (levels.some((l) => l.status === 'warn'))
+    return { status: 'warn', label: t('page.guard.statusShort.warn') };
+  if (levels.some((l) => l.status === 'pass'))
+    return { status: 'pass', label: t('page.guard.statusShort.pass') };
   return { status: 'pass', label: t('page.guard.statusShort.idle') };
 }
 
@@ -86,7 +118,12 @@ export function toGuardReportDataFromRecord(record: GuardReportRecordData): Guar
     checks: record.checks.map((c) => ({
       id: c.checkId,
       name: c.checkId,
-      status: c.status === 'passed' ? 'pass' : c.status === 'failed' || c.status === 'error' ? 'fail' : 'warn',
+      status:
+        c.status === 'passed'
+          ? 'pass'
+          : c.status === 'failed' || c.status === 'error'
+            ? 'fail'
+            : 'warn',
       message: c.message,
       severity: c.severity === 'error' ? 'high' : c.severity === 'warning' ? 'medium' : 'low',
     })),
@@ -168,7 +205,10 @@ function useGuardCopyToAi(projectPath: string): {
       if (checks.length === 0) return;
       const text = buildAiFixPrompt(projectPath, checks.map(guardCheckToAiIssue));
       void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('page.guard.copiedAll', { count: checks.length })) : toast(t('toast.copyFailed'), 'error')),
+        (ok) =>
+          ok
+            ? toast(t('page.guard.copiedAll', { count: checks.length }))
+            : toast(t('toast.copyFailed'), 'error'),
         () => toast(t('toast.copyFailed'), 'error'),
       );
     },
@@ -220,7 +260,10 @@ function useGuardReportFalsePositive(projectPath: string): {
         message: check.message,
         severity: check.severity,
       }).then(
-        (result) => (result.ok ? toast(t('page.guard.falsePositiveSubmitted')) : toast(result.reason ?? t('page.guard.reportFailed'), 'error')),
+        (result) =>
+          result.ok
+            ? toast(t('page.guard.falsePositiveSubmitted'))
+            : toast(result.reason ?? t('page.guard.reportFailed'), 'error'),
         () => toast(t('page.guard.reportFailed'), 'error'),
       );
     },
@@ -243,5 +286,15 @@ export function useGuardPage(projectPath: string) {
     await refreshHistory();
   }, [handleScan, refreshHistory]);
 
-  return { loading, progressLabel, report, copyToAi, copyAllToAi, reportFalsePositive, handleScan: handleScanAndRefresh, history, falsePositiveCount };
+  return {
+    loading,
+    progressLabel,
+    report,
+    copyToAi,
+    copyAllToAi,
+    reportFalsePositive,
+    handleScan: handleScanAndRefresh,
+    history,
+    falsePositiveCount,
+  };
 }

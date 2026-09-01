@@ -27,6 +27,7 @@ function collectSubdirCandidates(startDir: string): Set<string> {
 
   try {
     for (const entry of fs.readdirSync(startDir)) {
+      if (entry === 'node_modules') continue;
       addSubdirCandidate(startDir, entry, candidates);
     }
   } catch {

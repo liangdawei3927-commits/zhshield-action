@@ -21,7 +21,13 @@ export class SemgrepScanRunner {
   private readonly mapper = new SemgrepResultMapper();
 
   /** 执行 semgrep 扫描并映射输出为可用结果 */
-  async run(command: string, options: ToolScanOptions, args: string[], category: IssueCategory, start: number): Promise<ToolResult> {
+  async run(
+    command: string,
+    options: ToolScanOptions,
+    args: string[],
+    category: IssueCategory,
+    start: number,
+  ): Promise<ToolResult> {
     try {
       const { stdout } = await execFileAsync(command, args, {
         cwd: options.projectPath,
@@ -38,7 +44,12 @@ export class SemgrepScanRunner {
 
   /** 处理 semgrep 执行错误：未安装 / 超时 / 输出错误 */
   private handleError(error: unknown, start: number, category: IssueCategory): ToolResult {
-    const err = error as { code?: number | string; stdout?: string; stderr?: string; message?: string };
+    const err = error as {
+      code?: number | string;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
     if (err.code === 'ENOENT') {
       return this.buildUnavailable(start, 'Semgrep 未安装或未在 PATH 中找到');
     }
@@ -67,14 +78,19 @@ export class SemgrepScanRunner {
     }
 
     // 兜底：剔除 OCaml 运行时噪音后使用 stderr / message
-    return this.buildError(start, this.stripRuntimeNoise(err.stderr) || err.message || 'Semgrep 执行失败');
+    return this.buildError(
+      start,
+      this.stripRuntimeNoise(err.stderr) || err.message || 'Semgrep 执行失败',
+    );
   }
 
   private extractJsonError(stdout?: string): string | null {
     if (!stdout) return null;
     try {
       const output = JSON.parse(stdout) as SemgrepOutput;
-      const first = output.errors?.find((e) => typeof e.message === 'string' && e.message.length > 0);
+      const first = output.errors?.find(
+        (e) => typeof e.message === 'string' && e.message.length > 0,
+      );
       return first?.message ?? null;
     } catch {
       return null;
@@ -86,7 +102,9 @@ export class SemgrepScanRunner {
     return stderr
       .split('\n')
       .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !RUNTIME_NOISE_PATTERNS.some((pattern) => pattern.test(line)))
+      .filter(
+        (line) => line.length > 0 && !RUNTIME_NOISE_PATTERNS.some((pattern) => pattern.test(line)),
+      )
       .join('\n');
   }
 

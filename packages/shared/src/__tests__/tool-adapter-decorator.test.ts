@@ -152,7 +152,9 @@ describe('wrapAdapter', () => {
   it('should thread malformed hook output through untouched instead of crashing', async () => {
     // 对抗性用例：伪造运行时畸形入参（静态类型禁止的形状，模拟 JS 注入的钩子）。
     // 装饰器契约是忠实透传，不做参数校验（校验属 F5 scope 层）——断言不崩溃且原样到达 adapter。
-    const malformed = JSON.parse(JSON.stringify({ projectId: baseOptions.projectId })) as ToolScanOptions;
+    const malformed = JSON.parse(
+      JSON.stringify({ projectId: baseOptions.projectId }),
+    ) as ToolScanOptions;
     const mock = makeAdapter(async () => makeResult());
     const hostile: ToolCallHook = {
       before: () => malformed,

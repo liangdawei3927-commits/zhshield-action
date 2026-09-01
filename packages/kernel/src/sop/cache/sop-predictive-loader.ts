@@ -68,13 +68,16 @@ export class SopPredictiveLoader {
     lazyLoader: SopLazyLoader,
   ): Promise<string[]> {
     const preloaded: string[] = [];
-    for (const _module of this.predictNextModules(profile)) {
-      const feature: ProjectFeature = {
-        framework: profile.currentProjectType,
-        language: 'typescript',
-        features: profile.projectHistory,
-      };
-      preloaded.push(...(await lazyLoader.syncForProject(feature)));
+    const feature: ProjectFeature = {
+      framework: profile.currentProjectType,
+      language: 'typescript',
+      features: profile.projectHistory,
+    };
+    const results = await Promise.all(
+      this.predictNextModules(profile).map(() => lazyLoader.syncForProject(feature)),
+    );
+    for (const r of results) {
+      preloaded.push(...r);
     }
     return preloaded;
   }
@@ -83,10 +86,7 @@ export class SopPredictiveLoader {
    * 预测用户下一步可能需要的模块
    */
   private predictNextModules(profile: UserActivityProfile): string[] {
-    const predicted = [
-      ...this.predictFromProjectType(profile),
-      ...this.predictFromActiveHours(),
-    ];
+    const predicted = [...this.predictFromProjectType(profile), ...this.predictFromActiveHours()];
     return [...new Set(predicted)];
   }
 

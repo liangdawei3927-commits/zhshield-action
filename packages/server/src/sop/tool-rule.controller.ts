@@ -1,4 +1,12 @@
-import { Controller, Get, Param, HttpCode, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { hashToolRuleFiles, type ToolRuleFile } from '@zh/kernel';
 import { ToolRuleLoader } from './tool-rule-loader';
@@ -70,7 +78,9 @@ export class ToolRuleController {
   getRules(@Param('tool') tool: string): ToolRuleFile[] {
     const t = this.resolveTool(tool);
     const { version, hash } = this.versions[t];
-    this.logger.debug(`Serving rule pack tool=${t} version=${version} hash=${hash} files=${this.packs[t].length}`);
+    this.logger.debug(
+      `Serving rule pack tool=${t} version=${version} hash=${hash} files=${this.packs[t].length}`,
+    );
     return this.packs[t];
   }
 

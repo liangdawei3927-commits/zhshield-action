@@ -43,7 +43,9 @@ function useScoreHistory(projectPath: string): {
   const [loading, setLoading] = useState(true);
   const load = useScoreHistoryLoader(fetchHistory, setLoading);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return { data, loading, load };
 }
@@ -92,7 +94,9 @@ export function useModuleScores(projectPath: string) {
       if (!cancelled) setModules(views);
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectPath]);
   return { modules, loading };
 }

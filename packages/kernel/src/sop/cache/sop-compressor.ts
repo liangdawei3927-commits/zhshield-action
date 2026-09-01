@@ -14,19 +14,24 @@ export enum CompressionFormat {
 }
 
 /** 压缩格式 → 压缩函数策略表（替代 compress 中的 switch 分派） */
-const COMPRESSORS: Partial<Record<CompressionFormat, (data: Buffer | Uint8Array) => Promise<Buffer>>> = {
+const COMPRESSORS: Partial<
+  Record<CompressionFormat, (data: Buffer | Uint8Array) => Promise<Buffer>>
+> = {
   [CompressionFormat.Gzip]: (data) => gzipAsync(data, { level: 6 }),
-  [CompressionFormat.Brotli]: (data) => brotliCompressAsync(data, {
-    params: {
-      [constants.BROTLI_PARAM_QUALITY]: 4,
-      [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
-    },
-  }),
+  [CompressionFormat.Brotli]: (data) =>
+    brotliCompressAsync(data, {
+      params: {
+        [constants.BROTLI_PARAM_QUALITY]: 4,
+        [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+      },
+    }),
   [CompressionFormat.Cbor]: (data) => gzipAsync(data, { level: 9 }),
 };
 
 /** 压缩格式 → 解压函数策略表（替代 decompress 中的 switch 分派） */
-const DECOMPRESSORS: Partial<Record<CompressionFormat, (data: Buffer | Uint8Array) => Promise<Buffer>>> = {
+const DECOMPRESSORS: Partial<
+  Record<CompressionFormat, (data: Buffer | Uint8Array) => Promise<Buffer>>
+> = {
   [CompressionFormat.Gzip]: (data) => gunzipAsync(data),
   [CompressionFormat.Brotli]: (data) => brotliDecompressAsync(data),
   [CompressionFormat.Cbor]: (data) => gunzipAsync(data),
@@ -52,10 +57,7 @@ export class SopCompressor {
    * @param data 要压缩的数据
    * @param format 压缩格式
    */
-  async compress(
-    data: Buffer | Uint8Array,
-    format: CompressionFormat,
-  ): Promise<Buffer> {
+  async compress(data: Buffer | Uint8Array, format: CompressionFormat): Promise<Buffer> {
     const compressFn = COMPRESSORS[format] ?? ((d: Buffer | Uint8Array) => gzipAsync(d));
     return compressFn(data);
   }
@@ -63,10 +65,7 @@ export class SopCompressor {
   /**
    * 解压缩
    */
-  async decompress(
-    data: Buffer | Uint8Array,
-    format: CompressionFormat,
-  ): Promise<Buffer> {
+  async decompress(data: Buffer | Uint8Array, format: CompressionFormat): Promise<Buffer> {
     const decompressFn = DECOMPRESSORS[format] ?? ((d: Buffer | Uint8Array) => gunzipAsync(d));
     return decompressFn(data);
   }

@@ -51,7 +51,13 @@ export class BackupOrchestrator {
     this.emit(BACKUP_EVENTS.STARTED, { projectId, backupId, type: 'full' });
 
     const config = await this.configManager.loadProjectConfig(projectPath, options.projectName);
-    const results = await this.runEnabledBackups(config, projectPath, projectId, backupId, abortSignal);
+    const results = await this.runEnabledBackups(
+      config,
+      projectPath,
+      projectId,
+      backupId,
+      abortSignal,
+    );
     const overallStatus = this.calculateOverallStatus(results);
     const duration = Date.now() - startTime;
     const result: BackupResult = {
@@ -80,11 +86,23 @@ export class BackupOrchestrator {
   ): Promise<BackupSubResult[]> {
     const results: BackupSubResult[] = [];
     if (config.github.enabled && !abortSignal?.aborted) {
-      this.emitProgress({ projectId, backupId, phase: 'github-commit', percent: 40, message: '正在提交到 GitHub...' });
+      this.emitProgress({
+        projectId,
+        backupId,
+        phase: 'github-commit',
+        percent: 40,
+        message: '正在提交到 GitHub...',
+      });
       results.push(await this.githubBackup.backup(projectPath, config.github, abortSignal));
     }
     if (config.local.enabled && !abortSignal?.aborted) {
-      this.emitProgress({ projectId, backupId, phase: 'local-copy', percent: 70, message: '正在复制到本地目录...' });
+      this.emitProgress({
+        projectId,
+        backupId,
+        phase: 'local-copy',
+        percent: 70,
+        message: '正在复制到本地目录...',
+      });
       results.push(await this.localBackup.backup(projectPath, config.local, abortSignal));
     }
     return results;
@@ -99,12 +117,19 @@ export class BackupOrchestrator {
   ): void {
     if (overallStatus === 'failed') {
       this.emit(BACKUP_EVENTS.FAILED, {
-        projectId, backupId,
+        projectId,
+        backupId,
         error: '所有备份方式均失败',
         partialResult: result,
       });
     } else {
-      this.emitProgress({ projectId, backupId, phase: 'local-metadata', percent: 100, message: '备份完成' });
+      this.emitProgress({
+        projectId,
+        backupId,
+        phase: 'local-metadata',
+        percent: 100,
+        message: '备份完成',
+      });
       this.emit(BACKUP_EVENTS.COMPLETED, { projectId, backupId, result });
     }
   }

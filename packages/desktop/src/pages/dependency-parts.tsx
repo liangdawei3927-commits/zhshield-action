@@ -50,7 +50,16 @@ export function DependencyIllustration() {
 /** 依赖图谱小图标（24×24，线性风格） */
 function DependencyGraphIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-brand))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgb(var(--zh-brand))"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="5" r="2.5" />
       <circle cx="5" cy="18" r="2.5" />
       <circle cx="19" cy="18" r="2.5" />
@@ -84,16 +93,34 @@ export function DependencyHeader({
         <div>
           <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.deps.done')}</h1>
           <p className="text-sm text-zh-muted">
-            {t('page.deps.summary', { direct: report.direct, transitive: report.transitive, edges: report.edgeCount })}
+            {t('page.deps.summary', {
+              direct: report.direct,
+              transitive: report.transitive,
+              edges: report.edgeCount,
+            })}
           </p>
         </div>
-        <PrimaryButton className="ml-auto" onClick={onRescan} loading={loading} loadingLabel={t('page.deps.checking')}>
+        <PrimaryButton
+          className="ml-auto"
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={t('page.deps.checking')}
+        >
           {t('page.deps.rescan')}
         </PrimaryButton>
       </div>
       {report.error && (
         <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-danger))"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4" />
             <path d="M12 16h.01" />
@@ -108,10 +135,20 @@ export function DependencyHeader({
   );
 }
 
-function SectionTitle({ icon, label, right }: { icon: ReactNode; label: string; right?: ReactNode }) {
+function SectionTitle({
+  icon,
+  label,
+  right,
+}: {
+  icon: ReactNode;
+  label: string;
+  right?: ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">{icon}</span>
+      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+        {icon}
+      </span>
       <span className="text-sm font-semibold text-zh-ink-2">{label}</span>
       {right && <span className="ml-auto">{right}</span>}
     </div>
@@ -131,7 +168,16 @@ export function DependencyOverviewCard({ report }: { report: DependencyReportDat
     <ResultCard variant="score" className="mb-6">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="5" r="2" />
             <circle cx="5" cy="19" r="2" />
             <circle cx="19" cy="19" r="2" />
@@ -159,13 +205,26 @@ export function DependencyOverviewCard({ report }: { report: DependencyReportDat
 }
 
 /** 锁文件状态卡片：存在性 / 一致性 / 哈希完整性（勾选 / 叉号 + 文案） */
-export function DependencyLockfileCard({ lockfile }: { lockfile: DependencyReportData['lockfile'] }) {
+export function DependencyLockfileCard({
+  lockfile,
+}: {
+  lockfile: DependencyReportData['lockfile'];
+}) {
   const t = useT();
   return (
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="5" y="11" width="14" height="10" rx="2" />
             <path d="M8 11V8a4 4 0 018 0v3" />
             <circle cx="12" cy="16" r="1" />
@@ -180,20 +239,42 @@ export function DependencyLockfileCard({ lockfile }: { lockfile: DependencyRepor
           const na = state === 'na';
           return (
             <div key={check.key} className="flex items-center gap-3">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-green-50' : na ? 'bg-zh-panel' : 'bg-red-50'}`}>
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-green-50' : na ? 'bg-zh-panel' : 'bg-red-50'}`}
+              >
                 {ok ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-success-700))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="rgb(var(--zh-success-700))"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 ) : na ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-zh-muted" />
                 ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="rgb(var(--zh-danger))"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M18 6L6 18M6 6l12 12" />
                   </svg>
                 )}
               </span>
-              <span className={`text-sm ${ok ? 'text-green-700' : na ? 'text-zh-muted' : 'text-red-600'}`}>
+              <span
+                className={`text-sm ${ok ? 'text-green-700' : na ? 'text-zh-muted' : 'text-red-600'}`}
+              >
                 {t(ok ? check.okKey : na ? check.naKey : check.failKey)}
               </span>
             </div>
@@ -205,13 +286,26 @@ export function DependencyLockfileCard({ lockfile }: { lockfile: DependencyRepor
 }
 
 /** 信任状态统计卡片：verified / suspicious / compromised / unknown（四色） */
-export function DependencyTrustCard({ trustCounts }: { trustCounts: DependencyReportData['trustCounts'] }) {
+export function DependencyTrustCard({
+  trustCounts,
+}: {
+  trustCounts: DependencyReportData['trustCounts'];
+}) {
   const t = useT();
   return (
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         }
@@ -226,7 +320,10 @@ export function DependencyTrustCard({ trustCounts }: { trustCounts: DependencyRe
               <div className="text-xl font-bold leading-none" style={{ color: cfg.color }}>
                 {count}
               </div>
-              <div className="text-[11px] mt-1 flex items-center gap-1.5" style={{ color: cfg.color }}>
+              <div
+                className="text-[11px] mt-1 flex items-center gap-1.5"
+                style={{ color: cfg.color }}
+              >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
                 {t(cfg.labelKey)}
               </div>
@@ -239,7 +336,11 @@ export function DependencyTrustCard({ trustCounts }: { trustCounts: DependencyRe
 }
 
 /** 高风险许可证单条：名称 + 版本 + 许可证 + 原因 */
-function HighRiskEntry({ entry }: { entry: DependencyReportData['licenseMatrix']['entries'][number] }) {
+function HighRiskEntry({
+  entry,
+}: {
+  entry: DependencyReportData['licenseMatrix']['entries'][number];
+}) {
   const t = useT();
   const cfg = LICENSE_CATEGORY_CONFIG[entry.category] ?? LICENSE_CATEGORY_CONFIG.unknown;
   return (
@@ -247,7 +348,10 @@ function HighRiskEntry({ entry }: { entry: DependencyReportData['licenseMatrix']
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-zh-ink-2">{entry.name}</span>
         <span className="text-xs text-zh-muted">v{entry.version}</span>
-        <span className="ml-auto px-2 py-0.5 rounded text-xs font-medium" style={{ background: cfg.bg, color: cfg.color }}>
+        <span
+          className="ml-auto px-2 py-0.5 rounded text-xs font-medium"
+          style={{ background: cfg.bg, color: cfg.color }}
+        >
           {entry.license || t('page.deps.license.unknown')}
         </span>
       </div>
@@ -257,21 +361,38 @@ function HighRiskEntry({ entry }: { entry: DependencyReportData['licenseMatrix']
 }
 
 /** 许可证矩阵卡片：四类计数（风险色标）+ 高风险清单 */
-export function DependencyLicenseCard({ matrix }: { matrix: DependencyReportData['licenseMatrix'] }) {
+export function DependencyLicenseCard({
+  matrix,
+}: {
+  matrix: DependencyReportData['licenseMatrix'];
+}) {
   const t = useT();
   const highRiskEntries = matrix.entries.filter((entry) => entry.risk === 'high');
   return (
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
             <path d="M14 2v6h6" />
             <path d="M9 15h6M9 11h2" />
           </svg>
         }
         label={t('page.deps.license')}
-        right={<span className="text-xs text-zh-muted">{t('page.deps.licenseTotal', { count: matrix.total })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.deps.licenseTotal', { count: matrix.total })}
+          </span>
+        }
       />
       <div className="grid grid-cols-4 gap-3 mb-6">
         {LICENSE_CATEGORY_ORDER.map((category) => {
@@ -282,7 +403,10 @@ export function DependencyLicenseCard({ matrix }: { matrix: DependencyReportData
               <div className="text-xl font-bold leading-none" style={{ color: cfg.color }}>
                 {count}
               </div>
-              <div className="text-[11px] mt-1 flex items-center gap-1.5" style={{ color: cfg.color }}>
+              <div
+                className="text-[11px] mt-1 flex items-center gap-1.5"
+                style={{ color: cfg.color }}
+              >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
                 {t(cfg.labelKey)}
               </div>
@@ -299,7 +423,9 @@ export function DependencyLicenseCard({ matrix }: { matrix: DependencyReportData
         {highRiskEntries.length === 0 && (
           <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
             <span className="text-2xl">🟢</span>
-            <span className="text-sm font-medium text-green-700">{t('page.deps.licenseNoRisks')}</span>
+            <span className="text-sm font-medium text-green-700">
+              {t('page.deps.licenseNoRisks')}
+            </span>
           </div>
         )}
       </div>
@@ -312,7 +438,17 @@ function AdapterErrorNote({ title, message }: { title: string; message?: string 
   if (!message) return null;
   return (
     <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="rgb(var(--zh-danger))"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="mt-0.5 shrink-0"
+      >
         <circle cx="12" cy="12" r="10" />
         <path d="M12 8v4" />
         <path d="M12 16h.01" />
@@ -333,20 +469,38 @@ export function DependencyTyposquatCard({ report }: { report: DependencyReportDa
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
             <path d="M11 8v3l2 2" />
           </svg>
         }
         label={t('page.deps.typosquat')}
-        right={<span className="text-xs text-zh-muted">{t('page.deps.typosquat.total', { count: findings.length })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.deps.typosquat.total', { count: findings.length })}
+          </span>
+        }
       />
-      <AdapterErrorNote title={t('page.deps.typosquat.checkFailed')} message={report.typosquatError} />
+      <AdapterErrorNote
+        title={t('page.deps.typosquat.checkFailed')}
+        message={report.typosquatError}
+      />
       {findings.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🛡️</span>
-          <span className="text-sm font-medium text-green-700">{t('page.deps.typosquat.none')}</span>
+          <span className="text-sm font-medium text-green-700">
+            {t('page.deps.typosquat.none')}
+          </span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -356,7 +510,10 @@ export function DependencyTyposquatCard({ report }: { report: DependencyReportDa
               <div key={finding.nodeId} className="rounded-lg border border-zh-line p-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-zh-ink-2">{finding.nodeId}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-medium" style={{ background: cfg.bg, color: cfg.color }}>
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] font-medium"
+                    style={{ background: cfg.bg, color: cfg.color }}
+                  >
                     {t(cfg.labelKey)}
                   </span>
                 </div>
@@ -397,21 +554,53 @@ export function DependencyLockfileVerificationCard({ report }: { report: Depende
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <path d="M9 12l2 2 4-4" />
           </svg>
         }
         label={t('page.deps.lockfileVerify')}
       />
-      <AdapterErrorNote title={t('page.deps.lockfileVerify.checkFailed')} message={report.lockfileError} />
-      <div className={`mb-3 flex items-center gap-2 text-sm ${clean ? 'text-green-700' : 'text-red-600'}`}>
+      <AdapterErrorNote
+        title={t('page.deps.lockfileVerify.checkFailed')}
+        message={report.lockfileError}
+      />
+      <div
+        className={`mb-3 flex items-center gap-2 text-sm ${clean ? 'text-green-700' : 'text-red-600'}`}
+      >
         {clean ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         )}
@@ -425,11 +614,17 @@ export function DependencyLockfileVerificationCard({ report }: { report: Depende
       </div>
       {verification.diffs.length > 0 && (
         <div className="mb-3">
-          <div className="text-xs font-medium text-zh-muted mb-2">{t('page.deps.lockfileVerify.diffs', { count: verification.diffs.length })}</div>
+          <div className="text-xs font-medium text-zh-muted mb-2">
+            {t('page.deps.lockfileVerify.diffs', { count: verification.diffs.length })}
+          </div>
           <div className="space-y-1">
             {verification.diffs.map((diff) => (
-              <div key={`${diff.name}:${diff.declaredVersion}`} className="text-[11px] text-zh-muted">
-                <span className="font-medium text-zh-ink-2">{diff.name}</span> {diff.declaredVersion} → {diff.lockedVersion || '—'}
+              <div
+                key={`${diff.name}:${diff.declaredVersion}`}
+                className="text-[11px] text-zh-muted"
+              >
+                <span className="font-medium text-zh-ink-2">{diff.name}</span>{' '}
+                {diff.declaredVersion} → {diff.lockedVersion || '—'}
               </div>
             ))}
           </div>
@@ -437,10 +632,16 @@ export function DependencyLockfileVerificationCard({ report }: { report: Depende
       )}
       {verification.integrityFailures.length > 0 && (
         <div>
-          <div className="text-xs font-medium text-zh-muted mb-2">{t('page.deps.lockfileVerify.integrity', { count: verification.integrityFailures.length })}</div>
+          <div className="text-xs font-medium text-zh-muted mb-2">
+            {t('page.deps.lockfileVerify.integrity', {
+              count: verification.integrityFailures.length,
+            })}
+          </div>
           <ul className="space-y-1">
             {verification.integrityFailures.map((failure) => (
-              <li key={failure} className="text-[11px] text-red-500 break-all">{failure}</li>
+              <li key={failure} className="text-[11px] text-red-500 break-all">
+                {failure}
+              </li>
             ))}
           </ul>
         </div>
@@ -457,13 +658,26 @@ export function DependencyUpgradeCard({ report }: { report: DependencyReportData
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M23 6l-9.5 9.5-5-5L1 18" />
             <path d="M17 6h6v6" />
           </svg>
         }
         label={t('page.deps.upgrade')}
-        right={<span className="text-xs text-zh-muted">{t('page.deps.upgrade.total', { count: assessments.length })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.deps.upgrade.total', { count: assessments.length })}
+          </span>
+        }
       />
       <AdapterErrorNote title={t('page.deps.upgrade.checkFailed')} message={report.upgradeError} />
       {assessments.length === 0 ? (
@@ -482,23 +696,33 @@ export function DependencyUpgradeCard({ report }: { report: DependencyReportData
                   return (
                     <div key={candidate.targetVersion} className="rounded-md bg-zh-panel px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-zh-ink-2">v{candidate.targetVersion}</span>
+                        <span className="text-xs font-semibold text-zh-ink-2">
+                          v{candidate.targetVersion}
+                        </span>
                         {candidate.securityRelevant && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600">
                             {t('page.deps.upgrade.security')}
                           </span>
                         )}
-                        <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: cfg.bg, color: cfg.color }}>
+                        <span
+                          className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium"
+                          style={{ background: cfg.bg, color: cfg.color }}
+                        >
                           {t(cfg.labelKey)}
                         </span>
                       </div>
                       <div className="mt-1 text-[11px] text-zh-muted">{candidate.reason}</div>
                       {candidate.breakingChanges.length > 0 && (
                         <div className="mt-1.5">
-                          <div className="text-[10px] font-medium text-zh-muted mb-0.5">{t('page.deps.upgrade.breaking')}</div>
+                          <div className="text-[10px] font-medium text-zh-muted mb-0.5">
+                            {t('page.deps.upgrade.breaking')}
+                          </div>
                           <ul className="space-y-0.5">
                             {candidate.breakingChanges.map((change) => (
-                              <li key={`${change.type}:${change.description}`} className="text-[11px] text-zh-muted flex gap-1.5">
+                              <li
+                                key={`${change.type}:${change.description}`}
+                                className="text-[11px] text-zh-muted flex gap-1.5"
+                              >
                                 <span className="shrink-0">•</span>
                                 <span className="break-all">{change.description}</span>
                               </li>
@@ -525,18 +749,31 @@ export function DependencyOutdatedCard({ report }: { report: DependencyReportDat
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             <path d="M9 12l2 2 4-4" />
           </svg>
         }
         label={t('page.deps.outdated')}
-        right={<span className="text-xs text-zh-muted">{t('page.deps.outdated.total', { count: outdatedDeps.length })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.deps.outdated.total', { count: outdatedDeps.length })}
+          </span>
+        }
       />
       {outdatedDeps.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">✅</span>
-            <span className="text-sm font-medium text-green-700">{t('page.deps.outdated.none')}</span>
+          <span className="text-sm font-medium text-green-700">{t('page.deps.outdated.none')}</span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -544,7 +781,9 @@ export function DependencyOutdatedCard({ report }: { report: DependencyReportDat
             <div key={dep.name} className="rounded-lg border border-zh-line p-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zh-ink-2">{dep.name}</span>
-                <span className="text-xs text-zh-muted">{dep.current} → <span className="text-green-600 font-medium">{dep.latest}</span></span>
+                <span className="text-xs text-zh-muted">
+                  {dep.current} → <span className="text-green-600 font-medium">{dep.latest}</span>
+                </span>
                 {dep.isSecurityUpdate && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600">
                     {t('page.deps.outdated.security')}
@@ -570,12 +809,25 @@ export function DependencyEnvCard({ report }: { report: DependencyReportData }) 
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
           </svg>
         }
         label={t('page.deps.env')}
-        right={<span className="text-xs text-zh-muted">{t('page.deps.env.total', { count: entries.length })}</span>}
+        right={
+          <span className="text-xs text-zh-muted">
+            {t('page.deps.env.total', { count: entries.length })}
+          </span>
+        }
       />
       <AdapterErrorNote title={t('page.deps.env.checkFailed')} message={report.envError} />
       {entries.length === 0 ? (
@@ -588,17 +840,26 @@ export function DependencyEnvCard({ report }: { report: DependencyReportData }) 
           {entries.map((entry) => {
             const cfg = ENV_SEVERITY_CONFIG[entry.severity] ?? ENV_SEVERITY_CONFIG.info;
             return (
-              <div key={`${entry.kind}:${entry.name}`} className="rounded-lg border border-zh-line p-3">
+              <div
+                key={`${entry.kind}:${entry.name}`}
+                className="rounded-lg border border-zh-line p-3"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-zh-ink-2">{t(`page.deps.env.kind.${entry.kind}`)}</span>
+                  <span className="text-xs font-medium text-zh-ink-2">
+                    {t(`page.deps.env.kind.${entry.kind}`)}
+                  </span>
                   <span className="text-[11px] text-zh-muted">· {entry.name}</span>
-                  <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: cfg.bg, color: cfg.color }}>
+                  <span
+                    className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    style={{ background: cfg.bg, color: cfg.color }}
+                  >
                     {t(cfg.labelKey)}
                   </span>
                 </div>
                 <div className="mt-1 text-[11px] text-zh-muted break-all">{entry.detail}</div>
                 <div className="mt-0.5 text-[11px] text-zh-muted">
-                  {t('page.deps.env.expected', { value: entry.expected })} · {t('page.deps.env.actual', { value: entry.actual })}
+                  {t('page.deps.env.expected', { value: entry.expected })} ·{' '}
+                  {t('page.deps.env.actual', { value: entry.actual })}
                 </div>
               </div>
             );
@@ -610,7 +871,13 @@ export function DependencyEnvCard({ report }: { report: DependencyReportData }) 
 }
 
 /** 空态：引导依赖管家 */
-export function DependencyEmptyState({ loading, onScan }: { loading: boolean; onScan: () => void }) {
+export function DependencyEmptyState({
+  loading,
+  onScan,
+}: {
+  loading: boolean;
+  onScan: () => void;
+}) {
   const t = useT();
   return (
     <PageShell
@@ -625,7 +892,16 @@ export function DependencyEmptyState({ loading, onScan }: { loading: boolean; on
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="5" y="11" width="14" height="10" rx="2" />
               <path d="M8 11V8a4 4 0 018 0v3" />
               <circle cx="12" cy="16" r="1" />
@@ -636,7 +912,16 @@ export function DependencyEmptyState({ loading, onScan }: { loading: boolean; on
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
               <path d="M14 2v6h6" />
               <path d="M9 15h6M9 11h2" />
@@ -647,7 +932,16 @@ export function DependencyEmptyState({ loading, onScan }: { loading: boolean; on
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <path d="M12 8v4M12 16h.01" />
             </svg>

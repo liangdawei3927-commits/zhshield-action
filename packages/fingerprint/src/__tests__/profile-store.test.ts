@@ -247,7 +247,10 @@ describe('ProfileStore', () => {
       };
 
       const storeWithBus = new ProfileStore(tempDir, fakeBus);
-      storeWithBus.save('/test/project', makeTestProfile({ overrides: { architecture: 'monolith' } }));
+      storeWithBus.save(
+        '/test/project',
+        makeTestProfile({ overrides: { architecture: 'monolith' } }),
+      );
 
       const result = storeWithBus.mergeOverridesAndSave('/test/project', {
         targets: { default: { language: 'python', productForm: 'backend' } },
@@ -262,7 +265,9 @@ describe('ProfileStore', () => {
     });
 
     it('GIVEN 未提供 eventBus WHEN mergeOverridesAndSave THEN 不报错', () => {
-      const result = store.mergeOverridesAndSave('/test/project', { architecture: 'microservices' });
+      const result = store.mergeOverridesAndSave('/test/project', {
+        architecture: 'microservices',
+      });
 
       expect(result.schemaVersion).toBe(1);
       expect(result.overrides.architecture).toBe('microservices');

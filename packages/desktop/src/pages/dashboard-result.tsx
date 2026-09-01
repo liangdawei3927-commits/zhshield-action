@@ -1,8 +1,22 @@
 import type { CheckSummary } from './dashboard-logic';
-import { AutoFixNotice, IssuesOutcome, ResultHeader, ResultStats, ScopeOverview } from './dashboard-result-parts';
+import {
+  AutoFixNotice,
+  IssuesOutcome,
+  ResultHeader,
+  ResultStats,
+  ScopeOverview,
+} from './dashboard-result-parts';
 
 /** 结果正文：评分/统计/范围/提示/问题列表 分区块展示 */
-function CheckResultBody({ summary, ok, score, autoFixNotice, onRerun, onBack, onCopyIssues }: {
+function CheckResultBody({
+  summary,
+  ok,
+  score,
+  autoFixNotice,
+  onRerun,
+  onBack,
+  onCopyIssues,
+}: {
   summary: CheckSummary;
   ok: boolean;
   score: number | null;
@@ -13,14 +27,28 @@ function CheckResultBody({ summary, ok, score, autoFixNotice, onRerun, onBack, o
 }) {
   return (
     <div className="w-full px-8 py-10">
-      <ResultStatsSection summary={summary} ok={ok} score={score} autoFixNotice={autoFixNotice} onRerun={onRerun} onBack={onBack} />
+      <ResultStatsSection
+        summary={summary}
+        ok={ok}
+        score={score}
+        autoFixNotice={autoFixNotice}
+        onRerun={onRerun}
+        onBack={onBack}
+      />
 
       <IssuesSection summary={summary} onCopyIssues={onCopyIssues} />
     </div>
   );
 }
 
-function ResultStatsSection({ summary, ok, score, autoFixNotice, onRerun, onBack }: {
+function ResultStatsSection({
+  summary,
+  ok,
+  score,
+  autoFixNotice,
+  onRerun,
+  onBack,
+}: {
   summary: CheckSummary;
   ok: boolean;
   score: number | null;
@@ -41,7 +69,10 @@ function ResultStatsSection({ summary, ok, score, autoFixNotice, onRerun, onBack
   );
 }
 
-function IssuesSection({ summary, onCopyIssues }: {
+function IssuesSection({
+  summary,
+  onCopyIssues,
+}: {
   summary: CheckSummary;
   onCopyIssues: (items: CheckSummary['failedItems']) => void;
 }) {
@@ -52,7 +83,15 @@ function IssuesSection({ summary, onCopyIssues }: {
   );
 }
 
-export function CheckResultView({ summary, ok, score, autoFixNotice, onRerun, onBack, onCopyIssues }: {
+export function CheckResultView({
+  summary,
+  ok,
+  score,
+  autoFixNotice,
+  onRerun,
+  onBack,
+  onCopyIssues,
+}: {
   summary: CheckSummary;
   ok: boolean;
   score: number | null;

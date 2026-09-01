@@ -35,6 +35,8 @@ export class LocalBackupScanner {
       const relativePath = path.relative(rootDir, fullPath);
       if (matchesExcludePattern(relativePath, excludePatterns)) continue;
       if (entry.isDirectory()) {
+        // perf rule false positive: arg depends on loop var via dataflow
+        // eslint-disable-next-line perf/perf-no-serial-await
         await this.collectFiles(fullPath, rootDir, excludePatterns, abortSignal, results);
       } else if (entry.isFile()) {
         results.push(fullPath);

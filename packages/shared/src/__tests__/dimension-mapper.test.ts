@@ -1,8 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { getToolDimensions, mapIssuesToDimensions, computeOverallScore, scoreToGrade } from '../dimension-mapper';
+import {
+  getToolDimensions,
+  mapIssuesToDimensions,
+  computeOverallScore,
+  scoreToGrade,
+} from '../dimension-mapper';
 import type { Issue, ToolId } from '../types';
 
-function makeIssue(overrides: Partial<Issue> & { id: string; category: Issue['category']; severity: Issue['severity'] }): Issue {
+function makeIssue(
+  overrides: Partial<Issue> & {
+    id: string;
+    category: Issue['category'];
+    severity: Issue['severity'];
+  },
+): Issue {
   return {
     ruleId: 'RULE-1',
     message: 'test issue',
@@ -83,7 +94,7 @@ describe('dimension-mapper', () => {
     it('should compute weighted average', () => {
       const dims = [
         { name: 'security' as const, weight: 0.25, score: 80, issues: 2 },
-        { name: 'quality' as const, weight: 0.20, score: 100, issues: 0 },
+        { name: 'quality' as const, weight: 0.2, score: 100, issues: 0 },
       ];
       const result = computeOverallScore(dims);
       expect(result).toBeCloseTo(88.89, 0);

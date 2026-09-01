@@ -77,7 +77,9 @@ jobs:
             echo "凭据不全，产出未签名产物（公证关闭）"
           fi
           # 双架构一次构建：生成单一 latest-mac.yml（含 x64/arm64 两条更新记录）
-          pnpm exec electron-builder --mac --x64 --arm64 $NOTARIZE_ARGS
+          # --publish never：发布统一由 release.yml 的 Publish job 上传产物，
+          # electron-builder 在 CI + tag 环境默认会尝试自动发布并要求 GH_TOKEN（未注入即失败）
+          pnpm exec electron-builder --mac --x64 --arm64 $NOTARIZE_ARGS --publish never
 
       - name: Collect artifacts
         working-directory: packages/desktop

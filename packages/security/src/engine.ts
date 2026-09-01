@@ -1,5 +1,11 @@
 import type { ToolAdapter, EventEmitter, Issue } from '@zh/shared';
-import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER, wrapAdapter } from '@zh/shared';
+import {
+  DegradationManager,
+  AuditLogger,
+  ToolManager,
+  NOOP_EMITTER,
+  wrapAdapter,
+} from '@zh/shared';
 import type { Vulnerability, SecurityScanReport, GarbageItem, MalwareItem } from './types';
 import { calculateSecurityScore } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
@@ -8,7 +14,13 @@ import { MalwareScanner } from './malware-scanner';
 import { GrypeCrossValidator } from './cross-validator';
 import { RuleConflictResolver } from './rule-conflict-resolver';
 import type { RuleConflictReport } from './rule-conflict-resolver';
-import { TrivyAdapter, GrypeAdapter, DepcheckAdapter, SemgrepAdapter, ORTAdapter } from './adapters';
+import {
+  TrivyAdapter,
+  GrypeAdapter,
+  DepcheckAdapter,
+  SemgrepAdapter,
+  ORTAdapter,
+} from './adapters';
 import { ScanOrchestrator } from './engine-scan-orchestrator';
 import { ResultAggregator } from './engine-result-aggregator';
 
@@ -25,7 +37,11 @@ export class SecurityEngine {
     this.degradationManager = new DegradationManager();
     this.auditLogger = new AuditLogger();
     this.emitter = emitter ?? NOOP_EMITTER;
-    this.scanOrchestrator = new ScanOrchestrator(this.degradationManager, this.auditLogger, this.emitter);
+    this.scanOrchestrator = new ScanOrchestrator(
+      this.degradationManager,
+      this.auditLogger,
+      this.emitter,
+    );
     this.resultAggregator = new ResultAggregator(
       new VulnerabilityScanner(),
       new GarbageScanner(),
@@ -80,13 +96,14 @@ export class SecurityEngine {
     const start = Date.now();
     const { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues } =
       await this.scanOrchestrator.run(projectId, projectPath);
-    const { garbage, malware, vulnerabilities, conflictReport } = await this.resultAggregator.collect({
-      projectPath,
-      depcheckIssues,
-      semgrepIssues,
-      trivyIssues,
-      grypeIssues,
-    });
+    const { garbage, malware, vulnerabilities, conflictReport } =
+      await this.resultAggregator.collect({
+        projectPath,
+        depcheckIssues,
+        semgrepIssues,
+        trivyIssues,
+        grypeIssues,
+      });
     await this.emitScanCompleted(projectId, start, allIssues, vulnerabilities);
     return this.buildReport(projectId, vulnerabilities, garbage, malware, conflictReport);
   }

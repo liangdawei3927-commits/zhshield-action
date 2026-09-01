@@ -4,7 +4,15 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { translate, DEFAULT_LANGUAGE, type LanguageCode } from '@zh/i18n';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, IssueCategory, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  IssueCategory,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -62,7 +70,8 @@ function hasTsconfig(dir: string): boolean {
 
 function listPackageTsconfigs(packagesDir: string): string[] {
   try {
-    return fs.readdirSync(packagesDir)
+    return fs
+      .readdirSync(packagesDir)
       .filter((d) => d !== 'node_modules' && fs.statSync(path.join(packagesDir, d)).isDirectory())
       .map((d) => path.join(packagesDir, d, 'tsconfig.json'))
       .filter((p) => fs.existsSync(p));
@@ -123,7 +132,10 @@ export class TypeScriptAdapter implements ToolAdapter {
   constructor(projectRoot?: string, locale?: LanguageCode) {
     this.projectRoot = projectRoot;
     this.locale = locale ?? DEFAULT_LANGUAGE;
-    this.meta = { ...META, description: translate('engine.inspect.tool.tsc.description', this.locale) };
+    this.meta = {
+      ...META,
+      description: translate('engine.inspect.tool.tsc.description', this.locale),
+    };
   }
 
   private tr(key: string, params?: Record<string, unknown>): string {
@@ -154,12 +166,21 @@ export class TypeScriptAdapter implements ToolAdapter {
     try {
       return await this.runTscScan(options, start, category);
     } catch (error: unknown) {
-      return this.buildResult(start, category, [], (error as Error).message || this.tr('engine.inspect.tool.tsc.runFailed'));
+      return this.buildResult(
+        start,
+        category,
+        [],
+        (error as Error).message || this.tr('engine.inspect.tool.tsc.runFailed'),
+      );
     }
   }
 
   /** 解析项目并逐个运行 tsc，聚合结果 */
-  private async runTscScan(options: ToolScanOptions, start: number, category: IssueCategory): Promise<ToolResult> {
+  private async runTscScan(
+    options: ToolScanOptions,
+    start: number,
+    category: IssueCategory,
+  ): Promise<ToolResult> {
     const command = await this.resolveCommand();
     const projects = resolveTscProjects(options.projectPath);
     if (projects.length === 0) {
@@ -167,7 +188,13 @@ export class TypeScriptAdapter implements ToolAdapter {
       return this.buildResult(start, category, []);
     }
     const flags = this.buildFlags(options);
-    const { issues, infraError } = await this.runAllProjects(command, projects, flags, options, category);
+    const { issues, infraError } = await this.runAllProjects(
+      command,
+      projects,
+      flags,
+      options,
+      category,
+    );
     if (infraError && issues.length === 0) {
       return this.buildResult(start, category, [], infraError);
     }
@@ -225,11 +252,19 @@ export class TypeScriptAdapter implements ToolAdapter {
       if (issues.length > 0) {
         return { issues };
       }
-      return { issues: [], infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed') };
+      return {
+        issues: [],
+        infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed'),
+      };
     }
   }
 
-  private buildResult(start: number, category: IssueCategory, issues: Issue[], error?: string): ToolResult {
+  private buildResult(
+    start: number,
+    category: IssueCategory,
+    issues: Issue[],
+    error?: string,
+  ): ToolResult {
     const infraFailed = !!error && issues.length === 0;
     return {
       tool: 'tsc',

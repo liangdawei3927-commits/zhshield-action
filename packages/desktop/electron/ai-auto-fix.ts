@@ -24,7 +24,8 @@ export interface AutoFixReport {
 export function shouldAutoFix(report: AutoFixReport): boolean {
   if (report.issues) {
     return report.issues.some(
-      (issue) => issue.source !== 'guard' && (issue.severity === 'error' || issue.severity === 'warning'),
+      (issue) =>
+        issue.source !== 'guard' && (issue.severity === 'error' || issue.severity === 'warning'),
     );
   }
   return report.summary.error > 0 || report.summary.warning > 0;

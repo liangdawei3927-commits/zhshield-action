@@ -40,48 +40,54 @@ function node(id: string, partial: Partial<DependencyNode> = {}): DependencyNode
 }
 
 describe('deps-baseline 读写', () => {
-  it('写入后可从同路径读回；捕获时间戳存在', () => {
+  it('写入后可从同路径读回；捕获时间戳存在', async () => {
     const root = tmpDir('zh-baseline-ok-');
-    const baseline = saveDepsBaseline(root, { 'lodash@4.17.21': 'sha512-x', 'react@18.2.0': 'sha512-y' });
+    const baseline = await saveDepsBaseline(root, {
+      'lodash@4.17.21': 'sha512-x',
+      'react@18.2.0': 'sha512-y',
+    });
 
     expect(baseline.version).toBe(1);
     expect(fs.existsSync(depsBaselinePath(root))).toBe(true);
     expect(fs.existsSync(`${depsBaselinePath(root)}.${process.pid}.tmp`)).toBe(false);
 
-    const loaded = loadDepsBaseline(root);
+    const loaded = await loadDepsBaseline(root);
     expect(loaded).not.toBeNull();
     expect(loaded!.integrity).toEqual({ 'lodash@4.17.21': 'sha512-x', 'react@18.2.0': 'sha512-y' });
     expect(loaded!.capturedAt).toBe(baseline.capturedAt);
   });
 
-  it('原子写：.zhshield 目录自动创建', () => {
+  it('原子写：.zhshield 目录自动创建', async () => {
     const root = tmpDir('zh-baseline-mkdir-');
-    saveDepsBaseline(root, {});
+    await saveDepsBaseline(root, {});
     expect(fs.statSync(path.join(root, '.zhshield')).isDirectory()).toBe(true);
   });
 
-  it('损坏文件 → null（降级为无基线）', () => {
+  it('损坏文件 → null（降级为无基线）', async () => {
     const root = tmpDir('zh-baseline-corrupt-');
     fs.mkdirSync(path.join(root, '.zhshield'), { recursive: true });
     fs.writeFileSync(depsBaselinePath(root), '{not json');
 
-    expect(loadDepsBaseline(root)).toBeNull();
+    expect(await loadDepsBaseline(root)).toBeNull();
   });
 
-  it('版本不符 / 结构缺失 → null', () => {
+  it('版本不符 / 结构缺失 → null', async () => {
     const root = tmpDir('zh-baseline-badshape-');
     fs.mkdirSync(path.join(root, '.zhshield'), { recursive: true });
-    fs.writeFileSync(depsBaselinePath(root), JSON.stringify({ version: 999, capturedAt: 'x', integrity: {} }));
+    fs.writeFileSync(
+      depsBaselinePath(root),
+      JSON.stringify({ version: 999, capturedAt: 'x', integrity: {} }),
+    );
 
-    expect(loadDepsBaseline(root)).toBeNull();
+    expect(await loadDepsBaseline(root)).toBeNull();
 
     fs.writeFileSync(depsBaselinePath(root), JSON.stringify({ version: 1, integrity: {} }));
-    expect(loadDepsBaseline(root)).toBeNull();
+    expect(await loadDepsBaseline(root)).toBeNull();
   });
 
-  it('文件不存在 → null', () => {
+  it('文件不存在 → null', async () => {
     const root = tmpDir('zh-baseline-missing-');
-    expect(loadDepsBaseline(root)).toBeNull();
+    expect(await loadDepsBaseline(root)).toBeNull();
   });
 });
 

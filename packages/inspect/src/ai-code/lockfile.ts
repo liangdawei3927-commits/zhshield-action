@@ -38,7 +38,8 @@ function collectFromPackages(packages: Record<string, unknown>): Set<string> {
     const idx = key.lastIndexOf('node_modules/');
     const name = key.slice(idx + 'node_modules/'.length);
     if (name === '') continue;
-    if (name.startsWith('@')) names.add(name); // scoped：@scope/pkg 名称含 '/'，合法
+    if (name.startsWith('@'))
+      names.add(name); // scoped：@scope/pkg 名称含 '/'，合法
     else if (!name.includes('/')) names.add(name);
   }
   return names;

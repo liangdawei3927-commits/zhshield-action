@@ -6,3 +6,4 @@ export type { DbConfig } from './connection';
 
 export * from './types';
 export * from './queries';
+export * from './batch';

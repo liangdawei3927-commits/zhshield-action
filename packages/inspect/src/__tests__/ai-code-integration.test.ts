@@ -16,13 +16,19 @@ vi.mock('../ai-code/review', async (importOriginal) => {
     constructor() {
       this.delegate = new actual.AiCodeReviewImpl();
     }
-    detectOrigin(project: ProjectProfile) { return this.delegate.detectOrigin(project); }
+    detectOrigin(project: ProjectProfile) {
+      return this.delegate.detectOrigin(project);
+    }
     async deepReview(project: ProjectProfile, opts?: { readonly scope?: readonly string[] }) {
       if (forceDeepReviewError) throw new Error('AI review service unavailable');
       return this.delegate.deepReview(project, opts ?? {});
     }
-    suggestFix(vuln) { return this.delegate.suggestFix(vuln); }
-    complianceReport(project: ProjectProfile) { return this.delegate.complianceReport(project); }
+    suggestFix(vuln) {
+      return this.delegate.suggestFix(vuln);
+    }
+    complianceReport(project: ProjectProfile) {
+      return this.delegate.complianceReport(project);
+    }
   }
   return { ...actual, AiCodeReviewImpl: SpiedAiCodeReviewImpl };
 });
@@ -63,12 +69,7 @@ describe('AI code review integration in scan flow', () => {
     await writeFile('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true } }));
     await writeFile(
       'src/index.ts',
-      [
-        "import 'fake-ai-pkg';",
-        '',
-        '// @ts-ignore',
-        'const x: any = eval("1");',
-      ].join('\n'),
+      ["import 'fake-ai-pkg';", '', '// @ts-ignore', 'const x: any = eval("1");'].join('\n'),
     );
   }
 
@@ -110,7 +111,9 @@ describe('AI code review integration in scan flow', () => {
     expect(report.projectId).toBe(tmpDir);
     expect(report.score.grade).toBeDefined();
     expect(report.issues.filter((i) => i.source === 'ai-code-review')).toHaveLength(0);
-    expect(warnSpy).toHaveBeenCalledWith('[inspect] AI code review skipped — error during deepReview');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[inspect] AI code review skipped — error during deepReview',
+    );
     warnSpy.mockRestore();
   });
 

@@ -28,7 +28,8 @@ export class ToolRuleLoader {
 
   constructor(packsDir?: string) {
     // 默认指向 packages/kernel/src/sop/tool-packs（从 <server>/{src,dist}/sop 上溯三级到 packages/）
-    this.packsDir = packsDir ?? join(__dirname, '..', '..', '..', 'kernel', 'src', 'sop', 'tool-packs');
+    this.packsDir =
+      packsDir ?? join(__dirname, '..', '..', '..', 'kernel', 'src', 'sop', 'tool-packs');
   }
 
   /**
@@ -36,15 +37,15 @@ export class ToolRuleLoader {
    */
   loadAll(): ToolRule[] {
     const rules: ToolRule[] = [];
-    
+
     if (!existsSync(this.packsDir)) {
       console.warn(`[ToolRuleLoader] Packs directory not found: ${this.packsDir}`);
       return rules;
     }
 
     const tools = readdirSync(this.packsDir, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
 
     for (const tool of tools) {
       const toolRules = this.loadToolRules(tool);
@@ -84,11 +85,12 @@ export class ToolRuleLoader {
 
   private walkDirectory(dir: string, toolId: string, rules: ToolRule[]): void {
     const entries = readdirSync(dir, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
 
       if (entry.isDirectory()) {
+        if (entry.name === 'node_modules') continue;
         this.walkDirectory(fullPath, toolId, rules);
         continue;
       }
@@ -103,7 +105,7 @@ export class ToolRuleLoader {
     try {
       const content = readFileSync(filePath, 'utf-8');
       const ext = extname(filePath).slice(1) as 'yaml' | 'json' | 'toml';
-      
+
       return {
         id: `${toolId}-${filePath.replace(this.packsDir, '').replace(/[/\\]/g, '-').slice(1)}`,
         toolId,
@@ -113,7 +115,11 @@ export class ToolRuleLoader {
         filePath,
       };
     } catch (err) {
-      console.warn('[ToolRuleLoader] Failed to load rule file: %s', sanitizeLogField(filePath), err);
+      console.warn(
+        '[ToolRuleLoader] Failed to load rule file: %s',
+        sanitizeLogField(filePath),
+        err,
+      );
       return null;
     }
   }

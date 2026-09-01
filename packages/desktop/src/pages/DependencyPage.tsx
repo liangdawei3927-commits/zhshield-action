@@ -34,11 +34,14 @@ function buildOverviewSection(report: DependencyReportData): HtmlReportData['sec
   };
 }
 
-function buildLockfileSection(report: DependencyReportData): HtmlReportData['sections'][number] | null {
+function buildLockfileSection(
+  report: DependencyReportData,
+): HtmlReportData['sections'][number] | null {
   if (report.lockfileVerification.status === 'missing') return null;
   const lockfileItems = [
     {
-      status: report.lockfileVerification.status === 'clean' ? 'pass' as const : 'warn' as const,
+      status:
+        report.lockfileVerification.status === 'clean' ? ('pass' as const) : ('warn' as const),
       message: `Lockfile status: ${report.lockfileVerification.status}`,
     },
   ];
@@ -51,24 +54,33 @@ function buildLockfileSection(report: DependencyReportData): HtmlReportData['sec
   return { title: 'Lockfile Verification', items: lockfileItems };
 }
 
-function buildTyposquatSection(report: DependencyReportData): HtmlReportData['sections'][number] | null {
+function buildTyposquatSection(
+  report: DependencyReportData,
+): HtmlReportData['sections'][number] | null {
   if (report.typosquatFindings.length === 0) return null;
   return {
     title: 'Typosquat Findings',
     items: report.typosquatFindings.map((f) => ({
-      status: f.risk === 'high' ? 'fail' as const : f.risk === 'medium' ? 'warn' as const : 'pass' as const,
+      status:
+        f.risk === 'high'
+          ? ('fail' as const)
+          : f.risk === 'medium'
+            ? ('warn' as const)
+            : ('pass' as const),
       message: `${f.nodeId}: ${f.evidence.join('; ')}`,
       severity: f.risk,
     })),
   };
 }
 
-function buildUpgradeSection(report: DependencyReportData): HtmlReportData['sections'][number] | null {
+function buildUpgradeSection(
+  report: DependencyReportData,
+): HtmlReportData['sections'][number] | null {
   if (report.upgradeAssessments.length === 0) return null;
   return {
     title: 'Upgrade Assessments',
     items: report.upgradeAssessments.map((a) => ({
-      status: a.candidates.some((c) => c.risk === 'high') ? 'fail' as const : 'warn' as const,
+      status: a.candidates.some((c) => c.risk === 'high') ? ('fail' as const) : ('warn' as const),
       message: `${a.nodeId}: ${a.candidates.map((c) => c.targetVersion).join(', ')}`,
     })),
   };
@@ -79,7 +91,12 @@ function buildEnvSection(report: DependencyReportData): HtmlReportData['sections
   return {
     title: 'Environment Consistency',
     items: report.envEntries.map((e) => ({
-      status: e.severity === 'error' ? 'fail' as const : e.severity === 'warning' ? 'warn' as const : 'pass' as const,
+      status:
+        e.severity === 'error'
+          ? ('fail' as const)
+          : e.severity === 'warning'
+            ? ('warn' as const)
+            : ('pass' as const),
       message: `${e.name}: expected ${e.expected}, actual ${e.actual}`,
       severity: e.severity === 'error' ? 'high' : e.severity === 'warning' ? 'medium' : 'low',
     })),
@@ -99,11 +116,23 @@ function buildOptionalSections(report: DependencyReportData): HtmlReportData['se
   return sections;
 }
 
-function dependencyReportToHtmlData(report: DependencyReportData, projectPath: string): HtmlReportData {
-  const sections: HtmlReportData['sections'] = [buildOverviewSection(report), ...buildOptionalSections(report)];
+function dependencyReportToHtmlData(
+  report: DependencyReportData,
+  projectPath: string,
+): HtmlReportData {
+  const sections: HtmlReportData['sections'] = [
+    buildOverviewSection(report),
+    ...buildOptionalSections(report),
+  ];
   const totalIssues = sections.reduce<number>((acc, s) => acc + s.items.length, 0);
-  const failures = sections.reduce<number>((acc, s) => acc + s.items.filter((i) => i.status === 'fail').length, 0);
-  const warnings = sections.reduce<number>((acc, s) => acc + s.items.filter((i) => i.status === 'warn').length, 0);
+  const failures = sections.reduce<number>(
+    (acc, s) => acc + s.items.filter((i) => i.status === 'fail').length,
+    0,
+  );
+  const warnings = sections.reduce<number>(
+    (acc, s) => acc + s.items.filter((i) => i.status === 'warn').length,
+    0,
+  );
 
   return {
     timestamp: report.generatedAt,
@@ -125,7 +154,10 @@ async function exportDependencyReport(
   t: (key: string, opts?: { defaultValue?: string }) => string,
 ): Promise<void> {
   try {
-    const ok = await exportHtmlReport(dependencyReportToHtmlData(report, projectPath), 'dependency-report.html');
+    const ok = await exportHtmlReport(
+      dependencyReportToHtmlData(report, projectPath),
+      'dependency-report.html',
+    );
     if (ok) toast(t('page.deps.exportSuccess', { defaultValue: 'Report exported' }), 'success');
   } catch {
     toast(t('page.deps.exportFailed', { defaultValue: 'Export failed' }), 'error');
@@ -155,8 +187,19 @@ function DependencyReportView({
             onClick={onExport}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             {t('page.deps.exportReport', { defaultValue: 'Export Report' })}
           </button>
@@ -194,7 +237,15 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }, [report, projectPath, toast, t]);
 
   if (report) {
-    return <DependencyReportView report={report} loading={loading} onRescan={handleScan} onExport={handleExport} t={t} />;
+    return (
+      <DependencyReportView
+        report={report}
+        loading={loading}
+        onRescan={handleScan}
+        onExport={handleExport}
+        t={t}
+      />
+    );
   }
 
   return <DependencyEmptyState loading={loading} onScan={handleScan} />;

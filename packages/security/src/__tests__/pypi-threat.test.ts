@@ -11,10 +11,10 @@ function tmpDir(prefix: string): string {
 describe('scanPypiThreats', () => {
   it('flags known malicious packages from requirements.txt', async () => {
     const dir = tmpDir('zh-pypi-mal-');
-    fs.writeFileSync(path.join(dir, 'requirements.txt'), [
-      'requests==2.26.0',
-      'pytorch==1.0.0',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(dir, 'requirements.txt'),
+      ['requests==2.26.0', 'pytorch==1.0.0'].join('\n'),
+    );
 
     const items = await scanPypiThreats(dir);
 
@@ -29,11 +29,10 @@ describe('scanPypiThreats', () => {
 
   it('flags typosquatting packages against popular names', async () => {
     const dir = tmpDir('zh-pypi-squat-');
-    fs.writeFileSync(path.join(dir, 'requirements.txt'), [
-      '# comment line',
-      'flask>=2.0',
-      'requets>=2.0',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(dir, 'requirements.txt'),
+      ['# comment line', 'flask>=2.0', 'requets>=2.0'].join('\n'),
+    );
 
     const items = await scanPypiThreats(dir);
 
@@ -47,14 +46,17 @@ describe('scanPypiThreats', () => {
 
   it('does not flag legitimate popular packages', async () => {
     const dir = tmpDir('zh-pypi-ok-');
-    fs.writeFileSync(path.join(dir, 'requirements.txt'), [
-      'requests==2.26.0',
-      'numpy>=1.0',
-      'pandas',
-      'urllib3',
-      'scikit-learn',
-      'flask[async]>=2.0',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(dir, 'requirements.txt'),
+      [
+        'requests==2.26.0',
+        'numpy>=1.0',
+        'pandas',
+        'urllib3',
+        'scikit-learn',
+        'flask[async]>=2.0',
+      ].join('\n'),
+    );
 
     expect(await scanPypiThreats(dir)).toEqual([]);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -62,16 +64,19 @@ describe('scanPypiThreats', () => {
 
   it('flags known malicious packages from Pipfile.lock default section', async () => {
     const dir = tmpDir('zh-pypi-pipfile-');
-    fs.writeFileSync(path.join(dir, 'Pipfile.lock'), JSON.stringify({
-      _meta: { hash: { sha256: 'abc' } },
-      default: {
-        pytorch: { version: '==1.0.0' },
-        requests: { version: '==2.26.0' },
-      },
-      develop: {
-        pytest: { version: '==7.0.0' },
-      },
-    }));
+    fs.writeFileSync(
+      path.join(dir, 'Pipfile.lock'),
+      JSON.stringify({
+        _meta: { hash: { sha256: 'abc' } },
+        default: {
+          pytorch: { version: '==1.0.0' },
+          requests: { version: '==2.26.0' },
+        },
+        develop: {
+          pytest: { version: '==7.0.0' },
+        },
+      }),
+    );
 
     const items = await scanPypiThreats(dir);
 
@@ -84,17 +89,20 @@ describe('scanPypiThreats', () => {
 
   it('flags typosquatting from pyproject.toml [project] dependencies', async () => {
     const dir = tmpDir('zh-pypi-pyproject-');
-    fs.writeFileSync(path.join(dir, 'pyproject.toml'), [
-      '[project]',
-      'name = "demo"',
-      'dependencies = [',
-      '    "requests",',
-      '    "requets",',
-      ']',
-      '',
-      '[tool.pytest.ini_options]',
-      'testpaths = ["tests"]',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(dir, 'pyproject.toml'),
+      [
+        '[project]',
+        'name = "demo"',
+        'dependencies = [',
+        '    "requests",',
+        '    "requets",',
+        ']',
+        '',
+        '[tool.pytest.ini_options]',
+        'testpaths = ["tests"]',
+      ].join('\n'),
+    );
 
     const items = await scanPypiThreats(dir);
 

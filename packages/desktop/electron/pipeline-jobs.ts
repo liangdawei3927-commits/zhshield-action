@@ -22,7 +22,10 @@ export async function runRefactorJob(id: string, projectPath: string): Promise<v
     send({ type: 'result', id, report: serializePipelineReport(report) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 重构分析异常:', err instanceof Error ? err.stack || message : message);
+    console.error(
+      '[pipeline-worker] 重构分析异常:',
+      err instanceof Error ? err.stack || message : message,
+    );
     send({ type: 'error', id, error: message });
   }
 }
@@ -45,7 +48,10 @@ export async function runGuardJob(
   } = await import('@zh/guard');
   const engine = new GuardEngine(projectPath, undefined, { emit: () => undefined });
   engine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
-  engine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter(new FileSecretStateLookup()));
+  engine.registerAdapter(
+    'sensitive-info',
+    new GuardSensitiveInfoAdapter(new FileSecretStateLookup()),
+  );
   engine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
   engine.registerAdapter('test-runner', new TestRunnerAdapter());
   engine.registerAdapter('security-scan', new SecurityScanAdapter());
@@ -131,7 +137,11 @@ export async function runGarbageCleanJob(
   }
 }
 
-export async function runGarbageRestoreJob(id: string, projectPath: string, batchId: string): Promise<void> {
+export async function runGarbageRestoreJob(
+  id: string,
+  projectPath: string,
+  batchId: string,
+): Promise<void> {
   progress(id, 'garbage', t('pipeline.garbage.restoring'), 0.1);
   const { restoreGarbage } = await import('@zh/security');
   try {
@@ -173,7 +183,10 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
         });
       }
     } catch (err) {
-      console.warn('[pipeline-worker] 性能引擎通道异常，降级为仅 SOP:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[pipeline-worker] 性能引擎通道异常，降级为仅 SOP:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
 
     // SOP 通道：运行时反模式（可并行失败隔离）
@@ -188,7 +201,10 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
       sopIssues = collectPerformanceIssues(inspectReport.evaluations ?? []);
       sopDuration = inspectReport.durationMs;
     } catch (err) {
-      console.warn('[pipeline-worker] 性能 SOP 通道异常，降级为仅引擎:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[pipeline-worker] 性能 SOP 通道异常，降级为仅引擎:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
 
     const issues = dedupePerformanceIssues([...engineIssues, ...sopIssues]);

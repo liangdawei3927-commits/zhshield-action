@@ -83,7 +83,12 @@ export function bucketFindingsByModule(
 
   const rootCard: ModuleScoreInput = {
     path: root.projectRoot,
-    profile: moduleToProfile({ path: root.projectRoot, language: root.language, framework: root.framework, type: root.type }),
+    profile: moduleToProfile({
+      path: root.projectRoot,
+      language: root.language,
+      framework: root.framework,
+      type: root.type,
+    }),
     guard: { results: [] },
     inspect: { issues: [] },
   };
@@ -117,7 +122,13 @@ export function scoreProjectModules(modules: ModuleScoreInput[]): ProjectScoreAg
   const cards = modules.map((m) => {
     const dims = buildHealthDimensions(m.guard, m.inspect, m.path, m.profile);
     const res = new ScoringEngine().calculate(m.path, dims);
-    return { path: m.path, type: m.profile.type, overall: res.overall, grade: res.grade, dimensions: dims };
+    return {
+      path: m.path,
+      type: m.profile.type,
+      overall: res.overall,
+      grade: res.grade,
+      dimensions: dims,
+    };
   });
   const overall = cards.length
     ? Math.round((cards.reduce((s, c) => s + c.overall, 0) / cards.length) * 100) / 100

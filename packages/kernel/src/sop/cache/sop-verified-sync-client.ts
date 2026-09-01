@@ -60,9 +60,7 @@ function isSignedSopPackage(value: unknown): value is SignedSopPackage {
   if (!value || typeof value !== 'object') return false;
   const pkg = value as Partial<SignedSopPackage>;
   return (
-    typeof pkg.signature === 'string' &&
-    typeof pkg.hash === 'string' &&
-    Array.isArray(pkg.rules)
+    typeof pkg.signature === 'string' && typeof pkg.hash === 'string' && Array.isArray(pkg.rules)
   );
 }
 

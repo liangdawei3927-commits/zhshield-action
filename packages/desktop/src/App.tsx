@@ -23,7 +23,13 @@ import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboarding
 import { useInactivityTimer } from './hooks/useInactivityTimer';
 
 /** 根据当前页面渲染对应内容区（欢迎页 / 各功能页） */
-function PageView({ currentPage, projects, activeProjectPath, onNavigate, onAddProject }: {
+function PageView({
+  currentPage,
+  projects,
+  activeProjectPath,
+  onNavigate,
+  onAddProject,
+}: {
   currentPage: Page;
   projects: ProjectInfo[];
   activeProjectPath?: string;

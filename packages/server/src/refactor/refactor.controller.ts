@@ -10,9 +10,7 @@ export class RefactorController {
   constructor(private readonly refactorService: RefactorService) {}
 
   @Post('scan')
-  async scan(
-    @Body() body: { projectPath: string; mode?: 'full' | 'staged' },
-  ) {
+  async scan(@Body() body: { projectPath: string; mode?: 'full' | 'staged' }) {
     this.logger.log(`Refactor scan request: ${body.projectPath} (mode: ${body.mode ?? 'full'})`);
 
     const result =

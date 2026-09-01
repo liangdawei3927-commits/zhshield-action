@@ -72,7 +72,10 @@ function useSystemLocaleSync(setLanguageState: Dispatch<SetStateAction<LanguageC
   }, []);
 }
 
-async function applyLanguageChange(lng: LanguageCode, setLanguageState: Dispatch<SetStateAction<LanguageCode>>): Promise<void> {
+async function applyLanguageChange(
+  lng: LanguageCode,
+  setLanguageState: Dispatch<SetStateAction<LanguageCode>>,
+): Promise<void> {
   writeSavedLanguage(lng);
   await setI18nLanguage(lng);
   window.electronAPI?.setLanguage?.(lng);

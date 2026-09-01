@@ -24,11 +24,17 @@ export type ApiResponseEnvelope<T> = {
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
 export type IssueCategory =
-  | 'architecture' | 'security' | 'quality'
-  | 'performance' | 'documentation' | 'test' | 'dependency'
+  | 'architecture'
+  | 'security'
+  | 'quality'
+  | 'performance'
+  | 'documentation'
+  | 'test'
+  | 'dependency'
   | 'refactoring';
 
-export type IssueSource = 'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor';
+export type IssueSource =
+  'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor' | 'performance';
 
 export interface Issue {
   id: string;
@@ -168,9 +174,15 @@ export interface InspectionReport {
 // ─── 哨兵事件（SentinelEvent）────────────────────────────
 
 export type EventType =
-  | 'runtime-exception' | 'http-error' | 'performance-degradation'
-  | 'crash' | 'frontend-error' | 'white-screen' | 'security-incident'
-  | 'memory-leak' | 'timeout';
+  | 'runtime-exception'
+  | 'http-error'
+  | 'performance-degradation'
+  | 'crash'
+  | 'frontend-error'
+  | 'white-screen'
+  | 'security-incident'
+  | 'memory-leak'
+  | 'timeout';
 
 export type EventSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type EventSource = 'backend' | 'frontend' | 'middleware' | 'infrastructure';
@@ -236,8 +248,14 @@ export interface Vulnerability {
 
 export interface MalwareItem {
   id: string;
-  type: 'reverse-shell' | 'data-exfiltration' | 'privilege-escalation'
-    | 'crypto-ransomware' | 'backdoor' | 'supply-chain' | 'suspicious-behavior';
+  type:
+    | 'reverse-shell'
+    | 'data-exfiltration'
+    | 'privilege-escalation'
+    | 'crypto-ransomware'
+    | 'backdoor'
+    | 'supply-chain'
+    | 'suspicious-behavior';
   severity: 'critical' | 'high' | 'medium' | 'low';
   title: string;
   description: string;
@@ -278,9 +296,18 @@ export interface ExperienceEntry {
 // ─── 开源工具集成（Tool Adapter）────────────────────────
 
 export type ToolId =
-  | 'eslint' | 'semgrep' | 'trivy' | 'grype'
-  | 'gitleaks' | 'ort' | 'depcheck' | 'dep-cruiser' | 'jscpd'
-  | 'ts-prune' | 'tsc';
+  | 'eslint'
+  | 'semgrep'
+  | 'trivy'
+  | 'grype'
+  | 'gitleaks'
+  | 'ort'
+  | 'depcheck'
+  | 'dep-cruiser'
+  | 'jscpd'
+  | 'ts-prune'
+  | 'tsc'
+  | 'autoperf';
 
 export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
 
@@ -389,9 +416,13 @@ export interface ToolErrorLog {
 // ─── 审计日志（AuditLog）────────────────────────────────
 
 export type AuditAction =
-  | 'tool-executed' | 'tool-skipped' | 'tool-failed'
-  | 'guard-blocked' | 'guard-passed'
-  | 'whitelist-granted' | 'experience-recorded';
+  | 'tool-executed'
+  | 'tool-skipped'
+  | 'tool-failed'
+  | 'guard-blocked'
+  | 'guard-passed'
+  | 'whitelist-granted'
+  | 'experience-recorded';
 
 export interface AuditLogEntry {
   id: string;
@@ -453,25 +484,25 @@ export type DegradationLevel = 0 | 1 | 2 | 3 | 4;
 // ─── SOP 类型（智汇云脑 — 三维分类体系） ──────────────────
 
 export type GovernanceDomain =
-  | 'guard'     // 拦截域
-  | 'inspect'   // 巡检域
-  | 'security'  // 安全域
-  | 'sentinel'  // 监控域
-  | 'evolve';   // 演进域
+  | 'guard' // 拦截域
+  | 'inspect' // 巡检域
+  | 'security' // 安全域
+  | 'sentinel' // 监控域
+  | 'evolve'; // 演进域
 
 export type ActionType =
-  | 'scan'       // 扫描检测
-  | 'block'      // 拦截阻断
-  | 'score'      // 评分量化
-  | 'alert'      // 告警响应
-  | 'suggest'    // 修复建议
+  | 'scan' // 扫描检测
+  | 'block' // 拦截阻断
+  | 'score' // 评分量化
+  | 'alert' // 告警响应
+  | 'suggest' // 修复建议
   | 'calibrate'; // 进化校准
 
 export type DataSource =
-  | 'external'   // 外部标准
-  | 'internal'   // 内部模式
-  | 'community'  // 社区贡献
-  | 'official';  // 官方维护
+  | 'external' // 外部标准
+  | 'internal' // 内部模式
+  | 'community' // 社区贡献
+  | 'official'; // 官方维护
 
 export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
 

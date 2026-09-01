@@ -74,13 +74,17 @@ export function setLanguage(lng: LanguageCode): Promise<void> {
 /** 当前语言（始终为受支持的语言代码） */
 export function getLanguage(): LanguageCode {
   const current = i18n.language ?? i18n.resolvedLanguage ?? DEFAULT_LANGUAGE;
-  return isSupportedLanguage(current) ? (current as LanguageCode) : normalizeLanguage(current) ?? DEFAULT_LANGUAGE;
+  return isSupportedLanguage(current)
+    ? (current as LanguageCode)
+    : (normalizeLanguage(current) ?? DEFAULT_LANGUAGE);
 }
 
 /** 当前生效语言（含 fallback 解析结果） */
 export function getResolvedLanguage(): LanguageCode {
   const current = i18n.resolvedLanguage ?? i18n.language ?? DEFAULT_LANGUAGE;
-  return isSupportedLanguage(current) ? (current as LanguageCode) : normalizeLanguage(current) ?? DEFAULT_LANGUAGE;
+  return isSupportedLanguage(current)
+    ? (current as LanguageCode)
+    : (normalizeLanguage(current) ?? DEFAULT_LANGUAGE);
 }
 
 /** 按当前语言翻译（renderer / main / CLI 交互层使用） */
@@ -89,7 +93,11 @@ export function t(key: string, params?: Record<string, unknown>): string {
 }
 
 /** 无状态翻译：显式指定语言（引擎等纯逻辑代码使用，不依赖全局语言状态） */
-export function translate(key: string, lng: LanguageCode, params?: Record<string, unknown>): string {
+export function translate(
+  key: string,
+  lng: LanguageCode,
+  params?: Record<string, unknown>,
+): string {
   return i18n.t(key, { ...(params ?? {}), lng }) as string;
 }
 

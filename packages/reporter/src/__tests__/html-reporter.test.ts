@@ -15,7 +15,13 @@ describe('generateHtmlReport — HTML 报告生成', () => {
       {
         title: 'Security',
         items: [
-          { status: 'fail', message: 'Hardcoded API key', file: 'src/config.ts', line: 5, severity: 'high' },
+          {
+            status: 'fail',
+            message: 'Hardcoded API key',
+            file: 'src/config.ts',
+            line: 5,
+            severity: 'high',
+          },
           { status: 'pass', message: 'No SQL injection', file: 'src/db.ts', line: 12 },
         ],
       },
@@ -114,9 +120,7 @@ describe('generateHtmlReport — HTML 报告生成', () => {
     const data: HtmlReportData = {
       timestamp: '2026-01-01T00:00:00Z',
       summary: { total: 0, passed: 0, warnings: 0, failures: 0 },
-      sections: [
-        { title: 'Empty Section', items: [] },
-      ],
+      sections: [{ title: 'Empty Section', items: [] }],
     };
     const html = generateHtmlReport(data);
 
@@ -180,9 +184,7 @@ describe('generateHtmlReport — HTML 报告生成', () => {
       sections: [
         {
           title: '<b>Bold</b> & "Quotes"',
-          items: [
-            { status: 'pass', message: "It's a <test>" },
-          ],
+          items: [{ status: 'pass', message: "It's a <test>" }],
         },
       ],
     };
@@ -219,9 +221,7 @@ describe('generateHtmlReport — HTML 报告生成', () => {
       sections: [
         {
           title: 'General',
-          items: [
-            { status: 'pass', message: 'All good' },
-          ],
+          items: [{ status: 'pass', message: 'All good' }],
         },
       ],
     };

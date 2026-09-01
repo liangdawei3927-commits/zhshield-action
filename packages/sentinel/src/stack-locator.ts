@@ -221,7 +221,11 @@ function parseSourceMap(raw: string): SourceMapData | null {
 }
 
 /** 用 sourcemap 将产物坐标反混淆回源文件坐标；无命中段返回 null */
-export function locateWithSourceMap(frame: StackFrame, map: SourceMapData, projectPath?: string): SourceLocation | null {
+export function locateWithSourceMap(
+  frame: StackFrame,
+  map: SourceMapData,
+  projectPath?: string,
+): SourceLocation | null {
   const segments = decodeMappings(map.mappings);
   const genLine = frame.line - 1;
   const genColumn = Math.max(0, frame.column - 1);
@@ -234,10 +238,14 @@ export function locateWithSourceMap(frame: StackFrame, map: SourceMapData, proje
   if (!best || best.sourceIndex >= map.sources.length) return null;
 
   const sourceRel = map.sources[best.sourceIndex];
-  const file = (map.sourceRoot ? path.join(map.sourceRoot, sourceRel) : sourceRel).replace(/\\/g, '/');
+  const file = (map.sourceRoot ? path.join(map.sourceRoot, sourceRel) : sourceRel).replace(
+    /\\/g,
+    '/',
+  );
   const line = best.originalLine + 1;
   const column = best.originalColumn + 1;
-  const functionName = best.nameIndex !== undefined && map.names ? map.names[best.nameIndex] : frame.functionName;
+  const functionName =
+    best.nameIndex !== undefined && map.names ? map.names[best.nameIndex] : frame.functionName;
 
   return {
     module: deriveModule(file),

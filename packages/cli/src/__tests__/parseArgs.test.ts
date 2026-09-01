@@ -96,7 +96,16 @@ describe('CLI argument parsing', () => {
   });
 
   it('should parse pipeline command with all options', () => {
-    const opts = parseArgs(['node', 'index.ts', 'pipeline', '--dir', '/my/project', '--sop', '--verbose', '--dry-run']);
+    const opts = parseArgs([
+      'node',
+      'index.ts',
+      'pipeline',
+      '--dir',
+      '/my/project',
+      '--sop',
+      '--verbose',
+      '--dry-run',
+    ]);
     expect(opts.command).toBe('pipeline');
     expect(opts.dir).toBe('/my/project');
     expect(opts.sop).toBe(true);

@@ -18,7 +18,7 @@ async function main() {
   try {
     const { SopRegistry } = await import(`${KERNEL}/sop/_meta/sop-registry.js`);
     const { SopLoader } = await import(`${KERNEL}/sop/_meta/sop-loader.js`);
-    
+
     const registry = new SopRegistry();
     const loader = new SopLoader(registry);
     const ruleCount = await loader.loadFromFileSystem();
@@ -27,7 +27,9 @@ async function main() {
 
     // CRUD
     const stats = registry.getStats();
-    console.log(`  Stats: ${JSON.stringify({ totalRules: stats.totalRules, domains: Object.keys(stats.byDomain).length })}`);
+    console.log(
+      `  Stats: ${JSON.stringify({ totalRules: stats.totalRules, domains: Object.keys(stats.byDomain).length })}`,
+    );
 
     const all = registry.getAll();
     console.log(`  getAll(): ${all.length}`);
@@ -35,7 +37,7 @@ async function main() {
     const first = all[0];
     const got = registry.get(first.id);
     console.log(`  get('${first.id}'): ${got ? got.name : 'NOT FOUND'}`);
-    
+
     const updated = registry.update(first.id, { severity: 'critical' });
     console.log(`  update severity: ${updated.severity}`);
 
@@ -95,7 +97,7 @@ async function main() {
       { dimension: 'performance', score: 78, weight: 0.3 },
     ]);
     console.log(`  Score: ${score.overall} (${score.grade})`);
-    
+
     const evolve = new EvolveEngine();
     evolve.recordExperience({
       projectId: 'test-project',
@@ -122,7 +124,7 @@ async function main() {
     console.log(`  Evolve suggestions: ${suggestions.length} (expect >=1 for high false-positive)`);
     const weights = evolve.autoAdjustWeights();
     console.log(`  Auto-adjusted weights: ${weights.length}`);
-    
+
     console.log('  ✅ ScoringEngine + EvolveEngine OK');
   } catch (e) {
     console.log(`  ❌ ScoringEngine + EvolveEngine FAILED: ${e.message}`);
@@ -143,4 +145,7 @@ async function main() {
   console.log('='.repeat(60));
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

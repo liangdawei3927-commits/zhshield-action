@@ -48,7 +48,10 @@ function categoryOf(tags: string[]): string {
 }
 
 /** 从 SOP RuleEvaluation 抽取文件路径（files[0] 优先，回退到首条违规的 file），用于模块级分桶 */
-function firstFileOf(ev: { files?: string[]; violations?: Array<{ file?: string }> }): string | undefined {
+function firstFileOf(ev: {
+  files?: string[];
+  violations?: Array<{ file?: string }>;
+}): string | undefined {
   return ev.files?.[0] ?? ev.violations?.[0]?.file;
 }
 
@@ -57,7 +60,12 @@ export function convertGuardEvaluations(evaluations: unknown[]): ConvertedGuardR
   return evaluations
     .filter((ev) => (ev as { status?: string }).status !== 'skipped')
     .map((ev) => {
-      const e = ev as { status?: string; rule?: { severity?: string }; files?: string[]; violations?: Array<{ file?: string }> };
+      const e = ev as {
+        status?: string;
+        rule?: { severity?: string };
+        files?: string[];
+        violations?: Array<{ file?: string }>;
+      };
       const statusMap: Record<string, 'passed' | 'failed' | 'error' | 'warning'> = {
         passed: 'passed',
         failed: 'failed',
@@ -87,7 +95,12 @@ export function convertInspectEvaluations(evaluations: unknown[]): ConvertedInsp
       return s !== 'passed' && s !== 'skipped';
     })
     .map((ev) => {
-      const e = ev as { status?: string; rule?: { severity?: string; tags?: string[] }; files?: string[]; violations?: Array<{ file?: string }> };
+      const e = ev as {
+        status?: string;
+        rule?: { severity?: string; tags?: string[] };
+        files?: string[];
+        violations?: Array<{ file?: string }>;
+      };
       const severityMap: Record<string, 'error' | 'warning' | 'info'> = {
         critical: 'error',
         high: 'error',
@@ -117,7 +130,9 @@ export function convertInspectEvaluations(evaluations: unknown[]): ConvertedInsp
  * - 敏感信息适配器：details.findings 为 `{ file, ... }[]`
  * 其它无法定位到文件的检查保持单条（落入根模块），行为与原先一致。
  */
-export function convertTraditionalGuardResults(results: GuardCheckResultLike[]): ConvertedGuardResult[] {
+export function convertTraditionalGuardResults(
+  results: GuardCheckResultLike[],
+): ConvertedGuardResult[] {
   const out: ConvertedGuardResult[] = [];
   for (const r of results) out.push(...explodeTraditionalResult(r));
   return out;
@@ -132,12 +147,8 @@ function explodeTraditionalResult(r: GuardCheckResultLike): ConvertedGuardResult
   if (r.status === 'passed') return [{ severity: 'info', status: 'passed', blocking: false }];
 
   const d = r.details as
-    | { errors?: string[]; warnings?: string[]; findings?: Array<{ file?: string }> }
-    | undefined;
-  const exploded: ConvertedGuardResult[] = [
-    ...explodeErrors(d, r),
-    ...explodeWarnings(d),
-  ];
+    { errors?: string[]; warnings?: string[]; findings?: Array<{ file?: string }> } | undefined;
+  const exploded: ConvertedGuardResult[] = [...explodeErrors(d, r), ...explodeWarnings(d)];
   if (exploded.length === 0) {
     exploded.push(...explodeFindings(d, r));
   }
@@ -147,7 +158,10 @@ function explodeTraditionalResult(r: GuardCheckResultLike): ConvertedGuardResult
   return [{ severity: r.severity, status: r.status, blocking: r.blocking }];
 }
 
-function explodeErrors(d: { errors?: string[] } | undefined, r: GuardCheckResultLike): ConvertedGuardResult[] {
+function explodeErrors(
+  d: { errors?: string[] } | undefined,
+  r: GuardCheckResultLike,
+): ConvertedGuardResult[] {
   if (!d || !Array.isArray(d.errors)) return [];
   const exploded: ConvertedGuardResult[] = [];
   for (const s of d.errors) {
@@ -167,7 +181,10 @@ function explodeWarnings(d: { warnings?: string[] } | undefined): ConvertedGuard
   return exploded;
 }
 
-function explodeFindings(d: { findings?: Array<{ file?: string }> } | undefined, r: GuardCheckResultLike): ConvertedGuardResult[] {
+function explodeFindings(
+  d: { findings?: Array<{ file?: string }> } | undefined,
+  r: GuardCheckResultLike,
+): ConvertedGuardResult[] {
   if (!d || !Array.isArray(d.findings)) return [];
   const exploded: ConvertedGuardResult[] = [];
   for (const f of d.findings) {

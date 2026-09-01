@@ -32,7 +32,10 @@ export class SchedulerService {
   private onJobRun?: (result: SchedulerRunResult) => void;
   private storage?: SchedulerStorage;
 
-  constructor(options?: { storage?: SchedulerStorage; onJobRun?: (result: SchedulerRunResult) => void }) {
+  constructor(options?: {
+    storage?: SchedulerStorage;
+    onJobRun?: (result: SchedulerRunResult) => void;
+  }) {
     this.storage = options?.storage;
     this.onJobRun = options?.onJobRun;
     this.loadJobs();
@@ -40,7 +43,8 @@ export class SchedulerService {
 
   private loadJobs(): void {
     if (!this.storage) return;
-    this.storage.loadJobs()
+    this.storage
+      .loadJobs()
       .then((loaded) => {
         this.jobs = loaded;
       })

@@ -5,7 +5,12 @@ import * as path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ProjectProfile } from '@zh/dependency';
-import { AiOriginDetectorImpl, classifyStrength, commitEvidenceFromLog, isAiMarkedCommit } from '../ai-code/origin-detector';
+import {
+  AiOriginDetectorImpl,
+  classifyStrength,
+  commitEvidenceFromLog,
+  isAiMarkedCommit,
+} from '../ai-code/origin-detector';
 import { analyzeStyleSignature } from '../ai-code/style-signature';
 import type { AiEvidence } from '../ai-code/types';
 
@@ -19,7 +24,13 @@ try {
 }
 
 function profile(projectPath: string): ProjectProfile {
-  return { projectPath, language: 'typescript', framework: null, packageManager: 'pnpm', hasTypeScript: true };
+  return {
+    projectPath,
+    language: 'typescript',
+    framework: null,
+    packageManager: 'pnpm',
+    hasTypeScript: true,
+  };
 }
 
 function evidence(kind: AiEvidence['kind'], confidence: number): AiEvidence {
@@ -65,7 +76,9 @@ describe('classifyStrength', () => {
   });
 
   it('多类证据一致 → strong', () => {
-    expect(classifyStrength([evidence('commit-meta', 0.7), evidence('style-signature', 0.9)])).toBe('strong');
+    expect(classifyStrength([evidence('commit-meta', 0.7), evidence('style-signature', 0.9)])).toBe(
+      'strong',
+    );
   });
 
   it('commit-meta 单类 → suggestive', () => {
@@ -82,7 +95,9 @@ describe('classifyStrength', () => {
   });
 
   it('≥2 弱风格组合 → suggestive', () => {
-    expect(classifyStrength([evidence('style-signature', 0.4), evidence('style-signature', 0.5)])).toBe('suggestive');
+    expect(
+      classifyStrength([evidence('style-signature', 0.4), evidence('style-signature', 0.5)]),
+    ).toBe('suggestive');
   });
 });
 
@@ -155,7 +170,10 @@ describe('AiOriginDetectorImpl', () => {
   });
 
   it('单弱风格特征 → 默认不标记；includeUncertain 时输出 uncertain', async () => {
-    await writeFile('src/foo.ts', 'const item1 = 1;\nconst item2 = 2;\nconst step1 = 3;\nconst step2 = 4;\n');
+    await writeFile(
+      'src/foo.ts',
+      'const item1 = 1;\nconst item2 = 2;\nconst step1 = 3;\nconst step2 = 4;\n',
+    );
 
     const detector = new AiOriginDetectorImpl();
     expect(await detector.detect(profile(tmpDir))).toHaveLength(0);

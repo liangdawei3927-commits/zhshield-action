@@ -3,7 +3,15 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, CodeFlow, CodeFlowThreadFlow } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  CodeFlow,
+  CodeFlowThreadFlow,
+} from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -37,12 +45,33 @@ export class SemgrepAdapter implements ToolAdapter {
     const rulesDir = this.resolveRulesDir(options.projectPath);
 
     try {
-      if (!rulesDir || !fs.existsSync(rulesDir)) {
+      if (!rulesDir) {
         return {
           tool: 'semgrep',
           status: 'skipped',
           issues: [],
-          metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+          metadata: {
+            version: '',
+            duration: Date.now() - start,
+            timestamp: new Date(),
+            fileCount: 0,
+          },
+          error: 'Semgrep 规则目录不存在，请先同步云脑规则',
+        };
+      }
+      try {
+        await fs.promises.access(rulesDir);
+      } catch {
+        return {
+          tool: 'semgrep',
+          status: 'skipped',
+          issues: [],
+          metadata: {
+            version: '',
+            duration: Date.now() - start,
+            timestamp: new Date(),
+            fileCount: 0,
+          },
           error: 'Semgrep 规则目录不存在，请先同步云脑规则',
         };
       }
@@ -93,7 +122,12 @@ export class SemgrepAdapter implements ToolAdapter {
         tool: 'semgrep',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'Semgrep 未安装或未在 PATH 中找到',
       };
     }
@@ -103,7 +137,12 @@ export class SemgrepAdapter implements ToolAdapter {
         tool: 'semgrep',
         status: 'available',
         issues: partialIssues,
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: partialIssues.length,
+        },
       };
     }
     return {
@@ -144,8 +183,12 @@ export class SemgrepAdapter implements ToolAdapter {
     return output.results.map((r) => ({
       id: randomUUID(),
       ruleId: `semgrep.${r.check_id || 'unknown'}`,
-      severity: r.extra?.severity === 'ERROR' ? 'error'
-        : r.extra?.severity === 'WARNING' ? 'warning' : 'info',
+      severity:
+        r.extra?.severity === 'ERROR'
+          ? 'error'
+          : r.extra?.severity === 'WARNING'
+            ? 'warning'
+            : 'info',
       category: 'security',
       message: r.extra?.message || r.extra?.metadata?.description || `Semgrep: ${r.check_id}`,
       file: r.path || '',

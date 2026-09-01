@@ -85,7 +85,9 @@ describe('SopSyncClient', () => {
     };
 
     it('JSON 响应应直接解析为 SopDiff', async () => {
-      fetchMock.mockResolvedValueOnce(makeResponse(sampleDiff, { contentType: 'application/json' }));
+      fetchMock.mockResolvedValueOnce(
+        makeResponse(sampleDiff, { contentType: 'application/json' }),
+      );
       const result = await client.fetchDiff('1.0.0', '2.0.0');
       expect(result).not.toBeNull();
       expect(result?.version).toBe('2.0.0');
@@ -101,8 +103,14 @@ describe('SopSyncClient', () => {
     it('二进制压缩响应（octet-stream）应通过 gzip 解压', async () => {
       const compressor = new SopCompressor();
       const json = JSON.stringify(sampleDiff);
-      const compressed = await compressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Gzip);
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
+      const compressed = await compressor.compress(
+        Buffer.from(json, 'utf-8'),
+        CompressionFormat.Gzip,
+      );
+      const buffer = compressed.buffer.slice(
+        compressed.byteOffset,
+        compressed.byteOffset + compressed.byteLength,
+      );
 
       fetchMock.mockResolvedValueOnce(
         makeResponse(buffer, { contentType: 'application/octet-stream' }),
@@ -116,8 +124,14 @@ describe('SopSyncClient', () => {
     it('cbor content-type 也应走解压分支', async () => {
       const compressor = new SopCompressor();
       const json = JSON.stringify(sampleDiff);
-      const compressed = await compressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Gzip);
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
+      const compressed = await compressor.compress(
+        Buffer.from(json, 'utf-8'),
+        CompressionFormat.Gzip,
+      );
+      const buffer = compressed.buffer.slice(
+        compressed.byteOffset,
+        compressed.byteOffset + compressed.byteLength,
+      );
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer, { contentType: 'application/cbor' }));
       const result = await client.fetchDiff('1.0.0', '2.0.0');
@@ -142,8 +156,14 @@ describe('SopSyncClient', () => {
       const rules: SopRule[] = [makeRule({ id: 'r-1' }), makeRule({ id: 'r-2' })];
       const compressor = new SopCompressor();
       const json = JSON.stringify(rules);
-      const compressed = await compressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Brotli);
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
+      const compressed = await compressor.compress(
+        Buffer.from(json, 'utf-8'),
+        CompressionFormat.Brotli,
+      );
+      const buffer = compressed.buffer.slice(
+        compressed.byteOffset,
+        compressed.byteOffset + compressed.byteLength,
+      );
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));
       const result = await client.fetchFull('3.0.0');
@@ -180,8 +200,14 @@ describe('SopSyncClient', () => {
 
       const rules: SopRule[] = [makeRule({ id: 'r-1' })];
       const json = JSON.stringify(rules);
-      const compressed = await customCompressor.compress(Buffer.from(json, 'utf-8'), CompressionFormat.Brotli);
-      const buffer = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
+      const compressed = await customCompressor.compress(
+        Buffer.from(json, 'utf-8'),
+        CompressionFormat.Brotli,
+      );
+      const buffer = compressed.buffer.slice(
+        compressed.byteOffset,
+        compressed.byteOffset + compressed.byteLength,
+      );
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));
       await clientWithCustom.fetchFull('1.0.0');

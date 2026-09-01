@@ -6,7 +6,8 @@ interface SecretsPageProps {
 }
 
 export function SecretsPage({ projectPath }: SecretsPageProps) {
-  const { loading, report, handleScan, handleMarkRotating, handleVerifyRotated, handleDismiss } = useSecretsPage(projectPath);
+  const { loading, report, handleScan, handleMarkRotating, handleVerifyRotated, handleDismiss } =
+    useSecretsPage(projectPath);
 
   if (report) {
     return (

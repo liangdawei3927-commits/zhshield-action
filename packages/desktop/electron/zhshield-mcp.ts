@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -16,12 +16,13 @@ const execFileAsync = promisify(execFile);
 const server = new McpServer({ name: 'zhshield', version: '1.1.0' });
 
 // ─── 辅助：读取 .zhshield 下的 JSON 文件 ────────────────────
-function readZhshieldJson(root: string, relativePath: string): string {
+async function readZhshieldJson(root: string, relativePath: string): Promise<string> {
   const filePath = join(root, '.zhshield', relativePath);
-  if (!existsSync(filePath)) {
+  try {
+    return await readFile(filePath, 'utf-8');
+  } catch {
     return JSON.stringify({ ok: false, error: t('mcp.fileNotFound', { relativePath }) });
   }
-  return readFileSync(filePath, 'utf-8');
 }
 
 // ─── 辅助：探测 zhshield CLI 启动方式（dist 优先，否则 src + 本地 tsx） ──
@@ -31,24 +32,33 @@ interface CliInvocation {
   cwd: string;
 }
 
-function resolveCliInvocation(
+async function resolveCliInvocation(
   command: 'inspect' | 'guard' | 'refactor' | 'pipeline',
   projectPath: string,
-): CliInvocation | null {
+): Promise<CliInvocation | null> {
   const cliDist = join(__dirname, '..', '..', 'cli', 'dist', 'index.js');
   const cliSrc = join(__dirname, '..', '..', 'cli', 'src', 'index.ts');
   // monorepo 根（node_modules 与本地 tsx 所在），npx 需在此目录解析本地工具
   const repoRoot = join(__dirname, '..', '..', '..');
 
-  if (existsSync(cliDist)) {
+  try {
+    await access(cliDist);
     return { cmd: 'node', args: [cliDist, command, '--dir', projectPath], cwd: projectPath };
+  } catch {
+    // dist 不存在，回退到 src + 本地 tsx
   }
-  if (existsSync(cliSrc)) {
+  try {
+    await access(cliSrc);
     // --no-install 且 cwd=repoRoot：强制使用 monorepo 本地 tsx，避免 npx 从
     // npm 缓存下载另一版本 tsx 导致 @zh/* workspace 包解析失败（MODULE_NOT_FOUND）
-    return { cmd: 'npx', args: ['--no-install', 'tsx', cliSrc, command, '--dir', projectPath], cwd: repoRoot };
+    return {
+      cmd: 'npx',
+      args: ['--no-install', 'tsx', cliSrc, command, '--dir', projectPath],
+      cwd: repoRoot,
+    };
+  } catch {
+    return null;
   }
-  return null;
 }
 
 // ─── 辅助：调用 zhshield CLI（自动探测 dist/src） ──────────
@@ -57,7 +67,7 @@ async function runCli(
   projectPath: string,
   opts: { sop?: boolean; dryRun?: boolean } = {},
 ): Promise<string> {
-  const invocation = resolveCliInvocation(command, projectPath);
+  const invocation = await resolveCliInvocation(command, projectPath);
   if (!invocation) {
     return JSON.stringify({ ok: false, error: t('mcp.cliNotFound') });
   }
@@ -75,7 +85,9 @@ async function runCli(
       cwd: invocation.cwd,
       env: sanitizeEnv(),
     });
-    return stdout || JSON.stringify({ ok: true, message: t('mcp.commandDoneNoOutput', { command }) });
+    return (
+      stdout || JSON.stringify({ ok: true, message: t('mcp.commandDoneNoOutput', { command }) })
+    );
   } catch (err) {
     const output =
       err && typeof err === 'object' && 'stdout' in err
@@ -94,7 +106,7 @@ server.tool(
   { projectPath: z.string().optional().describe(t('mcp.projectPathDesc')) },
   async ({ projectPath }) => {
     const root = projectPath ?? process.cwd();
-    const text = readZhshieldJson(root, 'diagnostics/latest.json');
+    const text = await readZhshieldJson(root, 'diagnostics/latest.json');
     return { content: [{ type: 'text', text }] };
   },
 );
@@ -111,21 +123,26 @@ server.tool(
   },
   async ({ projectPath, severity, category, source }) => {
     const root = projectPath ?? process.cwd();
-    const text = readZhshieldJson(root, 'diagnostics/latest.json');
+    const text = await readZhshieldJson(root, 'diagnostics/latest.json');
     let parsed: { issues?: ReadonlyArray<Record<string, unknown>> };
     try {
       parsed = JSON.parse(text);
     } catch {
-      return { content: [{ type: 'text', text: JSON.stringify({ ok: false, error: t('mcp.diagnosticsUnparseable') }) }] };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ ok: false, error: t('mcp.diagnosticsUnparseable') }),
+          },
+        ],
+      };
     }
     let issues = parsed.issues ?? [];
     if (severity) issues = issues.filter((i) => i.severity === severity);
     if (category) issues = issues.filter((i) => i.category === category);
     if (source) issues = issues.filter((i) => i.source === source);
     return {
-      content: [
-        { type: 'text', text: JSON.stringify({ ok: true, total: issues.length, issues }) },
-      ],
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, total: issues.length, issues }) }],
     };
   },
 );
@@ -137,7 +154,7 @@ server.tool(
   { projectPath: z.string().optional().describe(t('mcp.projectPathDesc')) },
   async ({ projectPath }) => {
     const root = projectPath ?? process.cwd();
-    const text = readZhshieldJson(root, 'integration.json');
+    const text = await readZhshieldJson(root, 'integration.json');
     return { content: [{ type: 'text', text }] };
   },
 );
@@ -204,7 +221,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.stack ?? err.message : String(err);
+  const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
   process.stderr.write(`[zhshield-mcp] 启动失败: ${message}\n`);
   process.exitCode = 1;
 });

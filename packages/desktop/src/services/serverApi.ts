@@ -36,7 +36,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ─── Guard ──────────────────────────────────────────────
 
-export async function runGuardViaHttp(projectPath: string, dryRun?: boolean): Promise<GuardReportData> {
+export async function runGuardViaHttp(
+  projectPath: string,
+  dryRun?: boolean,
+): Promise<GuardReportData> {
   return request<GuardReportData>('/guard/check', {
     method: 'POST',
     body: JSON.stringify({ projectPath, dryRun }),
@@ -81,7 +84,10 @@ export async function getScoreHistoryViaHttp(projectId: string): Promise<HealthS
 
 // ─── Refactor ───────────────────────────────────────────
 
-export async function runRefactorViaHttp(projectPath: string, mode?: 'full' | 'staged'): Promise<RefactorReportData> {
+export async function runRefactorViaHttp(
+  projectPath: string,
+  mode?: 'full' | 'staged',
+): Promise<RefactorReportData> {
   return request<RefactorReportData>('/refactor/scan', {
     method: 'POST',
     body: JSON.stringify({ projectPath, mode: mode ?? 'full' }),
@@ -101,7 +107,7 @@ export async function runPipelineViaHttp(
   });
   if (!raw.ok) throw new Error(`Pipeline API ${raw.status}: ${raw.statusText}`);
   const json = await raw.json();
-  return json.raw ?? json.data as PipelineReportData;
+  return json.raw ?? (json.data as PipelineReportData);
 }
 
 // ─── SOP ────────────────────────────────────────────────
@@ -134,7 +140,10 @@ interface SopStats {
 
 // ─── Sentinel ────────────────────────────────────────────
 
-export async function getSentinelEventsViaHttp(options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> {
+export async function getSentinelEventsViaHttp(options?: {
+  status?: string;
+  severity?: string;
+}): Promise<SentinelEvent[]> {
   try {
     const params = new URLSearchParams();
     if (options?.status) params.set('status', options.status);
@@ -146,14 +155,18 @@ export async function getSentinelEventsViaHttp(options?: { status?: string; seve
   }
 }
 
-export async function startSentinelViaHttp(projectPath: string): Promise<{ ok: boolean; started: string[] }> {
+export async function startSentinelViaHttp(
+  projectPath: string,
+): Promise<{ ok: boolean; started: string[] }> {
   const started: string[] = [];
   await request('/system/sentinel/file-monitor/start', {
     method: 'POST',
     body: JSON.stringify({ projectId: projectPath, watchPaths: [projectPath] }),
   });
   started.push('file-monitor');
-  const logPaths = ['logs/app.log', 'logs/error.log', 'logs/server.log'].map((p) => `${projectPath.replace(TRAILING_SLASHES, '')}/${p}`);
+  const logPaths = ['logs/app.log', 'logs/error.log', 'logs/server.log'].map(
+    (p) => `${projectPath.replace(TRAILING_SLASHES, '')}/${p}`,
+  );
   await request('/system/sentinel/log-collector/start', {
     method: 'POST',
     body: JSON.stringify({ projectId: projectPath, logPaths }),
@@ -206,7 +219,10 @@ export async function getBackupConfigViaHttp(projectPath: string): Promise<Backu
   return request<BackupConfigData>(`/backup/config?projectPath=${encodeURIComponent(projectPath)}`);
 }
 
-export async function saveBackupConfigViaHttp(projectPath: string, config: BackupConfigData): Promise<void> {
+export async function saveBackupConfigViaHttp(
+  projectPath: string,
+  config: BackupConfigData,
+): Promise<void> {
   await request('/backup/config', {
     method: 'PUT',
     body: JSON.stringify({ projectPath, config }),

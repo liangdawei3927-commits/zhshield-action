@@ -23,7 +23,7 @@ export class SopSyncClient {
     try {
       const url = `${this.remoteBaseUrl}/version`;
       const res = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) return null;

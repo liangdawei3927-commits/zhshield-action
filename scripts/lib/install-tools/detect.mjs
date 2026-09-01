@@ -9,11 +9,14 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { IS_WIN, TOOLS_DIR } from './constants.mjs';
 
+/** 换行符（\r?\n），模块级常量避免每次调用重编译 */
+const RE_NEWLINE = /\r?\n/;
+
 /** 探测 PATH（等价 command -v / where） */
 export function findInPath(binName) {
   if (IS_WIN) {
     const res = spawnSync('where', [binName], { encoding: 'utf-8' });
-    if (res.status === 0 && res.stdout.trim()) return res.stdout.trim().split(/\r?\n/)[0];
+    if (res.status === 0 && res.stdout.trim()) return res.stdout.trim().split(RE_NEWLINE)[0];
     return null;
   }
   const res = spawnSync('sh', ['-c', `command -v ${binName}`], { encoding: 'utf-8' });
@@ -65,7 +68,11 @@ export function findFileRecursive(dir, fileName) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
     let st;
-    try { st = statSync(p); } catch { continue; }
+    try {
+      st = statSync(p);
+    } catch {
+      continue;
+    }
     if (st.isDirectory()) {
       const found = findFileRecursive(p, fileName);
       if (found) return found;

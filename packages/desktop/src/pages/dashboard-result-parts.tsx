@@ -14,13 +14,31 @@ function ResultStats({ summary }: { summary: CheckSummary }) {
   return (
     <div className="grid grid-cols-4 gap-3 mb-6">
       {[
-        { labelKey: 'page.dashboard.result.stats.total', value: summary.total, color: 'rgb(var(--zh-ink))' },
-        { labelKey: 'page.dashboard.result.stats.passed', value: summary.passed, color: 'rgb(var(--zh-success))' },
-        { labelKey: 'page.dashboard.result.stats.issues', value: issueCount, color: issueCount ? 'rgb(var(--zh-danger))' : 'rgb(var(--zh-success))' },
-        { labelKey: 'page.dashboard.result.stats.skipped', value: summary.skipped, color: 'rgb(var(--zh-warning))' },
+        {
+          labelKey: 'page.dashboard.result.stats.total',
+          value: summary.total,
+          color: 'rgb(var(--zh-ink))',
+        },
+        {
+          labelKey: 'page.dashboard.result.stats.passed',
+          value: summary.passed,
+          color: 'rgb(var(--zh-success))',
+        },
+        {
+          labelKey: 'page.dashboard.result.stats.issues',
+          value: issueCount,
+          color: issueCount ? 'rgb(var(--zh-danger))' : 'rgb(var(--zh-success))',
+        },
+        {
+          labelKey: 'page.dashboard.result.stats.skipped',
+          value: summary.skipped,
+          color: 'rgb(var(--zh-warning))',
+        },
       ].map((x) => (
         <BounceCard key={x.labelKey} className="rounded-xl bg-zh-panel p-4 text-center">
-          <div className="text-2xl font-bold" style={{ color: x.color }}>{x.value}</div>
+          <div className="text-2xl font-bold" style={{ color: x.color }}>
+            {x.value}
+          </div>
           <div className="text-xs text-zh-muted mt-1">{t(x.labelKey)}</div>
         </BounceCard>
       ))}
@@ -28,7 +46,13 @@ function ResultStats({ summary }: { summary: CheckSummary }) {
   );
 }
 
-function ResultHeader({ ok, score, summary, onRerun, onBack }: {
+function ResultHeader({
+  ok,
+  score,
+  summary,
+  onRerun,
+  onBack,
+}: {
   ok: boolean;
   score: number | null;
   summary: CheckSummary;
@@ -45,7 +69,9 @@ function ResultHeader({ ok, score, summary, onRerun, onBack }: {
         </h1>
         <p className="text-sm text-zh-muted leading-relaxed">
           {t('page.dashboard.result.header.coverage', { inspectTotal: summary.inspectTotal })}
-          {summary.skipped > 0 ? ` ${t('page.dashboard.result.header.skipped', { skipped: summary.skipped })}` : ''}
+          {summary.skipped > 0
+            ? ` ${t('page.dashboard.result.header.skipped', { skipped: summary.skipped })}`
+            : ''}
           {t('page.dashboard.result.header.configureHint')}
         </p>
         <div className="flex gap-3 mt-5">
@@ -63,19 +89,29 @@ function ResultHeader({ ok, score, summary, onRerun, onBack }: {
   );
 }
 
-function FailedIssuesList({ summary, onCopyIssues }: { summary: CheckSummary; onCopyIssues: (items: CheckSummary['failedItems']) => void }) {
+function FailedIssuesList({
+  summary,
+  onCopyIssues,
+}: {
+  summary: CheckSummary;
+  onCopyIssues: (items: CheckSummary['failedItems']) => void;
+}) {
   const t = useT();
   return (
     <div className="rounded-xl border border-red-100 bg-red-50/40 p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-red-700">{t('page.dashboard.result.issuesTitle')}</h3>
+        <h3 className="text-sm font-semibold text-red-700">
+          {t('page.dashboard.result.issuesTitle')}
+        </h3>
         <CopyAllToAiButton onClick={() => onCopyIssues(summary.failedItems)} />
       </div>
       <ul className="space-y-2">
         {summary.failedItems.slice(0, 20).map((item) => (
           <li key={`${item.stage}-${item.id}`} className="text-sm text-zh-ink-2">
             <span className="text-xs text-red-500 mr-2">
-              {item.stage === 'guard' ? t('page.dashboard.result.stage.guard') : t('page.dashboard.result.stage.inspect')}
+              {item.stage === 'guard'
+                ? t('page.dashboard.result.stage.guard')
+                : t('page.dashboard.result.stage.inspect')}
             </span>
             <span className="font-medium">{item.name}</span>
             <span className="text-zh-muted"> — {item.message}</span>
@@ -91,7 +127,9 @@ function ScopeOverview() {
   const t = useT();
   return (
     <ResultCard variant="score" className="mb-6">
-      <h3 className="text-sm font-semibold text-zh-ink mb-3">{t('page.dashboard.result.scopeTitle')}</h3>
+      <h3 className="text-sm font-semibold text-zh-ink mb-3">
+        {t('page.dashboard.result.scopeTitle')}
+      </h3>
       <div className="space-y-3">
         {CHECK_SCOPE.map((block) => (
           <ScopeBlock key={block.key} titleKey={block.titleKey} items={block.items} />
@@ -113,7 +151,13 @@ function AutoFixNotice({ notice }: { notice: string }) {
 }
 
 /** 检查结果区：有问题列表或全部通过提示 */
-function IssuesOutcome({ summary, onCopyIssues }: { summary: CheckSummary; onCopyIssues: (items: CheckSummary['failedItems']) => void }) {
+function IssuesOutcome({
+  summary,
+  onCopyIssues,
+}: {
+  summary: CheckSummary;
+  onCopyIssues: (items: CheckSummary['failedItems']) => void;
+}) {
   const t = useT();
   if (summary.failedItems.length > 0) {
     return <FailedIssuesList summary={summary} onCopyIssues={onCopyIssues} />;

@@ -67,5 +67,13 @@ export function useEvolvePage(projectPath: string) {
     }
   }, [loadSuggestions, loadWeights, loadScore]);
 
-  return { suggestions, weights, score, loading, analyzed, analyze, ...computeWeightStats(weights) };
+  return {
+    suggestions,
+    weights,
+    score,
+    loading,
+    analyzed,
+    analyze,
+    ...computeWeightStats(weights),
+  };
 }

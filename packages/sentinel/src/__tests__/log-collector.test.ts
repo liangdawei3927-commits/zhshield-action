@@ -23,11 +23,11 @@ function writeSourcemapProject(projectDir: string): string {
       sources: ['src/modules/order/order.service.ts'],
       names: [],
       mappings: 'AAAA;AACA',
-    })
+    }),
   );
   fs.writeFileSync(
     path.join(projectDir, 'src/modules/order/order.service.ts'),
-    'export function getOrder() {}\nexport function calc() {}\n'
+    'export function getOrder() {}\nexport function calc() {}\n',
   );
 
   return path.join(projectDir, 'logs/app.log');
@@ -40,12 +40,17 @@ describe('LogCollector crash stack location', () => {
     const frameFile = path.join(projectDir, 'dist/server.js');
     fs.writeFileSync(
       logPath,
-      `uncaughtException: boom\n    at getOrder (${frameFile}:2:15)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n`
+      `uncaughtException: boom\n    at getOrder (${frameFile}:2:15)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)\n`,
     );
 
     const ec = new EventCenter();
     const collector = new LogCollector(ec);
-    collector.start({ projectId: 'p1', logPaths: [logPath], projectPath: projectDir, pollIntervalMs: 50 });
+    collector.start({
+      projectId: 'p1',
+      logPaths: [logPath],
+      projectPath: projectDir,
+      pollIntervalMs: 50,
+    });
 
     const events = ec.listEvents();
     const crashEvent = events.find((e) => e.context.pattern === 'uncaught-exception');
@@ -55,7 +60,12 @@ describe('LogCollector crash stack location', () => {
     expect(ctx.stack).toContain('at getOrder');
     expect(ctx.stack).toContain('node:internal');
 
-    const location = ctx.location as { module: string; file: string; line: number; snippet?: string };
+    const location = ctx.location as {
+      module: string;
+      file: string;
+      line: number;
+      snippet?: string;
+    };
     expect(location.module).toBe('order');
     expect(location.file).toBe('src/modules/order/order.service.ts');
     expect(location.line).toBe(2);
@@ -71,7 +81,12 @@ describe('LogCollector crash stack location', () => {
 
     const ec = new EventCenter();
     const collector = new LogCollector(ec);
-    collector.start({ projectId: 'p1', logPaths: [logPath], projectPath: projectDir, pollIntervalMs: 50 });
+    collector.start({
+      projectId: 'p1',
+      logPaths: [logPath],
+      projectPath: projectDir,
+      pollIntervalMs: 50,
+    });
 
     const events = ec.listEvents();
     const warningEvent = events.find((e) => e.context.pattern === 'warning');
@@ -89,12 +104,17 @@ describe('LogCollector crash stack location', () => {
     const frameFile = path.join(projectDir, 'dist/server.js');
     fs.writeFileSync(
       logPath,
-      `uncaughtException: boom\n    at getOrder (${frameFile}:2:15)\n    at helper (${frameFile}:1:5)\n`
+      `uncaughtException: boom\n    at getOrder (${frameFile}:2:15)\n    at helper (${frameFile}:1:5)\n`,
     );
 
     const ec = new EventCenter();
     const collector = new LogCollector(ec);
-    collector.start({ projectId: 'p1', logPaths: [logPath], projectPath: projectDir, pollIntervalMs: 50 });
+    collector.start({
+      projectId: 'p1',
+      logPaths: [logPath],
+      projectPath: projectDir,
+      pollIntervalMs: 50,
+    });
 
     const events = ec.listEvents();
     expect(events.length).toBe(1);

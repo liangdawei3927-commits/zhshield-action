@@ -120,9 +120,10 @@ export class SopCacheManager {
       eventBus: this.eventBus,
     });
     const signatureVerifier = new SopSignatureVerifier(options.publicKey);
-    const syncClient = options.publicKey !== undefined
-      ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
-      : new SopSyncClient(remoteBaseUrl);
+    const syncClient =
+      options.publicKey !== undefined
+        ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
+        : new SopSyncClient(remoteBaseUrl);
     this.scheduler = new SopSyncScheduler(this.syncPolicy);
     this.coordinator = new SopSyncCoordinator({
       registry,

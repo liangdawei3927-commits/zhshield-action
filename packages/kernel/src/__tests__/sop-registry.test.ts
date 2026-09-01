@@ -134,9 +134,39 @@ describe('SopRegistry', () => {
   describe('query', () => {
     function setupRules() {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', domain: 'guard', action: 'scan', source: 'official', status: 'active', severity: 'high', tags: ['ts'] }));
-      reg.register(makeRule({ id: 'r-2', domain: 'inspect', action: 'block', source: 'community', status: 'trial', severity: 'low', tags: ['vue'] }));
-      reg.register(makeRule({ id: 'r-3', domain: 'guard', action: 'scan', source: 'official', status: 'deprecated', severity: 'high', tags: ['ts', 'security'] }));
+      reg.register(
+        makeRule({
+          id: 'r-1',
+          domain: 'guard',
+          action: 'scan',
+          source: 'official',
+          status: 'active',
+          severity: 'high',
+          tags: ['ts'],
+        }),
+      );
+      reg.register(
+        makeRule({
+          id: 'r-2',
+          domain: 'inspect',
+          action: 'block',
+          source: 'community',
+          status: 'trial',
+          severity: 'low',
+          tags: ['vue'],
+        }),
+      );
+      reg.register(
+        makeRule({
+          id: 'r-3',
+          domain: 'guard',
+          action: 'scan',
+          source: 'official',
+          status: 'deprecated',
+          severity: 'high',
+          tags: ['ts', 'security'],
+        }),
+      );
       return reg;
     }
 
@@ -222,8 +252,24 @@ describe('SopRegistry', () => {
 
     it('应正确按维度统计', () => {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', domain: 'guard', action: 'scan', status: 'active', severity: 'high' }));
-      reg.register(makeRule({ id: 'r-2', domain: 'guard', action: 'block', status: 'trial', severity: 'high' }));
+      reg.register(
+        makeRule({
+          id: 'r-1',
+          domain: 'guard',
+          action: 'scan',
+          status: 'active',
+          severity: 'high',
+        }),
+      );
+      reg.register(
+        makeRule({
+          id: 'r-2',
+          domain: 'guard',
+          action: 'block',
+          status: 'trial',
+          severity: 'high',
+        }),
+      );
       const stats = reg.getStats();
       expect(stats.totalRules).toBe(2);
       expect(stats.byDomain.guard).toBe(2);
@@ -239,7 +285,9 @@ describe('SopRegistry', () => {
   describe('evaluateLifecycle', () => {
     it('active + 误报率>10% 应降级为 trial', () => {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 20, truePositiveCount: 10 }));
+      reg.register(
+        makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 20, truePositiveCount: 10 }),
+      );
       const result = reg.evaluateLifecycle();
       expect(result.downgraded).toContain('r-1');
       expect(reg.get('r-1')?.status).toBe('trial');
@@ -247,7 +295,9 @@ describe('SopRegistry', () => {
 
     it('active + 误报率<=10% 应保持 active', () => {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 5, truePositiveCount: 100 }));
+      reg.register(
+        makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 5, truePositiveCount: 100 }),
+      );
       const result = reg.evaluateLifecycle();
       expect(result.downgraded).not.toContain('r-1');
       expect(reg.get('r-1')?.status).toBe('active');
@@ -255,7 +305,9 @@ describe('SopRegistry', () => {
 
     it('active + 无反馈数据应保持 active（不评估降级）', () => {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 0, truePositiveCount: 0 }));
+      reg.register(
+        makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 0, truePositiveCount: 0 }),
+      );
       const result = reg.evaluateLifecycle();
       expect(result.downgraded).not.toContain('r-1');
     });
@@ -263,7 +315,15 @@ describe('SopRegistry', () => {
     it('active + 90天未使用应废弃为 deprecated', () => {
       const reg = new SopRegistry();
       const longAgo = new Date(Date.now() - 91 * 86_400_000);
-      reg.register(makeRule({ id: 'r-1', status: 'active', falsePositiveCount: 0, truePositiveCount: 0, lastUsedAt: longAgo }));
+      reg.register(
+        makeRule({
+          id: 'r-1',
+          status: 'active',
+          falsePositiveCount: 0,
+          truePositiveCount: 0,
+          lastUsedAt: longAgo,
+        }),
+      );
       const result = reg.evaluateLifecycle();
       expect(result.deprecated).toContain('r-1');
       expect(reg.get('r-1')?.status).toBe('deprecated');
@@ -272,7 +332,12 @@ describe('SopRegistry', () => {
     it('trial + 误报率<1% + 创建>30天应升级为 active', () => {
       const reg = new SopRegistry();
       const oldCreated = new Date(Date.now() - 31 * 86_400_000);
-      const rule = makeRule({ id: 'r-1', status: 'trial', falsePositiveCount: 1, truePositiveCount: 200 });
+      const rule = makeRule({
+        id: 'r-1',
+        status: 'trial',
+        falsePositiveCount: 1,
+        truePositiveCount: 200,
+      });
       rule.createdAt = oldCreated;
       reg.register(rule);
       const result = reg.evaluateLifecycle();
@@ -282,7 +347,12 @@ describe('SopRegistry', () => {
 
     it('trial + 创建不足30天应保持 trial', () => {
       const reg = new SopRegistry();
-      const rule = makeRule({ id: 'r-1', status: 'trial', falsePositiveCount: 0, truePositiveCount: 200 });
+      const rule = makeRule({
+        id: 'r-1',
+        status: 'trial',
+        falsePositiveCount: 0,
+        truePositiveCount: 200,
+      });
       rule.createdAt = new Date(); // 刚创建
       reg.register(rule);
       const result = reg.evaluateLifecycle();
@@ -291,7 +361,9 @@ describe('SopRegistry', () => {
 
     it('deprecated 状态不应被自动变更', () => {
       const reg = new SopRegistry();
-      reg.register(makeRule({ id: 'r-1', status: 'deprecated', falsePositiveCount: 50, truePositiveCount: 0 }));
+      reg.register(
+        makeRule({ id: 'r-1', status: 'deprecated', falsePositiveCount: 50, truePositiveCount: 0 }),
+      );
       const result = reg.evaluateLifecycle();
       expect(result.downgraded).not.toContain('r-1');
       expect(result.upgraded).not.toContain('r-1');

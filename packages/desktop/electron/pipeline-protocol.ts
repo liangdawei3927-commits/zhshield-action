@@ -25,10 +25,7 @@ export interface PipelineReadyMsg {
 }
 
 export type PipelineWorkerOutbound =
-  | PipelineProgressMsg
-  | PipelineResultMsg
-  | PipelineErrorMsg
-  | PipelineReadyMsg;
+  PipelineProgressMsg | PipelineResultMsg | PipelineErrorMsg | PipelineReadyMsg;
 
 export interface PipelineRunMsg {
   type: 'run';

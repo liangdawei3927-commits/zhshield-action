@@ -32,11 +32,15 @@ afterEach(() => {
 describe('tree-shaking-detector', () => {
   it('package.json 缺少 sideEffects 且为 npm 包 → side-effects-missing（low）', () => {
     const dir = tmpDir('zh-perf-side-missing-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      name: 'demo',
-      version: '1.0.0',
-      main: 'dist/index.js',
-    }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        name: 'demo',
+        version: '1.0.0',
+        main: 'dist/index.js',
+      }),
+    );
 
     const issues = detector.detect(dir);
 
@@ -52,11 +56,15 @@ describe('tree-shaking-detector', () => {
 
   it('sideEffects 显式为 true → side-effects-true（high）', () => {
     const dir = tmpDir('zh-perf-side-true-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      name: 'demo',
-      version: '1.0.0',
-      sideEffects: true,
-    }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        name: 'demo',
+        version: '1.0.0',
+        sideEffects: true,
+      }),
+    );
 
     const issues = detector.detect(dir);
 
@@ -114,7 +122,11 @@ describe('tree-shaking-detector', () => {
     const dir = tmpDir('zh-perf-no-split-');
     const deps: Record<string, string> = {};
     for (let i = 1; i <= 6; i++) deps[`dep-${i}`] = '^1.0.0';
-    writeFile(dir, 'package.json', JSON.stringify({ name: 'demo', version: '1.0.0', dependencies: deps }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({ name: 'demo', version: '1.0.0', dependencies: deps }),
+    );
     writeFile(dir, 'dist/app.js', 'console.log(1);');
 
     const issues = detector.detect(dir);

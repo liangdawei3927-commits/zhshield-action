@@ -25,10 +25,7 @@ export type {
   LockfileVerification,
   LockfileDiff,
 } from './adapters/lockfile-verifier';
-export {
-  UpgradeEvaluatorImpl,
-  DEFAULT_UPGRADE_CATALOG,
-} from './adapters/upgrade-evaluator';
+export { UpgradeEvaluatorImpl, DEFAULT_UPGRADE_CATALOG } from './adapters/upgrade-evaluator';
 export type {
   UpgradeEvaluator,
   UpgradeAssessment,
@@ -49,12 +46,14 @@ export type {
   PackageManager,
 } from './adapters/env-consistency';
 export { checkOutdated, NpmOutdatedError } from './adapters/npm-outdated';
-export type {
-  OutdatedDependencyInfo,
-  NpmOutdatedErrorCode,
-} from './adapters/npm-outdated';
+export type { OutdatedDependencyInfo, NpmOutdatedErrorCode } from './adapters/npm-outdated';
 export type { CycloneDXDocument, CycloneDXComponent } from './sbom';
-export type { LicenseMatrixReport, LicenseEntry, LicenseCategory, LicenseRisk } from './license-matrix';
+export type {
+  LicenseMatrixReport,
+  LicenseEntry,
+  LicenseCategory,
+  LicenseRisk,
+} from './license-matrix';
 export type {
   DependencyGraph,
   DependencyNode,

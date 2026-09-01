@@ -106,7 +106,9 @@ export class AuditLogger {
       await this.collectCategoryEntries(category, filters, allEntries);
     }
 
-    return allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return allEntries.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
   }
 
   /** 列出某类别目录下的日志文件，目录不存在时返回 null */
@@ -146,7 +148,11 @@ export class AuditLogger {
     }
   }
 
-  private collectMatchingEntries(content: string, filters: AuditQuery, allEntries: AuditLogEntry[]): void {
+  private collectMatchingEntries(
+    content: string,
+    filters: AuditQuery,
+    allEntries: AuditLogEntry[],
+  ): void {
     for (const line of content.trim().split('\n').filter(Boolean)) {
       try {
         const entry = JSON.parse(line) as AuditLogEntry;
@@ -192,15 +198,15 @@ export class AuditLogger {
     const files = await this.listCategoryFiles(category);
     if (!files) return 0;
 
-    let compressed = 0;
-    for (const file of files) {
-      if (!this.isExpiredLog(file, cutoff)) continue;
-      const sourcePath = path.join(this.basePath, category, file);
-      if (await this.compressFile(sourcePath, sourcePath + '.gz')) {
-        compressed++;
-      }
-    }
-    return compressed;
+    const expiredFiles = files.filter((file) => this.isExpiredLog(file, cutoff));
+    if (expiredFiles.length === 0) return 0;
+    const results = await Promise.all(
+      expiredFiles.map((file) => {
+        const sourcePath = path.join(this.basePath, category, file);
+        return this.compressFile(sourcePath, sourcePath + '.gz');
+      }),
+    );
+    return results.filter(Boolean).length;
   }
 
   /**

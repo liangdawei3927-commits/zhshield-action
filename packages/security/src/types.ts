@@ -1,8 +1,14 @@
 import type { RuleConflictReport } from './rule-conflict-resolver';
 
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
-export type MalwareType = 'reverse-shell' | 'data-exfiltration' | 'privilege-escalation'
-  | 'crypto-ransomware' | 'backdoor' | 'supply-chain' | 'suspicious-behavior';
+export type MalwareType =
+  | 'reverse-shell'
+  | 'data-exfiltration'
+  | 'privilege-escalation'
+  | 'crypto-ransomware'
+  | 'backdoor'
+  | 'supply-chain'
+  | 'suspicious-behavior';
 export type GarbageType = 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code';
 
 export interface Vulnerability {

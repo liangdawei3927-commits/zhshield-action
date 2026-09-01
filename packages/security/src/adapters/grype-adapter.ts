@@ -60,10 +60,7 @@ export class GrypeAdapter implements ToolAdapter {
   }
 
   private async runGrype(source: string, options: ToolScanOptions): Promise<GrypeOutput> {
-    const { stdout } = await execFileAsync('grype', [
-      source,
-      '-o', 'json',
-    ], {
+    const { stdout } = await execFileAsync('grype', [source, '-o', 'json'], {
       cwd: options.projectPath,
       timeout: options.timeout || 120000,
       maxBuffer: 20 * 1024 * 1024,
@@ -77,7 +74,12 @@ export class GrypeAdapter implements ToolAdapter {
         tool: 'grype',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'Grype 未安装',
       };
     }
@@ -87,7 +89,12 @@ export class GrypeAdapter implements ToolAdapter {
         tool: 'grype',
         status: 'available',
         issues: partialIssues,
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: partialIssues.length },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: partialIssues.length,
+        },
       };
     }
     return {
@@ -119,14 +126,16 @@ export class GrypeAdapter implements ToolAdapter {
       return {
         id: randomUUID(),
         ruleId: m.vulnerability?.id || 'grype-unknown',
-        severity: sev === 'critical' || sev === 'high' ? 'error'
-          : sev === 'medium' ? 'warning' : 'info',
+        severity:
+          sev === 'critical' || sev === 'high' ? 'error' : sev === 'medium' ? 'warning' : 'info',
         category: 'security',
         message: `${m.artifact?.name || '?'}@${m.artifact?.version || '?'}: ${m.vulnerability?.description || m.vulnerability?.id || ''}`,
         file: '',
         line: 0,
         column: 0,
-        suggestion: m.vulnerability?.fixedInVersion ? `升级到 ${m.vulnerability.fixedInVersion}` : undefined,
+        suggestion: m.vulnerability?.fixedInVersion
+          ? `升级到 ${m.vulnerability.fixedInVersion}`
+          : undefined,
         autoFixable: !!m.vulnerability?.fixedInVersion,
         source: 'security',
         fingerprint: `grype:${m.vulnerability?.id || ''}:${m.artifact?.name || ''}`,

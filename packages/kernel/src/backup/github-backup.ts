@@ -3,37 +3,15 @@
  *
  * 需 OAuth 授权，通过 GitHub Git Data API 创建树 → 提交 → 更新分支。
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { type GitHubBackupConfig, type GitHubBackupSubResult } from './types';
-import { matchesExcludePattern } from './utils';
-
-interface GitHubTreeItem {
-  path: string;
-  mode: '100644' | '100755' | '040000' | '160000' | '120000';
-  type: 'blob' | 'tree' | 'commit';
-  content?: string;
-  sha?: string;
-}
-
-interface GitHubCommit {
-  sha: string;
-}
-
-interface GitHubTree {
-  sha: string;
-}
-
-interface GitHubRef {
-  object: { sha: string };
-}
-
-interface GitHubApiContext {
-  owner: string;
-  repo: string;
-  token: string;
-  abortSignal?: AbortSignal;
-}
+import { collectTreeItems } from './github-tree-collector';
+import type {
+  GitHubApiContext,
+  GitHubCommit,
+  GitHubRef,
+  GitHubTree,
+  GitHubTreeItem,
+} from './github-api-types';
 
 export class GitHubBackup {
   private tokenStore: TokenStore;
@@ -57,7 +35,12 @@ export class GitHubBackup {
       const ctx: GitHubApiContext = { owner: config.owner, repo: config.repo, token, abortSignal };
       const parentSha = await this.getParentSha(ctx, config.branch);
       const tree = await this.createTree(ctx, projectPath, config.excludePatterns);
-      const { commitMessage, commit } = await this.createBackupCommit(ctx, config, tree.sha, parentSha);
+      const { commitMessage, commit } = await this.createBackupCommit(
+        ctx,
+        config,
+        tree.sha,
+        parentSha,
+      );
       await this.updateRef(ctx, config.branch, commit.sha);
       return this.buildSuccessResult(config, commit, commitMessage);
     } catch (err) {
@@ -75,7 +58,11 @@ export class GitHubBackup {
   }
 
   /** 检查/创建仓库 */
-  private async ensureRepoExists(config: GitHubBackupConfig, token: string, abortSignal?: AbortSignal): Promise<void> {
+  private async ensureRepoExists(
+    config: GitHubBackupConfig,
+    token: string,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
     const repoExists = await this.checkRepoExists(config.owner, config.repo, token, abortSignal);
     if (!repoExists) {
       await this.createRepo(config.owner, config.repo, token, abortSignal);
@@ -101,7 +88,12 @@ export class GitHubBackup {
   ): Promise<{ commitMessage: string; commit: GitHubCommit }> {
     const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
     const commitMessage = `${config.commitPrefix} 自动备份 - ${timestamp}`;
-    const commit = await this.createCommit(ctx, commitMessage, treeSha, parentSha ? [parentSha] : []);
+    const commit = await this.createCommit(
+      ctx,
+      commitMessage,
+      treeSha,
+      parentSha ? [parentSha] : [],
+    );
     return { commitMessage, commit };
   }
 
@@ -139,13 +131,17 @@ export class GitHubBackup {
     return true;
   }
 
-  async handleOAuthCallback(code: string, clientId: string, clientSecret: string): Promise<boolean> {
+  async handleOAuthCallback(
+    code: string,
+    clientId: string,
+    clientSecret: string,
+  ): Promise<boolean> {
     try {
       const response = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           client_id: clientId,
@@ -193,16 +189,31 @@ export class GitHubBackup {
     return response.json() as Promise<T>;
   }
 
-  private async checkRepoExists(owner: string, repo: string, token: string, abortSignal?: AbortSignal): Promise<boolean> {
+  private async checkRepoExists(
+    owner: string,
+    repo: string,
+    token: string,
+    abortSignal?: AbortSignal,
+  ): Promise<boolean> {
     try {
-      await this.githubFetch(`https://api.github.com/repos/${owner}/${repo}`, token, {}, abortSignal);
+      await this.githubFetch(
+        `https://api.github.com/repos/${owner}/${repo}`,
+        token,
+        {},
+        abortSignal,
+      );
       return true;
     } catch {
       return false;
     }
   }
 
-  private async createRepo(owner: string, repo: string, token: string, abortSignal?: AbortSignal): Promise<void> {
+  private async createRepo(
+    owner: string,
+    repo: string,
+    token: string,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
     await this.githubFetch(
       'https://api.github.com/user/repos',
       token,
@@ -234,7 +245,7 @@ export class GitHubBackup {
     excludePatterns: string[],
   ): Promise<GitHubTree> {
     const tree: GitHubTreeItem[] = [];
-    await this.collectTreeItems(ctx, projectPath, '', excludePatterns, tree);
+    await collectTreeItems(ctx, projectPath, '', excludePatterns, tree);
     return this.githubFetch<GitHubTree>(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees`,
       ctx.token,
@@ -244,36 +255,6 @@ export class GitHubBackup {
       },
       ctx.abortSignal,
     );
-  }
-
-  /** 递归收集目录树条目（跳过排除项与中止信号） */
-  private async collectTreeItems(
-    ctx: GitHubApiContext,
-    dir: string,
-    prefix: string,
-    excludePatterns: string[],
-    tree: GitHubTreeItem[],
-  ): Promise<void> {
-    if (ctx.abortSignal?.aborted) return;
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (ctx.abortSignal?.aborted) return;
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (matchesExcludePattern(relativePath, excludePatterns)) continue;
-      if (entry.isDirectory()) {
-        await this.collectTreeItems(ctx, fullPath, relativePath, excludePatterns, tree);
-      } else if (entry.isFile()) {
-        const content = await fs.readFile(fullPath, 'base64');
-        tree.push({
-          path: relativePath,
-          mode: '100644',
-          type: 'blob',
-          content,
-        });
-      }
-    }
   }
 
   private async createCommit(
@@ -293,11 +274,7 @@ export class GitHubBackup {
     );
   }
 
-  private async updateRef(
-    ctx: GitHubApiContext,
-    branch: string,
-    commitSha: string,
-  ): Promise<void> {
+  private async updateRef(ctx: GitHubApiContext, branch: string, commitSha: string): Promise<void> {
     await this.githubFetch(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/refs/heads/${branch}`,
       ctx.token,
@@ -308,7 +285,6 @@ export class GitHubBackup {
       ctx.abortSignal,
     );
   }
-
 }
 
 // ─── Token 存储接口 ──────────────────────────────────────

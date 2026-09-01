@@ -43,7 +43,10 @@ function createBlockedResult(adapter: ToolAdapter): HookedToolResult {
  * 判定顺序：excludePaths 命中 → excluded-by-scope；未命中 readPaths → outside-read-paths；
  * 命中 sensitivePatterns → sensitive-path。未声明 readPaths 视为不限制读取范围。
  */
-export function evaluateAccessScope(scope: AccessScope, options: ToolScanOptions): ScopeViolation[] {
+export function evaluateAccessScope(
+  scope: AccessScope,
+  options: ToolScanOptions,
+): ScopeViolation[] {
   const violations: ScopeViolation[] = [];
   for (const file of options.targetFiles ?? []) {
     const excludeHit = (scope.excludePaths ?? []).find((p) => matchGlobPath(file, p));
@@ -51,8 +54,10 @@ export function evaluateAccessScope(scope: AccessScope, options: ToolScanOptions
       violations.push({ file, reason: `excluded-by-scope:${excludeHit}` });
       continue;
     }
-    if ((scope.readPaths ?? []).length > 0
-      && !(scope.readPaths as string[]).some((p) => matchGlobPath(file, p))) {
+    if (
+      (scope.readPaths ?? []).length > 0 &&
+      !(scope.readPaths as string[]).some((p) => matchGlobPath(file, p))
+    ) {
       violations.push({ file, reason: 'outside-read-paths' });
       continue;
     }
@@ -84,7 +89,11 @@ export function wrapAdapter(
         return createBlockedResult(adapter);
       }
 
-      const violations = evaluateAndNotifyViolations(adapter, before.options, options?.onScopeViolation);
+      const violations = evaluateAndNotifyViolations(
+        adapter,
+        before.options,
+        options?.onScopeViolation,
+      );
       const after = await runAfterHooks(adapter, hooks, await adapter.scan(before.options));
 
       if (violations.length > 0 || after.modifications.length > 0) {

@@ -84,7 +84,10 @@ export function globToRegExp(pattern: string): RegExp {
 }
 
 /** 相对路径是否命中任一排除模式（支持 ** 与 * 通配） */
-export function matchesExcludePatterns(relativePath: string, patterns: string[] | undefined): boolean {
+export function matchesExcludePatterns(
+  relativePath: string,
+  patterns: string[] | undefined,
+): boolean {
   if (!patterns || patterns.length === 0) return false;
   return patterns.some((p) => globToRegExp(p).test(relativePath));
 }
@@ -224,7 +227,12 @@ export function readFileSafe(filePath: string): string | null {
 }
 
 /** 按正则模式扫描单文件内容，返回所有命中违规 */
-export function scanPatternsInFile(content: string, relativePath: string, rule: SopRule, patterns: string[]): Violation[] {
+export function scanPatternsInFile(
+  content: string,
+  relativePath: string,
+  rule: SopRule,
+  patterns: string[],
+): Violation[] {
   const violations: Violation[] = [];
   const lines = content.split('\n');
 
@@ -319,14 +327,27 @@ function scanLineForForbidden(
 }
 
 /** 扫描单文件内容中的禁止模式（子串匹配；裸标识符按整词匹配），返回所有命中违规 */
-export function scanForbiddenInFile(content: string, relativePath: string, rule: SopRule, patterns: string[]): Violation[] {
+export function scanForbiddenInFile(
+  content: string,
+  relativePath: string,
+  rule: SopRule,
+  patterns: string[],
+): Violation[] {
   const violations: Violation[] = [];
   const lines = content.split('\n');
 
   for (const pattern of patterns) {
     const isBareIdentifier = BARE_IDENTIFIER_RE.test(pattern);
     for (let i = 0; i < lines.length; i++) {
-      scanLineForForbidden(lines[i], pattern, isBareIdentifier, relativePath, rule, i + 1, violations);
+      scanLineForForbidden(
+        lines[i],
+        pattern,
+        isBareIdentifier,
+        relativePath,
+        rule,
+        i + 1,
+        violations,
+      );
     }
   }
 
@@ -334,7 +355,10 @@ export function scanForbiddenInFile(content: string, relativePath: string, rule:
 }
 
 /** 根据文件路径判断所属层级（按层名匹配目录） */
-export function detectLayer(filePath: string, layers: Array<{ name: string; allowedDependencies: string[] }>): string | null {
+export function detectLayer(
+  filePath: string,
+  layers: Array<{ name: string; allowedDependencies: string[] }>,
+): string | null {
   const normalized = filePath.replace(/\\/g, '/');
   for (const layer of layers) {
     if (!SAFE_LAYER_NAME_RE.test(layer.name)) continue;
@@ -346,7 +370,10 @@ export function detectLayer(filePath: string, layers: Array<{ name: string; allo
 }
 
 /** 根据导入的模块名判断目标层级 */
-export function detectLayerByName(moduleName: string, layers: Array<{ name: string; allowedDependencies: string[] }>): string | null {
+export function detectLayerByName(
+  moduleName: string,
+  layers: Array<{ name: string; allowedDependencies: string[] }>,
+): string | null {
   const lower = moduleName.toLowerCase();
   for (const layer of layers) {
     if (lower === layer.name.toLowerCase() || lower.includes(layer.name.toLowerCase())) {

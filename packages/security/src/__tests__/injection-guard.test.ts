@@ -11,7 +11,11 @@ import {
   scanMarkdownHiddenLinks,
 } from '../injection-guard';
 
-const FIXTURE_ROOT = path.join(fileURLToPath(new URL('.', import.meta.url)), 'fixtures', 'injection');
+const FIXTURE_ROOT = path.join(
+  fileURLToPath(new URL('.', import.meta.url)),
+  'fixtures',
+  'injection',
+);
 
 function readFixture(...segments: string[]): string {
   return fs.readFileSync(path.join(FIXTURE_ROOT, ...segments), 'utf-8');
@@ -34,7 +38,10 @@ describe('scanCommentInstructions', () => {
   });
 
   it('extracts python line comments and md html comments', () => {
-    const pyHits = scanCommentInstructions('# system prompt override below\ndef main():\n    pass\n', '.py');
+    const pyHits = scanCommentInstructions(
+      '# system prompt override below\ndef main():\n    pass\n',
+      '.py',
+    );
     expect(pyHits).toHaveLength(1);
     expect(pyHits[0]?.matchedPattern).toBe('system-prompt-reference');
 
@@ -58,12 +65,23 @@ describe('scanCommentInstructions', () => {
 
 describe('classifyPackageJsonScripts', () => {
   it('classifies each script with matched-pattern reason on suspicious package.json', () => {
-    const verdicts = classifyPackageJsonScripts(readFixture('scripts', 'suspicious', 'package.json'));
+    const verdicts = classifyPackageJsonScripts(
+      readFixture('scripts', 'suspicious', 'package.json'),
+    );
     const byScript = new Map(verdicts.map((v) => [v.script, v]));
 
-    expect(byScript.get('setup')).toMatchObject({ verdict: 'suspicious', matchedPattern: 'remote-content-piped-to-shell' });
-    expect(byScript.get('decode')).toMatchObject({ verdict: 'suspicious', matchedPattern: 'base64-decode-execution' });
-    expect(byScript.get('reset')).toMatchObject({ verdict: 'suspicious', matchedPattern: 'force-delete' });
+    expect(byScript.get('setup')).toMatchObject({
+      verdict: 'suspicious',
+      matchedPattern: 'remote-content-piped-to-shell',
+    });
+    expect(byScript.get('decode')).toMatchObject({
+      verdict: 'suspicious',
+      matchedPattern: 'base64-decode-execution',
+    });
+    expect(byScript.get('reset')).toMatchObject({
+      verdict: 'suspicious',
+      matchedPattern: 'force-delete',
+    });
     expect(byScript.get('probe')?.verdict).toBe('safe');
   });
 
@@ -114,7 +132,9 @@ describe('InjectionGuard.scan', () => {
   });
 
   it('flags suspicious package.json scripts as supply-chain findings and skips clean pkg', async () => {
-    const suspicious = await new InjectionGuard().scan(path.join(FIXTURE_ROOT, 'scripts', 'suspicious'));
+    const suspicious = await new InjectionGuard().scan(
+      path.join(FIXTURE_ROOT, 'scripts', 'suspicious'),
+    );
     expect(suspicious.filter((i) => i.type === 'supply-chain')).toHaveLength(3);
 
     const clean = await new InjectionGuard().scan(path.join(FIXTURE_ROOT, 'scripts', 'clean'));

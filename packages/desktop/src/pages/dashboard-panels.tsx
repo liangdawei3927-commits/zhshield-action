@@ -11,7 +11,10 @@ export function ScopeBlock({ titleKey, items }: { titleKey: string; items: reado
       <div className="text-xs font-medium text-zh-muted mb-1.5">{t(titleKey)}</div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
-          <span key={item} className="px-2.5 py-1 rounded-full text-[11px] bg-green-50 text-green-800">
+          <span
+            key={item}
+            className="px-2.5 py-1 rounded-full text-[11px] bg-green-50 text-green-800"
+          >
             {t(item)}
           </span>
         ))}
@@ -34,23 +37,45 @@ export function CheckScopePanel() {
 }
 
 /** 一键体检按钮（含运行中 loading 态） */
-export function CheckRunButton({ running, progressLabel, onCheck }: { running: boolean; progressLabel: string; onCheck: () => void }) {
+export function CheckRunButton({
+  running,
+  progressLabel,
+  onCheck,
+}: {
+  running: boolean;
+  progressLabel: string;
+  onCheck: () => void;
+}) {
   const t = useT();
   return (
-    <PrimaryButton onClick={onCheck} loading={running} loadingLabel={progressLabel || t('page.dashboard.running')}>
+    <PrimaryButton
+      onClick={onCheck}
+      loading={running}
+      loadingLabel={progressLabel || t('page.dashboard.running')}
+    >
       {t('page.dashboard.check')}
     </PrimaryButton>
   );
 }
 
 /** 运行中进度与自动修复提示 */
-export function RunStatus({ running, pipelineProgress, autoFixNotice }: { running: boolean; pipelineProgress: PipelineProgress | null; autoFixNotice: string | null }) {
+export function RunStatus({
+  running,
+  pipelineProgress,
+  autoFixNotice,
+}: {
+  running: boolean;
+  pipelineProgress: PipelineProgress | null;
+  autoFixNotice: string | null;
+}) {
   const t = useT();
   return (
     <>
       {running && pipelineProgress ? (
         <p className="text-xs text-zh-muted mt-3">
-          {t('page.dashboard.progress', { progress: Math.round((pipelineProgress.progress || 0) * 100) })}
+          {t('page.dashboard.progress', {
+            progress: Math.round((pipelineProgress.progress || 0) * 100),
+          })}
           {pipelineProgress.stage === 'guard' ? t('page.dashboard.stageGuard') : ''}
           {pipelineProgress.stage === 'inspect' ? t('page.dashboard.stageInspect') : ''}
         </p>

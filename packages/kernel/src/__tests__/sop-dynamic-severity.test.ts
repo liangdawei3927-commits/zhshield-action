@@ -199,12 +199,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
     writeRuleFile(
       root,
       'guard/scan/dyn-unknown-key.yml',
-      [
-        'severity: medium',
-        'accumulate:',
-        '  escalateTo: high',
-        '  bogusKey: 1',
-      ].join('\n'),
+      ['severity: medium', 'accumulate:', '  escalateTo: high', '  bogusKey: 1'].join('\n'),
     );
 
     const registry = await loadRoot(root);
@@ -220,11 +215,7 @@ describe('SopLoader — F1 动态严重级配置（accumulationPolicy / blocking
   // ─── 无新字段的规则：行为不变 ───────────────────────────
   it('未声明新字段的规则不携带 accumulationPolicy/blockingThreshold', async () => {
     const root = trackDir();
-    writeRuleFile(
-      root,
-      'guard/scan/plain.yml',
-      ['name: Plain', 'severity: medium'].join('\n'),
-    );
+    writeRuleFile(root, 'guard/scan/plain.yml', ['name: Plain', 'severity: medium'].join('\n'));
 
     const registry = await loadRoot(root);
     const rule = registry.get('guard.scan.official.plain');

@@ -4,9 +4,21 @@ import { resolveLockfileCheck, LOCKFILE_CHECKS } from '../pages/dependency-logic
 type LockfileLike = { present: boolean; consistent: boolean; integrityVerified: boolean };
 
 const okLockfile: LockfileLike = { present: true, consistent: true, integrityVerified: true };
-const inconsistentLockfile: LockfileLike = { present: true, consistent: false, integrityVerified: true };
-const noIntegrityLockfile: LockfileLike = { present: true, consistent: true, integrityVerified: false };
-const missingLockfile: LockfileLike = { present: false, consistent: false, integrityVerified: false };
+const inconsistentLockfile: LockfileLike = {
+  present: true,
+  consistent: false,
+  integrityVerified: true,
+};
+const noIntegrityLockfile: LockfileLike = {
+  present: true,
+  consistent: true,
+  integrityVerified: false,
+};
+const missingLockfile: LockfileLike = {
+  present: false,
+  consistent: false,
+  integrityVerified: false,
+};
 
 describe('resolveLockfileCheck', () => {
   it('present 恒可判定：true → ok，false → fail', () => {

@@ -28,7 +28,9 @@ export interface TargetProfile {
 
 export interface UserOverrides {
   readonly architecture?: ArchitectureForm;
-  readonly targets?: Readonly<Record<string, { readonly language?: string; readonly productForm?: string }>>;
+  readonly targets?: Readonly<
+    Record<string, { readonly language?: string; readonly productForm?: string }>
+  >;
   readonly updatedAt?: string;
 }
 
@@ -55,13 +57,16 @@ export interface ProjectProfile {
 
 export function ConfidenceBadge({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
-  const colorClass = pct >= 90
-    ? 'bg-green-100 text-green-800'
-    : pct >= 70
-      ? 'bg-amber-100 text-amber-800'
-      : 'bg-red-100 text-red-800';
+  const colorClass =
+    pct >= 90
+      ? 'bg-green-100 text-green-800'
+      : pct >= 70
+        ? 'bg-amber-100 text-amber-800'
+        : 'bg-red-100 text-red-800';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${colorClass}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${colorClass}`}
+    >
       {pct}%
     </span>
   );
@@ -70,7 +75,16 @@ export function ConfidenceBadge({ confidence }: { confidence: number }) {
 export function StaleBadge() {
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v6l4 2" />
       </svg>
@@ -88,7 +102,15 @@ export function SectionCard({ title, children }: { title: string; children: Reac
   );
 }
 
-export function DataRow({ label, value, badge }: { label: string; value: React.ReactNode; badge?: React.ReactNode }) {
+export function DataRow({
+  label,
+  value,
+  badge,
+}: {
+  label: string;
+  value: React.ReactNode;
+  badge?: React.ReactNode;
+}) {
   return (
     <div className="flex items-start justify-between py-2 border-b border-zh-line/50 last:border-b-0">
       <span className="text-xs text-zh-muted shrink-0 mr-4">{label}</span>
@@ -113,7 +135,9 @@ export function SignalList({ signals }: { signals: readonly Signal[] }) {
       <div className="space-y-1.5">
         {shown.map((sig, i) => (
           <div key={i} className="flex items-center gap-2 text-[11px] py-1">
-            <span className="shrink-0 px-1.5 py-0.5 rounded bg-zh-bg text-zh-muted font-mono">{sig.kind}</span>
+            <span className="shrink-0 px-1.5 py-0.5 rounded bg-zh-bg text-zh-muted font-mono">
+              {sig.kind}
+            </span>
             <span className="text-zh-ink font-mono truncate">{sig.ruleId}</span>
             <span className="text-zh-muted shrink-0">{sig.file}</span>
           </div>
@@ -141,7 +165,9 @@ export function TargetCard({ target }: { target: TargetProfile }) {
           <span className="text-sm font-semibold text-zh-ink">{target.id}</span>
           <span className="text-[11px] text-zh-muted font-mono">{target.path}</span>
         </div>
-        <span className="text-[11px] font-mono text-zh-muted bg-zh-bg px-2 py-0.5 rounded">{target.routeKey}</span>
+        <span className="text-[11px] font-mono text-zh-muted bg-zh-bg px-2 py-0.5 rounded">
+          {target.routeKey}
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-x-6">
@@ -150,16 +176,19 @@ export function TargetCard({ target }: { target: TargetProfile }) {
           value={target.language.value}
           badge={<ConfidenceBadge confidence={target.language.confidence} />}
         />
-        <DataRow label="框架" value={
-          <span className="flex flex-wrap gap-1 justify-end">
-            {target.frameworks.map((fw, i) => (
-              <span key={i} className="inline-flex items-center gap-1">
-                <span>{fw.value}</span>
-                <ConfidenceBadge confidence={fw.confidence} />
-              </span>
-            ))}
-          </span>
-        } />
+        <DataRow
+          label="框架"
+          value={
+            <span className="flex flex-wrap gap-1 justify-end">
+              {target.frameworks.map((fw, i) => (
+                <span key={i} className="inline-flex items-center gap-1">
+                  <span>{fw.value}</span>
+                  <ConfidenceBadge confidence={fw.confidence} />
+                </span>
+              ))}
+            </span>
+          }
+        />
         {target.productForm && (
           <DataRow
             label="交付形态"
@@ -201,24 +230,25 @@ export function OverridesPanel({ overrides }: { overrides: UserOverrides }) {
 
   return (
     <div className="space-y-2">
-      {overrides.architecture && (
-        <DataRow label="架构修正" value={overrides.architecture} />
-      )}
-      {overrides.targets && Object.entries(overrides.targets).map(([key, val]) => (
-        <DataRow
-          key={key}
-          label={`目标修正: ${key}`}
-          value={
-            <span className="text-[11px] font-mono">
-              {val.language && `语言=${val.language}`}
-              {val.language && val.productForm && ' / '}
-              {val.productForm && `形态=${val.productForm}`}
-            </span>
-          }
-        />
-      ))}
+      {overrides.architecture && <DataRow label="架构修正" value={overrides.architecture} />}
+      {overrides.targets &&
+        Object.entries(overrides.targets).map(([key, val]) => (
+          <DataRow
+            key={key}
+            label={`目标修正: ${key}`}
+            value={
+              <span className="text-[11px] font-mono">
+                {val.language && `语言=${val.language}`}
+                {val.language && val.productForm && ' / '}
+                {val.productForm && `形态=${val.productForm}`}
+              </span>
+            }
+          />
+        ))}
       {overrides.updatedAt && (
-        <p className="text-[11px] text-zh-muted mt-2">最后修正：{new Date(overrides.updatedAt).toLocaleString()}</p>
+        <p className="text-[11px] text-zh-muted mt-2">
+          最后修正：{new Date(overrides.updatedAt).toLocaleString()}
+        </p>
       )}
     </div>
   );

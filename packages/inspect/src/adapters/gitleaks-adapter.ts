@@ -1,7 +1,14 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -71,7 +78,11 @@ export class GitleaksAdapter implements ToolAdapter {
   }
 
   /** 执行 gitleaks 并映射输出为可用结果 */
-  private async runGitleaks(options: ToolScanOptions, start: number, isStaged: boolean): Promise<ToolResult> {
+  private async runGitleaks(
+    options: ToolScanOptions,
+    start: number,
+    isStaged: boolean,
+  ): Promise<ToolResult> {
     const command = await this.resolveCommand();
     const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
       cwd: options.projectPath,
@@ -80,7 +91,7 @@ export class GitleaksAdapter implements ToolAdapter {
     });
 
     const parsed = JSON.parse(stdout);
-    const findings = Array.isArray(parsed) ? parsed : (parsed?.findings || []);
+    const findings = Array.isArray(parsed) ? parsed : parsed?.findings || [];
     return this.buildAvailable(findings, start);
   }
 
@@ -103,7 +114,7 @@ export class GitleaksAdapter implements ToolAdapter {
     if (!stdout) return null;
     try {
       const parsed = JSON.parse(stdout);
-      const findings = Array.isArray(parsed) ? parsed : (parsed?.findings || []);
+      const findings = Array.isArray(parsed) ? parsed : parsed?.findings || [];
       return findings.length > 0 ? findings : null;
     } catch {
       return null;

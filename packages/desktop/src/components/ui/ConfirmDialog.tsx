@@ -60,7 +60,9 @@ export function ConfirmDialog({
             as="button"
             onClick={onConfirm}
             className={`px-4 py-2 rounded-lg text-sm font-medium text-white border-none cursor-pointer transition-colors ${
-              variant === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-brand-600 hover:bg-brand-800'
+              variant === 'danger'
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-brand-600 hover:bg-brand-800'
             }`}
           >
             {confirmLabel ?? t('common.confirm')}

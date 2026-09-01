@@ -7,7 +7,15 @@ import { GitleaksAdapter } from '../adapters/gitleaks-adapter';
 import { EventBus, SopRegistry, SopRuleEngine } from '@zh/kernel';
 import type { SopRule } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
-import type { EventEmitter, GovernanceEvent, ScopeViolationEvent, ToolAdapter, ToolId, ToolResult, ToolScanOptions } from '@zh/shared';
+import type {
+  EventEmitter,
+  GovernanceEvent,
+  ScopeViolationEvent,
+  ToolAdapter,
+  ToolId,
+  ToolResult,
+  ToolScanOptions,
+} from '@zh/shared';
 
 function makeCapturingEmitter(): { emitter: EventEmitter; events: GovernanceEvent[] } {
   const events: GovernanceEvent[] = [];
@@ -21,7 +29,10 @@ function makeCapturingEmitter(): { emitter: EventEmitter; events: GovernanceEven
   };
 }
 
-function makeScopedMock(id: ToolId, accessScope: ToolAdapter['accessScope']): ToolAdapter & { scanCalls: ToolScanOptions[] } {
+function makeScopedMock(
+  id: ToolId,
+  accessScope: ToolAdapter['accessScope'],
+): ToolAdapter & { scanCalls: ToolScanOptions[] } {
   const scanCalls: ToolScanOptions[] = [];
   const result: ToolResult = {
     tool: id,
@@ -88,7 +99,10 @@ describe('F5-2 越界事件接线（warn-only）', () => {
     });
 
     expect(['available', 'unavailable', 'error']).toContain(result.status);
-    const scopeEvents = events.filter((e): e is Extract<GovernanceEvent, { type: 'tool:scope-violation' }> => e.type === 'tool:scope-violation');
+    const scopeEvents = events.filter(
+      (e): e is Extract<GovernanceEvent, { type: 'tool:scope-violation' }> =>
+        e.type === 'tool:scope-violation',
+    );
     expect(scopeEvents).toHaveLength(1);
     expect(scopeEvents[0]?.payload).toMatchObject({
       tool: 'gitleaks',
@@ -103,11 +117,14 @@ describe('F5-2 越界事件接线（warn-only）', () => {
     const engine = new InspectEngine(emitter);
     engine.registerAdapter(new GitleaksAdapter());
 
-    await engine.getToolManager().get('gitleaks').scan({
-      projectPath: '/tmp/proj',
-      projectId: 'proj-f5',
-      targetFiles: ['src/app.ts', '.env'],
-    });
+    await engine
+      .getToolManager()
+      .get('gitleaks')
+      .scan({
+        projectPath: '/tmp/proj',
+        projectId: 'proj-f5',
+        targetFiles: ['src/app.ts', '.env'],
+      });
 
     expect(events.filter((e) => e.type === 'tool:scope-violation')).toHaveLength(0);
   });
@@ -160,7 +177,11 @@ describe('F5-2 越界事件接线（warn-only）', () => {
     engine.registerToolAdapter('eslint', fake);
     registry.register(makeToolDispatchRule('eslint'));
 
-    await engine.evaluateRules({ repoRoot: '/test-project', domain: 'guard', files: NODE_MODULES_TARGETS });
+    await engine.evaluateRules({
+      repoRoot: '/test-project',
+      domain: 'guard',
+      files: NODE_MODULES_TARGETS,
+    });
 
     expect(fake.scanCalls).toHaveLength(1);
     expect(received).toHaveLength(1);

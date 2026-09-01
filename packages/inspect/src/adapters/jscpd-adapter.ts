@@ -3,7 +3,14 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  AccessScope,
+} from '@zh/shared';
 import { FileHelper } from '@zh/kernel';
 import { resolveToolCommand } from './tool-bin';
 
@@ -89,7 +96,11 @@ export class JscpdAdapter implements ToolAdapter {
   }
 
   /** 执行 jscpd、读取报告并映射为可用结果 */
-  private async runJscpd(options: ToolScanOptions, start: number, reportPath: string): Promise<ToolResult> {
+  private async runJscpd(
+    options: ToolScanOptions,
+    start: number,
+    reportPath: string,
+  ): Promise<ToolResult> {
     const target = options.targetFiles?.[0] || path.join(options.projectPath, 'src');
     await this.executeJscpd(options, target, reportPath);
     const content = await this.readJscpdReport(reportPath);
@@ -98,7 +109,11 @@ export class JscpdAdapter implements ToolAdapter {
   }
 
   /** 运行 jscpd 命令并输出 JSON 报告到 reportPath */
-  private async executeJscpd(options: ToolScanOptions, target: string, reportPath: string): Promise<void> {
+  private async executeJscpd(
+    options: ToolScanOptions,
+    target: string,
+    reportPath: string,
+  ): Promise<void> {
     const command = await this.resolveCommand();
     await FileHelper.ensureDir(path.dirname(reportPath));
     const args = ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
@@ -132,7 +147,11 @@ export class JscpdAdapter implements ToolAdapter {
   }
 
   /** 处理 jscpd 执行错误：清理报告 / 未安装 / 失败 */
-  private async handleJscpdError(error: unknown, start: number, reportPath: string): Promise<ToolResult> {
+  private async handleJscpdError(
+    error: unknown,
+    start: number,
+    reportPath: string,
+  ): Promise<ToolResult> {
     await this.cleanupReport(reportPath);
 
     const err = error as { code?: string; stderr?: string; message?: string };
@@ -141,7 +160,12 @@ export class JscpdAdapter implements ToolAdapter {
         tool: 'jscpd',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'jscpd 未安装',
       };
     }
@@ -155,7 +179,11 @@ export class JscpdAdapter implements ToolAdapter {
   }
 
   private async cleanupReport(reportPath: string): Promise<void> {
-    try { await fs.promises.unlink(reportPath); } catch { /* ignore */ }
+    try {
+      await fs.promises.unlink(reportPath);
+    } catch {
+      /* ignore */
+    }
   }
 
   private mapOutput(output: unknown): Issue[] {

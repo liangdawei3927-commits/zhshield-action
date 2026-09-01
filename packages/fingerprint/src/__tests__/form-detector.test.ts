@@ -32,9 +32,7 @@ describe('FormDetector', () => {
     });
     try {
       const signals = await detector.detect(root);
-      expect(ruleIds(signals)).toEqual(
-        expect.arrayContaining(['form:podfile', 'form:xcodeproj']),
-      );
+      expect(ruleIds(signals)).toEqual(expect.arrayContaining(['form:podfile', 'form:xcodeproj']));
     } finally {
       cleanupTempProject(root);
     }
@@ -74,7 +72,9 @@ describe('FormDetector', () => {
     });
     try {
       const signals = await detector.detect(root);
-      expect(ruleIds(signals)).toEqual(expect.arrayContaining(['form:index-html', 'form:web-bundler']));
+      expect(ruleIds(signals)).toEqual(
+        expect.arrayContaining(['form:index-html', 'form:web-bundler']),
+      );
     } finally {
       cleanupTempProject(root);
     }

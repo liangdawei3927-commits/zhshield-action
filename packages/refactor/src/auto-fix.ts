@@ -3,7 +3,8 @@ import type { CodeSmell, TextEdit, Fix, FixResult } from './types';
 
 type FixGenerator = (smell: CodeSmell, sourceDir: string) => Fix | null;
 
-const FIELD_DECLARATION = /^(public\s+)?(?:static readonly|readonly static|static|readonly)?\s*(?:\w+)\s*:\s/;
+const FIELD_DECLARATION =
+  /^(public\s+)?(?:static readonly|readonly static|static|readonly)?\s*(?:\w+)\s*:\s/;
 const PUBLIC_PREFIX = /^public\s+/;
 const THEN_CHAIN = /\.then\(/;
 const METHOD_SIG = /^\s*(public|private|protected)?\s*(static\s+)?\w+\s*\(/;
@@ -13,7 +14,8 @@ const EXTRACT_LITERAL = /将 "([^"]+)" 提取为共享常量文件/;
 const NON_ALPHANUMERIC = /[^a-zA-Z0-9_]/g;
 const LEADING_DIGIT = /^(\d)/;
 const METHOD_NAME_PREFIX = /^[a-zA-Z_$]/;
-const METHOD_DECLARATION = /^((?:public|private|protected)\s+)?(static\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/;
+const METHOD_DECLARATION =
+  /^((?:public|private|protected)\s+)?(static\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/;
 
 // ─── Inappropriate-Intimacy: 将 public 字段改为 private ─────
 
@@ -35,8 +37,10 @@ const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir) => {
       const replaced = ' '.repeat(indent) + 'private ' + trimmed.replace(PUBLIC_PREFIX, '');
       edits.push({
         filePath,
-        startLine: i, startColumn: 1,
-        endLine: i, endColumn: line.length + 1,
+        startLine: i,
+        startColumn: 1,
+        endLine: i,
+        endColumn: line.length + 1,
         replacement: replaced,
       });
     }
@@ -69,12 +73,16 @@ const fixCallbackHell: FixGenerator = (smell, _sourceDir) => {
   const asyncSig = buildAsyncSignature(sigLine);
   if (!asyncSig) return null;
 
-  const edits: TextEdit[] = [{
-    filePath,
-    startLine: methodSigLine + 1, startColumn: 1,
-    endLine: methodSigLine + 1, endColumn: sigLine.length + 1,
-    replacement: asyncSig,
-  }];
+  const edits: TextEdit[] = [
+    {
+      filePath,
+      startLine: methodSigLine + 1,
+      startColumn: 1,
+      endLine: methodSigLine + 1,
+      endColumn: sigLine.length + 1,
+      replacement: asyncSig,
+    },
+  ];
   const thenEdit = buildThenToAwaitTodo(lines, filePath, smell.location.line, methodText);
   if (thenEdit) edits.push(thenEdit);
 
@@ -111,25 +119,41 @@ function buildAsyncSignature(sigLine: string): string | null {
     if (!methodMatch) return null;
     const prefix = methodMatch[1] || '';
     const staticPrefix = methodMatch[2] || '';
-    return ' '.repeat(indent) + prefix + staticPrefix + 'async ' + methodMatch[3] + trimmedSig.slice(methodMatch[0].length - 1);
+    return (
+      ' '.repeat(indent) +
+      prefix +
+      staticPrefix +
+      'async ' +
+      methodMatch[3] +
+      trimmedSig.slice(methodMatch[0].length - 1)
+    );
   }
   return null;
 }
 
 /** 复杂 .then().catch() 链在首个 .then 处补充手动转换 TODO 注释 */
-function buildThenToAwaitTodo(lines: string[], filePath: string, smellLine: number, methodText: string): TextEdit | null {
+function buildThenToAwaitTodo(
+  lines: string[],
+  filePath: string,
+  smellLine: number,
+  methodText: string,
+): TextEdit | null {
   if (!methodText.includes('.then(') || !methodText.includes('.catch(')) return null;
 
-  const firstThenLine = smellLine + methodText.split('\n').findIndex(l => l.includes('.then('));
+  const firstThenLine = smellLine + methodText.split('\n').findIndex((l) => l.includes('.then('));
   if (firstThenLine < smellLine || firstThenLine > lines.length) return null;
 
   const thenLine = lines[firstThenLine - 1];
   const thenIndent = thenLine.length - thenLine.trimStart().length;
   return {
     filePath,
-    startLine: firstThenLine, startColumn: 1,
-    endLine: firstThenLine, endColumn: 1,
-    replacement: ' '.repeat(thenIndent) + '// TODO: 将 .then() 链手动转换为 await (auto-fix 已添加 async 关键字)\n',
+    startLine: firstThenLine,
+    startColumn: 1,
+    endLine: firstThenLine,
+    endColumn: 1,
+    replacement:
+      ' '.repeat(thenIndent) +
+      '// TODO: 将 .then() 链手动转换为 await (auto-fix 已添加 async 关键字)\n',
   };
 }
 
@@ -153,12 +177,16 @@ const fixShotgunSurgery: FixGenerator = (smell, sourceDir) => {
     smellId: smell.id,
     ruleId: smell.ruleId,
     description: `将 "${literal}" 提取到 ${constantsFile}`,
-    edits: [{
-      filePath: constantsFile,
-      startLine: 1, startColumn: 1,
-      endLine: 1, endColumn: 1,
-      replacement: existingContent + newEntry,
-    }],
+    edits: [
+      {
+        filePath: constantsFile,
+        startLine: 1,
+        startColumn: 1,
+        endLine: 1,
+        endColumn: 1,
+        replacement: existingContent + newEntry,
+      },
+    ],
   };
 };
 
@@ -168,10 +196,7 @@ function extractLiteralFromSuggestion(smell: CodeSmell): string | null {
 }
 
 function toConstantName(literal: string): string {
-  return literal
-    .replace(NON_ALPHANUMERIC, '_')
-    .replace(LEADING_DIGIT, '_$1')
-    .toUpperCase();
+  return literal.replace(NON_ALPHANUMERIC, '_').replace(LEADING_DIGIT, '_$1').toUpperCase();
 }
 
 function loadConstantsContent(constantsFile: string): string {
@@ -262,7 +287,10 @@ function applyEditsToFile(filePath: string, edits: TextEdit[]): { fixed: number;
   }
 }
 
-function applyEdit(content: string, edit: TextEdit): { content: string; wroteFile: boolean } | null {
+function applyEdit(
+  content: string,
+  edit: TextEdit,
+): { content: string; wroteFile: boolean } | null {
   const lines = content.split('\n');
   if (edit.startLine > lines.length) return null;
 
@@ -270,7 +298,10 @@ function applyEdit(content: string, edit: TextEdit): { content: string; wroteFil
 }
 
 /** 按单行/多行分派编辑应用：单行替换不落盘，多行整段替换 */
-function applyEditToLines(lines: string[], edit: TextEdit): { content: string; wroteFile: boolean } {
+function applyEditToLines(
+  lines: string[],
+  edit: TextEdit,
+): { content: string; wroteFile: boolean } {
   if (edit.startLine === edit.endLine) {
     return { content: applySingleLineEdit(lines, edit), wroteFile: false };
   }

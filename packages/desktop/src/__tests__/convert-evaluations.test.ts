@@ -53,9 +53,7 @@ describe('convertInspectEvaluations', () => {
   });
 
   it('Bug3: test 标签 → category "test"（落入 dependencies 维度）', () => {
-    const evals: InspectEval[] = [
-      { status: 'failed', rule: { severity: 'low', tags: ['test'] } },
-    ];
+    const evals: InspectEval[] = [{ status: 'failed', rule: { severity: 'low', tags: ['test'] } }];
     const out = convertInspectEvaluations(evals);
     expect(out).toHaveLength(1);
     expect(out[0].category).toBe('test');
@@ -103,9 +101,7 @@ describe('convertGuardEvaluations', () => {
   });
 
   it('error 状态保留并映射', () => {
-    const evals = [
-      { status: 'error', rule: { severity: 'low' } },
-    ];
+    const evals = [{ status: 'error', rule: { severity: 'low' } }];
     const out = convertGuardEvaluations(evals);
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual({ severity: 'info', status: 'error', blocking: false });

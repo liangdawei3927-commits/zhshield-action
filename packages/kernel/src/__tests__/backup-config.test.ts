@@ -147,7 +147,13 @@ describe('BackupOrchestrator 接线与真实落盘（端到端）', () => {
     await fs.mkdir(zhDir, { recursive: true });
     await fs.writeFile(
       path.join(zhDir, 'backup.yml'),
-      ['backup:', '  local:', `    backupDir: ${backupRoot}`, '    maxBackups: 3', '    format: directory'].join('\n'),
+      [
+        'backup:',
+        '  local:',
+        `    backupDir: ${backupRoot}`,
+        '    maxBackups: 3',
+        '    format: directory',
+      ].join('\n'),
       'utf-8',
     );
     manager = new BackupConfigManager();
@@ -239,8 +245,12 @@ describe('LocalBackup zip 归档（默认格式）', () => {
       expect(archive.entriesByName.has('BACKUP_MANIFEST.json')).toBe(true);
       expect(archive.entriesByName.has('src/index.ts')).toBe(true);
       expect(archive.entriesByName.has('README.md')).toBe(true);
-      const manifestBuf = await archive.readEntry(archive.entriesByName.get('BACKUP_MANIFEST.json')!);
-      const manifest = JSON.parse(manifestBuf.toString('utf-8')) as { files: Array<{ relativePath: string }> };
+      const manifestBuf = await archive.readEntry(
+        archive.entriesByName.get('BACKUP_MANIFEST.json')!,
+      );
+      const manifest = JSON.parse(manifestBuf.toString('utf-8')) as {
+        files: Array<{ relativePath: string }>;
+      };
       expect(manifest.files).toHaveLength(2);
     } finally {
       archive.close();
@@ -256,7 +266,9 @@ describe('LocalBackup zip 归档（默认格式）', () => {
 
     expect(restored.failed).toBe(0);
     expect(restored.restored).toBe(2);
-    expect(await fs.readFile(path.join(restoreDir, 'src', 'index.ts'), 'utf-8')).toBe('export const a = 1;\n');
+    expect(await fs.readFile(path.join(restoreDir, 'src', 'index.ts'), 'utf-8')).toBe(
+      'export const a = 1;\n',
+    );
     expect(await fs.readFile(path.join(restoreDir, 'README.md'), 'utf-8')).toBe('# demo\n');
   });
 

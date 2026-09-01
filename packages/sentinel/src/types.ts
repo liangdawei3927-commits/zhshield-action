@@ -12,9 +12,16 @@ export type EventStatus =
   | 'manual_taken_over';
 
 export type EventSeverity = 'p1' | 'p2' | 'p3';
-export type EventType = 'runtime-exception' | 'http-error' | 'performance-degradation'
-  | 'crash' | 'frontend-error' | 'white-screen' | 'security-incident'
-  | 'memory-leak' | 'timeout';
+export type EventType =
+  | 'runtime-exception'
+  | 'http-error'
+  | 'performance-degradation'
+  | 'crash'
+  | 'frontend-error'
+  | 'white-screen'
+  | 'security-incident'
+  | 'memory-leak'
+  | 'timeout';
 
 export interface SentinelEvent {
   id: string;

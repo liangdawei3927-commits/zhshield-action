@@ -18,8 +18,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+// 依赖注入边界：字段/契约依赖接口 TyposquatDetector，仅构造点引用实现类 TyposquatDetectorImpl
+import type {
+  TyposquatDetector,
+  DependencyGraph,
+  DependencyNode,
+  ProjectProfile,
+} from '@zh/dependency';
 import { TyposquatDetectorImpl } from '@zh/dependency';
-import type { DependencyGraph, DependencyNode, ProjectProfile } from '@zh/dependency';
 
 import { extractImportReferences, listNodeModules, readJsonSafe, readTextFileSafe } from './files';
 import { collectLockfilePackages } from './lockfile';
@@ -51,9 +57,11 @@ function resolveContext(projectPath: string, relFile: string): DependencyContext
   if (manifestDir === null) return { manifestDir: null, workspaceRoot: null };
   let dir = manifestDir;
   for (;;) {
-    if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return { manifestDir, workspaceRoot: dir };
+    if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml')))
+      return { manifestDir, workspaceRoot: dir };
     const pkg = readJsonSafe(`${dir}/package.json`);
-    if (pkg !== null && Array.isArray(pkg['workspaces'])) return { manifestDir, workspaceRoot: dir };
+    if (pkg !== null && Array.isArray(pkg['workspaces']))
+      return { manifestDir, workspaceRoot: dir };
     const parent = path.dirname(dir);
     if (parent === dir) return { manifestDir, workspaceRoot: null };
     dir = parent;
@@ -102,10 +110,18 @@ function isWorkspacePackage(ctx: DependencyContext, packageName: string): boolea
   if (ctx.manifestDir !== null) roots.add(ctx.manifestDir);
   for (const root of roots) {
     const wsYaml = readTextFileSafe(root, 'pnpm-workspace.yaml');
-    if (wsYaml !== null && packageExistsAt(root, packageName, parsePnpmWorkspaceGlobs(wsYaml))) return true;
+    if (wsYaml !== null && packageExistsAt(root, packageName, parsePnpmWorkspaceGlobs(wsYaml)))
+      return true;
     const pkg = readJsonSafe(`${root}/package.json`);
     if (pkg !== null && Array.isArray(pkg['workspaces'])) {
-      if (packageExistsAt(root, packageName, (pkg['workspaces'] as unknown[]).map((w) => String(w)))) return true;
+      if (
+        packageExistsAt(
+          root,
+          packageName,
+          (pkg['workspaces'] as unknown[]).map((w) => String(w)),
+        )
+      )
+        return true;
     }
   }
   return false;
@@ -122,7 +138,12 @@ function collectDeclaredPackages(dir: string): ReadonlySet<string> {
   const declared = new Set<string>();
   const pkg = readJsonSafe(`${dir}/package.json`);
   if (pkg === null) return declared;
-  for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+  for (const section of [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
     const block = pkg[section];
     if (typeof block !== 'object' || block === null || Array.isArray(block)) continue;
     for (const name of Object.keys(block as Record<string, unknown>)) declared.add(name);
@@ -131,7 +152,9 @@ function collectDeclaredPackages(dir: string): ReadonlySet<string> {
 }
 
 /** 按包名分组 import 引用，并去重（同一 文件:行 只记一次） */
-function groupRefsByPackage(refs: readonly { packageName: string; file: string; line: number }[]): Map<string, RefSite[]> {
+function groupRefsByPackage(
+  refs: readonly { packageName: string; file: string; line: number }[],
+): Map<string, RefSite[]> {
   const byPkg = new Map<string, Map<string, Set<number>>>();
   for (const ref of refs) {
     let byFile = byPkg.get(ref.packageName);
@@ -150,7 +173,8 @@ function groupRefsByPackage(refs: readonly { packageName: string; file: string; 
   for (const [pkg, byFile] of byPkg) {
     const sites: RefSite[] = [];
     for (const [file, lines] of byFile) {
-      for (const line of Array.from(lines, (n) => n).toSorted((a, b) => a - b)) sites.push({ file, line });
+      for (const line of Array.from(lines, (n) => n).toSorted((a, b) => a - b))
+        sites.push({ file, line });
     }
     sites.sort((a, b) => (a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file)));
     out.set(pkg, sites);
@@ -208,7 +232,7 @@ function closureAt(
  * 返回按风险排序的候选：typosquat-similar（抢注最危）→ not-found → unverified-offline。
  */
 export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCheck {
-  private readonly typosquat: TyposquatDetectorImpl;
+  private readonly typosquat: TyposquatDetector;
 
   constructor() {
     this.typosquat = new TyposquatDetectorImpl();
@@ -216,8 +240,16 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
 
   async check(project: ProjectProfile): Promise<readonly HallucinatedDependencyFinding[]> {
     const projectPath = project.projectPath;
-    const { projectLocked, projectInstalled, declaredCache, closureCache, contextCache } = this.setupCaches(projectPath);
-    const { candidates, manifestSeen } = this.collectCandidates(projectPath, projectLocked, projectInstalled, declaredCache, closureCache, contextCache);
+    const { projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
+      this.setupCaches(projectPath);
+    const { candidates, manifestSeen } = this.collectCandidates(
+      projectPath,
+      projectLocked,
+      projectInstalled,
+      declaredCache,
+      closureCache,
+      contextCache,
+    );
     const typosquatById = await this.runTyposquatCheck(projectPath, candidates);
     const findings = this.buildFindings(candidates, manifestSeen, typosquatById);
     this.sortFindings(findings);
@@ -237,7 +269,10 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
     const projectInstalled = listNodeModules(projectPath);
     // 缓存：manifestDir → 声明集；闭包根 → 锁文件/安装集；引用文件 → 上下文
     const declaredCache = new Map<string, ReadonlySet<string>>();
-    const closureCache = new Map<string, { locked: ReadonlySet<string>; installed: ReadonlySet<string> }>();
+    const closureCache = new Map<
+      string,
+      { locked: ReadonlySet<string>; installed: ReadonlySet<string> }
+    >();
     const contextCache = new Map<string, DependencyContext>();
     return { projectLocked, projectInstalled, declaredCache, closureCache, contextCache };
   }
@@ -264,7 +299,11 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
       }
       if (ctx.manifestDir === null) {
         // 无清单上下文：仅入口级闭包可佐证
-        if (declaredAt(projectPath, declaredCache).has(pkg) || projectLocked.has(pkg) || projectInstalled.has(pkg)) {
+        if (
+          declaredAt(projectPath, declaredCache).has(pkg) ||
+          projectLocked.has(pkg) ||
+          projectInstalled.has(pkg)
+        ) {
           anyResolved = true;
           break;
         }
@@ -325,11 +364,18 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
   }
 
   /** 附 B 交叉验证：已引用幻觉名若被 typosquat 命中 → typosquat-similar */
-  private async runTyposquatCheck(projectPath: string, candidates: Map<string, RefSite[]>): Promise<Map<string, { evidence: string[] }>> {
+  private async runTyposquatCheck(
+    projectPath: string,
+    candidates: Map<string, RefSite[]>,
+  ): Promise<Map<string, { evidence: string[] }>> {
     const candidateNames = [...candidates.keys()];
     const typosquatFindings =
-      candidateNames.length > 0 ? await this.typosquat.detect(buildTyposquatGraph(projectPath, candidateNames)) : [];
-    return new Map(typosquatFindings.map((f: { nodeId: string; evidence: string[] }) => [f.nodeId, f]));
+      candidateNames.length > 0
+        ? await this.typosquat.detect(buildTyposquatGraph(projectPath, candidateNames))
+        : [];
+    return new Map(
+      typosquatFindings.map((f: { nodeId: string; evidence: string[] }) => [f.nodeId, f]),
+    );
   }
 
   /** 依据 typosquat 命中与清单上下文构建分级结果 */
@@ -387,6 +433,10 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
       'not-found': 1,
       'unverified-offline': 2,
     };
-    findings.sort((a, b) => rank[a.registryStatus] - rank[b.registryStatus] || a.packageName.localeCompare(b.packageName));
+    findings.sort(
+      (a, b) =>
+        rank[a.registryStatus] - rank[b.registryStatus] ||
+        a.packageName.localeCompare(b.packageName),
+    );
   }
 }

@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ExperienceEntry, RuleStateEntry, RuleWeightEntry, Suggestion, SyncPayload } from './types';
+import type {
+  ExperienceEntry,
+  RuleStateEntry,
+  RuleWeightEntry,
+  Suggestion,
+  SyncPayload,
+} from './types';
 
 async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -24,7 +30,9 @@ export class EvolveEngine {
     this.clientId = id;
   }
 
-  recordExperience(entry: Omit<ExperienceEntry, 'id' | 'createdAt' | 'updatedAt'>): ExperienceEntry {
+  recordExperience(
+    entry: Omit<ExperienceEntry, 'id' | 'createdAt' | 'updatedAt'>,
+  ): ExperienceEntry {
     const now = new Date();
     const experience: ExperienceEntry = {
       ...entry,
@@ -65,7 +73,12 @@ export class EvolveEngine {
     return suggestions;
   }
 
-  changeRuleState(ruleId: string, state: RuleStateEntry['state'], reason: string, changedBy: string): RuleStateEntry {
+  changeRuleState(
+    ruleId: string,
+    state: RuleStateEntry['state'],
+    reason: string,
+    changedBy: string,
+  ): RuleStateEntry {
     const entry: RuleStateEntry = { ruleId, state, reason, changedAt: new Date(), changedBy };
     this.ruleStates.set(ruleId, entry);
     return entry;
@@ -157,7 +170,9 @@ export class EvolveEngine {
     await writeJsonFile(filePath, this.syncToCloud());
   }
 
-  async syncFromFile(filePath: string): Promise<{ weightsImported: number; statesImported: number }> {
+  async syncFromFile(
+    filePath: string,
+  ): Promise<{ weightsImported: number; statesImported: number }> {
     const content = await fs.readFile(filePath, 'utf-8');
     const payload: SyncPayload = JSON.parse(content);
     return this.syncFromCloud(payload);

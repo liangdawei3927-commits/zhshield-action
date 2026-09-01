@@ -1,11 +1,20 @@
 import { defineConfig } from 'vitest/config';
 import type { UserConfig } from 'vitest/config';
 import path from 'path';
+import { detectMachineProfile } from './packages/shared/src/machine-profile';
 
 const DEFAULT_TEST_INCLUDE = 'src/__tests__/**/*.test.ts';
 const DEFAULT_COVERAGE_INCLUDE = ['src/**/*.ts'];
 const DEFAULT_COVERAGE_EXCLUDE = ['src/__tests__/**', 'src/types.ts', 'src/index.ts'];
 const DEFAULT_COVERAGE_THRESHOLDS = { statements: 70, branches: 60, functions: 70, lines: 70 };
+
+const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), max);
+
+const envRaw = process.env.ZH_VITEST_MAX_WORKERS;
+const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
+const maxWorkers = Number.isFinite(envMax)
+  ? clamp(envMax, 1, 4)
+  : detectMachineProfile().vitestMaxWorkers;
 
 export interface CreateVitestConfigOptions {
   /** Monorepo `packages` 目录，alias 目标基于它解析。 */
@@ -37,6 +46,8 @@ export function createVitestConfig(options: CreateVitestConfigOptions) {
     test: {
       globals: true,
       include: [include ?? DEFAULT_TEST_INCLUDE],
+      pool: 'forks',
+      maxWorkers,
       ...test,
       coverage: {
         provider: 'v8',
@@ -51,9 +62,7 @@ export function createVitestConfig(options: CreateVitestConfigOptions) {
   });
 }
 
-export function createPackageVitestConfig(
-  options: Omit<CreateVitestConfigOptions, 'packagesDir'>,
-) {
+export function createPackageVitestConfig(options: Omit<CreateVitestConfigOptions, 'packagesDir'>) {
   return createVitestConfig({
     packagesDir: path.join(__dirname, 'packages'),
     ...options,

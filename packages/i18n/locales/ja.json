@@ -652,6 +652,7 @@
   },
   "layout": {
     "about": "について",
+    "navigation": "ナビゲーション",
     "aboutVersion": "CodeShield {{version}}",
     "addProject": "プロジェクトを追加",
     "aiTool": "AI ツール",

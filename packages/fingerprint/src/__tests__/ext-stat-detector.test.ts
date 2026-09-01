@@ -12,7 +12,11 @@ function statPayload(signals: readonly Signal[], ruleId: string): { count: numbe
   const signal = signals.find((s) => s.ruleId === ruleId);
   if (signal === undefined) throw new Error(`missing signal: ${ruleId}`);
   const payload = signal.payload;
-  if (!isRecord(payload) || typeof payload.count !== 'number' || typeof payload.ratio !== 'number') {
+  if (
+    !isRecord(payload) ||
+    typeof payload.count !== 'number' ||
+    typeof payload.ratio !== 'number'
+  ) {
     throw new Error(`invalid payload for ${ruleId}`);
   }
   return { count: payload.count, ratio: payload.ratio };
@@ -105,7 +109,7 @@ describe('ExtStatDetector', () => {
   it('GIVEN 无可统计源码（仅文档/无扩展名文件）WHEN detect THEN 不产出任何信号', async () => {
     const root = makeTempProject({
       'README.md': '# demo',
-      'LICENSE': 'MIT',
+      LICENSE: 'MIT',
     });
     try {
       const signals = await detector.detect(root);

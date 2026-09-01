@@ -46,7 +46,10 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
   initialize(dbPath?: string): void {
     if (this.initialized) return;
 
-    const resolved = dbPath ?? process.env.ZH_SERVER_DB ?? path.join(os.homedir(), '.zhshield', 'server', 'zh-codeshield.db');
+    const resolved =
+      dbPath ??
+      process.env.ZH_SERVER_DB ??
+      path.join(os.homedir(), '.zhshield', 'server', 'zh-codeshield.db');
     try {
       const conn = new DbConnection({ dbPath: resolved, walMode: true });
       const db = conn.connect();
@@ -108,9 +111,7 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`健康评分已落库: ${projectPath} ${score.overall} (${score.grade})`);
       return score;
     } catch (err) {
-      this.logger.warn(
-        `健康评分落库失败: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`健康评分落库失败: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }
@@ -150,7 +151,8 @@ function resolveReportFormats(report: PipelineReport): ReportFormatResult {
       inspectIssues: convertInspectEvaluations(inspectReport.evaluations),
     };
   }
-  if (isRuleEngineReport(guardReport) || isRuleEngineReport(inspectReport)) return { kind: 'mixed' };
+  if (isRuleEngineReport(guardReport) || isRuleEngineReport(inspectReport))
+    return { kind: 'mixed' };
 
   return {
     kind: 'ok',

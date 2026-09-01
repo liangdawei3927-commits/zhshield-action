@@ -1,24 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import { resolveEslintTargetDir } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
-const ESLINT_CONFIG_NAMES = [
-  'eslint.config.js',
-  'eslint.config.mjs',
-  'eslint.config.cjs',
-  '.eslintrc.js',
-  '.eslintrc.cjs',
-  '.eslintrc.json',
-  '.eslintrc',
-] as const;
-
-function hasEslintConfig(dir: string): boolean {
-  return ESLINT_CONFIG_NAMES.some((name) => fs.existsSync(path.join(dir, name)));
-}
+export { resolveEslintTargetDir };
 
 /** ESLint JSON 输出中的单条消息 */
 interface EslintMessage {
@@ -33,33 +20,6 @@ interface EslintMessage {
 interface EslintFile {
   filePath?: string;
   messages?: EslintMessage[];
-}
-
-/**
- * 探测 ESLint 应扫描的目录（ESLint 从该目录向上查找配置）：
- * 1. 项目根含 eslint 配置 → 项目根
- * 2. 一层子目录含 eslint 配置（嵌套仓库，如 zhiyan-codeshield/）→ 该子目录
- * 3. 有 src / packages → 对应源码目录
- * 4. 兜底项目根
- */
-export function resolveEslintTargetDir(projectPath: string): string {
-  if (hasEslintConfig(projectPath)) return projectPath;
-
-  const entries = fs.existsSync(projectPath) ? fs.readdirSync(projectPath) : [];
-  for (const entry of entries) {
-    const child = path.join(projectPath, entry);
-    try {
-      if (fs.statSync(child).isDirectory() && hasEslintConfig(child)) return child;
-    } catch {
-      // 忽略损坏的符号链接 / 无权限目录
-    }
-  }
-
-  for (const candidate of ['src', 'packages']) {
-    const dir = path.join(projectPath, candidate);
-    if (fs.existsSync(dir)) return dir;
-  }
-  return projectPath;
 }
 
 /**
@@ -91,15 +51,11 @@ export class GuardESLintCheckAdapter implements Adapter {
 
   /** 执行 ESLint CLI 并返回原始输出 */
   private runEslint(targetDir: string): Promise<{ stdout: string; stderr: string }> {
-    return execFileAsync(
-      'eslint',
-      ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir],
-      {
-        cwd: targetDir,
-        timeout: 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      },
-    );
+    return execFileAsync('eslint', ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
+      cwd: targetDir,
+      timeout: 60000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
   }
 
   /** 解析成功输出：空输出视为无文件，非法 JSON 归为执行失败 */
@@ -177,14 +133,13 @@ export class GuardESLintCheckAdapter implements Adapter {
       );
     }
 
-    return this.makeResult(
-      check,
-      'passed',
-      `ESLint 检查通过（${files.length} 个文件）`,
-    );
+    return this.makeResult(check, 'passed', `ESLint 检查通过（${files.length} 个文件）`);
   }
 
-  private collectMessages(files: Record<string, unknown>[]): { errors: string[]; warnings: string[] } {
+  private collectMessages(files: Record<string, unknown>[]): {
+    errors: string[];
+    warnings: string[];
+  } {
     const errors: string[] = [];
     const warnings: string[] = [];
 

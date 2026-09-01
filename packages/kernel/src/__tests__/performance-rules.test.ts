@@ -74,8 +74,15 @@ describe('SOP 性能检测规则包', () => {
     const receivedConfigs: Array<Record<string, unknown> | undefined> = [];
     const mockAdapter = {
       meta: {
-        id: 'eslint', name: 'ESLint', category: 'inspect' as const, priority: 'P0' as const,
-        installMode: 'builtin' as const, description: '', cliCommand: 'eslint', homepage: '', license: '',
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'inspect' as const,
+        priority: 'P0' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: 'eslint',
+        homepage: '',
+        license: '',
       },
       isAvailable: async () => true,
       scan: async (opts: ToolScanOptions) => {
@@ -94,7 +101,9 @@ describe('SOP 性能检测规则包', () => {
     });
 
     const report = await engine.evaluateRules({ repoRoot: '/test-project', domain: 'inspect' });
-    const evalResult = report.evaluations.find((e) => e.rule.id === 'inspect.scan.official.eslint-performance');
+    const evalResult = report.evaluations.find(
+      (e) => e.rule.id === 'inspect.scan.official.eslint-performance',
+    );
     expect(evalResult).toBeDefined();
     expect(evalResult!.status).toBe('passed');
 
@@ -110,8 +119,15 @@ describe('SOP 性能检测规则包', () => {
     const receivedConfigs: Array<Record<string, unknown> | undefined> = [];
     const mockAdapter = {
       meta: {
-        id: 'semgrep', name: 'Semgrep', category: 'inspect' as const, priority: 'P0' as const,
-        installMode: 'builtin' as const, description: '', cliCommand: 'semgrep', homepage: '', license: '',
+        id: 'semgrep',
+        name: 'Semgrep',
+        category: 'inspect' as const,
+        priority: 'P0' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: 'semgrep',
+        homepage: '',
+        license: '',
       },
       isAvailable: async () => true,
       scan: async (opts: ToolScanOptions) => {
@@ -130,7 +146,9 @@ describe('SOP 性能检测规则包', () => {
     });
 
     const report = await engine.evaluateRules({ repoRoot: '/test-project', domain: 'inspect' });
-    const evalResult = report.evaluations.find((e) => e.rule.id === 'inspect.scan.official.semgrep-redos');
+    const evalResult = report.evaluations.find(
+      (e) => e.rule.id === 'inspect.scan.official.semgrep-redos',
+    );
     expect(evalResult).toBeDefined();
     expect(evalResult!.status).toBe('passed');
 
@@ -147,27 +165,36 @@ describe('SOP 性能检测规则包', () => {
     // 并回写到 issue.category，验证 yml → interpreter → runToolScan → adapter → toolScanViolations 全链路
     const mockAdapter = {
       meta: {
-        id: 'eslint', name: 'ESLint', category: 'inspect' as const, priority: 'P0' as const,
-        installMode: 'builtin' as const, description: '', cliCommand: 'eslint', homepage: '', license: '',
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'inspect' as const,
+        priority: 'P0' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: 'eslint',
+        homepage: '',
+        license: '',
       },
       isAvailable: async () => true,
       scan: async (opts: ToolScanOptions) => ({
         tool: 'eslint' as const,
         status: 'available' as const,
-        issues: [{
-          id: 'perf-1',
-          ruleId: 'runtime-complexity/no-immutable-reduce',
-          severity: 'warning',
-          category: opts.config?.category ?? 'quality',
-          message: 'reduce 内展开累加器导致 O(n²)',
-          file: 'src/a.js',
-          line: 1,
-          column: 1,
-          suggestion: undefined,
-          autoFixable: false,
-          source: 'inspect',
-          fingerprint: 'perf-1:src/a.js:1',
-        }],
+        issues: [
+          {
+            id: 'perf-1',
+            ruleId: 'runtime-complexity/no-immutable-reduce',
+            severity: 'warning',
+            category: opts.config?.category ?? 'quality',
+            message: 'reduce 内展开累加器导致 O(n²)',
+            file: 'src/a.js',
+            line: 1,
+            column: 1,
+            suggestion: undefined,
+            autoFixable: false,
+            source: 'inspect',
+            fingerprint: 'perf-1:src/a.js:1',
+          },
+        ],
         metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 1 },
       }),
     };
@@ -177,7 +204,9 @@ describe('SOP 性能检测规则包', () => {
     });
 
     const report = await engine.evaluateRules({ repoRoot: '/test-project', domain: 'inspect' });
-    const evalResult = report.evaluations.find((e) => e.rule.id === 'inspect.scan.official.eslint-performance');
+    const evalResult = report.evaluations.find(
+      (e) => e.rule.id === 'inspect.scan.official.eslint-performance',
+    );
     expect(evalResult).toBeDefined();
     expect(evalResult!.violations?.length).toBe(1);
     expect(evalResult!.violations?.[0]?.category).toBe('performance');

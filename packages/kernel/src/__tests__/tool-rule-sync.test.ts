@@ -11,7 +11,9 @@ describe('api-base', () => {
 
   it('builds sop base without duplicating /sop', () => {
     expect(resolveSopBase('http://localhost:3010/api/v1')).toBe('http://localhost:3010/api/v1/sop');
-    expect(resolveSopBase('http://localhost:3010/api/v1/sop')).toBe('http://localhost:3010/api/v1/sop');
+    expect(resolveSopBase('http://localhost:3010/api/v1/sop')).toBe(
+      'http://localhost:3010/api/v1/sop',
+    );
   });
 });
 

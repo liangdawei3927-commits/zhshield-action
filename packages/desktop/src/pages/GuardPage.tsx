@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useT } from '../i18n';
-import { useGuardPage, buildGuardLevels, deriveGuardStatus, type GuardLevelInfo } from './guard-logic';
-import { GuardStatusBanner, GuardLevels, GuardStats, GuardTable, GuardHistory, GuardConfigCard } from './guard-parts';
+import {
+  useGuardPage,
+  buildGuardLevels,
+  deriveGuardStatus,
+  type GuardLevelInfo,
+} from './guard-logic';
+import {
+  GuardStatusBanner,
+  GuardLevels,
+  GuardStats,
+  GuardTable,
+  GuardHistory,
+  GuardConfigCard,
+} from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useToast } from '../components/ui/Toast';
 import { exportHtmlReport } from '../utils/htmlExport';
@@ -70,14 +82,25 @@ async function exportGuardReport(
   t: (key: string, params?: Record<string, unknown>) => string,
 ): Promise<void> {
   try {
-    const ok = await exportHtmlReport(guardReportToHtmlData(report, projectPath), 'guard-report.html');
+    const ok = await exportHtmlReport(
+      guardReportToHtmlData(report, projectPath),
+      'guard-report.html',
+    );
     if (ok) toast(t('page.guard.exportSuccess', { defaultValue: 'Report exported' }), 'success');
   } catch {
     toast(t('page.guard.exportFailed', { defaultValue: 'Export failed' }), 'error');
   }
 }
 
-function GuardExportButton({ onClick, disabled, t }: { onClick?: () => void; disabled?: boolean; t: (key: string, params?: Record<string, unknown>) => string }) {
+function GuardExportButton({
+  onClick,
+  disabled,
+  t,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
   return (
     <div className="flex justify-end mb-4">
       <button
@@ -85,11 +108,24 @@ function GuardExportButton({ onClick, disabled, t }: { onClick?: () => void; dis
         onClick={onClick}
         disabled={disabled}
         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white ${
-          disabled ? 'text-zh-muted cursor-not-allowed opacity-50' : 'hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors'
+          disabled
+            ? 'text-zh-muted cursor-not-allowed opacity-50'
+            : 'hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors'
         }`}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
         {t('page.guard.exportReport', { defaultValue: 'Export Report' })}
       </button>
@@ -129,12 +165,28 @@ function GuardReportView({
   return (
     <div className="h-full w-full bg-zh-bg overflow-auto">
       <div className="w-full px-8 py-10">
-        <GuardStatusBanner report={report} status={status} loading={loading} progressLabel={progressLabel} onRescan={onRescan} />
+        <GuardStatusBanner
+          report={report}
+          status={status}
+          loading={loading}
+          progressLabel={progressLabel}
+          onRescan={onRescan}
+        />
         <GuardExportButton onClick={onExport} t={t} />
         <GuardLevels levels={levels} />
         <GuardStats report={report} />
-        <GuardTable report={report} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} onReportFalsePositive={reportFalsePositive} />
-        <GuardHistory records={history} onCopyToAi={copyToAi} onReportFalsePositive={reportFalsePositive} falsePositiveCount={falsePositiveCount} />
+        <GuardTable
+          report={report}
+          onCopyToAi={copyToAi}
+          onCopyAll={copyAllToAi}
+          onReportFalsePositive={reportFalsePositive}
+        />
+        <GuardHistory
+          records={history}
+          onCopyToAi={copyToAi}
+          onReportFalsePositive={reportFalsePositive}
+          falsePositiveCount={falsePositiveCount}
+        />
         <GuardConfigCard />
         <div className="mt-4 text-xs text-zh-muted">
           {t('page.guard.duration', { duration: report.metadata.duration })}
@@ -170,19 +222,33 @@ function GuardEmptyView({
   return (
     <div className="h-full w-full bg-zh-bg overflow-auto">
       <div className="w-full px-8 pt-8">
-        <GuardStatusBanner report={null} status={status} loading={loading} progressLabel={progressLabel} onRescan={onRescan} />
+        <GuardStatusBanner
+          report={null}
+          status={status}
+          loading={loading}
+          progressLabel={progressLabel}
+          onRescan={onRescan}
+        />
         <GuardExportButton disabled t={t} />
         <GuardLevels levels={levels} />
       </div>
       <div className="w-full px-8 pb-10">
-        <GuardHistory records={history} onCopyToAi={copyToAi} onReportFalsePositive={reportFalsePositive} falsePositiveCount={falsePositiveCount} />
+        <GuardHistory
+          records={history}
+          onCopyToAi={copyToAi}
+          onReportFalsePositive={reportFalsePositive}
+          falsePositiveCount={falsePositiveCount}
+        />
         <GuardConfigCard />
       </div>
     </div>
   );
 }
 
-function useGuardBlockNotification(report: GuardReportData | null, notify: (n: AppNotification) => void): void {
+function useGuardBlockNotification(
+  report: GuardReportData | null,
+  notify: (n: AppNotification) => void,
+): void {
   const lastNotifiedTimestampRef = useRef<string | null>(null);
   useEffect(() => {
     if (report === null) return;
@@ -202,7 +268,17 @@ function useGuardExport(report: GuardReportData | null, projectPath: string): ()
 
 export function GuardPage({ projectPath }: GuardPageProps) {
   const t = useT();
-  const { loading, progressLabel, report, copyToAi, copyAllToAi, reportFalsePositive, handleScan, history, falsePositiveCount } = useGuardPage(projectPath);
+  const {
+    loading,
+    progressLabel,
+    report,
+    copyToAi,
+    copyAllToAi,
+    reportFalsePositive,
+    handleScan,
+    history,
+    falsePositiveCount,
+  } = useGuardPage(projectPath);
   const levels = buildGuardLevels(history);
   const status = deriveGuardStatus(levels).status;
   const { notify } = useNotification();

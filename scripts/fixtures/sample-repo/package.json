@@ -1,0 +1,9 @@
+{
+  "name": "zhshield-sample-repo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "智汇码盾基准回归门禁固定样本项目（确定性生成）",
+  "scripts": {
+    "test": "echo \"sample-repo has no tests\""
+  }
+}

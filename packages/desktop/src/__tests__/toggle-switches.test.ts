@@ -92,12 +92,28 @@ describe('createSkippedGuardReport', () => {
 describe('PipelineReport with skipped guard', () => {
   it('guard passed=true + inspect passed=true → 整体 passed', () => {
     const guardReport = {
-      total: 0, passed: 0, failed: 0, errors: 0, skipped: 1,
-      ok: true, blockingCount: 0, evaluations: [], durationMs: 0, timestamp: new Date(),
+      total: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      blockingCount: 0,
+      evaluations: [],
+      durationMs: 0,
+      timestamp: new Date(),
     };
     const inspectReport = {
-      total: 3, passed: 3, failed: 0, errors: 0, skipped: 0,
-      ok: true, blockingCount: 0, evaluations: [], durationMs: 100, timestamp: new Date(),
+      total: 3,
+      passed: 3,
+      failed: 0,
+      errors: 0,
+      skipped: 0,
+      ok: true,
+      blockingCount: 0,
+      evaluations: [],
+      durationMs: 100,
+      timestamp: new Date(),
     };
     const report = createReport({
       guard: guardReport,
@@ -112,12 +128,28 @@ describe('PipelineReport with skipped guard', () => {
 
   it('guard skipped + inspect 有失败 → 整体 passed=false', () => {
     const guardReport = {
-      total: 0, passed: 0, failed: 0, errors: 0, skipped: 1,
-      ok: true, blockingCount: 0, evaluations: [], durationMs: 0, timestamp: new Date(),
+      total: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      blockingCount: 0,
+      evaluations: [],
+      durationMs: 0,
+      timestamp: new Date(),
     };
     const inspectReport = {
-      total: 5, passed: 2, failed: 3, errors: 0, skipped: 0,
-      ok: false, blockingCount: 3, evaluations: [], durationMs: 200, timestamp: new Date(),
+      total: 5,
+      passed: 2,
+      failed: 3,
+      errors: 0,
+      skipped: 0,
+      ok: false,
+      blockingCount: 3,
+      evaluations: [],
+      durationMs: 200,
+      timestamp: new Date(),
     };
     const report = createReport({
       guard: guardReport,

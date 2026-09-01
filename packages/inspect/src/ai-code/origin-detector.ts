@@ -58,7 +58,10 @@ export interface AiOriginDetectorOptions {
 
 /** AI 来源检测器契约（E.5 信号源聚合） */
 export interface AiOriginDetector {
-  detect(project: ProjectProfile, options?: AiOriginDetectorOptions): Promise<readonly AiOriginFinding[]>;
+  detect(
+    project: ProjectProfile,
+    options?: AiOriginDetectorOptions,
+  ): Promise<readonly AiOriginFinding[]>;
 }
 
 /**
@@ -77,7 +80,8 @@ export function commitEvidenceFromLog(output: string): CommitEvidence[] {
     const at = parts[1];
     const subject = parts[2];
     const hash = parts[3];
-    if (author === undefined || at === undefined || subject === undefined || hash === undefined) continue;
+    if (author === undefined || at === undefined || subject === undefined || hash === undefined)
+      continue;
     const timestamp = Number(at);
     if (!Number.isFinite(timestamp)) continue;
     commits.push({ author, timestamp, subject, hash, files: lines.slice(1) });
@@ -91,7 +95,11 @@ export function isAiMarkedCommit(subject: string): boolean {
 }
 
 /** 对单个作者的提交索引（已按时间排序）统计 600 秒内 ≥5 次的批量提交，命中索引加入 burst */
-function addBurstIndexes(commits: readonly CommitEvidence[], sorted: number[], burst: Set<number>): void {
+function addBurstIndexes(
+  commits: readonly CommitEvidence[],
+  sorted: number[],
+  burst: Set<number>,
+): void {
   for (let i = 0; i < sorted.length; i++) {
     const start = sorted[i];
     let count = 1;
@@ -115,7 +123,11 @@ function burstCommitIndexes(commits: readonly CommitEvidence[]): ReadonlySet<num
     else arr.push(i);
   });
   for (const indexes of byAuthor.values()) {
-    addBurstIndexes(commits, indexes.toSorted((a, b) => commits[a].timestamp - commits[b].timestamp), burst);
+    addBurstIndexes(
+      commits,
+      indexes.toSorted((a, b) => commits[a].timestamp - commits[b].timestamp),
+      burst,
+    );
   }
   return burst;
 }
@@ -128,7 +140,16 @@ async function runGitLog(projectPath: string, maxCommits: number): Promise<strin
   try {
     const { stdout } = await execFileAsync(
       'git',
-      ['-C', projectPath, 'log', '--no-merges', '--no-renames', `--pretty=format:%an\x1f%at\x1f%s\x1f%H`, '--name-only', `-${maxCommits}`],
+      [
+        '-C',
+        projectPath,
+        'log',
+        '--no-merges',
+        '--no-renames',
+        `--pretty=format:%an\x1f%at\x1f%s\x1f%H`,
+        '--name-only',
+        `-${maxCommits}`,
+      ],
       { timeout: 15_000, maxBuffer: 10 * 1024 * 1024 },
     );
     return stdout;
@@ -153,7 +174,10 @@ export function classifyStrength(evidence: readonly AiEvidence[]): AiStrength {
 }
 
 /** 按文件聚合 commit 证据（file → 命中 commit 的提交元证据） */
-async function collectCommitEvidence(projectPath: string, maxCommits: number): Promise<Map<string, AiEvidence[]>> {
+async function collectCommitEvidence(
+  projectPath: string,
+  maxCommits: number,
+): Promise<Map<string, AiEvidence[]>> {
   const byFile = new Map<string, AiEvidence[]>();
   const log = await runGitLog(projectPath, maxCommits);
   if (log === null) return byFile;
@@ -167,7 +191,10 @@ async function collectCommitEvidence(projectPath: string, maxCommits: number): P
     for (const file of commit.files) {
       const detail: string[] = [];
       if (marked) detail.push(`commit '${commit.subject}' carries AI-tool marker`);
-      if (isBurst) detail.push(`author '${commit.author}' committed ${BURST_MIN_COMMITS}+ times within ${BURST_WINDOW_SECONDS}s`);
+      if (isBurst)
+        detail.push(
+          `author '${commit.author}' committed ${BURST_MIN_COMMITS}+ times within ${BURST_WINDOW_SECONDS}s`,
+        );
       if (isBatch) detail.push(`commit touches ${commit.files.length} files (bulk paste pattern)`);
       if (detail.length === 0) continue;
       const arr = byFile.get(file);
@@ -185,7 +212,10 @@ async function collectCommitEvidence(projectPath: string, maxCommits: number): P
 
 /** AI 来源检测实现：聚合四类信号，按分级输出 */
 export class AiOriginDetectorImpl implements AiOriginDetector {
-  async detect(project: ProjectProfile, options: AiOriginDetectorOptions = {}): Promise<readonly AiOriginFinding[]> {
+  async detect(
+    project: ProjectProfile,
+    options: AiOriginDetectorOptions = {},
+  ): Promise<readonly AiOriginFinding[]> {
     const projectPath = project.projectPath;
     const includeUncertain = options.includeUncertain ?? false;
     const maxCommits = options.maxCommits ?? 200;
@@ -249,7 +279,10 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
       if (!files.has(tag.file)) continue;
       addEvidence(tag.file, {
         kind: 'user-tagged',
-        detail: tag.source !== undefined ? `user marked as AI-generated (${tag.source})` : 'user marked as AI-generated',
+        detail:
+          tag.source !== undefined
+            ? `user marked as AI-generated (${tag.source})`
+            : 'user marked as AI-generated',
         confidence: 1,
       });
     }
@@ -272,7 +305,10 @@ export class AiOriginDetectorImpl implements AiOriginDetector {
   }
 
   /** 聚合证据为分级结果并按强度排序 */
-  private buildFindings(evidenceByFile: Map<string, AiEvidence[]>, includeUncertain: boolean): AiOriginFinding[] {
+  private buildFindings(
+    evidenceByFile: Map<string, AiEvidence[]>,
+    includeUncertain: boolean,
+  ): AiOriginFinding[] {
     const findings: AiOriginFinding[] = [];
     for (const [file, evidence] of evidenceByFile) {
       const strength = classifyStrength(evidence);

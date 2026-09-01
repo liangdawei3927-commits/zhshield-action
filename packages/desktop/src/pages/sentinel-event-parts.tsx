@@ -1,4 +1,13 @@
-import { SEVERITY_CONFIG, STATUS_CONFIG, TYPE_LABELS, EVENT_LIFECYCLE_STEPS, statusToStage, eventToAiFixIssue, eventToFalsePositiveItem, type SentinelEventItem } from './sentinel-logic';
+import {
+  SEVERITY_CONFIG,
+  STATUS_CONFIG,
+  TYPE_LABELS,
+  EVENT_LIFECYCLE_STEPS,
+  statusToStage,
+  eventToAiFixIssue,
+  eventToFalsePositiveItem,
+  type SentinelEventItem,
+} from './sentinel-logic';
 import { useT } from '../i18n';
 import { Bounce } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -12,7 +21,11 @@ import { reportFalsePositive } from '../services/engineApi';
 function EventLifecycle({ status }: { status: string }) {
   const t = useT();
   const stage = statusToStage(status);
-  const st = STATUS_CONFIG[status] ?? { textKey: status, color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.15)' };
+  const st = STATUS_CONFIG[status] ?? {
+    textKey: status,
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-muted) / 0.15)',
+  };
   const currentIdx = EVENT_LIFECYCLE_STEPS.findIndex((s) => s.key === stage);
   return (
     <div className="mt-3 flex items-center gap-2">
@@ -33,11 +46,23 @@ function EventLifecycle({ status }: { status: string }) {
             >
               {isDone ? '✓' : idx + 1}
             </span>
-            <span className="text-[11px] whitespace-nowrap" style={{ color: isCurrent ? st.color : isDone ? 'rgb(var(--zh-success))' : 'rgb(var(--zh-muted))' }}>
+            <span
+              className="text-[11px] whitespace-nowrap"
+              style={{
+                color: isCurrent
+                  ? st.color
+                  : isDone
+                    ? 'rgb(var(--zh-success))'
+                    : 'rgb(var(--zh-muted))',
+              }}
+            >
               {t(step.labelKey)}
             </span>
             {idx < EVENT_LIFECYCLE_STEPS.length - 1 && (
-              <div className="flex-1 h-px" style={{ background: isDone ? 'rgb(var(--zh-success))' : 'rgb(var(--zh-line))' }} />
+              <div
+                className="flex-1 h-px"
+                style={{ background: isDone ? 'rgb(var(--zh-success))' : 'rgb(var(--zh-line))' }}
+              />
             )}
           </div>
         );
@@ -54,7 +79,9 @@ function EventContextLocation({ location }: { location: EventContextLocationData
     <div className="mt-2 rounded-lg bg-zh-panel border border-zh-line px-3 py-2 text-xs">
       <div className="flex items-center gap-2 text-zh-muted">
         {location.module && (
-          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">{location.module}</span>
+          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">
+            {location.module}
+          </span>
         )}
         <span className="font-mono">
           {location.file}:{location.line}
@@ -62,7 +89,9 @@ function EventContextLocation({ location }: { location: EventContextLocationData
         </span>
       </div>
       {location.snippet && (
-        <pre className="mt-1 font-mono text-[11px] text-zh-ink-2 whitespace-pre-wrap">{location.snippet}</pre>
+        <pre className="mt-1 font-mono text-[11px] text-zh-ink-2 whitespace-pre-wrap">
+          {location.snippet}
+        </pre>
       )}
     </div>
   );
@@ -71,18 +100,27 @@ function EventContextLocation({ location }: { location: EventContextLocationData
 function EventRow({ event, projectPath }: { event: SentinelEventItem; projectPath: string }) {
   const t = useT();
   const sev = SEVERITY_CONFIG[event.severity] ?? SEVERITY_CONFIG.info;
-  const st = STATUS_CONFIG[event.status] ?? { textKey: event.status, color: 'rgb(var(--zh-muted))' };
+  const st = STATUS_CONFIG[event.status] ?? {
+    textKey: event.status,
+    color: 'rgb(var(--zh-muted))',
+  };
   const { toast } = useToast();
   const handleReportFalsePositive = () => {
     void reportFalsePositive(projectPath, eventToFalsePositiveItem(event)).then(
-      (result) => (result.ok ? toast(t('page.sentinel.falsePositiveSubmitted')) : toast(result.reason ?? t('page.sentinel.submitFailed'), 'error')),
+      (result) =>
+        result.ok
+          ? toast(t('page.sentinel.falsePositiveSubmitted'))
+          : toast(result.reason ?? t('page.sentinel.submitFailed'), 'error'),
       () => toast(t('page.sentinel.submitFailed'), 'error'),
     );
   };
   return (
     <ResultCard>
       <div className="flex items-center gap-3">
-        <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: sev.bg, color: sev.color }}>
+        <span
+          className="px-2 py-0.5 rounded text-xs font-medium"
+          style={{ background: sev.bg, color: sev.color }}
+        >
           {t(sev.textKey)}
         </span>
         <span className="text-sm font-medium text-zh-ink-2">{event.title}</span>
@@ -94,7 +132,9 @@ function EventRow({ event, projectPath }: { event: SentinelEventItem; projectPat
           >
             {t('page.sentinel.markFalsePositive')}
           </Bounce>
-          <CopyToAiButton onClick={() => copyIssuesToAi(projectPath, toast, [eventToAiFixIssue(event)])} />
+          <CopyToAiButton
+            onClick={() => copyIssuesToAi(projectPath, toast, [eventToAiFixIssue(event)])}
+          />
           <span className="flex items-center gap-1.5 text-xs" style={{ color: st.color }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />
             {t(st.textKey)}
@@ -105,22 +145,45 @@ function EventRow({ event, projectPath }: { event: SentinelEventItem; projectPat
       <div className="mt-2 flex items-center gap-3 text-xs text-zh-muted">
         <span>{t(TYPE_LABELS[event.type] ?? event.type)}</span>
         <span>·</span>
-        <span>{event.source === 'backend' ? t('page.sentinel.source.backend') : event.source === 'frontend' ? t('page.sentinel.source.frontend') : event.source === 'middleware' ? t('page.sentinel.source.middleware') : t('page.sentinel.source.infrastructure')}</span>
+        <span>
+          {event.source === 'backend'
+            ? t('page.sentinel.source.backend')
+            : event.source === 'frontend'
+              ? t('page.sentinel.source.frontend')
+              : event.source === 'middleware'
+                ? t('page.sentinel.source.middleware')
+                : t('page.sentinel.source.infrastructure')}
+        </span>
         {event.location?.file && (
-          <><span>·</span><span className="font-mono">{event.location.file}{event.location.line != null ? `:${event.location.line}` : ''}</span></>
+          <>
+            <span>·</span>
+            <span className="font-mono">
+              {event.location.file}
+              {event.location.line != null ? `:${event.location.line}` : ''}
+            </span>
+          </>
         )}
         <span>·</span>
         <span>{t('page.sentinel.occurrenceCount', { count: event.occurrenceCount })}</span>
       </div>
       <div className="mt-1 text-xs text-zh-muted">
-        {event.diagnosis?.suggestion ?? (event.context?.request ? `${event.context.request.method} ${event.context.request.path}` : '')}
+        {event.diagnosis?.suggestion ??
+          (event.context?.request
+            ? `${event.context.request.method} ${event.context.request.path}`
+            : '')}
       </div>
       <EventContextLocation location={event.context?.location} />
     </ResultCard>
   );
 }
 
-export function EventsPanel({ events, projectPath }: { events: SentinelEventItem[]; projectPath: string }) {
+export function EventsPanel({
+  events,
+  projectPath,
+}: {
+  events: SentinelEventItem[];
+  projectPath: string;
+}) {
   const t = useT();
   const { toast } = useToast();
   const handleCopyAll = () => copyIssuesToAi(projectPath, toast, events.map(eventToAiFixIssue));
@@ -128,7 +191,9 @@ export function EventsPanel({ events, projectPath }: { events: SentinelEventItem
     <div>
       {events.length > 0 && (
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-zh-muted">{t('page.sentinel.copyAllHint', { count: events.length })}</span>
+          <span className="text-xs text-zh-muted">
+            {t('page.sentinel.copyAllHint', { count: events.length })}
+          </span>
           <CopyAllToAiButton onClick={handleCopyAll} />
         </div>
       )}

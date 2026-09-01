@@ -28,7 +28,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
         description: '项目没有严重安全漏洞',
         dimension: 'security',
         points: 10,
-        condition: (ctx) => !ctx.findings.some(f => f.severity === 'critical'),
+        condition: (ctx) => !ctx.findings.some((f) => f.severity === 'critical'),
       },
       {
         id: 'security-tools-configured',
@@ -77,7 +77,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'architecture',
     name: '架构',
-    weight: 0.20,
+    weight: 0.2,
     description: '项目架构和依赖管理',
     penalties: {
       dimension: 'architecture',
@@ -130,7 +130,8 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
         description: '没有严重过期的依赖',
         dimension: 'dependencies',
         points: 5,
-        condition: (ctx) => !ctx.findings.some(f => f.category === 'dependency' && f.severity === 'high'),
+        condition: (ctx) =>
+          !ctx.findings.some((f) => f.category === 'dependency' && f.severity === 'high'),
       },
     ],
   },
@@ -155,7 +156,8 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
         description: '项目有README文件',
         dimension: 'documentation',
         points: 3,
-        condition: (ctx) => ctx.metrics.documentationCoverage !== undefined && ctx.metrics.documentationCoverage > 0,
+        condition: (ctx) =>
+          ctx.metrics.documentationCoverage !== undefined && ctx.metrics.documentationCoverage > 0,
       },
     ],
   },
@@ -170,9 +172,9 @@ export function getDefaultScoringConfig(): ScoringConfig {
 }
 
 export function getDimensionConfig(dimensionId: string): DimensionDefinition | undefined {
-  return DEFAULT_DIMENSIONS.find(d => d.id === dimensionId);
+  return DEFAULT_DIMENSIONS.find((d) => d.id === dimensionId);
 }
 
 export function getDimensionIds(): string[] {
-  return DEFAULT_DIMENSIONS.map(d => d.id);
+  return DEFAULT_DIMENSIONS.map((d) => d.id);
 }

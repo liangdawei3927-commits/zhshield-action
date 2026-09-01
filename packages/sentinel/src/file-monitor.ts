@@ -35,11 +35,36 @@ export function defaultFileWatchFilter(filePath: string): boolean {
   return !DEFAULT_IGNORE_RE.test(filePath);
 }
 
-export function resolveChangeType(eventType: string, existsOnDisk: boolean, wasKnown: boolean): FileChangeType {
+export function resolveChangeType(
+  eventType: string,
+  existsOnDisk: boolean,
+  wasKnown: boolean,
+): FileChangeType {
   if (eventType === 'unlink') return 'unlink';
   if (!existsOnDisk) return 'unlink';
   if (eventType === 'rename') return wasKnown ? 'change' : 'add';
   return 'change';
+}
+
+/** 事件活跃时轮询退避的上限（毫秒） */
+export const MAX_POLL_BACKOFF_MS = 30_000;
+
+/**
+ * 计算下一次轮询的延迟：
+ * - 心跳在 intervalMs 内（事件活跃）→ 退避到 min(MAX_POLL_BACKOFF_MS, intervalMs * 10)
+ * - 安静（超过 intervalMs 无事件）→ 回到正常 intervalMs
+ */
+export function computePollDelay(
+  lastEventAt: number,
+  now: number,
+  intervalMs: number,
+  maxBackoffMs: number = MAX_POLL_BACKOFF_MS,
+): number {
+  const sinceEvent = now - lastEventAt;
+  if (sinceEvent < intervalMs) {
+    return Math.min(maxBackoffMs, intervalMs * 10);
+  }
+  return intervalMs;
 }
 
 export interface FileMonitorConfig {
@@ -62,8 +87,10 @@ interface ScanState {
 export class FileMonitor {
   private eventCenter: EventCenter;
   private watchers = new Map<string, fs.FSWatcher>();
-  private pollTimers = new Map<string, ReturnType<typeof setInterval>>();
+  private pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private lastMtimes = new Map<string, number>();
+  private lastEventAt = new Map<string, number>();
+  private pollInFlight = new Set<string>();
   private running = false;
 
   constructor(eventCenter: EventCenter) {
@@ -72,23 +99,25 @@ export class FileMonitor {
 
   start(config: FileMonitorConfig): void {
     this.running = true;
-    const interval = config.intervalMs || 3000;
+    const effectiveConfig: FileMonitorConfig = {
+      ...config,
+      ignoreDirs: config.ignoreDirs ?? DEFAULT_IGNORE_DIRS,
+    };
 
-    for (const watchPath of config.watchPaths) {
+    for (const watchPath of effectiveConfig.watchPaths) {
       if (!fs.existsSync(watchPath)) {
         console.warn(`[FileMonitor] Path does not exist, skipping: ${watchPath}`);
         continue;
       }
-      this.watchPath(watchPath, config);
-      const timer = setInterval(() => this.pollPath(watchPath, config), interval);
-      this.pollTimers.set(watchPath, timer);
+      this.watchPath(watchPath, effectiveConfig);
+      this.scheduleNextPoll(watchPath, effectiveConfig);
     }
   }
 
   stop(): void {
     this.running = false;
     for (const [watchPath, timer] of this.pollTimers) {
-      clearInterval(timer);
+      clearTimeout(timer);
       this.pollTimers.delete(watchPath);
     }
     for (const [watchPath, watcher] of this.watchers) {
@@ -96,15 +125,18 @@ export class FileMonitor {
       this.watchers.delete(watchPath);
     }
     this.lastMtimes.clear();
+    this.lastEventAt.clear();
+    this.pollInFlight.clear();
   }
 
   private watchPath(watchPath: string, config: FileMonitorConfig): void {
     try {
       const watcher = fs.watch(watchPath, { recursive: true }, (eventType, filename) => {
         if (!this.running || !filename) return;
+        this.lastEventAt.set(watchPath, Date.now());
         const fullPath = safeJoin(watchPath, filename);
         if (config.filter && !config.filter(fullPath)) return;
-        this.handleChange(config.projectId, fullPath, eventType as FileChangeType);
+        void this.handleChange(config.projectId, fullPath, eventType as FileChangeType);
       });
       this.watchers.set(watchPath, watcher);
     } catch (err) {
@@ -112,8 +144,23 @@ export class FileMonitor {
     }
   }
 
-  private pollPath(watchPath: string, config: FileMonitorConfig): void {
+  private scheduleNextPoll(watchPath: string, config: FileMonitorConfig): void {
+    const interval = config.intervalMs || 3000;
+    const lastEvent = this.lastEventAt.get(watchPath) ?? 0;
+    const delay = computePollDelay(lastEvent, Date.now(), interval);
+    const timer = setTimeout(() => {
+      this.pollTimers.delete(watchPath);
+      void this.pollPath(watchPath, config).finally(() => {
+        if (this.running) this.scheduleNextPoll(watchPath, config);
+      });
+    }, delay);
+    this.pollTimers.set(watchPath, timer);
+  }
+
+  private async pollPath(watchPath: string, config: FileMonitorConfig): Promise<void> {
     if (!this.running) return;
+    if (this.pollInFlight.has(watchPath)) return;
+    this.pollInFlight.add(watchPath);
     try {
       const state: ScanState = {
         ignoreSet: new Set(config.ignoreDirs ?? []),
@@ -122,17 +169,19 @@ export class FileMonitor {
         stack: [watchPath],
       };
       while (state.stack.length > 0) {
-        this.scanDirEntries(state.stack.pop()!, state);
+        await this.scanDirEntries(state.stack.pop()!, state);
       }
     } catch {
       // Directory may have been removed during iteration
+    } finally {
+      this.pollInFlight.delete(watchPath);
     }
   }
 
-  private scanDirEntries(dir: string, state: ScanState): void {
+  private async scanDirEntries(dir: string, state: ScanState): Promise<void> {
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
     } catch {
       return; // Directory may have been removed during iteration
     }
@@ -142,17 +191,25 @@ export class FileMonitor {
         continue;
       }
       if (!entry.isFile()) continue;
-      this.inspectFileEntry(safeJoin(dir, entry.name), state.watchPath, state.config);
+      await this.inspectFileEntry(safeJoin(dir, entry.name), state.watchPath, state.config);
     }
   }
 
-  private inspectFileEntry(fullPath: string, watchPath: string, config: FileMonitorConfig): void {
+  private async inspectFileEntry(
+    fullPath: string,
+    watchPath: string,
+    config: FileMonitorConfig,
+  ): Promise<void> {
     if (config.filter && !config.filter(fullPath)) return;
-    this.checkMtime(fullPath, watchPath, config);
+    await this.checkMtime(fullPath, watchPath, config);
   }
 
-  private checkMtime(fullPath: string, watchPath: string, config: FileMonitorConfig): void {
-    const stat = fs.statSync(fullPath);
+  private async checkMtime(
+    fullPath: string,
+    watchPath: string,
+    config: FileMonitorConfig,
+  ): Promise<void> {
+    const stat = await fs.promises.stat(fullPath);
     const mtime = stat.mtimeMs;
     if (this.isModifiedSinceLast(fullPath, mtime)) {
       this.emitMtimeChange(fullPath, watchPath, config.projectId, mtime);
@@ -165,7 +222,12 @@ export class FileMonitor {
     return !!last && mtime > last;
   }
 
-  private emitMtimeChange(fullPath: string, watchPath: string, projectId: string, mtime: number): void {
+  private emitMtimeChange(
+    fullPath: string,
+    watchPath: string,
+    projectId: string,
+    mtime: number,
+  ): void {
     this.eventCenter.createEvent({
       projectId,
       title: `File changed: ${path.relative(watchPath, fullPath)}`,
@@ -179,8 +241,12 @@ export class FileMonitor {
     });
   }
 
-  private handleChange(projectId: string, fullPath: string, eventType: FileChangeType): void {
-    const stat = this.statIfFile(fullPath);
+  private async handleChange(
+    projectId: string,
+    fullPath: string,
+    eventType: FileChangeType,
+  ): Promise<void> {
+    const stat = await this.statIfFile(fullPath);
     if (stat && !stat.isFile()) return;
     const wasKnown = this.lastMtimes.has(fullPath);
     const changeType = resolveChangeType(eventType, !!stat, wasKnown);
@@ -192,9 +258,9 @@ export class FileMonitor {
   }
 
   /** 读取文件状态；不存在或读取失败返回 null */
-  private statIfFile(fullPath: string): fs.Stats | null {
+  private async statIfFile(fullPath: string): Promise<fs.Stats | null> {
     try {
-      return fs.statSync(fullPath);
+      return await fs.promises.stat(fullPath);
     } catch {
       return null;
     }
@@ -208,7 +274,12 @@ export class FileMonitor {
   }
 
   /** 记录 mtime 变化；仅当 mtime 前进时上报变更事件 */
-  private recordMtimeChange(projectId: string, fullPath: string, stat: fs.Stats, changeType: FileChangeType): void {
+  private recordMtimeChange(
+    projectId: string,
+    fullPath: string,
+    stat: fs.Stats,
+    changeType: FileChangeType,
+  ): void {
     const mtime = stat.mtimeMs;
     const prev = this.lastMtimes.get(fullPath);
     this.lastMtimes.set(fullPath, mtime);
@@ -216,7 +287,11 @@ export class FileMonitor {
     this.emitFileChangeEvent(projectId, fullPath, changeType);
   }
 
-  private emitFileChangeEvent(projectId: string, fullPath: string, changeType: FileChangeType): void {
+  private emitFileChangeEvent(
+    projectId: string,
+    fullPath: string,
+    changeType: FileChangeType,
+  ): void {
     this.eventCenter.createEvent({
       projectId,
       title: `File ${changeType}: ${path.basename(fullPath)}`,

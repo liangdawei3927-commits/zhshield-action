@@ -9,7 +9,11 @@ import {
 } from '../tech-debt/dashboard';
 import type { DebtIssueInput, ModuleHotnessInput, TechDebtInput } from '../tech-debt/types';
 
-function makeInput(issues: DebtIssueInput[], hotness: ModuleHotnessInput[] = [], exposed: string[] = []): TechDebtInput {
+function makeInput(
+  issues: DebtIssueInput[],
+  hotness: ModuleHotnessInput[] = [],
+  exposed: string[] = [],
+): TechDebtInput {
   return { projectId: 'proj-1', issues, moduleHotness: hotness, exposedFiles: exposed };
 }
 
@@ -100,23 +104,49 @@ describe('tech-debt: buildTechDebtDashboard', () => {
   });
 
   it('模块热度影响利息：高热度模块同问题利息更高', () => {
-    const hotIssue: DebtIssueInput = { id: 'h1', severity: 'error', category: 'security', file: 'src/hot.ts' };
-    const coldIssue: DebtIssueInput = { id: 'c1', severity: 'error', category: 'security', file: 'src/cold.ts' };
+    const hotIssue: DebtIssueInput = {
+      id: 'h1',
+      severity: 'error',
+      category: 'security',
+      file: 'src/hot.ts',
+    };
+    const coldIssue: DebtIssueInput = {
+      id: 'c1',
+      severity: 'error',
+      category: 'security',
+      file: 'src/cold.ts',
+    };
     const hot = buildTechDebtDashboard(
       makeInput([hotIssue], [{ module: 'src/hot.ts', commitCount: 50 }]),
     ).actionList.find((a) => a.module === 'src/hot.ts');
-    const cold = buildTechDebtDashboard(makeInput([coldIssue])).actionList.find((a) => a.module === 'src/cold.ts');
+    const cold = buildTechDebtDashboard(makeInput([coldIssue])).actionList.find(
+      (a) => a.module === 'src/cold.ts',
+    );
     expect(hot!.interestScore).toBeGreaterThan(cold!.interestScore);
-    expect(hot!.interestBreakdown.hotnessFactor).toBeGreaterThan(cold!.interestBreakdown.hotnessFactor);
+    expect(hot!.interestBreakdown.hotnessFactor).toBeGreaterThan(
+      cold!.interestBreakdown.hotnessFactor,
+    );
   });
 
   it('安全敞口：对外接口文件加权', () => {
-    const exposedIssue: DebtIssueInput = { id: 'e1', severity: 'error', category: 'security', file: 'src/routes.ts' };
-    const normalIssue: DebtIssueInput = { id: 'n1', severity: 'error', category: 'security', file: 'src/lib.ts' };
+    const exposedIssue: DebtIssueInput = {
+      id: 'e1',
+      severity: 'error',
+      category: 'security',
+      file: 'src/routes.ts',
+    };
+    const normalIssue: DebtIssueInput = {
+      id: 'n1',
+      severity: 'error',
+      category: 'security',
+      file: 'src/lib.ts',
+    };
     const exposed = buildTechDebtDashboard(
       makeInput([exposedIssue], [], ['src/routes.ts']),
     ).actionList.find((a) => a.module === 'src/routes.ts');
-    const normal = buildTechDebtDashboard(makeInput([normalIssue])).actionList.find((a) => a.module === 'src/lib.ts');
+    const normal = buildTechDebtDashboard(makeInput([normalIssue])).actionList.find(
+      (a) => a.module === 'src/lib.ts',
+    );
     expect(exposed!.interestBreakdown.exposureFactor).toBe(1.5);
     expect(normal!.interestBreakdown.exposureFactor).toBe(1);
   });
@@ -152,8 +182,18 @@ describe('tech-debt: buildTechDebtDashboard', () => {
 describe('tech-debt: mergeActionStatuses', () => {
   it('overrides status for matching actionIds from persisted', () => {
     const actions = [
-      { actionId: 'td-security-abc', status: 'pending', module: 'src/a.ts', category: 'security' as const } as import('../tech-debt/types').DebtAction,
-      { actionId: 'td-quality-def', status: 'pending', module: 'src/b.ts', category: 'quality' as const } as import('../tech-debt/types').DebtAction,
+      {
+        actionId: 'td-security-abc',
+        status: 'pending',
+        module: 'src/a.ts',
+        category: 'security' as const,
+      } as import('../tech-debt/types').DebtAction,
+      {
+        actionId: 'td-quality-def',
+        status: 'pending',
+        module: 'src/b.ts',
+        category: 'quality' as const,
+      } as import('../tech-debt/types').DebtAction,
     ];
     const persisted = [{ actionId: 'td-security-abc', status: 'planned' as const }];
     const result = mergeActionStatuses(actions, persisted);
@@ -170,7 +210,9 @@ describe('tech-debt: mergeActionStatuses', () => {
   });
 
   it('does not mutate original array', () => {
-    const original = [{ actionId: 'x', status: 'pending' as const }] as import('../tech-debt/types').DebtAction[];
+    const original = [
+      { actionId: 'x', status: 'pending' as const },
+    ] as import('../tech-debt/types').DebtAction[];
     mergeActionStatuses(original, [{ actionId: 'x', status: 'repaid' as const }]);
     expect(original[0].status).toBe('pending');
   });

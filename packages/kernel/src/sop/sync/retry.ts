@@ -64,6 +64,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
+      // eslint-disable-next-line perf/perf-no-serial-await -- retry loop: each attempt depends on previous failure
       return await fn();
     } catch (err) {
       lastError = err;
@@ -73,6 +74,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     }
     const nominal = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
     const delay = nominal * (0.5 + 0.5 * Math.random());
+    // eslint-disable-next-line perf/perf-no-serial-await -- retry loop: sleep depends on attempt count
     if ((await sleep(delay, signal)) === 'aborted') {
       throw lastError;
     }

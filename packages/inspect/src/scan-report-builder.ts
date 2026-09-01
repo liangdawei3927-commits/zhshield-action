@@ -3,7 +3,13 @@ import type { EventEmitter } from '@zh/shared';
 import { DegradationManager } from '@zh/shared';
 
 const SCAN_CATEGORIES = [
-  'architecture', 'security', 'quality', 'performance', 'documentation', 'test', 'dependency',
+  'architecture',
+  'security',
+  'quality',
+  'performance',
+  'documentation',
+  'test',
+  'dependency',
 ] as const;
 
 export interface ScanReportInput {
@@ -41,15 +47,21 @@ export class ScanReportBuilder {
   }
 
   scoreOf(summary: InspectionReport['summary'], penalizeInfo = true): InspectionReport['score'] {
-    const overall = summary.total === 0
-      ? 100
-      : Math.max(0, 100 - summary.error * 10 - summary.warning * 3 - (penalizeInfo ? summary.info : 0));
+    const overall =
+      summary.total === 0
+        ? 100
+        : Math.max(
+            0,
+            100 - summary.error * 10 - summary.warning * 3 - (penalizeInfo ? summary.info : 0),
+          );
     const grade = overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
     return { overall, grade };
   }
 
   categoryCounts(issues: Issue[]): Record<string, number> {
-    return Object.fromEntries(SCAN_CATEGORIES.map((c) => [c, issues.filter((i) => i.category === c).length]));
+    return Object.fromEntries(
+      SCAN_CATEGORIES.map((c) => [c, issues.filter((i) => i.category === c).length]),
+    );
   }
 
   recommendations(issues: Issue[]): string[] {

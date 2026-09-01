@@ -53,15 +53,21 @@ async function runGuardCheck(
       rule,
       status: violations.length === 0 ? 'passed' : 'failed',
       violations,
-      message: violations.length > 0
-        ? `Guard 检查发现 ${violations.length} 个问题`
-        : 'Guard 检查通过',
+      message:
+        violations.length > 0 ? `Guard 检查发现 ${violations.length} 个问题` : 'Guard 检查通过',
       durationMs: 0,
       targetEngine: 'guard',
       timestamp: new Date(),
     };
   } catch (err) {
-    return errorResult(rule, `Guard 派发失败: ${toMessage(err)}`, 'guard');
+    const msg = toMessage(err);
+    // 规则 content 的 checks 与传统 checkId 体系不对应时（如 TS 编译器选项类规则
+    // 被解释为 check-list），派发无匹配属于跳过而非错误——升级为 error 会产生
+    // 无 location 的 error 级误报，阻断门禁且 SARIF 上传被 GitHub 拒绝
+    if (msg.includes('no checks matched the current filters')) {
+      return skippedResult(rule, `无可匹配的 Guard 检查，跳过派发: ${msg}`, 'guard');
+    }
+    return errorResult(rule, `Guard 派发失败: ${msg}`, 'guard');
   }
 }
 
@@ -145,9 +151,8 @@ async function runScannerAdapters(
       const msg = one.message ?? '扫描器不可用';
       // 形如「工具不可用: semgrep（未安装或在 PATH 中未找到）」→ 提取括号内原因
       const prefix = `工具不可用: ${toolName}（`;
-      const reason = msg.startsWith(prefix) && msg.endsWith('）')
-        ? msg.slice(prefix.length, -1)
-        : msg;
+      const reason =
+        msg.startsWith(prefix) && msg.endsWith('）') ? msg.slice(prefix.length, -1) : msg;
       reasons.push(`${toolName}(${reason})`);
       continue;
     }
@@ -169,9 +174,7 @@ async function runScannerAdapters(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
-    message: violations.length > 0
-      ? `扫描器发现 ${violations.length} 个问题`
-      : '扫描器检查通过',
+    message: violations.length > 0 ? `扫描器发现 ${violations.length} 个问题` : '扫描器检查通过',
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
@@ -188,14 +191,26 @@ export async function evalToolDispatch(
 ): Promise<RuleEvaluation> {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    return skippedResult(rule, `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`, targetEngineOf(rule));
+    return skippedResult(
+      rule,
+      `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`,
+      targetEngineOf(rule),
+    );
   }
   if (!isAdapterUsable(adapter)) {
-    return skippedResult(rule, `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`, targetEngineOf(rule));
+    return skippedResult(
+      rule,
+      `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`,
+      targetEngineOf(rule),
+    );
   }
   const available = await adapter.isAvailable();
   if (!available) {
-    return skippedResult(rule, `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`, targetEngineOf(rule));
+    return skippedResult(
+      rule,
+      `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`,
+      targetEngineOf(rule),
+    );
   }
   return runToolScan(host, adapter, rule, instr, context);
 }
@@ -236,7 +251,11 @@ async function runToolScan(
     });
     return buildToolScanResult(rule, instr, result);
   } catch (err) {
-    return errorResult(rule, `工具 ${instr.tool} 执行失败: ${toMessage(err)}`, targetEngineOf(rule));
+    return errorResult(
+      rule,
+      `工具 ${instr.tool} 执行失败: ${toMessage(err)}`,
+      targetEngineOf(rule),
+    );
   }
 }
 
@@ -247,20 +266,26 @@ function buildToolScanResult(
   result: ToolResult,
 ): RuleEvaluation {
   const violations = toolScanViolations(result, rule);
-  const status = result.status === 'available' && result.issues.length === 0 ? 'passed'
-    : result.status === 'error' ? 'error'
-    : result.status === 'unavailable' ? 'skipped'
-    : 'failed';
+  const status =
+    result.status === 'available' && result.issues.length === 0
+      ? 'passed'
+      : result.status === 'error'
+        ? 'error'
+        : result.status === 'unavailable'
+          ? 'skipped'
+          : 'failed';
 
   return {
     rule,
     status,
     violations,
     files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : undefined,
-    message: violations.length > 0
-      ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
-      : result.error ? `工具 ${instr.tool} 错误: ${result.error}`
-      : `工具 ${instr.tool} 检查通过`,
+    message:
+      violations.length > 0
+        ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
+        : result.error
+          ? `工具 ${instr.tool} 错误: ${result.error}`
+          : `工具 ${instr.tool} 检查通过`,
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: new Date(),
@@ -271,9 +296,12 @@ function toolScanViolations(result: ToolResult, rule: SopRule): Violation[] {
   return result.issues.map((issue: Issue) => ({
     id: issue.id,
     ruleId: rule.id,
-    severity: issue.severity === 'error' ? ('high' as const)
-      : issue.severity === 'warning' ? ('medium' as const)
-      : ('low' as const),
+    severity:
+      issue.severity === 'error'
+        ? ('high' as const)
+        : issue.severity === 'warning'
+          ? ('medium' as const)
+          : ('low' as const),
     file: issue.file,
     line: issue.line,
     column: issue.column,
@@ -322,7 +350,12 @@ function pickPresetTool(host: EngineHost, instr: PresetInstruction): string | nu
   const preferredTools = ['eslint', 'semgrep', 'gitleaks'] as const;
   for (const tool of preferredTools) {
     if (!host.toolAdapters.has(tool)) continue;
-    if (tool === 'eslint' || presetHint.includes(tool) || presetHint.includes('error-rules') || presetHint.includes('recommended')) {
+    if (
+      tool === 'eslint' ||
+      presetHint.includes(tool) ||
+      presetHint.includes('error-rules') ||
+      presetHint.includes('recommended')
+    ) {
       return tool;
     }
   }
@@ -376,11 +409,19 @@ async function runInspectScan(
   }
 }
 
-function skippedResult(rule: SopRule, message: string, targetEngine: 'guard' | 'inspect'): RuleEvaluation {
+function skippedResult(
+  rule: SopRule,
+  message: string,
+  targetEngine: 'guard' | 'inspect',
+): RuleEvaluation {
   return { rule, status: 'skipped', message, durationMs: 0, targetEngine, timestamp: new Date() };
 }
 
-function errorResult(rule: SopRule, message: string, targetEngine: 'guard' | 'inspect'): RuleEvaluation {
+function errorResult(
+  rule: SopRule,
+  message: string,
+  targetEngine: 'guard' | 'inspect',
+): RuleEvaluation {
   return { rule, status: 'error', message, durationMs: 0, targetEngine, timestamp: new Date() };
 }
 

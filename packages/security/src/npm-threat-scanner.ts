@@ -14,25 +14,76 @@ import type { MalwareItem } from './types';
 import { safeJoin } from '@zh/shared';
 
 /** 已知恶意 / 仿冒 npm 包（社区确认，仅收录整名即为恶意的包，不含版本投毒事件） */
-const KNOWN_MALICIOUS_PACKAGES = new Set<string>([  'flatmap-stream',   // event-stream 供应链投毒（2018，已移除）
-  'crossenv',         // cross-env 仿冒
-  'jquery-dist',      // jquery typosquatting
-  'lodahs',           // lodash typosquatting
-  'loadash',          // lodash typosquatting
-  'babelcli',         // babel 仿冒
-  'db-json',          // json-server 仿冒
+const KNOWN_MALICIOUS_PACKAGES = new Set<string>([
+  'flatmap-stream', // event-stream 供应链投毒（2018，已移除）
+  'crossenv', // cross-env 仿冒
+  'jquery-dist', // jquery typosquatting
+  'lodahs', // lodash typosquatting
+  'loadash', // lodash typosquatting
+  'babelcli', // babel 仿冒
+  'db-json', // json-server 仿冒
 ]);
 
 /** 高频流行包名：仿冒检测基准，同时作为合法白名单（避免命中真实包） */
 const KNOWN_POPULAR_PACKAGES = new Set<string>([
-  'react', 'react-dom', 'lodash', 'express', 'axios', 'node-fetch', 'request',
-  'async', 'chalk', 'debug', 'commander', 'jsonwebtoken', 'moment', 'mongoose',
-  'uuid', 'ws', 'socket.io', 'next', 'vue', 'angular', 'webpack', 'gulp', 'grunt',
-  'jquery', 'bootstrap', 'typescript', 'eslint', 'prettier', 'jest', 'mocha',
-  'ioredis', 'mysql', 'mysql2', 'pg', 'dotenv', 'yargs', 'minimist', 'semver',
-  'form-data', 'body-parser', 'cors', 'helmet', 'morgan', 'cookie-parser',
-  'sqlite', 'sqlite3', 'redis', 'glob', 'rimraf', 'mkdirp', 'http-proxy',
-  'undici', 'zod', 'dayjs', 'classnames', 'nanoid', 'tailwindcss', 'vitest',
+  'react',
+  'react-dom',
+  'lodash',
+  'express',
+  'axios',
+  'node-fetch',
+  'request',
+  'async',
+  'chalk',
+  'debug',
+  'commander',
+  'jsonwebtoken',
+  'moment',
+  'mongoose',
+  'uuid',
+  'ws',
+  'socket.io',
+  'next',
+  'vue',
+  'angular',
+  'webpack',
+  'gulp',
+  'grunt',
+  'jquery',
+  'bootstrap',
+  'typescript',
+  'eslint',
+  'prettier',
+  'jest',
+  'mocha',
+  'ioredis',
+  'mysql',
+  'mysql2',
+  'pg',
+  'dotenv',
+  'yargs',
+  'minimist',
+  'semver',
+  'form-data',
+  'body-parser',
+  'cors',
+  'helmet',
+  'morgan',
+  'cookie-parser',
+  'sqlite',
+  'sqlite3',
+  'redis',
+  'glob',
+  'rimraf',
+  'mkdirp',
+  'http-proxy',
+  'undici',
+  'zod',
+  'dayjs',
+  'classnames',
+  'nanoid',
+  'tailwindcss',
+  'vitest',
 ]);
 
 /** 编辑距离阈值：短包名更宽松（仿冒通常只差一两个字符） */
@@ -122,10 +173,10 @@ function extractPnpmPackageNames(lock: unknown): string[] {
 function collectImporterDeps(importers: Record<string, unknown>, names: Set<string>): void {
   for (const importer of Object.values(importers)) {
     if (!importer || typeof importer !== 'object') continue;
-    const deps = (importer as {
+    const deps = importer as {
       dependencies?: Record<string, unknown>;
       devDependencies?: Record<string, unknown>;
-    });
+    };
     for (const depMap of [deps.dependencies, deps.devDependencies]) {
       if (!depMap || typeof depMap !== 'object') continue;
       for (const name of Object.keys(depMap)) names.add(name);
@@ -169,12 +220,14 @@ function scanPackageNames(names: string[], lockPath: string): MalwareItem[] {
     const isScoped = name.startsWith('@');
 
     if (KNOWN_MALICIOUS_PACKAGES.has(name)) {
-      items.push(makeThreatItem(lockPath, name, {
-        severity: 'critical',
-        title: '已知恶意 npm 包（供应链投毒黑名单）',
-        pattern: 'npm-threat-db',
-        evidence: `${path.basename(lockPath)} 引用了黑名单包 ${name}`,
-      }));
+      items.push(
+        makeThreatItem(lockPath, name, {
+          severity: 'critical',
+          title: '已知恶意 npm 包（供应链投毒黑名单）',
+          pattern: 'npm-threat-db',
+          evidence: `${path.basename(lockPath)} 引用了黑名单包 ${name}`,
+        }),
+      );
       continue;
     }
 
@@ -184,12 +237,14 @@ function scanPackageNames(names: string[], lockPath: string): MalwareItem[] {
     for (const popular of KNOWN_POPULAR_PACKAGES) {
       const distance = levenshtein(short, popular);
       if (distance >= 1 && distance <= threshold) {
-        items.push(makeThreatItem(lockPath, name, {
-          severity: 'high',
-          title: '疑似仿冒包（typosquatting）',
-          pattern: `typosquat:${popular}:${distance}`,
-          evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
-        }));
+        items.push(
+          makeThreatItem(lockPath, name, {
+            severity: 'high',
+            title: '疑似仿冒包（typosquatting）',
+            pattern: `typosquat:${popular}:${distance}`,
+            evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
+          }),
+        );
         break;
       }
     }

@@ -26,7 +26,8 @@ export function buildAiFixPrompt(projectPath: string, issues: readonly AiFixIssu
     const location = [issue.file, issue.line, issue.column].filter((v) => v != null).join(':');
     if (location) lines.push(t('ai.copyFix.locationLabel', { location }));
     lines.push(t('ai.copyFix.messageLabel', { message: issue.message }));
-    if (issue.suggestion) lines.push(t('ai.copyFix.suggestionLabel', { suggestion: issue.suggestion }));
+    if (issue.suggestion)
+      lines.push(t('ai.copyFix.suggestionLabel', { suggestion: issue.suggestion }));
     lines.push('');
   });
   lines.push(t('ai.copyFix.projectPathLabel', { projectPath }));
@@ -76,7 +77,11 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 
 export type ToastFn = (message: string, variant?: 'success' | 'error' | 'warning' | 'info') => void;
 
-export function copyIssuesToAi(projectPath: string, toast: ToastFn, issues: readonly AiFixIssue[]): void {
+export function copyIssuesToAi(
+  projectPath: string,
+  toast: ToastFn,
+  issues: readonly AiFixIssue[],
+): void {
   const text = buildAiFixPrompt(projectPath, issues);
   void copyTextToClipboard(text).then(
     (ok) => (ok ? toast(t('toast.issuesCopied')) : toast(t('toast.copyFailed'), 'error')),

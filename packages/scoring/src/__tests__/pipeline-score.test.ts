@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildHealthDimensions, type GuardReportLike, type InspectionReportLike } from '../pipeline-score';
+import {
+  buildHealthDimensions,
+  type GuardReportLike,
+  type InspectionReportLike,
+} from '../pipeline-score';
 
 const cleanGuard: GuardReportLike = { results: [] };
 const cleanInspect: InspectionReportLike = { issues: [] };
@@ -9,7 +13,11 @@ describe('buildHealthDimensions', () => {
     const dims = buildHealthDimensions(cleanGuard, cleanInspect);
     expect(dims).toHaveLength(5);
     expect(dims.map((d) => d.name)).toEqual([
-      'security', 'quality', 'architecture', 'dependencies', 'documentation',
+      'security',
+      'quality',
+      'architecture',
+      'dependencies',
+      'documentation',
     ]);
     expect(dims.every((d) => d.score === 100)).toBe(true);
     expect(dims.every((d) => d.issues === 0)).toBe(true);

@@ -77,7 +77,7 @@ export class SyncConflictResolver {
       return remote;
     }
 
-    const merged = { ...local as Record<string, unknown> };
+    const merged = { ...(local as Record<string, unknown>) };
     const remoteObj = remote as Record<string, unknown>;
 
     for (const [key, value] of Object.entries(remoteObj)) {

@@ -6,7 +6,13 @@ import type { ProjectProfile } from '@zh/dependency';
 import { AiCodeReviewImpl } from '../ai-code/review';
 
 function profile(projectPath: string): ProjectProfile {
-  return { projectPath, language: 'typescript', framework: null, packageManager: 'pnpm', hasTypeScript: true };
+  return {
+    projectPath,
+    language: 'typescript',
+    framework: null,
+    packageManager: 'pnpm',
+    hasTypeScript: true,
+  };
 }
 
 describe('AiCodeReviewImpl', () => {
@@ -27,7 +33,10 @@ describe('AiCodeReviewImpl', () => {
   }
 
   async function makeFixture(): Promise<void> {
-    await writeFile('package.json', JSON.stringify({ name: 'f', dependencies: { lodash: '^4.17.21' } }));
+    await writeFile(
+      'package.json',
+      JSON.stringify({ name: 'f', dependencies: { lodash: '^4.17.21' } }),
+    );
     await writeFile(
       'src/app.ts',
       [
@@ -55,7 +64,9 @@ describe('AiCodeReviewImpl', () => {
     const critical = hallucinated.find((v) => v.severity === 'critical');
     expect(critical?.description).toContain('lodahs');
 
-    const tsSuppression = vulns.find((v) => v.ruleId === 'ai-unsafe-default' && v.description.includes('ts-ignore'));
+    const tsSuppression = vulns.find(
+      (v) => v.ruleId === 'ai-unsafe-default' && v.description.includes('ts-ignore'),
+    );
     expect(tsSuppression?.line).toBe(4);
     expect(vulns.find((v) => v.description.includes('eval'))?.severity).toBe('high');
     expect(vulns.find((v) => v.description.includes('catch'))?.severity).toBe('medium');

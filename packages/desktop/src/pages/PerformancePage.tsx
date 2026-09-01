@@ -1,7 +1,12 @@
 import { PageShell } from '../components/business/PageShell';
 import { useT } from '../i18n';
 import { usePerformancePage } from './performance-logic';
-import { AmberBolt, PerformanceHeader, PerformanceScoreCard, IssuesPanel } from './performance-parts';
+import {
+  AmberBolt,
+  PerformanceHeader,
+  PerformanceScoreCard,
+  IssuesPanel,
+} from './performance-parts';
 
 interface PerformancePageProps {
   projectPath: string;
@@ -9,13 +14,19 @@ interface PerformancePageProps {
 
 export function PerformancePage({ projectPath }: PerformancePageProps) {
   const t = useT();
-  const { loading, progressLabel, report, copyToAi, copyAllToAi, handleScan } = usePerformancePage(projectPath);
+  const { loading, progressLabel, report, copyToAi, copyAllToAi, handleScan } =
+    usePerformancePage(projectPath);
 
   if (report) {
     return (
       <div className="h-full w-full bg-zh-bg overflow-auto">
         <div className="w-full px-8 py-10">
-          <PerformanceHeader report={report} loading={loading} progressLabel={progressLabel} onRescan={handleScan} />
+          <PerformanceHeader
+            report={report}
+            loading={loading}
+            progressLabel={progressLabel}
+            onRescan={handleScan}
+          />
           <PerformanceScoreCard report={report} />
           <IssuesPanel issues={report.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>
@@ -31,7 +42,16 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
       featureList={[
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           ),
@@ -40,7 +60,16 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           ),
@@ -49,7 +78,16 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M2 12h6l3-9 4 18 3-9h4" />
             </svg>
           ),
@@ -58,8 +96,18 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           ),
           title: t('page.performance.shell.featureTimer.title'),

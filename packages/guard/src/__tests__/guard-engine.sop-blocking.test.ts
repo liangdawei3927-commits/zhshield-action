@@ -49,7 +49,17 @@ function demoIssue(): Issue {
 
 function failingEslintAdapter(): ToolAdapter {
   return {
-    meta: { id: 'eslint', name: 'ESLint', category: 'guard', priority: 'P1', installMode: 'builtin', description: '', cliCommand: '', homepage: '', license: '' },
+    meta: {
+      id: 'eslint',
+      name: 'ESLint',
+      category: 'guard',
+      priority: 'P1',
+      installMode: 'builtin',
+      description: '',
+      cliCommand: '',
+      homepage: '',
+      license: '',
+    },
     isAvailable: async () => true,
     scan: async (_opts: ToolScanOptions): Promise<ToolResult> => ({
       tool: 'eslint',
@@ -74,11 +84,13 @@ function buildGuardWithRule(rule: SopRule): GuardEngine {
 
 describe('GuardEngine — F1-4 SOP 阻断判定消费', () => {
   it('存量路径：未声明阈值的规则失败 → CheckResult.blocking=true、summary.blocking=1、ok=false（旧行为不变）', async () => {
-    const guard = buildGuardWithRule(makeSopRule({
-      id: RULE_ID,
-      severity: 'medium',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    const guard = buildGuardWithRule(
+      makeSopRule({
+        id: RULE_ID,
+        severity: 'medium',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await guard.run({ mode: 'guard' });
     expect(report.results[0]?.status).toBe('failed');
@@ -88,13 +100,15 @@ describe('GuardEngine — F1-4 SOP 阻断判定消费', () => {
     expect(report.ok).toBe(false);
   });
 
-  it("有效严重级低于阈值（medium < critical）→ 不阻断，但 ok 仍为 false（状态驱动不变量）", async () => {
-    const guard = buildGuardWithRule(makeSopRule({
-      id: RULE_ID,
-      severity: 'medium',
-      blockingThreshold: 'critical',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+  it('有效严重级低于阈值（medium < critical）→ 不阻断，但 ok 仍为 false（状态驱动不变量）', async () => {
+    const guard = buildGuardWithRule(
+      makeSopRule({
+        id: RULE_ID,
+        severity: 'medium',
+        blockingThreshold: 'critical',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await guard.run({ mode: 'guard' });
     expect(report.results[0]?.status).toBe('failed');
@@ -106,13 +120,15 @@ describe('GuardEngine — F1-4 SOP 阻断判定消费', () => {
   });
 
   it("连续失败升级到 'critical' 达到阈值 → 第二次运行阻断，ok 语义与第一次完全一致（均为 false）", async () => {
-    const guard = buildGuardWithRule(makeSopRule({
-      id: RULE_ID,
-      severity: 'medium',
-      accumulationPolicy: { threshold: 1, escalateTo: 'critical' },
-      blockingThreshold: 'critical',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    const guard = buildGuardWithRule(
+      makeSopRule({
+        id: RULE_ID,
+        severity: 'medium',
+        accumulationPolicy: { threshold: 1, escalateTo: 'critical' },
+        blockingThreshold: 'critical',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     // 第 1 次：有效严重级 medium < critical → 不阻断；ok=false
     const r1 = await guard.run({ mode: 'guard' });

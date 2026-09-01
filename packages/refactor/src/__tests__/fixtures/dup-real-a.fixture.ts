@@ -4,7 +4,8 @@ export function formatMoney(amount: number, currency: string): string {
   const absolute = Math.abs(normalized);
   const whole = Math.floor(absolute);
   const fraction = Math.round((absolute - whole) * 100);
-  const withFraction = fraction === 0 ? `${whole}.00` : `${whole}.${fraction < 10 ? `0${fraction}` : fraction}`;
+  const withFraction =
+    fraction === 0 ? `${whole}.00` : `${whole}.${fraction < 10 ? `0${fraction}` : fraction}`;
   const grouped = withFraction.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const prefix = currency === 'JPY' || currency === 'KRW' ? '' : `${currency} `;
   const sign = negative ? '-' : '';

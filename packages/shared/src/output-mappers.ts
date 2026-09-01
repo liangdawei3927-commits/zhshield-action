@@ -28,7 +28,9 @@ interface SemgrepResult {
     metadata?: { description?: string };
   };
 }
-interface SemgrepOutput { results?: SemgrepResult[] }
+interface SemgrepOutput {
+  results?: SemgrepResult[];
+}
 
 interface TrivyVulnerability {
   VulnerabilityID?: string;
@@ -49,13 +51,17 @@ interface TrivyResult {
   Vulnerabilities?: TrivyVulnerability[];
   Secrets?: TrivySecret[];
 }
-interface TrivyOutput { Results?: TrivyResult[] }
+interface TrivyOutput {
+  Results?: TrivyResult[];
+}
 
 interface GrypeMatch {
   vulnerability?: { id?: string; severity?: string; description?: string; fixedInVersion?: string };
   artifact?: { name?: string; version?: string };
 }
-interface GrypeOutput { matches?: GrypeMatch[] }
+interface GrypeOutput {
+  matches?: GrypeMatch[];
+}
 
 interface GitleaksFinding {
   RuleID?: string;
@@ -75,14 +81,22 @@ interface DepCruiserViolation {
   from?: { path?: string; line?: number };
   to?: { path?: string };
 }
-interface DepCruiserOutput { summary?: { violations?: DepCruiserViolation[] } }
+interface DepCruiserOutput {
+  summary?: { violations?: DepCruiserViolation[] };
+}
 
 interface JscpdDuplicate {
   format?: string;
-  first?: { location?: { path?: string; start?: { line?: number } }; path?: string; position?: { start?: { line?: number } } };
+  first?: {
+    location?: { path?: string; start?: { line?: number } };
+    path?: string;
+    position?: { start?: { line?: number } };
+  };
   second?: { location?: { path?: string }; path?: string };
 }
-interface JscpdOutput { duplicates?: JscpdDuplicate[] }
+interface JscpdOutput {
+  duplicates?: JscpdDuplicate[];
+}
 
 // ─── Mappers ──────────────────────────────────────────────
 
@@ -102,7 +116,9 @@ export const eslintMapper: ToolOutputMapper = (output: unknown): Issue[] => {
         file: file.filePath || '',
         line: msg.line || 0,
         column: msg.column || 0,
-        suggestion: msg.fix ? '可自动修复' : msg.suggestions?.map((s) => s.desc).join('; ') || undefined,
+        suggestion: msg.fix
+          ? '可自动修复'
+          : msg.suggestions?.map((s) => s.desc).join('; ') || undefined,
         autoFixable: !!msg.fix,
         source: 'inspect',
         fingerprint: `${msg.ruleId}:${file.filePath || ''}:${msg.line || 0}`,
@@ -118,7 +134,12 @@ export const semgrepMapper: ToolOutputMapper = (output: unknown): Issue[] => {
   return data.results.map((r) => ({
     id: randomUUID(),
     ruleId: `semgrep.${r.check_id || 'unknown'}`,
-    severity: r.extra?.severity === 'ERROR' ? 'error' : r.extra?.severity === 'WARNING' ? 'warning' : 'info',
+    severity:
+      r.extra?.severity === 'ERROR'
+        ? 'error'
+        : r.extra?.severity === 'WARNING'
+          ? 'warning'
+          : 'info',
     category: 'security',
     message: r.extra?.message || r.extra?.metadata?.description || `Semgrep: ${r.check_id}`,
     file: r.path || '',
@@ -142,7 +163,8 @@ export const trivyMapper: ToolOutputMapper = (output: unknown): Issue[] => {
         issues.push({
           id: randomUUID(),
           ruleId: vuln.VulnerabilityID || 'trivy-unknown',
-          severity: sev === 'CRITICAL' || sev === 'HIGH' ? 'error' : sev === 'MEDIUM' ? 'warning' : 'info',
+          severity:
+            sev === 'CRITICAL' || sev === 'HIGH' ? 'error' : sev === 'MEDIUM' ? 'warning' : 'info',
           category: 'security',
           message: `${vuln.PkgName || '?'}@${vuln.InstalledVersion || '?'}: ${vuln.Title || vuln.VulnerabilityID || ''}`,
           file: result.Target || '',
@@ -185,13 +207,16 @@ export const grypeMapper: ToolOutputMapper = (output: unknown): Issue[] => {
     return {
       id: randomUUID(),
       ruleId: m.vulnerability?.id || 'grype-unknown',
-      severity: sev === 'critical' || sev === 'high' ? 'error' : sev === 'medium' ? 'warning' : 'info',
+      severity:
+        sev === 'critical' || sev === 'high' ? 'error' : sev === 'medium' ? 'warning' : 'info',
       category: 'security',
       message: `${m.artifact?.name || '?'}@${m.artifact?.version || '?'}: ${m.vulnerability?.description || m.vulnerability?.id || ''}`,
       file: '',
       line: 0,
       column: 0,
-      suggestion: m.vulnerability?.fixedInVersion ? `升级到 ${m.vulnerability.fixedInVersion}` : undefined,
+      suggestion: m.vulnerability?.fixedInVersion
+        ? `升级到 ${m.vulnerability.fixedInVersion}`
+        : undefined,
       autoFixable: !!m.vulnerability?.fixedInVersion,
       source: 'security',
       fingerprint: `grype:${m.vulnerability?.id || ''}:${m.artifact?.name || ''}`,
@@ -264,7 +289,8 @@ export const depCruiserMapper: ToolOutputMapper = (output: unknown): Issue[] => 
   return data.summary.violations.map((v) => ({
     id: randomUUID(),
     ruleId: v.rule?.name || 'dep-cruiser/violation',
-    severity: v.rule?.severity === 'error' ? 'error' : v.rule?.severity === 'warn' ? 'warning' : 'info',
+    severity:
+      v.rule?.severity === 'error' ? 'error' : v.rule?.severity === 'warn' ? 'warning' : 'info',
     category: 'architecture',
     message: `架构边界违规: ${v.rule?.name || '未知规则'} - ${v.from?.path || '?'} → ${v.to?.path || '?'}`,
     file: v.from?.path || '',

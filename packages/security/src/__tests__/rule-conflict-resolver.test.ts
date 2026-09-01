@@ -21,7 +21,7 @@ function makeIssue(overrides: Partial<Issue> & { ruleId: string; fingerprint: st
 
 /** 测试专用破坏器：给合法 finding 打上缺字段/坏字段的补丁（无类型断言） */
 function corrupt(finding: RuleFinding, patch: Record<string, unknown>): RuleFinding {
-  return { ...finding , ...patch};
+  return { ...finding, ...patch };
 }
 
 const SEMGREP_BACKDOOR = makeIssue({
@@ -115,7 +115,11 @@ describe('RuleConflictResolver', () => {
       }),
     ];
     const dismissals = [
-      RuleConflictResolver.dismissal(TRIVY_CVE.fingerprint, 'trivy/policy/ignore.yml', 'superseded by patched lodash@4.17.21 pin'),
+      RuleConflictResolver.dismissal(
+        TRIVY_CVE.fingerprint,
+        'trivy/policy/ignore.yml',
+        'superseded by patched lodash@4.17.21 pin',
+      ),
     ];
 
     const report = resolver.resolve(findings, dismissals);
@@ -216,7 +220,11 @@ describe('RuleConflictResolver', () => {
       [
         RuleConflictResolver.dismissal(GITLEAKS_AWS_TOKEN.fingerprint, 'allowlist/x.yml', ''),
         RuleConflictResolver.dismissal('', 'allowlist/x.yml', 'no fingerprint'),
-        RuleConflictResolver.dismissal(GITLEAKS_AWS_TOKEN.fingerprint, 'allowlist/ok.yml', 'rotated key'),
+        RuleConflictResolver.dismissal(
+          GITLEAKS_AWS_TOKEN.fingerprint,
+          'allowlist/ok.yml',
+          'rotated key',
+        ),
       ],
     );
 
@@ -235,10 +243,17 @@ describe('RuleConflictResolver', () => {
       RuleConflictResolver.finding('semgrep', 'secret', GITLEAKS_AWS_TOKEN),
       RuleConflictResolver.finding('gitleaks', 'secret', GITLEAKS_AWS_TOKEN),
       RuleConflictResolver.finding('trivy', 'vulnerability', TRIVY_CVE),
-      RuleConflictResolver.finding('gitleaks', 'secret', { ...TRIVY_CVE, fingerprint: TRIVY_CVE.fingerprint }),
+      RuleConflictResolver.finding('gitleaks', 'secret', {
+        ...TRIVY_CVE,
+        fingerprint: TRIVY_CVE.fingerprint,
+      }),
     ];
     const dismissals = [
-      RuleConflictResolver.dismissal(GITLEAKS_AWS_TOKEN.fingerprint, 'allowlist/a.yml', 'rotated key'),
+      RuleConflictResolver.dismissal(
+        GITLEAKS_AWS_TOKEN.fingerprint,
+        'allowlist/a.yml',
+        'rotated key',
+      ),
     ];
 
     const first = resolver.resolve(findings, dismissals);
@@ -264,7 +279,9 @@ describe('RuleConflictResolver', () => {
     const second = resolver.resolve(rehydrated);
 
     expect(second.summary.confirmed).toBe(first.summary.confirmed);
-    expect(second.confirmed.map((c) => c.fingerprint)).toEqual(first.confirmed.map((c) => c.fingerprint));
+    expect(second.confirmed.map((c) => c.fingerprint)).toEqual(
+      first.confirmed.map((c) => c.fingerprint),
+    );
     expect(second.confirmed[0].sources).toEqual(first.confirmed[0].sources);
     expect(second.summary.total).toBe(first.summary.total);
   });
@@ -283,7 +300,10 @@ describe('RuleConflictResolver', () => {
       }),
       // 分类矛盾
       RuleConflictResolver.finding('trivy', 'vulnerability', TRIVY_CVE),
-      RuleConflictResolver.finding('gitleaks', 'secret', { ...TRIVY_CVE, fingerprint: TRIVY_CVE.fingerprint }),
+      RuleConflictResolver.finding('gitleaks', 'secret', {
+        ...TRIVY_CVE,
+        fingerprint: TRIVY_CVE.fingerprint,
+      }),
     ];
     const dismissals = [
       RuleConflictResolver.dismissal(

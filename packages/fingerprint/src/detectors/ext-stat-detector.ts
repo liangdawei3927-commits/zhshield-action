@@ -43,7 +43,13 @@ export class ExtStatDetector implements Detector {
         count += n;
       }
       if (count === 0) continue;
-      signals.push(makeSignal(KIND, `ext-stat:${lang}`, '.', this.weight, { count, ratio: count / total, byDir: dirs }));
+      signals.push(
+        makeSignal(KIND, `ext-stat:${lang}`, '.', this.weight, {
+          count,
+          ratio: count / total,
+          byDir: dirs,
+        }),
+      );
     }
     return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0));
   }

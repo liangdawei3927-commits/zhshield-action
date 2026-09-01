@@ -11,9 +11,7 @@ export class PipelineController {
   constructor(private readonly pipelineService: PipelineService) {}
 
   @Post('run')
-  async run(
-    @Body() body: { projectPath: string; dryRun?: boolean; sop?: boolean },
-  ) {
+  async run(@Body() body: { projectPath: string; dryRun?: boolean; sop?: boolean }) {
     this.logger.log(`Pipeline run request: ${body.projectPath}`);
 
     const result = await this.pipelineService.runPipeline(body);
@@ -23,7 +21,9 @@ export class PipelineController {
   }
 
   private buildSummary(result: PipelineReport): Record<string, unknown> {
-    const summary: Record<string, unknown> = { refactorTotalSmells: result.refactor?.totalSmells ?? null };
+    const summary: Record<string, unknown> = {
+      refactorTotalSmells: result.refactor?.totalSmells ?? null,
+    };
 
     if (result.guard && 'ok' in result.guard) {
       summary.guardPassed = (result.guard as unknown as { ok: boolean | undefined }).ok;

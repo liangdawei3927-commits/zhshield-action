@@ -158,15 +158,25 @@ export class RuleConflictResolver {
     findings: readonly RuleFinding[],
     dismissals: readonly RuleDismissal[] = [],
   ): RuleConflictReport {
-    const { invalid, byFingerprint, dismissalByKey } = this.collectInvalidAndIndex(findings, dismissals);
-    const { confirmed, falsePositives, conflicts } = this.classifyGroups(byFingerprint, dismissalByKey);
+    const { invalid, byFingerprint, dismissalByKey } = this.collectInvalidAndIndex(
+      findings,
+      dismissals,
+    );
+    const { confirmed, falsePositives, conflicts } = this.classifyGroups(
+      byFingerprint,
+      dismissalByKey,
+    );
     return this.buildReport(confirmed, falsePositives, conflicts, invalid);
   }
 
   private collectInvalidAndIndex(
     findings: readonly RuleFinding[],
     dismissals: readonly RuleDismissal[],
-  ): { invalid: InvalidEntry[]; byFingerprint: Map<string, RuleFinding[]>; dismissalByKey: Map<string, RuleDismissal> } {
+  ): {
+    invalid: InvalidEntry[];
+    byFingerprint: Map<string, RuleFinding[]>;
+    dismissalByKey: Map<string, RuleDismissal>;
+  } {
     const invalid: InvalidEntry[] = [];
     const byFingerprint = new Map<string, RuleFinding[]>();
 
@@ -203,14 +213,25 @@ export class RuleConflictResolver {
   private classifyGroups(
     byFingerprint: Map<string, RuleFinding[]>,
     dismissalByKey: Map<string, RuleDismissal>,
-  ): { confirmed: ConfirmedFinding[]; falsePositives: FalsePositiveEntry[]; conflicts: ConflictEntry[] } {
+  ): {
+    confirmed: ConfirmedFinding[];
+    falsePositives: FalsePositiveEntry[];
+    conflicts: ConflictEntry[];
+  } {
     const confirmed: ConfirmedFinding[] = [];
     const falsePositives: FalsePositiveEntry[] = [];
     const conflicts: ConflictEntry[] = [];
     const fingerprints = [...byFingerprint.keys()].sort();
     for (const fingerprint of fingerprints) {
       const group = byFingerprint.get(fingerprint) ?? [];
-      this.classifyGroup(fingerprint, group, dismissalByKey.get(fingerprint), confirmed, falsePositives, conflicts);
+      this.classifyGroup(
+        fingerprint,
+        group,
+        dismissalByKey.get(fingerprint),
+        confirmed,
+        falsePositives,
+        conflicts,
+      );
     }
     return { confirmed, falsePositives, conflicts };
   }

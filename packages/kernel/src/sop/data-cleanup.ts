@@ -59,7 +59,7 @@ export class DataCleanup {
     entries: T[],
     cutoffDate: Date,
   ): T[] {
-    return entries.filter(e => {
+    return entries.filter((e) => {
       const ts = e.timestamp instanceof Date ? e.timestamp : new Date(e.timestamp);
       return ts >= cutoffDate;
     });
@@ -81,10 +81,7 @@ export class DataCleanup {
   /**
    * 版本裁剪：保留最近N个版本
    */
-  trimVersions<T extends { version: number }>(
-    items: T[],
-    maxVersions: number,
-  ): T[] {
+  trimVersions<T extends { version: number }>(items: T[], maxVersions: number): T[] {
     return items.slice(-maxVersions);
   }
 }

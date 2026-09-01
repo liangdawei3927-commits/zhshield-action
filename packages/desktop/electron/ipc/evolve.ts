@@ -32,10 +32,13 @@ function registerEvolveQueries(): void {
 }
 
 function registerEvolveWrites(): void {
-  ipcMain.handle('evolve:recordExperience', async (_event, entry: Parameters<EvolveEngine['recordExperience']>[0]) => {
-    const evolve = await getEvolve();
-    return evolve.recordExperience(entry);
-  });
+  ipcMain.handle(
+    'evolve:recordExperience',
+    async (_event, entry: Parameters<EvolveEngine['recordExperience']>[0]) => {
+      const evolve = await getEvolve();
+      return evolve.recordExperience(entry);
+    },
+  );
 
   ipcMain.handle('evolve:autoAdjustWeights', async () => {
     const evolve = await getEvolve();

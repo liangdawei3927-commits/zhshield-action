@@ -69,9 +69,7 @@ describe('SopSignatureVerifier.getPublicKey / verifySignature', () => {
     fs.rmSync(cacheDir, { recursive: true, force: true });
   });
 
-  function makeVerifier(
-    publicKey?: string | (() => Promise<string | null>),
-  ): SopSignatureVerifier {
+  function makeVerifier(publicKey?: string | (() => Promise<string | null>)): SopSignatureVerifier {
     return new SopSignatureVerifier(publicKey);
   }
 

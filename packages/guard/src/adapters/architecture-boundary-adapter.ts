@@ -9,13 +9,33 @@ import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
  * Lower index = more core (domain). A layer can import from same or lower index.
  */
 const LAYER_RULES: { name: string; patterns: RegExp[]; index: number }[] = [
-  { name: 'domain',       patterns: [/\/domain\//],                                                       index: 0 },
-  { name: 'application',  patterns: [/\/application\//, /\/use-cases?\//, /\/usecases?\//],               index: 1 },
-  { name: 'infrastructure', patterns: [/\/infrastructure\//, /\/data\//, /\/repositories?\//],            index: 2 },
-  { name: 'presentation', patterns: [/\/presentation\//, /\/web\//, /\/api\//, /\/controllers?\//, /\/pages?\//], index: 3 },
+  { name: 'domain', patterns: [/\/domain\//], index: 0 },
+  {
+    name: 'application',
+    patterns: [/\/application\//, /\/use-cases?\//, /\/usecases?\//],
+    index: 1,
+  },
+  {
+    name: 'infrastructure',
+    patterns: [/\/infrastructure\//, /\/data\//, /\/repositories?\//],
+    index: 2,
+  },
+  {
+    name: 'presentation',
+    patterns: [/\/presentation\//, /\/web\//, /\/api\//, /\/controllers?\//, /\/pages?\//],
+    index: 3,
+  },
 ];
 
-const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', '.next', 'build', 'coverage']);
+const EXCLUDED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  '.git',
+  '.turbo',
+  '.next',
+  'build',
+  'coverage',
+]);
 
 const TS_FILE_EXT = /\.(ts|tsx)$/;
 const IMPORT_FROM = /import\s+.*\s+from\s+['"](\.\.?\/[^'"]+)['"]/;
@@ -51,7 +71,9 @@ function collectFiles(dir: string): string[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch { return files; }
+  } catch {
+    return files;
+  }
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -105,7 +127,9 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     let content: string;
     try {
       content = fs.readFileSync(file, 'utf-8');
-    } catch { return; }
+    } catch {
+      return;
+    }
     const lines = content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
@@ -161,7 +185,10 @@ export class ArchitectureBoundaryAdapter implements Adapter {
   }
 
   /** 解析 import 路径对应的目标层 */
-  private resolveTargetLayer(file: string, importPath: string): { name: string; index: number } | null {
+  private resolveTargetLayer(
+    file: string,
+    importPath: string,
+  ): { name: string; index: number } | null {
     const resolved = path.resolve(path.dirname(file), importPath);
     return findLayer(resolved);
   }
@@ -180,8 +207,8 @@ export class ArchitectureBoundaryAdapter implements Adapter {
       return this.makeResult(check, 'passed', '模块边界检查通过，未发现跨层违规引用');
     }
 
-    const details = violations.map(v =>
-      `${v.file}:${v.line} [${v.fromLayer}→${v.toLayer}] ${v.importPath}`
+    const details = violations.map(
+      (v) => `${v.file}:${v.line} [${v.fromLayer}→${v.toLayer}] ${v.importPath}`,
     );
     return this.makeResult(
       check,
@@ -191,7 +218,12 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     );
   }
 
-  private makeResult(check: CheckConfig, status: CheckStatus, message: string, details?: unknown): CheckResult {
+  private makeResult(
+    check: CheckConfig,
+    status: CheckStatus,
+    message: string,
+    details?: unknown,
+  ): CheckResult {
     return {
       checkId: check.checkId,
       adapter: check.adapter,

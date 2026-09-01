@@ -24,7 +24,10 @@ export interface ParsedLockfile {
   direct: Array<{ name: string; version: string }>;
 }
 
-interface DepName { name: string; version: string }
+interface DepName {
+  name: string;
+  version: string;
+}
 
 function readFile(root: string, rel: string): string {
   return fs.readFileSync(path.join(root, ...rel.split('/')), 'utf-8');
@@ -173,7 +176,12 @@ function parseGoSum(root: string, rel: string): ParsedLockfile | null {
 }
 
 /** Cargo.lock / poetry.lock / uv.lock 的 `name = "..."` / `version = "..."` 键值行解析。 */
-function parsePackageStyle(root: string, rel: string, ruleId: string, packageManager: string): ParsedLockfile | null {
+function parsePackageStyle(
+  root: string,
+  rel: string,
+  ruleId: string,
+  packageManager: string,
+): ParsedLockfile | null {
   let content: string;
   try {
     content = readFile(root, rel);

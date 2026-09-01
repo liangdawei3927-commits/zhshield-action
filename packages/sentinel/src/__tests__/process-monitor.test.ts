@@ -17,7 +17,9 @@ interface MockChildProcess extends NodeJS.EventEmitter {
 const { spawnSpy, getProcs, resetProcs } = vi.hoisted(() => {
   const procs: MockChildProcess[] = [];
   const spy = vi.fn((_cmd: string, _args: string[], _opts: unknown): MockChildProcess => {
-    const { EventEmitter } = require('node:events') as { EventEmitter: new () => NodeJS.EventEmitter };
+    const { EventEmitter } = require('node:events') as {
+      EventEmitter: new () => NodeJS.EventEmitter;
+    };
     const proc = new EventEmitter() as MockChildProcess;
     proc.pid = 12345;
     proc.exitCode = null;
@@ -36,7 +38,9 @@ const { spawnSpy, getProcs, resetProcs } = vi.hoisted(() => {
   return {
     spawnSpy: spy,
     getProcs: () => procs,
-    resetProcs: () => { procs.length = 0; },
+    resetProcs: () => {
+      procs.length = 0;
+    },
   };
 });
 
@@ -53,7 +57,7 @@ import { EventCenter } from '../event-center';
 
 /** 查找 EventCenter 中 history.action 为指定值的事件 */
 function findEventByAction(ec: EventCenter, action: string) {
-  return ec.listEvents().find(e => e.history[0]?.action === action);
+  return ec.listEvents().find((e) => e.history[0]?.action === action);
 }
 
 function makeConfig(overrides?: Partial<ProcessMonitorConfig>): ProcessMonitorConfig {
@@ -134,7 +138,9 @@ describe('ProcessMonitor — 进程监控', () => {
 
     vi.advanceTimersByTime(500);
 
-    const healthFailed = ec.listEvents().filter(e => e.history[0]?.action === 'health-check-failed');
+    const healthFailed = ec
+      .listEvents()
+      .filter((e) => e.history[0]?.action === 'health-check-failed');
     expect(healthFailed).toHaveLength(0);
   });
 
@@ -221,7 +227,7 @@ describe('ProcessMonitor — 进程监控', () => {
     const proc = latestProc();
     proc.stderr.emit('data', Buffer.from('normal output'));
 
-    const stderrEvents = ec.listEvents().filter(e => e.history[0]?.action === 'process-stderr');
+    const stderrEvents = ec.listEvents().filter((e) => e.history[0]?.action === 'process-stderr');
     expect(stderrEvents).toHaveLength(0);
   });
 

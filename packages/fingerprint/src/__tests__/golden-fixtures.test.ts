@@ -12,8 +12,12 @@ const TS_MONOREPO_DIR = path.resolve(__dirname, '../../fixtures/golden/ts-monore
 describe('golden fixtures（ts-monorepo）', () => {
   it('GIVEN fixtures/golden/ts-monorepo 存在 WHEN 前置校验 THEN fixture 树完整（根清单 + workspaces + 嵌套 core 清单）', () => {
     expect(fs.existsSync(path.join(TS_MONOREPO_DIR, 'package.json'))).toBe(true);
-    expect(fs.existsSync(path.join(TS_MONOREPO_DIR, 'packages', 'core', 'package.json'))).toBe(true);
-    const rootPkg: unknown = JSON.parse(fs.readFileSync(path.join(TS_MONOREPO_DIR, 'package.json'), 'utf-8'));
+    expect(fs.existsSync(path.join(TS_MONOREPO_DIR, 'packages', 'core', 'package.json'))).toBe(
+      true,
+    );
+    const rootPkg: unknown = JSON.parse(
+      fs.readFileSync(path.join(TS_MONOREPO_DIR, 'package.json'), 'utf-8'),
+    );
     expect(rootPkg).toEqual(expect.objectContaining({ workspaces: ['packages/*'] }));
   });
 
@@ -30,7 +34,9 @@ describe('golden fixtures（ts-monorepo）', () => {
     );
     expect(react).toBeDefined();
 
-    const next = signals.find((s) => s.ruleId === 'manifest:framework:next-js' && s.file === 'package.json');
+    const next = signals.find(
+      (s) => s.ruleId === 'manifest:framework:next-js' && s.file === 'package.json',
+    );
     expect(next).toBeDefined();
   });
 

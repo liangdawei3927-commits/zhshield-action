@@ -52,12 +52,18 @@ export const TOOL_LICENSE_REGISTRY: Record<string, ToolLicense> = {
   trivy: {
     spdxId: 'AGPL-3.0',
     risk: 'review',
-    redistributionNote: translate('engine.toolchain.license.trivyRedistributionNote', DEFAULT_LANGUAGE),
+    redistributionNote: translate(
+      'engine.toolchain.license.trivyRedistributionNote',
+      DEFAULT_LANGUAGE,
+    ),
   },
   semgrep: {
     spdxId: 'LGPL-2.1',
     risk: 'review',
-    redistributionNote: translate('engine.toolchain.license.semgrepRedistributionNote', DEFAULT_LANGUAGE),
+    redistributionNote: translate(
+      'engine.toolchain.license.semgrepRedistributionNote',
+      DEFAULT_LANGUAGE,
+    ),
   },
   gitleaks: { spdxId: 'MIT', risk: 'low', redistributionNote: '' },
   jscpd: { spdxId: 'MIT', risk: 'low', redistributionNote: '' },
@@ -66,7 +72,10 @@ export const TOOL_LICENSE_REGISTRY: Record<string, ToolLicense> = {
   ort: {
     spdxId: 'Apache-2.0',
     risk: 'low',
-    redistributionNote: translate('engine.toolchain.license.ortRedistributionNote', DEFAULT_LANGUAGE),
+    redistributionNote: translate(
+      'engine.toolchain.license.ortRedistributionNote',
+      DEFAULT_LANGUAGE,
+    ),
   },
   grype: { spdxId: 'Apache-2.0', risk: 'low', redistributionNote: '' },
 };

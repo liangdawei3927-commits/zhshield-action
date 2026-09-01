@@ -24,9 +24,11 @@ import type {
 // ─── Projects ─────────────────────────────────────────────
 
 export function createProject(db: Database.Database, params: CreateProjectParams): void {
-  db.prepare(
-    'INSERT INTO projects (id, name, path) VALUES (?, ?, ?)',
-  ).run(params.id, params.name, params.path);
+  db.prepare('INSERT INTO projects (id, name, path) VALUES (?, ?, ?)').run(
+    params.id,
+    params.name,
+    params.path,
+  );
 }
 
 export function getProject(db: Database.Database, id: string): ProjectRow | undefined {
@@ -54,21 +56,21 @@ export function saveScore(db: Database.Database, params: SaveScoreParams): void 
 }
 
 export function getLatestScore(db: Database.Database, projectId: string): ScoreRow | undefined {
-  return db.prepare(
-    'SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT 1',
-  ).get(projectId) as ScoreRow | undefined;
+  return db
+    .prepare('SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT 1')
+    .get(projectId) as ScoreRow | undefined;
 }
 
 export function getScoreHistory(db: Database.Database, projectId: string, limit = 30): ScoreRow[] {
-  return db.prepare(
-    'SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT ?',
-  ).all(projectId, limit) as ScoreRow[];
+  return db
+    .prepare('SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT ?')
+    .all(projectId, limit) as ScoreRow[];
 }
 
 export function getScoreTrend(db: Database.Database, projectId: string): ScoreRow[] {
-  return db.prepare(
-    'SELECT * FROM scores WHERE project_id = ? ORDER BY created_at ASC',
-  ).all(projectId) as ScoreRow[];
+  return db
+    .prepare('SELECT * FROM scores WHERE project_id = ? ORDER BY created_at ASC')
+    .all(projectId) as ScoreRow[];
 }
 
 // ─── Scanning Results ─────────────────────────────────────
@@ -76,30 +78,49 @@ export function getScoreTrend(db: Database.Database, projectId: string): ScoreRo
 export function saveScanResult(db: Database.Database, params: SaveScanResultParams): void {
   db.prepare(
     'INSERT INTO scanning_results (project_id, source, passed, summary, report) VALUES (?, ?, ?, ?, ?)',
-  ).run(params.projectId, params.source, params.passed ? 1 : 0, params.summary, params.report ?? null);
+  ).run(
+    params.projectId,
+    params.source,
+    params.passed ? 1 : 0,
+    params.summary,
+    params.report ?? null,
+  );
 }
 
-export function getLatestScanResult(db: Database.Database, projectId: string, source: string): ScanningResultRow | undefined {
-  return db.prepare(
-    'SELECT * FROM scanning_results WHERE project_id = ? AND source = ? ORDER BY created_at DESC LIMIT 1',
-  ).get(projectId, source) as ScanningResultRow | undefined;
+export function getLatestScanResult(
+  db: Database.Database,
+  projectId: string,
+  source: string,
+): ScanningResultRow | undefined {
+  return db
+    .prepare(
+      'SELECT * FROM scanning_results WHERE project_id = ? AND source = ? ORDER BY created_at DESC LIMIT 1',
+    )
+    .get(projectId, source) as ScanningResultRow | undefined;
 }
 
-export function listScanResults(db: Database.Database, projectId: string, source?: string): ScanningResultRow[] {
+export function listScanResults(
+  db: Database.Database,
+  projectId: string,
+  source?: string,
+): ScanningResultRow[] {
   if (source) {
-    return db.prepare(
-      'SELECT * FROM scanning_results WHERE project_id = ? AND source = ? ORDER BY created_at DESC',
-    ).all(projectId, source) as ScanningResultRow[];
+    return db
+      .prepare(
+        'SELECT * FROM scanning_results WHERE project_id = ? AND source = ? ORDER BY created_at DESC',
+      )
+      .all(projectId, source) as ScanningResultRow[];
   }
-  return db.prepare(
-    'SELECT * FROM scanning_results WHERE project_id = ? ORDER BY created_at DESC',
-  ).all(projectId) as ScanningResultRow[];
+  return db
+    .prepare('SELECT * FROM scanning_results WHERE project_id = ? ORDER BY created_at DESC')
+    .all(projectId) as ScanningResultRow[];
 }
 
 // ─── Rules ────────────────────────────────────────────────
 
 export function upsertRule(db: Database.Database, params: UpsertRuleParams): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO rules (id, rule_id, state, severity, weight, reason, changed_by)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(rule_id) DO UPDATE SET
@@ -109,8 +130,10 @@ export function upsertRule(db: Database.Database, params: UpsertRuleParams): voi
       reason     = COALESCE(?, reason),
       changed_by = COALESCE(?, changed_by),
       changed_at = CURRENT_TIMESTAMP
-  `).run(
-    params.ruleId, params.ruleId,
+  `,
+  ).run(
+    params.ruleId,
+    params.ruleId,
     params.state ?? 'active',
     params.severity ?? null,
     params.weight ?? 1.0,
@@ -138,25 +161,47 @@ export function listRules(db: Database.Database): RuleRow[] {
 export function saveExperience(db: Database.Database, params: SaveExperienceParams): void {
   db.prepare(
     'INSERT INTO experiences (id, project_id, rule_id, type, detail, source) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(params.id, params.projectId, params.ruleId, params.type, params.detail ?? null, params.source ?? null);
+  ).run(
+    params.id,
+    params.projectId,
+    params.ruleId,
+    params.type,
+    params.detail ?? null,
+    params.source ?? null,
+  );
 }
 
-export function listExperiences(db: Database.Database, projectId?: string, ruleId?: string): ExperienceRow[] {
+export function listExperiences(
+  db: Database.Database,
+  projectId?: string,
+  ruleId?: string,
+): ExperienceRow[] {
   let sql = 'SELECT * FROM experiences WHERE 1=1';
   const params: unknown[] = [];
-  if (projectId) { sql += ' AND project_id = ?'; params.push(projectId); }
-  if (ruleId) { sql += ' AND rule_id = ?'; params.push(ruleId); }
+  if (projectId) {
+    sql += ' AND project_id = ?';
+    params.push(projectId);
+  }
+  if (ruleId) {
+    sql += ' AND rule_id = ?';
+    params.push(ruleId);
+  }
   sql += ' ORDER BY created_at DESC';
   return db.prepare(sql).all(...params) as ExperienceRow[];
 }
 
 // ─── Sentinel Events ───────────────────────────────────────
 
-export function createSentinelEvent(db: Database.Database, params: CreateSentinelEventParams): void {
-  db.prepare(`
+export function createSentinelEvent(
+  db: Database.Database,
+  params: CreateSentinelEventParams,
+): void {
+  db.prepare(
+    `
     INSERT INTO sentinel_events (id, project_id, timestamp, dedupe_key, title, service, module, severity, status, validation, context, history, occurrence_count, first_seen, last_seen)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `,
+  ).run(
     params.id,
     params.projectId,
     params.timestamp.toISOString(),
@@ -175,7 +220,10 @@ export function createSentinelEvent(db: Database.Database, params: CreateSentine
   );
 }
 
-export function updateSentinelEvent(db: Database.Database, params: UpdateSentinelEventParams): void {
+export function updateSentinelEvent(
+  db: Database.Database,
+  params: UpdateSentinelEventParams,
+): void {
   const { sets, values } = collectUpdateSets(params);
   if (sets.length === 0) return;
 
@@ -186,28 +234,55 @@ export function updateSentinelEvent(db: Database.Database, params: UpdateSentine
 }
 
 /** 收集需要更新的字段与对应值 */
-function collectUpdateSets(params: UpdateSentinelEventParams): { sets: string[]; values: unknown[] } {
+function collectUpdateSets(params: UpdateSentinelEventParams): {
+  sets: string[];
+  values: unknown[];
+} {
   const sets: string[] = [];
   const values: unknown[] = [];
 
-  if (params.status !== undefined) { sets.push('status = ?'); values.push(params.status); }
-  if (params.validation !== undefined) { sets.push('validation = ?'); values.push(params.validation); }
-  if (params.history !== undefined) { sets.push('history = ?'); values.push(params.history); }
-  if (params.occurrenceCount !== undefined) { sets.push('occurrence_count = ?'); values.push(params.occurrenceCount); }
-  if (params.lastSeen !== undefined) { sets.push('last_seen = ?'); values.push(params.lastSeen.toISOString()); }
+  if (params.status !== undefined) {
+    sets.push('status = ?');
+    values.push(params.status);
+  }
+  if (params.validation !== undefined) {
+    sets.push('validation = ?');
+    values.push(params.validation);
+  }
+  if (params.history !== undefined) {
+    sets.push('history = ?');
+    values.push(params.history);
+  }
+  if (params.occurrenceCount !== undefined) {
+    sets.push('occurrence_count = ?');
+    values.push(params.occurrenceCount);
+  }
+  if (params.lastSeen !== undefined) {
+    sets.push('last_seen = ?');
+    values.push(params.lastSeen.toISOString());
+  }
 
   return { sets, values };
 }
 
 export function getSentinelEvent(db: Database.Database, id: string): SentinelEventRow | undefined {
-  return db.prepare('SELECT * FROM sentinel_events WHERE id = ?').get(id) as SentinelEventRow | undefined;
+  return db.prepare('SELECT * FROM sentinel_events WHERE id = ?').get(id) as
+    SentinelEventRow | undefined;
 }
 
-export function findSentinelEventByDedupeKey(db: Database.Database, dedupeKey: string): SentinelEventRow | undefined {
-  return db.prepare('SELECT * FROM sentinel_events WHERE dedupe_key = ? ORDER BY last_seen DESC LIMIT 1').get(dedupeKey) as SentinelEventRow | undefined;
+export function findSentinelEventByDedupeKey(
+  db: Database.Database,
+  dedupeKey: string,
+): SentinelEventRow | undefined {
+  return db
+    .prepare('SELECT * FROM sentinel_events WHERE dedupe_key = ? ORDER BY last_seen DESC LIMIT 1')
+    .get(dedupeKey) as SentinelEventRow | undefined;
 }
 
-export function listSentinelEvents(db: Database.Database, filter?: ListSentinelEventsFilter): SentinelEventRow[] {
+export function listSentinelEvents(
+  db: Database.Database,
+  filter?: ListSentinelEventsFilter,
+): SentinelEventRow[] {
   const { sql, params } = buildSentinelQuery(filter);
   return db.prepare(sql).all(...params) as SentinelEventRow[];
 }
@@ -226,20 +301,35 @@ function buildSentinelQuery(filter?: ListSentinelEventsFilter): { sql: string; p
 function buildSentinelWhere(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
   let sql = '';
   const params: unknown[] = [];
-  if (filter?.projectId) { sql += ' AND project_id = ?'; params.push(filter.projectId); }
-  if (filter?.status) { sql += ' AND status = ?'; params.push(filter.status); }
-  if (filter?.severity) { sql += ' AND severity = ?'; params.push(filter.severity); }
+  if (filter?.projectId) {
+    sql += ' AND project_id = ?';
+    params.push(filter.projectId);
+  }
+  if (filter?.status) {
+    sql += ' AND status = ?';
+    params.push(filter.status);
+  }
+  if (filter?.severity) {
+    sql += ' AND severity = ?';
+    params.push(filter.severity);
+  }
   return { sql, params };
 }
 
 /** 构建 LIMIT/OFFSET 分页子句 */
-function buildSentinelPagination(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
+function buildSentinelPagination(filter?: ListSentinelEventsFilter): {
+  sql: string;
+  params: unknown[];
+} {
   let sql = '';
   const params: unknown[] = [];
   if (filter?.limit) sql += ' LIMIT ?';
   else sql += ' LIMIT 100';
   if (filter?.limit) params.push(filter.limit);
-  if (filter?.offset) { sql += ' OFFSET ?'; params.push(filter.offset); }
+  if (filter?.offset) {
+    sql += ' OFFSET ?';
+    params.push(filter.offset);
+  }
   return { sql, params };
 }
 
@@ -249,18 +339,39 @@ export function deleteSentinelEvent(db: Database.Database, id: string): void {
 
 export function getSentinelEventStats(db: Database.Database): Record<string, number> {
   const total = (db.prepare('SELECT COUNT(*) as c FROM sentinel_events').get() as { c: number }).c;
-  const bySeverity = db.prepare('SELECT severity, COUNT(*) as c FROM sentinel_events GROUP BY severity').all() as Array<{ severity: string; c: number }>;
-  const byStatus = db.prepare('SELECT status, COUNT(*) as c FROM sentinel_events GROUP BY status').all() as Array<{ status: string; c: number }>;
+  const bySeverity = db
+    .prepare('SELECT severity, COUNT(*) as c FROM sentinel_events GROUP BY severity')
+    .all() as Array<{ severity: string; c: number }>;
+  const byStatus = db
+    .prepare('SELECT status, COUNT(*) as c FROM sentinel_events GROUP BY status')
+    .all() as Array<{ status: string; c: number }>;
   const stats: Record<string, number> = { total };
   for (const row of bySeverity) stats[`severity_${row.severity}`] = row.c;
   for (const row of byStatus) stats[`status_${row.status}`] = row.c;
   return stats;
 }
 
-export function getExperienceStats(db: Database.Database, ruleId: string): { total: number; truePositives: number; falsePositives: number } {
-  const total = (db.prepare('SELECT COUNT(*) as c FROM experiences WHERE rule_id = ?').get(ruleId) as { c: number }).c;
-  const truePositives = (db.prepare("SELECT COUNT(*) as c FROM experiences WHERE rule_id = ? AND type = 'true-positive'").get(ruleId) as { c: number }).c;
-  const falsePositives = (db.prepare("SELECT COUNT(*) as c FROM experiences WHERE rule_id = ? AND type = 'false-positive'").get(ruleId) as { c: number }).c;
+export function getExperienceStats(
+  db: Database.Database,
+  ruleId: string,
+): { total: number; truePositives: number; falsePositives: number } {
+  const total = (
+    db.prepare('SELECT COUNT(*) as c FROM experiences WHERE rule_id = ?').get(ruleId) as {
+      c: number;
+    }
+  ).c;
+  const truePositives = (
+    db
+      .prepare("SELECT COUNT(*) as c FROM experiences WHERE rule_id = ? AND type = 'true-positive'")
+      .get(ruleId) as { c: number }
+  ).c;
+  const falsePositives = (
+    db
+      .prepare(
+        "SELECT COUNT(*) as c FROM experiences WHERE rule_id = ? AND type = 'false-positive'",
+      )
+      .get(ruleId) as { c: number }
+  ).c;
   return { total, truePositives, falsePositives };
 }
 
@@ -296,19 +407,33 @@ export function saveDebtAction(db: Database.Database, params: SaveDebtActionPara
   );
 }
 
-export function updateDebtActionStatus(db: Database.Database, params: UpdateDebtActionStatusParams): void {
-  db.prepare('UPDATE debt_actions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND action_id = ?')
-    .run(params.status, params.projectId, params.actionId);
+export function updateDebtActionStatus(
+  db: Database.Database,
+  params: UpdateDebtActionStatusParams,
+): void {
+  db.prepare(
+    'UPDATE debt_actions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND action_id = ?',
+  ).run(params.status, params.projectId, params.actionId);
 }
 
 export function getDebtActionsByProject(db: Database.Database, projectId: string): DebtActionRow[] {
-  return db.prepare('SELECT * FROM debt_actions WHERE project_id = ? ORDER BY created_at DESC').all(projectId) as DebtActionRow[];
+  return db
+    .prepare('SELECT * FROM debt_actions WHERE project_id = ? ORDER BY created_at DESC')
+    .all(projectId) as DebtActionRow[];
 }
 
 export function saveDebtSnapshot(db: Database.Database, params: SaveDebtSnapshotParams): void {
-  db.prepare('INSERT INTO debt_snapshots (project_id, debt_index) VALUES (?, ?)').run(params.projectId, params.debtIndex);
+  db.prepare('INSERT INTO debt_snapshots (project_id, debt_index) VALUES (?, ?)').run(
+    params.projectId,
+    params.debtIndex,
+  );
 }
 
-export function getLatestDebtSnapshot(db: Database.Database, projectId: string): DebtSnapshotRow | undefined {
-  return db.prepare('SELECT * FROM debt_snapshots WHERE project_id = ? ORDER BY id DESC LIMIT 1').get(projectId) as DebtSnapshotRow | undefined;
+export function getLatestDebtSnapshot(
+  db: Database.Database,
+  projectId: string,
+): DebtSnapshotRow | undefined {
+  return db
+    .prepare('SELECT * FROM debt_snapshots WHERE project_id = ? ORDER BY id DESC LIMIT 1')
+    .get(projectId) as DebtSnapshotRow | undefined;
 }

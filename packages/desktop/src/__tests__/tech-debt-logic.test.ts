@@ -58,7 +58,9 @@ describe('INTEREST_FACTOR_CONFIG', () => {
 
   it('each factor has a valid key', () => {
     for (const f of INTEREST_FACTOR_CONFIG) {
-      expect(['severityFactor', 'hotnessFactor', 'densityFactor', 'exposureFactor']).toContain(f.key);
+      expect(['severityFactor', 'hotnessFactor', 'densityFactor', 'exposureFactor']).toContain(
+        f.key,
+      );
     }
   });
 

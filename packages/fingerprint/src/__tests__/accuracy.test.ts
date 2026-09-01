@@ -95,9 +95,7 @@ describe('evaluateAccuracy', () => {
     });
 
     it('GIVEN 断言为空但有检测 WHEN evaluateAccuracy THEN precision=0 recall=0', () => {
-      const detected = [
-        { file: 'x.ts', detectorId: 'manifest-detector', language: 'typescript' },
-      ];
+      const detected = [{ file: 'x.ts', detectorId: 'manifest-detector', language: 'typescript' }];
 
       const report = evaluateAccuracy([], detected);
 
@@ -181,7 +179,7 @@ describe('evaluateAccuracy', () => {
         { path: 'ios/Podfile', productForm: 'ios' },
         { path: 'android/build.gradle', productForm: 'android' },
       ];
-      // 2 TPs + 1 FP → precision=2/3≈0.667... 
+      // 2 TPs + 1 FP → precision=2/3≈0.667...
       // Actually need ≥0.8, so: 2 TPs + 0 FPs → precision=1
       const detected = [
         { file: 'ios/Podfile', detectorId: 'form-detector', productForm: 'ios' },
@@ -217,7 +215,12 @@ describe('evaluateAccuracy', () => {
         { path: 'package.json', language: 'typescript', framework: 'Next.js' },
       ];
       const detected = [
-        { file: 'package.json', detectorId: 'manifest-detector', language: 'typescript', framework: 'Next.js' },
+        {
+          file: 'package.json',
+          detectorId: 'manifest-detector',
+          language: 'typescript',
+          framework: 'Next.js',
+        },
       ];
 
       const report = evaluateAccuracy(assertions, detected);
@@ -225,7 +228,12 @@ describe('evaluateAccuracy', () => {
 
       // framework 不匹配 → FP
       const detectedBad = [
-        { file: 'package.json', detectorId: 'manifest-detector', language: 'typescript', framework: 'Vue' },
+        {
+          file: 'package.json',
+          detectorId: 'manifest-detector',
+          language: 'typescript',
+          framework: 'Vue',
+        },
       ];
       const reportBad = evaluateAccuracy(assertions, detectedBad);
       expect(reportBad.evaluations[0].falsePositives).toBe(1);

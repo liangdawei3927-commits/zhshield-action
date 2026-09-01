@@ -19,7 +19,17 @@ export class EvolveController {
 
   @Post('experience')
   async recordExperience(
-    @Body() body: { projectId: string; ruleId: string; type: string; pattern: string; message: string; feedback: string; source?: string; confidence?: number },
+    @Body()
+    body: {
+      projectId: string;
+      ruleId: string;
+      type: string;
+      pattern: string;
+      message: string;
+      feedback: string;
+      source?: string;
+      confidence?: number;
+    },
   ) {
     this.logger.log(`Record experience for rule: ${body.ruleId}`);
     const result = await this.evolveService.recordExperience({

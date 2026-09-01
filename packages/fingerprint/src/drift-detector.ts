@@ -187,7 +187,8 @@ export class DriftDetector {
 
     // 关键文件变化（package.json, tsconfig.json 等）→ 建议重新确认
     const criticalFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'pom.xml', 'go.mod'];
-    const hasCriticalChange = changedFiles.some((f) => criticalFiles.includes(f)) ||
+    const hasCriticalChange =
+      changedFiles.some((f) => criticalFiles.includes(f)) ||
       addedFiles.some((f) => criticalFiles.includes(f)) ||
       removedFiles.some((f) => criticalFiles.includes(f));
 

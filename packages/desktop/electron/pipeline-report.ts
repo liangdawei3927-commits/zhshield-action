@@ -10,7 +10,13 @@ import type { RuleEngineReport } from '@zh/kernel';
 /** 从规则引擎报告抽取失败项，便于前端展示 */
 export function collectFailedItems(
   stage: 'guard' | 'inspect',
-  report: { evaluations?: Array<{ rule?: { id?: string; name?: string }; status?: string; message?: string }> } | null,
+  report: {
+    evaluations?: Array<{
+      rule?: { id?: string; name?: string };
+      status?: string;
+      message?: string;
+    }>;
+  } | null,
 ): Array<{ stage: string; id: string; name: string; message: string }> {
   if (!report?.evaluations) return [];
   return report.evaluations
@@ -19,15 +25,29 @@ export function collectFailedItems(
       stage,
       id: ev.rule?.id ?? 'unknown',
       name: ev.rule?.name ?? ev.rule?.id ?? t('pipeline.report.unknownRule'),
-      message: ev.message ?? (ev.status === 'error' ? t('pipeline.report.executionError') : t('pipeline.report.failed')),
+      message:
+        ev.message ??
+        (ev.status === 'error' ? t('pipeline.report.executionError') : t('pipeline.report.failed')),
     }));
 }
 
 export function attachSummary(
   report: PipelineReport & { summary?: Record<string, unknown> },
 ): PipelineReport & { summary: Record<string, unknown> } {
-  const g = report.guard as { total?: number; passed?: number; failed?: number; skipped?: number; errors?: number } | null;
-  const i = report.inspect as { total?: number; passed?: number; failed?: number; skipped?: number; errors?: number } | null;
+  const g = report.guard as {
+    total?: number;
+    passed?: number;
+    failed?: number;
+    skipped?: number;
+    errors?: number;
+  } | null;
+  const i = report.inspect as {
+    total?: number;
+    passed?: number;
+    failed?: number;
+    skipped?: number;
+    errors?: number;
+  } | null;
   const failedItems = [
     ...collectFailedItems('guard', report.guard as RuleEngineReport | null),
     ...collectFailedItems('inspect', report.inspect as RuleEngineReport | null),
@@ -86,7 +106,9 @@ export interface PerformanceReportIssue {
   autoFixable: boolean;
 }
 
-export function collectPerformanceIssues(evaluations: PerformanceEvaluation[]): PerformanceReportIssue[] {
+export function collectPerformanceIssues(
+  evaluations: PerformanceEvaluation[],
+): PerformanceReportIssue[] {
   const issues: PerformanceReportIssue[] = [];
   for (const ev of evaluations) {
     for (const v of ev.violations ?? []) {

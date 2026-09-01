@@ -8,11 +8,15 @@ import { makeTempProject, cleanupTempProject } from './helpers';
 
 const detector = new LockfileDetector();
 
-function directOf(signals: readonly Signal[], ruleId: string): Array<{ name: string; version: string }> {
+function directOf(
+  signals: readonly Signal[],
+  ruleId: string,
+): Array<{ name: string; version: string }> {
   const signal = signals.find((s) => s.ruleId === ruleId);
   if (signal === undefined) throw new Error(`missing signal: ${ruleId}`);
   const payload = signal.payload;
-  if (!isRecord(payload) || !Array.isArray(payload.direct)) throw new Error(`payload.direct missing for ${ruleId}`);
+  if (!isRecord(payload) || !Array.isArray(payload.direct))
+    throw new Error(`payload.direct missing for ${ruleId}`);
   return payload.direct.filter(
     (d): d is { name: string; version: string } =>
       isRecord(d) && typeof d.name === 'string' && typeof d.version === 'string',

@@ -10,7 +10,10 @@ export class TrendAnalyzer {
   static linearRegressionSlope(values: number[]): number {
     const n = values.length;
     if (n < 2) return 0;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
     for (let i = 0; i < n; i++) {
       sumX += i;
       sumY += values[i];
@@ -74,7 +77,10 @@ export class TrendAnalyzer {
   }
 
   /** 维度级趋势 */
-  static computeDimensionTrends(history: HealthScore[], windowSize: number): TrendReport['dimensionTrends'] {
+  static computeDimensionTrends(
+    history: HealthScore[],
+    windowSize: number,
+  ): TrendReport['dimensionTrends'] {
     if (history.length < 2) return [];
 
     const window = history.slice(-windowSize);
@@ -90,8 +96,7 @@ export class TrendAnalyzer {
     const trends: TrendReport['dimensionTrends'] = [];
     for (const [name, scores] of dimMap) {
       const slope = this.linearRegressionSlope(scores);
-      const trend: ScoreTrend =
-        slope > 0.5 ? 'improving' : slope < -0.5 ? 'declining' : 'stable';
+      const trend: ScoreTrend = slope > 0.5 ? 'improving' : slope < -0.5 ? 'declining' : 'stable';
       const current = scores.at(-1)!;
       trends.push({ name, current, trend, slope: Math.round(slope * 1000) / 1000 });
     }

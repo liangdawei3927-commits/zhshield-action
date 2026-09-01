@@ -113,13 +113,22 @@ export class BackupConfigManager {
 
   private normalizeConfig(raw: Record<string, unknown>, def: BackupConfig): BackupConfig {
     return {
-      github: this.normalizeGitHub(raw.github as Partial<GitHubBackupConfig> | undefined, def.github),
+      github: this.normalizeGitHub(
+        raw.github as Partial<GitHubBackupConfig> | undefined,
+        def.github,
+      ),
       local: this.normalizeLocal(raw.local as Partial<LocalBackupConfig> | undefined, def.local),
-      schedule: this.normalizeSchedule(raw.schedule as Partial<BackupScheduleConfig> | undefined, def.schedule),
+      schedule: this.normalizeSchedule(
+        raw.schedule as Partial<BackupScheduleConfig> | undefined,
+        def.schedule,
+      ),
     };
   }
 
-  private normalizeGitHub(raw: Partial<GitHubBackupConfig> | undefined, def: GitHubBackupConfig): GitHubBackupConfig {
+  private normalizeGitHub(
+    raw: Partial<GitHubBackupConfig> | undefined,
+    def: GitHubBackupConfig,
+  ): GitHubBackupConfig {
     return {
       enabled: raw?.enabled ?? def.enabled,
       owner: raw?.owner ?? def.owner,
@@ -130,7 +139,10 @@ export class BackupConfigManager {
     };
   }
 
-  private normalizeLocal(raw: Partial<LocalBackupConfig> | undefined, def: LocalBackupConfig): LocalBackupConfig {
+  private normalizeLocal(
+    raw: Partial<LocalBackupConfig> | undefined,
+    def: LocalBackupConfig,
+  ): LocalBackupConfig {
     return {
       enabled: raw?.enabled ?? def.enabled,
       backupDir: raw?.backupDir ?? def.backupDir,
@@ -141,7 +153,10 @@ export class BackupConfigManager {
     };
   }
 
-  private normalizeSchedule(raw: Partial<BackupScheduleConfig> | undefined, def: BackupScheduleConfig): BackupScheduleConfig {
+  private normalizeSchedule(
+    raw: Partial<BackupScheduleConfig> | undefined,
+    def: BackupScheduleConfig,
+  ): BackupScheduleConfig {
     return {
       enabled: raw?.enabled ?? def.enabled,
       frequency: raw?.frequency ?? def.frequency,
@@ -181,5 +196,3 @@ export class BackupConfigManager {
     return yaml.dump(obj, { indent: 2, lineWidth: 120 });
   }
 }
-
-

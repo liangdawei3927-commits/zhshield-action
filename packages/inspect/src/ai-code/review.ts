@@ -59,7 +59,10 @@ export class AiCodeReviewImpl implements AiCodeReview {
   }
 
   /** Pro 层：深度审查（幻觉依赖 + 不安全模式规则集），scope 限制扫描范围 */
-  async deepReview(project: ProjectProfile, opts: { readonly scope?: readonly string[] } = {}): Promise<readonly AiCodeVuln[]> {
+  async deepReview(
+    project: ProjectProfile,
+    opts: { readonly scope?: readonly string[] } = {},
+  ): Promise<readonly AiCodeVuln[]> {
     const projectPath = project.projectPath;
     const scope = opts.scope;
     const vulns: AiCodeVuln[] = [];
@@ -71,14 +74,18 @@ export class AiCodeReviewImpl implements AiCodeReview {
   }
 
   /** 收集幻觉依赖漏洞（附 B 协同：抢注 → critical） */
-  private async collectHallucinations(project: ProjectProfile, scope: readonly string[] | undefined): Promise<AiCodeVuln[]> {
+  private async collectHallucinations(
+    project: ProjectProfile,
+    scope: readonly string[] | undefined,
+  ): Promise<AiCodeVuln[]> {
     const vulns: AiCodeVuln[] = [];
     const hallucinations = await this.hallucinatedCheck.check(project);
     for (const h of hallucinations) {
       const first = h.referencedFrom[0];
       if (first === undefined) continue;
       if (!isInScope(first.file, scope)) continue;
-      const severity = HALLUCINATED_SEVERITY['ai-hallucinated-dependency'][h.registryStatus] ?? 'medium';
+      const severity =
+        HALLUCINATED_SEVERITY['ai-hallucinated-dependency'][h.registryStatus] ?? 'medium';
       vulns.push({
         vulnId: `ai-hallucinated-${h.packageName}`,
         ruleId: 'ai-hallucinated-dependency',
@@ -93,7 +100,10 @@ export class AiCodeReviewImpl implements AiCodeReview {
   }
 
   /** 逐文件扫描不安全模式规则集 */
-  private collectPatternVulns(projectPath: string, scope: readonly string[] | undefined): AiCodeVuln[] {
+  private collectPatternVulns(
+    projectPath: string,
+    scope: readonly string[] | undefined,
+  ): AiCodeVuln[] {
     const vulns: AiCodeVuln[] = [];
     for (const file of walkSourceFiles(projectPath)) {
       if (!isInScope(file, scope)) continue;
@@ -164,21 +174,26 @@ export class AiCodeReviewImpl implements AiCodeReview {
   /** 计算 AI 代码占比（基于标记结果，边界 1：不是概率黑盒） */
   private async computeAiCodeRatio(project: ProjectProfile): Promise<number> {
     const findings = await this.originDetector.detect(project);
-    const markedFiles = new Set(findings.filter((f) => f.strength !== 'uncertain').map((f) => f.file)).size;
+    const markedFiles = new Set(
+      findings.filter((f) => f.strength !== 'uncertain').map((f) => f.file),
+    ).size;
     const totalFiles = walkSourceFiles(project.projectPath).length;
     return totalFiles === 0 ? 0 : markedFiles / totalFiles;
   }
 
   /** 按模块（路径首段）聚合深度审查漏洞 */
-  private async computeRiskByModule(project: ProjectProfile): Promise<{ module: string; vulnCount: number }[]> {
+  private async computeRiskByModule(
+    project: ProjectProfile,
+  ): Promise<{ module: string; vulnCount: number }[]> {
     const vulns = await this.deepReview(project, {});
     const byModule = new Map<string, number>();
     for (const v of vulns) {
       const module = v.file.split('/')[0] ?? '';
       byModule.set(module, (byModule.get(module) ?? 0) + 1);
     }
-    return Array.from(byModule.entries(), ([module, vulnCount]) => ({ module, vulnCount }))
-      .sort((a, b) => b.vulnCount - a.vulnCount || a.module.localeCompare(b.module));
+    return Array.from(byModule.entries(), ([module, vulnCount]) => ({ module, vulnCount })).sort(
+      (a, b) => b.vulnCount - a.vulnCount || a.module.localeCompare(b.module),
+    );
   }
 
   /** 构建审计日志：谁 / 何时 / 哪些文件被审查 */

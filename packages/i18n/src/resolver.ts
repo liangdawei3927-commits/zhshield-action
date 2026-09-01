@@ -59,7 +59,10 @@ export interface ResolvedLanguage {
 }
 
 /** 优先级：显式指定 > 系统语言 > 默认（zh-Hans） */
-export function resolveLanguage(explicit?: string | null, system?: string | null): ResolvedLanguage {
+export function resolveLanguage(
+  explicit?: string | null,
+  system?: string | null,
+): ResolvedLanguage {
   const explicitLang = normalizeLanguage(explicit);
   if (explicitLang) return { source: 'explicit', value: explicitLang };
   const systemLang = normalizeLanguage(system);

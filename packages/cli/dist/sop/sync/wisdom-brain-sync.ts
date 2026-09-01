@@ -44,7 +44,8 @@ export class WisdomBrainSync {
     this.toolRuleSync = options?.toolRuleSync ?? new ToolRuleSync();
     this.experienceReporter = options?.experienceReporter ?? new ExperienceReporter();
     this.lockedVersions = new Map();
-    this.lockFilePath = options?.lockFilePath ?? path.join(os.homedir(), '.zhshield', 'version-locks.json');
+    this.lockFilePath =
+      options?.lockFilePath ?? path.join(os.homedir(), '.zhshield', 'version-locks.json');
   }
 
   async initialize(): Promise<void> {
@@ -137,9 +138,7 @@ export class WisdomBrainSync {
 
   // ─── 一键同步 ─────────────────────────────────────────
 
-  async syncAll(params?: {
-    experiences?: ExperienceRecord[];
-  }): Promise<WisdomBrainSyncResult> {
+  async syncAll(params?: { experiences?: ExperienceRecord[] }): Promise<WisdomBrainSyncResult> {
     const ruleSyncResults = await this.syncAllRules();
 
     let experienceResult: ExperienceReportResult | null = null;

@@ -15,6 +15,7 @@ export class TestCommandDetector {
 
     const entries = fs.existsSync(projectPath) ? fs.readdirSync(projectPath) : [];
     for (const entry of entries) {
+      if (entry === 'node_modules') continue;
       const child = path.join(projectPath, entry);
       try {
         if (!fs.statSync(child).isDirectory()) continue;

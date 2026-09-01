@@ -2,7 +2,13 @@ import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './t
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
 import type { SopRuleEngine } from '@zh/kernel';
 import type { ProjectProfile } from '@zh/dependency';
-import { DegradationManager, AuditLogger, ToolManager, NOOP_EMITTER, wrapAdapter } from '@zh/shared';
+import {
+  DegradationManager,
+  AuditLogger,
+  ToolManager,
+  NOOP_EMITTER,
+  wrapAdapter,
+} from '@zh/shared';
 import { AdapterRunner } from './adapter-runner';
 import { ToolAdapterExecutor } from './tool-adapter-executor';
 import { ScanReportBuilder } from './scan-report-builder';
@@ -94,7 +100,10 @@ export class InspectEngine {
     return this.degradationManager;
   }
 
-  async runScan(projectId: string, scanType: InspectionReport['scanType'] = 'full'): Promise<InspectionReport> {
+  async runScan(
+    projectId: string,
+    scanType: InspectionReport['scanType'] = 'full',
+  ): Promise<InspectionReport> {
     const start = Date.now();
     if (this.sopEngine && !this._sopScanning) {
       return this.runSopGuarded(projectId, scanType, start);
@@ -103,7 +112,11 @@ export class InspectEngine {
   }
 
   /** SOP 驱动模式：评估 inspect/security 域规则（带重入保护） */
-  private async runSopGuarded(projectId: string, scanType: InspectionReport['scanType'], start: number): Promise<InspectionReport> {
+  private async runSopGuarded(
+    projectId: string,
+    scanType: InspectionReport['scanType'],
+    start: number,
+  ): Promise<InspectionReport> {
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
     this._sopScanning = true;
@@ -115,8 +128,15 @@ export class InspectEngine {
   }
 
   /** 直接执行模式：运行全部适配器 + AI 审查并构建报告 */
-  private async runDirectScan(projectId: string, scanType: InspectionReport['scanType'], start: number): Promise<InspectionReport> {
-    const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(this.registeredAdapters, projectId);
+  private async runDirectScan(
+    projectId: string,
+    scanType: InspectionReport['scanType'],
+    start: number,
+  ): Promise<InspectionReport> {
+    const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(
+      this.registeredAdapters,
+      projectId,
+    );
     const legacyResults = await this.runner.runAll({ projectId, scanType });
     adapterResults.push(...legacyResults);
 
@@ -135,7 +155,13 @@ export class InspectEngine {
 
   /** 构建最小项目画像（AI 审查仅消费 projectPath 定位清单与源码） */
   private buildAiProfile(projectId: string): ProjectProfile {
-    return { projectPath: projectId, language: 'typescript', framework: null, packageManager: 'pnpm', hasTypeScript: true };
+    return {
+      projectPath: projectId,
+      language: 'typescript',
+      framework: null,
+      packageManager: 'pnpm',
+      hasTypeScript: true,
+    };
   }
 
   private mapAiSeverity(severity: AiCodeVuln['severity']): Issue['severity'] {

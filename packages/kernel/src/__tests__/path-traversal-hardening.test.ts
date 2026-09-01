@@ -110,11 +110,16 @@ describe('restoreFromZipArchive 路径穿越防御纵深', () => {
       sourceDir: 'x',
       lastBackupAt: '2026-08-28T00:00:00.000Z',
       fullBackupAt: '2026-08-28T00:00:00.000Z',
-      files: [{ relativePath: '../evil.txt', hash: 'x', size: 5, backedUpAt: '2026-08-28T00:00:00.000Z' }],
+      files: [
+        { relativePath: '../evil.txt', hash: 'x', size: 5, backedUpAt: '2026-08-28T00:00:00.000Z' },
+      ],
     };
 
     const zip = buildZip([
-      { name: 'BACKUP_MANIFEST.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8') },
+      {
+        name: 'BACKUP_MANIFEST.json',
+        data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8'),
+      },
       { name: '../evil.txt', data: Buffer.from('EVIL!', 'utf-8') },
     ]);
     await fs.writeFile(zipPath, zip);

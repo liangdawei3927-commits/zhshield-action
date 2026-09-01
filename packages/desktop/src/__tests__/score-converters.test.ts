@@ -34,7 +34,9 @@ describe('convertTraditionalGuardResults', () => {
     expect(out).toHaveLength(2);
     expect(out.every((x) => x.file !== undefined)).toBe(true);
     expect(out.map((x) => x.file)).toEqual(['packages/foo/src/a.ts', 'packages/bar/src/b.ts']);
-    expect(out.every((x) => x.severity === 'error' && x.status === 'failed' && x.blocking === true)).toBe(true);
+    expect(
+      out.every((x) => x.severity === 'error' && x.status === 'failed' && x.blocking === true),
+    ).toBe(true);
   });
 
   it('maps ESLint warnings to warning-level per-file results', () => {
@@ -42,11 +44,21 @@ describe('convertTraditionalGuardResults', () => {
       adapter: 'eslint-check',
       status: 'warning',
       severity: 'warning',
-      details: { errors: [], warnings: ['(packages/foo/src/a.ts:1:2)'], totalErrors: 0, totalWarnings: 1 },
+      details: {
+        errors: [],
+        warnings: ['(packages/foo/src/a.ts:1:2)'],
+        totalErrors: 0,
+        totalWarnings: 1,
+      },
     });
     const out = convertTraditionalGuardResults([r]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ severity: 'warning', status: 'warning', blocking: false, file: 'packages/foo/src/a.ts' });
+    expect(out[0]).toMatchObject({
+      severity: 'warning',
+      status: 'warning',
+      blocking: false,
+      file: 'packages/foo/src/a.ts',
+    });
   });
 
   it('explodes sensitive-info findings into per-file results', () => {
@@ -63,7 +75,10 @@ describe('convertTraditionalGuardResults', () => {
       },
     });
     const out = convertTraditionalGuardResults([r]);
-    expect(out.map((x) => x.file)).toEqual(['packages/foo/src/config.ts', 'packages/bar/src/secret.ts']);
+    expect(out.map((x) => x.file)).toEqual([
+      'packages/foo/src/config.ts',
+      'packages/bar/src/secret.ts',
+    ]);
   });
 
   it('keeps a passed check as a single root-level result (no file)', () => {
@@ -75,7 +90,12 @@ describe('convertTraditionalGuardResults', () => {
   });
 
   it('falls back to a single root-level result when no file is locatable', () => {
-    const r = guardResult({ adapter: 'license-check', status: 'failed', severity: 'error', details: { summary: 'bad license' } });
+    const r = guardResult({
+      adapter: 'license-check',
+      status: 'failed',
+      severity: 'error',
+      details: { summary: 'bad license' },
+    });
     const out = convertTraditionalGuardResults([r]);
     expect(out).toHaveLength(1);
     expect(out[0].file).toBeUndefined();
@@ -87,7 +107,12 @@ describe('convertTraditionalGuardResults', () => {
       adapter: 'eslint-check',
       status: 'failed',
       severity: 'error',
-      details: { errors: ['(packages/foo/src/a.ts:1:2)'], warnings: [], totalErrors: 1, totalWarnings: 0 },
+      details: {
+        errors: ['(packages/foo/src/a.ts:1:2)'],
+        warnings: [],
+        totalErrors: 1,
+        totalWarnings: 0,
+      },
     });
     const out = convertTraditionalGuardResults([r]);
     const fooFile = out.find((x) => x.file?.startsWith('packages/foo/'));

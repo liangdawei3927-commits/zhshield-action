@@ -11,7 +11,17 @@ import { PipelineModule } from './pipeline/pipeline.module';
 import { EvolveModule } from './evolve/evolve.module';
 
 @Module({
-  imports: [SopModule, SentinelModule, GuardModule, InspectModule, SecurityModule, ScoringModule, RefactorModule, PipelineModule, EvolveModule],
+  imports: [
+    SopModule,
+    SentinelModule,
+    GuardModule,
+    InspectModule,
+    SecurityModule,
+    ScoringModule,
+    RefactorModule,
+    PipelineModule,
+    EvolveModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

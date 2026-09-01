@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { parseV8Stack, deriveModule, locateWithSourceMap, fallbackLocation, locateCrash } from '../stack-locator';
+import {
+  parseV8Stack,
+  deriveModule,
+  locateWithSourceMap,
+  fallbackLocation,
+  locateCrash,
+} from '../stack-locator';
 
 const V8_STACK = `TypeError: Cannot read properties of undefined (reading 'name')
     at getOrder (webpack:///src/modules/order/order.service.ts:42:15)
@@ -102,10 +108,7 @@ describe('locateWithSourceMap', () => {
 
   it('returns null when no segment matches the line', () => {
     const map = { version: 3, sources: ['src/a.ts'], names: [], mappings: 'AAAA;' };
-    const located = locateWithSourceMap(
-      { file: '/x/dist/a.js', line: 10, column: 1 },
-      map,
-    );
+    const located = locateWithSourceMap({ file: '/x/dist/a.js', line: 10, column: 1 }, map);
     expect(located).toBeNull();
   });
 });
@@ -130,7 +133,8 @@ describe('locateCrash', () => {
         names: [],
         mappings: 'AAAA;AACA',
       }),
-      'src/modules/order/order.service.ts': 'export function getOrder() {}\nexport function calc() {}\n',
+      'src/modules/order/order.service.ts':
+        'export function getOrder() {}\nexport function calc() {}\n',
     });
 
     const stack = `TypeError: boom
@@ -169,7 +173,12 @@ describe('locateCrash', () => {
 
 describe('fallbackLocation', () => {
   it('keeps frame coordinates when no project path is available', () => {
-    const located = fallbackLocation({ functionName: 'f', file: '/app/main.js', line: 3, column: 7 });
+    const located = fallbackLocation({
+      functionName: 'f',
+      file: '/app/main.js',
+      line: 3,
+      column: 7,
+    });
     expect(located.file).toBe('/app/main.js');
     expect(located.line).toBe(3);
     expect(located.column).toBe(7);

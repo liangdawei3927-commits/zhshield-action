@@ -57,14 +57,22 @@ export class ContentDetector implements Detector {
       if (shebang !== null) {
         const lang = shebangLanguage(shebang[1]);
         if (lang !== null) {
-          signals.push(makeSignal(KIND, 'content:shebang', rel, this.weight, { language: lang, interpreter: shebang[1] }));
+          signals.push(
+            makeSignal(KIND, 'content:shebang', rel, this.weight, {
+              language: lang,
+              interpreter: shebang[1],
+            }),
+          );
         }
       }
       if (ext === 'py') {
         const lang = pythonImportLanguage(head);
-        if (lang !== null) signals.push(makeSignal(KIND, 'content:import', rel, this.weight, { language: lang }));
+        if (lang !== null)
+          signals.push(makeSignal(KIND, 'content:import', rel, this.weight, { language: lang }));
       }
     }
-    return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+    return signals.sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+    );
   }
 }

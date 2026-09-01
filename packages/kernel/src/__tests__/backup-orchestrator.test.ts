@@ -6,7 +6,14 @@ function createMockGitHubBackup(success: boolean): GitHubBackup {
   const mock = new GitHubBackup();
   mock.backup = async () =>
     success
-      ? { type: 'github', success: true, commitHash: 'abc123', commitMessage: 'backup', repoUrl: 'https://github.com/mock/repo', branch: 'main' }
+      ? {
+          type: 'github',
+          success: true,
+          commitHash: 'abc123',
+          commitMessage: 'backup',
+          repoUrl: 'https://github.com/mock/repo',
+          branch: 'main',
+        }
       : { type: 'github', success: false, error: 'github failed' };
   return mock;
 }
@@ -28,7 +35,12 @@ describe('BackupOrchestrator', () => {
         localBackup: createMockLocalBackup(true),
       });
 
-      const result = await orchestrator.execute({ projectId: 'test-project', projectPath: '/mock/path', projectName: 'Test Project', trigger: 'manual' });
+      const result = await orchestrator.execute({
+        projectId: 'test-project',
+        projectPath: '/mock/path',
+        projectName: 'Test Project',
+        trigger: 'manual',
+      });
       // local is enabled by default; github is disabled by default
       expect(result.overallStatus).toBe('success');
       expect(result.results.length).toBe(1);
@@ -41,7 +53,10 @@ describe('BackupOrchestrator', () => {
         localBackup: createMockLocalBackup(false),
       });
 
-      const result = await orchestrator.execute({ projectId: 'test-project', projectPath: '/mock/path' });
+      const result = await orchestrator.execute({
+        projectId: 'test-project',
+        projectPath: '/mock/path',
+      });
       expect(result.overallStatus).toBe('failed');
       expect(result.results.every((r) => !r.success)).toBe(true);
     });
@@ -54,7 +69,11 @@ describe('BackupOrchestrator', () => {
         localBackup: createMockLocalBackup(true),
       });
 
-      await orchestrator.execute({ projectId: 'test-project', projectPath: '/mock/path', projectName: 'Test' });
+      await orchestrator.execute({
+        projectId: 'test-project',
+        projectPath: '/mock/path',
+        projectName: 'Test',
+      });
       const records = orchestrator.getRecords();
       expect(records).toHaveLength(1);
       expect(records[0].projectId).toBe('test-project');

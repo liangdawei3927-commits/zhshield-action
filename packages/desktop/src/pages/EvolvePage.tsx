@@ -1,6 +1,13 @@
 import { PageShell } from '../components/business/PageShell';
 import { useEvolvePage } from './evolve-logic';
-import { NodeGraph, EvolveHeader, EvolveStats, SuggestionsPanel, WeightsPanel, EmptyAnalysisResult } from './evolve-parts';
+import {
+  NodeGraph,
+  EvolveHeader,
+  EvolveStats,
+  SuggestionsPanel,
+  WeightsPanel,
+  EmptyAnalysisResult,
+} from './evolve-parts';
 import { useT } from '../i18n';
 
 interface EvolvePageProps {
@@ -8,7 +15,8 @@ interface EvolvePageProps {
 }
 
 export function EvolvePage({ projectPath }: EvolvePageProps) {
-  const { suggestions, weights, score, loading, analyzed, analyze, highFp, adjustedCount } = useEvolvePage(projectPath);
+  const { suggestions, weights, score, loading, analyzed, analyze, highFp, adjustedCount } =
+    useEvolvePage(projectPath);
   const t = useT();
 
   if (analyzed) {
@@ -48,8 +56,19 @@ export function EvolvePage({ projectPath }: EvolvePageProps) {
       featureList={[
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
             </svg>
           ),
           title: t('page.evolve.empty.feature.graph.title'),
@@ -57,8 +76,18 @@ export function EvolvePage({ projectPath }: EvolvePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
             </svg>
           ),
           title: t('page.evolve.empty.feature.coupling.title'),
@@ -66,9 +95,20 @@ export function EvolvePage({ projectPath }: EvolvePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
           ),
           title: t('page.evolve.empty.feature.directory.title'),
@@ -76,8 +116,18 @@ export function EvolvePage({ projectPath }: EvolvePageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
             </svg>
           ),
           title: t('page.evolve.empty.feature.suggest.title'),

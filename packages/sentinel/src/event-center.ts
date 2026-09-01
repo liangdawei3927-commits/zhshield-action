@@ -79,12 +79,14 @@ export class EventCenter {
       status: 'detected',
       validation: { status: 'pending' },
       context: { ...labels },
-      history: [{
-        timestamp: new Date(),
-        action: 'alert-received',
-        operator: 'alertmanager',
-        detail: `Alert received: ${labels.alertname}`,
-      }],
+      history: [
+        {
+          timestamp: new Date(),
+          action: 'alert-received',
+          operator: 'alertmanager',
+          detail: `Alert received: ${labels.alertname}`,
+        },
+      ],
       occurrenceCount: 1,
       firstSeen: new Date(),
       lastSeen: new Date(),
@@ -118,12 +120,14 @@ export class EventCenter {
       status: 'detected',
       validation: { status: 'pending' },
       context: (params.context || {}) as Record<string, unknown>,
-      history: [{
-        timestamp: new Date(),
-        action: params.action || 'event-created',
-        operator: params.operator || 'system',
-        detail: params.detail || params.title,
-      }],
+      history: [
+        {
+          timestamp: new Date(),
+          action: params.action || 'event-created',
+          operator: params.operator || 'system',
+          detail: params.detail || params.title,
+        },
+      ],
       occurrenceCount: 1,
       firstSeen: new Date(),
       lastSeen: new Date(),
@@ -134,7 +138,11 @@ export class EventCenter {
     return event;
   }
 
-  updateStatus(eventId: string, status: EventStatus, operator: string = 'system'): SentinelEvent | null {
+  updateStatus(
+    eventId: string,
+    status: EventStatus,
+    operator: string = 'system',
+  ): SentinelEvent | null {
     const event = this.events.get(eventId) || this.loadFromDb(eventId);
     if (!event) return null;
     const prev = event.status;
@@ -150,7 +158,11 @@ export class EventCenter {
     return event;
   }
 
-  updateValidation(eventId: string, result: 'pass' | 'fail', source?: string): SentinelEvent | null {
+  updateValidation(
+    eventId: string,
+    result: 'pass' | 'fail',
+    source?: string,
+  ): SentinelEvent | null {
     const event = this.events.get(eventId) || this.loadFromDb(eventId);
     if (!event) return null;
     event.validation = { status: result, source, summary: `Validation ${result}` };

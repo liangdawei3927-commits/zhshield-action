@@ -35,7 +35,11 @@ function parseProjectPath(): string {
 function logScanStart(projectPath: string, root: string): void {
   console.log('=== 扫描项目:', projectPath, '===');
   const resolvedElsewhere = root !== projectPath;
-  console.log('resolveProjectRoot →', root, resolvedElsewhere ? '(向上/向下解析到锁文件所在目录)' : '(未解析，锁文件判定在所选目录处)');
+  console.log(
+    'resolveProjectRoot →',
+    root,
+    resolvedElsewhere ? '(向上/向下解析到锁文件所在目录)' : '(未解析，锁文件判定在所选目录处)',
+  );
 }
 
 /** 打印依赖图摘要 */
@@ -48,12 +52,17 @@ function logGraphSummary(graph: ReturnType<typeof buildDependencyGraph>): void {
     'direct 节点:',
     graph.nodes
       .filter((n) => n.kind === 'direct')
-      .map((n) => `${n.name}@${n.version} declared=${n.declaredRange} integrity=${n.integrity ? 'Y' : 'N'}`),
+      .map(
+        (n) =>
+          `${n.name}@${n.version} declared=${n.declaredRange} integrity=${n.integrity ? 'Y' : 'N'}`,
+      ),
   );
 }
 
 /** 打印锁文件校验结果 */
-function logVerificationSummary(verification: Awaited<ReturnType<typeof lockfileVerifier.verify>>): void {
+function logVerificationSummary(
+  verification: Awaited<ReturnType<typeof lockfileVerifier.verify>>,
+): void {
   console.log('--- lockfileVerifier.verify ---');
   console.log('status:', verification.status);
   console.log('lockfilePath:', verification.lockfilePath ?? '(null)');

@@ -16,7 +16,10 @@ const SCAN_FILE_EXT = /\.(ts|tsx|js|jsx|yml|yaml|json|md|env|config)$/i;
  * - normalize(): 将发现结果转为 CheckResult（同步）
  */
 const DEFAULT_PATTERNS: { name: string; regex: RegExp }[] = [
-  { name: 'API Key/Password/Secret', regex: /(?:api[_-]?key|password|secret|token|credential)\s*[:=]\s*['"][^'"]+['"]/i },
+  {
+    name: 'API Key/Password/Secret',
+    regex: /(?:api[_-]?key|password|secret|token|credential)\s*[:=]\s*['"][^'"]+['"]/i,
+  },
   { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/ },
   { name: 'OpenAI API Key', regex: /sk-[a-zA-Z0-9]{32,}/ },
   { name: 'Private Key', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
@@ -99,14 +102,11 @@ export class GuardSensitiveInfoAdapter implements Adapter {
     return this.makeResult(check, 'passed', '敏感信息检查通过，未发现泄露');
   }
 
-  private scanDir(
-    dir: string,
-    findings: Finding[],
-    rootDir: string,
-  ): void {
+  private scanDir(dir: string, findings: Finding[], rootDir: string): void {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
+      if (entry.name === 'node_modules') continue;
       this.scanEntry(dir, entry, findings, rootDir);
     }
   }

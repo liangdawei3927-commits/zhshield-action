@@ -37,10 +37,7 @@ export interface OutdatedDependencyInfo {
 
 /** npm outdated 命令失败时抛出的错误类型 */
 export type NpmOutdatedErrorCode =
-  | 'NO_PACKAGE_JSON'
-  | 'NPM_NOT_FOUND'
-  | 'NPM_COMMAND_FAILED'
-  | 'JSON_PARSE_ERROR';
+  'NO_PACKAGE_JSON' | 'NPM_NOT_FOUND' | 'NPM_COMMAND_FAILED' | 'JSON_PARSE_ERROR';
 
 /** npm outdated 适配器专属错误，携带结构化错误码 */
 export class NpmOutdatedError extends Error {
@@ -126,10 +123,7 @@ export async function checkOutdated(projectPath: string): Promise<OutdatedDepend
 function assertPackageJson(projectPath: string): void {
   const pkgJsonPath = safeJoin(projectPath, 'package.json');
   if (!fs.existsSync(pkgJsonPath)) {
-    throw new NpmOutdatedError(
-      `未找到 package.json：${pkgJsonPath}`,
-      'NO_PACKAGE_JSON',
-    );
+    throw new NpmOutdatedError(`未找到 package.json：${pkgJsonPath}`, 'NO_PACKAGE_JSON');
   }
 }
 
@@ -147,10 +141,7 @@ async function runNpmOutdated(projectPath: string): Promise<string> {
       return error.stdout;
     }
     if (isExecErrorWithOutput(error) && isNpmNotFound(error)) {
-      throw new NpmOutdatedError(
-        'npm 未安装或不在 PATH 中',
-        'NPM_NOT_FOUND',
-      );
+      throw new NpmOutdatedError('npm 未安装或不在 PATH 中', 'NPM_NOT_FOUND');
     }
     throw new NpmOutdatedError(
       `npm outdated 命令执行失败：${toErrorMessage(error)}`,
@@ -168,18 +159,12 @@ function parseOutdatedJson(stdout: string): Record<string, unknown> {
   try {
     const raw: unknown = JSON.parse(trimmed);
     if (!isRecord(raw)) {
-      throw new NpmOutdatedError(
-        'npm outdated 输出的 JSON 结构异常（非对象）',
-        'JSON_PARSE_ERROR',
-      );
+      throw new NpmOutdatedError('npm outdated 输出的 JSON 结构异常（非对象）', 'JSON_PARSE_ERROR');
     }
     return raw;
   } catch (error: unknown) {
     if (error instanceof NpmOutdatedError) throw error;
-    throw new NpmOutdatedError(
-      'npm outdated 输出的 JSON 解析失败',
-      'JSON_PARSE_ERROR',
-    );
+    throw new NpmOutdatedError('npm outdated 输出的 JSON 解析失败', 'JSON_PARSE_ERROR');
   }
 }
 

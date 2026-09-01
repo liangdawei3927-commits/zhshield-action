@@ -65,8 +65,7 @@ export class SopSyncScheduler {
   getSyncHealthLevel(): 0 | 1 | 2 | 3 | 4 {
     if (!this.lastSyncTime) return 4;
 
-    const daysSinceSync =
-      (Date.now() - this.lastSyncTime.getTime()) / (24 * 60 * 60 * 1000);
+    const daysSinceSync = (Date.now() - this.lastSyncTime.getTime()) / (24 * 60 * 60 * 1000);
 
     if (daysSinceSync <= 1) return 0;
     if (daysSinceSync <= 3) return 1;
@@ -80,8 +79,7 @@ export class SopSyncScheduler {
    */
   isStale(): boolean {
     if (!this.lastSyncTime) return true;
-    const daysSinceSync =
-      (Date.now() - this.lastSyncTime.getTime()) / (24 * 60 * 60 * 1000);
+    const daysSinceSync = (Date.now() - this.lastSyncTime.getTime()) / (24 * 60 * 60 * 1000);
     return daysSinceSync > this.syncPolicy.staleThresholdDays;
   }
 }

@@ -34,11 +34,7 @@ export class SopLazyLoader {
       'quality.complexity',
       'quality.duplication',
     ],
-    security: [
-      'security.vulnerability',
-      'security.malware',
-      'security.garbage',
-    ], // 所有项目都需要
+    security: ['security.vulnerability', 'security.malware', 'security.garbage'], // 所有项目都需要
     architecture: [
       'architecture.circular-dependency',
       'architecture.layer-boundary',
@@ -128,7 +124,12 @@ export class SopLazyLoader {
   }
 
   private async isModuleFresh(modulePath: string, module: string): Promise<boolean> {
-    if (!fs.existsSync(modulePath) || module === 'security') return false;
+    if (module === 'security') return false;
+    try {
+      await fs.promises.access(modulePath);
+    } catch {
+      return false;
+    }
     const stat = await fs.promises.stat(modulePath);
     return Date.now() - stat.mtimeMs < 24 * 60 * 60 * 1000;
   }
@@ -149,9 +150,7 @@ export class SopLazyLoader {
     const modulesDir = path.join(this.cacheManager.getCacheDir(), 'modules');
     try {
       const files = await fs.promises.readdir(modulesDir);
-      return files
-        .filter((f) => f.endsWith('.db'))
-        .map((f) => f.replace(DB_EXT, ''));
+      return files.filter((f) => f.endsWith('.db')).map((f) => f.replace(DB_EXT, ''));
     } catch {
       return [];
     }

@@ -12,13 +12,38 @@ export function SecretsIllustration() {
     <svg width="150" height="150" viewBox="0 0 150 150" fill="none">
       <circle cx="75" cy="75" r="65" fill="rgb(var(--zh-brand) / 0.05)" />
       <circle cx="75" cy="75" r="55" fill="rgb(var(--zh-brand) / 0.03)" />
-      <path d="M33 50V40a7 7 0 0 1 7-7h10" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="3" strokeLinecap="round" />
-      <path d="M117 50V40a7 7 0 0 0-7-7h-10" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="3" strokeLinecap="round" />
-      <path d="M33 100v10a7 7 0 0 0 7 7h10" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="3" strokeLinecap="round" />
-      <path d="M117 100v10a7 7 0 0 1-7 7h-10" stroke="rgb(var(--zh-brand-lighter))" strokeWidth="3" strokeLinecap="round" />
+      <path
+        d="M33 50V40a7 7 0 0 1 7-7h10"
+        stroke="rgb(var(--zh-brand-lighter))"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M117 50V40a7 7 0 0 0-7-7h-10"
+        stroke="rgb(var(--zh-brand-lighter))"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M33 100v10a7 7 0 0 0 7 7h10"
+        stroke="rgb(var(--zh-brand-lighter))"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M117 100v10a7 7 0 0 1-7 7h-10"
+        stroke="rgb(var(--zh-brand-lighter))"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
       <circle cx="62" cy="74" r="16" stroke="rgb(var(--zh-brand))" strokeWidth="5" />
       <path d="M75 74h28" stroke="rgb(var(--zh-brand))" strokeWidth="5" strokeLinecap="round" />
-      <path d="M97 74l6 6M97 74l6-6M85 74l6 6" stroke="rgb(var(--zh-brand))" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M97 74l6 6M97 74l6-6M85 74l6 6"
+        stroke="rgb(var(--zh-brand))"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
       <circle cx="112" cy="112" r="2" fill="rgb(var(--zh-danger))" />
       <path d="M112 100v-6" stroke="rgb(var(--zh-danger))" strokeWidth="4" strokeLinecap="round" />
     </svg>
@@ -27,7 +52,16 @@ export function SecretsIllustration() {
 
 function SecretsKeyIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-brand))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgb(var(--zh-brand))"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="7.5" cy="15.5" r="4.5" />
       <path d="M11 12L21 2" />
       <path d="M15.5 7.5l3 3L22 7l-3-3" />
@@ -35,15 +69,36 @@ function SecretsKeyIcon() {
   );
 }
 
-function SummaryChip({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
+function SummaryChip({
+  label,
+  value,
+  color,
+  bg,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+}) {
   return (
-    <span className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ color, background: bg }}>
+    <span
+      className="px-2.5 py-1 rounded-full text-xs font-medium"
+      style={{ color, background: bg }}
+    >
       {label} {value}
     </span>
   );
 }
 
-export function SecretsHeader({ report, loading, onRescan }: { report: SecretReportData; loading: boolean; onRescan: () => void }) {
+export function SecretsHeader({
+  report,
+  loading,
+  onRescan,
+}: {
+  report: SecretReportData;
+  loading: boolean;
+  onRescan: () => void;
+}) {
   const t = useT();
   return (
     <div className="mb-8">
@@ -54,21 +109,60 @@ export function SecretsHeader({ report, loading, onRescan }: { report: SecretRep
         <div>
           <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.secrets.done')}</h1>
           <p className="text-sm text-zh-muted">
-            {t('page.secrets.summary', { total: report.summary.total, critical: report.summary.critical, active: report.summary.active })}
+            {t('page.secrets.summary', {
+              total: report.summary.total,
+              critical: report.summary.critical,
+              active: report.summary.active,
+            })}
           </p>
         </div>
-        <PrimaryButton className="ml-auto" onClick={onRescan} loading={loading} loadingLabel={t('page.secrets.checking')}>
+        <PrimaryButton
+          className="ml-auto"
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={t('page.secrets.checking')}
+        >
           {t('page.secrets.rescan')}
         </PrimaryButton>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <SummaryChip label={t('page.secrets.summaryChip.total')} value={report.summary.total} color="rgb(var(--zh-ink-2))" bg="rgb(var(--zh-bg-secondary))" />
-        <SummaryChip label={t('page.secrets.summaryChip.critical')} value={report.summary.critical} color="rgb(var(--zh-danger))" bg="rgb(var(--zh-danger) / 0.1)" />
-        <SummaryChip label={t('page.secrets.summaryChip.active')} value={report.summary.active} color="rgb(var(--zh-warning))" bg="rgb(var(--zh-warning) / 0.12)" />
-        <SummaryChip label={t('page.secrets.summaryChip.historyOnly')} value={report.summary.historyFound} color="rgb(var(--zh-info))" bg="rgb(var(--zh-info) / 0.1)" />
+        <SummaryChip
+          label={t('page.secrets.summaryChip.total')}
+          value={report.summary.total}
+          color="rgb(var(--zh-ink-2))"
+          bg="rgb(var(--zh-bg-secondary))"
+        />
+        <SummaryChip
+          label={t('page.secrets.summaryChip.critical')}
+          value={report.summary.critical}
+          color="rgb(var(--zh-danger))"
+          bg="rgb(var(--zh-danger) / 0.1)"
+        />
+        <SummaryChip
+          label={t('page.secrets.summaryChip.active')}
+          value={report.summary.active}
+          color="rgb(var(--zh-warning))"
+          bg="rgb(var(--zh-warning) / 0.12)"
+        />
+        <SummaryChip
+          label={t('page.secrets.summaryChip.historyOnly')}
+          value={report.summary.historyFound}
+          color="rgb(var(--zh-info))"
+          bg="rgb(var(--zh-info) / 0.1)"
+        />
       </div>
       <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-zh-panel">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-muted))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="rgb(var(--zh-muted))"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="shrink-0"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 16v-4" />
           <path d="M12 8h.01" />
@@ -77,7 +171,16 @@ export function SecretsHeader({ report, loading, onRescan }: { report: SecretRep
       </div>
       {report.error && (
         <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-danger))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-danger))"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4" />
             <path d="M12 16h.01" />
@@ -92,23 +195,45 @@ export function SecretsHeader({ report, loading, onRescan }: { report: SecretRep
   );
 }
 
-function SectionTitle({ icon, label, right }: { icon: ReactNode; label: string; right?: ReactNode }) {
+function SectionTitle({
+  icon,
+  label,
+  right,
+}: {
+  icon: ReactNode;
+  label: string;
+  right?: ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">{icon}</span>
+      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+        {icon}
+      </span>
       <span className="text-sm font-semibold text-zh-ink-2">{label}</span>
       {right && <span className="ml-auto">{right}</span>}
     </div>
   );
 }
 
-function ActionButton({ label, title, primary, onClick }: { label: string; title: string; primary?: boolean; onClick: () => void }) {
+function ActionButton({
+  label,
+  title,
+  primary,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  primary?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       title={title}
       className={`px-2.5 py-1 rounded-lg text-xs font-medium border-none cursor-pointer transition-colors ${
-        primary ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
+        primary
+          ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+          : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
       }`}
     >
       {label}
@@ -135,11 +260,18 @@ function SecretsFindingItem({
   return (
     <ResultCard>
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-mono text-sm font-semibold text-zh-ink break-all">{finding.displayValue}</span>
-        <span className="px-2 py-0.5 rounded text-xs font-medium shrink-0" style={{ background: sevCfg.bg, color: sevCfg.color }}>
+        <span className="font-mono text-sm font-semibold text-zh-ink break-all">
+          {finding.displayValue}
+        </span>
+        <span
+          className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
+          style={{ background: sevCfg.bg, color: sevCfg.color }}
+        >
           {t(sevCfg.labelKey)}
         </span>
-        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zh-panel text-zh-ink-2 shrink-0">{t(typeKey)}</span>
+        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zh-panel text-zh-ink-2 shrink-0">
+          {t(typeKey)}
+        </span>
         <span className="ml-auto text-[11px] shrink-0" style={{ color: statusCfg.color }}>
           {t(statusCfg.labelKey)}
         </span>
@@ -150,16 +282,25 @@ function SecretsFindingItem({
         </span>
         {commit && <span className="text-xs text-zh-muted font-mono">{commit}</span>}
         {finding.stillReferenced ? (
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50" style={{ color: 'rgb(var(--zh-success-700))' }}>
+          <span
+            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50"
+            style={{ color: 'rgb(var(--zh-success-700))' }}
+          >
             {t('page.secrets.badge.active')}
           </span>
         ) : (
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel" style={{ color: 'rgb(var(--zh-muted))' }}>
+          <span
+            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
+            style={{ color: 'rgb(var(--zh-muted))' }}
+          >
             {t('page.secrets.badge.historyOnly')}
           </span>
         )}
         {finding.pushedToRemote && (
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel" style={{ color: 'rgb(var(--zh-info))' }}>
+          <span
+            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
+            style={{ color: 'rgb(var(--zh-info))' }}
+          >
             {t('page.secrets.badge.pushedToRemote')}
           </span>
         )}
@@ -180,11 +321,19 @@ function SecretsFindingItem({
                 title={t('page.secrets.action.verifyRotatedConfirm')}
                 onClick={() => onVerifyRotated(finding.secretId)}
               />
-              <ActionButton label={t('page.secrets.action.dismiss')} title={t('page.secrets.action.dismissConfirm')} onClick={() => onDismiss(finding.secretId)} />
+              <ActionButton
+                label={t('page.secrets.action.dismiss')}
+                title={t('page.secrets.action.dismissConfirm')}
+                onClick={() => onDismiss(finding.secretId)}
+              />
             </>
           )}
           {finding.status === 'rotated' && (
-            <ActionButton label={t('page.secrets.action.dismiss')} title={t('page.secrets.action.dismissConfirm')} onClick={() => onDismiss(finding.secretId)} />
+            <ActionButton
+              label={t('page.secrets.action.dismiss')}
+              title={t('page.secrets.action.dismissConfirm')}
+              onClick={() => onDismiss(finding.secretId)}
+            />
           )}
         </span>
       </div>
@@ -208,7 +357,16 @@ export function SecretsListCard({
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 12a9 9 0 1 1-3.6-7.2" />
             <path d="M21 3v6h-6" />
           </svg>
@@ -248,7 +406,16 @@ export function SecretsEmptyState({ loading, onScan }: { loading: boolean; onSca
       featureList={[
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.35-4.35" />
             </svg>
@@ -258,7 +425,16 @@ export function SecretsEmptyState({ loading, onScan }: { loading: boolean; onSca
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <path d="M14 2v6h6" />
               <path d="M8 13h8M8 17h5" />
@@ -269,7 +445,16 @@ export function SecretsEmptyState({ loading, onScan }: { loading: boolean; onSca
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="7.5" cy="15.5" r="4.5" />
               <path d="M11 12L21 2" />
               <path d="M15.5 7.5l3 3L22 7l-3-3" />

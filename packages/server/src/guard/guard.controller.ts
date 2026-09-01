@@ -10,9 +10,7 @@ export class GuardController {
   constructor(private readonly guardService: GuardService) {}
 
   @Post('check')
-  async check(
-    @Body() body: { projectPath: string; dryRun?: boolean },
-  ) {
+  async check(@Body() body: { projectPath: string; dryRun?: boolean }) {
     this.logger.log(`Guard check request: ${body.projectPath}`);
     const result = await this.guardService.runCheck(body.projectPath, { dryRun: body.dryRun });
     return {

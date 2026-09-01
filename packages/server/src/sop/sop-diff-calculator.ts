@@ -114,11 +114,18 @@ export class SopDiffCalculator {
   /**
    * 查询某版本快照中指定规则的哈希（默认 content 变体）
    */
-  getStoredHash(version: string, ruleId: string, variant: RuleHashVariant = 'content'): string | undefined {
+  getStoredHash(
+    version: string,
+    ruleId: string,
+    variant: RuleHashVariant = 'content',
+  ): string | undefined {
     return this.versionHashes.get(version)?.get(ruleId)?.[variant];
   }
 
-  private classifyRules(allRules: SopRule[], fromVersion: string): { unchanged: string[]; modified: SopRule[]; removed: string[] } {
+  private classifyRules(
+    allRules: SopRule[],
+    fromVersion: string,
+  ): { unchanged: string[]; modified: SopRule[]; removed: string[] } {
     const unchanged: string[] = [];
     const modified: SopRule[] = [];
     const removed: string[] = [];
@@ -138,14 +145,22 @@ export class SopDiffCalculator {
   }
 
   /** 有来源版本快照时按内容哈希精确比对；否则回退 updatedAt 启发式 */
-  private isModified(rule: SopRule, fromVersion: string, stored: ReadonlyMap<string, RuleHashes> | undefined): boolean {
+  private isModified(
+    rule: SopRule,
+    fromVersion: string,
+    stored: ReadonlyMap<string, RuleHashes> | undefined,
+  ): boolean {
     const previous = stored?.get(rule.id);
     if (!previous) return stored ? true : this.wasModifiedSince(rule, fromVersion);
     return previous.content !== this.computeRuleHash(rule).content;
   }
 
   // 新增的规则（注册时间较晚）：Set 成员查找，O(n) 取代旧嵌套扫描的 O(n²)
-  private findAddedRules(activeRules: SopRule[], unchanged: string[], modified: SopRule[]): SopRule[] {
+  private findAddedRules(
+    activeRules: SopRule[],
+    unchanged: string[],
+    modified: SopRule[],
+  ): SopRule[] {
     const knownIds = new Set<string>(unchanged);
     for (const rule of modified) {
       knownIds.add(rule.id);
@@ -160,7 +175,11 @@ export class SopDiffCalculator {
   }
 
   // 简化版本差异计算：比较规则内容哈希
-  private buildDiffSummary(added: SopRule[], modified: SopRule[], removed: string[]): { diffContent: string; hash: string } {
+  private buildDiffSummary(
+    added: SopRule[],
+    modified: SopRule[],
+    removed: string[],
+  ): { diffContent: string; hash: string } {
     const diffContent = JSON.stringify({ added, modified, removed });
     const hash = crypto.createHash('sha256').update(diffContent).digest('hex');
     return { diffContent, hash };
@@ -191,6 +210,34 @@ export class SopDiffCalculator {
 
 /** 参与内容哈希的语义字段；误报计数与时间戳等易变元数据不参与（保证计数噪声不触发 modified） */
 function semanticContent(rule: SopRule): Record<string, unknown> {
-  const { id, name, domain, action, source, description, status, executionMode, severity, applicableEngines, content, serves, tags } = rule;
-  return { id, name, domain, action, source, description, status, executionMode, severity, applicableEngines, content, serves, tags };
+  const {
+    id,
+    name,
+    domain,
+    action,
+    source,
+    description,
+    status,
+    executionMode,
+    severity,
+    applicableEngines,
+    content,
+    serves,
+    tags,
+  } = rule;
+  return {
+    id,
+    name,
+    domain,
+    action,
+    source,
+    description,
+    status,
+    executionMode,
+    severity,
+    applicableEngines,
+    content,
+    serves,
+    tags,
+  };
 }

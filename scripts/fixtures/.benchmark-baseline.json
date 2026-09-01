@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-08-31T17:04:34.850Z",
+  "machineProfile": {
+    "cores": 4,
+    "totalMemGb": 8,
+    "freeMemGb": 1.57
+  },
+  "results": [
+    {
+      "name": "scan-files",
+      "elapsed": 139,
+      "status": "success",
+      "detail": "50 files x40000 (count=2000000)"
+    },
+    {
+      "name": "read-package",
+      "elapsed": 147,
+      "status": "success",
+      "detail": "name=zhshield-sample-repo x100000"
+    },
+    {
+      "name": "evaluate-n",
+      "elapsed": 167,
+      "status": "success",
+      "detail": "len=12 x1500000"
+    }
+  ]
+}

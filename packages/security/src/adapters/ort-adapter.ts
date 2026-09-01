@@ -11,10 +11,17 @@ const ORT_TIMEOUT = 300000; // 5 min
 
 /** 需关注/标记的许可证 */
 const RESTRICTED_LICENSES = new Set([
-  'GPL-2.0-only', 'GPL-2.0-or-later', 'GPL-3.0-only', 'GPL-3.0-or-later',
-  'AGPL-3.0-only', 'AGPL-3.0-or-later',
-  'LGPL-3.0-only', 'LGPL-3.0-or-later',
-  'BUSL-1.1', 'SSPL-1.0', 'BSL-1.0',
+  'GPL-2.0-only',
+  'GPL-2.0-or-later',
+  'GPL-3.0-only',
+  'GPL-3.0-or-later',
+  'AGPL-3.0-only',
+  'AGPL-3.0-or-later',
+  'LGPL-3.0-only',
+  'LGPL-3.0-or-later',
+  'BUSL-1.1',
+  'SSPL-1.0',
+  'BSL-1.0',
   'No-license-found',
 ]);
 
@@ -91,42 +98,58 @@ export class ORTAdapter implements ToolAdapter {
   private async runOrtAnalyze(options: ToolScanOptions, outputDir: string): Promise<void> {
     await fs.promises.mkdir(outputDir, { recursive: true });
     const pm = options.config?.packageManagers?.[0] || 'NPM';
-    await execFileAsync('ort', [
-      'analyze',
-      '-i', options.projectPath,
-      '-o', outputDir,
-      '--package-managers', pm,
-    ], {
-      cwd: options.projectPath,
-      timeout: options.timeout || ORT_TIMEOUT,
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    await execFileAsync(
+      'ort',
+      ['analyze', '-i', options.projectPath, '-o', outputDir, '--package-managers', pm],
+      {
+        cwd: options.projectPath,
+        timeout: options.timeout || ORT_TIMEOUT,
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    );
   }
 
   private async readAnalyzerResult(outputDir: string): Promise<Issue[]> {
     const resultFile = path.join(outputDir, 'analyzer-result.yml');
-    if (!fs.existsSync(resultFile)) return [];
-    const content = await fs.promises.readFile(resultFile, 'utf-8');
+    let content: string;
+    try {
+      content = await fs.promises.readFile(resultFile, 'utf-8');
+    } catch {
+      return [];
+    }
     return this.mapOutput(content);
   }
 
   private async cleanupOutputDir(outputDir: string): Promise<void> {
     try {
       await fs.promises.rm(outputDir, { recursive: true, force: true });
-    } catch { /* ignore cleanup failure */ }
+    } catch {
+      /* ignore cleanup failure */
+    }
   }
 
-  private async buildErrorResult(start: number, err: ExecError, outputDir: string): Promise<ToolResult> {
+  private async buildErrorResult(
+    start: number,
+    err: ExecError,
+    outputDir: string,
+  ): Promise<ToolResult> {
     try {
       await fs.promises.rm(outputDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     if (err.code === 'ENOENT') {
       return {
         tool: 'ort',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'ORT 未安装',
       };
     }
@@ -164,7 +187,8 @@ export class ORTAdapter implements ToolAdapter {
       id: randomUUID(),
       ruleId: 'ort/restricted-license',
       severity: restrictedLicenses.some((l) => l.startsWith('GPL') || l.startsWith('AGPL'))
-        ? 'error' : 'warning',
+        ? 'error'
+        : 'warning',
       category: 'dependency',
       message: `${pkgName} 使用了需要关注的许可证: ${restrictedLicenses.join(', ')}`,
       file: '',
@@ -194,7 +218,10 @@ export class ORTAdapter implements ToolAdapter {
     }
   }
 
-  private buildAnalyzerResult(packages: OrtPackageEntry[], state: OrtParseState): OrtAnalyzerResult | null {
+  private buildAnalyzerResult(
+    packages: OrtPackageEntry[],
+    state: OrtParseState,
+  ): OrtAnalyzerResult | null {
     if (state.currentPkg) {
       packages.push(state.currentPkg as unknown as OrtPackageEntry);
     }
@@ -267,7 +294,11 @@ export class ORTAdapter implements ToolAdapter {
     const val = content.slice(colonIdx + 1).trim();
 
     if (key === 'declared_licenses') {
-      currentPkg.declared_licenses = this.collectLicenseLines(lines, lines.indexOf(line) + 1, indent);
+      currentPkg.declared_licenses = this.collectLicenseLines(
+        lines,
+        lines.indexOf(line) + 1,
+        indent,
+      );
     } else if (key === 'description') {
       currentPkg.description = val.replace(/['"]/g, '');
     } else if (key === 'homepage_url') {

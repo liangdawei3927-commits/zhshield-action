@@ -37,9 +37,7 @@ export class DimensionMapper {
     return map;
   }
 
-  groupByDimension<T extends { category?: string }>(
-    items: T[],
-  ): Record<string, T[]> {
+  groupByDimension<T extends { category?: string }>(items: T[]): Record<string, T[]> {
     const grouped: Record<string, T[]> = {};
     for (const dim of this.config.dimensions) {
       grouped[dim.id] = [];

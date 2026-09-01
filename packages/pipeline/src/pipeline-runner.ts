@@ -25,6 +25,7 @@ import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine }
 import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import type { PipelineReport } from './types';
+import { registerAutoPerfAdapter } from './autoperf-adapter';
 
 /** 从 unknown 类型的 catch 错误中安全提取 message */
 function toMessage(error: unknown): string {
@@ -85,10 +86,10 @@ export class PipelineRunner {
     this.guardEngine.useSopEngine(this.sopRuleEngine);
     this.inspectEngine.useSopEngine(this.sopRuleEngine);
 
-    this.registerDefaultAdapters();
+    void this.registerDefaultAdapters();
   }
 
-  private registerDefaultAdapters(): void {
+  private async registerDefaultAdapters(): Promise<void> {
     this.guardEngine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
     this.guardEngine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter());
     this.guardEngine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
@@ -103,6 +104,9 @@ export class PipelineRunner {
     this.inspectEngine.registerAdapter(new TsPruneAdapter());
     this.inspectEngine.registerAdapter(new SemgrepAdapter());
     this.inspectEngine.registerAdapter(new DepcheckAdapter());
+
+    // AutoPerf 性能自治引擎（fail-soft 注册，详见 autoperf-adapter.ts）
+    await registerAutoPerfAdapter(this.inspectEngine);
   }
 
   async loadPlugin(plugin: Plugin): Promise<void> {
@@ -306,10 +310,10 @@ export class PipelineRunner {
   }
 
   /** 构造流水线成功报告（重构由独立入口 runRefactor() / 桌面重构页负责，全流水线不串行跑重构） */
-  private buildSuccessReport<G extends PipelineReport['guard'], I extends PipelineReport['inspect']>(
-    guard: G,
-    inspect: I,
-  ): PipelineReport {
+  private buildSuccessReport<
+    G extends PipelineReport['guard'],
+    I extends PipelineReport['inspect'],
+  >(guard: G, inspect: I): PipelineReport {
     return {
       timestamp: new Date(),
       guard,

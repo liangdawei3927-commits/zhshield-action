@@ -48,10 +48,10 @@ describe('SopCacheManager 指标接入（MetricsCollector）', () => {
   function counter(name: string, labels?: Record<string, string>): CounterMetric | undefined {
     return manager
       .getMetricsSnapshot()
-      .counters.find((c) =>
-        c.name === name &&
-        (labels === undefined ||
-          Object.entries(labels).every(([k, v]) => c.labels?.[k] === v)),
+      .counters.find(
+        (c) =>
+          c.name === name &&
+          (labels === undefined || Object.entries(labels).every(([k, v]) => c.labels?.[k] === v)),
       );
   }
 
@@ -75,7 +75,9 @@ describe('SopCacheManager 指标接入（MetricsCollector）', () => {
     await manager.loadRules('refactor');
 
     expect(counter('sop_cache_lookups_total', { module: 'guard', result: 'hit' })?.value).toBe(1);
-    expect(counter('sop_cache_lookups_total', { module: 'refactor', result: 'miss' })?.value).toBe(1);
+    expect(counter('sop_cache_lookups_total', { module: 'refactor', result: 'miss' })?.value).toBe(
+      1,
+    );
   });
 
   it('GIVEN applyDiff 与 emergencyUpdate WHEN 应用规则 THEN 分别按通道记录规则应用量', async () => {

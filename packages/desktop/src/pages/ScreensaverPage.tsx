@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ShieldLogo } from '../components/ui/Icons';
-import { useMacOSTrafficLightInset, TRAFFIC_LIGHT_OFFSET } from '../hooks/useMacOSTrafficLightInset';
+import {
+  useMacOSTrafficLightInset,
+  TRAFFIC_LIGHT_OFFSET,
+} from '../hooks/useMacOSTrafficLightInset';
 
 interface ScreensaverPageProps {
   onDismiss: () => void;
@@ -41,7 +44,9 @@ function ScreensaverHeader({ visible, maximized }: { visible: boolean; maximized
         }}
       >
         <ShieldLogo size={18} />
-        <span style={{ fontSize: 'var(--zh-font-md)', fontWeight: 600, letterSpacing: 0.5 }}>智汇码盾</span>
+        <span style={{ fontSize: 'var(--zh-font-md)', fontWeight: 600, letterSpacing: 0.5 }}>
+          智汇码盾
+        </span>
       </div>
 
       <div
@@ -178,7 +183,16 @@ function ScreensaverFooter({ visible }: { visible: boolean }) {
       className="absolute bottom-8 left-10 flex items-center gap-2 pointer-events-none transition-all duration-700 ease-out"
       style={{ opacity: visible ? 0.6 : 0, transitionDelay: '600ms' }}
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="white"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
         <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
         <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
@@ -201,7 +215,8 @@ export function ScreensaverPage({ onDismiss }: ScreensaverPageProps) {
     <div
       className="fixed inset-0 z-50 flex flex-col cursor-pointer select-none"
       style={{
-        background: 'linear-gradient(135deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-700)) 50%, rgb(var(--zh-brand-500)) 100%)',
+        background:
+          'linear-gradient(135deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-700)) 50%, rgb(var(--zh-brand-500)) 100%)',
       }}
       onClick={onDismiss}
       onKeyDown={onDismiss}

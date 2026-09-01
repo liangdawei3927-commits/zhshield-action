@@ -13,9 +13,15 @@ import fs from 'node:fs';
 import { t } from '@zh/i18n';
 
 import {
-  EventBus, SopRegistry, SopCacheManager,
-  WisdomBrainSync, ToolRuleSync, ExperienceReporter,
-  buildDefaultToolRuleConfigs, resolveApiBase, resolveSopBase,
+  EventBus,
+  SopRegistry,
+  SopCacheManager,
+  WisdomBrainSync,
+  ToolRuleSync,
+  ExperienceReporter,
+  buildDefaultToolRuleConfigs,
+  resolveApiBase,
+  resolveSopBase,
 } from '@zh/kernel';
 import { DbConnection } from '@zh/db';
 import type { ScoringEngine } from '@zh/scoring';
@@ -92,10 +98,15 @@ const dbConn = new DbConnection({ dbPath });
 let db: ReturnType<DbConnection['connect']> | null = null;
 try {
   db = dbConn.connect();
-  const migrationsDir = path.resolve(__dirname, VITE_DEV_SERVER_URL ? '../../db/migrations' : 'resources/db/migrations');
-  if (fs.existsSync(migrationsDir)) {
-    dbConn.migrate(migrationsDir);
-  }
+  const migrationsDir = path.resolve(
+    __dirname,
+    VITE_DEV_SERVER_URL ? '../../db/migrations' : 'resources/db/migrations',
+  );
+  // 迁移在微任务中异步执行，远早于任何 IPC 处理器（处理器仅在窗口创建后触发）
+  void fs.promises
+    .access(migrationsDir)
+    .then(() => dbConn.migrate(migrationsDir))
+    .catch(() => {});
 } catch (err) {
   console.error(
     `[ipc-context] DB 初始化失败，降级为无持久化模式: ${err instanceof Error ? err.message : String(err)}`,
@@ -127,7 +138,8 @@ export interface SentinelRuntime {
 let sentinelRuntime: SentinelRuntime | null = null;
 export async function getSentinel(): Promise<SentinelRuntime> {
   if (sentinelRuntime) return sentinelRuntime;
-  const { EventCenter, FileMonitor, LogCollector, ProcessMonitor, subscribeScopeViolations } = await import('@zh/sentinel');
+  const { EventCenter, FileMonitor, LogCollector, ProcessMonitor, subscribeScopeViolations } =
+    await import('@zh/sentinel');
   const eventCenter = new EventCenter();
   if (db) eventCenter.setDb(db);
   subscribeScopeViolations(eventBus, eventCenter);

@@ -29,7 +29,8 @@ const MIN_VARIANTS_PER_POSITIVE_PATTERN = 5;
 const MIN_HIT_RATE = 0.95;
 
 function loadPatternSources(): string[] {
-  return fs.readdirSync(PATTERN_DIR)
+  return fs
+    .readdirSync(PATTERN_DIR)
     .filter((name) => name.endsWith('.yaml'))
     .sort()
     .map((name) => fs.readFileSync(path.join(PATTERN_DIR, name), 'utf-8'));
@@ -47,7 +48,9 @@ function detectVariant(variant: GeneratedVariant): DetectionResult {
       return { hit: hits.length > 0, finding: hits[0]?.matchedPattern };
     }
     case 'classifyPackageJsonScripts': {
-      const suspicious = classifyPackageJsonScripts(variant.content).find((v) => v.verdict === 'suspicious');
+      const suspicious = classifyPackageJsonScripts(variant.content).find(
+        (v) => v.verdict === 'suspicious',
+      );
       return { hit: suspicious !== undefined, finding: suspicious?.matchedPattern };
     }
     case 'scanMarkdownHiddenLinks': {
@@ -59,7 +62,10 @@ function detectVariant(variant: GeneratedVariant): DetectionResult {
   }
 }
 
-function requireVariant(group: readonly GeneratedVariant[], planDescription: string): GeneratedVariant {
+function requireVariant(
+  group: readonly GeneratedVariant[],
+  planDescription: string,
+): GeneratedVariant {
   const found = group.find((v) => v.planDescription === planDescription);
   if (found === undefined) throw new Error(`missing variant with plan '${planDescription}'`);
   return found;
@@ -91,17 +97,26 @@ describe('F4-1 attack-pattern corpus', () => {
 
   it('covers all four landed injection categories', () => {
     const categories = [...new Set(patterns.map((p) => p.category))].sort();
-    expect(categories).toEqual(['prompt-injection', 'secret-exfiltration', 'supply-chain', 'ui-redress']);
+    expect(categories).toEqual([
+      'prompt-injection',
+      'secret-exfiltration',
+      'supply-chain',
+      'ui-redress',
+    ]);
   });
 
   it('rejects malformed patterns instead of guessing', () => {
     expect(() => loadAttackPatternsFromSources(['patternId: only-id'])).toThrow(DESCRIPTION_ERR_RE);
-    expect(() => loadAttackPatternsFromSources([
-      'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\n',
-    ])).toThrow(BASE_TEMPLATE_ERR_RE);
-    expect(() => loadAttackPatternsFromSources([
-      'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\nbaseTemplate: t\nlocalDiversifiers:\n  - type: contextPrefix\n    preset: benign-doc-lines\n',
-    ])).toThrow(BENIGN_DOC_LINES_ERR_RE);
+    expect(() =>
+      loadAttackPatternsFromSources([
+        'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\n',
+      ]),
+    ).toThrow(BASE_TEMPLATE_ERR_RE);
+    expect(() =>
+      loadAttackPatternsFromSources([
+        'patternId: x\ndescription: d\ncategory: supply-chain\ntargetDetector: classifyPackageJsonScripts\nexpectedHit: true\nbaseTemplate: t\nlocalDiversifiers:\n  - type: contextPrefix\n    preset: benign-doc-lines\n',
+      ]),
+    ).toThrow(BENIGN_DOC_LINES_ERR_RE);
   });
 });
 
@@ -117,7 +132,8 @@ describe('F4 adversarial generator', () => {
       const baseline = requireVariant(group, 'baseline');
       for (const variant of group) {
         if (variant.planDescription === 'baseline') continue;
-        const differs = variant.content !== baseline.content || variant.fileName !== baseline.fileName;
+        const differs =
+          variant.content !== baseline.content || variant.fileName !== baseline.fileName;
         expect(differs, `${variant.variantLabel} is identical to baseline`).toBe(true);
       }
     }
@@ -125,13 +141,17 @@ describe('F4 adversarial generator', () => {
 
   it('combined local+global plans differ from their local-only parent', () => {
     for (const pattern of patterns) {
-      if (pattern.localDiversifiers.length === 0 || pattern.globalDiversifiers.length === 0) continue;
+      if (pattern.localDiversifiers.length === 0 || pattern.globalDiversifiers.length === 0)
+        continue;
       const group = variants.filter((v) => v.patternId === pattern.patternId);
       const localType = pattern.localDiversifiers[0]?.type ?? '';
       const globalType = pattern.globalDiversifiers[0]?.type ?? '';
       const localOnly = requireVariant(group, localType);
       const combined = requireVariant(group, `${localType}+${globalType}`);
-      expect(combined.content, `${pattern.patternId}: combined plan collapsed onto local-only`).not.toBe(localOnly.content);
+      expect(
+        combined.content,
+        `${pattern.patternId}: combined plan collapsed onto local-only`,
+      ).not.toBe(localOnly.content);
     }
   });
 
@@ -164,10 +184,9 @@ describe('F4-2 hit-rate stability against real injection-guard detectors', () =>
     const negatives = variants.filter((v) => !v.expectHit);
     expect(negatives.length).toBeGreaterThanOrEqual(10);
     const flagged = negatives.filter((v) => detectVariant(v).hit);
-    expect(
-      flagged,
-      `false positives: ${flagged.map((f) => f.variantLabel).join(', ')}`,
-    ).toEqual([]);
+    expect(flagged, `false positives: ${flagged.map((f) => f.variantLabel).join(', ')}`).toEqual(
+      [],
+    );
   });
 });
 

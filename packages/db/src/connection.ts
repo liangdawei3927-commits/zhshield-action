@@ -64,6 +64,22 @@ export class DbConnection {
     const runMigration = createMigrationRunner(db);
     applyPendingMigrations(migrationsDir, files, applied, runMigration);
   }
+
+  /**
+   * 在单个 SQL 事务内执行 fn，全部成功则提交，任一步抛错则整体回滚（all-or-nothing）。
+   * 复用迁移执行器的事务模式（better-sqlite3 的 db.transaction 包装）。
+   * @example
+   * ```ts
+   * conn.transaction((db) => {
+   *   for (const row of rows) insert(db, row);
+   * });
+   * ```
+   */
+  transaction<T>(fn: (db: Database.Database) => T): T {
+    const db = this.getDb();
+    const run = db.transaction(fn);
+    return run(db);
+  }
 }
 
 /** 创建迁移记录表（幂等） */
@@ -80,13 +96,17 @@ function ensureMigrationsTable(db: Database.Database): void {
 /** 读取已应用的迁移名集合 */
 function loadAppliedMigrations(db: Database.Database): Set<string> {
   return new Set(
-    db.prepare('SELECT name FROM _migrations').all().map((r) => (r as { name: string }).name),
+    db
+      .prepare('SELECT name FROM _migrations')
+      .all()
+      .map((r) => (r as { name: string }).name),
   );
 }
 
 /** 列出迁移目录下按名称排序的 .sql 文件 */
 function listMigrationFiles(migrationsDir: string): string[] {
-  return fs.readdirSync(migrationsDir)
+  return fs
+    .readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort();
 }

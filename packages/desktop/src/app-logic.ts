@@ -1,9 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { t } from '@zh/i18n';
 import { useToast } from './components/ui/Toast';
 import type { ToastVariant } from './components/ui/toast-logic';
 import type { AiToolConfigData } from './types/electron';
-import { installGuardHooks, startSentinelMonitoring, readGuardConfig, writeGuardConfig, getSentinelState, setSentinelEnabled } from './services/engineApi';
+import {
+  installGuardHooks,
+  startSentinelMonitoring,
+  readGuardConfig,
+  writeGuardConfig,
+  getSentinelState,
+  setSentinelEnabled,
+} from './services/engineApi';
 
 export type Page =
   | 'welcome'
@@ -52,25 +66,31 @@ function useAiToolConfig(
   const [aiTool, setAiTool] = useState<AiToolConfigData | null>(null);
   const [aiApplying, setAiApplying] = useState(false);
 
-  const toggleAiTool = useCallback(async (enabled: boolean) => {
-    const current = aiTool ?? DEFAULT_AI_TOOL;
-    const next = { ...current, enabled };
-    setAiTool(next);
-    setAiApplying(true);
-    try {
-      const result = await window.electronAPI?.ai?.saveConfig(next, projects.map((p) => p.path));
-      if (result?.saved) {
-        notifyAiToolResult(enabled, result, toast);
-      } else {
+  const toggleAiTool = useCallback(
+    async (enabled: boolean) => {
+      const current = aiTool ?? DEFAULT_AI_TOOL;
+      const next = { ...current, enabled };
+      setAiTool(next);
+      setAiApplying(true);
+      try {
+        const result = await window.electronAPI?.ai?.saveConfig(
+          next,
+          projects.map((p) => p.path),
+        );
+        if (result?.saved) {
+          notifyAiToolResult(enabled, result, toast);
+        } else {
+          toast(t('toast.aiToolSaveFailed'), 'error');
+        }
+      } catch {
         toast(t('toast.aiToolSaveFailed'), 'error');
+        setAiTool({ ...(aiTool ?? DEFAULT_AI_TOOL), enabled: !enabled });
+      } finally {
+        setAiApplying(false);
       }
-    } catch {
-      toast(t('toast.aiToolSaveFailed'), 'error');
-      setAiTool({ ...(aiTool ?? DEFAULT_AI_TOOL), enabled: !enabled });
-    } finally {
-      setAiApplying(false);
-    }
-  }, [aiTool, projects, toast]);
+    },
+    [aiTool, projects, toast],
+  );
 
   return { aiTool, setAiTool, aiApplying, toggleAiTool };
 }
@@ -82,18 +102,22 @@ function useLoadGateConfig(
 ): void {
   useEffect(() => {
     let cancelled = false;
-    readGuardConfig().then((config) => {
-      if (!cancelled) {
-        setGateEnabledState(config.enabled);
-        setGateLoading(false);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setGateEnabledState(true);
-        setGateLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
+    readGuardConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setGateEnabledState(config.enabled);
+          setGateLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGateEnabledState(true);
+          setGateLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 }
 
@@ -111,9 +135,7 @@ async function saveGateConfig(
   }
 }
 
-function useGateSwitch(
-  toast: (msg: string, variant?: ToastVariant) => void,
-): {
+function useGateSwitch(toast: (msg: string, variant?: ToastVariant) => void): {
   gateEnabled: boolean | null;
   setGateEnabled: (enabled: boolean) => void;
   gateLoading: boolean;
@@ -121,10 +143,13 @@ function useGateSwitch(
   const [gateEnabled, setGateEnabledState] = useState<boolean | null>(null);
   const [gateLoading, setGateLoading] = useState(true);
   useLoadGateConfig(setGateEnabledState, setGateLoading);
-  const setGateEnabled = useCallback(async (enabled: boolean) => {
-    setGateEnabledState(enabled);
-    await saveGateConfig(enabled, setGateEnabledState, toast);
-  }, [toast]);
+  const setGateEnabled = useCallback(
+    async (enabled: boolean) => {
+      setGateEnabledState(enabled);
+      await saveGateConfig(enabled, setGateEnabledState, toast);
+    },
+    [toast],
+  );
   return { gateEnabled, setGateEnabled, gateLoading };
 }
 
@@ -135,18 +160,22 @@ function useLoadSentinelConfig(
 ): void {
   useEffect(() => {
     let cancelled = false;
-    getSentinelState().then((state) => {
-      if (!cancelled) {
-        setSentinelEnabledState(state.enabled);
-        setSentinelLoading(false);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setSentinelEnabledState(true);
-        setSentinelLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
+    getSentinelState()
+      .then((state) => {
+        if (!cancelled) {
+          setSentinelEnabledState(state.enabled);
+          setSentinelLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSentinelEnabledState(true);
+          setSentinelLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 }
 
@@ -167,9 +196,7 @@ async function saveSentinelConfig(
   }
 }
 
-function useSentinelSwitch(
-  toast: (msg: string, variant?: ToastVariant) => void,
-): {
+function useSentinelSwitch(toast: (msg: string, variant?: ToastVariant) => void): {
   sentinelEnabled: boolean | null;
   setSentinelEnabledState: (enabled: boolean) => void;
   sentinelLoading: boolean;
@@ -177,10 +204,13 @@ function useSentinelSwitch(
   const [sentinelEnabled, setSentinelEnabledState] = useState<boolean | null>(null);
   const [sentinelLoading, setSentinelLoading] = useState(true);
   useLoadSentinelConfig(setSentinelEnabledState, setSentinelLoading);
-  const setEnabled = useCallback(async (enabled: boolean) => {
-    setSentinelEnabledState(enabled);
-    await saveSentinelConfig(enabled, setSentinelEnabledState, toast);
-  }, [toast]);
+  const setEnabled = useCallback(
+    async (enabled: boolean) => {
+      setSentinelEnabledState(enabled);
+      await saveSentinelConfig(enabled, setSentinelEnabledState, toast);
+    },
+    [toast],
+  );
   return { sentinelEnabled, setSentinelEnabledState: setEnabled, sentinelLoading };
 }
 
@@ -190,7 +220,11 @@ function useSentinelSwitch(
  */
 function useIntelligentEngineSwitch(
   gate: { gateEnabled: boolean | null; setGateEnabled: (v: boolean) => void; gateLoading: boolean },
-  sentinel: { sentinelEnabled: boolean | null; setSentinelEnabledState: (v: boolean) => void; sentinelLoading: boolean },
+  sentinel: {
+    sentinelEnabled: boolean | null;
+    setSentinelEnabledState: (v: boolean) => void;
+    sentinelLoading: boolean;
+  },
 ): {
   intelligentEnabled: boolean;
   setIntelligentEnabled: (enabled: boolean) => void;
@@ -199,14 +233,17 @@ function useIntelligentEngineSwitch(
   const [toggling, setToggling] = useState(false);
   // 未加载完按「开」处理，避免启动时闪烁（与原来各子开关默认常开一致）
   const intelligentEnabled = (gate.gateEnabled ?? true) && (sentinel.sentinelEnabled ?? true);
-  const setIntelligentEnabled = useCallback((enabled: boolean) => {
-    setToggling(true);
-    gate.setGateEnabled(enabled);
-    sentinel.setSentinelEnabledState(enabled);
-    // 乐观更新后，底层异步落盘；短暂标记加载态保持观感一致
-    const timer = setTimeout(() => setToggling(false), 120);
-    return () => clearTimeout(timer);
-  }, [gate, sentinel]);
+  const setIntelligentEnabled = useCallback(
+    (enabled: boolean) => {
+      setToggling(true);
+      gate.setGateEnabled(enabled);
+      sentinel.setSentinelEnabledState(enabled);
+      // 乐观更新后，底层异步落盘；短暂标记加载态保持观感一致
+      const timer = setTimeout(setToggling, 120, false);
+      return () => clearTimeout(timer);
+    },
+    [gate, sentinel],
+  );
   return {
     intelligentEnabled,
     setIntelligentEnabled,
@@ -221,13 +258,16 @@ function useRemoveProject(
   setCurrentPage: Dispatch<SetStateAction<Page>>,
   toast: (msg: string, variant?: ToastVariant) => void,
 ): { removeProject: (path: string) => void } {
-  const removeProject = useCallback((path: string) => {
-    const target = projects.find((p) => p.path === path);
-    const next = projects.filter((p) => p.path !== path);
-    setProjects(next);
-    if (next.length === 0) setCurrentPage('welcome');
-    toast(t('toast.projectRemoved', { projectName: target?.name ?? '' }), 'info');
-  }, [projects, setProjects, setCurrentPage, toast]);
+  const removeProject = useCallback(
+    (path: string) => {
+      const target = projects.find((p) => p.path === path);
+      const next = projects.filter((p) => p.path !== path);
+      setProjects(next);
+      if (next.length === 0) setCurrentPage('welcome');
+      toast(t('toast.projectRemoved', { projectName: target?.name ?? '' }), 'info');
+    },
+    [projects, setProjects, setCurrentPage, toast],
+  );
 
   return { removeProject };
 }
@@ -281,18 +321,20 @@ export function useAppState() {
   const { aiTool, setAiTool, aiApplying, toggleAiTool } = useAiToolConfig(projects, toast);
   const { gateEnabled, setGateEnabled, gateLoading } = useGateSwitch(toast);
   const { sentinelEnabled, setSentinelEnabledState, sentinelLoading } = useSentinelSwitch(toast);
-  const {
-    intelligentEnabled,
-    setIntelligentEnabled,
-    intelligentLoading,
-  } = useIntelligentEngineSwitch(
-    { gateEnabled, setGateEnabled, gateLoading },
-    { sentinelEnabled, setSentinelEnabledState, sentinelLoading },
-  );
+  const { intelligentEnabled, setIntelligentEnabled, intelligentLoading } =
+    useIntelligentEngineSwitch(
+      { gateEnabled, setGateEnabled, gateLoading },
+      { sentinelEnabled, setSentinelEnabledState, sentinelLoading },
+    );
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
-  const { openFolderAndAddProject } = useAddProject(setProjects, setCurrentPage, toast, setOnboardingProject);
+  const { openFolderAndAddProject } = useAddProject(
+    setProjects,
+    setCurrentPage,
+    toast,
+    setOnboardingProject,
+  );
   const { removeProject } = useRemoveProject(projects, setProjects, setCurrentPage, toast);
   const { currentProjectIndex, switchCurrentProject } = useCurrentProjectIndex(projects.length);
 
@@ -341,11 +383,17 @@ function useLoadInitialState(handlers: {
     load();
 
     let cancelledAi = false;
-    window.electronAPI?.ai?.loadConfig().then((cfg) => {
-      if (!cancelledAi) setAiTool(cfg);
-    }).catch(() => {});
+    window.electronAPI?.ai
+      ?.loadConfig()
+      .then((cfg) => {
+        if (!cancelledAi) setAiTool(cfg);
+      })
+      .catch(() => {});
 
-    return () => { cancelled = true; cancelledAi = true; };
+    return () => {
+      cancelled = true;
+      cancelledAi = true;
+    };
   }, [setProjects, setCurrentPage, setLoaded, setAiTool]);
 }
 
@@ -369,7 +417,9 @@ async function loadProjectsFromStorage(): Promise<ProjectInfo[] | null> {
   try {
     const fromIpc = await window.electronAPI?.loadProjects?.();
     if (fromIpc && fromIpc.length > 0) saved = fromIpc;
-  } catch { /* ipc not available */ }
+  } catch {
+    /* ipc not available */
+  }
 
   if (!saved || saved.length === 0) {
     saved = loadFromLocalStorage();

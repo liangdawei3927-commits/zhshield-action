@@ -20,8 +20,21 @@ const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
 
 export function SecurityPage({ projectPath }: SecurityPageProps) {
   const t = useT();
-  const { loading, progressLabel, report, copyToAi, copyAllToAi, handleScan: handleSecurityScan } = useSecurityPage(projectPath);
-  const { report: secretsReport, handleScan: handleSecretsScan, handleMarkRotating, handleVerifyRotated, handleDismiss } = useSecretsPage(projectPath);
+  const {
+    loading,
+    progressLabel,
+    report,
+    copyToAi,
+    copyAllToAi,
+    handleScan: handleSecurityScan,
+  } = useSecurityPage(projectPath);
+  const {
+    report: secretsReport,
+    handleScan: handleSecretsScan,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+  } = useSecretsPage(projectPath);
   const [tab, setTab] = useState<SecurityTab>('vuln');
 
   const handleScan = useCallback(async () => {
@@ -32,7 +45,12 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
     return (
       <div className="h-full w-full bg-zh-bg overflow-auto">
         <div className="w-full px-8 py-10">
-          <SecurityHeader report={report} loading={loading} progressLabel={progressLabel} onRescan={handleScan} />
+          <SecurityHeader
+            report={report}
+            loading={loading}
+            progressLabel={progressLabel}
+            onRescan={handleScan}
+          />
           <SecurityScoreCard report={report} />
           <div className="flex gap-2 mb-6">
             {TABS.map((t2) => (
@@ -40,7 +58,9 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
                 key={t2.id}
                 onClick={() => setTab(t2.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
-                  tab === t2.id ? 'bg-red-600 text-white' : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
+                  tab === t2.id
+                    ? 'bg-red-600 text-white'
+                    : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
                 }`}
               >
                 {t(t2.labelKey)}
@@ -48,7 +68,11 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
             ))}
           </div>
           {tab === 'vuln' ? (
-            <FindingsPanel findings={report.findings} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
+            <FindingsPanel
+              findings={report.findings}
+              onCopyToAi={copyToAi}
+              onCopyAll={copyAllToAi}
+            />
           ) : tab === 'malware' ? (
             <MalwarePanel items={report.malware} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
           ) : secretsReport ? (

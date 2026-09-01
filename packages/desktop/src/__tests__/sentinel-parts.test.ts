@@ -16,7 +16,12 @@ describe('eventToAiFixIssue 哨兵事件转 AI 问题', () => {
       context: {
         pattern: 'uncaught-exception',
         matchedLine: 'uncaughtException: boom',
-        location: { module: 'order', file: 'src/modules/order/order.service.ts', line: 42, column: 15 },
+        location: {
+          module: 'order',
+          file: 'src/modules/order/order.service.ts',
+          line: 42,
+          column: 15,
+        },
       },
       diagnosis: { suggestion: '初始化前判空' },
     });
@@ -101,7 +106,12 @@ describe('eventToFalsePositiveItem 哨兵事件转误报反馈', () => {
       context: {
         pattern: 'uncaught-exception',
         matchedLine: 'uncaughtException: boom',
-        location: { module: 'order', file: 'src/modules/order/order.service.ts', line: 42, column: 15 },
+        location: {
+          module: 'order',
+          file: 'src/modules/order/order.service.ts',
+          line: 42,
+          column: 15,
+        },
       },
     });
 
@@ -151,7 +161,12 @@ describe('eventToFalsePositiveItem 哨兵事件转误报反馈', () => {
 
 describe('statusToStage 事件闭环阶段映射', () => {
   it('生命周期共四个阶段：发现 → 修复 → 验证 → 归档', () => {
-    expect(EVENT_LIFECYCLE_STEPS.map((s) => s.key)).toEqual(['detect', 'fix', 'validate', 'archive']);
+    expect(EVENT_LIFECYCLE_STEPS.map((s) => s.key)).toEqual([
+      'detect',
+      'fix',
+      'validate',
+      'archive',
+    ]);
   });
 
   it('检测态落在发现阶段', () => {

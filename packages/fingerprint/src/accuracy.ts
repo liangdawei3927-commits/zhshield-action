@@ -39,13 +39,19 @@ const FORM_PRECISION_THRESHOLD = 0.8;
 
 /** 检测项是否匹配断言（文件路径 + 可选字段匹配） */
 function matchesAssertion(
-  det: { readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string },
+  det: {
+    readonly file: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  },
   assertion: GoldenAssertion,
 ): boolean {
   if (det.file !== assertion.path) return false;
   if (assertion.language !== undefined && det.language !== assertion.language) return false;
   if (assertion.framework !== undefined && det.framework !== assertion.framework) return false;
-  if (assertion.productForm !== undefined && det.productForm !== assertion.productForm) return false;
+  if (assertion.productForm !== undefined && det.productForm !== assertion.productForm)
+    return false;
   return true;
 }
 
@@ -58,7 +64,12 @@ function isFormDetector(detectorId: string): boolean {
 function evaluateDetector(
   detectorId: string,
   assertions: readonly GoldenAssertion[],
-  detections: ReadonlyArray<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
+  detections: ReadonlyArray<{
+    readonly file: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  }>,
 ): DetectorEvaluation {
   const { truePositives, matchedCount } = countTruePositives(detections, assertions);
   const falsePositives = detections.length - truePositives;
@@ -68,7 +79,12 @@ function evaluateDetector(
 }
 
 function countTruePositives(
-  detections: ReadonlyArray<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
+  detections: ReadonlyArray<{
+    readonly file: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  }>,
   assertions: readonly GoldenAssertion[],
 ): { truePositives: number; matchedCount: number } {
   const matchedAssertionIndices = new Set<number>();
@@ -98,7 +114,10 @@ function computeRates(
 }
 
 /** 计算评估列表的宏平均值 */
-function macroAverage(evaluations: readonly DetectorEvaluation[]): { precision: number; recall: number } {
+function macroAverage(evaluations: readonly DetectorEvaluation[]): {
+  precision: number;
+  recall: number;
+} {
   if (evaluations.length === 0) return { precision: 0, recall: 0 };
   const sum = evaluations.reduce(
     (acc, e) => ({ precision: acc.precision + e.precision, recall: acc.recall + e.recall }),
@@ -116,7 +135,13 @@ function macroAverage(evaluations: readonly DetectorEvaluation[]): { precision: 
  */
 export function evaluateAccuracy(
   assertions: readonly GoldenAssertion[],
-  detected: ReadonlyArray<{ readonly file: string; readonly detectorId: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
+  detected: ReadonlyArray<{
+    readonly file: string;
+    readonly detectorId: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  }>,
 ): AccuracyReport {
   const grouped = groupByDetector(detected);
   const evaluations = evaluateAll(grouped, assertions);
@@ -126,9 +151,31 @@ export function evaluateAccuracy(
 }
 
 function groupByDetector(
-  detected: ReadonlyArray<{ readonly file: string; readonly detectorId: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>,
-): Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>> {
-  const grouped = new Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>>();
+  detected: ReadonlyArray<{
+    readonly file: string;
+    readonly detectorId: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  }>,
+): Map<
+  string,
+  Array<{
+    readonly file: string;
+    readonly language?: string;
+    readonly framework?: string;
+    readonly productForm?: string;
+  }>
+> {
+  const grouped = new Map<
+    string,
+    Array<{
+      readonly file: string;
+      readonly language?: string;
+      readonly framework?: string;
+      readonly productForm?: string;
+    }>
+  >();
   for (const det of detected) {
     const group = grouped.get(det.detectorId);
     if (group) {
@@ -141,7 +188,15 @@ function groupByDetector(
 }
 
 function evaluateAll(
-  grouped: Map<string, Array<{ readonly file: string; readonly language?: string; readonly framework?: string; readonly productForm?: string }>>,
+  grouped: Map<
+    string,
+    Array<{
+      readonly file: string;
+      readonly language?: string;
+      readonly framework?: string;
+      readonly productForm?: string;
+    }>
+  >,
   assertions: readonly GoldenAssertion[],
 ): DetectorEvaluation[] {
   const evaluations: DetectorEvaluation[] = [];
@@ -173,6 +228,7 @@ export function loadGoldenDir(dirPath: string): GoldenAssertion[] {
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+    if (entry.name === 'node_modules') continue;
     const goldenPath = path.join(dirPath, entry.name, 'golden.json');
     if (!fs.existsSync(goldenPath)) continue;
     const raw: unknown = JSON.parse(fs.readFileSync(goldenPath, 'utf-8'));
@@ -188,5 +244,10 @@ export function loadGoldenDir(dirPath: string): GoldenAssertion[] {
 
 /** 类型守卫：验证 unknown 是否为合法 GoldenAssertion */
 function isGoldenAssertion(value: unknown): value is GoldenAssertion {
-  return typeof value === 'object' && value !== null && 'path' in value && typeof (value as { path: unknown }).path === 'string';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'path' in value &&
+    typeof (value as { path: unknown }).path === 'string'
+  );
 }

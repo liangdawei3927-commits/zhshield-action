@@ -16,7 +16,9 @@ describe('isSafeRegexPattern（ReDoS 防护）', () => {
   it('接受 SOP 规则中的合法正则（字面量 / 简单量词）', () => {
     expect(isSafeRegexPattern('class.*Service')).toBe(true);
     expect(isSafeRegexPattern('base64.*bash')).toBe(true);
-    expect(isSafeRegexPattern('(?:bash|sh|perl|python|ruby).*(?:-i|reverse|revshell|connect|callback)')).toBe(true);
+    expect(
+      isSafeRegexPattern('(?:bash|sh|perl|python|ruby).*(?:-i|reverse|revshell|connect|callback)'),
+    ).toBe(true);
     expect(isSafeRegexPattern('AKIA[0-9A-Z]{16}')).toBe(true);
   });
 
@@ -49,7 +51,9 @@ describe('scanPatternsInFile（ReDoS 不阻塞主线程）', () => {
 
   it('合法模式仍正常命中（行为保持）', () => {
     // 测试夹具故意不使用凭证形状字面量，避免安全扫描误判
-    const violations = scanPatternsInFile('const cmd = "sh -c reverse";', 'src/a.ts', RULE, ['(?:bash|sh|perl|python|ruby).*(?:-i|reverse|revshell|connect|callback)']);
+    const violations = scanPatternsInFile('const cmd = "sh -c reverse";', 'src/a.ts', RULE, [
+      '(?:bash|sh|perl|python|ruby).*(?:-i|reverse|revshell|connect|callback)',
+    ]);
     expect(violations).toHaveLength(1);
     expect(violations[0]?.ruleId).toBe('test/redos');
   });
@@ -93,10 +97,7 @@ describe('resolveFiles（源码根探测与回退）', () => {
   });
 
   it('显式 files + exts 过滤：只返回匹配扩展名的文件', () => {
-    const files = resolveFiles(
-      { repoRoot: tempDir, files: ['a.ts', 'b.js', 'c.tsx'] },
-      ['.ts'],
-    );
+    const files = resolveFiles({ repoRoot: tempDir, files: ['a.ts', 'b.js', 'c.tsx'] }, ['.ts']);
     expect(files).toEqual(['a.ts']);
   });
 

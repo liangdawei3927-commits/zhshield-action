@@ -41,23 +41,31 @@ afterEach(() => {
 
 /** 构造 npm v3 项目：lodahs（投毒阳性）+ react（升级目录命中），版本与锁文件一致 */
 function buildFixture(dir: string): void {
-  writeFile(dir, 'package.json', JSON.stringify({
-    name: 'app',
-    engines: { node: '^20.0.0' },
-    dependencies: {
-      lodahs: '^4.17.21',
-      react: '^18.2.0',
-    },
-  }));
-  writeFile(dir, 'package-lock.json', JSON.stringify({
-    name: 'app',
-    lockfileVersion: 3,
-    packages: {
-      '': { name: 'app' },
-      'node_modules/lodahs': { version: '4.17.21', integrity: 'sha512-lodahs-hash' },
-      'node_modules/react': { version: '18.2.0', integrity: 'sha512-react-hash' },
-    },
-  }));
+  writeFile(
+    dir,
+    'package.json',
+    JSON.stringify({
+      name: 'app',
+      engines: { node: '^20.0.0' },
+      dependencies: {
+        lodahs: '^4.17.21',
+        react: '^18.2.0',
+      },
+    }),
+  );
+  writeFile(
+    dir,
+    'package-lock.json',
+    JSON.stringify({
+      name: 'app',
+      lockfileVersion: 3,
+      packages: {
+        '': { name: 'app' },
+        'node_modules/lodahs': { version: '4.17.21', integrity: 'sha512-lodahs-hash' },
+        'node_modules/react': { version: '18.2.0', integrity: 'sha512-react-hash' },
+      },
+    }),
+  );
   writeFile(dir, '.nvmrc', '18.20.2\n');
 }
 
@@ -86,7 +94,9 @@ describe('依赖盘点接线层（desktop runDeps / CLI deps 同款编排）', (
     expect(verification.integrityFailures).toEqual([]);
 
     const evaluator = new UpgradeEvaluatorImpl();
-    const directNodes = nodes.filter((node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG);
+    const directNodes = nodes.filter(
+      (node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG,
+    );
     const assessments = [];
     for (const node of directNodes) {
       assessments.push(await evaluator.evaluate(node));
@@ -104,7 +114,9 @@ describe('依赖盘点接线层（desktop runDeps / CLI deps 同款编排）', (
       hasTypeScript: true,
     };
     const envReport = await new EnvConsistencyCheckerImpl().check(profile);
-    const runtime = envReport.entries.find((entry) => entry.kind === 'runtime-version' && entry.name === 'node');
+    const runtime = envReport.entries.find(
+      (entry) => entry.kind === 'runtime-version' && entry.name === 'node',
+    );
     expect(runtime).toBeDefined();
     expect(runtime?.severity).toBe('error');
     expect(runtime?.expected).toBe('.nvmrc: 18.20.2');
@@ -113,7 +125,11 @@ describe('依赖盘点接线层（desktop runDeps / CLI deps 同款编排）', (
 
   it('无锁文件项目：锁文件校验降级为 missing，其余适配器不抛异常', async () => {
     const dir = tmpDir('zh-deps-no-lock-');
-    writeFile(dir, 'package.json', JSON.stringify({ name: 'app', dependencies: { react: '^18.2.0' } }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({ name: 'app', dependencies: { react: '^18.2.0' } }),
+    );
 
     const graph = buildDependencyGraph(dir);
     expect(graph.lockfile.present).toBe(false);
@@ -137,15 +153,25 @@ describe('依赖盘点接线层（desktop runDeps / CLI deps 同款编排）', (
 
   it('升级评估的 code-scan 在未传 projectRoot 时不执行（防主进程阻塞）', async () => {
     const dir = tmpDir('zh-deps-noscan-');
-    writeFile(dir, 'package.json', JSON.stringify({ name: 'app', dependencies: { axios: '^0.27.0' } }));
-    writeFile(dir, 'package-lock.json', JSON.stringify({
-      name: 'app',
-      lockfileVersion: 3,
-      packages: { 'node_modules/axios': { version: '0.27.2', integrity: 'sha512-axios-hash' } },
-    }));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({ name: 'app', dependencies: { axios: '^0.27.0' } }),
+    );
+    writeFile(
+      dir,
+      'package-lock.json',
+      JSON.stringify({
+        name: 'app',
+        lockfileVersion: 3,
+        packages: { 'node_modules/axios': { version: '0.27.2', integrity: 'sha512-axios-hash' } },
+      }),
+    );
 
     const graph = buildDependencyGraph(dir);
-    const axiosNode = graph.nodes.find((node: DependencyNode): node is DependencyNode => node.name === 'axios');
+    const axiosNode = graph.nodes.find(
+      (node: DependencyNode): node is DependencyNode => node.name === 'axios',
+    );
     expect(axiosNode).toBeDefined();
 
     const assessment = await new UpgradeEvaluatorImpl().evaluate(axiosNode as DependencyNode);

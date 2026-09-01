@@ -7,7 +7,12 @@
  * - 企业 complianceReport：合规报告
  */
 export { HallucinatedDependencyCheckImpl } from './hallucinated-dependency';
-export { AiOriginDetectorImpl, commitEvidenceFromLog, isAiMarkedCommit, classifyStrength } from './origin-detector';
+export {
+  AiOriginDetectorImpl,
+  commitEvidenceFromLog,
+  isAiMarkedCommit,
+  classifyStrength,
+} from './origin-detector';
 export type { AiOriginDetector, AiOriginDetectorOptions, CommitEvidence } from './origin-detector';
 export { analyzeStyleSignature } from './style-signature';
 export type { StyleSignal, StyleSignalKind } from './style-signature';

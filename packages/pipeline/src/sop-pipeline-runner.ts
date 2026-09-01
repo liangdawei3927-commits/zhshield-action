@@ -9,12 +9,10 @@ function toMessage(error: unknown): string {
 }
 
 type SopGuardStageResult =
-  | { ok: true; report: RuleEngineReport }
-  | { ok: false; earlyReturn: PipelineReport };
+  { ok: true; report: RuleEngineReport } | { ok: false; earlyReturn: PipelineReport };
 
 type SopInspectStageResult =
-  | { ok: true; report: RuleEngineReport }
-  | { ok: false; earlyReturn: PipelineReport };
+  { ok: true; report: RuleEngineReport } | { ok: false; earlyReturn: PipelineReport };
 
 /**
  * SOP-driven pipeline runner — executes Guard → Inspect using SOP rule engine.
@@ -38,7 +36,10 @@ export class SopPipelineRunner {
     this.logger = logger;
   }
 
-  async runSopGuard(context?: Partial<RuleContext>, locale?: LanguageCode): Promise<RuleEngineReport> {
+  async runSopGuard(
+    context?: Partial<RuleContext>,
+    locale?: LanguageCode,
+  ): Promise<RuleEngineReport> {
     this.logger.info(translate('engine.pipeline.log.sopGuardStart', locale ?? DEFAULT_LANGUAGE));
     const report = await this.sopRuleEngine.runGuard({
       repoRoot: this.repoRoot,
@@ -56,7 +57,10 @@ export class SopPipelineRunner {
     return report;
   }
 
-  async runSopInspect(context?: Partial<RuleContext>, locale?: LanguageCode): Promise<RuleEngineReport> {
+  async runSopInspect(
+    context?: Partial<RuleContext>,
+    locale?: LanguageCode,
+  ): Promise<RuleEngineReport> {
     this.logger.info(translate('engine.pipeline.log.sopInspectStart', locale ?? DEFAULT_LANGUAGE));
     const report = await this.sopRuleEngine.runInspect({
       repoRoot: this.repoRoot,
@@ -72,17 +76,24 @@ export class SopPipelineRunner {
     return report;
   }
 
-  async runSopDrivenPipeline(options?: {
-    guardContext?: Partial<RuleContext>;
-    inspectContext?: Partial<RuleContext>;
-  }, locale?: LanguageCode): Promise<PipelineReport> {
+  async runSopDrivenPipeline(
+    options?: {
+      guardContext?: Partial<RuleContext>;
+      inspectContext?: Partial<RuleContext>;
+    },
+    locale?: LanguageCode,
+  ): Promise<PipelineReport> {
     this.logger.info(translate('engine.pipeline.log.sopPipelineStart', locale ?? DEFAULT_LANGUAGE));
 
     const guardStage = await this.runSopGuardStage(options?.guardContext, locale);
     if (!guardStage.ok) return guardStage.earlyReturn;
 
     this.logger.info(translate('engine.pipeline.log.sopGuardPassed', locale ?? DEFAULT_LANGUAGE));
-    const inspectStage = await this.runSopInspectStage(options?.inspectContext, guardStage.report, locale);
+    const inspectStage = await this.runSopInspectStage(
+      options?.inspectContext,
+      guardStage.report,
+      locale,
+    );
     if (!inspectStage.ok) return inspectStage.earlyReturn;
 
     // 重构检测由桌面端「代码重构」页负责（马上检查 / 定时检查），全流水线不再串行跑重构
@@ -104,7 +115,9 @@ export class SopPipelineRunner {
       guardReport = await this.runSopGuard(context, locale);
     } catch (error) {
       this.logger.error(
-        translate('engine.pipeline.log.sopGuardFailed', locale ?? DEFAULT_LANGUAGE, { error: toMessage(error) }),
+        translate('engine.pipeline.log.sopGuardFailed', locale ?? DEFAULT_LANGUAGE, {
+          error: toMessage(error),
+        }),
       );
       return {
         ok: false,
@@ -145,7 +158,9 @@ export class SopPipelineRunner {
       return { ok: true, report: inspectReport };
     } catch (error) {
       this.logger.error(
-        translate('engine.pipeline.log.sopInspectFailed', locale ?? DEFAULT_LANGUAGE, { error: toMessage(error) }),
+        translate('engine.pipeline.log.sopInspectFailed', locale ?? DEFAULT_LANGUAGE, {
+          error: toMessage(error),
+        }),
       );
       return {
         ok: false,

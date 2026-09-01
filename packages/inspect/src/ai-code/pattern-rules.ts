@@ -51,12 +51,20 @@ function matchLineNumbers(content: string, regex: RegExp): PatternHit[] {
 }
 
 /** 逐规则匹配函数（内容级，调用方负责按文件读取） */
-const MATCHERS: Record<Exclude<PatternRuleId, 'ai-any-flood'>, (content: string) => readonly PatternHit[]> = {
-  'ai-ts-suppression': (content) => matchLineNumbers(content, /@ts-igno(?:re)|@ts-no(?:ch)eck|@ts-expect-err(?:or)/g),
+const MATCHERS: Record<
+  Exclude<PatternRuleId, 'ai-any-flood'>,
+  (content: string) => readonly PatternHit[]
+> = {
+  'ai-ts-suppression': (content) =>
+    matchLineNumbers(content, /@ts-igno(?:re)|@ts-no(?:ch)eck|@ts-expect-err(?:or)/g),
   'ai-empty-catch': (content) => matchLineNumbers(content, /catch\s*\([^)]*\)\s*\{\s*\}/g),
-  'ai-eslint-disable': (content) => matchLineNumbers(content, /\/\/\s*eslint-disable(?:-next-line|-line)?(?:\s|$)/g),
+  'ai-eslint-disable': (content) =>
+    matchLineNumbers(content, /\/\/\s*eslint-disable(?:-next-line|-line)?(?:\s|$)/g),
   'ai-empty-hooks-deps': (content) =>
-    matchLineNumbers(content, /use(?:Effect|Memo|Callback|LayoutEffect)\([\s\S]*?,[ \t]*\[[ \t]*\][ \t]*\)/g),
+    matchLineNumbers(
+      content,
+      /use(?:Effect|Memo|Callback|LayoutEffect)\([\s\S]*?,[ \t]*\[[ \t]*\][ \t]*\)/g,
+    ),
   'ai-hardcoded-credential': (content) =>
     matchLineNumbers(
       content,
@@ -87,7 +95,8 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     id: 'ai-ts-suppression',
     ruleId: 'ai-unsafe-default',
     severity: 'high',
-    description: 'TypeScript suppression directives (ts-ignore / ts-nocheck / ts-expect-error) bypass type safety',
+    description:
+      'TypeScript suppression directives (ts-ignore / ts-nocheck / ts-expect-error) bypass type safety',
     fix: 'Resolve the underlying type error instead of suppressing it; if truly necessary, document why with a short comment',
     match: MATCHERS['ai-ts-suppression'],
   },

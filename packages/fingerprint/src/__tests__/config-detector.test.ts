@@ -59,7 +59,7 @@ describe('ConfigDetector', () => {
   it('GIVEN .nvmrc 与 Dockerfile WHEN detect THEN 产出 node/docker 环境信号', async () => {
     const root = makeTempProject({
       '.nvmrc': '20',
-      'Dockerfile': 'FROM node:20-alpine\n',
+      Dockerfile: 'FROM node:20-alpine\n',
     });
     try {
       const signals = await detector.detect(root);
@@ -93,7 +93,7 @@ describe('ConfigDetector', () => {
       'package.json': '{"name":"monorepo","private":true,"workspaces":["apps/*"]}',
       'apps/web/tsconfig.json': '{"compilerOptions":{"strict":true}}',
       'apps/web/src/main.tsx': "import { createRoot } from 'react-dom/client';\n",
-      'apps/web/vite.config.ts': "export default {};\n",
+      'apps/web/vite.config.ts': 'export default {};\n',
     });
     try {
       const signals = await detector.detect(root);

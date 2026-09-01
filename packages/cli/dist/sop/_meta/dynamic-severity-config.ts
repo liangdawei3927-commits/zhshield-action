@@ -15,10 +15,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /** F1：规则动态严重级配置非法 — 加载期快速失败，绝不静默跳过 */
 export class SopRuleConfigError extends Error {
-  constructor(
-    ruleId: string,
-    detail: string,
-  ) {
+  constructor(ruleId: string, detail: string) {
     super(`[SopLoader] Rule "${ruleId}" 配置非法: ${detail}`);
     this.name = 'SopRuleConfigError';
   }

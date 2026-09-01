@@ -28,7 +28,10 @@ const ALL_FIELDS: InferableField[] = ['language', 'framework', 'type', 'packageM
  * config-file 信号权重 2（铁证），其他权重 1（佐证）。
  * 返回得票最高的值；无信号返回 undefined。
  */
-function voteField<T extends string>(signals: ProfileSignal[], field: InferableField): T | undefined {
+function voteField<T extends string>(
+  signals: ProfileSignal[],
+  field: InferableField,
+): T | undefined {
   const counts = new Map<T, number>();
   for (const s of signals) {
     const val = s.inferred[field] as T | undefined;
@@ -78,11 +81,26 @@ function detectFieldSignals(scan: ScanResult): DetectedFields {
   allSignals.push(...language.signals);
   const framework = detectField<ProjectFramework>(scan, detectFramework, 'framework', 'none');
   allSignals.push(...framework.signals);
-  const type = detectField<ProjectType>(scan, (s) => detectProjectType(s, framework.value), 'type', 'unknown');
+  const type = detectField<ProjectType>(
+    scan,
+    (s) => detectProjectType(s, framework.value),
+    'type',
+    'unknown',
+  );
   allSignals.push(...type.signals);
-  const packageManager = detectField<PackageManager>(scan, detectPackageManager, 'packageManager', 'unknown');
+  const packageManager = detectField<PackageManager>(
+    scan,
+    detectPackageManager,
+    'packageManager',
+    'unknown',
+  );
   allSignals.push(...packageManager.signals);
-  const runtime = detectField<Runtime>(scan, (s) => detectRuntime(s, language.value, framework.value), 'runtime', 'unknown');
+  const runtime = detectField<Runtime>(
+    scan,
+    (s) => detectRuntime(s, language.value, framework.value),
+    'runtime',
+    'unknown',
+  );
   allSignals.push(...runtime.signals);
   return {
     allSignals,
@@ -187,7 +205,11 @@ function discoverModules(scan: ScanResult): string[] {
     const abs = safeJoin(scan.projectRoot, dir);
     if (!fs.existsSync(abs)) continue;
     try {
-      collectModuleEntries(dir, fs.readdirSync(abs, { withFileTypes: true }), result);
+      collectModuleEntries(
+        dir,
+        fs.readdirSync(abs, { withFileTypes: true }).filter((e) => e.name !== 'node_modules'),
+        result,
+      );
     } catch {
       // ignore
     }
@@ -217,7 +239,8 @@ export class ProjectProfiler {
         warnings: [`文件扫描失败: ${err instanceof Error ? err.message : String(err)}`],
       };
     }
-    const { allSignals, language, framework, type, packageManager, runtime } = detectFieldSignals(scan);
+    const { allSignals, language, framework, type, packageManager, runtime } =
+      detectFieldSignals(scan);
     const modules = detectModules(scan, type);
     const confidence = computeConfidence(allSignals);
     const warnings = buildWarnings(language, framework, type, confidence);
@@ -270,7 +293,10 @@ export class ProjectProfiler {
     };
   }
 
-  private extractSecondaryLanguages(signals: ProfileSignal[], primary: ProjectLanguage): ProjectLanguage[] {
+  private extractSecondaryLanguages(
+    signals: ProfileSignal[],
+    primary: ProjectLanguage,
+  ): ProjectLanguage[] {
     const langs = new Set<ProjectLanguage>();
     for (const s of signals) {
       const l = s.inferred.language;

@@ -23,7 +23,17 @@ function demoIssue(): Issue {
 
 function controlledAdapter(shouldFail: () => boolean): ToolAdapter {
   return {
-    meta: { id: 'eslint', name: 'ESLint', category: 'guard', priority: 'P1', installMode: 'builtin', description: '', cliCommand: '', homepage: '', license: '' },
+    meta: {
+      id: 'eslint',
+      name: 'ESLint',
+      category: 'guard',
+      priority: 'P1',
+      installMode: 'builtin',
+      description: '',
+      cliCommand: '',
+      homepage: '',
+      license: '',
+    },
     isAvailable: async () => true,
     scan: async (_opts: ToolScanOptions): Promise<ToolResult> => ({
       tool: 'eslint',
@@ -45,13 +55,15 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => true) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
     expect(report.evaluations[0]?.status).toBe('failed');
@@ -64,14 +76,16 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => true) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      blockingThreshold: 'critical',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        blockingThreshold: 'critical',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
     expect(report.evaluations[0]?.status).toBe('failed');
@@ -85,15 +99,17 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => true) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      accumulationPolicy: { threshold: 1, escalateTo: 'critical' },
-      blockingThreshold: 'critical',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        accumulationPolicy: { threshold: 1, escalateTo: 'critical' },
+        blockingThreshold: 'critical',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     // 第 1 次：判定计数 0（<1）→ 有效严重级仍 medium < critical → 不阻断
     const r1 = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
@@ -117,7 +133,17 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
 
   it('error 评估不阻断：适配器抛异常 → blocking=false 且 blockingCount=0，ok 仍由状态驱动为 false', async () => {
     const crashingAdapter: ToolAdapter = {
-      meta: { id: 'eslint', name: 'ESLint', category: 'guard', priority: 'P1', installMode: 'builtin', description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'guard',
+        priority: 'P1',
+        installMode: 'builtin',
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => true,
       scan: async (): Promise<ToolResult> => {
         throw new Error('adapter crashed');
@@ -126,13 +152,15 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: crashingAdapter }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'critical',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'critical',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
     expect(report.evaluations[0]?.status).toBe('error');

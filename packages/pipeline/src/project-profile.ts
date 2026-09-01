@@ -6,7 +6,8 @@ const PYPROJECT_HEADER_RE = /^\[(.+)\]$/;
 const PYPROJECT_KEY_RE = /^([A-Za-z0-9_.-]+)\s*=/;
 
 export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
-export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
+export type PackageManager =
+  'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
 
 export interface ProjectProfile {
   projectPath: string;
@@ -56,11 +57,7 @@ const PYPROJECT_DEP_SECTIONS = new Set([
 
 // 规范化包名：小写、`_` 与 `-` 等价，去掉版本/环境标记
 function normalizePackageName(raw: string): string {
-  return raw
-    .split(VERSION_SPLIT_RE)[0]
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, '-');
+  return raw.split(VERSION_SPLIT_RE)[0].trim().toLowerCase().replace(/_/g, '-');
 }
 
 function extractPyprojectDeps(content: string): string[] {
@@ -123,7 +120,11 @@ function detectLanguage(pkg: Record<string, unknown>, hasTsConfig: boolean): Pro
     ...(pkg.dependencies as Record<string, string> | undefined),
     ...(pkg.devDependencies as Record<string, string> | undefined),
   };
-  if (hasTsConfig || typeof deps?.typescript === 'string' || typeof deps?.['ts-node'] === 'string') {
+  if (
+    hasTsConfig ||
+    typeof deps?.typescript === 'string' ||
+    typeof deps?.['ts-node'] === 'string'
+  ) {
     return 'typescript';
   }
   if (deps && Object.keys(deps).length > 0) return 'javascript';
@@ -189,7 +190,9 @@ export function detectProjectProfile(projectPath: string): ProjectProfile {
     projectPath,
     language: isPython ? 'python' : detectLanguage(pkg, hasTsConfig),
     framework: isPython ? detectPythonFramework(projectPath) : detectFramework(pkg),
-    packageManager: isPython ? detectPythonPackageManager(projectPath) : detectPackageManager(projectPath),
+    packageManager: isPython
+      ? detectPythonPackageManager(projectPath)
+      : detectPackageManager(projectPath),
     hasTypeScript: !isPython && (hasTsConfig || detectLanguage(pkg, hasTsConfig) === 'typescript'),
   };
 }

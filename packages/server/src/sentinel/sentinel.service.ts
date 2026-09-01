@@ -28,9 +28,7 @@ export class SentinelService implements OnModuleDestroy {
       try {
         this.dbConn = new DbConnection({ dbPath, walMode: true });
         const db = this.dbConn.connect();
-        this.dbConn.migrate(
-          safeJoin(path.dirname(dbPath), '..', 'migrations'),
-        );
+        this.dbConn.migrate(safeJoin(path.dirname(dbPath), '..', 'migrations'));
         this.eventCenter.setDb(db);
         this.logger.log('Sentinel persistence initialized');
       } catch {
@@ -61,7 +59,10 @@ export class SentinelService implements OnModuleDestroy {
     return this.autoFixer;
   }
 
-  processWebhook(token: string, payload: AlertPayload): { accepted: boolean; eventId?: string; reason?: string } {
+  processWebhook(
+    token: string,
+    payload: AlertPayload,
+  ): { accepted: boolean; eventId?: string; reason?: string } {
     if (!this.isValidAlertPayload(payload)) {
       return { accepted: false, reason: 'invalid payload' };
     }

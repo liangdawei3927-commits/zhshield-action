@@ -110,7 +110,7 @@ export class SopSyncCoordinator {
     }
 
     const state = this.compareVersions(remoteVersion);
-    const stateResult = await this.handleVersionState(state, remoteVersion);
+    const stateResult = await this.handleVersionState(state);
     if (stateResult) return stateResult;
 
     return this.syncDiffOrFull(remoteVersion);
@@ -127,7 +127,6 @@ export class SopSyncCoordinator {
   /** 处理版本对比结果：latest 直接返回，reset 先清缓存；proceed 返回 null 继续 */
   private async handleVersionState(
     state: 'latest' | 'reset' | 'proceed',
-    remoteVersion: SopVersion,
   ): Promise<SyncResult | null> {
     if (state === 'latest') {
       this.scheduler.recordSync();

@@ -34,11 +34,18 @@ export interface AiApplyResult {
 
 /** OpenCode MCP server 绝对路径（打包后从 asar.unpacked 加载，node 可直接执行） */
 function resolveZhshieldMcpPath(): string {
-  return path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), 'dist-electron', 'zhshield-mcp.js');
+  return path.join(
+    app.getAppPath().replace('app.asar', 'app.asar.unpacked'),
+    'dist-electron',
+    'zhshield-mcp.js',
+  );
 }
 
 /** 合并写入目标项目的 opencode.json：启用时写入 mcp.zhshield，停用时移除该块 */
-async function writeOpenCodeConfig(projectPath: string, config: AiToolConfig): Promise<string | null> {
+async function writeOpenCodeConfig(
+  projectPath: string,
+  config: AiToolConfig,
+): Promise<string | null> {
   if (config.id !== 'opencode') return null;
   const configPath = path.join(projectPath, 'opencode.json');
   let existing: string | null = null;
@@ -60,7 +67,10 @@ async function writeOpenCodeConfig(projectPath: string, config: AiToolConfig): P
 }
 
 /** 合并写入目标项目的 .trae/mcp.json：启用时注册 zhshield MCP server，停用时移除 */
-async function writeTraeMcpConfig(projectPath: string, config: AiToolConfig): Promise<string | null> {
+async function writeTraeMcpConfig(
+  projectPath: string,
+  config: AiToolConfig,
+): Promise<string | null> {
   if (config.id !== 'trae') return null;
   const configPath = path.join(projectPath, '.trae', 'mcp.json');
   let existing: string | null = null;
@@ -78,7 +88,10 @@ async function writeTraeMcpConfig(projectPath: string, config: AiToolConfig): Pr
   return '.trae/mcp.json';
 }
 
-async function writeAiIntegrationFiles(projectPath: string, config: AiToolConfig): Promise<AiProjectWriteResult> {
+async function writeAiIntegrationFiles(
+  projectPath: string,
+  config: AiToolConfig,
+): Promise<AiProjectWriteResult> {
   const result: AiProjectWriteResult = { path: projectPath, ok: true, files: [] };
   try {
     const openCodeFile = await writeOpenCodeConfig(projectPath, config);
@@ -89,6 +102,7 @@ async function writeAiIntegrationFiles(projectPath: string, config: AiToolConfig
     if (!config.enabled) return result;
     for (const file of buildIntegrationFiles(config)) {
       const abs = path.join(projectPath, file.path);
+      // eslint-disable-next-line perf/perf-no-serial-await -- abs derived from loop var file via intermediate assignment
       await mkdir(path.dirname(abs), { recursive: true });
       await writeFile(abs, file.content, 'utf-8');
       result.files.push(file.path);
@@ -125,7 +139,10 @@ async function writeAiToolConfig(config: AiToolConfig): Promise<boolean> {
 }
 
 /** 将集成文件写入多个目标项目（停用也遍历：仅移除 opencode.json 中的 mcp 注册） */
-async function applyIntegrationToProjects(config: AiToolConfig, projectPaths: string[]): Promise<AiProjectWriteResult[]> {
+async function applyIntegrationToProjects(
+  config: AiToolConfig,
+  projectPaths: string[],
+): Promise<AiProjectWriteResult[]> {
   const projects: AiProjectWriteResult[] = [];
   for (const projectPath of projectPaths) {
     if (!projectPath || typeof projectPath !== 'string') continue;
@@ -165,11 +182,18 @@ export async function syncAiIntegrationOnStartup(): Promise<void> {
     for (const projectPath of await readProjectPaths()) {
       const result = await writeAiIntegrationFiles(projectPath, config);
       if (!result.ok) {
-        console.warn('[ai:startup] 集成文件同步失败: %s', sanitizeLogField(projectPath), result.error ?? '');
+        console.warn(
+          '[ai:startup] 集成文件同步失败: %s',
+          sanitizeLogField(projectPath),
+          result.error ?? '',
+        );
       }
     }
   } catch (err) {
-    console.warn('[ai:startup] 启动同步 AI 工具配置失败（不影响启动）:', err instanceof Error ? err.message : err);
+    console.warn(
+      '[ai:startup] 启动同步 AI 工具配置失败（不影响启动）:',
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 
@@ -183,12 +207,15 @@ export function registerAiToolsIpc(): void {
     }
   });
 
-  ipcMain.handle('ai:saveConfig', async (_event, config: AiToolConfig, projectPaths: string[]): Promise<AiApplyResult> => {
-    if (!(await writeAiToolConfig(config))) {
-      return { saved: false, projects: [] };
-    }
+  ipcMain.handle(
+    'ai:saveConfig',
+    async (_event, config: AiToolConfig, projectPaths: string[]): Promise<AiApplyResult> => {
+      if (!(await writeAiToolConfig(config))) {
+        return { saved: false, projects: [] };
+      }
 
-    const projects = await applyIntegrationToProjects(config, projectPaths);
-    return { saved: true, projects };
-  });
+      const projects = await applyIntegrationToProjects(config, projectPaths);
+      return { saved: true, projects };
+    },
+  );
 }

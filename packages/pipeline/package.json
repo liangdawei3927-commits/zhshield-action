@@ -12,6 +12,7 @@
     "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {
+    "@zh/autoperf": "workspace:*",
     "@zh/guard": "workspace:*",
     "@zh/i18n": "workspace:*",
     "@zh/inspect": "workspace:*",

@@ -21,14 +21,22 @@ describe('cleanGarbage', () => {
     expect(result.cleaned).toHaveLength(1);
     expect(result.failed).toHaveLength(0);
     expect(fs.existsSync(path.join(dir, 'debug.log'))).toBe(false);
-    expect(fs.existsSync(path.join(dir, '.zhshield', 'trash', result.batchId, 'debug.log'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.zhshield', 'trash', result.batchId, 'debug.log'))).toBe(
+      true,
+    );
     expect(fs.existsSync(path.join(dir, 'keep.ts'))).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('skips unused-dependency entries', async () => {
     const dir = tmpProject();
-    const dep: GarbageItem = { id: 'd1', type: 'unused-dependency', path: 'lodash', size: 0, reason: 'Unused' };
+    const dep: GarbageItem = {
+      id: 'd1',
+      type: 'unused-dependency',
+      path: 'lodash',
+      size: 0,
+      reason: 'Unused',
+    };
 
     const result = cleanGarbage(dir, [dep]);
 

@@ -36,7 +36,11 @@ export class ContentInterpreter {
 
   private hasToolDispatch(c: Record<string, unknown>): boolean {
     const check = c.check;
-    return typeof check === 'object' && check !== null && typeof (check as Record<string, unknown>).tool === 'string';
+    return (
+      typeof check === 'object' &&
+      check !== null &&
+      typeof (check as Record<string, unknown>).tool === 'string'
+    );
   }
 
   private toToolDispatch(c: Record<string, unknown>): ToolDispatchInstruction {
@@ -78,7 +82,8 @@ export class ContentInterpreter {
 
   private hasThresholds(c: Record<string, unknown>): boolean {
     return (
-      (typeof c.threshold === 'number' || typeof c.threshold === 'string') ||
+      typeof c.threshold === 'number' ||
+      typeof c.threshold === 'string' ||
       (typeof c.thresholds === 'object' && c.thresholds !== null)
     );
   }

@@ -22,20 +22,52 @@ const PYPROJECT_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
 
 /** 已知恶意 / 仿冒 PyPI 包（社区确认并已从 PyPI 移除，仅收录整名即为恶意的包） */
 const KNOWN_MALICIOUS_PACKAGES = new Set<string>([
-  'pytorch',      // 冒名 torch 的投毒包，安装即窃密（2023 已移除）
-  'urlib3',       // urllib3 的 typosquatting 投毒包（已移除）
-  'jeilyfish',    // jellyfish 的 typosquatting，携带木马（已移除）
-  'hostpy',       // setup.py 窃取系统信息的恶意包（已移除）
+  'pytorch', // 冒名 torch 的投毒包，安装即窃密（2023 已移除）
+  'urlib3', // urllib3 的 typosquatting 投毒包（已移除）
+  'jeilyfish', // jellyfish 的 typosquatting，携带木马（已移除）
+  'hostpy', // setup.py 窃取系统信息的恶意包（已移除）
 ]);
 
 /** 高频流行包名：仿冒检测基准，同时作为合法白名单（避免命中真实包） */
 const KNOWN_POPULAR_PACKAGES = new Set<string>([
-  'requests', 'numpy', 'pandas', 'django', 'flask', 'fastapi', 'torch',
-  'tensorflow', 'scikit-learn', 'matplotlib', 'scipy', 'boto3', 'pytest',
-  'beautifulsoup4', 'lxml', 'click', 'jinja2', 'celery', 'sqlalchemy',
-  'redis', 'urllib3', 'httpx', 'aiohttp', 'pillow', 'pydantic', 'tqdm',
-  'rich', 'typer', 'uvicorn', 'gunicorn', 'streamlit', 'transformers',
-  'openai', 'nltk', 'spacy', 'setuptools', 'pip', 'wheel',
+  'requests',
+  'numpy',
+  'pandas',
+  'django',
+  'flask',
+  'fastapi',
+  'torch',
+  'tensorflow',
+  'scikit-learn',
+  'matplotlib',
+  'scipy',
+  'boto3',
+  'pytest',
+  'beautifulsoup4',
+  'lxml',
+  'click',
+  'jinja2',
+  'celery',
+  'sqlalchemy',
+  'redis',
+  'urllib3',
+  'httpx',
+  'aiohttp',
+  'pillow',
+  'pydantic',
+  'tqdm',
+  'rich',
+  'typer',
+  'uvicorn',
+  'gunicorn',
+  'streamlit',
+  'transformers',
+  'openai',
+  'nltk',
+  'spacy',
+  'setuptools',
+  'pip',
+  'wheel',
 ]);
 
 /** PyPI 包名大小写不敏感，且 _ 与 - 等价（PEP 503 规范化）；统一小写并将 - 归一为 _ */
@@ -130,7 +162,10 @@ function extractPyprojectNames(content: string): string[] {
         if (!name) continue;
         names.add(name);
       }
-    } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
+    } else if (
+      sectionName === 'tool.poetry.dependencies' ||
+      sectionName === 'tool.uv.dependencies'
+    ) {
       for (const line of section.split(NEWLINE_RE)) {
         if (line.trim().startsWith('[')) continue;
         const key = line.match(PYPROJECT_KEY_RE);
@@ -146,7 +181,10 @@ function extractPyprojectNames(content: string): string[] {
 function findPythonManifest(projectPath: string): { file: string; names: string[] } | null {
   const requirementsPath = safeJoin(projectPath, 'requirements.txt');
   if (fs.existsSync(requirementsPath)) {
-    return { file: requirementsPath, names: extractRequirementsNames(fs.readFileSync(requirementsPath, 'utf-8')) };
+    return {
+      file: requirementsPath,
+      names: extractRequirementsNames(fs.readFileSync(requirementsPath, 'utf-8')),
+    };
   }
   const pipfilePath = safeJoin(projectPath, 'Pipfile.lock');
   if (fs.existsSync(pipfilePath)) {
@@ -154,7 +192,10 @@ function findPythonManifest(projectPath: string): { file: string; names: string[
   }
   const pyprojectPath = safeJoin(projectPath, 'pyproject.toml');
   if (fs.existsSync(pyprojectPath)) {
-    return { file: pyprojectPath, names: extractPyprojectNames(fs.readFileSync(pyprojectPath, 'utf-8')) };
+    return {
+      file: pyprojectPath,
+      names: extractPyprojectNames(fs.readFileSync(pyprojectPath, 'utf-8')),
+    };
   }
   return null;
 }
@@ -180,12 +221,14 @@ function scanManifestNames(manifest: { file: string; names: string[] }): Malware
     const norm = normalizePyName(name);
 
     if (MALICIOUS_LOOKUP.has(norm)) {
-      items.push(makeThreatItem(manifest.file, name, {
-        severity: 'critical',
-        title: '已知恶意 PyPI 包（供应链投毒黑名单）',
-        pattern: 'pypi-threat-db',
-        evidence: `${path.basename(manifest.file)} 引用了黑名单包 ${name}`,
-      }));
+      items.push(
+        makeThreatItem(manifest.file, name, {
+          severity: 'critical',
+          title: '已知恶意 PyPI 包（供应链投毒黑名单）',
+          pattern: 'pypi-threat-db',
+          evidence: `${path.basename(manifest.file)} 引用了黑名单包 ${name}`,
+        }),
+      );
       continue;
     }
 
@@ -195,12 +238,14 @@ function scanManifestNames(manifest: { file: string; names: string[] }): Malware
     for (const popular of KNOWN_POPULAR_PACKAGES) {
       const distance = levenshtein(norm, normalizePyName(popular));
       if (distance >= 1 && distance <= threshold) {
-        items.push(makeThreatItem(manifest.file, name, {
-          severity: 'high',
-          title: '疑似仿冒包（typosquatting）',
-          pattern: `typosquat:${popular}:${distance}`,
-          evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
-        }));
+        items.push(
+          makeThreatItem(manifest.file, name, {
+            severity: 'high',
+            title: '疑似仿冒包（typosquatting）',
+            pattern: `typosquat:${popular}:${distance}`,
+            evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
+          }),
+        );
         break;
       }
     }

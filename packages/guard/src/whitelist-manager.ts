@@ -33,7 +33,14 @@ type WhitelistSection = 'project' | 'file' | 'rule';
 interface LineParseContext {
   config: WhitelistConfig;
   trimmed: string;
-  current?: { rule?: string; reason?: string; expiresAt?: string; path?: string; rules?: string[]; pattern?: string } | null;
+  current?: {
+    rule?: string;
+    reason?: string;
+    expiresAt?: string;
+    path?: string;
+    rules?: string[];
+    pattern?: string;
+  } | null;
 }
 
 /** 各 section 的行解析器，按 section 分发（无状态纯函数） */
@@ -274,7 +281,10 @@ export class WhitelistManager {
     return true;
   }
 
-  isWhitelisted(ruleId: string, filePath: string): { whitelisted: boolean; entry?: WhitelistEntry } {
+  isWhitelisted(
+    ruleId: string,
+    filePath: string,
+  ): { whitelisted: boolean; entry?: WhitelistEntry } {
     for (const entry of this.entries) {
       if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) continue;
 

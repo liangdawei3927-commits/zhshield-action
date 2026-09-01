@@ -15,7 +15,10 @@ function createTestDb(): Database.Database {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   const migrationsDir = path.resolve(__dirname, '../../migrations');
-  const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
   for (const file of files) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     db.exec(sql);
@@ -62,7 +65,10 @@ describe('Debt Actions CRUD', () => {
 
   it('saveDebtAction upserts on conflict (project_id, action_id)', () => {
     saveDebtAction(db, makeSaveParams({ status: 'pending' }));
-    saveDebtAction(db, makeSaveParams({ status: 'planned', sprint: 'S23', gate: 'allow-with-record' }));
+    saveDebtAction(
+      db,
+      makeSaveParams({ status: 'planned', sprint: 'S23', gate: 'allow-with-record' }),
+    );
     const rows = getDebtActionsByProject(db, 'proj-1');
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('planned');
@@ -72,7 +78,11 @@ describe('Debt Actions CRUD', () => {
 
   it('updateDebtActionStatus changes status', () => {
     saveDebtAction(db, makeSaveParams());
-    updateDebtActionStatus(db, { projectId: 'proj-1', actionId: 'td-security-abc123', status: 'repaid' });
+    updateDebtActionStatus(db, {
+      projectId: 'proj-1',
+      actionId: 'td-security-abc123',
+      status: 'repaid',
+    });
     const rows = getDebtActionsByProject(db, 'proj-1');
     expect(rows[0].status).toBe('repaid');
   });
@@ -83,7 +93,10 @@ describe('Debt Actions CRUD', () => {
 
   it('multiple actions per project', () => {
     saveDebtAction(db, makeSaveParams({ actionId: 'td-security-abc' }));
-    saveDebtAction(db, makeSaveParams({ actionId: 'td-quality-def', category: 'quality', module: 'src/util.ts' }));
+    saveDebtAction(
+      db,
+      makeSaveParams({ actionId: 'td-quality-def', category: 'quality', module: 'src/util.ts' }),
+    );
     const rows = getDebtActionsByProject(db, 'proj-1');
     expect(rows).toHaveLength(2);
   });

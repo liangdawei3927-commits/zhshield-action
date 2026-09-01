@@ -16,7 +16,8 @@ function signalByRuleId(signals: readonly Signal[], ruleId: string): Signal {
 
 function depsOf(signals: readonly Signal[], ruleId: string): string[] {
   const payload = signalByRuleId(signals, ruleId).payload;
-  if (!isRecord(payload) || !Array.isArray(payload.deps)) throw new Error(`payload.deps missing for ${ruleId}`);
+  if (!isRecord(payload) || !Array.isArray(payload.deps))
+    throw new Error(`payload.deps missing for ${ruleId}`);
   return payload.deps.filter((d): d is string => typeof d === 'string');
 }
 
@@ -60,12 +61,15 @@ describe('ManifestDetector', () => {
 
   it('GIVEN pyproject.toml 含 fastapi WHEN detect THEN 产出 python 语言信号与 FastAPI 框架信号', async () => {
     const root = makeTempProject({
-      'pyproject.toml': '[project]\nname = "api"\ndependencies = [\n  "fastapi==0.111.0",\n  "uvicorn",\n]\n',
+      'pyproject.toml':
+        '[project]\nname = "api"\ndependencies = [\n  "fastapi==0.111.0",\n  "uvicorn",\n]\n',
     });
     try {
       const signals = await detector.detect(root);
 
-      expect(depsOf(signals, 'manifest:pyproject')).toEqual(expect.arrayContaining(['fastapi', 'uvicorn']));
+      expect(depsOf(signals, 'manifest:pyproject')).toEqual(
+        expect.arrayContaining(['fastapi', 'uvicorn']),
+      );
       const fastapi = signalByRuleId(signals, 'manifest:framework:fastapi');
       expect(fastapi.payload).toEqual(expect.objectContaining({ language: 'python' }));
       expect(fastapi.file).toBe('pyproject.toml');
@@ -81,7 +85,9 @@ describe('ManifestDetector', () => {
     try {
       const signals = await detector.detect(root);
 
-      expect(depsOf(signals, 'manifest:requirements-txt')).toEqual(expect.arrayContaining(['flask', 'django']));
+      expect(depsOf(signals, 'manifest:requirements-txt')).toEqual(
+        expect.arrayContaining(['flask', 'django']),
+      );
       expect(signals.map((s) => s.ruleId)).toContain('manifest:framework:flask');
     } finally {
       cleanupTempProject(root);
@@ -134,12 +140,18 @@ describe('ManifestDetector', () => {
     try {
       const signals = await detector.detect(root);
 
-      const web = signals.find((s) => s.ruleId === 'manifest:package-json' && s.file === 'apps/web/package.json');
-      const core = signals.find((s) => s.ruleId === 'manifest:package-json' && s.file === 'packages/core/package.json');
+      const web = signals.find(
+        (s) => s.ruleId === 'manifest:package-json' && s.file === 'apps/web/package.json',
+      );
+      const core = signals.find(
+        (s) => s.ruleId === 'manifest:package-json' && s.file === 'packages/core/package.json',
+      );
       expect(web).toBeDefined();
       expect(core).toBeDefined();
 
-      const webFrameworks = signals.filter((s) => s.ruleId.startsWith('manifest:framework:') && s.file === 'apps/web/package.json');
+      const webFrameworks = signals.filter(
+        (s) => s.ruleId.startsWith('manifest:framework:') && s.file === 'apps/web/package.json',
+      );
       expect(webFrameworks.map((s) => s.ruleId)).toContain('manifest:framework:react');
     } finally {
       cleanupTempProject(root);
@@ -154,7 +166,10 @@ describe('ManifestDetector', () => {
         workspaces: ['packages/*'],
       }),
       'pnpm-workspace.yaml': 'packages:\n  - packages/*\n',
-      'packages/core/package.json': JSON.stringify({ name: '@demo/core', dependencies: { lodash: '^4.0.0' } }),
+      'packages/core/package.json': JSON.stringify({
+        name: '@demo/core',
+        dependencies: { lodash: '^4.0.0' },
+      }),
     });
     try {
       const signals = await detector.detect(root);
@@ -170,7 +185,10 @@ describe('ManifestDetector', () => {
   it('GIVEN workspaces glob 仅命中噪声目录内清单 WHEN detect THEN 不产出信号', async () => {
     const root = makeTempProject({
       'package.json': JSON.stringify({ name: 'monorepo', private: true, workspaces: ['dist/*'] }),
-      'dist/bundle/package.json': JSON.stringify({ name: 'generated', dependencies: { react: '^18.0.0' } }),
+      'dist/bundle/package.json': JSON.stringify({
+        name: 'generated',
+        dependencies: { react: '^18.0.0' },
+      }),
     });
     try {
       const signals = await detector.detect(root);

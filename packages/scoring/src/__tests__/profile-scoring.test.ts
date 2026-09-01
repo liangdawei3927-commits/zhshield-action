@@ -61,8 +61,14 @@ describe('resolveProfileScoring — 画像驱动权重解析', () => {
 
 describe('applyWeightDeltas — 权重归一化', () => {
   it('应用增量后权重和仍为 1', () => {
-    const base = { security: 0.35, quality: 0.25, architecture: 0.20, dependencies: 0.15, documentation: 0.05 };
-    const deltas = { security: -0.10, quality: +0.10 };
+    const base = {
+      security: 0.35,
+      quality: 0.25,
+      architecture: 0.2,
+      dependencies: 0.15,
+      documentation: 0.05,
+    };
+    const deltas = { security: -0.1, quality: +0.1 };
     const result = applyWeightDeltas(base, deltas);
     const sum = Object.values(result).reduce((a, b) => a + b, 0);
     expect(Math.abs(sum - 1)).toBeLessThan(0.01);
@@ -112,7 +118,15 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
   });
 
   it('所有维度权重和为 1（任意 profile）', () => {
-    for (const type of ['backend', 'frontend', 'app', 'mini-program', 'desktop', 'library', 'cli'] as const) {
+    for (const type of [
+      'backend',
+      'frontend',
+      'app',
+      'mini-program',
+      'desktop',
+      'library',
+      'cli',
+    ] as const) {
       const dims = buildHealthDimensions(emptyGuard, emptyInspect, undefined, makeProfile(type));
       const sum = dims.reduce((s, d) => s + d.weight, 0);
       expect(Math.abs(sum - 1)).toBeLessThan(0.02);

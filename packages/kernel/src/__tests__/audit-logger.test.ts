@@ -68,7 +68,7 @@ describe('AuditLogger', () => {
 
       const entries = await logger.query({ limit: 1000 });
       expect(entries).toHaveLength(20);
-      expect(new Set(results.map(r => r.id)).size).toBe(20);
+      expect(new Set(results.map((r) => r.id)).size).toBe(20);
       const integrity = await logger.verifyIntegrity();
       expect(integrity.valid).toBe(true);
     });

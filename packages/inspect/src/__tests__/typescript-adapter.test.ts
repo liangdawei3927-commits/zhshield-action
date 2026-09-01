@@ -7,7 +7,7 @@ import { parseTscDiagnostics, resolveTscProjects } from '../adapters/typescript-
 describe('parseTscDiagnostics — tsc 诊断行解析', () => {
   it('解析标准 error 行（含行列号）', () => {
     const issues = parseTscDiagnostics(
-      '/repo/src/index.ts(12,5): error TS2322: Type \'string\' is not assignable to type \'number\'.',
+      "/repo/src/index.ts(12,5): error TS2322: Type 'string' is not assignable to type 'number'.",
     );
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
@@ -24,11 +24,18 @@ describe('parseTscDiagnostics — tsc 诊断行解析', () => {
   it('解析 warning 行，只取错误码不含冒号后缀', () => {
     const issues = parseTscDiagnostics('/repo/a.ts(1,1): warning TS8000: deprecated usage');
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ ruleId: 'tsc/TS8000', severity: 'warning', line: 1, column: 1 });
+    expect(issues[0]).toMatchObject({
+      ruleId: 'tsc/TS8000',
+      severity: 'warning',
+      line: 1,
+      column: 1,
+    });
   });
 
   it('忽略与 tsc 格式无关的行（如 "Found 2 errors"）', () => {
-    const issues = parseTscDiagnostics('Found 2 errors. Watching for file changes.\n\n/ok.ts(1,1): error TS1000: x');
+    const issues = parseTscDiagnostics(
+      'Found 2 errors. Watching for file changes.\n\n/ok.ts(1,1): error TS1000: x',
+    );
     expect(issues).toHaveLength(1);
     expect(issues[0].ruleId).toBe('tsc/TS1000');
   });
@@ -63,7 +70,11 @@ describe('resolveTscProjects — tsconfig 项目发现', () => {
     }
     // 无 tsconfig 的包应被跳过
     mkdirSync(path.join(tempDir, 'packages', 'nolint'), { recursive: true });
-    expect(resolveTscProjects(tempDir).map((p) => path.basename(path.dirname(p))).sort()).toEqual(['a', 'b']);
+    expect(
+      resolveTscProjects(tempDir)
+        .map((p) => path.basename(path.dirname(p)))
+        .sort(),
+    ).toEqual(['a', 'b']);
   });
 
   it('单项目（仅根 tsconfig）→ 返回根 tsconfig', () => {

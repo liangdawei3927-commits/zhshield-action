@@ -7,10 +7,23 @@ import { NavIcon } from '../components/ui/Icons';
 import { useToast } from '../components/ui/Toast';
 import { useT } from '../i18n';
 
-function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: BackupRecordData; isExpanded: boolean; onToggle: () => void; onDelete: () => void }) {
+function BackupRecordRow({
+  record,
+  isExpanded,
+  onToggle,
+  onDelete,
+}: {
+  record: BackupRecordData;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
   const t = useT();
   const { toast } = useToast();
-  const info = STATUS_LABEL[record.status] ?? { textKey: record.status, color: 'rgb(var(--zh-muted))' };
+  const info = STATUS_LABEL[record.status] ?? {
+    textKey: record.status,
+    color: 'rgb(var(--zh-muted))',
+  };
 
   const openFolder = async (target: string): Promise<void> => {
     const ok = await openBackupFolder(target);
@@ -31,7 +44,9 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
           <span className="text-xs px-2 py-0.5 rounded bg-zh-panel text-zh-muted">
             {t(TYPE_LABEL[record.type] ?? record.type)}
           </span>
-          <span className="text-xs" style={{ color: info.color }}>{t(info.textKey)}</span>
+          <span className="text-xs" style={{ color: info.color }}>
+            {t(info.textKey)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-zh-muted">{record.duration}ms</span>
@@ -40,7 +55,10 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
               as="button"
               title={t('page.backup.openFolderTip', { path: backupRoot })}
               aria-label={t('page.backup.openFolder')}
-              onClick={(e) => { e.stopPropagation(); void openFolder(backupRoot); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                void openFolder(backupRoot);
+              }}
               className="flex items-center justify-center w-7 h-7 rounded hover:bg-brand/10 transition-colors text-zh-muted hover:text-zh-brand cursor-pointer border-none bg-transparent"
             >
               <NavIcon id="folder" size={16} />
@@ -48,7 +66,10 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
           )}
           <Bounce
             as="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
             className="text-xs border-none cursor-pointer px-2 py-1 rounded hover:bg-red-50 transition-colors text-red-500"
           >
             {t('common.delete')}
@@ -59,14 +80,36 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
         <div className="px-4 pb-3 pt-1 text-xs bg-zh-panel text-zh-muted">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
             <div>{t('page.backup.detail.backupId', { id: record.id })}</div>
-            <div>{t('page.backup.detail.trigger', { mode: record.trigger === 'manual' ? t('page.backup.trigger.manual') : record.trigger === 'schedule' ? t('page.backup.trigger.schedule') : 'API' })}</div>
-            {record.githubRepoUrl && <div>{t('page.backup.detail.github')}<a href={record.githubRepoUrl} target="_blank" className="text-blue-500">{record.githubRepoUrl}</a></div>}
-            {record.githubCommitHash && <div>{t('page.backup.detail.commit', { hash: record.githubCommitHash.slice(0, 7) })}</div>}
+            <div>
+              {t('page.backup.detail.trigger', {
+                mode:
+                  record.trigger === 'manual'
+                    ? t('page.backup.trigger.manual')
+                    : record.trigger === 'schedule'
+                      ? t('page.backup.trigger.schedule')
+                      : 'API',
+              })}
+            </div>
+            {record.githubRepoUrl && (
+              <div>
+                {t('page.backup.detail.github')}
+                <a href={record.githubRepoUrl} target="_blank" className="text-blue-500">
+                  {record.githubRepoUrl}
+                </a>
+              </div>
+            )}
+            {record.githubCommitHash && (
+              <div>
+                {t('page.backup.detail.commit', { hash: record.githubCommitHash.slice(0, 7) })}
+              </div>
+            )}
             {snapshot && (
               <div className="flex items-center gap-2">
                 <span>{t('page.backup.detail.localPath', { path: snapshot })}</span>
                 <button
-                  onClick={() => { void openFolder(snapshot); }}
+                  onClick={() => {
+                    void openFolder(snapshot);
+                  }}
                   className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline cursor-pointer border-none bg-transparent"
                 >
                   <NavIcon id="folder" size={14} />
@@ -74,9 +117,17 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
                 </button>
               </div>
             )}
-            {record.backupSize != null && <div>{t('page.backup.detail.size', { size: formatSize(record.backupSize) })}</div>}
-            {record.fileCount != null && <div>{t('page.backup.detail.fileCount', { count: record.fileCount })}</div>}
-            {record.error && <div className="col-span-2 text-red-500">{t('page.backup.detail.error', { error: record.error })}</div>}
+            {record.backupSize != null && (
+              <div>{t('page.backup.detail.size', { size: formatSize(record.backupSize) })}</div>
+            )}
+            {record.fileCount != null && (
+              <div>{t('page.backup.detail.fileCount', { count: record.fileCount })}</div>
+            )}
+            {record.error && (
+              <div className="col-span-2 text-red-500">
+                {t('page.backup.detail.error', { error: record.error })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -84,7 +135,17 @@ function BackupRecordRow({ record, isExpanded, onToggle, onDelete }: { record: B
   );
 }
 
-export function BackupRecordsPanel({ records, expandedId, onToggle, onDelete }: { records: BackupRecordData[]; expandedId: string | null; onToggle: (id: string) => void; onDelete: (id: string) => void }) {
+export function BackupRecordsPanel({
+  records,
+  expandedId,
+  onToggle,
+  onDelete,
+}: {
+  records: BackupRecordData[];
+  expandedId: string | null;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   const t = useT();
   return (
     <ResultCard variant="list">

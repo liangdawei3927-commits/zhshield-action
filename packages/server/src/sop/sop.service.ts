@@ -1,6 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'node:crypto';
-import { SopRegistry, SopLoader, SopCacheManager, SopCompressor, CompressionFormat, SopSigner, EventBus } from '@zh/kernel';
+import {
+  SopRegistry,
+  SopLoader,
+  SopCacheManager,
+  SopCompressor,
+  CompressionFormat,
+  SopSigner,
+  EventBus,
+} from '@zh/kernel';
 import type { SopRule, SopVersion, SopDiff, SopRuleFilter, SignedSopPackage } from '@zh/kernel';
 import { SopDiffCalculator } from './sop-diff-calculator';
 

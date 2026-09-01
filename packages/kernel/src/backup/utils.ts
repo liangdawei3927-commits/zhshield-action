@@ -33,7 +33,7 @@ export function sanitizeDirSegment(input: string): string {
     .replace(/\s+/g, '-')
     .replace(/^[.-]+|[.-]+$/g, '')
     .trim();
-  return (cleaned.slice(0, 64) || 'project');
+  return cleaned.slice(0, 64) || 'project';
 }
 
 /**

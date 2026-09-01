@@ -196,7 +196,10 @@ export class LogCollector {
     }
     const stack = pending.stackLines.join('\n');
     const location = locateCrash(stack, { projectPath: pending.projectPath });
-    this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern, { stack, location });
+    this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern, {
+      stack,
+      location,
+    });
   }
 
   private findMatchingPattern(line: string): LogPattern | null {

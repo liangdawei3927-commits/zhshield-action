@@ -26,7 +26,12 @@ export class LocalBackupCopier {
     timestamp: string,
     abortSignal?: AbortSignal,
     compress?: boolean,
-  ): Promise<{ backedUp: number; errors: number; totalSize: number; fileEntries: LocalBackupFileEntry[] }> {
+  ): Promise<{
+    backedUp: number;
+    errors: number;
+    totalSize: number;
+    fileEntries: LocalBackupFileEntry[];
+  }> {
     const fileEntries: LocalBackupFileEntry[] = [];
     let backedUp = 0;
     let errors = 0;
@@ -39,6 +44,8 @@ export class LocalBackupCopier {
         const [hash, stat] = await Promise.all([hashFile(file), fs.stat(file)]);
         const storedAs = compress ? `${relativePath}.gz` : relativePath;
         const targetPath = safeJoinReal(backupDir, storedAs);
+        // perf rule false positive: arg depends on loop var via dataflow
+        // eslint-disable-next-line perf/perf-no-serial-await
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
         if (compress) {
           await pipeline(

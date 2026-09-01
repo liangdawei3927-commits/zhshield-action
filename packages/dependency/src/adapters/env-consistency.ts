@@ -49,7 +49,8 @@ const YAML_FILE_RE = /\.ya?ml$/i;
 export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
 
 /** 包管理器（与 pipeline 的 PackageManager 结构对齐） */
-export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
+export type PackageManager =
+  'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
 
 /**
  * 项目画像：仅消费 projectPath 定位清单文件。
@@ -158,24 +159,44 @@ function satisfiesRange(range: string, version: string): boolean {
 }
 
 /** 精确版本 x.y.z 匹配 */
-function matchesExact(exact: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+function matchesExact(
+  exact: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
   return exact[1] === String(major) && exact[2] === String(minor) && exact[3] === String(patch);
 }
 
 /** ^x.y.z 范围匹配 */
-function matchesCaret(caret: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+function matchesCaret(
+  caret: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
   const [cM, cm, cP] = [Number(caret[1]), Number(caret[2]), Number(caret[3])];
   if (cM !== major) return false;
   return cM > 0 ? minor >= cm : (minor === cm && patch >= cP) || minor > cm;
 }
 
 /** ~x.y.z 范围匹配 */
-function matchesTilde(tilde: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+function matchesTilde(
+  tilde: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
   return Number(tilde[1]) === major && Number(tilde[2]) === minor && patch >= Number(tilde[3]);
 }
 
 /** 带前缀版本（v/~ /^ 前缀 + 1-3 段）匹配 */
-function matchesPrefixed(star: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
+function matchesPrefixed(
+  star: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
   const [sM, sm, sP] = [Number(star[1]), Number(star[2] ?? '0'), Number(star[3] ?? '0')];
   if (sM !== major) return false;
   if (star[2] === undefined) return true;
@@ -215,7 +236,8 @@ function collectNpmVersions(lock: Record<string, unknown>): Map<string, string> 
     const walk = (section: Record<string, unknown>): void => {
       for (const [name, meta] of Object.entries(section)) {
         if (!isRecord(meta)) continue;
-        if (typeof meta.version === 'string' && !versions.has(name)) versions.set(name, meta.version);
+        if (typeof meta.version === 'string' && !versions.has(name))
+          versions.set(name, meta.version);
         const nested = meta.dependencies;
         if (isRecord(nested)) walk(nested);
       }
@@ -264,7 +286,8 @@ function collectYarnVersions(content: string): Map<string, string> {
     }
     if (currentName && trimmed.startsWith('version ')) {
       let value = trimmed.slice('version'.length).trim();
-      if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+      if (value.length >= 2 && value.startsWith('"') && value.endsWith('"'))
+        value = value.slice(1, -1);
       if (!versions.has(currentName)) versions.set(currentName, value);
       currentName = null;
     }
@@ -273,7 +296,10 @@ function collectYarnVersions(content: string): Map<string, string> {
 }
 
 /** 锁文件漂移检查：声明范围 vs 锁文件解析版本 */
-function checkLockfileDrift(projectRoot: string, pkgJson: Record<string, unknown> | null): EnvEntry[] {
+function checkLockfileDrift(
+  projectRoot: string,
+  pkgJson: Record<string, unknown> | null,
+): EnvEntry[] {
   if (!pkgJson) return [];
   const declared = readDeclaredDeps(pkgJson);
   if (declared.size === 0) return [];
@@ -306,7 +332,10 @@ function resolveLockfileVersions(projectRoot: string): Map<string, string> | nul
 }
 
 /** 对比声明范围与锁定版本，产出漂移条目 */
-function buildDriftEntries(declared: Map<string, string>, resolved: Map<string, string>): EnvEntry[] {
+function buildDriftEntries(
+  declared: Map<string, string>,
+  resolved: Map<string, string>,
+): EnvEntry[] {
   const entries: EnvEntry[] = [];
   for (const [name, range] of declared) {
     const locked = resolved.get(name);
@@ -331,7 +360,10 @@ interface RuntimeSource {
 }
 
 /** 收集运行时版本来源：.nvmrc / .node-version / engines.node / .tool-versions */
-function collectRuntimeSources(projectRoot: string, pkgJson: Record<string, unknown> | null): RuntimeSource[] {
+function collectRuntimeSources(
+  projectRoot: string,
+  pkgJson: Record<string, unknown> | null,
+): RuntimeSource[] {
   const sources: RuntimeSource[] = [];
 
   for (const file of ['.nvmrc', '.node-version']) {
@@ -364,7 +396,10 @@ function collectRuntimeSources(projectRoot: string, pkgJson: Record<string, unkn
 }
 
 /** 运行时版本一致性检查：多源矛盾 → error；仅单源 → info */
-function checkRuntimeVersion(projectRoot: string, pkgJson: Record<string, unknown> | null): EnvEntry[] {
+function checkRuntimeVersion(
+  projectRoot: string,
+  pkgJson: Record<string, unknown> | null,
+): EnvEntry[] {
   const sources = collectRuntimeSources(projectRoot, pkgJson);
   if (sources.length === 0) return [];
 
@@ -571,7 +606,11 @@ function checkCiVsLocal(
         detail: `工作流 ${workflow.file} 使用 Node ${workflow.nodeVersion}，本地清单声明 ${localNode}`,
       });
     }
-    if (workflow.packageManager !== null && localPackageManager !== null && workflow.packageManager !== localPackageManager) {
+    if (
+      workflow.packageManager !== null &&
+      localPackageManager !== null &&
+      workflow.packageManager !== localPackageManager
+    ) {
       entries.push({
         kind: 'ci-vs-local',
         name: `${workflow.file} package-manager`,
@@ -593,7 +632,10 @@ function checkCiVsLocal(
  */
 export class EnvConsistencyCheckerImpl implements EnvConsistencyChecker {
   /** 执行环境一致性检查（离线静态，永不抛异常） */
-  async check(profile: ProjectProfile, options?: EnvConsistencyOptions): Promise<EnvConsistencyReport> {
+  async check(
+    profile: ProjectProfile,
+    options?: EnvConsistencyOptions,
+  ): Promise<EnvConsistencyReport> {
     const projectRoot = options?.projectRoot ?? profile.projectPath;
 
     const pkgJson = readJsonSafe(safeJoin(projectRoot, 'package.json'));

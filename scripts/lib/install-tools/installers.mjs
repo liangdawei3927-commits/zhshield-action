@@ -12,9 +12,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import {
-  mkdirSync, existsSync, copyFileSync, chmodSync, rmSync, mkdtempSync,
-} from 'node:fs';
+import { mkdirSync, existsSync, copyFileSync, chmodSync, rmSync, mkdtempSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { platform, arch, tmpdir } from 'node:os';
 import { BIN_DIR, TOOLS_DIR, IS_WIN, log, warn, ok } from './constants.mjs';
@@ -30,11 +28,20 @@ export function installNpmTool(tool) {
   const spec = `${pkg}@${tool.version}`;
 
   mkdirSync(toolDir, { recursive: true });
-  const res = spawnSync('npm', [
-    'install', '--prefix', toolDir,
-    '--no-save', '--no-audit', '--no-fund', '--no-package-lock',
-    spec,
-  ], { encoding: 'utf-8', stdio: 'inherit' });
+  const res = spawnSync(
+    'npm',
+    [
+      'install',
+      '--prefix',
+      toolDir,
+      '--no-save',
+      '--no-audit',
+      '--no-fund',
+      '--no-package-lock',
+      spec,
+    ],
+    { encoding: 'utf-8', stdio: 'inherit' },
+  );
   if (res.status !== 0) {
     throw new Error(`npm install ${spec} 失败（exit ${res.status}）`);
   }
@@ -97,7 +104,10 @@ async function verifyChecksum(tool, fileName, checksumUrl, archivePath) {
 /** 解压归档（.zip 用 bsdtar，win32/macOS 均自带；.tar.gz 用 GNU/bsd tar） */
 function extractArchive(archivePath, extractDir, ext, fileName) {
   mkdirSync(extractDir, { recursive: true });
-  const tarArgs = ext === 'zip' ? ['-xf', archivePath, '-C', extractDir] : ['-xzf', archivePath, '-C', extractDir];
+  const tarArgs =
+    ext === 'zip'
+      ? ['-xf', archivePath, '-C', extractDir]
+      : ['-xzf', archivePath, '-C', extractDir];
   const tarRes = spawnSync('tar', tarArgs, { encoding: 'utf-8', stdio: 'inherit' });
   if (tarRes.status !== 0) {
     throw new Error(`解压失败: ${fileName}`);
@@ -142,7 +152,8 @@ export function installPypiTool(tool) {
     log(`    pipx install ${spec}（PIPX_BIN_DIR=${BIN_DIR}）`);
     const res = spawnSync('pipx', ['install', spec], {
       env: { ...process.env, PIPX_BIN_DIR: BIN_DIR },
-      encoding: 'utf-8', stdio: 'inherit',
+      encoding: 'utf-8',
+      stdio: 'inherit',
     });
     if (res.status === 0) return { verified: true };
     warn(`pipx 安装失败（exit ${res.status}），尝试 uv`);
@@ -151,14 +162,16 @@ export function installPypiTool(tool) {
     log(`    uv tool install ${spec}（UV_TOOL_BIN_DIR=${BIN_DIR}）`);
     const res = spawnSync('uv', ['tool', 'install', spec], {
       env: { ...process.env, UV_TOOL_BIN_DIR: BIN_DIR },
-      encoding: 'utf-8', stdio: 'inherit',
+      encoding: 'utf-8',
+      stdio: 'inherit',
     });
     if (res.status === 0) return { verified: true };
     warn(`uv 安装失败（exit ${res.status}），尝试 pip --user`);
   }
   // 兜底: pip --user（二进制落在 ~/.local/bin，不在 ~/.zhshield/bin）
   const res = spawnSync('python3', ['-m', 'pip', 'install', '--user', spec], {
-    encoding: 'utf-8', stdio: 'inherit',
+    encoding: 'utf-8',
+    stdio: 'inherit',
   });
   if (res.status !== 0) {
     throw new Error(`pip install ${spec} 失败（exit ${res.status}）`);

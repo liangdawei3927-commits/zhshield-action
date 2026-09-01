@@ -14,7 +14,7 @@ function computeOverall(dimensionResults: readonly DimensionScoreDetail[]): numb
 }
 
 function buildDimensions(dimensionResults: readonly DimensionScoreDetail[]): DimensionScore[] {
-  return dimensionResults.map(d => ({
+  return dimensionResults.map((d) => ({
     name: d.dimension,
     weight: d.weight,
     score: d.score,
@@ -38,7 +38,7 @@ export class ScoringEngine {
   }
 
   score(context: ScoringRuleContext): ScoringResult {
-    const dimensionResults = this.config.dimensions.map(dim => this.scoreDimension(dim, context));
+    const dimensionResults = this.config.dimensions.map((dim) => this.scoreDimension(dim, context));
     const overall = computeOverall(dimensionResults);
     const positivePoints = dimensionResults.reduce((sum, d) => sum + d.positive, 0);
     const negativePoints = dimensionResults.reduce((sum, d) => sum + d.negative, 0);
@@ -53,7 +53,10 @@ export class ScoringEngine {
     };
   }
 
-  private scoreDimension(dim: DimensionDefinition, context: ScoringRuleContext): DimensionScoreDetail {
+  private scoreDimension(
+    dim: DimensionDefinition,
+    context: ScoringRuleContext,
+  ): DimensionScoreDetail {
     const baseScore = 100;
     const negativePoints = this.calculateNegativePoints(dim.id, context);
     const positivePoints = this.calculatePositivePoints(dim.id, context);
@@ -65,15 +68,15 @@ export class ScoringEngine {
       weight: dim.weight,
       positive: positivePoints,
       negative: negativePoints,
-      issues: context.findings.filter(f => f.category === dim.id).length,
+      issues: context.findings.filter((f) => f.category === dim.id).length,
     };
   }
 
   private calculateNegativePoints(dimensionId: string, context: ScoringRuleContext): number {
-    const dim = this.config.dimensions.find(d => d.id === dimensionId);
+    const dim = this.config.dimensions.find((d) => d.id === dimensionId);
     if (!dim) return 0;
 
-    const findings = context.findings.filter(f => f.category === dimensionId);
+    const findings = context.findings.filter((f) => f.category === dimensionId);
     let totalPenalty = 0;
 
     for (const finding of findings) {
@@ -85,7 +88,7 @@ export class ScoringEngine {
   }
 
   private calculatePositivePoints(dimensionId: string, context: ScoringRuleContext): number {
-    const dim = this.config.dimensions.find(d => d.id === dimensionId);
+    const dim = this.config.dimensions.find((d) => d.id === dimensionId);
     if (!dim) return 0;
 
     let totalPoints = 0;

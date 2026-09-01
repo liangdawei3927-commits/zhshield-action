@@ -41,7 +41,8 @@ export interface AiOriginFinding {
 // ── ② 深度审查漏洞（Pro 层） ──
 
 /** AiCodeVuln.ruleId 值域（附 E.2 固定枚举） */
-export type AiCodeVulnRuleId = 'ai-hallucinated-dependency' | 'ai-unsafe-default' | 'ai-boundary-miss';
+export type AiCodeVulnRuleId =
+  'ai-hallucinated-dependency' | 'ai-unsafe-default' | 'ai-boundary-miss';
 
 /** 漏洞严重度 */
 export type AiVulnSeverity = 'critical' | 'high' | 'medium' | 'low';
@@ -137,7 +138,10 @@ export interface AiCodeReview {
   detectOrigin(project: ProjectProfile): Promise<readonly AiOriginFinding[]>;
 
   /** Pro：深度审查（幻觉依赖 + 不安全模式规则集），scope 限制扫描范围 */
-  deepReview(project: ProjectProfile, opts: { readonly scope?: readonly string[] }): Promise<readonly AiCodeVuln[]>;
+  deepReview(
+    project: ProjectProfile,
+    opts: { readonly scope?: readonly string[] },
+  ): Promise<readonly AiCodeVuln[]>;
 
   /** Pro：修复建议（输出给 07 协议 → AI 修复闭环） */
   suggestFix(vuln: AiCodeVuln): Promise<string>;

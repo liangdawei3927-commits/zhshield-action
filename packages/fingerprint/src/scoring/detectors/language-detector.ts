@@ -97,7 +97,11 @@ function pushGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
       file: f,
       kind: 'config-file',
       matched: f,
-      inferred: { language: hasFile(scan, 'src/main/kotlin') ? 'kotlin' : 'java', runtime: 'jvm', packageManager: 'gradle' },
+      inferred: {
+        language: hasFile(scan, 'src/main/kotlin') ? 'kotlin' : 'java',
+        runtime: 'jvm',
+        packageManager: 'gradle',
+      },
     });
   }
 }

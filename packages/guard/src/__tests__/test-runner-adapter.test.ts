@@ -7,9 +7,11 @@ import { TestRunnerAdapter } from '../adapters/test-runner-adapter';
 import { VitestOutputParser } from '../adapters/vitest-output-parser';
 
 vi.mock('node:child_process', () => ({
-  execFile: vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-    cb(Object.assign(new Error('Test execution failed'), { stdout: '', stderr: '' }));
-  }),
+  execFile: vi.fn(
+    (_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
+      cb(Object.assign(new Error('Test execution failed'), { stdout: '', stderr: '' }));
+    },
+  ),
 }));
 
 type ParsedCounts = { totalTests: number; passed: number; failed: number };
@@ -43,7 +45,8 @@ describe('VitestOutputParser — 多包输出解析', () => {
   });
 
   it('剥离 turbo 透传的 ANSI 颜色码后解析汇总行', () => {
-    const ansiPassed = '\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m68 passed\u001b[39m\u001b[22m\u001b[90m (68)\u001b[39m';
+    const ansiPassed =
+      '\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m68 passed\u001b[39m\u001b[22m\u001b[90m (68)\u001b[39m';
     const ansiMixed =
       '\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m44 passed\u001b[39m\u001b[22m\u001b[90m (47)\u001b[39m';
     const counts = parser.parseVitestCounts([ansiPassed, ansiMixed]);
@@ -111,7 +114,9 @@ describe('TestCommandDetector — 项目目录解析', () => {
 
   it('找不到含 test 脚本的 package.json 时报错', () => {
     const dir = makeTempDir();
-    expect(detector.resolveProjectDir(dir)).toEqual({ error: '未找到含 test 脚本的项目目录' } satisfies DirResult);
+    expect(detector.resolveProjectDir(dir)).toEqual({
+      error: '未找到含 test 脚本的项目目录',
+    } satisfies DirResult);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
@@ -134,7 +139,10 @@ describe('TestRunnerAdapter — 输出解析失败的文件系统兜底', () => 
     const dir = makeTempDir();
     const testsDir = path.join(dir, 'src', '__tests__');
     fs.mkdirSync(testsDir, { recursive: true });
-    fs.writeFileSync(path.join(testsDir, 'kernel.test.ts'), 'import { it } from "vitest"; it("x", () => {});');
+    fs.writeFileSync(
+      path.join(testsDir, 'kernel.test.ts'),
+      'import { it } from "vitest"; it("x", () => {});',
+    );
     fs.mkdirSync(path.join(dir, 'node_modules'));
     fs.writeFileSync(path.join(dir, 'node_modules', 'fake.test.ts'), '');
     fs.mkdirSync(path.join(dir, 'dist'));
@@ -187,7 +195,10 @@ describe('TestRunnerAdapter — 输出解析失败的文件系统兜底', () => 
     fs.writeFileSync(path.join(dir, 'package.json'), '{"scripts":{"test":"vitest run"}}');
     const testsDir = path.join(dir, 'src', '__tests__');
     fs.mkdirSync(testsDir, { recursive: true });
-    fs.writeFileSync(path.join(testsDir, 'kernel.test.ts'), 'import { it } from "vitest"; it("x", () => {});');
+    fs.writeFileSync(
+      path.join(testsDir, 'kernel.test.ts'),
+      'import { it } from "vitest"; it("x", () => {});',
+    );
 
     const raw = await adapter.run({ projectPath: dir }, check);
     const result = adapter.normalize(raw, {}, check);

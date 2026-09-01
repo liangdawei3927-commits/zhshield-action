@@ -1,0 +1,39 @@
+{
+  "name": "@zh/autoperf",
+  "version": "0.1.0",
+  "private": true,
+  "description": "智汇码盾性能自治引擎 - 基准运行数据 + 静态分析 → Issue[]（复用现有 Issue 模型，走现成门禁→修复→验证闭环）",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "lint": "eslint src --max-warnings 50"
+  },
+  "dependencies": {
+    "@zh/evolve": "workspace:*",
+    "@zh/shared": "workspace:*",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*",
+      "import": "./dist/*",
+      "require": "./dist/*"
+    }
+  }
+}

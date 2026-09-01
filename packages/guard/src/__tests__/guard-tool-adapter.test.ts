@@ -141,9 +141,11 @@ describe('GuardToolAdapterWrapper', () => {
     it('should build CheckConfig with ruleId from config when provided', async () => {
       const adapter = makeMockAdapter();
       const wrapper = new GuardToolAdapterWrapper('test', adapter);
-      await wrapper.scan(makeScanOptions({
-        config: { ruleId: 'custom-rule-1', severity: 'warning' },
-      }));
+      await wrapper.scan(
+        makeScanOptions({
+          config: { ruleId: 'custom-rule-1', severity: 'warning' },
+        }),
+      );
 
       expect(adapter.run).toHaveBeenCalledWith(
         expect.anything(),

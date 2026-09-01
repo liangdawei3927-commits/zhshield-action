@@ -71,7 +71,9 @@ export class SopLoader {
    * domain/action 从路径推导，YAML governance 字段会覆盖推导值
    */
   async loadFromDirectory(dir: string, replaceAll = false): Promise<number> {
-    if (!fs.existsSync(dir)) {
+    try {
+      await fs.promises.access(dir);
+    } catch {
       console.warn(`[SopLoader] Rules directory not found: ${dir}`);
       return 0;
     }

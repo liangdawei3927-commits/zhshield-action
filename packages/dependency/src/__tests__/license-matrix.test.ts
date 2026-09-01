@@ -5,7 +5,9 @@ import { ROOT_NODE_ID } from '../types';
 import { buildLicenseMatrix, classifyLicense, normalizeLicenseId } from '../license-matrix';
 
 /** 构造仅含指定许可证节点的图谱 */
-function graphWithLicenses(entries: Array<{ name: string; version: string; license?: string }>): DependencyGraph {
+function graphWithLicenses(
+  entries: Array<{ name: string; version: string; license?: string }>,
+): DependencyGraph {
   const nodes: DependencyNode[] = entries.map((entry) => {
     const node: DependencyNode = {
       id: `${entry.name}@${entry.version}`,
@@ -55,7 +57,9 @@ describe('buildLicenseMatrix', () => {
     const opaque = report.entries.find((e) => e.name === 'opaque');
     expect(opaque?.category).toBe('unknown');
     expect(opaque?.risk).toBe('medium');
-    expect(opaque?.reason).toBe(translate('engine.dependency.license.unknownReason', DEFAULT_LANGUAGE));
+    expect(opaque?.reason).toBe(
+      translate('engine.dependency.license.unknownReason', DEFAULT_LANGUAGE),
+    );
 
     const lodash = report.entries.find((e) => e.name === 'lodash');
     expect(lodash?.category).toBe('permissive');
@@ -142,7 +146,19 @@ describe('normalizeLicenseId', () => {
 
 describe('classifyLicense', () => {
   it('宽松许可清单', () => {
-    for (const id of ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'Unlicense', 'MIT-0', 'PostgreSQL', 'Python-2.0', 'Zlib']) {
+    for (const id of [
+      'MIT',
+      'Apache-2.0',
+      'BSD-2-Clause',
+      'BSD-3-Clause',
+      'ISC',
+      '0BSD',
+      'Unlicense',
+      'MIT-0',
+      'PostgreSQL',
+      'Python-2.0',
+      'Zlib',
+    ]) {
       expect(classifyLicense(id)).toBe('permissive');
     }
   });

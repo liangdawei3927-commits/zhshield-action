@@ -1,7 +1,11 @@
 import type { DimensionScore } from './types';
 import { DimensionMapper } from './dimension-mapper';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
-import { resolveProfileScoring, applyWeightDeltas, applyDisabledDimensions } from './profile-scoring-resolver';
+import {
+  resolveProfileScoring,
+  applyWeightDeltas,
+  applyDisabledDimensions,
+} from './profile-scoring-resolver';
 
 /** guard 检查的最小结构 — 与 @zh/guard CheckResult 字段兼容，避免包间依赖 */
 export interface GuardCheckLike {

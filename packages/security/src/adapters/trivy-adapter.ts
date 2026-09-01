@@ -3,7 +3,13 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import type { ExecError, TrivyOutput, TrivyResult, TrivyVulnerability, TrivySecret } from './tool-output-types';
+import type {
+  ExecError,
+  TrivyOutput,
+  TrivyResult,
+  TrivyVulnerability,
+  TrivySecret,
+} from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,28 +28,22 @@ const META: ToolMeta = {
 type TrivyScanType = 'dependency' | 'filesystem' | 'config' | 'image';
 
 /** 扫描类型 → trivy CLI 参数构建策略表（替代 buildArgs 中的 switch 分派） */
-const ARG_BUILDERS: Partial<Record<TrivyScanType, (projectPath: string, options?: ToolScanOptions) => string[]>> = {
+const ARG_BUILDERS: Partial<
+  Record<TrivyScanType, (projectPath: string, options?: ToolScanOptions) => string[]>
+> = {
   dependency: (projectPath) => [
-    'fs', '--format', 'json',
-    '--severity', 'HIGH,CRITICAL',
+    'fs',
+    '--format',
+    'json',
+    '--severity',
+    'HIGH,CRITICAL',
     path.join(projectPath, 'package.json'),
   ],
-  filesystem: (projectPath) => [
-    'fs', '--format', 'json',
-    '--scanners', 'vuln,secret',
-    projectPath,
-  ],
-  config: (projectPath) => [
-    'config', '--format', 'json',
-    projectPath,
-  ],
+  filesystem: (projectPath) => ['fs', '--format', 'json', '--scanners', 'vuln,secret', projectPath],
+  config: (projectPath) => ['config', '--format', 'json', projectPath],
   image: (projectPath, options) => {
     const imageName = options?.config?.rules?.[0] || projectPath;
-    return [
-      'image', '--format', 'json',
-      '--severity', 'HIGH,CRITICAL',
-      imageName,
-    ];
+    return ['image', '--format', 'json', '--severity', 'HIGH,CRITICAL', imageName];
   },
 };
 
@@ -61,7 +61,9 @@ export class TrivyAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const scanTypes: TrivyScanType[] = (options.config?.scanners as TrivyScanType[]) || ['dependency'];
+    const scanTypes: TrivyScanType[] = (options.config?.scanners as TrivyScanType[]) || [
+      'dependency',
+    ];
 
     try {
       const allIssues: Issue[] = [];
@@ -86,7 +88,10 @@ export class TrivyAdapter implements ToolAdapter {
     }
   }
 
-  private async runTrivyScan(scanType: TrivyScanType, options: ToolScanOptions): Promise<Issue[] | null> {
+  private async runTrivyScan(
+    scanType: TrivyScanType,
+    options: ToolScanOptions,
+  ): Promise<Issue[] | null> {
     const args = this.buildArgs(scanType, options.projectPath, options);
     if (!args) return null;
     const { stdout } = await execFileAsync('trivy', args, {
@@ -104,7 +109,12 @@ export class TrivyAdapter implements ToolAdapter {
         tool: 'trivy',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'Trivy 未安装，请运行 trivy 安装命令',
       };
     }
@@ -117,7 +127,11 @@ export class TrivyAdapter implements ToolAdapter {
     };
   }
 
-  private buildArgs(scanType: TrivyScanType, projectPath: string, options?: ToolScanOptions): string[] | null {
+  private buildArgs(
+    scanType: TrivyScanType,
+    projectPath: string,
+    options?: ToolScanOptions,
+  ): string[] | null {
     const build = ARG_BUILDERS[scanType];
     return build ? build(projectPath, options) : null;
   }
@@ -144,8 +158,8 @@ export class TrivyAdapter implements ToolAdapter {
     return {
       id: randomUUID(),
       ruleId: vuln.VulnerabilityID || 'trivy-unknown',
-      severity: sev === 'CRITICAL' || sev === 'HIGH' ? 'error'
-        : sev === 'MEDIUM' ? 'warning' : 'info',
+      severity:
+        sev === 'CRITICAL' || sev === 'HIGH' ? 'error' : sev === 'MEDIUM' ? 'warning' : 'info',
       category: 'security',
       message: `${vuln.PkgName || '?'}@${vuln.InstalledVersion || '?'}: ${vuln.Title || vuln.VulnerabilityID || ''}`,
       file: target,

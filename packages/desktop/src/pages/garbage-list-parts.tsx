@@ -33,7 +33,9 @@ export function GarbageStats({ report }: { report: SecurityScanReportData }) {
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.items')}</div>
       </ResultCard>
       <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-emerald-600">{formatSize(report.summary.garbageSize)}</div>
+        <div className="text-2xl font-bold text-emerald-600">
+          {formatSize(report.summary.garbageSize)}
+        </div>
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.freeable')}</div>
       </ResultCard>
       {(['unused-dependency', 'unused-file'] as const).map((type) => (
@@ -77,13 +79,13 @@ function GarbageCard({
           {t(GARBAGE_TYPE_LABEL[item.type] ?? item.type)}
         </span>
         <span className="text-sm font-medium text-zh-ink-2 truncate">{item.path}</span>
-        <span className="ml-auto shrink-0 text-xs font-semibold text-emerald-600">{formatSize(item.size)}</span>
+        <span className="ml-auto shrink-0 text-xs font-semibold text-emerald-600">
+          {formatSize(item.size)}
+        </span>
       </div>
       <div className="mt-1 text-xs text-zh-muted pl-7">{item.reason}</div>
       {item.type === 'unused-dependency' && (
-        <div className="mt-2 pl-7 text-xs text-amber-700">
-          {t('page.garbage.dependencyHint')}
-        </div>
+        <div className="mt-2 pl-7 text-xs text-amber-700">{t('page.garbage.dependencyHint')}</div>
       )}
     </ResultCard>
   );
@@ -94,7 +96,12 @@ export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <GarbageCard key={item.id} item={item} selected={selected.has(item.id)} onToggle={onToggle} />
+        <GarbageCard
+          key={item.id}
+          item={item}
+          selected={selected.has(item.id)}
+          onToggle={onToggle}
+        />
       ))}
       {items.length === 0 && (
         <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
@@ -115,7 +122,14 @@ interface GarbageActionBarProps {
   cleaning: boolean;
 }
 
-export function GarbageActionBar({ items, selected, onToggleAll, onClean, onCopyAllToAi, cleaning }: GarbageActionBarProps) {
+export function GarbageActionBar({
+  items,
+  selected,
+  onToggleAll,
+  onClean,
+  onCopyAllToAi,
+  cleaning,
+}: GarbageActionBarProps) {
   const t = useT();
   const cleanable = items.filter((i) => isCleanableType(i.type));
   const selectedCount = cleanable.filter((i) => selected.has(i.id)).length;
@@ -135,15 +149,23 @@ export function GarbageActionBar({ items, selected, onToggleAll, onClean, onCopy
         />
         {t('page.garbage.selectAll')}
       </label>
-      <span className="text-sm text-zh-muted">{t('page.garbage.selectedCount', { count: selectedCount })}</span>
-      <CopyAllToAiButton className="ml-auto" label={t('page.garbage.copyAllToAi')} onClick={onCopyAllToAi} />
+      <span className="text-sm text-zh-muted">
+        {t('page.garbage.selectedCount', { count: selectedCount })}
+      </span>
+      <CopyAllToAiButton
+        className="ml-auto"
+        label={t('page.garbage.copyAllToAi')}
+        onClick={onCopyAllToAi}
+      />
       <PrimaryButton
         onClick={onClean}
         disabled={selectedCount === 0}
         loading={cleaning}
         loadingLabel={t('page.garbage.cleaning')}
       >
-        {selectedCount > 0 ? t('page.garbage.cleanButtonCount', { count: selectedCount }) : t('page.garbage.cleanButton')}
+        {selectedCount > 0
+          ? t('page.garbage.cleanButtonCount', { count: selectedCount })
+          : t('page.garbage.cleanButton')}
       </PrimaryButton>
     </ResultCard>
   );

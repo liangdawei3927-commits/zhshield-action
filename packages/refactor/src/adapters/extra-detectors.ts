@@ -9,7 +9,10 @@ const IDENT_CHAR = /[a-zA-Z0-9_$]/;
 const IDENT_FULL = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 const COLLECTION_TYPE_RE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
-export function detectInappropriateIntimacy(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
+export function detectInappropriateIntimacy(
+  parsed: ParsedFile,
+  config: RefactorConfig,
+): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
@@ -33,7 +36,7 @@ function isIntimacyCandidate(
 
 /** 收集超过 3 个的公共字段，未超过时返回 null */
 function collectExcessivePublicFields(cls: ParsedClass): ParsedClass['members']['fields'] | null {
-  const publicFields = cls.members.fields.filter(f => f.accessModifier === 'public');
+  const publicFields = cls.members.fields.filter((f) => f.accessModifier === 'public');
   if (publicFields.length <= 3) return null;
   return publicFields;
 }
@@ -49,8 +52,12 @@ function buildIntimacySmell(
     ruleId: 'inappropriate-intimacy',
     severity: config.severities['inappropriate-intimacy'],
     message: `${cls.name} 暴露过多公共字段 (${publicFields.length} 个)，破坏封装性`,
-    filePath: parsed.filePath, line: cls.startLine, column: 1,
-    metric: 'publicFieldCount', value: publicFields.length, threshold: 3,
+    filePath: parsed.filePath,
+    line: cls.startLine,
+    column: 1,
+    metric: 'publicFieldCount',
+    value: publicFields.length,
+    threshold: 3,
     suggestion: {
       type: 'Encapsulate Field',
       description: '将 public 字段改为 private，通过 getter/setter 访问',
@@ -66,7 +73,7 @@ function buildIntimacySmell(
 function isFrameworkManagedClass(node: ts.ClassDeclaration): boolean {
   const hasDecorators =
     (ts.canHaveDecorators(node) && (ts.getDecorators(node)?.length ?? 0) > 0) ||
-    node.members.some(m => ts.canHaveDecorators(m) && (ts.getDecorators(m)?.length ?? 0) > 0);
+    node.members.some((m) => ts.canHaveDecorators(m) && (ts.getDecorators(m)?.length ?? 0) > 0);
   return hasDecorators;
 }
 
@@ -129,8 +136,12 @@ function buildMiddleManSmell(
     ruleId: 'middle-man',
     severity: config.severities['middle-man'],
     message: `${cls.name} 大部分方法只是委托调用 (${stats.delegatingMethods} 次委托 / ${stats.totalMethods} 个方法)`,
-    filePath: parsed.filePath, line: cls.startLine, column: 1,
-    metric: 'delegationRatio', value: stats.delegatingMethods, threshold: stats.delegationThreshold,
+    filePath: parsed.filePath,
+    line: cls.startLine,
+    column: 1,
+    metric: 'delegationRatio',
+    value: stats.delegatingMethods,
+    threshold: stats.delegationThreshold,
     suggestion: {
       type: 'Remove Middle Man',
       description: '考虑移除中间层，让调用方直接使用委托目标',
@@ -143,7 +154,7 @@ function buildMiddleManSmell(
 }
 
 function countDelegatingMethods(cls: ParsedClass, sourceFile: ts.SourceFile): number {
-  const ownMethodNames = new Set(cls.members.methods.map(m => m.name));
+  const ownMethodNames = new Set(cls.members.methods.map((m) => m.name));
   const collectionFields = collectCollectionFields(cls.node, sourceFile);
   let delegatingMethods = 0;
 
@@ -231,22 +242,28 @@ export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig):
       if (matches.length === 0) continue;
 
       const uniqueMatches = [...new Set(matches)].slice(0, 3);
-      smells.push(makeSmell({
-        ruleId: 'message-chains',
-        severity: config.severities['message-chains'],
-        message: `${cls.name}.${method.name}() 存在链式调用: ${uniqueMatches.join(', ')}`,
-        filePath: parsed.filePath,
-        line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
-        column: 1,
-        metric: 'chainCount', value: uniqueMatches.length, threshold: 1,
-        suggestion: {
-          type: 'Hide Delegate',
-          description: '将链式调用封装为委托方法，降低调用方与被调用方的耦合',
-          priority: 'medium',
-          effort: 'small',
-          autoFixable: false,
-        },
-      }));
+      smells.push(
+        makeSmell({
+          ruleId: 'message-chains',
+          severity: config.severities['message-chains'],
+          message: `${cls.name}.${method.name}() 存在链式调用: ${uniqueMatches.join(', ')}`,
+          filePath: parsed.filePath,
+          line:
+            parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile))
+              .line + 1,
+          column: 1,
+          metric: 'chainCount',
+          value: uniqueMatches.length,
+          threshold: 1,
+          suggestion: {
+            type: 'Hide Delegate',
+            description: '将链式调用封装为委托方法，降低调用方与被调用方的耦合',
+            priority: 'medium',
+            effort: 'small',
+            autoFixable: false,
+          },
+        }),
+      );
     }
   }
 
@@ -280,10 +297,7 @@ function extractChainAtDot(methodText: string, dotIdx: number): string | null {
 }
 
 /** 读取点号两侧的标识符 token */
-function readChainTokens(
-  methodText: string,
-  dotIdx: number,
-): { before: string; after: string } {
+function readChainTokens(methodText: string, dotIdx: number): { before: string; after: string } {
   let start = dotIdx - 1;
   while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
   const before = methodText.slice(start + 1, dotIdx);
@@ -300,7 +314,10 @@ function isValidChainBoundary(before: string, after: string): boolean {
   return Boolean(before) && Boolean(after) && before !== 'this' && ![')', '}'].includes(before);
 }
 
-function measureChainLength(methodText: string, dotIdx: number): { length: number; endIdx: number } {
+function measureChainLength(
+  methodText: string,
+  dotIdx: number,
+): { length: number; endIdx: number } {
   let chainLen = 0;
   let searchIdx = dotIdx;
   while (searchIdx < methodText.length) {
@@ -319,25 +336,31 @@ export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig)
 
   for (const cls of parsed.classes) {
     if (cls.extendsClass) {
-      const ownMethods = cls.members.methods.filter(m => m.accessModifier === 'public').length;
+      const ownMethods = cls.members.methods.filter((m) => m.accessModifier === 'public').length;
       const ownFields = cls.members.fields.length;
 
       if (ownMethods <= 2 && ownFields <= 1) {
-        smells.push(makeSmell({
-          ruleId: 'refused-bequest',
-          severity: config.severities['refused-bequest'],
-          message: `${cls.name} 继承自 ${cls.extendsClass} 但几乎没有添加新成员 (${ownMethods} 方法, ${ownFields} 字段)，可能不需要继承`,
-          filePath: parsed.filePath, line: cls.startLine, column: 1,
-          metric: 'ownMethodCount', value: ownMethods, threshold: 3,
-          suggestion: {
-            type: 'Replace Inheritance with Delegation',
-            description: `用组合 (Composition) 替换继承，减少继承层次`,
-            priority: 'medium',
-            effort: 'medium',
-            autoFixable: false,
-          },
-          endLine: cls.endLine,
-        }));
+        smells.push(
+          makeSmell({
+            ruleId: 'refused-bequest',
+            severity: config.severities['refused-bequest'],
+            message: `${cls.name} 继承自 ${cls.extendsClass} 但几乎没有添加新成员 (${ownMethods} 方法, ${ownFields} 字段)，可能不需要继承`,
+            filePath: parsed.filePath,
+            line: cls.startLine,
+            column: 1,
+            metric: 'ownMethodCount',
+            value: ownMethods,
+            threshold: 3,
+            suggestion: {
+              type: 'Replace Inheritance with Delegation',
+              description: `用组合 (Composition) 替换继承，减少继承层次`,
+              priority: 'medium',
+              effort: 'medium',
+              autoFixable: false,
+            },
+            endLine: cls.endLine,
+          }),
+        );
       }
     }
   }
@@ -356,24 +379,34 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): Cod
     const decorators = ts.canHaveDecorators(cls.node) ? ts.getDecorators(cls.node) : undefined;
     if (decorators && decorators.length > 0) continue;
     const modifiers = ts.canHaveModifiers(cls.node) ? ts.getModifiers(cls.node) : undefined;
-    if (modifiers?.some(m => m.kind === ts.SyntaxKind.AbstractKeyword)) continue;
+    if (modifiers?.some((m) => m.kind === ts.SyntaxKind.AbstractKeyword)) continue;
 
-    if (cls.lineCount < threshold && cls.members.methods.length <= 2 && cls.members.fields.length <= 2) {
-      smells.push(makeSmell({
-        ruleId: 'lazy-class',
-        severity: config.severities['lazy-class'],
-        message: `${cls.name} 太小 (${cls.lineCount} 行，${cls.members.methods.length} 个方法)，可能不值得作为独立类`,
-        filePath: parsed.filePath, line: cls.startLine, column: 1,
-        metric: 'classLineCount', value: cls.lineCount, threshold,
-        suggestion: {
-          type: 'Inline Class',
-          description: '将功能合并到调用它的类中，或直接移除',
-          priority: 'low',
-          effort: 'small',
-          autoFixable: false,
-        },
-        endLine: cls.endLine,
-      }));
+    if (
+      cls.lineCount < threshold &&
+      cls.members.methods.length <= 2 &&
+      cls.members.fields.length <= 2
+    ) {
+      smells.push(
+        makeSmell({
+          ruleId: 'lazy-class',
+          severity: config.severities['lazy-class'],
+          message: `${cls.name} 太小 (${cls.lineCount} 行，${cls.members.methods.length} 个方法)，可能不值得作为独立类`,
+          filePath: parsed.filePath,
+          line: cls.startLine,
+          column: 1,
+          metric: 'classLineCount',
+          value: cls.lineCount,
+          threshold,
+          suggestion: {
+            type: 'Inline Class',
+            description: '将功能合并到调用它的类中，或直接移除',
+            priority: 'low',
+            effort: 'small',
+            autoFixable: false,
+          },
+          endLine: cls.endLine,
+        }),
+      );
     }
   }
 
@@ -395,22 +428,29 @@ export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig
       countSwitches(method.node);
 
       if (switchCount > 0) {
-        smells.push(makeSmell({
-          ruleId: 'switch-statement',
-          severity: config.severities['switch-statement'],
-          message: `${cls.name}.${method.name}() 使用 ${switchCount} 处 switch 语句，建议用多态替代`,
-          filePath: parsed.filePath,
-          line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
-          column: 1,
-          metric: 'switchCount', value: switchCount, threshold: 0,
-          suggestion: {
-            type: 'Replace Conditional with Polymorphism',
-            description: '用策略模式或多态替换 switch/if-else if 链',
-            priority: 'medium',
-            effort: 'large',
-            autoFixable: false,
-          },
-        }));
+        smells.push(
+          makeSmell({
+            ruleId: 'switch-statement',
+            severity: config.severities['switch-statement'],
+            message: `${cls.name}.${method.name}() 使用 ${switchCount} 处 switch 语句，建议用多态替代`,
+            filePath: parsed.filePath,
+            line:
+              parsed.sourceFile.getLineAndCharacterOfPosition(
+                method.node.getStart(parsed.sourceFile),
+              ).line + 1,
+            column: 1,
+            metric: 'switchCount',
+            value: switchCount,
+            threshold: 0,
+            suggestion: {
+              type: 'Replace Conditional with Polymorphism',
+              description: '用策略模式或多态替换 switch/if-else if 链',
+              priority: 'medium',
+              effort: 'large',
+              autoFixable: false,
+            },
+          }),
+        );
         break;
       }
     }

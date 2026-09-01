@@ -12,6 +12,7 @@
  */
 import { Worker } from 'node:worker_threads';
 import path from 'node:path';
+import type { ScoringProfileResult } from '@zh/fingerprint';
 import type { ProfileWorkerRequest, ProfileWorkerResponse } from './profile-worker';
 
 const WORKER_SCRIPT = path.join(__dirname, 'profile-worker.js');
@@ -54,7 +55,13 @@ function handleWorkerError(err: Error): void {
   console.error('[profile-host] worker 错误:', err.message);
   worker = null;
   const tripped = noteFailure();
-  rejectAll(tripped ? new Error(`[profile-host] profile worker 连续失败 ${consecutiveFailures} 次，已熔断: ${err.message}`) : err);
+  rejectAll(
+    tripped
+      ? new Error(
+          `[profile-host] profile worker 连续失败 ${consecutiveFailures} 次，已熔断: ${err.message}`,
+        )
+      : err,
+  );
 }
 
 function handleWorkerExit(code: number): void {
@@ -62,9 +69,11 @@ function handleWorkerExit(code: number): void {
   worker = null;
   if (pending.size === 0) return;
   const tripped = noteFailure();
-  rejectAll(new Error(
-    `[profile-host] profile worker 异常退出 code=${code}${tripped ? `（连续失败 ${consecutiveFailures} 次，已熔断）` : ''}`,
-  ));
+  rejectAll(
+    new Error(
+      `[profile-host] profile worker 异常退出 code=${code}${tripped ? `（连续失败 ${consecutiveFailures} 次，已熔断）` : ''}`,
+    ),
+  );
 }
 
 function spawnWorker(): Worker {
@@ -98,7 +107,10 @@ function terminateWorker(): void {
   worker = null;
   if (!w) return;
   w.terminate().catch((err: unknown) => {
-    console.warn('[profile-host] 终止 worker 失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[profile-host] 终止 worker 失败:',
+      err instanceof Error ? err.message : String(err),
+    );
   });
 }
 
@@ -116,12 +128,14 @@ function sendRequest(w: Worker, req: ProfileWorkerRequest, job: PendingRequest):
  * 向 profile worker 发送请求并等待结果。
  * 超时 / 崩溃 / 发送失败都会以明确错误 reject —— 永不挂起。
  */
-export function runInProfileWorker<T>(
-  job: ProfileJob,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-): Promise<T> {
+export function runInProfileWorker<T>(job: ProfileJob, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const id = `${job.type}-${Date.now()}-${++seq}`;
-  const req: ProfileWorkerRequest = { id, type: job.type, projectPath: job.projectPath, options: job.options };
+  const req: ProfileWorkerRequest = {
+    id,
+    type: job.type,
+    projectPath: job.projectPath,
+    options: job.options,
+  };
   const w = ensureWorker();
 
   return new Promise<T>((resolve, reject) => {
@@ -129,9 +143,11 @@ export function runInProfileWorker<T>(
       pending.delete(id);
       terminateWorker(); // 卡死线程只能终止；下次请求自动重启
       const tripped = noteFailure();
-      reject(new Error(
-        `[profile-host] profile worker 响应超时（${timeoutMs}ms）${tripped ? `，连续失败 ${consecutiveFailures} 次已熔断` : ''}`,
-      ));
+      reject(
+        new Error(
+          `[profile-host] profile worker 响应超时（${timeoutMs}ms）${tripped ? `，连续失败 ${consecutiveFailures} 次已熔断` : ''}`,
+        ),
+      );
     }, timeoutMs);
 
     const entry: PendingRequest = {
@@ -145,16 +161,30 @@ export function runInProfileWorker<T>(
 }
 
 /** 技术债对外接口扫描（原 engines.ts 主线程同步扫盘，移入 worker） */
-export function collectExposedFilesInWorker(projectPath: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<string[]> {
+export function collectExposedFilesInWorker(
+  projectPath: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<string[]> {
   return runInProfileWorker<string[]>({ type: 'collectExposedFiles', projectPath }, timeoutMs);
 }
 
 /** @zh/pipeline 项目画像识别（原主线程同步 fs，移入 worker） */
-export function detectProfileInWorker(projectPath: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<unknown> {
+export function detectProfileInWorker(
+  projectPath: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<unknown> {
   return runInProfileWorker<unknown>({ type: 'detectProfile', projectPath }, timeoutMs);
 }
 
 /** @zh/fingerprint 完整画像 + 问题集 + 漂移（engine:runProfile 彩球修复主体） */
 export function runProfileInWorker(projectPath: string, timeoutMs = 5 * 60_000): Promise<unknown> {
   return runInProfileWorker<unknown>({ type: 'runProfile', projectPath }, timeoutMs);
+}
+
+/** @zh/fingerprint 同步画像（ScoringProjectProfile + warnings，原主进程同步调用，移入 worker） */
+export function runProfileSyncInWorker(
+  projectPath: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<ScoringProfileResult> {
+  return runInProfileWorker<ScoringProfileResult>({ type: 'profileSync', projectPath }, timeoutMs);
 }

@@ -105,17 +105,23 @@ export async function getGuardHooksStatus(projectPath: string): Promise<GuardHoo
 
 export async function installGuardHooks(projectPath: string): Promise<GuardHooksInstallResultData> {
   const api = getAPI();
-  if (!api?.guardHooks) return { ok: false, installed: [], skipped: [], reason: t('engine.hooksUnavailable') };
+  if (!api?.guardHooks)
+    return { ok: false, installed: [], skipped: [], reason: t('engine.hooksUnavailable') };
   return api.guardHooks.install(projectPath);
 }
 
-export async function uninstallGuardHooks(projectPath: string): Promise<{ ok: boolean; removed: string[] }> {
+export async function uninstallGuardHooks(
+  projectPath: string,
+): Promise<{ ok: boolean; removed: string[] }> {
   const api = getAPI();
   if (!api?.guardHooks) return { ok: false, removed: [] };
   return api.guardHooks.uninstall(projectPath);
 }
 
-export async function listGuardReports(projectPath: string, limit = 20): Promise<GuardReportRecordData[]> {
+export async function listGuardReports(
+  projectPath: string,
+  limit = 20,
+): Promise<GuardReportRecordData[]> {
   const api = getAPI();
   if (!api?.guardHooks) return [];
   return api.guardHooks.listReports(projectPath, limit);
@@ -156,13 +162,19 @@ export interface FalsePositiveFeedbackItem {
   line?: number;
 }
 
-export async function reportFalsePositive(projectPath: string, item: FalsePositiveFeedbackItem): Promise<{ ok: boolean; id?: string; reason?: string }> {
+export async function reportFalsePositive(
+  projectPath: string,
+  item: FalsePositiveFeedbackItem,
+): Promise<{ ok: boolean; id?: string; reason?: string }> {
   const api = getAPI();
   if (!api?.feedback) return { ok: false, reason: t('engine.feedbackUnavailable') };
   return api.feedback.reportFalsePositive(projectPath, item);
 }
 
-export async function listFalsePositives(projectPath: string, source?: 'guard' | 'sentinel'): Promise<FalsePositiveFeedbackRecord[]> {
+export async function listFalsePositives(
+  projectPath: string,
+  source?: 'guard' | 'sentinel',
+): Promise<FalsePositiveFeedbackRecord[]> {
   const api = getAPI();
   if (!api?.feedback) return [];
   return api.feedback.listFalsePositives(projectPath, source);
@@ -190,7 +202,16 @@ export async function runSecurity(projectPath: string): Promise<SecurityScanRepo
   const api = getAPI();
   if (!api?.engine) {
     return {
-      summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, malwareTotal: 0, garbageTotal: 0, garbageSize: 0 },
+      summary: {
+        total: 0,
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        malwareTotal: 0,
+        garbageTotal: 0,
+        garbageSize: 0,
+      },
       findings: [],
       malware: [],
       garbage: [],
@@ -207,16 +228,28 @@ export async function cleanGarbage(
   projectPath: string,
   items: Array<{ id: string; path: string; size: number; type: string }>,
 ): Promise<GarbageCleanResultData> {
-  if (isHttpMode()) return { batchId: '', cleaned: [], freedBytes: 0, failed: [t('engine.remoteCleanUnsupported')] };
+  if (isHttpMode())
+    return {
+      batchId: '',
+      cleaned: [],
+      freedBytes: 0,
+      failed: [t('engine.remoteCleanUnsupported')],
+    };
   const api = getAPI();
-  if (!api?.engine) return { batchId: '', cleaned: [], freedBytes: 0, failed: [t('engine.engineUnavailable')] };
+  if (!api?.engine)
+    return { batchId: '', cleaned: [], freedBytes: 0, failed: [t('engine.engineUnavailable')] };
   return api.engine.cleanGarbage(projectPath, items);
 }
 
-export async function restoreGarbage(projectPath: string, batchId: string): Promise<GarbageRestoreResultData> {
-  if (isHttpMode()) return { restored: 0, restoredBytes: 0, failed: [t('engine.remoteRestoreUnsupported')] };
+export async function restoreGarbage(
+  projectPath: string,
+  batchId: string,
+): Promise<GarbageRestoreResultData> {
+  if (isHttpMode())
+    return { restored: 0, restoredBytes: 0, failed: [t('engine.remoteRestoreUnsupported')] };
   const api = getAPI();
-  if (!api?.engine) return { restored: 0, restoredBytes: 0, failed: [t('engine.engineUnavailable')] };
+  if (!api?.engine)
+    return { restored: 0, restoredBytes: 0, failed: [t('engine.engineUnavailable')] };
   return api.engine.restoreGarbage(projectPath, batchId);
 }
 
@@ -289,7 +322,11 @@ export async function runTechDebt(projectPath: string): Promise<TechDebtReportDa
   return api.engine.runTechDebt(projectPath);
 }
 
-export async function planDebtRepayment(projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }): Promise<void> {
+export async function planDebtRepayment(
+  projectPath: string,
+  actionId: string,
+  opts?: { sprint?: string; gate?: 'allow-with-record' },
+): Promise<void> {
   const api = getAPI();
   if (!api?.engine) return;
   return api.engine.planDebtRepayment(projectPath, actionId, opts);
@@ -399,7 +436,10 @@ export async function runRefactor(projectPath: string): Promise<RefactorReportDa
 
 // ─── Pipeline 流水线引擎 ──────────────────────────────────
 
-export async function runPipeline(projectPath: string, options?: { dryRun?: boolean; sop?: boolean; presetName?: string }): Promise<PipelineReportData> {
+export async function runPipeline(
+  projectPath: string,
+  options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
+): Promise<PipelineReportData> {
   if (isHttpMode()) return runPipelineViaHttp(projectPath, options);
   const api = getAPI();
   if (!api?.engine) {
@@ -415,14 +455,19 @@ export async function runPipeline(projectPath: string, options?: { dryRun?: bool
 
 // ─── Sentinel 哨兵监控 ────────────────────────────────────
 
-export async function getSentinelEvents(options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> {
+export async function getSentinelEvents(options?: {
+  status?: string;
+  severity?: string;
+}): Promise<SentinelEvent[]> {
   if (isHttpMode()) return getSentinelEventsViaHttp(options);
   const api = getAPI();
   if (!api?.sentinel) return [];
   return api.sentinel.getEvents(options);
 }
 
-export async function startSentinelMonitoring(projectPath: string): Promise<{ ok: boolean; started: string[]; disabled?: boolean }> {
+export async function startSentinelMonitoring(
+  projectPath: string,
+): Promise<{ ok: boolean; started: string[]; disabled?: boolean }> {
   if (isHttpMode()) return startSentinelViaHttp(projectPath);
   const api = getAPI();
   if (!api?.sentinel) return { ok: false, started: [] };
@@ -501,7 +546,11 @@ export async function syncRules(): Promise<{ added: number; updated: number }> {
   }
 }
 
-export async function getSyncHealth(): Promise<{ level: number; stale: boolean; lastSync: string | null }> {
+export async function getSyncHealth(): Promise<{
+  level: number;
+  stale: boolean;
+  lastSync: string | null;
+}> {
   if (isHttpMode()) return { level: 4, stale: true, lastSync: null };
   try {
     const api = getSopAPI();
@@ -560,7 +609,10 @@ export async function getBackupConfig(projectPath: string): Promise<BackupConfig
   return api.backup.getConfig(projectPath);
 }
 
-export async function saveBackupConfig(projectPath: string, config: BackupConfigData): Promise<void> {
+export async function saveBackupConfig(
+  projectPath: string,
+  config: BackupConfigData,
+): Promise<void> {
   if (isHttpMode()) return saveBackupConfigViaHttp(projectPath, config);
   const api = getAPI();
   if (!api?.backup) return;
@@ -620,7 +672,10 @@ export async function writeSchedulerState(state: SchedulerStateData): Promise<vo
 
 // ─── 原生对话框 & 文件写入 ─────────────────────────────────
 
-export async function showSaveDialog(options: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> }): Promise<{ canceled: boolean; filePath?: string }> {
+export async function showSaveDialog(options: {
+  defaultPath: string;
+  filters: Array<{ name: string; extensions: string[] }>;
+}): Promise<{ canceled: boolean; filePath?: string }> {
   const api = getAPI();
   if (!api) return { canceled: true };
   return api.showSaveDialog(options);

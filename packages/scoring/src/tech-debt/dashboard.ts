@@ -74,7 +74,7 @@ function hotnessFactor(commitCount: number): number {
 /** 密度系数：同模块同类别 issue 数量 → 1.0-2.0（1 条 → 1.0，≥10 条 → 2.0，扎堆一次修一片优先） */
 function densityFactor(count: number): number {
   if (count <= 1) return 1;
-  return Math.min(2, 1 + (count / 10));
+  return Math.min(2, 1 + count / 10);
 }
 
 /** 模块提取：取 issue.file 的顶层目录 + 文件名（相对路径，无 file 归 '(root)'） */
@@ -106,7 +106,9 @@ function buildActions(
   return actions;
 }
 
-function groupIssuesByModule(issues: DebtIssueInput[]): Map<string, { issues: DebtIssueInput[]; category: DebtCategory }> {
+function groupIssuesByModule(
+  issues: DebtIssueInput[],
+): Map<string, { issues: DebtIssueInput[]; category: DebtCategory }> {
   const groups = new Map<string, { issues: DebtIssueInput[]; category: DebtCategory }>();
   for (const issue of issues) {
     const module = moduleOf(issue.file);
@@ -135,14 +137,15 @@ function buildActionFromGroup(
   const severityFactor = avgSeverity;
   const hotnessFactorValue = hotnessFactor(hotnessByModule.get(module) ?? 0);
   const densityFactorValue = densityFactor(groupIssues.length);
-  const maxExposure = Math.max(
-    ...groupIssues.map((i) => exposureFactor(i.file, exposedFiles)),
-    1,
-  );
+  const maxExposure = Math.max(...groupIssues.map((i) => exposureFactor(i.file, exposedFiles)), 1);
   const exposureFactorValue = maxExposure;
 
   const interestScore =
-    severityFactor * hotnessFactorValue * densityFactorValue * exposureFactorValue * CATEGORY_WEIGHT[category];
+    severityFactor *
+    hotnessFactorValue *
+    densityFactorValue *
+    exposureFactorValue *
+    CATEGORY_WEIGHT[category];
 
   const principalEstimate = PRINCIPAL_DAYS[category] * groupIssues.length;
   const roi = principalEstimate > 0 ? interestScore / principalEstimate : interestScore;
@@ -214,13 +217,15 @@ function aggregateByModule(
   const totalInterest = moduleMap.size
     ? [...moduleMap.values()].reduce((acc, m) => acc + m.interest, 0)
     : 0;
-  const byModule: ModuleDebt[] = Array.from(moduleMap.entries(), ([module, { interest, hotness }]) => ({
+  const byModule: ModuleDebt[] = Array.from(
+    moduleMap.entries(),
+    ([module, { interest, hotness }]) => ({
       module,
       debtShare: totalInterest > 0 ? round2(interest / totalInterest) : 0,
       hotness,
       interestTotal: round2(interest),
-    }))
-    .sort((a, b) => b.interestTotal - a.interestTotal);
+    }),
+  ).sort((a, b) => b.interestTotal - a.interestTotal);
   return { byModule, totalInterest };
 }
 
@@ -233,11 +238,10 @@ function aggregateByCategory(actions: DebtAction[], totalInterest: number): Cate
     categoryMap.set(action.category, cur);
   }
   return Array.from(categoryMap.entries(), ([category, { count, interest }]) => ({
-      category,
-      count,
-      weight: totalInterest > 0 ? round2(interest / totalInterest) : 0,
-    }))
-    .sort((a, b) => b.weight - a.weight);
+    category,
+    count,
+    weight: totalInterest > 0 ? round2(interest / totalInterest) : 0,
+  })).sort((a, b) => b.weight - a.weight);
 }
 
 /** 债务指数：issues 加权和 → 0-100（0=无债，100=满债）。与健康评分同源互补（评分越高越健康，债务指数越高越重）。 */

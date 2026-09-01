@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getSentinelEvents, startSentinelMonitoring, getSentinelState, type FalsePositiveFeedbackItem } from '../services/engineApi';
+import {
+  getSentinelEvents,
+  startSentinelMonitoring,
+  getSentinelState,
+  type FalsePositiveFeedbackItem,
+} from '../services/engineApi';
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { AiFixIssue } from '../utils/copyToAi';
 
@@ -25,25 +30,85 @@ export interface SentinelEventItem {
 }
 
 export const SEVERITY_CONFIG: Record<string, { textKey: string; color: string; bg: string }> = {
-  critical: { textKey: 'severity.critical', color: 'rgb(var(--zh-danger-dark))', bg: 'rgb(var(--zh-danger) / 0.1)' },
-  high: { textKey: 'severity.high', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)' },
-  medium: { textKey: 'severity.medium', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)' },
+  critical: {
+    textKey: 'severity.critical',
+    color: 'rgb(var(--zh-danger-dark))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+  },
+  high: {
+    textKey: 'severity.high',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+  },
+  medium: {
+    textKey: 'severity.medium',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+  },
   low: { textKey: 'severity.low', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)' },
-  info: { textKey: 'severity.info', color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-bg-secondary))' },
+  info: {
+    textKey: 'severity.info',
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-bg-secondary))',
+  },
 };
 
 export const STATUS_CONFIG: Record<string, { textKey: string; color: string; bg: string }> = {
-  detected: { textKey: 'status.detected', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.15)' },
-  assigned: { textKey: 'status.assigned', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.15)' },
-  fixing: { textKey: 'status.fixing', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.15)' },
-  pr_opened: { textKey: 'status.pr_opened', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.15)' },
-  validating: { textKey: 'status.validating', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.15)' },
-  passed: { textKey: 'status.passed', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.15)' },
-  failed: { textKey: 'status.failed', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.15)' },
-  merged: { textKey: 'status.merged', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.15)' },
-  deployed: { textKey: 'status.deployed', color: 'rgb(var(--zh-success))', bg: 'rgb(var(--zh-success) / 0.15)' },
-  rolled_back: { textKey: 'status.rolled_back', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.15)' },
-  manual_taken_over: { textKey: 'status.manual_taken_over', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.15)' },
+  detected: {
+    textKey: 'status.detected',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.15)',
+  },
+  assigned: {
+    textKey: 'status.assigned',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.15)',
+  },
+  fixing: {
+    textKey: 'status.fixing',
+    color: 'rgb(var(--zh-info))',
+    bg: 'rgb(var(--zh-info) / 0.15)',
+  },
+  pr_opened: {
+    textKey: 'status.pr_opened',
+    color: 'rgb(var(--zh-info))',
+    bg: 'rgb(var(--zh-info) / 0.15)',
+  },
+  validating: {
+    textKey: 'status.validating',
+    color: 'rgb(var(--zh-info))',
+    bg: 'rgb(var(--zh-info) / 0.15)',
+  },
+  passed: {
+    textKey: 'status.passed',
+    color: 'rgb(var(--zh-success))',
+    bg: 'rgb(var(--zh-success) / 0.15)',
+  },
+  failed: {
+    textKey: 'status.failed',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.15)',
+  },
+  merged: {
+    textKey: 'status.merged',
+    color: 'rgb(var(--zh-success))',
+    bg: 'rgb(var(--zh-success) / 0.15)',
+  },
+  deployed: {
+    textKey: 'status.deployed',
+    color: 'rgb(var(--zh-success))',
+    bg: 'rgb(var(--zh-success) / 0.15)',
+  },
+  rolled_back: {
+    textKey: 'status.rolled_back',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.15)',
+  },
+  manual_taken_over: {
+    textKey: 'status.manual_taken_over',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.15)',
+  },
 };
 
 /** 事件闭环阶段：发现 → 修复 → 验证 → 归档 */
@@ -75,11 +140,15 @@ export function statusToStage(status: string): LifecycleStage {
 }
 
 export const TYPE_LABELS: Record<string, string> = {
-  'runtime-exception': 'page.sentinel.type.runtimeException', 'http-error': 'page.sentinel.type.httpError',
-  'performance-degradation': 'page.sentinel.type.performanceDegradation', 'crash': 'page.sentinel.type.crash',
-  'frontend-error': 'page.sentinel.type.frontendError', 'white-screen': 'page.sentinel.type.whiteScreen',
-  'security-incident': 'page.sentinel.type.securityIncident', 'memory-leak': 'page.sentinel.type.memoryLeak',
-  'timeout': 'page.sentinel.type.timeout',
+  'runtime-exception': 'page.sentinel.type.runtimeException',
+  'http-error': 'page.sentinel.type.httpError',
+  'performance-degradation': 'page.sentinel.type.performanceDegradation',
+  crash: 'page.sentinel.type.crash',
+  'frontend-error': 'page.sentinel.type.frontendError',
+  'white-screen': 'page.sentinel.type.whiteScreen',
+  'security-incident': 'page.sentinel.type.securityIncident',
+  'memory-leak': 'page.sentinel.type.memoryLeak',
+  timeout: 'page.sentinel.type.timeout',
 };
 
 /** 监控开启后每 5s 轮询刷新事件 */
@@ -133,14 +202,18 @@ function useSentinelMonitoring(
 
   useEffect(() => {
     let cancelled = false;
-    getSentinelState().then((state) => {
-      if (!cancelled && state.enabled) {
-        void startMonitoring();
-      }
-    }).catch(() => {
-      if (!cancelled) void startMonitoring();
-    });
-    return () => { cancelled = true; };
+    getSentinelState()
+      .then((state) => {
+        if (!cancelled && state.enabled) {
+          void startMonitoring();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) void startMonitoring();
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [startMonitoring]);
 
   return { monitoring, startMonitoring };
@@ -191,7 +264,9 @@ function countSentinelStats(events: SentinelEventItem[]): {
 } {
   const criticalCount = events.filter((e) => e.severity === 'critical').length;
   const highCount = events.filter((e) => e.severity === 'high').length;
-  const activeCount = events.filter((e) => ['detected', 'assigned', 'fixing'].includes(e.status)).length;
+  const activeCount = events.filter((e) =>
+    ['detected', 'assigned', 'fixing'].includes(e.status),
+  ).length;
   return { criticalCount, highCount, activeCount };
 }
 
@@ -199,13 +274,14 @@ function countSentinelStats(events: SentinelEventItem[]): {
 function sortSentinelEvents(events: SentinelEventItem[]): SentinelEventItem[] {
   return events.toSorted(
     (a: Readonly<SentinelEventItem>, b: Readonly<SentinelEventItem>) =>
-      new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+      new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime(),
   );
 }
 
 /** 误报反馈数量（按来源过滤，用于 KPI 卡展示） */
 export function useSentinelPage(projectPath: string) {
-  const { events, loading, monitoring, refreshEvents, startMonitoring } = useSentinelEvents(projectPath);
+  const { events, loading, monitoring, refreshEvents, startMonitoring } =
+    useSentinelEvents(projectPath);
   const falsePositiveCount = useFalsePositiveCount(projectPath, 'sentinel');
 
   return {

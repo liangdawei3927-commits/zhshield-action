@@ -14,7 +14,7 @@ if (!existsSync(pkgsDir)) {
 }
 
 const pkgs = readdirSync(pkgsDir).filter(
-  (d) => d !== 'node_modules' && existsSync(join(pkgsDir, d, 'tsconfig.json'))
+  (d) => d !== 'node_modules' && existsSync(join(pkgsDir, d, 'tsconfig.json')),
 );
 
 console.log(`\n类型检查 ${pkgs.length} 个包：${pkgs.join(', ')}\n`);
@@ -23,10 +23,10 @@ const failed = [];
 for (const pkg of pkgs) {
   process.stdout.write(`  ${pkg.padEnd(14)} `);
   try {
-    execSync(
-      `npx tsc --noEmit --composite false -p packages/${pkg}/tsconfig.json`,
-      { stdio: 'pipe', cwd: root }
-    );
+    execSync(`npx tsc --noEmit --composite false -p packages/${pkg}/tsconfig.json`, {
+      stdio: 'pipe',
+      cwd: root,
+    });
     console.log('✓ ok');
   } catch {
     console.log('✗ FAIL');
@@ -36,7 +36,9 @@ for (const pkg of pkgs) {
 
 if (failed.length) {
   console.error(`\n❌ 类型检查失败：${failed.join(', ')}`);
-  console.error('请运行 `pnpm --filter @zh/<pkg> exec tsc --noEmit --composite false` 查看详细错误\n');
+  console.error(
+    '请运行 `pnpm --filter @zh/<pkg> exec tsc --noEmit --composite false` 查看详细错误\n',
+  );
   process.exit(1);
 }
 console.log('\n✅ 全部包类型检查通过\n');

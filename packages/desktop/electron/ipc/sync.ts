@@ -7,7 +7,12 @@
 
 import { ipcMain } from 'electron';
 
-import type { ExperienceRecord, GovernanceDomain, SignedSopPackage, ToolRuleSyncResult } from '@zh/kernel';
+import type {
+  ExperienceRecord,
+  GovernanceDomain,
+  SignedSopPackage,
+  ToolRuleSyncResult,
+} from '@zh/kernel';
 import { SopSigner } from '@zh/kernel';
 import { resolveSopPublicKey, sopCache, sopRegistry, wisdomBrainSync } from '../ipc-context';
 
@@ -23,27 +28,43 @@ function registerToolRuleSync(): void {
     return wisdomBrainSync.syncAllRules();
   });
 
-  ipcMain.handle('sync:rulesStatus', async (): Promise<Array<{ toolId: string; localVersion: string | null; stale: boolean }>> => {
-    const rs = wisdomBrainSync.getRuleSync();
-    const tools = rs.getConfiguredToolIds() as Array<'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser'>;
-    return tools.map((tid) => ({
-      toolId: tid,
-      localVersion: rs.getLocalVersion(tid)?.version ?? null,
-      stale: rs.isStale(tid),
-    }));
-  });
+  ipcMain.handle(
+    'sync:rulesStatus',
+    async (): Promise<Array<{ toolId: string; localVersion: string | null; stale: boolean }>> => {
+      const rs = wisdomBrainSync.getRuleSync();
+      const tools = rs.getConfiguredToolIds() as Array<
+        'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser'
+      >;
+      return tools.map((tid) => ({
+        toolId: tid,
+        localVersion: rs.getLocalVersion(tid)?.version ?? null,
+        stale: rs.isStale(tid),
+      }));
+    },
+  );
 
-  ipcMain.handle('sync:emergencyUpdate', async (_event, toolId: string): Promise<ToolRuleSyncResult> => {
-    return wisdomBrainSync.syncToolRules(toolId as 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser');
-  });
+  ipcMain.handle(
+    'sync:emergencyUpdate',
+    async (_event, toolId: string): Promise<ToolRuleSyncResult> => {
+      return wisdomBrainSync.syncToolRules(
+        toolId as 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser',
+      );
+    },
+  );
 }
 
 /** 经验回写（智汇大脑协同 8.2） */
 function registerExperienceSync(): void {
-  ipcMain.handle('sync:submitExperience', async (_event, records: ExperienceRecord[]): Promise<{ sent: number; queued: number; failed: number }> => {
-    const result = await wisdomBrainSync.syncExperienceBatch(records);
-    return result;
-  });
+  ipcMain.handle(
+    'sync:submitExperience',
+    async (
+      _event,
+      records: ExperienceRecord[],
+    ): Promise<{ sent: number; queued: number; failed: number }> => {
+      const result = await wisdomBrainSync.syncExperienceBatch(records);
+      return result;
+    },
+  );
 
   ipcMain.handle('sync:queueStatus', async (): Promise<{ queueLength: number }> => {
     return { queueLength: wisdomBrainSync.getExperienceReporter().getQueueLength() };
@@ -67,7 +88,9 @@ function registerSopVersionQuery(): void {
 }
 
 /** SOP 同步动作 IPC：手动同步与紧急更新 */
-async function verifySopPackage(pkgJson: string): Promise<{ pkg?: SignedSopPackage; reason?: string }> {
+async function verifySopPackage(
+  pkgJson: string,
+): Promise<{ pkg?: SignedSopPackage; reason?: string }> {
   let pkg: SignedSopPackage;
   try {
     pkg = JSON.parse(pkgJson) as SignedSopPackage;
@@ -88,7 +111,9 @@ async function verifySopPackage(pkgJson: string): Promise<{ pkg?: SignedSopPacka
   return { pkg };
 }
 
-async function handleSopEmergencyUpdate(pkgJson: string): Promise<{ success: boolean; reason?: string }> {
+async function handleSopEmergencyUpdate(
+  pkgJson: string,
+): Promise<{ success: boolean; reason?: string }> {
   const { pkg, reason } = await verifySopPackage(pkgJson);
   if (!pkg) {
     return { success: false, reason };

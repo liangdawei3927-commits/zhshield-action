@@ -107,7 +107,9 @@ export class SemgrepResultMapper {
   }
 
   /** 收集 taint_source → intermediate_vars → taint_sink 的 locations 链 */
-  private collectTraceLocations(trace: NonNullable<SemgrepResult['dataflow_trace']>): CodeFlowLocation[] {
+  private collectTraceLocations(
+    trace: NonNullable<SemgrepResult['dataflow_trace']>,
+  ): CodeFlowLocation[] {
     const locations: CodeFlowLocation[] = [];
     const source = this.collectSourceLocation(trace);
     if (source) locations.push(source);
@@ -118,24 +120,35 @@ export class SemgrepResultMapper {
   }
 
   /** 收集 taint_source 位置 */
-  private collectSourceLocation(trace: NonNullable<SemgrepResult['dataflow_trace']>): CodeFlowLocation | undefined {
+  private collectSourceLocation(
+    trace: NonNullable<SemgrepResult['dataflow_trace']>,
+  ): CodeFlowLocation | undefined {
     const source = trace.taint_source?.location;
     return source ? this.toCodeFlowLocation(source, 'taint source') : undefined;
   }
 
   /** 收集 intermediate_vars 位置 */
-  private collectIntermediateLocations(trace: NonNullable<SemgrepResult['dataflow_trace']>): CodeFlowLocation[] {
+  private collectIntermediateLocations(
+    trace: NonNullable<SemgrepResult['dataflow_trace']>,
+  ): CodeFlowLocation[] {
     const locations: CodeFlowLocation[] = [];
     for (const iv of trace.intermediate_vars ?? []) {
       if (iv?.location) {
-        locations.push(this.toCodeFlowLocation(iv.location, iv.var_name ? `intermediate var: ${iv.var_name}` : 'intermediate var'));
+        locations.push(
+          this.toCodeFlowLocation(
+            iv.location,
+            iv.var_name ? `intermediate var: ${iv.var_name}` : 'intermediate var',
+          ),
+        );
       }
     }
     return locations;
   }
 
   /** 收集 taint_sink 位置 */
-  private collectSinkLocation(trace: NonNullable<SemgrepResult['dataflow_trace']>): CodeFlowLocation | undefined {
+  private collectSinkLocation(
+    trace: NonNullable<SemgrepResult['dataflow_trace']>,
+  ): CodeFlowLocation | undefined {
     const sink = trace.taint_sink?.location;
     return sink ? this.toCodeFlowLocation(sink, 'taint sink') : undefined;
   }
@@ -160,7 +173,8 @@ export class SemgrepResultMapper {
 
     const sca = r.extra?.sca_info;
     if (sca) {
-      if (sca.reachable !== undefined) tags.push(sca.reachable ? 'sca:reachable' : 'sca:unreachable');
+      if (sca.reachable !== undefined)
+        tags.push(sca.reachable ? 'sca:reachable' : 'sca:unreachable');
       if (sca.sca_kind) tags.push(`sca:${sca.sca_kind}`);
     }
 

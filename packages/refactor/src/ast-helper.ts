@@ -67,19 +67,19 @@ export function parseFile(filePath: string): ParsedFile {
 }
 
 function createSourceFile(filePath: string, content: string): ts.SourceFile {
-  return ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  return ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
 function countLinesOfCode(content: string): number {
-  return content.split('\n')
-    .filter(l => l.trim().length > 0 && !l.trim().startsWith('//') && !l.trim().startsWith('/*') && !l.trim().startsWith('*'))
-    .length;
+  return content
+    .split('\n')
+    .filter(
+      (l) =>
+        l.trim().length > 0 &&
+        !l.trim().startsWith('//') &&
+        !l.trim().startsWith('/*') &&
+        !l.trim().startsWith('*'),
+    ).length;
 }
 
 /** 遍历语法树收集类 / 函数 / 导入声明 */
@@ -109,13 +109,19 @@ function collectDeclarations(sourceFile: ts.SourceFile): {
   return { classes, functions, imports };
 }
 
-function getClassStartEnd(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): { startLine: number; endLine: number } {
+function getClassStartEnd(
+  node: ts.ClassDeclaration,
+  sourceFile: ts.SourceFile,
+): { startLine: number; endLine: number } {
   const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
   return { startLine, endLine };
 }
 
-function getMethodStartEnd(member: ts.MethodDeclaration, sourceFile: ts.SourceFile): { startLine: number; endLine: number } {
+function getMethodStartEnd(
+  member: ts.MethodDeclaration,
+  sourceFile: ts.SourceFile,
+): { startLine: number; endLine: number } {
   const startLine = sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile)).line + 1;
   const endLine = sourceFile.getLineAndCharacterOfPosition(member.getEnd()).line + 1;
   return { startLine, endLine };
@@ -159,12 +165,12 @@ function parseHeritage(
   let extendsClass: string | undefined;
   const implementsInterfaces: string[] = [];
 
-  node.heritageClauses?.forEach(clause => {
+  node.heritageClauses?.forEach((clause) => {
     if (clause.token === ts.SyntaxKind.ExtendsKeyword && clause.types.length > 0) {
       extendsClass = clause.types[0].getText(sourceFile);
     }
     if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
-      clause.types.forEach(t => implementsInterfaces.push(t.getText(sourceFile)));
+      clause.types.forEach((t) => implementsInterfaces.push(t.getText(sourceFile)));
     }
   });
 
@@ -179,7 +185,7 @@ function parseClassMembers(
   const methods: ParsedClass['members']['methods'] = [];
   const fields: ParsedClass['members']['fields'] = [];
 
-  node.members.forEach(member => {
+  node.members.forEach((member) => {
     if (ts.isMethodDeclaration(member)) {
       const method = parseMethodMember(member, sourceFile);
       if (method) methods.push(method);
@@ -269,7 +275,7 @@ function parseImport(node: ts.ImportDeclaration): ImportInfo {
       defaultImport = node.importClause.name.getText();
     }
     if (node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
-      node.importClause.namedBindings.elements.forEach(e => {
+      node.importClause.namedBindings.elements.forEach((e) => {
         namedImports.push(e.name.getText());
       });
     }
@@ -304,7 +310,7 @@ export function computeCyclomaticComplexity(node: ts.Node): number {
       ts.isConditionalExpression(n) ||
       (ts.isBinaryExpression(n) &&
         (n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
-         n.operatorToken.kind === ts.SyntaxKind.BarBarToken)) ||
+          n.operatorToken.kind === ts.SyntaxKind.BarBarToken)) ||
       ts.isCatchClause(n)
     ) {
       complexity++;
@@ -328,16 +334,20 @@ export function computeNestingDepth(node: ts.Node): number {
       ts.isTryStatement(n) ||
       ts.isSwitchStatement(n)
     ) {
-      ts.forEachChild(n, child => visit(child, depth + 1));
+      ts.forEachChild(n, (child) => visit(child, depth + 1));
     } else {
-      ts.forEachChild(n, child => visit(child, depth));
+      ts.forEachChild(n, (child) => visit(child, depth));
     }
   }
   visit(node, 0);
   return maxDepth;
 }
 
-export function collectExternalCalls(node: ts.Node, className: string, sourceFile: ts.SourceFile): Map<string, number> {
+export function collectExternalCalls(
+  node: ts.Node,
+  className: string,
+  sourceFile: ts.SourceFile,
+): Map<string, number> {
   const calls = new Map<string, number>();
 
   function visit(n: ts.Node) {
@@ -389,7 +399,10 @@ function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
   for (const f of files) {
     const lines = f.sourceFile.getFullText().split('\n');
     for (let i = 0; i <= lines.length - minLines; i++) {
-      const block = lines.slice(i, i + minLines).join('\n').trim();
+      const block = lines
+        .slice(i, i + minLines)
+        .join('\n')
+        .trim();
       if (block.length < 20) continue;
       const normalized = normalizeCode(block);
       // 归一化后为空（纯注释 / 纯空白）的块不参与重复比较：

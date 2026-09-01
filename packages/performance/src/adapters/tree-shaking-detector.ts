@@ -136,7 +136,8 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         severity: 'high',
         file: 'package.json',
         message: 'package.json 将 sideEffects 显式设为 true — 彻底关闭摇树，全部模块均会被打包',
-        suggestion: '改为 "sideEffects": false 或仅对真正有副作用的文件（如 polyfill、样式）列出白名单',
+        suggestion:
+          '改为 "sideEffects": false 或仅对真正有副作用的文件（如 polyfill、样式）列出白名单',
         autoFixable: false,
       });
     }
@@ -212,7 +213,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       } catch {
         return;
       }
-       for (const entry of entries) {
+      for (const entry of entries) {
         if (entry.name === '.' || entry.name === '..') continue;
         if (files.length >= limit) return;
         const full = safeJoin(current, entry.name);
@@ -239,10 +240,11 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       } catch {
         return;
       }
-       for (const entry of entries) {
+      for (const entry of entries) {
         if (entry.name === '.' || entry.name === '..') continue;
         const full = safeJoin(dir, entry.name);
         if (entry.isDirectory()) {
+          if (entry.name === 'node_modules') continue;
           visit(full, safeJoin(prefix, entry.name));
         } else if (entry.isFile() && entry.name.endsWith('.js') && !entry.name.endsWith('.map')) {
           this.collectChunkFile(chunks, full, prefix, entry.name);
@@ -272,7 +274,11 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   }
 
   /** 统计每个文件对已知大库的全量引入（排除子路径引入），按 (file, library) 去重 */
-  private findWholeLibraryImports(projectRoot: string, files: string[], limit: number): Array<{ file: string; library: string }> {
+  private findWholeLibraryImports(
+    projectRoot: string,
+    files: string[],
+    limit: number,
+  ): Array<{ file: string; library: string }> {
     const hits: Array<{ file: string; library: string }> = [];
     const seen = new Set<string>();
     let scanned = 0;
@@ -282,7 +288,9 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       const content = readTextSafe(filePath);
       if (content === null) continue;
       // 匹配 import ... from 'xxx' / "xxx" 或 require('xxx')
-      for (const m of content.matchAll(/(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g)) {
+      for (const m of content.matchAll(
+        /(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g,
+      )) {
         this.recordWholeLibraryHit(hits, seen, projectRoot, filePath, m[1]);
       }
     }
@@ -314,7 +322,13 @@ export const treeShakingDetector: TreeShakingDetector = new TreeShakingDetectorI
 
 /** 排序：严重度降序，其次文件路径升序 */
 function sortTreeShakingIssues(issues: PerformanceIssue[]): PerformanceIssue[] {
-  const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  const severityOrder: Record<string, number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+    info: 4,
+  };
   issues.sort((a, b) => {
     const sa = severityOrder[a.severity] ?? 5;
     const sb = severityOrder[b.severity] ?? 5;

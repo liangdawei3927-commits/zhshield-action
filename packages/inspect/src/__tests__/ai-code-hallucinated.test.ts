@@ -8,7 +8,13 @@ import { listNodeModules, packageNameFromSpecifier } from '../ai-code/files';
 import { collectNpmPackages, collectPnpmPackages, collectYarnPackages } from '../ai-code/lockfile';
 
 function profile(projectPath: string): ProjectProfile {
-  return { projectPath, language: 'typescript', framework: null, packageManager: 'pnpm', hasTypeScript: true };
+  return {
+    projectPath,
+    language: 'typescript',
+    framework: null,
+    packageManager: 'pnpm',
+    hasTypeScript: true,
+  };
 }
 
 describe('锁文件解析', () => {
@@ -122,7 +128,10 @@ describe('HallucinatedDependencyCheckImpl', () => {
   }
 
   it('已声明包跳过；未声明 → not-found；typosquat 命中 → typosquat-similar', async () => {
-    await writeFile('package.json', JSON.stringify({ name: 'f', dependencies: { lodash: '^4.17.21' } }));
+    await writeFile(
+      'package.json',
+      JSON.stringify({ name: 'f', dependencies: { lodash: '^4.17.21' } }),
+    );
     await writeFile(
       'pnpm-lock.yaml',
       "lockfileVersion: '9.0'\n\npackages:\n  /lodash@4.17.21:\n    resolution: {integrity: sha512-aaa}\n",
@@ -157,7 +166,10 @@ describe('HallucinatedDependencyCheckImpl', () => {
   });
 
   it('声明过但未安装 → 非幻觉，不产出', async () => {
-    await writeFile('package.json', JSON.stringify({ name: 'f', dependencies: { 'ghost-declared': '^1.0.0' } }));
+    await writeFile(
+      'package.json',
+      JSON.stringify({ name: 'f', dependencies: { 'ghost-declared': '^1.0.0' } }),
+    );
     await writeFile('src/app.ts', "import 'ghost-declared';\n");
 
     const findings = await new HallucinatedDependencyCheckImpl().check(profile(tmpDir));
@@ -192,9 +204,15 @@ describe('monorepo 闭包解析（根因修复）', () => {
       `${repo}/package.json`,
       JSON.stringify({ name: 'repo-root', devDependencies: { react: '^18.3.1' } }),
     );
-    await writeFile(`${repo}/pnpm-lock.yaml`, "lockfileVersion: '9.0'\n\npackages:\n  /react@18.3.1:\n    resolution: {integrity: sha512-aaa}\n");
+    await writeFile(
+      `${repo}/pnpm-lock.yaml`,
+      "lockfileVersion: '9.0'\n\npackages:\n  /react@18.3.1:\n    resolution: {integrity: sha512-aaa}\n",
+    );
     await fs.mkdir(path.join(tmpDir, repo, 'node_modules', 'react'), { recursive: true });
-    await writeFile(`${repo}/packages/kernel/package.json`, JSON.stringify({ name: '@zh/kernel', version: '0.1.0' }));
+    await writeFile(
+      `${repo}/packages/kernel/package.json`,
+      JSON.stringify({ name: '@zh/kernel', version: '0.1.0' }),
+    );
     await writeFile(
       `${repo}/packages/desktop/src/App.tsx`,
       "import React from 'react';\nimport { x } from '@zh/kernel';\nimport 'truly-ghost-pkg-98765';\n",
@@ -215,15 +233,12 @@ describe('monorepo 闭包解析（根因修复）', () => {
   it('pnpm 工作区声明了 globs 但目标包不存在 → 仍判 not-found（防误豁免）', async () => {
     await writeFile('pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n");
     await writeFile('package.json', JSON.stringify({ name: 'root' }));
-    await writeFile('src/a.ts', "import { g } from '@zh/ghost';\nimport { r } from '@zh/kernel';\n");
     await writeFile(
-      'packages/kernel/package.json',
-      JSON.stringify({ name: '@zh/kernel' }),
+      'src/a.ts',
+      "import { g } from '@zh/ghost';\nimport { r } from '@zh/kernel';\n",
     );
-    await writeFile(
-      'packages/shared/package.json',
-      JSON.stringify({ name: '@zh/shared' }),
-    );
+    await writeFile('packages/kernel/package.json', JSON.stringify({ name: '@zh/kernel' }));
+    await writeFile('packages/shared/package.json', JSON.stringify({ name: '@zh/shared' }));
 
     const findings = await new HallucinatedDependencyCheckImpl().check(profile(tmpDir));
 
@@ -236,12 +251,20 @@ describe('monorepo 闭包解析（根因修复）', () => {
   it('子包目录为扫描入口：向上解析到工作区根，根/node_modules 闭包仍生效', async () => {
     await writeFile('pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n");
     await writeFile('package.json', JSON.stringify({ name: 'root' }));
-    await writeFile('pnpm-lock.yaml', "lockfileVersion: '9.0'\n\npackages:\n  /lodash@4.17.21:\n    resolution: {integrity: sha512-aaa}\n");
+    await writeFile(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n\npackages:\n  /lodash@4.17.21:\n    resolution: {integrity: sha512-aaa}\n",
+    );
     await writeFile('packages/kernel/package.json', JSON.stringify({ name: '@zh/kernel' }));
-    await writeFile('packages/kernel/src/index.ts', "import lodash from 'lodash';\nimport { x } from '@zh/shared';\n");
+    await writeFile(
+      'packages/kernel/src/index.ts',
+      "import lodash from 'lodash';\nimport { x } from '@zh/shared';\n",
+    );
 
     // 扫描入口 = 子包目录（无根闭包信息，只有上层工作区根可解析）
-    const findings = await new HallucinatedDependencyCheckImpl().check(profile(path.join(tmpDir, 'packages', 'kernel')));
+    const findings = await new HallucinatedDependencyCheckImpl().check(
+      profile(path.join(tmpDir, 'packages', 'kernel')),
+    );
 
     expect(findings.some((f) => f.packageName === 'lodash')).toBe(false);
     /* @zh/shared 无对应目录时仍应报 not-found，但首个用例 kernel 自己没声明它且工作区无此包 → not-found */

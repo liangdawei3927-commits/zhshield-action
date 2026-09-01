@@ -15,7 +15,11 @@ interface Step {
   icon: JSX.Element;
 }
 
-function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPreset: string | null): Step[] {
+function buildSteps(
+  projectPath: string,
+  presetConfirmed: boolean,
+  selectedPreset: string | null,
+): Step[] {
   return [
     {
       id: 'analyze',
@@ -24,7 +28,16 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
         await window.electronAPI?.engine?.runProfile(projectPath);
       },
       icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
@@ -37,7 +50,16 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
         await window.electronAPI?.sop?.syncNow();
       },
       icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
           <line x1="16" y1="13" x2="8" y2="13" />
@@ -53,7 +75,16 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
         await window.electronAPI?.sop?.getStats();
       },
       icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ),
@@ -74,7 +105,16 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
         }
       },
       icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="3" y="3" width="7" height="7" />
           <rect x="14" y="3" width="7" height="7" />
           <rect x="14" y="14" width="7" height="7" />
@@ -86,10 +126,22 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
       id: 'ready',
       labelKey: 'page.onboarding.step.ready',
       execute: async () => {
-        await window.electronAPI?.engine?.runPipeline(projectPath, { sop: true, presetName: selectedPreset || undefined });
+        await window.electronAPI?.engine?.runPipeline(projectPath, {
+          sop: true,
+          presetName: selectedPreset || undefined,
+        });
       },
       icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -99,12 +151,15 @@ function buildSteps(projectPath: string, presetConfirmed: boolean, selectedPrese
 }
 
 function runStep(step: Step, onDone: () => void): void {
-  step.execute()
-    .then(onDone)
-    .catch(onDone);
+  step.execute().then(onDone).catch(onDone);
 }
 
-function runCurrentStep(steps: Step[], index: number, presetConfirmed: boolean, onDone: () => void): void {
+function runCurrentStep(
+  steps: Step[],
+  index: number,
+  presetConfirmed: boolean,
+  onDone: () => void,
+): void {
   const step = steps[index];
   if (step.id === 'preset' && !presetConfirmed) {
     return;
@@ -138,9 +193,14 @@ function useStepAdvance(steps: Step[], presetConfirmed: boolean, onComplete: () 
 
 function OnboardingLogo({ t }: { t: (key: string) => string }) {
   return (
-    <div className="absolute top-4 left-5 flex items-center gap-2" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+    <div
+      className="absolute top-4 left-5 flex items-center gap-2"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    >
       <ShieldLogo size={22} />
-      <span className="text-white text-sm font-semibold tracking-wide">{t('page.welcome.brand')}</span>
+      <span className="text-white text-sm font-semibold tracking-wide">
+        {t('page.welcome.brand')}
+      </span>
     </div>
   );
 }
@@ -149,7 +209,13 @@ function OnboardingShield({ projectName }: { projectName: string }) {
   return (
     <>
       <div className="relative mb-8" style={{ width: 160, height: 160 }}>
-        <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgb(var(--zh-brand) / 0.25) 0%, rgb(var(--zh-brand) / 0.05) 60%, transparent 80%)' }} />
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle, rgb(var(--zh-brand) / 0.25) 0%, rgb(var(--zh-brand) / 0.05) 60%, transparent 80%)',
+          }}
+        />
         <div
           className="absolute inset-0 rounded-full"
           style={{
@@ -162,7 +228,10 @@ function OnboardingShield({ projectName }: { projectName: string }) {
           <ShieldLogo size={60} />
         </div>
       </div>
-      <div className="text-white text-xl font-bold mb-2" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.35)' }}>
+      <div
+        className="text-white text-xl font-bold mb-2"
+        style={{ textShadow: '0 2px 12px rgba(0,0,0,0.35)' }}
+      >
         {projectName}
       </div>
     </>
@@ -171,7 +240,10 @@ function OnboardingShield({ projectName }: { projectName: string }) {
 
 function OnboardingProgressBar({ progress }: { progress: number }) {
   return (
-    <div className="w-64 h-1.5 rounded-full overflow-hidden mb-8" style={{ background: 'rgba(255,255,255,0.15)' }}>
+    <div
+      className="w-64 h-1.5 rounded-full overflow-hidden mb-8"
+      style={{ background: 'rgba(255,255,255,0.15)' }}
+    >
       <div
         className="h-full rounded-full transition-all duration-500"
         style={{
@@ -208,8 +280,8 @@ function OnboardingStepList({
               isCurrent
                 ? 'bg-white/15 border border-white/30'
                 : isCompleted
-                ? 'bg-white/8 border border-white/15'
-                : 'bg-white/5 border border-white/10 opacity-40'
+                  ? 'bg-white/8 border border-white/15'
+                  : 'bg-white/5 border border-white/10 opacity-40'
             }`}
           >
             <div
@@ -217,12 +289,21 @@ function OnboardingStepList({
                 isCurrent
                   ? 'bg-white/20 text-white'
                   : isCompleted
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-white/10 text-white/50'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-white/10 text-white/50'
               }`}
             >
               {isCompleted ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
@@ -238,7 +319,10 @@ function OnboardingStepList({
             </span>
             {isCurrent && (
               <div className="ml-auto">
-                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full" style={{ animation: 'spin 1s linear infinite' }} />
+                <div
+                  className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full"
+                  style={{ animation: 'spin 1s linear infinite' }}
+                />
               </div>
             )}
           </div>
@@ -265,9 +349,7 @@ function OnboardingPresetSelector({
         className="rounded-xl p-5"
         style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
       >
-        <div className="text-white text-sm font-semibold mb-4 text-center">
-          选择治理预设
-        </div>
+        <div className="text-white text-sm font-semibold mb-4 text-center">选择治理预设</div>
         <div className="grid grid-cols-3 gap-3 mb-4">
           {presets.map((preset) => (
             <button
@@ -281,8 +363,12 @@ function OnboardingPresetSelector({
               }`}
             >
               <span className="text-2xl">{preset.icon}</span>
-              <span className="text-white text-xs font-medium leading-tight text-center">{preset.label}</span>
-              <span className="text-white/50 text-[10px] leading-tight text-center">{preset.desc}</span>
+              <span className="text-white text-xs font-medium leading-tight text-center">
+                {preset.label}
+              </span>
+              <span className="text-white/50 text-[10px] leading-tight text-center">
+                {preset.desc}
+              </span>
             </button>
           ))}
         </div>
@@ -291,11 +377,16 @@ function OnboardingPresetSelector({
           onClick={onConfirm}
           className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
           style={{
-            background: 'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
+            background:
+              'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.9';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '1';
+          }}
         >
           确认选择
         </button>
@@ -325,7 +416,12 @@ function OnboardingSteps({
 }) {
   return (
     <>
-      <OnboardingStepList steps={steps} completedSteps={completedSteps} currentStepIndex={currentStepIndex} t={t} />
+      <OnboardingStepList
+        steps={steps}
+        completedSteps={completedSteps}
+        currentStepIndex={currentStepIndex}
+        t={t}
+      />
       {showPreset && (
         <OnboardingPresetSelector
           presets={ONBOARDING_PRESETS}
@@ -405,7 +501,10 @@ function OnboardingContent({
   return (
     <div
       className="flex flex-col items-center justify-center h-full w-full relative"
-      style={{ background: 'linear-gradient(180deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-dark)) 30%, rgb(var(--zh-brand-hover)) 60%, rgb(var(--zh-brand-600)) 100%)' }}
+      style={{
+        background:
+          'linear-gradient(180deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-dark)) 30%, rgb(var(--zh-brand-hover)) 60%, rgb(var(--zh-brand-600)) 100%)',
+      }}
     >
       <OnboardingLogo t={t} />
       <OnboardingCenter
@@ -420,15 +519,17 @@ function OnboardingContent({
         onSelectPreset={onSelectPreset}
         onConfirmPreset={onConfirmPreset}
       />
-      <div className="absolute bottom-6 text-white/40 text-xs">
-        {t('page.onboarding.hint')}
-      </div>
+      <div className="absolute bottom-6 text-white/40 text-xs">{t('page.onboarding.hint')}</div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: ProjectOnboardingPageProps) {
+export function ProjectOnboardingPage({
+  projectName,
+  projectPath,
+  onComplete,
+}: ProjectOnboardingPageProps) {
   const t = useT();
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [presetConfirmed, setPresetConfirmed] = useState(false);
@@ -446,7 +547,11 @@ export function ProjectOnboardingPage({ projectName, projectPath, onComplete }: 
       selectedPreset={selectedPreset}
       onSelectPreset={setSelectedPreset}
       onConfirmPreset={() => setPresetConfirmed(true)}
-      showPreset={currentStepIndex < steps.length && steps[currentStepIndex].id === 'preset' && !presetConfirmed}
+      showPreset={
+        currentStepIndex < steps.length &&
+        steps[currentStepIndex].id === 'preset' &&
+        !presetConfirmed
+      }
     />
   );
 }

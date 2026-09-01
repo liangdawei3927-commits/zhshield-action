@@ -17,7 +17,16 @@ export function ThemeSection() {
       <SectionTitle
         label={t('layout.theme')}
         icon={
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="5" />
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
           </svg>
@@ -32,7 +41,9 @@ export function ThemeSection() {
             <span className="text-sm">{option.icon}</span>
             <span className="text-xs text-zh-ink-2 flex-1">{t(option.labelKey)}</span>
             <div className="w-4 h-4 rounded-full border-2 border-zh-line flex items-center justify-center">
-              {mode === option.value && <div className="w-2 h-2 rounded-full bg-[rgb(var(--zh-brand))]" />}
+              {mode === option.value && (
+                <div className="w-2 h-2 rounded-full bg-[rgb(var(--zh-brand))]" />
+              )}
             </div>
             <input
               type="radio"
@@ -57,7 +68,16 @@ export function LanguageSection() {
       <SectionTitle
         label={t('layout.language')}
         icon={
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
           </svg>
@@ -89,14 +109,25 @@ export function AboutSection() {
       <SectionTitle
         label={t('layout.about')}
         icon={
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 16v-4M12 8h.01" />
           </svg>
         }
       />
       <div className="px-3 py-2">
-        <div className="text-xs text-zh-muted">{t('layout.aboutVersion', { version: 'v0.1.0' })}</div>
+        <div className="text-xs text-zh-muted">
+          {t('layout.aboutVersion', { version: 'v0.1.0' })}
+        </div>
         <div className="text-[11px] text-zh-muted mt-1">{t('layout.brandSlogan')}</div>
       </div>
     </section>

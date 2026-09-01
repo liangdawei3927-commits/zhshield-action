@@ -1,4 +1,5 @@
-export type SchedulerTaskType = 'pipeline' | 'inspect' | 'security' | 'guard' | 'refactor' | 'deps' | 'techDebt';
+export type SchedulerTaskType =
+  'pipeline' | 'inspect' | 'security' | 'guard' | 'refactor' | 'deps' | 'techDebt';
 
 export type SchedulerFrequency = 'daily' | 'weekly' | 'monthly';
 

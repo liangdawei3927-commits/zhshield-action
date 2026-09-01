@@ -12,7 +12,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function ToastViewport({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
+function ToastViewport({
+  toasts,
+  onDismiss,
+}: {
+  toasts: ToastItem[];
+  onDismiss: (id: string) => void;
+}) {
   return (
     <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
       {toasts.map((t) => (

@@ -87,9 +87,26 @@ export class LocalBackup {
       const snapshotName = timestamp.replace(/[:.]/g, '-');
 
       if (config.format === 'zip') {
-        return await this.runZipBackup(resolvedBackupDir, snapshotName, files, projectPath, timestamp, config, abortSignal);
+        return await this.runZipBackup(
+          resolvedBackupDir,
+          snapshotName,
+          files,
+          projectPath,
+          timestamp,
+          config,
+          abortSignal,
+        );
       }
-      return await this.runDirectoryBackup(resolvedBackupDir, snapshotName, files, manifest, projectPath, timestamp, config, abortSignal);
+      return await this.runDirectoryBackup(
+        resolvedBackupDir,
+        snapshotName,
+        files,
+        manifest,
+        projectPath,
+        timestamp,
+        config,
+        abortSignal,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : '未知本地备份错误';
       return {
@@ -128,7 +145,9 @@ export class LocalBackup {
       backupPath: zipPath,
       size: stats.totalSize,
       fileCount: stats.backedUp,
-      ...(stats.errors > 0 && stats.backedUp === 0 ? { error: `${stats.errors} 个文件打包失败` } : {}),
+      ...(stats.errors > 0 && stats.backedUp === 0
+        ? { error: `${stats.errors} 个文件打包失败` }
+        : {}),
     };
   }
 
@@ -158,7 +177,12 @@ export class LocalBackup {
 
     if (!abortSignal?.aborted) {
       await this.manifestStore.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);
-      await this.manifestStore.updateManifestFile(resolvedBackupDir, fileEntries, timestamp, isFullBackup);
+      await this.manifestStore.updateManifestFile(
+        resolvedBackupDir,
+        fileEntries,
+        timestamp,
+        isFullBackup,
+      );
       await this.pruneOldBackups(resolvedBackupDir, config.maxBackups);
     }
 
@@ -200,8 +224,11 @@ export class LocalBackup {
       const entries = await fs.readdir(dir);
       const snapshots: string[] = [];
       for (const entry of entries) {
+        if (entry === 'node_modules') continue;
         if (!SNAPSHOT_NAME_RE.test(entry)) continue;
         const fullPath = path.join(dir, entry);
+        // perf rule false positive: arg depends on loop var via dataflow
+        // eslint-disable-next-line perf/perf-no-serial-await
         const stat = await fs.stat(fullPath).catch(() => null);
         if (stat?.isDirectory() || stat?.isFile()) {
           snapshots.push(fullPath);

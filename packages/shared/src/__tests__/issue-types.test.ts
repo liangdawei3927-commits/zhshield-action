@@ -28,20 +28,28 @@ describe('Issue 可选扩展字段（§11.3 / ADR #1 内部规范形态）', () 
   });
 
   it('Given SARIF-compatible 污点链，When 挂载 codeFlows，Then 完整保留 source→sink 位置链', () => {
-    const codeFlows: CodeFlow[] = [{
-      threadFlows: [{
-        locations: [
-          { location: { file: 'src/a.py', line: 1, column: 2 }, message: 'taint source' },
-          { location: { file: 'src/a.py', line: 5, column: 1 }, message: 'taint sink' },
+    const codeFlows: CodeFlow[] = [
+      {
+        threadFlows: [
+          {
+            locations: [
+              { location: { file: 'src/a.py', line: 1, column: 2 }, message: 'taint source' },
+              { location: { file: 'src/a.py', line: 5, column: 1 }, message: 'taint sink' },
+            ],
+          },
         ],
-      }],
-    }];
+      },
+    ];
 
     const issue: Issue = { ...baseIssue(), codeFlows };
 
     expect(issue.codeFlows).toHaveLength(1);
     expect(issue.codeFlows![0].threadFlows[0].locations).toHaveLength(2);
-    expect(issue.codeFlows![0].threadFlows[0].locations[0].location).toEqual({ file: 'src/a.py', line: 1, column: 2 });
+    expect(issue.codeFlows![0].threadFlows[0].locations[0].location).toEqual({
+      file: 'src/a.py',
+      line: 1,
+      column: 2,
+    });
     expect(issue.codeFlows![0].threadFlows[0].locations[1].message).toBe('taint sink');
   });
 
@@ -77,7 +85,11 @@ describe('Issue 可选扩展字段类型断言（typecheck 阶段生效）', () 
   it('CodeFlow 形状与 SARIF 子集一致且不含 any', () => {
     expectTypeOf<CodeFlow>().toEqualTypeOf<{ threadFlows: CodeFlowThreadFlow[] }>();
     expectTypeOf<CodeFlowThreadFlow>().toEqualTypeOf<{ locations: CodeFlowLocation[] }>();
-    expectTypeOf<CodeFlowLocation['location']>().toEqualTypeOf<{ file: string; line?: number; column?: number }>();
+    expectTypeOf<CodeFlowLocation['location']>().toEqualTypeOf<{
+      file: string;
+      line?: number;
+      column?: number;
+    }>();
   });
 
   it('不带新字段的 Issue 依然可赋值为 Issue', () => {

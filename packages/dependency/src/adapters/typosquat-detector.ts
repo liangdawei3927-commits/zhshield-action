@@ -263,7 +263,10 @@ function evaluateNode(node: DependencyNode): TyposquatFinding | null {
 }
 
 /** 逐一比对知名包，取编辑距离最小者（同距离时视觉混淆优先） */
-function findBestMatch(name: string, visualTarget: string | null): { target: string; dist: number; visual: boolean } | null {
+function findBestMatch(
+  name: string,
+  visualTarget: string | null,
+): { target: string; dist: number; visual: boolean } | null {
   let bestTarget = '';
   let bestDist = Infinity;
   let bestVisual = false;
@@ -282,7 +285,11 @@ function findBestMatch(name: string, visualTarget: string | null): { target: str
 }
 
 /** 风险定级：≤1 或视觉混淆 → high；≤2 → medium；≤3 且常见目标 → low */
-function classifyRisk(best: { target: string; dist: number; visual: boolean }): TyposquatFinding['risk'] | null {
+function classifyRisk(best: {
+  target: string;
+  dist: number;
+  visual: boolean;
+}): TyposquatFinding['risk'] | null {
   if (best.visual || best.dist <= HIGH_RISK_MAX_EDIT_DISTANCE) return 'high';
   if (best.dist <= MEDIUM_RISK_MAX_EDIT_DISTANCE) return 'medium';
   if (best.dist <= LOW_RISK_MAX_EDIT_DISTANCE && COMMON_TARGETS.has(best.target)) return 'low';

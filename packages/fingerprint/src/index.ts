@@ -87,10 +87,7 @@ export {
   FORM_DIR_RULES,
   slugify,
 } from './language-map';
-export {
-  FRAMEWORK_KEYWORDS,
-  SERVER_FRAMEWORK_DEP_KEYWORDS,
-} from './framework-map';
+export { FRAMEWORK_KEYWORDS, SERVER_FRAMEWORK_DEP_KEYWORDS } from './framework-map';
 
 // ─── 便捷 API ───
 
@@ -139,7 +136,10 @@ export async function profileProject(
   questions: ReturnType<QuestionSet['generate']>;
   drift: ReturnType<DriftDetector['detect']>;
 }> {
-  const { profiler, profileStore, driftDetector, questionSet } = createPipelineComponents(projectPath, options);
+  const { profiler, profileStore, driftDetector, questionSet } = createPipelineComponents(
+    projectPath,
+    options,
+  );
   const drift = detectDrift(profileStore, driftDetector, projectPath);
   const profile = await profiler.profile(projectPath, options?.overrides);
   profileStore.save(projectPath, profile);
@@ -179,10 +179,7 @@ function detectDrift(
  * @param overrides 用户修正
  * @returns 更新后的画像
  */
-export function confirmProfile(
-  projectPath: string,
-  overrides: UserOverrides,
-): ProjectProfile {
+export function confirmProfile(projectPath: string, overrides: UserOverrides): ProjectProfile {
   const profileStore = createProfileStore();
   return profileStore.mergeOverridesAndSave(projectPath, overrides);
 }

@@ -13,6 +13,7 @@
     "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {
+    "@zh/db": "workspace:*",
     "@zh/shared": "workspace:*"
   },
   "devDependencies": {

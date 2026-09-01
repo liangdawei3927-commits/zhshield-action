@@ -11,11 +11,16 @@ function HistoryRow({ item, isLast }: { item: HealthScoreRow; isLast: boolean })
         {new Date(item.timestamp).toLocaleDateString()}
       </td>
       <td className="px-5 py-3">
-        <span className="font-bold" style={{ color: getScoreColor(item.score) }}>{item.score}</span>
+        <span className="font-bold" style={{ color: getScoreColor(item.score) }}>
+          {item.score}
+        </span>
         <span className="text-xs ml-1 text-zh-muted">({getScoreLabel(item.score)})</span>
       </td>
       <td className="px-5 py-3">
-        <span className="text-xs" style={{ color: item.score >= 60 ? 'rgb(var(--zh-success))' : 'rgb(var(--zh-danger))' }}>
+        <span
+          className="text-xs"
+          style={{ color: item.score >= 60 ? 'rgb(var(--zh-success))' : 'rgb(var(--zh-danger))' }}
+        >
           {item.score >= 60 ? t('page.reports.table.healthy') : t('page.reports.table.abnormal')}
         </span>
       </td>
@@ -40,11 +45,21 @@ export function HistoryTable({ data }: { data: HealthScoreData[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-zh-panel">
-            <th className="text-left px-5 py-3 font-medium text-zh-muted">{t('page.reports.table.col.date')}</th>
-            <th className="text-left px-5 py-3 font-medium text-zh-muted">{t('page.reports.table.col.score')}</th>
-            <th className="text-left px-5 py-3 font-medium text-zh-muted">{t('page.reports.table.col.status')}</th>
-            <th className="text-left px-5 py-3 font-medium text-zh-muted">{t('page.reports.table.col.dimension')}</th>
-            <th className="text-right px-5 py-3 font-medium text-zh-muted">{t('page.reports.table.col.summary')}</th>
+            <th className="text-left px-5 py-3 font-medium text-zh-muted">
+              {t('page.reports.table.col.date')}
+            </th>
+            <th className="text-left px-5 py-3 font-medium text-zh-muted">
+              {t('page.reports.table.col.score')}
+            </th>
+            <th className="text-left px-5 py-3 font-medium text-zh-muted">
+              {t('page.reports.table.col.status')}
+            </th>
+            <th className="text-left px-5 py-3 font-medium text-zh-muted">
+              {t('page.reports.table.col.dimension')}
+            </th>
+            <th className="text-right px-5 py-3 font-medium text-zh-muted">
+              {t('page.reports.table.col.summary')}
+            </th>
           </tr>
         </thead>
         <tbody>

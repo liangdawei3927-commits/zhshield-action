@@ -54,7 +54,8 @@ export class GuardEngine {
       if (!check.enabled) return false;
       if (check.mode.length > 0 && !check.mode.includes(options.mode)) return false;
       if (options.profile && check.category !== options.profile) return false;
-      if (options.checks && options.checks.length > 0 && !options.checks.includes(check.checkId)) return false;
+      if (options.checks && options.checks.length > 0 && !options.checks.includes(check.checkId))
+        return false;
       return true;
     });
   }
@@ -62,7 +63,9 @@ export class GuardEngine {
   aggregateReport(results: CheckResult[], options: CheckOptions): GuardReport {
     const failed = results.filter((r) => r.status === 'failed');
     const errors = results.filter((r) => r.status === 'error');
-    const warnings = results.filter((r) => r.status !== 'passed' && r.severity === 'warning').length;
+    const warnings = results.filter(
+      (r) => r.status !== 'passed' && r.severity === 'warning',
+    ).length;
 
     return this.buildReport(results, options, failed.length, errors.length, warnings);
   }
@@ -131,7 +134,9 @@ export class GuardEngine {
   }
 
   /** 执行 SOP 规则引擎评估 */
-  private async evaluateSopRules(options: CheckOptions): Promise<Awaited<ReturnType<SopRuleEngine['evaluateRules']>>> {
+  private async evaluateSopRules(
+    options: CheckOptions,
+  ): Promise<Awaited<ReturnType<SopRuleEngine['evaluateRules']>>> {
     return this.sopEngine!.evaluateRules({
       repoRoot: this.repoRoot,
       domain: 'guard',
@@ -182,8 +187,7 @@ export class GuardEngine {
     const wanted = new Set(checks);
     const exact = evaluations.filter(
       (ev) =>
-        (ev.rule?.id && wanted.has(ev.rule.id)) ||
-        (ev.rule?.name && wanted.has(ev.rule.name)),
+        (ev.rule?.id && wanted.has(ev.rule.id)) || (ev.rule?.name && wanted.has(ev.rule.name)),
     );
     if (exact.length > 0) return exact;
 
@@ -244,19 +248,15 @@ export class GuardEngine {
       status: EVAL_STATUS_MAP[ev.status] ?? 'error',
       severity: this.resolveEvalSeverity(ev),
       // F1-4：优先消费 kernel 附加的阻断判定；存量/外部评估缺省该字段时回退旧行为（failed 即阻断）
-      blocking: ev.blocking ?? (ev.status === 'failed'),
+      blocking: ev.blocking ?? ev.status === 'failed',
       message: ev.message || `${ev.status}: ${ev.rule?.name || ev.rule?.id || '未知规则'}`,
-      details: ev.violations
-        ? { violations: ev.violations, files: ev.files }
-        : undefined,
+      details: ev.violations ? { violations: ev.violations, files: ev.files } : undefined,
       duration: ev.durationMs,
     };
   }
 
   /** 解析评估的严重级：规则严重级映射，缺省回退 warning */
   private resolveEvalSeverity(ev: RuleEvaluation): CheckResult['severity'] {
-    return ev.rule
-      ? EVAL_SEVERITY_MAP[ev.rule.severity] ?? 'warning'
-      : 'warning';
+    return ev.rule ? (EVAL_SEVERITY_MAP[ev.rule.severity] ?? 'warning') : 'warning';
   }
 }

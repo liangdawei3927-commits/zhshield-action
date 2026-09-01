@@ -6,23 +6,50 @@ import { ResultCard } from '../components/ui/ResultCard';
 import { type SmellGroup } from './refactor-logic';
 import { SmellGroupPanel } from './refactor-panel';
 
-export function RefactorHeader({ report, scanning, progressLabel, lastAutoAt, onScan }: { report: RefactorReportData; scanning: boolean; progressLabel?: string; lastAutoAt: string | null; onScan: () => void }) {
+export function RefactorHeader({
+  report,
+  scanning,
+  progressLabel,
+  lastAutoAt,
+  onScan,
+}: {
+  report: RefactorReportData;
+  scanning: boolean;
+  progressLabel?: string;
+  lastAutoAt: string | null;
+  onScan: () => void;
+}) {
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8 flex-wrap">
       <Bounce className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--zh-info))" strokeWidth="1.8">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="rgb(var(--zh-info))"
+          strokeWidth="1.8"
+        >
           <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
         </svg>
       </Bounce>
       <div className="flex-1 min-w-[200px]">
         <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.refactor.header.title')}</h1>
         <p className="text-sm text-zh-muted">
-          {t('page.refactor.header.summary', { totalSmells: report.totalSmells, files: report.files.length })}
+          {t('page.refactor.header.summary', {
+            totalSmells: report.totalSmells,
+            files: report.files.length,
+          })}
           {lastAutoAt ? t('page.refactor.header.lastAutoCheck', { time: lastAutoAt }) : ''}
         </p>
       </div>
-      <PrimaryButton className="ml-auto" onClick={onScan} loading={scanning} loadingLabel={progressLabel || t('page.refactor.scanning')}>
+      <PrimaryButton
+        className="ml-auto"
+        onClick={onScan}
+        loading={scanning}
+        loadingLabel={progressLabel || t('page.refactor.scanning')}
+      >
         {t('page.refactor.scanNow')}
       </PrimaryButton>
     </div>
@@ -34,20 +61,42 @@ export function RefactorStats({ report }: { report: RefactorReportData }) {
   return (
     <div className="flex gap-4 mb-6">
       {[
-        { labelKey: 'page.refactor.stats.smells', value: report.totalSmells, color: 'rgb(var(--zh-info))' },
-        { labelKey: 'page.refactor.stats.files', value: report.files.length, color: 'rgb(var(--zh-warning))' },
-        { labelKey: 'page.refactor.stats.highPriority', value: report.summary.needsImmediateAction, color: 'rgb(var(--zh-danger))' },
+        {
+          labelKey: 'page.refactor.stats.smells',
+          value: report.totalSmells,
+          color: 'rgb(var(--zh-info))',
+        },
+        {
+          labelKey: 'page.refactor.stats.files',
+          value: report.files.length,
+          color: 'rgb(var(--zh-warning))',
+        },
+        {
+          labelKey: 'page.refactor.stats.highPriority',
+          value: report.summary.needsImmediateAction,
+          color: 'rgb(var(--zh-danger))',
+        },
       ].map((item) => (
         <ResultCard key={item.labelKey} variant="stats" className="flex-1">
           <div className="text-xs text-zh-muted mb-1">{t(item.labelKey)}</div>
-          <div className="text-xl font-bold" style={{ color: item.color }}>{item.value}</div>
+          <div className="text-xl font-bold" style={{ color: item.color }}>
+            {item.value}
+          </div>
         </ResultCard>
       ))}
     </div>
   );
 }
 
-export function RuleTabs({ groups, activeRuleId, onSelect }: { groups: SmellGroup[]; activeRuleId: string; onSelect: (ruleId: string) => void }) {
+export function RuleTabs({
+  groups,
+  activeRuleId,
+  onSelect,
+}: {
+  groups: SmellGroup[];
+  activeRuleId: string;
+  onSelect: (ruleId: string) => void;
+}) {
   const t = useT();
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -94,8 +143,18 @@ interface ReportViewProps {
 
 /** 报告态：头部 + 统计 + 按类型分组的问题面板 */
 export function RefactorReportView({
-  report, scanning, progressLabel, lastAutoAt, error, groups, activeRuleId, activeGroup,
-  onScan, onSelectRule, onCopyGroup, onCopyItem,
+  report,
+  scanning,
+  progressLabel,
+  lastAutoAt,
+  error,
+  groups,
+  activeRuleId,
+  activeGroup,
+  onScan,
+  onSelectRule,
+  onCopyGroup,
+  onCopyItem,
 }: ReportViewProps) {
   const t = useT();
   return (
@@ -115,8 +174,15 @@ export function RefactorReportView({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zh-ink-2">{t('page.refactor.groupedIssues')}</h3>
-            <span className="text-xs text-zh-muted">{t('page.refactor.groupsSummary', { groups: groups.length, total: report.totalSmells })}</span>
+            <h3 className="text-sm font-semibold text-zh-ink-2">
+              {t('page.refactor.groupedIssues')}
+            </h3>
+            <span className="text-xs text-zh-muted">
+              {t('page.refactor.groupsSummary', {
+                groups: groups.length,
+                total: report.totalSmells,
+              })}
+            </span>
           </div>
           {groups.length === 0 ? (
             <ResultCard variant="list" className="p-8 text-center">

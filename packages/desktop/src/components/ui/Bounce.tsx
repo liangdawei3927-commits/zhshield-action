@@ -47,20 +47,59 @@ function usePress() {
   };
   const release = () => setPressed(false);
 
-  return { ref, pressed, onPointerDown, onPointerUp: release, onPointerCancel: release, onPointerLeave: release };
+  return {
+    ref,
+    pressed,
+    onPointerDown,
+    onPointerUp: release,
+    onPointerCancel: release,
+    onPointerLeave: release,
+  };
 }
 
-function BounceImpl<T extends ElementType = 'div'>({ baseClass, as, className, children, onPointerDown, onPointerUp, onPointerCancel, onPointerLeave, ...rest }: BounceProps<T> & { baseClass: string }) {
+function BounceImpl<T extends ElementType = 'div'>({
+  baseClass,
+  as,
+  className,
+  children,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  onPointerLeave,
+  ...rest
+}: BounceProps<T> & { baseClass: string }) {
   const Tag: ElementType = as ?? 'div';
-  const { ref, pressed, onPointerDown: down, onPointerUp: up, onPointerCancel: cancel, onPointerLeave: leave } = usePress();
+  const {
+    ref,
+    pressed,
+    onPointerDown: down,
+    onPointerUp: up,
+    onPointerCancel: cancel,
+    onPointerLeave: leave,
+  } = usePress();
   return (
     <Tag
       ref={ref}
-      className={mergeClass(mergeClass(baseClass, className), pressed ? 'zh-bounce-pressed' : undefined)}
-      onPointerDown={(e: ReactPointerEvent) => { down(e); onPointerDown?.(e); }}
-      onPointerUp={(e: ReactPointerEvent) => { up(); onPointerUp?.(e); }}
-      onPointerCancel={(e: ReactPointerEvent) => { cancel(); onPointerCancel?.(e); }}
-      onPointerLeave={(e: ReactPointerEvent) => { leave(); onPointerLeave?.(e); }}
+      className={mergeClass(
+        mergeClass(baseClass, className),
+        pressed ? 'zh-bounce-pressed' : undefined,
+      )}
+      onPointerDown={(e: ReactPointerEvent) => {
+        down(e);
+        onPointerDown?.(e);
+      }}
+      onPointerUp={(e: ReactPointerEvent) => {
+        up();
+        onPointerUp?.(e);
+      }}
+      onPointerCancel={(e: ReactPointerEvent) => {
+        cancel();
+        onPointerCancel?.(e);
+      }}
+      onPointerLeave={(e: ReactPointerEvent) => {
+        leave();
+        onPointerLeave?.(e);
+      }}
       {...rest}
     >
       {children}
@@ -74,7 +113,12 @@ export function Bounce<T extends ElementType = 'div'>(props: BounceProps<T>) {
 }
 
 /** 品牌绿边框卡片外观（无弹跳），与 Bounce 组合等价 BounceCard */
-export function Card<T extends ElementType = 'div'>({ as, className, children, ...rest }: BounceProps<T>) {
+export function Card<T extends ElementType = 'div'>({
+  as,
+  className,
+  children,
+  ...rest
+}: BounceProps<T>) {
   const Tag: ElementType = as ?? 'div';
   return (
     <Tag className={mergeClass('border border-brand/50', className)} {...rest}>

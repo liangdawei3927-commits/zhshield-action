@@ -86,10 +86,7 @@ describe('DriftDetector', () => {
         const detector = new DriftDetector(root);
 
         // 扫描前添加 package.json
-        fs.writeFileSync(
-          path.join(root, 'package.json'),
-          JSON.stringify({ name: 'test' }),
-        );
+        fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'test' }));
 
         const result = detector.detect(profile);
 

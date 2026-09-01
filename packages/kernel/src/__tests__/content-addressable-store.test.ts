@@ -152,17 +152,23 @@ describe('ContentAddressableStore', () => {
 
     it('应正确分类新增/删除/修改/未变化', async () => {
       // v1: r-1, r-2, r-3
-      await store.saveManifest('v1', new Map([
-        ['r-1', 'h-1'],
-        ['r-2', 'h-2'],
-        ['r-3', 'h-3'],
-      ]));
+      await store.saveManifest(
+        'v1',
+        new Map([
+          ['r-1', 'h-1'],
+          ['r-2', 'h-2'],
+          ['r-3', 'h-3'],
+        ]),
+      );
       // v2: r-2(改), r-3(不变), r-4(新增)；r-1 删除
-      await store.saveManifest('v2', new Map([
-        ['r-2', 'h-2-modified'],
-        ['r-3', 'h-3'],
-        ['r-4', 'h-4'],
-      ]));
+      await store.saveManifest(
+        'v2',
+        new Map([
+          ['r-2', 'h-2-modified'],
+          ['r-3', 'h-3'],
+          ['r-4', 'h-4'],
+        ]),
+      );
 
       const diff = await store.diffVersions('v1', 'v2');
       expect(diff.added).toEqual(['r-4']);
@@ -179,7 +185,10 @@ describe('ContentAddressableStore', () => {
     });
 
     it('完全相同的两个版本应全部 unchanged', async () => {
-      const m = new Map([['r-1', 'h-1'], ['r-2', 'h-2']]);
+      const m = new Map([
+        ['r-1', 'h-1'],
+        ['r-2', 'h-2'],
+      ]);
       await store.saveManifest('v1', m);
       await store.saveManifest('v2', m);
       const diff = await store.diffVersions('v1', 'v2');

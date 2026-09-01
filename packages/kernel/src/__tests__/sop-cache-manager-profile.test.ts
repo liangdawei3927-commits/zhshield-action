@@ -14,13 +14,15 @@ function makeRegistryMock(rules: SopRule[]): SopRegistry {
   return { getAll: () => rules } as unknown as SopRegistry;
 }
 
-function makeProfileShape(overrides: {
-  language?: string;
-  framework?: string;
-  productForm?: string;
-  architecture?: string;
-  environments?: string[];
-} = {}) {
+function makeProfileShape(
+  overrides: {
+    language?: string;
+    framework?: string;
+    productForm?: string;
+    architecture?: string;
+    environments?: string[];
+  } = {},
+) {
   return {
     schemaVersion: 1 as const,
     architecture: { value: overrides.architecture ?? 'monolith', confidence: 1.0, signals: [] },

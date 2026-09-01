@@ -7,9 +7,21 @@ import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils
 import { useTaskRun } from '../task-store';
 
 export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
-  critical: { color: 'rgb(var(--zh-danger-dark))', bg: 'rgb(var(--zh-danger) / 0.1)', labelKey: 'severity.critical' },
-  high: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', labelKey: 'severity.high' },
-  medium: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)', labelKey: 'severity.medium' },
+  critical: {
+    color: 'rgb(var(--zh-danger-dark))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    labelKey: 'severity.critical',
+  },
+  high: {
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+    labelKey: 'severity.high',
+  },
+  medium: {
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+    labelKey: 'severity.medium',
+  },
   low: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)', labelKey: 'severity.low' },
 };
 

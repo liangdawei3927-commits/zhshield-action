@@ -97,13 +97,22 @@ function requireNumber(
   const value = container[key];
   if (value === undefined) return;
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new ProjectScoringConfigError(filePath, `${label}.${key} 必须是有限数字，实际为 ${JSON.stringify(value)}`);
+    throw new ProjectScoringConfigError(
+      filePath,
+      `${label}.${key} 必须是有限数字，实际为 ${JSON.stringify(value)}`,
+    );
   }
   if (opts.min !== undefined && value < opts.min) {
-    throw new ProjectScoringConfigError(filePath, `${label}.${key} 不能小于 ${opts.min}，实际为 ${value}`);
+    throw new ProjectScoringConfigError(
+      filePath,
+      `${label}.${key} 不能小于 ${opts.min}，实际为 ${value}`,
+    );
   }
   if (opts.max !== undefined && value > opts.max) {
-    throw new ProjectScoringConfigError(filePath, `${label}.${key} 不能大于 ${opts.max}，实际为 ${value}`);
+    throw new ProjectScoringConfigError(
+      filePath,
+      `${label}.${key} 不能大于 ${opts.max}，实际为 ${value}`,
+    );
   }
 }
 
@@ -127,7 +136,10 @@ function rejectUnknownKeys(
  * 校验从文件解析出的原始对象是否符合 {@link ScoringOverrides} schema。
  * 未知维度、未知规则、未知字段、非法数值一律抛出 {@link ProjectScoringConfigError}。
  */
-export function validateScoringOverrides(raw: unknown, filePath: string | null = null): ScoringOverrides {
+export function validateScoringOverrides(
+  raw: unknown,
+  filePath: string | null = null,
+): ScoringOverrides {
   if (!isPlainObject(raw)) {
     throw new ProjectScoringConfigError(filePath, '覆盖文件顶层必须是映射（mapping）');
   }
@@ -163,7 +175,12 @@ function validateDimensionOverride(
   if (!isPlainObject(dimOverride)) {
     throw new ProjectScoringConfigError(filePath, `维度 "${dimId}" 的覆盖项必须是映射`);
   }
-  rejectUnknownKeys(dimOverride, ['weight', 'penalties', 'positiveRules'], `维度 "${dimId}"`, filePath);
+  rejectUnknownKeys(
+    dimOverride,
+    ['weight', 'penalties', 'positiveRules'],
+    `维度 "${dimId}"`,
+    filePath,
+  );
 
   requireNumber(dimOverride, 'weight', `维度 "${dimId}"`, filePath, { min: 0, max: 1 });
 
@@ -178,7 +195,11 @@ function validateDimensionOverride(
   }
 }
 
-function validatePenaltyOverrides(dimId: string, penalties: unknown, filePath: string | null): void {
+function validatePenaltyOverrides(
+  dimId: string,
+  penalties: unknown,
+  filePath: string | null,
+): void {
   if (!isPlainObject(penalties)) {
     throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties 必须是映射`);
   }
@@ -194,7 +215,10 @@ function validatePenaltyOverrides(dimId: string, penalties: unknown, filePath: s
   const multipliers = penalties.severityMultipliers;
   if (multipliers !== undefined) {
     if (!isPlainObject(multipliers)) {
-      throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties.severityMultipliers 必须是映射`);
+      throw new ProjectScoringConfigError(
+        filePath,
+        `维度 "${dimId}".penalties.severityMultipliers 必须是映射`,
+      );
     }
     for (const [severity, multiplier] of Object.entries(multipliers)) {
       if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier < 0) {
@@ -214,7 +238,10 @@ function validatePositiveRuleOverrides(
   filePath: string | null,
 ): void {
   if (!isPlainObject(positiveRules)) {
-    throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules 必须是「规则id → 覆盖项」的映射`);
+    throw new ProjectScoringConfigError(
+      filePath,
+      `维度 "${dimId}".positiveRules 必须是「规则id → 覆盖项」的映射`,
+    );
   }
   for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
     const defaultRule = defaultDim.positiveRules.find((r) => r.id === ruleId);
@@ -225,10 +252,20 @@ function validatePositiveRuleOverrides(
       );
     }
     if (!isPlainObject(ruleOverride)) {
-      throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".positiveRules.${ruleId} 必须是映射`);
+      throw new ProjectScoringConfigError(
+        filePath,
+        `维度 "${dimId}".positiveRules.${ruleId} 必须是映射`,
+      );
     }
-    rejectUnknownKeys(ruleOverride, ['points'], `维度 "${dimId}".positiveRules.${ruleId}`, filePath);
-    requireNumber(ruleOverride, 'points', `维度 "${dimId}".positiveRules.${ruleId}`, filePath, { min: 0 });
+    rejectUnknownKeys(
+      ruleOverride,
+      ['points'],
+      `维度 "${dimId}".positiveRules.${ruleId}`,
+      filePath,
+    );
+    requireNumber(ruleOverride, 'points', `维度 "${dimId}".positiveRules.${ruleId}`, filePath, {
+      min: 0,
+    });
   }
 }
 
@@ -250,7 +287,10 @@ function cloneDimension(dim: DimensionDefinition): DimensionDefinition {
  * @param base 基准配置，缺省使用内置默认配置
  * @throws {ProjectScoringConfigError} 覆盖引用了未知维度/规则，或合并后权重和 ≠ 1
  */
-export function mergeScoringOverrides(overrides: ScoringOverrides, base?: ScoringConfig): ScoringConfig {
+export function mergeScoringOverrides(
+  overrides: ScoringOverrides,
+  base?: ScoringConfig,
+): ScoringConfig {
   const source = base ?? getDefaultScoringConfig();
   const mergedDimensions: DimensionDefinition[] = source.dimensions.map(cloneDimension);
 
@@ -290,11 +330,17 @@ function mergePenaltyOverride(p: PenaltyConfig, penaltyOverride: PenaltyOverride
   Object.assign(p.severityMultipliers, penaltyOverride.severityMultipliers ?? {});
 }
 
-function mergePositiveRules(dim: DimensionDefinition, positiveRules: Record<string, PositiveRuleOverride>): void {
+function mergePositiveRules(
+  dim: DimensionDefinition,
+  positiveRules: Record<string, PositiveRuleOverride>,
+): void {
   for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
     const rule = dim.positiveRules.find((r) => r.id === ruleId);
     if (!rule) {
-      throw new ProjectScoringConfigError(null, `维度 "${dim.id}" 下未知加分规则 "${ruleId}"，无法合并覆盖`);
+      throw new ProjectScoringConfigError(
+        null,
+        `维度 "${dim.id}" 下未知加分规则 "${ruleId}"，无法合并覆盖`,
+      );
     }
     if (ruleOverride.points !== undefined) rule.points = ruleOverride.points;
   }
@@ -316,7 +362,10 @@ function assertWeightsNormalized(mergedDimensions: DimensionDefinition[]): void 
  *
  * @throws {ProjectScoringConfigError} YAML 语法无法解析或内容不符合 schema
  */
-export function parseProjectScoringOverrides(content: string, filePath: string | null = null): ScoringOverrides {
+export function parseProjectScoringOverrides(
+  content: string,
+  filePath: string | null = null,
+): ScoringOverrides {
   let parsed: unknown;
   try {
     parsed = parseSimpleYaml(content);

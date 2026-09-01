@@ -1,4 +1,3 @@
-
 export interface HtmlReportOptions {
   title?: string;
   lang?: string;
@@ -57,22 +56,31 @@ const DEFAULT_STYLES = `
 
 export function generateHtmlReport(data: HtmlReportData, options: HtmlReportOptions = {}): string {
   const { title = 'CodeShield Report', includeStyles = true } = options;
-  const passRate = data.summary.total > 0 ? Math.round((data.summary.passed / data.summary.total) * 100) : 0;
+  const passRate =
+    data.summary.total > 0 ? Math.round((data.summary.passed / data.summary.total) * 100) : 0;
 
-  const sectionsHtml = data.sections.map(section => `
+  const sectionsHtml = data.sections
+    .map(
+      (section) => `
     <div class="section">
       <div class="section-header">${escapeHtml(section.title)}</div>
       ${section.items.length === 0 ? '<div class="section-item"><span class="item-message">No issues found</span></div>' : ''}
-      ${section.items.map(item => `
+      ${section.items
+        .map(
+          (item) => `
         <div class="section-item">
           <span class="status-dot status-${item.status}"></span>
           <span class="item-message">${escapeHtml(item.message)}</span>
           ${item.file ? `<span class="item-location">${escapeHtml(item.file)}${item.line ? `:${item.line}` : ''}</span>` : ''}
           ${item.severity ? `<span class="item-severity severity-${item.severity}">${escapeHtml(item.severity)}</span>` : ''}
         </div>
-      `).join('')}
+      `,
+        )
+        .join('')}
     </div>
-  `).join('');
+  `,
+    )
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="${options.lang ?? 'en'}">

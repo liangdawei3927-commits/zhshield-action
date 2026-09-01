@@ -7,10 +7,15 @@
 
 import { ipcMain, app } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 
 import type { SentinelEvent, EventStatus, EventSeverity } from '@zh/sentinel';
-import { detectRunCommand, discoverLogPaths, defaultFileWatchFilter, DEFAULT_IGNORE_DIRS } from '@zh/sentinel';
+import {
+  detectRunCommand,
+  discoverLogPaths,
+  defaultFileWatchFilter,
+  DEFAULT_IGNORE_DIRS,
+} from '@zh/sentinel';
 import { getSentinel, stopAllMonitoring, type SentinelRuntime } from '../ipc-context';
 
 const STATE_FILE = 'sentinel-state.json';
@@ -25,9 +30,9 @@ function getStatePath(): string {
   return path.join(app.getPath('userData'), STATE_FILE);
 }
 
-function readStateSync(): SentinelState {
+async function readState(): Promise<SentinelState> {
   try {
-    const data = fs.readFileSync(getStatePath(), 'utf-8');
+    const data = await fs.readFile(getStatePath(), 'utf-8');
     const parsed = JSON.parse(data) as Partial<SentinelState>;
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_STATE.enabled,
@@ -37,33 +42,44 @@ function readStateSync(): SentinelState {
   }
 }
 
-function writeStateSync(state: SentinelState): void {
+async function writeState(state: SentinelState): Promise<void> {
   try {
     const dir = app.getPath('userData');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(getStatePath(), JSON.stringify(state, null, 2), 'utf-8');
-  } catch { /* best-effort persistence */ }
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(getStatePath(), JSON.stringify(state, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[sentinel] 状态持久化失败:', err instanceof Error ? err.message : String(err));
+  }
 }
 
 // 已启动监控的项目（幂等保护：重复 startMonitoring 不重复启动进程/日志监听）
 const monitoredProjects = new Set<string>();
 
 function registerStateIpc(): void {
-  ipcMain.handle('sentinel:getState', (): SentinelState => readStateSync());
+  ipcMain.handle('sentinel:getState', async (): Promise<SentinelState> => readState());
 
-  ipcMain.handle('sentinel:setEnabled', (_event, enabled: boolean): { ok: boolean } => {
-    writeStateSync({ enabled });
-    if (!enabled) {
-      stopAllMonitoring();
-      monitoredProjects.clear();
-    }
-    return { ok: true };
-  });
+  ipcMain.handle(
+    'sentinel:setEnabled',
+    async (_event, enabled: boolean): Promise<{ ok: boolean }> => {
+      await writeState({ enabled });
+      if (!enabled) {
+        stopAllMonitoring();
+        monitoredProjects.clear();
+      }
+      return { ok: true };
+    },
+  );
 }
 
 /** 启动文件监控：项目目录存在时挂载哨兵，返回启动/跳过说明 */
-function startFileMonitoring(fileMonitor: SentinelRuntime['fileMonitor'], projectId: string, projectPath: string): string[] {
-  if (!fs.existsSync(projectPath)) {
+async function startFileMonitoring(
+  fileMonitor: SentinelRuntime['fileMonitor'],
+  projectId: string,
+  projectPath: string,
+): Promise<string[]> {
+  try {
+    await fs.access(projectPath);
+  } catch {
     return [`file-monitor: path not found (${projectPath})`];
   }
   fileMonitor.start({
@@ -77,7 +93,11 @@ function startFileMonitoring(fileMonitor: SentinelRuntime['fileMonitor'], projec
 }
 
 /** 启动日志采集：按 package.json 识别运行命令并采集 logs/ 与根目录日志，返回启动/跳过说明 */
-function startLogCollecting(logCollector: SentinelRuntime['logCollector'], projectId: string, projectPath: string): string[] {
+function startLogCollecting(
+  logCollector: SentinelRuntime['logCollector'],
+  projectId: string,
+  projectPath: string,
+): string[] {
   const logPaths = discoverLogPaths(projectPath);
   if (logPaths.length === 0) {
     return ['log-collector: no log files found'];
@@ -87,7 +107,11 @@ function startLogCollecting(logCollector: SentinelRuntime['logCollector'], proje
 }
 
 /** 启动进程监控：识别 dev/start/build 命令并启动，返回启动/跳过说明 */
-function startProcessMonitoring(processMonitor: SentinelRuntime['processMonitor'], projectId: string, projectPath: string): string[] {
+function startProcessMonitoring(
+  processMonitor: SentinelRuntime['processMonitor'],
+  projectId: string,
+  projectPath: string,
+): string[] {
   const runCommand = detectRunCommand(projectPath);
   if (!runCommand) {
     return ['process-monitor: no dev/start/build script found'];
@@ -99,7 +123,11 @@ function startProcessMonitoring(processMonitor: SentinelRuntime['processMonitor'
 /** 按跳过标记把启动说明归入 started / skipped 桶 */
 function classifyStartupNotes(notes: string[], started: string[], skipped: string[]): void {
   for (const note of notes) {
-    if (note.includes('path not found') || note.includes('no log files') || note.includes('no dev/start/build')) {
+    if (
+      note.includes('path not found') ||
+      note.includes('no log files') ||
+      note.includes('no dev/start/build')
+    ) {
       skipped.push(note);
     } else {
       started.push(note);
@@ -108,12 +136,16 @@ function classifyStartupNotes(notes: string[], started: string[], skipped: strin
 }
 
 /** 依次启动文件监控、日志采集与进程监控，返回启动/跳过说明 */
-async function startMonitors(runtime: SentinelRuntime, projectId: string, projectPath: string): Promise<{ started: string[]; skipped: string[] }> {
+async function startMonitors(
+  runtime: SentinelRuntime,
+  projectId: string,
+  projectPath: string,
+): Promise<{ started: string[]; skipped: string[] }> {
   const started: string[] = [];
   const skipped: string[] = [];
   classifyStartupNotes(
     [
-      ...startFileMonitoring(runtime.fileMonitor, projectId, projectPath),
+      ...(await startFileMonitoring(runtime.fileMonitor, projectId, projectPath)),
       ...startLogCollecting(runtime.logCollector, projectId, projectPath),
       ...startProcessMonitoring(runtime.processMonitor, projectId, projectPath),
     ],
@@ -125,15 +157,23 @@ async function startMonitors(runtime: SentinelRuntime, projectId: string, projec
 
 /** 事件查询 IPC：列表 + 单条查询 */
 function registerEventQuery(): void {
-  ipcMain.handle('sentinel:getEvents', async (_event, options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> => {
-    const { eventCenter } = await getSentinel();
-    return eventCenter.listEvents(options as { status?: EventStatus; severity?: EventSeverity } | undefined);
-  });
+  ipcMain.handle(
+    'sentinel:getEvents',
+    async (_event, options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> => {
+      const { eventCenter } = await getSentinel();
+      return eventCenter.listEvents(
+        options as { status?: EventStatus; severity?: EventSeverity } | undefined,
+      );
+    },
+  );
 
-  ipcMain.handle('sentinel:getEvent', async (_event, id: string): Promise<SentinelEvent | undefined> => {
-    const { eventCenter } = await getSentinel();
-    return eventCenter.getEvent(id);
-  });
+  ipcMain.handle(
+    'sentinel:getEvent',
+    async (_event, id: string): Promise<SentinelEvent | undefined> => {
+      const { eventCenter } = await getSentinel();
+      return eventCenter.getEvent(id);
+    },
+  );
 }
 
 /** 启动文件监控、日志采集与进程监控（幂等），返回启动/跳过说明 */
@@ -141,7 +181,7 @@ async function startMonitoringForProject(
   projectId: string,
   projectPath: string,
 ): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> {
-  const state = readStateSync();
+  const state = await readState();
   if (!state.enabled) {
     return { ok: false, started: [], skipped: [], disabled: true };
   }
@@ -161,7 +201,11 @@ async function startMonitoringForProject(
 function registerMonitoringStart(): void {
   ipcMain.handle(
     'sentinel:startMonitoring',
-    async (_event, projectId: string, projectPath: string): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> => {
+    async (
+      _event,
+      projectId: string,
+      projectPath: string,
+    ): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> => {
       return startMonitoringForProject(projectId, projectPath);
     },
   );

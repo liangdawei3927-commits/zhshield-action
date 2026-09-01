@@ -1,7 +1,13 @@
 import type { AppNotification, NotificationListener, NotificationStore } from './types';
 
-type BrowserNotificationCtor = new (title: string, options?: { body?: string }) => { close(): void };
-type BrowserNotificationStatic = BrowserNotificationCtor & { permission: string; requestPermission(): Promise<string> };
+type BrowserNotificationCtor = new (
+  title: string,
+  options?: { body?: string },
+) => { close(): void };
+type BrowserNotificationStatic = BrowserNotificationCtor & {
+  permission: string;
+  requestPermission(): Promise<string>;
+};
 
 const hasGlobalNotification = (): boolean =>
   typeof globalThis !== 'undefined' && 'Notification' in globalThis;

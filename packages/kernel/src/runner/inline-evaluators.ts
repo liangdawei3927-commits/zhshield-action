@@ -46,9 +46,7 @@ export async function evalPatternScan(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message: violations.length > 0
-      ? `发现 ${violations.length} 处匹配 (${rule.id})`
-      : undefined,
+    message: violations.length > 0 ? `发现 ${violations.length} 处匹配 (${rule.id})` : undefined,
     durationMs: 0,
     targetEngine: 'guard',
     timestamp: new Date(),
@@ -104,7 +102,11 @@ function loadRuleWhitelist(repoRoot: string): WhitelistRuleEntry[] {
 }
 
 /** 规则级白名单匹配：ruleId 一致且文件路径包含 pattern（与 guard WhitelistManager 语义一致） */
-function isRuleWhitelisted(entries: WhitelistRuleEntry[], ruleId: string, filePath: string): boolean {
+function isRuleWhitelisted(
+  entries: WhitelistRuleEntry[],
+  ruleId: string,
+  filePath: string,
+): boolean {
   return entries.some((e) => e.ruleId === ruleId && (!e.pattern || filePath.includes(e.pattern)));
 }
 
@@ -122,9 +124,8 @@ export async function evalForbidden(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message: violations.length > 0
-      ? `发现 ${violations.length} 处禁止模式 (${rule.id})`
-      : undefined,
+    message:
+      violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
@@ -226,9 +227,8 @@ export async function evalLayerBoundary(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message: violations.length > 0
-      ? `发现 ${violations.length} 处架构边界违规`
-      : '架构边界检查通过',
+    message:
+      violations.length > 0 ? `发现 ${violations.length} 处架构边界违规` : '架构边界检查通过',
     durationMs: 0,
     targetEngine: 'guard',
     timestamp: new Date(),
@@ -259,7 +259,8 @@ function scanFileLayerBoundaries({
   const fileLayer = detectLayer(relativePath, instr.layers);
   if (!fileLayer) return [];
   const violations: Violation[] = [];
-  const importRegex = /(?:import\s+(?:[\w*{},\s]+\s+from\s+)?['"])([^'"]+)(?:['"])|(?:require\s*\(\s*['"])([^'"]+)(?:['"]\s*\))/g;
+  const importRegex =
+    /(?:import\s+(?:[\w*{},\s]+\s+from\s+)?['"])([^'"]+)(?:['"])|(?:require\s*\(\s*['"])([^'"]+)(?:['"]\s*\))/g;
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     importRegex.lastIndex = 0;

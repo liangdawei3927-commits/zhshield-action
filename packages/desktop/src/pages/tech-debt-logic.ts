@@ -1,6 +1,11 @@
 import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
-import { runTechDebt, planDebtRepayment, verifyDebtRepaid, dismissDebtAction } from '../services/engineApi';
+import {
+  runTechDebt,
+  planDebtRepayment,
+  verifyDebtRepaid,
+  dismissDebtAction,
+} from '../services/engineApi';
 import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
@@ -10,32 +15,96 @@ import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils
  * security 红 / architecture 橙 / quality 绿 / dependency 橙 / duplication 灰
  * （颜色走设计系统 token：#DC2626 → zh-danger、#B45309 → zh-warning、#047857 → zh-success-700、#6B7280 → zh-muted）
  */
-export const DEBT_CATEGORY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
-  security: { color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)', labelKey: 'page.techdebt.category.security' },
-  architecture: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.techdebt.category.architecture' },
-  quality: { color: 'rgb(var(--zh-success-700))', bg: 'rgb(var(--zh-success) / 0.08)', labelKey: 'page.techdebt.category.quality' },
-  dependency: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.techdebt.category.dependency' },
-  duplication: { color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.08)', labelKey: 'page.techdebt.category.duplication' },
-};
+export const DEBT_CATEGORY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> =
+  {
+    security: {
+      color: 'rgb(var(--zh-danger))',
+      bg: 'rgb(var(--zh-danger) / 0.1)',
+      labelKey: 'page.techdebt.category.security',
+    },
+    architecture: {
+      color: 'rgb(var(--zh-warning))',
+      bg: 'rgb(var(--zh-warning) / 0.12)',
+      labelKey: 'page.techdebt.category.architecture',
+    },
+    quality: {
+      color: 'rgb(var(--zh-success-700))',
+      bg: 'rgb(var(--zh-success) / 0.08)',
+      labelKey: 'page.techdebt.category.quality',
+    },
+    dependency: {
+      color: 'rgb(var(--zh-warning))',
+      bg: 'rgb(var(--zh-warning) / 0.12)',
+      labelKey: 'page.techdebt.category.dependency',
+    },
+    duplication: {
+      color: 'rgb(var(--zh-muted))',
+      bg: 'rgb(var(--zh-muted) / 0.08)',
+      labelKey: 'page.techdebt.category.duplication',
+    },
+  };
 
 /** 债务类别展示顺序（构成占比条固定排序） */
-export const DEBT_CATEGORY_ORDER: string[] = ['security', 'quality', 'architecture', 'duplication', 'dependency'];
+export const DEBT_CATEGORY_ORDER: string[] = [
+  'security',
+  'quality',
+  'architecture',
+  'duplication',
+  'dependency',
+];
 
 /** 动作状态配置（pending / planned / in-progress / repaid / dismissed） */
-export const ACTION_STATUS_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
-  pending: { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.techdebt.status.pending' },
-  planned: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)', labelKey: 'page.techdebt.status.planned' },
-  'in-progress': { color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.12)', labelKey: 'page.techdebt.status.inProgress' },
-  repaid: { color: 'rgb(var(--zh-success-700))', bg: 'rgb(var(--zh-success) / 0.08)', labelKey: 'page.techdebt.status.repaid' },
-  dismissed: { color: 'rgb(var(--zh-muted))', bg: 'rgb(var(--zh-muted) / 0.08)', labelKey: 'page.techdebt.status.dismissed' },
-};
+export const ACTION_STATUS_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> =
+  {
+    pending: {
+      color: 'rgb(var(--zh-warning))',
+      bg: 'rgb(var(--zh-warning) / 0.12)',
+      labelKey: 'page.techdebt.status.pending',
+    },
+    planned: {
+      color: 'rgb(var(--zh-info))',
+      bg: 'rgb(var(--zh-info) / 0.1)',
+      labelKey: 'page.techdebt.status.planned',
+    },
+    'in-progress': {
+      color: 'rgb(var(--zh-warning))',
+      bg: 'rgb(var(--zh-warning) / 0.12)',
+      labelKey: 'page.techdebt.status.inProgress',
+    },
+    repaid: {
+      color: 'rgb(var(--zh-success-700))',
+      bg: 'rgb(var(--zh-success) / 0.08)',
+      labelKey: 'page.techdebt.status.repaid',
+    },
+    dismissed: {
+      color: 'rgb(var(--zh-muted))',
+      bg: 'rgb(var(--zh-muted) / 0.08)',
+      labelKey: 'page.techdebt.status.dismissed',
+    },
+  };
 
 /** 利息四因子配置（D.7 可解释验收：severity × hotness × density × exposure） */
-export const INTEREST_FACTOR_CONFIG: Array<{ key: keyof TechDebtReportData['actionList'][number]['interestBreakdown']; labelKey: string; color: string }> = [
-  { key: 'severityFactor', labelKey: 'page.techdebt.factor.severity', color: 'rgb(var(--zh-danger))' },
-  { key: 'hotnessFactor', labelKey: 'page.techdebt.factor.hotness', color: 'rgb(var(--zh-warning))' },
+export const INTEREST_FACTOR_CONFIG: Array<{
+  key: keyof TechDebtReportData['actionList'][number]['interestBreakdown'];
+  labelKey: string;
+  color: string;
+}> = [
+  {
+    key: 'severityFactor',
+    labelKey: 'page.techdebt.factor.severity',
+    color: 'rgb(var(--zh-danger))',
+  },
+  {
+    key: 'hotnessFactor',
+    labelKey: 'page.techdebt.factor.hotness',
+    color: 'rgb(var(--zh-warning))',
+  },
   { key: 'densityFactor', labelKey: 'page.techdebt.factor.density', color: 'rgb(var(--zh-info))' },
-  { key: 'exposureFactor', labelKey: 'page.techdebt.factor.exposure', color: 'rgb(var(--zh-success-700))' },
+  {
+    key: 'exposureFactor',
+    labelKey: 'page.techdebt.factor.exposure',
+    color: 'rgb(var(--zh-success-700))',
+  },
 ];
 
 /** 利息因子归一化分母：四因子最大取值（severity/hotness ≤ 3，density ≤ 2，exposure ≤ 1.5） */
@@ -88,7 +157,10 @@ function useTechDebtActions(
 ): {
   planLoading: string | null;
   verifyLoading: string | null;
-  handlePlan: (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
+  handlePlan: (
+    actionId: string,
+    opts?: { sprint?: string; gate?: 'allow-with-record' },
+  ) => Promise<void>;
   handleVerify: (actionId: string) => Promise<void>;
   handleDismiss: (actionId: string) => Promise<void>;
 } {
@@ -107,7 +179,15 @@ function useTechDebtActions(
     async (actionId: string) => {
       await runDebtAction(actionId, setVerifyLoading, async () => {
         const success = await verifyDebtRepaid(projectPath, actionId);
-        setReport((prev) => markActionStatus(prev, actionId, success ? 'repaid' : prev?.actionList.find((a) => a.actionId === actionId)?.status ?? 'pending'));
+        setReport((prev) =>
+          markActionStatus(
+            prev,
+            actionId,
+            success
+              ? 'repaid'
+              : (prev?.actionList.find((a) => a.actionId === actionId)?.status ?? 'pending'),
+          ),
+        );
       });
     },
     [projectPath, setReport],
@@ -128,13 +208,17 @@ function useTechDebtRun(projectPath: string): {
   planLoading: string | null;
   verifyLoading: string | null;
   handleScan: () => Promise<void>;
-  handlePlan: (actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
+  handlePlan: (
+    actionId: string,
+    opts?: { sprint?: string; gate?: 'allow-with-record' },
+  ) => Promise<void>;
   handleVerify: (actionId: string) => Promise<void>;
   handleDismiss: (actionId: string) => Promise<void>;
 } {
   const [report, setReport] = useState<TechDebtReportData | null>(null);
   const [loading, setLoading] = useState(false);
-  const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } = useTechDebtActions(projectPath, setReport);
+  const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } =
+    useTechDebtActions(projectPath, setReport);
 
   const handleScan = useCallback(async () => {
     setLoading(true);
@@ -143,7 +227,16 @@ function useTechDebtRun(projectPath: string): {
     setLoading(false);
   }, [projectPath]);
 
-  return { loading, report, planLoading, verifyLoading, handleScan, handlePlan, handleVerify, handleDismiss };
+  return {
+    loading,
+    report,
+    planLoading,
+    verifyLoading,
+    handleScan,
+    handlePlan,
+    handleVerify,
+    handleDismiss,
+  };
 }
 
 /** 复制单个技术债偿还建议到 AI 修复 */

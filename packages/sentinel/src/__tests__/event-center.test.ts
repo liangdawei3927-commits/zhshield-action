@@ -124,17 +124,19 @@ describe('EventCenter', () => {
   describe('processAlert', () => {
     it('should create a new event from alert payload', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-1',
-          labels: {
-            alertname: 'ServerError',
-            service: 'api',
-            module: 'auth',
-            severity: 'critical',
-            repo: 'proj-1',
+        alerts: [
+          {
+            fingerprint: 'fp-1',
+            labels: {
+              alertname: 'ServerError',
+              service: 'api',
+              module: 'auth',
+              severity: 'critical',
+              repo: 'proj-1',
+            },
+            annotations: { summary: 'Server 500 errors detected' },
           },
-          annotations: { summary: 'Server 500 errors detected' },
-        }],
+        ],
       };
       const { event, isNew } = ec.processAlert(payload);
       expect(isNew).toBe(true);
@@ -147,17 +149,19 @@ describe('EventCenter', () => {
 
     it('should deduplicate repeated alerts', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-dedup',
-          labels: {
-            alertname: 'DedupTest',
-            service: 'api',
-            module: 'core',
-            severity: 'high',
-            repo: 'proj-1',
+        alerts: [
+          {
+            fingerprint: 'fp-dedup',
+            labels: {
+              alertname: 'DedupTest',
+              service: 'api',
+              module: 'core',
+              severity: 'high',
+              repo: 'proj-1',
+            },
+            annotations: { summary: 'Dedup test' },
           },
-          annotations: { summary: 'Dedup test' },
-        }],
+        ],
       };
       const first = ec.processAlert(payload);
       const second = ec.processAlert(payload);
@@ -169,11 +173,13 @@ describe('EventCenter', () => {
 
     it('should map severity correctly', () => {
       const make = (sev: string) => ({
-        alerts: [{
-          fingerprint: `fp-${sev}`,
-          labels: { alertname: 'test', service: 'api', module: 'core', severity: sev, repo: 'p' },
-          annotations: { summary: 'test' },
-        }],
+        alerts: [
+          {
+            fingerprint: `fp-${sev}`,
+            labels: { alertname: 'test', service: 'api', module: 'core', severity: sev, repo: 'p' },
+            annotations: { summary: 'test' },
+          },
+        ],
       });
       expect(ec.processAlert(make('critical')).event.severity).toBe('p1');
       expect(ec.processAlert(make('high')).event.severity).toBe('p2');

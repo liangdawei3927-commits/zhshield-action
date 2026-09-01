@@ -31,8 +31,18 @@ export interface SmellParams {
 
 export function makeSmell(params: SmellParams): CodeSmell {
   const {
-    ruleId, severity, message, filePath, line, column,
-    metric, value, threshold, suggestion, endLine, endColumn,
+    ruleId,
+    severity,
+    message,
+    filePath,
+    line,
+    column,
+    metric,
+    value,
+    threshold,
+    suggestion,
+    endLine,
+    endColumn,
   } = params;
 
   return {

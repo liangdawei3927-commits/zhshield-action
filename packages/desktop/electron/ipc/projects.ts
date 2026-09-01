@@ -22,11 +22,14 @@ export function registerProjectsIpc(): void {
     return [];
   });
 
-  ipcMain.handle('app:saveProjects', async (_event, projects: Array<{ name: string; path: string }>): Promise<void> => {
-    try {
-      await writeFile(PROJECTS_FILE, JSON.stringify(projects, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Failed to save projects:', e);
-    }
-  });
+  ipcMain.handle(
+    'app:saveProjects',
+    async (_event, projects: Array<{ name: string; path: string }>): Promise<void> => {
+      try {
+        await writeFile(PROJECTS_FILE, JSON.stringify(projects, null, 2), 'utf-8');
+      } catch (e) {
+        console.error('Failed to save projects:', e);
+      }
+    },
+  );
 }

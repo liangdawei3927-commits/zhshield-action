@@ -24,10 +24,13 @@ describe('ProjectProfiler', () => {
   const profiler = new ProjectProfiler();
 
   it('TS/NestJS 后端项目探测', () => {
-    writeFile('package.json', JSON.stringify({
-      name: 'demo-backend',
-      dependencies: { '@nestjs/core': '^10.0.0', '@nestjs/common': '^10.0.0' },
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'demo-backend',
+        dependencies: { '@nestjs/core': '^10.0.0', '@nestjs/common': '^10.0.0' },
+      }),
+    );
     writeFile('tsconfig.json', '{}');
     writeFile('pnpm-lock.yaml', 'lockfileVersion: 6.0');
     writeFile('src/main.ts', 'console.log("hi");');
@@ -42,10 +45,13 @@ describe('ProjectProfiler', () => {
   });
 
   it('React 前端项目探测', () => {
-    writeFile('package.json', JSON.stringify({
-      name: 'demo-frontend',
-      dependencies: { react: '^18.0.0', 'react-dom': '^18.0.0' },
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'demo-frontend',
+        dependencies: { react: '^18.0.0', 'react-dom': '^18.0.0' },
+      }),
+    );
     writeFile('src/App.tsx', 'export default () => null;');
 
     const result = profiler.profileSync(tmpDir);
@@ -76,11 +82,14 @@ describe('ProjectProfiler', () => {
   });
 
   it('Electron 桌面端项目探测', () => {
-    writeFile('package.json', JSON.stringify({
-      name: 'demo-desktop',
-      main: 'electron/main.js',
-      dependencies: { electron: '^42.0.0' },
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'demo-desktop',
+        main: 'electron/main.js',
+        dependencies: { electron: '^42.0.0' },
+      }),
+    );
     writeFile('electron/main.js', 'console.log("main");');
 
     const result = profiler.profileSync(tmpDir);
@@ -101,14 +110,20 @@ describe('ProjectProfiler', () => {
 
   it('Monorepo 项目探测并展开模块', () => {
     writeFile('pnpm-workspace.yaml', 'packages:\n  - "packages/*"\n');
-    writeFile('packages/server/package.json', JSON.stringify({
-      name: '@demo/server',
-      dependencies: { '@nestjs/core': '^10.0.0' },
-    }));
-    writeFile('packages/web/package.json', JSON.stringify({
-      name: '@demo/web',
-      dependencies: { react: '^18.0.0' },
-    }));
+    writeFile(
+      'packages/server/package.json',
+      JSON.stringify({
+        name: '@demo/server',
+        dependencies: { '@nestjs/core': '^10.0.0' },
+      }),
+    );
+    writeFile(
+      'packages/web/package.json',
+      JSON.stringify({
+        name: '@demo/web',
+        dependencies: { react: '^18.0.0' },
+      }),
+    );
 
     const result = profiler.profileSync(tmpDir);
     expect(result.profile.isMonorepo).toBe(true);
@@ -119,14 +134,20 @@ describe('ProjectProfiler', () => {
 
   it('Monorepo 模块探测排除 node_modules/dist 等噪声目录', () => {
     writeFile('pnpm-workspace.yaml', 'packages:\n  - "packages/*"\n');
-    writeFile('packages/server/package.json', JSON.stringify({
-      name: '@demo/server',
-      dependencies: { '@nestjs/core': '^10.0.0' },
-    }));
-    writeFile('packages/web/package.json', JSON.stringify({
-      name: '@demo/web',
-      dependencies: { react: '^18.0.0' },
-    }));
+    writeFile(
+      'packages/server/package.json',
+      JSON.stringify({
+        name: '@demo/server',
+        dependencies: { '@nestjs/core': '^10.0.0' },
+      }),
+    );
+    writeFile(
+      'packages/web/package.json',
+      JSON.stringify({
+        name: '@demo/web',
+        dependencies: { react: '^18.0.0' },
+      }),
+    );
     // 噪声目录：pnpm 会把依赖提升到 packages/node_modules，构建产物也可能落在 packages/dist
     writeFile('packages/node_modules/some-lib/index.js', 'module.exports = 1;');
     writeFile('packages/dist/bundle.js', 'console.log(1);');
@@ -142,12 +163,15 @@ describe('ProjectProfiler', () => {
   });
 
   it('无框架的私有 TS 包按入口字段判定为 library（不再因 private 误判 unknown）', () => {
-    writeFile('package.json', JSON.stringify({
-      name: '@demo/lib',
-      private: true,
-      main: 'dist/index.js',
-      types: 'dist/index.d.ts',
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: '@demo/lib',
+        private: true,
+        main: 'dist/index.js',
+        types: 'dist/index.d.ts',
+      }),
+    );
     writeFile('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true } }));
 
     const result = profiler.profileSync(tmpDir);
@@ -155,11 +179,14 @@ describe('ProjectProfiler', () => {
   });
 
   it('仅有 bin 的包判定为 cli，不被 library 覆盖', () => {
-    writeFile('package.json', JSON.stringify({
-      name: 'demo-cli',
-      bin: { 'demo-cli': './bin/cli.js' },
-      main: 'dist/index.js',
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'demo-cli',
+        bin: { 'demo-cli': './bin/cli.js' },
+        main: 'dist/index.js',
+      }),
+    );
 
     const result = profiler.profileSync(tmpDir);
     expect(result.profile.type).toBe('cli');
@@ -173,10 +200,13 @@ describe('ProjectProfiler', () => {
   });
 
   it('CLI 工具项目探测', () => {
-    writeFile('package.json', JSON.stringify({
-      name: 'demo-cli',
-      bin: { 'demo-cli': './bin/cli.js' },
-    }));
+    writeFile(
+      'package.json',
+      JSON.stringify({
+        name: 'demo-cli',
+        bin: { 'demo-cli': './bin/cli.js' },
+      }),
+    );
 
     const result = profiler.profileSync(tmpDir);
     expect(result.profile.type).toBe('cli');

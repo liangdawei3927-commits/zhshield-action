@@ -68,7 +68,10 @@ function pushMonorepoSignal(scan: ScanResult, signals: ProfileSignal[]): boolean
   return false;
 }
 
-function pushFrameworkMappedSignal(framework: ProjectFramework, signals: ProfileSignal[]): ProjectType | undefined {
+function pushFrameworkMappedSignal(
+  framework: ProjectFramework,
+  signals: ProfileSignal[],
+): ProjectType | undefined {
   const mappedType = FRAMEWORK_TYPE_MAP[framework];
   if (mappedType) {
     signals.push({
@@ -81,7 +84,11 @@ function pushFrameworkMappedSignal(framework: ProjectFramework, signals: Profile
   return mappedType;
 }
 
-function pushPackageJsonTypeSignals(scan: ScanResult, mappedType: ProjectType | undefined, signals: ProfileSignal[]): void {
+function pushPackageJsonTypeSignals(
+  scan: ScanResult,
+  mappedType: ProjectType | undefined,
+  signals: ProfileSignal[],
+): void {
   const pkgContent = readConfig(scan, 'package.json');
   if (pkgContent) {
     try {

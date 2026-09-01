@@ -47,7 +47,10 @@ describe('WisdomBrainSync', () => {
   let er: ReturnType<typeof makeExperienceReporterMock>;
 
   beforeEach(() => {
-    lockFile = path.join(os.tmpdir(), `zhshield-lock-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+    lockFile = path.join(
+      os.tmpdir(),
+      `zhshield-lock-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+    );
     trs = makeToolRuleSyncMock();
     er = makeExperienceReporterMock();
     sync = new WisdomBrainSync({
@@ -121,7 +124,10 @@ describe('WisdomBrainSync', () => {
   describe('syncToolRules', () => {
     it('无锁时应原样返回同步结果', async () => {
       trs.syncTool.mockResolvedValue<ToolRuleSyncResult>({
-        toolId: 'eslint', updated: true, fromVersion: '1.0', toVersion: '1.1',
+        toolId: 'eslint',
+        updated: true,
+        fromVersion: '1.0',
+        toVersion: '1.1',
       });
       const out = await sync.syncToolRules('eslint');
       expect(out.updated).toBe(true);
@@ -131,7 +137,10 @@ describe('WisdomBrainSync', () => {
     it('存在不同版本的锁时应覆盖为 updated:false / reason:write_error', async () => {
       sync.lockVersion('eslint', '1.1'); // 锁定在 1.1
       trs.syncTool.mockResolvedValue<ToolRuleSyncResult>({
-        toolId: 'eslint', updated: true, fromVersion: '1.0', toVersion: '1.2',
+        toolId: 'eslint',
+        updated: true,
+        fromVersion: '1.0',
+        toVersion: '1.2',
       });
       const out = await sync.syncToolRules('eslint');
       expect(out.updated).toBe(false);
@@ -142,7 +151,10 @@ describe('WisdomBrainSync', () => {
     it('锁版本与目标版本相同时不应覆盖', async () => {
       sync.lockVersion('eslint', '1.1');
       trs.syncTool.mockResolvedValue<ToolRuleSyncResult>({
-        toolId: 'eslint', updated: true, fromVersion: '1.0', toVersion: '1.1',
+        toolId: 'eslint',
+        updated: true,
+        fromVersion: '1.0',
+        toVersion: '1.1',
       });
       const out = await sync.syncToolRules('eslint');
       expect(out.updated).toBe(true);
@@ -151,7 +163,9 @@ describe('WisdomBrainSync', () => {
     it('updated:false 时不应触发锁覆盖', async () => {
       sync.lockVersion('eslint', '9.9'); // 即便有锁
       trs.syncTool.mockResolvedValue<ToolRuleSyncResult>({
-        toolId: 'eslint', updated: false, reason: 'already_latest',
+        toolId: 'eslint',
+        updated: false,
+        reason: 'already_latest',
       });
       const out = await sync.syncToolRules('eslint');
       expect(out.updated).toBe(false);
@@ -163,11 +177,18 @@ describe('WisdomBrainSync', () => {
   describe('syncAllRules', () => {
     it('应遍历全部配置工具并返回结果数组', async () => {
       trs.syncTool.mockImplementation(async (id: ToolId) => ({
-        toolId: id, updated: false, reason: 'already_latest',
+        toolId: id,
+        updated: false,
+        reason: 'already_latest',
       }));
       const results = await sync.syncAllRules();
       expect(results).toHaveLength(4);
-      expect(results.map((r) => r.toolId).sort()).toEqual(['dep-cruiser', 'eslint', 'semgrep', 'trivy']);
+      expect(results.map((r) => r.toolId).sort()).toEqual([
+        'dep-cruiser',
+        'eslint',
+        'semgrep',
+        'trivy',
+      ]);
     });
   });
 
@@ -193,7 +214,11 @@ describe('WisdomBrainSync', () => {
   // ─── syncAll ────────────────────────────────────────────
   describe('syncAll', () => {
     it('无 experiences 时 experienceResult 应为 null', async () => {
-      trs.syncTool.mockResolvedValue({ toolId: 'eslint', updated: false, reason: 'already_latest' });
+      trs.syncTool.mockResolvedValue({
+        toolId: 'eslint',
+        updated: false,
+        reason: 'already_latest',
+      });
       const r = await sync.syncAll();
       expect(r.experienceResult).toBeNull();
       expect(r.ruleSyncResults).toHaveLength(4);
@@ -201,7 +226,11 @@ describe('WisdomBrainSync', () => {
     });
 
     it('带 experiences 时应回写并返回 experienceResult', async () => {
-      trs.syncTool.mockResolvedValue({ toolId: 'eslint', updated: false, reason: 'already_latest' });
+      trs.syncTool.mockResolvedValue({
+        toolId: 'eslint',
+        updated: false,
+        reason: 'already_latest',
+      });
       er.flush.mockResolvedValue({ sent: 1, queued: 0, failed: 0 });
       const r = await sync.syncAll({ experiences: [makeRecord()] });
       expect(r.experienceResult?.sent).toBe(1);

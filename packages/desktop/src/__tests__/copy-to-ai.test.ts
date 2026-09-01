@@ -73,7 +73,9 @@ describe('copyTextToClipboard', () => {
   });
 
   it('writeText 被拒绝（NotAllowedError）时降级 execCommand 复制成功返回 true', async () => {
-    const writeText = vi.fn().mockRejectedValue(new DOMException('Write permission denied.', 'NotAllowedError'));
+    const writeText = vi
+      .fn()
+      .mockRejectedValue(new DOMException('Write permission denied.', 'NotAllowedError'));
     vi.stubGlobal('navigator', { clipboard: { writeText } });
     const { textarea } = stubDocument(() => true);
 

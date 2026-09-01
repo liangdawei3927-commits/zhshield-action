@@ -24,7 +24,7 @@ describe('parseFile', () => {
 describe('computeCyclomaticComplexity', () => {
   it('returns 1 for simple methods', () => {
     const parsed = parseFile(path.join(FIXTURES_DIR, 'long-method.fixture.ts'));
-    const shortMethod = parsed.classes[0].members.methods.find(m => m.name === 'shortMethod');
+    const shortMethod = parsed.classes[0].members.methods.find((m) => m.name === 'shortMethod');
     expect(shortMethod).toBeDefined();
     if (shortMethod) {
       expect(shortMethod.complexity).toBe(1);
@@ -33,7 +33,7 @@ describe('computeCyclomaticComplexity', () => {
 
   it('counts if/else branches in complex methods', () => {
     const parsed = parseFile(path.join(FIXTURES_DIR, 'deep-nesting.fixture.ts'));
-    const checkAccess = parsed.classes[0].members.methods.find(m => m.name === 'checkAccess');
+    const checkAccess = parsed.classes[0].members.methods.find((m) => m.name === 'checkAccess');
     expect(checkAccess).toBeDefined();
     if (checkAccess) {
       expect(checkAccess.complexity).toBeGreaterThan(1);
@@ -44,7 +44,7 @@ describe('computeCyclomaticComplexity', () => {
 describe('computeNestingDepth', () => {
   it('detects deep nesting', () => {
     const parsed = parseFile(path.join(FIXTURES_DIR, 'deep-nesting.fixture.ts'));
-    const checkAccess = parsed.classes[0].members.methods.find(m => m.name === 'checkAccess');
+    const checkAccess = parsed.classes[0].members.methods.find((m) => m.name === 'checkAccess');
     expect(checkAccess).toBeDefined();
     if (checkAccess) {
       const depth = computeNestingDepth(checkAccess.node);
@@ -56,11 +56,12 @@ describe('computeNestingDepth', () => {
 describe('detectLongMethod', () => {
   it('flags methods exceeding threshold', () => {
     // Access engine's internal by running analysis
-    const baseConfig = { ...DEFAULT_CONFIG, thresholds: { ...DEFAULT_CONFIG.thresholds, maxMethodLines: 10 } };
+    const baseConfig = {
+      ...DEFAULT_CONFIG,
+      thresholds: { ...DEFAULT_CONFIG.thresholds, maxMethodLines: 10 },
+    };
     const customEngine = new RefactorEngine({ thresholds: baseConfig.thresholds });
-    customEngine.analyzeFiles('/tmp', [
-      path.join(FIXTURES_DIR, 'long-method.fixture.ts'),
-    ]);
+    customEngine.analyzeFiles('/tmp', [path.join(FIXTURES_DIR, 'long-method.fixture.ts')]);
 
     // Cannot await inside sync context — use a quick manual check instead
   });
@@ -83,8 +84,8 @@ describe('detectDeepNesting', () => {
   it('flags deep nesting with low threshold', () => {
     const parsed = parseFile(path.join(FIXTURES_DIR, 'deep-nesting.fixture.ts'));
 
-    const checkAccess = parsed.classes[0].members.methods.find(m => m.name === 'checkAccess');
-    const flatCheck = parsed.classes[0].members.methods.find(m => m.name === 'flatCheck');
+    const checkAccess = parsed.classes[0].members.methods.find((m) => m.name === 'checkAccess');
+    const flatCheck = parsed.classes[0].members.methods.find((m) => m.name === 'flatCheck');
 
     expect(checkAccess).toBeDefined();
     expect(flatCheck).toBeDefined();
@@ -201,8 +202,8 @@ describe('detectDeepNesting via engine', () => {
       path.join(FIXTURES_DIR, 'deep-nesting.fixture.ts'),
     ]);
 
-    const nestingSmells = report.files.flatMap(f =>
-      f.smells.filter(s => s.ruleId === 'deep-nesting')
+    const nestingSmells = report.files.flatMap((f) =>
+      f.smells.filter((s) => s.ruleId === 'deep-nesting'),
     );
     expect(nestingSmells.length).toBeGreaterThanOrEqual(1);
   });
@@ -218,9 +219,8 @@ describe('duplicated-code regression', () => {
       thresholds: thresholds ? { ...DEFAULT_CONFIG.thresholds, ...thresholds } : undefined,
     });
     const report = await engine.analyzeFiles('/tmp', filePaths);
-    return report.files.flatMap(f =>
-      f.smells.filter(s => s.ruleId === 'duplicated-code')
-    ).length;
+    return report.files.flatMap((f) => f.smells.filter((s) => s.ruleId === 'duplicated-code'))
+      .length;
   }
 
   it('does not flag files that only share short JSDoc headers', async () => {

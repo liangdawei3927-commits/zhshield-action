@@ -3,7 +3,14 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -114,7 +121,12 @@ export class DependencyCruiserAdapter implements ToolAdapter {
         tool: 'dep-cruiser',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'dependency-cruiser 未安装',
       };
     }

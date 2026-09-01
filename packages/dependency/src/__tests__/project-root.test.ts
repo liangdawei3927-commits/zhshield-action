@@ -28,7 +28,7 @@ afterEach(() => {
 describe('resolveProjectRoot', () => {
   it('目录自身含锁文件 → 原样返回自身', () => {
     const dir = tmpDir('zh-root-self-');
-    writeFile(dir, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+    writeFile(dir, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(dir)).toBe(path.resolve(dir));
   });
 
@@ -37,7 +37,7 @@ describe('resolveProjectRoot', () => {
     const sub = path.join(root, 'packages', 'desktop');
     fs.mkdirSync(sub, { recursive: true });
     writeFile(sub, 'package.json', '{}');
-    writeFile(root, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+    writeFile(root, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(sub)).toBe(path.resolve(root));
   });
 
@@ -55,7 +55,7 @@ describe('resolveProjectRoot', () => {
     const deep = path.join(mid, 'deep');
     fs.mkdirSync(deep, { recursive: true });
     writeFile(root, 'package-lock.json', '{}');
-    writeFile(mid, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+    writeFile(mid, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(deep)).toBe(path.resolve(mid));
   });
 
@@ -63,8 +63,8 @@ describe('resolveProjectRoot', () => {
     const root = tmpDir('zh-root-no-up-');
     const sub = path.join(root, 'sub');
     fs.mkdirSync(sub, { recursive: true });
-    writeFile(root, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
-    writeFile(sub, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+    writeFile(root, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
+    writeFile(sub, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(sub)).toBe(path.resolve(sub));
   });
 
@@ -79,7 +79,7 @@ describe('resolveProjectRoot', () => {
     const parent = tmpDir('zh-root-down1-');
     const child = path.join(parent, 'project-a');
     fs.mkdirSync(child, { recursive: true });
-    writeFile(child, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+    writeFile(child, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(parent)).toBe(path.resolve(child));
   });
 
@@ -88,7 +88,7 @@ describe('resolveProjectRoot', () => {
     for (const name of ['a', 'b']) {
       const child = path.join(parent, name);
       fs.mkdirSync(child, { recursive: true });
-      writeFile(child, 'pnpm-lock.yaml', 'lockfileVersion: \'9.0\'\n');
+      writeFile(child, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     }
     expect(resolveProjectRoot(parent)).toBe(path.resolve(parent));
   });

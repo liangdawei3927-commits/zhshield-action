@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { toHealthScoreData, toInspectionReportData, toSecurityScanReportData } from '../../electron/ipc/report-format';
+import {
+  toHealthScoreData,
+  toInspectionReportData,
+  toSecurityScanReportData,
+} from '../../electron/ipc/report-format';
 
 describe('toSecurityScanReportData 映射', () => {
   const report = {
@@ -23,7 +27,9 @@ describe('toSecurityScanReportData 映射', () => {
         autoFixable: true,
       },
     ],
-    garbage: [{ id: 'g-1', type: 'unused-file', path: 'src/old.ts', size: 2048, reason: '未被引用' }],
+    garbage: [
+      { id: 'g-1', type: 'unused-file', path: 'src/old.ts', size: 2048, reason: '未被引用' },
+    ],
     malware: [
       {
         id: 'm-1',
@@ -160,7 +166,9 @@ describe('toInspectionReportData 覆盖率缺口显式上报', () => {
 
   it('keeps pass adapterResults out of attention checks', () => {
     const data = toInspectionReportData(baseReport as never);
-    expect(data.checks.filter((c) => c.name === 'ESLint' && c.status === 'attention')).toHaveLength(0);
+    expect(data.checks.filter((c) => c.name === 'ESLint' && c.status === 'attention')).toHaveLength(
+      0,
+    );
   });
 
   it('does not duplicate adapter attention when adapter has issues', () => {

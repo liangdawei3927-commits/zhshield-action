@@ -1,7 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "daemon": false,
-  "concurrency": "4",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

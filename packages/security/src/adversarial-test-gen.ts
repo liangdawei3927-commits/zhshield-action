@@ -18,7 +18,8 @@ import { load as loadYaml } from 'js-yaml';
 
 const HEX4_RE = /^[0-9A-Fa-f]{4}$/;
 
-export type AttackCategory = 'prompt-injection' | 'supply-chain' | 'secret-exfiltration' | 'ui-redress';
+export type AttackCategory =
+  'prompt-injection' | 'supply-chain' | 'secret-exfiltration' | 'ui-redress';
 
 export type TargetDetector =
   | 'scanCommentInstructions'
@@ -27,7 +28,8 @@ export type TargetDetector =
   | 'isEnvFile';
 
 export type CommentStyle = 'line-slash' | 'line-hash' | 'block' | 'html';
-export type ContextPreset = 'benign-code-header' | 'benign-code-footer' | 'benign-doc-lines' | 'benign-extra-script';
+export type ContextPreset =
+  'benign-code-header' | 'benign-code-footer' | 'benign-doc-lines' | 'benign-extra-script';
 
 export type Diversifier =
   | { type: 'commentStyle'; style: CommentStyle }
@@ -67,11 +69,26 @@ export interface GeneratedVariant {
   readonly planDescription: string;
 }
 
-const CATEGORIES: readonly AttackCategory[] = ['prompt-injection', 'supply-chain', 'secret-exfiltration', 'ui-redress'];
-const DETECTORS: readonly TargetDetector[] = ['scanCommentInstructions', 'classifyPackageJsonScripts', 'scanMarkdownHiddenLinks', 'isEnvFile'];
+const CATEGORIES: readonly AttackCategory[] = [
+  'prompt-injection',
+  'supply-chain',
+  'secret-exfiltration',
+  'ui-redress',
+];
+const DETECTORS: readonly TargetDetector[] = [
+  'scanCommentInstructions',
+  'classifyPackageJsonScripts',
+  'scanMarkdownHiddenLinks',
+  'isEnvFile',
+];
 const COMMENT_STYLES: readonly CommentStyle[] = ['line-slash', 'line-hash', 'block', 'html'];
-const CONTEXT_PRESETS: readonly ContextPreset[] = ['benign-code-header', 'benign-doc-lines', 'benign-extra-script', 'benign-code-footer'];
- 
+const CONTEXT_PRESETS: readonly ContextPreset[] = [
+  'benign-code-header',
+  'benign-doc-lines',
+  'benign-extra-script',
+  'benign-code-footer',
+];
+
 const ZERO_WIDTH_FAMILY = new RegExp('\\u200B|\\u200C|\\u200D|\\u2060|\\uFEFF', 'g');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -83,13 +100,22 @@ function fail(source: string, message: string): never {
 
 function requireString(record: Record<string, unknown>, field: string, source: string): string {
   const value = record[field];
-  if (typeof value !== 'string' || value.trim().length === 0) return fail(source, `field '${field}' must be a non-empty string`);
+  if (typeof value !== 'string' || value.trim().length === 0)
+    return fail(source, `field '${field}' must be a non-empty string`);
   return value;
 }
 
-function requireEnum<T extends string>(value: unknown, allowed: readonly T[], field: string, source: string): T {
+function requireEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  field: string,
+  source: string,
+): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    return fail(source, `field '${field}' must be one of ${allowed.join(' | ')}, got ${String(value)}`);
+    return fail(
+      source,
+      `field '${field}' must be one of ${allowed.join(' | ')}, got ${String(value)}`,
+    );
   }
   return value as T;
 }
@@ -106,7 +132,16 @@ function parseDiversifiers(value: unknown, source: string): Diversifier[] {
 
 function parseDiversifier(raw: unknown, source: string): Diversifier {
   if (!isRecord(raw)) return fail(source, 'each diversifier must be a mapping');
-  const types = ['commentStyle', 'casing', 'whitespace', 'textReplace', 'zeroWidth', 'fileName', 'contextPrefix', 'contextSuffix'] as const;
+  const types = [
+    'commentStyle',
+    'casing',
+    'whitespace',
+    'textReplace',
+    'zeroWidth',
+    'fileName',
+    'contextPrefix',
+    'contextSuffix',
+  ] as const;
   const type = requireEnum(raw.type, types, 'diversifier.type', source);
   switch (type) {
     case 'commentStyle':
@@ -116,10 +151,15 @@ function parseDiversifier(raw: unknown, source: string): Diversifier {
     case 'whitespace':
       return { type, mode: requireEnum(raw.mode, ['double-spaces'], 'mode', source) };
     case 'textReplace':
-      return { type, find: requireString(raw, 'find', source), replaceWith: requireString(raw, 'replaceWith', source) };
+      return {
+        type,
+        find: requireString(raw, 'find', source),
+        replaceWith: requireString(raw, 'replaceWith', source),
+      };
     case 'zeroWidth': {
       const codepoint = requireString(raw, 'codepoint', source);
-      if (!HEX4_RE.test(codepoint)) return fail(source, `zeroWidth.codepoint must be 4 hex digits, got '${codepoint}'`);
+      if (!HEX4_RE.test(codepoint))
+        return fail(source, `zeroWidth.codepoint must be 4 hex digits, got '${codepoint}'`);
       return { type, codepoint };
     }
     case 'fileName':
@@ -147,15 +187,22 @@ export function parseAttackPattern(rawYaml: string, source = 'inline'): AttackPa
     localDiversifiers: parseDiversifiers(doc.localDiversifiers, source),
     globalDiversifiers: parseDiversifiers(doc.globalDiversifiers, source),
   };
-  if (doc.expectedHit !== true && doc.expectedHit !== false) return fail(source, "field 'expectedHit' must be a boolean");
+  if (doc.expectedHit !== true && doc.expectedHit !== false)
+    return fail(source, "field 'expectedHit' must be a boolean");
   for (const d of [...pattern.localDiversifiers, ...pattern.globalDiversifiers]) {
     const preset = d.type === 'contextPrefix' || d.type === 'contextSuffix' ? d.preset : undefined;
     const jsonDetector = pattern.targetDetector === 'classifyPackageJsonScripts';
     if (preset === 'benign-extra-script' && !jsonDetector) {
-      return fail(source, `preset 'benign-extra-script' only applies to classifyPackageJsonScripts (${pattern.patternId})`);
+      return fail(
+        source,
+        `preset 'benign-extra-script' only applies to classifyPackageJsonScripts (${pattern.patternId})`,
+      );
     }
     if (preset !== undefined && preset !== 'benign-extra-script' && jsonDetector) {
-      return fail(source, `preset '${preset}' cannot apply to classifyPackageJsonScripts (${pattern.patternId})`);
+      return fail(
+        source,
+        `preset '${preset}' cannot apply to classifyPackageJsonScripts (${pattern.patternId})`,
+      );
     }
   }
   return pattern;
@@ -166,22 +213,28 @@ export function loadAttackPatternsFromSources(sources: readonly string[]): Attac
 }
 
 const CONTEXT_TEXT: Record<ContextPreset, string> = {
-  'benign-code-header': '// generated benign context: module bootstrap\nexport const MAX_RETRIES = 3;\n',
+  'benign-code-header':
+    '// generated benign context: module bootstrap\nexport const MAX_RETRIES = 3;\n',
   'benign-code-footer': '\nexport function reportHealth(): boolean {\n  return true;\n}\n',
   'benign-doc-lines': '# Notes\n\nRoutine release documentation line.\n',
   'benign-extra-script': '',
 };
 
 const DEFAULT_STYLE_BY_EXT: ReadonlyMap<string, CommentStyle> = new Map([
-  ['.py', 'line-hash'], ['.md', 'html'],
+  ['.py', 'line-hash'],
+  ['.md', 'html'],
 ]);
 
 function wrapComment(payload: string, style: CommentStyle): { text: string; ext: string } {
   switch (style) {
-    case 'line-slash': return { text: `// ${payload}\n`, ext: '.ts' };
-    case 'line-hash': return { text: `# ${payload}\n`, ext: '.py' };
-    case 'block': return { text: `/* ${payload} */\n`, ext: '.ts' };
-    case 'html': return { text: `<!-- ${payload} -->\n`, ext: '.md' };
+    case 'line-slash':
+      return { text: `// ${payload}\n`, ext: '.ts' };
+    case 'line-hash':
+      return { text: `# ${payload}\n`, ext: '.py' };
+    case 'block':
+      return { text: `/* ${payload} */\n`, ext: '.ts' };
+    case 'html':
+      return { text: `<!-- ${payload} -->\n`, ext: '.md' };
   }
 }
 
@@ -206,31 +259,56 @@ interface RenderState {
 
 function applyDiversifier(state: RenderState, d: Diversifier): void {
   switch (d.type) {
-    case 'textReplace': state.payload = state.payload.split(d.find).join(d.replaceWith); return;
+    case 'textReplace':
+      state.payload = state.payload.split(d.find).join(d.replaceWith);
+      return;
     case 'zeroWidth': {
       const ch = String.fromCharCode(Number.parseInt(d.codepoint, 16));
       state.payload = state.payload.replace(ZERO_WIDTH_FAMILY, ch).split('{ZW}').join(ch);
       return;
     }
-    case 'casing': state.payload = d.mode === 'upper' ? state.payload.toUpperCase() : state.payload.toLowerCase(); return;
-    case 'whitespace': state.payload = state.payload.split(' ').join('  '); return;
-    case 'commentStyle': state.commentStyle = d.style; return;
-    case 'fileName': state.fileNameOverride = d.name; return;
+    case 'casing':
+      state.payload =
+        d.mode === 'upper' ? state.payload.toUpperCase() : state.payload.toLowerCase();
+      return;
+    case 'whitespace':
+      state.payload = state.payload.split(' ').join('  ');
+      return;
+    case 'commentStyle':
+      state.commentStyle = d.style;
+      return;
+    case 'fileName':
+      state.fileNameOverride = d.name;
+      return;
     case 'contextPrefix':
     case 'contextSuffix':
-      state.contexts.push({ position: d.type === 'contextPrefix' ? 'prefix' : 'suffix', preset: d.preset });
+      state.contexts.push({
+        position: d.type === 'contextPrefix' ? 'prefix' : 'suffix',
+        preset: d.preset,
+      });
       return;
   }
 }
 
-function renderContent(pattern: AttackPattern, plan: readonly Diversifier[]): { content: string; ext: string; fileName: string } {
-  const state: RenderState = { payload: pattern.baseTemplate, ext: pattern.fileExt, extraScriptContext: false, contexts: [] };
+function renderContent(
+  pattern: AttackPattern,
+  plan: readonly Diversifier[],
+): { content: string; ext: string; fileName: string } {
+  const state: RenderState = {
+    payload: pattern.baseTemplate,
+    ext: pattern.fileExt,
+    extraScriptContext: false,
+    contexts: [],
+  };
   for (const d of plan) applyDiversifier(state, d);
 
   let content: string;
   let ext = state.ext;
   if (pattern.targetDetector === 'classifyPackageJsonScripts') {
-    content = renderPackageJson(state.payload, state.extraScriptContext || state.contexts.length > 0);
+    content = renderPackageJson(
+      state.payload,
+      state.extraScriptContext || state.contexts.length > 0,
+    );
   } else if (pattern.targetDetector === 'scanCommentInstructions') {
     const style = state.commentStyle ?? DEFAULT_STYLE_BY_EXT.get(ext) ?? 'line-slash';
     const wrapped = wrapComment(state.payload, style);

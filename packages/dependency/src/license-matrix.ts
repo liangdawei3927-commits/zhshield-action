@@ -40,19 +40,30 @@ export interface LicenseMatrixReport {
 
 /** 宽松许可（商用安全，风险低） */
 const PERMISSIVE_LICENSES = new Set<string>([
-  'MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD',
-  'Unlicense', 'MIT-0', 'PostgreSQL', 'Python-2.0', 'Zlib',
+  'MIT',
+  'Apache-2.0',
+  'BSD-2-Clause',
+  'BSD-3-Clause',
+  'ISC',
+  '0BSD',
+  'Unlicense',
+  'MIT-0',
+  'PostgreSQL',
+  'Python-2.0',
+  'Zlib',
 ]);
 
 /** 弱左版许可（商用需注意衍生条款，风险中） */
 const WEAK_COPYLEFT_LICENSES = new Set<string>([
-  'LGPL-2.1', 'LGPL-3.0', 'MPL-2.0', 'EPL-2.0', 'CDDL-1.0',
+  'LGPL-2.1',
+  'LGPL-3.0',
+  'MPL-2.0',
+  'EPL-2.0',
+  'CDDL-1.0',
 ]);
 
 /** 强左版许可（传染性强，商用风险高） */
-const STRONG_COPYLEFT_LICENSES = new Set<string>([
-  'GPL-2.0', 'GPL-3.0', 'AGPL-3.0', 'SSPL-1.0',
-]);
+const STRONG_COPYLEFT_LICENSES = new Set<string>(['GPL-2.0', 'GPL-3.0', 'AGPL-3.0', 'SSPL-1.0']);
 
 /** 许可类别 → 风险等级 */
 const RISK_BY_CATEGORY: Record<LicenseCategory, LicenseRisk> = {
@@ -68,7 +79,7 @@ const LICENSE_ALIASES: Record<string, string> = {
   'apache-2.0': 'Apache-2.0',
   'apache-2': 'Apache-2.0',
   'apache 2.0': 'Apache-2.0',
-  'apache2': 'Apache-2.0',
+  apache2: 'Apache-2.0',
   'apache license 2.0': 'Apache-2.0',
   'apache license, version 2.0': 'Apache-2.0',
   'apache-2.0 license': 'Apache-2.0',
@@ -204,7 +215,10 @@ export function classifyLicense(license: string | undefined): LicenseCategory {
  * 构建许可证矩阵：遍历图谱中每个依赖节点（根节点除外），
  * 归一化分类许可证并附风险等级，同时输出按类别计数。
  */
-export function buildLicenseMatrix(graph: DependencyGraph, locale?: LanguageCode): LicenseMatrixReport {
+export function buildLicenseMatrix(
+  graph: DependencyGraph,
+  locale?: LanguageCode,
+): LicenseMatrixReport {
   const entries: LicenseEntry[] = [];
 
   const nodes: DependencyNode[] = graph.nodes.filter((node) => node.name !== ROOT_NODE_NAME);
@@ -219,7 +233,10 @@ export function buildLicenseMatrix(graph: DependencyGraph, locale?: LanguageCode
       risk: RISK_BY_CATEGORY[category],
     };
     if (category === 'unknown') {
-      entry.reason = translate('engine.dependency.license.unknownReason', locale ?? DEFAULT_LANGUAGE);
+      entry.reason = translate(
+        'engine.dependency.license.unknownReason',
+        locale ?? DEFAULT_LANGUAGE,
+      );
     }
     entries.push(entry);
   }

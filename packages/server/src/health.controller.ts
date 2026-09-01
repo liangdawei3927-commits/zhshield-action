@@ -83,7 +83,9 @@ export class HealthController {
     const version = await this.sop.getCacheManager().getLocalVersion();
     return {
       ok: true,
-      detail: version ? `local version ${version.version}` : 'cache reachable, no synced version yet',
+      detail: version
+        ? `local version ${version.version}`
+        : 'cache reachable, no synced version yet',
     };
   }
 
@@ -103,7 +105,10 @@ export class HealthController {
       : { ok: false, detail: `sync severely stale (level ${level})` };
   }
 
-  private async withTimeout(label: string, probe: () => Promise<CheckResult> | CheckResult): Promise<ComponentCheck> {
+  private async withTimeout(
+    label: string,
+    probe: () => Promise<CheckResult> | CheckResult,
+  ): Promise<ComponentCheck> {
     const start = Date.now();
     let timer: NodeJS.Timeout | undefined;
     try {
@@ -117,7 +122,11 @@ export class HealthController {
           timer.unref();
         }),
       ]);
-      return { status: result.ok ? 'ok' : 'degraded', latencyMs: Date.now() - start, detail: result.detail };
+      return {
+        status: result.ok ? 'ok' : 'degraded',
+        latencyMs: Date.now() - start,
+        detail: result.detail,
+      };
     } catch (err) {
       return {
         status: 'degraded',

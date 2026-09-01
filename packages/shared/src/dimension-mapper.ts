@@ -18,6 +18,7 @@ const TOOL_DIMENSION_MAP: Record<ToolId, IssueCategory[]> = {
   jscpd: ['quality'],
   'ts-prune': ['quality'],
   tsc: ['quality'],
+  autoperf: ['performance'],
 };
 
 export function getToolDimensions(toolId: ToolId): IssueCategory[] {
@@ -25,12 +26,12 @@ export function getToolDimensions(toolId: ToolId): IssueCategory[] {
 }
 
 const CATEGORY_WEIGHTS: Record<IssueCategory, number> = {
-  architecture: 0.20,
+  architecture: 0.2,
   security: 0.25,
-  quality: 0.20,
+  quality: 0.2,
   performance: 0.15,
   documentation: 0.05,
-  test: 0.10,
+  test: 0.1,
   dependency: 0.05,
   refactoring: 0.05,
 };

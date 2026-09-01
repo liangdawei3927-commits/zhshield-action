@@ -1,5 +1,13 @@
 export type IssueSeverity = 'error' | 'warning' | 'info';
-export type IssueCategory = 'architecture' | 'security' | 'quality' | 'performance' | 'documentation' | 'test' | 'dependency' | 'refactoring';
+export type IssueCategory =
+  | 'architecture'
+  | 'security'
+  | 'quality'
+  | 'performance'
+  | 'documentation'
+  | 'test'
+  | 'dependency'
+  | 'refactoring';
 
 export interface Issue {
   id: string;

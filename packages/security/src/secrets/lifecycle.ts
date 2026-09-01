@@ -131,7 +131,9 @@ export function parseRemoteHost(url: string): string {
 export function isPublicRemoteUrl(url: string): boolean {
   const host = parseRemoteHost(url);
   if (!host) return false;
-  return PUBLIC_HOSTS.has(host) || Array.from(PUBLIC_HOSTS, (h) => h).some((h) => host.endsWith(`.${h}`));
+  return (
+    PUBLIC_HOSTS.has(host) || Array.from(PUBLIC_HOSTS, (h) => h).some((h) => host.endsWith(`.${h}`))
+  );
 }
 
 /** 默认命令执行器：gitleaks 检出密钥时退出码非 0 但 stdout 含有效 JSON，需保留 stdout */
@@ -183,7 +185,8 @@ export class FileSecretStore implements SecretStore {
       const raw = await fs.promises.readFile(this.statePath, 'utf8');
       const parsed = JSON.parse(raw) as SecretPersistState;
       return {
-        lastScannedCommit: typeof parsed.lastScannedCommit === 'string' ? parsed.lastScannedCommit : '',
+        lastScannedCommit:
+          typeof parsed.lastScannedCommit === 'string' ? parsed.lastScannedCommit : '',
         secrets: parsed.secrets && typeof parsed.secrets === 'object' ? parsed.secrets : {},
       };
     } catch {
@@ -244,7 +247,11 @@ export class SecretLifecycleManager {
     const state = await this.store.load();
     const remote = await this.getRemoteInfo(projectPath);
     const workspaceFindings = await this.runGitleaksDetect(projectPath, undefined);
-    const { historyFindings, lastScannedCommit } = await this.collectHistoryFindings(projectPath, opts, state);
+    const { historyFindings, lastScannedCommit } = await this.collectHistoryFindings(
+      projectPath,
+      opts,
+      state,
+    );
     const findings = this.mergeFindings({
       workspaceFindings,
       historyFindings,
@@ -269,7 +276,9 @@ export class SecretLifecycleManager {
     if (opts.history) {
       const logOpts = state.lastScannedCommit ? `${state.lastScannedCommit}..HEAD` : '--all';
       historyFindings = await this.runGitleaksDetect(projectPath, logOpts);
-      lastScannedCommit = await this.getHeadCommit(projectPath).catch(() => state.lastScannedCommit);
+      lastScannedCommit = await this.getHeadCommit(projectPath).catch(
+        () => state.lastScannedCommit,
+      );
     }
     return { historyFindings, lastScannedCommit };
   }
@@ -315,7 +324,11 @@ export class SecretLifecycleManager {
     return false;
   }
 
-  private async transition(secretId: string, status: SecretStatus, reason: string | undefined): Promise<void> {
+  private async transition(
+    secretId: string,
+    status: SecretStatus,
+    reason: string | undefined,
+  ): Promise<void> {
     const state = await this.store.load();
     const record: SecretStateRecord = {
       status,
@@ -326,8 +339,19 @@ export class SecretLifecycleManager {
     await this.store.save(state);
   }
 
-  private async runGitleaksDetect(projectPath: string, logOpts: string | undefined): Promise<GitleaksFinding[]> {
-    const args = ['detect', '--source', projectPath, '--report-format', 'json', '--report-path', '-'];
+  private async runGitleaksDetect(
+    projectPath: string,
+    logOpts: string | undefined,
+  ): Promise<GitleaksFinding[]> {
+    const args = [
+      'detect',
+      '--source',
+      projectPath,
+      '--report-format',
+      'json',
+      '--report-path',
+      '-',
+    ];
     if (logOpts) args.push('--log-opts', logOpts);
     const { stdout } = await this.runner.run('gitleaks', args, {
       cwd: projectPath,
@@ -347,7 +371,10 @@ export class SecretLifecycleManager {
   }
 
   private async getHeadCommit(projectPath: string): Promise<string> {
-    const { stdout } = await this.runner.run('git', ['rev-parse', 'HEAD'], { cwd: projectPath, timeout: 10000 });
+    const { stdout } = await this.runner.run('git', ['rev-parse', 'HEAD'], {
+      cwd: projectPath,
+      timeout: 10000,
+    });
     return stdout.trim();
   }
 
@@ -411,7 +438,12 @@ export class SecretLifecycleManager {
         stillReferenced,
         pushedToRemote: remote.pushedToRemote,
         remotePublic: remote.remotePublic,
-        severity: classifySeverity({ stillReferenced, type, pushedToRemote: remote.pushedToRemote, remotePublic: remote.remotePublic }),
+        severity: classifySeverity({
+          stillReferenced,
+          type,
+          pushedToRemote: remote.pushedToRemote,
+          remotePublic: remote.remotePublic,
+        }),
         status: state.secrets[secretId]?.status ?? 'active',
       };
     });

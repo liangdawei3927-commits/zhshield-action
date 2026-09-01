@@ -1,27 +1,27 @@
 // ─── 三维分类体系：治理域 ──────────────────────────────────
 export type GovernanceDomain =
-  | 'guard'     // 拦截域 — 门禁拦截（L1/L2/L3）
-  | 'inspect'   // 巡检域 — 巡检扫描（20+ 适配器）
-  | 'security'  // 安全域 — 漏洞扫描 + 垃圾清理 + 病毒查杀
-  | 'sentinel'  // 监控域 — 运行时监控、告警、事件管理
-  | 'evolve'    // 演进域 — 评分量化 + AI 规则自优化
+  | 'guard' // 拦截域 — 门禁拦截（L1/L2/L3）
+  | 'inspect' // 巡检域 — 巡检扫描（20+ 适配器）
+  | 'security' // 安全域 — 漏洞扫描 + 垃圾清理 + 病毒查杀
+  | 'sentinel' // 监控域 — 运行时监控、告警、事件管理
+  | 'evolve' // 演进域 — 评分量化 + AI 规则自优化
   | 'refactor'; // 重构域 — 代码异味检测 + 自动重构 + AST 分析
 
 // ─── 三维分类体系：动作类型 ──────────────────────────────────
 export type ActionType =
-  | 'scan'       // 扫描检测 — 主动发现代码/依赖/运行时中的问题
-  | 'block'      // 拦截阻断 — 在关键节点阻止不合格行为
-  | 'score'      // 评分量化 — 将检测结果转化为量化评分
-  | 'alert'      // 告警响应 — 发现异常后通知和分级响应
-  | 'suggest'    // 修复建议 — 基于经验库生成可执行的修复方案
+  | 'scan' // 扫描检测 — 主动发现代码/依赖/运行时中的问题
+  | 'block' // 拦截阻断 — 在关键节点阻止不合格行为
+  | 'score' // 评分量化 — 将检测结果转化为量化评分
+  | 'alert' // 告警响应 — 发现异常后通知和分级响应
+  | 'suggest' // 修复建议 — 基于经验库生成可执行的修复方案
   | 'calibrate'; // 进化校准 — 根据反馈调整规则本身
 
 // ─── 三维分类体系：数据来源 ──────────────────────────────────
 export type DataSource =
-  | 'external'   // 外部标准 — GitHub Advisory、CVE、npm audit、开源规范库
-  | 'internal'   // 内部模式 — 项目实际问题模式、代码异味、架构违规
-  | 'community'  // 社区贡献 — 开发者提交的新规则、最佳实践
-  | 'official';  // 官方维护 — 智汇码盾官方定义的检查标准
+  | 'external' // 外部标准 — GitHub Advisory、CVE、npm audit、开源规范库
+  | 'internal' // 内部模式 — 项目实际问题模式、代码异味、架构违规
+  | 'community' // 社区贡献 — 开发者提交的新规则、最佳实践
+  | 'official'; // 官方维护 — 智汇码盾官方定义的检查标准
 
 // ─── 规则生命周期 ────────────────────────────────────────────
 export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
@@ -185,9 +185,9 @@ export type SignedSopAlg = 'hmac-sha256' | 'ed25519';
 export interface SignedSopPackage {
   version: string;
   rules: SopRule[];
-  signature: string;    // 签名（HMAC-SHA256 hex 或 Ed25519 base64）
-  hash: string;         // 规则内容的 SHA-256 哈希
-  timestamp: Date;      // 签名时间
+  signature: string; // 签名（HMAC-SHA256 hex 或 Ed25519 base64）
+  hash: string; // 规则内容的 SHA-256 哈希
+  timestamp: Date; // 签名时间
   /** 签名算法；可选，缺省 = 'hmac-sha256'（旧缓存包无此字段） */
   alg?: SignedSopAlg;
 }

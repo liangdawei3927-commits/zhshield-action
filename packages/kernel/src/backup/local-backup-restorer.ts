@@ -5,7 +5,11 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { LocalBackupFileEntry, LocalBackupManifest, LocalBackupRestoreResult } from './local-backup';
+import type {
+  LocalBackupFileEntry,
+  LocalBackupManifest,
+  LocalBackupRestoreResult,
+} from './local-backup';
 import { restoreStoredEntry } from './restore-entry';
 import { safeJoinReal } from '@zh/shared';
 

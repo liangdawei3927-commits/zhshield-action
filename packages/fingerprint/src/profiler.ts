@@ -2,13 +2,7 @@
 // 两阶段判定：① 语言/框架/环境聚合 + 置信度加权 → ② 形态语义判定（消费语言结果 + 交叉验证）
 // 职责拆分：语言/框架/环境/形态/目标构建/修正合并 各自独立类，Profiler 仅编排委托。
 
-import type {
-  Signal,
-  LanguageId,
-  MatchResult,
-  ProjectProfile,
-  UserOverrides,
-} from './types';
+import type { Signal, LanguageId, MatchResult, ProjectProfile, UserOverrides } from './types';
 import type { Detector } from './detector';
 import { LanguageAggregator } from './profiler-language';
 import { FrameworkAggregator } from './profiler-framework';
@@ -39,13 +33,22 @@ export class Profiler {
    * @param overrides 人工修正记录（可选）
    * @returns ProjectProfile
    */
-  async profile(
-    projectPath: string,
-    overrides?: UserOverrides,
-  ): Promise<ProjectProfile> {
+  async profile(projectPath: string, overrides?: UserOverrides): Promise<ProjectProfile> {
     const allSignals = await this.collectSignals(projectPath);
-    const { languageResult, frameworkResults, environmentResults, packageManagerResult, formResults } = this.aggregateAllFields(allSignals);
-    const target = this.targetBuilder.build(projectPath, languageResult, frameworkResults, formResults, packageManagerResult);
+    const {
+      languageResult,
+      frameworkResults,
+      environmentResults,
+      packageManagerResult,
+      formResults,
+    } = this.aggregateAllFields(allSignals);
+    const target = this.targetBuilder.build(
+      projectPath,
+      languageResult,
+      frameworkResults,
+      formResults,
+      packageManagerResult,
+    );
     const architecture = this.targetBuilder.determineArchitecture(allSignals);
     const dependencies = this.targetBuilder.extractDependencySummary(allSignals);
     const mergedOverrides = this.overrideMerger.merge(overrides, target);
@@ -74,7 +77,13 @@ export class Profiler {
     const frameworkResults = this.frameworkAggregator.aggregate(signals, languageResult.value);
     const { environments, packageManager } = this.environmentAggregator.aggregate(signals);
     const formResults = this.formDeterminer.determine(signals, languageResult.value);
-    return { languageResult, frameworkResults, environmentResults: environments, packageManagerResult: packageManager, formResults };
+    return {
+      languageResult,
+      frameworkResults,
+      environmentResults: environments,
+      packageManagerResult: packageManager,
+      formResults,
+    };
   }
 
   // ─── 信号采集 ───

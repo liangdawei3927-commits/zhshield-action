@@ -8,7 +8,9 @@ interface Database {
   prepare(sql: string): Statement;
   exec(sql: string): void;
   close(): void;
-  transaction<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult): (...args: TArgs) => TResult;
+  transaction<TArgs extends unknown[], TResult>(
+    fn: (...args: TArgs) => TResult,
+  ): (...args: TArgs) => TResult;
 }
 interface Statement {
   run(...params: unknown[]): { changes: number };
@@ -45,7 +47,10 @@ export class SopSqliteStore {
   private db: Database | null = null;
   private readonly compressor?: SmartCompressor;
 
-  constructor(private readonly dbPath: string, options?: { compressor?: SmartCompressor }) {
+  constructor(
+    private readonly dbPath: string,
+    options?: { compressor?: SmartCompressor },
+  ) {
     this.compressor = options?.compressor;
   }
 
@@ -89,7 +94,9 @@ export class SopSqliteStore {
   loadByDomain(module: string): SopRule[] {
     if (!this.db) return [];
     try {
-      const rows = this.db.prepare('SELECT data FROM sop_rules WHERE domain = ?').all(module) as { data: string }[];
+      const rows = this.db.prepare('SELECT data FROM sop_rules WHERE domain = ?').all(module) as {
+        data: string;
+      }[];
       return rows.map((r) => this.decodeRule(r.data));
     } catch {
       return [];
@@ -149,7 +156,9 @@ export class SopSqliteStore {
     const parsed: unknown = JSON.parse(data);
     if (!isCompressedEnvelope(parsed)) return parsed as SopRule;
     if (!this.compressor) {
-      throw new Error(`Compressed SOP rule found but no compressor configured: ${parsed['strategy'] ?? 'unknown'}`);
+      throw new Error(
+        `Compressed SOP rule found but no compressor configured: ${parsed['strategy'] ?? 'unknown'}`,
+      );
     }
     return JSON.parse(this.compressor.decompress(parsed)) as SopRule;
   }

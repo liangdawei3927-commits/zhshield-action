@@ -54,10 +54,7 @@ export class DepcheckAdapter implements ToolAdapter {
   }
 
   private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
-    const { stdout } = await execFileAsync('depcheck', [
-      options.projectPath,
-      '--json',
-    ], {
+    const { stdout } = await execFileAsync('depcheck', [options.projectPath, '--json'], {
       cwd: options.projectPath,
       timeout: options.timeout || 30000,
       maxBuffer: 10 * 1024 * 1024,
@@ -71,7 +68,12 @@ export class DepcheckAdapter implements ToolAdapter {
         tool: 'depcheck',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'depcheck 未安装',
       };
     }

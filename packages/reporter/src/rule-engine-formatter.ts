@@ -51,10 +51,16 @@ export class RuleEngineReportFormatter {
     const errors = report.errors;
     const skipped = report.skipped;
 
-    lines.push(`${indent}${this.color.bold(this.tt('reporter.summary'))}: ${`${this.color.bold(String(total))} ${this.color.dim(this.tt('reporter.ruleCount', { count: total }))}`}`);
-    lines.push(`${indent}  ${this.tt('reporter.passed')}: ${this.color.green(String(passed))}  ${this.tt('reporter.failed')}: ${this.color.red(String(failed))}  ` +
-      `${this.tt('reporter.errors')}: ${this.color.yellow(String(errors))}  ${this.tt('reporter.skipped')}: ${this.color.gray(String(skipped))}`);
-    lines.push(`${indent}${this.color.dim(this.tt('reporter.duration', { duration: report.durationMs }))}`);
+    lines.push(
+      `${indent}${this.color.bold(this.tt('reporter.summary'))}: ${`${this.color.bold(String(total))} ${this.color.dim(this.tt('reporter.ruleCount', { count: total }))}`}`,
+    );
+    lines.push(
+      `${indent}  ${this.tt('reporter.passed')}: ${this.color.green(String(passed))}  ${this.tt('reporter.failed')}: ${this.color.red(String(failed))}  ` +
+        `${this.tt('reporter.errors')}: ${this.color.yellow(String(errors))}  ${this.tt('reporter.skipped')}: ${this.color.gray(String(skipped))}`,
+    );
+    lines.push(
+      `${indent}${this.color.dim(this.tt('reporter.duration', { duration: report.durationMs }))}`,
+    );
   }
 
   private pushCategories(ctx: RuleEngineReportContext): void {
@@ -72,7 +78,9 @@ export class RuleEngineReportFormatter {
       const catParts = [...categoryCounts.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([cat, count]) => `${this.color.magenta(cat)} ${this.color.bold(String(count))}`);
-      lines.push(`${indent}  ${this.tt('reporter.category')}: ${catParts.join(this.color.dim(', '))}`);
+      lines.push(
+        `${indent}  ${this.tt('reporter.category')}: ${catParts.join(this.color.dim(', '))}`,
+      );
     }
   }
 
@@ -108,7 +116,9 @@ export class RuleEngineReportFormatter {
     lines.push('');
     lines.push(`${indent}${this.color.bold(this.tt('reporter.passedRules'))}`);
     for (const eval_ of passedEvals) {
-      lines.push(`${indent}  ${this.color.green('✓')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`);
+      lines.push(
+        `${indent}  ${this.color.green('✓')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
+      );
     }
   }
 
@@ -121,11 +131,18 @@ export class RuleEngineReportFormatter {
 
   private pushEvaluationHeader(ctx: RuleEvaluationContext): void {
     const { evaluation, lines, indent } = ctx;
-    const statusIcon = evaluation.status === 'passed' ? this.color.green('✓') :
-      evaluation.status === 'failed' ? this.color.red('✗') :
-      evaluation.status === 'error' ? this.color.yellow('⚠') : this.color.gray('-');
+    const statusIcon =
+      evaluation.status === 'passed'
+        ? this.color.green('✓')
+        : evaluation.status === 'failed'
+          ? this.color.red('✗')
+          : evaluation.status === 'error'
+            ? this.color.yellow('⚠')
+            : this.color.gray('-');
 
-    lines.push(`${indent}${statusIcon} ${this.color.bold(evaluation.rule.id)} (${severityLabel(evaluation.rule.severity, this.tt)})`);
+    lines.push(
+      `${indent}${statusIcon} ${this.color.bold(evaluation.rule.id)} (${severityLabel(evaluation.rule.severity, this.tt)})`,
+    );
   }
 
   private pushEvaluationMessage(ctx: RuleEvaluationContext): void {
@@ -144,29 +161,35 @@ export class RuleEngineReportFormatter {
       this.formatViolation(v, lines, `${indent}    `);
     }
     if (evaluation.violations.length > 10) {
-      lines.push(`${indent}    ${this.color.dim(this.tt('reporter.andMore', { count: evaluation.violations.length - 10 }))}`);
+      lines.push(
+        `${indent}    ${this.color.dim(this.tt('reporter.andMore', { count: evaluation.violations.length - 10 }))}`,
+      );
     }
   }
 
   private pushEvaluationFiles(ctx: RuleEvaluationContext): void {
     const { evaluation, lines, indent } = ctx;
     if (evaluation.files && evaluation.files.length > 0) {
-      lines.push(`${indent}  ${this.color.dim(this.tt('reporter.filesInvolved', { count: evaluation.files.length }))}`);
+      lines.push(
+        `${indent}  ${this.color.dim(this.tt('reporter.filesInvolved', { count: evaluation.files.length }))}`,
+      );
     }
   }
 
   private formatViolation(violation: Violation, lines: string[], indent: string): void {
-    const location = violation.line
-      ? `${violation.file}:${violation.line}`
-      : violation.file;
-    const locColor = violation.severity === 'critical' || violation.severity === 'high'
-      ? this.color.red(location) : this.color.yellow(location);
+    const location = violation.line ? `${violation.file}:${violation.line}` : violation.file;
+    const locColor =
+      violation.severity === 'critical' || violation.severity === 'high'
+        ? this.color.red(location)
+        : this.color.yellow(location);
 
     const catTag = violation.category ? `${this.color.magenta(`[${violation.category}]`)} ` : '';
     lines.push(`${indent}${this.color.dim('•')} ${locColor}`);
     lines.push(`${indent}  ${catTag}${violation.message}`);
     if (violation.suggestion) {
-      lines.push(`${indent}  ${this.color.dim(this.tt('reporter.suggestion'))} ${violation.suggestion}`);
+      lines.push(
+        `${indent}  ${this.color.dim(this.tt('reporter.suggestion'))} ${violation.suggestion}`,
+      );
     }
   }
 }

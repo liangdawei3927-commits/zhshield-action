@@ -6,8 +6,16 @@ import type { Issue } from '@zh/shared';
 import { safeJoin, safeJoinReal, safeResolveReal } from '@zh/shared';
 
 const IGNORE_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.turbo',
-  '.cache', 'release', 'dist-electron',
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  '.next',
+  'coverage',
+  '.turbo',
+  '.cache',
+  'release',
+  'dist-electron',
 ]);
 
 const JUNK_NAMES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
@@ -63,7 +71,12 @@ function scanDirectory(dir: string, projectPath: string, items: GarbageItem[], d
   }
 }
 
-function collectFileItem(entry: fs.Dirent, fullPath: string, projectPath: string, items: GarbageItem[]): void {
+function collectFileItem(
+  entry: fs.Dirent,
+  fullPath: string,
+  projectPath: string,
+  items: GarbageItem[],
+): void {
   let stat: fs.Stats;
   try {
     stat = fs.statSync(fullPath);
@@ -123,7 +136,12 @@ export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): G
     fs.rmSync(state.trashDir, { recursive: true, force: true });
     state.batchId = '';
   }
-  return { batchId: state.batchId, cleaned: state.cleaned, freedBytes: state.freedBytes, failed: state.failed };
+  return {
+    batchId: state.batchId,
+    cleaned: state.cleaned,
+    freedBytes: state.freedBytes,
+    failed: state.failed,
+  };
 }
 
 interface CleanState {
@@ -155,7 +173,13 @@ function resolveItemPath(root: string, item: GarbageCleanInput, failed: string[]
   }
 }
 
-function moveToTrash(item: GarbageCleanInput, type: GarbageType, absPath: string, root: string, state: CleanState): void {
+function moveToTrash(
+  item: GarbageCleanInput,
+  type: GarbageType,
+  absPath: string,
+  root: string,
+  state: CleanState,
+): void {
   try {
     if (!state.batchId) {
       const newBatchId = randomUUID();
@@ -168,7 +192,13 @@ function moveToTrash(item: GarbageCleanInput, type: GarbageType, absPath: string
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.renameSync(absPath, dest);
     state.freedBytes += item.size;
-    state.cleaned.push({ id: item.id, type, path: item.path, size: item.size, reason: item.reason ?? '' });
+    state.cleaned.push({
+      id: item.id,
+      type,
+      path: item.path,
+      size: item.size,
+      reason: item.reason ?? '',
+    });
   } catch (err) {
     state.failed.push(`${item.id}: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -198,11 +228,18 @@ interface RestoreState {
 
 function restoreDirectory(dir: string, batchDir: string, root: string, state: RestoreState): void {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name === 'node_modules') continue;
     restoreEntry(entry, dir, batchDir, root, state);
   }
 }
 
-function restoreEntry(entry: fs.Dirent, dir: string, batchDir: string, root: string, state: RestoreState): void {
+function restoreEntry(
+  entry: fs.Dirent,
+  dir: string,
+  batchDir: string,
+  root: string,
+  state: RestoreState,
+): void {
   const full = resolveFullPath(dir, entry.name, state.failed);
   if (full === null) return;
   if (entry.isDirectory()) {

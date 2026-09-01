@@ -126,7 +126,11 @@ describe('SopCacheManager 自动维护接入（DataCleanup）', () => {
     await manager.initialize();
 
     expect(registry.count()).toBe(3);
-    expect(registry.getAll().map((r) => r.id)).toEqual(['guard.seed-3', 'guard.seed-4', 'guard.seed-5']);
+    expect(registry.getAll().map((r) => r.id)).toEqual([
+      'guard.seed-3',
+      'guard.seed-4',
+      'guard.seed-5',
+    ]);
 
     const initEvent = events.find((e) => e.trigger === 'init');
     expect(initEvent).toMatchObject({ rulesBefore: 5, rulesAfter: 3, rulesRemoved: 2 });
@@ -173,8 +177,16 @@ describe('SopCacheManager 自动维护接入（DataCleanup）', () => {
     createManager();
     const day = 24 * 60 * 60 * 1000;
     const lines = [
-      JSON.stringify({ timestamp: new Date(Date.now() - 100 * day).toISOString(), from: '0', to: 'x' }),
-      JSON.stringify({ timestamp: new Date(Date.now() - 95 * day).toISOString(), from: 'x', to: 'y' }),
+      JSON.stringify({
+        timestamp: new Date(Date.now() - 100 * day).toISOString(),
+        from: '0',
+        to: 'x',
+      }),
+      JSON.stringify({
+        timestamp: new Date(Date.now() - 95 * day).toISOString(),
+        from: 'x',
+        to: 'y',
+      }),
       JSON.stringify({ timestamp: new Date().toISOString(), from: 'y', to: 'z' }),
     ];
     fs.writeFileSync(path.join(cacheDir, 'sync.log'), lines.join('\n') + '\n', 'utf-8');

@@ -1,7 +1,10 @@
 import { generateHtmlReport, type HtmlReportData } from '@zh/reporter';
 import { showSaveDialog, writeFile } from '../services/engineApi';
 
-export async function exportHtmlReport(data: HtmlReportData, defaultFilename: string): Promise<boolean> {
+export async function exportHtmlReport(
+  data: HtmlReportData,
+  defaultFilename: string,
+): Promise<boolean> {
   const html = generateHtmlReport(data);
   const result = await showSaveDialog({
     defaultPath: defaultFilename,

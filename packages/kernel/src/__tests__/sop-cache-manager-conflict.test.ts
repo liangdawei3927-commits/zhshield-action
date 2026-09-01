@@ -52,7 +52,9 @@ describe('SyncConflictResolver（SHA-256 内容哈希）', () => {
 
   it('GIVEN MANUAL 策略 WHEN resolve THEN 抛出需人工处理异常', () => {
     const conflict = resolver.detectConflict('r1', 1, 2, { v: 1 }, { v: 2 })!;
-    expect(() => resolver.resolve(conflict, ConflictResolution.MANUAL)).toThrow(MANUAL_RESOLUTION_RE);
+    expect(() => resolver.resolve(conflict, ConflictResolution.MANUAL)).toThrow(
+      MANUAL_RESOLUTION_RE,
+    );
   });
 });
 
@@ -63,10 +65,7 @@ describe('SopCacheManager 冲突解决接入（syncFromCloud/applyDiff 共用链
   let manager: SopCacheManager;
   let conflictEvents: ConflictResolvedEvent[];
 
-  function createManager(
-    strategy?: ConflictResolution,
-    initialRules: SopRule[] = [],
-  ): void {
+  function createManager(strategy?: ConflictResolution, initialRules: SopRule[] = []): void {
     registry = new SopRegistry();
     for (const rule of initialRules) registry.register(rule);
     manager = new SopCacheManager(registry, {
@@ -185,6 +184,8 @@ describe('SopCacheManager 冲突解决接入（syncFromCloud/applyDiff 共用链
     await manager.applyDiff(makeDiff([], [makeRule({ id: 'guard.fresh' })]));
 
     expect(registry.get('guard.fresh')).toBeDefined();
-    expect(manager.getMetricsSnapshot().counters.find((c) => c.name === 'sop_conflicts_resolved_total')).toBeUndefined();
+    expect(
+      manager.getMetricsSnapshot().counters.find((c) => c.name === 'sop_conflicts_resolved_total'),
+    ).toBeUndefined();
   });
 });

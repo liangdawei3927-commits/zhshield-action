@@ -24,13 +24,13 @@ export class GuardService {
     });
 
     // Register all guard adapters (checks.json adapter field ↔ class mapping)
-    this.engine.registerAdapter('eslint-check',          new GuardESLintCheckAdapter());
-    this.engine.registerAdapter('sonarway-eslint',        new GuardSonarwayESLintAdapter());
-    this.engine.registerAdapter('sensitive-info',         new GuardSensitiveInfoAdapter());
-    this.engine.registerAdapter('architecture-boundary',  new ArchitectureBoundaryAdapter());
-    this.engine.registerAdapter('test-runner',            new TestRunnerAdapter());
-    this.engine.registerAdapter('security-scan',          new SecurityScanAdapter());
-    this.engine.registerAdapter('trivy',                  new GuardTrivyAdapter());
+    this.engine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
+    this.engine.registerAdapter('sonarway-eslint', new GuardSonarwayESLintAdapter());
+    this.engine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter());
+    this.engine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
+    this.engine.registerAdapter('test-runner', new TestRunnerAdapter());
+    this.engine.registerAdapter('security-scan', new SecurityScanAdapter());
+    this.engine.registerAdapter('trivy', new GuardTrivyAdapter());
   }
 
   async runCheck(projectPath: string, options?: Partial<CheckOptions>): Promise<GuardReport> {

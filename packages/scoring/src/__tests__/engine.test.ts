@@ -186,7 +186,9 @@ describe('ScoringEngine (persistent)', () => {
       expect(history.length).toBeGreaterThanOrEqual(1);
     } finally {
       conn.close();
-      try { unlinkSync(dbPath); } catch {}
+      try {
+        unlinkSync(dbPath);
+      } catch {}
     }
   });
 
@@ -200,7 +202,9 @@ describe('ScoringEngine (persistent)', () => {
       expect(s2.trend).toBe('improving');
     } finally {
       conn.close();
-      try { unlinkSync(dbPath); } catch {}
+      try {
+        unlinkSync(dbPath);
+      } catch {}
     }
   });
 });

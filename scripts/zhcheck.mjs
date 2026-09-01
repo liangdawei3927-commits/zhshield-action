@@ -28,6 +28,10 @@ import { execSync } from 'child_process';
 const PKGS_ROOT = resolve(import.meta.dirname, '..', 'packages');
 const PROJECT_ROOT = resolve(import.meta.dirname, '..');
 
+/** 构建产物目录（dist/dist-electron），模块级常量避免每次过滤时重编译正则 */
+const RE_DIST = /(^|\/)dist(\/|$)/;
+const RE_DIST_ELECTRON = /(^|\/)dist-electron(\/|$)/;
+
 function importEngine(name) {
   const p = resolve(PKGS_ROOT, name, 'dist', 'engine.js');
   if (!existsSync(p)) {
@@ -144,11 +148,16 @@ async function runSecurity(files, opts, projectRoot) {
 
   for (const vuln of report?.vulnerabilities || []) {
     if (!opts.json) {
-      console.log(formatLinter({
-        severity: vuln.severity,
-        ruleId: vuln.cveId || 'vulnerability',
-        message: vuln.package ? `[${vuln.package}] ${vuln.title}` : vuln.title,
-      }, ''));
+      console.log(
+        formatLinter(
+          {
+            severity: vuln.severity,
+            ruleId: vuln.cveId || 'vulnerability',
+            message: vuln.package ? `[${vuln.package}] ${vuln.title}` : vuln.title,
+          },
+          '',
+        ),
+      );
     }
     if (vuln.severity === 'error' || vuln.severity === 'critical') errorCount++;
     if (vuln.severity === 'warning' || vuln.severity === 'high') warningCount++;
@@ -158,7 +167,11 @@ async function runSecurity(files, opts, projectRoot) {
     console.log(JSON.stringify(report, null, 2));
   }
 
-  return { total: (report?.vulnerabilities || []).length, warnings: warningCount, errors: errorCount };
+  return {
+    total: (report?.vulnerabilities || []).length,
+    warnings: warningCount,
+    errors: errorCount,
+  };
 }
 
 // ── 门禁检查 ──────────────────────────────────────────────
@@ -189,7 +202,11 @@ async function runGuard(files, opts, _projectRoot) {
     }
   }
 
-  return { total: report?.checks?.filter(c => !c.passed).length || 0, warnings: warningCount, errors: errorCount };
+  return {
+    total: report?.checks?.filter((c) => !c.passed).length || 0,
+    warnings: warningCount,
+    errors: errorCount,
+  };
 }
 
 // ── 获取 Git 暂存区文件 ────────────────────────────────────
@@ -199,27 +216,38 @@ function getStagedFiles() {
     const cmd = 'git diff --cached --name-only --diff-filter=ACM HEAD';
     let out;
     try {
-      out = execSync(cmd, { cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      out = execSync(cmd, {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
     } catch {
       // 没有 HEAD（首次提交），使用 --cached 不带 HEAD
       out = execSync('git diff --cached --name-only --diff-filter=AM', {
-        cwd: PROJECT_ROOT, encoding: 'utf-8',
+        cwd: PROJECT_ROOT,
+        encoding: 'utf-8',
       });
     }
-    return out
-      .split('\n')
-      .filter(f => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.mjs')))
-      // 跳过构建产物：dist/dist-electron 为自包含 bundle 与 SOP 拷贝（随仓库分发的发布物，非可分析源码）
-      .filter(f => !/(^|\/)dist(\/|$)/.test(f) && !/(^|\/)dist-electron(\/|$)/.test(f))
-      // 跳过超大文件（压缩 bundle 无法做有意义的静态分析）
-      .filter(f => {
-        try {
-          return existsSync(f) && statSync(f).size <= 2 * 1024 * 1024; // ≤ 2MB
-        } catch {
-          return false;
-        }
-      })
-      .map(f => resolve(PROJECT_ROOT, f));
+    return (
+      out
+        .split('\n')
+        .filter(
+          (f) =>
+            f.trim() &&
+            (f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.mjs')),
+        )
+        // 跳过构建产物：dist/dist-electron 为自包含 bundle 与 SOP 拷贝（随仓库分发的发布物，非可分析源码）
+        .filter((f) => !RE_DIST.test(f) && !RE_DIST_ELECTRON.test(f))
+        // 跳过超大文件（压缩 bundle 无法做有意义的静态分析）
+        .filter((f) => {
+          try {
+            return existsSync(f) && statSync(f).size <= 2 * 1024 * 1024; // ≤ 2MB
+          } catch {
+            return false;
+          }
+        })
+        .map((f) => resolve(PROJECT_ROOT, f))
+    );
   } catch {
     return [];
   }
@@ -315,16 +343,16 @@ Linter 输出格式:
   const opts = { json: values.json, ci: values.ci };
 
   // 扫描目标项目：--project 指定外部项目，默认当前项目
-  const projectRoot = values.project
-    ? resolve(values.project)
-    : PROJECT_ROOT;
+  const projectRoot = values.project ? resolve(values.project) : PROJECT_ROOT;
 
   if (!existsSync(projectRoot)) {
     console.error(`zhcheck: project not found: ${projectRoot}`);
     process.exit(2);
   }
 
-  console.log(`zhcheck: scanning ${projectRoot === PROJECT_ROOT ? 'current project' : relative(process.cwd(), projectRoot)}`);
+  console.log(
+    `zhcheck: scanning ${projectRoot === PROJECT_ROOT ? 'current project' : relative(process.cwd(), projectRoot)}`,
+  );
 
   let stagedFiles = [];
   if (values.staged) {
@@ -353,7 +381,9 @@ Linter 输出格式:
   if (values.all || values.guard) engines.push({ name: 'guard', fn: runGuard });
 
   if (engines.length === 0) {
-    console.log('zhcheck: no engine selected. Use --refactor, --inspect, --security, --guard, or --all.');
+    console.log(
+      'zhcheck: no engine selected. Use --refactor, --inspect, --security, --guard, or --all.',
+    );
     console.log('zhcheck: try --help for usage.');
     process.exit(0);
   }
@@ -395,7 +425,7 @@ Linter 输出格式:
   process.exit(0);
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error('zhcheck: error:', e.message);
   process.exit(2);
 });

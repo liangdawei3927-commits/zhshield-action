@@ -52,7 +52,11 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...config };
     if (!cfg.analyzeArtifacts) return [];
 
-    const state: { scanned: number; totalBytes: number; seq: number } = { scanned: 0, totalBytes: 0, seq: 0 };
+    const state: { scanned: number; totalBytes: number; seq: number } = {
+      scanned: 0,
+      totalBytes: 0,
+      seq: 0,
+    };
     const issues: PerformanceIssue[] = [];
     for (const dirName of ARTIFACT_DIR_NAMES) {
       if (state.scanned >= cfg.scanLimit) break;
@@ -129,7 +133,10 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
 }
 
 /** 产物总量告警（低优先级，单独规则） */
-function pushTotalWarning(state: { scanned: number; totalBytes: number; seq: number }, issues: PerformanceIssue[]): void {
+function pushTotalWarning(
+  state: { scanned: number; totalBytes: number; seq: number },
+  issues: PerformanceIssue[],
+): void {
   if (state.totalBytes > TOTAL_ARTIFACT_WARN_BYTES) {
     issues.push({
       id: `bundle-size-${state.seq++}`,

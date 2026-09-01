@@ -6,8 +6,16 @@ import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 
 const RISK_LABELS: Record<string, { textKey: string; color: string; bg: string }> = {
-  high: { textKey: 'severity.high', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)' },
-  medium: { textKey: 'severity.medium', color: 'rgb(var(--zh-warning))', bg: 'rgb(var(--zh-warning) / 0.1)' },
+  high: {
+    textKey: 'severity.high',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+  },
+  medium: {
+    textKey: 'severity.medium',
+    color: 'rgb(var(--zh-warning))',
+    bg: 'rgb(var(--zh-warning) / 0.1)',
+  },
   low: { textKey: 'severity.low', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)' },
 };
 
@@ -24,7 +32,9 @@ const SEVERITY_MAP: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   info: 'low',
 };
 
-function recordCheckToView(check: GuardReportRecordData['checks'][number]): GuardReportData['checks'][number] {
+function recordCheckToView(
+  check: GuardReportRecordData['checks'][number],
+): GuardReportData['checks'][number] {
   const status = check.status === 'passed' ? 'pass' : check.status === 'warning' ? 'warn' : 'fail';
   return {
     id: check.checkId,
@@ -35,11 +45,22 @@ function recordCheckToView(check: GuardReportRecordData['checks'][number]): Guar
   };
 }
 
-function GuardHistoryCheckRow({ check, onCopyToAi, onReportFalsePositive }: { check: GuardReportRecordData['checks'][number]; onCopyToAi: (check: GuardReportData['checks'][number]) => void; onReportFalsePositive: (check: GuardReportData['checks'][number]) => void }) {
+function GuardHistoryCheckRow({
+  check,
+  onCopyToAi,
+  onReportFalsePositive,
+}: {
+  check: GuardReportRecordData['checks'][number];
+  onCopyToAi: (check: GuardReportData['checks'][number]) => void;
+  onReportFalsePositive: (check: GuardReportData['checks'][number]) => void;
+}) {
   const t = useT();
   return (
     <div className="flex items-center gap-2">
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_LABELS.fail.color }} />
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ background: STATUS_LABELS.fail.color }}
+      />
       <span className="text-xs text-zh-ink-2 truncate">{check.message}</span>
       <div className="ml-auto flex items-center gap-2 shrink-0">
         <Bounce
@@ -89,16 +110,25 @@ export function GuardHistory({
           return (
             <div key={i} className="rounded-lg border border-zh-line p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: risk.bg, color: risk.color }}>
+                <span
+                  className="px-2 py-0.5 rounded text-xs font-medium"
+                  style={{ background: risk.bg, color: risk.color }}
+                >
                   {t(risk.textKey)}
                 </span>
                 <span className="text-xs text-zh-muted">{t(trigger)}</span>
-                <span className="ml-auto text-xs text-zh-muted">{new Date(record.timestamp).toLocaleString()}</span>
+                <span className="ml-auto text-xs text-zh-muted">
+                  {new Date(record.timestamp).toLocaleString()}
+                </span>
               </div>
               <div className="flex items-center gap-4 text-xs text-zh-muted mb-2">
                 <span>{t('page.guard.checkCount', { count: record.summary.total })}</span>
-                <span className="text-red-500">{t('page.guard.blockedCount', { count: record.summary.blocking })}</span>
-                <span className="text-amber-500">{t('page.guard.warningCount', { count: record.summary.warnings })}</span>
+                <span className="text-red-500">
+                  {t('page.guard.blockedCount', { count: record.summary.blocking })}
+                </span>
+                <span className="text-amber-500">
+                  {t('page.guard.warningCount', { count: record.summary.warnings })}
+                </span>
               </div>
               {failedChecks.length > 0 && (
                 <div className="space-y-1.5">

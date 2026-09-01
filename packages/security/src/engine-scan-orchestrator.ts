@@ -11,8 +11,10 @@ interface CollectIssuesByToolParams {
 }
 
 const TOOL_ISSUE_COLLECTORS: Record<string, (params: CollectIssuesByToolParams) => void> = {
-  trivy: (params) => params.trivyIssues.push(...params.issues.filter((i) => i.category === 'security')),
-  grype: (params) => params.grypeIssues.push(...params.issues.filter((i) => i.category === 'security')),
+  trivy: (params) =>
+    params.trivyIssues.push(...params.issues.filter((i) => i.category === 'security')),
+  grype: (params) =>
+    params.grypeIssues.push(...params.issues.filter((i) => i.category === 'security')),
   depcheck: (params) => params.depcheckIssues.push(...params.issues),
   semgrep: (params) => params.semgrepIssues.push(...params.issues),
 };
@@ -35,7 +37,11 @@ export class ScanOrchestrator {
   private auditLogger: AuditLogger;
   private emitter: EventEmitter;
 
-  constructor(degradationManager: DegradationManager, auditLogger: AuditLogger, emitter: EventEmitter) {
+  constructor(
+    degradationManager: DegradationManager,
+    auditLogger: AuditLogger,
+    emitter: EventEmitter,
+  ) {
     this.degradationManager = degradationManager;
     this.auditLogger = auditLogger;
     this.emitter = emitter;
@@ -78,7 +84,13 @@ export class ScanOrchestrator {
     depcheck: Issue[];
     semgrep: Issue[];
   }> {
-    const result = { all: [] as Issue[], trivy: [] as Issue[], grype: [] as Issue[], depcheck: [] as Issue[], semgrep: [] as Issue[] };
+    const result = {
+      all: [] as Issue[],
+      trivy: [] as Issue[],
+      grype: [] as Issue[],
+      depcheck: [] as Issue[],
+      semgrep: [] as Issue[],
+    };
     const toolStart = Date.now();
 
     try {

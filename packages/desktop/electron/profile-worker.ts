@@ -35,15 +35,14 @@ interface ProfileResult {
 /** 入站请求（id 由主进程生成，响应原样回传用于关联） */
 export interface ProfileWorkerRequest {
   id: string;
-  type: 'collectFiles' | 'detectProfile' | 'runProfile' | 'collectExposedFiles';
+  type: 'collectFiles' | 'detectProfile' | 'runProfile' | 'collectExposedFiles' | 'profileSync';
   projectPath: string;
   options?: ProfileWorkerOptions;
 }
 
 /** 出站响应（result 恒为可结构化克隆的纯 JSON） */
 export type ProfileWorkerResponse =
-  | { id: string; ok: true; result: unknown }
-  | { id: string; ok: false; error: string };
+  { id: string; ok: true; result: unknown } | { id: string; ok: false; error: string };
 
 /** 收集单个源码文件条目（扩展名匹配 + 大小统计；不可读文件跳过） */
 function collectFileEntry(
@@ -61,7 +60,9 @@ function collectFileEntry(
     files.push({ path: fullPath, size: stat.size, ext });
     byExtension[ext] = (byExtension[ext] ?? 0) + 1;
     state.totalSize += stat.size;
-  } catch { /* skip unreadable files */ }
+  } catch {
+    /* skip unreadable files */
+  }
 }
 
 function walkProjectFiles(
@@ -75,7 +76,9 @@ function walkProjectFiles(
   let entries: Dirent[];
   try {
     entries = readdirSync(dir, { withFileTypes: true });
-  } catch { /* skip unreadable directories */ return; }
+  } catch {
+    /* skip unreadable directories */ return;
+  }
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
 
@@ -92,18 +95,34 @@ function walkProjectFiles(
  * Worker thread for project profiling
  * Moves heavy filesystem operations off the main Electron thread
  */
-function collectProjectFiles(
-  projectPath: string,
-  options?: ProfileWorkerOptions,
-): ProfileResult {
+function collectProjectFiles(projectPath: string, options?: ProfileWorkerOptions): ProfileResult {
   const excludeDirs = options?.excludeDirs ?? [
-    'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
-    '__pycache__', '.venv', 'vendor', '.cache',
+    'node_modules',
+    '.git',
+    'dist',
+    'build',
+    '.next',
+    'coverage',
+    '__pycache__',
+    '.venv',
+    'vendor',
+    '.cache',
   ];
   const includeExtensions = options?.includeExtensions ?? [
-    '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-    '.py', '.go', '.rs', '.java', '.kt',
-    '.vue', '.svelte', '.astro',
+    '.ts',
+    '.tsx',
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.py',
+    '.go',
+    '.rs',
+    '.java',
+    '.kt',
+    '.vue',
+    '.svelte',
+    '.astro',
   ];
 
   const files: ProfileResult['files'] = [];
@@ -132,6 +151,7 @@ function collectFilesRecursively(absDir: string, relPrefix: string, acc: string[
   }
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
+    if (entry.name === 'node_modules') continue;
     const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       collectFilesRecursively(join(absDir, entry.name), rel, acc);
@@ -144,7 +164,15 @@ function collectFilesRecursively(absDir: string, relPrefix: string, acc: string[
 /** 扫描项目对外接口入口（API 路由/控制器/服务入口文件），目录缺失或不可读 → 跳过 */
 function collectExposedFiles(projectPath: string): string[] {
   const exposed: string[] = [];
-  const dirs = ['src/api', 'src/routes', 'src/controllers', 'src/rest', 'api', 'routes', 'controllers'];
+  const dirs = [
+    'src/api',
+    'src/routes',
+    'src/controllers',
+    'src/rest',
+    'api',
+    'routes',
+    'controllers',
+  ];
   for (const dir of dirs) {
     const abs = join(projectPath, dir);
     try {
@@ -156,8 +184,14 @@ function collectExposedFiles(projectPath: string): string[] {
     }
   }
   const entryFiles = [
-    'src/main.ts', 'src/app.ts', 'src/server.ts', 'src/index.ts',
-    'main.ts', 'app.ts', 'server.ts', 'index.ts',
+    'src/main.ts',
+    'src/app.ts',
+    'src/server.ts',
+    'src/index.ts',
+    'main.ts',
+    'app.ts',
+    'server.ts',
+    'index.ts',
   ];
   for (const file of entryFiles) {
     try {
@@ -183,6 +217,12 @@ async function runFingerprintProfile(projectPath: string): Promise<unknown> {
   return { profile: result.profile, questions: result.questions, drift: result.drift };
 }
 
+/** @zh/fingerprint 同步画像（ScoringProjectProfile + warnings，原主进程同步调用，移入 worker） */
+async function runSyncProfile(projectPath: string): Promise<unknown> {
+  const { profileSync } = await import('@zh/fingerprint');
+  return profileSync(projectPath);
+}
+
 async function dispatchRequest(req: ProfileWorkerRequest): Promise<unknown> {
   switch (req.type) {
     case 'collectFiles':
@@ -193,6 +233,8 @@ async function dispatchRequest(req: ProfileWorkerRequest): Promise<unknown> {
       return runFingerprintProfile(req.projectPath);
     case 'collectExposedFiles':
       return collectExposedFiles(req.projectPath);
+    case 'profileSync':
+      return runSyncProfile(req.projectPath);
     default: {
       const exhaustive: never = req.type;
       throw new Error(`[profile-worker] 未知请求类型: ${String(exhaustive)}`);

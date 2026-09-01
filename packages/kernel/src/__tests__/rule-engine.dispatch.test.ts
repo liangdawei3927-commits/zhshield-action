@@ -38,13 +38,15 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     };
 
     const engineWithGuard = new SopRuleEngine(registry, { guardEngine: mockGuard });
-    registry.register(makeRule({
-      id: 'guard.block.eslint-error',
-      domain: 'guard',
-      content: {
-        checks: [{ rule: 'no-unused-vars', level: 'error' }],
-      },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.eslint-error',
+        domain: 'guard',
+        content: {
+          checks: [{ rule: 'no-unused-vars', level: 'error' }],
+        },
+      }),
+    );
 
     const report = await engineWithGuard.evaluateRules({ repoRoot: '/tmp' });
     expect(report.total).toBe(1);
@@ -66,13 +68,15 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     };
 
     const engineWithInspect = new SopRuleEngine(registry, { inspectEngine: mockInspect });
-    registry.register(makeRule({
-      id: 'inspect.security.dependency-audit',
-      domain: 'inspect',
-      action: 'scan',
-      applicableEngines: ['inspect'],
-      content: { scanners: ['npm-audit', 'trivy'], schedule: 'daily' },
-    }));
+    registry.register(
+      makeRule({
+        id: 'inspect.security.dependency-audit',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { scanners: ['npm-audit', 'trivy'], schedule: 'daily' },
+      }),
+    );
 
     const report = await engineWithInspect.evaluateRules({
       repoRoot: '/tmp',
@@ -89,22 +93,36 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
   it('scanner-dispatch: 扫描器不可用/未注册混合时返回 skipped 并逐项列出原因', async () => {
     const unavailableAdapter = {
-      meta: { id: 'semgrep', name: 'Semgrep', category: 'security' as const, priority: 'P1' as const, installMode: 'external' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'semgrep',
+        name: 'Semgrep',
+        category: 'security' as const,
+        priority: 'P1' as const,
+        installMode: 'external' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => false,
-      scan: async () => { throw new Error('should not be called'); },
+      scan: async () => {
+        throw new Error('should not be called');
+      },
     };
 
     const engineWithAdapters = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'semgrep', adapter: unavailableAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'inspect.security.semgrep-scan',
-      domain: 'inspect',
-      action: 'scan',
-      applicableEngines: ['inspect'],
-      content: { scanners: ['semgrep', 'gitleaks'] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'inspect.security.semgrep-scan',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { scanners: ['semgrep', 'gitleaks'] },
+      }),
+    );
 
     const report = await engineWithAdapters.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
     const evalResult = report.evaluations[0];
@@ -117,7 +135,17 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
   it('scanner-dispatch: 至少一个扫描器可用且零违规时仍为 passed', async () => {
     const availableAdapter = {
-      meta: { id: 'semgrep', name: 'Semgrep', category: 'security' as const, priority: 'P1' as const, installMode: 'external' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'semgrep',
+        name: 'Semgrep',
+        category: 'security' as const,
+        priority: 'P1' as const,
+        installMode: 'external' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => true,
       scan: async () => ({
         tool: 'semgrep' as const,
@@ -131,13 +159,15 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
       toolAdapters: [{ name: 'semgrep', adapter: availableAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'inspect.security.semgrep-scan',
-      domain: 'inspect',
-      action: 'scan',
-      applicableEngines: ['inspect'],
-      content: { scanners: ['semgrep', 'gitleaks'] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'inspect.security.semgrep-scan',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { scanners: ['semgrep', 'gitleaks'] },
+      }),
+    );
 
     const report = await engineWithAdapters.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
     const evalResult = report.evaluations[0];
@@ -146,11 +176,13 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
   });
 
   it('GuardEngine 未注册时 check-list 返回 skipped', async () => {
-    registry.register(makeRule({
-      id: 'guard.block.eslint-error',
-      domain: 'guard',
-      content: { checks: [{ rule: 'no-console', level: 'warn' }] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.eslint-error',
+        domain: 'guard',
+        content: { checks: [{ rule: 'no-console', level: 'warn' }] },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/tmp' });
     expect(report.total).toBe(1);
@@ -161,7 +193,17 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
   it('tool-dispatch: 注册 mock 适配器后正确执行', async () => {
     let scanCalled = false;
     const mockAdapter = {
-      meta: { id: 'eslint', name: 'ESLint', category: 'guard' as const, priority: 'P1' as const, installMode: 'builtin' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => true,
       scan: async (opts: ToolScanOptions) => {
         scanCalled = true;
@@ -180,17 +222,19 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
       toolAdapters: [{ name: 'eslint', adapter: mockAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'guard.block.external.eslint-error',
-      domain: 'guard',
-      action: 'block',
-      severity: 'high',
-      content: {
-        metadata: { id: 'guard.block.external.eslint-error', name: 'ESLint Error' },
-        governance: { domain: 'guard', action: 'block' },
-        check: { tool: 'eslint', toolConfig: { configFile: '.eslintrc.cjs' } },
-      },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.external.eslint-error',
+        domain: 'guard',
+        action: 'block',
+        severity: 'high',
+        content: {
+          metadata: { id: 'guard.block.external.eslint-error', name: 'ESLint Error' },
+          governance: { domain: 'guard', action: 'block' },
+          check: { tool: 'eslint', toolConfig: { configFile: '.eslintrc.cjs' } },
+        },
+      }),
+    );
 
     const report = await e2eEngine.evaluateRules({
       repoRoot: '/test-project',
@@ -202,13 +246,15 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
   });
 
   it('tool-dispatch: 未注册适配器时返回 skipped', async () => {
-    registry.register(makeRule({
-      id: 'guard.block.test-missing-adapter',
-      domain: 'guard',
-      content: {
-        check: { tool: 'nonexistent-tool', toolConfig: {} },
-      },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.test-missing-adapter',
+        domain: 'guard',
+        content: {
+          check: { tool: 'nonexistent-tool', toolConfig: {} },
+        },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
     const evalResult = report.evaluations[0];
@@ -218,20 +264,34 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
   it('tool-dispatch: 适配器 isAvailable=false 时返回 skipped', async () => {
     const unavailableAdapter = {
-      meta: { id: 'broken-tool', name: 'Broken', category: 'guard' as const, priority: 'P1' as const, installMode: 'builtin' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'broken-tool',
+        name: 'Broken',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => false,
-      scan: async () => { throw new Error('should not be called'); },
+      scan: async () => {
+        throw new Error('should not be called');
+      },
     };
 
     const unavailableEngine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'broken-tool', adapter: unavailableAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'guard.block.test-unavailable',
-      domain: 'guard',
-      content: { check: { tool: 'broken-tool', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.test-unavailable',
+        domain: 'guard',
+        content: { check: { tool: 'broken-tool', toolConfig: {} } },
+      }),
+    );
 
     const report = await unavailableEngine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
     expect(report.evaluations[0].status).toBe('skipped');
@@ -240,7 +300,17 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
   it('tool-dispatch: scan() 返回 unavailable 时映射为 skipped（如注入 config 缺失）', async () => {
     const unavailableScanAdapter = {
-      meta: { id: 'eslint', name: 'ESLint', category: 'guard' as const, priority: 'P1' as const, installMode: 'builtin' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => true,
       scan: async () => ({
         tool: 'eslint' as const,
@@ -255,13 +325,22 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
       toolAdapters: [{ name: 'eslint', adapter: unavailableScanAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'inspect.scan.official.eslint-performance',
-      domain: 'inspect',
-      action: 'scan',
-      applicableEngines: ['inspect'],
-      content: { check: { tool: 'eslint', toolConfig: { config: 'node_modules/@zh/kernel/dist/assets/eslint/eslint-performance.config.mjs' } } },
-    }));
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.official.eslint-performance',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: {
+          check: {
+            tool: 'eslint',
+            toolConfig: {
+              config: 'node_modules/@zh/kernel/dist/assets/eslint/eslint-performance.config.mjs',
+            },
+          },
+        },
+      }),
+    );
 
     const report = await e2eEngine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
     const evalResult = report.evaluations[0];
@@ -271,20 +350,34 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
   it('tool-dispatch: scan() 抛出异常时返回 error', async () => {
     const errorAdapter = {
-      meta: { id: 'error-tool', name: 'ErrorTool', category: 'guard' as const, priority: 'P1' as const, installMode: 'builtin' as const, description: '', cliCommand: '', homepage: '', license: '' },
+      meta: {
+        id: 'error-tool',
+        name: 'ErrorTool',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
       isAvailable: async () => true,
-      scan: async () => { throw new Error('CLI crashed'); },
+      scan: async () => {
+        throw new Error('CLI crashed');
+      },
     };
 
     const errorEngine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'error-tool', adapter: errorAdapter }],
     });
 
-    registry.register(makeRule({
-      id: 'guard.block.test-error',
-      domain: 'guard',
-      content: { check: { tool: 'error-tool', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.test-error',
+        domain: 'guard',
+        content: { check: { tool: 'error-tool', toolConfig: {} } },
+      }),
+    );
 
     const report = await errorEngine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
     expect(report.evaluations[0].status).toBe('error');
@@ -304,17 +397,21 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
 
     engine = new SopRuleEngine(registry, { inspectEngine });
 
-    registry.register(makeRule({
-      id: 'guard.block.eslint-error',
-      domain: 'guard',
-      content: { presets: ['error-rules'] },
-    }));
-    registry.register(makeRule({
-      id: 'inspect.scan.eslint-rules',
-      domain: 'inspect',
-      applicableEngines: ['inspect'],
-      content: { presets: ['recommended'] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.eslint-error',
+        domain: 'guard',
+        content: { presets: ['error-rules'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.eslint-rules',
+        domain: 'inspect',
+        applicableEngines: ['inspect'],
+        content: { presets: ['recommended'] },
+      }),
+    );
 
     const report = await Promise.race([
       engine.runGuard({ repoRoot: tempDir }),

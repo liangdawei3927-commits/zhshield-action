@@ -44,7 +44,9 @@ describe('SentinelService', () => {
     });
 
     it('should initialize with invalid db path gracefully', async () => {
-      await expect(service.initialize('/tmp/zh-test-nonexistent/db.sqlite')).resolves.toBeUndefined();
+      await expect(
+        service.initialize('/tmp/zh-test-nonexistent/db.sqlite'),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -76,19 +78,21 @@ describe('SentinelService', () => {
 
     it('should accept valid webhook payload with proper alerts', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-1',
-          labels: {
-            alertname: 'TestAlert',
-            service: 'api',
-            module: 'auth',
-            severity: 'critical',
-            repo: 'test-repo',
+        alerts: [
+          {
+            fingerprint: 'fp-1',
+            labels: {
+              alertname: 'TestAlert',
+              service: 'api',
+              module: 'auth',
+              severity: 'critical',
+              repo: 'test-repo',
+            },
+            annotations: {
+              summary: 'Test alert summary',
+            },
           },
-          annotations: {
-            summary: 'Test alert summary',
-          },
-        }],
+        ],
       };
       const result = service.processWebhook('token', payload);
       expect(result.accepted).toBe(true);
@@ -97,19 +101,21 @@ describe('SentinelService', () => {
 
     it('should deduplicate repeated alerts', () => {
       const payload = {
-        alerts: [{
-          fingerprint: 'fp-dedup',
-          labels: {
-            alertname: 'DedupAlert',
-            service: 'api',
-            module: 'cache',
-            severity: 'high',
-            repo: 'test-repo',
+        alerts: [
+          {
+            fingerprint: 'fp-dedup',
+            labels: {
+              alertname: 'DedupAlert',
+              service: 'api',
+              module: 'cache',
+              severity: 'high',
+              repo: 'test-repo',
+            },
+            annotations: {
+              summary: 'Dedup test',
+            },
           },
-          annotations: {
-            summary: 'Dedup test',
-          },
-        }],
+        ],
       };
       const first = service.processWebhook('token', payload);
       const second = service.processWebhook('token', payload);

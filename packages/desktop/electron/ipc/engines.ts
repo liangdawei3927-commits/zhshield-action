@@ -13,8 +13,19 @@ import os from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
 
-import { buildHealthDimensions, buildTechDebtDashboard, mergeActionStatuses, computeTrendDelta, scoreProjectByModules } from '@zh/scoring';
-import type { DebtIssueInput, ModuleHotnessInput, ConvertedGuardResult, ConvertedInspectIssue } from '@zh/scoring';
+import {
+  buildHealthDimensions,
+  buildTechDebtDashboard,
+  mergeActionStatuses,
+  computeTrendDelta,
+  scoreProjectByModules,
+} from '@zh/scoring';
+import type {
+  DebtIssueInput,
+  ModuleHotnessInput,
+  ConvertedGuardResult,
+  ConvertedInspectIssue,
+} from '@zh/scoring';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
@@ -22,9 +33,19 @@ import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } fro
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
-import { profileSync, type ScoringProjectProfile } from '@zh/fingerprint';
-import { convertGuardEvaluations, convertInspectEvaluations, convertTraditionalGuardResults } from './score-converters';
-import { loadDepsBaseline, saveDepsBaseline, integritySnapshot, extractMismatchedNodeIds, applyMismatchedTrust } from './deps-baseline';
+import { type ScoringProjectProfile } from '@zh/fingerprint';
+import {
+  convertGuardEvaluations,
+  convertInspectEvaluations,
+  convertTraditionalGuardResults,
+} from './score-converters';
+import {
+  loadDepsBaseline,
+  saveDepsBaseline,
+  integritySnapshot,
+  extractMismatchedNodeIds,
+  applyMismatchedTrust,
+} from './deps-baseline';
 import {
   buildDependencyGraph,
   buildLicenseMatrix,
@@ -43,7 +64,13 @@ import type {
   UpgradeAssessment,
   EnvEntry,
 } from '@zh/dependency';
-import { saveDebtAction, updateDebtActionStatus, getDebtActionsByProject, saveDebtSnapshot, getLatestDebtSnapshot } from '@zh/db';
+import {
+  saveDebtAction,
+  updateDebtActionStatus,
+  getDebtActionsByProject,
+  saveDebtSnapshot,
+  getLatestDebtSnapshot,
+} from '@zh/db';
 
 import {
   persistDiagnostics,
@@ -53,9 +80,20 @@ import {
   normalizeRefactorSource,
   normalizePerformanceData,
 } from '../zh-diagnostics';
-import { shouldAutoFix, countFixableIssues, buildFixPrompt, resolveOpenCodeBin, resolveOpenCodeModel } from '../ai-auto-fix';
+import {
+  shouldAutoFix,
+  countFixableIssues,
+  buildFixPrompt,
+  resolveOpenCodeBin,
+  resolveOpenCodeModel,
+} from '../ai-auto-fix';
 import { getScoring, getDb, sendProgress } from '../ipc-context';
-import { collectExposedFilesInWorker, detectProfileInWorker, runProfileInWorker } from '../profile-host';
+import {
+  collectExposedFilesInWorker,
+  detectProfileInWorker,
+  runProfileInWorker,
+  runProfileSyncInWorker,
+} from '../profile-host';
 import type { TaskManager } from '../task-manager';
 import {
   toGuardReportData,
@@ -68,7 +106,13 @@ import {
   type PerformanceReportData,
   type HealthScoreData,
 } from './report-format';
-import type { DependencyReportData, TechDebtReportData, SecretReportData, ProjectProfileData, DepsRelockResult } from '../../src/types/electron';
+import type {
+  DependencyReportData,
+  TechDebtReportData,
+  SecretReportData,
+  ProjectProfileData,
+  DepsRelockResult,
+} from '../../src/types/electron';
 
 async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -100,6 +144,7 @@ async function collectOpenCodeCandidates(): Promise<Array<{ path: string; execut
   }
   for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
     const p = path.join(dir, 'opencode');
+    // eslint-disable-next-line perf/perf-no-serial-await -- p derived from loop var dir via intermediate assignment
     candidates.push({ path: p, executable: await isExecutable(p) });
   }
   const homeLocalBin = path.join(os.homedir(), '.local', 'bin', 'opencode');
@@ -110,16 +155,31 @@ async function collectOpenCodeCandidates(): Promise<Array<{ path: string; execut
 }
 
 /** 以 detached 方式启动 opencode 修复进程，仅记录日志与进度，不阻塞主进程 */
-function spawnOpenCodeFix(bin: string, projectPath: string, fixableError: number, fixableWarning: number): void {
+function spawnOpenCodeFix(
+  bin: string,
+  projectPath: string,
+  fixableError: number,
+  fixableWarning: number,
+): void {
   const model = resolveOpenCodeModel(process.env.ZH_OPENCODE_MODEL);
-  const child = spawn(bin, ['run', '-m', model, '--dir', projectPath, buildFixPrompt(projectPath)], {
-    stdio: 'ignore',
-    detached: true,
-  });
+  const child = spawn(
+    bin,
+    ['run', '-m', model, '--dir', projectPath, buildFixPrompt(projectPath)],
+    {
+      stdio: 'ignore',
+      detached: true,
+    },
+  );
   child.on('error', (err) => console.warn('[ai:autofix] 启动 opencode 失败:', err.message));
-  child.on('exit', (code) => console.log(`[ai:autofix] opencode 修复进程退出，code=${code ?? 'null'}`));
+  child.on('exit', (code) =>
+    console.log(`[ai:autofix] opencode 修复进程退出，code=${code ?? 'null'}`),
+  );
   child.unref();
-  sendProgress('autofix', t('pipeline.autofix.started', { errors: fixableError, warnings: fixableWarning }), 1);
+  sendProgress(
+    'autofix',
+    t('pipeline.autofix.started', { errors: fixableError, warnings: fixableWarning }),
+    1,
+  );
 }
 
 /**
@@ -159,7 +219,9 @@ function scoreProjectModules(
   for (const card of aggregate.modules) {
     if (card.path === projectPath) continue;
     const moduleScore = scoring.calculate(card.path, card.dimensions);
-    console.log(`[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`);
+    console.log(
+      `[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`,
+    );
   }
 }
 
@@ -174,7 +236,10 @@ function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports
   const guardReport = report.guard;
   const inspectReport = report.inspect;
   if (!guardReport || !inspectReport) {
-    console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', { hasGuard: !!guardReport, hasInspect: !!inspectReport });
+    console.warn('[engine:runPipeline] 跳过评分: 缺少 guard 或 inspect 报告', {
+      hasGuard: !!guardReport,
+      hasInspect: !!inspectReport,
+    });
     return null;
   }
   const isSop = isRuleEngineReport(guardReport) && isRuleEngineReport(inspectReport);
@@ -199,9 +264,12 @@ function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports
 /** 探测项目画像，失败时降级为 null（采用默认评分配置） */
 async function probeProjectProfile(projectPath: string): Promise<ScoringProjectProfile | null> {
   try {
-    return profileSync(projectPath).profile;
+    return (await runProfileSyncInWorker(projectPath)).profile;
   } catch (err) {
-    console.warn('[engine:runPipeline] 画像探测失败，降级默认评分配置:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runPipeline] 画像探测失败，降级默认评分配置:',
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   }
 }
@@ -240,29 +308,77 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
       scoreProjectModules(scoring, aggregate, projectPath);
     }
   } catch (err) {
-    console.warn('[engine:runPipeline] 健康评分落库失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runPipeline] 健康评分落库失败:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
 export function registerEnginesIpc(manager: TaskManager): void {
-  ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) => runGuardHandler(manager, projectPath, options));
-  ipcMain.handle('engine:runInspect', (_e, projectPath: string) => runInspectHandler(manager, projectPath));
-  ipcMain.handle('engine:runSecurity', (_e, projectPath: string) => runSecurityHandler(manager, projectPath));
-  ipcMain.handle('engine:garbageClean', (_e, projectPath: string, items: Array<{ id: string; path: string; size: number; type: string }>) => garbageCleanHandler(manager, projectPath, items));
-  ipcMain.handle('engine:garbageRestore', (_e, projectPath: string, batchId: string) => garbageRestoreHandler(manager, projectPath, batchId));
-  ipcMain.handle('engine:runPerformance', (_e, projectPath: string) => runPerformanceHandler(manager, projectPath));
-  ipcMain.handle('engine:runRefactor', (_e, projectPath: string) => runRefactorHandler(manager, projectPath));
+  ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) =>
+    runGuardHandler(manager, projectPath, options),
+  );
+  ipcMain.handle('engine:runInspect', (_e, projectPath: string) =>
+    runInspectHandler(manager, projectPath),
+  );
+  ipcMain.handle('engine:runSecurity', (_e, projectPath: string) =>
+    runSecurityHandler(manager, projectPath),
+  );
+  ipcMain.handle(
+    'engine:garbageClean',
+    (
+      _e,
+      projectPath: string,
+      items: Array<{ id: string; path: string; size: number; type: string }>,
+    ) => garbageCleanHandler(manager, projectPath, items),
+  );
+  ipcMain.handle('engine:garbageRestore', (_e, projectPath: string, batchId: string) =>
+    garbageRestoreHandler(manager, projectPath, batchId),
+  );
+  ipcMain.handle('engine:runPerformance', (_e, projectPath: string) =>
+    runPerformanceHandler(manager, projectPath),
+  );
+  ipcMain.handle('engine:runRefactor', (_e, projectPath: string) =>
+    runRefactorHandler(manager, projectPath),
+  );
   ipcMain.handle('engine:runDeps', (_e, projectPath: string) => runDepsHandler(projectPath));
-  ipcMain.handle('engine:depsRelockBaseline', (_e, projectPath: string) => depsRelockBaselineHandler(projectPath));
-  ipcMain.handle('engine:runTechDebt', (_e, projectPath: string) => runTechDebtHandler(manager, projectPath));
-  ipcMain.handle('debt:planRepayment', (_e, projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => planDebtRepaymentHandler(manager, projectPath, actionId, opts));
-  ipcMain.handle('debt:verifyRepaid', (_e, projectPath: string, actionId: string) => verifyDebtRepaidHandler(manager, projectPath, actionId));
-  ipcMain.handle('debt:dismiss', (_e, projectPath: string, actionId: string) => dismissDebtActionHandler(projectPath, actionId));
+  ipcMain.handle('engine:depsRelockBaseline', (_e, projectPath: string) =>
+    depsRelockBaselineHandler(projectPath),
+  );
+  ipcMain.handle('engine:runTechDebt', (_e, projectPath: string) =>
+    runTechDebtHandler(manager, projectPath),
+  );
+  ipcMain.handle(
+    'debt:planRepayment',
+    (
+      _e,
+      projectPath: string,
+      actionId: string,
+      opts?: { sprint?: string; gate?: 'allow-with-record' },
+    ) => planDebtRepaymentHandler(manager, projectPath, actionId, opts),
+  );
+  ipcMain.handle('debt:verifyRepaid', (_e, projectPath: string, actionId: string) =>
+    verifyDebtRepaidHandler(manager, projectPath, actionId),
+  );
+  ipcMain.handle('debt:dismiss', (_e, projectPath: string, actionId: string) =>
+    dismissDebtActionHandler(projectPath, actionId),
+  );
   ipcMain.handle('engine:runSecrets', (_e, projectPath: string) => runSecretsHandler(projectPath));
-  ipcMain.handle('engine:secretRotating', (_e, secretId: string) => markSecretRotatingHandler(secretId));
-  ipcMain.handle('engine:secretVerify', (_e, secretId: string) => verifySecretRotatedHandler(secretId));
-  ipcMain.handle('engine:secretDismiss', (_e, secretId: string, reason: string) => dismissSecretHandler(secretId, reason));
-  ipcMain.handle('engine:runPipeline', (_e, projectPath: string, options?: { dryRun?: boolean; sop?: boolean }) => runPipelineHandler(manager, projectPath, options));
+  ipcMain.handle('engine:secretRotating', (_e, secretId: string) =>
+    markSecretRotatingHandler(secretId),
+  );
+  ipcMain.handle('engine:secretVerify', (_e, secretId: string) =>
+    verifySecretRotatedHandler(secretId),
+  );
+  ipcMain.handle('engine:secretDismiss', (_e, secretId: string, reason: string) =>
+    dismissSecretHandler(secretId, reason),
+  );
+  ipcMain.handle(
+    'engine:runPipeline',
+    (_e, projectPath: string, options?: { dryRun?: boolean; sop?: boolean }) =>
+      runPipelineHandler(manager, projectPath, options),
+  );
   ipcMain.handle('engine:getScore', getScoreHandler);
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
   ipcMain.handle('engine:getProfile', getProfileHandler);
@@ -279,34 +395,47 @@ async function runGuardHandler(
       throw new Error(t('electron.invalidProjectPath'));
     }
     const task = manager.start('guard', projectPath, options);
-    const report = await manager.waitFor(task.id) as GuardReport;
+    const report = (await manager.waitFor(task.id)) as GuardReport;
     try {
       await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report));
     } catch (e) {
       console.warn('[engine:runGuard] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
     try {
-      appendGuardReport(projectPath, toGuardReportRecord(report, options?.triggerSource ?? 'manual'));
+      appendGuardReport(
+        projectPath,
+        toGuardReportRecord(report, options?.triggerSource ?? 'manual'),
+      );
     } catch (e) {
       console.warn('[engine:runGuard] 报告落库失败:', e instanceof Error ? e.message : String(e));
     }
     return toGuardReportData(report);
   } catch (err) {
     console.error('[engine:runGuard] Error:', err);
-    return { summary: { totalChecks: 0, passed: 0, blocked: 0, warnings: 0 }, checks: [], metadata: { duration: 0, timestamp: new Date().toISOString() } };
+    return {
+      summary: { totalChecks: 0, passed: 0, blocked: 0, warnings: 0 },
+      checks: [],
+      metadata: { duration: 0, timestamp: new Date().toISOString() },
+    };
   }
 }
 
 /** 运行 inspect 巡检并返回原生报告（runInspect / runTechDebt 共用同一执行路径） */
-async function runInspectTask(manager: TaskManager, projectPath: string): Promise<InspectionReport> {
+async function runInspectTask(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<InspectionReport> {
   if (!projectPath || typeof projectPath !== 'string') {
     throw new Error(t('electron.invalidProjectPath'));
   }
   const task = manager.start('inspect', projectPath);
-  return await manager.waitFor(task.id) as InspectionReport;
+  return (await manager.waitFor(task.id)) as InspectionReport;
 }
 
-async function runInspectHandler(manager: TaskManager, projectPath: string): Promise<InspectionReportData> {
+async function runInspectHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<InspectionReportData> {
   try {
     const report = await runInspectTask(manager, projectPath);
     try {
@@ -317,22 +446,38 @@ async function runInspectHandler(manager: TaskManager, projectPath: string): Pro
     return toInspectionReportData(report);
   } catch (err) {
     console.error('[engine:runInspect] Error:', err);
-    return { summary: { total: 0, passed: 0, warnings: 0, failures: 0 }, checks: [], metadata: { duration: 0, timestamp: new Date().toISOString() } };
+    return {
+      summary: { total: 0, passed: 0, warnings: 0, failures: 0 },
+      checks: [],
+      metadata: { duration: 0, timestamp: new Date().toISOString() },
+    };
   }
 }
 
-async function runSecurityHandler(manager: TaskManager, projectPath: string): Promise<SecurityScanReportData> {
+async function runSecurityHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<SecurityScanReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
     const task = manager.start('security', projectPath);
-    const report = await manager.waitFor(task.id) as SecurityScanReport;
+    const report = (await manager.waitFor(task.id)) as SecurityScanReport;
     return toSecurityScanReportData(report);
   } catch (err) {
     console.error('[engine:runSecurity] Error:', err);
     return {
-      summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, malwareTotal: 0, garbageTotal: 0, garbageSize: 0 },
+      summary: {
+        total: 0,
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        malwareTotal: 0,
+        garbageTotal: 0,
+        garbageSize: 0,
+      },
       findings: [],
       malware: [],
       garbage: [],
@@ -352,7 +497,7 @@ async function garbageCleanHandler(
       throw new Error(t('electron.invalidProjectPath'));
     }
     const task = manager.start('garbageClean', projectPath, { items });
-    const result = await manager.waitFor(task.id) as GarbageCleanResult;
+    const result = (await manager.waitFor(task.id)) as GarbageCleanResult;
     return result;
   } catch (err) {
     console.error('[engine:garbageClean] Error:', err);
@@ -366,11 +511,16 @@ async function garbageRestoreHandler(
   batchId: string,
 ): Promise<GarbageRestoreResult> {
   try {
-    if (!projectPath || typeof projectPath !== 'string' || !batchId || typeof batchId !== 'string') {
+    if (
+      !projectPath ||
+      typeof projectPath !== 'string' ||
+      !batchId ||
+      typeof batchId !== 'string'
+    ) {
       throw new Error(t('electron.invalidParams'));
     }
     const task = manager.start('garbageRestore', projectPath, { batchId });
-    const result = await manager.waitFor(task.id) as GarbageRestoreResult;
+    const result = (await manager.waitFor(task.id)) as GarbageRestoreResult;
     return result;
   } catch (err) {
     console.error('[engine:garbageRestore] Error:', err);
@@ -378,37 +528,53 @@ async function garbageRestoreHandler(
   }
 }
 
-async function runPerformanceHandler(manager: TaskManager, projectPath: string): Promise<PerformanceReportData> {
+async function runPerformanceHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<PerformanceReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
     const task = manager.start('performance', projectPath);
-    const result = await manager.waitFor(task.id) as PerformanceReportData;
+    const result = (await manager.waitFor(task.id)) as PerformanceReportData;
     try {
       await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result));
     } catch (e) {
-      console.warn('[engine:runPerformance] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
+      console.warn(
+        '[engine:runPerformance] 诊断落盘失败:',
+        e instanceof Error ? e.message : String(e),
+      );
     }
     return result;
   } catch (err) {
     console.error('[engine:runPerformance] Error:', err);
-    return { summary: { total: 0, autoFixable: 0 }, issues: [], metadata: { duration: 0, timestamp: new Date().toISOString() } };
+    return {
+      summary: { total: 0, autoFixable: 0 },
+      issues: [],
+      metadata: { duration: 0, timestamp: new Date().toISOString() },
+    };
   }
 }
 
-async function runRefactorHandler(manager: TaskManager, projectPath: string): Promise<RefactorReport> {
+async function runRefactorHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<RefactorReport> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
     // 重构分析含同步扫盘 + AST，必须离主进程，否则 macOS 彩球
     const task = manager.start('refactor', projectPath);
-    const report = await manager.waitFor(task.id) as RefactorReport;
+    const report = (await manager.waitFor(task.id)) as RefactorReport;
     try {
       await persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report));
     } catch (e) {
-      console.warn('[engine:runRefactor] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
+      console.warn(
+        '[engine:runRefactor] 诊断落盘失败:',
+        e instanceof Error ? e.message : String(e),
+      );
     }
     return report;
   } catch (err) {
@@ -459,7 +625,7 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
       throw new Error(t('electron.invalidProjectPath'));
     }
     const projectRoot = resolveProjectRoot(projectPath);
-    const baseline = loadDepsBaseline(projectRoot);
+    const baseline = await loadDepsBaseline(projectRoot);
     const graph = buildDependencyGraph(projectRoot);
     const matrix = buildLicenseMatrix(graph);
     let nodes = graph.nodes;
@@ -475,7 +641,7 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
     nodes = applyMismatchedTrust(nodes, lockfileCheck.mismatchedNodeIds);
     // 首次盘点（无基线）且校验 clean → 自动建基线（幂等；后续仅显式 relock 更新）
     if (!baseline && lockfileCheck.verification.status === 'clean') {
-      saveDepsBaseline(projectRoot, integritySnapshot(nodes));
+      await saveDepsBaseline(projectRoot, integritySnapshot(nodes));
     }
     return {
       schemaVersion: graph.schemaVersion,
@@ -516,7 +682,7 @@ async function depsRelockBaselineHandler(projectPath: string): Promise<DepsReloc
     if (!graph.lockfile.integrityVerified) {
       return { ok: false, error: t('electron.depsRelock.integrityIncomplete') };
     }
-    saveDepsBaseline(projectRoot, integritySnapshot(graph.nodes));
+    await saveDepsBaseline(projectRoot, integritySnapshot(graph.nodes));
     return { ok: true };
   } catch (err) {
     console.error('[engine:depsRelockBaseline] Error:', err);
@@ -525,12 +691,17 @@ async function depsRelockBaselineHandler(projectPath: string): Promise<DepsReloc
 }
 
 /** 投毒检测接线：单适配器失败 → 空数组 + error，不阻断整个盘点 */
-async function runTyposquatChecks(graph: DependencyGraph): Promise<{ findings: TyposquatFinding[]; error?: string }> {
+async function runTyposquatChecks(
+  graph: DependencyGraph,
+): Promise<{ findings: TyposquatFinding[]; error?: string }> {
   try {
     const detector = new TyposquatDetectorImpl();
     return { findings: await detector.detect(graph) };
   } catch (err) {
-    console.warn('[engine:runDeps] 投毒检测失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runDeps] 投毒检测失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return { findings: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -541,10 +712,19 @@ async function runLockfileChecks(
   expectedIntegrity?: Record<string, string>,
 ): Promise<{ verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string }> {
   try {
-    const verification = await lockfileVerifier.verify(projectPath, expectedIntegrity ? { expectedIntegrity } : undefined);
-    return { verification, mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures) };
+    const verification = await lockfileVerifier.verify(
+      projectPath,
+      expectedIntegrity ? { expectedIntegrity } : undefined,
+    );
+    return {
+      verification,
+      mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures),
+    };
   } catch (err) {
-    console.warn('[engine:runDeps] 锁文件校验失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runDeps] 锁文件校验失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return {
       verification: { status: 'missing', diffs: [], integrityFailures: [] },
       mismatchedNodeIds: [],
@@ -554,30 +734,42 @@ async function runLockfileChecks(
 }
 
 /** 升级评估接线：仅 direct 依赖且命中内置升级目录，不做 code-scan 防主进程阻塞 */
-async function runUpgradeChecks(nodes: readonly DependencyNode[]): Promise<{ assessments: UpgradeAssessment[]; error?: string }> {
+async function runUpgradeChecks(
+  nodes: readonly DependencyNode[],
+): Promise<{ assessments: UpgradeAssessment[]; error?: string }> {
   try {
     const evaluator = new UpgradeEvaluatorImpl();
-    const directNodes = nodes.filter((node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG);
+    const directNodes = nodes.filter(
+      (node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG,
+    );
     const assessments: UpgradeAssessment[] = [];
     for (const node of directNodes) {
       assessments.push(await evaluator.evaluate(node));
     }
     return { assessments };
   } catch (err) {
-    console.warn('[engine:runDeps] 升级评估失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runDeps] 升级评估失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return { assessments: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 /** 环境一致性检查接线：从 projectPath 推导 ProjectProfile（detectProjectProfile 同步 fs，移入 profile worker 执行） */
-async function runEnvConsistencyChecks(projectPath: string): Promise<{ entries: EnvEntry[]; error?: string }> {
+async function runEnvConsistencyChecks(
+  projectPath: string,
+): Promise<{ entries: EnvEntry[]; error?: string }> {
   try {
     const checker = new EnvConsistencyCheckerImpl();
     const profile = (await detectProfileInWorker(projectPath)) as ProjectProfile;
     const report = await checker.check(profile);
     return { entries: report.entries };
   } catch (err) {
-    console.warn('[engine:runDeps] 环境一致性检查失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:runDeps] 环境一致性检查失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return { entries: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -618,8 +810,10 @@ function collectModuleHotness(projectPath: string): Promise<ModuleHotnessInput[]
           if (!file) continue;
           counts.set(file, (counts.get(file) ?? 0) + 1);
         }
-        const hotness = Array.from(counts.entries(), ([module, commitCount]) => ({ module, commitCount }))
-          .sort((a, b) => b.commitCount - a.commitCount);
+        const hotness = Array.from(counts.entries(), ([module, commitCount]) => ({
+          module,
+          commitCount,
+        })).sort((a, b) => b.commitCount - a.commitCount);
         resolve(hotness);
       },
     );
@@ -632,7 +826,10 @@ function collectModuleHotness(projectPath: string): Promise<ModuleHotnessInput[]
  * 由 @zh/scoring buildTechDebtDashboard 生成 ROI 排序报告。
  * 对外接口清单的同步扫盘已移入 profile worker（collectExposedFilesInWorker）。
  */
-async function runTechDebtHandler(manager: TaskManager, projectPath: string): Promise<TechDebtReportData> {
+async function runTechDebtHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<TechDebtReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
@@ -659,7 +856,10 @@ async function runTechDebtHandler(manager: TaskManager, projectPath: string): Pr
       const persisted = getDebtActionsByProject(db, projectId);
       finalSnapshot = {
         ...snapshot,
-        actionList: mergeActionStatuses(snapshot.actionList, persisted.map((row) => ({ actionId: row.action_id, status: row.status }))),
+        actionList: mergeActionStatuses(
+          snapshot.actionList,
+          persisted.map((row) => ({ actionId: row.action_id, status: row.status })),
+        ),
       };
       const previous = getLatestDebtSnapshot(db, projectId);
       finalSnapshot = {
@@ -671,7 +871,10 @@ async function runTechDebtHandler(manager: TaskManager, projectPath: string): Pr
       };
       saveDebtSnapshot(db, { projectId, debtIndex: snapshot.debtIndex });
     } catch (err) {
-      console.warn('[engine:runTechDebt] 债务状态持久化不可用，降级为纯计算:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[engine:runTechDebt] 债务状态持久化不可用，降级为纯计算:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
     return { ...finalSnapshot, error: null };
   } catch (err) {
@@ -680,9 +883,19 @@ async function runTechDebtHandler(manager: TaskManager, projectPath: string): Pr
   }
 }
 
-async function planDebtRepaymentHandler(manager: TaskManager, projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }): Promise<void> {
+async function planDebtRepaymentHandler(
+  manager: TaskManager,
+  projectPath: string,
+  actionId: string,
+  opts?: { sprint?: string; gate?: 'allow-with-record' },
+): Promise<void> {
   try {
-    if (!projectPath || typeof projectPath !== 'string' || !actionId || typeof actionId !== 'string') {
+    if (
+      !projectPath ||
+      typeof projectPath !== 'string' ||
+      !actionId ||
+      typeof actionId !== 'string'
+    ) {
       throw new Error(t('electron.invalidProjectPath'));
     }
     const inspectReport = await runInspectTask(manager, projectPath);
@@ -694,7 +907,12 @@ async function planDebtRepaymentHandler(manager: TaskManager, projectPath: strin
     }));
     const moduleHotness = await collectModuleHotness(projectPath);
     const exposedFiles = await collectExposedFilesInWorker(projectPath);
-    const snapshot = buildTechDebtDashboard({ projectId: inspectReport.projectId, issues, moduleHotness, exposedFiles });
+    const snapshot = buildTechDebtDashboard({
+      projectId: inspectReport.projectId,
+      issues,
+      moduleHotness,
+      exposedFiles,
+    });
     const action = snapshot.actionList.find((a) => a.actionId === actionId);
     if (!action) {
       console.warn(`[engine:debt:planRepayment] action 未找到: ${actionId}`);
@@ -715,13 +933,26 @@ async function planDebtRepaymentHandler(manager: TaskManager, projectPath: strin
       gate: opts?.gate ?? undefined,
     });
   } catch (err) {
-    console.warn('[engine:debt:planRepayment] 计划偿还失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:debt:planRepayment] 计划偿还失败:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
-async function verifyDebtRepaidHandler(manager: TaskManager, projectPath: string, actionId: string): Promise<boolean> {
+async function verifyDebtRepaidHandler(
+  manager: TaskManager,
+  projectPath: string,
+  actionId: string,
+): Promise<boolean> {
   try {
-    if (!projectPath || typeof projectPath !== 'string' || !actionId || typeof actionId !== 'string') return false;
+    if (
+      !projectPath ||
+      typeof projectPath !== 'string' ||
+      !actionId ||
+      typeof actionId !== 'string'
+    )
+      return false;
     const inspectReport = await runInspectTask(manager, projectPath);
     const issues: DebtIssueInput[] = inspectReport.issues.map((issue) => ({
       id: issue.id,
@@ -731,30 +962,50 @@ async function verifyDebtRepaidHandler(manager: TaskManager, projectPath: string
     }));
     const moduleHotness = await collectModuleHotness(projectPath);
     const exposedFiles = await collectExposedFilesInWorker(projectPath);
-    const snapshot = buildTechDebtDashboard({ projectId: inspectReport.projectId, issues, moduleHotness, exposedFiles });
+    const snapshot = buildTechDebtDashboard({
+      projectId: inspectReport.projectId,
+      issues,
+      moduleHotness,
+      exposedFiles,
+    });
     const stillPresent = snapshot.actionList.some((a) => a.actionId === actionId);
     if (stillPresent) return false;
     const db = getDb();
     updateDebtActionStatus(db, { projectId: snapshot.projectId, actionId, status: 'repaid' });
     return true;
   } catch (err) {
-    console.warn('[engine:debt:verifyRepaid] 验证失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:debt:verifyRepaid] 验证失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return false;
   }
 }
 
 async function dismissDebtActionHandler(projectPath: string, actionId: string): Promise<void> {
   try {
-    if (!projectPath || typeof projectPath !== 'string' || !actionId || typeof actionId !== 'string') return;
+    if (
+      !projectPath ||
+      typeof projectPath !== 'string' ||
+      !actionId ||
+      typeof actionId !== 'string'
+    )
+      return;
     const db = getDb();
     updateDebtActionStatus(db, { projectId: projectPath, actionId, status: 'dismissed' });
   } catch (err) {
-    console.warn('[engine:debt:dismiss] 忽略操作失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:debt:dismiss] 忽略操作失败:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
 /** 各项目已实例化的密钥生命周期管理器（key = projectPath，状态变更按 secretId 反查项目） */
-const secretManagers = new Map<string, { manager: SecretLifecycleManager; store: FileSecretStore }>();
+const secretManagers = new Map<
+  string,
+  { manager: SecretLifecycleManager; store: FileSecretStore }
+>();
 
 /** 密钥扫描失败时的空报告（error 携带失败原因，不 throw） */
 function emptySecretsReport(error: string): SecretReportData {
@@ -788,7 +1039,9 @@ async function runSecretsHandler(projectPath: string): Promise<SecretReportData>
 }
 
 /** 按 secretId 反查持有该密钥状态的项目管理器；未找到返回 undefined（对应渲染层静默成功/返回 false） */
-async function findSecretManager(secretId: string): Promise<{ manager: SecretLifecycleManager } | undefined> {
+async function findSecretManager(
+  secretId: string,
+): Promise<{ manager: SecretLifecycleManager } | undefined> {
   for (const { manager, store } of secretManagers.values()) {
     const state = await store.load();
     if (state.secrets[secretId]) return { manager };
@@ -843,19 +1096,25 @@ async function runPipelineHandler(
       throw new Error(t('electron.invalidProjectPath'));
     }
     const task = manager.start('pipeline', projectPath, options ?? {});
-    const report = await manager.waitFor(task.id) as PipelineReport;
+    const report = (await manager.waitFor(task.id)) as PipelineReport;
     if (!options?.dryRun) {
       try {
         const diagnosticsPath = await persistDiagnostics(projectPath, report);
         void triggerOpenCodeAutoFix(projectPath, diagnosticsPath);
       } catch (err) {
-        console.warn('[engine:runPipeline] 诊断文件写入失败:', err instanceof Error ? err.message : String(err));
+        console.warn(
+          '[engine:runPipeline] 诊断文件写入失败:',
+          err instanceof Error ? err.message : String(err),
+        );
       }
       recordPipelineScore(projectPath, report);
     }
     return report;
   } catch (err) {
-    console.error('[engine:runPipeline] 流水线执行异常:', err instanceof Error ? err.stack || err.message : String(err));
+    console.error(
+      '[engine:runPipeline] 流水线执行异常:',
+      err instanceof Error ? err.stack || err.message : String(err),
+    );
     return createReport({
       stage: 'failed',
       passed: false,
@@ -872,37 +1131,55 @@ async function runProfileHandler(projectPath: string): Promise<unknown> {
   return runProfileInWorker(projectPath);
 }
 
-async function getScoreHandler(_event: Electron.IpcMainInvokeEvent, projectId: string): Promise<HealthScoreData | null> {
+async function getScoreHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectId: string,
+): Promise<HealthScoreData | null> {
   try {
     const scoring = await getScoring();
     const score = scoring.getCurrent(projectId);
     return score ? toHealthScoreData(score) : null;
   } catch (err) {
-    console.warn('[engine:getScore] 评分读取失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:getScore] 评分读取失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   }
 }
 
-async function getScoreHistoryHandler(_event: Electron.IpcMainInvokeEvent, projectId: string): Promise<HealthScoreData[]> {
+async function getScoreHistoryHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectId: string,
+): Promise<HealthScoreData[]> {
   try {
     const scoring = await getScoring();
     return scoring.getHistory(projectId).map(toHealthScoreData);
   } catch (err) {
-    console.warn('[engine:getScoreHistory] 评分历史读取失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:getScoreHistory] 评分历史读取失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return [];
   }
 }
 
 /** 项目画像（含子模块列表）：供报告页列出模块用于模块级评分卡展示；探测失败时返回 null */
-async function getProfileHandler(_event: Electron.IpcMainInvokeEvent, projectPath: string): Promise<ProjectProfileData | null> {
+async function getProfileHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectPath: string,
+): Promise<ProjectProfileData | null> {
   try {
-    const profilingResult = profileSync(projectPath).profile;
+    const profilingResult = (await runProfileSyncInWorker(projectPath)).profile;
     return {
       type: profilingResult.type,
       modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),
     };
   } catch (err) {
-    console.warn('[engine:getProfile] 画像探测失败:', err instanceof Error ? err.message : String(err));
+    console.warn(
+      '[engine:getProfile] 画像探测失败:',
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   }
 }

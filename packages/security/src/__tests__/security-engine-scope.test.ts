@@ -42,11 +42,14 @@ describe('F5 SecurityEngine 越界事件接线（warn-only）', () => {
     });
     engine.registerAdapter(makeScopedStub('semgrep'));
 
-    await engine.getToolManager().get('semgrep').scan({
-      projectPath: '/tmp/proj',
-      projectId: 'proj-f5-security',
-      targetFiles: ['node_modules/left-pad/index.js'],
-    });
+    await engine
+      .getToolManager()
+      .get('semgrep')
+      .scan({
+        projectPath: '/tmp/proj',
+        projectId: 'proj-f5-security',
+        targetFiles: ['node_modules/left-pad/index.js'],
+      });
 
     const alerts = center.listEvents();
     expect(alerts).toHaveLength(1);
@@ -74,11 +77,14 @@ describe('F5 SecurityEngine 越界事件接线（warn-only）', () => {
     });
     engine.registerAdapter(makeScopedStub('semgrep'));
 
-    await engine.getToolManager().get('semgrep').scan({
-      projectPath: '/tmp/proj',
-      projectId: 'proj-f5-security',
-      targetFiles: ['src/app.ts'],
-    });
+    await engine
+      .getToolManager()
+      .get('semgrep')
+      .scan({
+        projectPath: '/tmp/proj',
+        projectId: 'proj-f5-security',
+        targetFiles: ['src/app.ts'],
+      });
 
     expect(center.listEvents()).toHaveLength(0);
     unsubscribe();

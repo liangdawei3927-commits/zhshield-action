@@ -24,10 +24,7 @@ export type { SopLoaderOptions } from './_meta/sop-loader';
 
 // ─── cache: 本地缓存与同步 ──────────────────────────────────
 export { SopCacheManager, createSyncPolicy } from './cache/sop-cache-manager';
-export type {
-  SopCacheManagerOptions,
-  SyncPolicyOptions,
-} from './cache/sop-cache-manager';
+export type { SopCacheManagerOptions, SyncPolicyOptions } from './cache/sop-cache-manager';
 export { ContentAddressableStore } from './cache/content-addressable-store';
 export { SopCompressor, CompressionFormat } from './cache/sop-compressor';
 export { SopLazyLoader } from './cache/sop-lazy-loader';

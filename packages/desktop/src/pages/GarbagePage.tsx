@@ -35,10 +35,21 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
     return (
       <div className="h-full w-full bg-zh-bg overflow-auto">
         <div className="w-full px-8 py-10">
-          <GarbageHeader report={report} loading={loading} progressLabel={progressLabel} onRescan={handleScan} />
+          <GarbageHeader
+            report={report}
+            loading={loading}
+            progressLabel={progressLabel}
+            onRescan={handleScan}
+          />
           <GarbageStats report={report} />
           {restoreResult && <RestoreBanner result={restoreResult} />}
-          {cleanResult && <CleanResultBanner result={cleanResult} onRestore={handleRestore} restoring={restoring} />}
+          {cleanResult && (
+            <CleanResultBanner
+              result={cleanResult}
+              onRestore={handleRestore}
+              restoring={restoring}
+            />
+          )}
           <GarbageActionBar
             items={report.garbage}
             selected={selected}

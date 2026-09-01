@@ -79,9 +79,12 @@ describe('loadProjectScoringConfig — 无覆盖文件', () => {
     const defaults = getDefaultScoringConfig();
 
     expect(config.dimensions.map((d) => d.id)).toEqual(defaults.dimensions.map((d) => d.id));
-    expect(config.dimensions.map((d) => d.weight)).toEqual(defaults.dimensions.map((d) => d.weight));
-    expect(config.dimensions.map((d) => d.penalties.maxPenalty))
-      .toEqual(defaults.dimensions.map((d) => d.penalties.maxPenalty));
+    expect(config.dimensions.map((d) => d.weight)).toEqual(
+      defaults.dimensions.map((d) => d.weight),
+    );
+    expect(config.dimensions.map((d) => d.penalties.maxPenalty)).toEqual(
+      defaults.dimensions.map((d) => d.penalties.maxPenalty),
+    );
     // 权重归一化仍然成立
     const sum = config.dimensions.reduce((s, d) => s + d.weight, 0);
     expect(sum).toBeCloseTo(1, 3);
@@ -90,7 +93,9 @@ describe('loadProjectScoringConfig — 无覆盖文件', () => {
   it('resolveScoringConfig 在无覆盖时等价于默认配置', () => {
     const root = makeProject();
     const config = resolveScoringConfig(root);
-    expect(config.dimensions.map((d) => d.weight)).toEqual(getDefaultScoringConfig().dimensions.map((d) => d.weight));
+    expect(config.dimensions.map((d) => d.weight)).toEqual(
+      getDefaultScoringConfig().dimensions.map((d) => d.weight),
+    );
   });
 });
 
@@ -130,7 +135,9 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
     expect(rule.name).toBe('无严重漏洞');
     expect(typeof rule.condition).toBe('function');
     // 未提及的规则不受影响
-    expect(security.positiveRules.find((r) => r.id === 'security-tools-configured')!.points).toBe(5);
+    expect(security.positiveRules.find((r) => r.id === 'security-tools-configured')!.points).toBe(
+      5,
+    );
   });
 
   it('支持 .yaml 扩展名回退探测', () => {

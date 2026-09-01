@@ -129,7 +129,12 @@ export class ProcessMonitor {
     this.proc.on('error', (err) => this.emitProcessError(cmd, err));
   }
 
-  private emitProcessStarted(cmd: string, pid: number | undefined, cwd: string, args: string[]): void {
+  private emitProcessStarted(
+    cmd: string,
+    pid: number | undefined,
+    cwd: string,
+    args: string[],
+  ): void {
     this.eventCenter.createEvent({
       projectId: this.config!.projectId,
       title: `Process started: ${cmd}`,

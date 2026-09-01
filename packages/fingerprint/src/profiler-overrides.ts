@@ -5,10 +5,7 @@ import type { UserOverrides, TargetProfile } from './types';
 /** 人工修正合并器 */
 export class OverrideMerger {
   /** 合并人工修正 */
-  merge(
-    overrides: UserOverrides | undefined,
-    target: TargetProfile,
-  ): UserOverrides {
+  merge(overrides: UserOverrides | undefined, target: TargetProfile): UserOverrides {
     if (overrides === undefined) {
       return {};
     }

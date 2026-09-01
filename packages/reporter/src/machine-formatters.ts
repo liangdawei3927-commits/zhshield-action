@@ -65,28 +65,49 @@ function toFindingSeverity(s: string | undefined): FindingSeverity {
 // ─── 类型守卫 ─────────────────────────────────────────
 
 function isGuardReport(r: unknown): r is GuardReport {
-  return !!r && typeof r === 'object' && Array.isArray((r as { results?: unknown }).results) &&
-    !!(r as { summary?: unknown }).summary;
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    Array.isArray((r as { results?: unknown }).results) &&
+    !!(r as { summary?: unknown }).summary
+  );
 }
 
 function isRuleEngineReport(r: unknown): r is RuleEngineReport {
-  return !!r && typeof r === 'object' && Array.isArray((r as { evaluations?: unknown }).evaluations) &&
-    typeof (r as { ok?: unknown }).ok === 'boolean';
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    Array.isArray((r as { evaluations?: unknown }).evaluations) &&
+    typeof (r as { ok?: unknown }).ok === 'boolean'
+  );
 }
 
 function isInspectionReport(r: unknown): r is InspectionReport {
-  return !!r && typeof r === 'object' && Array.isArray((r as { issues?: unknown }).issues) &&
-    !!(r as { summary?: unknown }).summary && 'score' in (r as object);
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    Array.isArray((r as { issues?: unknown }).issues) &&
+    !!(r as { summary?: unknown }).summary &&
+    'score' in (r as object)
+  );
 }
 
 function isRefactorReport(r: unknown): r is RefactorReport {
-  return !!r && typeof r === 'object' && Array.isArray((r as { files?: unknown }).files) &&
-    !!(r as { bySeverity?: unknown }).bySeverity;
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    Array.isArray((r as { files?: unknown }).files) &&
+    !!(r as { bySeverity?: unknown }).bySeverity
+  );
 }
 
 function isPipelineReport(r: unknown): r is PipelineReport {
-  return !!r && typeof r === 'object' && 'stage' in (r as object) &&
-    ('guard' in (r as object) || 'inspect' in (r as object) || 'refactor' in (r as object));
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    'stage' in (r as object) &&
+    ('guard' in (r as object) || 'inspect' in (r as object) || 'refactor' in (r as object))
+  );
 }
 
 // ─── 归一化 ───────────────────────────────────────────
@@ -221,7 +242,8 @@ export function buildFindings(report: unknown): Finding[] {
  * 把 Finding 列表渲染为 SARIF 2.1.0 JSON 字符串。
  *
  * level 映射：error→error，warning→warning，info→note（GitHub SARIF 合法值）。
- * 无文件定位的 Finding 仍然保留（SARIF 允许结果不含 locations）。
+ * GitHub Code Scanning 要求每个 result 至少一个 location（缺失会被整份拒绝：
+ * "expected at least one location"），因此无文件的 finding 回退到占位路径 unknown。
  */
 export function toSarif(findings: Finding[], toolName = 'zhshield'): string {
   const rules = new Map<string, { id: string; short: string }>();
@@ -235,33 +257,35 @@ export function toSarif(findings: Finding[], toolName = 'zhshield'): string {
       level,
       message: { text: f.message },
     };
-    if (f.file) {
-      result.locations = [{
+    result.locations = [
+      {
         physicalLocation: {
-          artifactLocation: { uri: f.file },
+          artifactLocation: { uri: f.file ?? 'unknown' },
           region: { startLine: f.line ?? 1, startColumn: f.column ?? 1 },
         },
-      }];
-    }
+      },
+    ];
     return result;
   });
 
   const log = {
     version: '2.1.0',
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-    runs: [{
-      tool: {
-        driver: {
-          name: toolName,
-          informationUri: 'https://github.com/zhishield/zhshield',
-          rules: Array.from(rules.values(), (r) => ({
-            id: r.id,
-            shortDescription: { text: r.short },
-          })),
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: toolName,
+            informationUri: 'https://github.com/zhishield/zhshield',
+            rules: Array.from(rules.values(), (r) => ({
+              id: r.id,
+              shortDescription: { text: r.short },
+            })),
+          },
         },
+        results,
       },
-      results,
-    }],
+    ],
   };
   return JSON.stringify(log, null, 2);
 }

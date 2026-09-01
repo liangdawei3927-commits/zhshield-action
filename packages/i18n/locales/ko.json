@@ -652,6 +652,7 @@
   },
   "layout": {
     "about": "정보",
+    "navigation": "내비게이션",
     "aboutVersion": "ZhiYun Shield {{version}}",
     "addProject": "프로젝트 추가",
     "aiTool": "AI 도구",

@@ -6,10 +6,7 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { LocalBackup } from '../backup/local-backup';
-import type {
-  LocalBackupFileEntry,
-  LocalBackupManifest,
-} from '../backup/local-backup';
+import type { LocalBackupFileEntry, LocalBackupManifest } from '../backup/local-backup';
 import type { LocalBackupConfig } from '../backup/types';
 
 function makeConfig(backupDir: string, compress: boolean): LocalBackupConfig {
@@ -67,10 +64,12 @@ describe('LocalBackup 归档格式一致性', () => {
     expect(restoreResult.failed).toBe(0);
     expect(restoreResult.problems).toEqual([]);
     expect(restoreResult.restored).toBe(2);
-    expect(
-      await fs.readFile(path.join(targetDir, 'src', 'index.ts'), 'utf-8'),
-    ).toBe('console.log("hi");\n');
-    expect(await fs.readFile(path.join(targetDir, 'docs', 'readme.md'), 'utf-8')).toBe('# 文档\n内容\n');
+    expect(await fs.readFile(path.join(targetDir, 'src', 'index.ts'), 'utf-8')).toBe(
+      'console.log("hi");\n',
+    );
+    expect(await fs.readFile(path.join(targetDir, 'docs', 'readme.md'), 'utf-8')).toBe(
+      '# 文档\n内容\n',
+    );
 
     const manifest = await readManifest(backupPath);
     expect(manifest.files.every((f) => f.compression === 'none')).toBe(true);
@@ -102,10 +101,12 @@ describe('LocalBackup 归档格式一致性', () => {
     expect(restoreResult.failed).toBe(0);
     expect(restoreResult.problems).toEqual([]);
     expect(restoreResult.restored).toBe(2);
-    expect(
-      await fs.readFile(path.join(targetDir, 'src', 'index.ts'), 'utf-8'),
-    ).toBe('console.log("hi");\n');
-    expect(await fs.readFile(path.join(targetDir, 'docs', 'readme.md'), 'utf-8')).toBe('# 文档\n内容\n');
+    expect(await fs.readFile(path.join(targetDir, 'src', 'index.ts'), 'utf-8')).toBe(
+      'console.log("hi");\n',
+    );
+    expect(await fs.readFile(path.join(targetDir, 'docs', 'readme.md'), 'utf-8')).toBe(
+      '# 文档\n内容\n',
+    );
   });
 
   it('旧版清单（无格式字段）+ 落盘 .gz 通过魔数嗅探兜底还原', async () => {
@@ -115,7 +116,12 @@ describe('LocalBackup 归档格式一致性', () => {
     await fs.writeFile(path.join(backupPath, 'src', 'app.ts.gz'), gzipSync(content, { level: 6 }));
 
     const legacyEntries: LocalBackupFileEntry[] = [
-      { relativePath: 'src/app.ts', hash: 'x', size: content.length, backedUpAt: '2026-08-18T00:00:00.000Z' },
+      {
+        relativePath: 'src/app.ts',
+        hash: 'x',
+        size: content.length,
+        backedUpAt: '2026-08-18T00:00:00.000Z',
+      },
     ];
     const legacyManifest: LocalBackupManifest = {
       version: '1.0',

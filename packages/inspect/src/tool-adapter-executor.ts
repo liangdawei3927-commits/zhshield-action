@@ -1,6 +1,6 @@
 import type { AdapterResult } from './types';
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
-import { DegradationManager, AuditLogger } from '@zh/shared';
+import { DegradationManager, AuditLogger, detectMachineProfile } from '@zh/shared';
 
 export interface ToolAdapterExecutorDeps {
   degradationManager: DegradationManager;
@@ -30,16 +30,29 @@ export class ToolAdapterExecutor {
   }
 
   async runAll(adapters: Map<string, ToolAdapter>, projectId: string): Promise<AdapterResult[]> {
-    const adapterResults: AdapterResult[] = [];
+    const adapterEntries = [...adapters.entries()];
+    const results: AdapterResult[] = new Array<AdapterResult>(adapterEntries.length);
+    const maxConcurrency = detectMachineProfile().adapterParallelism;
 
-    for (const [, adapter] of adapters) {
-      const result = this.degradationManager.isToolSkipped(adapter.meta.id)
-        ? this.makeSkippedResult(adapter)
-        : await this.runAdapter(adapter, projectId);
-      adapterResults.push(result);
-    }
+    // 有界并行池：结果写入预分配数组对应下标，保持 Map 插入顺序（测试按位置索引 results[i]）；
+    // isToolSkipped 在调度时刻（worker 取任务时）判定，与串行语义一致。
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= adapterEntries.length) return;
+        const [, adapter] = adapterEntries[index];
+        results[index] = this.degradationManager.isToolSkipped(adapter.meta.id)
+          ? this.makeSkippedResult(adapter)
+          : await this.runAdapter(adapter, projectId);
+      }
+    };
 
-    return adapterResults;
+    await Promise.all(
+      Array.from({ length: Math.min(maxConcurrency, adapterEntries.length) }, () => worker()),
+    );
+
+    return results;
   }
 
   private makeSkippedResult(adapter: ToolAdapter): AdapterResult {
@@ -83,13 +96,20 @@ export class ToolAdapterExecutor {
     try {
       return await this.runAdapterCore(adapter, projectId, toolStart);
     } catch (error: unknown) {
-      this.degradationManager.escalate((error instanceof Error ? error.message : String(error)) || 'Unknown error', adapter.meta.id);
+      this.degradationManager.escalate(
+        (error instanceof Error ? error.message : String(error)) || 'Unknown error',
+        adapter.meta.id,
+      );
       return this.makeErrorResult(adapter, error, toolStart);
     }
   }
 
   /** 执行扫描、副作用与结果构建（副作用失败不污染扫描结果） */
-  private async runAdapterCore(adapter: ToolAdapter, projectId: string, toolStart: number): Promise<AdapterResult> {
+  private async runAdapterCore(
+    adapter: ToolAdapter,
+    projectId: string,
+    toolStart: number,
+  ): Promise<AdapterResult> {
     const result = await this.executeAdapter(adapter, projectId);
     const duration = Date.now() - toolStart;
 
@@ -102,7 +122,10 @@ export class ToolAdapterExecutor {
   }
 
   /** 执行适配器扫描并施加硬上限保护 */
-  private async executeAdapter(adapter: ToolAdapter, projectId: string): Promise<Awaited<ReturnType<ToolAdapter['scan']>>> {
+  private async executeAdapter(
+    adapter: ToolAdapter,
+    projectId: string,
+  ): Promise<Awaited<ReturnType<ToolAdapter['scan']>>> {
     return ToolAdapterExecutor.withHardTimeout(
       adapter.scan({
         projectPath: process.cwd(),
@@ -145,7 +168,15 @@ export class ToolAdapterExecutor {
     }
     if (result.status === 'unavailable') {
       const failClosed = adapter.meta.category === 'security';
-      return this.buildStatusResult(adapter, result, duration, issues, 'unavailable', !failClosed, true);
+      return this.buildStatusResult(
+        adapter,
+        result,
+        duration,
+        issues,
+        'unavailable',
+        !failClosed,
+        true,
+      );
     }
     if (result.status === 'skipped') {
       return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false);
@@ -214,20 +245,22 @@ export class ToolAdapterExecutor {
       duration: Date.now() - toolStart,
       issueCount: 1,
       passed: false,
-      issues: [{
-        id: `error-${adapter.meta.id}`,
-        ruleId: 'ADAPTER-ERROR',
-        severity: 'error',
-        category: 'quality',
-        message: error instanceof Error ? error.message : String(error),
-        file: '',
-        line: 0,
-        column: 0,
-        suggestion: undefined,
-        autoFixable: false,
-        source: adapter.meta.id,
-        fingerprint: `${adapter.meta.id}-error`,
-      }],
+      issues: [
+        {
+          id: `error-${adapter.meta.id}`,
+          ruleId: 'ADAPTER-ERROR',
+          severity: 'error',
+          category: 'quality',
+          message: error instanceof Error ? error.message : String(error),
+          file: '',
+          line: 0,
+          column: 0,
+          suggestion: undefined,
+          autoFixable: false,
+          source: adapter.meta.id,
+          fingerprint: `${adapter.meta.id}-error`,
+        },
+      ],
     };
   }
 }

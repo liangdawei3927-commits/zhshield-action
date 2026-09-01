@@ -23,7 +23,17 @@ function demoIssue(): Issue {
 
 function controlledAdapter(shouldFail: () => boolean): ToolAdapter {
   return {
-    meta: { id: 'eslint', name: 'ESLint', category: 'guard', priority: 'P1', installMode: 'builtin', description: '', cliCommand: '', homepage: '', license: '' },
+    meta: {
+      id: 'eslint',
+      name: 'ESLint',
+      category: 'guard',
+      priority: 'P1',
+      installMode: 'builtin',
+      description: '',
+      cliCommand: '',
+      homepage: '',
+      license: '',
+    },
     isAvailable: async () => true,
     scan: async (_opts: ToolScanOptions): Promise<ToolResult> => ({
       tool: 'eslint',
@@ -46,14 +56,16 @@ describe('SopRuleEngine — F1-3 动态严重级集成（连续失败计数 × �
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => shouldFail) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      accumulationPolicy: { threshold: 2, escalateTo: 'high' },
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        accumulationPolicy: { threshold: 2, escalateTo: 'high' },
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     // 第 1 次：判定用计数 0 → 静态 medium；失败后计数 → 1
     const r1 = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
@@ -92,14 +104,16 @@ describe('SopRuleEngine — F1-3 动态严重级集成（连续失败计数 × �
       }),
     };
     const engine = new SopRuleEngine(registry, { guardEngine: mockGuard });
-    registry.register(makeRule({
-      id: 'guard.block.adaptive-checklist',
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      accumulationPolicy: { threshold: 1, escalateTo: 'high' },
-      content: { checks: [{ rule: 'no-unused-vars', level: 'error' }] },
-    }));
+    registry.register(
+      makeRule({
+        id: 'guard.block.adaptive-checklist',
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        accumulationPolicy: { threshold: 1, escalateTo: 'high' },
+        content: { checks: [{ rule: 'no-unused-vars', level: 'error' }] },
+      }),
+    );
 
     const r1 = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
     expect(r1.evaluations[0]?.rule.severity).toBe('medium');
@@ -116,17 +130,23 @@ describe('SopRuleEngine — F1-3 动态严重级集成（连续失败计数 × �
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => shouldFail) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      accumulationPolicy: { threshold: 1, escalateTo: 'high' },
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        accumulationPolicy: { threshold: 1, escalateTo: 'high' },
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     // skipped：计数保持 0
-    const skipped = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard', dryRun: true });
+    const skipped = await engine.evaluateRules({
+      repoRoot: '/proj',
+      domain: 'guard',
+      dryRun: true,
+    });
     expect(skipped.evaluations[0]?.status).toBe('skipped');
 
     // 若 skipped 曾被计入，此处判定计数已 >=1 会直接升级；实际应仍为静态 medium
@@ -143,13 +163,15 @@ describe('SopRuleEngine — F1-3 动态严重级集成（连续失败计数 × �
       healthBaseline: 30,
       toolAdapters: [{ name: 'eslint', adapter: controlledAdapter(() => true) }],
     });
-    registry.register(makeRule({
-      id: RULE_ID,
-      domain: 'guard',
-      action: 'block',
-      severity: 'medium',
-      content: { check: { tool: 'eslint', toolConfig: {} } },
-    }));
+    registry.register(
+      makeRule({
+        id: RULE_ID,
+        domain: 'guard',
+        action: 'block',
+        severity: 'medium',
+        content: { check: { tool: 'eslint', toolConfig: {} } },
+      }),
+    );
 
     const report = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
     expect(report.evaluations[0]?.rule.severity).toBe('error');

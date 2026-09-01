@@ -36,20 +36,106 @@ describe('secrets 纯函数', () => {
   });
 
   it('classifySeverity 附 C.4 矩阵', () => {
-    expect(classifySeverity({ stillReferenced: true, type: 'aws-access-key', pushedToRemote: true, remotePublic: true })).toBe('critical');
-    expect(classifySeverity({ stillReferenced: true, type: 'aws-secret-key', pushedToRemote: true, remotePublic: false })).toBe('critical');
-    expect(classifySeverity({ stillReferenced: true, type: 'github-token', pushedToRemote: true, remotePublic: true })).toBe('high');
-    expect(classifySeverity({ stillReferenced: true, type: 'github-token', pushedToRemote: false, remotePublic: false })).toBe('medium');
-    expect(classifySeverity({ stillReferenced: false, type: 'stripe-key', pushedToRemote: true, remotePublic: true })).toBe('medium');
-    expect(classifySeverity({ stillReferenced: false, type: 'generic-api-key', pushedToRemote: false, remotePublic: false })).toBe('low');
+    expect(
+      classifySeverity({
+        stillReferenced: true,
+        type: 'aws-access-key',
+        pushedToRemote: true,
+        remotePublic: true,
+      }),
+    ).toBe('critical');
+    expect(
+      classifySeverity({
+        stillReferenced: true,
+        type: 'aws-secret-key',
+        pushedToRemote: true,
+        remotePublic: false,
+      }),
+    ).toBe('critical');
+    expect(
+      classifySeverity({
+        stillReferenced: true,
+        type: 'github-token',
+        pushedToRemote: true,
+        remotePublic: true,
+      }),
+    ).toBe('high');
+    expect(
+      classifySeverity({
+        stillReferenced: true,
+        type: 'github-token',
+        pushedToRemote: false,
+        remotePublic: false,
+      }),
+    ).toBe('medium');
+    expect(
+      classifySeverity({
+        stillReferenced: false,
+        type: 'stripe-key',
+        pushedToRemote: true,
+        remotePublic: true,
+      }),
+    ).toBe('medium');
+    expect(
+      classifySeverity({
+        stillReferenced: false,
+        type: 'generic-api-key',
+        pushedToRemote: false,
+        remotePublic: false,
+      }),
+    ).toBe('low');
   });
 
   it('sortFindings 严重度降序 + 同级仍引用优先', () => {
     const findings: SecretFinding[] = [
-      { secretId: 'a', type: 'generic-api-key', displayValue: 'x', location: { file: 'f', line: 1, commit: '' }, introducedAt: '', stillReferenced: false, pushedToRemote: false, remotePublic: false, severity: 'low', status: 'active' },
-      { secretId: 'b', type: 'generic-api-key', displayValue: 'x', location: { file: 'f', line: 1, commit: '' }, introducedAt: '', stillReferenced: true, pushedToRemote: false, remotePublic: false, severity: 'high', status: 'active' },
-      { secretId: 'c', type: 'generic-api-key', displayValue: 'x', location: { file: 'f', line: 1, commit: '' }, introducedAt: '', stillReferenced: true, pushedToRemote: false, remotePublic: false, severity: 'medium', status: 'active' },
-      { secretId: 'd', type: 'generic-api-key', displayValue: 'x', location: { file: 'f', line: 1, commit: '' }, introducedAt: '', stillReferenced: false, pushedToRemote: false, remotePublic: false, severity: 'high', status: 'active' },
+      {
+        secretId: 'a',
+        type: 'generic-api-key',
+        displayValue: 'x',
+        location: { file: 'f', line: 1, commit: '' },
+        introducedAt: '',
+        stillReferenced: false,
+        pushedToRemote: false,
+        remotePublic: false,
+        severity: 'low',
+        status: 'active',
+      },
+      {
+        secretId: 'b',
+        type: 'generic-api-key',
+        displayValue: 'x',
+        location: { file: 'f', line: 1, commit: '' },
+        introducedAt: '',
+        stillReferenced: true,
+        pushedToRemote: false,
+        remotePublic: false,
+        severity: 'high',
+        status: 'active',
+      },
+      {
+        secretId: 'c',
+        type: 'generic-api-key',
+        displayValue: 'x',
+        location: { file: 'f', line: 1, commit: '' },
+        introducedAt: '',
+        stillReferenced: true,
+        pushedToRemote: false,
+        remotePublic: false,
+        severity: 'medium',
+        status: 'active',
+      },
+      {
+        secretId: 'd',
+        type: 'generic-api-key',
+        displayValue: 'x',
+        location: { file: 'f', line: 1, commit: '' },
+        introducedAt: '',
+        stillReferenced: false,
+        pushedToRemote: false,
+        remotePublic: false,
+        severity: 'high',
+        status: 'active',
+      },
     ];
     const sorted = sortFindings(findings);
     expect(sorted.map((f) => f.secretId)).toEqual(['b', 'd', 'c', 'a']);
@@ -75,8 +161,22 @@ describe('SecretLifecycleManager', () => {
     { RuleID: 'github-pat', File: 'src/a.ts', StartLine: 3, Secret: githubPat },
   ]);
   const GITLEAKS_HISTORY_JSON = JSON.stringify([
-    { RuleID: 'github-pat', File: 'src/a.ts', StartLine: 3, Secret: githubPat, Commit: 'abc123', Date: '2024-01-01T00:00:00Z' },
-    { RuleID: 'aws-access-token', File: 'src/b.ts', StartLine: 10, Secret: awsAccessKey, Commit: 'def456', Date: '2023-06-01T00:00:00Z' },
+    {
+      RuleID: 'github-pat',
+      File: 'src/a.ts',
+      StartLine: 3,
+      Secret: githubPat,
+      Commit: 'abc123',
+      Date: '2024-01-01T00:00:00Z',
+    },
+    {
+      RuleID: 'aws-access-token',
+      File: 'src/b.ts',
+      StartLine: 10,
+      Secret: awsAccessKey,
+      Commit: 'def456',
+      Date: '2023-06-01T00:00:00Z',
+    },
   ]);
 
   function createRunner(_overrides: Partial<CommandRunner> = {}): CommandRunner {
@@ -86,7 +186,8 @@ describe('SecretLifecycleManager', () => {
         return { stdout: GITLEAKS_WORKSPACE_JSON };
       }
       if (command === 'git' && args[0] === 'rev-parse') return { stdout: 'HEADHASH\n' };
-      if (command === 'git' && args[0] === 'remote') return { stdout: 'https://github.com/org/repo.git\n' };
+      if (command === 'git' && args[0] === 'remote')
+        return { stdout: 'https://github.com/org/repo.git\n' };
       return { stdout: '' };
     });
     return { run };

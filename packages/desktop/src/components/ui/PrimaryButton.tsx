@@ -2,7 +2,10 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { Bounce } from './Bounce';
 import { useT } from '../../i18n';
 
-interface PrimaryButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'className' | 'children'> {
+interface PrimaryButtonProps extends Omit<
+  ComponentPropsWithoutRef<'button'>,
+  'className' | 'children'
+> {
   children: ReactNode;
   /** 追加类名（如 ml-auto 布局调整） */
   className?: string;
@@ -15,7 +18,14 @@ interface PrimaryButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'c
  * 全局统一主操作按钮：所有页面中间按钮的唯一大小与配色
  * （品牌盾青渐变，180 x 48 圆角胶囊，白字加粗）
  */
-export function PrimaryButton({ children, className, loading = false, loadingLabel, disabled, ...rest }: PrimaryButtonProps) {
+export function PrimaryButton({
+  children,
+  className,
+  loading = false,
+  loadingLabel,
+  disabled,
+  ...rest
+}: PrimaryButtonProps) {
   const t = useT();
   return (
     <Bounce

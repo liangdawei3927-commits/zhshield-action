@@ -54,29 +54,82 @@ describe('SopSigner', () => {
   describe('signRequest / verifyRequest', () => {
     it('有效请求签名应验证通过（往返）', () => {
       const ts = Date.now().toString();
-      const sig = SopSigner.signRequest({ method: 'POST', path: '/api/v1/rules', body: { a: 1 }, secretKey: SECRET, nonce: 'nonce-1', timestamp: ts });
-      const result = SopSigner.verifyRequest({ method: 'POST', path: '/api/v1/rules', body: { a: 1 }, secretKey: SECRET, nonce: 'nonce-1', signature: sig, timestamp: ts });
+      const sig = SopSigner.signRequest({
+        method: 'POST',
+        path: '/api/v1/rules',
+        body: { a: 1 },
+        secretKey: SECRET,
+        nonce: 'nonce-1',
+        timestamp: ts,
+      });
+      const result = SopSigner.verifyRequest({
+        method: 'POST',
+        path: '/api/v1/rules',
+        body: { a: 1 },
+        secretKey: SECRET,
+        nonce: 'nonce-1',
+        signature: sig,
+        timestamp: ts,
+      });
       expect(result.valid).toBe(true);
     });
 
     it('过期请求应拒绝（防重放）', () => {
       const ts = (Date.now() - 6 * 60 * 1000).toString();
-      const sig = SopSigner.signRequest({ method: 'POST', path: '/api', body: {}, secretKey: SECRET, nonce: 'n', timestamp: ts });
-      const result = SopSigner.verifyRequest({ method: 'POST', path: '/api', body: {}, secretKey: SECRET, nonce: 'n', signature: sig, timestamp: ts });
+      const sig = SopSigner.signRequest({
+        method: 'POST',
+        path: '/api',
+        body: {},
+        secretKey: SECRET,
+        nonce: 'n',
+        timestamp: ts,
+      });
+      const result = SopSigner.verifyRequest({
+        method: 'POST',
+        path: '/api',
+        body: {},
+        secretKey: SECRET,
+        nonce: 'n',
+        signature: sig,
+        timestamp: ts,
+      });
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('request_expired');
     });
 
     it('无效时间戳应拒绝', () => {
-      const result = SopSigner.verifyRequest({ method: 'POST', path: '/api', body: {}, secretKey: SECRET, nonce: 'n', signature: 'sig', timestamp: 'not-a-number' });
+      const result = SopSigner.verifyRequest({
+        method: 'POST',
+        path: '/api',
+        body: {},
+        secretKey: SECRET,
+        nonce: 'n',
+        signature: 'sig',
+        timestamp: 'not-a-number',
+      });
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('request_expired');
     });
 
     it('签名不匹配应拒绝（防伪造）', () => {
       const ts = Date.now().toString();
-      const sig = SopSigner.signRequest({ method: 'POST', path: '/api', body: {}, secretKey: 'secret-a', nonce: 'n', timestamp: ts });
-      const result = SopSigner.verifyRequest({ method: 'POST', path: '/api', body: {}, secretKey: 'secret-b', nonce: 'n', signature: sig, timestamp: ts });
+      const sig = SopSigner.signRequest({
+        method: 'POST',
+        path: '/api',
+        body: {},
+        secretKey: 'secret-a',
+        nonce: 'n',
+        timestamp: ts,
+      });
+      const result = SopSigner.verifyRequest({
+        method: 'POST',
+        path: '/api',
+        body: {},
+        secretKey: 'secret-b',
+        nonce: 'n',
+        signature: sig,
+        timestamp: ts,
+      });
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('signature_mismatch');
     });

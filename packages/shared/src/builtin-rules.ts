@@ -232,7 +232,7 @@ export const BUILTIN_FALLBACK_RULES: BuiltinRule[] = [
     severity: 'info',
     category: 'quality',
     message: '从 barrel (index) 文件导入可能导致循环依赖',
-    pattern: "from\\s+['\"]\\.\\.?/[^'\"]*/index['\"]",
+    pattern: 'from\\s+[\'"]\\.\\.?/[^\'"]*/index[\'"]',
   },
   {
     ruleId: 'fallback/quality/large-function',

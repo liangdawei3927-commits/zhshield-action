@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { NotificationService } from '@zh/kernel';
 import type { AppNotification } from '@zh/kernel';
 
@@ -49,7 +57,10 @@ export const NotificationContext = createContext<NotificationContextValue | null
 // Browser permission helper (globalThis, not window)
 // ---------------------------------------------------------------------------
 
-type BrowserNotificationCtor = new (title: string, options?: { body?: string }) => { close(): void };
+type BrowserNotificationCtor = new (
+  title: string,
+  options?: { body?: string },
+) => { close(): void };
 type BrowserNotificationStatic = BrowserNotificationCtor & {
   permission: string;
   requestPermission(): Promise<string>;

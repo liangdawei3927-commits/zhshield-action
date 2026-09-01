@@ -13,7 +13,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
-import type { DependencyEdge, DependencyGraph, DependencyNode, Ecosystem, LockfileStatus, TrustStatus } from './types';
+import type {
+  DependencyEdge,
+  DependencyGraph,
+  DependencyNode,
+  Ecosystem,
+  LockfileStatus,
+  TrustStatus,
+} from './types';
 import { ROOT_NODE_ID } from './types';
 import { safeJoin } from '@zh/shared';
 import { satisfiesVersion } from './adapters/lockfile-verifier';
@@ -252,7 +259,7 @@ function collectNpmV1Deps(
     if (index.has(id)) continue;
 
     const isDirect = isRootLevel && declared.has(name);
-    const range = isDirect ? declared.get(name) ?? '' : '';
+    const range = isDirect ? (declared.get(name) ?? '') : '';
     const integrity = typeof meta.integrity === 'string' ? meta.integrity : undefined;
     const node = makeNode({
       name,
@@ -311,7 +318,10 @@ function buildNpmLockGraph(npmLockPath: string, pkgJson: DirectDeps | null): Bui
 const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
 
 /** 解析 pnpm-lock.yaml v6+：importers 直接依赖 + packages 完整性哈希 */
-function collectPnpm(lock: Record<string, unknown>): { nodes: DependencyNode[]; edges: DependencyEdge[] } {
+function collectPnpm(lock: Record<string, unknown>): {
+  nodes: DependencyNode[];
+  edges: DependencyEdge[];
+} {
   const nodes: DependencyNode[] = [];
   const byId = new Map<string, DependencyNode>();
   const edges: DependencyEdge[] = [];
@@ -385,7 +395,11 @@ function collectPnpmImporters(
 }
 
 /** 其余 packages 为传递依赖 */
-function collectPnpmTransitives(integrityById: Map<string, string>, nodes: DependencyNode[], byId: Map<string, DependencyNode>): void {
+function collectPnpmTransitives(
+  integrityById: Map<string, string>,
+  nodes: DependencyNode[],
+  byId: Map<string, DependencyNode>,
+): void {
   for (const [id, integrity] of integrityById) {
     if (byId.has(id)) continue;
     const at = id.lastIndexOf('@');
@@ -529,7 +543,11 @@ function collectYarnDirects(
 }
 
 /** 第二遍：其余块为传递依赖 */
-function collectYarnTransitives(blocks: YarnBlock[], nodes: DependencyNode[], byId: Map<string, DependencyNode>): void {
+function collectYarnTransitives(
+  blocks: YarnBlock[],
+  nodes: DependencyNode[],
+  byId: Map<string, DependencyNode>,
+): void {
   for (const block of blocks) {
     const version = block.fields.get('version');
     if (!version) continue;
@@ -552,7 +570,10 @@ function collectYarnTransitives(blocks: YarnBlock[], nodes: DependencyNode[], by
 }
 
 /** 边：根 → 直接依赖 */
-function buildRootEdges(declared: Map<string, string>, byName: Map<string, DependencyNode>): DependencyEdge[] {
+function buildRootEdges(
+  declared: Map<string, string>,
+  byName: Map<string, DependencyNode>,
+): DependencyEdge[] {
   const edges: DependencyEdge[] = [];
   for (const [name, range] of declared) {
     const node = byName.get(name);
@@ -621,7 +642,10 @@ function parsePoetryConstraint(value: string): string {
  * [project] 的 dependencies 数组（PEP 621，双引号包名，附带版本约束）；
  * [tool.poetry.dependencies] / [tool.uv.dependencies] 的表键即包名。
  */
-function parsePyproject(content: string): { dependencies: Map<string, string>; devDependencies: Map<string, string> } {
+function parsePyproject(content: string): {
+  dependencies: Map<string, string>;
+  devDependencies: Map<string, string>;
+} {
   const dependencies = new Map<string, string>();
   const devDependencies = new Map<string, string>();
   const sections = content.split(TOML_SECTION_RE);
@@ -633,7 +657,10 @@ function parsePyproject(content: string): { dependencies: Map<string, string>; d
 
     if (sectionName === 'project') {
       collectProjectDeps(section, dependencies);
-    } else if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
+    } else if (
+      sectionName === 'tool.poetry.dependencies' ||
+      sectionName === 'tool.uv.dependencies'
+    ) {
       collectPoetryDeps(section, dependencies);
     }
   }
@@ -796,7 +823,13 @@ function buildPyprojectGraph(pyprojectPath: string): BuildResult {
     const version = versionFromConstraint(constraint);
     const id = `${name}@${version}`;
     if (byId.has(id)) continue;
-    const node = makeNode({ name, version, declaredRange: constraint, kind: 'direct', trust: 'unknown' });
+    const node = makeNode({
+      name,
+      version,
+      declaredRange: constraint,
+      kind: 'direct',
+      trust: 'unknown',
+    });
     nodes.push(node);
     byId.set(id, node);
     edges.push({ from: ROOT_NODE_ID, to: id, requirement: constraint });
@@ -841,17 +874,40 @@ function buildRequirementsGraph(requirementsPath: string): BuildResult {
  * → pip（poetry.lock → Pipfile.lock → pyproject.toml → requirements.txt）。
  * 清单解析失败时按缺失处理：返回空图谱且 lockfile.present=false，绝不抛异常。
  */
-export function buildDependencyGraph(projectPath: string, options?: { targetId?: string }): DependencyGraph {
+export function buildDependencyGraph(
+  projectPath: string,
+  options?: { targetId?: string },
+): DependencyGraph {
   const targetId = options?.targetId ?? path.basename(projectPath);
   const generatedAt = new Date().toISOString();
   const pkgJson = readPackageJson(projectPath);
   const { result, ecosystem, lockfilePath } = detectLockfileSource(projectPath, pkgJson);
   if (!result) {
-    const emptyLockfile: LockfileStatus = { present: false, consistent: false, integrityVerified: false };
-    return { schemaVersion: 1, targetId, ecosystem, nodes: [], edges: [], lockfile: emptyLockfile, generatedAt };
+    const emptyLockfile: LockfileStatus = {
+      present: false,
+      consistent: false,
+      integrityVerified: false,
+    };
+    return {
+      schemaVersion: 1,
+      targetId,
+      ecosystem,
+      nodes: [],
+      edges: [],
+      lockfile: emptyLockfile,
+      generatedAt,
+    };
   }
   const lockfile = buildLockfileStatus(result, lockfilePath);
-  return { schemaVersion: 1, targetId, ecosystem, nodes: result.nodes, edges: result.edges, lockfile, generatedAt };
+  return {
+    schemaVersion: 1,
+    targetId,
+    ecosystem,
+    nodes: result.nodes,
+    edges: result.edges,
+    lockfile,
+    generatedAt,
+  };
 }
 
 /** 探测锁文件来源并构建图谱（优先级：pnpm → npm → yarn → poetry → Pipfile → pyproject → requirements） */
@@ -871,22 +927,42 @@ function detectLockfileSource(
     return { result: buildPnpmGraph(pnpmLockPath), ecosystem: 'npm', lockfilePath: pnpmLockPath };
   }
   if (fs.existsSync(npmLockPath)) {
-    return { result: buildNpmLockGraph(npmLockPath, pkgJson), ecosystem: 'npm', lockfilePath: npmLockPath };
+    return {
+      result: buildNpmLockGraph(npmLockPath, pkgJson),
+      ecosystem: 'npm',
+      lockfilePath: npmLockPath,
+    };
   }
   if (fs.existsSync(yarnLockPath)) {
-    return { result: buildYarnGraph(yarnLockPath, pkgJson), ecosystem: 'npm', lockfilePath: yarnLockPath };
+    return {
+      result: buildYarnGraph(yarnLockPath, pkgJson),
+      ecosystem: 'npm',
+      lockfilePath: yarnLockPath,
+    };
   }
   if (fs.existsSync(poetryLockPath)) {
-    return { result: buildPoetryGraph(poetryLockPath, projectPath), ecosystem: 'pip', lockfilePath: poetryLockPath };
+    return {
+      result: buildPoetryGraph(poetryLockPath, projectPath),
+      ecosystem: 'pip',
+      lockfilePath: poetryLockPath,
+    };
   }
   if (fs.existsSync(pipfileLockPath)) {
-    return { result: buildPipfileGraph(pipfileLockPath), ecosystem: 'pip', lockfilePath: pipfileLockPath };
+    return {
+      result: buildPipfileGraph(pipfileLockPath),
+      ecosystem: 'pip',
+      lockfilePath: pipfileLockPath,
+    };
   }
   if (fs.existsSync(pyprojectPath)) {
     return { result: buildPyprojectGraph(pyprojectPath), ecosystem: 'pip', lockfilePath: null };
   }
   if (fs.existsSync(requirementsPath)) {
-    return { result: buildRequirementsGraph(requirementsPath), ecosystem: 'pip', lockfilePath: null };
+    return {
+      result: buildRequirementsGraph(requirementsPath),
+      ecosystem: 'pip',
+      lockfilePath: null,
+    };
   }
   return { result: null, ecosystem: pkgJson ? 'npm' : 'mixed', lockfilePath: null };
 }
@@ -897,7 +973,9 @@ function buildLockfileStatus(result: BuildResult, lockfilePath: string | null): 
     result.nodes.length > 0 && result.nodes.every((node) => node.integrity !== undefined);
   const consistent =
     result.present &&
-    result.nodes.filter((node) => node.kind === 'direct').every((node) => satisfiesVersion(node.version, node.declaredRange));
+    result.nodes
+      .filter((node) => node.kind === 'direct')
+      .every((node) => satisfiesVersion(node.version, node.declaredRange));
   let lastModified: string | undefined;
   if (result.present && lockfilePath) {
     try {

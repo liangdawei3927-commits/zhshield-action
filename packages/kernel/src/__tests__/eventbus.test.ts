@@ -25,7 +25,9 @@ describe('EventBus', () => {
 
   it('should support once', async () => {
     let count = 0;
-    bus.once('test', () => { count++; });
+    bus.once('test', () => {
+      count++;
+    });
     await bus.emit('test', null);
     await bus.emit('test', null);
     expect(count).toBe(1);
@@ -33,7 +35,9 @@ describe('EventBus', () => {
 
   it('should support off', async () => {
     let count = 0;
-    const handler = () => { count++; };
+    const handler = () => {
+      count++;
+    };
     bus.on('test', handler);
     await bus.emit('test', null);
     bus.off('test', handler);

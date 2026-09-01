@@ -1,8 +1,16 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { FileMonitor, EventCenter, resolveChangeType, DEFAULT_IGNORE_DIRS, DEFAULT_IGNORE_RE, defaultFileWatchFilter } from '../index';
+import {
+  FileMonitor,
+  EventCenter,
+  resolveChangeType,
+  DEFAULT_IGNORE_DIRS,
+  DEFAULT_IGNORE_RE,
+  defaultFileWatchFilter,
+} from '../index';
+import { computePollDelay, MAX_POLL_BACKOFF_MS } from '../file-monitor';
 
 describe('resolveChangeType fs.watch 事件类型归一化', () => {
   it('change 事件在文件存在时保持 change', () => {
@@ -92,7 +100,18 @@ describe('默认忽略规则（噪音路径）', () => {
   });
 
   it('ignoreDirs 列表含全部关键噪音目录', () => {
-    for (const dir of ['node_modules', '.git', 'dist', 'dist-electron', 'test-results', '.playwright-mcp', '.opencode', '.omo', '.zhshield', '.turbo']) {
+    for (const dir of [
+      'node_modules',
+      '.git',
+      'dist',
+      'dist-electron',
+      'test-results',
+      '.playwright-mcp',
+      '.opencode',
+      '.omo',
+      '.zhshield',
+      '.turbo',
+    ]) {
       expect(DEFAULT_IGNORE_DIRS, dir).toContain(dir);
     }
   });
@@ -142,8 +161,12 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
       await new Promise((r) => setTimeout(r, 300));
 
       const events = eventCenter.listEvents();
-      expect(events.some((e) => e.context?.filePath?.toString().includes('node_modules'))).toBe(false);
-      expect(events.some((e) => e.context?.filePath?.toString().includes('test-results'))).toBe(false);
+      expect(events.some((e) => e.context?.filePath?.toString().includes('node_modules'))).toBe(
+        false,
+      );
+      expect(events.some((e) => e.context?.filePath?.toString().includes('test-results'))).toBe(
+        false,
+      );
       expect(events.some((e) => e.context?.filePath === realFile)).toBe(true);
       expect(events.some((e) => e.context?.filePath === dirOnly)).toBe(false);
       const realEvent = events.find((e) => e.context?.filePath === realFile)!;
@@ -169,7 +192,8 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
       const file = path.join(root, 'dup.ts');
       fs.writeFileSync(file, 'v1');
       await new Promise((r) => setTimeout(r, 300));
-      const countFor = () => eventCenter.listEvents().filter((e) => e.context?.filePath === file).length;
+      const countFor = () =>
+        eventCenter.listEvents().filter((e) => e.context?.filePath === file).length;
       const before = countFor();
       // macOS 原子保存会对同一写入触发多次 rename 回调但 mtime 不变：
       // utimesSync 强制触发一次事件，mtime 与上次相同 → 不应产生新事件
@@ -215,6 +239,102 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
       expect(unlinkEvent?.context?.changeType).toBe('unlink');
     } finally {
       monitor.stop();
+    }
+  });
+});
+
+describe('computePollDelay 事件驱动退避', () => {
+  const now = 1_000_000_000;
+
+  it('事件活跃（心跳在 intervalMs 内）时退避到上限', () => {
+    expect(computePollDelay(now - 100, now, 3000)).toBe(30_000);
+    expect(computePollDelay(now - 2999, now, 3000)).toBe(30_000);
+    expect(computePollDelay(now - 100, now, 5000)).toBe(30_000);
+  });
+
+  it('退避有上限 MAX_POLL_BACKOFF_MS', () => {
+    expect(computePollDelay(now - 1, now, 60_000)).toBe(MAX_POLL_BACKOFF_MS);
+    expect(computePollDelay(now - 1, now, 3000)).toBeLessThanOrEqual(MAX_POLL_BACKOFF_MS);
+  });
+
+  it('安静（超过 intervalMs 无事件）时回到正常间隔', () => {
+    expect(computePollDelay(now - 3000, now, 3000)).toBe(3000);
+    expect(computePollDelay(now - 10_000, now, 3000)).toBe(3000);
+    expect(computePollDelay(0, now, 3000)).toBe(3000);
+  });
+});
+
+describe('FileMonitor 默认 ignoreDirs 与退避（新增行为）', () => {
+  const tmpDirs: string[] = [];
+
+  function makeTmpDir(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-sentinel-new-'));
+    tmpDirs.push(dir);
+    return dir;
+  }
+
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('未提供 ignoreDirs 时默认应用 DEFAULT_IGNORE_DIRS，轮询不遍历 node_modules/.git', async () => {
+    const root = makeTmpDir();
+    const eventCenter = new EventCenter();
+    const monitor = new FileMonitor(eventCenter);
+    const readdirSpy = vi.spyOn(fs.promises, 'readdir');
+    // 先建目录再启动，避免创建事件触发退避
+    const nmDir = path.join(root, 'node_modules', 'pkg');
+    fs.mkdirSync(nmDir, { recursive: true });
+    fs.writeFileSync(path.join(nmDir, 'dep.js'), 'x');
+    const gitDir = path.join(root, '.git');
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'config'), 'x');
+    const srcDir = path.join(root, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(path.join(srcDir, 'app.ts'), 'v1');
+    monitor.start({
+      projectId: 'proj-default-ignore',
+      watchPaths: [root],
+      intervalMs: 100,
+    });
+    try {
+      // 等待至少一轮轮询（fs.watch 回调不调用 readdir，readdir 调用均来自轮询）
+      await new Promise((r) => setTimeout(r, 250));
+      const readdirPaths = readdirSpy.mock.calls.map((c) => String(c[0]));
+      expect(readdirPaths.some((p) => p.includes('node_modules'))).toBe(false);
+      expect(readdirPaths.some((p) => p.includes('.git'))).toBe(false);
+      expect(readdirPaths.some((p) => p.includes('src'))).toBe(true);
+    } finally {
+      monitor.stop();
+      readdirSpy.mockRestore();
+    }
+  });
+
+  it('事件活跃时轮询退避，安静后恢复（集成）', async () => {
+    const root = makeTmpDir();
+    const eventCenter = new EventCenter();
+    const monitor = new FileMonitor(eventCenter);
+    const readdirSpy = vi.spyOn(fs.promises, 'readdir');
+    monitor.start({ projectId: 'proj-backoff', watchPaths: [root], intervalMs: 100 });
+    try {
+      const f = path.join(root, 'a.ts');
+      // 事件比轮询间隔更频繁（每 50ms 写入，持续 200ms）
+      for (let i = 0; i < 4; i++) {
+        fs.writeFileSync(f, `v${i}`);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      // 事件活跃期间：轮询应退避（100ms ×10 = 1000ms），而非每 100ms 触发
+      const pollsDuring = readdirSpy.mock.calls.length;
+      expect(pollsDuring).toBeLessThanOrEqual(2);
+      // 停止写入，等待安静期（> 退避间隔）→ 恢复 100ms 轮询
+      await new Promise((r) => setTimeout(r, 1100));
+      const pollsAfter = readdirSpy.mock.calls.length;
+      expect(pollsAfter).toBeGreaterThan(pollsDuring);
+    } finally {
+      monitor.stop();
+      readdirSpy.mockRestore();
     }
   });
 });

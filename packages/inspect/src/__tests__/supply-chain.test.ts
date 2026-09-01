@@ -4,7 +4,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TOOL_LICENSE_REGISTRY } from '@zh/shared';
-import { SupplyChainManager, LockfileLicenseAuditor, ToolUnavailableError } from '../toolchain/supply-chain';
+import {
+  SupplyChainManager,
+  LockfileLicenseAuditor,
+  ToolUnavailableError,
+} from '../toolchain/supply-chain';
 import type { ToolDownloader } from '../toolchain/supply-chain';
 import type { ToolInstallRecord } from '@zh/shared';
 
@@ -36,7 +40,12 @@ describe('SupplyChainManager', () => {
   const requirement = {
     toolId: 'gitleaks',
     version: '8.18.0',
-    expectedSha256: sha256Of(Buffer.from('binary-for-https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks', 'utf-8')),
+    expectedSha256: sha256Of(
+      Buffer.from(
+        'binary-for-https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks',
+        'utf-8',
+      ),
+    ),
     officialSource: 'https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks',
     mirrorSources: ['https://mirror.example.com/gitleaks/8.18.0'],
   };
@@ -68,7 +77,11 @@ describe('SupplyChainManager', () => {
         return Buffer.from(`binary-for-${url}`, 'utf-8');
       },
     };
-    const manager2 = new SupplyChainManager({ lockfilePath, binDir, downloader: countingDownloader });
+    const manager2 = new SupplyChainManager({
+      lockfilePath,
+      binDir,
+      downloader: countingDownloader,
+    });
     const second = await manager2.ensureTool(requirement);
 
     expect(second.sha256).toBe(first.sha256);
@@ -76,7 +89,10 @@ describe('SupplyChainManager', () => {
   });
 
   it('官方渠道失败应镜像回退且记录 channel=mirror', async () => {
-    const officialBytes = Buffer.from('binary-for-https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks', 'utf-8');
+    const officialBytes = Buffer.from(
+      'binary-for-https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks',
+      'utf-8',
+    );
     const failingOfficial: ToolDownloader = {
       async download(url: string): Promise<Buffer> {
         if (url.includes('mirror.example.com')) {
@@ -124,7 +140,9 @@ describe('SupplyChainManager', () => {
   it('verifyBeforeRun：二进制被替换（哈希不匹配）返回 false', async () => {
     const manager = makeManager();
     await manager.ensureTool(requirement);
-    await fs.writeFile(path.join(binDir, 'gitleaks'), Buffer.from('evil-binary', 'utf-8'), { mode: 0o755 });
+    await fs.writeFile(path.join(binDir, 'gitleaks'), Buffer.from('evil-binary', 'utf-8'), {
+      mode: 0o755,
+    });
 
     expect(await manager.verifyBeforeRun('gitleaks')).toBe(false);
   });

@@ -33,10 +33,7 @@ function isPrivateKeyPem(key: string): boolean {
 }
 
 function hmacSign(key: string, data: string): string {
-  return crypto
-    .createHmac('sha256', key)
-    .update(data)
-    .digest('hex');
+  return crypto.createHmac('sha256', key).update(data).digest('hex');
 }
 
 function verifyTimestamp(timestamp: Date | string, windowMs: number): VerifyResult {
@@ -71,11 +68,7 @@ function signEd25519(rules: SopRule[], privateKey: string, version?: string): Si
 }
 
 /** 用 Ed25519 公钥（PEM SPKI）验证规则包签名 */
-function verifyEd25519(
-  pkg: SignedSopPackage,
-  publicKey: string,
-  windowMs: number,
-): VerifyResult {
+function verifyEd25519(pkg: SignedSopPackage, publicKey: string, windowMs: number): VerifyResult {
   const tsResult = verifyTimestamp(pkg.timestamp, windowMs);
   if (!tsResult.valid) return tsResult;
   const sorted = pkg.rules.toSorted((a, b) => a.id.localeCompare(b.id));
@@ -117,11 +110,7 @@ function signHmac(rules: SopRule[], secretKey: string, version?: string): Signed
 }
 
 /** HMAC-SHA256 验证规则包（旧对称路径） */
-function verifyHmac(
-  pkg: SignedSopPackage,
-  secretKey: string,
-  windowMs: number,
-): VerifyResult {
+function verifyHmac(pkg: SignedSopPackage, secretKey: string, windowMs: number): VerifyResult {
   const tsResult = verifyTimestamp(pkg.timestamp, windowMs);
   if (!tsResult.valid) return tsResult;
   const sorted = pkg.rules.toSorted((a, b) => a.id.localeCompare(b.id));
@@ -277,11 +266,7 @@ export class SopSigner {
    * 加密规则内容（AES-256-GCM）
    * 密钥由机器硬件指纹 + 用户 ID 派生
    */
-  static encryptRules(
-    rules: SopRule[],
-    machineFingerprint: string,
-    userId: string,
-  ): EncryptedData {
+  static encryptRules(rules: SopRule[], machineFingerprint: string, userId: string): EncryptedData {
     const key = SopSigner.deriveKey(machineFingerprint, userId);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -311,19 +296,12 @@ export class SopSigner {
   /**
    * 解密规则内容
    */
-  static decryptRules(
-    data: EncryptedData,
-    machineFingerprint: string,
-    userId: string,
-  ): SopRule[] {
+  static decryptRules(data: EncryptedData, machineFingerprint: string, userId: string): SopRule[] {
     const key = SopSigner.deriveKey(machineFingerprint, userId);
 
-    const decipher = crypto.createDecipheriv(
-      'aes-256-gcm',
-      key,
-      Buffer.from(data.iv, 'hex'),
-      { authTagLength: 16 },
-    );
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(data.iv, 'hex'), {
+      authTagLength: 16,
+    });
     decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
 
     const decrypted = Buffer.concat([

@@ -2,7 +2,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, AccessScope } from '@zh/shared';
+import type {
+  ToolAdapter,
+  ToolMeta,
+  ToolResult,
+  ToolScanOptions,
+  Issue,
+  AccessScope,
+} from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 
 const execFileAsync = promisify(execFile);
@@ -116,7 +123,12 @@ export class DepcheckAdapter implements ToolAdapter {
         tool: 'depcheck',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'depcheck 未安装',
       };
     }
@@ -131,7 +143,8 @@ export class DepcheckAdapter implements ToolAdapter {
 
   private mapOutput(result: DepcheckResult, projectPath: string): Issue[] {
     const issues: Issue[] = [];
-    const relPkgJson = path.relative(projectPath, path.join(projectPath, 'package.json')) || 'package.json';
+    const relPkgJson =
+      path.relative(projectPath, path.join(projectPath, 'package.json')) || 'package.json';
 
     for (const dep of result.dependencies || []) {
       issues.push({

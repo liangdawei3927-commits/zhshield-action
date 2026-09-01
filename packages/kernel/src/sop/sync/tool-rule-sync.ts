@@ -291,6 +291,7 @@ export class ToolRuleSync {
         }
         throw err;
       }
+      // eslint-disable-next-line perf/perf-no-serial-await -- arg depends on loop var via dataflow
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       await fs.promises.writeFile(filePath, record.content, 'utf-8');
     }
@@ -317,15 +318,20 @@ export class ToolRuleSync {
       return results;
     }
 
+    const subdirPromises: Promise<string[]>[] = [];
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        results.push(...(await this.walkDir(fullPath)));
+        if (entry.name === 'node_modules') continue;
+        subdirPromises.push(this.walkDir(path.join(dir, entry.name)));
         continue;
       }
       if (entry.isFile()) {
-        results.push(fullPath);
+        results.push(path.join(dir, entry.name));
       }
+    }
+    const subdirResults = await Promise.all(subdirPromises);
+    for (const sr of subdirResults) {
+      results.push(...sr);
     }
     return results;
   }

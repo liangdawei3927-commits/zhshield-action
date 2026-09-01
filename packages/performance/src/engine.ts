@@ -6,11 +6,7 @@
  */
 import * as fs from 'fs';
 import { safeJoin } from '@zh/shared';
-import type {
-  PerformanceIssue,
-  PerformanceReport,
-  PerformanceConfig,
-} from './types';
+import type { PerformanceIssue, PerformanceReport, PerformanceConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
 import { BuildConfigDetectorImpl } from './adapters/build-config-detector';
 import { BundleSizeDetectorImpl } from './adapters/bundle-size-detector';

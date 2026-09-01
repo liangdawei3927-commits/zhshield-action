@@ -12,9 +12,7 @@ export interface SyncPolicyOptions {
  * 封装缓存同步的时间策略（同步间隔 + 过期阈值）及其默认值，
  * 返回已解析的配置对象（替代原先无行为的值对象类，消除 lazy-class）。
  */
-export function createSyncPolicy(
-  options: SyncPolicyOptions = {},
-): Required<SyncPolicyOptions> {
+export function createSyncPolicy(options: SyncPolicyOptions = {}): Required<SyncPolicyOptions> {
   return {
     syncInterval: options.syncInterval ?? 6 * 60 * 60 * 1000, // 6 小时
     staleThresholdDays: options.staleThresholdDays ?? 7,

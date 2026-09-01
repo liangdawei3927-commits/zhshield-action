@@ -15,7 +15,9 @@ export class ConfigLoader {
   }
 
   loadSeverities(): Record<string, { level: string; blocking: boolean }> {
-    return this.loadJson<Record<string, { level: string; blocking: boolean }>>('severities.json') ?? {};
+    return (
+      this.loadJson<Record<string, { level: string; blocking: boolean }>>('severities.json') ?? {}
+    );
   }
 
   private resolveConfigPath(fileName: string): string {

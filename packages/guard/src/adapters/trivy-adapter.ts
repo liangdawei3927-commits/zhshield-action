@@ -88,12 +88,11 @@ export class TrivyAdapter {
   }
 
   /** 组装 trivy fs 漏洞扫描参数 */
-  private buildScanArgs(projectPath: string, options?: { severity?: string; format?: string }): string[] {
-    const args = [
-      'fs',
-      '--format', 'json',
-      '--vuln-type', 'os,library',
-    ];
+  private buildScanArgs(
+    projectPath: string,
+    options?: { severity?: string; format?: string },
+  ): string[] {
+    const args = ['fs', '--format', 'json', '--vuln-type', 'os,library'];
 
     if (options?.severity) {
       args.push('--severity', options.severity);
@@ -107,12 +106,7 @@ export class TrivyAdapter {
    * 运行配置扫描
    */
   async scanMisconfigurations(projectPath: string): Promise<TrivyFinding[]> {
-    const args = [
-      'fs',
-      '--format', 'json',
-      '--scanners', 'config',
-      projectPath,
-    ];
+    const args = ['fs', '--format', 'json', '--scanners', 'config', projectPath];
 
     try {
       const { stdout } = await execFileAsync(this.trivyPath, args, {
@@ -147,10 +141,10 @@ export class TrivyAdapter {
     const all = [...vulnerabilities, ...misconfigurations];
     const summary = {
       total: all.length,
-      critical: all.filter(f => this.getSeverity(f) === 'CRITICAL').length,
-      high: all.filter(f => this.getSeverity(f) === 'HIGH').length,
-      medium: all.filter(f => this.getSeverity(f) === 'MEDIUM').length,
-      low: all.filter(f => this.getSeverity(f) === 'LOW').length,
+      critical: all.filter((f) => this.getSeverity(f) === 'CRITICAL').length,
+      high: all.filter((f) => this.getSeverity(f) === 'HIGH').length,
+      medium: all.filter((f) => this.getSeverity(f) === 'MEDIUM').length,
+      low: all.filter((f) => this.getSeverity(f) === 'LOW').length,
     };
 
     return { vulnerabilities, misconfigurations, summary };
@@ -198,6 +192,10 @@ export class TrivyAdapter {
   }
 
   private getSeverity(finding: TrivyFinding): string {
-    return (finding.vulnerability?.severity ?? finding.misconfiguration?.severity ?? 'UNKNOWN').toUpperCase();
+    return (
+      finding.vulnerability?.severity ??
+      finding.misconfiguration?.severity ??
+      'UNKNOWN'
+    ).toUpperCase();
   }
 }

@@ -9,7 +9,8 @@ interface InspectPageProps {
 
 export function InspectPage({ projectPath }: InspectPageProps) {
   const t = useT();
-  const { report, loading, progressLabel, copyToAi, copyAllToAi, startInspect } = useInspectPage(projectPath);
+  const { report, loading, progressLabel, copyToAi, copyAllToAi, startInspect } =
+    useInspectPage(projectPath);
 
   if (report && report.checks.length > 0) {
     const items = report.checks;
@@ -18,7 +19,13 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     return (
       <div className="h-full w-full bg-zh-bg overflow-auto">
         <div className="w-full px-8 py-10">
-          <InspectHeader passCount={passCount} total={items.length} loading={loading} progressLabel={progressLabel} onRescan={startInspect} />
+          <InspectHeader
+            passCount={passCount}
+            total={items.length}
+            loading={loading}
+            progressLabel={progressLabel}
+            onRescan={startInspect}
+          />
           <ProgressBar passCount={passCount} total={items.length} />
           <CheckList items={items} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>
@@ -34,8 +41,18 @@ export function InspectPage({ projectPath }: InspectPageProps) {
       featureList={[
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
           ),
           title: t('page.inspect.feature.build.title'),
@@ -43,8 +60,18 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
               <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
             </svg>
           ),
@@ -53,8 +80,18 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="8.5" cy="7" r="4" />
               <polyline points="17 11 19 13 23 9" />
             </svg>
           ),
@@ -63,9 +100,20 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" /><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" />
-              <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
             </svg>
           ),
           title: t('page.inspect.feature.garbage.title'),

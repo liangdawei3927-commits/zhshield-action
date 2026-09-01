@@ -28,7 +28,12 @@ export class ToolUnavailableError extends Error {
     readonly attempts: { url: string; channel: ToolChannel; error: string }[],
     locale?: LanguageCode,
   ) {
-    super(translate('engine.inspect.supplyChain.downloadAllFailed', locale ?? DEFAULT_LANGUAGE, { toolId, attempts: attempts.length }));
+    super(
+      translate('engine.inspect.supplyChain.downloadAllFailed', locale ?? DEFAULT_LANGUAGE, {
+        toolId,
+        attempts: attempts.length,
+      }),
+    );
     this.name = 'ToolUnavailableError';
   }
 }
@@ -157,7 +162,10 @@ export class SupplyChainManager {
     }
   }
 
-  private async downloadWithFallback(req: ToolRequirement, locale?: LanguageCode): Promise<DownloadResult> {
+  private async downloadWithFallback(
+    req: ToolRequirement,
+    locale?: LanguageCode,
+  ): Promise<DownloadResult> {
     const sources: { url: string; channel: ToolChannel }[] = [];
     if (req.officialSource) sources.push({ url: req.officialSource, channel: 'official' });
     for (const url of req.mirrorSources ?? []) sources.push({ url, channel: 'mirror' });
@@ -193,11 +201,10 @@ export class SupplyChainManager {
   }
 
   private async upsertRecord(record: ToolInstallRecord): Promise<void> {
-    const lockfile: ToolLockfile =
-      (await loadToolLockfile(this.lockfilePath)) ?? {
-        schemaVersion: TOOL_LOCKFILE_SCHEMA_VERSION,
-        tools: {},
-      };
+    const lockfile: ToolLockfile = (await loadToolLockfile(this.lockfilePath)) ?? {
+      schemaVersion: TOOL_LOCKFILE_SCHEMA_VERSION,
+      tools: {},
+    };
     lockfile.tools[record.toolId] = record;
     await saveToolLockfile(this.lockfilePath, lockfile);
   }
@@ -213,12 +220,14 @@ export class LockfileLicenseAuditor implements LicenseAuditor {
     const entries = Object.entries(lockfile?.tools ?? {}) as [string, { version: string }][];
     const tools: (ToolLicense & { toolId: string; version: string })[] = entries.map(
       ([toolId, record]) => {
-        const license: ToolLicense =
-          TOOL_LICENSE_REGISTRY[toolId] ?? {
-            spdxId: 'UNKNOWN',
-            risk: 'block',
-            redistributionNote: translate('engine.inspect.supplyChain.unregisteredLicense', locale ?? DEFAULT_LANGUAGE),
-          };
+        const license: ToolLicense = TOOL_LICENSE_REGISTRY[toolId] ?? {
+          spdxId: 'UNKNOWN',
+          risk: 'block',
+          redistributionNote: translate(
+            'engine.inspect.supplyChain.unregisteredLicense',
+            locale ?? DEFAULT_LANGUAGE,
+          ),
+        };
         return { ...license, toolId, version: record.version };
       },
     );

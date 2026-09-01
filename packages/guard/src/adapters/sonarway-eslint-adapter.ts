@@ -51,7 +51,10 @@ export class GuardSonarwayESLintAdapter implements Adapter {
   }
 
   /** 用内置 SonarWay config 执行 ESLint 扫描，返回有消息的文件（失败降级为空结果 + error） */
-  private async lintWithConfig(projectPath: string, target: string | string[]): Promise<{ results: LintResult[]; error?: string }> {
+  private async lintWithConfig(
+    projectPath: string,
+    target: string | string[],
+  ): Promise<{ results: LintResult[]; error?: string }> {
     try {
       const eslint = new ESLint({
         cwd: projectPath,
@@ -85,7 +88,12 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     check: CheckConfig,
   ): CheckResult {
     if (rawResult.error) {
-      return this.makeResult(check, 'error', rawResult.error, { errors: [], warnings: [], totalErrors: 0, totalWarnings: 0 });
+      return this.makeResult(check, 'error', rawResult.error, {
+        errors: [],
+        warnings: [],
+        totalErrors: 0,
+        totalWarnings: 0,
+      });
     }
 
     const { errors, warnings } = this.collectMessages(rawResult.results);
@@ -119,7 +127,10 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     return this.makeResult(check, 'passed', 'SonarWay 检查通过');
   }
 
-  private collectMessages(results: LintResult[]): { errors: (string | undefined)[]; warnings: (string | undefined)[] } {
+  private collectMessages(results: LintResult[]): {
+    errors: (string | undefined)[];
+    warnings: (string | undefined)[];
+  } {
     const errors: (string | undefined)[] = [];
     const warnings: (string | undefined)[] = [];
 

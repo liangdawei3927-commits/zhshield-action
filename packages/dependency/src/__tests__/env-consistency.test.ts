@@ -35,7 +35,10 @@ afterEach(() => {
 
 const checker = new EnvConsistencyCheckerImpl();
 
-function profileOf(dir: string, packageManager: ProjectProfile['packageManager'] = 'pnpm'): ProjectProfile {
+function profileOf(
+  dir: string,
+  packageManager: ProjectProfile['packageManager'] = 'pnpm',
+): ProjectProfile {
   return {
     projectPath: dir,
     language: 'typescript',
@@ -48,21 +51,29 @@ function profileOf(dir: string, packageManager: ProjectProfile['packageManager']
 describe('EnvConsistencyCheckerImpl', () => {
   it('lockfile-drift：锁文件版本不在 package.json 声明范围内 → error 条目', async () => {
     const dir = tmpDir('zh-env-drift-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      dependencies: { lodash: '^4.17.21', react: '^18.2.0' },
-    }));
-    writeFile(dir, 'pnpm-lock.yaml', [
-      "lockfileVersion: '9.0'",
-      'importers:',
-      '  .:',
-      '    dependencies:',
-      '      lodash:',
-      '        specifier: ^4.17.21',
-      '        version: 3.10.1',
-      '      react:',
-      '        specifier: ^18.2.0',
-      '        version: 18.3.1',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        dependencies: { lodash: '^4.17.21', react: '^18.2.0' },
+      }),
+    );
+    writeFile(
+      dir,
+      'pnpm-lock.yaml',
+      [
+        "lockfileVersion: '9.0'",
+        'importers:',
+        '  .:',
+        '    dependencies:',
+        '      lodash:',
+        '        specifier: ^4.17.21',
+        '        version: 3.10.1',
+        '      react:',
+        '        specifier: ^18.2.0',
+        '        version: 18.3.1',
+      ].join('\n'),
+    );
 
     const report = await checker.check(profileOf(dir));
 
@@ -121,18 +132,22 @@ describe('EnvConsistencyCheckerImpl', () => {
   it('ci-vs-local：工作流 Node 版本与 engines.node 不一致 → warning 条目', async () => {
     const dir = tmpDir('zh-env-ci-');
     writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '20.11.0' } }));
-    writeNested(dir, '.github/workflows/ci.yml', [
-      'name: CI',
-      'on: [push]',
-      'jobs:',
-      '  build:',
-      '    runs-on: ubuntu-latest',
-      '    steps:',
-      '      - uses: actions/checkout@v4',
-      '      - uses: actions/setup-node@v4',
-      '        with:',
-      '          node-version: "18"',
-    ].join('\n'));
+    writeNested(
+      dir,
+      '.github/workflows/ci.yml',
+      [
+        'name: CI',
+        'on: [push]',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - uses: actions/checkout@v4',
+        '      - uses: actions/setup-node@v4',
+        '        with:',
+        '          node-version: "18"',
+      ].join('\n'),
+    );
 
     const report = await checker.check(profileOf(dir));
 
@@ -158,19 +173,27 @@ describe('EnvConsistencyCheckerImpl', () => {
 
   it('多类问题同时存在 → 报告包含多种 kind 的条目', async () => {
     const dir = tmpDir('zh-env-multi-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      dependencies: { lodash: '^4.17.21' },
-      engines: { node: '20.11.0' },
-    }));
-    writeFile(dir, 'pnpm-lock.yaml', [
-      "lockfileVersion: '9.0'",
-      'importers:',
-      '  .:',
-      '    dependencies:',
-      '      lodash:',
-      '        specifier: ^4.17.21',
-      '        version: 3.10.1',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        dependencies: { lodash: '^4.17.21' },
+        engines: { node: '20.11.0' },
+      }),
+    );
+    writeFile(
+      dir,
+      'pnpm-lock.yaml',
+      [
+        "lockfileVersion: '9.0'",
+        'importers:',
+        '  .:',
+        '    dependencies:',
+        '      lodash:',
+        '        specifier: ^4.17.21',
+        '        version: 3.10.1',
+      ].join('\n'),
+    );
     writeFile(dir, '.nvmrc', '18.20.2\n');
     writeFile(dir, '.env.example', 'API_KEY=\n');
     writeFile(dir, '.env', 'OTHER=1\n');
@@ -198,33 +221,45 @@ describe('EnvConsistencyCheckerImpl', () => {
 
   it('happy path：声明与锁文件 / 运行时 / 环境 / CI 全部一致 → 零条目', async () => {
     const dir = tmpDir('zh-env-happy-');
-    writeFile(dir, 'package.json', JSON.stringify({
-      dependencies: { lodash: '^4.17.21' },
-      engines: { node: '20.11.0' },
-    }));
-    writeFile(dir, 'pnpm-lock.yaml', [
-      "lockfileVersion: '9.0'",
-      'importers:',
-      '  .:',
-      '    dependencies:',
-      '      lodash:',
-      '        specifier: ^4.17.21',
-      '        version: 4.17.21',
-    ].join('\n'));
+    writeFile(
+      dir,
+      'package.json',
+      JSON.stringify({
+        dependencies: { lodash: '^4.17.21' },
+        engines: { node: '20.11.0' },
+      }),
+    );
+    writeFile(
+      dir,
+      'pnpm-lock.yaml',
+      [
+        "lockfileVersion: '9.0'",
+        'importers:',
+        '  .:',
+        '    dependencies:',
+        '      lodash:',
+        '        specifier: ^4.17.21',
+        '        version: 4.17.21',
+      ].join('\n'),
+    );
     writeFile(dir, '.nvmrc', '20.11.0\n');
     writeFile(dir, '.env.example', 'API_KEY=\n');
     writeFile(dir, '.env', 'API_KEY=secret\n');
-    writeNested(dir, '.github/workflows/ci.yml', [
-      'name: CI',
-      'on: [push]',
-      'jobs:',
-      '  build:',
-      '    runs-on: ubuntu-latest',
-      '    steps:',
-      '      - uses: actions/setup-node@v4',
-      '        with:',
-      '          node-version: "20.11.0"',
-    ].join('\n'));
+    writeNested(
+      dir,
+      '.github/workflows/ci.yml',
+      [
+        'name: CI',
+        'on: [push]',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - uses: actions/setup-node@v4',
+        '        with:',
+        '          node-version: "20.11.0"',
+      ].join('\n'),
+    );
 
     const report = await checker.check(profileOf(dir));
 
@@ -235,15 +270,19 @@ describe('EnvConsistencyCheckerImpl', () => {
     const root = tmpDir('zh-env-root-');
     const profile = profileOf(tmpDir('zh-env-profile-'));
     writeFile(root, 'package.json', JSON.stringify({ dependencies: { lodash: '^4.17.21' } }));
-    writeFile(root, 'pnpm-lock.yaml', [
-      "lockfileVersion: '9.0'",
-      'importers:',
-      '  .:',
-      '    dependencies:',
-      '      lodash:',
-      '        specifier: ^4.17.21',
-      '        version: 3.10.1',
-    ].join('\n'));
+    writeFile(
+      root,
+      'pnpm-lock.yaml',
+      [
+        "lockfileVersion: '9.0'",
+        'importers:',
+        '  .:',
+        '    dependencies:',
+        '      lodash:',
+        '        specifier: ^4.17.21',
+        '        version: 3.10.1',
+      ].join('\n'),
+    );
 
     const report = await checker.check(profile, { projectRoot: root });
 

@@ -5,10 +5,12 @@ import type { SopLazyLoader } from '../sop/cache/sop-lazy-loader';
 import type { SyncResult } from '../sop/_meta/sop-types';
 
 /** 构造 mock SopCacheManager，可控的 syncFromCloud + getLazyLoader */
-function makeCacheManagerMock(opts: {
-  syncResult?: SyncResult;
-  lazyLoader?: SopLazyLoader;
-} = {}) {
+function makeCacheManagerMock(
+  opts: {
+    syncResult?: SyncResult;
+    lazyLoader?: SopLazyLoader;
+  } = {},
+) {
   const syncFromCloud = vi.fn().mockResolvedValue(opts.syncResult ?? { updated: false });
   return {
     syncFromCloud,
@@ -136,7 +138,9 @@ describe('SopPredictiveLoader', () => {
       });
       expect(result.skipped).toBe(false);
       // 无 lazyLoader，preloadedModules 只可能有 *incremental-update
-      expect(result.preloadedModules.every((m) => m === '*incremental-update' || !m.startsWith('*'))).toBe(true);
+      expect(
+        result.preloadedModules.every((m) => m === '*incremental-update' || !m.startsWith('*')),
+      ).toBe(true);
     });
   });
 

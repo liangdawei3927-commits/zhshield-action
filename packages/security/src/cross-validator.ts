@@ -114,7 +114,11 @@ export class GrypeCrossValidator {
   private classifyEntries(
     trivyMap: Map<string, { cveId: string; issues: Issue[] }>,
     grypeMap: Map<string, { cveId: string; issues: Issue[] }>,
-  ): { highConfidence: CrossValidationEntry[]; trivyOnly: CrossValidationEntry[]; grypeOnly: CrossValidationEntry[] } {
+  ): {
+    highConfidence: CrossValidationEntry[];
+    trivyOnly: CrossValidationEntry[];
+    grypeOnly: CrossValidationEntry[];
+  } {
     const allKeys = new Set([...trivyMap.keys(), ...grypeMap.keys()]);
     const highConfidence: CrossValidationEntry[] = [];
     const trivyOnly: CrossValidationEntry[] = [];

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { bucketFindingsByModule, scoreProjectModules, scoreProjectByModules } from '../module-score';
+import {
+  bucketFindingsByModule,
+  scoreProjectModules,
+  scoreProjectByModules,
+} from '../module-score';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
 
 function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
@@ -24,20 +28,50 @@ function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile
   };
 }
 
-const emptyGuard = { results: [] as Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }> };
-const emptyInspect = { issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }> };
+const emptyGuard = {
+  results: [] as Array<{
+    severity: 'error' | 'warning' | 'info';
+    status: 'passed' | 'failed' | 'error' | 'warning';
+    blocking: boolean;
+    file?: string;
+  }>,
+};
+const emptyInspect = {
+  issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }>,
+};
 
 describe('bucketFindingsByModule — 按模块目录分桶', () => {
   it('findings 按 file 前缀落入对应子模块，未命中的归入根级兜底模块', () => {
     const profile = makeProfile('backend');
     const guard = {
       results: [
-        { severity: 'error' as const, status: 'failed' as const, blocking: true, file: '/p/packages/server/a.ts' },
-        { severity: 'warning' as const, status: 'warning' as const, blocking: false, file: '/p/packages/web/b.ts' },
-        { severity: 'info' as const, status: 'passed' as const, blocking: false, file: '/p/README.md' },
+        {
+          severity: 'error' as const,
+          status: 'failed' as const,
+          blocking: true,
+          file: '/p/packages/server/a.ts',
+        },
+        {
+          severity: 'warning' as const,
+          status: 'warning' as const,
+          blocking: false,
+          file: '/p/packages/web/b.ts',
+        },
+        {
+          severity: 'info' as const,
+          status: 'passed' as const,
+          blocking: false,
+          file: '/p/README.md',
+        },
       ],
     };
-    const inspect = { issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string; file?: string }> };
+    const inspect = {
+      issues: [] as Array<{
+        severity: 'error' | 'warning' | 'info';
+        category: string;
+        file?: string;
+      }>,
+    };
 
     const bucketed = bucketFindingsByModule(profile, guard, inspect);
     const server = bucketed.find((m) => m.path === '/p/packages/server')!;
@@ -51,7 +85,11 @@ describe('bucketFindingsByModule — 按模块目录分桶', () => {
   });
 
   it('非 monorepo（无 modules）只产生根级单模块', () => {
-    const profile: ProjectProfile = { ...makeProfile('backend'), isMonorepo: false, modules: undefined };
+    const profile: ProjectProfile = {
+      ...makeProfile('backend'),
+      isMonorepo: false,
+      modules: undefined,
+    };
     const bucketed = bucketFindingsByModule(profile, emptyGuard, emptyInspect);
     expect(bucketed).toHaveLength(1);
     expect(bucketed[0].path).toBe('/p');
@@ -63,7 +101,16 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
     const backend = {
       path: '/p/packages/server',
       profile: makeProfile('backend'),
-      guard: { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true, file: '/p/packages/server/a.ts' }] },
+      guard: {
+        results: [
+          {
+            severity: 'error' as const,
+            status: 'failed' as const,
+            blocking: true,
+            file: '/p/packages/server/a.ts',
+          },
+        ],
+      },
       inspect: {
         issues: [
           { severity: 'error' as const, category: 'security', file: '/p/packages/server/a.ts' },
@@ -74,7 +121,14 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
     const frontend = {
       path: '/p/packages/web',
       profile: makeProfile('frontend'),
-      guard: { results: [] as Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean; file?: string }> },
+      guard: {
+        results: [] as Array<{
+          severity: 'error' | 'warning' | 'info';
+          status: 'passed' | 'failed' | 'error' | 'warning';
+          blocking: boolean;
+          file?: string;
+        }>,
+      },
       inspect: {
         issues: [{ severity: 'error' as const, category: 'quality', file: '/p/packages/web/b.ts' }],
       },
@@ -114,14 +168,32 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
     const profile = makeProfile('backend');
     const guard = {
       results: [
-        { severity: 'error' as const, status: 'failed' as const, blocking: true, file: '/p/packages/server/a.ts' },
-        { severity: 'warning' as const, status: 'warning' as const, blocking: false, file: '/p/packages/web/b.ts' },
+        {
+          severity: 'error' as const,
+          status: 'failed' as const,
+          blocking: true,
+          file: '/p/packages/server/a.ts',
+        },
+        {
+          severity: 'warning' as const,
+          status: 'warning' as const,
+          blocking: false,
+          file: '/p/packages/web/b.ts',
+        },
       ],
     };
     const inspect = {
       issues: [
-        { severity: 'error' as const, category: 'security' as const, file: '/p/packages/server/a.ts' },
-        { severity: 'error' as const, category: 'security' as const, file: '/p/packages/server/a.ts' },
+        {
+          severity: 'error' as const,
+          category: 'security' as const,
+          file: '/p/packages/server/a.ts',
+        },
+        {
+          severity: 'error' as const,
+          category: 'security' as const,
+          file: '/p/packages/server/a.ts',
+        },
         { severity: 'error' as const, category: 'quality' as const, file: '/p/packages/web/b.ts' },
       ],
     };
@@ -141,7 +213,11 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
   });
 
   it('非 monorepo（无 modules）退化为根级单模块评分', () => {
-    const profile: ProjectProfile = { ...makeProfile('backend'), isMonorepo: false, modules: undefined };
+    const profile: ProjectProfile = {
+      ...makeProfile('backend'),
+      isMonorepo: false,
+      modules: undefined,
+    };
     const agg = scoreProjectByModules(profile, emptyGuard, emptyInspect);
     expect(agg.modules).toHaveLength(1);
     expect(agg.modules[0].path).toBe('/p');

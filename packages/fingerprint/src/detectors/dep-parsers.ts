@@ -13,11 +13,7 @@ const CARGO_KEY_RE = /^([A-Za-z0-9_-]+)\s*=/;
 
 /** 规范化包名：小写、`_` 与 `-` 等价，去掉版本/环境标记。 */
 export function normalizePackageName(raw: string): string {
-  return raw
-    .split(VERSION_SPLIT_RE)[0]
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, '-');
+  return raw.split(VERSION_SPLIT_RE)[0].trim().toLowerCase().replace(/_/g, '-');
 }
 
 const PYPROJECT_DEP_SECTIONS: ReadonlySet<string> = new Set([

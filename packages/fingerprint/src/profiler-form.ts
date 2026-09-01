@@ -28,18 +28,20 @@ export class FormDeterminer {
    * 形态语义判定（架构文档 §6.4 / C10）
    * 消费语言结果 + 形态信号交叉验证
    */
-  determine(
-    signals: readonly Signal[],
-    primaryLanguage: LanguageId,
-  ): readonly FormCandidate[] {
+  determine(signals: readonly Signal[], primaryLanguage: LanguageId): readonly FormCandidate[] {
     const candidates = this.collectCandidates(signals);
     const validatedCandidates = this.validateCandidates(candidates, primaryLanguage);
     validatedCandidates.sort((a, b) => b.score - a.score);
     return validatedCandidates;
   }
 
-  private collectCandidates(signals: readonly Signal[]): Map<ProductFormId, { score: number; signals: Signal[]; isDecisive: boolean }> {
-    const candidates = new Map<ProductFormId, { score: number; signals: Signal[]; isDecisive: boolean }>();
+  private collectCandidates(
+    signals: readonly Signal[],
+  ): Map<ProductFormId, { score: number; signals: Signal[]; isDecisive: boolean }> {
+    const candidates = new Map<
+      ProductFormId,
+      { score: number; signals: Signal[]; isDecisive: boolean }
+    >();
     const addCandidate = (form: ProductFormId, signal: Signal, isDecisive: boolean): void => {
       const existing = candidates.get(form);
       if (existing) {
@@ -85,13 +87,15 @@ export class FormDeterminer {
   /** 判断是否为决定性形态信号（架构文档 §6.2 形态识别信号表） */
   private isDecisiveSignal(signal: Signal): boolean {
     const ruleId = signal.ruleId;
-    return ruleId === 'form:electron' ||
+    return (
+      ruleId === 'form:electron' ||
       ruleId === 'form:tauri' ||
       ruleId === 'form:podfile' ||
       ruleId === 'form:xcodeproj' ||
       ruleId === 'form:android-gradle' ||
       ruleId === 'form:android-manifest' ||
-      ruleId === 'form:miniapp-project-config';
+      ruleId === 'form:miniapp-project-config'
+    );
   }
 
   private mapSignal(signal: Signal): ProductFormId | undefined {

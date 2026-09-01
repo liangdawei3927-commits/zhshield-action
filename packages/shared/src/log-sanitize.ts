@@ -11,5 +11,7 @@ export const MAX_LOG_FIELD_LENGTH = 512;
  * 常量模板（绝不可作为 util.format / console.* 的格式串）。
  */
 export function sanitizeLogField(value: unknown): string {
-  return String(value).replace(/[\r\n]/g, ' ').slice(0, MAX_LOG_FIELD_LENGTH);
+  return String(value)
+    .replace(/[\r\n]/g, ' ')
+    .slice(0, MAX_LOG_FIELD_LENGTH);
 }

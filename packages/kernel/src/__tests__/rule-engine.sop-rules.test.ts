@@ -189,13 +189,13 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       const srcDir = path.join(tempDir, 'src');
       mkdirSync(srcDir, { recursive: true });
       // type-safety.yml forbidden 包含 as any / @ts-ignore / @ts-expect-error / any
-      writeFileSync(
-        path.join(srcDir, 'service.ts'),
-        'const user = payload as any;\n',
-        'utf-8',
-      );
+      writeFileSync(path.join(srcDir, 'service.ts'), 'const user = payload as any;\n', 'utf-8');
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('type-safety'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('failed');
@@ -206,13 +206,13 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
     it('反向：干净文件通过', async () => {
       const srcDir = path.join(tempDir, 'src');
       mkdirSync(srcDir, { recursive: true });
-      writeFileSync(
-        path.join(srcDir, 'util.ts'),
-        'export const id = 42;\n',
-        'utf-8',
-      );
+      writeFileSync(path.join(srcDir, 'util.ts'), 'export const id = 42;\n', 'utf-8');
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('type-safety'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('passed');
@@ -224,13 +224,13 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
       const srcDir = path.join(tempDir, 'src');
       mkdirSync(srcDir, { recursive: true });
       // module-dependency.yml 禁止 core -> ui / domain -> infrastructure / shared -> feature
-      writeFileSync(
-        path.join(srcDir, 'deps.txt'),
-        'core -> ui\n',
-        'utf-8',
-      );
+      writeFileSync(path.join(srcDir, 'deps.txt'), 'core -> ui\n', 'utf-8');
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('module-dependency'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('failed');
@@ -240,13 +240,13 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
     it('反向：无禁止依赖模式通过', async () => {
       const srcDir = path.join(tempDir, 'src');
       mkdirSync(srcDir, { recursive: true });
-      writeFileSync(
-        path.join(srcDir, 'deps.txt'),
-        'ui -> core\n',
-        'utf-8',
-      );
+      writeFileSync(path.join(srcDir, 'deps.txt'), 'ui -> core\n', 'utf-8');
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('module-dependency'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('passed');
@@ -264,7 +264,11 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
         'utf-8',
       );
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('layer-boundary'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('failed');
@@ -281,7 +285,11 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
         'utf-8',
       );
 
-      const report = await engine.runInspect({ repoRoot: tempDir, domain: 'inspect', dryRun: true });
+      const report = await engine.runInspect({
+        repoRoot: tempDir,
+        domain: 'inspect',
+        dryRun: true,
+      });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('layer-boundary'));
       expect(evalResult).toBeDefined();
       expect(evalResult!.status).toBe('passed');

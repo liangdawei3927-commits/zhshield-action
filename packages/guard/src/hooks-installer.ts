@@ -70,9 +70,7 @@ export class HooksInstaller {
 
   async install(hookName?: string): Promise<string[]> {
     const installed: string[] = [];
-    const targets = hookName
-      ? HOOKS.filter((h) => h.hook === hookName)
-      : HOOKS;
+    const targets = hookName ? HOOKS.filter((h) => h.hook === hookName) : HOOKS;
 
     await fs.promises.mkdir(this.hooksDir, { recursive: true });
 
@@ -87,13 +85,12 @@ export class HooksInstaller {
 
   async uninstall(hookName?: string): Promise<string[]> {
     const removed: string[] = [];
-    const targets = hookName
-      ? HOOKS.filter((h) => h.hook === hookName)
-      : HOOKS;
+    const targets = hookName ? HOOKS.filter((h) => h.hook === hookName) : HOOKS;
 
     for (const hook of targets) {
       const hookPath = path.join(this.hooksDir, hook.hook);
       try {
+        // eslint-disable-next-line perf/perf-no-serial-await -- hookPath derived from loop var hook via intermediate assignment
         await fs.promises.unlink(hookPath);
         removed.push(hook.hook);
       } catch {
@@ -105,13 +102,12 @@ export class HooksInstaller {
   }
 
   async isInstalled(hookName?: string): Promise<boolean> {
-    const targets = hookName
-      ? HOOKS.filter((h) => h.hook === hookName)
-      : HOOKS;
+    const targets = hookName ? HOOKS.filter((h) => h.hook === hookName) : HOOKS;
 
     for (const hook of targets) {
       const hookPath = path.join(this.hooksDir, hook.hook);
       try {
+        // eslint-disable-next-line perf/perf-no-serial-await -- hookPath derived from loop var hook; loop short-circuits on failure
         await fs.promises.access(hookPath, fs.constants.X_OK);
       } catch {
         return false;
@@ -127,9 +123,7 @@ export class HooksInstaller {
   listInstalledHooks(): string[] {
     if (!fs.existsSync(this.hooksDir)) return [];
     try {
-      return fs.readdirSync(this.hooksDir).filter((f) =>
-        HOOKS.some((h) => h.hook === f)
-      );
+      return fs.readdirSync(this.hooksDir).filter((f) => HOOKS.some((h) => h.hook === f));
     } catch {
       return [];
     }

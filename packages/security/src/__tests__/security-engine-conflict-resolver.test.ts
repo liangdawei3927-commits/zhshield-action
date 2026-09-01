@@ -12,14 +12,21 @@ function semgrepAdapter(issue: Issue): ToolAdapter {
   return {
     meta: { id: 'semgrep', name: 'Semgrep', version: '1.0.0', category: 'security' as const },
     isAvailable: async () => true as const,
-    scan: async () => ({ status: 'available' as const, issues: [issue], metadata: { fileCount: 1 } }),
+    scan: async () => ({
+      status: 'available' as const,
+      issues: [issue],
+      metadata: { fileCount: 1 },
+    }),
   };
 }
 
 describe('SecurityEngine × RuleConflictResolver (F3 integration)', () => {
   it('leaves a clean scan unchanged and reports an empty conflict report', async () => {
     const engine = new SecurityEngine();
-    const report = await engine.runSecurityScan('clean-proj', path.join(FIXTURE_ROOT, 'injection', 'scripts', 'clean'));
+    const report = await engine.runSecurityScan(
+      'clean-proj',
+      path.join(FIXTURE_ROOT, 'injection', 'scripts', 'clean'),
+    );
 
     expect(report.malware).toEqual([]);
     expect(report.summary.malwareTotal).toBe(0);
@@ -36,20 +43,25 @@ describe('SecurityEngine × RuleConflictResolver (F3 integration)', () => {
   it('collapses duplicate findings from two producers into one confirmed entry', async () => {
     const evilFile = path.join(FIXTURE_ROOT, 'conflict-resolver', 'evil.ts');
     const engine = new SecurityEngine();
-    engine.registerAdapter(semgrepAdapter({
-      id: 'semgrep-eval-dup',
-      ruleId: EVAL_PATTERN_SOURCE,
-      severity: 'error',
-      category: 'security',
-      message: 'Base64/Buffer eval detected',
-      file: evilFile,
-      line: 1,
-      source: 'security',
-      autoFixable: false,
-      fingerprint: 'semgrep:dup-irrelevant',
-    }));
+    engine.registerAdapter(
+      semgrepAdapter({
+        id: 'semgrep-eval-dup',
+        ruleId: EVAL_PATTERN_SOURCE,
+        severity: 'error',
+        category: 'security',
+        message: 'Base64/Buffer eval detected',
+        file: evilFile,
+        line: 1,
+        source: 'security',
+        autoFixable: false,
+        fingerprint: 'semgrep:dup-irrelevant',
+      }),
+    );
 
-    const report = await engine.runSecurityScan('dup-proj', path.join(FIXTURE_ROOT, 'conflict-resolver'));
+    const report = await engine.runSecurityScan(
+      'dup-proj',
+      path.join(FIXTURE_ROOT, 'conflict-resolver'),
+    );
 
     const evalFindings = report.malware.filter((m) => m.file === evilFile && m.line === 1);
     expect(evalFindings).toHaveLength(1);

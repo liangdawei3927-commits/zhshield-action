@@ -26,8 +26,14 @@ describe('syncAiIntegrationOnStartup 日志注入防护', () => {
   it('项目路径含换行且写入失败：告警被净化，常量模板', async () => {
     const evilPath = path.join(userDataDir, 'evil\npath');
     fs.writeFileSync(evilPath, 'x'); // 普通文件 → 在其下写 opencode.json 抛 ENOTDIR
-    fs.writeFileSync(path.join(userDataDir, 'ai-tool.json'), JSON.stringify({ id: 'opencode', enabled: true }));
-    fs.writeFileSync(path.join(userDataDir, 'projects.json'), JSON.stringify([{ name: 'evil', path: evilPath }]));
+    fs.writeFileSync(
+      path.join(userDataDir, 'ai-tool.json'),
+      JSON.stringify({ id: 'opencode', enabled: true }),
+    );
+    fs.writeFileSync(
+      path.join(userDataDir, 'projects.json'),
+      JSON.stringify([{ name: 'evil', path: evilPath }]),
+    );
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {

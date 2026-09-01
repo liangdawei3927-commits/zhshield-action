@@ -128,7 +128,9 @@ describe('SopDiffCalculator.findAddedRules 特征化（新旧实现等价）', (
     const { active, modified } = randomFixture(rand);
 
     const rules = active.map((r) =>
-      modified.some((m) => m.id === r.id) ? { ...r, updatedAt: new Date('2026-06-01T00:00:00Z') } : r,
+      modified.some((m) => m.id === r.id)
+        ? { ...r, updatedAt: new Date('2026-06-01T00:00:00Z') }
+        : r,
     );
     const registry = {
       getAll: () => rules,

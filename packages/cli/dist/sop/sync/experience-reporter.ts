@@ -59,10 +59,7 @@ export class ExperienceReporter {
   private pendingQueue: ExperienceRecord[];
   private dirty: boolean;
 
-  constructor(options?: {
-    remoteUrl?: string;
-    batchSize?: number;
-  }) {
+  constructor(options?: { remoteUrl?: string; batchSize?: number }) {
     this.queuePath = path.join(os.homedir(), '.zhshield', 'experience-queue.json');
     this.remoteUrl = options?.remoteUrl ?? `${resolveApiBase()}/experience`;
     this.batchSize = options?.batchSize ?? 20;
@@ -136,18 +133,25 @@ export class ExperienceReporter {
     result: ExperienceReportResult,
   ): Promise<boolean> {
     let allSucceeded = true;
+    const chunks: ExperienceRecord[][] = [];
     for (let i = 0; i < batch.length; i += this.batchSize) {
-      const chunk = batch.slice(i, i + this.batchSize);
-      try {
-        const ok = await this.sendBatch(chunk);
-        if (ok) {
-          result.sent += chunk.length;
-        } else {
-          result.failed += chunk.length;
-          allSucceeded = false;
+      chunks.push(batch.slice(i, i + this.batchSize));
+    }
+    const outcomes = await Promise.all(
+      chunks.map(async (chunk) => {
+        try {
+          const ok = await this.sendBatch(chunk);
+          return { ok, chunkLength: chunk.length };
+        } catch {
+          return { ok: false, chunkLength: chunk.length };
         }
-      } catch {
-        result.failed += chunk.length;
+      }),
+    );
+    for (const { ok, chunkLength } of outcomes) {
+      if (ok) {
+        result.sent += chunkLength;
+      } else {
+        result.failed += chunkLength;
         allSucceeded = false;
       }
     }
@@ -207,5 +211,4 @@ export class ExperienceReporter {
     );
     this.dirty = false;
   }
-
 }

@@ -13,7 +13,12 @@ export class ResultNormalizer {
     };
   }
 
-  normalize(status: CheckStatus, message: string, check: CheckConfig, details?: unknown): CheckResult {
+  normalize(
+    status: CheckStatus,
+    message: string,
+    check: CheckConfig,
+    details?: unknown,
+  ): CheckResult {
     return {
       checkId: check.checkId,
       adapter: check.adapter,

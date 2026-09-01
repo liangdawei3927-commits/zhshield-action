@@ -57,7 +57,10 @@ export function registerSchedulerIpc(): void {
       if (isEnoentError(err)) {
         return { jobs: [] };
       }
-      console.warn('[scheduler] Failed to read state:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[scheduler] Failed to read state:',
+        err instanceof Error ? err.message : String(err),
+      );
       return { jobs: [] };
     }
   });
@@ -67,7 +70,10 @@ export function registerSchedulerIpc(): void {
       await ensureDir(statePath());
       await fs.writeFile(statePath(), JSON.stringify(state, null, 2), 'utf-8');
     } catch (err) {
-      console.warn('[scheduler] Failed to write state:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[scheduler] Failed to write state:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   });
 }

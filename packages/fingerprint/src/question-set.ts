@@ -22,12 +22,7 @@ const CONFIDENCE_THRESHOLDS = {
 } as const;
 
 /** 问题类型 */
-export type QuestionType =
-  | 'architecture'
-  | 'language'
-  | 'form'
-  | 'environment'
-  | 'framework';
+export type QuestionType = 'architecture' | 'language' | 'form' | 'environment' | 'framework';
 
 /** 问题优先级 */
 export type QuestionPriority = 'required' | 'recommended' | 'optional';
@@ -81,7 +76,11 @@ export interface RuleServes {
 function buildArchitectureOptions(architecture: MatchResult<ArchitectureForm>): QuestionOption[] {
   const options: QuestionOption[] = [
     { value: 'monolith', label: '单体架构', description: '所有代码在一个部署单元中' },
-    { value: 'modular-monolith', label: '模块化单体', description: '代码在一个部署单元中，但模块边界清晰' },
+    {
+      value: 'modular-monolith',
+      label: '模块化单体',
+      description: '代码在一个部署单元中，但模块边界清晰',
+    },
     { value: 'microservices', label: '微服务架构', description: '多个独立部署的服务' },
   ];
   const recommendedIndex = options.findIndex((o) => o.value === architecture.value);
@@ -105,13 +104,17 @@ function buildArchitectureQuestion(
     options,
     currentValue: architecture.value,
     signals: architecture.signals.map((s) => s.ruleId),
-    reason: profile.lastConfirmedAt === undefined
-      ? '首次注册，需要确认架构形态'
-      : `架构形态置信度较低 (${(architecture.confidence * 100).toFixed(0)}%)`,
+    reason:
+      profile.lastConfirmedAt === undefined
+        ? '首次注册，需要确认架构形态'
+        : `架构形态置信度较低 (${(architecture.confidence * 100).toFixed(0)}%)`,
   };
 }
 
-function buildFormOptions(forms: readonly ProductFormId[], current: ProductFormId): QuestionOption[] {
+function buildFormOptions(
+  forms: readonly ProductFormId[],
+  current: ProductFormId,
+): QuestionOption[] {
   return forms.map((form) => ({
     value: form,
     label: getFormLabel(form),
@@ -119,7 +122,10 @@ function buildFormOptions(forms: readonly ProductFormId[], current: ProductFormI
   }));
 }
 
-function buildFormQuestion(productForm: MatchResult<ProductFormId>, options: QuestionOption[]): Question {
+function buildFormQuestion(
+  productForm: MatchResult<ProductFormId>,
+  options: QuestionOption[],
+): Question {
   return {
     id: 'form-confirm',
     type: 'form',
@@ -270,9 +276,17 @@ export class QuestionSet {
     const { language } = primaryTarget;
     if (language.confidence >= CONFIDENCE_THRESHOLDS.high) return undefined;
     if (language.confidence < CONFIDENCE_THRESHOLDS.medium) {
-      return this.makeLanguageQuestion(profile, 'required', `语言判定置信度较低 (${(language.confidence * 100).toFixed(0)}%)，需要人工确认`);
+      return this.makeLanguageQuestion(
+        profile,
+        'required',
+        `语言判定置信度较低 (${(language.confidence * 100).toFixed(0)}%)，需要人工确认`,
+      );
     }
-    return this.makeLanguageQuestion(profile, 'recommended', `语言判定置信度中等 (${(language.confidence * 100).toFixed(0)}%)，建议确认`);
+    return this.makeLanguageQuestion(
+      profile,
+      'recommended',
+      `语言判定置信度中等 (${(language.confidence * 100).toFixed(0)}%)，建议确认`,
+    );
   }
 
   /** 构建语言问题 */

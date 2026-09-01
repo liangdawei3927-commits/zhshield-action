@@ -11,7 +11,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const KIND: SignalKind = 'lockfile';
-const LOCKFILE_NAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'go.sum', 'Cargo.lock', 'poetry.lock', 'uv.lock', 'pom.xml', 'Pipfile.lock']);
+const LOCKFILE_NAMES = new Set([
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'go.sum',
+  'Cargo.lock',
+  'poetry.lock',
+  'uv.lock',
+  'pom.xml',
+  'Pipfile.lock',
+]);
 
 function findProjectRoot(projectPath: string): string {
   for (const name of listRootFiles(projectPath)) {
@@ -52,6 +62,8 @@ export class LockfileDetector implements Detector {
         }),
       );
     }
-    return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+    return signals.sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+    );
   }
 }

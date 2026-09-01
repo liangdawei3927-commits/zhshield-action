@@ -47,17 +47,17 @@ describe('PipelineRunner — 端到端集成测试', () => {
 
   it('3. GuardEngine LINT-001', async () => {
     const report = await runner.guardEngine.run({
-      mode: 'guard', checks: ['LINT-001'], format: 'json', target: REPO_ROOT,
+      mode: 'guard',
+      checks: ['LINT-001'],
+      format: 'json',
+      target: REPO_ROOT,
     });
     expect(report.contractVersion).toBe('p0.v1');
     expect(report.summary.total).toBeGreaterThanOrEqual(1);
     expect(report.summary.total).toBeLessThanOrEqual(3);
     expect(report.results.length).toBe(report.summary.total);
     const lintRelated = report.results.some(
-      (r) =>
-        r.checkId === 'LINT-001' ||
-        ESLINT_LINT.test(r.checkId) ||
-        ESLINT_LINT.test(r.message),
+      (r) => r.checkId === 'LINT-001' || ESLINT_LINT.test(r.checkId) || ESLINT_LINT.test(r.message),
     );
     expect(lintRelated).toBe(true);
     expect(['passed', 'failed', 'error', 'warning']).toContain(report.results[0].status);
@@ -65,18 +65,35 @@ describe('PipelineRunner — 端到端集成测试', () => {
 
   it('4. GuardSensitiveInfoAdapter', () => {
     const adapter = new GuardSensitiveInfoAdapter();
-    const raw = adapter.run({ repoRoot: REPO_ROOT }, {
-      checkId: 'SEC-002', adapter: 'sensitive-info', enabled: true,
-      mode: ['guard'], category: 'security', severity: 'error',
-      blocking: true, description: '敏感信息检查',
-    });
+    const raw = adapter.run(
+      { repoRoot: REPO_ROOT },
+      {
+        checkId: 'SEC-002',
+        adapter: 'sensitive-info',
+        enabled: true,
+        mode: ['guard'],
+        category: 'security',
+        severity: 'error',
+        blocking: true,
+        description: '敏感信息检查',
+      },
+    );
     expect(raw).toBeDefined();
     expect(Array.isArray(raw.findings)).toBe(true);
-    const result = adapter.normalize(raw, {}, {
-      checkId: 'SEC-002', adapter: 'sensitive-info', enabled: true,
-      mode: ['guard'], category: 'security', severity: 'error',
-      blocking: true, description: '敏感信息检查',
-    });
+    const result = adapter.normalize(
+      raw,
+      {},
+      {
+        checkId: 'SEC-002',
+        adapter: 'sensitive-info',
+        enabled: true,
+        mode: ['guard'],
+        category: 'security',
+        severity: 'error',
+        blocking: true,
+        description: '敏感信息检查',
+      },
+    );
     expect(['passed', 'failed', 'error']).toContain(result.status);
     expect(result.checkId).toBe('SEC-002');
   });
@@ -99,7 +116,12 @@ describe('PipelineRunner — 端到端集成测试', () => {
 
   it('7. 插件管理器', async () => {
     const loader = new PluginLoader();
-    await loader.load({ name: 'tp', version: '1.0.0', init: async () => {}, destroy: async () => {} });
+    await loader.load({
+      name: 'tp',
+      version: '1.0.0',
+      init: async () => {},
+      destroy: async () => {},
+    });
     expect(loader.get('tp')).toBeDefined();
     expect(loader.list()).toHaveLength(1);
     await loader.unload('tp');
@@ -125,7 +147,8 @@ describe('PipelineRunner — 端到端集成测试', () => {
 
   it('10. SOP 全流水线', async () => {
     const p = await scanRunner.runSopDrivenPipeline({
-      guardContext: { dryRun: true }, inspectContext: { dryRun: true },
+      guardContext: { dryRun: true },
+      inspectContext: { dryRun: true },
     });
     expect(p.stage).toBe('complete');
     expect(p.passed).toBe(true);

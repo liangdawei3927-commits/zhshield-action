@@ -16,10 +16,13 @@ function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (!initialized) {
     initialized = true;
-    window.electronAPI?.tasks?.list?.().then((list) => {
-      for (const t of list) tasks.set(t.id, t);
-      emit();
-    }).catch(() => {});
+    window.electronAPI?.tasks
+      ?.list?.()
+      .then((list) => {
+        for (const t of list) tasks.set(t.id, t);
+        emit();
+      })
+      .catch(() => {});
     window.electronAPI?.tasks?.onChanged?.((task) => {
       tasks.set(task.id, task);
       emit();
@@ -44,7 +47,11 @@ export function useTask(kind: TaskKind, projectPath: string): TaskInfo | undefin
   return all.filter((t) => t.kind === kind && t.projectPath === projectPath).at(-1);
 }
 
-export function startTask(kind: TaskKind, projectPath: string, options?: Record<string, unknown>): Promise<TaskInfo> {
+export function startTask(
+  kind: TaskKind,
+  projectPath: string,
+  options?: Record<string, unknown>,
+): Promise<TaskInfo> {
   const api = window.electronAPI?.tasks;
   if (!api) return Promise.reject(new Error(t('task.schedulerUnavailable')));
   return api.start(kind, projectPath, options);
@@ -82,15 +89,33 @@ export interface TaskRunState {
  */
 export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
   const task = useTask(kind, projectPath);
-  const idle: TaskRunState = { loading: false, queued: false, progress: 0, progressLabel: '', task: undefined };
+  const idle: TaskRunState = {
+    loading: false,
+    queued: false,
+    progress: 0,
+    progressLabel: '',
+    task: undefined,
+  };
   if (!task || (task.status !== 'queued' && task.status !== 'running')) return idle;
 
   const base = t(TASK_KIND_DEFAULT_LABELS[kind]);
   if (task.status === 'queued') {
     const pos = task.queuePosition ?? '?';
-    return { loading: true, queued: true, progress: 0, progressLabel: t('task.queuedLabel', { position: pos }), task };
+    return {
+      loading: true,
+      queued: true,
+      progress: 0,
+      progressLabel: t('task.queuedLabel', { position: pos }),
+      task,
+    };
   }
   const percent = Math.min(Math.max(Math.round((task.progress || 0) * 100), 0), 100);
   const suffix = task.message && task.message.trim() ? ` · ${task.message.trim()}` : '';
-  return { loading: true, queued: false, progress: task.progress || 0, progressLabel: t('task.runningLabel', { kind: base, percent, suffix }), task };
+  return {
+    loading: true,
+    queued: false,
+    progress: task.progress || 0,
+    progressLabel: t('task.runningLabel', { kind: base, percent, suffix }),
+    task,
+  };
 }

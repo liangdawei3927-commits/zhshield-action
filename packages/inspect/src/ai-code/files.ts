@@ -70,7 +70,8 @@ export function readTextFileSafe(projectPath: string, relPath: string): string |
 export function readJsonSafe(filePath: string): Record<string, unknown> | null {
   try {
     const data: unknown = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    if (typeof data === 'object' && data !== null && !Array.isArray(data)) return data as Record<string, unknown>;
+    if (typeof data === 'object' && data !== null && !Array.isArray(data))
+      return data as Record<string, unknown>;
     return null;
   } catch {
     return null;
@@ -189,7 +190,12 @@ export function packageNameFromSpecifier(specifier: string): string | null {
 }
 
 /** 单行内提取的 import/require 引用追加到 refs（保持行内出现顺序） */
-function collectLineRefs(refs: ImportReference[], file: string, lineNumber: number, line: string): void {
+function collectLineRefs(
+  refs: ImportReference[],
+  file: string,
+  lineNumber: number,
+  line: string,
+): void {
   for (const spec of extractSpecifiers(line)) {
     const pkg = packageNameFromSpecifier(spec);
     if (pkg === null) continue;
@@ -198,7 +204,10 @@ function collectLineRefs(refs: ImportReference[], file: string, lineNumber: numb
 }
 
 /** 扫描项目全部源码文件，提取外部包 import/require 引用 */
-export function extractImportReferences(projectPath: string, scope?: readonly string[]): ImportReference[] {
+export function extractImportReferences(
+  projectPath: string,
+  scope?: readonly string[],
+): ImportReference[] {
   const refs: ImportReference[] = [];
   for (const file of walkSourceFiles(projectPath)) {
     if (!isInScope(file, scope)) continue;

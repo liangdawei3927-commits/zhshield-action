@@ -6,7 +6,7 @@
  * 读写归桌面接线层，不把 .zhshield 路径约定带进通用引擎包。
  * 写入 tmp+rename 原子替换；读取失败降级为 null（无基线行为），绝不抛异常。
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DependencyNode } from '@zh/dependency';
 
@@ -28,27 +28,42 @@ export function depsBaselinePath(projectRoot: string): string {
 }
 
 /** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为） */
-export function loadDepsBaseline(projectRoot: string): DepsBaseline | null {
+export async function loadDepsBaseline(projectRoot: string): Promise<DepsBaseline | null> {
   const file = depsBaselinePath(projectRoot);
-  if (!existsSync(file)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(file, 'utf-8')) as unknown;
+    const parsed = JSON.parse(await readFile(file, 'utf-8')) as unknown;
     if (typeof parsed !== 'object' || parsed === null) return null;
     const { version, capturedAt, integrity } = parsed as Partial<DepsBaseline>;
-    if (version !== BASELINE_VERSION || typeof capturedAt !== 'string' || typeof integrity !== 'object' || integrity === null) {
+    if (
+      version !== BASELINE_VERSION ||
+      typeof capturedAt !== 'string' ||
+      typeof integrity !== 'object' ||
+      integrity === null
+    ) {
       return null;
     }
-    return { version: BASELINE_VERSION, capturedAt, integrity: integrity as Record<string, string> };
+    return {
+      version: BASELINE_VERSION,
+      capturedAt,
+      integrity: integrity as Record<string, string>,
+    };
   } catch (err) {
-    console.warn('[deps-baseline] 读取失败，降级为无基线:', err instanceof Error ? err.message : String(err));
+    // 文件缺失（ENOENT）或损坏均降级为无基线，绝不抛异常
+    console.warn(
+      '[deps-baseline] 读取失败，降级为无基线:',
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   }
 }
 
 /** 写入基线（tmp+rename 原子替换），返回落盘基线 */
-export function saveDepsBaseline(projectRoot: string, integrityMap: Record<string, string>): DepsBaseline {
+export async function saveDepsBaseline(
+  projectRoot: string,
+  integrityMap: Record<string, string>,
+): Promise<DepsBaseline> {
   const dir = join(projectRoot, BASELINE_DIR);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   const baseline: DepsBaseline = {
     version: BASELINE_VERSION,
     capturedAt: new Date().toISOString(),
@@ -56,8 +71,8 @@ export function saveDepsBaseline(projectRoot: string, integrityMap: Record<strin
   };
   const file = depsBaselinePath(projectRoot);
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(baseline, null, 2), 'utf-8');
-  renameSync(tmp, file);
+  await writeFile(tmp, JSON.stringify(baseline, null, 2), 'utf-8');
+  await rename(tmp, file);
   return baseline;
 }
 
@@ -81,7 +96,10 @@ export function extractMismatchedNodeIds(integrityFailures: readonly string[]): 
 }
 
 /** 将被篡改节点覆盖为最高危 trust（浅拷贝替换，不原地修改原数组） */
-export function applyMismatchedTrust(nodes: readonly DependencyNode[], mismatchedNodeIds: readonly string[]): DependencyNode[] {
+export function applyMismatchedTrust(
+  nodes: readonly DependencyNode[],
+  mismatchedNodeIds: readonly string[],
+): DependencyNode[] {
   if (mismatchedNodeIds.length === 0) return [...nodes];
   const mismatched = new Set(mismatchedNodeIds);
   return nodes.map((node) => (mismatched.has(node.id) ? { ...node, trust: 'compromised' } : node));

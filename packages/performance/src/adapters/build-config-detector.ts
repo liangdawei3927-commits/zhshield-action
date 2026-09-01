@@ -110,7 +110,12 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
   }
 
   /** 按构建工具扫描配置文件 */
-  private scanConfig(issues: PerformanceIssue[], tool: BuildTool, configFile: string, content: string): void {
+  private scanConfig(
+    issues: PerformanceIssue[],
+    tool: BuildTool,
+    configFile: string,
+    content: string,
+  ): void {
     if (tool === 'vite') {
       this.scanViteConfig(issues, configFile, content);
     } else if (tool === 'webpack') {
@@ -122,36 +127,42 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
   private scanViteConfig(issues: PerformanceIssue[], configFile: string, content: string): void {
     // minify 默认开启（esbuild），仅当显式关闭时告警
     if (VITE_MINIFY_RE.test(content)) {
-      issues.push(this.makeIssue(
-        'build-config.vite-minify-disabled',
-        'high',
-        configFile,
-        `${configFile} 显式关闭了 minify，产物未压缩`,
-        '移除 minify: false 或改为 true，让 Vite 默认以 esbuild 压缩产物',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.vite-minify-disabled',
+          'high',
+          configFile,
+          `${configFile} 显式关闭了 minify，产物未压缩`,
+          '移除 minify: false 或改为 true，让 Vite 默认以 esbuild 压缩产物',
+        ),
+      );
     }
     // sourcemap：生产环境开启（true / 'inline'）建议关闭
     if (VITE_SOURCEMAP_RE.test(content)) {
-      issues.push(this.makeIssue(
-        'build-config.vite-sourcemap-enabled',
-        'info',
-        configFile,
-        `${configFile} 开启了 sourcemap，产物体积增大且暴露源码`,
-        '生产构建建议设置 build.sourcemap: false，仅在排障时按需开启',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.vite-sourcemap-enabled',
+          'info',
+          configFile,
+          `${configFile} 开启了 sourcemap，产物体积增大且暴露源码`,
+          '生产构建建议设置 build.sourcemap: false，仅在排障时按需开启',
+        ),
+      );
     }
     // chunkSizeWarningLimit：阈值过高会掩盖大 chunk 告警
     const limitMatch = content.match(CHUNK_SIZE_LIMIT_RE);
     if (limitMatch) {
       const limitKb = Number(limitMatch[1]);
       if (limitKb > 1000) {
-        issues.push(this.makeIssue(
-          'build-config.vite-chunk-size-limit-high',
-          'medium',
-          configFile,
-          `${configFile} 将 chunkSizeWarningLimit 设为 ${limitKb}kB，超过默认 500kB，大 chunk 告警被掩盖`,
-          `建议将 chunkSizeWarningLimit 调回 500 或更低，暴露超限 chunk 以便拆分`,
-        ));
+        issues.push(
+          this.makeIssue(
+            'build-config.vite-chunk-size-limit-high',
+            'medium',
+            configFile,
+            `${configFile} 将 chunkSizeWarningLimit 设为 ${limitKb}kB，超过默认 500kB，大 chunk 告警被掩盖`,
+            `建议将 chunkSizeWarningLimit 调回 500 或更低，暴露超限 chunk 以便拆分`,
+          ),
+        );
       }
     }
   }
@@ -161,77 +172,97 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
     // mode 缺失时 webpack 默认 development（不压缩）——未显式设置即视为高危
     const modeMatch = content.match(WEBPACK_MODE_RE);
     if (!modeMatch) {
-      issues.push(this.makeIssue(
-        'build-config.webpack-mode-missing',
-        'high',
-        configFile,
-        `${configFile} 未设置 mode，webpack 默认 development 模式，产物不压缩`,
-        `设置 mode: 'production' 以启用压缩与 tree-shaking`,
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.webpack-mode-missing',
+          'high',
+          configFile,
+          `${configFile} 未设置 mode，webpack 默认 development 模式，产物不压缩`,
+          `设置 mode: 'production' 以启用压缩与 tree-shaking`,
+        ),
+      );
     } else if (modeMatch[1] !== 'production') {
-      issues.push(this.makeIssue(
-        'build-config.webpack-mode-not-production',
-        'high',
-        configFile,
-        `${configFile} mode 为 '${modeMatch[1]}'，非 production，产物不压缩`,
-        `将 mode 改为 'production'（或按环境注入 NODE_ENV=production）`,
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.webpack-mode-not-production',
+          'high',
+          configFile,
+          `${configFile} mode 为 '${modeMatch[1]}'，非 production，产物不压缩`,
+          `将 mode 改为 'production'（或按环境注入 NODE_ENV=production）`,
+        ),
+      );
     }
     // optimization.minimize 显式关闭
     if (WEBPACK_MINIMIZE_RE.test(content)) {
-      issues.push(this.makeIssue(
-        'build-config.webpack-minimize-disabled',
-        'high',
-        configFile,
-        `${configFile} 显式关闭了 optimization.minimize，产物未压缩`,
-        '移除 minimize: false 或改为 true，恢复默认压缩',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.webpack-minimize-disabled',
+          'high',
+          configFile,
+          `${configFile} 显式关闭了 optimization.minimize，产物未压缩`,
+          '移除 minimize: false 或改为 true，恢复默认压缩',
+        ),
+      );
     }
     // devtool 完整 sourcemap 在产物中内嵌/外挂源码
     if (WEBPACK_DEVTOOL_RE.test(content)) {
-      issues.push(this.makeIssue(
-        'build-config.webpack-devtool-sourcemap',
-        'info',
-        configFile,
-        `${configFile} 使用 ${'devtool'} sourcemap 模式，产物可还原源码`,
-        '生产构建改用 hidden-source-map 或不配置 devtool',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.webpack-devtool-sourcemap',
+          'info',
+          configFile,
+          `${configFile} 使用 ${'devtool'} sourcemap 模式，产物可还原源码`,
+          '生产构建改用 hidden-source-map 或不配置 devtool',
+        ),
+      );
     }
   }
 
   /** package.json build 脚本：可疑构建标志扫描 */
   private scanBuildScript(issues: PerformanceIssue[], script: string): void {
     if (script.includes('--no-minify') || script.includes('minify=false')) {
-      issues.push(this.makeIssue(
-        'build-config.script-minify-disabled',
-        'high',
-        'package.json',
-        `package.json 的 build 脚本包含 ${script.includes('--no-minify') ? '--no-minify' : 'minify=false'}，构建产物未压缩`,
-        '移除该标志，让构建工具以默认配置压缩产物',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.script-minify-disabled',
+          'high',
+          'package.json',
+          `package.json 的 build 脚本包含 ${script.includes('--no-minify') ? '--no-minify' : 'minify=false'}，构建产物未压缩`,
+          '移除该标志，让构建工具以默认配置压缩产物',
+        ),
+      );
     }
     if (NODE_ENV_DEV_RE.test(script)) {
-      issues.push(this.makeIssue(
-        'build-config.script-node-env-development',
-        'high',
-        'package.json',
-        `package.json 的 build 脚本设置了 NODE_ENV=development，构建走开发分支，产物未做生产优化`,
-        '将 NODE_ENV 改为 production（如 NODE_ENV=production npm run build）',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.script-node-env-development',
+          'high',
+          'package.json',
+          `package.json 的 build 脚本设置了 NODE_ENV=development，构建走开发分支，产物未做生产优化`,
+          '将 NODE_ENV 改为 production（如 NODE_ENV=production npm run build）',
+        ),
+      );
     }
     if (script.includes('--sourcemap')) {
-      issues.push(this.makeIssue(
-        'build-config.script-sourcemap',
-        'info',
-        'package.json',
-        `package.json 的 build 脚本包含 --sourcemap，产物携带 sourcemap`,
-        '生产构建移除 --sourcemap 标志，避免产物体积增大与源码暴露',
-      ));
+      issues.push(
+        this.makeIssue(
+          'build-config.script-sourcemap',
+          'info',
+          'package.json',
+          `package.json 的 build 脚本包含 --sourcemap，产物携带 sourcemap`,
+          '生产构建移除 --sourcemap 标志，避免产物体积增大与源码暴露',
+        ),
+      );
     }
   }
 
   /** 构造单条性能问题（id 稳定自增） */
-  private makeIssue(ruleId: string, severity: PerformanceSeverity, file: string, message: string, suggestion: string): PerformanceIssue {
+  private makeIssue(
+    ruleId: string,
+    severity: PerformanceSeverity,
+    file: string,
+    message: string,
+    suggestion: string,
+  ): PerformanceIssue {
     return {
       id: `build-config-${this.nextId()}`,
       ruleId,
@@ -270,7 +301,10 @@ function readBuildScript(projectRoot: string): string {
 }
 
 /** 探测构建工具：配置文件存在优先，无配置时从构建脚本反推 */
-function detectBuildTool(projectRoot: string, buildScript: string): { tool: BuildTool | null; configFile: string } {
+function detectBuildTool(
+  projectRoot: string,
+  buildScript: string,
+): { tool: BuildTool | null; configFile: string } {
   let tool: BuildTool | null = null;
   let configFile = '';
   for (const candidate of CONFIG_CANDIDATES) {

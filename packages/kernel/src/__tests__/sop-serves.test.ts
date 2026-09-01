@@ -71,9 +71,7 @@ describe('SopRegistry — 规则库能力声明（serves）查询', () => {
     it('未声明 serves 的域应返回空对象', () => {
       // Given: 只有 guard 域规则声明了 serves
       const reg = new SopRegistry();
-      reg.register(
-        makeRule({ id: 'r-1', domain: 'guard', serves: { languages: ['typescript'] } }),
-      );
+      reg.register(makeRule({ id: 'r-1', domain: 'guard', serves: { languages: ['typescript'] } }));
 
       // When: 查询 sentinel 域
       const serves = reg.getServes('sentinel');

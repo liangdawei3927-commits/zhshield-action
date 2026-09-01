@@ -1,6 +1,12 @@
 import { PageShell } from '../components/business/PageShell';
 import { useReportsPage, useModuleScores } from './reports-logic';
-import { StackedDocs, ReportsHeader, LatestScoreCard, DimensionCards, ModuleScoreCards } from './reports-parts';
+import {
+  StackedDocs,
+  ReportsHeader,
+  LatestScoreCard,
+  DimensionCards,
+  ModuleScoreCards,
+} from './reports-parts';
 import { HistoryTable } from './reports-table';
 import { useT } from '../i18n';
 
@@ -32,12 +38,25 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
     <PageShell
       illustration={<StackedDocs />}
       title={t('page.reports.empty.title')}
-      subtitle={t('page.reports.empty.subtitle', { count: 0, date: new Date().toLocaleDateString() })}
+      subtitle={t('page.reports.empty.subtitle', {
+        count: 0,
+        date: new Date().toLocaleDateString(),
+      })}
       featureList={[
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           ),
           title: t('page.reports.empty.feature.scoring.title'),
@@ -45,8 +64,18 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+              <polyline points="17 6 23 6 23 12" />
             </svg>
           ),
           title: t('page.reports.empty.feature.trend.title'),
@@ -54,8 +83,19 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           ),
           title: t('page.reports.empty.feature.pdf.title'),
@@ -63,7 +103,16 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
         },
         {
           icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
               <polyline points="22,6 12,13 2,6" />
             </svg>

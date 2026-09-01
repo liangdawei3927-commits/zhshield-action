@@ -19,8 +19,19 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-brand))',
     bg: 'rgb(var(--zh-brand) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /><path d="M11 8v3l2 1" />
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4-4" />
+        <path d="M11 8v3l2 1" />
       </svg>
     ),
   },
@@ -31,8 +42,18 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-danger))',
     bg: 'rgb(var(--zh-danger) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3z" /><path d="M9 12l2 2 4-4" />
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2L4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3z" />
+        <path d="M9 12l2 2 4-4" />
       </svg>
     ),
   },
@@ -43,7 +64,16 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-warning))',
     bg: 'rgb(var(--zh-warning) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
       </svg>
     ),
@@ -55,8 +85,20 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-info))',
     bg: 'rgb(var(--zh-info) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 12l4-4-4-4" /><path d="M20 12l-4 4 4 4" /><path d="M14 4h-2a5 5 0 00-5 5v2" /><path d="M10 20h2a5 5 0 005-5v-2" />
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 12l4-4-4-4" />
+        <path d="M20 12l-4 4 4 4" />
+        <path d="M14 4h-2a5 5 0 00-5 5v2" />
+        <path d="M10 20h2a5 5 0 005-5v-2" />
       </svg>
     ),
   },
@@ -67,8 +109,19 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-brand))',
     bg: 'rgb(var(--zh-brand) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="6" width="18" height="4" rx="1" /><rect x="5" y="10" width="14" height="9" rx="1" /><path d="M9 14h6" />
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="6" width="18" height="4" rx="1" />
+        <rect x="5" y="10" width="14" height="9" rx="1" />
+        <path d="M9 14h6" />
       </svg>
     ),
   },
@@ -79,8 +132,18 @@ const features: FeatureItem[] = [
     color: 'rgb(var(--zh-info))',
     bg: 'rgb(var(--zh-info) / 0.07)',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h5" />
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <path d="M14 2v6h6M8 13h8M8 17h5" />
       </svg>
     ),
   },
@@ -106,8 +169,12 @@ export function FeatureMap({ onNavigate }: { onNavigate: (page: string) => void 
               {f.icon}
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-zh-ink whitespace-nowrap">{t(f.titleKey)}</span>
-              <span className="block text-[11px] text-zh-muted mt-0.5 leading-relaxed truncate">{t(f.descKey)}</span>
+              <span className="block text-sm font-medium text-zh-ink whitespace-nowrap">
+                {t(f.titleKey)}
+              </span>
+              <span className="block text-[11px] text-zh-muted mt-0.5 leading-relaxed truncate">
+                {t(f.descKey)}
+              </span>
             </span>
           </BounceCard>
         ))}

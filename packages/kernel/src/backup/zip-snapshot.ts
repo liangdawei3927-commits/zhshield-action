@@ -43,7 +43,11 @@ export async function buildZipSnapshot(request: ZipSnapshotRequest): Promise<Zip
   const zip = new yazl.ZipFile();
 
   const { fileEntries, backedUp, errors, totalSize } = await addFilesToZip(
-    zip, files, projectPath, timestamp, abortSignal,
+    zip,
+    files,
+    projectPath,
+    timestamp,
+    abortSignal,
   );
   await finalizeZip(zip, fileEntries, timestamp, tmpZipPath, zipPath, abortSignal);
 
@@ -57,7 +61,12 @@ async function addFilesToZip(
   projectPath: string,
   timestamp: string,
   abortSignal?: AbortSignal,
-): Promise<{ fileEntries: LocalBackupFileEntry[]; backedUp: number; errors: number; totalSize: number }> {
+): Promise<{
+  fileEntries: LocalBackupFileEntry[];
+  backedUp: number;
+  errors: number;
+  totalSize: number;
+}> {
   const fileEntries: LocalBackupFileEntry[] = [];
   let backedUp = 0;
   let errors = 0;

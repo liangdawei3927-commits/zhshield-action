@@ -7,7 +7,11 @@ import type { RuleEvaluation, RuleEngineReport } from '../sop/_meta/rule-evaluat
  */
 
 /** 构造 skipped 评估结果（dryRun / 防重入等场景，不触发任何副作用） */
-export function skipEvaluation(rule: SopRule, message: string, targetEngine: 'guard' | 'inspect'): RuleEvaluation {
+export function skipEvaluation(
+  rule: SopRule,
+  message: string,
+  targetEngine: 'guard' | 'inspect',
+): RuleEvaluation {
   return {
     rule,
     status: 'skipped',
@@ -19,7 +23,11 @@ export function skipEvaluation(rule: SopRule, message: string, targetEngine: 'gu
 }
 
 /** 构造 error 评估结果（工具异常等场景） */
-export function errorEvaluation(rule: SopRule, message: string, durationMs: number): RuleEvaluation {
+export function errorEvaluation(
+  rule: SopRule,
+  message: string,
+  durationMs: number,
+): RuleEvaluation {
   return {
     rule,
     status: 'error',

@@ -42,6 +42,8 @@ export class ConfigDetector implements Detector {
         signals.push(makeSignal(KIND, rule.ruleId, rel, this.weight, payload));
       }
     }
-    return signals.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1));
+    return signals.sort((a, b) =>
+      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+    );
   }
 }

@@ -28,13 +28,14 @@ export class FrameworkAggregator {
   }
 
   /** 按得分排序，只返回置信度 >= 阈值的框架 */
-  private buildResults(candidates: CandidateMap, signals: readonly Signal[]): MatchResult<string>[] {
+  private buildResults(
+    candidates: CandidateMap,
+    signals: readonly Signal[],
+  ): MatchResult<string>[] {
     const results: MatchResult<string>[] = [];
     for (const [framework, { score, signals: sigs }] of candidates) {
       const maxPossibleScore = SignalScorer.calculateMaxPossibleScore(signals, 'framework');
-      const confidence = maxPossibleScore > 0
-        ? Math.min(score / maxPossibleScore, 1)
-        : 0;
+      const confidence = maxPossibleScore > 0 ? Math.min(score / maxPossibleScore, 1) : 0;
       if (confidence >= CONFIDENCE_THRESHOLD) {
         results.push({ value: framework, confidence, signals: sigs });
       }
@@ -102,9 +103,7 @@ export class FrameworkAggregator {
         { name: 'Laravel', keywords: ['laravel/framework', 'laravel'] },
         { name: 'Symfony', keywords: ['symfony/framework-bundle'] },
       ],
-      ruby: [
-        { name: 'Rails', keywords: ['rails'] },
-      ],
+      ruby: [{ name: 'Rails', keywords: ['rails'] }],
       csharp: [],
       kotlin: [],
       swift: [],
@@ -116,7 +115,9 @@ export class FrameworkAggregator {
 
     const candidates = frameworkKeywords[language] ?? [];
     for (const candidate of candidates) {
-      if (candidate.keywords.some((kw) => deps.some((d) => typeof d === 'string' && d.includes(kw)))) {
+      if (
+        candidate.keywords.some((kw) => deps.some((d) => typeof d === 'string' && d.includes(kw)))
+      ) {
         return candidate.name;
       }
     }

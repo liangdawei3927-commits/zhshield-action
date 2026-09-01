@@ -69,8 +69,27 @@ export const FRAMEWORK_KEYWORDS: Readonly<Record<LanguageId, readonly FrameworkK
     { name: 'Celery', keywords: ['celery'] },
   ],
   java: [
-    { name: 'Spring Boot', keywords: ['spring-boot-starter', 'spring-boot-starter-web', 'spring-boot-starter-security', 'spring-boot-starter-data-jpa', 'spring-boot-starter-validation', 'spring-boot-starter-data-redis', 'spring-boot-starter-amqp', 'spring-boot-starter-actuator'] },
-    { name: 'Spring Cloud', keywords: ['spring-cloud-starter-gateway', 'spring-cloud-starter-openfeign', 'spring-cloud-starter'] },
+    {
+      name: 'Spring Boot',
+      keywords: [
+        'spring-boot-starter',
+        'spring-boot-starter-web',
+        'spring-boot-starter-security',
+        'spring-boot-starter-data-jpa',
+        'spring-boot-starter-validation',
+        'spring-boot-starter-data-redis',
+        'spring-boot-starter-amqp',
+        'spring-boot-starter-actuator',
+      ],
+    },
+    {
+      name: 'Spring Cloud',
+      keywords: [
+        'spring-cloud-starter-gateway',
+        'spring-cloud-starter-openfeign',
+        'spring-cloud-starter',
+      ],
+    },
     { name: 'Spring', keywords: ['spring-web', 'spring-webmvc', 'spring-context', 'spring-boot'] },
     { name: 'MyBatis', keywords: ['mybatis', 'mybatis-plus', 'mybatis-spring-boot-starter'] },
     { name: 'Netty', keywords: ['netty-all', 'netty-transport', 'netty-handler'] },

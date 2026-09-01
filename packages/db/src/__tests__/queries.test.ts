@@ -34,7 +34,10 @@ function createTestDb(): Database.Database {
   // Run all migrations
   const migrationsDir = path.resolve(__dirname, '../../migrations');
   const fs = require('fs');
-  const files = fs.readdirSync(migrationsDir).filter((f: string) => f.endsWith('.sql')).sort();
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f: string) => f.endsWith('.sql'))
+    .sort();
   for (const file of files) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     db.exec(sql);
@@ -45,7 +48,9 @@ function createTestDb(): Database.Database {
 describe('Projects CRUD', () => {
   let db: Database.Database;
 
-  beforeEach(() => { db = createTestDb(); });
+  beforeEach(() => {
+    db = createTestDb();
+  });
 
   it('should create and retrieve a project', () => {
     createProject(db, { id: 'proj-1', name: 'Test Project', path: '/test/path' });
@@ -72,7 +77,7 @@ describe('Projects CRUD', () => {
     createProject(db, { id: 'proj-2', name: 'Second', path: '/second' });
     const projects = listProjects(db);
     expect(projects).toHaveLength(2);
-    const ids = projects.map(p => p.id);
+    const ids = projects.map((p) => p.id);
     expect(ids).toContain('proj-1');
     expect(ids).toContain('proj-2');
   });
@@ -98,7 +103,13 @@ describe('Scores CRUD', () => {
   });
 
   it('should save and retrieve latest score', () => {
-    saveScore(db, { projectId: 'proj-1', overall: 85, grade: 'B', dimensions: '{}', trend: 'improving' });
+    saveScore(db, {
+      projectId: 'proj-1',
+      overall: 85,
+      grade: 'B',
+      dimensions: '{}',
+      trend: 'improving',
+    });
     const score = getLatestScore(db, 'proj-1');
     expect(score).toBeDefined();
     expect(score!.overall).toBe(85);
@@ -107,15 +118,33 @@ describe('Scores CRUD', () => {
   });
 
   it('should retrieve most recent score when multiple exist', () => {
-    saveScore(db, { projectId: 'proj-1', overall: 60, grade: 'D', dimensions: '{}', trend: 'declining' });
-    saveScore(db, { projectId: 'proj-1', overall: 90, grade: 'A', dimensions: '{}', trend: 'improving' });
+    saveScore(db, {
+      projectId: 'proj-1',
+      overall: 60,
+      grade: 'D',
+      dimensions: '{}',
+      trend: 'declining',
+    });
+    saveScore(db, {
+      projectId: 'proj-1',
+      overall: 90,
+      grade: 'A',
+      dimensions: '{}',
+      trend: 'improving',
+    });
     const latest = getLatestScore(db, 'proj-1');
     expect(latest!.overall).toBe(90);
   });
 
   it('should return score history with limit', () => {
     for (let i = 0; i < 5; i++) {
-      saveScore(db, { projectId: 'proj-1', overall: 70 + i, grade: 'B', dimensions: '{}', trend: 'improving' });
+      saveScore(db, {
+        projectId: 'proj-1',
+        overall: 70 + i,
+        grade: 'B',
+        dimensions: '{}',
+        trend: 'improving',
+      });
     }
     const history = getScoreHistory(db, 'proj-1', 3);
     expect(history).toHaveLength(3);
@@ -123,7 +152,13 @@ describe('Scores CRUD', () => {
 
   it('should reject invalid grade', () => {
     expect(() => {
-      saveScore(db, { projectId: 'proj-1', overall: 50, grade: 'E' as unknown as 'A' | 'B' | 'C' | 'D', dimensions: '{}', trend: 'improving' });
+      saveScore(db, {
+        projectId: 'proj-1',
+        overall: 50,
+        grade: 'E' as unknown as 'A' | 'B' | 'C' | 'D',
+        dimensions: '{}',
+        trend: 'improving',
+      });
     }).toThrow();
   });
 });
@@ -145,7 +180,13 @@ describe('Scanning Results CRUD', () => {
   });
 
   it('should save scan result with report', () => {
-    saveScanResult(db, { projectId: 'proj-1', source: 'trivy', passed: false, summary: '2 vulns', report: '{"vulns":[]}' });
+    saveScanResult(db, {
+      projectId: 'proj-1',
+      source: 'trivy',
+      passed: false,
+      summary: '2 vulns',
+      report: '{"vulns":[]}',
+    });
     const result = getLatestScanResult(db, 'proj-1', 'trivy');
     expect(result!.report).toBe('{"vulns":[]}');
   });
@@ -169,10 +210,18 @@ describe('Scanning Results CRUD', () => {
 describe('Rules CRUD', () => {
   let db: Database.Database;
 
-  beforeEach(() => { db = createTestDb(); });
+  beforeEach(() => {
+    db = createTestDb();
+  });
 
   it('should insert and retrieve a rule', () => {
-    upsertRule(db, { ruleId: 'RULE-001', state: 'active', weight: 1.5, reason: 'Important', changedBy: 'admin' });
+    upsertRule(db, {
+      ruleId: 'RULE-001',
+      state: 'active',
+      weight: 1.5,
+      reason: 'Important',
+      changedBy: 'admin',
+    });
     const rule = getRule(db, 'RULE-001');
     expect(rule).toBeDefined();
     expect(rule!.state).toBe('active');
@@ -206,24 +255,56 @@ describe('Experiences CRUD', () => {
   });
 
   it('should save and list experiences', () => {
-    saveExperience(db, { id: 'exp-1', projectId: 'proj-1', ruleId: 'RULE-001', type: 'true-positive', detail: 'Found real bug', source: 'user' });
+    saveExperience(db, {
+      id: 'exp-1',
+      projectId: 'proj-1',
+      ruleId: 'RULE-001',
+      type: 'true-positive',
+      detail: 'Found real bug',
+      source: 'user',
+    });
     const list = listExperiences(db);
     expect(list).toHaveLength(1);
     expect(list[0].type).toBe('true-positive');
   });
 
   it('should filter experiences by project and rule', () => {
-    saveExperience(db, { id: 'exp-1', projectId: 'proj-1', ruleId: 'RULE-001', type: 'true-positive' });
-    saveExperience(db, { id: 'exp-2', projectId: 'proj-1', ruleId: 'RULE-002', type: 'false-positive' });
+    saveExperience(db, {
+      id: 'exp-1',
+      projectId: 'proj-1',
+      ruleId: 'RULE-001',
+      type: 'true-positive',
+    });
+    saveExperience(db, {
+      id: 'exp-2',
+      projectId: 'proj-1',
+      ruleId: 'RULE-002',
+      type: 'false-positive',
+    });
     const filtered = listExperiences(db, 'proj-1', 'RULE-001');
     expect(filtered).toHaveLength(1);
     expect(filtered[0].rule_id).toBe('RULE-001');
   });
 
   it('should get experience stats for a rule', () => {
-    saveExperience(db, { id: 'exp-1', projectId: 'proj-1', ruleId: 'RULE-001', type: 'true-positive' });
-    saveExperience(db, { id: 'exp-2', projectId: 'proj-1', ruleId: 'RULE-001', type: 'true-positive' });
-    saveExperience(db, { id: 'exp-3', projectId: 'proj-1', ruleId: 'RULE-001', type: 'false-positive' });
+    saveExperience(db, {
+      id: 'exp-1',
+      projectId: 'proj-1',
+      ruleId: 'RULE-001',
+      type: 'true-positive',
+    });
+    saveExperience(db, {
+      id: 'exp-2',
+      projectId: 'proj-1',
+      ruleId: 'RULE-001',
+      type: 'true-positive',
+    });
+    saveExperience(db, {
+      id: 'exp-3',
+      projectId: 'proj-1',
+      ruleId: 'RULE-001',
+      type: 'false-positive',
+    });
     const stats = getExperienceStats(db, 'RULE-001');
     expect(stats.total).toBe(3);
     expect(stats.truePositives).toBe(2);
@@ -242,10 +323,21 @@ describe('Sentinel Events CRUD', () => {
 
   it('should create and retrieve an event', () => {
     createSentinelEvent(db, {
-      id: 'evt-1', projectId: 'proj-1', timestamp: now, dedupeKey: 'dk-1',
-      title: 'Server Error', service: 'api', module: 'auth',
-      severity: 'p1', status: 'detected', validation: '{}', context: '{}',
-      history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+      id: 'evt-1',
+      projectId: 'proj-1',
+      timestamp: now,
+      dedupeKey: 'dk-1',
+      title: 'Server Error',
+      service: 'api',
+      module: 'auth',
+      severity: 'p1',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: now,
+      lastSeen: now,
     });
     const event = getSentinelEvent(db, 'evt-1');
     expect(event).toBeDefined();
@@ -256,22 +348,49 @@ describe('Sentinel Events CRUD', () => {
 
   it('should update event status', () => {
     createSentinelEvent(db, {
-      id: 'evt-1', projectId: 'proj-1', timestamp: now, dedupeKey: 'dk-1',
-      title: 'Error', service: 'api', module: 'auth',
-      severity: 'p2', status: 'detected', validation: '{}', context: '{}',
-      history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+      id: 'evt-1',
+      projectId: 'proj-1',
+      timestamp: now,
+      dedupeKey: 'dk-1',
+      title: 'Error',
+      service: 'api',
+      module: 'auth',
+      severity: 'p2',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: now,
+      lastSeen: now,
     });
-    updateSentinelEvent(db, { id: 'evt-1', status: 'resolved', occurrenceCount: 3, lastSeen: new Date('2026-07-29T13:00:00Z') });
+    updateSentinelEvent(db, {
+      id: 'evt-1',
+      status: 'resolved',
+      occurrenceCount: 3,
+      lastSeen: new Date('2026-07-29T13:00:00Z'),
+    });
     const updated = getSentinelEvent(db, 'evt-1');
     expect(updated!.status).toBe('resolved');
   });
 
   it('should find event by dedupe key', () => {
     createSentinelEvent(db, {
-      id: 'evt-1', projectId: 'proj-1', timestamp: now, dedupeKey: 'unique-error',
-      title: 'Memory Leak', service: 'api', module: 'cache',
-      severity: 'p1', status: 'detected', validation: '{}', context: '{}',
-      history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+      id: 'evt-1',
+      projectId: 'proj-1',
+      timestamp: now,
+      dedupeKey: 'unique-error',
+      title: 'Memory Leak',
+      service: 'api',
+      module: 'cache',
+      severity: 'p1',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: now,
+      lastSeen: now,
     });
     const found = findSentinelEventByDedupeKey(db, 'unique-error');
     expect(found).toBeDefined();
@@ -281,10 +400,21 @@ describe('Sentinel Events CRUD', () => {
   it('should list events with filters', () => {
     for (const sev of ['p1', 'p2', 'p3'] as const) {
       createSentinelEvent(db, {
-        id: `evt-${sev}`, projectId: 'proj-1', timestamp: now, dedupeKey: `dk-${sev}`,
-        title: `${sev} event`, service: 'api', module: 'core',
-        severity: sev, status: 'detected', validation: '{}', context: '{}',
-        history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+        id: `evt-${sev}`,
+        projectId: 'proj-1',
+        timestamp: now,
+        dedupeKey: `dk-${sev}`,
+        title: `${sev} event`,
+        service: 'api',
+        module: 'core',
+        severity: sev,
+        status: 'detected',
+        validation: '{}',
+        context: '{}',
+        history: '[]',
+        occurrenceCount: 1,
+        firstSeen: now,
+        lastSeen: now,
       });
     }
     const p1events = listSentinelEvents(db, { severity: 'p1' });
@@ -295,10 +425,21 @@ describe('Sentinel Events CRUD', () => {
   it('should return stats', () => {
     for (const sev of ['p1', 'p1', 'p2'] as const) {
       createSentinelEvent(db, {
-        id: `evt-${Math.random()}`, projectId: 'proj-1', timestamp: now, dedupeKey: `dk-${Math.random()}`,
-        title: 'test', service: 'api', module: 'core',
-        severity: sev, status: 'detected', validation: '{}', context: '{}',
-        history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+        id: `evt-${Math.random()}`,
+        projectId: 'proj-1',
+        timestamp: now,
+        dedupeKey: `dk-${Math.random()}`,
+        title: 'test',
+        service: 'api',
+        module: 'core',
+        severity: sev,
+        status: 'detected',
+        validation: '{}',
+        context: '{}',
+        history: '[]',
+        occurrenceCount: 1,
+        firstSeen: now,
+        lastSeen: now,
       });
     }
     const stats = getSentinelEventStats(db);
@@ -309,10 +450,21 @@ describe('Sentinel Events CRUD', () => {
 
   it('should delete an event', () => {
     createSentinelEvent(db, {
-      id: 'evt-del', projectId: 'proj-1', timestamp: now, dedupeKey: 'dk-del',
-      title: 'To Delete', service: 'api', module: 'core',
-      severity: 'p3', status: 'detected', validation: '{}', context: '{}',
-      history: '[]', occurrenceCount: 1, firstSeen: now, lastSeen: now,
+      id: 'evt-del',
+      projectId: 'proj-1',
+      timestamp: now,
+      dedupeKey: 'dk-del',
+      title: 'To Delete',
+      service: 'api',
+      module: 'core',
+      severity: 'p3',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: now,
+      lastSeen: now,
     });
     deleteSentinelEvent(db, 'evt-del');
     expect(getSentinelEvent(db, 'evt-del')).toBeUndefined();
@@ -322,10 +474,18 @@ describe('Sentinel Events CRUD', () => {
 describe('Foreign key relaxation', () => {
   let db: Database.Database;
 
-  beforeEach(() => { db = createTestDb(); });
+  beforeEach(() => {
+    db = createTestDb();
+  });
 
   it('should accept score for project without projects row (008_relax_fk)', () => {
-    saveScore(db, { projectId: 'nonexistent', overall: 85, grade: 'B', dimensions: '{}', trend: 'improving' });
+    saveScore(db, {
+      projectId: 'nonexistent',
+      overall: 85,
+      grade: 'B',
+      dimensions: '{}',
+      trend: 'improving',
+    });
 
     const score = getLatestScore(db, 'nonexistent');
     expect(score).toBeDefined();
@@ -334,7 +494,12 @@ describe('Foreign key relaxation', () => {
 
   it('should accept scanning result for project without projects row (008_relax_fk)', () => {
     expect(() => {
-      saveScanResult(db, { projectId: 'nonexistent', source: 'eslint', passed: true, summary: 'OK' });
+      saveScanResult(db, {
+        projectId: 'nonexistent',
+        source: 'eslint',
+        passed: true,
+        summary: 'OK',
+      });
     }).not.toThrow();
   });
 });
@@ -342,7 +507,9 @@ describe('Foreign key relaxation', () => {
 describe('Empty states', () => {
   let db: Database.Database;
 
-  beforeEach(() => { db = createTestDb(); });
+  beforeEach(() => {
+    db = createTestDb();
+  });
 
   it('should return empty list for projects', () => {
     expect(listProjects(db)).toEqual([]);

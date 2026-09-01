@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { t } from '@zh/i18n';
 import { WhitelistManager } from '@zh/guard';
@@ -78,7 +78,9 @@ export function normalizePipelineReport(report: PipelineReport): readonly Diagno
 }
 
 /** guard 输出可能是 GuardReport（adapter 模式）或 RuleEngineReport（SOP 模式） */
-export function normalizeGuardSource(guard: GuardReport | RuleEngineReport): readonly DiagnosticEntry[] {
+export function normalizeGuardSource(
+  guard: GuardReport | RuleEngineReport,
+): readonly DiagnosticEntry[] {
   if ('evaluations' in guard) {
     return normalizeRuleEngine(guard, 'guard');
   }
@@ -97,7 +99,9 @@ export function normalizeGuardSource(guard: GuardReport | RuleEngineReport): rea
 }
 
 /** inspect 输出可能是 InspectionReport 或 RuleEngineReport（SOP 模式） */
-export function normalizeInspectSource(inspect: InspectionReport | RuleEngineReport): readonly DiagnosticEntry[] {
+export function normalizeInspectSource(
+  inspect: InspectionReport | RuleEngineReport,
+): readonly DiagnosticEntry[] {
   if ('evaluations' in inspect) {
     return normalizeRuleEngine(inspect, 'inspect');
   }
@@ -116,7 +120,10 @@ export function normalizeInspectSource(inspect: InspectionReport | RuleEngineRep
   }));
 }
 
-function normalizeRuleEngine(report: RuleEngineReport, source: 'guard' | 'inspect'): readonly DiagnosticEntry[] {
+function normalizeRuleEngine(
+  report: RuleEngineReport,
+  source: 'guard' | 'inspect',
+): readonly DiagnosticEntry[] {
   const entries: DiagnosticEntry[] = [];
   for (const evaluation of report.evaluations) {
     if (evaluation.violations && evaluation.violations.length > 0) {
@@ -176,7 +183,9 @@ export function normalizeRefactorSource(refactor: RefactorReport): readonly Diag
 }
 
 /** RuleEngine violation 五级严重度 → 三级诊断严重度 */
-function mapViolationSeverity(severity: NonNullable<RuleEvaluation['violations']>[number]['severity']): DiagnosticSeverity {
+function mapViolationSeverity(
+  severity: NonNullable<RuleEvaluation['violations']>[number]['severity'],
+): DiagnosticSeverity {
   switch (severity) {
     case 'critical':
     case 'high':
@@ -260,12 +269,21 @@ function mapLspSeverity(severity: DiagnosticSeverity): LspDiagnostic['severity']
 
 // ─── 落盘 ──────────────────────────────────────────────────────────────
 
+// 串行化写入队列：并发扫描（guard/inspect/refactor/performance 可并行触发）时
+// 保证 latest.json 的写入互不交错，始终以最后一次写入为准。
+let writeQueue: Promise<unknown> = Promise.resolve();
+
 /** 写入 <project>/.zhshield/diagnostics/latest.json，返回绝对路径 */
-export function writeDiagnosticsFile(report: DiagnosticsReport): string {
+export async function writeDiagnosticsFile(report: DiagnosticsReport): Promise<string> {
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
-  mkdirSync(dir, { recursive: true });
   const absPath = join(dir, 'latest.json');
-  writeFileSync(absPath, `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
+  const payload = `${JSON.stringify(report, null, 2)}\n`;
+  // 排队执行，避免并发扫描时多次 writeFile 交错覆盖
+  writeQueue = writeQueue.then(async () => {
+    await mkdir(dir, { recursive: true });
+    await writeFile(absPath, payload, 'utf-8');
+  });
+  await writeQueue;
   return absPath;
 }
 
@@ -280,7 +298,10 @@ function filterWhitelisted(
 }
 
 /** pipeline 报告一键归一化并落盘（dryRun 由调用方决定是否跳过） */
-export async function persistDiagnostics(projectPath: string, report: PipelineReport): Promise<string> {
+export async function persistDiagnostics(
+  projectPath: string,
+  report: PipelineReport,
+): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
   const issues = filterWhitelisted(whitelist, normalizePipelineReport(report));
@@ -289,7 +310,7 @@ export async function persistDiagnostics(projectPath: string, report: PipelineRe
     issues,
     new Date().toISOString(),
   );
-  return writeDiagnosticsFile(diagnostics);
+  return await writeDiagnosticsFile(diagnostics);
 }
 
 /**
@@ -308,7 +329,7 @@ export async function persistDiagnosticsFromEntries(
     filterWhitelisted(whitelist, entries),
     new Date().toISOString(),
   );
-  return writeDiagnosticsFile(diagnostics);
+  return await writeDiagnosticsFile(diagnostics);
 }
 
 /** PerformanceReportData 形状（结构化类型，避免与 report-format.ts 形成循环依赖） */

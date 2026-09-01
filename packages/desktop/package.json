@@ -4,14 +4,14 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../../scripts/sync-snapshot-links.mjs && vite",
     "build": "tsc && vite build",
     "build:mac": "tsc && vite build && electron-builder --mac",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "pnpm build && playwright test",
-    "lint": "eslint src electron --max-warnings 50"
+    "lint": "eslint src electron --max-warnings 0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

@@ -2,7 +2,7 @@ name: P2 High Alert
 description: P2 高危告警策略 — 需要快速响应的性能问题
 severity: high
 executionMode: event
-status: active
+status: draft
 source: official
 tags: [sentinel, alert, p2]
 applicableEngines: [sentinel]

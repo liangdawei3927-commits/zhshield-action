@@ -10,3 +10,6 @@ checks:
   - strict: true
   - noImplicitAny: true
   - strictNullChecks: true
+check:
+  tool: tsc # TypeScript 编译错误检测
+  toolConfig: {}

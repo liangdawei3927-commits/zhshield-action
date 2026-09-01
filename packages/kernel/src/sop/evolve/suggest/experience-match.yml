@@ -2,7 +2,7 @@ name: Experience Matching Strategy
 description: 经验库匹配策略 — 根据当前问题匹配经验库中的修复方案
 severity: info
 executionMode: async
-status: active
+status: draft
 source: internal
 tags: [evolve, suggest, experience]
 applicableEngines: [evolve]

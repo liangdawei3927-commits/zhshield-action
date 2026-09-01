@@ -2,7 +2,7 @@ name: Auto Rollback Strategy
 description: 自动回滚策略 — 新版本发布后出现 critical 错误时触发
 severity: critical
 executionMode: event
-status: active
+status: draft
 source: official
 tags: [sentinel, rollback, deploy]
 applicableEngines: [sentinel]

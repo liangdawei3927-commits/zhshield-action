@@ -2,7 +2,7 @@ name: Commit Message Convention Check
 description: L2 门禁 — 提交规范检查，确保 commit message 符合约定
 severity: warning
 executionMode: sync
-status: active
+status: draft
 source: official
 tags: [git, commit, convention]
 applicableEngines: [guard]

@@ -2,7 +2,7 @@ name: Runtime Error Detection
 description: 运行时错误检测 — 监控应用运行时异常
 severity: high
 executionMode: periodic
-status: active
+status: draft
 source: internal
 tags: [sentinel, runtime, error]
 applicableEngines: [sentinel]

@@ -2,7 +2,7 @@ name: P1 Critical Alert
 description: P1 严重告警策略 — 需要立即处理的运行时异常
 severity: critical
 executionMode: event
-status: active
+status: draft
 source: official
 tags: [sentinel, alert, p1]
 applicableEngines: [sentinel]

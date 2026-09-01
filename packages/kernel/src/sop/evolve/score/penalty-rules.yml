@@ -2,7 +2,7 @@ name: Penalty Rules Configuration
 description: 扣分规则 — 各类问题的扣分权重
 severity: info
 executionMode: sync
-status: active
+status: draft
 source: official
 tags: [evolve, score, penalty]
 applicableEngines: [evolve, scoring]

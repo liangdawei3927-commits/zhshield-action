@@ -2,7 +2,7 @@ name: Fix Generation Strategy
 description: 修复方案生成策略 — 基于规则和经验库生成可执行修复
 severity: info
 executionMode: async
-status: active
+status: draft
 source: internal
 tags: [evolve, suggest, fix]
 applicableEngines: [evolve]

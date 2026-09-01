@@ -2,7 +2,7 @@ name: Quality Score Calculation
 description: 巡检结果到健康评分的映射规则
 severity: info
 executionMode: periodic
-status: active
+status: draft
 source: official
 tags: [score, quality, inspect]
 applicableEngines: [inspect, scoring]

@@ -2,7 +2,7 @@ name: Naming Conventions
 description: 检查代码命名规范一致性
 severity: info
 executionMode: async
-status: active
+status: draft
 source: official
 tags: [naming, convention, style]
 applicableEngines: [inspect]

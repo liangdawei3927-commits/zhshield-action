@@ -11,3 +11,6 @@ checks:
   - unused-variables
   - unreachable-code
   - empty-functions
+check:
+  tool: ts-prune # 死代码（未使用导出）检测
+  toolConfig: {}

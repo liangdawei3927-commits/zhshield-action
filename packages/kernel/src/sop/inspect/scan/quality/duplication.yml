@@ -14,3 +14,6 @@ thresholds:
     - '*.test.ts'
     - '*.spec.ts'
     - '**/__tests__/**'
+check:
+  tool: jscpd # 重复代码检测
+  toolConfig: {}

@@ -12,7 +12,14 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { load as loadYaml } from 'js-yaml';
+import {
+  isRecord,
+  readJsonSafe,
+  readYamlSafe,
+  readTextSafe,
+  versionFromConstraint,
+  parsePoetryConstraint,
+} from './lockfile-utils';
 import type {
   DependencyEdge,
   DependencyGraph,
@@ -32,10 +39,6 @@ const NEWLINE_RE = /\r?\n/;
 const INDENT_RE = /^\s*/;
 /** yarn块字段行 'key value' */
 const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
-/** 精确版本约束：'==2.3.2' / '===2.3.2' */
-const EXACT_CONSTRAINT_RE = /^(?:==|===)\s*(.+)$/;
-/** 非数字前缀剥离 */
-const NON_DIGIT_PREFIX_RE = /^[^0-9]*/;
 /** PEP 508 入口：包名 + 剩余约束 */
 const PEP508_ENTRY_RE = /^([A-Za-z0-9_.-]+)(.*)$/;
 /** 行注释剥离（#...） */
@@ -44,8 +47,6 @@ const COMMENT_STRIPPING_RE = /#.*/;
 const PEP508_NAME_RE = /^[A-Za-z0-9_.-]+/;
 /** 版本约束操作符匹配 */
 const CONSTRAINT_RE = /(?:==|>=|<=|!=|~=|===|>|<)\s*[^\s]+/;
-/** poetry 约束值 version = "..." */
-const POETRY_VERSION_VALUE_RE = /version\s*=\s*["']([^"']+)["']/;
 /** TOML 节头拆分 */
 const TOML_SECTION_RE = /^\s*\[/m;
 /** TOML 节标题提取 */
@@ -76,41 +77,6 @@ interface DirectDeps {
 }
 
 /** 判断值是否为普通对象（非 null、非数组） */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** 安全读取 JSON 文件；解析失败返回 null */
-function readJsonSafe(filePath: string): Record<string, unknown> | null {
-  try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return isRecord(data) ? data : null;
-  } catch {
-    // 无法解析时按缺失处理
-    return null;
-  }
-}
-
-/** 安全读取 YAML 文件；解析失败返回 null */
-function readYamlSafe(filePath: string): unknown {
-  try {
-    return loadYaml(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
-    // 无法解析时按缺失处理
-    return null;
-  }
-}
-
-/** 安全读取文本文件；读取失败返回 null */
-function readTextSafe(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    // 无法读取时按缺失处理
-    return null;
-  }
-}
-
 /** 读取 package.json 的 dependencies / devDependencies 声明 */
 function readPackageJson(projectPath: string): DirectDeps | null {
   const data = readJsonSafe(safeJoin(projectPath, 'package.json'));
@@ -585,14 +551,6 @@ function buildRootEdges(
 // ────────────────────────────── Python ──────────────────────────────
 
 /** 从版本约束提取锁定版本：'==2.3.2' → '2.3.2'；'>=2.0' → '2.0'；'*' / '' → '' */
-function versionFromConstraint(constraint: string): string {
-  const trimmed = constraint.trim();
-  const first = trimmed.split(',')[0].trim();
-  const exact = first.match(EXACT_CONSTRAINT_RE);
-  if (exact) return exact[1].trim();
-  return first.replace(NON_DIGIT_PREFIX_RE, '').trim();
-}
-
 /** 从引号值中提取包名与约束（剥离 extras；如 'flask[async]>=2.0' → flask + >=2.0） */
 function parsePep508(entry: string): { name: string; constraint: string } | null {
   const withoutExtras = entry.replace(/\[.*?\]/g, '');
@@ -617,24 +575,6 @@ function parseRequirements(content: string): Array<{ name: string; constraint: s
     deps.push({ name, constraint });
   }
   return deps;
-}
-
-/** poetry 依赖约束值解析：'^2.0' / '"*"' / '{ version = "^2.0", ... }' → 版本约束字符串 */
-function parsePoetryConstraint(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.startsWith('{')) {
-    const m = trimmed.match(POETRY_VERSION_VALUE_RE);
-    return m ? m[1] : '';
-  }
-  let result = trimmed;
-  if (
-    result.length >= 2 &&
-    (result.startsWith('"') || result.startsWith("'")) &&
-    (result.endsWith('"') || result.endsWith("'"))
-  ) {
-    result = result.slice(1, -1);
-  }
-  return result;
 }
 
 /**

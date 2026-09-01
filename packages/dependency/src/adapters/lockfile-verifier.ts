@@ -9,8 +9,15 @@
  * 零网络请求、不执行安装命令；解析失败按缺失/已修改处理，绝不抛异常。
  */
 import * as fs from 'fs';
-import { load as loadYaml } from 'js-yaml';
 import { safeJoin } from '@zh/shared';
+import {
+  isRecord,
+  readJsonSafe,
+  readYamlSafe,
+  readTextSafe,
+  versionFromConstraint,
+  parsePoetryConstraint,
+} from '../lockfile-utils';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 
@@ -29,10 +36,6 @@ const FULL_SEMVER_RE = /^(\d+\.){2}\d+$/;
 const HYPHEN_RANGE_RE = /^\s*(\S+)\s+-\s+(\S+)\s*$/;
 /** 替代集合拆分（逗号/空白） */
 const ALT_SPLITTER_RE = /[\s,]+/;
-/** 精确版本约束：'==2.3.2' / '===2.3.2' */
-const EXACT_CONSTRAINT_RE = /^(?:==|===)\s*(.+)$/;
-/** 非数字前缀剥离 */
-const NON_DIGIT_PREFIX_RE = /^[^0-9]*/;
 /** npm package-lock.json packages 键 */
 const PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
 /** pnpm-lock.yaml packages 键 */
@@ -47,8 +50,6 @@ const NEWLINE_RE = /\r?\n/;
 const INDENT_RE = /^\s*/;
 /** yarn块字段行 'key value' */
 const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
-/** poetry 约束值 version = "..." */
-const POETRY_VERSION_VALUE_RE = /version\s*=\s*["']([^"']+)["']/;
 /** TOML 节头拆分 */
 const TOML_SECTION_RE = /^\s*\[/m;
 /** TOML 节标题提取 */
@@ -102,39 +103,6 @@ export interface LockfileDiff {
   declaredVersion: string;
   /** 锁文件锁定的实际版本，如 '4.17.21'；未在锁文件中出现时为 '' */
   lockedVersion: string;
-}
-
-/** 判断值是否为普通对象（非 null、非数组） */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** 安全读取 JSON 文件；解析失败返回 null */
-function readJsonSafe(filePath: string): Record<string, unknown> | null {
-  try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return isRecord(data) ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 安全读取 YAML 文件；解析失败返回 null */
-function readYamlSafe(filePath: string): unknown {
-  try {
-    return loadYaml(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-/** 安全读取文本文件；读取失败返回 null */
-function readTextSafe(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
 }
 
 // ────────────────────────────── semver 范围匹配（手写实现，零依赖） ──────────────────────────────
@@ -311,15 +279,6 @@ export function satisfiesVersion(version: string, range: string): boolean {
 }
 
 // ────────────────────────────── 锁文件 / 清单解析 ──────────────────────────────
-
-/** 从版本约束提取精确版本：'==2.3.2' → '2.3.2'；'>=2.0' → '2.0' */
-function versionFromConstraint(constraint: string): string {
-  const trimmed = constraint.trim();
-  const first = trimmed.split(',')[0].trim();
-  const exact = first.match(EXACT_CONSTRAINT_RE);
-  if (exact) return exact[1].trim();
-  return first.replace(NON_DIGIT_PREFIX_RE, '').trim();
-}
 
 /** package.json 声明范围（dependencies + devDependencies） */
 function readDeclaredRanges(projectRoot: string, failures: string[]): Map<string, string> {
@@ -596,24 +555,6 @@ function collectYarnBlock(
       integrity.set(`${name}@${version}`, integrityValue);
     }
   }
-}
-
-/** poetry 依赖约束值解析：'^2.0' / '{ version = "^2.0", ... }' → 版本约束字符串 */
-function parsePoetryConstraint(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.startsWith('{')) {
-    const m = trimmed.match(POETRY_VERSION_VALUE_RE);
-    return m ? m[1] : '';
-  }
-  let result = trimmed;
-  if (
-    result.length >= 2 &&
-    (result.startsWith('"') || result.startsWith("'")) &&
-    (result.endsWith('"') || result.endsWith("'"))
-  ) {
-    result = result.slice(1, -1);
-  }
-  return result;
 }
 
 /** pyproject.toml：[project].dependencies（PEP 621）与 [tool.poetry.dependencies] / [tool.uv.dependencies] */

@@ -11,8 +11,8 @@
  * - ci-vs-local：.github/workflows/*.yml 中 Node / 包管理器版本 vs 本地清单（不一致 → warning，无 CI → 不产出）
  */
 import * as fs from 'fs';
-import { load as loadYaml } from 'js-yaml';
 import { safeJoin } from '@zh/shared';
+import { isRecord, readJsonSafe, readYamlSafe, readTextSafe } from '../lockfile-utils';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 
@@ -93,42 +93,6 @@ export interface EnvEntry {
 /** 环境一致性检查器契约（对齐规格附 B.3(4) ④） */
 export interface EnvConsistencyChecker {
   check(profile: ProjectProfile, options?: EnvConsistencyOptions): Promise<EnvConsistencyReport>;
-}
-
-/** 判断值是否为普通对象（非 null、非数组） */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** 安全读取 JSON 文件；解析失败返回 null */
-function readJsonSafe(filePath: string): Record<string, unknown> | null {
-  try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return isRecord(data) ? data : null;
-  } catch {
-    // 无法解析时按缺失处理
-    return null;
-  }
-}
-
-/** 安全读取 YAML 文件；解析失败返回 null */
-function readYamlSafe(filePath: string): unknown {
-  try {
-    return loadYaml(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
-    // 无法解析时按缺失处理
-    return null;
-  }
-}
-
-/** 安全读取文本文件；读取失败返回 null */
-function readTextSafe(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    // 无法读取时按缺失处理
-    return null;
-  }
 }
 
 /** 去除版本号前后空白与首尾 v 前缀（'  v18.20.2\n' → '18.20.2'） */

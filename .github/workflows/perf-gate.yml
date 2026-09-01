@@ -32,3 +32,29 @@ jobs:
         # bench:gate = node scripts/benchmark.mjs --gate
         # 任何指标相对基线回归 >10% → exit 1，阻断合并；把「性能回归」当 bug 对待。
         run: pnpm bench:gate
+
+  rule-self-check:
+    name: AutoPerf 规则自检（no-sync + perf-*）
+    # 底座 B / Dogfooding：用自己的性能规则扫自己的代码，每次门禁自动体检防回归。
+    # 独立 job（不改 ci.yml/zhcheck.mjs），若任一规则违规 → exit 1 阻断合并。
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run eslint with AutoPerf rules on packages
+        # 根 eslint.config.mjs 已把 no-fs-sync 与 4 条 perf-* 注册为 error；
+        # 对 packages/** 全量 lint，检出任何同步 IO / 串行 await / 缺 ignore / 未批量 DB 写。
+        run: npx eslint packages --ext .ts,.tsx,.mjs,.js,.cjs --max-warnings 0

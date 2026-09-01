@@ -6,11 +6,11 @@
  *   2. 仿冒检测 — 与高频流行包名做编辑距离比对（typosquatting）
  * 纯静态分析，无需联网；产出 type='supply-chain' 的 MalwareItem。
  */
-import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { MalwareItem } from './types';
 import { safeJoin } from '@zh/shared';
+import { typosquatThreshold, levenshtein, makeThreatItem } from './threat-utils';
 
 const EXTRAS_RE = /\[.*?\]/g;
 const NEWLINE_RE = /\r?\n/;
@@ -77,32 +77,6 @@ function normalizePyName(name: string): string {
 
 const MALICIOUS_LOOKUP = new Set<string>(Array.from(KNOWN_MALICIOUS_PACKAGES, normalizePyName));
 const POPULAR_LOOKUP = new Set<string>(Array.from(KNOWN_POPULAR_PACKAGES, normalizePyName));
-
-/** 编辑距离阈值：短包名更宽松（仿冒通常只差一两个字符） */
-function typosquatThreshold(name: string): number {
-  return name.length <= 8 ? 1 : 2;
-}
-
-function levenshtein(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  if (m === 0) return n;
-  if (n === 0) return m;
-  const prev = new Array<number>(n + 1).fill(0).map((_, j) => j);
-  for (let i = 1; i <= m; i++) {
-    const curr = new Array<number>(n + 1).fill(0);
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      curr[j] = Math.min(
-        prev[j] + 1,
-        curr[j - 1] + 1,
-        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    prev.splice(0, prev.length, ...curr);
-  }
-  return prev[n];
-}
 
 const PACKAGE_NAME_RE = /^[A-Za-z0-9_.-]+/;
 
@@ -251,22 +225,4 @@ function scanManifestNames(manifest: { file: string; names: string[] }): Malware
     }
   }
   return items;
-}
-
-function makeThreatItem(
-  manifestPath: string,
-  name: string,
-  meta: { severity: MalwareItem['severity']; title: string; pattern: string; evidence: string },
-): MalwareItem {
-  return {
-    id: randomUUID(),
-    type: 'supply-chain',
-    severity: meta.severity,
-    title: meta.title,
-    description: `检测到供应链威胁：${name}`,
-    file: manifestPath,
-    line: 0,
-    pattern: meta.pattern,
-    evidence: meta.evidence,
-  };
 }

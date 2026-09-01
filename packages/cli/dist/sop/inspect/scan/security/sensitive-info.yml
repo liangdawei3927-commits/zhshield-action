@@ -6,3 +6,7 @@ status: active
 source: external
 tags: [security, secret, credential]
 applicableEngines: [inspect]
+check:
+  tool: gitleaks
+  toolConfig:
+    mode: detect

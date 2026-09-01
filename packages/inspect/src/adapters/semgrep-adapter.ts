@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
@@ -11,10 +9,9 @@ import type {
   AccessScope,
 } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
+import { isCommandAvailable } from './tool-available';
 import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
-
-const execFileAsync = promisify(execFile);
 
 const META: ToolMeta = {
   id: 'semgrep',
@@ -82,13 +79,7 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    return isCommandAvailable(() => this.resolveCommand());
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {

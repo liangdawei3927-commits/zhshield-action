@@ -14,6 +14,7 @@ import type {
   AccessScope,
 } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
+import { isCommandAvailable } from './tool-available';
 
 const execFileAsync = promisify(execFile);
 
@@ -150,13 +151,7 @@ export class TypeScriptAdapter implements ToolAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const command = await this.resolveCommand();
-      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 5000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    return isCommandAvailable(() => this.resolveCommand());
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import { depcheckMapper } from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
 import type { ExecError, DepcheckOutput } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -35,7 +35,7 @@ export class DepcheckAdapter implements ToolAdapter {
 
     try {
       const output = await this.runDepcheck(options);
-      const issues = this.mapOutput(output);
+      const issues = depcheckMapper(output);
 
       return {
         tool: 'depcheck',
@@ -84,46 +84,5 @@ export class DepcheckAdapter implements ToolAdapter {
       metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
       error: err.stderr || err.message || 'depcheck 执行失败',
     };
-  }
-
-  private mapOutput(output: DepcheckOutput): Issue[] {
-    if (!output || typeof output !== 'object') return [];
-    const issues: Issue[] = [];
-    const deps: string[] = output.dependencies || [];
-    const devDeps: string[] = output.devDependencies || [];
-
-    for (const name of deps) {
-      issues.push({
-        id: randomUUID(),
-        ruleId: 'depcheck/unused-dep',
-        severity: 'info',
-        category: 'quality',
-        message: `未使用的生产依赖: ${name}`,
-        file: 'package.json',
-        line: 0,
-        column: 0,
-        suggestion: `移除 ${name} 从 dependencies`,
-        autoFixable: false,
-        source: 'security',
-        fingerprint: `depcheck:${name}:dependencies`,
-      });
-    }
-    for (const name of devDeps) {
-      issues.push({
-        id: randomUUID(),
-        ruleId: 'depcheck/unused-dev-dep',
-        severity: 'info',
-        category: 'quality',
-        message: `未使用的开发依赖: ${name}`,
-        file: 'package.json',
-        line: 0,
-        column: 0,
-        suggestion: `移除 ${name} 从 devDependencies`,
-        autoFixable: false,
-        source: 'security',
-        fingerprint: `depcheck:${name}:devDependencies`,
-      });
-    }
-    return issues;
   }
 }

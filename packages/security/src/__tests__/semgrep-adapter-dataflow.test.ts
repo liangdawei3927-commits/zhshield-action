@@ -16,6 +16,8 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
+  // adapter 在规则目录存在后还会调用 fs.promises.access 二次校验
+  promises: { access: vi.fn(async () => undefined) },
 }));
 
 import { SemgrepAdapter } from '../adapters/semgrep-adapter';

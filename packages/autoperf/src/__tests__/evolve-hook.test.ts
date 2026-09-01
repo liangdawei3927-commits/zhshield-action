@@ -3,7 +3,7 @@
  * 验证 AutoPerf → evolve 经验库回写：映射规则、source='auto'、置信度、空报告短路。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AutoPerfReport, PerfBudget } from '../types';
+import type { AutoPerfReport } from '../types';
 
 const mockRecord = vi.fn();
 const mockAdjust = vi.fn();

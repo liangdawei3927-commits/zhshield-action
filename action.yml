@@ -38,7 +38,7 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
 
     # 用户 0 配置：Action 内部负责安装 CLI 与开源工具。
     # zhshield-cli 自包含 bundle 随本仓库分发包（packages/cli/dist），此处从本 Action

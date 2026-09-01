@@ -34,6 +34,13 @@ interface GitleaksFinding {
   StartColumn?: number;
 }
 
+/**
+ * 构建产物 / 依赖不参与密钥扫描：与 Guard 其他适配器排除 dist/node_modules 的约定一致。
+ * CLI 自包含 bundle（packages/cli/dist/zhshield.js）内嵌了密钥检测正则与示例字符串，
+ * 提交后必然触发 "Generic API Key" 等 error 级误报并阻断门禁。
+ */
+const EXCLUDED_FILE_PATTERN = /(^|\/)(dist|build|coverage|node_modules)(\/|$)|\.map$|\.min\.js$/;
+
 export class GitleaksAdapter implements ToolAdapter {
   meta = META;
   private commandPromise?: Promise<string>;
@@ -171,22 +178,27 @@ export class GitleaksAdapter implements ToolAdapter {
 
   private mapOutput(findings: Record<string, unknown>[]): Issue[] {
     if (!Array.isArray(findings)) return [];
-    return findings.map((f) => {
-      const finding = f as GitleaksFinding;
-      return {
-        id: randomUUID(),
-        ruleId: finding.RuleID || 'gitleaks-unknown',
-        severity: 'error',
-        category: 'security',
-        message: finding.Description || `检测到硬编码密钥: ${finding.RuleID || '未知'}`,
-        file: finding.File || '',
-        line: finding.StartLine || 0,
-        column: finding.StartColumn || 0,
-        suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
-        autoFixable: false,
-        source: 'inspect',
-        fingerprint: `gitleaks:${finding.RuleID || ''}:${finding.File || ''}:${finding.StartLine || 0}`,
-      };
-    });
+    return findings
+      .filter((f) => {
+        const finding = f as GitleaksFinding;
+        return !EXCLUDED_FILE_PATTERN.test(finding.File || '');
+      })
+      .map((f) => {
+        const finding = f as GitleaksFinding;
+        return {
+          id: randomUUID(),
+          ruleId: finding.RuleID || 'gitleaks-unknown',
+          severity: 'error',
+          category: 'security',
+          message: finding.Description || `检测到硬编码密钥: ${finding.RuleID || '未知'}`,
+          file: finding.File || '',
+          line: finding.StartLine || 0,
+          column: finding.StartColumn || 0,
+          suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
+          autoFixable: false,
+          source: 'inspect',
+          fingerprint: `gitleaks:${finding.RuleID || ''}:${finding.File || ''}:${finding.StartLine || 0}`,
+        };
+      });
   }
 }

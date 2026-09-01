@@ -46,7 +46,7 @@ describe('ipc-security sender 校验', () => {
   it('wrap 语义：enforceTrustedIpcSender 包装后，可信来源正常执行，不可信来源 handler 不被调用', async () => {
     vi.stubEnv('VITE_DEV_SERVER_URL', '');
     vi.resetModules();
-    const { enforceTrustedIpcSender } = await import('../../electron/ipc-security');
+    await import('../../electron/ipc-security');
 
     // 模拟 ipcMain 单例：handle/on 记录注册的 listener，便于直接触发验证
     type Listener = (event: unknown, ...args: unknown[]) => unknown;

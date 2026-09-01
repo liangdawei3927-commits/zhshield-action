@@ -1,27 +1,35 @@
 import type { ReactNode } from 'react';
 
-// 方块机器人Logo：白色线条方块 + 白色笑脸 < -（品牌唯一 LOGO）
+// 盾牌Logo：白色线条盾牌 + 代码箭头 <-（品牌唯一 LOGO）
 export function ShieldLogo({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect x="1.5" y="1.5" width="21" height="21" rx="5" stroke="white" strokeWidth="1.8" />
-      {/* 左眼 < 开眼，开口小一点更像代码符号 */}
+      {/* 盾牌外框 */}
       <path
-        d="M10.5 9.5L7.5 12L10.5 14.5"
+        d="M12 2L3 6.5V12C3 17.25 6.84 22.09 12 23.5C17.16 22.09 21 17.25 21 12V6.5L12 2Z"
         stroke="white"
-        strokeWidth="2"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* <- 箭头符号 */}
+      {/* < 符号 */}
+      <path
+        d="M9 10L6.5 12.5L9 15"
+        stroke="white"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      {/* 右眼 - 眯眼 */}
+      {/* - 符号（与<底边齐平） */}
       <line
-        x1="14"
-        y1="12"
-        x2="17.5"
-        y2="12"
+        x1="10.5"
+        y1="15"
+        x2="15.5"
+        y2="15"
         stroke="white"
-        strokeWidth="2"
+        strokeWidth="1.8"
         strokeLinecap="round"
       />
     </svg>

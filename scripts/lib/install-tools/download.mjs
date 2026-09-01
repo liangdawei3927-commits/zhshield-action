@@ -18,6 +18,9 @@ import { warn } from './constants.mjs';
 /** 换行符（\r?\n），模块级常量避免每次调用重编译 */
 const RE_NEWLINE = /\r?\n/;
 
+/** 空白字符（空格、制表符等），模块级常量避免每次调用重编译 */
+const RE_WHITESPACE = /\s+/;
+
 /** 下载文件到本地（GitHub CDN 会拒绝 undici 默认 UA，必须带 User-Agent） */
 export async function downloadFile(url, dest) {
   const buf = await downloadBuffer(url);
@@ -103,7 +106,7 @@ export function sha256File(p) {
 /** 从官方 checksum 文件中解析目标文件的 sha256（格式: <hash>  <filename>） */
 export function parseChecksum(text, fileName) {
   for (const line of text.split(RE_NEWLINE)) {
-    const parts = line.trim().split(/\s+/);
+    const parts = line.trim().split(RE_WHITESPACE);
     if (parts.length >= 2 && parts[1] === fileName) return parts[0];
   }
   return null;

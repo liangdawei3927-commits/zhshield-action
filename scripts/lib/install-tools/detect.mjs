@@ -12,6 +12,12 @@ import { IS_WIN, TOOLS_DIR } from './constants.mjs';
 /** 换行符（\r?\n），模块级常量避免每次调用重编译 */
 const RE_NEWLINE = /\r?\n/;
 
+/** 语义化版本三元组（major.minor.patch），模块级常量避免每次调用重编译 */
+const RE_SEMVER = /\d+\.\d+\.\d+/;
+
+/** 版本前缀 v，模块级常量避免每次调用重编译 */
+const RE_V_PREFIX = /^v/;
+
 /** 探测 PATH（等价 command -v / where） */
 export function findInPath(binName) {
   if (IS_WIN) {
@@ -30,7 +36,7 @@ export function getToolVersion(binPath, timeoutMs = 10000) {
     const res = spawnSync(binPath, ['--version'], { encoding: 'utf-8', timeout: timeoutMs });
     if (res.status !== 0) return null;
     const out = `${res.stdout || ''}${res.stderr || ''}`;
-    const m = out.match(/\d+\.\d+\.\d+/);
+    const m = out.match(RE_SEMVER);
     return m ? m[0] : null;
   } catch {
     return null;
@@ -44,7 +50,7 @@ export function probeTimeoutFor(tool) {
 
 export function versionsMatch(actual, expected) {
   if (!actual || !expected) return false;
-  return actual.replace(/^v/, '').trim() === expected.replace(/^v/, '').trim();
+  return actual.replace(RE_V_PREFIX, '').trim() === expected.replace(RE_V_PREFIX, '').trim();
 }
 
 /** npm 工具本地安装版本：直接读 ~/.zhshield/tools/<tool>/node_modules/<pkg>/package.json */

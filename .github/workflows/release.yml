@@ -1,10 +1,14 @@
 name: Release
 
-# 触发：推送 v* 开头的 tag（如 v0.2.0）
+# 触发：推送 v* 版本 tag（如 v0.2.0）
+# 排除 v1 —— 该 tag 是 zhshield-action 官方 Action 的 bundle 引用，
+# 每次门禁都会用到，误触发 Release 会在版本校验处必然失败
 on:
   push:
     tags:
       - 'v*'
+      - '!v1'
+      - '!v1.*'
   workflow_dispatch:
     inputs:
       tag:

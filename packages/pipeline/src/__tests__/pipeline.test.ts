@@ -10,7 +10,9 @@ const SCAN_TARGET = path.resolve(__dirname, '..');
 const ESLINT_LINT = /eslint|lint/i;
 const TARGET_ENGINE = /^(guard|inspect)$/;
 
-describe('PipelineRunner — 端到端集成测试', () => {
+// 端到端集成测试：调用真实 eslint/gitleaks 等外部工具，单次 ~250s
+// 默认跳过以保持 `pnpm test` 快速；CI 与发版通过 RUN_E2E=1 显式启用
+describe.skipIf(!process.env.RUN_E2E)('PipelineRunner — 端到端集成测试', () => {
   let runner: PipelineRunner;
   let scanRunner: PipelineRunner;
 

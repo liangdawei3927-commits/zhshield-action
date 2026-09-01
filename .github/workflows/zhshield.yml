@@ -1,8 +1,10 @@
 name: ZHCodeShield Guard
 
-# 门禁触发：push + pull_request
+# 门禁触发：push 到 main/master + pull_request
+# 不监听 tag push —— 发布 tag 时无需再跑一遍门禁（release.yml 已含 quality job）
 on:
   push:
+    branches: [main, master]
   pull_request:
 
 # SARIF 上传需要 security-events 写权限（自动 GITHUB_TOKEN，非用户 token）
@@ -15,7 +17,7 @@ jobs:
   shield:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # 官方 Action（P1 产出）：安装 CLI + 开源工具，只检查不修复
       - name: ZHCodeShield Guard
@@ -27,6 +29,6 @@ jobs:
       # error 级问题导致合并被状态检查阻断；始终上传 SARIF 以便 Security 面板 / PR 展示
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         with:
           sarif_file: zhshield.sarif

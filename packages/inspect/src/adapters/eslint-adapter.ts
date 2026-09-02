@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   ToolAdapter,
@@ -15,6 +14,7 @@ import type {
 import { resolveEslintTargetDir } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
+import { resolveInjectedConfigPath } from './injected-config';
 
 const execFileAsync = promisify(execFile);
 
@@ -123,15 +123,14 @@ export class ESLintAdapter implements ToolAdapter {
     const args: string[] = ['--format', 'json', ...defaultExts, ...relativeTargets];
 
     // 注入的 flat config 为规则声明（如 node_modules/@zh/kernel/dist/assets/...），
-    // 仅在被扫描项目内部安装了对应依赖时才存在。对于未安装该依赖的外部项目，
-    // 直接传入 --config 会让 ESLint 因 ENOENT 崩溃并使整次巡检失败；此处探测该
-    // config 文件是否真实存在（按规则声明的相对路径相对 cwd 解析），缺失时退化为
-    // unavailable（跳过该规则），而非硬错误。
+    // 仅在被扫描项目内部安装了对应依赖时按 cwd 直接解析才存在。缺失时按回退链
+    // （cwd → 项目根 → @zh/kernel 包内路径）解析；全部不存在时退化为 unavailable
+    // （跳过该规则），而非硬错误。
     const injectedConfig = options.config?.config;
     if (injectedConfig) {
-      const configPath = path.resolve(cwd, injectedConfig);
-      if (!fs.existsSync(configPath)) {
-        return { args, unavailable: `ESLint 性能配置不存在，跳过该规则: ${configPath}` };
+      const configPath = resolveInjectedConfigPath(injectedConfig, cwd, options.projectPath);
+      if (!configPath) {
+        return { args, unavailable: `ESLint 性能配置不存在，跳过该规则: ${injectedConfig}` };
       }
       // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
       args.unshift('--config', configPath);

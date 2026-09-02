@@ -52,7 +52,8 @@ describe('ESLintAdapter 注入 config 缺失时的行为', () => {
     const result = await adapter.scan({
       projectPath: tempDir,
       config: {
-        config: 'node_modules/@zh/kernel/dist/assets/eslint/eslint-performance.config.mjs',
+        // 注入一个真实不存在的内核资产路径（真实资产路径已可解析，不可再作为缺失样本）
+        config: '@zh/kernel/dist/assets/eslint/missing-performance.config.mjs',
         category: 'performance',
       },
     });

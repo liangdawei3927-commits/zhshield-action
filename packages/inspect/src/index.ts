@@ -10,5 +10,9 @@ export {
   TsPruneAdapter,
   SemgrepAdapter,
   DepcheckAdapter,
+  TypeScriptAdapter,
+  PrettierAdapter,
+  CommitLintAdapter,
+  NpmAuditAdapter,
 } from './adapters';
 export type { InspectionReport, AdapterResult, Issue, RunContext } from './types';

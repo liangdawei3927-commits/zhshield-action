@@ -89,18 +89,19 @@ export function findZhshieldToolBin(tool: string): string | null {
 }
 
 /**
- * 解析工具命令：优先 PATH 中的全局工具，其次项目本地 node_modules/.bin
- * （pnpm/yarn 等将工具安装为项目本地依赖，未进入全局 PATH），
+ * 解析工具命令：优先项目本地 node_modules/.bin（与该仓库构建所用版本一致，
+ * 例如 tsc 使用项目锁定的版本而非全局更新的版本），其次 PATH 中的全局工具，
  * 最后回退到 zhshield 共享工具目录 ~/.zhshield/bin（install-tools.mjs 安装目标）。
  * 均不可用时返回裸命令名，由调用方按 ENOENT 处理。
  */
 export async function resolveToolCommand(tool: string, startDir?: string): Promise<string> {
+  const dir = startDir ?? process.cwd();
+  const local = findLocalToolBin(tool, dir);
+  if (local) return local;
   try {
     await execFileAsync(tool, ['--version'], { timeout: 5000 });
     return tool;
   } catch {
-    const local = findLocalToolBin(tool, startDir ?? process.cwd());
-    if (local) return local;
     const shared = findZhshieldToolBin(tool);
     if (shared) return shared;
   }

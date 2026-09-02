@@ -10,6 +10,7 @@ import type {
 } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
+import { resolveInjectedConfigPath } from './injected-config';
 import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
 
@@ -84,9 +85,9 @@ export class SemgrepAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const { targetDir, category, configs, rules } = this.resolveScanSetup(options);
+    const { targetDir, category, configs, declaredConfigs, rules } = this.resolveScanSetup(options);
 
-    const unavailable = this.checkConfigAvailability(options, configs, rules);
+    const unavailable = this.checkConfigAvailability(declaredConfigs, configs, rules);
     if (unavailable) return this.runner.buildUnavailable(start, unavailable);
 
     const args = await this.argsBuilder.build(options, configs, targetDir);
@@ -99,30 +100,30 @@ export class SemgrepAdapter implements ToolAdapter {
     targetDir: string;
     category: IssueCategory;
     configs: string[];
+    declaredConfigs: string[];
     rules: SemgrepRule[] | undefined;
   } {
     const targetDir = options.targetFiles?.[0] ?? this.resolveTargetDir(options.projectPath);
     const category: IssueCategory = options.config?.category ?? 'security';
-    const configs = this.resolveConfigs(options);
+    const declaredConfigs = this.resolveConfigs(options);
+    // 按回退链（项目根 → @zh/kernel 包内路径）解析为存在的绝对路径，缺失项剔除
+    const configs = declaredConfigs
+      .map((c) => resolveInjectedConfigPath(c, options.projectPath, options.projectPath))
+      .filter((p): p is string => p !== null);
     const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
-    return { targetDir, category, configs, rules };
+    return { targetDir, category, configs, declaredConfigs, rules };
   }
 
   /** 校验 config / 内联 rules 可用性，缺失时返回 unavailable 原因 */
   private checkConfigAvailability(
-    options: ToolScanOptions,
+    declaredConfigs: string[],
     configs: string[],
     rules: SemgrepRule[] | undefined,
   ): string | null {
     // 注入的 config 多为规则声明的仓库内部相对路径（node_modules/@zh/kernel/dist/assets/...），
-    // 仅在目标项目安装了对应依赖时才存在。对缺失该依赖的外部项目直接 --config 会让
-    // semgrep 报 "unable to find a config" 并令整次巡检失败；此处探测并按 cwd 解析，
-    // 全部 config 缺失时退化为 unavailable（映射为 skipped），而非硬错误。
-    const existingConfigs = configs.filter((c) =>
-      fs.existsSync(path.resolve(options.projectPath, c)),
-    );
-    if (configs.length > 0 && existingConfigs.length === 0) {
-      return `Semgrep 配置不存在，跳过该规则: ${configs.join(', ')}`;
+    // 已按回退链解析；全部无法解析时退化为 unavailable（映射为 skipped），而非硬错误。
+    if (declaredConfigs.length > 0 && configs.length === 0) {
+      return `Semgrep 配置不存在，跳过该规则: ${declaredConfigs.join(', ')}`;
     }
 
     // 既无显式 config 也无内联 rules 时禁止裸跑 semgrep scan：不带 --config 会回退到

@@ -13,6 +13,7 @@ import type {
 } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
+import { resolveInjectedConfigPath } from './injected-config';
 
 const execFileAsync = promisify(execFile);
 
@@ -77,18 +78,19 @@ export class DependencyCruiserAdapter implements ToolAdapter {
 
   /** 执行 dependency-cruiser 并映射输出为可用结果 */
   private async runDepCruiser(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const configFile = this.resolveConfig(options.projectPath);
-    const targetDir = path.join(options.projectPath, 'src');
+    const configFile = this.resolveConfig(options);
+    const targetDirs = this.resolveTargetDirs(options.projectPath);
     const command = await this.resolveCommand();
     const args: string[] = [];
     if (configFile) {
-      args.push('--validate', configFile);
+      // dependency-cruiser v16+ 指定配置用 --config（--validate 已废弃）
+      args.push('--config', configFile);
     }
-    args.push('--output-type', 'json', targetDir);
+    args.push('--output-type', 'json', ...targetDirs);
 
     const { stdout } = await execFileAsync(command, args, {
       cwd: options.projectPath,
-      timeout: options.timeout || 60000,
+      timeout: options.timeout || 180000,
       maxBuffer: 10 * 1024 * 1024,
     });
 
@@ -134,16 +136,53 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     };
   }
 
-  private resolveConfig(projectPath: string): string | null {
+  /**
+   * 解析扫描目标目录：项目含 src/ 时扫描 src；monorepo（无根 src）时扫描各
+   * packages 下的 src 子目录（避免全仓扫描过慢）；均缺失时回退整个项目。
+   */
+  private resolveTargetDirs(projectPath: string): string[] {
+    const srcDir = path.join(projectPath, 'src');
+    if (fs.existsSync(srcDir)) return [srcDir];
+
+    const pkgsDir = path.join(projectPath, 'packages');
+    if (fs.existsSync(pkgsDir)) {
+      const targets: string[] = [];
+      try {
+        for (const entry of fs.readdirSync(pkgsDir, { withFileTypes: true })) {
+          if (entry.name === 'node_modules') continue;
+          const pkgSrc = path.join(pkgsDir, entry.name, 'src');
+          if (entry.isDirectory() && fs.existsSync(pkgSrc)) targets.push(pkgSrc);
+        }
+      } catch {
+        // packages 目录不可读时走回退
+      }
+      if (targets.length > 0) return targets;
+    }
+
+    return [projectPath];
+  }
+
+  /**
+   * 解析 dep-cruiser 校验配置：
+   * 1. SOP 规则注入的 config（按回退链解析，如内核资产 @zh/kernel/dist/assets/...）
+   * 2. 被扫描项目本地的 .dependency-cruiser.{cjs,js,json}
+   * 均缺失返回 null（dep-cruiser 将因找不到默认配置而报错，由调用方如实上报）
+   */
+  private resolveConfig(options: ToolScanOptions): string | null {
+    const injected = options.config?.config;
+    if (typeof injected === 'string' && injected.trim()) {
+      const resolved = resolveInjectedConfigPath(injected, options.projectPath, options.projectPath);
+      if (resolved) return resolved;
+    }
     const candidates = [
       '.dependency-cruiser.js',
       '.dependency-cruiser.cjs',
       '.dependency-cruiser.json',
     ];
     for (const name of candidates) {
-      const p = path.join(projectPath, name);
+      const p = path.join(options.projectPath, name);
       if (fs.existsSync(p)) return p;
-      const zhshield = path.join(projectPath, '.zhshield', name);
+      const zhshield = path.join(options.projectPath, '.zhshield', name);
       if (fs.existsSync(zhshield)) return zhshield;
     }
     return null;

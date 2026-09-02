@@ -5,3 +5,7 @@ export { JscpdAdapter } from './jscpd-adapter';
 export { TsPruneAdapter } from './ts-prune-adapter';
 export { SemgrepAdapter } from './semgrep-adapter';
 export { DepcheckAdapter } from './depcheck-adapter';
+export { TypeScriptAdapter } from './typescript-adapter';
+export { PrettierAdapter } from './prettier-adapter';
+export { CommitLintAdapter } from './commit-lint-adapter';
+export { NpmAuditAdapter } from './npm-audit-adapter';

@@ -288,7 +288,8 @@ describe('SemgrepAdapter', () => {
       const result = await adapter.scan({
         projectPath: project,
         projectId: project,
-        config: { enabled: true, config: 'node_modules/@zh/kernel/dist/assets/semgrep/redos.yml' },
+        // 注入一个真实不存在的内核资产路径（真实资产路径已可解析，不可再作为缺失样本）
+        config: { enabled: true, config: '@zh/kernel/dist/assets/semgrep/missing-rules.yml' },
       });
 
       expect(result.status).toBe('unavailable');

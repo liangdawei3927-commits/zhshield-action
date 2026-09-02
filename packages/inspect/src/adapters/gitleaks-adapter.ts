@@ -88,7 +88,8 @@ export class GitleaksAdapter implements ToolAdapter {
     const command = await this.resolveCommand();
     const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
       cwd: options.projectPath,
-      timeout: options.timeout || 30000,
+      // gitleaks 扫描完整 git 历史，流水线并行高负载下易超 30s，默认放宽到 120s
+      timeout: options.timeout || 120000,
       maxBuffer: 10 * 1024 * 1024,
     });
 

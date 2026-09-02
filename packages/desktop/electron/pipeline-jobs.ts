@@ -82,6 +82,10 @@ export async function runInspectJob(id: string, projectPath: string): Promise<vo
     TsPruneAdapter,
     SemgrepAdapter,
     DepcheckAdapter,
+    TypeScriptAdapter,
+    PrettierAdapter,
+    CommitLintAdapter,
+    NpmAuditAdapter,
   } = await import('@zh/inspect');
   const engine = new InspectEngine({ emit: () => undefined });
   // 注册常用适配器，与全流水线能力对齐
@@ -92,6 +96,10 @@ export async function runInspectJob(id: string, projectPath: string): Promise<vo
   engine.registerAdapter(new TsPruneAdapter());
   engine.registerAdapter(new SemgrepAdapter());
   engine.registerAdapter(new DepcheckAdapter());
+  engine.registerAdapter(new TypeScriptAdapter());
+  engine.registerAdapter(new PrettierAdapter());
+  engine.registerAdapter(new CommitLintAdapter());
+  engine.registerAdapter(new NpmAuditAdapter());
   try {
     const report = await engine.runScan(projectPath, 'full');
     progress(id, 'done', t('pipeline.inspect.jobDone'), 1.0);

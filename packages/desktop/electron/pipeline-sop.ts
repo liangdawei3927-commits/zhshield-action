@@ -54,40 +54,42 @@ function createSkippedChecksGuardReport(): GuardReport {
 
 type PipelineRunnerInstance = InstanceType<(typeof import('@zh/pipeline'))['PipelineRunner']>;
 
-/** 运行 SOP 门禁阶段：通过时返回报告，未通过/异常时返回失败摘要 */
+/** 运行 SOP 门禁阶段：始终返回报告与通过状态（失败不阻断后续巡检） */
 async function runSopGuardStage(
   id: string,
   runner: PipelineRunnerInstance,
   dryRun: boolean,
-): Promise<
-  { guardReport: Awaited<ReturnType<typeof runner.runSopGuard>> } | { failure: PipelineReport }
-> {
+): Promise<{ guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>; ok: boolean }> {
   progress(id, 'guard', t('pipeline.guard.sopScanning'), 0.15);
   try {
     const guardReport = await runner.runSopGuard({ dryRun });
     if (guardReport.ok === false) {
       progress(id, 'guard', t('pipeline.guard.failed', { count: guardReport.failed }), 0.3);
-      return {
-        failure: attachSummary(
-          createReport({
-            guard: guardReport,
-            passed: false,
-            stage: 'guard',
-          }),
-        ),
-      };
+      return { guardReport, ok: false };
     }
-    return { guardReport };
+    return { guardReport, ok: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      failure: attachSummary(
-        createReport({
-          stage: 'guard',
-          passed: false,
-          error: message,
-        }),
-      ),
+      ok: false,
+      guardReport: {
+        total: 1,
+        passed: 0,
+        failed: 0,
+        errors: 1,
+        skipped: 0,
+        ok: false,
+        blockingCount: 0,
+        evaluations: [
+          {
+            status: 'error',
+            message,
+            rule: { id: 'guard-stage', name: t('pipeline.guard.sopScanning') },
+          },
+        ],
+        durationMs: 0,
+        timestamp: new Date(),
+      } as Awaited<ReturnType<typeof runner.runSopGuard>>,
     };
   }
 }
@@ -126,14 +128,15 @@ async function runSopPipeline(
   guardEnabled = true,
 ): Promise<PipelineReport> {
   let guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>;
+  let guardOk = true;
 
   if (!guardEnabled) {
     progress(id, 'guard', t('pipeline.guard.skippedDisabled'), 0.2);
     guardReport = createSkippedGuardReport() as Awaited<ReturnType<typeof runner.runSopGuard>>;
   } else {
     const guard = await runSopGuardStage(id, runner, dryRun ?? false);
-    if ('failure' in guard) return guard.failure;
     guardReport = guard.guardReport;
+    guardOk = guard.ok;
   }
 
   const inspect = await runSopInspectStage(id, runner, guardReport);
@@ -145,7 +148,7 @@ async function runSopPipeline(
     createReport({
       guard: guardReport,
       inspect: inspect.inspectReport,
-      passed: inspectFailed === 0,
+      passed: guardOk && inspectFailed === 0,
       stage: 'complete',
     }),
   );
@@ -176,6 +179,7 @@ export async function runFullPipelineJob(
   guardEnabled = true,
 ): Promise<void> {
   let guardReport: Awaited<ReturnType<typeof runner.runGuard>>;
+  let guardOk = true;
 
   if (!guardEnabled) {
     progress(id, 'guard', t('pipeline.guard.skippedDisabled'), 0.2);
@@ -190,15 +194,7 @@ export async function runFullPipelineJob(
         t('pipeline.guard.failedBrief', { count: guardReport.summary.failed }),
         0.3,
       );
-      const report = attachSummary(
-        createReport({
-          guard: guardReport,
-          passed: false,
-          stage: 'guard',
-        }),
-      );
-      send({ type: 'result', id, report: serializePipelineReport(report) });
-      return;
+      guardOk = false;
     }
   }
 
@@ -208,7 +204,7 @@ export async function runFullPipelineJob(
     createReport({
       guard: guardReport,
       inspect: inspectReport,
-      passed: true,
+      passed: guardOk,
       stage: 'complete',
     }),
   );

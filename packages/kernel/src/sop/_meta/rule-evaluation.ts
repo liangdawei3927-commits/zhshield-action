@@ -148,6 +148,8 @@ export type ContentInstruction =
   | CheckListInstruction
   | ThresholdInstruction
   | ForbiddenPatternInstruction
+  | ForbiddenRegexInstruction
+  | RequiredContentInstruction
   | LayerBoundaryInstruction
   | ScannerDispatchInstruction
   | PresetInstruction
@@ -184,6 +186,57 @@ export interface ForbiddenPatternInstruction {
 export interface LayerBoundaryInstruction {
   type: 'layer-boundary';
   layers: Array<{ name: string; allowedDependencies: string[] }>;
+}
+
+/**
+ * ForbiddenRegexInstruction — 正则禁止模式指令
+ *
+ * 与 forbidden（字面量子串匹配）互补：patterns 需要正则语义
+ * （负向断言、量词、字符类等）时使用。沿用 isSafeRegexPattern 安全编译。
+ */
+export interface ForbiddenRegexInstruction {
+  type: 'forbidden-regex';
+  /** 正则禁止项：命中即违规 */
+  items: Array<{
+    /** 正则源码（逐行匹配，g 标志由评估器附加） */
+    regex: string;
+    /** 命中时的违规描述（缺省用正则源码） */
+    message?: string;
+    /** 修复建议 */
+    suggestion?: string;
+  }>;
+  /** 扫描文件扩展名过滤 */
+  fileExts?: string[];
+  /** 排除模式（相对路径 glob） */
+  excludePatterns?: string[];
+}
+
+/**
+ * RequiredContentInstruction — 必需内容指令
+ *
+ * 检测「应当存在的内容」：文件/章节/配置项/JSDoc 的缺失即违规。
+ * 与 forbidden（禁止存在的内容）语义互补，覆盖配置核查与文档完整性场景。
+ */
+export interface RequiredContentInstruction {
+  type: 'required-content';
+  items: RequiredContentItem[];
+}
+
+export interface RequiredContentItem {
+  /** 目标路径：单文件检查为相对 repoRoot 字面路径；jsdocOn 批量扫描为 glob */
+  path: string;
+  /** 批量扫描的扩展名过滤（jsdocOn 场景） */
+  fileExts?: string[];
+  /** 批量扫描的排除模式（jsdocOn 场景） */
+  excludePatterns?: string[];
+  /** 文件中必须同时出现的子串（大小写不敏感） */
+  contains?: string[];
+  /** 分组可选子串：每组至少命中一个（大小写不敏感），用于多语言文档 */
+  containsAny?: string[][];
+  /** JSON(C) 文件键路径 → 期望值（如 compilerOptions.strict: true） */
+  json?: Record<string, unknown>;
+  /** 命中这些声明正则的导出行必须有前置 JSDoc 注释 */
+  jsdocOn?: string[];
 }
 
 export interface ScannerDispatchInstruction {

@@ -2,15 +2,21 @@ name: Naming Conventions
 description: 检查代码命名规范一致性
 severity: info
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [naming, convention, style]
 applicableEngines: [inspect]
-rules:
-  - class: PascalCase
-  - function: camelCase
-  - variable: camelCase
-  - constant: UPPER_CASE
-  - interface: PascalCase
-  - type: PascalCase
-  - file: kebab-case
+forbiddenRegex:
+  - regex: '^\s*export\s+class\s+[a-z]'
+    message: '导出类名应使用 PascalCase'
+    suggestion: '将类名改为大驼峰命名（如 UserService）'
+  - regex: '^\s*export\s+interface\s+[a-z]'
+    message: '导出接口名应使用 PascalCase'
+    suggestion: '将接口名改为大驼峰命名（如 UserInfo）'
+  - regex: '^\s*export\s+type\s+[a-z][a-zA-Z0-9]*\s*='
+    message: '导出类型别名应使用 PascalCase'
+    suggestion: '将类型别名改为大驼峰命名（如 ParseResult）'
+  - regex: '^\s*export\s+enum\s+[a-z]'
+    message: '导出枚举名应使用 PascalCase'
+    suggestion: '将枚举名改为大驼峰命名（如 LogLevel）'
+fileExts: ['.ts', '.tsx']

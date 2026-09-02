@@ -313,15 +313,16 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
   describe('全领域规则加载清单', () => {
     it('加载 guard/inspect/security/sentinel/evolve/refactor 六个领域规则', () => {
       // 仅含真实检测逻辑的规则保持 active；空骨架规则（无 tool/patterns/thresholds
-      // 等检测字段）已标记 draft，避免 pattern-scan 兜底造成假通过
+      // 等检测字段）已标记 draft，避免 pattern-scan 兜底造成假通过。
+      // guard +2（prettier-check、commit-message），inspect +8（10 条空骨架补实）
       const byDomain = (d: string) => registry.getActive().filter((r) => r.domain === d);
-      expect(byDomain('guard').length).toBe(8);
-      expect(byDomain('inspect').length).toBe(16);
+      expect(byDomain('guard').length).toBe(10);
+      expect(byDomain('inspect').length).toBe(24);
       expect(byDomain('security').length).toBe(20);
       expect(byDomain('sentinel').length).toBe(0);
       expect(byDomain('evolve').length).toBe(2);
       expect(byDomain('refactor').length).toBe(13);
-      expect(registry.getActive().length).toBe(59);
+      expect(registry.getActive().length).toBe(69);
     });
   });
 });

@@ -2,12 +2,14 @@ name: Type Definitions Documentation
 description: 检查 TypeScript 类型定义是否文档化
 severity: info
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [documentation, typescript, types]
 applicableEngines: [inspect]
-requirements:
-  - exported-interfaces-documented
-  - public-type-aliases-documented
-  - generics-documented
-  - edge-cases-noted
+required:
+  # 导出 interface / type 别名必须有前置 JSDoc 文档
+  - path: src
+    fileExts: ['.ts']
+    jsdocOn:
+      - '^\s*export\s+interface\s+'
+      - '^\s*export\s+type\s+'

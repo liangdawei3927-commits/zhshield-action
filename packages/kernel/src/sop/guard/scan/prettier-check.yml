@@ -2,8 +2,10 @@ name: Prettier Format Check
 description: L1 门禁 — 代码格式检查，确保代码符合 Prettier 规范
 severity: warning
 executionMode: sync
-status: draft
+status: active
 source: official
 tags: [format, prettier, style]
 applicableEngines: [guard]
-autoFix: true
+check:
+  tool: prettier # 格式检查（--list-different 模式，只报不落盘）
+  toolConfig: {}

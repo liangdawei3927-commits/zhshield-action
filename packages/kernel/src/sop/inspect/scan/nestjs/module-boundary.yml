@@ -2,11 +2,17 @@ name: NestJS Module Boundary
 description: 检查 NestJS 模块边界 — 确保模块间依赖关系正确
 severity: warning
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [nestjs, module, boundary]
 applicableEngines: [inspect]
-rules:
-  - module-import-correctness
-  - circular-module-import
-  - provider-scope
+forbiddenRegex:
+  # 跨模块深引用：from 指向其它 modules/<name>/ 下的非 index 文件
+  - regex: 'from ["''][^"'']*/modules/[\w.-]+/(?!index)'
+    message: '跨模块深引用：仅允许引用目标模块的 index 导出'
+    suggestion: '改为从目标模块的 index.ts 导入，或将共享逻辑下沉到共享层'
+  # require 形式的跨模块深引用
+  - regex: 'require\(["''][^"'']*/modules/[\w.-]+/(?!index)'
+    message: '跨模块深引用（require）：仅允许引用目标模块的 index 导出'
+    suggestion: '改为从目标模块的 index.ts 导入，或将共享逻辑下沉到共享层'
+fileExts: ['.ts']

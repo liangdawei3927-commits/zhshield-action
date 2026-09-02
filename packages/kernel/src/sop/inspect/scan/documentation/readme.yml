@@ -2,17 +2,17 @@ name: README Documentation Check
 description: 检查项目 README 文档是否完整
 severity: info
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [documentation, readme]
 applicableEngines: [inspect]
-requiredSections:
-  - project-name
-  - description
-  - installation
-  - usage
-  - configuration
-optionalSections:
-  - api-reference
-  - contributing
-  - license
+required:
+  - path: README.md
+    contains: ['##']
+    containsAny:
+      # 安装章节（任一标题命中即可）
+      - ['## 安装', '## Installation', '## 快速开始', '## Quick Start', '## Getting Started']
+      # 使用章节（任一标题命中即可）
+      - ['## 使用', '## Usage', '## 快速开始', '## Quick Start', '## Getting Started']
+      # 配置章节（任一标题命中即可）
+      - ['## 配置', '## Configuration', '## 配置说明', '## 环境变量', '## Environment']

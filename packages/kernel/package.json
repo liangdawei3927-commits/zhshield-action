@@ -38,6 +38,7 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js"
     },
+    "./package.json": "./package.json",
     "./*": {
       "types": "./src/*",
       "import": "./dist/*",

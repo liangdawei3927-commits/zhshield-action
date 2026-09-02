@@ -5,17 +5,32 @@ import type {
   PatternScanInstruction,
   ThresholdInstruction,
   ForbiddenPatternInstruction,
+  ForbiddenRegexInstruction,
+  RequiredContentInstruction,
   LayerBoundaryInstruction,
   ScannerDispatchInstruction,
   PresetInstruction,
   ToolDispatchInstruction,
 } from './rule-evaluation';
+import {
+  hasToolDispatch,
+  hasLayers,
+  hasChecks,
+  hasForbidden,
+  hasForbiddenRegex,
+  hasRequired,
+  hasScanners,
+  hasPatterns,
+  hasThresholds,
+  hasPresets,
+} from './content-predicates';
 
 /**
  * ContentInterpreter — 将 SopRule.content 解释为可执行指令
  *
  * 每条 SOP 规则文件的 content 结构不同（patterns / checks / thresholds / forbidden / layers / scanners / presets），
  * 解释器根据存在哪些字段自动推断指令类型，供 SopRuleEngine 执行。
+ * 字段存在性谓词见 ./content-predicates（纯函数抽取）。
  */
 export class ContentInterpreter {
   /**
@@ -23,24 +38,17 @@ export class ContentInterpreter {
    */
   interpret(rule: SopRule): ContentInstruction {
     const c = rule.content ?? {};
-    if (this.hasToolDispatch(c)) return this.toToolDispatch(c);
-    if (this.hasLayers(c)) return this.toLayerBoundary(c);
-    if (this.hasChecks(c)) return this.toCheckList(c);
-    if (this.hasForbidden(c)) return this.toForbidden(c);
-    if (this.hasScanners(c)) return this.toScannerDispatch(c);
-    if (this.hasPatterns(c)) return this.toPatternScan(c);
-    if (this.hasThresholds(c)) return this.toThreshold(c);
-    if (this.hasPresets(c)) return this.toPreset(c);
+    if (hasToolDispatch(c)) return this.toToolDispatch(c);
+    if (hasLayers(c)) return this.toLayerBoundary(c);
+    if (hasChecks(c)) return this.toCheckList(c);
+    if (hasForbidden(c)) return this.toForbidden(c);
+    if (hasForbiddenRegex(c)) return this.toForbiddenRegex(c);
+    if (hasRequired(c)) return this.toRequired(c);
+    if (hasScanners(c)) return this.toScannerDispatch(c);
+    if (hasPatterns(c)) return this.toPatternScan(c);
+    if (hasThresholds(c)) return this.toThreshold(c);
+    if (hasPresets(c)) return this.toPreset(c);
     return { type: 'pattern-scan', patterns: [JSON.stringify(c)] };
-  }
-
-  private hasToolDispatch(c: Record<string, unknown>): boolean {
-    const check = c.check;
-    return (
-      typeof check === 'object' &&
-      check !== null &&
-      typeof (check as Record<string, unknown>).tool === 'string'
-    );
   }
 
   private toToolDispatch(c: Record<string, unknown>): ToolDispatchInstruction {
@@ -70,38 +78,6 @@ export class ContentInterpreter {
         resources: fix.resources as string[] | undefined,
       },
     };
-  }
-
-  private hasChecks(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.checks) && c.checks.length > 0;
-  }
-
-  private hasPatterns(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.patterns) && c.patterns.length > 0;
-  }
-
-  private hasThresholds(c: Record<string, unknown>): boolean {
-    return (
-      typeof c.threshold === 'number' ||
-      typeof c.threshold === 'string' ||
-      (typeof c.thresholds === 'object' && c.thresholds !== null)
-    );
-  }
-
-  private hasForbidden(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.forbidden) && c.forbidden.length > 0;
-  }
-
-  private hasLayers(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.layers) && c.layers.length > 0;
-  }
-
-  private hasScanners(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.scanners) && c.scanners.length > 0;
-  }
-
-  private hasPresets(c: Record<string, unknown>): boolean {
-    return Array.isArray(c.presets) && c.presets.length > 0;
   }
 
   private toCheckList(c: Record<string, unknown>): CheckListInstruction {
@@ -148,6 +124,54 @@ export class ContentInterpreter {
       excludePatterns: Array.isArray(c.excludePatterns)
         ? (c.excludePatterns as string[]).map(String)
         : undefined,
+    };
+  }
+
+  private toForbiddenRegex(c: Record<string, unknown>): ForbiddenRegexInstruction {
+    const rawItems = (c.forbiddenRegex as Array<Record<string, unknown>>).filter(
+      (it): it is Record<string, unknown> =>
+        typeof it === 'object' && it !== null && typeof it.regex === 'string',
+    );
+    return {
+      type: 'forbidden-regex',
+      items: rawItems.map((it) => ({
+        regex: String(it.regex),
+        ...(typeof it.message === 'string' ? { message: it.message } : {}),
+        ...(typeof it.suggestion === 'string' ? { suggestion: it.suggestion } : {}),
+      })),
+      fileExts: Array.isArray(c.fileExts) ? (c.fileExts as string[]).map(String) : undefined,
+      excludePatterns: Array.isArray(c.excludePatterns)
+        ? (c.excludePatterns as string[]).map(String)
+        : undefined,
+    };
+  }
+
+  private toRequired(c: Record<string, unknown>): RequiredContentInstruction {
+    const rawItems = (c.required as Array<Record<string, unknown>>).filter(
+      (it): it is Record<string, unknown> =>
+        typeof it === 'object' && it !== null && typeof it.path === 'string',
+    );
+    return {
+      type: 'required-content',
+      items: rawItems.map((it) => ({
+        path: String(it.path),
+        ...(Array.isArray(it.fileExts) ? { fileExts: (it.fileExts as string[]).map(String) } : {}),
+        ...(Array.isArray(it.excludePatterns)
+          ? { excludePatterns: (it.excludePatterns as string[]).map(String) }
+          : {}),
+        ...(Array.isArray(it.contains) ? { contains: (it.contains as string[]).map(String) } : {}),
+        ...(Array.isArray(it.containsAny)
+          ? {
+              containsAny: (it.containsAny as unknown[]).map((group) =>
+                Array.isArray(group) ? group.map(String) : [String(group)],
+              ),
+            }
+          : {}),
+        ...(typeof it.json === 'object' && it.json !== null
+          ? { json: it.json as Record<string, unknown> }
+          : {}),
+        ...(Array.isArray(it.jsdocOn) ? { jsdocOn: (it.jsdocOn as string[]).map(String) } : {}),
+      })),
     };
   }
 

@@ -19,6 +19,10 @@ const TOOL_DIMENSION_MAP: Record<ToolId, IssueCategory[]> = {
   'ts-prune': ['quality'],
   tsc: ['quality'],
   autoperf: ['performance'],
+  sentinel: ['quality'],
+  prettier: ['quality'],
+  'commit-lint': ['quality'],
+  'npm-audit': ['dependency', 'security'],
 };
 
 export function getToolDimensions(toolId: ToolId): IssueCategory[] {

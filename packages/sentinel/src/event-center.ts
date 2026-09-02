@@ -8,6 +8,7 @@ import {
   findSentinelEventByDedupeKey,
   getSentinelEvent,
 } from '@zh/db';
+import type { AuditLogger } from '@zh/shared';
 
 /** 告警 severity → 事件优先级映射表（替代 mapSeverity 中的 switch 分派） */
 const SEVERITY_TO_PRIORITY = new Map<string, 'p1' | 'p2' | 'p3'>([
@@ -21,13 +22,19 @@ export class EventCenter {
   private events = new Map<string, SentinelEvent>();
   private dedupeWindowMs = 10 * 60 * 1000;
   private db: Database.Database | null = null;
+  private auditLogger: AuditLogger | null = null;
 
-  constructor(db?: Database.Database) {
+  constructor(db?: Database.Database, auditLogger?: AuditLogger) {
     if (db) this.db = db;
+    if (auditLogger) this.auditLogger = auditLogger;
   }
 
   setDb(db: Database.Database): void {
     this.db = db;
+  }
+
+  setAuditLogger(auditLogger: AuditLogger): void {
+    this.auditLogger = auditLogger;
   }
 
   generateDedupeKey(alert: AlertPayload['alerts'][0], labels: Record<string, string>): string {
@@ -94,6 +101,7 @@ export class EventCenter {
 
     this.events.set(event.id, event);
     this.persistEvent(event);
+    this.writeAuditLog('alert-received', event);
     return { event, isNew: true };
   }
 
@@ -135,6 +143,7 @@ export class EventCenter {
 
     this.events.set(event.id, event);
     this.persistEvent(event);
+    this.writeAuditLog('event-created', event);
     return event;
   }
 
@@ -155,6 +164,7 @@ export class EventCenter {
     });
     this.events.set(event.id, event);
     this.persistUpdate(event);
+    this.writeAuditLog('status-changed', event);
     return event;
   }
 
@@ -174,6 +184,7 @@ export class EventCenter {
     });
     this.events.set(event.id, event);
     this.persistUpdate(event);
+    this.writeAuditLog('validation-updated', event);
     return event;
   }
 
@@ -266,6 +277,20 @@ export class EventCenter {
     } catch (err) {
       console.error('[EventCenter] Failed to persist update:', err);
     }
+  }
+
+  private writeAuditLog(action: string, event: SentinelEvent): void {
+    if (!this.auditLogger) return;
+    this.auditLogger
+      .logToolExecution({
+        tool: 'sentinel',
+        duration: 0,
+        fileCount: 0,
+        issueCount: 1,
+        status: event.severity === 'p1' ? 'warning' : 'success',
+        projectId: event.projectId,
+      })
+      .catch(() => {});
   }
 
   private mapSeverity(raw: string): 'p1' | 'p2' | 'p3' {

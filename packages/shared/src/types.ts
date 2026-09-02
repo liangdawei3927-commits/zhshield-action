@@ -307,7 +307,11 @@ export type ToolId =
   | 'jscpd'
   | 'ts-prune'
   | 'tsc'
-  | 'autoperf';
+  | 'autoperf'
+  | 'sentinel'
+  | 'prettier'
+  | 'commit-lint'
+  | 'npm-audit';
 
 export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
 
@@ -315,7 +319,7 @@ export type ToolPriority = 'P0' | 'P1' | 'P2';
 
 export type ToolInstallMode = 'builtin' | 'on-demand';
 
-export type ToolStatus = 'available' | 'unavailable' | 'error' | 'skipped';
+export type ToolStatus = 'available' | 'unavailable' | 'error' | 'skipped' | 'success' | 'warning';
 
 export interface ToolMeta {
   id: ToolId;
@@ -341,6 +345,9 @@ export interface ToolConfig {
   packageManagers?: string[];
   timeout?: number;
   flags?: string[];
+  /** commit-lint：提交信息校验正则与主题长度上限 */
+  pattern?: string;
+  maxSubjectLength?: number;
 }
 
 export interface ToolResult {

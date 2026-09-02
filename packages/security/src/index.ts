@@ -33,3 +33,5 @@ export {
   isPublicRemoteUrl,
 } from './secrets/lifecycle';
 export { scanGarbage, cleanGarbage, restoreGarbage } from './garbage-scanner';
+export { SupplyChainScanScheduler } from './supply-chain-scheduler';
+export type { SupplyChainScanOptions } from './supply-chain-scheduler';

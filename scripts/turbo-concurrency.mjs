@@ -12,7 +12,7 @@ const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
 let concurrency;
 if (Number.isFinite(envMax)) {
   concurrency = clamp(envMax, 1, 4);
-} else if (os.totalmem() < 8 * 1024 ** 3) {
+} else if (os.totalmem() <= 8 * 1024 ** 3) {
   concurrency = 1;
 } else {
   concurrency = clamp(os.cpus().length, 2, 4);

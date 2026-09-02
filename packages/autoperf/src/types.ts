@@ -14,7 +14,11 @@ import type { Issue } from '@zh/shared';
 export interface PerfProbeResult {
   /** 探测名（如 coldScan / eventLoopDelay / memoryPeak / sentinelCpu） */
   probeName: string;
-  /** 探测耗时（毫秒） */
+  /**
+   * 探测数值。字段名沿用 elapsedMs（毫秒），但单位随探测类型：
+   * 耗时类 = ms；sentinelCpu = 百分比（0-100，estimate）；memoryPeak = MB。
+   * 单位约定与 assets/perf-budgets.yaml 头注一致；Issue 文案单位由引擎 PROBE_UNIT 决定。
+   */
   elapsedMs: number;
   /** 采样时间戳 */
   sampledAt: Date;
@@ -28,9 +32,12 @@ export interface PerfBudget {
   ruleId: string;
   /** 预算名（如 冷启动） */
   name: string;
-  /** 阈值（毫秒） */
+  /**
+   * 阈值。单位随预算类型（有意复用同一字段，约定见 assets/perf-budgets.yaml 头注）：
+   * 耗时类 = ms；perf.budget.sentinel-idle-cpu = 百分比；perf.budget.memory-peak = MB。
+   */
   thresholdMs: number;
-  /** 基线值（首次/参考测量值，用于随版本自动校准） */
+  /** 基线值（首次/参考测量值，用于随版本自动校准；单位约定同 thresholdMs） */
   anchorMs?: number;
   /** 超预算严重级（Issue 层：error | warning） */
   severity: 'error' | 'warning';

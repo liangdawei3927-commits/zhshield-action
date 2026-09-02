@@ -228,6 +228,7 @@ function compareWithBaseline(baseline) {
     }
     if (r.status !== 'success') {
       console.log(`  FAIL ${r.name}: run failed, cannot compare`);
+      anyRegressed = true;
       continue;
     }
     const baseElapsed = base.elapsed;

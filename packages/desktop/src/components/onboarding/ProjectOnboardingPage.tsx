@@ -6,6 +6,7 @@ interface ProjectOnboardingPageProps {
   projectName: string;
   projectPath: string;
   onComplete: () => void;
+  intelligentEnabled?: boolean;
 }
 
 interface Step {
@@ -486,6 +487,7 @@ function OnboardingContent({
   onSelectPreset,
   onConfirmPreset,
   showPreset,
+  intelligentEnabled = true,
 }: {
   t: (key: string) => string;
   projectName: string;
@@ -497,6 +499,7 @@ function OnboardingContent({
   onSelectPreset: (id: string) => void;
   onConfirmPreset: () => void;
   showPreset: boolean;
+  intelligentEnabled?: boolean;
 }) {
   return (
     <div
@@ -507,6 +510,22 @@ function OnboardingContent({
       }}
     >
       <OnboardingLogo t={t} />
+      
+      {/* 智能引擎状态指示器 */}
+      <div
+        className="absolute top-8 right-10 flex items-center gap-2 pointer-events-none"
+        style={{ opacity: 0.7 }}
+      >
+        <span
+          className="w-2 h-2 rounded-full"
+          style={{
+            background: intelligentEnabled ? '#27c93f' : '#ef4444',
+            boxShadow: `0 0 6px ${intelligentEnabled ? '#27c93f' : '#ef4444'}`,
+          }}
+        />
+        <span className="text-sm text-white/80">智能引擎</span>
+      </div>
+
       <OnboardingCenter
         projectName={projectName}
         progress={progress}
@@ -529,6 +548,7 @@ export function ProjectOnboardingPage({
   projectName,
   projectPath,
   onComplete,
+  intelligentEnabled = true,
 }: ProjectOnboardingPageProps) {
   const t = useT();
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
@@ -552,6 +572,7 @@ export function ProjectOnboardingPage({
         steps[currentStepIndex].id === 'preset' &&
         !presetConfirmed
       }
+      intelligentEnabled={intelligentEnabled}
     />
   );
 }

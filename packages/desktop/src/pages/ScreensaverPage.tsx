@@ -7,6 +7,7 @@ import {
 
 interface ScreensaverPageProps {
   onDismiss: () => void;
+  intelligentEnabled?: boolean;
 }
 
 function ScreensaverBackground() {
@@ -30,7 +31,7 @@ function ScreensaverBackground() {
   );
 }
 
-function ScreensaverHeader({ visible, maximized }: { visible: boolean; maximized: boolean }) {
+function ScreensaverHeader({ visible, maximized, intelligentEnabled = true }: { visible: boolean; maximized: boolean; intelligentEnabled?: boolean }) {
   return (
     <>
       <div
@@ -56,11 +57,11 @@ function ScreensaverHeader({ visible, maximized }: { visible: boolean; maximized
         <span
           className="w-2 h-2 rounded-full"
           style={{
-            background: '#27c93f',
-            boxShadow: '0 0 6px #27c93f',
+            background: intelligentEnabled ? '#27c93f' : '#ef4444',
+            boxShadow: `0 0 6px ${intelligentEnabled ? '#27c93f' : '#ef4444'}`,
           }}
         />
-        <span className="text-sm text-white/80">智能引擎已开启</span>
+        <span className="text-sm text-white/80">智能引擎</span>
       </div>
     </>
   );
@@ -202,7 +203,7 @@ function ScreensaverFooter({ visible }: { visible: boolean }) {
   );
 }
 
-export function ScreensaverPage({ onDismiss }: ScreensaverPageProps) {
+export function ScreensaverPage({ onDismiss, intelligentEnabled = true }: ScreensaverPageProps) {
   const [visible, setVisible] = useState(false);
   const maximized = useMacOSTrafficLightInset();
 
@@ -224,7 +225,7 @@ export function ScreensaverPage({ onDismiss }: ScreensaverPageProps) {
       tabIndex={0}
     >
       <ScreensaverBackground />
-      <ScreensaverHeader visible={visible} maximized={maximized} />
+      <ScreensaverHeader visible={visible} maximized={maximized} intelligentEnabled={intelligentEnabled} />
       <ScreensaverCenter visible={visible} />
       <ScreensaverFooter visible={visible} />
 

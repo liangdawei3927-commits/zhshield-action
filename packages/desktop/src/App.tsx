@@ -218,13 +218,16 @@ function App() {
         />
       )}
 
-      {idle && projects.length > 0 && <ScreensaverPage onDismiss={resetInactivity} />}
+      {idle && projects.length > 0 && (
+        <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
+      )}
 
       {onboardingProject && (
         <ProjectOnboardingPage
           projectName={onboardingProject}
           projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
           onComplete={handleOnboardingComplete}
+          intelligentEnabled={intelligentEnabled}
         />
       )}
     </div>

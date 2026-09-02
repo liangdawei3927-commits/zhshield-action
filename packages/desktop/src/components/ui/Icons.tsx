@@ -15,18 +15,18 @@ export function ShieldLogo({ size = 24 }: { size?: number }) {
       {/* <- 箭头符号 */}
       {/* < 符号 */}
       <path
-        d="M9 10L6.5 12.5L9 15"
+        d="M8 10L5.5 12.5L8 15"
         stroke="white"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      {/* - 符号（与<底边齐平） */}
+      {/* - 符号（与<底边齐平，增加间距） */}
       <line
-        x1="10.5"
+        x1="12"
         y1="15"
-        x2="15.5"
+        x2="17"
         y2="15"
         stroke="white"
         strokeWidth="1.8"

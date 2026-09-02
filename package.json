@@ -22,11 +22,17 @@
     "clean": "turbo run clean",
     "check": "node scripts/zhcheck.mjs --all",
     "check:ci": "node scripts/zhcheck.mjs --all --ci",
+    "verify": "bash scripts/verify-env.sh",
+    "verify:fix": "bash scripts/verify-env.sh --fix",
     "check:staged": "node scripts/zhcheck.mjs --refactor --inspect --staged --ci",
     "check:refactor": "node scripts/zhcheck.mjs --refactor",
-    "hooks:install": "node scripts/zhcheck.mjs --install-hooks"
+    "hooks:install": "node scripts/zhcheck.mjs --install-hooks",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.1.1",
     "@eslint/js": "^9.22.0",
     "@vitest/coverage-v8": "^4.1.10",
     "depcheck": "^1.4.7",

@@ -45,12 +45,25 @@ check_env() {
 }
 
 # ── 命令实现 ──────────────────────────────────────
-cmd_init()      { banner; info "安装依赖..."; check_env; pnpm install; ok "依赖安装完成"; }
+# init：装依赖后立即跑 verify —— 首次安装即验证环境可复现，
+# 避免「node_modules 损坏 → 手动重装 → 再手动验证」的循环。
+cmd_init() {
+  banner
+  check_env
+  info "安装依赖..."
+  pnpm install
+  ok "依赖安装完成"
+  info "自动运行一键环境验证 (install→build→typecheck→test)..."
+  bash scripts/verify-env.sh
+  ok "首次环境验证通过"
+}
 cmd_build()     { banner; check_env; info "构建全部包..."; pnpm build; ok "构建完成"; }
 cmd_dev()       { banner; check_env; info "启动桌面端开发（先由 turbo 构建依赖包）..."; pnpm exec turbo run dev --filter=@zh/desktop; }
 cmd_lint()      { banner; check_env; info "代码检查..."; pnpm lint; }
 cmd_test()      { banner; check_env; info "运行测试..."; pnpm test; }
 cmd_clean()     { banner; info "清理构建产物..."; pnpm clean; ok "清理完成"; }
+cmd_verify()    { banner; check_env; info "一键环境验证 (install → build → typecheck → test)..."; bash scripts/verify-env.sh; ok "环境验证完成"; }
+cmd_verify_fix(){ banner; check_env; info "干净重建 + 环境验证..."; bash scripts/verify-env.sh --fix; ok "干净重建验证完成"; }
 
 cmd_dev_desktop() { banner; check_env; info "启动桌面端开发（先由 turbo 构建依赖包）..."; pnpm exec turbo run dev --filter=@zh/desktop; }
 cmd_dev_server()  { banner; check_env; info "启动后端服务开发 (Ctrl+C 停止)..."; pnpm --filter @zh/server dev; }
@@ -119,6 +132,8 @@ cmd_help() {
   echo ""
   echo -e "${BOLD}其他:${NC}"
   echo "  clean              清理构建产物"
+  echo "  verify             一键环境验证 (install→build→typecheck→test)"
+  echo "  verify:fix         彻底重建 node_modules 后验证（node_modules 损坏时用）"
   echo "  status             项目状态"
   echo "  help               本帮助"
   echo ""
@@ -146,6 +161,8 @@ case "${1:-help}" in
   check:refactor)   cmd_check_refactor ;;
   hooks)            cmd_hooks ;;
   clean)            cmd_clean ;;
+  verify)           cmd_verify ;;
+  verify:fix)       cmd_verify_fix ;;
   status)           cmd_status ;;
   help|-h|--help)   cmd_help ;;
   *)                err "未知命令: $1"; echo; cmd_help; exit 1 ;;

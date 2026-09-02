@@ -6,7 +6,9 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 function scheduleInitialCheck(): void {
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('[auto-updater] 首次检查失败（非致命）:', String(err));
+    });
   }, 30000);
 }
 

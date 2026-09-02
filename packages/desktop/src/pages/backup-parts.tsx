@@ -19,7 +19,7 @@ export function BackupHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"
@@ -87,11 +87,11 @@ export function BackupResultCard({
           >
             <span>{r.success ? '✓' : '✗'}</span>
             <span>{t(TYPE_LABEL[r.type] ?? r.type)}</span>
-            {r.error && <span className="text-red-500">({r.error})</span>}
+            {r.error && <span className="text-danger-500">({r.error})</span>}
           </div>
         ))}
       </div>
-      {error && <div className="mt-3 text-xs text-red-500">{error}</div>}
+      {error && <div className="mt-3 text-xs text-danger-500">{error}</div>}
     </ResultCard>
   );
 }

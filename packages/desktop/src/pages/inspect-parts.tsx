@@ -64,7 +64,7 @@ export function InspectHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-warning-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"
@@ -100,14 +100,14 @@ export function ProgressBar({ passCount, total }: { passCount: number; total: nu
   return (
     <ResultCard variant="score" className="flex items-center gap-6 mb-6">
       <div className="text-center">
-        <div className="text-3xl font-bold text-green-700">
+        <div className="text-3xl font-bold text-success-700">
           {passCount}/{total}
         </div>
         <div className="text-xs text-zh-muted mt-1">{t('page.inspect.checksPassed')}</div>
       </div>
       <div className="flex-1 h-2.5 rounded-full bg-zh-panel">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-700 transition-all"
+          className="h-full rounded-full bg-gradient-to-r from-success-600 to-success-700 transition-all"
           style={{ width: `${total ? (passCount / total) * 100 : 0}%` }}
         />
       </div>
@@ -159,8 +159,8 @@ export function CheckList({
                   <span
                     className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium"
                     style={{
-                      background: 'rgb(var(--zh-primary) / 0.1)',
-                      color: 'rgb(var(--zh-primary))',
+                      background: 'rgb(var(--zh-info) / 0.1)',
+                      color: 'rgb(var(--zh-info))',
                     }}
                   >
                     <svg

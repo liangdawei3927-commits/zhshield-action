@@ -11,10 +11,10 @@ interface ActivityTimelineProps {
 
 export function ActivityTimeline({ activities }: ActivityTimelineProps) {
   const typeColors = {
-    success: 'bg-green-700',
-    warning: 'bg-amber-500',
-    info: 'bg-blue-500',
-    error: 'bg-red-500',
+    success: 'bg-success-700',
+    warning: 'bg-warning-500',
+    info: 'bg-info-500',
+    error: 'bg-danger-500',
   };
 
   return (
@@ -25,7 +25,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
             <div className={`w-2 h-2 rounded-full ${typeColors[activity.type]}`}></div>
           </div>
           <div className="flex-1">
-            <div className="text-sm text-slate-400">{activity.time}</div>
+            <div className="text-sm text-zh-muted">{activity.time}</div>
             <div className="text-sm">{activity.text}</div>
           </div>
         </div>

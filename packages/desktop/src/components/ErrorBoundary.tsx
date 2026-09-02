@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <summary className="text-sm text-zh-muted cursor-pointer hover:text-zh-ink">
                   查看错误详情
                 </summary>
-                <pre className="mt-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700 overflow-auto max-h-40">
+                <pre className="mt-2 p-3 bg-danger-50 border border-danger-200 rounded text-xs text-danger-700 overflow-auto max-h-40">
                   {this.state.error.message}
                   {'\n\n'}
                   {this.state.error.stack}
@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
             <button
               onClick={this.handleReset}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              className="px-4 py-2 bg-info-500 text-white rounded hover:bg-info-600 transition-colors"
             >
               重试
             </button>

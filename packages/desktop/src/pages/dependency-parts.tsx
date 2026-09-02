@@ -110,7 +110,7 @@ export function DependencyHeader({
         </PrimaryButton>
       </div>
       {report.error && (
-        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
+        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
           <svg
             width="18"
             height="18"
@@ -126,8 +126,8 @@ export function DependencyHeader({
             <path d="M12 16h.01" />
           </svg>
           <div>
-            <div className="text-sm font-medium text-red-700">{t('page.deps.errorTitle')}</div>
-            <div className="text-xs text-red-500 mt-0.5">{report.error}</div>
+            <div className="text-sm font-medium text-danger-700">{t('page.deps.errorTitle')}</div>
+            <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
           </div>
         </div>
       )}
@@ -240,7 +240,7 @@ export function DependencyLockfileCard({
           return (
             <div key={check.key} className="flex items-center gap-3">
               <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-green-50' : na ? 'bg-zh-panel' : 'bg-red-50'}`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-success-50' : na ? 'bg-zh-panel' : 'bg-danger-50'}`}
               >
                 {ok ? (
                   <svg
@@ -273,7 +273,7 @@ export function DependencyLockfileCard({
                 )}
               </span>
               <span
-                className={`text-sm ${ok ? 'text-green-700' : na ? 'text-zh-muted' : 'text-red-600'}`}
+                className={`text-sm ${ok ? 'text-success-700' : na ? 'text-zh-muted' : 'text-danger-600'}`}
               >
                 {t(ok ? check.okKey : na ? check.naKey : check.failKey)}
               </span>
@@ -423,7 +423,7 @@ export function DependencyLicenseCard({
         {highRiskEntries.length === 0 && (
           <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
             <span className="text-2xl">🟢</span>
-            <span className="text-sm font-medium text-green-700">
+            <span className="text-sm font-medium text-success-700">
               {t('page.deps.licenseNoRisks')}
             </span>
           </div>
@@ -437,7 +437,7 @@ export function DependencyLicenseCard({
 function AdapterErrorNote({ title, message }: { title: string; message?: string }) {
   if (!message) return null;
   return (
-    <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
+    <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-danger-50 border border-danger-100">
       <svg
         width="14"
         height="14"
@@ -454,8 +454,8 @@ function AdapterErrorNote({ title, message }: { title: string; message?: string 
         <path d="M12 16h.01" />
       </svg>
       <div className="min-w-0">
-        <div className="text-xs font-medium text-red-700">{title}</div>
-        <div className="text-[11px] text-red-500 mt-0.5 break-all">{message}</div>
+        <div className="text-xs font-medium text-danger-700">{title}</div>
+        <div className="text-[11px] text-danger-500 mt-0.5 break-all">{message}</div>
       </div>
     </div>
   );
@@ -498,7 +498,7 @@ export function DependencyTyposquatCard({ report }: { report: DependencyReportDa
       {findings.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🛡️</span>
-          <span className="text-sm font-medium text-green-700">
+          <span className="text-sm font-medium text-success-700">
             {t('page.deps.typosquat.none')}
           </span>
         </div>
@@ -575,7 +575,7 @@ export function DependencyLockfileVerificationCard({ report }: { report: Depende
         message={report.lockfileError}
       />
       <div
-        className={`mb-3 flex items-center gap-2 text-sm ${clean ? 'text-green-700' : 'text-red-600'}`}
+        className={`mb-3 flex items-center gap-2 text-sm ${clean ? 'text-success-700' : 'text-danger-600'}`}
       >
         {clean ? (
           <svg
@@ -639,7 +639,7 @@ export function DependencyLockfileVerificationCard({ report }: { report: Depende
           </div>
           <ul className="space-y-1">
             {verification.integrityFailures.map((failure) => (
-              <li key={failure} className="text-[11px] text-red-500 break-all">
+              <li key={failure} className="text-[11px] text-danger-500 break-all">
                 {failure}
               </li>
             ))}
@@ -683,7 +683,7 @@ export function DependencyUpgradeCard({ report }: { report: DependencyReportData
       {assessments.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-green-700">{t('page.deps.upgrade.none')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.deps.upgrade.none')}</span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -700,7 +700,7 @@ export function DependencyUpgradeCard({ report }: { report: DependencyReportData
                           v{candidate.targetVersion}
                         </span>
                         {candidate.securityRelevant && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-danger-50 text-danger-600">
                             {t('page.deps.upgrade.security')}
                           </span>
                         )}
@@ -773,7 +773,7 @@ export function DependencyOutdatedCard({ report }: { report: DependencyReportDat
       {outdatedDeps.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">✅</span>
-          <span className="text-sm font-medium text-green-700">{t('page.deps.outdated.none')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.deps.outdated.none')}</span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -782,10 +782,10 @@ export function DependencyOutdatedCard({ report }: { report: DependencyReportDat
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zh-ink-2">{dep.name}</span>
                 <span className="text-xs text-zh-muted">
-                  {dep.current} → <span className="text-green-600 font-medium">{dep.latest}</span>
+                  {dep.current} → <span className="text-success-600 font-medium">{dep.latest}</span>
                 </span>
                 {dep.isSecurityUpdate && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-danger-50 text-danger-600">
                     {t('page.deps.outdated.security')}
                   </span>
                 )}
@@ -833,7 +833,7 @@ export function DependencyEnvCard({ report }: { report: DependencyReportData }) 
       {entries.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-green-700">{t('page.deps.env.none')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.deps.env.none')}</span>
         </div>
       ) : (
         <div className="space-y-2">

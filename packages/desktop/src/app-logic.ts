@@ -44,6 +44,7 @@ export interface ProjectInfo {
 }
 
 export const STORAGE_KEY = 'zh:projects';
+export const ONBOARDED_KEY = 'zh:onboarded-projects';
 
 export const DEFAULT_AI_TOOL: AiToolConfigData = {
   id: 'opencode',
@@ -312,6 +313,37 @@ function useCurrentProjectIndex(projectCount: number): {
   return { currentProjectIndex, switchCurrentProject };
 }
 
+/** 已完成「添加项目诊断」的项目路径集合（持久化到 localStorage，重启后仍可用） */
+function useOnboardedProjects(): {
+  onboardedPaths: Set<string>;
+  markOnboarded: (path: string) => void;
+} {
+  const [onboardedPaths, setOnboardedPaths] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(ONBOARDED_KEY);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      /* ignore */
+    }
+    return new Set();
+  });
+
+  const markOnboarded = useCallback((path: string) => {
+    setOnboardedPaths((prev) => {
+      if (prev.has(path)) return prev;
+      const next = new Set(prev).add(path);
+      try {
+        localStorage.setItem(ONBOARDED_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  return { onboardedPaths, markOnboarded };
+}
+
 export function useAppState() {
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -329,6 +361,7 @@ export function useAppState() {
   useLoadInitialState({ setProjects, setCurrentPage, setLoaded, setAiTool });
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
+  const { onboardedPaths, markOnboarded } = useOnboardedProjects();
   const { openFolderAndAddProject } = useAddProject(
     setProjects,
     setCurrentPage,
@@ -355,6 +388,8 @@ export function useAppState() {
     intelligentLoading,
     onboardingProject,
     setOnboardingProject,
+    onboardedPaths,
+    markOnboarded,
     currentProjectIndex,
     switchCurrentProject,
   };

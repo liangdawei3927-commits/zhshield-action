@@ -45,6 +45,30 @@
   --zh-info-800: 49 68 163;
   --zh-info-900: 39 55 126;
 
+  /* ── 警告色阶 (载体: amber 家族, DEFAULT=700 档) ── */
+  --zh-warning-50: 255 251 235;
+  --zh-warning-100: 254 243 199;
+  --zh-warning-200: 253 230 138;
+  --zh-warning-300: 252 211 77;
+  --zh-warning-400: 251 191 36;
+  --zh-warning-500: 245 158 11;
+  --zh-warning-600: 217 119 6;
+  --zh-warning-700: 180 83 9;
+  --zh-warning-800: 146 64 14;
+  --zh-warning-900: 120 53 15;
+
+  /* ── 危险色阶 (载体: red 家族, DEFAULT=600 档) ── */
+  --zh-danger-50: 254 242 242;
+  --zh-danger-100: 254 226 226;
+  --zh-danger-200: 254 202 202;
+  --zh-danger-300: 252 165 165;
+  --zh-danger-400: 248 113 113;
+  --zh-danger-500: 239 68 68;
+  --zh-danger-600: 220 38 38;
+  --zh-danger-700: 185 28 28;
+  --zh-danger-800: 153 27 27;
+  --zh-danger-900: 127 29 29;
+
   /* ── 语义色 (teal) ── */
   --zh-brand: 14 140 127;
   --zh-brand-hover: 10 107 97;

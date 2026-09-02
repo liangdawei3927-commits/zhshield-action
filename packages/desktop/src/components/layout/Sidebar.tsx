@@ -16,6 +16,7 @@ interface SidebarProps {
   onNavigate: (page: string) => void;
   onAddProject: () => void;
   onRemoveProject: (path: string) => void;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
   aiTool: AiToolConfigData | null;
   aiApplying: boolean;
   onToggleAiTool: (enabled: boolean) => void;
@@ -115,6 +116,7 @@ function SidebarPanel({
   setIntelligentEnabled,
   intelligentLoading,
   currentPage,
+  onOpenProjectProfile,
 }: {
   open: boolean;
   onClose: () => void;
@@ -128,6 +130,7 @@ function SidebarPanel({
   aiApplying: boolean;
   onToggleAiTool: (enabled: boolean) => void;
   currentPage: string;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
 } & EngineCardProps) {
   return (
     <aside
@@ -152,6 +155,7 @@ function SidebarPanel({
           onClose={onClose}
           onAddProject={onAddProject}
           onRequestDelete={onRequestDelete}
+          onOpenProjectProfile={onOpenProjectProfile}
         />
         <WisdomBrainCard />
         <EngineStatusSection
@@ -212,6 +216,7 @@ export function Sidebar({
   onNavigate,
   onAddProject,
   onRemoveProject,
+  onOpenProjectProfile,
   aiTool,
   aiApplying,
   onToggleAiTool,
@@ -233,6 +238,7 @@ export function Sidebar({
         onNavigate={onNavigate}
         onAddProject={onAddProject}
         onRequestDelete={setPendingDelete}
+        onOpenProjectProfile={onOpenProjectProfile}
         aiTool={aiTool}
         aiApplying={aiApplying}
         onToggleAiTool={onToggleAiTool}

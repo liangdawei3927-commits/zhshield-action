@@ -79,7 +79,7 @@ function EventContextLocation({ location }: { location: EventContextLocationData
     <div className="mt-2 rounded-lg bg-zh-panel border border-zh-line px-3 py-2 text-xs">
       <div className="flex items-center gap-2 text-zh-muted">
         {location.module && (
-          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">
+          <span className="px-1.5 py-0.5 rounded bg-info-50 text-info-600 font-medium">
             {location.module}
           </span>
         )}

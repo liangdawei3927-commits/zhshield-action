@@ -49,7 +49,7 @@ export function SecurityHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-danger-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"
@@ -111,7 +111,7 @@ function FindingCard({
       </div>
       <div className="mt-1 text-xs text-zh-muted">{finding.description}</div>
       {finding.recommendation && (
-        <div className="mt-1 text-xs text-blue-500">
+        <div className="mt-1 text-xs text-info-500">
           {t('page.security.recommendation', { recommendation: finding.recommendation })}
         </div>
       )}
@@ -148,7 +148,7 @@ function MalwareCard({
       </div>
       <div className="mt-1 text-xs text-zh-muted">{item.description}</div>
       {item.evidence && (
-        <div className="mt-2 px-3 py-1.5 rounded bg-red-50 text-[11px] font-mono text-red-700 break-all">
+        <div className="mt-2 px-3 py-1.5 rounded bg-danger-50 text-[11px] font-mono text-danger-700 break-all">
           {item.evidence}
         </div>
       )}
@@ -183,7 +183,7 @@ export function FindingsPanel({
         {findings.length === 0 && (
           <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
             <span className="text-2xl">✅</span>
-            <span className="text-sm font-medium text-green-700">
+            <span className="text-sm font-medium text-success-700">
               {t('page.security.noFindings')}
             </span>
           </div>
@@ -220,7 +220,7 @@ export function MalwarePanel({
         {items.length === 0 && (
           <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
             <span className="text-2xl">🛡️</span>
-            <span className="text-sm font-medium text-green-700">
+            <span className="text-sm font-medium text-success-700">
               {t('page.security.noMalware')}
             </span>
           </div>

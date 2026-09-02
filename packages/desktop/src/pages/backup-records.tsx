@@ -70,7 +70,7 @@ function BackupRecordRow({
               e.stopPropagation();
               onDelete();
             }}
-            className="text-xs border-none cursor-pointer px-2 py-1 rounded hover:bg-red-50 transition-colors text-red-500"
+            className="text-xs border-none cursor-pointer px-2 py-1 rounded hover:bg-danger-50 transition-colors text-danger-500"
           >
             {t('common.delete')}
           </Bounce>
@@ -93,7 +93,7 @@ function BackupRecordRow({
             {record.githubRepoUrl && (
               <div>
                 {t('page.backup.detail.github')}
-                <a href={record.githubRepoUrl} target="_blank" className="text-blue-500">
+                <a href={record.githubRepoUrl} target="_blank" className="text-info-500">
                   {record.githubRepoUrl}
                 </a>
               </div>
@@ -110,7 +110,7 @@ function BackupRecordRow({
                   onClick={() => {
                     void openFolder(snapshot);
                   }}
-                  className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline cursor-pointer border-none bg-transparent"
+                  className="inline-flex items-center gap-1 text-xs text-info-500 hover:underline cursor-pointer border-none bg-transparent"
                 >
                   <NavIcon id="folder" size={14} />
                   {t('page.backup.openFolder')}
@@ -124,7 +124,7 @@ function BackupRecordRow({
               <div>{t('page.backup.detail.fileCount', { count: record.fileCount })}</div>
             )}
             {record.error && (
-              <div className="col-span-2 text-red-500">
+              <div className="col-span-2 text-danger-500">
                 {t('page.backup.detail.error', { error: record.error })}
               </div>
             )}

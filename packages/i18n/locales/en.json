@@ -716,7 +716,15 @@
     "toggleGate": "Automated L1 L2 L3 gate check",
     "toggleGateLabel": "Gate",
     "toggleSentinel": "24/7 round-the-clock protection",
-    "toggleSentinelLabel": "Sentinel"
+    "toggleSentinelLabel": "Sentinel",
+    "statusBarLabel": "Live Protection",
+    "statusBarChecking": "Checking…",
+    "statusBarGuardOn": "Guard intercepting",
+    "statusBarGuardOff": "Guard disabled",
+    "statusBarSentinelOn": "Sentinel monitoring",
+    "statusBarSentinelOff": "Sentinel off",
+    "statusBarRulesSynced": "Rules synced",
+    "statusBarRulesStale": "Rules outdated"
   },
   "lifecycle": {
     "archive": "Archive",

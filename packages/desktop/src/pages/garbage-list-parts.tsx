@@ -29,11 +29,11 @@ export function GarbageStats({ report }: { report: SecurityScanReportData }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-emerald-600">{items.length}</div>
+        <div className="text-2xl font-bold text-success-600">{items.length}</div>
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.items')}</div>
       </ResultCard>
       <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-emerald-600">
+        <div className="text-2xl font-bold text-success-600">
           {formatSize(report.summary.garbageSize)}
         </div>
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.freeable')}</div>
@@ -73,19 +73,19 @@ function GarbageCard({
           checked={selected}
           disabled={!cleanable}
           onChange={() => cleanable && onToggle(item.id)}
-          className="w-4 h-4 rounded border-zh-line text-emerald-600 focus:ring-emerald-500 shrink-0 disabled:opacity-30"
+          className="w-4 h-4 rounded border-zh-line text-success-600 focus:ring-success-500 shrink-0 disabled:opacity-30"
         />
-        <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 shrink-0">
+        <span className="px-2 py-0.5 rounded text-xs font-medium bg-success-50 text-success-700 shrink-0">
           {t(GARBAGE_TYPE_LABEL[item.type] ?? item.type)}
         </span>
         <span className="text-sm font-medium text-zh-ink-2 truncate">{item.path}</span>
-        <span className="ml-auto shrink-0 text-xs font-semibold text-emerald-600">
+        <span className="ml-auto shrink-0 text-xs font-semibold text-success-600">
           {formatSize(item.size)}
         </span>
       </div>
       <div className="mt-1 text-xs text-zh-muted pl-7">{item.reason}</div>
       {item.type === 'unused-dependency' && (
-        <div className="mt-2 pl-7 text-xs text-amber-700">{t('page.garbage.dependencyHint')}</div>
+        <div className="mt-2 pl-7 text-xs text-warning-700">{t('page.garbage.dependencyHint')}</div>
       )}
     </ResultCard>
   );
@@ -106,7 +106,7 @@ export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
       {items.length === 0 && (
         <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🧹</span>
-          <span className="text-sm font-medium text-green-700">{t('page.garbage.emptyList')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.garbage.emptyList')}</span>
         </div>
       )}
     </div>
@@ -145,7 +145,7 @@ export function GarbageActionBar({
           checked={allChecked}
           onChange={onToggleAll}
           disabled={cleanable.length === 0}
-          className="w-4 h-4 rounded border-zh-line text-emerald-600 focus:ring-emerald-500"
+          className="w-4 h-4 rounded border-zh-line text-success-600 focus:ring-success-500"
         />
         {t('page.garbage.selectAll')}
       </label>

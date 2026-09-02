@@ -17,7 +17,7 @@ export function CopyToAiButton({ onClick, className }: CopyToAiButtonProps) {
     <Bounce
       as="button"
       onClick={onClick}
-      className={`px-2 py-0.5 rounded text-[11px] font-medium text-blue-800 bg-blue-50 hover:bg-blue-100 border-none cursor-pointer shrink-0${className ? ` ${className}` : ''}`}
+      className={`px-2 py-0.5 rounded text-[11px] font-medium text-info-800 bg-info-50 hover:bg-info-100 border-none cursor-pointer shrink-0${className ? ` ${className}` : ''}`}
     >
       {t('common.copyToAi')}
     </Bounce>

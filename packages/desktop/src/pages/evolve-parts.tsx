@@ -137,7 +137,7 @@ export function SuggestionsPanel({ suggestions }: { suggestions: SuggestionData[
         {suggestions.map((s) => (
           <BounceCard key={s.ruleId} className="p-3 rounded-lg bg-zh-panel">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-info-50 text-info-600">
                 {s.ruleId}
               </span>
               <span className="text-xs text-zh-muted">
@@ -170,7 +170,7 @@ export function WeightsPanel({ weights }: { weights: RuleWeightData[] }) {
           return (
             <BounceCard key={w.ruleId} className="p-3 rounded-lg bg-zh-panel">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-mono text-blue-600">{w.ruleId}</span>
+                <span className="text-xs font-mono text-info-600">{w.ruleId}</span>
                 <span className="text-xs font-medium" style={{ color: barColor }}>
                   {(w.weight * 100).toFixed(0)}%
                 </span>

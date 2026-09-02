@@ -68,7 +68,7 @@ export function GarbageHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"
@@ -119,23 +119,23 @@ export function CleanResultBanner({
   const cleaned = result.cleaned.length;
   if (cleaned === 0 && result.failed.length === 0) return null;
   return (
-    <div className="rounded-xl px-5 py-4 bg-emerald-50 border border-emerald-100 mb-4">
+    <div className="rounded-xl px-5 py-4 bg-success-50 border border-success-100 mb-4">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-emerald-700">
+        <span className="text-sm font-medium text-success-700">
           {t('page.garbage.cleaned', { count: cleaned, size: formatSize(result.freedBytes) })}
         </span>
         {result.batchId && (
           <button
             onClick={onRestore}
             disabled={restoring}
-            className="ml-auto h-9 px-4 rounded-full bg-zh-card text-emerald-700 text-sm font-medium border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-50"
+            className="ml-auto h-9 px-4 rounded-full bg-zh-card text-success-700 text-sm font-medium border border-success-200 hover:bg-success-100 transition-colors cursor-pointer disabled:opacity-50"
           >
             {restoring ? t('page.garbage.restoring') : t('page.garbage.restore')}
           </button>
         )}
       </div>
       {result.failed.length > 0 && (
-        <div className="mt-2 text-xs text-amber-600">
+        <div className="mt-2 text-xs text-warning-600">
           {t('page.garbage.cleanFailedCount', { count: result.failed.length })}
         </div>
       )}
@@ -146,15 +146,15 @@ export function CleanResultBanner({
 export function RestoreBanner({ result }: { result: GarbageRestoreResultData }) {
   const t = useT();
   return (
-    <div className="rounded-xl px-5 py-4 bg-blue-50 border border-blue-100 mb-4">
-      <div className="text-sm font-medium text-blue-700">
+    <div className="rounded-xl px-5 py-4 bg-info-50 border border-info-100 mb-4">
+      <div className="text-sm font-medium text-info-700">
         {t('page.garbage.restored', {
           count: result.restored,
           size: formatSize(result.restoredBytes),
         })}
       </div>
       {result.failed.length > 0 && (
-        <div className="mt-2 text-xs text-amber-600">
+        <div className="mt-2 text-xs text-warning-600">
           {t('page.garbage.restoreFailedCount', { count: result.failed.length })}
         </div>
       )}

@@ -165,7 +165,7 @@ export function RefactorEmptyState({ error, scanning, progressLabel, onScan }: E
         progressLabel={progressLabel || t('page.refactor.scanningEllipsis')}
       />
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        {error ? <p className="text-xs text-red-500">{error}</p> : null}
+        {error ? <p className="text-xs text-danger-500">{error}</p> : null}
       </div>
     </div>
   );

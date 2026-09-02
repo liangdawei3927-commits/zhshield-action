@@ -123,10 +123,10 @@ export function GuardHistory({
               </div>
               <div className="flex items-center gap-4 text-xs text-zh-muted mb-2">
                 <span>{t('page.guard.checkCount', { count: record.summary.total })}</span>
-                <span className="text-red-500">
+                <span className="text-danger-500">
                   {t('page.guard.blockedCount', { count: record.summary.blocking })}
                 </span>
-                <span className="text-amber-500">
+                <span className="text-warning-500">
                   {t('page.guard.warningCount', { count: record.summary.warnings })}
                 </span>
               </div>

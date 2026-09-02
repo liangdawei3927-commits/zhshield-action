@@ -22,7 +22,7 @@ export function RefactorHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8 flex-wrap">
-      <Bounce className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-info-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"
@@ -108,13 +108,13 @@ export function RuleTabs({
             key={group.ruleId}
             onClick={() => onSelect(group.ruleId)}
             className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border-none cursor-pointer transition-colors ${
-              isActive ? 'bg-blue-600 text-white' : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
+              isActive ? 'bg-info-600 text-white' : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
             }`}
           >
             {t(group.label)}
             <span
               className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                isActive ? 'bg-white/25 text-white' : 'bg-blue-50 text-blue-700'
+                isActive ? 'bg-white/25 text-white' : 'bg-info-50 text-info-700'
               }`}
             >
               {group.items.length}
@@ -168,7 +168,7 @@ export function RefactorReportView({
           onScan={onScan}
         />
 
-        {error ? <p className="text-sm text-red-500 mb-4">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-500 mb-4">{error}</p> : null}
 
         <RefactorStats report={report} />
 

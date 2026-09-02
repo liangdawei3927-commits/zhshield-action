@@ -93,7 +93,7 @@ export function LanguageSection() {
           >
             <span className="text-xs text-zh-ink-2 flex-1">{lang.nativeName}</span>
             <div className="w-4 h-4 rounded-full border-2 border-zh-line flex items-center justify-center">
-              {language === lang.code && <div className="w-2 h-2 rounded-full bg-green-700" />}
+              {language === lang.code && <div className="w-2 h-2 rounded-full bg-success-700" />}
             </div>
           </button>
         ))}

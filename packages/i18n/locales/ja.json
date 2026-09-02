@@ -716,7 +716,15 @@
     "toggleGate": "自動化 L1 L2 L3 ゲートチェック",
     "toggleGateLabel": "ゲート",
     "toggleSentinel": "24時間365日フルタイム保護",
-    "toggleSentinelLabel": "センチネル"
+    "toggleSentinelLabel": "センチネル",
+    "statusBarLabel": "リアルタイム保護",
+    "statusBarChecking": "確認中…",
+    "statusBarGuardOn": "ゲート遮断中",
+    "statusBarGuardOff": "ゲート無効",
+    "statusBarSentinelOn": "センチネル監視中",
+    "statusBarSentinelOff": "センチネル停止",
+    "statusBarRulesSynced": "ルール同期済み",
+    "statusBarRulesStale": "ルール要更新"
   },
   "lifecycle": {
     "archive": "アーカイブ",

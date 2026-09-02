@@ -110,7 +110,7 @@ export function TechDebtHeader({
         </PrimaryButton>
       </div>
       {report.error && (
-        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
+        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
           <svg
             width="18"
             height="18"
@@ -126,8 +126,8 @@ export function TechDebtHeader({
             <path d="M12 16h.01" />
           </svg>
           <div>
-            <div className="text-sm font-medium text-red-700">{t('page.techdebt.errorTitle')}</div>
-            <div className="text-xs text-red-500 mt-0.5">{report.error}</div>
+            <div className="text-sm font-medium text-danger-700">{t('page.techdebt.errorTitle')}</div>
+            <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
           </div>
         </div>
       )}
@@ -161,7 +161,7 @@ function TrendBadge({ trend }: { trend: TechDebtReportData['trend'] }) {
   const delta = trend.delta;
   if (delta > 0) {
     return (
-      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700">
+      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-danger-50 text-danger-700">
         ↑ {t('page.techdebt.trend.worse', { delta })}
       </span>
     );
@@ -169,7 +169,7 @@ function TrendBadge({ trend }: { trend: TechDebtReportData['trend'] }) {
   if (delta < 0) {
     return (
       <span
-        className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50"
+        className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-50"
         style={{ color: 'rgb(var(--zh-success-700))' }}
       >
         ↓ {t('page.techdebt.trend.better', { delta: Math.abs(delta) })}
@@ -336,7 +336,7 @@ export function TechDebtModuleCard({ modules }: { modules: TechDebtReportData['b
       {modules.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-green-700">{t('page.techdebt.noDebt')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.techdebt.noDebt')}</span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -637,7 +637,7 @@ export function TechDebtActionsCard({
       {sorted.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-green-700">{t('page.techdebt.noDebt')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.techdebt.noDebt')}</span>
         </div>
       ) : (
         <div className="space-y-3">

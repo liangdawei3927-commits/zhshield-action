@@ -30,7 +30,7 @@ function ProfileErrorView({ error }: { error: string | null }) {
   return (
     <div className="h-full w-full bg-zh-bg flex items-center justify-center">
       <div className="text-center">
-        <p className="text-sm text-red-600 mb-2">画像分析失败</p>
+        <p className="text-sm text-danger-600 mb-2">画像分析失败</p>
         <p className="text-xs text-zh-muted">{error ?? '未知错误'}</p>
       </div>
     </div>

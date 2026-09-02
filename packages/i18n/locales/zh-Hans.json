@@ -716,7 +716,15 @@
     "toggleGate": "自动化 L1 L2 L3 门禁检查",
     "toggleGateLabel": "门禁",
     "toggleSentinel": "7X24 全天候守护",
-    "toggleSentinelLabel": "哨兵"
+    "toggleSentinelLabel": "哨兵",
+    "statusBarLabel": "实时防护",
+    "statusBarChecking": "检查中…",
+    "statusBarGuardOn": "门禁拦截中",
+    "statusBarGuardOff": "门禁未启用",
+    "statusBarSentinelOn": "哨兵监控中",
+    "statusBarSentinelOff": "哨兵已停用",
+    "statusBarRulesSynced": "规则已同步",
+    "statusBarRulesStale": "规则待更新"
   },
   "lifecycle": {
     "archive": "归档",

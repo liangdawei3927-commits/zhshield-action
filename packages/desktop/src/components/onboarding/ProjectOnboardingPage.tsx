@@ -6,6 +6,7 @@ interface ProjectOnboardingPageProps {
   projectName: string;
   projectPath: string;
   onComplete: () => void;
+  onClose?: () => void;
   intelligentEnabled?: boolean;
 }
 
@@ -290,7 +291,7 @@ function OnboardingStepList({
                 isCurrent
                   ? 'bg-white/20 text-white'
                   : isCompleted
-                    ? 'bg-green-500/20 text-green-400'
+                    ? 'bg-success-500/20 text-success-400'
                     : 'bg-white/10 text-white/50'
               }`}
             >
@@ -487,6 +488,7 @@ function OnboardingContent({
   onSelectPreset,
   onConfirmPreset,
   showPreset,
+  onClose,
   intelligentEnabled = true,
 }: {
   t: (key: string) => string;
@@ -499,6 +501,7 @@ function OnboardingContent({
   onSelectPreset: (id: string) => void;
   onConfirmPreset: () => void;
   showPreset: boolean;
+  onClose?: () => void;
   intelligentEnabled?: boolean;
 }) {
   return (
@@ -506,14 +509,47 @@ function OnboardingContent({
       className="flex flex-col items-center justify-center h-full w-full relative"
       style={{
         background:
-          'linear-gradient(180deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-dark)) 30%, rgb(var(--zh-brand-hover)) 60%, rgb(var(--zh-brand-600)) 100%)',
+          'linear-gradient(180deg, rgb(var(--zh-brand-900)) 0%, rgb(var(--zh-brand-dark)) 20%, rgb(var(--zh-brand)) 50%, rgb(var(--zh-brand-700)) 80%, rgb(var(--zh-brand-600)) 100%)',
       }}
     >
       <OnboardingLogo t={t} />
-      
+
+      {/* 右上角：关闭诊断页面（不等待，稍后可从侧边栏项目画像入口重新打开） */}
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="关闭诊断页面"
+          className="absolute top-8 right-10 flex items-center justify-center w-9 h-9 rounded-full border-none cursor-pointer text-white/80 hover:text-white transition-all duration-200"
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            WebkitAppRegion: 'no-drag',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.22)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+
       {/* 智能引擎状态指示器 */}
       <div
-        className="absolute top-8 right-10 flex items-center gap-2 pointer-events-none"
+        className="absolute top-8 right-24 flex items-center gap-2 pointer-events-none"
         style={{ opacity: 0.7 }}
       >
         <span
@@ -548,6 +584,7 @@ export function ProjectOnboardingPage({
   projectName,
   projectPath,
   onComplete,
+  onClose,
   intelligentEnabled = true,
 }: ProjectOnboardingPageProps) {
   const t = useT();
@@ -572,6 +609,7 @@ export function ProjectOnboardingPage({
         steps[currentStepIndex].id === 'preset' &&
         !presetConfirmed
       }
+      onClose={onClose}
       intelligentEnabled={intelligentEnabled}
     />
   );

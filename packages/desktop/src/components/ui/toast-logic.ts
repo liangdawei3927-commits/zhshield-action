@@ -44,8 +44,8 @@ export function useToast(): ToastContextValue {
 }
 
 export const variantStyles: Record<ToastVariant, { bg: string; border: string; icon: string }> = {
-  success: { bg: 'bg-green-50', border: 'border-green-200', icon: '✓' },
-  error: { bg: 'bg-red-50', border: 'border-red-200', icon: '✗' },
-  warning: { bg: 'bg-amber-50', border: 'border-amber-200', icon: '!' },
-  info: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'i' },
+  success: { bg: 'bg-success-50', border: 'border-success-200', icon: '✓' },
+  error: { bg: 'bg-danger-50', border: 'border-danger-200', icon: '✗' },
+  warning: { bg: 'bg-warning-50', border: 'border-warning-200', icon: '!' },
+  info: { bg: 'bg-info-50', border: 'border-info-200', icon: 'i' },
 };

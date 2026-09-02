@@ -33,6 +33,36 @@ const infoScale = {
   dark: 'rgb(var(--zh-info-700) / <alpha-value>)',
 };
 
+const warningScale = {
+  50: 'rgb(var(--zh-warning-50) / <alpha-value>)',
+  100: 'rgb(var(--zh-warning-100) / <alpha-value>)',
+  200: 'rgb(var(--zh-warning-200) / <alpha-value>)',
+  300: 'rgb(var(--zh-warning-300) / <alpha-value>)',
+  400: 'rgb(var(--zh-warning-400) / <alpha-value>)',
+  500: 'rgb(var(--zh-warning-500) / <alpha-value>)',
+  600: 'rgb(var(--zh-warning-600) / <alpha-value>)',
+  700: 'rgb(var(--zh-warning-700) / <alpha-value>)',
+  800: 'rgb(var(--zh-warning-800) / <alpha-value>)',
+  900: 'rgb(var(--zh-warning-900) / <alpha-value>)',
+  DEFAULT: 'rgb(var(--zh-warning) / <alpha-value>)',
+  dark: 'rgb(var(--zh-warning-700) / <alpha-value>)',
+};
+
+const dangerScale = {
+  50: 'rgb(var(--zh-danger-50) / <alpha-value>)',
+  100: 'rgb(var(--zh-danger-100) / <alpha-value>)',
+  200: 'rgb(var(--zh-danger-200) / <alpha-value>)',
+  300: 'rgb(var(--zh-danger-300) / <alpha-value>)',
+  400: 'rgb(var(--zh-danger-400) / <alpha-value>)',
+  500: 'rgb(var(--zh-danger-500) / <alpha-value>)',
+  600: 'rgb(var(--zh-danger-600) / <alpha-value>)',
+  700: 'rgb(var(--zh-danger-700) / <alpha-value>)',
+  800: 'rgb(var(--zh-danger-800) / <alpha-value>)',
+  900: 'rgb(var(--zh-danger-900) / <alpha-value>)',
+  DEFAULT: 'rgb(var(--zh-danger) / <alpha-value>)',
+  dark: 'rgb(var(--zh-danger-700) / <alpha-value>)',
+};
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
@@ -58,10 +88,17 @@ export default {
           orange: 'rgb(var(--zh-warning) / <alpha-value>)',
           red: 'rgb(var(--zh-danger) / <alpha-value>)',
         },
-        /* 覆盖 Tailwind 默认色板 → VI 规范家族（成功绿 / AI 智靛），emerald 同 green */
+        /* 覆盖 Tailwind 默认色板 → VI 规范家族（成功绿 / AI 智靛 / 琥珀警告 / 品牌危险），emerald 同 green */
         green: successScale,
         emerald: successScale,
         blue: infoScale,
+        amber: warningScale,
+        red: dangerScale,
+        /* 语义色阶（推荐类名：text-success-500 / bg-danger-100 等） */
+        success: successScale,
+        info: infoScale,
+        warning: warningScale,
+        danger: dangerScale,
         /* 语义别名: 组件换肤类 (Agent B 使用) */
         zh: {
           bg: 'rgb(var(--zh-bg-primary) / <alpha-value>)',

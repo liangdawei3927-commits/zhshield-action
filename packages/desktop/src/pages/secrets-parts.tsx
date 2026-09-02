@@ -170,7 +170,7 @@ export function SecretsHeader({
         <span className="text-xs text-zh-muted">{t('page.secrets.remoteNote')}</span>
       </div>
       {report.error && (
-        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
+        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
           <svg
             width="18"
             height="18"
@@ -186,8 +186,8 @@ export function SecretsHeader({
             <path d="M12 16h.01" />
           </svg>
           <div>
-            <div className="text-sm font-medium text-red-700">{t('page.secrets.errorTitle')}</div>
-            <div className="text-xs text-red-500 mt-0.5">{report.error}</div>
+            <div className="text-sm font-medium text-danger-700">{t('page.secrets.errorTitle')}</div>
+            <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
           </div>
         </div>
       )}
@@ -283,7 +283,7 @@ function SecretsFindingItem({
         {commit && <span className="text-xs text-zh-muted font-mono">{commit}</span>}
         {finding.stillReferenced ? (
           <span
-            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50"
+            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-50"
             style={{ color: 'rgb(var(--zh-success-700))' }}
           >
             {t('page.secrets.badge.active')}
@@ -377,7 +377,7 @@ export function SecretsListCard({
       {findings.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-green-700">{t('page.secrets.list.empty')}</span>
+          <span className="text-sm font-medium text-success-700">{t('page.secrets.list.empty')}</span>
         </div>
       ) : (
         <div className="space-y-3">

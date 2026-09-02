@@ -19,7 +19,7 @@ export function CopyAllToAiButton({ onClick, label, className }: CopyAllToAiButt
     <Bounce
       as="button"
       onClick={onClick}
-      className={`px-4 py-1.5 rounded-full text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border-none cursor-pointer shrink-0${className ? ` ${className}` : ''}`}
+      className={`px-4 py-1.5 rounded-full text-xs font-semibold text-info-800 bg-info-50 hover:bg-info-100 border-none cursor-pointer shrink-0${className ? ` ${className}` : ''}`}
     >
       {label ?? t('common.copyAllToAi')}
     </Bounce>

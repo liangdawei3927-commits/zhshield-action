@@ -10,9 +10,9 @@ interface StatusCardProps {
 
 export function StatusCard({ title, value, icon, status, onClick }: StatusCardProps) {
   const statusColors = {
-    success: 'text-green-700',
-    warning: 'text-amber-500',
-    error: 'text-red-500',
+    success: 'text-success-700',
+    warning: 'text-warning-500',
+    error: 'text-danger-500',
   };
 
   return (

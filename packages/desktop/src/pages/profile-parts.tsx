@@ -59,10 +59,10 @@ export function ConfidenceBadge({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
   const colorClass =
     pct >= 90
-      ? 'bg-green-100 text-green-800'
+      ? 'bg-success-100 text-success-800'
       : pct >= 70
-        ? 'bg-amber-100 text-amber-800'
-        : 'bg-red-100 text-red-800';
+        ? 'bg-warning-100 text-warning-800'
+        : 'bg-danger-100 text-danger-800';
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${colorClass}`}
@@ -74,7 +74,7 @@ export function ConfidenceBadge({ confidence }: { confidence: number }) {
 
 export function StaleBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-warning-100 text-warning-800">
       <svg
         width="14"
         height="14"
@@ -146,7 +146,7 @@ export function SignalList({ signals }: { signals: readonly Signal[] }) {
       {signals.length > 5 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mt-2 text-[11px] text-blue-600 hover:text-blue-800 bg-transparent border-none cursor-pointer p-0"
+          className="mt-2 text-[11px] text-info-600 hover:text-info-800 bg-transparent border-none cursor-pointer p-0"
         >
           {expanded ? '收起' : `展开全部 (${signals.length})`}
         </button>

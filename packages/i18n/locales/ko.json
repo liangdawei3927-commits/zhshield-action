@@ -716,7 +716,15 @@
     "toggleGate": "자동화 L1 L2 L3 게이트 검사",
     "toggleGateLabel": "게이트",
     "toggleSentinel": "24/7 연중무휴 보호",
-    "toggleSentinelLabel": "센티넬"
+    "toggleSentinelLabel": "센티넬",
+    "statusBarLabel": "실시간 보호",
+    "statusBarChecking": "확인 중…",
+    "statusBarGuardOn": "가드 차단 중",
+    "statusBarGuardOff": "가드 비활성",
+    "statusBarSentinelOn": "센티넬 감시 중",
+    "statusBarSentinelOff": "센티넬 중지",
+    "statusBarRulesSynced": "규칙 동기화됨",
+    "statusBarRulesStale": "규칙 업데이트 필요"
   },
   "lifecycle": {
     "archive": "보관",

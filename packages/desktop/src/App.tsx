@@ -18,6 +18,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
+import StatusBar from './components/layout/StatusBar';
 import { ScreensaverPage } from './pages/ScreensaverPage';
 import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboardingPage';
 import { useInactivityTimer } from './hooks/useInactivityTimer';
@@ -97,6 +98,7 @@ function AppShell({
   intelligentEnabled,
   setIntelligentEnabled,
   intelligentLoading,
+  onOpenProjectProfile,
   viewProps,
 }: {
   sidebarOpen: boolean;
@@ -115,6 +117,7 @@ function AppShell({
   intelligentEnabled: boolean;
   setIntelligentEnabled: (v: boolean) => void;
   intelligentLoading: boolean;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
   viewProps: {
     currentPage: Page;
     projects: ProjectInfo[];
@@ -135,6 +138,7 @@ function AppShell({
         onNavigate={(p) => setCurrentPage(p as Page)}
         onAddProject={openFolderAndAddProject}
         onRemoveProject={removeProject}
+        onOpenProjectProfile={onOpenProjectProfile}
         aiTool={aiTool}
         aiApplying={aiApplying}
         onToggleAiTool={toggleAiTool}
@@ -152,6 +156,7 @@ function AppShell({
       <main className="flex-1 overflow-auto bg-zh-bg">
         <PageView {...viewProps} />
       </main>
+      <StatusBar activeProjectPath={activeProject?.path} intelligentEnabled={intelligentEnabled} />
     </>
   );
 }
@@ -172,6 +177,8 @@ function App() {
     intelligentEnabled,
     setIntelligentEnabled,
     intelligentLoading,
+    onboardedPaths,
+    markOnboarded,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,
@@ -181,8 +188,18 @@ function App() {
   if (!loaded) return <AppLoadingView />;
   const activeProject = projects[currentProjectIndex] ?? projects[0];
   const handleOnboardingComplete = () => {
+    const path = projects.find((p) => p.name === onboardingProject)?.path;
+    if (path) markOnboarded(path);
     setOnboardingProject(null);
     setCurrentPage('dashboard');
+  };
+  const handleOpenProjectProfile = (project: ProjectInfo, index: number) => {
+    switchCurrentProject(index);
+    if (onboardedPaths.has(project.path)) {
+      setCurrentPage('profile');
+    } else {
+      setOnboardingProject(project.name);
+    }
   };
   const viewProps = {
     currentPage,
@@ -194,7 +211,15 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-zh-bg font-sans">
-      {projects.length === 0 && currentPage === 'welcome' ? (
+      {onboardingProject ? (
+        <ProjectOnboardingPage
+          projectName={onboardingProject}
+          projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
+          onComplete={handleOnboardingComplete}
+          onClose={() => setOnboardingProject(null)}
+          intelligentEnabled={intelligentEnabled}
+        />
+      ) : projects.length === 0 && currentPage === 'welcome' ? (
         <PageView {...viewProps} />
       ) : (
         <AppShell
@@ -214,21 +239,13 @@ function App() {
           intelligentEnabled={intelligentEnabled}
           setIntelligentEnabled={setIntelligentEnabled}
           intelligentLoading={intelligentLoading}
+          onOpenProjectProfile={handleOpenProjectProfile}
           viewProps={viewProps}
         />
       )}
 
-      {idle && projects.length > 0 && (
+      {idle && projects.length > 0 && !onboardingProject && (
         <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
-      )}
-
-      {onboardingProject && (
-        <ProjectOnboardingPage
-          projectName={onboardingProject}
-          projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
-          onComplete={handleOnboardingComplete}
-          intelligentEnabled={intelligentEnabled}
-        />
       )}
     </div>
   );

@@ -26,6 +26,7 @@ function ProjectRow({
   onClose,
   onRequestDelete,
   onSwitchProject,
+  onOpenProjectProfile,
 }: {
   project: ProjectInfo;
   index: number;
@@ -34,6 +35,7 @@ function ProjectRow({
   onClose: () => void;
   onRequestDelete: (p: ProjectInfo) => void;
   onSwitchProject: (index: number) => void;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
 }) {
   const t = useT();
   return (
@@ -68,8 +70,7 @@ function ProjectRow({
       </button>
       <button
         onClick={() => {
-          onSwitchProject(index);
-          onNavigate('profile');
+          onOpenProjectProfile(project, index);
           onClose();
         }}
         aria-label={t('layout.profile')}
@@ -92,7 +93,7 @@ function ProjectRow({
       <button
         onClick={() => onRequestDelete(project)}
         aria-label={t('layout.deleteProject', { name: project.name })}
-        className="shrink-0 mr-2 flex items-center justify-center w-7 h-7 rounded-md border-none cursor-pointer text-zh-muted hover:text-red-500 hover:bg-red-50 transition-colors"
+        className="shrink-0 mr-2 flex items-center justify-center w-7 h-7 rounded-md border-none cursor-pointer text-zh-muted hover:text-danger-500 hover:bg-danger-50 transition-colors"
       >
         <svg
           width="13"
@@ -151,6 +152,7 @@ export function ProjectsSection({
   onClose,
   onAddProject,
   onRequestDelete,
+  onOpenProjectProfile,
 }: {
   projects: ProjectInfo[];
   currentProjectIndex: number;
@@ -159,6 +161,7 @@ export function ProjectsSection({
   onClose: () => void;
   onAddProject: () => void;
   onRequestDelete: (p: ProjectInfo) => void;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
 }) {
   const t = useT();
   return (
@@ -194,6 +197,7 @@ export function ProjectsSection({
               onNavigate={onNavigate}
               onClose={onClose}
               onRequestDelete={onRequestDelete}
+              onOpenProjectProfile={onOpenProjectProfile}
             />
           ))
         )}
@@ -203,7 +207,7 @@ export function ProjectsSection({
             onAddProject();
             onClose();
           }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left border-none cursor-pointer transition-colors hover:bg-green-50 text-green-800"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left border-none cursor-pointer transition-colors hover:bg-success-50 text-success-800"
         >
           <svg
             width="14"
@@ -265,7 +269,7 @@ export function AiToolSection({
             aria-label={t('layout.aiToolToggle')}
             className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border-none cursor-pointer ${
               aiApplying ? 'opacity-50 cursor-wait' : ''
-            } ${aiTool?.enabled ? 'bg-green-700' : 'bg-zh-line'}`}
+            } ${aiTool?.enabled ? 'bg-success-700' : 'bg-zh-line'}`}
           >
             <span
               className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${

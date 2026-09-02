@@ -21,7 +21,7 @@ function SmellRow({ smell, onCopy }: { smell: Smell; onCopy: () => void }) {
           {smell.location.line ? `:${smell.location.line}` : ''}
         </p>
         <p className="text-xs text-zh-ink-2 mt-0.5">{smell.message}</p>
-        <p className="text-xs mt-1 text-blue-700">
+        <p className="text-xs mt-1 text-info-700">
           {t('page.refactor.suggestion', { suggestion: smell.suggestion.description })}
         </p>
       </div>
@@ -44,7 +44,7 @@ export function SmellGroupPanel({
     <ResultCard variant="score">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-blue-600 shrink-0">
+          <span className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-info-600 shrink-0">
             {t(group.label)}
           </span>
           <span className="text-xs text-zh-muted shrink-0">

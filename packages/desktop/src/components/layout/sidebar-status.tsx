@@ -51,7 +51,7 @@ export function EngineStatusSection({
             aria-label={t('layout.engineStatus')}
             className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border-none cursor-pointer ${
               intelligentLoading ? 'opacity-50 cursor-wait' : ''
-            } ${intelligentEnabled ? 'bg-green-700' : 'bg-zh-line'}`}
+            } ${intelligentEnabled ? 'bg-success-700' : 'bg-zh-line'}`}
           >
             <span
               className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${
@@ -88,10 +88,10 @@ export function WisdomBrainCard() {
 
   const status =
     level === null || level === 0
-      ? { text: t('layout.brainHealthy'), dot: 'bg-green-700' }
+      ? { text: t('layout.brainHealthy'), dot: 'bg-success-700' }
       : level <= 3
-        ? { text: t('layout.brainUpdating'), dot: 'bg-amber-500' }
-        : { text: t('layout.brainStale'), dot: 'bg-red-600' };
+        ? { text: t('layout.brainUpdating'), dot: 'bg-warning-500' }
+        : { text: t('layout.brainStale'), dot: 'bg-danger-600' };
 
   return (
     <section>

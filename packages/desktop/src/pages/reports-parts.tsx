@@ -154,7 +154,7 @@ export function ReportsHeader({
   const t = useT();
   return (
     <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+      <Bounce className="w-12 h-12 rounded-xl bg-info-50 flex items-center justify-center">
         <svg
           width="24"
           height="24"

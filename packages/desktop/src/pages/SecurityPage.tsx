@@ -59,7 +59,7 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
                 onClick={() => setTab(t2.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
                   tab === t2.id
-                    ? 'bg-red-600 text-white'
+                    ? 'bg-danger-600 text-white'
                     : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
                 }`}
               >

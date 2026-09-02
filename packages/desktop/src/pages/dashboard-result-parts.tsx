@@ -98,9 +98,9 @@ function FailedIssuesList({
 }) {
   const t = useT();
   return (
-    <div className="rounded-xl border border-red-100 bg-red-50/40 p-5 mb-6">
+    <div className="rounded-xl border border-danger-100 bg-danger-50/40 p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-red-700">
+        <h3 className="text-sm font-semibold text-danger-700">
           {t('page.dashboard.result.issuesTitle')}
         </h3>
         <CopyAllToAiButton onClick={() => onCopyIssues(summary.failedItems)} />
@@ -108,7 +108,7 @@ function FailedIssuesList({
       <ul className="space-y-2">
         {summary.failedItems.slice(0, 20).map((item) => (
           <li key={`${item.stage}-${item.id}`} className="text-sm text-zh-ink-2">
-            <span className="text-xs text-red-500 mr-2">
+            <span className="text-xs text-danger-500 mr-2">
               {item.stage === 'guard'
                 ? t('page.dashboard.result.stage.guard')
                 : t('page.dashboard.result.stage.inspect')}
@@ -143,7 +143,7 @@ function ScopeOverview() {
 function AutoFixNotice({ notice }: { notice: string }) {
   const t = useT();
   return (
-    <div className="mb-6 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 leading-relaxed">
+    <div className="mb-6 max-w-2xl rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs text-warning-800 leading-relaxed">
       <span className="font-semibold mr-1">{t('page.dashboard.autoFix')}</span>
       {notice}
     </div>
@@ -164,7 +164,7 @@ function IssuesOutcome({
   }
 
   return (
-    <div className="rounded-xl border border-green-100 bg-green-50/50 p-5 mb-6 text-sm text-green-900">
+    <div className="rounded-xl border border-success-100 bg-success-50/50 p-5 mb-6 text-sm text-success-900">
       {t('page.dashboard.result.allPassed')}
     </div>
   );

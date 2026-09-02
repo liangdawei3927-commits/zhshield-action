@@ -13,7 +13,7 @@ export function ScopeBlock({ titleKey, items }: { titleKey: string; items: reado
         {items.map((item) => (
           <span
             key={item}
-            className="px-2.5 py-1 rounded-full text-[11px] bg-green-50 text-green-800"
+            className="px-2.5 py-1 rounded-full text-[11px] bg-success-50 text-success-800"
           >
             {t(item)}
           </span>
@@ -82,7 +82,7 @@ export function RunStatus({
       ) : null}
 
       {autoFixNotice && !running ? (
-        <div className="mt-4 max-w-lg rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 leading-relaxed">
+        <div className="mt-4 max-w-lg rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs text-warning-800 leading-relaxed">
           <span className="font-semibold mr-1">{t('page.dashboard.autoFix')}</span>
           {autoFixNotice}
         </div>

@@ -53,7 +53,7 @@ playwright-report/
 *.zip
 
 # Electron / packaging
-packages/desktop/release/
+# 构建产物输出至仓库外（../../../build-output），此处不再需要忽略
 *.dmg
 *.app
 *.exe

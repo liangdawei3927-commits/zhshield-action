@@ -9,12 +9,22 @@ on:
         description: '构建目标 ref（分支/tag/SHA），默认为触发 ref'
         required: false
         type: string
+      require-signing:
+        description: '强制签名+公证（公开发布通道必开 true；secrets 不齐直接失败，拒绝产出未签名发布物）'
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       ref:
         description: '构建目标 ref（分支/tag/SHA）'
         required: false
         type: string
+      require-signing:
+        description: '强制签名+公证（公开发布通道必开 true；secrets 不齐直接失败）'
+        required: false
+        type: boolean
+        default: false
 
 # 同一 ref 的并发构建互斥
 concurrency:
@@ -60,7 +70,7 @@ jobs:
       - name: Build desktop macOS artifacts
         working-directory: packages/desktop
         env:
-          # 签名证书（base64 编码的 .p12）。未配置时产出未签名 DMG 供内部测试。
+          # 签名证书（base64 编码的 .p12）。未配置时产出未签名产物（仅限内部测试）。
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           # 公证凭据：electron-builder 26 内置公证（无需 afterSign 脚本），三者需齐全
@@ -68,27 +78,61 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # 确定性门控：凭据是否齐全用 shell 判定（step 的 if 里读不到 secrets）
-          NOTARIZE_ARGS=""
-          if [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "签名与公证凭据齐全，启用公证（-c.mac.notarize=true）"
-            NOTARIZE_ARGS="-c.mac.notarize=true"
+          # 构件产物输出至仓库外 ../../../build-output（见 package.json build.directories.output），
+          # 避免 465M+ 的 .app/.zip 每次构建污染仓库工作树
+          REQUIRE_SIGNING="${{ inputs.require-signing }}"
+          if [ "$REQUIRE_SIGNING" = "true" ]; then
+            # 公开发布通道（release.yml 调用）：签名+公证是硬性要求，缺失即失败，绝不产出未签名发布物
+            if [ -z "$CSC_LINK" ] || [ -z "$CSC_KEY_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+              echo "::error::require-signing=true 但签名/公证 secrets 不齐全（需 CSC_LINK / CSC_KEY_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID 全部配置）"
+              echo "::error::请先在仓库 Settings → Secrets and variables → Actions 配置（Developer ID 证书 base64 + 公证账号），否则公开发布的更新链路无签名校验，属高危险状态，已中止。"
+              exit 1
+            fi
+            echo "签名与公证凭据齐全，强制签名 + 公证（forceCodeSigning + notarize）"
+            pnpm exec electron-builder --mac --x64 --arm64 -c.mac.notarize=true -c.forceCodeSigning=true --publish never
           else
-            echo "凭据不全，产出未签名产物（公证关闭）"
+            # 手动/内部触发：凭据齐全则按最优路径签名公证，缺失则产出未签名产物供内部测试
+            NOTARIZE_ARGS=""
+            if [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              echo "签名与公证凭据齐全，启用公证（-c.mac.notarize=true）"
+              NOTARIZE_ARGS="-c.mac.notarize=true"
+            else
+              echo "凭据不全，产出未签名产物（严禁上传到公开 release 通道）"
+            fi
+            # 双架构一次构建：生成单一 latest-mac.yml（含 x64/arm64 两条更新记录）
+            # --publish never：发布统一由 release.yml 的 Publish job 上传产物，
+            # electron-builder 在 CI + tag 环境默认会尝试自动发布并要求 GH_TOKEN（未注入即失败）
+            pnpm exec electron-builder --mac --x64 --arm64 $NOTARIZE_ARGS --publish never
           fi
-          # 双架构一次构建：生成单一 latest-mac.yml（含 x64/arm64 两条更新记录）
-          # --publish never：发布统一由 release.yml 的 Publish job 上传产物，
-          # electron-builder 在 CI + tag 环境默认会尝试自动发布并要求 GH_TOKEN（未注入即失败）
-          pnpm exec electron-builder --mac --x64 --arm64 $NOTARIZE_ARGS --publish never
+
+      - name: Verify code signature & notarization (release builds)
+        if: ${{ inputs.require-signing == true }}
+        working-directory: packages/desktop
+        run: |
+          # 发版产物双重校验：codesign 签名有效性 + spctl 公证状态。
+          # 任一失败即中止 —— 未签名/未公证的更新包一旦进公开通道，攻击者可替换安装包实现 RCE。
+          # 遍历 x64(mac/) 与 arm64(mac-arm64/) 两组产物逐一校验
+          APPS=$(ls -d ../../../build-output/mac*/*.app 2>/dev/null)
+          if [ -z "$APPS" ]; then
+            echo "::error::未找到构建产物 ../../../build-output/mac*/*.app，签名校验中止"
+            exit 1
+          fi
+          for APP_DIR in $APPS; do
+            codesign --verify --deep --strict "$APP_DIR"
+            spctl -a -t exec -vv "$APP_DIR" 2>&1 | grep -q "accepted" \
+              || { echo "::error::spctl 未通过（未签名或未公证）: $APP_DIR"; exit 1; }
+            echo "签名与公证校验通过：$APP_DIR"
+          done
+          echo "全部产物签名与公证校验通过 ✓"
 
       - name: Collect artifacts
         working-directory: packages/desktop
         run: |
           mkdir -p artifacts
           # dmg 用于首次安装分发；zip 供 electron-updater 自动更新下载（mac 更新走 zip）
-          cp release/*.dmg artifacts/ 2>/dev/null || true
-          cp release/*.zip artifacts/ 2>/dev/null || true
-          cp release/latest-mac.yml artifacts/ 2>/dev/null || true
+          cp ../../../build-output/*.dmg artifacts/ 2>/dev/null || true
+          cp ../../../build-output/*.zip artifacts/ 2>/dev/null || true
+          cp ../../../build-output/latest-mac.yml artifacts/ 2>/dev/null || true
           ls -la artifacts/
 
       - name: Upload artifacts

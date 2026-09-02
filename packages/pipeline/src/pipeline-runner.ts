@@ -17,6 +17,10 @@ import {
   TsPruneAdapter,
   SemgrepAdapter,
   DepcheckAdapter,
+  TypeScriptAdapter,
+  PrettierAdapter,
+  CommitLintAdapter,
+  NpmAuditAdapter,
 } from '@zh/inspect';
 import type { InspectionReport } from '@zh/inspect';
 import { RefactorEngine } from '@zh/refactor';
@@ -26,11 +30,10 @@ import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
+import { toMessage } from './runner-utils';
+import { buildFailureReport, buildSuccessReport } from './report-builders';
 
-/** 从 unknown 类型的 catch 错误中安全提取 message */
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { toMessage };
 
 export class PipelineRunner {
   guardEngine: GuardEngine;
@@ -104,6 +107,10 @@ export class PipelineRunner {
     this.inspectEngine.registerAdapter(new TsPruneAdapter());
     this.inspectEngine.registerAdapter(new SemgrepAdapter());
     this.inspectEngine.registerAdapter(new DepcheckAdapter());
+    this.inspectEngine.registerAdapter(new TypeScriptAdapter());
+    this.inspectEngine.registerAdapter(new PrettierAdapter());
+    this.inspectEngine.registerAdapter(new CommitLintAdapter());
+    this.inspectEngine.registerAdapter(new NpmAuditAdapter());
 
     // AutoPerf 性能自治引擎（fail-soft 注册，详见 autoperf-adapter.ts）
     await registerAutoPerfAdapter(this.inspectEngine);
@@ -202,7 +209,7 @@ export class PipelineRunner {
     const inspectReport = inspectPhase.report;
 
     this.logger.info('========== SOP 驱动型全流水线完成（不含重构） ==========');
-    return this.buildSuccessReport(guardReport, inspectReport);
+    return buildSuccessReport(guardReport, inspectReport);
   }
 
   /** 执行 SOP Guard 阶段：捕获异常并检查阻断，返回报告或失败报告 */
@@ -213,12 +220,12 @@ export class PipelineRunner {
       const report = await this.runSopGuard(guardContext);
       if (!report.ok) {
         this.logger.warn(`SOP Guard 阻断, 流水线终止 (${report.failed} 项失败)`);
-        return { failure: this.buildFailureReport('guard', report, null) };
+        return { failure: buildFailureReport('guard', report, null) };
       }
       return { report };
     } catch (error) {
       this.logger.error(`SOP Guard 检查失败: ${toMessage(error)}`);
-      return { failure: this.buildFailureReport('guard', null, null, toMessage(error)) };
+      return { failure: buildFailureReport('guard', null, null, toMessage(error)) };
     }
   }
 
@@ -232,7 +239,7 @@ export class PipelineRunner {
       return { report };
     } catch (error) {
       this.logger.error(`SOP Inspect 巡检失败: ${toMessage(error)}`);
-      return { failure: this.buildFailureReport('inspect', guardReport, null, toMessage(error)) };
+      return { failure: buildFailureReport('inspect', guardReport, null, toMessage(error)) };
     }
   }
 
@@ -255,7 +262,7 @@ export class PipelineRunner {
     const inspectReport = inspectPhase.report;
 
     this.logger.info('========== 智汇码盾全流水线完成（不含重构） ==========');
-    return this.buildSuccessReport(guardReport, inspectReport);
+    return buildSuccessReport(guardReport, inspectReport);
   }
 
   /** 执行 Guard 阶段：捕获异常并检查阻断，返回报告或失败报告 */
@@ -269,12 +276,12 @@ export class PipelineRunner {
       });
       if (report.ok === false) {
         this.logger.warn(`Guard 阻断, 流水线终止 (${report.summary.failed} 项失败)`);
-        return { failure: this.buildFailureReport('guard', report, null) };
+        return { failure: buildFailureReport('guard', report, null) };
       }
       return { report };
     } catch (error) {
       this.logger.error(`Guard 检查失败: ${toMessage(error)}`);
-      return { failure: this.buildFailureReport('guard', null, null, toMessage(error)) };
+      return { failure: buildFailureReport('guard', null, null, toMessage(error)) };
     }
   }
 
@@ -287,41 +294,8 @@ export class PipelineRunner {
       return { report };
     } catch (error) {
       this.logger.error(`Inspect 巡检失败: ${toMessage(error)}`);
-      return { failure: this.buildFailureReport('inspect', guardReport, null, toMessage(error)) };
+      return { failure: buildFailureReport('inspect', guardReport, null, toMessage(error)) };
     }
-  }
-
-  /** 构造阶段失败/阻断的流水线报告 */
-  private buildFailureReport(
-    stage: PipelineReport['stage'],
-    guard: PipelineReport['guard'],
-    inspect: PipelineReport['inspect'],
-    error?: string,
-  ): PipelineReport {
-    return {
-      timestamp: new Date(),
-      guard,
-      inspect,
-      refactor: null,
-      passed: false,
-      stage,
-      ...(error !== undefined ? { error } : {}),
-    };
-  }
-
-  /** 构造流水线成功报告（重构由独立入口 runRefactor() / 桌面重构页负责，全流水线不串行跑重构） */
-  private buildSuccessReport<
-    G extends PipelineReport['guard'],
-    I extends PipelineReport['inspect'],
-  >(guard: G, inspect: I): PipelineReport {
-    return {
-      timestamp: new Date(),
-      guard,
-      inspect,
-      refactor: null,
-      passed: true,
-      stage: 'complete',
-    };
   }
 
   async destroy(): Promise<void> {

@@ -82,7 +82,8 @@ jobs:
 
   # ─────────────────────────────────────────────
   # Job 2: 构建桌面端 DMG（Intel + Apple Silicon）
-  # 调用可复用 workflow，签名/公证由 secrets 自动门控
+  # 调用可复用 workflow；require-signing=true 强制签名+公证，
+  # secrets 不齐将直接失败 —— 公开更新通道不允许出现未签名产物
   # ─────────────────────────────────────────────
   build-desktop:
     name: Build Desktop
@@ -90,6 +91,7 @@ jobs:
     uses: ./.github/workflows/build-desktop.yml
     with:
       ref: ${{ inputs.tag || github.ref }}
+      require-signing: true
     secrets: inherit
 
   # ─────────────────────────────────────────────
@@ -136,9 +138,7 @@ jobs:
             本版本已上传 `latest-mac.yml` 与各架构 `.zip` 更新包，桌面端 `electron-updater` 将自动检查并提示更新（`.zip` 供更新通道使用，无需手动安装）。
 
             ### 校验
-            详见附件 DMG。签名/公证状态取决于仓库是否配置 `CSC_LINK` / `APPLE_*` secrets：
-            - 已配置：DMG 已签名 + 公证，Gatekeeper 直接放行
-            - 未配置：DMG 未签名，首次打开需在「系统设置 → 隐私与安全性」点击「仍要打开」
+            本版本已强制签名 + 公证（流水线 require-signing 门控），DMG 与自动更新包均通过代码签名校验，Gatekeeper 可直接放行。
 
             ---
             完整变更请见 [提交历史](https://github.com/${{ github.repository }}/commits/${{ inputs.tag || github.ref_name }})。

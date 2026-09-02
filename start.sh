@@ -68,7 +68,7 @@ cmd_verify_fix(){ banner; check_env; info "干净重建 + 环境验证..."; bash
 cmd_dev_desktop() { banner; check_env; info "启动桌面端开发（先由 turbo 构建依赖包）..."; pnpm exec turbo run dev --filter=@zh/desktop; }
 cmd_dev_server()  { banner; check_env; info "启动后端服务开发 (Ctrl+C 停止)..."; pnpm --filter @zh/server dev; }
 
-cmd_build_mac() { banner; check_env; info "构建依赖包..."; pnpm exec turbo run build --filter=@zh/desktop^...; info "构建桌面端 macOS DMG..."; pnpm --filter @zh/desktop build:mac; ok "桌面端构建完成 → packages/desktop/release/"; }
+cmd_build_mac() { banner; check_env; info "构建依赖包..."; pnpm exec turbo run build --filter=@zh/desktop^...; info "构建桌面端 macOS DMG..."; pnpm --filter @zh/desktop build:mac; ok "桌面端构建完成 → packages/desktop/../../../build-output/（仓库外）"; }
 
 cmd_check()           { banner; check_env; info "运行智汇码盾自检..."; pnpm check; }
 cmd_check_staged()    { banner; check_env; info "检查暂存区..."; pnpm check:staged; }

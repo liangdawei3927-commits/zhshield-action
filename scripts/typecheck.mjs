@@ -141,5 +141,5 @@ if (failed.length) {
 }
 
 // 汇总统计
-const totalTime = results.reduce((s, r) => s + r.elapsed, 0).toFixed(1);
+const totalTime = results.reduce((s, r) => s + Number(r.elapsed), 0).toFixed(1);
 console.log(`\n✅ 全部 ${pkgs.length} 个包类型检查通过（${totalTime}s）\n`);

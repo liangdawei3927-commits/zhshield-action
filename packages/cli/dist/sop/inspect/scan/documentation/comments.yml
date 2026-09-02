@@ -2,7 +2,7 @@ name: Code Comments Quality Check
 description: 检查代码注释质量和覆盖率
 severity: info
 executionMode: async
-status: active
+status: draft
 source: official
 tags: [documentation, comments]
 applicableEngines: [inspect]

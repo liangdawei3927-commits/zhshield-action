@@ -11,3 +11,6 @@ ignore:
   - '*.json'
   - '*.lock'
   - '*.svg'
+check:
+  tool: jscpd # 重复代码检测
+  toolConfig: {}

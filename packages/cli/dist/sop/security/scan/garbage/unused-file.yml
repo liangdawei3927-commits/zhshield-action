@@ -2,7 +2,7 @@ name: Unused File Detection
 description: 检测未使用的文件 — 清理无引用的源文件
 severity: info
 executionMode: async
-status: active
+status: draft
 source: internal
 tags: [security, garbage, cleanup]
 applicableEngines: [security]

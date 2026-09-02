@@ -2,7 +2,7 @@ name: P3 Medium Alert
 description: P3 中危告警策略 — 需要关注的非关键问题
 severity: medium
 executionMode: event
-status: active
+status: draft
 source: official
 tags: [sentinel, alert, p3]
 applicableEngines: [sentinel]

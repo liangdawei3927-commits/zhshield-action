@@ -6,9 +6,11 @@ status: active
 source: internal
 tags: [security, garbage, dependency]
 applicableEngines: [security]
-tool: depcheck
 ignore:
   - '@types/*'
   - typescript
   - eslint
   - prettier
+check:
+  tool: depcheck # 未使用依赖检测
+  toolConfig: {}

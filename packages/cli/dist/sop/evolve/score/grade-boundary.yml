@@ -2,7 +2,7 @@ name: Grade Boundary Configuration
 description: 健康等级分界 — A/B/C/D 等级阈值
 severity: info
 executionMode: sync
-status: active
+status: draft
 source: official
 tags: [evolve, score, grade]
 applicableEngines: [evolve, scoring]

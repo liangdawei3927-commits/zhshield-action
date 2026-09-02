@@ -2,7 +2,7 @@ name: Dimension Weight Configuration
 description: 健康评分五维度权重配置
 severity: info
 executionMode: sync
-status: active
+status: draft
 source: official
 tags: [evolve, score, weight]
 applicableEngines: [evolve, scoring]

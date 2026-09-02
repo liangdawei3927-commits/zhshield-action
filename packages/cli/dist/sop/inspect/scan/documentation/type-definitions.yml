@@ -2,7 +2,7 @@ name: Type Definitions Documentation
 description: 检查 TypeScript 类型定义是否文档化
 severity: info
 executionMode: async
-status: active
+status: draft
 source: official
 tags: [documentation, typescript, types]
 applicableEngines: [inspect]

@@ -11,3 +11,6 @@ detection:
   excludePatterns:
     - '*.test.ts'
     - '**/node_modules/**'
+check:
+  tool: dep-cruiser # 循环依赖检测
+  toolConfig: {}

@@ -2,7 +2,7 @@ name: TypeScript Strict Mode Check
 description: 检查 TypeScript strict 模式配置是否启用
 severity: warning
 executionMode: async
-status: active
+status: draft
 source: official
 tags: [typescript, strict, config]
 applicableEngines: [inspect]

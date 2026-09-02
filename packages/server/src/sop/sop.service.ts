@@ -110,8 +110,17 @@ export class SopService {
 
   // ─── 全量包 ────────────────────────────────────────────────
 
-  async getFullPackage(_version: string): Promise<Buffer> {
+  async getFullPackage(version: string): Promise<Buffer> {
     const rules = this.registry.getAll();
+
+    // 如果配置了私钥，返回签名包（Ed25519）；否则返回裸 JSON（向后兼容）
+    if (this.privateKey) {
+      const signedPkg = SopSigner.signPackage(rules, this.privateKey, version);
+      const json = JSON.stringify(signedPkg);
+      return this.compressor.compress(Buffer.from(json), CompressionFormat.Brotli);
+    }
+
+    // 未配置私钥时返回裸规则数组（向后兼容旧版客户端）
     const json = JSON.stringify(rules);
     return this.compressor.compress(Buffer.from(json), CompressionFormat.Brotli);
   }

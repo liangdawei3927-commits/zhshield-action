@@ -13,6 +13,7 @@ vi.mock('@nestjs/core', () => ({
       listen: vi.fn(async () => {}),
     })),
   },
+  APP_GUARD: 'APP_GUARD',
 }));
 
 vi.mock('./app.module', () => ({ AppModule: {} }));

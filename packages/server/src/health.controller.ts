@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Public } from './auth/local-only.guard';
 import { SopService } from './sop/sop.service';
 
 type CheckStatus = 'ok' | 'degraded';
@@ -29,6 +30,7 @@ export class HealthController {
 
   constructor(private readonly sop?: SopService) {}
 
+  @Public()
   @Get('health')
   async health() {
     const subsystems = await this.checkSubsystems();
@@ -41,6 +43,7 @@ export class HealthController {
     };
   }
 
+  @Public()
   @Get('ready')
   async ready() {
     const subsystems = await this.checkSubsystems();
@@ -52,6 +55,7 @@ export class HealthController {
     };
   }
 
+  @Public()
   @Get('live')
   live() {
     return { status: 'alive' };

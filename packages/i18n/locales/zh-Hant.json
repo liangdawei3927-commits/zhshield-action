@@ -825,7 +825,8 @@
         "deleteFailed": "刪除失敗",
         "deleted": "備份記錄已刪除",
         "failed": "備份執行失敗",
-        "success": "備份成功"
+        "success": "備份成功",
+        "openFailed": "無法開啟備份資料夾，路徑可能已被清理"
       },
       "trigger": {
         "manual": "手動",
@@ -1277,7 +1278,8 @@
         "pass": "通過",
         "warn": "警告",
         "attention": "未檢測"
-      }
+      },
+      "aiReviewBadge": "AI 深度審查"
     },
     "performance": {
       "autoFixable": "可自動修復",
@@ -1485,7 +1487,8 @@
       "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼 · {{garbage}} 項垃圾",
       "tab": {
         "malware": "病毒查殺",
-        "vuln": "漏洞掃描"
+        "vuln": "漏洞掃描",
+        "secrets": "金鑰管理"
       }
     },
     "sentinel": {
@@ -1634,7 +1637,16 @@
         },
         "worse": "較上期惡化 {{delta}}"
       },
-      "trendLabel": "債務趨勢"
+      "trendLabel": "債務趨勢",
+      "action": {
+        "dismiss": "忽略",
+        "notCleared": "關聯問題尚未清零",
+        "plan": "計劃償還",
+        "planning": "計劃中...",
+        "verified": "已驗證通過",
+        "verify": "驗證完成",
+        "verifying": "驗證中..."
+      }
     },
     "welcome": {
       "addProject": "+ 新增專案，開啟守護",
@@ -1662,6 +1674,81 @@
         "skills": "載入專屬技能包",
         "preset": "套用守護預設",
         "ready": "守護方案就緒"
+      }
+    },
+    "secrets": {
+      "action": {
+        "dismiss": "忽略",
+        "dismissConfirm": "忽略後不再告警，將記入經驗池",
+        "markRotating": "標記輪換",
+        "markRotatingConfirm": "標記該金鑰正在輪換？門禁將暫時放行",
+        "verifyRotated": "確認已輪換",
+        "verifyRotatedConfirm": "確認已輪換完成？將觸發複核掃描"
+      },
+      "badge": {
+        "active": "活躍引用",
+        "historyOnly": "僅歷史",
+        "pushedToRemote": "已推送遠端"
+      },
+      "checking": "掃描中...",
+      "done": "金鑰全生命週期",
+      "empty": {
+        "start": "開始掃描",
+        "subtitle": "掃描工作區與 git 歷史中的硬編碼金鑰，定位檔案與提交，引導輪換與複核",
+        "title": "發現金鑰，追蹤全生命週期"
+      },
+      "errorTitle": "掃描失敗",
+      "feature": {
+        "locate": {
+          "desc": "定位到檔案、行號與引入提交，快速下手處理",
+          "title": "精準定位"
+        },
+        "rotate": {
+          "desc": "標記輪換 → 確認已輪換 → 複核忽略，全程可追蹤",
+          "title": "輪換與複核"
+        },
+        "scan": {
+          "desc": "覆蓋工作區與 git 歷史，值已遮蔽顯示",
+          "title": "雙模式掃描"
+        }
+      },
+      "list": {
+        "empty": "未發現硬編碼金鑰",
+        "hint": "按嚴重度排序 · 值已遮蔽（僅前 4 後 4）",
+        "title": "金鑰清單"
+      },
+      "remoteNote": "遠端狀態僅基於本地 git remote 設定判斷，不代表已被公開爬取",
+      "rescan": "重新掃描",
+      "severity": {
+        "critical": "嚴重",
+        "high": "高危",
+        "low": "低危",
+        "medium": "中危"
+      },
+      "status": {
+        "active": "未處理",
+        "dismissed": "已忽略",
+        "rotated": "已輪換",
+        "rotating": "輪換中"
+      },
+      "summary": "共發現 {{total}} 項金鑰 · {{critical}} 項嚴重 · {{active}} 項未處理",
+      "summaryChip": {
+        "active": "未處理",
+        "critical": "嚴重",
+        "historyOnly": "僅歷史",
+        "total": "總計"
+      },
+      "type": {
+        "awsAccessKey": "AWS Access Key",
+        "awsSecretKey": "AWS Secret Key",
+        "databasePassword": "資料庫密碼",
+        "genericApiKey": "通用 API Key",
+        "githubToken": "GitHub Token",
+        "gitlabToken": "GitLab Token",
+        "privateKey": "私鑰",
+        "redisPassword": "Redis 密碼",
+        "stripeKey": "Stripe Key",
+        "twilioKey": "Twilio Key"
       }
     }
   },

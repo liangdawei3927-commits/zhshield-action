@@ -825,7 +825,8 @@
         "deleteFailed": "삭제 실패",
         "deleted": "백업 기록이 삭제되었습니다",
         "failed": "백업 실행 실패",
-        "success": "백업 성공"
+        "success": "백업 성공",
+        "openFailed": "백업 폴더를 열 수 없습니다. 경로가 정리되었을 수 있습니다"
       },
       "trigger": {
         "manual": "수동",
@@ -1277,7 +1278,8 @@
         "pass": "통과",
         "warn": "경고",
         "attention": "미검사"
-      }
+      },
+      "aiReviewBadge": "AI 심층 검토"
     },
     "performance": {
       "autoFixable": "자동 수정 가능",
@@ -1485,7 +1487,8 @@
       "summary": "취약점 {{vulns}}건 · 악성 코드 {{malware}}곳 · 쓰레기 {{garbage}}건",
       "tab": {
         "malware": "바이러스 검사",
-        "vuln": "취약점 스캔"
+        "vuln": "취약점 스캔",
+        "secrets": "시크릿 관리"
       }
     },
     "sentinel": {
@@ -1634,7 +1637,16 @@
         },
         "worse": "이전 기간보다 {{delta}} 악화"
       },
-      "trendLabel": "부채 추세"
+      "trendLabel": "부채 추세",
+      "action": {
+        "dismiss": "무시",
+        "notCleared": "연관 문제가 아직 해소되지 않았습니다",
+        "plan": "상환 계획",
+        "planning": "계획 중...",
+        "verified": "검증 통과 — 상환 완료",
+        "verify": "상환 완료 검증",
+        "verifying": "검증 중..."
+      }
     },
     "welcome": {
       "addProject": "+ 프로젝트 추가, 보호 시작",
@@ -1662,6 +1674,81 @@
         "skills": "전용 스킬 팩 로드",
         "preset": "보호 프리셋 적용",
         "ready": "보호 솔루션 준비 완료"
+      }
+    },
+    "secrets": {
+      "action": {
+        "dismiss": "무시",
+        "dismissConfirm": "무시하면 더 이상 경고하지 않으며 경험 풀에 기록됩니다",
+        "markRotating": "순환 중으로 표시",
+        "markRotatingConfirm": "이 시크릿을 순환 중으로 표시할까요? 게이트가 일시적으로 통과시킵니다",
+        "verifyRotated": "순환 완료 확인",
+        "verifyRotatedConfirm": "순환 완료를 확인할까요? 재검사가 실행됩니다"
+      },
+      "badge": {
+        "active": "활성 참조",
+        "historyOnly": "기록 전용",
+        "pushedToRemote": "원격 push 완료"
+      },
+      "checking": "검사 중...",
+      "done": "시크릿 수명 주기",
+      "empty": {
+        "start": "검사 시작",
+        "subtitle": "워크스페이스와 git 기록의 하드코딩된 시크릿을 검사하고, 파일과 커밋을 추적하여 순환과 검증을 안내합니다",
+        "title": "시크릿을 발견하고 전체 수명 주기를 추적"
+      },
+      "errorTitle": "검사 실패",
+      "feature": {
+        "locate": {
+          "desc": "파일, 줄 번호, 도입 커밋을 특정해 빠르게 조치",
+          "title": "정밀 추적"
+        },
+        "rotate": {
+          "desc": "순환 표시 → 완료 확인 → 검증 후 무시, 전 과정 추적 가능",
+          "title": "순환 및 검증"
+        },
+        "scan": {
+          "desc": "워크스페이스와 git 기록을 포괄하며, 값은 마스킹되어 표시됩니다",
+          "title": "이중 모드 검사"
+        }
+      },
+      "list": {
+        "empty": "하드코딩된 시크릿이 발견되지 않았습니다",
+        "hint": "심각도순 정렬 · 값 마스킹(앞 4자리, 뒤 4자리만 표시)",
+        "title": "시크릿 목록"
+      },
+      "remoteNote": "원격 상태는 로컬 git remote 설정 기준의 판단이며, 공개 크롤링되었음을 의미하지 않습니다",
+      "rescan": "다시 검사",
+      "severity": {
+        "critical": "치명",
+        "high": "높음",
+        "low": "낮음",
+        "medium": "보통"
+      },
+      "status": {
+        "active": "미처리",
+        "dismissed": "무시됨",
+        "rotated": "순환됨",
+        "rotating": "순환 중"
+      },
+      "summary": "총 {{total}}개 시크릿 · 치명 {{critical}}건 · 미처리 {{active}}건",
+      "summaryChip": {
+        "active": "미처리",
+        "critical": "치명",
+        "historyOnly": "기록 전용",
+        "total": "합계"
+      },
+      "type": {
+        "awsAccessKey": "AWS Access Key",
+        "awsSecretKey": "AWS Secret Key",
+        "databasePassword": "데이터베이스 비밀번호",
+        "genericApiKey": "범용 API Key",
+        "githubToken": "GitHub Token",
+        "gitlabToken": "GitLab Token",
+        "privateKey": "개인 키",
+        "redisPassword": "Redis 비밀번호",
+        "stripeKey": "Stripe Key",
+        "twilioKey": "Twilio Key"
       }
     }
   },

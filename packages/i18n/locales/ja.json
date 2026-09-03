@@ -825,7 +825,8 @@
         "deleteFailed": "削除に失敗しました",
         "deleted": "バックアップ記録を削除しました",
         "failed": "バックアップの実行に失敗しました",
-        "success": "バックアップに成功しました"
+        "success": "バックアップに成功しました",
+        "openFailed": "バックアップフォルダを開けません。パスが削除された可能性があります"
       },
       "trigger": {
         "manual": "手動",
@@ -1277,7 +1278,8 @@
         "pass": "合格",
         "warn": "警告",
         "attention": "未検出"
-      }
+      },
+      "aiReviewBadge": "AI 深層レビュー"
     },
     "performance": {
       "autoFixable": "自動修正可能",
@@ -1485,7 +1487,8 @@
       "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所 · ゴミ {{garbage}} 件",
       "tab": {
         "malware": "ウイルス駆除",
-        "vuln": "脆弱性スキャン"
+        "vuln": "脆弱性スキャン",
+        "secrets": "シークレット管理"
       }
     },
     "sentinel": {
@@ -1634,7 +1637,16 @@
         },
         "worse": "前回比で悪化 {{delta}}"
       },
-      "trendLabel": "負債のトレンド"
+      "trendLabel": "負債のトレンド",
+      "action": {
+        "dismiss": "取り下げ",
+        "notCleared": "関連する問題が未解消です",
+        "plan": "返済を計画",
+        "planning": "計画中...",
+        "verified": "検証済み — 返済完了",
+        "verify": "返済完了を検証",
+        "verifying": "検証中..."
+      }
     },
     "welcome": {
       "addProject": "+ プロジェクトを追加してガードを開始",
@@ -1662,6 +1674,81 @@
         "skills": "専用スキルパックを読み込み",
         "preset": "ガードプリセットを適用",
         "ready": "ガードソリューションの準備完了"
+      }
+    },
+    "secrets": {
+      "action": {
+        "dismiss": "取り下げ",
+        "dismissConfirm": "取り下げ後はアラートが停止し、経験プールに記録されます",
+        "markRotating": "ローテーション中として記録",
+        "markRotatingConfirm": "このシークレットをローテーション中として記録しますか？ゲートは一時的に通過させます",
+        "verifyRotated": "ローテーション完了を確認",
+        "verifyRotatedConfirm": "ローテーション完了を確認しますか？再スキャンが実行されます"
+      },
+      "badge": {
+        "active": "有効な参照",
+        "historyOnly": "履歴のみ",
+        "pushedToRemote": "リモートへ push 済み"
+      },
+      "checking": "スキャン中...",
+      "done": "シークレットのライフサイクル",
+      "empty": {
+        "start": "スキャン開始",
+        "subtitle": "ワークスペースと git 履歴内のハードコードされたシークレットをスキャンし、ファイルとコミットを特定して、ローテーションと検証を支援します",
+        "title": "シークレットを検出し、ライフサイクル全体を追跡"
+      },
+      "errorTitle": "スキャン失敗",
+      "feature": {
+        "locate": {
+          "desc": "ファイル・行番号・導入コミットを特定し、迅速に対応",
+          "title": "正確な特定"
+        },
+        "rotate": {
+          "desc": "ローテーション記録 → 完了確認 → 検証後取り下げ、全工程を追跡可能",
+          "title": "ローテーションと検証"
+        },
+        "scan": {
+          "desc": "ワークスペースと git 履歴をカバー。値はマスキング表示",
+          "title": "デュアルモードスキャン"
+        }
+      },
+      "list": {
+        "empty": "ハードコードされたシークレットは見つかりませんでした",
+        "hint": "深刻度順でソート · 値はマスキング済み（先頭 4 文字と末尾 4 文字のみ表示）",
+        "title": "シークレット一覧"
+      },
+      "remoteNote": "リモート状態はローカルの git remote 設定に基づく判断であり、公開クロールされたことを意味しません",
+      "rescan": "再スキャン",
+      "severity": {
+        "critical": "重大",
+        "high": "高",
+        "low": "低",
+        "medium": "中"
+      },
+      "status": {
+        "active": "未処理",
+        "dismissed": "取り下げ済み",
+        "rotated": "ローテーション済み",
+        "rotating": "ローテーション中"
+      },
+      "summary": "計 {{total}} 件のシークレット · {{critical}} 件が重大 · {{active}} 件が未処理",
+      "summaryChip": {
+        "active": "未処理",
+        "critical": "重大",
+        "historyOnly": "履歴のみ",
+        "total": "合計"
+      },
+      "type": {
+        "awsAccessKey": "AWS Access Key",
+        "awsSecretKey": "AWS Secret Key",
+        "databasePassword": "データベースパスワード",
+        "genericApiKey": "汎用 API Key",
+        "githubToken": "GitHub Token",
+        "gitlabToken": "GitLab Token",
+        "privateKey": "秘密鍵",
+        "redisPassword": "Redis パスワード",
+        "stripeKey": "Stripe Key",
+        "twilioKey": "Twilio Key"
       }
     }
   },

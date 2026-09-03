@@ -1,4 +1,4 @@
-# 智汇码盾 (ZhiYan CodeShield)
+# 智汇码盾 (ZhiHui CodeShield)
 
 模块化单体代码治理平台 — 用 SOP 元规则编排开源扫描工具（ESLint / Semgrep / Trivy / gitleaks 等），保护 TypeScript / NestJS 代码质量与安全。
 

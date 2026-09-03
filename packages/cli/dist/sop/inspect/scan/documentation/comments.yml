@@ -2,12 +2,14 @@ name: Code Comments Quality Check
 description: 检查代码注释质量和覆盖率
 severity: info
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [documentation, comments]
 applicableEngines: [inspect]
-rules:
-  - check-public-api-docs
-  - no-commented-code
-  - no-todo-without-ticket
-  - jsdoc-for-exports
+required:
+  # 导出函数/类必须有前置 JSDoc 文档（公共 API 文档化）
+  - path: src
+    fileExts: ['.ts', '.tsx']
+    jsdocOn:
+      - '^\s*export\s+(async\s+)?function\s+'
+      - '^\s*export\s+class\s+'

@@ -13,4 +13,6 @@ detection:
     - '**/node_modules/**'
 check:
   tool: dep-cruiser # 循环依赖检测
-  toolConfig: {}
+  toolConfig:
+    # 内置校验配置（内核资产），被扫描项目无需自带 .dependency-cruiser.cjs
+    config: '@zh/kernel/dist/assets/dependency-cruiser/.dependency-cruiser.cjs'

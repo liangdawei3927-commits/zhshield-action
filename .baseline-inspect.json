@@ -1,5 +1,5 @@
 {
-  "projectId": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield",
+  "projectId": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield",
   "timestamp": "2026-08-30T18:34:37.279Z",
   "scanType": "full",
   "duration": 251773,
@@ -14,12 +14,12 @@
       "severity": "warning",
       "category": "performance",
       "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-      "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+      "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
       "line": 33,
       "column": 25,
       "autoFixable": false,
       "source": "inspect",
-      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:33"
+      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:33"
     },
     {
       "id": "babf38a4-07d5-4d2b-baa7-2784b7b7fe24",
@@ -27,12 +27,12 @@
       "severity": "warning",
       "category": "performance",
       "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-      "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+      "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
       "line": 47,
       "column": 25,
       "autoFixable": false,
       "source": "inspect",
-      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:47"
+      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:47"
     },
     {
       "id": "d677377e-700a-48da-ad3e-20a2bf8da83f",
@@ -40,12 +40,12 @@
       "severity": "warning",
       "category": "performance",
       "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-      "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+      "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
       "line": 47,
       "column": 63,
       "autoFixable": false,
       "source": "inspect",
-      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:47"
+      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:47"
     },
     {
       "id": "e5e2c1ae-ace1-4fff-9b8e-cc4a3621b731",
@@ -53,12 +53,12 @@
       "severity": "warning",
       "category": "performance",
       "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-      "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/download.mjs",
+      "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/download.mjs",
       "line": 106,
       "column": 37,
       "autoFixable": false,
       "source": "inspect",
-      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/download.mjs:106"
+      "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/download.mjs:106"
     },
     {
       "id": "0cc46d0f-1d2d-4a8e-aa59-377e3b0fd949",
@@ -331,12 +331,12 @@
           "severity": "warning",
           "category": "performance",
           "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-          "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+          "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
           "line": 33,
           "column": 25,
           "autoFixable": false,
           "source": "inspect",
-          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:33"
+          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:33"
         },
         {
           "id": "babf38a4-07d5-4d2b-baa7-2784b7b7fe24",
@@ -344,12 +344,12 @@
           "severity": "warning",
           "category": "performance",
           "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-          "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+          "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
           "line": 47,
           "column": 25,
           "autoFixable": false,
           "source": "inspect",
-          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:47"
+          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:47"
         },
         {
           "id": "d677377e-700a-48da-ad3e-20a2bf8da83f",
@@ -357,12 +357,12 @@
           "severity": "warning",
           "category": "performance",
           "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-          "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs",
+          "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs",
           "line": 47,
           "column": 63,
           "autoFixable": false,
           "source": "inspect",
-          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/detect.mjs:47"
+          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/detect.mjs:47"
         },
         {
           "id": "e5e2c1ae-ace1-4fff-9b8e-cc4a3621b731",
@@ -370,12 +370,12 @@
           "severity": "warning",
           "category": "performance",
           "message": "Move this regular expression to module scope to avoid re-compilation on every call.",
-          "file": "/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/download.mjs",
+          "file": "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/download.mjs",
           "line": 106,
           "column": 37,
           "autoFixable": false,
           "source": "inspect",
-          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/scripts/lib/install-tools/download.mjs:106"
+          "fingerprint": "inspect.scan.official.eslint-performance:/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/scripts/lib/install-tools/download.mjs:106"
         }
       ]
     },

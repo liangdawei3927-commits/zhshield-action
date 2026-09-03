@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SopRule, ProjectFeature } from './sop-types';
+import { ruleMatchesProject } from './rule-project-match';
 import { SopRegistry } from './sop-registry';
 import { SopRuleParser } from './sop-loader-parser';
 import { SopRuleFileCollector } from './sop-loader-fs';
@@ -99,10 +100,6 @@ export class SopLoader {
   }
 
   private matchesProject(rule: SopRule, feature: ProjectFeature): boolean {
-    const tags = rule.tags ?? [];
-    if (feature.framework && tags.includes(feature.framework)) return true;
-    if (feature.language && tags.includes(feature.language)) return true;
-    if (feature.features.some((f) => tags.includes(f))) return true;
-    return rule.domain === 'security';
+    return ruleMatchesProject(rule, feature);
   }
 }

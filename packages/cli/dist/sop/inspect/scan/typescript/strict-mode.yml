@@ -2,12 +2,14 @@ name: TypeScript Strict Mode Check
 description: 检查 TypeScript strict 模式配置是否启用
 severity: warning
 executionMode: async
-status: draft
+status: active
 source: official
 tags: [typescript, strict, config]
 applicableEngines: [inspect]
-requiredConfig:
-  strict: true
-  noImplicitAny: true
-  strictNullChecks: true
-  noUncheckedIndexedAccess: true
+required:
+  # strict: true 已隐含 noImplicitAny / strictNullChecks，无需重复声明；
+  # noUncheckedIndexedAccess 不被 strict 隐含，需单独开启
+  - path: tsconfig.json
+    json:
+      compilerOptions.strict: true
+      compilerOptions.noUncheckedIndexedAccess: true

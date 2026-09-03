@@ -524,7 +524,7 @@ describe('resolveEslintTargetDir', () => {
 
   it('嵌套仓库：子目录含 eslint 配置时指向该子目录', () => {
     const dir = makeTempDir();
-    const repo = path.join(dir, 'zhiyan-codeshield');
+    const repo = path.join(dir, 'zhihui-codeshield');
     fs.mkdirSync(path.join(repo, 'packages'), { recursive: true });
     fs.writeFileSync(path.join(repo, 'eslint.config.mjs'), 'export default []');
     expect(resolveEslintTargetDir(dir)).toBe(repo);

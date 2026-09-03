@@ -8,7 +8,7 @@ const WHITESPACE = /\s+/;
  * 同时在嵌套仓库中定位含 test 脚本的项目目录。
  */
 export class TestCommandDetector {
-  /** 解析实际项目目录：projectPath 无 package.json 时向下查找含 test 脚本的一层子目录（嵌套仓库，如 zhiyan-codeshield/） */
+  /** 解析实际项目目录：projectPath 无 package.json 时向下查找含 test 脚本的一层子目录（嵌套仓库，如 zhihui-codeshield/） */
   resolveProjectDir(projectPath: string): { dir: string } | { error: string } {
     const pkg = this.loadPackageJson(projectPath);
     if (!('error' in pkg)) return { dir: projectPath };

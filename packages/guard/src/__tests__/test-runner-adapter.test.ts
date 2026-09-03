@@ -93,7 +93,7 @@ describe('TestCommandDetector — 项目目录解析', () => {
 
   it('projectPath 无 package.json 时向下查找含 test 脚本的子目录（嵌套仓库）', () => {
     const outer = makeTempDir();
-    const inner = path.join(outer, 'zhiyan-codeshield');
+    const inner = path.join(outer, 'zhihui-codeshield');
     fs.mkdirSync(inner);
     fs.writeFileSync(path.join(inner, 'package.json'), '{"scripts":{"test":"vitest run"}}');
     expect(detector.resolveProjectDir(outer)).toEqual({ dir: inner });
@@ -105,7 +105,7 @@ describe('TestCommandDetector — 项目目录解析', () => {
     const noScript = path.join(outer, '.opencode');
     fs.mkdirSync(noScript);
     fs.writeFileSync(path.join(noScript, 'package.json'), '{"scripts":{"dev":"node x.js"}}');
-    const inner = path.join(outer, 'zhiyan-codeshield');
+    const inner = path.join(outer, 'zhihui-codeshield');
     fs.mkdirSync(inner);
     fs.writeFileSync(path.join(inner, 'package.json'), '{"scripts":{"test":"turbo run test"}}');
     expect(detector.resolveProjectDir(outer)).toEqual({ dir: inner });

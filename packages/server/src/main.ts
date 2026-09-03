@@ -67,10 +67,10 @@ function setupSwagger(app: INestApplication): void {
 
   const pkg = readPackageMetadata();
   const config = new DocumentBuilder()
-    .setTitle('ZhiYan CodeShield API')
+    .setTitle('ZhiHui CodeShield API')
     .setDescription(pkg.description ?? '智汇码盾模块化单体代码治理平台 — NestJS HTTP API')
     .setVersion(pkg.version)
-    .setContact('ZhiYan CodeShield', 'https://github.com/zhshield/zhiyan-codeshield', '')
+    .setContact('ZhiHui CodeShield', 'https://github.com/zhshield/zhihui-codeshield', '')
     .addServer(`http://localhost:${process.env.PORT ?? 3010}/api/v1`, 'Local development')
     .build();
   const document = SwaggerModule.createDocument(app, config);

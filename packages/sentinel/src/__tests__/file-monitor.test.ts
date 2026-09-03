@@ -39,12 +39,12 @@ describe('默认忽略规则（噪音路径）', () => {
   it('命中依赖/构建/测试/工具产物目录', () => {
     const noisy = [
       '/proj/node_modules/pkg/index.js',
-      '/proj/zhiyan-codeshield/packages/desktop/dist-electron/main.js',
-      '/proj/zhiyan-codeshield/packages/desktop/test-results/.last-run.json',
-      '/proj/zhiyan-codeshield/packages/desktop/test-results/trace.zip',
-      '/proj/zhiyan-codeshield/packages/desktop/test-results/error-context.md',
-      '/proj/zhiyan-codeshield/packages/desktop/.playwright-artifacts-0/shot.png',
-      '/proj/zhiyan-codeshield/packages/desktop/.playwright-artifacts-1/shot.png',
+      '/proj/zhihui-codeshield/packages/desktop/dist-electron/main.js',
+      '/proj/zhihui-codeshield/packages/desktop/test-results/.last-run.json',
+      '/proj/zhihui-codeshield/packages/desktop/test-results/trace.zip',
+      '/proj/zhihui-codeshield/packages/desktop/test-results/error-context.md',
+      '/proj/zhihui-codeshield/packages/desktop/.playwright-artifacts-0/shot.png',
+      '/proj/zhihui-codeshield/packages/desktop/.playwright-artifacts-1/shot.png',
       '/proj/.playwright-mcp/state.json',
       '/proj/.omo/run-continuation/ses_025d64df2ffeZMTofO2r8LQ7D3.json',
       '/proj/.opencode/sessions/ses_029fa45dcffeF0ZYfgSMcVNSHM.json',
@@ -59,10 +59,10 @@ describe('默认忽略规则（噪音路径）', () => {
 
   it('命中临时文件与 TypeScript 构建缓存（tsbuildinfo）', () => {
     const noisy = [
-      '/proj/zhiyan-codeshield/_tmp_5769_8448c06a329974ee939ceea3be7872c3',
-      '/proj/zhiyan-codeshield/_tmp_85458_0368b6118d93550beff3c092455163a8',
-      '/proj/zhiyan-codeshield/packages/guard/tsconfig.tsbuildinfo',
-      '/proj/zhiyan-codeshield/packages/pipeline/tsconfig.tsbuildinfo',
+      '/proj/zhihui-codeshield/_tmp_5769_8448c06a329974ee939ceea3be7872c3',
+      '/proj/zhihui-codeshield/_tmp_85458_0368b6118d93550beff3c092455163a8',
+      '/proj/zhihui-codeshield/packages/guard/tsconfig.tsbuildinfo',
+      '/proj/zhihui-codeshield/packages/pipeline/tsconfig.tsbuildinfo',
     ];
     for (const p of noisy) {
       expect(DEFAULT_IGNORE_RE.test(p), p).toBe(true);
@@ -72,9 +72,9 @@ describe('默认忽略规则（噪音路径）', () => {
 
   it('命中编辑器锁文件与 macOS 元数据文件（Vim 交换/Emacs 锁/.DS_Store）', () => {
     const noisy = [
-      '/proj/zhiyan-codeshield/.!31175!file-monitor.ts',
-      '/proj/zhiyan-codeshield/.!31147!file-monitor.ts',
-      '/proj/zhiyan-codeshield/.!31146!file-monitor.ts',
+      '/proj/zhihui-codeshield/.!31175!file-monitor.ts',
+      '/proj/zhihui-codeshield/.!31147!file-monitor.ts',
+      '/proj/zhihui-codeshield/.!31146!file-monitor.ts',
       '/proj/src/.#runner.ts',
       '/proj/src/runner.ts.swp',
       '/proj/src/runner.ts.swo',
@@ -91,7 +91,7 @@ describe('默认忽略规则（噪音路径）', () => {
       '/proj/src/pages/GuardPage.tsx',
       '/proj/src/utils/copyToAi.ts',
       '/proj/src/pages/guard-logic.ts',
-      '/proj/zhiyan-codeshield/packages/desktop/e2e/app.spec.ts',
+      '/proj/zhihui-codeshield/packages/desktop/e2e/app.spec.ts',
     ];
     for (const p of source) {
       expect(DEFAULT_IGNORE_RE.test(p), p).toBe(false);
@@ -152,7 +152,7 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
       fs.mkdirSync(path.dirname(realFile), { recursive: true });
       fs.writeFileSync(realFile, 'console.log(1)');
       // 子目录自身元数据变化（如子项增删导致目录 mtime 更新）不应产生事件，
-      // 复现 macOS fs.watch 递归对目录自身触发 change 的噪声（如 "File change: zhiyan-codeshield"）
+      // 复现 macOS fs.watch 递归对目录自身触发 change 的噪声（如 "File change: zhihui-codeshield"）
       const dirOnly = path.join(root, 'dir-only');
       fs.mkdirSync(dirOnly);
       const past = new Date(Date.now() - 5000);

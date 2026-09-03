@@ -196,9 +196,9 @@ describe('monorepo 闭包解析（根因修复）', () => {
 
   it('父容器目录扫描：pnpm 工作区根 + 根声明解析真实闭包 → 0 幻觉误报', async () => {
     // 布局仿 `/Users/dawei/Desktop/ZHCodeShield` 容器：容器本身无 package.json，
-    // 子目录 zhiyan-codeshield 才是带 pnpm-workspace.yaml 的仓库根。
+    // 子目录 zhihui-codeshield 才是带 pnpm-workspace.yaml 的仓库根。
     await writeFile('container.txt', '');
-    const repo = 'zhiyan-codeshield';
+    const repo = 'zhihui-codeshield';
     await writeFile(`${repo}/pnpm-workspace.yaml`, "packages:\n  - 'packages/*'\n");
     await writeFile(
       `${repo}/package.json`,

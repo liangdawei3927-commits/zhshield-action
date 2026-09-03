@@ -1,7 +1,7 @@
 {
   "ai": {
     "autoFix": {
-      "promptIntro": "You are the auto-fix assistant for ZhiYan CodeShield.",
+      "promptIntro": "You are the auto-fix assistant for ZhiHui CodeShield.",
       "readDiagnostics": "First read the diagnostics file {{diagPath}}, then fix the issues listed in it in priority order: error → warning → info.",
       "requirement1": "1. Understand each issue's ruleId, message, file, line, column, and suggestion, then locate the code",
       "requirement2": "2. Entries without a file field are tool/config issues (e.g., an ESLint scan directory misconfiguration); check and fix the relevant tool config, don't pretend to fix code",
@@ -16,7 +16,7 @@
       "locationLabel": "- Location: {{location}}",
       "messageLabel": "- Description: {{message}}",
       "projectPathLabel": "Project path: {{projectPath}}",
-      "promptIntro": "You are the code-fix assistant for ZhiYan CodeShield. Please verify and handle the following issues one by one:",
+      "promptIntro": "You are the code-fix assistant for ZhiHui CodeShield. Please verify and handle the following issues one by one:",
       "requirement1": "1. Verify each issue is real, unreferenced, and safe to handle before acting.",
       "requirement2": "2. Understand the impact before making changes; ask instead of faking a fix.",
       "requirement3": "3. Make only minimal necessary changes; don't refactor or handle anything outside the list.",
@@ -29,12 +29,12 @@
     },
     "toolConfig": {
       "openCodeCommand": {
-        "description": "description: Read ZhiYan CodeShield diagnostics and fix code issues",
+        "description": "description: Read ZhiHui CodeShield diagnostics and fix code issues",
         "step1": "1. Read the project root `.zhshield/diagnostics/latest.json` (if missing, tell the user to run an inspection first)",
         "step2": "2. Sort issues by error → warning → info priority",
         "step3": "3. Understand each issue, locate the code, generate and apply a fix",
         "step4": "4. After fixing, run `zhshield issue resolve --fingerprint=\"<fingerprint>\"` to mark it resolved (optional)",
-        "title": "# ZhiYan CodeShield diagnostics fix"
+        "title": "# ZhiHui CodeShield diagnostics fix"
       }
     }
   },
@@ -80,7 +80,7 @@
     "sbomWriteFailed": "❌ SBOM write failed: {{error}}",
     "sbomWritten": "✅ SBOM written: {{path}}",
     "stagedSkipped": "✅ No staged changes, gate check skipped",
-    "title": "zhshield - ZhiYan CodeShield: Code Quality Governance",
+    "title": "zhshield - ZhiHui CodeShield: Code Quality Governance",
     "unknownCommand": "Unknown command: {{command}}",
     "usageTitle": "Usage:"
   },
@@ -103,7 +103,7 @@
     "yes": "Yes"
   },
   "electron": {
-    "appTitle": "ZhiYan CodeShield",
+    "appTitle": "ZhiHui CodeShield",
     "cleanFailed": "Cleanup failed, please try again later",
     "depsRelock.integrityIncomplete": "Lockfile hashes incomplete (nodes missing hashes); relock refused",
     "diagnostics": {
@@ -200,7 +200,7 @@
         "passedNoOutput": "ESLint check passed (no output)"
       },
       "hook": {
-        "guardFailed": "❌ ZhiYan CodeShield gate check failed; please fix the issues then {{action}}"
+        "guardFailed": "❌ ZhiHui CodeShield gate check failed; please fix the issues then {{action}}"
       },
       "securityScan": {
         "commandInjection": "Possible command injection: use execFile instead of exec",
@@ -314,13 +314,13 @@
       "backup": {
         "allFailed": "All backup methods failed",
         "commitMessage": "{{prefix}} auto backup - {{timestamp}}",
-        "commitPrefix": "[ZhiYan CodeShield]",
+        "commitPrefix": "[ZhiHui CodeShield]",
         "done": "Backup complete",
         "githubNotAuthorized": "GitHub is not authorized; authorize your GitHub account in settings first",
         "localCopyFailed": "{{count}} files failed to copy",
         "progressGitHubCommit": "Committing to GitHub...",
         "progressLocalCopy": "Copying to local directory...",
-        "repoDescription": "ZhiYan CodeShield auto backup repository",
+        "repoDescription": "ZhiHui CodeShield auto backup repository",
         "unknownGitHubError": "Unknown GitHub backup error",
         "unknownLocalError": "Unknown local backup error"
       },
@@ -390,8 +390,8 @@
         "inspectFailed": "Inspect failed: {{error}}",
         "inspectStart": "Starting Inspect engine scan...",
         "pipelineClosed": "Pipeline closed",
-        "pipelineDone": "========== ZhiYan CodeShield full pipeline complete (excluding refactor) ==========",
-        "pipelineStart": "========== ZhiYan CodeShield full pipeline start ==========",
+        "pipelineDone": "========== ZhiHui CodeShield full pipeline complete (excluding refactor) ==========",
+        "pipelineStart": "========== ZhiHui CodeShield full pipeline start ==========",
         "pluginLoaded": "Plugin loaded: {{name}}@{{version}}",
         "profileDone": "Project profile: {{language}}{{framework}} ({{packageManager}})",
         "profileStart": "Starting project profile analysis...",
@@ -653,13 +653,13 @@
   "layout": {
     "about": "About",
     "navigation": "Navigation",
-    "aboutVersion": "ZhiYan CodeShield {{version}}",
+    "aboutVersion": "ZhiHui CodeShield {{version}}",
     "addProject": "Add project",
     "aiTool": "AI tools",
     "aiToolDesc": "Linter protocol · diagnostics listener",
     "aiToolEnabled": "Enabled: AI reads diagnostics and fixes them automatically",
     "aiToolToggle": "Toggle OpenCode integration",
-    "brandName": "ZhiYan CodeShield",
+    "brandName": "ZhiHui CodeShield",
     "brandSlogan": "The smart guardian of the code world",
     "cancelTask": "Cancel task",
     "collapseSidebar": "Collapse sidebar",
@@ -739,15 +739,15 @@
     "commandFailed": "{{command}} execution failed",
     "diagnosticsUnparseable": "Diagnostics file cannot be parsed",
     "fileNotFound": "File not found: .zhshield/{{relativePath}}",
-    "getDiagnosticsDesc": "Read the diagnostics from ZhiYan CodeShield's most recent checkup (.zhshield/diagnostics/latest.json)",
-    "getIntegrationDesc": "Read ZhiYan CodeShield's integration config (.zhshield/integration.json), including auto-trigger, filters, and auto-fix settings",
-    "getIssuesDesc": "Get issues from ZhiYan CodeShield's most recent checkup (filterable by severity/category/source); returns a {ok,total,issues} JSON",
+    "getDiagnosticsDesc": "Read the diagnostics from ZhiHui CodeShield's most recent checkup (.zhshield/diagnostics/latest.json)",
+    "getIntegrationDesc": "Read ZhiHui CodeShield's integration config (.zhshield/integration.json), including auto-trigger, filters, and auto-fix settings",
+    "getIssuesDesc": "Get issues from ZhiHui CodeShield's most recent checkup (filterable by severity/category/source); returns a {ok,total,issues} JSON",
     "guardProjectPathDesc": "Project root directory to check",
     "guardSopModeDesc": "Use SOP rule-driven mode",
     "inspectProjectPathDesc": "Project root directory to inspect",
     "projectPathDesc": "Project root directory; defaults to the current working directory",
-    "runGuardDesc": "Trigger a ZhiYan CodeShield gate check (calls zhshield guard --dry-run) to examine code in report-only, non-blocking mode",
-    "runInspectDesc": "Trigger a ZhiYan CodeShield inspection (calls zhshield inspect) to scan for code quality issues and return a report",
+    "runGuardDesc": "Trigger a ZhiHui CodeShield gate check (calls zhshield guard --dry-run) to examine code in report-only, non-blocking mode",
+    "runInspectDesc": "Trigger a ZhiHui CodeShield inspection (calls zhshield inspect) to scan for code quality issues and return a report",
     "severityFilterDesc": "Filter by severity",
     "sopModeDesc": "Use SOP rule-driven mode (default: checks.json mode)",
     "sourceFilterDesc": "Filter by source engine"
@@ -973,7 +973,7 @@
         "foundIssues": "Checkup complete: found {{count}} issues",
         "noValidItems": "Checkup complete, but no valid checks ran (check the project path)"
       },
-      "welcome": "Welcome to ZhiYan CodeShield"
+      "welcome": "Welcome to ZhiHui CodeShield"
     },
     "deps": {
       "checking": "Taking inventory...",
@@ -1730,8 +1730,8 @@
         "ops": "Operations",
         "security": "Security"
       },
-      "brand": "ZhiYan CodeShield",
-      "cloudOn": "ZhiYan Cloud Brain enabled",
+      "brand": "ZhiHui CodeShield",
+      "cloudOn": "ZhiHui Cloud Brain enabled",
       "engineOn": "Smart engine enabled",
       "sloganTitle": "The smart guardian of the code world",
       "stat": {
@@ -1853,7 +1853,7 @@
     "pipelinePassed": "✓ Pipeline passed",
     "profileTitle": "Project profile",
     "refactorSection": "Refactor smell detection",
-    "reportTitle": "ZhiYan CodeShield - Code Quality Management Report",
+    "reportTitle": "ZhiHui CodeShield - Code Quality Management Report",
     "ruleCount": "{{count}} rules",
     "ruleEngineTitle": "SOP rule engine report",
     "scanCount": "Scanned: {{scanned}}/{{files}} files",
@@ -1884,7 +1884,7 @@
   },
   "server": {
     "bootstrap": {
-      "running": "ZhiYan CodeShield server running at http://localhost:{{port}}"
+      "running": "ZhiHui CodeShield server running at http://localhost:{{port}}"
     },
     "pipeline": {
       "scoreRecordFailed": "Health score recording failed: {{error}}"
@@ -1961,7 +1961,7 @@
       "loading": "Loading capability pack",
       "ready": "Protection ready"
     },
-    "hint": "Please wait while ZhiYan CodeShield configures your optimal protection"
+    "hint": "Please wait while ZhiHui CodeShield configures your optimal protection"
   },
   "screensaver": {
     "engineActive": "Smart engine active",

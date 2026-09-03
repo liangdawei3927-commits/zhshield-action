@@ -18,6 +18,24 @@ import path from 'node:path';
 
 const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
+/**
+ * 显式固定被测 Electron 二进制（项目的 electron 依赖版本）。
+ * 不固定时 Playwright 在 pnpm workspace 下解析不到 electron 包，
+ * 会尝试自行下载缓存副本（版本与项目不一致，主进程启动即崩）。
+ */
+const ELECTRON_BIN = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  'electron',
+  'dist',
+  process.platform === 'darwin'
+    ? 'Electron.app/Contents/MacOS/Electron'
+    : process.platform === 'win32'
+      ? 'electron.exe'
+      : 'electron',
+);
+
 /** 种子项目路径：默认指向本 monorepo 根（随仓库位置自适应，CI 可用 ZH_E2E_PROJECT_PATH 覆盖） */
 const DEMO_PROJECT_PATH = process.env.ZH_E2E_PROJECT_PATH ?? path.resolve(__dirname, '..', '..', '..');
 
@@ -57,6 +75,7 @@ async function launchApp(
     );
   }
   const app = await electron.launch({
+    executablePath: ELECTRON_BIN,
     args: [`--user-data-dir=${userDataDir}`, MAIN_ENTRY],
     timeout: 60_000,
     env: { ...CLEAN_ENV, HOME: fakeHome },

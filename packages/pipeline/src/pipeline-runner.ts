@@ -26,14 +26,44 @@ import type { InspectionReport } from '@zh/inspect';
 import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
-import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
+import type { Plugin, RuleContext, RuleEngineReport, ProjectFeature } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
+import { SonarwayToolAdapter } from './sonarway-tool-adapter';
+import { detectProjectProfile } from './project-profile';
 import { toMessage } from './runner-utils';
 import { buildFailureReport, buildSuccessReport } from './report-builders';
 
 export { toMessage };
+
+/** 默认适配器注册表 — 纯模块级装配函数，不依赖 PipelineRunner 实例状态。
+ *  Guard 适配器走自身 registerAdapter；Inspect ToolAdapter 经 useSopEngine
+ *  连线自动注入 SopRuleEngine。AutoPerf 性能自治引擎 fail-soft 注册。 */
+async function registerDefaultAdapters(
+  guardEngine: GuardEngine,
+  inspectEngine: InspectEngine,
+): Promise<void> {
+  guardEngine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
+  guardEngine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter());
+  guardEngine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
+  guardEngine.registerAdapter('test-runner', new TestRunnerAdapter());
+  guardEngine.registerAdapter('security-scan', new SecurityScanAdapter());
+  guardEngine.registerAdapter('trivy', new GuardTrivyAdapter());
+  inspectEngine.registerAdapter(new ESLintAdapter());
+  inspectEngine.registerAdapter(new GitleaksAdapter());
+  inspectEngine.registerAdapter(new DependencyCruiserAdapter());
+  inspectEngine.registerAdapter(new JscpdAdapter());
+  inspectEngine.registerAdapter(new TsPruneAdapter());
+  inspectEngine.registerAdapter(new SemgrepAdapter());
+  inspectEngine.registerAdapter(new DepcheckAdapter());
+  inspectEngine.registerAdapter(new TypeScriptAdapter());
+  inspectEngine.registerAdapter(new PrettierAdapter());
+  inspectEngine.registerAdapter(new CommitLintAdapter());
+  inspectEngine.registerAdapter(new NpmAuditAdapter());
+  inspectEngine.registerAdapter(new SonarwayToolAdapter());
+  await registerAutoPerfAdapter(inspectEngine);
+}
 
 export class PipelineRunner {
   guardEngine: GuardEngine;
@@ -89,31 +119,7 @@ export class PipelineRunner {
     this.guardEngine.useSopEngine(this.sopRuleEngine);
     this.inspectEngine.useSopEngine(this.sopRuleEngine);
 
-    void this.registerDefaultAdapters();
-  }
-
-  private async registerDefaultAdapters(): Promise<void> {
-    this.guardEngine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
-    this.guardEngine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter());
-    this.guardEngine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
-    this.guardEngine.registerAdapter('test-runner', new TestRunnerAdapter());
-    this.guardEngine.registerAdapter('security-scan', new SecurityScanAdapter());
-    this.guardEngine.registerAdapter('trivy', new GuardTrivyAdapter());
-    // 注册 Inspect ToolAdapter → 经 useSopEngine 连线自动注入 SopRuleEngine
-    this.inspectEngine.registerAdapter(new ESLintAdapter());
-    this.inspectEngine.registerAdapter(new GitleaksAdapter());
-    this.inspectEngine.registerAdapter(new DependencyCruiserAdapter());
-    this.inspectEngine.registerAdapter(new JscpdAdapter());
-    this.inspectEngine.registerAdapter(new TsPruneAdapter());
-    this.inspectEngine.registerAdapter(new SemgrepAdapter());
-    this.inspectEngine.registerAdapter(new DepcheckAdapter());
-    this.inspectEngine.registerAdapter(new TypeScriptAdapter());
-    this.inspectEngine.registerAdapter(new PrettierAdapter());
-    this.inspectEngine.registerAdapter(new CommitLintAdapter());
-    this.inspectEngine.registerAdapter(new NpmAuditAdapter());
-
-    // AutoPerf 性能自治引擎（fail-soft 注册，详见 autoperf-adapter.ts）
-    await registerAutoPerfAdapter(this.inspectEngine);
+    void registerDefaultAdapters(this.guardEngine, this.inspectEngine);
   }
 
   async loadPlugin(plugin: Plugin): Promise<void> {
@@ -165,12 +171,9 @@ export class PipelineRunner {
   // ─── SOP 规则驱动模式 ───
   async runSopGuard(context?: Partial<RuleContext>): Promise<RuleEngineReport> {
     this.logger.info('开始 SOP 驱动型 Guard 门禁检查...');
-    const report = await this.sopRuleEngine.runGuard({
-      repoRoot: this.repoRoot,
-      dryRun: context?.dryRun ?? false,
-      domain: 'guard',
-      ...context,
-    });
+    const report = await this.sopRuleEngine.runGuard(
+      this.composeContext('guard', context),
+    );
     this.logger.info(
       `SOP Guard 检查完成: ${report.passed} passed, ${report.failed} failed, ${report.errors} errors`,
     );
@@ -179,10 +182,9 @@ export class PipelineRunner {
 
   async runSopInspect(context?: Partial<RuleContext>): Promise<RuleEngineReport> {
     this.logger.info('开始 SOP 驱动型 Inspect 巡检...');
-    const report = await this.sopRuleEngine.runInspect({
-      repoRoot: this.repoRoot,
-      ...context,
-    });
+    const report = await this.sopRuleEngine.runInspect(
+      this.composeContext('inspect', context),
+    );
     this.logger.info(
       `SOP Inspect 完成: ${report.passed} passed, ${report.failed} failed, ${report.skipped} skipped`,
     );
@@ -195,14 +197,17 @@ export class PipelineRunner {
   }): Promise<PipelineReport> {
     this.logger.info('========== SOP 驱动型全流水线开始 ==========');
 
-    const guardPhase = await this.runSopGuardPhase(options?.guardContext);
+    const guardContext = this.composeContext('guard', options?.guardContext);
+    const inspectContext = this.composeContext('inspect', options?.inspectContext);
+
+    const guardPhase = await this.runSopGuardPhase(guardContext);
     if ('failure' in guardPhase) {
       return guardPhase.failure;
     }
     const guardReport = guardPhase.report;
 
     this.logger.info('SOP Guard 通过, 进入 SOP Inspect 巡检阶段...');
-    const inspectPhase = await this.runSopInspectPhase(options?.inspectContext, guardReport);
+    const inspectPhase = await this.runSopInspectPhase(inspectContext, guardReport);
     if ('failure' in inspectPhase) {
       return inspectPhase.failure;
     }
@@ -210,6 +215,49 @@ export class PipelineRunner {
 
     this.logger.info('========== SOP 驱动型全流水线完成（不含重构） ==========');
     return buildSuccessReport(guardReport, inspectReport);
+  }
+
+  /**
+   * 组装引擎所需 context：叠加 repoRoot + 阶段 domain，并在调用方未显式给定
+   * projectFeature 时按画像自动注入（M2）。画像探测异常 → undefined → 引擎回退
+   * 为不按画像过滤的全量规则评估（安全行为）。
+   */
+  private composeContext(
+    domain: 'guard' | 'inspect',
+    partial?: Partial<RuleContext>,
+  ): RuleContext {
+    const base = {
+      dryRun: domain === 'guard' ? (partial?.dryRun ?? false) : partial?.dryRun,
+      ...partial,
+      repoRoot: this.repoRoot,
+    } satisfies RuleContext;
+    if (!base.projectFeature) {
+      const feature = this.deriveProjectFeature();
+      if (feature) base.projectFeature = feature;
+    }
+    return base;
+  }
+
+  /**
+   * 从本项目既有的 detectProjectProfile 探测结果派生 kernel 兼容的 ProjectFeature。
+   * 失败/未知时返回 undefined（触发 full-context 评估，退化为不按画像过滤的安全行为）。
+   */
+  private deriveProjectFeature(): ProjectFeature | undefined {
+    try {
+      const profile = detectProjectProfile(this.repoRoot);
+      const features: string[] = [];
+      if (profile.language !== 'unknown') features.push(profile.language);
+      if (profile.hasTypeScript) features.push('typescript');
+      if (profile.framework) features.push(profile.framework);
+      return {
+        ...(profile.language !== 'unknown' ? { language: profile.language } : {}),
+        ...(profile.framework ? { framework: profile.framework } : {}),
+        features,
+      };
+    } catch {
+      // 画像探测异常不影响体检主流程，退化为不按画像过滤（全量规则）的既有行为。
+      return undefined;
+    }
   }
 
   /** 执行 SOP Guard 阶段：捕获异常并检查阻断，返回报告或失败报告 */

@@ -770,6 +770,7 @@
   "page": {
     "backup": {
       "backingUp": "バックアップ中...",
+      "progressPreparing": "バックアップを準備中…（大きなプロジェクトは2〜3分かかります）",
       "deleteMessage": "このバックアップ記録を削除しますか？この操作は元に戻せません。",
       "deleteTitle": "バックアップ記録を削除",
       "detail": {
@@ -834,6 +835,35 @@
         "full": "すべて",
         "githubOnly": "GitHub のみ",
         "localOnly": "ローカルのみ"
+      },
+      "schedule": {
+        "title": "定期バックアップ",
+        "enabled": "有効",
+        "disabled": "無効",
+        "enable": "有効にする",
+        "disable": "無効にする",
+        "frequency": "頻度",
+        "freqDaily": "毎日",
+        "freqWeekly": "毎週",
+        "freqMonthly": "毎月",
+        "time": "時刻",
+        "dayOfWeek": "曜日",
+        "dayOfMonth": "日付",
+        "save": "保存",
+        "saving": "保存中…",
+        "saved": "定期バックアップ設定を保存しました（即時反映）",
+        "saveFailed": "定期バックアップ設定の保存に失敗しました",
+        "descOn": "{freq} {time} に自動バックアップ実行（アプリ起動中）。再起動後も自動で復元されます",
+        "descOff": "有効にすると毎日/毎週/毎月の自動バックアップを設定でき、保存後すぐに反映されます",
+        "weekday": {
+          "0": "日",
+          "1": "月",
+          "2": "火",
+          "3": "水",
+          "4": "木",
+          "5": "金",
+          "6": "土"
+        }
       }
     },
     "dashboard": {

@@ -770,6 +770,7 @@
   "page": {
     "backup": {
       "backingUp": "备份中...",
+      "progressPreparing": "正在准备备份…（大项目打包约需 2-3 分钟，请勿关闭应用）",
       "deleteMessage": "确定要删除这条备份记录吗？此操作不可撤销。",
       "deleteTitle": "删除备份记录",
       "detail": {
@@ -835,6 +836,35 @@
         "full": "全部",
         "githubOnly": "仅 GitHub",
         "localOnly": "仅本地"
+      },
+      "schedule": {
+        "title": "定时备份",
+        "enabled": "已启用",
+        "disabled": "未启用",
+        "enable": "启用",
+        "disable": "停用",
+        "frequency": "频率",
+        "freqDaily": "每天",
+        "freqWeekly": "每周",
+        "freqMonthly": "每月",
+        "time": "时间",
+        "dayOfWeek": "星期",
+        "dayOfMonth": "日期",
+        "save": "保存",
+        "saving": "保存中…",
+        "saved": "定时备份设置已保存，立即生效",
+        "saveFailed": "定时备份设置保存失败",
+        "descOn": "已设置{freq} {time} 自动备份，应用运行期间到点自动执行，重启后自动恢复调度",
+        "descOff": "启用后可设置每天/每周/每月定时自动备份，保存后立即生效",
+        "weekday": {
+          "0": "周日",
+          "1": "周一",
+          "2": "周二",
+          "3": "周三",
+          "4": "周四",
+          "5": "周五",
+          "6": "周六"
+        }
       }
     },
     "dashboard": {

@@ -770,6 +770,7 @@
   "page": {
     "backup": {
       "backingUp": "Backing up...",
+      "progressPreparing": "Preparing backup... (large projects take 2-3 minutes, keep the app open)",
       "deleteMessage": "Delete this backup record? This action cannot be undone.",
       "deleteTitle": "Delete backup record",
       "detail": {
@@ -835,6 +836,35 @@
         "full": "Full",
         "githubOnly": "GitHub only",
         "localOnly": "Local only"
+      },
+      "schedule": {
+        "title": "Scheduled Backup",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "enable": "Enable",
+        "disable": "Disable",
+        "frequency": "Frequency",
+        "freqDaily": "Daily",
+        "freqWeekly": "Weekly",
+        "freqMonthly": "Monthly",
+        "time": "Time",
+        "dayOfWeek": "Day of week",
+        "dayOfMonth": "Day of month",
+        "save": "Save",
+        "saving": "Saving…",
+        "saved": "Schedule saved and active immediately",
+        "saveFailed": "Failed to save backup schedule",
+        "descOn": "Scheduled {freq} at {time} while the app is running; schedule is restored on restart",
+        "descOff": "Enable to run automatic backups daily/weekly/monthly; takes effect immediately after saving",
+        "weekday": {
+          "0": "Sun",
+          "1": "Mon",
+          "2": "Tue",
+          "3": "Wed",
+          "4": "Thu",
+          "5": "Fri",
+          "6": "Sat"
+        }
       }
     },
     "dashboard": {

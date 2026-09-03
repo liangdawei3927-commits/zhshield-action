@@ -66,7 +66,11 @@ describe('SopRuleEngine — forbidden-regex / required-content 内联评估', ()
       applicableEngines: ['inspect'],
       content: {
         required: [
-          { path: 'README.md', contains: ['## 快速开始'], containsAny: [['## 安装', '## Install']] },
+          {
+            path: 'README.md',
+            contains: ['## 快速开始'],
+            containsAny: [['## 安装', '## Install']],
+          },
           { path: 'tsconfig.json', json: { 'compilerOptions.strict': true } },
           { path: 'src', fileExts: ['.ts'], jsdocOn: ['^export\\s+(interface|type)\\s+'] },
         ],
@@ -258,13 +262,17 @@ describe('SopRuleEngine — forbidden-regex / required-content 内联评估', ()
     // JSONC 形式（带注释/尾逗号）也应可解析
     writeFileSync(
       path.join(tempDir, 'tsconfig.json'),
-      ['{', '  // 编译选项', '  "compilerOptions": {', '    "strict": false,', '  },', '}'].join('\n'),
+      ['{', '  // 编译选项', '  "compilerOptions": {', '    "strict": false,', '  },', '}'].join(
+        '\n',
+      ),
       'utf-8',
     );
     const failReport = await engine.evaluateRules({ repoRoot: tempDir });
     expect(failReport.failed).toBe(1);
     expect(
-      failReport.evaluations[0].violations!.some((v) => v.message.includes('compilerOptions.strict')),
+      failReport.evaluations[0].violations!.some((v) =>
+        v.message.includes('compilerOptions.strict'),
+      ),
     ).toBe(true);
 
     writeFileSync(
@@ -305,7 +313,7 @@ describe('SopRuleEngine — forbidden-regex / required-content 内联评估', ()
 
     writeFileSync(
       filePath,
-      ["/** 用户实体 */", 'export interface User {', '  id: string;', '}', ''].join('\n'),
+      ['/** 用户实体 */', 'export interface User {', '  id: string;', '}', ''].join('\n'),
       'utf-8',
     );
     const passReport = await engine.evaluateRules({ repoRoot: tempDir });

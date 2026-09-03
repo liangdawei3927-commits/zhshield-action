@@ -222,7 +222,14 @@ export async function evalForbiddenRegex(
   const compiled = compileForbiddenRegexItems(instr.items);
   const files = resolveFiles(context, instr.fileExts);
   const whitelist = loadRuleWhitelist(context.repoRoot);
-  const violations = scanForbiddenRegexFiles(files, whitelist, rule, instr, compiled, context.repoRoot);
+  const violations = scanForbiddenRegexFiles(
+    files,
+    whitelist,
+    rule,
+    instr,
+    compiled,
+    context.repoRoot,
+  );
 
   return {
     rule,
@@ -331,7 +338,8 @@ export async function evalRequiredContent(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message: violations.length > 0 ? `缺少必需内容 ${violations.length} 处 (${rule.id})` : undefined,
+    message:
+      violations.length > 0 ? `缺少必需内容 ${violations.length} 处 (${rule.id})` : undefined,
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
@@ -351,7 +359,13 @@ function checkRequiredFile(
   const content = readFileSafe(filePath);
   if (content === null) {
     violations.push(
-      makeRequiredViolation(rule, relativePath, 0, `缺少必需文件: ${item.path}`, `补充 ${item.path}`),
+      makeRequiredViolation(
+        rule,
+        relativePath,
+        0,
+        `缺少必需文件: ${item.path}`,
+        `补充 ${item.path}`,
+      ),
     );
     return violations;
   }
@@ -360,7 +374,13 @@ function checkRequiredFile(
   for (const sub of item.contains ?? []) {
     if (!lower.includes(sub.toLowerCase())) {
       violations.push(
-        makeRequiredViolation(rule, relativePath, 0, `缺少必需内容: "${sub}"`, `在 ${item.path} 中补充 "${sub}" 相关章节`),
+        makeRequiredViolation(
+          rule,
+          relativePath,
+          0,
+          `缺少必需内容: "${sub}"`,
+          `在 ${item.path} 中补充 "${sub}" 相关章节`,
+        ),
       );
     }
   }
@@ -368,7 +388,13 @@ function checkRequiredFile(
     const hit = group.some((sub) => lower.includes(sub.toLowerCase()));
     if (!hit) {
       violations.push(
-        makeRequiredViolation(rule, relativePath, 0, `缺少必需章节（任一即可）: ${group.join(' / ')}`, `在 ${item.path} 中补充相关章节`),
+        makeRequiredViolation(
+          rule,
+          relativePath,
+          0,
+          `缺少必需章节（任一即可）: ${group.join(' / ')}`,
+          `在 ${item.path} 中补充相关章节`,
+        ),
       );
     }
   }
@@ -393,7 +419,13 @@ function checkRequiredJson(
   const parsed = parseJsoncSafe(raw);
   if (parsed === undefined) {
     violations.push(
-      makeRequiredViolation(rule, relativePath, 0, `${item.path} 无法解析为 JSON`, '修复 JSON 语法错误'),
+      makeRequiredViolation(
+        rule,
+        relativePath,
+        0,
+        `${item.path} 无法解析为 JSON`,
+        '修复 JSON 语法错误',
+      ),
     );
     return violations;
   }

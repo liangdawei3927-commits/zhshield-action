@@ -1,4 +1,5 @@
 import type { SopRule } from './sop/_meta/sop-types';
+import { ruleMatchesProject } from './sop/_meta/rule-project-match';
 import type { RuleContext } from './sop/_meta/rule-context';
 import type {
   RuleEvaluation,
@@ -8,7 +9,7 @@ import type {
 import { resolveEffectiveRule, trackConsecutiveFailures } from './sop/_meta/adaptive-severity';
 import { computeBlocking } from './sop/_meta/rule-evaluation';
 import type { ToolAdapter, ToolCallHook, GovernanceEvent } from '@zh/shared';
-import { AuditLogger, wrapAdapter } from '@zh/shared';
+import { AuditLogger, wrapAdapter, detectMachineProfile } from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
@@ -32,6 +33,17 @@ import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-
 
 /** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
 const ENGINE_DISPATCH_TYPES = new Set(['preset', 'scanner-dispatch', 'check-list']);
+
+/** 外部派发指令类型（dryRun 模式下全部跳过）— 纯函数，不依赖实例状态 */
+function isExternalDispatch(type: ContentInstruction['type']): boolean {
+  return (
+    type === 'scanner-dispatch' ||
+    type === 'tool-dispatch' ||
+    type === 'preset' ||
+    type === 'check-list' ||
+    type === 'threshold'
+  );
+}
 
 /**
  * SopRuleEngine — SOP 规则引擎（runner.ts）
@@ -207,6 +219,11 @@ export class SopRuleEngine {
     if (context.action) {
       rules = rules.filter((r) => r.action === context.action);
     }
+    // M2：按项目画像裁剪（security 域恒包含），仅评估本项目相关的规则子集
+    if (context.projectFeature) {
+      const feature = context.projectFeature;
+      rules = rules.filter((r) => ruleMatchesProject(r, feature));
+    }
     return rules;
   }
 
@@ -215,36 +232,60 @@ export class SopRuleEngine {
     context: RuleContext,
     nested: boolean,
   ): Promise<RuleEvaluation[]> {
-    const evaluations: RuleEvaluation[] = [];
-    for (const rule of rules) {
-      const evalStart = Date.now();
-      const instruction = this.interpreter.interpret(rule);
-      // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
-      const effectiveRule = resolveEffectiveRule(
-        rule,
-        this.consecutiveFailures,
-        this.healthBaseline,
-      );
-      try {
-        // perf rule false positive: arg depends on loop var via dataflow
-        // eslint-disable-next-line perf/perf-no-serial-await
-        const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
-        result.durationMs = Date.now() - evalStart;
-        // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值（effectiveRule.severity），阈值取 registry 原规则
-        result.blocking = computeBlocking(
-          result.status,
-          effectiveRule.severity,
-          rule.blockingThreshold,
-        );
-        trackConsecutiveFailures(this.consecutiveFailures, rule.id, result.status);
-        evaluations.push(result);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        trackConsecutiveFailures(this.consecutiveFailures, rule.id, 'error');
-        evaluations.push(errorEvaluation(effectiveRule, message, Date.now() - evalStart));
+    // 有界并行池：同一 context 内的规则相互独立（无跨规则依赖；顺序仅来自
+    // guard→inspect 两阶段，本方法内不跨调用）。复用机器画像的 adapterParallelism
+    // 口径（clamp(cores,2,4)）作为并发上限，与 tool-adapter-executor 保持一致。
+    // 预分配数组 + 下标写入，保证 results[i] === rules[i] 的顺序约定不被并行打破。
+    if (rules.length === 0) return [];
+    const evaluations: RuleEvaluation[] = new Array<RuleEvaluation>(rules.length);
+    const maxConcurrency = Math.min(detectMachineProfile().adapterParallelism, rules.length);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const index = next++;
+        if (index >= rules.length) return;
+        evaluations[index] = await this.evaluateSingleRule(rules[index], context, nested);
       }
-    }
+    };
+    await Promise.all(Array.from({ length: maxConcurrency }, () => worker()));
     return evaluations;
+  }
+
+  /**
+   * 单条规则评估（M1 并行化的原子单元）：
+   * 逐行等价于原 evaluateAll 的 for 循环体，仅提升为独立方法以便有界并行。
+   * 每条 rule 的唯一 key（rule.id）保证 consecutiveFailures 读写在本任务内原子，
+   * 互不交叉；规则之间本无声明依赖，故并行安全。
+   */
+  private async evaluateSingleRule(
+    rule: SopRule,
+    context: RuleContext,
+    nested: boolean,
+  ): Promise<RuleEvaluation> {
+    const evalStart = Date.now();
+    const instruction = this.interpreter.interpret(rule);
+    // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
+    const effectiveRule = resolveEffectiveRule(
+      rule,
+      this.consecutiveFailures,
+      this.healthBaseline,
+    );
+    try {
+      const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
+      result.durationMs = Date.now() - evalStart;
+      // F1-4：阻断判定（附加元数据，不影响 ok 公式）；severity 取升级后的有效值（effectiveRule.severity），阈值取 registry 原规则
+      result.blocking = computeBlocking(
+        result.status,
+        effectiveRule.severity,
+        rule.blockingThreshold,
+      );
+      trackConsecutiveFailures(this.consecutiveFailures, rule.id, result.status);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      trackConsecutiveFailures(this.consecutiveFailures, rule.id, 'error');
+      return errorEvaluation(effectiveRule, message, Date.now() - evalStart);
+    }
   }
 
   private async evaluateOne(
@@ -255,7 +296,7 @@ export class SopRuleEngine {
   ): Promise<RuleEvaluation> {
     const engine = rule.domain === 'guard' ? ('guard' as const) : ('inspect' as const);
     // dryRun 模式：跳过所有外部派发（scanner-dispatch / tool-dispatch / preset / check-list / threshold）
-    if (context.dryRun && this.isExternalDispatch(instruction.type)) {
+    if (context.dryRun && isExternalDispatch(instruction.type)) {
       return skipEvaluation(rule, `[dryRun] 跳过外部工具: ${instruction.type}`, engine);
     }
 
@@ -266,16 +307,6 @@ export class SopRuleEngine {
     }
 
     return this.evaluateSingle(rule, instruction, context);
-  }
-
-  private isExternalDispatch(type: ContentInstruction['type']): boolean {
-    return (
-      type === 'scanner-dispatch' ||
-      type === 'tool-dispatch' ||
-      type === 'preset' ||
-      type === 'check-list' ||
-      type === 'threshold'
-    );
   }
 
   /**

@@ -347,9 +347,13 @@ export async function evalPreset(
 
 function pickPresetTool(host: EngineHost, instr: PresetInstruction): string | null {
   const presetHint = (instr.presets ?? []).join(' ').toLowerCase();
-  const preferredTools = ['eslint', 'semgrep', 'gitleaks'] as const;
+  const preferredTools = ['sonarway', 'eslint', 'semgrep', 'gitleaks'] as const;
   for (const tool of preferredTools) {
     if (!host.toolAdapters.has(tool)) continue;
+    if (tool === 'sonarway') {
+      if (presetHint.includes('sonar')) return tool;
+      continue;
+    }
     if (
       tool === 'eslint' ||
       presetHint.includes(tool) ||

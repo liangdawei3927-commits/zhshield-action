@@ -23,6 +23,7 @@ const TOOL_DIMENSION_MAP: Record<ToolId, IssueCategory[]> = {
   prettier: ['quality'],
   'commit-lint': ['quality'],
   'npm-audit': ['dependency', 'security'],
+  sonarway: ['quality'],
 };
 
 export function getToolDimensions(toolId: ToolId): IssueCategory[] {

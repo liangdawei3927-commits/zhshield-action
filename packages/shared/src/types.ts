@@ -311,7 +311,8 @@ export type ToolId =
   | 'sentinel'
   | 'prettier'
   | 'commit-lint'
-  | 'npm-audit';
+  | 'npm-audit'
+  | 'sonarway';
 
 export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
 

@@ -1,4 +1,5 @@
 import type { GovernanceDomain, ActionType } from './sop-types';
+import type { ProjectFeature } from './sop-types';
 
 /**
  * RuleContext — 规则评估的上下文
@@ -23,6 +24,9 @@ export interface RuleContext {
 
   /** 是否干运行（不实际执行阻断） */
   dryRun?: boolean;
+
+  /** 项目画像特征（可选）。存在时按画像裁剪规则集（security 域恒包含），实现按项目精准评估 */
+  projectFeature?: ProjectFeature;
 
   /** 附加参数（透传到适配器） */
   extra?: Record<string, unknown>;

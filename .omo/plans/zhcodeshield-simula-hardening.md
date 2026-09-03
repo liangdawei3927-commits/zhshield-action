@@ -93,7 +93,8 @@ F0  Hook/Audit 地基（原方案二，升为 P0 地基）
 - `packages/kernel/src/sop/_meta/sop-types.ts:71`：`SopRule` 加 `accumulationPolicy?: { window: number; threshold: number; escalateTo: Severity }`；`Severity` 联合保持 `critical|high|medium|low|info`（先修 C6 的 `severity: error` 越界数据）。
 - `packages/kernel/src/sop/_meta/sop-loader.ts`：`buildSimple` 与 `buildWithMeta` **两处**都解析 `accumulationPolicy`（纠正 C6 双 schema）。
 - `packages/kernel/src/runner.ts`：`evaluateAll`/`evaluateOne` 前插入 `resolveSeverity(rule, ctx)` —— 读近期同 ruleId 评估历史（来自 `scoring` 的 `HealthScore` 维度 + `sentinel_events` 历史，纠正 C4），累积≥threshold 则升 `escalateTo`。
-- **gate 改造（核心）**：`guard/src/engine.ts` 的 `evalToCheckResult` + `packages/pipeline/src/sop-pipeline-runner.ts` 的 gate：阻断阈值 `blockingThreshold`（默认 `high`），仅当 `effectiveSeverity >= blockingThreshold` 才 `blocking=true`。
+- `packages/kernel/src/runner.ts`：`runInspect` 默认评估 **inspect + security 双域**（`RuleContext.domains` 多域筛选，修复「JSDoc 承诺 inspect/security 但仅跑 inspect」的实现缺口）；`runGuard` 保持单 guard 域（门禁语义不变）。
+- **gate 改造（核心）**：`guard/src/engine.ts` 的 `evalToCheckResult` + `packages/pipeline/src/pipeline-runner.ts`（`PipelineRunner.runSopGuard/runSopInspect`，门禁由 kernel `computeBlocking` 统一承担）的 gate：阻断阈值 `blockingThreshold`（默认 `high`），仅当 `effectiveSeverity >= blockingThreshold` 才 `blocking=true`。注：遗留的 `packages/pipeline/src/sop-pipeline-runner.ts`（`SopPipelineRunner`）为未接入 M2 的重复实现，已 `@deprecated`，勿再引用为门禁实现。
 - 数据迁移：现有 YAML `severity: error` 归一化为 `high`（写迁移脚本，进 `packages/kernel/src/sop/` 或文档）。
 
 **验收标准**：

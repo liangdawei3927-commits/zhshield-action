@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { t } from '@zh/i18n';
-import { runBackup, getBackupRecords, deleteBackupRecord } from '../services/engineApi';
+import {
+  runBackup,
+  getBackupRecords,
+  deleteBackupRecord,
+  getBackupConfig,
+  saveBackupConfig,
+  onBackupProgress,
+  onBackupRecordsUpdated,
+} from '../services/engineApi';
 import { useToast } from '../components/ui/Toast';
-import type { BackupRecordData, BackupResultData } from '../types/electron';
+import type {
+  BackupRecordData,
+  BackupResultData,
+  BackupProgressData,
+  BackupConfigData,
+} from '../types/electron';
+
+export type BackupScheduleData = BackupConfigData['schedule'];
 
 export const STATUS_LABEL: Record<string, { textKey: string; color: string }> = {
   success: { textKey: 'page.backup.status.success', color: 'rgb(var(--zh-success))' },
@@ -66,23 +81,38 @@ function useBackupRecords(): {
   return { records, setRecords, loadRecords: fetchRecords };
 }
 
-/** 一键备份执行：状态 + 结果提示 */
+/** 一键备份执行：状态 + 进度推送 + 结果提示 */
 function useBackupRun(
   projectPath: string,
   loadRecords: () => Promise<void>,
 ): {
   isBackingUp: boolean;
+  progress: BackupProgressData | null;
   lastResult: BackupResultData | null;
   error: string | null;
   handleBackup: () => Promise<void>;
 } {
   const [isBackingUp, setIsBackingUp] = useState(false);
+  const [progress, setProgress] = useState<BackupProgressData | null>(null);
   const [lastResult, setLastResult] = useState<BackupResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // 订阅主进程推送的备份进度（950MB 大包需 2-3 分钟，无进度时 UI 像死机）
+  // 注意 payload 可能来自其他项目的定时备份，按 projectId 过滤
+  useEffect(
+    () =>
+      onBackupProgress((payload) => {
+        if (payload && payload.projectId === projectPath) {
+          setProgress(payload);
+        }
+      }),
+    [projectPath],
+  );
+
   const handleBackup = useCallback(async () => {
     setIsBackingUp(true);
+    setProgress(null);
     setError(null);
     setLastResult(null);
     try {
@@ -101,10 +131,11 @@ function useBackupRun(
       toast(msg, 'error');
     } finally {
       setIsBackingUp(false);
+      setProgress(null);
     }
   }, [projectPath, toast, loadRecords]);
 
-  return { isBackingUp, lastResult, error, handleBackup };
+  return { isBackingUp, progress, lastResult, error, handleBackup };
 }
 
 /** 删除确认：目标状态 + 确认执行 */
@@ -131,18 +162,74 @@ function useBackupDelete(onDeleted: (id: string) => void): {
   return { deleteTarget, setDeleteTarget, handleDeleteConfirm };
 }
 
-/** 备份页全部状态与副作用：记录加载、一键备份、删除确认 */
+/** 定时备份设置：读取/编辑/保存项目级 schedule 配置（此前该配置无任何 UI 入口） */
+export function useBackupSchedule(projectPath: string) {
+  const [schedule, setSchedule] = useState<BackupScheduleData | null>(null);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let active = true;
+    getBackupConfig(projectPath)
+      .then((c) => {
+        if (active)
+          setSchedule(c?.schedule ?? { enabled: false, frequency: 'daily', time: '02:00' });
+      })
+      .catch(() => {
+        if (active) setSchedule({ enabled: false, frequency: 'daily', time: '02:00' });
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectPath]);
+
+  const update = useCallback((patch: Partial<BackupScheduleData>) => {
+    setSchedule((prev) => ({
+      enabled: false,
+      frequency: 'daily',
+      time: '02:00',
+      ...prev,
+      ...patch,
+    }));
+  }, []);
+
+  const save = useCallback(async () => {
+    if (!schedule) return;
+    setSaving(true);
+    try {
+      const full = await getBackupConfig(projectPath);
+      if (!full) throw new Error('backup config unavailable');
+      await saveBackupConfig(projectPath, { ...full, schedule });
+      toast(t('page.backup.schedule.saved'), 'success');
+    } catch {
+      toast(t('page.backup.schedule.saveFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [projectPath, schedule, toast]);
+
+  return { schedule, update, save, saving };
+}
+
+/** 备份页全部状态与副作用：记录加载（含定时备份后台刷新）、一键备份+进度、删除确认 */
 export function useBackupPage(projectPath: string) {
   const { records, setRecords, loadRecords } = useBackupRecords();
-  const { isBackingUp, lastResult, error, handleBackup } = useBackupRun(projectPath, loadRecords);
+  const { isBackingUp, progress, lastResult, error, handleBackup } = useBackupRun(
+    projectPath,
+    loadRecords,
+  );
   const { deleteTarget, setDeleteTarget, handleDeleteConfirm } = useBackupDelete((id) =>
     setRecords((prev) => prev.filter((r) => r.id !== id)),
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // 定时备份在后台完成时刷新记录列表（用户停留在备份页也能看到新记录）
+  useEffect(() => onBackupRecordsUpdated(() => void loadRecords()), [loadRecords]);
+
   return {
     records,
     isBackingUp,
+    progress,
     lastResult,
     expandedId,
     setExpandedId,

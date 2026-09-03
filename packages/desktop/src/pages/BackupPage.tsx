@@ -1,5 +1,5 @@
 import { useBackupPage } from './backup-logic';
-import { BackupRecordsView } from './backup-parts';
+import { BackupRecordsView, BackupScheduleCard } from './backup-parts';
 import { BackupEmptyState } from './backup-empty-state';
 
 interface BackupPageProps {
@@ -11,6 +11,7 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
   const {
     records,
     isBackingUp,
+    progress,
     lastResult,
     expandedId,
     setExpandedId,
@@ -21,23 +22,31 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
     handleDeleteConfirm,
   } = useBackupPage(projectPath);
 
-  if (records.length > 0 || lastResult) {
-    return (
-      <BackupRecordsView
-        records={records}
-        isBackingUp={isBackingUp}
-        lastResult={lastResult}
-        error={error}
-        expandedId={expandedId}
-        deleteTarget={deleteTarget}
-        onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
-        onDelete={setDeleteTarget}
-        onBackup={handleBackup}
-        onDeleteConfirm={handleDeleteConfirm}
-        onCancelDelete={() => setDeleteTarget(null)}
-      />
-    );
-  }
-
-  return <BackupEmptyState isBackingUp={isBackingUp} onBackup={handleBackup} />;
+  return (
+    <div className="h-full w-full flex flex-col">
+      <div className="px-8 pt-8 shrink-0">
+        <BackupScheduleCard projectPath={projectPath} />
+      </div>
+      <div className="flex-1 min-h-0">
+        {records.length > 0 || lastResult ? (
+          <BackupRecordsView
+            records={records}
+            isBackingUp={isBackingUp}
+            progress={progress}
+            lastResult={lastResult}
+            error={error}
+            expandedId={expandedId}
+            deleteTarget={deleteTarget}
+            onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
+            onDelete={setDeleteTarget}
+            onBackup={handleBackup}
+            onDeleteConfirm={handleDeleteConfirm}
+            onCancelDelete={() => setDeleteTarget(null)}
+          />
+        ) : (
+          <BackupEmptyState isBackingUp={isBackingUp} progress={progress} onBackup={handleBackup} />
+        )}
+      </div>
+    </div>
+  );
 }

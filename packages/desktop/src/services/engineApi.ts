@@ -23,6 +23,7 @@ import type {
   BackupRecordData,
   BackupResultData,
   BackupConfigData,
+  BackupProgressData,
   GarbageCleanResultData,
   GarbageRestoreResultData,
   FalsePositiveFeedbackRecord,
@@ -624,6 +625,30 @@ export async function authorizeGitHub(): Promise<boolean> {
   const api = getAPI();
   if (!api?.backup) return false;
   return api.backup.authorizeGitHub();
+}
+
+/** 订阅备份进度推送；无 Electron API 时返回空退订函数 */
+export function onBackupProgress(callback: (payload: BackupProgressData) => void): () => void {
+  const api = getAPI();
+  return api?.backup?.onProgress?.(callback) ?? (() => {});
+}
+
+/** 订阅备份完成推送 */
+export function onBackupCompleted(callback: (payload: unknown) => void): () => void {
+  const api = getAPI();
+  return api?.backup?.onCompleted?.(callback) ?? (() => {});
+}
+
+/** 订阅备份失败推送 */
+export function onBackupFailed(callback: (payload: unknown) => void): () => void {
+  const api = getAPI();
+  return api?.backup?.onFailed?.(callback) ?? (() => {});
+}
+
+/** 订阅备份记录更新推送（定时备份在后台完成时通知刷新列表） */
+export function onBackupRecordsUpdated(callback: (payload: unknown) => void): () => void {
+  const api = getAPI();
+  return api?.backup?.onRecordsUpdated?.(callback) ?? (() => {});
 }
 
 export async function openBackupFolder(folderPath: string): Promise<boolean> {

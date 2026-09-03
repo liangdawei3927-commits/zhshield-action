@@ -129,6 +129,29 @@ describe('BackupConfigManager.loadProjectConfig 隔离与显式配置优先级',
     const reloaded = await manager.loadProjectConfig(projectDir);
     expect(reloaded.local.format).toBe('directory');
   });
+
+  it('schedule 的 dayOfWeek/dayOfMonth 读写往返保留（回归：序列化曾丢弃该字段）', async () => {
+    const cfg = await manager.loadProjectConfig(projectDir);
+    await manager.saveProjectConfig(projectDir, {
+      ...cfg,
+      schedule: {
+        ...cfg.schedule,
+        enabled: true,
+        frequency: 'weekly',
+        time: '09:30',
+        dayOfWeek: 3,
+      },
+    });
+
+    const yml = await fs.readFile(path.join(projectDir, '.zhshield', 'backup.yml'), 'utf-8');
+    expect(yml).toContain('dayOfWeek: 3');
+
+    const reloaded = await manager.loadProjectConfig(projectDir);
+    expect(reloaded.schedule.enabled).toBe(true);
+    expect(reloaded.schedule.frequency).toBe('weekly');
+    expect(reloaded.schedule.time).toBe('09:30');
+    expect(reloaded.schedule.dayOfWeek).toBe(3);
+  });
 });
 
 describe('BackupOrchestrator 接线与真实落盘（端到端）', () => {

@@ -1,5 +1,7 @@
 import { PageShell } from '../components/business/PageShell';
 import { useT } from '../i18n';
+import { BackupProgressBar } from './backup-parts';
+import type { BackupProgressData } from '../types/electron';
 
 /** 云朵上传 SVG（线性风格） */
 export function CloudUpload() {
@@ -30,101 +32,110 @@ export function CloudUpload() {
 /** 空态：引导一键备份 */
 export function BackupEmptyState({
   isBackingUp,
+  progress,
   onBackup,
 }: {
   isBackingUp: boolean;
+  progress: BackupProgressData | null;
   onBackup: () => void;
 }) {
   const t = useT();
   return (
-    <PageShell
-      illustration={<CloudUpload />}
-      title={t('page.backup.empty.title')}
-      subtitle={t('page.backup.empty.lastBackup', { date: new Date().toLocaleString('zh-CN') })}
-      featureList={[
-        {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          ),
-          title: t('page.backup.empty.feature.config.title'),
-          desc: t('page.backup.empty.feature.config.desc'),
-        },
-        {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          ),
-          title: t('page.backup.empty.feature.rules.title'),
-          desc: t('page.backup.empty.feature.rules.desc'),
-        },
-        {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-            </svg>
-          ),
-          title: t('page.backup.empty.feature.sync.title'),
-          desc: t('page.backup.empty.feature.sync.desc'),
-        },
-        {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M3 14l3 3 3-3" />
-            </svg>
-          ),
-          title: t('page.backup.empty.feature.restore.title'),
-          desc: t('page.backup.empty.feature.restore.desc'),
-        },
-      ]}
-      buttonText={t('page.backup.oneClickBackup')}
-      onAction={onBackup}
-      loading={isBackingUp}
-    />
+    <div className="h-full w-full bg-zh-bg overflow-auto">
+      {isBackingUp && (
+        <div className="w-full px-8 pt-8">
+          <BackupProgressBar progress={progress} />
+        </div>
+      )}
+      <PageShell
+        illustration={<CloudUpload />}
+        title={t('page.backup.empty.title')}
+        subtitle={t('page.backup.empty.lastBackup', { date: new Date().toLocaleString('zh-CN') })}
+        featureList={[
+          {
+            icon: (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            ),
+            title: t('page.backup.empty.feature.config.title'),
+            desc: t('page.backup.empty.feature.config.desc'),
+          },
+          {
+            icon: (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            ),
+            title: t('page.backup.empty.feature.rules.title'),
+            desc: t('page.backup.empty.feature.rules.desc'),
+          },
+          {
+            icon: (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+            ),
+            title: t('page.backup.empty.feature.sync.title'),
+            desc: t('page.backup.empty.feature.sync.desc'),
+          },
+          {
+            icon: (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M3 14l3 3 3-3" />
+              </svg>
+            ),
+            title: t('page.backup.empty.feature.restore.title'),
+            desc: t('page.backup.empty.feature.restore.desc'),
+          },
+        ]}
+        buttonText={t('page.backup.oneClickBackup')}
+        onAction={onBackup}
+        loading={isBackingUp}
+      />
+    </div>
   );
 }

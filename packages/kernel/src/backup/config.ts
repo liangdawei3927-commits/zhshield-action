@@ -189,6 +189,13 @@ export class BackupConfigManager {
           enabled: config.schedule.enabled,
           frequency: config.schedule.frequency,
           time: config.schedule.time,
+          // weekly/monthly 需要的日期字段：此前序列化丢弃导致保存后调度回退为每天
+          ...(config.schedule.dayOfWeek !== undefined
+            ? { dayOfWeek: config.schedule.dayOfWeek }
+            : {}),
+          ...(config.schedule.dayOfMonth !== undefined
+            ? { dayOfMonth: config.schedule.dayOfMonth }
+            : {}),
         },
       },
     };

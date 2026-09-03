@@ -511,7 +511,23 @@ export interface BackupConfigData {
   cloud: { enabled: boolean; serverUrl: string; [key: string]: unknown };
   github: { enabled: boolean; owner: string; repo: string; [key: string]: unknown };
   local: { enabled: boolean; backupDir: string; [key: string]: unknown };
-  schedule: { enabled: boolean; frequency: string; time: string; [key: string]: unknown };
+  schedule: {
+    enabled: boolean;
+    frequency: string;
+    time: string;
+    dayOfWeek?: number; // 0=Sun, weekly（对齐 kernel BackupSchedule）
+    dayOfMonth?: number; // monthly（对齐 kernel BackupSchedule）
+    [key: string]: unknown;
+  };
+}
+
+/** 主进程推送的备份进度事件（kernel BACKUP_EVENTS payload） */
+export interface BackupProgressData {
+  projectId: string;
+  backupId: string;
+  phase: string;
+  percent: number;
+  message: string;
 }
 
 export interface BackupAPI {
@@ -523,6 +539,10 @@ export interface BackupAPI {
   saveConfig: (projectPath: string, config: BackupConfigData) => Promise<void>;
   authorizeGitHub: () => Promise<boolean>;
   openFolder: (folderPath: string) => Promise<boolean>;
+  onProgress: (callback: (payload: BackupProgressData) => void) => () => void;
+  onCompleted: (callback: (payload: unknown) => void) => () => void;
+  onFailed: (callback: (payload: unknown) => void) => () => void;
+  onRecordsUpdated: (callback: (payload: unknown) => void) => () => void;
 }
 
 export interface PipelineProgress {

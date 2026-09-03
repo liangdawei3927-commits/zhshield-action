@@ -57,7 +57,7 @@ export { FormDetector } from './detectors/form-detector';
 export { LockfileDetector } from './detectors/lockfile-detector';
 
 // ─── 投影导出（§11.1 ProjectProfile → ProjectFeature） ───
-export { toFeature } from './projection';
+export { toFeature, toFeatureFromProfile } from './projection';
 export type { ProjectFeatureLike } from './projection';
 
 // ─── 评分契约导出（由 @zh/profiler 合并而来：供 scoring 使用的轻量同步画像，不依赖 worker） ───

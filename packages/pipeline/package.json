@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@zh/autoperf": "workspace:*",
+    "@zh/fingerprint": "workspace:*",
     "@zh/guard": "workspace:*",
     "@zh/i18n": "workspace:*",
     "@zh/inspect": "workspace:*",

@@ -60,6 +60,36 @@ function extractFramework(primary: ProjectProfile['targets'][number]): string | 
   return primary.frameworks[0]?.value;
 }
 
+// ─── 轻量画像投影（chaotic 检测层复用） ──────────────────────────
+
+/**
+ * 轻量项目画像 → ProjectFeature 投影（纯函数，零 IO）。
+ *
+ * 消费 pipeline `detectProjectProfile` 的扁平输出（`{language, framework, hasTypeScript}`），
+ * 供热路径做按画像规则裁剪。与 {@link toFeature} 输入不同：本函数输入是轻量 heuristics
+ * 结果，而非 {@link ProjectProfile} 富画像；输出结构一致（结构兼容 kernel ProjectFeature）。
+ *
+ * feature 语义与 M2 旧 `deriveProjectFeature` 逐字段一致，锁定 rule-project-match 行为不漂移：
+ * `features = [language(已知时), 'typescript'(hasTypeScript 时), framework(存在时)]`，
+ * 顶层 `language`/`framework` 仅在已知/存在时设置。
+ */
+export function toFeatureFromProfile(profile: {
+  language: string;
+  framework: string | null;
+  hasTypeScript: boolean;
+}): ProjectFeatureLike {
+  const features: string[] = [];
+  if (profile.language !== 'unknown') features.push(profile.language);
+  if (profile.hasTypeScript) features.push('typescript');
+  if (profile.framework) features.push(profile.framework);
+
+  return {
+    ...(profile.language !== 'unknown' ? { language: profile.language } : {}),
+    ...(profile.framework ? { framework: profile.framework } : {}),
+    features,
+  };
+}
+
 // ─── 特性聚合 ───────────────────────────────────────────────────
 
 /**

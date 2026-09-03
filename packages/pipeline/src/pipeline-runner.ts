@@ -32,6 +32,7 @@ import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
 import { detectProjectProfile } from './project-profile';
+import { toFeatureFromProfile } from '@zh/fingerprint';
 import { toMessage } from './runner-utils';
 import { buildFailureReport, buildSuccessReport } from './report-builders';
 
@@ -240,20 +241,13 @@ export class PipelineRunner {
 
   /**
    * 从本项目既有的 detectProjectProfile 探测结果派生 kernel 兼容的 ProjectFeature。
-   * 失败/未知时返回 undefined（触发 full-context 评估，退化为不按画像过滤的安全行为）。
+   * 投影委托给 fingerprint 的 toFeatureFromProfile（§11.1 投影资产，唯一投影家），
+   * 本处仅保留探测调用与异常降级。失败/未知时返回 undefined（退化为不按画像过滤的安全行为）。
    */
   private deriveProjectFeature(): ProjectFeature | undefined {
     try {
       const profile = detectProjectProfile(this.repoRoot);
-      const features: string[] = [];
-      if (profile.language !== 'unknown') features.push(profile.language);
-      if (profile.hasTypeScript) features.push('typescript');
-      if (profile.framework) features.push(profile.framework);
-      return {
-        ...(profile.language !== 'unknown' ? { language: profile.language } : {}),
-        ...(profile.framework ? { framework: profile.framework } : {}),
-        features,
-      };
+      return toFeatureFromProfile(profile);
     } catch {
       // 画像探测异常不影响体检主流程，退化为不按画像过滤（全量规则）的既有行为。
       return undefined;

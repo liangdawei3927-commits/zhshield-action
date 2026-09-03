@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toFeature } from '../projection';
+import { toFeature, toFeatureFromProfile } from '../projection';
 import type { ProjectProfile, MatchResult, Signal } from '../types';
 
 function emptySignal(): Signal {
@@ -216,5 +216,66 @@ describe('toFeature', () => {
       const second = toFeature(profile);
       expect(first).toEqual(second);
     });
+  });
+});
+
+describe('toFeatureFromProfile', () => {
+  it('GIVEN typescript+NestJS+hasTypeScript WHEN 投影 THEN 返回完整 feature 结构', () => {
+    const result = toFeatureFromProfile({
+      language: 'typescript',
+      framework: 'NestJS',
+      hasTypeScript: true,
+    });
+    expect(result.language).toBe('typescript');
+    expect(result.framework).toBe('NestJS');
+    expect(result.features).toEqual(['typescript', 'typescript', 'NestJS']);
+  });
+
+  it('GIVEN language=unknown WHEN 投影 THEN 顶层 language 未设且 features 不含 unknown', () => {
+    const result = toFeatureFromProfile({
+      language: 'unknown',
+      framework: 'Express',
+      hasTypeScript: false,
+    });
+    expect(result.language).toBeUndefined();
+    expect(result.framework).toBe('Express');
+    expect(result.features).toEqual(['Express']);
+  });
+
+  it('GIVEN 无 framework 且非 TS WHEN 投影 THEN 仅保留 language feature', () => {
+    const result = toFeatureFromProfile({
+      language: 'python',
+      framework: null,
+      hasTypeScript: false,
+    });
+    expect(result.language).toBe('python');
+    expect(result.framework).toBeUndefined();
+    expect(result.features).toEqual(['python']);
+  });
+
+  it('GIVEN TS 但 language=unknown WHEN 投影 THEN 仅含 typescript feature', () => {
+    const result = toFeatureFromProfile({
+      language: 'unknown',
+      framework: null,
+      hasTypeScript: true,
+    });
+    expect(result.language).toBeUndefined();
+    expect(result.features).toEqual(['typescript']);
+  });
+
+  it('GIVEN 空语义（unknown+无framework+非TS）WHEN 投影 THEN 返回空 features', () => {
+    const result = toFeatureFromProfile({
+      language: 'unknown',
+      framework: null,
+      hasTypeScript: false,
+    });
+    expect(result.language).toBeUndefined();
+    expect(result.framework).toBeUndefined();
+    expect(result.features).toEqual([]);
+  });
+
+  it('GIVEN 任何输入 WHEN 调用两次 THEN 纯函数返回相同结构', () => {
+    const input = { language: 'typescript', framework: 'React', hasTypeScript: true };
+    expect(toFeatureFromProfile(input)).toEqual(toFeatureFromProfile(input));
   });
 });

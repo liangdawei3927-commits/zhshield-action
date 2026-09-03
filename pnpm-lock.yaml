@@ -489,6 +489,9 @@ importers:
       '@zh/autoperf':
         specifier: workspace:*
         version: link:../autoperf
+      '@zh/fingerprint':
+        specifier: workspace:*
+        version: link:../fingerprint
       '@zh/guard':
         specifier: workspace:*
         version: link:../guard
@@ -5577,6 +5580,7 @@ snapshots:
   '@zh/pipeline@file:packages/pipeline':
     dependencies:
       '@zh/autoperf': link:packages/autoperf
+      '@zh/fingerprint': link:packages/fingerprint
       '@zh/guard': link:packages/guard
       '@zh/i18n': link:packages/i18n
       '@zh/inspect': link:packages/inspect

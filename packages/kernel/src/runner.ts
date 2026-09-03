@@ -45,6 +45,25 @@ function isExternalDispatch(type: ContentInstruction['type']): boolean {
   );
 }
 
+/** 按上下文过滤待评估规则（domains 优先于 domain）— 纯函数，仅依赖 registry */
+function filterRulesByContext(registry: SopRegistry, context: RuleContext): SopRule[] {
+  let rules = registry.getActive();
+  const { domains, domain, action, projectFeature } = context;
+  if (domains) {
+    rules = rules.filter((r) => domains.includes(r.domain));
+  } else if (domain) {
+    rules = rules.filter((r) => r.domain === domain);
+  }
+  if (action) {
+    rules = rules.filter((r) => r.action === action);
+  }
+  // M2：按项目画像裁剪（security 域恒包含），仅评估本项目相关的规则子集
+  if (projectFeature) {
+    rules = rules.filter((r) => ruleMatchesProject(r, projectFeature));
+  }
+  return rules;
+}
+
 /**
  * SopRuleEngine — SOP 规则引擎（runner.ts）
  *
@@ -212,19 +231,7 @@ export class SopRuleEngine {
   }
 
   private filterRulesByContext(context: RuleContext): SopRule[] {
-    let rules = this.registry.getActive();
-    if (context.domain) {
-      rules = rules.filter((r) => r.domain === context.domain);
-    }
-    if (context.action) {
-      rules = rules.filter((r) => r.action === context.action);
-    }
-    // M2：按项目画像裁剪（security 域恒包含），仅评估本项目相关的规则子集
-    if (context.projectFeature) {
-      const feature = context.projectFeature;
-      rules = rules.filter((r) => ruleMatchesProject(r, feature));
-    }
-    return rules;
+    return filterRulesByContext(this.registry, context);
   }
 
   private async evaluateAll(
@@ -320,7 +327,13 @@ export class SopRuleEngine {
    * SOP 驱动型 Inspect 巡检 — 筛选 inspect / security domain 规则执行
    */
   async runInspect(context: RuleContext): Promise<RuleEngineReport> {
-    return this.evaluateRules({ ...context, domain: context.domain ?? 'inspect' });
+    // 显式 domains 优先；未给 domain 时默认 inspect + security（对齐本方法 JSDoc 承诺）
+    const domains = context.domains ?? (context.domain ? undefined : ['inspect', 'security']);
+    return this.evaluateRules({
+      ...context,
+      domain: domains ? undefined : (context.domain ?? 'inspect'),
+      domains,
+    });
   }
 
   // ─── 单条规则评估 ──────────────────────────────────────

@@ -92,6 +92,63 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
     expect(report.total).toBe(2);
   });
 
+  it('runInspect（未显式 domain）按 JSDoc 评估 inspect + security 双域', async () => {
+    registry.register(
+      makeRule({
+        id: 'inspect.code',
+        domain: 'inspect',
+        action: 'scan',
+        content: { patterns: ['NEVER_INSPECT'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'security.cve',
+        domain: 'security',
+        action: 'scan',
+        content: { patterns: ['NEVER_SEC'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'guard.block',
+        domain: 'guard',
+        action: 'scan',
+        content: { patterns: ['NEVER_GUARD'] },
+      }),
+    );
+
+    // 修复回归：runInspect 默认收起 inspect + security 两域（先前仅 inspect，security 被静默丢弃）
+    const report = await engine.runInspect({ repoRoot: '/tmp' });
+    const ids = report.evaluations.map((e) => e.rule.id);
+    expect(ids).toContain('inspect.code');
+    expect(ids).toContain('security.cve');
+    expect(ids).not.toContain('guard.block'); // guard 域不进巡检
+  });
+
+  it('runInspect 显式单域 domain 时仍只评估该域（向后兼容）', async () => {
+    registry.register(
+      makeRule({
+        id: 'security.cve',
+        domain: 'security',
+        action: 'scan',
+        content: { patterns: ['NEVER_SEC'] },
+      }),
+    );
+    registry.register(
+      makeRule({
+        id: 'inspect.code',
+        domain: 'inspect',
+        action: 'scan',
+        content: { patterns: ['NEVER_INSPECT'] },
+      }),
+    );
+
+    const report = await engine.runInspect({ repoRoot: '/tmp', domain: 'inspect' });
+    const ids = report.evaluations.map((e) => e.rule.id);
+    expect(ids).toEqual(['inspect.code']);
+  });
+
   it('通用规则（无栈标签）不被画像裁剪：修复 monorepo 画像欠采样的过度裁剪', async () => {
     registry.register(
       makeRule({

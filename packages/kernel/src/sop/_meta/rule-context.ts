@@ -19,6 +19,10 @@ export interface RuleContext {
   /** 治理域筛选（可选，仅评估该 domain 的规则） */
   domain?: GovernanceDomain;
 
+  /** 多域筛选（可选）。设置时按该集合过滤（如巡检含安全域 inspect+security）；
+   *  优先于单值 {@link domain}。 */
+  domains?: GovernanceDomain[];
+
   /** 动作类型筛选（可选，仅评估该 action 的规则） */
   action?: ActionType;
 

@@ -18,6 +18,17 @@ import path from 'node:path';
 
 const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
+/** 种子项目路径：默认指向本 monorepo 根（随仓库位置自适应，CI 可用 ZH_E2E_PROJECT_PATH 覆盖） */
+const DEMO_PROJECT_PATH = process.env.ZH_E2E_PROJECT_PATH ?? path.resolve(__dirname, '..', '..', '..');
+
+/**
+ * 剥离会污染被测应用的宿主环境变量：
+ * - ELECTRON_RUN_AS_NODE：宿主（如 AI 编码工具）本身是 Electron 应用时泄漏，
+ *   会让被测 Electron 以 Node 模式启动，所有 Chromium 开关报 bad option
+ * - NODE_OPTIONS：宿主注入的 require shim 不应进入被测应用主进程
+ */
+const { ELECTRON_RUN_AS_NODE: _drop1, NODE_OPTIONS: _drop2, ...CLEAN_ENV } = process.env;
+
 /**
  * 启动 Electron 应用（独立临时 userData）。
  *
@@ -29,12 +40,16 @@ async function launchApp(
   opts: { seedProject?: boolean } = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'zh-e2e-'));
+  // 隔离 HOME：macOS 会在 $HOME/Library/Saved Application State 写窗口恢复状态，
+  // 指向临时目录可保证测试完全 hermetic（不写真实 ~/Library，CI/沙箱环境均可跑）
+  const fakeHome = path.join(userDataDir, 'home');
+  mkdirSync(fakeHome, { recursive: true });
   if (opts.seedProject) {
     mkdirSync(userDataDir, { recursive: true });
     writeFileSync(
       path.join(userDataDir, 'projects.json'),
       JSON.stringify(
-        [{ name: 'demo', path: '/Users/dawei/Desktop/ZHCodeShieid/zhiyan-codeshield' }],
+        [{ name: 'demo', path: DEMO_PROJECT_PATH }],
         null,
         2,
       ),
@@ -44,6 +59,7 @@ async function launchApp(
   const app = await electron.launch({
     args: [`--user-data-dir=${userDataDir}`, MAIN_ENTRY],
     timeout: 60_000,
+    env: { ...CLEAN_ENV, HOME: fakeHome },
   });
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');

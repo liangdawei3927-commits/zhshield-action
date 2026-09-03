@@ -15,15 +15,13 @@ type SopInspectStageResult =
   { ok: true; report: RuleEngineReport } | { ok: false; earlyReturn: PipelineReport };
 
 /**
- * SOP-driven pipeline runner — executes Guard → Inspect using SOP rule engine.
+ * @deprecated SOP 流水线已统一由 {@link PipelineRunner}（pipeline-runner.ts）实现：
+ *  本类未被任何调用方引用、未导出，且未接入 M2「按项目画像裁剪」（projectFeature 线程），
+ *  并保留过时的 "security 不在本路径" 注释（与 runInspect 的 inspect+security 语义不符）。
+ *  请勿在本类上继续开发；删除前需同步 .omo/plans/zhcodeshield-simula-hardening.md 中
+ *  对 sop-pipeline-runner.ts 门禁的文档引用。
  *
- * **Simplified 2-stage serial pipeline:**
- * - SOP Guard Stage (SOP rules + tool adapters) → [gate] → SOP Inspect Stage → Complete
- * - Refactor is excluded (handled by desktop client separately)
- * - Security and Scoring are not included in this path
- *
- * Both stages are **fail-fast gates**: if Guard or Inspect fails, the pipeline
- * returns immediately with a partial {@link PipelineReport} indicating the failure stage.
+ * SOP-driven pipeline runner — Guard → Inspect（遗留实现）。
  */
 export class SopPipelineRunner {
   private repoRoot: string;

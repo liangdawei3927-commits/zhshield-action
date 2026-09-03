@@ -222,6 +222,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('backup:saveConfig', projectPath, config),
     authorizeGitHub: () => ipcRenderer.invoke('backup:authorizeGitHub'),
     openFolder: (folderPath: string) => ipcRenderer.invoke('backup:openFolder', folderPath),
+    // 备份进度/完成/失败推送（主进程 eventBus 转发）；返回退订函数
+    onProgress: (callback: (payload: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);
+      ipcRenderer.on('backup:progress', handler);
+      return () => ipcRenderer.removeListener('backup:progress', handler);
+    },
+    onCompleted: (callback: (payload: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);
+      ipcRenderer.on('backup:completed', handler);
+      return () => ipcRenderer.removeListener('backup:completed', handler);
+    },
+    onFailed: (callback: (payload: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);
+      ipcRenderer.on('backup:failed', handler);
+      return () => ipcRenderer.removeListener('backup:failed', handler);
+    },
+    onRecordsUpdated: (callback: (payload: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);
+      ipcRenderer.on('backup:records-updated', handler);
+      return () => ipcRenderer.removeListener('backup:records-updated', handler);
+    },
   },
 
   // ─── 演进引擎 ──────────────────────────────────────────────

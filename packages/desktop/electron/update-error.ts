@@ -61,7 +61,8 @@ const CLASSIFY_RULES: readonly ClassifyRule[] = [
   {
     code: 'UPDATE_NETWORK_ERROR',
     // Chromium net:: 错误、DNS/连接/超时、fetch 网络层失败
-    pattern: /net::|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|getaddrinfo|socket|request failed|fetch.*fail/i,
+    pattern:
+      /net::|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|getaddrinfo|socket|request failed|fetch.*fail/i,
   },
   {
     code: 'UPDATE_DOWNLOAD_FAILED',

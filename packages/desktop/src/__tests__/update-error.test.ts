@@ -23,9 +23,9 @@ describe('update-error 错误分类', () => {
     expect(classifyUpdateError(new Error('getaddrinfo ENOTFOUND github.com')).code).toBe(
       'UPDATE_NETWORK_ERROR',
     );
-    expect(classifyUpdateError(new Error('request to https://x failed, reason: ECONNRESET')).code).toBe(
-      'UPDATE_NETWORK_ERROR',
-    );
+    expect(
+      classifyUpdateError(new Error('request to https://x failed, reason: ECONNRESET')).code,
+    ).toBe('UPDATE_NETWORK_ERROR');
   });
 
   it('清单缺失/404 → UPDATE_CHECK_FAILED', () => {
@@ -41,9 +41,9 @@ describe('update-error 错误分类', () => {
     expect(classifyUpdateError(new Error('ENOSPC: no space left on device')).code).toBe(
       'UPDATE_DOWNLOAD_FAILED',
     );
-    expect(classifyUpdateError(new Error('EACCES: permission denied, open /Applications/x')).code).toBe(
-      'UPDATE_DOWNLOAD_FAILED',
-    );
+    expect(
+      classifyUpdateError(new Error('EACCES: permission denied, open /Applications/x')).code,
+    ).toBe('UPDATE_DOWNLOAD_FAILED');
   });
 
   it('无法匹配的异常 → 降级为 UPDATE_UNKNOWN（同样安全）', () => {

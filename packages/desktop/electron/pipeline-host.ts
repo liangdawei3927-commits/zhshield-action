@@ -20,7 +20,9 @@ import { readConfig } from './ipc/guard-config';
 export type ProgressHandler = (stage: string, message: string, progress: number) => void;
 
 const WORKER_SCRIPT = path.join(__dirname, 'pipeline-worker.js');
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+// 大型 monorepo 完整体检(guard+inspect 串行)常超 10 分钟；过紧超时会 SIGTERM 杀死仍在推进的扫描，
+// 生成「0 检查项、全通过」的误导性空报告。放宽到 30 分钟以拿到真实结果。
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const STDERR_TAIL_LIMIT = 4000;
 
 interface PendingJob {

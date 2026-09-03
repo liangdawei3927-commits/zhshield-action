@@ -30,6 +30,14 @@ pnpm + Turborepo monorepo，19 个 `@zh/*` 包。依赖方向：客户端 → �
 
 - 小步原子提交，语义化前缀（`feat:` / `fix:` / `chore:` / `refactor:`）
 - 本地备份（`.zhshield/backups/` 与 `~/zhshield-backups/`）现已包含 `.git/`，恢复时会带回完整提交历史
+- zhcheck pre-commit 门禁已两次真实拦截提交（large-class 300 行阈值）。被拦时**禁止 `--no-verify`**：优先把不依赖实例状态的纯函数提为模块级函数给类体瘦身（runner.ts / pipeline-runner.ts 均有先例）
+
+## ⚠️ 本机资源纪律（8GB Intel Mac，必读）
+
+- **测试与 typecheck 严禁并行跑**：两者同时执行必然 OOM（进程被 SIGKILL / exit 137），产生假失败。串行执行；`pnpm test` 脚本已内置 `--concurrency=1`，勿改
+- **全量 typecheck 约 13 分钟**：只改了单包时用 `pnpm --filter @zh/<pkg> exec tsc --noEmit` 验证该包即可，不要每次跑全量
+- **desktop E2E 本机不可跑**：宿主 AI 工具环境会泄漏 `ELECTRON_RUN_AS_NODE`（Electron 退化为 Node 模式、参数全拒）与 `NODE_OPTIONS`（safe-delete shim 拦截 Playwright 清理 test-results）；macOS Saved Application State 写入亦会被拦截。spec 已做三重防御（剥离环境变量 + HOME 重定向），首跑验证依赖 CI 的 `desktop-e2e` job
+- **并行开发注意**：多 AI 工具同时改代码是常态，验证前先 `git status` 确认文件当前状态，撞上中间态编译失败先重跑一次再下结论
 
 ## 常用命令
 

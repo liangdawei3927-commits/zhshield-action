@@ -683,7 +683,9 @@ export function DependencyUpgradeCard({ report }: { report: DependencyReportData
       {assessments.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-success-700">{t('page.deps.upgrade.none')}</span>
+          <span className="text-sm font-medium text-success-700">
+            {t('page.deps.upgrade.none')}
+          </span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -773,7 +775,9 @@ export function DependencyOutdatedCard({ report }: { report: DependencyReportDat
       {outdatedDeps.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">✅</span>
-          <span className="text-sm font-medium text-success-700">{t('page.deps.outdated.none')}</span>
+          <span className="text-sm font-medium text-success-700">
+            {t('page.deps.outdated.none')}
+          </span>
         </div>
       ) : (
         <div className="space-y-3">

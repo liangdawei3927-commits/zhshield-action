@@ -106,7 +106,9 @@ export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
       {items.length === 0 && (
         <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🧹</span>
-          <span className="text-sm font-medium text-success-700">{t('page.garbage.emptyList')}</span>
+          <span className="text-sm font-medium text-success-700">
+            {t('page.garbage.emptyList')}
+          </span>
         </div>
       )}
     </div>

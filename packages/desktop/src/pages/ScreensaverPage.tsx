@@ -31,7 +31,15 @@ function ScreensaverBackground() {
   );
 }
 
-function ScreensaverHeader({ visible, maximized, intelligentEnabled = true }: { visible: boolean; maximized: boolean; intelligentEnabled?: boolean }) {
+function ScreensaverHeader({
+  visible,
+  maximized,
+  intelligentEnabled = true,
+}: {
+  visible: boolean;
+  maximized: boolean;
+  intelligentEnabled?: boolean;
+}) {
   return (
     <>
       <div
@@ -225,7 +233,11 @@ export function ScreensaverPage({ onDismiss, intelligentEnabled = true }: Screen
       tabIndex={0}
     >
       <ScreensaverBackground />
-      <ScreensaverHeader visible={visible} maximized={maximized} intelligentEnabled={intelligentEnabled} />
+      <ScreensaverHeader
+        visible={visible}
+        maximized={maximized}
+        intelligentEnabled={intelligentEnabled}
+      />
       <ScreensaverCenter visible={visible} />
       <ScreensaverFooter visible={visible} />
 

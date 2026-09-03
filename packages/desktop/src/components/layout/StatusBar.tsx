@@ -97,15 +97,21 @@ function StatusBar({
     >
       <span className="font-medium text-zh-ink">{t('layout.statusBarLabel')}</span>
       <span className="flex items-center gap-1.5">
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${items[0].state === 'ok' ? 'animate-pulse ' : ''}${DOT[items[0].state]}`} />
+        <span
+          className={`inline-block w-1.5 h-1.5 rounded-full ${items[0].state === 'ok' ? 'animate-pulse ' : ''}${DOT[items[0].state]}`}
+        />
         {items[0].label}
       </span>
-      <span aria-hidden className="text-zh-line">·</span>
+      <span aria-hidden className="text-zh-line">
+        ·
+      </span>
       <span className="flex items-center gap-1.5">
         <span className={`inline-block w-1.5 h-1.5 rounded-full ${DOT[items[1].state]}`} />
         {items[1].label}
       </span>
-      <span aria-hidden className="text-zh-line">·</span>
+      <span aria-hidden className="text-zh-line">
+        ·
+      </span>
       <span className="flex items-center gap-1.5">
         <span className={`inline-block w-1.5 h-1.5 rounded-full ${DOT[items[2].state]}`} />
         {items[2].label}

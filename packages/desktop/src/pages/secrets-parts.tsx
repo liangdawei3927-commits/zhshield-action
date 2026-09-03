@@ -186,7 +186,9 @@ export function SecretsHeader({
             <path d="M12 16h.01" />
           </svg>
           <div>
-            <div className="text-sm font-medium text-danger-700">{t('page.secrets.errorTitle')}</div>
+            <div className="text-sm font-medium text-danger-700">
+              {t('page.secrets.errorTitle')}
+            </div>
             <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
           </div>
         </div>
@@ -377,7 +379,9 @@ export function SecretsListCard({
       {findings.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>
-          <span className="text-sm font-medium text-success-700">{t('page.secrets.list.empty')}</span>
+          <span className="text-sm font-medium text-success-700">
+            {t('page.secrets.list.empty')}
+          </span>
         </div>
       ) : (
         <div className="space-y-3">

@@ -126,7 +126,9 @@ export function TechDebtHeader({
             <path d="M12 16h.01" />
           </svg>
           <div>
-            <div className="text-sm font-medium text-danger-700">{t('page.techdebt.errorTitle')}</div>
+            <div className="text-sm font-medium text-danger-700">
+              {t('page.techdebt.errorTitle')}
+            </div>
             <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
           </div>
         </div>

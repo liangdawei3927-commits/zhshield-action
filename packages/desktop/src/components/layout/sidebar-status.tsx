@@ -49,13 +49,13 @@ export function EngineStatusSection({
             onClick={() => setIntelligentEnabled(!intelligentEnabled)}
             disabled={intelligentLoading}
             aria-label={t('layout.engineStatus')}
-            className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border-none cursor-pointer ${
+            className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border cursor-pointer ${
               intelligentLoading ? 'opacity-50 cursor-wait' : ''
-            } ${intelligentEnabled ? 'bg-success-700' : 'bg-zh-line'}`}
+            } ${intelligentEnabled ? 'bg-success-700 border-success-700' : 'bg-zh-ink-2/20 border-zh-ink-2/30'}`}
           >
             <span
-              className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                intelligentEnabled ? 'translate-x-4' : 'translate-x-0'
+              className={`block w-4 h-4 rounded-full shadow-sm transition-transform ${
+                intelligentEnabled ? 'bg-white translate-x-4' : 'bg-zh-ink-2/60 translate-x-0'
               }`}
             />
           </button>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ResultCard } from '../ui/ResultCard';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { SecondaryButton } from '../ui/SecondaryButton';
 
 interface FeatureItem {
   icon: ReactNode;
@@ -25,6 +26,12 @@ interface PageShellProps {
   loading?: boolean;
   /** 加载时的进度提示文字 */
   progressLabel?: string;
+  /** 副操作按钮文字（描边样式，承载「查看报告」等次级动作） */
+  secondaryText?: string;
+  /** 副操作点击 */
+  onSecondary?: () => void;
+  /** 副操作是否禁用（默认跟随 loading） */
+  secondaryDisabled?: boolean;
 }
 
 /** 中心插图 + 标题区 */
@@ -109,19 +116,30 @@ export function PageShell({
   featureList,
   loading = false,
   progressLabel,
+  secondaryText,
+  onSecondary,
+  secondaryDisabled,
 }: PageShellProps) {
+  const showSecondary = Boolean(secondaryText && onSecondary);
   return (
     <div className="h-full w-full flex flex-col items-center bg-zh-bg select-none relative overflow-auto">
       {/* 上半部分：插图 + 标题 + 主按钮，垂直居中 */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 min-h-0">
         <PageHeading illustration={illustration} title={title} subtitle={subtitle} />
-        <ActionButton
-          onClick={onAction}
-          disabled={loading}
-          buttonText={buttonText}
-          loading={loading}
-          progressLabel={progressLabel}
-        />
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <ActionButton
+            onClick={onAction}
+            disabled={loading}
+            buttonText={buttonText}
+            loading={loading}
+            progressLabel={progressLabel}
+          />
+          {showSecondary && (
+            <SecondaryButton onClick={onSecondary} disabled={secondaryDisabled ?? loading}>
+              {secondaryText}
+            </SecondaryButton>
+          )}
+        </div>
       </div>
 
       {/* 下半部分：功能清单 */}

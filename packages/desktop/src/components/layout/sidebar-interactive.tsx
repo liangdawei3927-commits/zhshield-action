@@ -267,13 +267,13 @@ export function AiToolSection({
             onClick={() => onToggleAiTool(!(aiTool?.enabled ?? false))}
             disabled={aiApplying}
             aria-label={t('layout.aiToolToggle')}
-            className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border-none cursor-pointer ${
+            className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors border cursor-pointer ${
               aiApplying ? 'opacity-50 cursor-wait' : ''
-            } ${aiTool?.enabled ? 'bg-success-700' : 'bg-zh-line'}`}
+            } ${aiTool?.enabled ? 'bg-success-700 border-success-700' : 'bg-zh-ink-2/20 border-zh-ink-2/30'}`}
           >
             <span
-              className={`block w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                aiTool?.enabled ? 'translate-x-4' : 'translate-x-0'
+              className={`block w-4 h-4 rounded-full shadow-sm transition-transform ${
+                aiTool?.enabled ? 'bg-white translate-x-4' : 'bg-zh-ink-2/60 translate-x-0'
               }`}
             />
           </button>

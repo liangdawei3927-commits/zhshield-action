@@ -103,12 +103,7 @@ export class NpmAuditAdapter implements ToolAdapter {
       const err = error as { stdout?: string; message?: string };
       raw = err.stdout ?? '';
       if (!raw.trim()) {
-        return this.buildResult(
-          start,
-          'error',
-          [],
-          err.message || `${command.cmd} audit 执行失败`,
-        );
+        return this.buildResult(start, 'error', [], err.message || `${command.cmd} audit 执行失败`);
       }
     }
 

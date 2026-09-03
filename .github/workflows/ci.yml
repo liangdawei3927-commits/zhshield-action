@@ -43,6 +43,12 @@ jobs:
       - name: Refresh desktop injected dependency copies
         run: rm -rf packages/desktop/node_modules && pnpm install --frozen-lockfile
 
+      # pnpm 对 file: 目录依赖生成实体副本：已存在文件随源码更新，新增文件永不自动同步
+      # （install / --force 均无效）。新增 .ts 源文件后副本会静默缺文件，
+      # 下游报 "Cannot find module './xxx'" 且单跑也不过，极易误判为代码缺陷。
+      - name: Check injected dependency copies are in sync
+        run: pnpm check:copies
+
       - name: Verify dist/sop sync with kernel source
         run: pnpm --filter zhshield-cli verify:sop
 

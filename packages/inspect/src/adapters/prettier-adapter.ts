@@ -89,10 +89,7 @@ export class PrettierAdapter implements ToolAdapter {
     }
   }
 
-  private async runPrettierScan(
-    options: ToolScanOptions,
-    start: number,
-  ): Promise<ToolResult> {
+  private async runPrettierScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const command = await this.resolveCommand();
     const target = options.targetFiles?.length
       ? options.targetFiles[0]
@@ -137,12 +134,7 @@ export class PrettierAdapter implements ToolAdapter {
     if (err.code === 'ENOENT') {
       return this.buildResult(start, 'unavailable', [], 'prettier 未安装或未在 PATH 中找到');
     }
-    return this.buildResult(
-      start,
-      'error',
-      [],
-      err.stderr || err.message || 'prettier 执行失败',
-    );
+    return this.buildResult(start, 'error', [], err.stderr || err.message || 'prettier 执行失败');
   }
 
   private buildResult(

@@ -15,12 +15,7 @@ import * as os from 'node:os';
 export const PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
 
-const LOCAL_IPS = new Set([
-  '127.0.0.1',
-  '::1',
-  '::ffff:127.0.0.1',
-  '::ffff:7f00:1',
-]);
+const LOCAL_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', '::ffff:7f00:1']);
 
 const TOKEN_FILE = path.join(os.homedir(), '.zhshield', '.api-token');
 
@@ -49,9 +44,7 @@ export class LocalOnlyGuard implements CanActivate {
   private readonly logger = new Logger(LocalOnlyGuard.name);
   private readonly expectedToken: string;
 
-  constructor(
-    private reflector: Reflector,
-  ) {
+  constructor(private reflector: Reflector) {
     this.expectedToken = resolveLocalToken();
   }
 

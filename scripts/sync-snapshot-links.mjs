@@ -69,7 +69,9 @@ let linked = 0;
 let copied = 0;
 
 const pkgNames = fs.existsSync(PACKAGES_DIR)
-  ? fs.readdirSync(PACKAGES_DIR).filter((n) => fs.statSync(path.join(PACKAGES_DIR, n)).isDirectory())
+  ? fs
+      .readdirSync(PACKAGES_DIR)
+      .filter((n) => fs.statSync(path.join(PACKAGES_DIR, n)).isDirectory())
   : [];
 
 for (const pkg of pkgNames) {
@@ -105,7 +107,9 @@ for (const pkg of pkgNames) {
       if (res === 'linked') linked++;
       else if (res === 'copied') copied++;
       else console.error(`[${pkg}] ❌ 补链失败 ${rel}: ${res}`);
-      console.log(`[${pkg}] ${res === 'linked' ? '补链' : res === 'copied' ? '复制' : '❌'} ${rel}`);
+      console.log(
+        `[${pkg}] ${res === 'linked' ? '补链' : res === 'copied' ? '复制' : '❌'} ${rel}`,
+      );
     }
   }
 }

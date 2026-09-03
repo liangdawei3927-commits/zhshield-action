@@ -46,9 +46,7 @@ describe('LocalOnlyGuard', () => {
 
   it('缺失或错误的 token 被拒绝（timing-safe 比较路径）', () => {
     const missing = makeGuard();
-    expect(() => missing.guard.canActivate(missing.makeContext({}))).toThrow(
-      UnauthorizedException,
-    );
+    expect(() => missing.guard.canActivate(missing.makeContext({}))).toThrow(UnauthorizedException);
 
     const wrong = makeGuard();
     expect(() => wrong.guard.canActivate(wrong.makeContext({ token: 'a'.repeat(64) }))).toThrow(

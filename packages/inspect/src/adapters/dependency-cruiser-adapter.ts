@@ -171,7 +171,11 @@ export class DependencyCruiserAdapter implements ToolAdapter {
   private resolveConfig(options: ToolScanOptions): string | null {
     const injected = options.config?.config;
     if (typeof injected === 'string' && injected.trim()) {
-      const resolved = resolveInjectedConfigPath(injected, options.projectPath, options.projectPath);
+      const resolved = resolveInjectedConfigPath(
+        injected,
+        options.projectPath,
+        options.projectPath,
+      );
       if (resolved) return resolved;
     }
     const candidates = [

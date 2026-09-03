@@ -4,7 +4,7 @@
 #
 #  用途：node_modules 损坏 / 环境不可复现时，一条命令回到 CI 同等状态。
 #  链路：clean 依赖 → 冻结安装 → 构建(排除 desktop) → 刷新 desktop 副本 →
-#        SOP 同步校验 → 全量 typecheck → 全量 test。
+#        副本一致性检查 → SOP 同步校验 → 全量 typecheck → 全量 test。
 #  与 .github/workflows/ci.yml 的 `build-and-test` job 逐步骤对应。
 #
 #  用法:
@@ -60,6 +60,15 @@ step "刷新 desktop injected 依赖副本 ..."
 rm -rf packages/desktop/node_modules
 pnpm install --frozen-lockfile
 ok "desktop 副本已刷新"
+
+# ── 3.5 注入副本 dist 一致性检查 ─────────────────
+# pnpm 对 file: 目录依赖生成的是「实体副本」而非符号链接：
+# 已存在的文件随源码更新，但新增的文件永远不会自动出现（install / install --force 均无效）。
+# 因此任何「新建 / 删除 .ts 源文件」的重构后，副本都会静默缺文件，下游报
+# "Cannot find module './xxx'"，极易误判为代码缺陷。此处主动比对，提前暴露。
+step "检查 pnpm 注入副本与源 dist 一致性 ..."
+node scripts/check-injected-copies.mjs
+ok "注入副本与源 dist 一致"
 
 # ── 4. SOP 同步校验 ───────────────────────────────
 step "校验 dist/sop 与 kernel 源同步 ..."

@@ -24,6 +24,7 @@
     "check:ci": "node scripts/zhcheck.mjs --all --ci",
     "verify": "bash scripts/verify-env.sh",
     "verify:fix": "bash scripts/verify-env.sh --fix",
+    "check:copies": "node scripts/check-injected-copies.mjs",
     "check:staged": "node scripts/zhcheck.mjs --refactor --inspect --staged --ci",
     "check:refactor": "node scripts/zhcheck.mjs --refactor",
     "hooks:install": "node scripts/zhcheck.mjs --install-hooks",

@@ -80,11 +80,11 @@ export class CommitLintAdapter implements ToolAdapter {
 
     let subjects: string[];
     try {
-      const { stdout } = await execFileAsync(
-        'git',
-        ['log', '-20', '--pretty=%s'],
-        { cwd: options.projectPath, timeout: 15000, maxBuffer: 1024 * 1024 },
-      );
+      const { stdout } = await execFileAsync('git', ['log', '-20', '--pretty=%s'], {
+        cwd: options.projectPath,
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+      });
       subjects = stdout.split('\n').filter((s) => s.trim().length > 0);
     } catch (error: unknown) {
       // 非 Git 仓库 / git 不可用：属检查前提不满足，跳过而非报错

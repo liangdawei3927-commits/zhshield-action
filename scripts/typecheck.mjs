@@ -59,9 +59,7 @@ const pkgs = readdirSync(pkgsDir).filter(
 );
 
 const memGB = (TOTAL_MEM / 1024 ** 3).toFixed(1);
-console.log(
-  `\n类型检查 ${pkgs.length} 个包（内存 ${memGB} GB，并发 ${CONCURRENCY}）\n`,
-);
+console.log(`\n类型检查 ${pkgs.length} 个包（内存 ${memGB} GB，并发 ${CONCURRENCY}）\n`);
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 function memMB() {
@@ -72,10 +70,10 @@ function runTsc(pkg) {
   return new Promise((resolve) => {
     const start = Date.now();
     try {
-      execSync(
-        `npx tsc --noEmit --composite false -p packages/${pkg}/tsconfig.json`,
-        { stdio: 'pipe', cwd: root },
-      );
+      execSync(`npx tsc --noEmit --composite false -p packages/${pkg}/tsconfig.json`, {
+        stdio: 'pipe',
+        cwd: root,
+      });
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       resolve({ pkg, ok: true, elapsed, mem: memMB() });
     } catch (err) {

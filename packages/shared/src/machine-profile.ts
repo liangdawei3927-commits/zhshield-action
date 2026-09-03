@@ -25,7 +25,7 @@ const clamp = (n: number, min: number, max: number): number => Math.min(Math.max
 
 /**
  * 探测当前机器并推导各环节并发预算。
- * 依据文档《智研码盾AutoPerf自动化性能优化方案》P0-1/MachineProfile：
+ * 依据文档《智汇码盾AutoPerf自动化性能优化方案》P0-1/MachineProfile：
  * 4 核 8GB 机型 → turbo --concurrency=1 · 适配器并行度 2 · vitest maxWorkers=2。
  */
 export function detectMachineProfile(): MachineProfile {

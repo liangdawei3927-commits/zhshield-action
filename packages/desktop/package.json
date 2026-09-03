@@ -72,7 +72,7 @@
     "vitest": "^4.1.0"
   },
   "build": {
-    "appId": "com.zhiyan.codeshield",
+    "appId": "com.zhihui.codeshield",
     "productName": "智汇码盾",
     "files": [
       "dist/**",

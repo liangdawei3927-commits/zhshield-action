@@ -1,7 +1,7 @@
 # 智汇码盾 CI/CD 集成蓝图与开发规格
 
 > 版本：v0.1.0-draft ｜ 日期：2026-08-28 ｜ 状态：**开发依据（Single Source of Truth）** ｜ 备注：§1 已澄清「检测 + 分派」模型
-> 适用范围：智汇码盾（zhiyan-codeshield）GitHub / CI/CD 集成相关全部开发
+> 适用范围：智汇码盾（zhihui-codeshield）GitHub / CI/CD 集成相关全部开发
 > 维护原则：本文档是该类需求的唯一权威来源；任何范围变更必须先更新本文档再开发
 
 ---
@@ -228,7 +228,7 @@ jobs:
 ## 9. 附录：事实与文件索引
 
 **核查来源（2026-08-28）：**
-- 仓库：`/Users/dawei/Desktop/ZHCodeShield/zhiyan-codeshield/`（私有 monorepo，无 git remote）
+- 仓库：`/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/`（私有 monorepo，无 git remote）
 - 零 Token 边界：`00-项目文档/00-总览/零Token模式能力边界图.md`
 - CI 现状：`.github/workflows/ci.yml`（仅 build/test/lint）
 - CLI：`packages/cli/src/index.ts`（guard/inspect/refactor/pipeline，无 `--ci`/`--format`/`--token`）

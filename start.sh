@@ -81,7 +81,7 @@ cmd_test_coverage() { banner; check_env; info "测试 + 覆盖率..."; pnpm turb
 cmd_status() {
   banner
   echo -e "${BOLD}项目信息:${NC}"
-  echo "  名称:     智汇码盾 (zhiyan-codeshield)"
+  echo "  名称:     智汇码盾 (zhihui-codeshield)"
   echo "  包管理:   pnpm $(pnpm -v 2>/dev/null || echo 'N/A')"
   echo "  Node:     $(node -v 2>/dev/null || echo 'N/A')"
   echo "  Git 分支: $(git branch --show-current 2>/dev/null || echo 'N/A')"

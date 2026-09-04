@@ -54,7 +54,9 @@ async function waitHealthy(timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://localhost:${PORT}/health`, { signal: AbortSignal.timeout(2000) });
+      const res = await fetch(`http://localhost:${PORT}/health`, {
+        signal: AbortSignal.timeout(2000),
+      });
       if (res.ok) return;
     } catch {
       /* not up yet */
@@ -128,7 +130,11 @@ async function main() {
 
     console.log('\n── 2. 建组织 ──');
     const org = await orgsApi('POST', '/orgs', { name: 'e2e-org', ownerId: 'user-owner' });
-    check('POST /orgs 返回 orgId', typeof org.orgId === 'string' && org.orgId.length > 0, JSON.stringify(org));
+    check(
+      'POST /orgs 返回 orgId',
+      typeof org.orgId === 'string' && org.orgId.length > 0,
+      JSON.stringify(org),
+    );
 
     console.log('\n── 3. 发布组织规则快照（模拟运营侧主通道） ──');
     const localRules = [
@@ -148,12 +154,24 @@ async function main() {
 
     console.log('\n── 4. T0 画像注册（kernel 客户端） ──');
     const feature = { language: 'typescript', framework: 'nestjs', features: ['security'] };
-    await kernelResolve.registerProjectFeatures(org.orgId, 'user-owner', 'e2e-proj-1', feature, API_BASE);
+    await kernelResolve.registerProjectFeatures(
+      org.orgId,
+      'user-owner',
+      'e2e-proj-1',
+      feature,
+      API_BASE,
+    );
     check('PUT /orgs/:id/projects/:pid/features → ok', true);
     // 非成员注册应被拒
     let rejected = false;
     try {
-      await kernelResolve.registerProjectFeatures(org.orgId, 'user-intruder', 'e2e-proj-x', feature, API_BASE);
+      await kernelResolve.registerProjectFeatures(
+        org.orgId,
+        'user-intruder',
+        'e2e-proj-x',
+        feature,
+        API_BASE,
+      );
     } catch {
       rejected = true;
     }
@@ -163,7 +181,8 @@ async function main() {
     const tsTools = await kernelResolve.resolveTools(org.orgId, feature, API_BASE);
     check(
       'TS 画像 → 4 工具全量（semgrep/trivy/eslint/dep-cruiser）',
-      JSON.stringify([...tsTools].sort()) === JSON.stringify(['dep-cruiser', 'eslint', 'semgrep', 'trivy']),
+      JSON.stringify([...tsTools].sort()) ===
+        JSON.stringify(['dep-cruiser', 'eslint', 'semgrep', 'trivy']),
       JSON.stringify(tsTools),
     );
     const pyFeature = { language: 'python', framework: 'fastapi', features: ['security'] };
@@ -176,8 +195,16 @@ async function main() {
 
     console.log('\n── 6. /resolve/rules 差量（kernel 客户端） ──');
     const first = await kernelResolve.resolveRules(org.orgId, feature, undefined, API_BASE);
-    check('未上报 currentVersions → 全部视为变更', first.changed.length === 2, JSON.stringify(first.changed));
-    check('生效清单 2 条', first.rules.length === 2, JSON.stringify(first.rules.map((r) => r.ruleId)));
+    check(
+      '未上报 currentVersions → 全部视为变更',
+      first.changed.length === 2,
+      JSON.stringify(first.changed),
+    );
+    check(
+      '生效清单 2 条',
+      first.rules.length === 2,
+      JSON.stringify(first.rules.map((r) => r.ruleId)),
+    );
 
     // content_sha 一致 → 免重发（即使 version 变了）
     const sameShaNewVersion = await orgsApi('POST', `/orgs/${org.orgId}/rules`, {
@@ -262,7 +289,11 @@ async function main() {
     console.log('\n── 8. 跨租户隔离 ──');
     const org2 = await orgsApi('POST', '/orgs', { name: 'e2e-org-2', ownerId: 'user-owner2' });
     const org2Rules = await kernelResolve.resolveRules(org2.orgId, feature, undefined, API_BASE);
-    check('org2 解析不到 org1 的规则（隔离）', org2Rules.rules.length === 0, JSON.stringify(org2Rules));
+    check(
+      'org2 解析不到 org1 的规则（隔离）',
+      org2Rules.rules.length === 0,
+      JSON.stringify(org2Rules),
+    );
 
     console.log(`\n════════ E2E 结果: ${passed} 通过 / ${failed} 失败 ════════`);
     process.exitCode = failed === 0 ? 0 : 1;

@@ -1,6 +1,6 @@
 import type { AdapterResult } from './types';
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
-import { DegradationManager, AuditLogger, detectMachineProfile } from '@zh/shared';
+import { DegradationManager, AuditLogger, detectMachineProfile, isToolInScope } from '@zh/shared';
 
 export interface ToolAdapterExecutorDeps {
   degradationManager: DegradationManager;
@@ -29,7 +29,11 @@ export class ToolAdapterExecutor {
     this.hardTimeoutMs = deps.hardTimeoutMs ?? 120_000;
   }
 
-  async runAll(adapters: Map<string, ToolAdapter>, projectId: string): Promise<AdapterResult[]> {
+  async runAll(
+    adapters: Map<string, ToolAdapter>,
+    projectId: string,
+    projectFeature?: { framework?: string; language?: string; features?: string[] },
+  ): Promise<AdapterResult[]> {
     const adapterEntries = [...adapters.entries()];
     const results: AdapterResult[] = new Array<AdapterResult>(adapterEntries.length);
     const maxConcurrency = detectMachineProfile().adapterParallelism;
@@ -42,9 +46,11 @@ export class ToolAdapterExecutor {
         const index = nextIndex++;
         if (index >= adapterEntries.length) return;
         const [, adapter] = adapterEntries[index];
-        results[index] = this.degradationManager.isToolSkipped(adapter.meta.id)
-          ? this.makeSkippedResult(adapter)
-          : await this.runAdapter(adapter, projectId);
+        const outOfScope = projectFeature && !isToolInScope(adapter.meta.id, projectFeature);
+        results[index] =
+          this.degradationManager.isToolSkipped(adapter.meta.id) || outOfScope
+            ? this.makeSkippedResult(adapter, outOfScope ? 'out-of-scope' : undefined)
+            : await this.runAdapter(adapter, projectId);
       }
     };
 
@@ -55,7 +61,10 @@ export class ToolAdapterExecutor {
     return results;
   }
 
-  private makeSkippedResult(adapter: ToolAdapter): AdapterResult {
+  private makeSkippedResult(
+    adapter: ToolAdapter,
+    skipReason?: AdapterResult['skipReason'],
+  ): AdapterResult {
     return {
       adapterId: adapter.meta.id,
       adapterName: adapter.meta.name,
@@ -64,6 +73,7 @@ export class ToolAdapterExecutor {
       passed: true,
       degraded: false,
       status: 'skipped',
+      skipReason,
       issues: [],
     };
   }

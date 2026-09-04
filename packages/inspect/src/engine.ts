@@ -103,12 +103,13 @@ export class InspectEngine {
   async runScan(
     projectId: string,
     scanType: InspectionReport['scanType'] = 'full',
+    projectFeature?: { framework?: string; language?: string; features?: string[] },
   ): Promise<InspectionReport> {
     const start = Date.now();
     if (this.sopEngine && !this._sopScanning) {
       return this.runSopGuarded(projectId, scanType, start);
     }
-    return this.runDirectScan(projectId, scanType, start);
+    return this.runDirectScan(projectId, scanType, start, projectFeature);
   }
 
   /** SOP 驱动模式：评估 inspect/security 域规则（带重入保护） */
@@ -132,10 +133,12 @@ export class InspectEngine {
     projectId: string,
     scanType: InspectionReport['scanType'],
     start: number,
+    projectFeature?: { framework?: string; language?: string; features?: string[] },
   ): Promise<InspectionReport> {
     const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(
       this.registeredAdapters,
       projectId,
+      projectFeature,
     );
     const legacyResults = await this.runner.runAll({ projectId, scanType });
     adapterResults.push(...legacyResults);

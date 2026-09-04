@@ -1,10 +1,12 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
+import { isToolInScope } from '@zh/shared';
 import { ToolRuleSync } from './tool-rule-sync';
 import type { ToolRuleSyncResult, ToolId as SyncToolId } from './tool-rule-sync';
 import { ExperienceReporter } from './experience-reporter';
 import type { ExperienceRecord, ExperienceReportResult } from './experience-reporter';
+import type { ProjectFeature } from '../_meta/sop-types';
 
 async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -68,9 +70,13 @@ export class WisdomBrainSync {
     return result;
   }
 
-  async syncAllRules(): Promise<ToolRuleSyncResult[]> {
+  /**
+   * 全量同步工具规则。可传入画像 → 仅下发画像 scope 内的工具（security 恒含、
+   * eslint/dep-cruiser 按 language 裁剪）；缺省 → 全量下发（保持原有降级语义）。
+   */
+  async syncAllRules(feature?: ProjectFeature): Promise<ToolRuleSyncResult[]> {
     const results: ToolRuleSyncResult[] = [];
-    for (const toolId of this.getConfiguredTools()) {
+    for (const toolId of this.getConfiguredTools(feature)) {
       results.push(await this.syncToolRules(toolId));
     }
     return results;
@@ -138,8 +144,11 @@ export class WisdomBrainSync {
 
   // ─── 一键同步 ─────────────────────────────────────────
 
-  async syncAll(params?: { experiences?: ExperienceRecord[] }): Promise<WisdomBrainSyncResult> {
-    const ruleSyncResults = await this.syncAllRules();
+  async syncAll(params?: {
+    experiences?: ExperienceRecord[];
+    feature?: ProjectFeature;
+  }): Promise<WisdomBrainSyncResult> {
+    const ruleSyncResults = await this.syncAllRules(params?.feature);
 
     let experienceResult: ExperienceReportResult | null = null;
     if (params?.experiences && params.experiences.length > 0) {
@@ -170,7 +179,9 @@ export class WisdomBrainSync {
     return this.experienceReporter;
   }
 
-  private getConfiguredTools(): ToolId[] {
-    return ['semgrep', 'trivy', 'eslint', 'dep-cruiser'];
+  private getConfiguredTools(feature?: ProjectFeature): ToolId[] {
+    const tools = this.toolRuleSync.getConfiguredToolIds();
+    if (!feature) return tools;
+    return tools.filter((toolId) => isToolInScope(toolId, feature));
   }
 }

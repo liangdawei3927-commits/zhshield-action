@@ -204,6 +204,14 @@ export async function evalToolDispatch(
       targetEngineOf(rule),
     );
   }
+  // M4 工具执行面随画像裁剪：工具不在当前项目画像 scope 内 → 视为既定裁剪跳过（不进可用性/扫描）
+  if (host.toolScope && !host.toolScope(instr.tool)) {
+    return skippedResult(
+      rule,
+      `工具 ${instr.tool} 不在当前项目画像 scope 内，tool-dispatch 跳过`,
+      targetEngineOf(rule),
+    );
+  }
   const available = await adapter.isAvailable();
   if (!available) {
     return skippedResult(

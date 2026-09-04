@@ -9,7 +9,7 @@ import type {
 import { resolveEffectiveRule, trackConsecutiveFailures } from './sop/_meta/adaptive-severity';
 import { computeBlocking } from './sop/_meta/rule-evaluation';
 import type { ToolAdapter, ToolCallHook, GovernanceEvent } from '@zh/shared';
-import { AuditLogger, wrapAdapter, detectMachineProfile } from '@zh/shared';
+import { AuditLogger, wrapAdapter, detectMachineProfile, isToolInScope } from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
@@ -130,12 +130,14 @@ export class SopRuleEngine {
     'tool-dispatch': (rule, instr, ctx) => evalToolDispatch(this.host, rule, instr, ctx),
   };
 
-  /**
-   * 评估重入深度。preset / scanner-dispatch / check-list 会回调
+  /** 评估重入深度。preset / scanner-dispatch / check-list 会回调
    * InspectEngine.runScan / GuardEngine.run → 再次 evaluateRules，
    * 若不拦截会形成无限递归，拖死体检子进程。
    */
   private evalDepth = 0;
+
+  /** 当前评估的项目画像（M4 工具执行面随画像裁剪）：evaluateRules 从 context 提取，tool-dispatch 据此裁剪 */
+  private projectFeature?: RuleContext['projectFeature'];
 
   constructor(
     registry: SopRegistry,
@@ -196,12 +198,14 @@ export class SopRuleEngine {
   /** 派发评估函数的运行时视图（evalDepth 实时读取，保持重入判断与原行为一致） */
   private get host(): EngineHost {
     const readEvalDepth = () => this.evalDepth;
+    const feature = this.projectFeature;
     return {
       toolAdapters: this.toolAdapters,
       guardEngine: this.guardEngine,
       inspectEngine: this.inspectEngine,
       auditLogger: this.auditLogger,
       eventBus: this.eventBus,
+      toolScope: feature ? (toolId: string) => isToolInScope(toolId, feature) : undefined,
       get evalDepth() {
         return readEvalDepth();
       },
@@ -219,6 +223,7 @@ export class SopRuleEngine {
     this.evalDepth += 1;
 
     try {
+      this.projectFeature = context.projectFeature;
       const rules = this.filterRulesByContext(context);
       const evaluations = rules.length === 0 ? [] : await this.evaluateAll(rules, context, nested);
 

@@ -39,5 +39,7 @@ export interface EngineHost {
   auditLogger?: AuditLogger;
   /** EventBus — 用于 tool:executed 等事件发射；缺失或发射失败均不得影响扫描结果 */
   eventBus?: EventBus;
+  /** 工具 scope 判定：返回 false 表示工具不在当前项目画像 scope 内，tool-dispatch 应跳过 */
+  toolScope?: (toolId: string) => boolean;
   evalDepth: number;
 }

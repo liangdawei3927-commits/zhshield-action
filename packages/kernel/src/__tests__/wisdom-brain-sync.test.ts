@@ -15,6 +15,7 @@ function makeToolRuleSyncMock() {
     initialize: vi.fn().mockResolvedValue(undefined),
     syncTool: vi.fn(),
     setOnline: vi.fn(),
+    getConfiguredToolIds: () => ['semgrep', 'trivy', 'eslint', 'dep-cruiser'],
   };
 }
 
@@ -189,6 +190,76 @@ describe('WisdomBrainSync', () => {
         'semgrep',
         'trivy',
       ]);
+    });
+  });
+
+  // ─── 画像驱动工具下发（M4：按画像裁剪同步工具子集） ────────
+  describe('画像驱动工具下发', () => {
+    function makeScopedMock(toolIds: ToolId[]) {
+      return {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        syncTool: vi.fn().mockImplementation(async (id: ToolId) => ({
+          toolId: id,
+          updated: false,
+          reason: 'already_latest',
+        })),
+        setOnline: vi.fn(),
+        getConfiguredToolIds: () => toolIds,
+      };
+    }
+
+    it('无画像时全量下发全部配置工具', async () => {
+      const scoped = makeScopedMock(['semgrep', 'trivy', 'eslint', 'dep-cruiser']);
+      const s = new WisdomBrainSync({
+        toolRuleSync: scoped as never,
+        experienceReporter: er as never,
+        lockFilePath: lockFile,
+      });
+      const results = await s.syncAllRules();
+      expect(results.map((r) => r.toolId).sort()).toEqual([
+        'dep-cruiser',
+        'eslint',
+        'semgrep',
+        'trivy',
+      ]);
+    });
+
+    it('go 画像仅下发 security 工具（semgrep/trivy 恒含，eslint/dep-cruiser 裁剪）', async () => {
+      const scoped = makeScopedMock(['semgrep', 'trivy', 'eslint', 'dep-cruiser']);
+      const s = new WisdomBrainSync({
+        toolRuleSync: scoped as never,
+        experienceReporter: er as never,
+        lockFilePath: lockFile,
+      });
+      const results = await s.syncAllRules({ language: 'go', features: [] });
+      expect(results.map((r) => r.toolId).sort()).toEqual(['semgrep', 'trivy']);
+    });
+
+    it('typescript 画像下发全部工具（eslint/dep-cruiser 命中）', async () => {
+      const scoped = makeScopedMock(['semgrep', 'trivy', 'eslint', 'dep-cruiser']);
+      const s = new WisdomBrainSync({
+        toolRuleSync: scoped as never,
+        experienceReporter: er as never,
+        lockFilePath: lockFile,
+      });
+      const results = await s.syncAllRules({ language: 'typescript', features: [] });
+      expect(results.map((r) => r.toolId).sort()).toEqual([
+        'dep-cruiser',
+        'eslint',
+        'semgrep',
+        'trivy',
+      ]);
+    });
+
+    it('syncAll 透传 feature 至规则同步', async () => {
+      const scoped = makeScopedMock(['semgrep', 'trivy', 'eslint', 'dep-cruiser']);
+      const s = new WisdomBrainSync({
+        toolRuleSync: scoped as never,
+        experienceReporter: er as never,
+        lockFilePath: lockFile,
+      });
+      const r = await s.syncAll({ feature: { language: 'go', features: [] } });
+      expect(r.ruleSyncResults.map((x) => x.toolId).sort()).toEqual(['semgrep', 'trivy']);
     });
   });
 

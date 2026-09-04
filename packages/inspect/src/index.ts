@@ -16,3 +16,9 @@ export {
   NpmAuditAdapter,
 } from './adapters';
 export type { InspectionReport, AdapterResult, Issue, RunContext } from './types';
+export {
+  findLocalToolBin,
+  findZhshieldToolBin,
+  getZhshieldToolBinDir,
+  resolveToolCommand,
+} from './adapters/tool-bin';

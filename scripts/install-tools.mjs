@@ -190,6 +190,7 @@ async function main() {
     options: {
       check: { type: 'boolean', default: false },
       force: { type: 'boolean', default: false },
+      only: { type: 'string', default: '' },
       help: { type: 'boolean', default: false },
     },
   });
@@ -198,6 +199,16 @@ async function main() {
     process.exit(0);
   }
   const manifest = readManifest();
+  // --only a,b：只处理清单中指定名称的工具（桌面端按需引导安装入口）
+  if (values.only) {
+    const wanted = new Set(
+      String(values.only)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    manifest.tools = manifest.tools.filter((t) => wanted.has(t.name));
+  }
   printHeader(manifest, values);
   const rows = [];
   let installedCount = 0;

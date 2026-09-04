@@ -180,7 +180,13 @@ export interface RefactorReportData {
       category: string;
       severity: string;
       message: string;
-      location: { filePath: string; line: number; column: number; endLine: number; endColumn: number };
+      location: {
+        filePath: string;
+        line: number;
+        column: number;
+        endLine: number;
+        endColumn: number;
+      };
       context: { metric: string; value: number; threshold: number };
       suggestion: { type: string; description: string; priority: string };
     }>;
@@ -409,14 +415,21 @@ export interface EngineAPI {
   runGuard: (projectPath: string, options?: Record<string, unknown>) => Promise<GuardReportData>;
   runInspect: (projectPath: string) => Promise<InspectionReportData>;
   runSecurity: (projectPath: string) => Promise<SecurityScanReportData>;
-  cleanGarbage: (projectPath: string, items: Array<{ id: string; path: string; size: number; type: string }>) => Promise<GarbageCleanResultData>;
+  cleanGarbage: (
+    projectPath: string,
+    items: Array<{ id: string; path: string; size: number; type: string }>,
+  ) => Promise<GarbageCleanResultData>;
   restoreGarbage: (projectPath: string, batchId: string) => Promise<GarbageRestoreResultData>;
   runPerformance: (projectPath: string) => Promise<PerformanceReportData>;
   runRefactor: (projectPath: string) => Promise<RefactorReportData>;
   runDeps: (projectPath: string) => Promise<DependencyReportData>;
   depsRelockBaseline: (projectPath: string) => Promise<DepsRelockResult>;
   runTechDebt: (projectPath: string) => Promise<TechDebtReportData>;
-  planDebtRepayment: (projectPath: string, actionId: string, opts?: { sprint?: string; gate?: 'allow-with-record' }) => Promise<void>;
+  planDebtRepayment: (
+    projectPath: string,
+    actionId: string,
+    opts?: { sprint?: string; gate?: 'allow-with-record' },
+  ) => Promise<void>;
   verifyDebtRepaid: (projectPath: string, actionId: string) => Promise<boolean>;
   dismissDebtAction: (projectPath: string, actionId: string) => Promise<void>;
   runSecrets: (projectPath: string) => Promise<SecretReportData>;
@@ -426,22 +439,35 @@ export interface EngineAPI {
   getScore: (projectId: string) => Promise<HealthScoreData | null>;
   getScoreHistory: (projectId: string) => Promise<HealthScoreData[]>;
   getProfile: (projectPath: string) => Promise<ProjectProfileData | null>;
-  runPipeline: (projectPath: string, options?: { dryRun?: boolean; sop?: boolean; presetName?: string }) => Promise<PipelineReportData>;
-  runProfile: (projectPath: string) => Promise<{ profile: unknown; questions: unknown; drift: unknown }>;
+  runPipeline: (
+    projectPath: string,
+    options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
+  ) => Promise<PipelineReportData>;
+  runProfile: (
+    projectPath: string,
+  ) => Promise<{ profile: unknown; questions: unknown; drift: unknown }>;
 }
 
 export interface SyncAPI {
   syncRules: () => Promise<unknown[]>;
-  getRulesStatus: () => Promise<Array<{ toolId: string; localVersion: string | null; stale: boolean }>>;
+  resolveRules: () => Promise<{ ok: boolean; reason?: string; total: number; changed: string[] }>;
+  getRulesStatus: () => Promise<
+    Array<{ toolId: string; localVersion: string | null; stale: boolean }>
+  >;
   emergencyUpdate: (toolId: string) => Promise<unknown>;
-  submitExperience: (records: unknown[]) => Promise<{ sent: number; queued: number; failed: number }>;
+  submitExperience: (
+    records: unknown[],
+  ) => Promise<{ sent: number; queued: number; failed: number }>;
   getQueueStatus: () => Promise<{ queueLength: number }>;
 }
 
 export interface SentinelAPI {
   getEvents: (options?: { status?: string; severity?: string }) => Promise<SentinelEvent[]>;
   getEvent: (id: string) => Promise<SentinelEvent | undefined>;
-  startMonitoring: (projectId: string, projectPath: string) => Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }>;
+  startMonitoring: (
+    projectId: string,
+    projectPath: string,
+  ) => Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }>;
   getState: () => Promise<{ enabled: boolean }>;
   setEnabled: (enabled: boolean) => Promise<{ ok: boolean }>;
 }
@@ -583,7 +609,11 @@ export interface TaskInfo {
 }
 
 export interface TaskAPI {
-  start: (kind: TaskKind, projectPath: string, options?: Record<string, unknown>) => Promise<TaskInfo>;
+  start: (
+    kind: TaskKind,
+    projectPath: string,
+    options?: Record<string, unknown>,
+  ) => Promise<TaskInfo>;
   list: () => Promise<TaskInfo[]>;
   cancel: (id: string) => Promise<boolean>;
   onChanged: (callback: (task: TaskInfo) => void) => () => void;
@@ -673,8 +703,14 @@ export interface FalsePositiveFeedbackRecord extends FalsePositiveFeedbackItem {
 }
 
 export interface FeedbackAPI {
-  reportFalsePositive: (projectPath: string, item: FalsePositiveFeedbackItem) => Promise<{ ok: boolean; id?: string; reason?: string }>;
-  listFalsePositives: (projectPath: string, source?: 'guard' | 'sentinel') => Promise<FalsePositiveFeedbackRecord[]>;
+  reportFalsePositive: (
+    projectPath: string,
+    item: FalsePositiveFeedbackItem,
+  ) => Promise<{ ok: boolean; id?: string; reason?: string }>;
+  listFalsePositives: (
+    projectPath: string,
+    source?: 'guard' | 'sentinel',
+  ) => Promise<FalsePositiveFeedbackRecord[]>;
 }
 
 /** 门禁配置（持久化到 .zhshield/guard-config.json） */
@@ -724,7 +760,10 @@ export interface ElectronAPI {
   openFolderDialog: () => Promise<string | null>;
   loadProjects: () => Promise<Array<{ name: string; path: string }>>;
   saveProjects: (projects: Array<{ name: string; path: string }>) => Promise<void>;
-  showSaveDialog: (options: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> }) => Promise<SaveDialogResult>;
+  showSaveDialog: (options: {
+    defaultPath: string;
+    filters: Array<{ name: string; extensions: string[] }>;
+  }) => Promise<SaveDialogResult>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   ai?: AiAPI;
   sop: SopAPI;

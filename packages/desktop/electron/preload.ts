@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 云脑协同：工具规则下发 + 经验回写 ──────────────────
   sync: {
     syncRules: () => ipcRenderer.invoke('sync:rules'),
+    resolveRules: () => ipcRenderer.invoke('sync:resolveRules'),
     getRulesStatus: () => ipcRenderer.invoke('sync:rulesStatus'),
     emergencyUpdate: (toolId: string) => ipcRenderer.invoke('sync:emergencyUpdate', toolId),
     submitExperience: (records: ExperienceRecord[]) =>

@@ -22,6 +22,13 @@ import {
   buildDefaultToolRuleConfigs,
   resolveApiBase,
   resolveSopBase,
+  readApiToken,
+  readOrCreateUserId,
+  getOrCreateDefaultOrg,
+  registerProjectFeatures,
+  resolveTools as cloudResolveTools,
+  resolveRules as cloudResolveRules,
+  type ScopeProfileLike,
 } from '@zh/kernel';
 import { DbConnection } from '@zh/db';
 import type { ScoringEngine } from '@zh/scoring';
@@ -108,6 +115,83 @@ export function getCachedProfile(): CachedProjectFeature | null {
 export function setCachedProfile(feature: CachedProjectFeature | null): void {
   cachedProfile = feature;
 }
+
+// ─── T0 云端画像注册 ─────────────────────────────────────────
+
+import * as crypto from 'node:crypto';
+
+/** 由 projectPath 推导稳定 projectId（sha256 前 16 位 hex） */
+function deriveProjectId(projectPath: string): string {
+  return crypto.createHash('sha256').update(projectPath).digest('hex').slice(0, 16);
+}
+
+/**
+ * 调用服务器 POST /orgs 创建默认组织，返回服务器生成的真实 orgId。
+ * 返回 CreateOrgFn 供 getOrCreateDefaultOrg 复用（组织创建语义收敛在 kernel）。
+ */
+async function createDefaultOrg(body: {
+  name: string;
+  ownerId: string;
+}): Promise<{ orgId: string }> {
+  const res = await fetch(`${API_BASE}/orgs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'x-api-token': readApiToken(),
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) {
+    const err = new Error(`POST /orgs failed: ${res.status}`);
+    (err as Error & { status: number }).status = res.status;
+    throw err;
+  }
+  return (await res.json()) as { orgId: string };
+}
+
+/**
+ * Fire-and-forget: 将项目画像快照注册到云端。
+ * 失败仅 log，永不阻断流水线（离线降级）。
+ */
+export async function registerProjectFeaturesToCloud(
+  feature: CachedProjectFeature,
+  projectPath: string,
+): Promise<void> {
+  try {
+    readApiToken(); // side-effect: 确保 API token 文件存在
+    const userId = readOrCreateUserId();
+    const org = await getOrCreateDefaultOrg(createDefaultOrg);
+    if (!org) {
+      console.warn('[cloud:T0] 无可用 orgId，跳过云端画像注册（离线降级）');
+      return;
+    }
+    const projectId = deriveProjectId(projectPath);
+    await registerProjectFeatures(org.orgId, userId, projectId, {
+      framework: feature.framework,
+      language: feature.language,
+      features: feature.features,
+    });
+  } catch (err) {
+    console.warn(
+      '[cloud:T0] 云端画像注册失败，降级跳过:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/** 获取默认 orgId（供 T1 在 sync 流程中使用）；失败/离线返回 null */
+export async function getDefaultOrgId(): Promise<string | null> {
+  try {
+    const org = await getOrCreateDefaultOrg(createDefaultOrg);
+    return org?.orgId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export { cloudResolveTools, cloudResolveRules, type ScopeProfileLike };
 
 // ─── 治理引擎依赖：DB ──────────────────────────────────────
 // DB 初始化失败不应阻断主进程启动 — 降级为无持久化模式（与 server 端 SopService/SentinelService 一致）。

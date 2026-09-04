@@ -87,7 +87,14 @@ import {
   resolveOpenCodeBin,
   resolveOpenCodeModel,
 } from '../ai-auto-fix';
-import { getScoring, getDb, sendProgress, setCachedProfile } from '../ipc-context';
+import {
+  getScoring,
+  getDb,
+  sendProgress,
+  setCachedProfile,
+  registerProjectFeaturesToCloud,
+  type CachedProjectFeature,
+} from '../ipc-context';
 import {
   collectExposedFilesInWorker,
   detectProfileInWorker,
@@ -265,7 +272,7 @@ function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports
 async function probeProjectProfile(projectPath: string): Promise<ScoringProjectProfile | null> {
   try {
     const profile = (await runProfileSyncInWorker(projectPath)).profile;
-    cacheProfile(profile);
+    cacheProfile(profile, projectPath);
     return profile;
   } catch (err) {
     console.warn(
@@ -277,12 +284,16 @@ async function probeProjectProfile(projectPath: string): Promise<ScoringProjectP
 }
 
 /** 将探测到的项目画像投影为 kernel 兼容的 ProjectFeature 并写入画像缓存（供工具规则按画像裁剪） */
-function cacheProfile(profile: ScoringProjectProfile): void {
-  setCachedProfile({
+function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): void {
+  const feature: CachedProjectFeature = {
     language: profile.language === 'unknown' ? undefined : profile.language,
     framework: profile.framework,
     features: [],
-  });
+  };
+  setCachedProfile(feature);
+  if (projectPath) {
+    void registerProjectFeaturesToCloud(feature, projectPath);
+  }
 }
 
 /**
@@ -1134,12 +1145,45 @@ async function runPipelineHandler(
   }
 }
 
+/**
+ * 将 @zh/fingerprint profileProject 结果投影为画像缓存并触发 T0 云端注册。
+ * onboarding 第 1 步（engine:runProfile）探测后立即调用，
+ * 使第 2 步 syncRules 能读到画像做按需裁剪（否则退化为全量 4 工具同步）。
+ */
+function cacheProfileFromFingerprintResult(result: unknown, projectPath: string): void {
+  try {
+    const { profile } = (result ?? {}) as { profile?: import('@zh/fingerprint').ProjectProfile };
+    const target = profile?.targets?.[0];
+    if (!target) {
+      console.warn('[engine:runProfile] 画像无 targets，跳过缓存（同步保持全量）');
+      return;
+    }
+    const feature: CachedProjectFeature = {
+      language: target.language?.value,
+      framework: target.frameworks?.[0]?.value,
+      features: [],
+    };
+    setCachedProfile(feature);
+    void registerProjectFeaturesToCloud(feature, projectPath);
+    console.log(
+      `[engine:runProfile] 画像已缓存: language=${feature.language ?? 'unknown'} framework=${feature.framework ?? 'unknown'}`,
+    );
+  } catch (err) {
+    console.warn(
+      '[engine:runProfile] 画像缓存失败（不影响探测结果返回）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 async function runProfileHandler(projectPath: string): Promise<unknown> {
   if (!projectPath || typeof projectPath !== 'string') {
     throw new Error(t('electron.invalidProjectPath'));
   }
   // 画像探测含全量同步扫盘（@zh/fingerprint detectors），必须离主进程，否则 macOS 彩球
-  return runProfileInWorker(projectPath);
+  const result = await runProfileInWorker(projectPath);
+  cacheProfileFromFingerprintResult(result, projectPath);
+  return result;
 }
 
 async function getScoreHandler(
@@ -1182,7 +1226,7 @@ async function getProfileHandler(
 ): Promise<ProjectProfileData | null> {
   try {
     const profilingResult = (await runProfileSyncInWorker(projectPath)).profile;
-    cacheProfile(profilingResult);
+    cacheProfile(profilingResult, projectPath);
     return {
       type: profilingResult.type,
       modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),

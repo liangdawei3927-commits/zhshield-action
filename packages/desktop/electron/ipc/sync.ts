@@ -15,7 +15,47 @@ import type {
   ToolRuleSyncResult,
 } from '@zh/kernel';
 import { SopSigner } from '@zh/kernel';
-import { resolveSopPublicKey, sopCache, sopRegistry, wisdomBrainSync, getCachedProfile } from '../ipc-context';
+import {
+  resolveSopPublicKey,
+  sopCache,
+  sopRegistry,
+  wisdomBrainSync,
+  getCachedProfile,
+  getDefaultOrgId,
+  cloudResolveTools,
+  cloudResolveRules,
+  type ScopeProfileLike,
+} from '../ipc-context';
+
+/** /resolve/rules 云端生效规则解析结果（T1 规则差量；失败降级不阻断同步） */
+export interface ResolveRulesOutcome {
+  ok: boolean;
+  reason?: 'no_org' | 'cloud_error';
+  total: number;
+  changed: string[];
+}
+
+/** 云端规则差量解析：按当前画像返回生效清单 + changed 差量（云端不可达时降级本地全量） */
+async function resolveRulesHandler(): Promise<ResolveRulesOutcome> {
+  const feature = getCachedProfile() ?? undefined;
+  try {
+    const orgId = await getDefaultOrgId();
+    if (!orgId) {
+      return { ok: false, reason: 'no_org', total: 0, changed: [] };
+    }
+    const res = await cloudResolveRules(orgId, feature as ScopeProfileLike | undefined);
+    console.log(
+      `[cloud:T1] /resolve/rules 生效规则 ${res.rules.length} 条，本次变更 ${res.changed.length} 条`,
+    );
+    return { ok: true, total: res.rules.length, changed: res.changed };
+  } catch (err) {
+    console.warn(
+      '[cloud:T1] /resolve/rules 失败，降级本地全量:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return { ok: false, reason: 'cloud_error', total: 0, changed: [] };
+  }
+}
 
 export function registerSyncIpc(): void {
   registerToolRuleSync();
@@ -26,8 +66,27 @@ export function registerSyncIpc(): void {
 /** 工具规则同步（智汇大脑协同 8.1） */
 function registerToolRuleSync(): void {
   ipcMain.handle('sync:rules', async (): Promise<ToolRuleSyncResult[]> => {
-    return wisdomBrainSync.syncAllRules(getCachedProfile() ?? undefined);
+    const feature = getCachedProfile() ?? undefined;
+    const ruleSync = wisdomBrainSync.getRuleSync();
+    try {
+      const orgId = await getDefaultOrgId();
+      if (orgId) {
+        const remoteTools = await cloudResolveTools(orgId, feature as ScopeProfileLike | undefined);
+        ruleSync.setRemoteToolIds(remoteTools as ToolId[]);
+      } else {
+        ruleSync.setRemoteToolIds(null);
+      }
+    } catch (err) {
+      console.warn(
+        '[cloud:T1] 云端工具 resolve 失败，降级为本地默认:',
+        err instanceof Error ? err.message : String(err),
+      );
+      ruleSync.setRemoteToolIds(null);
+    }
+    return wisdomBrainSync.syncAllRules(feature);
   });
+
+  ipcMain.handle('sync:resolveRules', () => resolveRulesHandler());
 
   ipcMain.handle(
     'sync:rulesStatus',

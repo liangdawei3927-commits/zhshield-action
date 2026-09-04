@@ -195,3 +195,74 @@ export interface DebtSnapshotRow {
   debt_index: number;
   created_at: string;
 }
+
+// ─── M3 轻量 Org 多租户（迁移 009）────────────────────────
+
+export interface OrgRow {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  created_at: string;
+}
+
+export interface OrgMemberRow {
+  id: string;
+  org_id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'member';
+  created_at: string;
+}
+
+export interface RuleScopeRow {
+  id: string;
+  rule_id: string;
+  org_id: string | null;
+  version: string;
+  enabled: 0 | 1;
+  content_sha: string | null;
+  source: 'manual' | 'calibrated';
+  published_at: string;
+}
+
+export interface ProjectFeatureRow {
+  id: string;
+  project_id: string;
+  framework: string | null;
+  language: string | null;
+  features_json: string;
+  schema_version: number;
+  updated_at: string;
+}
+
+export interface CreateOrgParams {
+  id: string;
+  name: string;
+  ownerUserId: string;
+}
+
+export interface AddOrgMemberParams {
+  id: string;
+  orgId: string;
+  userId: string;
+  role: OrgMemberRow['role'];
+}
+
+export interface UpsertRuleScopeParams {
+  id: string;
+  ruleId: string;
+  /** null = 平台默认（全局兜底） */
+  orgId: string | null;
+  version: string;
+  enabled: boolean;
+  contentSha: string | null;
+  source?: RuleScopeRow['source'];
+}
+
+export interface SaveProjectFeaturesParams {
+  id: string;
+  projectId: string;
+  framework?: string | null;
+  language?: string | null;
+  features: string[];
+  schemaVersion?: number;
+}

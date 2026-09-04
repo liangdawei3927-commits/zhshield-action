@@ -44,7 +44,7 @@ function SidebarPanel({
   intelligentEnabled,
   setIntelligentEnabled,
   intelligentLoading,
-  currentPage,
+  currentPage: _currentPage,
   onOpenProjectProfile,
 }: {
   open: boolean;

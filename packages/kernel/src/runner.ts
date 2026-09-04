@@ -45,6 +45,20 @@ function isExternalDispatch(type: ContentInstruction['type']): boolean {
   );
 }
 
+/** M 观测增强：按画像裁剪观测（active=预裁剪活跃总数，hit=命中后实际评估数）— 纯函数 */
+function attachProfileTrim(
+  report: RuleEngineReport,
+  registry: SopRegistry,
+  rules: SopRule[],
+  feature: NonNullable<RuleContext['projectFeature']>,
+): void {
+  report.profileTrim = {
+    active: registry.getActive().length,
+    hit: rules.length,
+    feature,
+  };
+}
+
 /** 按上下文过滤待评估规则（domains 优先于 domain）— 纯函数，仅依赖 registry */
 function filterRulesByContext(registry: SopRegistry, context: RuleContext): SopRule[] {
   let rules = registry.getActive();
@@ -228,6 +242,9 @@ export class SopRuleEngine {
       const evaluations = rules.length === 0 ? [] : await this.evaluateAll(rules, context, nested);
 
       const report = aggregate(evaluations, Date.now() - start);
+      if (context.projectFeature) {
+        attachProfileTrim(report, this.registry, rules, context.projectFeature);
+      }
       await this.emit('rule-engine:evaluated', report);
       return report;
     } finally {

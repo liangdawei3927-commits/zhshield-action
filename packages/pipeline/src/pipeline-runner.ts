@@ -210,6 +210,9 @@ export class PipelineRunner {
     }
     const inspectReport = inspectPhase.report;
 
+    this.logTrimObservability(guardReport, 'Guard');
+    this.logTrimObservability(inspectReport, 'Inspect');
+
     this.logger.info('========== SOP 驱动型全流水线完成（不含重构） ==========');
     return buildSuccessReport(guardReport, inspectReport);
   }
@@ -230,6 +233,22 @@ export class PipelineRunner {
       if (feature) base.projectFeature = feature;
     }
     return base;
+  }
+
+  /**
+   * 输出按画像裁剪观测：active=预裁剪活跃规则数，hit=命中后实际评估数，
+   * 差值即画像驱动裁剪削减量（验证加载链路裁剪效果）。
+   */
+  private logTrimObservability(report: RuleEngineReport, phase: string): void {
+    const trim = report.profileTrim;
+    if (!trim) {
+      this.logger.info(`[${phase}] 未启用画像裁剪观测（无 projectFeature，全量评估）`);
+      return;
+    }
+    const trimmed = trim.active - trim.hit;
+    this.logger.info(
+      `[${phase}] 画像裁剪观测: 活跃 ${trim.active} 条 → 命中 ${trim.hit} 条 (削减 ${trimmed} 条, ${Math.round((trimmed / trim.active) * 100)}%)`,
+    );
   }
 
   /**

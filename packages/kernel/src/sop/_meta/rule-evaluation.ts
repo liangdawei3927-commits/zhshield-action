@@ -72,6 +72,30 @@ export interface Violation {
   category?: IssueCategory;
 }
 
+// ─── 按画像裁剪观测 ────────────────────────────────────
+
+/**
+ * ProfileTrimObservability — 按项目画像裁剪的观测指标（M 观测增强）。
+ *
+ * 仅当评估上下文携带 projectFeature 时写入：记录「预裁剪活跃规则数 active」
+ * 与「按画像命中后实际评估数 total」（= 命中数），其差值即裁剪削减量，
+ * 用于验证画像驱动加载链路的裁剪效果。
+ */
+export interface ProfileTrimObservability {
+  /** 预裁剪的活跃规则总数 */
+  readonly active: number;
+
+  /** 按画像命中后实际评估的规则数（= 命中数） */
+  readonly hit: number;
+
+  /** 裁剪使用的项目画像（透传以便下游记录/校验） */
+  readonly feature: {
+    readonly framework?: string;
+    readonly language?: string;
+    readonly features?: readonly string[];
+  };
+}
+
 // ─── 引擎报告 ──────────────────────────────────────────
 
 export interface RuleEngineReport {
@@ -95,6 +119,9 @@ export interface RuleEngineReport {
 
   /** 阻断评估数（F1-4） */
   blockingCount?: number;
+
+  /** 按画像裁剪观测（仅携带 projectFeature 时写入；验证裁剪效果） */
+  profileTrim?: ProfileTrimObservability;
 
   /** 各规则的详细评估 */
   evaluations: RuleEvaluation[];

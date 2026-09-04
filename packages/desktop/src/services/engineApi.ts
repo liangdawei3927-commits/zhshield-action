@@ -535,13 +535,14 @@ export async function getRuleVersion(): Promise<string> {
 export async function syncRules(): Promise<{ added: number; updated: number }> {
   if (isHttpMode()) return { added: 0, updated: 0 };
   try {
-    const api = getSopAPI();
-    if (!api) return { added: 0, updated: 0 };
-    const result = await api.syncNow();
-    if (result.updated) {
-      return { added: result.ruleCount ?? 0, updated: 1 };
-    }
-    return { added: 0, updated: 0 };
+    const api = getAPI();
+    if (!api?.sync) return { added: 0, updated: 0 };
+    const result = (await api.sync.syncRules()) as Array<{
+      toolId: string;
+      stale: boolean;
+    }>;
+    const updated = result.filter((r) => r.stale).length;
+    return { added: result.length, updated };
   } catch {
     return { added: 0, updated: 0 };
   }

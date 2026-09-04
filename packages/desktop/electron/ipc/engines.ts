@@ -1150,7 +1150,7 @@ async function runPipelineHandler(
  * onboarding 第 1 步（engine:runProfile）探测后立即调用，
  * 使第 2 步 syncRules 能读到画像做按需裁剪（否则退化为全量 4 工具同步）。
  */
-function cacheProfileFromFingerprintResult(result: unknown, projectPath: string): void {
+export function cacheProfileFromFingerprintResult(result: unknown, projectPath: string): void {
   try {
     const { profile } = (result ?? {}) as { profile?: import('@zh/fingerprint').ProjectProfile };
     const target = profile?.targets?.[0];

@@ -19,6 +19,8 @@ import {
 import { registerProjectsIpc } from './ipc/projects';
 import { registerAiToolsIpc, syncAiIntegrationOnStartup } from './ipc/ai-tools';
 import { registerSyncIpc } from './ipc/sync';
+import { startResolveReconcileTimer } from './ipc/resolve-reconcile';
+import { startProfileDriftWatcher } from './profile-drift';
 import { registerEnginesIpc } from './ipc/engines';
 import { registerTasksIpc } from './ipc/tasks';
 import { buildTaskManager } from './task-manager';
@@ -313,6 +315,9 @@ async function initSopCache() {
   }
   if (!initialized) return;
   sopCache.startPeriodicSync();
+  // T1 免维护同步：云端规则对账循环（与 SOP 定时同步同频）+ 画像漂移监听
+  startResolveReconcileTimer();
+  startProfileDriftWatcher();
   // 云端同步放到下一轮事件循环，失败不影响本地体检
   setImmediate(() => {
     void sopCache.checkOnStartup().catch((err) => {

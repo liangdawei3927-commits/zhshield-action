@@ -23,38 +23,32 @@ import {
   getCachedProfile,
   getDefaultOrgId,
   cloudResolveTools,
-  cloudResolveRules,
   type ScopeProfileLike,
 } from '../ipc-context';
+import { reconcileRulesWithCloud, type ResolveRulesOutcome } from './resolve-reconcile';
 
-/** /resolve/rules 云端生效规则解析结果（T1 规则差量；失败降级不阻断同步） */
-export interface ResolveRulesOutcome {
-  ok: boolean;
-  reason?: 'no_org' | 'cloud_error';
-  total: number;
-  changed: string[];
-}
+export type { ResolveRulesOutcome };
 
-/** 云端规则差量解析：按当前画像返回生效清单 + changed 差量（云端不可达时降级本地全量） */
-async function resolveRulesHandler(): Promise<ResolveRulesOutcome> {
+/** 工具规则按画像同步（sync:rules IPC 与画像漂移触发共用） */
+export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
   const feature = getCachedProfile() ?? undefined;
+  const ruleSync = wisdomBrainSync.getRuleSync();
   try {
     const orgId = await getDefaultOrgId();
-    if (!orgId) {
-      return { ok: false, reason: 'no_org', total: 0, changed: [] };
+    if (orgId) {
+      const remoteTools = await cloudResolveTools(orgId, feature as ScopeProfileLike | undefined);
+      ruleSync.setRemoteToolIds(remoteTools as ToolId[]);
+    } else {
+      ruleSync.setRemoteToolIds(null);
     }
-    const res = await cloudResolveRules(orgId, feature as ScopeProfileLike | undefined);
-    console.log(
-      `[cloud:T1] /resolve/rules 生效规则 ${res.rules.length} 条，本次变更 ${res.changed.length} 条`,
-    );
-    return { ok: true, total: res.rules.length, changed: res.changed };
   } catch (err) {
     console.warn(
-      '[cloud:T1] /resolve/rules 失败，降级本地全量:',
+      '[cloud:T1] 云端工具 resolve 失败，降级为本地默认:',
       err instanceof Error ? err.message : String(err),
     );
-    return { ok: false, reason: 'cloud_error', total: 0, changed: [] };
+    ruleSync.setRemoteToolIds(null);
   }
+  return wisdomBrainSync.syncAllRules(feature);
 }
 
 export function registerSyncIpc(): void {
@@ -65,28 +59,9 @@ export function registerSyncIpc(): void {
 
 /** 工具规则同步（智汇大脑协同 8.1） */
 function registerToolRuleSync(): void {
-  ipcMain.handle('sync:rules', async (): Promise<ToolRuleSyncResult[]> => {
-    const feature = getCachedProfile() ?? undefined;
-    const ruleSync = wisdomBrainSync.getRuleSync();
-    try {
-      const orgId = await getDefaultOrgId();
-      if (orgId) {
-        const remoteTools = await cloudResolveTools(orgId, feature as ScopeProfileLike | undefined);
-        ruleSync.setRemoteToolIds(remoteTools as ToolId[]);
-      } else {
-        ruleSync.setRemoteToolIds(null);
-      }
-    } catch (err) {
-      console.warn(
-        '[cloud:T1] 云端工具 resolve 失败，降级为本地默认:',
-        err instanceof Error ? err.message : String(err),
-      );
-      ruleSync.setRemoteToolIds(null);
-    }
-    return wisdomBrainSync.syncAllRules(feature);
-  });
+  ipcMain.handle('sync:rules', () => syncToolRulesForProfile());
 
-  ipcMain.handle('sync:resolveRules', () => resolveRulesHandler());
+  ipcMain.handle('sync:resolveRules', () => reconcileRulesWithCloud());
 
   ipcMain.handle(
     'sync:rulesStatus',
@@ -180,7 +155,10 @@ async function handleSopEmergencyUpdate(
 
 function registerSopSyncActions(): void {
   ipcMain.handle('sop:syncNow', async () => {
-    return sopCache.syncFromCloud();
+    const result = await sopCache.syncFromCloud();
+    // 同步后顺手做一次云端对账（fire-and-forget，失败不影响返回值）
+    void reconcileRulesWithCloud().catch(() => {});
+    return result;
   });
 
   ipcMain.handle('sop:emergencyUpdate', async (_event, pkgJson: string) => {

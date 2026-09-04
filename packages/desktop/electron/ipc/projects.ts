@@ -30,6 +30,8 @@ export function registerProjectsIpc(): void {
       } catch (e) {
         console.error('Failed to save projects:', e);
       }
+      // 项目列表变化 → 画像漂移监听纳入新项目（动态导入避免与 profile-drift 循环依赖）
+      void import('../profile-drift').then((m) => m.rewatchProjectsAfterChange());
     },
   );
 }

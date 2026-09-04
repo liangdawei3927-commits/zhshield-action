@@ -450,7 +450,16 @@ export interface EngineAPI {
 
 export interface SyncAPI {
   syncRules: () => Promise<unknown[]>;
-  resolveRules: () => Promise<{ ok: boolean; reason?: string; total: number; changed: string[] }>;
+  resolveRules: () => Promise<{
+    ok: boolean;
+    reason?: string;
+    total: number;
+    changed: string[];
+    missing: string[];
+    shaMismatch: string[];
+    unexpected: string[];
+    healed: boolean;
+  }>;
   getRulesStatus: () => Promise<
     Array<{ toolId: string; localVersion: string | null; stale: boolean }>
   >;

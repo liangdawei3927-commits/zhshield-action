@@ -9,6 +9,7 @@ export default makeVitestConfig({
       '@zh/guard': path.join(packagesDir, 'guard', 'src'),
       '@zh/inspect': path.join(packagesDir, 'inspect', 'src'),
       '@zh/refactor': path.join(packagesDir, 'refactor', 'src'),
+      '@zh/fingerprint': path.join(packagesDir, 'fingerprint', 'src'),
     },
   },
   test: {

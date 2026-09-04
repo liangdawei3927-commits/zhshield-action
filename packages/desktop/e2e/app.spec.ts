@@ -158,9 +158,12 @@ test.describe('智汇码盾桌面端 E2E', () => {
     await navBar(page).getByRole('button', { name: '技术债务' }).click();
     await expect(page.getByText('量化技术债，把评分变成行动')).toBeVisible();
 
-    // 报告中心不在 TopNav（10 项上限），入口在 Banner 图标按钮
+    // 报告中心/规则进化不在 TopNav（10 项上限），入口在 Banner 图标按钮
     await page.getByRole('banner').getByRole('button', { name: '报告中心' }).click();
     await expect(page.getByText('多维度分析报告，决策更有依据')).toBeVisible();
+
+    await page.getByRole('banner').getByRole('button', { name: '规则进化' }).click();
+    await expect(page.getByText('洞察项目架构，规划演进路径')).toBeVisible();
   });
 
   test('侧边栏展开与收回', async () => {

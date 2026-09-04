@@ -71,8 +71,23 @@ export function TitleBar({
         )}
       </div>
 
-      {/* 右：备份中心/报告中心入口 + 侧边栏按钮 */}
+      {/* 右：规则进化/备份中心/报告中心入口 + 侧边栏按钮 */}
       <div className="flex items-center gap-2 pr-3" style={{ WebkitAppRegion: 'no-drag' as const }}>
+        <button
+          onClick={() => onNavigate?.('evolve')}
+          className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"
+          style={{
+            width: 28,
+            height: 24,
+            borderRadius: 'var(--zh-radius-sm)',
+            background:
+              currentPage === 'evolve' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.15)',
+            color: 'rgb(var(--zh-text-on-brand))',
+          }}
+          title={t('nav.evolve')}
+        >
+          <NavIcon id="evolve" size={14} />
+        </button>
         <button
           onClick={() => onNavigate?.('backup')}
           className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"

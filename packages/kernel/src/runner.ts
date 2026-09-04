@@ -275,11 +275,7 @@ export class SopRuleEngine {
     const evalStart = Date.now();
     const instruction = this.interpreter.interpret(rule);
     // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
-    const effectiveRule = resolveEffectiveRule(
-      rule,
-      this.consecutiveFailures,
-      this.healthBaseline,
-    );
+    const effectiveRule = resolveEffectiveRule(rule, this.consecutiveFailures, this.healthBaseline);
     try {
       const result = await this.evaluateOne(effectiveRule, instruction, context, nested);
       result.durationMs = Date.now() - evalStart;

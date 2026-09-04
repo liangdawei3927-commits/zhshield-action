@@ -71,9 +71,7 @@ describe('SopRuleEngine — M1 并行化回归（保序 + 聚合等价）', () =
 
     expect(report.total).toBe(rules.length);
     // 顺序不变量：evaluations 的 id 序列必须与注册顺序逐位一致。
-    expect(report.evaluations.map((e) => e.rule.id)).toEqual(
-      rules.map((r) => r.id),
-    );
+    expect(report.evaluations.map((e) => e.rule.id)).toEqual(rules.map((r) => r.id));
     // 全部未命中 → 全部 passed；聚合 ok 为 true。
     expect(report.passed).toBe(rules.length);
     expect(report.failed).toBe(0);
@@ -84,11 +82,7 @@ describe('SopRuleEngine — M1 并行化回归（保序 + 聚合等价）', () =
     // 两条规则先后在两次体检中失败/通过，验证失败计数不因并行交叉污染。
     const srcDir = path.join(tempDir, 'src');
     mkdirSync(srcDir, { recursive: true });
-    writeFileSync(
-      path.join(srcDir, 'a.ts'),
-      'const API_KEY = "sk-abcd1234efgh5678ijkl";',
-      'utf-8',
-    );
+    writeFileSync(path.join(srcDir, 'a.ts'), 'const API_KEY = "sk-abcd1234efgh5678ijkl";', 'utf-8');
 
     const hitRule = makeRule({
       id: 'guard.scan.hit',
@@ -110,10 +104,7 @@ describe('SopRuleEngine — M1 并行化回归（保序 + 聚合等价）', () =
     const second = await engine.evaluateRules({ repoRoot: tempDir });
 
     // 顺序仍保持注册序
-    expect(second.evaluations.map((e) => e.rule.id)).toEqual([
-      missRule.id,
-      hitRule.id,
-    ]);
+    expect(second.evaluations.map((e) => e.rule.id)).toEqual([missRule.id, hitRule.id]);
     // hitRule 命中 → failed（keys 命中 pattern-scan）
     expect(second.evaluations.find((e) => e.rule.id === hitRule.id)?.status).toBe('failed');
     // missRule 未命中 → passed

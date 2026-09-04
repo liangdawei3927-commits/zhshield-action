@@ -42,9 +42,7 @@ function makeSpyAdapter(
       return {
         tool: tool as ToolResult['tool'],
         status: 'available' as const,
-        issues: [
-          { id: 'i1', severity: 'warning', file: 'a.ts', line: 1, message: 'demo issue' },
-        ],
+        issues: [{ id: 'i1', severity: 'warning', file: 'a.ts', line: 1, message: 'demo issue' }],
         metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 1 },
       };
     },

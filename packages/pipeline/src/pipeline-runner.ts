@@ -172,9 +172,7 @@ export class PipelineRunner {
   // ─── SOP 规则驱动模式 ───
   async runSopGuard(context?: Partial<RuleContext>): Promise<RuleEngineReport> {
     this.logger.info('开始 SOP 驱动型 Guard 门禁检查...');
-    const report = await this.sopRuleEngine.runGuard(
-      this.composeContext('guard', context),
-    );
+    const report = await this.sopRuleEngine.runGuard(this.composeContext('guard', context));
     this.logger.info(
       `SOP Guard 检查完成: ${report.passed} passed, ${report.failed} failed, ${report.errors} errors`,
     );
@@ -183,9 +181,7 @@ export class PipelineRunner {
 
   async runSopInspect(context?: Partial<RuleContext>): Promise<RuleEngineReport> {
     this.logger.info('开始 SOP 驱动型 Inspect 巡检...');
-    const report = await this.sopRuleEngine.runInspect(
-      this.composeContext('inspect', context),
-    );
+    const report = await this.sopRuleEngine.runInspect(this.composeContext('inspect', context));
     this.logger.info(
       `SOP Inspect 完成: ${report.passed} passed, ${report.failed} failed, ${report.skipped} skipped`,
     );
@@ -223,10 +219,7 @@ export class PipelineRunner {
    * projectFeature 时按画像自动注入（M2）。画像探测异常 → undefined → 引擎回退
    * 为不按画像过滤的全量规则评估（安全行为）。
    */
-  private composeContext(
-    domain: 'guard' | 'inspect',
-    partial?: Partial<RuleContext>,
-  ): RuleContext {
+  private composeContext(domain: 'guard' | 'inspect', partial?: Partial<RuleContext>): RuleContext {
     const base = {
       dryRun: domain === 'guard' ? (partial?.dryRun ?? false) : partial?.dryRun,
       ...partial,

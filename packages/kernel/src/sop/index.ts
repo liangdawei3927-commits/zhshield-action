@@ -83,3 +83,10 @@ export type {
   MaintenanceOutcome,
   SopCacheMaintenanceOptions,
 } from './cache/sop-cache-maintenance';
+export {
+  computeRuleContentSha,
+  buildCurrentVersions,
+  verifyRuleManifest,
+  needsHeal,
+} from './cache/sop-resolve-verifier';
+export type { RuleManifestEntry, ResolveDriftReport } from './cache/sop-resolve-verifier';

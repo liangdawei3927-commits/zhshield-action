@@ -244,6 +244,9 @@ export class SopRuleEngine {
     // 口径（clamp(cores,2,4)）作为并发上限，与 tool-adapter-executor 保持一致。
     // 预分配数组 + 下标写入，保证 results[i] === rules[i] 的顺序约定不被并行打破。
     if (rules.length === 0) return [];
+    // M1b 工具调用去重：单次调用内的缓存，调用结束即弃（不跨调用、不跨 guard/inspect 两阶段）。
+    // 并行 worker 命中同 (tool, configHash) 时共享同一次真实扫描（single-flight）。
+    context.toolScanCache = new Map();
     const evaluations: RuleEvaluation[] = new Array<RuleEvaluation>(rules.length);
     const maxConcurrency = Math.min(detectMachineProfile().adapterParallelism, rules.length);
     let next = 0;

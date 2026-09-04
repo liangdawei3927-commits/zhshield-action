@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { Issue, ToolAdapter, ToolConfig, ToolResult, ToolId } from '@zh/shared';
 import type { SopRule } from '../sop/_meta/sop-types';
-import type { RuleContext } from '../sop/_meta/rule-context';
+import type { RuleContext, ToolScanOutcome } from '../sop/_meta/rule-context';
 import type {
   RuleEvaluation,
   Violation,
@@ -212,7 +212,24 @@ export async function evalToolDispatch(
       targetEngineOf(rule),
     );
   }
-  return runToolScan(host, adapter, rule, instr, context);
+
+  // M1b 工具调用去重：同一次调用内同 (tool, configHash) 的规则共享一次真实扫描（single-flight）。
+  // 可用性检查始终前置（不进缓存），保证各消费者得到各自的 skipped 语义。
+  const cache = context.toolScanCache;
+  if (!cache) {
+    // 无缓存（旧调用路径）→ 保守直扫，行为与去重前一致
+    const outcome = await executeToolScan(host, adapter, instr, context, rule);
+    return consumeToolScan(rule, instr, outcome);
+  }
+
+  const key = `${instr.tool}|${stableConfigKey(instr.toolConfig)}`;
+  let inFlight = cache.get(key);
+  if (!inFlight) {
+    inFlight = executeToolScan(host, adapter, instr, context, rule);
+    cache.set(key, inFlight);
+  }
+  const outcome = await inFlight;
+  return consumeToolScan(rule, instr, outcome);
 }
 
 /** 防御性检查：适配器接口不完整（如 guard 旧 Adapter 缺少 isAvailable/scan）时跳过，而非崩溃 */
@@ -220,13 +237,28 @@ function isAdapterUsable(adapter: ToolAdapter): boolean {
   return typeof adapter.isAvailable === 'function' && typeof adapter.scan === 'function';
 }
 
-async function runToolScan(
+/**
+ * M1b：规范化 toolConfig 的稳定序列化（顶层键排序），作为去重键的 config 部分。
+ * 键与 runToolScan 实际传入的 config（{ enabled: true, ...toolConfig }）严格对应；
+ * 嵌套对象未深排序——最坏情况是语义相同的配置各自执行（漏合），绝不误合。
+ */
+function stableConfigKey(toolConfig: Record<string, unknown> | undefined): string {
+  const config: Record<string, unknown> = { enabled: true, ...(toolConfig ?? {}) };
+  const keys = Object.keys(config).sort();
+  return JSON.stringify(keys.map((k) => [k, config[k]]));
+}
+
+/**
+ * M1b：真实执行一次工具扫描（含审计日志与 tool:executed 事件，均仅在真实执行时发生一次，
+ * sopRuleId 为发起规则）。返回的 Promise 永不 reject——扫描失败也是一种结果。
+ */
+async function executeToolScan(
   host: EngineHost,
   adapter: ToolAdapter,
-  rule: SopRule,
   instr: ToolDispatchInstruction,
   context: RuleContext,
-): Promise<RuleEvaluation> {
+  initiatingRule: SopRule,
+): Promise<ToolScanOutcome> {
   try {
     const toolConfig = instr.toolConfig ?? {};
     const result = await adapter.scan({
@@ -246,17 +278,28 @@ async function runToolScan(
       duration: result.metadata.duration,
       issueCount: result.issues.length,
       projectId: context.repoRoot,
-      sopRuleId: rule.id,
+      sopRuleId: initiatingRule.id,
       timestamp: new Date(),
     });
-    return buildToolScanResult(rule, instr, result);
+    return { ok: true, result };
   } catch (err) {
-    return errorResult(
-      rule,
-      `工具 ${instr.tool} 执行失败: ${toMessage(err)}`,
-      targetEngineOf(rule),
-    );
+    return { ok: false, error: toMessage(err) };
   }
+}
+
+/**
+ * M1b：将共享扫描 outcome 组装为当前规则的评估结果（纯组装，无副作用）。
+ * 每条规则的 violations 以自身 rule.id 标注，与串行逐条执行逐字段等价。
+ */
+function consumeToolScan(
+  rule: SopRule,
+  instr: ToolDispatchInstruction,
+  outcome: ToolScanOutcome,
+): RuleEvaluation {
+  if (!outcome.ok) {
+    return errorResult(rule, `工具 ${instr.tool} 执行失败: ${outcome.error}`, targetEngineOf(rule));
+  }
+  return buildToolScanResult(rule, instr, outcome.result);
 }
 
 /** 组装工具扫描结果：状态映射 + 违规收集 */

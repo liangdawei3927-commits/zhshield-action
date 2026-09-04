@@ -127,38 +127,46 @@ test.describe('智汇码盾桌面端 E2E', () => {
   test('欢迎页（无项目初始态）渲染关键文案', async () => {
     ({ app, page } = await launchApp());
     await expect(page.getByText('添加项目，开启守护')).toBeVisible();
-    await expect(page.getByText('智汇引擎已开启')).toBeVisible();
+    await expect(page.getByText('智能引擎已开启')).toBeVisible();
     await expect(page.getByText('已守护项目')).toBeVisible();
     await expect(page.getByText('累计拦截')).toBeVisible();
     await expect(page.getByText('健康评分')).toBeVisible();
   });
 
-  test('有项目时渲染完整布局（TopNav 导航到门禁检查页）', async () => {
+  test('有项目时渲染完整布局（TopNav 十项导航 + 底部状态栏）', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
-    await expect(navBar(page).getByRole('button', { name: '门禁检查' })).toBeVisible();
-    await navBar(page).getByRole('button', { name: '门禁检查' }).click();
-    await expect(page.getByText('实时扫描代码变更，拦截安全风险')).toBeVisible();
+    // 断言对象与 nav.* i18n 键对齐：项目体检/门禁系统/哨兵监控…
+    for (const nav of ['项目体检', '门禁系统', '哨兵监控', '智能巡检', '安全中心', '技术债务', '代码重构']) {
+      await expect(navBar(page).getByRole('button', { name: nav })).toBeVisible();
+    }
+    await expect(page.getByText('demo')).toBeVisible();
+    await expect(page.getByText('实时防护')).toBeVisible();
+    // 切换到门禁系统页不崩溃，导航仍可用
+    await navBar(page).getByRole('button', { name: '门禁系统' }).click();
+    await expect(navBar(page).getByRole('button', { name: '门禁系统' })).toBeVisible();
   });
 
-  test('顶部导航切换到智能巡检 / 安全扫描 / 报告中心 / 规则进化', async () => {
+  test('顶部导航切换到智能巡检 / 安全中心 / 技术债务，Banner 进入报告中心', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
+    // 各页空态标题与 page.<x>.empty.title i18n 键对齐（种子项目无扫描数据 → 空态）
     await navBar(page).getByRole('button', { name: '智能巡检' }).click();
     await expect(page.getByText('检查构建产物，确保交付质量')).toBeVisible();
 
-    await navBar(page).getByRole('button', { name: '安全扫描' }).click();
+    await navBar(page).getByRole('button', { name: '安全中心' }).click();
     await expect(page.getByText('深度扫描漏洞，修复安全隐患')).toBeVisible();
 
-    await navBar(page).getByRole('button', { name: '报告中心' }).click();
-    await expect(page.getByText('多维度分析报告，决策更有依据')).toBeVisible();
+    await navBar(page).getByRole('button', { name: '技术债务' }).click();
+    await expect(page.getByText('量化技术债，把评分变成行动')).toBeVisible();
 
-    await navBar(page).getByRole('button', { name: '规则进化' }).click();
-    await expect(page.getByText('洞察项目架构，规划演进路径')).toBeVisible();
+    // 报告中心不在 TopNav（10 项上限），入口在 Banner 图标按钮
+    await page.getByRole('banner').getByRole('button', { name: '报告中心' }).click();
+    await expect(page.getByText('多维度分析报告，决策更有依据')).toBeVisible();
   });
 
   test('侧边栏展开与收回', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     await page.getByTitle('展开侧边栏').click();
-    await expect(page.getByText('引擎状态')).toBeVisible();
+    await expect(page.getByText('引擎运行中')).toBeVisible();
     await expect(page.getByRole('button', { name: 'demo' })).toBeVisible();
 
     // 展开时右侧 aside 覆盖 TopNav 右上角按钮，点击遮罩（aside 外区域）收回

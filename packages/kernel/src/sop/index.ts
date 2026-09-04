@@ -43,6 +43,13 @@ export {
   buildDefaultToolRuleConfigs,
   resolveApiBase,
   resolveSopBase,
+  readApiToken,
+  resolveTools,
+  resolveRules,
+  registerProjectFeatures,
+  resolveHealth,
+  readOrCreateUserId,
+  getOrCreateDefaultOrg,
 } from './sync';
 export type {
   ToolId,
@@ -56,6 +63,9 @@ export type {
   VersionLock,
   ExperienceSyncPayload,
   WisdomBrainSyncResult,
+  ScopeProfileLike,
+  ResolveRulesResponse,
+  DefaultOrgResult,
 } from './sync';
 
 // ─── 深度优化协作者：冲突解决 / 压缩 / 清理 / 缓存指标与维护 ──

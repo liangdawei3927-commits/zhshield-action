@@ -57,11 +57,7 @@ describe('resolve-api network functions', () => {
         json: async () => ({ tools: ['semgrep', 'trivy'] }),
       });
 
-      const result = await resolveTools(
-        'org-1',
-        { language: 'go', features: [] },
-        mockBase,
-      );
+      const result = await resolveTools('org-1', { language: 'go', features: [] }, mockBase);
       expect(result).toEqual(['semgrep', 'trivy']);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
@@ -98,7 +94,7 @@ describe('resolve-api network functions', () => {
       const result = await resolveRules(
         'org-1',
         { language: 'typescript', features: [] },
-        { 'r1': '0.9' },
+        { r1: '0.9' },
         mockBase,
       );
       expect(result.rules).toHaveLength(1);
@@ -116,11 +112,17 @@ describe('resolve-api network functions', () => {
         json: async () => ({ ok: true, projectId: 'p1', orgId: 'org-1' }),
       });
 
-      await registerProjectFeatures('org-1', 'user-1', 'p1', {
-        framework: 'react',
-        language: 'typescript',
-        features: ['spa'],
-      }, mockBase);
+      await registerProjectFeatures(
+        'org-1',
+        'user-1',
+        'p1',
+        {
+          framework: 'react',
+          language: 'typescript',
+          features: ['spa'],
+        },
+        mockBase,
+      );
 
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe(`${mockBase}/orgs/org-1/projects/p1/features`);

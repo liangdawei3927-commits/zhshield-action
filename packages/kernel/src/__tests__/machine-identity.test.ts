@@ -10,9 +10,7 @@ const ORG_ID_FILE = path.join(os.homedir(), '.zhshield', 'default-org-id');
 describe('readOrCreateUserId', () => {
   it('returns a UUID v4 string', () => {
     const userId = readOrCreateUserId();
-    expect(userId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(userId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it('returns stable value across calls', () => {

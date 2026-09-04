@@ -87,7 +87,7 @@ import {
   resolveOpenCodeBin,
   resolveOpenCodeModel,
 } from '../ai-auto-fix';
-import { getScoring, getDb, sendProgress } from '../ipc-context';
+import { getScoring, getDb, sendProgress, setCachedProfile } from '../ipc-context';
 import {
   collectExposedFilesInWorker,
   detectProfileInWorker,
@@ -264,7 +264,9 @@ function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports
 /** 探测项目画像，失败时降级为 null（采用默认评分配置） */
 async function probeProjectProfile(projectPath: string): Promise<ScoringProjectProfile | null> {
   try {
-    return (await runProfileSyncInWorker(projectPath)).profile;
+    const profile = (await runProfileSyncInWorker(projectPath)).profile;
+    cacheProfile(profile);
+    return profile;
   } catch (err) {
     console.warn(
       '[engine:runPipeline] 画像探测失败，降级默认评分配置:',
@@ -272,6 +274,15 @@ async function probeProjectProfile(projectPath: string): Promise<ScoringProjectP
     );
     return null;
   }
+}
+
+/** 将探测到的项目画像投影为 kernel 兼容的 ProjectFeature 并写入画像缓存（供工具规则按画像裁剪） */
+function cacheProfile(profile: ScoringProjectProfile): void {
+  setCachedProfile({
+    language: profile.language === 'unknown' ? undefined : profile.language,
+    framework: profile.framework,
+    features: [],
+  });
 }
 
 /**
@@ -1171,6 +1182,7 @@ async function getProfileHandler(
 ): Promise<ProjectProfileData | null> {
   try {
     const profilingResult = (await runProfileSyncInWorker(projectPath)).profile;
+    cacheProfile(profilingResult);
     return {
       type: profilingResult.type,
       modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),

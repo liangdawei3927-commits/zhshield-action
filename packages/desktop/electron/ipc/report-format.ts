@@ -156,7 +156,12 @@ export function toInspectionReportData(r: InspectionReport): InspectionReportDat
   };
 }
 
-function getCoverageGap(a: Pick<AdapterResult, 'adapterId' | 'status' | 'degraded'>): boolean {
+// 覆盖率缺口判定：unavailable/skipped/degraded 计缺口，但 out-of-scope（画像裁剪的既定跳过）不算——
+// 裁剪是显式决策，非工具故障或未安装，不应稀释通过率/覆盖率。
+function getCoverageGap(
+  a: Pick<AdapterResult, 'adapterId' | 'status' | 'degraded' | 'skipReason'>,
+): boolean {
+  if (a.skipReason === 'out-of-scope') return false;
   return a.status === 'unavailable' || a.status === 'skipped' || a.degraded === true;
 }
 

@@ -11,10 +11,11 @@ import type {
   ExperienceRecord,
   GovernanceDomain,
   SignedSopPackage,
+  ToolId,
   ToolRuleSyncResult,
 } from '@zh/kernel';
 import { SopSigner } from '@zh/kernel';
-import { resolveSopPublicKey, sopCache, sopRegistry, wisdomBrainSync } from '../ipc-context';
+import { resolveSopPublicKey, sopCache, sopRegistry, wisdomBrainSync, getCachedProfile } from '../ipc-context';
 
 export function registerSyncIpc(): void {
   registerToolRuleSync();
@@ -25,16 +26,14 @@ export function registerSyncIpc(): void {
 /** 工具规则同步（智汇大脑协同 8.1） */
 function registerToolRuleSync(): void {
   ipcMain.handle('sync:rules', async (): Promise<ToolRuleSyncResult[]> => {
-    return wisdomBrainSync.syncAllRules();
+    return wisdomBrainSync.syncAllRules(getCachedProfile() ?? undefined);
   });
 
   ipcMain.handle(
     'sync:rulesStatus',
     async (): Promise<Array<{ toolId: string; localVersion: string | null; stale: boolean }>> => {
       const rs = wisdomBrainSync.getRuleSync();
-      const tools = rs.getConfiguredToolIds() as Array<
-        'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser'
-      >;
+      const tools = rs.getConfiguredToolIds() as ToolId[];
       return tools.map((tid) => ({
         toolId: tid,
         localVersion: rs.getLocalVersion(tid)?.version ?? null,
@@ -46,9 +45,7 @@ function registerToolRuleSync(): void {
   ipcMain.handle(
     'sync:emergencyUpdate',
     async (_event, toolId: string): Promise<ToolRuleSyncResult> => {
-      return wisdomBrainSync.syncToolRules(
-        toolId as 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser',
-      );
+      return wisdomBrainSync.syncToolRules(toolId as ToolId);
     },
   );
 }

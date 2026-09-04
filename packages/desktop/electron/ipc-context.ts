@@ -90,6 +90,25 @@ export const wisdomBrainSync = new WisdomBrainSync({
   experienceReporter: new ExperienceReporter({ remoteUrl: `${API_BASE}/experience` }),
 });
 
+// ─── 画像驱动工具下发：当前项目画像缓存 ────────────────────
+// 结构兼容 kernel ProjectFeature；null = 未探测（同步退化为全量下发，行为不变）。
+// 由 engines.ts 在流水线完成 / getProfile 后写入，sync.ts 读取用于按画像裁剪工具子集。
+export type CachedProjectFeature = {
+  framework?: string;
+  language?: string;
+  features: string[];
+};
+
+let cachedProfile: CachedProjectFeature | null = null;
+
+export function getCachedProfile(): CachedProjectFeature | null {
+  return cachedProfile;
+}
+
+export function setCachedProfile(feature: CachedProjectFeature | null): void {
+  cachedProfile = feature;
+}
+
 // ─── 治理引擎依赖：DB ──────────────────────────────────────
 // DB 初始化失败不应阻断主进程启动 — 降级为无持久化模式（与 server 端 SopService/SentinelService 一致）。
 // HTTP 模式下 renderer 走服务端，不依赖本地 DB；IPC 模式下评分/哨兵持久化退化为内存态。

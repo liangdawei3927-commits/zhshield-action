@@ -13,17 +13,25 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
 /**
- * 显式固定被测 Electron 二进制（项目的 electron 依赖版本）。
- * 不固定时 Playwright 在 pnpm workspace 下解析不到 electron 包，
- * 会尝试自行下载缓存副本（版本与项目不一致，主进程启动即崩）。
+ * 解析被测 Electron 二进制路径（项目的 electron 依赖版本，禁止 Playwright 自行下载缓存副本）。
+ *
+ * 不写死相对路径：node_modules 布局随 linker 模式而异——
+ * isolated linker（默认）下 electron 链接在 packages/desktop/node_modules/electron，
+ * hoisted linker（.npmrc node-linker=hoisted，CI 实际使用）下被提升到根 node_modules/electron，
+ * 写死前者在 CI 上 ENOENT（electron.launch spawn 失败，5 用例全挂）。
+ *
+ * 首选 electron 包自身导出的二进制绝对路径（其 index.js 会校验 dist 存在，
+ * 缺失时抛出 "Electron failed to install correctly" 便于诊断）；
+ * 解析失败时兜底 isolated 布局的固定路径。
  */
-const ELECTRON_BIN = path.join(
+const LEGACY_ELECTRON_BIN = path.join(
   __dirname,
   '..',
   'node_modules',
@@ -35,6 +43,15 @@ const ELECTRON_BIN = path.join(
       ? 'electron.exe'
       : 'electron',
 );
+
+const ELECTRON_BIN = (() => {
+  try {
+    const requireFromDesktop = createRequire(path.join(__dirname, '..', 'package.json'));
+    return requireFromDesktop('electron') as unknown as string;
+  } catch {
+    return LEGACY_ELECTRON_BIN;
+  }
+})();
 
 /** 种子项目路径：默认指向本 monorepo 根（随仓库位置自适应，CI 可用 ZH_E2E_PROJECT_PATH 覆盖） */
 const DEMO_PROJECT_PATH = process.env.ZH_E2E_PROJECT_PATH ?? path.resolve(__dirname, '..', '..', '..');

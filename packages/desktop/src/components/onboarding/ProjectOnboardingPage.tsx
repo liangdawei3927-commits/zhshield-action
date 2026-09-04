@@ -10,6 +10,25 @@ interface ProjectOnboardingPageProps {
   intelligentEnabled?: boolean;
 }
 
+/** 画像确认面板展示用投影（来自 engine:runProfile 的 fingerprint ProjectProfile） */
+export interface OnboardingProfileSummary {
+  language?: string;
+  framework?: string;
+  architecture?: string;
+  /** 探测置信度 0-1（主语言判定），低于 0.6 时 UI 提示人工核对 */
+  confidence?: number;
+}
+
+/** 云端规则差量同步摘要（/resolve/rules 结果） */
+export interface RuleSyncSummary {
+  ok: boolean;
+  total: number;
+  changedCount: number;
+}
+
+/** 低置信度阈值：低于此值确认面板需提示人工核对（对齐 06-多语言自适应架构 §七） */
+const LOW_CONFIDENCE_THRESHOLD = 0.6;
+
 interface Step {
   id: string;
   labelKey: string;
@@ -17,17 +36,42 @@ interface Step {
   icon: JSX.Element;
 }
 
+/** 将 fingerprint ProjectProfile 投影为确认面板数据（无 targets 返回 null） */
+function toProfileSummary(result: unknown): OnboardingProfileSummary | null {
+  const profile = (
+    result as { profile?: { targets?: unknown[]; architecture?: { value?: string } } }
+  )?.profile;
+  const target = profile?.targets?.[0] as
+    | {
+        language?: { value?: string; confidence?: number };
+        frameworks?: Array<{ value?: string }>;
+      }
+    | undefined;
+  if (!target) return null;
+  return {
+    language: target.language?.value,
+    framework: target.frameworks?.[0]?.value,
+    architecture: profile?.architecture?.value,
+    confidence: target.language?.confidence,
+  };
+}
+
 function buildSteps(
   projectPath: string,
   presetConfirmed: boolean,
   selectedPreset: string | null,
+  profileDetected: boolean,
+  profileConfirmed: boolean,
+  onProfileDetected: (summary: OnboardingProfileSummary | null) => void,
+  onRuleSyncResult: (summary: RuleSyncSummary) => void,
 ): Step[] {
   return [
     {
       id: 'analyze',
       labelKey: 'page.onboarding.step.analyze',
       execute: async () => {
-        await window.electronAPI?.engine?.runProfile(projectPath);
+        const result = await window.electronAPI?.engine?.runProfile(projectPath);
+        onProfileDetected(toProfileSummary(result));
       },
       icon: (
         <svg
@@ -46,10 +90,47 @@ function buildSteps(
       ),
     },
     {
+      id: 'confirm',
+      labelKey: 'page.onboarding.step.confirm',
+      execute: async () => {
+        // 画像未识别（null）时无需确认，直接进入同步；已识别则等待用户确认
+        if (!profileDetected) return;
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            if (profileConfirmed) {
+              clearInterval(check);
+              resolve();
+            }
+          }, 100);
+        });
+      },
+      icon: (
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 12l2 2 4-4" />
+          <path d="M21 12c.552 0 1-.448 1-1V8.5L12 3 2 8.5V11c0 5.523 4.477 10 10 10 2.145 0 4.13-.676 5.76-1.826" />
+        </svg>
+      ),
+    },
+    {
       id: 'profile',
       labelKey: 'page.onboarding.step.profile',
       execute: async () => {
-        await window.electronAPI?.sop?.syncNow();
+        await window.electronAPI?.sync?.syncRules();
+        const outcome = await window.electronAPI?.sync?.resolveRules();
+        onRuleSyncResult({
+          ok: outcome?.ok ?? false,
+          total: outcome?.total ?? 0,
+          changedCount: outcome?.changed?.length ?? 0,
+        });
       },
       icon: (
         <svg
@@ -160,10 +241,15 @@ function runCurrentStep(
   steps: Step[],
   index: number,
   presetConfirmed: boolean,
+  profileDetected: boolean,
+  profileConfirmed: boolean,
   onDone: () => void,
 ): void {
   const step = steps[index];
   if (step.id === 'preset' && !presetConfirmed) {
+    return;
+  }
+  if (step.id === 'confirm' && profileDetected && !profileConfirmed) {
     return;
   }
   runStep(step, onDone);
@@ -175,7 +261,13 @@ const ONBOARDING_PRESETS = [
   { id: 'general-purpose', label: '通用配置模板', desc: '所有项目类型', icon: '⚙️' },
 ];
 
-function useStepAdvance(steps: Step[], presetConfirmed: boolean, onComplete: () => void) {
+function useStepAdvance(
+  steps: Step[],
+  presetConfirmed: boolean,
+  profileDetected: boolean,
+  profileConfirmed: boolean,
+  onComplete: () => void,
+) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
@@ -184,11 +276,25 @@ function useStepAdvance(steps: Step[], presetConfirmed: boolean, onComplete: () 
       const timer = setTimeout(onComplete, 500);
       return () => clearTimeout(timer);
     }
-    runCurrentStep(steps, currentStepIndex, presetConfirmed, () => {
-      setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
-      setCurrentStepIndex((prev) => prev + 1);
-    });
-  }, [currentStepIndex, steps.length, onComplete, presetConfirmed]);
+    runCurrentStep(
+      steps,
+      currentStepIndex,
+      presetConfirmed,
+      profileDetected,
+      profileConfirmed,
+      () => {
+        setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
+        setCurrentStepIndex((prev) => prev + 1);
+      },
+    );
+  }, [
+    currentStepIndex,
+    steps.length,
+    onComplete,
+    presetConfirmed,
+    profileDetected,
+    profileConfirmed,
+  ]);
 
   return { currentStepIndex, completedSteps };
 }
@@ -397,6 +503,122 @@ function OnboardingPresetSelector({
   );
 }
 
+/** 画像确认面板行：标签 + 值（值缺失显示通用兜底文案） */
+function ProfileConfirmRow({
+  label,
+  value,
+  t,
+}: {
+  label: string;
+  value?: string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-white/60 text-xs">{label}</span>
+      <span className="text-white text-xs font-medium">
+        {value ?? t('page.onboarding.profileConfirm.unknown')}
+      </span>
+    </div>
+  );
+}
+
+/** 画像人工核对确认面板（06-多语言自适应架构 §七：首次注册必选确认，确认一次永久生效） */
+function OnboardingProfileConfirm({
+  summary,
+  onConfirm,
+  t,
+}: {
+  summary: OnboardingProfileSummary;
+  onConfirm: () => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
+  const lowConfidence = (summary.confidence ?? 1) < LOW_CONFIDENCE_THRESHOLD;
+  return (
+    <div className="mt-6 w-80">
+      <div
+        className="rounded-xl p-5"
+        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
+      >
+        <div className="text-white text-sm font-semibold mb-3 text-center">
+          {t('page.onboarding.profileConfirm.title')}
+        </div>
+        <div className="mb-3 divide-y divide-white/10">
+          <ProfileConfirmRow
+            label={t('page.onboarding.profileConfirm.language')}
+            value={summary.language}
+            t={t}
+          />
+          <ProfileConfirmRow
+            label={t('page.onboarding.profileConfirm.framework')}
+            value={summary.framework}
+            t={t}
+          />
+          <ProfileConfirmRow
+            label={t('page.onboarding.profileConfirm.architecture')}
+            value={summary.architecture}
+            t={t}
+          />
+          {summary.confidence !== undefined && (
+            <ProfileConfirmRow
+              label={t('page.onboarding.profileConfirm.confidence')}
+              value={`${Math.round(summary.confidence * 100)}%`}
+              t={t}
+            />
+          )}
+        </div>
+        {lowConfidence && (
+          <div className="mb-3 text-center text-[11px] leading-snug text-amber-300">
+            {t('page.onboarding.profileConfirm.lowConfidence')}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
+          style={{
+            background:
+              'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.9';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '1';
+          }}
+        >
+          {t('page.onboarding.profileConfirm.confirmBtn')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 云端规则差量同步摘要（sync:resolveRules 结果，失败/离线时提示降级） */
+function OnboardingRuleSyncSummary({
+  summary,
+  t,
+}: {
+  summary: RuleSyncSummary;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
+  return (
+    <div className="mt-4 w-72 text-center text-xs">
+      {summary.ok ? (
+        <span className="text-white/70">
+          {t('page.onboarding.ruleSync.summary', {
+            total: summary.total,
+            changed: summary.changedCount,
+          })}
+        </span>
+      ) : (
+        <span className="text-white/40">{t('page.onboarding.ruleSync.offline')}</span>
+      )}
+    </div>
+  );
+}
+
 function OnboardingSteps({
   steps,
   completedSteps,
@@ -406,15 +628,23 @@ function OnboardingSteps({
   selectedPreset,
   onSelectPreset,
   onConfirmPreset,
+  showConfirm,
+  profileSummary,
+  onConfirmProfile,
+  ruleSyncSummary,
 }: {
   steps: Step[];
   completedSteps: Set<number>;
   currentStepIndex: number;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
   showPreset: boolean;
   selectedPreset: string | null;
   onSelectPreset: (id: string) => void;
   onConfirmPreset: () => void;
+  showConfirm: boolean;
+  profileSummary: OnboardingProfileSummary | null;
+  onConfirmProfile: () => void;
+  ruleSyncSummary: RuleSyncSummary | null;
 }) {
   return (
     <>
@@ -424,6 +654,10 @@ function OnboardingSteps({
         currentStepIndex={currentStepIndex}
         t={t}
       />
+      {ruleSyncSummary && <OnboardingRuleSyncSummary summary={ruleSyncSummary} t={t} />}
+      {showConfirm && profileSummary && (
+        <OnboardingProfileConfirm summary={profileSummary} onConfirm={onConfirmProfile} t={t} />
+      )}
       {showPreset && (
         <OnboardingPresetSelector
           presets={ONBOARDING_PRESETS}
@@ -447,17 +681,25 @@ function OnboardingCenter({
   selectedPreset,
   onSelectPreset,
   onConfirmPreset,
+  showConfirm,
+  profileSummary,
+  onConfirmProfile,
+  ruleSyncSummary,
 }: {
   projectName: string;
   progress: number;
   steps: Step[];
   completedSteps: Set<number>;
   currentStepIndex: number;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
   showPreset: boolean;
   selectedPreset: string | null;
   onSelectPreset: (id: string) => void;
   onConfirmPreset: () => void;
+  showConfirm: boolean;
+  profileSummary: OnboardingProfileSummary | null;
+  onConfirmProfile: () => void;
+  ruleSyncSummary: RuleSyncSummary | null;
 }) {
   return (
     <div className="relative flex flex-col items-center">
@@ -472,6 +714,10 @@ function OnboardingCenter({
         selectedPreset={selectedPreset}
         onSelectPreset={onSelectPreset}
         onConfirmPreset={onConfirmPreset}
+        showConfirm={showConfirm}
+        profileSummary={profileSummary}
+        onConfirmProfile={onConfirmProfile}
+        ruleSyncSummary={ruleSyncSummary}
       />
     </div>
   );
@@ -488,10 +734,14 @@ function OnboardingContent({
   onSelectPreset,
   onConfirmPreset,
   showPreset,
+  showConfirm,
+  profileSummary,
+  onConfirmProfile,
+  ruleSyncSummary,
   onClose,
   intelligentEnabled = true,
 }: {
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
   projectName: string;
   steps: Step[];
   currentStepIndex: number;
@@ -501,6 +751,10 @@ function OnboardingContent({
   onSelectPreset: (id: string) => void;
   onConfirmPreset: () => void;
   showPreset: boolean;
+  showConfirm: boolean;
+  profileSummary: OnboardingProfileSummary | null;
+  onConfirmProfile: () => void;
+  ruleSyncSummary: RuleSyncSummary | null;
   onClose?: () => void;
   intelligentEnabled?: boolean;
 }) {
@@ -573,6 +827,10 @@ function OnboardingContent({
         selectedPreset={selectedPreset}
         onSelectPreset={onSelectPreset}
         onConfirmPreset={onConfirmPreset}
+        showConfirm={showConfirm}
+        profileSummary={profileSummary}
+        onConfirmProfile={onConfirmProfile}
+        ruleSyncSummary={ruleSyncSummary}
       />
       <div className="absolute bottom-6 text-white/40 text-xs">{t('page.onboarding.hint')}</div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -590,8 +848,25 @@ export function ProjectOnboardingPage({
   const t = useT();
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [presetConfirmed, setPresetConfirmed] = useState(false);
-  const steps = buildSteps(projectPath, presetConfirmed, selectedPreset);
-  const { currentStepIndex, completedSteps } = useStepAdvance(steps, presetConfirmed, onComplete);
+  const [profileSummary, setProfileSummary] = useState<OnboardingProfileSummary | null>(null);
+  const [profileConfirmed, setProfileConfirmed] = useState(false);
+  const [ruleSyncSummary, setRuleSyncSummary] = useState<RuleSyncSummary | null>(null);
+  const steps = buildSteps(
+    projectPath,
+    presetConfirmed,
+    selectedPreset,
+    profileSummary !== null,
+    profileConfirmed,
+    setProfileSummary,
+    setRuleSyncSummary,
+  );
+  const { currentStepIndex, completedSteps } = useStepAdvance(
+    steps,
+    presetConfirmed,
+    profileSummary !== null,
+    profileConfirmed,
+    onComplete,
+  );
 
   return (
     <OnboardingContent
@@ -609,6 +884,15 @@ export function ProjectOnboardingPage({
         steps[currentStepIndex].id === 'preset' &&
         !presetConfirmed
       }
+      showConfirm={
+        currentStepIndex < steps.length &&
+        steps[currentStepIndex].id === 'confirm' &&
+        profileSummary !== null &&
+        !profileConfirmed
+      }
+      profileSummary={profileSummary}
+      onConfirmProfile={() => setProfileConfirmed(true)}
+      ruleSyncSummary={ruleSyncSummary}
       onClose={onClose}
       intelligentEnabled={intelligentEnabled}
     />

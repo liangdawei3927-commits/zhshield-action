@@ -1670,10 +1670,25 @@
       "hint": "正在為您的專案配置最佳守護方案",
       "step": {
         "analyze": "分析專案結構與技術棧",
+        "confirm": "核對並確認專案畫像",
         "profile": "生成專案能力畫像",
         "skills": "載入專屬技能包",
         "preset": "套用守護預設",
         "ready": "守護方案就緒"
+      },
+      "profileConfirm": {
+        "title": "請核對自動識別的專案畫像",
+        "language": "主語言",
+        "framework": "主框架",
+        "architecture": "架構形態",
+        "confidence": "探測置信度",
+        "unknown": "未識別",
+        "lowConfidence": "探測置信度較低，請仔細核對；如有誤可稍後在專案畫像頁修正",
+        "confirmBtn": "確認無誤，開始按需同步"
+      },
+      "ruleSync": {
+        "summary": "雲端生效規則 {{total}} 條，本次增量變更 {{changed}} 條",
+        "offline": "雲端不可達，已按本地規則全量同步"
       }
     },
     "secrets": {

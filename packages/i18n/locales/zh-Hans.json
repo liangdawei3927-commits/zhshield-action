@@ -1745,10 +1745,25 @@
       "hint": "正在为您的项目配置最佳守护方案",
       "step": {
         "analyze": "分析项目结构与技术栈",
+        "confirm": "核对并确认项目画像",
         "profile": "生成项目能力画像",
         "skills": "加载专属技能包",
         "preset": "应用守护预设",
         "ready": "守护方案就绪"
+      },
+      "profileConfirm": {
+        "title": "请核对自动识别的项目画像",
+        "language": "主语言",
+        "framework": "主框架",
+        "architecture": "架构形态",
+        "confidence": "探测置信度",
+        "unknown": "未识别",
+        "lowConfidence": "探测置信度较低，请仔细核对；如有误可稍后在项目画像页修正",
+        "confirmBtn": "确认无误，开始按需同步"
+      },
+      "ruleSync": {
+        "summary": "云端生效规则 {{total}} 条，本次增量变更 {{changed}} 条",
+        "offline": "云端不可达，已按本地规则全量同步"
       }
     }
   },

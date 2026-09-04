@@ -1745,10 +1745,25 @@
       "hint": "Configuring the best guard solution for your project",
       "step": {
         "analyze": "Analyzing project structure & tech stack",
+        "confirm": "Review & confirm project profile",
         "profile": "Generating project capability profile",
         "skills": "Loading exclusive skill pack",
         "preset": "Applying guard presets",
         "ready": "Guard solution ready"
+      },
+      "profileConfirm": {
+        "title": "Review the auto-detected project profile",
+        "language": "Primary language",
+        "framework": "Primary framework",
+        "architecture": "Architecture",
+        "confidence": "Detection confidence",
+        "unknown": "Unknown",
+        "lowConfidence": "Detection confidence is low. Please review carefully; you can correct it later on the profile page.",
+        "confirmBtn": "Confirmed — start on-demand sync"
+      },
+      "ruleSync": {
+        "summary": "{{total}} rules effective from cloud, {{changed}} changed in this sync",
+        "offline": "Cloud unreachable; synced with local rules instead"
       }
     }
   },

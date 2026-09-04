@@ -1764,6 +1764,22 @@
       "ruleSync": {
         "summary": "云端生效规则 {{total}} 条，本次增量变更 {{changed}} 条",
         "offline": "云端不可达，已按本地规则全量同步"
+      },
+      "tools": {
+        "title": "工具就绪检查",
+        "sourceCloud": "清单来源：云端",
+        "sourceLocal": "清单来源：本地默认",
+        "st": {
+          "project": "项目内",
+          "path": "系统",
+          "shared": "共享目录",
+          "missing": "缺失"
+        },
+        "install": "确认并安装 {{count}} 个缺失工具",
+        "installing": "安装中…（可能需要几分钟）",
+        "installDone": "安装完成",
+        "installFailed": "安装失败，请稍后重试",
+        "allReady": "全部 {{count}} 个工具就绪"
       }
     }
   },

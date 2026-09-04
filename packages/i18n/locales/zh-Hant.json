@@ -1689,6 +1689,22 @@
       "ruleSync": {
         "summary": "雲端生效規則 {{total}} 條，本次增量變更 {{changed}} 條",
         "offline": "雲端不可達，已按本地規則全量同步"
+      },
+      "tools": {
+        "title": "工具就緒檢查",
+        "sourceCloud": "清單來源：雲端",
+        "sourceLocal": "清單來源：本地預設",
+        "st": {
+          "project": "專案內",
+          "path": "系統",
+          "shared": "共用目錄",
+          "missing": "缺失"
+        },
+        "install": "確認並安裝 {{count}} 個缺失工具",
+        "installing": "安裝中…（可能需要幾分鐘）",
+        "installDone": "安裝完成",
+        "installFailed": "安裝失敗，請稍後重試",
+        "allReady": "全部 {{count}} 個工具就緒"
       }
     },
     "secrets": {

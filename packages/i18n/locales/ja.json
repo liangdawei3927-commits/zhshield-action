@@ -1689,6 +1689,22 @@
       "ruleSync": {
         "summary": "クラウド有効ルール {{total}} 件、今回の差分 {{changed}} 件",
         "offline": "クラウドに到達できず、ローカルルールで全量同期しました"
+      },
+      "tools": {
+        "title": "ツール準備状況チェック",
+        "sourceCloud": "ソース：クラウド",
+        "sourceLocal": "ソース：ローカル既定",
+        "st": {
+          "project": "プロジェクト内",
+          "path": "システム",
+          "shared": "共有ディレクトリ",
+          "missing": "未導入"
+        },
+        "install": "不足ツール {{count}} 件を確認してインストール",
+        "installing": "インストール中…（数分かかる場合があります）",
+        "installDone": "インストール完了",
+        "installFailed": "インストールに失敗しました。後でお試しください",
+        "allReady": "{{count}} 件すべてのツールが準備完了"
       }
     },
     "secrets": {

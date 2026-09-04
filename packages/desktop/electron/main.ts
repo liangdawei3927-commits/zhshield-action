@@ -19,6 +19,7 @@ import {
 import { registerProjectsIpc } from './ipc/projects';
 import { registerAiToolsIpc, syncAiIntegrationOnStartup } from './ipc/ai-tools';
 import { registerSyncIpc } from './ipc/sync';
+import { registerToolsIpc } from './ipc/tools';
 import { startResolveReconcileTimer } from './ipc/resolve-reconcile';
 import { startProfileDriftWatcher } from './profile-drift';
 import { registerEnginesIpc } from './ipc/engines';
@@ -289,6 +290,7 @@ ipcMain.handle(
 registerProjectsIpc();
 registerAiToolsIpc();
 registerSyncIpc();
+registerToolsIpc();
 const taskManager = buildTaskManager();
 registerTasksIpc(taskManager);
 registerEnginesIpc(taskManager);

@@ -470,6 +470,18 @@ export interface SyncAPI {
   getQueueStatus: () => Promise<{ queueLength: number }>;
 }
 
+export interface ToolsAPI {
+  status: (projectPath?: string) => Promise<{
+    source: 'cloud' | 'local';
+    tools: Array<{ toolId: string; status: 'project' | 'path' | 'shared' | 'missing'; bin: string | null }>;
+  }>;
+  install: (toolIds: string[]) => Promise<{
+    ok: boolean;
+    reason?: 'packaged' | 'script_error';
+    output: string;
+  }>;
+}
+
 export interface SentinelAPI {
   getEvents: (options?: { status?: string; severity?: string }) => Promise<SentinelEvent[]>;
   getEvent: (id: string) => Promise<SentinelEvent | undefined>;
@@ -777,6 +789,7 @@ export interface ElectronAPI {
   ai?: AiAPI;
   sop: SopAPI;
   sync: SyncAPI;
+  tools: ToolsAPI;
   engine: EngineAPI;
   tasks: TaskAPI;
   guardHooks?: GuardHooksAPI;

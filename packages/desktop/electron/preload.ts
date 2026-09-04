@@ -92,6 +92,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getQueueStatus: () => ipcRenderer.invoke('sync:queueStatus'),
   },
 
+  // ─── 工具就绪探测与引导安装（工具半自动原则）────────────
+  tools: {
+    status: (projectPath?: string) => ipcRenderer.invoke('tools:status', { projectPath }),
+    install: (toolIds: string[]) => ipcRenderer.invoke('tools:install', { toolIds }),
+  },
+
   // ─── 治理引擎（Guard / Inspect / Security / Scoring）────
   engine: {
     runGuard: (projectPath: string, options?: Record<string, unknown>) =>

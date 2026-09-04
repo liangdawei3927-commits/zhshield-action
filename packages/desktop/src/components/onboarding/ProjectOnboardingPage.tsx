@@ -26,6 +26,16 @@ export interface RuleSyncSummary {
   changedCount: number;
 }
 
+/** 工具就绪探测结果（tools:status；工具半自动原则的面板数据源） */
+export interface ToolsStatusSummary {
+  source: 'cloud' | 'local';
+  tools: Array<{
+    toolId: string;
+    status: 'project' | 'path' | 'shared' | 'missing';
+    bin: string | null;
+  }>;
+}
+
 /** 低置信度阈值：低于此值确认面板需提示人工核对（对齐 06-多语言自适应架构 §七） */
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
@@ -64,6 +74,7 @@ function buildSteps(
   profileConfirmed: boolean,
   onProfileDetected: (summary: OnboardingProfileSummary | null) => void,
   onRuleSyncResult: (summary: RuleSyncSummary) => void,
+  onToolsStatus: (status: ToolsStatusSummary | null) => void,
 ): Step[] {
   return [
     {
@@ -131,6 +142,13 @@ function buildSteps(
           total: outcome?.total ?? 0,
           changedCount: outcome?.changed?.length ?? 0,
         });
+        // 工具就绪探测（云端清单优先；失败/离线时主进程降级本地默认）
+        try {
+          const status = await window.electronAPI?.tools?.status(projectPath);
+          onToolsStatus(status ?? null);
+        } catch {
+          onToolsStatus(null);
+        }
       },
       icon: (
         <svg
@@ -632,6 +650,8 @@ function OnboardingSteps({
   profileSummary,
   onConfirmProfile,
   ruleSyncSummary,
+  toolsStatus,
+  onRefreshTools,
 }: {
   steps: Step[];
   completedSteps: Set<number>;
@@ -645,6 +665,8 @@ function OnboardingSteps({
   profileSummary: OnboardingProfileSummary | null;
   onConfirmProfile: () => void;
   ruleSyncSummary: RuleSyncSummary | null;
+  toolsStatus: ToolsStatusSummary | null;
+  onRefreshTools: () => Promise<void>;
 }) {
   return (
     <>
@@ -655,6 +677,9 @@ function OnboardingSteps({
         t={t}
       />
       {ruleSyncSummary && <OnboardingRuleSyncSummary summary={ruleSyncSummary} t={t} />}
+      {toolsStatus && (
+        <OnboardingToolsPanel status={toolsStatus} onRefresh={onRefreshTools} t={t} />
+      )}
       {showConfirm && profileSummary && (
         <OnboardingProfileConfirm summary={profileSummary} onConfirm={onConfirmProfile} t={t} />
       )}
@@ -667,6 +692,110 @@ function OnboardingSteps({
         />
       )}
     </>
+  );
+}
+
+/** 工具就绪状态行标签 */
+function toolStatusLabel(status: ToolRowStatus, t: TFunc): string {
+  return t(`page.onboarding.tools.st.${status}`);
+}
+
+type ToolRowStatus = ToolsStatusSummary['tools'][number]['status'];
+type TFunc = (key: string, params?: Record<string, unknown>) => string;
+
+/** 工具就绪面板（工具半自动原则：展示三层探测状态，缺失项由用户点击确认后安装） */
+function OnboardingToolsPanel({
+  status,
+  onRefresh,
+  t,
+}: {
+  status: ToolsStatusSummary;
+  onRefresh: () => Promise<void>;
+  t: TFunc;
+}) {
+  const [installing, setInstalling] = useState(false);
+  const [done, setDone] = useState<'ok' | 'fail' | null>(null);
+  const missing = status.tools.filter((row) => row.status === 'missing');
+  const readyCount = status.tools.length - missing.length;
+
+  async function handleInstall(): Promise<void> {
+    setInstalling(true);
+    setDone(null);
+    try {
+      const res = await window.electronAPI?.tools?.install(missing.map((row) => row.toolId));
+      await onRefresh();
+      setDone(res?.ok ? 'ok' : 'fail');
+    } catch {
+      setDone('fail');
+    } finally {
+      setInstalling(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 w-80">
+      <div
+        className="rounded-xl p-4"
+        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-white text-xs font-semibold">
+            {t('page.onboarding.tools.title')}
+          </span>
+          <span className="text-white/40 text-[10px]">
+            {status.source === 'cloud'
+              ? t('page.onboarding.tools.sourceCloud')
+              : t('page.onboarding.tools.sourceLocal')}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {status.tools.map((row) => (
+            <div key={row.toolId} className="flex items-center justify-between">
+              <span className="text-white/80 text-xs font-mono">{row.toolId}</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  row.status === 'missing'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-success-500/20 text-success-400'
+                }`}
+              >
+                {toolStatusLabel(row.status, t)}
+              </span>
+            </div>
+          ))}
+        </div>
+        {missing.length > 0 ? (
+          <button
+            type="button"
+            onClick={handleInstall}
+            disabled={installing}
+            className="mt-3 w-full py-2 rounded-lg text-xs font-medium text-white transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{
+              background:
+                'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
+            }}
+          >
+            {installing
+              ? t('page.onboarding.tools.installing')
+              : t('page.onboarding.tools.install', { count: missing.length })}
+          </button>
+        ) : (
+          <div className="mt-3 text-center text-[11px] text-success-400">
+            {t('page.onboarding.tools.allReady', { count: readyCount })}
+          </div>
+        )}
+        {done === 'ok' && (
+          <div className="mt-2 text-center text-[11px] text-success-400">
+            {t('page.onboarding.tools.installDone')}
+          </div>
+        )}
+        {done === 'fail' && (
+          <div className="mt-2 text-center text-[11px] text-amber-300">
+            {t('page.onboarding.tools.installFailed')}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -685,6 +814,8 @@ function OnboardingCenter({
   profileSummary,
   onConfirmProfile,
   ruleSyncSummary,
+  toolsStatus,
+  onRefreshTools,
 }: {
   projectName: string;
   progress: number;
@@ -700,6 +831,8 @@ function OnboardingCenter({
   profileSummary: OnboardingProfileSummary | null;
   onConfirmProfile: () => void;
   ruleSyncSummary: RuleSyncSummary | null;
+  toolsStatus: ToolsStatusSummary | null;
+  onRefreshTools: () => Promise<void>;
 }) {
   return (
     <div className="relative flex flex-col items-center">
@@ -718,6 +851,8 @@ function OnboardingCenter({
         profileSummary={profileSummary}
         onConfirmProfile={onConfirmProfile}
         ruleSyncSummary={ruleSyncSummary}
+        toolsStatus={toolsStatus}
+        onRefreshTools={onRefreshTools}
       />
     </div>
   );
@@ -738,6 +873,8 @@ function OnboardingContent({
   profileSummary,
   onConfirmProfile,
   ruleSyncSummary,
+  toolsStatus,
+  onRefreshTools,
   onClose,
   intelligentEnabled = true,
 }: {
@@ -755,6 +892,8 @@ function OnboardingContent({
   profileSummary: OnboardingProfileSummary | null;
   onConfirmProfile: () => void;
   ruleSyncSummary: RuleSyncSummary | null;
+  toolsStatus: ToolsStatusSummary | null;
+  onRefreshTools: () => Promise<void>;
   onClose?: () => void;
   intelligentEnabled?: boolean;
 }) {
@@ -831,6 +970,8 @@ function OnboardingContent({
         profileSummary={profileSummary}
         onConfirmProfile={onConfirmProfile}
         ruleSyncSummary={ruleSyncSummary}
+        toolsStatus={toolsStatus}
+        onRefreshTools={onRefreshTools}
       />
       <div className="absolute bottom-6 text-white/40 text-xs">{t('page.onboarding.hint')}</div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -851,6 +992,18 @@ export function ProjectOnboardingPage({
   const [profileSummary, setProfileSummary] = useState<OnboardingProfileSummary | null>(null);
   const [profileConfirmed, setProfileConfirmed] = useState(false);
   const [ruleSyncSummary, setRuleSyncSummary] = useState<RuleSyncSummary | null>(null);
+  const [toolsStatus, setToolsStatus] = useState<ToolsStatusSummary | null>(null);
+
+  /** 重新探测工具就绪状态（安装完成后面板刷新用） */
+  const refreshTools = async (): Promise<void> => {
+    try {
+      const status = await window.electronAPI?.tools?.status(projectPath);
+      setToolsStatus(status ?? null);
+    } catch {
+      // 探测失败保留旧状态
+    }
+  };
+
   const steps = buildSteps(
     projectPath,
     presetConfirmed,
@@ -859,6 +1012,7 @@ export function ProjectOnboardingPage({
     profileConfirmed,
     setProfileSummary,
     setRuleSyncSummary,
+    setToolsStatus,
   );
   const { currentStepIndex, completedSteps } = useStepAdvance(
     steps,
@@ -893,6 +1047,8 @@ export function ProjectOnboardingPage({
       profileSummary={profileSummary}
       onConfirmProfile={() => setProfileConfirmed(true)}
       ruleSyncSummary={ruleSyncSummary}
+      toolsStatus={toolsStatus}
+      onRefreshTools={refreshTools}
       onClose={onClose}
       intelligentEnabled={intelligentEnabled}
     />

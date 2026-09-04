@@ -1764,6 +1764,22 @@
       "ruleSync": {
         "summary": "{{total}} rules effective from cloud, {{changed}} changed in this sync",
         "offline": "Cloud unreachable; synced with local rules instead"
+      },
+      "tools": {
+        "title": "Tool readiness check",
+        "sourceCloud": "Source: cloud",
+        "sourceLocal": "Source: local defaults",
+        "st": {
+          "project": "in project",
+          "path": "system",
+          "shared": "shared dir",
+          "missing": "missing"
+        },
+        "install": "Confirm & install {{count}} missing tools",
+        "installing": "Installing… (may take a few minutes)",
+        "installDone": "Installation complete",
+        "installFailed": "Installation failed, please retry later",
+        "allReady": "All {{count}} tools ready"
       }
     }
   },

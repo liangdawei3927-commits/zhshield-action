@@ -151,8 +151,15 @@ export class TenancyService implements OnModuleDestroy {
     currentVersions?: Record<string, string>,
   ): { rules: RuleScopeRow[]; changed: string[] } {
     const enabled = getEffectiveRuleScope(this.getDb(), orgId).filter((r) => r.enabled === 1);
+    // 差量判定：客户端上报值与 content_sha 一致 → 内容未变（免重发）；
+    // content_sha 缺失时退化为 version 比较；未上报 currentVersions → 全部视为变更（兼容旧客户端）。
     const changed = enabled
-      .filter((r) => !currentVersions || currentVersions[r.rule_id] !== r.version)
+      .filter((r) => {
+        const local = currentVersions?.[r.rule_id];
+        if (local === undefined) return true;
+        if (r.content_sha != null && local === r.content_sha) return false;
+        return local !== r.version;
+      })
       .map((r) => r.rule_id);
     return { rules: enabled, changed };
   }

@@ -98,6 +98,33 @@ describe('Tenancy (M3 Stage B)', () => {
     ).toEqual(['r1']);
   });
 
+  it('content_sha 差量：客户端上报内容哈希一致 → 免重发；不一致 → 进 changed', () => {
+    tenancy.publishRuleScope({
+      ruleId: 'r-sha',
+      orgId: null,
+      version: '1.0.0',
+      contentSha: 'aa66',
+    });
+
+    // 哈希一致：即使 version 字符串不同也视为内容未变（免重发）
+    expect(
+      resolveCtrl.resolveRules({ orgId: 'org-x', currentVersions: { 'r-sha': 'aa66' } }).changed,
+    ).toEqual([]);
+    // 哈希不一致：内容漂移 → 进 changed
+    expect(
+      resolveCtrl.resolveRules({ orgId: 'org-x', currentVersions: { 'r-sha': 'bb00' } }).changed,
+    ).toEqual(['r-sha']);
+    // content_sha 缺失的规则退化为 version 比较
+    // （changed 为全量生效规则的差量：r-sha 本轮未上报 → 仍进 changed，故用成员断言）
+    tenancy.publishRuleScope({ ruleId: 'r-nosha', orgId: null, version: '2.0.0' });
+    expect(
+      resolveCtrl.resolveRules({ orgId: 'org-x', currentVersions: { 'r-nosha': '2.0.0' } }).changed,
+    ).not.toContain('r-nosha');
+    expect(
+      resolveCtrl.resolveRules({ orgId: 'org-x', currentVersions: { 'r-nosha': '9.9.9' } }).changed,
+    ).toContain('r-nosha');
+  });
+
   it('resolve/tools：画像裁剪（security 恒含，语言相关按 language），缺省全量', () => {
     const tsFeature = { language: 'typescript' };
     const pyFeature = { language: 'python' };

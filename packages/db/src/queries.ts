@@ -489,18 +489,13 @@ export function listOrgsForUser(db: Database.Database, userId: string): OrgRow[]
 }
 
 /** 将既有项目挂到组织（组织内共享项目） */
-export function linkProjectToOrg(
-  db: Database.Database,
-  projectId: string,
-  orgId: string,
-): void {
+export function linkProjectToOrg(db: Database.Database, projectId: string, orgId: string): void {
   db.prepare('UPDATE projects SET org_id = ? WHERE id = ?').run(orgId, projectId);
 }
 
 export function getProjectOrgId(db: Database.Database, projectId: string): string | null {
   const row = db.prepare('SELECT org_id FROM projects WHERE id = ?').get(projectId) as
-    | { org_id: string | null }
-    | undefined;
+    { org_id: string | null } | undefined;
   return row?.org_id ?? null;
 }
 
@@ -533,10 +528,7 @@ export function upsertRuleScope(db: Database.Database, params: UpsertRuleScopePa
  * 读取某租户的**生效**规则 scope：平台默认（org_id NULL）为底，
  * 组织行覆盖同 rule_id 的平台行。只在租户自己的行 + 平台行内取，绝无跨租户。
  */
-export function getEffectiveRuleScope(
-  db: Database.Database,
-  orgId: string,
-): RuleScopeRow[] {
+export function getEffectiveRuleScope(db: Database.Database, orgId: string): RuleScopeRow[] {
   const rows = db
     .prepare('SELECT * FROM rule_scope WHERE org_id IS NULL OR org_id = ? ORDER BY rule_id')
     .all(orgId) as RuleScopeRow[];
@@ -578,7 +570,6 @@ export function getProjectFeatures(
   db: Database.Database,
   projectId: string,
 ): ProjectFeatureRow | undefined {
-  return db
-    .prepare('SELECT * FROM project_features WHERE project_id = ?')
-    .get(projectId) as ProjectFeatureRow | undefined;
+  return db.prepare('SELECT * FROM project_features WHERE project_id = ?').get(projectId) as
+    ProjectFeatureRow | undefined;
 }

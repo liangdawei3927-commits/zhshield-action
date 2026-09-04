@@ -34,9 +34,9 @@ function createTestDb(): Database.Database {
 describe('M3 轻量 Org 多租户（迁移 009）', () => {
   it('GIVEN 迁移 009 WHEN 建库 THEN 租户五件套表全部存在', () => {
     const db = createTestDb();
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-      .all() as { name: string }[];
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+      name: string;
+    }[];
     const names = tables.map((t) => t.name);
     expect(names).toContain('orgs');
     expect(names).toContain('org_members');
@@ -159,9 +159,8 @@ describe('M3 轻量 Org 多租户（迁移 009）', () => {
     const row = getProjectFeatures(db, 'proj_1');
     expect(row).toBeDefined();
     // upsert：仍只有一行，且取最新值
-    const count = (
-      db.prepare('SELECT COUNT(*) AS c FROM project_features').get() as { c: number }
-    ).c;
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM project_features').get() as { c: number })
+      .c;
     expect(count).toBe(1);
     expect(JSON.parse(row!.features_json)).toEqual(['typescript', 'NestJS', 'backend']);
   });

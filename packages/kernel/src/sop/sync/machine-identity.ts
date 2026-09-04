@@ -30,10 +30,7 @@ export interface CreateOrgResponse {
  * 服务器 POST /orgs 返回 { orgId }，orgId 由服务器生成（randomUUID），
  * 客户端必须使用服务器返回的值，而非本地臆造。
  */
-export type CreateOrgFn = (body: {
-  name: string;
-  ownerId: string;
-}) => Promise<CreateOrgResponse>;
+export type CreateOrgFn = (body: { name: string; ownerId: string }) => Promise<CreateOrgResponse>;
 
 // ─── 路径 ─────────────────────────────────────────────────────
 
@@ -92,9 +89,7 @@ export function readCachedDefaultOrgId(): string | null {
  * 不再使用"确定性推导 orgId"——那永远匹配不上服务器真实组织，
  * 会导致 T0 画像注册 assertMember 失败、T1 resolve 拿不到租户规则。
  */
-export async function getOrCreateDefaultOrg(
-  apiFn: CreateOrgFn,
-): Promise<DefaultOrgResult | null> {
+export async function getOrCreateDefaultOrg(apiFn: CreateOrgFn): Promise<DefaultOrgResult | null> {
   // 1. 优先复用已持久化的 orgId
   const cached = readCachedDefaultOrgId();
   if (cached) {

@@ -13,6 +13,9 @@ import { ToolRuleLoader } from './tool-rule-loader';
 
 const VALID_TOOLS = ['semgrep', 'trivy', 'eslint', 'dep-cruiser'] as const;
 
+/** 服务端可下发的工具全集（M3 resolve/tools 的裁剪输入域） */
+export const SERVER_TOOL_IDS: readonly string[] = VALID_TOOLS;
+
 type ToolName = (typeof VALID_TOOLS)[number];
 
 const VALID_TOOL_SET: ReadonlySet<string> = new Set<string>(VALID_TOOLS);

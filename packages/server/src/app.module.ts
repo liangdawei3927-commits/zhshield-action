@@ -10,6 +10,7 @@ import { ScoringModule } from './scoring/scoring.module';
 import { RefactorModule } from './refactor/refactor.module';
 import { PipelineModule } from './pipeline/pipeline.module';
 import { EvolveModule } from './evolve/evolve.module';
+import { TenancyModule } from './tenancy/tenancy.module';
 import { LocalOnlyGuard } from './auth/local-only.guard';
 
 @Module({
@@ -23,6 +24,7 @@ import { LocalOnlyGuard } from './auth/local-only.guard';
     RefactorModule,
     PipelineModule,
     EvolveModule,
+    TenancyModule,
   ],
   controllers: [HealthController],
   providers: [

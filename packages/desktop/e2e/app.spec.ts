@@ -93,11 +93,17 @@ async function launchApp(
   }
   const app = await electron.launch({
     executablePath: ELECTRON_BIN,
-    args: [`--user-data-dir=${userDataDir}`, MAIN_ENTRY],
+    // --lang 固定 Chromium locale：CI runner 系统语言是 en-US，不固定则界面渲染英文
+    args: [`--user-data-dir=${userDataDir}`, '--lang=zh-CN', MAIN_ENTRY],
     timeout: 60_000,
     env: { ...CLEAN_ENV, HOME: fakeHome },
   });
   const page = await app.firstWindow();
+  await page.waitForLoadState('domcontentloaded');
+  // 双保险：--lang 在 macOS 上对 navigator.language 不一定生效，
+  // 再写 localStorage（渲染进程语言链的最高优先级）后重载，保证界面语言确定为 zh-Hans
+  await page.evaluate(() => window.localStorage.setItem('zhshield.language', 'zh-Hans'));
+  await page.reload();
   await page.waitForLoadState('domcontentloaded');
   return { app, page };
 }

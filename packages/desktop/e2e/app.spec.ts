@@ -139,7 +139,7 @@ test.describe('智汇码盾桌面端 E2E', () => {
     for (const nav of ['项目体检', '门禁系统', '哨兵监控', '智能巡检', '安全中心', '技术债务', '代码重构']) {
       await expect(navBar(page).getByRole('button', { name: nav })).toBeVisible();
     }
-    await expect(page.getByText('demo')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'demo', exact: true })).toBeVisible();
     await expect(page.getByText('实时防护')).toBeVisible();
     // 切换到门禁系统页不崩溃，导航仍可用
     await navBar(page).getByRole('button', { name: '门禁系统' }).click();
@@ -167,7 +167,7 @@ test.describe('智汇码盾桌面端 E2E', () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     await page.getByTitle('展开侧边栏').click();
     await expect(page.getByText('引擎运行中')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'demo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'demo', exact: true })).toBeVisible();
 
     // 展开时右侧 aside 覆盖 TopNav 右上角按钮，点击遮罩（aside 外区域）收回
     await page.mouse.click(20, 100);

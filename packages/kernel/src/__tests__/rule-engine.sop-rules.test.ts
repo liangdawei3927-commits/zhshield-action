@@ -7,8 +7,8 @@ import { SopRuleEngine } from '../runner';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 import { SopLoader } from '../sop/_meta/sop-loader';
 
-/** 真实 SOP 规则目录 */
-const SOP_RULES_DIR = path.resolve(__dirname, '../sop');
+/** 真实 SOP 规则目录（C6 迁至 test-fixtures） */
+const SOP_RULES_DIR = path.resolve(__dirname, '../../test-fixtures/sop-content/rules');
 
 describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
   let registry: SopRegistry;

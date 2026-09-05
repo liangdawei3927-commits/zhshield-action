@@ -12,7 +12,7 @@ const TS_FILE_PATTERN = /\.tsx?$/;
 // 测试/夹具目录不参与产品代码质量检测：
 // 夹具是其他工具（如 dependency-cruiser、semgrep、本包测试）的解析样本，
 // 修改它们会破坏各自测试套件。SOP 规则源已迁移至 @zh/kernel 的
-// src/sop/presets/（sop-presets/sop-templates）与 src/sop/tool-packs/。
+// src/sop/presets/（sop-presets/sop-templates）与 test-fixtures/sop-content/。
 const EXCLUDED_DIRS = new Set([
   'node_modules',
   'dist',

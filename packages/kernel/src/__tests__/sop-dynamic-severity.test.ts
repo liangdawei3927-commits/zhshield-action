@@ -12,8 +12,8 @@ const DYN_THRESHOLD_RE = /dyn-threshold.*blockingThreshold/s;
 const DYN_ESCALATE_RE = /dyn-escalate.*escalateTo/s;
 const THRESHOLD_RE = /threshold/;
 
-/** 真实 SOP 规则目录（F1-5：全部存量 YAML 必须零错误加载） */
-const SOP_RULES_DIR = path.resolve(__dirname, '../sop');
+/** 真实 SOP 规则目录（F1-5：全部存量 YAML 必须零错误加载；C6 迁至 test-fixtures） */
+const SOP_RULES_DIR = path.resolve(__dirname, '../../test-fixtures/sop-content/rules');
 
 function makeRulesRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'sop-dynamic-severity-'));

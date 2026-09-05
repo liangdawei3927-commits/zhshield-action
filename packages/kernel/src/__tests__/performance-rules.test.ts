@@ -8,8 +8,11 @@ import { SopRegistry } from '../sop/_meta/sop-registry';
 import { SopLoader } from '../sop/_meta/sop-loader';
 import type { ToolScanOptions } from '@zh/shared';
 
+/** 性能规则 fixture 目录（C6 迁至 test-fixtures，语义与 src/sop 一致） */
+const FIXTURE_RULES_DIR = path.resolve(__dirname, '../../test-fixtures/sop-content/rules');
+
 /**
- * 性能检测规则包（packages/kernel/src/sop/inspect/scan/performance/）：
+ * 性能检测规则包（test-fixtures/sop-content/rules/inspect/scan/performance/）：
  * 验证两条规则从文件系统正确加载、解释为 tool-dispatch、且 toolConfig.config
  * 原样透传给对应工具适配器（ESLint 性能配置 / Semgrep ReDoS 规则文件）。
  */
@@ -20,7 +23,7 @@ describe('SOP 性能检测规则包', () => {
 
   beforeEach(() => {
     registry = new SopRegistry();
-    loader = new SopLoader(registry);
+    loader = new SopLoader(registry, { rulesDir: FIXTURE_RULES_DIR });
     tempDir = mkdtempSync(path.join(tmpdir(), 'perf-rule-test-'));
   });
 

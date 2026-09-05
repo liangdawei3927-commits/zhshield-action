@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 import { SopLoader } from '../sop/_meta/sop-loader';
 
-const SOP_RULES_DIR = path.resolve(__dirname, '../sop');
+const SOP_RULES_DIR = path.resolve(__dirname, '../../test-fixtures/sop-content/rules');
 
 describe('F2 injection SOP 模板注册（security/scan/injection/）', () => {
   it('经 SopLoader.loadFromFileSystem 目录自动发现注册为 security.scan.internal.* 规则', async () => {

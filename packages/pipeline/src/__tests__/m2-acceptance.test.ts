@@ -12,7 +12,7 @@ import { detectProjectProfile } from '../project-profile';
  *
  * 验证收敛后的唯一投影桥 toFeatureFromProfile 全链路：
  *   detectProjectProfile(fixture) → toFeatureFromProfile → kernel getRulesForProject
- * 使用 kernel 真实规则（src/sop/{guard,inspect,security}），断言对齐 M2 验收 1/2：
+ * 使用 kernel 规则 fixture（test-fixtures/sop-content/rules/{guard,inspect,security}），断言对齐 M2 验收 1/2：
  *  - 画像贯通：ProjectFeature 与规则 tags 正确匹配 → 命中非空
  *  - security 域恒含：按画像过滤后 security 规则全部保留
  * 纯逻辑验证（不调外部工具），可在常规 pnpm test 中快速运行。
@@ -36,8 +36,8 @@ function makeFixture(): string {
   return dir;
 }
 
-// kernel 真实规则目录（src，非 dist）：SopLoader 默认 rulesDir 即 __dirname/.. = src/sop
-const KERNEL_RULES_DIR = path.join(__dirname, '..', '..', '..', 'kernel', 'src', 'sop');
+// kernel 规则 fixture 目录（C6 迁至 test-fixtures，语义与 src/sop 一致）
+const KERNEL_RULES_DIR = path.join(__dirname, '..', '..', '..', 'kernel', 'test-fixtures', 'sop-content', 'rules');
 
 describe('M2 验收：画像驱动贯通（收敛桥）', () => {
   it('GIVEN NestJS+TS 项目 WHEN 收敛桥投影 THEN 产出 kernel 兼容 ProjectFeature', () => {

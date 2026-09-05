@@ -266,3 +266,159 @@ export interface SaveProjectFeaturesParams {
   features: string[];
   schemaVersion?: number;
 }
+
+// ─── 规则内容仓库（迁移 010，05-规则内容仓库与管理后台.md §二）──────
+
+/** rule_content — 规则本体表（一条规则 = 一行） */
+export interface RuleContentRow {
+  id: string;
+  rule_id: string;
+  domain: string;
+  action: string;
+  source: string;
+  name: string;
+  description: string | null;
+  severity: string;
+  status: string; // draft | trial | active | deprecated | disabled
+  execution_mode: string;
+  tags: string; // JSON 数组
+  applicable_engines: string; // JSON 数组
+  languages: string; // JSON 数组
+  frameworks: string; // JSON 数组
+  tool_id: string | null;
+  tool_version: string | null;
+  content: string; // SopRule 稳定子集的规范化序列化（H1）
+  content_sha: string; // computeRuleContentSha(SopRule)（H1）
+  version: string;
+  created_by: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+/** rule_content_version — 规则历史快照（发布/回滚） */
+export interface RuleContentVersionRow {
+  id: string;
+  rule_id: string;
+  version: string;
+  content_sha: string;
+  content: string;
+  status_at_release: string;
+  released_by: string | null;
+  released_at: string;
+  changes: string | null;
+}
+
+/** tool_package — 工具包注册表（当前生效版本） */
+export interface ToolPackageRow {
+  id: string;
+  tool_id: string;
+  version: string;
+  sha256: string;
+  files_json: string; // [{filename, content}]
+  languages: string; // JSON 数组
+  frameworks: string; // JSON 数组
+  status: string; // active | deprecated | disabled
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** tool_package_version — 工具包历史快照（发布/回滚） */
+export interface ToolPackageVersionRow {
+  id: string;
+  tool_id: string;
+  version: string;
+  sha256: string;
+  files_json: string;
+  languages: string;
+  frameworks: string;
+  released_by: string | null;
+  released_at: string;
+  changes: string | null;
+}
+
+/** content_audit_log — 内容操作审计（谁改了什么） */
+export interface ContentAuditLogRow {
+  id: string;
+  entity_type: 'rule' | 'tool';
+  entity_id: string;
+  action: string; // create | update | delete | publish | rollback | status_change
+  detail: string | null;
+  operator: string;
+  operated_at: string;
+}
+
+/** 创建/更新规则的入参（C4 /admin/rules） */
+export interface SaveRuleContentParams {
+  id: string;
+  ruleId: string;
+  domain: string;
+  action: string;
+  source?: string;
+  name: string;
+  description?: string | null;
+  severity: string;
+  status?: string;
+  executionMode?: string;
+  tags?: string[];
+  applicableEngines?: string[];
+  languages?: string[];
+  frameworks?: string[];
+  toolId?: string | null;
+  toolVersion?: string | null;
+  content: string;
+  contentSha: string;
+  version: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+}
+
+/** 保存规则历史快照的入参（publish 时写入） */
+export interface SaveRuleContentVersionParams {
+  id: string;
+  ruleId: string;
+  version: string;
+  contentSha: string;
+  content: string;
+  statusAtRelease: string;
+  releasedBy?: string | null;
+  changes?: string | null;
+}
+
+/** upsert 工具包当前行的入参 */
+export interface SaveToolPackageParams {
+  id: string;
+  toolId: string;
+  version: string;
+  sha256: string;
+  filesJson: string;
+  languages?: string[];
+  frameworks?: string[];
+  status?: string;
+  description?: string | null;
+  createdBy?: string | null;
+}
+
+/** 保存工具包历史快照的入参（publish 时写入） */
+export interface SaveToolPackageVersionParams {
+  id: string;
+  toolId: string;
+  version: string;
+  sha256: string;
+  filesJson: string;
+  languages?: string[];
+  frameworks?: string[];
+  releasedBy?: string | null;
+  changes?: string | null;
+}
+
+/** 写审计日志的入参 */
+export interface AppendAuditLogParams {
+  id: string;
+  entityType: ContentAuditLogRow['entity_type'];
+  entityId: string;
+  action: string;
+  detail?: string | null;
+  operator: string;
+}

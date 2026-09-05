@@ -164,4 +164,60 @@ describe('M3 轻量 Org 多租户（迁移 009）', () => {
     expect(count).toBe(1);
     expect(JSON.parse(row!.features_json)).toEqual(['typescript', 'NestJS', 'backend']);
   });
+
+  it('GIVEN 平台行二次 upsert WHEN 同 rule_id org_id NULL THEN 仅 1 行且取最新版本（SQLite NULL 互异回归）', () => {
+    const db = createTestDb();
+    upsertRuleScope(db, {
+      id: 'rs_dup_1',
+      ruleId: 'platform-dup',
+      orgId: null,
+      version: '1.0.0',
+      enabled: true,
+      contentSha: 'sha_v1',
+    });
+    upsertRuleScope(db, {
+      id: 'rs_dup_2',
+      ruleId: 'platform-dup',
+      orgId: null,
+      version: '1.0.1',
+      enabled: true,
+      contentSha: 'sha_v2',
+    });
+    const rows = db
+      .prepare('SELECT version, enabled FROM rule_scope WHERE rule_id = ?')
+      .all('platform-dup') as Array<{ version: string; enabled: number }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.version).toBe('1.0.1');
+    expect(rows[0]!.enabled).toBe(1);
+  });
+
+  it('GIVEN 平台行与组织行同 rule_id WHEN 各自 upsert THEN 2 行共存互不覆盖', () => {
+    const db = createTestDb();
+    createOrg(db, { id: 'org_a', name: 'A 组织', ownerUserId: 'user_a' });
+    upsertRuleScope(db, {
+      id: 'rs_p',
+      ruleId: 'coexist-rule',
+      orgId: null,
+      version: '1.0',
+      enabled: true,
+      contentSha: 'sha_platform',
+    });
+    upsertRuleScope(db, {
+      id: 'rs_o',
+      ruleId: 'coexist-rule',
+      orgId: 'org_a',
+      version: '2.0',
+      enabled: false,
+      contentSha: 'sha_org',
+    });
+    const rows = db
+      .prepare('SELECT org_id, version, enabled FROM rule_scope WHERE rule_id = ? ORDER BY org_id')
+      .all('coexist-rule') as Array<{ org_id: string | null; version: string; enabled: number }>;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.org_id).toBeNull();
+    expect(rows[0]!.version).toBe('1.0');
+    expect(rows[1]!.org_id).toBe('org_a');
+    expect(rows[1]!.version).toBe('2.0');
+    expect(rows[1]!.enabled).toBe(0);
+  });
 });

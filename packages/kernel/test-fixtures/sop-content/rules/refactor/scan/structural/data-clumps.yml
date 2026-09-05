@@ -1,0 +1,10 @@
+name: Data Clumps
+description: 检测重复出现的参数组合 — 建议封装为一个类
+severity: info
+executionMode: async
+status: active
+source: official
+tags: [refactor, structural, cohesion]
+applicableEngines: [refactor]
+thresholds:
+  minClumpFrequency: 3

@@ -1,0 +1,10 @@
+name: ESLint Error Blocking
+description: L1 门禁 — ESLint error 级阻断，阻止有 ESLint 错误的代码提交
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [eslint, linter, frontend]
+applicableEngines: [guard]
+presets:
+  - error-rules

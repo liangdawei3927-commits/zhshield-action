@@ -1,0 +1,11 @@
+name: Long Method Detection
+description: 检测过长的方法/函数 — 建议拆分为更小的函数
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, structural, maintainability]
+applicableEngines: [refactor]
+thresholds:
+  maxMethodLines: 30
+  maxFunctionLines: 30

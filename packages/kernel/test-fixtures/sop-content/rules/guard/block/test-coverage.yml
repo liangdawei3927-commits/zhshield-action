@@ -1,0 +1,11 @@
+name: Test Coverage Blocking
+description: L2 门禁 — 测试覆盖率低于 80% 阻断
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [test, coverage, quality]
+applicableEngines: [guard]
+threshold: 80
+unit: percent
+scope: diff

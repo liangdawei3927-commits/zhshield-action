@@ -1,0 +1,10 @@
+name: Inappropriate Intimacy
+description: 检测类暴露过多公共字段 — 破坏封装，与外部类耦合过深
+severity: error
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, encapsulation]
+applicableEngines: [refactor]
+thresholds:
+  maxPublicFields: 3

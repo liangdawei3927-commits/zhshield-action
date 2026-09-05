@@ -1,0 +1,14 @@
+name: False Positive Calibration
+description: 误报校准规则 — 误报率超过 10% 自动降级 active → trial
+severity: info
+executionMode: periodic
+status: active
+source: internal
+tags: [evolve, calibrate, false-positive]
+applicableEngines: [evolve]
+thresholds:
+  downgradeRate: 0.1     # 误报率 > 10% 降级
+  upgradeRate: 0.01      # 误报率 < 1% 升级
+  trialDays: 30          # trial 试用天数
+  deprecationDays: 90    # 90 天未使用 → deprecated
+checkInterval: 86400000  # 每天检查（毫秒）

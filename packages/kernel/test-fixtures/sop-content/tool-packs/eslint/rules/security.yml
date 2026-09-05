@@ -1,0 +1,49 @@
+# ESLint Security Rules - 智汇码盾 Tool Pack
+rules:
+  no-eval:
+    severity: error
+    message: "Avoid eval() - use Function constructor or alternatives"
+    
+  no-implied-eval:
+    severity: error
+    message: "Avoid implied eval - use Function constructor"
+    
+  no-new-func:
+    severity: error
+    message: "Avoid new Function - use arrow functions or named functions"
+    
+  no-script-url:
+    severity: error
+    message: "Avoid javascript: URLs - use event handlers"
+    
+  no-proto:
+    severity: error
+    message: "Avoid __proto__ - use Object.create() or Object.getPrototypeOf()"
+    
+  no-extend-native:
+    severity: error
+    message: "Do not extend native prototypes"
+    
+  no-caller:
+    severity: error
+    message: "Do not use arguments.caller or arguments.callee"
+    
+  no-eq-null:
+    severity: error
+    message: "Do not use == null - use === null or === undefined"
+    
+  no-shadow-restricted-names:
+    severity: error
+    message: "Do not shadow restricted names"
+    
+  no-use-before-define:
+    severity: warning
+    message: "Do not use variable before definition"
+    
+  no-unused-vars:
+    severity: warning
+    message: "Remove unused variables"
+    
+  no-undef:
+    severity: error
+    message: "Do not use undeclared variables"

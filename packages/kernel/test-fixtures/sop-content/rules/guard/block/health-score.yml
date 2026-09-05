@@ -1,0 +1,16 @@
+name: Health Score Blocking
+description: L3 门禁 — 健康评分低于 70 阻断
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [health, score, quality]
+applicableEngines: [guard]
+threshold: 70
+unit: score
+dimensions:
+  - code-quality
+  - security
+  - architecture
+  - testing
+  - performance

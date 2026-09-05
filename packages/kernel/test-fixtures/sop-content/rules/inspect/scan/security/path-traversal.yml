@@ -1,0 +1,21 @@
+name: Semgrep Path Traversal Check
+description: >-
+  检测 raw path.join / path.resolve 调用（含解构写法 join(...)/resolve(...)，可能来自
+  import { join } from 'path'），提示改用 @zh/shared 的 safeJoin / safeResolve 以防御
+  CWE-22 路径穿越。
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [semgrep, security, path-traversal, javascript, typescript]
+applicableEngines: [inspect]
+check:
+  tool: semgrep
+  toolConfig:
+    config: node_modules/@zh/kernel/dist/assets/semgrep/path-traversal.yml
+    category: security
+  conditions:
+    languages: [javascript, typescript]
+  judgment:
+    passCondition: 'issueCount === 0'
+    priority: medium

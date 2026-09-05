@@ -1,0 +1,20 @@
+name: TypeScript Type Safety
+description: 检查 TypeScript 类型安全性 — 禁止 as any、@ts-ignore
+severity: error
+executionMode: async
+status: active
+source: official
+tags: [typescript, safety, strict]
+applicableEngines: [inspect]
+fileExts: [.ts, .tsx]
+excludePatterns:
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - '**/__tests__/**'
+  - '**/dist*/**'
+  - '**/node_modules/**'
+forbidden:
+  - as any
+  - '@ts-ignore'
+  - '@ts-expect-error'
+  - any

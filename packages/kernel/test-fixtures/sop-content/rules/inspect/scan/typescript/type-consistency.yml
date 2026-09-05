@@ -1,0 +1,12 @@
+name: TypeScript Type Consistency
+description: 检查 TypeScript 类型一致性 — 避免隐式 any、类型断言滥用
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [typescript, type, consistency]
+applicableEngines: [inspect]
+checks:
+  - no-implicit-any
+  - no-type-assertion
+  - prefer-interface-over-type

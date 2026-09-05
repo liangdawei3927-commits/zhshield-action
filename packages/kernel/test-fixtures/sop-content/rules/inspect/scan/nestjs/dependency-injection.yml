@@ -1,0 +1,12 @@
+name: NestJS Dependency Injection
+description: 检查 NestJS DI 使用规范 — 确保依赖注入模式正确
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [nestjs, di, injection]
+applicableEngines: [inspect]
+checks:
+  - use-injectable-decorator
+  - no-new-in-service
+  - constructor-injection-only

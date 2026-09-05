@@ -1,0 +1,10 @@
+name: Lazy Class
+description: 检测过小的类 — 可能不值得作为独立类存在
+severity: info
+executionMode: async
+status: active
+source: official
+tags: [refactor, inheritance, simplification]
+applicableEngines: [refactor]
+thresholds:
+  minClassLines: 15

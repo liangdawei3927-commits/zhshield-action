@@ -1,0 +1,12 @@
+name: Trend Threshold Configuration
+description: 评分趋势判定阈值 — 判定 improving/stable/declining
+severity: info
+executionMode: sync
+status: active
+source: official
+tags: [evolve, score, trend]
+applicableEngines: [evolve, scoring]
+thresholds:
+  improving: 5     # 上升超过 5 分视为改善
+  declining: -5    # 下降超过 5 分视为恶化
+  windowDays: 30   # 趋势统计窗口

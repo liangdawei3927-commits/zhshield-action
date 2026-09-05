@@ -1,0 +1,19 @@
+name: Semgrep ReDoS Check
+description: 检测可导致正则表达式拒绝服务（ReDoS）的灾难性回溯模式 —
+  基于 Semgrep 官方 metavariable-analysis redos 分析器
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [semgrep, performance, regex, javascript, typescript]
+applicableEngines: [inspect]
+check:
+  tool: semgrep
+  toolConfig:
+    config: node_modules/@zh/kernel/dist/assets/semgrep/redos.yml
+    category: performance
+conditions:
+  languages: [javascript, typescript]
+judgment:
+  passCondition: 'issueCount === 0'
+  priority: medium

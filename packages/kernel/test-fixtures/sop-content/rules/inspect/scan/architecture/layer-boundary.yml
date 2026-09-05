@@ -1,0 +1,17 @@
+name: Layer Boundary Check
+description: 检查分层架构边界 — 确保各层职责清晰
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [architecture, layer, boundary]
+applicableEngines: [inspect]
+layers:
+  - name: presentation
+    allowedDependencies: [application]
+  - name: application
+    allowedDependencies: [domain]
+  - name: domain
+    allowedDependencies: []
+  - name: infrastructure
+    allowedDependencies: [domain]

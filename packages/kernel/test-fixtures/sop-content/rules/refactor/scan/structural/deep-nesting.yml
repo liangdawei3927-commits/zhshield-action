@@ -1,0 +1,10 @@
+name: Deep Nesting
+description: 检测嵌套过深的代码 — if/for/while/try 嵌套超过阈值
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, structural, readability]
+applicableEngines: [refactor]
+thresholds:
+  maxNestingDepth: 4

@@ -1,0 +1,144 @@
+# Semgrep Security Rules - 智汇码盾 Tool Pack
+rules:
+  - id: detect-sql-injection
+    pattern: |
+      $QUERY = "..." + $INPUT
+      $DB.query($QUERY)
+    message: "Potential SQL injection via string concatenation"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-89"
+      
+  - id: detect-xss-vulnerability
+    pattern: |
+      $EL.innerHTML = $USER_INPUT
+    message: "XSS vulnerability: use textContent or sanitize input"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-79"
+      
+  - id: detect-command-injection
+    pattern: |
+      child_process.exec($USER_INPUT)
+    message: "Command injection: avoid exec with user input"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-78"
+
+  - id: detect-path-traversal
+    pattern: |
+      fs.readFile($USER_INPUT, ...)
+    message: "Potential path traversal: validate file path"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-22"
+
+  - id: detect-prototype-pollution
+    pattern: |
+      $OBJ[$KEY] = $VALUE
+    message: "Potential prototype pollution: validate key"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-1321"
+
+  - id: detect-open-redirect
+    pattern: |
+      res.redirect($USER_INPUT)
+    message: "Open redirect: validate redirect URL"
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      cwe: "CWE-601"
+
+  # NestJS Security Rules
+  - id: nestjs-disable-auto-serialize
+    pattern: |
+      @Controller('...')
+    message: "NestJS: Enable class-validator for DTO validation"
+    severity: INFO
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-validate-input
+    pattern: |
+      @Body() $BODY: any
+    message: "NestJS: Use typed DTO instead of 'any' for request body"
+    severity: WARNING
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-sql-injection
+    pattern: |
+      $QUERY = "SELECT * FROM " + $TABLE
+    message: "NestJS: Use parameterized queries"
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  - id: nestjs-unsafe-eval
+    pattern: |
+      eval($CODE)
+    message: "NestJS: Avoid eval() in server code"
+    severity: ERROR
+    languages: [typescript]
+    metadata:
+      category: security
+      framework: nestjs
+
+  # Adversarial Injection Rules (F2 对抗性注入检测)
+  - id: suspicious-comment-instruction
+    pattern-regex: '(?i)(?:\/\/|#|\/\*|<!--)[^\n]*(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?|disregard\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|rules)|system\s+prompt|you\s+are\s+now\s+(?:a|an|the)\s+)'
+    message: "AI-prompt-style instruction embedded in comment (prompt injection)"
+    severity: WARNING
+    blockingThreshold: WARNING
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-74"
+
+  - id: dependency-script-injection
+    pattern-regex: '"[^"]+"\s*:\s*"[^"]*(?:\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b|\bbase64\s+(?:-d|-D|--decode)\b|\beval\b|\brm\s+-rf\b)[^"]*"'
+    message: "Suspicious shell command in package.json script (remote pipe/decode/eval/force-delete)"
+    severity: ERROR
+    blockingThreshold: ERROR
+    languages: [json]
+    metadata:
+      category: security
+      cwe: "CWE-78"
+
+  - id: env-file-exfiltration
+    pattern-regex: '(?i)(?:(?:fetch|axios)\s*\([^)]*(?:process\.env\.|\.env\b)|(?:curl|wget)\b[^;&|]*--data[^;&|]*@\.env)'
+    message: "Environment values sent to outbound request (.env exfiltration)"
+    severity: ERROR
+    blockingThreshold: ERROR
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-200"
+
+  - id: markdown-hidden-link
+    pattern-regex: '(?i)<a\s[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?:px)?\s*[;''"])[^>]*>|\[[^\]]*\]\([^)]*[\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}][^)]*\)'
+    message: "Hidden or misleading link in markdown (invisible anchor / zero-width link target)"
+    severity: WARNING
+    blockingThreshold: WARNING
+    languages: [generic]
+    metadata:
+      category: security
+      cwe: "CWE-451"

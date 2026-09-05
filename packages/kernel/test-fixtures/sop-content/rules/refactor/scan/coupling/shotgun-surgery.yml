@@ -1,0 +1,10 @@
+name: Shotgun Surgery
+description: 检测公共方法过多的类 — 修改一个功能可能需要改动多个方法
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, responsibility]
+applicableEngines: [refactor]
+thresholds:
+  maxPublicMethods: 10

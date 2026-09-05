@@ -1,0 +1,14 @@
+name: Dependency Script Injection Detection
+description: 检测 package.json scripts 中的可疑 shell（远程内容管道执行 / base64 解码 / eval / rm -rf）
+severity: critical
+blockingThreshold: critical
+executionMode: async
+status: active
+source: internal
+tags: [security, injection, supply-chain]
+applicableEngines: [security]
+checks:
+  - remote-content-piped-to-shell
+  - base64-decode-execution
+  - eval-usage
+  - force-delete

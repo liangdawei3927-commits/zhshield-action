@@ -1,0 +1,10 @@
+name: SonarWay Bug Blocking
+description: L1 门禁 — SonarWay 内置 bug 检测阻断（eslint-plugin-sonarjs，S 系高置信度规则），阻止含核心逻辑缺陷（恒真恒假/死代码/空指针/误用/危险模式）的代码提交
+severity: error
+executionMode: sync
+status: active
+source: official
+tags: [sonarway, sonarjs, linter, bug-detection, free-tier]
+applicableEngines: [guard]
+presets:
+  - sonarway-bug-rules

@@ -1,0 +1,11 @@
+name: Large Class Detection
+description: 检测过大的类 — 行数过多或方法过多，建议按职责拆分
+severity: error
+executionMode: async
+status: active
+source: official
+tags: [refactor, structural, design]
+applicableEngines: [refactor]
+thresholds:
+  maxClassLines: 300
+  maxClassMethods: 20

@@ -1,0 +1,10 @@
+name: Middle Man
+description: 检测大部分方法只是委托调用的类 — 可能是多余的中间层
+severity: info
+executionMode: async
+status: active
+source: official
+tags: [refactor, coupling, delegation]
+applicableEngines: [refactor]
+thresholds:
+  delegationRatio: 2.0

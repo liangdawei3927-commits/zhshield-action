@@ -1,0 +1,12 @@
+name: Markdown Hidden Link Detection
+description: 检测 Markdown 文档中的隐藏/误导链接（display:none 锚点、零宽字符链接目标）
+severity: medium
+blockingThreshold: medium
+executionMode: async
+status: active
+source: internal
+tags: [security, injection, hidden-link]
+applicableEngines: [security]
+checks:
+  - hidden-anchor-style
+  - zero-width-link-target

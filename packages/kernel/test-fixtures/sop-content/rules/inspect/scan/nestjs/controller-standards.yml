@@ -1,0 +1,13 @@
+name: NestJS Controller Standards
+description: 检查 NestJS Controller 编码标准
+severity: warning
+executionMode: async
+status: active
+source: official
+tags: [nestjs, controller, api]
+applicableEngines: [inspect]
+checks:
+  - use-validation-pipe
+  - use-http-codes
+  - use-swagger-decorators
+  - dto-validation

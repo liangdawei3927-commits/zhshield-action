@@ -29,13 +29,6 @@ export function BackupScheduleCard({ projectPath }: { projectPath: string }) {
   const { schedule, update, save, saving } = useBackupSchedule(projectPath);
   const enabled = schedule?.enabled === true;
 
-  const freqLabel = (f: BackupScheduleData['frequency']) =>
-    f === 'weekly'
-      ? t('page.backup.schedule.freqWeekly')
-      : f === 'monthly'
-        ? t('page.backup.schedule.freqMonthly')
-        : t('page.backup.schedule.freqDaily');
-
   return (
     <div className="mb-8 px-5 py-4 rounded-xl bg-white border border-black/5 shadow-sm">
       <div className="flex items-center gap-3">
@@ -141,14 +134,11 @@ export function BackupScheduleCard({ projectPath }: { projectPath: string }) {
         </div>
       )}
 
-      <p className="mt-2 text-xs text-zh-muted">
-        {enabled
-          ? t('page.backup.schedule.descOn', {
-              freq: freqLabel(schedule?.frequency ?? 'daily'),
-              time: schedule?.time ?? '',
-            })
-          : t('page.backup.schedule.descOff')}
-      </p>
+      {!enabled && (
+        <p className="mt-2 text-xs text-zh-muted">
+          {t('page.backup.schedule.descOff')}
+        </p>
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { RefactorModule } from './refactor/refactor.module';
 import { PipelineModule } from './pipeline/pipeline.module';
 import { EvolveModule } from './evolve/evolve.module';
 import { TenancyModule } from './tenancy/tenancy.module';
+import { AdminModule } from './admin/admin.module';
 import { LocalOnlyGuard } from './auth/local-only.guard';
 
 @Module({
@@ -25,6 +26,7 @@ import { LocalOnlyGuard } from './auth/local-only.guard';
     PipelineModule,
     EvolveModule,
     TenancyModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

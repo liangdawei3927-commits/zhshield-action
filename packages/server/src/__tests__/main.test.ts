@@ -14,6 +14,7 @@ vi.mock('@nestjs/core', () => ({
     })),
   },
   APP_GUARD: 'APP_GUARD',
+  Reflector: vi.fn(),
 }));
 
 vi.mock('./app.module', () => ({ AppModule: {} }));

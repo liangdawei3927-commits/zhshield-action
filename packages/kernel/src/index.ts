@@ -7,6 +7,7 @@ export type { LogLevel } from './log';
 export { FileHelper } from './file';
 export { PluginLoader } from './plugin';
 export type { Plugin } from './plugin';
+export { parseYamlText, stringifyYaml } from './yaml';
 
 // ─── SOP (智汇云脑 — 规则系统) ──────────────────────────────
 export * from './sop/index';

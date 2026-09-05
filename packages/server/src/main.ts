@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe, type INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { ADMIN_UI_PATHS } from './admin/admin-pages-paths';
 
 interface PackageMetadata {
   name: string;
@@ -52,7 +53,7 @@ async function bootstrap() {
 
 function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health', 'ready', 'live', 'metrics'],
+    exclude: ['health', 'ready', 'live', 'metrics', ...ADMIN_UI_PATHS],
   });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

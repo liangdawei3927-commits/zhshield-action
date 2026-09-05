@@ -17,6 +17,8 @@
  *   7. verifyRuleManifest + needsHeal      本地 vs 云端清单漂移检测（kernel 校验器）
  *      - 一致 → 不自愈；云端停用规则 → missing → 自愈触发；恢复后收敛
  *   8. 跨租户隔离                          org2 解析不到 org1 的规则
+ *   9. admin 管理后台发布平台规则          POST /admin/rules → publish → /resolve/rules 差量可见
+ *      （C5 Gate：编辑规则→发布→客户端同步生效，走真实管理接口而非 orgs 快照通道）
  */
 
 import { createRequire } from 'node:module';
@@ -31,6 +33,7 @@ const PORT = process.env.E2E_PORT ?? '3012';
 const API_BASE = `http://localhost:${PORT}/api/v1`;
 const DB_DIR = '/tmp/zh-e2e';
 const DB_PATH = join(DB_DIR, 'e2e.db');
+const ADMIN_TOKEN = process.env.E2E_ADMIN_TOKEN ?? 'e2e-admin-token';
 
 const kernelResolve = require_(join(ROOT, 'packages/kernel/dist/sop/sync/resolve-api.js'));
 const verifier = require_(join(ROOT, 'packages/kernel/dist/sop/cache/sop-resolve-verifier.js'));
@@ -82,6 +85,21 @@ async function orgsApi(method, path, body) {
   return res.json();
 }
 
+/** 调 admin 管理接口（ZH_ADMIN_TOKEN Bearer）——C5 真实管理后台链路 */
+async function adminApi(method, path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${ADMIN_TOKEN}`,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`${method} ${path} → HTTP ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 /** 构造本地 SopRule 最小样本（与 kernel 校验器入参对齐） */
 function makeLocalRule(id, content) {
   return {
@@ -114,7 +132,13 @@ async function main() {
     rmSync(DB_DIR, { recursive: true, force: true });
     serverProc = spawn(process.execPath, [join(ROOT, 'packages/server/dist/main.js')], {
       cwd: join(ROOT, 'packages/server'),
-      env: { ...process.env, PORT, ZH_SERVER_DB: DB_PATH, NODE_OPTIONS: '' },
+      env: {
+        ...process.env,
+        PORT,
+        ZH_SERVER_DB: DB_PATH,
+        ZH_ADMIN_TOKEN: ADMIN_TOKEN,
+        NODE_OPTIONS: '',
+      },
       stdio: 'ignore',
       detached: true,
     });
@@ -294,6 +318,56 @@ async function main() {
       org2Rules.rules.length === 0,
       JSON.stringify(org2Rules),
     );
+
+    console.log('\n── 9. C5 Gate: admin 管理后台发布平台规则 → 客户端差量可见 ──');
+    // 未带令牌 → 401（鉴权在真实链路上生效）
+    const noTokenRes = await fetch(`${API_BASE}/admin/rules`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    check('admin 无令牌 → HTTP 401', noTokenRes.status === 401, String(noTokenRes.status));
+
+    // 新建规则草稿（走管理接口）
+    const adminRuleId = 'e2e.admin.platform';
+    const created = await adminApi('POST', '/admin/rules', {
+      id: adminRuleId,
+      name: '平台侧 C5 E2E 规则',
+      domain: 'security',
+      action: 'scan',
+      source: 'official',
+      severity: 'high',
+      executionMode: 'async',
+      status: 'draft',
+      applicableEngines: ['security'],
+      content: { tool: 'semgrep', severity: 'high', rule: 'c5-e2e-admin' },
+      tags: ['e2e', 'admin'],
+    });
+    check('POST /admin/rules 创建草稿 → ruleId', created.ruleId === adminRuleId, JSON.stringify(created));
+
+    // 发布平台规则（P2-4 语义：rule_scope 平台行，全租户生效）
+    const published = await adminApi('POST', `/admin/rules/${adminRuleId}/publish`, {});
+    check('POST /admin/rules/:id/publish → ok', published.ok === true, JSON.stringify(published));
+
+    // resolve 差量（org1 客户端未上报该规则版本 → 全量变更含新规则）
+    const adminResolve = await kernelResolve.resolveRules(org.orgId, feature, undefined, API_BASE);
+    check(
+      '发布后 /resolve/rules 差量包含新平台规则',
+      adminResolve.rules.some((r) => r.ruleId === adminRuleId),
+      JSON.stringify(adminResolve.rules.map((r) => r.ruleId)),
+    );
+    check(
+      '新平台规则进 changed（客户端未上报 → 全量变更）',
+      adminResolve.changed.includes(adminRuleId),
+      JSON.stringify(adminResolve.changed),
+    );
+    // 审计留痕（读库验证 publish 审计存在）
+    const auditRes = await fetch(
+      `${API_BASE}/admin/rules/${adminRuleId}`,
+      {
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    check('GET /admin/rules/:id 可读已发布规则', auditRes.ok === true, String(auditRes.status));
 
     console.log(`\n════════ E2E 结果: ${passed} 通过 / ${failed} 失败 ════════`);
     process.exitCode = failed === 0 ? 0 : 1;

@@ -86,7 +86,7 @@ export {
   jscpdMapper,
 } from './output-mappers';
 export { DegradationManager } from './degradation-manager';
-export { isToolInScope, filterToolsByProfile } from './tool-scope';
+export { isToolInScope, filterToolsByProfile, SERVER_TOOL_IDS } from './tool-scope';
 export type { ScopeProfile } from './tool-scope';
 export { BUILTIN_FALLBACK_RULES } from './builtin-rules';
 export { AuditLogger } from './audit-logger';

@@ -11,6 +11,7 @@ import {
 } from '@zh/kernel';
 import type { SopRule, SopVersion, SopDiff, SopRuleFilter, SignedSopPackage } from '@zh/kernel';
 import { SopDiffCalculator } from './sop-diff-calculator';
+import { SopContentRepository } from './sop-content.repository';
 
 /**
  * SopService — 智汇云脑 SOP 规则服务
@@ -35,7 +36,7 @@ export class SopService {
   /** Ed25519 公钥（PEM SPKI），由私钥派生；未配置为 null */
   private readonly publicKeyPem: string | null;
 
-  constructor() {
+  constructor(private readonly contentRepo: SopContentRepository) {
     const eventBus = new EventBus();
     this.registry = new SopRegistry(eventBus);
     this.loader = new SopLoader(this.registry);
@@ -72,7 +73,23 @@ export class SopService {
       );
     }
 
-    // 从文件系统加载内置规则
+    await this.loadRules();
+  }
+
+  /** 从内容仓库读库加载规则；DB 不可用/空库 → 降级内置 YAML 文件系统 */
+  private async loadRules(): Promise<void> {
+    // C3：优先从内容仓库（rule_content）读库；DB 不可用/空库 → 降级内置 YAML 文件系统
+    const rules = this.contentRepo.getAllRules();
+    if (rules && rules.length > 0) {
+      this.registry.loadAll(rules);
+      this.logger.log(`Loaded ${rules.length} SOP rules from content repository`);
+      return;
+    }
+    const source = rules === null ? 'unavailable' : 'empty';
+    this.logger.warn(
+      `Content repository ${source}, falling back to built-in filesystem rules`,
+    );
+
     try {
       const loaded = await this.loader.loadFromFileSystem();
       this.logger.log(`Loaded ${loaded} built-in SOP rules`);
@@ -81,6 +98,17 @@ export class SopService {
         `Failed to load built-in SOP rules: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /** C4 管理写路径完成后调用：从内容仓库重新加载规则到 registry（读路径立即生效，不降级文件系统） */
+  async reloadFromRepository(): Promise<void> {
+    const rules = this.contentRepo.getAllRules();
+    if (rules === null) {
+      this.logger.warn('Content repository unavailable, keeping current registry');
+      return;
+    }
+    this.registry.loadAll(rules);
+    this.logger.log(`Reloaded ${rules.length} SOP rules from content repository`);
   }
 
   // ─── 版本 ──────────────────────────────────────────────────

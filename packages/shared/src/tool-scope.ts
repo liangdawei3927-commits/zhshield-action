@@ -17,6 +17,9 @@ export interface ScopeProfile {
   features?: string[];
 }
 
+/** 服务端可下发的工具全集（M3 resolve/tools 的裁剪输入域） */
+export const SERVER_TOOL_IDS = ['semgrep', 'trivy', 'eslint', 'dep-cruiser'] as const;
+
 /**
  * 工具→画像条件映射。undefined / 命中返回 true（启用），未命中返回 false（裁剪）。
  *

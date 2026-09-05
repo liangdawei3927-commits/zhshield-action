@@ -5,16 +5,17 @@ import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { hashToolRuleFiles } from '@zh/kernel';
 import { ToolRuleController } from '../sop/tool-rule.controller';
+import { ToolRuleStore } from '../sop/tool-rule-store';
 import { ToolRuleLoader } from '../sop/tool-rule-loader';
 
 const RULE_FILE_EXT_RE = /\.(yaml|yml|json|toml)$/;
 
 // packages/server/src/__tests__ → 仓库根
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
-const REAL_PACKS_DIR = join(REPO_ROOT, 'packages', 'kernel', 'src', 'sop', 'tool-packs');
+const REAL_PACKS_DIR = join(REPO_ROOT, 'packages', 'kernel', 'test-fixtures', 'sop-content', 'tool-packs');
 
 function makeController(packsDir: string = REAL_PACKS_DIR): ToolRuleController {
-  return new ToolRuleController(new ToolRuleLoader(packsDir));
+  return new ToolRuleController(new ToolRuleStore(new ToolRuleLoader(packsDir)));
 }
 
 describe('ToolRuleController', () => {
@@ -34,7 +35,7 @@ describe('ToolRuleController', () => {
 
   describe('规则包来源 — 三层架构（tool-packs YAML → ToolRuleLoader → controller）', () => {
     it('default ToolRuleLoader resolves the real kernel tool-packs directory', () => {
-      const files = new ToolRuleLoader().loadToolRuleFiles('semgrep');
+      const files = new ToolRuleLoader(REAL_PACKS_DIR).loadToolRuleFiles('semgrep');
       expect(files.length).toBeGreaterThan(0);
     });
 

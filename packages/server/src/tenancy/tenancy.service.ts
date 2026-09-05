@@ -10,6 +10,7 @@ import {
   getProjectFeatures,
   getProjectOrgId,
   linkProjectToOrg,
+  listToolPackages,
   saveProjectFeatures,
   upsertRuleScope,
 } from '@zh/db';
@@ -164,8 +165,24 @@ export class TenancyService implements OnModuleDestroy {
     return { rules: enabled, changed };
   }
 
-  /** 本项目应下发的工具清单：isToolInScope 画像裁剪（security 恒含，缺省全量） */
-  resolveTools(toolIds: readonly string[], feature: ScopeProfileLike | undefined): string[] {
+  /** 本项目应下发的工具清单：tool_package 表（active）→ isToolInScope 画像裁剪；空表/不可用回退静态全集 */
+  resolveTools(staticToolIds: readonly string[], feature: ScopeProfileLike | undefined): string[] {
+    const fromDb = this.readEnabledToolPackages();
+    const toolIds = fromDb && fromDb.length > 0 ? fromDb : staticToolIds;
     return toolIds.filter((toolId) => isToolInScope(toolId, feature));
+  }
+
+  /** 读 tool_package 全部非禁用工具 id；DB 不可用返回 null */
+  private readEnabledToolPackages(): string[] | null {
+    try {
+      return listToolPackages(this.getDb())
+        .filter((r) => r.status !== 'disabled')
+        .map((r) => r.tool_id);
+    } catch (err) {
+      this.logger.warn(
+        `tool_package 读取失败，降级静态工具全集: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
   }
 }

@@ -322,6 +322,7 @@ export interface ToolPackageRow {
   description: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 /** tool_package_version — 工具包历史快照（发布/回滚） */

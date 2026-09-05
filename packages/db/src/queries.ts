@@ -767,8 +767,8 @@ export function saveToolPackage(db: Database.Database, params: SaveToolPackagePa
   db.prepare(
     `INSERT INTO tool_package (
        id, tool_id, version, sha256, files_json, languages, frameworks,
-       status, description, created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       status, description, created_by, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(tool_id)
      DO UPDATE SET version = excluded.version,
                    sha256 = excluded.sha256,

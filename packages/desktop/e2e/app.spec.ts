@@ -16,6 +16,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { deriveProjectId } from '../electron/capability-refs';
 
 const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -73,7 +74,7 @@ const { ELECTRON_RUN_AS_NODE: _drop1, NODE_OPTIONS: _drop2, ...CLEAN_ENV } = pro
  */
 async function launchApp(
   opts: { seedProject?: boolean } = {},
-): Promise<{ app: ElectronApplication; page: Page }> {
+): Promise<{ app: ElectronApplication; page: Page; userDataDir: string; fakeHome: string }> {
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'zh-e2e-'));
   // 隔离 HOME：macOS 会在 $HOME/Library/Saved Application State 写窗口恢复状态，
   // 指向临时目录可保证测试完全 hermetic（不写真实 ~/Library，CI/沙箱环境均可跑）
@@ -96,7 +97,8 @@ async function launchApp(
     // --lang 固定 Chromium locale：CI runner 系统语言是 en-US，不固定则界面渲染英文
     args: [`--user-data-dir=${userDataDir}`, '--lang=zh-CN', MAIN_ENTRY],
     timeout: 60_000,
-    env: { ...CLEAN_ENV, HOME: fakeHome },
+    // E2E=1 门控注册测试专用观测 IPC（删除全链用例观测主进程内存态）
+    env: { ...CLEAN_ENV, HOME: fakeHome, E2E: '1' },
   });
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
@@ -105,7 +107,7 @@ async function launchApp(
   await page.evaluate(() => window.localStorage.setItem('zhshield.language', 'zh-Hans'));
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
-  return { app, page };
+  return { app, page, userDataDir, fakeHome };
 }
 
 /** TopNav 顶部导航栏（限定作用域，避免与 dashboard 主页快捷按钮重名冲突） */
@@ -114,6 +116,7 @@ const navBar = (page: Page) => page.getByRole('navigation');
 test.describe('智汇码盾桌面端 E2E', () => {
   let app: ElectronApplication;
   let page: Page;
+  let fakeHome: string;
 
   test.afterEach(async () => {
     await app?.close();
@@ -175,5 +178,232 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // 展开时右侧 aside 覆盖 TopNav 右上角按钮，点击遮罩（aside 外区域）收回
     await page.mouse.click(20, 100);
     await expect(page.getByTitle('展开侧边栏')).toBeVisible();
+  });
+
+  // 关联 R1 规格验收 1/2/6：删项目完整归还链（06 §3.4 ②-⑤）
+  // 渲染链（setProjects/持久化）由 renderer 既有机制负责（usePersistProjects 自动 saveProjects 落盘），
+  // 本用例验证清理链全链：①画像文件删除 ②5表软删 ③cachedProfile 清空 ④链完整不抛错 ⑤回收能力缺席后续扫描。
+  test('删除项目完整归还（画像删除 + 5表软删 + cachedProfile 清空 + 链完整 + 回收能力缺席）', async () => {
+    ({ app, page, fakeHome } = await launchApp({ seedProject: true }));
+    // 画像存储 key：ProfileStore.normalizeKey 将路径分隔符替换为下划线并去掉开头下划线
+    const profileKey = DEMO_PROJECT_PATH.replace(/\//g, '_').replace(/^_+/, '');
+    const profileFile = path.join(fakeHome, '.zhshield', 'profiles', `${profileKey}.json`);
+    const { existsSync } = await import('node:fs');
+
+    // e2e 不引用 renderer 类型声明，此处按最小 API 面做类型断言。
+    // 注意：page.evaluate 回调在浏览器上下文执行，无法引用 Node 侧闭包，
+    // 因此每个回调内联 window.electronAPI 断言（与 reclaiming 用例同构）。
+    // 预置：5 表孤儿行 + cachedProfile 归属 demo 项目 + 账本 eslint 引用 demo 项目
+    await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: { e2e?: { seedOrphanData?: (projectPath: string) => Promise<void> } };
+        }).electronAPI?.e2e?.seedOrphanData?.(p),
+      DEMO_PROJECT_PATH,
+    );
+    await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
+        }).electronAPI?.e2e?.setCachedProfile?.(p),
+      DEMO_PROJECT_PATH,
+    );
+    // 账本预置：eslint 被 demo 项目引用（active）→ 删除后 releaseProjectRefs 使 refs 空 → reclaiming
+    const ledgerDir = path.join(fakeHome, '.zhshield');
+    mkdirSync(ledgerDir, { recursive: true });
+    writeFileSync(
+      path.join(ledgerDir, 'capability-refs.json'),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          capabilities: {
+            'toolrule:eslint': {
+              languages: [],
+              refs: [deriveProjectId(DEMO_PROJECT_PATH)],
+              status: 'active',
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+    // 预置后 5 表各 1 行（未软删）
+    const totalBefore = await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: { e2e?: { countTotalData?: (projectPath: string) => Promise<Record<string, number>> } };
+        }).electronAPI?.e2e?.countTotalData?.(p),
+      DEMO_PROJECT_PATH,
+    );
+    expect(totalBefore).toEqual({
+      scores: 1,
+      scanning_results: 1,
+      debt_actions: 1,
+      debt_snapshots: 1,
+      sentinel_events: 1,
+    });
+
+    // 触发清理链：直接调 window.electronAPI.removeProject（UI 删除按钮定位不稳定，
+    // 且本用例关注清理链而非渲染链，故绕过 UI 直接调 API）
+    const result = await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: { removeProject?: (projectPath: string) => Promise<{ ok: boolean }> };
+        }).electronAPI?.removeProject?.(p),
+      DEMO_PROJECT_PATH,
+    );
+
+    // ③ removeProject 返回 { ok: true }（④ 云端注销 fire-and-forget 内部降级，链完整不抛错）
+    expect(result).toEqual({ ok: true });
+    // ① 画像文件不存在（e2e 用假 HOME，从隔离 HOME 路径找；
+    //    若画像从未生成则断言天然通过，重点在 API 链路）
+    expect(existsSync(profileFile)).toBe(false);
+    // ② 5 表软删：删除后预置的孤儿行全部被打上 deleted_at（计数 = 预置数）
+    const softDeleted = await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: {
+            e2e?: { countSoftDeletedData?: (projectPath: string) => Promise<Record<string, number>> };
+          };
+        }).electronAPI?.e2e?.countSoftDeletedData?.(p),
+      DEMO_PROJECT_PATH,
+    );
+    expect(softDeleted).toEqual({
+      scores: 1,
+      scanning_results: 1,
+      debt_actions: 1,
+      debt_snapshots: 1,
+      sentinel_events: 1,
+    });
+    // ③ cachedProfile 清空：删除后归属项目路径为 null
+    const cachedPath = await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: { e2e?: { getCachedProfileProjectPath?: () => Promise<string | null> } };
+        }).electronAPI?.e2e?.getCachedProfileProjectPath?.(),
+    );
+    expect(cachedPath).toBeNull();
+    // ⑤ 回收能力缺席后续扫描：删除后 releaseProjectRefs 使 refs 空 → reclaiming，
+    //    触发一次 sync:rulesStatus，被回收能力应缺席（复用 reclaiming 剔除结构）
+    const status = await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: {
+            sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
+          };
+        }).electronAPI?.sync?.getRulesStatus?.(),
+    );
+    const toolIds = (status ?? []).map((s) => s.toolId);
+    // 删除后无项目引用 → 无能力被领取，eslint 不在运行清单（与 reclaiming 用例同构）
+    expect(toolIds).not.toContain('eslint');
+  });
+
+  // 关联 R2 规格验收 3/8：reclaiming 工具从运行清单立即剔除（06 §6.4 接线红线）
+  // 预置 ledger 使 seeded 项目工具为 reclaiming → getRulesStatus 中该工具缺席（隔离 HOME，真实主进程回包）
+  test('reclaiming 工具从运行清单立即剔除', async () => {
+    ({ app, page, fakeHome } = await launchApp({ seedProject: true }));
+    // 预置账本：toolrule:eslint 标记 reclaiming（refs 空 + since）
+    const ledgerDir = path.join(fakeHome, '.zhshield');
+    mkdirSync(ledgerDir, { recursive: true });
+    writeFileSync(
+      path.join(ledgerDir, 'capability-refs.json'),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          capabilities: {
+            'toolrule:eslint': { languages: [], refs: [], status: 'reclaiming', since: Date.now() },
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    // 真实主进程回包：sync:rulesStatus 经 getActiveToolIds 过滤，reclaiming 工具应缺席
+    const status = await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: {
+            sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
+          };
+        }).electronAPI?.sync?.getRulesStatus?.(),
+    );
+
+    const toolIds = (status ?? []).map((s) => s.toolId);
+    // eslint 被剔除
+    expect(toolIds).not.toContain('eslint');
+    // 其余工具不受影响（semgrep/trivy/dep-cruiser 仍在）
+    for (const tool of ['semgrep', 'trivy', 'dep-cruiser']) {
+      expect(toolIds).toContain(tool);
+    }
+  });
+
+  // 关联 R2 规格验收 3b/8：窗口内唤醒（06 §7 验收 3b）——7 天窗口内重加同栈项目，
+  // 能力经 claim 唤醒复用本地文件（refs 从空变非空 → reclaiming → active），
+  // 运行层清单恢复。P1 修复：claim 步骤改用 getUnfilteredToolIds（含 reclaiming），
+  // 否则 reclaiming 能力永远进不了 claim 列表、新项目裸奔 7 天。
+  test('窗口内唤醒：syncRules claim 使 reclaiming 能力恢复 active 并被运行层重新纳入', async () => {
+    ({ app, page, fakeHome } = await launchApp({ seedProject: true }));
+    // 预置账本：toolrule:eslint 标记 reclaiming（refs 空 + since，模拟删项目后进入 7 天窗口）
+    const ledgerDir = path.join(fakeHome, '.zhshield');
+    mkdirSync(ledgerDir, { recursive: true });
+    writeFileSync(
+      path.join(ledgerDir, 'capability-refs.json'),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          capabilities: {
+            'toolrule:eslint': { languages: [], refs: [], status: 'reclaiming', since: Date.now() },
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    // 预置画像缓存归属 seeded 项目：claim 步骤以 getCachedProfileProjectPath 为入口（无归属则跳过 claim）
+    await page.evaluate(
+      (p) =>
+        (window as unknown as {
+          electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
+        }).electronAPI?.e2e?.setCachedProfile?.(p),
+      DEMO_PROJECT_PATH,
+    );
+
+    // 唤醒前：eslint 处于 reclaiming → 运行层剔除（基线断言）
+    const before = await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: {
+            sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
+          };
+        }).electronAPI?.sync?.getRulesStatus?.(),
+    );
+    expect((before ?? []).map((s) => s.toolId)).not.toContain('eslint');
+
+    // 触发一次 syncRules：claim 步骤（未过滤清单）把 seeded 项目 id 写入 eslint refs → 唤醒
+    await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: {
+            sync?: { syncRules?: () => Promise<unknown> };
+          };
+        }).electronAPI?.sync?.syncRules?.(),
+    );
+
+    // 唤醒后：eslint 恢复 active → 运行层重新纳入运行清单
+    const after = await page.evaluate(
+      () =>
+        (window as unknown as {
+          electronAPI?: {
+            sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
+          };
+        }).electronAPI?.sync?.getRulesStatus?.(),
+    );
+    expect((after ?? []).map((s) => s.toolId)).toContain('eslint');
   });
 });

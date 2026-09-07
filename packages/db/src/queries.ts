@@ -65,6 +65,42 @@ export function deleteProject(db: Database.Database, id: string): void {
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
 }
 
+// ─── 项目数据清理(R1:删项目完整归还,软删标记)───
+
+/** 随项目删除而软删的数据表（不含 experiences，见下） */
+const PROJECT_DATA_TABLES = [
+  'scores',
+  'scanning_results',
+  'debt_actions',
+  'debt_snapshots',
+  'sentinel_events',
+] as const;
+
+/**
+ * 对某项目的关联数据打软删标记（deleted_at = now）。
+ * 先 getProjectByPath 反查；desktop 从不写 projects 表（见 008 注释），
+ * 无行则直接按 project_id = projectPath 清理（与桌面写入键控对齐）；
+ * 有行 → 对该 project.id，按固定表顺序
+ * 对 5 张表执行 UPDATE <表> SET deleted_at = ? WHERE project_id = ? AND deleted_at IS NULL。
+ * 注意：experiences 是全局校准样本库，不随项目删除（06 §2.4），不在此列。
+ */
+export function softDeleteProjectData(db: Database.Database, projectPath: string): void {
+  // 桌面路径:从不写 projects 表(008),写入键控 project_id = projectPath → 直接按 path 清理
+  // 服务端路径:有 projects 行,按 id 清理(行为不变)
+  const project = getProjectByPath(db, projectPath);
+  const key = project ? project.id : projectPath;
+  const now = new Date().toISOString();
+  // 提取 prepared statement 循环外复用（perf-batch-db-write：循环内 prepare 属单行写入低效模式）
+  const stmts = PROJECT_DATA_TABLES.map((table) =>
+    db.prepare(
+      `UPDATE ${table} SET deleted_at = ? WHERE project_id = ? AND deleted_at IS NULL`,
+    ),
+  );
+  for (const stmt of stmts) {
+    stmt.run(now, key);
+  }
+}
+
 // ─── Scores ───────────────────────────────────────────────
 
 export function saveScore(db: Database.Database, params: SaveScoreParams): void {
@@ -594,6 +630,11 @@ export function getProjectFeatures(
 ): ProjectFeatureRow | undefined {
   return db.prepare('SELECT * FROM project_features WHERE project_id = ?').get(projectId) as
     ProjectFeatureRow | undefined;
+}
+
+/** 删除某项目的画像快照行（T0 注销，与 saveProjectFeatures 对称） */
+export function deleteProjectFeatures(db: Database.Database, projectId: string): void {
+  db.prepare('DELETE FROM project_features WHERE project_id = ?').run(projectId);
 }
 
 // ─── 规则内容仓库（迁移 010：rule_content / tool_package / *_version / content_audit_log）───

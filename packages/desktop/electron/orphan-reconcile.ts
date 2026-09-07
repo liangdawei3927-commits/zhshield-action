@@ -21,12 +21,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import {
   softDeleteProjectData,
   listActiveProjectIds,
+  listSoftDeletedProjectIds,
   countActiveRows,
   purgeExpiredSoftDeleted,
 } from '@zh/db';
 import { AuditLogger } from '@zh/shared';
-import { getDb } from './ipc-context';
+import { getDb, sopCache, wisdomBrainSync } from './ipc-context';
 import { PROJECTS_FILE } from './ipc/projects';
+import { saveCapabilityRefs, loadCapabilityRefs } from './capability-refs';
 
 // ─── 常量 ───
 
@@ -38,6 +40,12 @@ const STATE_FILE = path.join(os.homedir(), '.zhshield', 'orphan-state.json');
 const UPGRADE_DAYS = 30;
 /** TTL 物理清除阈值（天） */
 const TTL_DAYS = 180;
+/** 空项目集全局重置宽限期（天）：删除全部项目后进入宽限，超期则彻底清除本地残留 */
+const EMPTY_GRACE_DAYS = 7;
+/** 空项目集宽限期毫秒数 */
+const EMPTY_GRACE_MS = EMPTY_GRACE_DAYS * 24 * 60 * 60 * 1000;
+/** state 中空项目集宽限起点的保留键（与 projectId 索引键区分） */
+const EMPTY_SINCE_KEY = '__orphan_empty_since__';
 
 // 画像 key 归一正则（与 fingerprint profile-store.ts 等价，不修改该包）
 const NON_KEY_CHARS_RE = /[^a-zA-Z0-9_-]/g;
@@ -77,10 +85,29 @@ export interface OrphanReconcileReport {
   }>;
   orphanProfilesTrashed: string[];
   purged: { table: string; deleted: number }[];
+  /** 空项目集全局重置结果（宽限未到期 / 无残留 → undefined） */
+  cleanReset?: CleanResetReport;
 }
 
 interface OrphanState {
-  [projectId: string]: { firstSeenAt: string };
+  /** 疑似孤儿项目 → 首次发现时刻（升级阈值起算）；保留键 __orphan_empty_since__ 存空项目集宽限起点（epoch ms） */
+  [projectId: string]: { firstSeenAt: string } | number | undefined;
+}
+
+/** 空项目集全局重置结果（宽限期到期后彻底清除本地残留的明细） */
+export interface CleanResetReport {
+  /** 宽限起点（epoch ms） */
+  emptySince: number;
+  /** 画像 trash 是否被清除 */
+  profilesTrashCleared: boolean;
+  /** SOP 规则缓存是否被清空 */
+  sopCacheCleared: boolean;
+  /** 被物理删除的工具规则 id 列表 */
+  removedTools: string[];
+  /** 能力引用账本是否被清空 */
+  capabilityRefsCleared: boolean;
+  /** DB 各表强清的软删行数 */
+  purged: { table: string; deleted: number }[];
 }
 
 // ─── 画像 key 归一（等价于 fingerprint normalizeKey） ───
@@ -185,6 +212,143 @@ async function handleConfirmedOrphan(
   confirmedOrphans.push({ projectId, reason, activeRowCounts, profilesTrashed });
 }
 
+// ─── 空项目集宽限 + 全局重置 ───
+
+/** 本地是否存在待清理残留（画像 trash / DB 软删行 / 工具规则 / 能力账本） */
+async function hasLocalResiduals(db: ReturnType<typeof getDb>): Promise<boolean> {
+  try {
+    const trashDir = path.join(PROFILES_DIR, 'trash');
+    const entries = await fs.promises.readdir(trashDir);
+    if (entries.length > 0) return true;
+  } catch {
+    // trash 不存在 → 无画像残留
+  }
+  try {
+    const refs = await loadCapabilityRefs();
+    if (Object.keys(refs.capabilities).length > 0) return true;
+  } catch {
+    // 账本不可读 → 视为无残留
+  }
+  try {
+    if (listSoftDeletedProjectIds(db).length > 0) return true;
+  } catch {
+    // DB 不可查 → 视为无残留
+  }
+  try {
+    const toolIds = wisdomBrainSync.getRuleSync().getUnfilteredToolIds();
+    for (const toolId of toolIds) {
+      try {
+        await fs.promises.stat(wisdomBrainSync.getRuleSync().getRuleDir(toolId));
+        return true;
+      } catch {
+        // 该工具无规则目录 → 继续
+      }
+    }
+  } catch {
+    // 工具同步未初始化 → 视为无残留
+  }
+  return false;
+}
+
+/** 全局重置：彻底清除全部本地残留（画像 trash / SOP 缓存 / 工具规则 / 能力账本 / DB 软删行） */
+async function resetToCleanState(
+  db: ReturnType<typeof getDb>,
+  emptySince: number,
+): Promise<CleanResetReport> {
+  const purgedEntries: { table: string; deleted: number }[] = [];
+  const removedTools: string[] = [];
+  let profilesTrashCleared = false;
+  let sopCacheCleared = false;
+  let capabilityRefsCleared = false;
+
+  try {
+    const trashDir = path.join(PROFILES_DIR, 'trash');
+    await fs.promises.rm(trashDir, { recursive: true, force: true });
+    profilesTrashCleared = true;
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：清理画像 trash 失败:', err);
+  }
+
+  try {
+    await sopCache.clearCache();
+    sopCacheCleared = true;
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：清空 SOP 缓存失败:', err);
+  }
+
+  try {
+    const toolIds = wisdomBrainSync.getRuleSync().getUnfilteredToolIds();
+    for (const toolId of toolIds) {
+      try {
+        await wisdomBrainSync.getRuleSync().removeRules(toolId);
+        removedTools.push(toolId);
+      } catch (err) {
+        warn(`[orphan-reconcile] 全局重置：删除工具规则 ${toolId} 失败:`, err);
+      }
+    }
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：工具规则清除失败:', err);
+  }
+
+  try {
+    await saveCapabilityRefs({ schemaVersion: 1, capabilities: {} });
+    capabilityRefsCleared = true;
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：清空能力账本失败:', err);
+  }
+
+  try {
+    purgedEntries.push(...purgeExpiredSoftDeleted(db, 0));
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：DB 软删行强清失败:', err);
+  }
+
+  await auditLog
+    .logOrphanCleanup({
+      action: 'clean_reset',
+      emptySince,
+      profilesTrashCleared,
+      sopCacheCleared,
+      removedTools,
+      capabilityRefsCleared,
+      purged: purgedEntries,
+    })
+    .catch(() => {});
+
+  return {
+    emptySince,
+    profilesTrashCleared,
+    sopCacheCleared,
+    removedTools,
+    capabilityRefsCleared,
+    purged: purgedEntries,
+  };
+}
+
+/** 空项目集宽限逻辑：空集开始记录 → 7 天到期执行全局重置（项目重加则取消宽限） */
+async function handleEmptyGrace(
+  db: ReturnType<typeof getDb>,
+  activeProjectPaths: string[],
+  state: OrphanState,
+): Promise<CleanResetReport | undefined> {
+  if (activeProjectPaths.length > 0) {
+    delete state[EMPTY_SINCE_KEY];
+    return undefined;
+  }
+  const existing = state[EMPTY_SINCE_KEY];
+  if (typeof existing !== 'number') {
+    if (await hasLocalResiduals(db)) {
+      state[EMPTY_SINCE_KEY] = Date.now();
+      console.warn('[orphan-reconcile] 项目集为空且存在残留 → 开始 7 天宽限记录');
+    }
+    return undefined;
+  }
+  if (Date.now() - existing < EMPTY_GRACE_MS) return undefined;
+  const report = await resetToCleanState(db, existing);
+  delete state[EMPTY_SINCE_KEY];
+  return report;
+}
+
 // ─── 主流程 ───
 
 export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
@@ -233,7 +397,8 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
         const reason = await classifyDir(projectId);
         if (reason === 'dir_present_with_content') {
           // 疑似孤儿：状态持久化 + 30 天升级
-          const existing = state[projectId];
+          const raw = state[projectId];
+          const existing = typeof raw === 'object' && raw !== null ? raw : undefined;
           if (existing && now - new Date(existing.firstSeenAt).getTime() > upgradeMs) {
             await handleConfirmedOrphan(db, projectId, 'dir_present_with_content', confirmedOrphans);
             delete state[projectId];
@@ -313,6 +478,19 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
       warn('[orphan-reconcile] TTL 清除失败:', err);
     }
 
+    // 9. 空项目集宽限：空集记录起点 → 7 天到期全局重置（项目重加取消）
+    //    置于画像扫描/TTL 之后：重置为最后一个写操作，避免扫描新移入的残留被跳过
+    let cleanReset: CleanResetReport | undefined;
+    const emptySinceExisted = state[EMPTY_SINCE_KEY] !== undefined;
+    try {
+      cleanReset = await handleEmptyGrace(db, activeProjectPaths, state);
+    } catch (err) {
+      warn('[orphan-reconcile] 空项目集宽限处理失败:', err);
+    }
+    if (emptySinceExisted || cleanReset !== undefined || state[EMPTY_SINCE_KEY] !== undefined) {
+      await saveOrphanState(state);
+    }
+
     return {
       scannedAt,
       activeProjectPaths,
@@ -320,11 +498,44 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
       suspectedOrphans,
       orphanProfilesTrashed,
       purged,
+      cleanReset,
     };
   } catch (err) {
     warn('[orphan-reconcile] 对账失败，降级返回空报告:', err);
     return emptyReport();
   } finally {
     inFlight = false;
+  }
+}
+
+// ─── 周期巡检 ───
+
+/** 首轮巡检延迟（启动后 30s，避开窗口创建高峰） */
+const RECONCILE_STARTUP_DELAY_MS = 30_000;
+/** 巡检周期：与桌面端 SOP 定时同步同频（ipc-context: syncInterval = 6 小时） */
+const RECONCILE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * 启动周期巡检：确保 7 天空项目集宽限期在应用常驻期间到期也能自动触发全局重置。
+ * 幂等：重复调用不会创建多个定时器。fire-and-forget，永不阻断主流程。
+ */
+export function startOrphanReconcileTimer(intervalMs = RECONCILE_INTERVAL_MS): void {
+  if (reconcileTimer) return;
+  setTimeout(() => {
+    void runOrphanReconcile().catch(() => {});
+  }, RECONCILE_STARTUP_DELAY_MS).unref?.();
+  reconcileTimer = setInterval(() => {
+    void runOrphanReconcile().catch(() => {});
+  }, intervalMs);
+  reconcileTimer.unref?.();
+}
+
+/** 停止周期巡检（测试 / 退出清理用） */
+export function stopOrphanReconcileTimer(): void {
+  if (reconcileTimer) {
+    clearInterval(reconcileTimer);
+    reconcileTimer = null;
   }
 }

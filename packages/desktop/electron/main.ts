@@ -385,11 +385,15 @@ app.whenReady().then(async () => {
   createWindow();
   const mainWindow = getMainWindow();
   if (mainWindow) setupAutoUpdater(mainWindow);
-  // 孤儿数据对账（L2）：窗口渲染完成后空闲触发，不阻塞启动；失败仅 warn
+  // 孤儿数据对账（L2）：窗口渲染完成后空闲触发，不阻塞启动；失败仅 warn。
+  // 同时启动周期巡检：7 天空项目集宽限期在应用常驻期间到期也能自动触发全局重置。
   mainWindow?.webContents.once('did-finish-load', () => {
     setImmediate(() => {
       void import('./orphan-reconcile')
-        .then((m) => m.runOrphanReconcile())
+        .then((m) => {
+          void m.runOrphanReconcile();
+          m.startOrphanReconcileTimer();
+        })
         .catch((err) => {
           console.warn(
             '[orphan-reconcile] 启动对账失败:',

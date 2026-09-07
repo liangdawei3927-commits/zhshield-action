@@ -62,8 +62,24 @@ export class SopDiffCalculator {
     const allRules = registry.getAll();
     const activeRules = registry.getActive();
 
-    const { unchanged, modified, removed } = this.classifyRules(allRules, fromVersion);
-    const added = this.findAddedRules(activeRules, unchanged, modified);
+    // 空基线：客户端本地无规则。'0.0.0'/空串不匹配 VERSION_DATE，updatedAt 启发式会把全部规则误判为 unchanged，added 恒空
+    const emptyBaseline = fromVersion === '' || fromVersion === '0.0.0';
+
+    let unchanged: string[];
+    let modified: SopRule[];
+    let removed: string[];
+    let added: SopRule[];
+
+    if (emptyBaseline) {
+      unchanged = [];
+      modified = [];
+      removed = [];
+      added = activeRules;
+    } else {
+      ({ unchanged, modified, removed } = this.classifyRules(allRules, fromVersion));
+      added = this.findAddedRules(activeRules, unchanged, modified);
+    }
+
     const { diffContent, hash } = this.buildDiffSummary(added, modified, removed);
 
     this.storeVersionHashes(toVersion, this.hashAll(allRules));

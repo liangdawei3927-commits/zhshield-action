@@ -19,7 +19,12 @@ export interface GuardEngineLike {
  */
 export interface InspectEngineLike {
   // scanType 实际为 'full' | 'incremental' | 'scheduled'，kernel 不感知，设为 unknown 兼容。
-  runScan(projectId: string, scanType?: unknown): Promise<{ summary?: { total?: number } }>;
+  // projectFeature 为 R3d 执行面投影激活的画像第三参（可选；缺省 → 不裁剪），结构契约随真实 runScan 对齐。
+  runScan(
+    projectId: string,
+    scanType?: unknown,
+    projectFeature?: unknown,
+  ): Promise<{ summary?: { total?: number } }>;
 }
 
 /**

@@ -30,8 +30,15 @@ export interface ResolveRulesResponse {
     version: string;
     sha: string | null;
     source: string;
+    languages: string[];
   }>;
   changed: string[];
+}
+
+/** 服务端 resolve 返回的单工具条目（toolId + 语言元数据） */
+export interface ResolvedTool {
+  toolId: string;
+  languages: string[];
 }
 
 // ─── 令牌管理 ─────────────────────────────────────────────────
@@ -131,23 +138,61 @@ async function apiPut<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * DELETE 请求（用于注销类端点）。支持可选 body（鉴权字段，如注销需 body.userId）。
+ * 与 apiGet 对称：携带 x-api-token + Accept，超时 10_000，withRetry 包裹，非 ok 抛 HttpError。
+ */
+async function apiDelete<T>(
+  endpoint: string,
+  body?: Record<string, unknown>,
+  apiBaseOverride?: string,
+): Promise<T> {
+  const apiBase = resolveApiBase(apiBaseOverride);
+  const token = readApiToken();
+
+  const res = await withRetry(async () => {
+    const r = await fetch(`${apiBase}${endpoint}`, {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        'x-api-token': token,
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) throw new HttpError(r.status);
+    return r;
+  });
+
+  return (await res.json()) as T;
+}
+
 // ─── 公开 API ─────────────────────────────────────────────────
 
 /**
  * 按画像 resolve 本项目应下发的工具清单。
- * POST /resolve/tools → { tools: string[] }
+ * POST /resolve/tools → { tools: Array<{ toolId, languages }> }
+ * languages 缺失时默认 []（向后兼容旧服务端）。
  */
 export async function resolveTools(
   orgId: string,
   feature?: ScopeProfileLike,
   apiBaseOverride?: string,
-): Promise<string[]> {
+): Promise<ResolvedTool[]> {
   const body: Record<string, unknown> = { orgId };
   if (feature !== undefined) {
     body.projectFeature = feature;
   }
-  const res = await apiPost<{ tools: string[] }>('/resolve/tools', body, apiBaseOverride);
-  return res.tools;
+  const res = await apiPost<{ tools?: Array<{ toolId: string; languages?: string[] }> }>(
+    '/resolve/tools',
+    body,
+    apiBaseOverride,
+  );
+  return (res.tools ?? []).map((tool) => ({
+    toolId: tool.toolId,
+    languages: Array.isArray(tool.languages) ? tool.languages : [],
+  }));
 }
 
 /**
@@ -189,6 +234,24 @@ export async function registerProjectFeatures(
       language: feature.language,
       features: feature.features ?? [],
     },
+    apiBaseOverride,
+  );
+}
+
+/**
+ * 注销 T0 画像快照（与 registerProjectFeatures 对称）。
+ * DELETE /orgs/:orgId/projects/:projectId/features → { ok: true }
+ * body 携带 userId（服务端 assertMember 鉴权契约，缺失 → 400）。
+ */
+export async function unregisterProjectFeatures(
+  orgId: string,
+  userId: string,
+  projectId: string,
+  apiBaseOverride?: string,
+): Promise<void> {
+  await apiDelete<{ ok: true }>(
+    `/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(projectId)}/features`,
+    { userId },
     apiBaseOverride,
   );
 }

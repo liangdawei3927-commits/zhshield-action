@@ -448,7 +448,9 @@ async function runInspectScan(
   label: string,
 ): Promise<RuleEvaluation> {
   try {
-    const result = await inspectEngine.runScan(context.repoRoot, 'full');
+    // R3d 执行面投影激活：SOP scanner-dispatch 内层直扫透传画像（RuleContext.projectFeature），
+    // 无画像 → undefined → 不裁剪（回归安全）。
+    const result = await inspectEngine.runScan(context.repoRoot, 'full', context.projectFeature);
     const total = result?.summary?.total ?? 0;
 
     return {

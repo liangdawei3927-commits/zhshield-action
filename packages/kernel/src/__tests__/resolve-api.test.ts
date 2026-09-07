@@ -7,6 +7,7 @@ import {
   resolveTools,
   resolveRules,
   registerProjectFeatures,
+  unregisterProjectFeatures,
   health,
 } from '../sop/sync/resolve-api';
 
@@ -54,11 +55,19 @@ describe('resolve-api network functions', () => {
     it('POSTs to /resolve/tools with orgId and feature', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
-        json: async () => ({ tools: ['semgrep', 'trivy'] }),
+        json: async () => ({
+          tools: [
+            { toolId: 'semgrep', languages: ['go'] },
+            { toolId: 'trivy', languages: [] },
+          ],
+        }),
       });
 
       const result = await resolveTools('org-1', { language: 'go', features: [] }, mockBase);
-      expect(result).toEqual(['semgrep', 'trivy']);
+      expect(result).toEqual([
+        { toolId: 'semgrep', languages: ['go'] },
+        { toolId: 'trivy', languages: [] },
+      ]);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe(`${mockBase}/resolve/tools`);
@@ -72,12 +81,22 @@ describe('resolve-api network functions', () => {
     it('omits projectFeature when feature is undefined', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
-        json: async () => ({ tools: ['semgrep'] }),
+        json: async () => ({ tools: [{ toolId: 'semgrep' }] }),
       });
 
       await resolveTools('org-1', undefined, mockBase);
       const body = JSON.parse(String(fetchSpy.mock.calls[0][1].body)) as Record<string, unknown>;
       expect(body).not.toHaveProperty('projectFeature');
+    });
+
+    it('languages 缺失时默认 []（向后兼容旧服务端）', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({ tools: [{ toolId: 'eslint' }] }),
+      });
+
+      const result = await resolveTools('org-1', undefined, mockBase);
+      expect(result).toEqual([{ toolId: 'eslint', languages: [] }]);
     });
   });
 
@@ -86,7 +105,15 @@ describe('resolve-api network functions', () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: async () => ({
-          rules: [{ ruleId: 'r1', version: '1.0', sha: null, source: 'manual' }],
+          rules: [
+            {
+              ruleId: 'r1',
+              version: '1.0',
+              sha: null,
+              source: 'manual',
+              languages: ['typescript'],
+            },
+          ],
           changed: ['r1'],
         }),
       });
@@ -98,6 +125,7 @@ describe('resolve-api network functions', () => {
         mockBase,
       );
       expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].languages).toEqual(['typescript']);
       expect(result.changed).toEqual(['r1']);
       const body = JSON.parse(String(fetchSpy.mock.calls[0][1].body)) as Record<string, unknown>;
       expect(body.orgId).toBe('org-1');
@@ -132,6 +160,24 @@ describe('resolve-api network functions', () => {
       expect(body.framework).toBe('react');
       expect(body.language).toBe('typescript');
       expect(body.features).toEqual(['spa']);
+    });
+  });
+
+  describe('unregisterProjectFeatures', () => {
+    it('DELETEs with userId in body (server assertMember 契约)', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, projectId: 'p1', orgId: 'org-1' }),
+      });
+
+      await unregisterProjectFeatures('org-1', 'user-1', 'p1', mockBase);
+
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(`${mockBase}/orgs/org-1/projects/p1/features`);
+      expect(opts.method).toBe('DELETE');
+      const body = JSON.parse(String(opts.body)) as Record<string, unknown>;
+      expect(body.userId).toBe('user-1');
+      expect(opts.headers).toHaveProperty('x-api-token');
     });
   });
 

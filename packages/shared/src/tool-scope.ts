@@ -55,6 +55,27 @@ export function isToolInScope(toolId: string, feature?: ScopeProfile): boolean {
 }
 
 /**
+ * languages 元数据投影判定。
+ * 语义：'*' 恒含；languages 含 feature.language → in scope；
+ *       languages 缺省/空数组 → true（保守,元数据未知不裁）。
+ * 供 server resolveTools 下发裁剪与 desktop claim 领取裁剪共用（同一语义单源）。
+ *
+ * @param languages 能力声明的适用语言（tool_package.languages / languagesByTool）；缺省或空数组 → true（保守降级）
+ * @param feature 画像最小投影；缺省 → true（与现有「画像缺失 → 全部启用」降级对齐）
+ */
+export function isToolLanguagesMatch(
+  languages: string[] | undefined,
+  feature?: { language?: string },
+): boolean {
+  if (languages === undefined || languages.length === 0) return true;
+  if (languages.includes('*')) return true;
+  if (!feature) return true;
+  const language = feature.language;
+  if (language !== undefined && language !== '' && languages.includes(language)) return true;
+  return false;
+}
+
+/**
  * 按画像过滤工具列表（供 SOP 双注册 / 直扫 runAll 的 adapter 列表裁剪）。
  *
  * @param tools 带 id 字段的工具/适配器列表

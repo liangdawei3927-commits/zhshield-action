@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isToolInScope, filterToolsByProfile } from '../tool-scope';
+import { isToolInScope, isToolLanguagesMatch, filterToolsByProfile } from '../tool-scope';
 import type { ScopeProfile } from '../tool-scope';
 
 describe('isToolInScope', () => {
@@ -67,5 +67,40 @@ describe('filterToolsByProfile', () => {
     const original = [...tools];
     filterToolsByProfile(tools, { language: 'go', features: [] });
     expect(tools).toEqual(original);
+  });
+});
+
+describe('isToolLanguagesMatch（R3c §2.1 六条边界钉死）', () => {
+  it("1. ['*'] 任意语言 → true（恒含）", () => {
+    expect(isToolLanguagesMatch(['*'], { language: 'go' })).toBe(true);
+    expect(isToolLanguagesMatch(['*'], { language: 'typescript' })).toBe(true);
+    expect(isToolLanguagesMatch(['*'], { language: '' })).toBe(true);
+  });
+
+  it("2. ['typescript','javascript'] + language=typescript/js → true", () => {
+    expect(isToolLanguagesMatch(['typescript', 'javascript'], { language: 'typescript' })).toBe(
+      true,
+    );
+    expect(isToolLanguagesMatch(['typescript', 'javascript'], { language: 'javascript' })).toBe(
+      true,
+    );
+  });
+
+  it("3. ['typescript'] + language=go → false", () => {
+    expect(isToolLanguagesMatch(['typescript'], { language: 'go' })).toBe(false);
+  });
+
+  it('4. [] / undefined + 任意语言 → true（保守降级）', () => {
+    expect(isToolLanguagesMatch([], { language: 'go' })).toBe(true);
+    expect(isToolLanguagesMatch(undefined, { language: 'go' })).toBe(true);
+  });
+
+  it('5. 无 feature → true（画像缺失全量启用）', () => {
+    expect(isToolLanguagesMatch(['typescript'], undefined)).toBe(true);
+    expect(isToolLanguagesMatch(['*'], undefined)).toBe(true);
+  });
+
+  it('6. language 空字符串（未检测出）→ false（有 languages 且无 * 时）', () => {
+    expect(isToolLanguagesMatch(['typescript'], { language: '' })).toBe(false);
   });
 });

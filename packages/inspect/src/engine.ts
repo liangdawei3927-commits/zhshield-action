@@ -107,7 +107,7 @@ export class InspectEngine {
   ): Promise<InspectionReport> {
     const start = Date.now();
     if (this.sopEngine && !this._sopScanning) {
-      return this.runSopGuarded(projectId, scanType, start);
+      return this.runSopGuarded(projectId, scanType, start, projectFeature);
     }
     return this.runDirectScan(projectId, scanType, start, projectFeature);
   }
@@ -117,12 +117,13 @@ export class InspectEngine {
     projectId: string,
     scanType: InspectionReport['scanType'],
     start: number,
+    projectFeature?: { framework?: string; language?: string; features?: string[] },
   ): Promise<InspectionReport> {
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
     this._sopScanning = true;
     try {
-      return await this.runScanWithSop(projectId, scanType, start);
+      return await this.runScanWithSop(projectId, scanType, start, projectFeature);
     } finally {
       this._sopScanning = false;
     }
@@ -212,15 +213,22 @@ export class InspectEngine {
     projectId: string,
     scanType: InspectionReport['scanType'],
     start: number,
+    projectFeature?: { framework?: string; language?: string; features?: string[] },
   ): Promise<InspectionReport> {
+    // R3d 执行面投影激活：SOP 直扫分支透传画像 → evaluateRules 收到 projectFeature
+    // → host.toolScope 生效 → tool-dispatch 按画像裁剪；无画像 → 不携带 → 不裁剪（回归安全）。
+    // features 可选入参 → kernel ProjectFeature 必填语义：边界归一化为 []（保守：不裁剪）。
+    const featureCtx = projectFeature ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } } : {};
     // 只评估 inspect / security 域，避免拉入 guard/evolve 等规则形成交叉重入
     const inspectReport = await this.sopEngine!.evaluateRules({
       repoRoot: projectId,
       domain: 'inspect',
+      ...featureCtx,
     });
     const securityReport = await this.sopEngine!.evaluateRules({
       repoRoot: projectId,
       domain: 'security',
+      ...featureCtx,
     });
     const sopReport = this.sopMapper.mergeReports(inspectReport, securityReport);
 

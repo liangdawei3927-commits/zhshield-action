@@ -157,6 +157,48 @@ describe('ToolAdapterExecutor 硬上限保护（防 CI 卡死）', () => {
   }, 5000);
 });
 
+describe('ToolAdapterExecutor — R3d 直扫按画像裁剪（out-of-scope）', () => {
+  it('④ 传 projectFeature { language: "go" } → eslint 适配器 out-of-scope skipped，scan 不执行', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter = makeAdapter('eslint', 'inspect', 'available');
+    const adapters = new Map<string, ToolAdapter>([['eslint', adapter]]);
+
+    const results = await executor.runAll(adapters, 'proj-1', { language: 'go', features: [] });
+
+    expect(results[0].status).toBe('skipped');
+    expect(results[0].skipReason).toBe('out-of-scope');
+    expect(adapter.scan).not.toHaveBeenCalled();
+  });
+
+  it('⑤ 传 projectFeature { language: "typescript" } → eslint 适配器正常执行', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter = makeAdapter('eslint', 'inspect', 'available');
+    const adapters = new Map<string, ToolAdapter>([['eslint', adapter]]);
+
+    const results = await executor.runAll(adapters, 'proj-1', {
+      language: 'typescript',
+      features: [],
+    });
+
+    expect(results[0].status).toBe('passed');
+    expect(adapter.scan).toHaveBeenCalledTimes(1);
+  });
+
+  it('⑥ 不传 projectFeature → 全部正常执行（回归现状：无画像不裁）', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter = makeAdapter('eslint', 'inspect', 'available');
+    const adapters = new Map<string, ToolAdapter>([['eslint', adapter]]);
+
+    const results = await executor.runAll(adapters, 'proj-1');
+
+    expect(results[0].status).toBe('passed');
+    expect(adapter.scan).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ToolAdapterExecutor 并行池（P0-1）', () => {
   it('Given 多个适配器，When runAll，Then 并行执行且结果保持 Map 插入顺序', async () => {
     const { deps } = makeDeps();

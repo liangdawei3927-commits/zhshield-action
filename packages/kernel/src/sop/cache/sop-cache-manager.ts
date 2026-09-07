@@ -19,7 +19,7 @@ import { createSyncPolicy } from './sop-sync-policy';
 import type { SyncPolicyOptions } from './sop-sync-policy';
 import { SopSqliteStore } from './sop-sqlite-store';
 import { SopVersionStore } from './sop-version-store';
-import { SopSyncClient } from './sop-sync-client';
+import { SopSyncClient, type ApiTokenProvider } from './sop-sync-client';
 import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
@@ -52,6 +52,8 @@ export interface SopCacheManagerOptions {
   secretKey?: string;
   /** 验签公钥：字符串或异步解析函数；未配置时验签放行（向后兼容），配置后解析失败则 fail-closed */
   publicKey?: string | (() => Promise<string | null>);
+  /** API 令牌（x-api-token 请求头）：固定字符串或懒加载函数；本地后端 LocalOnlyGuard 需校验 */
+  apiToken?: ApiTokenProvider;
   /** 云端/本地规则冲突自动解决策略，默认 REMOTE_WINS（与既有「云端覆盖本地」行为一致） */
   conflictStrategy?: ConflictResolution;
   /** 外部指标收集器（注入后可与外部仪表盘共享同一份数据） */
@@ -122,8 +124,13 @@ export class SopCacheManager {
     const signatureVerifier = new SopSignatureVerifier(options.publicKey);
     const syncClient =
       options.publicKey !== undefined
-        ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
-        : new SopSyncClient(remoteBaseUrl);
+        ? new VerifiedSopSyncClient(
+            remoteBaseUrl,
+            (pkg) => signatureVerifier.verifySignature(pkg),
+            undefined,
+            options.apiToken,
+          )
+        : new SopSyncClient(remoteBaseUrl, undefined, options.apiToken);
     this.scheduler = new SopSyncScheduler(this.syncPolicy);
     this.coordinator = new SopSyncCoordinator({
       registry,

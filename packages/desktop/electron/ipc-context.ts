@@ -97,6 +97,7 @@ export const sopCache = new SopCacheManager(sopRegistry, {
   remoteBaseUrl: SOP_BASE,
   syncPolicy: { syncInterval: 6 * 60 * 60 * 1000 }, // 6 小时
   publicKey: resolveSopPublicKey,
+  apiToken: () => readApiToken(),
 });
 
 /** 智汇大脑协同：工具规则下发 + 经验回写 */

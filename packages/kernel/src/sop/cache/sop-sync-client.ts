@@ -1,6 +1,9 @@
 import type { SopVersion, SopDiff, SopRule } from '../_meta/sop-types';
 import { SopCompressor, CompressionFormat } from './sop-compressor';
 
+/** API 令牌：固定字符串或懒加载函数（每次请求时求值，兼容令牌文件轮换） */
+export type ApiTokenProvider = string | (() => string);
+
 /**
  * SopSyncClient — 云端同步客户端（文档 7.4 节）
  *
@@ -8,12 +11,25 @@ import { SopCompressor, CompressionFormat } from './sop-compressor';
  */
 export class SopSyncClient {
   protected readonly compressor: SopCompressor;
+  private readonly apiToken?: ApiTokenProvider;
 
   constructor(
     private readonly remoteBaseUrl: string,
     compressor?: SopCompressor,
+    apiToken?: ApiTokenProvider,
   ) {
     this.compressor = compressor ?? new SopCompressor();
+    this.apiToken = apiToken;
+  }
+
+  /** 组装请求头；注入 x-api-token 供本地后端 LocalOnlyGuard 鉴权（与工具规则路径一致） */
+  protected buildHeaders(extra?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...extra };
+    if (this.apiToken !== undefined) {
+      const token = typeof this.apiToken === 'function' ? this.apiToken() : this.apiToken;
+      if (token) headers['x-api-token'] = token;
+    }
+    return headers;
   }
 
   /**
@@ -23,7 +39,7 @@ export class SopSyncClient {
     try {
       const url = `${this.remoteBaseUrl}/version`;
       const res = await fetch(url, {
-        headers: { Accept: 'application/json' },
+        headers: this.buildHeaders({ Accept: 'application/json' }),
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) return null;
@@ -39,7 +55,10 @@ export class SopSyncClient {
   async fetchDiff(fromVersion: string, toVersion: string): Promise<SopDiff | null> {
     try {
       const url = `${this.remoteBaseUrl}/diff?from=${fromVersion}&to=${toVersion}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      const res = await fetch(url, {
+        headers: this.buildHeaders(),
+        signal: AbortSignal.timeout(30_000),
+      });
       if (!res.ok) return null;
 
       const contentType = res.headers.get('content-type') ?? '';
@@ -65,7 +84,7 @@ export class SopSyncClient {
   async fetchFull(version: string): Promise<SopRule[] | null> {
     try {
       const fullUrl = `${this.remoteBaseUrl}/full/${version}`;
-      const res = await fetch(fullUrl);
+      const res = await fetch(fullUrl, { headers: this.buildHeaders() });
       if (!res.ok) return null;
 
       const compressed = await res.arrayBuffer();

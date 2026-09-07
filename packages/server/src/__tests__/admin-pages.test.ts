@@ -185,7 +185,12 @@ describe('C5 零依赖 SSR 管理后台页面（E2E）', () => {
     });
     expect(resolve.status).toBe(200);
     const body = (await resolve.json()) as {
-      rules: Array<{ ruleId: string; version: string; sha: string | null }>;
+      rules: Array<{
+        ruleId: string;
+        version: string;
+        sha: string | null;
+        languages: string[];
+      }>;
     };
     const entry = body.rules.find((r) => r.ruleId === rule.id);
     expect(entry).toBeDefined();

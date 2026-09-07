@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -11,7 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { TenancyService, type ScopeProfileLike } from './tenancy.service';
+import { TenancyService, type ResolvedTool, type ScopeProfileLike } from './tenancy.service';
 import { SERVER_TOOL_IDS } from '../sop/tool-rule.controller';
 import type { RuleScopeRow } from '@zh/db';
 
@@ -85,6 +86,23 @@ export class OrgsController {
     return { ok: true, projectId, orgId };
   }
 
+  /** T0 注销：删除组织内项目的云端画像快照（putProjectFeatures 的对称镜像） */
+  @Delete(':orgId/projects/:projectId/features')
+  @HttpCode(HttpStatus.OK)
+  deleteProjectFeatures(
+    @Param('orgId') orgId: string,
+    @Param('projectId') projectId: string,
+    @Body() body: { userId?: unknown },
+  ): { ok: true; projectId: string; orgId: string } {
+    requireString(orgId, 'orgId');
+    requireString(projectId, 'projectId');
+    const userId = requireString(body.userId, 'userId');
+    this.tenancy.assertMember(orgId, userId);
+    this.tenancy.removeProjectFeatures(orgId, projectId);
+    this.logger.debug(`T0 画像已注销: org=${orgId} project=${projectId}`);
+    return { ok: true, projectId, orgId };
+  }
+
   /** 运营侧主通道：发布平台默认/组织规则快照（source=manual，M5 回写预留 calibrated） */
   @Post(':orgId/rules')
   @HttpCode(HttpStatus.CREATED)
@@ -117,12 +135,14 @@ export class ResolveController {
 
   @Post('tools')
   @HttpCode(HttpStatus.OK)
-  resolveTools(@Body() body: { orgId?: unknown; projectFeature?: unknown }): { tools: string[] } {
+  resolveTools(@Body() body: { orgId?: unknown; projectFeature?: unknown }): {
+    tools: ResolvedTool[];
+  } {
     const orgId = requireString(body.orgId, 'orgId');
     const feature = this.parseFeature(body.projectFeature);
     const tools = this.tenancy.resolveTools(SERVER_TOOL_IDS, feature);
     this.logger.debug(
-      `resolve/tools org=${orgId} feature=${JSON.stringify(feature)} -> ${tools.join(',')}`,
+      `resolve/tools org=${orgId} feature=${JSON.stringify(feature)} -> ${tools.map((t) => t.toolId).join(',')}`,
     );
     return { tools };
   }
@@ -137,7 +157,13 @@ export class ResolveController {
       currentVersions?: unknown;
     },
   ): {
-    rules: Array<{ ruleId: string; version: string; sha: string | null; source: string }>;
+    rules: Array<{
+      ruleId: string;
+      version: string;
+      sha: string | null;
+      source: string;
+      languages: string[];
+    }>;
     changed: string[];
   } {
     const orgId = requireString(body.orgId, 'orgId');
@@ -180,11 +206,18 @@ export class ResolveController {
   }
 }
 
-function toRuleDto(r: RuleScopeRow): {
+function toRuleDto(r: RuleScopeRow & { languages: string[] }): {
   ruleId: string;
   version: string;
   sha: string | null;
   source: string;
+  languages: string[];
 } {
-  return { ruleId: r.rule_id, version: r.version, sha: r.content_sha, source: r.source };
+  return {
+    ruleId: r.rule_id,
+    version: r.version,
+    sha: r.content_sha,
+    source: r.source,
+    languages: r.languages,
+  };
 }

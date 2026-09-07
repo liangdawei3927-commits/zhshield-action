@@ -3,8 +3,9 @@ import { Logger } from '@nestjs/common';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DbConnection, getProject, getProjectFeatures, saveRuleContent, saveToolPackage } from '@zh/db';
 import { OrgsController, ResolveController } from '../tenancy/tenancy.controller';
-import { TenancyService } from '../tenancy/tenancy.service';
+import { resolveMigrationsDir, TenancyService } from '../tenancy/tenancy.service';
 import { SERVER_TOOL_IDS } from '../sop/tool-rule.controller';
 
 /**
@@ -18,6 +19,43 @@ describe('Tenancy (M3 Stage B)', () => {
   let tenancy: TenancyService;
   let orgs: OrgsController;
   let resolveCtrl: ResolveController;
+
+  /** 独立连接向 tool_package 种子工具行（languages 缺省 → 列默认 '[]'） */
+  function seedToolPackage(toolId: string, languages?: string[]): void {
+    const conn = new DbConnection({ dbPath: join(dir, 'test.db'), walMode: true });
+    conn.connect();
+    conn.migrate(resolveMigrationsDir());
+    saveToolPackage(conn.getDb(), {
+      id: `tp-${toolId}`,
+      toolId,
+      version: '1.0.0',
+      sha256: 'seed-sha',
+      filesJson: '[]',
+      languages,
+      status: 'active',
+    });
+    conn.close();
+  }
+
+  /** 独立连接向 rule_content 种子规则行（languages 缺省 → 列默认 '[]'） */
+  function seedRuleContent(ruleId: string, languages?: string[]): void {
+    const conn = new DbConnection({ dbPath: join(dir, 'test.db'), walMode: true });
+    conn.connect();
+    conn.migrate(resolveMigrationsDir());
+    saveRuleContent(conn.getDb(), {
+      id: `rc-${ruleId}`,
+      ruleId,
+      domain: 'guard',
+      action: 'scan',
+      name: `seed-${ruleId}`,
+      severity: 'high',
+      content: '{}',
+      contentSha: `sha-${ruleId}`,
+      version: '1.0.0',
+      languages,
+    });
+    conn.close();
+  }
 
   beforeEach(() => {
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
@@ -58,6 +96,54 @@ describe('Tenancy (M3 Stage B)', () => {
     });
     // 二次注册走 upsert，不因 UNIQUE 冲突爆炸
     orgs.putProjectFeatures(orgId, 'p1', { userId: 'u1', language: 'typescript' });
+  });
+
+  it('T0 画像注销：注册后可注销，返回 ok 且快照行与 projects 行消失', () => {
+    const { orgId } = orgs.createOrg({ name: 'acme', ownerId: 'u1' });
+    orgs.putProjectFeatures(orgId, 'p1', {
+      userId: 'u1',
+      name: 'demo',
+      language: 'typescript',
+      framework: 'nestjs',
+      features: ['modular-monolith'],
+    });
+
+    const res = orgs.deleteProjectFeatures(orgId, 'p1', { userId: 'u1' });
+    expect(res).toEqual({ ok: true, projectId: 'p1', orgId });
+
+    const conn = new DbConnection({ dbPath: join(dir, 'test.db') });
+    const db = conn.connect();
+    expect(getProjectFeatures(db, 'p1')).toBeUndefined();
+    expect(getProject(db, 'p1')).toBeUndefined();
+    conn.close();
+  });
+
+  it('T0 画像注销：非成员被拒', () => {
+    const { orgId } = orgs.createOrg({ name: 'acme', ownerId: 'u1' });
+    orgs.putProjectFeatures(orgId, 'p1', { userId: 'u1', language: 'typescript' });
+    expect(() =>
+      orgs.deleteProjectFeatures(orgId, 'p1', { userId: 'intruder' }),
+    ).toThrow(/not a member/);
+  });
+
+  it('T0 画像注销：注销后 resolve 不再含该项目画像（features 为空）', () => {
+    const { orgId } = orgs.createOrg({ name: 'acme', ownerId: 'u1' });
+    orgs.putProjectFeatures(orgId, 'p1', {
+      userId: 'u1',
+      language: 'typescript',
+      features: ['modular-monolith'],
+    });
+    orgs.deleteProjectFeatures(orgId, 'p1', { userId: 'u1' });
+
+    const conn = new DbConnection({ dbPath: join(dir, 'test.db') });
+    const db = conn.connect();
+    expect(getProjectFeatures(db, 'p1')).toBeUndefined();
+    conn.close();
+
+    // resolve 侧不再携带已注销画像：无画像 → 缺省全量兼容
+    expect(resolveCtrl.resolveTools({ orgId }).tools.map((t) => t.toolId)).toEqual([
+      ...SERVER_TOOL_IDS,
+    ]);
   });
 
   it('租户隔离：orgA 的规则对 orgB 不可见，平台默认双方可见', () => {
@@ -129,9 +215,13 @@ describe('Tenancy (M3 Stage B)', () => {
     const tsFeature = { language: 'typescript' };
     const pyFeature = { language: 'python' };
 
-    const tsTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: tsFeature }).tools;
-    const pyTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: pyFeature }).tools;
-    const noFeature = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools;
+    const tsTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: tsFeature }).tools.map(
+      (t) => t.toolId,
+    );
+    const pyTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: pyFeature }).tools.map(
+      (t) => t.toolId,
+    );
+    const noFeature = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools.map((t) => t.toolId);
 
     // security 域恒含
     for (const t of ['semgrep', 'trivy']) {
@@ -143,6 +233,69 @@ describe('Tenancy (M3 Stage B)', () => {
     expect(pyTools).not.toContain('eslint');
     // 缺省全量兼容
     expect(noFeature).toEqual([...SERVER_TOOL_IDS]);
+  });
+
+  it('resolve/tools：透出 tool_package.languages（有值 + 缺省空数组）', () => {
+    seedToolPackage('eslint', ['typescript', 'javascript']);
+    seedToolPackage('semgrep'); // languages 缺省 → 列默认 '[]'
+
+    const tools = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools;
+    expect(tools.find((t) => t.toolId === 'eslint')?.languages).toEqual([
+      'typescript',
+      'javascript',
+    ]);
+    expect(tools.find((t) => t.toolId === 'semgrep')?.languages).toEqual([]);
+  });
+
+  it('resolve/tools：DB 工具表为空 → 静态全集回退，每条 { toolId, languages: [] }', () => {
+    const tools = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools;
+    expect(tools).toEqual(SERVER_TOOL_IDS.map((toolId) => ({ toolId, languages: [] })));
+  });
+
+  it('R3c 验收1：go 画像按 languages 元数据裁剪（eslint/tsc 剔除、semgrep 恒含）', () => {
+    seedToolPackage('eslint', ['typescript', 'javascript']);
+    seedToolPackage('tsc', ['typescript']);
+    seedToolPackage('semgrep', ['*']);
+
+    const goTools = resolveCtrl
+      .resolveTools({ orgId: 'org-x', projectFeature: { language: 'go' } })
+      .tools.map((t) => t.toolId);
+    expect(goTools).not.toContain('eslint');
+    expect(goTools).not.toContain('tsc');
+    expect(goTools).toContain('semgrep');
+
+    const tsTools = resolveCtrl
+      .resolveTools({ orgId: 'org-x', projectFeature: { language: 'typescript' } })
+      .tools.map((t) => t.toolId);
+    expect(tsTools).toContain('eslint');
+    expect(tsTools).toContain('tsc');
+    expect(tsTools).toContain('semgrep');
+  });
+
+  it('R3c 验收2：languages 缺省/空数组 → 保守不裁（工具仍返回）', () => {
+    seedToolPackage('eslint', []); // languages 空数组
+    seedToolPackage('semgrep'); // languages 缺省 → 列默认 '[]'
+
+    const goTools = resolveCtrl
+      .resolveTools({ orgId: 'org-x', projectFeature: { language: 'go' } })
+      .tools.map((t) => t.toolId);
+    expect(goTools).toContain('eslint');
+    expect(goTools).toContain('semgrep');
+  });
+
+  it('R3c 验收3：静态回退（DB 空表）→ 静态全集照旧全返回，languages 恒空', () => {
+    const tools = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools;
+    expect(tools).toEqual(SERVER_TOOL_IDS.map((toolId) => ({ toolId, languages: [] })));
+  });
+
+  it('resolve/rules：规则条目 languages 关联 rule_content（无行 → 空数组）', () => {
+    seedRuleContent('r-lang', ['typescript']);
+    tenancy.publishRuleScope({ ruleId: 'r-lang', orgId: null, version: '1.0.0' });
+    tenancy.publishRuleScope({ ruleId: 'r-nocontent', orgId: null, version: '1.0.0' });
+
+    const rules = resolveCtrl.resolveRules({ orgId: 'org-x' }).rules;
+    expect(rules.find((r) => r.ruleId === 'r-lang')?.languages).toEqual(['typescript']);
+    expect(rules.find((r) => r.ruleId === 'r-nocontent')?.languages).toEqual([]);
   });
 
   it('resolve/health 与入参校验', () => {

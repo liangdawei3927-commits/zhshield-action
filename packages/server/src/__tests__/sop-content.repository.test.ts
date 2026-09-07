@@ -77,6 +77,7 @@ function seedDb(dbPath: string): void {
     version: `1.${sha256.slice(0, 12)}`,
     sha256,
     filesJson: JSON.stringify(FIXTURE_FILES),
+    languages: ['typescript'],
     status: 'active',
   });
 
@@ -144,16 +145,20 @@ describe('SopContentRepository（C3 服务端读库 + 故障降级）', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('resolveTools 优先读 tool_package（DB 种子唯一工具 semgrep），空表不可用时回退静态全集', () => {
-    // 库内只有 semgrep → DB 清单优先生效，覆盖静态全集种子
+  it('resolveTools 优先读 tool_package（DB 种子唯一工具 semgrep，含 languages），空表不可用时回退静态全集', () => {
+    // 库内只有 semgrep → DB 清单优先生效，覆盖静态全集种子；languages 透出 tool_package 列
     const tenancy = new TenancyService();
-    expect(tenancy.resolveTools(STATIC_TOOLS, undefined)).toEqual(['semgrep']);
+    expect(tenancy.resolveTools(STATIC_TOOLS, undefined)).toEqual([
+      { toolId: 'semgrep', languages: ['typescript'] },
+    ]);
 
-    // DB 不可用 → 回退静态全集
+    // DB 不可用 → 回退静态全集，languages 恒空数组
     writeFileSync(join(dir, 'blocked'), 'blocker');
     process.env.ZH_SERVER_DB = join(dir, 'blocked', 'no.db');
     const degraded = new TenancyService();
-    expect(degraded.resolveTools(STATIC_TOOLS, undefined)).toEqual([...STATIC_TOOLS]);
+    expect(degraded.resolveTools(STATIC_TOOLS, undefined)).toEqual(
+      STATIC_TOOLS.map((toolId) => ({ toolId, languages: [] })),
+    );
     degraded.onModuleDestroy();
   });
 });

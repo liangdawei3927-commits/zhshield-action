@@ -4,7 +4,6 @@ import {
   TYPE_LABEL,
   formatTime,
   useBackupSchedule,
-  type BackupScheduleData,
 } from './backup-logic';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BackupRecordsPanel } from './backup-records';

@@ -148,7 +148,7 @@ async function walkRuleDir(dir: string): Promise<string[]> {
 }
 
 /** 解包规则包写入目标目录；路径穿越条目拒绝写盘（safeJoinReal 白名单越界跳过） */
-async function extractRulePackage(data: Uint8Array, targetDir: string): Promise<void> {
+export async function extractRulePackage(data: Uint8Array, targetDir: string): Promise<void> {
   const records: ToolRuleFile[] = JSON.parse(new TextDecoder().decode(data));
   await fs.promises.rm(targetDir, { recursive: true, force: true });
   await fs.promises.mkdir(targetDir, { recursive: true });

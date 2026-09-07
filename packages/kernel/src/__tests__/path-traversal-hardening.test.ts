@@ -1,14 +1,18 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
-import { ToolRuleSync } from '../sop/sync/tool-rule-sync';
+import { extractRulePackage } from '../sop/sync/tool-rule-sync';
 import { restoreFromZipArchive } from '../backup/zip-snapshot';
 import type { LocalBackupManifest } from '../backup/local-backup';
 
 const workRoot = path.join(os.tmpdir(), `zhshield-path-traversal-${crypto.randomUUID()}`);
+
+beforeAll(async () => {
+  await fs.mkdir(workRoot, { recursive: true });
+});
 
 afterAll(async () => {
   await fs.rm(workRoot, { recursive: true, force: true });
@@ -92,7 +96,7 @@ describe('tool-rule-sync extractRules 路径穿越加固', () => {
       ]),
     );
 
-    await new ToolRuleSync([]).extractRules(payload, targetDir);
+    await extractRulePackage(payload, targetDir);
 
     expect(fsSync.existsSync(escaped)).toBe(false);
     expect(await fs.readFile(path.join(targetDir, 'ok.json'), 'utf-8')).toBe('x');

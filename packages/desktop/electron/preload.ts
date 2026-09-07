@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadProjects: () => ipcRenderer.invoke('app:loadProjects'),
   saveProjects: (projects: Array<{ name: string; path: string }>) =>
     ipcRenderer.invoke('app:saveProjects', projects),
+  removeProject: (projectPath: string) => ipcRenderer.invoke('app:removeProject', projectPath),
 
   // 对话框
   openFolderDialog: () => ipcRenderer.invoke('dialog:openFolder'),
@@ -283,5 +284,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scheduler: {
     readState: () => ipcRenderer.invoke('scheduler:readState'),
     writeState: (state: { jobs: unknown[] }) => ipcRenderer.invoke('scheduler:writeState', state),
+  },
+
+  // ─── 测试专用观测（仅 e2e 门控注册，生产不暴露）────────────
+  // 供 e2e 删除全链用例观测主进程内存态；handler 仅在 E2E=1 时注册，
+  // 生产调用会 reject（无 handler），但生产代码从不调用。
+  e2e: {
+    countSoftDeletedData: (projectPath: string) =>
+      ipcRenderer.invoke('e2e:countSoftDeletedData', projectPath),
+    countTotalData: (projectPath: string) =>
+      ipcRenderer.invoke('e2e:countTotalData', projectPath),
+    getCachedProfileProjectPath: () => ipcRenderer.invoke('e2e:getCachedProfileProjectPath'),
+    setCachedProfile: (projectPath: string) => ipcRenderer.invoke('e2e:setCachedProfile', projectPath),
+    seedOrphanData: (projectPath: string) => ipcRenderer.invoke('e2e:seedOrphanData', projectPath),
   },
 });

@@ -26,6 +26,7 @@ import {
   readOrCreateUserId,
   getOrCreateDefaultOrg,
   registerProjectFeatures,
+  unregisterProjectFeatures,
   resolveTools as cloudResolveTools,
   resolveRules as cloudResolveRules,
   type ScopeProfileLike,
@@ -107,23 +108,35 @@ export type CachedProjectFeature = {
 };
 
 let cachedProfile: CachedProjectFeature | null = null;
+/** 与 cachedProfile 配套记录其归属项目路径；null = 未归属（单例/未探测） */
+let cachedProfileProjectPath: string | null = null;
 
 export function getCachedProfile(): CachedProjectFeature | null {
   return cachedProfile;
 }
 
-export function setCachedProfile(feature: CachedProjectFeature | null): void {
+/**
+ * 写入画像缓存；可选记录归属项目路径（供删项目时精确归还内存缓存）。
+ * 向后兼容：不传 projectPath 时保持既有 path 不变；传 null 时清空 path。
+ */
+export function setCachedProfile(
+  feature: CachedProjectFeature | null,
+  projectPath?: string | null,
+): void {
   cachedProfile = feature;
+  if (projectPath !== undefined) {
+    cachedProfileProjectPath = projectPath;
+  }
+}
+
+/** 返回当前画像缓存归属的项目路径（null = 未归属） */
+export function getCachedProfileProjectPath(): string | null {
+  return cachedProfileProjectPath;
 }
 
 // ─── T0 云端画像注册 ─────────────────────────────────────────
 
-import * as crypto from 'node:crypto';
-
-/** 由 projectPath 推导稳定 projectId（sha256 前 16 位 hex） */
-function deriveProjectId(projectPath: string): string {
-  return crypto.createHash('sha256').update(projectPath).digest('hex').slice(0, 16);
-}
+import { deriveProjectId } from './capability-refs';
 
 /**
  * 调用服务器 POST /orgs 创建默认组织，返回服务器生成的真实 orgId。
@@ -181,6 +194,29 @@ export async function registerProjectFeaturesToCloud(
   }
 }
 
+/**
+ * Fire-and-forget: 注销项目云端画像快照（与 registerProjectFeaturesToCloud 对称）。
+ * 失败仅 log，永不抛出（离线降级）。
+ */
+export async function unregisterProjectFeaturesFromCloud(projectPath: string): Promise<void> {
+  try {
+    readApiToken(); // side-effect: 确保 API token 文件存在
+    const userId = readOrCreateUserId();
+    const org = await getOrCreateDefaultOrg(createDefaultOrg);
+    if (!org) {
+      console.warn('[cloud:T0] 无可用 orgId，跳过云端画像注销（离线降级）');
+      return;
+    }
+    const projectId = deriveProjectId(projectPath);
+    await unregisterProjectFeatures(org.orgId, userId, projectId);
+  } catch (err) {
+    console.warn(
+      '[cloud:T0] 云端画像注销失败，降级跳过:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 /** 获取默认 orgId（供 T1 在 sync 流程中使用）；失败/离线返回 null */
 export async function getDefaultOrgId(): Promise<string | null> {
   try {
@@ -199,22 +235,38 @@ export { cloudResolveTools, cloudResolveRules, type ScopeProfileLike };
 const dbPath = path.join(app.getPath('userData'), 'zh-codeshield.db');
 const dbConn = new DbConnection({ dbPath });
 let db: ReturnType<DbConnection['connect']> | null = null;
+// 迁移完成句柄：e2e 冷启动可能立即触发写表 IPC，需先 await 迁移结束（否则 no such table）。
+// 生产路径不依赖该句柄，语义不变；无 db 时 resolve 空（降级模式）。
+let dbReady: Promise<void> = Promise.resolve();
 try {
   db = dbConn.connect();
-  const migrationsDir = path.resolve(
-    __dirname,
-    VITE_DEV_SERVER_URL ? '../../db/migrations' : 'resources/db/migrations',
-  );
+  // 迁移目录按存在性探测而非 VITE_DEV_SERVER_URL 开关：
+  // 生产打包（electron-builder extraResources）→ resources/db/migrations；
+  // dev / e2e 裸跑 vite build 产物无 resources → 回退仓库源码迁移目录（packages/db/migrations），
+  // 保证迁移真实执行（否则 DB 空库、写表 IPC 报 no such table）。
+  // 探测放在异步链内（主进程禁止 fs 同步 IO，no-fs-sync 门禁）。
+  const packagedMigrations = path.resolve(__dirname, 'resources/db/migrations');
+  const fallbackMigrations = path.resolve(__dirname, '../../db/migrations');
   // 迁移在微任务中异步执行，远早于任何 IPC 处理器（处理器仅在窗口创建后触发）
-  void fs.promises
-    .access(migrationsDir)
-    .then(() => dbConn.migrate(migrationsDir))
+  // access 失败（目录缺失）或 migrate 抛错均吞掉：
+  // migrate 内部对目录缺失已优雅处理（existsSync 短路），解析为空 Promise 即可。
+  dbReady = fs.promises
+    .access(packagedMigrations)
+    .then(() => packagedMigrations)
+    .catch(() => fallbackMigrations)
+    .then((migrationsDir) => dbConn.migrate(migrationsDir))
     .catch(() => {});
+  void dbReady;
 } catch (err) {
   console.error(
     `[ipc-context] DB 初始化失败，降级为无持久化模式: ${err instanceof Error ? err.message : String(err)}`,
   );
   db = null;
+}
+
+/** 等待本地 DB 迁移完成（测试专用观测 IPC 冷启动时使用） */
+export function whenDbReady(): Promise<void> {
+  return dbReady;
 }
 
 // ─── 引擎懒初始化（按需加载，不占用启动时间） ────────────

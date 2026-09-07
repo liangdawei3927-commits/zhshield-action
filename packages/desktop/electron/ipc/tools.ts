@@ -56,7 +56,7 @@ async function resolveToolIds(): Promise<{ ids: string[]; source: 'cloud' | 'loc
     if (orgId) {
       const ids = await cloudResolveTools(orgId, getCachedProfile() ?? undefined);
       if (Array.isArray(ids) && ids.length > 0) {
-        return { ids: ids.map(String), source: 'cloud' };
+        return { ids: ids.map((t) => t.toolId), source: 'cloud' };
       }
     }
   } catch (err) {

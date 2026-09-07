@@ -290,7 +290,7 @@ function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): voi
     framework: profile.framework,
     features: [],
   };
-  setCachedProfile(feature);
+  setCachedProfile(feature, projectPath);
   if (projectPath) {
     void registerProjectFeaturesToCloud(feature, projectPath);
   }
@@ -1163,7 +1163,7 @@ export function cacheProfileFromFingerprintResult(result: unknown, projectPath: 
       framework: target.frameworks?.[0]?.value,
       features: [],
     };
-    setCachedProfile(feature);
+    setCachedProfile(feature, projectPath);
     void registerProjectFeaturesToCloud(feature, projectPath);
     console.log(
       `[engine:runProfile] 画像已缓存: language=${feature.language ?? 'unknown'} framework=${feature.framework ?? 'unknown'}`,

@@ -10,6 +10,7 @@ import { SecurityEngine } from '@zh/security';
 import type { SecurityScanReport } from '@zh/security';
 import { EventBus } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
+import { getCachedProfile } from './ipc-context';
 
 export class EngineService {
   private db: ReturnType<DbConnection['connect']> | null = null;
@@ -56,7 +57,9 @@ export class EngineService {
 
   async runInspect(projectPath: string): Promise<InspectionReport> {
     if (!this.inspect) throw new Error('EngineService not initialized');
-    return this.inspect.runScan(projectPath, 'full');
+    // R3d 执行面投影激活：直扫按画像裁剪 — 与 claim 同步同源快照（getCachedProfile），
+    // 无画像 → undefined → 不裁剪（回归安全）。
+    return this.inspect.runScan(projectPath, 'full', getCachedProfile() ?? undefined);
   }
 
   async runSecurity(projectPath: string): Promise<SecurityScanReport> {

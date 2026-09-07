@@ -764,6 +764,20 @@ export interface SchedulerAPI {
   writeState: (state: SchedulerStateData) => Promise<void>;
 }
 
+/** 测试专用观测 API（仅 e2e 门控注册，生产不暴露） */
+export interface E2eObservationAPI {
+  /** 统计某 project_id 在 5 表中已软删（deleted_at IS NOT NULL）的行数（逐表） */
+  countSoftDeletedData: (projectPath: string) => Promise<Record<string, number>>;
+  /** 统计某 project_id 在 5 表中的总行数（含未软删，供预置断言对照） */
+  countTotalData: (projectPath: string) => Promise<Record<string, number>>;
+  /** 返回当前画像缓存归属的项目路径（null = 已清空） */
+  getCachedProfileProjectPath: () => Promise<string | null>;
+  /** 预置画像缓存归属某项目（供删除后断言清空） */
+  setCachedProfile: (projectPath: string) => Promise<void>;
+  /** 预置 5 表孤儿行（project_id = projectPath，与桌面写入键控对齐） */
+  seedOrphanData: (projectPath: string) => Promise<void>;
+}
+
 export interface ElectronAPI {
   getAppInfo: () => Promise<{ name: string; version: string; platform: string; apiBase?: string }>;
   getToolAvailability?: () => Promise<Array<{ id: string; available: boolean }>>;
@@ -781,6 +795,7 @@ export interface ElectronAPI {
   openFolderDialog: () => Promise<string | null>;
   loadProjects: () => Promise<Array<{ name: string; path: string }>>;
   saveProjects: (projects: Array<{ name: string; path: string }>) => Promise<void>;
+  removeProject: (projectPath: string) => Promise<{ ok: boolean }>;
   showSaveDialog: (options: {
     defaultPath: string;
     filters: Array<{ name: string; extensions: string[] }>;
@@ -799,6 +814,8 @@ export interface ElectronAPI {
   backup?: BackupAPI;
   feedback?: FeedbackAPI;
   scheduler?: SchedulerAPI;
+  /** 测试专用观测（仅 e2e 门控注册，生产不暴露；供删除全链用例观测主进程内存态） */
+  e2e?: E2eObservationAPI;
 }
 
 declare global {

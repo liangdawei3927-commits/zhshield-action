@@ -32,6 +32,7 @@ import { registerFeedbackIpc } from './ipc/feedback';
 import { registerEvolveIpc } from './ipc/evolve';
 import { registerBackupIpc } from './ipc/backup';
 import { registerSchedulerIpc } from './ipc/scheduler';
+import { registerE2eObservationIpc } from './ipc/e2e-observation';
 import { preheatPipelineWorker, disposePipelineWorker } from './pipeline-host';
 import { setupAutoUpdater } from './auto-updater';
 import { enforceTrustedIpcSender } from './ipc-security';
@@ -301,6 +302,12 @@ registerFeedbackIpc();
 registerEvolveIpc();
 registerBackupIpc();
 registerSchedulerIpc();
+
+// ─── 测试专用观测 IPC（仅 e2e 门控，不污染生产 API 面）────
+// 供 e2e 删除全链用例观测主进程内存态（5 表软删计数 / cachedProfile 归属 / 孤儿行预置）。
+if (process.env.E2E === '1') {
+  registerE2eObservationIpc();
+}
 
 /** 初始化 SOP 缓存（网络同步不阻塞窗口创建，避免与体检并发抢 DNS/主线程） */
 async function initSopCache() {

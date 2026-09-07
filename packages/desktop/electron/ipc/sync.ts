@@ -21,10 +21,21 @@ import {
   sopRegistry,
   wisdomBrainSync,
   getCachedProfile,
+  getCachedProfileProjectPath,
   getDefaultOrgId,
   cloudResolveTools,
   type ScopeProfileLike,
 } from '../ipc-context';
+import { isToolInScope, isToolLanguagesMatch } from '@zh/shared';
+import {
+  claimToolRefs,
+  deriveProjectId,
+  loadCapabilityRefs,
+  markReclaimed,
+  saveCapabilityRefs,
+  splitResolvedTools,
+  type LanguagesByTool,
+} from '../capability-refs';
 import { reconcileRulesWithCloud, type ResolveRulesOutcome } from './resolve-reconcile';
 
 export type { ResolveRulesOutcome };
@@ -33,11 +44,15 @@ export type { ResolveRulesOutcome };
 export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
   const feature = getCachedProfile() ?? undefined;
   const ruleSync = wisdomBrainSync.getRuleSync();
+  // R3-b：云端下发 languages 元数据（toolId → languages），claim 时写入账本
+  let languagesByTool: LanguagesByTool = {};
   try {
     const orgId = await getDefaultOrgId();
     if (orgId) {
       const remoteTools = await cloudResolveTools(orgId, feature as ScopeProfileLike | undefined);
-      ruleSync.setRemoteToolIds(remoteTools as ToolId[]);
+      const split = splitResolvedTools(remoteTools);
+      ruleSync.setRemoteToolIds(split.toolIds);
+      languagesByTool = split.languagesByTool;
     } else {
       ruleSync.setRemoteToolIds(null);
     }
@@ -48,7 +63,43 @@ export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
     );
     ruleSync.setRemoteToolIds(null);
   }
-  return wisdomBrainSync.syncAllRules(feature);
+  // R2 领取记账（06 §3.3「领取」+ §3.4 ①）：在 syncAllRules 之前记账，
+  // 使能力被项目占用（下次同步续期）；唤醒必须先于 syncAllRules，
+  // 否则 reclaiming 工具已被运行层过滤踢出清单、永远不会被重新同步。
+  const projectPath = getCachedProfileProjectPath();
+  if (projectPath) {
+    // 领取用「未过滤」清单（含 reclaiming）：唤醒必须先于运行层过滤，
+    // 否则 7 天窗口内重加同栈项目时 reclaiming 能力永远进不了 claim 列表
+    // （getConfiguredToolIds 已剔 reclaiming，不能用于领取）。
+    const inScope = wisdomBrainSync
+      .getRuleSync()
+      .getUnfilteredToolIds()
+      .filter((toolId) => isToolInScope(toolId, feature));
+    // R3c：claim 前按 languagesByTool + 项目主语言投影，语言不匹配的能力不进入 refs
+    const claimable = inScope.filter((toolId) =>
+      isToolLanguagesMatch(languagesByTool[toolId], { language: feature?.language }),
+    );
+    const refs = await loadCapabilityRefs();
+    await saveCapabilityRefs(
+      claimToolRefs(refs, deriveProjectId(projectPath), claimable, languagesByTool),
+    );
+  }
+  const results = await wisdomBrainSync.syncAllRules(feature);
+  // R3-a 到期物理删除对账（06 §4.3 + §2.4 触发链）：kernel 扫描并物理删除过期
+  // reclaiming 工具，返回本次删除列表 → 账本标记 reclaimed 终态。
+  // best-effort：扫描/标记失败绝不阻断同步响应。
+  try {
+    const deleted = await wisdomBrainSync.scanAndRemoveExpired();
+    if (deleted.length > 0) {
+      await saveCapabilityRefs(markReclaimed(await loadCapabilityRefs(), deleted));
+    }
+  } catch (err) {
+    console.warn(
+      '[sync:R3] 到期物理删除对账失败（best-effort 跳过）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  return results;
 }
 
 export function registerSyncIpc(): void {

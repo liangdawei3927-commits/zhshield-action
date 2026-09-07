@@ -10,6 +10,7 @@ import { progress, send } from './pipeline-ipc';
 import { collectPerformanceIssues } from './pipeline-report';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
+import { getCachedProfile } from './ipc-context';
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);
@@ -101,7 +102,9 @@ export async function runInspectJob(id: string, projectPath: string): Promise<vo
   engine.registerAdapter(new CommitLintAdapter());
   engine.registerAdapter(new NpmAuditAdapter());
   try {
-    const report = await engine.runScan(projectPath, 'full');
+    // R3d 执行面投影激活：直扫按画像裁剪 — 复用 getCachedProfile 同源快照；
+    // 子进程内画像缓存未共享（主进程模块态）→ 通常为 undefined → 不裁剪（回归安全）。
+    const report = await engine.runScan(projectPath, 'full', getCachedProfile() ?? undefined);
     progress(id, 'done', t('pipeline.inspect.jobDone'), 1.0);
     send({ type: 'result', id, report: serializePipelineReport(report) });
   } catch (err) {

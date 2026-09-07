@@ -263,6 +263,9 @@ function useRemoveProject(
     (path: string) => {
       const target = projects.find((p) => p.path === path);
       const next = projects.filter((p) => p.path !== path);
+      // 清理链（画像/DB/内存/云端）fire-and-forget：失败不阻塞 UI——渲染链与清理链解耦；
+      // projects.json 落盘由 usePersistProjects 的 saveProjects 机制自动完成，不重复写盘
+      void window.electronAPI?.removeProject?.(path).catch(() => {});
       setProjects(next);
       if (next.length === 0) setCurrentPage('welcome');
       toast(t('toast.projectRemoved', { projectName: target?.name ?? '' }), 'info');

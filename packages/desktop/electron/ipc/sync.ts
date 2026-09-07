@@ -7,6 +7,9 @@
 
 import { ipcMain } from 'electron';
 
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import type {
   ExperienceRecord,
   GovernanceDomain,
@@ -14,7 +17,7 @@ import type {
   ToolId,
   ToolRuleSyncResult,
 } from '@zh/kernel';
-import { SopSigner } from '@zh/kernel';
+import { EXPIRY_THRESHOLD_DAYS, getReclaimingSopModuleSinces, SopSigner } from '@zh/kernel';
 import {
   resolveSopPublicKey,
   sopCache,
@@ -29,9 +32,11 @@ import {
 import { isToolInScope, isToolLanguagesMatch } from '@zh/shared';
 import {
   claimToolRefs,
+  claimSopModuleRefs,
   deriveProjectId,
   loadCapabilityRefs,
   markReclaimed,
+  markSopModulesReclaimed,
   saveCapabilityRefs,
   splitResolvedTools,
   type LanguagesByTool,
@@ -99,7 +104,85 @@ export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
       err instanceof Error ? err.message : String(err),
     );
   }
+  // ── SOP 模块同步链（与 toolrule 对称：claim → syncForProject → 到期回收） ──
+  await syncSopModulesForProfile(feature);
   return results;
+}
+
+const SOP_CAPABILITY_REFS_BASE_DIR = path.join(os.homedir(), '.zhshield');
+
+async function scanAndRemoveExpiredSopModules(): Promise<string[]> {
+  const thresholdMs = EXPIRY_THRESHOLD_DAYS * 86_400_000;
+  const candidates = getReclaimingSopModuleSinces(SOP_CAPABILITY_REFS_BASE_DIR);
+  const removed: string[] = [];
+  for (const [moduleId, since] of candidates) {
+    if (Date.now() - since <= thresholdMs) continue;
+    // 删除前重读账本：确认仍 reclaiming 且 since 仍超阈值（对齐 toolrule scanAndRemoveExpired
+    // 的窗口末唤醒防误删——claim 在 syncForProject 前执行，刚唤醒的模块此处应跳过）。
+    const freshSince = getReclaimingSopModuleSinces(SOP_CAPABILITY_REFS_BASE_DIR).get(moduleId);
+    if (freshSince === undefined || Date.now() - freshSince <= thresholdMs) continue;
+    await sopCache.removeModule(moduleId);
+    removed.push(moduleId);
+  }
+  return removed;
+}
+
+export async function syncSopModulesForProfile(
+  feature?: { framework?: string; language?: string; features: string[] } | null,
+): Promise<string[]> {
+  const profile = feature ?? undefined;
+
+  // R2 领取记账（SOP 对称）：claim 必须先于 syncForProject（唤醒语义，
+  // 对照 toolrule 的 R2 注释：唤醒必须先于运行层过滤，否则 reclaiming 能力
+  // 永远进不了 claim 列表）。
+  const projectPath = getCachedProfileProjectPath();
+  if (projectPath) {
+    const needed = profile ? sopCache.getNeededModules(profile) : [];
+    if (needed.length > 0) {
+      try {
+        const refs = await loadCapabilityRefs();
+        await saveCapabilityRefs(
+          claimSopModuleRefs(refs, deriveProjectId(projectPath), needed),
+        );
+      } catch (err) {
+        console.warn(
+          '[sync:SOP:R2] SOP 模块领取记账失败（best-effort 跳过）:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+  }
+
+  // 按项目特征下载 SOP 模块；feature 为 undefined 时跳过下载（防 undefined.targets 崩溃），
+  // 仅做回收扫描。
+  if (profile !== undefined) {
+    try {
+      await sopCache.syncForProject(profile);
+    } catch (err) {
+      console.warn(
+        '[sync:SOP] SOP 模块下载失败（best-effort 跳过）:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  // R3-a 到期回收（对齐 toolrule 的 R3-a 注释语义）：扫描 reclaiming 的 sop-module 条目，
+  // 删除过期模块 → 账本标记 reclaimed 终态。
+  // best-effort：扫描/标记失败绝不阻断同步响应。
+  try {
+    const removed = await scanAndRemoveExpiredSopModules();
+    if (removed.length > 0) {
+      await saveCapabilityRefs(markSopModulesReclaimed(await loadCapabilityRefs(), removed));
+    }
+  } catch (err) {
+    console.warn(
+      '[sync:SOP:R3] 到期物理删除对账失败（best-effort 跳过）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  // 返回本次同步的模块名
+  return profile !== undefined ? sopCache.getNeededModules(profile) : [];
 }
 
 export function registerSyncIpc(): void {

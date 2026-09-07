@@ -129,7 +129,7 @@ test.describe('智汇码盾桌面端 E2E', () => {
 
   test('欢迎页（无项目初始态）渲染关键文案', async () => {
     ({ app, page } = await launchApp());
-    await expect(page.getByText('添加项目开启守护')).toBeVisible();
+    await expect(page.getByText('添加项目 开启守护')).toBeVisible();
     await expect(page.getByText('已守护项目')).toBeVisible();
     await expect(page.getByText('累计拦截')).toBeVisible();
     await expect(page.getByText('健康评分')).toBeVisible();

@@ -154,7 +154,10 @@ export class PipelineRunner {
   }
   async runInspect(): Promise<InspectionReport> {
     this.logger.info('开始 Inspect 引擎巡检...');
-    const report = await this.inspectEngine.runScan(this.repoRoot, 'full');
+    // R3d 执行面投影激活：直扫按画像裁剪 — 复用既有 deriveProjectFeature（M2 同源探测），
+    // 探测失败 → undefined → 不裁剪（与现状行为一致，回归安全）。
+    const feature = this.deriveProjectFeature();
+    const report = await this.inspectEngine.runScan(this.repoRoot, 'full', feature);
     this.logger.info(
       `巡检完成: ${report.summary.total} 个问题 (${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info)`,
     );

@@ -50,39 +50,22 @@ function WelcomeCorners({ maximized }: { maximized: boolean }) {
         </span>
       </div>
 
-      {/* 右上角：引擎状态 */}
+      {/* 右下角：云大脑状态 —— 样式对齐原右上角引擎徽章（绿色圆点 + 文字） */}
       <div
-        className="absolute top-4 right-5 flex items-center gap-2 px-3 py-1.5 rounded-full"
+        className="absolute bottom-4 right-5 flex items-center gap-2 px-3 py-1.5 rounded-full"
         style={{
-          background: 'rgb(var(--zh-brand) / 0.12)',
-          border: '1px solid rgb(var(--zh-brand) / 0.25)',
+          background: 'rgb(var(--zh-brand) / 0.2)',
+          border: '1px solid rgb(var(--zh-brand-300) / 0.6)',
         }}
       >
         <span
           className="w-2 h-2 rounded-full"
           style={{
-            background: 'rgb(var(--zh-brand))',
-            boxShadow: '0 0 6px rgb(var(--zh-brand) / 0.6)',
+            background: '#27c93f',
+            boxShadow: '0 0 6px #27c93f',
           }}
         />
         <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
-          {t('page.welcome.engineOn')}
-        </span>
-      </div>
-
-      {/* 右下角 */}
-      <div
-        className="absolute bottom-4 right-5 flex items-center gap-2"
-        style={{ color: 'rgba(255,255,255,0.35)' }}
-      >
-        <span className="text-xs flex items-center gap-1.5">
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              background: 'rgb(var(--zh-brand))',
-              boxShadow: '0 0 4px rgb(var(--zh-brand) / 0.5)',
-            }}
-          />
           {t('page.welcome.cloudOn')}
         </span>
       </div>

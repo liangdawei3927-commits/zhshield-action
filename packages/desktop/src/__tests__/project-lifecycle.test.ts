@@ -179,7 +179,13 @@ describe('步骤 5 失败降级不抛(规格 §2.3)', () => {
     });
     h.createProfileStore.mockReturnValue({ delete: vi.fn() });
 
-    await expect(cleanupProjectAfterRemoval(projA)).resolves.toBeUndefined();
+    await expect(cleanupProjectAfterRemoval(projA)).resolves.toEqual([
+      { step: 'profile-delete', status: 'ok' },
+      { step: 'db-soft-delete', status: 'ok' },
+      { step: 'memory-release', status: 'ok' },
+      { step: 'cloud-unregister', status: 'ok' },
+      { step: 'capability-refs-release', status: 'failed', error: 'disk full' },
+    ]);
 
     expect(warnSpy).toHaveBeenCalled();
   });

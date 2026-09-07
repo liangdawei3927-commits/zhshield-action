@@ -42,6 +42,19 @@ interface ExperienceRecordData {
   projectId: string;
 }
 
+interface OrphanCleanupEntry {
+  action: 'suspected' | 'confirmed' | 'soft_deleted' | 'profiles_trashed' | 'purged';
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+interface ProjectRemovalEntry {
+  projectId: string;
+  ok: boolean;
+  steps?: Array<{ step: string; status: 'ok' | 'failed'; error?: string }>;
+  [key: string]: unknown;
+}
+
 interface AuditQuery {
   action?: string;
   tool?: string;
@@ -50,7 +63,14 @@ interface AuditQuery {
   toDate?: Date;
 }
 
-const LOG_CATEGORIES = ['tool-execution', 'guard-block', 'whitelist', 'experience'] as const;
+const LOG_CATEGORIES = [
+  'tool-execution',
+  'guard-block',
+  'whitelist',
+  'experience',
+  'orphan-cleanup',
+  'project-removal',
+] as const;
 
 export class AuditLogger {
   private basePath: string;
@@ -97,6 +117,14 @@ export class AuditLogger {
       action: 'experience-recorded',
       ...data,
     });
+  }
+
+  async logOrphanCleanup(entry: OrphanCleanupEntry): Promise<void> {
+    await this.logToFile('orphan-cleanup', entry);
+  }
+
+  async logProjectRemoval(entry: ProjectRemovalEntry): Promise<void> {
+    await this.logToFile('project-removal', entry);
   }
 
   async query(filters: AuditQuery): Promise<AuditLogEntry[]> {

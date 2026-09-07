@@ -385,6 +385,19 @@ app.whenReady().then(async () => {
   createWindow();
   const mainWindow = getMainWindow();
   if (mainWindow) setupAutoUpdater(mainWindow);
+  // 孤儿数据对账（L2）：窗口渲染完成后空闲触发，不阻塞启动；失败仅 warn
+  mainWindow?.webContents.once('did-finish-load', () => {
+    setImmediate(() => {
+      void import('./orphan-reconcile')
+        .then((m) => m.runOrphanReconcile())
+        .catch((err) => {
+          console.warn(
+            '[orphan-reconcile] 启动对账失败:',
+            err instanceof Error ? err.message : err,
+          );
+        });
+    });
+  });
   // 后台预热体检子进程，避免首次点击冷启动过久
   preheatPipelineWorker();
   void syncAiIntegrationOnStartup();

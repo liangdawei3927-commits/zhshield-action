@@ -908,3 +908,77 @@ export function listAuditLogs(
   const sql = `SELECT * FROM content_audit_log ${where} ORDER BY operated_at DESC LIMIT ?`;
   return db.prepare(sql).all(...params, limit) as ContentAuditLogRow[];
 }
+
+// ─── 孤儿治理查询 (Orphan Governance) ─────────────────────
+
+/**
+ * 列出所有仍有活跃（未软删）关联数据的 project_id。
+ * 对 PROJECT_DATA_TABLES 5 表各 SELECT DISTINCT project_id WHERE deleted_at IS NULL，
+ * UNION 去重后返回。
+ */
+export function listActiveProjectIds(db: Database.Database): string[] {
+  const unionSql = PROJECT_DATA_TABLES.map(
+    (t) => `SELECT DISTINCT project_id FROM ${t} WHERE deleted_at IS NULL`,
+  ).join(' UNION ');
+  const rows = db.prepare(unionSql).all() as { project_id: string }[];
+  return rows.map((r) => r.project_id);
+}
+
+/**
+ * 列出所有仅有软删（deleted_at IS NOT NULL）关联数据、且无活跃数据的 project_id。
+ * 对 PROJECT_DATA_TABLES 5 表各 SELECT DISTINCT project_id WHERE deleted_at IS NOT NULL，
+ * UNION 去重后返回。
+ */
+export function listSoftDeletedProjectIds(db: Database.Database): string[] {
+  const unionSql = PROJECT_DATA_TABLES.map(
+    (t) => `SELECT DISTINCT project_id FROM ${t} WHERE deleted_at IS NOT NULL`,
+  ).join(' UNION ');
+  const rows = db.prepare(unionSql).all() as { project_id: string }[];
+  return rows.map((r) => r.project_id);
+}
+
+/**
+ * 物理删除已过 TTL 的软删行。
+ * 对 5 表执行 DELETE … WHERE deleted_at IS NOT NULL AND julianday(deleted_at) < julianday('now', '-N days')
+ * 用 julianday 做跨格式比较（ISO 8601 字符串 vs SQLite datetime 格式）。
+ * 在 db.transaction 内执行保证原子性。
+ */
+export function purgeExpiredSoftDeleted(
+  db: Database.Database,
+  ttlDays: number,
+): { table: string; deleted: number }[] {
+  const results: { table: string; deleted: number }[] = [];
+  const statements = PROJECT_DATA_TABLES.map((table) =>
+    db.prepare(
+      `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND julianday(deleted_at) < julianday('now', '-${ttlDays} days')`,
+    ),
+  );
+  db.transaction(() => {
+    for (let i = 0; i < PROJECT_DATA_TABLES.length; i++) {
+      const info = statements[i].run();
+      results.push({ table: PROJECT_DATA_TABLES[i], deleted: info.changes });
+    }
+  })();
+  return results;
+}
+
+/**
+ * 统计某项目在各表中的活跃（未软删）行数。
+ * 只返回 count > 0 的表。
+ */
+export function countActiveRows(
+  db: Database.Database,
+  projectId: string,
+): { table: string; count: number }[] {
+  const results: { table: string; count: number }[] = [];
+  const statements = PROJECT_DATA_TABLES.map((table) =>
+    db.prepare(`SELECT COUNT(*) AS cnt FROM ${table} WHERE project_id = ? AND deleted_at IS NULL`),
+  );
+  for (let i = 0; i < PROJECT_DATA_TABLES.length; i++) {
+    const row = statements[i].get(projectId) as { cnt: number };
+    if (row.cnt > 0) {
+      results.push({ table: PROJECT_DATA_TABLES[i], count: row.cnt });
+    }
+  }
+  return results;
+}

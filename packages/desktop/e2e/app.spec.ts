@@ -129,8 +129,7 @@ test.describe('智汇码盾桌面端 E2E', () => {
 
   test('欢迎页（无项目初始态）渲染关键文案', async () => {
     ({ app, page } = await launchApp());
-    await expect(page.getByText('添加项目，开启守护')).toBeVisible();
-    await expect(page.getByText('智能引擎已开启')).toBeVisible();
+    await expect(page.getByText('添加项目开启守护')).toBeVisible();
     await expect(page.getByText('已守护项目')).toBeVisible();
     await expect(page.getByText('累计拦截')).toBeVisible();
     await expect(page.getByText('健康评分')).toBeVisible();
@@ -250,13 +249,15 @@ test.describe('智汇码盾桌面端 E2E', () => {
     const result = await page.evaluate(
       (p) =>
         (window as unknown as {
-          electronAPI?: { removeProject?: (projectPath: string) => Promise<{ ok: boolean }> };
+          electronAPI?: {
+            removeProject?: (projectPath: string) => Promise<{ ok: boolean; errors?: string[] }>;
+          };
         }).electronAPI?.removeProject?.(p),
       DEMO_PROJECT_PATH,
     );
 
-    // ③ removeProject 返回 { ok: true }（④ 云端注销 fire-and-forget 内部降级，链完整不抛错）
-    expect(result).toEqual({ ok: true });
+    // ③ removeProject 返回 { ok: true, errors: [] }（④ 云端注销 fire-and-forget 内部降级，链完整不抛错）
+    expect(result).toEqual({ ok: true, errors: [] });
     // ① 画像文件不存在（e2e 用假 HOME，从隔离 HOME 路径找；
     //    若画像从未生成则断言天然通过，重点在 API 链路）
     expect(existsSync(profileFile)).toBe(false);

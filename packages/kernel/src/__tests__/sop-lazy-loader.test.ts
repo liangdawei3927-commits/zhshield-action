@@ -157,4 +157,98 @@ describe('SopLazyLoader', () => {
       expect(secRules.some((r) => r.id.startsWith('security'))).toBe(true);
     });
   });
+
+  // ─── removeModule ────────────────────────────────
+  describe('removeModule', () => {
+    it('删除后 getLoadedModules 不再包含该模块', async () => {
+      await loader.syncForProject({ language: 'typescript', features: [] });
+      expect(await loader.getLoadedModules()).toContain('typescript');
+
+      await loader.removeModule('typescript');
+      const loaded = await loader.getLoadedModules();
+      expect(loaded).not.toContain('typescript');
+      // 其余模块不受影响
+      expect(loaded).toContain('security');
+    });
+
+    it('幂等：二次删除不抛', async () => {
+      await loader.syncForProject({ language: 'typescript', features: [] });
+      await loader.removeModule('typescript');
+      await expect(loader.removeModule('typescript')).resolves.toBeUndefined();
+    });
+
+    it('删除不存在的模块不抛', async () => {
+      await expect(loader.removeModule('non-existent')).resolves.toBeUndefined();
+    });
+  });
+
+  // ─── getNeededModules ────────────────────────────
+  describe('getNeededModules', () => {
+    it('framework=nestjs → 含 nestjs', () => {
+      const needed = loader.getNeededModules({ framework: 'nestjs', features: [] });
+      expect(needed).toContain('nestjs');
+    });
+
+    it('language=typescript → 含 typescript', () => {
+      const needed = loader.getNeededModules({ language: 'typescript', features: [] });
+      expect(needed).toContain('typescript');
+    });
+
+    it('默认含 security/quality/architecture', () => {
+      const needed = loader.getNeededModules({ features: [] });
+      expect(needed.sort()).toEqual(['architecture', 'quality', 'security']);
+    });
+  });
+
+  // ─── getRefsFilteredActiveModules ────────────────
+  describe('getRefsFilteredActiveModules', () => {
+    // 账本与 cacheDir 同级（sop-cache 的父目录）；用独立父目录隔离账本文件，避免跨用例串扰
+    let parentDir: string;
+    let isolatedLoader: SopLazyLoader;
+
+    beforeEach(() => {
+      parentDir = path.join(os.tmpdir(), `zhshield-lazy-parent-${crypto.randomUUID()}`);
+      const dir = path.join(parentDir, 'sop-cache');
+      fs.mkdirSync(path.join(dir, 'modules'), { recursive: true });
+      isolatedLoader = new SopLazyLoader(makeCacheManagerMock(dir, rules));
+    });
+
+    afterEach(() => {
+      fs.rmSync(parentDir, { recursive: true, force: true });
+    });
+
+    it('账本含 sop-module:typescript reclaiming → 结果剔除 typescript', async () => {
+      await isolatedLoader.syncForProject({ language: 'typescript', features: [] });
+      const ledgerPath = path.join(parentDir, 'capability-refs.json');
+      fs.writeFileSync(
+        ledgerPath,
+        JSON.stringify({
+          schemaVersion: 1,
+          capabilities: {
+            'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+          },
+        }),
+        'utf-8',
+      );
+
+      const active = await isolatedLoader.getRefsFilteredActiveModules();
+      expect(active).not.toContain('typescript');
+      expect(active).toContain('security');
+    });
+
+    it('账本缺失 → 返回全部已加载模块', async () => {
+      await isolatedLoader.syncForProject({ language: 'typescript', features: [] });
+      const active = await isolatedLoader.getRefsFilteredActiveModules();
+      expect(active).toContain('typescript');
+      expect(active).toContain('security');
+    });
+
+    it('账本 JSON 损坏 → 返回全部已加载模块（不抛）', async () => {
+      await isolatedLoader.syncForProject({ language: 'typescript', features: [] });
+      const ledgerPath = path.join(parentDir, 'capability-refs.json');
+      fs.writeFileSync(ledgerPath, '{ not valid json', 'utf-8');
+      const active = await isolatedLoader.getRefsFilteredActiveModules();
+      expect(active).toContain('typescript');
+    });
+  });
 });

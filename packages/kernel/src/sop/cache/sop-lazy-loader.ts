@@ -4,6 +4,7 @@ import type { SopRule, ProjectFeature } from '../_meta/sop-types';
 import type { SopCacheManager } from './sop-cache-manager';
 
 const DB_EXT = /\.db$/;
+const SOP_MODULE_PREFIX = 'sop-module:';
 
 /**
  * SopLazyLoader — 分模块懒加载（文档 9.5 节）
@@ -58,7 +59,7 @@ export class SopLazyLoader {
    */
   async syncForProject(feature: ProjectFeature): Promise<string[]> {
     // 1. 识别项目特征 → 映射到需要的模块
-    const neededModules = this.mapFeaturesToModules(feature);
+    const neededModules = this.getNeededModules(feature);
 
     // 2. 只下载需要的规则模块
     const syncedModules: string[] = [];
@@ -73,7 +74,7 @@ export class SopLazyLoader {
   /**
    * 将项目特征映射到需要加载的模块
    */
-  private mapFeaturesToModules(feature: ProjectFeature): string[] {
+  getNeededModules(feature: ProjectFeature): string[] {
     const modules = new Set<string>(['security', 'quality', 'architecture']);
     this.addFrameworkModules(feature, modules);
     this.addLanguageModules(feature, modules);
@@ -154,6 +155,51 @@ export class SopLazyLoader {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * 物理删除指定模块的缓存文件（cacheDir/modules/<module>.db）。
+   *
+   * 幂等：文件不存在时静默成功。不触碰 capability-refs.json（账本写者始终是 desktop）。
+   */
+  async removeModule(module: string): Promise<void> {
+    const cacheDir = this.cacheManager.getCacheDir();
+    const modulePath = path.join(cacheDir, 'modules', `${module}.db`);
+    await fs.promises.rm(modulePath, { force: true });
+  }
+
+  /**
+   * 运行层过滤钩子：读取账本中 reclaiming 的 sop-module:* id，从已加载模块中剔除。
+   *
+   * 账本路径 = cacheDir 上一级 capability-refs.json（sop-cache 在 .zhshield/sop-cache，父目录即 .zhshield）。
+   * 读账本失败/缺失 → 返回全部已加载模块。此函数绝不抛。
+   */
+  async getRefsFilteredActiveModules(): Promise<string[]> {
+    const loaded = await this.getLoadedModules();
+    let reclaiming: Set<string>;
+    try {
+      const cacheDir = this.cacheManager.getCacheDir();
+      const ledgerPath = path.join(path.dirname(cacheDir), 'capability-refs.json');
+      const raw = await fs.promises.readFile(ledgerPath, 'utf-8');
+      const parsed: unknown = JSON.parse(raw);
+      const capabilities =
+        typeof parsed === 'object' && parsed !== null
+          ? (parsed as { capabilities?: unknown }).capabilities
+          : undefined;
+      reclaiming = new Set<string>();
+      if (typeof capabilities === 'object' && capabilities !== null) {
+        for (const [key, value] of Object.entries(capabilities)) {
+          if (!key.startsWith(SOP_MODULE_PREFIX)) continue;
+          const entry = value as { status?: unknown } | null;
+          if (entry !== null && typeof entry === 'object' && entry.status === 'reclaiming') {
+            reclaiming.add(key.slice(SOP_MODULE_PREFIX.length));
+          }
+        }
+      }
+    } catch {
+      return loaded;
+    }
+    return loaded.filter((m) => !reclaiming.has(m));
   }
 
   /**

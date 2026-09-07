@@ -43,6 +43,14 @@ export {
   buildDefaultToolRuleConfigs,
   resolveApiBase,
   resolveSopBase,
+  readApiToken,
+  resolveTools,
+  resolveRules,
+  registerProjectFeatures,
+  unregisterProjectFeatures,
+  resolveHealth,
+  readOrCreateUserId,
+  getOrCreateDefaultOrg,
 } from './sync';
 export type {
   ToolId,
@@ -56,6 +64,9 @@ export type {
   VersionLock,
   ExperienceSyncPayload,
   WisdomBrainSyncResult,
+  ScopeProfileLike,
+  ResolveRulesResponse,
+  DefaultOrgResult,
 } from './sync';
 
 // ─── 深度优化协作者：冲突解决 / 压缩 / 清理 / 缓存指标与维护 ──
@@ -73,3 +84,10 @@ export type {
   MaintenanceOutcome,
   SopCacheMaintenanceOptions,
 } from './cache/sop-cache-maintenance';
+export {
+  computeRuleContentSha,
+  buildCurrentVersions,
+  verifyRuleManifest,
+  needsHeal,
+} from './cache/sop-resolve-verifier';
+export type { RuleManifestEntry, ResolveDriftReport } from './cache/sop-resolve-verifier';

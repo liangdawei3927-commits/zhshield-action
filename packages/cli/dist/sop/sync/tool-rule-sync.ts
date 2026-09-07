@@ -5,6 +5,10 @@ import * as crypto from 'node:crypto';
 import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { resolveApiBase } from './api-base';
 import { HttpError, withRetry } from './retry';
+import { getReclaimingToolRuleIds } from './capability-refs-reader';
+
+/** 能力到期物理删除阈值：reclaiming 持续超过该天数（严格大于）才删除（06 §4.3 窗口参数） */
+export const EXPIRY_THRESHOLD_DAYS = 7;
 
 export type ToolId = 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser';
 
@@ -84,19 +88,92 @@ export function buildDefaultToolRuleConfigs(apiBase?: string): ToolRuleSyncConfi
   ];
 }
 
+/** 远程版本探测：网络失败/非 2xx 返回 null（由调用方降级为 network_error） */
+async function fetchRemoteVersion(cfg: ToolRuleSyncConfig): Promise<ToolRuleVersion | null> {
+  try {
+    return await withRetry(async () => {
+      const res = await fetch(cfg.remoteVersionUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new HttpError(res.status);
+      return (await res.json()) as ToolRuleVersion;
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** 远程规则包下载：网络失败/非 2xx 返回 null */
+async function downloadRulePackage(cfg: ToolRuleSyncConfig): Promise<Uint8Array | null> {
+  try {
+    return await withRetry(async () => {
+      const res = await fetch(cfg.remoteDownloadUrl, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) throw new HttpError(res.status);
+      return new Uint8Array(await res.arrayBuffer());
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** 递归收集目录下规则文件（node_modules 跳过；目录不存在返回空） */
+async function walkRuleDir(dir: string): Promise<string[]> {
+  const results: string[] = [];
+  let entries: fs.Dirent[];
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+
+  const subdirPromises: Promise<string[]>[] = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules') continue;
+      subdirPromises.push(walkRuleDir(path.join(dir, entry.name)));
+      continue;
+    }
+    if (entry.isFile()) {
+      results.push(path.join(dir, entry.name));
+    }
+  }
+  const subdirResults = await Promise.all(subdirPromises);
+  for (const sr of subdirResults) {
+    results.push(...sr);
+  }
+  return results;
+}
+
+/** 目录内容哈希：相对路径排序后走 hashToolRuleFiles（与下发哈希算法一致） */
+async function computeRuleDirHash(dir: string): Promise<string> {
+  const files = await walkRuleDir(dir);
+  const entries: ToolRuleFile[] = [];
+  for (const file of files) {
+    const relative = path.relative(dir, file).split(path.sep).join('/');
+    const content = await fs.promises.readFile(file, 'utf-8');
+    entries.push({ filename: relative, content });
+  }
+  return hashToolRuleFiles(entries);
+}
+
 export class ToolRuleSync {
-  private baseDir: string;
+  private _baseDir: string;
   private configs: Map<ToolId, ToolRuleSyncConfig>;
   private versionCache: Map<ToolId, ToolRuleVersion>;
   private timers: Map<ToolId, ReturnType<typeof setInterval>>;
   private isOnline: boolean;
+  private remoteToolIds: readonly ToolId[] | null;
 
-  constructor(customConfigs?: ToolRuleSyncConfig[]) {
-    this.baseDir = path.join(os.homedir(), '.zhshield');
+  constructor(customConfigs?: ToolRuleSyncConfig[], baseDir?: string) {
+    this._baseDir = baseDir ?? path.join(os.homedir(), '.zhshield');
     this.configs = new Map();
     this.versionCache = new Map();
     this.timers = new Map();
     this.isOnline = true;
+    this.remoteToolIds = null;
 
     const cfgs = customConfigs ?? buildDefaultToolRuleConfigs();
     for (const cfg of cfgs) {
@@ -104,9 +181,14 @@ export class ToolRuleSync {
     }
   }
 
+  /** 规则根目录（只读暴露，供到期扫描等外部逻辑定位账本/版本文件） */
+  get baseDir(): string {
+    return this._baseDir;
+  }
+
   async initialize(): Promise<void> {
     for (const cfg of this.configs.values()) {
-      await fs.promises.mkdir(path.join(this.baseDir, cfg.localDir), { recursive: true });
+      await fs.promises.mkdir(path.join(this._baseDir, cfg.localDir), { recursive: true });
     }
     await this.loadAllVersions();
   }
@@ -117,7 +199,7 @@ export class ToolRuleSync {
       return { toolId, updated: false, reason: 'network_error' };
     }
     try {
-      const remoteVersion = await this.fetchRemoteVersion(cfg);
+      const remoteVersion = await fetchRemoteVersion(cfg);
       if (!remoteVersion) {
         return { toolId, updated: false, reason: 'network_error' };
       }
@@ -137,13 +219,13 @@ export class ToolRuleSync {
     remoteVersion: ToolRuleVersion,
     localVersion: ToolRuleVersion | undefined,
   ): Promise<ToolRuleSyncResult> {
-    const downloaded = await this.downloadRules(cfg);
+    const downloaded = await downloadRulePackage(cfg);
     if (!downloaded) {
       return { toolId, updated: false, reason: 'network_error' };
     }
-    const localDir = path.join(this.baseDir, cfg.localDir);
+    const localDir = path.join(this._baseDir, cfg.localDir);
     await this.extractRules(downloaded, localDir);
-    const computedHash = await this.computeDirHash(localDir);
+    const computedHash = await computeRuleDirHash(localDir);
     if (computedHash !== remoteVersion.hash) {
       return { toolId, updated: false, reason: 'hash_mismatch' };
     }
@@ -159,7 +241,7 @@ export class ToolRuleSync {
 
   async syncAll(): Promise<ToolRuleSyncResult[]> {
     const results: ToolRuleSyncResult[] = [];
-    for (const toolId of this.configs.keys()) {
+    for (const toolId of this.getActiveToolIds()) {
       results.push(await this.syncTool(toolId));
     }
     return results;
@@ -181,11 +263,11 @@ export class ToolRuleSync {
         return r;
       });
       const buf = new Uint8Array(await res.arrayBuffer());
-      const localDir = path.join(this.baseDir, cfg.localDir);
+      const localDir = path.join(this._baseDir, cfg.localDir);
       await this.extractRules(buf, localDir);
-      const remoteVersion = await this.fetchRemoteVersion(cfg);
+      const remoteVersion = await fetchRemoteVersion(cfg);
       if (!remoteVersion) return { toolId, updated: false, reason: 'network_error' };
-      const computedHash = await this.computeDirHash(localDir);
+      const computedHash = await computeRuleDirHash(localDir);
       if (computedHash !== remoteVersion.hash) {
         return { toolId, updated: false, reason: 'hash_mismatch' };
       }
@@ -197,12 +279,13 @@ export class ToolRuleSync {
   }
 
   startPeriodicSync(): void {
-    for (const cfg of this.configs.values()) {
-      if (this.timers.has(cfg.toolId)) continue;
+    for (const toolId of this.getActiveToolIds()) {
+      const cfg = this.configs.get(toolId);
+      if (!cfg || this.timers.has(toolId)) continue;
       const timer = setInterval(async () => {
-        await this.syncTool(cfg.toolId);
+        await this.syncTool(toolId);
       }, cfg.syncIntervalMs);
-      this.timers.set(cfg.toolId, timer);
+      this.timers.set(toolId, timer);
     }
   }
 
@@ -225,8 +308,53 @@ export class ToolRuleSync {
     this.isOnline = online;
   }
 
+  /**
+   * 设置服务端 resolve 返回的远程工具白名单。
+   * 设置后 getConfiguredToolIds / syncAll / startPeriodicSync 仅作用于
+   * configuredIds ∩ remoteIds 的交集。传 null 或不调用 → 恢复全量（离线降级）。
+   */
+  setRemoteToolIds(ids: readonly ToolId[] | null): void {
+    this.remoteToolIds = ids;
+  }
+
+  getRemoteToolIds(): readonly ToolId[] | null {
+    return this.remoteToolIds;
+  }
+
+  /**
+   * 当前活跃的工具 ID 列表：远程白名单与本地配置的交集，
+   * 再剔除 capability-refs 账本中 status === 'reclaiming' 的工具。
+   * 无远程白名单 → 全部配置（离线/无 org 降级）。
+   */
+  private getActiveToolIds(): ToolId[] {
+    const reclaiming = getReclaimingToolRuleIds(this._baseDir);
+    return this.getScopedToolIds().filter((id) => !reclaiming.has(id));
+  }
+
+  /**
+   * 未剔 reclaiming 的工具清单（仅远程交集；无远程白名单 → 全部配置）。
+   * 供「领取」步骤用于唤醒（claim 必须先于运行层过滤，否则 reclaiming 能力
+   * 永远进不了 claim 列表，7 天窗口内重加同栈项目无法复用本地文件）。
+   */
+  getUnfilteredToolIds(): ToolId[] {
+    return this.getScopedToolIds();
+  }
+
+  /** 远程白名单与本地配置的交集（无远程白名单 → 全部配置） */
+  private getScopedToolIds(): ToolId[] {
+    const configured = [...this.configs.keys()];
+    if (!this.remoteToolIds) return configured;
+    const remoteSet = new Set(this.remoteToolIds);
+    return configured.filter((id) => remoteSet.has(id));
+  }
+
+  /** 能力引用回收过滤后的活跃工具（getActiveToolIds 的公共别名） */
+  getRefsFilteredActiveTools(): ToolId[] {
+    return this.getActiveToolIds();
+  }
+
   getConfiguredToolIds(): ToolId[] {
-    return [...this.configs.keys()];
+    return this.getRefsFilteredActiveTools();
   }
 
   getLocalVersion(toolId: ToolId): ToolRuleVersion | undefined {
@@ -235,7 +363,18 @@ export class ToolRuleSync {
 
   getRuleDir(toolId: ToolId): string {
     const cfg = this.configs.get(toolId);
-    return path.join(this.baseDir, cfg?.localDir ?? `${toolId}-rules`);
+    return path.join(this._baseDir, cfg?.localDir ?? `${toolId}-rules`);
+  }
+
+  /**
+   * 物理删除指定工具的规则目录 + 版本缓存条目 + 周期同步 timer；幂等。
+   * 不触碰 capability-refs.json（账本写入方始终是 desktop，单写者原则）。
+   */
+  async removeRules(toolId: ToolId): Promise<void> {
+    this.stopToolSync(toolId);
+    await fs.promises.rm(this.getRuleDir(toolId), { recursive: true, force: true });
+    this.versionCache.delete(toolId);
+    await this.persistVersions();
   }
 
   isStale(toolId: ToolId, thresholdDays = 7): boolean {
@@ -244,35 +383,6 @@ export class ToolRuleSync {
     const daysSinceSync =
       (Date.now() - new Date(version.publishedAt).getTime()) / (24 * 60 * 60 * 1000);
     return daysSinceSync > thresholdDays;
-  }
-
-  private async fetchRemoteVersion(cfg: ToolRuleSyncConfig): Promise<ToolRuleVersion | null> {
-    try {
-      return await withRetry(async () => {
-        const res = await fetch(cfg.remoteVersionUrl, {
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (!res.ok) throw new HttpError(res.status);
-        return (await res.json()) as ToolRuleVersion;
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  private async downloadRules(cfg: ToolRuleSyncConfig): Promise<Uint8Array | null> {
-    try {
-      return await withRetry(async () => {
-        const res = await fetch(cfg.remoteDownloadUrl, {
-          signal: AbortSignal.timeout(30_000),
-        });
-        if (!res.ok) throw new HttpError(res.status);
-        return new Uint8Array(await res.arrayBuffer());
-      });
-    } catch {
-      return null;
-    }
   }
 
   private async extractRules(data: Uint8Array, targetDir: string): Promise<void> {
@@ -297,47 +407,8 @@ export class ToolRuleSync {
     }
   }
 
-  private async computeDirHash(dir: string): Promise<string> {
-    const files = await this.walkDir(dir);
-    const entries: ToolRuleFile[] = [];
-    for (const file of files) {
-      const relative = path.relative(dir, file).split(path.sep).join('/');
-      const content = await fs.promises.readFile(file, 'utf-8');
-      entries.push({ filename: relative, content });
-    }
-    return hashToolRuleFiles(entries);
-  }
-
-  private async walkDir(dir: string): Promise<string[]> {
-    const results: string[] = [];
-    let entries: fs.Dirent[];
-    try {
-      entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    } catch {
-      // directory may not exist yet
-      return results;
-    }
-
-    const subdirPromises: Promise<string[]>[] = [];
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        if (entry.name === 'node_modules') continue;
-        subdirPromises.push(this.walkDir(path.join(dir, entry.name)));
-        continue;
-      }
-      if (entry.isFile()) {
-        results.push(path.join(dir, entry.name));
-      }
-    }
-    const subdirResults = await Promise.all(subdirPromises);
-    for (const sr of subdirResults) {
-      results.push(...sr);
-    }
-    return results;
-  }
-
   private async loadAllVersions(): Promise<void> {
-    const versionFile = path.join(this.baseDir, 'tool-rule-versions.json');
+    const versionFile = path.join(this._baseDir, 'tool-rule-versions.json');
     try {
       const raw = await fs.promises.readFile(versionFile, 'utf-8');
       const versions: ToolRuleVersion[] = JSON.parse(raw);
@@ -349,10 +420,14 @@ export class ToolRuleSync {
     }
   }
 
-  private async saveVersion(toolId: ToolId, version: ToolRuleVersion): Promise<void> {
-    this.versionCache.set(toolId, version);
-    const versionFile = path.join(this.baseDir, 'tool-rule-versions.json');
+  private async persistVersions(): Promise<void> {
+    const versionFile = path.join(this._baseDir, 'tool-rule-versions.json');
     const all = [...this.versionCache.values()];
     await fs.promises.writeFile(versionFile, JSON.stringify(all, null, 2), 'utf-8');
+  }
+
+  private async saveVersion(toolId: ToolId, version: ToolRuleVersion): Promise<void> {
+    this.versionCache.set(toolId, version);
+    await this.persistVersions();
   }
 }

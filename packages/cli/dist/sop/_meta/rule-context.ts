@@ -6,9 +6,7 @@ import type { ToolResult } from '@zh/shared';
  * ToolScanOutcome — M1b 工具扫描去重的共享结果。
  * Promise 永不 reject：扫描失败也是一种结果（所有消费者得到等价错误评估）。
  */
-export type ToolScanOutcome =
-  | { ok: true; result: ToolResult }
-  | { ok: false; error: string };
+export type ToolScanOutcome = { ok: true; result: ToolResult } | { ok: false; error: string };
 
 /**
  * ToolScanCache — 单次 evaluateRules 调用内的工具扫描缓存（M1b 去重）。

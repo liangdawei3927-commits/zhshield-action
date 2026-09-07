@@ -47,7 +47,14 @@ export function getMainWindow(): BrowserWindow | null {
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
 // ─── 智汇大脑：SOP 规则缓存管理器 ────────────────────────────
-export const API_BASE = resolveApiBase(process.env.ZH_API_BASE || process.env.VITE_API_BASE);
+// dev 模式默认连本地后端（packages/server，3010），打包后用环境变量或正式域名。
+// 显式设置 ZH_API_BASE / VITE_API_BASE 始终优先。
+const DEV_DEFAULT_API_BASE = 'http://localhost:3010/api/v1';
+export const API_BASE = resolveApiBase(
+  process.env.ZH_API_BASE ||
+    process.env.VITE_API_BASE ||
+    (app.isPackaged ? undefined : DEV_DEFAULT_API_BASE),
+);
 export const eventBus = new EventBus();
 export const sopRegistry = new SopRegistry(eventBus);
 

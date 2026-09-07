@@ -3,8 +3,24 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { WisdomBrainSync } from '../sop/sync/wisdom-brain-sync';
-import type { ToolRuleSyncResult, ToolId } from '../sop/sync/tool-rule-sync';
+import {
+  ToolRuleSync,
+  buildDefaultToolRuleConfigs,
+  EXPIRY_THRESHOLD_DAYS,
+} from '../sop/sync/tool-rule-sync';
+import type { ToolRuleSyncResult, ToolId, ToolRuleVersion } from '../sop/sync/tool-rule-sync';
+import { getReclaimingToolRuleSinces } from '../sop/sync/capability-refs-reader';
 import type { ExperienceRecord, ExperienceReportResult } from '../sop/sync/experience-reporter';
+
+// 竞态测试需要拦截 getReclaimingToolRuleSinces 的两次读取（初扫 vs 删除前重读），
+// 默认实现委托真实函数，其余测试行为不变。
+vi.mock('../sop/sync/capability-refs-reader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../sop/sync/capability-refs-reader')>();
+  return {
+    ...actual,
+    getReclaimingToolRuleSinces: vi.fn(actual.getReclaimingToolRuleSinces),
+  };
+});
 
 const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}T/;
 
@@ -263,6 +279,29 @@ describe('WisdomBrainSync', () => {
     });
   });
 
+  // ─── getInScopeToolIds ──────────────────────────────────
+  describe('getInScopeToolIds', () => {
+    it('无 feature 时返回全部配置工具', () => {
+      expect(sync.getInScopeToolIds()).toEqual(['semgrep', 'trivy', 'eslint', 'dep-cruiser']);
+    });
+
+    it('go 画像按 isToolInScope 裁剪为 security 工具', () => {
+      expect(sync.getInScopeToolIds({ language: 'go', features: [] })).toEqual([
+        'semgrep',
+        'trivy',
+      ]);
+    });
+
+    it('typescript 画像保留全部工具', () => {
+      expect(sync.getInScopeToolIds({ language: 'typescript', features: [] })).toEqual([
+        'semgrep',
+        'trivy',
+        'eslint',
+        'dep-cruiser',
+      ]);
+    });
+  });
+
   // ─── 经验回写 ───────────────────────────────────────────
   describe('经验回写', () => {
     it('syncExperience 应逐条 submit 后 flush', async () => {
@@ -328,6 +367,143 @@ describe('WisdomBrainSync', () => {
       await sync.initialize();
       expect(trs.initialize).toHaveBeenCalledTimes(1);
       expect(er.initialize).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─── scanAndRemoveExpired（R3 到期物理删除） ──────────────
+  describe('scanAndRemoveExpired', () => {
+    let expiryTmpDir: string;
+    let expirySync: WisdomBrainSync;
+    let expiryTrs: ToolRuleSync;
+
+    beforeEach(() => {
+      expiryTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-wbs-expiry-'));
+      expiryTrs = new ToolRuleSync(
+        buildDefaultToolRuleConfigs('http://localhost:3010/api/v1'),
+        expiryTmpDir,
+      );
+      expirySync = new WisdomBrainSync({
+        toolRuleSync: expiryTrs,
+        experienceReporter: er as never,
+        lockFilePath: path.join(expiryTmpDir, 'version-locks.json'),
+      });
+    });
+
+    afterEach(() => {
+      fs.rmSync(expiryTmpDir, { recursive: true, force: true });
+    });
+
+    function writeLedger(entries: Record<string, unknown>): void {
+      fs.writeFileSync(
+        path.join(expiryTmpDir, 'capability-refs.json'),
+        JSON.stringify({ schemaVersion: 1, capabilities: entries }),
+        'utf-8',
+      );
+    }
+
+    function writeVersions(versions: ToolRuleVersion[]): void {
+      fs.writeFileSync(
+        path.join(expiryTmpDir, 'tool-rule-versions.json'),
+        JSON.stringify(versions),
+        'utf-8',
+      );
+    }
+
+    it('reclaiming 且 since 8 天前 → 物理删除并返回 toolId', async () => {
+      writeVersions([
+        {
+          toolId: 'eslint',
+          version: '1.0.0',
+          hash: 'h1',
+          size: 1,
+          publishedAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          toolId: 'trivy',
+          version: '2.0.0',
+          hash: 'h2',
+          size: 2,
+          publishedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+      await expiryTrs.initialize();
+      fs.writeFileSync(path.join(expiryTmpDir, 'eslint-rules', 'rule.json'), '{}', 'utf-8');
+      writeLedger({
+        'toolrule:eslint': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: Date.now() - 8 * 24 * 60 * 60 * 1000,
+        },
+      });
+
+      const removed = await expirySync.scanAndRemoveExpired();
+
+      expect(removed).toEqual(['eslint']);
+      expect(fs.existsSync(path.join(expiryTmpDir, 'eslint-rules'))).toBe(false);
+      const persisted = JSON.parse(
+        fs.readFileSync(path.join(expiryTmpDir, 'tool-rule-versions.json'), 'utf-8'),
+      ) as ToolRuleVersion[];
+      expect(persisted.map((v) => v.toolId)).toEqual(['trivy']);
+    });
+
+    it('reclaiming 且 since 1 小时前（窗口内）→ 不删', async () => {
+      await expiryTrs.initialize();
+      fs.mkdirSync(path.join(expiryTmpDir, 'eslint-rules'), { recursive: true });
+      writeLedger({
+        'toolrule:eslint': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: Date.now() - 60 * 60 * 1000,
+        },
+      });
+
+      const removed = await expirySync.scanAndRemoveExpired();
+
+      expect(removed).toEqual([]);
+      expect(fs.existsSync(path.join(expiryTmpDir, 'eslint-rules'))).toBe(true);
+    });
+
+    it('since 恰为 7 天整 → 不删（严格大于）', async () => {
+      await expiryTrs.initialize();
+      fs.mkdirSync(path.join(expiryTmpDir, 'eslint-rules'), { recursive: true });
+      vi.useFakeTimers();
+      try {
+        const now = Date.now();
+        const thresholdMs = EXPIRY_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+        writeLedger({
+          'toolrule:eslint': {
+            languages: [],
+            refs: [],
+            status: 'reclaiming',
+            since: now - thresholdMs,
+          },
+        });
+        const removed = await expirySync.scanAndRemoveExpired();
+        expect(removed).toEqual([]);
+        expect(fs.existsSync(path.join(expiryTmpDir, 'eslint-rules'))).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('竞态：扫描后、删除前被唤醒 → 不删', async () => {
+      await expiryTrs.initialize();
+      fs.mkdirSync(path.join(expiryTmpDir, 'eslint-rules'), { recursive: true });
+      const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
+      vi.mocked(getReclaimingToolRuleSinces)
+        .mockImplementationOnce(() => new Map([['eslint', eightDaysAgo]]))
+        .mockImplementationOnce(() => new Map()); // 重读：已被唤醒（active / since 清除）
+
+      const removed = await expirySync.scanAndRemoveExpired();
+
+      expect(removed).toEqual([]);
+      expect(fs.existsSync(path.join(expiryTmpDir, 'eslint-rules'))).toBe(true);
+    });
+
+    it('initialize 内调用 scanAndRemoveExpired 不抛', async () => {
+      await expect(expirySync.initialize()).resolves.toBeUndefined();
     });
   });
 });

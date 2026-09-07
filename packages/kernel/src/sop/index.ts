@@ -47,6 +47,7 @@ export {
   resolveTools,
   resolveRules,
   registerProjectFeatures,
+  unregisterProjectFeatures,
   resolveHealth,
   readOrCreateUserId,
   getOrCreateDefaultOrg,

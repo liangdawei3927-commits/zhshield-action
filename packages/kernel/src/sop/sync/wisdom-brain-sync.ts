@@ -2,8 +2,9 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import { isToolInScope } from '@zh/shared';
-import { ToolRuleSync } from './tool-rule-sync';
+import { ToolRuleSync, EXPIRY_THRESHOLD_DAYS } from './tool-rule-sync';
 import type { ToolRuleSyncResult, ToolId as SyncToolId } from './tool-rule-sync';
+import { getReclaimingToolRuleSinces } from './capability-refs-reader';
 import { ExperienceReporter } from './experience-reporter';
 import type { ExperienceRecord, ExperienceReportResult } from './experience-reporter';
 import type { ProjectFeature } from '../_meta/sop-types';
@@ -54,6 +55,7 @@ export class WisdomBrainSync {
     await this.toolRuleSync.initialize();
     await this.experienceReporter.initialize();
     await this.loadLockedVersions();
+    await this.scanAndRemoveExpired();
   }
 
   // ─── 云端规则下发 ─────────────────────────────────────
@@ -76,10 +78,36 @@ export class WisdomBrainSync {
    */
   async syncAllRules(feature?: ProjectFeature): Promise<ToolRuleSyncResult[]> {
     const results: ToolRuleSyncResult[] = [];
-    for (const toolId of this.getConfiguredTools(feature)) {
+    for (const toolId of this.getInScopeToolIds(feature)) {
       results.push(await this.syncToolRules(toolId));
     }
     return results;
+  }
+
+  /**
+   * 扫描到期（reclaiming 且 since 超过 EXPIRY_THRESHOLD_DAYS）的工具并物理删除。
+   *
+   * 删除动作前重读账本确认仍 reclaiming（防窗口末唤醒竞态误删）。
+   * 返回本次实际删除的 ToolId[]（供 desktop 侧账本标记 reclaimed）。
+   * 任何异常 → 返回 []（绝不抛，运行于 initialize）。
+   */
+  async scanAndRemoveExpired(): Promise<ToolId[]> {
+    try {
+      const thresholdMs = EXPIRY_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+      const candidates = getReclaimingToolRuleSinces(this.toolRuleSync.baseDir);
+      const removed: ToolId[] = [];
+      for (const [toolId, since] of candidates) {
+        if (Date.now() - since <= thresholdMs) continue;
+        // 删除前重读账本：确认仍 reclaiming 且 since 仍超阈值（窗口末唤醒绝不误删）
+        const freshSince = getReclaimingToolRuleSinces(this.toolRuleSync.baseDir).get(toolId);
+        if (freshSince === undefined || Date.now() - freshSince <= thresholdMs) continue;
+        await this.toolRuleSync.removeRules(toolId);
+        removed.push(toolId);
+      }
+      return removed;
+    } catch {
+      return [];
+    }
   }
 
   // ─── 经验回写 ─────────────────────────────────────────
@@ -179,7 +207,7 @@ export class WisdomBrainSync {
     return this.experienceReporter;
   }
 
-  private getConfiguredTools(feature?: ProjectFeature): ToolId[] {
+  getInScopeToolIds(feature?: ProjectFeature): ToolId[] {
     const tools = this.toolRuleSync.getConfiguredToolIds();
     if (!feature) return tools;
     return tools.filter((toolId) => isToolInScope(toolId, feature));

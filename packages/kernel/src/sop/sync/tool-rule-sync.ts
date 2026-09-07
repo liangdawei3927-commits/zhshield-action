@@ -5,6 +5,10 @@ import * as crypto from 'node:crypto';
 import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { resolveApiBase } from './api-base';
 import { HttpError, withRetry } from './retry';
+import { getReclaimingToolRuleIds } from './capability-refs-reader';
+
+/** 能力到期物理删除阈值：reclaiming 持续超过该天数（严格大于）才删除（06 §4.3 窗口参数） */
+export const EXPIRY_THRESHOLD_DAYS = 7;
 
 export type ToolId = 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser';
 
@@ -143,6 +147,56 @@ async function walkRuleDir(dir: string): Promise<string[]> {
   return results;
 }
 
+/** 解包规则包写入目标目录；路径穿越条目拒绝写盘（safeJoinReal 白名单越界跳过） */
+async function extractRulePackage(data: Uint8Array, targetDir: string): Promise<void> {
+  const records: ToolRuleFile[] = JSON.parse(new TextDecoder().decode(data));
+  await fs.promises.rm(targetDir, { recursive: true, force: true });
+  await fs.promises.mkdir(targetDir, { recursive: true });
+  for (const record of records) {
+    let filePath: string;
+    try {
+      filePath = safeJoinReal(targetDir, record.filename);
+    } catch (err) {
+      if (err instanceof PathTraversalError) {
+        // 拒绝路径穿越：越界条目不写盘到 targetDir 之外
+        console.warn(`[tool-rule-sync] skipping unsafe rule filename: ${record.filename}`);
+        continue;
+      }
+      throw err;
+    }
+    // eslint-disable-next-line perf/perf-no-serial-await -- arg depends on loop var via dataflow
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.promises.writeFile(filePath, record.content, 'utf-8');
+  }
+}
+
+/** 载入版本缓存文件（不存在 → 空缓存；损坏 → 空缓存） */
+async function loadVersionCache(
+  baseDir: string,
+  versionCache: Map<ToolId, ToolRuleVersion>,
+): Promise<void> {
+  const versionFile = path.join(baseDir, 'tool-rule-versions.json');
+  try {
+    const raw = await fs.promises.readFile(versionFile, 'utf-8');
+    const versions: ToolRuleVersion[] = JSON.parse(raw);
+    for (const v of versions) {
+      versionCache.set(v.toolId, v);
+    }
+  } catch {
+    // no cached versions yet
+  }
+}
+
+/** 持久化版本缓存文件（全量覆写） */
+async function persistVersionCache(
+  baseDir: string,
+  versionCache: Map<ToolId, ToolRuleVersion>,
+): Promise<void> {
+  const versionFile = path.join(baseDir, 'tool-rule-versions.json');
+  const all = [...versionCache.values()];
+  await fs.promises.writeFile(versionFile, JSON.stringify(all, null, 2), 'utf-8');
+}
+
 /** 目录内容哈希：相对路径排序后走 hashToolRuleFiles（与下发哈希算法一致） */
 async function computeRuleDirHash(dir: string): Promise<string> {
   const files = await walkRuleDir(dir);
@@ -156,15 +210,15 @@ async function computeRuleDirHash(dir: string): Promise<string> {
 }
 
 export class ToolRuleSync {
-  private baseDir: string;
+  private _baseDir: string;
   private configs: Map<ToolId, ToolRuleSyncConfig>;
   private versionCache: Map<ToolId, ToolRuleVersion>;
   private timers: Map<ToolId, ReturnType<typeof setInterval>>;
   private isOnline: boolean;
   private remoteToolIds: readonly ToolId[] | null;
 
-  constructor(customConfigs?: ToolRuleSyncConfig[]) {
-    this.baseDir = path.join(os.homedir(), '.zhshield');
+  constructor(customConfigs?: ToolRuleSyncConfig[], baseDir?: string) {
+    this._baseDir = baseDir ?? path.join(os.homedir(), '.zhshield');
     this.configs = new Map();
     this.versionCache = new Map();
     this.timers = new Map();
@@ -177,11 +231,16 @@ export class ToolRuleSync {
     }
   }
 
+  /** 规则根目录（只读暴露，供到期扫描等外部逻辑定位账本/版本文件） */
+  get baseDir(): string {
+    return this._baseDir;
+  }
+
   async initialize(): Promise<void> {
     for (const cfg of this.configs.values()) {
-      await fs.promises.mkdir(path.join(this.baseDir, cfg.localDir), { recursive: true });
+      await fs.promises.mkdir(path.join(this._baseDir, cfg.localDir), { recursive: true });
     }
-    await this.loadAllVersions();
+    await loadVersionCache(this._baseDir, this.versionCache);
   }
 
   async syncTool(toolId: ToolId): Promise<ToolRuleSyncResult> {
@@ -214,14 +273,14 @@ export class ToolRuleSync {
     if (!downloaded) {
       return { toolId, updated: false, reason: 'network_error' };
     }
-    const localDir = path.join(this.baseDir, cfg.localDir);
-    await this.extractRules(downloaded, localDir);
+    const localDir = path.join(this._baseDir, cfg.localDir);
+    await extractRulePackage(downloaded, localDir);
     const computedHash = await computeRuleDirHash(localDir);
     if (computedHash !== remoteVersion.hash) {
       return { toolId, updated: false, reason: 'hash_mismatch' };
     }
     this.versionCache.set(toolId, remoteVersion);
-    await this.saveVersion(toolId, remoteVersion);
+    await persistVersionCache(this._baseDir, this.versionCache);
     return {
       toolId,
       updated: true,
@@ -254,15 +313,16 @@ export class ToolRuleSync {
         return r;
       });
       const buf = new Uint8Array(await res.arrayBuffer());
-      const localDir = path.join(this.baseDir, cfg.localDir);
-      await this.extractRules(buf, localDir);
+      const localDir = path.join(this._baseDir, cfg.localDir);
+      await extractRulePackage(buf, localDir);
       const remoteVersion = await fetchRemoteVersion(cfg);
       if (!remoteVersion) return { toolId, updated: false, reason: 'network_error' };
       const computedHash = await computeRuleDirHash(localDir);
       if (computedHash !== remoteVersion.hash) {
         return { toolId, updated: false, reason: 'hash_mismatch' };
       }
-      await this.saveVersion(toolId, remoteVersion);
+      this.versionCache.set(toolId, remoteVersion);
+      await persistVersionCache(this._baseDir, this.versionCache);
       return { toolId, updated: true, toVersion: remoteVersion.version };
     } catch {
       return { toolId, updated: false, reason: 'network_error' };
@@ -313,18 +373,39 @@ export class ToolRuleSync {
   }
 
   /**
-   * 当前活跃的工具 ID 列表：远程白名单与本地配置的交集。
+   * 当前活跃的工具 ID 列表：远程白名单与本地配置的交集，
+   * 再剔除 capability-refs 账本中 status === 'reclaiming' 的工具。
    * 无远程白名单 → 全部配置（离线/无 org 降级）。
    */
   private getActiveToolIds(): ToolId[] {
+    const reclaiming = getReclaimingToolRuleIds(this._baseDir);
+    return this.getScopedToolIds().filter((id) => !reclaiming.has(id));
+  }
+
+  /**
+   * 未剔 reclaiming 的工具清单（仅远程交集；无远程白名单 → 全部配置）。
+   * 供「领取」步骤用于唤醒（claim 必须先于运行层过滤，否则 reclaiming 能力
+   * 永远进不了 claim 列表，7 天窗口内重加同栈项目无法复用本地文件）。
+   */
+  getUnfilteredToolIds(): ToolId[] {
+    return this.getScopedToolIds();
+  }
+
+  /** 远程白名单与本地配置的交集（无远程白名单 → 全部配置） */
+  private getScopedToolIds(): ToolId[] {
     const configured = [...this.configs.keys()];
     if (!this.remoteToolIds) return configured;
     const remoteSet = new Set(this.remoteToolIds);
     return configured.filter((id) => remoteSet.has(id));
   }
 
-  getConfiguredToolIds(): ToolId[] {
+  /** 能力引用回收过滤后的活跃工具（getActiveToolIds 的公共别名） */
+  getRefsFilteredActiveTools(): ToolId[] {
     return this.getActiveToolIds();
+  }
+
+  getConfiguredToolIds(): ToolId[] {
+    return this.getRefsFilteredActiveTools();
   }
 
   getLocalVersion(toolId: ToolId): ToolRuleVersion | undefined {
@@ -333,7 +414,18 @@ export class ToolRuleSync {
 
   getRuleDir(toolId: ToolId): string {
     const cfg = this.configs.get(toolId);
-    return path.join(this.baseDir, cfg?.localDir ?? `${toolId}-rules`);
+    return path.join(this._baseDir, cfg?.localDir ?? `${toolId}-rules`);
+  }
+
+  /**
+   * 物理删除指定工具的规则目录 + 版本缓存条目 + 周期同步 timer；幂等。
+   * 不触碰 capability-refs.json（账本写入方始终是 desktop，单写者原则）。
+   */
+  async removeRules(toolId: ToolId): Promise<void> {
+    this.stopToolSync(toolId);
+    await fs.promises.rm(this.getRuleDir(toolId), { recursive: true, force: true });
+    this.versionCache.delete(toolId);
+    await persistVersionCache(this._baseDir, this.versionCache);
   }
 
   isStale(toolId: ToolId, thresholdDays = 7): boolean {
@@ -342,47 +434,5 @@ export class ToolRuleSync {
     const daysSinceSync =
       (Date.now() - new Date(version.publishedAt).getTime()) / (24 * 60 * 60 * 1000);
     return daysSinceSync > thresholdDays;
-  }
-
-  private async extractRules(data: Uint8Array, targetDir: string): Promise<void> {
-    const records: ToolRuleFile[] = JSON.parse(new TextDecoder().decode(data));
-    await fs.promises.rm(targetDir, { recursive: true, force: true });
-    await fs.promises.mkdir(targetDir, { recursive: true });
-    for (const record of records) {
-      let filePath: string;
-      try {
-        filePath = safeJoinReal(targetDir, record.filename);
-      } catch (err) {
-        if (err instanceof PathTraversalError) {
-          // 拒绝路径穿越：越界条目不写盘到 targetDir 之外
-          console.warn(`[tool-rule-sync] skipping unsafe rule filename: ${record.filename}`);
-          continue;
-        }
-        throw err;
-      }
-      // eslint-disable-next-line perf/perf-no-serial-await -- arg depends on loop var via dataflow
-      await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.promises.writeFile(filePath, record.content, 'utf-8');
-    }
-  }
-
-  private async loadAllVersions(): Promise<void> {
-    const versionFile = path.join(this.baseDir, 'tool-rule-versions.json');
-    try {
-      const raw = await fs.promises.readFile(versionFile, 'utf-8');
-      const versions: ToolRuleVersion[] = JSON.parse(raw);
-      for (const v of versions) {
-        this.versionCache.set(v.toolId, v);
-      }
-    } catch {
-      // no cached versions yet
-    }
-  }
-
-  private async saveVersion(toolId: ToolId, version: ToolRuleVersion): Promise<void> {
-    this.versionCache.set(toolId, version);
-    const versionFile = path.join(this.baseDir, 'tool-rule-versions.json');
-    const all = [...this.versionCache.values()];
-    await fs.promises.writeFile(versionFile, JSON.stringify(all, null, 2), 'utf-8');
   }
 }

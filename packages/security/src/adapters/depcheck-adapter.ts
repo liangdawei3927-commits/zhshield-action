@@ -54,11 +54,23 @@ export class DepcheckAdapter implements ToolAdapter {
   }
 
   private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
-    const { stdout } = await execFileAsync('depcheck', [options.projectPath, '--json'], {
-      cwd: options.projectPath,
-      timeout: options.timeout || 30000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    let stdout = '';
+    try {
+      const res = await execFileAsync('depcheck', [options.projectPath, '--json'], {
+        cwd: options.projectPath,
+        timeout: options.timeout || 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      stdout = res.stdout;
+    } catch (error) {
+      // depcheck 检出未使用依赖时以非零码退出但 stdout 仍是合法 JSON（与 inspect 端实测一致）
+      const err = error as ExecError;
+      if (err.stdout) {
+        stdout = err.stdout;
+      } else {
+        throw error;
+      }
+    }
     return JSON.parse(stdout);
   }
 

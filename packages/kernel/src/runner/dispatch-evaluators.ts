@@ -23,9 +23,18 @@ function toMessage(err: unknown): string {
 export async function evalCheckList(
   host: EngineHost,
   rule: SopRule,
-  _instr: CheckListInstruction,
+  instr: CheckListInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
+  // security 域 check-list 规则（缓存同步：helmet-check / comment-instruction /
+  // dependency-scripts / env-exfiltration / hidden-link）→ SecurityCheckEngine。
+  // 这些规则的 checks 是语义化检测项（如 helmet-configured），GuardEngine checks.json
+  // 仅有 ARCH/LINT/TEST/SEC 四条 → 路由到 GuardEngine.run 会永久「无可匹配」跳过。
+  // SecurityCheckEngine 为纯文件检测，不回调 evaluateRules（无重入），故先于 evalDepth
+  // 切断路由——既消除『防重入』误跳，也避免并行评估时共享 evalDepth 计数器导致的漂移。
+  if (rule.domain === 'security' && host.securityCheckEngine) {
+    return runSecurityCheck(host.securityCheckEngine, rule, instr, context);
+  }
   if (!host.guardEngine) {
     return skippedResult(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard');
   }
@@ -33,6 +42,36 @@ export async function evalCheckList(
     return skippedResult(rule, '跳过 check-list→GuardEngine.run（防止规则引擎重入）', 'guard');
   }
   return runGuardCheck(host.guardEngine, rule, context);
+}
+
+async function runSecurityCheck(
+  securityEngine: NonNullable<EngineHost['securityCheckEngine']>,
+  rule: SopRule,
+  instr: CheckListInstruction,
+  context: RuleContext,
+): Promise<RuleEvaluation> {
+  try {
+    const result = await securityEngine.run({
+      mode: 'security',
+      target: context.repoRoot,
+      checks: instr.checks.map((c) => c.rule),
+      dryRun: context.dryRun ?? false,
+    });
+
+    const violations = collectGuardViolations(result, rule);
+    return {
+      rule,
+      status: violations.length === 0 ? 'passed' : 'failed',
+      violations,
+      message:
+        violations.length > 0 ? `安全检查发现 ${violations.length} 个问题` : '安全检查通过',
+      durationMs: 0,
+      targetEngine: 'inspect',
+      timestamp: new Date(),
+    };
+  } catch (err) {
+    return errorResult(rule, `安全引擎派发失败: ${toMessage(err)}`, 'inspect');
+  }
 }
 
 async function runGuardCheck(

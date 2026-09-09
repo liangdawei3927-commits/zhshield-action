@@ -13,6 +13,23 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * trivy 启动扫描时若本地无漏洞库（或版本过期），会尝试联网更新 DB；
+ * 离线/受限环境下载失败即抛错，stderr 出现以下签名。此时报错应给出可操作的
+ * 解决指引（预置 DB 或设置镜像/离线环境变量），而非原始下载日志噪音。
+ * 注意：trivy 子进程继承 process.env，运营侧可直接用 TRIVY_SKIP_DB_UPDATE=1 /
+ * TRIVY_OFFLINE_SCAN=1 / TRIVY_DB_REPOSITORY=<镜像> 控制，无需改代码；
+ * 但首次运行（无任何本地缓存）时 --skip-db-update 会被 trivy 拒绝
+ * （"first run cannot skip downloading DB"），必须先联网预置一次 DB。
+ */
+const DB_UNAVAILABLE_MARKERS: readonly RegExp[] = [
+  /Need to update DB/,
+  /Downloading vulnerability DB/,
+  /Downloading artifact.*trivy-db/,
+  /first run cannot skip downloading DB/,
+  /--skip-db-update cannot be specified on the first run/,
+];
+
 const META: ToolMeta = {
   id: 'trivy',
   name: 'Trivy',
@@ -118,6 +135,19 @@ export class TrivyAdapter implements ToolAdapter {
         error: 'Trivy 未安装，请运行 trivy 安装命令',
       };
     }
+    // 漏洞库下载失败（离线/受限网络）给可操作指引，而非原始下载日志噪音
+    if (this.isDbUnavailableError(err)) {
+      return {
+        tool: 'trivy',
+        status: 'error',
+        issues: [],
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        error:
+          'Trivy 漏洞库不可用：无法下载/更新 DB（离线或网络受限）。' +
+          '请先联网执行一次 `trivy image --download-db-only` 预置缓存；' +
+          '或设置环境变量 TRIVY_SKIP_DB_UPDATE=1（使用已有缓存）/ TRIVY_DB_REPOSITORY=<镜像地址>（指向可达镜像）。',
+      };
+    }
     return {
       tool: 'trivy',
       status: 'error',
@@ -125,6 +155,13 @@ export class TrivyAdapter implements ToolAdapter {
       metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
       error: err.stderr || err.message || 'Trivy 执行失败',
     };
+  }
+
+  /** 命中 trivy 漏洞库下载失败签名（Need to update DB / Downloading vulnerability DB / Downloading artifact） */
+  private isDbUnavailableError(err: ExecError): boolean {
+    const stderr = err.stderr;
+    if (!stderr) return false;
+    return DB_UNAVAILABLE_MARKERS.some((marker) => marker.test(stderr));
   }
 
   private buildArgs(

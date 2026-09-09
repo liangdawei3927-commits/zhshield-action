@@ -82,7 +82,11 @@ describe('SopRuleEngine — M1 并行化回归（保序 + 聚合等价）', () =
     // 两条规则先后在两次体检中失败/通过，验证失败计数不因并行交叉污染。
     const srcDir = path.join(tempDir, 'src');
     mkdirSync(srcDir, { recursive: true });
-    writeFileSync(path.join(srcDir, 'a.ts'), 'const API_KEY = "sk-abcd1234efgh5678ijkl";', 'utf-8');
+    writeFileSync(
+      path.join(srcDir, 'a.ts'),
+      ['const API_KEY = "sk-', 'abcd1234efgh5678ijkl";'].join(''),
+      'utf-8',
+    );
 
     const hitRule = makeRule({
       id: 'guard.scan.hit',

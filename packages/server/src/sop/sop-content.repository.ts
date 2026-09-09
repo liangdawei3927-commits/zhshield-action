@@ -119,7 +119,7 @@ export class SopContentRepository implements OnModuleDestroy {
     try {
       const rows = listToolPackages(db).filter((r) => r.status !== 'disabled');
       const entries = rows.map((row) => this.rowToToolPack(row));
-      const drift = entries.filter((e, i) => e.sha256 !== hashToolRuleFiles(e.files));
+      const drift = entries.filter((e) => e.sha256 !== hashToolRuleFiles(e.files));
       if (drift.length > 0) {
         this.logger.warn(`tool_package sha256 漂移 ${drift.length} 条（tool_id: ${drift.map((d) => d.toolId).join(',')}）`);
       }

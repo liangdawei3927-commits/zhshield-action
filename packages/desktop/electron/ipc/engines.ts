@@ -1129,7 +1129,9 @@ async function runPipelineHandler(
           err instanceof Error ? err.message : String(err),
         );
       }
-      recordPipelineScore(projectPath, report);
+      // 评分必须先落库再返回报告：渲染层在 runPipeline 返回后立即 getScore，
+      // 若 fire-and-forget 会导致 UI 读到上一轮的旧评分（health_scores 显示滞后一轮）。
+      await recordPipelineScore(projectPath, report);
     }
     return report;
   } catch (err) {

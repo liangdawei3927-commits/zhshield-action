@@ -915,14 +915,14 @@
       },
       "progress": "진행률 {{progress}}%",
       "result": {
-        "allPassed": "실행된 검사 항목이 모두 통과했습니다. 건너뛴 항목이 많다면 ESLint / Semgrep 등의 도구를 설치한 후 다시 점검하면 더 완전한 결과를 얻을 수 있습니다.",
+        "allPassed": "실행된 검사 항목이 모두 통과했습니다. 실행되지 않은 항목과 사유는 아래 목록을 확인하세요.",
         "backHome": "홈으로 돌아가기",
         "header": {
           "configureHint": "여기 또는 상단 제목 표시줄의 스위치로 게이트 검사와 센티넬 모니터링을 켜고 끌 수 있습니다.",
           "coverage": "이번 점검은 품질 검사 {{inspectTotal}}개 항목을 포함합니다.",
           "failed": "점검에서 문제 발견",
           "passed": "원클릭 점검 완료",
-          "skipped": "그중 {{skipped}}개 항목은 도구가 설치되지 않아 건너뛰었습니다."
+          "skipped": "그중 {{skipped}}개 항목은 실행되지 않았습니다. 사유는 아래 목록을 확인하세요."
         },
         "issuesTitle": "주목할 문제",
         "rerun": "다시 점검",
@@ -1835,6 +1835,7 @@
       "failed": "미통과",
       "scopeGuard": "게이트 검사",
       "scopeInspect": "품질 점검",
+      "skipped": "건너뜀",
       "unknownRule": "알 수 없는 규칙"
     },
     "security": {

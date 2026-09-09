@@ -150,6 +150,32 @@ function AutoFixNotice({ notice }: { notice: string }) {
   );
 }
 
+/** 未执行的检查项列表（携带真实跳过原因，如 scope 裁剪 / 前置缺失 / 工具名错配） */
+function SkippedIssuesList({ summary }: { summary: CheckSummary }) {
+  const t = useT();
+  if (summary.skippedItems.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-warning-200 bg-warning-50/40 p-5 mb-6">
+      <h3 className="text-sm font-semibold text-warning-800 mb-3">
+        {t('page.dashboard.result.stats.skipped')}
+      </h3>
+      <ul className="space-y-2">
+        {summary.skippedItems.slice(0, 20).map((item) => (
+          <li key={`${item.stage}-${item.id}`} className="text-sm text-zh-ink-2">
+            <span className="text-xs text-warning-600 mr-2">
+              {item.stage === 'guard'
+                ? t('page.dashboard.result.stage.guard')
+                : t('page.dashboard.result.stage.inspect')}
+            </span>
+            <span className="font-medium">{item.name}</span>
+            <span className="text-zh-muted"> — {item.message}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** 检查结果区：有问题列表或全部通过提示 */
 function IssuesOutcome({
   summary,
@@ -160,7 +186,15 @@ function IssuesOutcome({
 }) {
   const t = useT();
   if (summary.failedItems.length > 0) {
-    return <FailedIssuesList summary={summary} onCopyIssues={onCopyIssues} />;
+    return (
+      <>
+        <FailedIssuesList summary={summary} onCopyIssues={onCopyIssues} />
+        <SkippedIssuesList summary={summary} />
+      </>
+    );
+  }
+  if (summary.skippedItems.length > 0) {
+    return <SkippedIssuesList summary={summary} />;
   }
 
   return (

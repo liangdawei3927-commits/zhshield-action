@@ -138,7 +138,9 @@ export class ToolAdapterExecutor {
   ): Promise<Awaited<ReturnType<ToolAdapter['scan']>>> {
     return ToolAdapterExecutor.withHardTimeout(
       adapter.scan({
-        projectPath: process.cwd(),
+        // 用实际扫描目标（repoRoot，经 runScan(projectId) 传入）而非 process.cwd()，
+        // 否则 CLI --dir / 引擎 repoRoot 传不到适配器，ts-prune/semgrep/trivy 会扫错目录
+        projectPath: projectId,
         projectId,
         timeout: 60000,
       }),

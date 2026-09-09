@@ -197,6 +197,20 @@ describe('ToolAdapterExecutor — R3d 直扫按画像裁剪（out-of-scope）', 
     expect(results[0].status).toBe('passed');
     expect(adapter.scan).toHaveBeenCalledTimes(1);
   });
+
+  it('⑦ 扫描目标传入 projectId（repoRoot）而非 process.cwd()，避免适配器扫错目录', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter = makeAdapter('eslint', 'inspect', 'available');
+    const adapters = new Map<string, ToolAdapter>([['eslint', adapter]]);
+
+    const leadingEdgeRepoRoot = '/abs/path/to/scanned-repo';
+    await executor.runAll(adapters, leadingEdgeRepoRoot);
+
+    const scanArg = vi.mocked(adapter.scan).mock.calls[0][0];
+    expect(scanArg.projectPath).toBe(leadingEdgeRepoRoot);
+    expect(scanArg.projectPath).not.toBe(process.cwd());
+  });
 });
 
 describe('ToolAdapterExecutor 并行池（P0-1）', () => {

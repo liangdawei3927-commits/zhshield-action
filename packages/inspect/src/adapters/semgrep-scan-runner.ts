@@ -12,6 +12,26 @@ const RUNTIME_NOISE_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * semgrep --json 模式下的 Progress/Scan-Status 横幅（到 stderr）和表格行（偶串入 stdout）。
+ * 成功扫描亦打印横幅，非错误信号；诊断将横幅误判为 error 时会产生误导性 scan-tool-error。
+ * 以盒线字符、进度行、汇总要点特征过滤——真实 semgrep 错误不含盒线绘制符。
+ */
+const BANNER_NOISE_PATTERNS: readonly RegExp[] = [
+  /[─┌┐└┘├┤│]/,
+  /^Scanning \d+ files?/,
+  /^Language\s+Rules\s+Files\s+Origin/,
+  // 分语言统计表格的数据行（表头 Language/Rules/Files/Origin 已在上方过滤；
+  // 数据行如 `ts 4 552 Custom 4` / `js 4 15` 也属成功扫描的总结横幅，非错误信号；
+  // Origin 列为可选——部分场景表格仅输出 语言 规则数 文件数 三列）
+  /^\s*[a-z][a-z0-9+]*\s+\d+\s+\d+\s*(?:(?:Custom|Built|Registry|N\.?A\.?)(?:\s+\d+)?)?/i,
+  /^Scan completed/,
+  /^\s*✅/,
+  /^\s*•/,
+];
+
+const NOISE_PATTERNS = [...RUNTIME_NOISE_PATTERNS, ...BANNER_NOISE_PATTERNS];
+
+/**
  * SemgrepScanRunner — 执行 semgrep 扫描并映射输出为可用结果，统一处理执行错误
  *
  * 职责：调用 semgrep CLI、解析 JSON 输出、把结果/错误归一化为 ToolResult。
@@ -86,15 +106,12 @@ export class SemgrepScanRunner {
 
   private extractJsonError(stdout?: string): string | null {
     if (!stdout) return null;
-    try {
-      const output = JSON.parse(stdout) as SemgrepOutput;
-      const first = output.errors?.find(
-        (e) => typeof e.message === 'string' && e.message.length > 0,
-      );
-      return first?.message ?? null;
-    } catch {
-      return null;
-    }
+    const output = this.parseStdoutJson(stdout);
+    if (!output) return null;
+    const first = output.errors?.find(
+      (e) => typeof e.message === 'string' && e.message.length > 0,
+    );
+    return first?.message ?? null;
   }
 
   private stripRuntimeNoise(stderr?: string): string {
@@ -102,10 +119,32 @@ export class SemgrepScanRunner {
     return stderr
       .split('\n')
       .map((line) => line.trim())
-      .filter(
-        (line) => line.length > 0 && !RUNTIME_NOISE_PATTERNS.some((pattern) => pattern.test(line)),
-      )
+      .filter((line) => line.length > 0 && !NOISE_PATTERNS.some((pattern) => pattern.test(line)))
       .join('\n');
+  }
+
+  /** 提取 stderr 去噪后的非空内容；空串或全噪音均返回 null（非真实错误信号） */
+  private nonNoiseError(stderr?: string): string | null {
+    const stripped = this.stripRuntimeNoise(stderr);
+    return stripped.length > 0 ? stripped : null;
+  }
+
+  /** 从 stdout 提取 JSON：先整体解析，失败则跳过前置横幅文本（semgrep --json 偶有横幅串入 stdout） */
+  private parseStdoutJson(stdout: string): SemgrepOutput | null {
+    try {
+      return JSON.parse(stdout) as SemgrepOutput;
+    } catch {
+      // ignore
+    }
+    const firstBrace = stdout.indexOf('{');
+    const firstBracket = stdout.indexOf('[');
+    const candidates = [firstBrace, firstBracket].filter((i) => i >= 0);
+    if (candidates.length === 0) return null;
+    try {
+      return JSON.parse(stdout.slice(Math.min(...candidates))) as SemgrepOutput;
+    } catch {
+      return null;
+    }
   }
 
   private parsePartialOutput(
@@ -114,14 +153,11 @@ export class SemgrepScanRunner {
     stderr?: string,
   ): { output: SemgrepOutput; issues: Issue[] } | null {
     if (!stdout) return null;
-    try {
-      const output = JSON.parse(stdout);
-      const issues = this.mapper.mapOutput(output, category);
-      if (issues.length > 0 || !stderr) {
-        return { output, issues };
-      }
-    } catch {
-      return null;
+    const output = this.parseStdoutJson(stdout);
+    if (!output) return null;
+    const issues = this.mapper.mapOutput(output, category);
+    if (issues.length > 0 || !this.nonNoiseError(stderr)) {
+      return { output, issues };
     }
     return null;
   }

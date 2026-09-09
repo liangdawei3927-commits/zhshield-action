@@ -120,6 +120,45 @@ describe('SemgrepAdapter', () => {
     }
   });
 
+  it('stderr 中 semgrep 分语言统计表格行（ts 4 552 Custom 4）不当作错误信号上报', async () => {
+    const project = tempProject(false);
+    writeDefaultConfig(project);
+    try {
+      // stdout 无可用 JSON（无法提取 jsonError / 无部分结果），命中 stderr 兜底路径
+      mockFailure({
+        code: 2,
+        stdout: '',
+        // semgrep 正常扫描的总结横幅：表头 + 分语言统计行（非错误信号）
+        // 注：统计行可能是 4 列（ts 4 552 Custom 4）也可能是 3 列（js 4 15，无 Origin）
+        stderr: [
+          OCAML_NOISE_STDERR,
+          'Scanning 552 files.',
+          'Language  Rules  Files  Origin',
+          'ts        4      552    Custom  4',
+          'js        4      15',
+          'Scan completed.',
+        ].join('\n'),
+        message: 'Command failed: semgrep scan',
+      });
+
+      const result = await adapter.scan({
+        projectPath: project,
+        projectId: project,
+        config: { enabled: true, config: 'redos.yml' },
+      });
+
+      expect(result.status).toBe('error');
+      // 仅剩 stderr 中的真实失败信号，不得包含横幅/表格行
+      expect(result.error).toBe('Command failed: semgrep scan');
+      expect(result.error).not.toContain('Custom');
+      expect(result.error).not.toContain('Language');
+      expect(result.error).not.toContain('Scanning');
+      expect(result.error).not.toContain('Failed to register');
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('无 JSON 输出时剔除 stderr 中的 OCaml 运行时噪音后兜底', async () => {
     const project = tempProject(true);
     writeDefaultConfig(project);
@@ -469,6 +508,29 @@ describe('SemgrepAdapter', () => {
       const yaml = readFileSync(rulePath, 'utf-8');
       expect(yaml).toContain('    pattern-regex: Access-Control-Allow-Origin\\s*[:=]\\s*[*]');
       expect(yaml).toContain('languages: [generic]');
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('单飞缓存：并发 isAvailable 只探测一次，避免多条规则并发冷启动误判未安装', async () => {
+    const project = tempProject(false);
+    mockSuccess('1.172.0\n');
+    const fresh = new SemgrepAdapter(project);
+    try {
+      const results = await Promise.all([
+        fresh.isAvailable(),
+        fresh.isAvailable(),
+        fresh.isAvailable(),
+      ]);
+      expect(results).toEqual([true, true, true]);
+
+      // 无单飞缓存时 3 条并发会执行 3 次 isCommandAvailable 探测 + 1 次命令解析探测 = 4 次；
+      // 单飞后仅 1 次解析探测 + 1 次可用性探测 = 2 次。
+      const versionCalls = execFileMock.mock.calls.filter((c) =>
+        (c[1] as string[]).includes('--version'),
+      );
+      expect(versionCalls.length).toBe(2);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

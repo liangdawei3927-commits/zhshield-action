@@ -1,5 +1,5 @@
 import type { SignedSopPackage, SopRule } from '../_meta/sop-types';
-import { SopSyncClient } from './sop-sync-client';
+import { SopSyncClient, type ApiTokenProvider } from './sop-sync-client';
 import { CompressionFormat, type SopCompressor } from './sop-compressor';
 
 /**
@@ -16,8 +16,9 @@ export class VerifiedSopSyncClient extends SopSyncClient {
     remoteBaseUrl: string,
     private readonly verifyPackage: (pkg: SignedSopPackage) => Promise<boolean>,
     compressor?: SopCompressor,
+    apiToken?: ApiTokenProvider,
   ) {
-    super(remoteBaseUrl, compressor);
+    super(remoteBaseUrl, compressor, apiToken);
     this.baseUrl = remoteBaseUrl;
   }
 
@@ -36,7 +37,9 @@ export class VerifiedSopSyncClient extends SopSyncClient {
 
   /** 下载并解压全量包，解析为 JSON；网络/解压失败返回 null */
   private async fetchAndParsePayload(version: string): Promise<unknown | null> {
-    const res = await fetch(`${this.baseUrl}/full/${version}`);
+    const res = await fetch(`${this.baseUrl}/full/${version}`, {
+      headers: this.buildHeaders(),
+    });
     if (!res.ok) return null;
     const compressed = await res.arrayBuffer();
     const decompressed = await this.compressor.decompress(

@@ -171,7 +171,7 @@ describe('SopSyncClient', () => {
       expect(result?.length).toBe(2);
       expect(result?.[0].id).toBe('r-1');
       // URL 应包含版本路径
-      expect(fetchMock).toHaveBeenCalledWith(`${baseUrl}/full/3.0.0`);
+      expect(fetchMock).toHaveBeenCalledWith(`${baseUrl}/full/3.0.0`, expect.any(Object));
     });
 
     it('HTTP 错误应返回 null', async () => {
@@ -212,6 +212,56 @@ describe('SopSyncClient', () => {
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));
       await clientWithCustom.fetchFull('1.0.0');
       expect(spy).toHaveBeenCalled();
+    });
+  });
+
+  // ─── API 令牌注入 ────────────────────────────────
+  describe('API 令牌注入', () => {
+    it('固定令牌：checkRemoteVersion 请求头应带 x-api-token', async () => {
+      const version: SopVersion = { version: '1.0.0', knowledge: 'k', timestamp: new Date() };
+      fetchMock.mockResolvedValueOnce(makeResponse(version));
+      const authed = new SopSyncClient(baseUrl, undefined, 'tok-123');
+      await authed.checkRemoteVersion();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${baseUrl}/version`,
+        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-123' }) }),
+      );
+    });
+
+    it('固定令牌：fetchDiff 请求头应带 x-api-token', async () => {
+      const diff: SopDiff = { from: '1.0.0', to: '2.0.0', rules: [], removedRuleIds: [] };
+      fetchMock.mockResolvedValueOnce(makeResponse(diff, { contentType: 'application/json' }));
+      const authed = new SopSyncClient(baseUrl, undefined, 'tok-123');
+      await authed.fetchDiff('1.0.0', '2.0.0');
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${baseUrl}/diff?from=1.0.0&to=2.0.0`,
+        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-123' }) }),
+      );
+    });
+
+    it('懒加载令牌：每次请求时求值，支持令牌文件轮换', async () => {
+      const version: SopVersion = { version: '1.0.0', knowledge: 'k', timestamp: new Date() };
+      fetchMock.mockResolvedValue(makeResponse(version));
+      const getToken = vi.fn().mockReturnValueOnce('tok-a').mockReturnValueOnce('tok-b');
+      const authed = new SopSyncClient(baseUrl, undefined, getToken);
+
+      await authed.checkRemoteVersion();
+      await authed.checkRemoteVersion();
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `${baseUrl}/version`,
+        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-b' }) }),
+      );
+    });
+
+    it('未配置令牌：不带 x-api-token 头（兼容无鉴权远端）', async () => {
+      const version: SopVersion = { version: '1.0.0', knowledge: 'k', timestamp: new Date() };
+      fetchMock.mockResolvedValueOnce(makeResponse(version));
+      await client.checkRemoteVersion();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(`${baseUrl}/version`);
+      expect((init.headers as Record<string, string>)['x-api-token']).toBeUndefined();
     });
   });
 });

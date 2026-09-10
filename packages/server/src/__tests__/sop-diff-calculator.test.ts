@@ -201,3 +201,75 @@ describe('SopDiffCalculator.findAddedRules 性质（O(n) 验证）', () => {
     },
   );
 });
+
+describe('SopDiffCalculator.computeDiff 空基线（客户端本地无规则）', () => {
+  function makeRegistry(rules: SopRule[]): SopRegistry {
+    return {
+      getAll: () => rules,
+      getActive: () => rules.filter((r) => r.status === 'active'),
+    } as unknown as SopRegistry;
+  }
+
+  it("fromVersion='0.0.0'：全部活跃规则进 added，unchanged/modified/removed 为空", () => {
+    const rules = [
+      makeRule('rule-a', new Date('2026-01-01T00:00:00Z')),
+      makeRule('rule-b', new Date('2026-06-01T00:00:00Z')),
+      makeRule('deprecated', new Date('2026-01-01T00:00:00Z')),
+    ];
+    rules[2].status = 'deprecated';
+
+    const diff = new SopDiffCalculator().computeDiff(
+      makeRegistry(rules),
+      '0.0.0',
+      '1.2026.07.28.001',
+    );
+
+    expect(diff.added.map((r) => r.id)).toEqual(['rule-a', 'rule-b']);
+    expect(diff.unchanged).toEqual([]);
+    expect(diff.modified).toEqual([]);
+    expect(diff.removed).toEqual([]);
+    expect(diff.fromVersion).toBe('0.0.0');
+    expect(diff.metadata.totalRules).toBe(3);
+  });
+
+  it("fromVersion='0.0.0'：updatedAt 早于目标版本的规则不被误判为 unchanged（回归）", () => {
+    const rules = [makeRule('old-rule', new Date('2025-01-01T00:00:00Z'))];
+
+    const diff = new SopDiffCalculator().computeDiff(
+      makeRegistry(rules),
+      '0.0.0',
+      '1.2026.07.28.001',
+    );
+
+    expect(diff.added.map((r) => r.id)).toEqual(['old-rule']);
+    expect(diff.unchanged).toEqual([]);
+  });
+
+  it("fromVersion=''：与 '0.0.0' 同等处理", () => {
+    const rules = [makeRule('rule-c')];
+
+    const diff = new SopDiffCalculator().computeDiff(makeRegistry(rules), '', '1.2026.07.28.001');
+
+    expect(diff.added.map((r) => r.id)).toEqual(['rule-c']);
+    expect(diff.unchanged).toEqual([]);
+    expect(diff.modified).toEqual([]);
+    expect(diff.removed).toEqual([]);
+  });
+
+  it('非空基线：updatedAt 早于 fromVersion 日期的规则保持 unchanged，晚于则 modified', () => {
+    const rules = [
+      makeRule('old-rule', new Date('2026-01-01T00:00:00Z')),
+      makeRule('new-rule', new Date('2026-06-01T00:00:00Z')),
+    ];
+
+    const diff = new SopDiffCalculator().computeDiff(
+      makeRegistry(rules),
+      '1.2026.01.02.001',
+      '1.2026.07.28.001',
+    );
+
+    expect(diff.unchanged).toEqual(['old-rule']);
+    expect(diff.modified.map((r) => r.id)).toEqual(['new-rule']);
+    expect(diff.added).toEqual([]);
+  });
+});

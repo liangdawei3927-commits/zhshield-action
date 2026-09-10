@@ -107,40 +107,13 @@ export const wisdomBrainSync = new WisdomBrainSync({
 });
 
 // ─── 画像驱动工具下发：当前项目画像缓存 ────────────────────
-// 结构兼容 kernel ProjectFeature；null = 未探测（同步退化为全量下发，行为不变）。
-// 由 engines.ts 在流水线完成 / getProfile 后写入，sync.ts 读取用于按画像裁剪工具子集。
-export type CachedProjectFeature = {
-  framework?: string;
-  language?: string;
-  features: string[];
-};
-
-let cachedProfile: CachedProjectFeature | null = null;
-/** 与 cachedProfile 配套记录其归属项目路径；null = 未归属（单例/未探测） */
-let cachedProfileProjectPath: string | null = null;
-
-export function getCachedProfile(): CachedProjectFeature | null {
-  return cachedProfile;
-}
-
-/**
- * 写入画像缓存；可选记录归属项目路径（供删项目时精确归还内存缓存）。
- * 向后兼容：不传 projectPath 时保持既有 path 不变；传 null 时清空 path。
- */
-export function setCachedProfile(
-  feature: CachedProjectFeature | null,
-  projectPath?: string | null,
-): void {
-  cachedProfile = feature;
-  if (projectPath !== undefined) {
-    cachedProfileProjectPath = projectPath;
-  }
-}
-
-/** 返回当前画像缓存归属的项目路径（null = 未归属） */
-export function getCachedProfileProjectPath(): string | null {
-  return cachedProfileProjectPath;
-}
+// 状态与存取实现在 profile-cache（纯内存、无 electron 副作用）；
+// 此处 re-export 保持主进程既有导入路径不变。
+// pipeline-worker 子进程构建必须直连 profile-cache（pipeline-jobs），
+// 不得经本模块导入——否则 worker bundle 内联 electron 副作用 → fork 崩溃。
+export type { CachedProjectFeature } from './profile-cache';
+export { getCachedProfile, setCachedProfile, getCachedProfileProjectPath } from './profile-cache';
+import type { CachedProjectFeature } from './profile-cache';
 
 // ─── T0 云端画像注册 ─────────────────────────────────────────
 

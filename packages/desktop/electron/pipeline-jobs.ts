@@ -10,7 +10,10 @@ import { progress, send } from './pipeline-ipc';
 import { collectPerformanceIssues } from './pipeline-report';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
-import { getCachedProfile } from './ipc-context';
+// 直连纯内存缓存模块而非 ipc-context：本文件被打进 pipeline-worker 子进程
+// bundle，ipc-context 顶层 electron 副作用（app.isPackaged 等）在 fork
+// （ELECTRON_RUN_AS_NODE=1）中加载即崩溃。
+import { getCachedProfile } from './profile-cache';
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);

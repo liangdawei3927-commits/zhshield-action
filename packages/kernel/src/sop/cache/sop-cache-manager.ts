@@ -164,13 +164,6 @@ export class SopCacheManager {
   // ─── 云端同步（7.4 完整同步流程） ───────────────────────────
 
   /**
-   * 检查云端版本 — GET /api/sop/version
-   */
-  async checkRemoteVersion(): Promise<SopVersion | null> {
-    return this.coordinator.checkRemoteVersion();
-  }
-
-  /**
    * 完整同步流程（文档 7.4 节）
    */
   async syncFromCloud(): Promise<SyncResult> {
@@ -280,13 +273,6 @@ export class SopCacheManager {
   }
 
   /**
-   * 停止定时同步
-   */
-  stopPeriodicSync(): void {
-    this.scheduler.stopPeriodicSync();
-  }
-
-  /**
    * 启动时静默检查（7.5 节 触发方式 1）
    */
   async checkOnStartup(): Promise<SyncResult> {
@@ -324,6 +310,24 @@ export class SopCacheManager {
       const normalized = isProjectProfile(feature) ? projectProfileToFeature(feature) : feature;
       await this.lazyLoader.syncForProject(normalized);
     }
+  }
+
+  /**
+   * 物理删除指定模块的缓存文件（转发 lazyLoader；lazyLoader 未启用时 no-op）。
+   */
+  async removeModule(module: string): Promise<void> {
+    if (this.lazyLoader) {
+      await this.lazyLoader.removeModule(module);
+    }
+  }
+
+  /**
+   * 将项目特征/画像映射到需要加载的模块（转发 lazyLoader；未启用时返回空数组）。
+   */
+  getNeededModules(feature: ProjectFeature | ProjectProfile): string[] {
+    if (!this.lazyLoader) return [];
+    const normalized = isProjectProfile(feature) ? projectProfileToFeature(feature) : feature;
+    return this.lazyLoader.getNeededModules(normalized);
   }
 
   getLazyLoader(): SopLazyLoader | undefined {

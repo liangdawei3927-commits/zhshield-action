@@ -208,7 +208,7 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
       scan: async (opts: ToolScanOptions) => {
         scanCalled = true;
         expect(opts.projectPath).toBe('/test-project');
-        expect(opts.config?.configFile).toBe('.eslintrc.cjs');
+        expect(opts.config?.config).toBe('.eslintrc.cjs');
         return {
           tool: 'eslint' as const,
           status: 'available' as const,

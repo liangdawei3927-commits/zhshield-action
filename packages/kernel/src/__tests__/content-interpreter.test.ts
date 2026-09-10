@@ -22,9 +22,46 @@ describe('ContentInterpreter — 规则内容解释分发', () => {
     expect(instr.type).toBe('tool-dispatch');
     if (instr.type === 'tool-dispatch') {
       expect(instr.tool).toBe('eslint');
-      expect(instr.toolConfig).toHaveProperty('configFile');
+      // 模板的 configFile 键须归一化为 config——适配器统一从 options.config?.config 读取注入配置
+      expect(instr.toolConfig.config).toBe('.eslintrc.cjs');
+      expect(instr.toolConfig).not.toHaveProperty('configFile');
       expect(instr.conditions?.languages).toContain('typescript');
       expect(instr.judgment?.priority).toBe('high');
+    }
+  });
+
+  it('toolConfig.configFile 归一化为 config，config 已存在时保留既有值', () => {
+    const rule = makeRule({
+      id: 'test.tool-dispatch.config-normalize',
+      content: {
+        check: {
+          tool: 'dep-cruiser',
+          toolConfig: { configFile: '.dependency-cruiser.cjs', rules: ['no-circular'] },
+        },
+      },
+    });
+    const instr = interpreter.interpret(rule);
+    expect(instr.type).toBe('tool-dispatch');
+    if (instr.type === 'tool-dispatch') {
+      expect(instr.toolConfig.config).toBe('.dependency-cruiser.cjs');
+      expect(instr.toolConfig).not.toHaveProperty('configFile');
+      expect(instr.toolConfig.rules).toEqual(['no-circular']);
+    }
+
+    // config 与 configFile 同时声明时保留 config（适配器既有契约优先）
+    const bothRule = makeRule({
+      id: 'test.tool-dispatch.config-both',
+      content: {
+        check: {
+          tool: 'semgrep',
+          toolConfig: { config: 'p/security-audit', configFile: 'rules.yml' },
+        },
+      },
+    });
+    const both = interpreter.interpret(bothRule);
+    expect(both.type).toBe('tool-dispatch');
+    if (both.type === 'tool-dispatch') {
+      expect(both.toolConfig.config).toBe('p/security-audit');
     }
   });
 

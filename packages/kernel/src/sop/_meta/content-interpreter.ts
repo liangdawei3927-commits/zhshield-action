@@ -57,10 +57,25 @@ export class ContentInterpreter {
     const judgment = (c.judgment ?? {}) as Record<string, unknown>;
     const fix = (c.fix ?? {}) as Record<string, unknown>;
 
+    // 模板把内联检测规则声明在 check.semgrepRules（与 toolConfig 平级），适配器从
+    // config.rules 读取：在此合并，使 registry 风格 config（如 typescript/lang/security/）
+    // 无法本地解析时仍能以内联规则执行扫描。toolConfig 已含 rules 时保留既有声明。
+    const toolConfig = { ...((check.toolConfig as Record<string, unknown>) ?? {}) };
+    if (Array.isArray(check.semgrepRules) && check.semgrepRules.length > 0 && !Array.isArray(toolConfig.rules)) {
+      toolConfig.rules = check.semgrepRules;
+    }
+    // 适配器统一从 options.config?.config 读取注入配置；模板历史写法为
+    // toolConfig.configFile（如 circular-dependency 的 .dependency-cruiser.cjs），
+    // 在此归一化使两条声明路径收敛到同一读取点。config 已存在时保留既有值。
+    if (toolConfig.config === undefined && toolConfig.configFile !== undefined) {
+      toolConfig.config = toolConfig.configFile;
+      delete toolConfig.configFile;
+    }
+
     return {
       type: 'tool-dispatch',
       tool: String(check.tool ?? ''),
-      toolConfig: (check.toolConfig as Record<string, unknown>) ?? {},
+      toolConfig,
       conditions: {
         languages: conditions.languages as string[] | undefined,
         filePatterns: conditions.filePatterns as string[] | undefined,
@@ -81,12 +96,20 @@ export class ContentInterpreter {
   }
 
   private toCheckList(c: Record<string, unknown>): CheckListInstruction {
+    const raw = Array.isArray(c.checks) ? (c.checks as unknown[]) : [];
     return {
       type: 'check-list',
-      checks: (c.checks as Array<{ rule: string; level: string }>).map((ch) => ({
-        rule: String(ch.rule ?? ''),
-        level: String(ch.level ?? 'error'),
-      })),
+      checks: raw.map((ch) => {
+        // checks 条目两种写法兼容：字符串（`- helmet-configured`）或对象（`- rule: ...`）
+        if (typeof ch === 'string') {
+          return { rule: ch, level: 'error' };
+        }
+        const o = (ch ?? {}) as Record<string, unknown>;
+        return {
+          rule: String(o.rule ?? ''),
+          level: String(o.level ?? 'error'),
+        };
+      }),
     };
   }
 

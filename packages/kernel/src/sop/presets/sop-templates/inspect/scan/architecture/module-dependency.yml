@@ -52,7 +52,7 @@ conditions:
     - "**/*.d.ts"
 
 check:
-  tool: "dependency-cruiser"
+  tool: "dep-cruiser"
   toolConfig:
     configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
     rules:

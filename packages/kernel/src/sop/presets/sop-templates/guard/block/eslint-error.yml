@@ -65,7 +65,7 @@ conditions:
 check:
   tool: "eslint"               # 工具名称
   toolConfig:
-    configFile: ".eslintrc.cjs"
+    config: ".eslintrc.cjs"
     extends:
       - "eslint:recommended"
       - "plugin:@typescript-eslint/strict"

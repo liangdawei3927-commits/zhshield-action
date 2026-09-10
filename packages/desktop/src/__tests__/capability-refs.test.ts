@@ -14,13 +14,16 @@ import * as path from 'node:path';
 import {
   capabilityIdOf,
   claimToolRefs,
+  claimSopModuleRefs,
   defaultCapabilityRefsPath,
   deriveProjectId,
   getReclaimingToolIds,
   loadCapabilityRefs,
   markReclaimed,
+  markSopModulesReclaimed,
   releaseProjectRefs,
   saveCapabilityRefs,
+  sopModuleIdOf,
   splitResolvedTools,
   type CapabilityRefs,
 } from '../../electron/capability-refs';
@@ -465,5 +468,229 @@ describe('defaultCapabilityRefsPath', () => {
     expect(defaultCapabilityRefsPath()).toBe(
       path.join(os.homedir(), '.zhshield', 'capability-refs.json'),
     );
+  });
+});
+
+// ─── SOP 模块账本纯函数（与 toolrule 对称） ──────────────────
+
+describe('sopModuleIdOf', () => {
+  it('构造 sop-module:<module>', () => {
+    expect(sopModuleIdOf('typescript')).toBe('sop-module:typescript');
+  });
+
+  it('空字符串 → sop-module:', () => {
+    expect(sopModuleIdOf('')).toBe('sop-module:');
+  });
+});
+
+describe('claimSopModuleRefs 幂等', () => {
+  it('同 projectId 两次 claim refs 不重复', () => {
+    const base: CapabilityRefs = { schemaVersion: 1, capabilities: {} };
+    const once = claimSopModuleRefs(base, 'proj-A', ['typescript']);
+    const twice = claimSopModuleRefs(once, 'proj-A', ['typescript']);
+    expect(twice.capabilities[sopModuleIdOf('typescript')].refs).toEqual(['proj-A']);
+  });
+
+  it('不同 projectId 各自入 refs', () => {
+    const base: CapabilityRefs = { schemaVersion: 1, capabilities: {} };
+    const a = claimSopModuleRefs(base, 'proj-A', ['typescript']);
+    const ab = claimSopModuleRefs(a, 'proj-B', ['typescript']);
+    expect(ab.capabilities[sopModuleIdOf('typescript')].refs).toEqual(['proj-A', 'proj-B']);
+  });
+
+  it('返回新对象，不原地改输入', () => {
+    const base: CapabilityRefs = { schemaVersion: 1, capabilities: {} };
+    const result = claimSopModuleRefs(base, 'proj-A', ['typescript']);
+    expect(result).not.toBe(base);
+    expect(base.capabilities).toEqual({});
+  });
+
+  it('新条目 languages 恒 []', () => {
+    const base: CapabilityRefs = { schemaVersion: 1, capabilities: {} };
+    const claimed = claimSopModuleRefs(base, 'proj-A', ['typescript']);
+    expect(claimed.capabilities[sopModuleIdOf('typescript')].languages).toEqual([]);
+  });
+
+  it('已存在条目的 languages 保持不变', () => {
+    const base: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': { languages: ['ts'], refs: ['X'], status: 'active' },
+      },
+    };
+    const claimed = claimSopModuleRefs(base, 'proj-A', ['typescript']);
+    expect(claimed.capabilities[sopModuleIdOf('typescript')].languages).toEqual(['ts']);
+  });
+});
+
+describe('claimSopModuleRefs 唤醒', () => {
+  it('reclaiming + since 条目被 claim 后 → active 且 delete since', () => {
+    const reclaiming: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+      },
+    };
+    const claimed = claimSopModuleRefs(reclaiming, 'proj-A', ['typescript']);
+    const entry = claimed.capabilities[sopModuleIdOf('typescript')];
+    expect(entry.refs).toEqual(['proj-A']);
+    expect(entry.status).toBe('active');
+    expect(entry.since).toBeUndefined();
+  });
+
+  it('active 条目再次 claim 不改变 status', () => {
+    const base: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': { languages: [], refs: ['X'], status: 'active' },
+      },
+    };
+    const claimed = claimSopModuleRefs(base, 'proj-B', ['typescript']);
+    const entry = claimed.capabilities[sopModuleIdOf('typescript')];
+    expect(entry.status).toBe('active');
+    expect(entry.since).toBeUndefined();
+    expect(entry.refs).toEqual(['X', 'proj-B']);
+  });
+});
+
+describe('markSopModulesReclaimed', () => {
+  it('reclaiming 条目 → reclaimed + at 为数值 + since 删除 + refs 保留', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+      },
+    };
+    const marked = markSopModulesReclaimed(refs, ['typescript']);
+    const entry = marked.capabilities[sopModuleIdOf('typescript')];
+    expect(entry.status).toBe('reclaimed');
+    expect(typeof entry.at).toBe('number');
+    expect(entry.since).toBeUndefined();
+    expect(entry.refs).toEqual([]);
+  });
+
+  it('mark 只动 sop-module:* — toolrule 键不被误触', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        [capabilityIdOf('eslint')]: {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+      },
+    };
+    const marked = markSopModulesReclaimed(refs, ['typescript']);
+    expect(marked.capabilities[capabilityIdOf('eslint')].status).toBe('reclaiming');
+    expect(marked.capabilities[capabilityIdOf('eslint')].since).toBe(1759747200000);
+    expect(marked.capabilities[sopModuleIdOf('typescript')].status).toBe('reclaimed');
+  });
+
+  it('mark 不动 active 的 sop-module 条目', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': { languages: [], refs: ['A'], status: 'active' },
+      },
+    };
+    const marked = markSopModulesReclaimed(refs, ['typescript']);
+    const entry = marked.capabilities[sopModuleIdOf('typescript')];
+    expect(entry.status).toBe('active');
+    expect(entry.at).toBeUndefined();
+    expect(entry.since).toBeUndefined();
+  });
+
+  it('mark 不动不存在的 moduleId', () => {
+    const base: CapabilityRefs = { schemaVersion: 1, capabilities: {} };
+    const marked = markSopModulesReclaimed(base, ['nonexistent']);
+    expect(marked.capabilities).toEqual({});
+  });
+
+  it('mark 不动已 reclaimed 的条目（at 保持原值）', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaimed',
+          at: 1759747200000,
+        },
+      },
+    };
+    const marked = markSopModulesReclaimed(refs, ['typescript']);
+    const entry = marked.capabilities[sopModuleIdOf('typescript')];
+    expect(entry.status).toBe('reclaimed');
+    expect(entry.at).toBe(1759747200000);
+  });
+
+  it('混合账本：仅 reclaiming sop-module 被标记，toolrule/active/reclaimed 不动', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        [capabilityIdOf('eslint')]: {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+        'sop-module:go': { languages: [], refs: ['A'], status: 'active' },
+        'sop-module:python': {
+          languages: [],
+          refs: [],
+          status: 'reclaimed',
+          at: 1759747200000,
+        },
+      },
+    };
+    const marked = markSopModulesReclaimed(refs, ['typescript', 'go', 'python']);
+    expect(marked.capabilities[capabilityIdOf('eslint')].status).toBe('reclaiming');
+    expect(marked.capabilities[sopModuleIdOf('typescript')].status).toBe('reclaimed');
+    expect(typeof marked.capabilities[sopModuleIdOf('typescript')].at).toBe('number');
+    expect(marked.capabilities[sopModuleIdOf('go')].status).toBe('active');
+    expect(marked.capabilities[sopModuleIdOf('python')].at).toBe(1759747200000);
+  });
+
+  it('返回新对象，不原地改输入', () => {
+    const refs: CapabilityRefs = {
+      schemaVersion: 1,
+      capabilities: {
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+      },
+    };
+    const result = markSopModulesReclaimed(refs, ['typescript']);
+    expect(result).not.toBe(refs);
+    const original = refs.capabilities[sopModuleIdOf('typescript')];
+    expect(original.status).toBe('reclaiming');
+    expect(original.since).toBe(1759747200000);
+    expect(original.at).toBeUndefined();
   });
 });

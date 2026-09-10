@@ -225,3 +225,72 @@ export function getReclaimingToolIds(refs: CapabilityRefs): ToolId[] {
   }
   return ids;
 }
+
+// ─── SOP 模块账本（与 toolrule 三函数对称） ──────────────────
+
+/** 能力键构造辅助：sop-module:<module>（与 capabilityIdOf 模式一致） */
+export function sopModuleIdOf(module: string): string {
+  return `sop-module:${module}`;
+}
+
+/**
+ * 领取：对每个 moduleId 幂等把 projectId 加入 refs（去重）。
+ * 若该能力当时 reclaiming 且 refs 从空变非空 → 置回 active 并删除 since（唤醒）。
+ * 与 claimToolRefs 逐字对称，唯一差异：
+ *   - 键 = sop-module:<module>（无 languages 参数，新条目 languages 恒 []）
+ * 返回新对象（不可原地改）。
+ */
+export function claimSopModuleRefs(
+  refs: CapabilityRefs,
+  projectId: string,
+  moduleIds: string[],
+): CapabilityRefs {
+  const capabilities: Record<string, CapabilityEntry> = {};
+  for (const [key, entry] of Object.entries(refs.capabilities)) {
+    capabilities[key] = { ...entry, refs: [...entry.refs] };
+  }
+
+  for (const moduleId of moduleIds) {
+    const key = sopModuleIdOf(moduleId);
+    const entry = capabilities[key] ?? { languages: [], refs: [] };
+    const wasEmpty = entry.refs.length === 0;
+    if (!entry.refs.includes(projectId)) {
+      entry.refs.push(projectId);
+    }
+    // 唤醒：refs 从空变非空且此前 reclaiming → active + since 清除
+    if (wasEmpty && entry.refs.length > 0 && entry.status === 'reclaiming') {
+      entry.status = 'active';
+      delete entry.since;
+    }
+    capabilities[key] = entry;
+  }
+
+  return { schemaVersion: 1, capabilities };
+}
+
+/**
+ * 标记物理删除：将给定 sop-module:* 条目从 reclaiming → reclaimed + at: Date.now()，
+ * 并删除 since（窗口起算点已无意义）。refs 保留（审计；reclaimed 与运行层无关）。
+ * 仅处理当前 status === 'reclaiming' 的 sop-module:* 条目；
+ * 不存在 / 已 reclaimed / active / toolrule:* 均不动。
+ * 与 markReclaimed 逐字对称（输入为 moduleId 字符串，自动拼 sop-module: 前缀）。
+ * 返回新对象（不可原地改）。
+ */
+export function markSopModulesReclaimed(refs: CapabilityRefs, moduleIds: string[]): CapabilityRefs {
+  const capabilities: Record<string, CapabilityEntry> = {};
+  for (const [key, entry] of Object.entries(refs.capabilities)) {
+    capabilities[key] = { ...entry, refs: [...entry.refs] };
+  }
+
+  for (const moduleId of moduleIds) {
+    const key = sopModuleIdOf(moduleId);
+    const entry = capabilities[key];
+    if (entry !== undefined && entry.status === 'reclaiming') {
+      entry.status = 'reclaimed';
+      entry.at = Date.now();
+      delete entry.since;
+    }
+  }
+
+  return { schemaVersion: 1, capabilities };
+}

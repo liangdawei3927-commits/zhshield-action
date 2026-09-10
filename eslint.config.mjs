@@ -18,6 +18,7 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/build/**',
       'eslint.config.mjs',
+      '.dependency-cruiser.cjs',
     ],
   },
   eslint.configs.recommended,

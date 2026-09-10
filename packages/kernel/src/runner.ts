@@ -14,7 +14,12 @@ import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
 import { Logger } from './log';
-import type { EngineHost, GuardEngineLike, InspectEngineLike } from './runner/evaluator-host';
+import type {
+  EngineHost,
+  GuardEngineLike,
+  InspectEngineLike,
+  SecurityCheckEngineLike,
+} from './runner/evaluator-host';
 import {
   evalPatternScan,
   evalForbidden,
@@ -57,6 +62,29 @@ function attachProfileTrim(
     hit: rules.length,
     feature,
   };
+}
+
+/** F0-3 Hook 包装 + F5-2 越界事件转发（warn-only，经 EventBus 供 sentinel 消费）— 纯函数 */
+function wrapWithScopeGuard(
+  adapter: ToolAdapter,
+  hooks: ToolCallHook[],
+  eventBus: EventBus,
+): ToolAdapter {
+  return wrapAdapter(adapter, hooks, {
+    onScopeViolation: (violation, { options }) => {
+      const payload: GovernanceEvent = {
+        type: 'tool:scope-violation',
+        payload: {
+          tool: adapter.meta.id,
+          projectId: options.projectId,
+          file: violation.file,
+          reason: violation.reason,
+          timestamp: new Date(),
+        },
+      };
+      void eventBus.emit(payload.type, payload.payload);
+    },
+  });
 }
 
 /** 按上下文过滤待评估规则（domains 优先于 domain）— 纯函数，仅依赖 registry */
@@ -106,6 +134,7 @@ export class SopRuleEngine {
   /** 可选的外部引擎引用 — 用于派发 check-list / scanner-dispatch / preset 指令 */
   private guardEngine?: GuardEngineLike;
   private inspectEngine?: InspectEngineLike;
+  private securityCheckEngine?: SecurityCheckEngineLike;
 
   /** ToolAdapter 注册表 — 用于 tool-dispatch 指令 */
   private toolAdapters = new Map<string, ToolAdapter>();
@@ -159,6 +188,7 @@ export class SopRuleEngine {
       eventBus?: EventBus;
       guardEngine?: GuardEngineLike;
       inspectEngine?: InspectEngineLike;
+      securityCheckEngine?: SecurityCheckEngineLike;
       /** 预注册的 ToolAdapter 列表 */
       toolAdapters?: Array<{ name: string; adapter: ToolAdapter }>;
       /** 审计日志注入点 — 缺省用 @zh/shared AuditLogger（写 ~/.zhshield/audit） */
@@ -175,38 +205,20 @@ export class SopRuleEngine {
     this.logger = new Logger('SopRuleEngine', 'info');
     this.guardEngine = options?.guardEngine;
     this.inspectEngine = options?.inspectEngine;
+    this.securityCheckEngine = options?.securityCheckEngine;
     this.auditLogger = options?.auditLogger ?? new AuditLogger();
     this.toolCallHooks = options?.hooks ?? [];
     this.healthBaseline = options?.healthBaseline;
     if (options?.toolAdapters) {
       for (const { name, adapter } of options.toolAdapters) {
-        this.toolAdapters.set(name, this.wrapWithScopeGuard(adapter));
+        this.toolAdapters.set(name, wrapWithScopeGuard(adapter, this.toolCallHooks, this.eventBus));
       }
     }
   }
 
   /** 注册单个 ToolAdapter */
   registerToolAdapter(name: string, adapter: ToolAdapter): void {
-    this.toolAdapters.set(name, this.wrapWithScopeGuard(adapter));
-  }
-
-  /** F0-3 Hook 包装 + F5-2 越界事件转发（warn-only，经 EventBus 供 sentinel 消费） */
-  private wrapWithScopeGuard(adapter: ToolAdapter): ToolAdapter {
-    return wrapAdapter(adapter, this.toolCallHooks, {
-      onScopeViolation: (violation, { options }) => {
-        const payload: GovernanceEvent = {
-          type: 'tool:scope-violation',
-          payload: {
-            tool: adapter.meta.id,
-            projectId: options.projectId,
-            file: violation.file,
-            reason: violation.reason,
-            timestamp: new Date(),
-          },
-        };
-        void this.eventBus.emit(payload.type, payload.payload);
-      },
-    });
+    this.toolAdapters.set(name, wrapWithScopeGuard(adapter, this.toolCallHooks, this.eventBus));
   }
 
   /** 派发评估函数的运行时视图（evalDepth 实时读取，保持重入判断与原行为一致） */
@@ -217,6 +229,7 @@ export class SopRuleEngine {
       toolAdapters: this.toolAdapters,
       guardEngine: this.guardEngine,
       inspectEngine: this.inspectEngine,
+      securityCheckEngine: this.securityCheckEngine,
       auditLogger: this.auditLogger,
       eventBus: this.eventBus,
       toolScope: feature ? (toolId: string) => isToolInScope(toolId, feature) : undefined,

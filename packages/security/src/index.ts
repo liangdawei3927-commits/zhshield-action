@@ -35,3 +35,5 @@ export {
 export { scanGarbage, cleanGarbage, restoreGarbage } from './garbage-scanner';
 export { SupplyChainScanScheduler } from './supply-chain-scheduler';
 export type { SupplyChainScanOptions } from './supply-chain-scheduler';
+export { SecurityCheckEngine } from './security-check-engine';
+export type { SecurityCheckResult } from './security-check-engine';

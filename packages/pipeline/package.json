@@ -20,7 +20,8 @@
     "@zh/kernel": "workspace:*",
     "@zh/refactor": "workspace:*",
     "@zh/sentinel": "workspace:*",
-    "@zh/shared": "workspace:*"
+    "@zh/shared": "workspace:*",
+    "@zh/security": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

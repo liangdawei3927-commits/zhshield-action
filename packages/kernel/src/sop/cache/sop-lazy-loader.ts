@@ -131,6 +131,14 @@ export class SopLazyLoader {
     } catch {
       return false;
     }
+    // 空数组（规则库为空时写下的占位文件）必须可重写，否则卡 24h 新鲜窗口
+    try {
+      const raw = await fs.promises.readFile(modulePath, 'utf-8');
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return false;
+    } catch {
+      return false;
+    }
     const stat = await fs.promises.stat(modulePath);
     return Date.now() - stat.mtimeMs < 24 * 60 * 60 * 1000;
   }

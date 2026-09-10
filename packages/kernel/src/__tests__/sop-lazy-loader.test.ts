@@ -110,6 +110,20 @@ describe('SopLazyLoader', () => {
       const afterMtime = fs.statSync(tsPath).mtimeMs;
       expect(afterMtime).toBe(beforeMtime);
     });
+
+    it('空内容（[]）模块文件不应被视为新鲜（应重新写入规则）', async () => {
+      const feature: ProjectFeature = { language: 'typescript', features: [] };
+      // 预置空数组占位文件：模拟规则库为空时写入的缓存，此类文件必须可被重写
+      const tsPath = path.join(cacheDir, 'modules', 'typescript.db');
+      fs.writeFileSync(tsPath, '[]', 'utf-8');
+
+      await loader.syncForProject(feature);
+
+      // 空内容触发重写：模块规则被实际写入而非被 24h 窗口跳过
+      const tsRules = await loader.getModuleRules('typescript');
+      expect(tsRules.length).toBeGreaterThan(0);
+      expect(tsRules.some((r) => r.id.startsWith('typescript'))).toBe(true);
+    });
   });
 
   // ─── getLoadedModules ────────────────────────────

@@ -35,6 +35,18 @@ async function runPipelineByMode(
   opts: { dryRun?: boolean; sop?: boolean; guardEnabled: boolean },
 ): Promise<void> {
   await runner.loadSopRules();
+  const cacheDir = process.env.ZH_SOP_CACHE_DIR;
+  if (cacheDir) {
+    const synced = await runner.loadSopRulesFromCache(cacheDir);
+    progress(
+      id,
+      'sop',
+      synced > 0
+        ? `同步规则已加载 ${synced} 条`
+        : '同步缓存不可用，使用内置模板',
+      0.06,
+    );
+  }
   if (opts.sop) {
     await runSopJob(id, runner, opts.dryRun, opts.guardEnabled);
   } else {

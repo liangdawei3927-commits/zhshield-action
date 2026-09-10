@@ -915,14 +915,14 @@
       },
       "progress": "進捗 {{progress}}%",
       "result": {
-        "allPassed": "実行されたチェック項目はすべて合格しました。スキップが多い場合は、ESLint / Semgrep などのツールをインストールして再点検すると、より完全な結果が得られます。",
+        "allPassed": "実行されたチェック項目はすべて合格しました。未実行の項目と理由は下のリストをご覧ください。",
         "backHome": "ホームに戻る",
         "header": {
           "configureHint": "ここまたは上部タイトルバーのスイッチで、ゲートチェックとセンチネル監視を切り替えられます。",
           "coverage": "今回は品質巡回 {{inspectTotal}} 項目を対象としました。",
           "failed": "点検で問題を検出しました",
           "passed": "ワンクリック点検が完了しました",
-          "skipped": "うち {{skipped}} 項目はツール未インストールのためスキップされました。"
+          "skipped": "うち {{skipped}} 項目は未実行でした。理由は下のリストをご覧ください。"
         },
         "issuesTitle": "注意が必要な問題",
         "rerun": "再点検",
@@ -1835,6 +1835,7 @@
       "failed": "不合格",
       "scopeGuard": "ゲートチェック",
       "scopeInspect": "品質巡回",
+      "skipped": "スキップ",
       "unknownRule": "不明なルール"
     },
     "security": {

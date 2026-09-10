@@ -6,6 +6,7 @@
  */
 import { fork, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
+import { app } from 'electron';
 import { t, getLanguage } from '@zh/i18n';
 import type { PipelineReport } from '@zh/pipeline';
 import type { RefactorReport } from '@zh/refactor';
@@ -187,6 +188,10 @@ export function ensurePipelineWorker(): ChildProcess {
       ...process.env,
       LNG: getLanguage(),
       ELECTRON_RUN_AS_NODE: '1',
+      // 同步规则缓存目录（与 ipc-context 中 SopCacheManager 的 cacheDir 保持一致）。
+      // 子进程据此加载云端同步的 45 条活跃规则（guard 6 + inspect 19 + security 20），
+      // 无缓存时回退内置模板。
+      ZH_SOP_CACHE_DIR: path.join(app.getPath('userData'), 'sop-cache'),
       NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=4096']
         .filter(Boolean)
         .join(' '),

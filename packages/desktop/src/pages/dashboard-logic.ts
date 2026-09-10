@@ -29,6 +29,7 @@ export interface CheckSummary {
   skipped: number;
   errors: number;
   failedItems: Array<{ stage: string; id: string; name: string; message: string }>;
+  skippedItems: Array<{ stage: string; id: string; name: string; message: string }>;
   guardTotal: number;
   inspectTotal: number;
 }
@@ -61,6 +62,9 @@ export function extractSummary(report: PipelineReportData): CheckSummary {
       failedItems: Array.isArray(s.failedItems)
         ? (s.failedItems as CheckSummary['failedItems'])
         : [],
+      skippedItems: Array.isArray(s.skippedItems)
+        ? (s.skippedItems as CheckSummary['skippedItems'])
+        : [],
       guardTotal: Number(guard.total) || 0,
       inspectTotal: Number(inspect.total) || 0,
     };
@@ -76,6 +80,7 @@ export function extractSummary(report: PipelineReportData): CheckSummary {
     skipped: (g?.skipped ?? 0) + (i?.skipped ?? 0),
     errors: (g?.errors ?? 0) + (i?.errors ?? 0),
     failedItems: [],
+    skippedItems: [],
     guardTotal: g?.total ?? 0,
     inspectTotal: i?.total ?? 0,
   };

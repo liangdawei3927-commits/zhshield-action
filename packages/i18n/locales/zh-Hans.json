@@ -915,14 +915,14 @@
       },
       "progress": "进度 {{progress}}%",
       "result": {
-        "allPassed": "已执行的检查项均通过。若跳过项较多，可安装 ESLint / Semgrep 等工具后重新体检以获得更完整结果。",
+        "allPassed": "已执行的检查项均通过。未执行的检查项及原因见下方列表。",
         "backHome": "返回首页",
         "header": {
           "configureHint": "可在此处或顶部标题栏开关门禁检查与哨兵监控。",
           "coverage": "本次覆盖质量巡检 {{inspectTotal}} 项。",
           "failed": "体检发现问题",
           "passed": "一键体检完成",
-          "skipped": "其中 {{skipped}} 项因工具未安装已跳过。"
+          "skipped": "其中 {{skipped}} 项未执行，原因见下方列表。"
         },
         "issuesTitle": "需关注的问题",
         "rerun": "再次体检",
@@ -1835,6 +1835,7 @@
       "failed": "未通过",
       "scopeGuard": "门禁检查",
       "scopeInspect": "质量巡检",
+      "skipped": "已跳过",
       "unknownRule": "未知规则"
     },
     "security": {

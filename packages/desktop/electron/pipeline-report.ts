@@ -31,6 +31,28 @@ export function collectFailedItems(
     }));
 }
 
+/** 从规则引擎报告抽取跳过项（携带真实跳过原因，如 scope 裁剪 / 前置缺失 / 工具名错配），供前端展示 */
+export function collectSkippedItems(
+  stage: 'guard' | 'inspect',
+  report: {
+    evaluations?: Array<{
+      rule?: { id?: string; name?: string };
+      status?: string;
+      message?: string;
+    }>;
+  } | null,
+): Array<{ stage: string; id: string; name: string; message: string }> {
+  if (!report?.evaluations) return [];
+  return report.evaluations
+    .filter((ev) => ev.status === 'skipped')
+    .map((ev) => ({
+      stage,
+      id: ev.rule?.id ?? 'unknown',
+      name: ev.rule?.name ?? ev.rule?.id ?? t('pipeline.report.unknownRule'),
+      message: ev.message ?? t('pipeline.report.skipped'),
+    }));
+}
+
 export function attachSummary(
   report: PipelineReport & { summary?: Record<string, unknown> },
 ): PipelineReport & { summary: Record<string, unknown> } {
@@ -51,6 +73,10 @@ export function attachSummary(
   const failedItems = [
     ...collectFailedItems('guard', report.guard as RuleEngineReport | null),
     ...collectFailedItems('inspect', report.inspect as RuleEngineReport | null),
+  ];
+  const skippedItems = [
+    ...collectSkippedItems('guard', report.guard as RuleEngineReport | null),
+    ...collectSkippedItems('inspect', report.inspect as RuleEngineReport | null),
   ];
   const guardTotal = g?.total ?? 0;
   const inspectTotal = i?.total ?? 0;
@@ -76,6 +102,7 @@ export function attachSummary(
     skipped: (g?.skipped ?? 0) + (i?.skipped ?? 0),
     errors: (g?.errors ?? 0) + (i?.errors ?? 0),
     failedItems,
+    skippedItems,
   };
   return report as PipelineReport & { summary: Record<string, unknown> };
 }

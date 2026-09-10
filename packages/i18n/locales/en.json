@@ -915,14 +915,14 @@
       },
       "progress": "Progress {{progress}}%",
       "result": {
-        "allPassed": "All executed checks passed. If many were skipped, install tools like ESLint / Semgrep and rerun the checkup for more complete results.",
+        "allPassed": "All executed checks passed. Checks that were not executed and the reasons are listed below.",
         "backHome": "Back to home",
         "header": {
           "configureHint": "You can toggle gate check and sentinel monitoring here or via the switches in the top title bar.",
           "coverage": "This run covered {{inspectTotal}} quality inspections.",
           "failed": "Checkup found issues",
           "passed": "One-click checkup complete",
-          "skipped": "Of these, {{skipped}} were skipped because the tools aren't installed."
+          "skipped": "Of these, {{skipped}} were not executed — reasons below."
         },
         "issuesTitle": "Issues to watch",
         "rerun": "Rerun checkup",
@@ -1835,6 +1835,7 @@
       "failed": "Failed",
       "scopeGuard": "Gate check",
       "scopeInspect": "Quality inspection",
+      "skipped": "Skipped",
       "unknownRule": "Unknown rule"
     },
     "security": {

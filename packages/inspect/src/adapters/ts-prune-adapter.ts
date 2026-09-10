@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   ToolAdapter,
@@ -11,7 +12,6 @@ import type {
   AccessScope,
 } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
 
 const execFileAsync = promisify(execFile);
 
@@ -52,7 +52,30 @@ export class TsPruneAdapter implements ToolAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
+    // ts-prune 的 `--version` 不短路：会连同参数当作项目扫描真实执行（实测输出为全量
+    // 未导出报告而非版本号），>20s 超时 → isCommandAvailable 误判未安装。
+    // 改为检查解析出的命令文件存在且可执行（解析链已覆盖本地 bin / PATH / zhshield bin）。
+    try {
+      const command = await this.resolveCommand();
+      if (path.isAbsolute(command)) {
+        await fs.promises.access(command, fs.constants.X_OK);
+        return true;
+      }
+      // 裸命令名（PATH 上解析到）：逐 PATH 目录查找可执行文件，避免执行 --version
+      const pathEnv = process.env.PATH ?? '';
+      for (const dir of pathEnv.split(path.delimiter)) {
+        if (!dir) continue;
+        try {
+          await fs.promises.access(path.join(dir, command), fs.constants.X_OK);
+          return true;
+        } catch {
+          // 该目录无此命令，继续下一个 PATH 目录
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -66,7 +89,10 @@ export class TsPruneAdapter implements ToolAdapter {
 
   /** 执行 ts-prune 并映射输出为可用结果 */
   private async runTsPrune(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const tsConfigPath = path.join(options.projectPath, 'tsconfig.json');
+    // ts-prune@0.10.3 runner 内部用 path.join(process.cwd(), tsConfigPath) 组装路径，
+    // 传绝对路径会翻倍（cwd/projectPath + 绝对路径）；cwd 已是 projectPath，故传相对路径。
+    const tsConfigAbsPath = path.resolve(options.projectPath, 'tsconfig.json');
+    const tsConfigPath = path.relative(options.projectPath, tsConfigAbsPath);
     const command = await this.resolveCommand();
     const { stdout } = await execFileAsync(command, ['-p', tsConfigPath, '--json'], {
       cwd: options.projectPath,

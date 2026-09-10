@@ -99,7 +99,8 @@ export async function resolveToolCommand(tool: string, startDir?: string): Promi
   const local = findLocalToolBin(tool, dir);
   if (local) return local;
   try {
-    await execFileAsync(tool, ['--version'], { timeout: 5000 });
+    // 20s：semgrep 等 Python 工具冷启动 --version 可达 7.6s，5s 会误判 PATH 不可用
+    await execFileAsync(tool, ['--version'], { timeout: 20000 });
     return tool;
   } catch {
     const shared = findZhshieldToolBin(tool);

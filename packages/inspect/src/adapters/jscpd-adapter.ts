@@ -58,9 +58,10 @@ export class JscpdAdapter implements ToolAdapter {
   private commandPromise?: Promise<string>;
   private readonly projectRoot?: string;
 
-  /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标） */
+  /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标）；
+   *  monorepo（无顶层 src）时经 resolveTargetDir 落到 packages/，故同时声明 packages 读取范围 */
   readonly accessScope: AccessScope = {
-    readPaths: ['src/**/*.{ts,tsx,js,jsx}'],
+    readPaths: ['src/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
     excludePaths: ['**/node_modules/**'],
   };
 
@@ -96,11 +97,20 @@ export class JscpdAdapter implements ToolAdapter {
     start: number,
     reportPath: string,
   ): Promise<ToolResult> {
-    const target = options.targetFiles?.[0] || path.join(options.projectPath, 'src');
+    const target = options.targetFiles?.[0] || this.resolveTargetDir(options.projectPath);
     await this.executeJscpd(options, target, reportPath);
     const content = await this.readJscpdReport(reportPath);
     const issues = this.mapOutput(content);
     return this.buildJscpdAvailable(content, issues, start);
+  }
+
+  /** 目标目录解析：src → packages → 项目根(对齐 SemgrepAdapter，避免 monorepo 无顶层 src 时报"未找到可扫描的源文件目录") */
+  private resolveTargetDir(projectPath: string): string {
+    const srcDir = path.join(projectPath, 'src');
+    if (fs.existsSync(srcDir)) return srcDir;
+    const packagesDir = path.join(projectPath, 'packages');
+    if (fs.existsSync(packagesDir)) return packagesDir;
+    return projectPath;
   }
 
   /** 运行 jscpd 命令并输出 JSON 报告到 reportPath */

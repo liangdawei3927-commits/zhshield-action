@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   ToolAdapter,
@@ -72,16 +73,51 @@ export class DepcheckAdapter implements ToolAdapter {
   /** 执行 depcheck 并映射输出为可用结果 */
   private async runDepcheck(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const projectPath = options.projectPath;
+    const pkgJson = path.join(projectPath, 'package.json');
+    try {
+      await fs.promises.access(pkgJson);
+    } catch {
+      return {
+        tool: 'depcheck',
+        status: 'unavailable',
+        issues: [],
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
+      };
+    }
     const command = await this.resolveCommand();
     const args = this.buildArgs(options, projectPath);
 
-    const { stdout } = await execFileAsync(command, args, {
-      cwd: projectPath,
-      timeout: options.timeout || 60000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    let stdout = '';
+    try {
+      const res = await execFileAsync(command, args, {
+        cwd: projectPath,
+        timeout: options.timeout || 60000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      stdout = res.stdout;
+    } catch (error) {
+      // depcheck 检出未使用依赖时以非零码退出但 stdout 仍是合法 JSON（本项目实测 exit 255）
+      const err = error as { stdout?: string };
+      if (err.stdout) {
+        stdout = err.stdout;
+      } else {
+        return this.handleDepcheckError(error, start);
+      }
+    }
 
-    const result: DepcheckResult = JSON.parse(stdout);
+    let result: DepcheckResult;
+    try {
+      result = JSON.parse(stdout);
+    } catch {
+      return {
+        tool: 'depcheck',
+        status: 'error',
+        issues: [],
+        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        error: 'depcheck 输出不是合法 JSON',
+      };
+    }
     const issues = this.mapOutput(result, projectPath);
 
     return {

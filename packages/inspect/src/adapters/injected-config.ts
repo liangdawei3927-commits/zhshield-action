@@ -59,8 +59,10 @@ export function resolveInjectedConfigPath(
   const kernelPrefix = '@zh/kernel/';
   if (config.includes(kernelPrefix)) {
     const kernelRoot = locateKernelPackageRoot([cwd, projectPath, process.cwd(), __dirname]);
-    if (kernelRoot) {
-      const inKernel = path.join(kernelRoot, config.split(kernelPrefix)[1]);
+    // 3b. monorepo 布局回退：扫描目标自身是仓库时，kernel 包位于 <projectPath>/packages/kernel
+    const monoKernelRoot = kernelRoot ?? path.join(projectPath, 'packages', 'kernel');
+    if (isFile(path.join(monoKernelRoot, 'package.json'))) {
+      const inKernel = path.join(monoKernelRoot, config.split(kernelPrefix)[1]);
       if (isFile(inKernel)) return inKernel;
     }
   }

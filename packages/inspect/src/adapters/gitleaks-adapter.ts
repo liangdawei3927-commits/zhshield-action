@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -41,6 +42,37 @@ interface GitleaksFinding {
  * 提交后必然触发 "Generic API Key" 等 error 级误报并阻断门禁。
  */
 const EXCLUDED_FILE_PATTERN = /(^|\/)(dist|build|coverage|node_modules)(\/|$)|\.map$|\.min\.js$/;
+
+/**
+ * 展开配置路径中的环境变量占位符（${VAR} / $VAR）。
+ * SOP 规则以 ${ZHSHIELD_HOME}/gitleaks.toml 声明运行时配置，execFile 不做
+ * shell 展开——不展开会把字面量 ${ZHSHIELD_HOME}/gitleaks.toml 直接传给 gitleaks，
+ * 导致 "unable to load gitleaks config, err: open ${ZHSHIELD_HOME}/gitleaks.toml"。
+ * 未定义的环境变量展开为空串（与 shell 语义一致），由 resolveConfigPath 处理为空。
+ */
+function expandEnv(value: string): string {
+  return value.replace(
+    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+    (_match, braced: string | undefined, plain: string | undefined) =>
+      process.env[braced ?? plain ?? ''] ?? '',
+  );
+}
+
+/**
+ * 解析 gitleaks 配置文件路径：展开环境变量后仅当文件真实存在时才返回，
+ * 否则返回 undefined 回退到 gitleaks 内置默认规则集（222 条）。
+ * 运行时配置是可选定制项（SOP 注释明示），自定义 tOML 缺失不应把密钥扫描打成 error。
+ */
+function resolveConfigPath(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const expanded = expandEnv(raw);
+  if (!expanded) return undefined;
+  try {
+    return fs.existsSync(expanded) ? expanded : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export class GitleaksAdapter implements ToolAdapter {
   meta = META;
@@ -132,8 +164,9 @@ export class GitleaksAdapter implements ToolAdapter {
     if (isStaged) {
       args.push(options.projectPath);
     }
-    if (options.config?.config) {
-      args.push('--config', options.config.config);
+    const configPath = resolveConfigPath(options.config?.config);
+    if (configPath) {
+      args.push('--config', configPath);
     }
     return args;
   }

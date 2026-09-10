@@ -47,6 +47,8 @@ interface SemgrepRule {
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
   private commandPromise?: Promise<string>;
+  /** 单飞可用性结果：所有 semgrep 规则共享同一 adapter 实例，只探测一次 */
+  private availabilityPromise?: Promise<boolean>;
   private readonly projectRoot?: string;
 
   /** F5：semgrep 对源码做 SAST 规则匹配 */
@@ -80,7 +82,13 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
+    // 单飞：resolveToolCommand 内部 PATH 探测已跑一次 `--version`（Python 冷启动实测 16.7s），
+    // isCommandAvailable 再跑一次。多条 semgrep 规则并发 isAvailable 时会有 2N 次并发
+    // 冷启动，全部撞 20s 超时 → 误判未安装。缓存到首个探测 Promise，其余规则等同一结果。
+    if (!this.availabilityPromise) {
+      this.availabilityPromise = isCommandAvailable(() => this.resolveCommand(), 60000);
+    }
+    return this.availabilityPromise;
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -120,17 +128,20 @@ export class SemgrepAdapter implements ToolAdapter {
     configs: string[],
     rules: SemgrepRule[] | undefined,
   ): string | null {
-    // 注入的 config 多为规则声明的仓库内部相对路径（node_modules/@zh/kernel/dist/assets/...），
-    // 已按回退链解析；全部无法解析时退化为 unavailable（映射为 skipped），而非硬错误。
-    if (declaredConfigs.length > 0 && configs.length === 0) {
-      return `Semgrep 配置不存在，跳过该规则: ${declaredConfigs.join(', ')}`;
-    }
+    const hasInlineRules = rules != null && rules.length > 0;
 
-    // 既无显式 config 也无内联 rules 时禁止裸跑 semgrep scan：不带 --config 会回退到
-    // semgrep 官方 registry auto 规则集（英文通用规则，如 detect-non-literal-regexp 等），
-    // 产生与受控规则语义不一致的误报（典型：guard.security-scan 的 scanners 派发
-    // toolConfig 为空导致 9+ 个误报阻断）。未配置规则集即视为检测不可用（映射为 skipped）。
-    if (configs.length === 0 && !(rules && rules.length > 0)) {
+    // 注入的 config 多为规则声明的仓库内部相对路径（node_modules/@zh/kernel/dist/assets/...），
+    // 已按回退链解析；全部无法解析且无内联 rules 时退化为 unavailable（映射为 skipped），而非硬错误。
+    // 存在内联 rules 时以内联规则执行（config 缺失不阻断）：registry 风格 config
+    // （如 typescript/lang/security/）无法本地解析，但规则自带 pattern 时扫描仍可进行。
+    if (configs.length === 0 && !hasInlineRules) {
+      if (declaredConfigs.length > 0) {
+        return `Semgrep 配置不存在，跳过该规则: ${declaredConfigs.join(', ')}`;
+      }
+      // 既无显式 config 也无内联 rules 时禁止裸跑 semgrep scan：不带 --config 会回退到
+      // semgrep 官方 registry auto 规则集（英文通用规则，如 detect-non-literal-regexp 等），
+      // 产生与受控规则语义不一致的误报（典型：guard.security-scan 的 scanners 派发
+      // toolConfig 为空导致 9+ 个误报阻断）。未配置规则集即视为检测不可用（映射为 skipped）。
       return 'Semgrep 未配置规则集（无 config 或无内联 rules），跳过扫描';
     }
 

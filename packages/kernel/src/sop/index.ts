@@ -37,6 +37,7 @@ export type { VerifyResult, EncryptedData } from './security/sop-signer';
 // ─── sync: 智汇大脑协同 ─────────────────────────────────
 export {
   ToolRuleSync,
+  EXPIRY_THRESHOLD_DAYS,
   ExperienceReporter,
   WisdomBrainSync,
   hashToolRuleFiles,
@@ -51,6 +52,10 @@ export {
   resolveHealth,
   readOrCreateUserId,
   getOrCreateDefaultOrg,
+  getReclaimingToolRuleIds,
+  getReclaimingToolRuleSinces,
+  getReclaimingSopModuleIds,
+  getReclaimingSopModuleSinces,
 } from './sync';
 export type {
   ToolId,

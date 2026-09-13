@@ -75,7 +75,7 @@ export class TrivyAdapter {
     const args = this.buildScanArgs(projectPath, options);
     try {
       const { stdout } = await execFileAsync(this.trivyPath, args, {
-        timeout: 120_000, // 2 minutes
+        timeout: 300_000, // 5 minutes for large monorepos
         maxBuffer: 10 * 1024 * 1024, // 10MB
       });
 
@@ -110,7 +110,7 @@ export class TrivyAdapter {
 
     try {
       const { stdout } = await execFileAsync(this.trivyPath, args, {
-        timeout: 120_000,
+        timeout: 300_000,
         maxBuffer: 10 * 1024 * 1024,
       });
 

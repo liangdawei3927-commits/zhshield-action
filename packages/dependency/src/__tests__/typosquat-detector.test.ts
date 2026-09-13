@@ -6,6 +6,7 @@ import { buildDependencyGraph } from '../graph-builder';
 import {
   KNOWN_PACKAGES,
   COMMON_TARGETS,
+  VERIFIED_LEGIT_PACKAGES,
   TyposquatDetectorImpl,
   HIGH_RISK_MAX_EDIT_DISTANCE,
   MEDIUM_RISK_MAX_EDIT_DISTANCE,
@@ -73,6 +74,16 @@ describe('TyposquatDetectorImpl 基本契约', () => {
     expect(MEDIUM_RISK_MAX_EDIT_DISTANCE).toBe(2);
     expect(LOW_RISK_MAX_EDIT_DISTANCE).toBe(3);
   });
+
+  it('导出已验证合法包豁免清单，且与碰瓷目标清单无重叠', () => {
+    expect(VERIFIED_LEGIT_PACKAGES.length).toBeGreaterThanOrEqual(40);
+    expect(VERIFIED_LEGIT_PACKAGES).toContain('ms');
+    expect(VERIFIED_LEGIT_PACKAGES).toContain('qs');
+    expect(VERIFIED_LEGIT_PACKAGES).toContain('uid');
+    for (const pkg of VERIFIED_LEGIT_PACKAGES) {
+      expect(KNOWN_PACKAGES).not.toContain(pkg);
+    }
+  });
 });
 
 describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
@@ -103,6 +114,31 @@ describe('TyposquatDetectorImpl detect（附 B.6 验收）', () => {
     const findings = await detector.detect(graph);
 
     expect(findings).toHaveLength(0);
+  });
+
+  it('已核实合法包 ms / qs / uid / vitest / chai / obug 不被误报', async () => {
+    const graph = buildNpmGraph({
+      ms: '2.1.3',
+      qs: '6.16.0',
+      uid: '2.0.2',
+      vitest: '4.1.11',
+      chai: '6.2.2',
+      obug: '2.1.4',
+    });
+    const findings = await detector.detect(graph);
+
+    expect(findings).toHaveLength(0);
+  });
+
+  it('豁免仅精确全名生效：变体名不在豁免清单且仍被检出', async () => {
+    const graph = buildNpmGraph({ ms2: '1.0.0', uid2: '1.0.0' });
+    const findings = await detector.detect(graph);
+    const ids = findings.map((f) => f.nodeId);
+
+    expect(VERIFIED_LEGIT_PACKAGES).not.toContain('ms2');
+    expect(VERIFIED_LEGIT_PACKAGES).not.toContain('uid2');
+    expect(ids).toContain('ms2@1.0.0');
+    expect(ids).toContain('uid2@1.0.0');
   });
 
   it('evidence 非空且可解释（含包名 / 目标 / 编辑距离 / 分数）', async () => {

@@ -92,9 +92,7 @@ export function softDeleteProjectData(db: Database.Database, projectPath: string
   const now = new Date().toISOString();
   // 提取 prepared statement 循环外复用（perf-batch-db-write：循环内 prepare 属单行写入低效模式）
   const stmts = PROJECT_DATA_TABLES.map((table) =>
-    db.prepare(
-      `UPDATE ${table} SET deleted_at = ? WHERE project_id = ? AND deleted_at IS NULL`,
-    ),
+    db.prepare(`UPDATE ${table} SET deleted_at = ? WHERE project_id = ? AND deleted_at IS NULL`),
   );
   for (const stmt of stmts) {
     stmt.run(now, key);
@@ -660,18 +658,12 @@ export function listRuleContent(
   return (filter ? db.prepare(sql).all(...params) : db.prepare(sql).all()) as RuleContentRow[];
 }
 
-export function getRuleContent(
-  db: Database.Database,
-  ruleId: string,
-): RuleContentRow | undefined {
+export function getRuleContent(db: Database.Database, ruleId: string): RuleContentRow | undefined {
   return db.prepare('SELECT * FROM rule_content WHERE rule_id = ?').get(ruleId) as
     RuleContentRow | undefined;
 }
 
-export function getRuleContentById(
-  db: Database.Database,
-  id: string,
-): RuleContentRow | undefined {
+export function getRuleContentById(db: Database.Database, id: string): RuleContentRow | undefined {
   return db.prepare('SELECT * FROM rule_content WHERE id = ?').get(id) as
     RuleContentRow | undefined;
 }
@@ -737,11 +729,7 @@ export function softDeleteRuleContent(db: Database.Database, ruleId: string): vo
 }
 
 /** 标记状态；状态机由服务层裁决 */
-export function setRuleContentStatus(
-  db: Database.Database,
-  ruleId: string,
-  status: string,
-): void {
+export function setRuleContentStatus(db: Database.Database, ruleId: string, status: string): void {
   db.prepare(
     `UPDATE rule_content SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE rule_id = ?`,
   ).run(status, ruleId);
@@ -772,11 +760,11 @@ export function listRuleContentVersions(
   db: Database.Database,
   ruleId: string,
 ): RuleContentVersionRow[] {
-  return (db
+  return db
     .prepare(
       'SELECT * FROM rule_content_version WHERE rule_id = ? ORDER BY released_at DESC, version DESC',
     )
-    .all(ruleId) as RuleContentVersionRow[]);
+    .all(ruleId) as RuleContentVersionRow[];
 }
 
 export function getRuleContentVersion(
@@ -795,10 +783,7 @@ export function listToolPackages(db: Database.Database): ToolPackageRow[] {
   return db.prepare('SELECT * FROM tool_package ORDER BY tool_id').all() as ToolPackageRow[];
 }
 
-export function getToolPackage(
-  db: Database.Database,
-  toolId: string,
-): ToolPackageRow | undefined {
+export function getToolPackage(db: Database.Database, toolId: string): ToolPackageRow | undefined {
   return db.prepare('SELECT * FROM tool_package WHERE tool_id = ?').get(toolId) as
     ToolPackageRow | undefined;
 }
@@ -866,11 +851,11 @@ export function listToolPackageVersions(
   db: Database.Database,
   toolId: string,
 ): ToolPackageVersionRow[] {
-  return (db
+  return db
     .prepare(
       'SELECT * FROM tool_package_version WHERE tool_id = ? ORDER BY released_at DESC, version DESC',
     )
-    .all(toolId) as ToolPackageVersionRow[]);
+    .all(toolId) as ToolPackageVersionRow[];
 }
 
 // ─── content_audit_log ──────────────────────────────────────

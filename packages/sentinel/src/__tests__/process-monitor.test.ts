@@ -124,6 +124,20 @@ describe('ProcessMonitor — 进程监控', () => {
     expect(opts?.shell).toBe(false);
   });
 
+  it('3c. start(): 命令串含空格（如 "npm run dev"）时拆分为可执行名+参数，shell 保持 false', () => {
+    monitor.start(makeConfig({ command: 'echo hello', args: undefined }));
+
+    const [cmd, args, opts] = spawnSpy.mock.calls[0] as [
+      string,
+      string[],
+      Record<string, unknown>,
+    ];
+    expect(cmd).toBe('echo');
+    expect(args).toEqual(['hello']);
+    expect(opts.shell).toBe(false);
+    expect(monitor.isRunning()).toBe(true);
+  });
+
   it('4. stop(): 停止后 isRunning 为 false', () => {
     monitor.start(makeConfig());
     expect(monitor.isRunning()).toBe(true);

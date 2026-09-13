@@ -109,6 +109,66 @@ const KNOWN_PYTHON_PACKAGES: readonly string[] = [
   'pytest',
 ];
 
+/**
+ * 已验证合法知名 npm 包（逐一经 npm registry 核实：官方仓库 / 知名维护者 / 百万级周下载）。
+ *
+ * 离线静态检测只做名字编辑距离比对，无发布者信誉 / 下载量 / 发布时间等真实信号，
+ * 合法包名与知名清单「撞车」时（如 ms↔ws、qs↔ws、vitest↔pytest）必然误报。
+ * 此处对已核实的合法包做**精确全名**豁免：仅包名完全相等时跳过，
+ * 变体（ms2 / qs-dev / vitest-x）仍会正常检出，绝不削弱真实投毒检测。
+ */
+export const VERIFIED_LEGIT_PACKAGES: readonly string[] = [
+  'uid',
+  'ms',
+  'qs',
+  'bytes',
+  'vitest',
+  'chai',
+  'cliui',
+  'jsesc',
+  'obug',
+  'pump',
+  'aws4',
+  'ejs',
+  'jose',
+  'tsx',
+  'mz',
+  'asynckit',
+  'espree',
+  'gensync',
+  'dotenv',
+  'mime',
+  'plist',
+  'uri-js',
+  'cac',
+  'depd',
+  'etag',
+  'fastq',
+  'fresh',
+  'glob',
+  'hono',
+  'json5',
+  'pkijs',
+  'refa',
+  'retry',
+  'roarr',
+  'which',
+  'ajv',
+  'cors',
+  'fdir',
+  'gopd',
+  'got',
+  'jake',
+  'jiti',
+  'jju',
+  'keyv',
+  'levn',
+  'nopt',
+  'pend',
+  'send',
+  'temp',
+];
+
 /** 全部知名包清单（npm + python），供编辑距离 / 视觉混淆比对 */
 export const KNOWN_PACKAGES: readonly string[] = [...KNOWN_NPM_PACKAGES, ...KNOWN_PYTHON_PACKAGES];
 
@@ -252,6 +312,8 @@ function evaluateNode(node: DependencyNode): TyposquatFinding | null {
   if (node.name.startsWith('@')) return null;
   const name = node.name.toLowerCase();
   if (KNOWN_PACKAGES.includes(name)) return null;
+  // 精确全名匹配已核实合法包；变体名不受豁免，仍走编辑距离比对
+  if (VERIFIED_LEGIT_PACKAGES.includes(name)) return null;
 
   const variantSet = new Set(visualConfusionVariants(name));
   const visualTarget = visualConfusionTarget(variantSet);

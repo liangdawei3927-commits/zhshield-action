@@ -469,4 +469,166 @@ describe('ConsoleReporter — 报告格式化', () => {
     expect(result.text).not.toContain('不可用');
     expect(result.text).not.toContain('⚠');
   });
+
+  it('11. format: skipped adapterResults 显示真实原因，不再一律"语言不适用"（P2）', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: null,
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 90, grade: 'A' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [
+          {
+            adapterId: 'semgrep',
+            adapterName: 'semgrep',
+            duration: 0,
+            issueCount: 0,
+            passed: true,
+            status: 'skipped',
+            skipDetail: 'Semgrep 规则目录不存在，请先同步云脑规则',
+            issues: [],
+          },
+          {
+            adapterId: 'eslint',
+            adapterName: 'eslint',
+            duration: 0,
+            issueCount: 0,
+            passed: true,
+            status: 'skipped',
+            skipReason: 'out-of-scope',
+            issues: [],
+          },
+          {
+            adapterId: 'ts-prune',
+            adapterName: 'ts-prune',
+            duration: 0,
+            issueCount: 0,
+            passed: true,
+            status: 'skipped',
+            issues: [],
+          },
+        ],
+        recommendations: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('已跳过');
+    expect(result.text).toContain('Semgrep 规则目录不存在，请先同步云脑规则');
+    expect(result.text).toContain('画像裁剪');
+    expect(result.text).not.toContain('语言不适用');
+  });
+
+  it('12. format: error/failed 且 issueCount>0 归入"检出问题"，不再误报"工具执行失败"', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: null,
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 60, grade: 'C' },
+        issues: [],
+        summary: { total: 4, error: 4, warning: 0, info: 0 },
+        adapterResults: [
+          {
+            adapterId: 'dep-cruiser',
+            adapterName: '循环依赖检测',
+            duration: 1200,
+            issueCount: 1,
+            passed: false,
+            status: 'error',
+            issues: [],
+          },
+          {
+            adapterId: 'tsc',
+            adapterName: 'TypeScript 类型错误检查（真 tsc）',
+            duration: 600,
+            issueCount: 2,
+            passed: false,
+            status: 'failed',
+            issues: [],
+          },
+          {
+            adapterId: 'gitleaks',
+            adapterName: '硬编码密钥/凭证检测',
+            duration: 2500,
+            issueCount: 1,
+            passed: false,
+            status: 'error',
+            issues: [],
+          },
+        ],
+        recommendations: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('⚠ 检出 4 个问题');
+    expect(result.text).toContain('循环依赖检测(1)');
+    expect(result.text).toContain('TypeScript 类型错误检查（真 tsc）(2)');
+    expect(result.text).toContain('硬编码密钥/凭证检测(1)');
+    expect(result.text).not.toContain('✗ 工具执行失败');
+  });
+
+  it('13. format: error/failed 且 issueCount===0 保留"工具执行失败"（真失败）', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: null,
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 100, grade: 'A' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [
+          {
+            adapterId: 'dep-cruiser',
+            adapterName: '循环依赖检测',
+            duration: 1200,
+            issueCount: 0,
+            passed: false,
+            status: 'error',
+            issues: [],
+          },
+          {
+            adapterId: 'tsc',
+            adapterName: 'TypeScript 类型错误检查（真 tsc）',
+            duration: 600,
+            issueCount: 0,
+            passed: false,
+            status: 'failed',
+            issues: [],
+          },
+        ],
+        recommendations: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('✗ 工具执行失败');
+    expect(result.text).toContain('循环依赖检测');
+    expect(result.text).toContain('TypeScript 类型错误检查（真 tsc）');
+    expect(result.text).not.toContain('⚠ 检出');
+  });
 });

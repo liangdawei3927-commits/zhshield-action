@@ -37,7 +37,16 @@ function makeFixture(): string {
 }
 
 // kernel 规则 fixture 目录（C6 迁至 test-fixtures，语义与 src/sop 一致）
-const KERNEL_RULES_DIR = path.join(__dirname, '..', '..', '..', 'kernel', 'test-fixtures', 'sop-content', 'rules');
+const KERNEL_RULES_DIR = path.join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  'kernel',
+  'test-fixtures',
+  'sop-content',
+  'rules',
+);
 
 describe('M2 验收：画像驱动贯通（收敛桥）', () => {
   it('GIVEN NestJS+TS 项目 WHEN 收敛桥投影 THEN 产出 kernel 兼容 ProjectFeature', () => {

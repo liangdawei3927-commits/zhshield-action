@@ -31,6 +31,7 @@ import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport, ProjectFeature } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
+import { loadBaseline } from '@zh/shared';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
@@ -316,7 +317,9 @@ export class PipelineRunner {
 
     await this.sopLoader.loadFromKnowledgeBase(synced);
     const stats = this.sopRegistry.getStats();
-    this.logger.info(`SOP 同步规则已加载: ${synced.length} 条 (活跃: ${stats.byStatus.active || 0})`);
+    this.logger.info(
+      `SOP 同步规则已加载: ${synced.length} 条 (活跃: ${stats.byStatus.active || 0})`,
+    );
     return synced.length;
   }
   async runGuard(options?: Partial<CheckOptions>): Promise<GuardReport> {
@@ -338,14 +341,19 @@ export class PipelineRunner {
     );
     return report;
   }
-  async runInspect(): Promise<InspectionReport> {
+  async runInspect(options?: { skipBaseline?: boolean }): Promise<InspectionReport> {
     this.logger.info('开始 Inspect 引擎巡检...');
     // R3d 执行面投影激活：直扫按画像裁剪 — 复用既有 deriveProjectFeature（M2 同源探测），
     // 探测失败 → undefined → 不裁剪（与现状行为一致，回归安全）。
     const feature = deriveProjectFeature(this.repoRoot);
-    const report = await this.inspectEngine.runScan(this.repoRoot, 'full', feature);
+    const baseline = options?.skipBaseline ? null : await loadBaseline(this.repoRoot);
+    const report = await this.inspectEngine.runScan(this.repoRoot, 'full', feature, baseline);
+    const suppressedNote =
+      report.suppressedCount && report.suppressedCount > 0
+        ? `（基线豁免 ${report.suppressedCount} 项）`
+        : '';
     this.logger.info(
-      `巡检完成: ${report.summary.total} 个问题 (${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info)`,
+      `巡检完成: ${report.summary.total} 个问题 (${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info)${suppressedNote}`,
     );
     return report;
   }
@@ -390,7 +398,11 @@ export class PipelineRunner {
     const guardContext = composeRuleContext(this.repoRoot, 'guard', options?.guardContext);
     const inspectContext = composeRuleContext(this.repoRoot, 'inspect', options?.inspectContext);
 
-    const guardPhase = await runSopGuardPhase(this.logger, (ctx) => this.runSopGuard(ctx), guardContext);
+    const guardPhase = await runSopGuardPhase(
+      this.logger,
+      (ctx) => this.runSopGuard(ctx),
+      guardContext,
+    );
     if ('failure' in guardPhase) {
       return guardPhase.failure;
     }

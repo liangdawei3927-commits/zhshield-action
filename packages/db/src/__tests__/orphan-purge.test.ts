@@ -320,7 +320,24 @@ describe('purgeExpiredSoftDeleted', () => {
     db.prepare(
       `INSERT INTO sentinel_events (id, project_id, timestamp, dedupe_key, title, service, module, severity, status, validation, context, history, occurrence_count, first_seen, last_seen, deleted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run('evt-purge', 'p-all', oldDate.toISOString(), 'dk-purge', 'E', 'api', 'core', 'p1', 'detected', '{}', '{}', '[]', 1, oldDate.toISOString(), oldDate.toISOString(), oldDate.toISOString());
+    ).run(
+      'evt-purge',
+      'p-all',
+      oldDate.toISOString(),
+      'dk-purge',
+      'E',
+      'api',
+      'core',
+      'p1',
+      'detected',
+      '{}',
+      '{}',
+      '[]',
+      1,
+      oldDate.toISOString(),
+      oldDate.toISOString(),
+      oldDate.toISOString(),
+    );
 
     const results = purgeExpiredSoftDeleted(db, 30);
     for (const r of results) {

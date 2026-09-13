@@ -135,7 +135,8 @@ describe('softDeleteProjectData', () => {
     // experiences 无 deleted_at 列(012 刻意不加,L70-73 已验证)且行原样保留
     const row = db
       .prepare('SELECT id, project_id, rule_id, type FROM experiences WHERE id = ?')
-      .get('exp-1') as { id: string; project_id: string; rule_id: string; type: string } | undefined;
+      .get('exp-1') as
+      { id: string; project_id: string; rule_id: string; type: string } | undefined;
     expect(row).toEqual({
       id: 'exp-1',
       project_id: 'proj-1',

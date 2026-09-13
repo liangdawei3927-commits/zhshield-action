@@ -49,6 +49,13 @@ export class ProcessMonitor {
     const maxRestarts = this.config.maxRestarts ?? 3;
     if (this.restarts >= maxRestarts) {
       this.emitRestartLimitReached(maxRestarts);
+      // 已达最大重启次数：进程反复失败，继续健康检查只会每轮刷 p1 事件。
+      // 停止监控（停掉健康检查定时器 + 标记非运行），避免事件风暴。
+      this.running = false;
+      if (this.healthTimer) {
+        clearInterval(this.healthTimer);
+        this.healthTimer = null;
+      }
       return;
     }
 
@@ -107,7 +114,12 @@ export class ProcessMonitor {
 
   /** 以管道 stdio 启动子进程（不继承终端） */
   private spawnProcess(cmd: string, args: string[], cwd: string): ChildProcess {
-    return spawn(cmd, args, {
+    // detectRunCommand 等调用方可能传入 "npm run dev" 式命令串；shell:false 下
+    // spawn 会把整串当可执行文件路径导致 ENOENT，需拆分为可执行名 + 参数。
+    const tokens = cmd.trim().split(/\s+/);
+    const executable = tokens[0];
+    const resolvedArgs = args.length > 0 ? args : tokens.slice(1);
+    return spawn(executable, resolvedArgs, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,

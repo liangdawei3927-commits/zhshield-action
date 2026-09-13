@@ -141,13 +141,32 @@ export class StageSectionFormatter {
     }
 
     if (errors.length > 0) {
-      const names = errors.map((r) => this.fmt.red(r.adapterName)).join('、');
-      lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${names} (错误详情已在 issues 中)`);
+      // 非零退出码 ≠ 失败：有产出（issueCount>0）→ 检出问题；无产出（issueCount===0）→ 真失败
+      const withFindings = errors.filter((r) => r.issueCount > 0 || r.issues.length > 0);
+      const trulyFailed = errors.filter((r) => r.issueCount === 0 && r.issues.length === 0);
+
+      if (withFindings.length > 0) {
+        const total = withFindings.reduce((sum, r) => sum + r.issueCount, 0);
+        const names = withFindings
+          .map((r) => `${this.fmt.yellow(r.adapterName)}${this.fmt.dim(`(${r.issueCount})`)}`)
+          .join('、');
+        lines.push(`${indent}${this.fmt.yellow(`⚠ 检出 ${total} 个问题`)}: ${names}`);
+      }
+
+      if (trulyFailed.length > 0) {
+        const names = trulyFailed.map((r) => this.fmt.red(r.adapterName)).join('、');
+        lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${names} (错误详情已在 issues 中)`);
+      }
     }
 
     if (skipped.length > 0) {
-      const names = skipped.map((r) => this.fmt.gray(r.adapterName)).join('、');
-      lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${names}（语言不适用）`);
+      const parts = skipped.map((r) => {
+        const reason = r.skipDetail ?? (r.skipReason === 'out-of-scope' ? '画像裁剪，已跳过'
+          : r.skipReason === 'degraded' ? '降级运行'
+          : '已跳过');
+        return `${this.fmt.gray(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
+      });
+      lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);
     }
 
     if (normal.length > 0) {

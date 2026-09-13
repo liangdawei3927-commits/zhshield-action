@@ -98,6 +98,7 @@ describe('bucketFindingsByModule — 按模块目录分桶', () => {
 
 describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
   it('各模块按其类型权重独立评分，整体分为等权平均', () => {
+    // 两份完全相同的安全问题报告：backend 更看重 security（权重更高），整体分更低
     const backend = {
       path: '/p/packages/server',
       profile: makeProfile('backend'),
@@ -122,15 +123,20 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
       path: '/p/packages/web',
       profile: makeProfile('frontend'),
       guard: {
-        results: [] as Array<{
-          severity: 'error' | 'warning' | 'info';
-          status: 'passed' | 'failed' | 'error' | 'warning';
-          blocking: boolean;
-          file?: string;
-        }>,
+        results: [
+          {
+            severity: 'error' as const,
+            status: 'failed' as const,
+            blocking: true,
+            file: '/p/packages/web/b.ts',
+          },
+        ],
       },
       inspect: {
-        issues: [{ severity: 'error' as const, category: 'quality', file: '/p/packages/web/b.ts' }],
+        issues: [
+          { severity: 'error' as const, category: 'security', file: '/p/packages/web/b.ts' },
+          { severity: 'error' as const, category: 'security', file: '/p/packages/web/b.ts' },
+        ],
       },
     };
 
@@ -142,8 +148,8 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
     expect(webCard.type).toBe('frontend');
     // backend 更看重 security，同份安全问题时整体分更低
     expect(serverCard.overall).toBeLessThan(webCard.overall);
-    // 聚合 = 等权平均
-    expect(agg.overall).toBeCloseTo((serverCard.overall + webCard.overall) / 2, 2);
+    // 聚合 = 等权平均（overall 四舍五入到 2 位，均值可能差 0.005，用 1 位精度断言）
+    expect(agg.overall).toBeCloseTo((serverCard.overall + webCard.overall) / 2, 1);
   });
 
   it('单模块时退化为该模块自身评分（向后兼容）', () => {
@@ -175,9 +181,9 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
           file: '/p/packages/server/a.ts',
         },
         {
-          severity: 'warning' as const,
-          status: 'warning' as const,
-          blocking: false,
+          severity: 'error' as const,
+          status: 'failed' as const,
+          blocking: true,
           file: '/p/packages/web/b.ts',
         },
       ],
@@ -194,7 +200,16 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
           category: 'security' as const,
           file: '/p/packages/server/a.ts',
         },
-        { severity: 'error' as const, category: 'quality' as const, file: '/p/packages/web/b.ts' },
+        {
+          severity: 'error' as const,
+          category: 'security' as const,
+          file: '/p/packages/web/b.ts',
+        },
+        {
+          severity: 'error' as const,
+          category: 'security' as const,
+          file: '/p/packages/web/b.ts',
+        },
       ],
     };
 
@@ -205,7 +220,7 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
     const webCard = agg.modules.find((m) => m.path === '/p/packages/web')!;
     expect(serverCard.type).toBe('backend');
     expect(webCard.type).toBe('frontend');
-    // backend 更看重 security，同份安全问题时整体分更低
+    // 同份安全问题：backend 更看重 security，整体分更低
     expect(serverCard.overall).toBeLessThan(webCard.overall);
     // 聚合 = 各模块等权平均（含根级兜底）
     const mean = agg.modules.reduce((s, m) => s + m.overall, 0) / agg.modules.length;

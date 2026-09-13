@@ -35,7 +35,19 @@ export type {
   PenaltyOverride,
   PositiveRuleOverride,
 } from './project-scoring-config';
-export type { HealthScore, DimensionScore, ScoreTrend } from './types';
+export type {
+  HealthScore,
+  DimensionScore,
+  DimensionStatus,
+  SecretDataLike,
+  DepsDataLike,
+  TechDebtDataLike,
+  SentinelDataLike,
+  RefactorDataLike,
+  PerformanceDataLike,
+  DimensionExtras,
+  ScoreTrend,
+} from './types';
 export type {
   PositiveRule,
   PenaltyConfig,

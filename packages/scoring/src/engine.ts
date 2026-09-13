@@ -80,7 +80,11 @@ export class ScoringEngine {
   }
 
   calculate(projectId: string, dimensionScores: DimensionScore[]): HealthScore {
-    const overall = dimensionScores.reduce((sum, d) => sum + d.score * d.weight, 0);
+    // not-run 维度不参与加权：仅按已检测维度归一化（spec C：未检测域禁止按满分计）
+    const active = dimensionScores.filter((d) => d.status !== 'not-run');
+    const weightSum = active.reduce((s, d) => s + d.weight, 0);
+    const overall =
+      weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
     const grade: HealthScore['grade'] =
       overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
     const trend = this.computeTrend(projectId, overall);

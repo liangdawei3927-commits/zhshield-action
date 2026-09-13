@@ -44,8 +44,8 @@ describe('ScoringEngine (context scoring)', () => {
     expect(result.grade).toBe('A');
     expect(result.dimensions.every((d) => d.score === 100)).toBe(true);
     expect(result.negativePoints).toBe(0);
-    // security 15 + quality 13 + architecture 15 + dependencies 5 + documentation 3
-    expect(result.positivePoints).toBe(51);
+    // quality 13 + security 15 + dependencies 5 + techdebt 5 + gate 5 + refactor 3 + performance 2
+    expect(result.positivePoints).toBe(48);
   });
 
   it('applies severity multipliers to per-issue penalties', () => {
@@ -60,7 +60,7 @@ describe('ScoringEngine (context scoring)', () => {
     expect(security?.negative).toBe(15);
     expect(security?.score).toBe(85);
     expect(security?.issues).toBe(1);
-    expect(result.overall).toBeCloseTo(94.75, 2);
+    expect(result.overall).toBeCloseTo(96.25, 2);
   });
 
   it('caps dimension penalty at maxPenalty', () => {
@@ -82,13 +82,13 @@ describe('ScoringEngine (context scoring)', () => {
   it('falls back to multiplier 1 for unknown severities', () => {
     const engine = new ScoringEngine();
     const result = engine.score({
-      findings: [{ severity: 'catastrophic', category: 'documentation' }],
+      findings: [{ severity: 'catastrophic', category: 'quality' }],
       metrics: { dependencyCount: 0, circularDependencies: 0, totalFiles: 0 },
     });
 
-    const doc = result.details.find((d) => d.dimension === 'documentation');
-    expect(doc?.negative).toBe(1);
-    expect(doc?.score).toBe(99);
+    const quality = result.details.find((d) => d.dimension === 'quality');
+    expect(quality?.negative).toBe(3);
+    expect(quality?.score).toBe(97);
   });
 
   it('maps weighted overall to grades A/B/C/D at boundaries', () => {

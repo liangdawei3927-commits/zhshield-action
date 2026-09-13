@@ -10,7 +10,8 @@ import type { ScoringProjectProfile, ProjectType } from '@zh/fingerprint';
  * 3. 权重和保持为 1 — 应用增量后归一化，防止漂移
  * 4. 保守调整 — 每类项目只调 2 个维度的权重，避免过度拟合
  *
- * 当前阶段（MVP）：只调权重，不加维度。
+ * 当前阶段（MVP）：类型画像增量只调 quality/security/dependencies 三个维度，
+ * refactor/performance 保持默认权重（生产原则：不对项目类型做过拟合调整）。
  * 中期演进：extraDimensions 字段预留，用于按 profile 启用 ux/observability/api-contract 等维度。
  */
 export interface ProfileScoringOverrides {
@@ -23,13 +24,13 @@ export interface ProfileScoringOverrides {
 }
 
 /**
- * 按 ProjectType 的权重增量表
+ * 按 ProjectType 的权重增量表（P1b 扩展后仅剩 quality/security/dependencies 三个可调维）
  *
  * 调整依据：
- * - frontend/小程序：前端漏洞公网暴露面小，security 降；performance 归 quality，quality 升
- * - desktop (Electron)：IPC/打包安全风险高，security 升；文档需求低，documentation 降
- * - library：依赖安全由消费者负责，dependencies 降；文档是 API 契约，documentation 升
- * - cli：依赖通常少，dependencies 降；文档降，质量升
+ * - frontend/小程序：前端漏洞公网暴露面小，security 降；refactor/performance 保持默认权重（生产原则：不对项目类型做过拟合调整），quality 升
+ * - desktop (Electron)：IPC/打包安全风险高，security 升；质量需求相对低，quality 降
+ * - library：依赖安全由消费者负责，dependencies 降；文档是 API 契约，质量升
+ * - cli：依赖通常少，dependencies 降；质量升
  * - app：移动端安全敏感但低于后端，security 微降，quality 升（含性能）
  *
  * 每行增量和 = 0（保持总权重不变，归一化只是兜底）
@@ -39,22 +40,22 @@ const TYPE_WEIGHT_DELTAS: Record<ProjectType, Partial<Record<string, number>>> =
   frontend: { security: -0.1, quality: +0.1 },
   app: { security: -0.05, quality: +0.05 },
   'mini-program': { dependencies: -0.08, quality: +0.08 },
-  desktop: { security: +0.05, documentation: -0.05 },
-  library: { dependencies: -0.05, documentation: +0.05 },
-  cli: { dependencies: -0.08, documentation: -0.05, quality: +0.13 },
+  desktop: { security: +0.05, quality: -0.05 },
+  library: { dependencies: -0.05, quality: +0.05 },
+  cli: { dependencies: -0.08, quality: +0.08 },
   monorepo: {},
   unknown: {},
 };
 
-// 按项目类型剔除「本质上不适用」的维度（保守默认，集中此表便于产品校准）；被剔维度权重置 0、其余归一化
+// 按项目类型剔除「本质上不适用」的维度（P1b 后无已删维度引用，暂不新增禁用项）
 const TYPE_DISABLED_DIMENSIONS: Record<ProjectType, string[]> = {
   backend: [],
   frontend: [],
   app: [],
-  'mini-program': ['architecture'],
+  'mini-program': [],
   desktop: [],
   library: [],
-  cli: ['architecture'],
+  cli: [],
   monorepo: [],
   unknown: [],
 };

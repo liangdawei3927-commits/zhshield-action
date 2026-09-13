@@ -5,7 +5,7 @@ import { buildHealthDimensions } from '../pipeline-score';
 import { ScoringEngine } from '../engine';
 import { resolveProfileScoring } from '../profile-scoring-resolver';
 import { profileSync } from '@zh/fingerprint';
-import type { ScoringProjectProfile, ProjectType } from '@zh/fingerprint';
+import type { ScoringProjectProfile, ProjectType, ProjectFramework, Runtime } from '@zh/fingerprint';
 
 /**
  * 评分校准夹具（Task C：真实跑分校准）
@@ -33,22 +33,22 @@ const TYPES: ProjectType[] = [
 
 /** 构造贴近真实技术栈的画像（仅 type/framework 影响评分适配，其余字段填最小合理值） */
 function makeRealisticProfile(type: ProjectType): ScoringProjectProfile {
-  const frameworkByType: Record<ProjectType, string> = {
+  const frameworkByType: Record<ProjectType, ProjectFramework> = {
     backend: 'nestjs',
     frontend: 'react',
     app: 'react-native',
-    'mini-program': 'wechat-miniprogram',
+    'mini-program': 'weapp',
     desktop: 'electron',
     library: 'none',
     cli: 'none',
     monorepo: 'none',
     unknown: 'none',
   };
-  const runtimeByType: Record<ProjectType, string> = {
+  const runtimeByType: Record<ProjectType, Runtime> = {
     backend: 'node',
     frontend: 'browser',
-    app: 'react-native',
-    'mini-program': 'wechat',
+    app: 'browser',
+    'mini-program': 'browser',
     desktop: 'electron',
     library: 'node',
     cli: 'node',
@@ -116,14 +116,21 @@ describe('评分校准 — 权重不变量（Task C）', () => {
     }
   });
 
-  it('mini-program / cli 剔除 architecture 维度（权重置 0）', () => {
-    expect(weightMapOf(makeRealisticProfile('mini-program')).architecture).toBe(0);
-    expect(weightMapOf(makeRealisticProfile('cli')).architecture).toBe(0);
+  it('mini-program / cli 不再剔除任何维度（P1b 后无禁用项，全部权重 > 0）', () => {
+    for (const t of ['mini-program', 'cli'] as const) {
+      const wm = weightMapOf(makeRealisticProfile(t));
+      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate']) {
+        expect(wm[dim]).toBeGreaterThan(0);
+      }
+    }
   });
 
-  it('其余类型保留 architecture 维度', () => {
+  it('所有类型均保留全部 7 个维度', () => {
     for (const t of ['backend', 'frontend', 'app', 'desktop', 'library'] as const) {
-      expect(weightMapOf(makeRealisticProfile(t)).architecture).toBeGreaterThan(0);
+      const wm = weightMapOf(makeRealisticProfile(t));
+      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate']) {
+        expect(wm[dim]).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -131,7 +138,8 @@ describe('评分校准 — 权重不变量（Task C）', () => {
     for (const t of TYPES) {
       const o = resolveProfileScoring(makeRealisticProfile(t));
       if (!o.weightDeltas) continue;
-      const sum = Object.values(o.weightDeltas).reduce((a, b) => a + (b ?? 0), 0);
+      let sum = 0;
+      for (const v of Object.values(o.weightDeltas)) sum += v ?? 0;
       expect(Math.abs(sum)).toBeLessThan(1e-9);
     }
   });
@@ -139,11 +147,12 @@ describe('评分校准 — 权重不变量（Task C）', () => {
 
 describe('评分校准 — 类型区分度（Task C）', () => {
   it('同一安全失败：frontend 扣分少于 backend（前端安全降权）', () => {
-    const securityGuard = {
-      results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }],
+    // guard 失败已归 gate 维（两类型权重相同），改用 inspect security 问题验证安全降权
+    const securityInspect = {
+      issues: [{ severity: 'error' as const, category: 'security' }],
     };
-    const frontend = overallOf(makeRealisticProfile('frontend'), securityGuard);
-    const backend = overallOf(makeRealisticProfile('backend'), securityGuard);
+    const frontend = overallOf(makeRealisticProfile('frontend'), emptyGuard, securityInspect);
+    const backend = overallOf(makeRealisticProfile('backend'), emptyGuard, securityInspect);
     expect(frontend).toBeGreaterThan(backend);
   });
 
@@ -156,13 +165,13 @@ describe('评分校准 — 类型区分度（Task C）', () => {
     expect(backend).toBeGreaterThan(frontend);
   });
 
-  it('架构问题对 mini-program 无影响（architecture 已禁用）', () => {
+  it('架构问题计入 quality 维（P1b 合并后），对 mini-program 有影响（quality 升权）', () => {
     const archInspect = {
       issues: [{ severity: 'error' as const, category: 'architecture' }],
     };
     const withIssue = overallOf(makeRealisticProfile('mini-program'), emptyGuard, archInspect);
     const without = overallOf(makeRealisticProfile('mini-program'));
-    expect(withIssue).toBeCloseTo(without, 5);
+    expect(withIssue).toBeLessThan(without);
   });
 });
 
@@ -208,11 +217,11 @@ describe('评分校准 — 真实跑分（Task C）', () => {
         type: t,
         overall: score.overall,
         grade: score.grade,
-        securityW: wm.security,
         qualityW: wm.quality,
-        archW: wm.architecture,
+        securityW: wm.security,
         depsW: wm.dependencies,
-        docW: wm.documentation,
+        techdebtW: wm.techdebt,
+        gateW: wm.gate,
       };
     });
 

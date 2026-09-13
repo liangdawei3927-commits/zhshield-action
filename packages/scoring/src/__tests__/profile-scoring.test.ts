@@ -52,21 +52,21 @@ describe('resolveProfileScoring — 画像驱动权重解析', () => {
     expect(overrides.weightDeltas!.quality).toBeGreaterThan(0);
   });
 
-  it('desktop 类型提升 security、降低 documentation', () => {
+  it('desktop 类型提升 security、降低 quality', () => {
     const overrides = resolveProfileScoring(makeProfile('desktop'));
     expect(overrides.weightDeltas!.security).toBeGreaterThan(0);
-    expect(overrides.weightDeltas!.documentation).toBeLessThan(0);
+    expect(overrides.weightDeltas!.quality).toBeLessThan(0);
   });
 });
 
 describe('applyWeightDeltas — 权重归一化', () => {
   it('应用增量后权重和仍为 1', () => {
     const base = {
-      security: 0.35,
-      quality: 0.25,
-      architecture: 0.2,
+      quality: 0.35,
+      security: 0.25,
       dependencies: 0.15,
-      documentation: 0.05,
+      techdebt: 0.15,
+      gate: 0.10,
     };
     const deltas = { security: -0.1, quality: +0.1 };
     const result = applyWeightDeltas(base, deltas);
@@ -84,7 +84,7 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
   it('不传 profile 时向后兼容（默认权重）', () => {
     const dims = buildHealthDimensions(emptyGuard, emptyInspect);
     const securityDim = dims.find((d) => d.name === 'security');
-    expect(securityDim?.weight).toBeCloseTo(0.35, 1);
+    expect(securityDim?.weight).toBeCloseTo(0.25, 1);
   });
 
   it('frontend profile 降低 security 维度权重', () => {

@@ -1,15 +1,103 @@
 import type { ScoringConfig, DimensionDefinition } from './types';
 
 /**
- * 默认维度配置
- * 5 个维度，权重之和 = 1.0
+ * 默认维度配置（P2 扩展后 7 维）
+ * 质量 20% / 安全性 25% / 依赖 15% / 重构 10% / 性能 5% / 技术债 15% / 门禁哨兵 10%，权重之和 = 1.0
  */
 const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
+    id: 'quality',
+    name: '质量',
+    weight: 0.2,
+    description: '代码质量、性能、架构、重构、文档与测试',
+    penalties: {
+      dimension: 'quality',
+      maxPenalty: 35,
+      perIssuePenalty: 3,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+        info: 0.3,
+      },
+    },
+    positiveRules: [
+      {
+        id: 'has-tests',
+        name: '有测试覆盖',
+        description: '项目有测试文件',
+        dimension: 'quality',
+        points: 8,
+        condition: (ctx) => (ctx.metrics.testCoverage ?? 0) > 0,
+      },
+      {
+        id: 'good-test-coverage',
+        name: '测试覆盖率良好',
+        description: '测试覆盖率超过60%',
+        dimension: 'quality',
+        points: 5,
+        condition: (ctx) => (ctx.metrics.testCoverage ?? 0) > 60,
+      },
+    ],
+  },
+  {
+    id: 'refactor',
+    name: '重构',
+    weight: 0.1,
+    description: '代码可维护性与重构实践',
+    penalties: {
+      dimension: 'refactor',
+      maxPenalty: 10,
+      perIssuePenalty: 1,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+        info: 0.5,
+      },
+    },
+    positiveRules: [
+      {
+        id: 'no-smells',
+        name: '无明显代码异味',
+        description: '项目无明显代码异味',
+        dimension: 'refactor',
+        points: 3,
+        condition: (ctx) => ctx.findings.length === 0,
+      },
+    ],
+  },
+  {
+    id: 'performance',
+    name: '性能',
+    weight: 0.05,
+    description: '性能优化与资源效率',
+    penalties: {
+      dimension: 'performance',
+      maxPenalty: 5,
+      perIssuePenalty: 1,
+      severityMultipliers: {
+        critical: 3,
+        high: 2,
+        medium: 1,
+        low: 0.5,
+        info: 0.25,
+      },
+    },
+    positiveRules: [
+      {
+        id: 'no-perf-issues',
+        name: '无性能问题',
+        description: '项目无明显性能问题',
+        dimension: 'performance',
+        points: 2,
+        condition: (ctx) => ctx.findings.length === 0,
+      },
+    ],
+  },
+  {
     id: 'security',
     name: '安全性',
-    weight: 0.35,
-    description: '代码安全漏洞和安全实践',
+    weight: 0.25,
+    description: '代码安全漏洞与密钥管理',
     penalties: {
       dimension: 'security',
       maxPenalty: 30,
@@ -41,78 +129,10 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
     ],
   },
   {
-    id: 'quality',
-    name: '代码质量',
-    weight: 0.25,
-    description: '代码质量、复杂度和可维护性',
-    penalties: {
-      dimension: 'quality',
-      maxPenalty: 25,
-      perIssuePenalty: 3,
-      severityMultipliers: {
-        error: 2,
-        warning: 1,
-        info: 0.3,
-      },
-    },
-    positiveRules: [
-      {
-        id: 'has-tests',
-        name: '有测试覆盖',
-        description: '项目有测试文件',
-        dimension: 'quality',
-        points: 8,
-        condition: (ctx) => (ctx.metrics.testCoverage ?? 0) > 0,
-      },
-      {
-        id: 'good-test-coverage',
-        name: '测试覆盖率良好',
-        description: '测试覆盖率超过60%',
-        dimension: 'quality',
-        points: 5,
-        condition: (ctx) => (ctx.metrics.testCoverage ?? 0) > 60,
-      },
-    ],
-  },
-  {
-    id: 'architecture',
-    name: '架构',
-    weight: 0.2,
-    description: '项目架构和依赖管理',
-    penalties: {
-      dimension: 'architecture',
-      maxPenalty: 20,
-      perIssuePenalty: 4,
-      severityMultipliers: {
-        error: 2,
-        warning: 1,
-        info: 0.5,
-      },
-    },
-    positiveRules: [
-      {
-        id: 'no-circular-deps',
-        name: '无循环依赖',
-        description: '项目没有循环依赖',
-        dimension: 'architecture',
-        points: 10,
-        condition: (ctx) => ctx.metrics.circularDependencies === 0,
-      },
-      {
-        id: 'modular-structure',
-        name: '模块化结构',
-        description: '项目有良好的模块划分',
-        dimension: 'architecture',
-        points: 5,
-        condition: (ctx) => ctx.metrics.totalFiles > 10,
-      },
-    ],
-  },
-  {
     id: 'dependencies',
     name: '依赖',
     weight: 0.15,
-    description: '依赖管理和更新',
+    description: '依赖管理与漏洞',
     penalties: {
       dimension: 'dependencies',
       maxPenalty: 15,
@@ -136,28 +156,54 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
     ],
   },
   {
-    id: 'documentation',
-    name: '文档',
-    weight: 0.05,
-    description: '文档覆盖率和注释密度',
+    id: 'techdebt',
+    name: '技术债',
+    weight: 0.15,
+    description: '技术债指数（健康分 = 100 − debtIndex）',
     penalties: {
-      dimension: 'documentation',
-      maxPenalty: 5,
-      perIssuePenalty: 1,
+      dimension: 'techdebt',
+      maxPenalty: 15,
+      perIssuePenalty: 2,
       severityMultipliers: {
+        error: 2,
         warning: 1,
-        info: 0.3,
+        info: 0.5,
       },
     },
     positiveRules: [
       {
-        id: 'has-readme',
-        name: '有README',
-        description: '项目有README文件',
-        dimension: 'documentation',
-        points: 3,
+        id: 'no-debt-issues',
+        name: '无技术债问题',
+        description: '没有待处理的技术债问题',
+        dimension: 'techdebt',
+        points: 5,
+        condition: (ctx) => ctx.findings.length === 0,
+      },
+    ],
+  },
+  {
+    id: 'gate',
+    name: '门禁哨兵',
+    weight: 0.1,
+    description: '门禁检查与哨兵告警',
+    penalties: {
+      dimension: 'gate',
+      maxPenalty: 10,
+      perIssuePenalty: 2,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+      },
+    },
+    positiveRules: [
+      {
+        id: 'gate-clean',
+        name: '门禁通过',
+        description: '没有失败的门禁检查',
+        dimension: 'gate',
+        points: 5,
         condition: (ctx) =>
-          ctx.metrics.documentationCoverage !== undefined && ctx.metrics.documentationCoverage > 0,
+          !ctx.findings.some((f) => f.severity === 'error' || f.severity === 'critical'),
       },
     ],
   },
@@ -166,7 +212,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
 export function getDefaultScoringConfig(): ScoringConfig {
   return {
     dimensions: DEFAULT_DIMENSIONS,
-    version: '2.0.0',
+    version: '2.2.0',
     lastUpdated: new Date(),
   };
 }

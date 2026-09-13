@@ -19,7 +19,7 @@ const WEIGHT_NOT_NUMBER_RE = /weight 必须是有限数字/;
 const UNKNOWN_DIMENSION_RE = /未知维度 "seo"/;
 const SECURITY_RE = /security/;
 const WEIGHT_SUM_RE = /权重之和必须为 1/;
-const SUM_1_15_RE = /1\.15/;
+const SUM_1_25_RE = /1\.25/;
 const UNKNOWN_BONUS_RULE_RE = /未知加分规则 "made-up-rule"/;
 const UNKNOWN_FIELD_RE = /未知字段 "weights"/;
 const NOT_LESS_THAN_ZERO_RE = /不能小于 0/;
@@ -60,7 +60,7 @@ dimensions:
       no-critical-vulns:
         points: 15
   quality:
-    weight: 0.20
+    weight: 0.05
 `;
 
 function findDim(config: ReturnType<typeof loadProjectScoringConfig>, id: string) {
@@ -109,11 +109,11 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
 
     // 被覆盖的权重生效
     expect(findDim(config, 'security').weight).toBeCloseTo(0.4, 10);
-    expect(findDim(config, 'quality').weight).toBeCloseTo(0.2, 10);
+    expect(findDim(config, 'quality').weight).toBeCloseTo(0.05, 10);
     // 未覆盖的维度保持默认
-    expect(findDim(config, 'architecture').weight).toBeCloseTo(0.2, 10);
     expect(findDim(config, 'dependencies').weight).toBeCloseTo(0.15, 10);
-    expect(findDim(config, 'documentation').weight).toBeCloseTo(0.05, 10);
+    expect(findDim(config, 'techdebt').weight).toBeCloseTo(0.15, 10);
+    expect(findDim(config, 'gate').weight).toBeCloseTo(0.1, 10);
     // 权重归一化仍然成立
     const sum = config.dimensions.reduce((s, d) => s + d.weight, 0);
     expect(sum).toBeCloseTo(1, 3);
@@ -146,16 +146,16 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
         'dimensions:',
         '  dependencies:',
         '    weight: 0.10',
-        '  documentation:',
-        '    weight: 0.10',
+        '  techdebt:',
+        '    weight: 0.20',
         '',
       ].join('\n'),
     });
 
     const config = loadProjectScoringConfig(root);
     expect(findDim(config, 'dependencies').weight).toBeCloseTo(0.1, 10);
-    expect(findDim(config, 'documentation').weight).toBeCloseTo(0.1, 10);
-    expect(findDim(config, 'security').weight).toBeCloseTo(0.35, 10);
+    expect(findDim(config, 'techdebt').weight).toBeCloseTo(0.2, 10);
+    expect(findDim(config, 'security').weight).toBeCloseTo(0.25, 10);
   });
 
   it('DimensionMapper / buildHealthDimensions 透明消费项目覆盖权重', () => {
@@ -163,12 +163,12 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
 
     const mapper = new DimensionMapper(undefined, root);
     expect(mapper.getWeightMap().security).toBeCloseTo(0.4, 10);
-    expect(mapper.getWeightMap().quality).toBeCloseTo(0.2, 10);
+    expect(mapper.getWeightMap().quality).toBeCloseTo(0.05, 10);
     expect(mapper.validateWeights().valid).toBe(true);
 
     const dims = buildHealthDimensions({ results: [] }, { issues: [] }, root);
     expect(dims.find((d) => d.name === 'security')?.weight).toBeCloseTo(0.4, 10);
-    expect(dims.find((d) => d.name === 'documentation')?.weight).toBeCloseTo(0.05, 10);
+    expect(dims.find((d) => d.name === 'gate')?.weight).toBeCloseTo(0.1, 10);
   });
 
   it('显式传入 config 时优先级高于项目覆盖文件', () => {
@@ -176,7 +176,7 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
     const explicit = getDefaultScoringConfig();
 
     const mapper = new DimensionMapper(explicit, root);
-    expect(mapper.getWeightMap().security).toBeCloseTo(0.35, 10);
+    expect(mapper.getWeightMap().security).toBeCloseTo(0.25, 10);
   });
 
   it('ContextScoringEngine 默认构造经 process.cwd() 透明加载项目覆盖', () => {
@@ -189,7 +189,7 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
 
     // 基线引擎必须先于 cwd stub 构造，否则它也会读到项目覆盖
     const defaultOverall = new ScoringEngine().score(context).overall;
-    expect(defaultOverall).toBeCloseTo(94.75, 2);
+    expect(defaultOverall).toBeCloseTo(96.25, 2);
 
     vi.spyOn(process, 'cwd').mockReturnValue(root);
 
@@ -225,10 +225,10 @@ describe('非法覆盖 — fail-fast 策略', () => {
       '.zhshield/scoring.yml': ['dimensions:', '  security:', '    weight: 0.5', ''].join('\n'),
     });
 
-    // 0.5 + 0.25 + 0.20 + 0.15 + 0.05 = 1.15
+    // 0.5 + 0.20 + 0.15 + 0.15 + 0.10 + 0.10 + 0.05 = 1.25
     expect(() => loadProjectScoringConfig(root)).toThrow(ProjectScoringConfigError);
     expect(() => loadProjectScoringConfig(root)).toThrow(WEIGHT_SUM_RE);
-    expect(() => loadProjectScoringConfig(root)).toThrow(SUM_1_15_RE);
+    expect(() => loadProjectScoringConfig(root)).toThrow(SUM_1_25_RE);
   });
 
   it('未知加分规则 id → 报错', () => {
@@ -280,7 +280,7 @@ describe('mergeScoringOverrides — 纯函数语义', () => {
     const overrides = validateScoringOverrides({
       dimensions: {
         security: { weight: 0.4, penalties: { severityMultipliers: { critical: 9 } } },
-        quality: { weight: 0.2 },
+        quality: { weight: 0.05 },
       },
     });
 
@@ -289,7 +289,7 @@ describe('mergeScoringOverrides — 纯函数语义', () => {
 
     // 默认配置未被污染
     expect(findDim(fresh, 'security').penalties.severityMultipliers.critical).toBe(3);
-    expect(findDim(fresh, 'security').weight).toBeCloseTo(0.35, 10);
+    expect(findDim(fresh, 'security').weight).toBeCloseTo(0.25, 10);
 
     // 返回的是全新对象
     expect(merged.dimensions).not.toBe(fresh.dimensions);
@@ -298,7 +298,7 @@ describe('mergeScoringOverrides — 纯函数语义', () => {
     // 合并结果正确
     expect(findDim(merged, 'security').penalties.severityMultipliers.critical).toBe(9);
     expect(findDim(merged, 'security').penalties.severityMultipliers.high).toBe(2);
-    expect(findDim(merged, 'quality').weight).toBeCloseTo(0.2, 10);
+    expect(findDim(merged, 'quality').weight).toBeCloseTo(0.05, 10);
   });
 
   it('程序化构造的未知维度在合并阶段同样被拒绝（纵深防御）', () => {

@@ -24,8 +24,10 @@ function isFile(p: string): boolean {
 
 /** 尝试从 paths 中定位 @zh/kernel 包根目录，失败返回 null */
 function locateKernelPackageRoot(paths: string[]): string | null {
-  // 锚点文件仅需合法格式（inspect 以 CJS 编译，不能用 import.meta.url）
-  const require = createRequire(path.join(process.cwd(), 'package.json'));
+  // 锚点文件仅需合法格式（inspect 以 CJS 编译，不能用 import.meta.url）。
+  // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：createRequire 锚点改为
+  // __dirname（本模块所在目录），不再依赖 process.cwd()。
+  const require = createRequire(path.join(__dirname, 'package.json'));
   for (const base of paths) {
     if (!base) continue;
     try {
@@ -58,7 +60,9 @@ export function resolveInjectedConfigPath(
   // 3. 仓库内部资产：定位 @zh/kernel 包后按包内相对路径解析
   const kernelPrefix = '@zh/kernel/';
   if (config.includes(kernelPrefix)) {
-    const kernelRoot = locateKernelPackageRoot([cwd, projectPath, process.cwd(), __dirname]);
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：候选列表剔除 process.cwd()，
+    // 仅按调用方传入的 cwd（=被扫描目录）与 projectPath 解析，避免依赖进程工作目录。
+    const kernelRoot = locateKernelPackageRoot([cwd, projectPath, __dirname]);
     // 3b. monorepo 布局回退：扫描目标自身是仓库时，kernel 包位于 <projectPath>/packages/kernel
     const monoKernelRoot = kernelRoot ?? path.join(projectPath, 'packages', 'kernel');
     if (isFile(path.join(monoKernelRoot, 'package.json'))) {

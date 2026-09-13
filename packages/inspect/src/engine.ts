@@ -1,5 +1,6 @@
 import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './types';
-import type { ToolAdapter, EventEmitter } from '@zh/shared';
+import type { ToolAdapter, EventEmitter, Baseline } from '@zh/shared';
+import { filterIssuesByBaseline } from '@zh/shared';
 import type { SopRuleEngine } from '@zh/kernel';
 import type { ProjectProfile } from '@zh/dependency';
 import {
@@ -104,12 +105,13 @@ export class InspectEngine {
     projectId: string,
     scanType: InspectionReport['scanType'] = 'full',
     projectFeature?: { framework?: string; language?: string; features?: string[] },
+    baseline?: Baseline | null,
   ): Promise<InspectionReport> {
     const start = Date.now();
     if (this.sopEngine && !this._sopScanning) {
-      return this.runSopGuarded(projectId, scanType, start, projectFeature);
+      return this.runSopGuarded(projectId, scanType, start, projectFeature, baseline);
     }
-    return this.runDirectScan(projectId, scanType, start, projectFeature);
+    return this.runDirectScan(projectId, scanType, start, projectFeature, baseline);
   }
 
   /** SOP 驱动模式：评估 inspect/security 域规则（带重入保护） */
@@ -118,12 +120,13 @@ export class InspectEngine {
     scanType: InspectionReport['scanType'],
     start: number,
     projectFeature?: { framework?: string; language?: string; features?: string[] },
+    baseline?: Baseline | null,
   ): Promise<InspectionReport> {
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
     this._sopScanning = true;
     try {
-      return await this.runScanWithSop(projectId, scanType, start, projectFeature);
+      return await this.runScanWithSop(projectId, scanType, start, projectFeature, baseline);
     } finally {
       this._sopScanning = false;
     }
@@ -135,6 +138,7 @@ export class InspectEngine {
     scanType: InspectionReport['scanType'],
     start: number,
     projectFeature?: { framework?: string; language?: string; features?: string[] },
+    baseline?: Baseline | null,
   ): Promise<InspectionReport> {
     const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(
       this.registeredAdapters,
@@ -146,14 +150,50 @@ export class InspectEngine {
 
     const aiIssues = await this.runAiCodeReview(projectId);
     const allIssues: Issue[] = [...aiIssues, ...adapterResults.flatMap((r) => r.issues)];
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, allIssues);
+    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
+    const reconciledResults = this.reconcileAdapterResults(
+      adapterResults,
+      baseline ?? null,
+      projectId,
+    );
+    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
 
     return this.reportBuilder.buildReport({
       projectId,
       scanType,
       duration: Date.now() - start,
-      issues: allIssues,
-      adapterResults,
+      issues: kept,
+      adapterResults: reconciledResults,
+      suppressedCount: suppressed,
+    });
+  }
+
+  /**
+   * 基线豁免后的适配器结果重算：剔除已豁免 issue，同步 issueCount/passed/status。
+   * 未接入基线（null/空）时原样返回；规则所有 issue 全部豁免 → 该规则视为通过，
+   * 避免报告出现"0 问题但工具 failed"的矛盾（SOP 模式的 failed 即 violations 命中态）。
+   */
+  private reconcileAdapterResults(
+    adapterResults: AdapterResult[],
+    baseline: Baseline | null,
+    projectId: string,
+  ): AdapterResult[] {
+    if (!baseline || baseline.entries.length === 0) return adapterResults;
+    return adapterResults.map((result) => {
+      const { kept, suppressed } = filterIssuesByBaseline(result.issues, baseline, projectId);
+      if (suppressed === 0) return result;
+      const fullySuppressed = kept.length === 0 && result.issues.length > 0;
+      const status =
+        fullySuppressed && result.status !== 'unavailable' && result.status !== 'skipped'
+          ? ('passed' as const)
+          : result.status;
+      return {
+        ...result,
+        issues: kept,
+        issueCount: kept.length,
+        passed: fullySuppressed ? true : result.passed,
+        status,
+      };
     });
   }
 
@@ -214,11 +254,14 @@ export class InspectEngine {
     scanType: InspectionReport['scanType'],
     start: number,
     projectFeature?: { framework?: string; language?: string; features?: string[] },
+    baseline?: Baseline | null,
   ): Promise<InspectionReport> {
     // R3d 执行面投影激活：SOP 直扫分支透传画像 → evaluateRules 收到 projectFeature
     // → host.toolScope 生效 → tool-dispatch 按画像裁剪；无画像 → 不携带 → 不裁剪（回归安全）。
     // features 可选入参 → kernel ProjectFeature 必填语义：边界归一化为 []（保守：不裁剪）。
-    const featureCtx = projectFeature ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } } : {};
+    const featureCtx = projectFeature
+      ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } }
+      : {};
     // 只评估 inspect / security 域，避免拉入 guard/evolve 等规则形成交叉重入
     const inspectReport = await this.sopEngine!.evaluateRules({
       repoRoot: projectId,
@@ -232,18 +275,24 @@ export class InspectEngine {
     });
     const sopReport = this.sopMapper.mergeReports(inspectReport, securityReport);
 
-    const issues = this.sopMapper.flattenViolations(sopReport);
-    const adapterResults = this.sopMapper.buildAdapterResults(sopReport);
+    const allIssues = this.sopMapper.flattenViolations(sopReport);
+    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
+    const adapterResults = this.reconcileAdapterResults(
+      this.sopMapper.buildAdapterResults(sopReport),
+      baseline ?? null,
+      projectId,
+    );
 
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, issues);
+    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
 
     return this.reportBuilder.buildReport({
       projectId,
       scanType,
       duration: Date.now() - start,
-      issues,
+      issues: kept,
       adapterResults,
       penalizeInfo: false,
+      suppressedCount: suppressed,
     });
   }
 }

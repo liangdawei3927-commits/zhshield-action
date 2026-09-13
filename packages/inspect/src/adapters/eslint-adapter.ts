@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -48,7 +49,8 @@ const META: ToolMeta = {
 
 export class ESLintAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
 
   /** F5：ESLint 以 --ext .ts/.tsx/.js/.jsx 扫描 JS/TS 源码 */
@@ -61,11 +63,17 @@ export class ESLintAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('eslint', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('eslint', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -95,7 +103,7 @@ export class ESLintAdapter implements ToolAdapter {
     cwd: string,
     targetFiles: string[],
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand();
+    const command = await this.resolveCommand(options.projectPath);
     const { args, unavailable } = this.buildEslintArgs(options, cwd, targetFiles);
     if (unavailable) return this.buildUnavailable(start, unavailable);
 
@@ -124,13 +132,16 @@ export class ESLintAdapter implements ToolAdapter {
 
     // 注入的 flat config 为规则声明（如 node_modules/@zh/kernel/dist/assets/...），
     // 仅在被扫描项目内部安装了对应依赖时按 cwd 直接解析才存在。缺失时按回退链
-    // （cwd → 项目根 → @zh/kernel 包内路径）解析；全部不存在时退化为 unavailable
-    // （跳过该规则），而非硬错误。
+    // （cwd → 项目根 → @zh/kernel 包内路径）解析；全部不存在时回退到项目自身实际
+    // 存在的 ESLint 配置（eslint.config.* flat config 或 .eslintrc.* legacy），
+    // 仍不存在才退化为 unavailable（跳过该规则），而非硬错误。
     const injectedConfig = options.config?.config;
     if (injectedConfig) {
-      const configPath = resolveInjectedConfigPath(injectedConfig, cwd, options.projectPath);
+      const configPath =
+        resolveInjectedConfigPath(injectedConfig, cwd, options.projectPath) ??
+        resolveProjectEslintConfig(options.projectPath);
       if (!configPath) {
-        return { args, unavailable: `ESLint 性能配置不存在，跳过该规则: ${injectedConfig}` };
+        return { args, unavailable: `ESLint 配置不存在，跳过该规则: ${injectedConfig}` };
       }
       // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
       args.unshift('--config', configPath);
@@ -229,4 +240,21 @@ export class ESLintAdapter implements ToolAdapter {
       fingerprint: `${msg.ruleId}:${file.filePath || ''}:${msg.line || 0}`,
     };
   }
+}
+
+/** 项目自身实际存在的 ESLint 配置文件（flat config 优先，legacy eslintrc 兜底） */
+function resolveProjectEslintConfig(projectPath: string): string | null {
+  const candidates = [
+    'eslint.config.mjs',
+    'eslint.config.cjs',
+    'eslint.config.js',
+    '.eslintrc.cjs',
+    '.eslintrc.js',
+    '.eslintrc.json',
+  ];
+  for (const name of candidates) {
+    const p = path.join(projectPath, name);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }

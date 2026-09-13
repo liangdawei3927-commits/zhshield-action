@@ -13,6 +13,7 @@ import type {
   IssueCategory,
   AccessScope,
 } from '@zh/shared';
+import { detectMachineProfile } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
 
@@ -121,7 +122,8 @@ interface TscRunResult {
 export class TypeScriptAdapter implements ToolAdapter {
   meta: ToolMeta;
   private projectRoot?: string;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly locale: LanguageCode;
 
   /** F5：tsc 按 tsconfig 编译检查全部 TS 源文件 */
@@ -143,11 +145,17 @@ export class TypeScriptAdapter implements ToolAdapter {
     return translate(key, this.locale, params);
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('tsc', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('tsc', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -176,7 +184,7 @@ export class TypeScriptAdapter implements ToolAdapter {
     start: number,
     category: IssueCategory,
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand();
+    const command = await this.resolveCommand(options.projectPath);
     const projects = resolveTscProjects(options.projectPath);
     if (projects.length === 0) {
       // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
@@ -196,7 +204,7 @@ export class TypeScriptAdapter implements ToolAdapter {
     return this.buildResult(start, category, issues);
   }
 
-  /** 逐个 tsconfig 运行 tsc 并聚合 issues 与首个基础设施错误 */
+  /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues 与首个基础设施错误 */
   private async runAllProjects(
     command: string,
     projects: string[],
@@ -204,10 +212,22 @@ export class TypeScriptAdapter implements ToolAdapter {
     options: ToolScanOptions,
     category: IssueCategory,
   ): Promise<{ issues: Issue[]; infraError?: string }> {
+    // 串行跑 20 包约 92-116s，会撞 120s 硬上限；复用机器画像并发度（2-4）有界并行
+    const concurrency = Math.min(detectMachineProfile().adapterParallelism, projects.length);
+    const results: TscRunResult[] = new Array(projects.length);
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const index = cursor++;
+        if (index >= projects.length) break;
+        results[index] = await this.runTsc(command, projects[index], flags, options, category);
+      }
+    };
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
     const issues: Issue[] = [];
     let infraError: string | undefined;
-    for (const tsconfig of projects) {
-      const one = await this.runTsc(command, tsconfig, flags, options, category);
+    for (const one of results) {
       issues.push(...one.issues);
       if (one.infraError && !infraError) infraError = one.infraError;
     }

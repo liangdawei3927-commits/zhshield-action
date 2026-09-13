@@ -6,7 +6,7 @@ export interface ToolAdapterExecutorDeps {
   degradationManager: DegradationManager;
   auditLogger: AuditLogger;
   emitter: EventEmitter;
-  /** 单次适配器扫描硬上限（ms），防止异常工具无限挂起巡检任务；默认 120000 */
+  /** 单次适配器扫描硬上限（ms），防止异常工具无限挂起巡检任务；默认 300000（5 分钟） */
   hardTimeoutMs?: number;
 }
 
@@ -26,7 +26,7 @@ export class ToolAdapterExecutor {
     this.degradationManager = deps.degradationManager;
     this.auditLogger = deps.auditLogger;
     this.emitter = deps.emitter;
-    this.hardTimeoutMs = deps.hardTimeoutMs ?? 120_000;
+    this.hardTimeoutMs = deps.hardTimeoutMs ?? 300_000;
   }
 
   async runAll(
@@ -45,11 +45,12 @@ export class ToolAdapterExecutor {
       while (true) {
         const index = nextIndex++;
         if (index >= adapterEntries.length) return;
-        const [, adapter] = adapterEntries[index];
+        const adapter = adapterEntries[index][1];
         const outOfScope = projectFeature && !isToolInScope(adapter.meta.id, projectFeature);
+        const degraded = this.degradationManager.isToolSkipped(adapter.meta.id);
         results[index] =
-          this.degradationManager.isToolSkipped(adapter.meta.id) || outOfScope
-            ? this.makeSkippedResult(adapter, outOfScope ? 'out-of-scope' : undefined)
+          degraded || outOfScope
+            ? this.makeSkippedResult(adapter, degraded ? 'degraded' : 'out-of-scope')
             : await this.runAdapter(adapter, projectId);
       }
     };
@@ -191,7 +192,8 @@ export class ToolAdapterExecutor {
       );
     }
     if (result.status === 'skipped') {
-      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false);
+      // P2：透传适配器真实跳过原因（ToolResult.error），供 reporter 如实展示
+      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false, result.error);
     }
     return this.buildStatusResult(adapter, result, duration, issues, 'passed', true, false);
   }
@@ -205,6 +207,7 @@ export class ToolAdapterExecutor {
     status: AdapterResult['status'],
     passed: boolean,
     degraded: boolean,
+    skipDetail?: string,
   ): AdapterResult {
     return {
       adapterId: adapter.meta.id,
@@ -214,6 +217,7 @@ export class ToolAdapterExecutor {
       passed,
       degraded,
       status,
+      ...(skipDetail ? { skipDetail } : {}),
       issues,
     };
   }

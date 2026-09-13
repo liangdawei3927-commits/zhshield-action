@@ -29,11 +29,16 @@ const META: ToolMeta = {
   license: 'MIT',
 };
 
-/** Dependency-cruiser JSON 输出中的单条违规 */
+/** Dependency-cruiser JSON 输出中的单条违规。
+ *  v16+ 的 from/to 为字符串路径；旧版接口可能为 { path, line } 对象。 */
+interface DepCruiserNodeRef {
+  path?: string;
+  line?: number;
+}
 interface DepCruiserViolation {
   rule?: { name?: string; severity?: string };
-  from?: { path?: string; line?: number };
-  to?: { path?: string };
+  from?: string | DepCruiserNodeRef;
+  to?: string | DepCruiserNodeRef;
 }
 
 /** Dependency-cruiser JSON 输出结构 */
@@ -43,7 +48,8 @@ interface DepCruiserOutput {
 
 export class DependencyCruiserAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
 
   /** F5：dep-cruiser 校验 src/ 目录内模块依赖边界 */
@@ -56,11 +62,17 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('depcruise', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('depcruise', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -80,7 +92,8 @@ export class DependencyCruiserAdapter implements ToolAdapter {
   private async runDepCruiser(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const configFile = this.resolveConfig(options);
     const targetDirs = this.resolveTargetDirs(options.projectPath);
-    const command = await this.resolveCommand();
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
+    const command = await this.resolveCommand(options.projectPath);
     const args: string[] = [];
     if (configFile) {
       // dependency-cruiser v16+ 指定配置用 --config（--validate 已废弃）
@@ -199,20 +212,32 @@ export class DependencyCruiserAdapter implements ToolAdapter {
   }
 
   private mapViolationToIssue(v: DepCruiserViolation): Issue {
+    const fromPath = this.nodeRefPath(v.from);
+    const toPath = this.nodeRefPath(v.to);
     return {
       id: randomUUID(),
       ruleId: v.rule?.name || 'dep-cruiser/violation',
       severity: this.mapSeverity(v.rule?.severity),
       category: 'architecture',
       message: this.buildViolationMessage(v),
-      file: v.from?.path || '',
-      line: v.from?.line || 0,
+      file: fromPath,
+      line: this.nodeRefLine(v.from),
       column: 0,
-      suggestion: `模块 ${v.from?.path || ''} 不应引用 ${v.to?.path || ''}`,
+      suggestion: `模块 ${fromPath} 不应引用 ${toPath}`,
       autoFixable: false,
       source: 'inspect',
       fingerprint: this.buildViolationFingerprint(v),
     };
+  }
+
+  private nodeRefPath(ref: string | DepCruiserNodeRef | undefined): string {
+    if (typeof ref === 'string') return ref;
+    return ref?.path || '';
+  }
+
+  private nodeRefLine(ref: string | DepCruiserNodeRef | undefined): number {
+    if (typeof ref === 'string') return 0;
+    return ref?.line || 0;
   }
 
   private mapSeverity(severity: string | undefined): Issue['severity'] {
@@ -220,10 +245,10 @@ export class DependencyCruiserAdapter implements ToolAdapter {
   }
 
   private buildViolationMessage(v: DepCruiserViolation): string {
-    return `架构边界违规: ${v.rule?.name || '未知规则'} - ${v.from?.path || '?'} → ${v.to?.path || '?'}`;
+    return `架构边界违规: ${v.rule?.name || '未知规则'} - ${this.nodeRefPath(v.from) || '?'} → ${this.nodeRefPath(v.to) || '?'}`;
   }
 
   private buildViolationFingerprint(v: DepCruiserViolation): string {
-    return `dep-cruiser:${v.rule?.name || ''}:${v.from?.path || ''}:${v.to?.path || ''}`;
+    return `dep-cruiser:${v.rule?.name || ''}:${this.nodeRefPath(v.from)}:${this.nodeRefPath(v.to)}`;
   }
 }

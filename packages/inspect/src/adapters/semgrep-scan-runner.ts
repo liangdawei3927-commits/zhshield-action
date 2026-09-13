@@ -108,9 +108,7 @@ export class SemgrepScanRunner {
     if (!stdout) return null;
     const output = this.parseStdoutJson(stdout);
     if (!output) return null;
-    const first = output.errors?.find(
-      (e) => typeof e.message === 'string' && e.message.length > 0,
-    );
+    const first = output.errors?.find((e) => typeof e.message === 'string' && e.message.length > 0);
     return first?.message ?? null;
   }
 

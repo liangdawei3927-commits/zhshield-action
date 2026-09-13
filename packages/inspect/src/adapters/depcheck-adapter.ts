@@ -37,7 +37,8 @@ interface DepcheckResult {
 
 export class DepcheckAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
 
   /** F5：depcheck 读 package.json 并静态解析源码 import 判断未使用依赖 */
@@ -50,11 +51,17 @@ export class DepcheckAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('depcheck', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('depcheck', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -81,11 +88,16 @@ export class DepcheckAdapter implements ToolAdapter {
         tool: 'depcheck',
         status: 'unavailable',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
       };
     }
-    const command = await this.resolveCommand();
+    const command = await this.resolveCommand(options.projectPath);
     const args = this.buildArgs(options, projectPath);
 
     let stdout = '';
@@ -114,7 +126,12 @@ export class DepcheckAdapter implements ToolAdapter {
         tool: 'depcheck',
         status: 'error',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error: 'depcheck 输出不是合法 JSON',
       };
     }

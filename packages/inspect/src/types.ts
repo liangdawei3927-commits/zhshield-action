@@ -41,6 +41,12 @@ export interface AdapterResult {
    * 报告层不应视为通过率稀释）；degraded = 降级跳过（沿用既有覆盖率缺口语义）。
    */
   skipReason?: 'degraded' | 'out-of-scope';
+  /**
+   * 适配器返回 skipped 时携带的真实原因（透传 ToolResult.error），如
+   * "Semgrep 规则目录不存在、请先同步云脑规则"/"blocked-by-hook"。
+   * 报告层据此如实展示，不再臆断为"语言不适用"（P2）。
+   */
+  skipDetail?: string;
   issues: Issue[];
 }
 
@@ -54,6 +60,8 @@ export interface InspectionReport {
   summary: { total: number; error: number; warning: number; info: number };
   adapterResults: AdapterResult[];
   recommendations: string[];
+  /** 基线豁免命中数（无基线/未启用时为 0） */
+  suppressedCount?: number;
 }
 
 export interface RunContext {

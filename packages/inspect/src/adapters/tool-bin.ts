@@ -93,10 +93,14 @@ export function findZhshieldToolBin(tool: string): string | null {
  * 例如 tsc 使用项目锁定的版本而非全局更新的版本），其次 PATH 中的全局工具，
  * 最后回退到 zhshield 共享工具目录 ~/.zhshield/bin（install-tools.mjs 安装目标）。
  * 均不可用时返回裸命令名，由调用方按 ENOENT 处理。
+ *
+ * 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：startDir 缺失时不再回落
+ * process.cwd()（cwd 依赖会让同一 --dir 在不同工作目录下解析到不同版本的工具，
+ * 如 depcruise 本地 18.2.0 vs 全局 18.1.1），而是跳过本地 bin 查找，直接走
+ * PATH → zhshield 共享目录，保证解析结果与进程工作目录无关。
  */
 export async function resolveToolCommand(tool: string, startDir?: string): Promise<string> {
-  const dir = startDir ?? process.cwd();
-  const local = findLocalToolBin(tool, dir);
+  const local = startDir ? findLocalToolBin(tool, startDir) : null;
   if (local) return local;
   try {
     // 20s：semgrep 等 Python 工具冷启动 --version 可达 7.6s，5s 会误判 PATH 不可用

@@ -2,6 +2,23 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolScanOptions } from '@zh/shared';
 
+/**
+ * patterns 复合结构中的单条子表达式。
+ * 缓存规则 JSON 以 kebab-case 键声明（pattern-not / metavariable-regex / pattern-either），
+ * SOP 内联声明使用 camelCase——两种键同时声明并在规范化时归一到 camelCase。
+ */
+interface SemgrepPatternEntry {
+  pattern?: string;
+  patternEither?: string[];
+  patternNot?: string;
+  patternRegex?: string;
+  metavariableRegex?: { metavariable: string; regex: string };
+  'pattern-either'?: string[];
+  'pattern-not'?: string;
+  'pattern-regex'?: string;
+  'metavariable-regex'?: { metavariable: string; regex: string };
+}
+
 /** 内联规则声明（来自 config.rules，原始声明为 string[]，此处按对象结构访问） */
 interface SemgrepRule {
   id?: string;
@@ -14,6 +31,7 @@ interface SemgrepRule {
   patternRegex?: string;
   message?: string;
   metavariableRegex?: Array<{ metavariable: string; regex: string }>;
+  patterns?: SemgrepPatternEntry[];
 }
 
 /** 规范化后用于生成 YAML 的规则 */
@@ -27,6 +45,18 @@ interface SemgrepRuleYaml {
   patternRegex?: string;
   message: string;
   metavariableRegex?: Array<{ metavariable: string; regex: string }>;
+  patterns?: SemgrepPatternEntry[];
+}
+
+/** 将 kebab-case / camelCase 声明归一为 camelCase */
+function normalizePatternEntry(entry: SemgrepPatternEntry): SemgrepPatternEntry {
+  return {
+    pattern: entry.pattern,
+    patternEither: entry.patternEither ?? entry['pattern-either'],
+    patternNot: entry.patternNot ?? entry['pattern-not'],
+    patternRegex: entry.patternRegex ?? entry['pattern-regex'],
+    metavariableRegex: entry.metavariableRegex ?? entry['metavariable-regex'],
+  };
 }
 
 /**
@@ -54,6 +84,7 @@ export class SemgrepRuleWriter {
       patternRegex: r.patternRegex,
       message: r.message || `Semgrep: ${r.id || `rule-${i}`}`,
       metavariableRegex: r.metavariableRegex,
+      patterns: r.patterns?.map(normalizePatternEntry),
     }));
 
     const ruleDir = path.join(targetDir, '.semgrep');
@@ -77,18 +108,49 @@ export class SemgrepRuleWriter {
   private buildRuleYaml(rules: SemgrepRuleYaml[]): string {
     const lines: string[] = ['rules:'];
     for (const r of rules) {
-      lines.push(`  - id: ${r.id}`);
-      lines.push(`    severity: ${r.severity}`);
+      // id/severity/message 必须 YAML 引号包裹：message 常含 ': '（如 "Semgrep: <id>"、URL 协议），
+      // 裸标量会触发 "mapping values are not allowed here" 解析错误。
+      lines.push(`  - id: ${JSON.stringify(r.id)}`);
+      lines.push(`    severity: ${JSON.stringify(r.severity)}`);
       lines.push(`    languages: [${r.languages.join(', ')}]`);
-      lines.push(`    message: ${r.message}`);
+      lines.push(`    message: ${JSON.stringify(r.message)}`);
       this.appendRuleMatch(lines, r);
     }
     return lines.join('\n');
   }
 
   private appendRuleMatch(lines: string[], r: SemgrepRuleYaml): void {
+    if (r.patterns && r.patterns.length > 0) {
+      lines.push('    patterns:');
+      for (const p of r.patterns) {
+        if (typeof p.pattern === 'string' && p.pattern.length > 0) {
+          lines.push('      - pattern: |');
+          for (const line of p.pattern.split('\n')) lines.push(`          ${line}`);
+        } else if (p.patternEither && p.patternEither.length > 0) {
+          lines.push('      - pattern-either:');
+          for (const pe of p.patternEither) {
+            lines.push('          - pattern: |');
+            for (const line of pe.split('\n')) lines.push(`              ${line}`);
+          }
+        }
+        if (typeof p.patternNot === 'string' && p.patternNot.length > 0) {
+          lines.push('      - pattern-not: |');
+          for (const line of p.patternNot.split('\n')) lines.push(`          ${line}`);
+        }
+        if (typeof p.patternRegex === 'string' && p.patternRegex.length > 0) {
+          lines.push(`      - pattern-regex: ${JSON.stringify(p.patternRegex)}`);
+        }
+        if (p.metavariableRegex) {
+          lines.push('      - metavariable-regex:');
+          lines.push(`          metavariable: ${JSON.stringify(p.metavariableRegex.metavariable)}`);
+          lines.push(`          regex: ${JSON.stringify(p.metavariableRegex.regex)}`);
+        }
+      }
+      return;
+    }
+
     if (typeof r.patternRegex === 'string' && r.patternRegex.length > 0) {
-      lines.push(`    pattern-regex: ${r.patternRegex}`);
+      lines.push(`    pattern-regex: ${JSON.stringify(r.patternRegex)}`);
       return;
     }
 
@@ -128,7 +190,7 @@ export class SemgrepRuleWriter {
   private appendMetavariableRegex(lines: string[], r: SemgrepRuleYaml, indent: string): void {
     for (const m of r.metavariableRegex ?? []) {
       lines.push(`${indent}- metavariable-regex:`);
-      lines.push(`${indent}    metavariable: ${m.metavariable}`);
+      lines.push(`${indent}    metavariable: ${JSON.stringify(m.metavariable)}`);
       lines.push(`${indent}    regex: ${JSON.stringify(m.regex)}`);
     }
   }

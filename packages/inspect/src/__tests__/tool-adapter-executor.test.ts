@@ -71,7 +71,7 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
     expect(escalation).not.toHaveBeenCalled();
   });
 
-  it('Given 工具返回 skipped（语言不适用），When runAll，Then 不计失败：passed=true 且不标记 degraded，status=skipped', async () => {
+  it('Given 工具返回 skipped，When runAll，Then 不计失败：passed=true 且不标记 degraded，status=skipped', async () => {
     const { deps, escalation } = makeDeps();
     const executor = new ToolAdapterExecutor(deps);
     const adapters = new Map<string, ToolAdapter>([
@@ -84,6 +84,26 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
     expect(results[0].degraded).toBe(false);
     expect(results[0].status).toBe('skipped');
     expect(escalation).not.toHaveBeenCalled();
+  });
+
+  it('Given 适配器返回 skipped 且带 error（真实原因），When runAll，Then 透传 skipDetail（P2）', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter: ToolAdapter = {
+      ...makeAdapter('semgrep', 'inspect', 'skipped'),
+      scan: vi.fn().mockResolvedValue({
+        tool: 'semgrep',
+        status: 'skipped',
+        issues: [],
+        metadata: { version: '', duration: 1, timestamp: new Date(), fileCount: 0 },
+        error: 'Semgrep 规则目录不存在，请先同步云脑规则',
+      } satisfies ToolResult),
+    };
+
+    const results = await executor.runAll(new Map([['semgrep', adapter]]), 'proj-1');
+
+    expect(results[0].status).toBe('skipped');
+    expect(results[0].skipDetail).toBe('Semgrep 规则目录不存在，请先同步云脑规则');
   });
 
   it('Given 工具返回 error，When runAll，Then 失败：passed=false、degraded 不标记，且 escalate 真实错误', async () => {
@@ -126,6 +146,8 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
     expect(results[0].passed).toBe(true);
     expect(results[0].degraded).toBe(false);
     expect(results[0].issueCount).toBe(0);
+    expect(results[0].status).toBe('skipped');
+    expect(results[0].skipReason).toBe('degraded');
   });
 });
 

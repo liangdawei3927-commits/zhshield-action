@@ -55,7 +55,8 @@ interface JscpdReport {
 
 export class JscpdAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
 
   /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标）；
@@ -69,15 +70,44 @@ export class JscpdAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('jscpd', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('jscpd', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
     return isCommandAvailable(() => this.resolveCommand());
+  }
+
+  /** 缓存的 jscpd 版本号（major, minor），首次探测后复用 */
+  private versionInfo?: { major: number; minor: number };
+
+  /**
+   * 探测 jscpd 版本。jscpd 5.x 起 CLI 语义发生破坏性变更（见 executeJscpd 注释），
+   * 需按 major 版本选择参数集。解析失败时保守回退旧版（major=0）。
+   */
+  private async detectVersion(projectPath?: string): Promise<{ major: number; minor: number }> {
+    if (this.versionInfo) return this.versionInfo;
+    try {
+      // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：版本探测与执行使用同一锚点命令
+      const command = await this.resolveCommand(projectPath);
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 20000 });
+      const m = /(\d+)\.(\d+)/.exec(stdout.trim());
+      this.versionInfo = m
+        ? { major: Number(m[1]), minor: Number(m[2]) }
+        : { major: 0, minor: 0 };
+    } catch {
+      this.versionInfo = { major: 0, minor: 0 };
+    }
+    return this.versionInfo;
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -99,7 +129,7 @@ export class JscpdAdapter implements ToolAdapter {
   ): Promise<ToolResult> {
     const target = options.targetFiles?.[0] || this.resolveTargetDir(options.projectPath);
     await this.executeJscpd(options, target, reportPath);
-    const content = await this.readJscpdReport(reportPath);
+    const content = await this.readJscpdReport(reportPath, options.projectPath);
     const issues = this.mapOutput(content);
     return this.buildJscpdAvailable(content, issues, start);
   }
@@ -119,9 +149,16 @@ export class JscpdAdapter implements ToolAdapter {
     target: string,
     reportPath: string,
   ): Promise<void> {
-    const command = await this.resolveCommand();
+    const command = await this.resolveCommand(options.projectPath);
     await FileHelper.ensureDir(path.dirname(reportPath));
-    const args = ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
+    const { major } = await this.detectVersion(options.projectPath);
+    // jscpd ≥5.x 破坏性变更: --format 由"输出格式"变为"输入文件格式",
+    // --output 由"文件路径"变为"输出目录"; JSON 报告改用 --reporters json 生成,
+    // 输出到 <output>/jscpd-report.json。旧版(<5)维持原参数集。
+    const args =
+      major >= 5
+        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', target]
+        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
     await execFileAsync(command, args, {
       cwd: options.projectPath,
       timeout: options.timeout || 60000,
@@ -130,9 +167,19 @@ export class JscpdAdapter implements ToolAdapter {
   }
 
   /** 读取 jscpd 报告并清理临时文件 */
-  private async readJscpdReport(reportPath: string): Promise<JscpdReport> {
-    const content = (await FileHelper.readJSON(reportPath)) as JscpdReport;
-    await this.cleanupReport(reportPath);
+  private async readJscpdReport(reportPath: string, projectPath: string): Promise<JscpdReport> {
+    let p = reportPath;
+    if ((await this.detectVersion(projectPath)).major >= 5) {
+      const v5Report = path.join(path.dirname(reportPath), 'jscpd-report.json');
+      try {
+        await fs.promises.access(v5Report);
+        p = v5Report;
+      } catch {
+        /* jscpd 未生成 5.x 报告，回退原路径 */
+      }
+    }
+    const content = (await FileHelper.readJSON(p)) as JscpdReport;
+    await this.cleanupReport(p);
     return content;
   }
 

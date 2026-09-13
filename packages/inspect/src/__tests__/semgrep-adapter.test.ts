@@ -74,8 +74,14 @@ function tempContainerProject(): { root: string; nested: string } {
   return { root, nested };
 }
 
+/** 定位真正的 scan 调用（args 首元素为 'scan'），跳过命令解析的 --version 探测 */
+function scanArgs(): string[] {
+  const call = execFileMock.mock.calls.find((c) => (c[1] as string[]).includes('scan'));
+  return (call?.[1] as string[]) ?? [];
+}
+
 function lastTargetArg(): string {
-  const args = execFileMock.mock.calls[0][1] as string[];
+  const args = scanArgs();
   return args.at(-1)!;
 }
 
@@ -350,7 +356,7 @@ describe('SemgrepAdapter', () => {
         config: { enabled: true, config: 'redos.yml' },
       });
 
-      const args = execFileMock.mock.calls[0][1] as string[];
+      const args = scanArgs();
       const excludes: string[] = [];
       for (let i = 0; i < args.length - 1; i++) {
         if (args[i] === '--exclude') excludes.push(args[i + 1]);
@@ -391,14 +397,14 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = execFileMock.mock.calls[0][1] as string[];
+      const args = scanArgs();
       const configIndex = args.indexOf('--config');
       const rulePath = args[configIndex + 1];
 
       const yaml = readFileSync(rulePath, 'utf-8');
       expect(yaml).toContain('      - pattern: |');
       expect(yaml).toContain('      - metavariable-regex:');
-      expect(yaml).toContain('          metavariable: $USER_INPUT');
+      expect(yaml).toContain('          metavariable: "$USER_INPUT"');
       expect(yaml).toContain('regex:');
     } finally {
       rmSync(project, { recursive: true, force: true });
@@ -429,7 +435,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = execFileMock.mock.calls[0][1] as string[];
+      const args = scanArgs();
       const configIndex = args.indexOf('--config');
       const rulePath = args[configIndex + 1];
 
@@ -466,7 +472,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = execFileMock.mock.calls[0][1] as string[];
+      const args = scanArgs();
       const configIndex = args.indexOf('--config');
       const rulePath = args[configIndex + 1];
 
@@ -501,12 +507,12 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = execFileMock.mock.calls[0][1] as string[];
+      const args = scanArgs();
       const configIndex = args.indexOf('--config');
       const rulePath = args[configIndex + 1];
 
       const yaml = readFileSync(rulePath, 'utf-8');
-      expect(yaml).toContain('    pattern-regex: Access-Control-Allow-Origin\\s*[:=]\\s*[*]');
+      expect(yaml).toContain('    pattern-regex: "Access-Control-Allow-Origin\\\\s*[:=]\\\\s*[*]"');
       expect(yaml).toContain('languages: [generic]');
     } finally {
       rmSync(project, { recursive: true, force: true });

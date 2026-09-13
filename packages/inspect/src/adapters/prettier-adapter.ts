@@ -55,7 +55,8 @@ function parseListDifferent(raw: string, projectPath: string): Issue[] {
 
 export class PrettierAdapter implements ToolAdapter {
   meta: ToolMeta;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
 
   /** F5：prettier 对源码与配置文件做格式检查 */
@@ -69,11 +70,17 @@ export class PrettierAdapter implements ToolAdapter {
     this.meta = { ...META, description: '代码格式一致性检查（Prettier --list-different）' };
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('prettier', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('prettier', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -90,7 +97,7 @@ export class PrettierAdapter implements ToolAdapter {
   }
 
   private async runPrettierScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const command = await this.resolveCommand();
+    const command = await this.resolveCommand(options.projectPath);
     const target = options.targetFiles?.length
       ? options.targetFiles[0]
       : PrettierAdapter.pickScanTarget(options.projectPath);

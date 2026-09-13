@@ -20,6 +20,8 @@ export interface ScanReportInput {
   adapterResults: AdapterResult[];
   /** SOP 分支不惩罚 info 级问题（保持原有计分行为） */
   penalizeInfo?: boolean;
+  /** 基线豁免命中数（透传至报告供消费方观测） */
+  suppressedCount?: number;
 }
 
 /**
@@ -110,6 +112,7 @@ export class ScanReportBuilder {
       summary,
       adapterResults: input.adapterResults,
       recommendations: this.recommendations(input.issues),
+      suppressedCount: input.suppressedCount ?? 0,
     };
   }
 }

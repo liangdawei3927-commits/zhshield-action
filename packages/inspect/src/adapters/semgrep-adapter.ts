@@ -46,7 +46,8 @@ interface SemgrepRule {
 
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   /** 单飞可用性结果：所有 semgrep 规则共享同一 adapter 实例，只探测一次 */
   private availabilityPromise?: Promise<boolean>;
   private readonly projectRoot?: string;
@@ -74,11 +75,17 @@ export class SemgrepAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('semgrep', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('semgrep', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -99,7 +106,8 @@ export class SemgrepAdapter implements ToolAdapter {
     if (unavailable) return this.runner.buildUnavailable(start, unavailable);
 
     const args = await this.argsBuilder.build(options, configs, targetDir);
-    const command = await this.resolveCommand();
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
+    const command = await this.resolveCommand(options.projectPath);
     return this.runner.run(command, options, args, category, start);
   }
 

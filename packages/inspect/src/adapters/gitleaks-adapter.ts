@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -37,11 +38,16 @@ interface GitleaksFinding {
 }
 
 /**
- * 构建产物 / 依赖不参与密钥扫描：与 Guard 其他适配器排除 dist/node_modules 的约定一致。
- * CLI 自包含 bundle（packages/cli/dist/zhshield.js）内嵌了密钥检测正则与示例字符串，
- * 提交后必然触发 "Generic API Key" 等 error 级误报并阻断门禁。
+ * 构建产物 / 依赖 / 测试夹具不参与密钥扫描：
+ * - 构建产物排除与 Guard 其他适配器排除 dist/node_modules 的约定一致。
+ *   CLI 自包含 bundle（packages/cli/dist/zhshield.js）内嵌了密钥检测正则与示例字符串，
+ *   提交后必然触发 "Generic API Key" 等 error 级误报并阻断门禁。
+ * - 测试目录/文件中校验引擎行为的固定密钥字符串（如 fakesecret/x-api-token 断言值）
+ *   是夹具而非真实泄露，与 security-check-engine 的 SKIP_DIRS（__tests__/fixtures/test）
+ *   及规则模板排除测试文件的约定保持一致。
  */
-const EXCLUDED_FILE_PATTERN = /(^|\/)(dist|build|coverage|node_modules)(\/|$)|\.map$|\.min\.js$/;
+const EXCLUDED_FILE_PATTERN =
+  /(^|\/)(dist|build|coverage|node_modules|__tests__|__fixtures__|fixtures|test|tests)(\/|$)|\.map$|\.min\.js$|\.(test|spec)\.[jt]sx?$/;
 
 /**
  * 展开配置路径中的环境变量占位符（${VAR} / $VAR）。
@@ -76,8 +82,11 @@ function resolveConfigPath(raw: string | undefined): string | undefined {
 
 export class GitleaksAdapter implements ToolAdapter {
   meta = META;
-  private commandPromise?: Promise<string>;
+  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
+  private readonly commandCache = new Map<string, Promise<string>>();
   private readonly projectRoot?: string;
+  /** 最近一次 scan 的 projectPath，供错误分支（findings 经 stderr 返回）做相对化 */
+  private lastProjectPath?: string;
 
   /** F5：gitleaks 读取仓库文本文件找硬编码密钥；依赖目录排除 */
   readonly accessScope: AccessScope = {
@@ -89,11 +98,17 @@ export class GitleaksAdapter implements ToolAdapter {
     this.projectRoot = projectRoot;
   }
 
-  private resolveCommand(): Promise<string> {
-    if (!this.commandPromise) {
-      this.commandPromise = resolveToolCommand('gitleaks', this.projectRoot);
+  private resolveCommand(projectPath?: string): Promise<string> {
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
+    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
+    const anchor = this.projectRoot ?? projectPath;
+    const key = anchor ?? '';
+    let cached = this.commandCache.get(key);
+    if (!cached) {
+      cached = resolveToolCommand('gitleaks', anchor);
+      this.commandCache.set(key, cached);
     }
-    return this.commandPromise;
+    return cached;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -103,6 +118,7 @@ export class GitleaksAdapter implements ToolAdapter {
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
     const isStaged = !!(options.targetFiles && options.targetFiles.length > 0);
+    this.lastProjectPath = options.projectPath;
 
     try {
       return await this.runGitleaks(options, start, isStaged);
@@ -117,8 +133,9 @@ export class GitleaksAdapter implements ToolAdapter {
     start: number,
     isStaged: boolean,
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand();
-    const { stdout } = await execFileAsync(command, this.buildArgs(options, isStaged), {
+    const command = await this.resolveCommand(options.projectPath);
+    const args = this.buildArgs(options, isStaged);
+    const { stdout } = await execFileAsync(command, args, {
       cwd: options.projectPath,
       // gitleaks 扫描完整 git 历史，流水线并行高负载下易超 30s，默认放宽到 120s
       timeout: options.timeout || 120000,
@@ -127,7 +144,7 @@ export class GitleaksAdapter implements ToolAdapter {
 
     const parsed = JSON.parse(stdout);
     const findings = Array.isArray(parsed) ? parsed : parsed?.findings || [];
-    return this.buildAvailable(findings, start);
+    return this.buildAvailable(findings, start, options.projectPath);
   }
 
   /** 处理 gitleaks 执行错误：未安装 / 部分输出 / 失败 */
@@ -140,7 +157,7 @@ export class GitleaksAdapter implements ToolAdapter {
     // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
     const partialFindings = this.parsePartialFindings(err.stdout ?? '');
     if (partialFindings) {
-      return this.buildAvailable(partialFindings, start);
+      return this.buildAvailable(partialFindings, start, this.lastProjectPath);
     }
     return this.buildError(start, err.stderr || err.message || 'Gitleaks 执行失败');
   }
@@ -163,6 +180,10 @@ export class GitleaksAdapter implements ToolAdapter {
     args.push('--report-format', 'json', '--report-path', '-');
     if (isStaged) {
       args.push(options.projectPath);
+    } else if (!this.isGitRepo(options.projectPath)) {
+      // 目标目录非 git 仓库时（如验收 fixture 无 .git），gitleaks 默认沿父目录向上找最近
+      // 的 git 仓库并只扫已跟踪文件，untracked 目标整体漏检；加 --no-git 强制扫工作树（09-12 复验修复）。
+      args.push('--no-git');
     }
     const configPath = resolveConfigPath(options.config?.config);
     if (configPath) {
@@ -171,11 +192,19 @@ export class GitleaksAdapter implements ToolAdapter {
     return args;
   }
 
-  private buildAvailable(findings: Record<string, unknown>[], start: number): ToolResult {
+  private isGitRepo(projectPath: string): boolean {
+    try {
+      return fs.existsSync(path.join(projectPath, '.git'));
+    } catch {
+      return false;
+    }
+  }
+
+  private buildAvailable(findings: Record<string, unknown>[], start: number, projectPath?: string): ToolResult {
     return {
       tool: 'gitleaks',
       status: 'available',
-      issues: this.mapOutput(findings),
+      issues: this.mapOutput(findings, projectPath),
       metadata: {
         version: '',
         duration: Date.now() - start,
@@ -205,28 +234,36 @@ export class GitleaksAdapter implements ToolAdapter {
     };
   }
 
-  private mapOutput(findings: Record<string, unknown>[]): Issue[] {
+  private mapOutput(findings: Record<string, unknown>[], projectPath?: string): Issue[] {
     if (!Array.isArray(findings)) return [];
+    // gitleaks 对 --source 返回绝对路径 File；相对化到扫描根后再做排除判断，
+    // 否则扫描根自身路径含 fixtures/dist 等段时（如验收 fixture）会被误过滤（09-12 复验修复）。
+    const normalize = (f: string): string => {
+      if (!projectPath) return f;
+      const rel = path.relative(projectPath, f);
+      return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : f;
+    };
     return findings
       .filter((f) => {
         const finding = f as GitleaksFinding;
-        return !EXCLUDED_FILE_PATTERN.test(finding.File || '');
+        return !EXCLUDED_FILE_PATTERN.test(normalize(finding.File || ''));
       })
       .map((f) => {
         const finding = f as GitleaksFinding;
+        const file = normalize(finding.File || '');
         return {
           id: randomUUID(),
           ruleId: finding.RuleID || 'gitleaks-unknown',
           severity: 'error',
           category: 'security',
           message: finding.Description || `检测到硬编码密钥: ${finding.RuleID || '未知'}`,
-          file: finding.File || '',
+          file,
           line: finding.StartLine || 0,
           column: finding.StartColumn || 0,
           suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
           autoFixable: false,
           source: 'inspect',
-          fingerprint: `gitleaks:${finding.RuleID || ''}:${finding.File || ''}:${finding.StartLine || 0}`,
+          fingerprint: `gitleaks:${finding.RuleID || ''}:${file}:${finding.StartLine || 0}`,
         };
       });
   }

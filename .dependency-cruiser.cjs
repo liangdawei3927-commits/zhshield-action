@@ -19,8 +19,13 @@ module.exports = {
     doNotFollow: { path: 'node_modules' },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: './tsconfig.json' },
+    // 只校验源码内模块边界：构建产物（dist/build/coverage）非人工编辑，
+    // 其内部相互引用会稳定产生 no-circular 误报（见 F5 契约：校验 src/ 目录）。
+    // e2e/fixtures 为刻意构造的循环依赖样本（验证引擎检出能力），排除其避免
+    // 仓库级全量扫描误报；adapter 扫描 fixture 自身时扫描根为 fixture 目录，
+    // 路径不含 e2e/fixtures 段，不受影响。
     exclude: {
-      path: '^node_modules',
+      path: '(^|/)(node_modules|dist|dist-electron|build|coverage|e2e/fixtures)(/|$)',
     },
   },
 };

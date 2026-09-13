@@ -35,6 +35,10 @@ packages/*/vite.config.js
 packages/*/vite.config.js.map
 packages/*/vite.config.d.ts
 packages/*/vite.config.d.ts.map
+packages/*/playwright.config.js
+packages/*/playwright.config.js.map
+packages/*/playwright.config.d.ts
+packages/*/playwright.config.d.ts.map
 scripts/*.js
 scripts/*.js.map
 scripts/*.d.ts
@@ -101,3 +105,49 @@ report/
 
 # Vitest
 .vitest/
+
+# 根级 tsc 产物（vitest 配置编译输出，源为 .ts）
+/vitest.config.js
+/vitest.config.js.map
+/vitest.config.d.ts
+/vitest.config.d.ts.map
+/vitest.shared.js
+/vitest.shared.js.map
+/vitest.shared.d.ts
+/vitest.shared.d.ts.map
+
+# CLI 自包含 bundle 内的编译产物：仅 dist/zhshield.js 与 dist/sop/**/*.ts、*.yml 入库；
+# 其余 .js/.d.ts/.map 由 tsc 生成，体积大且非运行时必需（覆盖上方 !packages/cli/dist/**）
+packages/cli/dist/**/*.js
+packages/cli/dist/**/*.js.map
+packages/cli/dist/**/*.d.ts
+packages/cli/dist/**/*.d.ts.map
+
+# desktop e2e 编译产物（源为 .ts）
+packages/desktop/e2e/*.js
+packages/desktop/e2e/*.js.map
+packages/desktop/e2e/*.d.ts
+packages/desktop/e2e/*.d.ts.map
+
+# 测试 fixture 编译产物（仅保留源码 .ts 与元数据文件入库）
+scripts/fixtures/sample-repo/**/*.js
+scripts/fixtures/sample-repo/**/*.js.map
+scripts/fixtures/sample-repo/**/*.d.ts
+scripts/fixtures/sample-repo/**/*.d.ts.map
+packages/fingerprint/fixtures/golden/**/*.js
+packages/fingerprint/fixtures/golden/**/*.js.map
+packages/fingerprint/fixtures/golden/**/*.d.ts
+packages/fingerprint/fixtures/golden/**/*.d.ts.map
+packages/inspect/e2e/fixtures/**/*.js
+packages/inspect/e2e/fixtures/**/*.js.map
+packages/inspect/e2e/fixtures/**/*.d.ts
+packages/inspect/e2e/fixtures/**/*.d.ts.map
+
+# 扫描运行产物（根级 zhshield.json、fixture 内扫描结果）；源码与配置入库
+/zhshield.json
+packages/inspect/e2e/fixtures/**/zhshield.json
+
+# OpenCode 运行时状态（会话账本/续跑/boulder），非仓库资产；plans 与报告保留跟踪
+.omo/boulder.json
+.omo/start-work/
+.omo/run-continuation/

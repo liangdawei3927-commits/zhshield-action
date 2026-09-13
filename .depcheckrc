@@ -1,0 +1,7 @@
+{
+  "ignores": [
+    "depcheck",
+    "dependency-cruiser",
+    "ts-prune"
+  ]
+}

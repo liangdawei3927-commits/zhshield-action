@@ -18,6 +18,32 @@ function toMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** tool-dispatch 单次工具扫描硬上限缺省值（ms）：2 分钟对大型 monorepo（20+ 包）不足，提至 5 分钟 */
+export const DEFAULT_TOOL_SCAN_TIMEOUT_MS = 300_000;
+
+/**
+ * 硬上限保护：即便适配器未遵守 timeout（进程未退出），单次工具扫描也绝不
+ * 无限挂起整个体检。超时即 reject，由 executeToolScan 的 catch 降级为该规则 error。
+ */
+function withHardTimeout<T>(promise: Promise<T>, ms: number, toolId: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`[sop] 工具 ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 // ─── 派发评估：check-list → GuardEngine ────────────────
 
 export async function evalCheckList(
@@ -63,8 +89,7 @@ async function runSecurityCheck(
       rule,
       status: violations.length === 0 ? 'passed' : 'failed',
       violations,
-      message:
-        violations.length > 0 ? `安全检查发现 ${violations.length} 个问题` : '安全检查通过',
+      message: violations.length > 0 ? `安全检查发现 ${violations.length} 个问题` : '安全检查通过',
       durationMs: 0,
       targetEngine: 'inspect',
       timestamp: new Date(),
@@ -308,16 +333,22 @@ async function executeToolScan(
 ): Promise<ToolScanOutcome> {
   try {
     const toolConfig = instr.toolConfig ?? {};
-    const result = await adapter.scan({
-      projectPath: context.repoRoot,
-      projectId: context.repoRoot,
-      targetFiles: context.files,
-      config: {
-        enabled: true,
-        ...toolConfig,
-      } as ToolConfig,
-      timeout: (toolConfig.timeout as number) ?? undefined,
-    });
+    // 硬上限保护：对齐 InspectEngine ToolAdapterExecutor——即便工具未遵守 timeout，
+    // 单次扫描也绝不无限挂起体检。超时 reject → 下方 catch → 该规则降级为 error。
+    const result = await withHardTimeout(
+      adapter.scan({
+        projectPath: context.repoRoot,
+        projectId: context.repoRoot,
+        targetFiles: context.files,
+        config: {
+          enabled: true,
+          ...toolConfig,
+        } as ToolConfig,
+        timeout: (toolConfig.timeout as number) ?? undefined,
+      }),
+      host.toolScanTimeoutMs ?? DEFAULT_TOOL_SCAN_TIMEOUT_MS,
+      adapter.meta.id,
+    );
     await logToolExecutionAudit(host.auditLogger, adapter.meta.id, result, context.repoRoot);
     void host.eventBus?.emit('tool:executed', {
       tool: adapter.meta.id,

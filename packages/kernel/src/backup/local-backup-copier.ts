@@ -8,7 +8,7 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
-import type { LocalBackupFileEntry, LocalBackupManifest } from './local-backup';
+import type { LocalBackupFileEntry, LocalBackupManifest } from './types';
 import { hashFile } from './utils';
 import { safeJoinReal } from '@zh/shared';
 

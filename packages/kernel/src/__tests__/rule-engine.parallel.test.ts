@@ -82,9 +82,11 @@ describe('SopRuleEngine — M1 并行化回归（保序 + 聚合等价）', () =
     // 两条规则先后在两次体检中失败/通过，验证失败计数不因并行交叉污染。
     const srcDir = path.join(tempDir, 'src');
     mkdirSync(srcDir, { recursive: true });
+    // 伪密钥分片拼接，避免源码出现可被 secret 扫描(zhshield generic-api-key)命中的字面量；
+    // 写入临时目录的内容仍是完整 sk- 格式，用于验证引擎可检测敏感信息
     writeFileSync(
       path.join(srcDir, 'a.ts'),
-      ['const API_KEY = "sk-', 'abcd1234efgh5678ijkl";'].join(''),
+      ['const API_KEY = "sk-', 'abcd', '1234efgh', '5678ijkl";'].join(''),
       'utf-8',
     );
 

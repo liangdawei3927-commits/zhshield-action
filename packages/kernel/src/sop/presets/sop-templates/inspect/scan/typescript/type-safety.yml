@@ -65,6 +65,7 @@ check:
         excludePattern:
           - "catch.*: any"
           - 'any\['
+        note: "执行层已实现字符串/注释剥离（stripStringsAndComments），正则仅匹配代码语义区域"
         cwe: "CWE-1104"
       - id: "no-type-assertion"
         description: "禁止 as 类型断言（除非有 Zod 等运行时验证保证）"

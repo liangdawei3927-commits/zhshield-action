@@ -243,3 +243,7 @@ export interface SopRuleStats {
   byStatus: Record<RuleLifecycleStatus, number>;
   bySeverity: Record<string, number>;
 }
+
+// ─── 评估状态（规则引擎评估结果；由 rule-evaluation 定义迁移至此，切断 _meta 内循环 import） ──
+
+export type EvaluationStatus = 'passed' | 'failed' | 'error' | 'skipped';

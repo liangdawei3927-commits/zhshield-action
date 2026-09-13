@@ -151,6 +151,9 @@ export class SopRuleEngine {
   /** F1-3：项目健康基线分（@zh/scoring 注入；缺省 undefined = 基线升档关闭） */
   private readonly healthBaseline?: number;
 
+  /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 undefined → dispatch 用 DEFAULT_TOOL_SCAN_TIMEOUT_MS */
+  private readonly toolScanTimeoutMs?: number;
+
   /** 指令类型 → 评估器策略表（替代 evaluateSingle 中的 switch 分派）。
    *  映射类型保证每个 handler 收到对应判别联合变体，类型安全；
    *  分派处对联合索引做一次局部断言以绕过 TS 相关联合的索引限制。 */
@@ -197,6 +200,8 @@ export class SopRuleEngine {
       hooks?: ToolCallHook[];
       /** 项目健康基线分（F1-3）— <60 时有效严重级整体上移一档；缺省 undefined = 关闭 */
       healthBaseline?: number;
+      /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 120000（与 InspectEngine 对齐） */
+      toolScanTimeoutMs?: number;
     },
   ) {
     this.registry = registry;
@@ -209,6 +214,7 @@ export class SopRuleEngine {
     this.auditLogger = options?.auditLogger ?? new AuditLogger();
     this.toolCallHooks = options?.hooks ?? [];
     this.healthBaseline = options?.healthBaseline;
+    this.toolScanTimeoutMs = options?.toolScanTimeoutMs;
     if (options?.toolAdapters) {
       for (const { name, adapter } of options.toolAdapters) {
         this.toolAdapters.set(name, wrapWithScopeGuard(adapter, this.toolCallHooks, this.eventBus));
@@ -233,6 +239,7 @@ export class SopRuleEngine {
       auditLogger: this.auditLogger,
       eventBus: this.eventBus,
       toolScope: feature ? (toolId: string) => isToolInScope(toolId, feature) : undefined,
+      toolScanTimeoutMs: this.toolScanTimeoutMs,
       get evalDepth() {
         return readEvalDepth();
       },

@@ -6,7 +6,7 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { createGunzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
-import type { LocalBackupCompression, LocalBackupFileEntry } from './local-backup';
+import type { LocalBackupCompression, LocalBackupFileEntry } from './types';
 import { safeJoinReal } from '@zh/shared';
 
 /** gzip 魔数（RFC 1952：0x1f 0x8b） */

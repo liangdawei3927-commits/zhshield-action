@@ -65,6 +65,24 @@ describe('ContentInterpreter — 规则内容解释分发', () => {
     }
   });
 
+  it('toolConfig.configPath 归一化为 config（gitleaks/dep-cruiser 模板历史写法）', () => {
+    const rule = makeRule({
+      id: 'test.tool-dispatch.configpath-normalize',
+      content: {
+        check: {
+          tool: 'gitleaks',
+          toolConfig: { configPath: '${ZHSHIELD_HOME}/gitleaks.toml' },
+        },
+      },
+    });
+    const instr = interpreter.interpret(rule);
+    expect(instr.type).toBe('tool-dispatch');
+    if (instr.type === 'tool-dispatch') {
+      expect(instr.toolConfig.config).toBe('${ZHSHIELD_HOME}/gitleaks.toml');
+      expect(instr.toolConfig).not.toHaveProperty('configPath');
+    }
+  });
+
   it('所有类型均正确分发（含 tool-dispatch）', () => {
     const patternRule = makeRule({
       id: 'test.pattern',

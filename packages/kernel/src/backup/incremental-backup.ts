@@ -45,6 +45,9 @@ const DEFAULT_EXCLUDE: RegExp[] = [/backups?\//, /node_modules\//, /\.git\//];
 
 const MANIFEST_VERSION = '1.0';
 
+/** 递归扫描深度上限：防止病态深层目录树导致栈溢出 */
+const MAX_WALK_DEPTH = 64;
+
 export class BackupManager {
   private sourceDir: string;
   private backupRoot: string;
@@ -220,7 +223,8 @@ export class BackupManager {
     return results;
   }
 
-  private async walkFiles(dir: string, results: string[]): Promise<void> {
+  private async walkFiles(dir: string, results: string[], depth = 0): Promise<void> {
+    if (depth > MAX_WALK_DEPTH) return;
     let entries: Dirent[];
     try {
       entries = await fs.readdir(dir, { withFileTypes: true });
@@ -236,7 +240,7 @@ export class BackupManager {
       if (entry.isDirectory()) {
         // perf rule false positive: arg depends on loop var via dataflow
         // eslint-disable-next-line perf/perf-no-serial-await
-        await this.walkFiles(fullPath, results);
+        await this.walkFiles(fullPath, results, depth + 1);
         continue;
       }
       if (entry.isFile() && this.includePatterns.some((p) => p.test(entry.name))) {
@@ -249,7 +253,13 @@ export class BackupManager {
     const manifestPath = path.join(this.backupRoot, 'MANIFEST.json');
     try {
       const content = await fs.readFile(manifestPath, 'utf-8');
-      return JSON.parse(content) as BackupManifest;
+      const parsed: unknown = JSON.parse(content);
+      const files =
+        typeof parsed === 'object' && parsed !== null
+          ? (parsed as Record<string, unknown>).files
+          : undefined;
+      if (!Array.isArray(files)) return null;
+      return parsed as BackupManifest;
     } catch {
       return null;
     }

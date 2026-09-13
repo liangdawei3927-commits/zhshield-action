@@ -56,7 +56,7 @@ conditions:
 check:
   tool: "dep-cruiser"
   toolConfig:
-    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
     scanRules:
       - ruleId: "layer-violation"
         description: "违规：{sourceLayer} 直接依赖了 {targetLayer}，违反单向依赖约束"

@@ -64,5 +64,7 @@ export interface EngineHost {
   eventBus?: EventBus;
   /** 工具 scope 判定：返回 false 表示工具不在当前项目画像 scope 内，tool-dispatch 应跳过 */
   toolScope?: (toolId: string) => boolean;
+  /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 300000（5 分钟，大型 monorepo trivy/semgrep 需更长时间） */
+  toolScanTimeoutMs?: number;
   evalDepth: number;
 }

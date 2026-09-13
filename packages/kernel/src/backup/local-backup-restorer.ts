@@ -5,11 +5,7 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type {
-  LocalBackupFileEntry,
-  LocalBackupManifest,
-  LocalBackupRestoreResult,
-} from './local-backup';
+import type { LocalBackupFileEntry, LocalBackupManifest, LocalBackupRestoreResult } from './types';
 import { restoreStoredEntry } from './restore-entry';
 import { safeJoinReal } from '@zh/shared';
 
@@ -24,7 +20,13 @@ export class LocalBackupRestorer {
     const manifestPath = path.join(backupDir, 'BACKUP_MANIFEST.json');
     try {
       const content = await fs.readFile(manifestPath, 'utf-8');
-      return JSON.parse(content) as LocalBackupManifest;
+      const parsed: unknown = JSON.parse(content);
+      const files =
+        typeof parsed === 'object' && parsed !== null
+          ? (parsed as Record<string, unknown>).files
+          : undefined;
+      if (!Array.isArray(files)) return null;
+      return parsed as LocalBackupManifest;
     } catch {
       return null;
     }

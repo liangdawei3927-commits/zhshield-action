@@ -236,9 +236,7 @@ describe('ToolRuleSync reclaiming capability filter', () => {
 
     const result = await sync.syncTool('eslint');
     expect(result).toEqual({ toolId: 'eslint', updated: false, reason: 'already_latest' });
-    const downloadCalls = fetchMock.mock.calls.filter(([url]) =>
-      String(url).endsWith('/download'),
-    );
+    const downloadCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/download'));
     expect(downloadCalls).toHaveLength(0);
   });
 });

@@ -112,7 +112,12 @@ describe('getReclaimingToolRuleSinces', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'toolrule:eslint': { languages: [], refs: [], status: 'reclaiming', since: '1759747200000' },
+        'toolrule:eslint': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: '1759747200000',
+        },
         'toolrule:trivy': { languages: [], refs: [], status: 'reclaiming', since: -5 },
         'toolrule:semgrep': { languages: [], refs: [], status: 'reclaiming', since: null },
       },
@@ -159,8 +164,18 @@ describe('getReclaimingSopModuleIds', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
-        'sop-module:nestjs': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+        'sop-module:nestjs': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
       },
     });
     expect(getReclaimingSopModuleIds(tmpDir)).toEqual(new Set(['typescript', 'nestjs']));
@@ -170,8 +185,18 @@ describe('getReclaimingSopModuleIds', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'active', since: 1759747200000 },
-        'sop-module:quality': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'active',
+          since: 1759747200000,
+        },
+        'sop-module:quality': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
       },
     });
     expect(getReclaimingSopModuleIds(tmpDir)).toEqual(new Set(['quality']));
@@ -181,7 +206,12 @@ describe('getReclaimingSopModuleIds', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
         'toolrule:eslint': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
       },
     });
@@ -217,8 +247,18 @@ describe('getReclaimingSopModuleSinces', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
-        'sop-module:nestjs': { languages: [], refs: [], status: 'reclaiming', since: 1759747200001 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
+        'sop-module:nestjs': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200001,
+        },
       },
     });
     expect(getReclaimingSopModuleSinces(tmpDir)).toEqual(
@@ -243,7 +283,12 @@ describe('getReclaimingSopModuleSinces', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: '1759747200000' },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: '1759747200000',
+        },
         'sop-module:nestjs': { languages: [], refs: [], status: 'reclaiming', since: -5 },
         'sop-module:quality': { languages: [], refs: [], status: 'reclaiming', since: null },
       },
@@ -255,7 +300,12 @@ describe('getReclaimingSopModuleSinces', () => {
     writeLedger({
       schemaVersion: 1,
       capabilities: {
-        'sop-module:typescript': { languages: [], refs: [], status: 'active', since: 1759747200000 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'active',
+          since: 1759747200000,
+        },
       },
     });
     expect(getReclaimingSopModuleSinces(tmpDir)).toEqual(new Map());
@@ -266,7 +316,12 @@ describe('getReclaimingSopModuleSinces', () => {
       schemaVersion: 1,
       capabilities: {
         'toolrule:eslint': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
-        'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+        'sop-module:typescript': {
+          languages: [],
+          refs: [],
+          status: 'reclaiming',
+          since: 1759747200000,
+        },
       },
     });
     expect(getReclaimingSopModuleSinces(tmpDir)).toEqual(new Map([['typescript', 1759747200000]]));

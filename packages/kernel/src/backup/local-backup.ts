@@ -7,7 +7,14 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { type LocalBackupConfig, type LocalBackupSubResult } from './types';
+import {
+  type LocalBackupConfig,
+  type LocalBackupSubResult,
+  type LocalBackupCompression,
+  type LocalBackupFileEntry,
+  type LocalBackupManifest,
+  type LocalBackupRestoreResult,
+} from './types';
 import { buildZipSnapshot, restoreFromZipArchive } from './zip-snapshot';
 import { safeJoinReal } from '@zh/shared';
 import { LocalBackupScanner } from './local-backup-scanner';
@@ -16,45 +23,18 @@ import { LocalBackupCopier } from './local-backup-copier';
 import { LocalBackupPruner } from './local-backup-pruner';
 import { LocalBackupRestorer } from './local-backup-restorer';
 
+// 运行态共享类型定义于 ./types，此处重导出保持 backup/index.ts 公共 API 不变
+export type {
+  LocalBackupCompression,
+  LocalBackupFileEntry,
+  LocalBackupManifest,
+  LocalBackupRestoreResult,
+};
+
 const TILDE_PREFIX = /^~/;
 
 /** 快照条目名（ISO 时间戳目录或同名 .zip）；不匹配的条目（pre-restore-*、MANIFEST.json 等）不参与轮换 */
 const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(\.zip)?$/;
-
-/** 备份条目落盘压缩格式（写入 BACKUP_MANIFEST.json，恢复时按此解压） */
-export type LocalBackupCompression = 'none' | 'gzip';
-
-export interface LocalBackupFileEntry {
-  relativePath: string;
-  hash: string;
-  size: number;
-  backedUpAt: string;
-  /**
-   * 实际落盘文件名（备份目录内相对路径）。
-   * 旧版清单缺省此字段：视为与 relativePath 相同。
-   */
-  storedAs?: string;
-  /**
-   * 落盘压缩格式。旧版清单缺省此字段时按 'none' 处理，
-   * 恢复阶段对缺失文件用 gzip 魔数嗅探兜底（兼容旧版 compress:true 目录）。
-   */
-  compression?: LocalBackupCompression;
-}
-
-/** restore() 结果：成功/失败计数与逐条失败原因（匹配 orchestrator 的错误聚合风格） */
-export interface LocalBackupRestoreResult {
-  restored: number;
-  failed: number;
-  problems: string[];
-}
-
-export interface LocalBackupManifest {
-  version: string;
-  sourceDir: string;
-  lastBackupAt: string;
-  fullBackupAt: string;
-  files: LocalBackupFileEntry[];
-}
 
 export class LocalBackup {
   private backupRoot: string;

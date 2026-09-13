@@ -239,7 +239,12 @@ describe('SopLazyLoader', () => {
         JSON.stringify({
           schemaVersion: 1,
           capabilities: {
-            'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: 1759747200000 },
+            'sop-module:typescript': {
+              languages: [],
+              refs: [],
+              status: 'reclaiming',
+              since: 1759747200000,
+            },
           },
         }),
         'utf-8',

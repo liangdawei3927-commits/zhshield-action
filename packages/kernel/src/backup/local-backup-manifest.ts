@@ -5,7 +5,7 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { LocalBackupFileEntry, LocalBackupManifest } from './local-backup';
+import type { LocalBackupFileEntry, LocalBackupManifest } from './types';
 
 export class LocalBackupManifestStore {
   async loadManifest(backupRoot: string): Promise<LocalBackupManifest | null> {

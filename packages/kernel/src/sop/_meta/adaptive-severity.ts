@@ -1,5 +1,4 @@
-import type { SopRule, Severity } from './sop-types';
-import type { EvaluationStatus } from './rule-evaluation';
+import type { SopRule, Severity, EvaluationStatus } from './sop-types';
 
 // ─── severity 秩序表（F1-3 单一事实源）────────────────────
 /** 固定升序：'error' 对齐 ESLint/semgrep 的 ERROR 档，位于 medium 与 high 之间。

@@ -9,6 +9,9 @@ import * as path from 'node:path';
 import type { GitHubApiContext, GitHubTreeItem } from './github-api-types';
 import { matchesExcludePattern } from './utils';
 
+/** GitHub git blob API 单文件大小上限：超过则跳过（避免内存/请求双爆） */
+const MAX_BLOB_BYTES = 100 * 1024 * 1024;
+
 /** 递归收集目录树条目（跳过排除项与中止信号） */
 export async function collectTreeItems(
   ctx: GitHubApiContext,
@@ -30,6 +33,13 @@ export async function collectTreeItems(
       // eslint-disable-next-line perf/perf-no-serial-await
       await collectTreeItems(ctx, fullPath, relativePath, excludePatterns, tree);
     } else if (entry.isFile()) {
+      // perf rule false positive: arg depends on loop var via dataflow
+      // eslint-disable-next-line perf/perf-no-serial-await
+      const stat = await fs.stat(fullPath);
+      if (stat.size > MAX_BLOB_BYTES) {
+        console.warn(`[github-backup] 跳过超大文件（>100MB）: ${relativePath}`);
+        continue;
+      }
       // perf rule false positive: arg depends on loop var via dataflow
       // eslint-disable-next-line perf/perf-no-serial-await
       const content = await fs.readFile(fullPath, 'base64');

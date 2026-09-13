@@ -54,7 +54,7 @@ conditions:
 check:
   tool: "dep-cruiser"
   toolConfig:
-    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
     rules:
       - ruleId: "cross-module-internal-path"
         description: "模块 A 直接引用模块 B 的内部路径（如 module-b/src/internal/file.ts），应通过模块 B 的 index.ts 导出"

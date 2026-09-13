@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ToolId } from './tool-rule-sync';
+import type { ToolId } from './tool-ids';
 
 const TOOLRULE_PREFIX = 'toolrule:';
 const SOP_MODULE_PREFIX = 'sop-module:';

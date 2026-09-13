@@ -287,6 +287,39 @@ function scanForbiddenRegexFiles(
   return violations;
 }
 
+/**
+ * 剥离字符串字面量和注释，仅保留代码语义内容。
+ * 用于 forbidden-regex 扫描前预处理，避免正则匹配到字符串/注释中的子串。
+ *
+ * 处理范围：// 行注释、/* 块注释、' " ` 字符串字面量（含转义）。
+ * 不处理：正则字面量、嵌套模板字符串（对 forbidden-regex 场景足够）。
+ */
+function stripStringsAndComments(line: string): string {
+  let result = '';
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '/' && line[i + 1] === '/') break;
+    if (line[i] === '/' && line[i + 1] === '*') {
+      let j = i + 2;
+      while (j < line.length - 1 && !(line[j] === '*' && line[j + 1] === '/')) j++;
+      i = j + 2;
+      continue;
+    }
+    if (line[i] === "'" || line[i] === '"' || line[i] === '`') {
+      const q = line[i];
+      let j = i + 1;
+      while (j < line.length) {
+        if (line[j] === '\\') { j += 2; } else if (line[j] === q) { j++; break; } else { j++; }
+      }
+      i = j;
+      continue;
+    }
+    result += line[i];
+    i++;
+  }
+  return result;
+}
+
 function scanForbiddenRegexInFile(
   content: string,
   relativePath: string,
@@ -297,9 +330,10 @@ function scanForbiddenRegexInFile(
   const lines = content.split('\n');
   for (const item of compiled) {
     for (let i = 0; i < lines.length; i++) {
+      const stripped = stripStringsAndComments(lines[i]);
       item.regex.lastIndex = 0;
       let match: RegExpExecArray | null;
-      while ((match = item.regex.exec(lines[i])) !== null) {
+      while ((match = item.regex.exec(stripped)) !== null) {
         violations.push({
           id: randomUUID(),
           ruleId: rule.id,

@@ -14,6 +14,9 @@ const SKIP_DIRS = new Set([
   '.cache',
 ]);
 
+/** 递归遍历深度上限：防止病态深层目录树导致栈溢出 */
+const MAX_GLOB_DEPTH = 64;
+
 export class FileHelper {
   static async readJSON(filePath: string): Promise<unknown> {
     const content = await fs.promises.readFile(filePath, 'utf-8');
@@ -38,7 +41,8 @@ export class FileHelper {
     const isMatch = picomatch(pattern);
     const results: string[] = [];
 
-    const walk = async (currentDir: string): Promise<void> => {
+    const walk = async (currentDir: string, depth = 0): Promise<void> => {
+      if (depth > MAX_GLOB_DEPTH) return;
       let dirEntries: fs.Dirent[];
       try {
         dirEntries = await fs.promises.readdir(currentDir, { withFileTypes: true });
@@ -53,7 +57,7 @@ export class FileHelper {
           if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
           // perf rule false positive: arg depends on loop var via dataflow
           // eslint-disable-next-line perf/perf-no-serial-await
-          await walk(fullPath);
+          await walk(fullPath, depth + 1);
         } else if (entry.isFile()) {
           // 相对路径统一用 '/' 分隔，与 picomatch 的 glob 语义对齐
           const relativePath = path.relative(dir, fullPath).split(path.sep).join('/');

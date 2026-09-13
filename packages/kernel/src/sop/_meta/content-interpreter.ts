@@ -61,15 +61,23 @@ export class ContentInterpreter {
     // config.rules 读取：在此合并，使 registry 风格 config（如 typescript/lang/security/）
     // 无法本地解析时仍能以内联规则执行扫描。toolConfig 已含 rules 时保留既有声明。
     const toolConfig = { ...((check.toolConfig as Record<string, unknown>) ?? {}) };
-    if (Array.isArray(check.semgrepRules) && check.semgrepRules.length > 0 && !Array.isArray(toolConfig.rules)) {
+    if (
+      Array.isArray(check.semgrepRules) &&
+      check.semgrepRules.length > 0 &&
+      !Array.isArray(toolConfig.rules)
+    ) {
       toolConfig.rules = check.semgrepRules;
     }
-    // 适配器统一从 options.config?.config 读取注入配置；模板历史写法为
-    // toolConfig.configFile（如 circular-dependency 的 .dependency-cruiser.cjs），
-    // 在此归一化使两条声明路径收敛到同一读取点。config 已存在时保留既有值。
-    if (toolConfig.config === undefined && toolConfig.configFile !== undefined) {
-      toolConfig.config = toolConfig.configFile;
-      delete toolConfig.configFile;
+    // 适配器统一从 options.config?.config 读取注入配置；模板历史写法有
+    // toolConfig.configFile（如 circular-dependency 的 .dependency-cruiser.cjs）与
+    // toolConfig.configPath（如 gitleaks 的 ${ZHSHIELD_HOME}/gitleaks.toml），
+    // 在此按别名收敛到同一读取点。config 已存在时保留既有值。
+    const configAliases = ['configFile', 'configPath'] as const;
+    for (const alias of configAliases) {
+      if (toolConfig.config === undefined && toolConfig[alias] !== undefined) {
+        toolConfig.config = toolConfig[alias];
+        delete toolConfig[alias];
+      }
     }
 
     return {

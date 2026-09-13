@@ -1,7 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SopRule, ProjectFeature } from '../_meta/sop-types';
-import type { SopCacheManager } from './sop-cache-manager';
+
+/** SopCacheManager 最小契约（惰性加载仅依赖缓存目录与规则注册表；避免反向 import 形成循环） */
+interface CacheManagerLike {
+  getCacheDir(): string;
+  getRegistry(): { getAll(): SopRule[] };
+}
 
 const DB_EXT = /\.db$/;
 const SOP_MODULE_PREFIX = 'sop-module:';
@@ -14,7 +19,7 @@ const SOP_MODULE_PREFIX = 'sop-module:';
  * 按项目特征只加载需要的模块，全量同步 50MB → 按需同步 5-10MB（节省 80%）。
  */
 export class SopLazyLoader {
-  private cacheManager: SopCacheManager;
+  private cacheManager: CacheManagerLike;
 
   /** 模块 → 规则 ID 列表映射 */
   private moduleMap: Record<string, string[]> = {
@@ -48,7 +53,7 @@ export class SopLazyLoader {
     ],
   };
 
-  constructor(cacheManager: SopCacheManager) {
+  constructor(cacheManager: CacheManagerLike) {
     this.cacheManager = cacheManager;
   }
 

@@ -12,11 +12,7 @@ import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { pipeline } from 'node:stream/promises';
 import { hashFile } from './utils';
 import { openZipArchive, toZipEntryName } from './zip-archive';
-import type {
-  LocalBackupFileEntry,
-  LocalBackupManifest,
-  LocalBackupRestoreResult,
-} from './local-backup';
+import type { LocalBackupFileEntry, LocalBackupManifest, LocalBackupRestoreResult } from './types';
 
 export interface ZipSnapshotStats {
   backedUp: number;
@@ -153,15 +149,20 @@ export async function restoreFromZipArchive(
   }
 }
 
-/** 从归档内读取 BACKUP_MANIFEST.json 清单；缺失时按空清单处理 */
+/** 从归档内读取 BACKUP_MANIFEST.json 清单；缺失或格式不合法时按空清单处理 */
 async function readManifestFiles(
   archive: Awaited<ReturnType<typeof openZipArchive>>,
 ): Promise<LocalBackupFileEntry[]> {
   const manifestEntry = archive.entriesByName.get('BACKUP_MANIFEST.json');
   const manifestBuf = manifestEntry ? await archive.readEntry(manifestEntry) : null;
-  return manifestBuf
-    ? (JSON.parse(manifestBuf.toString('utf-8')) as LocalBackupManifest).files
-    : [];
+  if (!manifestBuf) return [];
+  const parsed: unknown = JSON.parse(manifestBuf.toString('utf-8'));
+  const files =
+    typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, unknown>).files
+      : undefined;
+  if (!Array.isArray(files)) return [];
+  return files as LocalBackupFileEntry[];
 }
 
 /** 解析还原目标路径；路径穿越被拦截时返回 null（调用方计数失败），其他错误原样抛出 */

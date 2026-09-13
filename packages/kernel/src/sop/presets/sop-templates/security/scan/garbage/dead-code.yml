@@ -58,7 +58,7 @@ conditions:
 check:
   tool: "ts-prune"
   toolConfig:
-    configPath: "tsconfig.json"
+    config: "tsconfig.json"
     skip:
       - "(.*\\.module\\.ts)$"          # NestJS 模块自动发现
       - "(.*\\.controller\\.ts)$"       # 控制由框架注册

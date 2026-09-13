@@ -48,6 +48,14 @@ form.inline{display:inline}
 <main>
 ${body}
 </main>
+<script>
+function zsReadCookie(n){var m=document.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?decodeURIComponent(m[1]||''):''}
+document.addEventListener('DOMContentLoaded',function(){
+  var t=zsReadCookie('zh_csrf');if(!t)return;
+  var forms=document.querySelectorAll('form[method="post"]');
+  for(var i=0;i<forms.length;i++)(function(f){var h=document.createElement('input');h.type='hidden';h.name='_csrf';h.value=t;f.appendChild(h)})(forms[i]);
+});
+</script>
 </body>
 </html>`;
 }

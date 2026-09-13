@@ -88,7 +88,9 @@ export class AdminToolsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createTool(@Body() body: Record<string, unknown>): Promise<{ toolId: string; created: true }> {
+  async createTool(
+    @Body() body: Record<string, unknown>,
+  ): Promise<{ toolId: string; created: true }> {
     const { toolId } = await this.admin.saveToolPackage(parseToolBody(body));
     return { toolId, created: true };
   }
@@ -118,10 +120,7 @@ export class AdminToolsController {
 
   @Post(':id/rollback')
   @HttpCode(HttpStatus.OK)
-  rollbackTool(
-    @Param('id') id: string,
-    @Body() body: { version?: unknown },
-  ): { ok: true } {
+  rollbackTool(@Param('id') id: string, @Body() body: { version?: unknown }): { ok: true } {
     this.admin.rollbackTool(id, requireString(body.version, 'version'));
     return { ok: true };
   }

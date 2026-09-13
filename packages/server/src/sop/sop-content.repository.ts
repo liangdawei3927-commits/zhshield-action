@@ -23,7 +23,7 @@ export interface ToolPackEntry {
  * 懒连接 + 迁移（与 TenancyService 同构）；DB 不可用/空 → 调用方降级文件系统。
  *
  * 纪律：
- * - 只读仓库，不暴露任何写方法；C4 写路径在 SopContentAdminRepository（子类）中
+ * - 只读仓库，不暴露任何写方法；C4 写路径在 SopRuleAdminRepository / SopToolAdminRepository（子类）中
  * - 懒连接：首次访问才建连并跑迁移，不阻塞 Nest 启动
  * - DB 不可用返回 null（调用方降级），绝不 throw 污染服务启动
  * - content_sha 与 files sha256 均为 H1 校验口径（computeRuleContentSha / hashToolRuleFiles），
@@ -83,7 +83,9 @@ export class SopContentRepository implements OnModuleDestroy {
       const rules = rows.map((row) => this.rowToRule(row));
       const drift = rows.filter((row, i) => row.content_sha !== computeRuleContentSha(rules[i]));
       if (drift.length > 0) {
-        this.logger.warn(`content_sha 漂移 ${drift.length} 条（rule_id: ${drift.map((d) => d.rule_id).join(',')}）`);
+        this.logger.warn(
+          `content_sha 漂移 ${drift.length} 条（rule_id: ${drift.map((d) => d.rule_id).join(',')}）`,
+        );
       }
       this.logger.log(`Loaded ${rules.length} SOP rules from content repository`);
       return rules;
@@ -121,7 +123,9 @@ export class SopContentRepository implements OnModuleDestroy {
       const entries = rows.map((row) => this.rowToToolPack(row));
       const drift = entries.filter((e) => e.sha256 !== hashToolRuleFiles(e.files));
       if (drift.length > 0) {
-        this.logger.warn(`tool_package sha256 漂移 ${drift.length} 条（tool_id: ${drift.map((d) => d.toolId).join(',')}）`);
+        this.logger.warn(
+          `tool_package sha256 漂移 ${drift.length} 条（tool_id: ${drift.map((d) => d.toolId).join(',')}）`,
+        );
       }
       this.logger.log(`Loaded ${entries.length} tool packs from content repository`);
       return entries;

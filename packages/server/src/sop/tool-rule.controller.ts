@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  HttpCode,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Controller, Get, Param, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { ToolRuleFile } from '@zh/kernel';
 import { SERVER_TOOL_IDS } from '@zh/shared';

@@ -106,7 +106,9 @@ export class AdminRulesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createRule(@Body() body: Record<string, unknown>): Promise<{ ruleId: string; created: true }> {
+  async createRule(
+    @Body() body: Record<string, unknown>,
+  ): Promise<{ ruleId: string; created: true }> {
     const { ruleId } = await this.admin.saveRule(parseRuleBody(body));
     return { ruleId, created: true };
   }
@@ -143,20 +145,14 @@ export class AdminRulesController {
 
   @Post(':id/rollback')
   @HttpCode(HttpStatus.OK)
-  rollbackRule(
-    @Param('id') id: string,
-    @Body() body: { version?: unknown },
-  ): { ok: true } {
+  rollbackRule(@Param('id') id: string, @Body() body: { version?: unknown }): { ok: true } {
     this.admin.rollbackRule(id, requireString(body.version, 'version'));
     return { ok: true };
   }
 
   @Post(':id/status')
   @HttpCode(HttpStatus.OK)
-  setStatus(
-    @Param('id') id: string,
-    @Body() body: { status?: unknown },
-  ): { ok: true } {
+  setStatus(@Param('id') id: string, @Body() body: { status?: unknown }): { ok: true } {
     this.admin.setRuleStatus(id, requireString(body.status, 'status'));
     return { ok: true };
   }

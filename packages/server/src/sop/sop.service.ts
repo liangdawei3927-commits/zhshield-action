@@ -86,9 +86,7 @@ export class SopService {
       return;
     }
     const source = rules === null ? 'unavailable' : 'empty';
-    this.logger.warn(
-      `Content repository ${source}, falling back to built-in filesystem rules`,
-    );
+    this.logger.warn(`Content repository ${source}, falling back to built-in filesystem rules`);
 
     try {
       const loaded = await this.loader.loadFromFileSystem();

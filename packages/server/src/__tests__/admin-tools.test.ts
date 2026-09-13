@@ -8,7 +8,8 @@ import { DbConnection } from '@zh/db';
 import { hashToolRuleFiles } from '@zh/kernel';
 import type { ToolRuleFile } from '@zh/kernel';
 import { resolveMigrationsDir } from '../tenancy/tenancy.service';
-import { SopContentAdminRepository } from '../sop/sop-content-admin.repository';
+import { SopRuleAdminRepository } from '../sop/sop-content-admin.repository';
+import { SopToolAdminRepository } from '../sop/sop-tool-admin.repository';
 import { SopService } from '../sop/sop.service';
 import { ToolRuleStore } from '../sop/tool-rule-store';
 import { ToolRuleLoader } from '../sop/tool-rule-loader';
@@ -19,12 +20,20 @@ const FILES_V2: ToolRuleFile[] = [{ filename: 'rules/v2.yml', content: 'v2-conte
 
 // packages/server/src/__tests__ → 仓库根
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
-const FIXTURE_PACKS_DIR = join(REPO_ROOT, 'packages', 'kernel', 'test-fixtures', 'sop-content', 'tool-packs');
+const FIXTURE_PACKS_DIR = join(
+  REPO_ROOT,
+  'packages',
+  'kernel',
+  'test-fixtures',
+  'sop-content',
+  'tool-packs',
+);
 
 describe('AdminService 工具包管理（C4 写路径 + 读路径刷新）', () => {
   let dir: string;
   let dbPath: string;
-  let adminRepo: SopContentAdminRepository;
+  let ruleRepo: SopRuleAdminRepository;
+  let toolRepo: SopToolAdminRepository;
   let toolStore: ToolRuleStore;
   let admin: AdminService;
   let db: ReturnType<DbConnection['getDb']>;
@@ -37,10 +46,11 @@ describe('AdminService 工具包管理（C4 写路径 + 读路径刷新）', () 
     dbPath = join(dir, 'test.db');
     process.env.ZH_SERVER_DB = dbPath;
 
-    adminRepo = new SopContentAdminRepository();
-    const sopService = new SopService(adminRepo);
-    toolStore = new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), adminRepo);
-    admin = new AdminService(adminRepo, sopService, toolStore);
+    ruleRepo = new SopRuleAdminRepository();
+    toolRepo = new SopToolAdminRepository();
+    const sopService = new SopService(ruleRepo);
+    toolStore = new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), toolRepo);
+    admin = new AdminService(ruleRepo, toolRepo, sopService, toolStore);
 
     const conn = new DbConnection({ dbPath, walMode: true });
     conn.connect();
@@ -50,7 +60,8 @@ describe('AdminService 工具包管理（C4 写路径 + 读路径刷新）', () 
 
   afterEach(() => {
     delete process.env.ZH_SERVER_DB;
-    adminRepo.onModuleDestroy();
+    ruleRepo.onModuleDestroy();
+    toolRepo.onModuleDestroy();
     rmSync(dir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -129,7 +140,9 @@ describe('AdminService 工具包管理（C4 写路径 + 读路径刷新）', () 
     expect(row.status).toBe('active');
 
     const audit = db
-      .prepare("SELECT * FROM content_audit_log WHERE entity_id = 'semgrep' AND action = 'rollback'")
+      .prepare(
+        "SELECT * FROM content_audit_log WHERE entity_id = 'semgrep' AND action = 'rollback'",
+      )
       .get();
     expect(audit).toBeDefined();
   });

@@ -10,6 +10,7 @@ vi.mock('@nestjs/core', () => ({
       setGlobalPrefix: vi.fn(),
       useGlobalPipes: vi.fn(),
       enableCors: vi.fn(),
+      use: vi.fn(),
       listen: vi.fn(async () => {}),
     })),
   },

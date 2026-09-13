@@ -19,7 +19,14 @@ const FIXTURE_FILES: ToolRuleFile[] = [
 
 // packages/server/src/__tests__ → 仓库根
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
-const FIXTURE_PACKS_DIR = join(REPO_ROOT, 'packages', 'kernel', 'test-fixtures', 'sop-content', 'tool-packs');
+const FIXTURE_PACKS_DIR = join(
+  REPO_ROOT,
+  'packages',
+  'kernel',
+  'test-fixtures',
+  'sop-content',
+  'tool-packs',
+);
 
 function makeRule(id: string, status: SopRule['status'] = 'active'): SopRule {
   return {
@@ -125,7 +132,9 @@ describe('SopContentRepository（C3 服务端读库 + 故障降级）', () => {
 
   it('controller 优先从 DB 提供工具包（命中库内 fixture 而非真实 tool-packs）', () => {
     const repo = new SopContentRepository();
-    const ctrl = new ToolRuleController(new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), repo));
+    const ctrl = new ToolRuleController(
+      new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), repo),
+    );
     const files = ctrl.getRules('semgrep');
     expect(files).toEqual(FIXTURE_FILES);
     expect(ctrl.getVersion('semgrep').hash).toBe(hashToolRuleFiles(files));
@@ -140,7 +149,9 @@ describe('SopContentRepository（C3 服务端读库 + 故障降级）', () => {
     expect(repo.getAllRules()).toBeNull();
     expect(repo.listActiveToolPacks()).toBeNull();
 
-    const ctrl = new ToolRuleController(new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), repo));
+    const ctrl = new ToolRuleController(
+      new ToolRuleStore(new ToolRuleLoader(FIXTURE_PACKS_DIR), repo),
+    );
     const files = ctrl.getRules('semgrep');
     expect(files.length).toBeGreaterThan(0);
   });

@@ -113,7 +113,7 @@ export class TrivyAdapter implements ToolAdapter {
     if (!args) return null;
     const { stdout } = await execFileAsync('trivy', args, {
       cwd: options.projectPath,
-      timeout: options.timeout || 120000,
+      timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,
     });
     const output = JSON.parse(stdout);
@@ -141,7 +141,12 @@ export class TrivyAdapter implements ToolAdapter {
         tool: 'trivy',
         status: 'error',
         issues: [],
-        metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
         error:
           'Trivy 漏洞库不可用：无法下载/更新 DB（离线或网络受限）。' +
           '请先联网执行一次 `trivy image --download-db-only` 预置缓存；' +

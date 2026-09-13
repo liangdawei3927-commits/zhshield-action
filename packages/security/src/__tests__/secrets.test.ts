@@ -215,6 +215,49 @@ describe('SecretLifecycleManager', () => {
     expect(report.lastScannedCommit).toBe('');
   });
 
+  it('扫描过滤既定误报路径（dist 构建产物与测试夹具，与 GitleaksAdapter 约定一致）', async () => {
+    const runnerWithNoise: CommandRunner = {
+      run: vi.fn(async (command: string, args: string[], _opts?: { cwd?: string }) => {
+        if (command === 'gitleaks') {
+          const findings = JSON.stringify([
+            {
+              RuleID: 'generic-api-key',
+              File: 'packages/cli/dist/zhshield.js',
+              StartLine: 428282,
+              Secret: 'eslint_' + 'visitor_keys_1.getKeys',
+            },
+            {
+              RuleID: 'generic-api-key',
+              File: 'packages/kernel/src/__tests__/rule-engine.parallel.test.ts',
+              StartLine: 85,
+              Secret: 'sk-' + 'abcd1234efgh5678ijkl',
+            },
+            {
+              RuleID: 'generic-api-key',
+              File: 'packages/cli/dist/zhshield.js.map',
+              StartLine: 4,
+              Secret: 'Diag_' + 'nostics.The_0_operator',
+            },
+            {
+              RuleID: 'github-pat',
+              File: 'src/a.ts',
+              StartLine: 3,
+              Secret: 'ghp_' + 'still-active-pat-not-real',
+            },
+          ]);
+          return { stdout: findings };
+        }
+        if (command === 'git' && args[0] === 'remote') return { stdout: '' };
+        return { stdout: '' };
+      }),
+    };
+    const m = new SecretLifecycleManager(runnerWithNoise, new InMemorySecretStore());
+    const report = await m.scan('/proj', { history: false });
+    expect(report.findings).toHaveLength(1);
+    expect(report.findings[0].location.file).toBe('src/a.ts');
+    expect(report.findings[0].type).toBe('github-token');
+  });
+
   it('历史扫描：增量断点 = HEAD；history 引入时间与 commit 补齐', async () => {
     const report = await manager.scan('/proj', { history: true });
     expect(report.lastScannedCommit).toBe('HEADHASH');

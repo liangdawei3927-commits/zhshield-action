@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe, type INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ADMIN_UI_PATHS } from './admin/admin-pages-paths';
 
@@ -59,6 +60,19 @@ function configureApp(app: INestApplication): void {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   app.enableCors({ origin: resolveAllowedOrigins(), credentials: true });
+
+  // 安全响应头（P13）：CSP/点击劫持/MIME 嗅探/来源策略等。管理页为内联脚本与样式
+  // （无外部静态资源），显式放行 inline script/style，其余指令保持 helmet 默认值。
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+        },
+      },
+    }),
+  );
 
   setupSwagger(app);
 }

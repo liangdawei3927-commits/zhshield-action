@@ -83,7 +83,9 @@ export class ToolRuleStore {
       >;
     }
     if (Object.values(packs).every((files) => files.length === 0)) {
-      this.logger.warn('Tool packs filesystem fallback is empty（tool-packs 缺失或为空），降级为空包');
+      this.logger.warn(
+        'Tool packs filesystem fallback is empty（tool-packs 缺失或为空），降级为空包',
+      );
     }
     this.packs = packs;
     this.versions = Object.fromEntries(

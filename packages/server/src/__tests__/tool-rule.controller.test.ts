@@ -12,7 +12,14 @@ const RULE_FILE_EXT_RE = /\.(yaml|yml|json|toml)$/;
 
 // packages/server/src/__tests__ → 仓库根
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
-const REAL_PACKS_DIR = join(REPO_ROOT, 'packages', 'kernel', 'test-fixtures', 'sop-content', 'tool-packs');
+const REAL_PACKS_DIR = join(
+  REPO_ROOT,
+  'packages',
+  'kernel',
+  'test-fixtures',
+  'sop-content',
+  'tool-packs',
+);
 
 function makeController(packsDir: string = REAL_PACKS_DIR): ToolRuleController {
   return new ToolRuleController(new ToolRuleStore(new ToolRuleLoader(packsDir)));

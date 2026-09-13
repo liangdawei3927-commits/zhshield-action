@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import type { RuleContentRow, ToolPackageRow } from '@zh/db';
 import type { SopRule } from '@zh/kernel';
-import { AdminError, SopContentAdminRepository } from '../sop/sop-content-admin.repository';
+import { AdminError } from '../sop/sop-content-admin.shared';
+import { SopRuleAdminRepository } from '../sop/sop-content-admin.repository';
+import { SopToolAdminRepository } from '../sop/sop-tool-admin.repository';
 import { SopService } from '../sop/sop.service';
 import { ToolRuleStore } from '../sop/tool-rule-store';
 
@@ -32,7 +34,8 @@ function translateAdminError(err: AdminError): never {
 @Injectable()
 export class AdminService {
   constructor(
-    private readonly adminRepo: SopContentAdminRepository,
+    private readonly ruleRepo: SopRuleAdminRepository,
+    private readonly toolRepo: SopToolAdminRepository,
     private readonly sopService: SopService,
     private readonly toolRuleStore: ToolRuleStore,
   ) {}
@@ -41,7 +44,7 @@ export class AdminService {
 
   async saveRule(rule: SopRule): Promise<{ ruleId: string; created: boolean }> {
     try {
-      const result = this.adminRepo.saveRule(rule);
+      const result = this.ruleRepo.saveRule(rule);
       await this.sopService.reloadFromRepository();
       return result;
     } catch (err) {
@@ -52,7 +55,7 @@ export class AdminService {
 
   async publishRule(ruleId: string): Promise<void> {
     try {
-      this.adminRepo.publishRule(ruleId);
+      this.ruleRepo.publishRule(ruleId);
       await this.sopService.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -62,7 +65,7 @@ export class AdminService {
 
   async rollbackRule(ruleId: string, version: string): Promise<void> {
     try {
-      this.adminRepo.rollbackRule(ruleId, version);
+      this.ruleRepo.rollbackRule(ruleId, version);
       await this.sopService.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -72,7 +75,7 @@ export class AdminService {
 
   async setRuleStatus(ruleId: string, status: string): Promise<void> {
     try {
-      this.adminRepo.setRuleStatus(ruleId, status);
+      this.ruleRepo.setRuleStatus(ruleId, status);
       await this.sopService.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -82,7 +85,7 @@ export class AdminService {
 
   async deleteRule(ruleId: string): Promise<void> {
     try {
-      this.adminRepo.deleteRule(ruleId);
+      this.ruleRepo.deleteRule(ruleId);
       await this.sopService.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -91,12 +94,12 @@ export class AdminService {
   }
 
   listRules(): RuleContentRow[] {
-    return this.adminRepo.listRules();
+    return this.ruleRepo.listRules();
   }
 
   getRule(ruleId: string): RuleContentRow {
     try {
-      return this.adminRepo.getRule(ruleId);
+      return this.ruleRepo.getRule(ruleId);
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
       throw err;
@@ -104,7 +107,7 @@ export class AdminService {
   }
 
   listRuleVersions(ruleId: string): Array<{ version: string; releasedAt: string }> {
-    return this.adminRepo.listRuleVersions(ruleId);
+    return this.ruleRepo.listRuleVersions(ruleId);
   }
 
   // ─── 工具包 ────────────────────────────────────────────────
@@ -118,7 +121,7 @@ export class AdminService {
     status?: string;
   }): Promise<{ toolId: string; created: boolean }> {
     try {
-      const result = this.adminRepo.saveToolPackage(input);
+      const result = this.toolRepo.saveToolPackage(input);
       this.toolRuleStore.reloadFromRepository();
       return result;
     } catch (err) {
@@ -129,7 +132,7 @@ export class AdminService {
 
   async publishTool(toolId: string): Promise<void> {
     try {
-      this.adminRepo.publishTool(toolId);
+      this.toolRepo.publishTool(toolId);
       this.toolRuleStore.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -139,7 +142,7 @@ export class AdminService {
 
   async rollbackTool(toolId: string, version: string): Promise<void> {
     try {
-      this.adminRepo.rollbackTool(toolId, version);
+      this.toolRepo.rollbackTool(toolId, version);
       this.toolRuleStore.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -149,7 +152,7 @@ export class AdminService {
 
   async deleteTool(toolId: string): Promise<void> {
     try {
-      this.adminRepo.deleteTool(toolId);
+      this.toolRepo.deleteTool(toolId);
       this.toolRuleStore.reloadFromRepository();
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
@@ -158,16 +161,16 @@ export class AdminService {
   }
 
   listTools(): ToolPackageRow[] {
-    return this.adminRepo.listTools();
+    return this.toolRepo.listTools();
   }
 
   listToolVersions(toolId: string): Array<{ version: string; releasedAt: string }> {
-    return this.adminRepo.listToolVersions(toolId);
+    return this.toolRepo.listToolVersions(toolId);
   }
 
   getTool(toolId: string): ToolPackageRow {
     try {
-      return this.adminRepo.getTool(toolId);
+      return this.toolRepo.getTool(toolId);
     } catch (err) {
       if (err instanceof AdminError) translateAdminError(err);
       throw err;

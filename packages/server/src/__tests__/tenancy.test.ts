@@ -3,7 +3,13 @@ import { Logger } from '@nestjs/common';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DbConnection, getProject, getProjectFeatures, saveRuleContent, saveToolPackage } from '@zh/db';
+import {
+  DbConnection,
+  getProject,
+  getProjectFeatures,
+  saveRuleContent,
+  saveToolPackage,
+} from '@zh/db';
 import { OrgsController, ResolveController } from '../tenancy/tenancy.controller';
 import { resolveMigrationsDir, TenancyService } from '../tenancy/tenancy.service';
 import { SERVER_TOOL_IDS } from '../sop/tool-rule.controller';
@@ -121,9 +127,9 @@ describe('Tenancy (M3 Stage B)', () => {
   it('T0 画像注销：非成员被拒', () => {
     const { orgId } = orgs.createOrg({ name: 'acme', ownerId: 'u1' });
     orgs.putProjectFeatures(orgId, 'p1', { userId: 'u1', language: 'typescript' });
-    expect(() =>
-      orgs.deleteProjectFeatures(orgId, 'p1', { userId: 'intruder' }),
-    ).toThrow(/not a member/);
+    expect(() => orgs.deleteProjectFeatures(orgId, 'p1', { userId: 'intruder' })).toThrow(
+      /not a member/,
+    );
   });
 
   it('T0 画像注销：注销后 resolve 不再含该项目画像（features 为空）', () => {
@@ -215,12 +221,12 @@ describe('Tenancy (M3 Stage B)', () => {
     const tsFeature = { language: 'typescript' };
     const pyFeature = { language: 'python' };
 
-    const tsTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: tsFeature }).tools.map(
-      (t) => t.toolId,
-    );
-    const pyTools = resolveCtrl.resolveTools({ orgId: 'org-x', projectFeature: pyFeature }).tools.map(
-      (t) => t.toolId,
-    );
+    const tsTools = resolveCtrl
+      .resolveTools({ orgId: 'org-x', projectFeature: tsFeature })
+      .tools.map((t) => t.toolId);
+    const pyTools = resolveCtrl
+      .resolveTools({ orgId: 'org-x', projectFeature: pyFeature })
+      .tools.map((t) => t.toolId);
     const noFeature = resolveCtrl.resolveTools({ orgId: 'org-x' }).tools.map((t) => t.toolId);
 
     // security 域恒含

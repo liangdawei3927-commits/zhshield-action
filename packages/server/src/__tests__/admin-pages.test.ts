@@ -45,6 +45,7 @@ describe('C5 零依赖 SSR 管理后台页面（E2E）', () => {
   let admin: AdminService;
   let db: ReturnType<DbConnection['getDb']>;
   let cookie = '';
+  let csrf = '';
   let localToken = '';
 
   beforeAll(async () => {
@@ -86,13 +87,16 @@ describe('C5 零依赖 SSR 管理后台页面（E2E）', () => {
   }
 
   function postForm(path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new URLSearchParams(fields);
+    // 双提交 Cookie CSRF：原生表单回显 zh_csrf 令牌为 _csrf 字段（服务端逐字段校验）
+    if (csrf && !body.has('_csrf')) body.set('_csrf', csrf);
     return fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
         ...(cookie ? { cookie } : {}),
       },
-      body: new URLSearchParams(fields),
+      body,
       redirect: 'manual',
     });
   }
@@ -123,9 +127,17 @@ describe('C5 零依赖 SSR 管理后台页面（E2E）', () => {
     const sc = ok.headers.get('set-cookie') ?? '';
     expect(sc).toContain('zh_admin_token=');
     expect(sc).toContain('HttpOnly');
-    const m = /^([^=]+=[^;]+)/.exec(sc);
-    cookie = m ? m[1] : '';
+    const pairs: Record<string, string> = {};
+    for (const m of sc.matchAll(/([a-zA-Z0-9_]+)=([^;,\s]*)/g)) {
+      if (m[1] === 'zh_admin_token' || m[1] === 'zh_csrf') pairs[m[1]] = m[2];
+    }
+    // 双提交 CSRF：浏览器自动携带 zh_csrf Cookie（默认行为），表单以 _csrf 回显同一令牌
+    cookie = [`zh_admin_token=${pairs['zh_admin_token']}`, `zh_csrf=${pairs['zh_csrf']}`].join(
+      '; ',
+    );
+    csrf = pairs['zh_csrf'] ?? '';
     expect(cookie).toContain('zh_admin_token=');
+    expect(csrf).not.toBe('');
   });
 
   it('规则列表与编辑页回显字段全部转义（XSS）', async () => {
@@ -234,6 +246,15 @@ describe('C5 零依赖 SSR 管理后台页面（E2E）', () => {
     expect(html).toContain(expectedVersion);
     expect(html).toContain(`/admin-ui/tools/${encodeURIComponent(tool.toolId)}/rollback`);
     expect(html).toContain('回滚');
+  });
+
+  it('携带会话但未回显 CSRF 令牌的状态变更请求被拒绝（403）', async () => {
+    const res = await fetch(`${baseUrl}/admin-ui/rules/security.scan.official.c5-xss/publish`, {
+      method: 'POST',
+      headers: cookie ? { cookie } : {},
+      redirect: 'manual',
+    });
+    expect(res.status).toBe(403);
   });
 
   it('C4 JSON API 仍可达（Bearer 鉴权）', async () => {

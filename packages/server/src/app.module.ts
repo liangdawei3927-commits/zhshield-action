@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthController } from './health.controller';
+import { csrfProtection } from './security/csrf-protection.middleware';
 import { SopModule } from './sop/sop.module';
 import { SentinelModule } from './sentinel/sentinel.module';
 import { GuardModule } from './guard/guard.module';
@@ -36,4 +37,9 @@ import { LocalOnlyGuard } from './auth/local-only.guard';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // 双提交 Cookie CSRF 防护：全路由挂载，中间件内部按会话/凭据放行规则缩小生效面
+    consumer.apply(csrfProtection).forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

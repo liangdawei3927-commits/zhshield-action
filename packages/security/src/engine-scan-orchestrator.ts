@@ -97,7 +97,7 @@ export class ScanOrchestrator {
       const scanResult = await adapter.scan({
         projectPath,
         projectId,
-        timeout: 120000,
+        timeout: 300000,
       });
       result.all.push(...scanResult.issues);
       this.collectIssuesByTool({

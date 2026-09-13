@@ -18,6 +18,7 @@ interface ResLike {
   status(code: number): ResLike;
   send(body: string): void;
   setHeader(name: string, value: string): void;
+  append(name: string, value: string): void;
 }
 
 /**
@@ -49,7 +50,8 @@ export class AdminPagesController {
       res.status(401).send(loginPageHtml('无效的管理令牌'));
       return;
     }
-    res.setHeader(
+    // append 而非 setHeader：保留响应链上已设置的 Cookie（如 CSRF 中间件签发的 zh_csrf）
+    res.append(
       'Set-Cookie',
       `${TOKEN_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict`,
     );
@@ -103,7 +105,14 @@ export class AdminPagesController {
       const parsed = JSON.parse(rule.content) as Record<string, unknown>;
       res
         .status(400)
-        .send(ruleEditPage(rule, versions, stringifyYaml(parsed), err instanceof Error ? err.message : '保存失败'));
+        .send(
+          ruleEditPage(
+            rule,
+            versions,
+            stringifyYaml(parsed),
+            err instanceof Error ? err.message : '保存失败',
+          ),
+        );
     }
   }
 

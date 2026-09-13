@@ -25,16 +25,25 @@ const MAX_DEPTH = 12;
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue']);
 const PACKAGE_JSON = 'package.json';
 const HELMET_PKG = 'helmet';
-const WEB_FRAMEWORK_MARKERS = ['express', '@nestjs/core', '@nestjs/common', 'fastify', 'koa', 'hapi'];
+const WEB_FRAMEWORK_MARKERS = [
+  'express',
+  '@nestjs/core',
+  '@nestjs/common',
+  'fastify',
+  'koa',
+  'hapi',
+];
 const CSRF_LIBS = ['csurf', '@fastify/csrf-protection', 'tiny-csrf', '@nestjs/throttler'];
 const OUTBOUND_RE =
   /(?:fetch|axios(?:\.\w+)?|curl|https?\.(?:get|post|put|delete|request)|XMLHttpRequest|WebSocket)\s*\(?[^)\n]*(?:process\.env|import\.meta\.env)/i;
 const CSRF_TOKEN_USAGE_RE =
   /csrf\s*\(\s*\{|csrfToken\s*\(|X-CSRF(?:-Token)?[:=]|csrfProtection|app\.use\s*\(\s*(?:csurf|csrf)\b/i;
 const SAME_SITE_RE = /(?:sameSite\s*[:=]\s*(['"])(lax|strict|none)\1|SameSite=(Lax|Strict|None))/i;
-const ORIGIN_CHECK_RE = /\.headers\.origin|\[['"]origin['"]\]|checkOrigin|allowedOrigin|verifyOrigin/i;
+const ORIGIN_CHECK_RE =
+  /\.headers\.origin|\[['"]origin['"]\]|checkOrigin|allowedOrigin|verifyOrigin/i;
 /** 非注册表来源的依赖版本声明（本地文件 / workspace 协议 / git 远程）——依赖混淆的本地遮蔽面 */
-const NON_REGISTRY_VERSION_RE = /^(?:file:|workspace:|link:|git\+|github:|\.\.?\/)|^git\+(?:ssh|https):/;
+const NON_REGISTRY_VERSION_RE =
+  /^(?:file:|workspace:|link:|git\+|github:|\.\.?\/)|^git\+(?:ssh|https):/;
 /** 引擎自身实现文件名（无扩展名）：源码证据扫描需排除，避免 regex 定义行自匹配伪证据 */
 const SELF_BASENAME = 'security-check-engine';
 
@@ -86,12 +95,20 @@ export interface SecurityCheckResult {
  */
 export class SecurityCheckEngine {
   async run(opts: unknown): Promise<{ results: SecurityCheckResult[] }> {
-    const o = (opts ?? {}) as { mode?: string; target?: string; checks?: string[]; dryRun?: boolean };
+    const o = (opts ?? {}) as {
+      mode?: string;
+      target?: string;
+      checks?: string[];
+      dryRun?: boolean;
+    };
     const target = o.target ?? '';
     const checks = Array.isArray(o.checks) ? o.checks : [];
     if (!target) {
       return {
-        results: checks.map((c) => ({ status: 'error', message: `安全检查失败: 未指定 target（检查: ${c}）` })),
+        results: checks.map((c) => ({
+          status: 'error',
+          message: `安全检查失败: 未指定 target（检查: ${c}）`,
+        })),
       };
     }
     const items = await new InjectionGuard().scan(target);
@@ -130,7 +147,11 @@ export class SecurityCheckEngine {
       case 'zero-width-link-target':
         return this.verdict(
           check,
-          items.filter((i) => i.pattern === (check === 'hidden-anchor-style' ? 'hidden-anchor' : 'zero-width-target')),
+          items.filter(
+            (i) =>
+              i.pattern ===
+              (check === 'hidden-anchor-style' ? 'hidden-anchor' : 'zero-width-target'),
+          ),
           (i) => `${i.file}:${i.line} ${i.evidence}`,
         );
       case 'helmet-configured':
@@ -195,11 +216,7 @@ export class SecurityCheckEngine {
     return { status: 'error', message: `${check}: 未知检查项，安全引擎未实现该检测` };
   }
 
-  private verdict<T>(
-    check: string,
-    hits: T[],
-    describe: (item: T) => string,
-  ): SecurityCheckResult {
+  private verdict<T>(check: string, hits: T[], describe: (item: T) => string): SecurityCheckResult {
     if (hits.length === 0) {
       return { status: 'passed', message: `${check}: 未发现风险` };
     }
@@ -209,10 +226,16 @@ export class SecurityCheckEngine {
 
   private helmetVerdict(check: string, deps: DepsScan): SecurityCheckResult {
     if (!deps.hasWebFramework) {
-      return { status: 'passed', message: `${check}: 项目未使用 Express/NestJS 等 Web 框架，Helmet 检查不适用` };
+      return {
+        status: 'passed',
+        message: `${check}: 项目未使用 Express/NestJS 等 Web 框架，Helmet 检查不适用`,
+      };
     }
     if (deps.hasHelmet) {
-      return { status: 'passed', message: `${check}: 已启用 Helmet（${deps.evidence[0] ?? 'helmet 依赖已安装'}）` };
+      return {
+        status: 'passed',
+        message: `${check}: 已启用 Helmet（${deps.evidence[0] ?? 'helmet 依赖已安装'}）`,
+      };
     }
     return {
       status: 'failed',
@@ -225,10 +248,16 @@ export class SecurityCheckEngine {
       return { status: 'passed', message: `${check}: 项目未使用 Web 框架，CSRF 防护检查不适用` };
     }
     const bucket =
-      check === 'csrf-token-present' ? source.csrfToken :
-      check === 'same-site-cookie' ? source.sameSite : source.originCheck;
+      check === 'csrf-token-present'
+        ? source.csrfToken
+        : check === 'same-site-cookie'
+          ? source.sameSite
+          : source.originCheck;
     if (bucket.length > 0) {
-      const samples = bucket.slice(0, 3).map((h) => `${h.file}:${h.line}`).join(', ');
+      const samples = bucket
+        .slice(0, 3)
+        .map((h) => `${h.file}:${h.line}`)
+        .join(', ');
       return { status: 'passed', message: `${check}: 检测到防护证据（${samples}）` };
     }
     return { status: 'failed', message: `${check}: 未检测到 ${check} 的防护实现` };
@@ -264,7 +293,9 @@ export class SecurityCheckEngine {
           if (CSRF_LIBS.includes(name)) {
             scan.hasCsrfLib = true;
           }
-          if (WEB_FRAMEWORK_MARKERS.some((m) => name === m || name.startsWith(m.replace('*', '')))) {
+          if (
+            WEB_FRAMEWORK_MARKERS.some((m) => name === m || name.startsWith(m.replace('*', '')))
+          ) {
             scan.hasWebFramework = true;
           }
           if (
@@ -282,7 +313,12 @@ export class SecurityCheckEngine {
   }
 
   private scanSourceEvidence(target: string): SourceEvidence {
-    const evidence: SourceEvidence = { csrfToken: [], sameSite: [], originCheck: [], outboundValue: [] };
+    const evidence: SourceEvidence = {
+      csrfToken: [],
+      sameSite: [],
+      originCheck: [],
+      outboundValue: [],
+    };
     const files: string[] = [];
     this.walk(target, 0, files, SOURCE_EXTS);
     for (const file of files) {

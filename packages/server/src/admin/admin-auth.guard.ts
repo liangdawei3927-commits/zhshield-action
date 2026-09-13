@@ -23,7 +23,9 @@ export class AdminAuthGuard implements CanActivate {
     const expected = process.env.ZH_ADMIN_TOKEN;
     if (!expected) {
       this.logger.warn('ZH_ADMIN_TOKEN 未配置，管理接口不可用');
-      throw new ServiceUnavailableException('管理令牌未配置，管理接口不可用（请设置 ZH_ADMIN_TOKEN）');
+      throw new ServiceUnavailableException(
+        '管理令牌未配置，管理接口不可用（请设置 ZH_ADMIN_TOKEN）',
+      );
     }
 
     const request = context.switchToHttp().getRequest();

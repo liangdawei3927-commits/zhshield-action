@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Logger } from '@nestjs/common';
-import { BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,7 +12,8 @@ import { DbConnection } from '@zh/db';
 import { computeRuleContentSha } from '@zh/kernel';
 import type { SopRule } from '@zh/kernel';
 import { resolveMigrationsDir } from '../tenancy/tenancy.service';
-import { SopContentAdminRepository } from '../sop/sop-content-admin.repository';
+import { SopRuleAdminRepository } from '../sop/sop-content-admin.repository';
+import { SopToolAdminRepository } from '../sop/sop-tool-admin.repository';
 import { SopService } from '../sop/sop.service';
 import { ToolRuleStore } from '../sop/tool-rule-store';
 import { ToolRuleLoader } from '../sop/tool-rule-loader';
@@ -38,7 +43,8 @@ function makeRule(id: string, status: SopRule['status'] = 'draft'): SopRule {
 describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => {
   let dir: string;
   let dbPath: string;
-  let adminRepo: SopContentAdminRepository;
+  let ruleRepo: SopRuleAdminRepository;
+  let toolRepo: SopToolAdminRepository;
   let sopService: SopService;
   let admin: AdminService;
   let db: ReturnType<DbConnection['getDb']>;
@@ -51,10 +57,11 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
     dbPath = join(dir, 'test.db');
     process.env.ZH_SERVER_DB = dbPath;
 
-    adminRepo = new SopContentAdminRepository();
-    sopService = new SopService(adminRepo);
-    const toolStore = new ToolRuleStore(new ToolRuleLoader(), adminRepo);
-    admin = new AdminService(adminRepo, sopService, toolStore);
+    ruleRepo = new SopRuleAdminRepository();
+    toolRepo = new SopToolAdminRepository();
+    sopService = new SopService(ruleRepo);
+    const toolStore = new ToolRuleStore(new ToolRuleLoader(), ruleRepo);
+    admin = new AdminService(ruleRepo, toolRepo, sopService, toolStore);
 
     const conn = new DbConnection({ dbPath, walMode: true });
     conn.connect();
@@ -64,7 +71,8 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
 
   afterEach(() => {
     delete process.env.ZH_SERVER_DB;
-    adminRepo.onModuleDestroy();
+    ruleRepo.onModuleDestroy();
+    toolRepo.onModuleDestroy();
     rmSync(dir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -181,7 +189,12 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
 
     const scope = db
       .prepare('SELECT org_id, version, enabled, content_sha FROM rule_scope WHERE rule_id = ?')
-      .get(rule.id) as { org_id: string | null; version: string; enabled: number; content_sha: string };
+      .get(rule.id) as {
+      org_id: string | null;
+      version: string;
+      enabled: number;
+      content_sha: string;
+    };
     expect(scope.org_id).toBeNull();
     expect(scope.version).toBe('1.0.0');
     expect(scope.enabled).toBe(1);
@@ -211,9 +224,9 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
       status: string;
     };
     expect(row.status).toBe('deprecated');
-    const scope = db
-      .prepare('SELECT enabled FROM rule_scope WHERE rule_id = ?')
-      .get(rule.id) as { enabled: number };
+    const scope = db.prepare('SELECT enabled FROM rule_scope WHERE rule_id = ?').get(rule.id) as {
+      enabled: number;
+    };
     expect(scope.enabled).toBe(0);
     const audit = db
       .prepare("SELECT * FROM content_audit_log WHERE entity_id = ? AND action = 'delete'")
@@ -243,13 +256,15 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
   it('DB 不可用 → 503 ServiceUnavailableException', async () => {
     writeFileSync(join(dir, 'blocked'), 'blocker');
     process.env.ZH_SERVER_DB = join(dir, 'blocked', 'no.db');
-    const brokenRepo = new SopContentAdminRepository();
-    const brokenService = new SopService(brokenRepo);
-    const brokenStore = new ToolRuleStore(new ToolRuleLoader(), brokenRepo);
-    const brokenAdmin = new AdminService(brokenRepo, brokenService, brokenStore);
+    const brokenRuleRepo = new SopRuleAdminRepository();
+    const brokenToolRepo = new SopToolAdminRepository();
+    const brokenService = new SopService(brokenRuleRepo);
+    const brokenStore = new ToolRuleStore(new ToolRuleLoader(), brokenRuleRepo);
+    const brokenAdmin = new AdminService(brokenRuleRepo, brokenToolRepo, brokenService, brokenStore);
     await expect(
       brokenAdmin.saveRule(makeRule('security.scan.official.admin-unavailable')),
     ).rejects.toThrow(ServiceUnavailableException);
-    brokenRepo.onModuleDestroy();
+    brokenRuleRepo.onModuleDestroy();
+    brokenToolRepo.onModuleDestroy();
   });
 });

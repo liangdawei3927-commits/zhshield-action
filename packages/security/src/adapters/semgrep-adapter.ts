@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -110,7 +111,7 @@ export class SemgrepAdapter implements ToolAdapter {
   private async runSemgrep(args: string[], options: ToolScanOptions): Promise<SemgrepOutput> {
     const { stdout } = await execFileAsync('semgrep', args, {
       cwd: options.projectPath,
-      timeout: options.timeout || 120000,
+      timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,
     });
     return JSON.parse(stdout);
@@ -174,6 +175,22 @@ export class SemgrepAdapter implements ToolAdapter {
     ];
     for (const dir of candidates) {
       if (fs.existsSync(dir)) return dir;
+    }
+    return this.resolveKernelRulesDir();
+  }
+
+  /** 项目未同步云脑规则时回退到 @zh/kernel 内置规则资产（dist/assets/semgrep） */
+  private resolveKernelRulesDir(): string | null {
+    for (const base of [process.cwd(), __dirname]) {
+      try {
+        const require = createRequire(path.join(base, 'package.json'));
+        const pkgJson = require.resolve('@zh/kernel/package.json', { paths: [base] });
+        const kernelRoot = path.dirname(pkgJson);
+        const dir = path.join(kernelRoot, 'dist', 'assets', 'semgrep');
+        if (fs.existsSync(dir)) return dir;
+      } catch {
+        // 该 base 下不可解析，继续
+      }
     }
     return null;
   }

@@ -21,6 +21,19 @@ const SCHEME_RE = /^[a-z]+:\/\//i;
 const USER_RE = /^[^@]+@/;
 const HOST_SPLIT_RE = /[:/]/;
 
+/**
+ * gitleaks findings 中与 Guard 其他适配器约定一致的排除路径
+ * （与 GitleaksAdapter.EXCLUDED_FILE_PATTERN 保持同一语义，
+ * 见 packages/inspect/src/adapters/gitleaks-adapter.ts）：
+ * - 构建产物 / 依赖不参与密钥扫描：CLI 自包含 bundle（packages/cli/dist/zhshield.js）
+ *   内嵌 eslint-visitor-keys 等第三方库，其变量名（eslintVisitorKeys / visitorKeys）
+ *   会被 generic-api-key 误报，提交后必然阻断门禁；
+ * - 测试目录中的固定密钥字符串是夹具而非真实泄露（与 security-check-engine 的
+ *   SKIP_DIRS：__tests__/fixtures/test，及规则模板排除测试文件的约定保持一致）。
+ */
+const EXCLUDED_FILE_PATTERN =
+  /(^|\/)(dist|build|coverage|node_modules|__tests__|__fixtures__|fixtures|test|tests)(\/|$)|\.map$|\.min\.js$|\.(test|spec)\.[jt]sx?$/;
+
 /** gitleaks RuleID → 归一化 SecretType（未知规则 → generic-api-key） */
 const RULE_TO_TYPE: Record<string, SecretType> = {
   'aws-access-token': 'aws-access-key',
@@ -357,7 +370,10 @@ export class SecretLifecycleManager {
       cwd: projectPath,
       timeout: 120000,
     });
-    return this.parseGitleaksOutput(stdout);
+    // 工作区与历史 findings 统一过滤既定误报路径（dist/构建产物内嵌第三方库变量名、测试夹具）
+    return this.parseGitleaksOutput(stdout).filter(
+      (f) => !EXCLUDED_FILE_PATTERN.test(f.File || ''),
+    );
   }
 
   private parseGitleaksOutput(stdout: string): GitleaksFinding[] {

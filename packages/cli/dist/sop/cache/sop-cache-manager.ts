@@ -19,7 +19,7 @@ import { createSyncPolicy } from './sop-sync-policy';
 import type { SyncPolicyOptions } from './sop-sync-policy';
 import { SopSqliteStore } from './sop-sqlite-store';
 import { SopVersionStore } from './sop-version-store';
-import { SopSyncClient } from './sop-sync-client';
+import { SopSyncClient, type ApiTokenProvider } from './sop-sync-client';
 import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
@@ -52,6 +52,8 @@ export interface SopCacheManagerOptions {
   secretKey?: string;
   /** 验签公钥：字符串或异步解析函数；未配置时验签放行（向后兼容），配置后解析失败则 fail-closed */
   publicKey?: string | (() => Promise<string | null>);
+  /** API 令牌（x-api-token 请求头）：固定字符串或懒加载函数；本地后端 LocalOnlyGuard 需校验 */
+  apiToken?: ApiTokenProvider;
   /** 云端/本地规则冲突自动解决策略，默认 REMOTE_WINS（与既有「云端覆盖本地」行为一致） */
   conflictStrategy?: ConflictResolution;
   /** 外部指标收集器（注入后可与外部仪表盘共享同一份数据） */
@@ -122,8 +124,13 @@ export class SopCacheManager {
     const signatureVerifier = new SopSignatureVerifier(options.publicKey);
     const syncClient =
       options.publicKey !== undefined
-        ? new VerifiedSopSyncClient(remoteBaseUrl, (pkg) => signatureVerifier.verifySignature(pkg))
-        : new SopSyncClient(remoteBaseUrl);
+        ? new VerifiedSopSyncClient(
+            remoteBaseUrl,
+            (pkg) => signatureVerifier.verifySignature(pkg),
+            undefined,
+            options.apiToken,
+          )
+        : new SopSyncClient(remoteBaseUrl, undefined, options.apiToken);
     this.scheduler = new SopSyncScheduler(this.syncPolicy);
     this.coordinator = new SopSyncCoordinator({
       registry,
@@ -162,13 +169,6 @@ export class SopCacheManager {
   }
 
   // ─── 云端同步（7.4 完整同步流程） ───────────────────────────
-
-  /**
-   * 检查云端版本 — GET /api/sop/version
-   */
-  async checkRemoteVersion(): Promise<SopVersion | null> {
-    return this.coordinator.checkRemoteVersion();
-  }
 
   /**
    * 完整同步流程（文档 7.4 节）
@@ -280,13 +280,6 @@ export class SopCacheManager {
   }
 
   /**
-   * 停止定时同步
-   */
-  stopPeriodicSync(): void {
-    this.scheduler.stopPeriodicSync();
-  }
-
-  /**
    * 启动时静默检查（7.5 节 触发方式 1）
    */
   async checkOnStartup(): Promise<SyncResult> {
@@ -324,6 +317,24 @@ export class SopCacheManager {
       const normalized = isProjectProfile(feature) ? projectProfileToFeature(feature) : feature;
       await this.lazyLoader.syncForProject(normalized);
     }
+  }
+
+  /**
+   * 物理删除指定模块的缓存文件（转发 lazyLoader；lazyLoader 未启用时 no-op）。
+   */
+  async removeModule(module: string): Promise<void> {
+    if (this.lazyLoader) {
+      await this.lazyLoader.removeModule(module);
+    }
+  }
+
+  /**
+   * 将项目特征/画像映射到需要加载的模块（转发 lazyLoader；未启用时返回空数组）。
+   */
+  getNeededModules(feature: ProjectFeature | ProjectProfile): string[] {
+    if (!this.lazyLoader) return [];
+    const normalized = isProjectProfile(feature) ? projectProfileToFeature(feature) : feature;
+    return this.lazyLoader.getNeededModules(normalized);
   }
 
   getLazyLoader(): SopLazyLoader | undefined {

@@ -13,8 +13,8 @@ apiVersion: sop/v1
 kind: InspectRule
 metadata:
   id: "inspect.scan.internal.type-consistency"
-  name: "TypeScript 类型一致性检查"
-  description: "检查函数参数和返回值类型的一致性，确保类型定义严格完整"
+  name: "TypeScript 类型安全扫描（Semgrep 模式）"
+  description: "通过 Semgrep 模式匹配检查函数参数和返回值类型的常见不一致问题，非 tsc 实际编译检查"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"

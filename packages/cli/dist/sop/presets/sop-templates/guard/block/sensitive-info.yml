@@ -57,7 +57,7 @@ conditions:
 check:
   tool: "gitleaks"
   toolConfig:
-    configPath: "${ZHSHIELD_HOME}/gitleaks.toml"
+    config: "${ZHSHIELD_HOME}/gitleaks.toml"
     mode: "detect"
     target: "staged"
     verbose: true

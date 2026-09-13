@@ -5,6 +5,9 @@ import { SopRuleParser } from './sop-loader-parser';
 
 const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 
+/** 规则目录递归深度上限：防止病态深层目录树导致栈溢出 */
+const MAX_RULE_DEPTH = 64;
+
 /** 六大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
  *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载 */
 const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
@@ -76,13 +79,14 @@ export class SopRuleFileCollector {
   }
 
   /** 收集目录下所有规则文件（递归支持子目录如 inspect/scan/typescript/） */
-  private collectRuleFiles(dir: string): string[] {
+  private collectRuleFiles(dir: string, depth = 0): string[] {
+    if (depth > MAX_RULE_DEPTH) return [];
     if (!fs.existsSync(dir)) return [];
 
     return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        return this.collectRuleFiles(fullPath);
+        return this.collectRuleFiles(fullPath, depth + 1);
       }
       if (entry.isFile() && RULE_FILE_EXT.test(entry.name)) {
         return [fullPath];

@@ -19,7 +19,14 @@ import {
   type Finding,
   type FailOn,
 } from '@zh/reporter';
-import { augmentProcessPath } from '@zh/shared';
+import {
+  augmentProcessPath,
+  issuesToBaselineEntries,
+  saveBaseline,
+  loadBaseline,
+  clearBaseline,
+  baselinePath,
+} from '@zh/shared';
 import * as path from 'node:path';
 import { existsSync, writeFileSync } from 'node:fs';
 
@@ -41,6 +48,13 @@ function resolveBundledSopDir(): string | undefined {
   return existsSync(bundled) ? bundled : undefined;
 }
 
+/** 解析最终项目根目录（projectPath）：--dir 显式给出时按 cwd 解析为绝对路径；
+ *  未给出时默认当前工作目录。process.cwd() 作为项目目录默认值的语义仅在此处出现一次，
+ *  文件相对化与报告输出均以该解析结果为基准，避免随进程 cwd 漂移。 */
+function resolveProjectDir(dir: string): string {
+  return dir ? path.resolve(dir) : process.cwd();
+}
+
 function printUsage(): void {
   console.log(`
 zhshield — 智汇码盾 代码质量治理
@@ -50,6 +64,9 @@ zhshield — 智汇码盾 代码质量治理
   zhshield inspect [options]   执行 Inspect 巡检
   zhshield refactor [options]  执行 Refactor 重构检测
   zhshield pipeline [options]  执行完整流水线
+  zhshield baseline capture [--dir <path>]  捕获当前问题为豁免基线
+  zhshield baseline list [--dir <path>]     列出基线条目
+  zhshield baseline clear [--dir <path>]    清除基线文件
   zhshield help                显示此帮助
 
 选项:
@@ -75,6 +92,7 @@ interface CLIOptions {
   format: 'text' | 'json' | 'sarif';
   report: string;
   failOn: FailOn;
+  baselineAction?: 'capture' | 'list' | 'clear';
 }
 
 function parseArgs(argv: string[]): CLIOptions {
@@ -96,7 +114,7 @@ function parseArgs(argv: string[]): CLIOptions {
 function createDefaultOptions(): CLIOptions {
   return {
     command: '',
-    dir: process.cwd(),
+    dir: '', // 空串哨兵：未传 --dir 时由 resolveProjectDir 兜底为 process.cwd()
     dryRun: false,
     sop: false,
     verbose: false,
@@ -112,6 +130,9 @@ function parseCommand(args: string[], opts: CLIOptions): void {
   opts.command = args[0];
   if (opts.command === 'help') {
     opts.help = true;
+  }
+  if (opts.command === 'baseline') {
+    opts.baselineAction = (args[1] as CLIOptions['baselineAction']) ?? 'list';
   }
 }
 
@@ -164,9 +185,10 @@ function shouldBlock(
   report: unknown,
   failOn: FailOn,
   dryRun: boolean,
+  projectDir: string,
 ): { findings: Finding[]; blocked: boolean } {
   const findings = buildFindings(report);
-  relativizeFindings(findings);
+  relativizeFindings(findings, projectDir);
   const blocked =
     !dryRun &&
     failOn !== 'none' &&
@@ -175,25 +197,30 @@ function shouldBlock(
 }
 
 /** SARIF artifactLocation 要求仓库相对路径；引擎产出多为绝对路径，
- *  统一转为相对 cwd，否则 GitHub Code Scanning 无法映射到仓库文件 */
-function relativizeFindings(findings: Finding[]): void {
+ *  统一转为相对项目根（--dir 解析后的 projectPath），否则 GitHub Code Scanning 无法映射到仓库文件 */
+function relativizeFindings(findings: Finding[], projectDir: string): void {
   for (const f of findings) {
     if (f.file && path.isAbsolute(f.file)) {
-      f.file = path.relative(process.cwd(), f.file);
+      f.file = path.relative(projectDir, f.file);
     }
   }
 }
 
-function writeReportFile(opts: CLIOptions, report: unknown, findings: Finding[]): void {
+function writeReportFile(
+  opts: CLIOptions,
+  report: unknown,
+  findings: Finding[],
+  projectDir: string,
+): void {
   if (opts.format === 'sarif') {
     const outPath = opts.report || 'zhshield.sarif';
-    writeFileSync(path.resolve(process.cwd(), outPath), toSarif(findings), 'utf8');
+    writeFileSync(path.resolve(projectDir, outPath), toSarif(findings), 'utf8');
     console.error(`[CLI] 报告已写入: ${outPath}`);
     return;
   }
   if (opts.format === 'json') {
     const outPath = opts.report || 'zhshield.json';
-    writeFileSync(path.resolve(process.cwd(), outPath), formatReportJson(report), 'utf8');
+    writeFileSync(path.resolve(projectDir, outPath), formatReportJson(report), 'utf8');
     console.error(`[CLI] 报告已写入: ${outPath}`);
     return;
   }
@@ -217,23 +244,27 @@ async function main(): Promise<void> {
 
 /** 加载 SOP 规则并按命令分发执行 */
 async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+  const projectDir = resolveProjectDir(opts.dir);
   const sopDir = resolveBundledSopDir();
-  const runner = new PipelineRunner(opts.dir, sopDir ? { configDir: sopDir } : undefined);
+  const runner = new PipelineRunner(projectDir, sopDir ? { configDir: sopDir } : undefined);
   const ruleCount = await runner.loadSopRules();
   console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
 
   switch (opts.command) {
     case 'guard':
-      await runGuardCommand(runner, opts, reporter);
+      await runGuardCommand(runner, opts, reporter, projectDir);
       break;
     case 'inspect':
-      await runInspectCommand(runner, opts, reporter);
+      await runInspectCommand(runner, opts, reporter, projectDir);
       break;
     case 'refactor':
-      await runRefactorCommand(runner, opts, reporter);
+      await runRefactorCommand(runner, opts, reporter, projectDir);
       break;
     case 'pipeline':
-      await runPipelineCommand(runner, opts, reporter);
+      await runPipelineCommand(runner, opts, reporter, projectDir);
+      break;
+    case 'baseline':
+      await runBaselineCommand(runner, opts, reporter, projectDir);
       break;
     default:
       console.error(`未知命令: ${opts.command}`);
@@ -264,17 +295,18 @@ async function runGuardCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
   reporter: ConsoleReporter,
+  projectDir: string,
 ): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopGuard({ dryRun: opts.dryRun });
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun);
-    writeReportFile(opts, report, findings);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     const formatted = reporter.format({
       timestamp: new Date(),
       guard: report,
@@ -284,7 +316,7 @@ async function runGuardCommand(
       stage: 'guard',
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   }
 }
@@ -293,17 +325,18 @@ async function runInspectCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
   reporter: ConsoleReporter,
+  projectDir: string,
 ): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopInspect();
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
-    const { findings, blocked } = shouldBlock(report, opts.failOn, false);
-    writeReportFile(opts, report, findings);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   } else {
     const report = await runner.runInspect();
-    const { findings, blocked } = shouldBlock(report, opts.failOn, false);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     const formatted = reporter.format({
       timestamp: new Date(),
       guard: null,
@@ -313,7 +346,7 @@ async function runInspectCommand(
       stage: 'inspect',
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   }
 }
@@ -322,9 +355,10 @@ async function runRefactorCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
   reporter: ConsoleReporter,
+  projectDir: string,
 ): Promise<void> {
   const report = await runner.runRefactor();
-  const { findings, blocked } = shouldBlock(report, opts.failOn, false);
+  const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
   const formatted = reporter.format({
     timestamp: new Date(),
     guard: null,
@@ -334,30 +368,73 @@ async function runRefactorCommand(
     stage: 'refactor',
   });
   console.log(formatted.text);
-  writeReportFile(opts, report, findings);
+  writeReportFile(opts, report, findings, projectDir);
   process.exit(blocked ? 1 : 0);
+}
+
+async function runBaselineCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  _reporter: ConsoleReporter,
+  projectDir: string,
+): Promise<void> {
+  switch (opts.baselineAction) {
+    case 'capture': {
+      const report = await runner.runInspect({ skipBaseline: true });
+      const entries = issuesToBaselineEntries(report.issues, projectDir);
+      const saved = await saveBaseline(projectDir, entries);
+      console.log(
+        `基线已捕获: ${entries.length} 项问题 → ${baselinePath(projectDir)} (${saved.capturedAt})`,
+      );
+      process.exit(0);
+      break;
+    }
+    case 'list': {
+      const baseline = await loadBaseline(projectDir);
+      if (!baseline) {
+        console.log('尚未捕获基线（无 .zhshield/baseline.json）');
+        process.exit(0);
+        break;
+      }
+      console.log(`基线 ${baseline.entries.length} 项，捕获于 ${baseline.capturedAt}`);
+      for (const entry of baseline.entries) {
+        console.log(`  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}`);
+      }
+      process.exit(0);
+      break;
+    }
+    case 'clear': {
+      await clearBaseline(projectDir);
+      console.log(`基线已清除: ${baselinePath(projectDir)}`);
+      process.exit(0);
+      break;
+    }
+  }
+  console.error('未知 baseline 子命令，支持: capture | list | clear');
+  process.exit(1);
 }
 
 async function runPipelineCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
   reporter: ConsoleReporter,
+  projectDir: string,
 ): Promise<void> {
   if (opts.sop) {
     const report = await runner.runSopDrivenPipeline();
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     const formatted = reporter.format(report);
     console.log(formatted.text);
-    writeReportFile(opts, report, findings);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   } else {
     const report = await runner.runFullPipeline({
       dryRun: opts.dryRun,
     });
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun);
+    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     const formatted = reporter.format(report);
     console.log(formatted.text);
-    writeReportFile(opts, report, findings);
+    writeReportFile(opts, report, findings, projectDir);
     process.exit(blocked ? 1 : 0);
   }
 }

@@ -1,10 +1,10 @@
-import type { SopRule, Severity } from './sop-types';
+import type { SopRule, Severity, EvaluationStatus } from './sop-types';
 import { severityRank } from './adaptive-severity';
 import type { IssueCategory } from '@zh/shared';
 
 // ─── 评估状态 ──────────────────────────────────────────
 
-export type EvaluationStatus = 'passed' | 'failed' | 'error' | 'skipped';
+export type { EvaluationStatus };
 
 // ─── 一条规则的单次评估结果 ─────────────────────────────
 

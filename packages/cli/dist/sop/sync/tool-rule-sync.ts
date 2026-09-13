@@ -6,11 +6,12 @@ import { safeJoinReal, PathTraversalError } from '@zh/shared';
 import { resolveApiBase } from './api-base';
 import { HttpError, withRetry } from './retry';
 import { getReclaimingToolRuleIds } from './capability-refs-reader';
+import type { ToolId } from './tool-ids';
 
 /** 能力到期物理删除阈值：reclaiming 持续超过该天数（严格大于）才删除（06 §4.3 窗口参数） */
 export const EXPIRY_THRESHOLD_DAYS = 7;
 
-export type ToolId = 'semgrep' | 'trivy' | 'eslint' | 'dep-cruiser';
+export type { ToolId };
 
 export interface ToolRuleSyncConfig {
   toolId: ToolId;
@@ -149,7 +150,21 @@ async function walkRuleDir(dir: string): Promise<string[]> {
 
 /** 解包规则包写入目标目录；路径穿越条目拒绝写盘（safeJoinReal 白名单越界跳过） */
 export async function extractRulePackage(data: Uint8Array, targetDir: string): Promise<void> {
-  const records: ToolRuleFile[] = JSON.parse(new TextDecoder().decode(data));
+  // 远程下发的规则包先做 schema 校验，避免畸形载荷触发下游非预期行为
+  const parsed: unknown = JSON.parse(new TextDecoder().decode(data));
+  if (!Array.isArray(parsed)) {
+    throw new Error('rule package top-level must be an array');
+  }
+  const records: ToolRuleFile[] = parsed.map((record) => {
+    if (typeof record !== 'object' || record === null) {
+      throw new Error('rule package record must be an object');
+    }
+    const { filename, content } = record as Partial<ToolRuleFile>;
+    if (typeof filename !== 'string' || typeof content !== 'string') {
+      throw new Error('rule package record must have string filename and content');
+    }
+    return { filename, content };
+  });
   await fs.promises.rm(targetDir, { recursive: true, force: true });
   await fs.promises.mkdir(targetDir, { recursive: true });
   for (const record of records) {

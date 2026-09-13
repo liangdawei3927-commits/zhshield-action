@@ -11,7 +11,7 @@ function parseArgs(argv: string[]): {
 } {
   const opts = {
     command: '',
-    dir: process.cwd(),
+    dir: '', // 空串哨兵：与 index.ts createDefaultOptions 保持一致，未传 --dir 时由 resolveProjectDir 兜底
     dryRun: false,
     sop: false,
     verbose: false,

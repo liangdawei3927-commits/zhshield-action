@@ -52,9 +52,9 @@ conditions:
     - "coverage/**"
 
 check:
-  tool: "dependency-cruiser"
+  tool: "dep-cruiser"
   toolConfig:
-    configFile: ".dependency-cruiser.cjs"
+    config: ".dependency-cruiser.cjs"
     outputType: "err-long"
     exitCode: 1
   rules:

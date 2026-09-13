@@ -40,3 +40,10 @@ export type { ScopeProfileLike, ResolveRulesResponse, ResolvedTool } from './res
 
 export { readOrCreateUserId, getOrCreateDefaultOrg } from './machine-identity';
 export type { DefaultOrgResult } from './machine-identity';
+
+export {
+  getReclaimingToolRuleIds,
+  getReclaimingToolRuleSinces,
+  getReclaimingSopModuleIds,
+  getReclaimingSopModuleSinces,
+} from './capability-refs-reader';

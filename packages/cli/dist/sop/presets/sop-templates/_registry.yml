@@ -107,6 +107,12 @@ rules:
     priority: "low"
     status: "draft"
 
+  - id: "inspect.scan.typescript.type-error-check"
+    file: "inspect/scan/typescript/type-error-check.yml"
+    adapter: "Inspect TS · 类型错误(tsc)"
+    priority: "critical"
+    status: "active"
+
   # NestJS 适配器组
   - id: "inspect.scan.ironnest.module-boundary"
     file: "inspect/scan/nestjs/module-boundary.yml"
@@ -151,16 +157,16 @@ rules:
     status: "active"
 
   - id: "security.scan.semgrep.xss"
-    file: "security/scan/vulnerability/xss-detection.yml"
+    file: "security/scan/vulnerability/xss.yml"
     adapter: "Security SAST · XSS"
     priority: "critical"
     status: "active"
 
   - id: "security.scan.semgrep.csrf"
-    file: "security/scan/vulnerability/csrf-check.yml"
+    file: "security/scan/vulnerability/csrf.yml"
     adapter: "Security SAST · CSRF"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   - id: "security.scan.semgrep.command-injection"
     file: "security/scan/vulnerability/command-injection.yml"
@@ -178,7 +184,7 @@ rules:
     file: "security/scan/vulnerability/hardcoded-key.yml"
     adapter: "Security · 硬编码密钥"
     priority: "critical"
-    status: "draft"
+    status: "active"
 
   # 病毒查杀
   - id: "security.scan.malware.reverse-shell"
@@ -197,7 +203,7 @@ rules:
     file: "security/scan/malware/supply-chain.yml"
     adapter: "Security Malware · 供应链攻击"
     priority: "critical"
-    status: "draft"
+    status: "trial"
 
   # 垃圾清理
   - id: "security.scan.garbage.unused-file"

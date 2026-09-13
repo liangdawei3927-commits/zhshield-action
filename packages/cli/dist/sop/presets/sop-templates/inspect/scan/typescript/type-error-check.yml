@@ -1,0 +1,92 @@
+# =============================================================================
+# SOP 规则模板 — Inspect · TypeScript 类型错误检查（真 tsc）
+# =============================================================================
+# 规则 ID: inspect.scan.typescript.type-error-check
+# 治理域: 巡检域 (inspect)
+# 动作类型: 扫描检测 (scan)
+# 数据来源: 内部标准 (internal)
+# 对应适配器: TypeScriptAdapter (tool: tsc)
+# 外部标准源: TypeScript Compiler (tsc --noEmit) — TS2322 类型不匹配
+# 最后更新: 2026-09-11
+# =============================================================================
+
+apiVersion: sop/v1
+kind: InspectRule
+metadata:
+  id: "inspect.scan.typescript.type-error-check"
+  name: "TypeScript 类型错误检查（真 tsc）"
+  description: "调用 TypeScript 编译器（tsc --noEmit）检测真实类型错误（TS2322 等），确保类型安全。P0-3 核心规则，验收 TS2322 必须由本规则检出。"
+  version: "1.0.0"
+  author: "智汇码盾官方"
+  created: "2026-09-11"
+  updated: "2026-09-11"
+  status: "active"
+  source: "internal"
+  sourceRef: "TypeScript Compiler (tsc) — TS2322 type mismatch diagnostics"
+
+governance:
+  domain: "inspect"
+  action: "scan"
+  module: "Inspect"
+  subModule: "typescript"
+  adapter: "typescript"
+
+execution:
+  mode: "sync"
+  timeout: 120
+  maxConcurrency: 1
+  retryCount: 0
+  scope: "all"
+
+conditions:
+  languages:
+    - "typescript"
+  filePatterns:
+    - "*.ts"
+    - "*.tsx"
+  excludePatterns:
+    - "node_modules/**"
+    - "dist/**"
+    - "*.d.ts"
+    - "*.generated.ts"
+    - "coverage/**"
+
+check:
+  tool: "tsc"
+  toolConfig:
+    category: "type-safety"
+  severity: "error"
+  categories:
+    - "type-error"
+    - "type-safety"
+
+standards:
+  osps:
+    - "OSPS-QA-04"
+  cwe:
+    - "CWE-704"  # Incorrect Type Conversion or Cast
+
+judgment:
+  passCondition: "errorCount === 0"
+  maxIssues: 50
+  priority: "critical"
+
+score:
+  impact: "type-safety"
+  weight: 0.12
+
+fix:
+  autoFixAvailable: false
+  suggestionTemplate: |
+    检测到 TypeScript 类型错误（tsc）：
+
+    ⚠️ 文件: {file}:{line}
+    ⚠️ 诊断码: {diagnosticCode}
+    ⚠️ 信息: {message}
+
+    修复建议：
+    1. 检查类型定义是否与实际使用一致
+    2. 确保函数参数和返回值类型匹配
+    3. 使用 TypeScript 严格模式避免隐式 any
+
+    📖 参考: TypeScript Handbook — Type Checking

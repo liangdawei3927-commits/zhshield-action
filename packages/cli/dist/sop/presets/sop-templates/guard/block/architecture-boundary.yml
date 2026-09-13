@@ -53,9 +53,9 @@ conditions:
     - "**/*.d.ts"
 
 check:
-  tool: "dependency-cruiser"
+  tool: "dep-cruiser"
   toolConfig:
-    configPath: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
+    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
     rules:
       layerViolation:
         description: "禁止反向依赖（controller → service → domain → repository → adapter，单向）"

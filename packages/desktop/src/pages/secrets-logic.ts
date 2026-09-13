@@ -1,11 +1,14 @@
 import { useCallback, useState } from 'react';
 import { Logger } from '@zh/kernel';
+import { t } from '@zh/i18n';
 import {
   dismissSecret,
   markSecretRotating,
   runSecrets,
   verifySecretRotated,
 } from '../services/engineApi';
+import { useToast } from '../components/ui/Toast';
+import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
 import type { SecretReportData } from '../types/electron';
 
 const logger = new Logger('secrets-logic');
@@ -170,8 +173,67 @@ function useSecretActions(refresh: () => Promise<void>): {
   return { handleMarkRotating, handleVerifyRotated, handleDismiss };
 }
 
+function toAiIssue(finding: SecretReportData['findings'][number]): AiFixIssue {
+  const typeKey = SECRET_TYPE_LABEL[finding.type] ?? 'page.secrets.type.genericApiKey';
+  const sevKey = SECRET_SEVERITY_CONFIG[finding.severity]?.labelKey ?? finding.severity;
+  return {
+    source: t('page.secrets.source'),
+    ruleId: finding.type,
+    severity: t(sevKey),
+    file: finding.location.file,
+    line: finding.location.line,
+    message: `${t(typeKey)} · ${finding.displayValue}`,
+    suggestion: t('page.secrets.suggestion'),
+  };
+}
+
+function copyIssuesToAi(
+  projectPath: string,
+  issues: AiFixIssue[],
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+): void {
+  const text = buildAiFixPrompt(projectPath, issues);
+  void copyTextToClipboard(text).then(
+    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
+    () => toast(t('toast.copyFailed'), 'error'),
+  );
+}
+
+function useSecretsCopyToAi(projectPath: string): {
+  copyToAi: (finding: SecretReportData['findings'][number]) => void;
+  copyAllToAi: (findings: SecretReportData['findings']) => void;
+} {
+  const { toast } = useToast();
+
+  const copyToAi = useCallback(
+    (finding: SecretReportData['findings'][number]) =>
+      copyIssuesToAi(projectPath, [toAiIssue(finding)], toast),
+    [projectPath, toast],
+  );
+
+  const copyAllToAi = useCallback(
+    (findings: SecretReportData['findings']) => {
+      if (findings.length === 0) return;
+      copyIssuesToAi(projectPath, findings.map(toAiIssue), toast);
+    },
+    [projectPath, toast],
+  );
+
+  return { copyToAi, copyAllToAi };
+}
+
 export function useSecretsPage(projectPath: string) {
   const { loading, report, handleScan, refresh } = useSecretsRun(projectPath);
   const { handleMarkRotating, handleVerifyRotated, handleDismiss } = useSecretActions(refresh);
-  return { loading, report, handleScan, handleMarkRotating, handleVerifyRotated, handleDismiss };
+  const { copyToAi, copyAllToAi } = useSecretsCopyToAi(projectPath);
+  return {
+    loading,
+    report,
+    handleScan,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    copyToAi,
+    copyAllToAi,
+  };
 }

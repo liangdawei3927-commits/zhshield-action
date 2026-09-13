@@ -6,8 +6,16 @@ interface SecretsPageProps {
 }
 
 export function SecretsPage({ projectPath }: SecretsPageProps) {
-  const { loading, report, handleScan, handleMarkRotating, handleVerifyRotated, handleDismiss } =
-    useSecretsPage(projectPath);
+  const {
+    loading,
+    report,
+    handleScan,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    copyToAi,
+    copyAllToAi,
+  } = useSecretsPage(projectPath);
 
   if (report) {
     return (
@@ -19,6 +27,8 @@ export function SecretsPage({ projectPath }: SecretsPageProps) {
             onMarkRotating={handleMarkRotating}
             onVerifyRotated={handleVerifyRotated}
             onDismiss={handleDismiss}
+            onCopyToAi={copyToAi}
+            onCopyAll={copyAllToAi}
           />
         </div>
       </div>

@@ -1,5 +1,11 @@
 import type { HealthScoreData } from '../types/electron';
-import { getScoreColor, getScoreLabel, type HealthScoreRow } from './reports-logic';
+import {
+  getScoreColor,
+  getScoreLabel,
+  dimensionName,
+  gradeLabel,
+  type HealthScoreRow,
+} from './reports-logic';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useT } from '../i18n';
 
@@ -25,15 +31,32 @@ function HistoryRow({ item, isLast }: { item: HealthScoreRow; isLast: boolean })
         </span>
       </td>
       <td className="px-5 py-3">
-        <div className="flex gap-2">
-          {item.dimensions.slice(0, 3).map((d, j) => (
-            <span key={j} className="text-xs px-1.5 py-0.5 rounded bg-zh-panel text-zh-muted">
-              {d.name}: {d.score}
+        <div className="flex flex-wrap gap-1.5">
+          {item.dimensions.map((d, j) => (
+            <span
+              key={j}
+              className="inline-flex items-baseline gap-1 text-xs px-1.5 py-0.5 rounded bg-zh-panel"
+              style={{ color: getScoreColor(d.score) }}
+              title={getScoreLabel(d.score)}
+            >
+              <span className="text-zh-muted">{dimensionName(d.name, t)}</span>
+              <span className="font-bold">{d.score}</span>
+              <span className="text-[10px] opacity-70">{getScoreLabel(d.score)}</span>
             </span>
           ))}
         </div>
       </td>
-      <td className="px-5 py-3 text-right text-xs text-zh-muted">{item.summary}</td>
+      <td className="px-5 py-3 text-right text-xs text-zh-muted">
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded font-medium"
+          style={{
+            color: getScoreColor(item.score),
+            background: `color-mix(in srgb, ${getScoreColor(item.score)} 10%, transparent)`,
+          }}
+        >
+          {gradeLabel(item.summary, t)}
+        </span>
+      </td>
     </tr>
   );
 }

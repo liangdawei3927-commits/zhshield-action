@@ -17,7 +17,7 @@ import { useToast } from '../components/ui/Toast';
 import { useT } from '../i18n';
 import { exportHtmlReport } from '../utils/htmlExport';
 import type { HtmlReportData } from '@zh/reporter';
-import type { DependencyReportData } from '../types/electron';
+import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 interface DependencyPageProps {
   projectPath: string;
@@ -169,12 +169,16 @@ function DependencyReportView({
   loading,
   onRescan,
   onExport,
+  onCopyTyposquat,
+  onCopyAllTyposquat,
   t,
 }: {
   report: DependencyReportData;
   loading: boolean;
   onRescan: () => void;
   onExport: () => void;
+  onCopyTyposquat: (finding: TyposquatFindingData) => void;
+  onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
   t: (key: string, opts?: { defaultValue?: string }) => string;
 }) {
   return (
@@ -211,7 +215,11 @@ function DependencyReportView({
         </div>
         <DependencyLicenseCard matrix={report.licenseMatrix} />
         <div className="grid grid-cols-2 gap-6 my-6">
-          <DependencyTyposquatCard report={report} />
+          <DependencyTyposquatCard
+            report={report}
+            onCopyToAi={onCopyTyposquat}
+            onCopyAll={onCopyAllTyposquat}
+          />
           <DependencyLockfileVerificationCard report={report} />
         </div>
         <div className="grid grid-cols-2 gap-6">
@@ -227,7 +235,7 @@ function DependencyReportView({
 }
 
 export function DependencyPage({ projectPath }: DependencyPageProps) {
-  const { loading, report, handleScan } = useDependencyPage(projectPath);
+  const { loading, report, handleScan, copyToAi, copyAllToAi } = useDependencyPage(projectPath);
   const { toast } = useToast();
   const t = useT();
 
@@ -243,6 +251,8 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
         loading={loading}
         onRescan={handleScan}
         onExport={handleExport}
+        onCopyTyposquat={copyToAi}
+        onCopyAllTyposquat={copyAllToAi}
         t={t}
       />
     );

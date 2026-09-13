@@ -21,6 +21,18 @@ export function getScoreLabel(score: number) {
   return t('page.reports.scoreLabel.danger');
 }
 
+export function dimensionName(dimKey: string, tr: typeof t = t): string {
+  const key = `page.reports.dimension.${dimKey}`;
+  const name = tr(key);
+  return name === key ? dimKey : name;
+}
+
+export function gradeLabel(grade: string, tr: typeof t = t): string {
+  const key = `page.reports.grade.${grade}`;
+  const label = tr(key);
+  return label === key ? grade : label;
+}
+
 /** 历史分数数据加载：数据状态 + 拉取 */
 function useScoreHistoryData(projectPath: string): {
   data: HealthScoreData[];

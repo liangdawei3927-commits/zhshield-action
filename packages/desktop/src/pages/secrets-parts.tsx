@@ -5,6 +5,8 @@ import { PageShell } from '../components/business/PageShell';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
+import { CopyToAiButton } from '../components/ui/CopyToAiButton';
+import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { SECRET_SEVERITY_CONFIG, SECRET_STATUS_CONFIG, SECRET_TYPE_LABEL } from './secrets-logic';
 
 export function SecretsIllustration() {
@@ -248,11 +250,13 @@ function SecretsFindingItem({
   onMarkRotating,
   onVerifyRotated,
   onDismiss,
+  onCopyToAi,
 }: {
   finding: SecretReportData['findings'][number];
   onMarkRotating: (secretId: string) => void;
   onVerifyRotated: (secretId: string) => void;
   onDismiss: (secretId: string) => void;
+  onCopyToAi: (finding: SecretReportData['findings'][number]) => void;
 }) {
   const t = useT();
   const sevCfg = SECRET_SEVERITY_CONFIG[finding.severity] ?? SECRET_SEVERITY_CONFIG.low;
@@ -307,6 +311,7 @@ function SecretsFindingItem({
           </span>
         )}
         <span className="ml-auto flex items-center gap-2">
+          <CopyToAiButton onClick={() => onCopyToAi(finding)} />
           {finding.status === 'active' && (
             <ActionButton
               primary
@@ -348,11 +353,15 @@ export function SecretsListCard({
   onMarkRotating,
   onVerifyRotated,
   onDismiss,
+  onCopyToAi,
+  onCopyAll,
 }: {
   findings: SecretReportData['findings'];
   onMarkRotating: (secretId: string) => void;
   onVerifyRotated: (secretId: string) => void;
   onDismiss: (secretId: string) => void;
+  onCopyToAi: (finding: SecretReportData['findings'][number]) => void;
+  onCopyAll: (findings: SecretReportData['findings']) => void;
 }) {
   const t = useT();
   return (
@@ -384,17 +393,26 @@ export function SecretsListCard({
           </span>
         </div>
       ) : (
-        <div className="space-y-3">
-          {findings.map((finding) => (
-            <SecretsFindingItem
-              key={finding.secretId}
-              finding={finding}
-              onMarkRotating={onMarkRotating}
-              onVerifyRotated={onVerifyRotated}
-              onDismiss={onDismiss}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-zh-muted">
+              {t('page.secrets.copyAllPrompt', { count: findings.length })}
+            </span>
+            <CopyAllToAiButton onClick={() => onCopyAll(findings)} />
+          </div>
+          <div className="space-y-3">
+            {findings.map((finding) => (
+              <SecretsFindingItem
+                key={finding.secretId}
+                finding={finding}
+                onMarkRotating={onMarkRotating}
+                onVerifyRotated={onVerifyRotated}
+                onDismiss={onDismiss}
+                onCopyToAi={onCopyToAi}
+              />
+            ))}
+          </div>
+        </>
       )}
     </ResultCard>
   );

@@ -5,7 +5,7 @@
  * 主进程仅转发与转换报告；体检发现问题后自动触发 opencode CLI 修复（非阻塞）。
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import path from 'node:path';
 import { constants as FS_CONSTANTS } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
@@ -25,6 +25,7 @@ import type {
   ModuleHotnessInput,
   ConvertedGuardResult,
   ConvertedInspectIssue,
+  HealthScore,
 } from '@zh/scoring';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
@@ -79,7 +80,18 @@ import {
   normalizeInspectSource,
   normalizeRefactorSource,
   normalizePerformanceData,
+  normalizeDepsSource,
+  normalizeTechDebtSource,
+  normalizeSecuritySource,
 } from '../zh-diagnostics';
+import {
+  readDashboardState,
+  updateDashboardState,
+  type DashboardDepsState,
+  type DashboardTechDebtState,
+  type DashboardRefactorState,
+  type DashboardPerformanceState,
+} from './dashboard-state';
 import {
   shouldAutoFix,
   countFixableIssues,
@@ -90,6 +102,7 @@ import {
 import {
   getScoring,
   getDb,
+  getSentinel,
   sendProgress,
   setCachedProfile,
   registerProjectFeaturesToCloud,
@@ -119,7 +132,10 @@ import type {
   SecretReportData,
   ProjectProfileData,
   DepsRelockResult,
+  DashboardOverview,
+  DashboardCard,
 } from '../../src/types/electron';
+import type { DiagnosticsReport, DiagnosticEntry } from '../zh-diagnostics';
 
 async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -309,11 +325,15 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
 
     const scoring = await getScoring();
     const profilingResult = await probeProjectProfile(projectPath);
+    // P1b: 从 dashboard-state.json 读取 secrets/deps/techdebt/refactor/performance 最新数据组装 extras，
+    // 传入 buildHealthDimensions 第 5 参（DimensionExtras 契约），保证 pipeline 分与 dashboard 分一致。
+    const extras = await buildPipelineExtras(projectPath);
     const dimensions = buildHealthDimensions(
       { results: resolved.guardResults },
       { issues: resolved.inspectIssues },
       projectPath,
       profilingResult,
+      extras,
     );
     const score = scoring.calculate(projectPath, dimensions);
     console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
@@ -405,6 +425,11 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
   ipcMain.handle('engine:getProfile', getProfileHandler);
   ipcMain.handle('engine:runProfile', (_e, projectPath: string) => runProfileHandler(projectPath));
+  // P1b 聚合仪表盘：只读各域最新落盘结果 + 时间戳，一次返回六卡数据
+  ipcMain.handle('engine:getDashboardOverview', getDashboardOverviewHandler);
+  ipcMain.handle('engine:runFullCheck', (_e, projectPath: string, options?: { force?: boolean }) =>
+    runFullCheckHandler(manager, projectPath, options),
+  );
 }
 
 async function runGuardHandler(
@@ -486,7 +511,16 @@ async function runSecurityHandler(
     }
     const task = manager.start('security', projectPath);
     const report = (await manager.waitFor(task.id)) as SecurityScanReport;
-    return toSecurityScanReportData(report);
+    const data = toSecurityScanReportData(report);
+    try {
+      await persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource(data));
+    } catch (e) {
+      console.warn(
+        '[engine:runSecurity] 诊断落盘失败:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    return data;
   } catch (err) {
     console.error('[engine:runSecurity] Error:', err);
     return {
@@ -568,6 +602,8 @@ async function runPerformanceHandler(
         e instanceof Error ? e.message : String(e),
       );
     }
+    // P1b: 补写 dashboard-state performance 域（问题总数 + severity 分布 + lastRunAt）
+    await updateDashboardState(projectPath, { performance: performanceDashboardPatch(result) });
     return result;
   } catch (err) {
     console.error('[engine:runPerformance] Error:', err);
@@ -598,6 +634,8 @@ async function runRefactorHandler(
         e instanceof Error ? e.message : String(e),
       );
     }
+    // P1b: 补写 dashboard-state refactor 域（异味总数 + severity 分布 + lastRunAt）
+    await updateDashboardState(projectPath, { refactor: refactorDashboardPatch(report) });
     return report;
   } catch (err) {
     console.error('[engine:runRefactor] Error:', err);
@@ -637,6 +675,110 @@ function emptyDepsReport(error: string): DependencyReportData {
 }
 
 /**
+ * 从 DependencyReportData 提取 deps 域 dashboard-state patch。
+ *
+ * 漏洞计数提取口径（DependencyReportData 无精确 severity 字段，取最接近语义的字段）：
+ * - critical = trustCounts.compromised ?? 0（被攻陷依赖节点，最高安全风险）
+ * - high = trustCounts.suspicious ?? 0（可疑依赖节点，高安全风险）
+ * - medium = typosquatFindings 中 risk='medium' 的投毒发现数（中等投毒风险）
+ * - upgradable = upgradeAssessments 中 candidates.length > 0 的依赖数（可升级依赖）
+ */
+function depsDashboardPatch(report: DependencyReportData): DashboardDepsState {
+  const typosquatMedium = report.typosquatFindings.filter((f) => f.risk === 'medium').length;
+  const upgradable = report.upgradeAssessments.filter((a) => a.candidates.length > 0).length;
+  return {
+    vulnerabilities: {
+      critical: report.trustCounts.compromised ?? 0,
+      high: report.trustCounts.suspicious ?? 0,
+      medium: typosquatMedium,
+    },
+    upgradable,
+    lastRunAt: new Date().toISOString(),
+  };
+}
+
+/** 从 RefactorReport 提取 refactor 域 dashboard-state patch */
+function refactorDashboardPatch(report: RefactorReport): DashboardRefactorState {
+  const bySeverity = {
+    error: report.bySeverity.error ?? 0,
+    warning: report.bySeverity.warning ?? 0,
+    info: report.bySeverity.info ?? 0,
+  };
+  return { totalSmells: report.totalSmells, bySeverity, lastRunAt: new Date().toISOString() };
+}
+
+/** 从 PerformanceReportData 提取 performance 域 dashboard-state patch */
+function performanceDashboardPatch(report: PerformanceReportData): DashboardPerformanceState {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  for (const issue of report.issues) {
+    const key = issue.severity as keyof typeof counts;
+    if (key in counts) counts[key]++;
+  }
+  return { total: report.summary.total, bySeverity: counts, lastRunAt: new Date().toISOString() };
+}
+
+// ─── 仪表盘聚合（P1b）─────────────────────────────────────────────
+
+/** 新鲜度阈值：lastRunAt 距今 >24h 视为过期（方案 §3.3 ②） */
+const DASHBOARD_FRESH_MS = 24 * 60 * 60 * 1000;
+
+/** 哨兵已解决状态：不在集合内的事件视为 open（未处理） */
+const RESOLVED_SENTINEL_STATUSES: ReadonlySet<string> = new Set([
+  'passed',
+  'merged',
+  'deployed',
+  'rolled_back',
+]);
+
+/** 六卡 → 评分维度权重（方案 §4.3：质量35% / 安全25% / 依赖15% / 技术债15% / 门禁哨兵10%） */
+const DASHBOARD_CARD_WEIGHTS: Record<DashboardCard['key'], number> = {
+  quality: 0.35,
+  security: 0.25,
+  dependencies: 0.15,
+  techdebt: 0.15,
+  gate: 0.05,
+  sentinel: 0.05,
+};
+
+/**
+ * P1b extras 契约（对齐 Agent A 迁移后的 DimensionExtras）：
+ * secrets/deps/techdebt/refactor/performance 域最新数据，无对应域时传 null（Agent A 侧按 null 跳过该维度）。
+ */
+interface PipelineExtras {
+  secrets?: { activeCount: number } | null;
+  deps?: {
+    vulnerabilities: { critical: number; high: number; medium: number };
+    upgradable: number;
+  } | null;
+  techdebt?: { debtIndex: number; issueCount: number } | null;
+  refactor?: { totalSmells: number; bySeverity: { error: number; warning: number; info: number } } | null;
+  performance?: {
+    total: number;
+    bySeverity: { critical: number; high: number; medium: number; low: number; info: number };
+  } | null;
+}
+
+/** 从 dashboard-state.json 组装 extras（无对应域时传 null） */
+async function buildPipelineExtras(projectPath: string): Promise<PipelineExtras> {
+  const state = await readDashboardState(projectPath);
+  return {
+    secrets: state.secrets ? { activeCount: state.secrets.activeCount } : null,
+    deps: state.deps
+      ? { vulnerabilities: state.deps.vulnerabilities, upgradable: state.deps.upgradable }
+      : null,
+    techdebt: state.techdebt
+      ? { debtIndex: state.techdebt.debtIndex, issueCount: state.techdebt.issueCount }
+      : null,
+    refactor: state.refactor
+      ? { totalSmells: state.refactor.totalSmells, bySeverity: state.refactor.bySeverity }
+      : null,
+    performance: state.performance
+      ? { total: state.performance.total, bySeverity: state.performance.bySeverity }
+      : null,
+  };
+}
+
+/**
  * 依赖管家（engine:runDeps）：纯静态解析锁文件/清单，直连主进程，
  * 不经 TaskManager / worker。返回依赖图谱 + 许可证矩阵 + 投毒检测 +
  * 锁文件校验 + 升级评估 + 环境一致性报告。
@@ -665,7 +807,7 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
     if (!baseline && lockfileCheck.verification.status === 'clean') {
       await saveDepsBaseline(projectRoot, integritySnapshot(nodes));
     }
-    return {
+    const report: DependencyReportData = {
       schemaVersion: graph.schemaVersion,
       targetId: graph.targetId,
       ecosystem: graph.ecosystem,
@@ -687,6 +829,14 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
       ...(upgrade.error ? { upgradeError: upgrade.error } : {}),
       ...(env.error ? { envError: env.error } : {}),
     };
+    try {
+      await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report));
+    } catch (e) {
+      console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
+    }
+    // P1b: 补写 dashboard-state deps 域（漏洞 severity 计数 + 可升级数 + lastRunAt）
+    await updateDashboardState(projectPath, { deps: depsDashboardPatch(report) });
+    return report;
   } catch (err) {
     console.error('[engine:runDeps] Error:', err);
     return emptyDepsReport(err instanceof Error ? err.message : String(err));
@@ -898,7 +1048,24 @@ async function runTechDebtHandler(
         err instanceof Error ? err.message : String(err),
       );
     }
-    return { ...finalSnapshot, error: null };
+    const report: TechDebtReportData = { ...finalSnapshot, error: null };
+    try {
+      await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report));
+    } catch (e) {
+      console.warn(
+        '[engine:runTechDebt] 诊断落盘失败:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    // P1b: 补写 dashboard-state techdebt 域（debtIndex + 动作数 + lastRunAt）
+    await updateDashboardState(projectPath, {
+      techdebt: {
+        debtIndex: report.debtIndex,
+        issueCount: report.actionList.length,
+        lastRunAt: new Date().toISOString(),
+      },
+    });
+    return report;
   } catch (err) {
     console.error('[engine:runTechDebt] Error:', err);
     return emptyTechDebtReport(err instanceof Error ? err.message : String(err));
@@ -1053,6 +1220,10 @@ async function runSecretsHandler(projectPath: string): Promise<SecretReportData>
     const manager = new SecretLifecycleManager(undefined, store);
     secretManagers.set(projectPath, { manager, store });
     const report = await manager.scan(projectPath, { history: true });
+    // P1b: 补写 dashboard-state secrets 域（active 未处理数 + lastRunAt）
+    await updateDashboardState(projectPath, {
+      secrets: { activeCount: report.summary.active, lastRunAt: new Date().toISOString() },
+    });
     return { ...report, error: null };
   } catch (err) {
     console.error('[engine:runSecrets] Error:', err);
@@ -1239,5 +1410,451 @@ async function getProfileHandler(
       err instanceof Error ? err.message : String(err),
     );
     return null;
+  }
+}
+
+// ─── P1b 聚合仪表盘（engine:getDashboardOverview / engine:runFullCheck）────────
+
+/** 新鲜度判定：lastRunAt 缺失或距今 >24h → expired（方案 §3.3 ②） */
+function freshnessStatus(lastRunAt: string | null | undefined, now: number): 'scored' | 'expired' {
+  if (!lastRunAt) return 'expired';
+  const t = new Date(lastRunAt).getTime();
+  if (Number.isNaN(t)) return 'expired';
+  return now - t > DASHBOARD_FRESH_MS ? 'expired' : 'scored';
+}
+
+function clampScore(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
+}
+
+/** 从 scoring 维度数组取指定维度分；缺失返回 undefined */
+function dimensionScoreFrom(score: HealthScoreData | null, name: string): number | undefined {
+  return score?.dimensions.find((d) => d.name === name)?.score;
+}
+
+/** quality 卡：latest.json 中 source='inspect' + source='refactor' 的 issues（含 quality/refactor/performance 三维聚合） */
+function buildQualityCard(
+  issues: readonly DiagnosticEntry[],
+  lastRunAt: string | null,
+  score: HealthScoreData | null,
+  now: number,
+): DashboardCard {
+  const errors = issues.filter((i) => i.severity === 'error').length;
+  const warnings = issues.filter((i) => i.severity === 'warning').length;
+  const card: DashboardCard = {
+    key: 'quality',
+    // 状态以 lastRunAt 为准：0 检出 ≠ 未运行（干净通过也必须显示 scored，否则跑完仍显示"未检测"）
+    status: lastRunAt ? freshnessStatus(lastRunAt, now) : 'not-run',
+    issues: issues.length,
+    ...(lastRunAt ? { lastRunAt } : {}),
+    summary: `${errors} error / ${warnings} warning`,
+  };
+  // 三维聚合：quality/refactor/performance 按各自权重加权，仅对已出现的维度归一化
+  const dimKeys = ['quality', 'refactor', 'performance'] as const;
+  const dimWeights: Record<string, number> = { quality: 0.2, refactor: 0.1, performance: 0.05 };
+  const present = dimKeys.filter((k) => dimensionScoreFrom(score, k) !== undefined);
+  if (present.length > 0) {
+    const wsum = present.reduce((s, k) => s + dimWeights[k], 0);
+    card.score = clampScore(
+      present.reduce((s, k) => s + (dimensionScoreFrom(score, k)! * dimWeights[k]), 0) / wsum,
+    );
+  }
+  // 回退口径：无 scoring 数据时按扣分制计算（0 issues → 100），运行过就该计入加权总分
+  else card.score = clampScore(100 - errors * 8 - warnings * 4);
+  return card;
+}
+
+/** gate 卡：latest.json 中 source='guard' 的 issues（guard 计入 security 维度） */
+function buildGateCard(
+  issues: readonly DiagnosticEntry[],
+  lastRunAt: string | null,
+  score: HealthScoreData | null,
+  now: number,
+): DashboardCard {
+  const errors = issues.filter((i) => i.severity === 'error').length;
+  const warnings = issues.filter((i) => i.severity === 'warning').length;
+  const card: DashboardCard = {
+    key: 'gate',
+    // 状态以 lastRunAt 为准：guard 全过（0 issues）≠ 未运行
+    status: lastRunAt ? freshnessStatus(lastRunAt, now) : 'not-run',
+    issues: issues.length,
+    ...(lastRunAt ? { lastRunAt } : {}),
+    summary: `${errors} error / ${warnings} warning`,
+  };
+  const dim = dimensionScoreFrom(score, 'gate');
+  if (dim !== undefined) card.score = dim;
+  // 回退口径：同 quality 卡，guard 全过（0 issues）= 100 分且计入加权总分
+  else card.score = clampScore(100 - errors * 8 - warnings * 4);
+  return card;
+}
+
+/** security 卡：secrets-state.json 中 status='active' 的密钥数（active 未处理数） */
+function buildSecurityCard(
+  activeCount: number,
+  stateExists: boolean,
+  lastRunAt: string | null | undefined,
+  score: HealthScoreData | null,
+  now: number,
+): DashboardCard {
+  const card: DashboardCard = {
+    key: 'security',
+    status: stateExists ? freshnessStatus(lastRunAt, now) : 'not-run',
+    issues: activeCount,
+    ...(lastRunAt ? { lastRunAt } : {}),
+    summary: `${activeCount} active secrets`,
+  };
+  const dim = dimensionScoreFrom(score, 'security');
+  if (dim !== undefined) card.score = dim;
+  else if (stateExists) card.score = clampScore(100 - activeCount * 15); // 方案 §4.3.1：active 每条 -15（上限 60）
+  return card;
+}
+
+/** deps 卡：dashboard-state.json.deps（漏洞 severity 计数 + 可升级数） */
+function buildDepsCard(
+  deps: DashboardDepsState | undefined,
+  score: HealthScoreData | null,
+  now: number,
+): DashboardCard {
+  if (!deps) {
+    return { key: 'dependencies', status: 'not-run', issues: 0, summary: 'not run' };
+  }
+  const { critical, high, medium } = deps.vulnerabilities;
+  const total = critical + high + medium;
+  const card: DashboardCard = {
+    key: 'dependencies',
+    status: freshnessStatus(deps.lastRunAt, now),
+    issues: total,
+    lastRunAt: deps.lastRunAt,
+    summary: `${critical} critical / ${high} high / ${medium} medium, ${deps.upgradable} upgradable`,
+  };
+  const dim = dimensionScoreFrom(score, 'dependencies');
+  if (dim !== undefined) card.score = dim;
+  else if (total > 0) card.score = clampScore(100 - critical * 12 - high * 8 - medium * 4); // 方案 §4.3.1
+  return card;
+}
+
+/** techdebt 卡：dashboard-state.json.techdebt（debtIndex + 动作数） */
+function buildTechDebtCard(
+  techdebt: DashboardTechDebtState | undefined,
+  score: HealthScoreData | null,
+  now: number,
+): DashboardCard {
+  if (!techdebt) {
+    return { key: 'techdebt', status: 'not-run', issues: 0, summary: 'not run' };
+  }
+  const card: DashboardCard = {
+    key: 'techdebt',
+    status: freshnessStatus(techdebt.lastRunAt, now),
+    issues: techdebt.issueCount,
+    lastRunAt: techdebt.lastRunAt,
+    summary: `debtIndex ${techdebt.debtIndex}`,
+  };
+  const dim = dimensionScoreFrom(score, 'techdebt');
+  if (dim !== undefined) card.score = dim;
+  else card.score = clampScore(100 - techdebt.debtIndex); // 方案 §4.3.1：techdebt 健康分 = 100 − debtIndex
+  return card;
+}
+
+/** sentinel 卡：运行时 SentinelRuntime（P1a-3 豁免，不落盘）——enabled + open 事件计数 */
+function buildSentinelCard(
+  enabled: boolean,
+  openCount: number,
+  lastEventAt: string | null,
+  now: number,
+): DashboardCard {
+  const card: DashboardCard = {
+    key: 'sentinel',
+    status: enabled ? freshnessStatus(lastEventAt, now) : 'not-run',
+    issues: openCount,
+    ...(lastEventAt ? { lastRunAt: lastEventAt } : {}),
+    summary: enabled ? `${openCount} open events` : 'disabled',
+  };
+  // 哨兵为运行时域（P1a-3 豁免不落盘），不计入持久化维度；分值直接由开放事件推导
+  if (enabled && openCount > 0) card.score = clampScore(100 - openCount * 5);
+  return card;
+}
+
+/** 未运行域剔除后的加权总分（方案 §4.3：某域从未运行时该域不参与加权，禁止按满分计） */
+function computeFallbackOverall(cards: readonly DashboardCard[]): number {
+  let weightedSum = 0;
+  let weightSum = 0;
+  for (const card of cards) {
+    if (card.status === 'not-run' || card.score === undefined) continue;
+    const weight = DASHBOARD_CARD_WEIGHTS[card.key];
+    weightedSum += card.score * weight;
+    weightSum += weight;
+  }
+  return weightSum > 0 ? Math.round((weightedSum / weightSum) * 100) / 100 : 0;
+}
+
+function gradeFromScore(overall: number): string {
+  if (overall >= 90) return 'A';
+  if (overall >= 75) return 'B';
+  if (overall >= 60) return 'C';
+  return 'D';
+}
+
+/**
+ * 聚合仪表盘（engine:getDashboardOverview）：纯只读，一次返回六卡数据。
+ * 不触发任何扫描（聚合层是纯只读，禁止调 runPipeline）。
+ */
+async function getDashboardOverviewHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectPath: string,
+): Promise<DashboardOverview | null> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') return null;
+    const now = Date.now();
+
+    // ── latest.json（quality / gate 卡）──
+    let latest: DiagnosticsReport | null = null;
+    try {
+      const raw = await readFile(
+        path.join(projectPath, '.zhshield', 'diagnostics', 'latest.json'),
+        'utf-8',
+      );
+      latest = JSON.parse(raw) as DiagnosticsReport;
+    } catch {
+      latest = null;
+    }
+    const latestGeneratedAt = latest?.generatedAt ?? null;
+    const latestIssues = latest?.issues ?? [];
+    const inspectIssues = latestIssues.filter((i) => i.source === 'inspect');
+    const guardIssues = latestIssues.filter((i) => i.source === 'guard');
+    const refactorIssues = latestIssues.filter((i) => i.source === 'refactor');
+    // quality 卡合并 inspect + refactor 问题（performance 经 source='inspect' 已含在 inspectIssues）
+    const mergedQualityIssues = [...inspectIssues, ...refactorIssues];
+
+    // ── secrets-state.json（security 卡：active 未处理数）──
+    let secretsActive = 0;
+    let secretsStateExists = false;
+    try {
+      const raw = await readFile(
+        path.join(projectPath, '.zhshield', 'secrets-state.json'),
+        'utf-8',
+      );
+      const parsed = JSON.parse(raw) as { secrets?: Record<string, { status?: string }> };
+      secretsStateExists = true;
+      secretsActive = Object.values(parsed.secrets ?? {}).filter(
+        (s) => s.status === 'active',
+      ).length;
+    } catch {
+      secretsStateExists = false;
+    }
+
+    // ── dashboard-state.json（deps / techdebt 卡）──
+    const dashState = await readDashboardState(projectPath);
+
+    // ── sentinel 运行时（sentinel 卡：enabled + open 事件计数，P1a-3 豁免不落盘）──
+    let sentinelEnabled = false;
+    let sentinelOpen = 0;
+    let sentinelLastEventAt: string | null = null;
+    try {
+      const { eventCenter } = await getSentinel();
+      const events = eventCenter.listEvents();
+      sentinelOpen = events.filter((e) => !RESOLVED_SENTINEL_STATUSES.has(e.status)).length;
+      const lastEvent = events.at(-1);
+      sentinelLastEventAt = lastEvent
+        ? lastEvent.timestamp instanceof Date
+          ? lastEvent.timestamp.toISOString()
+          : String(lastEvent.timestamp)
+        : null;
+      try {
+        const raw = await readFile(
+          path.join(app.getPath('userData'), 'sentinel-state.json'),
+          'utf-8',
+        );
+        const parsed = JSON.parse(raw) as { enabled?: boolean };
+        sentinelEnabled = parsed.enabled ?? true;
+      } catch {
+        sentinelEnabled = true;
+      }
+    } catch {
+      sentinelEnabled = false;
+    }
+
+    // ── scoring（总评分优先取库内最新）──
+    let score: HealthScoreData | null = null;
+    let currentScore: HealthScore | null = null;
+    try {
+      const scoring = await getScoring();
+      const current = scoring.getCurrent(projectPath);
+      if (current) {
+        currentScore = current;
+        score = toHealthScoreData(current);
+      }
+    } catch {
+      score = null;
+    }
+
+    const cards: DashboardCard[] = [
+      buildQualityCard(mergedQualityIssues, latestGeneratedAt, score, now),
+      buildGateCard(guardIssues, latestGeneratedAt, score, now),
+      buildSecurityCard(
+        secretsActive,
+        secretsStateExists,
+        dashState.secrets?.lastRunAt,
+        score,
+        now,
+      ),
+      buildDepsCard(dashState.deps, score, now),
+      buildTechDebtCard(dashState.techdebt, score, now),
+      buildSentinelCard(sentinelEnabled, sentinelOpen, sentinelLastEventAt, now),
+    ];
+
+    const overall = score ? score.score : computeFallbackOverall(cards);
+    const grade = currentScore ? currentScore.grade : gradeFromScore(overall);
+    const trend = currentScore ? currentScore.trend : 'stable';
+
+    return {
+      projectPath,
+      overall,
+      grade,
+      trend,
+      cards,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn(
+      '[engine:getDashboardOverview] 聚合读取失败:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
+/**
+ * 单域执行超时阈值（§六 风险②"单域超时独立熔断不拖垮整体"）。
+ * 取值依据：semgrep 冷启动 80-150s + 1200+ 文件 monorepo 巡检 151s（§4.3.2 实测），
+ * 单域最坏约 5 分钟；10 分钟为 2 倍余量的硬熔断线，防止任一域永久挂起拖垮整体。
+ */
+const DOMAIN_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** 给 Promise 加超时熔断：超时后 reject 并释放定时器（底层任务若仍运行则交 cancel 兜底） */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`域 ${label} 执行超时（>${ms}ms），已熔断跳过`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * 撤销某域在 TaskManager 中正在排队的任务（§六 风险② 熔断后的兜底清理）。
+ * 仅对走 TaskManager 的任务生效：deps/secrets 为纯函数直跑（无 TaskManager 任务），跳过。
+ */
+function cancelDomainTask(manager: TaskManager, domainKey: string, projectPath: string): void {
+  const kindByDomain: Record<string, string> = {
+    guard: 'guard',
+    inspect: 'inspect',
+    security: 'security',
+    techdebt: 'inspect',
+    refactor: 'refactor',
+    performance: 'performance',
+  };
+  const kind = kindByDomain[domainKey];
+  if (!kind) return;
+  for (const task of manager.list()) {
+    if (
+      task.kind === kind &&
+      task.projectPath === projectPath &&
+      (task.status === 'queued' || task.status === 'running')
+    ) {
+      manager.cancel(task.id);
+    }
+  }
+}
+
+/**
+ * 一键全检（engine:runFullCheck）：默认读 dashboard-state.json，仅重跑 lastRunAt 距今 >24h 的域；
+ * force:true 时全量 8 域。严格按序执行（并发=1，8GB 机器红线，方案 §3.3 ③ / §六）。
+ * guard/inspect/security 未在 dashboard-state.json 中跟踪 lastRunAt → 默认模式下始终重跑。
+ */
+async function runFullCheckHandler(
+  manager: TaskManager,
+  projectPath: string,
+  options?: { force?: boolean },
+): Promise<{ ok: boolean; reran: string[]; skipped: string[]; error?: string }> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    const force = options?.force === true;
+    const dashState = await readDashboardState(projectPath);
+    const now = Date.now();
+    const isStale = (lastRunAt?: string): boolean =>
+      !lastRunAt || now - new Date(lastRunAt).getTime() > DASHBOARD_FRESH_MS;
+
+    const domains: Array<{ key: string; stale: boolean; run: () => Promise<void> }> = [
+      {
+        key: 'guard',
+        stale: true,
+        run: async () => void (await runGuardHandler(manager, projectPath)),
+      },
+      {
+        key: 'inspect',
+        stale: true,
+        run: async () => void (await runInspectHandler(manager, projectPath)),
+      },
+      {
+        key: 'security',
+        stale: true,
+        run: async () => void (await runSecurityHandler(manager, projectPath)),
+      },
+      {
+        key: 'deps',
+        stale: isStale(dashState.deps?.lastRunAt),
+        run: async () => void (await runDepsHandler(projectPath)),
+      },
+      {
+        key: 'techdebt',
+        stale: isStale(dashState.techdebt?.lastRunAt),
+        run: async () => void (await runTechDebtHandler(manager, projectPath)),
+      },
+      {
+        key: 'secrets',
+        stale: isStale(dashState.secrets?.lastRunAt),
+        run: async () => void (await runSecretsHandler(projectPath)),
+      },
+      {
+        key: 'refactor',
+        stale: isStale(dashState.refactor?.lastRunAt),
+        run: async () => void (await runRefactorHandler(manager, projectPath)),
+      },
+      {
+        key: 'performance',
+        stale: isStale(dashState.performance?.lastRunAt),
+        run: async () => void (await runPerformanceHandler(manager, projectPath)),
+      },
+    ];
+
+    const reran: string[] = [];
+    const skipped: string[] = [];
+    for (const domain of domains) {
+      if (!force && !domain.stale) {
+        skipped.push(domain.key);
+        continue;
+      }
+      try {
+        await withTimeout(domain.run(), DOMAIN_TIMEOUT_MS, domain.key);
+        reran.push(domain.key);
+      } catch (err) {
+        console.warn(
+          `[engine:runFullCheck] ${domain.key} 执行失败:`,
+          err instanceof Error ? err.message : String(err),
+        );
+        cancelDomainTask(manager, domain.key, projectPath);
+        skipped.push(domain.key);
+      }
+    }
+    return { ok: reran.length > 0, reran, skipped };
+  } catch (err) {
+    console.error('[engine:runFullCheck] Error:', err instanceof Error ? err.message : String(err));
+    return {
+      ok: false,
+      reran: [],
+      skipped: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }

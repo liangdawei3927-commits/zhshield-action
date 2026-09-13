@@ -244,6 +244,53 @@ export interface DepsRelockResult {
   error?: string;
 }
 
+/** 仪表盘六域 key（P1b：quality / security / dependencies / techdebt / gate / sentinel） */
+export type DashboardDomainKey =
+  | 'quality'
+  | 'security'
+  | 'dependencies'
+  | 'techdebt'
+  | 'gate'
+  | 'sentinel';
+
+/** 仪表盘分域卡片（P1b：getDashboardOverview → cards，共六张） */
+export interface DashboardCard {
+  key: DashboardDomainKey;
+  /** not-run 未运行 / scored 新鲜 / expired 超过 24h 未跑 */
+  status: 'not-run' | 'scored' | 'expired';
+  /** 域问题条数（not-run 时为 0） */
+  issues?: number;
+  /** 域健康分 0-100（无评分来源时不返回） */
+  score?: number;
+  /** 最近运行时间（ISO 8601；not-run 时缺失） */
+  lastRunAt?: string;
+  /** 域摘要文本（如 "3 error / 5 warning"） */
+  summary?: string;
+}
+
+/** 聚合仪表盘总览（engine:getDashboardOverview 返回值；纯只读聚合，不触发扫描） */
+export interface DashboardOverview {
+  projectPath: string;
+  /** 加权总分 0-100 */
+  overall: number;
+  /** 健康等级 A/B/C/D */
+  grade: string;
+  /** 评分趋势（stable / up / down） */
+  trend: string;
+  /** 六卡数据 */
+  cards: DashboardCard[];
+  /** 聚合生成时间（ISO 8601） */
+  generatedAt: string;
+}
+
+/** 一键全检执行结果（engine:runFullCheck 返回值：已重跑 / 已跳过域列表） */
+export interface RunFullCheckResult {
+  ok: boolean;
+  reran: string[];
+  skipped: string[];
+  error?: string;
+}
+
 /** 依赖管家结果（serializable，来自 @zh/dependency 依赖管家引擎） */
 export interface DependencyReportData {
   schemaVersion: number;
@@ -446,6 +493,11 @@ export interface EngineAPI {
   runProfile: (
     projectPath: string,
   ) => Promise<{ profile: unknown; questions: unknown; drift: unknown }>;
+  getDashboardOverview: (projectPath: string) => Promise<DashboardOverview | null>;
+  runFullCheck: (
+    projectPath: string,
+    options?: { force?: boolean },
+  ) => Promise<RunFullCheckResult>;
 }
 
 export interface SyncAPI {

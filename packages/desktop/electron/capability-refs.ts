@@ -200,9 +200,10 @@ export function markReclaimed(refs: CapabilityRefs, toolIds: ToolId[]): Capabili
  * 拆分云端 resolve 结果（R3-b）：toolId 清单（运行层 setRemoteToolIds 用）
  * + languagesByTool 映射（账本 claim 写入用）。纯函数，仅形状转换。
  */
-export function splitResolvedTools(
-  tools: Array<{ toolId: string; languages: string[] }>,
-): { toolIds: ToolId[]; languagesByTool: LanguagesByTool } {
+export function splitResolvedTools(tools: Array<{ toolId: string; languages: string[] }>): {
+  toolIds: ToolId[];
+  languagesByTool: LanguagesByTool;
+} {
   const toolIds: ToolId[] = [];
   const languagesByTool: LanguagesByTool = {};
   for (const tool of tools) {

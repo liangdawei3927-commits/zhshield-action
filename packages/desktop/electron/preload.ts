@@ -138,6 +138,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
     ) => ipcRenderer.invoke('engine:runPipeline', projectPath, options),
     runProfile: (projectPath: string) => ipcRenderer.invoke('engine:runProfile', projectPath),
+    getDashboardOverview: (projectPath: string) =>
+      ipcRenderer.invoke('engine:getDashboardOverview', projectPath),
+    runFullCheck: (projectPath: string, options?: { force?: boolean }) =>
+      ipcRenderer.invoke('engine:runFullCheck', projectPath, options),
   },
 
   // ─── 统一任务调度（受限并发 + 排队，状态/进度实时广播）────
@@ -292,10 +296,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   e2e: {
     countSoftDeletedData: (projectPath: string) =>
       ipcRenderer.invoke('e2e:countSoftDeletedData', projectPath),
-    countTotalData: (projectPath: string) =>
-      ipcRenderer.invoke('e2e:countTotalData', projectPath),
+    countTotalData: (projectPath: string) => ipcRenderer.invoke('e2e:countTotalData', projectPath),
     getCachedProfileProjectPath: () => ipcRenderer.invoke('e2e:getCachedProfileProjectPath'),
-    setCachedProfile: (projectPath: string) => ipcRenderer.invoke('e2e:setCachedProfile', projectPath),
+    setCachedProfile: (projectPath: string) =>
+      ipcRenderer.invoke('e2e:setCachedProfile', projectPath),
     seedOrphanData: (projectPath: string) => ipcRenderer.invoke('e2e:seedOrphanData', projectPath),
   },
 });

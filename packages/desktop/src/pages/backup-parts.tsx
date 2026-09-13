@@ -1,10 +1,5 @@
 import type { BackupRecordData, BackupResultData, BackupProgressData } from '../types/electron';
-import {
-  STATUS_LABEL,
-  TYPE_LABEL,
-  formatTime,
-  useBackupSchedule,
-} from './backup-logic';
+import { STATUS_LABEL, TYPE_LABEL, formatTime, useBackupSchedule } from './backup-logic';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BackupRecordsPanel } from './backup-records';
 import { Bounce } from '../components/ui/Bounce';
@@ -134,9 +129,7 @@ export function BackupScheduleCard({ projectPath }: { projectPath: string }) {
       )}
 
       {!enabled && (
-        <p className="mt-2 text-xs text-zh-muted">
-          {t('page.backup.schedule.descOff')}
-        </p>
+        <p className="mt-2 text-xs text-zh-muted">{t('page.backup.schedule.descOff')}</p>
       )}
     </div>
   );

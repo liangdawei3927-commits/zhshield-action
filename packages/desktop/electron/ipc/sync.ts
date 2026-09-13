@@ -141,9 +141,7 @@ export async function syncSopModulesForProfile(
     if (needed.length > 0) {
       try {
         const refs = await loadCapabilityRefs();
-        await saveCapabilityRefs(
-          claimSopModuleRefs(refs, deriveProjectId(projectPath), needed),
-        );
+        await saveCapabilityRefs(claimSopModuleRefs(refs, deriveProjectId(projectPath), needed));
       } catch (err) {
         console.warn(
           '[sync:SOP:R2] SOP 模块领取记账失败（best-effort 跳过）:',

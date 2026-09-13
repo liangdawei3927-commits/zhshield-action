@@ -34,6 +34,8 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
     handleMarkRotating,
     handleVerifyRotated,
     handleDismiss,
+    copyToAi: secretsCopyToAi,
+    copyAllToAi: secretsCopyAllToAi,
   } = useSecretsPage(projectPath);
   const [tab, setTab] = useState<SecurityTab>('vuln');
 
@@ -81,6 +83,8 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
               onMarkRotating={handleMarkRotating}
               onVerifyRotated={handleVerifyRotated}
               onDismiss={handleDismiss}
+              onCopyToAi={secretsCopyToAi}
+              onCopyAll={secretsCopyAllToAi}
             />
           ) : (
             <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">

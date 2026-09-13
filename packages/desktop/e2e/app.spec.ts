@@ -55,7 +55,8 @@ const ELECTRON_BIN = (() => {
 })();
 
 /** 种子项目路径：默认指向本 monorepo 根（随仓库位置自适应，CI 可用 ZH_E2E_PROJECT_PATH 覆盖） */
-const DEMO_PROJECT_PATH = process.env.ZH_E2E_PROJECT_PATH ?? path.resolve(__dirname, '..', '..', '..');
+const DEMO_PROJECT_PATH =
+  process.env.ZH_E2E_PROJECT_PATH ?? path.resolve(__dirname, '..', '..', '..');
 
 /**
  * 剥离会污染被测应用的宿主环境变量：
@@ -84,11 +85,7 @@ async function launchApp(
     mkdirSync(userDataDir, { recursive: true });
     writeFileSync(
       path.join(userDataDir, 'projects.json'),
-      JSON.stringify(
-        [{ name: 'demo', path: DEMO_PROJECT_PATH }],
-        null,
-        2,
-      ),
+      JSON.stringify([{ name: 'demo', path: DEMO_PROJECT_PATH }], null, 2),
       'utf-8',
     );
   }
@@ -135,23 +132,30 @@ test.describe('智汇码盾桌面端 E2E', () => {
     await expect(page.getByText('健康评分')).toBeVisible();
   });
 
-  test('有项目时渲染完整布局（TopNav 十项导航 + 底部状态栏）', async () => {
+  test('有项目时渲染完整布局（TopNav 十项导航）', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     // 断言对象与 nav.* i18n 键对齐：项目体检/门禁系统/哨兵监控…
-    for (const nav of ['项目体检', '门禁系统', '哨兵监控', '智能巡检', '安全中心', '技术债务', '代码重构']) {
+    for (const nav of [
+      '项目体检',
+      '门禁系统',
+      '哨兵监控',
+      '质量巡检',
+      '安全中心',
+      '技术债务',
+      '代码重构',
+    ]) {
       await expect(navBar(page).getByRole('button', { name: nav })).toBeVisible();
     }
     await expect(page.getByRole('button', { name: 'demo', exact: true })).toBeVisible();
-    await expect(page.getByText('实时防护')).toBeVisible();
     // 切换到门禁系统页不崩溃，导航仍可用
     await navBar(page).getByRole('button', { name: '门禁系统' }).click();
     await expect(navBar(page).getByRole('button', { name: '门禁系统' })).toBeVisible();
   });
 
-  test('顶部导航切换到智能巡检 / 安全中心 / 技术债务，Banner 进入报告中心', async () => {
+  test('顶部导航切换到质量巡检 / 安全中心 / 技术债务，Banner 进入报告中心', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     // 各页空态标题与 page.<x>.empty.title i18n 键对齐（种子项目无扫描数据 → 空态）
-    await navBar(page).getByRole('button', { name: '智能巡检' }).click();
+    await navBar(page).getByRole('button', { name: '质量巡检' }).click();
     await expect(page.getByText('检查构建产物，确保交付质量')).toBeVisible();
 
     await navBar(page).getByRole('button', { name: '安全中心' }).click();
@@ -195,16 +199,20 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // 预置：5 表孤儿行 + cachedProfile 归属 demo 项目 + 账本 eslint 引用 demo 项目
     await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: { e2e?: { seedOrphanData?: (projectPath: string) => Promise<void> } };
-        }).electronAPI?.e2e?.seedOrphanData?.(p),
+        (
+          window as unknown as {
+            electronAPI?: { e2e?: { seedOrphanData?: (projectPath: string) => Promise<void> } };
+          }
+        ).electronAPI?.e2e?.seedOrphanData?.(p),
       DEMO_PROJECT_PATH,
     );
     await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
-        }).electronAPI?.e2e?.setCachedProfile?.(p),
+        (
+          window as unknown as {
+            electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
+          }
+        ).electronAPI?.e2e?.setCachedProfile?.(p),
       DEMO_PROJECT_PATH,
     );
     // 账本预置：eslint 被 demo 项目引用（active）→ 删除后 releaseProjectRefs 使 refs 空 → reclaiming
@@ -231,9 +239,13 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // 预置后 5 表各 1 行（未软删）
     const totalBefore = await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: { e2e?: { countTotalData?: (projectPath: string) => Promise<Record<string, number>> } };
-        }).electronAPI?.e2e?.countTotalData?.(p),
+        (
+          window as unknown as {
+            electronAPI?: {
+              e2e?: { countTotalData?: (projectPath: string) => Promise<Record<string, number>> };
+            };
+          }
+        ).electronAPI?.e2e?.countTotalData?.(p),
       DEMO_PROJECT_PATH,
     );
     expect(totalBefore).toEqual({
@@ -248,11 +260,13 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // 且本用例关注清理链而非渲染链，故绕过 UI 直接调 API）
     const result = await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: {
-            removeProject?: (projectPath: string) => Promise<{ ok: boolean; errors?: string[] }>;
-          };
-        }).electronAPI?.removeProject?.(p),
+        (
+          window as unknown as {
+            electronAPI?: {
+              removeProject?: (projectPath: string) => Promise<{ ok: boolean; errors?: string[] }>;
+            };
+          }
+        ).electronAPI?.removeProject?.(p),
       DEMO_PROJECT_PATH,
     );
 
@@ -264,11 +278,15 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // ② 5 表软删：删除后预置的孤儿行全部被打上 deleted_at（计数 = 预置数）
     const softDeleted = await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: {
-            e2e?: { countSoftDeletedData?: (projectPath: string) => Promise<Record<string, number>> };
-          };
-        }).electronAPI?.e2e?.countSoftDeletedData?.(p),
+        (
+          window as unknown as {
+            electronAPI?: {
+              e2e?: {
+                countSoftDeletedData?: (projectPath: string) => Promise<Record<string, number>>;
+              };
+            };
+          }
+        ).electronAPI?.e2e?.countSoftDeletedData?.(p),
       DEMO_PROJECT_PATH,
     );
     expect(softDeleted).toEqual({
@@ -279,22 +297,24 @@ test.describe('智汇码盾桌面端 E2E', () => {
       sentinel_events: 1,
     });
     // ③ cachedProfile 清空：删除后归属项目路径为 null
-    const cachedPath = await page.evaluate(
-      () =>
-        (window as unknown as {
+    const cachedPath = await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: { e2e?: { getCachedProfileProjectPath?: () => Promise<string | null> } };
-        }).electronAPI?.e2e?.getCachedProfileProjectPath?.(),
+        }
+      ).electronAPI?.e2e?.getCachedProfileProjectPath?.(),
     );
     expect(cachedPath).toBeNull();
     // ⑤ 回收能力缺席后续扫描：删除后 releaseProjectRefs 使 refs 空 → reclaiming，
     //    触发一次 sync:rulesStatus，被回收能力应缺席（复用 reclaiming 剔除结构）
-    const status = await page.evaluate(
-      () =>
-        (window as unknown as {
+    const status = await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: {
             sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
           };
-        }).electronAPI?.sync?.getRulesStatus?.(),
+        }
+      ).electronAPI?.sync?.getRulesStatus?.(),
     );
     const toolIds = (status ?? []).map((s) => s.toolId);
     // 删除后无项目引用 → 无能力被领取，eslint 不在运行清单（与 reclaiming 用例同构）
@@ -324,13 +344,14 @@ test.describe('智汇码盾桌面端 E2E', () => {
     );
 
     // 真实主进程回包：sync:rulesStatus 经 getActiveToolIds 过滤，reclaiming 工具应缺席
-    const status = await page.evaluate(
-      () =>
-        (window as unknown as {
+    const status = await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: {
             sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
           };
-        }).electronAPI?.sync?.getRulesStatus?.(),
+        }
+      ).electronAPI?.sync?.getRulesStatus?.(),
     );
 
     const toolIds = (status ?? []).map((s) => s.toolId);
@@ -369,41 +390,46 @@ test.describe('智汇码盾桌面端 E2E', () => {
     // 预置画像缓存归属 seeded 项目：claim 步骤以 getCachedProfileProjectPath 为入口（无归属则跳过 claim）
     await page.evaluate(
       (p) =>
-        (window as unknown as {
-          electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
-        }).electronAPI?.e2e?.setCachedProfile?.(p),
+        (
+          window as unknown as {
+            electronAPI?: { e2e?: { setCachedProfile?: (projectPath: string) => Promise<void> } };
+          }
+        ).electronAPI?.e2e?.setCachedProfile?.(p),
       DEMO_PROJECT_PATH,
     );
 
     // 唤醒前：eslint 处于 reclaiming → 运行层剔除（基线断言）
-    const before = await page.evaluate(
-      () =>
-        (window as unknown as {
+    const before = await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: {
             sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
           };
-        }).electronAPI?.sync?.getRulesStatus?.(),
+        }
+      ).electronAPI?.sync?.getRulesStatus?.(),
     );
     expect((before ?? []).map((s) => s.toolId)).not.toContain('eslint');
 
     // 触发一次 syncRules：claim 步骤（未过滤清单）把 seeded 项目 id 写入 eslint refs → 唤醒
-    await page.evaluate(
-      () =>
-        (window as unknown as {
+    await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: {
             sync?: { syncRules?: () => Promise<unknown> };
           };
-        }).electronAPI?.sync?.syncRules?.(),
+        }
+      ).electronAPI?.sync?.syncRules?.(),
     );
 
     // 唤醒后：eslint 恢复 active → 运行层重新纳入运行清单
-    const after = await page.evaluate(
-      () =>
-        (window as unknown as {
+    const after = await page.evaluate(() =>
+      (
+        window as unknown as {
           electronAPI?: {
             sync?: { getRulesStatus?: () => Promise<Array<{ toolId: string }>> };
           };
-        }).electronAPI?.sync?.getRulesStatus?.(),
+        }
+      ).electronAPI?.sync?.getRulesStatus?.(),
     );
     expect((after ?? []).map((s) => s.toolId)).toContain('eslint');
   });

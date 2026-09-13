@@ -31,6 +31,8 @@ import type {
   DepsRelockResult,
   TechDebtReportData,
   SecretReportData,
+  DashboardOverview,
+  RunFullCheckResult,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 import {
@@ -452,6 +454,46 @@ export async function runPipeline(
     };
   }
   return api.engine.runPipeline(projectPath, options);
+}
+
+// ─── Dashboard 聚合仪表盘（P1b 体检页）──────────────────────
+
+/** 聚合仪表盘总览：读各域落盘结果 + scoring；无数据/引擎不可用时返回 null */
+export async function getDashboardOverview(
+  projectPath: string,
+): Promise<DashboardOverview | null> {
+  if (isHttpMode()) return null;
+  const api = getAPI();
+  if (!api?.engine) return null;
+  try {
+    return await api.engine.getDashboardOverview(projectPath);
+  } catch {
+    return null;
+  }
+}
+
+/** 一键全检：默认读缓存 + 仅重跑已过期域；force=true 强制全量重跑 */
+export async function runFullCheck(
+  projectPath: string,
+  options?: { force?: boolean },
+): Promise<RunFullCheckResult> {
+  if (isHttpMode()) {
+    return { ok: false, reran: [], skipped: [], error: t('engine.engineUnavailable') };
+  }
+  const api = getAPI();
+  if (!api?.engine) {
+    return { ok: false, reran: [], skipped: [], error: t('engine.engineUnavailable') };
+  }
+  try {
+    return await api.engine.runFullCheck(projectPath, options);
+  } catch (err) {
+    return {
+      ok: false,
+      reran: [],
+      skipped: [],
+      error: err instanceof Error ? err.message : t('engine.engineUnavailable'),
+    };
+  }
 }
 
 // ─── Sentinel 哨兵监控 ────────────────────────────────────

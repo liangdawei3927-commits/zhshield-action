@@ -16,7 +16,7 @@ interface PrimaryButtonProps extends Omit<
 
 /**
  * 全局统一主操作按钮：所有页面中间按钮的唯一大小与配色
- * （品牌盾青渐变，180 x 48 圆角胶囊，白字加粗）
+ * （品牌盾青渐变，220 x 56 圆角胶囊，白字加粗，放大档与全站 PageShell 骨架统一）
  */
 export function PrimaryButton({
   children,
@@ -32,7 +32,7 @@ export function PrimaryButton({
       as="button"
       disabled={disabled || loading}
       className={`
-        w-[180px] h-12 rounded-full text-white font-semibold text-sm
+        w-[220px] h-14 rounded-full text-white font-semibold text-base
         bg-gradient-to-r from-brand-600 to-brand-800
         shadow-lg shadow-black/10 hover:shadow-xl hover:shadow-black/15
         active:scale-[0.97] transition-all duration-200

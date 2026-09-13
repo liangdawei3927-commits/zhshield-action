@@ -716,15 +716,7 @@
     "toggleGate": "Automated L1 L2 L3 gate check",
     "toggleGateLabel": "Gate",
     "toggleSentinel": "24/7 round-the-clock protection",
-    "toggleSentinelLabel": "Sentinel",
-    "statusBarLabel": "Live Protection",
-    "statusBarChecking": "Checking…",
-    "statusBarGuardOn": "Guard intercepting",
-    "statusBarGuardOff": "Guard disabled",
-    "statusBarSentinelOn": "Sentinel monitoring",
-    "statusBarSentinelOff": "Sentinel off",
-    "statusBarRulesSynced": "Rules synced",
-    "statusBarRulesStale": "Rules outdated"
+    "toggleSentinelLabel": "Sentinel"
   },
   "lifecycle": {
     "archive": "Archive",
@@ -759,7 +751,7 @@
     "evolve": "Evolve",
     "garbage": "Garbage Cleanup",
     "guard": "Gate System",
-    "inspect": "Inspect",
+    "inspect": "Quality Inspection",
     "performance": "Performance",
     "refactor": "Refactor",
     "reports": "Reports",
@@ -884,6 +876,23 @@
         }
       },
       "check": "One-click checkup",
+      "card": {
+        "dependencies": "Dependencies",
+        "gate": "Gate Check",
+        "hoursAgo": "{{count}}h ago",
+        "issues": "{{count}} issues",
+        "justNow": "Just now",
+        "lastRun": "Last run: {{time}}",
+        "minutesAgo": "{{count}}m ago",
+        "neverRun": "Never run",
+        "quality": "Quality",
+        "score": "{{score}} pts",
+        "security": "Security",
+        "sentinel": "Sentinel",
+        "techdebt": "Tech Debt",
+        "weightTip": "{{pct}}% of overall score",
+        "weightExcluded": "Sentinel is not part of overall score"
+      },
       "copy": {
         "guardSource": "Gate · Prevention",
         "inspectSource": "Inspection"
@@ -909,6 +918,17 @@
         }
       },
       "guardSlogan": "Smart guardian: security · governance · operations",
+      "overview": {
+        "generatedAt": "Updated at {{time}}",
+        "title": "Project Health Overview",
+        "subtitle": "Guard project health with one-click full checks",
+        "trendDown": "Down from last run",
+        "trendFlat": "Same as last run",
+        "trendUp": "Up from last run",
+        "issuesFound": "{{count}} key issues found",
+        "noIssues": "No key issues — all good",
+        "notChecked": "Not checked yet — run a full check to get a health report"
+      },
       "productIntro": {
         "subtitle": "Built around security, governance, and operations, guarding every line of code",
         "title": "The smart guardian of the code world"
@@ -942,6 +962,13 @@
         "healthScore": "Health score",
         "notChecked": "Not checked yet"
       },
+      "runCheck": {
+        "expiredHint": "Some results are stale. Run a full check to refresh.",
+        "forceHint": "Ignores cache, re-runs all 6 checks serially (~5-10 min, measured). Continue?",
+        "forceTitle": "Force full re-run",
+        "hint": "Uses cache, re-runs only stale checks (~1-3 min by default)",
+        "title": "Full Check"
+      },
       "running": "Checkup in progress…",
       "sanitize": {
         "autoFixStarted": "OpenCode auto fix started",
@@ -963,20 +990,27 @@
       },
       "stageGuard": "· Gate",
       "stageInspect": "· Inspection",
+      "status": {
+        "expired": "Stale",
+        "notRun": "Not run"
+      },
       "toast": {
         "addProjectFirst": "Add a project to check first",
+        "allFresh": "All results are up to date, nothing to re-run",
         "completed": "Checkup complete: {{total}} checks, {{passed}} passed",
-        "copiedIssues": "Copied {{count}} issues; paste them into AI to fix",
+        "copiedIssues": "Copied {{count}} issues, paste into AI to fix",
         "copyFailed": "Copy failed",
         "executionFailed": "Checkup execution failed",
         "failed": "Checkup execution failed: {{error}}",
         "foundIssues": "Checkup complete: found {{count}} issues",
+        "fullCheckDone": "Full check done: re-ran {{count}} checks",
         "noValidItems": "Checkup complete, but no valid checks ran (check the project path)"
       },
       "welcome": "Welcome to ZhiHui CodeShield"
     },
     "deps": {
       "checking": "Taking inventory...",
+      "source": "Dependency Manager",
       "done": "Dependency Manager complete",
       "ecosystem": "Ecosystem",
       "empty": {
@@ -1069,8 +1103,10 @@
       "trust.verified": "Verified",
       "typosquat": "Typosquat detection",
       "typosquat.checkFailed": "Typosquat detection failed",
+      "typosquat.copyAllPrompt": "{{count}} potentially poisoned dependencies; copy them all to AI in one click",
       "typosquat.none": "No typosquatting dependencies found",
       "typosquat.resembles": "Resembles well-known package {{target}} (similarity {{score}})",
+      "typosquat.suggestion": "Verify the dependency's source and maintainer are official; remove and replace with the official package if needed, and pin a secure version",
       "typosquat.total": "{{count}} suspicious",
       "upgrade": "Upgrade assessment",
       "upgrade.breaking": "Breaking changes",
@@ -1268,8 +1304,13 @@
         "license": {
           "desc": "Identifies open-source license compatibility and compliance risks",
           "title": "License scan"
-        }
+        },
+        "tsType": {},
+        "complexity": {},
+        "nest": {},
+        "docs": {}
       },
+      "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} passed",
       "scanNow": "Inspect now",
       "scanning": "Inspecting...",
@@ -1429,6 +1470,23 @@
         "good": "Good",
         "needsImprovement": "Needs improvement"
       },
+      "dimension": {
+        "quality": "Quality",
+        "security": "Security",
+        "architecture": "Architecture",
+        "dependencies": "Dependencies",
+        "documentation": "Documentation",
+        "refactor": "Refactoring",
+        "performance": "Performance",
+        "techdebt": "Tech Debt",
+        "gate": "Gate Sentinel"
+      },
+      "grade": {
+        "A": "Grade A",
+        "B": "Grade B",
+        "C": "Grade C",
+        "D": "Grade D"
+      },
       "table": {
         "abnormal": "Abnormal",
         "col": {
@@ -1443,6 +1501,9 @@
       "title": "Analysis reports"
     },
     "secrets": {
+      "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
+      "source": "Key Management",
+      "suggestion": "Replace with environment variables or a key management service, and rotate any secret already pushed to remote immediately",
       "action": {
         "dismiss": "Dismiss",
         "dismissConfirm": "Dismissal stops alerts and records it in the experience pool",
@@ -1815,7 +1876,7 @@
     "inspect": {
       "fullScanning": "Running quality inspection…",
       "jobDone": "Inspection complete",
-      "jobScanning": "Running smart inspection…",
+      "jobScanning": "Running quality inspection…",
       "sopScanning": "Running quality inspection (type safety / dependencies / standards)…"
     },
     "jobTimeout": "Operation timed out ({{timeoutMs}}ms)",

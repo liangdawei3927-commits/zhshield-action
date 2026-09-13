@@ -716,15 +716,7 @@
     "toggleGate": "자동화 L1 L2 L3 게이트 검사",
     "toggleGateLabel": "게이트",
     "toggleSentinel": "24/7 연중무휴 보호",
-    "toggleSentinelLabel": "센티넬",
-    "statusBarLabel": "실시간 보호",
-    "statusBarChecking": "확인 중…",
-    "statusBarGuardOn": "가드 차단 중",
-    "statusBarGuardOff": "가드 비활성",
-    "statusBarSentinelOn": "센티넬 감시 중",
-    "statusBarSentinelOff": "센티넬 중지",
-    "statusBarRulesSynced": "규칙 동기화됨",
-    "statusBarRulesStale": "규칙 업데이트 필요"
+    "toggleSentinelLabel": "센티넬"
   },
   "lifecycle": {
     "archive": "보관",
@@ -759,7 +751,7 @@
     "evolve": "규칙 진화",
     "garbage": "쓰레기 정리",
     "guard": "게이트 시스템",
-    "inspect": "지능형 점검",
+    "inspect": "품질 점검",
     "performance": "성능 최적화",
     "refactor": "코드 리팩토링",
     "reports": "보고서 센터",
@@ -884,6 +876,23 @@
         }
       },
       "check": "원클릭 점검",
+      "card": {
+        "dependencies": "의존성",
+        "gate": "게이트 검사",
+        "hoursAgo": "{{count}}시간 전",
+        "issues": "{{count}}건",
+        "justNow": "방금",
+        "lastRun": "최근 실행: {{time}}",
+        "minutesAgo": "{{count}}분 전",
+        "neverRun": "실행 이력 없음",
+        "quality": "품질 검사",
+        "score": "{{score}}점",
+        "security": "보안",
+        "sentinel": "센티널",
+        "techdebt": "기술 부채",
+        "weightTip": "총점의 {{pct}}%",
+        "weightExcluded": "센티널은 총점에 포함되지 않습니다"
+      },
       "copy": {
         "guardSource": "게이트·예방",
         "inspectSource": "점검"
@@ -909,6 +918,17 @@
         }
       },
       "guardSlogan": "지능형 수호자: 보안 · 거버넌스 · 운영",
+      "overview": {
+        "generatedAt": "{{time}} 업데이트",
+        "title": "프로젝트 건강 개요",
+        "subtitle": "프로젝트 건강을 지키는 원클릭 전체 점검",
+        "trendDown": "이전보다 하락",
+        "trendFlat": "이전과 동일",
+        "trendUp": "이전보다 상승",
+        "issuesFound": "핵심 문제 {{count}}건이 발견되었습니다",
+        "noIssues": "핵심 문제가 발견되지 않았습니다",
+        "notChecked": "아직 점검하지 않았습니다. 전체 점검을 실행하세요"
+      },
       "productIntro": {
         "subtitle": "보안, 거버넌스, 운영을 핵심으로 모든 코드 라인을 수호합니다",
         "title": "코드 세계의 지능형 수호자"
@@ -942,6 +962,13 @@
         "healthScore": "건강 점수",
         "notChecked": "아직 점검하지 않음"
       },
+      "runCheck": {
+        "expiredHint": "일부 검사 결과가 만료되었습니다. 전체 검사를 실행해 주세요.",
+        "forceHint": "캐시를 무시하고 전체 6개 검사를 직렬 재실행(실측 약 5~10분). 계속하시겠습니까?",
+        "forceTitle": "강제 전체 재실행",
+        "hint": "캐시를 사용하고 만료된 검사만 다시 실행(기본 약 1~3분)",
+        "title": "전체 검사"
+      },
       "running": "점검 진행 중…",
       "sanitize": {
         "autoFixStarted": "OpenCode 자동 수정이 시작되었습니다",
@@ -963,20 +990,27 @@
       },
       "stageGuard": "· 게이트",
       "stageInspect": "· 점검",
+      "status": {
+        "expired": "결과 만료",
+        "notRun": "미검사"
+      },
       "toast": {
         "addProjectFirst": "먼저 점검할 프로젝트를 추가하세요",
-        "completed": "점검 완료: 검사 {{total}}개, 통과 {{passed}}개",
-        "copiedIssues": "문제 {{count}}건이 복사되었습니다. AI에 붙여넣어 수정할 수 있습니다",
+        "allFresh": "모든 검사 결과가 최신입니다. 재실행이 필요 없습니다",
+        "completed": "점검 완료: {{total}}개 검사, {{passed}}개 통과",
+        "copiedIssues": "문제 {{count}}건을 복사했습니다. AI에 붙여넣어 수정할 수 있습니다",
         "copyFailed": "복사 실패",
         "executionFailed": "점검 실행 실패",
         "failed": "점검 실행 실패: {{error}}",
         "foundIssues": "점검 완료: 문제 {{count}}건 발견",
+        "fullCheckDone": "전체 검사 완료: {{count}}건 재실행",
         "noValidItems": "점검이 완료되었지만 유효한 검사 항목이 실행되지 않았습니다 (프로젝트 경로를 확인하세요)"
       },
       "welcome": "ZhiYun Shield에 오신 것을 환영합니다"
     },
     "deps": {
       "checking": "점검 중...",
+      "source": "의존성 관리자",
       "done": "의존성 점검 완료",
       "ecosystem": "생태계",
       "empty": {
@@ -1069,8 +1103,10 @@
       "trust.verified": "신뢰됨",
       "typosquat": "타이포스쿼팅 탐지",
       "typosquat.checkFailed": "타이포스쿼팅 탐지 실패",
+      "typosquat.copyAllPrompt": "독소 의심 항목 {{count}}개. 버튼 한 번으로 전체를 복사해 AI로 수정할 수 있습니다",
       "typosquat.none": "타이포스쿼팅 의심 의존성이 발견되지 않았습니다",
       "typosquat.resembles": "잘 알려진 패키지 {{target}}과(와) 유사 (유사도 {{score}})",
+      "typosquat.suggestion": "의존성의 출처와 관리자가 공식인지 확인하고, 필요하면 제거 후 공식 패키지로 교체한 뒤 안전한 버전으로 고정하세요",
       "typosquat.total": "의심 항목 {{count}}건",
       "upgrade": "업그레이드 평가",
       "upgrade.breaking": "호환성 파괴 변경",
@@ -1267,8 +1303,13 @@
         "license": {
           "desc": "오픈소스 라이선스 호환성과 규정 준수 위험 식별",
           "title": "License 스캔"
-        }
+        },
+        "tsType": {},
+        "complexity": {},
+        "nest": {},
+        "docs": {}
       },
+      "groupTitle": {},
       "passedCount": "{{passed}}/{{total}}개 항목 통과",
       "scanNow": "지금 점검",
       "scanning": "점검 중...",
@@ -1708,6 +1749,9 @@
       }
     },
     "secrets": {
+      "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
+      "source": "비밀키 관리",
+      "suggestion": "환경 변수 또는 비밀키 관리 서비스로 대체하고, 원격에 이미 푸시된 시크릿은 즉시 순환하세요",
       "action": {
         "dismiss": "무시",
         "dismissConfirm": "무시하면 더 이상 경고하지 않으며 경험 풀에 기록됩니다",
@@ -1815,7 +1859,7 @@
     "inspect": {
       "fullScanning": "품질 점검 중…",
       "jobDone": "점검 완료",
-      "jobScanning": "지능형 점검 중…",
+      "jobScanning": "품질 점검 중…",
       "sopScanning": "품질 점검 중 (타입 안전성 / 의존성 / 규범)…"
     },
     "jobTimeout": "작업 시간 초과 ({{timeoutMs}}ms)",

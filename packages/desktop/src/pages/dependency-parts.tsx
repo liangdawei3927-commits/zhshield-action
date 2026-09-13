@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
-import type { DependencyReportData } from '../types/electron';
+import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
+import { CopyToAiButton } from '../components/ui/CopyToAiButton';
+import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import {
   LICENSE_CATEGORY_CONFIG,
   LICENSE_CATEGORY_ORDER,
@@ -462,7 +464,15 @@ function AdapterErrorNote({ title, message }: { title: string; message?: string 
 }
 
 /** 投毒检测卡片：可疑依赖清单（风险徽章 + 相似知名包 + 判定证据） */
-export function DependencyTyposquatCard({ report }: { report: DependencyReportData }) {
+export function DependencyTyposquatCard({
+  report,
+  onCopyToAi,
+  onCopyAll,
+}: {
+  report: DependencyReportData;
+  onCopyToAi: (finding: TyposquatFindingData) => void;
+  onCopyAll: (findings: TyposquatFindingData[]) => void;
+}) {
   const t = useT();
   const findings = report.typosquatFindings;
   return (
@@ -503,42 +513,51 @@ export function DependencyTyposquatCard({ report }: { report: DependencyReportDa
           </span>
         </div>
       ) : (
-        <div className="space-y-3">
-          {findings.map((finding) => {
-            const cfg = RISK_BADGE_CONFIG[finding.risk] ?? RISK_BADGE_CONFIG.low;
-            return (
-              <div key={finding.nodeId} className="rounded-lg border border-zh-line p-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zh-ink-2">{finding.nodeId}</span>
-                  <span
-                    className="px-2 py-0.5 rounded text-[10px] font-medium"
-                    style={{ background: cfg.bg, color: cfg.color }}
-                  >
-                    {t(cfg.labelKey)}
-                  </span>
-                </div>
-                {finding.signals.nameSimilarity && (
-                  <div className="mt-1 text-xs text-zh-muted">
-                    {t('page.deps.typosquat.resembles', {
-                      target: finding.signals.nameSimilarity.target,
-                      score: finding.signals.nameSimilarity.score,
-                    })}
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-zh-muted">
+              {t('page.deps.typosquat.copyAllPrompt', { count: findings.length })}
+            </span>
+            <CopyAllToAiButton onClick={() => onCopyAll(findings)} />
+          </div>
+          <div className="space-y-3">
+            {findings.map((finding) => {
+              const cfg = RISK_BADGE_CONFIG[finding.risk] ?? RISK_BADGE_CONFIG.low;
+              return (
+                <div key={finding.nodeId} className="rounded-lg border border-zh-line p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zh-ink-2">{finding.nodeId}</span>
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-medium"
+                      style={{ background: cfg.bg, color: cfg.color }}
+                    >
+                      {t(cfg.labelKey)}
+                    </span>
+                    <CopyToAiButton className="ml-auto" onClick={() => onCopyToAi(finding)} />
                   </div>
-                )}
-                {finding.evidence.length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5">
-                    {finding.evidence.map((item) => (
-                      <li key={item} className="text-[11px] text-zh-muted flex gap-1.5">
-                        <span className="shrink-0">•</span>
-                        <span className="break-all">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {finding.signals.nameSimilarity && (
+                    <div className="mt-1 text-xs text-zh-muted">
+                      {t('page.deps.typosquat.resembles', {
+                        target: finding.signals.nameSimilarity.target,
+                        score: finding.signals.nameSimilarity.score,
+                      })}
+                    </div>
+                  )}
+                  {finding.evidence.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {finding.evidence.map((item) => (
+                        <li key={item} className="text-[11px] text-zh-muted flex gap-1.5">
+                          <span className="shrink-0">•</span>
+                          <span className="break-all">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </ResultCard>
   );

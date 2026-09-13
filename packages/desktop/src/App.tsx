@@ -18,10 +18,10 @@ import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
-import StatusBar from './components/layout/StatusBar';
 import { ScreensaverPage } from './pages/ScreensaverPage';
 import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboardingPage';
 import { useInactivityTimer } from './hooks/useInactivityTimer';
+import { NavigationProvider } from './contexts/NavigationContext';
 
 /** 根据当前页面渲染对应内容区（欢迎页 / 各功能页） */
 function PageView({
@@ -156,7 +156,6 @@ function AppShell({
       <main className="flex-1 overflow-auto bg-zh-bg">
         <PageView {...viewProps} />
       </main>
-      <StatusBar activeProjectPath={activeProject?.path} intelligentEnabled={intelligentEnabled} />
     </>
   );
 }
@@ -210,7 +209,8 @@ function App() {
   } as const;
 
   return (
-    <div className="flex flex-col h-screen bg-zh-bg font-sans">
+    <NavigationProvider navigate={(p) => setCurrentPage(p as Page)} currentPage={currentPage}>
+      <div className="flex flex-col h-screen bg-zh-bg font-sans">
       {onboardingProject ? (
         <ProjectOnboardingPage
           projectName={onboardingProject}
@@ -247,7 +247,8 @@ function App() {
       {idle && projects.length > 0 && !onboardingProject && (
         <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
       )}
-    </div>
+      </div>
+    </NavigationProvider>
   );
 }
 

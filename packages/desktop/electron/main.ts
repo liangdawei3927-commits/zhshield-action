@@ -92,6 +92,25 @@ function attachWindowStateEvents(window: BrowserWindow): void {
   });
 }
 
+/** 是否为应用自身页面：dev 放行 dev server 同源，生产放行打包产物 index.html。
+ *  不能无条件拦截——Vite HMR 对无法 Fast Refresh 的模块（hook 模块等）走 location.reload()
+ *  全量刷新，宽松拦截会让渲染进程停留在旧模块图，改代码后只能重启才生效。 */
+function isSelfNavigation(url: string): boolean {
+  try {
+    const target = new URL(url);
+    if (VITE_DEV_SERVER_URL) {
+      return target.origin === new URL(VITE_DEV_SERVER_URL).origin;
+    }
+    return (
+      target.protocol === 'file:' &&
+      path.normalize(decodeURIComponent(target.pathname)) ===
+        path.normalize(path.join(MAIN_DIST, 'index.html'))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1200,
@@ -117,8 +136,11 @@ function createWindow() {
   attachWindowStateEvents(window);
 
   // ─── 安全：阻止渲染进程发起的导航（防止打开外部 URL）────
-  window.webContents.on('will-navigate', (event) => {
-    event.preventDefault();
+  // 仅放行应用自身页面的 reload/导航（HMR 依赖），其余一律拦截。
+  window.webContents.on('will-navigate', (event, url) => {
+    if (!isSelfNavigation(url)) {
+      event.preventDefault();
+    }
   });
 }
 

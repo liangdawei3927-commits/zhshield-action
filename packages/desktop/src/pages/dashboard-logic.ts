@@ -1,38 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getScore, runPipeline } from '../services/engineApi';
+import { getDashboardOverview, runFullCheck } from '../services/engineApi';
 import { useToast } from '../components/ui/Toast';
 import type { ToastVariant } from '../components/ui/toast-logic';
-import { buildAiFixPrompt, copyTextToClipboard } from '../utils/copyToAi';
-import type { PipelineProgress, PipelineReportData } from '../types/electron';
-import { useTask } from '../task-store';
-
-/** 一键体检覆盖范围（给客户看的说明，不含重构、门禁、哨兵） */
-export const CHECK_SCOPE = [
-  {
-    key: 'inspect',
-    titleKey: 'page.dashboard.scope.inspect',
-    items: [
-      'page.dashboard.scope.item.tsType',
-      'page.dashboard.scope.item.complexity',
-      'page.dashboard.scope.item.deps',
-      'page.dashboard.scope.item.nest',
-      'page.dashboard.scope.item.docs',
-    ],
-  },
-] as const;
-
-export interface CheckSummary {
-  total: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-  errors: number;
-  failedItems: Array<{ stage: string; id: string; name: string; message: string }>;
-  skippedItems: Array<{ stage: string; id: string; name: string; message: string }>;
-  guardTotal: number;
-  inspectTotal: number;
-}
+import type { DashboardOverview, PipelineProgress } from '../types/electron';
+import { useTask, useTasks } from '../task-store';
 
 const REFACTOR_KEYWORD = /重构/;
 
@@ -48,60 +20,7 @@ export function sanitizeProgress(message?: string, stage?: string): string {
   return message;
 }
 
-export function extractSummary(report: PipelineReportData): CheckSummary {
-  const s = report.summary as Record<string, unknown> | undefined;
-  if (s && typeof s.total === 'number') {
-    const guard = (s.guard ?? {}) as Record<string, number>;
-    const inspect = (s.inspect ?? {}) as Record<string, number>;
-    return {
-      total: Number(s.total) || 0,
-      passed: Number(s.passed) || 0,
-      failed: Number(s.failed) || 0,
-      skipped: Number(s.skipped) || 0,
-      errors: Number(s.errors) || 0,
-      failedItems: Array.isArray(s.failedItems)
-        ? (s.failedItems as CheckSummary['failedItems'])
-        : [],
-      skippedItems: Array.isArray(s.skippedItems)
-        ? (s.skippedItems as CheckSummary['skippedItems'])
-        : [],
-      guardTotal: Number(guard.total) || 0,
-      inspectTotal: Number(inspect.total) || 0,
-    };
-  }
-
-  // 兼容未带 summary 的旧报告（RuleEngineReport 形态）
-  const g = report.guard as unknown as Record<string, number> | undefined;
-  const i = report.inspect as unknown as Record<string, number> | undefined;
-  return {
-    total: (g?.total ?? 0) + (i?.total ?? 0),
-    passed: (g?.passed ?? 0) + (i?.passed ?? 0),
-    failed: (g?.failed ?? 0) + (i?.failed ?? 0),
-    skipped: (g?.skipped ?? 0) + (i?.skipped ?? 0),
-    errors: (g?.errors ?? 0) + (i?.errors ?? 0),
-    failedItems: [],
-    skippedItems: [],
-    guardTotal: g?.total ?? 0,
-    inspectTotal: i?.total ?? 0,
-  };
-}
-
-/** 健康分数加载（null = 尚未体检或读取失败） */
-export function useDashboardStatus(projectPath: string) {
-  const [healthScore, setHealthScore] = useState<number | null>(null);
-
-  const refreshScore = useCallback(() => {
-    getScore(projectPath).then((s) => setHealthScore(s?.score ?? null));
-  }, [projectPath]);
-
-  useEffect(() => {
-    refreshScore();
-  }, [refreshScore]);
-
-  return { healthScore, refreshScore };
-}
-
-/** 一键体检进度订阅：进度来自统一任务中心（tasks:changed），autofix 通知独立保留 */
+/** 一键全检进度订阅：进度来自统一任务中心（tasks:changed），autofix 通知独立保留 */
 export function usePipelineProgress(projectPath: string) {
   const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress | null>(null);
   const [autoFixNotice, setAutoFixNotice] = useState<string | null>(null);
@@ -135,29 +54,34 @@ export function usePipelineProgress(projectPath: string) {
   return { pipelineProgress, autoFixNotice, setPipelineProgress, setAutoFixNotice };
 }
 
-function notifyCheckResult(
-  report: PipelineReportData,
-  summary: CheckSummary,
-  toast: (msg: string, variant?: ToastVariant) => void,
-) {
-  if (report.error) {
-    toast(t('page.dashboard.toast.failed', { error: report.error }), 'error');
-  } else if (summary.failed > 0 || summary.errors > 0) {
-    toast(
-      t('page.dashboard.toast.foundIssues', { count: summary.failed + summary.errors }),
-      'warning',
-    );
-  } else if (summary.total === 0) {
-    toast(t('page.dashboard.toast.noValidItems'), 'warning');
-  } else {
-    toast(
-      t('page.dashboard.toast.completed', { total: summary.total, passed: summary.passed }),
-      'success',
-    );
-  }
+/** 聚合仪表盘数据：调 engineApi.getDashboardOverview；任务中心变化（含全检完成）时自动刷新 */
+export function useDashboardOverview(projectPath: string) {
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const tasks = useTasks();
+
+  const refresh = useCallback(async () => {
+    if (!projectPath) {
+      setOverview(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await getDashboardOverview(projectPath);
+      setOverview(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectPath]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, tasks]);
+
+  return { overview, loading, refresh };
 }
 
-/** 一键体检执行：运行流水线 + 进度提示 + 结果汇总 */
+/** 一键全检执行：调 engineApi.runFullCheck；force=true 为强制全量重跑（需显式确认） */
 export function useOneClickCheck(
   projectPath: string,
   toast: (msg: string, variant?: ToastVariant) => void,
@@ -165,100 +89,83 @@ export function useOneClickCheck(
   setAutoFixNotice: (n: string | null) => void,
 ) {
   const [running, setRunning] = useState(false);
-  const [lastReport, setLastReport] = useState<PipelineReportData | null>(null);
 
-  const handleOneClickCheck = useCallback(async () => {
-    if (!projectPath) {
-      toast(t('page.dashboard.toast.addProjectFirst'), 'warning');
-      return;
-    }
-    setRunning(true);
-    setPipelineProgress({
-      stage: 'sop',
-      message: t('page.dashboard.sanitize.loadingRules'),
-      progress: 0.05,
-    });
-    setAutoFixNotice(null);
-    setLastReport(null);
-    try {
-      const report = await runPipeline(projectPath, { dryRun: false, sop: true });
-      setLastReport(report);
-      notifyCheckResult(report, extractSummary(report), toast);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t('page.dashboard.toast.executionFailed');
-      toast(msg, 'error');
-    } finally {
-      setRunning(false);
-      setPipelineProgress(null);
-    }
-  }, [projectPath, toast, setPipelineProgress, setAutoFixNotice]);
-
-  return { running, lastReport, clearReport: () => setLastReport(null), handleOneClickCheck };
-}
-
-/** 复制未通过检查项到 AI 修复 */
-export function useCopyFailedIssues(projectPath: string) {
-  const { toast } = useToast();
-
-  const copyFailedIssues = useCallback(
-    (items: CheckSummary['failedItems']) => {
-      const text = buildAiFixPrompt(
-        projectPath,
-        items.map((it) => ({
-          source:
-            it.stage === 'guard'
-              ? t('page.dashboard.copy.guardSource')
-              : t('page.dashboard.copy.inspectSource'),
-          ruleId: it.id,
-          message: `${it.name} — ${it.message}`,
-        })),
-      );
-      void copyTextToClipboard(text).then(
-        (ok) =>
-          ok
-            ? toast(t('page.dashboard.toast.copiedIssues', { count: items.length }))
-            : toast(t('page.dashboard.toast.copyFailed'), 'error'),
-        () => toast(t('page.dashboard.toast.copyFailed'), 'error'),
-      );
+  const run = useCallback(
+    async (force: boolean) => {
+      if (!projectPath) {
+        toast(t('page.dashboard.toast.addProjectFirst'), 'warning');
+        return;
+      }
+      setRunning(true);
+      setPipelineProgress({
+        stage: 'sop',
+        message: t('page.dashboard.sanitize.loadingRules'),
+        progress: 0.05,
+      });
+      setAutoFixNotice(null);
+      try {
+        const result = await runFullCheck(projectPath, { force });
+        if (!result.ok) {
+          toast(result.error || t('page.dashboard.toast.executionFailed'), 'error');
+        } else if (result.reran.length === 0) {
+          toast(t('page.dashboard.toast.allFresh'), 'info');
+        } else {
+          toast(t('page.dashboard.toast.fullCheckDone', { count: result.reran.length }), 'success');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : t('page.dashboard.toast.executionFailed');
+        toast(msg, 'error');
+      } finally {
+        setRunning(false);
+        setPipelineProgress(null);
+      }
     },
-    [projectPath, toast],
+    [projectPath, toast, setPipelineProgress, setAutoFixNotice],
   );
 
-  return { copyFailedIssues };
+  const handleOneClickCheck = useCallback(() => run(false), [run]);
+  const handleForceFullCheck = useCallback(() => run(true), [run]);
+
+  return { running, handleOneClickCheck, handleForceFullCheck };
 }
 
-/** 仪表盘页全部状态与副作用：版本/分数加载、一键体检、进度监听、复制问题 */
+/** 体检页全部状态与副作用：聚合总览加载、一键全检（含强制全量）、进度监听 */
 export function useDashboardPage(projectPath: string) {
   const { toast } = useToast();
-  const { healthScore, refreshScore } = useDashboardStatus(projectPath);
+  const {
+    overview,
+    loading: overviewLoading,
+    refresh: refreshOverview,
+  } = useDashboardOverview(projectPath);
   const { pipelineProgress, autoFixNotice, setPipelineProgress, setAutoFixNotice } =
     usePipelineProgress(projectPath);
-  const { running, lastReport, clearReport, handleOneClickCheck } = useOneClickCheck(
+  const { running, handleOneClickCheck, handleForceFullCheck } = useOneClickCheck(
     projectPath,
     toast,
     setPipelineProgress,
     setAutoFixNotice,
   );
-  const { copyFailedIssues } = useCopyFailedIssues(projectPath);
 
   const handleOneClickCheckAndRefresh = useCallback(async () => {
     await handleOneClickCheck();
-    refreshScore();
-  }, [handleOneClickCheck, refreshScore]);
+    refreshOverview();
+  }, [handleOneClickCheck, refreshOverview]);
+
+  const handleForceFullCheckAndRefresh = useCallback(async () => {
+    await handleForceFullCheck();
+    refreshOverview();
+  }, [handleForceFullCheck, refreshOverview]);
 
   const progressLabel = sanitizeProgress(pipelineProgress?.message, pipelineProgress?.stage);
-  const summary = lastReport ? extractSummary(lastReport) : null;
 
   return {
-    score: healthScore,
+    overview,
+    overviewLoading,
     running,
     progressLabel,
     pipelineProgress,
     autoFixNotice,
-    lastReport,
-    summary,
     handleOneClickCheck: handleOneClickCheckAndRefresh,
-    copyFailedIssues,
-    clearReport,
+    handleForceFullCheck: handleForceFullCheckAndRefresh,
   };
 }

@@ -13,7 +13,7 @@
 import * as fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
-import { PROJECTS_FILE } from './ipc/projects';
+import { PROJECTS_FILE } from './ipc/projects-file';
 import { runProfileInWorker } from './profile-host';
 import { getCachedProfile } from './ipc-context';
 import { cacheProfileFromFingerprintResult } from './ipc/engines';

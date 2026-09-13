@@ -196,7 +196,12 @@ describe('R3c 领取投影（claim 前按 languagesByTool + 主语言过滤）',
     const claimable = inScope.filter((toolId) =>
       isToolLanguagesMatch(languagesByTool[toolId], { language }),
     );
-    return claimToolRefs({ schemaVersion: 1, capabilities: {} }, 'proj-go', claimable, languagesByTool);
+    return claimToolRefs(
+      { schemaVersion: 1, capabilities: {} },
+      'proj-go',
+      claimable,
+      languagesByTool,
+    );
   }
 
   it('go 项目：eslint 不进入 refs，semgrep（* 恒含）进入 refs', () => {
@@ -215,12 +220,7 @@ describe('R3c 领取投影（claim 前按 languagesByTool + 主语言过滤）',
     const claimable = ['eslint', 'semgrep'].filter(() =>
       isToolLanguagesMatch(undefined, { language: 'go' }),
     );
-    const claimed = claimToolRefs(
-      { schemaVersion: 1, capabilities: {} },
-      'proj-x',
-      claimable,
-      {},
-    );
+    const claimed = claimToolRefs({ schemaVersion: 1, capabilities: {} }, 'proj-x', claimable, {});
     expect(claimed.capabilities[capabilityIdOf('eslint')].refs).toEqual(['proj-x']);
     expect(claimed.capabilities[capabilityIdOf('semgrep')].refs).toEqual(['proj-x']);
   });

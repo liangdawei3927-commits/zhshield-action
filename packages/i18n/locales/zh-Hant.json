@@ -716,15 +716,7 @@
     "toggleGate": "自動化 L1 L2 L3 門禁檢查",
     "toggleGateLabel": "門禁",
     "toggleSentinel": "7X24 全天候守護",
-    "toggleSentinelLabel": "哨兵",
-    "statusBarLabel": "即時防護",
-    "statusBarChecking": "檢查中…",
-    "statusBarGuardOn": "門禁攔截中",
-    "statusBarGuardOff": "門禁未啟用",
-    "statusBarSentinelOn": "哨兵監控中",
-    "statusBarSentinelOff": "哨兵已停用",
-    "statusBarRulesSynced": "規則已同步",
-    "statusBarRulesStale": "規則待更新"
+    "toggleSentinelLabel": "哨兵"
   },
   "lifecycle": {
     "archive": "歸檔",
@@ -759,7 +751,7 @@
     "evolve": "規則進化",
     "garbage": "垃圾清理",
     "guard": "門禁系統",
-    "inspect": "智慧巡檢",
+    "inspect": "質量巡檢",
     "performance": "效能優化",
     "refactor": "程式碼重構",
     "reports": "報告中心",
@@ -884,6 +876,23 @@
         }
       },
       "check": "一鍵體檢",
+      "card": {
+        "dependencies": "依賴管家",
+        "gate": "門禁檢查",
+        "hoursAgo": "{{count}} 小時前",
+        "issues": "{{count}} 項",
+        "justNow": "剛剛",
+        "lastRun": "最近執行：{{time}}",
+        "minutesAgo": "{{count}} 分鐘前",
+        "neverRun": "從未執行",
+        "quality": "品質巡檢",
+        "score": "{{score}} 分",
+        "security": "安全防護",
+        "sentinel": "哨兵監控",
+        "techdebt": "技術債",
+        "weightTip": "總分權重 {{pct}}%",
+        "weightExcluded": "哨兵執行時不計入總分"
+      },
       "copy": {
         "guardSource": "門禁·預防",
         "inspectSource": "巡檢"
@@ -909,6 +918,17 @@
         }
       },
       "guardSlogan": "智慧衛士：安全 · 治理 · 運維",
+      "overview": {
+        "generatedAt": "更新於 {{time}}",
+        "title": "專案健康總覽",
+        "subtitle": "守護專案健康，一鍵全景體檢",
+        "trendDown": "較上次下降",
+        "trendFlat": "與上次持平",
+        "trendUp": "較上次提升",
+        "issuesFound": "發現 {{count}} 個重點問題",
+        "noIssues": "未發現重點問題，狀態良好",
+        "notChecked": "尚未體檢，運行一鍵全檢獲取健康報告"
+      },
       "productIntro": {
         "subtitle": "以安全、治理、運維為核心，守護每一行程式碼",
         "title": "程式碼界的智慧衛士"
@@ -942,6 +962,13 @@
         "healthScore": "健康分",
         "notChecked": "尚未體檢"
       },
+      "runCheck": {
+        "expiredHint": "部分檢查結果已過期，建議一鍵全檢重新整理",
+        "forceHint": "將忽略快取，對全部檢查項序列重跑（6 域，實測約 5-10 分鐘）。確定繼續？",
+        "forceTitle": "強制全量重跑",
+        "hint": "讀取快取，僅重跑已過期檢查（預設約 1-3 分鐘）",
+        "title": "一鍵體檢"
+      },
       "running": "體檢進行中…",
       "sanitize": {
         "autoFixStarted": "已啟動 OpenCode 自動修復",
@@ -963,20 +990,27 @@
       },
       "stageGuard": "· 門禁",
       "stageInspect": "· 巡檢",
+      "status": {
+        "expired": "結果已過期",
+        "notRun": "未檢測"
+      },
       "toast": {
         "addProjectFirst": "請先新增要體檢的專案",
+        "allFresh": "所有檢查結果均為最新，無需重跑",
         "completed": "體檢完成：{{total}} 項檢查，{{passed}} 項通過",
         "copiedIssues": "已複製 {{count}} 條問題，可貼上到 AI 修復",
         "copyFailed": "複製失敗",
         "executionFailed": "體檢執行失敗",
         "failed": "體檢執行失敗: {{error}}",
         "foundIssues": "體檢完成：發現 {{count}} 項問題",
+        "fullCheckDone": "全檢完成：重跑 {{count}} 項檢查",
         "noValidItems": "體檢完成，但未執行到有效檢查項（請確認專案路徑）"
       },
       "welcome": "歡迎使用智匯碼盾"
     },
     "deps": {
       "checking": "盤點中...",
+      "source": "依賴管家",
       "done": "依賴盤點完成",
       "ecosystem": "生態",
       "empty": {
@@ -1069,8 +1103,10 @@
       "trust.verified": "已信任",
       "typosquat": "投毒偵測",
       "typosquat.checkFailed": "投毒偵測失敗",
+      "typosquat.copyAllPrompt": "{{count}} 項疑似投毒依賴，可一鍵複製全部到 AI 修復",
       "typosquat.none": "未發現投毒依賴",
       "typosquat.resembles": "與知名套件 {{target}} 相似（相似度 {{score}}）",
+      "typosquat.suggestion": "核實該依賴的來源與維護者是否官方，必要時移除並替換為官方套件，同時鎖定安全版本",
       "typosquat.total": "共 {{count}} 項可疑",
       "upgrade": "升級評估",
       "upgrade.breaking": "破壞性變更",
@@ -1267,7 +1303,11 @@
         "license": {
           "desc": "識別開源許可證相容性與合規風險",
           "title": "License 掃描"
-        }
+        },
+        "tsType": {},
+        "complexity": {},
+        "nest": {},
+        "docs": {}
       },
       "passedCount": "{{passed}}/{{total}} 項通過",
       "scanNow": "馬上巡檢",
@@ -1279,7 +1319,8 @@
         "warn": "警告",
         "attention": "未檢測"
       },
-      "aiReviewBadge": "AI 深度審查"
+      "aiReviewBadge": "AI 深度審查",
+      "groupTitle": {}
     },
     "performance": {
       "autoFixable": "可自動修復",
@@ -1708,6 +1749,9 @@
       }
     },
     "secrets": {
+      "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
+      "source": "金鑰管理",
+      "suggestion": "使用環境變數或金鑰管理服務替換，並對已推遠端的金鑰立即執行輪換",
       "action": {
         "dismiss": "忽略",
         "dismissConfirm": "忽略後不再告警，將記入經驗池",
@@ -1815,7 +1859,7 @@
     "inspect": {
       "fullScanning": "質量巡檢中…",
       "jobDone": "巡檢完成",
-      "jobScanning": "智慧巡檢中…",
+      "jobScanning": "質量巡檢中…",
       "sopScanning": "質量巡檢中（型別安全 / 依賴 / 規範）…"
     },
     "jobTimeout": "操作超時 ({{timeoutMs}}ms)",

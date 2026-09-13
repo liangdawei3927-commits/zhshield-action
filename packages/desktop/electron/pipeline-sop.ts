@@ -104,7 +104,7 @@ async function runSopInspectStage(
 > {
   progress(id, 'inspect', t('pipeline.inspect.sopScanning'), 0.45);
   try {
-    const inspectReport = await runner.runSopInspect();
+    const inspectReport = await runner.runSopInspect({ domains: ['inspect'] });
     return { inspectReport };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

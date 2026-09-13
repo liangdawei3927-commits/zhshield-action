@@ -6,13 +6,13 @@
  * removeProject 返回每步成败并写删除审计日志，失败可观测而不改变解耦语义。
  */
 
-import { app, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { AuditLogger } from '@zh/shared';
 import { cleanupProjectAfterRemoval } from '../project-lifecycle';
+import { PROJECTS_FILE } from './projects-file';
 
-export const PROJECTS_FILE = path.join(app.getPath('userData'), 'projects.json');
+export { PROJECTS_FILE };
 
 export function registerProjectsIpc(): void {
   ipcMain.handle('app:loadProjects', async (): Promise<Array<{ name: string; path: string }>> => {

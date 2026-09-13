@@ -1,85 +1,80 @@
 import { useDashboardPage } from './dashboard-logic';
-import type { CheckSummary } from './dashboard-logic';
-import type { PipelineReportData } from '../types/electron';
-import { CheckResultView } from './dashboard-result';
-import { HomeView } from './dashboard-parts';
+import type { PipelineProgress } from '../types/electron';
+import { PageShell } from '../components/business/PageShell';
+import { HealthRing } from './dashboard-parts';
+import { GuardianFooter } from './dashboard-guardian-footer';
 import { useT } from '../i18n';
 
 interface DashboardPageProps {
   projectPath: string;
 }
 
-interface ResultViewProps {
-  summary: CheckSummary;
-  lastReport: PipelineReportData;
-  score: number | null;
-  autoFixNotice: string | null;
-  handleOneClickCheck: () => Promise<void>;
-  copyFailedIssues: (items: CheckSummary['failedItems']) => void;
-  clearReport: () => void;
+/** 一键全检运行中的管道进度（按钮下方附加区） */
+function PipelineProgress({
+  progress,
+  label,
+}: {
+  progress: PipelineProgress;
+  label: string;
+}) {
+  const pct = Math.round((progress.progress || 0) * 100);
+  return (
+    <div className="w-80 mt-5">
+      <div className="flex items-center justify-between gap-3 text-xs text-zh-muted mb-1.5">
+        <span className="truncate">{label} {pct}%</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-zh-line overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-700 transition-all duration-300"
+          style={{ width: `${Math.min(Math.max((progress.progress || 0) * 100, 4), 100)}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
-function renderResultView({
-  summary,
-  lastReport,
-  score,
-  autoFixNotice,
-  handleOneClickCheck,
-  copyFailedIssues,
-  clearReport,
-}: ResultViewProps) {
-  const issueCount = summary.failed + summary.errors;
-  const ok = lastReport.passed && issueCount === 0;
-
+/** AI 自动修复通知（按钮下方附加区） */
+function AutoFixNotice({ notice }: { notice: string }) {
+  const t = useT();
   return (
-    <CheckResultView
-      summary={summary}
-      ok={ok}
-      score={score}
-      autoFixNotice={autoFixNotice}
-      onRerun={() => void handleOneClickCheck()}
-      onBack={clearReport}
-      onCopyIssues={copyFailedIssues}
-    />
+    <div className="mt-5 max-w-xl rounded-xl border border-warning-200 bg-warning-50 px-4 py-2.5 text-xs text-warning-800 leading-relaxed text-center">
+      <span className="font-semibold mr-1">{t('page.dashboard.autoFix')}</span>
+      {notice}
+    </div>
   );
 }
 
 export function DashboardPage({ projectPath }: DashboardPageProps) {
-  // 订阅 i18n context：语言切换时重渲染，使逻辑层派生文案（进度/提示）同步更新
-  useT();
+  const t = useT();
   const {
-    score,
+    overview,
     running,
     progressLabel,
     pipelineProgress,
     autoFixNotice,
-    lastReport,
-    summary,
     handleOneClickCheck,
-    copyFailedIssues,
-    clearReport,
   } = useDashboardPage(projectPath);
 
-  if (summary && lastReport && !running) {
-    return renderResultView({
-      summary,
-      lastReport,
-      score,
-      autoFixNotice,
-      handleOneClickCheck,
-      copyFailedIssues,
-      clearReport,
-    });
-  }
+  const extra = (
+    <>
+      {running && pipelineProgress ? (
+        <PipelineProgress progress={pipelineProgress} label={progressLabel} />
+      ) : null}
+      {autoFixNotice && !running ? <AutoFixNotice notice={autoFixNotice} /> : null}
+    </>
+  );
 
   return (
-    <HomeView
-      score={score}
-      running={running}
-      progressLabel={progressLabel}
-      pipelineProgress={pipelineProgress}
-      autoFixNotice={autoFixNotice}
-      onCheck={() => void handleOneClickCheck()}
+    <PageShell
+      illustration={<HealthRing score={overview ? overview.overall : null} size={190} />}
+      title={t('page.dashboard.overview.title')}
+      subtitle={t('page.dashboard.overview.subtitle')}
+      buttonText={t('page.dashboard.runCheck.title')}
+      onAction={() => void handleOneClickCheck()}
+      loading={running}
+      progressLabel={progressLabel || t('page.dashboard.running')}
+      extra={extra}
+      footer={<GuardianFooter />}
     />
   );
 }

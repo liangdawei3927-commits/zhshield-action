@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
+import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
-import type { DependencyReportData } from '../types/electron';
+import { useToast } from '../components/ui/Toast';
+import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 /**
  * 许可证类别配置：permissive 绿 / weak-copyleft 黄 / strong-copyleft 红 / unknown 灰
@@ -178,6 +181,53 @@ function useDependencyRun(projectPath: string): {
   return { loading, report, handleScan };
 }
 
+function toAiIssue(finding: TyposquatFindingData): AiFixIssue {
+  const cfg = RISK_BADGE_CONFIG[finding.risk] ?? RISK_BADGE_CONFIG.low;
+  return {
+    source: t('page.deps.source'),
+    ruleId: 'typosquat',
+    severity: t(cfg.labelKey),
+    message: `${finding.nodeId} — ${finding.evidence.join('；')}`,
+    suggestion: t('page.deps.typosquat.suggestion'),
+  };
+}
+
+function copyIssuesToAi(
+  projectPath: string,
+  issues: AiFixIssue[],
+  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
+): void {
+  const text = buildAiFixPrompt(projectPath, issues);
+  void copyTextToClipboard(text).then(
+    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
+    () => toast(t('toast.copyFailed'), 'error'),
+  );
+}
+
+function useDependencyCopyToAi(projectPath: string): {
+  copyToAi: (finding: TyposquatFindingData) => void;
+  copyAllToAi: (findings: TyposquatFindingData[]) => void;
+} {
+  const { toast } = useToast();
+
+  const copyToAi = useCallback(
+    (finding: TyposquatFindingData) => copyIssuesToAi(projectPath, [toAiIssue(finding)], toast),
+    [projectPath, toast],
+  );
+
+  const copyAllToAi = useCallback(
+    (findings: TyposquatFindingData[]) => {
+      if (findings.length === 0) return;
+      copyIssuesToAi(projectPath, findings.map(toAiIssue), toast);
+    },
+    [projectPath, toast],
+  );
+
+  return { copyToAi, copyAllToAi };
+}
+
 export function useDependencyPage(projectPath: string) {
-  return useDependencyRun(projectPath);
+  const { loading, report, handleScan } = useDependencyRun(projectPath);
+  const { copyToAi, copyAllToAi } = useDependencyCopyToAi(projectPath);
+  return { loading, report, handleScan, copyToAi, copyAllToAi };
 }

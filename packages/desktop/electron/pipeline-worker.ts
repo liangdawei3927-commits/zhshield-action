@@ -41,9 +41,7 @@ async function runPipelineByMode(
     progress(
       id,
       'sop',
-      synced > 0
-        ? `同步规则已加载 ${synced} 条`
-        : '同步缓存不可用，使用内置模板',
+      synced > 0 ? `同步规则已加载 ${synced} 条` : '同步缓存不可用，使用内置模板',
       0.06,
     );
   }

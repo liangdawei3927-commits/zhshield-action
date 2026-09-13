@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
-import { runInspect } from '../services/engineApi';
+import { runPipeline } from '../services/engineApi';
 import type { InspectionReportData } from '../types/electron';
+import { toInspectionReportDataFromRuleEngine } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
@@ -37,7 +38,9 @@ export const STATUS_CONFIG: Record<
   },
 };
 
-/** 巡检报告状态：执行巡检并保存结果 */
+/**
+ * 巡检报告状态：跑 SOP 质量流水线并映射 InspectionReportData（见 inspect-sop-mapper）。
+ */
 function useInspectReport(projectPath: string): {
   report: InspectionReportData | null;
   run: () => Promise<void>;
@@ -45,7 +48,8 @@ function useInspectReport(projectPath: string): {
   const [report, setReport] = useState<InspectionReportData | null>(null);
   const run = useCallback(async () => {
     try {
-      setReport(await runInspect(projectPath));
+      const pipeline = await runPipeline(projectPath, { sop: true });
+      setReport(toInspectionReportDataFromRuleEngine(pipeline.inspect));
     } catch {
       setReport(null);
     }
@@ -61,7 +65,8 @@ function useInspectRun(projectPath: string): {
   startInspect: () => Promise<void>;
 } {
   const { report, run } = useInspectReport(projectPath);
-  const { loading, progressLabel } = useTaskRun('inspect', projectPath);
+  // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）
+  const { loading, progressLabel } = useTaskRun('pipeline', projectPath);
 
   const startInspect = useCallback(() => run(), [run]);
 

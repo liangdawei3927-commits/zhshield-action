@@ -207,7 +207,13 @@ async function handleConfirmedOrphan(
   const profilesTrashed = await moveProfilesToTrash(PROFILES_DIR, projectId);
   // (iii) 审计（失败静默，不阻断）
   await auditLog
-    .logOrphanCleanup({ action: 'soft_deleted', projectId, reason, activeRowCounts, profilesTrashed })
+    .logOrphanCleanup({
+      action: 'soft_deleted',
+      projectId,
+      reason,
+      activeRowCounts,
+      profilesTrashed,
+    })
     .catch(() => {});
   confirmedOrphans.push({ projectId, reason, activeRowCounts, profilesTrashed });
 }
@@ -400,7 +406,12 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
           const raw = state[projectId];
           const existing = typeof raw === 'object' && raw !== null ? raw : undefined;
           if (existing && now - new Date(existing.firstSeenAt).getTime() > upgradeMs) {
-            await handleConfirmedOrphan(db, projectId, 'dir_present_with_content', confirmedOrphans);
+            await handleConfirmedOrphan(
+              db,
+              projectId,
+              'dir_present_with_content',
+              confirmedOrphans,
+            );
             delete state[projectId];
           } else {
             const firstSeenAt = existing?.firstSeenAt ?? new Date().toISOString();
@@ -448,7 +459,10 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
         const isExpected = [...expectedKeys].some((k) => profileKeyMatches(fileKey, k));
         if (isExpected) continue;
         try {
-          await fs.promises.rename(path.join(PROFILES_DIR, file), path.join(trashDir, `${ts}_${file}`));
+          await fs.promises.rename(
+            path.join(PROFILES_DIR, file),
+            path.join(trashDir, `${ts}_${file}`),
+          );
           orphanProfilesTrashed.push(file);
         } catch (err) {
           warn(`[orphan-reconcile] 画像孤儿 ${file} 移入 trash 失败:`, err);

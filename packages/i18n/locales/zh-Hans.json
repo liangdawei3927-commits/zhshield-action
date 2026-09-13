@@ -716,15 +716,7 @@
     "toggleGate": "自动化 L1 L2 L3 门禁检查",
     "toggleGateLabel": "门禁",
     "toggleSentinel": "7X24 全天候守护",
-    "toggleSentinelLabel": "哨兵",
-    "statusBarLabel": "实时防护",
-    "statusBarChecking": "检查中…",
-    "statusBarGuardOn": "门禁拦截中",
-    "statusBarGuardOff": "门禁未启用",
-    "statusBarSentinelOn": "哨兵监控中",
-    "statusBarSentinelOff": "哨兵已停用",
-    "statusBarRulesSynced": "规则已同步",
-    "statusBarRulesStale": "规则待更新"
+    "toggleSentinelLabel": "哨兵"
   },
   "lifecycle": {
     "archive": "归档",
@@ -759,7 +751,7 @@
     "evolve": "规则进化",
     "garbage": "垃圾清理",
     "guard": "门禁系统",
-    "inspect": "智能巡检",
+    "inspect": "质量巡检",
     "performance": "性能优化",
     "refactor": "代码重构",
     "reports": "报告中心",
@@ -884,6 +876,23 @@
         }
       },
       "check": "一键体检",
+      "card": {
+        "dependencies": "依赖管家",
+        "gate": "门禁检查",
+        "hoursAgo": "{{count}} 小时前",
+        "issues": "{{count}} 项",
+        "justNow": "刚刚",
+        "lastRun": "最近运行：{{time}}",
+        "minutesAgo": "{{count}} 分钟前",
+        "neverRun": "从未运行",
+        "quality": "质量巡检",
+        "score": "{{score}} 分",
+        "security": "安全防护",
+        "sentinel": "哨兵监控",
+        "techdebt": "技术债",
+        "weightTip": "总分权重 {{pct}}%",
+        "weightExcluded": "哨兵运行时不入总分"
+      },
       "copy": {
         "guardSource": "门禁·预防",
         "inspectSource": "巡检"
@@ -909,6 +918,17 @@
         }
       },
       "guardSlogan": "智能卫士：安全 · 治理 · 运维",
+      "overview": {
+        "generatedAt": "更新于 {{time}}",
+        "title": "项目健康总览",
+        "subtitle": "守护项目健康，一键全景体检",
+        "trendDown": "较上次下降",
+        "trendFlat": "与上次持平",
+        "trendUp": "较上次提升",
+        "issuesFound": "发现 {{count}} 个重点问题",
+        "noIssues": "未发现重点问题，状态良好",
+        "notChecked": "尚未体检，运行一键全检获取健康报告"
+      },
       "productIntro": {
         "subtitle": "以安全、治理、运维为核心，守护每一行代码",
         "title": "代码界的智能卫士"
@@ -942,6 +962,13 @@
         "healthScore": "健康分",
         "notChecked": "尚未体检"
       },
+      "runCheck": {
+        "expiredHint": "部分检查结果已过期，建议一键全检刷新",
+        "forceHint": "将忽略缓存，对全部检查项串行重跑（6 域，实测约 5-10 分钟）。确定继续？",
+        "forceTitle": "强制全量重跑",
+        "hint": "读取缓存，仅重跑已过期检查（默认约 1-3 分钟）",
+        "title": "一键体检"
+      },
       "running": "体检进行中…",
       "sanitize": {
         "autoFixStarted": "已启动 OpenCode 自动修复",
@@ -963,20 +990,27 @@
       },
       "stageGuard": "· 门禁",
       "stageInspect": "· 巡检",
+      "status": {
+        "expired": "结果已过期",
+        "notRun": "未检测"
+      },
       "toast": {
         "addProjectFirst": "请先添加要体检的项目",
+        "allFresh": "所有检查结果均为最新，无需重跑",
         "completed": "体检完成：{{total}} 项检查，{{passed}} 项通过",
         "copiedIssues": "已复制 {{count}} 条问题，可粘贴到 AI 修复",
         "copyFailed": "复制失败",
         "executionFailed": "体检执行失败",
         "failed": "体检执行失败: {{error}}",
         "foundIssues": "体检完成：发现 {{count}} 项问题",
+        "fullCheckDone": "全检完成：重跑 {{count}} 项检查",
         "noValidItems": "体检完成，但未执行到有效检查项（请确认项目路径）"
       },
       "welcome": "欢迎使用智汇码盾"
     },
     "deps": {
       "checking": "盘点中...",
+      "source": "依赖管家",
       "done": "依赖管家盘点完成",
       "ecosystem": "生态",
       "empty": {
@@ -1069,8 +1103,10 @@
       "trust.verified": "已信任",
       "typosquat": "投毒检测",
       "typosquat.checkFailed": "投毒检测失败",
+      "typosquat.copyAllPrompt": "{{count}} 项疑似投毒依赖，可一键复制全部到 AI 修复",
       "typosquat.none": "未发现投毒依赖",
       "typosquat.resembles": "与知名包 {{target}} 相似（相似度 {{score}}）",
+      "typosquat.suggestion": "核实该依赖的来源与维护者是否官方，必要时移除并替换为官方包，同时锁定安全版本",
       "typosquat.total": "共 {{count}} 项可疑",
       "upgrade": "升级评估",
       "upgrade.breaking": "破坏性变更",
@@ -1268,8 +1304,13 @@
         "license": {
           "desc": "识别开源许可证兼容性与合规风险",
           "title": "License 扫描"
-        }
+        },
+        "tsType": {},
+        "complexity": {},
+        "nest": {},
+        "docs": {}
       },
+      "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} 项通过",
       "scanNow": "马上巡检",
       "scanning": "巡检中...",
@@ -1429,6 +1470,23 @@
         "good": "良好",
         "needsImprovement": "待改进"
       },
+      "dimension": {
+        "quality": "质量",
+        "security": "安全性",
+        "architecture": "架构",
+        "dependencies": "依赖",
+        "documentation": "文档",
+        "refactor": "重构",
+        "performance": "性能",
+        "techdebt": "技术债",
+        "gate": "门禁哨兵"
+      },
+      "grade": {
+        "A": "A 级",
+        "B": "B 级",
+        "C": "C 级",
+        "D": "D 级"
+      },
       "table": {
         "abnormal": "异常",
         "col": {
@@ -1443,6 +1501,9 @@
       "title": "分析报告"
     },
     "secrets": {
+      "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
+      "source": "密钥管理",
+      "suggestion": "使用环境变量或密钥管理服务替换，并对已推远程的密钥立即执行轮换",
       "action": {
         "dismiss": "忽略",
         "dismissConfirm": "忽略后不再告警，将记入经验池",
@@ -1815,7 +1876,7 @@
     "inspect": {
       "fullScanning": "质量巡检中…",
       "jobDone": "巡检完成",
-      "jobScanning": "智能巡检中…",
+      "jobScanning": "质量巡检中…",
       "sopScanning": "质量巡检中（类型安全 / 依赖 / 规范）…"
     },
     "jobTimeout": "操作超时 ({{timeoutMs}}ms)",

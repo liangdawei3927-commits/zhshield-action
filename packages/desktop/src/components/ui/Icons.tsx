@@ -47,7 +47,7 @@ const NAV_ICON_CONTENT: Record<string, ReactNode> = {
       <path d="M18 7l-2 2" />
     </>
   ),
-  // 智能巡检：扫描文档
+  // 质量巡检：扫描文档
   inspect: (
     <>
       <rect x="4" y="5" width="16" height="14" rx="2" />

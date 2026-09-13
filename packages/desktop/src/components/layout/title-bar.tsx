@@ -13,7 +13,7 @@ interface TitleBarProps {
   onNavigate?: (page: string) => void;
 }
 
-/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，备份中心/报告中心+侧边栏开关居右 */
+/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，备份中心入口+侧边栏开关居右 */
 export function TitleBar({
   onOpenSettings,
   projectName,
@@ -71,7 +71,7 @@ export function TitleBar({
         )}
       </div>
 
-      {/* 右：规则进化/备份中心/报告中心入口 + 侧边栏按钮 */}
+      {/* 右：规则进化/备份中心入口 + 侧边栏按钮 */}
       <div className="flex items-center gap-2 pr-3" style={{ WebkitAppRegion: 'no-drag' as const }}>
         <button
           onClick={() => onNavigate?.('evolve')}
@@ -102,21 +102,6 @@ export function TitleBar({
           title={t('nav.backup')}
         >
           <NavIcon id="backup" size={14} />
-        </button>
-        <button
-          onClick={() => onNavigate?.('reports')}
-          className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"
-          style={{
-            width: 28,
-            height: 24,
-            borderRadius: 'var(--zh-radius-sm)',
-            background:
-              currentPage === 'reports' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.15)',
-            color: 'rgb(var(--zh-text-on-brand))',
-          }}
-          title={t('nav.reports')}
-        >
-          <NavIcon id="reports" size={14} />
         </button>
         <button
           onClick={onOpenSettings}

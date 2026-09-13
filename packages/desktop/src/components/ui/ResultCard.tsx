@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef, ElementType } from 'react';
 import { BounceCard } from './Bounce';
 
 export type ResultCardVariant = 'item' | 'score' | 'stats' | 'section' | 'list';
@@ -20,6 +20,8 @@ const VARIANT_PADDING: Record<ResultCardVariant, string> = {
 interface ResultCardProps extends ComponentPropsWithoutRef<'div'> {
   /** 卡片变体，决定内边距（宽度/底色统一为 rounded-xl bg-zh-card shadow-sm） */
   variant?: ResultCardVariant;
+  /** 渲染元素（默认 div；传 "button" 可让整卡可点击下钻） */
+  as?: ElementType;
 }
 
 /**
@@ -27,9 +29,10 @@ interface ResultCardProps extends ComponentPropsWithoutRef<'div'> {
  * （圆角 + 白底 + 阴影 + 品牌绿边框）。改这一处，巡检/门禁/安全/性能/哨兵/
  * 重构/垃圾/演进/报告/备份 全部生效。
  */
-export function ResultCard({ variant = 'item', className, ...rest }: ResultCardProps) {
+export function ResultCard({ variant = 'item', as, className, ...rest }: ResultCardProps) {
   return (
     <BounceCard
+      as={as}
       className={`rounded-xl bg-zh-card shadow-sm ${VARIANT_PADDING[variant]}${className ? ` ${className}` : ''}`}
       {...rest}
     />

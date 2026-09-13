@@ -26,9 +26,12 @@ const h = vi.hoisted(() => {
   return {
     homedir,
     syncForProject: vi.fn(async () => []),
-    getNeededModules: vi.fn((f?: { language?: string }) =>
-      ['security', 'quality', 'architecture', ...(f?.language === 'typescript' ? ['typescript'] : [])],
-    ),
+    getNeededModules: vi.fn((f?: { language?: string }) => [
+      'security',
+      'quality',
+      'architecture',
+      ...(f?.language === 'typescript' ? ['typescript'] : []),
+    ]),
     removeModule: vi.fn(async () => undefined),
     getCachedProfile: vi.fn(() => null),
     getCachedProfileProjectPath: vi.fn(() => null),
@@ -60,7 +63,11 @@ vi.mock('../../electron/ipc-context', () => ({
     getNeededModules: h.getNeededModules,
     removeModule: h.removeModule,
   },
-  sopRegistry: { getStats: vi.fn(() => ({})), getActive: vi.fn(() => []), getByDomain: vi.fn(() => []) },
+  sopRegistry: {
+    getStats: vi.fn(() => ({})),
+    getActive: vi.fn(() => []),
+    getByDomain: vi.fn(() => []),
+  },
   wisdomBrainSync: { getRuleSync: vi.fn(() => ({ getUnfilteredToolIds: () => [] })) },
   getCachedProfile: h.getCachedProfile,
   getCachedProfileProjectPath: h.getCachedProfileProjectPath,
@@ -70,10 +77,7 @@ vi.mock('../../electron/ipc-context', () => ({
 }));
 
 import { syncSopModulesForProfile } from '../../electron/ipc/sync';
-import {
-  defaultCapabilityRefsPath,
-  loadCapabilityRefs,
-} from '../../electron/capability-refs';
+import { defaultCapabilityRefsPath, loadCapabilityRefs } from '../../electron/capability-refs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -93,10 +97,18 @@ afterEach(() => {
 
 describe('syncSopModulesForProfile 按画像下载接线', () => {
   it('项目归属 + 画像存在 → claim 记账先于 syncForProject（唤醒语义）', async () => {
-    h.getCachedProfile.mockReturnValue({ language: 'typescript', framework: 'nestjs', features: [] });
+    h.getCachedProfile.mockReturnValue({
+      language: 'typescript',
+      framework: 'nestjs',
+      features: [],
+    });
     h.getCachedProfileProjectPath.mockReturnValue('/demo/ts-project');
 
-    const modules = await syncSopModulesForProfile({ language: 'typescript', framework: 'nestjs', features: [] });
+    const modules = await syncSopModulesForProfile({
+      language: 'typescript',
+      framework: 'nestjs',
+      features: [],
+    });
 
     // syncForProject 必须被调用（断点 1：按画像下载接线）
     expect(h.syncForProject).toHaveBeenCalledWith(
@@ -152,8 +164,18 @@ describe('syncSopModulesForProfile 到期回收', () => {
         {
           schemaVersion: 1,
           capabilities: {
-            'sop-module:typescript': { languages: [], refs: [], status: 'reclaiming', since: Date.now() - 8 * DAY_MS },
-            'sop-module:security': { languages: [], refs: [], status: 'reclaiming', since: Date.now() - 2 * DAY_MS },
+            'sop-module:typescript': {
+              languages: [],
+              refs: [],
+              status: 'reclaiming',
+              since: Date.now() - 8 * DAY_MS,
+            },
+            'sop-module:security': {
+              languages: [],
+              refs: [],
+              status: 'reclaiming',
+              since: Date.now() - 2 * DAY_MS,
+            },
           },
         },
         null,
@@ -192,9 +214,7 @@ describe('syncSopModulesForProfile 到期回收', () => {
 
   it('reclaiming 未超期 → 不删除（7 天宽限窗口内保留）', async () => {
     h.getCachedProfileProjectPath.mockReturnValue('/demo/proj');
-    h.getReclaimingSopModuleSinces.mockReturnValue(
-      new Map([['quality', Date.now() - 6 * DAY_MS]]),
-    );
+    h.getReclaimingSopModuleSinces.mockReturnValue(new Map([['quality', Date.now() - 6 * DAY_MS]]));
 
     await syncSopModulesForProfile(undefined);
 

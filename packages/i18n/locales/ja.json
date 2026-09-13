@@ -716,15 +716,7 @@
     "toggleGate": "自動化 L1 L2 L3 ゲートチェック",
     "toggleGateLabel": "ゲート",
     "toggleSentinel": "24時間365日フルタイム保護",
-    "toggleSentinelLabel": "センチネル",
-    "statusBarLabel": "リアルタイム保護",
-    "statusBarChecking": "確認中…",
-    "statusBarGuardOn": "ゲート遮断中",
-    "statusBarGuardOff": "ゲート無効",
-    "statusBarSentinelOn": "センチネル監視中",
-    "statusBarSentinelOff": "センチネル停止",
-    "statusBarRulesSynced": "ルール同期済み",
-    "statusBarRulesStale": "ルール要更新"
+    "toggleSentinelLabel": "センチネル"
   },
   "lifecycle": {
     "archive": "アーカイブ",
@@ -759,7 +751,7 @@
     "evolve": "ルール進化",
     "garbage": "ゴミ清掃",
     "guard": "ゲートシステム",
-    "inspect": "スマート巡回",
+    "inspect": "品質巡視",
     "performance": "パフォーマンス最適化",
     "refactor": "コードリファクタリング",
     "reports": "レポートセンター",
@@ -884,6 +876,23 @@
         }
       },
       "check": "ワンクリック点検",
+      "card": {
+        "dependencies": "依存関係",
+        "gate": "ゲートチェック",
+        "hoursAgo": "{{count}} 時間前",
+        "issues": "{{count}} 件",
+        "justNow": "たった今",
+        "lastRun": "最終実行：{{time}}",
+        "minutesAgo": "{{count}} 分前",
+        "neverRun": "未実行",
+        "quality": "品質検査",
+        "score": "{{score}} 点",
+        "security": "セキュリティ",
+        "sentinel": "センチネル",
+        "techdebt": "技術負債",
+        "weightTip": "総合スコアの{{pct}}%",
+        "weightExcluded": "センチネルは総合スコアに含まれません"
+      },
       "copy": {
         "guardSource": "ゲート・予防",
         "inspectSource": "巡回"
@@ -909,6 +918,17 @@
         }
       },
       "guardSlogan": "スマートガーディアン: セキュリティ · ガバナンス · 運用",
+      "overview": {
+        "generatedAt": "更新：{{time}}",
+        "title": "プロジェクト健全性サマリー",
+        "subtitle": "プロジェクトの健全性を守る、ワンクリック全項目点検",
+        "trendDown": "前回より低下",
+        "trendFlat": "前回と同水準",
+        "trendUp": "前回より向上",
+        "issuesFound": "重要な問題が {{count}} 件見つかりました",
+        "noIssues": "重要な問題は見つかりませんでした",
+        "notChecked": "未点検です。一括点検を実行してください"
+      },
       "productIntro": {
         "subtitle": "セキュリティ、ガバナンス、運用を中心に、すべてのコードを守る",
         "title": "コード界のスマートガーディアン"
@@ -942,6 +962,13 @@
         "healthScore": "ヘルススコア",
         "notChecked": "まだ点検していません"
       },
+      "runCheck": {
+        "expiredHint": "一部の結果が期限切れです。全チェックで更新してください。",
+        "forceHint": "キャッシュを無視して全チェックを直列再実行（6 領域、実測約 5〜10 分）。続行しますか？",
+        "forceTitle": "強制フル再実行",
+        "hint": "キャッシュを利用し、期限切れのみ再実行（通常約 1〜3 分）",
+        "title": "一括チェック"
+      },
       "running": "点検を実行中…",
       "sanitize": {
         "autoFixStarted": "OpenCode 自動修正を開始しました",
@@ -963,20 +990,27 @@
       },
       "stageGuard": "· ゲート",
       "stageInspect": "· 巡回",
+      "status": {
+        "expired": "期限切れ",
+        "notRun": "未実行"
+      },
       "toast": {
         "addProjectFirst": "点検対象のプロジェクトを先に追加してください",
-        "completed": "点検完了: {{total}} 項目のチェック、{{passed}} 項目合格",
+        "allFresh": "すべての結果は最新です。再実行は不要です",
+        "completed": "点検完了：{{total}} 項目、{{passed}} 項目が合格",
         "copiedIssues": "{{count}} 件の問題をコピーしました。AI に貼り付けて修正できます",
         "copyFailed": "コピーに失敗しました",
         "executionFailed": "点検の実行に失敗しました",
         "failed": "点検の実行に失敗しました: {{error}}",
         "foundIssues": "点検完了: {{count}} 件の問題を検出しました",
+        "fullCheckDone": "一括チェック完了：{{count}} 件を再実行",
         "noValidItems": "点検は完了しましたが、有効なチェック項目が実行されませんでした（プロジェクトパスを確認してください）"
       },
       "welcome": "CodeShield へようこそ"
     },
     "deps": {
       "checking": "棚卸し中...",
+      "source": "依存関係マネージャー",
       "done": "依存関係の棚卸しが完了しました",
       "ecosystem": "エコシステム",
       "empty": {
@@ -1069,8 +1103,10 @@
       "trust.verified": "信頼済み",
       "typosquat": "タイポスクワッティング検出",
       "typosquat.checkFailed": "タイポスクワッティング検出に失敗しました",
+      "typosquat.copyAllPrompt": "{{count}} 件の投毒が疑われる依存関係です。ワンクリックで全部を AI にコピーして修正できます",
       "typosquat.none": "タイポスクワッティングの疑いがある依存関係は見つかりませんでした",
       "typosquat.resembles": "有名パッケージ {{target}} に類似（類似度 {{score}}）",
+      "typosquat.suggestion": "依存関係の出所とメンテナーが公式であることを確認し、必要に応じて削除して公式パッケージに置き換え、安全なバージョンに固定してください",
       "typosquat.total": "{{count}} 件が疑わしい",
       "upgrade": "アップグレード評価",
       "upgrade.breaking": "破壊的変更",
@@ -1267,8 +1303,13 @@
         "license": {
           "desc": "オープンソースライセンスの互換性とコンプライアンスリスクを識別",
           "title": "License スキャン"
-        }
+        },
+        "tsType": {},
+        "complexity": {},
+        "nest": {},
+        "docs": {}
       },
+      "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} 項目合格",
       "scanNow": "すぐ巡回",
       "scanning": "巡回中...",
@@ -1708,6 +1749,9 @@
       }
     },
     "secrets": {
+      "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
+      "source": "シークレット管理",
+      "suggestion": "環境変数やシークレット管理サービスで置き換え、リモートにプッシュ済みのシークレットは直ちにローテーションしてください",
       "action": {
         "dismiss": "取り下げ",
         "dismissConfirm": "取り下げ後はアラートが停止し、経験プールに記録されます",
@@ -1815,7 +1859,7 @@
     "inspect": {
       "fullScanning": "品質巡回中…",
       "jobDone": "巡回完了",
-      "jobScanning": "スマート巡回中…",
+      "jobScanning": "品質巡視中…",
       "sopScanning": "品質巡回中（型安全性 / 依存関係 / 規約）…"
     },
     "jobTimeout": "操作がタイムアウトしました（{{timeoutMs}}ms）",

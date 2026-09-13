@@ -1,5 +1,5 @@
 import type { HealthScoreData } from '../types/electron';
-import { getScoreColor, getScoreLabel } from './reports-logic';
+import { getScoreColor, getScoreLabel, dimensionName } from './reports-logic';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -217,11 +217,23 @@ export function LatestScoreCard({
 }
 
 export function DimensionCards({ dimensions }: { dimensions: HealthScoreData['dimensions'] }) {
+  const t = useT();
   return (
-    <div className="flex gap-4 mb-6">
-      {dimensions.slice(0, 5).map((d) => (
-        <ResultCard key={d.name} variant="stats" className="flex-1">
-          <div className="text-xs text-zh-muted mb-1">{d.name}</div>
+    <div className="flex flex-wrap gap-4 mb-6">
+      {dimensions.map((d) => (
+        <ResultCard key={d.name} variant="stats" className="flex-1 min-w-[150px]">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="text-xs text-zh-muted truncate">{dimensionName(d.name, t)}</div>
+            <span
+              className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+              style={{
+                color: getScoreColor(d.score),
+                background: `color-mix(in srgb, ${getScoreColor(d.score)} 12%, transparent)`,
+              }}
+            >
+              {getScoreLabel(d.score)}
+            </span>
+          </div>
           <div className="text-lg font-bold" style={{ color: getScoreColor(d.score) }}>
             {d.score}
           </div>

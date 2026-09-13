@@ -133,6 +133,21 @@ export type {
 export { NOOP_EMITTER } from './events';
 
 export { detectMachineProfile, type MachineProfile } from './machine-profile';
+export {
+  baselinePath,
+  loadBaseline,
+  saveBaseline,
+  clearBaseline,
+  baselineEntryKey,
+  baselineKeySet,
+  toBaselineEntry,
+  issuesToBaselineEntries,
+  filterIssuesByBaseline,
+  normalizeBaselineFile,
+  type Baseline,
+  type BaselineEntry,
+  type BaselineFilterResult,
+} from './baseline';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';

@@ -44,12 +44,7 @@ interface ExperienceRecordData {
 
 interface OrphanCleanupEntry {
   action:
-    | 'suspected'
-    | 'confirmed'
-    | 'soft_deleted'
-    | 'profiles_trashed'
-    | 'purged'
-    | 'clean_reset';
+    'suspected' | 'confirmed' | 'soft_deleted' | 'profiles_trashed' | 'purged' | 'clean_reset';
   projectId?: string;
   [key: string]: unknown;
 }

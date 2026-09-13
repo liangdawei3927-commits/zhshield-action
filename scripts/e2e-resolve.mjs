@@ -341,7 +341,11 @@ async function main() {
       content: { tool: 'semgrep', severity: 'high', rule: 'c5-e2e-admin' },
       tags: ['e2e', 'admin'],
     });
-    check('POST /admin/rules 创建草稿 → ruleId', created.ruleId === adminRuleId, JSON.stringify(created));
+    check(
+      'POST /admin/rules 创建草稿 → ruleId',
+      created.ruleId === adminRuleId,
+      JSON.stringify(created),
+    );
 
     // 发布平台规则（P2-4 语义：rule_scope 平台行，全租户生效）
     const published = await adminApi('POST', `/admin/rules/${adminRuleId}/publish`, {});
@@ -360,13 +364,10 @@ async function main() {
       JSON.stringify(adminResolve.changed),
     );
     // 审计留痕（读库验证 publish 审计存在）
-    const auditRes = await fetch(
-      `${API_BASE}/admin/rules/${adminRuleId}`,
-      {
-        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
-        signal: AbortSignal.timeout(15000),
-      },
-    );
+    const auditRes = await fetch(`${API_BASE}/admin/rules/${adminRuleId}`, {
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      signal: AbortSignal.timeout(15000),
+    });
     check('GET /admin/rules/:id 可读已发布规则', auditRes.ok === true, String(auditRes.status));
 
     console.log(`\n════════ E2E 结果: ${passed} 通过 / ${failed} 失败 ════════`);

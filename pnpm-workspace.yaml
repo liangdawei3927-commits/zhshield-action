@@ -4,12 +4,15 @@ packages:
 overrides:
   js-yaml: '>=4.3.1'
   lodash: '>=4.17.23'
-  qs: '>=6.15.2'
+  qs: '>=6.15.4'
   body-parser: '>=1.20.6'
   fast-uri: '>=3.1.5'
-  multer: '>=2.2.0'
-  hono: '>=4.12.34'
+  multer: '>=2.3.0'
+  hono: '>=4.13.5'
   nanoid: '>=3.3.18'
+  '@xmldom/xmldom': '>=0.9.12'
+  vitest: '4.1.11'
+  '@vitest/mocker': '4.1.11'
   # ── 依赖安全审计修复（inspect.scan.external.dependency-audit）──
   # @nestjs 10→11 升级（packages/server/package.json）消除 file-type@20.4.1，无需 override
   # depcheck / typescript-eslint / @electron/universal 经 minimatch 引入 brace-expansion<5.0.9（GHSA-x895）

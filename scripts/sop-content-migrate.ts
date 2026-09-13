@@ -24,7 +24,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { SopRegistry, SopLoader, computeRuleContentSha, hashToolRuleFiles } from '../packages/kernel/dist/index.js';
+import {
+  SopRegistry,
+  SopLoader,
+  computeRuleContentSha,
+  hashToolRuleFiles,
+} from '../packages/kernel/dist/index.js';
 import type { SopRule } from '../packages/kernel/dist/index.js';
 import { ToolRuleLoader } from '../packages/server/src/sop/tool-rule-loader';
 
@@ -35,8 +40,7 @@ const CONTENT_DIR = path.join(ROOT, 'packages', 'kernel', 'test-fixtures', 'sop-
 const RULES_DIR = path.join(CONTENT_DIR, 'rules');
 const TOOL_PACKS_DIR = path.join(CONTENT_DIR, 'tool-packs');
 const DB_PATH =
-  process.env.ZH_SERVER_DB ??
-  path.join(os.homedir(), '.zhshield', 'server', 'zh-codeshield.db');
+  process.env.ZH_SERVER_DB ?? path.join(os.homedir(), '.zhshield', 'server', 'zh-codeshield.db');
 
 const OPERATOR = 'migration-c2';
 const INITIAL_VERSION = '1.0.0';
@@ -78,7 +82,10 @@ async function main(): Promise<void> {
     for (const r of rules) domainCounts[r.domain] = (domainCounts[r.domain] ?? 0) + 1;
     console.log('[check] 通过（未写库）');
     console.log('[check] 域分布:', JSON.stringify(domainCounts));
-    console.log('[check] 工具:', tools.map((t) => `${t.toolId}(${t.files.length} 文件)`).join(', '));
+    console.log(
+      '[check] 工具:',
+      tools.map((t) => `${t.toolId}(${t.files.length} 文件)`).join(', '),
+    );
     process.exit(0);
   }
 
@@ -264,8 +271,12 @@ function apply(
   tx();
   const ruleRows = db.prepare('SELECT count(*) AS c FROM rule_content').get() as { c: number };
   const toolRows = db.prepare('SELECT count(*) AS c FROM tool_package').get() as { c: number };
-  const auditRows = db.prepare('SELECT count(*) AS c FROM content_audit_log').get() as { c: number };
-  console.log(`[apply] 完成: rule_content=${ruleRows.c} tool_package=${toolRows.c} audit=${auditRows.c}`);
+  const auditRows = db.prepare('SELECT count(*) AS c FROM content_audit_log').get() as {
+    c: number;
+  };
+  console.log(
+    `[apply] 完成: rule_content=${ruleRows.c} tool_package=${toolRows.c} audit=${auditRows.c}`,
+  );
 }
 
 // ─── 比对（§4.2 口径：content_sha 集合逐条相等）────────────
@@ -343,7 +354,9 @@ function ensureDb(): void {
     );
     db.close();
     if (tables.has('rule_content') && tables.has('tool_package')) {
-      console.warn(`[db] 迁移未完全应用（${String((err as Error).message).split('\n')[0]}），所需表已存在，继续`);
+      console.warn(
+        `[db] 迁移未完全应用（${String((err as Error).message).split('\n')[0]}），所需表已存在，继续`,
+      );
     } else {
       throw err;
     }

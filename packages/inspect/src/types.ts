@@ -59,6 +59,8 @@ export interface InspectionReport {
   issues: Issue[];
   summary: { total: number; error: number; warning: number; info: number };
   adapterResults: AdapterResult[];
+  /** 非预期降级数（工具不可用/引擎缺失导致"未检测"）：与 ok 判定联动——未检测 ≠ 通过 */
+  degraded?: number;
   recommendations: string[];
   /** 基线豁免命中数（无基线/未启用时为 0） */
   suppressedCount?: number;

@@ -14,9 +14,9 @@ inputs:
     required: false
     default: 'guard'
   sop:
-    description: '使用 SOP 规则驱动模式'
+    description: '使用 SOP 规则驱动模式（默认开启：无 SOP 的检查路径无降级护栏，属盲检）'
     required: false
-    default: 'false'
+    default: 'true'
   fail-on:
     description: '门禁阈值 (仅 guard/refactor/pipeline 生效): error | warning | info。inspect 模式固定仅报告，忽略此值'
     required: false
@@ -30,7 +30,7 @@ outputs:
     description: '问题清单路径 (sarif/json)；text 时为空字符串'
     value: ${{ steps.run.outputs.report }}
   exit-code:
-    description: 'zhshield 退出码 (0=通过, 1=阻断)'
+    description: 'zhshield 退出码 (0=通过, 1=阻断, 2=降级/盲检失败)'
     value: ${{ steps.run.outputs.exit-code }}
 runs:
   using: 'composite'
@@ -71,7 +71,10 @@ runs:
         echo "::endgroup::"
         zhshield 2>/dev/null | head -1 || true
 
-    # 0Token 开源扫描器（用户无需手动安装/配置）。单工具失败不阻断整体，CLI 自动降级。
+    # 0Token 开源扫描器（用户无需手动安装/配置）。
+    # 安装为 best-effort（单工具失败不中断安装），但失败不会静默：CLI 降级护栏
+    # 会把"工具不可用 → 检查未执行"计为 degraded → exit 2 → 本 Action 红。
+    # 即：任何一条扫描器没装上，门禁都不可能假绿。
     - name: Install open-source scanners
       shell: bash
       run: |

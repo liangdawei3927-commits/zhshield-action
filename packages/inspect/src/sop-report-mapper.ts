@@ -66,6 +66,17 @@ export class SopReportMapper {
       issueCount: ev.violations?.length ?? 0,
       passed: ev.status === 'passed',
       status: ev.status === 'passed' ? ('passed' as const) : ev.status,
+      // P0（复查4）：degraded 与跳过原因必须透传到报告层——此前只搬 7 个字段，
+      // 消费方（JSON 报告 / CLI 护栏 / 桌面端）完全看不到"未检测"及其原因，
+      // 造成 8 项全跳过仍 100 分通过的盲检面。
+      degraded: ev.degraded === true,
+      skipReason:
+        ev.status === 'skipped'
+          ? ev.degraded === true
+            ? ('degraded' as const)
+            : ('out-of-scope' as const)
+          : undefined,
+      skipDetail: ev.status === 'skipped' && ev.message ? ev.message : undefined,
       issues: ev.violations
         ? ev.violations.map((v) => ({
             id: v.id,

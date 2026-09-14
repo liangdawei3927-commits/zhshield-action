@@ -10,6 +10,7 @@
  */
 import { PipelineRunner } from '@zh/pipeline';
 import { resolveBundledSopDir } from './sop-dir';
+import { countDegraded } from './degraded';
 import { ConsoleReporter } from '@zh/reporter';
 import {
   buildFindings,
@@ -305,6 +306,20 @@ function handleError(reporter: ConsoleReporter, err: unknown): void {
   process.exit(1);
 }
 
+/** P0（复查4）降级护栏（全路径统一）：degraded > 0 → 告警 + exit 2。
+ *  此前该判定只存在于 --sop 分支，默认路径 8 项全跳过仍 100 分通过（盲检）。 */
+function applyDegradedGuard(report?: unknown, subReports?: unknown[]): void {
+  const degraded = subReports
+    ? subReports.reduce<number>((n, r) => n + countDegraded(r), 0)
+    : countDegraded(report);
+  if (degraded > 0) {
+    console.error(
+      `[CLI] 降级警告: ${degraded} 项检查未实际执行（工具不可用/引擎缺失）—— 未检测 ≠ 通过，按门禁失败处理（exit 2）。`,
+    );
+    process.exitCode = 2;
+  }
+}
+
 async function runGuardCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
@@ -317,9 +332,7 @@ async function runGuardCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, projectDir);
-    if ((report.degraded ?? 0) > 0) {
-      process.exitCode = 2;
-    }
+    applyDegradedGuard(report);
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
@@ -334,6 +347,7 @@ async function runGuardCommand(
     });
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
+    applyDegradedGuard(report);
     process.exit(blocked ? 1 : process.exitCode);
   }
 }
@@ -350,9 +364,7 @@ async function runInspectCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, projectDir);
-    if ((report.degraded ?? 0) > 0) {
-      process.exitCode = 2;
-    }
+    applyDegradedGuard(report);
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runInspect();
@@ -367,6 +379,7 @@ async function runInspectCommand(
     });
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
+    applyDegradedGuard(report);
     process.exit(blocked ? 1 : process.exitCode);
   }
 }
@@ -446,9 +459,7 @@ async function runPipelineCommand(
     const formatted = reporter.format(report);
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
-    if ((report.guard?.degraded ?? 0) > 0 || (report.inspect?.degraded ?? 0) > 0) {
-      process.exitCode = 2;
-    }
+    applyDegradedGuard(undefined, [report.guard, report.inspect]);
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runFullPipeline({
@@ -458,6 +469,7 @@ async function runPipelineCommand(
     const formatted = reporter.format(report);
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
+    applyDegradedGuard(undefined, [report.guard, report.inspect]);
     process.exit(blocked ? 1 : process.exitCode);
   }
 }

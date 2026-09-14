@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toSarif } from '../machine-formatters';
+import { toSarif, buildFindings } from '../machine-formatters';
 import type { Finding } from '../machine-formatters';
 
 // GitHub Code Scanning 对 location 是硬性要求：任何一个 result 缺少 locations，
@@ -40,5 +40,116 @@ describe('toSarif', () => {
     expect(results[0].locations.length).toBeGreaterThanOrEqual(1);
     expect(results[0].locations[0].physicalLocation.artifactLocation.uri).toBe('unknown');
     expect(results[0].locations[0].physicalLocation.region.startLine).toBe(1);
+  });
+});
+
+// 复查4 P0 回归门禁：降级跳过必须出现在 findings 中——
+// 此前 SARIF 0 results、无 skipped、无原因，CI 消费链路对"什么都没查"完全失明。
+describe('buildFindings — 降级跳过可见性（复查4 P0）', () => {
+  it('Given RuleEngineReport 含降级跳过评估，Then 产出 warning 级 finding 且携带原因', () => {
+    const report = {
+      total: 2,
+      passed: 1,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      degraded: 1,
+      evaluations: [
+        {
+          rule: { id: 'inspect.scan.typescript.type-error-check', name: '类型检查' },
+          status: 'skipped',
+          degraded: true,
+          message: 'tsc 不可用',
+          durationMs: 0,
+          targetEngine: 'inspect',
+          timestamp: new Date(),
+        },
+        {
+          rule: { id: 'inspect.scan.quality.loc', name: '行数' },
+          status: 'passed',
+          durationMs: 1,
+          targetEngine: 'inspect',
+          timestamp: new Date(),
+        },
+      ],
+      durationMs: 5,
+      timestamp: new Date(),
+    };
+    const findings = buildFindings(report);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('warning');
+    expect(findings[0].ruleId).toBe('inspect.scan.typescript.type-error-check');
+    expect(findings[0].message).toContain('tsc 不可用');
+    expect(findings[0].message).toContain('未检测');
+  });
+
+  it('Given RuleEngineReport 仅含预期裁剪跳过（out-of-scope），Then 不产出 finding', () => {
+    const report = {
+      total: 1,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      evaluations: [
+        {
+          rule: { id: 'inspect.scan.python.lint', name: 'Python Lint' },
+          status: 'skipped',
+          durationMs: 0,
+          targetEngine: 'inspect',
+          timestamp: new Date(),
+        },
+      ],
+      durationMs: 1,
+      timestamp: new Date(),
+    };
+    expect(buildFindings(report)).toHaveLength(0);
+  });
+
+  it('Given InspectionReport 含降级跳过的 adapterResult，Then 产出 warning 级 finding', () => {
+    const report = {
+      projectId: 'p',
+      timestamp: new Date(),
+      scanType: 'full',
+      duration: 1,
+      score: { overall: 100, grade: 'A' },
+      issues: [],
+      summary: { total: 0, error: 0, warning: 0, info: 0 },
+      adapterResults: [
+        {
+          adapterId: 'inspect.scan.architecture.circular-dependency',
+          adapterName: '循环依赖检测',
+          duration: 0,
+          issueCount: 0,
+          passed: false,
+          degraded: true,
+          status: 'skipped',
+          skipReason: 'degraded',
+          skipDetail: 'dependency-cruiser 不可用',
+          issues: [],
+        },
+      ],
+      recommendations: [],
+    };
+    const findings = buildFindings(report);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('warning');
+    expect(findings[0].message).toContain('dependency-cruiser 不可用');
+  });
+
+  it('Given 降级 finding，When 渲染 SARIF，Then results 非空且每条带 locations', () => {
+    const sarif = JSON.parse(
+      toSarif([
+        {
+          ruleId: 'inspect.scan.typescript.type-error-check',
+          severity: 'warning',
+          message: '检查被降级跳过（未检测 ≠ 通过）: 类型检查 — tsc 不可用',
+          source: 'inspect',
+        },
+      ]),
+    );
+    expect(sarif.runs[0].results).toHaveLength(1);
+    expect(sarif.runs[0].results[0].locations).toBeDefined();
   });
 });

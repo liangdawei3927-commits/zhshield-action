@@ -36,6 +36,12 @@ export interface RuleEvaluation {
   /** 阻断判定（F1-4）：failed 且有效严重级达到规则声明的 blockingThreshold；未声明阈值的规则保持旧行为（failed 即阻断）。
    *  可选字段：由 SopRuleEngine.evaluateAll 统一附加；外部/存量评估缺省时消费方按 status==='failed' 回退。 */
   blocking?: boolean;
+
+  /** 非预期降级跳过（工具不可用 / 引擎未注册 / 适配器缺失）：
+   *  degraded=true 的 skipped 评估在 aggregate() 中计入 ok 判定——
+   *  与 P0-2（规则 0 条）同级的盲检护栏：什么都没查 = 不得通过。
+   *  预期跳过（防重入 / dryRun / 画像 scope 裁剪）不标记。 */
+  degraded?: boolean;
 }
 
 // ─── 单条违规 ──────────────────────────────────────────
@@ -114,8 +120,11 @@ export interface RuleEngineReport {
   /** 跳过数 */
   skipped: number;
 
-  /** 是否通过（无 blocking 级别失败） */
+  /** 是否通过（无 blocking 级别失败；degraded 亦视为不通过） */
   ok: boolean;
+
+  /** 非预期降级跳过数（工具不可用 / 引擎未注册 / 适配器缺失等）。ok 为 false 时的可读指示值。聚合报告必写；兼容旧序列化报告缺失场景。 */
+  degraded?: number;
 
   /** 阻断评估数（F1-4） */
   blockingCount?: number;
@@ -143,7 +152,7 @@ export interface RuleEngineReport {
  * - 声明了阈值 → 有效严重级秩 >= 阈值秩才阻断（severityRank 单一事实源；未知值秩 -1 永不达标）。
  *
  * 结果仅作为附加元数据写入 RuleEvaluation.blocking，
- * 不参与 RuleEngineReport.ok 的计算（ok 保持纯状态驱动：failed===0 && errors===0）。
+ * 不参与 RuleEngineReport.ok 的计算（ok 由 failed / errors / degraded 三者共同决定）。
  */
 export function computeBlocking(
   status: EvaluationStatus,

@@ -111,6 +111,8 @@ export class ScanReportBuilder {
       issues: input.issues,
       summary,
       adapterResults: input.adapterResults,
+      // P0（复查4）：顶层降级计数，供 CLI 护栏与机器可读报告直接消费
+      degraded: input.adapterResults.filter((r) => r.degraded === true).length,
       recommendations: this.recommendations(input.issues),
       suppressedCount: input.suppressedCount ?? 0,
     };

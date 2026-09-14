@@ -96,36 +96,80 @@ async function runRefactor(files, opts, projectRoot) {
 }
 
 // ── 巡检检查 ──────────────────────────────────────────────
-async function runInspect(files, opts, projectRoot) {
-  const { InspectEngine } = await importEngine('inspect');
-  const engine = new InspectEngine();
+/** inspect 域适配器注册表（与 pipeline-runner.registerDefaultAdapters 对齐的
+ *  @zh/inspect 内置子集；pipeline 独有的 Sonarway/Trivy/AutoPerf 不在此列） */
+const INSPECT_ADAPTERS = [
+  'ESLintAdapter',
+  'GitleaksAdapter',
+  'DependencyCruiserAdapter',
+  'JscpdAdapter',
+  'TsPruneAdapter',
+  'SemgrepAdapter',
+  'DepcheckAdapter',
+  'TypeScriptAdapter',
+  'PrettierAdapter',
+  'CommitLintAdapter',
+  'NpmAuditAdapter',
+];
 
-  // inspect engine expects a project directory or file list
-  let issues;
-  try {
-    if (files.length > 0) {
-      issues = await engine.run(files);
-    } else {
-      issues = await engine.run([projectRoot]);
-    }
-  } catch {
-    // inspect might use adapters that aren't installed
-    console.error('zhcheck: inspect engine requires external tools (eslint, gitleaks, etc.)');
+async function runInspect(files, opts, projectRoot) {
+  // InspectEngine 与适配器从包入口加载（engine.js 不含适配器类）
+  const entry = resolve(PKGS_ROOT, 'inspect', 'dist', 'index.js');
+  if (!existsSync(entry)) {
+    console.error('zhcheck: inspect engine not built. Run pnpm build first.');
+    process.exit(2);
+  }
+  const inspectMod = await import(entry);
+  const engine = new inspectMod.InspectEngine();
+  for (const name of INSPECT_ADAPTERS) {
+    if (inspectMod[name]) engine.registerAdapter(new inspectMod[name]());
+  }
+
+  // P1（复查4）：inspect 引擎为项目级扫描（runScan），无 per-file API。
+  // 旧代码调用已不存在的 engine.run() 且异常被静默吞掉——--inspect 自
+  // 引擎 API 变更起从未真正执行过。现按现行 API 接通；暂存区/单文件模式
+  // 显式声明跳过（refactor 检查仍生效），不再伪装成"0 问题 = 通过"。
+  if (files.length > 0) {
+    console.log(
+      'zhcheck: inspect 引擎为项目级扫描，暂不支持单文件/暂存区模式，本次跳过（refactor 检查仍生效）。',
+    );
     return { total: 0, warnings: 0, errors: 0 };
+  }
+
+  let report;
+  try {
+    report = await engine.runScan(projectRoot);
+  } catch (e) {
+    // 引擎异常不得静默放行（复查4 P1）：显式失败（exit 2）。
+    console.error(`zhcheck: inspect engine error: ${e?.message ?? e}`);
+    process.exit(2);
   }
 
   let warningCount = 0;
   let errorCount = 0;
 
-  for (const issue of issues || []) {
+  for (const issue of report?.issues || []) {
     if (!opts.json) {
-      console.log(formatLinterIssue(issue, issue.filePath || ''));
+      console.log(formatLinterIssue(issue, issue.filePath || issue.file || ''));
     }
     if (issue.severity === 'error') errorCount++;
     if (issue.severity === 'warning') warningCount++;
   }
 
-  return { total: (issues || []).length, warnings: warningCount, errors: errorCount };
+  // 降级可见性：未实际执行的检查如实展示，不计入通过
+  const degraded = report?.degraded ?? 0;
+  if (degraded > 0 && !opts.json) {
+    console.log(`zhcheck: ${degraded} 项检查未实际执行（工具不可用）——未检测不计为通过。`);
+  }
+  if (opts.json && report) {
+    console.log(JSON.stringify(report, null, 2));
+  }
+
+  return {
+    total: (report?.issues || []).length,
+    warnings: warningCount,
+    errors: errorCount,
+  };
 }
 
 // ── 安全扫描 ──────────────────────────────────────────────
@@ -186,8 +230,10 @@ async function runGuard(files, opts, _projectRoot) {
     } else {
       report = await engine.check();
     }
-  } catch {
-    return { total: 0, warnings: 0, errors: 0 };
+  } catch (e) {
+    // P1（复查4）：同 runInspect——异常静默返回 0 问题 = 静默放行，显式失败。
+    console.error(`zhcheck: guard engine error: ${e?.message ?? e}`);
+    process.exit(2);
   }
 
   const warningCount = 0;

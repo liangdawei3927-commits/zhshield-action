@@ -154,7 +154,21 @@ function guardFindings(report: GuardReport): Finding[] {
 function ruleEngineFindings(report: RuleEngineReport): Finding[] {
   const findings: Finding[] = [];
   for (const ev of report.evaluations) {
-    if (ev.status === 'passed' || ev.status === 'skipped') continue;
+    // P0（复查4）：降级跳过必须可见——"未检测 ≠ 通过"。此前 skipped 被静默略过，
+    // CI（SARIF 0 results）完全看不到任何检查没跑。
+    if (ev.status === 'skipped') {
+      if (ev.degraded === true) {
+        const ruleId = ev.rule?.id ?? 'unknown';
+        findings.push({
+          ruleId,
+          severity: 'warning',
+          message: `检查被降级跳过（未检测 ≠ 通过）: ${ev.rule?.name ?? ruleId}${ev.message ? ` — ${ev.message}` : ''}`,
+          source: ev.targetEngine === 'inspect' ? 'inspect' : 'guard',
+        });
+      }
+      continue;
+    }
+    if (ev.status === 'passed') continue;
     const source: FindingSource = ev.targetEngine === 'inspect' ? 'inspect' : 'guard';
     const ruleId = ev.rule?.id ?? 'unknown';
     if (ev.violations?.length) {
@@ -197,6 +211,17 @@ function inspectionFindings(report: InspectionReport): Finding[] {
       source: (issue.source as FindingSource) || 'inspect',
       suggestion: issue.suggestion,
     });
+  }
+  // P0（复查4）：降级跳过的检查项必须出现在 findings（SARIF/CI 可见）
+  for (const r of report.adapterResults ?? []) {
+    if (r.degraded === true) {
+      findings.push({
+        ruleId: r.adapterId,
+        severity: 'warning',
+        message: `检查项被降级跳过（未检测 ≠ 通过）: ${r.adapterName}${r.skipDetail ? ` — ${r.skipDetail}` : ''}`,
+        source: 'inspect',
+      });
+    }
   }
   return findings;
 }

@@ -17,6 +17,8 @@ import {
   formatReportJson,
   severityRank,
   failOnRank,
+  FAIL_ON_VALUES,
+  isFailOnValue,
   type Finding,
   type FailOn,
 } from '@zh/reporter';
@@ -71,7 +73,7 @@ zhshield — 智汇码盾 代码质量治理
   --no-color      禁用颜色输出
   --format <fmt>  报告格式: text(默认) | json | sarif
   --report <path> 机器可读报告输出路径 (json/sarif 时生效)
-  --fail-on <lvl> 阻断阈值: guard/refactor/pipeline 默认 error | inspect 默认 none(仅报告) | warning | info
+  --fail-on <lvl> 阻断阈值: guard/refactor/pipeline 默认 error | inspect 默认 none(仅报告) | warning | info | 合法值: error | warning | info | none
 `);
 }
 
@@ -155,10 +157,19 @@ function parseFlags(args: string[], opts: CLIOptions): boolean {
       case '--report':
         opts.report = args[++i] || opts.report;
         break;
-      case '--fail-on':
-        opts.failOn = (args[++i] as FailOn) || opts.failOn;
+      case '--fail-on': {
+        // 解析边界校验：非法值（含缺参/空串）直接报错退出，禁止静默降级为默认阈值
+        const raw = args[++i];
+        if (!isFailOnValue(raw)) {
+          console.error(
+            `[CLI] 非法 --fail-on 值: ${raw ?? '(空)'}，合法值: ${FAIL_ON_VALUES.join(' | ')}`,
+          );
+          process.exit(2);
+        }
+        opts.failOn = raw;
         explicitFailOn = true;
         break;
+      }
       case 'help':
       case '--help':
         opts.help = true;

@@ -18,6 +18,7 @@ const SOP_TEMPLATES = path.join(
 );
 
 const GITLEAKS_RULE_ID = 'security.scan.gitleaks.hardcoded-key';
+const ESLINT_RULE_ID = 'guard.block.external.eslint-error';
 
 describe('CLI SOP 流水线 — 规则加载与已知问题检测（回归门禁）', () => {
   let runner: PipelineRunner;
@@ -55,5 +56,22 @@ describe('CLI SOP 流水线 — 规则加载与已知问题检测（回归门禁
     expect(violations.some((v) => v.file.includes('credentials.ts'))).toBe(true);
     // security 域为全量扫描（含 semgrep 对 fixutre 全量分析 ~60s），
     // 门禁同时覆盖 gitleaks 检出 + 全量扫描不崩溃，阈值放宽到 120s
+  }, 120_000);
+
+  it('Given 植入未使用变量的样本项目与 ESLint flat config，When SOP Guard 门禁，Then eslint-error 规则失败并报告违规', async () => {
+    // 不传 domains，跑全 guard 域（guard 域含 eslint-error 规则）。
+    // 显式注入 typescript 画像：fixture 无 tsconfig/依赖，自动画像为 unknown，
+    // 会触发 M4 工具 scope 裁剪把 eslint 裁掉（与本次回归的配置回退链无关）。
+    const report = await runner.runSopGuard({
+      projectFeature: { language: 'typescript', features: ['typescript'] },
+    });
+
+    const eslintEval = report.evaluations.find((ev) => ev.rule.id === ESLINT_RULE_ID);
+    expect(eslintEval).toBeDefined();
+    expect(eslintEval!.status).toBe('failed');
+
+    const violations = eslintEval!.violations ?? [];
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some((v) => v.file.includes('eslint-unused.js'))).toBe(true);
   }, 120_000);
 });

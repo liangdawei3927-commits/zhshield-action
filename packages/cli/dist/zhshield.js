@@ -597870,6 +597870,10 @@ var ConsoleReporter = class {
 };
 
 // ../reporter/src/machine-formatters.ts
+var FAIL_ON_VALUES = ["error", "warning", "info", "none"];
+function isFailOnValue(value2) {
+  return value2 !== void 0 && FAIL_ON_VALUES.includes(value2);
+}
 var SEVERITY_RANK3 = { error: 3, warning: 2, info: 1 };
 function severityRank2(s) {
   return SEVERITY_RANK3[s];
@@ -598103,7 +598107,7 @@ zhshield \u2014 \u667A\u6C47\u7801\u76FE \u4EE3\u7801\u8D28\u91CF\u6CBB\u7406
   --no-color      \u7981\u7528\u989C\u8272\u8F93\u51FA
   --format <fmt>  \u62A5\u544A\u683C\u5F0F: text(\u9ED8\u8BA4) | json | sarif
   --report <path> \u673A\u5668\u53EF\u8BFB\u62A5\u544A\u8F93\u51FA\u8DEF\u5F84 (json/sarif \u65F6\u751F\u6548)
-  --fail-on <lvl> \u963B\u65AD\u9608\u503C: guard/refactor/pipeline \u9ED8\u8BA4 error | inspect \u9ED8\u8BA4 none(\u4EC5\u62A5\u544A) | warning | info
+  --fail-on <lvl> \u963B\u65AD\u9608\u503C: guard/refactor/pipeline \u9ED8\u8BA4 error | inspect \u9ED8\u8BA4 none(\u4EC5\u62A5\u544A) | warning | info | \u5408\u6CD5\u503C: error | warning | info | none
 `);
 }
 function parseArgs(argv) {
@@ -598167,10 +598171,18 @@ function parseFlags(args, opts) {
       case "--report":
         opts.report = args[++i] || opts.report;
         break;
-      case "--fail-on":
-        opts.failOn = args[++i] || opts.failOn;
+      case "--fail-on": {
+        const raw = args[++i];
+        if (!isFailOnValue(raw)) {
+          console.error(
+            `[CLI] \u975E\u6CD5 --fail-on \u503C: ${raw ?? "(\u7A7A)"}\uFF0C\u5408\u6CD5\u503C: ${FAIL_ON_VALUES.join(" | ")}`
+          );
+          process.exit(2);
+        }
+        opts.failOn = raw;
         explicitFailOn = true;
         break;
+      }
       case "help":
       case "--help":
         opts.help = true;

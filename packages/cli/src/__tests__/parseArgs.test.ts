@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isFailOnValue, FAIL_ON_VALUES } from '@zh/reporter';
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -8,6 +9,8 @@ function parseArgs(argv: string[]): {
   verbose: boolean;
   color: boolean;
   help: boolean;
+  failOn: 'error' | 'warning' | 'info' | 'none';
+  explicitFailOn: boolean;
 } {
   const opts = {
     command: '',
@@ -17,6 +20,8 @@ function parseArgs(argv: string[]): {
     verbose: false,
     color: true,
     help: false,
+    failOn: 'error' as 'error' | 'warning' | 'info' | 'none',
+    explicitFailOn: false,
   };
   const args = argv.slice(2);
   if (args.length === 0) {
@@ -44,6 +49,18 @@ function parseArgs(argv: string[]): {
       case '--no-color':
         opts.color = false;
         break;
+      case '--fail-on': {
+        // 解析边界校验：与 index.ts parseFlags 保持一致，非法值抛错（镜像内不能 process.exit）
+        const raw = args[++i];
+        if (!isFailOnValue(raw)) {
+          throw new Error(
+            `非法 --fail-on 值: ${raw ?? '(空)'}，合法值: ${FAIL_ON_VALUES.join(' | ')}`,
+          );
+        }
+        opts.failOn = raw;
+        opts.explicitFailOn = true;
+        break;
+      }
       case 'help':
       case '--help':
         opts.help = true;
@@ -111,5 +128,33 @@ describe('CLI argument parsing', () => {
     expect(opts.sop).toBe(true);
     expect(opts.verbose).toBe(true);
     expect(opts.dryRun).toBe(true);
+  });
+
+  it('should parse --fail-on warning', () => {
+    const opts = parseArgs(['node', 'index.ts', 'guard', '--fail-on', 'warning']);
+    expect(opts.failOn).toBe('warning');
+    expect(opts.explicitFailOn).toBe(true);
+  });
+
+  it('should reject invalid --fail-on value critical', () => {
+    expect(() => parseArgs(['node', 'index.ts', 'guard', '--fail-on', 'critical'])).toThrow(
+      /非法 --fail-on 值: critical/,
+    );
+  });
+
+  it('should reject --fail-on without argument', () => {
+    expect(() => parseArgs(['node', 'index.ts', 'guard', '--fail-on'])).toThrow(
+      /非法 --fail-on 值: \(空\)/,
+    );
+  });
+
+  it('should validate all FAIL_ON_VALUES via isFailOnValue', () => {
+    for (const v of FAIL_ON_VALUES) {
+      expect(isFailOnValue(v)).toBe(true);
+    }
+    expect(isFailOnValue('critical')).toBe(false);
+    expect(isFailOnValue('nonexistent')).toBe(false);
+    expect(isFailOnValue('')).toBe(false);
+    expect(isFailOnValue(undefined)).toBe(false);
   });
 });

@@ -129,8 +129,12 @@ packages/desktop/e2e/*.js.map
 packages/desktop/e2e/*.d.ts
 packages/desktop/e2e/*.d.ts.map
 
-# 测试 fixture 编译产物（仅保留源码 .ts 与元数据文件入库）
+# 测试 fixture 编译产物（仅保留源码 .ts 与元数据文件入库）。
+# 例外：eslint.config.js 与 eslint-unused.js 是手写源文件（非编译产物），须入库。
+# 注意：取反规则必须位于 `**/*.js` 忽略规则之后（gitignore 后者覆盖前者）。
 scripts/fixtures/sample-repo/**/*.js
+!scripts/fixtures/sample-repo/eslint.config.js
+!scripts/fixtures/sample-repo/src/core/eslint-unused.js
 scripts/fixtures/sample-repo/**/*.js.map
 scripts/fixtures/sample-repo/**/*.d.ts
 scripts/fixtures/sample-repo/**/*.d.ts.map

@@ -4,8 +4,9 @@
  *
  * 生成 scripts/fixtures/sample-repo/ 下的固定样本项目：
  *  - 一个 package.json
- *  - src/ 下约 50 个小型 .ts 文件（含若干嵌套子目录，另植入 4 个已知问题文件）
+ *  - src/ 下约 50 个小型 .ts 文件（含若干嵌套子目录，另植入 5 个已知问题文件）
  *  - node_modules/ 下约 15 个小型但结构真实的虚拟包（package.json + index.js + 可选 lib/）
+ *  - 根目录一个 eslint.config.js（ESLint v9 flat config，仅内建规则）
  *  - 内容完全确定（无时间戳/随机数），可重复运行且结果一致（幂等）
  *
  * 用途：固定样本 = 每次运行输入完全相同，计时可比，用于基准回归门禁。
@@ -47,6 +48,25 @@ export const DEFAULT_ITEMS_${index}: Item${index}[] = Array.from(
 `;
 }
 
+// ESLint v9 flat config 模板：确定性生成，仅依赖 espree 内建能力（no-unused-vars /
+// no-console），不引用 @typescript-eslint（fixture 的 node_modules 为 stub，装不了真实插件）。
+// fixture 的 package.json 无 "type":"module"，故用 CommonJS 语法 module.exports。
+const ESLINT_CONFIG = `// 智汇码盾基准回归门禁 fixture 的 ESLint flat config（确定性生成，仅内建规则）
+module.exports = [
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+    },
+    rules: {
+      'no-unused-vars': 'error',
+      'no-console': 'error',
+    },
+  },
+];
+`;
+
 // 目录 → 文件清单（确定性顺序）。共 50 个源文件。
 const LAYOUT = [
   { dir: 'core', count: 12, kind: 'ts' },
@@ -61,6 +81,13 @@ const LAYOUT = [
 // 1) 循环依赖：circular-a ↔ circular-b（import 环）
 // 2) TS2322 类型错误：string 类型变量赋 number 值
 // 3) 硬编码密钥：Stripe sk_test_（gitleaks 默认规则可检出，且不在 .gitleaksignore 中）
+// 4) 未使用变量：纯 JS 顶层 const 从未引用且未 export（eslint no-unused-vars 可检出）
+// 未使用变量样本：纯 JS（无 TS 类型注解，espree 可解析），模块作用域顶层 const
+// 从未被引用且无 export，配合 eslint.config.js 的 no-unused-vars: error 必触发。
+const PLANTED_UNUSED_VARIABLE = `// eslint-unused.js — 已知问题：未使用变量（确定性植入，eslint no-unused-vars 可检出）
+const plantedUnusedVariable = 'planted-unused-variable';
+`;
+
 const PLANTED_FILES = [
   {
     file: 'core/circular-a.ts',
@@ -97,6 +124,10 @@ export const count: string = 42;
     content: `// credentials.ts — 已知问题：硬编码密钥（确定性植入，gitleaks 可检出）
 export const STRIPE_SECRET_KEY = 'sk_test_51H4xQwK2Y0zA3bC6dF7gH8jK9lM0nP2qR4sT6uV8wX0yZ1aB3cD5eF7gH9iJ';
 `,
+  },
+  {
+    file: 'core/eslint-unused.js',
+    content: PLANTED_UNUSED_VARIABLE,
   },
 ];
 
@@ -384,6 +415,9 @@ async function main() {
       JSON.stringify(packageJson, null, 2) + '\n',
       'utf-8',
     ),
+    // ESLint v9 flat config：让 guard.block.external.eslint-error 规则的回退链
+    // （resolveProjectEslintConfig）能找到项目自身配置，规则真实执行而非 skipped。
+    writeFile(path.join(SAMPLE_DIR, 'eslint.config.js'), ESLINT_CONFIG, 'utf-8'),
   ];
 
   let index = 0;

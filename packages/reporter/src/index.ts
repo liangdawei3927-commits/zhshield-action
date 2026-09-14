@@ -8,5 +8,7 @@ export {
   formatReportJson,
   severityRank,
   failOnRank,
+  FAIL_ON_VALUES,
+  isFailOnValue,
 } from './machine-formatters';
 export type { Finding, FindingSeverity, FindingSource, FailOn } from './machine-formatters';

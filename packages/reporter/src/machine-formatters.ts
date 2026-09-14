@@ -21,6 +21,14 @@ export type FindingSource = 'guard' | 'inspect' | 'refactor' | 'security' | 'sen
 /** 阻断阈值：none 表示永不阻断，其余映射到严重级秩 */
 export type FailOn = 'error' | 'warning' | 'info' | 'none';
 
+/** FailOn 合法值列表：供 CLI 解析边界校验与帮助文案复用，避免枚举漂移 */
+export const FAIL_ON_VALUES = ['error', 'warning', 'info', 'none'] as const;
+
+/** 严格校验 FailOn 枚举值：非空且属于合法值集合，供 CLI 解析边界拦截非法输入 */
+export function isFailOnValue(value: string | undefined): value is FailOn {
+  return value !== undefined && (FAIL_ON_VALUES as readonly string[]).includes(value);
+}
+
 export interface Finding {
   ruleId: string;
   severity: FindingSeverity;

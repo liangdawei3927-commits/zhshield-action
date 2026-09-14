@@ -959,6 +959,9 @@
         }
       },
       "ring": {
+        "gaugeMax": "100",
+        "gaugeMid": "50",
+        "gaugeMin": "0",
         "healthScore": "Health score",
         "notChecked": "Not checked yet"
       },

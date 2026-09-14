@@ -960,7 +960,10 @@
       },
       "ring": {
         "healthScore": "건강 점수",
-        "notChecked": "아직 점검하지 않음"
+        "notChecked": "아직 점검하지 않음",
+        "gaugeMin": "건",
+        "gaugeMid": "강",
+        "gaugeMax": "점"
       },
       "runCheck": {
         "expiredHint": "일부 검사 결과가 만료되었습니다. 전체 검사를 실행해 주세요.",
@@ -1481,7 +1484,24 @@
         },
         "healthy": "건강"
       },
-      "title": "분석 보고서"
+      "title": "분석 보고서",
+      "dimension": {
+        "quality": "품질",
+        "security": "보안",
+        "architecture": "아키텍처",
+        "dependencies": "의존성",
+        "documentation": "문서",
+        "refactor": "리팩터링",
+        "performance": "성능",
+        "techdebt": "기술 부채",
+        "gate": "게이트 검사"
+      },
+      "grade": {
+        "A": "A 등급",
+        "B": "B 등급",
+        "C": "C 등급",
+        "D": "D 등급"
+      }
     },
     "security": {
       "checking": "검사 중...",

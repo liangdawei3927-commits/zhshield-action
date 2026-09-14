@@ -960,7 +960,10 @@
       },
       "ring": {
         "healthScore": "健康分",
-        "notChecked": "尚未體檢"
+        "notChecked": "尚未體檢",
+        "gaugeMin": "健",
+        "gaugeMid": "康",
+        "gaugeMax": "分"
       },
       "runCheck": {
         "expiredHint": "部分檢查結果已過期，建議一鍵全檢重新整理",
@@ -1481,7 +1484,24 @@
         },
         "healthy": "健康"
       },
-      "title": "分析報告"
+      "title": "分析報告",
+      "dimension": {
+        "quality": "品質",
+        "security": "安全性",
+        "architecture": "架構",
+        "dependencies": "依賴",
+        "documentation": "文檔",
+        "refactor": "重構",
+        "performance": "效能",
+        "techdebt": "技術債",
+        "gate": "門禁哨兵"
+      },
+      "grade": {
+        "A": "A 級",
+        "B": "B 級",
+        "C": "C 級",
+        "D": "D 級"
+      }
     },
     "security": {
       "checking": "檢查中...",

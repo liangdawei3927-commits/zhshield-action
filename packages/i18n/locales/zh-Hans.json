@@ -959,6 +959,9 @@
         }
       },
       "ring": {
+        "gaugeMax": "分",
+        "gaugeMid": "康",
+        "gaugeMin": "健",
         "healthScore": "健康分",
         "notChecked": "尚未体检"
       },

@@ -960,7 +960,10 @@
       },
       "ring": {
         "healthScore": "ヘルススコア",
-        "notChecked": "まだ点検していません"
+        "notChecked": "まだ点検していません",
+        "gaugeMin": "健",
+        "gaugeMid": "康",
+        "gaugeMax": "点"
       },
       "runCheck": {
         "expiredHint": "一部の結果が期限切れです。全チェックで更新してください。",
@@ -1481,7 +1484,24 @@
         },
         "healthy": "健全"
       },
-      "title": "分析レポート"
+      "title": "分析レポート",
+      "dimension": {
+        "quality": "品質",
+        "security": "セキュリティ",
+        "architecture": "アーキテクチャ",
+        "dependencies": "依存関係",
+        "documentation": "ドキュメント",
+        "refactor": "リファクタリング",
+        "performance": "パフォーマンス",
+        "techdebt": "技術負債",
+        "gate": "ゲートチェック"
+      },
+      "grade": {
+        "A": "A 級",
+        "B": "B 級",
+        "C": "C 級",
+        "D": "D 級"
+      }
     },
     "security": {
       "checking": "チェック中...",

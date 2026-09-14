@@ -4,7 +4,7 @@
  *
  * 生成 scripts/fixtures/sample-repo/ 下的固定样本项目：
  *  - 一个 package.json
- *  - src/ 下约 50 个小型 .ts/.js 文件（含若干嵌套子目录）
+ *  - src/ 下约 50 个小型 .ts 文件（含若干嵌套子目录，另植入 4 个已知问题文件）
  *  - node_modules/ 下约 15 个小型但结构真实的虚拟包（package.json + index.js + 可选 lib/）
  *  - 内容完全确定（无时间戳/随机数），可重复运行且结果一致（幂等）
  *
@@ -47,28 +47,57 @@ export const DEFAULT_ITEMS_${index}: Item${index}[] = Array.from(
 `;
 }
 
-function jsModule(name, index) {
-  return `// ${name}.js — 固定样本模块 ${index}（确定性生成，勿手改）
-function compute${index}(a, b) {
-  return a * b + a - b;
-}
-
-function format${index}(value) {
-  return \`result=\${value}\`;
-}
-
-module.exports = { compute${index}, format${index} };
-`;
-}
-
 // 目录 → 文件清单（确定性顺序）。共 50 个源文件。
 const LAYOUT = [
   { dir: 'core', count: 12, kind: 'ts' },
   { dir: 'core/util', count: 8, kind: 'ts' },
   { dir: 'services', count: 10, kind: 'ts' },
-  { dir: 'services/adapters', count: 6, kind: 'js' },
+  { dir: 'services/adapters', count: 6, kind: 'ts' },
   { dir: 'ui', count: 8, kind: 'ts' },
-  { dir: 'ui/components', count: 6, kind: 'js' },
+  { dir: 'ui/components', count: 6, kind: 'ts' },
+];
+
+// ---- 已知问题植入（确定性，供回归门禁/验收测试断言）----
+// 1) 循环依赖：circular-a ↔ circular-b（import 环）
+// 2) TS2322 类型错误：string 类型变量赋 number 值
+// 3) 硬编码密钥：Stripe sk_test_（gitleaks 默认规则可检出，且不在 .gitleaksignore 中）
+const PLANTED_FILES = [
+  {
+    file: 'core/circular-a.ts',
+    content: `// circular-a.ts — 已知问题：与 circular-b 构成循环依赖（确定性植入）
+import { bValue } from './circular-b';
+
+export const aValue = 1;
+
+export function readB(): number {
+  return bValue;
+}
+`,
+  },
+  {
+    file: 'core/circular-b.ts',
+    content: `// circular-b.ts — 已知问题：与 circular-a 构成循环依赖（确定性植入）
+import { aValue } from './circular-a';
+
+export const bValue = 2;
+
+export function readA(): number {
+  return aValue;
+}
+`,
+  },
+  {
+    file: 'core/type-error.ts',
+    content: `// type-error.ts — 已知问题：TS2322 类型不匹配（确定性植入）
+export const count: string = 42;
+`,
+  },
+  {
+    file: 'core/credentials.ts',
+    content: `// credentials.ts — 已知问题：硬编码密钥（确定性植入，gitleaks 可检出）
+export const STRIPE_SECRET_KEY = 'sk_test_51H4xQwK2Y0zA3bC6dF7gH8jK9lM0nP2qR4sT6uV8wX0yZ1aB3cD5eF7gH9iJ';
+`,
+  },
 ];
 
 // ---- node_modules 虚拟包定义（确定性，真实结构但代码为 stub）----
@@ -358,15 +387,20 @@ async function main() {
   ];
 
   let index = 0;
-  for (const { dir, count, kind } of LAYOUT) {
+  for (const { dir, count } of LAYOUT) {
     const targetDir = path.join(SRC_DIR, dir);
     for (let i = 0; i < count; i++) {
       const name = `${dir.replace(/[^a-z]/g, '')}${i + 1}`;
-      const ext = kind === 'ts' ? 'ts' : 'js';
-      const content = kind === 'ts' ? tsModule(name, index) : jsModule(name, index);
-      writes.push(writeFile(path.join(targetDir, `${name}.${ext}`), content, 'utf-8'));
+      writes.push(writeFile(path.join(targetDir, `${name}.ts`), tsModule(name, index), 'utf-8'));
       index++;
     }
+  }
+
+  // 植入已知问题文件（确定性内容，独立于 LAYOUT 的 50 个常规模块）。
+  for (const planted of PLANTED_FILES) {
+    const target = path.join(SRC_DIR, planted.file);
+    await mkdir(path.dirname(target), { recursive: true });
+    writes.push(writeFile(target, planted.content, 'utf-8'));
   }
 
   // node_modules 虚拟包：每个包一个目录，含 package.json + index.js（+ 可选 lib/）。
@@ -399,7 +433,7 @@ async function main() {
   await Promise.all(writes);
 
   console.log(`✅ 固定样本项目已生成：${SAMPLE_DIR}`);
-  console.log(`   源文件数：${index}`);
+  console.log(`   源文件数：${index}（含植入已知问题 ${PLANTED_FILES.length} 个）`);
   console.log(`   node_modules 虚拟包数：${pkgCount}`);
 }
 

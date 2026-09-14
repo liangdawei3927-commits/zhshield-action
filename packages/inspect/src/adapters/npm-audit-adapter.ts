@@ -79,9 +79,10 @@ export class NpmAuditAdapter implements ToolAdapter {
     const start = Date.now();
     const category: IssueCategory = options.config?.category ?? 'dependency';
 
-    const command = AUDIT_COMMANDS.find((c) =>
-      fs.existsSync(path.join(options.projectPath, c.lockfile)),
-    );
+    // 归一化 projectPath 为绝对路径：相对路径会流入锁文件探测与 cwd，
+    // npm/pnpm 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const command = AUDIT_COMMANDS.find((c) => fs.existsSync(path.join(projectPath, c.lockfile)));
     if (!command) {
       return this.buildResult(
         start,
@@ -94,7 +95,7 @@ export class NpmAuditAdapter implements ToolAdapter {
     let raw = '';
     try {
       ({ stdout: raw } = await execFileAsync(command.cmd, command.args, {
-        cwd: options.projectPath,
+        cwd: projectPath,
         timeout: options.timeout || 120000,
         maxBuffer: 10 * 1024 * 1024,
       }));

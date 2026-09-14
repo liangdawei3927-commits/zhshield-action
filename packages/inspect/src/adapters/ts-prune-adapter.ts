@@ -96,14 +96,17 @@ export class TsPruneAdapter implements ToolAdapter {
 
   /** 执行 ts-prune 并映射输出为可用结果 */
   private async runTsPrune(options: ToolScanOptions, start: number): Promise<ToolResult> {
+    // 归一化 projectPath 为绝对路径：相对路径会流入 cwd 与 tsconfig 相对化，
+    // ts-prune 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
     // ts-prune@0.10.3 runner 内部用 path.join(process.cwd(), tsConfigPath) 组装路径，
     // 传绝对路径会翻倍（cwd/projectPath + 绝对路径）；cwd 已是 projectPath，故传相对路径。
-    const tsConfigAbsPath = path.resolve(options.projectPath, 'tsconfig.json');
-    const tsConfigPath = path.relative(options.projectPath, tsConfigAbsPath);
+    const tsConfigAbsPath = path.resolve(projectPath, 'tsconfig.json');
+    const tsConfigPath = path.relative(projectPath, tsConfigAbsPath);
     // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
-    const command = await this.resolveCommand(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
     const { stdout } = await execFileAsync(command, ['-p', tsConfigPath, '--json'], {
-      cwd: options.projectPath,
+      cwd: projectPath,
       timeout: options.timeout || 60000,
       maxBuffer: 10 * 1024 * 1024,
     });

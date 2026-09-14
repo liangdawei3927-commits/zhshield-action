@@ -68,7 +68,7 @@ export function HealthRing({ score, size = 150 }: { score: number | null; size?:
             style={{ transition: 'stroke-dashoffset 1s ease-out' }}
           />
         )}
-        {/* 底部刻度 健/康/分（0/50/100） */}
+        {/* 底部刻度 评/分（0/100）：左端起点、右端终点，开口中央留空 */}
         <text
           x={75 - 42}
           y={labelY}
@@ -77,15 +77,6 @@ export function HealthRing({ score, size = 150 }: { score: number | null; size?:
           style={{ fontSize: 11 }}
         >
           {t('page.dashboard.ring.gaugeMin')}
-        </text>
-        <text
-          x={75}
-          y={labelY}
-          textAnchor="middle"
-          fill="rgb(var(--zh-muted))"
-          style={{ fontSize: 11 }}
-        >
-          {t('page.dashboard.ring.gaugeMid')}
         </text>
         <text
           x={75 + 42}

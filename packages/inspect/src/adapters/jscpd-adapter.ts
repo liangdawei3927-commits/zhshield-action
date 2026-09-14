@@ -112,7 +112,10 @@ export class JscpdAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const reportPath = path.join(options.projectPath, '.zhshield', '.jscpd-report.json');
+    // 归一化 projectPath 为绝对路径：相对路径会流入报告路径与扫描目标，
+    // jscpd 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const reportPath = path.join(projectPath, '.zhshield', '.jscpd-report.json');
 
     try {
       return await this.runJscpd(options, start, reportPath);
@@ -127,9 +130,10 @@ export class JscpdAdapter implements ToolAdapter {
     start: number,
     reportPath: string,
   ): Promise<ToolResult> {
-    const target = options.targetFiles?.[0] || this.resolveTargetDir(options.projectPath);
+    const projectPath = path.resolve(options.projectPath);
+    const target = options.targetFiles?.[0] || this.resolveTargetDir(projectPath);
     await this.executeJscpd(options, target, reportPath);
-    const content = await this.readJscpdReport(reportPath, options.projectPath);
+    const content = await this.readJscpdReport(reportPath, projectPath);
     const issues = this.mapOutput(content);
     return this.buildJscpdAvailable(content, issues, start);
   }
@@ -149,9 +153,10 @@ export class JscpdAdapter implements ToolAdapter {
     target: string,
     reportPath: string,
   ): Promise<void> {
-    const command = await this.resolveCommand(options.projectPath);
+    const projectPath = path.resolve(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
     await FileHelper.ensureDir(path.dirname(reportPath));
-    const { major } = await this.detectVersion(options.projectPath);
+    const { major } = await this.detectVersion(projectPath);
     // jscpd ≥5.x 破坏性变更: --format 由"输出格式"变为"输入文件格式",
     // --output 由"文件路径"变为"输出目录"; JSON 报告改用 --reporters json 生成,
     // 输出到 <output>/jscpd-report.json。旧版(<5)维持原参数集。
@@ -160,7 +165,7 @@ export class JscpdAdapter implements ToolAdapter {
         ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', target]
         : ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
     await execFileAsync(command, args, {
-      cwd: options.projectPath,
+      cwd: projectPath,
       timeout: options.timeout || 60000,
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -168,6 +173,7 @@ export class JscpdAdapter implements ToolAdapter {
 
   /** 读取 jscpd 报告并清理临时文件 */
   private async readJscpdReport(reportPath: string, projectPath: string): Promise<JscpdReport> {
+    projectPath = path.resolve(projectPath);
     let p = reportPath;
     if ((await this.detectVersion(projectPath)).major >= 5) {
       const v5Report = path.join(path.dirname(reportPath), 'jscpd-report.json');

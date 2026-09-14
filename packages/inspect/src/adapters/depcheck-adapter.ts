@@ -79,7 +79,9 @@ export class DepcheckAdapter implements ToolAdapter {
 
   /** 执行 depcheck 并映射输出为可用结果 */
   private async runDepcheck(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const projectPath = options.projectPath;
+    // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
+    // depcheck 以自身 cwd 解析导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
     const pkgJson = path.join(projectPath, 'package.json');
     try {
       await fs.promises.access(pkgJson);

@@ -74,6 +74,9 @@ export class SemgrepRuleWriter {
   private async writeInlineRules(targetDir: string, rules: SemgrepRule[]): Promise<string | null> {
     if (rules.length === 0) return null;
 
+    // 归一化 targetDir 为绝对路径：相对路径会流入生成的 inline-*.yml 配置路径，
+    // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
+    targetDir = path.resolve(targetDir);
     const semgrepRules: SemgrepRuleYaml[] = rules.map((r, i) => ({
       id: r.id || `inline-rule-${i}`,
       severity: (r.severity || 'WARNING').toUpperCase(),

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -81,7 +82,7 @@ export class CommitLintAdapter implements ToolAdapter {
     let subjects: string[];
     try {
       const { stdout } = await execFileAsync('git', ['log', '-20', '--pretty=%s'], {
-        cwd: options.projectPath,
+        cwd: path.resolve(options.projectPath),
         timeout: 15000,
         maxBuffer: 1024 * 1024,
       });

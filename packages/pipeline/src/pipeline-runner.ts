@@ -205,6 +205,7 @@ export class PipelineRunner {
   private eventBus: EventBus;
   private eventCenter: EventCenter;
   private logger: Logger;
+  private readonly sopRulesDir: string;
 
   constructor(
     repoRoot: string,
@@ -212,7 +213,10 @@ export class PipelineRunner {
       configDir?: string;
     },
   ) {
-    this.repoRoot = repoRoot;
+    // 归一化 repoRoot 为绝对路径：相对路径会原样流入 SOP tool-dispatch 的
+    // ToolScanOptions.projectPath，外部工具（semgrep/gitleaks 等）以自身 cwd 解析导致
+    // "no such file" / "unable to find a config"。共享构造缝统一 resolve，下游全部拿到绝对路径。
+    this.repoRoot = path.resolve(repoRoot);
     this.logger = new Logger('Pipeline', 'info');
 
     this.eventBus = new EventBus();
@@ -249,10 +253,10 @@ export class PipelineRunner {
           'sop-templates',
         );
 
-    const rulesDir = options?.configDir || defaultRulesDir;
-    this.sopLoader = new SopLoader(this.sopRegistry, { rulesDir });
+    this.sopRulesDir = options?.configDir || defaultRulesDir;
+    this.sopLoader = new SopLoader(this.sopRegistry, { rulesDir: this.sopRulesDir });
 
-    this.guardEngine = new GuardEngine(repoRoot, options?.configDir, {
+    this.guardEngine = new GuardEngine(this.repoRoot, options?.configDir, {
       emit: (event) => this.eventBus.emit(event.type, event.payload),
     });
     this.inspectEngine = new InspectEngine({
@@ -281,7 +285,13 @@ export class PipelineRunner {
   async loadSopRules(): Promise<number> {
     const count = await this.sopLoader.loadFromFileSystem();
     const stats = this.sopRegistry.getStats();
-    this.logger.info(`SOP 规则已加载: ${count} 条 (活跃: ${stats.byStatus.active || 0})`);
+    if (count === 0) {
+      this.logger.error(
+        `SOP 规则加载降级: 0 条规则 — 引擎处于盲检状态，所有检查将默认通过。请检查规则目录: ${this.sopRulesDir}`,
+      );
+    } else {
+      this.logger.info(`SOP 规则已加载: ${count} 条 (活跃: ${stats.byStatus.active || 0})`);
+    }
     return count;
   }
 

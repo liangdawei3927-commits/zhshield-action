@@ -184,8 +184,11 @@ export class TypeScriptAdapter implements ToolAdapter {
     start: number,
     category: IssueCategory,
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand(options.projectPath);
-    const projects = resolveTscProjects(options.projectPath);
+    // 归一化 projectPath 为绝对路径：相对路径会流入 tsconfig 解析与 cwd，
+    // tsc 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
+    const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
       // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
       return this.buildResult(start, category, []);
@@ -251,7 +254,7 @@ export class TypeScriptAdapter implements ToolAdapter {
   ): Promise<TscRunResult> {
     try {
       const { stdout } = await execFileAsync(command, [...flags, '-p', tsconfigPath], {
-        cwd: options.projectPath,
+        cwd: path.resolve(options.projectPath),
         timeout: options.timeout || 120000,
         maxBuffer: 10 * 1024 * 1024,
       });

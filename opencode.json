@@ -13,5 +13,15 @@
       "git clean -d*": "deny",
       "git clean -x*": "deny"
     }
+  },
+  "mcp": {
+    "zhshield": {
+      "type": "local",
+      "command": [
+        "node",
+        "/Users/dawei/Desktop/ZHCodeShield/zhihui-codeshield/packages/desktop/dist-electron/zhshield-mcp.js"
+      ],
+      "enabled": true
+    }
   }
 }

@@ -6,6 +6,7 @@ import {
   NOOP_EMITTER,
   wrapAdapter,
 } from '@zh/shared';
+import * as path from 'node:path';
 import type { Vulnerability, SecurityScanReport, GarbageItem, MalwareItem } from './types';
 import { calculateSecurityScore } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
@@ -94,6 +95,9 @@ export class SecurityEngine {
 
   async runSecurityScan(projectId: string, projectPath: string): Promise<SecurityScanReport> {
     const start = Date.now();
+    // 归一化 projectPath 为绝对路径：服务端/桌面端直连引擎时可能传入相对路径，
+    // 相对路径会流入 ToolScanOptions.projectPath，外部工具以自身 cwd 解析导致扫描失败。
+    projectPath = path.resolve(projectPath);
     const { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues } =
       await this.scanOrchestrator.run(projectId, projectPath);
     const { garbage, malware, vulnerabilities, conflictReport } =

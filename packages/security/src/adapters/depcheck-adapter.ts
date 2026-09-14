@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import * as path from 'node:path';
 import { depcheckMapper } from '@zh/shared';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
 import type { ExecError, DepcheckOutput } from './tool-output-types';
@@ -56,8 +57,11 @@ export class DepcheckAdapter implements ToolAdapter {
   private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
     let stdout = '';
     try {
-      const res = await execFileAsync('depcheck', [options.projectPath, '--json'], {
-        cwd: options.projectPath,
+      // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
+      // depcheck 以自身 cwd 解析导致扫描失败。
+      const projectPath = path.resolve(options.projectPath);
+      const res = await execFileAsync('depcheck', [projectPath, '--json'], {
+        cwd: projectPath,
         timeout: options.timeout || 30000,
         maxBuffer: 10 * 1024 * 1024,
       });

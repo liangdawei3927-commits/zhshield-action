@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 import type { ExecError, GrypeOutput } from './tool-output-types';
 
@@ -56,12 +57,16 @@ export class GrypeAdapter implements ToolAdapter {
 
   private resolveScanSource(options: ToolScanOptions): string {
     // 支持 docker 镜像扫描：config.rules[0] 作为镜像名，否则扫描目录
-    return options.config?.rules?.[0] ? options.config.rules[0] : `dir:${options.projectPath}`;
+    // 归一化 projectPath 为绝对路径：相对路径会作为 dir:<path> 目标传给 grype，
+    // grype 以自身 cwd 解析导致扫描失败。
+    return options.config?.rules?.[0]
+      ? options.config.rules[0]
+      : `dir:${path.resolve(options.projectPath)}`;
   }
 
   private async runGrype(source: string, options: ToolScanOptions): Promise<GrypeOutput> {
     const { stdout } = await execFileAsync('grype', [source, '-o', 'json'], {
-      cwd: options.projectPath,
+      cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 120000,
       maxBuffer: 20 * 1024 * 1024,
     });

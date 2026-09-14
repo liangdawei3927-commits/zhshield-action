@@ -9,6 +9,7 @@
  *   tsx packages/cli/src/index.ts help
  */
 import { PipelineRunner } from '@zh/pipeline';
+import { resolveBundledSopDir } from './sop-dir';
 import { ConsoleReporter } from '@zh/reporter';
 import {
   buildFindings,
@@ -28,7 +29,7 @@ import {
   baselinePath,
 } from '@zh/shared';
 import * as path from 'node:path';
-import { existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 
 // 双模兼容：bundle 为 CJS（esbuild format:'cjs'），__dirname 原生可用；
 // 开发态（tsx 以 ESM 运行）__dirname 未声明，typeof 安全返回 undefined，
@@ -40,13 +41,6 @@ function resolveBaseDir(): string {
   return process.cwd();
 }
 const baseDir = resolveBaseDir();
-
-/** 随 bundle 打包的 SOP 规则目录（build-cli.mjs 复制到 dist/sop）。
- *  不存在时回退到 @zh/pipeline 的 monorepo 默认路径，保证开发态不受影响。 */
-function resolveBundledSopDir(): string | undefined {
-  const bundled = path.join(baseDir, 'sop');
-  return existsSync(bundled) ? bundled : undefined;
-}
 
 /** 解析最终项目根目录（projectPath）：--dir 显式给出时按 cwd 解析为绝对路径；
  *  未给出时默认当前工作目录。process.cwd() 作为项目目录默认值的语义仅在此处出现一次，
@@ -245,10 +239,19 @@ async function main(): Promise<void> {
 /** 加载 SOP 规则并按命令分发执行 */
 async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
   const projectDir = resolveProjectDir(opts.dir);
-  const sopDir = resolveBundledSopDir();
+  const sopDir = resolveBundledSopDir(baseDir);
   const runner = new PipelineRunner(projectDir, sopDir ? { configDir: sopDir } : undefined);
   const ruleCount = await runner.loadSopRules();
   console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
+  if (opts.sop && ruleCount === 0) {
+    console.error(
+      '[CLI] ============================================================\n' +
+        '[CLI] 降级警告: SOP 规则加载为 0 条 — 引擎处于盲检状态，所有检查将默认通过。\n' +
+        '[CLI] 请检查规则目录（presets/sop-templates 下应包含 guard/inspect/security/sentinel/evolve 域目录）。\n' +
+        '[CLI] ============================================================\n',
+    );
+    process.exitCode = 2;
+  }
 
   switch (opts.command) {
     case 'guard':
@@ -303,7 +306,7 @@ async function runGuardCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
@@ -317,7 +320,7 @@ async function runGuardCommand(
     });
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   }
 }
 
@@ -333,7 +336,7 @@ async function runInspectCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runInspect();
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
@@ -347,7 +350,7 @@ async function runInspectCommand(
     });
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   }
 }
 
@@ -369,7 +372,7 @@ async function runRefactorCommand(
   });
   console.log(formatted.text);
   writeReportFile(opts, report, findings, projectDir);
-  process.exit(blocked ? 1 : 0);
+  process.exit(blocked ? 1 : process.exitCode);
 }
 
 async function runBaselineCommand(
@@ -386,7 +389,7 @@ async function runBaselineCommand(
       console.log(
         `基线已捕获: ${entries.length} 项问题 → ${baselinePath(projectDir)} (${saved.capturedAt})`,
       );
-      process.exit(0);
+      process.exit(process.exitCode);
       break;
     }
     case 'list': {
@@ -400,13 +403,13 @@ async function runBaselineCommand(
       for (const entry of baseline.entries) {
         console.log(`  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}`);
       }
-      process.exit(0);
+      process.exit(process.exitCode);
       break;
     }
     case 'clear': {
       await clearBaseline(projectDir);
       console.log(`基线已清除: ${baselinePath(projectDir)}`);
-      process.exit(0);
+      process.exit(process.exitCode);
       break;
     }
   }
@@ -426,7 +429,7 @@ async function runPipelineCommand(
     const formatted = reporter.format(report);
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runFullPipeline({
       dryRun: opts.dryRun,
@@ -435,7 +438,7 @@ async function runPipelineCommand(
     const formatted = reporter.format(report);
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
-    process.exit(blocked ? 1 : 0);
+    process.exit(blocked ? 1 : process.exitCode);
   }
 }
 

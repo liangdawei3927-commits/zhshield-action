@@ -97,16 +97,19 @@ export class PrettierAdapter implements ToolAdapter {
   }
 
   private async runPrettierScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const command = await this.resolveCommand(options.projectPath);
+    // 归一化 projectPath 为绝对路径：相对路径会流入 cwd 与扫描目标，
+    // prettier 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
     const target = options.targetFiles?.length
       ? options.targetFiles[0]
-      : PrettierAdapter.pickScanTarget(options.projectPath);
+      : PrettierAdapter.pickScanTarget(projectPath);
     const args = ['--list-different', target];
 
     let stdout = '';
     try {
       ({ stdout } = await execFileAsync(command, args, {
-        cwd: options.projectPath,
+        cwd: projectPath,
         timeout: options.timeout || 120000,
         maxBuffer: 10 * 1024 * 1024,
       }));
@@ -117,7 +120,7 @@ export class PrettierAdapter implements ToolAdapter {
       stdout = err.stdout ?? '';
     }
 
-    const issues = parseListDifferent(stdout, options.projectPath);
+    const issues = parseListDifferent(stdout, projectPath);
     return {
       tool: 'prettier',
       status: 'available',

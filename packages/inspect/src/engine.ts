@@ -1,6 +1,7 @@
 import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './types';
 import type { ToolAdapter, EventEmitter, Baseline } from '@zh/shared';
 import { filterIssuesByBaseline } from '@zh/shared';
+import * as path from 'node:path';
 import type { SopRuleEngine } from '@zh/kernel';
 import type { ProjectProfile } from '@zh/dependency';
 import {
@@ -108,6 +109,9 @@ export class InspectEngine {
     baseline?: Baseline | null,
   ): Promise<InspectionReport> {
     const start = Date.now();
+    // 归一化 projectId 为绝对路径：服务端 InspectService 直连引擎时可能传入相对路径，
+    // 相对路径会流入 ToolScanOptions.projectPath，外部工具以自身 cwd 解析导致扫描失败。
+    projectId = path.resolve(projectId);
     if (this.sopEngine && !this._sopScanning) {
       return this.runSopGuarded(projectId, scanType, start, projectFeature, baseline);
     }

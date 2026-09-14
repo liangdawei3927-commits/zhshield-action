@@ -961,9 +961,8 @@
       "ring": {
         "healthScore": "ヘルススコア",
         "notChecked": "まだ点検していません",
-        "gaugeMin": "健",
-        "gaugeMid": "康",
-        "gaugeMax": "点"
+        "gaugeMin": "0",
+        "gaugeMax": "100"
       },
       "runCheck": {
         "expiredHint": "一部の結果が期限切れです。全チェックで更新してください。",

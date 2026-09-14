@@ -90,10 +90,13 @@ export class DependencyCruiserAdapter implements ToolAdapter {
 
   /** 执行 dependency-cruiser 并映射输出为可用结果 */
   private async runDepCruiser(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    const configFile = this.resolveConfig(options);
-    const targetDirs = this.resolveTargetDirs(options.projectPath);
+    // 归一化 projectPath 为绝对路径：相对路径会作为 --config/扫描目标传给 depcruise，
+    // depcruise 以自身 cwd 解析导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const configFile = this.resolveConfig(options, projectPath);
+    const targetDirs = this.resolveTargetDirs(projectPath);
     // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
-    const command = await this.resolveCommand(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
     const args: string[] = [];
     if (configFile) {
       // dependency-cruiser v16+ 指定配置用 --config（--validate 已废弃）
@@ -102,7 +105,7 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     args.push('--output-type', 'json', ...targetDirs);
 
     const { stdout } = await execFileAsync(command, args, {
-      cwd: options.projectPath,
+      cwd: projectPath,
       timeout: options.timeout || 180000,
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -181,14 +184,10 @@ export class DependencyCruiserAdapter implements ToolAdapter {
    * 2. 被扫描项目本地的 .dependency-cruiser.{cjs,js,json}
    * 均缺失返回 null（dep-cruiser 将因找不到默认配置而报错，由调用方如实上报）
    */
-  private resolveConfig(options: ToolScanOptions): string | null {
+  private resolveConfig(options: ToolScanOptions, projectPath: string): string | null {
     const injected = options.config?.config;
     if (typeof injected === 'string' && injected.trim()) {
-      const resolved = resolveInjectedConfigPath(
-        injected,
-        options.projectPath,
-        options.projectPath,
-      );
+      const resolved = resolveInjectedConfigPath(injected, projectPath, projectPath);
       if (resolved) return resolved;
     }
     const candidates = [
@@ -197,9 +196,9 @@ export class DependencyCruiserAdapter implements ToolAdapter {
       '.dependency-cruiser.json',
     ];
     for (const name of candidates) {
-      const p = path.join(options.projectPath, name);
+      const p = path.join(projectPath, name);
       if (fs.existsSync(p)) return p;
-      const zhshield = path.join(options.projectPath, '.zhshield', name);
+      const zhshield = path.join(projectPath, '.zhshield', name);
       if (fs.existsSync(zhshield)) return zhshield;
     }
     return null;

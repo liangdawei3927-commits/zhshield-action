@@ -109,10 +109,11 @@ export class TrivyAdapter implements ToolAdapter {
     scanType: TrivyScanType,
     options: ToolScanOptions,
   ): Promise<Issue[] | null> {
-    const args = this.buildArgs(scanType, options.projectPath, options);
+    const projectPath = path.resolve(options.projectPath);
+    const args = this.buildArgs(scanType, projectPath, options);
     if (!args) return null;
     const { stdout } = await execFileAsync('trivy', args, {
-      cwd: options.projectPath,
+      cwd: projectPath,
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,
     });

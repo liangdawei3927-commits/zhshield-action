@@ -82,14 +82,17 @@ export class ESLintAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const defaultTarget = resolveEslintTargetDir(options.projectPath);
+    // 归一化 projectPath 为绝对路径：相对路径会流入 cwd 与 --config 解析，
+    // ESLint 以自身 cwd 解析相对路径导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const defaultTarget = resolveEslintTargetDir(projectPath);
     const targetFiles = options.targetFiles || [defaultTarget];
     // ESLint v9 从 cwd 向上查找配置：默认扫描时以解析出的目录为 cwd，确保找到嵌套仓库的配置
-    const cwd = options.targetFiles?.length ? options.projectPath : defaultTarget;
+    const cwd = options.targetFiles?.length ? projectPath : defaultTarget;
     const category: IssueCategory = options.config?.category ?? 'quality';
 
     try {
-      return await this.runEslintScan(options, start, category, cwd, targetFiles);
+      return await this.runEslintScan(options, start, category, cwd, targetFiles, projectPath);
     } catch (error: unknown) {
       return this.handleEslintError(error, start, category);
     }
@@ -102,9 +105,10 @@ export class ESLintAdapter implements ToolAdapter {
     category: IssueCategory,
     cwd: string,
     targetFiles: string[],
+    projectPath: string,
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand(options.projectPath);
-    const { args, unavailable } = this.buildEslintArgs(options, cwd, targetFiles);
+    const command = await this.resolveCommand(projectPath);
+    const { args, unavailable } = this.buildEslintArgs(options, cwd, targetFiles, projectPath);
     if (unavailable) return this.buildUnavailable(start, unavailable);
 
     const { stdout } = await execFileAsync(command, args, {
@@ -124,6 +128,7 @@ export class ESLintAdapter implements ToolAdapter {
     options: ToolScanOptions,
     cwd: string,
     targetFiles: string[],
+    projectPath: string,
   ): { args: string[]; unavailable?: string } {
     const defaultExts = ['--ext', '.ts,.tsx,.js,.jsx'];
     // ESLint v9 base-path 校验：绝对 target 在 config 文件目录之外会被静默忽略，故转相对路径
@@ -138,8 +143,8 @@ export class ESLintAdapter implements ToolAdapter {
     const injectedConfig = options.config?.config;
     if (injectedConfig) {
       const configPath =
-        resolveInjectedConfigPath(injectedConfig, cwd, options.projectPath) ??
-        resolveProjectEslintConfig(options.projectPath);
+        resolveInjectedConfigPath(injectedConfig, cwd, projectPath) ??
+        resolveProjectEslintConfig(projectPath);
       if (!configPath) {
         return { args, unavailable: `ESLint 配置不存在，跳过该规则: ${injectedConfig}` };
       }

@@ -103,14 +103,16 @@ export class SemgrepAdapter implements ToolAdapter {
     if (options.targetFiles && options.targetFiles.length > 0) {
       args.push(...options.targetFiles);
     } else {
-      args.push(options.projectPath);
+      // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 semgrep，
+      // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
+      args.push(path.resolve(options.projectPath));
     }
     return args;
   }
 
   private async runSemgrep(args: string[], options: ToolScanOptions): Promise<SemgrepOutput> {
     const { stdout } = await execFileAsync('semgrep', args, {
-      cwd: options.projectPath,
+      cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,
     });
@@ -169,6 +171,9 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private resolveRulesDir(projectPath: string): string | null {
+    // 归一化 projectPath 为绝对路径：相对路径会流入 --config 参数，
+    // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
+    projectPath = path.resolve(projectPath);
     const candidates = [
       path.join(projectPath, '.zhshield', 'semgrep-rules'),
       path.join(projectPath, '.semgrep', 'rules'),

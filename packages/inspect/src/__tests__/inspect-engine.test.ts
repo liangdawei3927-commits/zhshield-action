@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as path from 'node:path';
 import { InspectEngine } from '../engine';
 import { SopRuleEngine, SopRegistry } from '@zh/kernel';
 import type { RuleEngineReport, SopRule } from '@zh/kernel';
@@ -41,7 +42,7 @@ describe('InspectEngine', () => {
   describe('runScan', () => {
     it('should return empty report when no adapters registered', async () => {
       const report = await engine.runScan('proj-1');
-      expect(report.projectId).toBe('proj-1');
+      expect(report.projectId).toBe(path.resolve('proj-1'));
       expect(report.scanType).toBe('full');
       expect(report.summary.total).toBe(0);
       expect(report.score.overall).toBe(100);
@@ -74,7 +75,7 @@ describe('InspectEngine', () => {
       engine.registerAdapter(adapter);
       const report = await engine.runScan('proj-1');
 
-      expect(report.projectId).toBe('proj-1');
+      expect(report.projectId).toBe(path.resolve('proj-1'));
       expect(report.summary.total).toBe(1);
       expect(report.summary.warning).toBe(1);
       expect(report.score.overall).toBeLessThan(100);

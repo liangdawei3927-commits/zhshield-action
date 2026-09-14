@@ -13,6 +13,7 @@ export function describe40(item: Item40): string {
   return `[${item.id}] ${item.label} (${item.active ? 'on' : 'off'})`;
 }
 
-export const DEFAULT_ITEMS_40: Item40[] = Array.from({ length: 8 }, (_, i) =>
-  makeItem40(i, `item-${i}`),
+export const DEFAULT_ITEMS_40: Item40[] = Array.from(
+  { length: 8 },
+  (_, i) => makeItem40(i, `item-${i}`)
 );

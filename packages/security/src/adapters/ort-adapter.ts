@@ -72,10 +72,13 @@ export class ORTAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    const outputDir = path.join(options.projectPath, '.zhshield', '.ort-output');
+    // 归一化 projectPath 为绝对路径：相对路径会作为 -i 输入与输出目录传给 ort，
+    // ort 以自身 cwd 解析导致扫描失败。
+    const projectPath = path.resolve(options.projectPath);
+    const outputDir = path.join(projectPath, '.zhshield', '.ort-output');
 
     try {
-      await this.runOrtAnalyze(options, outputDir);
+      await this.runOrtAnalyze(options, projectPath, outputDir);
       const issues = await this.readAnalyzerResult(outputDir);
       await this.cleanupOutputDir(outputDir);
 
@@ -95,14 +98,18 @@ export class ORTAdapter implements ToolAdapter {
     }
   }
 
-  private async runOrtAnalyze(options: ToolScanOptions, outputDir: string): Promise<void> {
+  private async runOrtAnalyze(
+    options: ToolScanOptions,
+    projectPath: string,
+    outputDir: string,
+  ): Promise<void> {
     await fs.promises.mkdir(outputDir, { recursive: true });
     const pm = options.config?.packageManagers?.[0] || 'NPM';
     await execFileAsync(
       'ort',
-      ['analyze', '-i', options.projectPath, '-o', outputDir, '--package-managers', pm],
+      ['analyze', '-i', projectPath, '-o', outputDir, '--package-managers', pm],
       {
-        cwd: options.projectPath,
+        cwd: projectPath,
         timeout: options.timeout || ORT_TIMEOUT,
         maxBuffer: 50 * 1024 * 1024,
       },

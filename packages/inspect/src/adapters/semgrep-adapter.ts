@@ -119,12 +119,15 @@ export class SemgrepAdapter implements ToolAdapter {
     declaredConfigs: string[];
     rules: SemgrepRule[] | undefined;
   } {
-    const targetDir = options.targetFiles?.[0] ?? this.resolveTargetDir(options.projectPath);
+    // 归一化 projectPath 为绝对路径：相对路径会流入 --config/--target 参数，
+    // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
+    const projectPath = path.resolve(options.projectPath);
+    const targetDir = options.targetFiles?.[0] ?? this.resolveTargetDir(projectPath);
     const category: IssueCategory = options.config?.category ?? 'security';
     const declaredConfigs = this.resolveConfigs(options);
     // 按回退链（项目根 → @zh/kernel 包内路径）解析为存在的绝对路径，缺失项剔除
     const configs = declaredConfigs
-      .map((c) => resolveInjectedConfigPath(c, options.projectPath, options.projectPath))
+      .map((c) => resolveInjectedConfigPath(c, projectPath, projectPath))
       .filter((p): p is string => p !== null);
     const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
     return { targetDir, category, configs, declaredConfigs, rules };
@@ -158,6 +161,7 @@ export class SemgrepAdapter implements ToolAdapter {
 
   /** 目标目录解析：src → packages → 项目根；容器根项目下探嵌套代码仓库的 packages 目录，避免全量扫描 */
   private resolveTargetDir(projectPath: string): string {
+    projectPath = path.resolve(projectPath);
     const srcDir = path.join(projectPath, 'src');
     if (fs.existsSync(srcDir)) return srcDir;
     const packagesDir = path.join(projectPath, 'packages');

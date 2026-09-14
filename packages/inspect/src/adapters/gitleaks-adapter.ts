@@ -133,10 +133,13 @@ export class GitleaksAdapter implements ToolAdapter {
     start: number,
     isStaged: boolean,
   ): Promise<ToolResult> {
-    const command = await this.resolveCommand(options.projectPath);
-    const args = this.buildArgs(options, isStaged);
+    // 归一化 projectPath 为绝对路径：相对路径会作为 --source/位置参数传给 gitleaks，
+    // gitleaks 以自身 cwd 解析导致 "stat ./scripts/fixtures/sample-repo: no such file or directory"。
+    const projectPath = path.resolve(options.projectPath);
+    const command = await this.resolveCommand(projectPath);
+    const args = this.buildArgs(options, isStaged, projectPath);
     const { stdout } = await execFileAsync(command, args, {
-      cwd: options.projectPath,
+      cwd: projectPath,
       // gitleaks 扫描完整 git 历史，流水线并行高负载下易超 30s，默认放宽到 120s
       timeout: options.timeout || 120000,
       maxBuffer: 10 * 1024 * 1024,
@@ -144,7 +147,7 @@ export class GitleaksAdapter implements ToolAdapter {
 
     const parsed = JSON.parse(stdout);
     const findings = Array.isArray(parsed) ? parsed : parsed?.findings || [];
-    return this.buildAvailable(findings, start, options.projectPath);
+    return this.buildAvailable(findings, start, projectPath);
   }
 
   /** 处理 gitleaks 执行错误：未安装 / 部分输出 / 失败 */
@@ -173,14 +176,14 @@ export class GitleaksAdapter implements ToolAdapter {
     }
   }
 
-  private buildArgs(options: ToolScanOptions, isStaged: boolean): string[] {
+  private buildArgs(options: ToolScanOptions, isStaged: boolean, projectPath: string): string[] {
     // gitleaks v8.28+ 移除了 detect 的 --format/--staged：JSON 输出统一走全局
     // --report-format/--report-path（"-"=stdout）；暂存扫描走 `git --staged` 子命令（仓库路径为位置参数，不支持 --source）。
-    const args = isStaged ? ['git', '--staged'] : ['detect', '--source', options.projectPath];
+    const args = isStaged ? ['git', '--staged'] : ['detect', '--source', projectPath];
     args.push('--report-format', 'json', '--report-path', '-');
     if (isStaged) {
-      args.push(options.projectPath);
-    } else if (!this.isGitRepo(options.projectPath)) {
+      args.push(projectPath);
+    } else if (!this.isGitRepo(projectPath)) {
       // 目标目录非 git 仓库时（如验收 fixture 无 .git），gitleaks 默认沿父目录向上找最近
       // 的 git 仓库并只扫已跟踪文件，untracked 目标整体漏检；加 --no-git 强制扫工作树（09-12 复验修复）。
       args.push('--no-git');

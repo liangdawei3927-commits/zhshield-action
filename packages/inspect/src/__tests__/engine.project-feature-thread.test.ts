@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as path from 'node:path';
 
 import { InspectEngine } from '../engine';
 import { SopRuleEngine, SopRegistry } from '@zh/kernel';
@@ -37,14 +38,14 @@ describe('InspectEngine — R3d 画像贯通（runScan → runScanWithSop → ev
 
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoRoot: 'proj-1',
+        repoRoot: path.resolve('proj-1'),
         domain: 'inspect',
         projectFeature: { language: 'typescript', features: [] },
       }),
     );
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoRoot: 'proj-1',
+        repoRoot: path.resolve('proj-1'),
         domain: 'security',
         projectFeature: { language: 'typescript', features: [] },
       }),
@@ -61,7 +62,7 @@ describe('InspectEngine — R3d 画像贯通（runScan → runScanWithSop → ev
     await engine.runScan('proj-1', 'full');
 
     expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ repoRoot: 'proj-1', domain: 'inspect' }),
+      expect.objectContaining({ repoRoot: path.resolve('proj-1'), domain: 'inspect' }),
     );
     expect(spy).not.toHaveBeenCalledWith(
       expect.objectContaining({ projectFeature: expect.anything() }),

@@ -317,6 +317,9 @@ async function runGuardCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, projectDir);
+    if ((report.degraded ?? 0) > 0) {
+      process.exitCode = 2;
+    }
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
@@ -347,6 +350,9 @@ async function runInspectCommand(
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, projectDir);
+    if ((report.degraded ?? 0) > 0) {
+      process.exitCode = 2;
+    }
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runInspect();
@@ -440,6 +446,9 @@ async function runPipelineCommand(
     const formatted = reporter.format(report);
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
+    if ((report.guard?.degraded ?? 0) > 0 || (report.inspect?.degraded ?? 0) > 0) {
+      process.exitCode = 2;
+    }
     process.exit(blocked ? 1 : process.exitCode);
   } else {
     const report = await runner.runFullPipeline({

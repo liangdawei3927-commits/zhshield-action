@@ -20,6 +20,7 @@ function createSkippedGuardReport(): RuleEngineReport {
     failed: 0,
     errors: 0,
     skipped: 1,
+    degraded: 0,
     ok: true,
     blockingCount: 0,
     evaluations: [],
@@ -78,6 +79,7 @@ async function runSopGuardStage(
         failed: 0,
         errors: 1,
         skipped: 0,
+        degraded: 0,
         ok: false,
         blockingCount: 0,
         evaluations: [
@@ -144,11 +146,12 @@ async function runSopPipeline(
 
   // 重构检测归「代码重构」页负责，一键体检不跑重构
   const inspectFailed = (inspect.inspectReport.failed ?? 0) + (inspect.inspectReport.errors ?? 0);
+  const inspectDegraded = (inspect.inspectReport.degraded ?? 0) > 0;
   return attachSummary(
     createReport({
       guard: guardReport,
       inspect: inspect.inspectReport,
-      passed: guardOk && inspectFailed === 0,
+      passed: guardOk && inspectFailed === 0 && !inspectDegraded,
       stage: 'complete',
     }),
   );

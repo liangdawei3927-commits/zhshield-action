@@ -55,6 +55,16 @@ jobs:
       - name: Full typecheck (15 packages)
         run: pnpm typecheck
 
+      # sop-pipeline.test.ts 的 gitleaks 用例断言 security.scan.gitleaks.hardcoded-key
+      # 必须真实检出（status 'failed'），ubuntu-latest 镜像未预装 gitleaks，
+      # 需在跑测试前安装到 /usr/local/bin（PATH 内）。semgrep/trivy 不装：
+      # security 域测试在工具缺失时已优雅降级跳过。
+      - name: Install gitleaks
+        if: matrix.node-version == 22
+        run: |
+          GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks
+
       - name: Run all tests
         run: pnpm test
 

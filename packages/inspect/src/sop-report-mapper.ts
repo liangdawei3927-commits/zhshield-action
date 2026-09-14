@@ -21,6 +21,7 @@ export class SopReportMapper {
       failed: inspectReport.failed + securityReport.failed,
       errors: inspectReport.errors + securityReport.errors,
       skipped: inspectReport.skipped + securityReport.skipped,
+      degraded: (inspectReport.degraded ?? 0) + (securityReport.degraded ?? 0),
       ok: inspectReport.ok && securityReport.ok,
       evaluations: [...inspectReport.evaluations, ...securityReport.evaluations],
       durationMs: inspectReport.durationMs + securityReport.durationMs,

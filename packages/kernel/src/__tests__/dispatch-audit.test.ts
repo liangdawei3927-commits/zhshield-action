@@ -98,4 +98,29 @@ describe('tool-dispatch 审计（F0-4）— kernel SOP 派发扫描补记 audit 
     expect(report.evaluations[0]?.status).toBe('skipped');
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('Given 适配器未注册（工具不可用降级）When evaluateRules Then report.degraded=1 且 ok=false', async () => {
+    const engine = new SopRuleEngine(registry);
+    registerDispatchRule(registry, 'nonexistent-tool');
+
+    const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
+
+    expect(report.evaluations[0]?.status).toBe('skipped');
+    expect(report.evaluations[0]?.degraded).toBe(true);
+    expect(report.degraded).toBe(1);
+    expect(report.ok).toBe(false);
+  });
+
+  it('Given dryRun 预期跳过 When evaluateRules Then degraded=0 且 ok=true', async () => {
+    const engine = new SopRuleEngine(registry);
+    engine.registerToolAdapter('eslint', makeFakeAdapter());
+    registerDispatchRule(registry, 'eslint');
+
+    const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'guard', dryRun: true });
+
+    expect(report.evaluations[0]?.status).toBe('skipped');
+    expect(report.evaluations[0]?.degraded).toBeUndefined();
+    expect(report.degraded).toBe(0);
+    expect(report.ok).toBe(true);
+  });
 });

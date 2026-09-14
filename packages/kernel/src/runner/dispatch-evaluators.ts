@@ -62,7 +62,7 @@ export async function evalCheckList(
     return runSecurityCheck(host.securityCheckEngine, rule, instr, context);
   }
   if (!host.guardEngine) {
-    return skippedResult(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard');
+    return skippedResult(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard', true);
   }
   if (host.evalDepth > 1) {
     return skippedResult(rule, '跳过 check-list→GuardEngine.run（防止规则引擎重入）', 'guard');
@@ -168,7 +168,7 @@ export async function evalScannerDispatch(
   if (viaAdapters) return viaAdapters;
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, 'InspectEngine 未注册，且无可用扫描器适配器', 'inspect');
+    return skippedResult(rule, 'InspectEngine 未注册，且无可用扫描器适配器', 'inspect', true);
   }
   if (host.evalDepth > 1) {
     return skippedResult(rule, '跳过 scanner-dispatch→runScan（防止规则引擎重入）', 'inspect');
@@ -230,6 +230,7 @@ async function runScannerAdapters(
         ? `所有扫描器不可用: ${reasons.join(', ')}`
         : '所有扫描器不可用（未配置任何可用扫描器）',
       'inspect',
+      true,
     );
   }
 
@@ -259,6 +260,7 @@ export async function evalToolDispatch(
       rule,
       `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`,
       targetEngineOf(rule),
+      true,
     );
   }
   if (!isAdapterUsable(adapter)) {
@@ -266,6 +268,7 @@ export async function evalToolDispatch(
       rule,
       `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`,
       targetEngineOf(rule),
+      true,
     );
   }
   // M4 工具执行面随画像裁剪：工具不在当前项目画像 scope 内 → 视为既定裁剪跳过（不进可用性/扫描）
@@ -282,6 +285,7 @@ export async function evalToolDispatch(
       rule,
       `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`,
       targetEngineOf(rule),
+      true,
     );
   }
 
@@ -458,7 +462,7 @@ export async function evalPreset(
   }
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect');
+    return skippedResult(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect', true);
   }
   if (host.evalDepth > 1) {
     return skippedResult(rule, '跳过 preset→runScan（防止规则引擎重入）', 'inspect');
@@ -540,8 +544,17 @@ function skippedResult(
   rule: SopRule,
   message: string,
   targetEngine: 'guard' | 'inspect',
+  degraded?: boolean,
 ): RuleEvaluation {
-  return { rule, status: 'skipped', message, durationMs: 0, targetEngine, timestamp: new Date() };
+  return {
+    rule,
+    status: 'skipped',
+    message,
+    durationMs: 0,
+    targetEngine,
+    timestamp: new Date(),
+    ...(degraded ? { degraded: true as const } : {}),
+  };
 }
 
 function errorResult(

@@ -38,13 +38,15 @@ export class RuleEngineSectionFormatter {
     const failed = report.failed;
     const errors = report.errors;
     const skipped = report.skipped;
+    const degraded = report.degraded ?? 0;
 
     lines.push(
       `${indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('条规则')}`}`,
     );
     lines.push(
       `${indent}  通过: ${this.fmt.green(String(passed))}  失败: ${this.fmt.red(String(failed))}  ` +
-        `错误: ${this.fmt.yellow(String(errors))}  跳过: ${this.fmt.gray(String(skipped))}`,
+        `错误: ${this.fmt.yellow(String(errors))}  跳过: ${this.fmt.gray(String(skipped))}` +
+        (degraded > 0 ? `  降级: ${this.fmt.yellow(String(degraded))}` : ''),
     );
   }
 

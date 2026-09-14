@@ -151,6 +151,10 @@ async function runSopInspectPhase(
 ): Promise<{ report: RuleEngineReport } | { failure: PipelineReport }> {
   try {
     const report = await runSopInspect(inspectContext);
+    if ((report.degraded ?? 0) > 0) {
+      logger.warn(`SOP Inspect 降级: ${report.degraded} 项规则因工具不可用而跳过`);
+      return { failure: buildFailureReport('inspect', guardReport, report) };
+    }
     return { report };
   } catch (error) {
     logger.error(`SOP Inspect 巡检失败: ${toMessage(error)}`);

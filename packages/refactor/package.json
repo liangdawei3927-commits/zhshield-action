@@ -14,8 +14,9 @@
     "lint": "eslint src --max-warnings 50"
   },
   "dependencies": {
+    "@zh/kernel": "workspace:*",
     "@zh/shared": "workspace:*",
-    "@zh/kernel": "workspace:*"
+    "typescript": "^5.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -22,6 +22,9 @@ overrides:
   'minimatch@9.0.9>brace-expansion': '5.0.9'
   # electron-builder 25 工具链引入 tar@6.2.1（11 项 node-tar 告警），统一强制到补丁版
   tar: '>=7.5.22'
+  # electron-builder 26.15.3 经 app-builder-lib 引入 plist@3.1.0：其 parse() 未传 mimeType，
+  # 与 @xmldom/xmldom 0.9.x 组合在打包 Info.plist 时直接崩溃（DMG 无法产出）。3.1.1 已修。
+  plist: '3.1.1'
 
 allowBuilds:
   '@nestjs/core': false

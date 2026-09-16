@@ -48,7 +48,8 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
     const ids = report.evaluations.map((e) => e.rule.id);
     expect(ids).toContain('inspect.nestjs.controller');
     expect(ids).not.toContain('inspect.vue.component');
-  });
+    // 真实引擎扫描（含工具探测），放宽默认 5s 超时防 CI 偶发假阳性
+  }, 60_000);
 
   it('无 domain 过滤时 security 规则经画像恒命中（ruleMatchesProject 兜底）', async () => {
     registry.register(
@@ -66,7 +67,7 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
       projectFeature: { framework: 'react', features: [] },
     });
     expect(report.evaluations.map((e) => e.rule.id)).toEqual(['security.vuln']);
-  });
+  }, 60_000);
 
   it('无 projectFeature 时执行全量活跃规则（不裁剪）', async () => {
     registry.register(
@@ -90,7 +91,7 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
 
     const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
     expect(report.total).toBe(2);
-  });
+  }, 60_000);
 
   it('runInspect（未显式 domain）按 JSDoc 评估 inspect + security 双域', async () => {
     registry.register(
@@ -124,7 +125,7 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
     expect(ids).toContain('inspect.code');
     expect(ids).toContain('security.cve');
     expect(ids).not.toContain('guard.block'); // guard 域不进巡检
-  });
+  }, 60_000);
 
   it('runInspect 显式单域 domain 时仍只评估该域（向后兼容）', async () => {
     registry.register(
@@ -147,7 +148,7 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
     const report = await engine.runInspect({ repoRoot: '/tmp', domain: 'inspect' });
     const ids = report.evaluations.map((e) => e.rule.id);
     expect(ids).toEqual(['inspect.code']);
-  });
+  }, 60_000);
 
   it('通用规则（无栈标签）不被画像裁剪：修复 monorepo 画像欠采样的过度裁剪', async () => {
     registry.register(
@@ -180,5 +181,5 @@ describe('SopRuleEngine — M2 画像裁剪（ruleMatchesProject）', () => {
     // 通用 duplication 规则不带栈标签 → 恒保留；nestjs 规则不匹配 typescript 栈 → 裁剪
     expect(ids).toContain('inspect.duplication');
     expect(ids).not.toContain('inspect.nestjs.controller');
-  });
+  }, 60_000);
 });

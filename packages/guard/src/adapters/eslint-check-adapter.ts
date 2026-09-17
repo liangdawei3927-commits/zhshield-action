@@ -1,7 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
-import { findEslintConfigDir, resolveEslintTargetDir } from '@zh/shared';
+import {
+  findEslintConfigDir,
+  resolveEslintTargetDir,
+  resolveToolCommandDetailed,
+} from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -73,8 +77,11 @@ export class GuardESLintCheckAdapter implements Adapter {
   }
 
   /** 执行 ESLint CLI 并返回原始输出 */
-  private runEslint(targetDir: string): Promise<{ stdout: string; stderr: string }> {
-    return execFileAsync('eslint', ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
+  private async runEslint(targetDir: string): Promise<{ stdout: string; stderr: string }> {
+    // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH，
+    // 会让码盾自装的 eslint 在门禁里报「未安装」）
+    const { command } = await resolveToolCommandDetailed('eslint', targetDir);
+    return execFileAsync(command, ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
       cwd: targetDir,
       timeout: 60000,
       maxBuffer: 10 * 1024 * 1024,

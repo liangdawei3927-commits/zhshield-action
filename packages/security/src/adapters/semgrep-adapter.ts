@@ -13,6 +13,7 @@ import type {
   CodeFlow,
   CodeFlowThreadFlow,
 } from '@zh/shared';
+import { resolveToolCommandDetailed } from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -33,12 +34,10 @@ export class SemgrepAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execFileAsync('semgrep', ['--version'], { timeout: 10000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    // 与 InspectEngine 用同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
+    // 此前裸命令只认 PATH，导致「工具就绪面板说已装、安全中心却报未安装」。
+    const { origin } = await resolveToolCommandDetailed('semgrep');
+    return origin !== 'unresolved';
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -111,7 +110,9 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private async runSemgrep(args: string[], options: ToolScanOptions): Promise<SemgrepOutput> {
-    const { stdout } = await execFileAsync('semgrep', args, {
+    // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
+    const { command } = await resolveToolCommandDetailed('semgrep', options.projectPath);
+    const { stdout } = await execFileAsync(command, args, {
       cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,
@@ -131,7 +132,7 @@ export class SemgrepAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error: 'Semgrep 未安装或未在 PATH 中找到',
+        error: 'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
       };
     }
     const partialIssues = this.parsePartialOutput(err.stdout);

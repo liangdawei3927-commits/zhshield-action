@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import { resolveToolCommandDetailed } from '@zh/shared';
 import type {
   ExecError,
   TrivyOutput,
@@ -68,12 +69,10 @@ export class TrivyAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execFileAsync('trivy', ['--version'], { timeout: 10000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    // 与 InspectEngine 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
+    // trivy 由 install-tools 装入码盾目录，裸命令只认 PATH 会误报未安装。
+    const { origin } = await resolveToolCommandDetailed('trivy');
+    return origin !== 'unresolved';
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -112,7 +111,9 @@ export class TrivyAdapter implements ToolAdapter {
     const projectPath = path.resolve(options.projectPath);
     const args = this.buildArgs(scanType, projectPath, options);
     if (!args) return null;
-    const { stdout } = await execFileAsync('trivy', args, {
+    // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
+    const { command } = await resolveToolCommandDetailed('trivy', options.projectPath);
+    const { stdout } = await execFileAsync(command, args, {
       cwd: projectPath,
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,

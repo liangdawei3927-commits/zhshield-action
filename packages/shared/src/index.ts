@@ -66,6 +66,14 @@ export type {
   SyncResult,
 } from './types';
 export { ToolManager } from './tool-manager';
+export {
+  findLocalToolBin,
+  findZhshieldToolBin,
+  getZhshieldToolBinDir,
+  resolveToolCommand,
+  resolveToolCommandDetailed,
+} from './tool-resolve';
+export type { ToolCommandOrigin, ResolvedToolCommand } from './tool-resolve';
 export { wrapAdapter, evaluateAccessScope } from './tool-adapter-decorator';
 export type {
   HookedToolResult,

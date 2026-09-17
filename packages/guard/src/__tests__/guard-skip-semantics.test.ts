@@ -113,7 +113,11 @@ describe('GuardESLintCheckAdapter — 无 ESLint 配置时跳过而不是判失�
     expect(result.status).toBe('warning');
     expect(result.message).toContain('no-console');
     expect(result.details).toMatchObject({ totalWarnings: 1 });
-  });
+    // 显式超时：本用例会穿透到 @zh/shared 的 resolveToolCommandDetailed（外部依赖，
+    // 不受本文件 child_process mock 覆盖）。临时目录无 node_modules/.bin、码盾目录
+    // 也无 eslint，故落到 PATH 探测 —— 真实 eslint 启动 ≈1s，全量并发时可能超默认 5s。
+    // 与 fix(kernel): M2 画像裁剪测试加显式 60s 超时 同一处置。
+  }, 20000);
 
   it('缺少 projectPath 上下文时显式报错，不静默回退 cwd', async () => {
     const adapter = new GuardESLintCheckAdapter();

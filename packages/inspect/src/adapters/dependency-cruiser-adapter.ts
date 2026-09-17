@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
@@ -8,12 +7,13 @@ import type {
   ToolMeta,
   ToolResult,
   ToolScanOptions,
-  Issue,
   AccessScope,
 } from '@zh/shared';
 import { resolveToolCommandDetailed, type ToolCommandOrigin } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
 import { resolveInjectedConfigPath } from './injected-config';
+import { mapDepCruiserOutput } from './dependency-cruiser-mapper';
+import { removeFileQuietly, writeRuleDefConfigFile } from './rule-def-config';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,23 +28,6 @@ const META: ToolMeta = {
   homepage: 'https://github.com/sverweij/dependency-cruiser',
   license: 'MIT',
 };
-
-/** Dependency-cruiser JSON 输出中的单条违规。
- *  v16+ 的 from/to 为字符串路径；旧版接口可能为 { path, line } 对象。 */
-interface DepCruiserNodeRef {
-  path?: string;
-  line?: number;
-}
-interface DepCruiserViolation {
-  rule?: { name?: string; severity?: string };
-  from?: string | DepCruiserNodeRef;
-  to?: string | DepCruiserNodeRef;
-}
-
-/** Dependency-cruiser JSON 输出结构 */
-interface DepCruiserOutput {
-  summary?: { violations?: DepCruiserViolation[] };
-}
 
 export class DependencyCruiserAdapter implements ToolAdapter {
   meta = META;
@@ -110,12 +93,32 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     }
   }
 
-  /** 执行 dependency-cruiser 并映射输出为可用结果 */
+  /**
+   * 执行 dependency-cruiser 并映射输出为可用结果。
+   *
+   * 配置解析分两路：SOP 规则声明了 ruleDef 时以规则为准（合成临时配置），
+   * 否则沿用「项目本地 → 内核默认」的回退链。合成配置在扫描结束后清理。
+   */
   private async runDepCruiser(options: ToolScanOptions, start: number): Promise<ToolResult> {
     // 归一化 projectPath 为绝对路径：相对路径会作为 --config/扫描目标传给 depcruise，
     // depcruise 以自身 cwd 解析导致扫描失败。
     const projectPath = path.resolve(options.projectPath);
-    const configFile = this.resolveConfig(options, projectPath);
+    const baseConfig = this.resolveConfig(options, projectPath);
+    const synthConfig = await writeRuleDefConfigFile(options.config?.rules, baseConfig);
+    try {
+      return await this.executeDepCruiser(options, projectPath, synthConfig ?? baseConfig, start);
+    } finally {
+      if (synthConfig) await removeFileQuietly(synthConfig);
+    }
+  }
+
+  /** 实际执行 dep-cruiser（配置已解析完毕）并映射输出为可用结果 */
+  private async executeDepCruiser(
+    options: ToolScanOptions,
+    projectPath: string,
+    configFile: string | null,
+    start: number,
+  ): Promise<ToolResult> {
     const targetDirs = this.resolveTargetDirs(projectPath);
     // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析；
     // 同时取回来源（project-local/shared/path），供 modules=0 时如实上报（P1 复查5）
@@ -125,7 +128,15 @@ export class DependencyCruiserAdapter implements ToolAdapter {
       // dependency-cruiser v16+ 指定配置用 --config（--validate 已废弃）
       args.push('--config', configFile);
     }
-    args.push('--output-type', 'json', ...targetDirs);
+    // 扫描目标传相对路径：dep-cruiser 以 baseDir（= cwd）解析配置里 from/to 的路径正则，
+    // 传绝对路径会使模块路径基准偏移，规则中形如 ^src/utils 的模式静默失配
+    // （09-17 实证：绝对路径下 no-utils-to-features 不报，相对路径下正常报出）。
+    // 执行 cwd 已锚定 projectPath，相对路径解析无误。
+    args.push(
+      '--output-type',
+      'json',
+      ...targetDirs.map((dir) => path.relative(projectPath, dir) || '.'),
+    );
 
     const { stdout } = await execFileAsync(command, args, {
       cwd: projectPath,
@@ -173,7 +184,7 @@ export class DependencyCruiserAdapter implements ToolAdapter {
       };
     }
 
-    const issues = this.mapOutput(output);
+    const issues = mapDepCruiserOutput(output);
 
     return {
       tool: 'dep-cruiser',
@@ -292,52 +303,5 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     );
     if (defaultConfig) return defaultConfig;
     return null;
-  }
-
-  private mapOutput(output: unknown): Issue[] {
-    const out = output as DepCruiserOutput;
-    if (!out?.summary?.violations || !Array.isArray(out.summary.violations)) return [];
-    return out.summary.violations.map((v) => this.mapViolationToIssue(v));
-  }
-
-  private mapViolationToIssue(v: DepCruiserViolation): Issue {
-    const fromPath = this.nodeRefPath(v.from);
-    const toPath = this.nodeRefPath(v.to);
-    return {
-      id: randomUUID(),
-      ruleId: v.rule?.name || 'dep-cruiser/violation',
-      severity: this.mapSeverity(v.rule?.severity),
-      category: 'architecture',
-      message: this.buildViolationMessage(v),
-      file: fromPath,
-      line: this.nodeRefLine(v.from),
-      column: 0,
-      suggestion: `模块 ${fromPath} 不应引用 ${toPath}`,
-      autoFixable: false,
-      source: 'inspect',
-      fingerprint: this.buildViolationFingerprint(v),
-    };
-  }
-
-  private nodeRefPath(ref: string | DepCruiserNodeRef | undefined): string {
-    if (typeof ref === 'string') return ref;
-    return ref?.path || '';
-  }
-
-  private nodeRefLine(ref: string | DepCruiserNodeRef | undefined): number {
-    if (typeof ref === 'string') return 0;
-    return ref?.line || 0;
-  }
-
-  private mapSeverity(severity: string | undefined): Issue['severity'] {
-    return severity === 'error' ? 'error' : severity === 'warn' ? 'warning' : 'info';
-  }
-
-  private buildViolationMessage(v: DepCruiserViolation): string {
-    return `架构边界违规: ${v.rule?.name || '未知规则'} - ${this.nodeRefPath(v.from) || '?'} → ${this.nodeRefPath(v.to) || '?'}`;
-  }
-
-  private buildViolationFingerprint(v: DepCruiserViolation): string {
-    return `dep-cruiser:${v.rule?.name || ''}:${this.nodeRefPath(v.from)}:${this.nodeRefPath(v.to)}`;
   }
 }

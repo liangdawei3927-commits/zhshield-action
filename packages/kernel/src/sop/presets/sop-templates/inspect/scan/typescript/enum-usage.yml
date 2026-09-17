@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.internal.enum-usage"
   name: "枚举/常量使用规范检查"
-  description: "检查枚举和常量声明的所有权合规性：枚举必须在声明所有者文件中、禁止魔法字符串替代枚举、常量必须有命名空间前缀、enum 成员必须显式赋值"
+  description: "检查 const enum 使用（isolatedModules/Babel 转译下不可用）。窄口径规则：AST 级枚举/常量语义检查已移除，避免误报"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "IronNest rules/06 · rules/30"
 
@@ -55,70 +55,33 @@ conditions:
     - "**/generated/**"
 
 check:
-  tool: "custom-ast-scanner"
-  toolConfig:
-    rules:
-      - id: "enum-in-logic-file"
-        description: "enum/const 声明在控制器/Service/Repository 文件中，应移至声明所有者文件"
-        severity: "warning"
-        checkFiles:
-          - "**/*.controller.ts"
-          - "**/*.service.ts"
-          - "**/*.repository.ts"
-          - "**/*.use-case.ts"
-          - "**/*.adapter.ts"
-          - "**/*.guard.ts"
-          - "**/*.interceptor.ts"
-          - "**/*.pipe.ts"
-          - "**/*.filter.ts"
-        detect:
-          - "enum "
-          - "const enum "
-          - "type Status = 'active' | 'inactive'"
-        excludePattern:
-          - "export type {"
-          - "import {"
-      - id: "magic-string"
-        description: "字符串字面量比较（如 status === 'active'），应使用枚举成员"
-        severity: "warning"
-        pattern:
-          type: "BinaryExpression"
-          operator: "=== | !== | == | !="
-          leftType: "string"
-          rightType: "string-literal"
-        excludePattern:
-          - "=== ''"
-          - "=== ' '"
-          - "path.*=== '"
-          - "NODE_ENV"
-          - "process.env"
-      - id: "enum-no-explicit-value"
-        description: "enum 成员应显式赋值"
-        severity: "warning"
-        pattern:
-          type: "EnumDeclaration"
-          hasExplicitValues: false
-        message: "隐式赋值的 enum 在值顺序变化时可能导致兼容性问题"
-      - id: "enum-naming-convention"
-        description: "enum 命名应为 PascalCase，成员为 UPPER_CASE"
-        severity: "info"
-        pattern:
-          type: "EnumDeclaration"
-          namingConvention:
-            enum: "PascalCase"
-            members: "UPPER_CASE"
-      - id: "inline-type-def"
-        description: "在业务逻辑文件中内联定义 type/interface"
-        severity: "warning"
-        pattern:
-          type: "TSTypeAliasDeclaration | TSInterfaceDeclaration"
-          fileContext: "controller|service|repository"
+  # ── 09-18 改造 ────────────────────────────────────────────────────────────
+  # 原写法 check.tool="custom-ast-scanner"（不存在）且 status=draft 从未执行。
+  # 现改用内核 forbiddenRegex 内联评估器。
+  #
+  # 覆盖范围声明（本条为**窄口径**规则：宁可少查，不可误报）：
+  #   ✓ const enum（TS 官方不推荐：isolatedModules/Babel 转译下不可用，跨包引用有兼容陷阱）
+  #   ✗ enum 成员显式赋值 / 命名规范 / 魔法字符串比较 / 内联类型定义 → 均需 AST 语义，
+  #     纯正则在真实项目误报率极高（任何 status === 'active' 都会命中），已移除；
+  #     由 @typescript-eslint/naming-convention 等规则覆盖
+  forbiddenRegex:
+    - regex: "\\bconst\\s+enum\\b"
+      message: "不建议使用 const enum（isolatedModules / Babel 转译下不可用，跨包引用存在兼容陷阱）"
+      suggestion: "改用普通 enum，或 `as const` 对象 + 联合类型（推荐）"
+  fileExts:
+    - ".ts"
+    - ".tsx"
+  excludePatterns:
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/generated/**"
   severity: "warning"
   categories:
     - "enums"
     - "constants"
-    - "typescript"
-    - "best-practice"
 
 judgment:
   passCondition: "warningCount < 5"

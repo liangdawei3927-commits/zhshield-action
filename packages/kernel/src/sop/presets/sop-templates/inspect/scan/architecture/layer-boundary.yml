@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.depcruiser.layer-boundary"
   name: "架构分层合规巡检"
-  description: "扫描全仓库的代码架构分层合规性，识别每一层的依赖方向违规、层间不合理的直接引用、模块内部私有路径泄露等架构异味"
+  description: "扫描项目源码的层间依赖方向合规性：控制器/用例/服务/仓储/适配器/领域/共享层之间必须符合单向依赖约束。前提是项目按目录分层（层名即目录名）"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "dependency-cruiser · IronNest rules/01 · rules/03 · rules/04"
 
@@ -54,67 +54,44 @@ conditions:
     - "**/generated/**"
 
 check:
-  tool: "dep-cruiser"
-  toolConfig:
-    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
-    scanRules:
-      - ruleId: "layer-violation"
-        description: "违规：{sourceLayer} 直接依赖了 {targetLayer}，违反单向依赖约束"
-        severity: "error"
-        layers:
-          - name: "controller"
-            path: "**/controllers/**"
-            allowDeps: ["service", "use-case", "dto"]
-          - name: "use-case"
-            path: "**/use-cases/**"
-            allowDeps: ["service", "domain", "dto"]
-          - name: "service"
-            path: "**/services/**"
-            allowDeps: ["domain", "infrastructure", "shared"]
-          - name: "domain"
-            path: "**/domain/**"
-            allowDeps: ["shared"]
-          - name: "repository"
-            path: "**/repositories/**"
-            allowDeps: ["domain", "shared"]
-          - name: "adapter"
-            path: "**/adapters/**"
-            allowDeps: ["shared", "core"]
-          - name: "shared"
-            path: "**/shared/**"
-            allowDeps: []        # shared 不能依赖任何业务层
-
-      - ruleId: "service-cohesion"
-        description: "service 方法过长（超过 {maxLines} 行），应拆分为 focused capability"
-        severity: "warning"
-        maxMethodLines: 20
-        maxFileLines: 200
-
-      - ruleId: "use-case-purity"
-        description: "use-case 应仅为编排层，不应包含基础设施导入或领域逻辑"
-        severity: "warning"
-        forbiddenImports:
-          - "TypeORM"
-          - "PrismaClient"
-          - "axios"
-          - "got"
-          - "ioredis"
-
-      - ruleId: "controller-thickness"
-        description: "控制器方法包含业务逻辑，应委托给 use-case"
-        severity: "warning"
-        checkPatterns:
-          - "instanceof"
-          - "throw new (?!.*AppError)"
-          - 'await this.*Repository\.'
-          - ".save()"
-          - ".find("
+  # ── 09-18 改造：从「声明了却没查」变为真实执行 ──────────────────────────────
+  # 原写法 check.tool="dep-cruiser" + toolConfig.scanRules（内核与适配器均不识别
+  # scanRules 结构），且 status=draft 从未进入执行集。现改用内核 layer-boundary
+  # 内联评估器：零外部二进制、毫秒级出结果，直接解析源码 import 语句判定层间方向。
+  #
+  # 覆盖范围声明（诚实标注，避免第二次「声明了却没查」）：
+  #   ✓ layer-violation（层间依赖方向违规）    → 本评估器真实执行
+  #   ✗ service-cohesion（方法/文件过长）      → 属「代码重构」域 long-method 职责，移除以免跨域重复
+  #   ✗ use-case-purity / controller-thickness → 需 AST 与控制流语义，纯正则误报率高，已移除
+  #
+  # 前提：项目按目录分层（src/<layer>/…），层名即目录名。未采用分层目录的项目不产生结论。
+  layers:
+    - name: "controllers"
+      allowedDependencies: ["services", "use-cases", "dto"]
+    - name: "use-cases"
+      allowedDependencies: ["services", "domain", "dto"]
+    - name: "services"
+      allowedDependencies: ["domain", "repositories", "adapters", "shared"]
+    - name: "repositories"
+      allowedDependencies: ["domain", "shared"]
+    - name: "adapters"
+      allowedDependencies: ["domain", "shared", "core"]
+    - name: "domain"
+      allowedDependencies: ["shared"]
+    - name: "shared"
+      allowedDependencies: []
+  excludePatterns:
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/coverage/**"
+    - "**/generated/**"
   severity: "warning"
   categories:
     - "architecture"
     - "layer-compliance"
-    - "service-cohesion"
-    - "controller-thinness"
 
 judgment:
   passCondition: "criticalErrorCount === 0"

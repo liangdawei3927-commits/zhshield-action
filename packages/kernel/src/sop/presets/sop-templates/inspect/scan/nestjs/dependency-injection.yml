@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.ironnest.dependency-injection"
   name: "NestJS 依赖注入合规巡检"
-  description: "检查 NestJS 模块的依赖注入合规性：Provider 作用域是否正确、循环依赖检测、外部库是否通过 Adapter 注入、禁止将 Vendor 类型直接注入业务层"
+  description: "检查 NestJS 依赖注入合规性：禁止 forwardRef 循环依赖、禁止业务代码直接实例化外部库、禁止直接注入 HTTP 客户端"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "IronNest rules/04 · rules/12 · NestJS documentation"
 
@@ -51,60 +51,41 @@ conditions:
     - "**/*.d.ts"
 
 check:
-  tool: "custom-ast-scanner"       # 智汇码盾 AST 分析引擎
-  toolConfig:
-    rules:
-      - ruleId: "provider-scope"
-        description: "Service/Repository/Adapter 应为 singleton（默认），避免意外的 REQUEST/SCOPED 导致状态污染"
-        severity: "warning"
-        check: "missing-@Injectable()-decorator"
-        patterns:
-          - "class.*Service"
-          - "class.*Repository"
-          - "class.*Adapter"
-        exceptions:
-          - "class.*ConfigService"         # 配置可能不同 scope
-          - "class.*CacheService"
-        fixCommand: "add @Injectable() decorator"
-
-      - ruleId: "circular-di"
-        description: "模块间循环依赖（Module A imports Module B，Module B imports Module A）"
-        severity: "error"
-        check: "circular-module-ref"
-        detectionStrategy: "import-graph-analyze"
-        maxDepth: 3
-
-      - ruleId: "adapter-vendor-separation"
-        description: "外部库必须通过 Adapter 注入业务层，禁止在 service/use-case 中直接注入 vendor SDK"
-        severity: "error"
-        check: "direct-vendor-injection"
-        vendorPatterns:
-          - "TypeORM.*Repository"
-          - "PrismaClient"
-          - "Client.*Redis"
-          - "amqplib.*Channel"
-          - "Stripe"
-          - "AWS.*Client"
-          - "OpenAI"
-          - "Anthropic"
-        allowedPatterns:
-          - "*.adapter.ts"                # Adapter 文件可以注入 vendor
-          - "app.module.ts"
-
-      - ruleId: "http-service-import"
-        description: "禁止在控制器/Service 中直接使用 HttpService/Axios，必须通过 Adapter"
-        severity: "warning"
-        check: "direct-http-client"
-        forbiddenProviders:
-          - "HttpService"
-          - "AxiosInstance"
-
+  # ── 09-18 改造 ────────────────────────────────────────────────────────────
+  # 原写法 check.tool="custom-ast-scanner" 指向**不存在的工具**（无任何适配器注册），
+  # 且 status=draft 从未执行。现改用内核 forbiddenRegex 内联评估器
+  # （逐行匹配，扫描前自动剥离字符串字面量与注释，避免误报）。
+  #
+  # 覆盖范围声明：
+  #   ✓ circular-di（forwardRef 循环依赖坏味道）              → 真实执行
+  #   ✓ adapter-vendor-separation（业务代码直接实例化外部库）  → 真实执行
+  #   ✓ http-service-import（直接注入 HTTP 客户端）           → 真实执行
+  #   ✗ provider-scope（缺 @Injectable 装饰器）→ 需 AST 语义与跨文件解析，
+  #     正则会大量误报，已移除；由 @typescript-eslint 与 NestJS 启动期校验覆盖
+  forbiddenRegex:
+    - regex: "\\bforwardRef\\s*\\("
+      message: "使用 forwardRef 解决循环依赖（NestJS 坏味道）"
+      suggestion: "重构模块边界消除循环；确需双向引用时提取共享接口到 shared-kernel"
+    - regex: "new\\s+(?:PrismaClient|Redis|Stripe|S3Client|OpenAI|Anthropic)\\b"
+      message: "业务代码直接实例化外部库，应通过 Adapter 注入"
+      suggestion: "在 adapters/ 中封装（如 payment.adapter.ts），业务层只依赖接口"
+    - regex: "@Inject\\s*\\(\\s*(?:HttpService|AxiosInstance)\\s*\\)"
+      message: "直接注入 HTTP 客户端，应通过 Adapter 封装"
+      suggestion: "定义 HttpClientPort 接口，由 adapter 实现具体协议"
+  fileExts:
+    - ".ts"
+  excludePatterns:
+    - "**/*.adapter.ts"
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/generated/**"
   severity: "warning"
   categories:
     - "dependency-injection"
     - "nestjs"
-    - "provider-scope"
-    - "adapter-pattern"
 
 judgment:
   passCondition: "errorCount === 0"

@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.internal.null-safety"
   name: "TypeScript 空安全扫描"
-  description: "扫描空安全违规：禁止非空断言运算符(!)、检测可选链使用机会、变量解引用前空值检查、禁止 definite assignment assertion"
+  description: "扫描空安全违规：非空断言运算符 ! 与 definite assignment 断言 !:。两项均为运行时无保证的编译器豁免写法"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "IronNest rules/00 (7, 47) · rules/08"
 
@@ -52,51 +52,37 @@ conditions:
     - "**/*.d.ts"
 
 check:
-  tool: "custom-ast-scanner"
-  toolConfig:
-    rules:
-      - id: "no-non-null-assertion"
-        description: "禁止非空断言运算符 !（postfix !），应使用类型守卫或 ?? 运算符"
-        severity: "error"
-        pattern:
-          type: "TSNonNullExpression"
-        excludePattern:
-          - "declare.*!"
-          - ".*.d.ts"
-        message: "非空断言会在运行时静默跳过 null 检查，掩盖潜在的 TypeError"
-        cwe: "CWE-476"
-      - id: "no-definite-assignment"
-        description: "禁止 definite assignment assertion (!:)，应使用构造函数初始化"
-        severity: "warning"
-        pattern:
-          type: "TSDefiniteAssignmentAssertion"
-        message: "Definite assignment 告诉编译器'我已初始化'但无运行时保证"
-      - id: "optional-chaining-opportunity"
-        description: "检测 xxx && xxx.property 模式，可替换为 xxx?.property"
-        severity: "info"
-        pattern:
-          type: "LogicalExpression"
-          operator: "&&"
-          depth: "2-levels"
-        autoFix: "?. 可选链"
-      - id: "nullable-deref"
-        description: "检测可能的 null/undefined 解引用（基于类型推断）"
-        severity: "warning"
-        pattern:
-          type: "MemberAccess"
-          nullableTarget: true
-        message: "该值可能为 null/undefined 但未做空值检查"
-      - id: "guard-before-access"
-        description: "建议在解引用前使用 if-guard 或 ?? 确保值存在"
-        severity: "info"
-        pattern:
-          type: "CallExpression"
-          nullableReceiver: true
+  # ── 09-18 改造 ────────────────────────────────────────────────────────────
+  # 原写法 check.tool="custom-ast-scanner"（不存在）且 status=draft 从未执行。
+  # 现改用内核 forbiddenRegex 内联评估器（自动剥离字符串与注释）。
+  #
+  # 覆盖范围声明：
+  #   ✓ no-non-null-assertion（非空断言 foo!.bar / arr[i]![0]）        → 真实执行
+  #   ✓ no-definite-assignment（属性 definite assignment 断言 `foo!: T`）→ 真实执行
+  #   ✗ optional-chaining-opportunity / nullable-deref / guard-before-access
+  #     → 需类型推断与控制流分析，正则会大量误报，已移除；
+  #       由 tsconfig strictNullChecks + @typescript-eslint 覆盖
+  forbiddenRegex:
+    - regex: "[A-Za-z0-9_$\\)\\]]!\\s*[.\\[(]"
+      message: "使用非空断言运算符 !（运行时静默跳过 null 检查，掩盖潜在 TypeError）"
+      suggestion: "改用类型守卫 / 可选链 ?. / 空值合并 ?? 或显式 if 判断"
+    - regex: "^\\s*[A-Za-z_$\\s]*!\\s*[:;]"
+      message: "使用 definite assignment 断言 !:（仅豁免编译器，无运行时保证）"
+      suggestion: "在构造函数中初始化，或声明为可选属性并在使用前做守卫"
+  fileExts:
+    - ".ts"
+    - ".tsx"
+  excludePatterns:
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/generated/**"
   severity: "warning"
   categories:
     - "null-safety"
     - "typescript"
-    - "best-practice"
 
 judgment:
   passCondition: "errorCount === 0"

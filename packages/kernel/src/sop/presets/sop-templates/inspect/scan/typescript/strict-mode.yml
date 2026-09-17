@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.internal.strict-mode"
   name: "TypeScript 严格模式配置检查"
-  description: "检查 tsconfig.json 中是否启用全部推荐严格标志（strict、strictNullChecks、noUncheckedIndexedAccess、exactOptionalPropertyTypes 等），确保项目在最高类型安全级别下编译"
+  description: "检查 tsconfig.json 是否启用 strict、noUncheckedIndexedAccess、exactOptionalPropertyTypes 三项关键严格标志"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "TypeScript strict · IronNest rules/13"
 
@@ -49,55 +49,29 @@ conditions:
   excludePatterns: []
 
 check:
-  tool: "tsc-config-validator"
-  toolConfig:
-    requiredFlags:
-      strict:
-        description: "启用所有严格类型检查"
-        value: true
-        severity: "error"
-        cwe: "CWE-1104"
-      strictNullChecks:
-        description: "启用严格的空值检查，防止 null/undefined 被隐式接受"
-        value: true
-        severity: "error"
-        cwe: "CWE-476"
-      noUncheckedIndexedAccess:
-        description: "对索引访问进行未定义检查"
-        value: true
-        severity: "error"
-      exactOptionalPropertyTypes:
-        description: "精确检查可选属性类型，防止 undefined 代替缺失属性"
-        value: true
-        severity: "error"
-      strictFunctionTypes:
-        description: "严格函数类型检查（逆变参数类型）"
-        value: true
-        severity: "warning"
-      strictBindCallApply:
-        description: "严格 bind/call/apply 类型检查"
-        value: true
-        severity: "warning"
-      noImplicitReturns:
-        description: "禁止函数中隐式返回 undefined"
-        value: true
-        severity: "warning"
-      noFallthroughCasesInSwitch:
-        description: "禁止 switch 语句穿透"
-        value: true
-        severity: "warning"
-      forceConsistentCasingInFileNames:
-        description: "强制文件名大小写一致性"
-        value: true
-        severity: "warning"
-    allowed:
-      "noUnusedLocals": false
-      "noUnusedParameters": false
+  # ── 09-18 改造 ────────────────────────────────────────────────────────────
+  # 原写法 check.tool="tsc-config-validator"（不存在）且 status=draft 从未执行。
+  # 现改用内核 required-content 的 JSON 键路径检查（compilerOptions.<flag> === true），
+  # 直接解析 JSONC（容忍注释与尾逗号）。
+  #
+  # 覆盖范围声明：
+  #   ✓ strict / noUncheckedIndexedAccess / exactOptionalPropertyTypes
+  #     —— 后两项是 strict: true 不覆盖、但对空安全影响最大的标志，真实执行
+  #   ✗ 其余标志（strictNullChecks / strictFunctionTypes / noImplicitReturns 等）
+  #     → 均被 strict: true 隐含，重复要求显式声明会误报（合理配置无需重复写），已移除
+  #
+  # 已知边界：仅检查仓库根的 tsconfig.json；若严格标志定义在 extends 的 base 配置中，
+  # 本项会对根配置误报（表现为"缺少配置项"而非"未开启"）。
+  required:
+    - path: "tsconfig.json"
+      json:
+        "compilerOptions.strict": true
+        "compilerOptions.noUncheckedIndexedAccess": true
+        "compilerOptions.exactOptionalPropertyTypes": true
   severity: "error"
   categories:
     - "typescript"
     - "strict-mode"
-    - "compiler-config"
 
 judgment:
   passCondition: "criticalErrorCount === 0"

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 
 import { ContentInterpreter } from '../runner';
+import { isSafeRegexPattern } from '../runner/scan-utils';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 import { SopLoader } from '../sop/_meta/sop-loader';
 import type { SopRule } from '../sop/_meta/sop-types';
@@ -111,5 +112,60 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
     expect(`const x = payload as any;`.match(asAny)).not.toBeNull();
     asAny.lastIndex = 0;
     expect(`const x = payload as string;`.match(asAny)).toBeNull();
+  });
+
+  // ─── T4（09-18）：7 条 inspect 域 draft 规则转正 ─────────────
+
+  /**
+   * 这 7 条规则原先用**不存在的伪 tool**（custom-ast-scanner / tsc-config-validator /
+   * 结构不被识别的 dep-cruiser），status=draft 从未执行 —— 属「声明了却没查」。
+   * T4 把它们改写为内核可解释形式并转 active，本用例锁死「转正 + 各接真实执行器」。
+   */
+  it('T4：原 7 条 draft 规则已转 active 且各自解释为真实可执行指令', async () => {
+    const { rules } = await loadPresets();
+    const expected: Record<string, string> = {
+      'inspect.scan.depcruiser.layer-boundary': 'layer-boundary',
+      'inspect.scan.depcruiser.module-dependency': 'tool-dispatch',
+      'inspect.scan.ironnest.dependency-injection': 'forbidden-regex',
+      'inspect.scan.internal.enum-usage': 'forbidden-regex',
+      'inspect.scan.internal.null-safety': 'forbidden-regex',
+      'inspect.scan.internal.strict-mode': 'required-content',
+      'inspect.scan.internal.type-safety': 'forbidden-regex',
+    };
+    const interpreter = new ContentInterpreter();
+
+    for (const [id, type] of Object.entries(expected)) {
+      const rule = rules.find((r) => r.id === id);
+      expect(rule, `规则 ${id} 应为 active（T4 转正）`).toBeDefined();
+      expect(interpreter.interpret(rule!).type, `${id} 的执行器类型`).toBe(type);
+    }
+  });
+
+  it('T4：inspect 域 active 规则覆盖 ≥ 11 条（原 4 条）', async () => {
+    const { registry } = await loadPresets();
+    const inspectActive = registry
+      .getAll()
+      .filter((r) => r.domain === 'inspect' && r.status === 'active');
+    expect(inspectActive.length).toBeGreaterThanOrEqual(11);
+  });
+
+  it('规则声明的 forbidden-regex 不得被安全校验静默拒绝', async () => {
+    // compileForbiddenRegexItems 对 isSafeRegexPattern 不通过的正则**静默跳过**：
+    // 规则文件里明明写着检查项，运行时却一条都不查，且无任何提示 ——
+    // 与「解释器兜底空跑」同类的第三次"声明了却没执行"。
+    // 09-18 实证：初版 definite-assignment 正则含「分组 + 量词」被拒，测试才发现。
+    const { rules } = await loadPresets();
+    const interpreter = new ContentInterpreter();
+    const rejected: string[] = [];
+
+    for (const rule of rules) {
+      const instr = interpreter.interpret(rule);
+      if (instr.type !== 'forbidden-regex') continue;
+      for (const item of instr.items) {
+        if (!isSafeRegexPattern(item.regex)) rejected.push(`${rule.id} → ${item.regex}`);
+      }
+    }
+
+    expect(rejected).toEqual([]);
   });
 });

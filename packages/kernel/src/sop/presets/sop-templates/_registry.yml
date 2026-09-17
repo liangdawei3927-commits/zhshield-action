@@ -81,25 +81,25 @@ rules:
     file: "inspect/scan/typescript/strict-mode.yml"
     adapter: "Inspect TS · strict-mode"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   - id: "inspect.scan.internal.type-safety"
     file: "inspect/scan/typescript/type-safety.yml"
     adapter: "Inspect TS · type-safety"
     priority: "medium"
-    status: "draft"
+    status: "active"
 
   - id: "inspect.scan.internal.null-safety"
     file: "inspect/scan/typescript/null-safety.yml"
     adapter: "Inspect TS · null-safety"
     priority: "medium"
-    status: "draft"
+    status: "active"
 
   - id: "inspect.scan.internal.enum-usage"
     file: "inspect/scan/typescript/enum-usage.yml"
     adapter: "Inspect TS · enum-usage"
     priority: "low"
-    status: "draft"
+    status: "active"
 
   - id: "inspect.scan.typescript.type-error-check"
     file: "inspect/scan/typescript/type-error-check.yml"
@@ -118,7 +118,7 @@ rules:
     file: "inspect/scan/nestjs/dependency-injection.yml"
     adapter: "Inspect NestJS · DI"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   # 架构适配器组
   - id: "inspect.scan.depcruiser.circular-dependency"
@@ -131,13 +131,13 @@ rules:
     file: "inspect/scan/architecture/layer-boundary.yml"
     adapter: "Inspect Arch · layer-boundary"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   - id: "inspect.scan.depcruiser.module-dependency"
     file: "inspect/scan/architecture/module-dependency.yml"
     adapter: "Inspect Arch · module-dependency"
     priority: "medium"
-    status: "draft"
+    status: "active"
 
   # ╔══════════════════════════════════════════════════════════════╗
   # ║  Security (安全域) — 漏洞/病毒/垃圾扫描规则                  ║

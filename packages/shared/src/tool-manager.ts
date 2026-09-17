@@ -90,7 +90,8 @@ export class ToolManager {
         timeout: 5000,
       });
       const match = stdout.match(VERSION_PATTERN);
-      return match ? match[1] : stdout.trim().split('\n')[0] || null;
+      // match[1] 在无捕获组命中时为 undefined，?? null 与函数返回契约 string | null 对齐
+      return match ? (match[1] ?? null) : stdout.trim().split('\n')[0] || null;
     } catch {
       return null;
     }

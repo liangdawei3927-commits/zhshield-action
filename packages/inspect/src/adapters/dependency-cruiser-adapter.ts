@@ -11,7 +11,7 @@ import type {
   Issue,
   AccessScope,
 } from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
+import { resolveToolCommandDetailed, type ToolCommandOrigin } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
 import { resolveInjectedConfigPath } from './injected-config';
 
@@ -69,10 +69,32 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     const key = anchor ?? '';
     let cached = this.commandCache.get(key);
     if (!cached) {
-      cached = resolveToolCommand('depcruise', anchor);
+      cached = resolveToolCommandDetailed('depcruise', anchor).then((r) => r.command);
       this.commandCache.set(key, cached);
     }
     return cached;
+  }
+
+  /** 记录最近一次实际使用的命令来源，供 modules=0 时如实上报（P1 复查5） */
+  private lastOrigin: ToolCommandOrigin = 'unresolved';
+
+  private async resolveCommandDetailed(
+    projectPath?: string,
+  ): Promise<{ command: string; origin: ToolCommandOrigin }> {
+    const anchor = this.projectRoot ?? projectPath;
+    const resolved = await resolveToolCommandDetailed('depcruise', anchor);
+    this.lastOrigin = resolved.origin;
+    return resolved;
+  }
+
+  /** 读取已解析命令的版本号（失败返回空串，不阻断主流程） */
+  private async probeVersion(command: string): Promise<string> {
+    try {
+      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 20000 });
+      return String(stdout).trim().split('\n')[0];
+    } catch {
+      return '';
+    }
   }
 
   async isAvailable(): Promise<boolean> {
@@ -95,8 +117,9 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     const projectPath = path.resolve(options.projectPath);
     const configFile = this.resolveConfig(options, projectPath);
     const targetDirs = this.resolveTargetDirs(projectPath);
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
-    const command = await this.resolveCommand(projectPath);
+    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析；
+    // 同时取回来源（project-local/shared/path），供 modules=0 时如实上报（P1 复查5）
+    const { command } = await this.resolveCommandDetailed(projectPath);
     const args: string[] = [];
     if (configFile) {
       // dependency-cruiser v16+ 指定配置用 --config（--validate 已废弃）
@@ -111,6 +134,45 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     });
 
     const output = JSON.parse(stdout);
+
+    // 模块数为 0 但目标目录存在可扫描源文件时，说明工具版本未能正确解析
+    // 项目（如全局 depcruise 18.1.1 对 TS 的已知问题），不应误报为通过。
+    if (
+      Array.isArray(output.modules) &&
+      output.modules.length === 0 &&
+      this.hasCruisableFiles(targetDirs)
+    ) {
+      // P1（复查5，根因于复查6 定案）：modules=0 时如实报出实际使用的
+      // 命令路径/来源/版本，并指出真根因——该工具位置解析不到 typescript。
+      // 2×2 对照实证（2026-09-17）：18.1.1+TS 与 18.2.0+TS 均 modules=18/violations=1，
+      // 18.2.0 无 TS 时 modules=0。所以"版本不符"是假象，别再把用户往换版本上引。
+      const version = await this.probeVersion(command);
+      const originLabel: Record<ToolCommandOrigin, string> = {
+        'project-local': '项目本地依赖',
+        shared: '智汇码盾工具目录',
+        path: 'PATH 全局安装（版本不可控）',
+        unresolved: '未解析到',
+      };
+      return {
+        tool: 'dep-cruiser',
+        status: 'error',
+        issues: [],
+        metadata: {
+          version,
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
+        error:
+          `dep-cruiser 未扫描到任何模块（modules=0），请勿视为通过。` +
+          `本次实际使用：${command}（来源：${originLabel[this.lastOrigin]}${
+            version ? `，版本 ${version}` : ''
+          }）。` +
+          `该工具所在位置解析不到 typescript，无法解析 TypeScript 依赖图。` +
+          `修复：在本项目内安装（npm i -D dependency-cruiser typescript）后重试。`,
+      };
+    }
+
     const issues = this.mapOutput(output);
 
     return {
@@ -178,6 +240,27 @@ export class DependencyCruiserAdapter implements ToolAdapter {
     return [projectPath];
   }
 
+  private hasCruisableFiles(dirs: string[]): boolean {
+    const CRUISABLE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx']);
+    const walk = (dir: string): boolean => {
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (entry.name === 'node_modules') continue;
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (walk(full)) return true;
+          } else if (CRUISABLE_EXT.has(path.extname(entry.name))) {
+            return true;
+          }
+        }
+      } catch {
+        // 目录不可读时跳过
+      }
+      return false;
+    };
+    return dirs.some(walk);
+  }
+
   /**
    * 解析 dep-cruiser 校验配置：
    * 1. SOP 规则注入的 config（按回退链解析，如内核资产 @zh/kernel/dist/assets/...）
@@ -201,6 +284,13 @@ export class DependencyCruiserAdapter implements ToolAdapter {
       const zhshield = path.join(projectPath, '.zhshield', name);
       if (fs.existsSync(zhshield)) return zhshield;
     }
+    // Default injected config fallback (kernel package asset)
+    const defaultConfig = resolveInjectedConfigPath(
+      '@zh/kernel/dist/assets/dependency-cruiser/.dependency-cruiser.cjs',
+      options.projectPath,
+      projectPath,
+    );
+    if (defaultConfig) return defaultConfig;
     return null;
   }
 

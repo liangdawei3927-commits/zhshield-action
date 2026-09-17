@@ -26,6 +26,10 @@ export function installNpmTool(tool) {
   const binName = tool.npm.binName || tool.name;
   const toolDir = join(TOOLS_DIR, tool.name);
   const spec = `${pkg}@${tool.version}`;
+  // 运行期依赖（如 dependency-cruiser 解析 .ts 需要 typescript）必须与主包装在
+  // 同一 node_modules 下：工具自身的 require 只按自身位置向上解析，项目里的
+  // typescript 救不了它。缺了就会「装好了、版本也对、modules=0」。
+  const extras = Array.isArray(tool.npm.extraPackages) ? tool.npm.extraPackages : [];
 
   mkdirSync(toolDir, { recursive: true });
   const res = spawnSync(
@@ -39,6 +43,7 @@ export function installNpmTool(tool) {
       '--no-fund',
       '--no-package-lock',
       spec,
+      ...extras,
     ],
     { encoding: 'utf-8', stdio: 'inherit' },
   );

@@ -21,4 +21,6 @@ export {
   findZhshieldToolBin,
   getZhshieldToolBinDir,
   resolveToolCommand,
+  resolveToolCommandDetailed,
 } from './adapters/tool-bin';
+export type { ToolCommandOrigin, ResolvedToolCommand } from './adapters/tool-bin';

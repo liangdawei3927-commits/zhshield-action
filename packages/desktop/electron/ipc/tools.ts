@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access } from 'node:fs/promises';
 import * as path from 'node:path';
-import { findLocalToolBin, findZhshieldToolBin } from '@zh/inspect';
+import { resolveToolCommandDetailed, type ToolCommandOrigin } from '@zh/inspect';
 import {
   cloudResolveTools,
   getCachedProfile,
@@ -68,22 +68,30 @@ async function resolveToolIds(): Promise<{ ids: string[]; source: 'cloud' | 'loc
   return { ids: wisdomBrainSync.getRuleSync().getConfiguredToolIds(), source: 'local' };
 }
 
-/** 单工具三层探测：项目本地 → PATH（--version 可执行）→ zhshield 共享目录 */
+/** 解析来源 → 面板就绪状态的映射（project-local 在 UI 语义上叫 project） */
+const ORIGIN_TO_READINESS: Record<ToolCommandOrigin, ToolReadiness> = {
+  'project-local': 'project',
+  shared: 'shared',
+  path: 'path',
+  unresolved: 'missing',
+};
+
+/**
+ * 单工具探测：必须与 InspectEngine 用**同一套**解析顺序与实现。
+ *
+ * P1（2026-09-17）：此前本函数自行实现「项目 → PATH → 码盾目录」，而引擎侧
+ * `resolveToolCommandDetailed` 是「项目 → 码盾目录 → PATH」——同一个工具会出现
+ * 「面板判可用（PATH 上的旧版）、引擎用码盾目录版（或反之）」两套答案。
+ * 现统一复用引擎侧解析器，面板与产出结论永远同源。
+ * probeTimeoutMs 传 8000：面板一次批量探测多个工具，需控制总耗时。
+ */
 async function probeTool(toolId: string, projectPath?: string): Promise<ToolStatusRow> {
   const binName = TOOL_BIN_NAME[toolId] ?? toolId;
-  if (projectPath) {
-    const local = findLocalToolBin(binName, projectPath);
-    if (local) return { toolId, status: 'project', bin: local };
-  }
-  try {
-    await execFileAsync(binName, ['--version'], { timeout: 8_000 });
-    return { toolId, status: 'path', bin: binName };
-  } catch {
-    // PATH 不可用（ENOENT 或版本探测失败）
-  }
-  const shared = findZhshieldToolBin(binName);
-  if (shared) return { toolId, status: 'shared', bin: shared };
-  return { toolId, status: 'missing', bin: null };
+  const { command, origin } = await resolveToolCommandDetailed(binName, projectPath, {
+    probeTimeoutMs: 8_000,
+  });
+  if (origin === 'unresolved') return { toolId, status: 'missing', bin: null };
+  return { toolId, status: ORIGIN_TO_READINESS[origin], bin: command };
 }
 
 /** 从 dir 逐级向上找 scripts/install-tools.mjs（最多 8 级；开发环境限定） */

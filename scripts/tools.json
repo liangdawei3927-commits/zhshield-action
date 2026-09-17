@@ -84,7 +84,8 @@
       },
       "npm": {
         "package": "dependency-cruiser",
-        "binName": "depcruise"
+        "binName": "depcruise",
+        "extraPackages": ["typescript@5.9.3"]
       }
     },
     {

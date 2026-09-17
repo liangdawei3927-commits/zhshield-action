@@ -63,6 +63,31 @@ export function getNpmInstalledVersion(tool) {
   }
 }
 
+/** 从 npm 安装规格取包名：typescript@5.9.3 → typescript；@scope/pkg@1.0.0 → @scope/pkg */
+function pkgNameOf(spec) {
+  const at = spec.lastIndexOf('@');
+  return at > 0 ? spec.slice(0, at) : spec;
+}
+
+/**
+ * npm 工具的附加运行期依赖是否就位（tools.json 的 npm.extraPackages）。
+ *
+ * 为什么必须检查：dependency-cruiser 解析 .ts 依赖同目录能解析到 typescript。
+ * 实测（2026-09-17 2×2 对照）——18.1.1+TS 与 18.2.0+TS 均检出 modules=18/violations=1，
+ * 而 18.2.0 无 TS 时 modules=0。也就是说"版本对、能跑 --version"完全不等于"能出结果"。
+ * 版本匹配但缺附加依赖时应触发重装，否则老安装会永远停在坏状态。
+ */
+export function hasNpmExtraPackages(tool) {
+  if (tool.install !== 'npm' || !Array.isArray(tool.npm?.extraPackages)) return true;
+  return tool.npm.extraPackages.every((spec) => {
+    try {
+      return statSync(join(TOOLS_DIR, tool.name, 'node_modules', pkgNameOf(spec))).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** 工具是否支持 --version（ts-prune 等不支持，运行 --version 会触发分析） */
 export function supportsVersionFlag(tool) {
   if (tool.install === 'npm') return tool.npm.versionFlag !== false;

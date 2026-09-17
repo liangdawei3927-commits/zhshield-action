@@ -9,7 +9,8 @@
  * 用法:
  *   node scripts/install-tools.mjs            # 探测并安装缺失工具
  *   node scripts/install-tools.mjs --check    # 只探测不安装（退出码 0=全可用，1=有缺失）
- *   node scripts/install-tools.mjs --force    # 强制重装（PATH 命中的工具仍跳过）
+ *   node scripts/install-tools.mjs --force    # 强制重装（PATH 命中且版本一致的工具仍跳过）
+ *   node scripts/install-tools.mjs --only a,b # 只处理清单中的指定工具（桌面端引导安装入口）
  *   node scripts/install-tools.mjs --help     # 帮助
  *
  * 目录约定:
@@ -54,6 +55,7 @@ import {
   findInPath,
   getToolVersion,
   getNpmInstalledVersion,
+  hasNpmExtraPackages,
   versionsMatch,
   supportsVersionFlag,
   probeTimeoutFor,
@@ -66,15 +68,17 @@ function printHelp() {
 用法:
   node scripts/install-tools.mjs            # 探测并安装缺失工具
   node scripts/install-tools.mjs --check    # 只探测不安装（退出码 0=全可用，1=有缺失）
-  node scripts/install-tools.mjs --force    # 强制重装（PATH 命中的工具仍跳过）
+  node scripts/install-tools.mjs --force    # 强制重装（PATH 命中且版本一致的工具仍跳过）
+  node scripts/install-tools.mjs --only a,b # 只处理清单中的指定工具（桌面端引导安装入口）
   node scripts/install-tools.mjs --help     # 帮助
 
 目录约定:
-  ~/.zhshield/bin/          二进制与 npm bin 软链（加入 PATH 即可被消费）
+  ~/.zhshield/bin/          二进制与 npm bin 软链（智汇码盾自动优先使用）
   ~/.zhshield/tools/<tool>/ npm 工具私有安装目录
 
 说明:
-  工具版本清单见 scripts/tools.json；安装入口与报告层提示一致（zhshield tools install）。`);
+  工具版本清单见 scripts/tools.json。本脚本即唯一安装入口：桌面端「工具就绪」面板
+  的引导安装通过 IPC tools:install 调用它（--only），开发环境也可直接执行。`);
 }
 
 /** 打印清单头部信息 */
@@ -93,7 +97,14 @@ function checkBuiltin(tool, label) {
   return { tool, status: 'builtin' };
 }
 
-/** PATH 命中（PATH 工具由用户管理，--force 也不重装） */
+/**
+ * PATH 命中：版本一致才算「可用」；版本不符时 PATH 保持不动，但**不能就此放行**。
+ *
+ * 放行的后果是码盾工具目录永远装不上正确版本，引擎会一直用那个碰巧在 PATH 上的
+ * 同名工具（实测 depcruise 18.1.1 → modules=0 读不出 TS 依赖图；18.2.0 → modules=18）。
+ * 故返回 path-stale，由 processTool 继续走「码盾目录 → 安装」分支。
+ * PATH 工具仍归用户所有，本脚本不覆盖。
+ */
 function checkPath(tool, label, binName) {
   const pathHit = findInPath(binName);
   if (!pathHit) return null;
@@ -104,18 +115,25 @@ function checkPath(tool, label, binName) {
   const actual = getToolVersion(pathHit, probeTimeoutFor(tool));
   if (actual && versionsMatch(actual, tool.version)) {
     ok(`${label} 可用（PATH: ${pathHit}）`);
-  } else {
-    warn(
-      `${label} PATH 命中但版本不符（${actual || '未知'} ≠ ${tool.version}），PATH 工具由用户管理，跳过`,
-    );
+    return { tool, status: 'path' };
   }
-  return { tool, status: 'path' };
+  warn(
+    `${label} PATH 命中但版本不符（${actual || '未知'} ≠ ${tool.version}），` +
+      'PATH 工具保持不动，改为安装到码盾工具目录',
+  );
+  return { tool, status: 'path-stale', pathBin: pathHit, actualVersion: actual || null };
 }
 
-/** ~/.zhshield/bin 命中（版本匹配则可用，否则重装） */
+/** ~/.zhshield/bin 命中（版本匹配且附加依赖就位才算可用，否则重装） */
 function checkLocal(tool, label, binName, force) {
   const localBin = join(BIN_DIR, IS_WIN ? `${binName}.cmd` : binName);
   if (!existsSync(localBin) || force) return null;
+  // 附加运行期依赖缺失同样视为不可用：版本号对、--version 也能跑，
+  // 但产出为空（dependency-cruiser 缺 typescript → modules=0）
+  if (!hasNpmExtraPackages(tool)) {
+    warn(`${label} 缺少运行期依赖（${tool.npm.extraPackages.join('、')}），重装`);
+    return null;
+  }
   const actual =
     tool.install === 'npm'
       ? getNpmInstalledVersion(tool)
@@ -128,20 +146,35 @@ function checkLocal(tool, label, binName, force) {
   return null;
 }
 
-/** 缺失 → 安装（或 --check 只报告） */
-async function installOrReport(tool, label, values) {
+/** 缺失 → 安装（或 --check 只报告）；stale 为 PATH 上版本不符的工具信息（可空） */
+async function installOrReport(tool, label, values, stale) {
+  const staleHint = stale
+    ? `（PATH 上是 ${stale.actualVersion || '同名工具'}，版本不符，需装到码盾工具目录）`
+    : '';
   if (values.check) {
-    fail(`${label} 缺失`);
-    return { row: { tool, status: 'missing' }, installed: 0, missing: 1 };
+    fail(`${label} 缺失${staleHint}`);
+    return {
+      row: { tool, status: 'missing', stalePath: stale?.pathBin },
+      installed: 0,
+      missing: 1,
+    };
   }
-  log(`  → ${label} 安装中...`);
+  log(`  → ${label} 安装中${stale ? '（PATH 版本不符，改数码盾目录）' : ''}...`);
   try {
     const r = await installTool(tool);
     ok(`${label} 已安装到 ${BIN_DIR}${r?.verified === false ? '（unverified）' : ''}`);
-    return { row: { tool, status: 'installed', verified: r?.verified }, installed: 1, missing: 0 };
+    return {
+      row: { tool, status: 'installed', verified: r?.verified, stalePath: stale?.pathBin },
+      installed: 1,
+      missing: 0,
+    };
   } catch (e) {
     fail(`${label} 安装失败: ${e.message}`);
-    return { row: { tool, status: 'error' }, installed: 0, missing: 1 };
+    return {
+      row: { tool, status: 'error', stalePath: stale?.pathBin },
+      installed: 0,
+      missing: 1,
+    };
   }
 }
 
@@ -152,10 +185,16 @@ async function processTool(tool, values) {
   const builtinRow = checkBuiltin(tool, label);
   if (builtinRow) return { row: builtinRow, installed: 0, missing: 0 };
   const pathRow = checkPath(tool, label, binName);
-  if (pathRow) return { row: pathRow, installed: 0, missing: 0 };
+  // path-stale = PATH 上有同名工具但版本不符：不放行，继续找/装码盾目录里的正确版本
+  if (pathRow && pathRow.status !== 'path-stale') {
+    return { row: pathRow, installed: 0, missing: 0 };
+  }
+  const stale = pathRow?.status === 'path-stale' ? pathRow : null;
   const localRow = checkLocal(tool, label, binName, values.force);
-  if (localRow) return { row: localRow, installed: 0, missing: 0 };
-  return installOrReport(tool, label, values);
+  if (localRow) {
+    return { row: { ...localRow, stalePath: stale?.pathBin }, installed: 0, missing: 0 };
+  }
+  return installOrReport(tool, label, values, stale);
 }
 
 /** 汇总输出与退出码 */
@@ -163,26 +202,44 @@ function printSummary(rows, installedCount, missingCount, values) {
   log('');
   const byStatus = (s) => rows.filter((r) => r.status === s).length;
   const available = byStatus('path') + byStatus('local') + byStatus('builtin');
+  // "已改用码盾目录的版本" 只有在真的可用时才能说：安装失败却照样宣告切换成功，
+  // 会让用户以为已经用上正确版本，实际仍在跑 PATH 上那个版本不符的工具。
+  const switched = rows.filter(
+    (r) => r.stalePath && (r.status === 'local' || r.status === 'installed'),
+  );
+  const stillStale = rows.filter(
+    (r) => r.stalePath && (r.status === 'error' || r.status === 'missing'),
+  );
   log(
     `[zhshield tools] 汇总: ${available} 可用 / ${installedCount} 新安装 / ${missingCount} 缺失或失败`,
   );
+  if (switched.length > 0) {
+    log(`[zhshield tools] ${switched.length} 个工具在 PATH 上版本不符，已改用 ${BIN_DIR} 内的版本`);
+  }
+  if (stillStale.length > 0) {
+    log(
+      `[zhshield tools] ⚠ ${stillStale.length} 个工具在 PATH 上版本不符，且未能装到 ${BIN_DIR}：` +
+        `${stillStale.map((r) => r.tool.name).join('、')} ——` +
+        '仍会使用 PATH 上的旧版本，检查结果可能不可靠。',
+    );
+  }
   if (values.check) {
     log(
       missingCount === 0
         ? '[zhshield tools] 全部工具可用。'
         : `[zhshield tools] ${missingCount} 个工具缺失，请运行 node scripts/install-tools.mjs 安装。`,
     );
-    process.exit(missingCount > 0 ? 1 : 0);
-  }
-  if (installedCount > 0) {
+  } else if (installedCount > 0) {
     log(
-      `已将 ${installedCount} 个工具安装到 ${BIN_DIR}，请将其加入 PATH（或使用 zhshield tools install 的等效入口）`,
+      `已将 ${installedCount} 个工具安装到 ${BIN_DIR}；智汇码盾会自动优先使用该目录的版本，无需改动 PATH。`,
     );
   } else if (missingCount === 0) {
     log('无需安装：全部工具已可用。');
   } else {
     log(`有 ${missingCount} 个工具安装失败，请检查上方错误信息后重试。`);
   }
+  // 安装失败必须反映到退出码（此前非 --check 模式恒为 0，脚本/CI 无法察觉失败）
+  process.exit(missingCount > 0 ? 1 : 0);
 }
 
 async function main() {

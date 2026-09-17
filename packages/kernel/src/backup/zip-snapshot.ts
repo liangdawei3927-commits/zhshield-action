@@ -118,6 +118,7 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= RENAME_MAX_RETRIES; attempt++) {
     try {
+      // eslint-disable-next-line perf/perf-no-serial-await -- retry loop: each attempt depends on previous failure
       await fs.rename(from, to);
       return;
     } catch (err) {

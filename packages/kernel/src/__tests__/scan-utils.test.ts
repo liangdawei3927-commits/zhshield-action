@@ -29,6 +29,17 @@ describe('isSafeRegexPattern（ReDoS 防护）', () => {
     expect(isSafeRegexPattern('((a+)+)')).toBe(false);
   });
 
+  it('非捕获分组修饰符 ?: 不被误当作量词（09-18 修）', () => {
+    // 组内只有交替、组后才是量词 —— 无嵌套量词，不构成回溯风险
+    expect(isSafeRegexPattern('(?:A|B)*')).toBe(true);
+    expect(isSafeRegexPattern('(?:get|post|put|delete)+')).toBe(true);
+    // 实证过的真实规则正则（曾因误判被静默跳过 → 规则声明了却一条都不查）
+    expect(isSafeRegexPattern('@Inject\\s*\\(\\s*(?:HttpService|AxiosInstance)\\s*\\)')).toBe(true);
+    // 真危险形态仍须拒绝（防止修复把检测放宽成摆设）
+    expect(isSafeRegexPattern('(a+)+')).toBe(false);
+    expect(isSafeRegexPattern('(a*)*')).toBe(false);
+  });
+
   it('拒绝超长模式与括号不配对', () => {
     expect(isSafeRegexPattern('a'.repeat(600))).toBe(false);
     expect(isSafeRegexPattern('(unclosed')).toBe(false);

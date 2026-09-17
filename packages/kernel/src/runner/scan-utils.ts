@@ -15,6 +15,15 @@ const MAX_PATTERN_LENGTH = 512;
 /** 灾难性回溯形态：含量词分组后紧跟量词（(a+)+ / (a*)* / (a?)* 等） */
 const RE_DANGEROUS_GROUP = /\([^()]*[+*?{][^()]*\)[+*?{]/;
 
+/**
+ * 分组修饰符（非捕获 ?: / 前瞻 ?= ?! / 命名 ?<）中的 `?` 不是量词。
+ * 检测前统一还原成 `(`，否则 `(?:a|b)*` 这类**完全安全**的写法会被
+ * RE_DANGEROUS_GROUP 误判为「组内量词 + 组后量词」而拒绝。
+ * 09-18 实证：`@Inject\s*\(\s*(?:HttpService|AxiosInstance)\s*\)` 被静默拒绝，
+ * 规则文件里写着检查项、运行时一条都不查。
+ */
+const RE_GROUP_MODIFIER = /\(\?[=!:<>]/g;
+
 /** 层名安全字符集：仅允许目录名常见字符（字母/数字/连字符/下划线/点） */
 const SAFE_LAYER_NAME_RE = /^[a-zA-Z0-9._-]{1,64}$/;
 
@@ -53,7 +62,10 @@ function escapeRegExp(text: string): string {
  */
 export function isSafeRegexPattern(pattern: string): boolean {
   if (pattern.length > MAX_PATTERN_LENGTH) return false;
-  const stripped = pattern.replace(/\\[^]/g, '').replace(/\[[^\]]*\]/g, 'X');
+  const stripped = pattern
+    .replace(/\\[^]/g, '')
+    .replace(/\[[^\]]*\]/g, 'X')
+    .replace(RE_GROUP_MODIFIER, '(');
   if (RE_DANGEROUS_GROUP.test(stripped)) return false;
   let depth = 0;
   for (const c of stripped) {
@@ -369,16 +381,31 @@ export function detectLayer(
   return null;
 }
 
-/** 根据导入的模块名判断目标层级 */
+/**
+ * 根据导入的模块路径判断目标层级。
+ *
+ * 关键：入参必须是**完整导入路径**（如 `../services/user`），不是首段。
+ * 旧实现由调用方传入 `path.split('/')[0]`，于是相对导入恒得 `..` → 层判定永远失效
+ * （内联 layer-boundary 评估器只对 `import 'domain/x'` 这种裸模块名生效，
+ * 对真实项目主流的相对路径/路径别名导入一律漏检，等价于静默空跑）。
+ *
+ * 匹配口径为**目录段精确命中**：`../services/user` → 段 [.., services, user] → 命中 services；
+ * 同时避免旧 includes 语义的误判（`my-domain-utils` 不应命中层 `domain`）。
+ * 兜底再按 `/层名/` 整串匹配一次，覆盖带扩展名等边界写法。
+ */
 export function detectLayerByName(
-  moduleName: string,
+  modulePath: string,
   layers: Array<{ name: string; allowedDependencies: string[] }>,
 ): string | null {
-  const lower = moduleName.toLowerCase();
+  const segments = modulePath.split('/').map((s) => s.toLowerCase());
   for (const layer of layers) {
-    if (lower === layer.name.toLowerCase() || lower.includes(layer.name.toLowerCase())) {
-      return layer.name;
-    }
+    if (!SAFE_LAYER_NAME_RE.test(layer.name)) continue;
+    if (segments.includes(layer.name.toLowerCase())) return layer.name;
+  }
+  const normalized = modulePath.replace(/\\/g, '/');
+  for (const layer of layers) {
+    if (!SAFE_LAYER_NAME_RE.test(layer.name)) continue;
+    if (new RegExp(`/${escapeRegExp(layer.name)}/`, 'i').test(normalized)) return layer.name;
   }
   return null;
 }

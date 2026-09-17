@@ -223,6 +223,10 @@ export interface ForbiddenPatternInstruction {
 export interface LayerBoundaryInstruction {
   type: 'layer-boundary';
   layers: Array<{ name: string; allowedDependencies: string[] }>;
+  /** 排除模式（相对路径 glob，支持 ** 跨目录与 * 单段通配），如测试文件与构建产物。
+   *  09-18 新增：层判定按文件名无关的目录结构进行，测试文件里的 import 同样会被扫描到，
+   *  缺此过滤会在真实项目产生大量误报。 */
+  excludePatterns?: string[];
 }
 
 /**

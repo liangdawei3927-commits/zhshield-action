@@ -309,7 +309,14 @@ function stripStringsAndComments(line: string): string {
       const q = line[i];
       let j = i + 1;
       while (j < line.length) {
-        if (line[j] === '\\') { j += 2; } else if (line[j] === q) { j++; break; } else { j++; }
+        if (line[j] === '\\') {
+          j += 2;
+        } else if (line[j] === q) {
+          j++;
+          break;
+        } else {
+          j++;
+        }
       }
       i = j;
       continue;
@@ -599,6 +606,7 @@ export async function evalLayerBoundary(
     if (content === null) continue;
 
     const relativePath = relative(context.repoRoot, filePath);
+    if (matchesExcludePatterns(relativePath, instr.excludePatterns)) continue;
     violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }));
   }
 
@@ -644,20 +652,25 @@ function scanFileLayerBoundaries({
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     importRegex.lastIndex = 0;
-    const m = importRegex.exec(lines[i]);
-    if (!m) continue;
-    const imported = (m[1] || m[2] || '').split('/')[0];
-    const targetLayer = detectLayerByName(imported, instr.layers);
-    if (targetLayer && !layerMap.get(fileLayer)?.allowedDeps.includes(targetLayer)) {
-      violations.push({
-        id: randomUUID(),
-        ruleId: rule.id,
-        severity: rule.severity,
-        file: relativePath,
-        line: i + 1,
-        message: `层违规: "${fileLayer}" 不允许依赖 "${targetLayer}" (导入: ${imported})`,
-        suggestion: `${fileLayer} 层只能依赖: ${(layerMap.get(fileLayer)?.allowedDeps ?? []).join(', ')}`,
-      });
+    let m: RegExpExecArray | null;
+    // 一行可能有多条 import（如 `import a from 'x'; import b from 'y'`），逐条检查
+    while ((m = importRegex.exec(lines[i])) !== null) {
+      const imported = m[1] || m[2] || '';
+      if (!imported) continue;
+      // 传**完整导入路径**：detectLayerByName 按目录段匹配层名，相对路径
+      // （../services/user）与路径别名（@app/services/user）均能识别。
+      const targetLayer = detectLayerByName(imported, instr.layers);
+      if (targetLayer && !layerMap.get(fileLayer)?.allowedDeps.includes(targetLayer)) {
+        violations.push({
+          id: randomUUID(),
+          ruleId: rule.id,
+          severity: rule.severity,
+          file: relativePath,
+          line: i + 1,
+          message: `层违规: "${fileLayer}" 不允许依赖 "${targetLayer}" (导入: ${imported})`,
+          suggestion: `${fileLayer} 层只能依赖: ${(layerMap.get(fileLayer)?.allowedDeps ?? []).join(', ')}`,
+        });
+      }
     }
   }
   return violations;

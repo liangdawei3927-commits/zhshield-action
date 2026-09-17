@@ -218,4 +218,47 @@ describe('SopRuleEngine — 内联评估（pattern-scan / forbidden / threshold 
     expect(infraViolation!.message).toContain('infrastructure');
     expect(infraViolation!.message).toContain('presentation');
   });
+
+  it('layer-boundary: 相对路径与路径别名导入也能识别层（09-18 修）', async () => {
+    const srcDir = path.join(tempDir, 'src');
+    mkdirSync(path.join(srcDir, 'infrastructure'), { recursive: true });
+    mkdirSync(path.join(srcDir, 'presentation'), { recursive: true });
+
+    // 5 行导入，层名基础设施不允许依赖任何层 → 前 3 行应全部报出
+    writeFileSync(
+      path.join(srcDir, 'infrastructure', 'db.ts'),
+      [
+        "import { A } from '../presentation/controller';", // ① 相对路径
+        "import { B } from '@/presentation/service';", // ② 路径别名
+        "import { C } from '../../src/presentation/deep';", // ③ 深层相对路径
+        "import { D } from './helper';", // 同层内部 → 不报
+        "import { E } from '../my-domain-utils/format';", // 含层名子串但非层目录 → 不报
+      ].join('\n'),
+      'utf-8',
+    );
+
+    registry.register(
+      makeRule({
+        id: 'guard.block.architecture-boundary-relative',
+        domain: 'guard',
+        action: 'block',
+        severity: 'error',
+        applicableEngines: ['guard'],
+        content: {
+          layers: [
+            { name: 'presentation', allowedDependencies: [] },
+            { name: 'domain', allowedDependencies: [] },
+            { name: 'infrastructure', allowedDependencies: [] },
+          ],
+        },
+      }),
+    );
+
+    const report = await engine.evaluateRules({ repoRoot: tempDir, domain: 'guard' });
+    const violations = report.evaluations[0].violations!;
+
+    // 旧实现只取导入路径首段（'..'）→ 层判定失效 → 这里会是 0 条（静默假通过）
+    expect(violations.map((v) => v.line)).toEqual([1, 2, 3]);
+    expect(violations[1].message).toContain('presentation');
+  });
 });

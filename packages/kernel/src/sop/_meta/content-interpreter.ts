@@ -234,6 +234,9 @@ export class ContentInterpreter {
           ? l.allowedDependencies.map(String)
           : [],
       })),
+      excludePatterns: Array.isArray(c.excludePatterns)
+        ? (c.excludePatterns as string[]).map(String)
+        : undefined,
     };
   }
 

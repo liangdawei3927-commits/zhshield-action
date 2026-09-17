@@ -52,19 +52,38 @@ conditions:
     - "coverage/**"
 
 check:
-  rules:
-    - id: "no-implicit-any"
-      description: "禁止隐式 any 类型"
-      severity: "warning"
-      pattern: "function $FUNC($PARAM) { ... }"  # Semgrep 模式
-    - id: "strict-function-types"
-      description: "函数参数和返回值必须显式声明类型"
-      severity: "warning"
-      pattern: ":$TYPE"
-    - id: "no-type-assertion"
-      description: "禁止非安全类型断言（as any）"
-      severity: "warning"
-      pattern: "as any"
+  # 09-17 修：原 content 只有 check.rules 而缺 check.tool，解释器无法识别，
+  # 落兜底把整份规则 JSON 当字面量搜源码 → 必然 0 命中 → 面板显示"通过"（静默空跑）。
+  # 原 pattern 字段用的是 Semgrep 元变量语法（$FUNC / $PARAM / $TYPE），内核无法执行；
+  # 现改用内核 forbiddenRegex 内联评估器（逐行匹配，自动剥离字符串与注释，避免误报）。
+  #
+  # 覆盖范围声明（诚实标注，避免"声明了却没查"的二次假通过）：
+  #   ✓ no-type-assertion     → as any 断言
+  #   ✓ no-double-assertion   → as unknown as X 双重断言
+  #   ✓ no-implicit-any-param → function 声明中无类型注解的参数
+  #   ✗ strict-function-types（返回值必须显式声明）→ 需 AST 语义，正则会大量误报，已移除；
+  #     该项由 tsconfig strict 与 @typescript-eslint/explicit-function-return-type 覆盖
+  forbiddenRegex:
+    - regex: "\\bas\\s+any\\b"
+      message: "禁止 as any 类型断言（绕过类型检查）"
+      suggestion: "改用精确类型、unknown + 类型守卫，或泛型约束"
+    - regex: "\\bas\\s+unknown\\s+as\\b"
+      message: "禁止 as unknown as 双重断言（等价于 as any）"
+      suggestion: "使用类型守卫函数（is / asserts）替代强制断言"
+    - regex: "function\\s+[A-Za-z_$][\\w$]*\\s*\\(\\s*[A-Za-z_$][\\w$]*\\s*(?:,|\\)\\s*\\{)"
+      message: "函数参数缺少显式类型注解（隐式 any）"
+      suggestion: "为参数补充显式类型，如 (input: InputDto) => ..."
+  fileExts:
+    - ".ts"
+    - ".tsx"
+  excludePatterns:
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/*.generated.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/coverage/**"
   severity: "warning"
   categories:
     - "type-safety"

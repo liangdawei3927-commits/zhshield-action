@@ -41,9 +41,12 @@ execution:
 conditions:
   languages:
     - "typescript"
+  # 声明规则的适用面。注意：实际扫描目标由 dep-cruiser 适配器按 targetDirs
+  # （项目的 src/，monorepo 则为各 packages/*/src）决定，本字段尚未透传到适配器。
+  # 原写法 "src/features/*/.ts" 缺少通配符，glob 无法命中任何文件，一并修正。
   filePatterns:
-    - "src/features/*/.ts"
-    - "src/modules/*/.ts"
+    - "**/*.ts"
+    - "**/*.tsx"
   excludePatterns:
     - "**/index.ts"
     - "node_modules/**"
@@ -52,25 +55,33 @@ conditions:
     - "**/*.test.ts"
 
 check:
-  rules:
-    - id: "no-direct-cross-module-import"
-      description: "禁止模块间直接 import 内部文件，必须通过模块的 index.ts"
-      severity: "error"
-      violationPattern: |
-        // ❌ 违规：直接 import 另一个模块的内部文件
-        import { Something } from '../other-module/internal.service'
-
-        // ✅ 正确：通过 barrel export 导入
-        import { Something } from '../other-module'
-    - id: "enforce-barrel-export"
-      description: "每个模块必须有 index.ts 作为公共 API"
-      severity: "error"
-    - id: "no-circular-module-ref"
-      description: "禁止循环模块引用（forwardRef 是坏味道）"
-      severity: "warning"
-    - id: "feature-module-organization"
-      description: "按特性模块组织，不按技术层组织（不混合 controllers/services 在同一个目录）"
-      severity: "warning"
+  # 09-17 修：原 content 只有 check.rules 而缺 check.tool，解释器无法识别，
+  # 落兜底把整份规则 JSON 当字面量搜源码 → 必然 0 命中 → 面板显示"通过"（静默空跑）。
+  # 现改用内核 forbiddenRegex 内联评估器：零外部工具依赖，逐行匹配且自动剥离
+  # 字符串与注释（避免 import 出现在注释/字符串里造成误报）。
+  #
+  # 覆盖范围声明（诚实标注，避免"声明了却没查"的二次假通过）：
+  #   ✓ no-direct-cross-module-import → 下述两条正则真实执行（import / require 两种写法）
+  #   ↪ no-circular-module-ref        → 不在此重复实现，由 inspect.scan.depcruiser.circular-dependency
+  #                                     规则（dependency-cruiser no-circular，含依赖图语义）覆盖
+  #   ✗ enforce-barrel-export         → 需目录枚举能力，内联评估器无此语义，已移除
+  #   ✗ feature-module-organization   → 需目录结构语义分析，正则会大量误报，已移除
+  forbiddenRegex:
+    - regex: 'from\s+["''][^"'']*/(?:modules|features)/[\w.-]+/(?!index)'
+      message: '跨模块深引用：仅允许引用目标模块的 index 导出'
+      suggestion: '改为从目标模块的 index.ts 导入，或将共享逻辑下沉到共享层'
+    - regex: 'require\(\s*["''][^"'']*/(?:modules|features)/[\w.-]+/(?!index)'
+      message: '跨模块深引用（require）：仅允许引用目标模块的 index 导出'
+      suggestion: '改为从目标模块的 index.ts 导入，或将共享逻辑下沉到共享层'
+  fileExts:
+    - ".ts"
+    - ".tsx"
+  excludePatterns:
+    - "**/index.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
   severity: "error"
 
 standards:

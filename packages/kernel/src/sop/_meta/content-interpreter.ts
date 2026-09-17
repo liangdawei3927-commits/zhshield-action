@@ -11,6 +11,7 @@ import type {
   ScannerDispatchInstruction,
   PresetInstruction,
   ToolDispatchInstruction,
+  UnresolvedInstruction,
 } from './rule-evaluation';
 import {
   hasToolDispatch,
@@ -37,7 +38,11 @@ export class ContentInterpreter {
    * 解释单条规则的 content
    */
   interpret(rule: SopRule): ContentInstruction {
-    const c = rule.content ?? {};
+    const raw = rule.content ?? {};
+    // 规则文件存在两种 schema：扁平（指令字段在顶层，如 test-fixtures）与嵌套
+    // （指令字段写在 check 段，如 presets/sop-templates）。合并视图令两组谓词对
+    // 两种写法都成立，同时保留 check 键供 tool-dispatch 读取 check.tool。
+    const c = resolveInstructionScope(raw);
     if (hasToolDispatch(c)) return this.toToolDispatch(c);
     if (hasLayers(c)) return this.toLayerBoundary(c);
     if (hasChecks(c)) return this.toCheckList(c);
@@ -48,7 +53,21 @@ export class ContentInterpreter {
     if (hasPatterns(c)) return this.toPatternScan(c);
     if (hasThresholds(c)) return this.toThreshold(c);
     if (hasPresets(c)) return this.toPreset(c);
-    return { type: 'pattern-scan', patterns: [JSON.stringify(c)] };
+    return this.toUnresolved(raw);
+  }
+
+  /**
+   * 兜底：content 无法解释为任何已知指令。
+   *
+   * 旧实现返回 `pattern-scan` + `JSON.stringify(content)`，把整份规则 JSON 当字面量
+   * 去源码里搜 —— 必然 0 命中 → 评估结果恒为 passed，用户在面板上看到假的通过勾
+   * （09-17 实证：module-boundary / type-consistency 两条 active 规则静默空跑）。
+   * 现改为显式 unresolved，由 SopRuleEngine 降级为 degraded skipped：
+   * 「什么都没查」不再等于「通过」。
+   */
+  private toUnresolved(c: Record<string, unknown>): UnresolvedInstruction {
+    const keys = Object.keys(c);
+    return { type: 'unresolved', reason: describeUnresolved(c, keys), keys };
   }
 
   private toToolDispatch(c: Record<string, unknown>): ToolDispatchInstruction {
@@ -245,4 +264,43 @@ export type {
   ScannerDispatchInstruction,
   PresetInstruction,
   ToolDispatchInstruction,
+  UnresolvedInstruction,
 } from './rule-evaluation';
+
+/**
+ * 构造指令作用域视图：把嵌套 schema 的 check 段字段提升到顶层。
+ *
+ * SopRuleParser 把整份 YAML 文档作为 content 传入（content = parsed），而内联指令
+ * 谓词读的是 content 顶层字段。嵌套 schema 的规则文件（presets/sop-templates）把
+ * 指令写在 check 段下（check.forbiddenRegex 等），不提升就会一律落 unresolved。
+ *
+ * 顶层字段优先（扁平 schema 或显式覆盖），check 段作为补充；check 键本身保留，
+ * 供 hasToolDispatch 读取 check.tool。
+ */
+function resolveInstructionScope(raw: Record<string, unknown>): Record<string, unknown> {
+  const check = raw.check;
+  if (typeof check !== 'object' || check === null || Array.isArray(check)) return raw;
+  return { ...(check as Record<string, unknown>), ...raw };
+}
+
+/**
+ * 生成 unresolved 的可读原因（纯函数，供 ContentInterpreter 兜底使用）。
+ *
+ * 优先识别高频写法错误（check.rules 声明了内联检查项却缺 check.tool），
+ * 使规则作者一眼看出问题所在，而非面对一句笼统的「无法识别」。
+ */
+function describeUnresolved(c: Record<string, unknown>, keys: string[]): string {
+  const check = c.check as Record<string, unknown> | undefined;
+  const hasCheckObj = typeof check === 'object' && check !== null && !Array.isArray(check);
+  if (hasCheckObj && Array.isArray(check.rules) && check.rules.length > 0) {
+    return (
+      `check.rules 已声明 ${check.rules.length} 项内联检查，但缺少 check.tool，` +
+      `无法确定由哪个工具执行；请补 check.tool，或改用内核可解释的写法 ` +
+      `(patterns / forbidden / forbiddenRegex / required / layers / checks)`
+    );
+  }
+  if (keys.length === 0) {
+    return '规则 content 为空，无可执行指令';
+  }
+  return `无法识别的规则内容写法（顶层键: ${keys.join(', ')}）`;
+}

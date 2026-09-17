@@ -189,7 +189,8 @@ export type ContentInstruction =
   | LayerBoundaryInstruction
   | ScannerDispatchInstruction
   | PresetInstruction
-  | ToolDispatchInstruction;
+  | ToolDispatchInstruction
+  | UnresolvedInstruction;
 
 export interface PatternScanInstruction {
   type: 'pattern-scan';
@@ -318,4 +319,22 @@ export interface ToolDispatchInstruction {
     suggestionTemplate?: string;
     resources?: string[];
   };
+}
+
+/**
+ * UnresolvedInstruction — 规则内容无法解释为任何可执行指令
+ *
+ * 护栏语义（防「静默空跑」）：规则文件的 content 写法有误（例如 check 段只有
+ * rules 而缺 tool）时，旧实现会兜底把整份 content 序列化成字面量去源码里搜，
+ * 必然 0 命中 → 评估为 passed。用户在面板上看到的是一个假的通过勾。
+ *
+ * 现在改为显式 unresolved：调用方据此降级（SopRuleEngine 落 degraded skipped），
+ * 使「什么都没查」不再等于「通过」。
+ */
+export interface UnresolvedInstruction {
+  type: 'unresolved';
+  /** 人类可读的原因（含修复指引） */
+  reason: string;
+  /** content 的顶层键名，便于定位写法错误 */
+  keys: string[];
 }

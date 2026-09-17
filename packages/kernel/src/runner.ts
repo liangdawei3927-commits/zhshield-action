@@ -174,6 +174,15 @@ export class SopRuleEngine {
     'scanner-dispatch': (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),
     preset: (rule, instr, ctx) => evalPreset(this.host, rule, instr, ctx),
     'tool-dispatch': (rule, instr, ctx) => evalToolDispatch(this.host, rule, instr, ctx),
+    // 盲检护栏：content 无法解释为任何可执行指令时不得判通过。
+    // degraded=true → aggregate() 计入 ok 判定（ok=false），面板不再出现假的通过勾。
+    unresolved: (rule, instr) =>
+      skipEvaluation(
+        rule,
+        `规则内容无法解释，未执行任何检查：${instr.reason}`,
+        rule.domain === 'guard' ? 'guard' : 'inspect',
+        true,
+      ),
   };
 
   /** 评估重入深度。preset / scanner-dispatch / check-list 会回调

@@ -110,8 +110,9 @@ export class GuardEngine {
     for (const check of checks) {
       try {
         const adapter = this.adapterRegistry.get(check.adapter);
-        const rawResult = await Promise.resolve(adapter.run({}, check));
-        results.push(adapter.normalize(rawResult, {}, check));
+        const ctx = { projectPath: this.repoRoot, repoRoot: this.repoRoot };
+        const rawResult = await Promise.resolve(adapter.run(ctx, check));
+        results.push(adapter.normalize(rawResult, ctx, check));
       } catch (error) {
         results.push(this.normalizer.fromException(check, error));
       }

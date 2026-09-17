@@ -51,7 +51,7 @@ export class GuardSensitiveInfoAdapter implements Adapter {
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
   ): { findings: Finding[]; error?: string } {
-    const targetDir = this.resolveTargetDir(context);
+    const targetDir = this.resolveTargetDir(context, _check.checkId);
     const findings: Finding[] = [];
 
     try {
@@ -64,8 +64,13 @@ export class GuardSensitiveInfoAdapter implements Adapter {
   }
 
   /** 从上下文解析待扫描的目标目录 */
-  private resolveTargetDir(context: { repoRoot?: string; projectPath?: string }): string {
-    return context.repoRoot || context.projectPath || process.cwd();
+  private resolveTargetDir(
+    context: { repoRoot?: string; projectPath?: string },
+    checkId: string,
+  ): string {
+    const targetDir = context.repoRoot || context.projectPath;
+    if (!targetDir) throw new Error(`${checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
+    return targetDir;
   }
 
   /** 扫描项目 src 目录（不存在时跳过） */

@@ -287,6 +287,16 @@ describe('GuardEngine', () => {
     expect(report.results).toHaveLength(1);
     expect(mockAdapter.run).toHaveBeenCalled();
     expect(mockAdapter.normalize).toHaveBeenCalled();
+    // P0 回归：传统路径必须把 repoRoot 作为 context 传给适配器，而不是空 {}
+    expect(mockAdapter.run).toHaveBeenCalledWith(
+      { projectPath: dir, repoRoot: dir },
+      expect.objectContaining({ checkId: 'mock-check' }),
+    );
+    expect(mockAdapter.normalize).toHaveBeenCalledWith(
+      { passed: true },
+      { projectPath: dir, repoRoot: dir },
+      expect.objectContaining({ checkId: 'mock-check' }),
+    );
 
     fs.rmSync(dir, { recursive: true });
   });
@@ -335,7 +345,7 @@ describe('GuardSensitiveInfoAdapter', () => {
       check,
     );
     expect(result.status).toBe('failed');
-    expect(result.details.count).toBe(1);
+    expect((result.details as { count: number }).count).toBe(1);
   });
 
   it('should return error on scan failure', () => {
@@ -375,7 +385,7 @@ describe('ArchitectureBoundaryAdapter', () => {
       check,
     );
     expect(result.status).toBe('failed');
-    expect(result.details.count).toBe(1);
+    expect((result.details as { count: number }).count).toBe(1);
   });
 
   it('should return error on scan failure', () => {
@@ -415,7 +425,7 @@ describe('SecurityScanAdapter', () => {
       check,
     );
     expect(result.status).toBe('failed');
-    expect(result.details.highCount).toBe(1);
+    expect((result.details as { highCount: number }).highCount).toBe(1);
   });
 
   it('should return warning for medium-severity only', () => {
@@ -472,7 +482,7 @@ describe('GuardESLintCheckAdapter normalize', () => {
     };
     const result = adapter.normalize(raw, {}, check);
     expect(result.status).toBe('failed');
-    expect(result.details.totalErrors).toBe(1);
+    expect((result.details as { totalErrors: number }).totalErrors).toBe(1);
   });
 
   it('should return warning for warnings only', () => {
@@ -490,7 +500,7 @@ describe('GuardESLintCheckAdapter normalize', () => {
     };
     const result = adapter.normalize(raw, {}, check);
     expect(result.status).toBe('warning');
-    expect(result.details.totalWarnings).toBe(1);
+    expect((result.details as { totalWarnings: number }).totalWarnings).toBe(1);
   });
 
   it('should return error on execution error', () => {

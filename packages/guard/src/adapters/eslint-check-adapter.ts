@@ -1,11 +1,23 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
-import { resolveEslintTargetDir } from '@zh/shared';
+import { findEslintConfigDir, resolveEslintTargetDir } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
 
 export { resolveEslintTargetDir };
+
+/** 适配器原始输出：成功/失败的文件列表，或「跳过」原因 */
+interface EslintRawResult {
+  files: Record<string, unknown>[];
+  error?: string;
+  /** 项目未配置 ESLint 时的跳过原因 —— 不是失败，不应判 error */
+  skipped?: string;
+}
+
+/** ESLint v9+ 在无配置文件时的报错特征（英文原文，随版本略有差异） */
+const MISSING_CONFIG_RE =
+  /couldn't find an eslint\.config|no eslint configuration found|eslint\.config\.\(js\|mjs\|cjs\)|Please install ESLint configuration/i;
 
 /** ESLint JSON 输出中的单条消息 */
 interface EslintMessage {
@@ -37,9 +49,20 @@ export class GuardESLintCheckAdapter implements Adapter {
   async run(
     context: { targetFiles?: string[]; projectPath?: string },
     _check: CheckConfig,
-  ): Promise<{ files: Record<string, unknown>[]; error?: string }> {
-    const projectPath = context.projectPath || process.cwd();
+  ): Promise<EslintRawResult> {
+    const projectPath = context.projectPath;
+    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
     const targetDir = resolveEslintTargetDir(projectPath);
+
+    // 项目自身没有任何 ESLint 配置时，ESLint v9+ 必然以非零退出并打印
+    // "couldn't find an eslint.config.(js|mjs|cjs) file" —— 那是「没得查」，
+    // 不是「查出问题」。先探测再决定，避免把覆盖率缺口报成检查失败。
+    if (!findEslintConfigDir([targetDir, projectPath])) {
+      return {
+        files: [],
+        skipped: `未检测到 ESLint 配置（eslint.config.* / .eslintrc.*），已跳过该检查。如需纳入门禁，请在项目根添加 ESLint 配置`,
+      };
+    }
 
     try {
       const { stdout } = await this.runEslint(targetDir);
@@ -59,15 +82,15 @@ export class GuardESLintCheckAdapter implements Adapter {
   }
 
   /** 解析成功输出：空输出视为无文件，非法 JSON 归为执行失败 */
-  private parseSuccessOutput(stdout: string): { files: Record<string, unknown>[]; error?: string } {
+  private parseSuccessOutput(stdout: string): EslintRawResult {
     if (!stdout) return { files: [] };
 
     const parsed = JSON.parse(stdout);
     return { files: Array.isArray(parsed) ? parsed : [] };
   }
 
-  /** 处理 ESLint 执行失败：区分未安装 / lint 失败有输出 / 其他错误 */
-  private handleRunError(error: unknown): { files: Record<string, unknown>[]; error?: string } {
+  /** 处理 ESLint 执行失败：区分未安装 / 缺配置（应跳过）/ lint 失败有输出 / 其他错误 */
+  private handleRunError(error: unknown): EslintRawResult {
     const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
     if (err.code === 'ENOENT') {
       return { files: [], error: 'ESLint 未安装或未在 PATH 中找到' };
@@ -76,6 +99,16 @@ export class GuardESLintCheckAdapter implements Adapter {
     // ESLint 以非零退出时有 JSON 输出（lint 失败）
     const parsed = this.parseLintOutput(err.stdout ?? '');
     if (parsed) return { files: parsed };
+
+    // 兜底：探测漏掉的自定义配置名（如 eslint.config.ts 需额外依赖）也会走到这里，
+    // 按报错文案识别「缺配置」，仍然跳过而不是判失败。
+    const text = `${err.stderr ?? ''}${err.message ?? ''}`;
+    if (MISSING_CONFIG_RE.test(text)) {
+      return {
+        files: [],
+        skipped: 'ESLint 未找到可用配置（eslint.config.* / .eslintrc.*），已跳过该检查',
+      };
+    }
 
     return { files: [], error: err.stderr || err.message || 'ESLint 执行失败' };
   }
@@ -90,11 +123,10 @@ export class GuardESLintCheckAdapter implements Adapter {
     }
   }
 
-  normalize(
-    rawResult: { files: Record<string, unknown>[]; error?: string },
-    context: unknown,
-    check: CheckConfig,
-  ): CheckResult {
+  normalize(rawResult: EslintRawResult, context: unknown, check: CheckConfig): CheckResult {
+    if (rawResult.skipped) {
+      return this.makeSkippedResult(check, rawResult.skipped);
+    }
     if (rawResult.error) {
       return this.makeResult(check, 'error', rawResult.error);
     }
@@ -106,6 +138,26 @@ export class GuardESLintCheckAdapter implements Adapter {
 
     const { errors, warnings } = this.collectMessages(files);
     return this.buildLintResult(check, files, errors, warnings);
+  }
+
+  /**
+   * 「跳过」结果：status=warning + severity=warning + blocking=false。
+   *
+   * 不复用 makeResult —— 那里会把非 failed/error 的 severity 压成 info，
+   * 导致跳过的检查在汇总里彻底消失（warnings 计数为 0，用户看不见覆盖率缺口）。
+   * 用 warning 而非新增 skipped 状态，是为了与 GuardEngine 既有的
+   * EVAL_STATUS_MAP（SOP skipped → warning）保持同一套口径。
+   */
+  private makeSkippedResult(check: CheckConfig, reason: string): CheckResult {
+    return {
+      checkId: check.checkId,
+      adapter: check.adapter,
+      status: 'warning',
+      severity: 'warning',
+      blocking: false,
+      message: `已跳过：${reason}`,
+      details: { skipped: true, reason },
+    };
   }
 
   /** 按错误 / 警告 / 通过三种情况构造结果 */

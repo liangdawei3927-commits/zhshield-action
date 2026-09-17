@@ -56,7 +56,13 @@ export interface CheckConfig {
   appliesTo?: { targets?: string[] };
 }
 
+export interface GuardContext {
+  projectPath: string;
+  repoRoot?: string;
+  targetFiles?: string[];
+}
+
 export interface Adapter {
-  run(context: unknown, check: CheckConfig): unknown;
-  normalize(rawResult: unknown, context: unknown, check: CheckConfig): CheckResult;
+  run(context: GuardContext, check: CheckConfig): unknown;
+  normalize(rawResult: unknown, context: GuardContext, check: CheckConfig): CheckResult;
 }

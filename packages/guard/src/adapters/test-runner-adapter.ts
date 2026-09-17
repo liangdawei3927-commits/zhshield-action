@@ -3,9 +3,17 @@ import { promisify } from 'node:util';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
 import type { TestResult } from './test-result';
 import { VitestOutputParser } from './vitest-output-parser';
-import { TestCommandDetector } from './test-command-detector';
+import { TestCommandDetector, isNoTestConfiguredReason } from './test-command-detector';
 
 const execFileAsync = promisify(execFile);
+
+/** 适配器原始输出：测试结果，或「跳过」原因，或真实错误 */
+interface TestRunnerRawResult {
+  result: TestResult | null;
+  error?: string;
+  /** 项目未配置测试时的跳过原因 —— 覆盖率缺口，不判失败 */
+  skipped?: string;
+}
 
 /**
  * Test runner adapter — runs project tests and reports pass/fail counts.
@@ -22,26 +30,38 @@ export class TestRunnerAdapter implements Adapter {
   async run(
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
-  ): Promise<{ result: TestResult | null; error?: string }> {
-    const projectPath = context.repoRoot || context.projectPath || process.cwd();
+  ): Promise<TestRunnerRawResult> {
+    const projectPath = context.repoRoot || context.projectPath;
+    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
     const resolved = this.commandDetector.resolveProjectDir(projectPath);
     if ('error' in resolved) {
-      return { result: null, error: resolved.error };
+      return this.handleDetectionFailure(resolved.error);
     }
 
     const detected = this.commandDetector.detectTestCommand(resolved.dir);
     if ('error' in detected) {
-      return { result: null, error: detected.error };
+      return this.handleDetectionFailure(detected.error);
     }
 
     return this.runDetectedTest(detected, resolved.dir);
+  }
+
+  /** 探测阶段失败：项目压根没配测试 → 跳过；其余（如损坏的 package.json）才判错误 */
+  private handleDetectionFailure(reason: string): TestRunnerRawResult {
+    if (isNoTestConfiguredReason(reason)) {
+      return {
+        result: null,
+        skipped: `项目未配置测试脚本（package.json 缺少 test / test:run / vitest 脚本），已跳过该检查`,
+      };
+    }
+    return { result: null, error: reason };
   }
 
   /** 执行已检测到的测试命令并解析输出，失败时走兜底解析 */
   private async runDetectedTest(
     detected: { testCmd: string; testArgs: string[] },
     projectPath: string,
-  ): Promise<{ result: TestResult | null; error?: string }> {
+  ): Promise<TestRunnerRawResult> {
     const startTime = Date.now();
     try {
       const { stdout, stderr } = await this.executeTestRun(
@@ -83,7 +103,7 @@ export class TestRunnerAdapter implements Adapter {
     error: unknown,
     startTime: number,
     projectPath: string,
-  ): { result: TestResult | null; error?: string } {
+  ): TestRunnerRawResult {
     const err = error as { stdout?: string; stderr?: string; message?: string };
     // Tests may exit non-zero when tests fail — that's OK, parse the output
     const output = (err.stdout || '') + '\n' + (err.stderr || '');
@@ -105,11 +125,10 @@ export class TestRunnerAdapter implements Adapter {
     return { ...result, totalTests: testFilesOnDisk, unresolved: true };
   }
 
-  normalize(
-    rawResult: { result: TestResult | null; error?: string },
-    _context: unknown,
-    check: CheckConfig,
-  ): CheckResult {
+  normalize(rawResult: TestRunnerRawResult, _context: unknown, check: CheckConfig): CheckResult {
+    if (rawResult.skipped) {
+      return this.makeSkippedResult(check, rawResult.skipped);
+    }
     if (rawResult.error) {
       return this.makeResult(check, 'error', `测试执行失败: ${rawResult.error}`);
     }
@@ -162,6 +181,25 @@ export class TestRunnerAdapter implements Adapter {
         durationMs: r.durationMs,
       },
     );
+  }
+
+  /**
+   * 「跳过」结果：status=warning + severity=warning + blocking=false。
+   *
+   * 关键点是 blocking 必须为 false —— TEST-001 在 checks.json 里 blocking=true，
+   * 走 makeResult 会让「项目没配测试」直接阻断门禁。severity 显式给 warning
+   * 是为了让 GuardEngine 的 warnings 计数能看到这条覆盖率缺口。
+   */
+  private makeSkippedResult(check: CheckConfig, reason: string): CheckResult {
+    return {
+      checkId: check.checkId,
+      adapter: check.adapter,
+      status: 'warning',
+      severity: 'warning',
+      blocking: false,
+      message: `已跳过：${reason}`,
+      details: { skipped: true, reason },
+    };
   }
 
   private makeResult(

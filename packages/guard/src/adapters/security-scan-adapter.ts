@@ -118,7 +118,8 @@ export class SecurityScanAdapter implements Adapter {
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
   ): { findings: Finding[]; error?: string } {
-    const targetDir = context.repoRoot || context.projectPath || process.cwd();
+    const targetDir = context.repoRoot || context.projectPath;
+    if (!targetDir) throw new Error(`${_check.checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
     const findings: Finding[] = [];
 
     try {

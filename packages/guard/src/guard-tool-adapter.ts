@@ -60,16 +60,12 @@ export class GuardToolAdapterWrapper implements ToolAdapter {
   }
 
   private async runAdapter(options: ToolScanOptions, check: CheckConfig) {
-    const raw = await Promise.resolve(
-      this.adapter.run(
-        {
-          projectPath: options.projectPath,
-          targetFiles: options.targetFiles,
-        },
-        check,
-      ),
-    );
-    return this.adapter.normalize(raw, {}, check);
+    const context = {
+      projectPath: options.projectPath,
+      targetFiles: options.targetFiles,
+    };
+    const raw = await Promise.resolve(this.adapter.run(context, check));
+    return this.adapter.normalize(raw, context, check);
   }
 
   private toToolResult(result: CheckResult, checkId: string, start: number): ToolResult {

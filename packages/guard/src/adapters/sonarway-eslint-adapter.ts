@@ -42,7 +42,8 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     context: { targetFiles?: string[]; projectPath?: string },
     _check: CheckConfig,
   ): Promise<{ results: LintResult[]; error?: string }> {
-    const projectPath = context.projectPath || process.cwd();
+    const projectPath = context.projectPath;
+    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
     const target =
       context.targetFiles && context.targetFiles.length > 0
         ? context.targetFiles

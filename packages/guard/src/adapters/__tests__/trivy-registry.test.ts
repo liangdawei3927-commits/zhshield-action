@@ -93,7 +93,7 @@ describe('GuardTrivyAdapter — registry path integration', () => {
     expect(raw.summary.critical).toBe(1);
     expect(raw.summary.high).toBe(1);
 
-    const result = adapter.normalize(raw, {}, makeCheck());
+    const result = adapter.normalize(raw, { projectPath: '/tmp/demo-project' }, makeCheck());
     expect(result.checkId).toBe('TRVY-001');
     expect(result.adapter).toBe('trivy');
     expect(result.status).toBe('failed');
@@ -130,7 +130,7 @@ describe('GuardTrivyAdapter — registry path integration', () => {
     const registry = new AdapterRegistry();
     registry.register('trivy', new GuardTrivyAdapter());
     const adapter = registry.get('trivy');
-    await Promise.resolve(adapter.run({}, makeCheck()));
+    await Promise.resolve(adapter.run({ projectPath: '/tmp/demo-project' }, makeCheck()));
 
     // isAvailable(--version) + 漏洞扫描(fs) + 配置扫描(fs --scanners config)，全部走默认二进制名
     expect(execFileMock).toHaveBeenCalledTimes(3);

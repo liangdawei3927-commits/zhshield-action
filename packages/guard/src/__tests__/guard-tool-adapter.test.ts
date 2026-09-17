@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GuardToolAdapterWrapper } from '../guard-tool-adapter';
 import type { Adapter, CheckResult } from '../types';
-import type { ToolScanOptions } from '@zh/shared';
+import type { ToolScanOptions, ToolConfig } from '@zh/shared';
 
 function makeMockAdapter(resultOverrides: Partial<CheckResult> = {}): Adapter {
   const defaultResult: CheckResult = {
@@ -93,7 +93,7 @@ describe('GuardToolAdapterWrapper', () => {
 
       expect(adapter.normalize).toHaveBeenCalledWith(
         { raw: 'data' },
-        {},
+        { projectPath: '/tmp/test-project', targetFiles: ['src/index.ts'] },
         expect.objectContaining({ checkId: expect.any(String) }),
       );
     });
@@ -143,7 +143,7 @@ describe('GuardToolAdapterWrapper', () => {
       const wrapper = new GuardToolAdapterWrapper('test', adapter);
       await wrapper.scan(
         makeScanOptions({
-          config: { ruleId: 'custom-rule-1', severity: 'warning' },
+          config: { ruleId: 'custom-rule-1', severity: 'warning' } as unknown as ToolConfig,
         }),
       );
 

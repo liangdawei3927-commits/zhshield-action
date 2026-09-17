@@ -177,7 +177,12 @@ export class ToolAdapterExecutor {
   ): AdapterResult {
     if (result.status === 'error') {
       this.degradationManager.escalate(result.error || 'Unknown error', adapter.meta.id);
-      return this.buildStatusResult(adapter, result, duration, issues, 'error', false, false);
+      // P1（复查5）：error 的真实原因必须透传（与 skipped 的 skipDetail 同源同构）——
+      // 此前 error 分支只透传 status，适配器返回的 error 字段被丢弃，
+      // 报告层只剩 `status:'error', issues:[]`，用户看到"失败"却无从得知为什么。
+      return this.buildStatusResult(adapter, result, duration, issues, 'error', false, false, {
+        errorDetail: result.error,
+      });
     }
     if (result.status === 'unavailable') {
       const failClosed = adapter.meta.category === 'security';
@@ -193,7 +198,9 @@ export class ToolAdapterExecutor {
     }
     if (result.status === 'skipped') {
       // P2：透传适配器真实跳过原因（ToolResult.error），供 reporter 如实展示
-      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false, result.error);
+      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false, {
+        skipDetail: result.error,
+      });
     }
     return this.buildStatusResult(adapter, result, duration, issues, 'passed', true, false);
   }
@@ -207,7 +214,7 @@ export class ToolAdapterExecutor {
     status: AdapterResult['status'],
     passed: boolean,
     degraded: boolean,
-    skipDetail?: string,
+    detail?: { skipDetail?: string; errorDetail?: string },
   ): AdapterResult {
     return {
       adapterId: adapter.meta.id,
@@ -217,7 +224,8 @@ export class ToolAdapterExecutor {
       passed,
       degraded,
       status,
-      ...(skipDetail ? { skipDetail } : {}),
+      ...(detail?.skipDetail ? { skipDetail: detail.skipDetail } : {}),
+      ...(detail?.errorDetail ? { errorDetail: detail.errorDetail } : {}),
       issues,
     };
   }
@@ -255,19 +263,24 @@ export class ToolAdapterExecutor {
   }
 
   private makeErrorResult(adapter: ToolAdapter, error: unknown, toolStart: number): AdapterResult {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       adapterId: adapter.meta.id,
       adapterName: adapter.meta.name,
       duration: Date.now() - toolStart,
       issueCount: 1,
       passed: false,
+      // P1（复查5）：抛出型失败此前不带 status，会被归类为"正常工具"；
+      // 统一为 status:'error' + errorDetail，让"工具执行失败"在任何消费方都不可静默。
+      status: 'error',
+      errorDetail: message,
       issues: [
         {
           id: `error-${adapter.meta.id}`,
           ruleId: 'ADAPTER-ERROR',
           severity: 'error',
           category: 'quality',
-          message: error instanceof Error ? error.message : String(error),
+          message,
           file: '',
           line: 0,
           column: 0,

@@ -38,6 +38,26 @@ describe('tech-debt: moduleOf', () => {
     expect(moduleOf('src\\a.ts')).toBe('src/a.ts');
     expect(moduleOf('')).toBe('(root)');
   });
+
+  it('should strip ../ prefixes', () => {
+    expect(moduleOf('../../../src/foo.ts')).toBe('src/foo.ts');
+    expect(moduleOf('../../bar.ts')).toBe('bar.ts');
+    expect(moduleOf('../baz.ts')).toBe('baz.ts');
+  });
+
+  it('should strip leading / from absolute paths', () => {
+    expect(moduleOf('/tmp/zh-nav-fixture/src/type-error.ts')).toBe(
+      'tmp/zh-nav-fixture/src/type-error.ts',
+    );
+    expect(moduleOf('/absolute/deep/path.ts')).toBe('absolute/deep/path.ts');
+    expect(moduleOf('/')).toBe('(root)');
+  });
+
+  it('should combine ../ stripping and leading / removal', () => {
+    expect(moduleOf('../../../tmp/zh-nav-fixture/src/type-error.ts')).toBe(
+      'tmp/zh-nav-fixture/src/type-error.ts',
+    );
+  });
 });
 
 describe('tech-debt: computeDebtIndex', () => {

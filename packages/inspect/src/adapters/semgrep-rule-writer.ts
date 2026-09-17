@@ -1,6 +1,10 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ToolScanOptions } from '@zh/shared';
+
+/** 内联规则临时目录前缀（位于 os.tmpdir() 下，不写入被测项目） */
+const INLINE_RULE_TMP_PREFIX = 'zhshield-semgrep-';
 
 /**
  * patterns 复合结构中的单条子表达式。
@@ -61,22 +65,25 @@ function normalizePatternEntry(entry: SemgrepPatternEntry): SemgrepPatternEntry 
 
 /**
  * SemgrepRuleWriter — 将内联规则声明写入临时 YAML 配置文件
+ *
+ * 规则文件写在 `os.tmpdir()` 下的一次性目录里，**不写进被测项目**：
+ * 早先写入 `<项目>/.semgrep/inline-*.yml` 且从不清理，实测残留 5+ 个，
+ * 既污染用户仓库（会出现在 git status 里），又因同源内容互相重复
+ * 逼得 jscpd 适配器专门加 `.semgrep` 目录排除来躲重复代码误报。
+ * 调用方在扫描结束（含失败）后应调用 removeInlineRuleFile 清理。
  */
 export class SemgrepRuleWriter {
-  async writeInlineRuleConfig(options: ToolScanOptions, targetDir: string): Promise<string | null> {
+  async writeInlineRuleConfig(options: ToolScanOptions): Promise<string | null> {
     const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
     if (rules && rules.length > 0) {
-      return this.writeInlineRules(targetDir, rules);
+      return this.writeInlineRules(rules);
     }
     return null;
   }
 
-  private async writeInlineRules(targetDir: string, rules: SemgrepRule[]): Promise<string | null> {
+  private async writeInlineRules(rules: SemgrepRule[]): Promise<string | null> {
     if (rules.length === 0) return null;
 
-    // 归一化 targetDir 为绝对路径：相对路径会流入生成的 inline-*.yml 配置路径，
-    // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
-    targetDir = path.resolve(targetDir);
     const semgrepRules: SemgrepRuleYaml[] = rules.map((r, i) => ({
       id: r.id || `inline-rule-${i}`,
       severity: (r.severity || 'WARNING').toUpperCase(),
@@ -90,12 +97,14 @@ export class SemgrepRuleWriter {
       patterns: r.patterns?.map(normalizePatternEntry),
     }));
 
-    const ruleDir = path.join(targetDir, '.semgrep');
     try {
-      await fs.promises.mkdir(ruleDir, { recursive: true });
-      const rulePath = path.join(ruleDir, `inline-${Date.now()}.yml`);
-      const yamlContent = this.buildRuleYaml(semgrepRules);
-      await fs.promises.writeFile(rulePath, yamlContent, 'utf-8');
+      // mkdtemp 保证目录唯一（并发/连续扫描互不覆盖），路径为绝对路径，
+      // 供 semgrep --config 直接消费。
+      const ruleDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), INLINE_RULE_TMP_PREFIX),
+      );
+      const rulePath = path.join(ruleDir, 'inline-rules.yml');
+      await fs.promises.writeFile(rulePath, this.buildRuleYaml(semgrepRules), 'utf-8');
       return rulePath;
     } catch {
       return null;
@@ -196,5 +205,20 @@ export class SemgrepRuleWriter {
       lines.push(`${indent}    metavariable: ${JSON.stringify(m.metavariable)}`);
       lines.push(`${indent}    regex: ${JSON.stringify(m.regex)}`);
     }
+  }
+}
+
+/**
+ * 清理 writeInlineRuleConfig 产生的一次性规则目录。
+ *
+ * 删除的是 mkdtemp 建出来的独立目录（内含单个 inline-rules.yml），
+ * 不会碰到被测项目里的任何文件。清理失败不影响扫描结论，静默忽略。
+ */
+export async function removeInlineRuleFile(rulePath: string | null | undefined): Promise<void> {
+  if (!rulePath) return;
+  try {
+    await fs.promises.rm(path.dirname(rulePath), { recursive: true, force: true });
+  } catch {
+    // 清理失败（权限/已被回收）不应影响扫描结果
   }
 }

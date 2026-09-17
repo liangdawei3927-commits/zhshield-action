@@ -64,6 +64,17 @@ export default tseslint.config(
       },
     },
   },
+  // e2e 测试：page.evaluate 回调在浏览器（Electron renderer）上下文执行，window/document 等
+  // 浏览器全局在此处合法（对齐 Playwright 官方 eslint 配置建议），同时保留 node 全局
+  {
+    files: ['packages/**/e2e/**/*.{ts,js}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
   // AutoPerf P2 perf-* 规则集（底座 B）：用自己的引擎扫自己的代码，每次门禁自动体检。
   // 4 条规则分别对应已修复的真实瓶颈：P0-1 串行 await、P1-7 async 内同步 fs、
   // P0-5 遍历不忽略 node_modules、P1-6 循环内单行 db 写入。

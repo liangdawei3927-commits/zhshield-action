@@ -121,7 +121,8 @@ export function calibrateBudgets(
     if (history.length === 0 || budget.anchorMs === undefined) return budget;
 
     const sorted = history.map((h) => h.elapsed).sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
+    // history.length >= 1（上方已早退），sorted 必非空；?? 0 仅为满足类型收窄的不可达兜底
+    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
     const calibrated = Math.max(budget.anchorMs, median * 1.1);
     const capped = Math.min(calibrated, budget.anchorMs * 5);
 

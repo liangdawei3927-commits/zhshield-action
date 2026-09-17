@@ -77,6 +77,9 @@ export class SopReportMapper {
             : ('out-of-scope' as const)
           : undefined,
       skipDetail: ev.status === 'skipped' && ev.message ? ev.message : undefined,
+      // P1（复查5）：error 的真实原因同样必须透传——此前 error 评估的 message
+      // 被整条丢弃，报告层只剩 `status:'error', issues:[]`（无原因可查）。
+      errorDetail: ev.status === 'error' && ev.message ? ev.message : undefined,
       issues: ev.violations
         ? ev.violations.map((v) => ({
             id: v.id,

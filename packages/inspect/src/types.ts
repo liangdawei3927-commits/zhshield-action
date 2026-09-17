@@ -47,15 +47,28 @@ export interface AdapterResult {
    * 报告层据此如实展示，不再臆断为"语言不适用"（P2）。
    */
   skipDetail?: string;
+  /**
+   * 适配器返回 error 时携带的真实失败原因（透传 ToolResult.error，如
+   * "ESLint couldn't find an eslint.config file" / "dependency-cruiser 执行失败: …"）。
+   *
+   * 与 skipDetail 同源同构、只是分属不同 status：此前只有 skipped 的原因被透传，
+   * error 的原因无处落点 → 报告里只剩 `status:'error', issues:[]`，
+   * 用户看到"工具执行失败"却无从得知为什么失败。报告层/CLI/桌面端据此如实展示。
+   */
+  errorDetail?: string;
   issues: Issue[];
 }
+
+/** 评分等级；降级时 grade 追加 ` [N工具降级]` 后缀（如 `D [3工具降级]`） */
+export type ScoreGrade = 'A' | 'B' | 'C' | 'D';
+export type ScoreGradeLabel = ScoreGrade | `${ScoreGrade} [${number}工具降级]`;
 
 export interface InspectionReport {
   projectId: string;
   timestamp: Date;
   scanType: 'full' | 'incremental' | 'scheduled';
   duration: number;
-  score: { overall: number; grade: 'A' | 'B' | 'C' | 'D' };
+  score: { overall: number; grade: ScoreGradeLabel };
   issues: Issue[];
   summary: { total: number; error: number; warning: number; info: number };
   adapterResults: AdapterResult[];

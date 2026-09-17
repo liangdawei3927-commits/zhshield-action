@@ -53,6 +53,34 @@ function emptyScanOutput(): string {
   return JSON.stringify({ version: '1.172.0', results: [], errors: [] });
 }
 
+/**
+ * 在 execFile 被调用的那一刻抓取内联规则 YAML。
+ *
+ * 规则文件写在 os.tmpdir() 的一次性目录里，scan() 结束（含失败）即清理，
+ * 事后再读必然是 ENOENT —— 只能趁调用当时取样。
+ */
+function captureInlineRuleYaml(): () => string {
+  let captured = '';
+  execFileMock.mockImplementation(((
+    _file: string,
+    args: string[],
+    _opts: unknown,
+    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+  ) => {
+    const i = args.indexOf('--config');
+    const candidate = i >= 0 ? args[i + 1] : '';
+    if (candidate.includes('zhshield-semgrep-')) {
+      try {
+        captured = readFileSync(candidate, 'utf-8');
+      } catch {
+        captured = '';
+      }
+    }
+    cb(null, { stdout: emptyScanOutput(), stderr: OCAML_NOISE_STDERR });
+  }) as never);
+  return () => captured;
+}
+
 function tempProject(withSrc: boolean, withPackages = false): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'semgrep-adapter-'));
   if (withSrc) mkdirSync(path.join(dir, 'src'));
@@ -373,7 +401,7 @@ describe('SemgrepAdapter', () => {
   it('内联规则含 metavariableRegex 时写入 metavariable-regex 块，收紧元变量避免误报', async () => {
     const project = tempProject(true);
     try {
-      mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
+      const inlineYaml = captureInlineRuleYaml();
       await adapter.scan({
         projectPath: project,
         projectId: project,
@@ -397,11 +425,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = scanArgs();
-      const configIndex = args.indexOf('--config');
-      const rulePath = args[configIndex + 1];
-
-      const yaml = readFileSync(rulePath, 'utf-8');
+      const yaml = inlineYaml();
       expect(yaml).toContain('      - pattern: |');
       expect(yaml).toContain('      - metavariable-regex:');
       expect(yaml).toContain('          metavariable: "$USER_INPUT"');
@@ -414,7 +438,7 @@ describe('SemgrepAdapter', () => {
   it('内联规则含 patternEither 时渲染 pattern-either 块，且 patternNot 作为同级排除项', async () => {
     const project = tempProject(true);
     try {
-      mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
+      const inlineYaml = captureInlineRuleYaml();
       await adapter.scan({
         projectPath: project,
         projectId: project,
@@ -435,11 +459,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = scanArgs();
-      const configIndex = args.indexOf('--config');
-      const rulePath = args[configIndex + 1];
-
-      const yaml = readFileSync(rulePath, 'utf-8');
+      const yaml = inlineYaml();
       expect(yaml).toContain('      - pattern-either:');
       expect(yaml).toContain('          - pattern: |');
       expect(yaml).toContain('              const $QUERY = "..." + $INPUT');
@@ -454,7 +474,7 @@ describe('SemgrepAdapter', () => {
   it('内联规则含 patternNot 时渲染受约束 pattern（patterns 序列 + pattern-not）', async () => {
     const project = tempProject(true);
     try {
-      mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
+      const inlineYaml = captureInlineRuleYaml();
       await adapter.scan({
         projectPath: project,
         projectId: project,
@@ -472,11 +492,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = scanArgs();
-      const configIndex = args.indexOf('--config');
-      const rulePath = args[configIndex + 1];
-
-      const yaml = readFileSync(rulePath, 'utf-8');
+      const yaml = inlineYaml();
       expect(yaml).toContain('    patterns:');
       expect(yaml).toContain('      - pattern: |');
       expect(yaml).toContain('      - pattern-not: |');
@@ -489,7 +505,7 @@ describe('SemgrepAdapter', () => {
   it('内联规则含 patternRegex 时渲染顶层 pattern-regex（generic 场景）', async () => {
     const project = tempProject(true);
     try {
-      mockSuccess(emptyScanOutput(), OCAML_NOISE_STDERR);
+      const inlineYaml = captureInlineRuleYaml();
       await adapter.scan({
         projectPath: project,
         projectId: project,
@@ -507,11 +523,7 @@ describe('SemgrepAdapter', () => {
         },
       });
 
-      const args = scanArgs();
-      const configIndex = args.indexOf('--config');
-      const rulePath = args[configIndex + 1];
-
-      const yaml = readFileSync(rulePath, 'utf-8');
+      const yaml = inlineYaml();
       expect(yaml).toContain('    pattern-regex: "Access-Control-Allow-Origin\\\\s*[:=]\\\\s*[*]"');
       expect(yaml).toContain('languages: [generic]');
     } finally {

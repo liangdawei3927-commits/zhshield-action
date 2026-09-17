@@ -177,6 +177,39 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
     }
   });
 
+  it('无 filter（server 场景）时 dist/.turbo 产物变更不产生事件（fs.watch 与轮询一致）', async () => {
+    const root = makeTmpDir();
+    const eventCenter = new EventCenter();
+    const monitor = new FileMonitor(eventCenter);
+    // 模拟 server 启动配置：不传 filter/ignoreDirs，依赖默认 DEFAULT_IGNORE_DIRS
+    monitor.start({ projectId: 'proj-server', watchPaths: [root], intervalMs: 60_000 });
+    try {
+      const distFile = path.join(root, 'dist', 'index.d.ts.map');
+      fs.mkdirSync(path.dirname(distFile), { recursive: true });
+      fs.writeFileSync(distFile, '{"version":3}');
+      const cacheFile = path.join(root, '.turbo', 'cache', 'd7a9144ea07bc21b.tar.zst');
+      fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+      fs.writeFileSync(cacheFile, 'x');
+      const tmpFile = path.join(root, '.turbo', 'cache', '.d7a9144ea07bc21b.tar.zst.13731.11.tmp');
+      fs.writeFileSync(tmpFile, 'x');
+      fs.writeFileSync(path.join(root, '.turbo', 'turbo-build.log'), 'build log');
+      const realFile = path.join(root, 'src', 'app.ts');
+      fs.mkdirSync(path.dirname(realFile), { recursive: true });
+      fs.writeFileSync(realFile, 'console.log(1)');
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      const events = eventCenter.listEvents();
+      expect(events.some((e) => String(e.context?.filePath).includes(path.join('dist', '')))).toBe(
+        false,
+      );
+      expect(events.some((e) => String(e.context?.filePath).includes('.turbo'))).toBe(false);
+      expect(events.some((e) => e.context?.filePath === realFile)).toBe(true);
+    } finally {
+      monitor.stop();
+    }
+  });
+
   it('同一 mtime 的重复 fs.watch 事件被去重（原子保存只产生一个事件）', async () => {
     const root = makeTmpDir();
     const eventCenter = new EventCenter();

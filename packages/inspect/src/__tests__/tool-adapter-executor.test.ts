@@ -106,6 +106,28 @@ describe('ToolAdapterExecutor skipped/unavailable 语义分离（ADR #7 + C4 分
     expect(results[0].skipDetail).toBe('Semgrep 规则目录不存在，请先同步云脑规则');
   });
 
+  // P1（复查5）：error 的真实原因此前被丢弃，报告层只剩 status:'error' + issues:[]，
+  // 用户看到"工具执行失败"却无从得知为什么失败。
+  it('Given 适配器返回 error 且带 error（真实原因），When runAll，Then 透传 errorDetail', async () => {
+    const { deps } = makeDeps();
+    const executor = new ToolAdapterExecutor(deps);
+    const adapter: ToolAdapter = {
+      ...makeAdapter('eslint', 'inspect', 'error'),
+      scan: vi.fn().mockResolvedValue({
+        tool: 'eslint',
+        status: 'error',
+        issues: [],
+        metadata: { version: '', duration: 1, timestamp: new Date(), fileCount: 0 },
+        error: "ESLint couldn't find an eslint.config.(js|mjs|cjs) file.",
+      } satisfies ToolResult),
+    };
+
+    const results = await executor.runAll(new Map([['eslint', adapter]]), 'proj-1');
+
+    expect(results[0].status).toBe('error');
+    expect(results[0].errorDetail).toBe("ESLint couldn't find an eslint.config.(js|mjs|cjs) file.");
+  });
+
   it('Given 工具返回 error，When runAll，Then 失败：passed=false、degraded 不标记，且 escalate 真实错误', async () => {
     const { deps, escalation } = makeDeps();
     const executor = new ToolAdapterExecutor(deps);

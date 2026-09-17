@@ -382,6 +382,8 @@ interface DuplicateBlock {
   files: [string, string];
   lines: [number, number];
   code: string;
+  /** 该重复区实际覆盖的行数（合并前等于 minLines；合并相邻窗口后为真实行数） */
+  lineCount: number;
 }
 
 export function findDuplicateCodeBlocks(
@@ -389,7 +391,82 @@ export function findDuplicateCodeBlocks(
   minLines: number = 6,
 ): DuplicateBlock[] {
   const blocks = collectCodeBlocks(files, minLines);
-  return findDuplicatePairs(blocks).slice(0, 50);
+  // 先合并再截断：截断必须落在「重复区」粒度上，否则会把同一段重复区切成
+  // 多条并挤掉后面真正不同的重复区
+  return mergeDuplicateRegions(findDuplicatePairs(blocks, minLines)).slice(0, 50);
+}
+
+/**
+ * 合并「同一段重复区被滑动窗口切成多条」的记录。
+ *
+ * collectCodeBlocks 按 1 行步进取定长窗口，因此两侧同步重复 l 行时会产出
+ * l - minLines + 1 条记录（两侧起始行同时 +1，形成连续序列）。若不合并，
+ * 一段 20 行的重复代码会产生 15 条记录、每侧各报一次 = 30 条，用户看到的是
+ * 被放大的问题数而非真实重复区数。这里把连续序列并成一条。
+ */
+function mergeDuplicateRegions(pairs: DuplicateBlock[]): DuplicateBlock[] {
+  // 按文件对分组：只有同一对文件内的记录才可能属于同一重复区
+  const groups = new Map<string, DuplicateBlock[]>();
+  for (const p of pairs) {
+    const key = `${p.files[0]}\u0000${p.files[1]}`;
+    const list = groups.get(key);
+    if (list) list.push(p);
+    else groups.set(key, [p]);
+  }
+
+  const merged: DuplicateBlock[] = [];
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.lines[0] - b.lines[0] || a.lines[1] - b.lines[1]);
+
+    let head = list[0];
+    let lastStart0 = head.lines[0];
+    let lastStart1 = head.lines[1];
+
+    for (let i = 1; i < list.length; i++) {
+      const next = list[i];
+      // 已被当前区覆盖（同一侧与另一侧起始行都不前进）
+      if (next.lines[0] <= lastStart0 && next.lines[1] <= lastStart1) continue;
+      // 两侧同步 +1 → 同一重复区的下一个窗口
+      if (next.lines[0] === lastStart0 + 1 && next.lines[1] === lastStart1 + 1) {
+        lastStart0 = next.lines[0];
+        lastStart1 = next.lines[1];
+        continue;
+      }
+      merged.push(withRegionLineCount(head, lastStart0));
+      head = next;
+      lastStart0 = next.lines[0];
+      lastStart1 = next.lines[1];
+    }
+    merged.push(withRegionLineCount(head, lastStart0));
+  }
+
+  return merged;
+}
+
+/** 由首窗口起始行与末窗口起始行还原重复区的真实行数 */
+function withRegionLineCount(head: DuplicateBlock, lastStart: number): DuplicateBlock {
+  return { ...head, lineCount: lastStart - head.lines[0] + head.lineCount };
+}
+
+/** 两两比较不同文件的归一化块，找出重复片段 */
+function findDuplicatePairs(blocks: CodeBlock[], minLines: number): DuplicateBlock[] {
+  const dups: DuplicateBlock[] = [];
+
+  for (let i = 0; i < blocks.length; i++) {
+    for (let j = i + 1; j < blocks.length; j++) {
+      if (blocks[i].file === blocks[j].file) continue;
+      if (blocks[i].normalized === blocks[j].normalized) {
+        dups.push({
+          files: [blocks[i].file, blocks[j].file],
+          lines: [blocks[i].startLine, blocks[j].startLine],
+          code: blocks[i].normalized.slice(0, 80),
+          lineCount: minLines,
+        });
+      }
+    }
+  }
+
+  return dups;
 }
 
 /** 滑动窗口收集各文件的归一化代码块 */
@@ -413,26 +490,6 @@ function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
   }
 
   return blocks;
-}
-
-/** 两两比较不同文件的归一化块，找出重复片段 */
-function findDuplicatePairs(blocks: CodeBlock[]): DuplicateBlock[] {
-  const dups: DuplicateBlock[] = [];
-
-  for (let i = 0; i < blocks.length; i++) {
-    for (let j = i + 1; j < blocks.length; j++) {
-      if (blocks[i].file === blocks[j].file) continue;
-      if (blocks[i].normalized === blocks[j].normalized) {
-        dups.push({
-          files: [blocks[i].file, blocks[j].file],
-          lines: [blocks[i].startLine, blocks[j].startLine],
-          code: blocks[i].normalized.slice(0, 80),
-        });
-      }
-    }
-  }
-
-  return dups;
 }
 
 function normalizeCode(code: string): string {

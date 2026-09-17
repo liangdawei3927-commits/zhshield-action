@@ -1769,12 +1769,14 @@ function cancelDomainTask(manager: TaskManager, domainKey: string, projectPath: 
  * 一键全检（engine:runFullCheck）：默认读 dashboard-state.json，仅重跑 lastRunAt 距今 >24h 的域；
  * force:true 时全量 8 域。严格按序执行（并发=1，8GB 机器红线，方案 §3.3 ③ / §六）。
  * guard/inspect/security 未在 dashboard-state.json 中跟踪 lastRunAt → 默认模式下始终重跑。
+ * 返回语义：ok=true 表示全检流程完整执行（所有域均完成或已做新鲜度判断），
+ * 没有任何域重跑（reran 空）也属于成功（数据已新鲜）；单域失败进 failed，不判整体失败。
  */
 async function runFullCheckHandler(
   manager: TaskManager,
   projectPath: string,
   options?: { force?: boolean },
-): Promise<{ ok: boolean; reran: string[]; skipped: string[]; error?: string }> {
+): Promise<{ ok: boolean; reran: string[]; skipped: string[]; failed?: string[]; error?: string }> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
@@ -1830,6 +1832,7 @@ async function runFullCheckHandler(
 
     const reran: string[] = [];
     const skipped: string[] = [];
+    const failed: string[] = [];
     for (const domain of domains) {
       if (!force && !domain.stale) {
         skipped.push(domain.key);
@@ -1844,10 +1847,11 @@ async function runFullCheckHandler(
           err instanceof Error ? err.message : String(err),
         );
         cancelDomainTask(manager, domain.key, projectPath);
-        skipped.push(domain.key);
+        failed.push(domain.key);
       }
     }
-    return { ok: reran.length > 0, reran, skipped };
+    // ok=true：全检流程已完成（无论是否有域重跑/失败）；单域失败单独上报 failed
+    return { ok: true, reran, skipped, failed };
   } catch (err) {
     console.error('[engine:runFullCheck] Error:', err instanceof Error ? err.message : String(err));
     return {

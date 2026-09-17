@@ -52,6 +52,31 @@ const performanceRules = {
   'perf/perf-no-sync-fs-hotpath': 'warn',
   'perf/perf-walk-requires-ignore': 'warn',
   'perf/perf-batch-db-write': 'warn',
+
+  // ── 内置 no-restricted-syntax：三重嵌套循环 + 通用同步 IO ──
+  'no-restricted-syntax': [
+    'warn',
+    {
+      selector: 'ForStatement ForStatement ForStatement',
+      message: '三重及以上嵌套循环可能导致 O(n³) 或更高复杂度，建议提取子循环为独立函数或改用 Map/Set 查找',
+    },
+    {
+      selector: 'WhileStatement WhileStatement WhileStatement',
+      message: '三重及以上嵌套循环可能导致 O(n³) 或更高复杂度，建议提取子循环为独立函数或改用 Map/Set 查找',
+    },
+    {
+      selector: 'DoWhileStatement DoWhileStatement DoWhileStatement',
+      message: '三重及以上嵌套循环可能导致 O(n³) 或更高复杂度，建议提取子循环为独立函数或改用 Map/Set 查找',
+    },
+    {
+      selector: 'CallExpression[callee.property.name="readFileSync"]',
+      message: '同步文件读取(readFileSync)会阻塞事件循环，建议使用 fs/promises 或 Stream',
+    },
+    {
+      selector: 'CallExpression[callee.property.name="writeFileSync"]',
+      message: '同步文件写入(writeFileSync)会阻塞事件循环，建议使用 fs/promises 或 Stream',
+    },
+  ],
 };
 
 const performancePlugins = {
@@ -68,9 +93,27 @@ const performancePlugins = {
 };
 
 export default [
-  // 全局忽略：build 产物与依赖
+  // 全局忽略：build 产物与依赖。
+  // 性能规则作用域与根 eslint.config.mjs 的 perf 块保持一致，仅针对生产代码：
+  // 测试/脚本/e2e 属测试惯用法与一次性工具，非热路径，不适用
+  // （根配置注释：曾误报 270 处测试违规）；eslint-rules 为规则自身实现亦不适用。
   {
-    ignores: ['**/dist/**', '**/dist-electron/**', '**/node_modules/**'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/dist-electron/**',
+      '**/coverage/**',
+      '**/release/**',
+      '**/.turbo/**',
+      '**/build/**',
+      'packages/**/__tests__/**',
+      'packages/**/*.test.{ts,tsx,mjs,js,cjs}',
+      'packages/**/*.spec.{ts,tsx,mjs,js,cjs}',
+      'packages/**/e2e/**',
+      'packages/**/scripts/**',
+      'scripts/**',
+      'eslint-rules/**',
+    ],
   },
   // JS/JSX/MJS/CJS 源码
   {

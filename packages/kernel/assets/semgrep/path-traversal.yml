@@ -36,18 +36,65 @@ rules:
       - javascript
       - typescript
     severity: WARNING
+    # 仅当 join/resolve 的首参或尾参为非常量（变量/表达式/调用）时才命中：
+    # 全字面量路径（path.join('a','b')）与数组拼接（arr.join(',')）非用户可控输入，
+    # 不构成 CWE-22 攻击面；常量标识符（__dirname、模块级 const）残余误报
+    # 通过 paths.exclude 允许列表收敛。metavariable-regex 的 ^ 锚定 + 负向前瞻
+    # 排除字符串/模板字面量，未被绑定的 metavariable 分支自动跳过。
     patterns:
       - pattern-either:
-          - pattern: path.join(...)
-          - pattern: path.resolve(...)
-          - pattern: join(...)
-          - pattern: resolve(...)
+          - patterns:
+              - pattern: path.join($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: path.join(..., $ARG)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: path.resolve($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: path.resolve(..., $ARG)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: join($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: join(..., $ARG)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: resolve($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
+          - patterns:
+              - pattern: resolve(..., $ARG)
+              - metavariable-regex:
+                  metavariable: $ARG
+                  regex: "^(?!['\"`])"
     paths:
       exclude:
         - "**/__tests__/**"
         - "**/*.test.ts"
         - "**/*.spec.ts"
-        - "packages/shared/src/path-augment.ts"   # 受控 PATH 补全器，非攻击面
+        # —— 非发布 / 测试 fixture / 受控工具目录（对应头注释的收敛策略）——
+        - "packages/**/scripts/**"
+        - "scripts/**"
+        - "**/fixtures/**"
+        - "**/vitest.config.*"
+        - "packages/shared/src/security/safe-path.ts"  # 规则推荐实现自身内部，非攻击面
+        - "packages/shared/src/path-augment.ts"  # 受控 PATH 补全器，非攻击面
         # —— 分诊报告 P3 非发布项（允许列表，与报告 §3.8 对应）——
         - "packages/fingerprint/src/__tests__/scoring-profile.test.ts"
         - "packages/sentinel/src/__tests__/log-collector.test.ts"

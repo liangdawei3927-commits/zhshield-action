@@ -283,11 +283,14 @@ export interface DashboardOverview {
   generatedAt: string;
 }
 
-/** 一键全检执行结果（engine:runFullCheck 返回值：已重跑 / 已跳过域列表） */
+/** 一键全检执行结果（engine:runFullCheck 返回值：已重跑 / 已跳过 / 已失败域列表） */
 export interface RunFullCheckResult {
+  /** 全检流程是否完整执行（数据全新鲜导致无域重跑也是 true） */
   ok: boolean;
   reran: string[];
   skipped: string[];
+  /** 尝试执行但失败的域（超时/异常被熔断） */
+  failed?: string[];
   error?: string;
 }
 

@@ -141,14 +141,28 @@ export function toInspectionReportData(r: InspectionReport): InspectionReportDat
       source: a.adapterId,
     }));
 
+  // P1（复查5）：status==='error' 且没有产出任何 issue 的适配器，此前在桌面端
+  // 完全不可见（既不是覆盖率缺口，issueChecks 里也没有它）→ 用户看到"巡检完成、
+  // 分数 100"，却不知道有几个工具其实跑挂了。补成 fail 检查项并带上真实原因。
+  const failedChecks = r.adapterResults
+    .filter((a) => a.status === 'error' && a.issueCount === 0 && (a.issues?.length ?? 0) === 0)
+    .map((a) => ({
+      id: `adapter-error:${a.adapterId}`,
+      name: a.adapterName,
+      status: 'fail' as const,
+      detail: `${a.adapterName} 执行失败，未产出检测结果：${a.errorDetail ?? '未提供失败原因'}`,
+      category: undefined,
+      source: a.adapterId,
+    }));
+
   return {
     summary: {
       total: r.summary.total,
       passed: r.summary.info,
       warnings: r.summary.warning,
-      failures: r.summary.error,
+      failures: r.summary.error + failedChecks.length,
     },
-    checks: [...issueChecks, ...attentionChecks],
+    checks: [...issueChecks, ...failedChecks, ...attentionChecks],
     metadata: {
       duration: r.duration,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),

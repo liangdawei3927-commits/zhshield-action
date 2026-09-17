@@ -1006,7 +1006,8 @@
         "failed": "점검 실행 실패: {{error}}",
         "foundIssues": "점검 완료: 문제 {{count}}건 발견",
         "fullCheckDone": "전체 검사 완료: {{count}}건 재실행",
-        "noValidItems": "점검이 완료되었지만 유효한 검사 항목이 실행되지 않았습니다 (프로젝트 경로를 확인하세요)"
+        "noValidItems": "점검이 완료되었지만 유효한 검사 항목이 실행되지 않았습니다 (프로젝트 경로를 확인하세요)",
+        "partialFailed": "일부 점검 실패: {{domains}}"
       },
       "welcome": "ZhiYun Shield에 오신 것을 환영합니다"
     },
@@ -1214,6 +1215,7 @@
       },
       "summary": "쓰레기 {{count}}개 · 확보 가능 {{size}}",
       "type": {
+        "buildArtifact": "빌드 산출물",
         "deadCode": "죽은 코드",
         "duplicateCode": "중복 코드",
         "unusedDependency": "미사용 의존성",

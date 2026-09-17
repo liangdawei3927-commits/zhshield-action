@@ -1006,7 +1006,8 @@
         "failed": "体检执行失败: {{error}}",
         "foundIssues": "体检完成：发现 {{count}} 项问题",
         "fullCheckDone": "全检完成：重跑 {{count}} 项检查",
-        "noValidItems": "体检完成，但未执行到有效检查项（请确认项目路径）"
+        "noValidItems": "体检完成，但未执行到有效检查项（请确认项目路径）",
+        "partialFailed": "部分检查失败：{{domains}}"
       },
       "welcome": "欢迎使用智汇码盾"
     },
@@ -1214,6 +1215,7 @@
       },
       "summary": "{{count}} 项垃圾 · 可释放 {{size}}",
       "type": {
+        "buildArtifact": "构建产物",
         "deadCode": "死代码",
         "duplicateCode": "重复代码",
         "unusedDependency": "未用依赖",

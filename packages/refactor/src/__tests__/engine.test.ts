@@ -249,4 +249,26 @@ describe('duplicated-code regression', () => {
     ]);
     expect(smells).toBeGreaterThanOrEqual(1);
   });
+
+  it('同一重复区的连续滑窗合并为一条/文件，不再逐窗口重复计数', async () => {
+    const engine = new RefactorEngine({ enabledRules: ['duplicated-code'] });
+    const report = await engine.analyzeFiles('/tmp', [
+      path.join(FIXTURES_DIR, 'dup-real-a.fixture.ts'),
+      path.join(FIXTURES_DIR, 'dup-real-b.fixture.ts'),
+    ]);
+    const smells = report.files.flatMap((f) =>
+      f.smells.filter((s) => s.ruleId === 'duplicated-code'),
+    );
+
+    // 两个夹具共用同一段 14 行实现 → 每侧各 1 条。
+    // 修复前：定长窗口按 1 行步进，该段被切成 14-5+1=10 个窗口 → 每侧 10 条、共 20 条，
+    // 用户看到的是被放大的问题数（实测导航 fixture 上 62 条 → 4 条）。
+    expect(smells).toHaveLength(2);
+    for (const s of smells) {
+      expect(s.context.metric).toBe('duplicateLines');
+      // value 必须是重复区行数（此前误用 dup.code.length = 截断到 80 的归一化字符数）
+      expect(s.context.value).toBe(14);
+      expect(s.location.endLine - s.location.line + 1).toBe(14);
+    }
+  });
 });

@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import type {
   ToolAdapter,
   ToolMeta,
@@ -12,7 +11,7 @@ import type {
   IssueCategory,
   AccessScope,
 } from '@zh/shared';
-import { resolveEslintTargetDir } from '@zh/shared';
+import { resolveEslintConfigPath, resolveEslintTargetDir } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
 import { resolveInjectedConfigPath } from './injected-config';
@@ -150,6 +149,18 @@ export class ESLintAdapter implements ToolAdapter {
       }
       // ESLint v9 中 --no-eslintrc 已移除；--config 指定 flat config 即不再查找其他配置
       args.unshift('--config', configPath);
+      return { args };
+    }
+
+    // 无注入配置时必须落到项目自身的配置：ESLint v9+ 在找不到 eslint.config.* 时
+    // 会以非零退出并打印 "couldn't find an eslint.config.(js|mjs|cjs) file"。
+    // 那是「没得查」，不是「查出问题」——归入 unavailable（跳过），不要让它变成 error。
+    if (!resolveProjectEslintConfig(projectPath)) {
+      return {
+        args,
+        unavailable:
+          '项目未检测到 ESLint 配置（eslint.config.* / .eslintrc.*），已跳过该检查（不参与评分）',
+      };
     }
 
     return { args };
@@ -247,19 +258,11 @@ export class ESLintAdapter implements ToolAdapter {
   }
 }
 
-/** 项目自身实际存在的 ESLint 配置文件（flat config 优先，legacy eslintrc 兜底） */
+/**
+ * 项目自身实际存在的 ESLint 配置文件路径（flat config 优先，legacy eslintrc 兜底）。
+ *
+ * 统一走 @zh/shared 的候选名清单，避免此处另立一份（此前漏掉了 eslint.config.ts/.mts/.cts）。
+ */
 function resolveProjectEslintConfig(projectPath: string): string | null {
-  const candidates = [
-    'eslint.config.mjs',
-    'eslint.config.cjs',
-    'eslint.config.js',
-    '.eslintrc.cjs',
-    '.eslintrc.js',
-    '.eslintrc.json',
-  ];
-  for (const name of candidates) {
-    const p = path.join(projectPath, name);
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
+  return resolveEslintConfigPath(projectPath) ?? null;
 }

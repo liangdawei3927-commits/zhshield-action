@@ -10,6 +10,7 @@ export const GARBAGE_TYPE_LABEL: Record<string, string> = {
   'unused-dependency': 'page.garbage.type.unusedDependency',
   'dead-code': 'page.garbage.type.deadCode',
   'duplicate-code': 'page.garbage.type.duplicateCode',
+  'build-artifact': 'page.garbage.type.buildArtifact',
 };
 
 export function formatSize(bytes: number): string {

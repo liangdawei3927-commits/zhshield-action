@@ -4,7 +4,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
-    "types": ["node"]
+    "types": ["node"],
+    // P7 试点：索引访问必须显式处理 undefined（其余包按批次启用 noUncheckedIndexedAccess）
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src"],
   "exclude": ["src/__tests__"]

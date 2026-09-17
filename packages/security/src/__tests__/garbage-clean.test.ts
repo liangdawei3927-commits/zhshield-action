@@ -9,6 +9,47 @@ function tmpProject(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'zh-clean-'));
 }
 
+describe('scanGarbage', () => {
+  it('detects root-level build-artifact dirs as single items plus junk files', async () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'coverage'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.cache'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dist', 'bundle.js'), 'x'.repeat(20 * 1024));
+    fs.writeFileSync(path.join(dir, 'coverage', 'lcov.info'), 'x'.repeat(15 * 1024));
+    fs.writeFileSync(path.join(dir, '.cache', 'blob.bin'), 'x'.repeat(12 * 1024));
+    fs.writeFileSync(path.join(dir, '.DS_Store'), 'x');
+    fs.writeFileSync(path.join(dir, 'src', 'old.log'), 'x');
+
+    const items = await scanGarbage(dir);
+
+    const artifacts = items.filter((i) => i.type === 'build-artifact');
+    expect(artifacts.map((i) => i.path).sort()).toEqual(['.cache', 'coverage', 'dist']);
+    expect(artifacts.find((i) => i.path === 'dist')?.size).toBe(20 * 1024);
+    expect(artifacts.find((i) => i.path === 'coverage')?.size).toBe(15 * 1024);
+    expect(artifacts.find((i) => i.path === '.cache')?.size).toBe(12 * 1024);
+    expect(artifacts.every((i) => i.reason.includes('构建产物'))).toBe(true);
+
+    const junk = items.filter((i) => i.type === 'unused-file');
+    expect(junk.map((i) => i.path).sort()).toEqual(['.DS_Store', 'src/old.log']);
+
+    expect(items).toHaveLength(5);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not treat nested build-artifact dirs as garbage', async () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'src', 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src', 'dist', 'bundle.js'), 'x'.repeat(1024));
+
+    const items = await scanGarbage(dir);
+
+    expect(items.filter((i) => i.type === 'build-artifact')).toHaveLength(0);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe('cleanGarbage', () => {
   it('moves selected files into .zhshield/trash and removes originals', async () => {
     const dir = tmpProject();
@@ -25,6 +66,21 @@ describe('cleanGarbage', () => {
       true,
     );
     expect(fs.existsSync(path.join(dir, 'keep.ts'))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('moves build-artifact dirs into trash', async () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dist', 'bundle.js'), 'x'.repeat(1024));
+    const items = (await scanGarbage(dir)).filter((i) => i.type === 'build-artifact');
+
+    const result = cleanGarbage(dir, items);
+
+    expect(result.cleaned).toHaveLength(1);
+    expect(result.failed).toHaveLength(0);
+    expect(fs.existsSync(path.join(dir, 'dist'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.zhshield', 'trash', result.batchId, 'dist'))).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 

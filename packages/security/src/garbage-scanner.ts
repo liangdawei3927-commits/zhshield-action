@@ -8,6 +8,10 @@ import { safeJoin, safeJoinReal, safeResolveReal } from '@zh/shared';
 const IGNORE_DIRS = new Set([
   'node_modules',
   '.git',
+]);
+
+/** 可再生成的构建产物根目录（仅项目根级识别，嵌套同名目录不视为垃圾） */
+const BUILD_ARTIFACT_DIRS = new Set([
   'dist',
   'build',
   '.next',
@@ -63,12 +67,47 @@ function scanDirectory(dir: string, projectPath: string, items: GarbageItem[], d
   for (const entry of entries) {
     const fullPath = safeJoin(dir, entry.name);
     if (entry.isDirectory()) {
+      if (depth === 0 && BUILD_ARTIFACT_DIRS.has(entry.name)) {
+        items.push(collectBuildArtifactItem(entry, fullPath, projectPath));
+        continue;
+      }
       if (!IGNORE_DIRS.has(entry.name)) scanDirectory(fullPath, projectPath, items, depth + 1);
       continue;
     }
     if (!entry.isFile()) continue;
     collectFileItem(entry, fullPath, projectPath, items);
   }
+}
+
+function collectBuildArtifactItem(
+  entry: fs.Dirent,
+  fullPath: string,
+  projectPath: string,
+): GarbageItem {
+  return {
+    id: randomUUID(),
+    type: 'build-artifact',
+    path: path.relative(projectPath, fullPath),
+    size: dirSize(fullPath),
+    reason: '可再生成的构建产物目录',
+  };
+}
+
+function dirSize(dir: string): number {
+  let total = 0;
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = safeJoin(dir, entry.name);
+      if (entry.isDirectory()) {
+        total += dirSize(full);
+      } else if (entry.isFile()) {
+        total += fs.statSync(full).size;
+      }
+    }
+  } catch {
+    return 0;
+  }
+  return total;
 }
 
 function collectFileItem(
@@ -114,7 +153,9 @@ export interface GarbageCleanInput {
 }
 
 function isGarbageType(value: string): value is GarbageType {
-  return ['unused-file', 'unused-dependency', 'dead-code', 'duplicate-code'].includes(value);
+  return ['unused-file', 'unused-dependency', 'dead-code', 'duplicate-code', 'build-artifact'].includes(
+    value,
+  );
 }
 
 export const scanGarbage = (projectPath: string): Promise<GarbageItem[]> =>

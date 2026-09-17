@@ -18,6 +18,7 @@ export const CLEANABLE_TYPES: ReadonlySet<string> = new Set([
   'unused-file',
   'dead-code',
   'duplicate-code',
+  'build-artifact',
 ]);
 
 export function isCleanableType(type: string): boolean {

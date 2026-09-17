@@ -13,6 +13,7 @@ import { isCommandAvailable } from './tool-available';
 import { resolveInjectedConfigPath } from './injected-config';
 import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
+import { removeInlineRuleFile } from './semgrep-rule-writer';
 
 const META: ToolMeta = {
   id: 'semgrep',
@@ -105,10 +106,15 @@ export class SemgrepAdapter implements ToolAdapter {
     const unavailable = this.checkConfigAvailability(declaredConfigs, configs, rules);
     if (unavailable) return this.runner.buildUnavailable(start, unavailable);
 
-    const args = await this.argsBuilder.build(options, configs, targetDir);
+    const { args, ruleFile } = await this.argsBuilder.build(options, configs, targetDir);
     // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
     const command = await this.resolveCommand(options.projectPath);
-    return this.runner.run(command, options, args, category, start);
+    try {
+      return await this.runner.run(command, options, args, category, start);
+    } finally {
+      // 内联规则写在系统临时目录：扫描一结束（含抛错）就清掉，避免临时文件堆积
+      await removeInlineRuleFile(ruleFile);
+    }
   }
 
   /** 解析扫描目标、类别与规则配置 */

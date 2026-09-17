@@ -154,16 +154,26 @@ export class StageSectionFormatter {
       }
 
       if (trulyFailed.length > 0) {
-        const names = trulyFailed.map((r) => this.fmt.red(r.adapterName)).join('、');
-        lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${names} (错误详情已在 issues 中)`);
+        // P1（复查5）：此前无条件写"(错误详情已在 issues 中)"，但 status==='error' 且
+        // issues 为空的适配器（ESLint 缺配置 / dep-cruiser 解析失败）根本没有 issue，
+        // 这句是假承诺 → 改为优先展示 errorDetail 真实原因。
+        const parts = trulyFailed.map((r) => {
+          const reason = r.errorDetail ?? '未提供失败原因';
+          return `${this.fmt.red(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
+        });
+        lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${parts.join('  ')}`);
       }
     }
 
     if (skipped.length > 0) {
       const parts = skipped.map((r) => {
-        const reason = r.skipDetail ?? (r.skipReason === 'out-of-scope' ? '画像裁剪，已跳过'
-          : r.skipReason === 'degraded' ? '降级运行'
-          : '已跳过');
+        const reason =
+          r.skipDetail ??
+          (r.skipReason === 'out-of-scope'
+            ? '画像裁剪，已跳过'
+            : r.skipReason === 'degraded'
+              ? '降级运行'
+              : '已跳过');
         return `${this.fmt.gray(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
       });
       lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);

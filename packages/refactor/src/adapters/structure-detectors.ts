@@ -203,7 +203,9 @@ export function detectDuplicateCode(
         line: dup.lines[0],
         column: 1,
         metric: 'duplicateLines',
-        value: dup.code.length,
+        // 值为重复区实际行数（原本误用 dup.code.length —— 那是被截断到 80 的
+        // 归一化字符数，与 metric 名 duplicateLines 语义不符，且恒不超 80）
+        value: dup.lineCount,
         threshold: minLines,
         suggestion: {
           type: 'Extract Common Function',
@@ -212,7 +214,7 @@ export function detectDuplicateCode(
           effort: 'medium',
           autoFixable: false,
         },
-        endLine: dup.lines[0] + minLines,
+        endLine: dup.lines[0] + dup.lineCount - 1,
       }),
     );
   }

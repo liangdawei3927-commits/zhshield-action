@@ -12,6 +12,7 @@ import {
   type GitHubBackupConfig,
   type LocalBackupConfig,
   type BackupScheduleConfig,
+  DEFAULT_BACKUP_ROOT,
   defaultBackupConfig,
 } from './types';
 import { safeJoinReal } from '@zh/shared';
@@ -24,7 +25,7 @@ export interface BackupGlobalConfig {
 }
 
 export const DEFAULT_GLOBAL_CONFIG: BackupGlobalConfig = {
-  defaultBackupDir: path.join(os.homedir(), 'zhshield-backups'),
+  defaultBackupDir: DEFAULT_BACKUP_ROOT,
   defaultMaxBackups: 10,
   autoBackupEnabled: false,
   notifyOnComplete: true,
@@ -37,21 +38,32 @@ const GLOBAL_CONFIG_FILE = '.zhshield-backup-global.json';
 export class BackupConfigManager {
   private globalConfig: BackupGlobalConfig;
   private globalConfigPath: string;
+  /** 构造时显式传入的默认备份目录（显式注入优先于持久化文件，便于测试与程序化覆盖） */
+  private explicitDefaultBackupDir?: string;
 
-  constructor(globalConfig?: Partial<BackupGlobalConfig>) {
+  /**
+   * @param globalConfig 全局默认配置（显式注入的 defaultBackupDir 优先于持久化文件）
+   * @param options.globalConfigPath 覆盖全局配置文件位置（测试用，避免读到开发机真实 home）
+   */
+  constructor(globalConfig?: Partial<BackupGlobalConfig>, options?: { globalConfigPath?: string }) {
     this.globalConfig = { ...DEFAULT_GLOBAL_CONFIG, ...globalConfig };
-    this.globalConfigPath = path.join(os.homedir(), GLOBAL_CONFIG_FILE);
+    this.globalConfigPath = options?.globalConfigPath ?? path.join(os.homedir(), GLOBAL_CONFIG_FILE);
+    this.explicitDefaultBackupDir = globalConfig?.defaultBackupDir;
   }
 
   // ─── 项目配置 ───────────────────────────────────────────
 
   /**
    * 从项目根目录加载备份配置
-   * 如果文件不存在，返回按项目隔离的默认配置（projectName 仅影响子目录可读名）
+   * 如果文件不存在，返回按项目隔离的默认配置（projectName 仅影响子目录可读名；
+   * 根目录取自生效的全局配置 defaultBackupDir）
    */
   async loadProjectConfig(projectRoot: string, projectName?: string): Promise<BackupConfig> {
     const configPath = this.projectConfigPath(projectRoot);
-    const def = defaultBackupConfig({ projectPath: projectRoot, projectName });
+    const def = defaultBackupConfig(
+      { projectPath: projectRoot, projectName },
+      await this.resolveGlobalBackupDir(),
+    );
     try {
       const raw = await fs.readFile(configPath, 'utf-8');
       const parsed = yaml.load(raw) as Record<string, unknown>;
@@ -88,21 +100,41 @@ export class BackupConfigManager {
   // ─── 全局配置 ───────────────────────────────────────────
 
   async loadGlobalConfig(): Promise<BackupGlobalConfig> {
-    try {
-      const raw = await fs.readFile(this.globalConfigPath, 'utf-8');
-      return { ...DEFAULT_GLOBAL_CONFIG, ...JSON.parse(raw) };
-    } catch {
-      return { ...DEFAULT_GLOBAL_CONFIG };
-    }
+    const persisted = await this.readPersistedGlobalConfig();
+    return { ...DEFAULT_GLOBAL_CONFIG, ...this.globalConfig, ...persisted };
   }
 
   async saveGlobalConfig(config: Partial<BackupGlobalConfig>): Promise<void> {
     this.globalConfig = { ...this.globalConfig, ...config };
+    if (config.defaultBackupDir) this.explicitDefaultBackupDir = config.defaultBackupDir;
     await fs.writeFile(this.globalConfigPath, JSON.stringify(this.globalConfig, null, 2), 'utf-8');
   }
 
   getGlobalConfig(): BackupGlobalConfig {
     return { ...this.globalConfig };
+  }
+
+  /**
+   * 生效的默认备份根目录（loadProjectConfig 生成默认值时的根）。
+   *
+   * 优先级：构造时显式注入 > 持久化的全局配置文件（用户显式设置）> 内置默认。
+   * 未设置时三者同为 '~/zhshield-backups'，故行为与旧版一致。
+   */
+  private async resolveGlobalBackupDir(): Promise<string> {
+    if (this.explicitDefaultBackupDir) return this.explicitDefaultBackupDir;
+    const persisted = await this.readPersistedGlobalConfig();
+    return persisted?.defaultBackupDir ?? this.globalConfig.defaultBackupDir;
+  }
+
+  /** 读取持久化的全局配置；文件不存在或损坏时返回 null（交由调用方决定回退） */
+  private async readPersistedGlobalConfig(): Promise<Partial<BackupGlobalConfig> | null> {
+    try {
+      const raw = await fs.readFile(this.globalConfigPath, 'utf-8');
+      const parsed = JSON.parse(raw) as unknown;
+      return parsed && typeof parsed === 'object' ? (parsed as Partial<BackupGlobalConfig>) : null;
+    } catch {
+      return null;
+    }
   }
 
   // ─── 私有 ───────────────────────────────────────────────

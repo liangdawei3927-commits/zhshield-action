@@ -158,4 +158,10 @@ export {
   safeResolveReal,
   PathTraversalError,
 } from './security/safe-path';
-export { hasEslintConfig, resolveEslintTargetDir } from './eslint-config';
+export {
+  ESLINT_CONFIG_NAMES,
+  findEslintConfigDir,
+  hasEslintConfig,
+  resolveEslintConfigPath,
+  resolveEslintTargetDir,
+} from './eslint-config';

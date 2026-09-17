@@ -89,6 +89,28 @@ describe('SopReportMapper.buildAdapterResults — degraded/跳过原因透传（
     expect(adapters.every((a) => a.degraded === false)).toBe(true);
   });
 
+  // P1（复查5）：error 评估的 message 此前被整条丢弃，报告层只剩 status:'error' + issues:[]
+  it('Given error 评估且带 message，When 映射，Then errorDetail=原因（不再是无原因的黑洞）', () => {
+    const r = report([
+      evaluation({
+        rule: rule('inspect.scan.depcruiser.circular-dependency'),
+        status: 'error',
+        message: '工具 dep-cruiser 错误: dep-cruiser 未扫描到任何模块（modules=0）',
+      }),
+    ]);
+    const [adapter] = mapper.buildAdapterResults(r);
+    expect(adapter.status).toBe('error');
+    expect(adapter.errorDetail).toBe(
+      '工具 dep-cruiser 错误: dep-cruiser 未扫描到任何模块（modules=0）',
+    );
+    expect(adapter.skipDetail).toBeUndefined();
+  });
+
+  it('Given passed 评估，When 映射，Then 不携带 errorDetail', () => {
+    const r = report([evaluation({ rule: rule('a'), status: 'passed' })]);
+    expect(mapper.buildAdapterResults(r)[0].errorDetail).toBeUndefined();
+  });
+
   it('Given 混合评估（2 降级 + 3 其他），When 求顶层 degraded，Then 计数 = 2（CLI 护栏输入）', () => {
     const r = report([
       evaluation({ rule: rule('a'), status: 'skipped', degraded: true, message: 'x' }),

@@ -1006,7 +1006,8 @@
         "failed": "體檢執行失敗: {{error}}",
         "foundIssues": "體檢完成：發現 {{count}} 項問題",
         "fullCheckDone": "全檢完成：重跑 {{count}} 項檢查",
-        "noValidItems": "體檢完成，但未執行到有效檢查項（請確認專案路徑）"
+        "noValidItems": "體檢完成，但未執行到有效檢查項（請確認專案路徑）",
+        "partialFailed": "部分檢查失敗：{{domains}}"
       },
       "welcome": "歡迎使用智匯碼盾"
     },
@@ -1214,6 +1215,7 @@
       },
       "summary": "{{count}} 項垃圾 · 可釋放 {{size}}",
       "type": {
+        "buildArtifact": "建置產物",
         "deadCode": "死程式碼",
         "duplicateCode": "重複程式碼",
         "unusedDependency": "未用依賴",

@@ -35,6 +35,22 @@ export function defaultFileWatchFilter(filePath: string): boolean {
   return !DEFAULT_IGNORE_RE.test(filePath);
 }
 
+/**
+ * 噪音路径判定：命中被监控根之下的任意忽略目录段，或命中默认噪音正则。
+ * fs.watch 回调需与轮询遍历保持一致（此前仅轮询跳过 ignoreDirs）。
+ * 只检查 watchPath 之后的相对段，用户显式监控噪音目录本身时内容不误杀。
+ */
+function isNoisePath(fullPath: string, watchPath: string, config: FileMonitorConfig): boolean {
+  const rel = path.relative(watchPath, fullPath);
+  if (rel) {
+    const ignoreSet = new Set(config.ignoreDirs ?? DEFAULT_IGNORE_DIRS);
+    for (const segment of rel.split(path.sep)) {
+      if (ignoreSet.has(segment)) return true;
+    }
+  }
+  return DEFAULT_IGNORE_RE.test(fullPath);
+}
+
 export function resolveChangeType(
   eventType: string,
   existsOnDisk: boolean,
@@ -72,7 +88,7 @@ export interface FileMonitorConfig {
   watchPaths: string[];
   intervalMs?: number;
   filter?: FileWatchFilter;
-  /** 遍历时整目录跳过的名称（如 node_modules/.git），避免同步扫描依赖树阻塞进程 */
+  /** 整目录跳过的名称（如 node_modules/.git/dist/.turbo），fs.watch 与轮询一致跳过 */
   ignoreDirs?: string[];
 }
 
@@ -136,6 +152,7 @@ export class FileMonitor {
         this.lastEventAt.set(watchPath, Date.now());
         const fullPath = safeJoin(watchPath, filename);
         if (config.filter && !config.filter(fullPath)) return;
+        if (isNoisePath(fullPath, watchPath, config)) return;
         void this.handleChange(config.projectId, fullPath, eventType as FileChangeType);
       });
       this.watchers.set(watchPath, watcher);
@@ -201,6 +218,7 @@ export class FileMonitor {
     config: FileMonitorConfig,
   ): Promise<void> {
     if (config.filter && !config.filter(fullPath)) return;
+    if (isNoisePath(fullPath, watchPath, config)) return;
     await this.checkMtime(fullPath, watchPath, config);
   }
 

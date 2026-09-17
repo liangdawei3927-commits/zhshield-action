@@ -1,7 +1,7 @@
 import { useDashboardPage } from './dashboard-logic';
 import type { PipelineProgress } from '../types/electron';
 import { PageShell } from '../components/business/PageShell';
-import { HealthRing } from './dashboard-parts';
+import { DashboardCards, HealthRing } from './dashboard-parts';
 import { GuardianFooter } from './dashboard-guardian-footer';
 import { useT } from '../i18n';
 
@@ -61,6 +61,7 @@ export function DashboardPage({ projectPath }: DashboardPageProps) {
         <PipelineProgress progress={pipelineProgress} label={progressLabel} />
       ) : null}
       {autoFixNotice && !running ? <AutoFixNotice notice={autoFixNotice} /> : null}
+      {overview ? <DashboardCards cards={overview.cards} /> : null}
     </>
   );
 

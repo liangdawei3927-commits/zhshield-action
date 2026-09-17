@@ -1,4 +1,6 @@
+import type { DashboardCard } from '../types/electron';
 import { useT } from '../i18n';
+import { ResultCard } from '../components/ui/ResultCard';
 
 const GAUGE_START = 135; // 仪表起点角（左下，0 分）
 const GAUGE_END = 45; // 仪表终点角（右下，100 分），经顶部顺时针 270°
@@ -93,6 +95,110 @@ export function HealthRing({ score, size = 150 }: { score: number | null; size?:
           {score === null ? '--' : Math.round(progress)}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 六卡标题文案键（顺序与 engines.ts 卡片构造一致：quality/gate/security/deps/techdebt/sentinel） */
+const CARD_TITLE_KEYS: Record<DashboardCard['key'], string> = {
+  quality: 'page.dashboard.card.quality',
+  gate: 'page.dashboard.card.gate',
+  security: 'page.dashboard.card.security',
+  dependencies: 'page.dashboard.card.dependencies',
+  techdebt: 'page.dashboard.card.techdebt',
+  sentinel: 'page.dashboard.card.sentinel',
+};
+
+/** 六卡评分权重（%）：与 engines.ts DASHBOARD_CARD_WEIGHTS 严格同源（方案 §4.3） */
+const CARD_WEIGHTS_PCT: Record<DashboardCard['key'], number> = {
+  quality: 35,
+  security: 25,
+  dependencies: 15,
+  techdebt: 15,
+  gate: 5,
+  sentinel: 5,
+};
+
+/** 卡面分数颜色：与 HealthRing / scoring.gradeOf 同源（A>=90/B>=75/C>=60/D），保证全站一致 */
+function scoreColor(score: number): string {
+  return score >= 90
+    ? 'rgb(var(--zh-success))'
+    : score >= 75
+      ? 'rgb(var(--zh-info))'
+      : score >= 60
+        ? 'rgb(var(--zh-warning))'
+        : 'rgb(var(--zh-danger))';
+}
+
+function formatLastRun(
+  t: (key: string, params?: Record<string, unknown>) => string,
+  lastRunAt?: string,
+): string {
+  if (!lastRunAt) return t('page.dashboard.card.neverRun');
+  const diff = Date.now() - new Date(lastRunAt).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return t('page.dashboard.card.justNow');
+  if (minutes < 60) return t('page.dashboard.card.minutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('page.dashboard.card.hoursAgo', { count: hours });
+  return t('page.dashboard.card.lastRun', { time: new Date(lastRunAt).toLocaleString() });
+}
+
+/** 健康画像六卡网格：一键全检后的分域结果总览（复用 ResultCard 全局卡片样式） */
+export function DashboardCards({ cards }: { cards: DashboardCard[] }) {
+  const t = useT();
+  return (
+    <div className="w-full max-w-4xl mt-8 grid grid-cols-3 gap-3">
+      {cards.map((card) => {
+        const notRun = card.status === 'not-run';
+        const expired = card.status === 'expired';
+        const statusPill = notRun
+          ? 'text-zh-muted bg-zh-line'
+          : expired
+            ? 'text-warning-700 bg-warning-50'
+            : 'text-success-700 bg-success-50';
+        const statusLabel = notRun
+          ? t('page.dashboard.status.notRun')
+          : expired
+            ? t('page.dashboard.status.expired')
+            : t('page.dashboard.card.justNow');
+        return (
+          <ResultCard key={card.key} variant="stats" className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-zh-ink truncate">
+                {t(CARD_TITLE_KEYS[card.key])}
+              </span>
+              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium ${statusPill}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span
+                className="text-2xl font-bold leading-none"
+                style={{ color: card.score !== undefined ? scoreColor(card.score) : 'rgb(var(--zh-muted))' }}
+              >
+                {card.score !== undefined ? Math.round(card.score) : '--'}
+              </span>
+              {card.score !== undefined && (
+                <span className="text-xs text-zh-muted">{t('page.dashboard.card.score', { score: Math.round(card.score) })}</span>
+              )}
+            </div>
+            <div className="text-xs text-zh-muted">
+              {notRun
+                ? t('page.dashboard.card.neverRun')
+                : t('page.dashboard.card.issues', { count: card.issues ?? 0 })}
+            </div>
+            <div className="mt-1 pt-1.5 border-t border-zh-line flex items-center justify-between gap-2 text-[11px]">
+              <span className="text-zh-muted">
+                {card.key === 'sentinel'
+                  ? t('page.dashboard.card.weightExcluded')
+                  : t('page.dashboard.card.weightTip', { pct: CARD_WEIGHTS_PCT[card.key] })}
+              </span>
+              <span className="text-zh-muted truncate">{formatLastRun(t, card.lastRunAt)}</span>
+            </div>
+          </ResultCard>
+        );
+      })}
     </div>
   );
 }

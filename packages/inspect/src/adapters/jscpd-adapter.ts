@@ -29,17 +29,22 @@ const META: ToolMeta = {
   license: 'MIT',
 };
 
-/** jscpd JSON 报告中的单条重复项 */
+/** jscpd JSON 报告中的单条重复项 — 同时覆盖 v5.x (firstFile/secondFile) 与旧版 (first/second) */
 interface JscpdDuplicate {
   format?: string;
+  /** jscpd ≥5.x: name 为相对路径, start/end 为行号, startLoc/endLoc 含 line */
+  firstFile?: { name?: string; start?: number; end?: number; startLoc?: { line?: number }; endLoc?: { line?: number } };
+  secondFile?: { name?: string; start?: number; end?: number; startLoc?: { line?: number }; endLoc?: { line?: number } };
+  /** jscpd <5 (legacy) */
   first?: {
     location?: { path?: string; start?: { line?: number } };
     path?: string;
     position?: { start?: { line?: number } };
   };
   second?: {
-    location?: { path?: string };
+    location?: { path?: string; start?: { line?: number }; end?: { line?: number } };
     path?: string;
+    position?: { start?: { line?: number }; end?: { line?: number }; path?: string };
   };
 }
 
@@ -63,7 +68,15 @@ export class JscpdAdapter implements ToolAdapter {
    *  monorepo（无顶层 src）时经 resolveTargetDir 落到 packages/，故同时声明 packages 读取范围 */
   readonly accessScope: AccessScope = {
     readPaths: ['src/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
-    excludePaths: ['**/node_modules/**'],
+    excludePaths: [
+      '**/node_modules/**',
+      // 扫描器自增产物/压缩部署物不是源码，不应进入重复检测：
+      // - dist/build 编译输出与 src 成对重复，占整仓重复报告大头（自扫误报）
+      // - .semgrep/inline-*.yml 为 SemgrepRuleWriter 生成的临时内联规则，内容同源互相重复
+      '**/dist/**',
+      '**/build/**',
+      '**/.semgrep/**',
+    ],
   };
 
   constructor(projectRoot?: string) {
@@ -160,10 +173,13 @@ export class JscpdAdapter implements ToolAdapter {
     // jscpd ≥5.x 破坏性变更: --format 由"输出格式"变为"输入文件格式",
     // --output 由"文件路径"变为"输出目录"; JSON 报告改用 --reporters json 生成,
     // 输出到 <output>/jscpd-report.json。旧版(<5)维持原参数集。
+    // 生成物与扫描器临时规则不计入重复检测：dist/build 编译输出与 src 成对重复，
+    // .semgrep/inline-*.yml 为 SemgrepRuleWriter 生成的同源临时规则（accessScope 同步排除）
+    const ignore = ['**/dist/**', '**/build/**', '**/.semgrep/**'];
     const args =
       major >= 5
-        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', target]
-        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', target];
+        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', '--ignore', ignore.join(','), target]
+        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', '--ignore', ignore.join(','), target];
     await execFileAsync(command, args, {
       cwd: projectPath,
       timeout: options.timeout || 60000,
@@ -248,20 +264,22 @@ export class JscpdAdapter implements ToolAdapter {
     const out = output as JscpdReport;
     if (!out?.duplicates || !Array.isArray(out.duplicates)) return [];
     return out.duplicates.map((d, idx) => {
-      const firstFile = d.first?.location?.path || d.first?.path || '';
-      const firstLines = d.first?.location?.start?.line || d.first?.position?.start?.line || 0;
-      const secondFile = d.second?.location?.path || d.second?.path || '';
+      const firstFile = d.firstFile?.name || d.first?.location?.path || d.first?.path || '';
+      const firstLines = d.firstFile?.startLoc?.line || d.first?.location?.start?.line || d.first?.position?.start?.line || 0;
+      const secondFile = d.secondFile?.name || d.second?.location?.path || d.second?.path || d.second?.position?.path || '';
+      const secondStart = d.secondFile?.startLoc?.line || d.second?.location?.start?.line || d.second?.position?.start?.line || 0;
+      const secondEnd = d.secondFile?.endLoc?.line || d.secondFile?.startLoc?.line || d.second?.location?.end?.line || d.second?.position?.end?.line || secondStart;
       const format = d.format || 'code';
       return {
         id: randomUUID(),
         ruleId: 'jscpd/duplicate',
         severity: 'warning',
         category: 'quality',
-        message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}`,
+        message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}:${secondStart}`,
         file: firstFile,
         line: firstLines,
         column: 0,
-        suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile})`,
+        suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile}:${secondStart}-${secondEnd})`,
         autoFixable: false,
         source: 'inspect',
         fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,

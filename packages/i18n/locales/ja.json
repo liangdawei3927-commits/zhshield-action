@@ -1006,7 +1006,8 @@
         "failed": "点検の実行に失敗しました: {{error}}",
         "foundIssues": "点検完了: {{count}} 件の問題を検出しました",
         "fullCheckDone": "一括チェック完了：{{count}} 件を再実行",
-        "noValidItems": "点検は完了しましたが、有効なチェック項目が実行されませんでした（プロジェクトパスを確認してください）"
+        "noValidItems": "点検は完了しましたが、有効なチェック項目が実行されませんでした（プロジェクトパスを確認してください）",
+        "partialFailed": "一部の点検に失敗しました：{{domains}}"
       },
       "welcome": "CodeShield へようこそ"
     },
@@ -1214,6 +1215,7 @@
       },
       "summary": "ゴミ {{count}} 項目 · 解放可能 {{size}}",
       "type": {
+        "buildArtifact": "ビルド成果物",
         "deadCode": "デッドコード",
         "duplicateCode": "重複コード",
         "unusedDependency": "未使用の依存関係",

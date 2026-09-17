@@ -223,6 +223,19 @@ function inspectionFindings(report: InspectionReport): Finding[] {
       });
     }
   }
+  // P1（复查5）：status==='error' 且无 issue 的适配器此前在 SARIF/CI 完全不可见
+  // （issues 为空 → 循环产出 0 条）→ 补一条 error finding，并带上真实原因。
+  for (const r of report.adapterResults ?? []) {
+    const hasIssues = (r.issues?.length ?? 0) > 0 || r.issueCount > 0;
+    if (r.status === 'error' && !hasIssues) {
+      findings.push({
+        ruleId: r.adapterId,
+        severity: 'error',
+        message: `检查工具执行失败（未产出检测结果）: ${r.adapterName} — ${r.errorDetail ?? '未提供失败原因'}`,
+        source: 'inspect',
+      });
+    }
+  }
   return findings;
 }
 

@@ -100,7 +100,7 @@ export class DepcheckAdapter implements ToolAdapter {
       };
     }
     const command = await this.resolveCommand(options.projectPath);
-    const args = this.buildArgs(options, projectPath);
+    const args = buildDepcheckArgs(options, projectPath);
 
     let stdout = '';
     try {
@@ -150,19 +150,6 @@ export class DepcheckAdapter implements ToolAdapter {
         fileCount: issues.length,
       },
     };
-  }
-
-  /** 依据配置组装 depcheck 命令行参数 */
-  private buildArgs(options: ToolScanOptions, projectPath: string): string[] {
-    const args = [projectPath, '--json'];
-    const cfg = options.config as Record<string, unknown> | undefined;
-    if (cfg?.skip) {
-      for (const s of cfg.skip as string[]) args.push('--skip', s);
-    }
-    if (cfg?.ignore) {
-      for (const ig of cfg.ignore as string[]) args.push('--ignore', ig);
-    }
-    return args;
   }
 
   /** 处理 depcheck 执行错误：未安装 / 失败 */
@@ -232,4 +219,19 @@ export class DepcheckAdapter implements ToolAdapter {
 
     return issues;
   }
+}
+
+/** 依据配置组装 depcheck 命令行参数：默认忽略列表始终生效，与配置中的 ignore 合并去重 */
+export function buildDepcheckArgs(options: ToolScanOptions, projectPath: string): string[] {
+  const args = [projectPath, '--json'];
+  const cfg = options.config as Record<string, unknown> | undefined;
+  if (cfg?.skip) {
+    for (const s of cfg.skip as string[]) args.push('--skip', s);
+  }
+  const defaultIgnore = ['@types/*', 'typescript', 'eslint', 'prettier'];
+  const ignoreList = [
+    ...new Set([...defaultIgnore, ...((cfg?.ignore as string[] | undefined) ?? [])]),
+  ];
+  for (const ig of ignoreList) args.push('--ignore', ig);
+  return args;
 }

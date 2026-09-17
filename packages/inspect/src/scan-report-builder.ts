@@ -1,4 +1,4 @@
-import type { AdapterResult, InspectionReport, Issue } from './types';
+import type { AdapterResult, InspectionReport, Issue, ScoreGrade, ScoreGradeLabel } from './types';
 import type { EventEmitter } from '@zh/shared';
 import { DegradationManager } from '@zh/shared';
 
@@ -48,7 +48,7 @@ export class ScanReportBuilder {
     };
   }
 
-  scoreOf(summary: InspectionReport['summary'], penalizeInfo = true): InspectionReport['score'] {
+  scoreOf(summary: InspectionReport['summary'], penalizeInfo = true): { overall: number; grade: ScoreGrade } {
     const overall =
       summary.total === 0
         ? 100
@@ -102,17 +102,22 @@ export class ScanReportBuilder {
 
   buildReport(input: ScanReportInput): InspectionReport {
     const summary = this.summarize(input.issues);
+    const baseScore = this.scoreOf(summary, input.penalizeInfo);
+    const degraded = input.adapterResults.filter((r) => r.degraded === true).length;
+    const grade: ScoreGradeLabel =
+      degraded > 0 ? `${baseScore.grade} [${degraded}工具降级]` : baseScore.grade;
+    const score = { overall: baseScore.overall, grade };
     return {
       projectId: input.projectId,
       timestamp: new Date(),
       scanType: input.scanType,
       duration: input.duration,
-      score: this.scoreOf(summary, input.penalizeInfo),
+      score,
       issues: input.issues,
       summary,
       adapterResults: input.adapterResults,
       // P0（复查4）：顶层降级计数，供 CLI 护栏与机器可读报告直接消费
-      degraded: input.adapterResults.filter((r) => r.degraded === true).length,
+      degraded,
       recommendations: this.recommendations(input.issues),
       suppressedCount: input.suppressedCount ?? 0,
     };

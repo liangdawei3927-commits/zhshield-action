@@ -171,6 +171,58 @@ describe('toInspectionReportData 覆盖率缺口显式上报', () => {
     );
   });
 
+  // P1（复查5）：status==='error' 且 0 issue 的适配器此前在桌面端完全隐身，
+  // 用户看到"巡检完成"却不知道有工具跑挂了 → 必须落成 fail 检查项并带真实原因。
+  it('maps errored adapters with no issues to fail checks carrying the real reason', () => {
+    const withErrors = {
+      ...baseReport,
+      adapterResults: [
+        {
+          adapterId: 'dep-cruiser',
+          adapterName: 'Dependency Cruiser',
+          duration: 3174,
+          issueCount: 0,
+          passed: false,
+          status: 'error',
+          errorDetail: 'dep-cruiser 未扫描到任何模块（modules=0）',
+          issues: [],
+        },
+      ],
+    };
+    const data = toInspectionReportData(withErrors as never);
+    const failed = data.checks.filter((c) => c.status === 'fail');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      id: 'adapter-error:dep-cruiser',
+      name: 'Dependency Cruiser',
+      source: 'dep-cruiser',
+    });
+    expect(failed[0].detail).toContain('dep-cruiser 未扫描到任何模块');
+    // 失败计数必须纳入，否则"0 失败"与页面上的红色项互相打脸
+    expect(data.summary.failures).toBe(baseReport.summary.error + 1);
+  });
+
+  it('does not add a fail check when the errored adapter did produce issues', () => {
+    const withIssues = {
+      ...baseReport,
+      adapterResults: [
+        {
+          adapterId: 'eslint',
+          adapterName: 'ESLint',
+          duration: 100,
+          issueCount: 1,
+          passed: false,
+          status: 'error',
+          errorDetail: '部分文件解析失败',
+          issues: [{ id: 'e-1' }],
+        },
+      ],
+    };
+    const data = toInspectionReportData(withIssues as never);
+    expect(data.checks.filter((c) => String(c.id).startsWith('adapter-error:'))).toHaveLength(0);
+    expect(data.summary.failures).toBe(baseReport.summary.error);
+  });
+
   it('does not duplicate adapter attention when adapter has issues', () => {
     const withIssues = {
       ...baseReport,

@@ -70,12 +70,29 @@ export interface BackupIdentity {
   projectPath?: string;
 }
 
-export function defaultBackupConfig(identity?: BackupIdentity): BackupConfig {
+/**
+ * 默认备份根目录（波浪号形式，落盘配置与展示统一用这一种写法，
+ * 由 LocalBackup.resolveBackupDir 在真正使用时展开为 home）。
+ */
+export const DEFAULT_BACKUP_ROOT = '~/zhshield-backups';
+
+/**
+ * 生成默认备份配置。
+ *
+ * `rootDir` 允许调用方（BackupConfigManager）注入全局配置里的默认备份根目录 ——
+ * 早先这里硬编码 `~/zhshield-backups`，导致全局配置项 defaultBackupDir
+ * 写进文件也永远不生效（用户改了备份位置却毫无变化）。
+ */
+export function defaultBackupConfig(
+  identity?: BackupIdentity,
+  rootDir: string = DEFAULT_BACKUP_ROOT,
+): BackupConfig {
   const segment = projectBackupSegment(
     identity?.projectPath ?? identity?.projectId,
     identity?.projectName,
   );
-  const backupDir = segment ? `~/zhshield-backups/${segment}` : '~/zhshield-backups';
+  const base = rootDir.replace(/[/\\]+$/, '') || DEFAULT_BACKUP_ROOT;
+  const backupDir = segment ? `${base}/${segment}` : base;
   return {
     github: {
       enabled: false,

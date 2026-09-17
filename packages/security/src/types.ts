@@ -9,7 +9,7 @@ export type MalwareType =
   | 'backdoor'
   | 'supply-chain'
   | 'suspicious-behavior';
-export type GarbageType = 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code';
+export type GarbageType = 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code' | 'build-artifact';
 
 export interface Vulnerability {
   id: string;

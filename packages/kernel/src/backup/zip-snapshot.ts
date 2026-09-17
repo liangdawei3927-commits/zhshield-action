@@ -91,6 +91,47 @@ async function addFilesToZip(
   return { fileEntries, backedUp, errors, totalSize };
 }
 
+/**
+ * 等待 write stream 的 close 事件。
+ * pipeline() 只保证 finish（数据已 flush），close 才代表底层 fd 已释放；
+ * 在 APFS/macOS 上若 fd 尚未释放就 rename，会偶发 EPERM。
+ */
+function waitForStreamClose(stream: fsSync.WriteStream): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (stream.closed) {
+      resolve();
+      return;
+    }
+    stream.once('close', () => resolve());
+    stream.once('error', reject);
+  });
+}
+
+const RENAME_RETRY_DELAY_MS = 75;
+const RENAME_MAX_RETRIES = 3;
+
+/**
+ * 原子改名。APFS/macOS 上偶发 EPERM：文件系统尚未释放刚写完的 inode，
+ * 短暂重试可自愈；重试耗尽后原样抛出。
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RENAME_MAX_RETRIES; attempt++) {
+    try {
+      await fs.rename(from, to);
+      return;
+    } catch (err) {
+      lastErr = err;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'EPERM' && code !== 'EACCES') throw err;
+      if (attempt < RENAME_MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 /** 写入清单并落盘：先写 .tmp 再原子改名，失败清理临时文件 */
 async function finalizeZip(
   zip: yazl.ZipFile,
@@ -110,11 +151,14 @@ async function finalizeZip(
     };
     zip.addBuffer(Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8'), 'BACKUP_MANIFEST.json');
     zip.end();
-    await pipeline(zip.outputStream, fsSync.createWriteStream(tmpZipPath));
+    const output = fsSync.createWriteStream(tmpZipPath);
+    await pipeline(zip.outputStream, output);
+    // pipeline() 只等待 finish；显式等待 write stream 的 close，确保底层 fd 真正释放
+    await waitForStreamClose(output);
     if (abortSignal?.aborted) {
       await fs.rm(tmpZipPath, { force: true }).catch(() => {});
     } else {
-      await fs.rename(tmpZipPath, zipPath);
+      await renameWithRetry(tmpZipPath, zipPath);
     }
   } catch (err) {
     await fs.rm(tmpZipPath, { force: true }).catch(() => {});
@@ -131,7 +175,10 @@ async function extractZipEntry(
   if (!zipEntry) throw new Error(`备份文件缺失（期望 ${entryName}）`);
   const stream = await archive.openEntryStream(zipEntry);
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await pipeline(stream, fsSync.createWriteStream(targetPath));
+  const output = fsSync.createWriteStream(targetPath);
+  await pipeline(stream, output);
+  // 与 finalizeZip 一致：显式等待 write stream close，确保 fd 释放后再返回
+  await waitForStreamClose(output);
 }
 
 /** 从 zip 归档还原：清单取自归档内 BACKUP_MANIFEST.json 条目，逐条流式解压 */

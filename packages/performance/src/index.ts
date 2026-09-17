@@ -10,6 +10,8 @@ export { BundleSizeDetectorImpl } from './adapters/bundle-size-detector';
 export type { BundleSizeDetector } from './adapters/bundle-size-detector';
 export { TreeShakingDetectorImpl } from './adapters/tree-shaking-detector';
 export type { TreeShakingDetector } from './adapters/tree-shaking-detector';
+export { ComplexityDetectorImpl } from './adapters/complexity-detector';
+export type { ComplexityDetector } from './adapters/complexity-detector';
 
 export type {
   PerformanceIssue,

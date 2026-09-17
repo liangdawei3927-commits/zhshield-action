@@ -107,6 +107,11 @@ export function useOneClickCheck(
         const result = await runFullCheck(projectPath, { force });
         if (!result.ok) {
           toast(result.error || t('page.dashboard.toast.executionFailed'), 'error');
+        } else if (result.failed && result.failed.length > 0) {
+          toast(
+            t('page.dashboard.toast.partialFailed', { domains: result.failed.join('、') }),
+            'error',
+          );
         } else if (result.reran.length === 0) {
           toast(t('page.dashboard.toast.allFresh'), 'info');
         } else {

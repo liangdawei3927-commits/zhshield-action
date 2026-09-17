@@ -205,15 +205,17 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
 
     // SOP 通道：运行时反模式（可并行失败隔离）
     let sopIssues: PerformanceReportIssue[] = [];
-    let sopDuration = 0;
     try {
       const { PipelineRunner } = await import('@zh/pipeline');
       const runner = new PipelineRunner(projectPath);
       await runner.loadSopRules();
       progress(id, 'performance', t('pipeline.performance.scanning'), 0.5);
-      const inspectReport = await runner.runSopInspect();
+      // 只评估 inspect 域：性能类 SOP 规则（inspect.scan.official.*）均属 inspect 域。
+      // 不传 domains 会落到 runInspect 的默认集 inspect+security，把整个安全域（5 条
+      // semgrep + gitleaks 硬编码密钥）跑一遍，而本通道只消费 category==='performance'
+      // 的违规 → 安全域产出 100% 被丢弃（实测该通道安全域为纯浪费）。
+      const inspectReport = await runner.runSopInspect({ domains: ['inspect'] });
       sopIssues = collectPerformanceIssues(inspectReport.evaluations ?? []);
-      sopDuration = inspectReport.durationMs;
     } catch (err) {
       console.warn(
         '[pipeline-worker] 性能 SOP 通道异常，降级为仅引擎:',
@@ -229,7 +231,7 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
       },
       issues,
       metadata: {
-        duration: Date.now() - startedAt + sopDuration,
+        duration: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       },
     };

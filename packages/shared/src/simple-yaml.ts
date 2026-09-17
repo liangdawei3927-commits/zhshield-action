@@ -134,7 +134,8 @@ function cleanArrays(obj: Record<string, unknown>): Record<string, unknown> {
   }
 
   const keys = Object.keys(obj);
-  if (keys.length === 1 && NUMERIC_KEY.test(keys[0])) {
+  // keys.length === 1 时 [0] 必有值；?? '' 仅为满足类型收窄的不可达兜底
+  if (keys.length === 1 && NUMERIC_KEY.test(keys[0] ?? '')) {
     return obj;
   }
 

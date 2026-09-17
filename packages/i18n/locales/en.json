@@ -1006,7 +1006,8 @@
         "failed": "Checkup execution failed: {{error}}",
         "foundIssues": "Checkup complete: found {{count}} issues",
         "fullCheckDone": "Full check done: re-ran {{count}} checks",
-        "noValidItems": "Checkup complete, but no valid checks ran (check the project path)"
+        "noValidItems": "Checkup complete, but no valid checks ran (check the project path)",
+        "partialFailed": "Some checks failed: {{domains}}"
       },
       "welcome": "Welcome to ZhiHui CodeShield"
     },
@@ -1214,6 +1215,7 @@
       },
       "summary": "{{count}} items · {{size}} releasable",
       "type": {
+        "buildArtifact": "Build artifact",
         "deadCode": "Dead code",
         "duplicateCode": "Duplicate code",
         "unusedDependency": "Unused dependency",

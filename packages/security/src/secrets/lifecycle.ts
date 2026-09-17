@@ -352,6 +352,14 @@ export class SecretLifecycleManager {
     await this.store.save(state);
   }
 
+  private isGitRepo(dir: string): boolean {
+    try {
+      return fs.existsSync(path.join(dir, '.git'));
+    } catch {
+      return false;
+    }
+  }
+
   private async runGitleaksDetect(
     projectPath: string,
     logOpts: string | undefined,
@@ -366,6 +374,10 @@ export class SecretLifecycleManager {
       '-',
     ];
     if (logOpts) args.push('--log-opts', logOpts);
+    // 非 git 仓库时追加 --no-git，避免 gitleaks 向上查找父级 git 仓库导致漏检
+    if (!logOpts && !this.isGitRepo(projectPath)) {
+      args.push('--no-git');
+    }
     const { stdout } = await this.runner.run('gitleaks', args, {
       cwd: projectPath,
       timeout: 120000,

@@ -79,7 +79,15 @@ function densityFactor(count: number): number {
 
 /** 模块提取：取 issue.file 的顶层目录 + 文件名（相对路径，无 file 归 '(root)'） */
 export function moduleOf(file: string): string {
-  const cleaned = file.replace(BACKSLASH_RE, '/').replace(DOT_SLASH_RE, '');
+  let cleaned = file.replace(BACKSLASH_RE, '/').replace(DOT_SLASH_RE, '');
+  // Strip leading ../ segments that leak from cross-directory imports
+  while (cleaned.startsWith('../')) {
+    cleaned = cleaned.slice(3);
+  }
+  // Strip leading '/' from absolute paths so the module label is repo-relative
+  if (cleaned.startsWith('/')) {
+    cleaned = cleaned.slice(1);
+  }
   if (!cleaned) return '(root)';
   return cleaned;
 }

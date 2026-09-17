@@ -175,7 +175,7 @@ export class AutoPerfEngine {
   /** 哨兵空闲 CPU：loadavg[0] / cores（estimate，非精确采样） */
   private probeSentinelCpu(): PerfProbeResult {
     const cores = os.cpus().length;
-    const load = os.loadavg()[0];
+    const load = os.loadavg()[0] ?? 0;
     const cpuPct = cores > 0 ? (load / cores) * 100 : 0;
     return {
       probeName: 'sentinelCpu',

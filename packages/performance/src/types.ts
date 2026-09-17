@@ -11,12 +11,13 @@
 /** 性能问题严重度（与桌面端 SEVERITY_CONFIG 键对齐） */
 export type PerformanceSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
-/** 性能问题归属类别（性能域四个静态分析维度） */
+/** 性能问题归属类别（性能域静态分析维度） */
 export type PerformanceCategory =
   | 'bundle-size' // 包体积：产物体积 / 单文件过大 / 未压缩
   | 'build-config' // 构建配置：缺压缩 / 缺拆包 / 未开启产物优化
   | 'tree-shaking' // tree-shaking：sideEffects 缺失 / 全量引入大包
-  | 'chunk-splitting'; // chunk 划分：单一 vendor chunk / 缺少代码分割
+  | 'chunk-splitting' // chunk 划分：单一 vendor chunk / 缺少代码分割
+  | 'complexity'; // 复杂度：嵌套循环 / 同步阻塞 IO
 
 /** 单条性能问题（可解释，含修复建议） */
 export interface PerformanceIssue {

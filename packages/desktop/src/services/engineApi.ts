@@ -31,7 +31,6 @@ import type {
   DepsRelockResult,
   TechDebtReportData,
   SecretReportData,
-  DashboardOverview,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 import {
@@ -454,18 +453,6 @@ export async function runPipeline(
 }
 
 // ─── 结果汇总（只读，不发起检查）──────────────────────────
-
-/** 聚合总览：读各域落盘结果 + scoring；无数据/引擎不可用时返回 null */
-export async function getDashboardOverview(projectPath: string): Promise<DashboardOverview | null> {
-  if (isHttpMode()) return null;
-  const api = getAPI();
-  if (!api?.engine) return null;
-  try {
-    return await api.engine.getDashboardOverview(projectPath);
-  } catch {
-    return null;
-  }
-}
 
 /**
  * 汇总生成报告：只读各域最新落盘结果 → 统一维度加权 → 落库。

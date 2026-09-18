@@ -90,14 +90,15 @@ export function gradeLabel(grade: string, tr: typeof t = t): string {
 }
 
 /**
- * 总分新鲜度阈值：与主进程 `DASHBOARD_FRESH_MS`（`electron/ipc/engines.ts`）同口径（24h）。
+ * 总分新鲜度阈值（24h）—— 全仓**唯一**的新鲜度阈值。
  *
- * 二者是**两个独立常量**（渲染进程一个、主进程一个），靠
- * `src/__tests__/freshness-parity.test.ts` 的结构断言保持数值一致 ——
- * 该用例若红，说明两侧已漂移，不要各自改数字，而要一起改。
+ * 历史上主进程还有一份 `DASHBOARD_FRESH_MS`（服务仪表盘六卡 not-run/scored/expired），
+ * 两者靠 `src/__tests__/freshness-parity.test.ts` 的结构断言保持数值一致。六卡链路
+ * 因渲染层零消费于 2026-09-19 整体删除后，主进程侧不再需要该阈值，这里成为唯一来源；
+ * 上述用例随之改为「单一来源 + 禁止主进程再引入第二份」。
  *
- * 总分是**对上一次检查结果的汇总**，不是实时值 —— 报告中心与体检页都只读各域最近一次
- * 落盘结果（guard 报告记录 + `.zhshield/diagnostics/domains/inspect.json` +
+ * 总分是**对上一次检查结果的汇总**，不是实时值 —— 报告中心只读各域最近一次
+ * 落盘结果（guard 报告记录 + `.zhshield/diagnostics/domains/<source>.json` +
  * `dashboard-state.json`），不会为了出分而重跑任何检查。因此必须把「这份分有多旧」
  * 显式告诉用户，否则陈旧分会被当成当前状态（T14 落分口径统一）。
  */

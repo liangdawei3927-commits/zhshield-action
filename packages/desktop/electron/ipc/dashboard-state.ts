@@ -2,9 +2,10 @@
  * 仪表盘聚合数据层（ipc/dashboard-state.ts）
  *
  * 维护 .zhshield/dashboard-state.json：deps / secrets / techdebt / refactor / performance
- * 五域的最新统计摘要 + lastRunAt，供 getDashboardOverview 一次读取六卡数据。
- * quality / gate 卡读 latest.json（各域覆盖写，generatedAt 作为 lastRunAt）；
- * sentinel 卡读运行时 SentinelRuntime（P1a-3 豁免，不落盘）。
+ * 五域的最新统计摘要 + lastRunAt。
+ *
+ * 消费方：`buildPipelineExtras`（engines.ts）—— 汇总生成报告时组装 @zh/scoring 的
+ * `DimensionExtras`，使报告中心的分与 pipeline 的分同口径（没跑过的域为 null → 该维度 not-run）。
  *
  * 写入遵循串行化队列（对齐 zh-diagnostics.ts writeQueue 模式），
  * 写入失败静默降级（catch 打 warn），不阻塞主流程。

@@ -12,7 +12,7 @@ import { SCORE_FRESH_MS, scoreFreshness } from '../pages/reports-logic';
 describe('scoreFreshness', () => {
   const NOW = Date.parse('2026-09-18T12:00:00.000Z');
 
-  it('阈值与主进程 DASHBOARD_FRESH_MS 同口径（24h）', () => {
+  it('阈值为 24h（全仓唯一来源；主进程侧的六卡阈值已随死链路删除）', () => {
     expect(SCORE_FRESH_MS).toBe(24 * 60 * 60 * 1000);
   });
 

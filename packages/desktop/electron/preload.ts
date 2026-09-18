@@ -139,8 +139,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
     ) => ipcRenderer.invoke('engine:runPipeline', projectPath, options),
     runProfile: (projectPath: string) => ipcRenderer.invoke('engine:runProfile', projectPath),
-    getDashboardOverview: (projectPath: string) =>
-      ipcRenderer.invoke('engine:getDashboardOverview', projectPath),
     generateReportSummary: (projectPath: string) =>
       ipcRenderer.invoke('engine:generateReportSummary', projectPath),
   },

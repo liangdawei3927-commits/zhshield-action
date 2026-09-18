@@ -5,9 +5,20 @@
 # 治理域: 拦截域 (guard)
 # 动作类型: 拦截阻断 (block)
 # 数据来源: 内部模式 (internal)
-# 对应适配器: Guard L3 CI · depcruiser
-# 内部标准源: dependency-cruiser 规则 + IronNest#01 架构边界规则 + IronNest#02 控制器规则
-# 最后更新: 2026-07-29
+# 对应适配器: 内核 layer-boundary 内联评估器（零外部二进制）
+# 内部标准源: IronNest#01 架构边界规则 · IronNest#02 控制器规则
+# 最后更新: 2026-09-18
+# =============================================================================
+# 09-18 改造（T8 口径统一）：从「声明了却没执行」变为真实执行
+#   原写法 check.tool="dep-cruiser" + toolConfig.rules（内核与适配器均不识别该结构）
+#   且 status=draft 从未进入执行集 —— 即"声明了却没查"。
+#   现改用内核 layer-boundary 内联评估器，层级表与体检的
+#   inspect/scan/architecture/layer-boundary.yml **逐字同源**（单一来源：
+#   @zh/shared 的 CLEAN_ARCH_LAYERS），由 arch-layers-parity.test.ts 锁定。
+#   ⇒ 同一处层间违规，门禁与体检给出相同结论。
+#   覆盖范围（诚实标注）：
+#     ✓ 层间依赖方向违规 → 本评估器真实执行
+#     ✗ 控制器厚度 / 模块内部引用 → 需 AST 语义，纯正则误报率高，未纳入
 # =============================================================================
 
 apiVersion: sop/v1
@@ -15,14 +26,14 @@ kind: GuardRule
 metadata:
   id: "guard.block.depcruiser.architecture"
   name: "架构边界阻断"
-  description: "在 CI 阶段拦截架构违规：跨层反向依赖、模块间违规引用、控制器包含业务逻辑、服务层越权调用基础设施"
-  version: "1.0.0"
+  description: "在门禁阶段拦截架构违规：跨层反向依赖、绕过白名单的层间引用。层级表与项目体检同源，前提是项目按目录分层（层名即目录名）"
+  version: "1.1.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
-  updated: "2026-07-29"
-  status: "draft"
+  updated: "2026-09-18"
+  status: "active"
   source: "internal"
-  sourceRef: "dependency-cruiser .dependency-cruiser.mjs · IronNest rules/01 · rules/02"
+  sourceRef: "IronNest rules/01 · rules/02 · 共用 CLEAN_ARCH_LAYERS"
 
 governance:
   domain: "guard"
@@ -53,34 +64,37 @@ conditions:
     - "**/*.d.ts"
 
 check:
-  tool: "dep-cruiser"
-  toolConfig:
-    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
-    rules:
-      layerViolation:
-        description: "禁止反向依赖（controller → service → domain → repository → adapter，单向）"
-        severity: "error"
-        patterns:
-          - "controller 直接 import repository / adapter"
-          - "service 直接 import 另一个 module 的 controller"
-          - "domain 层 import 基础设施层（repository/adapter/http）"
-      moduleBoundary:
-        description: "禁止跨模块内部引用（只能通过 index.ts 导出）"
-        severity: "error"
-        patterns:
-          - "module-a/src/internal 被 module-b 引用"
-          - "shared/ 包引用了非 shared/ 的内容"
-      controllerThickness:
-        description: "控制器必须薄（单一委托，不应包含分支/转换/基础设施导入）"
-        severity: "error"
-        checkAnnotations: true
-        maxControllerMethodLines: 5
+  # 内联 layer-boundary 评估器：零外部二进制、毫秒级出结果，直接解析源码 import 判定层间方向。
+  # 层表为单一来源（@zh/shared/src/arch-layers.ts 的 CLEAN_ARCH_LAYERS），
+  # 与 inspect/scan/architecture/layer-boundary.yml 必须逐字一致。
+  layers:
+    - name: "controllers"
+      allowedDependencies: ["services", "use-cases", "dto"]
+    - name: "use-cases"
+      allowedDependencies: ["services", "domain", "dto"]
+    - name: "services"
+      allowedDependencies: ["domain", "repositories", "adapters", "shared"]
+    - name: "repositories"
+      allowedDependencies: ["domain", "shared"]
+    - name: "adapters"
+      allowedDependencies: ["domain", "shared", "core"]
+    - name: "domain"
+      allowedDependencies: ["shared"]
+    - name: "shared"
+      allowedDependencies: []
+  excludePatterns:
+    - "**/*.spec.ts"
+    - "**/*.test.ts"
+    - "**/*.d.ts"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/coverage/**"
+    - "**/generated/**"
   severity: "error"
   categories:
     - "architecture"
     - "layer-violation"
-    - "module-boundary"
-    - "dependecy-direction"
+    - "layer-compliance"
 
 judgment:
   passCondition: "errorCount === 0"
@@ -99,21 +113,21 @@ experience:
   falsePositives: 0
   falsePositiveRate: 0.0
   avgFixTime: 900
-  lastCalibrated: "2026-07-29"
+  lastCalibrated: "2026-09-18"
 
 fix:
   autoFixAvailable: false
   suggestionTemplate: |
-    检测到架构边界违规：
+    检测到架构分层违规：
 
     ⚠️ 文件: {file}:{line}
-    ⚠️ 违规类型: {violationType}
-    ⚠️ 依赖链: {source} → {target}
+    ⚠️ 违规类型: {ruleId}
+    ⚠️ 违规详情: {detail}
 
-    建议修复：
-    1. 层次违规 → 确认依赖方向是否符合 controller → service → domain → repository → adapter 的单向约束
-    2. 模块间违规 → 通过目标模块的 `index.ts` 导出引用，不要深入内部路径
-    3. 控制器过厚 → 将业务逻辑抽取到 use-case 或 service，控制器只做委托
-    4. 共享包违规 → `shared/` 只能引用 `shared/`，不能引用其他模块
+    按 IronNest 架构规则修复：
+    1. 层次违规 → 确认目标层是否在来源层的 allowedDependencies 白名单内，不在则抽取到正确层
+    2. 控制器过厚 → 将业务逻辑抽取到 use-case 或 service，控制器只做委托
+    3. 领域层引用基础设施 → 反转依赖，在应用层做编排
 
-    📖 参考: IronNest #01 架构边界 · #02 控制器 · dependency-cruiser 规则集
+    📖 参考: IronNest #01 架构边界 · #02 控制器
+

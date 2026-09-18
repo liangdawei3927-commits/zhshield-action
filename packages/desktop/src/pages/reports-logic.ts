@@ -39,6 +39,31 @@ export function gradeLabel(grade: string, tr: typeof t = t): string {
   return label === key ? grade : label;
 }
 
+/**
+ * 总分新鲜度阈值：与主进程 `DASHBOARD_FRESH_MS` 同口径（24h）。
+ *
+ * 总分是**对上一次检查结果的汇总**，不是实时值 —— 报告中心与体检页都只读各域最近一次
+ * 落盘结果（guard 报告记录 + `.zhshield/diagnostics/domains/inspect.json` +
+ * `dashboard-state.json`），不会为了出分而重跑任何检查。因此必须把「这份分有多旧」
+ * 显式告诉用户，否则陈旧分会被当成当前状态（T14 落分口径统一）。
+ */
+export const SCORE_FRESH_MS = 24 * 60 * 60 * 1000;
+
+export interface ScoreFreshness {
+  /** true = 数据超过阈值，总分只能代表「截至那一时刻」的状态 */
+  stale: boolean;
+  /** 距今天数取整（小时）；时间戳不可解析时为 0 并同样判 stale */
+  ageHours: number;
+}
+
+/** 计算总分的数据新鲜度（纯函数，便于单测；不依赖 React / Electron） */
+export function scoreFreshness(timestamp: string, now: number = Date.now()): ScoreFreshness {
+  const ts = Date.parse(timestamp);
+  if (Number.isNaN(ts)) return { stale: true, ageHours: 0 };
+  const ageMs = Math.max(0, now - ts);
+  return { stale: ageMs > SCORE_FRESH_MS, ageHours: Math.floor(ageMs / 3_600_000) };
+}
+
 /** 历史分数数据加载：数据状态 + 拉取 */
 function useScoreHistoryData(projectPath: string): {
   data: HealthScoreData[];

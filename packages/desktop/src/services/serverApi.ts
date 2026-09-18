@@ -6,7 +6,6 @@
  */
 import type {
   GuardReportData,
-  InspectionReportData,
   SecurityScanReportData,
   HealthScoreData,
   RefactorReportData,
@@ -43,15 +42,6 @@ export async function runGuardViaHttp(
   return request<GuardReportData>('/guard/check', {
     method: 'POST',
     body: JSON.stringify({ projectPath, dryRun }),
-  });
-}
-
-// ─── Inspect ────────────────────────────────────────────
-
-export async function runInspectViaHttp(projectPath: string): Promise<InspectionReportData> {
-  return request<InspectionReportData>('/inspect/scan', {
-    method: 'POST',
-    body: JSON.stringify({ projectPath }),
   });
 }
 

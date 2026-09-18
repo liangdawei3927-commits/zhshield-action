@@ -476,7 +476,6 @@ export interface SaveDialogResult {
 
 export interface EngineAPI {
   runGuard: (projectPath: string, options?: Record<string, unknown>) => Promise<GuardReportData>;
-  runInspect: (projectPath: string) => Promise<InspectionReportData>;
   runSecurity: (projectPath: string) => Promise<SecurityScanReportData>;
   runGarbageScan: (projectPath: string) => Promise<GarbageScanReportData>;
   cleanGarbage: (

@@ -369,7 +369,7 @@ export function scanForbiddenInFile(
 /** 根据文件路径判断所属层级（按层名匹配目录） */
 export function detectLayer(
   filePath: string,
-  layers: Array<{ name: string; allowedDependencies: string[] }>,
+  layers: ReadonlyArray<{ name: string; allowedDependencies: string[] }>,
 ): string | null {
   const normalized = filePath.replace(/\\/g, '/');
   for (const layer of layers) {
@@ -395,7 +395,7 @@ export function detectLayer(
  */
 export function detectLayerByName(
   modulePath: string,
-  layers: Array<{ name: string; allowedDependencies: string[] }>,
+  layers: ReadonlyArray<{ name: string; allowedDependencies: string[] }>,
 ): string | null {
   const segments = modulePath.split('/').map((s) => s.toLowerCase());
   for (const layer of layers) {

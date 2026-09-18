@@ -1334,6 +1334,8 @@
         "needsImprovement": "待改進"
       },
       "summaryDone": "已彙總各域最新結果，健康總分 {{score}}",
+      "dataAsOf": "資料時間 {{date}}（總分基於各域最近一次結果彙總）",
+      "dataStale": "基於 {{hours}} 小時前的資料，建議重新彙總",
       "table": {
         "abnormal": "異常",
         "col": {

@@ -11,7 +11,6 @@ import type {
   GuardReportData,
   GuardReportRecordData,
   GuardConfig,
-  InspectionReportData,
   SecurityScanReportData,
   PerformanceReportData,
   HealthScoreData,
@@ -37,7 +36,6 @@ import type {
 import type { SentinelEvent } from '@zh/sentinel';
 import {
   runGuardViaHttp,
-  runInspectViaHttp,
   runSecurityViaHttp,
   getScoreViaHttp,
   getScoreHistoryViaHttp,
@@ -181,21 +179,6 @@ export async function listFalsePositives(
   const api = getAPI();
   if (!api?.feedback) return [];
   return api.feedback.listFalsePositives(projectPath, source);
-}
-
-// ─── Inspect 巡检引擎 ──────────────────────────────────────
-
-export async function runInspect(projectPath: string): Promise<InspectionReportData> {
-  if (isHttpMode()) return runInspectViaHttp(projectPath);
-  const api = getAPI();
-  if (!api?.engine) {
-    return {
-      summary: { total: 0, passed: 0, warnings: 0, failures: 0 },
-      checks: [],
-      metadata: { duration: 0, timestamp: new Date().toISOString() },
-    };
-  }
-  return api.engine.runInspect(projectPath);
 }
 
 // ─── Security 安全引擎 ─────────────────────────────────────

@@ -6,19 +6,19 @@
  *
  * 启动方式：child_process.fork(..., { env: { ELECTRON_RUN_AS_NODE: '1' } })
  *
- * 职责拆分：流水线编排见 pipeline-sop，单引擎任务见 pipeline-jobs，
- * 报告构建见 pipeline-report，IPC 发送见 pipeline-ipc。
+ * 职责拆分：runner 装配见 pipeline-runner-factory，流水线编排见 pipeline-sop，
+ * 单引擎任务见 pipeline-jobs，报告构建见 pipeline-report，IPC 发送见 pipeline-ipc。
  */
 import { initI18n, resolveLanguage } from '@zh/i18n';
 import { createReport, type PipelineRunner } from '@zh/pipeline';
 import { serializePipelineReport, type PipelineWorkerInbound } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
 import { attachSummary } from './pipeline-report';
+import { createLoadedRunner } from './pipeline-runner-factory';
 import { runSopJob, runFullPipelineJob } from './pipeline-sop';
 import {
   runRefactorJob,
   runGuardJob,
-  runInspectJob,
   runSecurityJob,
   runGarbageScanJob,
   runGarbageCleanJob,
@@ -35,17 +35,6 @@ async function runPipelineByMode(
   runner: PipelineRunner,
   opts: { dryRun?: boolean; sop?: boolean; guardEnabled: boolean },
 ): Promise<void> {
-  await runner.loadSopRules();
-  const cacheDir = process.env.ZH_SOP_CACHE_DIR;
-  if (cacheDir) {
-    const synced = await runner.loadSopRulesFromCache(cacheDir);
-    progress(
-      id,
-      'sop',
-      synced > 0 ? `同步规则已加载 ${synced} 条` : '同步缓存不可用，使用内置模板',
-      0.06,
-    );
-  }
   if (opts.sop) {
     await runSopJob(id, runner, opts.dryRun, opts.guardEnabled);
   } else {
@@ -58,33 +47,35 @@ async function runPipeline(
   projectPath: string,
   options?: { dryRun?: boolean; sop?: boolean; guardEnabled?: boolean },
 ): Promise<void> {
-  const { PipelineRunner } = await import('@zh/pipeline');
-  const runner = new PipelineRunner(projectPath);
   const opts = options ?? { guardEnabled: true };
-
   try {
     progress(id, 'sop', '加载体检规则…', 0.05);
-    await runPipelineByMode(id, runner, {
-      dryRun: opts.dryRun,
-      sop: opts.sop,
-      guardEnabled: opts.guardEnabled !== false,
-    });
+    // 规则装载同样收敛到装配工厂：只读内置模板而漏掉云同步规则，等于又造出
+    // 「内置口径 vs 云端口径」的第二处分叉。
+    const { runner, syncedRules } = await createLoadedRunner(projectPath);
+    progress(
+      id,
+      'sop',
+      syncedRules > 0 ? `同步规则已加载 ${syncedRules} 条` : '同步缓存不可用，使用内置模板',
+      0.06,
+    );
+    try {
+      await runPipelineByMode(id, runner, {
+        dryRun: opts.dryRun,
+        sop: opts.sop,
+        guardEnabled: opts.guardEnabled !== false,
+      });
+    } finally {
+      await runner.destroy().catch(() => undefined);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(
       '[pipeline-worker] 流水线异常:',
       err instanceof Error ? err.stack || message : message,
     );
-    const report = attachSummary(
-      createReport({
-        stage: 'failed',
-        passed: false,
-        error: message,
-      }),
-    );
+    const report = attachSummary(createReport({ stage: 'failed', passed: false, error: message }));
     send({ type: 'result', id, report: serializePipelineReport(report) });
-  } finally {
-    await runner.destroy().catch(() => undefined);
   }
 }
 
@@ -101,9 +92,6 @@ process.on('message', (raw: PipelineWorkerInbound) => {
       break;
     case 'runGuard':
       void runGuardJob(raw.id, raw.projectPath, raw.options);
-      break;
-    case 'runInspect':
-      void runInspectJob(raw.id, raw.projectPath);
       break;
     case 'runSecurity':
       void runSecurityJob(raw.id, raw.projectPath);

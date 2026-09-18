@@ -47,12 +47,6 @@ export interface GuardRunMsg {
   options?: Record<string, unknown>;
 }
 
-export interface InspectRunMsg {
-  type: 'runInspect';
-  id: string;
-  projectPath: string;
-}
-
 export interface SecurityRunMsg {
   type: 'runSecurity';
   id: string;
@@ -90,7 +84,6 @@ export type PipelineWorkerInbound =
   | PipelineRunMsg
   | RefactorRunMsg
   | GuardRunMsg
-  | InspectRunMsg
   | SecurityRunMsg
   | GarbageCleanRunMsg
   | GarbageRestoreRunMsg

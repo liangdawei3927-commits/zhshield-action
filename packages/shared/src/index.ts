@@ -1,6 +1,16 @@
 // @zh/shared - 所有模块共用的类型定义
 export const VERSION = '0.1.0';
 export { TOOL_IDS, GOVERNANCE_DOMAINS, INSPECT_SCOPE_DOMAINS } from './types';
+// 跨域单一来源（T8 口径统一）：门禁 与 体检/安全中心 共用同一份规则定义
+export {
+  CLEAN_ARCH_LAYERS,
+  ARCH_LAYER_EXCLUDED_DIRS,
+  ARCH_LAYER_EXCLUDE_PATTERNS,
+  allowedDependenciesOf,
+  isLayerDependencyAllowed,
+  type ArchLayer,
+} from './arch-layers';
+export { SECRET_PATTERNS, toNameRegexPatterns, type SecretPattern } from './secret-patterns';
 export type {
   PagedResult,
   ApiErrorDTO,

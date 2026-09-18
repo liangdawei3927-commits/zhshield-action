@@ -1,18 +1,20 @@
 /**
  * 单引擎任务执行
  *
- * 独立的「重构 / 门禁 / 巡检 / 安全 / 性能」任务，由子进程消息路由分发，
+ * 独立的「重构 / 门禁 / 安全 / 垃圾清理 / 性能」任务，由子进程消息路由分发，
  * 每个任务创建对应引擎并在完成后发送结果消息。
+ *
+ * 注：巡检（inspect）与门禁（guard）的**规则集口径**统一后，本文件不再自建引擎，
+ * 一律经 `createLoadedRunner` 装配（见 pipeline-runner-factory 的说明）。
+ * 巡检单引擎通道（runInspectJob）已移除——渲染层无调用方，巡检页走 SOP 流水线、
+ * MCP 走 CLI，保留它只会制造第三份规则集。
  */
 import { t } from '@zh/i18n';
 import { serializePipelineReport } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
+import { createLoadedRunner } from './pipeline-runner-factory';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
-// 直连纯内存缓存模块而非 ipc-context：本文件被打进 pipeline-worker 子进程
-// bundle，ipc-context 顶层 electron 副作用（app.isPackaged 等）在 fork
-// （ELECTRON_RUN_AS_NODE=1）中加载即崩溃。
-import { getCachedProfile } from './profile-cache';
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);
@@ -33,86 +35,45 @@ export async function runRefactorJob(id: string, projectPath: string): Promise<v
   }
 }
 
+/**
+ * 门禁任务 — 规则集与流水线门禁阶段**同源**（T13 口径统一）。
+ *
+ * 此前本函数自建 GuardEngine 并自行注册 6 个适配器，但**没有** `useSopEngine` 连线，
+ * 于是 `GuardEngine.run()` 走 runTraditional 分支读 `guard/config/checks.json`
+ * （4 项：ARCH-001 / LINT-001 / TEST-001 / SEC-001），而体检流水线的门禁阶段走
+ * SOP 门禁规则 —— 同一个「门禁」两个规则集，页面点与流水线跑的条目数、结论都不一致。
+ *
+ * 现改为经 `createLoadedRunner` 装配：runner 内部已完成 `useSopEngine` 连线与
+ * 适配器注册，`runGuard` 因此与流水线门禁阶段执行完全相同的 SOP 规则集。
+ *
+ * 已知缺口（不掩盖）：SOP 门禁域当前无「测试运行」规则，checks.json 时代的 TEST-001
+ * 因此不再出现在门禁页。补该规则需要新增 ToolAdapter（ToolId 枚举 + tools.json），
+ * 属独立立项，见交付说明遗留项。
+ */
 export async function runGuardJob(
   id: string,
   projectPath: string,
   options?: Record<string, unknown>,
 ): Promise<void> {
   progress(id, 'guard', t('pipeline.guard.jobScanning'), 0.1);
-  const {
-    GuardEngine,
-    GuardESLintCheckAdapter,
-    GuardSensitiveInfoAdapter,
-    FileSecretStateLookup,
-    ArchitectureBoundaryAdapter,
-    TestRunnerAdapter,
-    SecurityScanAdapter,
-    GuardTrivyAdapter,
-  } = await import('@zh/guard');
-  const engine = new GuardEngine(projectPath, undefined, { emit: () => undefined });
-  engine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
-  engine.registerAdapter(
-    'sensitive-info',
-    new GuardSensitiveInfoAdapter(new FileSecretStateLookup()),
-  );
-  engine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
-  engine.registerAdapter('test-runner', new TestRunnerAdapter());
-  engine.registerAdapter('security-scan', new SecurityScanAdapter());
-  engine.registerAdapter('trivy', new GuardTrivyAdapter());
+  const { runner, syncedRules } = await createLoadedRunner(projectPath);
+  if (syncedRules > 0) {
+    progress(id, 'guard', `同步规则已加载 ${syncedRules} 条`, 0.15);
+  }
   try {
-    const report = await engine.run({
+    const report = await runner.runGuard({
       mode: 'guard',
       target: projectPath,
       ...(options ?? {}),
-    } as CheckOptions);
+    } as Partial<CheckOptions>);
     progress(id, 'done', t('pipeline.guard.jobDone'), 1.0);
     send({ type: 'result', id, report: serializePipelineReport(report) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[pipeline-worker] 门禁扫描异常:', message);
     send({ type: 'error', id, error: message });
-  }
-}
-
-export async function runInspectJob(id: string, projectPath: string): Promise<void> {
-  progress(id, 'inspect', t('pipeline.inspect.jobScanning'), 0.1);
-  const {
-    InspectEngine,
-    ESLintAdapter,
-    GitleaksAdapter,
-    DependencyCruiserAdapter,
-    JscpdAdapter,
-    TsPruneAdapter,
-    SemgrepAdapter,
-    DepcheckAdapter,
-    TypeScriptAdapter,
-    PrettierAdapter,
-    CommitLintAdapter,
-    NpmAuditAdapter,
-  } = await import('@zh/inspect');
-  const engine = new InspectEngine({ emit: () => undefined });
-  // 注册常用适配器，与全流水线能力对齐
-  engine.registerAdapter(new ESLintAdapter());
-  engine.registerAdapter(new GitleaksAdapter());
-  engine.registerAdapter(new DependencyCruiserAdapter());
-  engine.registerAdapter(new JscpdAdapter());
-  engine.registerAdapter(new TsPruneAdapter());
-  engine.registerAdapter(new SemgrepAdapter());
-  engine.registerAdapter(new DepcheckAdapter());
-  engine.registerAdapter(new TypeScriptAdapter());
-  engine.registerAdapter(new PrettierAdapter());
-  engine.registerAdapter(new CommitLintAdapter());
-  engine.registerAdapter(new NpmAuditAdapter());
-  try {
-    // R3d 执行面投影激活：直扫按画像裁剪 — 复用 getCachedProfile 同源快照；
-    // 子进程内画像缓存未共享（主进程模块态）→ 通常为 undefined → 不裁剪（回归安全）。
-    const report = await engine.runScan(projectPath, 'full', getCachedProfile() ?? undefined);
-    progress(id, 'done', t('pipeline.inspect.jobDone'), 1.0);
-    send({ type: 'result', id, report: serializePipelineReport(report) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 巡检异常:', message);
-    send({ type: 'error', id, error: message });
+  } finally {
+    await runner.destroy().catch(() => undefined);
   }
 }
 

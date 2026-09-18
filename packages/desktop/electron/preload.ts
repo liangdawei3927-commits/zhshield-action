@@ -103,7 +103,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   engine: {
     runGuard: (projectPath: string, options?: Record<string, unknown>) =>
       ipcRenderer.invoke('engine:runGuard', projectPath, options),
-    runInspect: (projectPath: string) => ipcRenderer.invoke('engine:runInspect', projectPath),
     runSecurity: (projectPath: string) => ipcRenderer.invoke('engine:runSecurity', projectPath),
     runGarbageScan: (projectPath: string) =>
       ipcRenderer.invoke('engine:runGarbageScan', projectPath),

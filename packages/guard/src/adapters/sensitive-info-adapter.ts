@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
-import { FileSecretStateLookup } from '../file-secret-state-lookup';
+import { SECRET_PATTERNS, toNameRegexPatterns } from '@zh/shared';
 
 const SCAN_FILE_EXT = /\.(ts|tsx|js|jsx|yml|yaml|json|md|env|config)$/i;
 
@@ -9,24 +9,21 @@ const SCAN_FILE_EXT = /\.(ts|tsx|js|jsx|yml|yaml|json|md|env|config)$/i;
  * Guard 敏感信息适配器 — L1 门禁
  *
  * 使用正则表达式扫描目标目录中的敏感信息（密钥、Token、密码等）。
- * 无需外部依赖，纯静态分析。
+ * 无需外部依赖，纯静态分析 —— 门禁必须零外部二进制可跑，装 gitleaks 只是可选项。
+ *
+ * 口径来源（T8 统一）：模式表取自 `@zh/shared` 的 `SECRET_PATTERNS`，
+ * 每一行都用 gitleaks 规则 id 锚定，并与 `guard/block/sensitive-info.yml` 的
+ * `standards.gitleaks` 声明保持覆盖关系（由 kernel 的 parity 测试锁定）。
  *
  * 适配器契约:
  * - run(): 扫描目录，返回所有发现（同步）
  * - normalize(): 将发现结果转为 CheckResult（同步）
+ *
+ * 已知缺口（不掩盖）：本适配器**不消费**用户对密钥告警的驳回记录。此前构造签名
+ * 接受一个 FileSecretStateLookup 参数，看起来会豁免已驳回项，实际该字段从未被读取、
+ * acknowledge() 也从未被调用——是"接线了却没消费"的空壳。已删除以免继续误导，
+ * 驳回态抑制属于安全中心 SecretLifecycleManager 的职责，待立项。
  */
-const DEFAULT_PATTERNS: { name: string; regex: RegExp }[] = [
-  {
-    name: 'API Key/Password/Secret',
-    regex: /(?:api[_-]?key|password|secret|token|credential)\s*[:=]\s*['"][^'"]+['"]/i,
-  },
-  { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/ },
-  { name: 'OpenAI API Key', regex: /sk-[a-zA-Z0-9]{32,}/ },
-  { name: 'Private Key', regex: /-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/ },
-  { name: 'GitHub Token', regex: /gh[psu]_[a-zA-Z0-9]{36,}/ },
-  { name: 'JWT Token', regex: /eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/ },
-];
-
 interface Finding {
   file: string;
   line: number;
@@ -36,15 +33,9 @@ interface Finding {
 
 export class GuardSensitiveInfoAdapter implements Adapter {
   private patterns: { name: string; regex: RegExp }[];
-  private secretStateLookup?: FileSecretStateLookup;
 
-  constructor(customPatternsOrLookup?: { name: string; regex: RegExp }[] | FileSecretStateLookup) {
-    if (customPatternsOrLookup instanceof FileSecretStateLookup) {
-      this.patterns = DEFAULT_PATTERNS;
-      this.secretStateLookup = customPatternsOrLookup;
-    } else {
-      this.patterns = customPatternsOrLookup ?? DEFAULT_PATTERNS;
-    }
+  constructor(customPatterns?: { name: string; regex: RegExp }[]) {
+    this.patterns = customPatterns ?? toNameRegexPatterns(SECRET_PATTERNS);
   }
 
   run(
@@ -69,7 +60,8 @@ export class GuardSensitiveInfoAdapter implements Adapter {
     checkId: string,
   ): string {
     const targetDir = context.repoRoot || context.projectPath;
-    if (!targetDir) throw new Error(`${checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
+    if (!targetDir)
+      throw new Error(`${checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
     return targetDir;
   }
 

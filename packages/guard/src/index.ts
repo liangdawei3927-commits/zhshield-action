@@ -7,7 +7,6 @@ export { ResultNormalizer } from './result-normalizer';
 export { HooksInstaller } from './hooks-installer';
 export { WhitelistManager } from './whitelist-manager';
 export { GuardToolAdapterWrapper } from './guard-tool-adapter';
-export { FileSecretStateLookup } from './file-secret-state-lookup';
 export {
   GuardESLintCheckAdapter,
   GuardSonarwayESLintAdapter,

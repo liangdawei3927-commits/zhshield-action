@@ -28,7 +28,6 @@ describe('preload electronAPI surface', () => {
       },
       engine: {
         runGuard: vi.fn(),
-        runInspect: vi.fn(),
         runSecurity: vi.fn(),
         runPipeline: vi.fn(),
         runRefactor: vi.fn(),

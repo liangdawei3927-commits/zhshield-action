@@ -334,20 +334,6 @@ export async function runGuardInWorker(
   );
 }
 
-export async function runInspectInWorker(
-  projectPath: string,
-  onProgress?: ProgressHandler,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-): Promise<unknown> {
-  const id = `inspect-${Date.now()}-${++seq}`;
-  return dispatchJob(
-    { type: 'runInspect', id, projectPath },
-    timeoutMs,
-    'engine:runInspect',
-    onProgress,
-  );
-}
-
 export async function runSecurityInWorker(
   projectPath: string,
   onProgress?: ProgressHandler,

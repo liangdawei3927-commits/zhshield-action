@@ -1334,6 +1334,8 @@
         "needsImprovement": "Needs improvement"
       },
       "summaryDone": "Summarized the latest results from every domain. Overall score {{score}}.",
+      "dataAsOf": "Data as of {{date}} (score summarizes each domain's latest result)",
+      "dataStale": "Based on data from {{hours}}h ago — regenerate to refresh",
       "table": {
         "abnormal": "Abnormal",
         "col": {

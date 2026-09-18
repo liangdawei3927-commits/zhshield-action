@@ -48,9 +48,9 @@ rules:
 
   - id: "guard.block.depcruiser.architecture"
     file: "guard/block/architecture-boundary.yml"
-    adapter: "Guard L3 CI · depcruiser"
+    adapter: "Guard L3 CI · layer-boundary 内联评估器"
     priority: "high"
-    status: "draft"
+    status: "active"
 
   # 全新：容器安全基线（Dockerfile）
   - id: "guard.block.external.container-security"

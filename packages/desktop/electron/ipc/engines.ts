@@ -78,7 +78,6 @@ import {
   persistDiagnostics,
   persistDiagnosticsFromEntries,
   normalizeGuardSource,
-  normalizeInspectSource,
   normalizeRefactorSource,
   normalizePerformanceData,
   normalizeDepsSource,
@@ -119,11 +118,9 @@ import {
 import type { TaskManager } from '../task-manager';
 import {
   toGuardReportData,
-  toInspectionReportData,
   toSecurityScanReportData,
   toHealthScoreData,
   type GuardReportData,
-  type InspectionReportData,
   type SecurityScanReportData,
   type PerformanceReportData,
   type HealthScoreData,
@@ -321,7 +318,15 @@ function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): voi
 }
 
 /**
- * 体检完成后将 guard + inspect 报告转化为健康维度分并落库。
+ * 写分点 1/2：体检完成后将 guard + inspect 报告转化为健康维度分并落库。
+ *
+ * 🔴 落分口径铁律（T14）：健康总分在全仓**只有两个写分点** ——
+ *   ① 本函数：消费刚跑完的 PipelineReport（真实发起检查后落分）
+ *   ② `generateReportSummaryHandler`：只读各域最近落盘结果汇总（报告中心）
+ * 两者必须共用 `buildHealthDimensions` + `ScoringEngine.calculate`，
+ * 否则同一时刻两条路径会写出两个分，历史趋势断裂。
+ * 另：总分是**对已有结果的汇总**而非实时值，UI 侧由 `scoreFreshness` 标注数据时间。
+ *
  * 支持两种报告格式：
  * 1. 传统格式：GuardReport（有 results）+ InspectionReport（有 issues）
  * 2. SOP 格式：RuleEngineReport（有 evaluations）— 需要转换
@@ -368,7 +373,7 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
 // ─── 报告中心：只读汇总（不发起任何检查）──────────────────────────────
 
 /**
- * 报告中心「汇总生成报告」：只读各域最新落盘结果，按统一维度加权算出健康总分并落库。
+ * 写分点 2/2：报告中心「汇总生成报告」——只读各域最新落盘结果，按统一维度加权算健康总分并落库。
  *
  * 与 recordPipelineScore 唯一的区别是数据来源：
  * - recordPipelineScore 消费刚跑完的 PipelineReport（由 pipeline 触发）；
@@ -418,9 +423,6 @@ async function generateReportSummaryHandler(projectPath: string): Promise<Health
 export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) =>
     runGuardHandler(manager, projectPath, options),
-  );
-  ipcMain.handle('engine:runInspect', (_e, projectPath: string) =>
-    runInspectHandler(manager, projectPath),
   );
   ipcMain.handle('engine:runSecurity', (_e, projectPath: string) =>
     runSecurityHandler(manager, projectPath),
@@ -524,40 +526,6 @@ async function runGuardHandler(
     console.error('[engine:runGuard] Error:', err);
     return {
       summary: { totalChecks: 0, passed: 0, blocked: 0, warnings: 0 },
-      checks: [],
-      metadata: { duration: 0, timestamp: new Date().toISOString() },
-    };
-  }
-}
-
-/** 运行 inspect 巡检并返回原生报告（仅 runInspect 使用；技术债已改读落盘快照，见 T6） */
-async function runInspectTask(
-  manager: TaskManager,
-  projectPath: string,
-): Promise<InspectionReport> {
-  if (!projectPath || typeof projectPath !== 'string') {
-    throw new Error(t('electron.invalidProjectPath'));
-  }
-  const task = manager.start('inspect', projectPath);
-  return (await manager.waitFor(task.id)) as InspectionReport;
-}
-
-async function runInspectHandler(
-  manager: TaskManager,
-  projectPath: string,
-): Promise<InspectionReportData> {
-  try {
-    const report = await runInspectTask(manager, projectPath);
-    try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeInspectSource(report));
-    } catch (e) {
-      console.warn('[engine:runInspect] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
-    }
-    return toInspectionReportData(report);
-  } catch (err) {
-    console.error('[engine:runInspect] Error:', err);
-    return {
-      summary: { total: 0, passed: 0, warnings: 0, failures: 0 },
       checks: [],
       metadata: { duration: 0, timestamp: new Date().toISOString() },
     };

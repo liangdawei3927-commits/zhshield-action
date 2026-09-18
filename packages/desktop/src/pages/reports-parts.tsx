@@ -1,5 +1,5 @@
 import type { HealthScoreData } from '../types/electron';
-import { getScoreColor, getScoreLabel, dimensionName } from './reports-logic';
+import { getScoreColor, getScoreLabel, dimensionName, scoreFreshness } from './reports-logic';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -190,7 +190,8 @@ export function LatestScoreCard({
   latest: HealthScoreData;
   data: HealthScoreData[];
 }) {
-  useT();
+  const t = useT();
+  const freshness = scoreFreshness(latest.timestamp);
   return (
     <ResultCard variant="score" className="flex gap-6 mb-6">
       <div className="flex items-center gap-4">
@@ -202,8 +203,16 @@ export function LatestScoreCard({
         </div>
         <div>
           <div className="text-sm font-semibold text-zh-ink-2">{getScoreLabel(latest.score)}</div>
-          <div className="text-xs text-zh-muted mt-0.5">
-            {new Date(latest.timestamp).toLocaleDateString()}
+          {/* 总分是「上一次检查结果的汇总」，必须标注数据时间；超过阈值时显式提示陈旧（T14） */}
+          <div
+            className="text-xs mt-0.5"
+            style={{ color: freshness.stale ? 'rgb(var(--zh-warning))' : 'rgb(var(--zh-muted))' }}
+          >
+            {freshness.stale
+              ? t('page.reports.dataStale', { hours: freshness.ageHours })
+              : t('page.reports.dataAsOf', {
+                  date: new Date(latest.timestamp).toLocaleDateString(),
+                })}
           </div>
         </div>
       </div>

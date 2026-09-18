@@ -20,11 +20,61 @@ export function getScoreColor(score: number) {
   return 'rgb(var(--zh-danger))';
 }
 
-export function getScoreLabel(score: number) {
-  if (score >= 90) return t('page.reports.scoreLabel.excellent');
-  if (score >= 75) return t('page.reports.scoreLabel.good');
-  if (score >= 60) return t('page.reports.scoreLabel.needsImprovement');
-  return t('page.reports.scoreLabel.danger');
+export function getScoreLabel(score: number, tr: typeof t = t) {
+  if (score >= 90) return tr('page.reports.scoreLabel.excellent');
+  if (score >= 75) return tr('page.reports.scoreLabel.good');
+  if (score >= 60) return tr('page.reports.scoreLabel.needsImprovement');
+  return tr('page.reports.scoreLabel.danger');
+}
+
+/** 未检测维度的中性色（该域从未运行：既不是好也不是坏，不参与总分加权） */
+const NOT_RUN_COLOR = 'rgb(var(--zh-muted))';
+
+export interface DimensionView {
+  /** true = 该域从未运行（不参与总分加权） */
+  notRun: boolean;
+  /** 展示用颜色 */
+  color: string;
+  /** 展示用状态文案 */
+  label: string;
+  /** 展示用分值文本；未检测时为占位符而非 0 */
+  scoreText: string;
+}
+
+/**
+ * 维度展示视图：把「未检测」与「0 分」分开。
+ *
+ * `@zh/scoring` 的 `buildHealthDimensions` 为未运行的域产出 `{ score: 0, status: 'not-run' }`
+ * 并**保留在 dimensions 数组里**（只是不参与 overall 加权）。渲染层若直接按 score 上色，
+ * 未检测的域会显示成「0 分 · 危险」—— 把"没查"报成"查了、很差"。
+ *
+ * 缺省视作已检测（与 `@zh/scoring` 的 `DimensionScore.status?` 语义一致，兼容旧记录）。
+ */
+export function dimensionView(
+  dim: { score: number; status?: 'scored' | 'not-run' },
+  tr: typeof t = t,
+): DimensionView {
+  if (dim.status === 'not-run') {
+    return {
+      notRun: true,
+      color: NOT_RUN_COLOR,
+      label: tr('page.reports.scoreLabel.notRun'),
+      scoreText: '—',
+    };
+  }
+  return {
+    notRun: false,
+    color: getScoreColor(dim.score),
+    label: getScoreLabel(dim.score, tr),
+    scoreText: String(dim.score),
+  };
+}
+
+/** 已检测维度数：总分只由这些维度加权而来，未检测维度被排除在外 */
+export function countRunDimensions(
+  dims: readonly { status?: 'scored' | 'not-run' }[],
+): number {
+  return dims.filter((d) => d.status !== 'not-run').length;
 }
 
 export function dimensionName(dimKey: string, tr: typeof t = t): string {

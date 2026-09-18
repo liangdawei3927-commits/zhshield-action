@@ -1331,11 +1331,13 @@
         "danger": "危険",
         "excellent": "優秀",
         "good": "良好",
-        "needsImprovement": "改善が必要"
+        "needsImprovement": "改善が必要",
+        "notRun": "未実行"
       },
       "summaryDone": "各ドメインの最新結果を集約しました。総合スコア {{score}}",
       "dataAsOf": "データ時点 {{date}}（スコアは各ドメインの最新結果の集約です）",
       "dataStale": "{{hours}} 時間前のデータに基づきます。再集約を推奨します",
+      "partialDimensions": "スコアは検出済みの {{run}} / {{total}} 次元のみで重み付けされています（未検出の次元は除外）",
       "table": {
         "abnormal": "異常",
         "col": {

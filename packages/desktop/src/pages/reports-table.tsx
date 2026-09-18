@@ -3,6 +3,7 @@ import {
   getScoreColor,
   getScoreLabel,
   dimensionName,
+  dimensionView,
   gradeLabel,
   type HealthScoreRow,
 } from './reports-logic';
@@ -32,18 +33,22 @@ function HistoryRow({ item, isLast }: { item: HealthScoreRow; isLast: boolean })
       </td>
       <td className="px-5 py-3">
         <div className="flex flex-wrap gap-1.5">
-          {item.dimensions.map((d, j) => (
-            <span
-              key={j}
-              className="inline-flex items-baseline gap-1 text-xs px-1.5 py-0.5 rounded bg-zh-panel"
-              style={{ color: getScoreColor(d.score) }}
-              title={getScoreLabel(d.score)}
-            >
-              <span className="text-zh-muted">{dimensionName(d.name, t)}</span>
-              <span className="font-bold">{d.score}</span>
-              <span className="text-[10px] opacity-70">{getScoreLabel(d.score)}</span>
-            </span>
-          ))}
+          {item.dimensions.map((d, j) => {
+            // 经 dimensionView：未检测的域显示「未检测」，不按 0 分渲染成红色「危险」
+            const view = dimensionView(d, t);
+            return (
+              <span
+                key={j}
+                className="inline-flex items-baseline gap-1 text-xs px-1.5 py-0.5 rounded bg-zh-panel"
+                style={{ color: view.color }}
+                title={view.label}
+              >
+                <span className="text-zh-muted">{dimensionName(d.name, t)}</span>
+                <span className="font-bold">{view.scoreText}</span>
+                <span className="text-[10px] opacity-70">{view.label}</span>
+              </span>
+            );
+          })}
         </div>
       </td>
       <td className="px-5 py-3 text-right text-xs text-zh-muted">

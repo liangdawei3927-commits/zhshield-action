@@ -1,5 +1,12 @@
 import type { HealthScoreData } from '../types/electron';
-import { getScoreColor, getScoreLabel, dimensionName, scoreFreshness } from './reports-logic';
+import {
+  getScoreColor,
+  getScoreLabel,
+  dimensionName,
+  dimensionView,
+  countRunDimensions,
+  scoreFreshness,
+} from './reports-logic';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -192,6 +199,10 @@ export function LatestScoreCard({
 }) {
   const t = useT();
   const freshness = scoreFreshness(latest.timestamp);
+  // 总分只由「已检测」维度加权（@zh/scoring spec C）；未检测维度被排除在外，
+  // 必须显式说明覆盖范围，否则用户会把「只跑了 2 个域」的 92 分当成全量体检结论。
+  const runCount = countRunDimensions(latest.dimensions);
+  const totalCount = latest.dimensions.length;
   return (
     <ResultCard variant="score" className="flex gap-6 mb-6">
       <div className="flex items-center gap-4">
@@ -214,6 +225,12 @@ export function LatestScoreCard({
                   date: new Date(latest.timestamp).toLocaleDateString(),
                 })}
           </div>
+          {/* 覆盖范围提示：未检测维度不计入加权，必须告诉用户总分"算了几个域" */}
+          {runCount < totalCount && (
+            <div className="text-xs mt-0.5 text-zh-warning">
+              {t('page.reports.partialDimensions', { run: runCount, total: totalCount })}
+            </div>
+          )}
         </div>
       </div>
       {data.length >= 2 && (
@@ -229,31 +246,39 @@ export function DimensionCards({ dimensions }: { dimensions: HealthScoreData['di
   const t = useT();
   return (
     <div className="flex flex-wrap gap-4 mb-6">
-      {dimensions.map((d) => (
-        <ResultCard key={d.name} variant="stats" className="flex-1 min-w-[150px]">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="text-xs text-zh-muted truncate">{dimensionName(d.name, t)}</div>
-            <span
-              className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{
-                color: getScoreColor(d.score),
-                background: `color-mix(in srgb, ${getScoreColor(d.score)} 12%, transparent)`,
-              }}
-            >
-              {getScoreLabel(d.score)}
-            </span>
-          </div>
-          <div className="text-lg font-bold" style={{ color: getScoreColor(d.score) }}>
-            {d.score}
-          </div>
-          <div className="w-full h-1.5 rounded-full bg-zh-panel mt-2">
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${(d.weight || 0.5) * 100}%`, background: getScoreColor(d.score) }}
-            />
-          </div>
-        </ResultCard>
-      ))}
+      {dimensions.map((d) => {
+        // 经 dimensionView 取色/取文案：未检测的域显示「未检测」，不按 0 分渲染
+        const view = dimensionView(d, t);
+        return (
+          <ResultCard
+            key={d.name}
+            variant="stats"
+            className={`flex-1 min-w-[150px]${view.notRun ? ' opacity-70' : ''}`}
+          >
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="text-xs text-zh-muted truncate">{dimensionName(d.name, t)}</div>
+              <span
+                className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{
+                  color: view.color,
+                  background: `color-mix(in srgb, ${view.color} 12%, transparent)`,
+                }}
+              >
+                {view.label}
+              </span>
+            </div>
+            <div className="text-lg font-bold" style={{ color: view.color }}>
+              {view.scoreText}
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-zh-panel mt-2">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${(d.weight || 0.5) * 100}%`, background: view.color }}
+              />
+            </div>
+          </ResultCard>
+        );
+      })}
     </div>
   );
 }

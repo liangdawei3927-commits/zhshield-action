@@ -1331,11 +1331,13 @@
         "danger": "위험",
         "excellent": "우수",
         "good": "양호",
-        "needsImprovement": "개선 필요"
+        "needsImprovement": "개선 필요",
+        "notRun": "미실행"
       },
       "summaryDone": "각 도메인의 최신 결과를 집계했습니다. 종합 점수 {{score}}",
       "dataAsOf": "데이터 시각 {{date}} (점수는 각 도메인의 최신 결과 집계입니다)",
       "dataStale": "{{hours}}시간 전 데이터 기준입니다. 다시 집계하는 것을 권장합니다",
+      "partialDimensions": "점수는 검출된 {{run}} / {{total}} 차원만 가중치에 반영됩니다(미검출 차원 제외)",
       "table": {
         "abnormal": "이상",
         "col": {

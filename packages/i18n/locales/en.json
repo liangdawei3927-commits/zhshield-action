@@ -1331,11 +1331,13 @@
         "danger": "Danger",
         "excellent": "Excellent",
         "good": "Good",
-        "needsImprovement": "Needs improvement"
+        "needsImprovement": "Needs improvement",
+        "notRun": "Not run"
       },
       "summaryDone": "Summarized the latest results from every domain. Overall score {{score}}.",
       "dataAsOf": "Data as of {{date}} (score summarizes each domain's latest result)",
       "dataStale": "Based on data from {{hours}}h ago — regenerate to refresh",
+      "partialDimensions": "Score covers only {{run}} of {{total}} dimensions — undetected dimensions are excluded from weighting",
       "table": {
         "abnormal": "Abnormal",
         "col": {

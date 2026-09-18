@@ -169,6 +169,13 @@ export interface HealthScoreData {
     score: number;
     weight: number;
     issues?: number;
+    /**
+     * 维度检测状态：`not-run` = 该域从未运行（`score` 恒为 0 且**不参与**总分加权）。
+     * 缺省视作已检测。与 `@zh/scoring` 的 `DimensionScore.status?` 同源 ——
+     * 主进程 `toHealthScoreData` 整体透传 dimensions，故运行时该字段是存在的；
+     * 此处漏声明曾导致渲染层读不到，把「未检测」显示成「0 分 · 危险」。
+     */
+    status?: 'scored' | 'not-run';
   }>;
   summary: string;
   timestamp: string;

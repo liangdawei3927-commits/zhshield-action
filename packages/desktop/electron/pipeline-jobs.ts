@@ -7,7 +7,6 @@
 import { t } from '@zh/i18n';
 import { serializePipelineReport } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
-import { collectPerformanceIssues } from './pipeline-report';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
 // 直连纯内存缓存模块而非 ipc-context：本文件被打进 pipeline-worker 子进程
@@ -215,60 +214,41 @@ export async function runGarbageRestoreJob(
 }
 
 /**
- * 性能优化检测 — 双通道合并：
- * 1) @zh/performance 引擎（静态优先骨架：包体积 / 构建配置 / tree-shaking / chunk 划分）；
- * 2) SOP inspect 的 performance 维度（ESLint 性能规则集 + Semgrep ReDoS，运行时反模式）。
- * 引擎异常不阻断——回退到仅 SOP 通道。
+ * 性能优化检测 — 性能页自有引擎单通道（@zh/performance）。
+ *
+ * 历史（T7 去越界）：本任务曾并跑一条「inspect 域 SOP 通道」，注释声称覆盖
+ * ESLint 性能规则集 + Semgrep ReDoS。但生产 presets 中**不存在**
+ * `category: performance` 的规则 —— ESLint 性能配置（kernel/assets/eslint/
+ * eslint-performance.config.mjs）与 Semgrep ReDoS 规则只挂在 kernel assets
+ * 与 test-fixtures，由 zhcheck / guard 路径消费。该通道因此恒产出 0 条，
+ * 却要跑完整个 inspect 域（借调他域且零收益），已移除。
+ *
+ * 若后续要覆盖运行时反模式，应作为 @zh/performance 自有探测器落地
+ * （走 ToolAdapter 共享能力），而不是回到 inspect 域 SOP 借调。
+ *
+ * 引擎异常不再降级吞掉：单通道下吞异常等同于把「没查到」显示成「没问题」，
+ * 故直接抛出由外层转 error 事件。
  */
 export async function runPerformanceJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'performance', t('pipeline.performance.loadingRules'), 0.1);
   try {
     const startedAt = Date.now();
-    const engineIssues: PerformanceReportIssue[] = [];
-    try {
-      // 引擎通道：纯静态分析，不执行项目代码（P0-2 禁令）
-      const { PerformanceEngine } = await import('@zh/performance');
-      const engineReport = new PerformanceEngine().scan(projectPath);
-      for (const issue of engineReport.issues) {
-        engineIssues.push({
-          id: issue.id,
-          ruleId: issue.ruleId,
-          severity: issue.severity,
-          file: issue.file,
-          line: issue.line,
-          message: issue.message,
-          suggestion: issue.suggestion,
-          autoFixable: issue.autoFixable,
-        });
-      }
-    } catch (err) {
-      console.warn(
-        '[pipeline-worker] 性能引擎通道异常，降级为仅 SOP:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
-    // SOP 通道：运行时反模式（可并行失败隔离）
-    let sopIssues: PerformanceReportIssue[] = [];
-    try {
-      const { PipelineRunner } = await import('@zh/pipeline');
-      const runner = new PipelineRunner(projectPath);
-      await runner.loadSopRules();
-      progress(id, 'performance', t('pipeline.performance.scanning'), 0.5);
-      // 只评估 inspect 域：性能类 SOP 规则（inspect.scan.official.*）均属 inspect 域。
-      // 不传 domains 会落到 runInspect 的默认集 inspect+security，把整个安全域（5 条
-      // semgrep + gitleaks 硬编码密钥）跑一遍，而本通道只消费 category==='performance'
-      // 的违规 → 安全域产出 100% 被丢弃（实测该通道安全域为纯浪费）。
-      const inspectReport = await runner.runSopInspect({ domains: ['inspect'] });
-      sopIssues = collectPerformanceIssues(inspectReport.evaluations ?? []);
-    } catch (err) {
-      console.warn(
-        '[pipeline-worker] 性能 SOP 通道异常，降级为仅引擎:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
-    const issues = dedupePerformanceIssues([...engineIssues, ...sopIssues]);
+    // 纯静态分析，不执行项目代码（P0-2 禁令）
+    const { PerformanceEngine } = await import('@zh/performance');
+    const engineReport = new PerformanceEngine().scan(projectPath);
+    progress(id, 'performance', t('pipeline.performance.scanning'), 0.6);
+    const issues: PerformanceReportIssue[] = dedupePerformanceIssues(
+      engineReport.issues.map((issue) => ({
+        id: issue.id,
+        ruleId: issue.ruleId,
+        severity: issue.severity,
+        file: issue.file,
+        line: issue.line,
+        message: issue.message,
+        suggestion: issue.suggestion,
+        autoFixable: issue.autoFixable,
+      })),
+    );
     const report = {
       summary: {
         total: issues.length,
@@ -289,14 +269,20 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
   }
 }
 
-/** 合并双通道问题并按 ruleId+file 去重（引擎通道优先保留） */
+/**
+ * 按 issue.id 去重（引擎 id 已含 file + 具体维度，如
+ * `complexity-sync-io-{file}-{fnName}`）。
+ *
+ * 旧实现按 `ruleId:file` 去重 —— 那是双通道合并期的产物，单通道后只会**少报**：
+ * 同一文件里 readFileSync 与 execSync 是两条独立问题，ruleId 同为
+ * `complexity.sync-io`、file 相同 → 被压成 1 条。
+ */
 function dedupePerformanceIssues(issues: PerformanceReportIssue[]): PerformanceReportIssue[] {
   const seen = new Set<string>();
   const result: PerformanceReportIssue[] = [];
   for (const issue of issues) {
-    const key = `${issue.ruleId}:${issue.file}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(issue.id)) continue;
+    seen.add(issue.id);
     result.push(issue);
   }
   return result;

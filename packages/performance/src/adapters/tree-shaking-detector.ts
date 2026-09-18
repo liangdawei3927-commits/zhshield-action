@@ -12,6 +12,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { safeJoin } from '@zh/shared';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
+import {
+  resolveSourceRoots,
+  collectFilesAcrossRoots,
+  NON_PRODUCTION_DIRS,
+  isNonProductionFile,
+} from '../source-roots';
 
 /** 已知体积较大的第三方库（全量引入会显著增大产物 / 阻塞摇树） */
 export const KNOWN_LARGE_PACKAGES: ReadonlySet<string> = new Set([
@@ -34,9 +40,6 @@ export const LARGE_CHUNK_THRESHOLD = 1024 * 1024;
 
 /** 产物目录约定（与 bundle-size 检测器一致） */
 const ARTIFACT_DIRS: readonly string[] = ['dist', 'build', 'out'];
-
-/** 源码目录约定 */
-const SOURCE_DIRS: readonly string[] = ['src'];
 
 /** 源码文件扩展名（ts/tsx/js/jsx） */
 const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
@@ -92,9 +95,9 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
     const issues: PerformanceIssue[] = [];
     const pkg = readJsonSafe(safeJoin(projectRoot, 'package.json'));
-    const srcRoot = safeJoin(projectRoot, SOURCE_DIRS[0]);
+    const srcRoots = resolveSourceRoots(projectRoot);
     if (pkg) {
-      this.collectTreeShakingIssues(projectRoot, pkg, srcRoot, cfg, issues);
+      this.collectTreeShakingIssues(projectRoot, pkg, srcRoots, cfg, issues);
     }
     const chunkFiles = this.collectArtifactChunks(projectRoot);
     this.collectChunkIssues(chunkFiles, cfg, issues);
@@ -108,7 +111,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   private collectTreeShakingIssues(
     projectRoot: string,
     pkg: Record<string, unknown>,
-    srcRoot: string,
+    srcRoots: readonly string[],
     cfg: PerformanceConfig,
     issues: PerformanceIssue[],
   ): void {
@@ -141,7 +144,11 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         autoFixable: false,
       });
     }
-    const sourceFiles = this.collectFiles(srcRoot, SOURCE_EXTS, cfg.scanLimit);
+    const sourceFiles = collectFilesAcrossRoots(
+      srcRoots,
+      (root, limit) => this.collectFiles(root, SOURCE_EXTS, limit),
+      cfg.scanLimit,
+    );
     const wholeLibraryHits = this.findWholeLibraryImports(projectRoot, sourceFiles, cfg.scanLimit);
     for (const hit of wholeLibraryHits) {
       issues.push({
@@ -218,10 +225,20 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         if (files.length >= limit) return;
         const full = safeJoin(current, entry.name);
         if (entry.isDirectory()) {
-          // 跳过 node_modules 与产物目录，避免误扫依赖自身源码
-          if (entry.name === 'node_modules' || ARTIFACT_DIRS.includes(entry.name)) continue;
+          // 跳过 node_modules / 产物目录 / 测试夹具，避免误扫依赖自身源码与非生产代码
+          if (
+            entry.name === 'node_modules' ||
+            ARTIFACT_DIRS.includes(entry.name) ||
+            NON_PRODUCTION_DIRS.has(entry.name)
+          ) {
+            continue;
+          }
           visit(full);
-        } else if (entry.isFile() && exts.includes(path.extname(entry.name))) {
+        } else if (
+          entry.isFile() &&
+          exts.includes(path.extname(entry.name)) &&
+          !isNonProductionFile(entry.name)
+        ) {
           files.push(full);
         }
       }

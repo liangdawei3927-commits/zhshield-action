@@ -34,10 +34,26 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // ../shared/src/types.ts
-var INSPECT_SCOPE_DOMAINS;
+var GOVERNANCE_DOMAINS, INSPECT_SCOPE_DOMAINS;
 var init_types = __esm({
   "../shared/src/types.ts"() {
     "use strict";
+    GOVERNANCE_DOMAINS = [
+      "guard",
+      // 拦截域
+      "inspect",
+      // 巡检域
+      "security",
+      // 安全域
+      "sentinel",
+      // 监控域
+      "evolve",
+      // 演进域
+      "refactor",
+      // 重构域
+      "garbage"
+      // 垃圾清理域
+    ];
     INSPECT_SCOPE_DOMAINS = ["inspect", "security", "garbage"];
   }
 });
@@ -588626,17 +588642,10 @@ var SopRuleParser = class {
 // ../kernel/src/sop/_meta/sop-loader-fs.ts
 var fs22 = __toESM(require("node:fs"));
 var path24 = __toESM(require("node:path"));
+init_src2();
 var RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 var MAX_RULE_DEPTH = 64;
-var GOVERNANCE_DOMAIN_DIRS = /* @__PURE__ */ new Set([
-  "guard",
-  "inspect",
-  "security",
-  "sentinel",
-  "evolve",
-  "refactor",
-  "garbage"
-]);
+var GOVERNANCE_DOMAIN_DIRS = new Set(GOVERNANCE_DOMAINS);
 var SopRuleFileCollector = class {
   parser;
   constructor(parser) {
@@ -590733,7 +590742,8 @@ var SopRuleEngine = class {
     return this.evaluateRules({ ...context, domain: "guard" });
   }
   /**
-   * SOP 驱动型 Inspect 巡检 — 筛选 INSPECT_SCOPE_DOMAINS 覆盖的域执行（inspect / security / garbage）
+   * SOP 驱动型 Inspect 巡检 — 筛选 INSPECT_SCOPE_DOMAINS 覆盖的域（inspect/security/garbage）。
+   * garbage 必须在内：CLI `inspect --sop` 不传 domains，漏掉会静默少检垃圾规则。
    */
   async runInspect(context) {
     const domains = context.domains ?? (context.domain ? void 0 : [...INSPECT_SCOPE_DOMAINS]);
@@ -597876,7 +597886,8 @@ var PipelineRunner = class {
 // src/sop-dir.ts
 var path48 = __toESM(require("node:path"));
 var import_node_fs2 = require("node:fs");
-var DOMAIN_DIRS = /* @__PURE__ */ new Set(["guard", "inspect", "security", "sentinel", "evolve", "refactor"]);
+init_src2();
+var DOMAIN_DIRS = new Set(GOVERNANCE_DOMAINS);
 function resolveBundledSopDir(base) {
   const bundled = path48.join(base, "sop");
   if (!(0, import_node_fs2.existsSync)(bundled)) return void 0;

@@ -11,13 +11,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { safeJoin } from '@zh/shared';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
+import {
+  resolveSourceRoots,
+  collectFilesAcrossRoots,
+  NON_PRODUCTION_DIRS,
+  isNonProductionFile,
+} from '../source-roots';
 
-const SOURCE_DIRS: readonly string[] = ['src'];
 const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
 const SKIP_DIRS: ReadonlySet<string> = new Set(['node_modules', 'dist', 'build', 'out']);
 const NESTED_LOOP_THRESHOLD = 3;
-const SYNC_IO_PATTERN =
-  /\b(readFileSync|writeFileSync|appendFileSync|execSync|spawnSync)\s*\(/g;
+const SYNC_IO_PATTERN = /\b(readFileSync|writeFileSync|appendFileSync|execSync|spawnSync)\s*\(/g;
 
 export interface ComplexityDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[];
@@ -94,10 +98,7 @@ function detectMaxLoopDepth(source: string): number {
       }
     } else if (token === '}') {
       braceDepth--;
-      while (
-        loopBodyDepths.length > 0 &&
-        loopBodyDepths[loopBodyDepths.length - 1] > braceDepth
-      ) {
+      while (loopBodyDepths.length > 0 && loopBodyDepths[loopBodyDepths.length - 1] > braceDepth) {
         loopBodyDepths.pop();
       }
     } else {
@@ -111,8 +112,11 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
     const issues: PerformanceIssue[] = [];
-    const srcRoot = safeJoin(projectRoot, SOURCE_DIRS[0]);
-    const files = collectSourceFiles(srcRoot, cfg.scanLimit);
+    const files = collectFilesAcrossRoots(
+      resolveSourceRoots(projectRoot),
+      collectSourceFiles,
+      cfg.scanLimit,
+    );
 
     for (const filePath of files) {
       const content = readTextSafe(filePath);
@@ -124,11 +128,7 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     return issues;
   }
 
-  private detectNestedLoop(
-    relFile: string,
-    content: string,
-    issues: PerformanceIssue[],
-  ): void {
+  private detectNestedLoop(relFile: string, content: string, issues: PerformanceIssue[]): void {
     const maxDepth = detectMaxLoopDepth(content);
     if (maxDepth >= NESTED_LOOP_THRESHOLD) {
       issues.push({
@@ -144,11 +144,7 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     }
   }
 
-  private detectSyncIO(
-    relFile: string,
-    content: string,
-    issues: PerformanceIssue[],
-  ): void {
+  private detectSyncIO(relFile: string, content: string, issues: PerformanceIssue[]): void {
     const stripped = stripCommentsAndStrings(content);
     const seen = new Set<string>();
     const re = new RegExp(SYNC_IO_PATTERN.source, SYNC_IO_PATTERN.flags);
@@ -186,9 +182,13 @@ function collectSourceFiles(dir: string, limit: number): string[] {
       if (files.length >= limit) return;
       const full = safeJoin(current, entry.name);
       if (entry.isDirectory()) {
-        if (SKIP_DIRS.has(entry.name)) continue;
+        if (SKIP_DIRS.has(entry.name) || NON_PRODUCTION_DIRS.has(entry.name)) continue;
         visit(full);
-      } else if (entry.isFile() && SOURCE_EXTS.includes(path.extname(entry.name))) {
+      } else if (
+        entry.isFile() &&
+        SOURCE_EXTS.includes(path.extname(entry.name)) &&
+        !isNonProductionFile(entry.name)
+      ) {
         files.push(full);
       }
     }

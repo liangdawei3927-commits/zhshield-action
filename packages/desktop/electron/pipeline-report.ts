@@ -107,21 +107,6 @@ export function attachSummary(
   return report as PipelineReport & { summary: Record<string, unknown> };
 }
 
-export interface PerformanceViolation {
-  id: string;
-  ruleId: string;
-  severity: string;
-  file: string;
-  line?: number;
-  message: string;
-  suggestion?: string;
-  category?: string;
-}
-
-export interface PerformanceEvaluation {
-  violations?: PerformanceViolation[];
-}
-
 export interface PerformanceReportIssue {
   id: string;
   ruleId: string;
@@ -131,26 +116,4 @@ export interface PerformanceReportIssue {
   message: string;
   suggestion?: string;
   autoFixable: boolean;
-}
-
-export function collectPerformanceIssues(
-  evaluations: PerformanceEvaluation[],
-): PerformanceReportIssue[] {
-  const issues: PerformanceReportIssue[] = [];
-  for (const ev of evaluations) {
-    for (const v of ev.violations ?? []) {
-      if (v.category !== 'performance') continue;
-      issues.push({
-        id: v.id,
-        ruleId: v.ruleId,
-        severity: v.severity,
-        file: v.file,
-        line: v.line,
-        message: v.message,
-        suggestion: v.suggestion,
-        autoFixable: !!v.suggestion && v.suggestion.includes('自动修复'),
-      });
-    }
-  }
-  return issues;
 }

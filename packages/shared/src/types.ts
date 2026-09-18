@@ -502,14 +502,24 @@ export type DegradationLevel = 0 | 1 | 2 | 3 | 4;
 
 // ─── SOP 类型（智汇云脑 — 三维分类体系） ──────────────────
 
-export type GovernanceDomain =
-  | 'guard' // 拦截域
-  | 'inspect' // 巡检域
-  | 'security' // 安全域
-  | 'sentinel' // 监控域
-  | 'evolve' // 演进域
-  | 'refactor' // 重构域
-  | 'garbage'; // 垃圾清理域
+/**
+ * 治理域清单（**唯一来源**：运行时常量与类型同源）。
+ *
+ * 曾出现三份互不同步的域清单——shared 类型、kernel `GOVERNANCE_DOMAIN_DIRS`、
+ * cli `sop-dir.ts` 的 `DOMAIN_DIRS`；新增 `garbage` 域时漏改后者，导致
+ * 兼容分支判定失效。新增域请只改这里。
+ */
+export const GOVERNANCE_DOMAINS = [
+  'guard', // 拦截域
+  'inspect', // 巡检域
+  'security', // 安全域
+  'sentinel', // 监控域
+  'evolve', // 演进域
+  'refactor', // 重构域
+  'garbage', // 垃圾清理域
+] as const;
+
+export type GovernanceDomain = (typeof GOVERNANCE_DOMAINS)[number];
 
 /**
  * 「全量巡检」默认覆盖的治理域 —— 唯一来源，避免各调用点各写一份而漂移。

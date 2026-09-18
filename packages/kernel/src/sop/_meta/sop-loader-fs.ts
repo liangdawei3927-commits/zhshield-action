@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { GOVERNANCE_DOMAINS } from '@zh/shared';
 import type { SopRule, GovernanceDomain, ActionType } from './sop-types';
 import { SopRuleParser } from './sop-loader-parser';
 
@@ -9,16 +10,9 @@ const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 const MAX_RULE_DEPTH = 64;
 
 /** 各大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
- *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载 */
-const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
-  'guard',
-  'inspect',
-  'security',
-  'sentinel',
-  'evolve',
-  'refactor',
-  'garbage',
-]);
+ *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载。
+ *  清单来自 @zh/shared 的 GOVERNANCE_DOMAINS（唯一来源），勿在此另写一份。 */
+const GOVERNANCE_DOMAIN_DIRS: ReadonlySet<string> = new Set<string>(GOVERNANCE_DOMAINS);
 
 /**
  * SOP 规则文件收集器 — 遍历文件系统目录树，收集并解析规则文件

@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
+import { GOVERNANCE_DOMAINS } from '@zh/shared';
 
-/** SopLoader 扫描的治理域目录（与 kernel SopRuleFileCollector 的 GOVERNANCE_DOMAIN_DIRS 一致） */
-const DOMAIN_DIRS = new Set(['guard', 'inspect', 'security', 'sentinel', 'evolve', 'refactor']);
+/** SopLoader 扫描的治理域目录（与 kernel SopRuleFileCollector 同源：@zh/shared） */
+const DOMAIN_DIRS: ReadonlySet<string> = new Set<string>(GOVERNANCE_DOMAINS);
 
 /** 随 bundle 打包的 SOP 规则目录（build-cli.mjs 复制 kernel/src/sop → dist/sop）。
  *  优先返回 presets/sop-templates（SopLoader 扫描 {domain}/{action} 两级目录下的规则文件，

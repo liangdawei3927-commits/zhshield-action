@@ -1,21 +1,22 @@
 /**
  * 前端性能引擎（engine.ts）
  *
- * 聚合五个静态分析探测器：构建配置 / 包体积 / tree-shaking / chunk 划分 / 复杂度。
+ * 聚合四个静态分析探测器：构建配置 / 包体积 / tree-shaking+chunk 划分 / 复杂度。
  * 纯静态分析，绝不执行项目代码（与 P0-2 禁令一致）；零网络；不抛异常。
  */
 import * as fs from 'fs';
 import { safeJoin } from '@zh/shared';
 import type { PerformanceIssue, PerformanceReport, PerformanceConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
+import { resolveSourceRoots } from './source-roots';
 import { BuildConfigDetectorImpl } from './adapters/build-config-detector';
 import { BundleSizeDetectorImpl } from './adapters/bundle-size-detector';
 import { TreeShakingDetectorImpl } from './adapters/tree-shaking-detector';
 import { ComplexityDetectorImpl } from './adapters/complexity-detector';
 
-/** 判断给定路径是否为项目根（存在 package.json / 任意构建配置 / 源码目录） */
+/** 判断给定路径是否为项目根（存在 package.json / 任意源码根 / 已解析出源码目录） */
 function isProjectRoot(root: string): boolean {
-  return fs.existsSync(safeJoin(root, 'package.json')) || fs.existsSync(safeJoin(root, 'src'));
+  return fs.existsSync(safeJoin(root, 'package.json')) || resolveSourceRoots(root).length > 0;
 }
 
 /** 严重度权重（用于排序：critical=0 最高） */
@@ -46,9 +47,10 @@ export class PerformanceEngine {
     return this.buildReport(issues, Date.now() - startedAt);
   }
 
-  /** 聚合五个探测器（内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描） */
+  /** 聚合四个探测器（内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描） */
   private collectIssues(projectRoot: string, issues: PerformanceIssue[]): void {
     try {
+      this.reportMissingSourceRoot(projectRoot, issues);
       issues.push(...new BuildConfigDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new BundleSizeDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new TreeShakingDetectorImpl().detect(projectRoot, this.config));
@@ -56,6 +58,29 @@ export class PerformanceEngine {
     } catch {
       // 探测器内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描
     }
+  }
+
+  /**
+   * 源码根缺失时显式告知（诚实性约束）。
+   *
+   * 四处探测器中，复杂度与 tree-shaking 都依赖源码文件；解析不出源码根时它们
+   * 产出 0 条，面板会显示「0 问题」—— 那是「没查」而不是「没问题」。
+   * 这里补一条 info 级说明，让用户看见覆盖面缺口。
+   */
+  private reportMissingSourceRoot(projectRoot: string, issues: PerformanceIssue[]): void {
+    if (resolveSourceRoots(projectRoot).length > 0) return;
+    if (!fs.existsSync(safeJoin(projectRoot, 'package.json'))) return;
+    issues.push({
+      id: 'coverage-no-source-root',
+      ruleId: 'coverage.no-source-root',
+      category: 'complexity',
+      severity: 'info',
+      file: '',
+      message:
+        '未发现源码根目录（src/ · app/ · packages/*/src · apps/*/src）— 复杂度与 tree-shaking 检测本次未执行，0 条不等于无问题',
+      suggestion: '请核对项目结构；若源码位于非约定目录，请在项目根建立 src/ 软链或调整目录约定',
+      autoFixable: false,
+    });
   }
 
   private buildReport(issues: PerformanceIssue[], duration: number): PerformanceReport {

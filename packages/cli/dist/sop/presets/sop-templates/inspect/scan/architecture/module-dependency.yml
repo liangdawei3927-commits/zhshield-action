@@ -15,12 +15,12 @@ kind: InspectRule
 metadata:
   id: "inspect.scan.depcruiser.module-dependency"
   name: "模块间依赖方向巡检"
-  description: "扫描模块间的依赖方向合规性：禁止跨模块内部路径引用、确保 shared/ 模块被正确隔离、检测模块间循环依赖、验证有界上下文间的依赖方向"
+  description: "检查模块间依赖方向：shared/ 保持隔离不被业务模块反向依赖；控制器不得跳过中间层直接依赖仓储。由 dependency-cruiser 真实执行"
   version: "1.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "draft"
+  status: "active"
   source: "internal"
   sourceRef: "dependency-cruiser · IronNest rules/01 · rules/30"
 
@@ -52,58 +52,42 @@ conditions:
     - "**/*.d.ts"
 
 check:
+  # ── 09-18 改造 ────────────────────────────────────────────────────────────
+  # 原写法 check.tool="dep-cruiser" + toolConfig.rules（自定义 pattern/check 字段，
+  # 适配器不识别）且 status=draft 从未执行。现改用 dep-cruiser 的 ruleDef 合成能力：
+  # 规则即配置，扫描时注入临时 --config 真实执行。
+  #
+  # 覆盖范围声明：
+  #   ✓ shared-module-isolation（shared 不得依赖业务模块）→ ruleDef 真实执行
+  #   ✓ layer-skip（控制器直接依赖仓储，跳过中间层）      → ruleDef 真实执行
+  #   ✗ cross-module-internal-path / module-circular → 已由「模块边界」规则覆盖，
+  #     同一违规两处上报会被读作误报，此处不再重复声明
+  #   ✗ bounded-context-coupling / module-folder-count → 需语义与计数能力，
+  #     dep-cruiser 不支持，已移除
   tool: "dep-cruiser"
   toolConfig:
-    config: "${ZHSHIELD_HOME}/.dependency-cruiser.mjs"
-    rules:
-      - ruleId: "cross-module-internal-path"
-        description: "模块 A 直接引用模块 B 的内部路径（如 module-b/src/internal/file.ts），应通过模块 B 的 index.ts 导出"
-        severity: "error"
-        pattern:
-          source: "src/modules/{module}/**"
-          target: "src/modules/{other-module}/src/**"
-        exception:
-          - "src/modules/shared/**"
-      - ruleId: "shared-module-isolation"
-        description: "shared/ 模块不能依赖任何业务模块（controller/service/repository）"
-        severity: "error"
-        pattern:
-          source: "src/shared/**"
-          target: "src/modules/**"
-        allowed:
-          - "src/shared/**"
-          - "src/core/**"
-      - ruleId: "module-circular"
-        description: "模块 A 依赖模块 B，模块 B 又依赖模块 A 构成循环"
-        severity: "error"
-        check: "circular"
-        maxCycleDepth: 3
-      - ruleId: "bounded-context-coupling"
-        description: "有界上下文间的依赖应通过事件或共享内核，禁止直接引用对方内部实体"
-        severity: "warning"
-        check:
-          source: "src/modules/{context-a}/**"
-          target: "src/modules/{context-b}/**"
-          couplingType: "structural"
-          allowedCoupling:
-            - "events"
-            - "shared-kernel"
-      - ruleId: "layer-skip"
-        description: "跳过中间层的依赖（如 controller 直接依赖 repository）"
-        severity: "warning"
-        pattern:
-          source: "src/**/controllers/**"
-          target: "src/**/repositories/**"
-      - ruleId: "module-folder-count"
-        description: "单模块内文件数不应超过 IronNest#23 限制"
-        severity: "info"
-        maxFilesPerModule: 50
+    config: ".dependency-cruiser.cjs"
+  rules:
+    - id: "shared-module-isolation"
+      description: "shared/ 不得依赖业务模块，应保持无业务语义的公共库"
+      severity: "error"
+      ruleDef:
+        from:
+          path: "^src/shared/"
+        to:
+          path: "^src/(modules|features|domains|services)/"
+    - id: "layer-skip"
+      description: "控制器不得直接依赖仓储层（跳过 use-case/service）"
+      severity: "warning"
+      ruleDef:
+        from:
+          path: "/controllers/"
+        to:
+          path: "/repositories/"
   severity: "warning"
   categories:
     - "architecture"
     - "module-dependency"
-    - "bounded-context"
-    - "coupling"
 
 judgment:
   passCondition: "errorCount === 0"

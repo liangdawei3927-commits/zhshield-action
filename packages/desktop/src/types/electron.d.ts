@@ -75,7 +75,8 @@ export interface InspectionReportData {
   };
 }
 
-/** @zh/security SecurityScanReport shape (serializable) */
+/** @zh/security SecurityScanReport shape (serializable)。
+ *  垃圾清单已迁至 GarbageScanReportData（垃圾 ≠ 安全，T5 各司其职）。 */
 export interface SecurityScanReportData {
   summary: {
     total: number;
@@ -84,8 +85,6 @@ export interface SecurityScanReportData {
     medium: number;
     low: number;
     malwareTotal: number;
-    garbageTotal: number;
-    garbageSize: number;
   };
   findings: Array<{
     id: string;
@@ -107,18 +106,43 @@ export interface SecurityScanReportData {
     pattern: string;
     evidence: string;
   }>;
-  garbage: Array<{
+  securityScore: number;
+  metadata: {
+    duration: number;
+    timestamp: string;
+  };
+}
+
+/**
+ * 垃圾清理扫描报告（垃圾清理域自有通道，@zh/garbage GarbageScanReport 的序列化形态）。
+ * 不再寄生在 SecurityScanReportData 上。
+ */
+export interface GarbageScanReportData {
+  projectPath: string;
+  items: Array<{
     id: string;
     type: string;
     path: string;
     size: number;
     reason: string;
   }>;
-  securityScore: number;
-  metadata: {
-    duration: number;
-    timestamp: string;
+  summary: {
+    total: number;
+    /** 可释放字节数（构建产物 / 垃圾文件） */
+    size: number;
+    byType: Record<string, number>;
   };
+  /** 各检测项执行状态：ran=false 表示该项未真正执行（工具不可用/规则空跑） */
+  checks: Array<{
+    ruleId: string;
+    name: string;
+    ran: boolean;
+    producer: 'detector' | 'sop-rule';
+    reason?: string;
+  }>;
+  /** 未真正执行的检测项数 */
+  skipped: number;
+  timestamp: string;
 }
 
 /** 性能优化检测报告（SOP inspect performance 维度，serializable） */
@@ -465,6 +489,7 @@ export interface EngineAPI {
   runGuard: (projectPath: string, options?: Record<string, unknown>) => Promise<GuardReportData>;
   runInspect: (projectPath: string) => Promise<InspectionReportData>;
   runSecurity: (projectPath: string) => Promise<SecurityScanReportData>;
+  runGarbageScan: (projectPath: string) => Promise<GarbageScanReportData>;
   cleanGarbage: (
     projectPath: string,
     items: Array<{ id: string; path: string; size: number; type: string }>,
@@ -657,8 +682,9 @@ export interface PipelineProgress {
 export type TaskKind =
   | 'pipeline' // 一键体检（流水线）
   | 'inspect' // 质量巡检
-  | 'security' // 安全扫描（杀毒 + 垃圾发现）
-  | 'garbageClean' // 垃圾清理
+  | 'security' // 安全扫描（漏洞 + 恶意代码 + 密钥）
+  | 'garbage' // 垃圾清理扫描
+  | 'garbageClean' // 垃圾清理（移入回收站）
   | 'garbageRestore' // 回收站恢复
   | 'performance' // 优化加速
   | 'guard' // 门禁扫描

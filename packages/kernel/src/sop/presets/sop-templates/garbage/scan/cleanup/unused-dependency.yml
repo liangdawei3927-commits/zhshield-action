@@ -1,34 +1,34 @@
 # =============================================================================
-# SOP 规则模板 — Cleanup · 未使用依赖检测
+# SOP 规则模板 — Garbage · 未使用依赖检测
 # =============================================================================
-# 规则 ID: cleanup.scan.dependency.unused
-# 治理域: 安全域 (security)
+# 规则 ID: garbage.scan.cleanup.unused-dependency
+# 治理域: 垃圾清理域 (garbage)
 # 动作类型: 扫描检测 (scan)
 # 数据来源: 内部模式 (internal)
-# 对应适配器: Cleanup · 未用依赖
-# 内部标准源: IronNest#27 No Token-Burning · IronNest#21 YAGNI
-# 最后更新: 2026-07-29
+# 对应适配器: Inspect · depcheck（能力共享；触发权与判定权归垃圾清理域）
+# 内部标准源: IronNest#27 No Token-Burning · #21 YAGNI
+# 迁移: 2026-09-18 由 security/scan/garbage/unused-dependency.yml 迁入（T5 各司其职）
 # =============================================================================
 
 apiVersion: sop/v1
-kind: SecurityRule
+kind: GarbageRule
 metadata:
-  id: "security.scan.garbage.unused-dependency"
+  id: "garbage.scan.cleanup.unused-dependency"
   name: "未使用依赖检测"
   description: "检测 package.json 中声明但代码中未导入的依赖包。冗余依赖增加安装时间、增大 node_modules 体积、引入不必要的 CVE 暴露面"
-  version: "1.0.0"
+  version: "2.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
-  updated: "2026-07-29"
-  status: "draft"
+  updated: "2026-09-18"
+  status: "active"
   source: "internal"
   sourceRef: "IronNest rules/27 · rules/21 · depcheck"
 
 governance:
-  domain: "security"
+  domain: "garbage"
   action: "scan"
-  module: "Security"
-  category: "garbage"
+  module: "Garbage"
+  category: "cleanup"
 
 execution:
   mode: "async"
@@ -42,41 +42,28 @@ conditions:
   languages:
     - "typescript"
     - "javascript"
-    - "python"
-    - "go"
   filePatterns:
     - "package.json"
-    - "requirements.txt"
-    - "Pipfile"
-    - "go.mod"
-    - "Cargo.toml"
-  excludePatterns:
-    - "node_modules/**"
-    - "dist/**"
 
 check:
+  # ── 覆盖范围声明（诚实标注）───────────────────────────────────────────────
+  # 真实执行：depcheck 报告的未使用 dependencies / devDependencies。
+  #   skip   → --skip：按正则跳过文件（构建配置、入口等隐式使用依赖的位置）
+  #   ignore → --ignore：整体忽略的包名（与适配器默认忽略列表合并去重）
+  # 已移除：requirements.txt / Pipfile / go.mod / Cargo.toml 的等价检测 ——
+  #   depcheck 只解析 package.json；非 JS 生态的未用依赖检测需各自语言工具，
+  #   在多语言阶段单独立项，本规则不声明无法执行的范围。
   tool: "depcheck"
   toolConfig:
-    analysis:
-      method: "import-scan"
-      scope: "all-files"
-    specials:
-      - "eslint"
-      - "babel"
-      - "webpack"
-      - "vite"
-      - "jest"
-      - "typescript"
+    skip:
+      - "\\.config\\.(ts|js|mjs|cjs)$"
+      - "(^|/)scripts/"
+      - "(^|/)e2e/"
+    ignore:
       - "@types/*"
-    excludePackages:
-      - "typescript"            # 编译器，隐式使用
-      - "@types/*"              # 类型定义，隐式使用
+      - "typescript"
       - "ts-node"
       - "tsx"
-    excludeDevDependencies: true
-    threshold:
-      severity: "medium"
-      maxUnusedDeps: 2          # 超过 2 个未使用依赖时警告
   severity: "medium"
   categories:
     - "cleanup"
@@ -85,7 +72,7 @@ check:
     - "supply-chain"
 
 judgment:
-  passCondition: "unusedCount < 3"
+  passCondition: "unusedCount == 0"
   blockOn: "warning"
   priority: "medium"
 
@@ -105,23 +92,16 @@ experience:
   lastCalibrated: "2026-07-29"
 
 fix:
-  autoFixAvailable: true
+  autoFixAvailable: false
   suggestionTemplate: |
     检测到未使用的依赖：
 
     ⚠️ 包名: {package}
-    ⚠️ 当前版本: {version}
     ⚠️ 声明位置: {file}
-    ⚠️ 类型: {dependencyType}
 
     建议操作：
-    1. 运行 `npm uninstall {package}` 移除
+    1. 运行包管理器移除（`pnpm remove {package}`）；本条目不支持在垃圾清理页直接删除
     2. 如果后续计划使用但暂未接入 → 添加 `@todo` 注释并说明计划
-    3. 检查是否在非源码中使用（配置文件/构建脚本/文档等）
-
-    冗余依赖的影响：
-    - 增加 `npm install` 时间
-    - 引入不必要的 CVE 监控开销
-    - 增加 AI 上下文分析的噪声
+    3. 检查是否在非源码中使用（配置文件 / 构建脚本 / 文档等）
 
     📖 参考: IronNest #27 No Token-Burning · depcheck

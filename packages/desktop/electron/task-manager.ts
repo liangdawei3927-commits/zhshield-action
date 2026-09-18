@@ -7,6 +7,7 @@ import {
   runGuardInWorker,
   runInspectInWorker,
   runSecurityInWorker,
+  runGarbageScanInWorker,
   runGarbageCleanInWorker,
   runGarbageRestoreInWorker,
   runPerformanceInWorker,
@@ -16,6 +17,7 @@ export type TaskKind =
   | 'pipeline'
   | 'inspect'
   | 'security'
+  | 'garbage'
   | 'garbageClean'
   | 'garbageRestore'
   | 'performance'
@@ -227,6 +229,7 @@ export function buildTaskManager(): TaskManager {
       ),
     inspect: (task, _request, onProgress) => runInspectInWorker(task.projectPath, onProgress),
     security: (task, _request, onProgress) => runSecurityInWorker(task.projectPath, onProgress),
+    garbage: (task, _request, onProgress) => runGarbageScanInWorker(task.projectPath, onProgress),
     garbageClean: (task, request) =>
       runGarbageCleanInWorker(
         task.projectPath,

@@ -20,6 +20,7 @@ import {
   runGuardJob,
   runInspectJob,
   runSecurityJob,
+  runGarbageScanJob,
   runGarbageCleanJob,
   runGarbageRestoreJob,
   runPerformanceJob,
@@ -106,6 +107,9 @@ process.on('message', (raw: PipelineWorkerInbound) => {
       break;
     case 'runSecurity':
       void runSecurityJob(raw.id, raw.projectPath);
+      break;
+    case 'runGarbageScan':
+      void runGarbageScanJob(raw.id, raw.projectPath);
       break;
     case 'runGarbageClean':
       void runGarbageCleanJob(raw.id, raw.projectPath, raw.items);

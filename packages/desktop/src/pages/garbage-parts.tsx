@@ -1,5 +1,5 @@
 import type {
-  SecurityScanReportData,
+  GarbageScanReportData,
   GarbageCleanResultData,
   GarbageRestoreResultData,
 } from '../types/electron';
@@ -54,54 +54,79 @@ export function GarbageTrashIcon() {
   );
 }
 
+/** 未执行检测项提示：工具不可用 / 规则空跑时显式告知，禁止把「没查」当「没垃圾」 */
+export function GarbageSkippedNotice({ report }: { report: GarbageScanReportData }) {
+  const t = useT();
+  const skipped = report.checks.filter((c) => !c.ran);
+  if (skipped.length === 0) return null;
+  return (
+    <div className="mt-4 rounded-xl px-5 py-4 bg-warning-50 border border-warning-100">
+      <div className="text-sm font-medium text-warning-700">
+        {t('page.garbage.skippedNotice', { count: skipped.length })}
+      </div>
+      <ul className="mt-2 space-y-1">
+        {skipped.map((c) => (
+          <li key={c.ruleId} className="text-xs text-warning-600">
+            {c.name}
+            {c.reason ? ` · ${c.reason}` : ''}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function GarbageHeader({
   report,
   loading,
   progressLabel,
   onRescan,
 }: {
-  report: SecurityScanReportData;
+  report: GarbageScanReportData;
   loading: boolean;
   progressLabel?: string;
   onRescan: () => void;
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="rgb(var(--zh-success))"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <div className="mb-8">
+      <div className="flex items-center gap-4">
+        <Bounce className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-success))"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 6h18" />
+            <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+          </svg>
+        </Bounce>
+        <div>
+          <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.garbage.done')}</h1>
+          <p className="text-sm text-zh-muted">
+            {t('page.garbage.summary', {
+              count: report.summary.total,
+              size: formatSize(report.summary.size),
+            })}
+          </p>
+        </div>
+        <PrimaryButton
+          className="ml-auto"
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={progressLabel || t('page.garbage.scanning')}
         >
-          <path d="M3 6h18" />
-          <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-          <path d="M10 11v6M14 11v6" />
-        </svg>
-      </Bounce>
-      <div>
-        <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.garbage.done')}</h1>
-        <p className="text-sm text-zh-muted">
-          {t('page.garbage.summary', {
-            count: report.summary.garbageTotal,
-            size: formatSize(report.summary.garbageSize),
-          })}
-        </p>
+          {t('page.garbage.rescan')}
+        </PrimaryButton>
       </div>
-      <PrimaryButton
-        className="ml-auto"
-        onClick={onRescan}
-        loading={loading}
-        loadingLabel={progressLabel || t('page.garbage.scanning')}
-      >
-        {t('page.garbage.rescan')}
-      </PrimaryButton>
+      <GarbageSkippedNotice report={report} />
     </div>
   );
 }

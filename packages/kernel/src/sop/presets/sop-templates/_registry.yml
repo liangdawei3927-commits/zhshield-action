@@ -140,7 +140,7 @@ rules:
     status: "active"
 
   # ╔══════════════════════════════════════════════════════════════╗
-  # ║  Security (安全域) — 漏洞/病毒/垃圾扫描规则                  ║
+  # ║  Security (安全域) — 漏洞/病毒扫描规则                       ║
   # ╚══════════════════════════════════════════════════════════════╝
 
   # 漏洞扫描
@@ -198,31 +198,6 @@ rules:
     adapter: "Security Malware · 供应链攻击"
     priority: "critical"
     status: "trial"
-
-  # 垃圾清理
-  - id: "security.scan.garbage.unused-file"
-    file: "security/scan/garbage/unused-file.yml"
-    adapter: "Security · 无用文件清理"
-    priority: "low"
-    status: "draft"
-
-  - id: "security.scan.garbage.unused-dependency"
-    file: "security/scan/garbage/unused-dependency.yml"
-    adapter: "Security · 未用依赖清理"
-    priority: "medium"
-    status: "draft"
-
-  - id: "security.scan.garbage.dead-code"
-    file: "security/scan/garbage/dead-code.yml"
-    adapter: "Security · 死代码清理"
-    priority: "low"
-    status: "draft"
-
-  - id: "security.scan.garbage.duplicate-code"
-    file: "security/scan/garbage/duplicate-code.yml"
-    adapter: "Security · 重复代码清理"
-    priority: "low"
-    status: "draft"
 
   # ╔══════════════════════════════════════════════════════════════╗
   # ║  Sentinel (监控域) — 告警策略规则                            ║
@@ -314,6 +289,28 @@ rules:
     priority: "medium"
     status: "draft"
 
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  Garbage (垃圾清理域) — 死代码/重复代码/未用依赖清理规则     ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  # 2026-09-18 新建：垃圾清理不再借调安全引擎，本域自持规则与判定
+  - id: "garbage.scan.cleanup.dead-code"
+    file: "garbage/scan/cleanup/dead-code.yml"
+    adapter: "Garbage · 死代码（ts-prune）"
+    priority: "low"
+    status: "active"
+
+  - id: "garbage.scan.cleanup.duplicate-code"
+    file: "garbage/scan/cleanup/duplicate-code.yml"
+    adapter: "Garbage · 重复代码（jscpd）"
+    priority: "low"
+    status: "active"
+
+  - id: "garbage.scan.cleanup.unused-dependency"
+    file: "garbage/scan/cleanup/unused-dependency.yml"
+    adapter: "Garbage · 未用依赖（depcheck）"
+    priority: "medium"
+    status: "active"
+
 # ---- 统计 ----
 statistics:
   totalRegistered: 191
@@ -327,6 +324,7 @@ statistics:
     security: 38
     sentinel: 9
     evolve: 12
+    garbage: 3
   bySource:
     external: 101
     internal: 56

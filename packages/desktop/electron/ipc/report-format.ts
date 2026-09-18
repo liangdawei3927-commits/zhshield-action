@@ -41,8 +41,6 @@ export interface SecurityScanReportData {
     medium: number;
     low: number;
     malwareTotal: number;
-    garbageTotal: number;
-    garbageSize: number;
   };
   /** 漏洞扫描（依赖 CVE） */
   findings: Array<{
@@ -65,8 +63,6 @@ export interface SecurityScanReportData {
     pattern: string;
     evidence: string;
   }>;
-  /** 垃圾清理（无用文件 / 未用依赖 / 死代码） */
-  garbage: Array<{ id: string; type: string; path: string; size: number; reason: string }>;
   /** 安全评分 0-100 */
   securityScore: number;
   metadata: { duration: number; timestamp: string };
@@ -188,8 +184,6 @@ export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanRep
       medium: r.summary.vulnMedium,
       low: r.summary.vulnLow,
       malwareTotal: r.summary.malwareTotal,
-      garbageTotal: r.summary.garbageTotal,
-      garbageSize: r.garbage.reduce((sum, g) => sum + (g.size ?? 0), 0),
     },
     findings: r.vulnerabilities.map((v) => ({
       id: v.id,
@@ -209,13 +203,6 @@ export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanRep
       line: m.line,
       pattern: m.pattern,
       evidence: m.evidence,
-    })),
-    garbage: r.garbage.map((g) => ({
-      id: g.id,
-      type: g.type,
-      path: g.path,
-      size: g.size,
-      reason: g.reason,
     })),
     securityScore: r.securityScore,
     metadata: {

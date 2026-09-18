@@ -50,7 +50,6 @@ describe('toSecurityScanReportData 映射', () => {
       vulnHigh: 1,
       vulnMedium: 0,
       vulnLow: 0,
-      garbageTotal: 1,
       malwareTotal: 1,
     },
   };
@@ -80,15 +79,13 @@ describe('toSecurityScanReportData 映射', () => {
     });
   });
 
-  it('maps garbage items with size (previously dropped)', () => {
-    const data = toSecurityScanReportData(report as never);
-    expect(data.garbage).toHaveLength(1);
-    expect(data.garbage[0]).toMatchObject({
-      id: 'g-1',
-      type: 'unused-file',
-      path: 'src/old.ts',
-      size: 2048,
-    });
+  it('安全报告不再携带垃圾清单（T5 各司其职：垃圾归垃圾清理域）', () => {
+    const data = toSecurityScanReportData(report as never) as Record<string, unknown>;
+    // 即使上游 SecurityScanReport 仍带 garbage 字段，安全页也不得再透出
+    expect('garbage' in data).toBe(false);
+    const summary = data.summary as Record<string, unknown>;
+    expect('garbageTotal' in summary).toBe(false);
+    expect('garbageSize' in summary).toBe(false);
   });
 
   it('keeps securityScore and summary totals', () => {
@@ -99,8 +96,6 @@ describe('toSecurityScanReportData 映射', () => {
       critical: 0,
       high: 1,
       malwareTotal: 1,
-      garbageTotal: 1,
-      garbageSize: 2048,
     });
   });
 });

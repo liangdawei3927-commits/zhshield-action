@@ -8,7 +8,7 @@ const RULE_FILE_EXT = /\.(yml|yaml|json)$/i;
 /** 规则目录递归深度上限：防止病态深层目录树导致栈溢出 */
 const MAX_RULE_DEPTH = 64;
 
-/** 六大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
+/** 各大治理域目录 — collectRulesFromTree 只扫描这些一级目录，
  *  presets / tool-packs / cache / sync 等非域目录不作为规则来源加载 */
 const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
   'guard',
@@ -17,6 +17,7 @@ const GOVERNANCE_DOMAIN_DIRS = new Set<string>([
   'sentinel',
   'evolve',
   'refactor',
+  'garbage',
 ]);
 
 /**

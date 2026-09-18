@@ -68,6 +68,7 @@ export const TASK_KIND_DEFAULT_LABELS: Record<TaskKind, string> = {
   pipeline: 'task.kind.pipeline',
   inspect: 'task.kind.inspect',
   security: 'task.kind.security',
+  garbage: 'task.kind.garbage',
   garbageClean: 'task.kind.garbageClean',
   garbageRestore: 'task.kind.garbageRestore',
   performance: 'task.kind.performance',

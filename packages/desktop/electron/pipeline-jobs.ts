@@ -133,13 +133,58 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
   }
 }
 
+/**
+ * 垃圾清理扫描 — 垃圾清理域自有通道（T5 各司其职）。
+ *
+ * 组成两条来源，合并为一份 GarbageScanReport：
+ *   ① 文件系统检测器（@zh/garbage detectFsGarbage）：构建产物 / 垃圾文件 / 空文件
+ *   ② garbage 域 SOP 规则：死代码（ts-prune）/ 重复代码（jscpd）/ 未用依赖（depcheck）
+ *
+ * 不再调用安全引擎：此前为取 report.garbage 一个字段而完整跑一遍 11 工具安全扫描，
+ * 属跨域借调触发权。规则通道异常不阻断，报告 checks 会带 ruleChannelRan=false 显式留痕。
+ */
+export async function runGarbageScanJob(id: string, projectPath: string): Promise<void> {
+  progress(id, 'garbage', t('pipeline.garbage.scanning'), 0.1);
+  try {
+    const { detectFsGarbage, buildGarbageReport } = await import('@zh/garbage');
+    type GarbageInput = Parameters<typeof buildGarbageReport>[0];
+    const fsItems = await detectFsGarbage(projectPath);
+
+    let evaluations: GarbageInput['evaluations'] = [];
+    let ruleChannelRan = false;
+    try {
+      const { PipelineRunner } = await import('@zh/pipeline');
+      const runner = new PipelineRunner(projectPath);
+      await runner.loadSopRules();
+      progress(id, 'garbage', t('pipeline.garbage.ruleScanning'), 0.5);
+      // 只评估 garbage 域：规则声明了 ts-prune / jscpd / depcheck，均由适配器真实执行
+      const sopReport = await runner.runSopInspect({ domains: ['garbage'] });
+      evaluations = sopReport.evaluations ?? [];
+      ruleChannelRan = true;
+    } catch (err) {
+      console.warn(
+        '[pipeline-worker] 垃圾规则通道异常，降级为仅文件系统检测:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+
+    const report = buildGarbageReport({ projectPath, fsItems, evaluations, ruleChannelRan });
+    progress(id, 'done', t('pipeline.garbage.scanDone', { count: report.summary.total }), 1.0);
+    send({ type: 'result', id, report: serializePipelineReport(report) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[pipeline-worker] 垃圾扫描异常:', message);
+    send({ type: 'error', id, error: message });
+  }
+}
+
 export async function runGarbageCleanJob(
   id: string,
   projectPath: string,
   items: Array<{ id: string; path: string; size: number; type: string }>,
 ): Promise<void> {
   progress(id, 'garbage', t('pipeline.garbage.cleaning'), 0.1);
-  const { cleanGarbage } = await import('@zh/security');
+  const { cleanGarbage } = await import('@zh/garbage');
   try {
     const result = cleanGarbage(projectPath, items);
     progress(id, 'done', t('pipeline.garbage.done', { count: result.cleaned.length }), 1.0);
@@ -157,7 +202,7 @@ export async function runGarbageRestoreJob(
   batchId: string,
 ): Promise<void> {
   progress(id, 'garbage', t('pipeline.garbage.restoring'), 0.1);
-  const { restoreGarbage } = await import('@zh/security');
+  const { restoreGarbage } = await import('@zh/garbage');
   try {
     const result = restoreGarbage(projectPath, batchId);
     progress(id, 'done', t('pipeline.garbage.restoreDone', { count: result.restored }), 1.0);

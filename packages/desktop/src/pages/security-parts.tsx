@@ -68,7 +68,6 @@ export function SecurityHeader({
           {t('page.security.summary', {
             vulns: report.summary.total,
             malware: report.summary.malwareTotal,
-            garbage: report.summary.garbageTotal,
           })}
         </p>
       </div>

@@ -1,5 +1,6 @@
 // @zh/shared - 所有模块共用的类型定义
 export const VERSION = '0.1.0';
+export { TOOL_IDS, INSPECT_SCOPE_DOMAINS } from './types';
 export type {
   PagedResult,
   ApiErrorDTO,
@@ -26,6 +27,7 @@ export type {
   Vulnerability,
   MalwareItem,
   GarbageItem,
+  GarbageItemType,
   ExperienceEntry,
   // Tool integration types
   ToolId,

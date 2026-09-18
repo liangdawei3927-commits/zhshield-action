@@ -9,7 +9,13 @@ import type {
 import { resolveEffectiveRule, trackConsecutiveFailures } from './sop/_meta/adaptive-severity';
 import { computeBlocking } from './sop/_meta/rule-evaluation';
 import type { ToolAdapter, ToolCallHook, GovernanceEvent } from '@zh/shared';
-import { AuditLogger, wrapAdapter, detectMachineProfile, isToolInScope } from '@zh/shared';
+import {
+  AuditLogger,
+  wrapAdapter,
+  detectMachineProfile,
+  isToolInScope,
+  INSPECT_SCOPE_DOMAINS,
+} from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
 import { EventBus } from './bus';
@@ -374,11 +380,12 @@ export class SopRuleEngine {
   }
 
   /**
-   * SOP 驱动型 Inspect 巡检 — 筛选 inspect / security domain 规则执行
+   * SOP 驱动型 Inspect 巡检 — 筛选 INSPECT_SCOPE_DOMAINS 覆盖的域（inspect/security/garbage）。
+   * garbage 必须在内：CLI `inspect --sop` 不传 domains，漏掉会静默少检垃圾规则。
    */
   async runInspect(context: RuleContext): Promise<RuleEngineReport> {
-    // 显式 domains 优先；未给 domain 时默认 inspect + security（对齐本方法 JSDoc 承诺）
-    const domains = context.domains ?? (context.domain ? undefined : ['inspect', 'security']);
+    // 显式 domains 优先；未给 domain 时用全量巡检默认域集（对齐本方法 JSDoc 承诺）
+    const domains = context.domains ?? (context.domain ? undefined : [...INSPECT_SCOPE_DOMAINS]);
     return this.evaluateRules({
       ...context,
       domain: domains ? undefined : (context.domain ?? 'inspect'),

@@ -267,9 +267,15 @@ export interface MalwareItem {
 
 // ─── 垃圾项（GarbageItem）────────────────────────────────
 
+/** 垃圾项类型（垃圾清理域 owner = @zh/garbage）：
+ *  unused-file / build-artifact 由文件系统检测器产出；
+ *  dead-code / duplicate-code / unused-dependency 由 garbage 域 SOP 规则产出。 */
+export type GarbageItemType =
+  'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code' | 'build-artifact';
+
 export interface GarbageItem {
   id: string;
-  type: 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code';
+  type: GarbageItemType;
   path: string;
   size: number;
   reason: string;
@@ -295,24 +301,29 @@ export interface ExperienceEntry {
 
 // ─── 开源工具集成（Tool Adapter）────────────────────────
 
-export type ToolId =
-  | 'eslint'
-  | 'semgrep'
-  | 'trivy'
-  | 'grype'
-  | 'gitleaks'
-  | 'ort'
-  | 'depcheck'
-  | 'dep-cruiser'
-  | 'jscpd'
-  | 'ts-prune'
-  | 'tsc'
-  | 'autoperf'
-  | 'sentinel'
-  | 'prettier'
-  | 'commit-lint'
-  | 'npm-audit'
-  | 'sonarway';
+/** 已接入的工具 id（唯一来源：类型与运行时常量同源，供规则校验"声明的 tool 是否真实存在"）。
+ *  伪 tool（如 custom-ast-scanner）曾导致规则静默空跑，故需要运行时可校验的清单。 */
+export const TOOL_IDS = [
+  'eslint',
+  'semgrep',
+  'trivy',
+  'grype',
+  'gitleaks',
+  'ort',
+  'depcheck',
+  'dep-cruiser',
+  'jscpd',
+  'ts-prune',
+  'tsc',
+  'autoperf',
+  'sentinel',
+  'prettier',
+  'commit-lint',
+  'npm-audit',
+  'sonarway',
+] as const;
+
+export type ToolId = (typeof TOOL_IDS)[number];
 
 export type ToolCategory = 'inspect' | 'security' | 'guard' | 'evolve';
 
@@ -496,7 +507,24 @@ export type GovernanceDomain =
   | 'inspect' // 巡检域
   | 'security' // 安全域
   | 'sentinel' // 监控域
-  | 'evolve'; // 演进域
+  | 'evolve' // 演进域
+  | 'refactor' // 重构域
+  | 'garbage'; // 垃圾清理域
+
+/**
+ * 「全量巡检」默认覆盖的治理域 —— 唯一来源，避免各调用点各写一份而漂移。
+ *
+ * 语义边界（与《导航各司其职》一致）：
+ *   · 不传 domains 的调用方 = 跑一次全量巡检，本清单即其覆盖面；
+ *   · 各司其职约束的是「触发权与判定权域内独占」——面板上的垃圾清理页只能触发
+ *     garbage 域、安全中心只能触发 security 域；而全量巡检是一个**跨域入口**，
+ *     一并执行三者并各自独立判定，不构成借调。
+ *   · guard / sentinel / evolve / refactor 不在此列：它们各有独立命令与触发时机。
+ *
+ * 变更提示：新增治理域并希望进入全量巡检时，改这里一处即可；桌面端各面板
+ * 均显式传 domains，不受本清单影响。
+ */
+export const INSPECT_SCOPE_DOMAINS = ['inspect', 'security', 'garbage'] as const;
 
 export type ActionType =
   | 'scan' // 扫描检测

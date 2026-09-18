@@ -24,6 +24,7 @@ import type {
   BackupResultData,
   BackupConfigData,
   BackupProgressData,
+  GarbageScanReportData,
   GarbageCleanResultData,
   GarbageRestoreResultData,
   FalsePositiveFeedbackRecord,
@@ -212,17 +213,31 @@ export async function runSecurity(projectPath: string): Promise<SecurityScanRepo
         medium: 0,
         low: 0,
         malwareTotal: 0,
-        garbageTotal: 0,
-        garbageSize: 0,
       },
       findings: [],
       malware: [],
-      garbage: [],
       securityScore: 100,
       metadata: { duration: 0, timestamp: new Date().toISOString() },
     };
   }
   return api.engine.runSecurity(projectPath);
+}
+
+// ─── 垃圾清理扫描（垃圾清理域自有通道）─────────────────────
+
+export async function runGarbageScan(projectPath: string): Promise<GarbageScanReportData> {
+  const api = getAPI();
+  if (!api?.engine) {
+    return {
+      projectPath,
+      items: [],
+      summary: { total: 0, size: 0, byType: {} },
+      checks: [],
+      skipped: 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  return api.engine.runGarbageScan(projectPath);
 }
 
 // ─── 垃圾清理 ───────────────────────────────────────────
@@ -459,9 +474,7 @@ export async function runPipeline(
 // ─── Dashboard 聚合仪表盘（P1b 体检页）──────────────────────
 
 /** 聚合仪表盘总览：读各域落盘结果 + scoring；无数据/引擎不可用时返回 null */
-export async function getDashboardOverview(
-  projectPath: string,
-): Promise<DashboardOverview | null> {
+export async function getDashboardOverview(projectPath: string): Promise<DashboardOverview | null> {
   if (isHttpMode()) return null;
   const api = getAPI();
   if (!api?.engine) return null;

@@ -1207,6 +1207,7 @@
       "scanning": "掃描中...",
       "selectAll": "全選",
       "selectedCount": "已選 {{count}} 項",
+      "skippedNotice": "{{count}} 項檢測未執行，結果可能不完整：",
       "source": "垃圾清理",
       "startScan": "開始掃描",
       "stats": {
@@ -1546,7 +1547,7 @@
       "rescan": "重新檢查",
       "scoreLabel": "安全評分",
       "source": "安全",
-      "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼 · {{garbage}} 項垃圾",
+      "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼",
       "tab": {
         "malware": "病毒查殺",
         "vuln": "漏洞掃描",
@@ -1866,7 +1867,10 @@
       "cleaning": "清理垃圾檔案中…",
       "done": "清理完成：{{count}} 項",
       "restoreDone": "恢復完成：{{count}} 項",
-      "restoring": "恢復清理檔案中…"
+      "restoring": "恢復清理檔案中…",
+      "ruleScanning": "垃圾清理中（死程式碼 / 重複程式碼 / 未用依賴）…",
+      "scanDone": "垃圾清理完成：{{count}} 項",
+      "scanning": "掃描垃圾檔案中…"
     },
     "guard": {
       "failed": "門禁未通過：{{count}} 項需處理",
@@ -2016,6 +2020,7 @@
     "cancelled": "任務已取消",
     "executionFailed": "任務執行失敗",
     "kind": {
+      "garbage": "垃圾清理",
       "garbageClean": "清理",
       "garbageRestore": "恢復",
       "guard": "門禁掃描",

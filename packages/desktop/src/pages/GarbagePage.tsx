@@ -51,14 +51,14 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
             />
           )}
           <GarbageActionBar
-            items={report.garbage}
+            items={report.items}
             selected={selected}
             onToggleAll={toggleAll}
             onClean={handleClean}
-            onCopyAllToAi={() => copyAllToAi(report.garbage)}
+            onCopyAllToAi={() => copyAllToAi(report.items)}
             cleaning={cleaning}
           />
-          <GarbageList items={report.garbage} selected={selected} onToggle={toggleSelect} />
+          <GarbageList items={report.items} selected={selected} onToggle={toggleSelect} />
         </div>
       </div>
     );

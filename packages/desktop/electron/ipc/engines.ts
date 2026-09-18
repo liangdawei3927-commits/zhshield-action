@@ -30,7 +30,8 @@ import type {
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
-import type { SecurityScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/security';
+import type { SecurityScanReport } from '@zh/security';
+import type { GarbageScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/garbage';
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import type { RefactorReport } from '@zh/refactor';
 import { createReport, type PipelineReport, type ProjectProfile } from '@zh/pipeline';
@@ -367,6 +368,9 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runSecurity', (_e, projectPath: string) =>
     runSecurityHandler(manager, projectPath),
   );
+  ipcMain.handle('engine:runGarbageScan', (_e, projectPath: string) =>
+    runGarbageScanHandler(manager, projectPath),
+  );
   ipcMain.handle(
     'engine:garbageClean',
     (
@@ -531,14 +535,38 @@ async function runSecurityHandler(
         medium: 0,
         low: 0,
         malwareTotal: 0,
-        garbageTotal: 0,
-        garbageSize: 0,
       },
       findings: [],
       malware: [],
-      garbage: [],
       securityScore: 100,
       metadata: { duration: 0, timestamp: new Date().toISOString() },
+    };
+  }
+}
+
+/**
+ * 垃圾清理扫描（T5）：触发 garbage 任务（非 security），只跑垃圾清理域自有能力。
+ * 页面的 loading/进度取自任务中心的 garbage 任务，不再借 security 任务。
+ */
+async function runGarbageScanHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<GarbageScanReport> {
+  if (!projectPath || typeof projectPath !== 'string') {
+    throw new Error(t('electron.invalidProjectPath'));
+  }
+  try {
+    const task = manager.start('garbage', projectPath);
+    return (await manager.waitFor(task.id)) as GarbageScanReport;
+  } catch (err) {
+    console.error('[engine:runGarbageScan] Error:', err);
+    return {
+      projectPath,
+      items: [],
+      summary: { total: 0, size: 0, byType: {} },
+      checks: [],
+      skipped: 0,
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -751,7 +779,10 @@ interface PipelineExtras {
     upgradable: number;
   } | null;
   techdebt?: { debtIndex: number; issueCount: number } | null;
-  refactor?: { totalSmells: number; bySeverity: { error: number; warning: number; info: number } } | null;
+  refactor?: {
+    totalSmells: number;
+    bySeverity: { error: number; warning: number; info: number };
+  } | null;
   performance?: {
     total: number;
     bySeverity: { critical: number; high: number; medium: number; low: number; info: number };
@@ -1456,7 +1487,7 @@ function buildQualityCard(
   if (present.length > 0) {
     const wsum = present.reduce((s, k) => s + dimWeights[k], 0);
     card.score = clampScore(
-      present.reduce((s, k) => s + (dimensionScoreFrom(score, k)! * dimWeights[k]), 0) / wsum,
+      present.reduce((s, k) => s + dimensionScoreFrom(score, k)! * dimWeights[k], 0) / wsum,
     );
   }
   // 回退口径：无 scoring 数据时按扣分制计算（0 issues → 100），运行过就该计入加权总分

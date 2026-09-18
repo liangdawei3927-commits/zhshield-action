@@ -1207,6 +1207,7 @@
       "scanning": "Scanning...",
       "selectAll": "Select all",
       "selectedCount": "{{count}} selected",
+      "skippedNotice": "{{count}} check(s) did not run — results may be incomplete:",
       "source": "Garbage cleanup",
       "startScan": "Start scan",
       "stats": {
@@ -1624,7 +1625,7 @@
       "rescan": "Rescan",
       "scoreLabel": "Security score",
       "source": "Security",
-      "summary": "{{vulns}} vulnerabilities · {{malware}} malicious code · {{garbage}} garbage items",
+      "summary": "{{vulns}} vulnerabilities · {{malware}} malicious code",
       "tab": {
         "malware": "Malware scan",
         "secrets": "Secret management",
@@ -1866,7 +1867,10 @@
       "cleaning": "Cleaning garbage files…",
       "done": "Cleanup complete: {{count}} items",
       "restoreDone": "Restore complete: {{count}} items",
-      "restoring": "Restoring cleaned files…"
+      "restoring": "Restoring cleaned files…",
+      "ruleScanning": "Scanning garbage (dead code / duplicate code / unused deps)…",
+      "scanDone": "Garbage scan complete: {{count}} items",
+      "scanning": "Scanning for garbage files…"
     },
     "guard": {
       "failed": "Gate failed: {{count}} items need attention",
@@ -2016,6 +2020,7 @@
     "cancelled": "Task cancelled",
     "executionFailed": "Task execution failed",
     "kind": {
+      "garbage": "Garbage cleanup",
       "garbageClean": "Clean",
       "garbageRestore": "Restore",
       "guard": "Gate scan",

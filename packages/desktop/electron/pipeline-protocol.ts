@@ -73,6 +73,13 @@ export interface GarbageRestoreRunMsg {
   batchId: string;
 }
 
+/** 垃圾清理扫描（T5）：垃圾清理域自有通道，不借调安全引擎 */
+export interface GarbageScanRunMsg {
+  type: 'runGarbageScan';
+  id: string;
+  projectPath: string;
+}
+
 export interface PerformanceRunMsg {
   type: 'runPerformance';
   id: string;
@@ -87,6 +94,7 @@ export type PipelineWorkerInbound =
   | SecurityRunMsg
   | GarbageCleanRunMsg
   | GarbageRestoreRunMsg
+  | GarbageScanRunMsg
   | PerformanceRunMsg;
 
 /** 将报告转为可跨进程传输的纯 JSON（Date → ISO 字符串） */

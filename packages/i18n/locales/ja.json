@@ -1207,6 +1207,7 @@
       "scanning": "スキャン中...",
       "selectAll": "すべて選択",
       "selectedCount": "{{count}} 項目を選択中",
+      "skippedNotice": "{{count}} 件のチェックが実行されていません。結果が不完全な可能性があります:",
       "source": "ゴミ清掃",
       "startScan": "スキャンを開始",
       "stats": {
@@ -1546,7 +1547,7 @@
       "rescan": "再チェック",
       "scoreLabel": "セキュリティスコア",
       "source": "セキュリティ",
-      "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所 · ゴミ {{garbage}} 件",
+      "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所",
       "tab": {
         "malware": "ウイルス駆除",
         "vuln": "脆弱性スキャン",
@@ -1866,7 +1867,10 @@
       "cleaning": "ゴミファイルをクリーンアップ中…",
       "done": "クリーンアップ完了: {{count}} 項目",
       "restoreDone": "復元完了: {{count}} 項目",
-      "restoring": "クリーンアップしたファイルを復元中…"
+      "restoring": "クリーンアップしたファイルを復元中…",
+      "ruleScanning": "ゴミをスキャン中（デッドコード / 重複コード / 未使用依存）…",
+      "scanDone": "ゴミスキャン完了: {{count}} 項目",
+      "scanning": "ゴミファイルをスキャン中…"
     },
     "guard": {
       "failed": "ゲートに合格しませんでした: {{count}} 項目の処理が必要です",
@@ -2016,6 +2020,7 @@
     "cancelled": "タスクはキャンセルされました",
     "executionFailed": "タスクの実行に失敗しました",
     "kind": {
+      "garbage": "ゴミ清掃",
       "garbageClean": "クリーンアップ",
       "garbageRestore": "復元",
       "guard": "ゲートスキャン",

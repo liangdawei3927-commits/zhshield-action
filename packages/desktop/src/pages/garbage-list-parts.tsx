@@ -1,4 +1,4 @@
-import type { SecurityScanReportData } from '../types/electron';
+import type { GarbageScanReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -20,9 +20,9 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-export function GarbageStats({ report }: { report: SecurityScanReportData }) {
+export function GarbageStats({ report }: { report: GarbageScanReportData }) {
   const t = useT();
-  const items = report.garbage;
+  const items = report.items;
   const countByType = items.reduce<Record<string, number>>((acc, g) => {
     acc[g.type] = (acc[g.type] ?? 0) + 1;
     return acc;
@@ -34,9 +34,7 @@ export function GarbageStats({ report }: { report: SecurityScanReportData }) {
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.items')}</div>
       </ResultCard>
       <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-success-600">
-          {formatSize(report.summary.garbageSize)}
-        </div>
+        <div className="text-2xl font-bold text-success-600">{formatSize(report.summary.size)}</div>
         <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.freeable')}</div>
       </ResultCard>
       {(['unused-dependency', 'unused-file'] as const).map((type) => (
@@ -50,7 +48,7 @@ export function GarbageStats({ report }: { report: SecurityScanReportData }) {
 }
 
 interface GarbageListProps {
-  items: SecurityScanReportData['garbage'];
+  items: GarbageScanReportData['items'];
   selected: Set<string>;
   onToggle: (id: string) => void;
 }
@@ -60,7 +58,7 @@ function GarbageCard({
   selected,
   onToggle,
 }: {
-  item: SecurityScanReportData['garbage'][number];
+  item: GarbageScanReportData['items'][number];
   selected: boolean;
   onToggle: (id: string) => void;
 }) {
@@ -117,7 +115,7 @@ export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
 }
 
 interface GarbageActionBarProps {
-  items: SecurityScanReportData['garbage'];
+  items: GarbageScanReportData['items'];
   selected: Set<string>;
   onToggleAll: () => void;
   onClean: () => void;

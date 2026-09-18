@@ -362,6 +362,21 @@ export async function runSecurityInWorker(
   );
 }
 
+/** 垃圾清理扫描（T5）：文件系统检测器 + garbage 域 SOP 规则，不借调安全引擎 */
+export async function runGarbageScanInWorker(
+  projectPath: string,
+  onProgress?: ProgressHandler,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<unknown> {
+  const id = `garbage-scan-${Date.now()}-${++seq}`;
+  return dispatchJob(
+    { type: 'runGarbageScan', id, projectPath },
+    timeoutMs,
+    'engine:runGarbageScan',
+    onProgress,
+  );
+}
+
 export async function runGarbageCleanInWorker(
   projectPath: string,
   items: Array<{ id: string; path: string; size: number; type: string }>,

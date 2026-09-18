@@ -1,34 +1,34 @@
 # =============================================================================
-# SOP 规则模板 — Cleanup · 死代码（未使用导出）检测
+# SOP 规则模板 — Garbage · 死代码（未使用导出）检测
 # =============================================================================
-# 规则 ID: cleanup.scan.deadcode.unused-function
-# 治理域: 安全域 (security)
+# 规则 ID: garbage.scan.cleanup.dead-code
+# 治理域: 垃圾清理域 (garbage)
 # 动作类型: 扫描检测 (scan)
 # 数据来源: 内部模式 (internal)
-# 对应适配器: Cleanup · 死代码
+# 对应适配器: Inspect · ts-prune（能力共享；触发权与判定权归垃圾清理域）
 # 内部标准源: IronNest#27 No Token-Burning · #22 Reuse Before Creating
-# 最后更新: 2026-07-29
+# 迁移: 2026-09-18 由 security/scan/garbage/dead-code.yml 迁入（T5 各司其职）
 # =============================================================================
 
 apiVersion: sop/v1
-kind: SecurityRule
+kind: GarbageRule
 metadata:
-  id: "security.scan.garbage.dead-code"
+  id: "garbage.scan.cleanup.dead-code"
   name: "死代码检测"
   description: "检测导出的函数、变量、类、类型等在代码库中没有任何调用方。死代码增加维护成本、模糊代码意图、浪费 AI Token 上下文窗口"
-  version: "1.0.0"
+  version: "2.0.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
-  updated: "2026-07-29"
-  status: "draft"
+  updated: "2026-09-18"
+  status: "active"
   source: "internal"
   sourceRef: "IronNest rules/27 · rules/22 · ts-prune"
 
 governance:
-  domain: "security"
+  domain: "garbage"
   action: "scan"
-  module: "Security"
-  category: "garbage"
+  module: "Garbage"
+  category: "cleanup"
 
 execution:
   mode: "async"
@@ -56,12 +56,22 @@ conditions:
     - "**/generated/**"
 
 check:
+  # ── 覆盖范围声明（诚实标注，避免"声明了却没查"）─────────────────────────────
+  # 真实执行：ts-prune 报告的「导出但无引用」符号（-p 指向项目 tsconfig.json）。
+  # 已移除：unreachable-code（return/throw 后的死代码）与 self-assignment ——
+  #   ts-prune 不做语句级分析，二者的执行器是 ESLint（no-unreachable / no-self-assign），
+  #   归门禁与项目体检域，本规则不重复声明。
+  #
+  # 工具参数由适配器持有（当前 TsPruneAdapter 不消费 toolConfig 的阈值），
+  # 规则负责检查项、严重度、分类与修复话术。skip / ignore 由适配器直传 ts-prune：
+  #   skip   → -s：判定"是否被使用"时跳过的文件（框架注册型文件，见下）
+  #   ignore → -i：从报告中整体排除的路径
   tool: "ts-prune"
   toolConfig:
-    config: "tsconfig.json"
     skip:
-      - "(.*\\.module\\.ts)$"          # NestJS 模块自动发现
-      - "(.*\\.controller\\.ts)$"       # 控制由框架注册
+      # NestJS 等框架以装饰器/约定注册，符号"被使用"但不出现 import —— 不跳过会大量误报
+      - "(.*\\.module\\.ts)$"
+      - "(.*\\.controller\\.ts)$"
       - "(.*\\.resolver\\.ts)$"
       - "(.*\\.gateway\\.ts)$"
       - "(.*\\.decorator\\.ts)$"
@@ -77,18 +87,8 @@ check:
       - "(.*\\.interface\\.ts)$"
       - "(.*\\.type\\.ts)$"
       - "(.*\\.d\\.ts)$"
-    additionalChecks:
-      - id: "unused-export"
-        description: "导出但无引用"
-        severity: "info"
-      - id: "unreachable-code"
-        description: "return/throw 后的死代码"
-        severity: "warning"
-      - id: "self-assignment"
-        description: "无意义的自身赋值"
-        severity: "info"
-    threshold:
-      maxDeadExports: 10
+    ignore:
+      - "(node_modules|dist|build|coverage)/"
   severity: "low"
   categories:
     - "cleanup"
@@ -96,7 +96,7 @@ check:
     - "maintainability"
 
 judgment:
-  passCondition: "deadExportCount < 10"
+  passCondition: "deadExportCount == 0"
   blockOn: "info"
   priority: "low"
 
@@ -120,12 +120,10 @@ fix:
 
     ⚠️ 文件: {file}:{line}
     ⚠️ 符号: {symbol}
-    ⚠️ 类型: {symbolType}
-    ⚠️ 严重性: {severity}
 
     处置建议：
     1. 确认无调用方 → 删除导出或删除整个定义
-    2. 如测试直接使用 → 确认测试是否使用了该导出（ts-prune 可能忽略测试文件中的引用）
+    2. 如测试直接使用 → 确认测试是否引用了该导出（ts-prune 可能忽略测试文件中的引用）
     3. 如为公共 API 但尚未被消费 → 添加 `@public` 注释标注
     4. 批量清理时注意：一次删除一个符号，运行测试确认
 

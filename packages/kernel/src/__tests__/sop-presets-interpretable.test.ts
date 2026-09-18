@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 
+import { TOOL_IDS } from '@zh/shared';
 import { ContentInterpreter } from '../runner';
 import { isSafeRegexPattern } from '../runner/scan-utils';
 import { SopRegistry } from '../sop/_meta/sop-registry';
@@ -167,5 +168,38 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
     }
 
     expect(rejected).toEqual([]);
+  });
+
+  it('tool-dispatch 规则不得声明伪 tool（声明的工具必须有适配器 id）', async () => {
+    // T4 在 inspect 域发现 5 处「伪 tool」（custom-ast-scanner / tsc-config-validator /
+    // dead-file-analyzer 等），规则永远不会被执行，却在界面上占一个检查项。
+    // 这里把"声明的 tool 必须是真实存在的工具 id"变成硬约束。
+    const { rules } = await loadPresets();
+    const interpreter = new ContentInterpreter();
+    const bogus: string[] = [];
+
+    for (const rule of rules) {
+      const instr = interpreter.interpret(rule);
+      if (instr.type !== 'tool-dispatch') continue;
+      if (!TOOL_IDS.includes(instr.tool as (typeof TOOL_IDS)[number])) {
+        bogus.push(`${rule.id} → ${instr.tool}`);
+      }
+    }
+
+    // 已知存量（09-18 新发现，非本批修复范围）：sentinel / evolve 域 5 条 **active** 规则
+    // 声明的「工具」在全仓库中不存在任何适配器与注册点 → 这些规则同样从不执行。
+    // 该清单只能减不能增：新增伪 tool 会立刻红。
+    // 处置建议见方案文档：引擎型能力（评分/校准/去重）应显式建模为引擎调度，
+    // 或把规则降为 draft 直到适配器接入。
+    const KNOWN_PENDING = [
+      'evolve.score.official.dimension-weight → scoring-engine',
+      'evolve.calibrate.internal.false-positive → calibration-controller',
+      'evolve.suggest.internal.experience-match → suggestion-matcher',
+      'sentinel.alert.internal.deduplication → sentinel-dedup-controller',
+      'sentinel.alert.internal.p1-critical → sentinel-alert-controller',
+    ];
+    const unexpected = bogus.filter((b) => !KNOWN_PENDING.includes(b));
+    expect(unexpected, '出现新的伪 tool 声明').toEqual([]);
+    expect(bogus.length, '存量伪 tool 数不应增加').toBeLessThanOrEqual(KNOWN_PENDING.length);
   });
 });

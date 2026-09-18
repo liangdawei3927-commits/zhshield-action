@@ -2,10 +2,11 @@
 export type GovernanceDomain =
   | 'guard' // 拦截域 — 门禁拦截（L1/L2/L3）
   | 'inspect' // 巡检域 — 巡检扫描（20+ 适配器）
-  | 'security' // 安全域 — 漏洞扫描 + 垃圾清理 + 病毒查杀
+  | 'security' // 安全域 — 漏洞扫描 + 病毒查杀（不产出垃圾清单，垃圾归 cleanup 域）
   | 'sentinel' // 监控域 — 运行时监控、告警、事件管理
   | 'evolve' // 演进域 — 评分量化 + AI 规则自优化
-  | 'refactor'; // 重构域 — 代码异味检测 + 自动重构 + AST 分析
+  | 'refactor' // 重构域 — 代码异味检测 + 自动重构 + AST 分析
+  | 'garbage'; // 垃圾清理域 — 垃圾文件/死代码/重复代码/无用依赖/无用文件
 
 // ─── 三维分类体系：动作类型 ──────────────────────────────────
 export type ActionType =

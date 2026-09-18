@@ -205,7 +205,9 @@ server.tool(
       try {
         const records = listGuardReports(projectPath, 1);
         if (records.length > 0) {
-          await persistDiagnosticsFromEntries(projectPath, guardRecordToDiagnostics(records[0]));
+          await persistDiagnosticsFromEntries(projectPath, guardRecordToDiagnostics(records[0]), [
+            'guard',
+          ]);
         }
       } catch (e) {
         console.warn('[zhshield-mcp] 诊断落盘失败:', e instanceof Error ? e.message : String(e));

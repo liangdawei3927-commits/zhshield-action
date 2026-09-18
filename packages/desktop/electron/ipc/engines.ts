@@ -509,7 +509,7 @@ async function runGuardHandler(
     const task = manager.start('guard', projectPath, options);
     const report = (await manager.waitFor(task.id)) as GuardReport;
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report), ['guard']);
     } catch (e) {
       console.warn('[engine:runGuard] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -544,7 +544,7 @@ async function runSecurityHandler(
     const report = (await manager.waitFor(task.id)) as SecurityScanReport;
     const data = toSecurityScanReportData(report);
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource(data));
+      await persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource(data), ['security']);
     } catch (e) {
       console.warn(
         '[engine:runSecurity] 诊断落盘失败:',
@@ -650,7 +650,9 @@ async function runPerformanceHandler(
     const task = manager.start('performance', projectPath);
     const result = (await manager.waitFor(task.id)) as PerformanceReportData;
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result));
+      await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result), [
+        'inspect',
+      ]);
     } catch (e) {
       console.warn(
         '[engine:runPerformance] 诊断落盘失败:',
@@ -682,7 +684,9 @@ async function runRefactorHandler(
     const task = manager.start('refactor', projectPath);
     const report = (await manager.waitFor(task.id)) as RefactorReport;
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report), [
+        'refactor',
+      ]);
     } catch (e) {
       console.warn(
         '[engine:runRefactor] 诊断落盘失败:',
@@ -867,7 +871,7 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
       ...(env.error ? { envError: env.error } : {}),
     };
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report), ['deps']);
     } catch (e) {
       console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -1117,7 +1121,9 @@ async function runTechDebtHandler(projectPath: string): Promise<TechDebtReportDa
     }
     const report: TechDebtReportData = { ...finalSnapshot, error: null };
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report));
+      await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report), [
+        'techdebt',
+      ]);
     } catch (e) {
       console.warn(
         '[engine:runTechDebt] 诊断落盘失败:',

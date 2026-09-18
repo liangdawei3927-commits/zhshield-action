@@ -224,6 +224,9 @@ export class LocalBackup {
 
   private async pruneOldBackups(backupRoot: string, maxBackups: number): Promise<void> {
     const dirs = await this.listBackups(backupRoot);
-    await this.pruner.pruneOldBackups(dirs, maxBackups);
+    const { failed } = await this.pruner.pruneOldBackups(dirs, maxBackups);
+    if (failed.length > 0) {
+      console.warn(`[backup] ${failed.length} 个旧备份清理失败（可能被占用）`);
+    }
   }
 }

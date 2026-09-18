@@ -16,6 +16,7 @@ import {
   defaultBackupConfig,
 } from './types';
 import { safeJoinReal } from '@zh/shared';
+import { normalizeKeepCount } from './retention';
 
 export interface BackupGlobalConfig {
   defaultBackupDir: string;
@@ -47,7 +48,8 @@ export class BackupConfigManager {
    */
   constructor(globalConfig?: Partial<BackupGlobalConfig>, options?: { globalConfigPath?: string }) {
     this.globalConfig = { ...DEFAULT_GLOBAL_CONFIG, ...globalConfig };
-    this.globalConfigPath = options?.globalConfigPath ?? path.join(os.homedir(), GLOBAL_CONFIG_FILE);
+    this.globalConfigPath =
+      options?.globalConfigPath ?? path.join(os.homedir(), GLOBAL_CONFIG_FILE);
     this.explicitDefaultBackupDir = globalConfig?.defaultBackupDir;
   }
 
@@ -178,7 +180,7 @@ export class BackupConfigManager {
     return {
       enabled: raw?.enabled ?? def.enabled,
       backupDir: raw?.backupDir ?? def.backupDir,
-      maxBackups: raw?.maxBackups ?? def.maxBackups,
+      maxBackups: normalizeKeepCount(raw?.maxBackups, def.maxBackups),
       excludePatterns: raw?.excludePatterns ?? def.excludePatterns,
       compress: raw?.compress ?? def.compress,
       format: raw?.format === 'directory' ? 'directory' : 'zip',

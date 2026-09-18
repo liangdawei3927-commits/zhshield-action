@@ -40,7 +40,11 @@ export function gradeLabel(grade: string, tr: typeof t = t): string {
 }
 
 /**
- * 总分新鲜度阈值：与主进程 `DASHBOARD_FRESH_MS` 同口径（24h）。
+ * 总分新鲜度阈值：与主进程 `DASHBOARD_FRESH_MS`（`electron/ipc/engines.ts`）同口径（24h）。
+ *
+ * 二者是**两个独立常量**（渲染进程一个、主进程一个），靠
+ * `src/__tests__/freshness-parity.test.ts` 的结构断言保持数值一致 ——
+ * 该用例若红，说明两侧已漂移，不要各自改数字，而要一起改。
  *
  * 总分是**对上一次检查结果的汇总**，不是实时值 —— 报告中心与体检页都只读各域最近一次
  * 落盘结果（guard 报告记录 + `.zhshield/diagnostics/domains/inspect.json` +

@@ -20,6 +20,9 @@ export type {
 
 export { BackupScheduler } from './scheduler';
 
+export { MIN_BACKUP_KEEP, normalizeKeepCount } from './retention';
+export type { BackupPruneOutcome } from './local-backup-pruner';
+
 export { BACKUP_EVENTS } from './events';
 export type {
   BackupRequestPayload,

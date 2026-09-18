@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { hashFile } from './utils';
 import { safeJoinReal } from '@zh/shared';
+import { LocalBackupPruner } from './local-backup-pruner';
 
 export interface BackupFileEntry {
   relativePath: string;
@@ -54,6 +55,8 @@ export class BackupManager {
   private maxBackups: number;
   private includePatterns: RegExp[];
   private excludePatterns: RegExp[];
+  /** 唯一的备份删除入口（含「至少保留最新 1 份」护栏，见 retention.ts） */
+  private readonly pruner = new LocalBackupPruner();
 
   constructor(options?: BackupOptions) {
     this.sourceDir = options?.sourceDir ?? path.join(os.homedir(), '.zhshield');
@@ -308,17 +311,15 @@ export class BackupManager {
     return dirs.length > 0 ? dirs[0] : null;
   }
 
+  /**
+   * 轮换清理：委托给唯一的删除入口，避免与本类此前自持的一份 `slice(maxBackups)`
+   * 实现分叉（那一份在 maxBackups=0 时会删光全部备份）。
+   */
   private async pruneOldBackups(): Promise<void> {
     const dirs = await this.listBackups();
-    if (dirs.length <= this.maxBackups) return;
-
-    const toRemove = dirs.slice(this.maxBackups);
-    for (const dir of toRemove) {
-      try {
-        await fs.rm(dir, { recursive: true, force: true });
-      } catch (err) {
-        console.warn('[incremental-backup] 清理旧备份失败:', dir, err);
-      }
+    const { failed } = await this.pruner.pruneOldBackups(dirs, this.maxBackups);
+    if (failed.length > 0) {
+      console.warn('[incremental-backup] 清理旧备份失败:', failed.join(', '));
     }
   }
 }

@@ -290,12 +290,19 @@ export function domainSnapshotPath(projectPath: string, source: DiagnosticSource
 }
 
 /** 写入 <project>/.zhshield/diagnostics/latest.json，返回绝对路径 */
-export async function writeDiagnosticsFile(report: DiagnosticsReport): Promise<string> {
+export async function writeDiagnosticsFile(
+  report: DiagnosticsReport,
+  ranSources: readonly DiagnosticSource[] = [],
+): Promise<string> {
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
   const absPath = join(dir, 'latest.json');
   const payload = `${JSON.stringify(report, null, 2)}\n`;
   // 按域拆分快照：同一份报告里可能含多个来源（pipeline 全量落盘），逐个写出
   const perSource = new Map<DiagnosticSource, DiagnosticEntry[]>();
+  // 跑过的域先占位（空数组）：**「跑过且 0 检出」必须覆盖写空快照**，
+  // 否则磁盘上留着上一次那份「有问题」的快照，界面上已修好的问题永不消失。
+  // 只有「这次没跑」的域才保留旧快照 —— 二者语义必须区分。
+  for (const source of ranSources) perSource.set(source, []);
   for (const entry of report.issues) {
     const bucket = perSource.get(entry.source);
     if (bucket) bucket.push(entry);
@@ -380,7 +387,12 @@ export async function persistDiagnostics(
     issues,
     new Date().toISOString(),
   );
-  return await writeDiagnosticsFile(diagnostics);
+  // PipelineReport 的 guard/inspect/refactor 为可选字段：**字段存在 = 该域跑过**。
+  const ranSources: DiagnosticSource[] = [];
+  if (report.guard) ranSources.push('guard');
+  if (report.inspect) ranSources.push('inspect');
+  if (report.refactor) ranSources.push('refactor');
+  return await writeDiagnosticsFile(diagnostics, ranSources);
 }
 
 /**
@@ -391,6 +403,7 @@ export async function persistDiagnostics(
 export async function persistDiagnosticsFromEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
+  ranSources: readonly DiagnosticSource[],
 ): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
@@ -399,7 +412,7 @@ export async function persistDiagnosticsFromEntries(
     filterWhitelisted(whitelist, entries),
     new Date().toISOString(),
   );
-  return await writeDiagnosticsFile(diagnostics);
+  return await writeDiagnosticsFile(diagnostics, ranSources);
 }
 
 /** PerformanceReportData 形状（结构化类型，避免与 report-format.ts 形成循环依赖） */

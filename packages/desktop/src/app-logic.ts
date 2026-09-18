@@ -21,7 +21,6 @@ import {
 
 export type Page =
   | 'welcome'
-  | 'dashboard'
   | 'security'
   | 'deps'
   | 'techdebt'
@@ -35,7 +34,6 @@ export type Page =
   | 'evolve'
   | 'reports'
   | 'backup'
-  | 'scoring'
   | 'profile';
 
 export interface ProjectInfo {
@@ -413,7 +411,7 @@ function useLoadInitialState(handlers: {
       if (!cancelled) {
         if (saved && saved.length > 0) {
           setProjects(saved);
-          setCurrentPage('dashboard');
+          setCurrentPage('inspect');
         }
         setLoaded(true);
       }

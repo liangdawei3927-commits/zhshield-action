@@ -747,12 +747,11 @@
   },
   "nav": {
     "backup": "Backup",
-    "dashboard": "Dashboard",
     "deps": "Dependencies",
     "evolve": "Evolve",
     "garbage": "Garbage Cleanup",
     "guard": "Gate System",
-    "inspect": "Quality Inspection",
+    "inspect": "Health Check",
     "performance": "Performance",
     "refactor": "Refactor",
     "reports": "Reports",
@@ -859,158 +858,6 @@
           "6": "Sat"
         }
       }
-    },
-    "dashboard": {
-      "autoFix": "🤖 Auto fix",
-      "axis": {
-        "governance": {
-          "desc": "Keep code quality and standards in check",
-          "label": "Governance"
-        },
-        "ops": {
-          "desc": "Keep projects running healthy long term",
-          "label": "Operations"
-        },
-        "security": {
-          "desc": "Protect code and supply-chain security",
-          "label": "Security"
-        }
-      },
-      "check": "One-click checkup",
-      "card": {
-        "dependencies": "Dependencies",
-        "gate": "Gate Check",
-        "hoursAgo": "{{count}}h ago",
-        "issues": "{{count}} issues",
-        "justNow": "Just now",
-        "lastRun": "Last run: {{time}}",
-        "minutesAgo": "{{count}}m ago",
-        "neverRun": "Never run",
-        "quality": "Quality",
-        "score": "{{score}} pts",
-        "security": "Security",
-        "sentinel": "Sentinel",
-        "techdebt": "Tech Debt",
-        "weightTip": "{{pct}}% of overall score",
-        "weightExcluded": "Sentinel is not part of overall score"
-      },
-      "copy": {
-        "guardSource": "Gate · Prevention",
-        "inspectSource": "Inspection"
-      },
-      "feature": {
-        "backup": {
-          "desc": "One-click backup of config and rules to prevent data loss"
-        },
-        "inspect": {
-          "desc": "Regularly checks code quality, docs, and dependency health"
-        },
-        "performance": {
-          "desc": "Finds runtime performance anti-patterns and optimizes execution"
-        },
-        "refactor": {
-          "desc": "Detects code smells and pays down technical debt"
-        },
-        "reports": {
-          "desc": "View past check reports and health trends"
-        },
-        "security": {
-          "desc": "One-click scan for vulnerabilities, sensitive info, and malicious code"
-        }
-      },
-      "guardSlogan": "Smart guardian: security · governance · operations",
-      "overview": {
-        "generatedAt": "Updated at {{time}}",
-        "title": "Project Health Overview",
-        "subtitle": "Guard project health with one-click full checks",
-        "trendDown": "Down from last run",
-        "trendFlat": "Same as last run",
-        "trendUp": "Up from last run",
-        "issuesFound": "{{count}} key issues found",
-        "noIssues": "No key issues — all good",
-        "notChecked": "Not checked yet — run a full check to get a health report"
-      },
-      "productIntro": {
-        "subtitle": "Built around security, governance, and operations, guarding every line of code",
-        "title": "The smart guardian of the code world"
-      },
-      "progress": "Progress {{progress}}%",
-      "result": {
-        "allPassed": "All executed checks passed. Checks that were not executed and the reasons are listed below.",
-        "backHome": "Back to home",
-        "header": {
-          "configureHint": "You can toggle gate check and sentinel monitoring here or via the switches in the top title bar.",
-          "coverage": "This run covered {{inspectTotal}} quality inspections.",
-          "failed": "Checkup found issues",
-          "passed": "One-click checkup complete",
-          "skipped": "Of these, {{skipped}} were not executed — reasons below."
-        },
-        "issuesTitle": "Issues to watch",
-        "rerun": "Rerun checkup",
-        "scopeTitle": "Checkup scope",
-        "stage": {
-          "guard": "Gate",
-          "inspect": "Inspection"
-        },
-        "stats": {
-          "issues": "Issues",
-          "passed": "Passed",
-          "skipped": "Skipped",
-          "total": "Checks"
-        }
-      },
-      "ring": {
-        "gaugeMax": "100",
-        "gaugeMin": "0",
-        "healthScore": "Health score",
-        "notChecked": "Not checked yet"
-      },
-      "runCheck": {
-        "expiredHint": "Some results are stale. Run a full check to refresh.",
-        "forceHint": "Ignores cache, re-runs all 6 checks serially (~5-10 min, measured). Continue?",
-        "forceTitle": "Force full re-run",
-        "hint": "Uses cache, re-runs only stale checks (~1-3 min by default)",
-        "title": "Full Check"
-      },
-      "running": "Checkup in progress…",
-      "sanitize": {
-        "autoFixStarted": "OpenCode auto fix started",
-        "autoFixing": "Auto fixing…",
-        "done": "Checkup complete",
-        "guarding": "Running gate check…",
-        "inspecting": "Running quality inspection…",
-        "loadingRules": "Loading checkup rules…"
-      },
-      "scope": {
-        "inspect": "Quality inspection",
-        "item": {
-          "complexity": "Code complexity / standards",
-          "deps": "Dependency audit",
-          "docs": "Documentation completeness",
-          "nest": "Nest / module standards",
-          "tsType": "TypeScript type safety"
-        }
-      },
-      "stageGuard": "· Gate",
-      "stageInspect": "· Inspection",
-      "status": {
-        "expired": "Stale",
-        "notRun": "Not run"
-      },
-      "toast": {
-        "addProjectFirst": "Add a project to check first",
-        "allFresh": "All results are up to date, nothing to re-run",
-        "completed": "Checkup complete: {{total}} checks, {{passed}} passed",
-        "copiedIssues": "Copied {{count}} issues, paste into AI to fix",
-        "copyFailed": "Copy failed",
-        "executionFailed": "Checkup execution failed",
-        "failed": "Checkup execution failed: {{error}}",
-        "foundIssues": "Checkup complete: found {{count}} issues",
-        "fullCheckDone": "Full check done: re-ran {{count}} checks",
-        "noValidItems": "Checkup complete, but no valid checks ran (check the project path)",
-        "partialFailed": "Some checks failed: {{domains}}"
-      },
-      "welcome": "Welcome to ZhiHui CodeShield"
     },
     "deps": {
       "checking": "Taking inventory...",
@@ -1291,30 +1138,26 @@
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Inspection complete",
       "empty": {
-        "subtitle": "After midnight, build artifacts, licenses, dependencies, and garbage cleanup are auto-inspected daily; you can also inspect now",
-        "title": "Check build artifacts, ensure delivery quality"
+        "subtitle": "Architecture, module boundaries, type safety, and code conventions are auto-inspected daily after midnight; you can also inspect now",
+        "title": "Inspect source architecture and type safety"
       },
       "feature": {
-        "build": {
-          "desc": "Validates dist artifact conventions, integrity, and output directories",
-          "title": "Build artifact check"
+        "architecture": {
+          "desc": "Scans module dependency direction and circular dependencies to prevent architecture decay",
+          "title": "Architecture rules"
         },
-        "dependency": {
-          "desc": "Detects redundant, unused, and version-conflicting dependencies",
-          "title": "Dependency analysis"
+        "codeStyle": {
+          "desc": "Checks TypeScript strict-mode config and enum/constant usage conventions",
+          "title": "Code conventions"
         },
-        "garbage": {
-          "desc": "Finds and cleans temp files, caches, and useless artifacts",
-          "title": "Garbage cleanup"
+        "moduleBoundary": {
+          "desc": "Checks layering dependency direction, plus NestJS module boundaries and DI compliance",
+          "title": "Module boundaries"
         },
-        "license": {
-          "desc": "Identifies open-source license compatibility and compliance risks",
-          "title": "License scan"
-        },
-        "tsType": {},
-        "complexity": {},
-        "nest": {},
-        "docs": {}
+        "typeSafety": {
+          "desc": "Real tsc type checking combined with null-safety and type-consistency scans",
+          "title": "Type safety"
+        }
       },
       "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} passed",
@@ -1443,15 +1286,22 @@
       "suggestion": "Suggestion: {{suggestion}}"
     },
     "reports": {
+      "dimension": {
+        "quality": "Quality",
+        "security": "Security",
+        "architecture": "Architecture",
+        "dependencies": "Dependencies",
+        "documentation": "Documentation",
+        "refactor": "Refactoring",
+        "performance": "Performance",
+        "techdebt": "Tech Debt",
+        "gate": "Gate Sentinel"
+      },
       "empty": {
         "feature": {
-          "email": {
-            "desc": "Send reports to team members in one click",
-            "title": "Email"
-          },
-          "pdf": {
-            "desc": "Generate shareable professional quality reports",
-            "title": "PDF export"
+          "module": {
+            "title": "Module scores",
+            "desc": "Splits health scores per module based on the project profile"
           },
           "scoring": {
             "desc": "Aggregates security, performance, quality, and architecture health scores",
@@ -1465,34 +1315,25 @@
         "subtitle": "{{count}} reports generated, last updated {{date}}",
         "title": "Multi-dimension analysis reports, better decisions"
       },
-      "generate": "Generate report",
-      "header": {
-        "count": "{{count}} reports · last updated {{date}}",
-        "generate": "📊 Generate report"
-      },
-      "scoreLabel": {
-        "danger": "Danger",
-        "excellent": "Excellent",
-        "good": "Good",
-        "needsImprovement": "Needs improvement"
-      },
-      "dimension": {
-        "quality": "Quality",
-        "security": "Security",
-        "architecture": "Architecture",
-        "dependencies": "Dependencies",
-        "documentation": "Documentation",
-        "refactor": "Refactoring",
-        "performance": "Performance",
-        "techdebt": "Tech Debt",
-        "gate": "Gate Sentinel"
-      },
+      "generate": "Summarize report",
       "grade": {
         "A": "Grade A",
         "B": "Grade B",
         "C": "Grade C",
         "D": "Grade D"
       },
+      "header": {
+        "count": "{{count}} reports · last updated {{date}}",
+        "generate": "📊 Summarize report"
+      },
+      "noResults": "No check results to summarize yet. Run a project health check or a gate check first.",
+      "scoreLabel": {
+        "danger": "Danger",
+        "excellent": "Excellent",
+        "good": "Good",
+        "needsImprovement": "Needs improvement"
+      },
+      "summaryDone": "Summarized the latest results from every domain. Overall score {{score}}.",
       "table": {
         "abnormal": "Abnormal",
         "col": {

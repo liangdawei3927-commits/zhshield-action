@@ -28,7 +28,7 @@ import type {
   HealthScore,
 } from '@zh/scoring';
 import type { CheckOptions, GuardReport } from '@zh/guard';
-import { appendGuardReport, toGuardReportRecord } from '@zh/guard';
+import { appendGuardReport, listGuardReports, toGuardReportRecord } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport } from '@zh/security';
 import type { GarbageScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/garbage';
@@ -138,6 +138,12 @@ import type {
   DashboardCard,
 } from '../../src/types/electron';
 import type { DiagnosticsReport, DiagnosticEntry } from '../zh-diagnostics';
+import {
+  toGuardChecks,
+  toInspectIssues,
+  hasAnyExtraResult,
+  type PipelineExtras,
+} from '../report-summary';
 
 async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -359,6 +365,56 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
   }
 }
 
+// ─── 报告中心：只读汇总（不发起任何检查）──────────────────────────────
+
+/**
+ * 报告中心「汇总生成报告」：只读各域最新落盘结果，按统一维度加权算出健康总分并落库。
+ *
+ * 与 recordPipelineScore 唯一的区别是数据来源：
+ * - recordPipelineScore 消费刚跑完的 PipelineReport（由 pipeline 触发）；
+ * - 本函数消费 guard 报告记录 + .zhshield/diagnostics/domains/inspect.json +
+ *   dashboard-state.json，**纯只读，不触发任何扫描**。
+ * 评分算法（buildHealthDimensions + ScoringEngine.calculate）完整复用，
+ * 保证两条路径写出的分数同口径、历史趋势连续。
+ *
+ * 各域都没有可用结果时返回 null，由 UI 提示「先运行检查」——
+ * 不写一条 0 分记录污染历史（未检测 ≠ 0 分）。
+ */
+async function generateReportSummaryHandler(projectPath: string): Promise<HealthScoreData | null> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    // gate 维度取自 guard 报告记录（含通过项，与 pipeline 口径一致）：
+    // listGuardReports 返回新→旧，取 [0] 即最近一次门禁结果。
+    const guardRecord = listGuardReports(projectPath)[0] ?? null;
+    const inspectSnapshot = await readDomainSnapshot(projectPath, 'inspect');
+    const extras = await buildPipelineExtras(projectPath);
+    const hasResults =
+      guardRecord !== null || inspectSnapshot !== null || hasAnyExtraResult(extras);
+    if (!hasResults) return null;
+
+    const scoring = await getScoring();
+    const profilingResult = await probeProjectProfile(projectPath);
+    const dimensions = buildHealthDimensions(
+      guardRecord ? { results: toGuardChecks(guardRecord.checks) } : null,
+      inspectSnapshot ? { issues: toInspectIssues(inspectSnapshot.issues) } : null,
+      projectPath,
+      profilingResult,
+      extras,
+    );
+    const score = scoring.calculate(projectPath, dimensions);
+    console.log(`[engine:generateReportSummary] 汇总评分已落库: ${score.overall} (${score.grade})`);
+    return toHealthScoreData(score);
+  } catch (err) {
+    console.warn(
+      '[engine:generateReportSummary] 汇总失败:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) =>
     runGuardHandler(manager, projectPath, options),
@@ -430,10 +486,12 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
   ipcMain.handle('engine:getProfile', getProfileHandler);
   ipcMain.handle('engine:runProfile', (_e, projectPath: string) => runProfileHandler(projectPath));
-  // P1b 聚合仪表盘：只读各域最新落盘结果 + 时间戳，一次返回六卡数据
+  // 项目总览：只读各域最新落盘结果 + 时间戳，一次返回六卡数据。
+  // 不发起任何扫描（聚合层是纯只读）；「一键全检」通道已随体检页删除。
   ipcMain.handle('engine:getDashboardOverview', getDashboardOverviewHandler);
-  ipcMain.handle('engine:runFullCheck', (_e, projectPath: string, options?: { force?: boolean }) =>
-    runFullCheckHandler(manager, projectPath, options),
+  // 报告中心：只读汇总各域最新结果并落库（不发起检查；无结果时返回 null）
+  ipcMain.handle('engine:generateReportSummary', (_e, projectPath: string) =>
+    generateReportSummaryHandler(projectPath),
   );
 }
 
@@ -768,27 +826,6 @@ const DASHBOARD_CARD_WEIGHTS: Record<DashboardCard['key'], number> = {
   gate: 0.05,
   sentinel: 0.05,
 };
-
-/**
- * P1b extras 契约（对齐 Agent A 迁移后的 DimensionExtras）：
- * secrets/deps/techdebt/refactor/performance 域最新数据，无对应域时传 null（Agent A 侧按 null 跳过该维度）。
- */
-interface PipelineExtras {
-  secrets?: { activeCount: number } | null;
-  deps?: {
-    vulnerabilities: { critical: number; high: number; medium: number };
-    upgradable: number;
-  } | null;
-  techdebt?: { debtIndex: number; issueCount: number } | null;
-  refactor?: {
-    totalSmells: number;
-    bySeverity: { error: number; warning: number; info: number };
-  } | null;
-  performance?: {
-    total: number;
-    bySeverity: { critical: number; high: number; medium: number; low: number; info: number };
-  } | null;
-}
 
 /** 从 dashboard-state.json 组装 extras（无对应域时传 null） */
 async function buildPipelineExtras(projectPath: string): Promise<PipelineExtras> {
@@ -1476,7 +1513,9 @@ async function getProfileHandler(
   }
 }
 
-// ─── P1b 聚合仪表盘（engine:getDashboardOverview / engine:runFullCheck）────────
+// ─── 只读聚合总览（engine:getDashboardOverview）──────────────────────────
+// 供报告中心汇总「各域最新结果」，纯只读：不发起任何扫描。
+// 原「一键全检」（engine:runFullCheck）随体检页一并删除。
 
 /** 新鲜度判定：lastRunAt 缺失或距今 >24h → expired（方案 §3.3 ②） */
 function freshnessStatus(lastRunAt: string | null | undefined, now: number): 'scored' | 'expired' {
@@ -1783,145 +1822,5 @@ async function getDashboardOverviewHandler(
       err instanceof Error ? err.message : String(err),
     );
     return null;
-  }
-}
-
-/**
- * 单域执行超时阈值（§六 风险②"单域超时独立熔断不拖垮整体"）。
- * 取值依据：semgrep 冷启动 80-150s + 1200+ 文件 monorepo 巡检 151s（§4.3.2 实测），
- * 单域最坏约 5 分钟；10 分钟为 2 倍余量的硬熔断线，防止任一域永久挂起拖垮整体。
- */
-const DOMAIN_TIMEOUT_MS = 10 * 60 * 1000;
-
-/** 给 Promise 加超时熔断：超时后 reject 并释放定时器（底层任务若仍运行则交 cancel 兜底） */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`域 ${label} 执行超时（>${ms}ms），已熔断跳过`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
-/**
- * 撤销某域在 TaskManager 中正在排队的任务（§六 风险② 熔断后的兜底清理）。
- * 仅对走 TaskManager 的任务生效：deps/secrets 为纯函数直跑（无 TaskManager 任务），跳过。
- */
-function cancelDomainTask(manager: TaskManager, domainKey: string, projectPath: string): void {
-  const kindByDomain: Record<string, string> = {
-    guard: 'guard',
-    inspect: 'inspect',
-    security: 'security',
-    techdebt: 'inspect',
-    refactor: 'refactor',
-    performance: 'performance',
-  };
-  const kind = kindByDomain[domainKey];
-  if (!kind) return;
-  for (const task of manager.list()) {
-    if (
-      task.kind === kind &&
-      task.projectPath === projectPath &&
-      (task.status === 'queued' || task.status === 'running')
-    ) {
-      manager.cancel(task.id);
-    }
-  }
-}
-
-/**
- * 一键全检（engine:runFullCheck）：默认读 dashboard-state.json，仅重跑 lastRunAt 距今 >24h 的域；
- * force:true 时全量 8 域。严格按序执行（并发=1，8GB 机器红线，方案 §3.3 ③ / §六）。
- * guard/inspect/security 未在 dashboard-state.json 中跟踪 lastRunAt → 默认模式下始终重跑。
- * 返回语义：ok=true 表示全检流程完整执行（所有域均完成或已做新鲜度判断），
- * 没有任何域重跑（reran 空）也属于成功（数据已新鲜）；单域失败进 failed，不判整体失败。
- */
-async function runFullCheckHandler(
-  manager: TaskManager,
-  projectPath: string,
-  options?: { force?: boolean },
-): Promise<{ ok: boolean; reran: string[]; skipped: string[]; failed?: string[]; error?: string }> {
-  try {
-    if (!projectPath || typeof projectPath !== 'string') {
-      throw new Error(t('electron.invalidProjectPath'));
-    }
-    const force = options?.force === true;
-    const dashState = await readDashboardState(projectPath);
-    const now = Date.now();
-    const isStale = (lastRunAt?: string): boolean =>
-      !lastRunAt || now - new Date(lastRunAt).getTime() > DASHBOARD_FRESH_MS;
-
-    const domains: Array<{ key: string; stale: boolean; run: () => Promise<void> }> = [
-      {
-        key: 'guard',
-        stale: true,
-        run: async () => void (await runGuardHandler(manager, projectPath)),
-      },
-      {
-        key: 'inspect',
-        stale: true,
-        run: async () => void (await runInspectHandler(manager, projectPath)),
-      },
-      {
-        key: 'security',
-        stale: true,
-        run: async () => void (await runSecurityHandler(manager, projectPath)),
-      },
-      {
-        key: 'deps',
-        stale: isStale(dashState.deps?.lastRunAt),
-        run: async () => void (await runDepsHandler(projectPath)),
-      },
-      {
-        key: 'techdebt',
-        stale: isStale(dashState.techdebt?.lastRunAt),
-        run: async () => void (await runTechDebtHandler(projectPath)),
-      },
-      {
-        key: 'secrets',
-        stale: isStale(dashState.secrets?.lastRunAt),
-        run: async () => void (await runSecretsHandler(projectPath)),
-      },
-      {
-        key: 'refactor',
-        stale: isStale(dashState.refactor?.lastRunAt),
-        run: async () => void (await runRefactorHandler(manager, projectPath)),
-      },
-      {
-        key: 'performance',
-        stale: isStale(dashState.performance?.lastRunAt),
-        run: async () => void (await runPerformanceHandler(manager, projectPath)),
-      },
-    ];
-
-    const reran: string[] = [];
-    const skipped: string[] = [];
-    const failed: string[] = [];
-    for (const domain of domains) {
-      if (!force && !domain.stale) {
-        skipped.push(domain.key);
-        continue;
-      }
-      try {
-        await withTimeout(domain.run(), DOMAIN_TIMEOUT_MS, domain.key);
-        reran.push(domain.key);
-      } catch (err) {
-        console.warn(
-          `[engine:runFullCheck] ${domain.key} 执行失败:`,
-          err instanceof Error ? err.message : String(err),
-        );
-        cancelDomainTask(manager, domain.key, projectPath);
-        failed.push(domain.key);
-      }
-    }
-    // ok=true：全检流程已完成（无论是否有域重跑/失败）；单域失败单独上报 failed
-    return { ok: true, reran, skipped, failed };
-  } catch (err) {
-    console.error('[engine:runFullCheck] Error:', err instanceof Error ? err.message : String(err));
-    return {
-      ok: false,
-      reran: [],
-      skipped: [],
-      error: err instanceof Error ? err.message : String(err),
-    };
   }
 }

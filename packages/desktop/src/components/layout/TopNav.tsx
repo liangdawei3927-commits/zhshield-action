@@ -2,6 +2,7 @@ import { NavIcon } from '../ui/Icons';
 import { TitleBar } from './title-bar';
 import { Bounce } from '../ui/Bounce';
 import { useT } from '../../i18n';
+import { navItems, type NavItem } from './nav-items';
 
 interface TopNavProps {
   currentPage: string;
@@ -10,27 +11,6 @@ interface TopNavProps {
   projectName?: string;
   sidebarOpen?: boolean;
 }
-
-interface NavItem {
-  id: string;
-  labelKey: string;
-  /** 直接显示文本（优先于 t(labelKey)，用于 i18n 尚未收录的新页面） */
-  label?: string;
-}
-
-/** 10 个分类导航（360 风格：大图标 + 底部文字）；备份中心、报告中心入口已移至 TitleBar 右侧 */
-const navItems: NavItem[] = [
-  { id: 'dashboard', labelKey: 'nav.dashboard' },
-  { id: 'guard', labelKey: 'nav.guard' },
-  { id: 'sentinel', labelKey: 'nav.sentinel' },
-  { id: 'inspect', labelKey: 'nav.inspect' },
-  { id: 'security', labelKey: 'nav.security', label: '安全中心' },
-  { id: 'deps', labelKey: 'nav.deps' },
-  { id: 'garbage', labelKey: 'nav.garbage' },
-  { id: 'performance', labelKey: 'nav.performance' },
-  { id: 'techdebt', labelKey: 'nav.techdebt' },
-  { id: 'refactor', labelKey: 'nav.refactor' },
-];
 
 interface CategoryNavItemProps {
   item: NavItem;

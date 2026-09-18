@@ -33,7 +33,6 @@ import type {
   TechDebtReportData,
   SecretReportData,
   DashboardOverview,
-  RunFullCheckResult,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 import {
@@ -471,9 +470,9 @@ export async function runPipeline(
   return api.engine.runPipeline(projectPath, options);
 }
 
-// ─── Dashboard 聚合仪表盘（P1b 体检页）──────────────────────
+// ─── 结果汇总（只读，不发起检查）──────────────────────────
 
-/** 聚合仪表盘总览：读各域落盘结果 + scoring；无数据/引擎不可用时返回 null */
+/** 聚合总览：读各域落盘结果 + scoring；无数据/引擎不可用时返回 null */
 export async function getDashboardOverview(projectPath: string): Promise<DashboardOverview | null> {
   if (isHttpMode()) return null;
   const api = getAPI();
@@ -485,27 +484,18 @@ export async function getDashboardOverview(projectPath: string): Promise<Dashboa
   }
 }
 
-/** 一键全检：默认读缓存 + 仅重跑已过期域；force=true 强制全量重跑 */
-export async function runFullCheck(
-  projectPath: string,
-  options?: { force?: boolean },
-): Promise<RunFullCheckResult> {
-  if (isHttpMode()) {
-    return { ok: false, reran: [], skipped: [], error: t('engine.engineUnavailable') };
-  }
+/**
+ * 汇总生成报告：只读各域最新落盘结果 → 统一维度加权 → 落库。
+ * 不触发任何扫描；各域都没有可用结果时返回 null（由 UI 提示先运行检查）。
+ */
+export async function generateReportSummary(projectPath: string): Promise<HealthScoreData | null> {
+  if (isHttpMode()) return null;
   const api = getAPI();
-  if (!api?.engine) {
-    return { ok: false, reran: [], skipped: [], error: t('engine.engineUnavailable') };
-  }
+  if (!api?.engine) return null;
   try {
-    return await api.engine.runFullCheck(projectPath, options);
-  } catch (err) {
-    return {
-      ok: false,
-      reran: [],
-      skipped: [],
-      error: err instanceof Error ? err.message : t('engine.engineUnavailable'),
-    };
+    return await api.engine.generateReportSummary(projectPath);
+  } catch {
+    return null;
   }
 }
 

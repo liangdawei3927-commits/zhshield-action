@@ -7,6 +7,96 @@ interface InspectPageProps {
   projectPath: string;
 }
 
+/**
+ * 空态能力卡 — 与体检域（inspect）实跑规则分组严格一一对应，不列他域能力：
+ *   架构规范 ← circular-dependency / module-dependency / layer-boundary
+ *   模块边界 ← module-boundary / dependency-injection（NestJS）
+ *   类型安全 ← type-error-check（真 tsc）/ type-safety / type-consistency / null-safety
+ *   代码规范 ← strict-mode / enum-usage
+ * 改动前先核对 presets/sop-templates/inspect 下的 active 规则。旧四卡
+ * （构建产物 / License / 依赖分析 / 垃圾清理）全部不在体检域，属「宣称了却没查」，
+ * 于 2026-09-18 导航各司其职改造（T12）整改为此四组。
+ */
+
+/** 架构规范：层叠结构 */
+function ArchitectureIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+/** 模块边界：四个独立方块 */
+function ModuleBoundaryIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+/** 类型安全：盾牌 + 勾 */
+function TypeSafetyIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  );
+}
+
+/** 代码规范：尖括号 */
+function CodeStyleIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+
 export function InspectPage({ projectPath }: InspectPageProps) {
   const t = useT();
   const { report, loading, progressLabel, copyToAi, copyAllToAi, startInspect } =
@@ -40,84 +130,24 @@ export function InspectPage({ projectPath }: InspectPageProps) {
       subtitle={t('page.inspect.empty.subtitle')}
       featureList={[
         {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          ),
-          title: t('page.inspect.feature.build.title'),
-          desc: t('page.inspect.feature.build.desc'),
+          icon: <ArchitectureIcon />,
+          title: t('page.inspect.feature.architecture.title'),
+          desc: t('page.inspect.feature.architecture.desc'),
         },
         {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-            </svg>
-          ),
-          title: t('page.inspect.feature.license.title'),
-          desc: t('page.inspect.feature.license.desc'),
+          icon: <ModuleBoundaryIcon />,
+          title: t('page.inspect.feature.moduleBoundary.title'),
+          desc: t('page.inspect.feature.moduleBoundary.desc'),
         },
         {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-              <polyline points="17 11 19 13 23 9" />
-            </svg>
-          ),
-          title: t('page.inspect.feature.dependency.title'),
-          desc: t('page.inspect.feature.dependency.desc'),
+          icon: <TypeSafetyIcon />,
+          title: t('page.inspect.feature.typeSafety.title'),
+          desc: t('page.inspect.feature.typeSafety.desc'),
         },
         {
-          icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
-          ),
-          title: t('page.inspect.feature.garbage.title'),
-          desc: t('page.inspect.feature.garbage.desc'),
+          icon: <CodeStyleIcon />,
+          title: t('page.inspect.feature.codeStyle.title'),
+          desc: t('page.inspect.feature.codeStyle.desc'),
         },
       ]}
       buttonText={t('page.inspect.scanNow')}

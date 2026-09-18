@@ -38,16 +38,7 @@ export function ShieldLogo({ size = 24 }: { size?: number }) {
 
 /** 分类图标内容（24×24，极简 stroke 风格，功能语义清晰） */
 const NAV_ICON_CONTENT: Record<string, ReactNode> = {
-  // 项目体检：速度表
-  dashboard: (
-    <>
-      <circle cx="12" cy="13" r="8" />
-      <path d="M12 13l3-3" />
-      <path d="M6 7l2 2" />
-      <path d="M18 7l-2 2" />
-    </>
-  ),
-  // 质量巡检：扫描文档
+  // 项目体检：扫描文档
   inspect: (
     <>
       <rect x="4" y="5" width="16" height="14" rx="2" />

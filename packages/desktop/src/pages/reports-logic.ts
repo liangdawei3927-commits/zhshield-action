@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
-import { getProfile, getScore, getScoreHistory, runPipeline } from '../services/engineApi';
+import {
+  getProfile,
+  getScore,
+  getScoreHistory,
+  generateReportSummary,
+} from '../services/engineApi';
+import { useToast } from '../components/ui/Toast';
 import { collectModuleScores, type ModuleScoreView } from './module-scores-logic';
 import type { HealthScoreData } from '../types/electron';
 
@@ -76,14 +82,29 @@ function useScoreHistoryLoader(
   }, [fetchHistory]);
 }
 
-/** 报告页全部状态与副作用：历史加载、生成新报告 */
+/**
+ * 报告页全部状态与副作用：历史加载、汇总生成报告。
+ *
+ * 「汇总生成报告」= 只读汇总，不是「跑一遍检查」：
+ * 读各域（guard/inspect/…）最新落盘结果 → 统一维度加权 → 落库一条新评分。
+ * 触发权属于各治理域自己（在各自页面点扫描）；报告中心只负责把已有结果汇总成总分，
+ * 因此点按钮不会再在任务中心冒出 guard/inspect 任务。
+ * 各域都没跑过时后端返回 null —— 明确提示用户「先运行检查」，
+ * 而不是写一条 0 分污染历史（未检测 ≠ 0 分）。
+ */
 export function useReportsPage(projectPath: string) {
   const { data, loading, load } = useScoreHistory(projectPath);
+  const { toast } = useToast();
 
   const handleNewReport = useCallback(async () => {
-    await runPipeline(projectPath, { dryRun: false, sop: true });
+    const summary = await generateReportSummary(projectPath);
+    if (!summary) {
+      toast(t('page.reports.noResults'), 'warning');
+      return;
+    }
     await load();
-  }, [projectPath, load]);
+    toast(t('page.reports.summaryDone', { score: Math.round(summary.score) }), 'success');
+  }, [projectPath, load, toast]);
 
   return { data, loading, handleNewReport };
 }

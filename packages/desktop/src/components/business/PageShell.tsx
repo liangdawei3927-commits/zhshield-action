@@ -26,7 +26,7 @@ interface PageShellProps {
   onAction?: () => void;
   /** 功能清单：这个页面能做什么 */
   featureList?: FeatureItem[];
-  /** 底部自定义插槽（替代 featureList 网格；如体检页守护者长卡） */
+  /** 底部自定义插槽（替代 featureList 网格） */
   footer?: ReactNode;
   /** 底部卡片网格列数（默认 4） */
   columns?: 2 | 3 | 4 | 6;

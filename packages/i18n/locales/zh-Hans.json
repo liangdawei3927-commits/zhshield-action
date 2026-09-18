@@ -747,12 +747,11 @@
   },
   "nav": {
     "backup": "备份中心",
-    "dashboard": "项目体检",
     "deps": "依赖管家",
     "evolve": "规则进化",
     "garbage": "垃圾清理",
     "guard": "门禁系统",
-    "inspect": "质量巡检",
+    "inspect": "项目体检",
     "performance": "性能优化",
     "refactor": "代码重构",
     "reports": "报告中心",
@@ -859,158 +858,6 @@
           "6": "周六"
         }
       }
-    },
-    "dashboard": {
-      "autoFix": "🤖 自动修复",
-      "axis": {
-        "governance": {
-          "desc": "把控代码质量与规范",
-          "label": "治理"
-        },
-        "ops": {
-          "desc": "保障项目长期健康运行",
-          "label": "运维"
-        },
-        "security": {
-          "desc": "守护代码与供应链安全",
-          "label": "安全"
-        }
-      },
-      "check": "一键体检",
-      "card": {
-        "dependencies": "依赖管家",
-        "gate": "门禁检查",
-        "hoursAgo": "{{count}} 小时前",
-        "issues": "{{count}} 项",
-        "justNow": "刚刚",
-        "lastRun": "最近运行：{{time}}",
-        "minutesAgo": "{{count}} 分钟前",
-        "neverRun": "从未运行",
-        "quality": "质量巡检",
-        "score": "{{score}} 分",
-        "security": "安全防护",
-        "sentinel": "哨兵监控",
-        "techdebt": "技术债",
-        "weightTip": "总分权重 {{pct}}%",
-        "weightExcluded": "哨兵运行时不入总分"
-      },
-      "copy": {
-        "guardSource": "门禁·预防",
-        "inspectSource": "巡检"
-      },
-      "feature": {
-        "backup": {
-          "desc": "一键备份配置和规则，防止数据丢失"
-        },
-        "inspect": {
-          "desc": "定期检查代码质量、文档、依赖健康度"
-        },
-        "performance": {
-          "desc": "发现运行时性能反模式，优化执行效率"
-        },
-        "refactor": {
-          "desc": "检测代码异味，消除技术债务"
-        },
-        "reports": {
-          "desc": "查看历史检查报告和健康趋势"
-        },
-        "security": {
-          "desc": "漏洞、敏感信息、恶意代码一键排查"
-        }
-      },
-      "guardSlogan": "智能卫士：安全 · 治理 · 运维",
-      "overview": {
-        "generatedAt": "更新于 {{time}}",
-        "title": "项目健康总览",
-        "subtitle": "守护项目健康，一键全景体检",
-        "trendDown": "较上次下降",
-        "trendFlat": "与上次持平",
-        "trendUp": "较上次提升",
-        "issuesFound": "发现 {{count}} 个重点问题",
-        "noIssues": "未发现重点问题，状态良好",
-        "notChecked": "尚未体检，运行一键全检获取健康报告"
-      },
-      "productIntro": {
-        "subtitle": "以安全、治理、运维为核心，守护每一行代码",
-        "title": "代码界的智能卫士"
-      },
-      "progress": "进度 {{progress}}%",
-      "result": {
-        "allPassed": "已执行的检查项均通过。未执行的检查项及原因见下方列表。",
-        "backHome": "返回首页",
-        "header": {
-          "configureHint": "可在此处或顶部标题栏开关门禁检查与哨兵监控。",
-          "coverage": "本次覆盖质量巡检 {{inspectTotal}} 项。",
-          "failed": "体检发现问题",
-          "passed": "一键体检完成",
-          "skipped": "其中 {{skipped}} 项未执行，原因见下方列表。"
-        },
-        "issuesTitle": "需关注的问题",
-        "rerun": "再次体检",
-        "scopeTitle": "本次体检范围",
-        "stage": {
-          "guard": "门禁",
-          "inspect": "巡检"
-        },
-        "stats": {
-          "issues": "问题",
-          "passed": "通过",
-          "skipped": "跳过",
-          "total": "检查项"
-        }
-      },
-      "ring": {
-        "gaugeMax": "分",
-        "gaugeMin": "评",
-        "healthScore": "健康分",
-        "notChecked": "尚未体检"
-      },
-      "runCheck": {
-        "expiredHint": "部分检查结果已过期，建议一键全检刷新",
-        "forceHint": "将忽略缓存，对全部检查项串行重跑（6 域，实测约 5-10 分钟）。确定继续？",
-        "forceTitle": "强制全量重跑",
-        "hint": "读取缓存，仅重跑已过期检查（默认约 1-3 分钟）",
-        "title": "一键体检"
-      },
-      "running": "体检进行中…",
-      "sanitize": {
-        "autoFixStarted": "已启动 OpenCode 自动修复",
-        "autoFixing": "自动修复中…",
-        "done": "体检完成",
-        "guarding": "门禁检查中…",
-        "inspecting": "质量巡检中…",
-        "loadingRules": "加载体检规则…"
-      },
-      "scope": {
-        "inspect": "质量巡检",
-        "item": {
-          "complexity": "代码复杂度/规范",
-          "deps": "依赖审计",
-          "docs": "文档完整性",
-          "nest": "Nest/模块规范",
-          "tsType": "TypeScript 类型安全"
-        }
-      },
-      "stageGuard": "· 门禁",
-      "stageInspect": "· 巡检",
-      "status": {
-        "expired": "结果已过期",
-        "notRun": "未检测"
-      },
-      "toast": {
-        "addProjectFirst": "请先添加要体检的项目",
-        "allFresh": "所有检查结果均为最新，无需重跑",
-        "completed": "体检完成：{{total}} 项检查，{{passed}} 项通过",
-        "copiedIssues": "已复制 {{count}} 条问题，可粘贴到 AI 修复",
-        "copyFailed": "复制失败",
-        "executionFailed": "体检执行失败",
-        "failed": "体检执行失败: {{error}}",
-        "foundIssues": "体检完成：发现 {{count}} 项问题",
-        "fullCheckDone": "全检完成：重跑 {{count}} 项检查",
-        "noValidItems": "体检完成，但未执行到有效检查项（请确认项目路径）",
-        "partialFailed": "部分检查失败：{{domains}}"
-      },
-      "welcome": "欢迎使用智汇码盾"
     },
     "deps": {
       "checking": "盘点中...",
@@ -1291,30 +1138,26 @@
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "done": "巡检完成",
       "empty": {
-        "subtitle": "每日 0 点后自动巡检构建产物、License、依赖与垃圾清理，也可点击马上巡检",
-        "title": "检查构建产物，确保交付质量"
+        "subtitle": "每日 0 点后自动巡检架构规范、模块边界、类型安全与代码规范，也可点击马上巡检",
+        "title": "检查项目源码的架构与类型安全"
       },
       "feature": {
-        "build": {
-          "desc": "校验 dist 产物规范、完整性及输出目录",
-          "title": "构建产物检查"
+        "architecture": {
+          "desc": "扫描模块间依赖方向与循环依赖，防止架构腐化",
+          "title": "架构规范"
         },
-        "dependency": {
-          "desc": "检测冗余、未使用及版本冲突依赖",
-          "title": "依赖分析"
+        "codeStyle": {
+          "desc": "检查 TS 严格模式配置与枚举、常量使用规范",
+          "title": "代码规范"
         },
-        "garbage": {
-          "desc": "发现并清理临时文件、缓存与无用产物",
-          "title": "垃圾清理"
+        "moduleBoundary": {
+          "desc": "校验分层依赖方向，以及 NestJS 模块边界与依赖注入合规",
+          "title": "模块边界"
         },
-        "license": {
-          "desc": "识别开源许可证兼容性与合规风险",
-          "title": "License 扫描"
-        },
-        "tsType": {},
-        "complexity": {},
-        "nest": {},
-        "docs": {}
+        "typeSafety": {
+          "desc": "真实 tsc 类型检查，叠加空安全与类型一致性扫描",
+          "title": "类型安全"
+        }
       },
       "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} 项通过",
@@ -1443,15 +1286,22 @@
       "suggestion": "建议: {{suggestion}}"
     },
     "reports": {
+      "dimension": {
+        "quality": "质量",
+        "security": "安全性",
+        "architecture": "架构",
+        "dependencies": "依赖",
+        "documentation": "文档",
+        "refactor": "重构",
+        "performance": "性能",
+        "techdebt": "技术债",
+        "gate": "门禁哨兵"
+      },
       "empty": {
         "feature": {
-          "email": {
-            "desc": "将报告一键发送给团队成员",
-            "title": "邮件发送"
-          },
-          "pdf": {
-            "desc": "生成可分享的专业质量报告",
-            "title": "PDF 导出"
+          "module": {
+            "title": "模块级评分",
+            "desc": "按项目画像拆分到各模块，分别给出健康得分"
           },
           "scoring": {
             "desc": "汇总安全、性能、质量、架构健康得分",
@@ -1465,34 +1315,25 @@
         "subtitle": "已生成 {{count}} 份报告，最近更新于 {{date}}",
         "title": "多维度分析报告，决策更有依据"
       },
-      "generate": "生成报告",
-      "header": {
-        "count": "共 {{count}} 份报告 · 最近更新于 {{date}}",
-        "generate": "📊 生成报告"
-      },
-      "scoreLabel": {
-        "danger": "危险",
-        "excellent": "优秀",
-        "good": "良好",
-        "needsImprovement": "待改进"
-      },
-      "dimension": {
-        "quality": "质量",
-        "security": "安全性",
-        "architecture": "架构",
-        "dependencies": "依赖",
-        "documentation": "文档",
-        "refactor": "重构",
-        "performance": "性能",
-        "techdebt": "技术债",
-        "gate": "门禁哨兵"
-      },
+      "generate": "汇总生成报告",
       "grade": {
         "A": "A 级",
         "B": "B 级",
         "C": "C 级",
         "D": "D 级"
       },
+      "header": {
+        "count": "共 {{count}} 份报告 · 最近更新于 {{date}}",
+        "generate": "📊 汇总生成报告"
+      },
+      "noResults": "尚无可汇总的检查结果，请先运行一次「项目体检」或「门禁系统」",
+      "scoreLabel": {
+        "danger": "危险",
+        "excellent": "优秀",
+        "good": "良好",
+        "needsImprovement": "待改进"
+      },
+      "summaryDone": "已汇总各域最新结果，健康总分 {{score}}",
       "table": {
         "abnormal": "异常",
         "col": {

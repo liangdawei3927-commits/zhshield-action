@@ -2,7 +2,6 @@ import { useAppState } from './app-logic';
 import type { Page, ProjectInfo } from './app-logic';
 import type { AiToolConfigData } from './types/electron';
 import { WelcomePage } from './pages/WelcomePage';
-import { DashboardPage } from './pages/DashboardPage';
 import { GuardPage } from './pages/GuardPage';
 import { SentinelPage } from './pages/SentinelPage';
 import { InspectPage } from './pages/InspectPage';
@@ -42,8 +41,6 @@ function PageView({
   }
   const projectPath = activeProjectPath || projects[0]?.path || '';
   switch (currentPage) {
-    case 'dashboard':
-      return <DashboardPage projectPath={projectPath} />;
     case 'guard':
       return <GuardPage projectPath={projectPath} />;
     case 'sentinel':
@@ -70,10 +67,9 @@ function PageView({
       return <BackupPage projectPath={projectPath} onNavigate={onNavigate} />;
     case 'profile':
       return <ProfilePage projectPath={projectPath} />;
-    case 'scoring':
-      return <DashboardPage projectPath={projectPath} />;
     default:
-      return <DashboardPage projectPath={projectPath} />;
+      // 兜底落到「项目体检」：导航首项，也是全站唯一发起源码检查的入口
+      return <InspectPage projectPath={projectPath} />;
   }
 }
 
@@ -190,7 +186,7 @@ function App() {
     const path = projects.find((p) => p.name === onboardingProject)?.path;
     if (path) markOnboarded(path);
     setOnboardingProject(null);
-    setCurrentPage('dashboard');
+    setCurrentPage('inspect');
   };
   const handleOpenProjectProfile = (project: ProjectInfo, index: number) => {
     switchCurrentProject(index);
@@ -211,42 +207,42 @@ function App() {
   return (
     <NavigationProvider navigate={(p) => setCurrentPage(p as Page)} currentPage={currentPage}>
       <div className="flex flex-col h-screen bg-zh-bg font-sans">
-      {onboardingProject ? (
-        <ProjectOnboardingPage
-          projectName={onboardingProject}
-          projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
-          onComplete={handleOnboardingComplete}
-          onClose={() => setOnboardingProject(null)}
-          intelligentEnabled={intelligentEnabled}
-        />
-      ) : projects.length === 0 && currentPage === 'welcome' ? (
-        <PageView {...viewProps} />
-      ) : (
-        <AppShell
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          projects={projects}
-          currentProjectIndex={currentProjectIndex}
-          switchCurrentProject={switchCurrentProject}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          openFolderAndAddProject={openFolderAndAddProject}
-          removeProject={removeProject}
-          aiTool={aiTool}
-          aiApplying={aiApplying}
-          toggleAiTool={toggleAiTool}
-          activeProject={activeProject}
-          intelligentEnabled={intelligentEnabled}
-          setIntelligentEnabled={setIntelligentEnabled}
-          intelligentLoading={intelligentLoading}
-          onOpenProjectProfile={handleOpenProjectProfile}
-          viewProps={viewProps}
-        />
-      )}
+        {onboardingProject ? (
+          <ProjectOnboardingPage
+            projectName={onboardingProject}
+            projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
+            onComplete={handleOnboardingComplete}
+            onClose={() => setOnboardingProject(null)}
+            intelligentEnabled={intelligentEnabled}
+          />
+        ) : projects.length === 0 && currentPage === 'welcome' ? (
+          <PageView {...viewProps} />
+        ) : (
+          <AppShell
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            projects={projects}
+            currentProjectIndex={currentProjectIndex}
+            switchCurrentProject={switchCurrentProject}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            openFolderAndAddProject={openFolderAndAddProject}
+            removeProject={removeProject}
+            aiTool={aiTool}
+            aiApplying={aiApplying}
+            toggleAiTool={toggleAiTool}
+            activeProject={activeProject}
+            intelligentEnabled={intelligentEnabled}
+            setIntelligentEnabled={setIntelligentEnabled}
+            intelligentLoading={intelligentLoading}
+            onOpenProjectProfile={handleOpenProjectProfile}
+            viewProps={viewProps}
+          />
+        )}
 
-      {idle && projects.length > 0 && !onboardingProject && (
-        <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
-      )}
+        {idle && projects.length > 0 && !onboardingProject && (
+          <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
+        )}
       </div>
     </NavigationProvider>
   );

@@ -142,8 +142,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runProfile: (projectPath: string) => ipcRenderer.invoke('engine:runProfile', projectPath),
     getDashboardOverview: (projectPath: string) =>
       ipcRenderer.invoke('engine:getDashboardOverview', projectPath),
-    runFullCheck: (projectPath: string, options?: { force?: boolean }) =>
-      ipcRenderer.invoke('engine:runFullCheck', projectPath, options),
+    generateReportSummary: (projectPath: string) =>
+      ipcRenderer.invoke('engine:generateReportSummary', projectPath),
   },
 
   // ─── 统一任务调度（受限并发 + 排队，状态/进度实时广播）────

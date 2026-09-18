@@ -46,7 +46,7 @@ function ProjectRow({
       <button
         onClick={() => {
           onSwitchProject(index);
-          onNavigate('dashboard');
+          onNavigate('inspect');
           onClose();
         }}
         className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-1 py-2 rounded-lg text-left border-none cursor-pointer bg-transparent"

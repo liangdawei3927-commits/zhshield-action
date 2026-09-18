@@ -747,16 +747,15 @@
   },
   "nav": {
     "backup": "備份中心",
-    "dashboard": "專案體檢",
     "deps": "依賴盤點",
     "evolve": "規則進化",
     "garbage": "垃圾清理",
     "guard": "門禁系統",
-    "inspect": "質量巡檢",
+    "inspect": "專案體檢",
     "performance": "效能優化",
     "refactor": "程式碼重構",
     "reports": "報告中心",
-    "security": "安全掃描",
+    "security": "安全中心",
     "sentinel": "哨兵監控",
     "techdebt": "技術債務"
   },
@@ -859,158 +858,6 @@
           "6": "週六"
         }
       }
-    },
-    "dashboard": {
-      "autoFix": "🤖 自動修復",
-      "axis": {
-        "governance": {
-          "desc": "把控程式碼質量與規範",
-          "label": "治理"
-        },
-        "ops": {
-          "desc": "保障專案長期健康執行",
-          "label": "運維"
-        },
-        "security": {
-          "desc": "守護程式碼與供應鏈安全",
-          "label": "安全"
-        }
-      },
-      "check": "一鍵體檢",
-      "card": {
-        "dependencies": "依賴管家",
-        "gate": "門禁檢查",
-        "hoursAgo": "{{count}} 小時前",
-        "issues": "{{count}} 項",
-        "justNow": "剛剛",
-        "lastRun": "最近執行：{{time}}",
-        "minutesAgo": "{{count}} 分鐘前",
-        "neverRun": "從未執行",
-        "quality": "品質巡檢",
-        "score": "{{score}} 分",
-        "security": "安全防護",
-        "sentinel": "哨兵監控",
-        "techdebt": "技術債",
-        "weightTip": "總分權重 {{pct}}%",
-        "weightExcluded": "哨兵執行時不計入總分"
-      },
-      "copy": {
-        "guardSource": "門禁·預防",
-        "inspectSource": "巡檢"
-      },
-      "feature": {
-        "backup": {
-          "desc": "一鍵備份配置和規則，防止資料丟失"
-        },
-        "inspect": {
-          "desc": "定期檢查程式碼質量、檔案、依賴健康度"
-        },
-        "performance": {
-          "desc": "發現執行時效能反模式，最佳化執行效率"
-        },
-        "refactor": {
-          "desc": "檢測程式碼異味，消除技術債務"
-        },
-        "reports": {
-          "desc": "檢視歷史檢查報告和健康趨勢"
-        },
-        "security": {
-          "desc": "漏洞、敏感資訊、惡意程式碼一鍵排查"
-        }
-      },
-      "guardSlogan": "智慧衛士：安全 · 治理 · 運維",
-      "overview": {
-        "generatedAt": "更新於 {{time}}",
-        "title": "專案健康總覽",
-        "subtitle": "守護專案健康，一鍵全景體檢",
-        "trendDown": "較上次下降",
-        "trendFlat": "與上次持平",
-        "trendUp": "較上次提升",
-        "issuesFound": "發現 {{count}} 個重點問題",
-        "noIssues": "未發現重點問題，狀態良好",
-        "notChecked": "尚未體檢，運行一鍵全檢獲取健康報告"
-      },
-      "productIntro": {
-        "subtitle": "以安全、治理、運維為核心，守護每一行程式碼",
-        "title": "程式碼界的智慧衛士"
-      },
-      "progress": "進度 {{progress}}%",
-      "result": {
-        "allPassed": "已執行的檢查項均通過。未執行的檢查項及原因請見下方列表。",
-        "backHome": "返回首頁",
-        "header": {
-          "configureHint": "可在此處或頂部標題欄開關門禁檢查與哨兵監控。",
-          "coverage": "本次覆蓋質量巡檢 {{inspectTotal}} 項。",
-          "failed": "體檢發現問題",
-          "passed": "一鍵體檢完成",
-          "skipped": "其中 {{skipped}} 項未執行，原因請見下方列表。"
-        },
-        "issuesTitle": "需關注的問題",
-        "rerun": "再次體檢",
-        "scopeTitle": "本次體檢範圍",
-        "stage": {
-          "guard": "門禁",
-          "inspect": "巡檢"
-        },
-        "stats": {
-          "issues": "問題",
-          "passed": "通過",
-          "skipped": "跳過",
-          "total": "檢查項"
-        }
-      },
-      "ring": {
-        "healthScore": "健康分",
-        "notChecked": "尚未體檢",
-        "gaugeMin": "評",
-        "gaugeMax": "分"
-      },
-      "runCheck": {
-        "expiredHint": "部分檢查結果已過期，建議一鍵全檢重新整理",
-        "forceHint": "將忽略快取，對全部檢查項序列重跑（6 域，實測約 5-10 分鐘）。確定繼續？",
-        "forceTitle": "強制全量重跑",
-        "hint": "讀取快取，僅重跑已過期檢查（預設約 1-3 分鐘）",
-        "title": "一鍵體檢"
-      },
-      "running": "體檢進行中…",
-      "sanitize": {
-        "autoFixStarted": "已啟動 OpenCode 自動修復",
-        "autoFixing": "自動修復中…",
-        "done": "體檢完成",
-        "guarding": "門禁檢查中…",
-        "inspecting": "質量巡檢中…",
-        "loadingRules": "載入體檢規則…"
-      },
-      "scope": {
-        "inspect": "質量巡檢",
-        "item": {
-          "complexity": "程式碼複雜度/規範",
-          "deps": "依賴審計",
-          "docs": "檔案完整性",
-          "nest": "Nest/模組規範",
-          "tsType": "TypeScript 型別安全"
-        }
-      },
-      "stageGuard": "· 門禁",
-      "stageInspect": "· 巡檢",
-      "status": {
-        "expired": "結果已過期",
-        "notRun": "未檢測"
-      },
-      "toast": {
-        "addProjectFirst": "請先新增要體檢的專案",
-        "allFresh": "所有檢查結果均為最新，無需重跑",
-        "completed": "體檢完成：{{total}} 項檢查，{{passed}} 項通過",
-        "copiedIssues": "已複製 {{count}} 條問題，可貼上到 AI 修復",
-        "copyFailed": "複製失敗",
-        "executionFailed": "體檢執行失敗",
-        "failed": "體檢執行失敗: {{error}}",
-        "foundIssues": "體檢完成：發現 {{count}} 項問題",
-        "fullCheckDone": "全檢完成：重跑 {{count}} 項檢查",
-        "noValidItems": "體檢完成，但未執行到有效檢查項（請確認專案路徑）",
-        "partialFailed": "部分檢查失敗：{{domains}}"
-      },
-      "welcome": "歡迎使用智匯碼盾"
     },
     "deps": {
       "checking": "盤點中...",
@@ -1290,30 +1137,26 @@
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "done": "巡檢完成",
       "empty": {
-        "subtitle": "每日 0 點後自動巡檢構建產物、License、依賴與垃圾清理，也可點選馬上巡檢",
-        "title": "檢查構建產物，確保交付質量"
+        "subtitle": "每日 0 點後自動巡檢架構規範、模組邊界、型別安全與程式碼規範，也可點選馬上巡檢",
+        "title": "檢查專案原始碼的架構與型別安全"
       },
       "feature": {
-        "build": {
-          "desc": "校驗 dist 產物規範、完整性及輸出目錄",
-          "title": "構建產物檢查"
+        "architecture": {
+          "desc": "掃描模組間依賴方向與循環依賴，防止架構腐化",
+          "title": "架構規範"
         },
-        "dependency": {
-          "desc": "檢測冗餘、未使用及版本衝突依賴",
-          "title": "依賴分析"
+        "codeStyle": {
+          "desc": "檢查 TS 嚴格模式設定與列舉、常數使用規範",
+          "title": "程式碼規範"
         },
-        "garbage": {
-          "desc": "發現並清理臨時檔案、快取與無用產物",
-          "title": "垃圾清理"
+        "moduleBoundary": {
+          "desc": "校驗分層依賴方向，以及 NestJS 模組邊界與依賴注入合規",
+          "title": "模組邊界"
         },
-        "license": {
-          "desc": "識別開源許可證相容性與合規風險",
-          "title": "License 掃描"
-        },
-        "tsType": {},
-        "complexity": {},
-        "nest": {},
-        "docs": {}
+        "typeSafety": {
+          "desc": "真實 tsc 型別檢查，疊加空值安全與型別一致性掃描",
+          "title": "型別安全"
+        }
       },
       "passedCount": "{{passed}}/{{total}} 項通過",
       "scanNow": "馬上巡檢",
@@ -1443,15 +1286,22 @@
       "suggestion": "建議: {{suggestion}}"
     },
     "reports": {
+      "dimension": {
+        "quality": "品質",
+        "security": "安全性",
+        "architecture": "架構",
+        "dependencies": "依賴",
+        "documentation": "文檔",
+        "refactor": "重構",
+        "performance": "效能",
+        "techdebt": "技術債",
+        "gate": "門禁哨兵"
+      },
       "empty": {
         "feature": {
-          "email": {
-            "desc": "將報告一鍵傳送給團隊成員",
-            "title": "郵件傳送"
-          },
-          "pdf": {
-            "desc": "生成可分享的專業質量報告",
-            "title": "PDF 匯出"
+          "module": {
+            "title": "模組級評分",
+            "desc": "依專案輪廓拆分到各模組，分別給出健康得分"
           },
           "scoring": {
             "desc": "彙總安全、效能、質量、架構健康得分",
@@ -1465,17 +1315,25 @@
         "subtitle": "已生成 {{count}} 份報告，最近更新於 {{date}}",
         "title": "多維度分析報告，決策更有依據"
       },
-      "generate": "生成報告",
+      "generate": "彙總生成報告",
+      "grade": {
+        "A": "A 級",
+        "B": "B 級",
+        "C": "C 級",
+        "D": "D 級"
+      },
       "header": {
         "count": "共 {{count}} 份報告 · 最近更新於 {{date}}",
-        "generate": "📊 生成報告"
+        "generate": "📊 彙總生成報告"
       },
+      "noResults": "尚無可彙總的檢查結果，請先執行一次「專案體檢」或「門禁系統」",
       "scoreLabel": {
         "danger": "危險",
         "excellent": "優秀",
         "good": "良好",
         "needsImprovement": "待改進"
       },
+      "summaryDone": "已彙總各域最新結果，健康總分 {{score}}",
       "table": {
         "abnormal": "異常",
         "col": {
@@ -1487,24 +1345,7 @@
         },
         "healthy": "健康"
       },
-      "title": "分析報告",
-      "dimension": {
-        "quality": "品質",
-        "security": "安全性",
-        "architecture": "架構",
-        "dependencies": "依賴",
-        "documentation": "文檔",
-        "refactor": "重構",
-        "performance": "效能",
-        "techdebt": "技術債",
-        "gate": "門禁哨兵"
-      },
-      "grade": {
-        "A": "A 級",
-        "B": "B 級",
-        "C": "C 級",
-        "D": "D 級"
-      }
+      "title": "分析報告"
     },
     "security": {
       "checking": "檢查中...",

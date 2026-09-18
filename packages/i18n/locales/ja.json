@@ -747,16 +747,15 @@
   },
   "nav": {
     "backup": "バックアップセンター",
-    "dashboard": "プロジェクト点検",
     "deps": "依存関係",
     "evolve": "ルール進化",
     "garbage": "ゴミ清掃",
     "guard": "ゲートシステム",
-    "inspect": "品質巡視",
+    "inspect": "プロジェクト点検",
     "performance": "パフォーマンス最適化",
     "refactor": "コードリファクタリング",
     "reports": "レポートセンター",
-    "security": "セキュリティスキャン",
+    "security": "セキュリティセンター",
     "sentinel": "センチネル監視",
     "techdebt": "技術負債"
   },
@@ -859,158 +858,6 @@
           "6": "土"
         }
       }
-    },
-    "dashboard": {
-      "autoFix": "🤖 自動修正",
-      "axis": {
-        "governance": {
-          "desc": "コード品質と規約を管理",
-          "label": "ガバナンス"
-        },
-        "ops": {
-          "desc": "プロジェクトの長期的な健全な運用を確保",
-          "label": "運用"
-        },
-        "security": {
-          "desc": "コードとサプライチェーンの安全性を守る",
-          "label": "セキュリティ"
-        }
-      },
-      "check": "ワンクリック点検",
-      "card": {
-        "dependencies": "依存関係",
-        "gate": "ゲートチェック",
-        "hoursAgo": "{{count}} 時間前",
-        "issues": "{{count}} 件",
-        "justNow": "たった今",
-        "lastRun": "最終実行：{{time}}",
-        "minutesAgo": "{{count}} 分前",
-        "neverRun": "未実行",
-        "quality": "品質検査",
-        "score": "{{score}} 点",
-        "security": "セキュリティ",
-        "sentinel": "センチネル",
-        "techdebt": "技術負債",
-        "weightTip": "総合スコアの{{pct}}%",
-        "weightExcluded": "センチネルは総合スコアに含まれません"
-      },
-      "copy": {
-        "guardSource": "ゲート・予防",
-        "inspectSource": "巡回"
-      },
-      "feature": {
-        "backup": {
-          "desc": "設定とルールをワンクリックでバックアップし、データの喪失を防止"
-        },
-        "inspect": {
-          "desc": "コード品質、ドキュメント、依存関係の健全性を定期的にチェック"
-        },
-        "performance": {
-          "desc": "実行時のパフォーマンスアンチパターンを発見し、実行効率を最適化"
-        },
-        "refactor": {
-          "desc": "コードスメルを検出し、技術負債を解消"
-        },
-        "reports": {
-          "desc": "過去の検査レポートと健全性のトレンドを確認"
-        },
-        "security": {
-          "desc": "脆弱性、機密情報、悪意のあるコードをワンクリックで調査"
-        }
-      },
-      "guardSlogan": "スマートガーディアン: セキュリティ · ガバナンス · 運用",
-      "overview": {
-        "generatedAt": "更新：{{time}}",
-        "title": "プロジェクト健全性サマリー",
-        "subtitle": "プロジェクトの健全性を守る、ワンクリック全項目点検",
-        "trendDown": "前回より低下",
-        "trendFlat": "前回と同水準",
-        "trendUp": "前回より向上",
-        "issuesFound": "重要な問題が {{count}} 件見つかりました",
-        "noIssues": "重要な問題は見つかりませんでした",
-        "notChecked": "未点検です。一括点検を実行してください"
-      },
-      "productIntro": {
-        "subtitle": "セキュリティ、ガバナンス、運用を中心に、すべてのコードを守る",
-        "title": "コード界のスマートガーディアン"
-      },
-      "progress": "進捗 {{progress}}%",
-      "result": {
-        "allPassed": "実行されたチェック項目はすべて合格しました。未実行の項目と理由は下のリストをご覧ください。",
-        "backHome": "ホームに戻る",
-        "header": {
-          "configureHint": "ここまたは上部タイトルバーのスイッチで、ゲートチェックとセンチネル監視を切り替えられます。",
-          "coverage": "今回は品質巡回 {{inspectTotal}} 項目を対象としました。",
-          "failed": "点検で問題を検出しました",
-          "passed": "ワンクリック点検が完了しました",
-          "skipped": "うち {{skipped}} 項目は未実行でした。理由は下のリストをご覧ください。"
-        },
-        "issuesTitle": "注意が必要な問題",
-        "rerun": "再点検",
-        "scopeTitle": "今回の点検範囲",
-        "stage": {
-          "guard": "ゲート",
-          "inspect": "巡回"
-        },
-        "stats": {
-          "issues": "問題",
-          "passed": "合格",
-          "skipped": "スキップ",
-          "total": "チェック項目"
-        }
-      },
-      "ring": {
-        "healthScore": "ヘルススコア",
-        "notChecked": "まだ点検していません",
-        "gaugeMin": "0",
-        "gaugeMax": "100"
-      },
-      "runCheck": {
-        "expiredHint": "一部の結果が期限切れです。全チェックで更新してください。",
-        "forceHint": "キャッシュを無視して全チェックを直列再実行（6 領域、実測約 5〜10 分）。続行しますか？",
-        "forceTitle": "強制フル再実行",
-        "hint": "キャッシュを利用し、期限切れのみ再実行（通常約 1〜3 分）",
-        "title": "一括チェック"
-      },
-      "running": "点検を実行中…",
-      "sanitize": {
-        "autoFixStarted": "OpenCode 自動修正を開始しました",
-        "autoFixing": "自動修正中…",
-        "done": "点検完了",
-        "guarding": "ゲートチェック中…",
-        "inspecting": "品質巡回中…",
-        "loadingRules": "点検ルールを読み込み中…"
-      },
-      "scope": {
-        "inspect": "品質巡回",
-        "item": {
-          "complexity": "コード複雑度/規約",
-          "deps": "依存関係監査",
-          "docs": "ドキュメントの完全性",
-          "nest": "Nest/モジュール規約",
-          "tsType": "TypeScript 型安全性"
-        }
-      },
-      "stageGuard": "· ゲート",
-      "stageInspect": "· 巡回",
-      "status": {
-        "expired": "期限切れ",
-        "notRun": "未実行"
-      },
-      "toast": {
-        "addProjectFirst": "点検対象のプロジェクトを先に追加してください",
-        "allFresh": "すべての結果は最新です。再実行は不要です",
-        "completed": "点検完了：{{total}} 項目、{{passed}} 項目が合格",
-        "copiedIssues": "{{count}} 件の問題をコピーしました。AI に貼り付けて修正できます",
-        "copyFailed": "コピーに失敗しました",
-        "executionFailed": "点検の実行に失敗しました",
-        "failed": "点検の実行に失敗しました: {{error}}",
-        "foundIssues": "点検完了: {{count}} 件の問題を検出しました",
-        "fullCheckDone": "一括チェック完了：{{count}} 件を再実行",
-        "noValidItems": "点検は完了しましたが、有効なチェック項目が実行されませんでした（プロジェクトパスを確認してください）",
-        "partialFailed": "一部の点検に失敗しました：{{domains}}"
-      },
-      "welcome": "CodeShield へようこそ"
     },
     "deps": {
       "checking": "棚卸し中...",
@@ -1290,30 +1137,26 @@
       "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
       "done": "巡回完了",
       "empty": {
-        "subtitle": "毎日 0 時以降にビルド成果物、License、依存関係、ゴミ清掃を自動巡回します。「すぐ巡回」をクリックしても実行できます",
-        "title": "ビルド成果物をチェックし、納品品質を確保する"
+        "subtitle": "毎日 0 時以降にアーキテクチャ規範、モジュール境界、型安全性、コード規範を自動巡回します。「すぐ巡回」をクリックしても実行できます",
+        "title": "ソースコードのアーキテクチャと型安全性をチェック"
       },
       "feature": {
-        "build": {
-          "desc": "dist 成果物の規約、完全性、出力ディレクトリを検証",
-          "title": "ビルド成果物チェック"
+        "architecture": {
+          "desc": "モジュール間の依存方向と循環依存をスキャンし、アーキテクチャの腐敗を防ぎます",
+          "title": "アーキテクチャ規範"
         },
-        "dependency": {
-          "desc": "冗長な依存関係、未使用の依存関係、バージョン衝突を検出",
-          "title": "依存関係分析"
+        "codeStyle": {
+          "desc": "TypeScript strict モード設定と enum・定数の利用規約をチェック",
+          "title": "コード規範"
         },
-        "garbage": {
-          "desc": "一時ファイル、キャッシュ、不要な成果物を発見してクリーンアップ",
-          "title": "ゴミ清掃"
+        "moduleBoundary": {
+          "desc": "レイヤー依存方向と、NestJS モジュール境界・DI 準拠を検証",
+          "title": "モジュール境界"
         },
-        "license": {
-          "desc": "オープンソースライセンスの互換性とコンプライアンスリスクを識別",
-          "title": "License スキャン"
-        },
-        "tsType": {},
-        "complexity": {},
-        "nest": {},
-        "docs": {}
+        "typeSafety": {
+          "desc": "実際の tsc 型チェックに、null 安全と型整合性スキャンを追加",
+          "title": "型安全性"
+        }
       },
       "groupTitle": {},
       "passedCount": "{{passed}}/{{total}} 項目合格",
@@ -1443,15 +1286,22 @@
       "suggestion": "提案: {{suggestion}}"
     },
     "reports": {
+      "dimension": {
+        "quality": "品質",
+        "security": "セキュリティ",
+        "architecture": "アーキテクチャ",
+        "dependencies": "依存関係",
+        "documentation": "ドキュメント",
+        "refactor": "リファクタリング",
+        "performance": "パフォーマンス",
+        "techdebt": "技術負債",
+        "gate": "ゲートチェック"
+      },
       "empty": {
         "feature": {
-          "email": {
-            "desc": "レポートをチームメンバーにワンクリックで送信",
-            "title": "メール送信"
-          },
-          "pdf": {
-            "desc": "共有可能なプロフェッショナルな品質レポートを生成",
-            "title": "PDF エクスポート"
+          "module": {
+            "title": "モジュール別スコア",
+            "desc": "プロジェクトプロファイルに基づき各モジュールへ分割して採点"
           },
           "scoring": {
             "desc": "セキュリティ、パフォーマンス、品質、アーキテクチャの健全性スコアを集計",
@@ -1465,17 +1315,25 @@
         "subtitle": "{{count}} 件のレポートを生成済み。最終更新: {{date}}",
         "title": "多次元分析レポートで、意思決定の根拠に"
       },
-      "generate": "レポートを生成",
+      "generate": "レポートを集約",
+      "grade": {
+        "A": "A 級",
+        "B": "B 級",
+        "C": "C 級",
+        "D": "D 級"
+      },
       "header": {
         "count": "レポート合計 {{count}} 件 · 最終更新: {{date}}",
-        "generate": "📊 レポートを生成"
+        "generate": "📊 レポートを集約"
       },
+      "noResults": "集約できる検査結果がありません。先に「プロジェクト点検」または「ゲートシステム」を実行してください。",
       "scoreLabel": {
         "danger": "危険",
         "excellent": "優秀",
         "good": "良好",
         "needsImprovement": "改善が必要"
       },
+      "summaryDone": "各ドメインの最新結果を集約しました。総合スコア {{score}}",
       "table": {
         "abnormal": "異常",
         "col": {
@@ -1487,24 +1345,7 @@
         },
         "healthy": "健全"
       },
-      "title": "分析レポート",
-      "dimension": {
-        "quality": "品質",
-        "security": "セキュリティ",
-        "architecture": "アーキテクチャ",
-        "dependencies": "依存関係",
-        "documentation": "ドキュメント",
-        "refactor": "リファクタリング",
-        "performance": "パフォーマンス",
-        "techdebt": "技術負債",
-        "gate": "ゲートチェック"
-      },
-      "grade": {
-        "A": "A 級",
-        "B": "B 級",
-        "C": "C 級",
-        "D": "D 級"
-      }
+      "title": "分析レポート"
     },
     "security": {
       "checking": "チェック中...",

@@ -307,17 +307,6 @@ export interface DashboardOverview {
   generatedAt: string;
 }
 
-/** 一键全检执行结果（engine:runFullCheck 返回值：已重跑 / 已跳过 / 已失败域列表） */
-export interface RunFullCheckResult {
-  /** 全检流程是否完整执行（数据全新鲜导致无域重跑也是 true） */
-  ok: boolean;
-  reran: string[];
-  skipped: string[];
-  /** 尝试执行但失败的域（超时/异常被熔断） */
-  failed?: string[];
-  error?: string;
-}
-
 /** 依赖管家结果（serializable，来自 @zh/dependency 依赖管家引擎） */
 export interface DependencyReportData {
   schemaVersion: number;
@@ -522,10 +511,8 @@ export interface EngineAPI {
     projectPath: string,
   ) => Promise<{ profile: unknown; questions: unknown; drift: unknown }>;
   getDashboardOverview: (projectPath: string) => Promise<DashboardOverview | null>;
-  runFullCheck: (
-    projectPath: string,
-    options?: { force?: boolean },
-  ) => Promise<RunFullCheckResult>;
+  /** 汇总生成报告：只读各域最新结果并落库；无任何结果时为 null */
+  generateReportSummary: (projectPath: string) => Promise<HealthScoreData | null>;
 }
 
 export interface SyncAPI {

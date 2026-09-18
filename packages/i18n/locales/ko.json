@@ -113,6 +113,7 @@
     "hooksExist": "후크 파일 {{hooks}}이(가) 이미 있습니다. 덮어쓰지 않도록 수동으로 확인해 주세요",
     "invalidParams": "매개변수가 유효하지 않습니다",
     "invalidProjectPath": "프로젝트 경로가 유효하지 않습니다",
+    "techDebtNoSnapshot": "프로젝트 검진 결과가 없습니다. 먼저 프로젝트 검진을 실행한 후 기술 부채를 확인하세요.",
     "notGitRepo": "프로젝트가 git 저장소가 아닙니다",
     "restoreFailed": "복원 실패, 잠시 후 다시 시도해 주세요",
     "scoringUnavailable": "로컬 데이터베이스를 사용할 수 없어 채점 기능이 축소됩니다 (HTTP 모드로 서버에 연결해 주세요)",

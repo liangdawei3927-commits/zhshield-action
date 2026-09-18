@@ -7,12 +7,15 @@ import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport } from '@zh/kernel';
 import type { PipelineReport } from '@zh/pipeline';
+import { buildTechDebtDashboard } from '@zh/scoring';
 import {
   normalizePipelineReport,
   buildDiagnosticsReport,
   writeDiagnosticsFile,
   persistDiagnostics,
   persistDiagnosticsFromEntries,
+  readDomainSnapshot,
+  domainSnapshotPath,
   type DiagnosticEntry,
 } from '../../electron/zh-diagnostics';
 
@@ -339,6 +342,140 @@ describe('writeDiagnosticsFile', () => {
       expect(parsed.version).toBe('1.0');
       expect(parsed.project.path).toBe(project);
       expect(parsed.summary.total).toBe(0);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * 按域快照（T6 基础设施）。
+ * 目的：latest.json 是整份覆盖写，谁最后跑就只有谁；技术债等跨域消费者
+ * 需要「只读别域结果」的稳定入口，因此按域分文件落盘。
+ */
+describe('按域快照 domains/<source>.json', () => {
+  const entries: DiagnosticEntry[] = [
+    {
+      ruleId: 'typescript/no-any',
+      severity: 'warning',
+      category: 'quality',
+      message: 'w',
+      file: 'src/a.ts',
+      autoFixable: false,
+      source: 'inspect',
+      fingerprint: 'inspect::a',
+    },
+    {
+      ruleId: 'secret/hardcoded',
+      severity: 'error',
+      category: 'security',
+      message: 'e',
+      file: 'src/b.ts',
+      autoFixable: false,
+      source: 'security',
+      fingerprint: 'security::b',
+    },
+  ];
+
+  it('写入时按 source 拆分落盘，各域互不覆盖', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-domain-snap-'));
+    try {
+      const report = buildDiagnosticsReport({ path: project, name: 'tmp' }, entries, 'T1');
+      await writeDiagnosticsFile(report);
+
+      const inspectSnap = JSON.parse(readFileSync(domainSnapshotPath(project, 'inspect'), 'utf-8'));
+      const securitySnap = JSON.parse(
+        readFileSync(domainSnapshotPath(project, 'security'), 'utf-8'),
+      );
+      expect(inspectSnap.issues).toHaveLength(1);
+      expect(inspectSnap.issues[0].source).toBe('inspect');
+      expect(securitySnap.issues).toHaveLength(1);
+      expect(securitySnap.issues[0].source).toBe('security');
+      // 快照路径确实在 domains/ 子目录下
+      expect(domainSnapshotPath(project, 'inspect')).toBe(
+        join(project, '.zhshield', 'diagnostics', 'domains', 'inspect.json'),
+      );
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('readDomainSnapshot 读回同域快照；未落盘的域返回 null', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-domain-read-'));
+    try {
+      const report = buildDiagnosticsReport({ path: project, name: 'tmp' }, entries, 'T2');
+      await writeDiagnosticsFile(report);
+
+      const snap = await readDomainSnapshot(project, 'inspect');
+      expect(snap).not.toBeNull();
+      expect(snap!.generatedAt).toBe('T2');
+      expect(snap!.issues.map((i) => i.fingerprint)).toEqual(['inspect::a']);
+
+      // refactor 域本次没跑 → 必须返回 null（调用方据此显式提示，而非当成 0 问题）
+      expect(await readDomainSnapshot(project, 'refactor')).toBeNull();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('快照损坏 / 结构不符 → 返回 null，不抛异常', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-domain-corrupt-'));
+    try {
+      mkdirSync(join(project, '.zhshield', 'diagnostics', 'domains'), { recursive: true });
+      writeFileSync(domainSnapshotPath(project, 'inspect'), '{ not json', 'utf-8');
+      expect(await readDomainSnapshot(project, 'inspect')).toBeNull();
+
+      writeFileSync(domainSnapshotPath(project, 'inspect'), '{"version":"1.0"}', 'utf-8');
+      expect(await readDomainSnapshot(project, 'inspect')).toBeNull();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('单域落盘后 latest.json 仍为整份视图（不影响既有消费者）', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-domain-latest-'));
+    try {
+      await persistDiagnosticsFromEntries(project, entries);
+      const latest = JSON.parse(
+        readFileSync(join(project, '.zhshield', 'diagnostics', 'latest.json'), 'utf-8'),
+      );
+      expect(latest.issues).toHaveLength(2);
+      expect((await readDomainSnapshot(project, 'inspect'))!.issues).toHaveLength(1);
+      expect((await readDomainSnapshot(project, 'security'))!.issues).toHaveLength(1);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('快照足以直接生成技术债报告（T6：无需再触发一次巡检）', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-domain-debt-'));
+    try {
+      await persistDiagnosticsFromEntries(project, [
+        {
+          ruleId: 'architecture/layer',
+          severity: 'warning',
+          category: 'architecture',
+          message: 'layer violation',
+          file: 'src/a.ts',
+          autoFixable: false,
+          source: 'inspect',
+          fingerprint: 'architecture::src/a.ts::layer',
+        },
+      ]);
+      const snap = await readDomainSnapshot(project, 'inspect');
+      expect(snap).not.toBeNull();
+      const dashboard = buildTechDebtDashboard({
+        projectId: project,
+        issues: snap!.issues.map((e) => ({
+          id: e.fingerprint,
+          severity: e.severity,
+          category: e.category,
+          file: e.file,
+        })),
+        moduleHotness: [],
+      });
+      expect(dashboard.actionList.length).toBeGreaterThan(0);
+      expect(dashboard.debtIndex).toBeGreaterThanOrEqual(0);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

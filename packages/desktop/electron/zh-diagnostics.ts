@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { t } from '@zh/i18n';
 import { WhitelistManager } from '@zh/guard';
@@ -274,18 +274,87 @@ function mapLspSeverity(severity: DiagnosticSeverity): LspDiagnostic['severity']
 // 保证 latest.json 的写入互不交错，始终以最后一次写入为准。
 let writeQueue: Promise<unknown> = Promise.resolve();
 
+/** 诊断条目的来源引擎标识 */
+export type DiagnosticSource = DiagnosticEntry['source'];
+
+/**
+ * 按域快照目录：`<project>/.zhshield/diagnostics/domains/`。
+ *
+ * 为什么需要它：`latest.json` 是**整份覆盖写**——谁最后跑，文件里就只有谁的条目
+ * （security 跑完，inspect 的条目就没了）。于是任何「读别域结果」的页面都无法
+ * 从 latest.json 得到稳定数据，只能自己再触发一次别域检查（越界）。
+ * 按域分文件后，各域结果互不覆盖，跨域消费可以「只读结果，不发起检查」。
+ */
+export function domainSnapshotPath(projectPath: string, source: DiagnosticSource): string {
+  return join(projectPath, '.zhshield', 'diagnostics', 'domains', `${source}.json`);
+}
+
 /** 写入 <project>/.zhshield/diagnostics/latest.json，返回绝对路径 */
 export async function writeDiagnosticsFile(report: DiagnosticsReport): Promise<string> {
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
   const absPath = join(dir, 'latest.json');
   const payload = `${JSON.stringify(report, null, 2)}\n`;
+  // 按域拆分快照：同一份报告里可能含多个来源（pipeline 全量落盘），逐个写出
+  const perSource = new Map<DiagnosticSource, DiagnosticEntry[]>();
+  for (const entry of report.issues) {
+    const bucket = perSource.get(entry.source);
+    if (bucket) bucket.push(entry);
+    else perSource.set(entry.source, [entry]);
+  }
   // 排队执行，避免并发扫描时多次 writeFile 交错覆盖
   writeQueue = writeQueue.then(async () => {
     await mkdir(dir, { recursive: true });
     await writeFile(absPath, payload, 'utf-8');
+    if (perSource.size === 0) return;
+    await mkdir(join(dir, 'domains'), { recursive: true });
+    // 各域快照彼此独立 → 并行写，不做串行 await
+    const writes: Promise<void>[] = [];
+    for (const [source, issues] of perSource) {
+      const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
+      writes.push(
+        writeFile(
+          domainSnapshotPath(report.project.path, source),
+          `${JSON.stringify(snapshot, null, 2)}\n`,
+          'utf-8',
+        ),
+      );
+    }
+    await Promise.all(writes);
   });
   await writeQueue;
   return absPath;
+}
+
+/**
+ * 读取某治理域最近一次落盘快照（跨域**只读**消费入口）。
+ *
+ * 缺失 / 损坏 / 结构不符 → 返回 null，由调用方显式提示「无可用快照」，
+ * 不得静默当成「该域无问题」。
+ */
+export async function readDomainSnapshot(
+  projectPath: string,
+  source: DiagnosticSource,
+): Promise<DiagnosticsReport | null> {
+  try {
+    const raw = await readFile(domainSnapshotPath(projectPath, source), 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (!isDiagnosticsReport(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** 最小结构校验：快照必须带 version/project/issues 数组 */
+function isDiagnosticsReport(value: unknown): value is DiagnosticsReport {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Partial<DiagnosticsReport>;
+  return (
+    typeof candidate.version === 'string' &&
+    typeof candidate.project === 'object' &&
+    candidate.project !== null &&
+    Array.isArray(candidate.issues)
+  );
 }
 
 /** 依据 <project>/.zhshield/whitelist.yml 过滤被白名单压制的误报条目（rule+file 精确匹配） */

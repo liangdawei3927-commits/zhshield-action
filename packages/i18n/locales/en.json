@@ -113,6 +113,7 @@
     "hooksExist": "Hook file {{hooks}} already exists; confirm manually to avoid overwriting",
     "invalidParams": "Invalid parameters",
     "invalidProjectPath": "Invalid project path",
+    "techDebtNoSnapshot": "No project health check result yet. Run a project health check first, then revisit technical debt.",
     "notGitRepo": "Project is not a git repository",
     "restoreFailed": "Restore failed, please try again later",
     "scoringUnavailable": "Local database unavailable, scoring degraded (use HTTP mode to connect to the server)",

@@ -113,6 +113,7 @@
     "hooksExist": "已有鉤子檔案 {{hooks}}，為避免覆蓋請手動確認",
     "invalidParams": "引數無效",
     "invalidProjectPath": "專案路徑無效",
+    "techDebtNoSnapshot": "尚無專案健檢結果，請先執行一次專案健檢，再查看技術債務",
     "notGitRepo": "專案不是 git 倉庫",
     "restoreFailed": "恢復失敗，請稍後重試",
     "scoringUnavailable": "本地資料庫不可用，評分功能降級（請使用 HTTP 模式連線服務端）",

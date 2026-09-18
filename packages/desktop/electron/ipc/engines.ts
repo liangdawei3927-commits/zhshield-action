@@ -84,6 +84,7 @@ import {
   normalizeDepsSource,
   normalizeTechDebtSource,
   normalizeSecuritySource,
+  readDomainSnapshot,
 } from '../zh-diagnostics';
 import {
   readDashboardState,
@@ -393,7 +394,7 @@ export function registerEnginesIpc(manager: TaskManager): void {
     depsRelockBaselineHandler(projectPath),
   );
   ipcMain.handle('engine:runTechDebt', (_e, projectPath: string) =>
-    runTechDebtHandler(manager, projectPath),
+    runTechDebtHandler(projectPath),
   );
   ipcMain.handle(
     'debt:planRepayment',
@@ -402,10 +403,10 @@ export function registerEnginesIpc(manager: TaskManager): void {
       projectPath: string,
       actionId: string,
       opts?: { sprint?: string; gate?: 'allow-with-record' },
-    ) => planDebtRepaymentHandler(manager, projectPath, actionId, opts),
+    ) => planDebtRepaymentHandler(projectPath, actionId, opts),
   );
   ipcMain.handle('debt:verifyRepaid', (_e, projectPath: string, actionId: string) =>
-    verifyDebtRepaidHandler(manager, projectPath, actionId),
+    verifyDebtRepaidHandler(projectPath, actionId),
   );
   ipcMain.handle('debt:dismiss', (_e, projectPath: string, actionId: string) =>
     dismissDebtActionHandler(projectPath, actionId),
@@ -471,7 +472,7 @@ async function runGuardHandler(
   }
 }
 
-/** 运行 inspect 巡检并返回原生报告（runInspect / runTechDebt 共用同一执行路径） */
+/** 运行 inspect 巡检并返回原生报告（仅 runInspect 使用；技术债已改读落盘快照，见 T6） */
 async function runInspectTask(
   manager: TaskManager,
   projectPath: string,
@@ -1024,31 +1025,61 @@ function collectModuleHotness(projectPath: string): Promise<ModuleHotnessInput[]
 }
 
 /**
- * 技术债仪表盘（engine:runTechDebt）：直连主进程，不注册 TaskManager 任务类型。
- * 复用 inspect 巡检产出 issues，叠加 git 模块热度 + 对外接口清单，
- * 由 @zh/scoring buildTechDebtDashboard 生成 ROI 排序报告。
- * 对外接口清单的同步扫盘已移入 profile worker（collectExposedFilesInWorker）。
+ * 技术债的输入来自 **inspect 域最近一次落盘快照**（只读，不发起检查）。
+ *
+ * 背景（T6）：`runTechDebt` / `planDebtRepayment` / `verifyDebtRepaid` 三处此前都直接
+ * `runInspectTask()` —— 打开技术债页、计划还款、验证还款，各触发一次 11 工具完整巡检。
+ * 这违反「触发权域内独占」：技术债只是**消费**巡检结论并叠加 git 热度算出 ROI，
+ * 判定权不在它手里。
+ *
+ * 跨域消费的正确写法是「只读结果，不发起检查」：读 `.zhshield/diagnostics/domains/inspect.json`
+ * （由 inspect 域自己落盘，按域分文件，不被其他域覆盖写清掉）。
+ *
+ * projectId 沿用 `InspectionReport.projectId` 的口径 —— 那是 `path.resolve(projectPath)`
+ * 后的**绝对路径**（inspect/src/engine.ts 归一化），且 @zh/db 的债务快照/动作表都以它为键。
+ * **不可**换成 hash 型 projectId，否则历史趋势与动作状态会静默失联。
  */
-async function runTechDebtHandler(
-  manager: TaskManager,
-  projectPath: string,
-): Promise<TechDebtReportData> {
+type DebtInputResult =
+  | { ok: true; projectId: string; issues: DebtIssueInput[]; generatedAt: string }
+  | { ok: false; reason: 'no-snapshot' };
+
+async function loadDebtInputFromSnapshot(projectPath: string): Promise<DebtInputResult> {
+  const snapshot = await readDomainSnapshot(projectPath, 'inspect');
+  if (!snapshot) return { ok: false, reason: 'no-snapshot' };
+  return {
+    ok: true,
+    projectId: path.resolve(projectPath),
+    generatedAt: snapshot.generatedAt,
+    issues: snapshot.issues.map((entry) => ({
+      id: entry.fingerprint,
+      severity: entry.severity,
+      category: entry.category,
+      file: entry.file,
+    })),
+  };
+}
+
+/**
+ * 技术债仪表盘（engine:runTechDebt）：直连主进程，不注册 TaskManager 任务类型。
+ * 读 inspect 域落盘快照（只读），叠加 git 模块热度 + 对外接口清单，
+ * 由 @zh/scoring buildTechDebtDashboard 生成 ROI 排序报告。
+ * 无快照时返回带 error 的空报告（显式提示先跑体检），不静默显示 0 债务。
+ */
+async function runTechDebtHandler(projectPath: string): Promise<TechDebtReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const inspectReport = await runInspectTask(manager, projectPath);
-    const issues: DebtIssueInput[] = inspectReport.issues.map((issue) => ({
-      id: issue.id,
-      severity: issue.severity,
-      category: issue.category,
-      file: issue.file,
-    }));
+    const input = await loadDebtInputFromSnapshot(projectPath);
+    if (!input.ok) {
+      console.warn('[engine:runTechDebt] 无 inspect 域快照，提示先运行项目体检');
+      return emptyTechDebtReport(t('electron.techDebtNoSnapshot'));
+    }
     const moduleHotness = await collectModuleHotness(projectPath);
     const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({
-      projectId: inspectReport.projectId,
-      issues,
+      projectId: input.projectId,
+      issues: input.issues,
       moduleHotness,
       exposedFiles,
     });
@@ -1104,7 +1135,6 @@ async function runTechDebtHandler(
 }
 
 async function planDebtRepaymentHandler(
-  manager: TaskManager,
   projectPath: string,
   actionId: string,
   opts?: { sprint?: string; gate?: 'allow-with-record' },
@@ -1118,18 +1148,18 @@ async function planDebtRepaymentHandler(
     ) {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const inspectReport = await runInspectTask(manager, projectPath);
-    const issues: DebtIssueInput[] = inspectReport.issues.map((issue) => ({
-      id: issue.id,
-      severity: issue.severity,
-      category: issue.category,
-      file: issue.file,
-    }));
+    // 只读快照：这里的 action 本来就取自同一份快照（页面渲染用的就是它），
+    // 读快照比重新全量巡检更一致，也避免「点还款又跑一次 11 工具」。
+    const input = await loadDebtInputFromSnapshot(projectPath);
+    if (!input.ok) {
+      console.warn('[engine:debt:planRepayment] 无 inspect 域快照，请先运行项目体检');
+      return;
+    }
     const moduleHotness = await collectModuleHotness(projectPath);
     const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({
-      projectId: inspectReport.projectId,
-      issues,
+      projectId: input.projectId,
+      issues: input.issues,
       moduleHotness,
       exposedFiles,
     });
@@ -1160,11 +1190,15 @@ async function planDebtRepaymentHandler(
   }
 }
 
-async function verifyDebtRepaidHandler(
-  manager: TaskManager,
-  projectPath: string,
-  actionId: string,
-): Promise<boolean> {
+/**
+ * 验证还款：按 inspect 域最新落盘快照判定该 action 是否仍存在。
+ *
+ * 语义说明（T6）：本方法天然需要「新鲜」的巡检结果，但它无权发起巡检
+ * （触发权属体检/inspect 域）。因此正确用法是：用户修完后先重跑项目体检
+ * 让快照刷新，再回来点验证。快照缺失或未刷新时**保守返回 false**——
+ * 宁可显示「未还清」，绝不在没有证据时宣称「已还清」。
+ */
+async function verifyDebtRepaidHandler(projectPath: string, actionId: string): Promise<boolean> {
   try {
     if (
       !projectPath ||
@@ -1173,18 +1207,16 @@ async function verifyDebtRepaidHandler(
       typeof actionId !== 'string'
     )
       return false;
-    const inspectReport = await runInspectTask(manager, projectPath);
-    const issues: DebtIssueInput[] = inspectReport.issues.map((issue) => ({
-      id: issue.id,
-      severity: issue.severity,
-      category: issue.category,
-      file: issue.file,
-    }));
+    const input = await loadDebtInputFromSnapshot(projectPath);
+    if (!input.ok) {
+      console.warn('[engine:debt:verifyRepaid] 无 inspect 域快照，保守判为未还清');
+      return false;
+    }
     const moduleHotness = await collectModuleHotness(projectPath);
     const exposedFiles = await collectExposedFilesInWorker(projectPath);
     const snapshot = buildTechDebtDashboard({
-      projectId: inspectReport.projectId,
-      issues,
+      projectId: input.projectId,
+      issues: input.issues,
       moduleHotness,
       exposedFiles,
     });
@@ -1842,7 +1874,7 @@ async function runFullCheckHandler(
       {
         key: 'techdebt',
         stale: isStale(dashState.techdebt?.lastRunAt),
-        run: async () => void (await runTechDebtHandler(manager, projectPath)),
+        run: async () => void (await runTechDebtHandler(projectPath)),
       },
       {
         key: 'secrets',

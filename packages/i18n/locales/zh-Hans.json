@@ -113,6 +113,7 @@
     "hooksExist": "已有钩子文件 {{hooks}}，为避免覆盖请手动确认",
     "invalidParams": "参数无效",
     "invalidProjectPath": "项目路径无效",
+    "techDebtNoSnapshot": "尚无项目体检结果，请先运行一次项目体检，再查看技术债务",
     "notGitRepo": "项目不是 git 仓库",
     "restoreFailed": "恢复失败，请稍后重试",
     "scoringUnavailable": "本地数据库不可用，评分功能降级（请使用 HTTP 模式连接服务端）",

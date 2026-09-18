@@ -153,32 +153,12 @@ export function CheckList({
               {config.icon}
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-zh-ink-2">{item.name}</span>
-                {item.source === 'ai-code-review' && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium"
-                    style={{
-                      background: 'rgb(var(--zh-info) / 0.1)',
-                      color: 'rgb(var(--zh-info))',
-                    }}
-                  >
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
-                    </svg>
-                    {t('page.inspect.aiReviewBadge')}
-                  </span>
-                )}
-              </div>
+              {/* 「AI 深度审查」徽章已删除（09-19）：原判据 `item.source === 'ai-code-review'` 恒为假
+                  —— 唯一数据源 toInspectionReportDataFromRuleEngine 产出的 checks 不含 source 字段，
+                  且 AiCodeReviewImpl.deepReview 只在已废弃的直扫分支调用，SOP 巡检不执行 AI 审查。
+                  留一个永不出现的承诺比没有更糟。若将来恢复 AI 审查，需同时：①SOP 映射补 source
+                  ②本处重新渲染 ③i18n 五语言补回 page.inspect.aiReviewBadge。 */}
+              <span className="text-sm font-medium text-zh-ink-2">{item.name}</span>
               <div className="text-xs mt-0.5 text-zh-muted">{item.detail}</div>
             </div>
             {item.status !== 'pass' && <CopyToAiButton onClick={() => onCopyToAi(item)} />}

@@ -7,7 +7,7 @@
  *   3. 完成判定 = 任务管理器无 running/queued + 无进行中文案 + 文本稳定
  *
  * 扫描对象 = $ZH_NAV_FIXTURE（默认 /tmp/zh-nav-fixture，内含 7 类已知缺陷）。
- * 可只跑子集：ZH_NAV_ONLY=dashboard,guard
+ * 可只跑子集：ZH_NAV_ONLY=inspect,guard
  *
  * 运行：ZH_NAV_FIXTURE=/tmp/zh-nav-fixture pnpm exec playwright test e2e/nav-actions.spec.ts
  */
@@ -17,18 +17,18 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ENTRIES, SHOT_DIR, entryButton, launchApp, mainText } from './nav-helpers';
 
-/** 每项功能的主动作候选按钮标签（按顺序尝试） */
+/** 每项功能的主动作候选按钮标签（按顺序尝试）；键必须与 nav-helpers 的 ENTRIES.id 对齐 */
 const ACTION_CANDIDATES: Record<string, string[]> = {
-  dashboard: ['一键体检', '重新体检', '全量体检'],
+  inspect: ['马上巡检', '重新巡检'],
   guard: ['立即扫描', '重新扫描'],
   sentinel: ['启动监控', '监控运行中'],
-  inspect: ['马上巡检', '重新巡检'],
   security: ['一键扫描', '重新检查', '开始扫描'],
   deps: ['开始盘点', '重新盘点'],
   garbage: ['开始扫描', '重新扫描'],
   performance: ['开始性能检测', '重新检测'],
   techdebt: ['开始盘点', '重新盘点'],
   refactor: ['马上检查', '重新检查'],
+  reports: ['汇总生成报告', '📊 汇总生成报告', '重新汇总'],
   evolve: ['架构分析', '刷新'],
   backup: ['一键备份'],
 };

@@ -40,17 +40,27 @@ export interface NavEntry {
   action: string;
 }
 
+/**
+ * 与 `src/components/layout/nav-items.ts` 的 10 项 + TitleBar 2 项（规则进化 / 备份中心）
+ * 严格一一对应。
+ *
+ * ⚠️ `entryButton()` 用 **label 当按钮选择器**（`getByRole('button', { name: e.label })`），
+ * 所以本表的 label 必须等于该按钮当时的可见文字：**导航改名、页面删除、空态改版都要同步本表**，
+ * 否则断言必渲染失败（2026-09-19 修复：原表仍留着已删的 dashboard 页、inspect 仍叫「质量巡检」、
+ * markers 仍是旧空态卡）
+ * 同时 nav-actions.spec.ts 的 `ACTION_CANDIDATES` 按 id 取主动作，新增/删除项也要一起改。
+ */
 export const ENTRIES: NavEntry[] = [
-  { id: 'dashboard', label: '项目体检', where: 'nav', markers: ['项目健康总览', '健康总览'], action: '一键体检' },
+  { id: 'inspect', label: '项目体检', where: 'nav', markers: ['架构规范', '类型安全', '马上巡检'], action: '马上巡检' },
   { id: 'guard', label: '门禁系统', where: 'nav', markers: ['实时守护代码变更', '门禁', '检查项'], action: '立即扫描' },
   { id: 'sentinel', label: '哨兵监控', where: 'nav', markers: ['无间断监控', '监控已启动', '事件时间线'], action: '启动监控' },
-  { id: 'inspect', label: '质量巡检', where: 'nav', markers: ['检查构建产物', '马上巡检'], action: '马上巡检' },
   { id: 'security', label: '安全中心', where: 'nav', markers: ['深度扫描漏洞', '安全评分', '漏洞扫描'], action: '一键扫描' },
   { id: 'deps', label: '依赖管家', where: 'nav', markers: ['管家盘点', '开始盘点', '依赖图谱'], action: '开始盘点' },
   { id: 'garbage', label: '垃圾清理', where: 'nav', markers: ['清理无用文件', '开始扫描', '可清理'], action: '开始扫描' },
   { id: 'performance', label: '性能优化', where: 'nav', markers: ['检测运行时性能反模式', '开始性能检测', '性能'], action: '开始性能检测' },
   { id: 'techdebt', label: '技术债务', where: 'nav', markers: ['量化技术债', '开始盘点', '债务'], action: '开始盘点' },
   { id: 'refactor', label: '代码重构', where: 'nav', markers: ['优化代码结构', '马上检查', '重构'], action: '马上检查' },
+  { id: 'reports', label: '报告中心', where: 'nav', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
   { id: 'evolve', label: '规则进化', where: 'banner', markers: ['洞察项目架构', '架构分析'], action: '架构分析' },
   { id: 'backup', label: '备份中心', where: 'banner', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },
 ];

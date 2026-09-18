@@ -1133,12 +1133,11 @@
       "warningCount": "{{count}} warnings"
     },
     "inspect": {
-      "aiReviewBadge": "AI Deep Review",
       "checksPassed": "Checks passed",
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Inspection complete",
       "empty": {
-        "subtitle": "Architecture, module boundaries, type safety, and code conventions are auto-inspected daily after midnight; you can also inspect now",
+        "subtitle": "Auto-inspects architecture, module boundaries, type safety, and code conventions once on your first visit each day; you can also inspect now",
         "title": "Inspect source architecture and type safety"
       },
       "feature": {
@@ -1239,7 +1238,7 @@
           "title": "Auto fix"
         },
         "featureDaily": {
-          "desc": "Auto-scans after midnight daily, continuously tracking code quality",
+          "desc": "Auto-scans once on your first visit each day, continuously tracking code quality",
           "title": "Daily auto check"
         },
         "featureGrouping": {
@@ -1250,7 +1249,7 @@
           "desc": "Detects duplicate code, oversized functions, high cyclomatic complexity, and more",
           "title": "Code smells"
         },
-        "subtitle": "Daily auto checks for code duplication, smells, oversized functions, etc.; apply recommended refactorings in one click",
+        "subtitle": "Daily checks for code duplication, smells, oversized functions, etc.; apply recommended refactorings in one click",
         "title": "Optimize code structure, eliminate technical debt"
       },
       "smell": {

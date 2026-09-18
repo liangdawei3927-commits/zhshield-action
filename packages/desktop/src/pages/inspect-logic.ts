@@ -129,11 +129,11 @@ function useInspectCopyToAi(projectPath: string): {
   return { copyToAi, copyAllToAi };
 }
 
-/** 巡检页全部状态与副作用：每日 0 点自动巡检、复制到 AI */
+/** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
   const { report, loading, progressLabel, startInspect } = useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
-  useDailyAutoCheck(projectPath, () => void startInspect());
+  useDailyAutoCheck('inspect', projectPath, () => void startInspect());
 
   return { report, loading, progressLabel, copyToAi, copyAllToAi, startInspect };
 }

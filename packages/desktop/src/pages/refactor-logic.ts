@@ -172,7 +172,7 @@ export function useSmellGroups(report: RefactorReportData | null) {
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
   const { scanning, progressLabel, report, error, handleScan } = useRefactorScan(projectPath);
-  const { lastAutoAt } = useDailyAutoCheck(projectPath, () => void handleScan());
+  const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan());
   const { activeRuleId, setActiveRuleId, groups, activeGroup } = useSmellGroups(report);
   return {
     scanning,

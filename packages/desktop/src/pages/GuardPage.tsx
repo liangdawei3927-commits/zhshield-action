@@ -16,6 +16,7 @@ import {
 } from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useToast } from '../components/ui/Toast';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { exportHtmlReport } from '../utils/htmlExport';
 import type { HtmlReportData } from '@zh/reporter';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
@@ -146,6 +147,7 @@ function GuardReportView({
   reportFalsePositive,
   history,
   falsePositiveCount,
+  projectPath,
   t,
 }: {
   report: GuardReportData;
@@ -160,6 +162,7 @@ function GuardReportView({
   reportFalsePositive: (check: GuardReportData['checks'][number]) => void;
   history: GuardReportRecordData[];
   falsePositiveCount: number;
+  projectPath: string;
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
@@ -172,6 +175,7 @@ function GuardReportView({
           progressLabel={progressLabel}
           onRescan={onRescan}
         />
+        <DomainScoreCard projectPath={projectPath} dimension="gate" />
         <GuardExportButton onClick={onExport} t={t} />
         <GuardLevels levels={levels} />
         <GuardStats report={report} />
@@ -300,6 +304,7 @@ export function GuardPage({ projectPath }: GuardPageProps) {
         reportFalsePositive={reportFalsePositive}
         history={history}
         falsePositiveCount={falsePositiveCount}
+        projectPath={projectPath}
         t={t}
       />
     );

@@ -3,6 +3,7 @@ import { useT } from '../i18n';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { type SmellGroup } from './refactor-logic';
 import { SmellGroupPanel } from './refactor-panel';
 
@@ -135,6 +136,7 @@ interface ReportViewProps {
   groups: SmellGroup[];
   activeRuleId: string;
   activeGroup: SmellGroup | null;
+  projectPath: string;
   onScan: () => void;
   onSelectRule: (ruleId: string) => void;
   onCopyGroup: () => void;
@@ -151,6 +153,7 @@ export function RefactorReportView({
   groups,
   activeRuleId,
   activeGroup,
+  projectPath,
   onScan,
   onSelectRule,
   onCopyGroup,
@@ -169,6 +172,8 @@ export function RefactorReportView({
         />
 
         {error ? <p className="text-sm text-danger-500 mb-4">{error}</p> : null}
+
+        <DomainScoreCard projectPath={projectPath} dimension="refactor" />
 
         <RefactorStats report={report} />
 

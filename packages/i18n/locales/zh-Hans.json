@@ -760,6 +760,12 @@
     "techdebt": "技术债务"
   },
   "page": {
+    "domainScore": {
+      "title": "本域评分",
+      "noData": "暂无评分",
+      "noDataHint": "在报告中心「汇总生成报告」后显示",
+      "notRunHint": "运行本功能并汇总后计入总分"
+    },
     "backup": {
       "backingUp": "备份中...",
       "progressPreparing": "正在准备备份…（大项目打包约需 2-3 分钟，请勿关闭应用）",

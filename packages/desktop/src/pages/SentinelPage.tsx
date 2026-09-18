@@ -11,6 +11,7 @@ import {
 } from './sentinel-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useToast } from '../components/ui/Toast';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { exportHtmlReport } from '../utils/htmlExport';
 import type { HtmlReportData } from '@zh/reporter';
 import type { AppNotification } from '@zh/kernel';
@@ -169,6 +170,7 @@ function SentinelReportView({
           loading={loading}
           onRefresh={onRefresh}
         />
+        <DomainScoreCard projectPath={projectPath} dimension="gate" />
         <SentinelExportButton onClick={onExport} t={t} />
         <SentinelStats
           total={events.length}

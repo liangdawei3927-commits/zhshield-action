@@ -1,5 +1,6 @@
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { useInspectPage } from './inspect-logic';
 import { MagnifyingGlass, InspectHeader, ProgressBar, CheckList } from './inspect-parts';
 
@@ -116,6 +117,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
             progressLabel={progressLabel}
             onRescan={startInspect}
           />
+          <DomainScoreCard projectPath={projectPath} dimension="quality" />
           <ProgressBar passCount={passCount} total={items.length} />
           <CheckList items={items} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>

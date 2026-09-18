@@ -760,6 +760,12 @@
     "techdebt": "Tech Debt"
   },
   "page": {
+    "domainScore": {
+      "title": "Domain score",
+      "noData": "No score yet",
+      "noDataHint": "Shown after \"Generate report summary\" in Reports",
+      "notRunHint": "Run this check and summarize to count toward the total score"
+    },
     "backup": {
       "backingUp": "Backing up...",
       "progressPreparing": "Preparing backup... (large projects take 2-3 minutes, keep the app open)",

@@ -33,6 +33,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         groups={groups}
         activeRuleId={activeRuleId}
         activeGroup={activeGroup}
+        projectPath={projectPath}
         onScan={() => void handleScan()}
         onSelectRule={setActiveRuleId}
         onCopyGroup={() => copyGroupToAi(activeGroup!)}

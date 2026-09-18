@@ -1,4 +1,5 @@
 import { useTechDebtPage } from './tech-debt-logic';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import {
   TechDebtEmptyState,
   TechDebtHeader,
@@ -32,6 +33,7 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
       <div className="h-full w-full bg-zh-bg overflow-auto">
         <div className="w-full px-8 py-10">
           <TechDebtHeader report={report} loading={loading} onRescan={handleScan} />
+          <DomainScoreCard projectPath={projectPath} dimension="techdebt" />
           <TechDebtOverviewCard report={report} />
           <TechDebtModuleCard modules={report.byModule} />
           <TechDebtCompositionIntroCard />

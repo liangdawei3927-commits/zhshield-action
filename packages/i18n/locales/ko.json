@@ -760,6 +760,12 @@
     "techdebt": "기술 부채"
   },
   "page": {
+    "domainScore": {
+      "title": "영역 점수",
+      "noData": "아직 점수 없음",
+      "noDataHint": "보고서 센터에서 '요약 보고서 생성' 후 표시됩니다",
+      "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다"
+    },
     "backup": {
       "backingUp": "백업 중...",
       "progressPreparing": "백업 준비 중... (대형 프로젝트는 2-3분 소요)",

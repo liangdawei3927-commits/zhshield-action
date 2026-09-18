@@ -14,6 +14,7 @@ import {
   DependencyOutdatedCard,
 } from './dependency-parts';
 import { useToast } from '../components/ui/Toast';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { useT } from '../i18n';
 import { exportHtmlReport } from '../utils/htmlExport';
 import type { HtmlReportData } from '@zh/reporter';
@@ -171,6 +172,7 @@ function DependencyReportView({
   onExport,
   onCopyTyposquat,
   onCopyAllTyposquat,
+  projectPath,
   t,
 }: {
   report: DependencyReportData;
@@ -179,12 +181,14 @@ function DependencyReportView({
   onExport: () => void;
   onCopyTyposquat: (finding: TyposquatFindingData) => void;
   onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
+  projectPath: string;
   t: (key: string, opts?: { defaultValue?: string }) => string;
 }) {
   return (
     <div className="h-full w-full bg-zh-bg overflow-auto">
       <div className="w-full px-8 py-10">
         <DependencyHeader report={report} loading={loading} onRescan={onRescan} />
+        <DomainScoreCard projectPath={projectPath} dimension="dependencies" />
         <div className="flex justify-end mb-4">
           <button
             type="button"
@@ -253,6 +257,7 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
         onExport={handleExport}
         onCopyTyposquat={copyToAi}
         onCopyAllTyposquat={copyAllToAi}
+        projectPath={projectPath}
         t={t}
       />
     );

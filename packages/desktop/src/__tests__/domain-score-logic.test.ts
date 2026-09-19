@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainScoreView, findDimension } from '../pages/domain-score-logic';
+import { domainScoreView, findDimension, pickDomainScore } from '../pages/domain-score-logic';
 
 const NOW = Date.parse('2026-09-19T12:00:00+08:00');
 
@@ -58,5 +58,45 @@ describe('domain-score-logic', () => {
     expect(findDimension(data, 'gate')?.status).toBe('not-run');
     expect(findDimension(null, 'security')).toBeUndefined();
     expect(findDimension(data, 'performance')).toBeUndefined();
+  });
+});
+
+describe('pickDomainScore（实时快照优先，回退汇总）', () => {
+  const summary = {
+    dimensions: [{ name: 'quality', score: 90, status: 'scored' as const }],
+    timestamp: '2026-09-19T08:00:00+08:00',
+  };
+
+  it('live 已评分 → 用 live（本次检查当场出分），时间戳取快照生成时间', () => {
+    const picked = pickDomainScore(
+      { score: 88, issues: 2, status: 'scored', generatedAt: '2026-09-19T12:00:00+08:00' },
+      summary,
+      'quality',
+    );
+    expect(picked.dim?.score).toBe(88);
+    expect(picked.generatedAt).toBe('2026-09-19T12:00:00+08:00');
+  });
+
+  it('live 缺失（null）→ 回退汇总对应维度', () => {
+    const picked = pickDomainScore(null, summary, 'quality');
+    expect(picked.dim?.score).toBe(90);
+    expect(picked.generatedAt).toBe(summary.timestamp);
+  });
+
+  it('live 为旧格式快照（status 非 scored 视为无分）→ 回退汇总', () => {
+    const picked = pickDomainScore(
+      { score: 0, status: 'not-run', generatedAt: '2026-09-19T12:00:00+08:00' },
+      summary,
+      'quality',
+    );
+    expect(picked.dim?.score).toBe(90);
+  });
+
+  it('两者皆无 → dim undefined，由 domainScoreView 兜底 no-data', () => {
+    const picked = pickDomainScore(null, null, 'quality');
+    expect(picked.dim).toBeUndefined();
+    const v = domainScoreView(picked.dim, picked.generatedAt);
+    expect(v.kind).toBe('no-data');
+    expect(v.scoreText).toBe('—');
   });
 });

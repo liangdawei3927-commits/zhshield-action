@@ -764,6 +764,7 @@
       "title": "本域评分",
       "noData": "暂无评分",
       "noDataHint": "在报告中心「汇总生成报告」后显示",
+      "noDataHintLive": "完成一次巡检后，这里当场显示评分",
       "notRunHint": "运行本功能并汇总后计入总分"
     },
     "backup": {

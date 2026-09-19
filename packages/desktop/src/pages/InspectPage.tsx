@@ -117,7 +117,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
             progressLabel={progressLabel}
             onRescan={startInspect}
           />
-          <DomainScoreCard projectPath={projectPath} dimension="quality" />
+          <DomainScoreCard projectPath={projectPath} dimension="quality" live refreshKey={report} />
           <ProgressBar passCount={passCount} total={items.length} />
           <CheckList items={items} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>

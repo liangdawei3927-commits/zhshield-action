@@ -128,6 +128,7 @@ import type {
   SecretReportData,
   ProjectProfileData,
   DepsRelockResult,
+  DomainScoreData,
 } from '../../src/types/electron';
 import {
   toGuardChecks,
@@ -480,6 +481,7 @@ export function registerEnginesIpc(manager: TaskManager): void {
   );
   ipcMain.handle('engine:getScore', getScoreHandler);
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
+  ipcMain.handle('engine:getDomainScore', getDomainScoreHandler);
   ipcMain.handle('engine:getProfile', getProfileHandler);
   ipcMain.handle('engine:runProfile', (_e, projectPath: string) => runProfileHandler(projectPath));
   // 报告中心：只读汇总各域最新结果并落库（不发起检查；无结果时返回 null）
@@ -1433,6 +1435,28 @@ async function getScoreHistoryHandler(
       err instanceof Error ? err.message : String(err),
     );
     return [];
+  }
+}
+
+/**
+ * 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分。
+ * 评分在落盘时由 @zh/scoring 统一计算（与报告中心汇总同一函数），此处只读不算；
+ * 快照缺失或为旧格式（无 dimensionScore）时返回 null，由渲染层回退到报告中心汇总。
+ */
+async function getDomainScoreHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectPath: string,
+): Promise<DomainScoreData | null> {
+  try {
+    const snap = await readDomainSnapshot(projectPath, 'inspect');
+    if (!snap?.dimensionScore) return null;
+    return { ...snap.dimensionScore, generatedAt: snap.generatedAt };
+  } catch (err) {
+    console.warn(
+      '[engine:getDomainScore] 实时评分读取失败:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
   }
 }
 

@@ -80,3 +80,41 @@ export function findDimension(
 ): { score: number; status?: 'scored' | 'not-run' } | undefined {
   return data?.dimensions.find((d) => d.name === dimension);
 }
+
+/** 实时评分：引擎在检查落盘时写进按域快照的 dimensionScore（engine:getDomainScore 返回值） */
+export interface LiveScore {
+  score: number;
+  issues?: number;
+  status: 'scored' | 'not-run';
+  /** 快照生成时间（ISO 8601，即本次检查完成时间） */
+  generatedAt: string;
+}
+
+/** pickDomainScore 的返回：喂给 domainScoreView 的维度条目 + 数据时间 */
+export interface PickedScore {
+  dim: { score: number; status?: 'scored' | 'not-run' } | undefined;
+  generatedAt: string | undefined;
+}
+
+/**
+ * 选择评分数据源：实时快照优先，回退报告中心汇总。
+ *
+ * - live 存在且已评分 → 用 live（本次检查跑完当场出分，时间戳即检查完成时间）；
+ * - live 缺失或为旧格式快照（无评分字段）→ 回退汇总数据对应维度；
+ * - 两者皆无 → dim 为 undefined（domainScoreView 兜底 no-data）。
+ *
+ * 注意这是**选源**而非算分：两个数据源的分数都由 @zh/scoring 统一产出。
+ */
+export function pickDomainScore(
+  live: LiveScore | null,
+  summary: {
+    dimensions: Array<{ name: string; score: number; status?: 'scored' | 'not-run' }>;
+    timestamp?: string;
+  } | null,
+  dimension: ScoreDimension,
+): PickedScore {
+  if (live && live.status === 'scored') {
+    return { dim: { score: live.score, status: live.status }, generatedAt: live.generatedAt };
+  }
+  return { dim: findDimension(summary, dimension), generatedAt: summary?.timestamp };
+}

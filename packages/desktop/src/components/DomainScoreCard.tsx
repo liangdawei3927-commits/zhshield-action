@@ -1,25 +1,42 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
-import { getScore } from '../services/engineApi';
-import { domainScoreView, findDimension, type DomainScoreView, type ScoreDimension } from '../pages/domain-score-logic';
+import { getScore, getDomainScore } from '../services/engineApi';
+import {
+  domainScoreView,
+  pickDomainScore,
+  type DomainScoreView,
+  type ScoreDimension,
+} from '../pages/domain-score-logic';
 
 /**
- * 分类页「本域评分」卡 —— 展示报告中心最近一次汇总里本分类对应的维度分。
+ * 分类页「本域评分」卡。
  *
- * ⚠️ 只读不算：分数由 @zh/scoring 在「汇总生成报告」时统一产出（各域扣分制、
- * 权重画像可调），本组件绝不二次计算，避免与总分口径分叉（批 6 教训）。
+ * ⚠️ 只读不算：分数由 @zh/scoring 统一产出，本组件绝不二次计算，
+ * 避免与总分口径分叉（批 6 教训）。两个数据源（pickDomainScore 选源）：
+ * - 实时（live=true）：引擎在检查落盘时写进按域快照的评分 —— 跑完当场出分；
+ * - 汇总：报告中心「汇总生成报告」落库的 HealthScoreData。
+ * live 快照缺失或为旧格式时自动回退汇总数据。
  *
  * 展示语义（与批 5 not-run 修复同源）：
- * - 尚未汇总过 → 「暂无评分」，提示去报告中心汇总；
+ * - 尚无任何评分 → 「暂无评分」；live 页提示跑完一次检查即出分；
  * - 本域从未运行（not-run） → 「未检测」，中性灰，不按 0 分上色；
  * - 已评分 → 分数 + 等级色；数据超过 24h 附陈旧提示（SCORE_FRESH_MS 同口径）。
+ *
+ * @param refreshKey 变化时重新拉取（如检查完成后的 report 对象）——
+ *   组件本身不订阅流水线事件，靠调用方在跑完时换 key 刷新。
  */
 export function DomainScoreCard({
   projectPath,
   dimension,
+  live = false,
+  refreshKey,
 }: {
   projectPath: string;
   dimension: ScoreDimension;
+  /** 是否优先读按域快照实时评分（当前仅巡检页：inspect → quality） */
+  live?: boolean;
+  /** 变化时重新拉取评分 */
+  refreshKey?: unknown;
 }) {
   const t = useT();
   const [view, setView] = useState<DomainScoreView | null>(null);
@@ -28,14 +45,18 @@ export function DomainScoreCard({
     let alive = true;
     setView(null);
     (async () => {
-      const data = await getScore(projectPath);
+      const [liveScore, summary] = await Promise.all([
+        live ? getDomainScore(projectPath, 'inspect') : Promise.resolve(null),
+        getScore(projectPath),
+      ]);
       if (!alive) return;
-      setView(domainScoreView(findDimension(data, dimension), data?.timestamp));
+      const picked = pickDomainScore(liveScore, summary, dimension);
+      setView(domainScoreView(picked.dim, picked.generatedAt));
     })();
     return () => {
       alive = false;
     };
-  }, [projectPath, dimension]);
+  }, [projectPath, dimension, live, refreshKey]);
 
   if (!view) return null; // 加载中不闪占位
 
@@ -55,7 +76,8 @@ export function DomainScoreCard({
         {view.label}
       </span>
       <div className="text-xs text-zh-muted ml-auto text-right">
-        {view.kind === 'no-data' && t('page.domainScore.noDataHint')}
+        {view.kind === 'no-data' &&
+          (live ? t('page.domainScore.noDataHintLive') : t('page.domainScore.noDataHint'))}
         {view.kind === 'not-run' && t('page.domainScore.notRunHint')}
         {view.kind === 'stale' &&
           t('page.reports.dataStale', { hours: view.ageHours })}

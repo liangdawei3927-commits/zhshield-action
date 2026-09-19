@@ -764,6 +764,7 @@
       "title": "Domain score",
       "noData": "No score yet",
       "noDataHint": "Shown after \"Generate report summary\" in Reports",
+      "noDataHintLive": "Run an inspection and the score appears here instantly",
       "notRunHint": "Run this check and summarize to count toward the total score"
     },
     "backup": {

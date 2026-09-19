@@ -7,6 +7,7 @@ import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
 import type { PipelineReport } from '@zh/pipeline';
+import { buildHealthDimensions } from '@zh/scoring';
 import type { DependencyReportData, TechDebtReportData } from '../src/types/electron';
 
 // ─── 诊断条目（归一化，跨 guard/inspect/refactor） ─────────────────────
@@ -59,6 +60,21 @@ export interface FileDiagnostics {
 
 // ─── 落盘报告 ─────────────────────────────────────────────────────────
 
+/**
+ * 按域快照附带的实时维度评分（落盘时由 @zh/scoring 统一计算，渲染层只读不算）。
+ * 目前仅 inspect → quality（巡检与 quality 维的扣分口径一一对应）；
+ * gate 维需 status/blocking 语义（快照条目不带），暂不实时评分。
+ */
+export interface DomainDimensionScore {
+  /** 对应 @zh/scoring 的评分维度 */
+  dimension: 'quality';
+  /** 0-100（error -8 / warning -4 / info -1，下限 0） */
+  score: number;
+  /** 计分所依据的问题条数 */
+  issues: number;
+  status: 'scored' | 'not-run';
+}
+
 export interface DiagnosticsReport {
   version: '1.0';
   project: { path: string; name: string };
@@ -66,6 +82,8 @@ export interface DiagnosticsReport {
   summary: { total: number; error: number; warning: number; info: number };
   issues: readonly DiagnosticEntry[];
   files: readonly FileDiagnostics[];
+  /** 实时维度评分（仅 inspect 快照携带；旧快照缺省，向后兼容） */
+  dimensionScore?: DomainDimensionScore;
 }
 
 // ─── 归一化：PipelineReport → DiagnosticEntry[] ────────────────────────
@@ -318,6 +336,20 @@ export async function writeDiagnosticsFile(
     const writes: Promise<void>[] = [];
     for (const [source, issues] of perSource) {
       const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
+      // 巡检跑完当场出分：quality 维评分与报告中心汇总共用 @zh/scoring 的
+      // buildHealthDimensions（error -8 / warning -4 / info -1，下限 0），
+      // 不引入第三套算法；0 检出 → 100 分同样覆盖写。
+      if (source === 'inspect') {
+        const [quality] = buildHealthDimensions(null, { issues: issues.map((e) => ({ severity: e.severity, category: e.category })) });
+        if (quality?.name === 'quality' && quality.status) {
+          snapshot.dimensionScore = {
+            dimension: 'quality',
+            score: quality.score,
+            issues: quality.issues,
+            status: quality.status,
+          };
+        }
+      }
       writes.push(
         writeFile(
           domainSnapshotPath(report.project.path, source),

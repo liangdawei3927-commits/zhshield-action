@@ -31,6 +31,7 @@ import type {
   DepsRelockResult,
   TechDebtReportData,
   SecretReportData,
+  DomainScoreData,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 import {
@@ -384,6 +385,24 @@ export async function getScore(projectId: string): Promise<HealthScoreData | nul
   if (!api?.engine) return null;
   try {
     return await api.engine.getScore(projectId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分（跑完即有）。
+ * 快照缺失 / 旧格式（无评分）时返回 null，由调用方回退到 getScore 汇总数据。
+ */
+export async function getDomainScore(
+  projectPath: string,
+  source: 'inspect',
+): Promise<DomainScoreData | null> {
+  if (isHttpMode()) return null;
+  const api = getAPI();
+  if (!api?.engine) return null;
+  try {
+    return await api.engine.getDomainScore(projectPath, source);
   } catch {
     return null;
   }

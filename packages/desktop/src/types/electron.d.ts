@@ -269,6 +269,19 @@ export interface OutdatedDependencyData {
   description?: string;
 }
 
+/** 分类页实时评分（引擎在检查落盘时用 @zh/scoring 统一计算；渲染层只读不算） */
+export interface DomainScoreData {
+  /** 对应 @zh/scoring 的评分维度（当前仅 inspect → quality） */
+  dimension: string;
+  /** 0-100 */
+  score: number;
+  /** 计分所依据的问题条数 */
+  issues: number;
+  status: 'scored' | 'not-run';
+  /** 快照生成时间（ISO 8601，即本次检查完成时间） */
+  generatedAt: string;
+}
+
 /** 依赖管家显式重锁基线的结果 */
 export interface DepsRelockResult {
   ok: boolean;
@@ -469,6 +482,11 @@ export interface EngineAPI {
   dismissSecret: (secretId: string, reason: string) => Promise<void>;
   getScore: (projectId: string) => Promise<HealthScoreData | null>;
   getScoreHistory: (projectId: string) => Promise<HealthScoreData[]>;
+  /** 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分（跑完即有，无需手动汇总） */
+  getDomainScore: (
+    projectPath: string,
+    source: 'inspect',
+  ) => Promise<DomainScoreData | null>;
   getProfile: (projectPath: string) => Promise<ProjectProfileData | null>;
   runPipeline: (
     projectPath: string,

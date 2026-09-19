@@ -5,6 +5,7 @@ import { useSecretsPage } from './secrets-logic';
 import { SecurityEmptyState } from './security-empty-state';
 import { SecurityHeader, SecurityScoreCard, FindingsPanel, MalwarePanel } from './security-parts';
 import { SecretsListCard } from './secrets-parts';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 
 interface SecurityPageProps {
   projectPath: string;
@@ -53,6 +54,7 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
             progressLabel={progressLabel}
             onRescan={handleScan}
           />
+          <DomainScoreCard projectPath={projectPath} dimension="security" />
           <SecurityScoreCard report={report} />
           <div className="flex gap-2 mb-6">
             {TABS.map((t2) => (

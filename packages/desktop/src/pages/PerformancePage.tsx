@@ -1,5 +1,6 @@
 import { PageShell } from '../components/business/PageShell';
 import { useT } from '../i18n';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import { usePerformancePage } from './performance-logic';
 import {
   AmberBolt,
@@ -27,6 +28,7 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
             progressLabel={progressLabel}
             onRescan={handleScan}
           />
+          <DomainScoreCard projectPath={projectPath} dimension="performance" />
           <PerformanceScoreCard report={report} />
           <IssuesPanel issues={report.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>

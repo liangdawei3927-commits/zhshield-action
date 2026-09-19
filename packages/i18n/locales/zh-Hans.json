@@ -765,7 +765,8 @@
       "noData": "暂无评分",
       "noDataHint": "在报告中心「汇总生成报告」后显示",
       "noDataHintLive": "完成一次巡检后，这里当场显示评分",
-      "notRunHint": "运行本功能并汇总后计入总分"
+      "notRunHint": "运行本功能并汇总后计入总分",
+      "scoreDelta": "上次 {{prev}} → 本次 {{now}}"
     },
     "backup": {
       "backingUp": "备份中...",
@@ -1141,6 +1142,7 @@
     },
     "inspect": {
       "checksPassed": "检查通过",
+      "guardAlsoRan": "本次巡检同时执行了门禁检查，结果见「门禁系统」页",
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "done": "巡检完成",
       "empty": {
@@ -1190,7 +1192,7 @@
       "scanning": "性能检测中...",
       "score": {
         "fixable": "可修复 {{count}}",
-        "health": "性能健康度"
+        "statsTitle": "本次检测统计"
       },
       "severity": {
         "high": "高优",
@@ -1475,7 +1477,7 @@
       "noMalware": "未发现恶意代码",
       "recommendation": "建议：{{recommendation}}",
       "rescan": "重新检查",
-      "scoreLabel": "安全评分",
+      "statsTitle": "本次扫描统计",
       "source": "安全",
       "summary": "{{vulns}} 项漏洞 · {{malware}} 处恶意代码",
       "tab": {

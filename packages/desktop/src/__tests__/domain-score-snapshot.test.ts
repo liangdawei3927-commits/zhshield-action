@@ -75,7 +75,7 @@ describe('巡检实时评分写入按域快照', () => {
     expect(s?.status).toBe('scored');
   });
 
-  it('跑过 0 检出必须覆盖写 100 分（不得留着旧低分）', async () => {
+  it('跑过 0 检出必须覆盖写 100 分（不得留着旧低分），且带上一轮对比基线', async () => {
     const project = { path: projectDir, name: path.basename(projectDir) };
     await writeDiagnosticsFile(
       buildDiagnosticsReport(project, [entry({ fingerprint: 'fp-1' })], '2026-09-19T10:00:00.000Z'),
@@ -90,6 +90,37 @@ describe('巡检实时评分写入按域快照', () => {
     expect(snap?.issues.length).toBe(0);
     expect(snap?.dimensionScore?.score, '修干净后当场应为满分').toBe(100);
     expect(snap?.dimensionScore?.status).toBe('scored');
+    expect(
+      snap?.previousScore,
+      '覆盖写前必须抢救旧分作为对比基线（上一轮 92 分）',
+    ).toEqual({ score: 92, generatedAt: '2026-09-19T10:00:00.000Z' });
+  });
+
+  it('同轮重复落盘（generatedAt 相同）不产生对比基线', async () => {
+    const project = { path: projectDir, name: path.basename(projectDir) };
+    await writeDiagnosticsFile(
+      buildDiagnosticsReport(project, [entry({ fingerprint: 'fp-1' })], '2026-09-19T10:00:00.000Z'),
+      ['inspect'],
+    );
+    await writeDiagnosticsFile(
+      buildDiagnosticsReport(project, [entry({ fingerprint: 'fp-1' })], '2026-09-19T10:00:00.000Z'),
+      ['inspect'],
+    );
+
+    const snap = await readDomainSnapshot(projectDir, 'inspect');
+    expect(snap?.dimensionScore?.score).toBe(92); // 100 - 8
+    expect(snap?.previousScore).toBeUndefined();
+  });
+
+  it('首次检查（无旧快照）不带对比基线', async () => {
+    const project = { path: projectDir, name: path.basename(projectDir) };
+    await writeDiagnosticsFile(
+      buildDiagnosticsReport(project, [entry({ fingerprint: 'fp-1' })], '2026-09-19T10:00:00.000Z'),
+      ['inspect'],
+    );
+    const snap = await readDomainSnapshot(projectDir, 'inspect');
+    expect(snap?.dimensionScore?.score).toBe(92);
+    expect(snap?.previousScore).toBeUndefined();
   });
 
   it('guard 快照不带 dimensionScore（gate 维语义不同，暂不实时评分）', async () => {

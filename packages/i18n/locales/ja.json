@@ -765,7 +765,8 @@
       "noData": "スコアはまだありません",
       "noDataHint": "レポートセンターで「サマリーレポートを生成」すると表示されます",
       "noDataHintLive": "巡回を実行すると、ここに即座にスコアが表示されます",
-      "notRunHint": "この機能を実行して集計すると総合スコアに反映されます"
+      "notRunHint": "この機能を実行して集計すると総合スコアに反映されます",
+      "scoreDelta": "前回 {{prev}} → 今回 {{now}}"
     },
     "backup": {
       "backingUp": "バックアップ中...",
@@ -1141,6 +1142,7 @@
     },
     "inspect": {
       "checksPassed": "チェックに合格",
+      "guardAlsoRan": "この巡回ではガードチェックも実行しています。結果は「ガードシステム」ページを参照してください",
       "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
       "done": "巡回完了",
       "empty": {
@@ -1190,7 +1192,7 @@
       "scanning": "パフォーマンス検出中...",
       "score": {
         "fixable": "修正可能 {{count}}",
-        "health": "パフォーマンス健全性"
+        "statsTitle": "最新チェック統計"
       },
       "severity": {
         "high": "優先度高",
@@ -1397,7 +1399,7 @@
       "noMalware": "悪意のあるコードは見つかりませんでした",
       "recommendation": "提案: {{recommendation}}",
       "rescan": "再チェック",
-      "scoreLabel": "セキュリティスコア",
+      "statsTitle": "最新スキャン統計",
       "source": "セキュリティ",
       "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所",
       "tab": {

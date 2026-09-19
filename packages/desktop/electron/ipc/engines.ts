@@ -1450,7 +1450,11 @@ async function getDomainScoreHandler(
   try {
     const snap = await readDomainSnapshot(projectPath, 'inspect');
     if (!snap?.dimensionScore) return null;
-    return { ...snap.dimensionScore, generatedAt: snap.generatedAt };
+    return {
+      ...snap.dimensionScore,
+      generatedAt: snap.generatedAt,
+      previousScore: snap.previousScore,
+    };
   } catch (err) {
     console.warn(
       '[engine:getDomainScore] 实时评分读取失败:',

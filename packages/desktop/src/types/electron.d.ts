@@ -280,6 +280,8 @@ export interface DomainScoreData {
   status: 'scored' | 'not-run';
   /** 快照生成时间（ISO 8601，即本次检查完成时间） */
   generatedAt: string;
+  /** 上一轮检查的分数（覆盖写前从旧快照抢救；无基线时缺省） */
+  previousScore?: { score: number; generatedAt: string };
 }
 
 /** 依赖管家显式重锁基线的结果 */

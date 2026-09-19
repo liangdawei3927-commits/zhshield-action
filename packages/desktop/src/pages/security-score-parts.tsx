@@ -2,16 +2,20 @@ import type { SecurityScanReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { ResultCard } from '../components/ui/ResultCard';
 
+/**
+ * 安全中心扫描结果统计卡。
+ *
+ * 历史说明：此卡曾用 report.securityScore（扫描引擎自带分）画分值圈，
+ * 与 @zh/scoring 的 security 维扣分口径不一致（同名双实现）。09-19 统一：
+ * 分数展示交给 DomainScoreCard（只读不算，单一来源），本卡只陈列本次
+ * 扫描的严重度分布，不产分。
+ */
 export function SecurityScoreCard({ report }: { report: SecurityScanReportData }) {
   const t = useT();
-  const score = report.securityScore;
   return (
     <ResultCard variant="score" className="flex items-center gap-6 mb-6">
-      <div className="w-20 h-20 rounded-full flex items-center justify-center bg-success-50 border-[3px] border-success-700 shrink-0">
-        <span className="text-2xl font-bold text-success-700">{score}</span>
-      </div>
       <div>
-        <div className="text-sm font-semibold text-zh-ink-2">{t('page.security.scoreLabel')}</div>
+        <div className="text-sm font-semibold text-zh-ink-2">{t('page.security.statsTitle')}</div>
         <div className="flex gap-3 mt-2">
           <span className="text-xs flex items-center gap-1 text-success-700">
             <span className="w-1.5 h-1.5 rounded-full bg-success-700" />

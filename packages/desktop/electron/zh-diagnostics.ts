@@ -84,6 +84,8 @@ export interface DiagnosticsReport {
   files: readonly FileDiagnostics[];
   /** 实时维度评分（仅 inspect 快照携带；旧快照缺省，向后兼容） */
   dimensionScore?: DomainDimensionScore;
+  /** 上一次检查的维度分（覆盖写前从旧快照抢救出来的，供「上次 → 本次」对比；仅 inspect） */
+  previousScore?: { score: number; generatedAt: string };
 }
 
 // ─── 归一化：PipelineReport → DiagnosticEntry[] ────────────────────────
@@ -348,6 +350,29 @@ export async function writeDiagnosticsFile(
             issues: quality.issues,
             status: quality.status,
           };
+        }
+        // 「上次 → 本次」对比：覆盖写会把旧分抹掉，先从旧快照里抢救出上一轮的
+        // dimensionScore（generatedAt 不同才算是另一轮检查；相同说明是同轮重复落盘）。
+        // 读失败/旧快照无分（如批 9 之前的旧格式）→ 不带 previousScore，UI 不显示对比行。
+        try {
+          const oldRaw = await readFile(domainSnapshotPath(report.project.path, source), 'utf-8');
+          const old = JSON.parse(oldRaw) as {
+            generatedAt?: string;
+            dimensionScore?: { score: number };
+          };
+          if (
+            old.dimensionScore &&
+            typeof old.dimensionScore.score === 'number' &&
+            old.generatedAt &&
+            old.generatedAt !== report.generatedAt
+          ) {
+            snapshot.previousScore = {
+              score: old.dimensionScore.score,
+              generatedAt: old.generatedAt,
+            };
+          }
+        } catch {
+          // 旧快照不存在/损坏 → 无对比基线，静默跳过
         }
       }
       writes.push(

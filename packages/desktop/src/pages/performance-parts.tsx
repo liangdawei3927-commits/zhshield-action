@@ -71,23 +71,21 @@ export function PerformanceHeader({
   );
 }
 
+/**
+ * 性能页扫描结果统计卡。
+ *
+ * 历史说明：此卡曾用组件内私有公式 `(1 - total/(total+20)) × 100` 画分值圈，
+ * 与 @zh/scoring 的 performance 维扣分口径不一致（同名双实现，09-19 批 8 发现）。
+ * 09-19 统一：分数展示交给 DomainScoreCard（只读不算，单一来源），本卡只陈列
+ * 本次检测的严重度分布与可自动修复数，不产分。
+ */
 export function PerformanceScoreCard({ report }: { report: PerformanceReportData }) {
   const t = useT();
   return (
     <ResultCard variant="score" className="flex items-center gap-6 mb-6">
-      <div className="w-20 h-20 rounded-full flex items-center justify-center bg-warning-50 border-[3px] border-warning-500 shrink-0">
-        <span className="text-2xl font-bold text-warning-500">
-          {report.summary.total === 0
-            ? 100
-            : Math.max(
-                0,
-                Math.round((1 - report.summary.total / (report.summary.total + 20)) * 100),
-              )}
-        </span>
-      </div>
       <div>
         <div className="text-sm font-semibold text-zh-ink-2">
-          {t('page.performance.score.health')}
+          {t('page.performance.score.statsTitle')}
         </div>
         <div className="flex gap-3 mt-2">
           <span className="text-xs flex items-center gap-1 text-warning-500">

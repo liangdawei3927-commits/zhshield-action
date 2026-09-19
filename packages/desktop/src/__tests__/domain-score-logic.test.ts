@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { t } from '@zh/i18n';
 import { domainScoreView, findDimension, pickDomainScore } from '../pages/domain-score-logic';
 
 const NOW = Date.parse('2026-09-19T12:00:00+08:00');
@@ -98,5 +99,33 @@ describe('pickDomainScore（实时快照优先，回退汇总）', () => {
     const v = domainScoreView(picked.dim, picked.generatedAt);
     expect(v.kind).toBe('no-data');
     expect(v.scoreText).toBe('—');
+  });
+
+  it('live 带 previousScore → 透传给视图（上次 → 本次对比）', () => {
+    const picked = pickDomainScore(
+      {
+        score: 91,
+        status: 'scored',
+        generatedAt: '2026-09-19T12:00:00+08:00',
+        previousScore: { score: 82, generatedAt: '2026-09-18T12:00:00+08:00' },
+      },
+      summary,
+      'quality',
+    );
+    expect(picked.previousScore).toBe(82);
+    const v = domainScoreView(picked.dim, picked.generatedAt, Date.now(), t, picked.previousScore);
+    expect(v.kind).toBe('scored');
+    expect(v.previousScore).toBe(82);
+  });
+
+  it('live 无 previousScore（旧格式）→ 视图不带对比字段', () => {
+    const picked = pickDomainScore(
+      { score: 88, status: 'scored', generatedAt: '2026-09-19T12:00:00+08:00' },
+      summary,
+      'quality',
+    );
+    expect(picked.previousScore).toBeUndefined();
+    const v = domainScoreView(picked.dim, picked.generatedAt);
+    expect(v.previousScore).toBeUndefined();
   });
 });

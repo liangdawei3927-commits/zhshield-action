@@ -51,7 +51,7 @@ export function DomainScoreCard({
       ]);
       if (!alive) return;
       const picked = pickDomainScore(liveScore, summary, dimension);
-      setView(domainScoreView(picked.dim, picked.generatedAt));
+      setView(domainScoreView(picked.dim, picked.generatedAt, Date.now(), t, picked.previousScore));
     })();
     return () => {
       alive = false;
@@ -75,6 +75,25 @@ export function DomainScoreCard({
       >
         {view.label}
       </span>
+      {typeof view.previousScore === 'number' && (
+        <span
+          className="text-xs shrink-0"
+          style={{
+            color:
+              Number(view.scoreText) > view.previousScore
+                ? 'rgb(var(--zh-success))'
+                : Number(view.scoreText) < view.previousScore
+                  ? 'rgb(var(--zh-danger))'
+                  : 'rgb(var(--zh-muted))',
+          }}
+          data-testid={`domain-score-prev-${dimension}`}
+        >
+          {t('page.domainScore.scoreDelta', {
+            prev: view.previousScore,
+            now: view.scoreText,
+          })}
+        </span>
+      )}
       <div className="text-xs text-zh-muted ml-auto text-right">
         {view.kind === 'no-data' &&
           (live ? t('page.domainScore.noDataHintLive') : t('page.domainScore.noDataHint'))}

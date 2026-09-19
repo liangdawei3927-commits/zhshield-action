@@ -765,7 +765,8 @@
       "noData": "暫無評分",
       "noDataHint": "在報告中心「彙總產生報告」後顯示",
       "noDataHintLive": "完成一次巡檢後，這裡即時顯示評分",
-      "notRunHint": "執行本功能並彙總後計入總分"
+      "notRunHint": "執行本功能並彙總後計入總分",
+      "scoreDelta": "上次 {{prev}} → 本次 {{now}}"
     },
     "backup": {
       "backingUp": "備份中...",
@@ -1141,6 +1142,7 @@
     },
     "inspect": {
       "checksPassed": "檢查通過",
+      "guardAlsoRan": "本次巡檢同時執行了門禁檢查，結果見「門禁系統」頁",
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "done": "巡檢完成",
       "empty": {
@@ -1190,7 +1192,7 @@
       "scanning": "效能檢測中...",
       "score": {
         "fixable": "可修復 {{count}}",
-        "health": "效能健康度"
+        "statsTitle": "本次檢測統計"
       },
       "severity": {
         "high": "高優",
@@ -1397,7 +1399,7 @@
       "noMalware": "未發現惡意程式碼",
       "recommendation": "建議：{{recommendation}}",
       "rescan": "重新檢查",
-      "scoreLabel": "安全評分",
+      "statsTitle": "本次掃描統計",
       "source": "安全",
       "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼",
       "tab": {

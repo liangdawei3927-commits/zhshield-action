@@ -118,6 +118,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
             onRescan={startInspect}
           />
           <DomainScoreCard projectPath={projectPath} dimension="quality" live refreshKey={report} />
+          <p className="text-xs text-zh-muted mb-4">{t('page.inspect.guardAlsoRan')}</p>
           <ProgressBar passCount={passCount} total={items.length} />
           <CheckList items={items} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
         </div>

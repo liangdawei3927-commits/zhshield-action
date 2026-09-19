@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { relative, join } from 'node:path';
+import { relative, join, dirname, resolve, isAbsolute } from 'node:path';
 import { readFileSync } from 'node:fs';
 
 import type { SopRule } from '../sop/_meta/sop-types';
@@ -471,8 +471,16 @@ function checkRequiredJson(
     return violations;
   }
 
+  // tsconfig extends 支持：strict 等开关常定义在被 extends 的 base 配置里，
+  // 只查本文件会对这类合理项目误报「缺少配置项」。评估键路径前先沿 extends
+  // 链深合并出生效配置；链不可解析时回退为只查本文件（原有行为）。
+  const effective =
+    typeof parsed === 'object' && parsed !== null
+      ? resolveExtendsChain(filePath, parsed as Record<string, unknown>)
+      : parsed;
+
   for (const [keyPath, expected] of entries) {
-    const actual = getJsonPathValue(parsed, keyPath);
+    const actual = getJsonPathValue(effective, keyPath);
     if (actual === undefined || actual !== expected) {
       violations.push(
         makeRequiredViolation(
@@ -511,6 +519,71 @@ function getJsonPathValue(root: unknown, keyPath: string): unknown {
     current = (current as Record<string, unknown>)[segment];
   }
   return current;
+}
+
+/**
+ * 沿 tsconfig 的 extends 链深合并出生效配置。
+ *
+ * - extends 支持相对路径（相对当前文件目录）与 node_modules 包路径
+ *   （如 "@tsconfig/strictest/tsconfig.json"，无扩展名时按 TS 规则补 .json）；
+ * - 对象深合并（base 在下、子配置覆盖），数组与标量直接覆盖；
+ * - 循环 extends 以 visited 集合截断；任何一环不可读/不可解析即停止向上合并，
+ *   已合并到的部分仍然生效（优于整条链作废）。
+ */
+function resolveExtendsChain(
+  filePath: string,
+  self: Record<string, unknown>,
+): Record<string, unknown> {
+  const chain: Record<string, unknown>[] = [self];
+  const visited = new Set<string>([filePath]);
+  let currentDir = dirname(filePath);
+  let node: Record<string, unknown> | null = self;
+
+  while (node && typeof node.extends === 'string') {
+    const target = resolveExtendsTarget(currentDir, node.extends);
+    if (!target || visited.has(target)) break;
+    visited.add(target);
+    const raw = readFileSafe(target);
+    if (raw === null) break;
+    const parsed = parseJsoncSafe(raw);
+    if (parsed === undefined || typeof parsed !== 'object' || parsed === null) break;
+    node = parsed as Record<string, unknown>;
+    chain.unshift(node); // base 放前面，越靠近子配置越晚合并（覆盖力越强）
+    currentDir = dirname(target);
+  }
+
+  const merged: Record<string, unknown> = {};
+  for (const layer of chain) deepMergeInto(merged, layer);
+  return merged;
+}
+
+/** 解析一个 extends 目标为绝对文件路径；不可解析返回 null */
+function resolveExtendsTarget(fromDir: string, spec: string): string | null {
+  const withExt = spec.endsWith('.json') ? spec : `${spec}.json`;
+  if (spec.startsWith('./') || spec.startsWith('../')) return resolve(fromDir, withExt);
+  if (isAbsolute(spec)) return withExt;
+  // 包路径：@tsconfig/strictest/tsconfig.json 或 @tsconfig/node18（补 tsconfig.json）
+  const pkgPath = spec.endsWith('.json') ? spec : `${spec}/tsconfig.json`;
+  return resolve(fromDir, 'node_modules', pkgPath);
+}
+
+/** 对象递归合并：源对象的键覆盖目标；嵌套对象逐层合并，数组/标量直接替换 */
+function deepMergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(source)) {
+    const existing = target[key];
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      typeof existing === 'object' &&
+      existing !== null &&
+      !Array.isArray(existing)
+    ) {
+      deepMergeInto(existing as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      target[key] = value;
+    }
+  }
 }
 
 /** jsdocOn 批量检查：命中声明正则的导出行必须有前置 JSDoc（上一非空行以块注释结束符结尾） */

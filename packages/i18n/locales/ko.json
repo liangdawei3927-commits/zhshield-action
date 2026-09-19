@@ -765,7 +765,8 @@
       "noData": "아직 점수 없음",
       "noDataHint": "보고서 센터에서 '요약 보고서 생성' 후 표시됩니다",
       "noDataHintLive": "점검을 실행하면 여기에 즉시 점수가 표시됩니다",
-      "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다"
+      "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다",
+      "scoreDelta": "이전 {{prev}} → 현재 {{now}}"
     },
     "backup": {
       "backingUp": "백업 중...",
@@ -1141,6 +1142,7 @@
     },
     "inspect": {
       "checksPassed": "검사 통과",
+      "guardAlsoRan": "이 점검은 가드 검사도 함께 실행했습니다. 결과는 '가드 시스템' 페이지를 확인하세요",
       "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
       "done": "점검 완료",
       "empty": {
@@ -1190,7 +1192,7 @@
       "scanning": "성능 감지 중...",
       "score": {
         "fixable": "수정 가능 {{count}}",
-        "health": "성능 건강도"
+        "statsTitle": "최근 검사 통계"
       },
       "severity": {
         "high": "높은 우선순위",
@@ -1397,7 +1399,7 @@
       "noMalware": "악성 코드가 발견되지 않았습니다",
       "recommendation": "제안: {{recommendation}}",
       "rescan": "다시 검사",
-      "scoreLabel": "보안 점수",
+      "statsTitle": "최근 검사 통계",
       "source": "보안",
       "summary": "취약점 {{vulns}}건 · 악성 코드 {{malware}}곳",
       "tab": {

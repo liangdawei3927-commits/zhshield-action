@@ -29,6 +29,8 @@ export interface DomainScoreView {
   label: string;
   /** 数据距今小时数（仅 scored/stale 有意义） */
   ageHours: number;
+  /** 上一轮检查的分数（实时快照携带对比基线时才有；用于「上次 → 本次」行） */
+  previousScore?: number;
 }
 
 const MUTED = 'rgb(var(--zh-muted))';
@@ -43,6 +45,7 @@ export function domainScoreView(
   generatedAt: string | undefined,
   now: number = Date.now(),
   tr: typeof t = t,
+  previousScore?: number,
 ): DomainScoreView {
   if (!dim) {
     return {
@@ -70,6 +73,7 @@ export function domainScoreView(
     color: v.color,
     label: v.label,
     ageHours: f.ageHours,
+    ...(typeof previousScore === 'number' ? { previousScore } : {}),
   };
 }
 
@@ -88,12 +92,16 @@ export interface LiveScore {
   status: 'scored' | 'not-run';
   /** 快照生成时间（ISO 8601，即本次检查完成时间） */
   generatedAt: string;
+  /** 上一轮检查的分数（快照覆盖写前抢救出的对比基线；旧格式快照无此字段） */
+  previousScore?: { score: number; generatedAt: string };
 }
 
 /** pickDomainScore 的返回：喂给 domainScoreView 的维度条目 + 数据时间 */
 export interface PickedScore {
   dim: { score: number; status?: 'scored' | 'not-run' } | undefined;
   generatedAt: string | undefined;
+  /** 上一轮分数（仅 live 来源携带；汇总数据无轮次对比基线） */
+  previousScore?: number;
 }
 
 /**
@@ -114,7 +122,13 @@ export function pickDomainScore(
   dimension: ScoreDimension,
 ): PickedScore {
   if (live && live.status === 'scored') {
-    return { dim: { score: live.score, status: live.status }, generatedAt: live.generatedAt };
+    return {
+      dim: { score: live.score, status: live.status },
+      generatedAt: live.generatedAt,
+      ...(typeof live.previousScore?.score === 'number'
+        ? { previousScore: live.previousScore.score }
+        : {}),
+    };
   }
   return { dim: findDimension(summary, dimension), generatedAt: summary?.timestamp };
 }

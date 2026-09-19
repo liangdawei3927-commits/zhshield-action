@@ -765,7 +765,8 @@
       "noData": "No score yet",
       "noDataHint": "Shown after \"Generate report summary\" in Reports",
       "noDataHintLive": "Run an inspection and the score appears here instantly",
-      "notRunHint": "Run this check and summarize to count toward the total score"
+      "notRunHint": "Run this check and summarize to count toward the total score",
+      "scoreDelta": "Previous {{prev}} → Now {{now}}"
     },
     "backup": {
       "backingUp": "Backing up...",
@@ -1141,6 +1142,7 @@
     },
     "inspect": {
       "checksPassed": "Checks passed",
+      "guardAlsoRan": "This inspection also ran the guard checks — see the Guard page for results",
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Inspection complete",
       "empty": {
@@ -1190,7 +1192,7 @@
       "scanning": "Running performance detection...",
       "score": {
         "fixable": "{{count}} fixable",
-        "health": "Performance health"
+        "statsTitle": "Latest check stats"
       },
       "severity": {
         "high": "High priority",
@@ -1475,7 +1477,7 @@
       "noMalware": "No malicious code found",
       "recommendation": "Recommendation: {{recommendation}}",
       "rescan": "Rescan",
-      "scoreLabel": "Security score",
+      "statsTitle": "Latest scan stats",
       "source": "Security",
       "summary": "{{vulns}} vulnerabilities · {{malware}} malicious code",
       "tab": {

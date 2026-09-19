@@ -292,6 +292,61 @@ async function loadProjectPaths(): Promise<string[]> {
   }
 }
 
+// ─── 备份健康快照（十域评分章程 #10，报告中心汇总只读消费）──────
+
+/** 备份健康快照：供 buildPipelineExtras 组装 @zh/scoring 的 BackupDataLike */
+export interface BackupHealthSnapshot {
+  /** 最近一次成功备份时间（ISO）；null = 从未成功 */
+  lastSuccessAt: string | null;
+  /** 最近 ≤10 条记录的 overallStatus（新→旧）：success / partial / failed */
+  recentStatuses: string[];
+  /** 是否启用了定时备份 */
+  scheduleEnabled: boolean;
+}
+
+/**
+ * 只读指定项目的备份健康快照（从磁盘记录 + 项目配置聚合，不触发任何备份）。
+ * 返回 null = 该项目从未备份且未启用定时备份 → 评分侧按 not-run 处理（功能未使用不罚分）。
+ */
+export async function loadBackupHealthSnapshot(
+  projectPath: string,
+): Promise<BackupHealthSnapshot | null> {
+  try {
+    const records = await loadRecordsFromDisk();
+    const own = records
+      .filter((r) => (r as { projectId?: unknown }).projectId === projectPath)
+      .map((r) => ({
+        status: String((r as { overallStatus?: unknown }).overallStatus ?? 'failed'),
+        time: new Date((r as { timestamp?: unknown }).timestamp as string).getTime(),
+      }))
+      .filter((r) => Number.isFinite(r.time))
+      .sort((a, b) => b.time - a.time);
+
+    let scheduleEnabled = false;
+    try {
+      const config = await new BackupConfigManager().loadProjectConfig(projectPath);
+      scheduleEnabled = config?.schedule?.enabled === true;
+    } catch {
+      scheduleEnabled = false;
+    }
+
+    if (own.length === 0 && !scheduleEnabled) return null;
+
+    const lastSuccess = own.find((r) => r.status === 'success');
+    return {
+      lastSuccessAt: lastSuccess ? new Date(lastSuccess.time).toISOString() : null,
+      recentStatuses: own.slice(0, 10).map((r) => r.status),
+      scheduleEnabled,
+    };
+  } catch (err) {
+    console.warn(
+      '[backup] 健康快照读取失败（按 not-run 处理）:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 export function registerBackupIpc(): void {
   const configManager = new BackupConfigManager();
   // eventBus 接通：备份进度/完成/失败事件转发到渲染层（此前未传 eventBus，大包期间 UI 零反馈）

@@ -1303,7 +1303,10 @@
         "refactor": "리팩터링",
         "performance": "성능",
         "techdebt": "기술 부채",
-        "gate": "게이트 검사"
+        "gate": "게이트",
+        "sentinel": "센티널",
+        "garbage": "정리",
+        "backup": "백업"
       },
       "empty": {
         "feature": {
@@ -1357,7 +1360,13 @@
         },
         "healthy": "건강"
       },
-      "title": "분석 보고서"
+      "title": "분석 보고서",
+      "redLine": {
+        "capNotice": "치명적인 문제가 있어 총점이 {{cap}}점으로 제한되었습니다:",
+        "activeSecrets": "보안 센터에 미처리 시크릿 {{count}}건",
+        "criticalVulns": "의존성 관리자에 critical 취약점 {{count}}건",
+        "criticalEvents": "센티널에 critical 이벤트 {{count}}건"
+      }
     },
     "security": {
       "checking": "검사 중...",

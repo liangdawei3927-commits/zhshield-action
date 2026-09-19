@@ -60,7 +60,8 @@ describe('ScoringEngine (context scoring)', () => {
     expect(security?.negative).toBe(15);
     expect(security?.score).toBe(85);
     expect(security?.issues).toBe(1);
-    expect(result.overall).toBeCloseTo(96.25, 2);
+    // 十域等权 0.1：overall = 100 − 15×0.1 = 98.5
+    expect(result.overall).toBeCloseTo(98.5, 2);
   });
 
   it('caps dimension penalty at maxPenalty', () => {

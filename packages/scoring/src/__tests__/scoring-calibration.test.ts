@@ -119,16 +119,16 @@ describe('评分校准 — 权重不变量（Task C）', () => {
   it('mini-program / cli 不再剔除任何维度（P1b 后无禁用项，全部权重 > 0）', () => {
     for (const t of ['mini-program', 'cli'] as const) {
       const wm = weightMapOf(makeRealisticProfile(t));
-      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate']) {
+      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate', 'sentinel', 'garbage', 'backup']) {
         expect(wm[dim]).toBeGreaterThan(0);
       }
     }
   });
 
-  it('所有类型均保留全部 7 个维度', () => {
+  it('所有类型均保留全部 10 个维度', () => {
     for (const t of ['backend', 'frontend', 'app', 'desktop', 'library'] as const) {
       const wm = weightMapOf(makeRealisticProfile(t));
-      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate']) {
+      for (const dim of ['quality', 'security', 'dependencies', 'refactor', 'performance', 'techdebt', 'gate', 'sentinel', 'garbage', 'backup']) {
         expect(wm[dim]).toBeGreaterThan(0);
       }
     }

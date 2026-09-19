@@ -1,14 +1,14 @@
 import type { ScoringConfig, DimensionDefinition } from './types';
 
 /**
- * 默认维度配置（P2 扩展后 7 维）
- * 质量 20% / 安全性 25% / 依赖 15% / 重构 10% / 性能 5% / 技术债 15% / 门禁哨兵 10%，权重之和 = 1.0
+ * 默认维度配置（十域评分体系 v2）
+ * 10 维等权各 0.10，权重之和 = 1.0（报告中心总评 = 已运行域总和 ÷ 已运行域数；scoring.yml 可覆盖）
  */
 const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'quality',
     name: '质量',
-    weight: 0.2,
+    weight: 0.1,
     description: '代码质量、性能、架构、重构、文档与测试',
     penalties: {
       dimension: 'quality',
@@ -68,7 +68,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'performance',
     name: '性能',
-    weight: 0.05,
+    weight: 0.1,
     description: '性能优化与资源效率',
     penalties: {
       dimension: 'performance',
@@ -96,7 +96,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'security',
     name: '安全性',
-    weight: 0.25,
+    weight: 0.1,
     description: '代码安全漏洞与密钥管理',
     penalties: {
       dimension: 'security',
@@ -131,7 +131,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'dependencies',
     name: '依赖',
-    weight: 0.15,
+    weight: 0.1,
     description: '依赖管理与漏洞',
     penalties: {
       dimension: 'dependencies',
@@ -158,7 +158,7 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   {
     id: 'techdebt',
     name: '技术债',
-    weight: 0.15,
+    weight: 0.1,
     description: '技术债指数（健康分 = 100 − debtIndex）',
     penalties: {
       dimension: 'techdebt',
@@ -183,9 +183,9 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
   },
   {
     id: 'gate',
-    name: '门禁哨兵',
+    name: '门禁',
     weight: 0.1,
-    description: '门禁检查与哨兵告警',
+    description: '门禁检查（v2 起哨兵告警拆出独立维）',
     penalties: {
       dimension: 'gate',
       maxPenalty: 10,
@@ -207,12 +207,61 @@ const DEFAULT_DIMENSIONS: DimensionDefinition[] = [
       },
     ],
   },
+  {
+    id: 'sentinel',
+    name: '哨兵',
+    weight: 0.1,
+    description: '哨兵监控事件（critical -10 / warning -5）',
+    penalties: {
+      dimension: 'sentinel',
+      maxPenalty: 10,
+      perIssuePenalty: 2,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+      },
+    },
+    positiveRules: [],
+  },
+  {
+    id: 'garbage',
+    name: '垃圾清理',
+    weight: 0.1,
+    description: '项目整洁度：按垃圾类型计权扣分',
+    penalties: {
+      dimension: 'garbage',
+      maxPenalty: 10,
+      perIssuePenalty: 1,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+        info: 0.5,
+      },
+    },
+    positiveRules: [],
+  },
+  {
+    id: 'backup',
+    name: '备份',
+    weight: 0.1,
+    description: '备份健康度：成功新鲜度 + 失败率（状态守护型）',
+    penalties: {
+      dimension: 'backup',
+      maxPenalty: 10,
+      perIssuePenalty: 2,
+      severityMultipliers: {
+        error: 2,
+        warning: 1,
+      },
+    },
+    positiveRules: [],
+  },
 ];
 
 export function getDefaultScoringConfig(): ScoringConfig {
   return {
     dimensions: DEFAULT_DIMENSIONS,
-    version: '2.2.0',
+    version: '3.0.0',
     lastUpdated: new Date(),
   };
 }

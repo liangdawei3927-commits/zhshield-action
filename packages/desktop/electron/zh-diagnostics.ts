@@ -7,7 +7,7 @@ import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
 import type { PipelineReport } from '@zh/pipeline';
-import { buildHealthDimensions } from '@zh/scoring';
+import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { DependencyReportData, TechDebtReportData } from '../src/types/electron';
 
 // ─── 诊断条目（归一化，跨 guard/inspect/refactor） ─────────────────────
@@ -64,6 +64,7 @@ export interface FileDiagnostics {
  * 按域快照附带的实时维度评分（落盘时由 @zh/scoring 统一计算，渲染层只读不算）。
  * 目前仅 inspect → quality（巡检与 quality 维的扣分口径一一对应）；
  * gate 维需 status/blocking 语义（快照条目不带），暂不实时评分。
+ * version = 评分算法版本（scoreVersion 2 起）；跨版本快照的 previousScore 不参与对比。
  */
 export interface DomainDimensionScore {
   /** 对应 @zh/scoring 的评分维度 */
@@ -73,6 +74,8 @@ export interface DomainDimensionScore {
   /** 计分所依据的问题条数 */
   issues: number;
   status: 'scored' | 'not-run';
+  /** 评分算法版本（v1 旧快照缺省） */
+  version?: number;
 }
 
 export interface DiagnosticsReport {
@@ -349,20 +352,23 @@ export async function writeDiagnosticsFile(
             score: quality.score,
             issues: quality.issues,
             status: quality.status,
+            version: SCORE_VERSION,
           };
         }
         // 「上次 → 本次」对比：覆盖写会把旧分抹掉，先从旧快照里抢救出上一轮的
         // dimensionScore（generatedAt 不同才算是另一轮检查；相同说明是同轮重复落盘）。
-        // 读失败/旧快照无分（如批 9 之前的旧格式）→ 不带 previousScore，UI 不显示对比行。
+        // 算法版本不同（v1 快照无 version 字段）→ 不带 previousScore，
+        // UI 不显示对比行（跨版本分数不可比，scoreVersion 2 口径）。
         try {
           const oldRaw = await readFile(domainSnapshotPath(report.project.path, source), 'utf-8');
           const old = JSON.parse(oldRaw) as {
             generatedAt?: string;
-            dimensionScore?: { score: number };
+            dimensionScore?: { score: number; version?: number };
           };
           if (
             old.dimensionScore &&
             typeof old.dimensionScore.score === 'number' &&
+            old.dimensionScore.version === SCORE_VERSION &&
             old.generatedAt &&
             old.generatedAt !== report.generatedAt
           ) {

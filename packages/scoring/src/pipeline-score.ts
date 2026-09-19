@@ -6,6 +6,8 @@ import type {
   SentinelDataLike,
   RefactorDataLike,
   PerformanceDataLike,
+  GarbageDataLike,
+  BackupDataLike,
 } from './types';
 import { DimensionMapper } from './dimension-mapper';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
@@ -39,9 +41,9 @@ export interface InspectionReportLike {
 }
 
 /**
- * P1b 维度 → inspect issue.category 映射。
- * techdebt/gate/refactor/performance 无 category 映射：分别由 computeDebtIndex 全量 issues、
- * guard results + sentinel、extras.refactor、extras.performance 计算。
+ * 维度 → inspect issue.category 映射（十域评分体系，v2）。
+ * sentinel/garbage/backup/gate/techdebt/refactor/performance 无 category 映射：
+ * 分别由 extras 对应域数据计算。
  */
 const DIMENSION_CATEGORIES: Record<string, string[]> = {
   quality: ['performance', 'quality', 'architecture', 'refactoring', 'documentation', 'test'],
@@ -51,6 +53,9 @@ const DIMENSION_CATEGORIES: Record<string, string[]> = {
   performance: [],
   techdebt: [],
   gate: [],
+  sentinel: [],
+  garbage: [],
+  backup: [],
 };
 
 const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
@@ -90,9 +95,57 @@ function depsPenalty(deps: DepsDataLike): number {
   );
 }
 
-/** sentinel 扣分：criticalEvents -10 / warningEvents -5，上限 100（草案，实现处可调） */
+/** sentinel 扣分：criticalEvents -10 / warningEvents -5，上限 100（十域评分章程 #9，哨兵独立成维） */
 function sentinelPenalty(sentinel: SentinelDataLike): number {
   return Math.min(100, sentinel.criticalEvents * 10 + sentinel.warningEvents * 5);
+}
+
+/** garbage 扣分：build-artifact -1 / unused-file -2 / duplicate-code -3 / dead-code -4 / unused-dependency -6，上限 100（章程 #5） */
+const GARBAGE_TYPE_PENALTY: Record<string, number> = {
+  'build-artifact': 1,
+  'unused-file': 2,
+  'duplicate-code': 3,
+  'dead-code': 4,
+  'unused-dependency': 6,
+};
+
+function garbagePenalty(garbage: GarbageDataLike): number {
+  let sum = 0;
+  for (const [type, count] of Object.entries(garbage.byType)) {
+    sum += count * (GARBAGE_TYPE_PENALTY[type] ?? 2);
+  }
+  return Math.min(100, sum);
+}
+
+/**
+ * backup 健康度扣分（状态守护型，章程 #10）：
+ * - 新鲜度：7 天内有成功备份 0 分；7–30 天 -20；超过 30 天或从未成功 -40；
+ * - 失败率：最近 ≤10 条记录中 failed/partial 占比 × 30。
+ */
+export const BACKUP_FRESH_WINDOW_DAYS = 7;
+export const BACKUP_STALE_WINDOW_DAYS = 30;
+const BACKUP_FRESH_PENALTY = 0;
+const BACKUP_STALE_PENALTY = 20;
+const BACKUP_NEVER_PENALTY = 40;
+const BACKUP_FAILURE_WEIGHT = 30;
+
+export function backupPenalty(backup: BackupDataLike, now: number = Date.now()): number {
+  let freshnessPenalty: number;
+  if (backup.lastSuccessAt === null) {
+    freshnessPenalty = BACKUP_NEVER_PENALTY;
+  } else {
+    const days = (now - new Date(backup.lastSuccessAt).getTime()) / 86_400_000;
+    freshnessPenalty =
+      days <= BACKUP_FRESH_WINDOW_DAYS
+        ? BACKUP_FRESH_PENALTY
+        : days <= BACKUP_STALE_WINDOW_DAYS
+          ? BACKUP_STALE_PENALTY
+          : BACKUP_NEVER_PENALTY;
+  }
+  const total = backup.recentStatuses.length;
+  const bad = backup.recentStatuses.filter((s) => s === 'failed' || s === 'partial').length;
+  const failurePenalty = total > 0 ? (bad / total) * BACKUP_FAILURE_WEIGHT : 0;
+  return Math.min(100, freshnessPenalty + failurePenalty);
 }
 
 /** refactor 扣分：smell 按 error -8 / warning -4 / info -1，上限 100（spec D） */
@@ -110,11 +163,13 @@ function notRun(name: string, weight: number): DimensionScore {
 }
 
 /**
- * 由 guard + inspect + 扩展域数据构建健康维度分（P2 扩展后 7 维，权重和为 1）。
+ * 由 guard + inspect + 扩展域数据构建健康维度分（十域评分体系 v2，权重和为 1）。
  * 每个维度满分 100：inspect issues 按 error 扣 8、warning 扣 4、info 扣 1，下限 0；
  * security 额外扣 secrets 活跃密钥；dependencies 额外扣依赖漏洞；techdebt = 100 − debtIndex；
  * refactor 按 smell severity 计权扣分；performance 按 5 级 severity 计权扣分；
- * gate 由 guard 失败/阻塞 + sentinel 告警扣分。
+ * gate 由 guard 失败/阻塞扣分（v2 起哨兵告警拆出独立 sentinel 维）；
+ * sentinel 按事件 critical/warning 计权扣分；garbage 按垃圾类型计权扣分；
+ * backup 为状态守护型健康度（新鲜度 + 失败率，见 backupPenalty）。
  *
  * 未检测语义（spec C）：某域从未运行时该域不参与加权且标注 not-run，禁止按满分计。
  * - quality: inspect 为 null → not-run
@@ -151,6 +206,8 @@ export function buildHealthDimensions(
   const sentinel = extras?.sentinel ?? null;
   const refactor = extras?.refactor ?? null;
   const performance = extras?.performance ?? null;
+  const garbage = extras?.garbage ?? null;
+  const backup = extras?.backup ?? null;
 
   return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) =>
     scoreDimension(name, categories, weightMap, guard, inspect, {
@@ -160,6 +217,8 @@ export function buildHealthDimensions(
       sentinel,
       refactor,
       performance,
+      garbage,
+      backup,
     }),
   );
 }
@@ -189,6 +248,8 @@ interface ExtrasResolved {
   sentinel: SentinelDataLike | null;
   refactor: RefactorDataLike | null;
   performance: PerformanceDataLike | null;
+  garbage: GarbageDataLike | null;
+  backup: BackupDataLike | null;
 }
 
 function scoreDimension(
@@ -214,6 +275,9 @@ function scoreDimension(
   if (name === 'refactor' && extras.refactor === null) return notRun(name, weight);
   if (name === 'performance' && extras.performance === null) return notRun(name, weight);
   if (name === 'gate' && guard === null) return notRun(name, weight);
+  if (name === 'sentinel' && extras.sentinel === null) return notRun(name, weight);
+  if (name === 'garbage' && extras.garbage === null) return notRun(name, weight);
+  if (name === 'backup' && extras.backup === null) return notRun(name, weight);
 
   if (name === 'techdebt') {
     const debtIndex = extras.techdebt!.debtIndex;
@@ -237,17 +301,50 @@ function scoreDimension(
   }
 
   if (name === 'gate') {
+    // v2（十域评分章程）：哨兵告警已拆出独立 sentinel 维，gate 只吃 guard 检查结果
     const gPenalty = guard ? guardPenalty(guard.results) : 0;
-    const sPenalty = extras.sentinel ? sentinelPenalty(extras.sentinel) : 0;
     const gCount = guard ? guardIssueCount(guard.results) : 0;
-    const sCount = extras.sentinel
-      ? extras.sentinel.criticalEvents + extras.sentinel.warningEvents
-      : 0;
     return {
       name,
       weight,
-      score: Math.max(0, Math.round((100 - gPenalty - sPenalty) * 10) / 10),
-      issues: gCount + sCount,
+      score: Math.max(0, Math.round((100 - gPenalty) * 10) / 10),
+      issues: gCount,
+      status: 'scored',
+    };
+  }
+
+  if (name === 'sentinel') {
+    const sPenalty = sentinelPenalty(extras.sentinel!);
+    return {
+      name,
+      weight,
+      score: Math.max(0, Math.round((100 - sPenalty) * 10) / 10),
+      issues: extras.sentinel!.criticalEvents + extras.sentinel!.warningEvents,
+      status: 'scored',
+    };
+  }
+
+  if (name === 'garbage') {
+    const penalty = garbagePenalty(extras.garbage!);
+    return {
+      name,
+      weight,
+      score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+      issues: extras.garbage!.total,
+      status: 'scored',
+    };
+  }
+
+  if (name === 'backup') {
+    const penalty = backupPenalty(extras.backup!);
+    const bad = extras.backup!.recentStatuses.filter(
+      (s) => s === 'failed' || s === 'partial',
+    ).length;
+    return {
+      name,
+      weight,
+      score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+      issues: bad,
       status: 'scored',
     };
   }

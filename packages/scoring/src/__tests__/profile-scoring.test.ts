@@ -81,10 +81,10 @@ describe('applyWeightDeltas — 权重归一化', () => {
 });
 
 describe('buildHealthDimensions — 画像驱动评分', () => {
-  it('不传 profile 时向后兼容（默认权重）', () => {
+  it('不传 profile 时向后兼容（默认权重，十域等权 0.1）', () => {
     const dims = buildHealthDimensions(emptyGuard, emptyInspect);
     const securityDim = dims.find((d) => d.name === 'security');
-    expect(securityDim?.weight).toBeCloseTo(0.25, 1);
+    expect(securityDim?.weight).toBeCloseTo(0.1, 1);
   });
 
   it('frontend profile 降低 security 维度权重', () => {

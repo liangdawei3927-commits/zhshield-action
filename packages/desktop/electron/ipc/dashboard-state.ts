@@ -1,8 +1,8 @@
 /**
  * 仪表盘聚合数据层（ipc/dashboard-state.ts）
  *
- * 维护 .zhshield/dashboard-state.json：deps / secrets / techdebt / refactor / performance
- * 五域的最新统计摘要 + lastRunAt。
+ * 维护 .zhshield/dashboard-state.json：deps / secrets / techdebt / refactor / performance / garbage
+ * 各域的最新统计摘要 + lastRunAt。
  *
  * 消费方：`buildPipelineExtras`（engines.ts）—— 汇总生成报告时组装 @zh/scoring 的
  * `DimensionExtras`，使报告中心的分与 pipeline 的分同口径（没跑过的域为 null → 该维度 not-run）。
@@ -64,6 +64,15 @@ export interface DashboardPerformanceState {
   lastRunAt: string;
 }
 
+/** 垃圾清理域聚合数据（十域评分章程 #5） */
+export interface DashboardGarbageState {
+  /** 垃圾条目总数：来自 GarbageScanReport.summary.total */
+  total: number;
+  /** 类型 → 条目数：来自 GarbageScanReport.summary.byType（清理后按清理条目递减） */
+  byType: Record<string, number>;
+  lastRunAt: string;
+}
+
 /** dashboard-state.json 完整形状 */
 export interface DashboardState {
   deps?: DashboardDepsState;
@@ -71,6 +80,7 @@ export interface DashboardState {
   techdebt?: DashboardTechDebtState;
   refactor?: DashboardRefactorState;
   performance?: DashboardPerformanceState;
+  garbage?: DashboardGarbageState;
 }
 
 // ─── 文件路径 ─────────────────────────────────────────────────────
@@ -96,6 +106,7 @@ export async function readDashboardState(projectPath: string): Promise<Dashboard
       ...(parsed.techdebt ? { techdebt: parsed.techdebt } : {}),
       ...(parsed.refactor ? { refactor: parsed.refactor } : {}),
       ...(parsed.performance ? { performance: parsed.performance } : {}),
+      ...(parsed.garbage ? { garbage: parsed.garbage } : {}),
     };
   } catch {
     return {};
@@ -123,6 +134,7 @@ export async function updateDashboardState(
       if (patch.techdebt !== undefined) next.techdebt = patch.techdebt;
       if (patch.refactor !== undefined) next.refactor = patch.refactor;
       if (patch.performance !== undefined) next.performance = patch.performance;
+      if (patch.garbage !== undefined) next.garbage = patch.garbage;
       await mkdir(join(projectPath, '.zhshield'), { recursive: true });
       await writeFile(statePath(projectPath), `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
     });

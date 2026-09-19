@@ -17,12 +17,14 @@ const allExtras: DimensionExtras = {
   sentinel: { active: true, criticalEvents: 0, warningEvents: 0 },
   refactor: { totalSmells: 0, bySeverity: { error: 0, warning: 0, info: 0 } },
   performance: { total: 0, bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 } },
+  garbage: { total: 0, byType: {} },
+  backup: { lastSuccessAt: new Date().toISOString(), recentStatuses: ['success'], scheduleEnabled: true },
 };
 
 describe('buildHealthDimensions', () => {
   it('all clean reports score 100 on every dimension', () => {
     const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, allExtras);
-    expect(dims).toHaveLength(7);
+    expect(dims).toHaveLength(10);
     expect(dims.map((d) => d.name)).toEqual([
       'quality',
       'security',
@@ -31,6 +33,9 @@ describe('buildHealthDimensions', () => {
       'performance',
       'techdebt',
       'gate',
+      'sentinel',
+      'garbage',
+      'backup',
     ]);
     expect(dims.every((d) => d.score === 100)).toBe(true);
     expect(dims.every((d) => d.issues === 0)).toBe(true);
@@ -39,7 +44,7 @@ describe('buildHealthDimensions', () => {
   it('dimension weights sum to 1', () => {
     const dims = buildHealthDimensions(cleanGuard, cleanInspect);
     const sum = dims.reduce((acc, d) => acc + d.weight, 0);
-    expect(sum).toBe(1);
+    expect(sum).toBeCloseTo(1, 6);
   });
 
   it('maps inspect issues to their dimension by category', () => {
@@ -160,9 +165,93 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
     expect(refactor.issues).toBe(20);
   });
 
-  it('权重 sanity：refactor 0.10 / performance 0.05', () => {
+  it('权重 sanity：十域等权各 0.10', () => {
     const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, allExtras);
-    expect(dims.find((d) => d.name === 'refactor')!.weight).toBe(0.1);
-    expect(dims.find((d) => d.name === 'performance')!.weight).toBe(0.05);
+    for (const dim of dims) {
+      expect(dim.weight).toBe(0.1);
+    }
+  });
+});
+
+describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
+  it('sentinel null → not-run；有事件 → critical -10 / warning -5', () => {
+    const notRun = buildHealthDimensions(cleanGuard, cleanInspect);
+    const sentinelNotRun = notRun.find((d) => d.name === 'sentinel')!;
+    expect(sentinelNotRun.status).toBe('not-run');
+
+    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      sentinel: { active: true, criticalEvents: 1, warningEvents: 2 },
+    });
+    const sentinel = dims.find((d) => d.name === 'sentinel')!;
+    // penalty 10 + 10 = 20 → 80，issues 3
+    expect(sentinel.status).toBe('scored');
+    expect(sentinel.score).toBe(80);
+    expect(sentinel.issues).toBe(3);
+  });
+
+  it('gate 不再吃哨兵事件（v2 拆分）：guard 干净时 gate=100，哨兵事件只罚 sentinel 维', () => {
+    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      sentinel: { active: true, criticalEvents: 2, warningEvents: 0 },
+    });
+    expect(dims.find((d) => d.name === 'gate')!.score).toBe(100);
+    expect(dims.find((d) => d.name === 'sentinel')!.score).toBe(80);
+  });
+
+  it('garbage null → not-run；按类型计权扣分（1/2/3/4/6）', () => {
+    const notRun = buildHealthDimensions(cleanGuard, cleanInspect);
+    expect(notRun.find((d) => d.name === 'garbage')!.status).toBe('not-run');
+
+    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      garbage: {
+        total: 6,
+        byType: { 'build-artifact': 1, 'unused-file': 1, 'dead-code': 1 },
+      },
+    });
+    const garbage = dims.find((d) => d.name === 'garbage')!;
+    // penalty 1 + 2 + 4 = 7 → 93，issues 3（total 字段口径为条目总数）
+    expect(garbage.status).toBe('scored');
+    expect(garbage.score).toBe(93);
+    expect(garbage.issues).toBe(6);
+  });
+
+  it('garbage 未知类型按缺省 2 分计权；扣分上限 100', () => {
+    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      garbage: { total: 3, byType: { 'mystery-type': 3 } },
+    });
+    expect(dims.find((d) => d.name === 'garbage')!.score).toBe(94);
+
+    const floored = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      garbage: { total: 100, byType: { 'unused-dependency': 100 } },
+    });
+    expect(floored.find((d) => d.name === 'garbage')!.score).toBe(0);
+  });
+
+  it('backup null → not-run；新鲜度 + 失败率健康度', () => {
+    const notRun = buildHealthDimensions(cleanGuard, cleanInspect);
+    expect(notRun.find((d) => d.name === 'backup')!.status).toBe('not-run');
+
+    const now = Date.now();
+    const daysAgo = (n: number) => new Date(now - n * 86_400_000).toISOString();
+    // 7 天内成功 + 无失败 → 100
+    const fresh = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      backup: { lastSuccessAt: daysAgo(2), recentStatuses: ['success', 'success'], scheduleEnabled: true },
+    });
+    expect(fresh.find((d) => d.name === 'backup')!.score).toBe(100);
+
+    // 7–30 天成功 −20；近 10 条失败率 50% × 30 = 15 → 65
+    const stale = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      backup: {
+        lastSuccessAt: daysAgo(15),
+        recentStatuses: ['failed', 'success', 'failed', 'success'],
+        scheduleEnabled: true,
+      },
+    });
+    expect(stale.find((d) => d.name === 'backup')!.score).toBe(65);
+
+    // 从未成功 −40；唯一一条记录失败 1/1×30 = 30 → 100 − 70 = 30
+    const never = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
+      backup: { lastSuccessAt: null, recentStatuses: ['failed'], scheduleEnabled: true },
+    });
+    expect(never.find((d) => d.name === 'backup')!.score).toBe(30);
   });
 });

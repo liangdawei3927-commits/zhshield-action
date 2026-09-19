@@ -216,3 +216,38 @@ export function registerSentinelIpc(): void {
   registerEventQuery();
   registerMonitoringStart();
 }
+
+// ─── 哨兵健康数据（十域评分章程 #9，报告中心汇总只读消费）──────
+
+/** 未终态的事件状态：仍在处理链路上的告警才计入扣分（passed/merged/deployed 已解决） */
+const TERMINAL_EVENT_STATUSES = new Set(['passed', 'merged', 'deployed']);
+
+/**
+ * 只读指定项目的哨兵健康数据，供 buildPipelineExtras 组装 @zh/scoring 的 SentinelDataLike。
+ * 返回 null = 该项目当前未在监控且从未产生事件 → 评分侧按 not-run 处理。
+ * severity 映射：p1 → critical，p2 → warning，p3 不计入。
+ */
+export async function getSentinelHealthData(
+  projectId: string,
+): Promise<{ active: boolean; criticalEvents: number; warningEvents: number } | null> {
+  try {
+    const runtime = await getSentinel();
+    const events = runtime.eventCenter.listEvents();
+    const own = events.filter(
+      (e) => e.projectId === projectId && !TERMINAL_EVENT_STATUSES.has(e.status),
+    );
+    const active = monitoredProjects.has(projectId);
+    if (!active && own.length === 0) return null;
+    return {
+      active,
+      criticalEvents: own.filter((e) => e.severity === 'p1').length,
+      warningEvents: own.filter((e) => e.severity === 'p2').length,
+    };
+  } catch (err) {
+    console.warn(
+      '[sentinel] 健康数据读取失败（按 not-run 处理）:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}

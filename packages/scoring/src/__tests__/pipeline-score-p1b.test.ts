@@ -24,12 +24,12 @@ describe('P1b 验收 — 未检测域不参与加权（spec G）', () => {
     const deps = dims.find((d) => d.name === 'dependencies')!;
     expect(deps.status).toBe('not-run');
     expect(deps.score).toBe(0);
-    expect(deps.weight).toBe(0.15);
+    expect(deps.weight).toBe(0.1);
 
     const score = new ScoringEngine().calculate('p', dims);
-    // quality 92 (0.20) + gate 92 (0.10)，weightSum 0.30 → 92
+    // quality 92 (0.10) + gate 92 (0.10)，weightSum 0.20 → 92
     expect(score.overall).toBe(92);
-    // 若 dependencies 按满分 100 参与加权，overall = (92×0.20 + 92×0.10 + 100×0.15)/0.45 = 94.67
+    // 若 dependencies 按满分 100 参与加权，overall = (92×0.10 + 92×0.10 + 100×0.10)/0.30 = 94.67
     // 实际 92 证明未检测域被排除在分子与分母之外
   });
 
@@ -157,7 +157,7 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
     expect(techdebt.issues).toBe(7);
   });
 
-  it('gate 维 = 100 − guardPenalty − sentinelPenalty', () => {
+  it('gate 维 = 100 − guardPenalty（v2 起哨兵拆出独立维，gate 不再吃哨兵事件）', () => {
     const dims = buildHealthDimensions(
       { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] },
       emptyInspect,
@@ -166,8 +166,13 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
       { sentinel: { active: true, criticalEvents: 2, warningEvents: 1 } },
     );
     const gate = dims.find((d) => d.name === 'gate')!;
-    expect(gate.score).toBe(67); // 100 − 8(guard) − (2×10 + 1×5)(sentinel)
-    expect(gate.issues).toBe(4); // 1 guard + 3 sentinel 事件
+    expect(gate.score).toBe(92); // 100 − 8(guard)，哨兵事件不再进 gate
+    expect(gate.issues).toBe(1); // 仅 1 条 guard 检查项
+
+    const sentinel = dims.find((d) => d.name === 'sentinel')!;
+    expect(sentinel.status).toBe('scored');
+    expect(sentinel.score).toBe(75); // 100 − (2×10 + 1×5)
+    expect(sentinel.issues).toBe(3);
   });
 });
 
@@ -203,5 +208,12 @@ describe('P1b 验收 — 各域未检测判定（spec C）', () => {
   it('gate: guard null → not-run', () => {
     const dims = buildHealthDimensions(null, emptyInspect);
     expect(dims.find((d) => d.name === 'gate')!.status).toBe('not-run');
+  });
+
+  it('sentinel: extras.sentinel null → not-run；garbage/backup null → not-run', () => {
+    const dims = buildHealthDimensions(emptyGuard, emptyInspect);
+    expect(dims.find((d) => d.name === 'sentinel')!.status).toBe('not-run');
+    expect(dims.find((d) => d.name === 'garbage')!.status).toBe('not-run');
+    expect(dims.find((d) => d.name === 'backup')!.status).toBe('not-run');
   });
 });

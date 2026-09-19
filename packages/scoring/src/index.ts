@@ -3,6 +3,7 @@ export const VERSION = '0.1.0';
 export { ScoringEngine } from './engine';
 export { ScoringEngine as ContextScoringEngine } from './scoring-engine';
 export { DimensionMapper } from './dimension-mapper';
+export { computeRedLine, RED_LINE_CAP, SCORE_VERSION } from './redline';
 export { getDefaultScoringConfig, getDimensionConfig, getDimensionIds } from './scoring-config';
 export {
   findProjectScoringConfigFile,
@@ -45,6 +46,10 @@ export type {
   SentinelDataLike,
   RefactorDataLike,
   PerformanceDataLike,
+  GarbageDataLike,
+  BackupDataLike,
+  RedLineInfo,
+  RedLineReason,
   DimensionExtras,
   ScoreTrend,
 } from './types';

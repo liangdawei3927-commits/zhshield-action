@@ -1,5 +1,6 @@
 import { useGarbagePage } from './garbage-logic';
 import { GarbageEmptyState } from './garbage-empty-state';
+import { DomainScoreCard } from '../components/DomainScoreCard';
 import {
   GarbageHeader,
   GarbageStats,
@@ -42,6 +43,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
             onRescan={handleScan}
           />
           <GarbageStats report={report} />
+          <DomainScoreCard projectPath={projectPath} dimension="garbage" />
           {restoreResult && <RestoreBanner result={restoreResult} />}
           {cleanResult && (
             <CleanResultBanner

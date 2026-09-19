@@ -9,7 +9,8 @@ import {
   computeStreak,
   computeDimensionTrends,
 } from './trend-math';
-import type { HealthScore, DimensionScore, ScoreTrend, TrendReport } from './types';
+import type { HealthScore, DimensionScore, ScoreTrend, TrendReport, RedLineInfo } from './types';
+import { SCORE_VERSION } from './redline';
 
 function emptyTrendReport(projectId: string): TrendReport {
   return {
@@ -79,12 +80,22 @@ export class ScoringEngine {
     this.db = db ?? null;
   }
 
-  calculate(projectId: string, dimensionScores: DimensionScore[]): HealthScore {
+  calculate(
+    projectId: string,
+    dimensionScores: DimensionScore[],
+    redLine?: RedLineInfo | null,
+  ): HealthScore {
     // not-run 维度不参与加权：仅按已检测维度归一化（spec C：未检测域禁止按满分计）
     const active = dimensionScores.filter((d) => d.status !== 'not-run');
     const weightSum = active.reduce((s, d) => s + d.weight, 0);
-    const overall =
+    let overall =
       weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
+    // 红线封顶（十域评分章程）：任一 critical 事实存在时总评 ≤ cap，一票压制
+    let appliedRedLine: RedLineInfo | undefined;
+    if (redLine?.capped) {
+      overall = Math.min(overall, redLine.cap);
+      appliedRedLine = redLine;
+    }
     const grade: HealthScore['grade'] =
       overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
     const trend = this.computeTrend(projectId, overall);
@@ -96,6 +107,8 @@ export class ScoringEngine {
       grade,
       dimensions: dimensionScores,
       trend,
+      scoreVersion: SCORE_VERSION,
+      ...(appliedRedLine ? { redLine: appliedRedLine } : {}),
     };
 
     if (this.db) {

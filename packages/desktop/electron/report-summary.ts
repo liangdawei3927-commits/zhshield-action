@@ -14,7 +14,7 @@ import type { GuardReportRecord } from '@zh/guard';
 import type { DiagnosticEntry } from './zh-diagnostics';
 
 /**
- * 扩展域（secrets/deps/techdebt/refactor/performance）最新数据契约，
+ * 扩展域（secrets/deps/techdebt/refactor/performance/garbage/sentinel/backup）最新数据契约，
  * 对齐 @zh/scoring 的 DimensionExtras；无对应域时为 null（算法侧按 null 判 not-run）。
  */
 export interface PipelineExtras {
@@ -31,6 +31,13 @@ export interface PipelineExtras {
   performance?: {
     total: number;
     bySeverity: { critical: number; high: number; medium: number; low: number; info: number };
+  } | null;
+  garbage?: { total: number; byType: Record<string, number> } | null;
+  sentinel?: { active: boolean; criticalEvents: number; warningEvents: number } | null;
+  backup?: {
+    lastSuccessAt: string | null;
+    recentStatuses: string[];
+    scheduleEnabled: boolean;
   } | null;
 }
 

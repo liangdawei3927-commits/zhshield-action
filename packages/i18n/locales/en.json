@@ -1303,7 +1303,10 @@
         "refactor": "Refactoring",
         "performance": "Performance",
         "techdebt": "Tech Debt",
-        "gate": "Gate Sentinel"
+        "gate": "Gate",
+        "sentinel": "Sentinel",
+        "garbage": "Cleanup",
+        "backup": "Backup"
       },
       "empty": {
         "feature": {
@@ -1357,7 +1360,13 @@
         },
         "healthy": "Healthy"
       },
-      "title": "Analysis reports"
+      "title": "Analysis reports",
+      "redLine": {
+        "capNotice": "Critical issues found, overall capped at {{cap}}:",
+        "activeSecrets": "{{count}} active secret(s) unhandled in Security Center",
+        "criticalVulns": "{{count}} critical dependency vulnerabilit(ies) in Dependency Manager",
+        "criticalEvents": "{{count}} critical event(s) in Sentinel"
+      }
     },
     "secrets": {
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",

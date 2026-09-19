@@ -179,6 +179,14 @@ export interface HealthScoreData {
   }>;
   summary: string;
   timestamp: string;
+  /** 评分算法版本（2 = 十域聚合 + 红线封顶）；跨版本分数不做直接对比 */
+  scoreVersion?: number;
+  /** 红线封顶：本次汇总存在 critical 事实时总评被压制的原因 */
+  redLine?: {
+    capped: boolean;
+    cap: number;
+    reasons: Array<{ domain: string; kind: string; count: number }>;
+  };
 }
 
 /** 项目画像（可序列化子集，供前端列出模块用于模块级评分） */

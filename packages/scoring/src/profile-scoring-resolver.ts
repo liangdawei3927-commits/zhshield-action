@@ -24,7 +24,7 @@ export interface ProfileScoringOverrides {
 }
 
 /**
- * 按 ProjectType 的权重增量表（P1b 扩展后仅剩 quality/security/dependencies 三个可调维）
+ * 按 ProjectType 的权重增量表（十域评分体系 v2：基准为 10 维等权 0.1）
  *
  * 调整依据：
  * - frontend/小程序：前端漏洞公网暴露面小，security 降；refactor/performance 保持默认权重（生产原则：不对项目类型做过拟合调整），quality 升
@@ -33,16 +33,18 @@ export interface ProfileScoringOverrides {
  * - cli：依赖通常少，dependencies 降；质量升
  * - app：移动端安全敏感但低于后端，security 微降，quality 升（含性能）
  *
- * 每行增量和 = 0（保持总权重不变，归一化只是兜底）
+ * 每行增量和 = 0（保持总权重不变，归一化只是兜底）。
+ * v2 起基准为等权 0.1，增量幅度相应缩小——任一增量绝对值不得超过 0.1，
+ * 防止权重被打穿为 0（0 权重 = 该维问题对总评完全失声，安全产品不可接受）。
  */
 const TYPE_WEIGHT_DELTAS: Record<ProjectType, Partial<Record<string, number>>> = {
   backend: {},
-  frontend: { security: -0.1, quality: +0.1 },
-  app: { security: -0.05, quality: +0.05 },
-  'mini-program': { dependencies: -0.08, quality: +0.08 },
-  desktop: { security: +0.05, quality: -0.05 },
-  library: { dependencies: -0.05, quality: +0.05 },
-  cli: { dependencies: -0.08, quality: +0.08 },
+  frontend: { security: -0.04, quality: +0.04 },
+  app: { security: -0.02, quality: +0.02 },
+  'mini-program': { dependencies: -0.03, quality: +0.03 },
+  desktop: { security: +0.04, quality: -0.04 },
+  library: { dependencies: -0.03, quality: +0.03 },
+  cli: { dependencies: -0.03, quality: +0.03 },
   monorepo: {},
   unknown: {},
 };

@@ -1303,7 +1303,10 @@
         "refactor": "リファクタリング",
         "performance": "パフォーマンス",
         "techdebt": "技術負債",
-        "gate": "ゲートチェック"
+        "gate": "ゲート",
+        "sentinel": "センチネル",
+        "garbage": "クリーンアップ",
+        "backup": "バックアップ"
       },
       "empty": {
         "feature": {
@@ -1357,7 +1360,13 @@
         },
         "healthy": "健全"
       },
-      "title": "分析レポート"
+      "title": "分析レポート",
+      "redLine": {
+        "capNotice": "重大な問題があるため、総合スコアは {{cap}} 点に制限されました：",
+        "activeSecrets": "セキュリティセンターで {{count}} 件の未処理シークレット",
+        "criticalVulns": "依存関係マネージャーに {{count}} 件の critical 脆弱性",
+        "criticalEvents": "センチネルに {{count}} 件の critical イベント"
+      }
     },
     "security": {
       "checking": "チェック中...",

@@ -170,7 +170,7 @@ function SentinelReportView({
           loading={loading}
           onRefresh={onRefresh}
         />
-        <DomainScoreCard projectPath={projectPath} dimension="gate" />
+        <DomainScoreCard projectPath={projectPath} dimension="sentinel" />
         <SentinelExportButton onClick={onExport} t={t} />
         <SentinelStats
           total={events.length}

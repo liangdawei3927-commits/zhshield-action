@@ -231,6 +231,15 @@ export function LatestScoreCard({
               {t('page.reports.partialDimensions', { run: runCount, total: totalCount })}
             </div>
           )}
+          {/* 红线封顶提示（十域评分章程）：critical 事实一票压制总评，必须显式说明原因 */}
+          {latest.redLine?.capped && (
+            <div className="text-xs mt-0.5 text-zh-danger" data-testid="redline-notice">
+              {t('page.reports.redLine.capNotice', { cap: latest.redLine.cap })}
+              {latest.redLine.reasons
+                .map((r) => t(`page.reports.redLine.${r.kind}`, { count: r.count }))
+                .join(' · ')}
+            </div>
+          )}
         </div>
       </div>
       {data.length >= 2 && (

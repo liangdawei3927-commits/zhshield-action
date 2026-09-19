@@ -16,6 +16,7 @@ import { t } from '@zh/i18n';
 import {
   buildHealthDimensions,
   buildTechDebtDashboard,
+  computeRedLine,
   mergeActionStatuses,
   computeTrendDelta,
   scoreProjectByModules,
@@ -40,6 +41,8 @@ import {
   convertInspectEvaluations,
   convertTraditionalGuardResults,
 } from './score-converters';
+import { loadBackupHealthSnapshot } from './backup';
+import { getSentinelHealthData } from './sentinel';
 import {
   loadDepsBaseline,
   saveDepsBaseline,
@@ -90,6 +93,7 @@ import {
   type DashboardDepsState,
   type DashboardRefactorState,
   type DashboardPerformanceState,
+  type DashboardGarbageState,
 } from './dashboard-state';
 import {
   shouldAutoFix,
@@ -343,7 +347,7 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
       profilingResult,
       extras,
     );
-    const score = scoring.calculate(projectPath, dimensions);
+    const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
     console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
 
     if (profilingResult?.modules?.length) {
@@ -403,7 +407,7 @@ async function generateReportSummaryHandler(projectPath: string): Promise<Health
       profilingResult,
       extras,
     );
-    const score = scoring.calculate(projectPath, dimensions);
+    const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
     console.log(`[engine:generateReportSummary] 汇总评分已落库: ${score.overall} (${score.grade})`);
     return toHealthScoreData(score);
   } catch (err) {
@@ -577,7 +581,17 @@ async function runGarbageScanHandler(
   }
   try {
     const task = manager.start('garbage', projectPath);
-    return (await manager.waitFor(task.id)) as GarbageScanReport;
+    const report = (await manager.waitFor(task.id)) as GarbageScanReport;
+    // 十域评分：垃圾扫描结果落 dashboard-state（供报告中心只读汇总 garbage 维）
+    try {
+      await updateDashboardState(projectPath, { garbage: garbageDashboardPatch(report) });
+    } catch (e) {
+      console.warn(
+        '[engine:runGarbageScan] dashboard-state 落盘失败:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    return report;
   } catch (err) {
     console.error('[engine:runGarbageScan] Error:', err);
     return {
@@ -602,6 +616,27 @@ async function garbageCleanHandler(
     }
     const task = manager.start('garbageClean', projectPath, { items });
     const result = (await manager.waitFor(task.id)) as GarbageCleanResult;
+    // 十域评分：清理完成后按已清理条目递减 dashboard-state 里的 garbage 计数
+    try {
+      const state = await readDashboardState(projectPath);
+      if (state.garbage) {
+        const byType: Record<string, number> = { ...state.garbage.byType };
+        let total = state.garbage.total;
+        for (const item of result.cleaned ?? []) {
+          const type = String((item as { type?: unknown }).type ?? '');
+          if (type && byType[type] !== undefined) byType[type] = Math.max(0, byType[type] - 1);
+          total = Math.max(0, total - 1);
+        }
+        await updateDashboardState(projectPath, {
+          garbage: { total, byType, lastRunAt: new Date().toISOString() },
+        });
+      }
+    } catch (e) {
+      console.warn(
+        '[engine:garbageClean] dashboard-state 更新失败:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
     return result;
   } catch (err) {
     console.error('[engine:garbageClean] Error:', err);
@@ -769,11 +804,24 @@ function performanceDashboardPatch(report: PerformanceReportData): DashboardPerf
   return { total: report.summary.total, bySeverity: counts, lastRunAt: new Date().toISOString() };
 }
 
+/** 从 GarbageScanReport 提取 garbage 域 dashboard-state patch（十域评分章程 #5） */
+function garbageDashboardPatch(report: GarbageScanReport): DashboardGarbageState {
+  return {
+    total: report.summary.total,
+    byType: { ...report.summary.byType },
+    lastRunAt: new Date().toISOString(),
+  };
+}
+
 // ─── 仪表盘聚合（P1b）─────────────────────────────────────────────
 
-/** 从 dashboard-state.json 组装 extras（无对应域时传 null） */
+/** 从 dashboard-state.json + 哨兵事件中心 + 备份记录组装 extras（无对应域时传 null） */
 async function buildPipelineExtras(projectPath: string): Promise<PipelineExtras> {
   const state = await readDashboardState(projectPath);
+  const [sentinel, backup] = await Promise.all([
+    getSentinelHealthData(projectPath).catch(() => null),
+    loadBackupHealthSnapshot(projectPath).catch(() => null),
+  ]);
   return {
     secrets: state.secrets ? { activeCount: state.secrets.activeCount } : null,
     deps: state.deps
@@ -788,6 +836,11 @@ async function buildPipelineExtras(projectPath: string): Promise<PipelineExtras>
     performance: state.performance
       ? { total: state.performance.total, bySeverity: state.performance.bySeverity }
       : null,
+    garbage: state.garbage
+      ? { total: state.garbage.total, byType: state.garbage.byType }
+      : null,
+    sentinel,
+    backup,
   };
 }
 

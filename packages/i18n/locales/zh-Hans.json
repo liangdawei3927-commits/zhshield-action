@@ -1303,7 +1303,10 @@
         "refactor": "重构",
         "performance": "性能",
         "techdebt": "技术债",
-        "gate": "门禁哨兵"
+        "gate": "门禁",
+        "sentinel": "哨兵",
+        "garbage": "垃圾清理",
+        "backup": "备份"
       },
       "empty": {
         "feature": {
@@ -1357,7 +1360,13 @@
         },
         "healthy": "健康"
       },
-      "title": "分析报告"
+      "title": "分析报告",
+      "redLine": {
+        "capNotice": "存在致命问题，总评已封顶至 {{cap}} 分：",
+        "activeSecrets": "安全中心有 {{count}} 个活跃密钥未处理",
+        "criticalVulns": "依赖管家有 {{count}} 个 critical 级依赖漏洞",
+        "criticalEvents": "哨兵监控有 {{count}} 个 critical 级事件"
+      }
     },
     "secrets": {
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",

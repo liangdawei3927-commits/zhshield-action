@@ -6,6 +6,7 @@ export { AlertHandler } from './alert-handler';
 export { FileMonitor } from './file-monitor';
 export type { FileMonitorConfig, FileChangeType, FileWatchFilter } from './file-monitor';
 export { ProcessMonitor } from './process-monitor';
+export { isInformationalEvent } from './process-monitor';
 export type { ProcessMonitorConfig } from './process-monitor';
 export { LogCollector } from './log-collector';
 export type { LogCollectorConfig, LogPattern } from './log-collector';

@@ -8,6 +8,10 @@ describe('EventCenter', () => {
     ec = new EventCenter();
   });
 
+  function filterByTitle(center: EventCenter, title: string) {
+    return center.listEvents().filter((e) => e.title === title);
+  }
+
   describe('createEvent', () => {
     it('should create an event with generated id', () => {
       const event = ec.createEvent({
@@ -42,6 +46,24 @@ describe('EventCenter', () => {
       expect(event.history).toHaveLength(1);
       expect(event.history[0].action).toBe('event-created');
       expect(event.history[0].operator).toBe('admin');
+    });
+
+    it('should deduplicate repeated events with explicit dedupeKey', () => {
+      const params = { projectId: 'proj-1', title: 'Repeated', dedupeKey: 'stable-key-1' };
+      const first = ec.createEvent(params);
+      const second = ec.createEvent(params);
+      expect(second.id).toBe(first.id);
+      expect(second.occurrenceCount).toBe(2);
+      expect(second.history[1].action).toBe('event-repeat');
+      expect(filterByTitle(ec, 'Repeated')).toHaveLength(1);
+    });
+
+    it('should keep unique events without dedupeKey', () => {
+      const params = { projectId: 'proj-1', title: 'Default Unique' };
+      const first = ec.createEvent(params);
+      const second = ec.createEvent(params);
+      expect(second.id).not.toBe(first.id);
+      expect(filterByTitle(ec, 'Default Unique')).toHaveLength(2);
     });
   });
 

@@ -115,12 +115,32 @@ export class EventCenter {
     operator?: string;
     action?: string;
     detail?: string;
+    /** 显式稳定去重键：提供时复用 10 分钟去重窗口，同键重复事件合并为 occurrenceCount 递增（防事件风暴）。
+     *  不提供时保持历史行为（每次新建独立事件）。 */
+    dedupeKey?: string;
   }): SentinelEvent {
+    // 内部事件去重：显式稳定键且在去重窗口内的重复事件合并，而非新建行。
+    if (params.dedupeKey && this.isDuplicate(params.dedupeKey)) {
+      const existing = this.findEventByDedupeKey(params.dedupeKey)!;
+      existing.occurrenceCount += 1;
+      existing.lastSeen = new Date();
+      existing.history.push({
+        timestamp: new Date(),
+        action: 'event-repeat',
+        operator: params.operator || 'system',
+        detail: `Event repeated (${existing.occurrenceCount} times)`,
+      });
+      this.persistUpdate(existing);
+      this.writeAuditLog('event-repeat', existing);
+      return existing;
+    }
+
+    const dedupeKey = params.dedupeKey ?? `${params.projectId}|${params.title}|${Date.now()}`;
     const event: SentinelEvent = {
       id: randomUUID(),
       projectId: params.projectId,
       timestamp: new Date(),
-      dedupeKey: `${params.projectId}|${params.title}|${Date.now()}`,
+      dedupeKey,
       title: params.title,
       service: params.service || '',
       module: params.module || '',

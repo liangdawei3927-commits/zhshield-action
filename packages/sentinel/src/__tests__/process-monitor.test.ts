@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ProcessMonitorConfig } from '../process-monitor';
+import { isInformationalEvent } from '../process-monitor';
 
 // ─── Mock 子进程类型 ─────────────────────────────────────
 
@@ -317,5 +318,70 @@ describe('ProcessMonitor — 进程监控', () => {
 
     // 3 spawn calls: initial start + restart after first start + second start
     expect(spawnSpy).toHaveBeenCalledTimes(3);
+  });
+
+  // ─── 信息事件分类 & 稳定去重 ─────────────────────────────
+
+  it('20. isInformationalEvent: p3 生命周期事件为 true，p2 故障事件为 false', () => {
+    monitor.start(makeConfig());
+
+    const started = findEventByAction(ec, 'process-started');
+    expect(started).toBeDefined();
+    expect(isInformationalEvent(started!)).toBe(true);
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('Error: boom'));
+    const stderrEvent = findEventByAction(ec, 'process-stderr');
+    expect(stderrEvent).toBeDefined();
+    expect(isInformationalEvent(stderrEvent!)).toBe(false);
+  });
+
+  it('21. 稳定去重键：同命令重复 start 在去重窗口内合并为一次启动事件', () => {
+    monitor.start(makeConfig());
+    monitor.start(makeConfig());
+
+    const startedEvents = ec
+      .listEvents()
+      .filter((e) => e.history[0]?.action === 'process-started');
+    expect(startedEvents).toHaveLength(1);
+    expect(startedEvents[0].occurrenceCount).toBe(2);
+  });
+
+  // ─── 真实健康探测（healthCommand） ─────────────────────────
+
+  it('22. healthCommand 探测成功 (exit 0) 不触发健康失败', () => {
+    monitor.start(makeConfig({ healthCommand: 'curl', healthArgs: ['-f', 'http://x'] }));
+
+    vi.advanceTimersByTime(60);
+    expect(spawnSpy).toHaveBeenCalledTimes(2); // main process + probe
+
+    const probe = latestProc();
+    probe.exitCode = 0;
+    probe.emit('exit', 0, null);
+
+    const healthFailed = ec
+      .listEvents()
+      .filter((e) => e.history[0]?.action === 'health-check-failed');
+    expect(healthFailed).toHaveLength(0);
+  });
+
+  it('23. healthCommand 探测失败 (exit 1) 触发 health-check-failed (p1)', () => {
+    monitor.start(makeConfig({ healthCommand: 'curl', healthArgs: ['-f', 'http://x'] }));
+
+    vi.advanceTimersByTime(60);
+
+    const probe = latestProc();
+    probe.exitCode = 1;
+    probe.emit('exit', 1, null);
+
+    const healthEvent = findEventByAction(ec, 'health-check-failed');
+    expect(healthEvent).toBeDefined();
+    expect(healthEvent!.severity).toBe('p1');
+  });
+
+  it('24. 未配置 healthCommand 时不执行探测（行为向后兼容）', () => {
+    monitor.start(makeConfig());
+    vi.advanceTimersByTime(60);
+    expect(spawnSpy).toHaveBeenCalledTimes(1); // 仅主进程，无探测
   });
 });

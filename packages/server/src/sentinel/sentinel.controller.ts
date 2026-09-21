@@ -14,6 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { SentinelService } from './sentinel.service';
 import { SentinelWebhookGuard } from './sentinel.guard';
 import type { SentinelEvent, AlertPayload } from '@zh/sentinel';
+import { isInformationalEvent } from '@zh/sentinel';
 
 @ApiTags('sentinel')
 @Controller('system/sentinel')
@@ -41,8 +42,13 @@ export class SentinelController {
   listEvents(
     @Query('status') status?: string,
     @Query('severity') severity?: string,
+    @Query('excludeInformational') excludeInformational?: string,
   ): SentinelEvent[] {
-    return this.sentinelService.listEvents({ status, severity });
+    const events = this.sentinelService.listEvents({ status, severity });
+    if (excludeInformational === 'true') {
+      return events.filter((e) => !isInformationalEvent(e));
+    }
+    return events;
   }
 
   @Get('event-center/:id')

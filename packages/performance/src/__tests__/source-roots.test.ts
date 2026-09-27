@@ -127,9 +127,20 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
     const src = path.join(root, 'src');
     const tests = path.join(src, '__tests__');
     fs.mkdirSync(tests, { recursive: true });
-    fs.writeFileSync(path.join(src, 'prod.spec.ts'), 'export const x = 1;\nreadFileSync("/a");\n');
-    fs.writeFileSync(path.join(tests, 'a.test.ts'), 'export const y = 1;\nreadFileSync("/b");\n');
-    fs.writeFileSync(path.join(src, 'real.ts'), 'export const z = 1;\nreadFileSync("/c");\n');
+    // 三份都是浏览器上下文（无 node 内建导入 + 使用 document），sync-io 会命中；
+    // 因此这份断言真正验证的是「只排除测试/夹具」，而不是「同步 IO 一律不报」。
+    fs.writeFileSync(
+      path.join(src, 'prod.spec.ts'),
+      'document.title = "a";\nreadFileSync("/a");\n',
+    );
+    fs.writeFileSync(
+      path.join(tests, 'a.test.ts'),
+      'document.title = "b";\nreadFileSync("/b");\n',
+    );
+    fs.writeFileSync(
+      path.join(src, 'real.ts'),
+      'document.title = "c";\nreadFileSync("/c");\n',
+    );
 
     const report = new PerformanceEngine().scan(root);
     const syncIo = report.issues.filter((i) => i.ruleId === 'complexity.sync-io');

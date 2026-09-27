@@ -12,6 +12,7 @@
  * PerformanceEngine 显式产出 `coverage.no-source-root` 提示，不静默放行。
  */
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { safeJoin } from '@zh/shared';
 
 /** 单包项目常见的源码根目录名（刻意不含 lib/ — 多数项目 lib/ 是产物目录，会引入误报） */
@@ -44,6 +45,27 @@ const NON_PRODUCTION_FILE_RE = /\.(test|spec|bench|benchmark|stories)\.[cm]?[jt]
 /** 是否为非生产代码文件名 */
 export function isNonProductionFile(name: string): boolean {
   return NON_PRODUCTION_FILE_RE.test(name);
+}
+
+/** 源码文件扩展名（ts/tsx/js/jsx） */
+export const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
+
+/** 遍历源码时跳过的目录名：依赖自身、构建产物与非生产代码 */
+export const SKIPPED_SOURCE_DIRS: ReadonlySet<string> = new Set<string>([
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  ...NON_PRODUCTION_DIRS,
+]);
+
+/** 安全读取文本文件；读取失败返回 null */
+export function readTextSafe(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch {
+    return null;
+  }
 }
 
 function isDir(dir: string): boolean {
@@ -106,5 +128,46 @@ export function collectFilesAcrossRoots(
     if (files.length >= limit) break;
     files.push(...collect(root, limit - files.length));
   }
+  return files;
+}
+
+/**
+ * 递归收集单个根目录下匹配扩展名的源码文件（供 collectFilesAcrossRoots 分派）。
+ *
+ * 目录不存在、不可读一律按「无文件」静默处理，绝不抛异常。
+ */
+export function collectSourceFiles(
+  dir: string,
+  exts: readonly string[],
+  skipDirs: ReadonlySet<string>,
+  limit: number,
+): string[] {
+  const files: string[] = [];
+  if (!fs.existsSync(dir)) return files;
+  const visit = (current: string): void => {
+    if (files.length >= limit) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === '.' || entry.name === '..') continue;
+      if (files.length >= limit) return;
+      const full = safeJoin(current, entry.name);
+      if (entry.isDirectory()) {
+        if (skipDirs.has(entry.name) || NON_PRODUCTION_DIRS.has(entry.name)) continue;
+        visit(full);
+      } else if (
+        entry.isFile() &&
+        exts.includes(path.extname(entry.name)) &&
+        !isNonProductionFile(entry.name)
+      ) {
+        files.push(full);
+      }
+    }
+  };
+  visit(dir);
   return files;
 }

@@ -98,7 +98,8 @@ export function isLatencySensitive(site: SyncCallSite, context: RuntimeContext):
 function usesNodeBuiltin(scan: FileScan): boolean {
   for (const specifier of scan.moduleSpecifiers) {
     if (specifier.startsWith('node:')) return true;
-    if (NODE_BUILTINS.has(specifier.split('/')[0])) return true;
+    const [root] = specifier.split('/');
+    if (root !== undefined && NODE_BUILTINS.has(root)) return true;
   }
   return false;
 }

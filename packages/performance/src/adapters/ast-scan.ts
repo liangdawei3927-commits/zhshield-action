@@ -165,11 +165,11 @@ export function scanSourceFile(filePath: string, content: string): FileScan {
     const loopDepth = isLoop ? frame.loopDepth + 1 : frame.loopDepth;
     const loopChain = isLoop ? [...frame.loopChain, line(node)] : frame.loopChain;
     // 仅在层数刷新纪录时更新，层数相同则保留先出现的那条链（并列取最靠前）
-    if (loopDepth > (deepestLoops?.depth ?? 0)) {
+    if (isLoop && loopDepth > (deepestLoops?.depth ?? 0)) {
       deepestLoops = {
         depth: loopDepth,
         innermostIterable: iterableTextOf(node, sourceFile),
-        outermostLine: loopChain[0],
+        outermostLine: loopChain[0] ?? line(node),
       };
     }
 

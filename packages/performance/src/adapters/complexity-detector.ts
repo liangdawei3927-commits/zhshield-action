@@ -2,119 +2,83 @@
  * 代码复杂度检测器（complexity-detector.ts）
  *
  * 纯静态分析源码复杂度（零网络、零执行）：
- * - nested-loop：三层以上嵌套循环（For/While/DoWhile）→ medium
- * - sync-io：同步阻塞 IO 调用（readFileSync 等）→ high
+ * - nested-loop：三层以上真实 AST 嵌套循环 → medium
+ * - sync-io：落在延迟敏感执行上下文里的同步阻塞 IO → high
  *
+ * 判定全部基于 TypeScript 编译器 API（事实见 ast-scan.ts，上下文政策见
+ * runtime-context.ts），本文件只负责取文件、组装 issue。
  * 文件缺失 / 目录不存在均按静默跳过处理，不抛异常。
  */
-import * as fs from 'fs';
 import * as path from 'path';
-import { safeJoin } from '@zh/shared';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
 import {
   resolveSourceRoots,
   collectFilesAcrossRoots,
-  NON_PRODUCTION_DIRS,
-  isNonProductionFile,
+  collectSourceFiles,
+  readTextSafe,
+  SOURCE_EXTS,
+  SKIPPED_SOURCE_DIRS,
 } from '../source-roots';
+import { scanSourceFile, type FileScan } from './ast-scan';
+import { classifyRuntime, isLatencySensitive, type RuntimeContext } from './runtime-context';
 
-const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
-const SKIP_DIRS: ReadonlySet<string> = new Set(['node_modules', 'dist', 'build', 'out']);
 const NESTED_LOOP_THRESHOLD = 3;
-const SYNC_IO_PATTERN = /\b(readFileSync|writeFileSync|appendFileSync|execSync|spawnSync)\s*\(/g;
 
+/** 复杂度检测器契约：对项目根执行静态复杂度分析并产出性能问题列表 */
 export interface ComplexityDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[];
 }
 
-function readTextSafe(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
+/** 永不返回的穷尽兜底：新增上下文成员而忘记补分支时在此编译期报错 */
+function assertNever(value: never): never {
+  throw new Error(`未覆盖的运行时上下文: ${String(value)}`);
+}
+
+/** 该上下文下「同步阻塞」的真实后果：阻塞的是谁、怎么改（不用浏览器话术套 Node） */
+function impactOf(context: RuntimeContext): { label: string; impact: string; advice: string } {
+  switch (context) {
+    case 'browser':
+      return {
+        label: '浏览器主线程',
+        impact: '同步阻塞页面主线程，影响页面响应',
+        advice: '改用异步 API，或把重活移至 Worker 线程',
+      };
+    case 'electron-renderer':
+      return {
+        label: 'Electron 渲染进程',
+        impact: '同步阻塞渲染线程，界面出现卡顿',
+        advice: '改用异步版本（fs/promises），或把重活移到主进程执行',
+      };
+    case 'electron-main':
+      return {
+        label: 'Electron 主进程事件循环',
+        impact: '同步阻塞主进程事件循环，窗口无响应',
+        advice: '改用异步版本（fs/promises），让出事件循环',
+      };
+    case 'node':
+      return {
+        label: 'Node 服务端请求路径',
+        impact: '同步阻塞事件循环，同时到达的并发请求被一起挂起',
+        advice: '改用异步版本（fs/promises），让出事件循环',
+      };
+    default:
+      return assertNever(context);
   }
 }
 
 /**
- * 去除 JS/TS 注释与字符串字面量，保留空白/换行以维持位置对齐。
- * 简单词法清洗，非完整解析器。
+ * ComplexityDetectorImpl — 基于 AST 的复杂度检测实现
+ *
+ * 检出两类问题：三层以上嵌套循环（medium）与延迟敏感路径上的同步阻塞 IO（high）。
+ * 文件缺失 / 目录不存在均静默跳过，不抛异常。
  */
-function stripCommentsAndStrings(source: string): string {
-  let result = '';
-  let i = 0;
-  while (i < source.length) {
-    if (source[i] === '/' && source[i + 1] === '/') {
-      while (i < source.length && source[i] !== '\n') i++;
-      result += '\n';
-      continue;
-    }
-    if (source[i] === '/' && source[i + 1] === '*') {
-      i += 2;
-      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
-      i += 2;
-      result += '  ';
-      continue;
-    }
-    if (source[i] === '"' || source[i] === "'" || source[i] === '`') {
-      const quote = source[i];
-      i++;
-      while (i < source.length && source[i] !== quote) {
-        if (source[i] === '\\') i++;
-        i++;
-      }
-      i++;
-      result += '  ';
-      continue;
-    }
-    result += source[i];
-    i++;
-  }
-  return result;
-}
-
-/**
- * 词法扫描：返回源码中最深的循环嵌套层数。
- * 算法：遍历 token（loop 关键字 / 花括号），跟踪循环体进入的花括号深度，
- * 当 `}` 回退时弹出已结束的循环体，实时维护当前嵌套层数。
- */
-function detectMaxLoopDepth(source: string): number {
-  const stripped = stripCommentsAndStrings(source);
-  let braceDepth = 0;
-  let expectLoopBody = false;
-  const loopBodyDepths: number[] = [];
-  let maxNesting = 0;
-
-  const tokens = stripped.matchAll(/\b(for|while|do)\b|\{|\}/g);
-  for (const match of tokens) {
-    const token = match[0];
-    if (token === '{') {
-      braceDepth++;
-      if (expectLoopBody) {
-        loopBodyDepths.push(braceDepth);
-        if (loopBodyDepths.length > maxNesting) {
-          maxNesting = loopBodyDepths.length;
-        }
-        expectLoopBody = false;
-      }
-    } else if (token === '}') {
-      braceDepth--;
-      while (loopBodyDepths.length > 0 && loopBodyDepths[loopBodyDepths.length - 1] > braceDepth) {
-        loopBodyDepths.pop();
-      }
-    } else {
-      expectLoopBody = true;
-    }
-  }
-  return maxNesting;
-}
-
 export class ComplexityDetectorImpl implements ComplexityDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
     const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
     const issues: PerformanceIssue[] = [];
     const files = collectFilesAcrossRoots(
       resolveSourceRoots(projectRoot),
-      collectSourceFiles,
+      (root, limit) => collectSourceFiles(root, SOURCE_EXTS, SKIPPED_SOURCE_DIRS, limit),
       cfg.scanLimit,
     );
 
@@ -122,79 +86,62 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
       const content = readTextSafe(filePath);
       if (content === null) continue;
       const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
-      this.detectNestedLoop(rel, content, issues);
-      this.detectSyncIO(rel, content, issues);
+      const scan = scanSourceFile(rel, content);
+      this.detectNestedLoop(rel, scan, issues);
+      this.detectSyncIO(rel, scan, issues);
     }
     return issues;
   }
 
-  private detectNestedLoop(relFile: string, content: string, issues: PerformanceIssue[]): void {
-    const maxDepth = detectMaxLoopDepth(content);
-    if (maxDepth >= NESTED_LOOP_THRESHOLD) {
-      issues.push({
-        id: `complexity-nested-loop-${relFile}`,
-        ruleId: 'complexity.nested-loop',
-        category: 'complexity',
-        severity: 'medium',
-        file: relFile,
-        message: `${relFile} 存在 ${maxDepth} 层嵌套循环 — 时间复杂度为 O(n^${maxDepth})，严重影响性能`,
-        suggestion: '将内层循环提取为独立函数，或使用 Map/Set 降低嵌套层级',
-        autoFixable: false,
-      });
-    }
+  private detectNestedLoop(
+    relFile: string,
+    scan: FileScan,
+    issues: PerformanceIssue[],
+  ): void {
+    const chain = scan.deepestLoops;
+    if (chain === null || chain.depth < NESTED_LOOP_THRESHOLD) return;
+    const { depth, innermostIterable, outermostLine } = chain;
+    issues.push({
+      id: `complexity-nested-loop-${relFile}`,
+      ruleId: 'complexity.nested-loop',
+      category: 'complexity',
+      severity: 'medium',
+      file: relFile,
+      line: outermostLine,
+      message:
+        `${relFile} 存在 ${depth} 层嵌套循环` +
+        `（最内层遍历 ${innermostIterable}）— 循环层级过深，建议提取内层或预建索引`,
+      suggestion: '将最内层循环体提取为独立函数，或用 Map/Set 预建索引替代内层遍历',
+      autoFixable: false,
+    });
   }
 
-  private detectSyncIO(relFile: string, content: string, issues: PerformanceIssue[]): void {
-    const stripped = stripCommentsAndStrings(content);
+  private detectSyncIO(
+    relFile: string,
+    scan: FileScan,
+    issues: PerformanceIssue[],
+  ): void {
+    const context = classifyRuntime(scan);
     const seen = new Set<string>();
-    const re = new RegExp(SYNC_IO_PATTERN.source, SYNC_IO_PATTERN.flags);
-    for (const m of stripped.matchAll(re)) {
-      const fnName = m[1];
-      if (seen.has(fnName)) continue;
-      seen.add(fnName);
+    for (const site of scan.syncCalls) {
+      if (!isLatencySensitive(site, context)) continue;
+      if (seen.has(site.apiName)) continue;
+      seen.add(site.apiName);
+      const { label, impact, advice } = impactOf(context);
       issues.push({
-        id: `complexity-sync-io-${relFile}-${fnName}`,
+        id: `complexity-sync-io-${relFile}-${site.apiName}`,
         ruleId: 'complexity.sync-io',
         category: 'complexity',
         severity: 'high',
         file: relFile,
-        message: `${relFile} 调用了 ${fnName}() — 同步阻塞主线程，影响页面响应`,
-        suggestion: `将 ${fnName}() 替换为异步版本（如 readFile / writeFile），或移至 Worker 线程`,
+        line: site.line,
+        message: `${relFile} 在${label}调用了 ${site.apiName}() — ${impact}`,
+        suggestion: `将 ${site.apiName}() 换为异步版本；${advice}`,
         autoFixable: false,
       });
     }
   }
 }
 
-function collectSourceFiles(dir: string, limit: number): string[] {
-  const files: string[] = [];
-  if (!fs.existsSync(dir)) return files;
-  const visit = (current: string): void => {
-    if (files.length >= limit) return;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name === '.' || entry.name === '..') continue;
-      if (files.length >= limit) return;
-      const full = safeJoin(current, entry.name);
-      if (entry.isDirectory()) {
-        if (SKIP_DIRS.has(entry.name) || NON_PRODUCTION_DIRS.has(entry.name)) continue;
-        visit(full);
-      } else if (
-        entry.isFile() &&
-        SOURCE_EXTS.includes(path.extname(entry.name)) &&
-        !isNonProductionFile(entry.name)
-      ) {
-        files.push(full);
-      }
-    }
-  };
-  visit(dir);
-  return files;
-}
-
+/** 复杂度检测器单例（供适配器注册表直接引用） */
 export const complexityDetector: ComplexityDetector = new ComplexityDetectorImpl();

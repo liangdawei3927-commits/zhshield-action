@@ -153,9 +153,51 @@ function refactorPenalty(refactor: RefactorDataLike): number {
   return Math.min(100, refactor.bySeverity.error * 8 + refactor.bySeverity.warning * 4 + refactor.bySeverity.info * 1);
 }
 
-/** performance 扣分：critical -8 / high -4 / medium -2 / low -1 / info 0，上限 100 */
+/**
+ * performance 扣分：critical 8 / high 4 / medium 2 / low 1 / info 0，单级贡献封顶
+ * PERFORMANCE_SEVERITY_CAP，整体上限 100（2026-09-22 P2-3 同批补校）。
+ *
+ * 补校背景：performance 与 refactor / garbage 在 2026-09-22 P2-3 同批初校时被漏掉，仍是
+ * 裸「线性逐项扣分 + 全局 100 上限」。真实证据：改分前基线实扫 45 条 complexity.sync-io
+ * （high）+ 5 条 complexity.nested-loop（medium），加权 45×4 + 5×2 = 190 → 全局触顶 100 →
+ * 该维 0 分，即 1% 的问题项对分数零影响、其余 99% 全部不可见（23 条 high 之后分辨率归零）。
+ * 单级封顶保证某一级堆积再多也不独占整维；Σ 五级封顶恰好 100，与全局上限对齐（触底不为负）。
+ *
+ * 注：上述 45/5 是改分前基线，不是当前实扫值。同批已修正 complexity 检测器误报
+ * （Node CLI/批处理/启动期的同步 IO、非 O(n³) 的嵌套循环），当前实扫 0 条 sync-io
+ * + 6 条真实 3 层嵌套；本封顶的回归测试不依赖具体条数。
+ */
+export const PERFORMANCE_SEVERITY_PENALTY: Readonly<
+  Record<'critical' | 'high' | 'medium' | 'low' | 'info', number>
+> = {
+  critical: 8,
+  high: 4,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+
+/** performance 各级 severity 的单级最大贡献（P2-3 调参点；Σ = 100 与全局上限对齐） */
+export const PERFORMANCE_SEVERITY_CAP: Readonly<
+  Record<'critical' | 'high' | 'medium' | 'low' | 'info', number>
+> = {
+  critical: 40,
+  high: 40,
+  medium: 15,
+  low: 5,
+  info: 0,
+};
+
 function performancePenalty(performance: PerformanceDataLike): number {
-  return Math.min(100, performance.bySeverity.critical * 8 + performance.bySeverity.high * 4 + performance.bySeverity.medium * 2 + performance.bySeverity.low * 1);
+  const keys = ['critical', 'high', 'medium', 'low', 'info'] as const;
+  let sum = 0;
+  for (const key of keys) {
+    sum += Math.min(
+      PERFORMANCE_SEVERITY_CAP[key],
+      performance.bySeverity[key] * PERFORMANCE_SEVERITY_PENALTY[key],
+    );
+  }
+  return Math.min(100, sum);
 }
 
 function notRun(name: string, weight: number): DimensionScore {

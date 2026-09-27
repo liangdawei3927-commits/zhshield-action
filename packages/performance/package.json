@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@zh/i18n": "workspace:*",
-    "@zh/shared": "workspace:*"
+    "@zh/shared": "workspace:*",
+    "typescript": "^5.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

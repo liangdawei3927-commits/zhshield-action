@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue, ToolId } from '@zh/shared';
+import {
+  BuiltinToolAdapter,
+  type Issue,
+  type ToolId,
+  type ToolMeta,
+  type ToolResult,
+  type ToolScanOptions,
+} from '@zh/shared';
 import type { Adapter, CheckConfig, CheckResult } from './types';
 
 /**
@@ -10,11 +17,12 @@ import type { Adapter, CheckConfig, CheckResult } from './types';
  *   1. scan() → 构造 CheckConfig → adapter.run() + normalize() → CheckResult
  *   2. CheckResult → ToolResult (含 Issue[])
  */
-export class GuardToolAdapterWrapper implements ToolAdapter {
+export class GuardToolAdapterWrapper extends BuiltinToolAdapter {
   meta: ToolMeta;
   private adapter: Adapter;
 
   constructor(adapterName: string, adapter: Adapter, metaOverride?: Partial<ToolMeta>) {
+    super();
     this.adapter = adapter;
     this.meta = {
       id: adapterName as ToolId,
@@ -27,10 +35,6 @@ export class GuardToolAdapterWrapper implements ToolAdapter {
       homepage: '',
       license: '',
     };
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return true;
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -89,12 +93,7 @@ export class GuardToolAdapterWrapper implements ToolAdapter {
       tool: this.meta.id,
       status: result.status === 'error' ? 'error' : 'available',
       issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: 0,
-      },
+      metadata: this.buildToolMetadata(start, 0),
       error: result.status === 'error' ? result.message : undefined,
     };
   }
@@ -104,12 +103,7 @@ export class GuardToolAdapterWrapper implements ToolAdapter {
       tool: this.meta.id,
       status: 'error',
       issues: [],
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: 0,
-      },
+      metadata: this.buildToolMetadata(start, 0),
       error: err instanceof Error ? err.message : 'Guard adapter failed',
     };
   }

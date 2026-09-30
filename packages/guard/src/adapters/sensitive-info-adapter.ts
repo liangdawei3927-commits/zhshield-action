@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { CheckConfig, CheckResult } from '../types';
+import { makeAdapterResult } from './adapter-result';
+import { ScanAdapter } from './scan-adapter';
 import { SECRET_PATTERNS, toNameRegexPatterns } from '@zh/shared';
 
 const SCAN_FILE_EXT = /\.(ts|tsx|js|jsx|yml|yaml|json|md|env|config)$/i;
@@ -31,42 +33,16 @@ interface Finding {
   match: string;
 }
 
-export class GuardSensitiveInfoAdapter implements Adapter {
+export class GuardSensitiveInfoAdapter extends ScanAdapter<Finding> {
   private patterns: { name: string; regex: RegExp }[];
 
   constructor(customPatterns?: { name: string; regex: RegExp }[]) {
+    super();
     this.patterns = customPatterns ?? toNameRegexPatterns(SECRET_PATTERNS);
   }
 
-  run(
-    context: { repoRoot?: string; projectPath?: string },
-    _check: CheckConfig,
-  ): { findings: Finding[]; error?: string } {
-    const targetDir = this.resolveTargetDir(context, _check.checkId);
-    const findings: Finding[] = [];
-
-    try {
-      this.scanProject(targetDir, findings);
-    } catch (error: unknown) {
-      return { findings: [], error: error instanceof Error ? error.message : String(error) };
-    }
-
-    return { findings };
-  }
-
-  /** 从上下文解析待扫描的目标目录 */
-  private resolveTargetDir(
-    context: { repoRoot?: string; projectPath?: string },
-    checkId: string,
-  ): string {
-    const targetDir = context.repoRoot || context.projectPath;
-    if (!targetDir)
-      throw new Error(`${checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
-    return targetDir;
-  }
-
   /** 扫描项目 src 目录（不存在时跳过） */
-  private scanProject(targetDir: string, findings: Finding[]): void {
+  protected scanProject(targetDir: string, findings: Finding[]): void {
     const srcDir = path.join(targetDir, 'src');
     if (!fs.existsSync(srcDir)) {
       return;
@@ -80,7 +56,7 @@ export class GuardSensitiveInfoAdapter implements Adapter {
     check: CheckConfig,
   ): CheckResult {
     if (rawResult.error) {
-      return this.makeResult(check, 'error', `敏感信息扫描失败: ${rawResult.error}`);
+      return makeAdapterResult(check, 'error', `敏感信息扫描失败: ${rawResult.error}`);
     }
 
     const findings = rawResult.findings;
@@ -88,7 +64,7 @@ export class GuardSensitiveInfoAdapter implements Adapter {
       const details = findings.map(
         (f) => `${f.file}:${f.line} 匹配 ${f.pattern}: ${f.match.slice(0, 60)}`,
       );
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'failed',
         `发现 ${findings.length} 处疑似敏感信息:\n${details.join('\n')}`,
@@ -96,7 +72,7 @@ export class GuardSensitiveInfoAdapter implements Adapter {
       );
     }
 
-    return this.makeResult(check, 'passed', '敏感信息检查通过，未发现泄露');
+    return makeAdapterResult(check, 'passed', '敏感信息检查通过，未发现泄露');
   }
 
   private scanDir(dir: string, findings: Finding[], rootDir: string): void {
@@ -162,22 +138,5 @@ export class GuardSensitiveInfoAdapter implements Adapter {
       if (pattern.regex.test(line)) return pattern.name;
     }
     return null;
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

@@ -114,6 +114,27 @@ function extractPipfileNames(content: string): string[] {
   return [...names];
 }
 
+/** [project] 区块的 dependencies 数组：取双引号包名（PEP 621）加入 names */
+function collectProjectDeps(section: string, names: Set<string>): void {
+  const depsBlock = section.match(DEPS_BLOCK_RE);
+  if (!depsBlock) return;
+  const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
+  for (const m of block.matchAll(/"([^"]+)"/g)) {
+    const name = quotedPackageName(m[1]);
+    if (name) names.add(name);
+  }
+}
+
+/** [tool.poetry.dependencies] / [tool.uv.dependencies] 区块：表键即包名（值为版本约束，非包名） */
+function collectTableDeps(section: string, names: Set<string>): void {
+  for (const line of section.split(NEWLINE_RE)) {
+    if (line.trim().startsWith('[')) continue;
+    const key = line.match(PYPROJECT_KEY_RE);
+    if (!key) continue;
+    names.add(key[1]);
+  }
+}
+
 /**
  * pyproject.toml：按节拆分，仅处理目标区块——
  *   [project] 的 dependencies 数组取双引号包名（PEP 621）；
@@ -128,24 +149,11 @@ function extractPyprojectNames(content: string): string[] {
     if (!header) continue;
     const sectionName = header[1].trim().toLowerCase();
     if (sectionName === 'project') {
-      const depsBlock = section.match(DEPS_BLOCK_RE);
-      if (!depsBlock) continue;
-      const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-      for (const m of block.matchAll(/"([^"]+)"/g)) {
-        const name = quotedPackageName(m[1]);
-        if (!name) continue;
-        names.add(name);
-      }
-    } else if (
-      sectionName === 'tool.poetry.dependencies' ||
-      sectionName === 'tool.uv.dependencies'
-    ) {
-      for (const line of section.split(NEWLINE_RE)) {
-        if (line.trim().startsWith('[')) continue;
-        const key = line.match(PYPROJECT_KEY_RE);
-        if (!key) continue;
-        names.add(key[1]);
-      }
+      collectProjectDeps(section, names);
+      continue;
+    }
+    if (sectionName === 'tool.poetry.dependencies' || sectionName === 'tool.uv.dependencies') {
+      collectTableDeps(section, names);
     }
   }
   return [...names];

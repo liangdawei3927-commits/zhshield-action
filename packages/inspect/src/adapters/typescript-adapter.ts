@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -14,10 +12,13 @@ import type {
   AccessScope,
 } from '@zh/shared';
 import { detectMachineProfile } from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
-
-const execFileAsync = promisify(execFile);
+import {
+  asToolExecError,
+  buildAccessScope,
+  buildToolResult,
+  execTool,
+  ToolCommandResolver,
+} from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
   id: 'tsc',
@@ -119,21 +120,34 @@ interface TscRunResult {
   infraError?: string;
 }
 
+/** TypeScriptAdapter.runAllProjects 的执行参数 */
+interface RunAllProjectsParams {
+  command: string;
+  projects: string[];
+  flags: string[];
+  options: ToolScanOptions;
+  category: IssueCategory;
+}
+
+/** TypeScriptAdapter.runTsc 的执行参数 */
+interface RunTscParams {
+  command: string;
+  tsconfigPath: string;
+  flags: string[];
+  options: ToolScanOptions;
+  category: IssueCategory;
+}
+
 export class TypeScriptAdapter implements ToolAdapter {
   meta: ToolMeta;
-  private projectRoot?: string;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
+  private readonly commands: ToolCommandResolver;
   private readonly locale: LanguageCode;
 
   /** F5：tsc 按 tsconfig 编译检查全部 TS 源文件 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['**/*.{ts,tsx,mts,cts}', '**/tsconfig.json'],
-    excludePaths: ['**/node_modules/**'],
-  };
+  readonly accessScope: AccessScope = buildAccessScope(['**/*.{ts,tsx,mts,cts}', '**/tsconfig.json']);
 
   constructor(projectRoot?: string, locale?: LanguageCode) {
-    this.projectRoot = projectRoot;
+    this.commands = new ToolCommandResolver('tsc', projectRoot);
     this.locale = locale ?? DEFAULT_LANGUAGE;
     this.meta = {
       ...META,
@@ -145,21 +159,8 @@ export class TypeScriptAdapter implements ToolAdapter {
     return translate(key, this.locale, params);
   }
 
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('tsc', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
-  }
-
   async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
+    return this.commands.isAvailable();
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -187,20 +188,20 @@ export class TypeScriptAdapter implements ToolAdapter {
     // 归一化 projectPath 为绝对路径：相对路径会流入 tsconfig 解析与 cwd，
     // tsc 以自身 cwd 解析相对路径导致扫描失败。
     const projectPath = path.resolve(options.projectPath);
-    const command = await this.resolveCommand(projectPath);
+    const command = await this.commands.resolve(projectPath);
     const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
       // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
       return this.buildResult(start, category, []);
     }
     const flags = this.buildFlags(options);
-    const { issues, infraError } = await this.runAllProjects(
+    const { issues, infraError } = await this.runAllProjects({
       command,
       projects,
       flags,
       options,
       category,
-    );
+    });
     if (infraError && issues.length === 0) {
       return this.buildResult(start, category, [], infraError);
     }
@@ -208,13 +209,11 @@ export class TypeScriptAdapter implements ToolAdapter {
   }
 
   /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues 与首个基础设施错误 */
-  private async runAllProjects(
-    command: string,
-    projects: string[],
-    flags: string[],
-    options: ToolScanOptions,
-    category: IssueCategory,
-  ): Promise<{ issues: Issue[]; infraError?: string }> {
+  private async runAllProjects(params: RunAllProjectsParams): Promise<{
+    issues: Issue[];
+    infraError?: string;
+  }> {
+    const { command, projects, flags, options, category } = params;
     // 串行跑 20 包约 92-116s，会撞 120s 硬上限；复用机器画像并发度（2-4）有界并行
     const concurrency = Math.min(detectMachineProfile().adapterParallelism, projects.length);
     const results: TscRunResult[] = new Array(projects.length);
@@ -223,7 +222,13 @@ export class TypeScriptAdapter implements ToolAdapter {
       for (;;) {
         const index = cursor++;
         if (index >= projects.length) break;
-        results[index] = await this.runTsc(command, projects[index], flags, options, category);
+        results[index] = await this.runTsc({
+          command,
+          tsconfigPath: projects[index],
+          flags,
+          options,
+          category,
+        });
       }
     };
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
@@ -245,22 +250,16 @@ export class TypeScriptAdapter implements ToolAdapter {
     return flags;
   }
 
-  private async runTsc(
-    command: string,
-    tsconfigPath: string,
-    flags: string[],
-    options: ToolScanOptions,
-    category: IssueCategory,
-  ): Promise<TscRunResult> {
+  private async runTsc(params: RunTscParams): Promise<TscRunResult> {
+    const { command, tsconfigPath, flags, options, category } = params;
     try {
-      const { stdout } = await execFileAsync(command, [...flags, '-p', tsconfigPath], {
+      const { stdout } = await execTool(command, [...flags, '-p', tsconfigPath], {
         cwd: path.resolve(options.projectPath),
         timeout: options.timeout || 120000,
-        maxBuffer: 10 * 1024 * 1024,
       });
       return { issues: parseTscDiagnostics(stdout, category) };
     } catch (error: unknown) {
-      const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+      const err = asToolExecError(error);
       if (err.code === 'ENOENT') {
         return { issues: [], infraError: this.tr('engine.inspect.tool.tsc.unavailable') };
       }
@@ -284,17 +283,12 @@ export class TypeScriptAdapter implements ToolAdapter {
     error?: string,
   ): ToolResult {
     const infraFailed = !!error && issues.length === 0;
-    return {
+    return buildToolResult({
       tool: 'tsc',
       status: infraFailed ? 'error' : 'available',
       issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-      ...(error ? { error } : {}),
-    };
+      start,
+      error,
+    });
   }
 }

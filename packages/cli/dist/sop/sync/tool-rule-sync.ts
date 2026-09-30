@@ -13,6 +13,7 @@ export const EXPIRY_THRESHOLD_DAYS = 7;
 
 export type { ToolId };
 
+/** 单个工具的规则同步配置：本地目录 + 远端版本/下载地址 + 同步间隔，emergencyUrl 可选 */
 export interface ToolRuleSyncConfig {
   toolId: ToolId;
   localDir: string;
@@ -22,6 +23,7 @@ export interface ToolRuleSyncConfig {
   remoteEmergencyUrl?: string;
 }
 
+/** 远端工具规则版本信息：版本号 + 内容哈希 + 体积 + 发布时间 */
 export interface ToolRuleVersion {
   toolId: ToolId;
   version: string;
@@ -30,6 +32,7 @@ export interface ToolRuleVersion {
   publishedAt: string;
 }
 
+/** 工具规则同步结果：updated=false 时 reason 必填，标明未更新的具体原因 */
 export interface ToolRuleSyncResult {
   toolId: ToolId;
   updated: boolean;
@@ -38,6 +41,7 @@ export interface ToolRuleSyncResult {
   toVersion?: string;
 }
 
+/** 待写入的工具规则文件：文件名 + 文本内容（参与 hashToolRuleFiles 的哈希计算） */
 export interface ToolRuleFile {
   filename: string;
   content: string;
@@ -224,6 +228,17 @@ async function computeRuleDirHash(dir: string): Promise<string> {
   return hashToolRuleFiles(entries);
 }
 
+/** 远程白名单与本地配置的交集（无远程白名单 → 全部配置） */
+function scopedToolIds(
+  configs: Map<ToolId, ToolRuleSyncConfig>,
+  remoteToolIds: readonly ToolId[] | null,
+): ToolId[] {
+  const configured = [...configs.keys()];
+  if (!remoteToolIds) return configured;
+  const remoteSet = new Set(remoteToolIds);
+  return configured.filter((id) => remoteSet.has(id));
+}
+
 export class ToolRuleSync {
   private _baseDir: string;
   private configs: Map<ToolId, ToolRuleSyncConfig>;
@@ -288,20 +303,34 @@ export class ToolRuleSync {
     if (!downloaded) {
       return { toolId, updated: false, reason: 'network_error' };
     }
-    const localDir = path.join(this._baseDir, cfg.localDir);
-    await extractRulePackage(downloaded, localDir);
-    const computedHash = await computeRuleDirHash(localDir);
-    if (computedHash !== remoteVersion.hash) {
+    const installed = await this.installAndVerify(toolId, cfg, remoteVersion, downloaded);
+    if (!installed) {
       return { toolId, updated: false, reason: 'hash_mismatch' };
     }
-    this.versionCache.set(toolId, remoteVersion);
-    await persistVersionCache(this._baseDir, this.versionCache);
     return {
       toolId,
       updated: true,
       fromVersion: localVersion?.version,
       toVersion: remoteVersion.version,
     };
+  }
+
+  /** 解包规则包到本地目录、校验哈希并写回版本缓存；哈希不匹配返回 false（调用方回 hash_mismatch） */
+  private async installAndVerify(
+    toolId: ToolId,
+    cfg: ToolRuleSyncConfig,
+    remoteVersion: ToolRuleVersion,
+    packageData: Uint8Array,
+  ): Promise<boolean> {
+    const localDir = path.join(this._baseDir, cfg.localDir);
+    await extractRulePackage(packageData, localDir);
+    const computedHash = await computeRuleDirHash(localDir);
+    if (computedHash !== remoteVersion.hash) {
+      return false;
+    }
+    this.versionCache.set(toolId, remoteVersion);
+    await persistVersionCache(this._baseDir, this.versionCache);
+    return true;
   }
 
   async syncAll(): Promise<ToolRuleSyncResult[]> {
@@ -328,16 +357,12 @@ export class ToolRuleSync {
         return r;
       });
       const buf = new Uint8Array(await res.arrayBuffer());
-      const localDir = path.join(this._baseDir, cfg.localDir);
-      await extractRulePackage(buf, localDir);
       const remoteVersion = await fetchRemoteVersion(cfg);
       if (!remoteVersion) return { toolId, updated: false, reason: 'network_error' };
-      const computedHash = await computeRuleDirHash(localDir);
-      if (computedHash !== remoteVersion.hash) {
+      const installed = await this.installAndVerify(toolId, cfg, remoteVersion, buf);
+      if (!installed) {
         return { toolId, updated: false, reason: 'hash_mismatch' };
       }
-      this.versionCache.set(toolId, remoteVersion);
-      await persistVersionCache(this._baseDir, this.versionCache);
       return { toolId, updated: true, toVersion: remoteVersion.version };
     } catch {
       return { toolId, updated: false, reason: 'network_error' };
@@ -394,7 +419,7 @@ export class ToolRuleSync {
    */
   private getActiveToolIds(): ToolId[] {
     const reclaiming = getReclaimingToolRuleIds(this._baseDir);
-    return this.getScopedToolIds().filter((id) => !reclaiming.has(id));
+    return scopedToolIds(this.configs, this.remoteToolIds).filter((id) => !reclaiming.has(id));
   }
 
   /**
@@ -403,15 +428,7 @@ export class ToolRuleSync {
    * 永远进不了 claim 列表，7 天窗口内重加同栈项目无法复用本地文件）。
    */
   getUnfilteredToolIds(): ToolId[] {
-    return this.getScopedToolIds();
-  }
-
-  /** 远程白名单与本地配置的交集（无远程白名单 → 全部配置） */
-  private getScopedToolIds(): ToolId[] {
-    const configured = [...this.configs.keys()];
-    if (!this.remoteToolIds) return configured;
-    const remoteSet = new Set(this.remoteToolIds);
-    return configured.filter((id) => remoteSet.has(id));
+    return scopedToolIds(this.configs, this.remoteToolIds);
   }
 
   /** 能力引用回收过滤后的活跃工具（getActiveToolIds 的公共别名） */

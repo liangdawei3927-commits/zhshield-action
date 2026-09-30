@@ -17,6 +17,7 @@ import type { SopRule } from '@zh/kernel';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AdminService } from './admin.service';
 import { Public } from '../auth/local-only.guard';
+import { requireString, optionalString, parseStringArray } from '../request-body';
 
 const DOMAINS = new Set(['guard', 'inspect', 'security', 'sentinel', 'evolve', 'refactor']);
 const ACTIONS = new Set(['scan', 'block', 'score', 'alert', 'suggest', 'calibrate']);
@@ -24,25 +25,6 @@ const SOURCES = new Set(['external', 'internal', 'community', 'official']);
 const SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'info', 'error']);
 const EXECUTION_MODES = new Set(['sync', 'async', 'periodic', 'event']);
 const RULE_STATUSES = new Set(['draft', 'trial', 'active', 'deprecated', 'disabled']);
-
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new BadRequestException(`字段 ${field} 必须为非空字符串`);
-  }
-  return value;
-}
-
-function optionalString(value: unknown, field: string): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') throw new BadRequestException(`字段 ${field} 必须为字符串`);
-  return value;
-}
-
-function parseStringArray(value: unknown, field: string): string[] {
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) throw new BadRequestException(`字段 ${field} 必须为字符串数组`);
-  return value.map((v) => String(v));
-}
 
 function requireEnum(value: unknown, field: string, allowed: Set<string>): string {
   const s = requireString(value, field);

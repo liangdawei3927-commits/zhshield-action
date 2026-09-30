@@ -2,6 +2,8 @@ import ts from 'typescript';
 import type { Plugin } from 'vite';
 import { makeVitestConfig } from '../shared/src/vitest.config.base';
 
+const DECORATOR_RE = /@[A-Za-z]/;
+
 /**
  * esbuild 不支持 emitDecoratorMetadata（NestJS DI 依赖 design:paramtypes）。
  * 该插件仅对含装饰器的 .ts 文件改用 TypeScript 编译器转译，产出装饰器元数据。
@@ -14,7 +16,7 @@ function decoratorMetadataPlugin(): Plugin {
       if (!id.endsWith('.ts') || id.includes('node_modules') || id.endsWith('.d.ts')) {
         return;
       }
-      if (!/@[A-Za-z]/.test(code)) {
+      if (!DECORATOR_RE.test(code)) {
         return;
       }
       const out = ts.transpileModule(code, {

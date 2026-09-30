@@ -32,16 +32,19 @@ export class EngineService {
     this.eventBus = new EventBus();
     this.eventCenter = new EventCenter();
     subscribeScopeViolations(this.eventBus, this.eventCenter);
+    // 局部 const 捕获：init() 期间构造的各引擎 emit 闭包直接引用它，
+    // 避免对可空字段使用非空断言（此时字段必然已赋值）。
+    const eventBus = this.eventBus;
     this.scoring = new ScoringEngine(db);
     this.guard = new GuardEngine(process.cwd(), undefined, {
-      emit: (event) => this.eventBus!.emit(event.type, event.payload),
+      emit: (event) => eventBus.emit(event.type, event.payload),
     });
     this.guard.registerAdapter('trivy', new GuardTrivyAdapter());
     this.inspect = new InspectEngine({
-      emit: (event) => this.eventBus!.emit(event.type, event.payload),
+      emit: (event) => eventBus.emit(event.type, event.payload),
     });
     this.security = new SecurityEngine({
-      emit: (event) => this.eventBus!.emit(event.type, event.payload),
+      emit: (event) => eventBus.emit(event.type, event.payload),
     });
     this.security.registerDefaultAdapters();
   }

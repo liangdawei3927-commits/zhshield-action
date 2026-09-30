@@ -49,8 +49,16 @@ export async function cleanupProjectAfterRemoval(
   projectPath: string,
 ): Promise<ProjectRemovalStep[]> {
   const steps: ProjectRemovalStep[] = [];
+  await deleteProfileStep(projectPath, steps);
+  await softDeleteDbStep(projectPath, steps);
+  await releaseMemoryStep(projectPath, steps);
+  await unregisterCloudStep(projectPath, steps);
+  await releaseCapabilityRefsStep(projectPath, steps);
+  return steps;
+}
 
-  // 1. 画像文件删除
+/** 1. 画像文件删除 */
+async function deleteProfileStep(projectPath: string, steps: ProjectRemovalStep[]): Promise<void> {
   try {
     createProfileStore().delete(projectPath);
     steps.push({ step: 'profile-delete', status: 'ok' });
@@ -58,8 +66,10 @@ export async function cleanupProjectAfterRemoval(
     console.warn('[project-lifecycle] 画像删除失败,降级跳过:', errMsg(err));
     steps.push({ step: 'profile-delete', status: 'failed', error: errMsg(err) });
   }
+}
 
-  // 2. DB 软删（无持久化模式 getDb 抛错 → 降级仅 warn，不阻断）
+/** 2. DB 软删（无持久化模式 getDb 抛错 → 降级仅 warn，不阻断） */
+async function softDeleteDbStep(projectPath: string, steps: ProjectRemovalStep[]): Promise<void> {
   try {
     softDeleteProjectData(getDb(), projectPath);
     steps.push({ step: 'db-soft-delete', status: 'ok' });
@@ -67,8 +77,10 @@ export async function cleanupProjectAfterRemoval(
     console.warn('[project-lifecycle] DB 软删失败，降级跳过:', errMsg(err));
     steps.push({ step: 'db-soft-delete', status: 'failed', error: errMsg(err) });
   }
+}
 
-  // 3. 内存缓存归还（仅当缓存归属该项目时清空，宁缺毋滥）
+/** 3. 内存缓存归还（仅当缓存归属该项目时清空，宁缺毋滥） */
+async function releaseMemoryStep(projectPath: string, steps: ProjectRemovalStep[]): Promise<void> {
   try {
     if (getCachedProfileProjectPath() === projectPath) {
       // 第二参传 null 才会同时清空归属 path（ipc-context 语义：不传则保持 path 不变）
@@ -79,8 +91,10 @@ export async function cleanupProjectAfterRemoval(
     console.warn('[project-lifecycle] 内存缓存归还失败,降级跳过:', errMsg(err));
     steps.push({ step: 'memory-release', status: 'failed', error: errMsg(err) });
   }
+}
 
-  // 4. 云端画像注销（内部已降级不抛，仍 try/catch 保险）
+/** 4. 云端画像注销（内部已降级不抛，仍 try/catch 保险） */
+async function unregisterCloudStep(projectPath: string, steps: ProjectRemovalStep[]): Promise<void> {
   try {
     await unregisterProjectFeaturesFromCloud(projectPath);
     steps.push({ step: 'cloud-unregister', status: 'ok' });
@@ -88,8 +102,13 @@ export async function cleanupProjectAfterRemoval(
     console.warn('[project-lifecycle] 云端注销失败,降级跳过:', errMsg(err));
     steps.push({ step: 'cloud-unregister', status: 'failed', error: errMsg(err) });
   }
+}
 
-  // 5. 能力引用归还（06 §3.4 ⑥）：refs 空的能力 → reclaiming + since
+/** 5. 能力引用归还（06 §3.4 ⑥）：refs 空的能力 → reclaiming + since */
+async function releaseCapabilityRefsStep(
+  projectPath: string,
+  steps: ProjectRemovalStep[],
+): Promise<void> {
   try {
     await saveCapabilityRefs(
       releaseProjectRefs(await loadCapabilityRefs(), deriveProjectId(projectPath)),
@@ -99,6 +118,4 @@ export async function cleanupProjectAfterRemoval(
     console.warn('[project-lifecycle] 能力引用归还失败,降级跳过:', errMsg(err));
     steps.push({ step: 'capability-refs-release', status: 'failed', error: errMsg(err) });
   }
-
-  return steps;
 }

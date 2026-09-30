@@ -51,8 +51,12 @@ export class EvolveEngine {
 
     const byRule = new Map<string, ExperienceEntry[]>();
     for (const e of entries) {
-      if (!byRule.has(e.ruleId)) byRule.set(e.ruleId, []);
-      byRule.get(e.ruleId)!.push(e);
+      let ruleEntries = byRule.get(e.ruleId);
+      if (!ruleEntries) {
+        ruleEntries = [];
+        byRule.set(e.ruleId, ruleEntries);
+      }
+      ruleEntries.push(e);
     }
 
     const suggestions: Suggestion[] = [];
@@ -97,8 +101,12 @@ export class EvolveEngine {
   autoAdjustWeights(): RuleWeightEntry[] {
     const byRule = new Map<string, ExperienceEntry[]>();
     for (const e of this.experiences.values()) {
-      if (!byRule.has(e.ruleId)) byRule.set(e.ruleId, []);
-      byRule.get(e.ruleId)!.push(e);
+      let entries = byRule.get(e.ruleId);
+      if (!entries) {
+        entries = [];
+        byRule.set(e.ruleId, entries);
+      }
+      entries.push(e);
     }
 
     const results: RuleWeightEntry[] = [];

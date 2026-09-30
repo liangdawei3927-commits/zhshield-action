@@ -4,6 +4,7 @@ import { SmartCompressor } from '../smart-compressor';
 import type { CompressedData } from '../smart-compressor';
 
 // better-sqlite3 类型内联，避免 native 模块在非 Electron 环境下的构建问题
+// 签名对齐 @types/better-sqlite3（get/all/iterate 返回 unknown），使 conn.connect() 可直接赋值
 interface Database {
   prepare(sql: string): Statement;
   exec(sql: string): void;
@@ -14,9 +15,9 @@ interface Database {
 }
 interface Statement {
   run(...params: unknown[]): { changes: number };
-  get<T = unknown>(...params: unknown[]): T | undefined;
-  all<T = unknown>(...params: unknown[]): T[];
-  iterate<T = unknown>(...params: unknown[]): IterableIterator<T>;
+  get(...params: unknown[]): unknown | undefined;
+  all(...params: unknown[]): unknown[];
+  iterate(...params: unknown[]): IterableIterator<unknown>;
 }
 
 /** data 列中压缩负载的信封结构（SmartCompressor 产物 + 标记位） */
@@ -59,7 +60,7 @@ export class SopSqliteStore {
    */
   initialize(): void {
     const conn = new DbConnection({ dbPath: this.dbPath, walMode: true });
-    this.db = conn.connect() as unknown as Database;
+    this.db = conn.connect();
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS sop_rules (

@@ -51,6 +51,20 @@ export type DriftRecommendation =
 
 // ─── DriftDetector 类 ───
 
+/** generateRecommendation 参数对象 */
+interface GenerateRecommendationParams {
+  /** 是否检测到漂移 */
+  readonly hasDrift: boolean;
+  /** 发生变化的文件列表 */
+  readonly changedFiles: readonly string[];
+  /** 新增的文件列表 */
+  readonly addedFiles: readonly string[];
+  /** 删除的文件列表 */
+  readonly removedFiles: readonly string[];
+  /** 已固化的画像 */
+  readonly existingProfile: ProjectProfile;
+}
+
 export class DriftDetector {
   private readonly projectPath: string;
 
@@ -64,62 +78,16 @@ export class DriftDetector {
    * @returns DriftResult
    */
   detect(existingProfile?: ProjectProfile): DriftResult {
-    // 如果无已有画像，建议完整扫描
     if (existingProfile === undefined) {
-      return {
-        hasDrift: true,
-        changedFiles: [],
-        addedFiles: [],
-        removedFiles: [],
-        recommendation: { type: 'full-re-scan', reason: 'no-existing-profile' },
-      };
+      return noProfileResult();
     }
+    return this.detectWithProfile(existingProfile);
+  }
 
-    // 轻量重探测：检查关键文件 mtime
+  private detectWithProfile(existingProfile: ProjectProfile): DriftResult {
     const currentManifests = this.scanManifests();
     const storedManifests = this.extractStoredManifests(existingProfile);
-
-    // 比较差异
-    const changedFiles: string[] = [];
-    const addedFiles: string[] = [];
-    const removedFiles: string[] = [];
-
-    // 检查变化和新增
-    for (const [file, mtime] of currentManifests) {
-      const storedMtime = storedManifests.get(file);
-      if (storedMtime === undefined) {
-        addedFiles.push(file);
-      } else if (storedMtime !== 0 && mtime !== storedMtime) {
-        changedFiles.push(file);
-      }
-    }
-
-    // 检查删除
-    for (const [file] of storedManifests) {
-      if (!currentManifests.has(file)) {
-        removedFiles.push(file);
-      }
-    }
-
-    // 判断是否有漂移
-    const hasDrift = changedFiles.length > 0 || addedFiles.length > 0 || removedFiles.length > 0;
-
-    // 生成建议
-    const recommendation = this.generateRecommendation(
-      hasDrift,
-      changedFiles,
-      addedFiles,
-      removedFiles,
-      existingProfile,
-    );
-
-    return {
-      hasDrift,
-      changedFiles,
-      addedFiles,
-      removedFiles,
-      recommendation,
-    };
+    return buildDriftResult(currentManifests, storedManifests, existingProfile);
   }
 
   /**
@@ -172,39 +140,90 @@ export class DriftDetector {
 
     return manifests;
   }
+}
 
-  /** 生成漂移检测建议 */
-  private generateRecommendation(
-    hasDrift: boolean,
-    changedFiles: readonly string[],
-    addedFiles: readonly string[],
-    removedFiles: readonly string[],
-    _existingProfile: ProjectProfile,
-  ): DriftRecommendation {
-    if (!hasDrift) {
-      return { type: 'no-action' };
+function noProfileResult(): DriftResult {
+  return {
+    hasDrift: true,
+    changedFiles: [],
+    addedFiles: [],
+    removedFiles: [],
+    recommendation: { type: 'full-re-scan', reason: 'no-existing-profile' },
+  };
+}
+
+/** 比较当前与已存储的 manifest mtime，得出变化 / 新增 / 删除文件列表 */
+function diffManifests(
+  currentManifests: Map<string, number>,
+  storedManifests: Map<string, number>,
+): { changedFiles: string[]; addedFiles: string[]; removedFiles: string[] } {
+  const changedFiles: string[] = [];
+  const addedFiles: string[] = [];
+  const removedFiles: string[] = [];
+
+  for (const [file, mtime] of currentManifests) {
+    const storedMtime = storedManifests.get(file);
+    if (storedMtime === undefined) {
+      addedFiles.push(file);
+    } else if (storedMtime !== 0 && mtime !== storedMtime) {
+      changedFiles.push(file);
     }
+  }
 
-    // 关键文件变化（package.json, tsconfig.json 等）→ 建议重新确认
-    const criticalFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'pom.xml', 'go.mod'];
-    const hasCriticalChange =
-      changedFiles.some((f) => criticalFiles.includes(f)) ||
-      addedFiles.some((f) => criticalFiles.includes(f)) ||
-      removedFiles.some((f) => criticalFiles.includes(f));
-
-    if (hasCriticalChange) {
-      return {
-        type: 're-confirm',
-        reason: `critical-files-changed: ${[...changedFiles, ...addedFiles, ...removedFiles].join(', ')}`,
-      };
+  for (const [file] of storedManifests) {
+    if (!currentManifests.has(file)) {
+      removedFiles.push(file);
     }
+  }
 
-    // 非关键文件变化 → 建议轻量重新确认
+  return { changedFiles, addedFiles, removedFiles };
+}
+
+function buildDriftResult(
+  currentManifests: Map<string, number>,
+  storedManifests: Map<string, number>,
+  existingProfile: ProjectProfile,
+): DriftResult {
+  const { changedFiles, addedFiles, removedFiles } = diffManifests(
+    currentManifests,
+    storedManifests,
+  );
+  const hasDrift = changedFiles.length > 0 || addedFiles.length > 0 || removedFiles.length > 0;
+  const recommendation = generateRecommendation({
+    hasDrift,
+    changedFiles,
+    addedFiles,
+    removedFiles,
+    existingProfile,
+  });
+  return { hasDrift, changedFiles, addedFiles, removedFiles, recommendation };
+}
+
+function generateRecommendation(params: GenerateRecommendationParams): DriftRecommendation {
+  const { hasDrift, changedFiles, addedFiles, removedFiles } = params;
+  if (!hasDrift) {
+    return { type: 'no-action' };
+  }
+
+  // 关键文件变化（package.json, tsconfig.json 等）→ 建议重新确认
+  const criticalFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'pom.xml', 'go.mod'];
+  const hasCriticalChange =
+    changedFiles.some((f) => criticalFiles.includes(f)) ||
+    addedFiles.some((f) => criticalFiles.includes(f)) ||
+    removedFiles.some((f) => criticalFiles.includes(f));
+
+  if (hasCriticalChange) {
     return {
       type: 're-confirm',
-      reason: `manifest-changed: ${[...changedFiles, ...addedFiles, ...removedFiles].join(', ')}`,
+      reason: `critical-files-changed: ${[...changedFiles, ...addedFiles, ...removedFiles].join(', ')}`,
     };
   }
+
+  // 非关键文件变化 → 建议轻量重新确认
+  return {
+    type: 're-confirm',
+    reason: `manifest-changed: ${[...changedFiles, ...addedFiles, ...removedFiles].join(', ')}`,
+  };
 }
 
 // ─── 导出工厂函数 ───

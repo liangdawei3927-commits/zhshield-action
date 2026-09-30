@@ -1,13 +1,14 @@
+import { useState } from 'react';
 import { PageShell } from '../components/business/PageShell';
+import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { Bounce } from '../components/ui/Bounce';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
-import { DomainScoreCard } from '../components/DomainScoreCard';
 import { usePerformancePage } from './performance-logic';
-import {
-  AmberBolt,
-  PerformanceHeader,
-  PerformanceScoreCard,
-  IssuesPanel,
-} from './performance-parts';
+import { IssuesPanel } from './performance-parts';
+import type { PerformanceReportData } from '../types/electron';
 
 interface PerformancePageProps {
   projectPath: string;
@@ -15,111 +16,139 @@ interface PerformancePageProps {
 
 export function PerformancePage({ projectPath }: PerformancePageProps) {
   const t = useT();
-  const { loading, progressLabel, report, copyToAi, copyAllToAi, handleScan } =
+  const [showHome, setShowHome] = useState(false);
+  const { loading, progress, progressLabel, statusMessage, report, copyToAi, copyAllToAi, handleScan } =
     usePerformancePage(projectPath);
 
-  if (report) {
-    return (
-      <div className="h-full w-full bg-zh-bg overflow-auto">
-        <div className="w-full px-8 py-10">
-          <PerformanceHeader
-            report={report}
-            loading={loading}
-            progressLabel={progressLabel}
-            onRescan={handleScan}
+  if (report && !showHome) {
+    const mediumIssues = report.issues.filter((i) => i.severity === 'medium');
+    const lowIssues = report.issues.filter((i) => i.severity === 'low');
+    // 两张严重度卡的明细子表都是「同一张 IssuesPanel + 按卡过滤 issues」，只有子集不同
+    const statDetail = (items: PerformanceReportData['issues']): ReportStatCard['detail'] => ({
+      items,
+      render: (sub) => {
+        const subset = sub as PerformanceReportData['issues'];
+        return (
+          <IssuesPanel
+            issues={subset}
+            onCopyToAi={copyToAi}
+            onCopyAll={() => void Promise.all(subset.map((i) => copyToAi(i)))}
           />
-          <DomainScoreCard projectPath={projectPath} dimension="performance" />
-          <PerformanceScoreCard report={report} />
-          <IssuesPanel issues={report.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
-        </div>
-      </div>
+        );
+      },
+    });
+
+    return (
+      <ReportShell
+        projectPath={projectPath}
+        dimension="performance"
+        refreshKey={report}
+        icon={
+          <Bounce className="w-14 h-14 rounded-xl bg-warning-50 flex items-center justify-center">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgb(var(--zh-warning))"
+              strokeWidth="2"
+            >
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+          </Bounce>
+        }
+        title={t('page.performance.header.title')}
+        action={
+          <PrimaryButton
+            onClick={handleScan}
+            loading={loading}
+            loadingLabel={progressLabel || t('page.performance.detecting')}
+          >
+            {t('page.performance.rescan')}
+          </PrimaryButton>
+        }
+        onBackHome={() => setShowHome(true)}
+        stats={[
+          { key: 'total', label: t('page.performance.stats.total'), value: report.issues.length },
+          {
+            key: 'medium',
+            label: t('page.performance.severity.medium'),
+            value: mediumIssues.length,
+            color: 'rgb(var(--zh-warning))',
+            detail: statDetail(mediumIssues),
+          },
+          {
+            key: 'low',
+            label: t('page.performance.severity.low'),
+            value: lowIssues.length,
+            color: 'rgb(var(--zh-info))',
+            detail: statDetail(lowIssues),
+          },
+          {
+            key: 'autoFixable',
+            label: t('page.performance.autoFixable'),
+            value: report.issues.filter((i) => i.autoFixable).length,
+            color: 'rgb(var(--zh-success))',
+          },
+        ]}
+      >
+        <IssuesPanel issues={report.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
+      </ReportShell>
     );
   }
 
   return (
     <PageShell
-      illustration={<AmberBolt />}
+      illustration={<DomainScoreRing projectPath={projectPath} dimension="performance" />}
       title={t('page.performance.shell.title')}
       subtitle={t('page.performance.shell.subtitle')}
       featureList={[
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.performance.shell.featureComplexity.title'),
           desc: t('page.performance.shell.featureComplexity.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.performance.shell.featureReDoS.title'),
           desc: t('page.performance.shell.featureReDoS.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <path d="M2 12h6l3-9 4 18 3-9h4" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.performance.shell.featureModernApi.title'),
           desc: t('page.performance.shell.featureModernApi.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
+            <FeatureIcon>
+              <ClockGlyph />
+            </FeatureIcon>
           ),
           title: t('page.performance.shell.featureTimer.title'),
           desc: t('page.performance.shell.featureTimer.desc'),
         },
       ]}
       buttonText={t('page.performance.shell.start')}
-      onAction={handleScan}
+      onAction={() => {
+        setShowHome(false);
+        handleScan();
+      }}
       loading={loading}
-      progressLabel={progressLabel || t('page.performance.scanning')}
+      progress={Math.round(progress * 100)}
+      progressLabel={t('page.performance.scanning')}
+      progressMessage={statusMessage}
     />
   );
 }

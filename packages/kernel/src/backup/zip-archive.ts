@@ -5,6 +5,10 @@ import * as path from 'node:path';
 import type { Readable } from 'node:stream';
 import yauzl from 'yauzl';
 
+/**
+ * zip 归档读取器：封装 yauzl 回调 API。
+ * 调用方必须在使用完毕后调用 close() 释放文件句柄。
+ */
 export interface ZipArchiveReader {
   entriesByName: Map<string, yauzl.Entry>;
   readEntry(entry: yauzl.Entry): Promise<Buffer>;

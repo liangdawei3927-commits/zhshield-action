@@ -1,20 +1,8 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  ToolAdapter,
-  ToolMeta,
-  ToolResult,
-  ToolScanOptions,
-  Issue,
-  AccessScope,
-} from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
-
-const execFileAsync = promisify(execFile);
+import type { Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
+import { ToolCommandAdapter, buildAccessScope, buildToolResult, execTool } from './tool-runner';
 
 const META: ToolMeta = {
   id: 'depcheck',
@@ -35,147 +23,115 @@ interface DepcheckResult {
   using: Record<string, string[]>;
 }
 
-export class DepcheckAdapter implements ToolAdapter {
+/** 分步执行结果：成功携带值，失败携带已构建的 ToolResult（提前返回） */
+type StepOutcome<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
+
+/**
+ * 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
+ * depcheck 以自身 cwd 解析导致扫描失败。
+ */
+function normalizeProjectPath(projectPath: string): string {
+  return path.resolve(projectPath);
+}
+
+export class DepcheckAdapter extends ToolCommandAdapter {
   meta = META;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
-  private readonly projectRoot?: string;
 
   /** F5：depcheck 读 package.json 并静态解析源码 import 判断未使用依赖 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['**/package.json', '**/*.{ts,tsx,js,jsx}'],
-    excludePaths: ['**/node_modules/**'],
-  };
+  readonly accessScope = buildAccessScope(['**/package.json', '**/*.{ts,tsx,js,jsx}']);
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot;
-  }
-
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('depcheck', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
-  }
-
-  async scan(options: ToolScanOptions): Promise<ToolResult> {
-    const start = Date.now();
-    try {
-      return await this.runDepcheck(options, start);
-    } catch (error: unknown) {
-      return this.handleDepcheckError(error, start);
-    }
+    super('depcheck', projectRoot, { unavailable: 'depcheck 未安装', failed: 'depcheck 执行失败' });
   }
 
   /** 执行 depcheck 并映射输出为可用结果 */
-  private async runDepcheck(options: ToolScanOptions, start: number): Promise<ToolResult> {
-    // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
-    // depcheck 以自身 cwd 解析导致扫描失败。
-    const projectPath = path.resolve(options.projectPath);
-    const pkgJson = path.join(projectPath, 'package.json');
-    try {
-      await fs.promises.access(pkgJson);
-    } catch {
-      return {
-        tool: 'depcheck',
-        status: 'unavailable',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
-      };
-    }
-    const command = await this.resolveCommand(options.projectPath);
+  protected async runScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
+    const projectPath = normalizeProjectPath(options.projectPath);
+    const pkgCheck = await this.ensurePackageJson(projectPath, start);
+    if (!pkgCheck.ok) return pkgCheck.result;
+
+    const command = await this.commands.resolve(options.projectPath);
     const args = buildDepcheckArgs(options, projectPath);
+    const runResult = await this.runDepcheckCommand(command, args, options, projectPath, start);
+    if (!runResult.ok) return runResult.result;
 
-    let stdout = '';
-    try {
-      const res = await execFileAsync(command, args, {
-        cwd: projectPath,
-        timeout: options.timeout || 60000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      stdout = res.stdout;
-    } catch (error) {
-      // depcheck 检出未使用依赖时以非零码退出但 stdout 仍是合法 JSON（本项目实测 exit 255）
-      const err = error as { stdout?: string };
-      if (err.stdout) {
-        stdout = err.stdout;
-      } else {
-        return this.handleDepcheckError(error, start);
-      }
-    }
+    const parseResult = this.parseDepcheckOutput(runResult.value, start);
+    if (!parseResult.ok) return parseResult.result;
 
-    let result: DepcheckResult;
-    try {
-      result = JSON.parse(stdout);
-    } catch {
-      return {
-        tool: 'depcheck',
-        status: 'error',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: 'depcheck 输出不是合法 JSON',
-      };
-    }
-    const issues = this.mapOutput(result, projectPath);
-
-    return {
-      tool: 'depcheck',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-    };
+    return this.buildAvailableResult(parseResult.value, projectPath, start);
   }
 
-  /** 处理 depcheck 执行错误：未安装 / 失败 */
-  private handleDepcheckError(error: unknown, start: number): ToolResult {
-    const err = error as { code?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
+  /** 校验目标目录存在 package.json，缺失时返回 unavailable 结果 */
+  private async ensurePackageJson(
+    projectPath: string,
+    start: number,
+  ): Promise<StepOutcome<true>> {
+    try {
+      await fs.promises.access(path.join(projectPath, 'package.json'));
+      return { ok: true, value: true };
+    } catch {
       return {
-        tool: 'depcheck',
-        status: 'unavailable',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: 'depcheck 未安装',
+        ok: false,
+        result: buildToolResult({
+          tool: 'depcheck',
+          status: 'unavailable',
+          issues: [],
+          start,
+          error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
+        }),
       };
     }
-    return {
-      tool: 'depcheck',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'depcheck 执行失败',
-    };
+  }
+
+  /** 执行 depcheck 命令：检出未使用依赖时以非零码退出但 stdout 仍是合法 JSON（本项目实测 exit 255） */
+  private async runDepcheckCommand(
+    command: string,
+    args: string[],
+    options: ToolScanOptions,
+    projectPath: string,
+    start: number,
+  ): Promise<StepOutcome<string>> {
+    try {
+      const { stdout } = await execTool(command, args, {
+        cwd: projectPath,
+        timeout: options.timeout || 60000,
+      });
+      return { ok: true, value: stdout };
+    } catch (error) {
+      const err = this.execErrorOf(error);
+      if (err.stdout) {
+        return { ok: true, value: err.stdout };
+      }
+      return { ok: false, result: this.buildExecErrorResult(error, start) };
+    }
+  }
+
+  /** 解析 depcheck stdout 为结构化结果，非法 JSON 时返回 error 结果 */
+  private parseDepcheckOutput(stdout: string, start: number): StepOutcome<DepcheckResult> {
+    try {
+      return { ok: true, value: JSON.parse(stdout) as DepcheckResult };
+    } catch {
+      return {
+        ok: false,
+        result: buildToolResult({
+          tool: 'depcheck',
+          status: 'error',
+          issues: [],
+          start,
+          error: 'depcheck 输出不是合法 JSON',
+        }),
+      };
+    }
+  }
+
+  /** 映射输出为 Issue 并构建 available 结果 */
+  private buildAvailableResult(
+    result: DepcheckResult,
+    projectPath: string,
+    start: number,
+  ): ToolResult {
+    const issues = this.mapOutput(result, projectPath);
+    return buildToolResult({ tool: 'depcheck', status: 'available', issues, start });
   }
 
   private mapOutput(result: DepcheckResult, projectPath: string): Issue[] {

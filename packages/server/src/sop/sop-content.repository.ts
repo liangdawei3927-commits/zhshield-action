@@ -55,7 +55,9 @@ export class SopContentRepository implements OnModuleDestroy {
   protected tryReadyDb(): ReturnType<DbConnection['getDb']> | null {
     try {
       this.ensureReady();
-      return this.dbConn!.getDb();
+      const conn = this.dbConn;
+      if (!conn) return null;
+      return conn.getDb();
     } catch (err) {
       this.logger.warn(
         `Content repository unavailable: ${err instanceof Error ? err.message : String(err)}`,

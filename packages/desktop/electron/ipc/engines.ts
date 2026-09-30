@@ -12,6 +12,7 @@ import { access, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
+import { safeJoin } from '@zh/shared';
 
 import {
   buildHealthDimensions,
@@ -135,10 +136,16 @@ import type {
   DomainScoreData,
 } from '../../src/types/electron';
 import {
-  toGuardChecks,
-  toInspectIssues,
+  emptyDependencyReportData,
+  emptySecurityScanReportData,
+} from '../../src/services/empty-engine-reports';
+import {
+  assembleHealthInputs,
   hasAnyExtraResult,
+  isScoreDimension,
+  qualityFastPathScore,
   type PipelineExtras,
+  type ScoreDimension,
 } from '../report-summary';
 
 async function isExecutable(p: string): Promise<boolean> {
@@ -170,7 +177,8 @@ async function collectOpenCodeCandidates(): Promise<Array<{ path: string; execut
     candidates.push({ path: envBin, executable: await isExecutable(envBin) });
   }
   for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
-    const p = path.join(dir, 'opencode');
+    // safeJoin: PATH 目录 + 固定字面量，界内行为与 path.join 完全一致（09-24 path-traversal 清理）
+    const p = safeJoin(dir, 'opencode');
     // eslint-disable-next-line perf/perf-no-serial-await -- p derived from loop var dir via intermediate assignment
     candidates.push({ path: p, executable: await isExecutable(p) });
   }
@@ -330,37 +338,58 @@ function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): voi
  * 1. 传统格式：GuardReport（有 results）+ InspectionReport（有 issues）
  * 2. SOP 格式：RuleEngineReport（有 evaluations）— 需要转换
  */
+/** 组装评分输入并计算健康总分（P1b extras + S2 esloc 同口径），落库并记录日志 */
+async function computePipelineHealthScore(
+  projectPath: string,
+  resolved: ResolvedPipelineReports,
+  profilingResult: ScoringProjectProfile | null,
+  scoring: Awaited<ReturnType<typeof getScoring>>,
+): Promise<void> {
+  // P1b: 从 dashboard-state.json 读取 secrets/deps/techdebt/refactor/performance 最新数据组装 extras，
+  // 传入 buildHealthDimensions 第 5 参（DimensionExtras 契约），保证 pipeline 分与 dashboard 分一致。
+  const extras = await buildPipelineExtras(projectPath);
+  // S2 密度归一化分母：persistDiagnostics 先于本函数执行（runPipelineHandler 1399→1409），
+  // 快照已存落盘口径的 esloc，读同一值保证两条写分路径同口径。
+  const esloc = (await readDomainSnapshot(projectPath, 'inspect'))?.esloc;
+  const dimensions = buildHealthDimensions({
+    guard: { results: resolved.guardResults },
+    inspect: { issues: resolved.inspectIssues, esloc },
+    projectRoot: projectPath,
+    profile: profilingResult,
+    extras,
+  });
+  const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
+  console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
+}
+
+/** 模块级独立评分：跳过根级兜底卡，各模块用自身类型权重评分后逐模块落库 */
+async function scorePipelineModules(
+  projectPath: string,
+  report: PipelineReport,
+  resolved: ResolvedPipelineReports,
+  profilingResult: ScoringProjectProfile | null,
+  scoring: Awaited<ReturnType<typeof getScoring>>,
+): Promise<void> {
+  if (!profilingResult?.modules?.length) return;
+  const moduleGuardResults = resolved.isSop
+    ? resolved.guardResults
+    : convertTraditionalGuardResults((report.guard as GuardReport).results);
+  const aggregate = scoreProjectByModules(
+    profilingResult,
+    { results: moduleGuardResults },
+    { issues: resolved.inspectIssues },
+  );
+  scoreProjectModules(scoring, aggregate, projectPath);
+}
+
 async function recordPipelineScore(projectPath: string, report: PipelineReport): Promise<void> {
   try {
     const resolved = resolvePipelineReports(report);
     if (!resolved) return;
-
     const scoring = await getScoring();
     const profilingResult = await probeProjectProfile(projectPath);
-    // P1b: 从 dashboard-state.json 读取 secrets/deps/techdebt/refactor/performance 最新数据组装 extras，
-    // 传入 buildHealthDimensions 第 5 参（DimensionExtras 契约），保证 pipeline 分与 dashboard 分一致。
-    const extras = await buildPipelineExtras(projectPath);
-    const dimensions = buildHealthDimensions(
-      { results: resolved.guardResults },
-      { issues: resolved.inspectIssues },
-      projectPath,
-      profilingResult,
-      extras,
-    );
-    const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
-    console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
-
-    if (profilingResult?.modules?.length) {
-      const moduleGuardResults = resolved.isSop
-        ? resolved.guardResults
-        : convertTraditionalGuardResults((report.guard as GuardReport).results);
-      const aggregate = scoreProjectByModules(
-        profilingResult,
-        { results: moduleGuardResults },
-        { issues: resolved.inspectIssues },
-      );
-      scoreProjectModules(scoring, aggregate, projectPath);
-    }
+    await computePipelineHealthScore(projectPath, resolved, profilingResult, scoring);
+    await scorePipelineModules(projectPath, report, resolved, profilingResult, scoring);
   } catch (err) {
     console.warn(
       '[engine:runPipeline] 健康评分落库失败:',
@@ -389,25 +418,28 @@ async function generateReportSummaryHandler(projectPath: string): Promise<Health
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    // gate 维度取自 guard 报告记录（含通过项，与 pipeline 口径一致）：
-    // listGuardReports 返回新→旧，取 [0] 即最近一次门禁结果。
-    const guardRecord = listGuardReports(projectPath)[0] ?? null;
-    const inspectSnapshot = await readDomainSnapshot(projectPath, 'inspect');
-    const extras = await buildPipelineExtras(projectPath);
+    // 输入组装与分类页实时评分共用 assembleHealthInputs（含 Q4 评分输入缺口修复：
+    // security/deps 专用扫描发现并入），两条路径结构上不可能漂移。
+    const inputs = await assembleHealthInputs(projectPath, {
+      listGuardReports,
+      readDomainSnapshot,
+      readDashboardState,
+      buildPipelineExtras,
+    });
     const hasResults =
-      guardRecord !== null || inspectSnapshot !== null || hasAnyExtraResult(extras);
+      inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
     if (!hasResults) return null;
 
     const scoring = await getScoring();
     const profilingResult = await probeProjectProfile(projectPath);
-    const dimensions = buildHealthDimensions(
-      guardRecord ? { results: toGuardChecks(guardRecord.checks) } : null,
-      inspectSnapshot ? { issues: toInspectIssues(inspectSnapshot.issues) } : null,
-      projectPath,
-      profilingResult,
-      extras,
-    );
-    const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
+    const dimensions = buildHealthDimensions({
+      guard: inputs.guard,
+      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
+      projectRoot: projectPath,
+      profile: profilingResult,
+      extras: inputs.extras,
+    });
+    const score = scoring.calculate(projectPath, dimensions, computeRedLine(inputs.extras));
     console.log(`[engine:generateReportSummary] 汇总评分已落库: ${score.overall} (${score.grade})`);
     return toHealthScoreData(score);
   } catch (err) {
@@ -551,20 +583,7 @@ async function runSecurityHandler(
     return data;
   } catch (err) {
     console.error('[engine:runSecurity] Error:', err);
-    return {
-      summary: {
-        total: 0,
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        malwareTotal: 0,
-      },
-      findings: [],
-      malware: [],
-      securityScore: 100,
-      metadata: { duration: 0, timestamp: new Date().toISOString() },
-    };
+    return emptySecurityScanReportData();
   }
 }
 
@@ -605,6 +624,29 @@ async function runGarbageScanHandler(
   }
 }
 
+/** 十域评分：清理完成后按已清理条目递减 dashboard-state 里的 garbage 计数；失败仅告警，不阻断清理 */
+async function syncGarbageDashboard(projectPath: string, result: GarbageCleanResult): Promise<void> {
+  try {
+    const state = await readDashboardState(projectPath);
+    if (!state.garbage) return;
+    const byType: Record<string, number> = { ...state.garbage.byType };
+    let total = state.garbage.total;
+    for (const item of result.cleaned ?? []) {
+      const type = String((item as { type?: unknown }).type ?? '');
+      if (type && byType[type] !== undefined) byType[type] = Math.max(0, byType[type] - 1);
+      total = Math.max(0, total - 1);
+    }
+    await updateDashboardState(projectPath, {
+      garbage: { total, byType, lastRunAt: new Date().toISOString() },
+    });
+  } catch (e) {
+    console.warn(
+      '[engine:garbageClean] dashboard-state 更新失败:',
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
 async function garbageCleanHandler(
   manager: TaskManager,
   projectPath: string,
@@ -616,27 +658,7 @@ async function garbageCleanHandler(
     }
     const task = manager.start('garbageClean', projectPath, { items });
     const result = (await manager.waitFor(task.id)) as GarbageCleanResult;
-    // 十域评分：清理完成后按已清理条目递减 dashboard-state 里的 garbage 计数
-    try {
-      const state = await readDashboardState(projectPath);
-      if (state.garbage) {
-        const byType: Record<string, number> = { ...state.garbage.byType };
-        let total = state.garbage.total;
-        for (const item of result.cleaned ?? []) {
-          const type = String((item as { type?: unknown }).type ?? '');
-          if (type && byType[type] !== undefined) byType[type] = Math.max(0, byType[type] - 1);
-          total = Math.max(0, total - 1);
-        }
-        await updateDashboardState(projectPath, {
-          garbage: { total, byType, lastRunAt: new Date().toISOString() },
-        });
-      }
-    } catch (e) {
-      console.warn(
-        '[engine:garbageClean] dashboard-state 更新失败:',
-        e instanceof Error ? e.message : String(e),
-      );
-    }
+    await syncGarbageDashboard(projectPath, result);
     return result;
   } catch (err) {
     console.error('[engine:garbageClean] Error:', err);
@@ -739,28 +761,6 @@ function countTrustCounts(nodes: DependencyNode[]): Record<string, number> {
   return counts;
 }
 
-/** 依赖管家失败时的空报告（error 携带失败原因，不 throw） */
-function emptyDepsReport(error: string): DependencyReportData {
-  return {
-    schemaVersion: 0,
-    targetId: '',
-    ecosystem: 'mixed',
-    direct: 0,
-    transitive: 0,
-    total: 0,
-    edgeCount: 0,
-    lockfile: { present: false, consistent: false, integrityVerified: false },
-    trustCounts: {},
-    licenseMatrix: { total: 0, byCategory: {}, entries: [] },
-    typosquatFindings: [],
-    lockfileVerification: { status: 'missing', diffs: [], integrityFailures: [] },
-    upgradeAssessments: [],
-    envEntries: [],
-    generatedAt: new Date().toISOString(),
-    error,
-  };
-}
-
 /**
  * 从 DependencyReportData 提取 deps 域 dashboard-state patch。
  *
@@ -849,6 +849,65 @@ async function buildPipelineExtras(projectPath: string): Promise<PipelineExtras>
  * 不经 TaskManager / worker。返回依赖图谱 + 许可证矩阵 + 投毒检测 +
  * 锁文件校验 + 升级评估 + 环境一致性报告。
  */
+type DepsChecks = {
+  typosquat: { findings: TyposquatFinding[]; error?: string };
+  lockfileCheck: { verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string };
+  upgrade: { assessments: UpgradeAssessment[]; error?: string };
+  env: { entries: EnvEntry[]; error?: string };
+};
+
+/** 组装依赖盘点报告（含各检查结果与错误透传） */
+function buildDepsReport(
+  graph: DependencyGraph,
+  matrix: ReturnType<typeof buildLicenseMatrix>,
+  nodes: DependencyNode[],
+  checks: DepsChecks,
+): DependencyReportData {
+  const { typosquat, lockfileCheck, upgrade, env } = checks;
+  return {
+    schemaVersion: graph.schemaVersion,
+    targetId: graph.targetId,
+    ecosystem: graph.ecosystem,
+    direct: nodes.filter((node: { kind: string }) => node.kind === 'direct').length,
+    transitive: nodes.filter((node: { kind: string }) => node.kind === 'transitive').length,
+    total: nodes.length,
+    edgeCount: graph.edges.length,
+    lockfile: graph.lockfile,
+    trustCounts: countTrustCounts(nodes),
+    licenseMatrix: matrix,
+    generatedAt: graph.generatedAt,
+    error: null,
+    typosquatFindings: typosquat.findings,
+    lockfileVerification: lockfileCheck.verification,
+    upgradeAssessments: upgrade.assessments,
+    envEntries: env.entries,
+    ...(typosquat.error ? { typosquatError: typosquat.error } : {}),
+    ...(lockfileCheck.error ? { lockfileError: lockfileCheck.error } : {}),
+    ...(upgrade.error ? { upgradeError: upgrade.error } : {}),
+    ...(env.error ? { envError: env.error } : {}),
+  };
+}
+
+/** 依赖盘点结果落盘诊断（best-effort，失败仅记录日志） */
+async function persistDepsDiagnostics(
+  projectPath: string,
+  report: DependencyReportData,
+): Promise<void> {
+  try {
+    await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report), ['deps']);
+  } catch (e) {
+    console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** P1b: 补写 dashboard-state deps 域（漏洞 severity 计数 + 可升级数 + lastRunAt） */
+async function updateDepsDashboard(
+  projectPath: string,
+  report: DependencyReportData,
+): Promise<void> {
+  await updateDashboardState(projectPath, { deps: depsDashboardPatch(report) });
+}
+
 async function runDepsHandler(projectPath: string): Promise<DependencyReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
@@ -873,39 +932,18 @@ async function runDepsHandler(projectPath: string): Promise<DependencyReportData
     if (!baseline && lockfileCheck.verification.status === 'clean') {
       await saveDepsBaseline(projectRoot, integritySnapshot(nodes));
     }
-    const report: DependencyReportData = {
-      schemaVersion: graph.schemaVersion,
-      targetId: graph.targetId,
-      ecosystem: graph.ecosystem,
-      direct: nodes.filter((node: { kind: string }) => node.kind === 'direct').length,
-      transitive: nodes.filter((node: { kind: string }) => node.kind === 'transitive').length,
-      total: nodes.length,
-      edgeCount: graph.edges.length,
-      lockfile: graph.lockfile,
-      trustCounts: countTrustCounts(nodes),
-      licenseMatrix: matrix,
-      generatedAt: graph.generatedAt,
-      error: null,
-      typosquatFindings: typosquat.findings,
-      lockfileVerification: lockfileCheck.verification,
-      upgradeAssessments: upgrade.assessments,
-      envEntries: env.entries,
-      ...(typosquat.error ? { typosquatError: typosquat.error } : {}),
-      ...(lockfileCheck.error ? { lockfileError: lockfileCheck.error } : {}),
-      ...(upgrade.error ? { upgradeError: upgrade.error } : {}),
-      ...(env.error ? { envError: env.error } : {}),
-    };
-    try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report), ['deps']);
-    } catch (e) {
-      console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
-    }
-    // P1b: 补写 dashboard-state deps 域（漏洞 severity 计数 + 可升级数 + lastRunAt）
-    await updateDashboardState(projectPath, { deps: depsDashboardPatch(report) });
+    const report = buildDepsReport(graph, matrix, nodes, {
+      typosquat,
+      lockfileCheck,
+      upgrade,
+      env,
+    });
+    await persistDepsDiagnostics(projectPath, report);
+    await updateDepsDashboard(projectPath, report);
     return report;
   } catch (err) {
     console.error('[engine:runDeps] Error:', err);
-    return emptyDepsReport(err instanceof Error ? err.message : String(err));
+    return emptyDependencyReportData(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -1099,6 +1137,84 @@ async function loadDebtInputFromSnapshot(projectPath: string): Promise<DebtInput
  * 由 @zh/scoring buildTechDebtDashboard 生成 ROI 排序报告。
  * 无快照时返回带 error 的空报告（显式提示先跑体检），不静默显示 0 债务。
  */
+/** 组装技术债仪表盘快照：读 inspect 快照 + git 模块热度 + 对外接口清单 */
+async function buildTechDebtSnapshot(
+  projectPath: string,
+  input: Extract<DebtInputResult, { ok: true }>,
+): Promise<ReturnType<typeof buildTechDebtDashboard>> {
+  const moduleHotness = await collectModuleHotness(projectPath);
+  const exposedFiles = await collectExposedFilesInWorker(projectPath);
+  return buildTechDebtDashboard({
+    projectId: input.projectId,
+    issues: input.issues,
+    moduleHotness,
+    exposedFiles,
+  });
+}
+
+/** 合并债务动作状态与趋势（best-effort：持久化不可用时降级为纯计算） */
+async function mergeDebtPersistence(
+  snapshot: ReturnType<typeof buildTechDebtDashboard>,
+): Promise<ReturnType<typeof buildTechDebtDashboard>> {
+  try {
+    const db = getDb();
+    const projectId = snapshot.projectId;
+    const persisted = getDebtActionsByProject(db, projectId);
+    let finalSnapshot = {
+      ...snapshot,
+      actionList: mergeActionStatuses(
+        snapshot.actionList,
+        persisted.map((row) => ({ actionId: row.action_id, status: row.status })),
+      ),
+    };
+    const previous = getLatestDebtSnapshot(db, projectId);
+    finalSnapshot = {
+      ...finalSnapshot,
+      trend: {
+        ...finalSnapshot.trend,
+        delta: computeTrendDelta(snapshot.debtIndex, previous ? previous.debt_index : null),
+      },
+    };
+    saveDebtSnapshot(db, { projectId, debtIndex: snapshot.debtIndex });
+    return finalSnapshot;
+  } catch (err) {
+    console.warn(
+      '[engine:runTechDebt] 债务状态持久化不可用，降级为纯计算:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return snapshot;
+  }
+}
+
+/** 技术债报告落盘诊断（best-effort，失败仅记录日志） */
+async function persistTechDebtDiagnostics(
+  projectPath: string,
+  report: TechDebtReportData,
+): Promise<void> {
+  try {
+    await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report), ['techdebt']);
+  } catch (e) {
+    console.warn(
+      '[engine:runTechDebt] 诊断落盘失败:',
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
+/** P1b: 补写 dashboard-state techdebt 域（debtIndex + 动作数 + lastRunAt） */
+async function updateTechDebtDashboard(
+  projectPath: string,
+  report: TechDebtReportData,
+): Promise<void> {
+  await updateDashboardState(projectPath, {
+    techdebt: {
+      debtIndex: report.debtIndex,
+      issueCount: report.actionList.length,
+      lastRunAt: new Date().toISOString(),
+    },
+  });
+}
+
 async function runTechDebtHandler(projectPath: string): Promise<TechDebtReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
@@ -1109,60 +1225,11 @@ async function runTechDebtHandler(projectPath: string): Promise<TechDebtReportDa
       console.warn('[engine:runTechDebt] 无 inspect 域快照，提示先运行项目体检');
       return emptyTechDebtReport(t('electron.techDebtNoSnapshot'));
     }
-    const moduleHotness = await collectModuleHotness(projectPath);
-    const exposedFiles = await collectExposedFilesInWorker(projectPath);
-    const snapshot = buildTechDebtDashboard({
-      projectId: input.projectId,
-      issues: input.issues,
-      moduleHotness,
-      exposedFiles,
-    });
-    let finalSnapshot = snapshot;
-    try {
-      const db = getDb();
-      const projectId = snapshot.projectId;
-      const persisted = getDebtActionsByProject(db, projectId);
-      finalSnapshot = {
-        ...snapshot,
-        actionList: mergeActionStatuses(
-          snapshot.actionList,
-          persisted.map((row) => ({ actionId: row.action_id, status: row.status })),
-        ),
-      };
-      const previous = getLatestDebtSnapshot(db, projectId);
-      finalSnapshot = {
-        ...finalSnapshot,
-        trend: {
-          ...finalSnapshot.trend,
-          delta: computeTrendDelta(snapshot.debtIndex, previous ? previous.debt_index : null),
-        },
-      };
-      saveDebtSnapshot(db, { projectId, debtIndex: snapshot.debtIndex });
-    } catch (err) {
-      console.warn(
-        '[engine:runTechDebt] 债务状态持久化不可用，降级为纯计算:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
+    const snapshot = await buildTechDebtSnapshot(projectPath, input);
+    const finalSnapshot = await mergeDebtPersistence(snapshot);
     const report: TechDebtReportData = { ...finalSnapshot, error: null };
-    try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report), [
-        'techdebt',
-      ]);
-    } catch (e) {
-      console.warn(
-        '[engine:runTechDebt] 诊断落盘失败:',
-        e instanceof Error ? e.message : String(e),
-      );
-    }
-    // P1b: 补写 dashboard-state techdebt 域（debtIndex + 动作数 + lastRunAt）
-    await updateDashboardState(projectPath, {
-      techdebt: {
-        debtIndex: report.debtIndex,
-        issueCount: report.actionList.length,
-        lastRunAt: new Date().toISOString(),
-      },
-    });
+    await persistTechDebtDiagnostics(projectPath, report);
+    await updateTechDebtDashboard(projectPath, report);
     return report;
   } catch (err) {
     console.error('[engine:runTechDebt] Error:', err);
@@ -1492,21 +1559,58 @@ async function getScoreHistoryHandler(
 }
 
 /**
- * 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分。
- * 评分在落盘时由 @zh/scoring 统一计算（与报告中心汇总同一函数），此处只读不算；
- * 快照缺失或为旧格式（无 dimensionScore）时返回 null，由渲染层回退到报告中心汇总。
+ * 分类页实时评分返回：generatedAt 允许 null（该域无时间锚点时由渲染层回退汇总）。
+ */
+type DomainScoreDataLike = Omit<DomainScoreData, 'generatedAt'> & { generatedAt: string | null };
+
+/**
+ * 分类页实时评分（engine:getDomainScore）：按维度实时算分，只读不算。
+ *
+ * 只读不算：绝不调用 calculate（会写库，批 6/铁律）——本路径只调
+ * buildHealthDimensions 直接算该维分数，不落库、不写任何快照。
+ *
+ * - quality 走快照快路径：inspect 快照落盘时已当场出分（含 previousScore 对比基线），
+ *   直接透传，保持既有语义与 e2e。
+ * - 其余 9 维 compose-on-read：与报告中心汇总共用 assembleHealthInputs 组装输入，
+ *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
  */
 async function getDomainScoreHandler(
   _event: Electron.IpcMainInvokeEvent,
   projectPath: string,
-): Promise<DomainScoreData | null> {
+  dimension: ScoreDimension,
+): Promise<DomainScoreDataLike | null> {
   try {
-    const snap = await readDomainSnapshot(projectPath, 'inspect');
-    if (!snap?.dimensionScore) return null;
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    if (!isScoreDimension(dimension)) {
+      throw new Error(`unknown dimension: ${String(dimension)}`);
+    }
+    // quality 快路径：保持既有行为（快照自带评分 + previousScore 对比基线）
+    if (dimension === 'quality') {
+      return qualityFastPathScore(await readDomainSnapshot(projectPath, 'inspect'));
+    }
+    // 其余 9 维：compose-on-read，与报告中心汇总共用同一输入组装
+    const inputs = await assembleHealthInputs(projectPath, {
+      listGuardReports,
+      readDomainSnapshot,
+      readDashboardState,
+      buildPipelineExtras,
+    });
+    const dimensions = buildHealthDimensions({
+      guard: inputs.guard,
+      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
+      projectRoot: projectPath,
+      extras: inputs.extras,
+    });
+    const entry = dimensions.find((d) => d.name === dimension);
+    if (!entry) return null;
     return {
-      ...snap.dimensionScore,
-      generatedAt: snap.generatedAt,
-      previousScore: snap.previousScore,
+      dimension: entry.name,
+      score: entry.score,
+      issues: entry.issues,
+      status: entry.status ?? 'scored',
+      generatedAt: inputs.timestamps[dimension],
     };
   } catch (err) {
     console.warn(

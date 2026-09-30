@@ -89,8 +89,9 @@ export function computeDimensionTrends(
 
   for (const score of window) {
     for (const dim of score.dimensions) {
-      if (!dimMap.has(dim.name)) dimMap.set(dim.name, []);
-      dimMap.get(dim.name)!.push(dim.score);
+      const scores = dimMap.get(dim.name) ?? [];
+      scores.push(dim.score);
+      dimMap.set(dim.name, scores);
     }
   }
 

@@ -6,8 +6,13 @@ import { HttpError, withRetry } from './retry';
 
 // ─── 类型 ────────────────────────────────────────────────────
 
+/** 经验回写类型：误报标记、真阳性确认、修复建议、新问题模式 */
 export type ExperienceType = 'false_positive' | 'true_positive' | 'fix_suggestion' | 'new_pattern';
 
+/**
+ * 单条经验记录：待回写云端大脑的一条用户反馈。
+ * codePattern 与 fixSteps 仅在对应类型下有意义。
+ */
 export interface ExperienceRecord {
   /** 回写类型 */
   type: ExperienceType;
@@ -34,6 +39,7 @@ export interface ExperienceRecord {
   timestamp: string;
 }
 
+/** 经验回写结果：直接发送成功数、失败后入队待重试数与最终失败数 */
 export interface ExperienceReportResult {
   sent: number;
   queued: number;

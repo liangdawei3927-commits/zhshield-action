@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+/**
+ * 审计日志条目：单条操作记录。
+ * 通过 previousHash 与 hash 串联成哈希链，任何一条被篡改都会导致后续校验失败。
+ */
 export interface AuditEntry {
   id: string;
   timestamp: Date;
@@ -13,6 +17,7 @@ export interface AuditEntry {
   hash: string;
 }
 
+/** 审计日志查询条件：所有字段可选，未提供即不参与过滤，limit 用于限制返回条数 */
 export interface AuditQuery {
   startDate?: Date;
   endDate?: Date;
@@ -21,6 +26,10 @@ export interface AuditQuery {
   limit?: number;
 }
 
+/**
+ * 审计日志统计结果。
+ * dateRange 为 null 表示当前无任何条目。
+ */
 export interface AuditStats {
   totalEntries: number;
   byAction: Record<string, number>;
@@ -105,8 +114,12 @@ export class AuditLogger {
 
     const byAction: Record<string, number> = {};
     const byUser: Record<string, number> = {};
-    let earliest = entries[0]!.timestamp;
-    let latest = entries[0]!.timestamp;
+    const first = entries[0];
+    if (first === undefined) {
+      return { totalEntries: 0, byAction: {}, byUser: {}, dateRange: null };
+    }
+    let earliest = first.timestamp;
+    let latest = first.timestamp;
 
     for (const entry of entries) {
       byAction[entry.action] = (byAction[entry.action] ?? 0) + 1;
@@ -153,7 +166,8 @@ export class AuditLogger {
 
   private async getLastHash(): Promise<string> {
     const entries = await this.loadAllEntries();
-    return entries.length > 0 ? entries.at(-1)!.hash : '';
+    const last = entries.at(-1);
+    return last === undefined ? '' : last.hash;
   }
 
   private async appendEntry(entry: AuditEntry): Promise<void> {
@@ -195,25 +209,33 @@ export class AuditLogger {
       return [];
     }
 
-    const files = (await fs.promises.readdir(this.logDir))
+    const files = await this.listLogFiles();
+    const entries: AuditEntry[] = [];
+    for (const file of files) {
+      entries.push(...(await this.parseLogFile(file)));
+    }
+    return entries;
+  }
+
+  private async listLogFiles(): Promise<string[]> {
+    return (await fs.promises.readdir(this.logDir))
       .filter((f) => f.endsWith('.jsonl'))
       .sort();
-    const entries: AuditEntry[] = [];
+  }
 
-    for (const file of files) {
-      const content = await fs.promises.readFile(join(this.logDir, file), 'utf-8');
-      const lines = content.split('\n').filter((l) => l.trim());
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line) as AuditEntry;
-          entry.timestamp = new Date(entry.timestamp);
-          entries.push(entry);
-        } catch {
-          /* skip malformed lines */
-        }
+  private async parseLogFile(file: string): Promise<AuditEntry[]> {
+    const content = await fs.promises.readFile(join(this.logDir, file), 'utf-8');
+    const lines = content.split('\n').filter((l) => l.trim());
+    const entries: AuditEntry[] = [];
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as AuditEntry;
+        entry.timestamp = new Date(entry.timestamp);
+        entries.push(entry);
+      } catch {
+        /* skip malformed lines */
       }
     }
-
     return entries;
   }
 

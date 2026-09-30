@@ -14,6 +14,13 @@ export const VERSION = '0.1.0';
 export { detectFsGarbage } from './fs-detector';
 export { cleanGarbage, restoreGarbage } from './cleaner';
 export {
+  isDeletableItem,
+  isDeletablePath,
+  isDeletableType,
+  partitionByDeletability,
+} from './deletable';
+export type { DeletablePartition } from './deletable';
+export {
   GARBAGE_RULE_TYPE_MAP,
   isGarbageRuleMapped,
   mapRuleIdToGarbageType,

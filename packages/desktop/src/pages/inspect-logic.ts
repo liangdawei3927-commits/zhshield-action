@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
 import { runPipeline } from '../services/engineApi';
 import type { InspectionReportData } from '../types/electron';
-import { toInspectionReportDataFromRuleEngine } from './inspect-sop-mapper';
+import { selectIssueChecks, toInspectionReportDataFromRuleEngine } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { copyIssuesToAi } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useTaskRun } from '../task-store';
 
@@ -61,29 +61,18 @@ function useInspectReport(projectPath: string): {
 function useInspectRun(projectPath: string): {
   report: InspectionReportData | null;
   loading: boolean;
+  progress: number;
   progressLabel: string;
+  statusMessage: string;
   startInspect: () => Promise<void>;
 } {
   const { report, run } = useInspectReport(projectPath);
   // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）
-  const { loading, progressLabel } = useTaskRun('pipeline', projectPath);
+  const { loading, progress, progressLabel, statusMessage } = useTaskRun('pipeline', projectPath);
 
   const startInspect = useCallback(() => run(), [run]);
 
-  return { report, loading, progressLabel, startInspect };
-}
-
-/** 复制单个检查项到 AI 修复 */
-function copyIssuesToAi(
-  projectPath: string,
-  issues: AiFixIssue[],
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-): void {
-  const text = buildAiFixPrompt(projectPath, issues);
-  void copyTextToClipboard(text).then(
-    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-    () => toast(t('toast.copyFailed'), 'error'),
-  );
+  return { report, loading, progress, progressLabel, statusMessage, startInspect };
 }
 
 function useInspectCopyToAi(projectPath: string): {
@@ -94,33 +83,30 @@ function useInspectCopyToAi(projectPath: string): {
 
   const copyToAi = useCallback(
     (item: InspectionReportData['checks'][number]) => {
-      copyIssuesToAi(
-        projectPath,
-        [
-          {
-            source: t('page.inspect.source'),
-            ruleId: item.id,
-            message: `${item.name} — ${item.detail}`,
-          },
-        ],
-        toast,
-      );
+      copyIssuesToAi(projectPath, toast, [
+        {
+          source: t('page.inspect.source'),
+          ruleId: item.id,
+          message: `${item.name} — ${item.detail}`,
+          domain: 'inspect',
+        },
+      ]);
     },
     [projectPath, toast],
   );
 
   const copyAllToAi = useCallback(
     (items: InspectionReportData['checks']) => {
-      const failed = items.filter((i) => i.status !== 'pass');
+      const failed = selectIssueChecks(items);
       if (failed.length === 0) return;
       copyIssuesToAi(
         projectPath,
+        toast,
         failed.map((item) => ({
           source: t('page.inspect.source'),
           ruleId: item.id,
           message: `${item.name} — ${item.detail}`,
         })),
-        toast,
       );
     },
     [projectPath, toast],
@@ -131,9 +117,19 @@ function useInspectCopyToAi(projectPath: string): {
 
 /** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
-  const { report, loading, progressLabel, startInspect } = useInspectRun(projectPath);
+  const { report, loading, progress, progressLabel, statusMessage, startInspect } =
+    useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
   useDailyAutoCheck('inspect', projectPath, () => void startInspect());
 
-  return { report, loading, progressLabel, copyToAi, copyAllToAi, startInspect };
+  return {
+    report,
+    loading,
+    progress,
+    progressLabel,
+    statusMessage,
+    copyToAi,
+    copyAllToAi,
+    startInspect,
+  };
 }

@@ -3,8 +3,11 @@ import type { Issue, ToolOutputMapper } from './types';
 
 // ─── 工具原始输出类型（仅声明 mapper 实际读取的字段）─────────
 // 外部工具输出为 JSON，入口处断言 + 运行时守卫（Array.isArray 等）保证安全。
+// 这组类型是全仓工具输出结构的**唯一来源**：@zh/security 的 tool-output-types
+// 原样重导出它们，故新增字段只改此处。
 
-interface EslintFile {
+/** ESLint 单文件结果：命中列表与修复/建议载荷 */
+export interface EslintFile {
   filePath?: string;
   messages?: Array<{
     ruleId?: string;
@@ -17,7 +20,8 @@ interface EslintFile {
   }>;
 }
 
-interface SemgrepResult {
+/** Semgrep 单条匹配：规则 ID、命中位置与 extra 元信息（severity / message / fix / 污点链） */
+export interface SemgrepResult {
   check_id?: string;
   path?: string;
   start?: { line?: number; col?: number };
@@ -26,13 +30,42 @@ interface SemgrepResult {
     message?: string;
     fix?: string;
     metadata?: { description?: string };
+    /** dataflow_trace 的 extra 嵌套变体（部分包装器输出），兼容读取 */
+    dataflow_trace?: SemgrepDataflowTrace;
   };
+  /** 污点数据流链（SARIF codeFlows 子集），仅 join_mode/trace 规则输出 */
+  dataflow_trace?: SemgrepDataflowTrace;
 }
-interface SemgrepOutput {
+
+/** Semgrep JSON 输出顶层结构：results 为规则匹配列表（缺 results 表示零匹配） */
+export interface SemgrepOutput {
   results?: SemgrepResult[];
 }
 
-interface TrivyVulnerability {
+/** 污点数据流链容器（SARIF codeFlows 子集）：仅 join_mode / trace 类规则输出 */
+export interface SemgrepDataflowTrace {
+  code_flows?: SemgrepCodeFlow[];
+}
+
+/** 单条代码流：内含线程流列表 */
+export interface SemgrepCodeFlow {
+  thread_flows?: SemgrepThreadFlow[];
+}
+
+/** 单条线程流：污点传播依次经过的位置序列 */
+export interface SemgrepThreadFlow {
+  locations?: SemgrepFlowLocation[];
+}
+
+/** 流中的一个位置节点：文件路径 + 行列，并携带该步的说明文案 */
+export interface SemgrepFlowLocation {
+  /** 部分条目可能缺失 location 子对象，映射时需跳过 */
+  location?: { path?: string; start?: { line?: number; col?: number } };
+  message?: string;
+}
+
+/** Trivy 单条漏洞：包坐标 + 已装/修复版本 + 原始严重级别与标题 */
+export interface TrivyVulnerability {
   VulnerabilityID?: string;
   PkgName?: string;
   InstalledVersion?: string;
@@ -40,30 +73,40 @@ interface TrivyVulnerability {
   Title?: string;
   Severity?: string;
 }
-interface TrivySecret {
+
+/** Trivy 单条密钥命中：规则 ID + 所在文件与起始行 */
+export interface TrivySecret {
   RuleID?: string;
   Title?: string;
   File?: string;
   StartLine?: number;
 }
-interface TrivyResult {
+
+/** Trivy 单个扫描目标的结果分组：漏洞与密钥命中分别挂在 Vulnerabilities / Secrets */
+export interface TrivyResult {
   Target?: string;
   Vulnerabilities?: TrivyVulnerability[];
   Secrets?: TrivySecret[];
 }
-interface TrivyOutput {
+
+/** Trivy JSON 输出顶层结构：Results 按扫描目标（文件系统 / 依赖清单等）分组 */
+export interface TrivyOutput {
   Results?: TrivyResult[];
 }
 
-interface GrypeMatch {
+/** Grype 单条匹配：漏洞元信息（id/严重级别/描述/修复版本）+ 受影响构件（包名@版本） */
+export interface GrypeMatch {
   vulnerability?: { id?: string; severity?: string; description?: string; fixedInVersion?: string };
   artifact?: { name?: string; version?: string };
 }
-interface GrypeOutput {
+
+/** Grype JSON 输出顶层结构：matches 为漏洞匹配列表 */
+export interface GrypeOutput {
   matches?: GrypeMatch[];
 }
 
-interface GitleaksFinding {
+/** Gitleaks 单条密钥命中：规则 ID、说明文案、文件与起止行列 */
+export interface GitleaksFinding {
   RuleID?: string;
   Description?: string;
   File?: string;
@@ -71,21 +114,26 @@ interface GitleaksFinding {
   StartColumn?: number;
 }
 
-interface DepcheckOutput {
+/** Depcheck JSON 输出：未被引用（可删除）的运行时 / 开发依赖包名列表 */
+export interface DepcheckOutput {
   dependencies?: string[];
   devDependencies?: string[];
 }
 
-interface DepCruiserViolation {
+/** dependency-cruiser 单条架构违规：规则名/严重级别 + 违规来源与目标 */
+export interface DepCruiserViolation {
   rule?: { name?: string; severity?: string };
   from?: { path?: string; line?: number };
   to?: { path?: string };
 }
-interface DepCruiserOutput {
+
+/** dependency-cruiser JSON 输出顶层结构：违规列表挂在 summary.violations */
+export interface DepCruiserOutput {
   summary?: { violations?: DepCruiserViolation[] };
 }
 
-interface JscpdDuplicate {
+/** jscpd 单条重复块：两处位置 + 重复代码格式（语言/扩展名） */
+export interface JscpdDuplicate {
   format?: string;
   first?: {
     location?: { path?: string; start?: { line?: number } };
@@ -94,7 +142,9 @@ interface JscpdDuplicate {
   };
   second?: { location?: { path?: string }; path?: string };
 }
-interface JscpdOutput {
+
+/** jscpd JSON 输出顶层结构：duplicates 为重复代码块列表 */
+export interface JscpdOutput {
   duplicates?: JscpdDuplicate[];
 }
 
@@ -107,6 +157,9 @@ export const eslintMapper: ToolOutputMapper = (output: unknown): Issue[] => {
     if (!file?.messages || !Array.isArray(file.messages)) continue;
     for (const msg of file.messages) {
       if (!msg.ruleId) continue;
+      const suggestion = msg.fix
+        ? '可自动修复'
+        : msg.suggestions?.map((s) => s.desc).join('; ') || undefined;
       issues.push({
         id: randomUUID(),
         ruleId: msg.ruleId,
@@ -116,9 +169,7 @@ export const eslintMapper: ToolOutputMapper = (output: unknown): Issue[] => {
         file: file.filePath || '',
         line: msg.line || 0,
         column: msg.column || 0,
-        suggestion: msg.fix
-          ? '可自动修复'
-          : msg.suggestions?.map((s) => s.desc).join('; ') || undefined,
+        ...(suggestion ? { suggestion } : {}),
         autoFixable: !!msg.fix,
         source: 'inspect',
         fingerprint: `${msg.ruleId}:${file.filePath || ''}:${msg.line || 0}`,
@@ -145,7 +196,7 @@ export const semgrepMapper: ToolOutputMapper = (output: unknown): Issue[] => {
     file: r.path || '',
     line: r.start?.line || 0,
     column: r.start?.col || 0,
-    suggestion: r.extra?.fix || undefined,
+    ...(r.extra?.fix ? { suggestion: r.extra.fix } : {}),
     autoFixable: !!r.extra?.fix,
     source: 'security',
     fingerprint: `semgrep:${r.check_id || ''}:${r.path || ''}:${r.start?.line || 0}`,
@@ -170,7 +221,7 @@ export const trivyMapper: ToolOutputMapper = (output: unknown): Issue[] => {
           file: result.Target || '',
           line: 0,
           column: 0,
-          suggestion: vuln.FixedVersion ? `升级到 ${vuln.FixedVersion}` : undefined,
+          ...(vuln.FixedVersion ? { suggestion: `升级到 ${vuln.FixedVersion}` } : {}),
           autoFixable: !!vuln.FixedVersion,
           source: 'security',
           fingerprint: `trivy:${vuln.VulnerabilityID || ''}:${result.Target || ''}:${vuln.PkgName || ''}`,
@@ -214,9 +265,9 @@ export const grypeMapper: ToolOutputMapper = (output: unknown): Issue[] => {
       file: '',
       line: 0,
       column: 0,
-      suggestion: m.vulnerability?.fixedInVersion
-        ? `升级到 ${m.vulnerability.fixedInVersion}`
-        : undefined,
+      ...(m.vulnerability?.fixedInVersion
+        ? { suggestion: `升级到 ${m.vulnerability.fixedInVersion}` }
+        : {}),
       autoFixable: !!m.vulnerability?.fixedInVersion,
       source: 'security',
       fingerprint: `grype:${m.vulnerability?.id || ''}:${m.artifact?.name || ''}`,

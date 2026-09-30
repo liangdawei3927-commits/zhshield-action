@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { Adapter, CheckConfig, CheckResult } from '../types';
+import { makeAdapterResult, resolveScanTargetDir, toErrorMessage } from './adapter-result';
+import { collectSourceFiles } from './source-files';
 import { detectLayer, detectLayerByName } from '@zh/kernel';
 import {
   ARCH_LAYER_EXCLUDE_PATTERNS,
@@ -51,15 +53,13 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
   ): { violations: Violation[]; error?: string } {
-    const targetDir = context.repoRoot || context.projectPath;
-    if (!targetDir)
-      throw new Error(`${_check.checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
+    const targetDir = resolveScanTargetDir(context, _check.checkId);
     const violations: Violation[] = [];
 
     try {
       this.scanProject(targetDir, violations);
     } catch (error: unknown) {
-      return { violations: [], error: error instanceof Error ? error.message : String(error) };
+      return { violations: [], error: toErrorMessage(error) };
     }
 
     return { violations };
@@ -71,7 +71,11 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     const scanRoot = fs.existsSync(srcDir) ? srcDir : targetDir;
     const ctx: ScanContext = { rootDir: targetDir, scanRoot };
 
-    for (const file of this.collectFiles(scanRoot)) {
+    for (const file of collectSourceFiles(
+      scanRoot,
+      (name) => ARCH_LAYER_EXCLUDED_DIRS.includes(name),
+      (name) => SCAN_FILE_EXT.test(name) && !name.endsWith('.d.ts'),
+    )) {
       const relativePath = path.relative(ctx.rootDir, file).replace(/\\/g, '/');
       if (this.isExcludedPath(relativePath)) continue;
       // 层判定按目录名进行；未命中任何层名的文件不产生结论（不误报）
@@ -79,29 +83,6 @@ export class ArchitectureBoundaryAdapter implements Adapter {
       if (!fromLayer) continue;
       this.scanFileImports(file, relativePath, fromLayer, violations);
     }
-  }
-
-  /** 递归收集源码文件（跳过依赖/构建产物/隐藏目录） */
-  private collectFiles(dir: string): string[] {
-    const files: string[] = [];
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return files;
-    }
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (ARCH_LAYER_EXCLUDED_DIRS.includes(entry.name) || entry.name.startsWith('.')) continue;
-        files.push(...this.collectFiles(fullPath));
-        continue;
-      }
-      if (SCAN_FILE_EXT.test(entry.name) && !entry.name.endsWith('.d.ts')) {
-        files.push(fullPath);
-      }
-    }
-    return files;
   }
 
   /** 测试/声明/产物文件不参与层判定（与规则 YAML 的 excludePatterns 对齐） */
@@ -146,39 +127,22 @@ export class ArchitectureBoundaryAdapter implements Adapter {
     check: CheckConfig,
   ): CheckResult {
     if (rawResult.error) {
-      return this.makeResult(check, 'error', `模块边界检查失败: ${rawResult.error}`);
+      return makeAdapterResult(check, 'error', `模块边界检查失败: ${rawResult.error}`);
     }
 
     const violations = rawResult.violations;
     if (violations.length === 0) {
-      return this.makeResult(check, 'passed', '模块边界检查通过，未发现跨层违规引用');
+      return makeAdapterResult(check, 'passed', '模块边界检查通过，未发现跨层违规引用');
     }
 
     const details = violations.map(
       (v) => `${v.file}:${v.line} [${v.fromLayer}→${v.toLayer}] ${v.importPath}`,
     );
-    return this.makeResult(
+    return makeAdapterResult(
       check,
       'failed',
       `发现 ${violations.length} 处跨层违规引用:\n${details.join('\n')}`,
       { violations, count: violations.length },
     );
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

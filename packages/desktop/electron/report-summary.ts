@@ -9,9 +9,10 @@
  * ScoringEngine.calculate），差别只在数据来源：pipeline 吃刚跑完的报告，
  * 汇总吃各域已持久化的结果。因此需要「落盘结果 → 算法输入形状」的映射，即本模块职责。
  */
-import type { GuardCheckLike, InspectIssueLike } from '@zh/scoring';
+import type { GuardCheckLike, GuardReportLike, InspectIssueLike } from '@zh/scoring';
 import type { GuardReportRecord } from '@zh/guard';
-import type { DiagnosticEntry } from './zh-diagnostics';
+import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics';
+import type { DashboardState } from './ipc/dashboard-state';
 
 /**
  * 扩展域（secrets/deps/techdebt/refactor/performance/garbage/sentinel/backup）最新数据契约，
@@ -60,9 +61,13 @@ export function toGuardChecks(checks: readonly GuardReportCheck[]): GuardCheckLi
   }));
 }
 
-/** 诊断条目 → quality/security/dependencies 维度用的 inspect 问题（维度映射只用 severity + category） */
+/** 诊断条目 → quality/security/dependencies 维度用的 inspect 问题（维度映射用 severity+category，S1 规则聚合另需 ruleId） */
 export function toInspectIssues(issues: readonly DiagnosticEntry[]): InspectIssueLike[] {
-  return issues.map((issue) => ({ severity: issue.severity, category: issue.category }));
+  return issues.map((issue) => ({
+    severity: issue.severity,
+    category: issue.category,
+    ruleId: issue.ruleId,
+  }));
 }
 
 /**
@@ -74,4 +79,164 @@ export function toInspectIssues(issues: readonly DiagnosticEntry[]): InspectIssu
  */
 export function hasAnyExtraResult(extras: PipelineExtras): boolean {
   return Object.values(extras).some((value) => value !== null && value !== undefined);
+}
+
+// ─── 输入组装（报告中心汇总 ② 与分类页实时评分共用） ─────────────────
+
+/** 参与总分的 10 个评分维度（与 @zh/scoring 的 DIMENSION_CATEGORIES 键一致，十域评分体系 v2） */
+export type ScoreDimension =
+  | 'quality'
+  | 'gate'
+  | 'security'
+  | 'dependencies'
+  | 'techdebt'
+  | 'refactor'
+  | 'performance'
+  | 'sentinel'
+  | 'garbage'
+  | 'backup';
+
+export const SCORE_DIMENSIONS: readonly ScoreDimension[] = [
+  'quality',
+  'gate',
+  'security',
+  'dependencies',
+  'techdebt',
+  'refactor',
+  'performance',
+  'sentinel',
+  'garbage',
+  'backup',
+];
+
+export function isScoreDimension(value: unknown): value is ScoreDimension {
+  return typeof value === 'string' && (SCORE_DIMENSIONS as readonly string[]).includes(value);
+}
+
+/**
+ * buildHealthDimensions 的输入（报告中心汇总 ② 与分类页实时评分共用，
+ * 两条路径结构上不可能漂移）。
+ */
+export interface HealthInputs {
+  /** gate 维度输入：最近一次 guard 报告记录（listGuardReports[0]）；无记录 → null */
+  guard: GuardReportLike | null;
+  /**
+   * quality/security/dependencies 维度输入：inspect 快照条目 + Q4 并入的
+   * security/deps 专用扫描条目；无任何来源 → null（各维按 not-run 处理）。
+   */
+  inspectIssues: InspectIssueLike[] | null;
+  /** 项目 ESLOC（S2 密度归一化分母）。来自 inspect 快照落盘时算好的值，与落盘出分同口径 */
+  esloc?: number;
+  /** 扩展域数据（secrets/deps/techdebt/refactor/performance/garbage/sentinel/backup） */
+  extras: PipelineExtras;
+  /** 各维度新鲜度锚点（generatedAt 来源见 assembleHealthInputs 内注释）；无该域时间锚点 → null */
+  timestamps: Record<ScoreDimension, string | null>;
+}
+
+/** assembleHealthInputs 的外部读取依赖（注入以便零 Electron 依赖单测） */
+export interface HealthInputReads {
+  listGuardReports: (projectPath: string) => GuardReportRecord[];
+  readDomainSnapshot: (
+    projectPath: string,
+    source: DiagnosticSource,
+  ) => Promise<DiagnosticsReport | null>;
+  readDashboardState: (projectPath: string) => Promise<DashboardState>;
+  buildPipelineExtras: (projectPath: string) => Promise<PipelineExtras>;
+  /** 哨兵/备份为实时状态维，时间锚点取「现在」；测试可注入固定时钟 */
+  now?: () => string;
+}
+
+/** 取多个 ISO 时间戳中的最新者（ISO 字符串字典序即时间序）；全空 → null */
+function maxTimestamp(...values: Array<string | null | undefined>): string | null {
+  const valid = values.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  if (valid.length === 0) return null;
+  return valid.reduce((max, v) => (v > max ? v : max));
+}
+
+/** quality 快路径返回：inspect 快照自带评分 + 对比基线（无快照或无评分 → null） */
+export type QualityFastPathScore = {
+  dimension: 'quality';
+  score: number;
+  issues: number;
+  status: 'scored' | 'not-run';
+  version?: number;
+  generatedAt: string;
+  previousScore?: { score: number; generatedAt: string };
+};
+
+/** quality 快路径：透传 inspect 快照落盘时当场算好的 dimensionScore + previousScore */
+export function qualityFastPathScore(snap: DiagnosticsReport | null): QualityFastPathScore | null {
+  if (!snap?.dimensionScore) return null;
+  return {
+    ...snap.dimensionScore,
+    generatedAt: snap.generatedAt,
+    previousScore: snap.previousScore,
+  };
+}
+
+/**
+ * 组装 buildHealthDimensions 的输入（报告中心汇总 ② 与分类页实时评分共用）。
+ *
+ * 评分输入缺口修复（Q4）：security/deps 专用扫描的发现此前从未进入评分——
+ * 汇总只读 inspect 快照，意味着「只跑了 security 扫描」时 security 维永远 not-run，
+ * 安全页刚扫完仍显示「未检测」。现在把 security 快照的 security 类条目与 deps 快照的
+ * dependency 类条目并入 inspectIssues（仅并入 DIMENSION_CATEGORIES 覆盖的类别；
+ * malware/license/environment 不在十域映射内，不并入），使专用扫描结果终于进入
+ * buildHealthDimensions。
+ *
+ * timestamps 各维度锚点来源：
+ * - quality：inspect 快照 generatedAt（巡检完成时间）
+ * - gate：guard 报告记录 timestamp（listGuardReports 新→旧取 [0]）
+ * - security：max(dashboard-state.secrets.lastRunAt, security 快照 generatedAt)（合并来源）
+ * - dependencies：max(dashboard-state.deps.lastRunAt, deps 快照 generatedAt)（合并来源）
+ * - techdebt/refactor/performance/garbage：dashboard-state 对应域 lastRunAt
+ * - sentinel/backup：实时状态维（哨兵事件中心 / 备份记录实时读取），锚点取「现在」
+ */
+export async function assembleHealthInputs(
+  projectPath: string,
+  reads: HealthInputReads,
+): Promise<HealthInputs> {
+  const guardRecord = reads.listGuardReports(projectPath)[0] ?? null;
+  const [inspectSnapshot, securitySnapshot, depsSnapshot, state, extras] = await Promise.all([
+    reads.readDomainSnapshot(projectPath, 'inspect'),
+    reads.readDomainSnapshot(projectPath, 'security'),
+    reads.readDomainSnapshot(projectPath, 'deps'),
+    reads.readDashboardState(projectPath),
+    reads.buildPipelineExtras(projectPath),
+  ]);
+
+  const mergedIssues: InspectIssueLike[] = [];
+  if (inspectSnapshot) mergedIssues.push(...toInspectIssues(inspectSnapshot.issues));
+  if (securitySnapshot) {
+    mergedIssues.push(
+      ...toInspectIssues(securitySnapshot.issues.filter((issue) => issue.category === 'security')),
+    );
+  }
+  if (depsSnapshot) {
+    mergedIssues.push(
+      ...toInspectIssues(depsSnapshot.issues.filter((issue) => issue.category === 'dependency')),
+    );
+  }
+
+  const now = reads.now?.() ?? new Date().toISOString();
+  const timestamps: Record<ScoreDimension, string | null> = {
+    quality: inspectSnapshot?.generatedAt ?? null,
+    gate: guardRecord?.timestamp ?? null,
+    security: maxTimestamp(state.secrets?.lastRunAt, securitySnapshot?.generatedAt),
+    dependencies: maxTimestamp(state.deps?.lastRunAt, depsSnapshot?.generatedAt),
+    techdebt: state.techdebt?.lastRunAt ?? null,
+    refactor: state.refactor?.lastRunAt ?? null,
+    performance: state.performance?.lastRunAt ?? null,
+    garbage: state.garbage?.lastRunAt ?? null,
+    sentinel: now,
+    backup: now,
+  };
+
+  return {
+    guard: guardRecord ? { results: toGuardChecks(guardRecord.checks) } : null,
+    inspectIssues: mergedIssues.length > 0 || inspectSnapshot !== null ? mergedIssues : null,
+    esloc: inspectSnapshot?.esloc,
+    extras,
+    timestamps,
+  };
 }

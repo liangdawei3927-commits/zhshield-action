@@ -74,10 +74,10 @@ export function computeRuleContentSha(rule: SopRule): string {
     executionMode: rule.executionMode,
     accumulationPolicy: rule.accumulationPolicy ?? null,
     blockingThreshold: rule.blockingThreshold ?? null,
-    applicableEngines: [...rule.applicableEngines].sort(),
+    applicableEngines: rule.applicableEngines.toSorted(),
     serves: rule.serves ?? null,
     content: rule.content ?? {},
-    tags: [...rule.tags].sort(),
+    tags: rule.tags.toSorted(),
   };
   return crypto.createHash('sha256').update(stableStringify(stable)).digest('hex');
 }

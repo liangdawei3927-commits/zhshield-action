@@ -4,8 +4,6 @@ import type {
   GarbageRestoreResultData,
 } from '../types/electron';
 import { useT } from '../i18n';
-import { Bounce } from '../components/ui/Bounce';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { formatSize } from './garbage-list-parts';
 
 export {
@@ -15,44 +13,6 @@ export {
   GarbageList,
   GarbageActionBar,
 } from './garbage-list-parts';
-
-/** 绿色垃圾桶 SVG（线性风格） */
-export function GarbageTrashIcon() {
-  return (
-    <svg width="150" height="150" viewBox="0 0 150 150" fill="none">
-      <circle cx="75" cy="75" r="65" fill="rgb(var(--zh-success) / 0.05)" />
-      <circle cx="75" cy="75" r="55" fill="rgb(var(--zh-success) / 0.03)" />
-      <rect
-        x="42"
-        y="48"
-        width="66"
-        height="12"
-        rx="4"
-        fill="rgb(var(--zh-success) / 0.08)"
-        stroke="rgb(var(--zh-success))"
-        strokeWidth="2.5"
-      />
-      <path
-        d="M52 60h46l-5 54a8 8 0 01-8 7H65a8 8 0 01-8-7l-5-54z"
-        fill="rgb(var(--zh-success) / 0.08)"
-        stroke="rgb(var(--zh-success))"
-        strokeWidth="2.5"
-      />
-      <path
-        d="M60 48v-8a15 15 0 0130 0v8"
-        stroke="rgb(var(--zh-success))"
-        strokeWidth="2.5"
-        fill="none"
-      />
-      <path
-        d="M64 72l3 32M75 72v32M86 72l-3 32"
-        stroke="rgb(var(--zh-success))"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /** 未执行检测项提示：工具不可用 / 规则空跑时显式告知，禁止把「没查」当「没垃圾」 */
 export function GarbageSkippedNotice({ report }: { report: GarbageScanReportData }) {
@@ -72,61 +32,6 @@ export function GarbageSkippedNotice({ report }: { report: GarbageScanReportData
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function GarbageHeader({
-  report,
-  loading,
-  progressLabel,
-  onRescan,
-}: {
-  report: GarbageScanReportData;
-  loading: boolean;
-  progressLabel?: string;
-  onRescan: () => void;
-}) {
-  const t = useT();
-  return (
-    <div className="mb-8">
-      <div className="flex items-center gap-4">
-        <Bounce className="w-12 h-12 rounded-xl bg-success-50 flex items-center justify-center">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgb(var(--zh-success))"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 6h18" />
-            <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-          </svg>
-        </Bounce>
-        <div>
-          <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.garbage.done')}</h1>
-          <p className="text-sm text-zh-muted">
-            {t('page.garbage.summary', {
-              count: report.summary.total,
-              size: formatSize(report.summary.size),
-            })}
-          </p>
-        </div>
-        <PrimaryButton
-          className="ml-auto"
-          onClick={onRescan}
-          loading={loading}
-          loadingLabel={progressLabel || t('page.garbage.scanning')}
-        >
-          {t('page.garbage.rescan')}
-        </PrimaryButton>
-      </div>
-      <GarbageSkippedNotice report={report} />
     </div>
   );
 }

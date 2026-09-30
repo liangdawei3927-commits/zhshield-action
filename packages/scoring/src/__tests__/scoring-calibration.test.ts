@@ -88,12 +88,12 @@ function overallOf(
   guard = emptyGuard,
   inspect = emptyInspect,
 ): number {
-  const dims = buildHealthDimensions(guard, inspect, undefined, profile);
+  const dims = buildHealthDimensions({ guard, inspect, profile });
   return new ScoringEngine().calculate(profile.type, dims).overall;
 }
 
 function weightMapOf(profile: ScoringProjectProfile): Record<string, number> {
-  const dims = buildHealthDimensions(emptyGuard, emptyInspect, undefined, profile);
+  const dims = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile });
   return Object.fromEntries(dims.map((d) => [d.name, d.weight]));
 }
 
@@ -183,7 +183,12 @@ describe('评分校准 — 真实跑分（Task C）', () => {
     expect(real).toBeTruthy();
     expect(real.type).toBeTruthy();
 
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect, repoRoot, real);
+    const dims = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      projectRoot: repoRoot,
+      profile: real,
+    });
     const score = new ScoringEngine().calculate(repoRoot, dims);
     expect(score.overall).toBeGreaterThanOrEqual(0);
     expect(score.overall).toBeLessThanOrEqual(100);
@@ -210,7 +215,7 @@ describe('评分校准 — 真实跑分（Task C）', () => {
 
     const rows = TYPES.map((t) => {
       const profile = makeRealisticProfile(t);
-      const dims = buildHealthDimensions(mixedGuard, mixedInspect, undefined, profile);
+      const dims = buildHealthDimensions({ guard: mixedGuard, inspect: mixedInspect, profile });
       const score = new ScoringEngine().calculate(t, dims);
       const wm = weightMapOf(profile);
       return {

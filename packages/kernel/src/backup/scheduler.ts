@@ -5,6 +5,7 @@
  */
 import { type BackupScheduleConfig } from './types';
 
+/** 定时任务回调：可同步或异步完成，调度器按 cron 触发时调用 */
 export type CronCallback = () => void | Promise<void>;
 
 const WHITESPACE = /\s+/;

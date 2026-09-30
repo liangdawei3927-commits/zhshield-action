@@ -14,6 +14,7 @@ export interface DepCruiserNodeRef {
   line?: number;
 }
 
+/** dependency-cruiser 报告的单条违规：命中规则（含严重级别）与违规边（from → to） */
 export interface DepCruiserViolation {
   rule?: { name?: string; severity?: string };
   from?: string | DepCruiserNodeRef;

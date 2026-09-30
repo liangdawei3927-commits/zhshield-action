@@ -1,9 +1,7 @@
-import { useCallback } from 'react';
+import { useState } from 'react';
 import { useDependencyPage } from './dependency-logic';
 import {
   DependencyEmptyState,
-  DependencyHeader,
-  DependencyOverviewCard,
   DependencyLockfileCard,
   DependencyTrustCard,
   DependencyLicenseCard,
@@ -13,255 +11,144 @@ import {
   DependencyEnvCard,
   DependencyOutdatedCard,
 } from './dependency-parts';
-import { useToast } from '../components/ui/Toast';
-import { DomainScoreCard } from '../components/DomainScoreCard';
+import { ReportShell } from '../components/business/ReportShell';
+import { Bounce } from '../components/ui/Bounce';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
-import { exportHtmlReport } from '../utils/htmlExport';
-import type { HtmlReportData } from '@zh/reporter';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 interface DependencyPageProps {
   projectPath: string;
 }
 
-function buildOverviewSection(report: DependencyReportData): HtmlReportData['sections'][number] {
-  return {
-    title: 'Overview',
-    items: [
-      { status: 'pass', message: `Direct dependencies: ${report.direct}` },
-      { status: 'pass', message: `Transitive dependencies: ${report.transitive}` },
-      { status: 'pass', message: `Total: ${report.total}, Edges: ${report.edgeCount}` },
-    ],
-  };
-}
-
-function buildLockfileSection(
-  report: DependencyReportData,
-): HtmlReportData['sections'][number] | null {
-  if (report.lockfileVerification.status === 'missing') return null;
-  const lockfileItems = [
-    {
-      status:
-        report.lockfileVerification.status === 'clean' ? ('pass' as const) : ('warn' as const),
-      message: `Lockfile status: ${report.lockfileVerification.status}`,
-    },
-  ];
-  for (const diff of report.lockfileVerification.diffs) {
-    lockfileItems.push({
-      status: 'warn',
-      message: `${diff.name}: declared ${diff.declaredVersion}, locked ${diff.lockedVersion}`,
-    });
-  }
-  return { title: 'Lockfile Verification', items: lockfileItems };
-}
-
-function buildTyposquatSection(
-  report: DependencyReportData,
-): HtmlReportData['sections'][number] | null {
-  if (report.typosquatFindings.length === 0) return null;
-  return {
-    title: 'Typosquat Findings',
-    items: report.typosquatFindings.map((f) => ({
-      status:
-        f.risk === 'high'
-          ? ('fail' as const)
-          : f.risk === 'medium'
-            ? ('warn' as const)
-            : ('pass' as const),
-      message: `${f.nodeId}: ${f.evidence.join('; ')}`,
-      severity: f.risk,
-    })),
-  };
-}
-
-function buildUpgradeSection(
-  report: DependencyReportData,
-): HtmlReportData['sections'][number] | null {
-  if (report.upgradeAssessments.length === 0) return null;
-  return {
-    title: 'Upgrade Assessments',
-    items: report.upgradeAssessments.map((a) => ({
-      status: a.candidates.some((c) => c.risk === 'high') ? ('fail' as const) : ('warn' as const),
-      message: `${a.nodeId}: ${a.candidates.map((c) => c.targetVersion).join(', ')}`,
-    })),
-  };
-}
-
-function buildEnvSection(report: DependencyReportData): HtmlReportData['sections'][number] | null {
-  if (report.envEntries.length === 0) return null;
-  return {
-    title: 'Environment Consistency',
-    items: report.envEntries.map((e) => ({
-      status:
-        e.severity === 'error'
-          ? ('fail' as const)
-          : e.severity === 'warning'
-            ? ('warn' as const)
-            : ('pass' as const),
-      message: `${e.name}: expected ${e.expected}, actual ${e.actual}`,
-      severity: e.severity === 'error' ? 'high' : e.severity === 'warning' ? 'medium' : 'low',
-    })),
-  };
-}
-
-function buildOptionalSections(report: DependencyReportData): HtmlReportData['sections'] {
-  const sections: HtmlReportData['sections'] = [];
-  const lockfile = buildLockfileSection(report);
-  if (lockfile) sections.push(lockfile);
-  const typosquat = buildTyposquatSection(report);
-  if (typosquat) sections.push(typosquat);
-  const upgrade = buildUpgradeSection(report);
-  if (upgrade) sections.push(upgrade);
-  const env = buildEnvSection(report);
-  if (env) sections.push(env);
-  return sections;
-}
-
-function dependencyReportToHtmlData(
-  report: DependencyReportData,
-  projectPath: string,
-): HtmlReportData {
-  const sections: HtmlReportData['sections'] = [
-    buildOverviewSection(report),
-    ...buildOptionalSections(report),
-  ];
-  const totalIssues = sections.reduce<number>((acc, s) => acc + s.items.length, 0);
-  const failures = sections.reduce<number>(
-    (acc, s) => acc + s.items.filter((i) => i.status === 'fail').length,
-    0,
-  );
-  const warnings = sections.reduce<number>(
-    (acc, s) => acc + s.items.filter((i) => i.status === 'warn').length,
-    0,
-  );
-
-  return {
-    timestamp: report.generatedAt,
-    projectName: projectPath.split('/').pop() ?? projectPath,
-    summary: {
-      total: totalIssues,
-      passed: totalIssues - failures - warnings,
-      warnings,
-      failures,
-    },
-    sections,
-  };
-}
-
-async function exportDependencyReport(
-  report: DependencyReportData,
-  projectPath: string,
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-  t: (key: string, opts?: { defaultValue?: string }) => string,
-): Promise<void> {
-  try {
-    const ok = await exportHtmlReport(
-      dependencyReportToHtmlData(report, projectPath),
-      'dependency-report.html',
-    );
-    if (ok) toast(t('page.deps.exportSuccess', { defaultValue: 'Report exported' }), 'success');
-  } catch {
-    toast(t('page.deps.exportFailed', { defaultValue: 'Export failed' }), 'error');
-  }
-}
-
 function DependencyReportView({
   report,
   loading,
   onRescan,
-  onExport,
   onCopyTyposquat,
   onCopyAllTyposquat,
+  onBackHome,
   projectPath,
   t,
 }: {
   report: DependencyReportData;
   loading: boolean;
   onRescan: () => void;
-  onExport: () => void;
   onCopyTyposquat: (finding: TyposquatFindingData) => void;
   onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
+  onBackHome: () => void;
   projectPath: string;
-  t: (key: string, opts?: { defaultValue?: string }) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
-    <div className="h-full w-full bg-zh-bg overflow-auto">
-      <div className="w-full px-8 py-10">
-        <DependencyHeader report={report} loading={loading} onRescan={onRescan} />
-        <DomainScoreCard projectPath={projectPath} dimension="dependencies" />
-        <div className="flex justify-end mb-4">
-          <button
-            type="button"
-            onClick={onExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors"
+    <ReportShell
+      projectPath={projectPath}
+      dimension="dependencies"
+      refreshKey={report}
+      icon={
+        <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-brand))"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {t('page.deps.exportReport', { defaultValue: 'Export Report' })}
-          </button>
+            <circle cx="12" cy="5" r="2.5" />
+            <circle cx="5" cy="18" r="2.5" />
+            <circle cx="19" cy="18" r="2.5" />
+            <circle cx="12" cy="12" r="2.5" />
+            <path d="M12 7.5V9.5" />
+            <path d="M10.5 12H7.5" />
+            <path d="M13.5 12h3" />
+            <path d="M6.5 16.5l2-2" />
+            <path d="M17.5 16.5l-2-2" />
+          </svg>
+        </Bounce>
+      }
+      title={t('page.deps.done')}
+      action={
+        <PrimaryButton
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={t('page.deps.checking')}
+        >
+          {t('page.deps.rescan')}
+        </PrimaryButton>
+      }
+      onBackHome={onBackHome}
+      stats={[
+        { key: 'total', label: t('page.deps.overviewTotal'), value: report.total },
+        { key: 'direct', label: t('page.deps.overviewDirect'), value: report.direct },
+        { key: 'transitive', label: t('page.deps.overviewTransitive'), value: report.transitive },
+        { key: 'edges', label: t('page.deps.overviewEdges'), value: report.edgeCount },
+      ]}
+    >
+      {report.error && (
+        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircleIcon />
+          <div>
+            <div className="text-sm font-medium text-danger-700">{t('page.deps.errorTitle')}</div>
+            <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
+          </div>
         </div>
-        <DependencyOverviewCard report={report} />
-        <div className="grid grid-cols-2 gap-6 mb-6">
-          <DependencyLockfileCard lockfile={report.lockfile} />
-          <DependencyTrustCard trustCounts={report.trustCounts} />
-        </div>
-        <DependencyLicenseCard matrix={report.licenseMatrix} />
-        <div className="grid grid-cols-2 gap-6 my-6">
-          <DependencyTyposquatCard
-            report={report}
-            onCopyToAi={onCopyTyposquat}
-            onCopyAll={onCopyAllTyposquat}
-          />
-          <DependencyLockfileVerificationCard report={report} />
-        </div>
-        <div className="grid grid-cols-2 gap-6">
-          <DependencyUpgradeCard report={report} />
-          <DependencyEnvCard report={report} />
-        </div>
-        <div className="mt-6">
-          <DependencyOutdatedCard report={report} />
-        </div>
+      )}
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <DependencyLockfileCard lockfile={report.lockfile} />
+        <DependencyTrustCard trustCounts={report.trustCounts} />
       </div>
-    </div>
+      <DependencyLicenseCard matrix={report.licenseMatrix} />
+      <div className="grid grid-cols-2 gap-6 my-6">
+        <DependencyTyposquatCard
+          report={report}
+          onCopyToAi={onCopyTyposquat}
+          onCopyAll={onCopyAllTyposquat}
+        />
+        <DependencyLockfileVerificationCard report={report} />
+      </div>
+      <div className="grid grid-cols-2 gap-6">
+        <DependencyUpgradeCard report={report} />
+        <DependencyEnvCard report={report} />
+      </div>
+      <div className="mt-6">
+        <DependencyOutdatedCard report={report} />
+      </div>
+    </ReportShell>
   );
 }
 
 export function DependencyPage({ projectPath }: DependencyPageProps) {
   const { loading, report, handleScan, copyToAi, copyAllToAi } = useDependencyPage(projectPath);
-  const { toast } = useToast();
   const t = useT();
+  const [showHome, setShowHome] = useState(false);
 
-  const handleExport = useCallback(async () => {
-    if (report == null) return;
-    await exportDependencyReport(report, projectPath, toast, t);
-  }, [report, projectPath, toast, t]);
-
-  if (report) {
+  if (report && !showHome) {
     return (
       <DependencyReportView
         report={report}
         loading={loading}
         onRescan={handleScan}
-        onExport={handleExport}
         onCopyTyposquat={copyToAi}
         onCopyAllTyposquat={copyAllToAi}
+        onBackHome={() => setShowHome(true)}
         projectPath={projectPath}
         t={t}
       />
     );
   }
 
-  return <DependencyEmptyState loading={loading} onScan={handleScan} />;
+  return (
+    <DependencyEmptyState
+      projectPath={projectPath}
+      loading={loading}
+      onScan={() => {
+        setShowHome(false);
+        handleScan();
+      }}
+    />
+  );
 }

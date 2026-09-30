@@ -27,76 +27,102 @@ export function detectRuntime(
   language: ProjectLanguage,
   framework: ProjectFramework,
 ): ProfileSignal[] {
-  const signals: ProfileSignal[] = [];
+  return (
+    detectElectronRuntime(scan, framework) ??
+    detectBrowserRuntime(scan, framework) ??
+    detectBunRuntime(scan) ??
+    detectNodeRuntime(language) ??
+    detectMappedRuntime(language)
+  );
+}
 
-  // electron 优先（覆盖 node/browser）
+function detectElectronRuntime(
+  scan: ScanResult,
+  framework: ProjectFramework,
+): ProfileSignal[] | null {
   if (
     framework === 'electron' ||
     hasFile(scan, 'electron/main.ts') ||
     hasFile(scan, 'electron/main.js')
   ) {
-    signals.push({
-      file: '(framework-inferred)',
-      kind: 'source-pattern',
-      matched: 'framework=electron',
-      inferred: { runtime: 'electron' },
-    });
-    return signals;
+    return [
+      {
+        file: '(framework-inferred)',
+        kind: 'source-pattern',
+        matched: 'framework=electron',
+        inferred: { runtime: 'electron' },
+      },
+    ];
   }
+  return null;
+}
 
-  // 纯前端框架 → browser
+function detectBrowserRuntime(
+  scan: ScanResult,
+  framework: ProjectFramework,
+): ProfileSignal[] | null {
   if (BROWSER_FRAMEWORKS.includes(framework) && !hasFile(scan, 'package.json')) {
-    signals.push({
-      file: '(framework-inferred)',
-      kind: 'source-pattern',
-      matched: `framework=${framework}`,
-      inferred: { runtime: 'browser' },
-    });
-    return signals;
+    return [
+      {
+        file: '(framework-inferred)',
+        kind: 'source-pattern',
+        matched: `framework=${framework}`,
+        inferred: { runtime: 'browser' },
+      },
+    ];
   }
-  // 有 package.json 但纯前端框架 + 无 node 后端特征 → 仍可能是 browser
   if (BROWSER_FRAMEWORKS.includes(framework) && !['next', 'nuxt'].includes(framework)) {
-    signals.push({
-      file: '(framework-inferred)',
-      kind: 'source-pattern',
-      matched: `framework=${framework}`,
-      inferred: { runtime: 'browser' },
-    });
-    return signals;
+    return [
+      {
+        file: '(framework-inferred)',
+        kind: 'source-pattern',
+        matched: `framework=${framework}`,
+        inferred: { runtime: 'browser' },
+      },
+    ];
   }
+  return null;
+}
 
-  // bun 锁文件
+function detectBunRuntime(scan: ScanResult): ProfileSignal[] | null {
   if (hasFile(scan, 'bun.lockb')) {
-    signals.push({
-      file: 'bun.lockb',
-      kind: 'config-file',
-      matched: 'bun.lockb',
-      inferred: { runtime: 'bun' },
-    });
-    return signals;
+    return [
+      {
+        file: 'bun.lockb',
+        kind: 'config-file',
+        matched: 'bun.lockb',
+        inferred: { runtime: 'bun' },
+      },
+    ];
   }
+  return null;
+}
 
-  // typescript/javascript 默认 node
+function detectNodeRuntime(language: ProjectLanguage): ProfileSignal[] | null {
   if (language === 'typescript' || language === 'javascript') {
-    signals.push({
-      file: '(language-inferred)',
-      kind: 'source-pattern',
-      matched: `language=${language}`,
-      inferred: { runtime: 'node' },
-    });
-    return signals;
+    return [
+      {
+        file: '(language-inferred)',
+        kind: 'source-pattern',
+        matched: `language=${language}`,
+        inferred: { runtime: 'node' },
+      },
+    ];
   }
+  return null;
+}
 
-  // 其他语言映射
+function detectMappedRuntime(language: ProjectLanguage): ProfileSignal[] {
   const mapped = LANG_RUNTIME[language];
   if (mapped) {
-    signals.push({
-      file: '(language-inferred)',
-      kind: 'source-pattern',
-      matched: `language=${language}`,
-      inferred: { runtime: mapped },
-    });
+    return [
+      {
+        file: '(language-inferred)',
+        kind: 'source-pattern',
+        matched: `language=${language}`,
+        inferred: { runtime: mapped },
+      },
+    ];
   }
-
-  return signals;
+  return [];
 }

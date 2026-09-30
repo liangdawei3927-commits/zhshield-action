@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,7 +17,17 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    // 严格索引访问 / 严格可选属性：根级永久开启（防 undefined 穿透、精化可选属性语义）。
+    // 已全量合规包：shared / garbage / autoperf / desktop / i18n / evolve（无需覆盖）。
+    // 其余 15 个包在各自 tsconfig.json 显式关闭并附 TODO，按批次迁移后删除覆盖。
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

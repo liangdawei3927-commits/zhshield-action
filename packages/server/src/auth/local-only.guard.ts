@@ -17,6 +17,8 @@ export const Public = () => SetMetadata(PUBLIC_KEY, true);
 
 const LOCAL_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', '::ffff:7f00:1']);
 
+const IPV4_MAPPED_PREFIX_RE = /^::ffff:/;
+
 const TOKEN_FILE = path.join(os.homedir(), '.zhshield', '.api-token');
 
 function resolveLocalToken(): string {
@@ -49,44 +51,54 @@ export class LocalOnlyGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) return true;
+    if (isPublicRequest(this.reflector, context)) return true;
 
     const request = context.switchToHttp().getRequest();
     const clientIp = request.ip ?? request.socket?.remoteAddress ?? '';
-
-    if (!this.isLocalIp(clientIp)) {
-      this.logger.warn(`拒绝非本地请求: ${clientIp}`);
-      throw new UnauthorizedException('仅允许本地访问');
-    }
+    assertLocalIpAllowed(this.logger, clientIp);
 
     const token = (request.headers['x-api-token'] as string) ?? '';
-
-    if (!this.verifyToken(token)) {
-      this.logger.warn(`无效的 API token: ${token.slice(0, 8)}...`);
-      throw new UnauthorizedException('无效的 API token');
-    }
+    assertValidApiToken(this.logger, token, this.expectedToken);
 
     return true;
   }
+}
 
-  private isLocalIp(ip: string): boolean {
-    const normalized = ip.replace(/^::ffff:/, '');
-    return LOCAL_IPS.has(ip) || LOCAL_IPS.has(normalized);
+function isPublicRequest(reflector: Reflector, context: ExecutionContext): boolean {
+  const isPublic = reflector.getAllAndOverride<boolean>(PUBLIC_KEY, [
+    context.getHandler(),
+    context.getClass(),
+  ]);
+  return isPublic;
+}
+
+function assertLocalIpAllowed(logger: Logger, clientIp: string): void {
+  if (!isLocalIp(clientIp)) {
+    logger.warn(`拒绝非本地请求: ${clientIp}`);
+    throw new UnauthorizedException('仅允许本地访问');
   }
+}
 
-  private verifyToken(token: string): boolean {
-    if (!token || !this.expectedToken) return false;
+function assertValidApiToken(logger: Logger, token: string, expectedToken: string): void {
+  if (!verifyToken(token, expectedToken)) {
+    logger.warn(`无效的 API token: ${token.slice(0, 8)}...`);
+    throw new UnauthorizedException('无效的 API token');
+  }
+}
 
-    try {
-      const left = crypto.createHash('sha256').update(token).digest();
-      const right = crypto.createHash('sha256').update(this.expectedToken).digest();
-      return crypto.timingSafeEqual(left, right);
-    } catch {
-      return false;
-    }
+function isLocalIp(ip: string): boolean {
+  const normalized = ip.replace(IPV4_MAPPED_PREFIX_RE, '');
+  return LOCAL_IPS.has(ip) || LOCAL_IPS.has(normalized);
+}
+
+function verifyToken(token: string, expectedToken: string): boolean {
+  if (!token || !expectedToken) return false;
+
+  try {
+    const left = crypto.createHash('sha256').update(token).digest();
+    const right = crypto.createHash('sha256').update(expectedToken).digest();
+    return crypto.timingSafeEqual(left, right);
+  } catch {
+    return false;
   }
 }

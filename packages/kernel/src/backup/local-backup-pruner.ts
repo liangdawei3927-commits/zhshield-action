@@ -9,6 +9,7 @@
 import * as fs from 'node:fs/promises';
 import { normalizeKeepCount } from './retention';
 
+/** 备份轮换清理结果：成功删除与删除失败两路路径分开上报 */
 export interface BackupPruneOutcome {
   /** 实际删除的旧备份路径（`dirs` 为新→旧排序时，即保留之外的尾部） */
   removed: string[];

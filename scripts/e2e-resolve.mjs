@@ -178,24 +178,24 @@ async function main() {
 
     console.log('\n── 4. T0 画像注册（kernel 客户端） ──');
     const feature = { language: 'typescript', framework: 'nestjs', features: ['security'] };
-    await kernelResolve.registerProjectFeatures(
-      org.orgId,
-      'user-owner',
-      'e2e-proj-1',
+    await kernelResolve.registerProjectFeatures({
+      orgId: org.orgId,
+      userId: 'user-owner',
+      projectId: 'e2e-proj-1',
       feature,
-      API_BASE,
-    );
+      apiBaseOverride: API_BASE,
+    });
     check('PUT /orgs/:id/projects/:pid/features → ok', true);
     // 非成员注册应被拒
     let rejected = false;
     try {
-      await kernelResolve.registerProjectFeatures(
-        org.orgId,
-        'user-intruder',
-        'e2e-proj-x',
+      await kernelResolve.registerProjectFeatures({
+        orgId: org.orgId,
+        userId: 'user-intruder',
+        projectId: 'e2e-proj-x',
         feature,
-        API_BASE,
-      );
+        apiBaseOverride: API_BASE,
+      });
     } catch {
       rejected = true;
     }

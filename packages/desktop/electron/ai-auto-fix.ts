@@ -10,6 +10,7 @@
 import { join } from 'node:path';
 import { t } from '@zh/i18n';
 
+/** 体检报告（自动修复判定用）：问题分级计数 + 可选的归一化诊断条目明细 */
 export interface AutoFixReport {
   summary: { error: number; warning: number };
   /** 归一化诊断条目；每个条目带 source: 'guard' | 'inspect' | 'refactor' */

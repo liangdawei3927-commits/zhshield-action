@@ -57,12 +57,42 @@ if (!['--check', '--apply', '--verify'].includes(mode)) {
 
 // SopLoader API 是 async；以 async 主函数承载
 async function main(): Promise<void> {
+  const rules = await scanRules();
+  const tools = scanTools();
+
+  if (mode === '--check') {
+    runCheck(rules, tools);
+    return;
+  }
+
+  const db = openDb();
+  try {
+    if (mode === '--verify') {
+      verify(db, rules, tools);
+    } else {
+      apply(db, rules, tools);
+    }
+  } finally {
+    db.close();
+  }
+}
+
+async function scanRules(): Promise<SopRule[]> {
   const registry = new SopRegistry();
   const loader = new SopLoader(registry, { rulesDir: RULES_DIR });
   const loaded = await loader.loadFromDirectory(RULES_DIR, true);
   const rules = registry.getAll();
   console.log(`[scan] 规则源扫描: ${loaded} 文件 → registry ${rules.length} 条`);
+  return rules;
+}
 
+interface ScannedTool {
+  toolId: string;
+  files: { filename: string; content: string }[];
+  sha256: string;
+}
+
+function scanTools(): ScannedTool[] {
   const toolLoader = new ToolRuleLoader(TOOL_PACKS_DIR);
   const toolIds = fs.existsSync(TOOL_PACKS_DIR)
     ? fs
@@ -76,29 +106,19 @@ async function main(): Promise<void> {
     return { toolId, files, sha256: hashToolRuleFiles(files) };
   });
   console.log(`[scan] 工具源扫描: ${tools.length} 个工具包`);
+  return tools;
+}
 
-  if (mode === '--check') {
-    const domainCounts: Record<string, number> = {};
-    for (const r of rules) domainCounts[r.domain] = (domainCounts[r.domain] ?? 0) + 1;
-    console.log('[check] 通过（未写库）');
-    console.log('[check] 域分布:', JSON.stringify(domainCounts));
-    console.log(
-      '[check] 工具:',
-      tools.map((t) => `${t.toolId}(${t.files.length} 文件)`).join(', '),
-    );
-    process.exit(0);
-  }
-
-  const db = openDb();
-  try {
-    if (mode === '--verify') {
-      verify(db, rules, tools);
-    } else {
-      apply(db, rules, tools);
-    }
-  } finally {
-    db.close();
-  }
+function runCheck(rules: SopRule[], tools: ScannedTool[]): void {
+  const domainCounts: Record<string, number> = {};
+  for (const r of rules) domainCounts[r.domain] = (domainCounts[r.domain] ?? 0) + 1;
+  console.log('[check] 通过（未写库）');
+  console.log('[check] 域分布:', JSON.stringify(domainCounts));
+  console.log(
+    '[check] 工具:',
+    tools.map((t) => `${t.toolId}(${t.files.length} 文件)`).join(', '),
+  );
+  process.exit(0);
 }
 
 // ─── DB 开闭 ───────────────────────────────────────────────
@@ -121,6 +141,25 @@ function apply(
   rules: SopRule[],
   tools: { toolId: string; files: { filename: string; content: string }[]; sha256: string }[],
 ): void {
+  const { insertRule, insertVersion, insertAudit } = prepareRuleStatements(db);
+  const { insertTool, insertToolVersion } = prepareToolStatements(db);
+
+  const tx = db.transaction(() => {
+    const existingRuleIds = loadExistingRuleIds(db);
+    const existingToolIds = loadExistingToolIds(db);
+    upsertRules(rules, existingRuleIds, insertRule, insertVersion, insertAudit);
+    upsertTools(tools, existingToolIds, insertTool, insertToolVersion, insertAudit);
+  });
+
+  tx();
+  logApplySummary(db);
+}
+
+function prepareRuleStatements(db: Database.Database): {
+  insertRule: Database.Statement;
+  insertVersion: Database.Statement;
+  insertAudit: Database.Statement;
+} {
   const insertRule = db.prepare(`
     INSERT INTO rule_content (
       id, rule_id, domain, action, source, name, description, severity, status,
@@ -142,12 +181,20 @@ function apply(
       content_sha = excluded.content_sha, version = excluded.version,
       created_by = excluded.created_by, updated_by = excluded.updated_by,
       updated_at = CURRENT_TIMESTAMP`);
-
   const insertVersion = db.prepare(`
     INSERT INTO rule_content_version (id, rule_id, version, content_sha, content, status_at_release, released_by, changes)
     VALUES (@id, @rule_id, @version, @content_sha, @content, @status_at_release, @released_by, @changes)
     ON CONFLICT(rule_id, version) DO NOTHING`);
+  const insertAudit = db.prepare(`
+    INSERT INTO content_audit_log (id, entity_type, entity_id, action, detail, operator)
+    VALUES (@id, @entity_type, @entity_id, @action, @detail, @operator)`);
+  return { insertRule, insertVersion, insertAudit };
+}
 
+function prepareToolStatements(db: Database.Database): {
+  insertTool: Database.Statement;
+  insertToolVersion: Database.Statement;
+} {
   const insertTool = db.prepare(`
     INSERT INTO tool_package (
       id, tool_id, version, sha256, files_json, languages, frameworks, status, description, created_by
@@ -156,119 +203,135 @@ function apply(
       version = excluded.version, sha256 = excluded.sha256, files_json = excluded.files_json,
       languages = excluded.languages, frameworks = excluded.frameworks,
       status = excluded.status, description = excluded.description`);
-
   const insertToolVersion = db.prepare(`
     INSERT INTO tool_package_version (id, tool_id, version, sha256, files_json, languages, frameworks, released_by, changes)
     VALUES (@id, @tool_id, @version, @sha256, @files_json, @languages, @frameworks, @released_by, @changes)
     ON CONFLICT(tool_id, version) DO NOTHING`);
+  return { insertTool, insertToolVersion };
+}
 
-  const insertAudit = db.prepare(`
-    INSERT INTO content_audit_log (id, entity_type, entity_id, action, detail, operator)
-    VALUES (@id, @entity_type, @entity_id, @action, @detail, @operator)`);
+function loadExistingRuleIds(db: Database.Database): Set<string> {
+  return new Set(
+    (db.prepare('SELECT rule_id FROM rule_content').all() as { rule_id: string }[]).map(
+      (r) => r.rule_id,
+    ),
+  );
+}
 
-  const tx = db.transaction(() => {
-    // 幂等：audit 仅对真正新插入的行记录，重跑不重复追加
-    const existingRuleIds = new Set(
-      (db.prepare('SELECT rule_id FROM rule_content').all() as { rule_id: string }[]).map(
-        (r) => r.rule_id,
-      ),
-    );
-    const existingToolIds = new Set(
-      (db.prepare('SELECT tool_id FROM tool_package').all() as { tool_id: string }[]).map(
-        (t) => t.tool_id,
-      ),
-    );
+function loadExistingToolIds(db: Database.Database): Set<string> {
+  return new Set(
+    (db.prepare('SELECT tool_id FROM tool_package').all() as { tool_id: string }[]).map(
+      (t) => t.tool_id,
+    ),
+  );
+}
 
-    for (const rule of rules) {
-      const contentSha = computeRuleContentSha(rule);
-      const serialized = JSON.stringify(rule);
-      const isNew = !existingRuleIds.has(rule.id);
-      insertRule.run({
-        id: rule.id,
-        rule_id: rule.id,
-        domain: rule.domain,
-        action: rule.action,
-        source: rule.source,
-        name: rule.name,
-        description: rule.description ?? null,
-        severity: rule.severity,
-        status: rule.status,
-        execution_mode: rule.executionMode,
-        tags: JSON.stringify(rule.tags ?? []),
-        applicable_engines: JSON.stringify(rule.applicableEngines ?? []),
-        languages: JSON.stringify(rule.serves?.languages ?? []),
-        frameworks: JSON.stringify([]),
-        tool_id: null,
-        tool_version: null,
-        content: serialized,
-        content_sha: contentSha,
-        version: INITIAL_VERSION,
-        created_by: OPERATOR,
-        updated_by: OPERATOR,
-      });
-      insertVersion.run({
+function upsertRules(
+  rules: SopRule[],
+  existingRuleIds: Set<string>,
+  insertRule: Database.Statement,
+  insertVersion: Database.Statement,
+  insertAudit: Database.Statement,
+): void {
+  // 幂等：audit 仅对真正新插入的行记录，重跑不重复追加
+  for (const rule of rules) {
+    const contentSha = computeRuleContentSha(rule);
+    const serialized = JSON.stringify(rule);
+    const isNew = !existingRuleIds.has(rule.id);
+    insertRule.run({
+      id: rule.id,
+      rule_id: rule.id,
+      domain: rule.domain,
+      action: rule.action,
+      source: rule.source,
+      name: rule.name,
+      description: rule.description ?? null,
+      severity: rule.severity,
+      status: rule.status,
+      execution_mode: rule.executionMode,
+      tags: JSON.stringify(rule.tags ?? []),
+      applicable_engines: JSON.stringify(rule.applicableEngines ?? []),
+      languages: JSON.stringify(rule.serves?.languages ?? []),
+      frameworks: JSON.stringify([]),
+      tool_id: null,
+      tool_version: null,
+      content: serialized,
+      content_sha: contentSha,
+      version: INITIAL_VERSION,
+      created_by: OPERATOR,
+      updated_by: OPERATOR,
+    });
+    insertVersion.run({
+      id: randomUUID(),
+      rule_id: rule.id,
+      version: INITIAL_VERSION,
+      content_sha: contentSha,
+      content: serialized,
+      status_at_release: rule.status,
+      released_by: OPERATOR,
+      changes: 'C2 初始迁移',
+    });
+    if (isNew) {
+      insertAudit.run({
         id: randomUUID(),
-        rule_id: rule.id,
-        version: INITIAL_VERSION,
-        content_sha: contentSha,
-        content: serialized,
-        status_at_release: rule.status,
-        released_by: OPERATOR,
-        changes: 'C2 初始迁移',
+        entity_type: 'rule',
+        entity_id: rule.id,
+        action: 'create',
+        detail: `migrate content_sha=${contentSha.slice(0, 12)} version=${INITIAL_VERSION}`,
+        operator: OPERATOR,
       });
-      if (isNew) {
-        insertAudit.run({
-          id: randomUUID(),
-          entity_type: 'rule',
-          entity_id: rule.id,
-          action: 'create',
-          detail: `migrate content_sha=${contentSha.slice(0, 12)} version=${INITIAL_VERSION}`,
-          operator: OPERATOR,
-        });
-      }
     }
+  }
+}
 
-    for (const tool of tools) {
-      const version = `1.${tool.sha256.slice(0, 12)}`;
-      const filesJson = JSON.stringify(tool.files);
-      const isNew = !existingToolIds.has(tool.toolId);
-      insertTool.run({
+function upsertTools(
+  tools: { toolId: string; files: { filename: string; content: string }[]; sha256: string }[],
+  existingToolIds: Set<string>,
+  insertTool: Database.Statement,
+  insertToolVersion: Database.Statement,
+  insertAudit: Database.Statement,
+): void {
+  for (const tool of tools) {
+    const version = `1.${tool.sha256.slice(0, 12)}`;
+    const filesJson = JSON.stringify(tool.files);
+    const isNew = !existingToolIds.has(tool.toolId);
+    insertTool.run({
+      id: randomUUID(),
+      tool_id: tool.toolId,
+      version,
+      sha256: tool.sha256,
+      files_json: filesJson,
+      languages: JSON.stringify([]),
+      frameworks: JSON.stringify([]),
+      status: 'active',
+      description: null,
+      created_by: OPERATOR,
+    });
+    insertToolVersion.run({
+      id: randomUUID(),
+      tool_id: tool.toolId,
+      version,
+      sha256: tool.sha256,
+      files_json: filesJson,
+      languages: JSON.stringify([]),
+      frameworks: JSON.stringify([]),
+      released_by: OPERATOR,
+      changes: 'C2 初始迁移',
+    });
+    if (isNew) {
+      insertAudit.run({
         id: randomUUID(),
-        tool_id: tool.toolId,
-        version,
-        sha256: tool.sha256,
-        files_json: filesJson,
-        languages: JSON.stringify([]),
-        frameworks: JSON.stringify([]),
-        status: 'active',
-        description: null,
-        created_by: OPERATOR,
+        entity_type: 'tool',
+        entity_id: tool.toolId,
+        action: 'create',
+        detail: `migrate sha256=${tool.sha256.slice(0, 12)} version=${version}`,
+        operator: OPERATOR,
       });
-      insertToolVersion.run({
-        id: randomUUID(),
-        tool_id: tool.toolId,
-        version,
-        sha256: tool.sha256,
-        files_json: filesJson,
-        languages: JSON.stringify([]),
-        frameworks: JSON.stringify([]),
-        released_by: OPERATOR,
-        changes: 'C2 初始迁移',
-      });
-      if (isNew) {
-        insertAudit.run({
-          id: randomUUID(),
-          entity_type: 'tool',
-          entity_id: tool.toolId,
-          action: 'create',
-          detail: `migrate sha256=${tool.sha256.slice(0, 12)} version=${version}`,
-          operator: OPERATOR,
-        });
-      }
     }
-  });
+  }
+}
 
-  tx();
+function logApplySummary(db: Database.Database): void {
   const ruleRows = db.prepare('SELECT count(*) AS c FROM rule_content').get() as { c: number };
   const toolRows = db.prepare('SELECT count(*) AS c FROM tool_package').get() as { c: number };
   const auditRows = db.prepare('SELECT count(*) AS c FROM content_audit_log').get() as {

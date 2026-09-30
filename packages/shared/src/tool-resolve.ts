@@ -114,6 +114,7 @@ export function findZhshieldToolBin(tool: string): string | null {
 /** 工具命令解析结果的来源，供适配器如实上报「用的是哪一份工具」 */
 export type ToolCommandOrigin = 'project-local' | 'shared' | 'path' | 'unresolved';
 
+/** 工具命令解析结果：可执行命令 + 来源标记（供适配器如实上报用的是哪一份工具） */
 export interface ResolvedToolCommand {
   command: string;
   origin: ToolCommandOrigin;
@@ -135,10 +136,14 @@ export async function resolveToolCommandDetailed(
   const shared = findZhshieldToolBin(tool);
   if (shared) return { command: shared, origin: 'shared' };
 
+  return probePathCommand(tool, options?.probeTimeoutMs ?? 20000);
+}
+
+async function probePathCommand(tool: string, timeoutMs: number): Promise<ResolvedToolCommand> {
   try {
     // 20s：semgrep 等 Python 工具冷启动 --version 可达 7.6s，5s 会误判 PATH 不可用。
     // 批量探测场景（如桌面端工具就绪面板一次探 10 个工具）可传更短的值控制总耗时。
-    await execFileAsync(tool, ['--version'], { timeout: options?.probeTimeoutMs ?? 20000 });
+    await execFileAsync(tool, ['--version'], { timeout: timeoutMs });
     return { command: tool, origin: 'path' };
   } catch {
     return { command: tool, origin: 'unresolved' };

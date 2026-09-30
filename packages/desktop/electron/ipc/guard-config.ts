@@ -2,6 +2,7 @@ import { ipcMain, app } from 'electron';
 import path from 'node:path';
 import fsAsync from 'node:fs/promises';
 
+/** 门禁（Git hook）配置：总开关、pre-commit / pre-push 启用与 critical 阻断 */
 export interface GuardConfig {
   readonly enabled: boolean;
   readonly preCommit: boolean;
@@ -52,22 +53,7 @@ async function writeConfig(config: GuardConfig): Promise<void> {
 
 /** 异步读取门禁配置（供流水线子进程等无法使用 IPC 的场景调用） */
 export async function readGuardConfigFile(): Promise<GuardConfig> {
-  try {
-    const data = await fsAsync.readFile(getConfigPath(), 'utf-8');
-    const parsed = JSON.parse(data) as Partial<GuardConfig>;
-    return {
-      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_CONFIG.enabled,
-      preCommit:
-        typeof parsed.preCommit === 'boolean' ? parsed.preCommit : DEFAULT_CONFIG.preCommit,
-      prePush: typeof parsed.prePush === 'boolean' ? parsed.prePush : DEFAULT_CONFIG.prePush,
-      blockOnCritical:
-        typeof parsed.blockOnCritical === 'boolean'
-          ? parsed.blockOnCritical
-          : DEFAULT_CONFIG.blockOnCritical,
-    };
-  } catch {
-    return DEFAULT_CONFIG;
-  }
+  return readConfig();
 }
 
 export function registerGuardConfigIpc(): void {

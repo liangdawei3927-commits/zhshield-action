@@ -10,6 +10,7 @@ const VALID_TOOLS = SERVER_TOOL_IDS;
 
 type ToolName = (typeof VALID_TOOLS)[number];
 
+/** 工具规则包版本信息：工具、内容哈希、由哈希派生的版本号、体积与发布时间 */
 export interface ToolRuleVersion {
   toolId: ToolName;
   version: string;
@@ -43,9 +44,9 @@ function buildVersion(toolId: ToolName, files: ToolRuleFile[]): ToolRuleVersion 
 @Injectable()
 export class ToolRuleStore {
   private readonly logger = new Logger(ToolRuleStore.name);
-  private packs!: Record<string, ToolRuleFile[]>;
-  private versions!: Record<string, ToolRuleVersion>;
-  private toolIds!: ReadonlySet<string>;
+  private packs: Record<string, ToolRuleFile[]> = {};
+  private versions: Record<string, ToolRuleVersion> = {};
+  private toolIds: ReadonlySet<string> = new Set();
   private readonly ruleLoader: ToolRuleLoader;
   private readonly repository?: SopContentRepository;
 

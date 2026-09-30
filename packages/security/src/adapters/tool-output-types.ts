@@ -4,7 +4,26 @@
  * 这些接口描述了 Trivy / Semgrep / Grype / Depcheck / npm audit 等
  * 外部 CLI 工具的 JSON 输出结构，替代 mapOutput / mapVulnerability 等方法中的 any 类型。
  * 只声明代码实际访问的字段，未使用的字段省略。
+ *
+ * Trivy / Semgrep / Grype / Depcheck 四组结构与 @zh/shared 的 output-mappers 逐字段
+ * 同构，已收敛到该处作为全仓唯一来源；此处原样重导出，既有导入路径保持可用。
  */
+
+export type {
+  TrivyOutput,
+  TrivyResult,
+  TrivyVulnerability,
+  TrivySecret,
+  SemgrepOutput,
+  SemgrepResult,
+  SemgrepDataflowTrace,
+  SemgrepCodeFlow,
+  SemgrepThreadFlow,
+  SemgrepFlowLocation,
+  GrypeOutput,
+  GrypeMatch,
+  DepcheckOutput,
+} from '@zh/shared';
 
 // ─── execFile 错误类型 ─────────────────────────────────
 
@@ -15,106 +34,15 @@ export interface ExecError extends Error {
   stdout?: string;
 }
 
-// ─── Trivy 输出 ────────────────────────────────────────
-
-export interface TrivyOutput {
-  Results?: TrivyResult[];
-}
-
-export interface TrivyResult {
-  Target?: string;
-  Vulnerabilities?: TrivyVulnerability[];
-  Secrets?: TrivySecret[];
-}
-
-export interface TrivyVulnerability {
-  VulnerabilityID?: string;
-  PkgName?: string;
-  InstalledVersion?: string;
-  FixedVersion?: string;
-  Severity?: string;
-  Title?: string;
-}
-
-export interface TrivySecret {
-  RuleID?: string;
-  Title?: string;
-  File?: string;
-  StartLine?: number;
-}
-
-// ─── Semgrep 输出 ──────────────────────────────────────
-
-export interface SemgrepOutput {
-  results?: SemgrepResult[];
-}
-
-export interface SemgrepResult {
-  check_id?: string;
-  path?: string;
-  start?: { line?: number; col?: number };
-  extra?: {
-    severity?: string;
-    message?: string;
-    fix?: string;
-    metadata?: { description?: string };
-    /** dataflow_trace 的 extra 嵌套变体（部分包装器输出），兼容读取 */
-    dataflow_trace?: SemgrepDataflowTrace;
-  };
-  /** 污点数据流链（SARIF codeFlows 子集），仅 join_mode/trace 规则输出 */
-  dataflow_trace?: SemgrepDataflowTrace;
-}
-
-export interface SemgrepDataflowTrace {
-  code_flows?: SemgrepCodeFlow[];
-}
-
-export interface SemgrepCodeFlow {
-  thread_flows?: SemgrepThreadFlow[];
-}
-
-export interface SemgrepThreadFlow {
-  locations?: SemgrepFlowLocation[];
-}
-
-export interface SemgrepFlowLocation {
-  /** 部分条目可能缺失 location 子对象，映射时需跳过 */
-  location?: { path?: string; start?: { line?: number; col?: number } };
-  message?: string;
-}
-
-// ─── Grype 输出 ────────────────────────────────────────
-
-export interface GrypeOutput {
-  matches?: GrypeMatch[];
-}
-
-export interface GrypeMatch {
-  vulnerability?: {
-    id?: string;
-    severity?: string;
-    description?: string;
-    fixedInVersion?: string;
-  };
-  artifact?: {
-    name?: string;
-    version?: string;
-  };
-}
-
-// ─── Depcheck 输出 ─────────────────────────────────────
-
-export interface DepcheckOutput {
-  dependencies?: string[];
-  devDependencies?: string[];
-}
-
 // ─── npm audit 输出 ────────────────────────────────────
 
+/** npm audit JSON 输出：vulnerabilities 为「包名 → 漏洞详情」映射 */
 export interface NpmAuditOutput {
   vulnerabilities?: Record<string, NpmAuditVulnerability>;
 }
 
+/** npm audit 单条漏洞：严重级别、受影响版本区间（version/range）、是否直接依赖、
+ *  fixAvailable 为修复版本号或布尔标记，via 列出直接漏洞标题或传递依赖名 */
 export interface NpmAuditVulnerability {
   severity?: string;
   version?: string;
@@ -126,6 +54,7 @@ export interface NpmAuditVulnerability {
 
 // ─── poetry audit 输出 ────────────────────────────────
 
+/** poetry audit JSON 输出：vulnerabilities 为扁平漏洞数组（包名/版本/advisory/修复版本） */
 export interface PoetryAuditOutput {
   vulnerabilities?: Array<{
     name?: string;
@@ -138,6 +67,8 @@ export interface PoetryAuditOutput {
 
 // ─── pip-audit 输出 ───────────────────────────────────
 
+/** pip-audit JSON 输出：dependencies 按包聚合，vulns 内嵌该包命中的漏洞 ID、
+ *  advisory、别名与可修复版本列表 */
 export interface PipAuditOutput {
   dependencies?: Array<{
     name?: string;

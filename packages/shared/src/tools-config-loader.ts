@@ -53,15 +53,15 @@ export class ToolsConfigLoader {
   /** 从解析后的 tools 段构建全量工具配置 */
   private buildToolsConfig(tools: RawToolsYaml['tools']): ToolsConfig['tools'] {
     return {
-      eslint: this.parseToolConfig(tools!.eslint || {}),
-      semgrep: this.parseToolConfig(tools!.semgrep || {}),
-      trivy: this.parseToolConfig(tools!.trivy || {}),
-      gitleaks: this.parseToolConfig(tools!.gitleaks || {}),
-      grype: this.parseToolConfig(tools!.grype || {}),
-      ort: this.parseToolConfig(tools!.ort || {}),
-      depcheck: this.parseToolConfig(tools!.depcheck || {}),
-      'dependency-cruiser': this.parseToolConfig(tools!['dependency-cruiser'] || {}),
-      'ts-prune': this.parseToolConfig(tools!['ts-prune'] || {}),
+      eslint: this.parseToolConfig(tools?.eslint || {}),
+      semgrep: this.parseToolConfig(tools?.semgrep || {}),
+      trivy: this.parseToolConfig(tools?.trivy || {}),
+      gitleaks: this.parseToolConfig(tools?.gitleaks || {}),
+      grype: this.parseToolConfig(tools?.grype || {}),
+      ort: this.parseToolConfig(tools?.ort || {}),
+      depcheck: this.parseToolConfig(tools?.depcheck || {}),
+      'dependency-cruiser': this.parseToolConfig(tools?.['dependency-cruiser'] || {}),
+      'ts-prune': this.parseToolConfig(tools?.['ts-prune'] || {}),
     };
   }
 
@@ -109,15 +109,22 @@ export class ToolsConfigLoader {
   }
 
   private parseToolConfig(raw: Record<string, unknown>): ToolConfig {
+    const config = raw.config as string | undefined;
+    const ignore = raw.ignore as string[] | undefined;
+    const severity = raw.severity as string[] | undefined;
+    const scanners = raw.scanners as string[] | undefined;
+    const rules = raw.rules as string[] | undefined;
+    const packageManagers = raw.packageManagers as string[] | undefined;
+    const timeout = raw.timeout as number | undefined;
     return {
       enabled: (raw.enabled as boolean) ?? true,
-      config: raw.config as string | undefined,
-      ignore: raw.ignore as string[] | undefined,
-      severity: raw.severity as string[] | undefined,
-      scanners: raw.scanners as string[] | undefined,
-      rules: raw.rules as string[] | undefined,
-      packageManagers: raw.packageManagers as string[] | undefined,
-      timeout: raw.timeout as number | undefined,
+      ...(config !== undefined ? { config } : {}),
+      ...(ignore !== undefined ? { ignore } : {}),
+      ...(severity !== undefined ? { severity } : {}),
+      ...(scanners !== undefined ? { scanners } : {}),
+      ...(rules !== undefined ? { rules } : {}),
+      ...(packageManagers !== undefined ? { packageManagers } : {}),
+      ...(timeout !== undefined ? { timeout } : {}),
     };
   }
 }

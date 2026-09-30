@@ -9,6 +9,7 @@
 
 import { t } from '@zh/i18n';
 
+/** AI 编程工具集成配置：工具标识、通信模式与工具侧配置文件路径 */
 export interface AiToolConfig {
   /** 工具 ID（唯一标识） */
   id: string;
@@ -96,6 +97,7 @@ export function buildToolConfigFile(config: AiToolConfig): string | null {
   return null;
 }
 
+/** 待写入项目根的集成文件条目（相对路径 + 文件内容） */
 export interface IntegrationFile {
   /** 相对项目根的路径 */
   path: string;
@@ -116,12 +118,14 @@ export function buildIntegrationFiles(config: AiToolConfig): IntegrationFile[] {
 
 // ─── OpenCode MCP 配置（opencode.json 合并） ───────────────────────────
 
+/** 写入 opencode.json 的 `mcp.zhshield` 本地 MCP server 定义 */
 export interface OpenCodeMcpBlock {
   type: 'local';
   command: string[];
   enabled: boolean;
 }
 
+/** opencode.json 的最小结构：$schema + 可选 mcp 映射（合并时保留用户既有键） */
 export interface OpenCodeConfigJson {
   $schema: string;
   mcp?: Record<string, unknown>;
@@ -178,6 +182,7 @@ export function buildOpenCodeConfigJson(
 
 // ─── Trae MCP 配置（.trae/mcp.json 合并） ──────────────────────────────
 
+/** 写入 .trae/mcp.json 的 MCP server 条目（name='zhshield'） */
 export interface TraeMcpServer {
   name: string;
   command: string[];

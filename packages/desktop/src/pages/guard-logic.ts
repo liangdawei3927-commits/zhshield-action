@@ -8,7 +8,12 @@ import {
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import {
+  buildAiFixPrompt,
+  copyIssuesToAi,
+  copyTextToClipboard,
+  type AiFixIssue,
+} from '../utils/copyToAi';
 import { useTaskRun } from '../task-store';
 
 export const SEVERITY_LABELS: Record<string, string> = {
@@ -41,6 +46,7 @@ export const STATUS_LABELS: Record<string, { textKey: string; color: string; bg:
   },
 };
 
+/** 单个拦截关卡（L1 pre-commit / L2 pre-push / L3 CI）的聚合展示信息 */
 export interface GuardLevelInfo {
   level: 'L1' | 'L2' | 'L3';
   labelKey: string;
@@ -144,12 +150,14 @@ async function loadLatestGuardReport(projectPath: string): Promise<GuardReportDa
 /** 门禁扫描运行：loading/进度来自任务中心，状态 + 报告 */
 function useGuardRun(projectPath: string): {
   loading: boolean;
+  progress: number;
   progressLabel: string;
+  statusMessage: string;
   report: GuardReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<GuardReportData | null>(null);
-  const { loading, progressLabel } = useTaskRun('guard', projectPath);
+  const { loading, progress, progressLabel, statusMessage } = useTaskRun('guard', projectPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,7 +176,7 @@ function useGuardRun(projectPath: string): {
       setReport(null);
     }
   }, [projectPath]);
-  return { loading, progressLabel, report, handleScan };
+  return { loading, progress, progressLabel, statusMessage, report, handleScan };
 }
 
 /** 门禁检查项 → AI 修复问题条目 */
@@ -178,6 +186,7 @@ function guardCheckToAiIssue(check: GuardReportData['checks'][number]): AiFixIss
     ruleId: check.id,
     severity: check.severity ? t(SEVERITY_LABELS[check.severity] ?? check.severity) : undefined,
     message: check.message,
+    domain: 'guard',
   };
 }
 
@@ -189,13 +198,8 @@ function useGuardCopyToAi(projectPath: string): {
   const { toast } = useToast();
 
   const copyToAi = useCallback(
-    (check: GuardReportData['checks'][number]) => {
-      const text = buildAiFixPrompt(projectPath, [guardCheckToAiIssue(check)]);
-      void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-        () => toast(t('toast.copyFailed'), 'error'),
-      );
-    },
+    (check: GuardReportData['checks'][number]) =>
+      copyIssuesToAi(projectPath, toast, [guardCheckToAiIssue(check)]),
     [projectPath, toast],
   );
 
@@ -275,7 +279,8 @@ function useGuardReportFalsePositive(projectPath: string): {
 
 /** 门禁页全部状态与副作用：扫描、复制到 AI、误报反馈、历史拦截记录 */
 export function useGuardPage(projectPath: string) {
-  const { loading, progressLabel, report, handleScan } = useGuardRun(projectPath);
+  const { loading, progress, progressLabel, statusMessage, report, handleScan } =
+    useGuardRun(projectPath);
   const { copyToAi, copyAllToAi } = useGuardCopyToAi(projectPath);
   const { reportFalsePositive } = useGuardReportFalsePositive(projectPath);
   const { history, refreshHistory } = useGuardHistory(projectPath);
@@ -288,7 +293,9 @@ export function useGuardPage(projectPath: string) {
 
   return {
     loading,
+    progress,
     progressLabel,
+    statusMessage,
     report,
     copyToAi,
     copyAllToAi,

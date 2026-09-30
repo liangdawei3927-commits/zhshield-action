@@ -1,59 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '../components/business/PageShell';
+import { ReportShell } from '../components/business/ReportShell';
+import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { Bounce } from '../components/ui/Bounce';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { useSentinelPage, type SentinelEventItem } from './sentinel-logic';
-import {
-  RadarScan,
-  SentinelHeader,
-  SentinelStats,
-  SentinelTimeline,
-  EventsPanel,
-} from './sentinel-parts';
+import { SentinelTimeline, EventsPanel } from './sentinel-parts';
 import { useNotification } from '../contexts/NotificationContext';
-import { useToast } from '../components/ui/Toast';
-import { DomainScoreCard } from '../components/DomainScoreCard';
-import { exportHtmlReport } from '../utils/htmlExport';
-import type { HtmlReportData } from '@zh/reporter';
 import type { AppNotification } from '@zh/kernel';
 
 interface SentinelPageProps {
   projectPath: string;
-}
-
-function sentinelEventsToHtmlData(
-  events: SentinelEventItem[],
-  projectPath: string,
-): HtmlReportData {
-  const criticalCount = events.filter((e) => e.severity === 'critical').length;
-  const highCount = events.filter((e) => e.severity === 'high').length;
-  const mediumCount = events.filter((e) => e.severity === 'medium').length;
-  const lowCount = events.filter((e) => e.severity === 'low').length;
-  return {
-    timestamp: new Date().toISOString(),
-    projectName: projectPath.split('/').pop() ?? projectPath,
-    summary: {
-      total: events.length,
-      passed: 0,
-      warnings: mediumCount + lowCount,
-      failures: criticalCount + highCount,
-    },
-    sections: [
-      {
-        title: 'Sentinel Alerts',
-        items: events.map((e) => ({
-          status: (e.severity === 'critical' || e.severity === 'high'
-            ? 'fail'
-            : e.severity === 'medium'
-              ? 'warn'
-              : 'pass') as 'pass' | 'warn' | 'fail',
-          message: `[${e.type}] ${e.title}`,
-          file: e.location?.file,
-          line: e.location?.line,
-          severity: e.severity,
-        })),
-      },
-    ],
-  };
 }
 
 function notifyCriticalEvents(
@@ -77,75 +36,15 @@ function notifyCriticalEvents(
   }
 }
 
-async function exportSentinelReport(
-  events: SentinelEventItem[],
-  projectPath: string,
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-  t: (key: string, opts?: { defaultValue?: string }) => string,
-): Promise<void> {
-  if (events.length === 0) return;
-  try {
-    const ok = await exportHtmlReport(
-      sentinelEventsToHtmlData(events, projectPath),
-      'sentinel-report.html',
-    );
-    if (ok) toast(t('page.sentinel.exportSuccess', { defaultValue: 'Report exported' }), 'success');
-  } catch {
-    toast(t('page.sentinel.exportFailed', { defaultValue: 'Export failed' }), 'error');
-  }
-}
-
-function SentinelExportButton({
-  onClick,
-  disabled,
-  t,
-}: {
-  onClick?: () => void;
-  disabled?: boolean;
-  t: (key: string, opts?: { defaultValue?: string }) => string;
-}) {
-  return (
-    <div className="flex justify-end mb-4">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zh-line bg-white ${
-          disabled
-            ? 'text-zh-muted cursor-not-allowed opacity-50'
-            : 'hover:bg-zh-panel text-zh-ink-2 cursor-pointer transition-colors'
-        }`}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        {t('page.sentinel.exportReport', { defaultValue: 'Export Report' })}
-      </button>
-    </div>
-  );
-}
-
 function SentinelReportView({
   events,
   sorted,
   activeCount,
   highCount,
   criticalCount,
-  falsePositiveCount,
   loading,
   onRefresh,
-  onExport,
+  onBackHome,
   projectPath,
   t,
 }: {
@@ -154,44 +53,98 @@ function SentinelReportView({
   activeCount: number;
   highCount: number;
   criticalCount: number;
-  falsePositiveCount: number;
   loading: boolean;
   onRefresh: () => void;
-  onExport: () => void;
+  onBackHome: () => void;
   projectPath: string;
-  t: (key: string, opts?: { defaultValue?: string }) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
-    <div className="h-full w-full bg-zh-bg overflow-auto">
-      <div className="w-full px-8 py-10">
-        <SentinelHeader
-          count={events.length}
-          activeCount={activeCount}
+    <ReportShell
+      projectPath={projectPath}
+      dimension="sentinel"
+      refreshKey={events}
+      icon={
+        <Bounce className="w-14 h-14 rounded-xl bg-info-50 flex items-center justify-center">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-info))"
+            strokeWidth="2"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="5" strokeWidth="1.2" />
+            <circle cx="12" cy="12" r="1.5" fill="rgb(var(--zh-info))" />
+            <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeWidth="1.2" />
+          </svg>
+        </Bounce>
+      }
+      title={t('nav.sentinel')}
+      action={
+        <PrimaryButton
+          onClick={onRefresh}
           loading={loading}
-          onRefresh={onRefresh}
-        />
-        <DomainScoreCard projectPath={projectPath} dimension="sentinel" />
-        <SentinelExportButton onClick={onExport} t={t} />
-        <SentinelStats
-          total={events.length}
-          active={activeCount}
-          high={highCount}
-          critical={criticalCount}
-          falsePositive={falsePositiveCount}
-        />
-        <SentinelTimeline events={sorted} />
-        <EventsPanel events={sorted} projectPath={projectPath} />
-      </div>
-    </div>
+          loadingLabel={t('page.sentinel.refreshing')}
+        >
+          {t('common.refresh')}
+        </PrimaryButton>
+      }
+      onBackHome={onBackHome}
+      stats={[
+        { key: 'total', label: t('page.sentinel.total'), value: events.length },
+        {
+          key: 'active',
+          label: t('page.sentinel.active'),
+          value: activeCount,
+          color: 'rgb(var(--zh-warning))',
+          detail: {
+            items: sorted.filter((e) => ['detected', 'assigned', 'fixing'].includes(e.status)),
+            render: (sub) => (
+              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+            ),
+          },
+        },
+        {
+          key: 'high',
+          label: t('page.sentinel.high'),
+          value: highCount,
+          color: 'rgb(var(--zh-danger))',
+          detail: {
+            items: sorted.filter((e) => e.severity === 'high'),
+            render: (sub) => (
+              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+            ),
+          },
+        },
+        {
+          key: 'critical',
+          label: t('page.sentinel.critical'),
+          value: criticalCount,
+          color: 'rgb(var(--zh-danger))',
+          detail: {
+            items: sorted.filter((e) => e.severity === 'critical'),
+            render: (sub) => (
+              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+            ),
+          },
+        },
+      ]}
+    >
+      <SentinelTimeline events={sorted} />
+    </ReportShell>
   );
 }
 
 function SentinelEmptyView({
+  projectPath,
   monitoring,
   loading,
   onAction,
   t,
 }: {
+  projectPath: string;
   monitoring: boolean;
   loading: boolean;
   onAction: () => void;
@@ -199,7 +152,7 @@ function SentinelEmptyView({
 }) {
   return (
     <PageShell
-      illustration={<RadarScan />}
+      illustration={<DomainScoreRing projectPath={projectPath} dimension="sentinel" />}
       title={
         monitoring ? t('page.sentinel.shell.titleMonitoring') : t('page.sentinel.shell.titleIdle')
       }
@@ -211,76 +164,38 @@ function SentinelEmptyView({
       featureList={[
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.sentinel.shell.featureRealtime.title'),
           desc: t('page.sentinel.shell.featureRealtime.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.sentinel.shell.featureAlert.title'),
           desc: t('page.sentinel.shell.featureAlert.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.sentinel.shell.featureHistory.title'),
           desc: t('page.sentinel.shell.featureHistory.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
+            <FeatureIcon>
+              <LayersGlyph />
+            </FeatureIcon>
           ),
           title: t('page.sentinel.shell.featureScope.title'),
           desc: t('page.sentinel.shell.featureScope.desc'),
@@ -305,17 +220,9 @@ function useSentinelCriticalNotification(
   }, [events, notify]);
 }
 
-function useSentinelExport(events: SentinelEventItem[], projectPath: string): () => Promise<void> {
-  const { toast } = useToast();
-  const t = useT();
-  const handleExport = useCallback(async () => {
-    await exportSentinelReport(events, projectPath, toast, t);
-  }, [events, projectPath, toast, t]);
-  return handleExport;
-}
-
 export function SentinelPage({ projectPath }: SentinelPageProps) {
   const t = useT();
+  const [showHome, setShowHome] = useState(false);
   const {
     events,
     loading,
@@ -323,15 +230,13 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
     activeCount,
     highCount,
     criticalCount,
-    falsePositiveCount,
     sorted,
     startMonitoring,
   } = useSentinelPage(projectPath);
   const { notify } = useNotification();
   useSentinelCriticalNotification(events, notify);
-  const handleExport = useSentinelExport(events, projectPath);
 
-  if (events.length > 0) {
+  if (events.length > 0 && !showHome) {
     return (
       <SentinelReportView
         events={events}
@@ -339,10 +244,9 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         activeCount={activeCount}
         highCount={highCount}
         criticalCount={criticalCount}
-        falsePositiveCount={falsePositiveCount}
         loading={loading}
         onRefresh={startMonitoring}
-        onExport={handleExport}
+        onBackHome={() => setShowHome(true)}
         projectPath={projectPath}
         t={t}
       />
@@ -350,6 +254,15 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
   }
 
   return (
-    <SentinelEmptyView monitoring={monitoring} loading={loading} onAction={startMonitoring} t={t} />
+    <SentinelEmptyView
+      projectPath={projectPath}
+      monitoring={monitoring}
+      loading={loading}
+      onAction={() => {
+        setShowHome(false);
+        startMonitoring();
+      }}
+      t={t}
+    />
   );
 }

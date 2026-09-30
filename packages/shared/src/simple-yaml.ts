@@ -17,7 +17,7 @@ export function parseSimpleYaml(content: string): Record<string, unknown> {
     parseYamlLine(line, result, stack);
   }
 
-  return cleanArrays(result);
+  return cleanArrays(result) as Record<string, unknown>;
 }
 
 /** 解析单行 YAML 并维护容器栈 */
@@ -34,7 +34,7 @@ function parseYamlLine(
 
   popToIndent(stack, indent);
   const currentObj = resolveCurrentObj(stack, result);
-  applyValue(currentObj, kv.key, kv.value, stack, indent);
+  applyValue({ currentObj, key: kv.key, value: kv.value, stack, indent });
 }
 
 function computeIndent(line: string): number {
@@ -56,7 +56,10 @@ function popToIndent(
   stack: { indent: number; key: string; obj: Record<string, unknown> }[],
   indent: number,
 ): void {
-  while (stack.length > 0 && stack.at(-1)!.indent >= indent) {
+  while (stack.length > 0) {
+    const top = stack.at(-1);
+    if (top === undefined) break;
+    if (top.indent < indent) break;
     stack.pop();
   }
 }
@@ -65,17 +68,21 @@ function resolveCurrentObj(
   stack: { indent: number; key: string; obj: Record<string, unknown> }[],
   result: Record<string, unknown>,
 ): Record<string, unknown> {
-  return stack.length > 0 ? stack.at(-1)!.obj : result;
+    const top = stack.at(-1);
+    return top === undefined ? result : top.obj;
+}
+
+/** applyValue 参数对象 */
+interface ApplyValueParams {
+  currentObj: Record<string, unknown>;
+  key: string;
+  value: string;
+  stack: { indent: number; key: string; obj: Record<string, unknown> }[];
+  indent: number;
 }
 
 /** 按值类型分发：容器 / 数组项 / 标量 */
-function applyValue(
-  currentObj: Record<string, unknown>,
-  key: string,
-  value: string,
-  stack: { indent: number; key: string; obj: Record<string, unknown> }[],
-  indent: number,
-): void {
+function applyValue({ currentObj, key, value, stack, indent }: ApplyValueParams): void {
   if (value === '' || value === '|' || value === '>') {
     pushContainer(stack, currentObj, key, indent);
   } else if (key.startsWith('- ')) {
@@ -123,14 +130,14 @@ function parseScalar(value: string): unknown {
   return value.replace(/^['"]|['"]$/g, '');
 }
 
-function cleanArrays(obj: Record<string, unknown>): Record<string, unknown> {
+function cleanArrays(obj: Record<string, unknown>): Record<string, unknown> | unknown[] {
   if (obj._array) {
     const arr = obj._array as unknown[];
     delete obj._array;
     for (const item of arr) {
       cleanArrays(item as Record<string, unknown>);
     }
-    return arr as unknown as Record<string, unknown>;
+    return arr;
   }
 
   const keys = Object.keys(obj);

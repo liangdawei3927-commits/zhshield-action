@@ -87,7 +87,7 @@ function serializeResult(result: KernelBackupResult): SerializedBackupResult {
     timestamp: result.timestamp.toISOString(),
     duration: result.duration,
     ...(result.error ? { error: result.error } : {}),
-    results: result.results as unknown as Array<Record<string, unknown>>,
+    results: result.results.map((r) => ({ ...r })),
   };
 }
 
@@ -163,12 +163,7 @@ function registerConfigHandlers(
     'backup:getConfig',
     async (_event, projectPath: string): Promise<BackupConfigDataShape> => {
       if (!projectPath || typeof projectPath !== 'string') {
-        return {
-          cloud: { enabled: false, serverUrl: '' },
-          github: {},
-          local: {},
-          schedule: {},
-        } as unknown as BackupConfigDataShape;
+        return toConfigData(defaultBackupConfig());
       }
       return toConfigData(await configManager.loadProjectConfig(projectPath));
     },
@@ -191,35 +186,47 @@ function registerAuthorizeHandler(): void {
   ipcMain.handle('backup:authorizeGitHub', (): boolean => false);
 }
 
+/** 解析打开目标：快照目录可能已被 maxBackups 轮换清理，回退到其所在备份根目录 */
+async function resolveOpenTarget(folderPath: string): Promise<string | null> {
+  const { homedir } = await import('node:os');
+  let target = folderPath.startsWith('~') ? join(homedir(), folderPath.slice(1)) : folderPath;
+  try {
+    await stat(target);
+  } catch {
+    const parent = join(target, '..');
+    try {
+      await stat(parent);
+    } catch {
+      return null;
+    }
+    target = parent;
+  }
+  return target;
+}
+
+/** zip 归档快照是文件而非目录：在 Finder 中高亮显示，避免 openPath 触发解压 */
+async function revealOrOpenTarget(target: string): Promise<boolean> {
+  const { shell } = await import('electron');
+  if ((await stat(target)).isFile()) {
+    shell.showItemInFolder(target);
+    return true;
+  }
+  // shell.openPath 失败不抛异常而是 resolve 错误字符串，必须检查返回值而非 try/catch
+  const errMsg = await shell.openPath(target);
+  return !errMsg;
+}
+
+/** 打开备份目录（backup:openFolder）：目录回退解析 + 文件高亮 / 目录打开 */
+async function openBackupFolder(folderPath: string): Promise<boolean> {
+  if (!folderPath || typeof folderPath !== 'string') return false;
+  const target = await resolveOpenTarget(folderPath);
+  if (target === null) return false;
+  return revealOrOpenTarget(target);
+}
+
 function registerOpenFolderHandler(): void {
   ipcMain.handle('backup:openFolder', async (_event, folderPath: string): Promise<boolean> => {
-    if (!folderPath || typeof folderPath !== 'string') return false;
-    const { shell } = await import('electron');
-    const { homedir } = await import('node:os');
-
-    // 快照目录可能已被 maxBackups 轮换清理：回退打开其所在备份根目录，保证“查看备份”仍可用
-    let target = folderPath.startsWith('~') ? join(homedir(), folderPath.slice(1)) : folderPath;
-    try {
-      await stat(target);
-    } catch {
-      const parent = join(target, '..');
-      try {
-        await stat(parent);
-      } catch {
-        return false;
-      }
-      target = parent;
-    }
-
-    // zip 归档快照是文件而非目录：在 Finder 中高亮显示，避免 openPath 触发解压
-    if ((await stat(target)).isFile()) {
-      shell.showItemInFolder(target);
-      return true;
-    }
-
-    // shell.openPath 失败不抛异常而是 resolve 错误字符串，必须检查返回值而非 try/catch
-    const errMsg = await shell.openPath(target);
-    return !errMsg;
+    return openBackupFolder(folderPath);
   });
 }
 
@@ -249,6 +256,7 @@ export function createScheduleRunner(execute: (projectPath: string) => Promise<u
   return { run, lastRunMinute };
 }
 
+/** syncProjectSchedule 的依赖注入集合：调度器、配置读取与备份执行 */
 export interface ScheduleSyncDeps {
   scheduler: Pick<BackupScheduler, 'registerSchedule' | 'unregisterSchedule'>;
   loadScheduleConfig: (projectPath: string) => Promise<BackupScheduleConfig>;
@@ -305,39 +313,56 @@ export interface BackupHealthSnapshot {
 }
 
 /**
- * 只读指定项目的备份健康快照（从磁盘记录 + 项目配置聚合，不触发任何备份）。
- * 返回 null = 该项目从未备份且未启用定时备份 → 评分侧按 not-run 处理（功能未使用不罚分）。
+ * 持久化备份记录的最小形状（与 @zh/kernel BackupRecord 字段契约对齐；
+ * status 为唯一状态字段，见 kernel/src/backup/types.ts BackupRecord）。
  */
+export interface BackupRecordLike {
+  projectId: string;
+  timestamp: string;
+  status: string;
+}
+
+/**
+ * 由原始备份记录聚合健康快照（纯函数，不依赖 Electron/磁盘）。
+ * 传入 null = 该项目从未备份且未启用定时备份（评分侧按 not-run 处理）。
+ */
+export function buildBackupHealthSnapshot(
+  records: BackupRecordLike[],
+  scheduleEnabled: boolean,
+): BackupHealthSnapshot | null {
+  const own = records
+    .filter((r) => Number.isFinite(new Date(r.timestamp).getTime()))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  if (own.length === 0 && !scheduleEnabled) return null;
+
+  const lastSuccess = own.find((r) => r.status === 'success');
+  return {
+    lastSuccessAt: lastSuccess ? new Date(lastSuccess.timestamp).toISOString() : null,
+    recentStatuses: own.slice(0, 10).map((r) => r.status),
+    scheduleEnabled,
+  };
+}
+
+/** 读取项目是否启用定时备份（配置读取失败按未启用处理） */
+async function isScheduleEnabled(projectPath: string): Promise<boolean> {
+  try {
+    const config = await new BackupConfigManager().loadProjectConfig(projectPath);
+    return config?.schedule?.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+/** 只读指定项目的备份健康快照（从磁盘记录 + 项目配置聚合，不触发任何备份）。 */
 export async function loadBackupHealthSnapshot(
   projectPath: string,
 ): Promise<BackupHealthSnapshot | null> {
   try {
     const records = await loadRecordsFromDisk();
-    const own = records
-      .filter((r) => (r as { projectId?: unknown }).projectId === projectPath)
-      .map((r) => ({
-        status: String((r as { overallStatus?: unknown }).overallStatus ?? 'failed'),
-        time: new Date((r as { timestamp?: unknown }).timestamp as string).getTime(),
-      }))
-      .filter((r) => Number.isFinite(r.time))
-      .sort((a, b) => b.time - a.time);
-
-    let scheduleEnabled = false;
-    try {
-      const config = await new BackupConfigManager().loadProjectConfig(projectPath);
-      scheduleEnabled = config?.schedule?.enabled === true;
-    } catch {
-      scheduleEnabled = false;
-    }
-
-    if (own.length === 0 && !scheduleEnabled) return null;
-
-    const lastSuccess = own.find((r) => r.status === 'success');
-    return {
-      lastSuccessAt: lastSuccess ? new Date(lastSuccess.time).toISOString() : null,
-      recentStatuses: own.slice(0, 10).map((r) => r.status),
-      scheduleEnabled,
-    };
+    const own = records.filter((r) => r.projectId === projectPath);
+    const scheduleEnabled = await isScheduleEnabled(projectPath);
+    return buildBackupHealthSnapshot(own, scheduleEnabled);
   } catch (err) {
     console.warn(
       '[backup] 健康快照读取失败（按 not-run 处理）:',
@@ -347,10 +372,8 @@ export async function loadBackupHealthSnapshot(
   }
 }
 
-export function registerBackupIpc(): void {
-  const configManager = new BackupConfigManager();
-  // eventBus 接通：备份进度/完成/失败事件转发到渲染层（此前未传 eventBus，大包期间 UI 零反馈）
-  const orchestrator = new BackupOrchestrator({ configManager, eventBus });
+/** eventBus 接通：备份进度/完成/失败事件转发到渲染层（此前未传 eventBus，大包期间 UI 零反馈） */
+function wireBackupEventBus(): void {
   const forwardToRenderer = (channel: string) => (payload: unknown) => {
     getMainWindow()?.webContents.send(channel, payload);
   };
@@ -358,8 +381,13 @@ export function registerBackupIpc(): void {
   eventBus.on(BACKUP_EVENTS.PROGRESS, forwardToRenderer('backup:progress'));
   eventBus.on(BACKUP_EVENTS.COMPLETED, forwardToRenderer('backup:completed'));
   eventBus.on(BACKUP_EVENTS.FAILED, forwardToRenderer('backup:failed'));
+}
 
-  // ─── 定时备份：启动时按各项目 backup.yml 注册任务 ─────────
+/** 定时备份：启动时按各项目 backup.yml 注册任务 */
+function setupScheduledBackups(
+  configManager: BackupConfigManager,
+  orchestrator: BackupOrchestrator,
+): ScheduleSyncDeps {
   const scheduler = new BackupScheduler();
   const { run: runScheduledBackup } = createScheduleRunner(async (projectPath) => {
     const result = await orchestrator.execute({
@@ -392,14 +420,24 @@ export function registerBackupIpc(): void {
   void syncAllSchedules().catch((err) => {
     console.warn('[backup] 定时备份初始化失败:', err instanceof Error ? err.message : String(err));
   });
+  return scheduleDeps;
+}
 
-  // 启动时加载历史记录，保证重启后记录列表仍可读（异步读取，不阻塞主进程启动）
+/** 启动时加载历史记录，保证重启后记录列表仍可读（异步读取，不阻塞主进程启动） */
+function loadHistoricalRecords(orchestrator: BackupOrchestrator): void {
   void loadRecordsFromDisk()
     .then((records) => orchestrator.loadRecords(records))
     .catch((err) => {
       console.warn('[backup] 历史记录加载失败:', err instanceof Error ? err.message : String(err));
     });
+}
 
+export function registerBackupIpc(): void {
+  const configManager = new BackupConfigManager();
+  const orchestrator = new BackupOrchestrator({ configManager, eventBus });
+  wireBackupEventBus();
+  const scheduleDeps = setupScheduledBackups(configManager, orchestrator);
+  loadHistoricalRecords(orchestrator);
   registerExecuteHandler(orchestrator);
   registerRecordsHandler(orchestrator);
   registerRecordHandler(orchestrator);

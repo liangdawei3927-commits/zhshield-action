@@ -19,7 +19,7 @@ describe('P1b 验收 — 未检测域不参与加权（spec G）', () => {
   it('deps null → dependencies not-run，overall 按剩余维度归一化', () => {
     const guard = { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] };
     const inspect = { issues: [{ severity: 'error' as const, category: 'quality' }] };
-    const dims = buildHealthDimensions(guard, inspect, undefined, undefined, { deps: null });
+    const dims = buildHealthDimensions({ guard, inspect, extras: { deps: null } });
 
     const deps = dims.find((d) => d.name === 'dependencies')!;
     expect(deps.status).toBe('not-run');
@@ -34,7 +34,7 @@ describe('P1b 验收 — 未检测域不参与加权（spec G）', () => {
   });
 
   it('全部域未运行 → overall 0（weightSum 为 0 兜底）', () => {
-    const dims = buildHealthDimensions(null, null);
+    const dims = buildHealthDimensions({ guard: null, inspect: null });
     expect(dims.every((d) => d.status === 'not-run')).toBe(true);
     const score = new ScoringEngine().calculate('p', dims);
     expect(score.overall).toBe(0);
@@ -53,11 +53,11 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
     };
     const s1 = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, inspect, undefined, undefined, extras),
+      buildHealthDimensions({ guard, inspect, extras }),
     );
     const s2 = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, inspect, undefined, undefined, extras),
+      buildHealthDimensions({ guard, inspect, extras }),
     );
     expect(s1.overall).toBe(s2.overall);
   });
@@ -67,28 +67,29 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
     const baseInspect = { issues: [{ severity: 'warning' as const, category: 'quality' }] };
     const base = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, baseInspect, undefined, undefined, allExtras),
+      buildHealthDimensions({ guard, inspect: baseInspect, extras: allExtras }),
     ).overall;
 
     // 增加 security 问题 → 下降
     const worse = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(
+      buildHealthDimensions({
         guard,
-        { issues: [...baseInspect.issues, { severity: 'error' as const, category: 'security' }] },
-        undefined,
-        undefined,
-        allExtras,
-      ),
+        inspect: {
+          issues: [...baseInspect.issues, { severity: 'error' as const, category: 'security' }],
+        },
+        extras: allExtras,
+      }),
     ).overall;
     expect(worse).toBeLessThan(base);
 
     // 增加 secrets 活跃数 → 下降
     const worseSecrets = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, baseInspect, undefined, undefined, {
-        ...allExtras,
-        secrets: { activeCount: 2 },
+      buildHealthDimensions({
+        guard,
+        inspect: baseInspect,
+        extras: { ...allExtras, secrets: { activeCount: 2 } },
       }),
     ).overall;
     expect(worseSecrets).toBeLessThan(base);
@@ -96,9 +97,10 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
     // 增加 techdebt 指数 → 下降
     const worseDebt = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, baseInspect, undefined, undefined, {
-        ...allExtras,
-        techdebt: { debtIndex: 40, issueCount: 3 },
+      buildHealthDimensions({
+        guard,
+        inspect: baseInspect,
+        extras: { ...allExtras, techdebt: { debtIndex: 40, issueCount: 3 } },
       }),
     ).overall;
     expect(worseDebt).toBeLessThan(base);
@@ -106,7 +108,7 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
     // 减少问题 → 上升
     const better = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, { issues: [] }, undefined, undefined, allExtras),
+      buildHealthDimensions({ guard, inspect: { issues: [] }, extras: allExtras }),
     ).overall;
     expect(better).toBeGreaterThan(base);
   });
@@ -114,13 +116,17 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
 
 describe('P1b 验收 — null vs 空数组（spec G）', () => {
   it('{ deps: null } → not-run；{ deps: 全 0 } → scored 且 100 分', () => {
-    const notRun = buildHealthDimensions(emptyGuard, emptyInspect, undefined, undefined, {
-      deps: null,
+    const notRun = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      extras: { deps: null },
     });
     expect(notRun.find((d) => d.name === 'dependencies')!.status).toBe('not-run');
 
-    const scored = buildHealthDimensions(emptyGuard, emptyInspect, undefined, undefined, {
-      deps: { vulnerabilities: { critical: 0, high: 0, medium: 0 }, upgradable: 0 },
+    const scored = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      extras: { deps: { vulnerabilities: { critical: 0, high: 0, medium: 0 }, upgradable: 0 } },
     });
     const deps = scored.find((d) => d.name === 'dependencies')!;
     expect(deps.status).toBe('scored');
@@ -130,8 +136,10 @@ describe('P1b 验收 — null vs 空数组（spec G）', () => {
 
 describe('P1b 验收 — 新扣分公式（spec D）', () => {
   it('secrets 扣分：active 每条 -15，上限 60', () => {
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect, undefined, undefined, {
-      secrets: { activeCount: 4 },
+    const dims = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      extras: { secrets: { activeCount: 4 } },
     });
     const security = dims.find((d) => d.name === 'security')!;
     expect(security.status).toBe('scored');
@@ -140,8 +148,10 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
   });
 
   it('deps 扣分：critical -12 / high -8 / medium -4，upgradable 仅展示', () => {
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect, undefined, undefined, {
-      deps: { vulnerabilities: { critical: 1, high: 1, medium: 1 }, upgradable: 3 },
+    const dims = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      extras: { deps: { vulnerabilities: { critical: 1, high: 1, medium: 1 }, upgradable: 3 } },
     });
     const deps = dims.find((d) => d.name === 'dependencies')!;
     expect(deps.score).toBe(76); // 100 − (12+8+4)
@@ -149,8 +159,10 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
   });
 
   it('techdebt 维 = 100 − debtIndex（固定口径，自身无 inspect 扣分）', () => {
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect, undefined, undefined, {
-      techdebt: { debtIndex: 30, issueCount: 7 },
+    const dims = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      extras: { techdebt: { debtIndex: 30, issueCount: 7 } },
     });
     const techdebt = dims.find((d) => d.name === 'techdebt')!;
     expect(techdebt.score).toBe(70);
@@ -158,13 +170,11 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
   });
 
   it('gate 维 = 100 − guardPenalty（v2 起哨兵拆出独立维，gate 不再吃哨兵事件）', () => {
-    const dims = buildHealthDimensions(
-      { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] },
-      emptyInspect,
-      undefined,
-      undefined,
-      { sentinel: { active: true, criticalEvents: 2, warningEvents: 1 } },
-    );
+    const dims = buildHealthDimensions({
+      guard: { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] },
+      inspect: emptyInspect,
+      extras: { sentinel: { active: true, criticalEvents: 2, warningEvents: 1 } },
+    });
     const gate = dims.find((d) => d.name === 'gate')!;
     expect(gate.score).toBe(92); // 100 − 8(guard)，哨兵事件不再进 gate
     expect(gate.issues).toBe(1); // 仅 1 条 guard 检查项
@@ -178,40 +188,42 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
 
 describe('P1b 验收 — 各域未检测判定（spec C）', () => {
   it('quality: inspect null → not-run', () => {
-    const dims = buildHealthDimensions(emptyGuard, null);
+    const dims = buildHealthDimensions({ guard: emptyGuard, inspect: null });
     expect(dims.find((d) => d.name === 'quality')!.status).toBe('not-run');
   });
 
   it('security: secrets null 且无 security issues → not-run；有 security issues → scored', () => {
-    const noIssues = buildHealthDimensions(emptyGuard, emptyInspect);
+    const noIssues = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
     expect(noIssues.find((d) => d.name === 'security')!.status).toBe('not-run');
-    const withIssues = buildHealthDimensions(emptyGuard, {
-      issues: [{ severity: 'error' as const, category: 'security' }],
+    const withIssues = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: { issues: [{ severity: 'error' as const, category: 'security' }] },
     });
     expect(withIssues.find((d) => d.name === 'security')!.status).toBe('scored');
   });
 
   it('dependencies: deps null 且无 dependency issues → not-run；有 dependency issues → scored', () => {
-    const noIssues = buildHealthDimensions(emptyGuard, emptyInspect);
+    const noIssues = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
     expect(noIssues.find((d) => d.name === 'dependencies')!.status).toBe('not-run');
-    const withIssues = buildHealthDimensions(emptyGuard, {
-      issues: [{ severity: 'warning' as const, category: 'dependency' }],
+    const withIssues = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: { issues: [{ severity: 'warning' as const, category: 'dependency' }] },
     });
     expect(withIssues.find((d) => d.name === 'dependencies')!.status).toBe('scored');
   });
 
   it('techdebt: techdebt null → not-run', () => {
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect);
+    const dims = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
     expect(dims.find((d) => d.name === 'techdebt')!.status).toBe('not-run');
   });
 
   it('gate: guard null → not-run', () => {
-    const dims = buildHealthDimensions(null, emptyInspect);
+    const dims = buildHealthDimensions({ guard: null, inspect: emptyInspect });
     expect(dims.find((d) => d.name === 'gate')!.status).toBe('not-run');
   });
 
   it('sentinel: extras.sentinel null → not-run；garbage/backup null → not-run', () => {
-    const dims = buildHealthDimensions(emptyGuard, emptyInspect);
+    const dims = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
     expect(dims.find((d) => d.name === 'sentinel')!.status).toBe('not-run');
     expect(dims.find((d) => d.name === 'garbage')!.status).toBe('not-run');
     expect(dims.find((d) => d.name === 'backup')!.status).toBe('not-run');

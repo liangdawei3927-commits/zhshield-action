@@ -79,6 +79,7 @@ function mapCrossEntries(report: CrossValidationReport): Vulnerability[] {
   return result;
 }
 
+/** ResultAggregator.collect() 的聚合产物：垃圾/恶意/漏洞三类结果 + malware 多生产者冲突报告 */
 export interface ResultAggregatorResult {
   garbage: GarbageItem[];
   malware: MalwareItem[];

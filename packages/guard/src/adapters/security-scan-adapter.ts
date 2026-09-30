@@ -1,6 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { CheckConfig, CheckResult, CheckStatus } from '../types';
+import { makeAdapterResult } from './adapter-result';
+import { ScanAdapter } from './scan-adapter';
+import { collectSourceFiles } from './source-files';
 
 interface Finding {
   file: string;
@@ -91,51 +94,16 @@ const SECURITY_PATTERNS: {
 
 const ALLOWED_EXTENSIONS = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
 
-function collectFiles(dir: string): string[] {
-  const files: string[] = [];
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return files;
-  }
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (EXCLUDED_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
-      files.push(...collectFiles(fullPath));
-      continue;
-    }
-    if (ALLOWED_EXTENSIONS.test(entry.name)) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
-
-export class SecurityScanAdapter implements Adapter {
-  run(
-    context: { repoRoot?: string; projectPath?: string },
-    _check: CheckConfig,
-  ): { findings: Finding[]; error?: string } {
-    const targetDir = context.repoRoot || context.projectPath;
-    if (!targetDir) throw new Error(`${_check.checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
-    const findings: Finding[] = [];
-
-    try {
-      this.scanProject(targetDir, findings);
-    } catch (error: unknown) {
-      return { findings: [], error: error instanceof Error ? error.message : String(error) };
-    }
-
-    return { findings };
-  }
-
+export class SecurityScanAdapter extends ScanAdapter<Finding> {
   /** 扫描项目的源码目录（无 src 时回退到项目根） */
-  private scanProject(targetDir: string, findings: Finding[]): void {
+  protected scanProject(targetDir: string, findings: Finding[]): void {
     const srcDir = path.join(targetDir, 'src');
     const scanRoot = fs.existsSync(srcDir) ? srcDir : targetDir;
-    const files = collectFiles(scanRoot);
+    const files = collectSourceFiles(
+      scanRoot,
+      (name) => EXCLUDED_DIRS.has(name),
+      (name) => ALLOWED_EXTENSIONS.test(name),
+    );
 
     for (const file of files) {
       let content: string;
@@ -178,7 +146,7 @@ export class SecurityScanAdapter implements Adapter {
     check: CheckConfig,
   ): CheckResult {
     if (rawResult.error) {
-      return this.makeResult(check, 'error', `安全扫描失败: ${rawResult.error}`);
+      return makeAdapterResult(check, 'error', `安全扫描失败: ${rawResult.error}`);
     }
     return this.buildFindingsResult(check, rawResult.findings);
   }
@@ -186,7 +154,7 @@ export class SecurityScanAdapter implements Adapter {
   /** 汇总各严重级别统计并构建安全扫描检查结果 */
   private buildFindingsResult(check: CheckConfig, findings: Finding[]): CheckResult {
     if (findings.length === 0) {
-      return this.makeResult(check, 'passed', '安全扫描通过，未发现明显安全问题');
+      return makeAdapterResult(check, 'passed', '安全扫描通过，未发现明显安全问题');
     }
 
     const highCount = findings.filter((f) => f.severity === 'high').length;
@@ -196,28 +164,11 @@ export class SecurityScanAdapter implements Adapter {
     const details = findings.map((f) => `[${f.severity}] ${f.file}:${f.line} ${f.message}`);
 
     const status: CheckStatus = highCount > 0 ? 'failed' : 'warning';
-    return this.makeResult(
+    return makeAdapterResult(
       check,
       status,
       `发现 ${findings.length} 个安全问题 (高危 ${highCount}, 中危 ${medCount}, 低危 ${lowCount}):\n${details.join('\n')}`,
       { findings, count: findings.length, highCount, mediumCount: medCount, lowCount },
     );
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

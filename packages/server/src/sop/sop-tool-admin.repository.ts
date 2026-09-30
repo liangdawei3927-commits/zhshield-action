@@ -47,6 +47,14 @@ export class SopToolAdminRepository extends SopContentRepository {
     return row;
   }
 
+  /** requireDb() 成功后 dbConn 必已就绪；返回连接供 transaction 使用 */
+  private requireConn(): DbConnection {
+    this.requireDb();
+    const conn = this.dbConn;
+    if (!conn) throw new AdminError('数据库不可用', 'unavailable');
+    return conn;
+  }
+
   /** upsert 工具包；sha256 = hashToolRuleFiles，version = 1.<sha256 前 12 位>（与读路径同口径） */
   saveToolPackage(input: SaveToolPackageInput): { toolId: string; created: boolean } {
     const db = this.requireDb();
@@ -77,13 +85,13 @@ export class SopToolAdminRepository extends SopContentRepository {
       description: input.description ?? null,
       createdBy: 'admin',
     });
-    audit(
+    audit({
       db,
-      'tool',
-      input.toolId,
-      created ? 'create' : 'update',
-      `version=${version} sha256=${sha256.slice(0, 12)}`,
-    );
+      entityType: 'tool',
+      entityId: input.toolId,
+      action: created ? 'create' : 'update',
+      detail: `version=${version} sha256=${sha256.slice(0, 12)}`,
+    });
     return { toolId: input.toolId, created };
   }
 
@@ -91,7 +99,7 @@ export class SopToolAdminRepository extends SopContentRepository {
   publishTool(toolId: string): void {
     const db = this.requireDb();
     const row = this.requireTool(db, toolId);
-    this.dbConn!.transaction((tx) => {
+    this.requireConn().transaction((tx) => {
       const alreadySnapshotted = listToolPackageVersions(tx, toolId).some(
         (v) => v.version === row.version,
       );
@@ -119,7 +127,7 @@ export class SopToolAdminRepository extends SopContentRepository {
         description: row.description,
         createdBy: 'admin',
       });
-      audit(tx, 'tool', toolId, 'publish', `version=${row.version}`);
+      audit({ db: tx, entityType: 'tool', entityId: toolId, action: 'publish', detail: `version=${row.version}` });
     });
   }
 
@@ -129,7 +137,7 @@ export class SopToolAdminRepository extends SopContentRepository {
     const row = this.requireTool(db, toolId);
     const history = listToolPackageVersions(db, toolId).find((v) => v.version === version);
     if (!history) throw new AdminError(`历史版本不存在: ${version}`, 'not_found');
-    this.dbConn!.transaction((tx) => {
+    this.requireConn().transaction((tx) => {
       saveToolPackage(tx, {
         id: row.id,
         toolId,
@@ -142,7 +150,7 @@ export class SopToolAdminRepository extends SopContentRepository {
         description: row.description,
         createdBy: 'admin',
       });
-      audit(tx, 'tool', toolId, 'rollback', `回滚到 ${version}`);
+      audit({ db: tx, entityType: 'tool', entityId: toolId, action: 'rollback', detail: `回滚到 ${version}` });
     });
   }
 
@@ -151,7 +159,7 @@ export class SopToolAdminRepository extends SopContentRepository {
     const db = this.requireDb();
     this.requireTool(db, toolId);
     softDeleteToolPackage(db, toolId);
-    audit(db, 'tool', toolId, 'delete', '软删（disabled）');
+    audit({ db, entityType: 'tool', entityId: toolId, action: 'delete', detail: '软删（disabled）' });
   }
 
   listTools(): ToolPackageRow[] {

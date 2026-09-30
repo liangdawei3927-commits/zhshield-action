@@ -2,31 +2,27 @@ import {
   useMacOSTrafficLightInset,
   TRAFFIC_LIGHT_OFFSET,
 } from '../../hooks/useMacOSTrafficLightInset';
-import { ShieldLogo, NavIcon } from '../ui/Icons';
+import { ShieldLogo } from '../ui/Icons';
 import { useT } from '../../i18n';
 
 interface TitleBarProps {
   onOpenSettings: () => void;
   projectName?: string;
   sidebarOpen?: boolean;
-  currentPage?: string;
-  onNavigate?: (page: string) => void;
 }
 
-/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，备份中心入口+侧边栏开关居右 */
+/** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，侧边栏开关居右 */
 export function TitleBar({
   onOpenSettings,
   projectName,
   sidebarOpen,
-  currentPage,
-  onNavigate,
 }: TitleBarProps) {
   const maximized = useMacOSTrafficLightInset();
   const t = useT();
 
   return (
     <div
-      className="flex items-center shrink-0"
+      className="relative flex items-center shrink-0"
       style={{
         height: 'var(--zh-header-title-h)',
         background: 'rgb(var(--zh-bg-brand))',
@@ -43,10 +39,17 @@ export function TitleBar({
         </span>
       </div>
 
-      {/* 中：项目文件夹（居中） */}
+      {/* 中：项目文件夹（绝对定位，相对窗口中心线真居中，不受左右块宽度影响） */}
       <div
-        className="flex-1 flex items-center justify-center gap-2"
-        style={{ WebkitAppRegion: 'drag' }}
+        className="flex items-center justify-center gap-2"
+        style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          maxWidth: '45%',
+          overflow: 'hidden',
+          WebkitAppRegion: 'drag',
+        }}
       >
         {projectName ? (
           <>
@@ -59,50 +62,35 @@ export function TitleBar({
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
             >
               <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
             </svg>
-            <span style={{ fontSize: 'var(--zh-font-sm)', opacity: 0.95 }}>{projectName}</span>
+            <span
+              style={{
+                fontSize: 'var(--zh-font-sm)',
+                opacity: 0.95,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {projectName}
+            </span>
           </>
         ) : (
-          <span style={{ fontSize: 'var(--zh-font-sm)', opacity: 0.75 }}>
+          <span style={{ fontSize: 'var(--zh-font-sm)', opacity: 0.75, whiteSpace: 'nowrap' }}>
             {t('layout.noProject')}
           </span>
         )}
       </div>
 
-      {/* 右：规则进化/备份中心入口 + 侧边栏按钮 */}
-      <div className="flex items-center gap-2 pr-3" style={{ WebkitAppRegion: 'no-drag' as const }}>
-        <button
-          onClick={() => onNavigate?.('evolve')}
-          className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"
-          style={{
-            width: 28,
-            height: 24,
-            borderRadius: 'var(--zh-radius-sm)',
-            background:
-              currentPage === 'evolve' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.15)',
-            color: 'rgb(var(--zh-text-on-brand))',
-          }}
-          title={t('nav.evolve')}
-        >
-          <NavIcon id="evolve" size={14} />
-        </button>
-        <button
-          onClick={() => onNavigate?.('backup')}
-          className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"
-          style={{
-            width: 28,
-            height: 24,
-            borderRadius: 'var(--zh-radius-sm)',
-            background:
-              currentPage === 'backup' ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.15)',
-            color: 'rgb(var(--zh-text-on-brand))',
-          }}
-          title={t('nav.backup')}
-        >
-          <NavIcon id="backup" size={14} />
-        </button>
+      {/* 右：侧边栏按钮（备份中心已归入下方分类导航栏，不再占顶行）。
+          中块 absolute 脱离文档流后，右块需 margin-left:auto 保持在行尾 */}
+      <div
+        className="flex items-center gap-2 pr-3"
+        style={{ WebkitAppRegion: 'no-drag' as const, marginLeft: 'auto' }}
+      >
         <button
           onClick={onOpenSettings}
           className="flex items-center justify-center border-none cursor-pointer transition-colors hover:bg-white/20"

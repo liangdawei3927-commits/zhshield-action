@@ -17,12 +17,17 @@ export interface BaselineEntry {
   column: number;
 }
 
+/** 基线文件内容：持久化到 .zhshield/baseline.json 的顶层结构，version 当前固定为 1 */
 export interface Baseline {
   version: 1;
   capturedAt: string;
   entries: BaselineEntry[];
 }
 
+/**
+ * 基线过滤结果。
+ * @typeParam T 被过滤的问题元素类型（通常为 Issue），kept 保留原类型以便调用方继续处理。
+ */
 export interface BaselineFilterResult<T> {
   kept: T[];
   suppressed: number;
@@ -31,6 +36,7 @@ export interface BaselineFilterResult<T> {
 const BASELINE_VERSION = 1;
 const BASELINE_DIR = '.zhshield';
 const BASELINE_FILE = 'baseline.json';
+const RE_PATH_SEPARATOR = /[\\/]/;
 
 export function baselinePath(projectRoot: string): string {
   return join(projectRoot, BASELINE_DIR, BASELINE_FILE);
@@ -39,7 +45,7 @@ export function baselinePath(projectRoot: string): string {
 /** 文件归一化：绝对路径 → 相对 projectRoot；统一正斜杠（兼容 win32 反斜杠产出） */
 export function normalizeBaselineFile(file: string, projectRoot: string): string {
   const resolved = isAbsolute(file) ? relative(projectRoot, file) : file;
-  return resolved.split(/[\\/]/).join('/');
+  return resolved.split(RE_PATH_SEPARATOR).join('/');
 }
 
 /** 匹配键：ruleId:file:line:column。adapters 的 fingerprint 公式跨工具不一致

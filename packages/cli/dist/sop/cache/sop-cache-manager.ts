@@ -35,6 +35,7 @@ import { SopCacheMaintenance } from './sop-cache-maintenance';
 export { createSyncPolicy } from './sop-sync-policy';
 export type { SyncPolicyOptions } from './sop-sync-policy';
 
+/** SOP 缓存管理器配置：全部字段可选，成员均带内联说明；省略项使用默认值 */
 export interface SopCacheManagerOptions {
   /** 缓存根目录，默认 ~/.zhshield/sop-cache */
   cacheDir?: string;
@@ -175,15 +176,16 @@ export class SopCacheManager {
    */
   async syncFromCloud(): Promise<SyncResult> {
     const startedAt = Date.now();
-    this.emit('sop:sync-started');
+    emitEvent(this.eventBus,'sop:sync-started');
     try {
       const result = await this.coordinator.syncFromCloud();
+      await refreshModuleCaches(this.lazyLoader);
       this.metrics.recordSyncSuccess(Date.now() - startedAt);
-      this.emit('sop:sync-completed', { result, timestamp: new Date() });
+      emitEvent(this.eventBus,'sop:sync-completed', { result, timestamp: new Date() });
       return result;
     } catch (err) {
       this.metrics.recordSyncFailure(Date.now() - startedAt);
-      this.emit('sop:sync-failed', {
+      emitEvent(this.eventBus,'sop:sync-failed', {
         error: err instanceof Error ? err.message : String(err),
         timestamp: new Date(),
       });
@@ -195,19 +197,20 @@ export class SopCacheManager {
    * 应用增量更新（文档 13.3 节）
    */
   async applyDiff(diff: SopDiff): Promise<void> {
-    this.emit('sop:diff-started', {
+    emitEvent(this.eventBus,'sop:diff-started', {
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
       timestamp: new Date(),
     });
     await this.coordinator.applyDiff(diff);
-    this.emit('sop:diff-completed', {
+    await refreshModuleCaches(this.lazyLoader);
+    emitEvent(this.eventBus,'sop:diff-completed', {
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
       ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
       timestamp: new Date(),
     });
-    this.emit('sop:cache-synced', {
+    emitEvent(this.eventBus,'sop:cache-synced', {
       type: 'diff',
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
@@ -225,14 +228,15 @@ export class SopCacheManager {
    * 紧急更新（7.2 节）— 高危规则实时推送
    */
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
-    this.emit('sop:emergency-started', { count: rules.length, timestamp: new Date() });
+    emitEvent(this.eventBus,'sop:emergency-started', { count: rules.length, timestamp: new Date() });
     await this.coordinator.emergencyUpdate(rules);
-    this.emit('sop:emergency-completed', {
+    await refreshModuleCaches(this.lazyLoader);
+    emitEvent(this.eventBus,'sop:emergency-completed', {
       count: rules.length,
       ruleIds: rules.map((r) => r.id),
       timestamp: new Date(),
     });
-    this.emit('sop:cache-synced', {
+    emitEvent(this.eventBus,'sop:cache-synced', {
       type: 'emergency',
       ruleCount: rules.length,
       timestamp: new Date(),
@@ -265,8 +269,8 @@ export class SopCacheManager {
    */
   async clearCache(): Promise<void> {
     await this.coordinator.clearCache();
-    this.emit('sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
-    this.emit('sop:cache-synced', { type: 'cleared', timestamp: new Date() });
+    emitEvent(this.eventBus,'sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
+    emitEvent(this.eventBus,'sop:cache-synced', { type: 'cleared', timestamp: new Date() });
     this.metrics.recordCleanup(0, 0);
   }
 
@@ -276,14 +280,16 @@ export class SopCacheManager {
    * 启动后台定时同步（7.5 节 触发方式 2）
    */
   startPeriodicSync(): void {
-    this.scheduler.startPeriodicSync(() => this.coordinator.syncFromCloud());
+    this.scheduler.startPeriodicSync(() => this.syncFromCloud());
   }
 
   /**
    * 启动时静默检查（7.5 节 触发方式 1）
    */
   async checkOnStartup(): Promise<SyncResult> {
-    return this.coordinator.syncFromCloud();
+    const result = await this.coordinator.syncFromCloud();
+    await refreshModuleCaches(this.lazyLoader);
+    return result;
   }
 
   /**
@@ -355,17 +361,6 @@ export class SopCacheManager {
   getMetricsSnapshot(): SopCacheMetricsSnapshot {
     return this.metrics.snapshot();
   }
-
-  // ─── 事件发射 ──────────────────────────────────────────────
-
-  /**
-   * 发射事件（fire-and-forget：监听器异常不影响主流程）
-   */
-  private emit(event: string, data: Record<string, unknown> = {}): void {
-    if (this.eventBus) {
-      this.eventBus.emit(event, data).catch(() => {});
-    }
-  }
 }
 
 function isProjectProfile(input: ProjectFeature | ProjectProfile): input is ProjectProfile {
@@ -387,4 +382,33 @@ function projectProfileToFeature(profile: ProjectProfile): ProjectFeature {
     framework: target?.frameworks?.[0]?.value,
     features,
   };
+}
+
+/**
+ * 发射事件（fire-and-forget：监听器异常不影响主流程）
+ */
+function emitEvent(
+  eventBus: EventBus | undefined,
+  event: string,
+  data: Record<string, unknown> = {},
+): void {
+  if (eventBus) {
+    eventBus.emit(event, data).catch(() => {});
+  }
+}
+
+/**
+ * 同步成功后重建 modules/*.db，让校准规则进入扫描装载路径。
+ *
+ * 根因：扫描引擎（pipeline-runner.loadSopRulesFromCache）读取 cacheDir/modules/*.db，
+ * 而同步链路只写 rules.db（SQLite）；若不重建模块缓存，calibrate 后的规则永远到不了扫描端。
+ * lazyLoader 未启用时 no-op。
+ */
+async function refreshModuleCaches(lazyLoader: SopLazyLoader | undefined): Promise<void> {
+  if (!lazyLoader) return;
+  try {
+    await lazyLoader.refreshAllLoadedModules(true);
+  } catch (err) {
+    console.error('[SopCacheManager] 模块缓存重建失败，扫描仍将读取陈旧模块规则:', err);
+  }
 }

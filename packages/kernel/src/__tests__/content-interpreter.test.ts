@@ -131,4 +131,38 @@ describe('ContentInterpreter — 规则内容解释分发', () => {
     });
     expect(interpreter.interpret(mixedRule).type).toBe('tool-dispatch');
   });
+
+  it('tool-dispatch 规则顶层 thresholds 并入 toolConfig（duplication 的 jscpd 阈值透传）', () => {
+    const rule = makeRule({
+      id: 'inspect.scan.official.duplication',
+      content: {
+        check: { tool: 'jscpd', toolConfig: {} },
+        thresholds: { minLines: 10, minTokens: 50, minSimilarity: 80 },
+      },
+    });
+    const instr = interpreter.interpret(rule);
+    expect(instr.type).toBe('tool-dispatch');
+    if (instr.type === 'tool-dispatch') {
+      expect(instr.toolConfig.thresholds).toEqual({
+        minLines: 10,
+        minTokens: 50,
+        minSimilarity: 80,
+      });
+    }
+  });
+
+  it('toolConfig 已显式声明 thresholds 时保留既有声明，不被顶层覆盖', () => {
+    const rule = makeRule({
+      id: 'test.tool-dispatch.thresholds-precedence',
+      content: {
+        check: { tool: 'jscpd', toolConfig: { thresholds: { minLines: 99 } } },
+        thresholds: { minLines: 10 },
+      },
+    });
+    const instr = interpreter.interpret(rule);
+    expect(instr.type).toBe('tool-dispatch');
+    if (instr.type === 'tool-dispatch') {
+      expect(instr.toolConfig.thresholds).toEqual({ minLines: 99 });
+    }
+  });
 });

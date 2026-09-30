@@ -26,15 +26,15 @@ export class PipelineController {
     };
 
     if (result.guard && 'ok' in result.guard) {
-      summary.guardPassed = (result.guard as unknown as { ok: boolean | undefined }).ok;
+      summary.guardPassed = (result.guard as { ok: boolean | undefined }).ok;
     } else if (result.guard && 'passed' in result.guard) {
-      summary.guardPassed = (result.guard as unknown as { passed: number }).passed > 0;
+      summary.guardPassed = (result.guard as { passed: number }).passed > 0;
     } else {
       summary.guardPassed = null;
     }
 
     if (result.inspect && 'passed' in result.inspect) {
-      summary.inspectPassed = (result.inspect as unknown as { passed: number }).passed > 0;
+      summary.inspectPassed = (result.inspect as { passed: number }).passed > 0;
     } else {
       summary.inspectPassed = null;
     }

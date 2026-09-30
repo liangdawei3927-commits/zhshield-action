@@ -101,12 +101,12 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         return null;
       }
 
-      const dimensions = buildHealthDimensions(
-        { results: formats.guardResults },
-        { issues: formats.inspectIssues },
-        projectPath,
-        null,
-      );
+      const dimensions = buildHealthDimensions({
+        guard: { results: formats.guardResults },
+        inspect: { issues: formats.inspectIssues },
+        projectRoot: projectPath,
+        profile: null,
+      });
       const score = this.engine.calculate(projectPath, dimensions);
       this.logger.log(`健康评分已落库: ${projectPath} ${score.overall} (${score.grade})`);
       return score;

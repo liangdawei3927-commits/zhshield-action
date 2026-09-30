@@ -31,6 +31,7 @@ import {
   detectSwitchStatement,
 } from './extra-detectors';
 
+/** 坏味道检测器契约：规则名、说明、对应的 SOP 规则 ID 与检测入口 */
 export interface DetectorSet {
   name: string;
   description: string;
@@ -38,6 +39,7 @@ export interface DetectorSet {
   detect: (parsed: ParsedFile, allFiles: ParsedFile[], config: RefactorConfig) => CodeSmell[];
 }
 
+/** 全量检测器注册表（按 R01~R12 SOP 规则编号排列，供扫描引擎顺序执行） */
 export const ALL_DETECTORS: DetectorSet[] = [
   {
     name: 'long-method',

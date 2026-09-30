@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeJoinReal, safeResolveReal } from '@zh/shared';
+import { isDeletablePath, isDeletableType, isKnownGarbageType } from './deletable';
 import type {
   GarbageCleanInput,
   GarbageCleanResult,
@@ -17,18 +18,6 @@ import type {
   GarbageRestoreResult,
   GarbageType,
 } from './types';
-
-const CLEANABLE_TYPES: GarbageType[] = [
-  'unused-file',
-  'unused-dependency',
-  'dead-code',
-  'duplicate-code',
-  'build-artifact',
-];
-
-function isGarbageType(value: string): value is GarbageType {
-  return (CLEANABLE_TYPES as string[]).includes(value);
-}
 
 export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): GarbageCleanResult {
   const root = safeResolveReal(projectPath, '.');
@@ -39,7 +28,8 @@ export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): G
     if (type === null) continue;
     const absPath = resolveItemPath(root, item, state.failed);
     if (absPath === null) continue;
-    moveToTrash(item, type, absPath, root, state);
+    if (!authorizeDelete(item, state.failed)) continue;
+    moveToTrash({ item, type, absPath, root, state });
   }
 
   if (state.cleaned.length === 0 && state.batchId) {
@@ -63,15 +53,22 @@ interface CleanState {
 }
 
 function validateCleanItem(item: GarbageCleanInput, failed: string[]): GarbageType | null {
-  if (!isGarbageType(item.type)) {
+  if (!isKnownGarbageType(item.type)) {
     failed.push(`${item.id}: 未知垃圾类型 ${item.type}`);
     return null;
   }
-  if (item.type === 'unused-dependency') {
-    failed.push(`${item.id}: unused-dependency 需通过包管理器移除，已跳过`);
+  if (!isDeletableType(item.type)) {
+    failed.push(`${item.id}: ${item.type} 属需人工判断的分析结论，不支持批量清理`);
     return null;
   }
   return item.type;
+}
+
+/** 删除授权：须在 resolveItemPath 之后调用，否则越界路径会被降级成普通拒绝而丢掉越界诊断 */
+function authorizeDelete(item: GarbageCleanInput, failed: string[]): boolean {
+  if (isDeletablePath(item.path)) return true;
+  failed.push(`${item.id}: ${item.path} 非可再生路径，已拒绝（仅允许清理构建产物与垃圾文件）`);
+  return false;
 }
 
 function resolveItemPath(root: string, item: GarbageCleanInput, failed: string[]): string | null {
@@ -83,13 +80,16 @@ function resolveItemPath(root: string, item: GarbageCleanInput, failed: string[]
   }
 }
 
-function moveToTrash(
-  item: GarbageCleanInput,
-  type: GarbageType,
-  absPath: string,
-  root: string,
-  state: CleanState,
-): void {
+interface MoveToTrashParams {
+  item: GarbageCleanInput;
+  type: GarbageType;
+  absPath: string;
+  root: string;
+  state: CleanState;
+}
+
+function moveToTrash(params: MoveToTrashParams): void {
+  const { item, type, absPath, root, state } = params;
   try {
     if (!state.batchId) {
       const newBatchId = randomUUID();
@@ -139,17 +139,20 @@ interface RestoreState {
 function restoreDirectory(dir: string, batchDir: string, root: string, state: RestoreState): void {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name === 'node_modules') continue;
-    restoreEntry(entry, dir, batchDir, root, state);
+    restoreEntry({ entry, dir, batchDir, root, state });
   }
 }
 
-function restoreEntry(
-  entry: fs.Dirent,
-  dir: string,
-  batchDir: string,
-  root: string,
-  state: RestoreState,
-): void {
+interface RestoreEntryParams {
+  entry: fs.Dirent;
+  dir: string;
+  batchDir: string;
+  root: string;
+  state: RestoreState;
+}
+
+function restoreEntry(params: RestoreEntryParams): void {
+  const { entry, dir, batchDir, root, state } = params;
   const full = resolveFullPath(dir, entry.name, state.failed);
   if (full === null) return;
   if (entry.isDirectory()) {

@@ -14,20 +14,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { TenancyService, type ResolvedTool, type ScopeProfileLike } from './tenancy.service';
 import { SERVER_TOOL_IDS } from '../sop/tool-rule.controller';
+import { requireString, optionalString } from '../request-body';
 import type { RuleScopeRow } from '@zh/db';
-
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new BadRequestException(`字段 ${field} 必须为非空字符串`);
-  }
-  return value;
-}
-
-function optionalString(value: unknown, field: string): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') throw new BadRequestException(`字段 ${field} 必须为字符串`);
-  return value;
-}
 
 /**
  * 轻量 Org 端点（M3 规格 §四）。鉴权沿用全局 LocalOnlyGuard（本地令牌），

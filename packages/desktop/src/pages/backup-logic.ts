@@ -17,6 +17,7 @@ import type {
   BackupConfigData,
 } from '../types/electron';
 
+/** 备份调度配置（定时备份的 cron 表达式与启用开关，取自 BackupConfigData.schedule） */
 export type BackupScheduleData = BackupConfigData['schedule'];
 
 export const STATUS_LABEL: Record<string, { textKey: string; color: string }> = {
@@ -81,6 +82,23 @@ function useBackupRecords(): {
   return { records, setRecords, loadRecords: fetchRecords };
 }
 
+/** 备份进度推送订阅：主进程 eventBus 实时推送（950MB 大包需 2-3 分钟，无进度时 UI 像死机；payload 可能来自其他项目的定时备份，按 projectId 过滤） */
+function useBackupProgressState(
+  projectPath: string,
+): [BackupProgressData | null, Dispatch<SetStateAction<BackupProgressData | null>>] {
+  const [progress, setProgress] = useState<BackupProgressData | null>(null);
+  useEffect(
+    () =>
+      onBackupProgress((payload) => {
+        if (payload && payload.projectId === projectPath) {
+          setProgress(payload);
+        }
+      }),
+    [projectPath],
+  );
+  return [progress, setProgress];
+}
+
 /** 一键备份执行：状态 + 进度推送 + 结果提示 */
 function useBackupRun(
   projectPath: string,
@@ -93,22 +111,10 @@ function useBackupRun(
   handleBackup: () => Promise<void>;
 } {
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const [progress, setProgress] = useState<BackupProgressData | null>(null);
+  const [progress, setProgress] = useBackupProgressState(projectPath);
   const [lastResult, setLastResult] = useState<BackupResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  // 订阅主进程推送的备份进度（950MB 大包需 2-3 分钟，无进度时 UI 像死机）
-  // 注意 payload 可能来自其他项目的定时备份，按 projectId 过滤
-  useEffect(
-    () =>
-      onBackupProgress((payload) => {
-        if (payload && payload.projectId === projectPath) {
-          setProgress(payload);
-        }
-      }),
-    [projectPath],
-  );
 
   const handleBackup = useCallback(async () => {
     setIsBackingUp(true);
@@ -162,11 +168,12 @@ function useBackupDelete(onDeleted: (id: string) => void): {
   return { deleteTarget, setDeleteTarget, handleDeleteConfirm };
 }
 
-/** 定时备份设置：读取/编辑/保存项目级 schedule 配置（此前该配置无任何 UI 入口） */
-export function useBackupSchedule(projectPath: string) {
+/** 定时备份 schedule 状态：读取项目级配置 + 本地编辑（此前该配置无任何 UI 入口） */
+function useScheduleState(projectPath: string): {
+  schedule: BackupScheduleData | null;
+  update: (patch: Partial<BackupScheduleData>) => void;
+} {
   const [schedule, setSchedule] = useState<BackupScheduleData | null>(null);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     let active = true;
@@ -193,6 +200,17 @@ export function useBackupSchedule(projectPath: string) {
     }));
   }, []);
 
+  return { schedule, update };
+}
+
+/** 定时备份保存：合并完整配置写盘 + 结果提示 */
+function useScheduleSaver(
+  projectPath: string,
+  schedule: BackupScheduleData | null,
+): { saving: boolean; save: () => Promise<void> } {
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
   const save = useCallback(async () => {
     if (!schedule) return;
     setSaving(true);
@@ -207,6 +225,14 @@ export function useBackupSchedule(projectPath: string) {
       setSaving(false);
     }
   }, [projectPath, schedule, toast]);
+
+  return { saving, save };
+}
+
+/** 定时备份设置：读取/编辑/保存项目级 schedule 配置 */
+export function useBackupSchedule(projectPath: string) {
+  const { schedule, update } = useScheduleState(projectPath);
+  const { saving, save } = useScheduleSaver(projectPath, schedule);
 
   return { schedule, update, save, saving };
 }

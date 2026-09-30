@@ -11,15 +11,21 @@
  */
 import * as ts from 'typescript';
 import {
+  declaredNamesInLoopBody,
   decoratorNamesOf,
   implementedInterfacesOf,
   isClassMember,
   isFunctionLike,
   isIpcListener,
+  isStaticLengthIterable,
+  iterableExpressionOf,
   iterableTextOf,
   lineOf,
+  loopBindingNamesOf,
   paramTypesOf,
+  referencedNamesOf,
   scriptKindOf,
+  topLevelArrayConstNames,
 } from './ast-nodes';
 
 /**
@@ -51,6 +57,13 @@ export interface DeepestLoopChain {
   readonly innermostIterable: string;
   /** 最深链中最外层那个循环的起始行（1 基） */
   readonly outermostLine: number;
+  /**
+   * 该链是否存在「乘数层」——某一层的遍历规模与外层那一轮的规模相乘，总代价随两个维度同时放大。
+   *
+   * false = 三层只是**沿同一棵数据往下走**（每层的集合都由上一层那一轮的元素派生），总代价等于
+   * 叶子节点数，与输入规模线性；此时报「循环层级过深」是误报，开发也无从下手。
+   */
+  readonly amplifies: boolean;
 }
 
 /** 调用点所在作用域的形态；`constructor` / `field-init` / `module` 属一次性初始化 */
@@ -96,6 +109,46 @@ interface WalkFrame {
   readonly ipcHandler: boolean;
 }
 
+/**
+ * 判定一条循环链里是否存在乘数层：逐层看「本层遍历的集合」是否由上一层那一轮的元素派生。
+ *
+ * 派生（含下列任一）→ 本层规模受上一层那一轮约束，三层只是一次深度遍历，总量 = 叶子数：
+ *   - 引用了上一层循环的绑定名（`for (const pe of p.items)` 里的 `p.items`）
+ *   - 引用了上一层循环体内声明的局部名（`const deps = pkg[section]` 后的 `Object.keys(deps)`）
+ *   - 遍历的是静态有界的配置集合（顶层 const 数组 / 字面量数组），长度不随输入增长
+ *
+ * 都不满足 → 本层是独立维度，与外层相乘（`|files| × |rules| × |hits|`），即真正的乘法循环。
+ *
+ * 判据刻意偏向「不放大」：宁可漏报一条，也不给线性遍历扣分 —— 产品以误报率为硬约束。
+ */
+function chainAmplifies(innermost: ts.Node, staticLengthConsts: ReadonlySet<string>): boolean {
+  const chain: ts.Node[] = [];
+  for (let cur: ts.Node | undefined = innermost; cur !== undefined; cur = cur.parent) {
+    if (LOOP_KINDS.has(cur.kind)) chain.push(cur);
+  }
+  // chain 由内向外排列：chain[0] 最内层，chain[length-1] 最外层。
+  // 逐对比较「被内嵌的那层」是否在遍历由「外层那一轮」派生的集合。
+  for (let i = 1; i < chain.length; i += 1) {
+    const layer = chain[i - 1];
+    const outer = chain[i];
+    if (layer === undefined || outer === undefined) continue;
+    const iterable = iterableExpressionOf(layer);
+    if (iterable === undefined) continue;
+    if (isStaticLengthIterable(iterable, staticLengthConsts)) continue;
+    const derived = referencedNamesOf(iterable);
+    const visible = new Set([...loopBindingNamesOf(outer), ...declaredNamesInLoopBody(outer)]);
+    let overlaps = false;
+    for (const name of visible) {
+      if (derived.has(name)) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (!overlaps) return true;
+  }
+  return false;
+}
+
 /** 模块顶层作用域：没有任何函数包裹，代码只随模块求值执行一次 */
 const MODULE_SCOPE: ScopeFacts = {
   kind: 'module',
@@ -118,6 +171,7 @@ export function scanSourceFile(filePath: string, content: string): FileScan {
   );
   const identifierNames = new Set<string>();
   const moduleSpecifiers = new Set<string>();
+  const staticLengthConsts = topLevelArrayConstNames(sourceFile);
   const syncCalls: SyncCallSite[] = [];
   const classStack: string[][] = [];
   let deepestLoops: DeepestLoopChain | null = null;
@@ -126,7 +180,7 @@ export function scanSourceFile(filePath: string, content: string): FileScan {
 
   /** 进入函数/方法/字段初始化时切换作用域；其余节点沿用外层作用域 */
   const scopeOf = (node: ts.Node, inherited: ScopeFacts): ScopeFacts => {
-    const implementsInterfaces = classStack[classStack.length - 1] ?? [];
+    const implementsInterfaces = classStack.at(-1) ?? [];
     if (ts.isConstructorDeclaration(node)) {
       return { ...MODULE_SCOPE, kind: 'constructor', implementsInterfaces };
     }
@@ -164,13 +218,20 @@ export function scanSourceFile(filePath: string, content: string): FileScan {
     const isLoop = LOOP_KINDS.has(node.kind);
     const loopDepth = isLoop ? frame.loopDepth + 1 : frame.loopDepth;
     const loopChain = isLoop ? [...frame.loopChain, line(node)] : frame.loopChain;
-    // 仅在层数刷新纪录时更新，层数相同则保留先出现的那条链（并列取最靠前）
-    if (isLoop && loopDepth > (deepestLoops?.depth ?? 0)) {
-      deepestLoops = {
-        depth: loopDepth,
-        innermostIterable: iterableTextOf(node, sourceFile),
-        outermostLine: loopChain[0] ?? line(node),
-      };
+    // 层数刷新纪录才替换；同层时优先保留「存在乘数」那条，避免良性链把同文件里的真乘法循环挤掉
+    if (isLoop) {
+      const current = deepestLoops;
+      const deeper = loopDepth > (current?.depth ?? 0);
+      const outranksTie =
+        current !== null && loopDepth === current.depth && !current.amplifies;
+      if (deeper || outranksTie) {
+        deepestLoops = {
+          depth: loopDepth,
+          innermostIterable: iterableTextOf(node, sourceFile),
+          outermostLine: loopChain[0] ?? line(node),
+          amplifies: chainAmplifies(node, staticLengthConsts),
+        };
+      }
     }
 
     const isClass = ts.isClassDeclaration(node) || ts.isClassExpression(node);

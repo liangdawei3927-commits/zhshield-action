@@ -33,12 +33,28 @@ export interface GuardReportLike {
 export interface InspectIssueLike {
   severity: 'error' | 'warning' | 'info';
   category: string;
+  /** 规则 ID（S1 规则聚合计数用）；缺省时该条 issue 独立计分，行为向后兼容 */
+  ruleId?: string;
 }
 
 /** inspect 报告最小结构 — 与 @zh/inspect InspectionReport 字段兼容 */
 export interface InspectionReportLike {
   issues: InspectIssueLike[];
+  /**
+   * 项目有效源码规模（ESLOC，S2 密度归一化分母）。
+   * 缺省/非法值 → 密度因子 = 1（不稀释不满分，向后兼容）。
+   */
+  esloc?: number;
 }
+
+/**
+ * S1 单规则扣分封顶（章程修正①）：同 ruleId 的 issue 聚合后，
+ * 一条规则在 quality 维最多贡献的扣分。计数从「逐处命中」改为「按规则聚合」。
+ */
+export const RULE_PENALTY_CAP = 20;
+
+/** S2 密度归一化（章程修正②）：项目 ESLOC 达到该值时密度因子 = 1，超过则按比例稀释 */
+export const DENSITY_REF_ESLOC = 20_000;
 
 /**
  * 维度 → inspect issue.category 映射（十域评分体系，v2）。
@@ -66,6 +82,33 @@ const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
 
 function penaltyForIssues(issues: InspectIssueLike[]): number {
   return issues.reduce((sum, issue) => sum + ISSUE_PENALTY[issue.severity], 0);
+}
+
+/**
+ * quality 维扣分（S1 规则聚合 + S2 密度归一化，章程修正①/②）：
+ * - 同 ruleId 的 issue 聚合计数，单规则扣分封顶 RULE_PENALTY_CAP；
+ *   无 ruleId 的 issue 各自独立（单条 ≤8，恒低于封顶，行为与线性口径一致）；
+ * - 聚合扣分按密度因子稀释：esloc ≥ DENSITY_REF_ESLOC 时因子 = REF/esloc，
+ *   esloc 缺失/非法/小于 REF 时因子 = 1（不放大，向后兼容）。
+ */
+function qualityPenalty(issues: InspectIssueLike[], esloc: number | undefined): number {
+  const byRule = new Map<string, number>();
+  let untagged = 0;
+  for (const issue of issues) {
+    const p = ISSUE_PENALTY[issue.severity];
+    if (issue.ruleId) {
+      byRule.set(issue.ruleId, (byRule.get(issue.ruleId) ?? 0) + p);
+    } else {
+      untagged += p;
+    }
+  }
+  let penalty = untagged;
+  for (const raw of byRule.values()) penalty += Math.min(raw, RULE_PENALTY_CAP);
+  const density =
+    typeof esloc === 'number' && Number.isFinite(esloc) && esloc > 0
+      ? Math.min(1, DENSITY_REF_ESLOC / esloc)
+      : 1;
+  return penalty * density;
 }
 
 /** guard 失败/警告计入 gate 维度的扣分 */
@@ -100,8 +143,16 @@ function sentinelPenalty(sentinel: SentinelDataLike): number {
   return Math.min(100, sentinel.criticalEvents * 10 + sentinel.warningEvents * 5);
 }
 
-/** garbage 扣分：build-artifact -1 / unused-file -2 / duplicate-code -3 / dead-code -4 / unused-dependency -6，上限 100（章程 #5） */
-const GARBAGE_TYPE_PENALTY: Record<string, number> = {
+/**
+ * garbage 扣分：按类型单条计权（build-artifact 1 / unused-file 2 / duplicate-code 3 /
+ * dead-code 4 / unused-dependency 6），单类型贡献封顶 GARBAGE_TYPE_CAP，整体上限 100
+ * （章程 #5，2026-09-22 P2-3 初校）。
+ *
+ * 初校背景：旧口径线性逐项扣分 + 全局 100 上限，真实项目（ts-prune/jscpd 命中数百项）
+ * 加权罚分立即触顶 → 该维退化为二元（0/100）且几乎恒为 0。单类型封顶保证某一类垃圾
+ * 堆积再多也不独占整维，保留区分度；Σ 各类型封顶恰好 100，与全局上限对齐（触底不为负）。
+ */
+export const GARBAGE_TYPE_PENALTY: Readonly<Record<string, number>> = {
   'build-artifact': 1,
   'unused-file': 2,
   'duplicate-code': 3,
@@ -109,10 +160,25 @@ const GARBAGE_TYPE_PENALTY: Record<string, number> = {
   'unused-dependency': 6,
 };
 
+/** garbage 各类型的单类型最大贡献（P2-3 调参点；Σ = 100 与全局上限对齐） */
+export const GARBAGE_TYPE_CAP: Readonly<Record<string, number>> = {
+  'build-artifact': 10,
+  'unused-file': 15,
+  'duplicate-code': 20,
+  'dead-code': 25,
+  'unused-dependency': 30,
+};
+
+/** 未知垃圾类型的缺省单条罚分与其贡献封顶 */
+export const GARBAGE_UNKNOWN_PENALTY = 2;
+export const GARBAGE_UNKNOWN_CAP = 10;
+
 function garbagePenalty(garbage: GarbageDataLike): number {
   let sum = 0;
   for (const [type, count] of Object.entries(garbage.byType)) {
-    sum += count * (GARBAGE_TYPE_PENALTY[type] ?? 2);
+    const unit = GARBAGE_TYPE_PENALTY[type] ?? GARBAGE_UNKNOWN_PENALTY;
+    const cap = GARBAGE_TYPE_CAP[type] ?? GARBAGE_UNKNOWN_CAP;
+    sum += Math.min(cap, count * unit);
   }
   return Math.min(100, sum);
 }
@@ -148,9 +214,34 @@ export function backupPenalty(backup: BackupDataLike, now: number = Date.now()):
   return Math.min(100, freshnessPenalty + failurePenalty);
 }
 
-/** refactor 扣分：smell 按 error -8 / warning -4 / info -1，上限 100（spec D） */
+/**
+ * refactor 扣分：smell 按 error 8 / warning 4 / info 1 计权，单级贡献封顶
+ * REFACTOR_SEVERITY_CAP，整体上限 100（章程 #8，2026-09-22 P2-3 初校）。
+ *
+ * 初校背景：旧口径线性逐项扣分 + 全局 100 上限，真实项目（18 个 AST 规则检出 400+
+ * 异味）加权罚分立即触顶 → 该维退化为二元（0/100）且几乎恒为 0。单级封顶保证某一级
+ * 异味堆积再多也不独占整维，保留区分度；Σ 三级封顶恰好 100，与全局上限对齐（触底不为负）。
+ */
+export const REFACTOR_SEVERITY_PENALTY: Readonly<Record<'error' | 'warning' | 'info', number>> = {
+  error: 8,
+  warning: 4,
+  info: 1,
+};
+
+/** refactor 各级 severity 的单级最大贡献（P2-3 调参点；Σ = 100 与全局上限对齐） */
+export const REFACTOR_SEVERITY_CAP: Readonly<Record<'error' | 'warning' | 'info', number>> = {
+  error: 40,
+  warning: 48,
+  info: 12,
+};
+
 function refactorPenalty(refactor: RefactorDataLike): number {
-  return Math.min(100, refactor.bySeverity.error * 8 + refactor.bySeverity.warning * 4 + refactor.bySeverity.info * 1);
+  const keys = ['error', 'warning', 'info'] as const;
+  let sum = 0;
+  for (const key of keys) {
+    sum += Math.min(REFACTOR_SEVERITY_CAP[key], refactor.bySeverity[key] * REFACTOR_SEVERITY_PENALTY[key]);
+  }
+  return Math.min(100, sum);
 }
 
 /**
@@ -163,9 +254,13 @@ function refactorPenalty(refactor: RefactorDataLike): number {
  * 该维 0 分，即 1% 的问题项对分数零影响、其余 99% 全部不可见（23 条 high 之后分辨率归零）。
  * 单级封顶保证某一级堆积再多也不独占整维；Σ 五级封顶恰好 100，与全局上限对齐（触底不为负）。
  *
- * 注：上述 45/5 是改分前基线，不是当前实扫值。同批已修正 complexity 检测器误报
- * （Node CLI/批处理/启动期的同步 IO、非 O(n³) 的嵌套循环），当前实扫 0 条 sync-io
- * + 6 条真实 3 层嵌套；本封顶的回归测试不依赖具体条数。
+ * 注：上述 45/5 是改分前基线，不是当前实扫值。同步 IO 一侧已按运行时上下文修正
+ * （Node CLI/批处理/启动期不报），实扫 0 条。嵌套循环一侧原先只数 AST 层数、不看代价结构：
+ * 逐条实测 6 条全是线性分层遍历（4 倍输入耗时 2.2~4.0 倍），其中 4 条每层集合都由上一层
+ * 那一轮派生、总量等于叶子数。现补「乘数层」判据——某一层既不引用外层循环绑定、也不引用
+ * 外层体内的派生量、且遍历的不是固定长度配置集合时才算独立维度——只有存在独立维度才报。
+ * 当前实扫 0 条；`input × 固定配置` 形态（如「文件数 × 规则表」）在单文件静态分析里与真实
+ * 交叉乘法不可区分，按设计保留告警。本封顶的回归测试不依赖具体条数。
  */
 export const PERFORMANCE_SEVERITY_PENALTY: Readonly<
   Record<'critical' | 'high' | 'medium' | 'low' | 'info', number>
@@ -233,13 +328,30 @@ function notRun(name: string, weight: number): DimensionScore {
  * @param extras 扩展域数据（secrets/deps/techdebt/sentinel/refactor/performance）；缺省 = 各域 null = not-run
  * @throws {ProjectScoringConfigError} 项目覆盖文件存在但内容非法时（fail-fast）
  */
-export function buildHealthDimensions(
-  guard: GuardReportLike | null,
-  inspect: InspectionReportLike | null,
-  projectRoot?: string,
-  profile?: ScoringProjectProfile | null,
-  extras?: DimensionExtras,
-): DimensionScore[] {
+/**
+ * buildHealthDimensions 参数对象。
+ * @param guard guard 报告（可空；null = 门禁未运行）
+ * @param inspect inspect 报告（可空；null = 质量巡检未运行）
+ * @param projectRoot 项目根目录，缺省为 process.cwd()；传入可显式指定被扫描项目
+ * @param profile 项目画像（来自 @zh/fingerprint 的评分契约）；传入时按项目类型自动微调维度权重，
+ *   不传则走默认配置（向后兼容）。profile 增量在项目级 .zhshield/scoring.yml 之上叠加。
+ * @param extras 扩展域数据（secrets/deps/techdebt/sentinel/refactor/performance）；缺省 = 各域 null = not-run
+ */
+export interface BuildHealthDimensionsParams {
+  guard: GuardReportLike | null;
+  inspect: InspectionReportLike | null;
+  projectRoot?: string;
+  profile?: ScoringProjectProfile | null;
+  extras?: DimensionExtras;
+}
+
+export function buildHealthDimensions({
+  guard,
+  inspect,
+  projectRoot,
+  profile,
+  extras,
+}: BuildHealthDimensionsParams): DimensionScore[] {
   const dimensionMapper = new DimensionMapper(undefined, projectRoot);
   const weightMap = resolveWeightMap(profile, dimensionMapper);
   const secrets = extras?.secrets ?? null;
@@ -252,15 +364,22 @@ export function buildHealthDimensions(
   const backup = extras?.backup ?? null;
 
   return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) =>
-    scoreDimension(name, categories, weightMap, guard, inspect, {
-      secrets,
-      deps,
-      techdebt,
-      sentinel,
-      refactor,
-      performance,
-      garbage,
-      backup,
+    scoreDimension({
+      name,
+      categories,
+      weightMap,
+      guard,
+      inspect,
+      extras: {
+        secrets,
+        deps,
+        techdebt,
+        sentinel,
+        refactor,
+        performance,
+        garbage,
+        backup,
+      },
     }),
   );
 }
@@ -294,18 +413,52 @@ interface ExtrasResolved {
   backup: BackupDataLike | null;
 }
 
-function scoreDimension(
-  name: string,
-  categories: string[],
-  weightMap: Record<string, number>,
-  guard: GuardReportLike | null,
-  inspect: InspectionReportLike | null,
-  extras: ExtrasResolved,
-): DimensionScore {
+/** scoreDimension 参数对象 */
+interface ScoreDimensionParams {
+  name: string;
+  categories: string[];
+  weightMap: Record<string, number>;
+  guard: GuardReportLike | null;
+  inspect: InspectionReportLike | null;
+  extras: ExtrasResolved;
+}
+
+function scoreDimension(params: ScoreDimensionParams): DimensionScore {
+  const { name, categories, weightMap, guard, inspect, extras } = params;
   const weight = weightMap[name] ?? 0;
   const issues = inspect?.issues ?? [];
   const matched = issues.filter((issue) => categories.includes(issue.category));
 
+  const notRunResult = notRunDimension(params, matched);
+  if (notRunResult) return notRunResult;
+
+  switch (name) {
+    case 'techdebt':
+      return scoreTechdebt(name, weight, extras.techdebt);
+    case 'refactor':
+      return scoreRefactor(name, weight, extras.refactor);
+    case 'performance':
+      return scorePerformance(name, weight, extras.performance);
+    case 'gate':
+      return scoreGate(name, weight, guard);
+    case 'sentinel':
+      return scoreSentinel(name, weight, extras.sentinel);
+    case 'garbage':
+      return scoreGarbage(name, weight, extras.garbage);
+    case 'backup':
+      return scoreBackup(name, weight, extras.backup);
+    default:
+      return scoreInspectBased({ name, weight, inspect, extras, matched });
+  }
+}
+
+/** 未检测语义（spec C）：某域从未运行时该域不参与加权且标注 not-run，禁止按满分计 */
+function notRunDimension(
+  params: ScoreDimensionParams,
+  matched: InspectIssueLike[],
+): DimensionScore | null {
+  const { name, guard, inspect, extras } = params;
+  const weight = params.weightMap[name] ?? 0;
   if (name === 'quality' && inspect === null) return notRun(name, weight);
   if (name === 'security' && extras.secrets === null && matched.length === 0) {
     return notRun(name, weight);
@@ -320,97 +473,163 @@ function scoreDimension(
   if (name === 'sentinel' && extras.sentinel === null) return notRun(name, weight);
   if (name === 'garbage' && extras.garbage === null) return notRun(name, weight);
   if (name === 'backup' && extras.backup === null) return notRun(name, weight);
+  return null;
+}
 
-  if (name === 'techdebt') {
-    const debtIndex = extras.techdebt!.debtIndex;
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - debtIndex) * 10) / 10),
-      issues: extras.techdebt!.issueCount,
-      status: 'scored',
-    };
-  }
+function scoreTechdebt(
+  name: string,
+  weight: number,
+  techdebt: ExtrasResolved['techdebt'],
+): DimensionScore {
+  // 局部捕获 + 空值守卫：TS 无法跨 name 收窄 extras.techdebt，守卫保留 not-run 语义
+  if (techdebt === null) return notRun(name, weight);
+  const debtIndex = techdebt.debtIndex;
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - debtIndex) * 10) / 10),
+    issues: techdebt.issueCount,
+    status: 'scored',
+  };
+}
 
-  if (name === 'refactor') {
-    const penalty = refactorPenalty(extras.refactor!);
-    return { name, weight, score: Math.max(0, Math.round((100 - penalty) * 10) / 10), issues: extras.refactor!.totalSmells, status: 'scored' };
-  }
-
-  if (name === 'performance') {
-    const penalty = performancePenalty(extras.performance!);
-    return { name, weight, score: Math.max(0, Math.round((100 - penalty) * 10) / 10), issues: extras.performance!.total, status: 'scored' };
-  }
-
-  if (name === 'gate') {
-    // v2（十域评分章程）：哨兵告警已拆出独立 sentinel 维，gate 只吃 guard 检查结果
-    const gPenalty = guard ? guardPenalty(guard.results) : 0;
-    const gCount = guard ? guardIssueCount(guard.results) : 0;
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - gPenalty) * 10) / 10),
-      issues: gCount,
-      status: 'scored',
-    };
-  }
-
-  if (name === 'sentinel') {
-    const sPenalty = sentinelPenalty(extras.sentinel!);
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - sPenalty) * 10) / 10),
-      issues: extras.sentinel!.criticalEvents + extras.sentinel!.warningEvents,
-      status: 'scored',
-    };
-  }
-
-  if (name === 'garbage') {
-    const penalty = garbagePenalty(extras.garbage!);
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
-      issues: extras.garbage!.total,
-      status: 'scored',
-    };
-  }
-
-  if (name === 'backup') {
-    const penalty = backupPenalty(extras.backup!);
-    const bad = extras.backup!.recentStatuses.filter(
-      (s) => s === 'failed' || s === 'partial',
-    ).length;
-    return {
-      name,
-      weight,
-      score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
-      issues: bad,
-      status: 'scored',
-    };
-  }
-
-  let penalty = penaltyForIssues(matched);
-  let issueCount = matched.length;
-  if (name === 'security') {
-    if (extras.secrets) {
-      penalty += secretsPenalty(extras.secrets);
-      issueCount += extras.secrets.activeCount;
-    }
-  }
-  if (name === 'dependencies') {
-    if (extras.deps) {
-      penalty += depsPenalty(extras.deps);
-      issueCount += extras.deps.upgradable;
-    }
-  }
-
+function scoreRefactor(
+  name: string,
+  weight: number,
+  refactor: ExtrasResolved['refactor'],
+): DimensionScore {
+  if (refactor === null) return notRun(name, weight);
+  const penalty = refactorPenalty(refactor);
   return {
     name,
     weight,
     score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
-    issues: issueCount,
+    issues: refactor.totalSmells,
     status: 'scored',
+  };
+}
+
+function scorePerformance(
+  name: string,
+  weight: number,
+  performance: ExtrasResolved['performance'],
+): DimensionScore {
+  if (performance === null) return notRun(name, weight);
+  const penalty = performancePenalty(performance);
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    issues: performance.total,
+    status: 'scored',
+  };
+}
+
+function scoreGate(name: string, weight: number, guard: GuardReportLike | null): DimensionScore {
+  // v2（十域评分章程）：哨兵告警已拆出独立 sentinel 维，gate 只吃 guard 检查结果
+  const gPenalty = guard ? guardPenalty(guard.results) : 0;
+  const gCount = guard ? guardIssueCount(guard.results) : 0;
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - gPenalty) * 10) / 10),
+    issues: gCount,
+    status: 'scored',
+  };
+}
+
+function scoreSentinel(
+  name: string,
+  weight: number,
+  sentinel: ExtrasResolved['sentinel'],
+): DimensionScore {
+  if (sentinel === null) return notRun(name, weight);
+  const sPenalty = sentinelPenalty(sentinel);
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - sPenalty) * 10) / 10),
+    issues: sentinel.criticalEvents + sentinel.warningEvents,
+    status: 'scored',
+  };
+}
+
+function scoreGarbage(
+  name: string,
+  weight: number,
+  garbage: ExtrasResolved['garbage'],
+): DimensionScore {
+  if (garbage === null) return notRun(name, weight);
+  const penalty = garbagePenalty(garbage);
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    issues: garbage.total,
+    status: 'scored',
+  };
+}
+
+function scoreBackup(
+  name: string,
+  weight: number,
+  backup: ExtrasResolved['backup'],
+): DimensionScore {
+  if (backup === null) return notRun(name, weight);
+  const penalty = backupPenalty(backup);
+  const bad = backup.recentStatuses.filter((s) => s === 'failed' || s === 'partial').length;
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    issues: bad,
+    status: 'scored',
+  };
+}
+
+function scoreInspectBased(params: {
+  name: string;
+  weight: number;
+  inspect: InspectionReportLike | null;
+  extras: ExtrasResolved;
+  matched: InspectIssueLike[];
+}): DimensionScore {
+  const { name, weight, inspect, extras, matched } = params;
+  // quality 维用 S1+S2 口径（规则聚合 + 单规则封顶 + ESLOC 密度归一化）；
+  // security/dependencies 保持原线性扣分（各自另有 secrets/deps 绝对扣分上限）。
+  const penalty = name === 'quality' ? qualityPenalty(matched, inspect?.esloc) : penaltyForIssues(matched);
+  const issueCount = matched.length;
+  const withSecrets = applySecurityPenalty(penalty, issueCount, extras.secrets);
+  const withDeps = applyDepsPenalty(withSecrets.penalty, withSecrets.issueCount, extras.deps);
+  return {
+    name,
+    weight,
+    score: Math.max(0, Math.round((100 - withDeps.penalty) * 10) / 10),
+    issues: withDeps.issueCount,
+    status: 'scored',
+  };
+}
+
+function applySecurityPenalty(
+  penalty: number,
+  issueCount: number,
+  secrets: SecretDataLike | null,
+): { penalty: number; issueCount: number } {
+  if (!secrets) return { penalty, issueCount };
+  return {
+    penalty: penalty + secretsPenalty(secrets),
+    issueCount: issueCount + secrets.activeCount,
+  };
+}
+
+function applyDepsPenalty(
+  penalty: number,
+  issueCount: number,
+  deps: DepsDataLike | null,
+): { penalty: number; issueCount: number } {
+  if (!deps) return { penalty, issueCount };
+  return {
+    penalty: penalty + depsPenalty(deps),
+    issueCount: issueCount + deps.upgradable,
   };
 }

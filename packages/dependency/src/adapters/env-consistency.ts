@@ -12,7 +12,15 @@
  */
 import * as fs from 'fs';
 import { safeJoin } from '@zh/shared';
-import { isRecord, readJsonSafe, readYamlSafe, readTextSafe } from '../lockfile-utils';
+import {
+  isRecord,
+  readJsonSafe,
+  readYamlSafe,
+  readTextSafe,
+  collectManifestRanges,
+  parseYarnBlockKeys,
+  readPnpmImporterEntries,
+} from '../lockfile-utils';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 
@@ -171,15 +179,11 @@ function matchesPrefixed(
 
 /** package.json 直接依赖声明：name → 范围 */
 function readDeclaredDeps(pkgJson: Record<string, unknown>): Map<string, string> {
-  const declared = new Map<string, string>();
-  for (const key of ['dependencies', 'devDependencies', 'optionalDependencies'] as const) {
-    const section = pkgJson[key];
-    if (!isRecord(section)) continue;
-    for (const [name, range] of Object.entries(section)) {
-      if (typeof range === 'string') declared.set(name, range);
-    }
-  }
-  return declared;
+  return collectManifestRanges(pkgJson, [
+    'dependencies',
+    'devDependencies',
+    'optionalDependencies',
+  ]);
 }
 
 /** npm 锁文件：packages 映射 + v1 dependencies 嵌套 → name → version */
@@ -214,18 +218,13 @@ function collectNpmVersions(lock: Record<string, unknown>): Map<string, string> 
 /** pnpm 锁文件：importers 直接依赖 → name → 锁定版本 */
 function collectPnpmVersions(lock: Record<string, unknown>): Map<string, string> {
   const versions = new Map<string, string>();
-  const importers = lock.importers;
-  if (!isRecord(importers)) return versions;
-  const rootImporter = importers['.'] ?? Object.values(importers)[0];
-  if (!isRecord(rootImporter)) return versions;
-  for (const sectionKey of ['dependencies', 'devDependencies', 'optionalDependencies'] as const) {
-    const section = rootImporter[sectionKey];
-    if (!isRecord(section)) continue;
-    for (const [name, meta] of Object.entries(section)) {
-      if (!isRecord(meta)) continue;
-      if (typeof meta.version !== 'string') continue;
-      versions.set(name, meta.version.split('(')[0]);
-    }
+  const entries = readPnpmImporterEntries(lock, [
+    'dependencies',
+    'devDependencies',
+    'optionalDependencies',
+  ]);
+  for (const entry of entries) {
+    versions.set(entry.name, entry.version);
   }
   return versions;
 }
@@ -239,11 +238,7 @@ function collectYarnVersions(content: string): Map<string, string> {
     if (trimmed === '' || trimmed.startsWith('#')) continue;
     const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
     if (indent === 0 && trimmed.endsWith(':')) {
-      let keysText = trimmed.slice(0, -1).trim();
-      if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
-        keysText = keysText.slice(1, -1);
-      }
-      const first = keysText.split(',')[0].trim();
+      const first = parseYarnBlockKeys(trimmed)[0] ?? '';
       const m = first.match(YARN_PKG_NAME_RE);
       currentName = m ? `${m[1] ?? ''}${m[2]}` : null;
       continue;

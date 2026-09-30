@@ -9,6 +9,7 @@ import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport } from '@zh/security';
 import type { HealthScore } from '@zh/scoring';
 
+/** 门禁报告的页面序列化类型：门禁检查项列表 + 汇总计数 + 耗时/时间戳元信息 */
 export interface GuardReportData {
   summary: { totalChecks: number; passed: number; blocked: number; warnings: number };
   checks: Array<{
@@ -21,6 +22,7 @@ export interface GuardReportData {
   metadata: { duration: number; timestamp: string };
 }
 
+/** 巡检报告的页面序列化类型：issue/适配器失败/覆盖率缺口统一为 check 列表 */
 export interface InspectionReportData {
   summary: { total: number; passed: number; warnings: number; failures: number };
   checks: Array<{
@@ -33,6 +35,7 @@ export interface InspectionReportData {
   metadata: { duration: number; timestamp: string };
 }
 
+/** 安全扫描报告的页面序列化类型：分级漏洞计数、漏洞/恶意代码明细与安全评分 */
 export interface SecurityScanReportData {
   summary: {
     total: number;
@@ -68,6 +71,7 @@ export interface SecurityScanReportData {
   metadata: { duration: number; timestamp: string };
 }
 
+/** 性能报告的页面序列化类型：问题明细（含行号与自动修复可行性）+ 总数/可自动修复计数 */
 export interface PerformanceReportData {
   summary: { total: number; autoFixable: number };
   issues: Array<{
@@ -111,46 +115,9 @@ export function toGuardReportData(r: GuardReport): GuardReportData {
 }
 
 export function toInspectionReportData(r: InspectionReport): InspectionReportData {
-  const issueChecks = r.issues.map((issue) => ({
-    id: issue.id,
-    name: issue.ruleId,
-    status:
-      issue.severity === 'info'
-        ? ('pass' as const)
-        : issue.severity === 'warning'
-          ? ('warn' as const)
-          : ('fail' as const),
-    detail: issue.message,
-    category: issue.category,
-    source: issue.source,
-  }));
-
-  const knownNames = new Set(r.issues.map((i) => i.source));
-  const attentionChecks = r.adapterResults
-    .filter((a) => getCoverageGap(a) && !knownNames.has(a.adapterId))
-    .map((a) => ({
-      id: `adapter:${a.adapterId}`,
-      name: a.adapterName,
-      status: 'attention' as const,
-      detail: `${a.adapterName} 未检测（工具不可用或已跳过，覆盖率缺口）`,
-      category: undefined,
-      source: a.adapterId,
-    }));
-
-  // P1（复查5）：status==='error' 且没有产出任何 issue 的适配器，此前在桌面端
-  // 完全不可见（既不是覆盖率缺口，issueChecks 里也没有它）→ 用户看到"巡检完成、
-  // 分数 100"，却不知道有几个工具其实跑挂了。补成 fail 检查项并带上真实原因。
-  const failedChecks = r.adapterResults
-    .filter((a) => a.status === 'error' && a.issueCount === 0 && (a.issues?.length ?? 0) === 0)
-    .map((a) => ({
-      id: `adapter-error:${a.adapterId}`,
-      name: a.adapterName,
-      status: 'fail' as const,
-      detail: `${a.adapterName} 执行失败，未产出检测结果：${a.errorDetail ?? '未提供失败原因'}`,
-      category: undefined,
-      source: a.adapterId,
-    }));
-
+  const issueChecks = buildIssueChecks(r);
+  const attentionChecks = buildAttentionChecks(r);
+  const failedChecks = buildFailedAdapterChecks(r);
   return {
     summary: {
       total: r.summary.total,
@@ -164,6 +131,54 @@ export function toInspectionReportData(r: InspectionReport): InspectionReportDat
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
     },
   };
+}
+
+function buildIssueChecks(r: InspectionReport): InspectionReportData['checks'] {
+  return r.issues.map((issue) => ({
+    id: issue.id,
+    name: issue.ruleId,
+    status:
+      issue.severity === 'info'
+        ? ('pass' as const)
+        : issue.severity === 'warning'
+          ? ('warn' as const)
+          : ('fail' as const),
+    detail: issue.message,
+    category: issue.category,
+    source: issue.source,
+  }));
+}
+
+function buildAttentionChecks(r: InspectionReport): InspectionReportData['checks'] {
+  const knownNames = new Set(r.issues.map((i) => i.source));
+  return r.adapterResults
+    .filter((a) => getCoverageGap(a) && !knownNames.has(a.adapterId))
+    .map((a) => ({
+      id: `adapter:${a.adapterId}`,
+      name: a.adapterName,
+      status: 'attention' as const,
+      detail: `${a.adapterName} 未检测（工具不可用或已跳过，覆盖率缺口）`,
+      category: undefined,
+      source: a.adapterId,
+    }));
+}
+
+/**
+ * P1（复查5）：status==='error' 且没有产出任何 issue 的适配器，此前在桌面端
+ * 完全不可见（既不是覆盖率缺口，issueChecks 里也没有它）→ 用户看到"巡检完成、
+ * 分数 100"，却不知道有几个工具其实跑挂了。补成 fail 检查项并带上真实原因。
+ */
+function buildFailedAdapterChecks(r: InspectionReport): InspectionReportData['checks'] {
+  return r.adapterResults
+    .filter((a) => a.status === 'error' && a.issueCount === 0 && (a.issues?.length ?? 0) === 0)
+    .map((a) => ({
+      id: `adapter-error:${a.adapterId}`,
+      name: a.adapterName,
+      status: 'fail' as const,
+      detail: `${a.adapterName} 执行失败，未产出检测结果：${a.errorDetail ?? '未提供失败原因'}`,
+      category: undefined,
+      source: a.adapterId,
+    }));
 }
 
 // 覆盖率缺口判定：unavailable/skipped/degraded 计缺口，但 out-of-scope（画像裁剪的既定跳过）不算——

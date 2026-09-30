@@ -1,19 +1,16 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  ToolAdapter,
-  ToolMeta,
-  ToolResult,
-  ToolScanOptions,
-  Issue,
-  IssueCategory,
-  AccessScope,
+import {
+  BuiltinToolAdapter,
+  type ToolMeta,
+  type ToolResult,
+  type ToolScanOptions,
+  type Issue,
+  type IssueCategory,
+  type AccessScope,
 } from '@zh/shared';
-
-const execFileAsync = promisify(execFile);
+import { buildAccessScope, buildToolResult, execTool, asToolExecError } from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
   id: 'npm-audit',
@@ -31,6 +28,18 @@ const AUDIT_COMMANDS: Array<{ lockfile: string; cmd: string; args: string[] }> =
   { lockfile: 'pnpm-lock.yaml', cmd: 'pnpm', args: ['audit', '--json'] },
   { lockfile: 'package-lock.json', cmd: 'npm', args: ['audit', '--json'] },
 ];
+
+/**
+ * 归一化 projectPath 为绝对路径并探测锁文件对应的 audit 命令。
+ * 相对路径会流入锁文件探测与 cwd，npm/pnpm 以自身 cwd 解析相对路径导致扫描失败。
+ */
+function resolveAuditCommand(
+  projectPath: string,
+): { command: { cmd: string; args: string[] } | undefined; projectPath: string } {
+  const resolved = path.resolve(projectPath);
+  const command = AUDIT_COMMANDS.find((c) => fs.existsSync(path.join(resolved, c.lockfile)));
+  return { command, projectPath: resolved };
+}
 
 /** audit JSON 报告中的漏洞计数（npm/pnpm 均提供 metadata.vulnerabilities） */
 interface AuditVulnerabilities {
@@ -55,34 +64,26 @@ export function parseAuditVulnerabilities(raw: string): AuditVulnerabilities | n
   }
 }
 
-export class NpmAuditAdapter implements ToolAdapter {
+export class NpmAuditAdapter extends BuiltinToolAdapter {
   meta: ToolMeta;
   private readonly projectRoot?: string;
 
   /** F5：npm/pnpm audit 读取锁文件并联网查询漏洞库 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'package.json'],
-    excludePaths: [],
-  };
+  readonly accessScope: AccessScope = buildAccessScope(
+    ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'package.json'],
+    [],
+  );
 
   constructor(projectRoot?: string) {
+    super();
     this.projectRoot = projectRoot;
     this.meta = { ...META, description: '依赖已知漏洞审计（npm/pnpm audit）' };
-  }
-
-  /** 依赖 npm/pnpm 命令，锁文件存在时即可执行 */
-  async isAvailable(): Promise<boolean> {
-    return true;
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
     const category: IssueCategory = options.config?.category ?? 'dependency';
-
-    // 归一化 projectPath 为绝对路径：相对路径会流入锁文件探测与 cwd，
-    // npm/pnpm 以自身 cwd 解析相对路径导致扫描失败。
-    const projectPath = path.resolve(options.projectPath);
-    const command = AUDIT_COMMANDS.find((c) => fs.existsSync(path.join(projectPath, c.lockfile)));
+    const { command, projectPath } = resolveAuditCommand(options.projectPath);
     if (!command) {
       return this.buildResult(
         start,
@@ -92,20 +93,13 @@ export class NpmAuditAdapter implements ToolAdapter {
       );
     }
 
-    let raw = '';
-    try {
-      ({ stdout: raw } = await execFileAsync(command.cmd, command.args, {
-        cwd: projectPath,
-        timeout: options.timeout || 120000,
-        maxBuffer: 10 * 1024 * 1024,
-      }));
-    } catch (error: unknown) {
-      // npm/pnpm audit 发现漏洞时以非零码退出，stdout 仍为完整 JSON 报告 — 属正常路径
-      const err = error as { stdout?: string; message?: string };
-      raw = err.stdout ?? '';
-      if (!raw.trim()) {
-        return this.buildResult(start, 'error', [], err.message || `${command.cmd} audit 执行失败`);
-      }
+    const { raw, errorMessage } = await this.runAuditCommand(
+      command,
+      projectPath,
+      options.timeout || 120000,
+    );
+    if (errorMessage) {
+      return this.buildResult(start, 'error', [], errorMessage);
     }
 
     const vulns = parseAuditVulnerabilities(raw);
@@ -115,6 +109,29 @@ export class NpmAuditAdapter implements ToolAdapter {
 
     const issues = this.toIssues(vulns, category);
     return this.buildResult(start, 'available', issues);
+  }
+
+  /** 执行 audit 命令：漏洞命中时以非零码退出但 stdout 仍为完整 JSON 报告，属正常路径 */
+  private async runAuditCommand(
+    command: { cmd: string; args: string[] },
+    projectPath: string,
+    timeout: number,
+  ): Promise<{ raw: string; errorMessage?: string }> {
+    let raw = '';
+    try {
+      ({ stdout: raw } = await execTool(command.cmd, command.args, {
+        cwd: projectPath,
+        timeout,
+      }));
+    } catch (error: unknown) {
+      // npm/pnpm audit 发现漏洞时以非零码退出，stdout 仍为完整 JSON 报告 — 属正常路径
+      const err = asToolExecError(error);
+      raw = err.stdout ?? '';
+      if (!raw.trim()) {
+        return { raw, errorMessage: err.message || `${command.cmd} audit 执行失败` };
+      }
+    }
+    return { raw };
   }
 
   /** 漏洞计数 → Issue：每个非零严重级生成一条聚合问题 */
@@ -156,17 +173,6 @@ export class NpmAuditAdapter implements ToolAdapter {
     issues: Issue[],
     error?: string,
   ): ToolResult {
-    return {
-      tool: 'npm-audit',
-      status,
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-      ...(error ? { error } : {}),
-    };
+    return buildToolResult({ tool: 'npm-audit', status, issues, start, error });
   }
 }

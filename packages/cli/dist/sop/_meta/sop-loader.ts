@@ -9,6 +9,7 @@ import { SopRuleRegistrar } from './sop-loader-registry';
 
 export { SopRuleConfigError } from './dynamic-severity-config';
 
+/** SOP 加载器配置：三项路径均可省略，省略时使用内置默认值 */
 export interface SopLoaderOptions {
   /** SOP 规则文件的根目录，默认从 __dirname 向上查找 */
   rulesDir?: string;

@@ -1,7 +1,7 @@
 import type { PipelineReport } from '@zh/pipeline';
 import type { RuleEngineReport } from '@zh/kernel';
 import type { GuardReport } from '@zh/guard';
-import type { InspectionReport } from '@zh/inspect';
+import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { ConsoleReporterFormat } from './console-reporter-format';
 import type { RuleEngineSectionFormatter } from './console-reporter-rule-engine';
@@ -125,67 +125,80 @@ export class StageSectionFormatter {
     const normal = results.filter((r) => r.status === 'passed' || r.status === undefined);
 
     if (unavailable.length === 0 && errors.length === 0 && skipped.length === 0) {
-      const parts = normal.map(
-        (r) =>
-          `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`,
-      );
-      lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
+      this.formatNormalTools(normal, lines, indent);
       return;
     }
 
-    if (unavailable.length > 0) {
-      const names = unavailable.map((r) => this.fmt.yellow(r.adapterName)).join('、');
-      lines.push(
-        `${indent}${this.fmt.yellow('⚠ 工具不可用')}: ${names}（未安装，可用 zhshield tools install 安装）`,
-      );
-    }
+    this.formatUnavailableTools(unavailable, lines, indent);
+    this.formatErrorTools(errors, lines, indent);
+    this.formatSkippedTools(skipped, lines, indent);
+    this.formatNormalTools(normal, lines, indent);
+  }
 
-    if (errors.length > 0) {
-      // 非零退出码 ≠ 失败：有产出（issueCount>0）→ 检出问题；无产出（issueCount===0）→ 真失败
-      const withFindings = errors.filter((r) => r.issueCount > 0 || r.issues.length > 0);
-      const trulyFailed = errors.filter((r) => r.issueCount === 0 && r.issues.length === 0);
+  private formatUnavailableTools(
+    unavailable: AdapterResult[],
+    lines: string[],
+    indent: string,
+  ): void {
+    if (unavailable.length === 0) return;
+    const names = unavailable.map((r) => this.fmt.yellow(r.adapterName)).join('、');
+    lines.push(
+      `${indent}${this.fmt.yellow('⚠ 工具不可用')}: ${names}（未安装，可用 zhshield tools install 安装）`,
+    );
+  }
 
-      if (withFindings.length > 0) {
-        const total = withFindings.reduce((sum, r) => sum + r.issueCount, 0);
-        const names = withFindings
-          .map((r) => `${this.fmt.yellow(r.adapterName)}${this.fmt.dim(`(${r.issueCount})`)}`)
-          .join('、');
-        lines.push(`${indent}${this.fmt.yellow(`⚠ 检出 ${total} 个问题`)}: ${names}`);
-      }
+  private formatErrorTools(errors: AdapterResult[], lines: string[], indent: string): void {
+    if (errors.length === 0) return;
+    const withFindings = errors.filter((r) => r.issueCount > 0 || r.issues.length > 0);
+    const trulyFailed = errors.filter((r) => r.issueCount === 0 && r.issues.length === 0);
+    this.formatWithFindings(withFindings, lines, indent);
+    this.formatTrulyFailed(trulyFailed, lines, indent);
+  }
 
-      if (trulyFailed.length > 0) {
-        // P1（复查5）：此前无条件写"(错误详情已在 issues 中)"，但 status==='error' 且
-        // issues 为空的适配器（ESLint 缺配置 / dep-cruiser 解析失败）根本没有 issue，
-        // 这句是假承诺 → 改为优先展示 errorDetail 真实原因。
-        const parts = trulyFailed.map((r) => {
-          const reason = r.errorDetail ?? '未提供失败原因';
-          return `${this.fmt.red(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
-        });
-        lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${parts.join('  ')}`);
-      }
-    }
+  private formatWithFindings(withFindings: AdapterResult[], lines: string[], indent: string): void {
+    if (withFindings.length === 0) return;
+    // 非零退出码 ≠ 失败：有产出（issueCount>0）→ 检出问题；无产出（issueCount===0）→ 真失败
+    const total = withFindings.reduce((sum, r) => sum + r.issueCount, 0);
+    const names = withFindings
+      .map((r) => `${this.fmt.yellow(r.adapterName)}${this.fmt.dim(`(${r.issueCount})`)}`)
+      .join('、');
+    lines.push(`${indent}${this.fmt.yellow(`⚠ 检出 ${total} 个问题`)}: ${names}`);
+  }
 
-    if (skipped.length > 0) {
-      const parts = skipped.map((r) => {
-        const reason =
-          r.skipDetail ??
-          (r.skipReason === 'out-of-scope'
-            ? '画像裁剪，已跳过'
-            : r.skipReason === 'degraded'
-              ? '降级运行'
-              : '已跳过');
-        return `${this.fmt.gray(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
-      });
-      lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);
-    }
+  private formatTrulyFailed(trulyFailed: AdapterResult[], lines: string[], indent: string): void {
+    if (trulyFailed.length === 0) return;
+    // P1（复查5）：此前无条件写"(错误详情已在 issues 中)"，但 status==='error' 且
+    // issues 为空的适配器（ESLint 缺配置 / dep-cruiser 解析失败）根本没有 issue，
+    // 这句是假承诺 → 改为优先展示 errorDetail 真实原因。
+    const parts = trulyFailed.map((r) => {
+      const reason = r.errorDetail ?? '未提供失败原因';
+      return `${this.fmt.red(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
+    });
+    lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${parts.join('  ')}`);
+  }
 
-    if (normal.length > 0) {
-      const parts = normal.map(
-        (r) =>
-          `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`,
-      );
-      lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
-    }
+  private formatSkippedTools(skipped: AdapterResult[], lines: string[], indent: string): void {
+    if (skipped.length === 0) return;
+    const parts = skipped.map((r) => {
+      const reason =
+        r.skipDetail ??
+        (r.skipReason === 'out-of-scope'
+          ? '画像裁剪，已跳过'
+          : r.skipReason === 'degraded'
+            ? '降级运行'
+            : '已跳过');
+      return `${this.fmt.gray(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
+    });
+    lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);
+  }
+
+  private formatNormalTools(normal: AdapterResult[], lines: string[], indent: string): void {
+    if (normal.length === 0) return;
+    const parts = normal.map(
+      (r) =>
+        `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`,
+    );
+    lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
   }
 
   private isRuleEngineReport(r: unknown): r is RuleEngineReport {

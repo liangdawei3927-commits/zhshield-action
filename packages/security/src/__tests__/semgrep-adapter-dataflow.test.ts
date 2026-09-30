@@ -20,6 +20,21 @@ vi.mock('node:fs', () => ({
   promises: { access: vi.fn(async () => undefined) },
 }));
 
+// @zh/shared 经 package.json exports 解析到 dist/ 并被 Vitest 外部化，故上面的
+// node:child_process mock 覆盖不到其内部 tool-resolve —— 真实路径会 spawn 一次
+// `semgrep --version`（Python 冷启动约 7.4s），使本文件耗时 6~17s/用例且依赖开发机
+// 是否安装 semgrep。参见 guard-skip-semantics.test.ts 同处陷阱的说明。
+vi.mock('@zh/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@zh/shared')>();
+  return {
+    ...actual,
+    resolveToolCommandDetailed: vi.fn(async () => ({
+      command: 'semgrep',
+      origin: 'path' as const,
+    })),
+  };
+});
+
 import { SemgrepAdapter } from '../adapters/semgrep-adapter';
 
 function makeResult(overrides: Record<string, unknown>) {

@@ -1,3 +1,4 @@
+/** 计数器指标：只增不减的累计值，labels 用于区分同一指标的不同标签组合 */
 export interface CounterMetric {
   name: string;
   value: number;
@@ -5,6 +6,7 @@ export interface CounterMetric {
   timestamp: Date;
 }
 
+/** 瞬时值指标：可随采样被覆盖或增减，反映某一时刻的状态 */
 export interface GaugeMetric {
   name: string;
   value: number;
@@ -12,6 +14,7 @@ export interface GaugeMetric {
   timestamp: Date;
 }
 
+/** 直方图指标：value 为最新观测值，buckets 记录各区间边界的累计计数 */
 export interface HistogramMetric {
   name: string;
   value: number;

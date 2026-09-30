@@ -1,13 +1,32 @@
 import type { AdapterResult } from './types';
 import type { ToolAdapter, EventEmitter } from '@zh/shared';
-import { DegradationManager, AuditLogger, detectMachineProfile, isToolInScope } from '@zh/shared';
+import {
+  DegradationManager,
+  AuditLogger,
+  detectMachineProfile,
+  isToolInScope,
+  withHardTimeout,
+} from '@zh/shared';
 
+/** ToolAdapterExecutor 依赖注入项：降级管理器、审计日志、事件发射器与单次扫描硬超时 */
 export interface ToolAdapterExecutorDeps {
   degradationManager: DegradationManager;
   auditLogger: AuditLogger;
   emitter: EventEmitter;
   /** 单次适配器扫描硬上限（ms），防止异常工具无限挂起巡检任务；默认 300000（5 分钟） */
   hardTimeoutMs?: number;
+}
+
+/** ToolAdapterExecutor.buildStatusResult 的执行参数 */
+interface BuildStatusResultParams {
+  adapter: ToolAdapter;
+  result: Awaited<ReturnType<ToolAdapter['scan']>>;
+  duration: number;
+  issues: AdapterResult['issues'];
+  status: AdapterResult['status'];
+  passed: boolean;
+  degraded: boolean;
+  detail?: { skipDetail?: string; errorDetail?: string };
 }
 
 /**
@@ -84,22 +103,7 @@ export class ToolAdapterExecutor {
    * 无限挂起整个巡检任务。超时即 reject，由 runAdapter 的 catch 降级为该适配器 error。
    */
   private static withHardTimeout<T>(promise: Promise<T>, ms: number, toolId: string): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`[inspect] ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`)),
-        ms,
-      );
-      promise.then(
-        (value) => {
-          clearTimeout(timer);
-          resolve(value);
-        },
-        (error) => {
-          clearTimeout(timer);
-          reject(error);
-        },
-      );
-    });
+    return withHardTimeout(promise, ms, `[inspect] ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`);
   }
 
   private async runAdapter(adapter: ToolAdapter, projectId: string): Promise<AdapterResult> {
@@ -180,42 +184,56 @@ export class ToolAdapterExecutor {
       // P1（复查5）：error 的真实原因必须透传（与 skipped 的 skipDetail 同源同构）——
       // 此前 error 分支只透传 status，适配器返回的 error 字段被丢弃，
       // 报告层只剩 `status:'error', issues:[]`，用户看到"失败"却无从得知为什么。
-      return this.buildStatusResult(adapter, result, duration, issues, 'error', false, false, {
-        errorDetail: result.error,
-      });
-    }
-    if (result.status === 'unavailable') {
-      const failClosed = adapter.meta.category === 'security';
-      return this.buildStatusResult(
+      return this.buildStatusResult({
         adapter,
         result,
         duration,
         issues,
-        'unavailable',
-        !failClosed,
-        true,
-      );
+        status: 'error',
+        passed: false,
+        degraded: false,
+        detail: { errorDetail: result.error },
+      });
+    }
+    if (result.status === 'unavailable') {
+      const failClosed = adapter.meta.category === 'security';
+      return this.buildStatusResult({
+        adapter,
+        result,
+        duration,
+        issues,
+        status: 'unavailable',
+        passed: !failClosed,
+        degraded: true,
+      });
     }
     if (result.status === 'skipped') {
       // P2：透传适配器真实跳过原因（ToolResult.error），供 reporter 如实展示
-      return this.buildStatusResult(adapter, result, duration, issues, 'skipped', true, false, {
-        skipDetail: result.error,
+      return this.buildStatusResult({
+        adapter,
+        result,
+        duration,
+        issues,
+        status: 'skipped',
+        passed: true,
+        degraded: false,
+        detail: { skipDetail: result.error },
       });
     }
-    return this.buildStatusResult(adapter, result, duration, issues, 'passed', true, false);
+    return this.buildStatusResult({
+      adapter,
+      result,
+      duration,
+      issues,
+      status: 'passed',
+      passed: true,
+      degraded: false,
+    });
   }
 
   /** 构造各状态的统一结果（未命中分支的错误升格由调用方负责） */
-  private buildStatusResult(
-    adapter: ToolAdapter,
-    result: Awaited<ReturnType<ToolAdapter['scan']>>,
-    duration: number,
-    issues: AdapterResult['issues'],
-    status: AdapterResult['status'],
-    passed: boolean,
-    degraded: boolean,
-    detail?: { skipDetail?: string; errorDetail?: string },
-  ): AdapterResult {
+  private buildStatusResult(params: BuildStatusResultParams): AdapterResult {
+    const { adapter, result, duration, issues, status, passed, degraded, detail } = params;
     return {
       adapterId: adapter.meta.id,
       adapterName: adapter.meta.name,

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
+import { semgrepMapper } from '@zh/shared';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -45,54 +45,62 @@ export class SemgrepAdapter implements ToolAdapter {
     const rulesDir = this.resolveRulesDir(options.projectPath);
 
     try {
-      if (!rulesDir) {
-        return {
-          tool: 'semgrep',
-          status: 'skipped',
-          issues: [],
-          metadata: {
-            version: '',
-            duration: Date.now() - start,
-            timestamp: new Date(),
-            fileCount: 0,
-          },
-          error: 'Semgrep 规则目录不存在，请先同步云脑规则',
-        };
-      }
-      try {
-        await fs.promises.access(rulesDir);
-      } catch {
-        return {
-          tool: 'semgrep',
-          status: 'skipped',
-          issues: [],
-          metadata: {
-            version: '',
-            duration: Date.now() - start,
-            timestamp: new Date(),
-            fileCount: 0,
-          },
-          error: 'Semgrep 规则目录不存在，请先同步云脑规则',
-        };
-      }
-      const args = this.buildScanArgs(rulesDir, options);
-      const output = await this.runSemgrep(args, options);
-      const issues = this.mapOutput(output);
-
-      return {
-        tool: 'semgrep',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: output?.results?.length || 0,
-        },
-      };
+      return await this.executeScan(options, rulesDir, start);
     } catch (error) {
       return this.buildErrorResult(start, error as ExecError);
     }
+  }
+
+  private async executeScan(
+    options: ToolScanOptions,
+    rulesDir: string | null,
+    start: number,
+  ): Promise<ToolResult> {
+    if (!rulesDir || !(await this.rulesDirAccessible(rulesDir))) {
+      return this.buildSkippedResult(start);
+    }
+    const args = this.buildScanArgs(rulesDir, options);
+    const output = await this.runSemgrep(args, options);
+    const issues = this.mapOutput(output);
+    return this.buildAvailableResult(start, output, issues);
+  }
+
+  private async rulesDirAccessible(rulesDir: string): Promise<boolean> {
+    try {
+      await fs.promises.access(rulesDir);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private buildSkippedResult(start: number): ToolResult {
+    return {
+      tool: 'semgrep',
+      status: 'skipped',
+      issues: [],
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: 0,
+      },
+      error: 'Semgrep 规则目录不存在，请先同步云脑规则',
+    };
+  }
+
+  private buildAvailableResult(start: number, output: SemgrepOutput, issues: Issue[]): ToolResult {
+    return {
+      tool: 'semgrep',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: output?.results?.length || 0,
+      },
+    };
   }
 
   private buildScanArgs(rulesDir: string, options: ToolScanOptions): string[] {
@@ -202,26 +210,12 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private mapOutput(output: SemgrepOutput): Issue[] {
-    if (!output?.results || !Array.isArray(output.results)) return [];
-    return output.results.map((r) => ({
-      id: randomUUID(),
-      ruleId: `semgrep.${r.check_id || 'unknown'}`,
-      severity:
-        r.extra?.severity === 'ERROR'
-          ? 'error'
-          : r.extra?.severity === 'WARNING'
-            ? 'warning'
-            : 'info',
-      category: 'security',
-      message: r.extra?.message || r.extra?.metadata?.description || `Semgrep: ${r.check_id}`,
-      file: r.path || '',
-      line: r.start?.line || 0,
-      column: r.start?.col || 0,
-      suggestion: r.extra?.fix || undefined,
-      autoFixable: !!r.extra?.fix,
-      source: 'security',
-      fingerprint: `semgrep:${r.check_id || ''}:${r.path || ''}:${r.start?.line || 0}`,
-      codeFlows: this.mapDataflowTrace(r),
+    // 公共字段由 @zh/shared 的 semgrepMapper 产出：它与 data.results 一一对应，
+    // 故按下标把本适配器独有的污点链（codeFlows）回填到对应 Issue 上。
+    const results = output.results ?? [];
+    return semgrepMapper(output).map((issue, idx) => ({
+      ...issue,
+      codeFlows: this.mapDataflowTrace(results[idx]),
     }));
   }
 

@@ -19,6 +19,8 @@ const TOOL_ISSUE_COLLECTORS: Record<string, (params: CollectIssuesByToolParams) 
   semgrep: (params) => params.semgrepIssues.push(...params.issues),
 };
 
+/** ScanOrchestrator.run() 的分流结果：全部 Issue 及按工具拆分的 trivy/grype/depcheck/semgrep 四路，
+ *  供交叉验证（GrypeCrossValidator）与结果聚合（ResultAggregator）消费 */
 export interface ScanOrchestratorResult {
   allIssues: Issue[];
   trivyIssues: Issue[];

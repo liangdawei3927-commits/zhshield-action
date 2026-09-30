@@ -12,8 +12,8 @@ import type { DimensionExtras, RedLineInfo, RedLineReason } from './types';
 /** 红线封顶上限：存在任一 critical 事实时总评 ≤ 55（<60 强制落入 D 级红色区间） */
 export const RED_LINE_CAP = 55;
 
-/** 评分算法版本：2 = 十域聚合 + 红线封顶；跨版本分数不做直接对比（前端只提示不比较） */
-export const SCORE_VERSION = 2;
+/** 评分算法版本：3 = 十域聚合 + 红线封顶 + quality 维规则聚合封顶(S1) + ESLOC 密度归一化(S2)；跨版本分数不做直接对比（前端只提示不比较） */
+export const SCORE_VERSION = 3;
 
 /**
  * 由扩展域原始数据判定红线事实。数据在 extras 里各域独立持有，
@@ -22,23 +22,33 @@ export const SCORE_VERSION = 2;
  */
 export function computeRedLine(extras: DimensionExtras | undefined): RedLineInfo | null {
   if (!extras) return null;
-  const reasons: RedLineReason[] = [];
-
-  const activeSecrets = extras.secrets?.activeCount ?? 0;
-  if (activeSecrets > 0) {
-    reasons.push({ domain: 'security', kind: 'activeSecrets', count: activeSecrets });
-  }
-
-  const criticalVulns = extras.deps?.vulnerabilities?.critical ?? 0;
-  if (criticalVulns > 0) {
-    reasons.push({ domain: 'dependencies', kind: 'criticalVulns', count: criticalVulns });
-  }
-
-  const criticalEvents = extras.sentinel?.criticalEvents ?? 0;
-  if (criticalEvents > 0) {
-    reasons.push({ domain: 'sentinel', kind: 'criticalEvents', count: criticalEvents });
-  }
-
+  const reasons = [
+    activeSecretsReason(extras),
+    criticalVulnsReason(extras),
+    criticalEventsReason(extras),
+  ].filter((r): r is RedLineReason => r !== undefined);
   if (reasons.length === 0) return null;
   return { capped: true, cap: RED_LINE_CAP, reasons };
+}
+
+function activeSecretsReason(extras: DimensionExtras): RedLineReason | undefined {
+  const activeSecrets = extras.secrets?.activeCount ?? 0;
+  if (activeSecrets > 0) return { domain: 'security', kind: 'activeSecrets', count: activeSecrets };
+  return undefined;
+}
+
+function criticalVulnsReason(extras: DimensionExtras): RedLineReason | undefined {
+  const criticalVulns = extras.deps?.vulnerabilities?.critical ?? 0;
+  if (criticalVulns > 0) {
+    return { domain: 'dependencies', kind: 'criticalVulns', count: criticalVulns };
+  }
+  return undefined;
+}
+
+function criticalEventsReason(extras: DimensionExtras): RedLineReason | undefined {
+  const criticalEvents = extras.sentinel?.criticalEvents ?? 0;
+  if (criticalEvents > 0) {
+    return { domain: 'sentinel', kind: 'criticalEvents', count: criticalEvents };
+  }
+  return undefined;
 }

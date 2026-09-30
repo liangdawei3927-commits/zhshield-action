@@ -16,11 +16,13 @@ import * as crypto from 'node:crypto';
 
 // ─── 类型 ────────────────────────────────────────────────────
 
+/** 默认组织解析结果：orgId 为服务器生成并已持久化的真实组织标识 */
 export interface DefaultOrgResult {
   /** 服务器真实返回的 orgId（已持久化，跨运行稳定） */
   readonly orgId: string;
 }
 
+/** POST /orgs 响应体：仅含服务器生成的 orgId */
 export interface CreateOrgResponse {
   orgId: string;
 }

@@ -18,6 +18,10 @@ import {
 import { safeJoinReal } from '@zh/shared';
 import { normalizeKeepCount } from './retention';
 
+/**
+ * 备份全局默认配置：持久化于 ~/.zhshield-backup-global.json，
+ * 为所有项目提供兜底默认值，可被项目级配置或构造参数覆盖。
+ */
 export interface BackupGlobalConfig {
   defaultBackupDir: string;
   defaultMaxBackups: number;

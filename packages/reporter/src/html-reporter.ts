@@ -1,9 +1,11 @@
+/** HTML 报告渲染选项：标题、语言与是否内联默认样式 */
 export interface HtmlReportOptions {
   title?: string;
   lang?: string;
   includeStyles?: boolean;
 }
 
+/** HTML 报告数据：生成时间、汇总计数与分组后的明细条目 */
 export interface HtmlReportData {
   timestamp: string;
   projectName?: string;
@@ -54,6 +56,12 @@ const DEFAULT_STYLES = `
   .footer { text-align: center; color: #999; font-size: 12px; margin-top: 24px; }
 </style>`;
 
+/**
+ * 渲染单文件 HTML 报告（汇总卡片 + 分组明细，全部文本经 escapeHtml 转义）。
+ * @param data 报告数据
+ * @param options 标题 / 语言 / 是否内联样式
+ * @returns 完整 HTML 文档字符串
+ */
 export function generateHtmlReport(data: HtmlReportData, options: HtmlReportOptions = {}): string {
   const { title = 'CodeShield Report', includeStyles = true } = options;
   const passRate =

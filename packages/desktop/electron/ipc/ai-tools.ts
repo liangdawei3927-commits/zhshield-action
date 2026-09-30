@@ -20,6 +20,7 @@ import { PROJECTS_FILE } from './projects';
 
 const AI_TOOL_FILE = path.join(app.getPath('userData'), 'ai-tool.json');
 
+/** 单个项目的集成文件写入结果：成功标记 + 实际落盘的文件相对路径列表 */
 export interface AiProjectWriteResult {
   path: string;
   ok: boolean;
@@ -27,6 +28,7 @@ export interface AiProjectWriteResult {
   files: string[];
 }
 
+/** `ai:saveConfig` IPC 返回值：配置是否已保存 + 各项目写入结果 */
 export interface AiApplyResult {
   saved: boolean;
   projects: AiProjectWriteResult[];

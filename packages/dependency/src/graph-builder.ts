@@ -18,7 +18,12 @@ import {
   readYamlSafe,
   readTextSafe,
   versionFromConstraint,
-  parsePoetryConstraint,
+  collectPipfileLockDeps,
+  collectPyprojectDependencies,
+  parseYarnLock,
+  readPnpmImporterEntries,
+  readPoetryLockPackages,
+  type YarnBlock,
 } from './lockfile-utils';
 import type {
   DependencyEdge,
@@ -35,32 +40,12 @@ import { satisfiesVersion } from './adapters/lockfile-verifier';
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 /** 换行符拆分 */
 const NEWLINE_RE = /\r?\n/;
-/** 行首缩进检测 */
-const INDENT_RE = /^\s*/;
-/** yarn块字段行 'key value' */
-const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
-/** PEP 508 入口：包名 + 剩余约束 */
-const PEP508_ENTRY_RE = /^([A-Za-z0-9_.-]+)(.*)$/;
-/** 行注释剥离（#...） */
-const COMMENT_STRIPPING_RE = /#.*/;
 /** PEP 508 包名 */
 const PEP508_NAME_RE = /^[A-Za-z0-9_.-]+/;
 /** 版本约束操作符匹配 */
 const CONSTRAINT_RE = /(?:==|>=|<=|!=|~=|===|>|<)\s*[^\s]+/;
-/** TOML 节头拆分 */
-const TOML_SECTION_RE = /^\s*\[/m;
-/** TOML 节标题提取 */
-const TOML_HEADER_RE = /^([^\]]+)\]/;
-/** TOML dependencies 数组起始 */
-const TOML_DEPS_ARRAY_RE = /dependencies\s*=\s*\[/;
-/** poetry.toml 键行 */
-const POETRY_TOML_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
-/** poetry.lock 包块分隔 */
-const POETRY_BLOCK_RE = /^\s*\[\[package\]\]\s*$/m;
-/** poetry.lock name 字段 */
-const POETRY_NAME_FIELD_RE = /^\s*name\s*=\s*["']([^"']+)["']/m;
-/** poetry.lock version 字段 */
-const POETRY_VERSION_FIELD_RE = /^\s*version\s*=\s*["']([^"']+)["']/m;
+/** 行注释剥离（#...） */
+const COMMENT_STRIPPING_RE = /#.*/;
 
 /** 构建结果：节点 + 边 + 锁文件是否可解析 */
 interface BuildResult {
@@ -203,14 +188,23 @@ function buildNpmDirectEdges(
   return edges;
 }
 
+/** collectNpmV1Deps 参数对象 */
+interface CollectNpmV1DepsParams {
+  /** npm v1 dependencies 嵌套结构 */
+  readonly deps: Record<string, unknown>;
+  /** package.json 直接依赖声明（可能缺失） */
+  readonly pkgJson: DirectDeps | null;
+  /** 节点收集目标 */
+  readonly nodes: DependencyNode[];
+  /** 节点索引（id → node） */
+  readonly index: Map<string, DependencyNode>;
+  /** 是否为根层级 */
+  readonly isRootLevel: boolean;
+}
+
 /** 递归收集 npm v1 dependencies 嵌套结构 */
-function collectNpmV1Deps(
-  deps: Record<string, unknown>,
-  pkgJson: DirectDeps | null,
-  nodes: DependencyNode[],
-  index: Map<string, DependencyNode>,
-  isRootLevel: boolean,
-): void {
+function collectNpmV1Deps(params: CollectNpmV1DepsParams): void {
+  const { deps, pkgJson, nodes, index, isRootLevel } = params;
   const declared = new Map<string, string>(
     pkgJson
       ? [...Object.entries(pkgJson.dependencies), ...Object.entries(pkgJson.devDependencies)]
@@ -240,7 +234,7 @@ function collectNpmV1Deps(
 
     const nested = meta.dependencies;
     if (isRecord(nested)) {
-      collectNpmV1Deps(nested, pkgJson, nodes, index, false);
+      collectNpmV1Deps({ deps: nested, pkgJson, nodes, index, isRootLevel: false });
     }
   }
 }
@@ -260,7 +254,7 @@ function buildNpmLockGraph(npmLockPath: string, pkgJson: DirectDeps | null): Bui
     if (!isRecord(deps)) return { nodes: [], edges: [], present: true };
     const nodes: DependencyNode[] = [];
     const index = new Map<string, DependencyNode>();
-    collectNpmV1Deps(deps, pkgJson, nodes, index, true);
+    collectNpmV1Deps({ deps, pkgJson, nodes, index, isRootLevel: true });
     const edges: DependencyEdge[] = nodes
       .filter((node) => node.kind === 'direct')
       .map((node) => ({ from: ROOT_NODE_ID, to: node.id, requirement: node.declaredRange }));
@@ -292,7 +286,7 @@ function collectPnpm(lock: Record<string, unknown>): {
   const byId = new Map<string, DependencyNode>();
   const edges: DependencyEdge[] = [];
   const integrityById = collectPnpmIntegrity(lock);
-  collectPnpmImporters(lock, nodes, byId, edges, integrityById);
+  collectPnpmImporters({ lock, nodes, byId, edges, integrityById });
   collectPnpmTransitives(integrityById, nodes, byId);
   return { nodes, edges };
 }
@@ -322,41 +316,40 @@ function collectPnpmIntegrity(lock: Record<string, unknown>): Map<string, string
   return integrityById;
 }
 
+/** collectPnpmImporters 参数对象 */
+interface CollectPnpmImportersParams {
+  /** pnpm-lock.yaml 解析结果 */
+  readonly lock: Record<string, unknown>;
+  /** 节点收集目标 */
+  readonly nodes: DependencyNode[];
+  /** 节点索引（id → node） */
+  readonly byId: Map<string, DependencyNode>;
+  /** 边收集目标 */
+  readonly edges: DependencyEdge[];
+  /** 完整性哈希索引（id → integrity） */
+  readonly integrityById: Map<string, string>;
+}
+
 /** importers 区块：直接依赖（specifier = 声明范围，version = 锁定版本） */
-function collectPnpmImporters(
-  lock: Record<string, unknown>,
-  nodes: DependencyNode[],
-  byId: Map<string, DependencyNode>,
-  edges: DependencyEdge[],
-  integrityById: Map<string, string>,
-): void {
-  const importers = lock.importers;
-  if (!isRecord(importers)) return;
-  const rootImporter = importers['.'] ?? Object.values(importers)[0];
-  if (!isRecord(rootImporter)) return;
-  for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
-    const section = rootImporter[sectionKey];
-    if (!isRecord(section)) continue;
-    for (const [name, meta] of Object.entries(section)) {
-      if (!isRecord(meta)) continue;
-      const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
-      const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
-      if (!version) continue;
-      const id = `${name}@${version}`;
-      if (byId.has(id)) continue;
-      const integrity = integrityById.get(id);
-      const node = makeNode({
-        name,
-        version,
-        declaredRange: specifier,
-        kind: 'direct',
-        integrity,
-        trust: trustFromIntegrity(integrity),
-      });
-      nodes.push(node);
-      byId.set(id, node);
-      edges.push({ from: ROOT_NODE_ID, to: id, requirement: specifier });
-    }
+function collectPnpmImporters(params: CollectPnpmImportersParams): void {
+  const { lock, nodes, byId, edges, integrityById } = params;
+  for (const entry of readPnpmImporterEntries(lock, ['dependencies', 'devDependencies'])) {
+    const { name, specifier, version } = entry;
+    if (version === '') continue;
+    const id = `${name}@${version}`;
+    if (byId.has(id)) continue;
+    const integrity = integrityById.get(id);
+    const node = makeNode({
+      name,
+      version,
+      declaredRange: specifier,
+      kind: 'direct',
+      integrity,
+      trust: trustFromIntegrity(integrity),
+    });
+    nodes.push(node);
+    byId.set(id, node);
+    edges.push({ from: ROOT_NODE_ID, to: id, requirement: specifier });
   }
 }
 
@@ -394,14 +387,6 @@ function buildPnpmGraph(pnpmLockPath: string): BuildResult {
 
 // ────────────────────────────── yarn ──────────────────────────────
 
-/** yarn.lock v1 块 */
-interface YarnBlock {
-  /** 块键（可能多个，如 "lodash@^4.17.21, lodash@~4.17.0"） */
-  keys: string[];
-  /** 块内字段（version / resolved / integrity） */
-  fields: Map<string, string>;
-}
-
 /** yarn 块键解析：name@range → { name, range }（支持 @scope/name@range） */
 const YARN_KEY_RE = /^(@[^/]+\/)?([^@]+)@(.*)$/;
 
@@ -410,47 +395,6 @@ function parseYarnKey(key: string): { name: string; range: string } | null {
   if (!m) return null;
   const scope = m[1] ?? '';
   return { name: `${scope}${m[2]}`, range: m[3] ?? '' };
-}
-
-/** 解析 yarn.lock v1 块式格式（"name@range":\n  version "x.y.z"） */
-function parseYarnLock(content: string): YarnBlock[] {
-  const blocks: YarnBlock[] = [];
-  let current: YarnBlock | null = null;
-  for (const rawLine of content.split(NEWLINE_RE)) {
-    const trimmed = rawLine.trim();
-    if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
-    if (indent === 0 && trimmed.endsWith(':')) {
-      current = startYarnBlock(trimmed, blocks);
-      continue;
-    }
-    if (current) {
-      collectYarnField(current, trimmed);
-    }
-  }
-  return blocks;
-}
-
-/** 块头：剥离整体引号后再按逗号拆分键 */
-function startYarnBlock(trimmed: string, blocks: YarnBlock[]): YarnBlock {
-  let keysText = trimmed.slice(0, -1).trim();
-  if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
-    keysText = keysText.slice(1, -1);
-  }
-  const block: YarnBlock = { keys: keysText.split(',').map((k) => k.trim()), fields: new Map() };
-  blocks.push(block);
-  return block;
-}
-
-/** yarn.lock v1 字段行无冒号：`  version "4.17.21"`（键与值空白分隔） */
-function collectYarnField(current: YarnBlock, trimmed: string): void {
-  const m = trimmed.match(YARN_FIELD_RE);
-  if (!m) return;
-  let value = m[2].trim();
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    value = value.slice(1, -1);
-  }
-  current.fields.set(m[1], value);
 }
 
 /** 解析 yarn.lock v1：直接依赖来自 package.json，锁定版本来自块 */
@@ -465,20 +409,29 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
   const nodes: DependencyNode[] = [];
   const byId = new Map<string, DependencyNode>();
   const byName = new Map<string, DependencyNode>();
-  collectYarnDirects(blocks, declared, nodes, byId, byName);
+  collectYarnDirects({ blocks, declared, nodes, byId, byName });
   collectYarnTransitives(blocks, nodes, byId);
   const edges = buildRootEdges(declared, byName);
   return { nodes, edges, present: true };
 }
 
+/** collectYarnDirects 参数对象 */
+interface CollectYarnDirectsParams {
+  /** yarn.lock v1 块列表 */
+  readonly blocks: YarnBlock[];
+  /** package.json 声明（name → 范围） */
+  readonly declared: Map<string, string>;
+  /** 节点收集目标 */
+  readonly nodes: DependencyNode[];
+  /** 节点索引（id → node） */
+  readonly byId: Map<string, DependencyNode>;
+  /** 名称索引（name → node） */
+  readonly byName: Map<string, DependencyNode>;
+}
+
 /** 第一遍：直接依赖（声明范围精确匹配块键） */
-function collectYarnDirects(
-  blocks: YarnBlock[],
-  declared: Map<string, string>,
-  nodes: DependencyNode[],
-  byId: Map<string, DependencyNode>,
-  byName: Map<string, DependencyNode>,
-): void {
+function collectYarnDirects(params: CollectYarnDirectsParams): void {
+  const { blocks, declared, nodes, byId, byName } = params;
   for (const block of blocks) {
     const version = block.fields.get('version');
     if (!version) continue;
@@ -550,15 +503,6 @@ function buildRootEdges(
 
 // ────────────────────────────── Python ──────────────────────────────
 
-/** 从版本约束提取锁定版本：'==2.3.2' → '2.3.2'；'>=2.0' → '2.0'；'*' / '' → '' */
-/** 从引号值中提取包名与约束（剥离 extras；如 'flask[async]>=2.0' → flask + >=2.0） */
-function parsePep508(entry: string): { name: string; constraint: string } | null {
-  const withoutExtras = entry.replace(/\[.*?\]/g, '');
-  const m = withoutExtras.match(PEP508_ENTRY_RE);
-  if (!m) return null;
-  return { name: m[1], constraint: m[2].trim() };
-}
-
 /** requirements.txt：逐行剥离 # 注释、环境标记、extras，跳过空行与 - 开头的选项行 */
 function parseRequirements(content: string): Array<{ name: string; constraint: string }> {
   const deps: Array<{ name: string; constraint: string }> = [];
@@ -588,87 +532,31 @@ function parsePyproject(content: string): {
 } {
   const dependencies = new Map<string, string>();
   const devDependencies = new Map<string, string>();
-  const sections = content.split(TOML_SECTION_RE);
-
-  for (const section of sections) {
-    const header = section.match(TOML_HEADER_RE);
-    if (!header) continue;
-    const sectionName = header[1].trim().toLowerCase();
-
-    if (sectionName === 'project') {
-      collectProjectDeps(section, dependencies);
-    } else if (
-      sectionName === 'tool.poetry.dependencies' ||
-      sectionName === 'tool.uv.dependencies'
-    ) {
-      collectPoetryDeps(section, dependencies);
-    }
-  }
+  collectPyprojectDependencies(content, dependencies);
 
   return { dependencies, devDependencies };
 }
 
-/** [project].dependencies 数组（PEP 621）：双引号包名 + 附带约束 */
-function collectProjectDeps(section: string, dependencies: Map<string, string>): void {
-  const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
-  if (!depsBlock) return;
-  const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-  for (const m of block.matchAll(/"([^"]+)"/g)) {
-    const parsed = parsePep508(m[1]);
-    if (parsed) dependencies.set(parsed.name, parsed.constraint);
-  }
-}
-
-/** [tool.poetry.dependencies] / [tool.uv.dependencies]：表键即包名 */
-function collectPoetryDeps(section: string, dependencies: Map<string, string>): void {
-  for (const line of section.split(NEWLINE_RE)) {
-    if (line.trim().startsWith('[')) continue;
-    const key = line.match(POETRY_TOML_KEY_RE);
-    if (!key) continue;
-    const name = key[1];
-    if (name === 'python') continue; // poetry 特殊键，非依赖
-    const value = line.slice(line.indexOf('=') + 1);
-    dependencies.set(name, parsePoetryConstraint(value));
-  }
-}
-
 /** Pipfile.lock JSON：default / develop 两个区块的键即包名，version 字段为声明范围 */
 function parsePipfileLock(content: string): Array<{ name: string; declaredRange: string }> {
-  const deps: Array<{ name: string; declaredRange: string }> = [];
   let data: unknown;
   try {
     data = JSON.parse(content);
   } catch {
     // 无法解析时按缺失处理
-    return deps;
+    return [];
   }
-  if (!isRecord(data)) return deps;
+  if (!isRecord(data)) return [];
 
-  for (const section of ['default', 'develop'] as const) {
-    const sectionData = data[section];
-    if (!isRecord(sectionData)) continue;
-    for (const [name, meta] of Object.entries(sectionData)) {
-      if (name === '_meta') continue;
-      if (!isRecord(meta)) continue;
-      const declaredRange = typeof meta.version === 'string' ? meta.version : '';
-      deps.push({ name, declaredRange });
-    }
-  }
-  return deps;
+  return collectPipfileLockDeps(data);
 }
 
 /** poetry.lock：[[package]] 块的 name / version 字段 */
 function parsePoetryLock(content: string): Array<{ name: string; version: string }> {
-  const packages: Array<{ name: string; version: string }> = [];
-  const blocks = content.split(POETRY_BLOCK_RE);
-  for (const block of blocks) {
-    const nameMatch = block.match(POETRY_NAME_FIELD_RE);
-    const versionMatch = block.match(POETRY_VERSION_FIELD_RE);
-    if (nameMatch && versionMatch) {
-      packages.push({ name: nameMatch[1], version: versionMatch[1] });
-    }
-  }
-  return packages;
+  return readPoetryLockPackages(content).map((pkg) => ({
+    name: pkg.name,
+    version: pkg.version,
+  }));
 }
 
 /** poetry.lock 图谱：pyproject.toml 提供声明与范围，poetry.lock 提供锁定版本 */
@@ -681,7 +569,7 @@ function buildPoetryGraph(poetryLockPath: string, projectPath: string): BuildRes
   const byId = new Map<string, DependencyNode>();
   const byName = new Map<string, DependencyNode>();
   for (const pkg of packages) {
-    collectPoetryPackage(pkg, declared, nodes, byId, byName);
+    collectPoetryPackage({ pkg, declared, nodes, byId, byName });
   }
   const edges = buildRootEdges(declared, byName);
   return { nodes, edges, present: true };
@@ -695,14 +583,23 @@ function readPoetryDeclared(projectPath: string): Map<string, string> {
   return new Map<string, string>([...parsed.dependencies, ...parsed.devDependencies]);
 }
 
+/** collectPoetryPackage 参数对象 */
+interface CollectPoetryPackageParams {
+  /** poetry.lock 包（name + version） */
+  readonly pkg: { name: string; version: string };
+  /** pyproject.toml 声明（name → 范围） */
+  readonly declared: Map<string, string>;
+  /** 节点收集目标 */
+  readonly nodes: DependencyNode[];
+  /** 节点索引（id → node） */
+  readonly byId: Map<string, DependencyNode>;
+  /** 名称索引（name → node） */
+  readonly byName: Map<string, DependencyNode>;
+}
+
 /** 单个 poetry.lock 包 → 节点（直接依赖标记 + 根边） */
-function collectPoetryPackage(
-  pkg: { name: string; version: string },
-  declared: Map<string, string>,
-  nodes: DependencyNode[],
-  byId: Map<string, DependencyNode>,
-  byName: Map<string, DependencyNode>,
-): void {
+function collectPoetryPackage(params: CollectPoetryPackageParams): void {
+  const { pkg, declared, nodes, byId, byName } = params;
   const isDirect = declared.has(pkg.name);
   const range = declared.get(pkg.name) ?? '';
   const id = `${pkg.name}@${pkg.version}`;

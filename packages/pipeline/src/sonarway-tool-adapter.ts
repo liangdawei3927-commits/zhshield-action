@@ -72,42 +72,39 @@ export class SonarwayToolAdapter implements ToolAdapter {
     const { projectPath, targetFiles } = options;
 
     try {
-      const target = targetFiles?.length ? targetFiles : resolveEslintTargetDir(projectPath);
-      const config = this.withIgnores();
-      const eslint = new ESLint({
-        cwd: projectPath,
-        overrideConfigFile: true,
-        overrideConfig: config as never,
-      });
-
-      const results = (await eslint.lintFiles(target)) as unknown as LintResult[];
-      const issues = this.toIssues(results);
-
-      return {
-        tool: 'sonarway',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: results.length,
-        },
-      };
+      return await this.runScan(start, projectPath, targetFiles);
     } catch (error: unknown) {
-      return {
-        tool: 'sonarway',
-        status: 'error',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: (error as Error)?.message || 'SonarWay/ESLint 执行失败',
-      };
+      return buildScanErrorResult(start, error);
     }
+  }
+
+  private async runScan(
+    start: number,
+    projectPath: string,
+    targetFiles: string[] | undefined,
+  ): Promise<ToolResult> {
+    const target = targetFiles?.length ? targetFiles : resolveEslintTargetDir(projectPath);
+    const config = this.withIgnores();
+    const eslint = new ESLint({
+      cwd: projectPath,
+      overrideConfigFile: true,
+      overrideConfig: config as never,
+    });
+
+    const results = (await eslint.lintFiles(target)) as LintResult[];
+    const issues = this.toIssues(results);
+
+    return {
+      tool: 'sonarway',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: results.length,
+      },
+    };
   }
 
   /** 在 sonarway 规则 config 前追加 ignores 边界（ignores 对象必须是数组首项） */
@@ -141,4 +138,19 @@ export class SonarwayToolAdapter implements ToolAdapter {
     }
     return issues;
   }
+}
+
+function buildScanErrorResult(start: number, error: unknown): ToolResult {
+  return {
+    tool: 'sonarway',
+    status: 'error',
+    issues: [],
+    metadata: {
+      version: '',
+      duration: Date.now() - start,
+      timestamp: new Date(),
+      fileCount: 0,
+    },
+    error: (error as Error)?.message || 'SonarWay/ESLint 执行失败',
+  };
 }

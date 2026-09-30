@@ -25,6 +25,7 @@ export type ConvertedGuardResult = {
 export type ConvertedInspectIssue = {
   severity: 'error' | 'warning' | 'info';
   category: string;
+  ruleId?: string;
   file?: string;
 };
 
@@ -97,7 +98,7 @@ export function convertInspectEvaluations(evaluations: unknown[]): ConvertedInsp
     .map((ev) => {
       const e = ev as {
         status?: string;
-        rule?: { severity?: string; tags?: string[] };
+        rule?: { id?: string; severity?: string; tags?: string[] };
         files?: string[];
         violations?: Array<{ file?: string }>;
       };
@@ -114,6 +115,7 @@ export function convertInspectEvaluations(evaluations: unknown[]): ConvertedInsp
       return {
         severity: severityMap[e.rule?.severity ?? ''] ?? 'warning',
         category,
+        ruleId: e.rule?.id,
         file: firstFileOf(e),
       };
     });

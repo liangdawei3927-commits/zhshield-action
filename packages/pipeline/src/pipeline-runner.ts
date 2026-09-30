@@ -31,7 +31,7 @@ import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport, ProjectFeature } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
-import { loadBaseline } from '@zh/shared';
+import { loadBaseline, filterIssuesByBaseline, type Baseline } from '@zh/shared';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
@@ -196,6 +196,90 @@ async function runInspectPhase(
   }
 }
 
+type SyncRuleArray = Parameters<SopLoader['loadFromKnowledgeBase']>[0];
+
+async function readModulesDir(logger: Logger, modulesDir: string): Promise<string[] | null> {
+  try {
+    return await fs.promises.readdir(modulesDir);
+  } catch {
+    logger.warn(`同步规则缓存目录不可用，回退内置模板: ${modulesDir}`);
+    return null;
+  }
+}
+
+async function readSyncedRules(
+  logger: Logger,
+  modulesDir: string,
+  dbFiles: string[],
+): Promise<SyncRuleArray> {
+  const synced: SyncRuleArray = [];
+  for (const file of dbFiles) {
+    try {
+      const raw = await fs.promises.readFile(path.join(modulesDir, file), 'utf-8');
+      const rules = JSON.parse(raw) as SyncRuleArray;
+      if (Array.isArray(rules)) synced.push(...rules);
+    } catch (err) {
+      logger.warn(`同步规则模块 ${file} 解析失败: ${toMessage(err)}`);
+    }
+  }
+  return synced;
+}
+
+/**
+ * SOP 巡检报告基线豁免：对 RuleEngineReport 的每条评估按其 violations 命中
+ * .zhshield/baseline.json 过滤基线键（ruleId:file:line:column）。
+ *
+ * 语义对齐 InspectEngine.reconcileAdapterResults：
+ * - 未设置基线 / 基线为空 / 无命中 → 原样返回报告（零行为回归）；
+ * - 命中但仅部分豁免 → 保留未豁免的 violations，状态不变；
+ * - 全部豁免且原状态为 failed → 置为 passed（避免"0 违规但规则失败"的矛盾）。
+ *
+ * 豁免后重算 passed/failed/errors/skipped/degraded/blockingCount/ok，
+ * 使报告计数与 evaluations 内容一致（复用 kernel aggregate 的口径）。
+ */
+function applyBaselineToSopReport(
+  report: RuleEngineReport,
+  baseline: Baseline | null,
+  projectRoot: string,
+): RuleEngineReport {
+  if (!baseline || baseline.entries.length === 0) return report;
+
+  const evaluations = report.evaluations.map((ev) => {
+    const violations = ev.violations ?? [];
+    if (violations.length === 0) return ev;
+    const { kept, suppressed } = filterIssuesByBaseline(violations, baseline, projectRoot);
+    if (suppressed > 0) {
+      const fullySuppressed = kept.length === 0;
+      return {
+        ...ev,
+        violations: kept,
+        status: fullySuppressed && ev.status === 'failed' ? ('passed' as const) : ev.status,
+        blocking: fullySuppressed ? false : ev.blocking,
+      };
+    }
+    return ev;
+  });
+
+  const passed = evaluations.filter((e) => e.status === 'passed').length;
+  const failed = evaluations.filter((e) => e.status === 'failed').length;
+  const errors = evaluations.filter((e) => e.status === 'error').length;
+  const skipped = evaluations.filter((e) => e.status === 'skipped').length;
+  const degraded = evaluations.filter((e) => e.degraded === true).length;
+  const blockingCount = evaluations.filter((e) => e.blocking === true).length;
+
+  return {
+    ...report,
+    passed,
+    failed,
+    errors,
+    skipped,
+    degraded,
+    blockingCount,
+    ok: failed === 0 && errors === 0 && degraded === 0,
+    evaluations,
+  };
+}
+
 export class PipelineRunner {
   guardEngine: GuardEngine;
   inspectEngine: InspectEngine;
@@ -306,27 +390,13 @@ export class PipelineRunner {
    */
   async loadSopRulesFromCache(cacheDir: string): Promise<number> {
     const modulesDir = path.join(cacheDir, 'modules');
-    let files: string[];
-    try {
-      files = await fs.promises.readdir(modulesDir);
-    } catch {
-      this.logger.warn(`同步规则缓存目录不可用，回退内置模板: ${modulesDir}`);
-      return 0;
-    }
+    const files = await readModulesDir(this.logger, modulesDir);
+    if (!files) return 0;
+
     const dbFiles = files.filter((f) => f.endsWith('.db') && !f.startsWith('.'));
     if (dbFiles.length === 0) return 0;
 
-    type SyncRuleArray = Parameters<SopLoader['loadFromKnowledgeBase']>[0];
-    const synced: SyncRuleArray = [];
-    for (const file of dbFiles) {
-      try {
-        const raw = await fs.promises.readFile(path.join(modulesDir, file), 'utf-8');
-        const rules = JSON.parse(raw) as SyncRuleArray;
-        if (Array.isArray(rules)) synced.push(...rules);
-      } catch (err) {
-        this.logger.warn(`同步规则模块 ${file} 解析失败: ${toMessage(err)}`);
-      }
-    }
+    const synced = await readSyncedRules(this.logger, modulesDir, dbFiles);
     if (synced.length === 0) return 0;
 
     await this.sopLoader.loadFromKnowledgeBase(synced);
@@ -397,10 +467,17 @@ export class PipelineRunner {
     const report = await this.sopRuleEngine.runInspect(
       composeRuleContext(this.repoRoot, 'inspect', context),
     );
+    // R3d(b) 链路对齐：SOP 巡检报告同样消费 .zhshield/baseline.json 基线豁免
+    // （与 runInspect 直扫链路一致；无基线时原样返回，零回归）。
+    const baseline = await loadBaseline(this.repoRoot);
+    const filtered = applyBaselineToSopReport(report, baseline, this.repoRoot);
+    const rawViolations = report.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
+    const keptViolations = filtered.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
+    const suppressedNote = keptViolations < rawViolations ? `（基线豁免 ${rawViolations - keptViolations} 项）` : '';
     this.logger.info(
-      `SOP Inspect 完成: ${report.passed} passed, ${report.failed} failed, ${report.skipped} skipped`,
+      `SOP Inspect 完成: ${filtered.passed} passed, ${filtered.failed} failed, ${filtered.skipped} skipped${suppressedNote}`,
     );
-    return report;
+    return filtered;
   }
 
   async runSopDrivenPipeline(options?: {
@@ -408,21 +485,39 @@ export class PipelineRunner {
     inspectContext?: Partial<RuleContext>;
   }): Promise<PipelineReport> {
     this.logger.info('========== SOP 驱动型全流水线开始 ==========');
-
     const guardContext = composeRuleContext(this.repoRoot, 'guard', options?.guardContext);
     const inspectContext = composeRuleContext(this.repoRoot, 'inspect', options?.inspectContext);
 
+    const guardStage = await this.runSopGuardStage(guardContext);
+    if ('failure' in guardStage) return guardStage.failure;
+    const guardReport = guardStage.report;
+
+    this.logger.info('SOP Guard 通过, 进入 SOP Inspect 巡检阶段...');
+    const inspectStage = await this.runSopInspectStage(inspectContext, guardReport);
+    if ('failure' in inspectStage) return inspectStage.failure;
+    const inspectReport = inspectStage.report;
+
+    return this.finishSopPipeline(guardReport, inspectReport);
+  }
+
+  private async runSopGuardStage(
+    guardContext: Partial<RuleContext>,
+  ): Promise<{ report: RuleEngineReport } | { failure: PipelineReport }> {
     const guardPhase = await runSopGuardPhase(
       this.logger,
       (ctx) => this.runSopGuard(ctx),
       guardContext,
     );
     if ('failure' in guardPhase) {
-      return guardPhase.failure;
+      return { failure: guardPhase.failure };
     }
-    const guardReport = guardPhase.report;
+    return { report: guardPhase.report };
+  }
 
-    this.logger.info('SOP Guard 通过, 进入 SOP Inspect 巡检阶段...');
+  private async runSopInspectStage(
+    inspectContext: Partial<RuleContext> | undefined,
+    guardReport: RuleEngineReport,
+  ): Promise<{ report: RuleEngineReport } | { failure: PipelineReport }> {
     const inspectPhase = await runSopInspectPhase(
       this.logger,
       (ctx) => this.runSopInspect(ctx),
@@ -430,13 +525,17 @@ export class PipelineRunner {
       guardReport,
     );
     if ('failure' in inspectPhase) {
-      return inspectPhase.failure;
+      return { failure: inspectPhase.failure };
     }
-    const inspectReport = inspectPhase.report;
+    return { report: inspectPhase.report };
+  }
 
+  private finishSopPipeline(
+    guardReport: RuleEngineReport,
+    inspectReport: RuleEngineReport,
+  ): PipelineReport {
     logTrimObservability(this.logger, guardReport, 'Guard');
     logTrimObservability(this.logger, inspectReport, 'Inspect');
-
     this.logger.info('========== SOP 驱动型全流水线完成（不含重构） ==========');
     return buildSuccessReport(guardReport, inspectReport);
   }

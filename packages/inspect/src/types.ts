@@ -1,31 +1,21 @@
-export type IssueSeverity = 'error' | 'warning' | 'info';
-export type IssueCategory =
-  | 'architecture'
-  | 'security'
-  | 'quality'
-  | 'performance'
-  | 'documentation'
-  | 'test'
-  | 'dependency'
-  | 'refactoring';
+import type { Issue as SharedIssue } from '@zh/shared';
 
-export interface Issue {
-  id: string;
-  ruleId: string;
-  severity: IssueSeverity;
-  category: IssueCategory;
-  message: string;
-  file: string;
-  line?: number;
-  column?: number;
-  suggestion?: string;
-  autoFixable: boolean;
-  source: string;
-  fingerprint: string;
-}
+/** 问题严重级别（跨域单一来源：与 @zh/shared 的 IssueSeverity 同源） */
+export type { IssueSeverity } from '@zh/shared';
+/** 问题分类维度（跨域单一来源：与 @zh/shared 的 IssueCategory 同源） */
+export type { IssueCategory } from '@zh/shared';
 
+/**
+ * 单条巡检问题：直接复用 @zh/shared 的 Issue 字段集（含 codeFlows/stack/taxonomies 等
+ * SARIF 扩展），仅把 `source` 放宽为 string——本域的 'ai-code-review' 归属标识不在
+ * @zh/shared 的 IssueSource 联合内，强行收窄会破坏 AI 深度审查结果的来源透传。
+ */
+export type Issue = Omit<SharedIssue, 'source'> & { source: string };
+
+/** 适配器执行状态：unavailable/skipped 表示"未检测"（覆盖率缺口），非通过 */
 export type AdapterResultStatus = 'passed' | 'failed' | 'error' | 'unavailable' | 'skipped';
 
+/** 单个巡检适配器的执行结果：耗时、问题数、降级/跳过/失败原因与问题列表 */
 export interface AdapterResult {
   adapterId: string;
   adapterName: string;
@@ -61,8 +51,10 @@ export interface AdapterResult {
 
 /** 评分等级；降级时 grade 追加 ` [N工具降级]` 后缀（如 `D [3工具降级]`） */
 export type ScoreGrade = 'A' | 'B' | 'C' | 'D';
+/** 评分等级展示形态：纯等级，或降级时追加 ` [N工具降级]` 后缀 */
 export type ScoreGradeLabel = ScoreGrade | `${ScoreGrade} [${number}工具降级]`;
 
+/** 巡检报告：项目、扫描方式、评分与等级、问题汇总、各适配器结果与建议 */
 export interface InspectionReport {
   projectId: string;
   timestamp: Date;
@@ -79,6 +71,7 @@ export interface InspectionReport {
   suppressedCount?: number;
 }
 
+/** 单次巡检运行上下文：项目、扫描方式与项目画像（用于工具 scope 裁剪） */
 export interface RunContext {
   projectId: string;
   scanType: InspectionReport['scanType'];
@@ -86,6 +79,7 @@ export interface RunContext {
   projectFeature?: { framework?: string; language?: string; features?: string[] };
 }
 
+/** 巡检适配器契约：适配器 id/名称 + 依据运行上下文产出问题列表的 run 方法 */
 export interface InspectAdapter {
   id: string;
   name: string;

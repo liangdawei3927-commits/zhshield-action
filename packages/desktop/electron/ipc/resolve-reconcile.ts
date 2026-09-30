@@ -54,63 +54,76 @@ function localActiveRules(): SopRule[] {
   return sopRegistry.getActive();
 }
 
+/** 获取默认 orgId（失败/离线返回 null，不抛出） */
+async function resolveOrgId(): Promise<string | null> {
+  try {
+    return await getDefaultOrgId();
+  } catch {
+    return null;
+  }
+}
+
+/** 自愈：全量/增量同步补齐（SOP 版本一致时为 no-op，不重复下载），随后复检 */
+async function healRuleDrift(
+  rules: SopRule[],
+  res: Awaited<ReturnType<typeof cloudResolveRules>>,
+): Promise<{ report: ReturnType<typeof verifyRuleManifest>; healed: boolean }> {
+  let report = verifyRuleManifest(rules, res.rules);
+  let healed = false;
+  if (needsHeal(report)) {
+    try {
+      await sopCache.syncFromCloud();
+      healed = true;
+    } catch (err) {
+      console.warn(
+        '[cloud:T1] 自愈同步失败（保持漂移状态，下轮对账重试）:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+    if (healed) {
+      report = verifyRuleManifest(localActiveRules(), res.rules);
+    }
+  }
+  return { report, healed };
+}
+
+/** 对账主流程：云端 resolve → 清单校验 → 漂移自愈 → 复检（orgId 已确认存在） */
+async function reconcileWithOrg(
+  orgId: string,
+  feature: ScopeProfileLike | undefined,
+  rules: SopRule[],
+): Promise<ResolveRulesOutcome> {
+  const res = await cloudResolveRules(orgId, feature, buildCurrentVersions(rules));
+  const { report, healed } = await healRuleDrift(rules, res);
+  console.log(
+    `[cloud:T1] /resolve/rules 对账: 生效 ${report.expected} 条, changed=${res.changed.length}, ` +
+      `missing=${report.missing.length}, shaMismatch=${report.shaMismatch.length}, ` +
+      `unexpected=${report.unexpected.length}${healed ? '（已自愈）' : ''}`,
+  );
+  return {
+    ok: true,
+    total: report.expected,
+    changed: res.changed,
+    missing: report.missing,
+    shaMismatch: report.shaMismatch,
+    unexpected: report.unexpected,
+    healed,
+  };
+}
+
 /**
  * 对账主流程：云端 resolve → 清单校验 → 漂移自愈 → 复检。
  * 任何失败都收敛为 ok:false 降级结果，不抛出。
  */
 export async function reconcileRulesWithCloud(): Promise<ResolveRulesOutcome> {
   const feature = getCachedProfile() ?? undefined;
-
-  let orgId: string | null = null;
-  try {
-    orgId = await getDefaultOrgId();
-  } catch {
-    orgId = null;
-  }
+  const orgId = await resolveOrgId();
   if (!orgId) {
     return { ok: false, reason: 'no_org', ...EMPTY_OUTCOME };
   }
-
   const rules = localActiveRules();
   try {
-    const res = await cloudResolveRules(
-      orgId,
-      feature as ScopeProfileLike | undefined,
-      buildCurrentVersions(rules),
-    );
-    let report = verifyRuleManifest(rules, res.rules);
-    let healed = false;
-
-    if (needsHeal(report)) {
-      // 自愈：全量/增量同步补齐（SOP 版本一致时为 no-op，不重复下载）
-      try {
-        await sopCache.syncFromCloud();
-        healed = true;
-      } catch (err) {
-        console.warn(
-          '[cloud:T1] 自愈同步失败（保持漂移状态，下轮对账重试）:',
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-      if (healed) {
-        report = verifyRuleManifest(localActiveRules(), res.rules);
-      }
-    }
-
-    console.log(
-      `[cloud:T1] /resolve/rules 对账: 生效 ${report.expected} 条, changed=${res.changed.length}, ` +
-        `missing=${report.missing.length}, shaMismatch=${report.shaMismatch.length}, ` +
-        `unexpected=${report.unexpected.length}${healed ? '（已自愈）' : ''}`,
-    );
-    return {
-      ok: true,
-      total: report.expected,
-      changed: res.changed,
-      missing: report.missing,
-      shaMismatch: report.shaMismatch,
-      unexpected: report.unexpected,
-      healed,
-    };
+    return await reconcileWithOrg(orgId, feature, rules);
   } catch (err) {
     console.warn(
       '[cloud:T1] /resolve/rules 对账失败，降级本地:',

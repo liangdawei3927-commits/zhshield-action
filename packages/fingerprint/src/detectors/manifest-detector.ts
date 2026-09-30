@@ -7,8 +7,7 @@ import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
 import { FRAMEWORK_KEYWORDS } from '../framework-map';
-import { listRootFiles, readText, relDirname, isRecord, isNoiseDir } from '../fs-utils';
-import { SKIP_DIRS } from '../detector';
+import { listRootFiles, readText, relDirname, isRecord, isNoiseDir, findMarkerProjectRoot } from '../fs-utils';
 import { makeSignal, readDependencyNames, frameworkSignalsFromDeps } from './types';
 import {
   normalizePackageName,
@@ -51,6 +50,24 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
   return patterns;
 }
 
+/** baseDir 下单个子目录是否符合 glob 剩余路径（存在且为目录则加入结果） */
+function pushCandidateMatch(
+  projectRoot: string,
+  parts: string[],
+  globIdx: number,
+  baseDir: string,
+  entry: fs.Dirent,
+  dirs: string[],
+): void {
+  const rest = parts.slice(globIdx + 1).join('/');
+  const candidate =
+    rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
+  if (!fs.existsSync(candidate) || !fs.statSync(candidate).isDirectory()) return;
+  const rel = path.relative(projectRoot, candidate);
+  if (isNoiseRel(rel)) return;
+  dirs.push(rel);
+}
+
 function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]): void {
   const parts = pattern.split('/');
   const globIdx = parts.findIndex((p) => p === '*');
@@ -64,14 +81,8 @@ function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]
   if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) return;
   try {
     for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const rest = parts.slice(globIdx + 1).join('/');
-      const candidate =
-        rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
-      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-        const rel = path.relative(projectRoot, candidate);
-        if (isNoiseRel(rel)) continue;
-        dirs.push(rel);
+      if (entry.isDirectory()) {
+        pushCandidateMatch(projectRoot, parts, globIdx, baseDir, entry, dirs);
       }
     }
   } catch {
@@ -116,6 +127,20 @@ function readPackageJsonWorkspacePatterns(projectRoot: string): string[] {
 
 const KIND: SignalKind = 'manifest';
 
+/** detectManifest 参数对象 */
+interface DetectManifestParams {
+  /** 项目根路径 */
+  readonly projectRoot: string;
+  /** 清单相对路径 */
+  readonly rel: string;
+  /** 清单文件名 */
+  readonly name: string;
+  /** 规则 ID */
+  readonly ruleId: string;
+  /** 语言（当前未参与判定） */
+  readonly language: LanguageId;
+}
+
 const JS_FRAMEWORKS = [{ language: 'javascript', frameworks: FRAMEWORK_KEYWORDS.javascript }];
 const PYTHON_FRAMEWORKS = [{ language: 'python', frameworks: FRAMEWORK_KEYWORDS.python }];
 const JAVA_FRAMEWORKS = [{ language: 'java', frameworks: FRAMEWORK_KEYWORDS.java }];
@@ -145,9 +170,15 @@ function packageManagerSignals(
     const rel = dir === '.' ? lockName : `${dir}/${lockName}`;
     if (fs.existsSync(path.join(projectRoot, ...rel.split('/')))) {
       signals.push(
-        makeSignal(KIND, `manifest:package-manager:${manager}`, rel, weight, {
-          manager,
-          packageManager: manager,
+        makeSignal({
+          kind: KIND,
+          ruleId: `manifest:package-manager:${manager}`,
+          file: rel,
+          weight,
+          payload: {
+            manager,
+            packageManager: manager,
+          },
         }),
       );
     }
@@ -165,23 +196,7 @@ function findProjectRoot(projectPath: string): string {
     'pom.xml',
     'Gemfile',
   ];
-  for (const name of listRootFiles(projectPath)) {
-    if (manifestNames.includes(name)) return projectPath;
-  }
-  let entries: fs.Dirent[] = [];
-  try {
-    entries = fs.readdirSync(projectPath, { withFileTypes: true });
-  } catch {
-    return projectPath;
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.isSymbolicLink() || SKIP_DIRS.has(entry.name)) continue;
-    const sub = path.join(projectPath, entry.name);
-    for (const name of listRootFiles(sub)) {
-      if (manifestNames.includes(name)) return sub;
-    }
-  }
-  return projectPath;
+  return findMarkerProjectRoot(projectPath, (name) => manifestNames.includes(name));
 }
 
 export class ManifestDetector implements Detector {
@@ -196,7 +211,15 @@ export class ManifestDetector implements Detector {
       const rule = MANIFEST_RULES.find((r) => r.match(name));
       if (rule === undefined) continue;
       const rel = root === projectPath ? name : path.relative(projectPath, root) + '/' + name;
-      signals.push(...this.detectManifest(projectPath, rel, name, rule.ruleId, rule.language));
+      signals.push(
+        ...this.detectManifest({
+          projectRoot: projectPath,
+          rel,
+          name,
+          ruleId: rule.ruleId,
+          language: rule.language,
+        }),
+      );
     }
 
     const workspacePatterns = [
@@ -224,19 +247,21 @@ export class ManifestDetector implements Detector {
         const rel =
           (root === projectPath ? '' : path.relative(projectPath, root) + '/') + dir + '/' + name;
         signals.push(
-          ...this.detectManifest(projectPath, rel, name, 'manifest:package-json', 'typescript'),
+          ...this.detectManifest({
+            projectRoot: projectPath,
+            rel,
+            name,
+            ruleId: 'manifest:package-json',
+            language: 'typescript',
+          }),
         );
       }
     }
   }
 
-  private detectManifest(
-    projectRoot: string,
-    rel: string,
-    name: string,
-    ruleId: string,
-    _language: LanguageId,
-  ): Signal[] {
+  /** detectManifest 参数对象 */
+  private detectManifest(params: DetectManifestParams): Signal[] {
+    const { projectRoot, rel, name, ruleId } = params;
     switch (ruleId) {
       case 'manifest:package-json':
         return this.detectPackageJson(projectRoot, rel);
@@ -247,7 +272,13 @@ export class ManifestDetector implements Detector {
       case 'manifest:setup-py':
       case 'manifest:pipfile':
         return [
-          makeSignal(KIND, ruleId, rel, this.weight, { deps: [] }),
+          makeSignal({
+            kind: KIND,
+            ruleId,
+            file: rel,
+            weight: this.weight,
+            payload: { deps: [] },
+          }),
           ...packageManagerSignals(projectRoot, rel, name, this.weight),
         ];
       case 'manifest:pom-xml':
@@ -261,7 +292,15 @@ export class ManifestDetector implements Detector {
       case 'manifest:gemfile':
         return this.detectGemfile(projectRoot, rel);
       default:
-        return [makeSignal(KIND, ruleId, rel, this.weight, { deps: [] })];
+        return [
+          makeSignal({
+            kind: KIND,
+            ruleId,
+            file: rel,
+            weight: this.weight,
+            payload: { deps: [] },
+          }),
+        ];
     }
   }
 
@@ -269,22 +308,48 @@ export class ManifestDetector implements Detector {
     const signals: Signal[] = [];
     const names = readDependencyNames(projectRoot, rel);
     signals.push(
-      makeSignal(KIND, 'manifest:package-json', rel, this.weight, { dependencies: [...names] }),
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:package-json',
+        file: rel,
+        weight: this.weight,
+        payload: { dependencies: [...names] },
+      }),
     );
     if (names.has('typescript') || names.has('ts-node')) {
       signals.push(
-        makeSignal(KIND, 'manifest:typescript-dep', rel, this.weight, { dependency: 'typescript' }),
+        makeSignal({
+          kind: KIND,
+          ruleId: 'manifest:typescript-dep',
+          file: rel,
+          weight: this.weight,
+          payload: { dependency: 'typescript' },
+        }),
       );
     }
     if (readHasWorkspaces(projectRoot, rel)) {
-      signals.push(makeSignal(KIND, 'manifest:workspace', rel, this.weight, {}));
+      signals.push(
+        makeSignal({
+          kind: KIND,
+          ruleId: 'manifest:workspace',
+          file: rel,
+          weight: this.weight,
+          payload: {},
+        }),
+      );
     }
     signals.push(...frameworkSignalsFromDeps(names, rel, this.weight, JS_FRAMEWORKS));
     signals.push(...packageManagerSignals(projectRoot, rel, 'package.json', this.weight));
     const engines = readEngines(projectRoot, rel);
     if (engines !== null)
       signals.push(
-        makeSignal(KIND, 'manifest:node-engine', rel, this.weight, { version: engines }),
+        makeSignal({
+          kind: KIND,
+          ruleId: 'manifest:node-engine',
+          file: rel,
+          weight: this.weight,
+          payload: { version: engines },
+        }),
       );
     return signals;
   }
@@ -299,7 +364,15 @@ export class ManifestDetector implements Detector {
     const rawDeps =
       kind === 'pyproject' ? extractPyprojectDeps(content) : extractRequirementsNames(content);
     const deps = [...new Set(rawDeps.map(normalizePackageName))].filter((d) => d.length > 0);
-    const signals: Signal[] = [makeSignal(KIND, ruleId, rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal({
+        kind: KIND,
+        ruleId,
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, PYTHON_FRAMEWORKS));
     signals.push(
       ...packageManagerSignals(projectRoot, rel, rel.slice(rel.lastIndexOf('/') + 1), this.weight),
@@ -309,21 +382,45 @@ export class ManifestDetector implements Detector {
 
   private detectPom(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractPomDependencies(readText(projectRoot, rel)))];
-    const signals: Signal[] = [makeSignal(KIND, 'manifest:pom-xml', rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:pom-xml',
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, JAVA_FRAMEWORKS));
     return signals;
   }
 
   private detectGoMod(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractGoModRequires(readText(projectRoot, rel)))];
-    const signals: Signal[] = [makeSignal(KIND, 'manifest:go-mod', rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:go-mod',
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, GO_FRAMEWORKS));
     return signals;
   }
 
   private detectCargo(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractCargoDeps(readText(projectRoot, rel)))];
-    const signals: Signal[] = [makeSignal(KIND, 'manifest:cargo-toml', rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:cargo-toml',
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, RUST_FRAMEWORKS));
     return signals;
   }
@@ -331,7 +428,13 @@ export class ManifestDetector implements Detector {
   private detectComposer(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractComposerRequire(readText(projectRoot, rel)))];
     const signals: Signal[] = [
-      makeSignal(KIND, 'manifest:composer-json', rel, this.weight, { deps }),
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:composer-json',
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
     ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, PHP_FRAMEWORKS));
     return signals;
@@ -339,7 +442,15 @@ export class ManifestDetector implements Detector {
 
   private detectGemfile(projectRoot: string, rel: string): Signal[] {
     const deps = [...new Set(extractGemfileDeps(readText(projectRoot, rel)))];
-    const signals: Signal[] = [makeSignal(KIND, 'manifest:gemfile', rel, this.weight, { deps })];
+    const signals: Signal[] = [
+      makeSignal({
+        kind: KIND,
+        ruleId: 'manifest:gemfile',
+        file: rel,
+        weight: this.weight,
+        payload: { deps },
+      }),
+    ];
     signals.push(...frameworkSignalsFromDeps(new Set(deps), rel, this.weight, RUBY_FRAMEWORKS));
     return signals;
   }

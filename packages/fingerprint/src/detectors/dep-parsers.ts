@@ -1,56 +1,21 @@
 // 各语言清单文件的依赖名提取（正则行解析，无外部依赖）。供 manifest-detector 读框架、lockfile-detector 读清单。
+// pyproject.toml / requirements.txt 的行解析与包名规范化已收敛到 @zh/shared/manifest-parsers
+// （与 @zh/pipeline 的 project-profile 共用同一份实现），此处原样重导出以保持既有导入路径。
 
 import { isRecord } from '../fs-utils';
+import {
+  normalizePackageName,
+  extractPyprojectDeps,
+  extractRequirementsNames,
+} from '@zh/shared';
 
-const VERSION_SPLIT_RE = /[<>=!~[;]/;
-const PYPROJECT_SECTION_RE = /^\[(.+)\]$/;
-const PYPROJECT_KEY_RE = /^([A-Za-z0-9_.-]+)\s*=/;
+export { normalizePackageName, extractPyprojectDeps, extractRequirementsNames };
+
 const POM_ARTIFACT_RE = /<artifactId>([^<]+)<\/artifactId>/;
 const WHITESPACE_RE = /\s+/;
 const CARGO_SECTION_RE = /^\[(.*)\]$/;
 const CARGO_DEP_SECTION_RE = /^dependencies$|^dev-dependencies$|^build-dependencies$/;
 const CARGO_KEY_RE = /^([A-Za-z0-9_-]+)\s*=/;
-
-/** 规范化包名：小写、`_` 与 `-` 等价，去掉版本/环境标记。 */
-export function normalizePackageName(raw: string): string {
-  return raw.split(VERSION_SPLIT_RE)[0].trim().toLowerCase().replace(/_/g, '-');
-}
-
-const PYPROJECT_DEP_SECTIONS: ReadonlySet<string> = new Set([
-  'project',
-  'project.dependencies',
-  'tool.poetry.dependencies',
-  'tool.uv.dependencies',
-]);
-
-export function extractPyprojectDeps(content: string): string[] {
-  const deps: string[] = [];
-  let inDeps = false;
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    const header = line.match(PYPROJECT_SECTION_RE);
-    if (header) {
-      inDeps = PYPROJECT_DEP_SECTIONS.has(header[1].trim());
-      continue;
-    }
-    if (!inDeps) continue;
-    const key = line.match(PYPROJECT_KEY_RE);
-    if (key) deps.push(key[1]);
-    for (const quoted of line.matchAll(/"([^"]+)"/g)) deps.push(quoted[1]);
-  }
-  return deps;
-}
-
-export function extractRequirementsNames(content: string): string[] {
-  const names: string[] = [];
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith('-')) continue;
-    const name = line.split(VERSION_SPLIT_RE)[0].trim();
-    if (name) names.push(name);
-  }
-  return names;
-}
 
 /** pom.xml 的 <dependency><artifactId> 提取（含 groupId 消歧前缀）。 */
 export function extractPomDependencies(content: string): string[] {

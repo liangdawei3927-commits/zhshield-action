@@ -3,7 +3,13 @@
  * 复用 @zh/shared 的 ToolAdapter / ToolResult / ToolScanOptions 接口，
  * 输出 Issue[]（source='performance'），走现成门禁→修复→验证闭环。
  */
-import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, AccessScope } from '@zh/shared';
+import {
+  BuiltinToolAdapter,
+  type ToolMeta,
+  type ToolResult,
+  type ToolScanOptions,
+  type AccessScope,
+} from '@zh/shared';
 import { AutoPerfEngine } from './engine';
 
 const META: ToolMeta = {
@@ -19,7 +25,7 @@ const META: ToolMeta = {
   license: 'MIT',
 };
 
-export class AutoPerfToolAdapter implements ToolAdapter {
+export class AutoPerfToolAdapter extends BuiltinToolAdapter {
   meta = META;
 
   /** F5：AutoPerf 仅读取源码文件做静态统计，不触碰依赖与构建产物 */
@@ -29,11 +35,6 @@ export class AutoPerfToolAdapter implements ToolAdapter {
   };
 
   private engine = new AutoPerfEngine();
-
-  /** AutoPerf 为内置引擎，始终可用 */
-  async isAvailable(): Promise<boolean> {
-    return true;
-  }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
@@ -53,12 +54,7 @@ export class AutoPerfToolAdapter implements ToolAdapter {
       tool: 'autoperf',
       status: 'available',
       issues: report.issues,
-      metadata: {
-        version: '0.1.0',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount,
-      },
+      metadata: this.buildToolMetadata(start, fileCount, '0.1.0'),
     };
   }
 

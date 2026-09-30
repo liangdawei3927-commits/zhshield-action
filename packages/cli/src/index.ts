@@ -453,25 +453,16 @@ async function runPipelineCommand(
   reporter: ConsoleReporter,
   projectDir: string,
 ): Promise<void> {
-  if (opts.sop) {
-    const report = await runner.runSopDrivenPipeline();
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    const formatted = reporter.format(report);
-    console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
-    applyDegradedGuard(undefined, [report.guard, report.inspect]);
-    process.exit(blocked ? 1 : process.exitCode);
-  } else {
-    const report = await runner.runFullPipeline({
-      dryRun: opts.dryRun,
-    });
-    const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    const formatted = reporter.format(report);
-    console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
-    applyDegradedGuard(undefined, [report.guard, report.inspect]);
-    process.exit(blocked ? 1 : process.exitCode);
-  }
+  const report = opts.sop
+    ? await runner.runSopDrivenPipeline()
+    : await runner.runFullPipeline({ dryRun: opts.dryRun });
+
+  const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
+  const formatted = reporter.format(report);
+  console.log(formatted.text);
+  writeReportFile(opts, report, findings, projectDir);
+  applyDegradedGuard(undefined, [report.guard, report.inspect]);
+  process.exit(blocked ? 1 : process.exitCode);
 }
 
 main();

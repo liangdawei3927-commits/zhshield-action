@@ -8,6 +8,10 @@ export type { EvaluationStatus };
 
 // ─── 一条规则的单次评估结果 ─────────────────────────────
 
+/**
+ * 单条规则的一次评估结果。
+ * blocking 与 degraded 为可选附加元数据，缺省时消费方按 status 回退到旧行为。
+ */
 export interface RuleEvaluation {
   /** 关联的规则 */
   rule: SopRule;
@@ -46,6 +50,7 @@ export interface RuleEvaluation {
 
 // ─── 单条违规 ──────────────────────────────────────────
 
+/** 单条违规：定位到文件/行列的具体问题点，可附修复建议与原始匹配内容 */
 export interface Violation {
   /** 违规 ID */
   id: string;
@@ -104,6 +109,10 @@ export interface ProfileTrimObservability {
 
 // ─── 引擎报告 ──────────────────────────────────────────
 
+/**
+ * 规则引擎报告：一次引擎执行的汇总。
+ * ok 为门禁判定的唯一依据 —— 无 blocking 级失败，且无 degraded 跳过。
+ */
 export interface RuleEngineReport {
   /** 总评估数 */
   total: number;
@@ -192,6 +201,7 @@ export type ContentInstruction =
   | ToolDispatchInstruction
   | UnresolvedInstruction;
 
+/** pattern-scan 指令：按字面/正则 patterns 扫描文件，fileExts 限定扩展名 */
 export interface PatternScanInstruction {
   type: 'pattern-scan';
   patterns: string[];
@@ -199,11 +209,13 @@ export interface PatternScanInstruction {
   fileExts?: string[];
 }
 
+/** check-list 指令：按 checks 中列出的规则名清单逐条检查（如 ESLint 规则名单） */
 export interface CheckListInstruction {
   type: 'check-list';
   checks: Array<{ rule: string; level: string }>;
 }
 
+/** threshold 指令：对 thresholds 中的量化指标做阈值比较（覆盖率、复杂度等） */
 export interface ThresholdInstruction {
   type: 'threshold';
   thresholds: Record<string, number>;
@@ -211,6 +223,7 @@ export interface ThresholdInstruction {
   scope?: string;
 }
 
+/** forbidden 指令：命中 patterns 中任一字面禁止项即违规（正则版见 ForbiddenRegexInstruction） */
 export interface ForbiddenPatternInstruction {
   type: 'forbidden';
   patterns: string[];
@@ -220,6 +233,7 @@ export interface ForbiddenPatternInstruction {
   excludePatterns?: string[];
 }
 
+/** layer-boundary 指令：校验架构分层依赖，layers 声明每层允许依赖的层集合 */
 export interface LayerBoundaryInstruction {
   type: 'layer-boundary';
   layers: Array<{ name: string; allowedDependencies: string[] }>;
@@ -263,6 +277,7 @@ export interface RequiredContentInstruction {
   items: RequiredContentItem[];
 }
 
+/** required-content 指令中的单个必需内容检查项：文件/章节/配置项/JSDoc 缺失即违规 */
 export interface RequiredContentItem {
   /** 目标路径：单文件检查为相对 repoRoot 字面路径；jsdocOn 批量扫描为 glob */
   path: string;
@@ -280,12 +295,14 @@ export interface RequiredContentItem {
   jsdocOn?: string[];
 }
 
+/** scanner-dispatch 指令：将评估转交给外置工具链扫描，schedule 可限定执行时机 */
 export interface ScannerDispatchInstruction {
   type: 'scanner-dispatch';
   scanners: string[];
   schedule?: string;
 }
 
+/** preset 指令：套用配置预设集合（presets 为预设名列表） */
 export interface PresetInstruction {
   type: 'preset';
   presets: string[];

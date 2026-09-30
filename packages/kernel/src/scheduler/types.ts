@@ -1,8 +1,14 @@
+/** 调度任务类型：一次调度运行中可按序执行的任务种类 */
 export type SchedulerTaskType =
   'pipeline' | 'inspect' | 'security' | 'guard' | 'refactor' | 'deps' | 'techDebt';
 
+/** 调度频率：daily / weekly / monthly */
 export type SchedulerFrequency = 'daily' | 'weekly' | 'monthly';
 
+/**
+ * 调度任务配置。
+ * time 为 HH:mm 触发时刻，tasks 列出本次调度要执行的任务。
+ */
 export interface SchedulerConfig {
   enabled: boolean;
   frequency: SchedulerFrequency;
@@ -13,6 +19,7 @@ export interface SchedulerConfig {
   notifyOnFailure: boolean;
 }
 
+/** 调度作业：配置 + 下次/上次运行时间与上次执行状态 */
 export interface SchedulerJob {
   id: string;
   config: SchedulerConfig;
@@ -22,6 +29,7 @@ export interface SchedulerJob {
   createdAt: string;
 }
 
+/** 单次调度运行结果：起止时间、总体状态、实际执行的任务与各任务返回 */
 export interface SchedulerRunResult {
   jobId: string;
   startedAt: string;

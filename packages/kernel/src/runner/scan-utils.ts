@@ -251,7 +251,7 @@ export function scanPatternsInFile(
   for (const patternStr of patterns) {
     const regex = compileSafeRegex(patternStr);
     if (!regex) continue;
-    scanLinesForPattern(lines, regex, relativePath, rule, violations);
+    scanLinesForPattern({ lines, regex, relativePath, rule, violations });
   }
 
   return violations;
@@ -267,14 +267,17 @@ function compileSafeRegex(patternStr: string): RegExp | null {
   }
 }
 
+interface ScanLinesForPatternParams {
+  lines: string[];
+  regex: RegExp;
+  relativePath: string;
+  rule: SopRule;
+  violations: Violation[];
+}
+
 /** 逐行扫描正则命中并记录违规 */
-function scanLinesForPattern(
-  lines: string[],
-  regex: RegExp,
-  relativePath: string,
-  rule: SopRule,
-  violations: Violation[],
-): void {
+function scanLinesForPattern(params: ScanLinesForPatternParams): void {
+  const { lines, regex, relativePath, rule, violations } = params;
   for (let i = 0; i < lines.length; i++) {
     let match: RegExpExecArray | null;
     regex.lastIndex = 0;
@@ -297,16 +300,19 @@ function scanLinesForPattern(
 /** 裸标识符形态的禁止模式：按整词匹配，避免命中任意/anything/tianyin 等拼写含界符的子串 */
 const BARE_IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
+interface ScanLineForForbiddenParams {
+  line: string;
+  pattern: string;
+  isBareIdentifier: boolean;
+  relativePath: string;
+  rule: SopRule;
+  lineNumber: number;
+  violations: Violation[];
+}
+
 /** 扫描单行内容中的禁止模式（子串匹配；裸标识符按整词匹配），记录命中违规 */
-function scanLineForForbidden(
-  line: string,
-  pattern: string,
-  isBareIdentifier: boolean,
-  relativePath: string,
-  rule: SopRule,
-  lineNumber: number,
-  violations: Violation[],
-): void {
+function scanLineForForbidden(params: ScanLineForForbiddenParams): void {
+  const { line, pattern, isBareIdentifier, relativePath, rule, lineNumber, violations } = params;
   if (isBareIdentifier) {
     const wordRe = new RegExp(`\\b${escapeRegExp(pattern)}\\b`, 'g');
     let match: RegExpExecArray | null;
@@ -351,15 +357,15 @@ export function scanForbiddenInFile(
   for (const pattern of patterns) {
     const isBareIdentifier = BARE_IDENTIFIER_RE.test(pattern);
     for (let i = 0; i < lines.length; i++) {
-      scanLineForForbidden(
-        lines[i],
+      scanLineForForbidden({
+        line: lines[i],
         pattern,
         isBareIdentifier,
         relativePath,
         rule,
-        i + 1,
+        lineNumber: i + 1,
         violations,
-      );
+      });
     }
   }
 

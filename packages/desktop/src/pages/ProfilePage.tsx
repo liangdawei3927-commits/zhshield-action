@@ -224,8 +224,13 @@ function fetchProfile(
   projectPath: string,
   handlers: { onSuccess: (p: ProjectProfile) => void; onError: (msg: string) => void },
 ): void {
-  window
-    .electronAPI!.engine!.runProfile(projectPath)
+  const api = window.electronAPI;
+  if (api === undefined) {
+    handlers.onError('Electron API 不可用');
+    return;
+  }
+  api.engine
+    .runProfile(projectPath)
     .then((result) => handlers.onSuccess(result.profile as ProjectProfile))
     .catch((err: unknown) => handlers.onError(err instanceof Error ? err.message : String(err)));
 }

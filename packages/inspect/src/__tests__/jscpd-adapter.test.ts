@@ -145,4 +145,51 @@ describe('JscpdAdapter', () => {
 
     expect(result.issues).toHaveLength(0);
   });
+
+  it('passes SOP rule thresholds (minLines/minTokens) as CLI flags (jscpd>=5)', async () => {
+    mockExecVersion('5.0.14');
+    mockReadJSON({ duplicates: [] });
+
+    await adapter.scan({
+      projectPath: '/work',
+      config: { enabled: true, thresholds: { minLines: 10, minTokens: 50 } },
+    } as never);
+
+    const scanCall = execFileMock.mock.calls.find(([, args]) => args.includes('--mode'));
+    expect(scanCall).toBeDefined();
+    const args = scanCall![1] as string[];
+    expect(args).toContain('--min-lines');
+    const minLinesIdx = args.indexOf('--min-lines');
+    expect(Number(args[minLinesIdx + 1])).toBe(10);
+    const minTokensIdx = args.indexOf('--min-tokens');
+    expect(Number(args[minTokensIdx + 1])).toBe(50);
+  });
+
+  it('passes SOP rule thresholds as CLI flags for legacy jscpd<5', async () => {
+    mockExecVersion('3.0.6');
+    mockReadJSON({ duplicates: [] });
+
+    await adapter.scan({
+      projectPath: '/work',
+      config: { enabled: true, thresholds: { minLines: 6, minTokens: 25 } },
+    } as never);
+
+    const scanCall = execFileMock.mock.calls.find(([, args]) => args.includes('--format'));
+    expect(scanCall).toBeDefined();
+    const args = scanCall![1] as string[];
+    const minLinesIdx = args.indexOf('--min-lines');
+    expect(Number(args[minLinesIdx + 1])).toBe(6);
+  });
+
+  it('does not emit threshold flags when config lacks thresholds (default jscpd behavior)', async () => {
+    mockExecVersion('5.0.14');
+    mockReadJSON({ duplicates: [] });
+
+    await adapter.scan({ projectPath: '/work' } as never);
+
+    const scanCall = execFileMock.mock.calls.find(([, args]) => args.includes('--mode'));
+    const args = scanCall![1] as string[];
+    expect(args).not.toContain('--min-lines');
+    expect(args).not.toContain('--min-tokens');
+  });
 });

@@ -15,6 +15,12 @@ import { progress, send } from './pipeline-ipc';
 import { createLoadedRunner } from './pipeline-runner-factory';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
+import type { GarbageEvaluationLike, GarbageScanReport } from '@zh/garbage';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+/** garbage 快照串行化写入队列：并发并发多轮扫描时避免 writeFile 交错覆盖（对齐 dashboard-state writeQueue 模式） */
+let garbageSnapshotQueue: Promise<void> = Promise.resolve();
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);
@@ -107,34 +113,57 @@ export async function runGarbageScanJob(id: string, projectPath: string): Promis
   progress(id, 'garbage', t('pipeline.garbage.scanning'), 0.1);
   try {
     const { detectFsGarbage, buildGarbageReport } = await import('@zh/garbage');
-    type GarbageInput = Parameters<typeof buildGarbageReport>[0];
     const fsItems = await detectFsGarbage(projectPath);
-
-    let evaluations: GarbageInput['evaluations'] = [];
-    let ruleChannelRan = false;
-    try {
-      const { PipelineRunner } = await import('@zh/pipeline');
-      const runner = new PipelineRunner(projectPath);
-      await runner.loadSopRules();
-      progress(id, 'garbage', t('pipeline.garbage.ruleScanning'), 0.5);
-      // 只评估 garbage 域：规则声明了 ts-prune / jscpd / depcheck，均由适配器真实执行
-      const sopReport = await runner.runSopInspect({ domains: ['garbage'] });
-      evaluations = sopReport.evaluations ?? [];
-      ruleChannelRan = true;
-    } catch (err) {
-      console.warn(
-        '[pipeline-worker] 垃圾规则通道异常，降级为仅文件系统检测:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
+    const { evaluations, ruleChannelRan } = await runGarbageRuleChannel(id, projectPath);
     const report = buildGarbageReport({ projectPath, fsItems, evaluations, ruleChannelRan });
+    await writeGarbageSnapshot(projectPath, report);
     progress(id, 'done', t('pipeline.garbage.scanDone', { count: report.summary.total }), 1.0);
     send({ type: 'result', id, report: serializePipelineReport(report) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[pipeline-worker] 垃圾扫描异常:', message);
     send({ type: 'error', id, error: message });
+  }
+}
+
+/** ② garbage 域 SOP 规则通道：只评估 garbage 域（ts-prune / jscpd / depcheck），异常降级不阻断 */
+async function runGarbageRuleChannel(
+  id: string,
+  projectPath: string,
+): Promise<{ evaluations: GarbageEvaluationLike[]; ruleChannelRan: boolean }> {
+  let evaluations: GarbageEvaluationLike[] = [];
+  let ruleChannelRan = false;
+  try {
+    const { PipelineRunner } = await import('@zh/pipeline');
+    const runner = new PipelineRunner(projectPath);
+    await runner.loadSopRules();
+    progress(id, 'garbage', t('pipeline.garbage.ruleScanning'), 0.5);
+    const sopReport = await runner.runSopInspect({ domains: ['garbage'] });
+    evaluations = sopReport.evaluations ?? [];
+    ruleChannelRan = true;
+  } catch (err) {
+    console.warn(
+      '[pipeline-worker] 垃圾规则通道异常，降级为仅文件系统检测:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  return { evaluations, ruleChannelRan };
+}
+
+/** 全量快照落盘：与 inspect/guard 等域一致，写入 .zhshield/diagnostics/domains/garbage.json；失败静默降级 */
+async function writeGarbageSnapshot(projectPath: string, report: GarbageScanReport): Promise<void> {
+  try {
+    garbageSnapshotQueue = garbageSnapshotQueue.then(async () => {
+      const dir = join(projectPath, '.zhshield', 'diagnostics', 'domains');
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'garbage.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
+    });
+    await garbageSnapshotQueue;
+  } catch (err) {
+    console.warn(
+      '[pipeline-worker] garbage 快照落盘失败（扫描结果仍照常上报）:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 

@@ -65,18 +65,9 @@ export class RuleEngineReportFormatter {
 
   private pushCategories(ctx: RuleEngineReportContext): void {
     const { report, lines, indent } = ctx;
-    // 分类汇总：按 issue category 统计违规数，使各检测维度（security/quality/performance…）可见
-    const allViolations = report.evaluations
-      .filter((e) => e.status === 'failed' && e.violations)
-      .flatMap((e) => e.violations!);
-    const categoryCounts = new Map<string, number>();
-    for (const v of allViolations) {
-      const cat = v.category ?? 'uncategorized';
-      categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
-    }
-    if (categoryCounts.size > 0) {
-      const catParts = [...categoryCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
+    const categories = tallyViolationsByCategory(report.evaluations);
+    if (categories.length > 0) {
+      const catParts = categories
         .map(([cat, count]) => `${this.color.magenta(cat)} ${this.color.bold(String(count))}`);
       lines.push(
         `${indent}  ${this.tt('reporter.category')}: ${catParts.join(this.color.dim(', '))}`,
@@ -199,4 +190,24 @@ const SEVERITY_LABEL_KEYS = new Set(['critical', 'high', 'medium', 'low', 'info'
 /** 将引擎严重度值映射为目录标签（复用种子键 severity.*）；未知值原样返回 */
 export function severityLabel(severity: string, tt: TranslateFn): string {
   return SEVERITY_LABEL_KEYS.has(severity) ? tt(`severity.${severity}`) : severity;
+}
+
+/**
+ * 按 issue category 统计违规数并按计数降序排列，使各检测维度（security/quality/performance…）可见。
+ *
+ * 只累加 status 为 failed 的评估所带违规；无 category 的违规归入 'uncategorized'。
+ * 计数相同时保持 category 首次出现顺序（Array.prototype.sort 稳定），两个格式化器共用本结果。
+ */
+export function tallyViolationsByCategory(
+  evaluations: readonly RuleEvaluation[],
+): Array<[string, number]> {
+  const categoryCounts = new Map<string, number>();
+  for (const e of evaluations) {
+    if (e.status !== 'failed' || !e.violations) continue;
+    for (const v of e.violations) {
+      const cat = v.category ?? 'uncategorized';
+      categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
+    }
+  }
+  return [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]);
 }

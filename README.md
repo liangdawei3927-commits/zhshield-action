@@ -52,13 +52,20 @@ packages/
   refactor   AST 异味与自动修复
   sentinel   监控告警
   scoring    健康评分
-  evolve     经验池与规则权重
+  evolve     经验池与规则权重（⚠️ 桌面端入口暂下线，见下方「暂下线功能」）
   pipeline   编排 Guard + Inspect + Refactor
   reporter   控制台报告
   cli        zhshield 命令行
   server     NestJS HTTP API
   desktop    Electron + React 桌面端
 ```
+
+## ⛔ 暂下线功能
+
+以下两项功能处于产品性暂下线状态，从侧边栏隐藏入口并封死路由；开关在 `packages/desktop/src/feature-flags.ts`。未获用户明确指示前**不要重新开启**：
+
+- **AI 工具**（`FEATURE_AI_TOOL_ENABLED`）：功能未闭环——当前仍需用户手动把任务搬运到外部 AI 编程工具，侧边栏开关无法真正驱动完整 AI 流程。
+- **规则进化**（`FEATURE_EVOLVE_ENABLED`）：自动进化的标准需要足够规模的真实用户认可（启动门槛为千人级基础用户）；单人判断不能成为“真实好用”的规则标准。
 
 依赖方向：客户端 → 引擎 → `kernel` / `shared` / `db`。引擎之间不互相 import，横向通信走 EventBus。
 

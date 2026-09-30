@@ -9,9 +9,9 @@ import { navItems } from '../components/layout/nav-items';
  * 导航怎么改都不会红。这里改为直接断言真实导航配置（components/layout/nav-items.ts）。
  */
 describe('顶部导航归位', () => {
-  it('首位是项目体检（inspect）、末位是报告中心（reports）', () => {
+  it('首位是项目体检（inspect）、末位是备份中心（backup）', () => {
     expect(navItems[0]?.id).toBe('inspect');
-    expect(navItems.at(-1)?.id).toBe('reports');
+    expect(navItems.at(-1)?.id).toBe('backup');
   });
 
   it('不再有 dashboard 项：该页与「8 域串行全检」通道已删除', () => {

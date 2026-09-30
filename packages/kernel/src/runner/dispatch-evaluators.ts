@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Issue, ToolAdapter, ToolConfig, ToolResult, ToolId } from '@zh/shared';
+import { withHardTimeout } from '@zh/shared';
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext, ToolScanOutcome } from '../sop/_meta/rule-context';
 import type {
@@ -12,6 +13,7 @@ import type {
   PresetInstruction,
 } from '../sop/_meta/rule-evaluation';
 import type { EngineHost } from './evaluator-host';
+import { skipEvaluation } from './evaluation-builders';
 
 /** 从 unknown 类型的 catch 错误中安全提取 message */
 function toMessage(err: unknown): string {
@@ -25,23 +27,8 @@ export const DEFAULT_TOOL_SCAN_TIMEOUT_MS = 300_000;
  * 硬上限保护：即便适配器未遵守 timeout（进程未退出），单次工具扫描也绝不
  * 无限挂起整个体检。超时即 reject，由 executeToolScan 的 catch 降级为该规则 error。
  */
-function withHardTimeout<T>(promise: Promise<T>, ms: number, toolId: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`[sop] 工具 ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`)),
-      ms,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+function withToolScanHardTimeout<T>(promise: Promise<T>, ms: number, toolId: string): Promise<T> {
+  return withHardTimeout(promise, ms, `[sop] 工具 ${toolId} 扫描超过 ${ms}ms 硬上限，已跳过`);
 }
 
 // ─── 派发评估：check-list → GuardEngine ────────────────
@@ -62,10 +49,10 @@ export async function evalCheckList(
     return runSecurityCheck(host.securityCheckEngine, rule, instr, context);
   }
   if (!host.guardEngine) {
-    return skippedResult(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard', true);
+    return skipEvaluation(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard', true);
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, '跳过 check-list→GuardEngine.run（防止规则引擎重入）', 'guard');
+    return skipEvaluation(rule, '跳过 check-list→GuardEngine.run（防止规则引擎重入）', 'guard');
   }
   return runGuardCheck(host.guardEngine, rule, context);
 }
@@ -129,7 +116,7 @@ async function runGuardCheck(
     // 被解释为 check-list），派发无匹配属于跳过而非错误——升级为 error 会产生
     // 无 location 的 error 级误报，阻断门禁且 SARIF 上传被 GitHub 拒绝
     if (msg.includes('no checks matched the current filters')) {
-      return skippedResult(rule, `无可匹配的 Guard 检查，跳过派发: ${msg}`, 'guard');
+      return skipEvaluation(rule, `无可匹配的 Guard 检查，跳过派发: ${msg}`, 'guard');
     }
     return errorResult(rule, `Guard 派发失败: ${msg}`, 'guard');
   }
@@ -168,10 +155,10 @@ export async function evalScannerDispatch(
   if (viaAdapters) return viaAdapters;
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, 'InspectEngine 未注册，且无可用扫描器适配器', 'inspect', true);
+    return skipEvaluation(rule, 'InspectEngine 未注册，且无可用扫描器适配器', 'inspect', true);
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, '跳过 scanner-dispatch→runScan（防止规则引擎重入）', 'inspect');
+    return skipEvaluation(rule, '跳过 scanner-dispatch→runScan（防止规则引擎重入）', 'inspect');
   }
   return runInspectScan(host.inspectEngine, rule, context, '巡检');
 }
@@ -224,7 +211,7 @@ async function runScannerAdapters(
   }
   // 所有扫描器均未运行（未注册 / 不可用 / 被跳过）→ 显式上报 skipped 并附各工具原因
   if (!anyRan) {
-    return skippedResult(
+    return skipEvaluation(
       rule,
       reasons.length > 0
         ? `所有扫描器不可用: ${reasons.join(', ')}`
@@ -254,54 +241,100 @@ export async function evalToolDispatch(
   instr: ToolDispatchInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
+  const resolution = resolveToolAdapter(host, rule, instr);
+  if (resolution.kind === 'skipped') return resolution.result;
+  const unavailable = await checkAdapterAvailability(host, resolution.adapter, rule, instr);
+  if (unavailable) return unavailable;
+  return runToolScanWithCache(host, resolution.adapter, rule, instr, context);
+}
+
+type AdapterResolution =
+  | { kind: 'adapter'; adapter: ToolAdapter }
+  | { kind: 'skipped'; result: RuleEvaluation };
+
+/** 解析工具适配器：未注册 / 接口不完整 / 画像 scope 裁剪 → 返回 skipped 结果 */
+function resolveToolAdapter(
+  host: EngineHost,
+  rule: SopRule,
+  instr: ToolDispatchInstruction,
+): AdapterResolution {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    return skippedResult(
-      rule,
-      `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`,
-      targetEngineOf(rule),
-      true,
-    );
+    return {
+      kind: 'skipped',
+      result: skipEvaluation(
+        rule,
+        `未注册工具适配器: ${instr.tool}，无法执行 tool-dispatch`,
+        targetEngineOf(rule),
+        true,
+      ),
+    };
   }
   if (!isAdapterUsable(adapter)) {
-    return skippedResult(
-      rule,
-      `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`,
-      targetEngineOf(rule),
-      true,
-    );
+    return {
+      kind: 'skipped',
+      result: skipEvaluation(
+        rule,
+        `工具适配器 ${instr.tool} 接口不完整（缺少 isAvailable 或 scan 方法），tool-dispatch 跳过`,
+        targetEngineOf(rule),
+        true,
+      ),
+    };
   }
   // M4 工具执行面随画像裁剪：工具不在当前项目画像 scope 内 → 视为既定裁剪跳过（不进可用性/扫描）
   if (host.toolScope && !host.toolScope(instr.tool)) {
-    return skippedResult(
-      rule,
-      `工具 ${instr.tool} 不在当前项目画像 scope 内，tool-dispatch 跳过`,
-      targetEngineOf(rule),
-    );
+    return {
+      kind: 'skipped',
+      result: skipEvaluation(
+        rule,
+        `工具 ${instr.tool} 不在当前项目画像 scope 内，tool-dispatch 跳过`,
+        targetEngineOf(rule),
+      ),
+    };
   }
+  return { kind: 'adapter', adapter };
+}
+
+async function checkAdapterAvailability(
+  host: EngineHost,
+  adapter: ToolAdapter,
+  rule: SopRule,
+  instr: ToolDispatchInstruction,
+): Promise<RuleEvaluation | null> {
   const available = await adapter.isAvailable();
   if (!available) {
-    return skippedResult(
+    return skipEvaluation(
       rule,
       `工具不可用: ${instr.tool}（未安装或在 PATH 中未找到）`,
       targetEngineOf(rule),
       true,
     );
   }
+  return null;
+}
 
-  // M1b 工具调用去重：同一次调用内同 (tool, configHash) 的规则共享一次真实扫描（single-flight）。
-  // 可用性检查始终前置（不进缓存），保证各消费者得到各自的 skipped 语义。
+/**
+ * M1b 工具调用去重：同一次调用内同 (tool, configHash) 的规则共享一次真实扫描（single-flight）。
+ * 可用性检查始终前置（不进缓存），保证各消费者得到各自的 skipped 语义。
+ */
+async function runToolScanWithCache(
+  host: EngineHost,
+  adapter: ToolAdapter,
+  rule: SopRule,
+  instr: ToolDispatchInstruction,
+  context: RuleContext,
+): Promise<RuleEvaluation> {
   const cache = context.toolScanCache;
   if (!cache) {
     // 无缓存（旧调用路径）→ 保守直扫，行为与去重前一致
-    const outcome = await executeToolScan(host, adapter, instr, context, rule);
+    const outcome = await executeToolScan({ host, adapter, instr, context, initiatingRule: rule });
     return consumeToolScan(rule, instr, outcome);
   }
 
   const key = `${instr.tool}|${stableConfigKey(instr.toolConfig)}`;
   let inFlight = cache.get(key);
   if (!inFlight) {
-    inFlight = executeToolScan(host, adapter, instr, context, rule);
+    inFlight = executeToolScan({ host, adapter, instr, context, initiatingRule: rule });
     cache.set(key, inFlight);
   }
   const outcome = await inFlight;
@@ -324,22 +357,25 @@ function stableConfigKey(toolConfig: Record<string, unknown> | undefined): strin
   return JSON.stringify(keys.map((k) => [k, config[k]]));
 }
 
+interface ExecuteToolScanParams {
+  host: EngineHost;
+  adapter: ToolAdapter;
+  instr: ToolDispatchInstruction;
+  context: RuleContext;
+  initiatingRule: SopRule;
+}
+
 /**
  * M1b：真实执行一次工具扫描（含审计日志与 tool:executed 事件，均仅在真实执行时发生一次，
  * sopRuleId 为发起规则）。返回的 Promise 永不 reject——扫描失败也是一种结果。
  */
-async function executeToolScan(
-  host: EngineHost,
-  adapter: ToolAdapter,
-  instr: ToolDispatchInstruction,
-  context: RuleContext,
-  initiatingRule: SopRule,
-): Promise<ToolScanOutcome> {
+async function executeToolScan(params: ExecuteToolScanParams): Promise<ToolScanOutcome> {
+  const { host, adapter, instr, context, initiatingRule } = params;
   try {
     const toolConfig = instr.toolConfig ?? {};
     // 硬上限保护：对齐 InspectEngine ToolAdapterExecutor——即便工具未遵守 timeout，
     // 单次扫描也绝不无限挂起体检。超时 reject → 下方 catch → 该规则降级为 error。
-    const result = await withHardTimeout(
+    const result = await withToolScanHardTimeout(
       adapter.scan({
         projectPath: context.repoRoot,
         projectId: context.repoRoot,
@@ -462,10 +498,10 @@ export async function evalPreset(
   }
 
   if (!host.inspectEngine) {
-    return skippedResult(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect', true);
+    return skipEvaluation(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect', true);
   }
   if (host.evalDepth > 1) {
-    return skippedResult(rule, '跳过 preset→runScan（防止规则引擎重入）', 'inspect');
+    return skipEvaluation(rule, '跳过 preset→runScan（防止规则引擎重入）', 'inspect');
   }
   return runInspectScan(host.inspectEngine, rule, context, '预设检查');
 }
@@ -538,23 +574,6 @@ async function runInspectScan(
   } catch (err) {
     return errorResult(rule, `Inspect 派发失败: ${toMessage(err)}`, 'inspect');
   }
-}
-
-function skippedResult(
-  rule: SopRule,
-  message: string,
-  targetEngine: 'guard' | 'inspect',
-  degraded?: boolean,
-): RuleEvaluation {
-  return {
-    rule,
-    status: 'skipped',
-    message,
-    durationMs: 0,
-    targetEngine,
-    timestamp: new Date(),
-    ...(degraded ? { degraded: true as const } : {}),
-  };
 }
 
 function errorResult(

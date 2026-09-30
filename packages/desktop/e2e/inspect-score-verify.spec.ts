@@ -6,7 +6,7 @@
  *   → IPC engine:getDomainScore → DomainScoreCard(live) 显示。
  * 本 spec 用 fixture（自带带分快照）验证两件事：
  *   1. 打开体检页即显示分数（读既有快照，不跑检查）；
- *   2. 点「马上巡检/重新巡检」跑完后分数卡仍显示且快照更新（previousScore 对比行出现）。
+ *   2. 点「一键体检/重新巡检」跑完后分数卡仍显示且快照更新（previousScore 对比行出现）。
  */
 import { test, expect } from '@playwright/test';
 import { ENTRIES, entryButton, launchApp, waitSettled } from './nav-helpers';
@@ -27,16 +27,14 @@ test('体检分数卡：开页出分 → 巡检后更新', async () => {
     try {
       await expect(card).toBeVisible({ timeout: 8_000 });
       const before = (await card.innerText()).replace(/\s+/g, ' ').trim();
-      // eslint-disable-next-line no-console
       console.log(`SCORECARD-BEFORE ${before}`);
       expect(before, '开页应显示数字分（fixture 快照带分）').toMatch(/\d{1,3}/);
     } catch {
-      // eslint-disable-next-line no-console
       console.log('SCORECARD-BEFORE (none — 无快照分或体检进行中，等跑完再验)');
     }
 
     // 2) 跑一轮巡检（页面可能已自动开跑；若按钮可用则手动触发一次）
-    const candidates = ['重新巡检', '马上巡检'];
+    const candidates = ['重新巡检', '一键体检'];
     let clicked = '';
     for (const label of candidates) {
       const btn = page.getByRole('button', { name: label, exact: true }).first();
@@ -46,17 +44,14 @@ test('体检分数卡：开页出分 → 巡检后更新', async () => {
         break;
       }
     }
-    // eslint-disable-next-line no-console
     console.log(`INSPECT-CLICK ${clicked || '(none — 自动巡检已开跑)'}`);
     const { settled, elapsed } = await waitSettled(page, 25 * 60_000, 15_000);
-    // eslint-disable-next-line no-console
     console.log(`INSPECT-SETTLED ${settled} ${elapsed}ms`);
 
     // 3) 跑完后分数卡仍显示且带分
     const card2 = page.getByTestId('domain-score-quality');
     await expect(card2).toBeVisible({ timeout: 15_000 });
     const after = (await card2.innerText()).replace(/\s+/g, ' ').trim();
-    // eslint-disable-next-line no-console
     console.log(`SCORECARD-AFTER ${after}`);
     expect(after, '巡检完成后应显示数字分').toMatch(/\d{1,3}/);
   } finally {

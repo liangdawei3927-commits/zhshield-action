@@ -13,6 +13,9 @@ import { BackupConfigManager } from './config';
 import { GitHubBackup } from './github-backup';
 import { LocalBackup } from './local-backup';
 
+/**
+ * 备份编排器依赖注入选项：四项均可省略，省略时由编排器自行构造默认实现。
+ */
 export interface BackupOrchestratorOptions {
   eventBus?: EventBus;
   configManager?: BackupConfigManager;
@@ -20,11 +23,21 @@ export interface BackupOrchestratorOptions {
   localBackup?: LocalBackup;
 }
 
+/** 编排器单次执行的参数：项目坐标 + 触发来源 + 可选取消信号 */
 export interface ExecuteOptions {
   projectId: string;
   projectPath: string;
   projectName?: string;
   trigger?: BackupTrigger;
+  abortSignal?: AbortSignal;
+}
+
+/** BackupOrchestrator.runEnabledBackups 参数对象 */
+interface RunEnabledBackupsParams {
+  config: Awaited<ReturnType<BackupConfigManager['loadProjectConfig']>>;
+  projectPath: string;
+  projectId: string;
+  backupId: string;
   abortSignal?: AbortSignal;
 }
 
@@ -51,13 +64,13 @@ export class BackupOrchestrator {
     this.emit(BACKUP_EVENTS.STARTED, { projectId, backupId, type: 'full' });
 
     const config = await this.configManager.loadProjectConfig(projectPath, options.projectName);
-    const results = await this.runEnabledBackups(
+    const results = await this.runEnabledBackups({
       config,
       projectPath,
       projectId,
       backupId,
-      abortSignal,
-    );
+      ...(abortSignal !== undefined ? { abortSignal } : {}),
+    });
     const overallStatus = this.calculateOverallStatus(results);
     const duration = Date.now() - startTime;
     const result: BackupResult = {
@@ -77,13 +90,8 @@ export class BackupOrchestrator {
   }
 
   /** 依次执行已启用的备份方式（GitHub → 本地），返回子结果列表 */
-  private async runEnabledBackups(
-    config: Awaited<ReturnType<BackupConfigManager['loadProjectConfig']>>,
-    projectPath: string,
-    projectId: string,
-    backupId: string,
-    abortSignal?: AbortSignal,
-  ): Promise<BackupSubResult[]> {
+  private async runEnabledBackups(params: RunEnabledBackupsParams): Promise<BackupSubResult[]> {
+    const { config, projectPath, projectId, backupId, abortSignal } = params;
     const results: BackupSubResult[] = [];
     if (config.github.enabled && !abortSignal?.aborted) {
       this.emitProgress({

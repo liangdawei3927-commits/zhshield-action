@@ -5,6 +5,7 @@
  * 纯函数：输入 issues + 模块热度 + 对外接口清单，输出 TechDebtSnapshot。
  * 不执行 git、不碰 DB、不执行项目代码（P0-2 禁令合规）。
  */
+import { createHash } from 'node:crypto';
 import type {
   CategoryDebt,
   DebtAction,
@@ -18,6 +19,12 @@ import type {
 
 const BACKSLASH_RE = /\\/g;
 const DOT_SLASH_RE = /^\.\//;
+
+/** 债务动作 ID = 类别 + 模块路径 sha256 前 12 位。不可用 base64 截断：base64 每 3 字节→4 字符，截 12 字符只保留路径前 9 字节，monorepo 下 `packages/` 之下全部模块会塌缩成同一 ID。 */
+function debtActionId(category: DebtCategory, module: string): string {
+  const digest = createHash('sha256').update(module).digest('hex').slice(0, 12);
+  return `td-${category}-${digest}`;
+}
 
 /** 单条 Issue 按 severity 的利息权重（安全 > 架构 > 质量 > 重复 的近似：error > warning > info） */
 const SEVERITY_WEIGHT: Record<'error' | 'warning' | 'info', number> = {
@@ -159,7 +166,7 @@ function buildActionFromGroup(
   const roi = principalEstimate > 0 ? interestScore / principalEstimate : interestScore;
 
   return {
-    actionId: `td-${category}-${Buffer.from(module).toString('base64url').slice(0, 12)}`,
+    actionId: debtActionId(category, module),
     issueIds: groupIssues.map((i) => i.id),
     module,
     category,

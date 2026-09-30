@@ -166,7 +166,11 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
     expect(mapper.getWeightMap().quality).toBeCloseTo(0.05, 10);
     expect(mapper.validateWeights().valid).toBe(true);
 
-    const dims = buildHealthDimensions({ results: [] }, { issues: [] }, root);
+    const dims = buildHealthDimensions({
+      guard: { results: [] },
+      inspect: { issues: [] },
+      projectRoot: root,
+    });
     expect(dims.find((d) => d.name === 'security')?.weight).toBeCloseTo(0.15, 10);
     expect(dims.find((d) => d.name === 'gate')?.weight).toBeCloseTo(0.1, 10);
   });

@@ -16,14 +16,23 @@ import {
   extractGemfileDeps,
 } from './dep-parsers';
 
+/** makeSignal 参数对象 */
+export interface MakeSignalParams {
+  /** 信号种类 */
+  readonly kind: SignalKind;
+  /** 规则 ID */
+  readonly ruleId: string;
+  /** 关联文件相对路径 */
+  readonly file: string;
+  /** 信号权重 */
+  readonly weight: number;
+  /** 信号载荷 */
+  readonly payload: unknown;
+}
+
 /** 构造信号（ruleId/kind/file/weight/payload；weight = 产出探测器的权重）。 */
-export function makeSignal(
-  kind: SignalKind,
-  ruleId: string,
-  file: string,
-  weight: number,
-  payload: unknown,
-): Signal {
+export function makeSignal(params: MakeSignalParams): Signal {
+  const { kind, ruleId, file, weight, payload } = params;
   return { ruleId, kind, file, weight, payload };
 }
 
@@ -64,13 +73,13 @@ export function frameworkSignalsFromDeps(
       const keyword = candidate.keywords.find((kw) => deps.has(kw));
       if (keyword === undefined) continue;
       signals.push(
-        makeSignal(
-          'manifest',
-          `manifest:framework:${slugify(candidate.name)}`,
-          manifestRelPath,
+        makeSignal({
+          kind: 'manifest',
+          ruleId: `manifest:framework:${slugify(candidate.name)}`,
+          file: manifestRelPath,
           weight,
-          { framework: candidate.name, dependency: keyword, language: entry.language },
-        ),
+          payload: { framework: candidate.name, dependency: keyword, language: entry.language },
+        }),
       );
     }
   }
@@ -92,9 +101,15 @@ export function conventionDirSignals(projectRoot: string, weight: number): Signa
     const form: ProductFormId | undefined = FORM_DIR_RULES[entry.name];
     if (form === undefined) continue;
     signals.push(
-      makeSignal('form', `form:dir-${entry.name}`, entry.name, weight, {
-        dirPath: entry.name,
-        form,
+      makeSignal({
+        kind: 'form',
+        ruleId: `form:dir-${entry.name}`,
+        file: entry.name,
+        weight,
+        payload: {
+          dirPath: entry.name,
+          form,
+        },
       }),
     );
   }

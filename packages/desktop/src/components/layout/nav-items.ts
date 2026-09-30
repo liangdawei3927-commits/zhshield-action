@@ -4,7 +4,9 @@
  * - 首位「项目体检」（inspect）= 全站唯一发起源码检查的入口。该名号原由聚合仪表盘
  *   （dashboard）占用，但 dashboard 页跑的是「8 域串行全检 + 六卡汇总」，既不是体检
  *   也不该由页面发起扫描 —— 该页与全检通道已删除，名号归还给真正做检查的 inspect 域。
- * - 末位「报告中心」（reports）= 只读汇总各域最新结果，不发起任何检查。
+ * - 末位「备份中心」（backup）= 独立治理域，触发权与判定权域内独占。
+ *   原末位「报告中心」（reports）改为只读汇总各域最新结果、不发起任何检查，
+ *   入口收敛到各页 PageShell 右上角「报告」按钮（导航栏不放，避免与顶行重复）。
  * - 中间 8 项各是独立治理域，触发权与判定权域内独占，互不借调。
  *
  * 独立成模块（而非内联在 TopNav 组件里）的两个原因：
@@ -28,5 +30,5 @@ export const navItems: NavItem[] = [
   { id: 'performance', labelKey: 'nav.performance' },
   { id: 'techdebt', labelKey: 'nav.techdebt' },
   { id: 'refactor', labelKey: 'nav.refactor' },
-  { id: 'reports', labelKey: 'nav.reports' },
+  { id: 'backup', labelKey: 'nav.backup' },
 ];

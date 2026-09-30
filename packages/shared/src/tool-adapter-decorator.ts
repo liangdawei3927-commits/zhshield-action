@@ -22,6 +22,7 @@ export interface ScopeViolationContext {
   options: ToolScanOptions;
 }
 
+/** wrapAdapter 包装选项：当前仅承载 F5 越界回调，未传则不注册越界监听 */
 export interface WrapAdapterOptions {
   /** 每条越界触发一次；仅声明了 accessScope 的适配器会触发 */
   onScopeViolation?: (violation: ScopeViolation, context: ScopeViolationContext) => void;

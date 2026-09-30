@@ -182,3 +182,128 @@ export function NavIcon({ id, size = 24 }: { id: string; size?: number }) {
     </svg>
   );
 }
+
+/** 功能卡图标外壳：18×18、currentColor、1.8 描边；仅收敛外壳，图形路径由 children 传入 */
+export function FeatureIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** 结果卡分区标题图标外壳：14×14、currentColor、2 描边（与功能卡 1.8 描边规格不同，故独立导出） */
+export function SectionIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** 侧栏设置分区标题图标外壳：12×12、currentColor、2 描边（尺寸小于 SectionIcon 14×14，故独立导出） */
+export function MiniSectionIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** 分类插图内的小图标外壳：24×24、zh-brand 描边 1.8 */
+export function BrandMarkIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgb(var(--zh-brand))"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** 分层图形标（备份配置 / 重构异味 / 演进图谱 / 哨兵范围 共用同一组路径） */
+export function LayersGlyph() {
+  return (
+    <>
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </>
+  );
+}
+
+/** 宫格图形标（备份规则 / 重构分组 / 演进目录 共用同一组路径） */
+export function GridGlyph() {
+  return (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+  );
+}
+
+/** 时钟图形标（重构日报 / 性能计时 共用同一组路径） */
+export function ClockGlyph() {
+  return (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </>
+  );
+}
+
+/** 报错横幅内的警示图标：18×18、zh-danger 描边 2（描边规格与功能卡不同，故独立导出） */
+export function AlertCircleIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgb(var(--zh-danger))"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </svg>
+  );
+}

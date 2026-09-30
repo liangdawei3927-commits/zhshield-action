@@ -10,6 +10,7 @@ import {
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
+import { ScoreRing } from '../components/business/ScoreRing';
 import { useT } from '../i18n';
 import type { ModuleScoreView } from './module-scores-logic';
 
@@ -206,12 +207,7 @@ export function LatestScoreCard({
   return (
     <ResultCard variant="score" className="flex gap-6 mb-6">
       <div className="flex items-center gap-4">
-        <div
-          className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white shrink-0"
-          style={{ background: getScoreColor(latest.score) }}
-        >
-          {latest.score}
-        </div>
+        <ScoreRing score={latest.score} size={64} />
         <div>
           <div className="text-sm font-semibold text-zh-ink-2">{getScoreLabel(latest.score)}</div>
           {/* 总分是「上一次检查结果的汇总」，必须标注数据时间；超过阈值时显式提示陈旧（T14） */}

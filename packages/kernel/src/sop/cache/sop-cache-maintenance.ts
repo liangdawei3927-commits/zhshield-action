@@ -13,8 +13,10 @@ export const DEFAULT_SOP_CLEANUP_CONFIG: Readonly<CleanupConfig> = {
   keepMinimum: 100,
 };
 
+/** 缓存维护触发时机：init 初始化、diff 应用增量后、emergency 紧急收缩 */
 export type MaintenanceTrigger = 'init' | 'diff' | 'emergency';
 
+/** 维护执行结果：规则与同步日志两路裁剪前后的条目数对比 */
 export interface MaintenanceOutcome {
   trigger: MaintenanceTrigger;
   rulesBefore: number;
@@ -25,6 +27,7 @@ export interface MaintenanceOutcome {
   logEntriesRemoved: number;
 }
 
+/** 缓存维护器依赖：registry / sqliteStore / versionStore / cleanup 为必需，cleanupConfig、metrics、eventBus 可选 */
 export interface SopCacheMaintenanceOptions {
   registry: SopRegistry;
   sqliteStore: SopSqliteStore;

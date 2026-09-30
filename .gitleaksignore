@@ -23,7 +23,10 @@ d10301073494e705d69f2b16e8141503ced39265:packages/cli/dist/zhshield.js:generic-a
 d10301073494e705d69f2b16e8141503ced39265:packages/cli/dist/zhshield.js:generic-api-key:440787
 d10301073494e705d69f2b16e8141503ced39265:packages/cli/dist/zhshield.js:generic-api-key:445562
 
-# ── 路径级冗余覆盖（兼容不同 gitleaks 版本的 ignore 格式） ──
-packages/kernel/src/__tests__/**
-packages/security/src/__tests__/**
-packages/desktop/release/**
+# 说明：本文件只接受 `<commit>:<file>:<rule-id>:<line>` 指纹格式。
+# 此前追加的 `packages/**/__tests__/**`、`packages/desktop/release/**` 等裸路径 glob
+# 不是合法指纹，gitleaks 8.30.1 每次扫描都会打印 6 次
+# `WRN Invalid .gitleaksignore entry`，污染门禁输出。
+# 路径级排除不靠本文件，而由 GitleaksAdapter 的 EXCLUDED_FILE_PATTERN
+# （packages/inspect/src/adapters/gitleaks-adapter.ts）在 findings 映射阶段统一过滤
+# dist/build/coverage/node_modules/__tests__/fixtures 等目录。

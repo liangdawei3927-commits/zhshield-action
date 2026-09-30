@@ -19,6 +19,17 @@ export default tseslint.config(
       '**/build/**',
       'eslint.config.mjs',
       '.dependency-cruiser.cjs',
+      // 测试夹具：含故意植入的坏味道/未定义全局，是扫描适配器的输入而非待检源码
+      '**/fixtures/**',
+      // tsc 配置编译产物（vitest/vite/playwright config 的 .d.ts/.js/.map），对应 .gitignore 的生成物约定
+      '**/*.config.d.ts',
+      '**/*.config.d.ts.map',
+      '**/*.config.js.map',
+      'vitest.config.js',
+      'vitest.shared.js',
+      'vitest.shared.d.ts',
+      'vitest.shared.d.ts.map',
+      'vitest.shared.js.map',
     ],
   },
   eslint.configs.recommended,

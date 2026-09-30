@@ -74,6 +74,7 @@ export interface InvalidEntry {
   reason: string;
 }
 
+/** 规则冲突报告：确认项 / 误报项 / 冲突项 / 无效输入四路分流 + 计数汇总 */
 export interface RuleConflictReport {
   confirmed: ConfirmedFinding[];
   falsePositives: FalsePositiveEntry[];
@@ -134,6 +135,15 @@ function dismissalError(dismissal: unknown): string | null {
 }
 
 // ─── 主逻辑 ──────────────────────────────────────────────────
+
+interface ClassifyGroupParams {
+  fingerprint: string;
+  group: RuleFinding[];
+  dismissal: RuleDismissal | undefined;
+  confirmed: ConfirmedFinding[];
+  falsePositives: FalsePositiveEntry[];
+  conflicts: ConflictEntry[];
+}
 
 /**
  * RuleConflictResolver — F3 二次校验层（通用规则冲突裁决）
@@ -224,26 +234,20 @@ export class RuleConflictResolver {
     const fingerprints = [...byFingerprint.keys()].sort();
     for (const fingerprint of fingerprints) {
       const group = byFingerprint.get(fingerprint) ?? [];
-      this.classifyGroup(
+      this.classifyGroup({
         fingerprint,
         group,
-        dismissalByKey.get(fingerprint),
+        dismissal: dismissalByKey.get(fingerprint),
         confirmed,
         falsePositives,
         conflicts,
-      );
+      });
     }
     return { confirmed, falsePositives, conflicts };
   }
 
-  private classifyGroup(
-    fingerprint: string,
-    group: RuleFinding[],
-    dismissal: RuleDismissal | undefined,
-    confirmed: ConfirmedFinding[],
-    falsePositives: FalsePositiveEntry[],
-    conflicts: ConflictEntry[],
-  ): void {
+  private classifyGroup(params: ClassifyGroupParams): void {
+    const { fingerprint, group, dismissal, confirmed, falsePositives, conflicts } = params;
     if (dismissal) {
       falsePositives.push({
         fingerprint,

@@ -35,6 +35,40 @@ export const EXTENSION_LANGUAGES: Readonly<Record<string, LanguageId>> = {
   zsh: 'shell',
 };
 
+/**
+ * 语言聚合器（profiler）计入语言投票的扩展名：ts/tsx/mts/cts、js/jsx/mjs/cjs、py/pyi、
+ * java、go、rs、cs、php、rb、kt、swift。
+ *
+ * 刻意是 {@link EXTENSION_LANGUAGES} 的严格子集，且是后者的投影（语言值不重复定义）——
+ * 聚合器候选语言不含 c/cpp/dart/shell，故历史上不把 kts、c、cc、cpp、cxx、hpp、dart、
+ * sh、bash、zsh 计入投票。要新增扩展名时，只需往这个键列表追加；若同时要进入聚合器的
+ * 候选语言集，还须同步 STAT_LANGUAGES，否则会静默改变投票结果。
+ */
+const AGGREGATOR_EXTENSION_KEYS: readonly string[] = [
+  'ts',
+  'tsx',
+  'mts',
+  'cts',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'py',
+  'pyi',
+  'java',
+  'go',
+  'rs',
+  'cs',
+  'php',
+  'rb',
+  'kt',
+  'swift',
+];
+
+export const AGGREGATOR_EXTENSION_LANGUAGES: Readonly<Record<string, LanguageId>> = Object.freeze(
+  Object.fromEntries(AGGREGATOR_EXTENSION_KEYS.map((ext) => [ext, EXTENSION_LANGUAGES[ext]])),
+);
+
 /** 参与扩展名统计的语言集合（决定 ext-stat 信号枚举范围）。 */
 export const STAT_LANGUAGES: readonly LanguageId[] = [
   'typescript',

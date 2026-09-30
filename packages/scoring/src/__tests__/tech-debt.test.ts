@@ -238,6 +238,53 @@ describe('tech-debt: mergeActionStatuses', () => {
   });
 });
 
+describe('tech-debt: actionId 唯一性', () => {
+  const MONOREPO_FILES = [
+    'packages/cli/src/index.ts',
+    'packages/inspect/src/adapters/ts-prune-adapter.ts',
+    'packages/kernel/src/runner/scan-utils.ts',
+    'packages/server/src/main.ts',
+    'packages/guard/src/guard-report-store.ts',
+  ];
+
+  it('共享 9 字节前缀的模块不得塌缩为同一 actionId', () => {
+    const snap = buildTechDebtDashboard(
+      makeInput(
+        MONOREPO_FILES.map((file, i) => ({
+          id: `i${i}`,
+          severity: 'error' as const,
+          category: 'performance' as const,
+          file,
+        })),
+      ),
+    );
+    expect(snap.actionList).toHaveLength(MONOREPO_FILES.length);
+    expect(new Set(snap.actionList.map((a) => a.actionId)).size).toBe(MONOREPO_FILES.length);
+  });
+
+  it('actionId 格式为 td-<category>-<12 位十六进制>且跨类别不重复', () => {
+    const snap = buildTechDebtDashboard(
+      makeInput([
+        { id: 's', severity: 'error', category: 'security', file: 'src/a.ts' },
+        { id: 'q', severity: 'warning', category: 'quality', file: 'src/a.ts' },
+      ]),
+    );
+    for (const action of snap.actionList) {
+      expect(action.actionId).toMatch(/^td-[a-z]+-[0-9a-f]{12}$/);
+    }
+    expect(new Set(snap.actionList.map((a) => a.actionId)).size).toBe(2);
+  });
+
+  it('同输入重复构建得到相同 actionId', () => {
+    const issues: DebtIssueInput[] = [
+      { id: 'a', severity: 'error', category: 'security', file: 'packages/cli/src/index.ts' },
+    ];
+    expect(buildTechDebtDashboard(makeInput(issues)).actionList[0].actionId).toBe(
+      buildTechDebtDashboard(makeInput(issues)).actionList[0].actionId,
+    );
+  });
+});
+
 describe('tech-debt: computeTrendDelta', () => {
   it('returns current - previous when previous is non-null', () => {
     expect(computeTrendDelta(50, 45)).toBe(5);

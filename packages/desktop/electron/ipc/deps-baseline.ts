@@ -10,6 +10,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DependencyNode } from '@zh/dependency';
 
+/** 依赖完整性基线（deps-baseline.json）：抓取时间 + 包名→integrity 映射 */
 export interface DepsBaseline {
   version: 1;
   capturedAt: string;

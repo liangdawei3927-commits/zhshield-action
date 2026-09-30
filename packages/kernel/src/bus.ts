@@ -13,21 +13,23 @@ export class EventBus {
   private requestHandlers = new Map<string, (payload: unknown) => Promise<unknown>>();
 
   on<T = unknown>(event: string, callback: EventCallback<T>): () => void {
-    const entry: EventEntry = { callback: callback as EventCallback, once: false };
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    this.listeners.get(event)!.push(entry);
-    return () => this.off(event, callback as EventCallback);
+    return this.addListener(event, callback as EventCallback, false);
   }
 
   once<T = unknown>(event: string, callback: EventCallback<T>): () => void {
-    const entry: EventEntry = { callback: callback as EventCallback, once: true };
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
+    return this.addListener(event, callback as EventCallback, true);
+  }
+
+  /** 追加监听器（on / once 共用）：按事件维护监听数组并返回取消函数 */
+  private addListener(event: string, callback: EventCallback, once: boolean): () => void {
+    const entry: EventEntry = { callback, once };
+    let list = this.listeners.get(event);
+    if (list === undefined) {
+      list = [];
+      this.listeners.set(event, list);
     }
-    this.listeners.get(event)!.push(entry);
-    return () => this.off(event, callback as EventCallback);
+    list.push(entry);
+    return () => this.off(event, callback);
   }
 
   off(event: string, callback: EventCallback): void {

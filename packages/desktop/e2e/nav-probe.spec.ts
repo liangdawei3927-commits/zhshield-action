@@ -1,5 +1,5 @@
 /**
- * 顶部导航 12 功能 · 阶段C：穿透式取证
+ * 顶部导航 11 功能 · 阶段C：穿透式取证
  *
  *  C1 一键体检域级回执：直接取 runFullCheck 的返回对象（reran/skipped/failed），
  *     定位「仪表盘 100 分 / 0 项」与「质量巡检页检出 4 条」的口径冲突。
@@ -42,7 +42,7 @@ async function waitQuiet(page: import('@playwright/test').Page, maxMs = 300_000)
   return { settled: false, elapsed: Date.now() - t0 };
 }
 
-test.describe('顶部导航 12 功能 · 穿透取证', () => {
+test.describe('顶部导航 11 功能 · 穿透取证', () => {
   test.setTimeout(30 * 60_000);
 
   test('[C1] 一键体检 runFullCheck 域级回执', async () => {
@@ -71,7 +71,6 @@ test.describe('顶部导航 12 功能 · 穿透取证', () => {
         JSON.stringify({ result, probeError }, null, 2),
         'utf-8',
       );
-      // eslint-disable-next-line no-console
       console.log('PROBE-C1 ' + JSON.stringify({ result, probeError }));
       expect(probeError, 'runFullCheck 直接调用异常').toBeUndefined();
       expect(result).toBeTruthy();
@@ -117,7 +116,6 @@ test.describe('顶部导航 12 功能 · 穿透取证', () => {
       rec.errors = errors;
       await page.screenshot({ path: path.join(SHOT_DIR, 'action-security-secrets.png') });
       writeFileSync('/tmp/zh-nav-secrets.json', JSON.stringify(rec, null, 2), 'utf-8');
-      // eslint-disable-next-line no-console
       console.log('PROBE-C2 ' + JSON.stringify({ usedLabel: rec.usedLabel, settled: rec.settled }));
       expect(rec.error).toBeUndefined();
     } finally {

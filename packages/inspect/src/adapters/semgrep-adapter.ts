@@ -8,12 +8,12 @@ import type {
   IssueCategory,
   AccessScope,
 } from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
+import { buildAccessScope, ToolCommandResolver } from './tool-runner';
 import { resolveInjectedConfigPath } from './injected-config';
 import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
-import { removeInlineRuleFile } from './semgrep-rule-writer';
+import { isSemgrepRuleArray, removeInlineRuleFile, type SemgrepRule } from './semgrep-rule-writer';
 
 const META: ToolMeta = {
   id: 'semgrep',
@@ -27,36 +27,16 @@ const META: ToolMeta = {
   license: 'LGPL-2.1',
 };
 
-/** 内联规则声明（来自 config.rules，原始声明为 string[]，此处按对象结构访问） */
-interface SemgrepRule {
-  id?: string;
-  severity?: string;
-  language?: string;
-  languages?: string[];
-  pattern?: string;
-  /** pattern-either：多个候选 pattern，任一匹配即命中（如 const/let 赋值、直接内联拼接等变体） */
-  patternEither?: string[];
-  /** pattern-not：排除项，匹配则不算命中（如纯字符串字面量参数的无害调用） */
-  patternNot?: string[];
-  /** pattern-regex：正则匹配（generic 语言场景，如 CORS 配置串） */
-  patternRegex?: string;
-  message?: string;
-  /** semgrep 元变量约束（metavariable-regex）：按绑定文本收紧 pattern，避免元变量匹配任意表达式造成误报 */
-  metavariableRegex?: Array<{ metavariable: string; regex: string }>;
-}
-
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
+  private readonly commands: ToolCommandResolver;
   /** 单飞可用性结果：所有 semgrep 规则共享同一 adapter 实例，只探测一次 */
   private availabilityPromise?: Promise<boolean>;
-  private readonly projectRoot?: string;
 
   /** F5：semgrep 对源码做 SAST 规则匹配 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['**/*.{ts,tsx,js,jsx,py,go,java,rb,php,c,cpp,h}'],
-    excludePaths: [
+  readonly accessScope: AccessScope = buildAccessScope(
+    ['**/*.{ts,tsx,js,jsx,py,go,java,rb,php,c,cpp,h}'],
+    [
       '**/node_modules/**',
       '**/dist/**',
       '**/build/**',
@@ -67,26 +47,13 @@ export class SemgrepAdapter implements ToolAdapter {
       '**/fixtures/**',
       '**/__mocks__/**',
     ],
-  };
+  );
 
   private readonly argsBuilder = new SemgrepScanArgsBuilder();
   private readonly runner = new SemgrepScanRunner();
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot;
-  }
-
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('semgrep', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
+    this.commands = new ToolCommandResolver('semgrep', projectRoot);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -94,7 +61,7 @@ export class SemgrepAdapter implements ToolAdapter {
     // isCommandAvailable 再跑一次。多条 semgrep 规则并发 isAvailable 时会有 2N 次并发
     // 冷启动，全部撞 20s 超时 → 误判未安装。缓存到首个探测 Promise，其余规则等同一结果。
     if (!this.availabilityPromise) {
-      this.availabilityPromise = isCommandAvailable(() => this.resolveCommand(), 60000);
+      this.availabilityPromise = isCommandAvailable(() => this.commands.resolve(), 60000);
     }
     return this.availabilityPromise;
   }
@@ -107,10 +74,26 @@ export class SemgrepAdapter implements ToolAdapter {
     if (unavailable) return this.runner.buildUnavailable(start, unavailable);
 
     const { args, ruleFile } = await this.argsBuilder.build(options, configs, targetDir);
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析
-    const command = await this.resolveCommand(options.projectPath);
+    const command = await this.resolveCommandForScan(options);
+    return this.runScanWithCleanup(command, options, args, category, start, ruleFile);
+  }
+
+  /** 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析 */
+  private async resolveCommandForScan(options: ToolScanOptions): Promise<string> {
+    return this.commands.resolve(options.projectPath);
+  }
+
+  /** 执行 semgrep 扫描，结束后（含抛错）清理内联规则临时文件 */
+  private async runScanWithCleanup(
+    command: string,
+    options: ToolScanOptions,
+    args: string[],
+    category: IssueCategory,
+    start: number,
+    ruleFile: string | null,
+  ): Promise<ToolResult> {
     try {
-      return await this.runner.run(command, options, args, category, start);
+      return await this.runner.run({ command, options, args, category, start });
     } finally {
       // 内联规则写在系统临时目录：扫描一结束（含抛错）就清掉，避免临时文件堆积
       await removeInlineRuleFile(ruleFile);
@@ -135,7 +118,9 @@ export class SemgrepAdapter implements ToolAdapter {
     const configs = declaredConfigs
       .map((c) => resolveInjectedConfigPath(c, projectPath, projectPath))
       .filter((p): p is string => p !== null);
-    const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
+    const rules = isSemgrepRuleArray(options.config?.rules)
+      ? options.config.rules
+      : undefined;
     return { targetDir, category, configs, declaredConfigs, rules };
   }
 

@@ -44,15 +44,24 @@ export interface ProfileWorkerRequest {
 export type ProfileWorkerResponse =
   { id: string; ok: true; result: unknown } | { id: string; ok: false; error: string };
 
+interface CollectFileEntryParams {
+  fullPath: string;
+  name: string;
+  includeExtensions: string[];
+  files: ProfileResult['files'];
+  byExtension: Record<string, number>;
+  state: { totalSize: number };
+}
+
 /** 收集单个源码文件条目（扩展名匹配 + 大小统计；不可读文件跳过） */
-function collectFileEntry(
-  fullPath: string,
-  name: string,
-  includeExtensions: string[],
-  files: ProfileResult['files'],
-  byExtension: Record<string, number>,
-  state: { totalSize: number },
-): void {
+function collectFileEntry({
+  fullPath,
+  name,
+  includeExtensions,
+  files,
+  byExtension,
+  state,
+}: CollectFileEntryParams): void {
   const ext = extname(name).toLowerCase();
   if (!includeExtensions.includes(ext)) return;
   try {
@@ -65,14 +74,23 @@ function collectFileEntry(
   }
 }
 
-function walkProjectFiles(
-  dir: string,
-  excludeDirs: string[],
-  includeExtensions: string[],
-  files: ProfileResult['files'],
-  byExtension: Record<string, number>,
-  state: { totalSize: number },
-): void {
+interface WalkProjectFilesParams {
+  dir: string;
+  excludeDirs: string[];
+  includeExtensions: string[];
+  files: ProfileResult['files'];
+  byExtension: Record<string, number>;
+  state: { totalSize: number };
+}
+
+function walkProjectFiles({
+  dir,
+  excludeDirs,
+  includeExtensions,
+  files,
+  byExtension,
+  state,
+}: WalkProjectFilesParams): void {
   let entries: Dirent[];
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -84,9 +102,9 @@ function walkProjectFiles(
 
     if (entry.isDirectory()) {
       if (excludeDirs.includes(entry.name)) continue;
-      walkProjectFiles(fullPath, excludeDirs, includeExtensions, files, byExtension, state);
+      walkProjectFiles({ dir: fullPath, excludeDirs, includeExtensions, files, byExtension, state });
     } else if (entry.isFile()) {
-      collectFileEntry(fullPath, entry.name, includeExtensions, files, byExtension, state);
+      collectFileEntry({ fullPath, name: entry.name, includeExtensions, files, byExtension, state });
     }
   }
 }
@@ -129,7 +147,7 @@ function collectProjectFiles(projectPath: string, options?: ProfileWorkerOptions
   const byExtension: Record<string, number> = {};
   const state = { totalSize: 0 };
 
-  walkProjectFiles(projectPath, excludeDirs, includeExtensions, files, byExtension, state);
+  walkProjectFiles({ dir: projectPath, excludeDirs, includeExtensions, files, byExtension, state });
 
   return {
     files,

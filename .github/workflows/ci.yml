@@ -59,6 +59,8 @@ jobs:
       # 必须真实检出（status 'failed'），ubuntu-latest 镜像未预装 gitleaks，
       # 需在跑测试前安装到 /usr/local/bin（PATH 内）。semgrep/trivy 不装：
       # security 域测试在工具缺失时已优雅降级跳过。
+      # ⚠️ 但「优雅跳过」不可用于质量门禁 —— SOP 规则质量门禁（需 semgrep）单独成 job
+      #    「Rule Quality Gate」，在那里装工具 + 置 ZH_GATE_REQUIRE_SEMGREP=1。
       - name: Install gitleaks
         if: matrix.node-version == 22
         run: |
@@ -94,6 +96,62 @@ jobs:
           path: packages/*/coverage-summary.json
           if-no-files-found: ignore
           retention-days: 14
+
+  # SOP 规则质量门禁 —— golden 断言回放（precision / recall 双阈值）
+  # 机制：packages/kernel/src/sop/quality/rule-accuracy.ts
+  # 用例：packages/inspect/src/__tests__/rule-quality-gate.test.ts
+  #
+  # 为什么单独成 job、不并进 build-and-test：
+  #   ① 需要 semgrep（主 job 刻意不装，见其上注释），冷启动 + taint 扫描约 1–2 分钟
+  #   ② 失败语义单一：红 = 规则质量退化，与编译/单测失败区分开
+  #
+  # ⚠️ 必须设 ZH_GATE_REQUIRE_SEMGREP=1 —— 否则 semgrep 缺失时门禁会「优雅跳过」→ 假绿。
+  #    本项目历史上对 security 域正是「工具缺就跳过」，这个策略用在门禁上等于没有门禁。
+  rule-quality-gate:
+    name: Rule Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # semgrep 提供 taint 数据流分析（path-traversal 规则依赖）。
+      # 用 setup-python 的托管解释器：Ubuntu 24.04 系统 pip 受 PEP 668（externally-managed）限制。
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 版本与本地验证基线对齐（1.172.0）。taint 分析行为随版本可能变化，
+      # 升级 semgrep 必须重跑本门禁确认 precision/recall 未漂移。
+      - name: Install semgrep
+        run: pip install semgrep==1.172.0
+
+      # 门禁依赖构建产物：规则资产在 packages/kernel/dist/assets/semgrep/，
+      # 注入路径回退链也指向 dist；不构建则规则解析落空。
+      # 构建 inspect 的依赖闭包即可覆盖（比全量构建快，且不含 desktop）。
+      - name: Build inspect dependency closure
+        run: pnpm turbo run build --filter=@zh/inspect...
+
+      # 先自证工具真在 PATH：装坏了要在这里红，而不是让门禁静默跳过
+      - name: Verify semgrep is available
+        run: semgrep --version
+
+      - name: Rule quality gate (golden replay)
+        env:
+          ZH_GATE_REQUIRE_SEMGREP: '1'
+        run: pnpm --filter @zh/inspect exec vitest run src/__tests__/rule-quality-gate.test.ts
 
   lint:
     runs-on: ubuntu-latest

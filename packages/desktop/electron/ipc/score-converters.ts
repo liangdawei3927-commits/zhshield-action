@@ -9,8 +9,3 @@ export {
   convertInspectEvaluations,
   convertTraditionalGuardResults,
 } from '@zh/scoring';
-export type {
-  ConvertedGuardResult,
-  ConvertedInspectIssue,
-  GuardCheckResultLike,
-} from '@zh/scoring';

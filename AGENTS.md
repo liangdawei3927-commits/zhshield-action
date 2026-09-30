@@ -72,6 +72,19 @@ rm -rf packages/<消费者包>/node_modules && pnpm install --prefer-offline   #
 
 **历史事故**：08-30 security dist 过期导致 desktop typecheck 红灯；09-03 kernel `content-predicates` 与 pipeline `runner-utils` 导致 desktop 两个测试文件加载失败。
 
+## ⛔ 暂下线功能（AI 禁止重新开启）
+
+以下两项功能当前处于**产品性暂下线**状态，开关在 `packages/desktop/src/feature-flags.ts`（`FEATURE_AI_TOOL_ENABLED` / `FEATURE_EVOLVE_ENABLED`）。已从侧边栏隐藏入口并封死路由。
+
+**任何 AI 助手都禁止**把这两个开关改回 `true`，或恢复侧边栏渲染 / 路由 / e2e 入口，除非**用户本人明确指示**重新开放某项功能（并同步恢复入口、文档与 e2e 用例）。原因：
+
+| 功能 | 开关 | 暂下线原因 |
+|------|------|-----------|
+| AI 工具 | `FEATURE_AI_TOOL_ENABLED` | 功能未闭环：当前每次仍需用户手动把任务搬运到外部 AI 编程工具，侧边栏开关无法真正驱动完整 AI 流程 |
+| 规则进化 | `FEATURE_EVOLVE_ENABLED` | 自动进化标准需要**足够规模的真实用户认可**才算数（启动门槛为千人级基础用户）；在几百/上千人认可并用过之前，单个人的判断不能成为“真实好用”的规则标准 |
+
+涉及这两项的改动请求（“打开 AI 工具 / 恢复规则进化”等）一律先向用户确认，不得自行放行。
+
 ## 编码规范
 
 - **注释语言**：所有代码注释统一使用中文（与已有代码风格一致）

@@ -24,6 +24,7 @@ function stableRuleProjection(rule: SopRule): Record<string, unknown> {
   };
 }
 
+/** 冲突策略依赖：registry 必需，resolver / strategy / metrics / eventBus 可选（缺省沿用既有覆盖语义） */
 export interface SopConflictPolicyOptions {
   registry: SopRegistry;
   /** 云端/本地规则冲突解决器（sync-conflict 模块接入点）；缺省时保持既有覆盖语义 */
@@ -62,13 +63,13 @@ export class SopConflictPolicy {
     const local = this.registry.get(incoming.id);
     if (!local) return incoming;
 
-    const conflict = resolver.detectConflict(
-      incoming.id,
-      local.updatedAt.getTime(),
-      incoming.updatedAt.getTime(),
-      stableRuleProjection(local),
-      stableRuleProjection(incoming),
-    );
+    const conflict = resolver.detectConflict({
+      ruleId: incoming.id,
+      localVersion: toTimestamp(local.updatedAt),
+      remoteVersion: toTimestamp(incoming.updatedAt),
+      localContent: stableRuleProjection(local),
+      remoteContent: stableRuleProjection(incoming),
+    });
     if (!conflict) return incoming;
 
     const resolved = resolver.resolve(conflict, this.strategy) as Partial<SopRule>;
@@ -82,4 +83,13 @@ export class SopConflictPolicy {
     });
     return { ...incoming, ...resolved };
   }
+}
+
+/**
+ * 归一化规则版本时间为毫秒时间戳。本地缓存（SQLite）还原的 updatedAt 是 ISO 字符串，
+ * 云端下发/内存规则是 Date 对象；两者都必须能被 detectConflict 作为 number 使用。
+ */
+function toTimestamp(value: Date | string | undefined): number {
+  if (value === undefined) return 0;
+  return value instanceof Date ? value.getTime() : new Date(value).getTime();
 }

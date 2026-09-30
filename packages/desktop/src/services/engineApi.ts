@@ -32,6 +32,7 @@ import type {
   TechDebtReportData,
   SecretReportData,
   DomainScoreData,
+  ScoreDimension,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 import {
@@ -54,6 +55,10 @@ import {
   getBackupConfigViaHttp,
   saveBackupConfigViaHttp,
 } from './serverApi';
+import {
+  emptyDependencyReportData,
+  emptySecurityScanReportData,
+} from './empty-engine-reports';
 
 // ─── 模式检测 ─────────────────────────────────────────────
 
@@ -86,11 +91,13 @@ export async function runGuard(projectPath: string): Promise<GuardReportData> {
 
 // ─── 门禁 git hooks（本地自动守护）─────────────────────────
 
+/** 门禁 git hooks 安装状态：是否为 git 仓库 + 已安装的 hook 脚本列表 */
 export interface GuardHooksStatusData {
   hasGitDir: boolean;
   installed: string[];
 }
 
+/** 门禁 git hooks 安装结果：成功标记、已安装/跳过列表与失败原因 */
 export interface GuardHooksInstallResultData {
   ok: boolean;
   installed: string[];
@@ -98,6 +105,13 @@ export interface GuardHooksInstallResultData {
   reason?: string;
 }
 
+/**
+ * 查询 git hooks 安装状态。
+ *
+ * IPC handler（`guard:hooksStatus`）与 preload 桥接均已实现，UI 尚未接入消费方。
+ * ts-prune 会将本导出报告为「未使用」，但这不代表可删除——删除会连带作废
+ * electron 侧已完成的 guard:hooksStatus 能力。
+ */
 export async function getGuardHooksStatus(projectPath: string): Promise<GuardHooksStatusData> {
   const api = getAPI();
   if (!api?.guardHooks) return { hasGitDir: false, installed: [] };
@@ -111,6 +125,11 @@ export async function installGuardHooks(projectPath: string): Promise<GuardHooks
   return api.guardHooks.install(projectPath);
 }
 
+/**
+ * 卸载 git hooks。`guard:uninstallHooks` handler 与 preload 桥接已实现，UI 尚未接入。
+ * 卸载 git hooks。`guardHooks.uninstall` preload 桥接与 `guard:uninstallHooks` handler
+ * 已实现，UI 未接入，故 ts-prune 报为未使用。
+ */
 export async function uninstallGuardHooks(
   projectPath: string,
 ): Promise<{ ok: boolean; removed: string[] }> {
@@ -153,6 +172,7 @@ export async function writeGuardConfig(config: GuardConfig): Promise<void> {
 
 // ─── 误报反馈（门禁 / 哨兵标记误报，落盘供智汇大脑校准）───
 
+/** 误报反馈条目：门禁/哨兵标记的误报（规则、位置与说明），落盘供智汇大脑校准 */
 export interface FalsePositiveFeedbackItem {
   source: 'guard' | 'sentinel';
   ruleId: string;
@@ -187,20 +207,7 @@ export async function runSecurity(projectPath: string): Promise<SecurityScanRepo
   if (isHttpMode()) return runSecurityViaHttp(projectPath);
   const api = getAPI();
   if (!api?.engine) {
-    return {
-      summary: {
-        total: 0,
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        malwareTotal: 0,
-      },
-      findings: [],
-      malware: [],
-      securityScore: 100,
-      metadata: { duration: 0, timestamp: new Date().toISOString() },
-    };
+    return emptySecurityScanReportData();
   }
   return api.engine.runSecurity(projectPath);
 }
@@ -272,24 +279,7 @@ export async function runPerformance(projectPath: string): Promise<PerformanceRe
 export async function runDeps(projectPath: string): Promise<DependencyReportData> {
   const api = getAPI();
   if (!api?.engine) {
-    return {
-      schemaVersion: 0,
-      targetId: '',
-      ecosystem: 'mixed',
-      direct: 0,
-      transitive: 0,
-      total: 0,
-      edgeCount: 0,
-      lockfile: { present: false, consistent: false, integrityVerified: false },
-      trustCounts: {},
-      licenseMatrix: { total: 0, byCategory: {}, entries: [] },
-      typosquatFindings: [],
-      lockfileVerification: { status: 'missing', diffs: [], integrityFailures: [] },
-      upgradeAssessments: [],
-      envEntries: [],
-      generatedAt: new Date().toISOString(),
-      error: t('engine.engineUnavailable'),
-    };
+    return emptyDependencyReportData(t('engine.engineUnavailable'));
   }
   return api.engine.runDeps(projectPath);
 }
@@ -396,13 +386,13 @@ export async function getScore(projectId: string): Promise<HealthScoreData | nul
  */
 export async function getDomainScore(
   projectPath: string,
-  source: 'inspect',
+  dimension: ScoreDimension,
 ): Promise<DomainScoreData | null> {
   if (isHttpMode()) return null;
   const api = getAPI();
   if (!api?.engine) return null;
   try {
-    return await api.engine.getDomainScore(projectPath, source);
+    return await api.engine.getDomainScore(projectPath, dimension);
   } catch {
     return null;
   }
@@ -554,6 +544,7 @@ function getSopAPI() {
   return window.electronAPI?.sop;
 }
 
+/** SOP 规则版本；`sop:getVersion` IPC 链路已实现，UI 未接入。 */
 export async function getRuleVersion(): Promise<string> {
   if (isHttpMode()) return getRuleVersionViaHttp();
   try {
@@ -624,6 +615,7 @@ export async function getBackupRecords(projectId?: string): Promise<BackupRecord
   return api.backup.getRecords(projectId);
 }
 
+/** 单条备份记录查询；UI 未接入，故 ts-prune 报为未使用。 */
 export async function getBackupRecord(recordId: string): Promise<BackupRecordData | null> {
   if (isHttpMode()) return getBackupRecordViaHttp(recordId) as Promise<BackupRecordData | null>;
   const api = getAPI();
@@ -668,13 +660,13 @@ export function onBackupProgress(callback: (payload: BackupProgressData) => void
   return api?.backup?.onProgress?.(callback) ?? (() => {});
 }
 
-/** 订阅备份完成推送 */
+/** 订阅备份完成推送。`backup:completed` 事件已在 preload 桥接，UI 未订阅。 */
 export function onBackupCompleted(callback: (payload: unknown) => void): () => void {
   const api = getAPI();
   return api?.backup?.onCompleted?.(callback) ?? (() => {});
 }
 
-/** 订阅备份失败推送 */
+/** 订阅备份失败推送。`backup:failed` 事件已在 preload 桥接，UI 未订阅。 */
 export function onBackupFailed(callback: (payload: unknown) => void): () => void {
   const api = getAPI();
   return api?.backup?.onFailed?.(callback) ?? (() => {});
@@ -692,6 +684,7 @@ export async function openBackupFolder(folderPath: string): Promise<boolean> {
   return api.backup.openFolder(folderPath);
 }
 
+/** SOP 统计；`sop:getStats` IPC 链路已实现，UI 未接入。 */
 export async function getSopStats() {
   if (isHttpMode()) return null;
   try {
@@ -705,6 +698,7 @@ export async function getSopStats() {
 
 // ─── Scheduler 调度器状态持久化 ───────────────────────────────
 
+/** 调度器状态快照：已持久化的定时任务及其上次/下次运行时间与结果 */
 export interface SchedulerStateData {
   jobs: Array<{
     id: string;
@@ -716,6 +710,7 @@ export interface SchedulerStateData {
   }>;
 }
 
+/** 读取调度器状态；`scheduler:readState` IPC 链路已实现，UI 未接入。 */
 export async function readSchedulerState(): Promise<SchedulerStateData> {
   if (isHttpMode()) return { jobs: [] };
   const api = getAPI();
@@ -723,6 +718,7 @@ export async function readSchedulerState(): Promise<SchedulerStateData> {
   return api.scheduler.readState();
 }
 
+/** 写入调度器状态；`scheduler:writeState` IPC 链路已实现，UI 未接入。 */
 export async function writeSchedulerState(state: SchedulerStateData): Promise<void> {
   if (isHttpMode()) return;
   const api = getAPI();

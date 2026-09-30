@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 
+/** SOP 规则中心 API（主进程 IPC 桥接）：版本查询、规则同步、统计与应急更新 */
 export interface SopAPI {
   getVersion: () => Promise<{
     version: string;
@@ -194,6 +195,7 @@ export interface ModuleProfileData {
   path: string;
   type: string;
 }
+/** 项目画像（可序列化形态；模块明细见 {@link ModuleProfileData}） */
 export interface ProjectProfileData {
   type: string;
   modules: ModuleProfileData[];
@@ -237,6 +239,7 @@ export interface RefactorReportData {
   };
 }
 
+/** 一键体检流水线结果（serializable；各阶段报告按需挂在对应字段上，未跑阶段为 undefined） */
 export interface PipelineReportData {
   passed: boolean;
   stage: string;
@@ -291,6 +294,23 @@ export interface DomainScoreData {
   /** 上一轮检查的分数（覆盖写前从旧快照抢救；无基线时缺省） */
   previousScore?: { score: number; generatedAt: string };
 }
+
+/**
+ * 参与总分的 10 个评分维度（与 @zh/scoring 的 DIMENSION_CATEGORIES 键一致）。
+ * 源类型定义在 src/pages/domain-score-logic.ts（ScoreDimension），此处内联以保持
+ * electron.d.ts 作为共享契约文件自包含（主进程 / 渲染层均可引用）。
+ */
+export type ScoreDimension =
+  | 'quality'
+  | 'gate'
+  | 'security'
+  | 'dependencies'
+  | 'techdebt'
+  | 'refactor'
+  | 'performance'
+  | 'sentinel'
+  | 'garbage'
+  | 'backup';
 
 /** 依赖管家显式重锁基线的结果 */
 export interface DepsRelockResult {
@@ -465,6 +485,7 @@ export interface SaveDialogResult {
   readonly filePath?: string;
 }
 
+/** 检测引擎 API（主进程 IPC 桥接）：各域扫描/执行入口、评分读取与汇总报告生成 */
 export interface EngineAPI {
   runGuard: (projectPath: string, options?: Record<string, unknown>) => Promise<GuardReportData>;
   runSecurity: (projectPath: string) => Promise<SecurityScanReportData>;
@@ -495,7 +516,7 @@ export interface EngineAPI {
   /** 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分（跑完即有，无需手动汇总） */
   getDomainScore: (
     projectPath: string,
-    source: 'inspect',
+    dimension: ScoreDimension,
   ) => Promise<DomainScoreData | null>;
   getProfile: (projectPath: string) => Promise<ProjectProfileData | null>;
   runPipeline: (
@@ -509,6 +530,7 @@ export interface EngineAPI {
   generateReportSummary: (projectPath: string) => Promise<HealthScoreData | null>;
 }
 
+/** 工具规则同步 API（主进程 IPC 桥接）：规则拉取、一致性校验、状态查询与经验提交 */
 export interface SyncAPI {
   syncRules: () => Promise<unknown[]>;
   resolveRules: () => Promise<{
@@ -531,6 +553,7 @@ export interface SyncAPI {
   getQueueStatus: () => Promise<{ queueLength: number }>;
 }
 
+/** 外部工具可用性 API（主进程 IPC 桥接）：工具状态查询与安装 */
 export interface ToolsAPI {
   status: (projectPath?: string) => Promise<{
     source: 'cloud' | 'local';
@@ -543,6 +566,7 @@ export interface ToolsAPI {
   }>;
 }
 
+/** 哨兵（持续监控）API（主进程 IPC 桥接）：事件读取、单条查询与监控启停 */
 export interface SentinelAPI {
   getEvents: (options?: { status?: string; severity?: string }) => Promise<SentinelEvent[]>;
   getEvent: (id: string) => Promise<SentinelEvent | undefined>;
@@ -554,6 +578,7 @@ export interface SentinelAPI {
   setEnabled: (enabled: boolean) => Promise<{ ok: boolean }>;
 }
 
+/** 规则调优建议（来自 @zh/evolve，serializable） */
 export interface SuggestionData {
   ruleId: string;
   message: string;
@@ -561,6 +586,7 @@ export interface SuggestionData {
   source: string;
 }
 
+/** 规则权重（来自 @zh/evolve，serializable：权重、误报率与样本量） */
 export interface RuleWeightData {
   ruleId: string;
   weight: number;
@@ -569,6 +595,7 @@ export interface RuleWeightData {
   lastAdjustedAt: string;
 }
 
+/** 自进化 API（主进程 IPC 桥接）：建议、经验记录、权重读取与自动调权 */
 export interface EvolveAPI {
   getSuggestions: (projectId: string) => Promise<SuggestionData[]>;
   listExperiences: (projectId: string) => Promise<unknown[]>;
@@ -577,6 +604,7 @@ export interface EvolveAPI {
   autoAdjustWeights: () => Promise<RuleWeightData[]>;
 }
 
+/** 备份记录（serializable；CLI/桌面/HTTP 三端共享的落库行，云端/GitHub/本地产物信息按存在情况填充） */
 export interface BackupRecordData {
   id: string;
   projectId: string;
@@ -599,6 +627,7 @@ export interface BackupRecordData {
   error?: string;
 }
 
+/** 单次备份执行结果（serializable；results 逐通道列出成败与各通道特有字段） */
 export interface BackupResultData {
   projectId: string;
   projectName: string;
@@ -615,6 +644,7 @@ export interface BackupResultData {
   }>;
 }
 
+/** 备份配置（serializable；云端 / GitHub / 本地三通道开关与参数 + 调度计划） */
 export interface BackupConfigData {
   cloud: { enabled: boolean; serverUrl: string; [key: string]: unknown };
   github: { enabled: boolean; owner: string; repo: string; [key: string]: unknown };
@@ -638,6 +668,7 @@ export interface BackupProgressData {
   message: string;
 }
 
+/** 备份 API（主进程 IPC 桥接）：执行备份、记录管理、配置读写与进度/完成事件订阅 */
 export interface BackupAPI {
   executeBackup: (projectPath: string, trigger?: string) => Promise<BackupResultData>;
   getRecords: (projectId?: string) => Promise<BackupRecordData[]>;
@@ -653,6 +684,7 @@ export interface BackupAPI {
   onRecordsUpdated: (callback: (payload: unknown) => void) => () => void;
 }
 
+/** 流水线进度（主进程 → 渲染进程的推送事件载荷：当前阶段、提示文案与 0.0~1.0 进度） */
 export interface PipelineProgress {
   stage: string;
   message: string;
@@ -671,6 +703,7 @@ export type TaskKind =
   | 'guard' // 门禁扫描
   | 'refactor'; // 代码重构
 
+/** 任务状态（主进程任务注册表中的生命周期状态） */
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
 /** 任务信息（主进程任务注册表 → 渲染进程） */
@@ -691,6 +724,7 @@ export interface TaskInfo {
   queuePosition?: number;
 }
 
+/** 任务 API（主进程 IPC 桥接）：启动/列举/取消任务与任务变更事件订阅 */
 export interface TaskAPI {
   start: (
     kind: TaskKind,
@@ -702,6 +736,7 @@ export interface TaskAPI {
   onChanged: (callback: (task: TaskInfo) => void) => () => void;
 }
 
+/** AI 工具配置（可序列化形态：单个工具的启停、驱动方式 linter|cli 与配置文件路径） */
 export interface AiToolConfigData {
   id: string;
   name: string;
@@ -710,6 +745,7 @@ export interface AiToolConfigData {
   configFile: string;
 }
 
+/** AI 配置写入单个项目的结果（可序列化：受影响文件清单与失败原因） */
 export interface AiProjectWriteResultData {
   path: string;
   ok: boolean;
@@ -717,21 +753,25 @@ export interface AiProjectWriteResultData {
   files: string[];
 }
 
+/** AI 配置批量应用结果（可序列化：是否已落盘 + 各项目逐项结果） */
 export interface AiApplyResultData {
   saved: boolean;
   projects: AiProjectWriteResultData[];
 }
 
+/** AI 工具配置 API（主进程 IPC 桥接）：读取与保存 AI 工具配置 */
 export interface AiAPI {
   loadConfig: () => Promise<AiToolConfigData>;
   saveConfig: (config: AiToolConfigData, projectPaths: string[]) => Promise<AiApplyResultData>;
 }
 
+/** Git hooks 门禁状态（可序列化：是否存在 .git 与已安装的 hook 清单） */
 export interface GuardHooksStatusData {
   hasGitDir: boolean;
   installed: string[];
 }
 
+/** Git hooks 门禁安装结果（可序列化：成功安装的 hook、跳过的 hook 与跳过原因） */
 export interface GuardHooksInstallResultData {
   ok: boolean;
   installed: string[];
@@ -763,6 +803,7 @@ export interface GuardReportRecordData {
   }>;
 }
 
+/** Git hooks 门禁 API（主进程 IPC 桥接）：状态查询、安装/卸载与历史门禁报告列表 */
 export interface GuardHooksAPI {
   getStatus: (projectPath: string) => Promise<GuardHooksStatusData>;
   install: (projectPath: string) => Promise<GuardHooksInstallResultData>;
@@ -770,6 +811,7 @@ export interface GuardHooksAPI {
   listReports: (projectPath: string, limit?: number) => Promise<GuardReportRecordData[]>;
 }
 
+/** 误报反馈条目（渲染进程提交的误报描述：来源域、规则 ID、位置与说明） */
 export interface FalsePositiveFeedbackItem {
   source: 'guard' | 'sentinel';
   ruleId: string;
@@ -780,11 +822,13 @@ export interface FalsePositiveFeedbackItem {
   line?: number;
 }
 
+/** 误报反馈落库记录（在 {@link FalsePositiveFeedbackItem} 基础上补记录 ID 与提交时间） */
 export interface FalsePositiveFeedbackRecord extends FalsePositiveFeedbackItem {
   id: string;
   timestamp: string;
 }
 
+/** 误报反馈 API（主进程 IPC 桥接）：提交误报与按来源域查询历史记录 */
 export interface FeedbackAPI {
   reportFalsePositive: (
     projectPath: string,
@@ -810,6 +854,7 @@ export interface GuardConfigAPI {
   write: (config: GuardConfig) => Promise<void>;
 }
 
+/** 调度器状态（可序列化；落盘持久化各定时任务配置与最近一次执行结果） */
 export interface SchedulerStateData {
   jobs: Array<{
     id: string;
@@ -821,6 +866,7 @@ export interface SchedulerStateData {
   }>;
 }
 
+/** 调度器状态 API（主进程 IPC 桥接）：读写定时任务状态 */
 export interface SchedulerAPI {
   readState: () => Promise<SchedulerStateData>;
   writeState: (state: SchedulerStateData) => Promise<void>;
@@ -840,6 +886,7 @@ export interface E2eObservationAPI {
   seedOrphanData: (projectPath: string) => Promise<void>;
 }
 
+/** 渲染进程可用的 window.electronAPI 全量契约（由主进程 preload 注入；带 ? 的子域仅在启用时注册） */
 export interface ElectronAPI {
   getAppInfo: () => Promise<{ name: string; version: string; platform: string; apiBase?: string }>;
   getToolAvailability?: () => Promise<Array<{ id: string; available: boolean }>>;

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { Adapter, CheckConfig, CheckResult } from '../types';
+import { makeAdapterResult, makeSkippedAdapterResult, resolveScanTargetDir } from './adapter-result';
 import type { TestResult } from './test-result';
 import { VitestOutputParser } from './vitest-output-parser';
 import { TestCommandDetector, isNoTestConfiguredReason } from './test-command-detector';
@@ -31,8 +32,7 @@ export class TestRunnerAdapter implements Adapter {
     context: { repoRoot?: string; projectPath?: string },
     _check: CheckConfig,
   ): Promise<TestRunnerRawResult> {
-    const projectPath = context.repoRoot || context.projectPath;
-    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath/repoRoot 上下文，无法确定扫描目录`);
+    const projectPath = resolveScanTargetDir(context, _check.checkId);
     const resolved = this.commandDetector.resolveProjectDir(projectPath);
     if ('error' in resolved) {
       return this.handleDetectionFailure(resolved.error);
@@ -127,14 +127,14 @@ export class TestRunnerAdapter implements Adapter {
 
   normalize(rawResult: TestRunnerRawResult, _context: unknown, check: CheckConfig): CheckResult {
     if (rawResult.skipped) {
-      return this.makeSkippedResult(check, rawResult.skipped);
+      return makeSkippedAdapterResult(check, rawResult.skipped);
     }
     if (rawResult.error) {
-      return this.makeResult(check, 'error', `测试执行失败: ${rawResult.error}`);
+      return makeAdapterResult(check, 'error', `测试执行失败: ${rawResult.error}`);
     }
     const r = rawResult.result;
     if (!r) {
-      return this.makeResult(check, 'error', '测试未执行');
+      return makeAdapterResult(check, 'error', '测试未执行');
     }
     if (r.unresolved) {
       return this.normalizeUnresolved(check, r);
@@ -143,9 +143,9 @@ export class TestRunnerAdapter implements Adapter {
       return this.normalizeFailed(check, r);
     }
     if (r.totalTests === 0) {
-      return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
+      return makeAdapterResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
     }
-    return this.makeResult(check, 'passed', `全部 ${r.passed} 项测试通过 (${r.durationMs}ms)`, {
+    return makeAdapterResult(check, 'passed', `全部 ${r.passed} 项测试通过 (${r.durationMs}ms)`, {
       totalTests: r.totalTests,
       passed: r.passed,
       durationMs: r.durationMs,
@@ -155,21 +155,21 @@ export class TestRunnerAdapter implements Adapter {
   /** 输出解析失败（unresolved）时 totalTests 为磁盘兜底的测试文件数：磁盘有测试 → 结果未知报 warning；磁盘也无测试 → 才是真正的「未发现测试用例」 */
   private normalizeUnresolved(check: CheckConfig, r: TestResult): CheckResult {
     if (r.totalTests > 0) {
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'warning',
         `测试命令输出解析失败，磁盘发现 ${r.totalTests} 个测试文件，测试结果未知`,
         { totalTests: r.totalTests, passed: r.passed, failed: r.failed, unresolved: true },
       );
     }
-    return this.makeResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
+    return makeAdapterResult(check, 'warning', '未发现测试用例', { totalTests: 0 });
   }
 
   /** 有失败用例时归一化为 failed 结果 */
   private normalizeFailed(check: CheckConfig, r: TestResult): CheckResult {
     const failDetail =
       r.details.length > 0 ? `\n失败用例:\n${r.details.slice(0, 5).join('\n')}` : '';
-    return this.makeResult(
+    return makeAdapterResult(
       check,
       'failed',
       `测试 ${r.totalTests} 项: ${r.passed} 通过, ${r.failed} 失败 (${r.durationMs}ms)${failDetail}`,
@@ -181,41 +181,5 @@ export class TestRunnerAdapter implements Adapter {
         durationMs: r.durationMs,
       },
     );
-  }
-
-  /**
-   * 「跳过」结果：status=warning + severity=warning + blocking=false。
-   *
-   * 关键点是 blocking 必须为 false —— TEST-001 在 checks.json 里 blocking=true，
-   * 走 makeResult 会让「项目没配测试」直接阻断门禁。severity 显式给 warning
-   * 是为了让 GuardEngine 的 warnings 计数能看到这条覆盖率缺口。
-   */
-  private makeSkippedResult(check: CheckConfig, reason: string): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status: 'warning',
-      severity: 'warning',
-      blocking: false,
-      message: `已跳过：${reason}`,
-      details: { skipped: true, reason },
-    };
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

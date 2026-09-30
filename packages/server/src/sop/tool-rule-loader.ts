@@ -4,6 +4,7 @@ import { sanitizeLogField } from '@zh/shared';
 
 const RULE_FILE_EXT_RE = /\.(yaml|yml|json|toml)$/;
 
+/** 从 tool-packs 目录读出的单条工具规则：来源工具、规则名、原始内容与文件路径 */
 export interface ToolRule {
   id: string;
   toolId: string;

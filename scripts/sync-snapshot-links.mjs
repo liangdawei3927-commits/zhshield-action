@@ -15,6 +15,14 @@
  *   本脚本在每次 build / dev 之后运行，为快照中「缺失」的产物文件补硬链接（失败回退复制），
  *   彻底消除该类"新增文件不同步"导致的运行时缺模块问题。
  *
+ * 同类故障的**类型层**表现（本脚本早期只同步 dist 的 .js，故遗漏）：
+ *   各 @zh/* 包的 package.json 把 types / exports["."].types 指向 ./src/index.ts，
+ *   即消费方（@zh/desktop）对 @zh/pipeline 做类型检查时读的是 pipeline **源码**，
+ *   并沿其 import 链从 .pnpm 快照里取 @zh/guard、@zh/inspect 等 —— 取到的却是残缺副本。
+ *   缺文件时该包自身 typecheck 正常（它用真实 packages/<pkg>/src），但跨包的 desktop
+ *   会报 TS2345「X not assignable to Adapter」：基类（新增的 ScanAdapter 等）解析不到，
+ *   类型退化为不可赋值。故 src 子树与 .d.ts 同样必须补链。
+ *
  * 用法：node scripts/sync-snapshot-links.mjs [--check]
  *   --check：只校验并报告缺失，不实际补链；以非零退出码表示存在缺失（供 CI）。
  */
@@ -29,7 +37,15 @@ const PNPM_DIR = path.join(ROOT, 'node_modules', '.pnpm');
 
 const CHECK_ONLY = process.argv.includes('--check');
 
-const EXT_RE = /\.(js|cjs|mjs)$/;
+/**
+ * 需要与源保持一致的子树及各子树的文件类型。
+ * src —— types 指向 ./src/index.ts，消费方跨包类型检查会读到快照里的源码；
+ * dist —— 运行时 require 入口，且 .d.ts 缺失同样会让跨包类型检查失败。
+ */
+const SYNC_SUBTREES = [
+  { dir: 'src', extRe: /\.(ts|tsx|mts|cts)$/ },
+  { dir: 'dist', extRe: /\.(js|cjs|mjs|d\.ts|map)$/ },
+];
 
 /** 列出 @zh/<pkg> 的所有 .pnpm 快照主目录（可能因不同依赖上下文存在多个） */
 function findSnapshots(pkg) {
@@ -75,41 +91,44 @@ const pkgNames = fs.existsSync(PACKAGES_DIR)
   : [];
 
 for (const pkg of pkgNames) {
-  const srcDist = path.join(PACKAGES_DIR, pkg, 'dist');
-  if (!fs.existsSync(srcDist)) continue;
-
   const snapshots = findSnapshots(pkg).filter((d) => !isSymlink(d));
   if (snapshots.length === 0) continue; // 无复制型快照（可能是纯软链包，天然同步）
 
-  for (const snapDist of snapshots.map((d) => path.join(d, 'dist'))) {
-    if (!fs.existsSync(snapDist)) continue;
-    const files = [];
-    const walk = (rel) => {
-      const abs = path.join(srcDist, rel);
-      for (const entry of fs.readdirSync(abs)) {
-        const relPath = path.join(rel, entry);
-        const full = path.join(abs, entry);
-        if (fs.statSync(full).isDirectory()) walk(relPath);
-        else if (EXT_RE.test(entry)) files.push(relPath);
+  for (const { dir, extRe } of SYNC_SUBTREES) {
+    const srcRoot = path.join(PACKAGES_DIR, pkg, dir);
+    if (!fs.existsSync(srcRoot)) continue;
+
+    for (const snap of snapshots) {
+      const snapRoot = path.join(snap, dir);
+      if (!fs.existsSync(snapRoot)) continue;
+      const files = [];
+      const walk = (rel) => {
+        const abs = path.join(srcRoot, rel);
+        for (const entry of fs.readdirSync(abs)) {
+          const relPath = path.join(rel, entry);
+          const full = path.join(abs, entry);
+          if (fs.statSync(full).isDirectory()) walk(relPath);
+          else if (extRe.test(entry)) files.push(relPath);
+        }
+      };
+      walk('.');
+      for (const rel of files) {
+        const srcFile = path.join(srcRoot, rel);
+        const dstFile = path.join(snapRoot, rel);
+        if (fs.existsSync(dstFile)) continue;
+        anyMissing = true;
+        if (CHECK_ONLY) {
+          console.log(`[${pkg}] ${dir}/${rel} MISSING in snapshot`);
+          continue;
+        }
+        const res = linkFile(srcFile, dstFile);
+        if (res === 'linked') linked++;
+        else if (res === 'copied') copied++;
+        else console.error(`[${pkg}] ❌ 补链失败 ${dir}/${rel}: ${res}`);
+        console.log(
+          `[${pkg}] ${res === 'linked' ? '补链' : res === 'copied' ? '复制' : '❌'} ${dir}/${rel}`,
+        );
       }
-    };
-    walk('.');
-    for (const rel of files) {
-      const srcFile = path.join(srcDist, rel);
-      const dstFile = path.join(snapDist, rel);
-      if (fs.existsSync(dstFile)) continue;
-      anyMissing = true;
-      if (CHECK_ONLY) {
-        console.log(`[${pkg}] MISSING in snapshot: ${rel}`);
-        continue;
-      }
-      const res = linkFile(srcFile, dstFile);
-      if (res === 'linked') linked++;
-      else if (res === 'copied') copied++;
-      else console.error(`[${pkg}] ❌ 补链失败 ${rel}: ${res}`);
-      console.log(
-        `[${pkg}] ${res === 'linked' ? '补链' : res === 'copied' ? '复制' : '❌'} ${rel}`,
-      );
     }
   }
 }
@@ -119,9 +138,9 @@ if (CHECK_ONLY) {
     console.error('存在快照缺失（如上）。运行本脚本(不带 --check)以补链。');
     process.exit(1);
   }
-  console.log('✅ 所有 workspace 包快照产物与源 dist 一致。');
+  console.log('✅ 所有 workspace 包快照的 src/dist 已与源一致。');
 } else if (linked + copied === 0) {
-  console.log('✅ 无需补链：所有 workspace 包快照产物已与源 dist 同步。');
+  console.log('✅ 无需补链：所有 workspace 包快照的 src/dist 已与源同步。');
 } else {
   console.log(`✅ 补链完成：硬链 ${linked}，复制 ${copied}。`);
 }

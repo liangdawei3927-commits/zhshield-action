@@ -16,7 +16,13 @@ import {
   readYamlSafe,
   readTextSafe,
   versionFromConstraint,
-  parsePoetryConstraint,
+  collectManifestRanges,
+  collectPipfileLockDeps,
+  collectPyprojectDependencies,
+  parseYarnLock,
+  readPnpmImporterEntries,
+  readPoetryLockPackages,
+  type YarnBlock,
 } from '../lockfile-utils';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
@@ -44,34 +50,6 @@ const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
 const PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
 /** pnpm 本地目录/链接类型 resolution（本地包天然无 integrity） */
 const LOCAL_RESOLUTION_TYPES = new Set(['directory', 'link', 'workspace']);
-/** 换行符拆分 */
-const NEWLINE_RE = /\r?\n/;
-/** 行首缩进检测 */
-const INDENT_RE = /^\s*/;
-/** yarn块字段行 'key value' */
-const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
-/** TOML 节头拆分 */
-const TOML_SECTION_RE = /^\s*\[/m;
-/** TOML 节标题提取 */
-const TOML_HEADER_RE = /^([^\]]+)\]/;
-/** TOML dependencies 数组起始 */
-const TOML_DEPS_ARRAY_RE = /dependencies\s*=\s*\[/;
-/** TOML 双引号字符串（matchAll） */
-const TOML_QUOTED_RE = /"([^"]+)"/g;
-/** 剥离 extras [...] */
-const BRACKET_EXTRAS_RE = /\[.*?\]/g;
-/** PEP 508 包名 */
-const PEP508_NAME_RE = /^[A-Za-z0-9_.-]+/;
-/** poetry.toml 键行 */
-const POETRY_TOML_KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
-/** poetry.lock 包块分隔 */
-const POETRY_BLOCK_RE = /^\s*\[\[package\]\]\s*$/m;
-/** poetry.lock name 字段 */
-const POETRY_NAME_FIELD_RE = /^\s*name\s*=\s*["']([^"']+)["']/m;
-/** poetry.lock version 字段 */
-const POETRY_VERSION_FIELD_RE = /^\s*version\s*=\s*["']([^"']+)["']/m;
-/** poetry.lock hash 存在检测 */
-const POETRY_HASH_RE = /\bhash\s*=/;
 
 /** 锁文件校验器契约：离线静态校验，不联网 */
 export interface LockfileVerifier {
@@ -280,30 +258,42 @@ export function satisfiesVersion(version: string, range: string): boolean {
 
 // ────────────────────────────── 锁文件 / 清单解析 ──────────────────────────────
 
+/** 各生态解析结果统一形态 */
+interface ParsedLockfile {
+  declared: Map<string, string>;
+  locked: Map<string, string>;
+  integrity: Map<string, string>;
+  failures: string[];
+}
+
+/** 新建各生态解析结果的统一初始形态（declared / failures 由调用方提供，其余映射在此新建） */
+function createParsedLockfile(
+  declared: Map<string, string>,
+  failures: string[],
+): ParsedLockfile {
+  return {
+    declared,
+    locked: new Map<string, string>(),
+    integrity: new Map<string, string>(),
+    failures,
+  };
+}
+
 /** package.json 声明范围（dependencies + devDependencies） */
 function readDeclaredRanges(projectRoot: string, failures: string[]): Map<string, string> {
-  const declared = new Map<string, string>();
   const data = readJsonSafe(safeJoin(projectRoot, 'package.json'));
   if (!data) {
     failures.push('缺少可解析的 package.json，无法核对声明范围');
-    return declared;
+    return new Map<string, string>();
   }
-  for (const key of ['dependencies', 'devDependencies'] as const) {
-    const section = data[key];
-    if (!isRecord(section)) continue;
-    for (const [name, range] of Object.entries(section)) {
-      if (typeof range === 'string') declared.set(name, range);
-    }
-  }
-  return declared;
+  return collectManifestRanges(data, ['dependencies', 'devDependencies']);
 }
 
 /** npm package-lock.json（v1 / v2 / v3）→ 声明范围 / 锁定版本 / 完整性 */
 function parseNpmLock(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
   const declared = readDeclaredRanges(projectRoot, failures);
-  const locked = new Map<string, string>();
-  const integrity = new Map<string, string>();
+  const { locked, integrity } = createParsedLockfile(declared, failures);
   const lock = readJsonSafe(lockfilePath);
   if (!lock) {
     failures.push('package-lock.json 解析失败，无法校验');
@@ -379,9 +369,10 @@ function collectNpmPackages(
 /** pnpm-lock.yaml → importers 声明范围 + packages 完整性 */
 function parsePnpmLock(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const declared = new Map<string, string>();
-  const locked = new Map<string, string>();
-  const integrity = new Map<string, string>();
+  const { declared, locked, integrity } = createParsedLockfile(
+    new Map<string, string>(),
+    failures,
+  );
 
   if (!fs.existsSync(safeJoin(projectRoot, 'package.json'))) {
     failures.push('缺少 package.json 清单');
@@ -442,84 +433,26 @@ function collectPnpmImporters(
   declared: Map<string, string>,
   locked: Map<string, string>,
 ): void {
-  const importers = data.importers;
-  if (!isRecord(importers)) return;
-  const rootImporter = importers['.'] ?? Object.values(importers)[0];
-  if (!isRecord(rootImporter)) return;
-  for (const sectionKey of ['dependencies', 'devDependencies'] as const) {
-    const section = rootImporter[sectionKey];
-    if (!isRecord(section)) continue;
-    for (const [name, meta] of Object.entries(section)) {
-      if (!isRecord(meta)) continue;
-      const specifier = typeof meta.specifier === 'string' ? meta.specifier : '';
-      const version = typeof meta.version === 'string' ? meta.version.split('(')[0] : '';
-      if (version === '') continue;
-      if (PNPM_LOCAL_REF_PREFIX_RE.test(specifier) || PNPM_LOCAL_REF_PREFIX_RE.test(version))
-        continue;
-      declared.set(name, specifier);
-      locked.set(name, version);
-    }
+  for (const entry of readPnpmImporterEntries(data, ['dependencies', 'devDependencies'])) {
+    if (entry.version === '') continue;
+    if (
+      PNPM_LOCAL_REF_PREFIX_RE.test(entry.specifier) ||
+      PNPM_LOCAL_REF_PREFIX_RE.test(entry.version)
+    )
+      continue;
+    declared.set(entry.name, entry.specifier);
+    locked.set(entry.name, entry.version);
   }
-}
-
-/** yarn.lock v1 块 */
-interface YarnBlock {
-  keys: string[];
-  fields: Map<string, string>;
 }
 
 /** yarn 块键解析：name@range → { name, range }（支持 @scope/name@range） */
 const YARN_KEY_RE = /^(@[^/]+\/)?([^@]+)@(.*)$/;
 
-/** 解析 yarn.lock v1 块式格式 */
-function parseYarnLock(content: string): YarnBlock[] {
-  const blocks: YarnBlock[] = [];
-  let current: YarnBlock | null = null;
-  for (const rawLine of content.split(NEWLINE_RE)) {
-    const trimmed = rawLine.trim();
-    if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
-    if (indent === 0 && trimmed.endsWith(':')) {
-      let keysText = trimmed.slice(0, -1).trim();
-      if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
-        keysText = keysText.slice(1, -1);
-      }
-      current = { keys: keysText.split(',').map((k) => k.trim()), fields: new Map() };
-      blocks.push(current);
-      continue;
-    }
-    if (current) {
-      collectYarnField(current, trimmed);
-    }
-  }
-  return blocks;
-}
-
-/** yarn.lock v1 字段行：`  version "4.17.21"`（键与值空白分隔） */
-function collectYarnField(current: YarnBlock, trimmed: string): void {
-  const m = trimmed.match(YARN_FIELD_RE);
-  if (!m) return;
-  let value = m[2].trim();
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    value = value.slice(1, -1);
-  }
-  current.fields.set(m[1], value);
-}
-
 /** yarn.lock v1 → package.json 声明范围 + 块锁定版本 */
-function parseYarnLockFile(
-  projectRoot: string,
-  lockfilePath: string,
-): {
-  declared: Map<string, string>;
-  locked: Map<string, string>;
-  integrity: Map<string, string>;
-  failures: string[];
-} {
+function parseYarnLockFile(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
   const declared = readDeclaredRanges(projectRoot, failures);
-  const locked = new Map<string, string>();
-  const integrity = new Map<string, string>();
+  const { locked, integrity } = createParsedLockfile(declared, failures);
 
   const content = readTextSafe(lockfilePath);
   if (content === null) {
@@ -557,89 +490,19 @@ function collectYarnBlock(
   }
 }
 
-/** pyproject.toml：[project].dependencies（PEP 621）与 [tool.poetry.dependencies] / [tool.uv.dependencies] */
-function parsePyproject(content: string): Map<string, string> {
-  const declared = new Map<string, string>();
-  const sections = content.split(TOML_SECTION_RE);
-  for (const section of sections) {
-    const header = section.match(TOML_HEADER_RE);
-    if (!header) continue;
-    const sectionName = header[1].trim().toLowerCase();
-    if (sectionName === 'project') {
-      collectProjectDeps(section, declared);
-    } else if (
-      sectionName === 'tool.poetry.dependencies' ||
-      sectionName === 'tool.uv.dependencies'
-    ) {
-      collectPoetryDeps(section, declared);
-    }
-  }
-  return declared;
-}
-
-/** [project].dependencies 数组（PEP 621）：双引号包名 + 附带约束 */
-function collectProjectDeps(section: string, declared: Map<string, string>): void {
-  const depsBlock = section.match(TOML_DEPS_ARRAY_RE);
-  if (!depsBlock) return;
-  const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
-  for (const m of block.matchAll(TOML_QUOTED_RE)) {
-    const entry = m[1].replace(BRACKET_EXTRAS_RE, '');
-    const name = entry.match(PEP508_NAME_RE)?.[0];
-    if (!name) continue;
-    const rest = entry.slice(name.length).trim();
-    declared.set(name, rest);
-  }
-}
-
-/** [tool.poetry.dependencies] / [tool.uv.dependencies]：表键即包名 */
-function collectPoetryDeps(section: string, declared: Map<string, string>): void {
-  for (const line of section.split(NEWLINE_RE)) {
-    if (line.trim().startsWith('[')) continue;
-    const key = line.match(POETRY_TOML_KEY_RE);
-    if (!key) continue;
-    const name = key[1];
-    if (name === 'python') continue;
-    declared.set(name, parsePoetryConstraint(line.slice(line.indexOf('=') + 1)));
-  }
-}
-
-/** poetry.lock：[[package]] 块 → name / version / 是否带 [files] 哈希 */
-function parsePoetryLock(
-  content: string,
-): Array<{ name: string; version: string; hasHashes: boolean }> {
-  const packages: Array<{ name: string; version: string; hasHashes: boolean }> = [];
-  for (const block of content.split(POETRY_BLOCK_RE)) {
-    const nameMatch = block.match(POETRY_NAME_FIELD_RE);
-    const versionMatch = block.match(POETRY_VERSION_FIELD_RE);
-    if (!nameMatch || !versionMatch) continue;
-    const idx = block.indexOf('[files]');
-    const filesSection = idx >= 0 ? block.slice(idx) : '';
-    const hasHashes = filesSection !== '' && POETRY_HASH_RE.test(filesSection);
-    packages.push({ name: nameMatch[1], version: versionMatch[1], hasHashes });
-  }
-  return packages;
-}
-
 /** pyproject.toml + poetry.lock → 声明范围 + 锁定版本 */
-function parsePoetryProject(
-  projectRoot: string,
-  lockfilePath: string,
-): {
-  declared: Map<string, string>;
-  locked: Map<string, string>;
-  integrity: Map<string, string>;
-  failures: string[];
-} {
+function parsePoetryProject(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const declared = new Map<string, string>();
-  const locked = new Map<string, string>();
-  const integrity = new Map<string, string>();
+  const { declared, locked, integrity } = createParsedLockfile(
+    new Map<string, string>(),
+    failures,
+  );
 
   const pyprojectContent = readTextSafe(safeJoin(projectRoot, 'pyproject.toml'));
   if (pyprojectContent === null) {
     failures.push('缺少可解析的 pyproject.toml，无法核对声明范围');
   } else {
-    for (const [name, range] of parsePyproject(pyprojectContent)) declared.set(name, range);
+    collectPyprojectDependencies(pyprojectContent, declared);
   }
 
   const content = readTextSafe(lockfilePath);
@@ -647,7 +510,7 @@ function parsePoetryProject(
     failures.push('poetry.lock 读取失败，无法校验');
     return { declared, locked, integrity, failures };
   }
-  for (const pkg of parsePoetryLock(content)) {
+  for (const pkg of readPoetryLockPackages(content)) {
     if (!locked.has(pkg.name)) locked.set(pkg.name, pkg.version);
     if (!pkg.hasHashes) {
       failures.push(`[pip] ${pkg.name}@${pkg.version} 缺少 [files] 哈希校验字段`);
@@ -657,50 +520,31 @@ function parsePoetryProject(
 }
 
 /** Pipfile.lock：default / develop 区块，version 为声明范围，hashes 为完整性 */
-function parsePipfileLockFile(lockfilePath: string): {
-  declared: Map<string, string>;
-  locked: Map<string, string>;
-  integrity: Map<string, string>;
-  failures: string[];
-} {
+function parsePipfileLockFile(lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const declared = new Map<string, string>();
-  const locked = new Map<string, string>();
-  const integrity = new Map<string, string>();
+  const { declared, locked, integrity } = createParsedLockfile(
+    new Map<string, string>(),
+    failures,
+  );
 
   const data = readJsonSafe(lockfilePath);
   if (!data) {
     failures.push('Pipfile.lock 解析失败，无法校验');
     return { declared, locked, integrity, failures };
   }
-  for (const section of ['default', 'develop'] as const) {
-    const sectionData = data[section];
-    if (!isRecord(sectionData)) continue;
-    for (const [name, meta] of Object.entries(sectionData)) {
-      if (name === '_meta') continue;
-      if (!isRecord(meta)) continue;
-      const range = typeof meta.version === 'string' ? meta.version : '';
-      const lockedVersion = versionFromConstraint(range);
-      declared.set(name, range);
-      if (lockedVersion !== '') locked.set(name, lockedVersion);
-      const hashes = meta.hashes;
-      if (!Array.isArray(hashes) || hashes.length === 0) {
-        failures.push(`[pip] ${name}@${lockedVersion} 缺少 hashes 哈希字段`);
-      }
+  for (const entry of collectPipfileLockDeps(data)) {
+    const { name, declaredRange: range } = entry;
+    const lockedVersion = versionFromConstraint(range);
+    declared.set(name, range);
+    if (lockedVersion !== '') locked.set(name, lockedVersion);
+    if (!entry.hasHashes) {
+      failures.push(`[pip] ${name}@${lockedVersion} 缺少 hashes 哈希字段`);
     }
   }
   return { declared, locked, integrity, failures };
 }
 
 // ────────────────────────────── 校验器实现 ──────────────────────────────
-
-/** 各生态解析结果统一形态 */
-interface ParsedLockfile {
-  declared: Map<string, string>;
-  locked: Map<string, string>;
-  integrity: Map<string, string>;
-  failures: string[];
-}
 
 /** 锁文件校验器具体实现：离线静态，绝不抛异常 */
 export class LockfileVerifierImpl implements LockfileVerifier {

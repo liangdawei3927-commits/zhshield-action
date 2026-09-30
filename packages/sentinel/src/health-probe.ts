@@ -5,12 +5,14 @@ import type { EventCenter } from './event-center';
 /** 命令串按空白切分（避免热路径重建正则） */
 const RE_WHITESPACE = /\s+/;
 
+/** 健康探测命令配置：探测命令（可含内联参数）、显式参数覆盖与工作目录 */
 export interface HealthProbeConfig {
   command: string;
   args?: string[];
   cwd: string;
 }
 
+/** 健康探测回调：由调用方提供代际校验与失败通知钩子 */
 export interface HealthProbeCallbacks {
   /** 探测启动后进程已重新拉起（代数已变）时返回 false，陈旧结果应被丢弃 */
   isEpochCurrent: () => boolean;

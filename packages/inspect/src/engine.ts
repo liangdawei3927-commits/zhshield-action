@@ -2,7 +2,7 @@ import type { InspectionReport, AdapterResult, Issue, InspectAdapter } from './t
 import type { ToolAdapter, EventEmitter, Baseline } from '@zh/shared';
 import { filterIssuesByBaseline } from '@zh/shared';
 import * as path from 'node:path';
-import type { SopRuleEngine } from '@zh/kernel';
+import type { SopRuleEngine, RuleEngineReport, ProjectFeature } from '@zh/kernel';
 import type { ProjectProfile } from '@zh/dependency';
 import {
   DegradationManager,
@@ -17,6 +17,65 @@ import { ScanReportBuilder } from './scan-report-builder';
 import { SopReportMapper } from './sop-report-mapper';
 import { AiCodeReviewImpl } from './ai-code/review';
 import type { AiCodeVuln } from './ai-code/types';
+
+/** InspectEngine.runSopGuarded 的执行参数 */
+interface RunSopGuardedParams {
+  projectId: string;
+  scanType: InspectionReport['scanType'];
+  start: number;
+  projectFeature?: { framework?: string; language?: string; features?: string[] };
+  baseline?: Baseline | null;
+}
+
+/** InspectEngine.runDirectScan 的执行参数 */
+interface RunDirectScanParams {
+  projectId: string;
+  scanType: InspectionReport['scanType'];
+  start: number;
+  projectFeature?: { framework?: string; language?: string; features?: string[] };
+  baseline?: Baseline | null;
+}
+
+/** InspectEngine.runScanWithSop 的执行参数 */
+interface RunScanWithSopParams {
+  projectId: string;
+  scanType: InspectionReport['scanType'];
+  start: number;
+  projectFeature?: { framework?: string; language?: string; features?: string[] };
+  baseline?: Baseline | null;
+}
+
+/** SOP 评估上下文中的项目画像（可选；缺省 → 不裁剪） */
+interface SopFeatureContext {
+  projectFeature?: ProjectFeature;
+}
+
+/** InspectEngine.finalizeScan 的执行参数（直扫 / SOP 两分支共用的报告收尾） */
+interface FinalizeScanParams {
+  projectId: string;
+  scanType: InspectionReport['scanType'];
+  start: number;
+  baseline: Baseline | null | undefined;
+  allIssues: Issue[];
+  adapterResults: AdapterResult[];
+  /** SOP 分支不惩罚 info 级问题；缺省即惩罚（直扫原行为） */
+  penalizeInfo?: boolean;
+}
+
+/**
+ * 构建 SOP 评估上下文中的项目画像。
+ *
+ * R3d 执行面投影激活：SOP 直扫分支透传画像 → evaluateRules 收到 projectFeature
+ * → host.toolScope 生效 → tool-dispatch 按画像裁剪；无画像 → 不携带 → 不裁剪（回归安全）。
+ * features 可选入参 → kernel ProjectFeature 必填语义：边界归一化为 []（保守：不裁剪）。
+ */
+function buildFeatureContext(
+  projectFeature?: { framework?: string; language?: string; features?: string[] },
+): SopFeatureContext {
+  return projectFeature
+    ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } }
+    : {};
+}
 
 /**
  * InspectEngine — 巡检引擎（门面）
@@ -113,37 +172,27 @@ export class InspectEngine {
     // 相对路径会流入 ToolScanOptions.projectPath，外部工具以自身 cwd 解析导致扫描失败。
     projectId = path.resolve(projectId);
     if (this.sopEngine && !this._sopScanning) {
-      return this.runSopGuarded(projectId, scanType, start, projectFeature, baseline);
+      return this.runSopGuarded({ projectId, scanType, start, projectFeature, baseline });
     }
-    return this.runDirectScan(projectId, scanType, start, projectFeature, baseline);
+    return this.runDirectScan({ projectId, scanType, start, projectFeature, baseline });
   }
 
   /** SOP 驱动模式：评估 inspect/security 域规则（带重入保护） */
-  private async runSopGuarded(
-    projectId: string,
-    scanType: InspectionReport['scanType'],
-    start: number,
-    projectFeature?: { framework?: string; language?: string; features?: string[] },
-    baseline?: Baseline | null,
-  ): Promise<InspectionReport> {
+  private async runSopGuarded(params: RunSopGuardedParams): Promise<InspectionReport> {
+    const { projectId, scanType, start, projectFeature, baseline } = params;
     // ⚠️ 重入保护：_sopScanning 标志防止 SOP scanner-dispatch 规则回调 runScan 导致无限递归
     // SOP → evaluateRules → scanner-dispatch → runScan → SOP → evaluateRules → ...
     this._sopScanning = true;
     try {
-      return await this.runScanWithSop(projectId, scanType, start, projectFeature, baseline);
+      return await this.runScanWithSop({ projectId, scanType, start, projectFeature, baseline });
     } finally {
       this._sopScanning = false;
     }
   }
 
   /** 直接执行模式：运行全部适配器 + AI 审查并构建报告 */
-  private async runDirectScan(
-    projectId: string,
-    scanType: InspectionReport['scanType'],
-    start: number,
-    projectFeature?: { framework?: string; language?: string; features?: string[] },
-    baseline?: Baseline | null,
-  ): Promise<InspectionReport> {
+  private async runDirectScan(params: RunDirectScanParams): Promise<InspectionReport> {
+    const { projectId, scanType, start, projectFeature, baseline } = params;
     const adapterResults: AdapterResult[] = await this.adapterExecutor.runAll(
       this.registeredAdapters,
       projectId,
@@ -154,20 +203,27 @@ export class InspectEngine {
 
     const aiIssues = await this.runAiCodeReview(projectId);
     const allIssues: Issue[] = [...aiIssues, ...adapterResults.flatMap((r) => r.issues)];
-    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
-    const reconciledResults = this.reconcileAdapterResults(
-      adapterResults,
-      baseline ?? null,
-      projectId,
-    );
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
+    return this.finalizeScan({ projectId, scanType, start, baseline, allIssues, adapterResults });
+  }
 
+  /**
+   * 扫描收尾：基线过滤 → 适配器结果重算 → 发出 scan:completed 事件 → 报告构建。
+   *
+   * 直扫与 SOP 两分支的收尾此前逐行相同（engine.ts 内的自重复），仅 SOP 分支额外传
+   * penalizeInfo=false，故收敛为唯一实现；基线豁免计数、计分与事件口径均不变。
+   */
+  private async finalizeScan(params: FinalizeScanParams): Promise<InspectionReport> {
+    const { projectId, scanType, start, baseline, allIssues, adapterResults } = params;
+    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
+    const reconciled = this.reconcileAdapterResults(adapterResults, baseline ?? null, projectId);
+    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
     return this.reportBuilder.buildReport({
       projectId,
       scanType,
       duration: Date.now() - start,
       issues: kept,
-      adapterResults: reconciledResults,
+      adapterResults: reconciled,
+      penalizeInfo: params.penalizeInfo,
       suppressedCount: suppressed,
     });
   }
@@ -253,50 +309,52 @@ export class InspectEngine {
     }
   }
 
-  private async runScanWithSop(
+  private async runScanWithSop(params: RunScanWithSopParams): Promise<InspectionReport> {
+    const { projectId, scanType, start, projectFeature, baseline } = params;
+    const featureCtx = buildFeatureContext(projectFeature);
+    const sopEngine = this.sopEngine;
+    if (!sopEngine) {
+      throw new Error('SOP engine not registered');
+    }
+    const sopReport = await this.evaluateSopReports(sopEngine, projectId, featureCtx);
+    return this.buildSopReport(projectId, scanType, start, baseline, sopReport);
+  }
+
+  /** 评估 inspect / security 两个域的规则并合并报告（避免拉入 guard/evolve 等规则形成交叉重入） */
+  private async evaluateSopReports(
+    sopEngine: SopRuleEngine,
     projectId: string,
-    scanType: InspectionReport['scanType'],
-    start: number,
-    projectFeature?: { framework?: string; language?: string; features?: string[] },
-    baseline?: Baseline | null,
-  ): Promise<InspectionReport> {
-    // R3d 执行面投影激活：SOP 直扫分支透传画像 → evaluateRules 收到 projectFeature
-    // → host.toolScope 生效 → tool-dispatch 按画像裁剪；无画像 → 不携带 → 不裁剪（回归安全）。
-    // features 可选入参 → kernel ProjectFeature 必填语义：边界归一化为 []（保守：不裁剪）。
-    const featureCtx = projectFeature
-      ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } }
-      : {};
-    // 只评估 inspect / security 域，避免拉入 guard/evolve 等规则形成交叉重入
-    const inspectReport = await this.sopEngine!.evaluateRules({
+    featureCtx: SopFeatureContext,
+  ): Promise<RuleEngineReport> {
+    const inspectReport = await sopEngine.evaluateRules({
       repoRoot: projectId,
       domain: 'inspect',
       ...featureCtx,
     });
-    const securityReport = await this.sopEngine!.evaluateRules({
+    const securityReport = await sopEngine.evaluateRules({
       repoRoot: projectId,
       domain: 'security',
       ...featureCtx,
     });
-    const sopReport = this.sopMapper.mergeReports(inspectReport, securityReport);
+    return this.sopMapper.mergeReports(inspectReport, securityReport);
+  }
 
-    const allIssues = this.sopMapper.flattenViolations(sopReport);
-    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
-    const adapterResults = this.reconcileAdapterResults(
-      this.sopMapper.buildAdapterResults(sopReport),
-      baseline ?? null,
-      projectId,
-    );
-
-    await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
-
-    return this.reportBuilder.buildReport({
+  /** 汇总 SOP 报告：扁平化违规 → 基线过滤 → 适配器结果重算 → 事件与报告构建 */
+  private async buildSopReport(
+    projectId: string,
+    scanType: InspectionReport['scanType'],
+    start: number,
+    baseline: Baseline | null | undefined,
+    sopReport: RuleEngineReport,
+  ): Promise<InspectionReport> {
+    return this.finalizeScan({
       projectId,
       scanType,
-      duration: Date.now() - start,
-      issues: kept,
-      adapterResults,
+      start,
+      baseline,
+      allIssues: this.sopMapper.flattenViolations(sopReport),
+      adapterResults: this.sopMapper.buildAdapterResults(sopReport),
       penalizeInfo: false,
-      suppressedCount: suppressed,
     });
   }
 }

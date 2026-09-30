@@ -13,6 +13,7 @@ import { HallucinatedDependencyCheckImpl } from './hallucinated-dependency';
 import { AiOriginDetectorImpl } from './origin-detector';
 import type { AiOriginDetector } from './origin-detector';
 import { PATTERN_RULES } from './pattern-rules';
+import type { PatternRule } from './pattern-rules';
 import type {
   AiAuditEntry,
   AiCodeReview,
@@ -28,6 +29,26 @@ import type {
 export interface AiReviewOptions {
   userTags?: readonly AiUserTag[];
   toolReports?: readonly AiToolReport[];
+}
+
+/** 单条规则在单个文件上的全部命中 → 漏洞记录并入结果 */
+function collectRuleVulns(
+  vulns: AiCodeVuln[],
+  rule: PatternRule,
+  file: string,
+  content: string,
+): void {
+  for (const hit of rule.match(content)) {
+    vulns.push({
+      vulnId: `${rule.id}-${file}-${hit.line}`,
+      ruleId: rule.ruleId,
+      file,
+      line: hit.line,
+      severity: rule.severity,
+      description: rule.description,
+      fix: rule.fix,
+    });
+  }
 }
 
 /** 幻觉依赖 → 漏洞严重度映射（附 E.3：抢注即 critical） */
@@ -110,17 +131,7 @@ export class AiCodeReviewImpl implements AiCodeReview {
       const content = readTextFileSafe(projectPath, file);
       if (content === null) continue;
       for (const rule of PATTERN_RULES) {
-        for (const hit of rule.match(content)) {
-          vulns.push({
-            vulnId: `${rule.id}-${file}-${hit.line}`,
-            ruleId: rule.ruleId,
-            file,
-            line: hit.line,
-            severity: rule.severity,
-            description: rule.description,
-            fix: rule.fix,
-          });
-        }
+        collectRuleVulns(vulns, rule, file, content);
       }
     }
     return vulns;

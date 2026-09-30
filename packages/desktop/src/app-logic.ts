@@ -19,6 +19,7 @@ import {
   setSentinelEnabled,
 } from './services/engineApi';
 
+/** 应用页面路由标识：欢迎页 + 各治理域页面 + 报告/备份/画像等汇总页 */
 export type Page =
   | 'welcome'
   | 'security'
@@ -36,6 +37,7 @@ export type Page =
   | 'backup'
   | 'profile';
 
+/** 已添加项目的基本信息：展示名 + 绝对路径 */
 export interface ProjectInfo {
   name: string;
   path: string;
@@ -314,30 +316,38 @@ function useCurrentProjectIndex(projectCount: number): {
   return { currentProjectIndex, switchCurrentProject };
 }
 
+/** 从 localStorage 读取已完成「添加项目诊断」的项目路径集合（解析失败视为空） */
+function loadOnboardedPaths(): Set<string> {
+  try {
+    const raw = localStorage.getItem(ONBOARDED_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+/** 将项目路径集合持久化到 localStorage（写失败静默忽略） */
+function persistOnboardedPaths(paths: Set<string>): void {
+  try {
+    localStorage.setItem(ONBOARDED_KEY, JSON.stringify([...paths]));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 已完成「添加项目诊断」的项目路径集合（持久化到 localStorage，重启后仍可用） */
 function useOnboardedProjects(): {
   onboardedPaths: Set<string>;
   markOnboarded: (path: string) => void;
 } {
-  const [onboardedPaths, setOnboardedPaths] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem(ONBOARDED_KEY);
-      if (raw) return new Set(JSON.parse(raw) as string[]);
-    } catch {
-      /* ignore */
-    }
-    return new Set();
-  });
+  const [onboardedPaths, setOnboardedPaths] = useState<Set<string>>(loadOnboardedPaths);
 
   const markOnboarded = useCallback((path: string) => {
     setOnboardedPaths((prev) => {
       if (prev.has(path)) return prev;
       const next = new Set(prev).add(path);
-      try {
-        localStorage.setItem(ONBOARDED_KEY, JSON.stringify([...next]));
-      } catch {
-        /* ignore */
-      }
+      persistOnboardedPaths(next);
       return next;
     });
   }, []);

@@ -1,6 +1,7 @@
 import { useAppState } from './app-logic';
 import type { Page, ProjectInfo } from './app-logic';
 import type { AiToolConfigData } from './types/electron';
+import { FEATURE_EVOLVE_ENABLED } from './feature-flags';
 import { WelcomePage } from './pages/WelcomePage';
 import { GuardPage } from './pages/GuardPage';
 import { SentinelPage } from './pages/SentinelPage';
@@ -60,7 +61,12 @@ function PageView({
     case 'refactor':
       return <RefactorPage projectPath={projectPath} />;
     case 'evolve':
-      return <EvolvePage projectPath={projectPath} />;
+      // ⛔ 规则进化暂下线：用户规模未达门槛（见 feature-flags.ts）。保持关闭，勿直接改回 EvolvePage
+      return FEATURE_EVOLVE_ENABLED ? (
+        <EvolvePage projectPath={projectPath} />
+      ) : (
+        <InspectPage projectPath={projectPath} />
+      );
     case 'reports':
       return <ReportsPage projectPath={projectPath} />;
     case 'backup':

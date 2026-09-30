@@ -45,11 +45,11 @@ describe('画像驱动评分 — 端到端整体分异构区分（回归）', ()
 
     const backend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, inspect, undefined, makeProfile('backend')),
+      buildHealthDimensions({ guard, inspect, profile: makeProfile('backend') }),
     );
     const frontend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guard, inspect, undefined, makeProfile('frontend')),
+      buildHealthDimensions({ guard, inspect, profile: makeProfile('frontend') }),
     );
 
     expect(backend.overall).toBeLessThan(frontend.overall);
@@ -65,11 +65,11 @@ describe('画像驱动评分 — 端到端整体分异构区分（回归）', ()
     };
     const backend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guardPass, inspect, undefined, makeProfile('backend')),
+      buildHealthDimensions({ guard: guardPass, inspect, profile: makeProfile('backend') }),
     );
     const frontend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guardPass, inspect, undefined, makeProfile('frontend')),
+      buildHealthDimensions({ guard: guardPass, inspect, profile: makeProfile('frontend') }),
     );
 
     expect(frontend.overall).toBeLessThan(backend.overall);
@@ -89,7 +89,7 @@ describe('画像驱动评分 — 端到端整体分异构区分（回归）', ()
     ] as const) {
       const r = new ScoringEngine().calculate(
         'p',
-        buildHealthDimensions(guardPass, inspect, undefined, makeProfile(type)),
+        buildHealthDimensions({ guard: guardPass, inspect, profile: makeProfile(type) }),
       );
       scores[type] = r.overall;
       expect(r.overall).toBeGreaterThanOrEqual(99);
@@ -106,10 +106,13 @@ describe('画像驱动评分 — 端到端整体分异构区分（回归）', ()
         { severity: 'error' as const, category: 'quality' },
       ],
     };
-    const noProfile = new ScoringEngine().calculate('p', buildHealthDimensions(guardPass, inspect));
+    const noProfile = new ScoringEngine().calculate(
+      'p',
+      buildHealthDimensions({ guard: guardPass, inspect }),
+    );
     const backend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(guardPass, inspect, undefined, makeProfile('backend')),
+      buildHealthDimensions({ guard: guardPass, inspect, profile: makeProfile('backend') }),
     );
     expect(noProfile.overall).toBeCloseTo(backend.overall, 2);
   });

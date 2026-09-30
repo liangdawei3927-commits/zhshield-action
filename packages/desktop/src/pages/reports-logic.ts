@@ -30,6 +30,7 @@ export function getScoreLabel(score: number, tr: typeof t = t) {
 /** 未检测维度的中性色（该域从未运行：既不是好也不是坏，不参与总分加权） */
 const NOT_RUN_COLOR = 'rgb(var(--zh-muted))';
 
+/** 单个评分维度的展示视图：区分「未检测」与「0 分」 */
 export interface DimensionView {
   /** true = 该域从未运行（不参与总分加权） */
   notRun: boolean;
@@ -104,6 +105,7 @@ export function gradeLabel(grade: string, tr: typeof t = t): string {
  */
 export const SCORE_FRESH_MS = 24 * 60 * 60 * 1000;
 
+/** 总分数据新鲜度：是否已过期 + 距今小时数 */
 export interface ScoreFreshness {
   /** true = 数据超过阈值，总分只能代表「截至那一时刻」的状态 */
   stale: boolean;

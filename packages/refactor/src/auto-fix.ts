@@ -19,7 +19,7 @@ const METHOD_DECLARATION =
 
 // ─── Inappropriate-Intimacy: 将 public 字段改为 private ─────
 
-const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir) => {
+const fixInappropriateIntimacy: FixGenerator = (smell) => {
   const filePath = smell.location.filePath;
   const content = readFile(filePath);
   if (!content) return null;
@@ -56,7 +56,7 @@ const fixInappropriateIntimacy: FixGenerator = (smell, _sourceDir) => {
 
 // ─── Callback-Hell: .then() 链 → async/await ────────────────
 
-const fixCallbackHell: FixGenerator = (smell, _sourceDir) => {
+const fixCallbackHell: FixGenerator = (smell) => {
   const filePath = smell.location.filePath;
   const content = readFile(filePath);
   if (!content) return null;

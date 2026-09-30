@@ -1,9 +1,12 @@
+/** 总评等级：由 overall 分数映射的 A/B/C/D 四档 */
 export type ScoreGrade = 'A' | 'B' | 'C' | 'D';
+/** 趋势方向：improving 分数上升 / stable 持平 / declining 分数下降 */
 export type ScoreTrend = 'improving' | 'stable' | 'declining';
 
 /** 维度评分状态：scored=已检测并参与加权；not-run=该域从未运行，不参与加权 */
 export type DimensionStatus = 'scored' | 'not-run';
 
+/** 单维度得分：权重、得分、问题数与运行状态（not-run 维度不参与 overall 加权） */
 export interface DimensionScore {
   name: string;
   weight: number;
@@ -102,6 +105,7 @@ export interface RedLineInfo {
   reasons: RedLineReason[];
 }
 
+/** 项目健康总分：总分 + 等级 + 各维度得分 + 趋势 + 评分算法版本 + 红线封顶信息 */
 export interface HealthScore {
   projectId: string;
   timestamp: Date;
@@ -115,6 +119,7 @@ export interface HealthScore {
   redLine?: RedLineInfo;
 }
 
+/** 单维度趋势明细：当前分、趋势方向与线性拟合斜率 */
 export interface DimensionTrend {
   name: string;
   current: number;
@@ -122,6 +127,7 @@ export interface DimensionTrend {
   slope: number;
 }
 
+/** 趋势报告：总分、变化速度/加速度/波动率与预测分 + 逐维度趋势 + 洞察文案 + 连续同向计数 */
 export interface TrendReport {
   projectId: string;
   current: HealthScore | null;
@@ -135,6 +141,8 @@ export interface TrendReport {
   streak: { direction: ScoreTrend; count: number };
 }
 
+/** 规则求值上下文：发现项列表（severity + category）与工程指标
+ *  （依赖数 / 测试覆盖率 / 循环依赖 / 文件总数 / 文档覆盖率，后三项可选） */
 export interface ScoringRuleContext {
   findings: Array<{ severity: string; category: string }>;
   metrics: {
@@ -146,6 +154,7 @@ export interface ScoringRuleContext {
   };
 }
 
+/** 维度扣分配置：封顶扣分、单条扣分与按 severity 的扣分倍率表 */
 export interface PenaltyConfig {
   dimension: string;
   maxPenalty: number;
@@ -153,6 +162,7 @@ export interface PenaltyConfig {
   severityMultipliers: Record<string, number>;
 }
 
+/** 正向加分规则：命中条件（依 ScoringRuleContext 判定）与固定加分值 */
 export interface PositiveRule {
   id: string;
   name: string;
@@ -162,6 +172,7 @@ export interface PositiveRule {
   condition: (ctx: ScoringRuleContext) => boolean;
 }
 
+/** 维度定义：权重 + 扣分配置 + 正向规则集，评分引擎据此计算该维度得分 */
 export interface DimensionDefinition {
   id: string;
   name: string;
@@ -171,12 +182,14 @@ export interface DimensionDefinition {
   positiveRules: PositiveRule[];
 }
 
+/** 评分配置：配置版本、更新时间与全部维度定义 */
 export interface ScoringConfig {
   version: string;
   lastUpdated: Date;
   dimensions: DimensionDefinition[];
 }
 
+/** 维度得分明细：正向加分与负向扣分拆分 + 权重与加权结果 */
 export interface DimensionScoreDetail {
   dimension: string;
   score: number;
@@ -186,6 +199,7 @@ export interface DimensionScoreDetail {
   issues: number;
 }
 
+/** 单次评分计算结果：总分、等级、维度得分与正/负分汇总及逐维度明细 */
 export interface ScoringResult {
   overall: number;
   grade: ScoreGrade;

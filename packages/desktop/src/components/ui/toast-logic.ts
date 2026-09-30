@@ -1,13 +1,16 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 
+/** 轻提示样式变体：成功 / 错误 / 警告 / 信息 */
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
+/** 单条轻提示：自增 id、文案与样式变体 */
 export interface ToastItem {
   id: string;
   message: string;
   variant: ToastVariant;
 }
 
+/** Toast Context 值：当前提示列表 + 触发与关闭方法 */
 export interface ToastContextValue {
   toasts: ToastItem[];
   toast: (message: string, variant?: ToastVariant) => void;

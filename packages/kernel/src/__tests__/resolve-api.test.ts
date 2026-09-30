@@ -140,17 +140,17 @@ describe('resolve-api network functions', () => {
         json: async () => ({ ok: true, projectId: 'p1', orgId: 'org-1' }),
       });
 
-      await registerProjectFeatures(
-        'org-1',
-        'user-1',
-        'p1',
-        {
+      await registerProjectFeatures({
+        orgId: 'org-1',
+        userId: 'user-1',
+        projectId: 'p1',
+        feature: {
           framework: 'react',
           language: 'typescript',
           features: ['spa'],
         },
-        mockBase,
-      );
+        apiBaseOverride: mockBase,
+      });
 
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe(`${mockBase}/orgs/org-1/projects/p1/features`);

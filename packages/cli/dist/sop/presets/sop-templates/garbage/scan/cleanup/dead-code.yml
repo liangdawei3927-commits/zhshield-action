@@ -69,26 +69,42 @@ check:
   tool: "ts-prune"
   toolConfig:
     skip:
-      # NestJS 等框架以装饰器/约定注册，符号"被使用"但不出现 import —— 不跳过会大量误报
-      - "(.*\\.module\\.ts)$"
-      - "(.*\\.controller\\.ts)$"
-      - "(.*\\.resolver\\.ts)$"
-      - "(.*\\.gateway\\.ts)$"
-      - "(.*\\.decorator\\.ts)$"
-      - "(.*\\.guard\\.ts)$"
-      - "(.*\\.interceptor\\.ts)$"
-      - "(.*\\.pipe\\.ts)$"
-      - "(.*\\.filter\\.ts)$"
-      - "(.*\\.middleware\\.ts)$"
-      - "(^src/main\\.ts)$"
-      - "(.*\\.config\\.ts)$"
-      - "(index\\.ts)$"
+      # 纯类型/声明文件：不含可执行引用关系，skip 与 ignore 等价，且输出全为类型噪音
       - "(.*\\.enum\\.ts)$"
       - "(.*\\.interface\\.ts)$"
       - "(.*\\.type\\.ts)$"
       - "(.*\\.d\\.ts)$"
     ignore:
       - "(node_modules|dist|build|coverage)/"
+      # 工具约定加载的入口配置（vitest/playwright/vite.config.ts 等）由 CLI 读取而非 import，
+      # 其 export default 天然零引用。必须用 ignore 而非 skip：ts-prune 的 skip 同时作用于
+      # 「引用证据」与「被检查对象」（lib/analyzer.js getReferences + filterSkippedFiles），
+      # skip 掉 vitest.config.ts 会连带抹掉它对 shared/src/vitest.config.base.ts 中
+      # makeVitestConfig / packagesDir 的引用，使这两个真实被消费的导出反被误判为死代码。
+      - ".*/(vitest|playwright|vite)\\.config\\.ts:"
+      - ".*/tsconfig\\.json:"
+      # NestJS 等框架以装饰器/约定注册，符号"被使用"但不出现 import。
+      # 同样必须走 ignore 而非 skip：这些文件里既有装饰器注册的「隐式使用」，也有普通的
+      # 函数调用与 import（如 admin-auth.guard.ts 调用 admin-token.ts 的 verifyAdminToken）。
+      # skip 会把该文件对其他模块的引用一并抹掉，使被调用方反被误判为死代码。
+      - ".*/[^/]*\\.(module|controller|resolver|gateway|decorator|guard|interceptor|pipe|filter|middleware)\\.ts:"
+      - "(^|/)main\\.ts:"
+      # refactor/security 的 __tests__/fixtures 是被检测器的测试数据：按设计就必须包含
+      # 重复代码、超长函数、深嵌套等坏味道，其导出"无引用"是刻意的，不是死代码。
+      - ".*/__tests__/fixtures/.*:"
+      # 勿改成 (index\.ts)$：ts-prune 的 -i 匹配 presenter 拼好的整行 "file:line - symbol"
+      # （runner.js `!file.match(ignore)`），行尾是符号名，$ 锚定永不命中 → ignore 静默失效，
+      # barrel 误报涌入（实测 465 条 → 修正后 0 条）。
+      - "(^|/)index\\.ts:"
+      # browser.ts 与 index.ts 同类（纯再导出 barrel，8 行），但入口不来自 package.json main，
+      # 而来自 packages/desktop/vite.config.ts 的 '@zh/kernel' → 'src/browser.ts' alias。
+      # overlay 把 @zh/<pkg> 统一映射到 src/index.ts，ts-prune 静态看不到 alias 解析结果，
+      # 于是该 barrel 的 7 个导出被误判为死代码。属入口 barrel，非死代码。
+      - "(^|/)browser\\.ts:"
+      # engineApi.ts 是渲染进程的 IPC 桥：函数经 preload contextBridge 暴露、由 ipcRenderer
+      # 按 channel 字符串调用，没有一条是 import 进来的（与 NestJS 装饰器注册同类）。
+      # 后端 handler 链完整（preload + ipc/*），删除会破坏 IPC 契约。
+      - ".*/services/engineApi\\.ts:"
   severity: "low"
   categories:
     - "cleanup"

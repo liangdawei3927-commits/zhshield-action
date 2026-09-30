@@ -172,6 +172,53 @@ describe('SopLazyLoader', () => {
     });
   });
 
+  // ─── refreshAllLoadedModules ────────────────────
+  describe('refreshAllLoadedModules（同步后强制重建）', () => {
+    it('force 模式应绕过 24h 新鲜窗口重写非 security 模块', async () => {
+      const feature: ProjectFeature = { language: 'typescript', features: [] };
+      await loader.syncForProject(feature);
+      const tsPath = path.join(cacheDir, 'modules', 'typescript.db');
+      const beforeMtime = fs.statSync(tsPath).mtimeMs;
+
+      // 立即强制刷新（默认 force=true），typescript 本在 24h 新鲜窗口内也应被重写
+      await loader.refreshAllLoadedModules();
+      const afterMtime = fs.statSync(tsPath).mtimeMs;
+      expect(afterMtime).toBeGreaterThanOrEqual(beforeMtime);
+    });
+
+    it('registry 规则更新后 force 刷新应写入新规则内容', async () => {
+      const feature: ProjectFeature = { language: 'typescript', features: [] };
+      await loader.syncForProject(feature);
+
+      // 模拟校准：registry 中的 type-safety 规则变为新版本
+      const refreshedRules = rules.map((r) =>
+        r.id === 'typescript.type-safety'
+          ? { ...r, content: { ...r.content, forbidden: ['as any'], excludePatterns: ['**/*.d.ts'] } }
+          : r,
+      );
+      loader = new SopLazyLoader(makeCacheManagerMock(cacheDir, refreshedRules));
+
+      await loader.refreshAllLoadedModules();
+
+      const tsRules = await loader.getModuleRules('typescript');
+      const typeSafety = tsRules.find((r) => r.id === 'typescript.type-safety');
+      expect(typeSafety).toBeDefined();
+      expect(typeSafety!.content.forbidden).toEqual(['as any']);
+      expect(typeSafety!.content.excludePatterns).toEqual(['**/*.d.ts']);
+    });
+
+    it('force=false 时应遵守 24h 新鲜窗口（非 security 模块不重写）', async () => {
+      const feature: ProjectFeature = { language: 'typescript', features: [] };
+      await loader.syncForProject(feature);
+      const tsPath = path.join(cacheDir, 'modules', 'typescript.db');
+      const beforeMtime = fs.statSync(tsPath).mtimeMs;
+
+      await loader.refreshAllLoadedModules(false);
+      const afterMtime = fs.statSync(tsPath).mtimeMs;
+      expect(afterMtime).toBe(beforeMtime);
+    });
+  });
+
   // ─── removeModule ────────────────────────────────
   describe('removeModule', () => {
     it('删除后 getLoadedModules 不再包含该模块', async () => {

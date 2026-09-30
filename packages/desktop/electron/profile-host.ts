@@ -26,6 +26,7 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** 投递给 profile worker 的作业：任务类型 + 项目路径 + 可选参数 */
 export interface ProfileJob {
   type: ProfileWorkerRequest['type'];
   projectPath: string;

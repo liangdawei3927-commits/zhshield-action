@@ -76,11 +76,13 @@ export const TASK_KIND_DEFAULT_LABELS: Record<TaskKind, string> = {
   refactor: 'task.kind.refactor',
 };
 
+/** useTaskRun 的返回值：loading/排队/进度/状态文案 + 对应任务条目 */
 export interface TaskRunState {
   loading: boolean;
   queued: boolean;
   progress: number;
   progressLabel: string;
+  statusMessage: string;
   task: TaskInfo | undefined;
 }
 
@@ -95,6 +97,7 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
     queued: false,
     progress: 0,
     progressLabel: '',
+    statusMessage: '',
     task: undefined,
   };
   if (!task || (task.status !== 'queued' && task.status !== 'running')) return idle;
@@ -107,6 +110,7 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
       queued: true,
       progress: 0,
       progressLabel: t('task.queuedLabel', { position: pos }),
+      statusMessage: '',
       task,
     };
   }
@@ -117,6 +121,7 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
     queued: false,
     progress: task.progress || 0,
     progressLabel: t('task.runningLabel', { kind: base, percent, suffix }),
+    statusMessage: task.message?.trim() ?? '',
     task,
   };
 }

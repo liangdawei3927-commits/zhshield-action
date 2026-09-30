@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
+import type { SentinelEvent } from '@zh/sentinel';
 import {
   getSentinelEvents,
   startSentinelMonitoring,
@@ -9,6 +10,7 @@ import {
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { AiFixIssue } from '../utils/copyToAi';
 
+/** 哨兵事件展示条目：事件元信息 + 定位/诊断/上下文证据 */
 export interface SentinelEventItem {
   id: string;
   title: string;
@@ -119,6 +121,7 @@ export const EVENT_LIFECYCLE_STEPS = [
   { key: 'archive', labelKey: 'lifecycle.archive' },
 ] as const;
 
+/** 事件闭环阶段键（取自 EVENT_LIFECYCLE_STEPS，与事件 status 经 STATUS_TO_STAGE 映射） */
 export type LifecycleStage = (typeof EVENT_LIFECYCLE_STEPS)[number]['key'];
 
 const STATUS_TO_STAGE: Record<string, LifecycleStage> = {
@@ -171,11 +174,27 @@ function useSentinelEventData(onLoaded: () => void): {
 
   const refreshEvents = useCallback(() => {
     getSentinelEvents()
-      .then((data) => setEvents((data ?? []) as unknown as SentinelEventItem[]))
+      .then((data) => setEvents((data ?? []).map(toSentinelEventItem)))
       .finally(onLoaded);
   }, [onLoaded]);
 
   return { events, refreshEvents };
+}
+
+/** 哨兵事件（@zh/sentinel 运行期形状）→ 页面展示模型：只映射真实存在的字段 */
+function toSentinelEventItem(e: SentinelEvent): SentinelEventItem {
+  return {
+    id: e.id,
+    title: e.title,
+    // 运行期无 type 字段，module 是最贴近的语义来源（TYPE_LABELS 未命中时回退原始文本）
+    type: e.module,
+    severity: e.severity,
+    source: e.service,
+    status: e.status,
+    occurrenceCount: e.occurrenceCount,
+    // HTTP/IPC 序列化差异：Date 或 ISO 字符串均需规整为 string
+    lastSeen: e.lastSeen instanceof Date ? e.lastSeen.toISOString() : String(e.lastSeen),
+  };
 }
 
 /** 监控启停：监控状态 + 开启动作（挂载即自动启动，IPC 侧幂等） */
@@ -311,6 +330,7 @@ export function eventToAiFixIssue(event: SentinelEventItem): AiFixIssue {
     column: ctx.location?.column,
     message,
     suggestion: event.diagnosis?.suggestion,
+    domain: 'sentinel',
   };
 }
 

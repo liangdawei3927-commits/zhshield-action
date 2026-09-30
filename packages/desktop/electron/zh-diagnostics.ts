@@ -1,5 +1,6 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { basename, extname, join, relative, sep } from 'node:path';
 import { t } from '@zh/i18n';
 import { WhitelistManager } from '@zh/guard';
 import type { GuardReport } from '@zh/guard';
@@ -12,8 +13,10 @@ import type { DependencyReportData, TechDebtReportData } from '../src/types/elec
 
 // ─── 诊断条目（归一化，跨 guard/inspect/refactor） ─────────────────────
 
+/** 归一化诊断严重级别：error / warning / info */
 export type DiagnosticSeverity = 'error' | 'warning' | 'info';
 
+/** 归一化诊断条目：跨 guard/inspect/refactor 等引擎统一的问题描述（落盘进 latest.json） */
 export interface DiagnosticEntry {
   /** 规则 ID（guard 为 checkId，refactor 为 smell 规则） */
   ruleId: string;
@@ -36,6 +39,7 @@ export interface DiagnosticEntry {
 
 // ─── LSP 风格按文件视图（模拟 publishDiagnostics） ─────────────────────
 
+/** LSP 风格诊断项（模拟 publishDiagnostics 载荷，行列均为 0-based） */
 export interface LspDiagnostic {
   range: {
     start: { line: number; character: number };
@@ -53,6 +57,7 @@ export interface LspDiagnostic {
   };
 }
 
+/** 按文件聚合的诊断视图：文件 URI + 该文件的 LSP 诊断项 */
 export interface FileDiagnostics {
   uri: string;
   diagnostics: readonly LspDiagnostic[];
@@ -78,6 +83,7 @@ export interface DomainDimensionScore {
   version?: number;
 }
 
+/** 落盘的诊断报告（.zhshield/diagnostics/latest.json）：问题汇总 + 条目 + 按文件视图 */
 export interface DiagnosticsReport {
   version: '1.0';
   project: { path: string; name: string };
@@ -89,6 +95,8 @@ export interface DiagnosticsReport {
   dimensionScore?: DomainDimensionScore;
   /** 上一次检查的维度分（覆盖写前从旧快照抢救出来的，供「上次 → 本次」对比；仅 inspect） */
   previousScore?: { score: number; generatedAt: string };
+  /** 项目 ESLOC（S2 密度归一化分母；仅 inspect 快照携带，供报告中心汇总同口径复用） */
+  esloc?: number;
 }
 
 // ─── 归一化：PipelineReport → DiagnosticEntry[] ────────────────────────
@@ -108,7 +116,11 @@ export function normalizeGuardSource(
   if ('evaluations' in guard) {
     return normalizeRuleEngine(guard, 'guard');
   }
-  return guard.results
+  // 旧版 pipeline-worker（JSON 剥键序列化）可能产出无 results 的 guard 段：
+  // 直接 .filter 会 TypeError，persistDiagnostics 抛错 → 诊断文件永不刷新。
+  const guardResults = guard.results;
+  if (!Array.isArray(guardResults)) return [];
+  return guardResults
     .filter((result) => result.status !== 'passed')
     .map((result) => ({
       ruleId: result.checkId,
@@ -129,7 +141,11 @@ export function normalizeInspectSource(
   if ('evaluations' in inspect) {
     return normalizeRuleEngine(inspect, 'inspect');
   }
-  return inspect.issues.map((issue) => ({
+  // 同 guard：旧版 worker 剥键后可能无 issues（今天 fixed 的 inspect.json 曾 esloc
+  // undefined + issues 缺失 → UI 读快照得 0 分）。防御后空数组照常落盘 0 检出。
+  const inspectIssues = inspect.issues;
+  if (!Array.isArray(inspectIssues)) return [];
+  return inspectIssues.map((issue) => ({
     ruleId: issue.ruleId,
     severity: issue.severity,
     category: issue.category,
@@ -189,6 +205,7 @@ function normalizeRuleEngine(
 }
 
 export function normalizeRefactorSource(refactor: RefactorReport): readonly DiagnosticEntry[] {
+  if (!Array.isArray(refactor.files)) return [];
   return refactor.files.flatMap((file) =>
     file.smells.map((smell) => ({
       ruleId: smell.ruleId,
@@ -206,9 +223,12 @@ export function normalizeRefactorSource(refactor: RefactorReport): readonly Diag
   );
 }
 
-/** RuleEngine violation 五级严重度 → 三级诊断严重度 */
+/** RuleEngine violation 严重度 → 三级诊断严重度
+ * 注意:SOP 规则经序列化/落到 DB 后,运行时可能产出联合类型之外的 `warning`
+ * (实测 2026-09-21 体检被此处 assertNever 打断 → 诊断文件永不刷新)。
+ * 显式并入映射,钳住该通道,严禁再次落入 default 抛错。 */
 function mapViolationSeverity(
-  severity: NonNullable<RuleEvaluation['violations']>[number]['severity'],
+  severity: NonNullable<RuleEvaluation['violations']>[number]['severity'] | 'warning',
 ): DiagnosticSeverity {
   switch (severity) {
     case 'critical':
@@ -217,6 +237,7 @@ function mapViolationSeverity(
       return 'error';
     case 'medium':
     case 'low':
+    case 'warning':
       return 'warning';
     case 'info':
       return 'info';
@@ -291,6 +312,84 @@ function mapLspSeverity(severity: DiagnosticSeverity): LspDiagnostic['severity']
   }
 }
 
+// ─── ESLOC（S2 密度归一化的规模分母） ───────────────────────────────────
+
+/** ESLOC 口径：TS 系源码文件的非空行合计（S2 章程修正②的密度因子分母）。
+ * 只统计 .ts/.tsx/.mts/.cts —— 排除 JS 工具链/脚本（.js/.jsx/.mjs/.cjs），
+ * 避免 eslint 配置、构建脚本等非被巡检源码稀释密度因子。
+ * 还排除：test/spec 目录、*.test.* / *.spec.* / *.d.ts、依赖与产物目录。
+ * 与 zh-diagnostics 得分口径对齐：只统计会被巡检/评分影响的源码行（校准 ts/tsx-only ≈85K）。
+ */
+const ESLOC_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
+const ESLOC_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'dist-electron', 'build', 'coverage', 'generated', '.turbo', '.next', '.cache']);
+const ESLOC_TEST_DIR_RE = /^(test|tests|__tests__|spec|e2e)$/i;
+const ESLOC_TEST_FILE_RE = /\.(test|spec)\.[^.]+$/;
+
+function isEslocTestFile(relPath: string): boolean {
+  const segments = relPath.split(sep);
+  if (segments.some((s) => ESLOC_TEST_DIR_RE.test(s))) return true;
+  return ESLOC_TEST_FILE_RE.test(relPath);
+}
+
+/** 读取目录条目；目录不可读返回 null（调用方整体跳过该目录，不抛错） */
+async function readEslocDir(dir: string): Promise<Dirent[] | null> {
+  try {
+    return await readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+}
+
+/** 单文件非空行计数（ESLOC 口径：trim 后非空即计 1 行）；读取失败由调用方跳过 */
+async function countLinesInFile(fullPath: string): Promise<number> {
+  const content = await readFile(fullPath, 'utf-8');
+  let count = 0;
+  for (const line of content.split('\n')) {
+    if (line.trim().length > 0) count += 1;
+  }
+  return count;
+}
+
+/** 单个目录条目处理：目录入队 / 源文件计入 ESLOC，返回该条目的行数贡献；跳过目录/文件读取失败返回 0 */
+async function collectEslocEntry(
+  projectPath: string,
+  dir: string,
+  entry: Dirent,
+  pending: string[],
+): Promise<number> {
+  const full = join(dir, entry.name);
+  if (entry.isDirectory()) {
+    if (!ESLOC_SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) pending.push(full);
+    return 0;
+  }
+  if (!entry.isFile()) return 0;
+  const ext = extname(entry.name);
+  if (!ESLOC_EXTENSIONS.has(ext)) return 0;
+  const rel = relative(projectPath, full);
+  if (isEslocTestFile(rel)) return 0;
+  try {
+    return await countLinesInFile(full);
+  } catch {
+    // 单文件读取失败不影响整体统计
+    return 0;
+  }
+}
+
+/** 统计项目源文件 ESLOC（非空行数）。目录不可读/文件损坏时跳过该条，不抛错。 */
+export async function countSourceEsloc(projectPath: string): Promise<number> {
+  let total = 0;
+  const pending = [projectPath];
+  while (pending.length > 0) {
+    const dir = pending.pop() as string;
+    const entries = await readEslocDir(dir);
+    if (entries === null) continue;
+    for (const entry of entries) {
+      total += await collectEslocEntry(projectPath, dir, entry, pending);
+    }
+  }
+  return total;
+}
+
 // ─── 落盘 ──────────────────────────────────────────────────────────────
 
 // 串行化写入队列：并发扫描（guard/inspect/refactor/performance 可并行触发）时
@@ -312,6 +411,113 @@ export function domainSnapshotPath(projectPath: string, source: DiagnosticSource
   return join(projectPath, '.zhshield', 'diagnostics', 'domains', `${source}.json`);
 }
 
+/** 按域拆分快照条目：跑过的域先占位（空数组），未跑过的域保留旧快照 */
+function buildPerSourceEntries(
+  report: DiagnosticsReport,
+  ranSources: readonly DiagnosticSource[],
+): Map<DiagnosticSource, DiagnosticEntry[]> {
+  const perSource = new Map<DiagnosticSource, DiagnosticEntry[]>();
+  for (const source of ranSources) perSource.set(source, []);
+  for (const entry of report.issues) {
+    const bucket = perSource.get(entry.source);
+    if (bucket) bucket.push(entry);
+    else perSource.set(entry.source, [entry]);
+  }
+  return perSource;
+}
+
+/** 写入 latest.json 与各域快照（各域快照彼此独立 → 并行写，不做串行 await） */
+async function writeDomainSnapshots(
+  report: DiagnosticsReport,
+  perSource: Map<DiagnosticSource, DiagnosticEntry[]>,
+): Promise<void> {
+  if (perSource.size === 0) return;
+  await mkdir(join(report.project.path, '.zhshield', 'diagnostics', 'domains'), {
+    recursive: true,
+  });
+  const writes: Promise<void>[] = [];
+  const esloc = perSource.has('inspect') ? await countSourceEsloc(report.project.path) : 0;
+  for (const [source, issues] of perSource) {
+    const snapshot = await buildDomainSnapshot(report, source, issues, esloc);
+    writes.push(
+      writeFile(
+        domainSnapshotPath(report.project.path, source),
+        `${JSON.stringify(snapshot, null, 2)}\n`,
+        'utf-8',
+      ),
+    );
+  }
+  await Promise.all(writes);
+}
+
+async function buildDomainSnapshot(
+  report: DiagnosticsReport,
+  source: DiagnosticSource,
+  issues: readonly DiagnosticEntry[],
+  esloc: number,
+): Promise<DiagnosticsReport> {
+  const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
+  if (source !== 'inspect') return snapshot;
+  await enrichInspectSnapshot(report, snapshot, esloc);
+  return snapshot;
+}
+
+/** 巡检快照当场出分（quality 维，S1+S2：同规则聚合封顶 + ESLOC 密度归一化）并抢救上一轮分数 */
+async function enrichInspectSnapshot(
+  report: DiagnosticsReport,
+  snapshot: DiagnosticsReport,
+  esloc: number,
+): Promise<void> {
+  const [quality] = buildHealthDimensions({
+    guard: null,
+    inspect: {
+      issues: snapshot.issues.map((e) => ({
+        severity: e.severity,
+        category: e.category,
+        ruleId: e.ruleId,
+      })),
+      esloc,
+    },
+  });
+  snapshot.esloc = esloc;
+  if (quality?.name === 'quality' && quality.status) {
+    snapshot.dimensionScore = {
+      dimension: 'quality',
+      score: quality.score,
+      issues: quality.issues,
+      status: quality.status,
+      version: SCORE_VERSION,
+    };
+  }
+  const previousScore = await rescuePreviousScore(report);
+  if (previousScore) snapshot.previousScore = previousScore;
+}
+
+/** 「上次 → 本次」对比：从旧快照抢救上一轮 dimensionScore（generatedAt 不同且算法版本一致才带） */
+async function rescuePreviousScore(
+  report: DiagnosticsReport,
+): Promise<{ score: number; generatedAt: string } | undefined> {
+  try {
+    const oldRaw = await readFile(domainSnapshotPath(report.project.path, 'inspect'), 'utf-8');
+    const old = JSON.parse(oldRaw) as {
+      generatedAt?: string;
+      dimensionScore?: { score: number; version?: number };
+    };
+    if (
+      old.dimensionScore &&
+      typeof old.dimensionScore.score === 'number' &&
+      old.dimensionScore.version === SCORE_VERSION &&
+      old.generatedAt &&
+      old.generatedAt !== report.generatedAt
+    ) {
+      return { score: old.dimensionScore.score, generatedAt: old.generatedAt };
+    }
+  } catch {
+    // 旧快照不存在/损坏 → 无对比基线，静默跳过
+  }
+  return undefined;
+}
+
 /** 写入 <project>/.zhshield/diagnostics/latest.json，返回绝对路径 */
 export async function writeDiagnosticsFile(
   report: DiagnosticsReport,
@@ -320,77 +526,23 @@ export async function writeDiagnosticsFile(
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
   const absPath = join(dir, 'latest.json');
   const payload = `${JSON.stringify(report, null, 2)}\n`;
-  // 按域拆分快照：同一份报告里可能含多个来源（pipeline 全量落盘），逐个写出
-  const perSource = new Map<DiagnosticSource, DiagnosticEntry[]>();
-  // 跑过的域先占位（空数组）：**「跑过且 0 检出」必须覆盖写空快照**，
-  // 否则磁盘上留着上一次那份「有问题」的快照，界面上已修好的问题永不消失。
-  // 只有「这次没跑」的域才保留旧快照 —— 二者语义必须区分。
-  for (const source of ranSources) perSource.set(source, []);
-  for (const entry of report.issues) {
-    const bucket = perSource.get(entry.source);
-    if (bucket) bucket.push(entry);
-    else perSource.set(entry.source, [entry]);
-  }
+  const perSource = buildPerSourceEntries(report, ranSources);
   // 排队执行，避免并发扫描时多次 writeFile 交错覆盖
-  writeQueue = writeQueue.then(async () => {
-    await mkdir(dir, { recursive: true });
-    await writeFile(absPath, payload, 'utf-8');
-    if (perSource.size === 0) return;
-    await mkdir(join(dir, 'domains'), { recursive: true });
-    // 各域快照彼此独立 → 并行写，不做串行 await
-    const writes: Promise<void>[] = [];
-    for (const [source, issues] of perSource) {
-      const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
-      // 巡检跑完当场出分：quality 维评分与报告中心汇总共用 @zh/scoring 的
-      // buildHealthDimensions（error -8 / warning -4 / info -1，下限 0），
-      // 不引入第三套算法；0 检出 → 100 分同样覆盖写。
-      if (source === 'inspect') {
-        const [quality] = buildHealthDimensions(null, { issues: issues.map((e) => ({ severity: e.severity, category: e.category })) });
-        if (quality?.name === 'quality' && quality.status) {
-          snapshot.dimensionScore = {
-            dimension: 'quality',
-            score: quality.score,
-            issues: quality.issues,
-            status: quality.status,
-            version: SCORE_VERSION,
-          };
-        }
-        // 「上次 → 本次」对比：覆盖写会把旧分抹掉，先从旧快照里抢救出上一轮的
-        // dimensionScore（generatedAt 不同才算是另一轮检查；相同说明是同轮重复落盘）。
-        // 算法版本不同（v1 快照无 version 字段）→ 不带 previousScore，
-        // UI 不显示对比行（跨版本分数不可比，scoreVersion 2 口径）。
-        try {
-          const oldRaw = await readFile(domainSnapshotPath(report.project.path, source), 'utf-8');
-          const old = JSON.parse(oldRaw) as {
-            generatedAt?: string;
-            dimensionScore?: { score: number; version?: number };
-          };
-          if (
-            old.dimensionScore &&
-            typeof old.dimensionScore.score === 'number' &&
-            old.dimensionScore.version === SCORE_VERSION &&
-            old.generatedAt &&
-            old.generatedAt !== report.generatedAt
-          ) {
-            snapshot.previousScore = {
-              score: old.dimensionScore.score,
-              generatedAt: old.generatedAt,
-            };
-          }
-        } catch {
-          // 旧快照不存在/损坏 → 无对比基线，静默跳过
-        }
-      }
-      writes.push(
-        writeFile(
-          domainSnapshotPath(report.project.path, source),
-          `${JSON.stringify(snapshot, null, 2)}\n`,
-          'utf-8',
-        ),
+  writeQueue = writeQueue
+    .then(async () => {
+      await mkdir(dir, { recursive: true });
+      await writeFile(absPath, payload, 'utf-8');
+      await writeDomainSnapshots(report, perSource);
+    })
+    .catch((err) => {
+      // 自愈：单次写入失败只记 warn 复位队列，writeQueue 不永久 reject。
+      // 否则某轮 mkdir/writeFile 抛错后，后续每次 `await writeQueue` 直接抛，
+      // latest.json / domains/*.json 永不刷新 → UI 体检永远 0 分（本轮根因之一）。
+      console.warn(
+        '[zh-diagnostics] 诊断文件写入失败（队列已自愈，后续写入可继续）:',
+        err instanceof Error ? err.message : String(err),
       );
-    }
-    await Promise.all(writes);
-  });
+    });
   await writeQueue;
   return absPath;
 }
@@ -593,6 +745,13 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
   return entries;
 }
 
+/** severityFactor 是组内 severity 权重均值（error=3 / warning=2 / info=1），反查回原档位 */
+function severityFromFactor(severityFactor: number): DiagnosticSeverity {
+  if (severityFactor >= 2.5) return 'error';
+  if (severityFactor >= 1.5) return 'warning';
+  return 'info';
+}
+
 /** techdebt 引擎：未处理（pending/planned/in-progress）债务动作 → 落盘条目 */
 export function normalizeTechDebtSource(data: TechDebtReportData): readonly DiagnosticEntry[] {
   const UNPROCESSED: ReadonlySet<string> = new Set(['pending', 'planned', 'in-progress']);
@@ -600,10 +759,10 @@ export function normalizeTechDebtSource(data: TechDebtReportData): readonly Diag
     .filter((action) => UNPROCESSED.has(action.status))
     .map((action) => ({
       ruleId: `debt:${action.actionId}`,
-      severity: 'warning',
+      severity: severityFromFactor(action.interestBreakdown.severityFactor),
       category: `techdebt:${action.category}`,
       message: `${action.module} 债务项估价 ${action.principalEstimate}，ROI ${action.roi}${action.recommended ? '（推荐优先处理）' : ''}`,
-      file: '',
+      file: action.module,
       autoFixable: false,
       source: 'techdebt' as const,
       fingerprint: `debt:${action.actionId}:0`,

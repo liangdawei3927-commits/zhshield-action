@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import { grypeMapper } from '@zh/shared';
 import type { ExecError, GrypeOutput } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -125,26 +125,6 @@ export class GrypeAdapter implements ToolAdapter {
   }
 
   private mapOutput(output: GrypeOutput): Issue[] {
-    if (!output?.matches || !Array.isArray(output.matches)) return [];
-    return output.matches.map((m) => {
-      const sev = (m.vulnerability?.severity || '').toLowerCase();
-      return {
-        id: randomUUID(),
-        ruleId: m.vulnerability?.id || 'grype-unknown',
-        severity:
-          sev === 'critical' || sev === 'high' ? 'error' : sev === 'medium' ? 'warning' : 'info',
-        category: 'security',
-        message: `${m.artifact?.name || '?'}@${m.artifact?.version || '?'}: ${m.vulnerability?.description || m.vulnerability?.id || ''}`,
-        file: '',
-        line: 0,
-        column: 0,
-        suggestion: m.vulnerability?.fixedInVersion
-          ? `升级到 ${m.vulnerability.fixedInVersion}`
-          : undefined,
-        autoFixable: !!m.vulnerability?.fixedInVersion,
-        source: 'security',
-        fingerprint: `grype:${m.vulnerability?.id || ''}:${m.artifact?.name || ''}`,
-      };
-    });
+    return grypeMapper(output);
   }
 }

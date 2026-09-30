@@ -56,13 +56,15 @@ function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api/v1', {
     exclude: ['health', 'ready', 'live', 'metrics', ...ADMIN_UI_PATHS],
   });
-
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-
   app.enableCors({ origin: resolveAllowedOrigins(), credentials: true });
+  applySecurityHeaders(app);
+  setupSwagger(app);
+}
 
-  // 安全响应头（P13）：CSP/点击劫持/MIME 嗅探/来源策略等。管理页为内联脚本与样式
-  // （无外部静态资源），显式放行 inline script/style，其余指令保持 helmet 默认值。
+// 安全响应头（P13）：CSP/点击劫持/MIME 嗅探/来源策略等。管理页为内联脚本与样式
+// （无外部静态资源），显式放行 inline script/style，其余指令保持 helmet 默认值。
+function applySecurityHeaders(app: INestApplication): void {
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -73,8 +75,6 @@ function configureApp(app: INestApplication): void {
       },
     }),
   );
-
-  setupSwagger(app);
 }
 
 function setupSwagger(app: INestApplication): void {

@@ -18,6 +18,7 @@ import type {
 } from './pipeline-protocol';
 import { readConfig } from './ipc/guard-config';
 
+/** 子进程进度回调：(阶段, 阶段说明, 0-100 进度) */
 export type ProgressHandler = (stage: string, message: string, progress: number) => void;
 
 const WORKER_SCRIPT = path.join(__dirname, 'pipeline-worker.js');

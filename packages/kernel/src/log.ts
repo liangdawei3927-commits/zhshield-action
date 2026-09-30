@@ -1,3 +1,4 @@
+/** 日志级别：由低到高为 debug < info < warn < error，用于按阈值过滤输出 */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };

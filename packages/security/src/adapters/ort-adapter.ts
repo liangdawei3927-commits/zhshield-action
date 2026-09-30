@@ -53,7 +53,7 @@ interface OrtAnalyzerResult {
 }
 
 interface OrtParseState {
-  currentPkg: Record<string, unknown> | null;
+  currentPkg: OrtPackageEntry | null;
   inPackages: boolean;
   indentDepth: number;
 }
@@ -72,30 +72,37 @@ export class ORTAdapter implements ToolAdapter {
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
-    // 归一化 projectPath 为绝对路径：相对路径会作为 -i 输入与输出目录传给 ort，
-    // ort 以自身 cwd 解析导致扫描失败。
-    const projectPath = path.resolve(options.projectPath);
-    const outputDir = path.join(projectPath, '.zhshield', '.ort-output');
+    const { projectPath, outputDir } = this.resolveScanPaths(options.projectPath);
 
     try {
       await this.runOrtAnalyze(options, projectPath, outputDir);
       const issues = await this.readAnalyzerResult(outputDir);
       await this.cleanupOutputDir(outputDir);
-
-      return {
-        tool: 'ort',
-        status: 'available',
-        issues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: issues.length,
-        },
-      };
+      return this.buildAvailableResult(start, issues);
     } catch (error) {
       return this.buildErrorResult(start, error as ExecError, outputDir);
     }
+  }
+
+  private resolveScanPaths(projectPath: string): { projectPath: string; outputDir: string } {
+    // 归一化 projectPath 为绝对路径：相对路径会作为 -i 输入与输出目录传给 ort，
+    // ort 以自身 cwd 解析导致扫描失败。
+    const resolved = path.resolve(projectPath);
+    return { projectPath: resolved, outputDir: path.join(resolved, '.zhshield', '.ort-output') };
+  }
+
+  private buildAvailableResult(start: number, issues: Issue[]): ToolResult {
+    return {
+      tool: 'ort',
+      status: 'available',
+      issues,
+      metadata: {
+        version: '',
+        duration: Date.now() - start,
+        timestamp: new Date(),
+        fileCount: issues.length,
+      },
+    };
   }
 
   private async runOrtAnalyze(
@@ -230,7 +237,7 @@ export class ORTAdapter implements ToolAdapter {
     state: OrtParseState,
   ): OrtAnalyzerResult | null {
     if (state.currentPkg) {
-      packages.push(state.currentPkg as unknown as OrtPackageEntry);
+      packages.push(state.currentPkg);
     }
     if (packages.length > 0) {
       return { analyzer: { result: { packages } } };
@@ -267,7 +274,7 @@ export class ORTAdapter implements ToolAdapter {
 
   private closePackage(packages: OrtPackageEntry[], state: OrtParseState): void {
     if (state.currentPkg) {
-      packages.push(state.currentPkg as unknown as OrtPackageEntry);
+      packages.push(state.currentPkg);
     }
     state.currentPkg = null;
     state.inPackages = false;
@@ -279,17 +286,17 @@ export class ORTAdapter implements ToolAdapter {
 
   private openPackage(
     packages: OrtPackageEntry[],
-    currentPkg: Record<string, unknown> | null,
+    currentPkg: OrtPackageEntry | null,
     trimmed: string,
-  ): Record<string, unknown> {
+  ): OrtPackageEntry {
     if (currentPkg) {
-      packages.push(currentPkg as unknown as OrtPackageEntry);
+      packages.push(currentPkg);
     }
-    return { id: trimmed.trimStart().slice(5).trim().replace(/['"]/g, '') };
+    return { id: trimmed.trimStart().slice(5).trim().replace(/['"]/g, ''), declared_licenses: [] };
   }
 
   private parsePackageField(
-    currentPkg: Record<string, unknown>,
+    currentPkg: OrtPackageEntry,
     line: string,
     lines: string[],
     indent: number,

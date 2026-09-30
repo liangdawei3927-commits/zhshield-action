@@ -10,6 +10,7 @@ export function toPosix(p: string): string {
   return p.split(path.sep).join('/');
 }
 
+/** 目录名是否属于噪声目录（vendored / 依赖产物 / 构建输出，判定依据 SKIP_DIRS） */
 export function isNoiseDir(name: string): boolean {
   return SKIP_DIRS.has(name);
 }
@@ -28,9 +29,36 @@ export function listRootFiles(projectRoot: string): string[] {
     .sort();
 }
 
+/**
+ * 探测真实项目根：projectPath 根目录命中任一标志文件名则直接返回；否则下探一层子目录
+ * （跳过噪声目录与符号链接）看是否命中，仍未命中则返回 projectPath 本身。
+ *
+ * lockfile-detector 与 manifest-detector 此前各复制一份只差「标志文件名集合」的探测实现，
+ * 此处收敛为唯一实现，标志文件判定由调用方以 hasMarker 注入。
+ */
+export function findMarkerProjectRoot(
+  projectPath: string,
+  hasMarker: (name: string) => boolean,
+): string {
+  if (listRootFiles(projectPath).some(hasMarker)) return projectPath;
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = fs.readdirSync(projectPath, { withFileTypes: true });
+  } catch {
+    return projectPath;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink() || isNoiseDir(entry.name)) continue;
+    const sub = path.join(projectPath, entry.name);
+    if (listRootFiles(sub).some(hasMarker)) return sub;
+  }
+  return projectPath;
+}
+
 /** 递归遍历默认深度上限（目录层级；防止符号链接环之外的病态深树拖垮扫描）。 */
 export const DEFAULT_MAX_DEPTH = 12;
 
+/** 目录遍历选项：自定义层级上限（默认 DEFAULT_MAX_DEPTH）。 */
 export interface WalkOptions {
   /** 目录层级上限（根目录=0 层）；达到上限不再下钻。默认 DEFAULT_MAX_DEPTH。 */
   readonly maxDepth?: number;

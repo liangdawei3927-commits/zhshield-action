@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+/** 归一化的 Trivy 命中：漏洞（vulnerability）或配置错误（misconfiguration）+ 所在扫描目标 target */
 export interface TrivyFinding {
   id: string;
   target: string;
@@ -21,6 +22,7 @@ export interface TrivyFinding {
   };
 }
 
+/** Trivy CLI 原始 JSON 输出结构（仅声明代码实际读取的字段，未使用字段省略） */
 export interface TrivyResult {
   SchemaVersion?: number;
   ArtifactName?: string;

@@ -1,0 +1,8 @@
+{
+  "ruleId": "security.scan.semgrep.path-traversal",
+  "assertions": [
+    { "file": "src/tainted.ts", "expect": "violation" },
+    { "file": "src/clean-local.ts", "expect": "clean" },
+    { "file": "src/clean-literal.ts", "expect": "clean" }
+  ]
+}

@@ -14,6 +14,10 @@ thresholds:
     - '*.test.ts'
     - '*.spec.ts'
     - '**/__tests__/**'
+    - '**/sop-templates/**'
+    - '**/test-fixtures/**'
+    - '**/assets/**'
+    - '**/db/migrations/**'
 check:
   tool: jscpd # 重复代码检测
   toolConfig: {}

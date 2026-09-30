@@ -8,6 +8,7 @@ const EXPIRES_LINE = /expiresAt:\s*['"]?(.+?)['"]?$/;
 const PATH_LINE = /path:\s*['"]?(.+?)['"]?$/;
 const PATTERN_LINE = /pattern:\s*['"]?(.+?)['"]?$/;
 
+/** 白名单条目：作用域（project / file / rule）+ 目标 + 可选规则 ID + 理由 + 生效期，供门禁豁免匹配 */
 export interface WhitelistEntry {
   id: string;
   projectId: string;
@@ -20,6 +21,7 @@ export interface WhitelistEntry {
   createdAt: string;
 }
 
+/** 白名单配置文件结构：按 project / file / rule 三类作用域分组声明豁免规则 */
 export interface WhitelistConfig {
   whitelist: {
     project?: Array<{ rule: string; reason: string; expiresAt?: string }>;

@@ -66,8 +66,10 @@ function warn(msg: string, err: unknown): void {
 
 // ─── 类型 ───
 
+/** 孤儿判定原因：目录缺失 / 目录为空 / 目录存在但仍有活跃数据 */
 export type OrphanReason = 'dir_missing' | 'dir_empty' | 'dir_present_with_content';
 
+/** 孤儿项目核对报告：确认/疑似孤儿清单、已回收画像与已清理的表行数 */
 export interface OrphanReconcileReport {
   scannedAt: string;
   activeProjectPaths: string[];
@@ -222,24 +224,42 @@ async function handleConfirmedOrphan(
 
 /** 本地是否存在待清理残留（画像 trash / DB 软删行 / 工具规则 / 能力账本） */
 async function hasLocalResiduals(db: ReturnType<typeof getDb>): Promise<boolean> {
+  if (await hasTrashResiduals()) return true;
+  if (await hasCapabilityRefsResiduals()) return true;
+  if (hasSoftDeletedRows(db)) return true;
+  return await hasToolRuleResiduals();
+}
+
+async function hasTrashResiduals(): Promise<boolean> {
   try {
-    const trashDir = path.join(PROFILES_DIR, 'trash');
-    const entries = await fs.promises.readdir(trashDir);
-    if (entries.length > 0) return true;
+    const entries = await fs.promises.readdir(path.join(PROFILES_DIR, 'trash'));
+    return entries.length > 0;
   } catch {
     // trash 不存在 → 无画像残留
+    return false;
   }
+}
+
+async function hasCapabilityRefsResiduals(): Promise<boolean> {
   try {
     const refs = await loadCapabilityRefs();
-    if (Object.keys(refs.capabilities).length > 0) return true;
+    return Object.keys(refs.capabilities).length > 0;
   } catch {
     // 账本不可读 → 视为无残留
+    return false;
   }
+}
+
+function hasSoftDeletedRows(db: ReturnType<typeof getDb>): boolean {
   try {
-    if (listSoftDeletedProjectIds(db).length > 0) return true;
+    return listSoftDeletedProjectIds(db).length > 0;
   } catch {
     // DB 不可查 → 视为无残留
+    return false;
   }
+}
+
+async function hasToolRuleResiduals(): Promise<boolean> {
   try {
     const toolIds = wisdomBrainSync.getRuleSync().getUnfilteredToolIds();
     for (const toolId of toolIds) {
@@ -261,27 +281,54 @@ async function resetToCleanState(
   db: ReturnType<typeof getDb>,
   emptySince: number,
 ): Promise<CleanResetReport> {
-  const purgedEntries: { table: string; deleted: number }[] = [];
-  const removedTools: string[] = [];
-  let profilesTrashCleared = false;
-  let sopCacheCleared = false;
-  let capabilityRefsCleared = false;
+  const profilesTrashCleared = await clearProfilesTrash();
+  const sopCacheCleared = await clearSopCache();
+  const removedTools = await removeAllToolRules();
+  const capabilityRefsCleared = await clearCapabilityRefs();
+  const purged = purgeAllSoftDeleted(db);
+  await auditLog
+    .logOrphanCleanup({
+      action: 'clean_reset',
+      emptySince,
+      profilesTrashCleared,
+      sopCacheCleared,
+      removedTools,
+      capabilityRefsCleared,
+      purged,
+    })
+    .catch(() => {});
+  return {
+    emptySince,
+    profilesTrashCleared,
+    sopCacheCleared,
+    removedTools,
+    capabilityRefsCleared,
+    purged,
+  };
+}
 
+async function clearProfilesTrash(): Promise<boolean> {
   try {
-    const trashDir = path.join(PROFILES_DIR, 'trash');
-    await fs.promises.rm(trashDir, { recursive: true, force: true });
-    profilesTrashCleared = true;
+    await fs.promises.rm(path.join(PROFILES_DIR, 'trash'), { recursive: true, force: true });
+    return true;
   } catch (err) {
     warn('[orphan-reconcile] 全局重置：清理画像 trash 失败:', err);
+    return false;
   }
+}
 
+async function clearSopCache(): Promise<boolean> {
   try {
     await sopCache.clearCache();
-    sopCacheCleared = true;
+    return true;
   } catch (err) {
     warn('[orphan-reconcile] 全局重置：清空 SOP 缓存失败:', err);
+    return false;
   }
+}
 
+async function removeAllToolRules(): Promise<string[]> {
+  const removedTools: string[] = [];
   try {
     const toolIds = wisdomBrainSync.getRuleSync().getUnfilteredToolIds();
     for (const toolId of toolIds) {
@@ -295,43 +342,32 @@ async function resetToCleanState(
   } catch (err) {
     warn('[orphan-reconcile] 全局重置：工具规则清除失败:', err);
   }
-
-  try {
-    await saveCapabilityRefs({ schemaVersion: 1, capabilities: {} });
-    capabilityRefsCleared = true;
-  } catch (err) {
-    warn('[orphan-reconcile] 全局重置：清空能力账本失败:', err);
-  }
-
-  try {
-    purgedEntries.push(...purgeExpiredSoftDeleted(db, 0));
-  } catch (err) {
-    warn('[orphan-reconcile] 全局重置：DB 软删行强清失败:', err);
-  }
-
-  await auditLog
-    .logOrphanCleanup({
-      action: 'clean_reset',
-      emptySince,
-      profilesTrashCleared,
-      sopCacheCleared,
-      removedTools,
-      capabilityRefsCleared,
-      purged: purgedEntries,
-    })
-    .catch(() => {});
-
-  return {
-    emptySince,
-    profilesTrashCleared,
-    sopCacheCleared,
-    removedTools,
-    capabilityRefsCleared,
-    purged: purgedEntries,
-  };
+  return removedTools;
 }
 
-/** 空项目集宽限逻辑：空集开始记录 → 7 天到期执行全局重置（项目重加则取消宽限） */
+async function clearCapabilityRefs(): Promise<boolean> {
+  try {
+    await saveCapabilityRefs({ schemaVersion: 1, capabilities: {} });
+    return true;
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：清空能力账本失败:', err);
+    return false;
+  }
+}
+
+function purgeAllSoftDeleted(db: ReturnType<typeof getDb>): { table: string; deleted: number }[] {
+  try {
+    return purgeExpiredSoftDeleted(db, 0);
+  } catch (err) {
+    warn('[orphan-reconcile] 全局重置：DB 软删行强清失败:', err);
+    return [];
+  }
+}
+
+/**
+ * 空项目集宽限逻辑：空集开始记录 → 7 天到期执行全局重置（项目重加则取消宽限）。
+ * 置于画像扫描/TTL 之后：重置为最后一个写操作，避免扫描新移入的残留被跳过。
+ */
 async function handleEmptyGrace(
   db: ReturnType<typeof getDb>,
   activeProjectPaths: string[],
@@ -357,143 +393,232 @@ async function handleEmptyGrace(
 
 // ─── 主流程 ───
 
-export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
-  const scannedAt = new Date().toISOString();
-  const emptyReport = (): OrphanReconcileReport => ({
+function emptyReport(scannedAt: string): OrphanReconcileReport {
+  return {
     scannedAt,
     activeProjectPaths: [],
     confirmedOrphans: [],
     suspectedOrphans: [],
     orphanProfilesTrashed: [],
     purged: [],
-  });
+  };
+}
 
+/** 读 projects.json → activeProjectPaths（parse 失败 / ENOENT → 空数组） */
+async function loadActiveProjectPaths(): Promise<string[]> {
+  try {
+    const parsed = JSON.parse(await readFile(PROJECTS_FILE, 'utf-8')) as unknown;
+    return (Array.isArray(parsed) ? parsed : [])
+      .map((p) => (p as { path?: unknown })?.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0);
+  } catch {
+    // 忽略：无项目列表
+    return [];
+  }
+}
+
+/**
+ * candidates = active − activeProjectPaths（精确字符串比较）
+ * 仅绝对路径（用户项目）参与孤儿判定：packages/* 是 @zh/scoring 的模块分键（相对路径），
+ * 不过滤会让 classifyDir 相对解析到 packages/desktop/packages/* → ENOENT → 误判「确认孤儿」
+ * → softDeleteProjectData 把模块分整波软删（本次 42 行两波清空）。主项目绝对路径不受影响。
+ */
+function computeOrphanCandidates(
+  db: ReturnType<typeof getDb>,
+  activeProjectPaths: string[],
+): string[] {
+  const active = new Set([...listActiveProjectIds(db)].filter((id) => path.isAbsolute(id)));
+  const candidates: string[] = [];
+  for (const id of active) {
+    if (!activeProjectPaths.includes(id)) candidates.push(id);
+  }
+  return candidates;
+}
+
+interface CandidateReconcileResult {
+  confirmedOrphans: OrphanReconcileReport['confirmedOrphans'];
+  suspectedOrphans: OrphanReconcileReport['suspectedOrphans'];
+}
+
+/** 单个 candidate 判定：确认孤儿（dir_missing/dir_empty）软删；疑似孤儿（有内容）按 30 天阈值升级或登记。单项目失败由调用方捕获跳过 */
+async function reconcileSingleCandidate(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  state: OrphanState,
+  now: number,
+  upgradeMs: number,
+  confirmedOrphans: OrphanReconcileReport['confirmedOrphans'],
+  suspectedOrphans: OrphanReconcileReport['suspectedOrphans'],
+): Promise<void> {
+  const reason = await classifyDir(projectId);
+  if (reason === 'dir_present_with_content') {
+    // 疑似孤儿：状态持久化 + 30 天升级
+    const raw = state[projectId];
+    const existing = typeof raw === 'object' && raw !== null ? raw : undefined;
+    if (existing && now - new Date(existing.firstSeenAt).getTime() > upgradeMs) {
+      await handleConfirmedOrphan(db, projectId, 'dir_present_with_content', confirmedOrphans);
+      delete state[projectId];
+      return;
+    }
+    const firstSeenAt = existing?.firstSeenAt ?? new Date().toISOString();
+    state[projectId] = { firstSeenAt };
+    await auditLog
+      .logOrphanCleanup({ action: 'suspected', projectId, firstSeenAt })
+      .catch(() => {});
+    suspectedOrphans.push({
+      projectId,
+      reason: 'dir_present_with_content',
+      activeRowCounts: countActiveRows(db, projectId),
+      firstSeenAt,
+    });
+    return;
+  }
+  // 确认孤儿（dir_missing | dir_empty）
+  await handleConfirmedOrphan(db, projectId, reason, confirmedOrphans);
+  delete state[projectId];
+}
+
+/** 4-6. 每个 candidate 判定（单项目失败仅 warn + 跳过，不中断整轮） */
+async function reconcileCandidates(
+  db: ReturnType<typeof getDb>,
+  candidates: string[],
+  state: OrphanState,
+): Promise<CandidateReconcileResult> {
+  const confirmedOrphans: OrphanReconcileReport['confirmedOrphans'] = [];
+  const suspectedOrphans: OrphanReconcileReport['suspectedOrphans'] = [];
+  const now = Date.now();
+  const upgradeMs = UPGRADE_DAYS * 24 * 60 * 60 * 1000;
+  for (const projectId of candidates) {
+    try {
+      await reconcileSingleCandidate(
+        db,
+        projectId,
+        state,
+        now,
+        upgradeMs,
+        confirmedOrphans,
+        suspectedOrphans,
+      );
+    } catch (err) {
+      warn(`[orphan-reconcile] 项目 ${projectId} 判定失败，跳过:`, err);
+    }
+  }
+  return { confirmedOrphans, suspectedOrphans };
+}
+
+interface OrphanProfileScan {
+  expectedKeys: Set<string>;
+  trashDir: string;
+  ts: number;
+}
+
+function collectExpectedProfileKeys(
+  db: ReturnType<typeof getDb>,
+  activeProjectPaths: string[],
+  candidates: string[],
+): Set<string> {
+  const expectedKeys = new Set<string>();
+  for (const p of [...activeProjectPaths, ...candidates, ...listActiveProjectIds(db)]) {
+    expectedKeys.add(normalizeKey(p));
+  }
+  return expectedKeys;
+}
+
+async function trashOrphanProfileFile(
+  file: string,
+  scan: OrphanProfileScan,
+): Promise<string | null> {
+  if (file === 'trash' || !file.endsWith('.json')) return null;
+  const fileKey = file.slice(0, -'.json'.length);
+  // 保护：跳过空 key 或含绝对路径分隔符的 key（防误删根路径）
+  if (!fileKey || fileKey.includes('/') || fileKey.includes('\\')) {
+    console.warn(`[orphan-reconcile] 跳过异常画像 key: ${fileKey}`);
+    return null;
+  }
+  const isExpected = [...scan.expectedKeys].some((k) => profileKeyMatches(fileKey, k));
+  if (isExpected) return null;
+  try {
+    await fs.promises.rename(
+      path.join(PROFILES_DIR, file),
+      path.join(scan.trashDir, `${scan.ts}_${file}`),
+    );
+    return file;
+  } catch (err) {
+    warn(`[orphan-reconcile] 画像孤儿 ${file} 移入 trash 失败:`, err);
+    return null;
+  }
+}
+
+/** 7. 画像孤儿扫描（独立维度） */
+// eslint-disable-next-line perf/perf-walk-requires-ignore -- 固定画像目录（PROFILES_DIR）单层 readdir，非递归树遍历，与 node_modules 无关
+async function scanOrphanProfiles(
+  db: ReturnType<typeof getDb>,
+  activeProjectPaths: string[],
+  candidates: string[],
+): Promise<string[]> {
+  const orphanProfilesTrashed: string[] = [];
+  try {
+    const files = await fs.promises.readdir(PROFILES_DIR);
+    const scan: OrphanProfileScan = {
+      expectedKeys: collectExpectedProfileKeys(db, activeProjectPaths, candidates),
+      trashDir: path.join(PROFILES_DIR, 'trash'),
+      ts: Date.now(),
+    };
+    await fs.promises.mkdir(scan.trashDir, { recursive: true });
+    for (const file of files) {
+      const trashed = await trashOrphanProfileFile(file, scan);
+      if (trashed) orphanProfilesTrashed.push(trashed);
+    }
+    if (orphanProfilesTrashed.length > 0) {
+      await auditLog
+        .logOrphanCleanup({
+          action: 'profiles_trashed',
+          projectId: '',
+          profilesTrashed: orphanProfilesTrashed,
+        })
+        .catch(() => {});
+    }
+  } catch (err) {
+    warn('[orphan-reconcile] 画像孤儿扫描失败:', err);
+  }
+  return orphanProfilesTrashed;
+}
+
+/** 8. TTL 物理清除 */
+async function runTtlPurge(
+  db: ReturnType<typeof getDb>,
+): Promise<{ table: string; deleted: number }[]> {
+  let purged: { table: string; deleted: number }[] = [];
+  try {
+    purged = purgeExpiredSoftDeleted(db, TTL_DAYS);
+    if (purged.some((p) => p.deleted > 0)) {
+      await auditLog.logOrphanCleanup({ action: 'purged', purged }).catch(() => {});
+    }
+  } catch (err) {
+    warn('[orphan-reconcile] TTL 清除失败:', err);
+  }
+  return purged;
+}
+
+export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
+  const scannedAt = new Date().toISOString();
   // 1. 防重入
-  if (inFlight) return emptyReport();
+  if (inFlight) return emptyReport(scannedAt);
   inFlight = true;
-
   try {
     // getDb 抛错（无持久化模式）→ 整体降级返回空报告，不抛到启动链
     const db = getDb();
-
-    // 2. 读 projects.json → activeProjectPaths（parse 失败 / ENOENT → 空数组）
-    let activeProjectPaths: string[] = [];
-    try {
-      const parsed = JSON.parse(await readFile(PROJECTS_FILE, 'utf-8')) as unknown;
-      activeProjectPaths = (Array.isArray(parsed) ? parsed : [])
-        .map((p) => (p as { path?: unknown })?.path)
-        .filter((p): p is string => typeof p === 'string' && p.length > 0);
-    } catch {
-      // 忽略：无项目列表
-    }
-
-    // 3. candidates = active − activeProjectPaths（精确字符串比较）
-    const active = new Set(listActiveProjectIds(db));
-    const candidates = [...active].filter((id) => !activeProjectPaths.includes(id));
-
-    const confirmedOrphans: OrphanReconcileReport['confirmedOrphans'] = [];
-    const suspectedOrphans: OrphanReconcileReport['suspectedOrphans'] = [];
+    const activeProjectPaths = await loadActiveProjectPaths();
+    const candidates = computeOrphanCandidates(db, activeProjectPaths);
     const state = await loadOrphanState();
-    const now = Date.now();
-    const upgradeMs = UPGRADE_DAYS * 24 * 60 * 60 * 1000;
-
-    // 4-6. 每个 candidate 判定（单项目失败仅 warn + 跳过，不中断整轮）
-    for (const projectId of candidates) {
-      try {
-        const reason = await classifyDir(projectId);
-        if (reason === 'dir_present_with_content') {
-          // 疑似孤儿：状态持久化 + 30 天升级
-          const raw = state[projectId];
-          const existing = typeof raw === 'object' && raw !== null ? raw : undefined;
-          if (existing && now - new Date(existing.firstSeenAt).getTime() > upgradeMs) {
-            await handleConfirmedOrphan(
-              db,
-              projectId,
-              'dir_present_with_content',
-              confirmedOrphans,
-            );
-            delete state[projectId];
-          } else {
-            const firstSeenAt = existing?.firstSeenAt ?? new Date().toISOString();
-            state[projectId] = { firstSeenAt };
-            await auditLog
-              .logOrphanCleanup({ action: 'suspected', projectId, firstSeenAt })
-              .catch(() => {});
-            suspectedOrphans.push({
-              projectId,
-              reason: 'dir_present_with_content',
-              activeRowCounts: countActiveRows(db, projectId),
-              firstSeenAt,
-            });
-          }
-        } else {
-          // 确认孤儿（dir_missing | dir_empty）
-          await handleConfirmedOrphan(db, projectId, reason, confirmedOrphans);
-          delete state[projectId];
-        }
-      } catch (err) {
-        warn(`[orphan-reconcile] 项目 ${projectId} 判定失败，跳过:`, err);
-      }
-    }
+    const { confirmedOrphans, suspectedOrphans } = await reconcileCandidates(
+      db,
+      candidates,
+      state,
+    );
     await saveOrphanState(state);
-
-    // 7. 画像孤儿扫描（独立维度）
-    const orphanProfilesTrashed: string[] = [];
-    try {
-      const files = await fs.promises.readdir(PROFILES_DIR);
-      const expectedKeys = new Set<string>();
-      for (const p of [...activeProjectPaths, ...candidates, ...listActiveProjectIds(db)]) {
-        expectedKeys.add(normalizeKey(p));
-      }
-      const trashDir = path.join(PROFILES_DIR, 'trash');
-      await fs.promises.mkdir(trashDir, { recursive: true });
-      const ts = Date.now();
-      for (const file of files) {
-        if (file === 'trash' || !file.endsWith('.json')) continue;
-        const fileKey = file.slice(0, -'.json'.length);
-        // 保护：跳过空 key 或含绝对路径分隔符的 key（防误删根路径）
-        if (!fileKey || fileKey.includes('/') || fileKey.includes('\\')) {
-          console.warn(`[orphan-reconcile] 跳过异常画像 key: ${fileKey}`);
-          continue;
-        }
-        const isExpected = [...expectedKeys].some((k) => profileKeyMatches(fileKey, k));
-        if (isExpected) continue;
-        try {
-          await fs.promises.rename(
-            path.join(PROFILES_DIR, file),
-            path.join(trashDir, `${ts}_${file}`),
-          );
-          orphanProfilesTrashed.push(file);
-        } catch (err) {
-          warn(`[orphan-reconcile] 画像孤儿 ${file} 移入 trash 失败:`, err);
-        }
-      }
-      if (orphanProfilesTrashed.length > 0) {
-        await auditLog
-          .logOrphanCleanup({
-            action: 'profiles_trashed',
-            projectId: '',
-            profilesTrashed: orphanProfilesTrashed,
-          })
-          .catch(() => {});
-      }
-    } catch (err) {
-      warn('[orphan-reconcile] 画像孤儿扫描失败:', err);
-    }
-
-    // 8. TTL 物理清除
-    let purged: { table: string; deleted: number }[] = [];
-    try {
-      purged = purgeExpiredSoftDeleted(db, TTL_DAYS);
-      if (purged.some((p) => p.deleted > 0)) {
-        await auditLog.logOrphanCleanup({ action: 'purged', purged }).catch(() => {});
-      }
-    } catch (err) {
-      warn('[orphan-reconcile] TTL 清除失败:', err);
-    }
-
-    // 9. 空项目集宽限：空集记录起点 → 7 天到期全局重置（项目重加取消）
-    //    置于画像扫描/TTL 之后：重置为最后一个写操作，避免扫描新移入的残留被跳过
+    const orphanProfilesTrashed = await scanOrphanProfiles(db, activeProjectPaths, candidates);
+    const purged = await runTtlPurge(db);
     let cleanReset: CleanResetReport | undefined;
     const emptySinceExisted = state[EMPTY_SINCE_KEY] !== undefined;
     try {
@@ -504,7 +629,6 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
     if (emptySinceExisted || cleanReset !== undefined || state[EMPTY_SINCE_KEY] !== undefined) {
       await saveOrphanState(state);
     }
-
     return {
       scannedAt,
       activeProjectPaths,
@@ -516,7 +640,7 @@ export async function runOrphanReconcile(): Promise<OrphanReconcileReport> {
     };
   } catch (err) {
     warn('[orphan-reconcile] 对账失败，降级返回空报告:', err);
-    return emptyReport();
+    return emptyReport(scannedAt);
   } finally {
     inFlight = false;
   }

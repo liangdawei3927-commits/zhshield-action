@@ -8,21 +8,18 @@ import type {
 } from '../types/electron';
 import { useTaskRun } from '../task-store';
 import { useToast } from '../components/ui/Toast';
+import { isDeletableItem } from '@zh/garbage/policy';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
 
 /**
- * 引擎可移入回收站的垃圾类型（与 @zh/garbage cleanGarbage 能力对齐）：
- * unused-dependency 需通过包管理器移除，引擎不会物理移动，故不在可勾选集合内。
+ * 该项能否被"一键清理"真正移走。
+ *
+ * 判定复用 @zh/garbage 的删除授权策略（与主进程 cleaner 同一份代码），
+ * 不再在渲染进程另维护一份类型清单 —— 此前两份清单漂移，正是"界面能勾选、
+ * 后端却拒绝"以及误删源码的来源。
  */
-export const CLEANABLE_TYPES: ReadonlySet<string> = new Set([
-  'unused-file',
-  'dead-code',
-  'duplicate-code',
-  'build-artifact',
-]);
-
-export function isCleanableType(type: string): boolean {
-  return CLEANABLE_TYPES.has(type);
+export function isCleanableItem(item: { type: string; path: string }): boolean {
+  return isDeletableItem(item);
 }
 
 function toggleIdInSet(set: Set<string>, id: string): Set<string> {
@@ -33,7 +30,7 @@ function toggleIdInSet(set: Set<string>, id: string): Set<string> {
 }
 
 function toggleAllSelection(report: GarbageScanReportData, prev: Set<string>): Set<string> {
-  const cleanable = report.items.filter((g) => isCleanableType(g.type)).map((g) => g.id);
+  const cleanable = report.items.filter((g) => isCleanableItem(g)).map((g) => g.id);
   const allChecked = cleanable.length > 0 && cleanable.every((id) => prev.has(id));
   const next = new Set(prev);
   for (const id of cleanable) {
@@ -146,13 +143,21 @@ function clearGarbageResults(
   if (clearRestore) setRestoreResult(null);
 }
 
-function useGarbageClean(
-  projectPath: string,
-  report: GarbageScanReportData | null,
-  selected: Set<string>,
-  onReportChange: Dispatch<SetStateAction<GarbageScanReportData | null>>,
-  onSelectionCleared: () => void,
-): {
+interface UseGarbageCleanParams {
+  projectPath: string;
+  report: GarbageScanReportData | null;
+  selected: Set<string>;
+  onReportChange: Dispatch<SetStateAction<GarbageScanReportData | null>>;
+  onSelectionCleared: () => void;
+}
+
+function useGarbageClean({
+  projectPath,
+  report,
+  selected,
+  onReportChange,
+  onSelectionCleared,
+}: UseGarbageCleanParams): {
   cleaning: boolean;
   cleanResult: GarbageCleanResultData | null;
   handleClean: () => Promise<void>;
@@ -162,7 +167,7 @@ function useGarbageClean(
   const [cleanResult, setCleanResult] = useState<GarbageCleanResultData | null>(null);
   const handleClean = useCallback(async () => {
     if (!report || selected.size === 0) return;
-    const items = report.items.filter((g) => selected.has(g.id));
+    const items = report.items.filter((g) => selected.has(g.id) && isCleanableItem(g));
     await performClean(projectPath, items, {
       setCleaning,
       setCleanResult,
@@ -216,13 +221,13 @@ function useGarbageActions(params: {
   clearResults: (clearRestore: boolean) => void;
 } {
   const { projectPath, report, selected, onReportChange, onSelectionCleared, onRefresh } = params;
-  const { cleaning, cleanResult, handleClean, setCleanResult } = useGarbageClean(
+  const { cleaning, cleanResult, handleClean, setCleanResult } = useGarbageClean({
     projectPath,
     report,
     selected,
     onReportChange,
     onSelectionCleared,
-  );
+  });
   const { restoring, restoreResult, handleRestore, setRestoreResult } = useGarbageRestore(
     projectPath,
     cleanResult,
@@ -268,11 +273,12 @@ function useGarbageCopyToAi(projectPath: string): {
           source: t('page.garbage.source'),
           ruleId: g.type,
           file: g.path,
-          severity: isCleanableType(g.type)
+          severity: isCleanableItem(g)
             ? t('page.garbage.cleanableLabel')
             : t('page.garbage.manualLabel'),
           message: g.reason || g.path,
           suggestion: t('page.garbage.safetySuggestion'),
+          domain: 'garbage',
         })),
       );
     },
@@ -299,7 +305,9 @@ async function refreshGarbageReport(
 /** 垃圾清理页：走垃圾清理域自有通道（文件系统检测器 + garbage 域 SOP 规则），不再借调安全引擎 */
 export function useGarbagePage(projectPath: string): {
   loading: boolean;
+  progress: number;
   progressLabel: string;
+  statusMessage: string;
   report: GarbageScanReportData | null;
   selected: Set<string>;
   cleaning: boolean;
@@ -314,7 +322,7 @@ export function useGarbagePage(projectPath: string): {
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
 } {
   const [report, setReport] = useState<GarbageScanReportData | null>(null);
-  const { loading, progressLabel } = useTaskRun('garbage', projectPath);
+  const { loading, progress, progressLabel, statusMessage } = useTaskRun('garbage', projectPath);
   const { selected, toggleSelect, toggleAll, clearSelection } = useGarbageSelection(report);
   const refreshReport = useCallback(
     () => refreshGarbageReport(projectPath, setReport, clearSelection),
@@ -347,7 +355,9 @@ export function useGarbagePage(projectPath: string): {
 
   return {
     loading,
+    progress,
     progressLabel,
+    statusMessage,
     report,
     selected,
     cleaning,

@@ -23,6 +23,7 @@ export function isTransientError(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
+/** 重试选项：全部可选，省略时取 withRetry 各参数的默认值（attempts 3 / base 300ms / 上限 4000ms） */
 export interface RetryOptions {
   /** 总尝试次数（含首次），默认 3 */
   attempts?: number;

@@ -192,15 +192,18 @@ export function detectDuplicateCode(
   );
 
   for (const dup of fileDups) {
-    const otherFile = dup.files[0] === parsed.filePath ? dup.files[1] : dup.files[0];
+    const isFirst = dup.files[0] === parsed.filePath;
+    const otherFile = isFirst ? dup.files[1] : dup.files[0];
+    const myLine = isFirst ? dup.lines[0] : dup.lines[1];
+    const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
 
     smells.push(
       makeSmell({
         ruleId: 'duplicated-code',
         severity: config.severities['duplicated-code'],
-        message: `代码块与 ${otherFile}:${dup.lines[1]} 重复，建议提取为公共函数`,
+        message: `代码块与 ${otherFile}:${otherLine} 重复，建议提取为公共函数`,
         filePath: parsed.filePath,
-        line: dup.lines[0],
+        line: myLine,
         column: 1,
         metric: 'duplicateLines',
         // 值为重复区实际行数（原本误用 dup.code.length —— 那是被截断到 80 的
@@ -214,7 +217,7 @@ export function detectDuplicateCode(
           effort: 'medium',
           autoFixable: false,
         },
-        endLine: dup.lines[0] + dup.lineCount - 1,
+        endLine: myLine + dup.lineCount - 1,
       }),
     );
   }

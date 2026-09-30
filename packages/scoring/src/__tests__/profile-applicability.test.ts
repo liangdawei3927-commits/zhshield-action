@@ -63,12 +63,11 @@ describe('applyDisabledDimensions — 权重剔除与归一化', () => {
 
 describe('buildHealthDimensions — 维度适用性端到端', () => {
   it('mini-program 全部 7 维权重 > 0，且权重和仍为 1', () => {
-    const dims = buildHealthDimensions(
-      emptyGuard,
-      emptyInspect,
-      undefined,
-      makeProfile('mini-program'),
-    );
+    const dims = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      profile: makeProfile('mini-program'),
+    });
     for (const d of dims) {
       expect(d.weight).toBeGreaterThan(0);
     }
@@ -80,11 +79,11 @@ describe('buildHealthDimensions — 维度适用性端到端', () => {
     const inspect = { issues: [{ severity: 'error' as const, category: 'architecture' }] };
     const mini = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(emptyGuard, inspect, undefined, makeProfile('mini-program')),
+      buildHealthDimensions({ guard: emptyGuard, inspect, profile: makeProfile('mini-program') }),
     );
     const backend = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(emptyGuard, inspect, undefined, makeProfile('backend')),
+      buildHealthDimensions({ guard: emptyGuard, inspect, profile: makeProfile('backend') }),
     );
     expect(mini.overall).toBeLessThan(backend.overall);
   });
@@ -92,7 +91,7 @@ describe('buildHealthDimensions — 维度适用性端到端', () => {
   it('无 issue 时 mini-program 整体分近满分（剔除维度不影响满分）', () => {
     const r = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions(emptyGuard, emptyInspect, undefined, makeProfile('mini-program')),
+      buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile: makeProfile('mini-program') }),
     );
     expect(r.overall).toBeGreaterThanOrEqual(99);
   });

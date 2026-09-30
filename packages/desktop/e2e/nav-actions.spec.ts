@@ -1,5 +1,6 @@
 /**
- * 顶部导航 12 功能 · 阶段B（v2）：一项一实例，真实触发核心动作
+ * 顶部导航 11 功能 · 阶段B（v2）：一项一实例，真实触发核心动作
+ * ⛔ 规则进化 / AI 工具已暂下线（见 src/feature-flags.ts），不在遍历范围。
  *
  * 相比 v1 的修正：
  *   1. 每个功能独立启动一个 Electron 实例 —— 避免上一页的扫描任务排队串扰下一页
@@ -15,11 +16,11 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { ENTRIES, SHOT_DIR, entryButton, launchApp, mainText } from './nav-helpers';
+import { ENTRIES, SHOT_DIR, clickEntry, launchApp, mainText } from './nav-helpers';
 
 /** 每项功能的主动作候选按钮标签（按顺序尝试）；键必须与 nav-helpers 的 ENTRIES.id 对齐 */
 const ACTION_CANDIDATES: Record<string, string[]> = {
-  inspect: ['马上巡检', '重新巡检'],
+  inspect: ['一键体检', '重新巡检'],
   guard: ['立即扫描', '重新扫描'],
   sentinel: ['启动监控', '监控运行中'],
   security: ['一键扫描', '重新检查', '开始扫描'],
@@ -29,7 +30,6 @@ const ACTION_CANDIDATES: Record<string, string[]> = {
   techdebt: ['开始盘点', '重新盘点'],
   refactor: ['马上检查', '重新检查'],
   reports: ['汇总生成报告', '📊 汇总生成报告', '重新汇总'],
-  evolve: ['架构分析', '刷新'],
   backup: ['一键备份'],
 };
 
@@ -90,7 +90,7 @@ async function waitSettled(
 const ONLY = (process.env.ZH_NAV_ONLY ?? '').split(',').filter(Boolean);
 const TARGETS = ONLY.length ? ENTRIES.filter((e) => ONLY.includes(e.id)) : ENTRIES;
 
-test.describe('顶部导航 12 功能 · 真实动作验证（一项一实例）', () => {
+test.describe('顶部导航 11 功能 · 真实动作验证（一项一实例）', () => {
   test.setTimeout(30 * 60_000);
 
   for (const e of TARGETS) {
@@ -99,7 +99,7 @@ test.describe('顶部导航 12 功能 · 真实动作验证（一项一实例）
       const { app, page, errors } = await launchApp();
       const rec: Record<string, unknown> = { id: e.id, label: e.label, action: e.action };
       try {
-        await entryButton(page, e).click({ timeout: 20_000 });
+        await clickEntry(page, e);
         await page.waitForTimeout(1500);
         const before = await mainText(page);
 
@@ -132,7 +132,6 @@ test.describe('顶部导航 12 功能 · 真实动作验证（一项一实例）
         .catch(() => undefined);
       writeFileSync(`/tmp/zh-nav-action-${e.id}.json`, JSON.stringify(rec, null, 2), 'utf-8');
       await app.close();
-      // eslint-disable-next-line no-console
       console.log(
         `ACTROW ${JSON.stringify({ id: e.id, action: rec.usedLabel, settled: rec.settled, ms: rec.elapsedMs, err: rec.error ? 1 : 0 })}`,
       );

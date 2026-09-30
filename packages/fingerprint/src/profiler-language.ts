@@ -1,6 +1,7 @@
 // 语言聚合器：加权投票 + TypeScript 优先级 + 置信度计算（Profiler 拆分重构产物）
 
 import type { Signal, LanguageId, MatchResult } from './types';
+import { AGGREGATOR_EXTENSION_LANGUAGES } from './language-map';
 import { SignalScorer, accumulateCandidate, type CandidateMap } from './profiler-scoring';
 
 /** 置信度阈值：低于此值输出 unknown 而非硬猜（架构文档 §6.3） */
@@ -110,29 +111,9 @@ export class LanguageAggregator {
     return undefined;
   }
 
-  /** 扩展名 → 语言映射 */
+  /** 扩展名 → 语言映射（取 language-map 的聚合器子集） */
   private mapExtToLanguage(ext: string): LanguageId | undefined {
-    const map: Record<string, LanguageId> = {
-      ts: 'typescript',
-      tsx: 'typescript',
-      mts: 'typescript',
-      cts: 'typescript',
-      js: 'javascript',
-      jsx: 'javascript',
-      mjs: 'javascript',
-      cjs: 'javascript',
-      py: 'python',
-      pyi: 'python',
-      java: 'java',
-      go: 'go',
-      rs: 'rust',
-      cs: 'csharp',
-      php: 'php',
-      rb: 'ruby',
-      kt: 'kotlin',
-      swift: 'swift',
-    };
-    return map[ext];
+    return AGGREGATOR_EXTENSION_LANGUAGES[ext];
   }
 
   /** 构建 unknown 结果 */

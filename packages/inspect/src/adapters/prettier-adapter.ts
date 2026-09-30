@@ -1,20 +1,8 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  ToolAdapter,
-  ToolMeta,
-  ToolResult,
-  ToolScanOptions,
-  Issue,
-  AccessScope,
-} from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
-
-const execFileAsync = promisify(execFile);
+import type { Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
+import { ToolCommandAdapter, buildAccessScope, buildToolResult, execTool } from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
   id: 'prettier',
@@ -53,85 +41,40 @@ function parseListDifferent(raw: string, projectPath: string): Issue[] {
   return issues;
 }
 
-export class PrettierAdapter implements ToolAdapter {
+/** 扫描目标：显式 targetFiles 优先，否则按 src/ → 项目根 探测 */
+function resolvePrettierTarget(options: ToolScanOptions, projectPath: string): string {
+  return options.targetFiles?.length
+    ? options.targetFiles[0]
+    : PrettierAdapter.pickScanTarget(projectPath);
+}
+
+export class PrettierAdapter extends ToolCommandAdapter {
   meta: ToolMeta;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
-  private readonly projectRoot?: string;
 
   /** F5：prettier 对源码与配置文件做格式检查 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['**/*.{ts,tsx,js,jsx,mjs,cjs,json,md,yml,yaml,css,scss}'],
-    excludePaths: ['**/node_modules/**'],
-  };
+  readonly accessScope = buildAccessScope([
+    '**/*.{ts,tsx,js,jsx,mjs,cjs,json,md,yml,yaml,css,scss}',
+  ]);
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot;
+    super('prettier', projectRoot);
     this.meta = { ...META, description: '代码格式一致性检查（Prettier --list-different）' };
   }
 
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('prettier', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
-  }
-
-  async scan(options: ToolScanOptions): Promise<ToolResult> {
-    const start = Date.now();
-    try {
-      return await this.runPrettierScan(options, start);
-    } catch (error: unknown) {
-      return this.handleError(error, start);
-    }
-  }
-
-  private async runPrettierScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
+  protected async runScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
     // 归一化 projectPath 为绝对路径：相对路径会流入 cwd 与扫描目标，
     // prettier 以自身 cwd 解析相对路径导致扫描失败。
     const projectPath = path.resolve(options.projectPath);
-    const command = await this.resolveCommand(projectPath);
-    const target = options.targetFiles?.length
-      ? options.targetFiles[0]
-      : PrettierAdapter.pickScanTarget(projectPath);
+    const command = await this.commands.resolve(projectPath);
+    const target = resolvePrettierTarget(options, projectPath);
     const args = ['--list-different', target];
-
-    let stdout = '';
-    try {
-      ({ stdout } = await execFileAsync(command, args, {
-        cwd: projectPath,
-        timeout: options.timeout || 120000,
-        maxBuffer: 10 * 1024 * 1024,
-      }));
-    } catch (error: unknown) {
-      // prettier 有格式问题时以退出码 1 结束并列出文件，属正常路径而非失败
-      const err = error as { code?: number; stdout?: string };
-      if (typeof err.code !== 'number' || err.code === 0) throw error;
-      stdout = err.stdout ?? '';
-    }
-
-    const issues = parseListDifferent(stdout, projectPath);
-    return {
-      tool: 'prettier',
-      status: 'available',
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-    };
+    const stdout = await this.runPrettierCommand(
+      command,
+      args,
+      projectPath,
+      options.timeout || 120000,
+    );
+    return this.buildPrettierResult(stdout, projectPath, start);
   }
 
   /** 扫描目标：优先 src/，monorepo 回退项目根（交由 .prettierignore 约束范围） */
@@ -139,31 +82,28 @@ export class PrettierAdapter implements ToolAdapter {
     return fs.existsSync(path.join(projectPath, 'src')) ? 'src' : '.';
   }
 
-  private handleError(error: unknown, start: number): ToolResult {
-    const err = error as { code?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
-      return this.buildResult(start, 'unavailable', [], 'prettier 未安装或未在 PATH 中找到');
+  /** 执行 prettier --list-different：格式问题以退出码 1 结束并列出文件，属正常路径而非失败 */
+  private async runPrettierCommand(
+    command: string,
+    args: string[],
+    projectPath: string,
+    timeout: number,
+  ): Promise<string> {
+    let stdout = '';
+    try {
+      ({ stdout } = await execTool(command, args, { cwd: projectPath, timeout }));
+    } catch (error: unknown) {
+      // prettier 有格式问题时以退出码 1 结束并列出文件，属正常路径而非失败
+      const err = this.execErrorOf(error);
+      if (typeof err.code !== 'number' || err.code === 0) throw error;
+      stdout = err.stdout ?? '';
     }
-    return this.buildResult(start, 'error', [], err.stderr || err.message || 'prettier 执行失败');
+    return stdout;
   }
 
-  private buildResult(
-    start: number,
-    status: 'available' | 'unavailable' | 'error',
-    issues: Issue[],
-    error?: string,
-  ): ToolResult {
-    return {
-      tool: 'prettier',
-      status,
-      issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: issues.length,
-      },
-      ...(error ? { error } : {}),
-    };
+  /** 解析 --list-different 输出并构建 available 结果 */
+  private buildPrettierResult(stdout: string, projectPath: string, start: number): ToolResult {
+    const issues = parseListDifferent(stdout, projectPath);
+    return buildToolResult({ tool: 'prettier', status: 'available', issues, start });
   }
 }

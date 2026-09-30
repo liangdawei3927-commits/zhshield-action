@@ -20,6 +20,7 @@ export interface SourceLocation {
   snippet?: string;
 }
 
+/** 堆栈定位选项：项目根目录（用于 source map 与源码片段解析） */
 export interface LocateOptions {
   projectPath?: string;
 }
@@ -167,7 +168,7 @@ export function deriveModule(file: string): string {
   if (parts.length >= 2) {
     const parent = parts[parts.length - 2];
     if (GENERIC_SOURCE_ROOTS.has(parent)) {
-      return parts.at(-1)!.replace(EXTENSION_RE, '');
+      return parts.at(-1)?.replace(EXTENSION_RE, '') ?? '';
     }
     return parent;
   }

@@ -11,16 +11,26 @@ import type {
 import { calculateFormConfidence } from './profiler-form';
 import type { FormCandidate } from './profiler-form';
 
+/** TargetBuilder.build 参数对象 */
+export interface BuildParams {
+  /** 项目根路径 */
+  readonly projectPath: string;
+  /** 语言判定结果 */
+  readonly language: MatchResult<LanguageId>;
+  /** 框架判定结果列表 */
+  readonly frameworks: readonly MatchResult<string>[];
+  /** 形态候选列表 */
+  readonly forms: readonly FormCandidate[];
+  /** 包管理器判定结果（可能缺失） */
+  readonly packageManager: MatchResult<string> | undefined;
+}
+
 /** 目标画像构建器 */
 export class TargetBuilder {
   /** 构建 TargetProfile */
-  build(
-    projectPath: string,
-    language: MatchResult<LanguageId>,
-    frameworks: readonly MatchResult<string>[],
-    forms: readonly FormCandidate[],
-    packageManager: MatchResult<string> | undefined,
-  ): TargetProfile {
+  build(params: BuildParams): TargetProfile {
+    const { projectPath, language, frameworks, forms, packageManager } = params;
+
     // 选择最高置信度的形态
     const primaryForm = forms.length > 0 ? forms[0] : undefined;
 

@@ -27,7 +27,7 @@ function CategoryNavItem({ item, active, onNavigate }: CategoryNavItemProps) {
       onClick={() => onNavigate(item.id)}
       className="flex items-center justify-center border-none cursor-pointer"
       style={{
-        flex: '1 1 0',
+        flex: '0 1 auto',
         minWidth: 0,
         height: '100%',
       }}
@@ -53,7 +53,7 @@ function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage
       style={{
         height: 'var(--zh-header-nav-h)',
         background: 'rgb(var(--zh-bg-brand))',
-        padding: '0 12px',
+        justifyContent: 'space-around',
         WebkitAppRegion: 'no-drag' as const,
       }}
     >
@@ -83,8 +83,6 @@ export function TopNav({
         onOpenSettings={onOpenSettings}
         projectName={projectName}
         sidebarOpen={sidebarOpen}
-        currentPage={currentPage}
-        onNavigate={onNavigate}
       />
       {/* 第二行：大图标分类导航 */}
       <CategoryNav currentPage={currentPage} onNavigate={onNavigate} />

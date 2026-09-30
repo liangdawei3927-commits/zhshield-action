@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ShieldLogo } from '../ui/Icons';
+import { ShieldLogo, NavIcon } from '../ui/Icons';
 import type { AiToolConfigData } from '../../types/electron';
 import { Bounce, BounceCard } from '../ui/Bounce';
 import { useT } from '../../i18n';
@@ -227,6 +227,9 @@ export function ProjectsSection({
   );
 }
 
+// ⛔ AI 工具暂下线（见 src/feature-flags.ts：FEATURE_AI_TOOL_ENABLED=false）。
+// 功能未闭环——每次仍需用户手动搬运给外部 AI 编程工具，开关不能真正驱动完整 AI 流程。
+// 切勿自行改回 Sidebar 直接渲染；恢复需用户明确指示并同步文档/e2e。
 export function AiToolSection({
   aiTool,
   aiApplying,
@@ -261,7 +264,7 @@ export function AiToolSection({
         <div className="flex items-center gap-2.5">
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium text-zh-ink">OpenCode</div>
-            <div className="text-[11px] text-zh-muted mt-0.5">{t('layout.aiToolDesc')}</div>
+            <div className="text-xs text-zh-muted mt-0.5">{t('layout.aiToolDesc')}</div>
           </div>
           <button
             onClick={() => onToggleAiTool(!(aiTool?.enabled ?? false))}
@@ -279,10 +282,67 @@ export function AiToolSection({
           </button>
         </div>
         {aiTool?.enabled && (
-          <div className="mt-2 text-[11px] leading-relaxed text-zh-success-fg">
+          <div className="mt-2 text-xs leading-relaxed text-zh-success-fg">
             {t('layout.aiToolEnabled')}
           </div>
         )}
+      </BounceCard>
+    </section>
+  );
+}
+
+// ⛔ 规则进化暂下线（见 src/feature-flags.ts：FEATURE_EVOLVE_ENABLED=false）。
+// 自动进化标准需足够规模真实用户认可（基础用户 <1000 不可启动，单人判断不能成标准）。
+// 切勿自行改回 Sidebar 直接渲染；恢复需用户明确指示并同步文档/e2e。
+export function EvolveSection({
+  currentPage,
+  onNavigate,
+  onClose,
+}: {
+  currentPage: string;
+  onNavigate: (page: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  return (
+    <section>
+      <SectionTitle
+        label={t('layout.evolve')}
+        icon={<NavIcon id="evolve" size={12} />}
+      />
+      <BounceCard className="rounded-xl bg-zh-panel/60 p-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate('evolve');
+            onClose();
+          }}
+          aria-label={t('layout.evolve')}
+          className={`w-full flex items-center gap-2.5 rounded-lg py-1.5 pl-2 pr-1.5 text-left border-none cursor-pointer transition-colors ${
+            currentPage === 'evolve' ? 'bg-zh-panel/60' : 'hover:bg-zh-panel/60'
+          }`}
+        >
+          <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-info-50 text-info-600 shrink-0">
+            <NavIcon id="evolve" size={14} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-xs font-medium text-zh-ink">{t('layout.evolve')}</span>
+            <span className="block text-xs text-zh-muted mt-0.5">{t('layout.evolveDesc')}</span>
+          </span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 text-zh-muted"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
       </BounceCard>
     </section>
   );

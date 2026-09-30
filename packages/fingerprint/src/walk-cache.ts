@@ -64,7 +64,7 @@ function getDb(): Database | null {
       dbPath: path.join(cacheDir(), 'walk-cache.db'),
       walMode: true,
     });
-    db = conn.connect() as unknown as Database;
+    db = conn.connect() as Database;
     db.exec(`
       CREATE TABLE IF NOT EXISTS walk_index (
         root       TEXT PRIMARY KEY,
@@ -157,7 +157,9 @@ function walkAndSign(
         desc.push(entry.name + 'D');
         const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
         walk(rel, depth + 1);
-      } else if (entry.isFile()) {
+        continue;
+      }
+      if (entry.isFile()) {
         desc.push(entry.name + 'F');
         if (collectFiles) files.push(relDir === '' ? entry.name : `${relDir}/${entry.name}`);
       }
@@ -174,23 +176,32 @@ function walkAndSign(
  */
 export function cachedWalkFiles(root: string, maxDepth: number): string[] {
   const memoKey = `${root}\u0000${maxDepth}`;
+  const memoHit = tryMemoHit(memoKey);
+  if (memoHit) return memoHit;
+  const cachedHit = tryPersistentHit(root, maxDepth, memoKey);
+  if (cachedHit) return cachedHit;
+  return fullWalkAndCache(root, maxDepth, memoKey);
+}
 
-  // 1) 进程内记忆化（单飞）：短窗口内重复调用共享一次遍历
+/** 进程内记忆化（单飞）：短窗口内重复调用共享一次遍历 */
+function tryMemoHit(memoKey: string): string[] | null {
   const m = memo.get(memoKey);
   if (m && Date.now() - m.at < MEMO_TTL_MS) return m.files;
+  return null;
+}
 
-  // 2) 持久缓存：加载已存签名，若树结构签名未变则复用文件列表（免全量枚举）
+/** 持久缓存：加载已存签名，若树结构签名未变则复用文件列表（免全量枚举） */
+function tryPersistentHit(root: string, maxDepth: number, memoKey: string): string[] | null {
   const cached = loadCached(root, maxDepth);
-  if (cached) {
-    const sig = walkAndSign(root, maxDepth, false).sig;
-    if (sig === cached.sig) {
-      memo.set(memoKey, { files: cached.files, at: Date.now() });
-      return cached.files;
-    }
-    // 签名变化 → 树结构已变，回退全量遍历重建
-  }
+  if (!cached) return null;
+  const sig = walkAndSign(root, maxDepth, false).sig;
+  if (sig !== cached.sig) return null;
+  memo.set(memoKey, { files: cached.files, at: Date.now() });
+  return cached.files;
+}
 
-  // 3) 全量遍历（同时计算签名），写回缓存
+/** 全量遍历（同时计算签名），写回缓存 */
+function fullWalkAndCache(root: string, maxDepth: number, memoKey: string): string[] {
   const { sig, files } = walkAndSign(root, maxDepth, true);
   storeCached(root, maxDepth, sig, files);
   memo.set(memoKey, { files, at: Date.now() });

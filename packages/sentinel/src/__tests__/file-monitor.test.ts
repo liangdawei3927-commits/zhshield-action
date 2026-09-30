@@ -126,6 +126,29 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
     return dir;
   }
 
+  /** 轮询直到 count 达到 expected。fs.watch 回调时机受负载影响，固定 sleep 会在并发下假失败 */
+  async function waitForCount(count: () => number, expected: number, timeoutMs = 5_000) {
+    for (let waited = 0; waited < timeoutMs && count() !== expected; waited += 25) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+
+  /** 轮询直到 count 连续 quietMs 内不再变化（无滞留回调），再让调用方做"不应变化"的断言 */
+  async function waitForQuiet(count: () => number, quietMs = 250, timeoutMs = 5_000) {
+    let last = count();
+    let quietSince = Date.now();
+    for (let waited = 0; waited < timeoutMs; waited += 25) {
+      await new Promise((r) => setTimeout(r, 25));
+      const now = count();
+      if (now !== last) {
+        last = now;
+        quietSince = Date.now();
+      } else if (Date.now() - quietSince >= quietMs) {
+        return;
+      }
+    }
+  }
+
   afterEach(() => {
     for (const dir of tmpDirs.splice(0)) {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -223,21 +246,58 @@ describe('FileMonitor 噪音过滤（端到端）', () => {
     });
     try {
       const file = path.join(root, 'dup.ts');
-      fs.writeFileSync(file, 'v1');
-      await new Promise((r) => setTimeout(r, 300));
       const countFor = () =>
         eventCenter.listEvents().filter((e) => e.context?.filePath === file).length;
+      fs.writeFileSync(file, 'v1');
+      await waitForCount(countFor, 1);
+      await waitForQuiet(countFor);
       const before = countFor();
       // macOS 原子保存会对同一写入触发多次 rename 回调但 mtime 不变：
       // utimesSync 强制触发一次事件，mtime 与上次相同 → 不应产生新事件
       const mtime = fs.statSync(file).mtimeMs;
       fs.utimesSync(file, new Date(mtime / 1000), new Date(mtime / 1000));
-      await new Promise((r) => setTimeout(r, 300));
+      await waitForQuiet(countFor);
       expect(countFor()).toBe(before);
       // 真实写入（mtime 前进）→ 产生一个新事件
       fs.writeFileSync(file, 'v2');
-      await new Promise((r) => setTimeout(r, 300));
+      await waitForCount(countFor, before + 1);
       expect(countFor()).toBe(before + 1);
+    } finally {
+      monitor.stop();
+    }
+  });
+
+  it('同一文件的重复真实写入在去重窗口内合并为一条事件（occurrenceCount 递增）', async () => {
+    const root = makeTmpDir();
+    const eventCenter = new EventCenter();
+    const monitor = new FileMonitor(eventCenter);
+    monitor.start({
+      projectId: 'proj-dedupe',
+      watchPaths: [root],
+      intervalMs: 60_000,
+      ignoreDirs: DEFAULT_IGNORE_DIRS,
+      filter: defaultFileWatchFilter,
+    });
+    const file = path.join(root, 'pipeline-runner.ts');
+    const changedEvents = () =>
+      eventCenter
+        .listEvents()
+        .filter(
+          (e) => e.context?.filePath === file && e.title === `File change: ${path.basename(file)}`,
+        );
+    const changedCount = () => changedEvents().length;
+    try {
+      fs.writeFileSync(file, 'v1');
+      await waitForQuiet(changedCount);
+
+      for (let i = 2; i <= 4; i++) {
+        fs.writeFileSync(file, `v${i}`);
+        await waitForQuiet(changedCount);
+      }
+
+      const events = changedEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0]?.occurrenceCount).toBeGreaterThan(1);
     } finally {
       monitor.stop();
     }

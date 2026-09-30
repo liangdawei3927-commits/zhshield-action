@@ -8,6 +8,7 @@ import type { ToolId, ToolStatus } from './types';
 
 export type GuardStage = 'pre-commit' | 'pre-push' | 'ci';
 
+/** 工具执行事件：单个工具适配器 scan 完成（含 skipped/error）后 emit */
 export interface ToolExecutedEvent {
   tool: ToolId;
   status: ToolStatus;
@@ -17,6 +18,7 @@ export interface ToolExecutedEvent {
   timestamp: Date;
 }
 
+/** 扫描完成事件：inspect / security 模块一次巡检结束后 emit */
 export interface ScanCompletedEvent {
   module: 'inspect' | 'security';
   projectId: string;
@@ -26,6 +28,7 @@ export interface ScanCompletedEvent {
   timestamp: Date;
 }
 
+/** 门禁检查请求事件：命中 pre-commit / pre-push / ci 阶段时 emit */
 export interface GuardCheckRequestedEvent {
   stage: GuardStage;
   projectId: string;
@@ -33,6 +36,7 @@ export interface GuardCheckRequestedEvent {
   timestamp: Date;
 }
 
+/** 门禁检查完成事件：本次 guard 判定结束后 emit，passed=false 即阻断 */
 export interface GuardCheckCompletedEvent {
   stage: GuardStage;
   projectId: string;

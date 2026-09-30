@@ -38,12 +38,14 @@ export class ToolUnavailableError extends Error {
   }
 }
 
+/** 单渠道下载结果：字节内容、实际来源 URL 与命中的分发渠道 */
 export interface DownloadResult {
   data: Buffer;
   sourceUrl: string;
   channel: ToolChannel;
 }
 
+/** 工具下载器抽象：下载字节内容，失败抛错由调用方回退下一渠道 */
 export interface ToolDownloader {
   /** 下载并返回字节；失败抛错，由调用方决定回退下一渠道 */
   download(url: string): Promise<Buffer>;
@@ -63,6 +65,7 @@ function computeSha256(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
+/** {@link SupplyChainManager} 构造选项：锁文件路径、工具 bin 目录与可替换下载器 */
 export interface SupplyChainManagerOptions {
   lockfilePath?: string;
   binDir?: string;

@@ -19,10 +19,11 @@ import { SopContentRepository } from './sop-content.repository';
 const MAX_RULE_CONTENT_BYTES = 100 * 1024;
 const RULE_STATUSES = new Set(['draft', 'trial', 'active', 'deprecated', 'disabled']);
 const PUBLISHABLE_STATUSES = new Set(['draft', 'trial']);
+const SEMVER_PATCH_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
 /** 语义化版本 patch 段递增：1.0.0 → 1.0.1；无法解析时回退 1.0.1 */
 function bumpPatchVersion(version: string): string {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  const match = SEMVER_PATCH_RE.exec(version);
   if (!match) return '1.0.1';
   return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
 }
@@ -106,6 +107,14 @@ export class SopRuleAdminRepository extends SopContentRepository {
     return row;
   }
 
+  /** requireDb() 成功后 dbConn 必已就绪；返回连接供 transaction 使用 */
+  private requireConn(): DbConnection {
+    this.requireDb();
+    const conn = this.dbConn;
+    if (!conn) throw new AdminError('数据库不可用', 'unavailable');
+    return conn;
+  }
+
   /** upsert 规则本体；新规则 version=1.0.0，更新置草稿态（蓝图 §3.1：PUT 只改草稿） */
   saveRule(rule: SopRule): { ruleId: string; created: boolean } {
     const db = this.requireDb();
@@ -146,13 +155,13 @@ export class SopRuleAdminRepository extends SopContentRepository {
       createdBy: 'admin',
       updatedBy: 'admin',
     });
-    audit(
+    audit({
       db,
-      'rule',
-      rule.id,
-      created ? 'create' : 'update',
-      `version=${existing?.version ?? '1.0.0'} sha=${contentSha.slice(0, 12)}`,
-    );
+      entityType: 'rule',
+      entityId: rule.id,
+      action: created ? 'create' : 'update',
+      detail: `version=${existing?.version ?? '1.0.0'} sha=${contentSha.slice(0, 12)}`,
+    });
     return { ruleId: rule.id, created };
   }
 
@@ -166,7 +175,7 @@ export class SopRuleAdminRepository extends SopContentRepository {
     const nextVersion = bumpPatchVersion(row.version);
     const rule = JSON.parse(row.content) as SopRule;
     const contentSha = computeRuleContentSha(rule);
-    this.dbConn!.transaction((tx) => {
+    this.requireConn().transaction((tx) => {
       saveRuleContentVersion(tx, {
         id: randomUUID(),
         ruleId,
@@ -194,7 +203,7 @@ export class SopRuleAdminRepository extends SopContentRepository {
         contentSha,
         source: 'manual',
       });
-      audit(tx, 'rule', ruleId, 'publish', `${row.version} -> ${nextVersion}`);
+      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'publish', detail: `${row.version} -> ${nextVersion}` });
     });
   }
 
@@ -204,7 +213,7 @@ export class SopRuleAdminRepository extends SopContentRepository {
     const row = this.requireRule(db, ruleId);
     const history = getRuleContentVersion(db, ruleId, version);
     if (!history) throw new AdminError(`历史版本不存在: ${version}`, 'not_found');
-    this.dbConn!.transaction((tx) => {
+    this.requireConn().transaction((tx) => {
       saveRuleContent(
         tx,
         ruleContentParams(row, {
@@ -222,7 +231,7 @@ export class SopRuleAdminRepository extends SopContentRepository {
         contentSha: history.content_sha,
         source: 'manual',
       });
-      audit(tx, 'rule', ruleId, 'rollback', `回滚到 ${version}`);
+      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'rollback', detail: `回滚到 ${version}` });
     });
   }
 
@@ -234,14 +243,14 @@ export class SopRuleAdminRepository extends SopContentRepository {
       throw new AdminError(`非法状态: ${status}`, 'validation');
     }
     setRuleContentStatus(db, ruleId, status);
-    audit(db, 'rule', ruleId, 'status_change', `${row.status} -> ${status}`);
+    audit({ db, entityType: 'rule', entityId: ruleId, action: 'status_change', detail: `${row.status} -> ${status}` });
   }
 
   /** 软删：status → deprecated + rule_scope 平台行下架（enabled=0，停止下发） */
   deleteRule(ruleId: string): void {
     const db = this.requireDb();
     const row = this.requireRule(db, ruleId);
-    this.dbConn!.transaction((tx) => {
+    this.requireConn().transaction((tx) => {
       softDeleteRuleContent(tx, ruleId);
       upsertPlatformScope(tx, {
         id: randomUUID(),
@@ -251,7 +260,7 @@ export class SopRuleAdminRepository extends SopContentRepository {
         enabled: false,
         source: 'manual',
       });
-      audit(tx, 'rule', ruleId, 'delete', '软删（deprecated）');
+      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'delete', detail: '软删（deprecated）' });
     });
   }
 

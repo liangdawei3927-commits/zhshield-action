@@ -1,3 +1,4 @@
+/** 供应链定时扫描调度配置：扫描间隔（毫秒，缺省 24 小时）与扫描回调 */
 export interface SupplyChainScanOptions {
   scanInterval?: number;
   onScan: () => Promise<void>;

@@ -29,6 +29,7 @@ const TOOL_BIN_NAME: Record<string, string> = {
 /** 工具就绪状态（探测三层来源） */
 export type ToolReadiness = 'project' | 'path' | 'shared' | 'missing';
 
+/** 单个工具的就绪状态行：命中的可执行文件路径（missing 时为 null） */
 export interface ToolStatusRow {
   toolId: string;
   status: ToolReadiness;
@@ -36,12 +37,14 @@ export interface ToolStatusRow {
   bin: string | null;
 }
 
+/** 工具清单探测结果：清单来源（云端/本地降级）+ 逐工具就绪状态 */
 export interface ToolsStatusResult {
   /** 工具清单来源：cloud（/resolve/tools）或 local（离线默认） */
   source: 'cloud' | 'local';
   tools: ToolStatusRow[];
 }
 
+/** 引导安装结果：成功标记、失败原因（打包环境不支持 / 脚本报错）与脚本输出 */
 export interface ToolsInstallResult {
   ok: boolean;
   /** 打包环境暂不支持（安装脚本属仓库资产）；开发环境为脚本退出码 */

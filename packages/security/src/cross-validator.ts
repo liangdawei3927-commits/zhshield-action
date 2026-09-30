@@ -5,8 +5,10 @@ const CVE_ALT_PATTERN = /[:/](CVE-\d{4}-\d+)/i;
 
 // ─── 类型 ────────────────────────────────────────────────────
 
+/** 交叉验证置信度：high_confidence = Trivy ∩ Grype 双源印证；pending_confirmation = 仅单一来源待确认 */
 export type CrossConfidence = 'high_confidence' | 'pending_confirmation';
 
+/** 交叉验证条目：同一漏洞（CVE 优先，否则 包@版本）在双源比对后的合并结论 */
 export interface CrossValidationEntry {
   /** CVE ID（如 CVE-2024-1234）或规则 ID */
   cveId: string;
@@ -22,6 +24,7 @@ export interface CrossValidationEntry {
   suggestedSeverity: 'error' | 'warning' | 'info';
 }
 
+/** 交叉验证报告：按置信度分流的条目 + 计数汇总，供 ResultAggregator 构建 Vulnerability 列表 */
 export interface CrossValidationReport {
   /** 高置信度（A ∩ B） */
   highConfidence: CrossValidationEntry[];

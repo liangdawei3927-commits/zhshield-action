@@ -104,20 +104,6 @@ function runGuardAdapter(fixture: string): ReturnType<typeof normalize> {
   );
 }
 
-/** 体检侧：内核 SOP 规则评估 */
-function runKernelRule(report: RuleEngineReport, ruleId: string): ReturnType<typeof normalize> {
-  const ev = report.evaluations.find((e) => e.rule.id === ruleId);
-  expect(ev, `规则 ${ruleId} 未参与评估`).toBeDefined();
-  return normalize(
-    (ev!.violations ?? []).map((v) => ({
-      file: v.file,
-      line: v.line ?? 0,
-      from: 'services-or-repositories',
-      to: 'controllers',
-    })),
-  );
-}
-
 describe('架构边界 — 门禁与体检同结论（T8）', () => {
   let fixture: string;
 

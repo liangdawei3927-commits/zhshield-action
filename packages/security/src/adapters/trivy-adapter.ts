@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 import { resolveToolCommandDetailed } from '@zh/shared';
@@ -18,10 +20,6 @@ const execFileAsync = promisify(execFile);
  * trivy 启动扫描时若本地无漏洞库（或版本过期），会尝试联网更新 DB；
  * 离线/受限环境下载失败即抛错，stderr 出现以下签名。此时报错应给出可操作的
  * 解决指引（预置 DB 或设置镜像/离线环境变量），而非原始下载日志噪音。
- * 注意：trivy 子进程继承 process.env，运营侧可直接用 TRIVY_SKIP_DB_UPDATE=1 /
- * TRIVY_OFFLINE_SCAN=1 / TRIVY_DB_REPOSITORY=<镜像> 控制，无需改代码；
- * 但首次运行（无任何本地缓存）时 --skip-db-update 会被 trivy 拒绝
- * （"first run cannot skip downloading DB"），必须先联网预置一次 DB。
  */
 const DB_UNAVAILABLE_MARKERS: readonly RegExp[] = [
   /Need to update DB/,
@@ -30,6 +28,33 @@ const DB_UNAVAILABLE_MARKERS: readonly RegExp[] = [
   /first run cannot skip downloading DB/,
   /--skip-db-update cannot be specified on the first run/,
 ];
+
+/** trivy 漏洞库缓存目录（TRIVY_CACHE_DIR 优先，否则按平台默认，与 trivy 自身解析一致） */
+function resolveCacheDir(): string {
+  const fromEnv = process.env.TRIVY_CACHE_DIR;
+  if (fromEnv) return fromEnv;
+  return process.platform === 'darwin'
+    ? path.join(os.homedir(), 'Library', 'Caches', 'trivy')
+    : path.join(os.homedir(), '.cache', 'trivy');
+}
+
+/**
+ * 本地是否已有可用的漏洞库缓存。
+ *
+ * trivy 的 DB 带 NextUpdate：过期后每次扫描都会先联网刷新，受限网络下
+ * `mirror.gcr.io` 拉取会挂到网络超时（本仓实测 3m49s）再 FATAL，把整条门禁打红，
+ * 尽管磁盘上躺着 1.4GB 可用库。缓存存在时改走 --skip-db-update 复用它。
+ * 缓存不存在时不能加该标志（trivy 会以 "first run cannot skip downloading DB"
+ * 直接失败），此时才保留联网预置的报错指引。
+ */
+function hasLocalVulnerabilityDb(): boolean {
+  const dbDir = path.join(resolveCacheDir(), 'db');
+  try {
+    return fs.existsSync(path.join(dbDir, 'trivy.db')) && fs.existsSync(path.join(dbDir, 'metadata.json'));
+  } catch {
+    return false;
+  }
+}
 
 const META: ToolMeta = {
   id: 'trivy',
@@ -111,6 +136,7 @@ export class TrivyAdapter implements ToolAdapter {
     const projectPath = path.resolve(options.projectPath);
     const args = this.buildArgs(scanType, projectPath, options);
     if (!args) return null;
+    this.applyLocalDbArgs(args);
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
     const { command } = await resolveToolCommandDetailed('trivy', options.projectPath);
     const { stdout } = await execFileAsync(command, args, {
@@ -120,6 +146,20 @@ export class TrivyAdapter implements ToolAdapter {
     });
     const output = JSON.parse(stdout);
     return this.mapOutput(output);
+  }
+
+  /**
+   * 复用本地漏洞库：已有缓存时补 --skip-db-update / --offline-scan。
+   *
+   * 仅在缓存存在时生效（否则 trivy 报 first run cannot skip downloading DB），
+   * 且可用 ZHSHIELD_TRIVY_ALLOW_DB_UPDATE=1 强制走联网刷新。
+   * --offline-scan 一并补上：整树扫描会为解析 Java 依赖去访问 Maven Central，
+   * 受限网络下 429 会让扫描 FATAL，而它对基于本地库的漏洞匹配无影响。
+   */
+  private applyLocalDbArgs(args: string[]): void {
+    if (process.env.ZHSHIELD_TRIVY_ALLOW_DB_UPDATE === '1') return;
+    if (!hasLocalVulnerabilityDb()) return;
+    args.push('--skip-db-update', '--offline-scan');
   }
 
   private buildErrorResult(start: number, err: ExecError): ToolResult {

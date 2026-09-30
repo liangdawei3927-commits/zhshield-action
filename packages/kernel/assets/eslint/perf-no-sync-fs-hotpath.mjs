@@ -75,7 +75,7 @@ const noSyncFsHotpath = {
       },
       CallExpression(node) {
         // 仅最内层函数为 async 时报告
-        if (fnStack.length === 0 || !fnStack[fnStack.length - 1]) return;
+        if (fnStack.length === 0 || !fnStack.at(-1)) return;
         const callee = node.callee;
         if (callee.type === 'MemberExpression') {
           const object = callee.object;

@@ -120,7 +120,12 @@ export function bucketFindingsByModule(
  */
 export function scoreProjectModules(modules: ModuleScoreInput[]): ProjectScoreAggregate {
   const cards = modules.map((m) => {
-    const dims = buildHealthDimensions(m.guard, m.inspect, m.path, m.profile);
+    const dims = buildHealthDimensions({
+      guard: m.guard,
+      inspect: m.inspect,
+      projectRoot: m.path,
+      profile: m.profile,
+    });
     const res = new ScoringEngine().calculate(m.path, dims);
     return {
       path: m.path,

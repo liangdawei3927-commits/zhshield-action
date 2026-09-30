@@ -12,6 +12,7 @@ import { SopConflictPolicy } from './sop-conflict-policy';
 
 const MAJOR_VERSION = /^(\d+)\./;
 
+/** 同步协调器依赖：registry / clientVersion / sqliteStore / versionStore / syncClient / scheduler 必需，其余可选 */
 export interface SopSyncCoordinatorOptions {
   registry: SopRegistry;
   clientVersion: string;
@@ -228,7 +229,7 @@ export class SopSyncCoordinator {
    * 验证版本连续性 → 事务执行 → 记录同步日志
    */
   async applyDiff(diff: SopDiff): Promise<void> {
-    this.verifyVersionContinuity(diff);
+    verifyVersionContinuity(this.localVersion, diff);
     this.applyChanges(diff);
     this.sqliteStore.persist(this.registry.getAll());
 
@@ -242,29 +243,17 @@ export class SopSyncCoordinator {
     });
   }
 
-  private verifyVersionContinuity(diff: SopDiff): void {
-    const localVersion = this.localVersion?.version ?? '0.0.0';
-    if (localVersion !== diff.fromVersion) {
-      throw new Error(`Version mismatch: local=${localVersion}, expected=${diff.fromVersion}`);
-    }
-
-    const hashPayload = JSON.stringify({
-      added: diff.added,
-      modified: diff.modified,
-      removed: diff.removed,
-    });
-    const hash = crypto.createHash('sha256').update(hashPayload).digest('hex');
-    if (diff.metadata.hash && hash !== diff.metadata.hash) {
-      throw new Error(`Hash mismatch: expected=${diff.metadata.hash}, got=${hash}`);
-    }
-  }
-
   private applyChanges(diff: SopDiff): void {
     for (const ruleId of diff.removed) {
       this.registry.remove(ruleId);
     }
     for (const rule of diff.modified) {
-      this.registry.update(rule.id, this.conflictPolicy.resolveIncoming(rule));
+      const effective = this.conflictPolicy.resolveIncoming(rule);
+      if (this.registry.has(effective.id)) {
+        this.registry.update(effective.id, effective);
+      } else {
+        this.registry.register(effective);
+      }
     }
     this.upsertRules(diff.added);
   }
@@ -331,5 +320,23 @@ export class SopSyncCoordinator {
   private static extractMajor(version: string): number | null {
     const match = MAJOR_VERSION.exec(version);
     return match ? parseInt(match[1], 10) : null;
+  }
+}
+
+/** 验证版本连续性：本地版本须等于 diff.fromVersion，且内容哈希须与下发 metadata.hash 一致，否则抛错 */
+function verifyVersionContinuity(localVersion: SopVersion | null, diff: SopDiff): void {
+  const baseVersion = localVersion?.version ?? '0.0.0';
+  if (baseVersion !== diff.fromVersion) {
+    throw new Error(`Version mismatch: local=${baseVersion}, expected=${diff.fromVersion}`);
+  }
+
+  const hashPayload = JSON.stringify({
+    added: diff.added,
+    modified: diff.modified,
+    removed: diff.removed,
+  });
+  const hash = crypto.createHash('sha256').update(hashPayload).digest('hex');
+  if (diff.metadata.hash && hash !== diff.metadata.hash) {
+    throw new Error(`Hash mismatch: expected=${diff.metadata.hash}, got=${hash}`);
   }
 }

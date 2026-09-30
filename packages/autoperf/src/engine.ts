@@ -37,6 +37,10 @@ const PROBE_UNIT: Record<string, string> = {
   memoryPeak: 'MB',
 };
 
+/** countSourceFiles 的源码扩展名匹配（模块级复用，避免每目录项重建） */
+const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
+
+/** 引擎注入依赖项（默认值由构造函数回退到内置实现） */
 export interface AutoPerfEngineDeps {
   detectMachineProfile?: typeof detectMachineProfile;
   budgets?: PerfBudget[];
@@ -134,7 +138,7 @@ export class AutoPerfEngine {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         count += this.countSourceFiles(full);
-      } else if (entry.isFile() && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name)) {
+      } else if (entry.isFile() && SOURCE_FILE_RE.test(entry.name)) {
         count += 1;
       }
     }

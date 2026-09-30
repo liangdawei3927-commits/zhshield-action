@@ -2,7 +2,7 @@
  * 代码复杂度检测器（complexity-detector.ts）
  *
  * 纯静态分析源码复杂度（零网络、零执行）：
- * - nested-loop：三层以上真实 AST 嵌套循环 → medium
+ * - nested-loop：三层以上**且存在乘数层**的真实 AST 嵌套循环 → medium
  * - sync-io：落在延迟敏感执行上下文里的同步阻塞 IO → high
  *
  * 判定全部基于 TypeScript 编译器 API（事实见 ast-scan.ts，上下文政策见
@@ -69,7 +69,7 @@ function impactOf(context: RuntimeContext): { label: string; impact: string; adv
 /**
  * ComplexityDetectorImpl — 基于 AST 的复杂度检测实现
  *
- * 检出两类问题：三层以上嵌套循环（medium）与延迟敏感路径上的同步阻塞 IO（high）。
+ * 检出两类问题：三层以上且存在乘数层的嵌套循环（medium）与延迟敏感路径上的同步阻塞 IO（high）。
  * 文件缺失 / 目录不存在均静默跳过，不抛异常。
  */
 export class ComplexityDetectorImpl implements ComplexityDetector {
@@ -100,6 +100,7 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
   ): void {
     const chain = scan.deepestLoops;
     if (chain === null || chain.depth < NESTED_LOOP_THRESHOLD) return;
+    if (!chain.amplifies) return;
     const { depth, innermostIterable, outermostLine } = chain;
     issues.push({
       id: `complexity-nested-loop-${relFile}`,
@@ -111,7 +112,9 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
       message:
         `${relFile} 存在 ${depth} 层嵌套循环` +
         `（最内层遍历 ${innermostIterable}）— 循环层级过深，建议提取内层或预建索引`,
-      suggestion: '将最内层循环体提取为独立函数，或用 Map/Set 预建索引替代内层遍历',
+      suggestion:
+        '某一层的遍历规模与外层相乘，总代价随两个维度同时放大：把不随外层变化的那一维提到循环外预计算，' +
+        '或用 Map/Set 预建索引把内层遍历降成 O(1) 查找',
       autoFixable: false,
     });
   }

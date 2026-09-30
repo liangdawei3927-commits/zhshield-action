@@ -46,6 +46,24 @@ const SEVERITY_WEIGHT: Record<PerformanceIssue['severity'], number> = {
   info: 1,
 };
 
+/** BundleSizeDetectorImpl.walk 参数对象 */
+interface WalkParams {
+  dir: string;
+  projectRoot: string;
+  cfg: PerformanceConfig;
+  issues: PerformanceIssue[];
+  state: { scanned: number; totalBytes: number; seq: number };
+}
+
+/** BundleSizeDetectorImpl.collectFileSize 参数对象 */
+interface CollectFileSizeParams {
+  fullPath: string;
+  projectRoot: string;
+  cfg: PerformanceConfig;
+  issues: PerformanceIssue[];
+  state: { scanned: number; totalBytes: number; seq: number };
+}
+
 /** 包体积检测器具体实现：纯静态，绝不抛异常 */
 export class BundleSizeDetectorImpl implements BundleSizeDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
@@ -62,20 +80,15 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
       if (state.scanned >= cfg.scanLimit) break;
       const root = safeJoin(projectRoot, dirName);
       if (!fs.existsSync(root)) continue;
-      this.walk(root, projectRoot, cfg, issues, state);
+      this.walk({ dir: root, projectRoot, cfg, issues, state });
     }
     pushTotalWarning(state, issues);
     return sortBundleIssues(issues);
   }
 
   /** 递归遍历产物目录（受 scanLimit 约束），累计体积并收集大文件问题 */
-  private walk(
-    dir: string,
-    projectRoot: string,
-    cfg: PerformanceConfig,
-    issues: PerformanceIssue[],
-    state: { scanned: number; totalBytes: number; seq: number },
-  ): void {
+  private walk(params: WalkParams): void {
+    const { dir, projectRoot, cfg, issues, state } = params;
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -89,24 +102,23 @@ export class BundleSizeDetectorImpl implements BundleSizeDetector {
       const fullPath = safeJoin(dir, entry.name);
       if (entry.isDirectory()) {
         if (SKIP_DIR_NAMES.has(entry.name)) continue;
-        this.walk(fullPath, projectRoot, cfg, issues, state);
+        this.walk({ ...params, dir: fullPath });
         continue;
       }
       if (!entry.isFile()) continue;
       if (SKIP_FILE_RE.test(entry.name)) continue;
-      this.collectFileSize(entry, fullPath, projectRoot, cfg, issues, state);
+      this.collectFileSize({ fullPath, projectRoot, cfg, issues, state });
     }
   }
 
   /** 统计单文件体积并收集大文件问题 */
-  private collectFileSize(
-    entry: fs.Dirent,
-    fullPath: string,
-    projectRoot: string,
-    cfg: PerformanceConfig,
-    issues: PerformanceIssue[],
-    state: { scanned: number; totalBytes: number; seq: number },
-  ): void {
+  private collectFileSize({
+    fullPath,
+    projectRoot,
+    cfg,
+    issues,
+    state,
+  }: CollectFileSizeParams): void {
     state.scanned += 1;
     let size: number;
     try {

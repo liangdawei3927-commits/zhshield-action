@@ -85,7 +85,9 @@ export class TenancyService implements OnModuleDestroy {
 
   private getDb() {
     this.ensureReady();
-    return this.dbConn!.getDb();
+    const conn = this.dbConn;
+    if (!conn) throw new Error('数据库不可用');
+    return conn.getDb();
   }
 
   onModuleDestroy(): void {

@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { safeJoin } from '@zh/shared';
 
+/** 数据库连接配置：DbConnection 构造入参（dbPath 必填，其余有默认值，见构造函数） */
 export interface DbConfig {
   dbPath: string;
   walMode?: boolean;

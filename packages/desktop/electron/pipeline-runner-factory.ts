@@ -15,6 +15,7 @@
  */
 import type { PipelineRunner } from '@zh/pipeline';
 
+/** 装配结果：已装载规则的 PipelineRunner + 云同步规则条数 */
 export interface LoadedRunner {
   runner: PipelineRunner;
   /** 从云同步缓存合并的规则条数；0 = 仅内置模板（云端缓存不可用属正常降级） */

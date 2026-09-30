@@ -27,6 +27,7 @@ export type SecretType =
   | 'telegram-bot-token'
   | 'generic-api-key';
 
+/** 密钥严重级别：与 VulnerabilitySeverity 同构的四档分级（critical / high / medium / low） */
 export type SecretSeverity = 'critical' | 'high' | 'medium' | 'low';
 
 /**
@@ -38,6 +39,7 @@ export type SecretSeverity = 'critical' | 'high' | 'medium' | 'low';
  */
 export type SecretStatus = 'active' | 'rotating' | 'rotated' | 'dismissed';
 
+/** 密钥出现位置：文件 + 行号 + 引入提交（branch 可选，来自 git 分支信息） */
 export interface SecretLocation {
   file: string;
   line: number;
@@ -46,6 +48,7 @@ export interface SecretLocation {
   branch?: string;
 }
 
+/** 单条密钥发现：脱敏展示值 + 位置 + 活跃度（是否仍被引用、remote 是否公开） + 生命周期状态 */
 export interface SecretFinding {
   /** 确定性标识 = sha256(值) 十六进制，明文不落盘 */
   secretId: string;
@@ -65,6 +68,7 @@ export interface SecretFinding {
   status: SecretStatus;
 }
 
+/** 密钥扫描报告：发现列表 + 计数汇总 + 增量扫描断点（lastScannedCommit） */
 export interface SecretScanReport {
   findings: SecretFinding[];
   summary: {

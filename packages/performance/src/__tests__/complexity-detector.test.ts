@@ -78,12 +78,12 @@ describe('complexity-detector · nested-loop', () => {
   it('报告真实深度、最内层被遍历表达式与最外层循环行号，且不再断言时间复杂度', () => {
     const issues = scan('loop-report', {
       'src/index-ast.ts': [
-        'export function index(deps: Map<string, string[]>) {',
+        'export function index(deps: Map<string, string[]>, rules: string[], cols: string[]) {',
         '  for (const [, versions] of deps) {',
-        '    for (const raw of versions) {',
-        '      for (const chunk of raw.split("\\n")) {',
-        '        for (const ch of chunk) {',
-        '          console.log(ch);',
+        '    for (const rule of rules) {',
+        '      for (const col of cols) {',
+        '        for (const ch of col) {',
+        '          console.log(versions, rule, ch);',
         '        }',
         '      }',
         '    }',
@@ -94,8 +94,8 @@ describe('complexity-detector · nested-loop', () => {
 
     const hit = loopsOf(issues)[0];
     expect(hit?.message).toContain('4 层嵌套循环');
-    // 报的是**最内层**那一环的遍历源（第 4 层 for 的 chunk），不是中间任一层
-    expect(hit?.message).toContain('最内层遍历 chunk');
+    // 报的是**最内层**那一环的遍历源（第 4 层 for 的 col），不是中间任一层
+    expect(hit?.message).toContain('最内层遍历 col');
     expect(hit?.message).not.toContain('O(n^');
     expect(hit?.line).toBe(2);
   });
@@ -103,11 +103,11 @@ describe('complexity-detector · nested-loop', () => {
   it('for...of 三层嵌套被检出（最内层取 iterable 表达式）', () => {
     const issues = scan('loop-forof', {
       'src/forof.ts': [
-        'export function walk(deps: Map<string, Set<string>>) {',
+        'export function walk(deps: Map<string, Set<string>>, files: string[]) {',
         '  for (const [, versions] of deps) {',
-        '    for (const version of versions) {',
-        '      for (const file of version.split(",")) {',
-        '        console.log(file);',
+        '    for (const file of files) {',
+        '      for (const line of file.split(",")) {',
+        '        console.log(line, versions);',
         '      }',
         '    }',
         '  }',
@@ -117,7 +117,7 @@ describe('complexity-detector · nested-loop', () => {
 
     const hit = loopsOf(issues)[0];
     expect(hit?.message).toContain('3 层嵌套循环');
-    expect(hit?.message).toContain('version.split(",")');
+    expect(hit?.message).toContain('file.split(",")');
   });
 
   it('for...in 三层嵌套被检出（最内层取 iterable 表达式）', () => {
@@ -332,6 +332,156 @@ describe('complexity-detector · nested-loop', () => {
       expect(typeof issue.suggestion).toBe('string');
       expect(issue.autoFixable).toBe(false);
     }
+  });
+});
+
+describe('complexity-detector · nested-loop 误报抑制', () => {
+  it('rules × patternEither × lines：每层都由上一层那一轮派生 → 不报', () => {
+    const issues = scan('fp-semgrep', {
+      'src/semgrep-rule-writer.ts': [
+        'export function appendRuleMatch(lines: string[], r: RuleYaml): void {',
+        '  for (const p of r.patterns) {',
+        '    if (p.patternEither && p.patternEither.length > 0) {',
+        '      for (const pe of p.patternEither) {',
+        '        for (const line of pe.split("\\n")) lines.push(line);',
+        '      }',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(0);
+  });
+
+  it('byPkg × byFile × lines：Map→Map→Set 去重排序 → 不报', () => {
+    const issues = scan('fp-hallucinated', {
+      'src/hallucinated-dependency.ts': [
+        'export function group(byPkg: Map<string, Map<string, Set<number>>>): Map<string, RefSite[]> {',
+        '  const out = new Map<string, RefSite[]>();',
+        '  for (const [pkg, byFile] of byPkg) {',
+        '    const sites: RefSite[] = [];',
+        '    for (const [file, lines] of byFile) {',
+        '      for (const line of Array.from(lines, (n) => n).toSorted((a, b) => a - b))',
+        '        sites.push({ file, line });',
+        '    }',
+        '    out.set(pkg, sites);',
+        '  }',
+        '  return out;',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(0);
+  });
+
+  it('importers × [dependencies, devDependencies] × keys：中间层是字面量数组 → 不报', () => {
+    const issues = scan('fp-threat', {
+      'src/npm-threat-scanner.ts': [
+        'function collectImporterDeps(importers: Record<string, unknown>, names: Set<string>): void {',
+        '  for (const importer of Object.values(importers)) {',
+        '    const deps = importer as { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };',
+        '    for (const depMap of [deps.dependencies, deps.devDependencies]) {',
+        '      if (!depMap) continue;',
+        '      for (const name of Object.keys(depMap)) names.add(name);',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(0);
+  });
+
+  it('files × 字面量 section 列表 × deps：固定配置维度不算乘数 → 不报', () => {
+    const issues = scan('fp-security-engine', {
+      'src/security-check-engine.ts': [
+        'export function scanDependencies(files: string[]) {',
+        '  const scan = { hasHelmet: false };',
+        '  for (const file of files) {',
+        '    let parsed: unknown;',
+        '    parsed = JSON.parse(read(file));',
+        "    for (const section of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {",
+        '      const deps = (parsed as Record<string, unknown>)[section];',
+        '      if (!deps) continue;',
+        '      for (const [name] of Object.entries(deps as Record<string, unknown>)) {',
+        '        if (name === "helmet") scan.hasHelmet = true;',
+        '      }',
+        '    }',
+        '  }',
+        '  return scan;',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(0);
+  });
+
+  it('顶层 const 数组作最内层遍历源 → 固定配置维度，不报', () => {
+    const issues = scan('static-const', {
+      'src/const-array.ts': [
+        'const SECTIONS = ["a", "b", "c"] as const;',
+        'export function walk(packages: Record<string, string[]>) {',
+        '  const out: string[] = [];',
+        '  for (const pkg of Object.values(packages)) {',
+        '    for (const section of pkg) {',
+        '      for (const flag of SECTIONS) {',
+        '        out.push(section + flag);',
+        '      }',
+        '    }',
+        '  }',
+        '  return out;',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(0);
+  });
+
+  it('let k = 0 这类裸数字计数器不构成派生证据（真 O(n³)）→ 报', () => {
+    const issues = scan('counter', {
+      'src/counter.ts': [
+        'export function nested(data: number[]) {',
+        '  let i = 0;',
+        '  while (i < data.length) {',
+        '    let j = 0;',
+        '    do {',
+        '      let k = 0;',
+        '      while (k < data.length) {',
+        '        console.log(data[i] + data[j] + data[k]);',
+        '        k++;',
+        '      }',
+        '      j++;',
+        '    } while (j < data.length);',
+        '    i++;',
+        '  }',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(1);
+  });
+
+  it('导入的规则集数组与入参规则集：静态分析无法区分配置与数据，按设计仍报', () => {
+    const issues = scan('input-x-config', {
+      'src/review.ts': [
+        'import { PATTERN_RULES } from "./pattern-rules";',
+        'export function collectPatternVulns(files: string[]): string[] {',
+        '  const vulns: string[] = [];',
+        '  for (const file of files) {',
+        '    const content = read(file);',
+        '    for (const rule of PATTERN_RULES) {',
+        '      for (const hit of rule.match(content)) {',
+        '        vulns.push(`${rule.id}-${file}-${hit.line}`);',
+        '      }',
+        '    }',
+        '  }',
+        '  return vulns;',
+        '}',
+      ].join('\n'),
+    });
+
+    expect(loopsOf(issues)).toHaveLength(1);
   });
 });
 

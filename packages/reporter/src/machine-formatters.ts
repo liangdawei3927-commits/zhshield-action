@@ -15,7 +15,10 @@ import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { PipelineReport } from '@zh/pipeline';
 
+/** 归一化后的发现严重级（三档，供 SARIF level 与 fail-on 阈值比较） */
 export type FindingSeverity = 'error' | 'warning' | 'info';
+
+/** 发现来源域（决定 CI 面板归属与告警路由） */
 export type FindingSource = 'guard' | 'inspect' | 'refactor' | 'security' | 'sentinel';
 
 /** 阻断阈值：none 表示永不阻断，其余映射到严重级秩 */
@@ -29,6 +32,7 @@ export function isFailOnValue(value: string | undefined): value is FailOn {
   return value !== undefined && (FAIL_ON_VALUES as readonly string[]).includes(value);
 }
 
+/** 归一化发现条目：各引擎报告收敛后的统一机器可读形态（位置可缺省） */
 export interface Finding {
   ruleId: string;
   severity: FindingSeverity;
@@ -44,10 +48,20 @@ export interface Finding {
 /** 严重级 → 数值秩（error 最高），用于 fail-on 阈值比较 */
 const SEVERITY_RANK: Record<FindingSeverity, number> = { error: 3, warning: 2, info: 1 };
 
+/**
+ * 取严重级的数值秩（error 3 / warning 2 / info 1），用于阈值比较。
+ * @param s 归一化后的严重级
+ * @returns 数值秩
+ */
 export function severityRank(s: FindingSeverity): number {
   return SEVERITY_RANK[s];
 }
 
+/**
+ * 取阻断阈值的数值秩；'none'（永不阻断）恒为 0。
+ * @param f fail-on 阈值
+ * @returns 与 {@link severityRank} 同尺度的数值秩
+ */
 export function failOnRank(f: FailOn): number {
   return f === 'none' ? 0 : SEVERITY_RANK[f];
 }

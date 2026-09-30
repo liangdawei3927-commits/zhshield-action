@@ -2,8 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { sanitizeLogField, safeJoin } from '@zh/shared';
 import { EventCenter } from './event-center';
+import { eventKey } from './event-key';
 
+/** 文件变更类型：新增、内容变更、删除 */
 export type FileChangeType = 'add' | 'change' | 'unlink';
+/** 文件监听过滤器：返回 true 表示该路径需要被监控 */
 export type FileWatchFilter = (filePath: string) => boolean;
 
 export const DEFAULT_IGNORE_DIRS = [
@@ -83,6 +86,7 @@ export function computePollDelay(
   return intervalMs;
 }
 
+/** 文件监控器配置：归属项目、监听路径、轮询间隔、路径过滤与忽略目录 */
 export interface FileMonitorConfig {
   projectId: string;
   watchPaths: string[];
@@ -246,9 +250,10 @@ export class FileMonitor {
     projectId: string,
     mtime: number,
   ): void {
+    const title = `File changed: ${path.relative(watchPath, fullPath)}`;
     this.eventCenter.createEvent({
       projectId,
-      title: `File changed: ${path.relative(watchPath, fullPath)}`,
+      title,
       service: 'sentinel',
       module: 'file-monitor',
       severity: 'p3',
@@ -256,6 +261,7 @@ export class FileMonitor {
       operator: 'file-monitor',
       action: 'file-changed',
       detail: `File modified: ${fullPath}`,
+      dedupeKey: eventKey(projectId, 'file-monitor', title, 'p3'),
     });
   }
 
@@ -310,16 +316,20 @@ export class FileMonitor {
     fullPath: string,
     changeType: FileChangeType,
   ): void {
+    const title = `File ${changeType}: ${path.basename(fullPath)}`;
+    const severity = changeType === 'unlink' ? 'p2' : 'p3';
+    const perFileIdentity = `${title}|${fullPath}`;
     this.eventCenter.createEvent({
       projectId,
-      title: `File ${changeType}: ${path.basename(fullPath)}`,
+      title,
       service: 'sentinel',
       module: 'file-monitor',
-      severity: changeType === 'unlink' ? 'p2' : 'p3',
+      severity,
       context: { filePath: fullPath, changeType },
       operator: 'file-monitor',
       action: `file-${changeType}`,
       detail: `File ${changeType}: ${fullPath}`,
+      dedupeKey: eventKey(projectId, 'file-monitor', perFileIdentity, severity),
     });
   }
 }

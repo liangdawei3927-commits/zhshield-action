@@ -51,6 +51,20 @@ export interface SerializedRuleEngineReport {
 
 type CheckStatus = InspectionReportData['checks'][number]['status'];
 
+type CheckLike = InspectionReportData['checks'][number];
+
+/** P0-1：问题判定——仅 fail/warn（实际违规）算问题，attention（未检测）不算。 */
+export function isIssueStatus(status: CheckStatus): boolean {
+  return status === 'fail' || status === 'warn';
+}
+
+/** issues 数据源：从全量 checks 挑出问题项（排除 attention/pass）。 */
+export function selectIssueChecks(
+  checks: readonly CheckLike[],
+): InspectionReportData['checks'] {
+  return checks.filter((c) => isIssueStatus(c.status));
+}
+
 function mapStatus(status: SerializedRuleEvaluation['status']): CheckStatus {
   switch (status) {
     case 'passed':

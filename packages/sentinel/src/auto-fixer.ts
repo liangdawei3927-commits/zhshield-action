@@ -39,11 +39,13 @@ function parseSafeScript(script: string): { cmd: string; args: string[] } | null
   return { cmd, args };
 }
 
+/** 单个自动修复动作：动作类型 + 类型相关的参数表 */
 export interface AutoFixAction {
   type: 'restart-process' | 'rollback-commit' | 'run-script' | 'update-status';
   params: Record<string, string>;
 }
 
+/** 自动修复规则：命中事件过滤条件后按序执行的动作序列，可限制最大重试次数 */
 export interface AutoFixRule {
   name: string;
   eventFilter: (event: SentinelEvent) => boolean;
@@ -51,6 +53,7 @@ export interface AutoFixRule {
   maxAttempts?: number;
 }
 
+/** {@link AutoFixer} 初始化配置：归属项目、本地路径与生效规则列表 */
 export interface AutoFixerConfig {
   projectId: string;
   projectPath: string;
@@ -86,8 +89,9 @@ export class AutoFixer {
     },
     'rollback-commit': (_action, event) => {
       try {
-        const cwd = this.config?.projectPath;
-        if (!cwd) return false;
+        const config = this.config;
+        if (!config) return false;
+        const cwd = config.projectPath;
         // Get the last commit hash for potential rollback
         execSync('git log --oneline -1', { cwd, timeout: 5000 });
         // Attempt a soft rollback (revert, not reset)
@@ -96,7 +100,7 @@ export class AutoFixer {
           timeout: 15000,
         });
         this.eventCenter.createEvent({
-          projectId: this.config!.projectId,
+          projectId: config.projectId,
           title: 'Rollback executed',
           service: 'sentinel',
           module: 'auto-fixer',
@@ -180,11 +184,13 @@ export class AutoFixer {
     attempts: number,
     maxAttempts: number,
   ): boolean {
+    const config = this.config;
+    if (!config) return false;
     if (attempts < maxAttempts) return false;
 
     this.eventCenter.updateStatus(event.id, 'failed', 'auto-fixer');
     this.eventCenter.createEvent({
-      projectId: this.config!.projectId,
+      projectId: config.projectId,
       title: `Auto-fix exhausted: ${rule.name}`,
       service: 'sentinel',
       module: 'auto-fixer',
@@ -214,7 +220,9 @@ export class AutoFixer {
     succeeded: boolean,
     attempts: number,
   ): void {
-    const projectId = this.config!.projectId;
+    const config = this.config;
+    if (!config) return;
+    const projectId = config.projectId;
     if (succeeded) {
       this.eventCenter.updateStatus(event.id, 'pr_opened', 'auto-fixer');
       this.eventCenter.createEvent({

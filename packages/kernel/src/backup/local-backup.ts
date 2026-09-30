@@ -36,6 +36,29 @@ const TILDE_PREFIX = /^~/;
 /** 快照条目名（ISO 时间戳目录或同名 .zip）；不匹配的条目（pre-restore-*、MANIFEST.json 等）不参与轮换 */
 const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(\.zip)?$/;
 
+/** LocalBackup.runZipBackup 参数对象 */
+interface RunZipBackupParams {
+  resolvedBackupDir: string;
+  snapshotName: string;
+  files: string[];
+  projectPath: string;
+  timestamp: string;
+  config: LocalBackupConfig;
+  abortSignal?: AbortSignal;
+}
+
+/** LocalBackup.runDirectoryBackup 参数对象 */
+interface RunDirectoryBackupParams {
+  resolvedBackupDir: string;
+  snapshotName: string;
+  files: string[];
+  manifest: LocalBackupManifest | null;
+  projectPath: string;
+  timestamp: string;
+  config: LocalBackupConfig;
+  abortSignal?: AbortSignal;
+}
+
 export class LocalBackup {
   private backupRoot: string;
   private readonly scanner = new LocalBackupScanner();
@@ -67,17 +90,17 @@ export class LocalBackup {
       const snapshotName = timestamp.replace(/[:.]/g, '-');
 
       if (config.format === 'zip') {
-        return await this.runZipBackup(
+        return await this.runZipBackup({
           resolvedBackupDir,
           snapshotName,
           files,
           projectPath,
           timestamp,
           config,
-          abortSignal,
-        );
+          ...(abortSignal !== undefined ? { abortSignal } : {}),
+        });
       }
-      return await this.runDirectoryBackup(
+      return await this.runDirectoryBackup({
         resolvedBackupDir,
         snapshotName,
         files,
@@ -85,8 +108,8 @@ export class LocalBackup {
         projectPath,
         timestamp,
         config,
-        abortSignal,
-      );
+        ...(abortSignal !== undefined ? { abortSignal } : {}),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : '未知本地备份错误';
       return {
@@ -105,15 +128,9 @@ export class LocalBackup {
   }
 
   /** zip 格式备份：构建快照归档并轮换旧备份 */
-  private async runZipBackup(
-    resolvedBackupDir: string,
-    snapshotName: string,
-    files: string[],
-    projectPath: string,
-    timestamp: string,
-    config: LocalBackupConfig,
-    abortSignal?: AbortSignal,
-  ): Promise<LocalBackupSubResult> {
+  private async runZipBackup(params: RunZipBackupParams): Promise<LocalBackupSubResult> {
+    const { resolvedBackupDir, snapshotName, files, projectPath, timestamp, config, abortSignal } =
+      params;
     const zipPath = safeJoinReal(resolvedBackupDir, `${snapshotName}.zip`);
     const stats = await buildZipSnapshot({ files, projectPath, timestamp, zipPath, abortSignal });
     if (!abortSignal?.aborted) {
@@ -132,28 +149,29 @@ export class LocalBackup {
   }
 
   /** 目录格式备份：增量复制文件、写清单并轮换旧备份 */
-  private async runDirectoryBackup(
-    resolvedBackupDir: string,
-    snapshotName: string,
-    files: string[],
-    manifest: LocalBackupManifest | null,
-    projectPath: string,
-    timestamp: string,
-    config: LocalBackupConfig,
-    abortSignal?: AbortSignal,
-  ): Promise<LocalBackupSubResult> {
-    const backupDir = safeJoinReal(resolvedBackupDir, snapshotName);
-    const isFullBackup = !manifest || manifest.files.length === 0;
-    const { backedUp, errors, totalSize, fileEntries } = await this.copier.copyChangedFiles(
+  private async runDirectoryBackup(params: RunDirectoryBackupParams): Promise<LocalBackupSubResult> {
+    const {
+      resolvedBackupDir,
+      snapshotName,
       files,
       manifest,
-      isFullBackup,
+      projectPath,
+      timestamp,
+      config,
+      abortSignal,
+    } = params;
+    const backupDir = safeJoinReal(resolvedBackupDir, snapshotName);
+    const isFullBackup = !manifest || manifest.files.length === 0;
+    const { backedUp, errors, totalSize, fileEntries } = await this.copier.copyChangedFiles({
+      files,
+      _manifest: manifest,
+      _isFullBackup: isFullBackup,
       backupDir,
       projectPath,
       timestamp,
-      abortSignal,
-      config.compress,
-    );
+      ...(abortSignal !== undefined ? { abortSignal } : {}),
+      compress: config.compress,
+    });
 
     if (!abortSignal?.aborted) {
       await this.manifestStore.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);

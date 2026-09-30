@@ -1,8 +1,7 @@
 import type { ParsedFile } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
-
-const IDENT_START = /[a-zA-Z_]/;
+import * as ts from 'typescript';
 
 export function detectLongMethod(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
@@ -218,34 +217,139 @@ export function detectOversizedFile(parsed: ParsedFile, config: RefactorConfig):
 export function detectOversizedComponent(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   if (!isComponentFile(parsed.filePath)) return [];
 
-  const metrics = measureComponentMetrics(parsed);
-  if (!isOversizedComponent(parsed.linesOfCode, metrics.maxJsxDepth, metrics.handlerCount, config))
-    return [];
+  const worst = findWorstComponent(parsed.sourceFile);
+  if (!worst) return [];
 
-  const issues = collectComponentIssues(
-    parsed.linesOfCode,
-    metrics.maxJsxDepth,
-    metrics.handlerCount,
-    config,
-  );
-  return [buildOversizedComponentSmell(parsed, issues, config)];
+  const issues = collectComponentIssues(worst, config);
+  if (issues.length === 0) return [];
+
+  return [buildOversizedComponentSmell(parsed, worst, issues, config)];
 }
 
-/** 统计组件规模指标：JSX 嵌套深度与事件处理函数数量 */
-function measureComponentMetrics(parsed: ParsedFile): {
+interface ComponentSize {
+  name: string;
+  startLine: number;
+  endLine: number;
+  linesOfCode: number;
   maxJsxDepth: number;
   handlerCount: number;
-} {
-  const sourceText = parsed.sourceFile.getFullText();
-  return {
-    maxJsxDepth: computeJsxDepth(sourceText),
-    handlerCount: countEventHandlers(sourceText),
-  };
 }
 
-/** 构造组件过大代码异味 */
+function findWorstComponent(sourceFile: ts.SourceFile): ComponentSize | null {
+  const components: ComponentSize[] = [];
+
+  const addComponent = (name: string, node: ts.Node): void => {
+    const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+    const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+    components.push({
+      name,
+      startLine,
+      endLine,
+      linesOfCode: countLinesOfCode(node.getText(sourceFile)),
+      maxJsxDepth: computeJsxDepthFromAst(node),
+      handlerCount: countEventHandlers(node.getText(sourceFile)),
+    });
+  };
+
+  const visit = (node: ts.Node): void => {
+    const name = componentNameOf(node, sourceFile);
+    if (name !== null) {
+      addComponent(name, node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  if (components.length === 0) return null;
+  components.sort(
+    (a, b) =>
+      b.linesOfCode - a.linesOfCode || b.maxJsxDepth - a.maxJsxDepth || b.handlerCount - a.handlerCount,
+  );
+  return components[0];
+}
+
+/**
+ * 识别 React 组件形态并返回组件名：
+ * - 大写开头的函数声明；
+ * - 大写变量（initializer 为箭头函数/函数表达式，或 memo/forwardRef 调用）；
+ * - 继承自 (Pure)Component 的类声明。
+ * 非组件节点返回 null。
+ */
+function componentNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
+  if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text)) {
+    return node.name.text;
+  }
+  if (
+    ts.isVariableDeclaration(node) &&
+    ts.isIdentifier(node.name) &&
+    /^[A-Z]/.test(node.name.text)
+  ) {
+    const initializer = node.initializer;
+    if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) {
+      return node.name.text;
+    }
+    if (
+      initializer &&
+      ts.isCallExpression(initializer) &&
+      ts.isIdentifier(initializer.expression) &&
+      (initializer.expression.text === 'memo' || initializer.expression.text === 'forwardRef')
+    ) {
+      return node.name.text;
+    }
+    return null;
+  }
+  if (
+    ts.isClassDeclaration(node) &&
+    node.name &&
+    /^[A-Z]/.test(node.name.text) &&
+    (node.heritageClauses ?? []).some((clause) =>
+      clause.types.some((t) =>
+        /(?:React\.)?(?:Pure)?Component$/.test(t.expression.getText(sourceFile)),
+      ),
+    )
+  ) {
+    return node.name.text;
+  }
+  return null;
+}
+
+function countLinesOfCode(text: string): number {
+  return text
+    .split('\n')
+    .filter(
+      (line) =>
+        line.trim().length > 0 &&
+        !line.trim().startsWith('//') &&
+        !line.trim().startsWith('/*') &&
+        !line.trim().startsWith('*'),
+    ).length;
+}
+
+/**
+ * 基于真实 AST 计算 JSX 嵌套深度：JSX 元素的深度 = 其 JSX 祖先元素数 + 1。
+ *
+ * 遍历时必须在参数中传递「当前 JSX 祖先数」，而不是共享可变计数器——
+ * 共享计数器会在兄弟子树之间泄漏（后续兄弟的 JSX 元素在上一个子树的深度上
+ * 继续 +1），把 2-3 层的真实嵌套虚报成几十上百层（如 dependency-parts.tsx
+ * 报 184 层、真实仅 9 层）。
+ *
+ * 只统计真正的 JSX 元素（JsxElement / JsxSelfClosingElement）的父链深度，
+ * TS 泛型 / SVG / 字符串中的尖括号不参与。
+ */
+function computeJsxDepthFromAst(node: ts.Node): number {
+  let maxJsxDepth = 0;
+  function visit(n: ts.Node, jsxAncestors: number): void {
+    const next = ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) ? jsxAncestors + 1 : jsxAncestors;
+    if (next > maxJsxDepth) maxJsxDepth = next;
+    ts.forEachChild(n, (child) => visit(child, next));
+  }
+  visit(node, 0);
+  return maxJsxDepth;
+}
+
 function buildOversizedComponentSmell(
   parsed: ParsedFile,
+  component: ComponentSize,
   issues: string[],
   config: RefactorConfig,
 ): CodeSmell {
@@ -253,20 +357,21 @@ function buildOversizedComponentSmell(
   return makeSmell({
     ruleId: 'oversized-component',
     severity: config.severities['oversized-component'],
-    message: `组件过大 (${issues.join('，')})，建议拆分为子组件`,
+    message: `组件 ${component.name} 过大 (${issues.join('，')})，建议拆分为子组件`,
     filePath: parsed.filePath,
-    line: 1,
+    line: component.startLine,
     column: 1,
     metric: 'componentLines',
-    value: parsed.linesOfCode,
+    value: component.linesOfCode,
     threshold: lineThreshold,
     suggestion: {
       type: 'Extract Component / Custom Hook',
-      description: `将 UI 部分拆分为子组件，将状态逻辑提取为自定义 Hook`,
-      priority: parsed.linesOfCode > lineThreshold * 1.5 ? 'high' : 'medium',
-      effort: parsed.linesOfCode > lineThreshold * 2 ? 'large' : 'medium',
+      description: `将 ${component.name} 按职责拆分为子组件，将状态逻辑提取为自定义 Hook`,
+      priority: component.linesOfCode > lineThreshold * 1.5 ? 'high' : 'medium',
+      effort: component.linesOfCode > lineThreshold * 2 ? 'large' : 'medium',
       autoFixable: false,
     },
+    endLine: component.endLine,
   });
 }
 
@@ -281,51 +386,14 @@ function countEventHandlers(sourceText: string): number {
   return handlerMatches ? handlerMatches.length : 0;
 }
 
-function isOversizedComponent(
-  linesOfCode: number,
-  maxJsxDepth: number,
-  handlerCount: number,
-  config: RefactorConfig,
-): boolean {
-  return (
-    linesOfCode > config.thresholds.maxComponentLines ||
-    maxJsxDepth > config.thresholds.maxJsxNestingDepth ||
-    handlerCount > config.thresholds.maxCallbackHandlers
-  );
-}
-
-function collectComponentIssues(
-  linesOfCode: number,
-  maxJsxDepth: number,
-  handlerCount: number,
-  config: RefactorConfig,
-): string[] {
+function collectComponentIssues(component: ComponentSize, config: RefactorConfig): string[] {
   const issues: string[] = [];
-  if (linesOfCode > config.thresholds.maxComponentLines) issues.push(`${linesOfCode} 行代码`);
-  if (maxJsxDepth > config.thresholds.maxJsxNestingDepth) issues.push(`JSX 嵌套 ${maxJsxDepth} 层`);
-  if (handlerCount > config.thresholds.maxCallbackHandlers)
-    issues.push(`${handlerCount} 个事件处理函数`);
+  if (component.linesOfCode > config.thresholds.maxComponentLines)
+    issues.push(`${component.linesOfCode} 行代码`);
+  if (component.maxJsxDepth > config.thresholds.maxJsxNestingDepth)
+    issues.push(`JSX 嵌套 ${component.maxJsxDepth} 层`);
+  if (component.handlerCount > config.thresholds.maxCallbackHandlers)
+    issues.push(`${component.handlerCount} 个事件处理函数`);
   return issues;
 }
 
-function computeJsxDepth(sourceText: string): number {
-  let maxJsxDepth = 0;
-  let currentDepth = 0;
-
-  for (let i = 0; i < sourceText.length; i++) {
-    const ch = sourceText[i];
-    if (ch === '<' && i + 1 < sourceText.length && IDENT_START.test(sourceText[i + 1])) {
-      currentDepth++;
-      maxJsxDepth = Math.max(maxJsxDepth, currentDepth);
-      continue;
-    }
-    if (ch === '/' && i + 1 < sourceText.length && sourceText[i + 1] === '>') {
-      currentDepth = Math.max(0, currentDepth - 1);
-      continue;
-    }
-    if (ch === '<' && i + 2 < sourceText.length && sourceText[i + 1] === '/') {
-      currentDepth = Math.max(0, currentDepth - 1);
-    }
-  }
-  return maxJsxDepth;
-}

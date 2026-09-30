@@ -162,10 +162,15 @@ export async function registerProjectFeaturesToCloud(
       return;
     }
     const projectId = deriveProjectId(projectPath);
-    await registerProjectFeatures(org.orgId, userId, projectId, {
-      framework: feature.framework,
-      language: feature.language,
-      features: feature.features,
+    await registerProjectFeatures({
+      orgId: org.orgId,
+      userId,
+      projectId,
+      feature: {
+        framework: feature.framework,
+        language: feature.language,
+        features: feature.features,
+      },
     });
   } catch (err) {
     console.warn(
@@ -264,6 +269,7 @@ export function getDb(): ReturnType<DbConnection['connect']> {
   return db;
 }
 
+/** 哨兵运行时：事件中心 + 文件/日志/进程三个监控器（懒加载后单例复用） */
 export interface SentinelRuntime {
   eventCenter: InstanceType<typeof import('@zh/sentinel').EventCenter>;
   fileMonitor: InstanceType<typeof import('@zh/sentinel').FileMonitor>;

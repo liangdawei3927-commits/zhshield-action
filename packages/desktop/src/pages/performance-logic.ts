@@ -51,18 +51,24 @@ function toPerformanceAiIssue(issue: PerformanceReportData['issues'][number]) {
     line: issue.line,
     message: issue.message,
     suggestion: issue.suggestion,
+    domain: 'performance',
   };
 }
 
 /** 性能扫描运行：loading/进度来自任务中心，状态 + 报告 */
 function usePerformanceRun(projectPath: string): {
   loading: boolean;
+  progress: number;
   progressLabel: string;
+  statusMessage: string;
   report: PerformanceReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<PerformanceReportData | null>(null);
-  const { loading, progressLabel } = useTaskRun('performance', projectPath);
+  const { loading, progress, progressLabel, statusMessage } = useTaskRun(
+    'performance',
+    projectPath,
+  );
 
   const handleScan = useCallback(async () => {
     try {
@@ -73,7 +79,7 @@ function usePerformanceRun(projectPath: string): {
     }
   }, [projectPath]);
 
-  return { loading, progressLabel, report, handleScan };
+  return { loading, progress, progressLabel, statusMessage, report, handleScan };
 }
 
 /** 单条 / 全部复制到 AI（并唤起 Trae） */
@@ -132,8 +138,18 @@ function usePerformanceCopy(
 
 /** 性能页全部状态与副作用：扫描、单条/全部复制到 AI（并唤起 Trae） */
 export function usePerformancePage(projectPath: string) {
-  const { loading, progressLabel, report, handleScan } = usePerformanceRun(projectPath);
+  const { loading, progress, progressLabel, statusMessage, report, handleScan } =
+    usePerformanceRun(projectPath);
   const { copyToAi, copyAllToAi } = usePerformanceCopy(projectPath, report);
 
-  return { loading, progressLabel, report, copyToAi, copyAllToAi, handleScan };
+  return {
+    loading,
+    progress,
+    progressLabel,
+    statusMessage,
+    report,
+    copyToAi,
+    copyAllToAi,
+    handleScan,
+  };
 }

@@ -3,7 +3,7 @@ import { useT } from '../i18n';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
-import { isCleanableType } from './garbage-logic';
+import { isCleanableItem } from './garbage-logic';
 
 export const GARBAGE_TYPE_LABEL: Record<string, string> = {
   'unused-file': 'page.garbage.type.unusedFile',
@@ -63,7 +63,7 @@ function GarbageCard({
   onToggle: (id: string) => void;
 }) {
   const t = useT();
-  const cleanable = isCleanableType(item.type);
+  const cleanable = isCleanableItem(item);
   return (
     <ResultCard>
       <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export function GarbageActionBar({
   cleaning,
 }: GarbageActionBarProps) {
   const t = useT();
-  const cleanable = items.filter((i) => isCleanableType(i.type));
+  const cleanable = items.filter((i) => isCleanableItem(i));
   const selectedCount = cleanable.filter((i) => selected.has(i.id)).length;
   const allChecked = cleanable.length > 0 && selectedCount === cleanable.length;
   return (

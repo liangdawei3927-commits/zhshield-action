@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { Adapter, CheckConfig, CheckResult } from '../types';
+import { makeAdapterResult, makeSkippedAdapterResult } from './adapter-result';
 import {
   findEslintConfigDir,
   resolveEslintTargetDir,
@@ -8,6 +9,14 @@ import {
 } from '@zh/shared';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * 单次 ESLint 扫描的执行预算，对齐 SOP 引擎硬上限 300s。
+ * 此前为 60s，比外层硬上限更紧：门禁与其他扫描器并行时大型 monorepo 的全量
+ * lint 会被 SIGTERM，ESLint 末尾一次性输出 JSON 遂双空，失败原因退化成
+ * 不可读的 `Command failed: <cmd>`。
+ */
+const DEFAULT_SCAN_TIMEOUT_MS = 300_000;
 
 export { resolveEslintTargetDir };
 
@@ -83,7 +92,7 @@ export class GuardESLintCheckAdapter implements Adapter {
     const { command } = await resolveToolCommandDetailed('eslint', targetDir);
     return execFileAsync(command, ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
       cwd: targetDir,
-      timeout: 60000,
+      timeout: DEFAULT_SCAN_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
     });
   }
@@ -96,31 +105,56 @@ export class GuardESLintCheckAdapter implements Adapter {
     return { files: Array.isArray(parsed) ? parsed : [] };
   }
 
-  /** 处理 ESLint 执行失败：区分未安装 / 缺配置（应跳过）/ lint 失败有输出 / 其他错误 */
+  /** 处理 ESLint 执行失败：区分未安装 / 超时被杀 / 缺配置（应跳过）/ lint 失败有输出 / 其他错误 */
   private handleRunError(error: unknown): EslintRawResult {
-    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
-    if (err.code === 'ENOENT') {
-      return { files: [], error: 'ESLint 未安装或未在 PATH 中找到' };
-    }
+    const err = error as { code?: string; killed?: boolean; signal?: string | null; stdout?: string; stderr?: string; message?: string };
+    if (err.code === 'ENOENT') return this.notInstalledResult();
+    const lintOutput = this.parseLintOutput(err.stdout ?? '');
+    if (lintOutput) return { files: lintOutput };
+    if (this.isTimeoutError(err)) return this.timeoutResult();
+    if (this.isMissingConfigError(err)) return this.missingConfigResult();
+    return this.genericErrorResult(err);
+  }
 
-    // ESLint 以非零退出时有 JSON 输出（lint 失败）
-    const parsed = this.parseLintOutput(err.stdout ?? '');
-    if (parsed) return { files: parsed };
+  /** 超时判定：Node 超时置 killed=true + signal='SIGTERM' + code=null，stdout/stderr 常双空 */
+  private isTimeoutError(err: { code?: string; killed?: boolean; signal?: string | null; stdout?: string; stderr?: string }): boolean {
+    if (err.killed === true) return true;
+    return err.code === null && err.signal === 'SIGTERM' && !err.stdout && !err.stderr;
+  }
 
-    // 兜底：探测漏掉的自定义配置名（如 eslint.config.ts 需额外依赖）也会走到这里，
-    // 按报错文案识别「缺配置」，仍然跳过而不是判失败。
-    const text = `${err.stderr ?? ''}${err.message ?? ''}`;
-    if (MISSING_CONFIG_RE.test(text)) {
-      return {
-        files: [],
-        skipped: 'ESLint 未找到可用配置（eslint.config.* / .eslintrc.*），已跳过该检查',
-      };
-    }
+  private timeoutResult(): EslintRawResult {
+    return {
+      files: [],
+      error:
+        `ESLint 扫描超时（${DEFAULT_SCAN_TIMEOUT_MS}ms 内未完成，已终止进程）：` +
+        '请缩小扫描范围或显式放宽该检查的执行预算。',
+    };
+  }
 
+  private notInstalledResult(): EslintRawResult {
+    return { files: [], error: 'ESLint 未安装或未在 PATH 中找到' };
+  }
+
+  private missingConfigResult(): EslintRawResult {
+    return {
+      files: [],
+      skipped: 'ESLint 未找到可用配置（eslint.config.* / .eslintrc.*），已跳过该检查',
+    };
+  }
+
+  private genericErrorResult(err: { stderr?: string; message?: string }): EslintRawResult {
     return { files: [], error: err.stderr || err.message || 'ESLint 执行失败' };
   }
 
+  private isMissingConfigError(err: { stderr?: string; message?: string }): boolean {
+    // 兜底：探测漏掉的自定义配置名（如 eslint.config.ts 需额外依赖）也会走到这里，
+    // 按报错文案识别「缺配置」，仍然跳过而不是判失败。
+    const text = `${err.stderr ?? ''}${err.message ?? ''}`;
+    return MISSING_CONFIG_RE.test(text);
+  }
+
   private parseLintOutput(stdout: string): Record<string, unknown>[] | null {
+    // ESLint 以非零退出时有 JSON 输出（lint 失败）
     if (!stdout) return null;
     try {
       const parsed = JSON.parse(stdout);
@@ -132,39 +166,19 @@ export class GuardESLintCheckAdapter implements Adapter {
 
   normalize(rawResult: EslintRawResult, context: unknown, check: CheckConfig): CheckResult {
     if (rawResult.skipped) {
-      return this.makeSkippedResult(check, rawResult.skipped);
+      return makeSkippedAdapterResult(check, rawResult.skipped);
     }
     if (rawResult.error) {
-      return this.makeResult(check, 'error', rawResult.error);
+      return makeAdapterResult(check, 'error', rawResult.error);
     }
 
     const files = rawResult.files;
     if (files.length === 0) {
-      return this.makeResult(check, 'passed', 'ESLint 检查通过（无输出）');
+      return makeAdapterResult(check, 'passed', 'ESLint 检查通过（无输出）');
     }
 
     const { errors, warnings } = this.collectMessages(files);
     return this.buildLintResult(check, files, errors, warnings);
-  }
-
-  /**
-   * 「跳过」结果：status=warning + severity=warning + blocking=false。
-   *
-   * 不复用 makeResult —— 那里会把非 failed/error 的 severity 压成 info，
-   * 导致跳过的检查在汇总里彻底消失（warnings 计数为 0，用户看不见覆盖率缺口）。
-   * 用 warning 而非新增 skipped 状态，是为了与 GuardEngine 既有的
-   * EVAL_STATUS_MAP（SOP skipped → warning）保持同一套口径。
-   */
-  private makeSkippedResult(check: CheckConfig, reason: string): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status: 'warning',
-      severity: 'warning',
-      blocking: false,
-      message: `已跳过：${reason}`,
-      details: { skipped: true, reason },
-    };
   }
 
   /** 按错误 / 警告 / 通过三种情况构造结果 */
@@ -175,7 +189,7 @@ export class GuardESLintCheckAdapter implements Adapter {
     warnings: string[],
   ): CheckResult {
     if (errors.length > 0) {
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'failed',
         `ESLint 发现 ${errors.length} 个错误:\n${errors.join('\n')}`,
@@ -184,7 +198,7 @@ export class GuardESLintCheckAdapter implements Adapter {
     }
 
     if (warnings.length > 0 && check.severity !== 'error') {
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'warning',
         `ESLint 发现 ${warnings.length} 个警告:\n${warnings.join('\n')}`,
@@ -192,7 +206,7 @@ export class GuardESLintCheckAdapter implements Adapter {
       );
     }
 
-    return this.makeResult(check, 'passed', `ESLint 检查通过（${files.length} 个文件）`);
+    return makeAdapterResult(check, 'passed', `ESLint 检查通过（${files.length} 个文件）`);
   }
 
   private collectMessages(files: Record<string, unknown>[]): {
@@ -220,22 +234,5 @@ export class GuardESLintCheckAdapter implements Adapter {
     }
 
     return { errors, warnings };
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

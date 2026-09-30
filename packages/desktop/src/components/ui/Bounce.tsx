@@ -112,21 +112,6 @@ export function Bounce<T extends ElementType = 'div'>(props: BounceProps<T>) {
   return <BounceImpl baseClass="zh-bounce" {...props} />;
 }
 
-/** 品牌绿边框卡片外观（无弹跳），与 Bounce 组合等价 BounceCard */
-export function Card<T extends ElementType = 'div'>({
-  as,
-  className,
-  children,
-  ...rest
-}: BounceProps<T>) {
-  const Tag: ElementType = as ?? 'div';
-  return (
-    <Tag className={mergeClass('border border-brand/50', className)} {...rest}>
-      {children}
-    </Tag>
-  );
-}
-
 /** 绿色边框卡片 + 弹跳，页面卡片的统一入口 */
 export function BounceCard<T extends ElementType = 'div'>(props: BounceProps<T>) {
   return <BounceImpl baseClass="zh-bounce border border-brand/50" {...props} />;

@@ -12,6 +12,7 @@
  * 在 buildHealthDimensions 入口接受可选 profile 参数实现向后兼容。
  */
 
+/** 项目主/次语言（字符串字面量联合，避免 enum 跨包运行时依赖） */
 export type ProjectLanguage =
   | 'typescript'
   | 'javascript'
@@ -26,6 +27,7 @@ export type ProjectLanguage =
   | 'solidity'
   | 'unknown';
 
+/** 项目框架（依据依赖特征识别，未识别为 'none'，无法判定为 'unknown'） */
 export type ProjectFramework =
   | 'nestjs'
   | 'express'
@@ -51,6 +53,7 @@ export type ProjectFramework =
   | 'none'
   | 'unknown';
 
+/** 项目类型（决定各检测域的适用性，如前端项目不适用后端类检查） */
 export type ProjectType =
   | 'backend'
   | 'frontend'
@@ -62,6 +65,7 @@ export type ProjectType =
   | 'monorepo'
   | 'unknown';
 
+/** 包管理器（由锁文件与清单文件判定，决定依赖类检查的读取口径） */
 export type PackageManager =
   | 'npm'
   | 'pnpm'
@@ -76,6 +80,7 @@ export type PackageManager =
   | 'composer'
   | 'unknown';
 
+/** 运行时（决定执行类检查的探针，如浏览器端项目不做后端运行时探测） */
 export type Runtime =
   | 'node'
   | 'bun'

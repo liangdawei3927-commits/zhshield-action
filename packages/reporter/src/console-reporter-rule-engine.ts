@@ -1,5 +1,6 @@
 import type { RuleEngineReport, RuleEvaluation, Violation } from '@zh/kernel';
 import type { ConsoleReporterFormat } from './console-reporter-format';
+import { tallyViolationsByCategory } from './rule-engine-formatter';
 
 /**
  * RuleEngineSectionFormatter — 将规则引擎报告（SOP 驱动模式）格式化为终端文本行
@@ -52,18 +53,11 @@ export class RuleEngineSectionFormatter {
 
   /** 渲染按 issue category 统计的违规分类汇总 */
   private formatCategoryBreakdown(report: RuleEngineReport, lines: string[], indent: string): void {
-    const allViolations = report.evaluations
-      .filter((e) => e.status === 'failed' && e.violations)
-      .flatMap((e) => e.violations!);
-    const categoryCounts = new Map<string, number>();
-    for (const v of allViolations) {
-      const cat = v.category ?? 'uncategorized';
-      categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
-    }
-    if (categoryCounts.size > 0) {
-      const catParts = [...categoryCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([cat, count]) => `${this.fmt.magenta(cat)} ${this.fmt.bold(String(count))}`);
+    const categories = tallyViolationsByCategory(report.evaluations);
+    if (categories.length > 0) {
+      const catParts = categories.map(
+        ([cat, count]) => `${this.fmt.magenta(cat)} ${this.fmt.bold(String(count))}`,
+      );
       lines.push(`${indent}  分类: ${catParts.join(this.fmt.dim(', '))}`);
     }
   }

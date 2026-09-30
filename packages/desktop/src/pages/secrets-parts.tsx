@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type { SecretReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
@@ -7,6 +6,8 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
+import { SectionTitle } from '../components/ui/SectionTitle';
+import { BrandMarkIcon, FeatureIcon, SectionIcon, AlertCircleIcon } from '../components/ui/Icons';
 import { SECRET_SEVERITY_CONFIG, SECRET_STATUS_CONFIG, SECRET_TYPE_LABEL } from './secrets-logic';
 
 export function SecretsIllustration() {
@@ -54,20 +55,11 @@ export function SecretsIllustration() {
 
 function SecretsKeyIcon() {
   return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="rgb(var(--zh-brand))"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <BrandMarkIcon>
       <circle cx="7.5" cy="15.5" r="4.5" />
       <path d="M11 12L21 2" />
       <path d="M15.5 7.5l3 3L22 7l-3-3" />
-    </svg>
+    </BrandMarkIcon>
   );
 }
 
@@ -173,20 +165,7 @@ export function SecretsHeader({
       </div>
       {report.error && (
         <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgb(var(--zh-danger))"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 8v4" />
-            <path d="M12 16h.01" />
-          </svg>
+            <AlertCircleIcon />
           <div>
             <div className="text-sm font-medium text-danger-700">
               {t('page.secrets.errorTitle')}
@@ -195,26 +174,6 @@ export function SecretsHeader({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SectionTitle({
-  icon,
-  label,
-  right,
-}: {
-  icon: ReactNode;
-  label: string;
-  right?: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
-        {icon}
-      </span>
-      <span className="text-sm font-semibold text-zh-ink-2">{label}</span>
-      {right && <span className="ml-auto">{right}</span>}
     </div>
   );
 }
@@ -368,19 +327,10 @@ export function SecretsListCard({
     <ResultCard variant="score">
       <SectionTitle
         icon={
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <SectionIcon>
             <path d="M21 12a9 9 0 1 1-3.6-7.2" />
             <path d="M21 3v6h-6" />
-          </svg>
+          </SectionIcon>
         }
         label={t('page.secrets.list.title')}
         right={<span className="text-xs text-zh-muted">{t('page.secrets.list.hint')}</span>}
@@ -428,59 +378,32 @@ export function SecretsEmptyState({ loading, onScan }: { loading: boolean; onSca
       featureList={[
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.35-4.35" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.secrets.feature.scan.title'),
           desc: t('page.secrets.feature.scan.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <path d="M14 2v6h6" />
               <path d="M8 13h8M8 17h5" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.secrets.feature.locate.title'),
           desc: t('page.secrets.feature.locate.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <circle cx="7.5" cy="15.5" r="4.5" />
               <path d="M11 12L21 2" />
               <path d="M15.5 7.5l3 3L22 7l-3-3" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.secrets.feature.rotate.title'),
           desc: t('page.secrets.feature.rotate.desc'),

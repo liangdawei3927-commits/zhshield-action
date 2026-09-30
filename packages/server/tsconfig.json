@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": {
+    "compilerOptions": {
+    // TODO(ts-strict-migration): 存量违反点未清零，根级严格标志开启前按批次迁移，迁移完成后删除本覆盖。
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
     "outDir": "./dist",
     "rootDir": "./src",
     "types": ["node"],

@@ -3,7 +3,7 @@ import { t } from '@zh/i18n';
 import { runRefactor } from '../services/engineApi';
 import type { RefactorReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useTaskRun } from '../task-store';
 
@@ -88,14 +88,8 @@ export const SEVERITY_LABELS: Record<string, string> = {
 export function useCopyToAi(projectPath: string) {
   const { toast } = useToast();
   const copyIssues = useCallback(
-    (issues: AiFixIssue[]) => {
-      const text = buildAiFixPrompt(projectPath, issues);
-      void copyTextToClipboard(text).then(
-        (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-        () => toast(t('toast.copyFailed'), 'error'),
-      );
-    },
-    [projectPath, toast, t],
+    (issues: AiFixIssue[]) => copyIssuesToAi(projectPath, toast, issues),
+    [projectPath, toast],
   );
   const toAiIssue = useCallback(
     (filePath: string, smell: Smell): AiFixIssue => ({
@@ -108,6 +102,7 @@ export function useCopyToAi(projectPath: string) {
       line: smell.location?.line,
       message: smell.message,
       suggestion: smell.suggestion.description,
+      domain: 'refactor',
     }),
     [t],
   );
@@ -128,7 +123,10 @@ export function useRefactorScan(projectPath: string) {
   const [report, setReport] = useState<RefactorReportData | null>(null);
   const [error, setError] = useState('');
   const scanningRef = useRef(false);
-  const { loading: scanning, progressLabel } = useTaskRun('refactor', projectPath);
+  const { loading: scanning, progress, progressLabel, statusMessage } = useTaskRun(
+    'refactor',
+    projectPath,
+  );
   const handleScan = useCallback(async () => {
     if (!projectPath) {
       setError(t('page.refactor.addProjectFirst'));
@@ -147,7 +145,7 @@ export function useRefactorScan(projectPath: string) {
       scanningRef.current = false;
     }
   }, [projectPath, t]);
-  return { scanning, progressLabel, report, error, handleScan };
+  return { scanning, progress, progressLabel, statusMessage, report, error, handleScan };
 }
 
 /** 按 ruleId 分类聚合 + 当前选中分类 */
@@ -171,12 +169,15 @@ export function useSmellGroups(report: RefactorReportData | null) {
 /** 重构页全部状态与副作用：扫描、每日自动检查、复制到 AI、分类聚合 */
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
-  const { scanning, progressLabel, report, error, handleScan } = useRefactorScan(projectPath);
+  const { scanning, progress, progressLabel, statusMessage, report, error, handleScan } =
+    useRefactorScan(projectPath);
   const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan());
   const { activeRuleId, setActiveRuleId, groups, activeGroup } = useSmellGroups(report);
   return {
     scanning,
+    progress,
     progressLabel,
+    statusMessage,
     report,
     error,
     lastAutoAt,

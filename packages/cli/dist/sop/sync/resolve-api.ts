@@ -24,6 +24,10 @@ export interface ScopeProfileLike {
   readonly features?: readonly string[];
 }
 
+/**
+ * POST /resolve/rules 响应体。
+ * rules 为各规则的目标版本与语言元数据，changed 为本次需要更新的规则 ID 列表。
+ */
 export interface ResolveRulesResponse {
   rules: Array<{
     ruleId: string;
@@ -45,45 +49,68 @@ export interface ResolvedTool {
 
 const TOKEN_FILE = path.join(os.homedir(), '.zhshield', '.api-token');
 
+/** 确保令牌文件所在目录（~/.zhshield）存在 */
+function ensureTokenDir(): void {
+  const dir = path.dirname(TOKEN_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+/** 读取已存在的令牌文件内容（去空白）；文件不存在返回 null */
+function readTokenFile(): string | null {
+  if (!fs.existsSync(TOKEN_FILE)) return null;
+  return fs.readFileSync(TOKEN_FILE, 'utf-8').trim();
+}
+
+/** 生成新的随机 hex 令牌（32 字节） */
+function generateToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 /**
  * 读取本地 API 令牌；不存在则创建随机 hex 令牌并以 0o600 权限写入。
  * 与 LocalOnlyGuard 的文件路径 & 生成语义完全匹配。
  */
 export function readApiToken(): string {
-  const dir = path.dirname(TOKEN_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  ensureTokenDir();
+  const existing = readTokenFile();
+  if (existing !== null) return existing;
 
-  if (fs.existsSync(TOKEN_FILE)) {
-    return fs.readFileSync(TOKEN_FILE, 'utf-8').trim();
-  }
-
-  const token = crypto.randomBytes(32).toString('hex');
+  const token = generateToken();
   fs.writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
   return token;
 }
 
 // ─── HTTP 层 ──────────────────────────────────────────────────
 
-async function apiPost<T>(
-  endpoint: string,
-  body: Record<string, unknown>,
-  apiBaseOverride?: string,
-): Promise<T> {
+/** 内部请求参数：body 存在时序列化为 JSON 并附带 Content-Type 头 */
+interface ApiRequestOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  endpoint: string;
+  apiBaseOverride?: string;
+  /** 单次请求超时（ms） */
+  timeoutMs: number;
+  body?: Record<string, unknown>;
+}
+
+/** 统一请求实现：base 解析 + 令牌注入 + withRetry + 非 ok 抛 HttpError + JSON 解析 */
+async function apiRequest<T>(options: ApiRequestOptions): Promise<T> {
+  const { method, endpoint, apiBaseOverride, timeoutMs, body } = options;
   const apiBase = resolveApiBase(apiBaseOverride);
   const token = readApiToken();
+  const hasBody = body !== undefined;
 
   const res = await withRetry(async () => {
     const r = await fetch(`${apiBase}${endpoint}`, {
-      method: 'POST',
+      method,
       headers: {
-        'Content-Type': 'application/json',
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         Accept: 'application/json',
         'x-api-token': token,
       },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
+      ...(hasBody ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!r.ok) throw new HttpError(r.status);
     return r;
@@ -92,24 +119,16 @@ async function apiPost<T>(
   return (await res.json()) as T;
 }
 
+async function apiPost<T>(
+  endpoint: string,
+  body: Record<string, unknown>,
+  apiBaseOverride?: string,
+): Promise<T> {
+  return apiRequest<T>({ method: 'POST', endpoint, apiBaseOverride, timeoutMs: 15_000, body });
+}
+
 async function apiGet<T>(endpoint: string, apiBaseOverride?: string): Promise<T> {
-  const apiBase = resolveApiBase(apiBaseOverride);
-  const token = readApiToken();
-
-  const res = await withRetry(async () => {
-    const r = await fetch(`${apiBase}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'x-api-token': token,
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!r.ok) throw new HttpError(r.status);
-    return r;
-  });
-
-  return (await res.json()) as T;
+  return apiRequest<T>({ method: 'GET', endpoint, apiBaseOverride, timeoutMs: 10_000 });
 }
 
 async function apiPut<T>(
@@ -117,25 +136,7 @@ async function apiPut<T>(
   body: Record<string, unknown>,
   apiBaseOverride?: string,
 ): Promise<T> {
-  const apiBase = resolveApiBase(apiBaseOverride);
-  const token = readApiToken();
-
-  const res = await withRetry(async () => {
-    const r = await fetch(`${apiBase}${endpoint}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'x-api-token': token,
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!r.ok) throw new HttpError(r.status);
-    return r;
-  });
-
-  return (await res.json()) as T;
+  return apiRequest<T>({ method: 'PUT', endpoint, apiBaseOverride, timeoutMs: 15_000, body });
 }
 
 /**
@@ -147,25 +148,7 @@ async function apiDelete<T>(
   body?: Record<string, unknown>,
   apiBaseOverride?: string,
 ): Promise<T> {
-  const apiBase = resolveApiBase(apiBaseOverride);
-  const token = readApiToken();
-
-  const res = await withRetry(async () => {
-    const r = await fetch(`${apiBase}${endpoint}`, {
-      method: 'DELETE',
-      headers: {
-        Accept: 'application/json',
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
-        'x-api-token': token,
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!r.ok) throw new HttpError(r.status);
-    return r;
-  });
-
-  return (await res.json()) as T;
+  return apiRequest<T>({ method: 'DELETE', endpoint, apiBaseOverride, timeoutMs: 10_000, body });
 }
 
 // ─── 公开 API ─────────────────────────────────────────────────
@@ -215,17 +198,23 @@ export async function resolveRules(
   return apiPost<ResolveRulesResponse>('/resolve/rules', body, apiBaseOverride);
 }
 
+/** 注册项目画像的入参：组织/用户/项目三元组 + 画像快照，apiBaseOverride 可选 */
+export interface RegisterProjectFeaturesParams {
+  orgId: string;
+  userId: string;
+  projectId: string;
+  feature: ScopeProfileLike;
+  apiBaseOverride?: string;
+}
+
 /**
  * 注册项目画像快照到云端（T0）。
  * PUT /orgs/:orgId/projects/:projectId/features → { ok, projectId, orgId }
  */
 export async function registerProjectFeatures(
-  orgId: string,
-  userId: string,
-  projectId: string,
-  feature: ScopeProfileLike,
-  apiBaseOverride?: string,
+  params: RegisterProjectFeaturesParams,
 ): Promise<void> {
+  const { orgId, userId, projectId, feature, apiBaseOverride } = params;
   await apiPut<{ ok: true; projectId: string; orgId: string }>(
     `/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(projectId)}/features`,
     {

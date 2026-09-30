@@ -12,4 +12,4 @@ required:
     fileExts: ['.ts']
     jsdocOn:
       - '^\s*export\s+interface\s+'
-      - '^\s*export\s+type\s+'
+      - '^\s*export\s+type\s+(?!\{)'

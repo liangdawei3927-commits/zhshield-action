@@ -29,6 +29,7 @@ export interface GarbageEvaluationLike {
   violations?: GarbageViolationLike[];
 }
 
+/** 报告组装入参：文件系统检测器产出 + 规则通道求值结果 + 规则通道是否真实执行 */
 export interface BuildGarbageReportInput {
   projectPath: string;
   /** 文件系统检测器产出 */
@@ -40,71 +41,20 @@ export interface BuildGarbageReportInput {
   now?: () => Date;
 }
 
+/**
+ * 组装垃圾扫描报告：合并两类数据源、登记每项检测的执行状态并按体积排序。
+ * @param input 检测器产出与规则通道求值结果
+ * @returns 垃圾扫描报告（checks 含未执行项记账，skipped 为其中 ran=false 的计数）
+ */
 export function buildGarbageReport(input: BuildGarbageReportInput): GarbageScanReport {
   const { projectPath, fsItems, evaluations = [], ruleChannelRan = true } = input;
   const now = input.now ?? (() => new Date());
 
-  const checks: GarbageCheckStatus[] = [
-    {
-      ruleId: FS_DETECTOR_ID,
-      name: '文件系统级垃圾（构建产物 / 垃圾文件 / 空文件）',
-      ran: true,
-      producer: 'detector',
-    },
-  ];
-
+  const checks = initChecks(ruleChannelRan);
   const items: GarbageItem[] = [...fsItems];
-
-  if (!ruleChannelRan) {
-    checks.push({
-      ruleId: 'garbage.rules',
-      name: '垃圾规则通道',
-      ran: false,
-      producer: 'sop-rule',
-      reason: '规则通道未执行（引擎装配或规则加载异常）',
-    });
-  }
-
-  const unmapped = new Set<string>();
-  for (const evaluation of evaluations) {
-    const ruleId = evaluation.rule?.id ?? '';
-    const executed = evaluation.status === 'passed' || evaluation.status === 'failed';
-    const ran = executed && evaluation.degraded !== true;
-    checks.push({
-      ruleId,
-      name: evaluation.rule?.name || ruleId,
-      ran,
-      producer: 'sop-rule',
-      reason: ran ? undefined : evaluation.message || `规则未执行（${evaluation.status}）`,
-    });
-    if (!ran) continue;
-
-    for (const violation of evaluation.violations ?? []) {
-      if (mapRuleIdToGarbageType(violation.ruleId) === null) {
-        unmapped.add(violation.ruleId);
-        continue;
-      }
-    }
-    items.push(...issuesToGarbageItems(evaluation.violations ?? []));
-  }
-
-  // 未登记映射的规则：产出被丢弃时必须显式记账（防"规则跑了但页面看不到"）
-  for (const ruleId of unmapped) {
-    checks.push({
-      ruleId,
-      name: `未登记映射的规则产出：${ruleId}`,
-      ran: false,
-      producer: 'sop-rule',
-      reason: '该规则产出的条目未在 item-mapper 映射表登记，已丢弃（需补登记）',
-    });
-  }
-
-  const byType: Record<string, number> = {};
-  let size = 0;
-  for (const item of items) {
-    byType[item.type] = (byType[item.type] ?? 0) + 1;
-    size += item.size || 0;
-  }
+  const { checks: evaluationChecks, unmapped } = collectEvaluationChecks(evaluations, items);
+  checks.push(...evaluationChecks, ...collectUnmappedChecks(unmapped));
+  const { byType, size } = aggregateItems(items);
 
   return {
     projectPath,
@@ -116,9 +66,87 @@ export function buildGarbageReport(input: BuildGarbageReportInput): GarbageScanR
   };
 }
 
+/** 初始 checks：文件系统检测器固定项 + 规则通道未运行时的显式记账 */
+function initChecks(ruleChannelRan: boolean): GarbageCheckStatus[] {
+  const checks: GarbageCheckStatus[] = [
+    {
+      ruleId: FS_DETECTOR_ID,
+      name: '文件系统级垃圾（构建产物 / 垃圾文件 / 空文件）',
+      ran: true,
+      producer: 'detector',
+    },
+  ];
+  if (!ruleChannelRan) {
+    checks.push({
+      ruleId: 'garbage.rules',
+      name: '垃圾规则通道',
+      ran: false,
+      producer: 'sop-rule',
+      reason: '规则通道未执行（引擎装配或规则加载异常）',
+    });
+  }
+  return checks;
+}
+
+/** 规则求值结果 → checks + 未登记映射规则记账 + 垃圾条目收集 */
+function collectEvaluationChecks(
+  evaluations: GarbageEvaluationLike[],
+  items: GarbageItem[],
+): { checks: GarbageCheckStatus[]; unmapped: Set<string> } {
+  const checks: GarbageCheckStatus[] = [];
+  const unmapped = new Set<string>();
+  for (const evaluation of evaluations) {
+    const ruleId = evaluation.rule?.id ?? '';
+    const executed = evaluation.status === 'passed' || evaluation.status === 'failed';
+    const ran = executed && evaluation.degraded !== true;
+    checks.push({
+      ruleId,
+      name: evaluation.rule?.name || ruleId,
+      ran,
+      producer: 'sop-rule',
+      ...(ran ? {} : { reason: evaluation.message || `规则未执行（${evaluation.status}）` }),
+    });
+    if (!ran) continue;
+
+    for (const violation of evaluation.violations ?? []) {
+      if (mapRuleIdToGarbageType(violation.ruleId) === null) {
+        unmapped.add(violation.ruleId);
+        continue;
+      }
+    }
+    items.push(...issuesToGarbageItems(evaluation.violations ?? []));
+  }
+  return { checks, unmapped };
+}
+
+/** 未登记映射的规则：产出被丢弃时必须显式记账（防"规则跑了但页面看不到"） */
+function collectUnmappedChecks(unmapped: Set<string>): GarbageCheckStatus[] {
+  const checks: GarbageCheckStatus[] = [];
+  for (const ruleId of unmapped) {
+    checks.push({
+      ruleId,
+      name: `未登记映射的规则产出：${ruleId}`,
+      ran: false,
+      producer: 'sop-rule',
+      reason: '该规则产出的条目未在 item-mapper 映射表登记，已丢弃（需补登记）',
+    });
+  }
+  return checks;
+}
+
+function aggregateItems(items: GarbageItem[]): { byType: Record<string, number>; size: number } {
+  const byType: Record<string, number> = {};
+  let size = 0;
+  for (const item of items) {
+    byType[item.type] = (byType[item.type] ?? 0) + 1;
+    size += item.size || 0;
+  }
+  return { byType, size };
+}
+
 /** 排序：体积大的优先（清理收益高），同体积按路径稳定排序 */
 function sortItems(items: GarbageItem[]): GarbageItem[] {
-  return [...items].sort((a, b) => {
+  return items.toSorted((a, b) => {
     if (b.size !== a.size) return b.size - a.size;
     return a.path.localeCompare(b.path);
   });

@@ -11,6 +11,20 @@ interface CacheManagerLike {
 const DB_EXT = /\.db$/;
 const SOP_MODULE_PREFIX = 'sop-module:';
 
+/** 遍历 capabilities 对象，收集 status === 'reclaiming' 的 sop-module:* id（返回去掉前缀的模块名） */
+function collectReclaimingIds(capabilities: unknown): Set<string> {
+  if (typeof capabilities !== 'object' || capabilities === null) return new Set<string>();
+  const reclaiming = new Set<string>();
+  for (const [key, value] of Object.entries(capabilities)) {
+    if (!key.startsWith(SOP_MODULE_PREFIX)) continue;
+    const entry = value as { status?: unknown } | null;
+    if (entry !== null && typeof entry === 'object' && entry.status === 'reclaiming') {
+      reclaiming.add(key.slice(SOP_MODULE_PREFIX.length));
+    }
+  }
+  return reclaiming;
+}
+
 /**
  * SopLazyLoader — 分模块懒加载（文档 9.5 节）
  *
@@ -113,12 +127,14 @@ export class SopLazyLoader {
 
   /**
    * 同步单个模块规则到本地缓存
+   *
+   * @param force 为 true 时绕过 24h 新鲜窗口强制重写（用于同步后校准规则落地）
    */
-  private async syncModule(module: string): Promise<void> {
+  private async syncModule(module: string, force = false): Promise<void> {
     const cacheDir = this.cacheManager.getCacheDir();
     const modulePath = path.join(cacheDir, 'modules', `${module}.db`);
 
-    if (await this.isModuleFresh(modulePath, module)) {
+    if (!force && (await this.isModuleFresh(modulePath, module))) {
       return;
     }
 
@@ -158,6 +174,21 @@ export class SopLazyLoader {
   }
 
   /**
+   * 强制刷新所有已加载模块的缓存文件（绕过 24h 新鲜窗口）。
+   *
+   * 扫描引擎通过 loadSopRulesFromCache 读取 modules/*.db（REMOTE_WINS 覆盖内置模板），
+   * 若同步仅更新 rules.db 而不重建 modules 缓存，校准规则不会进入扫描装载路径。
+   * 每次成功同步后调用，确保 modules/*.db 与 registry 当前规则一致。
+   */
+  async refreshAllLoadedModules(force = true): Promise<string[]> {
+    const loaded = await this.getLoadedModules();
+    for (const module of loaded) {
+      await this.syncModule(module, force);
+    }
+    return loaded;
+  }
+
+  /**
    * 获取已加载的模块列表
    */
   async getLoadedModules(): Promise<string[]> {
@@ -189,7 +220,12 @@ export class SopLazyLoader {
    */
   async getRefsFilteredActiveModules(): Promise<string[]> {
     const loaded = await this.getLoadedModules();
-    let reclaiming: Set<string>;
+    const reclaiming = await this.loadReclaimingModuleIds();
+    return loaded.filter((m) => !reclaiming.has(m));
+  }
+
+  /** 读取账本中 reclaiming 的 sop-module:* id；读取/解析失败返回空集（调用方不过滤任何模块） */
+  private async loadReclaimingModuleIds(): Promise<Set<string>> {
     try {
       const cacheDir = this.cacheManager.getCacheDir();
       const ledgerPath = path.join(path.dirname(cacheDir), 'capability-refs.json');
@@ -199,20 +235,10 @@ export class SopLazyLoader {
         typeof parsed === 'object' && parsed !== null
           ? (parsed as { capabilities?: unknown }).capabilities
           : undefined;
-      reclaiming = new Set<string>();
-      if (typeof capabilities === 'object' && capabilities !== null) {
-        for (const [key, value] of Object.entries(capabilities)) {
-          if (!key.startsWith(SOP_MODULE_PREFIX)) continue;
-          const entry = value as { status?: unknown } | null;
-          if (entry !== null && typeof entry === 'object' && entry.status === 'reclaiming') {
-            reclaiming.add(key.slice(SOP_MODULE_PREFIX.length));
-          }
-        }
-      }
+      return collectReclaimingIds(capabilities);
     } catch {
-      return loaded;
+      return new Set<string>();
     }
-    return loaded.filter((m) => !reclaiming.has(m));
   }
 
   /**

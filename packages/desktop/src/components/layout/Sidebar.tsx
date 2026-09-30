@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AiToolConfigData } from '../../types/electron';
-import { SidebarHeader, ProjectsSection, AiToolSection } from './sidebar-interactive';
+import { FEATURE_AI_TOOL_ENABLED, FEATURE_EVOLVE_ENABLED } from '../../feature-flags';
+import { SidebarHeader, ProjectsSection, AiToolSection, EvolveSection } from './sidebar-interactive';
 import { ThemeSection, LanguageSection, AboutSection } from './sidebar-about';
 import { EngineStatusSection, WisdomBrainCard, type EngineCardProps } from './sidebar-status';
 import type { ProjectInfo } from './sidebar-interactive';
@@ -44,7 +45,7 @@ function SidebarPanel({
   intelligentEnabled,
   setIntelligentEnabled,
   intelligentLoading,
-  currentPage: _currentPage,
+  currentPage,
   onOpenProjectProfile,
 }: {
   open: boolean;
@@ -91,7 +92,15 @@ function SidebarPanel({
           setIntelligentEnabled={setIntelligentEnabled}
           intelligentLoading={intelligentLoading}
         />
-        <AiToolSection aiTool={aiTool} aiApplying={aiApplying} onToggleAiTool={onToggleAiTool} />
+        {/* ⛔ AI 工具暂下线：功能未闭环（仍需手动搬运给外部 AI），入口隐藏。
+            勿改回直接渲染 — 恢复需用户明确指示并同步文档/e2e（见 feature-flags.ts） */}
+        {FEATURE_AI_TOOL_ENABLED && (
+          <AiToolSection aiTool={aiTool} aiApplying={aiApplying} onToggleAiTool={onToggleAiTool} />
+        )}
+        {/* ⛔ 规则进化暂下线：用户规模未达千人门槛，单人判断不能成为可信标准。勿改回直接渲染 */}
+        {FEATURE_EVOLVE_ENABLED && (
+          <EvolveSection currentPage={currentPage} onNavigate={onNavigate} onClose={onClose} />
+        )}
         <ThemeSection />
         <LanguageSection />
         <AboutSection />

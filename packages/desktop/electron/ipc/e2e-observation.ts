@@ -26,38 +26,38 @@ const PROJECT_DATA_TABLES = [
   'sentinel_events',
 ] as const;
 
-/** 统计某 project_id 在 5 表中已软删（deleted_at IS NOT NULL）的行数（逐表） */
-function countSoftDeleted(db: ReturnType<typeof getDb>, projectId: string): Record<string, number> {
+/** 逐表统计：按 where 条件统计 5 表中该 project_id 的行数（返回 表名 → 行数） */
+function countRows(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  where: string,
+): Record<string, number> {
   const counts: Record<string, number> = {};
   const stmts = new Map(
     PROJECT_DATA_TABLES.map((table) => [
       table,
-      db.prepare(
-        `SELECT COUNT(*) AS c FROM ${table} WHERE project_id = ? AND deleted_at IS NOT NULL`,
-      ),
+      db.prepare(`SELECT COUNT(*) AS c FROM ${table} ${where}`),
     ]),
   );
   for (const table of PROJECT_DATA_TABLES) {
-    const row = stmts.get(table)!.get(projectId) as { c: number };
+    const stmt = stmts.get(table);
+    if (stmt === undefined) {
+      throw new Error(`[e2e-observation] missing prepared statement for table: ${table}`);
+    }
+    const row = stmt.get(projectId) as { c: number };
     counts[table] = row.c;
   }
   return counts;
 }
 
+/** 统计某 project_id 在 5 表中已软删（deleted_at IS NOT NULL）的行数（逐表） */
+function countSoftDeleted(db: ReturnType<typeof getDb>, projectId: string): Record<string, number> {
+  return countRows(db, projectId, 'WHERE project_id = ? AND deleted_at IS NOT NULL');
+}
+
 /** 统计某 project_id 在 5 表中的总行数（含未软删，供预置断言对照） */
 function countTotal(db: ReturnType<typeof getDb>, projectId: string): Record<string, number> {
-  const counts: Record<string, number> = {};
-  const stmts = new Map(
-    PROJECT_DATA_TABLES.map((table) => [
-      table,
-      db.prepare(`SELECT COUNT(*) AS c FROM ${table} WHERE project_id = ?`),
-    ]),
-  );
-  for (const table of PROJECT_DATA_TABLES) {
-    const row = stmts.get(table)!.get(projectId) as { c: number };
-    counts[table] = row.c;
-  }
-  return counts;
+  return countRows(db, projectId, 'WHERE project_id = ?');
 }
 
 /** 预置 5 表孤儿行（project_id = projectPath，与桌面写入键控对齐） */
@@ -103,33 +103,54 @@ function seedOrphanRows(projectPath: string): void {
   });
 }
 
-/** 注册测试专用观测 IPC（仅 E2E 门控下由 main.ts 调用） */
-export function registerE2eObservationIpc(): void {
+/** 注册 5 表软删计数观测（e2e:countSoftDeletedData） */
+function registerCountSoftDeletedData(): void {
   ipcMain.handle(
     'e2e:countSoftDeletedData',
     (_event, projectPath: string): Record<string, number> => {
       return countSoftDeleted(getDb(), projectPath);
     },
   );
+}
 
+/** 注册 5 表总行数观测（e2e:countTotalData） */
+function registerCountTotalData(): void {
   ipcMain.handle('e2e:countTotalData', (_event, projectPath: string): Record<string, number> => {
     return countTotal(getDb(), projectPath);
   });
+}
 
+/** 注册画像归属项目路径观测（e2e:getCachedProfileProjectPath） */
+function registerGetCachedProfileProjectPath(): void {
   ipcMain.handle('e2e:getCachedProfileProjectPath', (): string | null => {
     return getCachedProfileProjectPath();
   });
+}
 
+/** 注册画像缓存预置（e2e:setCachedProfile） */
+function registerSetCachedProfile(): void {
   ipcMain.handle('e2e:setCachedProfile', (_event, projectPath: string): void => {
     // 预置画像缓存归属 demo 项目，供删除后断言清空（null）。
     // language 用 'typescript'（真实管线 EXTENSION_LANGUAGES 映射值），与 isToolInScope 匹配。
     setCachedProfile({ framework: 'node', language: 'typescript', features: [] }, projectPath);
   });
+}
 
+/** 注册 5 表孤儿行预置（e2e:seedOrphanData） */
+function registerSeedOrphanData(): void {
   ipcMain.handle('e2e:seedOrphanData', async (_event, projectPath: string): Promise<void> => {
     // 冷启动竞态：迁移在微任务中异步执行（ipc-context dbReady），
     // 立即触发本 IPC 时 schema 可能未建好，须先 await 迁移完成。
     await whenDbReady();
     seedOrphanRows(projectPath);
   });
+}
+
+/** 注册测试专用观测 IPC（仅 E2E 门控下由 main.ts 调用） */
+export function registerE2eObservationIpc(): void {
+  registerCountSoftDeletedData();
+  registerCountTotalData();
+  registerGetCachedProfileProjectPath();
+  registerSetCachedProfile();
+  registerSeedOrphanData();
 }

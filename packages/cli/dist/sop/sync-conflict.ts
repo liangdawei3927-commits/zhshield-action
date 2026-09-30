@@ -7,6 +7,10 @@ export enum ConflictResolution {
   MANUAL = 'manual',
 }
 
+/**
+ * 同步冲突：同一条规则在本地与云端内容不一致。
+ * localHash / remoteHash 为内容稳定序列化后的 SHA-256，detectedAt 记录检出时刻。
+ */
 export interface SyncConflict {
   ruleId: string;
   localVersion: number;
@@ -16,6 +20,15 @@ export interface SyncConflict {
   localContent: unknown;
   remoteContent: unknown;
   detectedAt: Date;
+}
+
+/** 冲突检测入参：待比较的规则 ID、两端版本号与内容（哈希由检测方计算） */
+export interface DetectConflictParams {
+  ruleId: string;
+  localVersion: number;
+  remoteVersion: number;
+  localContent: unknown;
+  remoteContent: unknown;
 }
 
 export class SyncConflictResolver {
@@ -29,13 +42,8 @@ export class SyncConflictResolver {
   /**
    * 检测冲突
    */
-  detectConflict(
-    ruleId: string,
-    localVersion: number,
-    remoteVersion: number,
-    localContent: unknown,
-    remoteContent: unknown,
-  ): SyncConflict | null {
+  detectConflict(params: DetectConflictParams): SyncConflict | null {
+    const { ruleId, localVersion, remoteVersion, localContent, remoteContent } = params;
     const localHash = this.computeContentHash(localContent);
     const remoteHash = this.computeContentHash(remoteContent);
 

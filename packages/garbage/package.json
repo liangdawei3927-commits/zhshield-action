@@ -26,6 +26,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js"
     },
+    "./policy": {
+      "types": "./dist/deletable.d.ts",
+      "import": "./dist/deletable.js",
+      "require": "./dist/deletable.js"
+    },
     "./*": "./dist/*"
   }
 }

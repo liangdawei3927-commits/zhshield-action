@@ -1,7 +1,7 @@
 /**
- * 导航 12 功能验证 · 共享工具与入口定义（非测试文件，供两个 spec 复用）
+ * 导航 11 功能验证 · 共享工具与入口定义（非测试文件，供两个 spec 复用）
  */
-import { _electron as electron } from '@playwright/test';
+import { _electron as electron, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -12,7 +12,7 @@ export const MAIN_ENTRY = path.join(__dirname, '..', 'dist-electron', 'main.js')
 
 export const ELECTRON_BIN = (() => {
   try {
-    return createRequire(path.join(__dirname, '..', 'package.json'))('electron') as unknown as string;
+    return createRequire(path.join(__dirname, '..', 'package.json'))('electron') as string;
   } catch {
     return path.join(
       __dirname,
@@ -30,19 +30,22 @@ export const ELECTRON_BIN = (() => {
 export const FIXTURE = process.env.ZH_NAV_FIXTURE ?? '/tmp/zh-nav-fixture';
 export const SHOT_DIR = process.env.ZH_NAV_SHOTS ?? '/tmp/zh-nav-shots';
 
-/** 12 个顶部导航入口（TopNav 10 项 + TitleBar 规则进化/备份中心） */
+/** 顶部入口（TopNav 10 项 + 各页右上角报告中心），来源区分按钮所在容器。
+ *  ⛔ 规则进化 / AI 工具已暂下线（见 src/feature-flags.ts），其侧边栏入口不在此表。 */
 export interface NavEntry {
   id: string;
   label: string;
-  where: 'nav' | 'banner';
+  where: 'nav' | 'banner' | 'sidebar' | 'shell';
   /** 页面标识文案候选（命中任一即判为渲染成功） */
   markers: string[];
   action: string;
 }
 
 /**
- * 与 `src/components/layout/nav-items.ts` 的 10 项 + TitleBar 2 项（规则进化 / 备份中心）
- * 严格一一对应。
+ * 与 `src/components/layout/nav-items.ts` 的 10 项 + 页面右上角入口 1 项（报告中心）
+ * 严格一一对应。报告中心已移出导航栏，入口收敛到各页 PageShell 右上角按钮（where: 'shell'）。
+ * ⛔ 规则进化（原侧边栏入口）与 AI 工具已暂下线：见 `src/feature-flags.ts`，
+ * 恢复入口时必须同步本表。
  *
  * ⚠️ `entryButton()` 用 **label 当按钮选择器**（`getByRole('button', { name: e.label })`），
  * 所以本表的 label 必须等于该按钮当时的可见文字：**导航改名、页面删除、空态改版都要同步本表**，
@@ -51,7 +54,7 @@ export interface NavEntry {
  * 同时 nav-actions.spec.ts 的 `ACTION_CANDIDATES` 按 id 取主动作，新增/删除项也要一起改。
  */
 export const ENTRIES: NavEntry[] = [
-  { id: 'inspect', label: '项目体检', where: 'nav', markers: ['架构规范', '类型安全', '马上巡检'], action: '马上巡检' },
+  { id: 'inspect', label: '项目体检', where: 'nav', markers: ['架构规范', '类型安全', '一键体检'], action: '一键体检' },
   { id: 'guard', label: '门禁系统', where: 'nav', markers: ['实时守护代码变更', '门禁', '检查项'], action: '立即扫描' },
   { id: 'sentinel', label: '哨兵监控', where: 'nav', markers: ['无间断监控', '监控已启动', '事件时间线'], action: '启动监控' },
   { id: 'security', label: '安全中心', where: 'nav', markers: ['深度扫描漏洞', '安全评分', '漏洞扫描'], action: '一键扫描' },
@@ -60,9 +63,8 @@ export const ENTRIES: NavEntry[] = [
   { id: 'performance', label: '性能优化', where: 'nav', markers: ['检测运行时性能反模式', '开始性能检测', '性能'], action: '开始性能检测' },
   { id: 'techdebt', label: '技术债务', where: 'nav', markers: ['量化技术债', '开始盘点', '债务'], action: '开始盘点' },
   { id: 'refactor', label: '代码重构', where: 'nav', markers: ['优化代码结构', '马上检查', '重构'], action: '马上检查' },
-  { id: 'reports', label: '报告中心', where: 'nav', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
-  { id: 'evolve', label: '规则进化', where: 'banner', markers: ['洞察项目架构', '架构分析'], action: '架构分析' },
-  { id: 'backup', label: '备份中心', where: 'banner', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },
+  { id: 'backup', label: '备份中心', where: 'nav', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },
+  { id: 'reports', label: '报告中心', where: 'shell', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
 ];
 
 const { ELECTRON_RUN_AS_NODE: _d1, NODE_OPTIONS: _d2, ...CLEAN_ENV } = process.env;
@@ -104,9 +106,29 @@ export async function launchApp(): Promise<{
 }
 
 export function entryButton(page: Page, e: NavEntry) {
-  return e.where === 'nav'
-    ? page.getByRole('navigation').getByRole('button', { name: e.label })
-    : page.getByRole('banner').getByRole('button', { name: e.label });
+  if (e.where === 'nav') {
+    return page.getByRole('navigation').getByRole('button', { name: e.label });
+  }
+  if (e.where === 'sidebar') {
+    // ⛔ 侧边栏入口当前全部暂下线（规则进化 / AI 工具，见 src/feature-flags.ts）。
+    // 本分支保留给未来恢复侧边栏入口时使用，恢复时需同步该表。
+    return page.getByRole('complementary').getByRole('button', { name: e.label });
+  }
+  if (e.where === 'shell') {
+    // 报告中心入口在各页 PageShell 右上角（不再占导航栏），仍按 label 命中
+    return page.getByRole('button', { name: e.label }).first();
+  }
+  return page.getByRole('banner').getByRole('button', { name: e.label });
+}
+
+export async function clickEntry(page: Page, e: NavEntry) {
+  if (e.where === 'sidebar') {
+    await page.getByTitle('展开侧边栏').click();
+  }
+  const btn = entryButton(page, e);
+  await expect(btn).toBeVisible({ timeout: 15_000 });
+  await btn.click();
+  return btn;
 }
 
 /** main 内容区文本（排除隐藏侧边栏/顶栏噪声） */

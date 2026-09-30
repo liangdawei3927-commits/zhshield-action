@@ -6,6 +6,7 @@ import * as path from 'node:path';
 
 // ─── 类型定义 ───
 
+/** 黄金断言：人工标注的期望结果（文件路径必填，其余字段缺省表示该维度不参与比对） */
 export interface GoldenAssertion {
   path: string;
   language?: string;
@@ -13,6 +14,7 @@ export interface GoldenAssertion {
   productForm?: string;
 }
 
+/** 单个探测器的评估结果：混淆矩阵三值 + 由其推导的 precision/recall */
 export interface DetectorEvaluation {
   detectorId: string;
   truePositives: number;
@@ -22,6 +24,7 @@ export interface DetectorEvaluation {
   recall: number;
 }
 
+/** 准确率报告：逐探测器评估 + 宏平均指标 + 是否达到阈值（架构文档 §10.2） */
 export interface AccuracyReport {
   evaluations: DetectorEvaluation[];
   overallPrecision: number;

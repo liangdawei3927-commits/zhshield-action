@@ -9,7 +9,8 @@
 import { ESLint } from 'eslint';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { Adapter, CheckConfig, CheckResult, CheckStatus } from '../types';
+import type { Adapter, CheckConfig, CheckResult } from '../types';
+import { makeAdapterResult } from './adapter-result';
 import { buildSonarwayConfig } from './eslint-sonarway-config';
 
 /** ESLint 输出消息 */
@@ -64,7 +65,7 @@ export class GuardSonarwayESLintAdapter implements Adapter {
         overrideConfig: this.config as never,
       });
 
-      const results = (await eslint.lintFiles(target)) as unknown as LintResult[];
+      const results = (await eslint.lintFiles(target)) as LintResult[];
       const filtered = results.filter((r) => r.messages.length > 0);
       return { results: filtered };
     } catch (error) {
@@ -89,7 +90,7 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     check: CheckConfig,
   ): CheckResult {
     if (rawResult.error) {
-      return this.makeResult(check, 'error', rawResult.error, {
+      return makeAdapterResult(check, 'error', rawResult.error, {
         errors: [],
         warnings: [],
         totalErrors: 0,
@@ -108,7 +109,7 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     warnings: (string | undefined)[],
   ): CheckResult {
     if (errors.length > 0) {
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'failed',
         `SonarWay 发现 ${errors.length} 个错误:\n${errors.join('\n')}`,
@@ -117,7 +118,7 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     }
 
     if (warnings.length > 0 && check.severity !== 'error') {
-      return this.makeResult(
+      return makeAdapterResult(
         check,
         'warning',
         `SonarWay 发现 ${warnings.length} 个警告:\n${warnings.join('\n')}`,
@@ -125,7 +126,23 @@ export class GuardSonarwayESLintAdapter implements Adapter {
       );
     }
 
-    return this.makeResult(check, 'passed', 'SonarWay 检查通过');
+    return makeAdapterResult(check, 'passed', 'SonarWay 检查通过');
+  }
+
+  /** 单条消息按 severity 落位（errors / warnings），fatal 错误计入 errors */
+  private appendBySeverity(
+    file: LintResult,
+    msg: LintMessage,
+    errors: (string | undefined)[],
+    warnings: (string | undefined)[],
+  ): void {
+    const location = `${file.filePath}:${msg.line || 0}:${msg.column || 0}`;
+    const entry = `[${msg.ruleId}] ${msg.message} (${location})`;
+    if (msg.severity === 2 && !msg.fatal) {
+      errors.push(entry);
+    } else if (msg.severity === 1) {
+      warnings.push(entry);
+    }
   }
 
   private collectMessages(results: LintResult[]): {
@@ -139,33 +156,10 @@ export class GuardSonarwayESLintAdapter implements Adapter {
       if (!file.messages?.length) continue;
       for (const msg of file.messages) {
         if (!msg.ruleId) continue;
-        const location = `${file.filePath}:${msg.line || 0}:${msg.column || 0}`;
-        const entry = `[${msg.ruleId}] ${msg.message} (${location})`;
-        if (msg.severity === 2 && !msg.fatal) {
-          errors.push(entry);
-        } else if (msg.severity === 1) {
-          warnings.push(entry);
-        }
+        this.appendBySeverity(file, msg, errors, warnings);
       }
     }
 
     return { errors, warnings };
-  }
-
-  private makeResult(
-    check: CheckConfig,
-    status: CheckStatus,
-    message: string,
-    details?: unknown,
-  ): CheckResult {
-    return {
-      checkId: check.checkId,
-      adapter: check.adapter,
-      status,
-      severity: status === 'failed' || status === 'error' ? check.severity : 'info',
-      blocking: check.blocking && (status === 'failed' || status === 'error'),
-      message,
-      details,
-    };
   }
 }

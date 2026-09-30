@@ -69,6 +69,48 @@ function decliningDimensionsInsight(
   return `需要关注的维度: ${declining.map((d) => d.name).join('、')}`;
 }
 
+/** 加权总评：not-run 维度不参与加权，仅按已检测维度归一化（spec C：未检测域禁止按满分计） */
+function computeOverall(dimensionScores: DimensionScore[]): number {
+  const active = dimensionScores.filter((d) => d.status !== 'not-run');
+  const weightSum = active.reduce((s, d) => s + d.weight, 0);
+  return weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
+}
+
+/** 红线封顶（十域评分章程）：任一 critical 事实存在时总评 ≤ cap，一票压制 */
+function applyRedLineCap(
+  overall: number,
+  redLine?: RedLineInfo | null,
+): { overall: number; appliedRedLine: RedLineInfo | undefined } {
+  if (redLine?.capped) {
+    return { overall: Math.min(overall, redLine.cap), appliedRedLine: redLine };
+  }
+  return { overall, appliedRedLine: undefined };
+}
+
+function computeGrade(overall: number): HealthScore['grade'] {
+  return overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+}
+
+function buildScore(params: {
+  projectId: string;
+  dimensionScores: DimensionScore[];
+  overall: number;
+  grade: HealthScore['grade'];
+  trend: ScoreTrend;
+  appliedRedLine: RedLineInfo | undefined;
+}): HealthScore {
+  return {
+    projectId: params.projectId,
+    timestamp: new Date(),
+    overall: Math.round(params.overall * 100) / 100,
+    grade: params.grade,
+    dimensions: params.dimensionScores,
+    trend: params.trend,
+    scoreVersion: SCORE_VERSION,
+    ...(params.appliedRedLine ? { redLine: params.appliedRedLine } : {}),
+  };
+}
+
 /**
  * 评分引擎 v2 — 支持多点趋势分析、变化速率、维度趋势
  */
@@ -85,45 +127,20 @@ export class ScoringEngine {
     dimensionScores: DimensionScore[],
     redLine?: RedLineInfo | null,
   ): HealthScore {
-    // not-run 维度不参与加权：仅按已检测维度归一化（spec C：未检测域禁止按满分计）
-    const active = dimensionScores.filter((d) => d.status !== 'not-run');
-    const weightSum = active.reduce((s, d) => s + d.weight, 0);
-    let overall =
-      weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
-    // 红线封顶（十域评分章程）：任一 critical 事实存在时总评 ≤ cap，一票压制
-    let appliedRedLine: RedLineInfo | undefined;
-    if (redLine?.capped) {
-      overall = Math.min(overall, redLine.cap);
-      appliedRedLine = redLine;
-    }
-    const grade: HealthScore['grade'] =
-      overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
-    const trend = this.computeTrend(projectId, overall);
-
-    const score: HealthScore = {
+    const overall = computeOverall(dimensionScores);
+    const { overall: cappedOverall, appliedRedLine } = applyRedLineCap(overall, redLine);
+    const grade = computeGrade(cappedOverall);
+    const trend = this.computeTrend(projectId, cappedOverall);
+    const score = buildScore({
       projectId,
-      timestamp: new Date(),
-      overall: Math.round(overall * 100) / 100,
+      dimensionScores,
+      overall: cappedOverall,
       grade,
-      dimensions: dimensionScores,
       trend,
-      scoreVersion: SCORE_VERSION,
-      ...(appliedRedLine ? { redLine: appliedRedLine } : {}),
-    };
-
-    if (this.db) {
-      saveScore(this.db, {
-        projectId,
-        overall: score.overall,
-        grade,
-        dimensions: JSON.stringify(dimensionScores),
-        trend,
-      });
-    }
-
-    if (!this.history.has(projectId)) this.history.set(projectId, []);
-    this.history.get(projectId)!.push(score);
-
+      appliedRedLine,
+    });
+    this.persistScore(projectId, score);
+    this.recordHistory(projectId, score);
     return score;
   }
 
@@ -236,6 +253,23 @@ export class ScoringEngine {
     if (current > lastScore + 1) return 'improving';
     if (current < lastScore - 1) return 'declining';
     return 'stable';
+  }
+
+  private persistScore(projectId: string, score: HealthScore): void {
+    if (!this.db) return;
+    saveScore(this.db, {
+      projectId,
+      overall: score.overall,
+      grade: score.grade,
+      dimensions: JSON.stringify(score.dimensions),
+      trend: score.trend,
+    });
+  }
+
+  private recordHistory(projectId: string, score: HealthScore): void {
+    const scores = this.history.get(projectId) ?? [];
+    scores.push(score);
+    this.history.set(projectId, scores);
   }
 
   /** 洞察生成 */

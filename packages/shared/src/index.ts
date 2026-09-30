@@ -75,6 +75,7 @@ export type {
   RuleLifecycleStatus,
   SopVersion,
   SopDiff,
+  SopDiffMetadata,
   SyncResult,
 } from './types';
 export { ToolManager } from './tool-manager';
@@ -86,6 +87,7 @@ export {
   resolveToolCommandDetailed,
 } from './tool-resolve';
 export type { ToolCommandOrigin, ResolvedToolCommand } from './tool-resolve';
+export { BuiltinToolAdapter } from './builtin-tool-adapter';
 export { wrapAdapter, evaluateAccessScope } from './tool-adapter-decorator';
 export type {
   HookedToolResult,
@@ -104,6 +106,27 @@ export {
   depcheckMapper,
   depCruiserMapper,
   jscpdMapper,
+} from './output-mappers';
+export type {
+  EslintFile,
+  SemgrepResult,
+  SemgrepOutput,
+  SemgrepDataflowTrace,
+  SemgrepCodeFlow,
+  SemgrepThreadFlow,
+  SemgrepFlowLocation,
+  TrivyVulnerability,
+  TrivySecret,
+  TrivyResult,
+  TrivyOutput,
+  GrypeMatch,
+  GrypeOutput,
+  GitleaksFinding,
+  DepcheckOutput,
+  DepCruiserViolation,
+  DepCruiserOutput,
+  JscpdDuplicate,
+  JscpdOutput,
 } from './output-mappers';
 export { DegradationManager } from './degradation-manager';
 export {
@@ -168,6 +191,8 @@ export {
   type BaselineEntry,
   type BaselineFilterResult,
 } from './baseline';
+export { safeReadDirEntries } from './fs-safe';
+export { withHardTimeout } from './promise-timeout';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';
@@ -185,3 +210,10 @@ export {
   resolveEslintConfigPath,
   resolveEslintTargetDir,
 } from './eslint-config';
+export { scanGarbageDir, dirSizeOf } from './garbage-scan';
+export type { GarbageScanOptions, DirSizeOptions } from './garbage-scan';
+export {
+  normalizePackageName,
+  extractPyprojectDeps,
+  extractRequirementsNames,
+} from './manifest-parsers';

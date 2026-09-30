@@ -11,6 +11,7 @@ const VERSION_DATE = /(\d{4})\.(\d{2})\.(\d{2})/;
  */
 export type RuleHashVariant = 'content' | 'sha256' | 'quick';
 
+/** 单条规则的三重哈希：语义内容哈希、完整规则 SHA-256 与快速指纹 */
 export interface RuleHashes {
   content: string;
   sha256: string;
@@ -61,43 +62,43 @@ export class SopDiffCalculator {
   computeDiff(registry: SopRegistry, fromVersion: string, toVersion: string): SopDiff {
     const allRules = registry.getAll();
     const activeRules = registry.getActive();
+    const emptyBaseline = isEmptyBaseline(fromVersion);
 
-    // 空基线：客户端本地无规则。'0.0.0'/空串不匹配 VERSION_DATE，updatedAt 启发式会把全部规则误判为 unchanged，added 恒空
-    const emptyBaseline = fromVersion === '' || fromVersion === '0.0.0';
-
-    let unchanged: string[];
-    let modified: SopRule[];
-    let removed: string[];
-    let added: SopRule[];
-
-    if (emptyBaseline) {
-      unchanged = [];
-      modified = [];
-      removed = [];
-      added = activeRules;
-    } else {
-      ({ unchanged, modified, removed } = this.classifyRules(allRules, fromVersion));
-      added = this.findAddedRules(activeRules, unchanged, modified);
-    }
+    const { unchanged, modified, removed, added } = this.classifyDiff(
+      allRules,
+      activeRules,
+      fromVersion,
+      emptyBaseline,
+    );
 
     const { diffContent, hash } = this.buildDiffSummary(added, modified, removed);
-
     this.storeVersionHashes(toVersion, this.hashAll(allRules));
 
-    return {
-      version: toVersion,
+    return buildDiffResult(
+      toVersion,
       fromVersion,
-      compatibility: '>=0.1.0',
+      allRules,
       added,
       removed,
       modified,
       unchanged,
-      metadata: {
-        totalRules: allRules.length,
-        diffSize: Buffer.byteLength(diffContent, 'utf-8'),
-        hash,
-      },
-    };
+      diffContent,
+      hash,
+    );
+  }
+
+  private classifyDiff(
+    allRules: SopRule[],
+    activeRules: SopRule[],
+    fromVersion: string,
+    emptyBaseline: boolean,
+  ): { unchanged: string[]; modified: SopRule[]; removed: string[]; added: SopRule[] } {
+    if (emptyBaseline) {
+      return { unchanged: [], modified: [], removed: [], added: activeRules };
+    }
+    const { unchanged, modified, removed } = this.classifyRules(allRules, fromVersion);
+    const added = this.findAddedRules(activeRules, unchanged, modified);
+    return { unchanged, modified, removed, added };
   }
 
   /**
@@ -222,6 +223,38 @@ export class SopDiffCalculator {
     }
     return map;
   }
+}
+
+// 空基线：客户端本地无规则。'0.0.0'/空串不匹配 VERSION_DATE，updatedAt 启发式会把全部规则误判为 unchanged，added 恒空
+function isEmptyBaseline(fromVersion: string): boolean {
+  return fromVersion === '' || fromVersion === '0.0.0';
+}
+
+function buildDiffResult(
+  toVersion: string,
+  fromVersion: string,
+  allRules: SopRule[],
+  added: SopRule[],
+  removed: string[],
+  modified: SopRule[],
+  unchanged: string[],
+  diffContent: string,
+  hash: string,
+): SopDiff {
+  return {
+    version: toVersion,
+    fromVersion,
+    compatibility: '>=0.1.0',
+    added,
+    removed,
+    modified,
+    unchanged,
+    metadata: {
+      totalRules: allRules.length,
+      diffSize: Buffer.byteLength(diffContent, 'utf-8'),
+      hash,
+    },
+  };
 }
 
 /** 参与内容哈希的语义字段；误报计数与时间戳等易变元数据不参与（保证计数噪声不触发 modified） */

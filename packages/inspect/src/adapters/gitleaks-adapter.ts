@@ -1,20 +1,11 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  ToolAdapter,
-  ToolMeta,
-  ToolResult,
-  ToolScanOptions,
-  Issue,
-  AccessScope,
-} from '@zh/shared';
-import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
+import type { Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
+import { ToolCommandAdapter, buildAccessScope, buildToolResult, execTool, isToolTimeout } from './tool-runner';
 
-const execFileAsync = promisify(execFile);
+/** 单次 gitleaks 扫描的执行预算缺省值，对齐 SOP 引擎硬上限 300s（见 runGitleaks 注释） */
+const DEFAULT_SCAN_TIMEOUT_MS = 300_000;
 
 const META: ToolMeta = {
   id: 'gitleaks',
@@ -80,51 +71,25 @@ function resolveConfigPath(raw: string | undefined): string | undefined {
   }
 }
 
-export class GitleaksAdapter implements ToolAdapter {
+export class GitleaksAdapter extends ToolCommandAdapter {
   meta = META;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
-  private readonly projectRoot?: string;
   /** 最近一次 scan 的 projectPath，供错误分支（findings 经 stderr 返回）做相对化 */
   private lastProjectPath?: string;
 
   /** F5：gitleaks 读取仓库文本文件找硬编码密钥；依赖目录排除 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['**/*.{env,ts,js,json,yaml,yml}'],
-    excludePaths: ['**/node_modules/**'],
-  };
+  readonly accessScope = buildAccessScope(['**/*.{env,ts,js,json,yaml,yml}']);
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot;
+    super('gitleaks', projectRoot, {
+      unavailable: 'Gitleaks 未安装或未在 PATH 中找到',
+      failed: 'Gitleaks 执行失败',
+    });
   }
 
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('gitleaks', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
-  }
-
-  async scan(options: ToolScanOptions): Promise<ToolResult> {
-    const start = Date.now();
+  protected async runScan(options: ToolScanOptions, start: number): Promise<ToolResult> {
     const isStaged = !!(options.targetFiles && options.targetFiles.length > 0);
     this.lastProjectPath = options.projectPath;
-
-    try {
-      return await this.runGitleaks(options, start, isStaged);
-    } catch (error: unknown) {
-      return this.handleGitleaksError(error, start);
-    }
+    return this.runGitleaks(options, start, isStaged);
   }
 
   /** 执行 gitleaks 并映射输出为可用结果 */
@@ -136,13 +101,16 @@ export class GitleaksAdapter implements ToolAdapter {
     // 归一化 projectPath 为绝对路径：相对路径会作为 --source/位置参数传给 gitleaks，
     // gitleaks 以自身 cwd 解析导致 "stat ./scripts/fixtures/sample-repo: no such file or directory"。
     const projectPath = path.resolve(options.projectPath);
-    const command = await this.resolveCommand(projectPath);
+    const command = await this.commands.resolve(projectPath);
     const args = this.buildArgs(options, isStaged, projectPath);
-    const { stdout } = await execFileAsync(command, args, {
+    const { stdout } = await execTool(command, args, {
       cwd: projectPath,
-      // gitleaks 扫描完整 git 历史，流水线并行高负载下易超 30s，默认放宽到 120s
-      timeout: options.timeout || 120000,
-      maxBuffer: 10 * 1024 * 1024,
+      // 对齐 SOP 引擎硬上限 DEFAULT_TOOL_SCAN_TIMEOUT_MS（300s）。此前为 120s：
+      // 本仓 331 次提交的全历史扫描实测约 24s，但与 semgrep/trivy/eslint 并行时
+      // CPU 争用可突破 120s 被 SIGTERM。gitleaks 同样在末尾一次性写报告，
+      // 被杀时 stdout 为空，适配器捞不回 findings，只能落到 buildExecErrorResult
+      // 把带 ANSI 的 banner + WRN 原样当「错误原因」吐给门禁 —— 掩盖了真正的超时。
+      timeout: options.timeout || DEFAULT_SCAN_TIMEOUT_MS,
     });
 
     const parsed = JSON.parse(stdout);
@@ -150,19 +118,30 @@ export class GitleaksAdapter implements ToolAdapter {
     return this.buildAvailable(findings, start, projectPath);
   }
 
-  /** 处理 gitleaks 执行错误：未安装 / 部分输出 / 失败 */
-  private handleGitleaksError(error: unknown, start: number): ToolResult {
-    const err = error as { code?: string; stdout?: string; stderr?: string; message?: string };
+  /**
+   * gitleaks 命中密钥时以非零码退出但 stdout 仍是合法 JSON findings，
+   * 故先尝试从失败输出里捞回 findings，捞不到才按未安装 / 执行失败分类。
+   */
+  protected override buildExecErrorResult(error: unknown, start: number): ToolResult {
+    const err = this.execErrorOf(error);
     if (err.code === 'ENOENT') {
-      return this.buildUnavailable(start, 'Gitleaks 未安装或未在 PATH 中找到');
+      return this.buildUnavailable(start, this.errorTexts.unavailable);
     }
 
-    // gitleaks 检测到密钥时退出码非 0，但 stdout 仍含有效 JSON findings
     const partialFindings = this.parsePartialFindings(err.stdout ?? '');
     if (partialFindings) {
       return this.buildAvailable(partialFindings, start, this.lastProjectPath);
     }
-    return this.buildError(start, err.stderr || err.message || 'Gitleaks 执行失败');
+
+    if (isToolTimeout(err)) {
+      return this.buildError(
+        start,
+        `Gitleaks 扫描超时（${DEFAULT_SCAN_TIMEOUT_MS}ms 内未完成，已终止进程）：` +
+          '全历史扫描耗时随提交量增长，请改用 pre-commit 暂存区扫描或在 SOP 规则的 check.toolConfig.timeout 中放宽预算。',
+      );
+    }
+
+    return this.buildError(start, err.stderr || err.message || this.errorTexts.failed);
   }
 
   private parsePartialFindings(stdout: string): Record<string, unknown>[] | null {
@@ -203,38 +182,27 @@ export class GitleaksAdapter implements ToolAdapter {
     }
   }
 
-  private buildAvailable(findings: Record<string, unknown>[], start: number, projectPath?: string): ToolResult {
-    return {
+  private buildAvailable(findings: Record<string, unknown>[], start: number, projectPath?: string): ToolResult {    return buildToolResult({
       tool: 'gitleaks',
       status: 'available',
       issues: this.mapOutput(findings, projectPath),
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: findings.length,
-      },
-    };
+      start,
+      fileCount: findings.length,
+    });
   }
 
   private buildUnavailable(start: number, error: string): ToolResult {
-    return {
+    return buildToolResult({
       tool: 'gitleaks',
       status: 'unavailable',
       issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      start,
       error,
-    };
+    });
   }
 
   private buildError(start: number, error: string): ToolResult {
-    return {
-      tool: 'gitleaks',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error,
-    };
+    return buildToolResult({ tool: 'gitleaks', status: 'error', issues: [], start, error });
   }
 
   private mapOutput(findings: Record<string, unknown>[], projectPath?: string): Issue[] {

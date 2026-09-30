@@ -89,10 +89,31 @@ export type {
   MaintenanceOutcome,
   SopCacheMaintenanceOptions,
 } from './cache/sop-cache-maintenance';
-export {
+export { 
   computeRuleContentSha,
   buildCurrentVersions,
   verifyRuleManifest,
   needsHeal,
 } from './cache/sop-resolve-verifier';
 export type { RuleManifestEntry, ResolveDriftReport } from './cache/sop-resolve-verifier';
+
+// ─── quality: 规则质量门禁（2026-09-22 建立）──────────────────
+// 规则升 active / 改动后必须过 golden 断言回放，precision/recall 达标才放行。
+// 动机：Gate 原本只认「单测全绿」，照不到「规则报得对不对」（已有 358 条误报实证）。
+export {
+  evaluateRuleAccuracy,
+  loadRuleGoldenDir,
+  toRuleFindings,
+  formatRuleAccuracyReport,
+  RULE_PRECISION_THRESHOLD,
+  RULE_RECALL_THRESHOLD,
+  DEFAULT_LINE_TOLERANCE,
+} from './quality/rule-accuracy';
+export type {
+  RuleGoldenAssertion,
+  RuleGoldenFile,
+  RuleFinding,
+  RuleEvaluation,
+  RuleAccuracyReport,
+  EvaluateRuleAccuracyOptions,
+} from './quality/rule-accuracy';

@@ -38,20 +38,40 @@ describe('SyncConflictResolver（SHA-256 内容哈希）', () => {
   it('GIVEN 键序不同但内容相同 WHEN detectConflict THEN 返回 null（无冲突）', () => {
     const a = { id: 'r1', content: { pattern: 'x', engine: 'eslint' }, tags: ['a', 'b'] };
     const b = { content: { engine: 'eslint', pattern: 'x' }, tags: ['a', 'b'], id: 'r1' };
-    expect(resolver.detectConflict('r1', 1, 2, a, b)).toBeNull();
+    expect(
+      resolver.detectConflict({
+        ruleId: 'r1',
+        localVersion: 1,
+        remoteVersion: 2,
+        localContent: a,
+        remoteContent: b,
+      }),
+    ).toBeNull();
   });
 
   it('GIVEN 嵌套内容差异 WHEN detectConflict THEN 检出冲突且哈希不同', () => {
     const a = { id: 'r1', content: { severity: 'low' } };
     const b = { id: 'r1', content: { severity: 'high' } };
-    const conflict = resolver.detectConflict('r1', 1, 2, a, b);
+    const conflict = resolver.detectConflict({
+      ruleId: 'r1',
+      localVersion: 1,
+      remoteVersion: 2,
+      localContent: a,
+      remoteContent: b,
+    });
     expect(conflict).not.toBeNull();
     expect(conflict?.localHash).not.toBe(conflict?.remoteHash);
     expect(conflict?.detectedAt).toBeInstanceOf(Date);
   });
 
   it('GIVEN MANUAL 策略 WHEN resolve THEN 抛出需人工处理异常', () => {
-    const conflict = resolver.detectConflict('r1', 1, 2, { v: 1 }, { v: 2 })!;
+    const conflict = resolver.detectConflict({
+      ruleId: 'r1',
+      localVersion: 1,
+      remoteVersion: 2,
+      localContent: { v: 1 },
+      remoteContent: { v: 2 },
+    })!;
     expect(() => resolver.resolve(conflict, ConflictResolution.MANUAL)).toThrow(
       MANUAL_RESOLUTION_RE,
     );
@@ -187,5 +207,46 @@ describe('SopCacheManager 冲突解决接入（syncFromCloud/applyDiff 共用链
     expect(
       manager.getMetricsSnapshot().counters.find((c) => c.name === 'sop_conflicts_resolved_total'),
     ).toBeUndefined();
+  });
+
+  it('GIVEN 本地规则 updatedAt 为 ISO 字符串（SQLite 缓存读出）WHEN applyDiff 冲突路径 THEN 不抛 TypeError 且策略生效', async () => {
+    // 回归：SQLite decodeRule 还原的规则 updatedAt 是字符串，resolveIncoming 直接
+    // local.updatedAt.getTime() 之前会抛 TypeError → 增量同步静默失败（network_error）。
+    const local = makeRule({
+      id: 'guard.string-date',
+      severity: 'low',
+      description: 'local version',
+      updatedAt: '2026-07-28T00:00:00.000Z' as unknown as Date,
+    });
+    const incoming = makeRule({
+      id: 'guard.string-date',
+      severity: 'critical',
+      description: 'remote version',
+      updatedAt: '2026-09-24T20:14:07.879Z' as unknown as Date,
+    });
+    createManager(ConflictResolution.REMOTE_WINS, [local]);
+
+    await expect(manager.applyDiff(makeDiff([incoming]))).resolves.not.toThrow();
+    const stored = registry.get('guard.string-date');
+    expect(stored?.severity).toBe('critical');
+    expect(stored?.description).toBe('remote version');
+
+    const conflicts = manager
+      .getMetricsSnapshot()
+      .counters.find((c) => c.name === 'sop_conflicts_resolved_total');
+    expect(conflicts?.value).toBe(1);
+    expect(conflicts?.labels).toMatchObject({ strategy: 'remote-wins' });
+  });
+
+  it('GIVEN diff.modified 含本地不存在的规则 WHEN applyDiff THEN 不抛错且该规则被注册（收敛语义）', async () => {
+    // 回归：服务端无来源版本快照时 updatedAt 启发式会把新规则误判为 modified；
+    // applyChanges 对不存在的 ID 直接 registry.update 之前会抛 Error → 增量同步失败。
+    createManager(undefined, []);
+    const incoming = makeRule({ id: 'guard.brand-new', severity: 'critical' });
+
+    await expect(manager.applyDiff(makeDiff([incoming]))).resolves.not.toThrow();
+
+    const stored = registry.get('guard.brand-new');
+    expect(stored?.severity).toBe('critical');
   });
 });

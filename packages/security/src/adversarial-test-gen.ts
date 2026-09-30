@@ -18,19 +18,24 @@ import { load as loadYaml } from 'js-yaml';
 
 const HEX4_RE = /^[0-9A-Fa-f]{4}$/;
 
+/** 攻击模式分类：提示词注入 / 供应链 / 密钥外泄 / UI 伪装 */
 export type AttackCategory =
   'prompt-injection' | 'supply-chain' | 'secret-exfiltration' | 'ui-redress';
 
+/** 被驱动的检测器函数名（injection-guard 导出），决定 fixture 的渲染形态 */
 export type TargetDetector =
   | 'scanCommentInstructions'
   | 'classifyPackageJsonScripts'
   | 'scanMarkdownHiddenLinks'
   | 'isEnvFile';
 
+/** 注释包裹风格：line-slash/block → .ts，line-hash → .py，html → .md */
 export type CommentStyle = 'line-slash' | 'line-hash' | 'block' | 'html';
+/** 良性上下文预设：在 payload 前后拼接无害代码/文档，检验检测器抗干扰能力 */
 export type ContextPreset =
   'benign-code-header' | 'benign-code-footer' | 'benign-doc-lines' | 'benign-extra-script';
 
+/** 多样化器：对 payload / 上下文 / 文件名施加的单一变异操作（可组合成变异计划） */
 export type Diversifier =
   | { type: 'commentStyle'; style: CommentStyle }
   | { type: 'casing'; mode: 'upper' | 'lower' }
@@ -41,6 +46,7 @@ export type Diversifier =
   | { type: 'contextPrefix'; preset: ContextPreset }
   | { type: 'contextSuffix'; preset: ContextPreset };
 
+/** 攻击模式定义（YAML 单文档解析结果）：基准模板 + 期望命中断言 + 局部/全局多样化器 */
 export interface AttackPattern {
   readonly patternId: string;
   readonly description: string;
@@ -56,6 +62,7 @@ export interface AttackPattern {
   readonly globalDiversifiers: readonly Diversifier[];
 }
 
+/** 生成的测试变体：由 AttackPattern 与单个变异计划渲染出的 fixture 描述（纯数据，磁盘写入在测试侧） */
 export interface GeneratedVariant {
   readonly patternId: string;
   readonly variantIndex: number;

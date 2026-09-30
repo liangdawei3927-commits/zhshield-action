@@ -28,21 +28,35 @@ import {
 
 // ─── 内联评估：pattern-scan ────────────────────────────
 
+/**
+ * 遍历待扫描文件并交给 visit 消费：按 fileExts 解析文件列表 → 读取内容（不可读跳过）→
+ * 相对化路径 → excludePatterns 过滤。pattern-scan / forbidden / required-content /
+ * layer-boundary 四个内联评估器的文件遍历骨架逐字相同，收敛为唯一实现。
+ */
+function forEachScanTarget(
+  context: RuleContext,
+  fileExts: string[] | undefined,
+  excludePatterns: string[] | undefined,
+  visit: (content: string, relativePath: string) => void,
+): void {
+  for (const filePath of resolveFiles(context, fileExts)) {
+    const content = readFileSafe(filePath);
+    if (content === null) continue;
+    const relativePath = relative(context.repoRoot, filePath);
+    if (matchesExcludePatterns(relativePath, excludePatterns)) continue;
+    visit(content, relativePath);
+  }
+}
+
 export async function evalPatternScan(
   rule: SopRule,
   instr: PatternScanInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
-  const files = resolveFiles(context, instr.fileExts);
   const violations: Violation[] = [];
-
-  for (const filePath of files) {
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
-
-    const relativePath = relative(context.repoRoot, filePath);
+  forEachScanTarget(context, instr.fileExts, undefined, (content, relativePath) => {
     violations.push(...scanPatternsInFile(content, relativePath, rule, instr.patterns));
-  }
+  });
 
   return {
     rule,
@@ -113,49 +127,48 @@ function isRuleWhitelisted(
   return entries.some((e) => e.ruleId === ruleId && (!e.pattern || filePath.includes(e.pattern)));
 }
 
+/** forbidden / forbidden-regex 共用的指令投影（仅需文件过滤与排除模式） */
+interface ForbiddenScanScope {
+  fileExts?: string[];
+  excludePatterns?: string[];
+}
+
 export async function evalForbidden(
   rule: SopRule,
   instr: ForbiddenPatternInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
-  const files = resolveFiles(context, instr.fileExts);
+  return scanForbiddenScope(rule, instr, context, (content, relativePath) =>
+    scanForbiddenInFile(content, relativePath, rule, instr.patterns),
+  );
+}
+
+/** forbidden / forbidden-regex 的共同实现：逐文件扫描 → 规则级白名单过滤 → 构造评估结果 */
+async function scanForbiddenScope(
+  rule: SopRule,
+  instr: ForbiddenScanScope,
+  context: RuleContext,
+  scanFile: (content: string, relativePath: string) => Violation[],
+): Promise<RuleEvaluation> {
   const whitelist = loadRuleWhitelist(context.repoRoot);
-  const violations = scanForbiddenFiles(files, whitelist, rule, instr, context);
+  const violations: Violation[] = [];
+
+  forEachScanTarget(context, instr.fileExts, instr.excludePatterns, (content, relativePath) => {
+    for (const v of scanFile(content, relativePath)) {
+      if (!isRuleWhitelisted(whitelist, rule.id, v.file)) violations.push(v);
+    }
+  });
 
   return {
     rule,
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message:
-      violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
+    message: violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
   };
-}
-
-/** 扫描文件列表中的禁止模式，应用排除与规则级白名单 */
-function scanForbiddenFiles(
-  files: string[],
-  whitelist: WhitelistRuleEntry[],
-  rule: SopRule,
-  instr: ForbiddenPatternInstruction,
-  context: RuleContext,
-): Violation[] {
-  const violations: Violation[] = [];
-  for (const filePath of files) {
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
-
-    const relativePath = relative(context.repoRoot, filePath);
-    if (matchesExcludePatterns(relativePath, instr.excludePatterns)) continue;
-
-    for (const v of scanForbiddenInFile(content, relativePath, rule, instr.patterns)) {
-      if (!isRuleWhitelisted(whitelist, rule.id, v.file)) violations.push(v);
-    }
-  }
-  return violations;
 }
 
 // ─── 内联评估：threshold ───────────────────────────────
@@ -220,28 +233,9 @@ export async function evalForbiddenRegex(
   context: RuleContext,
 ): Promise<RuleEvaluation> {
   const compiled = compileForbiddenRegexItems(instr.items);
-  const files = resolveFiles(context, instr.fileExts);
-  const whitelist = loadRuleWhitelist(context.repoRoot);
-  const violations = scanForbiddenRegexFiles(
-    files,
-    whitelist,
-    rule,
-    instr,
-    compiled,
-    context.repoRoot,
+  return scanForbiddenScope(rule, instr, context, (content, relativePath) =>
+    scanForbiddenRegexInFile(content, relativePath, rule, compiled),
   );
-
-  return {
-    rule,
-    status: violations.length === 0 ? 'passed' : 'failed',
-    violations,
-    files: [...new Set(violations.map((v) => v.file))],
-    message:
-      violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
-    durationMs: 0,
-    targetEngine: 'inspect',
-    timestamp: new Date(),
-  };
 }
 
 function compileForbiddenRegexItems(
@@ -264,67 +258,115 @@ function compileForbiddenRegexItems(
   return compiled;
 }
 
-function scanForbiddenRegexFiles(
-  files: string[],
-  whitelist: WhitelistRuleEntry[],
-  rule: SopRule,
-  instr: ForbiddenRegexInstruction,
-  compiled: CompiledForbiddenRegex[],
-  repoRoot: string,
-): Violation[] {
-  const violations: Violation[] = [];
-  for (const filePath of files) {
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
+/** 从 from 起定位块注释闭合符的起始下标；未闭合时停在 len-1（调用方 +2 后越界退出） */
+function indexOfBlockCommentEnd(line: string, from: number): number {
+  let j = from;
+  while (j < line.length - 1 && !(line[j] === '*' && line[j + 1] === '/')) j++;
+  return j;
+}
 
-    const relativePath = relative(repoRoot, filePath);
-    if (matchesExcludePatterns(relativePath, instr.excludePatterns)) continue;
-
-    for (const v of scanForbiddenRegexInFile(content, relativePath, rule, compiled)) {
-      if (!isRuleWhitelisted(whitelist, rule.id, v.file)) violations.push(v);
+/** 从 from 起定位引号字面量闭合引号之后的下标（`\\` 转义跳 2，未闭合则返回 len） */
+function indexAfterClosingQuote(line: string, from: number, quote: string): number {
+  let j = from;
+  while (j < line.length) {
+    if (line[j] === '\\') {
+      j += 2;
+    } else if (line[j] === quote) {
+      j++;
+      break;
+    } else {
+      j++;
     }
   }
-  return violations;
+  return j;
+}
+
+/** 单行剥离结果：保留的代码语义内容 + 更新后的跨行模板状态 */
+interface StripLineResult {
+  result: string;
+  inTemplate: boolean;
+}
+
+/** 跨行模板字符串内消费一个字符：返回更新后的下标与闭合状态（转义跳 2、未闭合则原样继续） */
+function consumeTemplateChar(
+  line: string,
+  i: number,
+  inTemplate: boolean,
+): { i: number; inTemplate: boolean } {
+  if (line[i] === '\\') return { i: i + 2, inTemplate };
+  if (line[i] === '`') return { i: i + 1, inTemplate: false };
+  return { i: i + 1, inTemplate };
+}
+
+/**
+ * 剥离单行中的字符串字面量与注释，仅保留代码语义内容。
+ * 返回本行保留的字符与更新后的跨行模板状态（未闭合反引号延续到下一行）。
+ */
+function stripLine(line: string, inTemplate: boolean): StripLineResult {
+  let result = '';
+  let i = 0;
+  while (i < line.length) {
+    if (inTemplate) {
+      const next = consumeTemplateChar(line, i, inTemplate);
+      i = next.i;
+      inTemplate = next.inTemplate;
+      continue;
+    }
+    if (line[i] === '/' && line[i + 1] === '/') break;
+    if (line[i] === '/' && line[i + 1] === '*') {
+      i = indexOfBlockCommentEnd(line, i + 2) + 2;
+      continue;
+    }
+    if (line[i] === "'" || line[i] === '"') {
+      const q = line[i];
+      i = indexAfterClosingQuote(line, i + 1, q);
+      continue;
+    }
+    if (line[i] === '`') {
+      // 进入模板字符串：若同行未闭合则状态延续至后续行
+      inTemplate = true;
+      i++;
+      continue;
+    }
+    result += line[i];
+    i++;
+  }
+  return { result, inTemplate };
 }
 
 /**
  * 剥离字符串字面量和注释，仅保留代码语义内容。
  * 用于 forbidden-regex 扫描前预处理，避免正则匹配到字符串/注释中的子串。
  *
- * 处理范围：// 行注释、/* 块注释、' " ` 字符串字面量（含转义）。
- * 不处理：正则字面量、嵌套模板字符串（对 forbidden-regex 场景足够）。
+ * 处理范围：// 行注释、/* 块注释、' " 字符串字面量（含转义）。
+ * 跨行模板字符串（`...`）按状态机跨行剥离：未闭合反引号延续到后续行，
+ * 避免服务器渲染 HTML/JS 等跨行模板内容被误当作代码语义扫描
+ * （09-24 修复：admin-pages-view.ts 的 `<script>` 内联 JS 曾被误报隐式 any）。
+ * 不处理：正则字面量、模板插值（${...}）内部（对 forbidden-regex 场景足够）。
+ *
+ * @param content 需逐行扫描的文件内容
+ * @returns 逐行剥离后对应的行数组（长度与输入行数一致）
  */
-function stripStringsAndComments(line: string): string {
-  let result = '';
-  let i = 0;
-  while (i < line.length) {
-    if (line[i] === '/' && line[i + 1] === '/') break;
-    if (line[i] === '/' && line[i + 1] === '*') {
-      let j = i + 2;
-      while (j < line.length - 1 && !(line[j] === '*' && line[j + 1] === '/')) j++;
-      i = j + 2;
-      continue;
-    }
-    if (line[i] === "'" || line[i] === '"' || line[i] === '`') {
-      const q = line[i];
-      let j = i + 1;
-      while (j < line.length) {
-        if (line[j] === '\\') {
-          j += 2;
-        } else if (line[j] === q) {
-          j++;
-          break;
-        } else {
-          j++;
-        }
-      }
-      i = j;
-      continue;
-    }
-    result += line[i];
-    i++;
+function stripStringsAndComments(content: string): string[] {
+  const out: string[] = [];
+  let inTemplate = false; // 跨行模板字符串状态：true 表示当前位于未闭合反引号内
+  for (const line of content.split('\n')) {
+    const stripped = stripLine(line, inTemplate);
+    inTemplate = stripped.inTemplate;
+    out.push(stripped.result);
   }
-  return result;
+  return out;
+}
+
+/** 禁止正则逐个回调全局匹配项；每次调用前归零 lastIndex，保持原有「逐行重置」语义 */
+function forEachGlobalMatch(
+  regex: RegExp,
+  text: string,
+  onMatch: (match: RegExpExecArray) => void,
+): void {
+  regex.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) onMatch(match);
 }
 
 function scanForbiddenRegexInFile(
@@ -334,13 +376,11 @@ function scanForbiddenRegexInFile(
   compiled: CompiledForbiddenRegex[],
 ): Violation[] {
   const violations: Violation[] = [];
-  const lines = content.split('\n');
+  const lines = stripStringsAndComments(content);
   for (const item of compiled) {
     for (let i = 0; i < lines.length; i++) {
-      const stripped = stripStringsAndComments(lines[i]);
-      item.regex.lastIndex = 0;
-      let match: RegExpExecArray | null;
-      while ((match = item.regex.exec(stripped)) !== null) {
+      const stripped = lines[i];
+      forEachGlobalMatch(item.regex, stripped, (match) => {
         violations.push({
           id: randomUUID(),
           ruleId: rule.id,
@@ -350,9 +390,9 @@ function scanForbiddenRegexInFile(
           column: match.index + 1,
           message: item.message ?? `命中禁止正则: ${item.source.slice(0, 80)}`,
           suggestion: item.suggestion ?? '按项目规范调整该处代码',
-          match: lines[i].trim().slice(0, 120),
+          match: stripped.trim().slice(0, 120),
         });
-      }
+      });
     }
   }
   return violations;
@@ -399,15 +439,15 @@ function checkRequiredFile(
 
   const content = readFileSafe(filePath);
   if (content === null) {
-    violations.push(
-      makeRequiredViolation(
-        rule,
-        relativePath,
-        0,
-        `缺少必需文件: ${item.path}`,
-        `补充 ${item.path}`,
-      ),
-    );
+      violations.push(
+        makeRequiredViolation({
+          rule,
+          file: relativePath,
+          line: 0,
+          message: `缺少必需文件: ${item.path}`,
+          suggestion: `补充 ${item.path}`,
+        }),
+      );
     return violations;
   }
 
@@ -415,13 +455,13 @@ function checkRequiredFile(
   for (const sub of item.contains ?? []) {
     if (!lower.includes(sub.toLowerCase())) {
       violations.push(
-        makeRequiredViolation(
+        makeRequiredViolation({
           rule,
-          relativePath,
-          0,
-          `缺少必需内容: "${sub}"`,
-          `在 ${item.path} 中补充 "${sub}" 相关章节`,
-        ),
+          file: relativePath,
+          line: 0,
+          message: `缺少必需内容: "${sub}"`,
+          suggestion: `在 ${item.path} 中补充 "${sub}" 相关章节`,
+        }),
       );
     }
   }
@@ -429,13 +469,13 @@ function checkRequiredFile(
     const hit = group.some((sub) => lower.includes(sub.toLowerCase()));
     if (!hit) {
       violations.push(
-        makeRequiredViolation(
+        makeRequiredViolation({
           rule,
-          relativePath,
-          0,
-          `缺少必需章节（任一即可）: ${group.join(' / ')}`,
-          `在 ${item.path} 中补充相关章节`,
-        ),
+          file: relativePath,
+          line: 0,
+          message: `缺少必需章节（任一即可）: ${group.join(' / ')}`,
+          suggestion: `在 ${item.path} 中补充相关章节`,
+        }),
       );
     }
   }
@@ -460,48 +500,67 @@ function checkRequiredJson(
   const parsed = parseJsoncSafe(raw);
   if (parsed === undefined) {
     violations.push(
-      makeRequiredViolation(
+      makeRequiredViolation({
         rule,
-        relativePath,
-        0,
-        `${item.path} 无法解析为 JSON`,
-        '修复 JSON 语法错误',
-      ),
+        file: relativePath,
+        line: 0,
+        message: `${item.path} 无法解析为 JSON`,
+        suggestion: '修复 JSON 语法错误',
+      }),
     );
     return violations;
   }
 
-  // tsconfig extends 支持：strict 等开关常定义在被 extends 的 base 配置里，
-  // 只查本文件会对这类合理项目误报「缺少配置项」。评估键路径前先沿 extends
-  // 链深合并出生效配置；链不可解析时回退为只查本文件（原有行为）。
-  const effective =
-    typeof parsed === 'object' && parsed !== null
-      ? resolveExtendsChain(filePath, parsed as Record<string, unknown>)
-      : parsed;
+  const effective = resolveEffectiveConfig(filePath, parsed);
+  violations.push(...checkJsonKeyPaths(rule, item, relativePath, effective, entries));
+  return violations;
+}
 
+/**
+ * tsconfig extends 支持：strict 等开关常定义在被 extends 的 base 配置里，
+ * 只查本文件会对这类合理项目误报「缺少配置项」。评估键路径前先沿 extends
+ * 链深合并出生效配置；链不可解析时回退为只查本文件（原有行为）。
+ */
+function resolveEffectiveConfig(filePath: string, parsed: unknown): unknown {
+  return typeof parsed === 'object' && parsed !== null
+    ? resolveExtendsChain(filePath, parsed as Record<string, unknown>)
+    : parsed;
+}
+
+function checkJsonKeyPaths(
+  rule: SopRule,
+  item: RequiredContentInstruction['items'][number],
+  relativePath: string,
+  effective: unknown,
+  entries: [string, unknown][],
+): Violation[] {
+  const violations: Violation[] = [];
   for (const [keyPath, expected] of entries) {
     const actual = getJsonPathValue(effective, keyPath);
     if (actual === undefined || actual !== expected) {
       violations.push(
-        makeRequiredViolation(
+        makeRequiredViolation({
           rule,
-          relativePath,
-          0,
-          `${item.path} 缺少配置项 ${keyPath} (期望 ${JSON.stringify(expected)})`,
-          `在 ${item.path} 中设置 ${keyPath}: ${JSON.stringify(expected)}`,
-        ),
+          file: relativePath,
+          line: 0,
+          message: `${item.path} 缺少配置项 ${keyPath} (期望 ${JSON.stringify(expected)})`,
+          suggestion: `在 ${item.path} 中设置 ${keyPath}: ${JSON.stringify(expected)}`,
+        }),
       );
     }
   }
   return violations;
 }
 
+/** JSONC 行注释（须排除 URL 中的 `//`，且注释行内不含引号），配合 parseJsoncSafe 剥离 */
+const RE_JSONC_LINE_COMMENT = /(^|[^:])\/\/(?!.*["']).*$/;
+
 /** 解析 JSONC（剥离行/块注释与尾逗号），失败返回 undefined */
 function parseJsoncSafe(raw: string): unknown {
   const noBlockComments = raw.replace(/\/\*[\s\S]*?\*\//g, '');
   const noLineComments = noBlockComments
     .split('\n')
-    .map((line) => line.replace(/(^|[^:])\/\/(?!.*["']).*$/, '$1'))
+    .map((line) => line.replace(RE_JSONC_LINE_COMMENT, '$1'))
     .join('\n');
   const noTrailingCommas = noLineComments.replace(/,(\s*[}\]])/g, '$1');
   try {
@@ -548,9 +607,11 @@ function resolveExtendsChain(
     const parsed = parseJsoncSafe(raw);
     if (parsed === undefined || typeof parsed !== 'object' || parsed === null) break;
     node = parsed as Record<string, unknown>;
-    chain.unshift(node); // base 放前面，越靠近子配置越晚合并（覆盖力越强）
+    chain.push(node);
     currentDir = dirname(target);
   }
+
+  chain.reverse(); // base 放前面，越靠近子配置越晚合并（覆盖力越强）
 
   const merged: Record<string, unknown> = {};
   for (const layer of chain) deepMergeInto(merged, layer);
@@ -593,8 +654,17 @@ function checkRequiredJsdoc(
   context: RuleContext,
 ): Violation[] {
   const violations: Violation[] = [];
-  const patterns = item.jsdocOn ?? [];
-  const compiled = patterns
+  const compiled = compileJsdocPatterns(item.jsdocOn ?? []);
+  if (compiled.length === 0) return violations;
+
+  forEachScanTarget(context, item.fileExts, item.excludePatterns, (content, relativePath) => {
+    violations.push(...scanJsdocInFile(content, relativePath, rule, compiled));
+  });
+  return violations;
+}
+
+function compileJsdocPatterns(patterns: string[]): RegExp[] {
+  return patterns
     .filter((p) => isSafeRegexPattern(p))
     .map((p) => {
       try {
@@ -604,30 +674,28 @@ function checkRequiredJsdoc(
       }
     })
     .filter((r): r is RegExp => r !== null);
-  if (compiled.length === 0) return violations;
+}
 
-  const files = resolveFiles(context, item.fileExts);
-  for (const filePath of files) {
-    const relativePath = relative(context.repoRoot, filePath);
-    if (matchesExcludePatterns(relativePath, item.excludePatterns)) continue;
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
-
-    const lines = content.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (!compiled.some((re) => re.test(lines[i]))) continue;
-
-      if (!hasPrecedingJsdoc(lines, i)) {
-        violations.push(
-          makeRequiredViolation(
-            rule,
-            relativePath,
-            i + 1,
-            `导出声明缺少 JSDoc 注释: ${lines[i].trim().slice(0, 60)}`,
-            '为导出的接口/类型补充 /** ... */ 文档注释',
-          ),
-        );
-      }
+function scanJsdocInFile(
+  content: string,
+  relativePath: string,
+  rule: SopRule,
+  compiled: RegExp[],
+): Violation[] {
+  const violations: Violation[] = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!compiled.some((re) => re.test(lines[i]))) continue;
+    if (!hasPrecedingJsdoc(lines, i)) {
+      violations.push(
+        makeRequiredViolation({
+          rule,
+          file: relativePath,
+          line: i + 1,
+          message: `导出声明缺少 JSDoc 注释: ${lines[i].trim().slice(0, 60)}`,
+          suggestion: '为导出的接口/类型补充 /** ... */ 文档注释',
+        }),
+      );
     }
   }
   return violations;
@@ -643,13 +711,16 @@ function hasPrecedingJsdoc(lines: string[], index: number): boolean {
   return false;
 }
 
-function makeRequiredViolation(
-  rule: SopRule,
-  file: string,
-  line: number,
-  message: string,
-  suggestion: string,
-): Violation {
+interface MakeRequiredViolationParams {
+  rule: SopRule;
+  file: string;
+  line: number;
+  message: string;
+  suggestion: string;
+}
+
+function makeRequiredViolation(params: MakeRequiredViolationParams): Violation {
+  const { rule, file, line, message, suggestion } = params;
   return {
     id: randomUUID(),
     ruleId: rule.id,
@@ -670,18 +741,19 @@ export async function evalLayerBoundary(
   instr: LayerBoundaryInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
-  const files = resolveFiles(context, ['.ts', '.tsx', '.js', '.jsx']);
   const layerMap = buildLayerMap(instr.layers);
   const violations: Violation[] = [];
 
-  for (const filePath of files) {
-    const content = readFileSafe(filePath);
-    if (content === null) continue;
-
-    const relativePath = relative(context.repoRoot, filePath);
-    if (matchesExcludePatterns(relativePath, instr.excludePatterns)) continue;
-    violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }));
-  }
+  forEachScanTarget(
+    context,
+    ['.ts', '.tsx', '.js', '.jsx'],
+    instr.excludePatterns,
+    (content, relativePath) => {
+      violations.push(
+        ...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }),
+      );
+    },
+  );
 
   return {
     rule,

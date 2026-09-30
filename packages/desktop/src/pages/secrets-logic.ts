@@ -8,7 +8,7 @@ import {
   verifySecretRotated,
 } from '../services/engineApi';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import type { SecretReportData } from '../types/electron';
 
 const logger = new Logger('secrets-logic');
@@ -184,19 +184,8 @@ function toAiIssue(finding: SecretReportData['findings'][number]): AiFixIssue {
     line: finding.location.line,
     message: `${t(typeKey)} · ${finding.displayValue}`,
     suggestion: t('page.secrets.suggestion'),
+    domain: 'secrets',
   };
-}
-
-function copyIssuesToAi(
-  projectPath: string,
-  issues: AiFixIssue[],
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-): void {
-  const text = buildAiFixPrompt(projectPath, issues);
-  void copyTextToClipboard(text).then(
-    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-    () => toast(t('toast.copyFailed'), 'error'),
-  );
 }
 
 function useSecretsCopyToAi(projectPath: string): {
@@ -207,14 +196,14 @@ function useSecretsCopyToAi(projectPath: string): {
 
   const copyToAi = useCallback(
     (finding: SecretReportData['findings'][number]) =>
-      copyIssuesToAi(projectPath, [toAiIssue(finding)], toast),
+      copyIssuesToAi(projectPath, toast, [toAiIssue(finding)]),
     [projectPath, toast],
   );
 
   const copyAllToAi = useCallback(
     (findings: SecretReportData['findings']) => {
       if (findings.length === 0) return;
-      copyIssuesToAi(projectPath, findings.map(toAiIssue), toast);
+      copyIssuesToAi(projectPath, toast, findings.map(toAiIssue));
     },
     [projectPath, toast],
   );

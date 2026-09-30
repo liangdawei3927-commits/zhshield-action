@@ -4,6 +4,7 @@
 
 import * as os from 'node:os';
 
+/** 机器画像：启动时探测的 CPU/内存信息与各环节并发预算，消费方见文件头注释 */
 export interface MachineProfile {
   /** 逻辑核心数 */
   cores: number;

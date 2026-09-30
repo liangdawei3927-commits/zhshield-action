@@ -10,6 +10,7 @@ import type { PipelineReport } from '@zh/pipeline';
 import { buildTechDebtDashboard } from '@zh/scoring';
 import {
   normalizePipelineReport,
+  normalizeTechDebtSource,
   buildDiagnosticsReport,
   writeDiagnosticsFile,
   persistDiagnostics,
@@ -562,5 +563,56 @@ describe('persistDiagnosticsFromEntries whitelist 压制自检误报', () => {
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
+  });
+});
+
+describe('normalizeTechDebtSource', () => {
+  const MODULES = [
+    'packages/cli/src/index.ts',
+    'packages/inspect/src/adapters/ts-prune-adapter.ts',
+    'packages/kernel/src/runner/scan-utils.ts',
+  ];
+
+  function entriesFor(modules: string[], severity: 'error' | 'warning' | 'info' = 'error') {
+    const dashboard = buildTechDebtDashboard({
+      projectId: 'proj-1',
+      issues: modules.map((file, i) => ({
+        id: `i${i}`,
+        severity,
+        category: 'performance',
+        file,
+      })),
+      moduleHotness: [],
+    });
+    return normalizeTechDebtSource(dashboard);
+  }
+
+  it('共享 9 字节前缀的模块产出不同 ruleId 与 fingerprint', () => {
+    const entries = entriesFor(MODULES);
+    expect(entries).toHaveLength(MODULES.length);
+    expect(new Set(entries.map((e) => e.ruleId)).size).toBe(MODULES.length);
+    expect(new Set(entries.map((e) => e.fingerprint)).size).toBe(MODULES.length);
+  });
+
+  it('file 回填为真实模块路径', () => {
+    const entries = entriesFor(MODULES);
+    expect(entries.map((e) => e.file).sort()).toEqual([...MODULES].sort());
+    expect(entries.every((e) => e.file !== '')).toBe(true);
+  });
+
+  it('severity 由 severityFactor 还原，error 不再一律降级为 warning', () => {
+    expect(entriesFor(MODULES, 'error').every((e) => e.severity === 'error')).toBe(true);
+    expect(entriesFor(MODULES, 'warning').every((e) => e.severity === 'warning')).toBe(true);
+    expect(entriesFor(MODULES, 'info').every((e) => e.severity === 'info')).toBe(true);
+  });
+
+  it('已处理动作不落盘', () => {
+    const dashboard = buildTechDebtDashboard({
+      projectId: 'proj-1',
+      issues: [{ id: 'i0', severity: 'error', category: 'performance', file: MODULES[0] }],
+      moduleHotness: [],
+    });
+    dashboard.actionList[0].status = 'repaid';
+    expect(normalizeTechDebtSource(dashboard)).toHaveLength(0);
   });
 });

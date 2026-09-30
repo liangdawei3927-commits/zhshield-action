@@ -2,6 +2,7 @@ import { MetricsCollector } from '../../metrics/metrics-collector';
 import type { CounterMetric, GaugeMetric, HistogramMetric } from '../../metrics/metrics-collector';
 import type { ConflictResolution } from '../sync-conflict';
 
+/** SOP 缓存指标快照：按计数器/瞬时值/直方图三类归集的原始指标数组 */
 export interface SopCacheMetricsSnapshot {
   counters: CounterMetric[];
   gauges: GaugeMetric[];

@@ -12,6 +12,7 @@ import {
   runPerformanceInWorker,
 } from './pipeline-host';
 
+/** 任务类型：各引擎检查域（巡检/安全/垃圾/性能/门禁/重构） */
 export type TaskKind =
   | 'pipeline'
   | 'security'
@@ -22,8 +23,10 @@ export type TaskKind =
   | 'guard'
   | 'refactor';
 
+/** 任务状态机取值：排队 → 运行 → 完成/失败/取消 */
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
+/** 任务信息（广播给渲染进程的任务列表条目）：状态、进度、时间戳与结果/错误 */
 export interface TaskInfo {
   id: string;
   kind: TaskKind;

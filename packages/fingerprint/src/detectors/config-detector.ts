@@ -31,7 +31,15 @@ export class ConfigDetector implements Detector {
     for (const rel of walkFiles(projectPath)) {
       const name = rel.slice(rel.lastIndexOf('/') + 1);
       if (WORKSPACE_FILES.has(name)) {
-        signals.push(makeSignal(KIND, 'config:workspace', rel, this.weight, {}));
+        signals.push(
+          makeSignal({
+            kind: KIND,
+            ruleId: 'config:workspace',
+            file: rel,
+            weight: this.weight,
+            payload: {},
+          }),
+        );
       }
       for (const rule of CONFIG_RULES) {
         if (!(rule.match(name) || rule.match(rel))) continue;
@@ -39,7 +47,15 @@ export class ConfigDetector implements Detector {
         if (rule.framework !== undefined) payload.framework = rule.framework;
         if (rule.environment !== undefined) payload.environment = rule.environment;
         if (rule.language !== undefined) payload.language = rule.language;
-        signals.push(makeSignal(KIND, rule.ruleId, rel, this.weight, payload));
+        signals.push(
+          makeSignal({
+            kind: KIND,
+            ruleId: rule.ruleId,
+            file: rel,
+            weight: this.weight,
+            payload,
+          }),
+        );
       }
     }
     return signals.sort((a, b) =>

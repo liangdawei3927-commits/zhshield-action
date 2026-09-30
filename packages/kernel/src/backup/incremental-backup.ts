@@ -6,6 +6,7 @@ import { hashFile } from './utils';
 import { safeJoinReal } from '@zh/shared';
 import { LocalBackupPruner } from './local-backup-pruner';
 
+/** 清单中的单文件记录：相对路径 + 内容哈希，用于增量比对与跳过未变更文件 */
 export interface BackupFileEntry {
   relativePath: string;
   hash: string;
@@ -13,6 +14,10 @@ export interface BackupFileEntry {
   backedUpAt: string;
 }
 
+/**
+ * 备份清单：描述某次备份覆盖的文件集合与时间信息。
+ * lastBackupAt 支撑增量判定，fullBackupAt 记录最近一次全量备份。
+ */
 export interface BackupManifest {
   version: string;
   sourceDir: string;
@@ -21,6 +26,7 @@ export interface BackupManifest {
   files: BackupFileEntry[];
 }
 
+/** 单次备份执行结果：区分全量/增量，报告处理与跳过的文件数、错误数及产物位置 */
 export interface BackupResult {
   fullBackup: boolean;
   filesBackedUp: number;
@@ -32,6 +38,10 @@ export interface BackupResult {
   timestamp: string;
 }
 
+/**
+ * 备份可选参数：全部字段缺省时使用模块内 DEFAULT_INCLUDE / DEFAULT_EXCLUDE 等默认值。
+ * includePatterns 与 excludePatterns 同时生效，exclude 优先排除。
+ */
 export interface BackupOptions {
   sourceDir?: string;
   backupRoot?: string;
@@ -48,6 +58,24 @@ const MANIFEST_VERSION = '1.0';
 
 /** 递归扫描深度上限：防止病态深层目录树导致栈溢出 */
 const MAX_WALK_DEPTH = 64;
+
+/** BackupManager.copyChangedFiles 参数对象 */
+interface CopyChangedFilesParams {
+  files: string[];
+  manifest: BackupManifest | null;
+  isFullBackup: boolean;
+  backupDir: string;
+  timestamp: string;
+}
+
+/** BackupManager.copyOneFile 参数对象 */
+interface CopyOneFileParams {
+  filePath: string;
+  manifest: BackupManifest | null;
+  isFullBackup: boolean;
+  backupDir: string;
+  timestamp: string;
+}
 
 export class BackupManager {
   private sourceDir: string;
@@ -75,7 +103,7 @@ export class BackupManager {
 
     const isFullBackup = !manifest || manifest.files.length === 0;
     const { fileEntries, filesBackedUp, filesSkipped, errors, totalSize } =
-      await this.copyChangedFiles(files, manifest, isFullBackup, backupDir, timestamp);
+      await this.copyChangedFiles({ files, manifest, isFullBackup, backupDir, timestamp });
     await this.writeManifest(backupDir, timestamp, isFullBackup, fileEntries);
     await this.updateManifestFile(fileEntries, timestamp, isFullBackup);
     await this.pruneOldBackups();
@@ -93,19 +121,14 @@ export class BackupManager {
   }
 
   /** 增量复制变更文件：hash 相同跳过，其余复制并记录条目 */
-  private async copyChangedFiles(
-    files: string[],
-    manifest: BackupManifest | null,
-    isFullBackup: boolean,
-    backupDir: string,
-    timestamp: string,
-  ): Promise<{
+  private async copyChangedFiles(params: CopyChangedFilesParams): Promise<{
     fileEntries: BackupFileEntry[];
     filesBackedUp: number;
     filesSkipped: number;
     errors: number;
     totalSize: number;
   }> {
+    const { files, manifest, isFullBackup, backupDir, timestamp } = params;
     let filesBackedUp = 0;
     let filesSkipped = 0;
     let errors = 0;
@@ -113,7 +136,7 @@ export class BackupManager {
     const fileEntries: BackupFileEntry[] = [];
 
     for (const filePath of files) {
-      const result = await this.copyOneFile(filePath, manifest, isFullBackup, backupDir, timestamp);
+      const result = await this.copyOneFile({ filePath, manifest, isFullBackup, backupDir, timestamp });
       if (result === null) {
         errors++;
         continue;
@@ -131,13 +154,11 @@ export class BackupManager {
   }
 
   /** 复制单个文件到备份目录；hash 相同返回 skipped 标记，复制失败返回 null */
-  private async copyOneFile(
-    filePath: string,
-    manifest: BackupManifest | null,
-    isFullBackup: boolean,
-    backupDir: string,
-    timestamp: string,
-  ): Promise<{ entry: BackupFileEntry; skipped: boolean } | null> {
+  private async copyOneFile(params: CopyOneFileParams): Promise<{
+    entry: BackupFileEntry;
+    skipped: boolean;
+  } | null> {
+    const { filePath, manifest, isFullBackup, backupDir, timestamp } = params;
     const relativePath = path.relative(this.sourceDir, filePath);
     const stat = await fs.stat(filePath);
     const hash = await hashFile(filePath);
@@ -175,21 +196,31 @@ export class BackupManager {
 
     let restored = 0;
     for (const entry of manifest.files) {
-      try {
-        const sourcePath = safeJoinReal(latestBackup, entry.relativePath);
-        const targetPath = safeJoinReal(restoreTo, entry.relativePath);
-        // perf rule false positive: arg depends on loop var via dataflow
-        // eslint-disable-next-line perf/perf-no-serial-await
-        await fs.mkdir(path.dirname(targetPath), { recursive: true });
-        // perf rule false positive: arg depends on loop var via dataflow
-        // eslint-disable-next-line perf/perf-no-serial-await
-        await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
+      if (await this.restoreOneFile(latestBackup, restoreTo, entry.relativePath)) {
         restored++;
-      } catch {
-        continue;
       }
     }
     return restored;
+  }
+
+  private async restoreOneFile(
+    backupDir: string,
+    restoreTo: string,
+    relativePath: string,
+  ): Promise<boolean> {
+    try {
+      const sourcePath = safeJoinReal(backupDir, relativePath);
+      const targetPath = safeJoinReal(restoreTo, relativePath);
+      // perf rule false positive: arg depends on loop var via dataflow
+      // eslint-disable-next-line perf/perf-no-serial-await
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      // perf rule false positive: arg depends on loop var via dataflow
+      // eslint-disable-next-line perf/perf-no-serial-await
+      await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // ─── 查询 ─────────────────────────────────────────────
@@ -228,27 +259,32 @@ export class BackupManager {
 
   private async walkFiles(dir: string, results: string[], depth = 0): Promise<void> {
     if (depth > MAX_WALK_DEPTH) return;
-    let entries: Dirent[];
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    const entries = await readDirSafe(dir);
+    if (entries === null) return;
 
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(this.sourceDir, fullPath);
-      if (this.excludePatterns.some((p) => p.test(relativePath))) continue;
+      await this.walkEntry(dir, entry, results, depth);
+    }
+  }
 
-      if (entry.isDirectory()) {
-        // perf rule false positive: arg depends on loop var via dataflow
-        // eslint-disable-next-line perf/perf-no-serial-await
-        await this.walkFiles(fullPath, results, depth + 1);
-        continue;
-      }
-      if (entry.isFile() && this.includePatterns.some((p) => p.test(entry.name))) {
-        results.push(fullPath);
-      }
+  private async walkEntry(
+    dir: string,
+    entry: Dirent,
+    results: string[],
+    depth: number,
+  ): Promise<void> {
+    const fullPath = path.join(dir, entry.name);
+    const relativePath = path.relative(this.sourceDir, fullPath);
+    if (this.excludePatterns.some((p) => p.test(relativePath))) return;
+
+    if (entry.isDirectory()) {
+      // perf rule false positive: arg depends on loop var via dataflow
+      // eslint-disable-next-line perf/perf-no-serial-await
+      await this.walkFiles(fullPath, results, depth + 1);
+      return;
+    }
+    if (entry.isFile() && this.includePatterns.some((p) => p.test(entry.name))) {
+      results.push(fullPath);
     }
   }
 
@@ -321,5 +357,13 @@ export class BackupManager {
     if (failed.length > 0) {
       console.warn('[incremental-backup] 清理旧备份失败:', failed.join(', '));
     }
+  }
+}
+
+async function readDirSafe(dir: string): Promise<Dirent[] | null> {
+  try {
+    return await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
   }
 }

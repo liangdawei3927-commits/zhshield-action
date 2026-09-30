@@ -27,6 +27,7 @@ import {
   getCachedProfileProjectPath,
   getDefaultOrgId,
   cloudResolveTools,
+  type CachedProjectFeature,
   type ScopeProfileLike,
 } from '../ipc-context';
 import { isToolInScope, isToolLanguagesMatch } from '@zh/shared';
@@ -45,11 +46,11 @@ import { reconcileRulesWithCloud, type ResolveRulesOutcome } from './resolve-rec
 
 export type { ResolveRulesOutcome };
 
-/** 工具规则按画像同步（sync:rules IPC 与画像漂移触发共用） */
-export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
-  const feature = getCachedProfile() ?? undefined;
-  const ruleSync = wisdomBrainSync.getRuleSync();
-  // R3-b：云端下发 languages 元数据（toolId → languages），claim 时写入账本
+/** R3-b：云端下发 languages 元数据（toolId → languages），claim 时写入账本 */
+async function resolveCloudToolIds(
+  feature: CachedProjectFeature | undefined,
+  ruleSync: ReturnType<typeof wisdomBrainSync.getRuleSync>,
+): Promise<LanguagesByTool> {
   let languagesByTool: LanguagesByTool = {};
   try {
     const orgId = await getDefaultOrgId();
@@ -68,30 +69,39 @@ export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
     );
     ruleSync.setRemoteToolIds(null);
   }
-  // R2 领取记账（06 §3.3「领取」+ §3.4 ①）：在 syncAllRules 之前记账，
-  // 使能力被项目占用（下次同步续期）；唤醒必须先于 syncAllRules，
-  // 否则 reclaiming 工具已被运行层过滤踢出清单、永远不会被重新同步。
+  return languagesByTool;
+}
+
+/**
+ * R2 领取记账（06 §3.3「领取」+ §3.4 ①）：在 syncAllRules 之前记账，
+ * 使能力被项目占用（下次同步续期）；唤醒必须先于 syncAllRules，
+ * 否则 reclaiming 工具已被运行层过滤踢出清单、永远不会被重新同步。
+ */
+async function claimToolRefsForProfile(
+  feature: CachedProjectFeature | undefined,
+  languagesByTool: LanguagesByTool,
+): Promise<void> {
   const projectPath = getCachedProfileProjectPath();
-  if (projectPath) {
-    // 领取用「未过滤」清单（含 reclaiming）：唤醒必须先于运行层过滤，
-    // 否则 7 天窗口内重加同栈项目时 reclaiming 能力永远进不了 claim 列表
-    // （getConfiguredToolIds 已剔 reclaiming，不能用于领取）。
-    const inScope = wisdomBrainSync
-      .getRuleSync()
-      .getUnfilteredToolIds()
-      .filter((toolId) => isToolInScope(toolId, feature));
-    // R3c：claim 前按 languagesByTool + 项目主语言投影，语言不匹配的能力不进入 refs
-    const claimable = inScope.filter((toolId) =>
-      isToolLanguagesMatch(languagesByTool[toolId], { language: feature?.language }),
-    );
-    const refs = await loadCapabilityRefs();
-    await saveCapabilityRefs(
-      claimToolRefs(refs, deriveProjectId(projectPath), claimable, languagesByTool),
-    );
-  }
-  const results = await wisdomBrainSync.syncAllRules(feature);
-  // R3-a 到期物理删除对账（06 §4.3 + §2.4 触发链）：kernel 扫描并物理删除过期
-  // reclaiming 工具，返回本次删除列表 → 账本标记 reclaimed 终态。
+  if (!projectPath) return;
+  // 领取用「未过滤」清单（含 reclaiming）：唤醒必须先于运行层过滤，
+  // 否则 7 天窗口内重加同栈项目时 reclaiming 能力永远进不了 claim 列表
+  // （getConfiguredToolIds 已剔 reclaiming，不能用于领取）。
+  const inScope = wisdomBrainSync
+    .getRuleSync()
+    .getUnfilteredToolIds()
+    .filter((toolId) => isToolInScope(toolId, feature));
+  // R3c：claim 前按 languagesByTool + 项目主语言投影，语言不匹配的能力不进入 refs
+  const claimable = inScope.filter((toolId) =>
+    isToolLanguagesMatch(languagesByTool[toolId], { language: feature?.language }),
+  );
+  const refs = await loadCapabilityRefs();
+  await saveCapabilityRefs(
+    claimToolRefs(refs, deriveProjectId(projectPath), claimable, languagesByTool),
+  );
+}
+
+/** R3-a 到期物理删除对账（06 §4.3 + §2.4 触发链）：kernel 扫描并物理删除过期 reclaiming 工具 */
+async function reconcileExpiredToolRefs(): Promise<void> {
   // best-effort：扫描/标记失败绝不阻断同步响应。
   try {
     const deleted = await wisdomBrainSync.scanAndRemoveExpired();
@@ -104,7 +114,16 @@ export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
       err instanceof Error ? err.message : String(err),
     );
   }
-  // ── SOP 模块同步链（与 toolrule 对称：claim → syncForProject → 到期回收） ──
+}
+
+/** 工具规则按画像同步（sync:rules IPC 与画像漂移触发共用） */
+export async function syncToolRulesForProfile(): Promise<ToolRuleSyncResult[]> {
+  const feature = getCachedProfile() ?? undefined;
+  const ruleSync = wisdomBrainSync.getRuleSync();
+  const languagesByTool = await resolveCloudToolIds(feature, ruleSync);
+  await claimToolRefsForProfile(feature, languagesByTool);
+  const results = await wisdomBrainSync.syncAllRules(feature);
+  await reconcileExpiredToolRefs();
   await syncSopModulesForProfile(feature);
   return results;
 }
@@ -127,45 +146,46 @@ async function scanAndRemoveExpiredSopModules(): Promise<string[]> {
   return removed;
 }
 
-export async function syncSopModulesForProfile(
-  feature?: { framework?: string; language?: string; features: string[] } | null,
-): Promise<string[]> {
-  const profile = feature ?? undefined;
-
-  // R2 领取记账（SOP 对称）：claim 必须先于 syncForProject（唤醒语义，
-  // 对照 toolrule 的 R2 注释：唤醒必须先于运行层过滤，否则 reclaiming 能力
-  // 永远进不了 claim 列表）。
+/**
+ * R2 领取记账（SOP 对称）：claim 必须先于 syncForProject（唤醒语义，
+ * 对照 toolrule 的 R2 注释：唤醒必须先于运行层过滤，否则 reclaiming 能力
+ * 永远进不了 claim 列表）。
+ */
+async function claimSopModulesForProfile(
+  profile: { framework?: string; language?: string; features: string[] } | undefined,
+): Promise<void> {
   const projectPath = getCachedProfileProjectPath();
-  if (projectPath) {
-    const needed = profile ? sopCache.getNeededModules(profile) : [];
-    if (needed.length > 0) {
-      try {
-        const refs = await loadCapabilityRefs();
-        await saveCapabilityRefs(claimSopModuleRefs(refs, deriveProjectId(projectPath), needed));
-      } catch (err) {
-        console.warn(
-          '[sync:SOP:R2] SOP 模块领取记账失败（best-effort 跳过）:',
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    }
+  if (!projectPath) return;
+  const needed = profile ? sopCache.getNeededModules(profile) : [];
+  if (needed.length === 0) return;
+  try {
+    const refs = await loadCapabilityRefs();
+    await saveCapabilityRefs(claimSopModuleRefs(refs, deriveProjectId(projectPath), needed));
+  } catch (err) {
+    console.warn(
+      '[sync:SOP:R2] SOP 模块领取记账失败（best-effort 跳过）:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
+}
 
-  // 按项目特征下载 SOP 模块；feature 为 undefined 时跳过下载（防 undefined.targets 崩溃），
-  // 仅做回收扫描。
-  if (profile !== undefined) {
-    try {
-      await sopCache.syncForProject(profile);
-    } catch (err) {
-      console.warn(
-        '[sync:SOP] SOP 模块下载失败（best-effort 跳过）:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
+/** 按项目特征下载 SOP 模块；feature 为 undefined 时跳过下载（防 undefined.targets 崩溃），仅做回收扫描 */
+async function downloadSopModulesForProfile(
+  profile: { framework?: string; language?: string; features: string[] } | undefined,
+): Promise<void> {
+  if (profile === undefined) return;
+  try {
+    await sopCache.syncForProject(profile);
+  } catch (err) {
+    console.warn(
+      '[sync:SOP] SOP 模块下载失败（best-effort 跳过）:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
+}
 
-  // R3-a 到期回收（对齐 toolrule 的 R3-a 注释语义）：扫描 reclaiming 的 sop-module 条目，
-  // 删除过期模块 → 账本标记 reclaimed 终态。
+/** R3-a 到期回收（对齐 toolrule 的 R3-a 注释语义）：扫描 reclaiming 的 sop-module 条目，删除过期模块 → 账本标记 reclaimed 终态 */
+async function reconcileExpiredSopModules(): Promise<void> {
   // best-effort：扫描/标记失败绝不阻断同步响应。
   try {
     const removed = await scanAndRemoveExpiredSopModules();
@@ -178,8 +198,15 @@ export async function syncSopModulesForProfile(
       err instanceof Error ? err.message : String(err),
     );
   }
+}
 
-  // 返回本次同步的模块名
+export async function syncSopModulesForProfile(
+  feature?: { framework?: string; language?: string; features: string[] } | null,
+): Promise<string[]> {
+  const profile = feature ?? undefined;
+  await claimSopModulesForProfile(profile);
+  await downloadSopModulesForProfile(profile);
+  await reconcileExpiredSopModules();
   return profile !== undefined ? sopCache.getNeededModules(profile) : [];
 }
 

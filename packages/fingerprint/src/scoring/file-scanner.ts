@@ -44,12 +44,19 @@ const DEFAULT_IGNORE_DIRS = new Set([
 const DEFAULT_MAX_DEPTH = 12;
 const DEFAULT_MAX_FILES = 20000;
 
+/** 扫描选项：深度上限、文件数上限与额外忽略目录（缺省取内置默认值） */
 export interface ScanOptions {
   maxDepth?: number;
   maxFiles?: number;
   ignoreDirs?: string[];
 }
 
+/**
+ * 递归扫描项目目录，产出文件清单与快速查找集合（同步实现，过滤构建产物与依赖目录）。
+ * @param projectRoot 项目根绝对路径
+ * @param opts 深度/文件数上限与额外忽略目录，缺省用内置默认值
+ * @returns 扫描结果（configCache 为空 Map，由 readConfig 按需填充）
+ */
 export function scanProject(projectRoot: string, opts: ScanOptions = {}): ScanResult {
   const maxDepth = opts.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxFiles = opts.maxFiles ?? DEFAULT_MAX_FILES;

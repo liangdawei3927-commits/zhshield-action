@@ -12,14 +12,44 @@ import { matchesExcludePattern } from './utils';
 /** GitHub git blob API 单文件大小上限：超过则跳过（避免内存/请求双爆） */
 const MAX_BLOB_BYTES = 100 * 1024 * 1024;
 
-/** 递归收集目录树条目（跳过排除项与中止信号） */
-export async function collectTreeItems(
+/** collectTreeItems 参数对象 */
+export interface CollectTreeItemsParams {
+  ctx: GitHubApiContext;
+  dir: string;
+  prefix: string;
+  excludePatterns: string[];
+  tree: GitHubTreeItem[];
+}
+
+/** 收集单个文件条目的 blob 内容（跳过 >100MB 超大文件并告警） */
+async function collectBlobEntry(
   ctx: GitHubApiContext,
-  dir: string,
-  prefix: string,
-  excludePatterns: string[],
+  fullPath: string,
+  relativePath: string,
   tree: GitHubTreeItem[],
 ): Promise<void> {
+  if (ctx.abortSignal?.aborted) return;
+  // perf rule false positive: arg depends on loop var via dataflow
+  // eslint-disable-next-line perf/perf-no-serial-await
+  const stat = await fs.stat(fullPath);
+  if (stat.size > MAX_BLOB_BYTES) {
+    console.warn(`[github-backup] 跳过超大文件（>100MB）: ${relativePath}`);
+    return;
+  }
+  // perf rule false positive: arg depends on loop var via dataflow
+  // eslint-disable-next-line perf/perf-no-serial-await
+  const content = await fs.readFile(fullPath, 'base64');
+  tree.push({
+    path: relativePath,
+    mode: '100644',
+    type: 'blob',
+    content,
+  });
+}
+
+/** 递归收集目录树条目（跳过排除项与中止信号） */
+export async function collectTreeItems(params: CollectTreeItemsParams): Promise<void> {
+  const { ctx, dir, prefix, excludePatterns, tree } = params;
   if (ctx.abortSignal?.aborted) return;
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
@@ -31,24 +61,11 @@ export async function collectTreeItems(
     if (entry.isDirectory()) {
       // perf rule false positive: arg depends on loop var via dataflow
       // eslint-disable-next-line perf/perf-no-serial-await
-      await collectTreeItems(ctx, fullPath, relativePath, excludePatterns, tree);
+      await collectTreeItems({ ctx, dir: fullPath, prefix: relativePath, excludePatterns, tree });
     } else if (entry.isFile()) {
       // perf rule false positive: arg depends on loop var via dataflow
       // eslint-disable-next-line perf/perf-no-serial-await
-      const stat = await fs.stat(fullPath);
-      if (stat.size > MAX_BLOB_BYTES) {
-        console.warn(`[github-backup] 跳过超大文件（>100MB）: ${relativePath}`);
-        continue;
-      }
-      // perf rule false positive: arg depends on loop var via dataflow
-      // eslint-disable-next-line perf/perf-no-serial-await
-      const content = await fs.readFile(fullPath, 'base64');
-      tree.push({
-        path: relativePath,
-        mode: '100644',
-        type: 'blob',
-        content,
-      });
+      await collectBlobEntry(ctx, fullPath, relativePath, tree);
     }
   }
 }

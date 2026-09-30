@@ -1,9 +1,17 @@
+/**
+ * 数据清理阈值配置。
+ * maxEntries 为数量上限，maxAgeDays 为时间上限，keepMinimum 为无论如何都要保留的最少条目数。
+ */
 export interface CleanupConfig {
   maxEntries: number;
   maxAgeDays: number;
   keepMinimum: number;
 }
 
+/**
+ * 清理结果：裁剪前后条目数、移除/保留计数与逐条错误原因。
+ * kept 按保留顺序给出，供调用方回写或裁剪存储。
+ */
 export interface CleanupResult<T = unknown> {
   totalBefore: number;
   totalAfter: number;

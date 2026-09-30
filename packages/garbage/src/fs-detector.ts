@@ -9,136 +9,44 @@
  * 二者在 report.ts 合并为同一份 GarbageScanReport。
  *
  * 迁自 @zh/security/garbage-scanner.ts（T5）：垃圾 ≠ 安全，安全中心不再产出垃圾清单。
+ * 目录遍历骨架与三类产项已收敛到 @zh/shared 的 scanGarbageDir；本文件只保留本域
+ * 特有的忽略口径（IGNORE_DIRS / MAX_DEPTH / REGENERABLE_DIRS）与体积统计口径。
  */
-import { randomUUID } from 'node:crypto';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { GarbageItem } from '@zh/shared';
-import { safeJoin } from '@zh/shared';
+import { dirSizeOf, scanGarbageDir } from '@zh/shared';
+import { isJunkFileName, REGENERABLE_DIRS } from './junk-rules';
 
-const IGNORE_DIRS = new Set(['node_modules', '.git']);
-
-/** 可再生成的构建产物根目录（仅项目根级识别，嵌套同名目录不视为垃圾） */
-const BUILD_ARTIFACT_DIRS = new Set([
-  'dist',
-  'build',
-  '.next',
-  'coverage',
-  '.turbo',
-  '.cache',
-  'release',
-  'dist-electron',
-]);
-
-const JUNK_NAMES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
-const JUNK_EXTS = ['.log', '.tmp', '.bak', '.swp', '.swo'];
-const JUNK_PREFIXES = ['npm-debug.log', 'yarn-error.log', 'pnpm-debug.log'];
-const EMPTY_FILE_PATTERN = /^(index|main|app)\./i;
+/**
+ * 扫描一律跳过的目录。
+ *
+ * `.zhshield` 是本域自身状态目录（含用户可恢复的回收站）：纳入扫描会让清理
+ * 把自己的回收站重新计成垃圾，点一次清理数字反而上升（回归锁 clean-must-not-inflate-count）。
+ * `.turbo` 是机器缓存、永非用户源码：进本集合后任意层级都不展开，其 turbo-build.log
+ * 不再被计成垃圾（回归锁 build-must-not-grow-count）。根级 `.turbo` 的清理能力
+ * 由 REGENERABLE_DIRS 在 depth===0 处保留。
+ */
+const IGNORE_DIRS = new Set(['node_modules', '.git', '.zhshield', '.turbo']);
 
 const MAX_DEPTH = 14;
 
 /** 扫描文件系统级垃圾：构建产物 / 垃圾文件 / 空文件 */
 export async function detectFsGarbage(projectPath: string): Promise<GarbageItem[]> {
-  const items: GarbageItem[] = [];
-  scanDirectory(projectPath, projectPath, items);
-  return items;
-}
-
-function scanDirectory(dir: string, projectPath: string, items: GarbageItem[], depth = 0): void {
-  if (depth > MAX_DEPTH) return;
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const fullPath = safeJoin(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (depth === 0 && BUILD_ARTIFACT_DIRS.has(entry.name)) {
-        items.push({
-          id: randomUUID(),
-          type: 'build-artifact',
-          path: path.relative(projectPath, fullPath),
-          size: dirSize(fullPath),
-          reason: '可再生成的构建产物目录',
-        });
-        continue;
-      }
-      if (!IGNORE_DIRS.has(entry.name)) scanDirectory(fullPath, projectPath, items, depth + 1);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    collectFileItem(entry, fullPath, projectPath, items);
-  }
+  return scanGarbageDir(projectPath, {
+    ignoreDirs: IGNORE_DIRS,
+    buildArtifactDirs: REGENERABLE_DIRS,
+    isJunkFileName,
+    measureDirSize: dirSize,
+  });
 }
 
 /**
  * 递归统计目录体积。
  *
- * 与 scanDirectory 保持同一条忽略口径（node_modules / .git）：
+ * 与遍历保持同一条忽略口径（见 IGNORE_DIRS）：
  *   · 构建产物里嵌入 node_modules 时，递归进去既慢又可能踩符号链接环；
  *   · 代价是这类嵌套 node_modules 不计入体积 —— 属**少报**（承诺可释放空间偏小），
  *     不会出现"承诺得多、实际释放得少"的虚报。
  */
-function dirSize(dir: string, depth = 0): number {
-  if (depth > MAX_DEPTH) return 0;
-  let total = 0;
-  try {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
-      const full = safeJoin(dir, entry.name);
-      if (entry.isDirectory()) {
-        total += dirSize(full, depth + 1);
-      } else if (entry.isFile()) {
-        total += fs.statSync(full).size;
-      }
-    }
-  } catch {
-    return 0;
-  }
-  return total;
-}
-
-function collectFileItem(
-  entry: fs.Dirent,
-  fullPath: string,
-  projectPath: string,
-  items: GarbageItem[],
-): void {
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(fullPath);
-  } catch {
-    return;
-  }
-  if (isJunkFile(entry.name)) {
-    items.push({
-      id: randomUUID(),
-      type: 'unused-file',
-      path: path.relative(projectPath, fullPath),
-      size: stat.size,
-      reason: `Unwanted file: ${entry.name}`,
-    });
-    return;
-  }
-  // 空文件（非常见入口）视为垃圾候选
-  if (stat.size === 0 && !EMPTY_FILE_PATTERN.test(entry.name)) {
-    items.push({
-      id: randomUUID(),
-      type: 'unused-file',
-      path: path.relative(projectPath, fullPath),
-      size: 0,
-      reason: `Empty file: ${entry.name}`,
-    });
-  }
-}
-
-/** 判断文件名是否为垃圾文件（系统残留 / 临时文件 / 备份文件） */
-function isJunkFile(name: string): boolean {
-  if (JUNK_NAMES.has(name)) return true;
-  if (JUNK_EXTS.some((ext) => name.endsWith(ext))) return true;
-  if (JUNK_PREFIXES.some((p) => name.startsWith(p))) return true;
-  if (name.endsWith('~')) return true;
-  return false;
+function dirSize(dir: string): number {
+  return dirSizeOf(dir, { ignoreNames: IGNORE_DIRS, maxDepth: MAX_DEPTH });
 }

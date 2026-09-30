@@ -7,50 +7,58 @@ import { t } from '@zh/i18n';
 import type { PipelineReport } from '@zh/pipeline';
 import type { RuleEngineReport } from '@zh/kernel';
 
-/** 从规则引擎报告抽取失败项，便于前端展示 */
-export function collectFailedItems(
+/** 规则引擎报告中可被抽取的最小形状（evaluations 可选） */
+type EvaluationsReport = {
+  evaluations?: Array<{
+    rule?: { id?: string; name?: string };
+    status?: string;
+    message?: string;
+  }>;
+} | null;
+
+/** 抽取条目：按状态谓词筛选，并统一构造 阶段/id/名称/消息 四个字段 */
+function collectByStatus(
   stage: 'guard' | 'inspect',
-  report: {
-    evaluations?: Array<{
-      rule?: { id?: string; name?: string };
-      status?: string;
-      message?: string;
-    }>;
-  } | null,
+  report: EvaluationsReport,
+  match: (status: string | undefined) => boolean,
+  fallbackMessage: (status: string | undefined) => string,
 ): Array<{ stage: string; id: string; name: string; message: string }> {
   if (!report?.evaluations) return [];
   return report.evaluations
-    .filter((ev) => ev.status === 'failed' || ev.status === 'error')
+    .filter((ev) => match(ev.status))
     .map((ev) => ({
       stage,
       id: ev.rule?.id ?? 'unknown',
       name: ev.rule?.name ?? ev.rule?.id ?? t('pipeline.report.unknownRule'),
-      message:
-        ev.message ??
-        (ev.status === 'error' ? t('pipeline.report.executionError') : t('pipeline.report.failed')),
+      message: ev.message ?? fallbackMessage(ev.status),
     }));
+}
+
+/** 从规则引擎报告抽取失败项，便于前端展示 */
+export function collectFailedItems(
+  stage: 'guard' | 'inspect',
+  report: EvaluationsReport,
+): Array<{ stage: string; id: string; name: string; message: string }> {
+  return collectByStatus(
+    stage,
+    report,
+    (status) => status === 'failed' || status === 'error',
+    (status) =>
+      status === 'error' ? t('pipeline.report.executionError') : t('pipeline.report.failed'),
+  );
 }
 
 /** 从规则引擎报告抽取跳过项（携带真实跳过原因，如 scope 裁剪 / 前置缺失 / 工具名错配），供前端展示 */
 export function collectSkippedItems(
   stage: 'guard' | 'inspect',
-  report: {
-    evaluations?: Array<{
-      rule?: { id?: string; name?: string };
-      status?: string;
-      message?: string;
-    }>;
-  } | null,
+  report: EvaluationsReport,
 ): Array<{ stage: string; id: string; name: string; message: string }> {
-  if (!report?.evaluations) return [];
-  return report.evaluations
-    .filter((ev) => ev.status === 'skipped')
-    .map((ev) => ({
-      stage,
-      id: ev.rule?.id ?? 'unknown',
-      name: ev.rule?.name ?? ev.rule?.id ?? t('pipeline.report.unknownRule'),
-      message: ev.message ?? t('pipeline.report.skipped'),
-    }));
+  return collectByStatus(
+    stage,
+    report,
+    (status) => status === 'skipped',
+    () => t('pipeline.report.skipped'),
+  );
 }
 
 export function attachSummary(
@@ -107,6 +115,7 @@ export function attachSummary(
   return report as PipelineReport & { summary: Record<string, unknown> };
 }
 
+/** 性能报告的问题条目：规则、严重级别、位置、修复建议与是否可自动修复 */
 export interface PerformanceReportIssue {
   id: string;
   ruleId: string;

@@ -21,6 +21,7 @@ export interface GarbageCleanInput {
   reason?: string;
 }
 
+/** 移入回收站的结果：批次 ID、成功清理的条目、释放字节数与失败原因列表 */
 export interface GarbageCleanResult {
   batchId: string;
   cleaned: GarbageItem[];
@@ -28,6 +29,7 @@ export interface GarbageCleanResult {
   failed: string[];
 }
 
+/** 回收站恢复结果：恢复条数、恢复字节数与失败原因列表 */
 export interface GarbageRestoreResult {
   restored: number;
   restoredBytes: number;

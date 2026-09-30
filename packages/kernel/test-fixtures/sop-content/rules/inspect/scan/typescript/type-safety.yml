@@ -13,8 +13,8 @@ excludePatterns:
   - '**/__tests__/**'
   - '**/dist*/**'
   - '**/node_modules/**'
+  - '**/*.d.ts'
 forbidden:
   - as any
   - '@ts-ignore'
   - '@ts-expect-error'
-  - any

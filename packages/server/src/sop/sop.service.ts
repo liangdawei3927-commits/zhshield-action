@@ -8,6 +8,7 @@ import {
   CompressionFormat,
   SopSigner,
   EventBus,
+  computeRuleContentSha,
 } from '@zh/kernel';
 import type { SopRule, SopVersion, SopDiff, SopRuleFilter, SignedSopPackage } from '@zh/kernel';
 import { SopDiffCalculator } from './sop-diff-calculator';
@@ -115,15 +116,50 @@ export class SopService {
     const local = await this.cacheManager.getLocalVersion();
     if (local) return local;
 
-    // 默认版本
+    // 无本地版本文件时从规则内容派生版本号（对齐 tool-rule-store.deriveVersion 模式）：
+    // 规则内容（含校准/阈值修订）变化 → contentHash 变化 → 版本号变化，
+    // 客户端 compareVersions 才能识别出并重新拉取，否则 desktop 永远 already_latest。
+    const rules = this.registry.getAll();
+    if (rules.length === 0) {
+      // 空规则集：回退默认版本
+      return {
+        version: '1.2026.07.28.001',
+        knowledge: '1.2026.07.28',
+        experience: '1.2026.07.28',
+        malware: '1.2026.07.28',
+        publishedAt: new Date('2026-07-28'),
+        hash: '',
+        size: 0,
+      };
+    }
+
+    // 规范序（按 id 排序）聚合各规则内容 SHA256，保证派生版本只随内容变化
+    const canonical = rules
+      .toSorted((a, b) => a.id.localeCompare(b.id))
+      .map((r) => `${r.id}:${computeRuleContentSha(r)}`)
+      .join('\n');
+    const contentHash = crypto.createHash('sha256').update(canonical).digest('hex');
+
+    // 版本日期取规则最大更新时间：升序字符串比较永远判定 remote > local → proceed（增量拉取）
+    const maxUpdatedAt = rules.reduce(
+      (m, r) => (r.updatedAt && r.updatedAt > m ? r.updatedAt : m),
+      new Date(0),
+    );
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ymd = `${pad(maxUpdatedAt.getUTCFullYear())}.${pad(maxUpdatedAt.getUTCMonth() + 1)}.${pad(
+      maxUpdatedAt.getUTCDate(),
+    )}`;
+    // 修订号取内容哈希前 12 位命名的数字段，保证同日期内内容变更也换版本
+    const revision = (parseInt(contentHash.slice(0, 12), 16) % 1000).toString().padStart(3, '0');
+
     return {
-      version: '1.2026.07.28.001',
-      knowledge: '1.2026.07.28',
-      experience: '1.2026.07.28',
-      malware: '1.2026.07.28',
-      publishedAt: new Date('2026-07-28'),
-      hash: '',
-      size: 0,
+      version: `1.${ymd}.${revision}`,
+      knowledge: `1.${ymd}`,
+      experience: `1.${ymd}`,
+      malware: `1.${ymd}`,
+      publishedAt: maxUpdatedAt,
+      hash: contentHash,
+      size: rules.length,
     };
   }
 

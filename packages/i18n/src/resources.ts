@@ -9,9 +9,9 @@ import ko from '../locales/ko.json';
 import ja from '../locales/ja.json';
 
 export const resources: Resource = {
-  'zh-Hans': { translation: zhHans as unknown as ResourceLanguage },
-  'zh-Hant': { translation: zhHant as unknown as ResourceLanguage },
-  en: { translation: en as unknown as ResourceLanguage },
-  ko: { translation: ko as unknown as ResourceLanguage },
-  ja: { translation: ja as unknown as ResourceLanguage },
+  'zh-Hans': { translation: zhHans as ResourceLanguage },
+  'zh-Hant': { translation: zhHant as ResourceLanguage },
+  en: { translation: en as ResourceLanguage },
+  ko: { translation: ko as ResourceLanguage },
+  ja: { translation: ja as ResourceLanguage },
 };

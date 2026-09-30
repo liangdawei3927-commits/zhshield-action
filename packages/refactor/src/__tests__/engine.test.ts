@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'path';
 import { RefactorEngine } from '../engine';
 import { parseFile, computeNestingDepth } from '../ast-helper';
+import { detectOversizedComponent } from '../adapters/scale-detectors';
 import { DEFAULT_CONFIG } from '../types';
 
 const FIXTURES_DIR = path.resolve(__dirname, 'fixtures');
@@ -270,5 +271,69 @@ describe('duplicated-code regression', () => {
       expect(s.context.value).toBe(14);
       expect(s.location.endLine - s.location.line + 1).toBe(14);
     }
+  });
+
+  it('只共享 import 样板与防御性 catch 惯用法的文件不被误报为重复', async () => {
+    const smells = await duplicatedCodeSmells([
+      path.join(FIXTURES_DIR, 'dup-noise-a.fixture.ts'),
+      path.join(FIXTURES_DIR, 'dup-noise-b.fixture.ts'),
+    ]);
+    expect(smells).toBe(0);
+  });
+
+  it('只共享 SVG 图标属性 / ToolAdapter 骨架 / hook 接线收尾样板的文件不被误报为重复', async () => {
+    const smells = await duplicatedCodeSmells([
+      path.join(FIXTURES_DIR, 'dup-boiler-a.fixture.tsx'),
+      path.join(FIXTURES_DIR, 'dup-boiler-b.fixture.tsx'),
+    ]);
+    expect(smells).toBe(0);
+  });
+
+  it('重复区行号归属当前侧：A 侧报 A 的行、消息指 B 侧行，B 侧反之', async () => {
+    const engine = new RefactorEngine({ enabledRules: ['duplicated-code'] });
+    const fileA = path.join(FIXTURES_DIR, 'dup-attrib-a.fixture.ts');
+    const fileB = path.join(FIXTURES_DIR, 'dup-attrib-b.fixture.ts');
+    const report = await engine.analyzeFiles('/tmp', [fileA, fileB]);
+
+    const smells = report.files.flatMap((f) =>
+      f.smells.filter((s) => s.ruleId === 'duplicated-code'),
+    );
+    expect(smells).toHaveLength(2);
+
+    const aSmell = smells.find((s) => s.location.filePath === fileA);
+    const bSmell = smells.find((s) => s.location.filePath === fileB);
+    expect(aSmell).toBeDefined();
+    expect(bSmell).toBeDefined();
+    if (!aSmell || !bSmell) return;
+
+    // A 侧 sharedCalc 在第 4 行起（10 行）；B 侧在第 8 行起
+    expect(aSmell.location.line).toBe(4);
+    expect(aSmell.location.endLine).toBe(13);
+    expect(aSmell.message).toContain('dup-attrib-b.fixture.ts:8');
+
+    expect(bSmell.location.line).toBe(8);
+    expect(bSmell.location.endLine).toBe(17);
+    expect(bSmell.message).toContain('dup-attrib-a.fixture.ts:4');
+  });
+});
+
+describe('detectOversizedComponent (TDD 回归)', () => {
+  it('浅 JSX 组件因 TS 泛型误计 JSX 深度 → 不应触发 oversized-component', () => {
+    const parsed = parseFile(
+      path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'),
+    );
+    const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
+    expect(smells).toEqual([]);
+  });
+});
+
+describe('detectOversizedComponent — 泛型不应当作 JSX 深度 (TDD RED)', () => {
+  it('浅 JSX + TS 泛型组件不应被误判为"组件过大"', () => {
+    const parsed = parseFile(
+      path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'),
+    );
+    const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
+    // 泛型 useState<Set<number>> 不是 JSX，不应把 JSX 深度从 2 虚高到 12
+    expect(smells).toEqual([]);
   });
 });

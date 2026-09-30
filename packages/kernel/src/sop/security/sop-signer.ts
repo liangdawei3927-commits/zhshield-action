@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import type { SopRule, SignedSopAlg, SignedSopPackage } from '../_meta/sop-types';
 
+/** 请求签名入参：method + path + body 构成待签名原文，nonce 与 timestamp 防重放 */
 export interface SignRequestParams {
   method: string;
   path: string;
@@ -10,6 +11,7 @@ export interface SignRequestParams {
   timestamp?: string;
 }
 
+/** 请求验签入参：在签名入参基础上补 signature 与必填 timestamp（缺失即验签失败） */
 export interface VerifyRequestParams {
   method: string;
   path: string;
@@ -315,6 +317,7 @@ export class SopSigner {
 
 // ─── 验证结果 ────────────────────────────────────────────────
 
+/** 验签结果：valid=false 时 reason 必填，说明失败原因（如时间戳过期、签名不匹配） */
 export interface VerifyResult {
   valid: boolean;
   reason?: string;
@@ -322,6 +325,7 @@ export interface VerifyResult {
 
 // ─── 加密数据结构 ────────────────────────────────────────────
 
+/** 加密数据结构：初始化向量、密文、GCM 认证标签与所用算法名（各字段均为 hex/base64 字符串） */
 export interface EncryptedData {
   iv: string;
   encrypted: string;

@@ -53,7 +53,10 @@ const performanceRules = {
   'perf/perf-walk-requires-ignore': 'warn',
   'perf/perf-batch-db-write': 'warn',
 
-  // ── 内置 no-restricted-syntax：三重嵌套循环 + 通用同步 IO ──
+  // ── 内置 no-restricted-syntax：三重嵌套循环。
+  // 同步 IO（readFileSync/writeFileSync）不在此列：冷路径/一次性调用（启动配置、
+  // 迁移、锁文件解析）非热路径，误报率高于收益；热路径同步 IO 已由
+  // perf/perf-no-sync-fs-hotpath 专项规则覆盖。
   'no-restricted-syntax': [
     'warn',
     {
@@ -67,14 +70,6 @@ const performanceRules = {
     {
       selector: 'DoWhileStatement DoWhileStatement DoWhileStatement',
       message: '三重及以上嵌套循环可能导致 O(n³) 或更高复杂度，建议提取子循环为独立函数或改用 Map/Set 查找',
-    },
-    {
-      selector: 'CallExpression[callee.property.name="readFileSync"]',
-      message: '同步文件读取(readFileSync)会阻塞事件循环，建议使用 fs/promises 或 Stream',
-    },
-    {
-      selector: 'CallExpression[callee.property.name="writeFileSync"]',
-      message: '同步文件写入(writeFileSync)会阻塞事件循环，建议使用 fs/promises 或 Stream',
     },
   ],
 };

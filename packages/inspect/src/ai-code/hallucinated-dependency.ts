@@ -79,7 +79,7 @@ function parsePnpmWorkspaceGlobs(yaml: string): string[] {
   if (start < 0) return [];
   const globs: string[] = [];
   for (let i = start + 1; i < lines.length; i++) {
-    const trimmed = lines[i]!.trim();
+    const trimmed = lines[i].trim();
     if (!trimmed.startsWith('-')) break;
     const glob = trimmed.slice(1).trim().replace(QUOTES_RE, '');
     if (glob.length > 0 && !glob.includes('..')) globs.push(glob);
@@ -173,13 +173,19 @@ function groupRefsByPackage(
   for (const [pkg, byFile] of byPkg) {
     const sites: RefSite[] = [];
     for (const [file, lines] of byFile) {
-      for (const line of Array.from(lines, (n) => n).toSorted((a, b) => a - b))
-        sites.push({ file, line });
+      sites.push(...sortedRefSites(file, lines));
     }
     sites.sort((a, b) => (a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file)));
     out.set(pkg, sites);
   }
   return out;
+}
+
+/** 某包在某文件内的引用站点（行号升序） */
+function sortedRefSites(file: string, lines: ReadonlySet<number>): RefSite[] {
+  return Array.from(lines, (n) => n)
+    .toSorted((a, b) => a - b)
+    .map((line) => ({ file, line }));
 }
 
 /** 为幻觉候选构造附 B 交叉验证用的依赖图谱节点（仅消费包名） */
@@ -227,6 +233,28 @@ function closureAt(
   return c;
 }
 
+/** HallucinatedDependencyCheckImpl.resolvePackageSites 的执行参数 */
+interface ResolvePackageSitesParams {
+  projectPath: string;
+  pkg: string;
+  sites: readonly RefSite[];
+  projectLocked: ReadonlySet<string>;
+  projectInstalled: ReadonlySet<string>;
+  declaredCache: Map<string, ReadonlySet<string>>;
+  closureCache: Map<string, { locked: ReadonlySet<string>; installed: ReadonlySet<string> }>;
+  contextCache: Map<string, DependencyContext>;
+}
+
+/** HallucinatedDependencyCheckImpl.collectCandidates 的执行参数 */
+interface CollectCandidatesParams {
+  projectPath: string;
+  projectLocked: ReadonlySet<string>;
+  projectInstalled: ReadonlySet<string>;
+  declaredCache: Map<string, ReadonlySet<string>>;
+  closureCache: Map<string, { locked: ReadonlySet<string>; installed: ReadonlySet<string> }>;
+  contextCache: Map<string, DependencyContext>;
+}
+
 /**
  * 幻觉依赖检测实现：仅本地离线查证，零网络请求。
  * 返回按风险排序的候选：typosquat-similar（抢注最危）→ not-found → unverified-offline。
@@ -242,14 +270,14 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
     const projectPath = project.projectPath;
     const { projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
       this.setupCaches(projectPath);
-    const { candidates, manifestSeen } = this.collectCandidates(
+    const { candidates, manifestSeen } = this.collectCandidates({
       projectPath,
       projectLocked,
       projectInstalled,
       declaredCache,
       closureCache,
       contextCache,
-    );
+    });
     const typosquatById = await this.runTyposquatCheck(projectPath, candidates);
     const findings = this.buildFindings(candidates, manifestSeen, typosquatById);
     this.sortFindings(findings);
@@ -279,15 +307,10 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
 
   /** 解析单个包的全部引用点：返回未解析引用、是否已解析、是否出现过清单上下文 */
   private resolvePackageSites(
-    projectPath: string,
-    pkg: string,
-    sites: readonly RefSite[],
-    projectLocked: ReadonlySet<string>,
-    projectInstalled: ReadonlySet<string>,
-    declaredCache: Map<string, ReadonlySet<string>>,
-    closureCache: Map<string, { locked: ReadonlySet<string>; installed: ReadonlySet<string> }>,
-    contextCache: Map<string, DependencyContext>,
+    params: ResolvePackageSitesParams,
   ): { unresolved: RefSite[]; anyResolved: boolean; anyManifestContext: boolean } {
+    const { projectPath, pkg, sites, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
+      params;
     const unresolved: RefSite[] = [];
     let anyResolved = false;
     let anyManifestContext = false;
@@ -332,20 +355,17 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
 
   /** 遍历 import 引用，解析每个引用点并收集未解析的幻觉候选 */
   private collectCandidates(
-    projectPath: string,
-    projectLocked: ReadonlySet<string>,
-    projectInstalled: ReadonlySet<string>,
-    declaredCache: Map<string, ReadonlySet<string>>,
-    closureCache: Map<string, { locked: ReadonlySet<string>; installed: ReadonlySet<string> }>,
-    contextCache: Map<string, DependencyContext>,
+    params: CollectCandidatesParams,
   ): { candidates: Map<string, RefSite[]>; manifestSeen: Map<string, boolean> } {
+    const { projectPath, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
+      params;
     const refs = extractImportReferences(projectPath);
     const candidates = new Map<string, RefSite[]>();
     const manifestSeen = new Map<string, boolean>();
 
     for (const [pkg, sites] of groupRefsByPackage(refs)) {
       if (TEMPLATE_LITERAL_RE.test(pkg)) continue;
-      const { unresolved, anyResolved, anyManifestContext } = this.resolvePackageSites(
+      const { unresolved, anyResolved, anyManifestContext } = this.resolvePackageSites({
         projectPath,
         pkg,
         sites,
@@ -354,7 +374,7 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
         declaredCache,
         closureCache,
         contextCache,
-      );
+      });
       if (anyResolved) continue;
       if (unresolved.length === 0) continue;
       manifestSeen.set(pkg, anyManifestContext);

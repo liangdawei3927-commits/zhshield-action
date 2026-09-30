@@ -4,12 +4,14 @@ import { EventCenter } from './event-center';
 import { locateCrash } from './stack-locator';
 import type { SourceLocation } from './stack-locator';
 
+/** 日志匹配模式：模式名、匹配正则与命中后的事件严重级别 */
 export interface LogPattern {
   name: string;
   regex: RegExp;
   severity: 'p1' | 'p2' | 'p3';
 }
 
+/** 日志采集器配置：归属项目、待采集日志路径、项目根目录（用于堆栈定位）、匹配模式与轮询间隔 */
 export interface LogCollectorConfig {
   projectId: string;
   logPaths: string[];
@@ -39,6 +41,14 @@ interface PendingCrash {
 }
 
 const STACK_FRAME_RE = /^\s+at\s/;
+
+interface EmitLogMatchParams {
+  projectId: string;
+  logPath: string;
+  line: string;
+  pattern: LogPattern;
+  extra?: { stack: string; location: SourceLocation | null };
+}
 
 export class LogCollector {
   private eventCenter: EventCenter;
@@ -183,7 +193,7 @@ export class LogCollector {
       };
       return;
     }
-    this.emitLogMatch(projectId, logPath, line, pattern);
+    this.emitLogMatch({ projectId, logPath, line, pattern });
   }
 
   private flushPendingCrash(): void {
@@ -191,14 +201,22 @@ export class LogCollector {
     this.pendingCrash = null;
     if (!pending) return;
     if (pending.stackLines.length === 0) {
-      this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern);
+      this.emitLogMatch({
+        projectId: pending.projectId,
+        logPath: pending.logPath,
+        line: pending.line,
+        pattern: pending.pattern,
+      });
       return;
     }
     const stack = pending.stackLines.join('\n');
     const location = locateCrash(stack, { projectPath: pending.projectPath });
-    this.emitLogMatch(pending.projectId, pending.logPath, pending.line, pending.pattern, {
-      stack,
-      location,
+    this.emitLogMatch({
+      projectId: pending.projectId,
+      logPath: pending.logPath,
+      line: pending.line,
+      pattern: pending.pattern,
+      extra: { stack, location },
     });
   }
 
@@ -209,13 +227,8 @@ export class LogCollector {
     return null;
   }
 
-  private emitLogMatch(
-    projectId: string,
-    logPath: string,
-    line: string,
-    pattern: LogPattern,
-    extra?: { stack: string; location: SourceLocation | null },
-  ): void {
+  private emitLogMatch(params: EmitLogMatchParams): void {
+    const { projectId, logPath, line, pattern, extra } = params;
     const relativePath = path.relative(process.cwd(), logPath);
     const context: Record<string, unknown> = {
       pattern: pattern.name,

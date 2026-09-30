@@ -1,6 +1,7 @@
 import { TrivyAdapter, type TrivyFinding } from './trivy-adapter';
 import type { Adapter, CheckConfig, CheckResult } from '../types';
 
+/** 门禁侧 Trivy 归一化结果：状态/严重级别/命中列表 + 按级别计数汇总（由 TrivyResult 映射而来） */
 export interface GuardTrivyResult {
   adapterId: string;
   status: 'passed' | 'failed' | 'error';

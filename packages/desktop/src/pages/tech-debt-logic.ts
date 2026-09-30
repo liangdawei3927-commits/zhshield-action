@@ -8,7 +8,7 @@ import {
 } from '../services/engineApi';
 import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { copyIssuesToAi } from '../utils/copyToAi';
 
 /**
  * 债务类别配置（与 @zh/scoring tech-debt DebtCategory 对齐，5 类 4 色）：
@@ -239,19 +239,6 @@ function useTechDebtRun(projectPath: string): {
   };
 }
 
-/** 复制单个技术债偿还建议到 AI 修复 */
-function copyIssuesToAi(
-  projectPath: string,
-  issues: AiFixIssue[],
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-): void {
-  const text = buildAiFixPrompt(projectPath, issues);
-  void copyTextToClipboard(text).then(
-    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-    () => toast(t('toast.copyFailed'), 'error'),
-  );
-}
-
 function useTechDebtCopyToAi(projectPath: string): {
   copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
   copyAllToAi: (actions: TechDebtReportData['actionList']) => void;
@@ -260,17 +247,14 @@ function useTechDebtCopyToAi(projectPath: string): {
 
   const copyToAi = useCallback(
     (action: TechDebtReportData['actionList'][number]) => {
-      copyIssuesToAi(
-        projectPath,
-        [
-          {
-            source: t('page.techdebt.source'),
-            ruleId: action.actionId,
-            message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
-          },
-        ],
-        toast,
-      );
+      copyIssuesToAi(projectPath, toast, [
+        {
+          source: t('page.techdebt.source'),
+          ruleId: action.actionId,
+          message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
+          domain: 'techdebt',
+        },
+      ]);
     },
     [projectPath, toast],
   );
@@ -280,12 +264,12 @@ function useTechDebtCopyToAi(projectPath: string): {
       if (actions.length === 0) return;
       copyIssuesToAi(
         projectPath,
+        toast,
         actions.map((action) => ({
           source: t('page.techdebt.source'),
           ruleId: action.actionId,
           message: `${action.module} — ${t(`page.techdebt.category.${action.category}`)} (ROI: ${action.roi})`,
         })),
-        toast,
       );
     },
     [projectPath, toast],

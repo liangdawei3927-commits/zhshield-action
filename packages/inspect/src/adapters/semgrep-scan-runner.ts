@@ -1,9 +1,6 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import type { ToolScanOptions, ToolResult, Issue, IssueCategory } from '@zh/shared';
+import { asToolExecError, buildToolResult, execTool } from './tool-runner';
 import { SemgrepResultMapper, type SemgrepOutput } from './semgrep-result-mapper';
-
-const execFileAsync = promisify(execFile);
 
 /** 本机 semgrep-core（OCaml 运行时）每次启动都会打印的无害告警，非扫描失败原因 */
 const RUNTIME_NOISE_PATTERNS: readonly RegExp[] = [
@@ -31,6 +28,15 @@ const BANNER_NOISE_PATTERNS: readonly RegExp[] = [
 
 const NOISE_PATTERNS = [...RUNTIME_NOISE_PATTERNS, ...BANNER_NOISE_PATTERNS];
 
+/** SemgrepScanRunner.run 的执行参数 */
+export interface SemgrepRunParams {
+  command: string;
+  options: ToolScanOptions;
+  args: string[];
+  category: IssueCategory;
+  start: number;
+}
+
 /**
  * SemgrepScanRunner — 执行 semgrep 扫描并映射输出为可用结果，统一处理执行错误
  *
@@ -41,18 +47,12 @@ export class SemgrepScanRunner {
   private readonly mapper = new SemgrepResultMapper();
 
   /** 执行 semgrep 扫描并映射输出为可用结果 */
-  async run(
-    command: string,
-    options: ToolScanOptions,
-    args: string[],
-    category: IssueCategory,
-    start: number,
-  ): Promise<ToolResult> {
+  async run(params: SemgrepRunParams): Promise<ToolResult> {
+    const { command, options, args, category, start } = params;
     try {
-      const { stdout } = await execFileAsync(command, args, {
+      const { stdout } = await execTool(command, args, {
         cwd: options.projectPath,
         timeout: options.timeout || 120000,
-        maxBuffer: 10 * 1024 * 1024,
       });
 
       const output = JSON.parse(stdout);
@@ -64,12 +64,7 @@ export class SemgrepScanRunner {
 
   /** 处理 semgrep 执行错误：未安装 / 超时 / 输出错误 */
   private handleError(error: unknown, start: number, category: IssueCategory): ToolResult {
-    const err = error as {
-      code?: number | string;
-      stdout?: string;
-      stderr?: string;
-      message?: string;
-    };
+    const err = asToolExecError(error);
     if (err.code === 'ENOENT') {
       return this.buildUnavailable(start, 'Semgrep 未安装或未在 PATH 中找到');
     }
@@ -81,7 +76,7 @@ export class SemgrepScanRunner {
 
   /** 从 semgrep 输出中提取真实错误或部分结果 */
   private handleOutputError(
-    err: { code?: number | string; stdout?: string; stderr?: string; message?: string },
+    err: ReturnType<typeof asToolExecError>,
     start: number,
     category: IssueCategory,
   ): ToolResult {
@@ -161,36 +156,20 @@ export class SemgrepScanRunner {
   }
 
   buildAvailable(output: SemgrepOutput, issues: Issue[], start: number): ToolResult {
-    return {
+    return buildToolResult({
       tool: 'semgrep',
       status: 'available',
       issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: Array.isArray(output.results) ? output.results.length : 0,
-      },
-    };
+      start,
+      fileCount: Array.isArray(output.results) ? output.results.length : 0,
+    });
   }
 
   buildUnavailable(start: number, error: string): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'unavailable',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error,
-    };
+    return buildToolResult({ tool: 'semgrep', status: 'unavailable', issues: [], start, error });
   }
 
   buildError(start: number, error: string): ToolResult {
-    return {
-      tool: 'semgrep',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error,
-    };
+    return buildToolResult({ tool: 'semgrep', status: 'error', issues: [], start, error });
   }
 }

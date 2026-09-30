@@ -1,6 +1,8 @@
 import type { RuleConflictReport } from './rule-conflict-resolver';
 
+/** 漏洞严重级别（四档）；无 critical/high 时按 medium/low 的低权重扣分，见 calculateSecurityScore */
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
+/** 恶意代码/威胁类型分类：注入检测与启发式扫描共用同一枚举 */
 export type MalwareType =
   | 'reverse-shell'
   | 'data-exfiltration'
@@ -9,8 +11,11 @@ export type MalwareType =
   | 'backdoor'
   | 'supply-chain'
   | 'suspicious-behavior';
-export type GarbageType = 'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code' | 'build-artifact';
+/** 垃圾条目类型：未使用文件 / 未使用依赖 / 死代码 / 重复代码 / 构建产物 */
+export type GarbageType =
+  'unused-file' | 'unused-dependency' | 'dead-code' | 'duplicate-code' | 'build-artifact';
 
+/** 漏洞条目：包坐标、受影响版本区间、修复建议与自动修复可行性，附交叉验证置信度与来源工具 */
 export interface Vulnerability {
   id: string;
   cveId?: string;
@@ -44,6 +49,7 @@ export function calculateSecurityScore(vulnerabilities: Vulnerability[]): number
     : Math.max(0, 60 - (vulnCritical + vulnHigh) * 15);
 }
 
+/** 垃圾条目：可清理对象的类型、路径、占用体积与判定理由 */
 export interface GarbageItem {
   id: string;
   type: GarbageType;
@@ -52,6 +58,7 @@ export interface GarbageItem {
   reason: string;
 }
 
+/** 恶意代码条目：类型、严重级别、命中文件与行号、匹配模式名与原始证据片段 */
 export interface MalwareItem {
   id: string;
   type: MalwareType;
@@ -64,6 +71,7 @@ export interface MalwareItem {
   evidence: string;
 }
 
+/** 安全扫描报告：漏洞/垃圾/恶意三类结果 + 安全评分 + 计数汇总，附 F3 二次校验的 malware 冲突报告 */
 export interface SecurityScanReport {
   projectId: string;
   timestamp: Date;
@@ -82,17 +90,4 @@ export interface SecurityScanReport {
     garbageTotal: number;
     malwareTotal: number;
   };
-}
-
-export interface GarbageCleanResult {
-  batchId: string;
-  cleaned: GarbageItem[];
-  freedBytes: number;
-  failed: string[];
-}
-
-export interface GarbageRestoreResult {
-  restored: number;
-  restoredBytes: number;
-  failed: string[];
 }

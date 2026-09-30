@@ -40,35 +40,7 @@ export class FileHelper {
   static async glob(pattern: string, dir: string): Promise<string[]> {
     const isMatch = picomatch(pattern);
     const results: string[] = [];
-
-    const walk = async (currentDir: string, depth = 0): Promise<void> => {
-      if (depth > MAX_GLOB_DEPTH) return;
-      let dirEntries: fs.Dirent[];
-      try {
-        dirEntries = await fs.promises.readdir(currentDir, { withFileTypes: true });
-      } catch {
-        // 忽略无权限/不存在的目录
-        return;
-      }
-      for (const entry of dirEntries) {
-        const fullPath = safeJoin(currentDir, entry.name);
-        if (entry.isDirectory()) {
-          // 跳过噪声目录与点开头目录（含 .git），不深入遍历
-          if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
-          // perf rule false positive: arg depends on loop var via dataflow
-          // eslint-disable-next-line perf/perf-no-serial-await
-          await walk(fullPath, depth + 1);
-        } else if (entry.isFile()) {
-          // 相对路径统一用 '/' 分隔，与 picomatch 的 glob 语义对齐
-          const relativePath = path.relative(dir, fullPath).split(path.sep).join('/');
-          if (isMatch(relativePath)) {
-            results.push(fullPath);
-          }
-        }
-      }
-    };
-
-    await walk(dir);
+    await walkGlob(dir, dir, isMatch, results);
     return results;
   }
 
@@ -78,6 +50,40 @@ export class FileHelper {
       return true;
     } catch {
       return false;
+    }
+  }
+}
+
+async function walkGlob(
+  currentDir: string,
+  rootDir: string,
+  isMatch: (value: string) => boolean,
+  results: string[],
+  depth = 0,
+): Promise<void> {
+  if (depth > MAX_GLOB_DEPTH) return;
+  let dirEntries: fs.Dirent[];
+  try {
+    dirEntries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+  } catch {
+    // 忽略无权限/不存在的目录
+    return;
+  }
+  for (const entry of dirEntries) {
+    const fullPath = safeJoin(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      // 跳过噪声目录与点开头目录（含 .git），不深入遍历
+      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
+      // perf rule false positive: arg depends on loop var via dataflow
+      // eslint-disable-next-line perf/perf-no-serial-await
+      await walkGlob(fullPath, rootDir, isMatch, results, depth + 1);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    // 相对路径统一用 '/' 分隔，与 picomatch 的 glob 语义对齐
+    const relativePath = path.relative(rootDir, fullPath).split(path.sep).join('/');
+    if (isMatch(relativePath)) {
+      results.push(fullPath);
     }
   }
 }

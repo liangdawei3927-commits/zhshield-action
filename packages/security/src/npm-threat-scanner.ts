@@ -143,6 +143,12 @@ function extractPnpmPackageNames(lock: unknown): string[] {
   return [...names];
 }
 
+/** 单个依赖映射区块（dependencies / devDependencies）的包名并入 names */
+function addDepMapNames(depMap: unknown, names: Set<string>): void {
+  if (!depMap || typeof depMap !== 'object') return;
+  for (const name of Object.keys(depMap)) names.add(name);
+}
+
 /** pnpm-lock.yaml importers 区块：<workspace> → dependencies/devDependencies 直接依赖 */
 function collectImporterDeps(importers: Record<string, unknown>, names: Set<string>): void {
   for (const importer of Object.values(importers)) {
@@ -152,8 +158,7 @@ function collectImporterDeps(importers: Record<string, unknown>, names: Set<stri
       devDependencies?: Record<string, unknown>;
     };
     for (const depMap of [deps.dependencies, deps.devDependencies]) {
-      if (!depMap || typeof depMap !== 'object') continue;
-      for (const name of Object.keys(depMap)) names.add(name);
+      addDepMapNames(depMap, names);
     }
   }
 }

@@ -49,27 +49,91 @@ export function resolveInjectedConfigPath(
   cwd: string,
   projectPath: string,
 ): string | null {
-  // 1. 相对被扫描目录（ESLint v9 以 cwd 查找配置）
+  return (
+    resolveByCwd(config, cwd) ??
+    resolveByProject(config, projectPath) ??
+    resolveKernelAsset(config, cwd, projectPath)
+  );
+}
+
+/** 1. 相对被扫描目录（ESLint v9 以 cwd 查找配置） */
+function resolveByCwd(config: string, cwd: string): string | null {
   const byCwd = path.resolve(cwd, config);
   if (isFile(byCwd)) return byCwd;
+  return null;
+}
 
-  // 2. 相对项目根
+/** 2. 相对项目根 */
+function resolveByProject(config: string, projectPath: string): string | null {
   const byProject = path.resolve(projectPath, config);
   if (isFile(byProject)) return byProject;
+  return null;
+}
 
-  // 3. 仓库内部资产：定位 @zh/kernel 包后按包内相对路径解析
+/** 3. 仓库内部资产：定位 @zh/kernel 包后按包内相对路径解析 */
+function resolveKernelAsset(config: string, cwd: string, projectPath: string): string | null {
+  const inPackageRelPath = extractKernelRelPath(config);
+  if (inPackageRelPath === null) return null;
+
+  const candidates = buildKernelRootCandidates(cwd, projectPath);
+  return findKernelAsset(candidates, inPackageRelPath);
+}
+
+/** 从 config 中提取 @zh/kernel/ 前缀后的包内相对路径；非 kernel 资产返回 null */
+function extractKernelRelPath(config: string): string | null {
   const kernelPrefix = '@zh/kernel/';
-  if (config.includes(kernelPrefix)) {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：候选列表剔除 process.cwd()，
-    // 仅按调用方传入的 cwd（=被扫描目录）与 projectPath 解析，避免依赖进程工作目录。
-    const kernelRoot = locateKernelPackageRoot([cwd, projectPath, __dirname]);
-    // 3b. monorepo 布局回退：扫描目标自身是仓库时，kernel 包位于 <projectPath>/packages/kernel
-    const monoKernelRoot = kernelRoot ?? path.join(projectPath, 'packages', 'kernel');
-    if (isFile(path.join(monoKernelRoot, 'package.json'))) {
-      const inKernel = path.join(monoKernelRoot, config.split(kernelPrefix)[1]);
-      if (isFile(inKernel)) return inKernel;
-    }
-  }
+  if (!config.includes(kernelPrefix)) return null;
+  return config.split(kernelPrefix)[1];
+}
 
+/**
+ * 候选 kernel 包根（按顺序尝试，任一命中即返回）：
+ *   a) require.resolve 命中的实际安装位置（桌面端 Electron：node_modules 内有 @zh/kernel）
+ *   b) 扫描目标自身是 monorepo 根 → <projectPath>/packages/kernel
+ *   c) 按本模块所在目录逐级回溯仓库内 packages/kernel
+ *
+ * 为什么需要 c)：CLI 把 @zh/* 的**源码** bundle 成单文件（build-cli.mjs 解析到
+ * src/index.ts），但 `packages/cli` 的 package.json **未声明** @zh/kernel 依赖，
+ * 运行时 node_modules 里不存在该包 ⇒ a) 必然 MODULE_NOT_FOUND，b) 在扫描子目录时
+ * （projectPath = <repo>/packages/cli）也落空。此时只能按目录层级回溯。
+ * 2026-09-22：此缺口曾使「规则声明 config 引用内核资产」在 CLI 链路静默退化为
+ * skipped（表现为「Semgrep 配置不存在，跳过该规则」），而桌面端正常 ⇒ 同一规则
+ * 两入口行为不一致。
+ */
+function buildKernelRootCandidates(cwd: string, projectPath: string): Array<string | null> {
+  return [
+    locateKernelPackageRoot([cwd, projectPath, __dirname]),
+    path.join(projectPath, 'packages', 'kernel'),
+    inferMonorepoKernelRoot(__dirname),
+  ];
+}
+
+/** 在候选 kernel 根中查找包内资产，命中即返回绝对路径 */
+function findKernelAsset(
+  candidates: Array<string | null>,
+  inPackageRelPath: string,
+): string | null {
+  for (const root of candidates) {
+    if (!root) continue;
+    if (!isFile(path.join(root, 'package.json'))) continue;
+    const inKernel = path.join(root, inPackageRelPath);
+    if (isFile(inKernel)) return inKernel;
+  }
+  return null;
+}
+
+/**
+ * 从给定目录逐级向上寻找 monorepo 内的 `packages/kernel`。
+ * 用于 CLI bundle 场景（node_modules 无 @zh/kernel，只能按目录位置推断）。
+ */
+function inferMonorepoKernelRoot(startDir: string): string | null {
+  let dir = startDir;
+  for (let i = 0; i < 8; i++) {
+    const pkgJson = path.join(dir, 'packages', 'kernel', 'package.json');
+    if (isFile(pkgJson)) return path.dirname(pkgJson);
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
   return null;
 }

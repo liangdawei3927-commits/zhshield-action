@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SopVersion } from '../_meta/sop-types';
 
+/** 同步日志条目：时间戳 + 同步过程附加的任意键值字段（写入 sync.log 的单行记录） */
 export interface SyncLogEntry {
   timestamp: string;
   [key: string]: unknown;

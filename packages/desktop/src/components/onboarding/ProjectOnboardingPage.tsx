@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { ShieldLogo } from '../ui/Icons';
+import { EngineStatusIndicator } from '../ui/EngineStatusIndicator';
 import { useT } from '../../i18n';
 
 interface ProjectOnboardingPageProps {
@@ -66,16 +67,27 @@ function toProfileSummary(result: unknown): OnboardingProfileSummary | null {
   };
 }
 
-function buildSteps(
-  projectPath: string,
-  presetConfirmed: boolean,
-  selectedPreset: string | null,
-  profileDetected: boolean,
-  profileConfirmed: boolean,
-  onProfileDetected: (summary: OnboardingProfileSummary | null) => void,
-  onRuleSyncResult: (summary: RuleSyncSummary) => void,
-  onToolsStatus: (status: ToolsStatusSummary | null) => void,
-): Step[] {
+interface BuildStepsParams {
+  projectPath: string;
+  presetConfirmed: boolean;
+  selectedPreset: string | null;
+  profileDetected: boolean;
+  profileConfirmed: boolean;
+  onProfileDetected: (summary: OnboardingProfileSummary | null) => void;
+  onRuleSyncResult: (summary: RuleSyncSummary) => void;
+  onToolsStatus: (status: ToolsStatusSummary | null) => void;
+}
+
+function buildSteps({
+  projectPath,
+  presetConfirmed,
+  selectedPreset,
+  profileDetected,
+  profileConfirmed,
+  onProfileDetected,
+  onRuleSyncResult,
+  onToolsStatus,
+}: BuildStepsParams): Step[] {
   return [
     {
       id: 'analyze',
@@ -255,14 +267,23 @@ function runStep(step: Step, onDone: () => void): void {
   step.execute().then(onDone).catch(onDone);
 }
 
-function runCurrentStep(
-  steps: Step[],
-  index: number,
-  presetConfirmed: boolean,
-  profileDetected: boolean,
-  profileConfirmed: boolean,
-  onDone: () => void,
-): void {
+interface RunCurrentStepParams {
+  steps: Step[];
+  index: number;
+  presetConfirmed: boolean;
+  profileDetected: boolean;
+  profileConfirmed: boolean;
+  onDone: () => void;
+}
+
+function runCurrentStep({
+  steps,
+  index,
+  presetConfirmed,
+  profileDetected,
+  profileConfirmed,
+  onDone,
+}: RunCurrentStepParams): void {
   const step = steps[index];
   if (step.id === 'preset' && !presetConfirmed) {
     return;
@@ -279,13 +300,21 @@ const ONBOARDING_PRESETS = [
   { id: 'general-purpose', label: '通用配置模板', desc: '所有项目类型', icon: '⚙️' },
 ];
 
-function useStepAdvance(
-  steps: Step[],
-  presetConfirmed: boolean,
-  profileDetected: boolean,
-  profileConfirmed: boolean,
-  onComplete: () => void,
-) {
+interface UseStepAdvanceParams {
+  steps: Step[];
+  presetConfirmed: boolean;
+  profileDetected: boolean;
+  profileConfirmed: boolean;
+  onComplete: () => void;
+}
+
+function useStepAdvance({
+  steps,
+  presetConfirmed,
+  profileDetected,
+  profileConfirmed,
+  onComplete,
+}: UseStepAdvanceParams) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
@@ -294,17 +323,17 @@ function useStepAdvance(
       const timer = setTimeout(onComplete, 500);
       return () => clearTimeout(timer);
     }
-    runCurrentStep(
+    runCurrentStep({
       steps,
-      currentStepIndex,
+      index: currentStepIndex,
       presetConfirmed,
       profileDetected,
       profileConfirmed,
-      () => {
+      onDone: () => {
         setCompletedSteps((prev) => new Set(prev).add(currentStepIndex));
         setCurrentStepIndex((prev) => prev + 1);
       },
-    );
+    });
   }, [
     currentStepIndex,
     steps.length,
@@ -458,6 +487,30 @@ function OnboardingStepList({
   );
 }
 
+/** 面板底部主按钮：品牌渐变 + 悬停透明度反馈（预设选择 / 画像确认两处共用） */
+function OnboardingPanelAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
+      style={{
+        background:
+          'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.opacity = '0.9';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.opacity = '1';
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function OnboardingPresetSelector({
   presets,
   selectedPreset,
@@ -498,24 +551,7 @@ function OnboardingPresetSelector({
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
-          style={{
-            background:
-              'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
-        >
-          确认选择
-        </button>
+        <OnboardingPanelAction onClick={onConfirm}>确认选择</OnboardingPanelAction>
       </div>
     </div>
   );
@@ -590,24 +626,9 @@ function OnboardingProfileConfirm({
             {t('page.onboarding.profileConfirm.lowConfidence')}
           </div>
         )}
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 cursor-pointer"
-          style={{
-            background:
-              'linear-gradient(135deg, rgb(var(--zh-brand)) 0%, rgb(var(--zh-brand-hover)) 100%)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
-        >
+        <OnboardingPanelAction onClick={onConfirm}>
           {t('page.onboarding.profileConfirm.confirmBtn')}
-        </button>
+        </OnboardingPanelAction>
       </div>
     </div>
   );
@@ -637,22 +658,8 @@ function OnboardingRuleSyncSummary({
   );
 }
 
-function OnboardingSteps({
-  steps,
-  completedSteps,
-  currentStepIndex,
-  t,
-  showPreset,
-  selectedPreset,
-  onSelectPreset,
-  onConfirmPreset,
-  showConfirm,
-  profileSummary,
-  onConfirmProfile,
-  ruleSyncSummary,
-  toolsStatus,
-  onRefreshTools,
-}: {
+/** 引导中央舞台透传给步骤层的全部参数（OnboardingCenter 与 OnboardingSteps 共用同一形状） */
+type OnboardingStageProps = {
   steps: Step[];
   completedSteps: Set<number>;
   currentStepIndex: number;
@@ -667,7 +674,25 @@ function OnboardingSteps({
   ruleSyncSummary: RuleSyncSummary | null;
   toolsStatus: ToolsStatusSummary | null;
   onRefreshTools: () => Promise<void>;
-}) {
+};
+
+function OnboardingSteps(props: OnboardingStageProps) {
+  const {
+    steps,
+    completedSteps,
+    currentStepIndex,
+    t,
+    showPreset,
+    selectedPreset,
+    onSelectPreset,
+    onConfirmPreset,
+    showConfirm,
+    profileSummary,
+    onConfirmProfile,
+    ruleSyncSummary,
+    toolsStatus,
+    onRefreshTools,
+  } = props;
   return (
     <>
       <OnboardingStepList
@@ -802,58 +827,13 @@ function OnboardingToolsPanel({
 function OnboardingCenter({
   projectName,
   progress,
-  steps,
-  completedSteps,
-  currentStepIndex,
-  t,
-  showPreset,
-  selectedPreset,
-  onSelectPreset,
-  onConfirmPreset,
-  showConfirm,
-  profileSummary,
-  onConfirmProfile,
-  ruleSyncSummary,
-  toolsStatus,
-  onRefreshTools,
-}: {
-  projectName: string;
-  progress: number;
-  steps: Step[];
-  completedSteps: Set<number>;
-  currentStepIndex: number;
-  t: (key: string, params?: Record<string, unknown>) => string;
-  showPreset: boolean;
-  selectedPreset: string | null;
-  onSelectPreset: (id: string) => void;
-  onConfirmPreset: () => void;
-  showConfirm: boolean;
-  profileSummary: OnboardingProfileSummary | null;
-  onConfirmProfile: () => void;
-  ruleSyncSummary: RuleSyncSummary | null;
-  toolsStatus: ToolsStatusSummary | null;
-  onRefreshTools: () => Promise<void>;
-}) {
+  ...stageProps
+}: OnboardingStageProps & { projectName: string; progress: number }) {
   return (
     <div className="relative flex flex-col items-center">
       <OnboardingShield projectName={projectName} />
       <OnboardingProgressBar progress={progress} />
-      <OnboardingSteps
-        steps={steps}
-        completedSteps={completedSteps}
-        currentStepIndex={currentStepIndex}
-        t={t}
-        showPreset={showPreset}
-        selectedPreset={selectedPreset}
-        onSelectPreset={onSelectPreset}
-        onConfirmPreset={onConfirmPreset}
-        showConfirm={showConfirm}
-        profileSummary={profileSummary}
-        onConfirmProfile={onConfirmProfile}
-        ruleSyncSummary={ruleSyncSummary}
-        toolsStatus={toolsStatus}
-        onRefreshTools={onRefreshTools}
-      />
+      <OnboardingSteps {...stageProps} />
     </div>
   );
 }
@@ -945,14 +925,7 @@ function OnboardingContent({
         className="absolute top-8 right-24 flex items-center gap-2 pointer-events-none"
         style={{ opacity: 0.7 }}
       >
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{
-            background: intelligentEnabled ? '#27c93f' : '#ef4444',
-            boxShadow: `0 0 6px ${intelligentEnabled ? '#27c93f' : '#ef4444'}`,
-          }}
-        />
-        <span className="text-sm text-white/80">智能引擎</span>
+        <EngineStatusIndicator enabled={intelligentEnabled} />
       </div>
 
       <OnboardingCenter
@@ -979,6 +952,24 @@ function OnboardingContent({
   );
 }
 
+/** 工具就绪状态：探测 + 安装完成后面板刷新（探测失败保留旧状态） */
+function useToolsStatusState(projectPath: string): {
+  toolsStatus: ToolsStatusSummary | null;
+  setToolsStatus: Dispatch<SetStateAction<ToolsStatusSummary | null>>;
+  refreshTools: () => Promise<void>;
+} {
+  const [toolsStatus, setToolsStatus] = useState<ToolsStatusSummary | null>(null);
+  const refreshTools = async (): Promise<void> => {
+    try {
+      const status = await window.electronAPI?.tools?.status(projectPath);
+      setToolsStatus(status ?? null);
+    } catch {
+      // 探测失败保留旧状态
+    }
+  };
+  return { toolsStatus, setToolsStatus, refreshTools };
+}
+
 export function ProjectOnboardingPage({
   projectName,
   projectPath,
@@ -992,35 +983,25 @@ export function ProjectOnboardingPage({
   const [profileSummary, setProfileSummary] = useState<OnboardingProfileSummary | null>(null);
   const [profileConfirmed, setProfileConfirmed] = useState(false);
   const [ruleSyncSummary, setRuleSyncSummary] = useState<RuleSyncSummary | null>(null);
-  const [toolsStatus, setToolsStatus] = useState<ToolsStatusSummary | null>(null);
+  const { toolsStatus, setToolsStatus, refreshTools } = useToolsStatusState(projectPath);
 
-  /** 重新探测工具就绪状态（安装完成后面板刷新用） */
-  const refreshTools = async (): Promise<void> => {
-    try {
-      const status = await window.electronAPI?.tools?.status(projectPath);
-      setToolsStatus(status ?? null);
-    } catch {
-      // 探测失败保留旧状态
-    }
-  };
-
-  const steps = buildSteps(
+  const steps = buildSteps({
     projectPath,
     presetConfirmed,
     selectedPreset,
-    profileSummary !== null,
+    profileDetected: profileSummary !== null,
     profileConfirmed,
-    setProfileSummary,
-    setRuleSyncSummary,
-    setToolsStatus,
-  );
-  const { currentStepIndex, completedSteps } = useStepAdvance(
+    onProfileDetected: setProfileSummary,
+    onRuleSyncResult: setRuleSyncSummary,
+    onToolsStatus: setToolsStatus,
+  });
+  const { currentStepIndex, completedSteps } = useStepAdvance({
     steps,
     presetConfirmed,
-    profileSummary !== null,
+    profileDetected: profileSummary !== null,
     profileConfirmed,
     onComplete,
-  );
+  });
 
   return (
     <OnboardingContent

@@ -2,28 +2,8 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { MalwareItem, MalwareType } from './types';
+import { MAX_SCAN_DEPTH, PACKAGE_JSON_FILE, SKIP_DIRS } from './scan-walk';
 
-// 排除生成目录与测试目录/夹具（刻意构造的攻击样本仅用于驱动规则测试，非生产代码），
-// 对齐 inspect 包 semgrep-adapter 的 excludePaths 约定（见 semgrep-adapter.ts）
-const SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'dist-electron',
-  'build',
-  'coverage',
-  '.turbo',
-  '.next',
-  '.cache',
-  'release',
-  '.zhshield',
-  '__tests__',
-  'fixtures',
-  '__fixtures__',
-  '__mocks__',
-]);
-const MAX_DEPTH = 12;
-const PACKAGE_JSON = 'package.json';
 const MARKDOWN_EXT = '.md';
 const ENV_FILE_NAMES = new Set([
   '.env',
@@ -93,6 +73,7 @@ const MD_LINK_TARGET_PATTERN = /\[[^\]]*\]\(([^)]*)\)/g;
 
 const ZERO_WIDTH_PATTERN = new RegExp('\\u200B|\\u200C|\\u200D|\\u2060|\\uFEFF');
 
+/** package.json 单条脚本的判定结果：命令文本 + safe/suspicious 结论 + 命中的模式名 */
 export interface ScriptVerdict {
   script: string;
   command: string;
@@ -238,6 +219,14 @@ export function isEnvFile(fileName: string): boolean {
   return ENV_FILE_NAMES.has(fileName);
 }
 
+interface ScanCommentHitsParams {
+  filePath: string;
+  relFile: string;
+  content: string;
+  ext: string;
+  items: MalwareItem[];
+}
+
 export class InjectionGuard {
   async scan(projectPath: string): Promise<MalwareItem[]> {
     const items: MalwareItem[] = [];
@@ -246,7 +235,7 @@ export class InjectionGuard {
   }
 
   private walk(dir: string, depth: number, projectPath: string, items: MalwareItem[]): void {
-    if (depth > MAX_DEPTH) return;
+    if (depth > MAX_SCAN_DEPTH) return;
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -291,7 +280,7 @@ export class InjectionGuard {
     if (content === null) return;
     const relFile = path.relative(projectPath, filePath);
 
-    if (fileName === PACKAGE_JSON) {
+    if (fileName === PACKAGE_JSON_FILE) {
       this.scanPackageJsonScripts(filePath, content, items);
       return;
     }
@@ -301,7 +290,7 @@ export class InjectionGuard {
       this.scanMarkdownFile(filePath, relFile, content, items);
     }
     if (LINE_COMMENT_PREFIX.has(ext) || BLOCK_COMMENT_DELIMS.has(ext)) {
-      this.scanCommentHits(filePath, relFile, content, ext, items);
+      this.scanCommentHits({ filePath, relFile, content, ext, items });
     }
   }
 
@@ -353,13 +342,8 @@ export class InjectionGuard {
     }
   }
 
-  private scanCommentHits(
-    filePath: string,
-    relFile: string,
-    content: string,
-    ext: string,
-    items: MalwareItem[],
-  ): void {
+  private scanCommentHits(params: ScanCommentHitsParams): void {
+    const { filePath, relFile, content, ext, items } = params;
     for (const hit of scanCommentInstructions(content, ext)) {
       items.push(
         toFinding({

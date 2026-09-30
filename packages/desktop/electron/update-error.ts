@@ -18,8 +18,10 @@ export const UPDATE_ERROR_MESSAGES = {
   UPDATE_UNKNOWN: '更新服务暂时不可用，请稍后重试。',
 } as const;
 
+/** 自动更新错误码（UPDATE_ERROR_MESSAGES 的键） */
 export type UpdateErrorCode = keyof typeof UPDATE_ERROR_MESSAGES;
 
+/** 跨 IPC 传给渲染进程的更新错误信息：稳定错误码 + 已脱敏的通用文案 */
 export interface UpdateErrorInfo {
   readonly code: UpdateErrorCode;
   /** 渲染端可安全展示的通用文案（不含任何原始错误细节）。 */

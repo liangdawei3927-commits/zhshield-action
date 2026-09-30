@@ -62,6 +62,52 @@ export function capabilityIdOf(toolId: ToolId): string {
 /** toolId → languages 映射（R3-b；Partial：云端可能未下发某工具） */
 export type LanguagesByTool = Partial<Record<ToolId, string[]>>;
 
+/** 深拷贝一份 capabilities 条目映射（不可原地改账本的前提） */
+function cloneCapabilities(refs: CapabilityRefs): Record<string, CapabilityEntry> {
+  const capabilities: Record<string, CapabilityEntry> = {};
+  for (const [key, entry] of Object.entries(refs.capabilities)) {
+    capabilities[key] = { ...entry, refs: [...entry.refs] };
+  }
+  return capabilities;
+}
+
+/**
+ * 领取单键：幂等把 projectId 加入 refs（去重），必要时写入 languages；
+ * refs 从空变非空且此前 reclaiming → 置回 active 并删除 since（唤醒）。
+ * toolrule:* 与 sop-module:* 两族共用（唯一差异是键构造与 languages 是否有值）。
+ */
+function claimOne(
+  capabilities: Record<string, CapabilityEntry>,
+  key: string,
+  projectId: string,
+  languages?: string[],
+): void {
+  const entry = capabilities[key] ?? { languages: [], refs: [] };
+  if (languages !== undefined) {
+    entry.languages = [...languages];
+  }
+  const wasEmpty = entry.refs.length === 0;
+  if (!entry.refs.includes(projectId)) {
+    entry.refs.push(projectId);
+  }
+  // 唤醒：refs 从空变非空且此前 reclaiming → active + since 清除
+  if (wasEmpty && entry.refs.length > 0 && entry.status === 'reclaiming') {
+    entry.status = 'active';
+    delete entry.since;
+  }
+  capabilities[key] = entry;
+}
+
+/** 标记物理删除单键：reclaiming → reclaimed + at，并删除 since（窗口起算点已无意义）。 */
+function reclaimOne(capabilities: Record<string, CapabilityEntry>, key: string): void {
+  const entry = capabilities[key];
+  if (entry !== undefined && entry.status === 'reclaiming') {
+    entry.status = 'reclaimed';
+    entry.at = Date.now();
+    delete entry.since;
+  }
+}
+
 /** 空账本（缺文件 / 损坏 JSON 的保守降级） */
 function emptyRefs(): CapabilityRefs {
   return { schemaVersion: 1, capabilities: {} };
@@ -125,28 +171,10 @@ export function claimToolRefs(
   toolIds: ToolId[],
   languagesByTool?: LanguagesByTool,
 ): CapabilityRefs {
-  const capabilities: Record<string, CapabilityEntry> = {};
-  for (const [key, entry] of Object.entries(refs.capabilities)) {
-    capabilities[key] = { ...entry, refs: [...entry.refs] };
-  }
+  const capabilities = cloneCapabilities(refs);
 
   for (const toolId of toolIds) {
-    const key = capabilityIdOf(toolId);
-    const entry = capabilities[key] ?? { languages: [], refs: [] };
-    const languages = languagesByTool?.[toolId];
-    if (languages !== undefined) {
-      entry.languages = [...languages];
-    }
-    const wasEmpty = entry.refs.length === 0;
-    if (!entry.refs.includes(projectId)) {
-      entry.refs.push(projectId);
-    }
-    // 唤醒：refs 从空变非空且此前 reclaiming → active + since 清除
-    if (wasEmpty && entry.refs.length > 0 && entry.status === 'reclaiming') {
-      entry.status = 'active';
-      delete entry.since;
-    }
-    capabilities[key] = entry;
+    claimOne(capabilities, capabilityIdOf(toolId), projectId, languagesByTool?.[toolId]);
   }
 
   return { schemaVersion: 1, capabilities };
@@ -178,19 +206,10 @@ export function releaseProjectRefs(refs: CapabilityRefs, projectId: string): Cap
  * 返回新对象（不可原地改）。
  */
 export function markReclaimed(refs: CapabilityRefs, toolIds: ToolId[]): CapabilityRefs {
-  const capabilities: Record<string, CapabilityEntry> = {};
-  for (const [key, entry] of Object.entries(refs.capabilities)) {
-    capabilities[key] = { ...entry, refs: [...entry.refs] };
-  }
+  const capabilities = cloneCapabilities(refs);
 
   for (const toolId of toolIds) {
-    const key = capabilityIdOf(toolId);
-    const entry = capabilities[key];
-    if (entry !== undefined && entry.status === 'reclaiming') {
-      entry.status = 'reclaimed';
-      entry.at = Date.now();
-      delete entry.since;
-    }
+    reclaimOne(capabilities, capabilityIdOf(toolId));
   }
 
   return { schemaVersion: 1, capabilities };
@@ -246,24 +265,10 @@ export function claimSopModuleRefs(
   projectId: string,
   moduleIds: string[],
 ): CapabilityRefs {
-  const capabilities: Record<string, CapabilityEntry> = {};
-  for (const [key, entry] of Object.entries(refs.capabilities)) {
-    capabilities[key] = { ...entry, refs: [...entry.refs] };
-  }
+  const capabilities = cloneCapabilities(refs);
 
   for (const moduleId of moduleIds) {
-    const key = sopModuleIdOf(moduleId);
-    const entry = capabilities[key] ?? { languages: [], refs: [] };
-    const wasEmpty = entry.refs.length === 0;
-    if (!entry.refs.includes(projectId)) {
-      entry.refs.push(projectId);
-    }
-    // 唤醒：refs 从空变非空且此前 reclaiming → active + since 清除
-    if (wasEmpty && entry.refs.length > 0 && entry.status === 'reclaiming') {
-      entry.status = 'active';
-      delete entry.since;
-    }
-    capabilities[key] = entry;
+    claimOne(capabilities, sopModuleIdOf(moduleId), projectId);
   }
 
   return { schemaVersion: 1, capabilities };
@@ -278,19 +283,10 @@ export function claimSopModuleRefs(
  * 返回新对象（不可原地改）。
  */
 export function markSopModulesReclaimed(refs: CapabilityRefs, moduleIds: string[]): CapabilityRefs {
-  const capabilities: Record<string, CapabilityEntry> = {};
-  for (const [key, entry] of Object.entries(refs.capabilities)) {
-    capabilities[key] = { ...entry, refs: [...entry.refs] };
-  }
+  const capabilities = cloneCapabilities(refs);
 
   for (const moduleId of moduleIds) {
-    const key = sopModuleIdOf(moduleId);
-    const entry = capabilities[key];
-    if (entry !== undefined && entry.status === 'reclaiming') {
-      entry.status = 'reclaimed';
-      entry.at = Date.now();
-      delete entry.since;
-    }
+    reclaimOne(capabilities, sopModuleIdOf(moduleId));
   }
 
   return { schemaVersion: 1, capabilities };

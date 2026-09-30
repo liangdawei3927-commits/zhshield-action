@@ -15,6 +15,12 @@ import { PROJECTS_FILE } from './projects-file';
 export { PROJECTS_FILE };
 
 export function registerProjectsIpc(): void {
+  registerLoadProjectsHandler();
+  registerSaveProjectsHandler();
+  registerRemoveProjectHandler();
+}
+
+function registerLoadProjectsHandler(): void {
   ipcMain.handle('app:loadProjects', async (): Promise<Array<{ name: string; path: string }>> => {
     try {
       return JSON.parse(await readFile(PROJECTS_FILE, 'utf-8'));
@@ -25,7 +31,9 @@ export function registerProjectsIpc(): void {
     }
     return [];
   });
+}
 
+function registerSaveProjectsHandler(): void {
   ipcMain.handle(
     'app:saveProjects',
     async (_event, projects: Array<{ name: string; path: string }>): Promise<void> => {
@@ -44,7 +52,9 @@ export function registerProjectsIpc(): void {
       void import('../profile-drift').then((m) => m.rewatchProjectsAfterChange());
     },
   );
+}
 
+function registerRemoveProjectHandler(): void {
   ipcMain.handle(
     'app:removeProject',
     async (_event, projectPath: string): Promise<{ ok: boolean; errors?: string[] }> => {

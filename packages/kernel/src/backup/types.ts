@@ -7,13 +7,18 @@ import { projectBackupSegment } from './utils';
 
 // ─── 备份类型 ─────────────────────────────────────────────
 
+/** 备份方式：全量（同时走 GitHub 与本地）、仅 GitHub、仅本地 */
 export type BackupType = 'full' | 'github-only' | 'local-only';
+/** 备份整体状态：partial 表示部分子备份成功、部分失败 */
 export type BackupStatus = 'success' | 'partial' | 'failed';
+/** 备份触发来源：手动、定时调度或 API 调用 */
 export type BackupTrigger = 'manual' | 'schedule' | 'api';
+/** 备份执行阶段：GitHub 提交、GitHub 推送、本地拷贝、本地元数据写入 */
 export type BackupPhase = 'github-commit' | 'github-push' | 'local-copy' | 'local-metadata';
 
 // ─── 配置 ─────────────────────────────────────────────────
 
+/** GitHub 备份配置：目标仓库坐标、推送分支与提交信息前缀 */
 export interface GitHubBackupConfig {
   enabled: boolean;
   owner: string;
@@ -26,6 +31,7 @@ export interface GitHubBackupConfig {
 /** 快照载体形态：zip 为单文件归档，directory 为目录镜像（旧行为） */
 export type LocalBackupFormat = 'zip' | 'directory';
 
+/** 本地备份配置：存放目录、保留份数、排除规则与压缩/载体格式开关 */
 export interface LocalBackupConfig {
   enabled: boolean;
   backupDir: string;
@@ -35,6 +41,10 @@ export interface LocalBackupConfig {
   format: LocalBackupFormat;
 }
 
+/**
+ * 定时备份配置。
+ * dayOfWeek 仅 weekly 生效（0=周日），dayOfMonth 仅 monthly 生效。
+ */
 export interface BackupScheduleConfig {
   enabled: boolean;
   frequency: 'daily' | 'weekly' | 'monthly';
@@ -43,6 +53,7 @@ export interface BackupScheduleConfig {
   dayOfMonth?: number; // monthly
 }
 
+/** 备份总配置：GitHub、本地与定时三段配置的聚合（项目级 backup.yml 的根结构） */
 export interface BackupConfig {
   github: GitHubBackupConfig;
   local: LocalBackupConfig;
@@ -64,6 +75,10 @@ export const DEFAULT_EXCLUDE_PATTERNS = [
   '.env.local',
 ];
 
+/**
+ * 备份项目身份：用于生成项目级备份目录名。
+ * projectPath 优先，其次 projectId，最后退回 projectName。
+ */
 export interface BackupIdentity {
   projectId?: string;
   projectName?: string;
@@ -75,6 +90,9 @@ export interface BackupIdentity {
  * 由 LocalBackup.resolveBackupDir 在真正使用时展开为 home）。
  */
 export const DEFAULT_BACKUP_ROOT = '~/zhshield-backups';
+
+/** 尾部路径分隔符（正/反斜杠），defaultBackupConfig 归一化 rootDir 用 */
+const TRAILING_SLASHES = /[/\\]+$/;
 
 /**
  * 生成默认备份配置。
@@ -91,7 +109,7 @@ export function defaultBackupConfig(
     identity?.projectPath ?? identity?.projectId,
     identity?.projectName,
   );
-  const base = rootDir.replace(/[/\\]+$/, '') || DEFAULT_BACKUP_ROOT;
+  const base = rootDir.replace(TRAILING_SLASHES, '') || DEFAULT_BACKUP_ROOT;
   const backupDir = segment ? `${base}/${segment}` : base;
   return {
     github: {
@@ -120,6 +138,7 @@ export function defaultBackupConfig(
 
 // ─── 子结果 ───────────────────────────────────────────────
 
+/** GitHub 子备份结果：成功时给出 commitHash / repoUrl，失败时给出 error */
 export interface GitHubBackupSubResult {
   type: 'github';
   success: boolean;
@@ -130,6 +149,7 @@ export interface GitHubBackupSubResult {
   error?: string;
 }
 
+/** 本地子备份结果：成功时给出 backupPath / size / fileCount，失败时给出 error */
 export interface LocalBackupSubResult {
   type: 'local';
   success: boolean;
@@ -139,10 +159,15 @@ export interface LocalBackupSubResult {
   error?: string;
 }
 
+/** 子备份结果联合类型：以 type 字段区分 GitHub 与本地两条子结果分支 */
 export type BackupSubResult = GitHubBackupSubResult | LocalBackupSubResult;
 
 // ─── 总结果 ───────────────────────────────────────────────
 
+/**
+ * 备份总结果：聚合各子结果并给出 overallStatus 与耗时（毫秒）。
+ * 运行时结果，用作事件载荷与元数据落盘的来源。
+ */
 export interface BackupResult {
   projectId: string;
   projectName: string;
@@ -156,8 +181,10 @@ export interface BackupResult {
 
 // ─── 元数据（持久化） ─────────────────────────────────────
 
+/** 备份元数据的目标载体标签：写入 GitHub 仓库还是本地目录 */
 export type BackupTypeTag = 'github' | 'local';
 
+/** 备份元数据记录：持久化到本地索引的单次备份摘要，供历史列表与详情查询 */
 export interface BackupRecord {
   id: string; // bk_yyyymmdd_hhmmss
   projectId: string;
@@ -185,18 +212,21 @@ export interface BackupRecord {
 
 // ─── 事件载荷 ─────────────────────────────────────────────
 
+/** backup:request 事件载荷：仅声明要备份的项目与方式，具体执行由编排器接管 */
 export interface BackupRequestPayload {
   projectId: string;
   type: BackupType;
   trigger: BackupTrigger;
 }
 
+/** backup:started 事件载荷：备份已受理并分配 backupId */
 export interface BackupStartedPayload {
   projectId: string;
   backupId: string;
   type: BackupType;
 }
 
+/** backup:progress 事件载荷：按 phase 上报当前阶段与完成百分比（0-100） */
 export interface BackupProgressPayload {
   projectId: string;
   backupId: string;
@@ -205,12 +235,17 @@ export interface BackupProgressPayload {
   message: string;
 }
 
+/** backup:completed 事件载荷：携带本次备份的完整总结果 */
 export interface BackupCompletedPayload {
   projectId: string;
   backupId: string;
   result: BackupResult;
 }
 
+/**
+ * backup:failed 事件载荷。
+ * partialResult 在部分子备份已成功时提供，用于保留已产出的备份信息。
+ */
 export interface BackupFailedPayload {
   projectId: string;
   backupId: string;
@@ -218,6 +253,7 @@ export interface BackupFailedPayload {
   partialResult?: BackupResult;
 }
 
+/** backup:config-updated 事件载荷：广播某项目最新的完整备份配置 */
 export interface BackupConfigUpdatedPayload {
   projectId: string;
   config: BackupConfig;
@@ -228,6 +264,7 @@ export interface BackupConfigUpdatedPayload {
 /** 备份条目落盘压缩格式（写入 BACKUP_MANIFEST.json，恢复时按此解压） */
 export type LocalBackupCompression = 'none' | 'gzip';
 
+/** 本地备份清单中的单文件条目：落盘路径、哈希与大小，storedAs / compression 兼容旧版清单 */
 export interface LocalBackupFileEntry {
   relativePath: string;
   hash: string;
@@ -252,6 +289,7 @@ export interface LocalBackupRestoreResult {
   problems: string[];
 }
 
+/** 本地备份清单：记录备份来源、时间信息与全部文件条目（与增量清单同构） */
 export interface LocalBackupManifest {
   version: string;
   sourceDir: string;

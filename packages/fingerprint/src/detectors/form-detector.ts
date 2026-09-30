@@ -59,14 +59,28 @@ export class FormDetector implements Detector {
   async detect(projectPath: string): Promise<Signal[]> {
     const signals: Signal[] = [];
     for (const bundle of findXcodeBundles(projectPath)) {
-      signals.push(makeSignal(KIND, 'form:xcodeproj', bundle, this.weight, { productForm: 'ios' }));
+      signals.push(
+        makeSignal({
+          kind: KIND,
+          ruleId: 'form:xcodeproj',
+          file: bundle,
+          weight: this.weight,
+          payload: { productForm: 'ios' },
+        }),
+      );
     }
     for (const rel of walkFiles(projectPath)) {
       const name = rel.slice(rel.lastIndexOf('/') + 1);
       for (const rule of FORM_FILE_RULES) {
         if (rule.match(name)) {
           signals.push(
-            makeSignal(KIND, rule.ruleId, rel, this.weight, { productForm: rule.productForm }),
+            makeSignal({
+              kind: KIND,
+              ruleId: rule.ruleId,
+              file: rel,
+              weight: this.weight,
+              payload: { productForm: rule.productForm },
+            }),
           );
         }
       }
@@ -78,29 +92,55 @@ export class FormDetector implements Detector {
           continue;
         }
         if (hasDbConfigMarker(content))
-          signals.push(makeSignal(KIND, 'form:db-config', rel, this.weight, {}));
+          signals.push(
+            makeSignal({
+              kind: KIND,
+              ruleId: 'form:db-config',
+              file: rel,
+              weight: this.weight,
+              payload: {},
+            }),
+          );
       }
       const deps = readManifestDepNames(projectPath, rel, name);
       if (deps.size === 0) continue;
       if (deps.has('electron'))
         signals.push(
-          makeSignal(KIND, 'form:electron', rel, this.weight, {
-            dependency: 'electron',
-            productForm: 'pc',
+          makeSignal({
+            kind: KIND,
+            ruleId: 'form:electron',
+            file: rel,
+            weight: this.weight,
+            payload: {
+              dependency: 'electron',
+              productForm: 'pc',
+            },
           }),
         );
       if (deps.has('react-native'))
         signals.push(
-          makeSignal(KIND, 'form:react-native', rel, this.weight, {
-            dependency: 'react-native',
-            productForm: 'mobile',
+          makeSignal({
+            kind: KIND,
+            ruleId: 'form:react-native',
+            file: rel,
+            weight: this.weight,
+            payload: {
+              dependency: 'react-native',
+              productForm: 'mobile',
+            },
           }),
         );
       if (deps.has('@tarojs/cli') || deps.has('@tarojs/taro') || deps.has('taro')) {
         signals.push(
-          makeSignal(KIND, 'form:taro', rel, this.weight, {
-            dependency: 'taro',
-            productForm: 'miniapp',
+          makeSignal({
+            kind: KIND,
+            ruleId: 'form:taro',
+            file: rel,
+            weight: this.weight,
+            payload: {
+              dependency: 'taro',
+              productForm: 'miniapp',
+            },
           }),
         );
       }
@@ -113,7 +153,13 @@ export class FormDetector implements Detector {
       }
       if (hasServerFramework) {
         signals.push(
-          makeSignal(KIND, 'form:server-framework', rel, this.weight, { productForm: 'backend' }),
+          makeSignal({
+            kind: KIND,
+            ruleId: 'form:server-framework',
+            file: rel,
+            weight: this.weight,
+            payload: { productForm: 'backend' },
+          }),
         );
       }
     }

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
 import { useToast } from '../components/ui/Toast';
-import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 /**
@@ -189,19 +189,8 @@ function toAiIssue(finding: TyposquatFindingData): AiFixIssue {
     severity: t(cfg.labelKey),
     message: `${finding.nodeId} — ${finding.evidence.join('；')}`,
     suggestion: t('page.deps.typosquat.suggestion'),
+    domain: 'deps',
   };
-}
-
-function copyIssuesToAi(
-  projectPath: string,
-  issues: AiFixIssue[],
-  toast: (msg: string, variant?: 'success' | 'error' | 'warning' | 'info') => void,
-): void {
-  const text = buildAiFixPrompt(projectPath, issues);
-  void copyTextToClipboard(text).then(
-    (ok) => (ok ? toast(t('toast.copiedToAi')) : toast(t('toast.copyFailed'), 'error')),
-    () => toast(t('toast.copyFailed'), 'error'),
-  );
 }
 
 function useDependencyCopyToAi(projectPath: string): {
@@ -211,14 +200,14 @@ function useDependencyCopyToAi(projectPath: string): {
   const { toast } = useToast();
 
   const copyToAi = useCallback(
-    (finding: TyposquatFindingData) => copyIssuesToAi(projectPath, [toAiIssue(finding)], toast),
+    (finding: TyposquatFindingData) => copyIssuesToAi(projectPath, toast, [toAiIssue(finding)]),
     [projectPath, toast],
   );
 
   const copyAllToAi = useCallback(
     (findings: TyposquatFindingData[]) => {
       if (findings.length === 0) return;
-      copyIssuesToAi(projectPath, findings.map(toAiIssue), toast);
+      copyIssuesToAi(projectPath, toast, findings.map(toAiIssue));
     },
     [projectPath, toast],
   );

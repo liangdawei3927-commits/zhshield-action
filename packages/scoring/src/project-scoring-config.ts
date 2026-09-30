@@ -87,13 +87,22 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function requireNumber(
-  container: Record<string, unknown>,
-  key: string,
-  label: string,
-  filePath: string | null,
-  opts: { min?: number; max?: number } = {},
-): void {
+/** requireNumber 参数对象 */
+interface RequireNumberParams {
+  container: Record<string, unknown>;
+  key: string;
+  label: string;
+  filePath: string | null;
+  opts?: { min?: number; max?: number };
+}
+
+function requireNumber({
+  container,
+  key,
+  label,
+  filePath,
+  opts = {},
+}: RequireNumberParams): void {
   const value = container[key];
   if (value === undefined) return;
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -182,7 +191,13 @@ function validateDimensionOverride(
     filePath,
   );
 
-  requireNumber(dimOverride, 'weight', `维度 "${dimId}"`, filePath, { min: 0, max: 1 });
+  requireNumber({
+    container: dimOverride,
+    key: 'weight',
+    label: `维度 "${dimId}"`,
+    filePath,
+    opts: { min: 0, max: 1 },
+  });
 
   const penalties = dimOverride.penalties;
   if (penalties !== undefined) {
@@ -209,8 +224,20 @@ function validatePenaltyOverrides(
     `维度 "${dimId}".penalties`,
     filePath,
   );
-  requireNumber(penalties, 'maxPenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
-  requireNumber(penalties, 'perIssuePenalty', `维度 "${dimId}".penalties`, filePath, { min: 0 });
+  requireNumber({
+    container: penalties,
+    key: 'maxPenalty',
+    label: `维度 "${dimId}".penalties`,
+    filePath,
+    opts: { min: 0 },
+  });
+  requireNumber({
+    container: penalties,
+    key: 'perIssuePenalty',
+    label: `维度 "${dimId}".penalties`,
+    filePath,
+    opts: { min: 0 },
+  });
 
   const multipliers = penalties.severityMultipliers;
   if (multipliers !== undefined) {
@@ -263,8 +290,12 @@ function validatePositiveRuleOverrides(
       `维度 "${dimId}".positiveRules.${ruleId}`,
       filePath,
     );
-    requireNumber(ruleOverride, 'points', `维度 "${dimId}".positiveRules.${ruleId}`, filePath, {
-      min: 0,
+    requireNumber({
+      container: ruleOverride,
+      key: 'points',
+      label: `维度 "${dimId}".positiveRules.${ruleId}`,
+      filePath,
+      opts: { min: 0 },
     });
   }
 }

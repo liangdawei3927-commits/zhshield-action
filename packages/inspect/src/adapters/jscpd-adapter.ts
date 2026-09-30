@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,10 +10,47 @@ import type {
   AccessScope,
 } from '@zh/shared';
 import { FileHelper } from '@zh/kernel';
-import { resolveToolCommand } from './tool-bin';
-import { isCommandAvailable } from './tool-available';
+import {
+  asToolExecError,
+  buildAccessScope,
+  buildToolResult,
+  execTool,
+  ToolCommandResolver,
+} from './tool-runner';
 
-const execFileAsync = promisify(execFile);
+/** jscpd `--version` 输出解析（模块级复用，避免每次探测重建） */
+const JSCPD_VERSION_RE = /(\d+)\.(\d+)/;
+
+/**
+ * 不计入重复检测的路径（jscpd --ignore 与 AccessScope.excludePaths 共用同一份清单）。
+ *
+ * - dist/build 编译输出与 src 成对重复，占整仓重复报告大头（自扫误报）
+ * - .semgrep/inline-*.yml 为 SemgrepRuleWriter 生成的临时内联规则，内容同源互相重复
+ * - package.json 头部样板 / 测试与夹具结构（__tests__、*.test.*、e2e、fixtures）按脚手架约定重复为常态
+ * - Markdown 不是代码：jscpd 5.x 的 markdown 解析器会把同一段落的两个半边报成互相克隆
+ *   （firstFile/secondFile 指向同一文件同一行区间），产生无法处理的噪声条目
+ * - sop-templates / test-fixtures / assets / db/migrations 是模板与迁移脚本样板
+ */
+const JSCPD_IGNORED_PATHS: readonly string[] = [
+  '**/dist/**',
+  '**/build/**',
+  '**/.semgrep/**',
+  '**/package.json',
+  '**/tsconfig*.json',
+  '**/__tests__/**',
+  '**/*.test.ts',
+  '**/*.test.tsx',
+  '**/*.spec.ts',
+  '**/*.spec.tsx',
+  '**/e2e/**',
+  '**/fixtures/**',
+  '**/vitest.config.*',
+  '**/sop-templates/**',
+  '**/test-fixtures/**',
+  '**/assets/**',
+  '**/db/migrations/**',
+  '**/*.md',
+];
 
 const META: ToolMeta = {
   id: 'jscpd',
@@ -60,48 +95,25 @@ interface JscpdReport {
 
 export class JscpdAdapter implements ToolAdapter {
   meta = META;
-  /** 按锚点（projectRoot ?? projectPath）缓存解析结果；isAvailable 的无锚点 PATH 探测与 scan 的项目本地解析互不污染（09-12 复验修复） */
-  private readonly commandCache = new Map<string, Promise<string>>();
-  private readonly projectRoot?: string;
+  private readonly commands: ToolCommandResolver;
 
   /** F5：jscpd 默认对 src/ 做复制粘贴检测（targetFiles[0] 可覆盖目标）；
    *  monorepo（无顶层 src）时经 resolveTargetDir 落到 packages/，故同时声明 packages 读取范围 */
-  readonly accessScope: AccessScope = {
-    readPaths: ['src/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
-    excludePaths: [
-      '**/node_modules/**',
-      // 扫描器自增产物/压缩部署物不是源码，不应进入重复检测：
-      // - dist/build 编译输出与 src 成对重复，占整仓重复报告大头（自扫误报）
-      // - .semgrep/inline-*.yml 为 SemgrepRuleWriter 生成的临时内联规则，内容同源互相重复
-      '**/dist/**',
-      '**/build/**',
-      '**/.semgrep/**',
-    ],
-  };
+  readonly accessScope: AccessScope = buildAccessScope(
+    ['src/**/*.{ts,tsx,js,jsx}', 'packages/**/*.{ts,tsx,js,jsx}'],
+    ['**/node_modules/**', ...JSCPD_IGNORED_PATHS],
+  );
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot;
-  }
-
-  private resolveCommand(projectPath?: string): Promise<string> {
-    // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：anchor = projectRoot ?? projectPath，
-    // 无锚点时仅 PATH/共享目录探测（isAvailable 用），scan 时以 options.projectPath 锚定本地 bin。
-    const anchor = this.projectRoot ?? projectPath;
-    const key = anchor ?? '';
-    let cached = this.commandCache.get(key);
-    if (!cached) {
-      cached = resolveToolCommand('jscpd', anchor);
-      this.commandCache.set(key, cached);
-    }
-    return cached;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return isCommandAvailable(() => this.resolveCommand());
+    this.commands = new ToolCommandResolver('jscpd', projectRoot);
   }
 
   /** 缓存的 jscpd 版本号（major, minor），首次探测后复用 */
   private versionInfo?: { major: number; minor: number };
+
+  async isAvailable(): Promise<boolean> {
+    return this.commands.isAvailable();
+  }
 
   /**
    * 探测 jscpd 版本。jscpd 5.x 起 CLI 语义发生破坏性变更（见 executeJscpd 注释），
@@ -111,9 +123,9 @@ export class JscpdAdapter implements ToolAdapter {
     if (this.versionInfo) return this.versionInfo;
     try {
       // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：版本探测与执行使用同一锚点命令
-      const command = await this.resolveCommand(projectPath);
-      const { stdout } = await execFileAsync(command, ['--version'], { timeout: 20000 });
-      const m = /(\d+)\.(\d+)/.exec(stdout.trim());
+      const command = await this.commands.resolve(projectPath);
+      const { stdout } = await execTool(command, ['--version'], { timeout: 20000 });
+      const m = JSCPD_VERSION_RE.exec(stdout.trim());
       this.versionInfo = m
         ? { major: Number(m[1]), minor: Number(m[2]) }
         : { major: 0, minor: 0 };
@@ -167,23 +179,31 @@ export class JscpdAdapter implements ToolAdapter {
     reportPath: string,
   ): Promise<void> {
     const projectPath = path.resolve(options.projectPath);
-    const command = await this.resolveCommand(projectPath);
+    const command = await this.commands.resolve(projectPath);
     await FileHelper.ensureDir(path.dirname(reportPath));
     const { major } = await this.detectVersion(projectPath);
     // jscpd ≥5.x 破坏性变更: --format 由"输出格式"变为"输入文件格式",
     // --output 由"文件路径"变为"输出目录"; JSON 报告改用 --reporters json 生成,
     // 输出到 <output>/jscpd-report.json。旧版(<5)维持原参数集。
-    // 生成物与扫描器临时规则不计入重复检测：dist/build 编译输出与 src 成对重复，
-    // .semgrep/inline-*.yml 为 SemgrepRuleWriter 生成的同源临时规则（accessScope 同步排除）
-    const ignore = ['**/dist/**', '**/build/**', '**/.semgrep/**'];
+    // --ignore 与 accessScope.excludePaths 同步排除生成物/脚手架样板（JSCPD_IGNORED_PATHS）
+    // SOP 规则顶层 thresholds（minLines/minTokens）经 ContentInterpreter 并入 options.config.thresholds：
+    // jscpd CLI 有 --min-lines/--min-tokens（两者 ≥2.x 均支持），minSimilarity 无 CLI 标志（由 --mode strict 表达）。
+    // 未声明时保持旧行为（jscpd 默认阈值），避免无规则直扫模式下行为回归。
+    const thresholds = options.config?.thresholds ?? {};
+    const thresholdArgs: string[] = [];
+    if (typeof thresholds.minLines === 'number' && Number.isFinite(thresholds.minLines)) {
+      thresholdArgs.push('--min-lines', String(thresholds.minLines));
+    }
+    if (typeof thresholds.minTokens === 'number' && Number.isFinite(thresholds.minTokens)) {
+      thresholdArgs.push('--min-tokens', String(thresholds.minTokens));
+    }
     const args =
       major >= 5
-        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', '--ignore', ignore.join(','), target]
-        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', '--ignore', ignore.join(','), target];
-    await execFileAsync(command, args, {
+        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', '--ignore', JSCPD_IGNORED_PATHS.join(','), ...thresholdArgs, target]
+        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', '--ignore', JSCPD_IGNORED_PATHS.join(','), ...thresholdArgs, target];
+    await execTool(command, args, {
       cwd: projectPath,
       timeout: options.timeout || 60000,
-      maxBuffer: 10 * 1024 * 1024,
     });
   }
 
@@ -207,17 +227,13 @@ export class JscpdAdapter implements ToolAdapter {
 
   /** 组装 jscpd 可用结果 */
   private buildJscpdAvailable(content: JscpdReport, issues: Issue[], start: number): ToolResult {
-    return {
+    return buildToolResult({
       tool: 'jscpd',
       status: 'available',
       issues,
-      metadata: {
-        version: '',
-        duration: Date.now() - start,
-        timestamp: new Date(),
-        fileCount: content?.statistics?.detection?.total?.count || 0,
-      },
-    };
+      start,
+      fileCount: content?.statistics?.detection?.total?.count || 0,
+    });
   }
 
   /** 处理 jscpd 执行错误：清理报告 / 未安装 / 失败 */
@@ -228,28 +244,23 @@ export class JscpdAdapter implements ToolAdapter {
   ): Promise<ToolResult> {
     await this.cleanupReport(reportPath);
 
-    const err = error as { code?: string; stderr?: string; message?: string };
+    const err = asToolExecError(error);
     if (err.code === 'ENOENT') {
-      return {
+      return buildToolResult({
         tool: 'jscpd',
         status: 'unavailable',
         issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
+        start,
         error: 'jscpd 未安装',
-      };
+      });
     }
-    return {
+    return buildToolResult({
       tool: 'jscpd',
       status: 'error',
       issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
+      start,
       error: err.stderr || err.message || 'jscpd 执行失败',
-    };
+    });
   }
 
   private async cleanupReport(reportPath: string): Promise<void> {
@@ -263,14 +274,18 @@ export class JscpdAdapter implements ToolAdapter {
   private mapOutput(output: unknown): Issue[] {
     const out = output as JscpdReport;
     if (!out?.duplicates || !Array.isArray(out.duplicates)) return [];
-    return out.duplicates.map((d, idx) => {
+    const issues: Issue[] = [];
+    for (const [idx, d] of out.duplicates.entries()) {
       const firstFile = d.firstFile?.name || d.first?.location?.path || d.first?.path || '';
       const firstLines = d.firstFile?.startLoc?.line || d.first?.location?.start?.line || d.first?.position?.start?.line || 0;
       const secondFile = d.secondFile?.name || d.second?.location?.path || d.second?.path || d.second?.position?.path || '';
       const secondStart = d.secondFile?.startLoc?.line || d.second?.location?.start?.line || d.second?.position?.start?.line || 0;
       const secondEnd = d.secondFile?.endLoc?.line || d.secondFile?.startLoc?.line || d.second?.location?.end?.line || d.second?.position?.end?.line || secondStart;
+      // 克隆须位于两个不同位置：上游对非代码格式偶发上报「同一文件同一行」自比条目，
+      // 该类记录定位不到可提取的第二个代码块，只会污染报告
+      if (firstFile === secondFile && firstLines === secondStart) continue;
       const format = d.format || 'code';
-      return {
+      issues.push({
         id: randomUUID(),
         ruleId: 'jscpd/duplicate',
         severity: 'warning',
@@ -283,7 +298,8 @@ export class JscpdAdapter implements ToolAdapter {
         autoFixable: false,
         source: 'inspect',
         fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,
-      };
-    });
+      });
+    }
+    return issues;
   }
 }

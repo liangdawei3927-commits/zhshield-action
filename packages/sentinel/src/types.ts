@@ -1,3 +1,4 @@
+/** 事件在自动修复流水线中的生命周期状态（检测 → 派单 → 修复 → 验证 → 合并/部署，含人工接管与回滚） */
 export type EventStatus =
   | 'detected'
   | 'assigned'
@@ -11,7 +12,9 @@ export type EventStatus =
   | 'rolled_back'
   | 'manual_taken_over';
 
+/** 事件严重级别，p1 最高优先级 */
 export type EventSeverity = 'p1' | 'p2' | 'p3';
+/** 哨兵可采集/归类的事件类型 */
 export type EventType =
   | 'runtime-exception'
   | 'http-error'
@@ -23,6 +26,7 @@ export type EventType =
   | 'memory-leak'
   | 'timeout';
 
+/** 哨兵事件实体：一次异常的上报记录，含去重键、验证结论、上下文与状态流转历史 */
 export interface SentinelEvent {
   id: string;
   projectId: string;
@@ -50,6 +54,7 @@ export interface SentinelEvent {
   lastSeen: Date;
 }
 
+/** 告警通知负载（Alertmanager 兼容结构），转发至各接收渠道 */
 export interface AlertPayload {
   receiver: string;
   status: 'firing' | 'resolved';

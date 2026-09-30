@@ -1,5 +1,6 @@
 // ─── 数据库行类型 ─────────────────────────────────────────
 
+/** projects 表行：被巡检项目登记项，path 唯一（迁移 001；迁移 009 另加可空 org_id） */
 export interface ProjectRow {
   id: string;
   name: string;
@@ -8,6 +9,7 @@ export interface ProjectRow {
   updated_at: string;
 }
 
+/** scores 表行：项目某次健康评分快照，取最新一条即当前分（迁移 002） */
 export interface ScoreRow {
   id: number;
   project_id: string;
@@ -18,6 +20,7 @@ export interface ScoreRow {
   created_at: string;
 }
 
+/** scanning_results 表行：按 (project, source) 记录的单工具扫描结论（迁移 003） */
 export interface ScanningResultRow {
   id: number;
   project_id: string;
@@ -28,6 +31,7 @@ export interface ScanningResultRow {
   created_at: string;
 }
 
+/** rules 表行：规则的启用状态与最近一次变更留痕（迁移 004） */
 export interface RuleRow {
   id: string;
   rule_id: string;
@@ -39,6 +43,7 @@ export interface RuleRow {
   changed_at: string;
 }
 
+/** experiences 表行：经验校准样本（全局库，不随项目删除，迁移 005/012） */
 export interface ExperienceRow {
   id: string;
   project_id: string;
@@ -51,12 +56,14 @@ export interface ExperienceRow {
 
 // ─── 查询参数类型 ─────────────────────────────────────────
 
+/** 新增项目入参（added_at/updated_at 交由 SQLite 默认值填充） */
 export interface CreateProjectParams {
   id: string;
   name: string;
   path: string;
 }
 
+/** 写入评分入参（dimensions 为各维度评分明细的序列化文本） */
 export interface SaveScoreParams {
   projectId: string;
   overall: number;
@@ -65,6 +72,7 @@ export interface SaveScoreParams {
   trend: 'improving' | 'stable' | 'declining';
 }
 
+/** 写入扫描结果入参（passed 为布尔，落库转 0/1；report 缺省写 NULL） */
 export interface SaveScanResultParams {
   projectId: string;
   source: string;
@@ -73,6 +81,7 @@ export interface SaveScanResultParams {
   report?: string;
 }
 
+/** 规则 upsert 入参（按 rule_id 覆盖；state 缺省沿用库中现值，不传即不改） */
 export interface UpsertRuleParams {
   ruleId: string;
   state?: 'active' | 'disabled' | 'deprecated' | 'experimental';
@@ -84,6 +93,7 @@ export interface UpsertRuleParams {
 
 // ─── Sentinel Events ───────────────────────────────────────
 
+/** sentinel_events 表行：哨兵事件持久化记录，validation/context/history 为 JSON 文本（迁移 006） */
 export interface SentinelEventRow {
   id: string;
   project_id: string;
@@ -104,6 +114,7 @@ export interface SentinelEventRow {
   updated_at: string;
 }
 
+/** 新增哨兵事件入参（首次落库；时间字段在此以 Date 传入，落库转文本） */
 export interface CreateSentinelEventParams {
   id: string;
   projectId: string;
@@ -122,6 +133,7 @@ export interface CreateSentinelEventParams {
   lastSeen: Date;
 }
 
+/** 哨兵事件局部更新入参：仅写入显式传入的字段（undefined 跳过），用于状态流转与去重累加 */
 export interface UpdateSentinelEventParams {
   id: string;
   status?: string;
@@ -131,6 +143,7 @@ export interface UpdateSentinelEventParams {
   lastSeen?: Date;
 }
 
+/** 哨兵事件列表过滤条件（全不传即不过滤；limit/offset 为分页） */
 export interface ListSentinelEventsFilter {
   projectId?: string;
   status?: string;
@@ -139,6 +152,7 @@ export interface ListSentinelEventsFilter {
   offset?: number;
 }
 
+/** 写入经验样本入参（detail/source 可空，落库为 NULL；created_at 用默认值） */
 export interface SaveExperienceParams {
   id: string;
   projectId: string;
@@ -148,6 +162,7 @@ export interface SaveExperienceParams {
   source?: string;
 }
 
+/** 技术债治理动作入参：一次还债动作的度量与排期（issueIds 落库为 TEXT，迁移 007） */
 export interface SaveDebtActionParams {
   projectId: string;
   actionId: string;
@@ -162,6 +177,7 @@ export interface SaveDebtActionParams {
   gate?: string;
 }
 
+/** debt_actions 表行：技术债动作，主键 (project_id, action_id)（迁移 007） */
 export interface DebtActionRow {
   project_id: string;
   action_id: string;
@@ -178,17 +194,20 @@ export interface DebtActionRow {
   updated_at: string;
 }
 
+/** 技术债动作状态流转入参：只改 status，定位键为 (projectId, actionId) */
 export interface UpdateDebtActionStatusParams {
   projectId: string;
   actionId: string;
   status: SaveDebtActionParams['status'];
 }
 
+/** 写入技术债指数快照入参（debtIndex 为该时点的债务指数） */
 export interface SaveDebtSnapshotParams {
   projectId: string;
   debtIndex: number;
 }
 
+/** debt_snapshots 表行：技术债指数时序快照，取 id 最大一条即当前指数（迁移 007） */
 export interface DebtSnapshotRow {
   id: number;
   project_id: string;
@@ -198,6 +217,7 @@ export interface DebtSnapshotRow {
 
 // ─── M3 轻量 Org 多租户（迁移 009）────────────────────────
 
+/** orgs 表行：租户组织（迁移 009） */
 export interface OrgRow {
   id: string;
   name: string;
@@ -205,6 +225,7 @@ export interface OrgRow {
   created_at: string;
 }
 
+/** org_members 表行：组织成员与角色，(org_id, user_id) 唯一；随组织级联删除（迁移 009） */
 export interface OrgMemberRow {
   id: string;
   org_id: string;
@@ -213,6 +234,10 @@ export interface OrgMemberRow {
   created_at: string;
 }
 
+/**
+ * rule_scope 表行：按租户的规则启用/版本快照。
+ * org_id 为 NULL = 平台默认（全局兜底）；组织行覆盖平台行的合并语义在查询层实现（迁移 009）。
+ */
 export interface RuleScopeRow {
   id: string;
   rule_id: string;
@@ -224,6 +249,7 @@ export interface RuleScopeRow {
   published_at: string;
 }
 
+/** project_features 表行：项目画像快照（客户端 T0 注册提交、服务端 T1 resolve 依据），每项目唯一（迁移 009） */
 export interface ProjectFeatureRow {
   id: string;
   project_id: string;
@@ -234,12 +260,14 @@ export interface ProjectFeatureRow {
   updated_at: string;
 }
 
+/** 新增组织入参（ownerUserId 落库为 owner_user_id） */
 export interface CreateOrgParams {
   id: string;
   name: string;
   ownerUserId: string;
 }
 
+/** 新增组织成员入参（role 复用 OrgMemberRow['role'] 保证三处取值不漂移） */
 export interface AddOrgMemberParams {
   id: string;
   orgId: string;
@@ -247,6 +275,7 @@ export interface AddOrgMemberParams {
   role: OrgMemberRow['role'];
 }
 
+/** rule_scope upsert 入参（enabled 为布尔，落库转 0/1；orgId=null 写平台默认行） */
 export interface UpsertRuleScopeParams {
   id: string;
   ruleId: string;
@@ -258,6 +287,7 @@ export interface UpsertRuleScopeParams {
   source?: RuleScopeRow['source'];
 }
 
+/** 写入项目画像入参（features 数组序列化为 features_json 落库） */
 export interface SaveProjectFeaturesParams {
   id: string;
   projectId: string;

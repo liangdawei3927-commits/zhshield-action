@@ -70,17 +70,25 @@ export function defaultBudgetFilePath(): string {
  */
 export function loadPerfBudgets(filePath?: string): PerfBudget[] {
   const target = filePath ?? defaultBudgetFilePath();
-  if (!fs.existsSync(target)) return DEFAULT_BUDGETS;
+  const raw = readRawBudgets(target);
+  if (raw === null) return DEFAULT_BUDGETS;
+  const budgets = parseBudgetEntries(raw);
+  return budgets.length > 0 ? budgets : DEFAULT_BUDGETS;
+}
 
-  let raw: unknown;
+/** 读取预算文件：文件缺失或解析失败 → null（调用方回退内置默认预算） */
+function readRawBudgets(target: string): unknown | null {
+  if (!fs.existsSync(target)) return null;
   try {
-    raw = yaml.load(fs.readFileSync(target, 'utf8'));
+    return yaml.load(fs.readFileSync(target, 'utf8'));
   } catch {
-    return DEFAULT_BUDGETS;
+    return null;
   }
+}
 
-  if (!Array.isArray(raw)) return DEFAULT_BUDGETS;
-
+/** 将原始 YAML 条目解析为 PerfBudget[]（无合法条目时返回空数组） */
+function parseBudgetEntries(raw: unknown): PerfBudget[] {
+  if (!Array.isArray(raw)) return [];
   const budgets: PerfBudget[] = [];
   for (const entry of raw as RawBudgetEntry[]) {
     const config = entry?.content?.check?.budgetConfig;
@@ -89,13 +97,12 @@ export function loadPerfBudgets(filePath?: string): PerfBudget[] {
       ruleId: config.ruleId,
       name: entry.name ?? config.ruleId,
       thresholdMs: config.thresholdMs,
-      anchorMs: typeof config.anchorMs === 'number' ? config.anchorMs : undefined,
+      ...(typeof config.anchorMs === 'number' ? { anchorMs: config.anchorMs } : {}),
       severity: config.severity ?? entry.severity ?? 'warning',
       description: entry.description ?? '',
     });
   }
-
-  return budgets.length > 0 ? budgets : DEFAULT_BUDGETS;
+  return budgets;
 }
 
 /**

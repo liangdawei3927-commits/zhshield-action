@@ -38,6 +38,7 @@ export type { LanguageCode, LanguageInfo, ResolvedLanguage };
 /** 进程级共享翻译实例（模块加载即初始化，可直接 t()） */
 export const i18n: I18nInstance = i18next.createInstance();
 
+/** i18n 初始化选项：目标语言与缺失键的回退语言 */
 export interface InitI18nOptions {
   /** 目标语言；缺省沿用已初始化的语言 */
   lng?: LanguageCode;

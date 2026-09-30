@@ -25,7 +25,87 @@
       "requirementsTitle": "Handling requirements:",
       "ruleLabel": "- Rule: {{ruleId}}",
       "severityLabel": "- Severity: {{severity}}",
-      "suggestionLabel": "- Suggestion: {{suggestion}}"
+      "suggestionLabel": "- Suggestion: {{suggestion}}",
+      "domainRequirements": {
+        "guard": {
+          "title": "Fix requirements (gate/CI):",
+          "r1": "1. Verify each gate failure is real (rule out environment/timeout false failures); reproduce before fixing.",
+          "r2": "2. Fix the root cause itself; do NOT bypass the gate with --no-verify, disabling rules, or adjusting thresholds.",
+          "r3": "3. If a rule/config change is truly needed, explain the reason and impact; no silent changes.",
+          "r4": "4. Re-run the corresponding gate check to verify it passes; honestly report items that still fail."
+        },
+        "inspect": {
+          "title": "Fix requirements (inspection):",
+          "r1": "1. Read each ruleId and message, locate file:line, and confirm the issue really exists (rule out false positives) before acting.",
+          "r2": "2. Make the minimal fix per the rule intent (remove unused vars / dead code / fix boundary defects); no unrelated refactoring.",
+          "r3": "3. Do not modify the diagnostics file itself; do not silence issues with eslint-disable etc. unless genuinely necessary (explain why).",
+          "r4": "4. Run related tests / type checks afterwards; report results and remaining items."
+        },
+        "sentinel": {
+          "title": "Fix requirements (sentinel events):",
+          "r1": "1. First confirm the event is a real fault (rule out false positives / environment flakiness), then classify it: code defect / configuration issue / environment cause, with supporting evidence.",
+          "r2": "2. Code defect: minimal fix, then point out the fix site; config issue: correct the configuration and explain how it takes effect.",
+          "r3": "3. Environment/infrastructure: do not change code; provide evidence and recommendations (thresholds, retry policy, etc.).",
+          "r4": "4. If it cannot be reproduced locally, state the repro conditions and evidence; do not fake a fix."
+        },
+        "vuln": {
+          "title": "Fix requirements (security vulnerabilities):",
+          "r1": "1. Verify each vulnerability is real (matching dependency version / reachable attack surface), rule out false positives, then describe input sources and call chain before acting.",
+          "r2": "2. Minimal fix: patch the defect itself (input validation / boundary handling / dependency upgrade). No new dependencies, no big refactor.",
+          "r3": "3. Do not break existing interface contracts; explain first if the change spans files.",
+          "r4": "4. Run related tests / type checks after fixing; honestly explain if local verification is impossible."
+        },
+        "malware": {
+          "title": "Fix requirements (malicious code):",
+          "r1": "1. First confirm the payload is genuinely malicious (rule out test samples, already-quarantined files), then REMOVE/ISOLATE it — never patch.",
+          "r2": "2. Locate file:line, remove the malicious code/dependency; for supply-chain cases (disguised packages) also update the package manifest and lockfile.",
+          "r3": "3. Do not output or copy the malicious payload verbatim in replies; describe location, pattern, and the handling action only.",
+          "r4": "4. After handling, describe how to re-verify (rescan shows zero findings) and report other files that look related."
+        },
+        "secrets": {
+          "title": "Fix requirements (secret leakage):",
+          "r1": "1. Locate each secret (file:line and commit history) and first verify it is a real secret (rule out test placeholders / demo values).",
+          "r2": "2. Real secrets: remove them from code/config, replace with environment variables or a secrets manager reference; never output the secret value in replies.",
+          "r3": "3. If committed to git history or pushed to remote: honestly report locations, commits, and rotation advice; do not create commits on your own.",
+          "r4": "4. Only handle listed secrets; after finishing, describe how to re-verify (secret scan findings should decrease)."
+        },
+        "deps": {
+          "title": "Fix requirements (dependency risks):",
+          "r1": "1. Verify each risky dependency truly exists and is a genuine lookalike (compare against official repo / package metadata, rule out similarly-named normal packages) before deciding the action.",
+          "r2": "2. typosquat lookalikes: replace with the correct package name, update manifest and lockfile, reinstall; first check which code references it.",
+          "r3": "3. Update referenced locations accordingly; ask when unsure, do not guess replacements.",
+          "r4": "4. After finishing, give a lockfile change summary and reinstall verification results."
+        },
+        "garbage": {
+          "title": "Fix requirements (cleanup):",
+          "r1": "1. Before deletion, verify each item is truly unreferenced (source imports, dynamic require, config files, script paths); delete only when unreferenced.",
+          "r2": "2. Handle one item at a time; after handling, confirm the item (file / export / dependency) is no longer referenced.",
+          "r3": "3. Do not rename, move, or opportunistically refactor referenced code.",
+          "r4": "4. Afterwards verify existence: the item is gone and no new errors were introduced."
+        },
+        "performance": {
+          "title": "Fix requirements (performance):",
+          "r1": "1. Locate each performance problem and its cause, and confirm it is a real bottleneck (rule out one-time costs / non-critical-path false positives).",
+          "r2": "2. Optimize the hotspot with minimal changes; do not alter existing behavior or output semantics.",
+          "r3": "3. After optimizing, re-check for concurrency/timing side effects; provide before/after comparison when needed.",
+          "r4": "4. Run related tests / type checks to confirm behavior is unchanged."
+        },
+        "techdebt": {
+          "title": "Fix requirements (tech debt):",
+          "r1": "1. Verify each tech-debt item (location, cause, suggested action) is real and sound, rule out stale/already-handled items, then act.",
+          "r2": "2. Handle each item minimally per its suggested action; split into independently committable units.",
+          "r3": "3. Explain the impact first for interface/structural changes; ask when unsure, do not guess.",
+          "r4": "4. Run related tests and type checks afterwards and report."
+        },
+        "refactor": {
+          "title": "Fix requirements (refactoring):",
+          "r1": "1. Verify each code smell really exists (rule out deliberate design / necessary structure), then understand the object behavior and call chain before acting.",
+          "r2": "2. Refactor structure only, never behavior; stop and explain immediately if behavior changes.",
+          "r3": "3. Keep existing interfaces and exports; do not optimize unrelated code.",
+          "r4": "4. After refactoring, run related tests / type checks to confirm behavior is unchanged."
+        }
+      },
+      "toolHint": "Execution: Prefer your available inspection/repair skills to verify issues and validate fixes; otherwise reproduce and verify with the project's existing commands (tests / lint / typecheck / scans). If neither is available, say so honestly."
     },
     "toolConfig": {
       "openCodeCommand": {
@@ -661,7 +741,6 @@
     "aiToolEnabled": "Enabled: AI reads diagnostics and fixes them automatically",
     "aiToolToggle": "Toggle OpenCode integration",
     "brandName": "ZhiHui CodeShield",
-    "brandSlogan": "The smart guardian of the code world",
     "cancelTask": "Cancel task",
     "collapseSidebar": "Collapse sidebar",
     "deleteProject": "Delete project {{name}}",
@@ -680,8 +759,11 @@
     "brainChecking": "Checking…",
     "brainSubtitle": "Wisdom Brain auto-sync · maintenance-free",
     "engineSwitches": "Engine switches",
+    "evolve": "Evolve",
+    "evolveDesc": "Rule self-evolution · false-positive calibration",
     "expandSidebar": "Expand sidebar",
     "language": "Language settings",
+    "languageExpand": "{{count}} languages",
     "noProject": "No project added",
     "noProjects": "No projects yet",
     "projectManagement": "Project management",
@@ -709,8 +791,8 @@
       "running": "Running"
     },
     "theme": "Theme settings",
-    "themeDark": "Dark (Deep Teal)",
-    "themeLight": "Light (Teal)",
+    "themeDark": "Dark",
+    "themeLight": "Light",
     "themeSystem": "Follow System",
     "toolsDegraded": "External tools degraded: missing {{tools}}",
     "toolsPathHint": "Installing them to the system PATH will remove this hint",
@@ -761,12 +843,20 @@
   },
   "page": {
     "domainScore": {
-      "title": "Domain score",
+      "title": "Score",
       "noData": "No score yet",
       "noDataHint": "Shown after \"Generate report summary\" in Reports",
       "noDataHintLive": "Run an inspection and the score appears here instantly",
       "notRunHint": "Run this check and summarize to count toward the total score",
-      "scoreDelta": "Previous {{prev}} → Now {{now}}"
+      "scoreDelta": "Previous {{prev}} → Now {{now}}",
+      "ring": {
+        "gaugeMin": "0",
+        "gaugeMid": "50",
+        "gaugeMax": "100"
+      }
+    },
+    "reportShell": {
+      "backHome": "Back to Home"
     },
     "backup": {
       "backingUp": "Backing up...",
@@ -891,9 +981,6 @@
       "env.severity.warning": "Warning",
       "env.total": "{{count}} entries",
       "errorTitle": "Inventory failed",
-      "exportFailed": "Export failed",
-      "exportReport": "Export Report",
-      "exportSuccess": "Report exported",
       "feature": {
         "graph": {
           "desc": "Direct / transitive dependencies and edge relations at a glance",
@@ -1094,6 +1181,24 @@
       "duration": "Scan took {{duration}}ms",
       "falsePositiveCount": "{{count}} false positive reports",
       "falsePositiveSubmitted": "False positive report submitted; it will be used to calibrate rules",
+      "feature": {
+        "ci": {
+          "desc": "Pipeline checkpoints enforce quality gates and block failing builds",
+          "title": "CI gate"
+        },
+        "manual": {
+          "desc": "Run a full gate check anytime to see the current quality state",
+          "title": "Manual scan"
+        },
+        "preCommit": {
+          "desc": "Automatically blocks problematic code before it is committed",
+          "title": "Commit gate"
+        },
+        "prePush": {
+          "desc": "Double-checks at push time so issues never ship",
+          "title": "Push gate"
+        }
+      },
       "history": {
         "subtitle": "Hook auto-trigger + manual scans persisted to DB",
         "title": "Recent blocks"
@@ -1146,8 +1251,8 @@
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Inspection complete",
       "empty": {
-        "subtitle": "Auto-inspects architecture, module boundaries, type safety, and code conventions once on your first visit each day; you can also inspect now",
-        "title": "Inspect source architecture and type safety"
+        "subtitle": "Auto-inspects architecture and type safety daily; run a one-click checkup anytime",
+        "title": "Check architecture and type safety"
       },
       "feature": {
         "architecture": {
@@ -1168,8 +1273,12 @@
         }
       },
       "groupTitle": {},
+      "issues": "Issues",
+      "issuesHint": "Issues only — copying inside this card copies just these issues",
+      "passed": "Passed",
+      "total": "Checks",
       "passedCount": "{{passed}}/{{total}} passed",
-      "scanNow": "Inspect now",
+      "scanNow": "One-click Checkup",
       "scanning": "Inspecting...",
       "source": "Inspection",
       "status": {
@@ -1221,7 +1330,10 @@
         "title": "Detect runtime performance anti-patterns, optimize execution efficiency"
       },
       "source": "Performance",
-      "suggestion": "Suggestion: {{suggestion}}"
+      "suggestion": "Suggestion: {{suggestion}}",
+      "stats": {
+        "total": "Issues"
+      }
     },
     "refactor": {
       "addProjectFirst": "Add a project on the dashboard first",
@@ -1493,10 +1605,18 @@
         "malware": "Malware scan",
         "secrets": "Secret management",
         "vuln": "Vulnerability scan"
+      },
+      "stats": {
+        "total": "Vulnerabilities",
+        "malware": "Malware"
       }
     },
     "sentinel": {
       "aiFixSource": "Sentinel · Monitor",
+      "active": "Pending",
+      "critical": "Critical",
+      "high": "High",
+      "total": "Total events",
       "copyAllHint": "{{count}} events total; copy them all to AI in one click to fix",
       "falsePositiveSubmitted": "False positive report submitted; it will be used to calibrate rules",
       "headerSummary": "Monitoring {{count}} events · {{activeCount}} pending",

@@ -5,14 +5,17 @@ import { translate, DEFAULT_LANGUAGE } from '@zh/i18n';
 
 // ─── 供应链锁数据契约（08-商业化P0实现规格.md §6.2） ─────────────
 
+/** 工具获取渠道：官方源（official）或镜像源（mirror），决定下载源与校验期望 */
 export type ToolChannel = 'official' | 'mirror';
 
+/** 工具许可信息：SPDX 标识 + 风险等级 + 再分发约束（矩阵依据，见 TOOL_LICENSE_REGISTRY） */
 export interface ToolLicense {
   spdxId: string;
   risk: 'low' | 'review' | 'block';
   redistributionNote: string;
 }
 
+/** 工具安装记录：tool-lockfile.json 中每个已装工具的一行（供供应链完整性核对） */
 export interface ToolInstallRecord {
   toolId: string;
   version: string;
@@ -23,11 +26,13 @@ export interface ToolInstallRecord {
   signatureVerified: boolean;
 }
 
+/** 工具锁文件：~/.zhshield/tool-lockfile.json 的顶层结构，schemaVersion 由 TOOL_LOCKFILE_SCHEMA_VERSION 约束 */
 export interface ToolLockfile {
   schemaVersion: number;
   tools: Record<string, ToolInstallRecord>;
 }
 
+/** 工具安装要求：由 SOP 规则声明的期望版本/校验值，缺 expectedSha256 表示不做哈希强校验 */
 export interface ToolRequirement {
   toolId: string;
   version: string;
@@ -36,12 +41,14 @@ export interface ToolRequirement {
   mirrorSources?: string[];
 }
 
+/** 许可矩阵报告：blockers 必须阻断商业化分发，reviews 需人工复核 */
 export interface LicenseMatrixReport {
   tools: (ToolLicense & { toolId: string; version: string })[];
   blockers: string[];
   reviews: string[];
 }
 
+/** 许可审计器：由 toolchain 域实现，产出许可矩阵报告 */
 export interface LicenseAuditor {
   audit(): Promise<LicenseMatrixReport>;
 }

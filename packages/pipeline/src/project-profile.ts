@@ -1,14 +1,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { normalizePackageName, extractPyprojectDeps, extractRequirementsNames } from '@zh/shared';
 
-const VERSION_SPLIT_RE = /[<>=!~[;]/;
-const PYPROJECT_HEADER_RE = /^\[(.+)\]$/;
-const PYPROJECT_KEY_RE = /^([A-Za-z0-9_.-]+)\s*=/;
-
+/** 项目语言（JS/TS 走 package.json 判定，Python 走清单信号判定） */
 export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
+
+/** 包管理器（JS 侧按锁文件判定，Python 侧按 poetry/uv/Pipfile 等锁定文件判定） */
 export type PackageManager =
   'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
 
+/** 项目画像：语言、框架、包管理器与是否含 TypeScript（供流水线选择应启用的域） */
 export interface ProjectProfile {
   projectPath: string;
   language: ProjectLanguage;
@@ -46,50 +47,6 @@ const PYTHON_MANIFESTS = [
   'poetry.lock',
   'uv.lock',
 ] as const;
-
-// pyproject.toml 中声明依赖的区段（[project] 数组形式与各工具的子表形式）
-const PYPROJECT_DEP_SECTIONS = new Set([
-  'project',
-  'project.dependencies',
-  'tool.poetry.dependencies',
-  'tool.uv.dependencies',
-]);
-
-// 规范化包名：小写、`_` 与 `-` 等价，去掉版本/环境标记
-function normalizePackageName(raw: string): string {
-  return raw.split(VERSION_SPLIT_RE)[0].trim().toLowerCase().replace(/_/g, '-');
-}
-
-function extractPyprojectDeps(content: string): string[] {
-  const deps: string[] = [];
-  let inDeps = false;
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    const header = line.match(PYPROJECT_HEADER_RE);
-    if (header) {
-      inDeps = PYPROJECT_DEP_SECTIONS.has(header[1].trim());
-      continue;
-    }
-    if (!inDeps) continue;
-    // 键值形式：django = "^4.2"
-    const key = line.match(PYPROJECT_KEY_RE);
-    if (key) deps.push(key[1]);
-    // 数组形式："django==4.2.0"
-    for (const quoted of line.matchAll(/"([^"]+)"/g)) deps.push(quoted[1]);
-  }
-  return deps;
-}
-
-function extractRequirementsNames(content: string): string[] {
-  const names: string[] = [];
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith('-')) continue; // 注释与 -r/-e/--index-url 等指令
-    const name = line.split(VERSION_SPLIT_RE)[0].trim();
-    if (name) names.push(name);
-  }
-  return names;
-}
 
 function detectPythonFramework(projectPath: string): string | null {
   const names = new Set<string>();

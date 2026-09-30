@@ -3,27 +3,9 @@ import * as path from 'node:path';
 import { InjectionGuard } from './injection-guard';
 import { scanNpmThreats } from './npm-threat-scanner';
 import type { MalwareItem } from './types';
+import { MAX_SCAN_DEPTH, PACKAGE_JSON_FILE, SKIP_DIRS } from './scan-walk';
 
-const SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'dist-electron',
-  'build',
-  'coverage',
-  '.turbo',
-  '.next',
-  '.cache',
-  'release',
-  '.zhshield',
-  '__tests__',
-  'fixtures',
-  '__fixtures__',
-  '__mocks__',
-]);
-const MAX_DEPTH = 12;
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue']);
-const PACKAGE_JSON = 'package.json';
 const HELMET_PKG = 'helmet';
 const WEB_FRAMEWORK_MARKERS = [
   'express',
@@ -36,6 +18,7 @@ const WEB_FRAMEWORK_MARKERS = [
 const CSRF_LIBS = ['csurf', '@fastify/csrf-protection', 'tiny-csrf', '@nestjs/throttler'];
 const OUTBOUND_RE =
   /(?:fetch|axios(?:\.\w+)?|curl|https?\.(?:get|post|put|delete|request)|XMLHttpRequest|WebSocket)\s*\(?[^)\n]*(?:process\.env|import\.meta\.env)/i;
+const ENV_ACCESS_RE = /(?:process\.env|import\.meta\.env)/;
 const CSRF_TOKEN_USAGE_RE =
   /csrf\s*\(\s*\{|csrfToken\s*\(|X-CSRF(?:-Token)?[:=]|csrfProtection|app\.use\s*\(\s*(?:csurf|csrf)\b/i;
 const SAME_SITE_RE = /(?:sameSite\s*[:=]\s*(['"])(lax|strict|none)\1|SameSite=(Lax|Strict|None))/i;
@@ -69,9 +52,51 @@ interface SourceEvidence {
   outboundValue: OutboundHit[];
 }
 
+/** 单条 check 的检测结论：passed / failed（命中风险）/ error（检测执行异常），
+ *  由 SecurityCheckEngine 转为 GuardEngine 契约的 violation 列表 */
 export interface SecurityCheckResult {
   status: 'passed' | 'failed' | 'error';
   message?: string;
+}
+
+interface EvaluateCheckParams {
+  check: string;
+  items: MalwareItem[];
+  threats: MalwareItem[];
+  deps: DepsScan;
+  source: SourceEvidence;
+}
+
+/**
+ * 单个依赖区块的每条声明并入扫描结论：helmet 证据 / CSRF 库 / Web 框架标记 /
+ * 非注册表版本遮蔽面。独立于类体以避免 scanDependencies 的循环嵌套超过两层。
+ */
+function applyDepEntries(
+  scan: DepsScan,
+  rel: string,
+  section: string,
+  deps: Record<string, unknown>,
+): void {
+  for (const [name, version] of Object.entries(deps)) {
+    if (name === HELMET_PKG) {
+      scan.hasHelmet = true;
+      scan.evidence.push(`${rel}[${section}]: helmet`);
+    }
+    if (CSRF_LIBS.includes(name)) {
+      scan.hasCsrfLib = true;
+    }
+    if (WEB_FRAMEWORK_MARKERS.some((m) => name === m || name.startsWith(m.replace('*', '')))) {
+      scan.hasWebFramework = true;
+    }
+    if (
+      typeof version === 'string' &&
+      NON_REGISTRY_VERSION_RE.test(version) &&
+      !name.startsWith('@') && // 有 @scope 的本地包不构成可抢占公共命名空间
+      !NAME_EXEMPT_SET.has(name)
+    ) {
+      scan.localUnscopedDeps.push(name);
+    }
+  }
 }
 
 /**
@@ -118,17 +143,12 @@ export class SecurityCheckEngine {
     // csrf 三项是否适用由 csrfVerdict 内部按 hasWebFramework 自判
     const source = this.scanSourceEvidence(target);
     return {
-      results: checks.map((check) => this.evaluateCheck(check, items, threats, deps, source)),
+      results: checks.map((check) => this.evaluateCheck({ check, items, threats, deps, source })),
     };
   }
 
-  private evaluateCheck(
-    check: string,
-    items: MalwareItem[],
-    threats: MalwareItem[],
-    deps: DepsScan,
-    source: SourceEvidence,
-  ): SecurityCheckResult {
+  private evaluateCheck(params: EvaluateCheckParams): SecurityCheckResult {
+    const { check, items, threats, deps, source } = params;
     switch (check) {
       case 'env-tracked-in-scan-set':
         // InjectionGuard 的 .env 检出以 title 标识（pattern 为文件名，无法按下发名匹配）
@@ -272,7 +292,7 @@ export class SecurityCheckEngine {
       localUnscopedDeps: [],
     };
     const files: string[] = [];
-    this.walk(target, 0, files, new Set([PACKAGE_JSON]));
+    this.walk(target, 0, files, new Set([PACKAGE_JSON_FILE]));
     for (const file of files) {
       let parsed: unknown;
       try {
@@ -285,28 +305,7 @@ export class SecurityCheckEngine {
       for (const section of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
         const deps = (parsed as Record<string, unknown>)[section];
         if (typeof deps !== 'object' || deps === null) continue;
-        for (const [name, version] of Object.entries(deps as Record<string, unknown>)) {
-          if (name === HELMET_PKG) {
-            scan.hasHelmet = true;
-            scan.evidence.push(`${rel}[${section}]: helmet`);
-          }
-          if (CSRF_LIBS.includes(name)) {
-            scan.hasCsrfLib = true;
-          }
-          if (
-            WEB_FRAMEWORK_MARKERS.some((m) => name === m || name.startsWith(m.replace('*', '')))
-          ) {
-            scan.hasWebFramework = true;
-          }
-          if (
-            typeof version === 'string' &&
-            NON_REGISTRY_VERSION_RE.test(version) &&
-            !name.startsWith('@') && // 有 @scope 的本地包不构成可抢占公共命名空间
-            !NAME_EXEMPT_SET.has(name)
-          ) {
-            scan.localUnscopedDeps.push(name);
-          }
-        }
+        applyDepEntries(scan, rel, section, deps as Record<string, unknown>);
       }
     }
     return scan;
@@ -336,7 +335,7 @@ export class SecurityCheckEngine {
         const trim = line.trim();
         if (trim.length === 0 || trim.startsWith('//')) return;
         // 出站请求携带 env 值（fetch/axios/curl/http 命中且行内含 process.env / import.meta.env）
-        if (OUTBOUND_RE.test(line) && /(?:process\.env|import\.meta\.env)/.test(line)) {
+        if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) {
           evidence.outboundValue.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
         }
         if (CSRF_TOKEN_USAGE_RE.test(line)) {
@@ -354,7 +353,7 @@ export class SecurityCheckEngine {
   }
 
   private walk(dir: string, depth: number, out: string[], exts: Set<string>): void {
-    if (depth > MAX_DEPTH) return;
+    if (depth > MAX_SCAN_DEPTH) return;
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -368,7 +367,7 @@ export class SecurityCheckEngine {
         continue;
       }
       if (!entry.isFile()) continue;
-      // PACKAGE_JSON 以精确文件名匹配；源码走扩展名匹配
+      // PACKAGE_JSON_FILE 以精确文件名匹配；源码走扩展名匹配
       if (exts.has(entry.name) || exts.has(path.extname(entry.name).toLowerCase())) {
         out.push(path.join(dir, entry.name));
       }

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ProcessMonitorConfig } from '../process-monitor';
-import { isInformationalEvent } from '../process-monitor';
+import {
+  classifyNonRemediableFault,
+  decideRestart,
+  isInformationalEvent,
+} from '../process-monitor';
 
 // ─── Mock 子进程类型 ─────────────────────────────────────
 
@@ -128,11 +132,7 @@ describe('ProcessMonitor — 进程监控', () => {
   it('3c. start(): 命令串含空格（如 "npm run dev"）时拆分为可执行名+参数，shell 保持 false', () => {
     monitor.start(makeConfig({ command: 'echo hello', args: undefined }));
 
-    const [cmd, args, opts] = spawnSpy.mock.calls[0] as [
-      string,
-      string[],
-      Record<string, unknown>,
-    ];
+    const [cmd, args, opts] = spawnSpy.mock.calls[0] as [string, string[], Record<string, unknown>];
     expect(cmd).toBe('echo');
     expect(args).toEqual(['hello']);
     expect(opts.shell).toBe(false);
@@ -175,7 +175,7 @@ describe('ProcessMonitor — 进程监控', () => {
 
   // ─── 重启 ────────────────────────────────────────────
 
-  it('9. restart(): 达到最大重启次数后触发 restart-limit-reached 事件', () => {
+  it('9. restart(): 达到最大重启次数后触发 restart-limit-reached 事件 (severity p2)', () => {
     const config = makeConfig({ maxRestarts: 2 });
     monitor.start(config);
 
@@ -190,7 +190,7 @@ describe('ProcessMonitor — 进程监控', () => {
 
     const limitEvent = findEventByAction(ec, 'restart-limit-reached');
     expect(limitEvent).toBeDefined();
-    expect(limitEvent!.severity).toBe('p1');
+    expect(limitEvent!.severity).toBe('p2');
   });
 
   it('10. restart(): 无 config 时不报错', () => {
@@ -340,9 +340,7 @@ describe('ProcessMonitor — 进程监控', () => {
     monitor.start(makeConfig());
     monitor.start(makeConfig());
 
-    const startedEvents = ec
-      .listEvents()
-      .filter((e) => e.history[0]?.action === 'process-started');
+    const startedEvents = ec.listEvents().filter((e) => e.history[0]?.action === 'process-started');
     expect(startedEvents).toHaveLength(1);
     expect(startedEvents[0].occurrenceCount).toBe(2);
   });
@@ -383,5 +381,195 @@ describe('ProcessMonitor — 进程监控', () => {
     monitor.start(makeConfig());
     vi.advanceTimersByTime(60);
     expect(spawnSpy).toHaveBeenCalledTimes(1); // 仅主进程，无探测
+  });
+
+  // ─── 重启预算结算幂等 ─────────────────────────────────
+
+  it('25. 连续非零退出：每次失败只消耗一次预算（健康探测的并发请求不重复结算）', () => {
+    // healthCheckIntervalMs 远小于 restartDelayMs：健康定时器必然在"重启在途"窗口内反复触发
+    const config = makeConfig({ maxRestarts: 3, healthCheckIntervalMs: 20, restartDelayMs: 100 });
+    monitor.start(config);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+
+    for (let failure = 0; failure < 3; failure++) {
+      const proc = latestProc();
+      proc.exitCode = 1;
+      proc.emit('exit', 1, null);
+      vi.advanceTimersByTime(100); // 跨过 restartDelayMs，期间健康定时器触发 5 次
+    }
+
+    // 3 次失败应恰好用满 3 次预算；若被重复结算，此时早已 exhausted
+    expect(monitor.getState()).toBe('running');
+    expect(findEventByAction(ec, 'restart-limit-reached')).toBeUndefined();
+    expect(spawnSpy).toHaveBeenCalledTimes(4); // 首次拉起 + 3 次重拉
+
+    const proc = latestProc();
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    expect(monitor.getState()).toBe('exhausted');
+  });
+
+  // ─── 端口占用：不消耗预算，转 suppressed ──────────────────
+
+  it('26. 端口占用退出：不重拉、不消耗预算，转 suppressed 并发出可操作 p2', () => {
+    monitor.start(makeConfig({ maxRestarts: 3 }));
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('Error: Port 5173 is already in use'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    const suppressed = findEventByAction(ec, 'port-in-use-suppressed');
+    expect(suppressed).toBeDefined();
+    expect(suppressed!.severity).toBe('p2');
+    expect(suppressed!.context.port).toBe(5173);
+    expect(suppressed!.history[0]?.detail).toContain('5173');
+    expect(monitor.getState()).toBe('suppressed');
+    expect(spawnSpy).toHaveBeenCalledTimes(1); // 未重拉
+    expect(findEventByAction(ec, 'restart-limit-reached')).toBeUndefined();
+  });
+
+  it('27. 端口占用 p2 与通用 stderr p2 去重键不同（否则互相吞掉）', () => {
+    monitor.start(makeConfig());
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('Error: Port 5173 is already in use'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    const stderrEvent = findEventByAction(ec, 'process-stderr');
+    const suppressedEvent = findEventByAction(ec, 'port-in-use-suppressed');
+    expect(stderrEvent).toBeDefined();
+    expect(suppressedEvent).toBeDefined();
+    expect(stderrEvent!.dedupeKey).not.toBe(suppressedEvent!.dedupeKey);
+  });
+
+  it('28. 端口占用错误分块到达也能识别（跨块累积后单次分类）', () => {
+    monitor.start(makeConfig());
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('Error: Port 51'));
+    proc.stderr.emit('data', Buffer.from('73 is already'));
+    proc.stderr.emit('data', Buffer.from(' in use'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    expect(monitor.getState()).toBe('suppressed');
+    expect(findEventByAction(ec, 'port-in-use-suppressed')!.history[0]?.detail).toContain('5173');
+  });
+
+  it('29. 上一轮拉起的端口占用输出不污染下一轮判定', () => {
+    monitor.start(makeConfig());
+    const first = latestProc();
+    first.stderr.emit('data', Buffer.from('Error: Port 5173 is already in use'));
+    first.emit('exit', 1, null);
+    expect(monitor.getState()).toBe('suppressed');
+
+    // 用户显式重新启动（重新武装）
+    monitor.start(makeConfig());
+    const second = latestProc();
+    second.exitCode = 1;
+    second.emit('exit', 1, null);
+
+    expect(monitor.getState()).toBe('running'); // 本轮无端口占用输出 → 正常走重启预算
+  });
+
+  it('30. EADDRINUSE 形态同样抑制重启（Node 错误码）', () => {
+    monitor.start(makeConfig());
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('Error: listen EADDRINUSE: address already in use'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    expect(monitor.getState()).toBe('suppressed');
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── 生命周期终态可观测 ─────────────────────────────────
+
+  it('31. getState(): 区分从未启动 / 运行中 / 预算耗尽，start() 可重新武装', () => {
+    expect(monitor.getState()).toBe('stopped');
+
+    monitor.start(makeConfig({ maxRestarts: 0 }));
+    expect(monitor.getState()).toBe('running');
+
+    const proc = latestProc();
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+    expect(monitor.getState()).toBe('exhausted');
+
+    monitor.start(makeConfig());
+    expect(monitor.getState()).toBe('running');
+  });
+});
+
+// ─── 纯函数单测（无定时器） ───────────────────────────────
+
+describe('classifyNonRemediableFault — 端口占用事实提取', () => {
+  it('A1. Node 错误码 EADDRINUSE 识别为端口占用并取出端口号', () => {
+    const result = classifyNonRemediableFault(
+      'Error: listen EADDRINUSE: address already in use 127.0.0.1:5173',
+    );
+    expect(result).toEqual({ kind: 'port-in-use', port: 5173 });
+  });
+
+  it('A2. Vite 可读形态 "Port 5173 is already in use" 识别并取出 5173', () => {
+    expect(classifyNonRemediableFault('Error: Port 5173 is already in use')).toEqual({
+      kind: 'port-in-use',
+      port: 5173,
+    });
+  });
+
+  it('A3. 大小写不敏感匹配', () => {
+    expect(classifyNonRemediableFault('error: PORT 5173 IS ALREADY IN USE')).toEqual({
+      kind: 'port-in-use',
+      port: 5173,
+    });
+  });
+
+  it('A4. 消息分块到达时按累积后的完整串判定', () => {
+    const chunks = ['Error: Port 51', '73 is already', ' in use'];
+    expect(classifyNonRemediableFault(chunks.join(''))).toEqual({
+      kind: 'port-in-use',
+      port: 5173,
+    });
+  });
+
+  it('A5. 端口号缺失时返回 port: null（不猜测、不报错）', () => {
+    expect(classifyNonRemediableFault('Error: listen EADDRINUSE: address already in use')).toEqual({
+      kind: 'port-in-use',
+      port: null,
+    });
+    expect(classifyNonRemediableFault('Error: Port is already in use')).toEqual({
+      kind: 'port-in-use',
+      port: null,
+    });
+  });
+
+  it('A6. 普通崩溃输出归类为 none', () => {
+    expect(classifyNonRemediableFault('Error: TypeError: undefined is not a function')).toEqual({
+      kind: 'none',
+    });
+    expect(classifyNonRemediableFault('')).toEqual({ kind: 'none' });
+  });
+});
+
+describe('decideRestart — 重启预算结算', () => {
+  it('B1. 已用次数低于上限时返回 restart', () => {
+    expect(decideRestart(0, 3, false)).toEqual({ kind: 'restart' });
+    expect(decideRestart(2, 3, false)).toEqual({ kind: 'restart' });
+  });
+
+  it('B2. 已用次数达到上限时返回 exhausted（边界取等号）', () => {
+    expect(decideRestart(3, 3, false)).toEqual({ kind: 'exhausted' });
+    expect(decideRestart(4, 3, false)).toEqual({ kind: 'exhausted' });
+  });
+
+  it('B3. 已有重启在途时返回 suppress，不消耗第二次预算', () => {
+    expect(decideRestart(1, 3, true)).toEqual({ kind: 'suppress' });
+    // 即使已达上限，在途标志仍优先：这一次失败已被结算过
+    expect(decideRestart(3, 3, true)).toEqual({ kind: 'suppress' });
   });
 });

@@ -25,6 +25,14 @@ import {
 import { ScanOrchestrator } from './engine-scan-orchestrator';
 import { ResultAggregator } from './engine-result-aggregator';
 
+interface SecurityBuildReportParams {
+  projectId: string;
+  vulnerabilities: Vulnerability[];
+  garbage: GarbageItem[];
+  malware: MalwareItem[];
+  conflictReport: RuleConflictReport;
+}
+
 export class SecurityEngine {
   private toolManager: ToolManager;
   private degradationManager: DegradationManager;
@@ -109,16 +117,11 @@ export class SecurityEngine {
         grypeIssues,
       });
     await this.emitScanCompleted(projectId, start, allIssues, vulnerabilities);
-    return this.buildReport(projectId, vulnerabilities, garbage, malware, conflictReport);
+    return this.buildReport({ projectId, vulnerabilities, garbage, malware, conflictReport });
   }
 
-  private buildReport(
-    projectId: string,
-    vulnerabilities: Vulnerability[],
-    garbage: GarbageItem[],
-    malware: MalwareItem[],
-    conflictReport: RuleConflictReport,
-  ): SecurityScanReport {
+  private buildReport(params: SecurityBuildReportParams): SecurityScanReport {
+    const { projectId, vulnerabilities, garbage, malware, conflictReport } = params;
     const summary = summarizeFindings(vulnerabilities, garbage, malware);
     const securityScore = calculateSecurityScore(vulnerabilities);
     return {

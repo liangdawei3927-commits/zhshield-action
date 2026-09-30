@@ -45,10 +45,12 @@ const CATEGORY_WEIGHTS: Record<IssueCategory, number> = {
 function groupIssuesByCategory(issues: Issue[]): Map<IssueCategory, Issue[]> {
   const dimMap = new Map<IssueCategory, Issue[]>();
   for (const issue of issues) {
-    if (!dimMap.has(issue.category)) {
-      dimMap.set(issue.category, []);
+    let list = dimMap.get(issue.category);
+    if (list === undefined) {
+      list = [];
+      dimMap.set(issue.category, list);
     }
-    dimMap.get(issue.category)!.push(issue);
+    list.push(issue);
   }
   return dimMap;
 }

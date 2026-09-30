@@ -51,7 +51,7 @@ export class PerformanceEngine {
   private collectIssues(projectRoot: string, issues: PerformanceIssue[]): void {
     try {
       this.reportMissingSourceRoot(projectRoot, issues);
-      issues.push(...new BuildConfigDetectorImpl().detect(projectRoot, this.config));
+      issues.push(...new BuildConfigDetectorImpl().detect(projectRoot));
       issues.push(...new BundleSizeDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new TreeShakingDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new ComplexityDetectorImpl().detect(projectRoot, this.config));

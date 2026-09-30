@@ -42,18 +42,21 @@ function analyzeMethodForFeatureEnvy(
   if (stats.ratio <= config.thresholds.featureEnvyRatio || stats.externalCount <= 3) return null;
 
   const targetName = findTopTarget(externalCalls);
-  return buildFeatureEnvySmell(parsed, cls, method, config, stats, targetName);
+  return buildFeatureEnvySmell({ parsed, cls, method, config, stats, targetName });
+}
+
+interface BuildFeatureEnvySmellParams {
+  parsed: ParsedFile;
+  cls: ParsedClass;
+  method: ParsedClass['members']['methods'][number];
+  config: RefactorConfig;
+  stats: { externalCount: number; totalStatements: number; ratio: number };
+  targetName: string;
 }
 
 /** 构造 Feature Envy CodeSmell */
-function buildFeatureEnvySmell(
-  parsed: ParsedFile,
-  cls: ParsedClass,
-  method: ParsedClass['members']['methods'][number],
-  config: RefactorConfig,
-  stats: { externalCount: number; totalStatements: number; ratio: number },
-  targetName: string,
-): CodeSmell {
+function buildFeatureEnvySmell(params: BuildFeatureEnvySmellParams): CodeSmell {
+  const { parsed, cls, method, config, stats, targetName } = params;
   const threshold = config.thresholds.featureEnvyRatio;
   return makeSmell({
     ruleId: 'feature-envy',
@@ -147,8 +150,12 @@ function collectRepeatedStringLiterals(allFiles: ParsedFile[]): Map<string, Set<
     for (const s of strings) {
       const cleaned = s.slice(1, -1);
       if (!UPPER_CASE_START.test(cleaned) || cleaned.includes(' ')) continue;
-      if (!stringLiterals.has(cleaned)) stringLiterals.set(cleaned, new Set());
-      stringLiterals.get(cleaned)!.add(otherFile.filePath);
+      let files = stringLiterals.get(cleaned);
+      if (!files) {
+        files = new Set();
+        stringLiterals.set(cleaned, files);
+      }
+      files.add(otherFile.filePath);
     }
   }
   return stringLiterals;
@@ -207,14 +214,17 @@ function isFieldHeavyMethodLight(cls: ParsedClass, config: RefactorConfig): bool
   );
 }
 
+interface BuildDataClassSmellParams {
+  parsed: ParsedFile;
+  cls: ParsedClass;
+  fieldCount: number;
+  ownMethods: number;
+  config: RefactorConfig;
+}
+
 /** 构造数据类 CodeSmell */
-function buildDataClassSmell(
-  parsed: ParsedFile,
-  cls: ParsedClass,
-  fieldCount: number,
-  ownMethods: number,
-  config: RefactorConfig,
-): CodeSmell {
+function buildDataClassSmell(params: BuildDataClassSmellParams): CodeSmell {
+  const { parsed, cls, fieldCount, ownMethods, config } = params;
   return makeSmell({
     ruleId: 'data-class',
     severity: config.severities['data-class'],
@@ -244,7 +254,7 @@ export function detectDataClass(parsed: ParsedFile, config: RefactorConfig): Cod
 
     const ownMethods = countNonTrivialMethods(cls);
     const fieldCount = cls.members.fields.length;
-    smells.push(buildDataClassSmell(parsed, cls, fieldCount, ownMethods, config));
+    smells.push(buildDataClassSmell({ parsed, cls, fieldCount, ownMethods, config }));
   }
 
   return smells;
@@ -326,10 +336,12 @@ function collectParamGroups(
           return 'any';
         })
         .join(',');
-      if (!paramGroups.has(paramTypes)) {
-        paramGroups.set(paramTypes, { methods: [], params: paramTypes.split(',') });
+      let group = paramGroups.get(paramTypes);
+      if (!group) {
+        group = { methods: [], params: paramTypes.split(',') };
+        paramGroups.set(paramTypes, group);
       }
-      paramGroups.get(paramTypes)!.methods.push(`${cls.name}.${method.name}`);
+      group.methods.push(`${cls.name}.${method.name}`);
     }
   }
 

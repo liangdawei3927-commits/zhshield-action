@@ -10,6 +10,10 @@ import type {
 } from './sop-types';
 import { RuleIndex } from './sop-rule-index';
 
+/**
+ * 规则变更事件载荷。
+ * status-changed 时 previousStatus 必填；其余变更类型下 rule 给出变更后的规则内容。
+ */
 export interface RuleChangeEvent {
   type: 'added' | 'removed' | 'modified' | 'status-changed';
   ruleId: string;

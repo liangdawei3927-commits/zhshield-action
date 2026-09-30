@@ -1,5 +1,6 @@
 import type { IssueSeverity } from '@zh/shared';
 
+/** 代码位置：起止行列（1-based） */
 export interface CodeLocation {
   filePath: string;
   line: number;
@@ -8,6 +9,7 @@ export interface CodeLocation {
   endColumn: number;
 }
 
+/** 代码坏味道：命中规则、定位、度量上下文（指标值与阈值）与重构建议 */
 export interface CodeSmell {
   id: string;
   ruleId: string;
@@ -31,6 +33,7 @@ export interface CodeSmell {
   };
 }
 
+/** 单文件坏味道报告：文件定位、坏味道列表、可维护性评分与重构优先级 */
 export interface FileSmellReport {
   filePath: string;
   totalSmells: number;
@@ -39,15 +42,20 @@ export interface FileSmellReport {
   refactorPriority: 'critical' | 'high' | 'medium' | 'low';
 }
 
+/** 坏味道分类计数：结构性（规模/职责）、耦合性、继承体系三类 */
 export interface ByCategory {
   structural: number;
   coupling: number;
   inheritance: number;
 }
 
+/** 坏味道分类键（对应 {@link ByCategory} 的字段名） */
 export type SmellCategory = keyof ByCategory;
+
+/** 坏味道严重级（复用 @zh/shared 的 IssueSeverity，保证跨域严重级可比较） */
 export type SmellSeverity = IssueSeverity;
 
+/** 重构报告：全量扫描的时间、范围、分类/严重级分布、逐文件明细与汇总建议 */
 export interface RefactorReport {
   timestamp: string;
   projectRoot: string;
@@ -91,6 +99,7 @@ export interface FixResult {
   errors: string[];
 }
 
+/** 重构配置：度量阈值、规则 → 严重级映射与启用的规则清单 */
 export interface RefactorConfig {
   thresholds: {
     maxMethodLines: number;
@@ -117,6 +126,7 @@ export interface RefactorConfig {
   enabledRules: string[];
 }
 
+/** 默认重构配置：内置度量阈值、规则严重级映射与全量启用规则集（调用方可整体覆盖） */
 export const DEFAULT_CONFIG: RefactorConfig = {
   thresholds: {
     maxMethodLines: 80,

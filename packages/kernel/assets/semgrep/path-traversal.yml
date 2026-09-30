@@ -1,25 +1,63 @@
 # 智汇码盾 — Semgrep 路径穿越（Path Traversal, CWE-22）检测规则
 #
-# 机制同 redos.yml：可由 SOP 规则经 SemgrepAdapter 以 `--config <本文件>` 注入扫描
-# （参考 inspect.scan.performance.semgrep-redos 对 redos.yml 的引用方式）。
+# 机制：由 SOP 规则经 SemgrepAdapter 以 `--config <本文件所在目录>` 注入扫描。
+#   真实加载路径（2026-09-22 核实）——SemgrepAdapter.resolveRulesDir() 依次查找：
+#     <项目>/.zhshield/semgrep-rules → <项目>/.semgrep/rules → @zh/kernel/dist/assets/semgrep
+#   本机实测落在第三档（内核资产目录），故**改本文件即改变产品行为**；
+#   改完必须重跑 packages/kernel/scripts/copy-sop-rules.cjs 同步到 dist/assets/semgrep/。
+#   ⚠️ 适配器以「目录」为 --config，**不读**云规则里的 toolConfig.config 字段
+#      （那条路径是死配置）；同目录下的 redos.yml 会一并被加载。
 #
-# 本文件承担两件事：
-#   1) detect-path-traversal：标记 raw `path.join` / `path.resolve` 调用，提示改用
-#      @zh/shared 的 safeJoin / safeResolve（防 CWE-22 路径穿越）。
-#   2) allowlist：paths.exclude 排除"非发布 / 测试 fixture / 受控补全器"等已知项，
-#      对应安全分诊报告中 12 个 P3 项，使 recurring 扫描基线收敛。
+# ⚠️ 2026-09-22 检测方法变更：pattern-match → taint mode（实测驱动）
 #
-# 状态：report-only（severity: WARNING），已通过 SOP 规则
-#   src/sop/inspect/scan/security/path-traversal.yml 接入 inspect 引擎
-#   （toolConfig.config 指向 dist/assets/semgrep/path-traversal.yml）。
-#   提升为阻断前，需在 CI 跑一次 semgrep 统计误报率并据此收敛。
-#   注意：join(...)/resolve(...) 解构写法可能误报（如 Array.prototype.join），当前 report-only 可接受。
+#   【旧版为何产生 358 条误报】
+#   v1 用 `pattern: path.join($ARG, ...)` + 负向前瞻 `^(?!['"`])`，只能排除「首参为
+#   字符串字面量」的情形。`__dirname` / `os.homedir()` / `process.cwd()` /
+#   `this.backupRoot` 这类**常量标识符与本地变量**一律命中——实测 packages/kernel/src
+#   报 75 处、packages/desktop/electron 报 76 处，逐条阅读后**全部是合法本地拼接**。
+#
+#   【为何不能靠「加白名单 / 收窄正则」修】
+#   实测对照（目标 packages/cli/src/index.ts，原报 4 处）：
+#     原版规则                            → 4
+#     收窄正则 + 排除 __dirname/process.* → 4   ← 完全无效
+#     semgrep taint mode                   → 1（保留的是真阳性 path.resolve(invoked)，
+#                                                invoked 源自 process.argv）
+#   原因：「某变量是否来自不可信输入」是**数据流**问题，模式匹配在原理上无法回答。
+#
+#   【taint 版实测口径】
+#   语义样本（8 个函数 = 3 真阳性 + 5 误报形态）：
+#     旧规则 5 条（含 2 条误报）→ 新规则 3 条（恰为 3 条真阳性，5 条误报全清除）
+#   目录级抽样：
+#     packages/cli/src            6 → 1
+#     packages/kernel/src        75 → 0    （逐条核实：全为 os.homedir()/__dirname/常量拼接）
+#     packages/server/src        12 → 0    （逐条核实：含 path.join(os.homedir(), '.zhshield', …)）
+#     packages/desktop/electron  76 → 1    （保留 process.env.PATH → path.join 的污点流）
+#   合计 169 → 5（-97%），真阳性 0 丢失。
+#
+#   09-24 更新：desktop/electron 的 PATH → path.join（engines.ts collectOpenCodeCandidates）与
+#   inspect 的 PATH → path.join（ts-prune-adapter.ts findExecutableOnPath）已改用 @zh/shared
+#   safeJoin 修复（界内行为与 path.join 一致），两处命中清零。现全仓仅剩唯一保留命中：
+#   cli/src/index.ts:43 resolveBaseDir() 对 process.argv[1]（Node 已解析并执行的脚本自身路径）
+#   的 path.resolve —— 非可注入边界（能改写 argv[1] 者已具代码执行），且脚本可位于任意绝对
+#   路径（bundle/开发态双模），safeResolve 需人为假定的 base 会破坏该语义，故按校准基线保留。
+#
+# 状态：report-only（severity: WARNING）——**已完成误报率实测并据此收敛**。
+#   v1 头注释自称「提升为阻断前，需在 CI 跑一次 semgrep 统计误报率并据此收敛」，
+#   该人工前置条件现已满足；但**提升为阻断仍须先补自动化门禁**（见文末）。
+#
+# 能力边界（诚实声明，勿再犯 v1 的错）：
+#   ✓ 真实执行：**同一文件内** source → sink 的数据流跟踪（intra-file taint）。
+#   ✗ 已知局限：**跨文件/跨函数的污点传播不覆盖**（semgrep OSS 无跨文件分析）。
+#     例：库 `export function load(p: string) { return path.join(base, p) }`，
+#     若调用方传入不可信值，本规则**不会**报出。需覆盖须升级 semgrep Pro 或改符号级分析。
+#   ✗ 已移除：对「sink 入参是否为变量」的清单式罗列——那是噪音来源，不是安全信号。
 
 rules:
   - id: detect-path-traversal
+    mode: taint
     message: >-
-        检测到 `path.join` / `path.resolve` 调用（含解构写法 `import { join } from 'path'` 后的 `join(...)` / `resolve(...)`）。若任一片段可能来自外部/不可信输入
-        （用户、HTTP 请求、文件名、仓库名、扫描目标等），存在路径穿越（CWE-22）风险。
+        检测到外部输入（process.argv / process.env / HTTP 请求参数）经未净化的路径拼接
+        流向 path.join / path.resolve，存在路径穿越（CWE-22）风险。
         请改用 @zh/shared 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，
         二者在目标逃出 base 时会抛出 PathTraversalError。
     metadata:
@@ -36,75 +74,54 @@ rules:
       - javascript
       - typescript
     severity: WARNING
-    # 仅当 join/resolve 的首参或尾参为非常量（变量/表达式/调用）时才命中：
-    # 全字面量路径（path.join('a','b')）与数组拼接（arr.join(',')）非用户可控输入，
-    # 不构成 CWE-22 攻击面；常量标识符（__dirname、模块级 const）残余误报
-    # 通过 paths.exclude 允许列表收敛。metavariable-regex 的 ^ 锚定 + 负向前瞻
-    # 排除字符串/模板字面量，未被绑定的 metavariable 分支自动跳过。
-    patterns:
-      - pattern-either:
-          - patterns:
-              - pattern: path.join($ARG, ...)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: path.join(..., $ARG)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: path.resolve($ARG, ...)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: path.resolve(..., $ARG)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: join($ARG, ...)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: join(..., $ARG)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: resolve($ARG, ...)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
-          - patterns:
-              - pattern: resolve(..., $ARG)
-              - metavariable-regex:
-                  metavariable: $ARG
-                  regex: "^(?!['\"`])"
+    # —— 污点源：外部 / 不可信输入 ——
+    pattern-sources:
+      - pattern: process.argv
+      - pattern: process.env.$ANY
+      - pattern: $REQ.query.$ANY
+      - pattern: $REQ.params.$ANY
+      - pattern: $REQ.body.$ANY
+    # —— 净化器：经 safeJoin / safeResolve 处理后视为安全，不再向下跟踪 ——
+    pattern-sanitizers:
+      - pattern: safeJoin(...)
+      - pattern: safeResolve(...)
+    # —— 污点汇：路径拼接 ——
+    pattern-sinks:
+      - pattern: path.join(...)
+      - pattern: path.resolve(...)
+      # 解构写法 `import { join } from 'path'` 后的裸调用。
+      # 必须排除成员调用（$OBJ.join(...) / $OBJ.resolve(...)），否则
+      # `process.argv.join(',')` 这类字符串拼接会被误判为路径汇。
+      - patterns:
+          - pattern: join(...)
+          - pattern-not: $OBJ.join(...)
+      - patterns:
+          - pattern: resolve(...)
+          - pattern-not: $OBJ.resolve(...)
     paths:
       exclude:
         - "**/__tests__/**"
         - "**/*.test.ts"
         - "**/*.spec.ts"
-        # —— 非发布 / 测试 fixture / 受控工具目录（对应头注释的收敛策略）——
+        # —— 非发布 / 测试 fixture / 受控工具目录 ——
         - "packages/**/scripts/**"
         - "scripts/**"
         - "**/fixtures/**"
         - "**/vitest.config.*"
-        - "packages/shared/src/security/safe-path.ts"  # 规则推荐实现自身内部，非攻击面
-        - "packages/shared/src/path-augment.ts"  # 受控 PATH 补全器，非攻击面
-        # —— 分诊报告 P3 非发布项（允许列表，与报告 §3.8 对应）——
-        - "packages/fingerprint/src/__tests__/scoring-profile.test.ts"
-        - "packages/sentinel/src/__tests__/log-collector.test.ts"
+        - "packages/shared/src/security/safe-path.ts"  # 规则推荐实现自身，非攻击面
+        - "packages/shared/src/path-augment.ts"        # 受控 PATH 补全器，非攻击面
         - "packages/kernel/scripts/copy-sop-rules.cjs"
+        # 注：下列两项在 taint 语义下已冗余（不会再命中），保留以维持扫描基线稳定：
+        #   packages/fingerprint/src/__tests__/scoring-profile.test.ts
+        #   packages/sentinel/src/__tests__/log-collector.test.ts
 
 # ───────────────────────────────────────────────────────────────────────────
-# 接入方式（已实现）：已新增 SOP 规则 src/sop/inspect/scan/security/path-traversal.yml，
-#   复用 SemgrepAdapter，toolConfig.config 指向
-#   node_modules/@zh/kernel/dist/assets/semgrep/path-traversal.yml（由 copy-sop-rules.cjs
-#   从本文件拷贝到 dist/assets/semgrep/）。先以 severity WARNING（report-only）运行，
-#   统计误报；误报收敛后再考虑提升为 ERROR/阻断。本地若无 semgrep 则本规则不触发，
-#   不影响 pnpm lint/build。
+# 遗留门禁缺口（尚未修复，勿误认为已完成）：
+#   v1 注释写着「提升为阻断前，需在 CI 跑一次 semgrep 统计误报率并据此收敛」——
+#   即作者已知「未统计误报率就以 active 下发」。本次（2026-09-22）由人工补做该统计
+#   并通过，但**自动化门禁仍未建立**：规则上架链路
+#   （server/src/sop/sop-content-admin.repository.ts 的 PUBLISHABLE_STATUSES = {draft, trial}）
+#   没有任何 fixture 回放 / 误报率阈值校验。门禁建立前，新规则仍可能重现本文件 v1 的路径。
+#   可复用的现成机制：packages/fingerprint/src/accuracy.ts（precision ≥ 0.95 才放行），
+#   目前只覆盖 Detector，且未被 CI 消费。
 # ───────────────────────────────────────────────────────────────────────────

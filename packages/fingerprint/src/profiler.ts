@@ -42,13 +42,13 @@ export class Profiler {
       packageManagerResult,
       formResults,
     } = this.aggregateAllFields(allSignals);
-    const target = this.targetBuilder.build(
+    const target = this.targetBuilder.build({
       projectPath,
-      languageResult,
-      frameworkResults,
-      formResults,
-      packageManagerResult,
-    );
+      language: languageResult,
+      frameworks: frameworkResults,
+      forms: formResults,
+      packageManager: packageManagerResult,
+    });
     const architecture = this.targetBuilder.determineArchitecture(allSignals);
     const dependencies = this.targetBuilder.extractDependencySummary(allSignals);
     const mergedOverrides = this.overrideMerger.merge(overrides, target);

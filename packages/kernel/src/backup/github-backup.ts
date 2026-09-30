@@ -245,7 +245,7 @@ export class GitHubBackup {
     excludePatterns: string[],
   ): Promise<GitHubTree> {
     const tree: GitHubTreeItem[] = [];
-    await collectTreeItems(ctx, projectPath, '', excludePatterns, tree);
+    await collectTreeItems({ ctx, dir: projectPath, prefix: '', excludePatterns, tree });
     return this.githubFetch<GitHubTree>(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees`,
       ctx.token,
@@ -289,6 +289,10 @@ export class GitHubBackup {
 
 // ─── Token 存储接口 ──────────────────────────────────────
 
+/**
+ * GitHub Token 存取接口：getToken 返回 null 表示未配置凭据。
+ * 实现方负责选择持久化介质（默认实现仅在内存中保存）。
+ */
 export interface TokenStore {
   getToken(): Promise<string | null>;
   saveToken(token: string): Promise<void>;

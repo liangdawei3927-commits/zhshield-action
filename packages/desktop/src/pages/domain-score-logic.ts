@@ -15,7 +15,7 @@ export type ScoreDimension =
   | 'backup';
 
 /**
- * 分类页「本域评分」卡的展示视图（纯函数，供 DomainScoreCard 消费）。
+ * 分类页「评分」卡的展示视图（纯函数，供 DomainScoreCard 消费）。
  *
  * 数据源是报告中心最近一次汇总的 HealthScoreData（getScore）——**只读不算**：
  * 各维分数由 @zh/scoring 在汇总时统一产出，页面不做任何二次计算，
@@ -38,18 +38,30 @@ export interface DomainScoreView {
 
 const MUTED = 'rgb(var(--zh-muted))';
 
+/** domainScoreView 的入参：维度条目 + 汇总时间戳（可选当前时间与翻译函数便于测试） */
+export interface DomainScoreViewParams {
+  /** 该维度在 dimensions 数组中的条目（undefined = 汇总数据里没有这一维） */
+  dim: { score: number; status?: 'scored' | 'not-run' } | undefined;
+  /** 汇总时间戳（undefined = 无汇总数据） */
+  generatedAt: string | undefined;
+  /** 当前时间戳（默认 Date.now()） */
+  now?: number;
+  /** i18n 翻译函数（默认 t） */
+  tr?: typeof t;
+  /** 上一轮检查的分数（用于「上次 → 本次」行） */
+  previousScore?: number;
+}
+
 /**
  * 由汇总数据中该维度的值构建展示视图。
- * @param dim 该维度在 dimensions 数组中的条目（undefined = 汇总数据里没有这一维）
- * @param generatedAt 汇总时间戳（undefined = 无汇总数据）
  */
-export function domainScoreView(
-  dim: { score: number; status?: 'scored' | 'not-run' } | undefined,
-  generatedAt: string | undefined,
-  now: number = Date.now(),
-  tr: typeof t = t,
-  previousScore?: number,
-): DomainScoreView {
+export function domainScoreView({
+  dim,
+  generatedAt,
+  now = Date.now(),
+  tr = t,
+  previousScore,
+}: DomainScoreViewParams): DomainScoreView {
   if (!dim) {
     return {
       kind: 'no-data',

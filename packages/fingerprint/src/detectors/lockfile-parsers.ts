@@ -18,6 +18,7 @@ const POM_GROUP_RE = /<groupId>([^<]+)<\/groupId>/;
 const POM_ARTIFACT_RE = /<artifactId>([^<]+)<\/artifactId>/;
 const POM_VERSION_RE = /<version>([^<]+)<\/version>/;
 
+/** 锁文件解析结果：来源规则 ID、包管理器与直接依赖清单（M0 只取 name + version） */
 export interface ParsedLockfile {
   ruleId: string;
   packageManager: string;
@@ -31,6 +32,15 @@ interface DepName {
 
 function readFile(root: string, rel: string): string {
   return fs.readFileSync(path.join(root, ...rel.split('/')), 'utf-8');
+}
+
+/** 读取锁文件文本；文件不存在 / 不可读 / 解码失败一律视为「无此锁文件」（null） */
+function readLockfileOrNull(root: string, rel: string): string | null {
+  try {
+    return readFile(root, rel);
+  } catch {
+    return null;
+  }
 }
 
 function dedupe(deps: DepName[]): DepName[] {
@@ -118,24 +128,16 @@ function parsePnpmImporters(content: string): DepName[] {
 }
 
 function parsePnpmLock(root: string, rel: string): ParsedLockfile | null {
-  let content: string;
-  try {
-    content = readFile(root, rel);
-  } catch {
-    return null;
-  }
+  const content = readLockfileOrNull(root, rel);
+  if (content === null) return null;
   const direct = parsePnpmImporters(content);
   if (direct.length === 0) return null;
   return { ruleId: 'lockfile:pnpm', packageManager: 'pnpm', direct: dedupe(direct) };
 }
 
 function parseYarnLock(root: string, rel: string): ParsedLockfile | null {
-  let content: string;
-  try {
-    content = readFile(root, rel);
-  } catch {
-    return null;
-  }
+  const content = readLockfileOrNull(root, rel);
+  if (content === null) return null;
   const direct: DepName[] = [];
   let pending: DepName | null = null;
   for (const raw of content.split('\n')) {
@@ -161,12 +163,8 @@ function parseYarnLock(root: string, rel: string): ParsedLockfile | null {
 }
 
 function parseGoSum(root: string, rel: string): ParsedLockfile | null {
-  let content: string;
-  try {
-    content = readFile(root, rel);
-  } catch {
-    return null;
-  }
+  const content = readLockfileOrNull(root, rel);
+  if (content === null) return null;
   const direct: DepName[] = [];
   for (const match of content.matchAll(/^([^\s]+)\s+(v[^\s]+)/gm)) {
     direct.push({ name: match[1], version: match[2] });
@@ -182,12 +180,8 @@ function parsePackageStyle(
   ruleId: string,
   packageManager: string,
 ): ParsedLockfile | null {
-  let content: string;
-  try {
-    content = readFile(root, rel);
-  } catch {
-    return null;
-  }
+  const content = readLockfileOrNull(root, rel);
+  if (content === null) return null;
   const direct: DepName[] = [];
   let pending: DepName | null = null;
   for (const raw of content.split('\n')) {
@@ -207,12 +201,8 @@ function parsePackageStyle(
 }
 
 function parsePomXml(root: string, rel: string): ParsedLockfile | null {
-  let content: string;
-  try {
-    content = readFile(root, rel);
-  } catch {
-    return null;
-  }
+  const content = readLockfileOrNull(root, rel);
+  if (content === null) return null;
   const direct: DepName[] = [];
   for (const block of content.matchAll(/<dependency>([\s\S]*?)<\/dependency>/g)) {
     const group = block[1].match(POM_GROUP_RE)?.[1] ?? '';
@@ -246,6 +236,13 @@ function parsePipfileLock(root: string, rel: string): ParsedLockfile | null {
   return { ruleId: 'lockfile:pipfile-lock', packageManager: 'pipenv', direct: dedupe(direct) };
 }
 
+/**
+ * 按锁文件名分派到对应解析器，提取直接依赖清单。
+ * @param root 项目根绝对路径
+ * @param rel 锁文件相对路径（posix，'/' 分隔）
+ * @param name 锁文件名（如 'pnpm-lock.yaml'），用于选择解析器
+ * @returns 解析结果；不支持的文件名、文件缺失或解析失败均返回 null
+ */
 export function parseLockfile(root: string, rel: string, name: string): ParsedLockfile | null {
   switch (name) {
     case 'package-lock.json':

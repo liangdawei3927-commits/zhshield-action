@@ -3,6 +3,7 @@ import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport } from '@zh/kernel';
 
+/** 流水线报告：各阶段报告、是否通过、终止阶段与失败原因 */
 export interface PipelineReport {
   timestamp: Date;
 

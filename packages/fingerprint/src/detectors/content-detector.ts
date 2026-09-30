@@ -58,9 +58,15 @@ export class ContentDetector implements Detector {
         const lang = shebangLanguage(shebang[1]);
         if (lang !== null) {
           signals.push(
-            makeSignal(KIND, 'content:shebang', rel, this.weight, {
-              language: lang,
-              interpreter: shebang[1],
+            makeSignal({
+              kind: KIND,
+              ruleId: 'content:shebang',
+              file: rel,
+              weight: this.weight,
+              payload: {
+                language: lang,
+                interpreter: shebang[1],
+              },
             }),
           );
         }
@@ -68,7 +74,15 @@ export class ContentDetector implements Detector {
       if (ext === 'py') {
         const lang = pythonImportLanguage(head);
         if (lang !== null)
-          signals.push(makeSignal(KIND, 'content:import', rel, this.weight, { language: lang }));
+          signals.push(
+            makeSignal({
+              kind: KIND,
+              ruleId: 'content:import',
+              file: rel,
+              weight: this.weight,
+              payload: { language: lang },
+            }),
+          );
       }
     }
     return signals.sort((a, b) =>

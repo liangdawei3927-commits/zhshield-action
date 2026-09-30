@@ -54,8 +54,10 @@ describe('computeRedLine — 红线事实判定', () => {
 
 describe('ScoringEngine.calculate — 红线封顶', () => {
   it('无红线 → overall 为纯加权平均，scoreVersion=2，redLine 缺省', () => {
-    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
-      security: { activeCount: 0 },
+    const dims = buildHealthDimensions({
+      guard: cleanGuard,
+      inspect: cleanInspect,
+      extras: { security: { activeCount: 0 } },
     });
     const score = new ScoringEngine().calculate('p', dims);
     expect(score.scoreVersion).toBe(SCORE_VERSION);
@@ -64,8 +66,10 @@ describe('ScoringEngine.calculate — 红线封顶', () => {
   });
 
   it('存在 critical 密钥 → overall 被压到 ≤ 60 且 grade=D，redLine 附带原因', () => {
-    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
-      secrets: { activeCount: 5 },
+    const dims = buildHealthDimensions({
+      guard: cleanGuard,
+      inspect: cleanInspect,
+      extras: { secrets: { activeCount: 5 } },
     });
     const rl = computeRedLine({ secrets: { activeCount: 5 } });
     const score = new ScoringEngine().calculate('p', dims, rl);
@@ -79,8 +83,10 @@ describe('ScoringEngine.calculate — 红线封顶', () => {
   });
 
   it('各域都好但哨兵有 critical 事件 → 总评照样封顶（平均不背锅）', () => {
-    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, {
-      sentinel: { active: true, criticalEvents: 1, warningEvents: 0 },
+    const dims = buildHealthDimensions({
+      guard: cleanGuard,
+      inspect: cleanInspect,
+      extras: { sentinel: { active: true, criticalEvents: 1, warningEvents: 0 } },
     });
     const rl = computeRedLine({ sentinel: { active: true, criticalEvents: 1, warningEvents: 0 } });
     const score = new ScoringEngine().calculate('p', dims, rl);
@@ -89,8 +95,8 @@ describe('ScoringEngine.calculate — 红线封顶', () => {
 });
 
 describe('SCORE_VERSION / 全域 extras 类型完整性', () => {
-  it('SCORE_VERSION = 2', () => {
-    expect(SCORE_VERSION).toBe(2);
+  it('SCORE_VERSION = 3', () => {
+    expect(SCORE_VERSION).toBe(3);
   });
 
   it('garbage/backup extras 参与 extras 全量运行判定', () => {
@@ -102,7 +108,7 @@ describe('SCORE_VERSION / 全域 extras 类型完整性', () => {
         scheduleEnabled: false,
       },
     };
-    const dims = buildHealthDimensions(cleanGuard, cleanInspect, undefined, undefined, extras);
+    const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras });
     expect(dims.find((d) => d.name === 'garbage')!.status).toBe('scored');
     expect(dims.find((d) => d.name === 'backup')!.status).toBe('scored');
   });

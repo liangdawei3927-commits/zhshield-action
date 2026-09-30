@@ -15,8 +15,10 @@ import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '.
 import {
   resolveSourceRoots,
   collectFilesAcrossRoots,
-  NON_PRODUCTION_DIRS,
-  isNonProductionFile,
+  collectSourceFiles,
+  readTextSafe,
+  SOURCE_EXTS,
+  SKIPPED_SOURCE_DIRS,
 } from '../source-roots';
 
 /** 已知体积较大的第三方库（全量引入会显著增大产物 / 阻塞摇树） */
@@ -41,9 +43,6 @@ export const LARGE_CHUNK_THRESHOLD = 1024 * 1024;
 /** 产物目录约定（与 bundle-size 检测器一致） */
 const ARTIFACT_DIRS: readonly string[] = ['dist', 'build', 'out'];
 
-/** 源码文件扩展名（ts/tsx/js/jsx） */
-const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
-
 /** 摇树优化与代码分割检测器契约：离线静态，不联网 */
 export interface TreeShakingDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[];
@@ -59,15 +58,6 @@ function readJsonSafe(filePath: string): Record<string, unknown> | null {
   try {
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     return isRecord(data) ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 安全读取文本文件；读取失败返回 null */
-function readTextSafe(filePath: string): string | null {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
   } catch {
     return null;
   }
@@ -89,6 +79,24 @@ export function formatBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
+/** TreeShakingDetectorImpl.collectTreeShakingIssues 参数对象 */
+interface CollectTreeShakingIssuesParams {
+  projectRoot: string;
+  pkg: Record<string, unknown>;
+  srcRoots: readonly string[];
+  cfg: PerformanceConfig;
+  issues: PerformanceIssue[];
+}
+
+/** TreeShakingDetectorImpl.recordWholeLibraryHit 参数对象 */
+interface RecordWholeLibraryHitParams {
+  hits: Array<{ file: string; library: string }>;
+  seen: Set<string>;
+  projectRoot: string;
+  filePath: string;
+  specifier: string;
+}
+
 /** 摇树优化与代码分割检测器具体实现：离线静态，绝不抛异常 */
 export class TreeShakingDetectorImpl implements TreeShakingDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
@@ -97,7 +105,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
     const pkg = readJsonSafe(safeJoin(projectRoot, 'package.json'));
     const srcRoots = resolveSourceRoots(projectRoot);
     if (pkg) {
-      this.collectTreeShakingIssues(projectRoot, pkg, srcRoots, cfg, issues);
+      this.collectTreeShakingIssues({ projectRoot, pkg, srcRoots, cfg, issues });
     }
     const chunkFiles = this.collectArtifactChunks(projectRoot);
     this.collectChunkIssues(chunkFiles, cfg, issues);
@@ -108,13 +116,13 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   }
 
   /** tree-shaking 维度：sideEffects 缺失/显式关闭 + 大库全量引入 */
-  private collectTreeShakingIssues(
-    projectRoot: string,
-    pkg: Record<string, unknown>,
-    srcRoots: readonly string[],
-    cfg: PerformanceConfig,
-    issues: PerformanceIssue[],
-  ): void {
+  private collectTreeShakingIssues({
+    projectRoot,
+    pkg,
+    srcRoots,
+    cfg,
+    issues,
+  }: CollectTreeShakingIssuesParams): void {
     const isNpmPackage =
       typeof pkg.name === 'string' &&
       typeof pkg.version === 'string' &&
@@ -146,7 +154,7 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
     }
     const sourceFiles = collectFilesAcrossRoots(
       srcRoots,
-      (root, limit) => this.collectFiles(root, SOURCE_EXTS, limit),
+      (root, limit) => collectSourceFiles(root, SOURCE_EXTS, SKIPPED_SOURCE_DIRS, limit),
       cfg.scanLimit,
     );
     const wholeLibraryHits = this.findWholeLibraryImports(projectRoot, sourceFiles, cfg.scanLimit);
@@ -206,45 +214,6 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
         autoFixable: false,
       });
     }
-  }
-
-  /** 递归收集源码目录下的 ts/tsx/js/jsx 文件（受 scanLimit 约束） */
-  private collectFiles(dir: string, exts: readonly string[], limit: number): string[] {
-    const files: string[] = [];
-    if (!fs.existsSync(dir)) return files;
-    const visit = (current: string): void => {
-      if (files.length >= limit) return;
-      let entries: fs.Dirent[];
-      try {
-        entries = fs.readdirSync(current, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        if (entry.name === '.' || entry.name === '..') continue;
-        if (files.length >= limit) return;
-        const full = safeJoin(current, entry.name);
-        if (entry.isDirectory()) {
-          // 跳过 node_modules / 产物目录 / 测试夹具，避免误扫依赖自身源码与非生产代码
-          if (
-            entry.name === 'node_modules' ||
-            ARTIFACT_DIRS.includes(entry.name) ||
-            NON_PRODUCTION_DIRS.has(entry.name)
-          ) {
-            continue;
-          }
-          visit(full);
-        } else if (
-          entry.isFile() &&
-          exts.includes(path.extname(entry.name)) &&
-          !isNonProductionFile(entry.name)
-        ) {
-          files.push(full);
-        }
-      }
-    };
-    visit(dir);
-    return files;
   }
 
   /** 递归收集产物目录（dist/build/out）下的 JS chunk（排除 .map），返回相对路径与字节数 */
@@ -308,20 +277,20 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       for (const m of content.matchAll(
         /(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g,
       )) {
-        this.recordWholeLibraryHit(hits, seen, projectRoot, filePath, m[1]);
+        this.recordWholeLibraryHit({ hits, seen, projectRoot, filePath, specifier: m[1] });
       }
     }
     return hits;
   }
 
   /** 记录单个 specifier 对已知大库的全量引入（排除子路径引入），按 (file, library) 去重 */
-  private recordWholeLibraryHit(
-    hits: Array<{ file: string; library: string }>,
-    seen: Set<string>,
-    projectRoot: string,
-    filePath: string,
-    specifier: string,
-  ): void {
+  private recordWholeLibraryHit({
+    hits,
+    seen,
+    projectRoot,
+    filePath,
+    specifier,
+  }: RecordWholeLibraryHitParams): void {
     for (const lib of KNOWN_LARGE_PACKAGES) {
       // 仅全量引入（包名精确匹配），子路径如 'lodash/debounce' 不命中
       if (specifier !== lib) continue;

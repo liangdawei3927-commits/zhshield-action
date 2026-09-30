@@ -12,6 +12,7 @@ const SCAN_CATEGORIES = [
   'dependency',
 ] as const;
 
+/** 巡检报告构建入参：项目、扫描方式、耗时、问题列表与各适配器结果 */
 export interface ScanReportInput {
   projectId: string;
   scanType: InspectionReport['scanType'];

@@ -14,6 +14,7 @@ import { hashFile } from './utils';
 import { openZipArchive, toZipEntryName } from './zip-archive';
 import type { LocalBackupFileEntry, LocalBackupManifest, LocalBackupRestoreResult } from './types';
 
+/** zip 快照构建统计：成功/失败文件数、总体积及写入归档的文件条目清单 */
 export interface ZipSnapshotStats {
   backedUp: number;
   errors: number;
@@ -21,10 +22,30 @@ export interface ZipSnapshotStats {
   fileEntries: LocalBackupFileEntry[];
 }
 
+/** 构建 zip 快照的入参：待打包文件列表、项目根路径、归档输出路径与取消信号 */
 export interface ZipSnapshotRequest {
   files: string[];
   projectPath: string;
   timestamp: string;
+  zipPath: string;
+  abortSignal?: AbortSignal;
+}
+
+/** addFilesToZip 参数对象 */
+interface AddFilesToZipParams {
+  zip: yazl.ZipFile;
+  files: string[];
+  projectPath: string;
+  timestamp: string;
+  abortSignal?: AbortSignal;
+}
+
+/** finalizeZip 参数对象 */
+interface FinalizeZipParams {
+  zip: yazl.ZipFile;
+  fileEntries: LocalBackupFileEntry[];
+  timestamp: string;
+  tmpZipPath: string;
   zipPath: string;
   abortSignal?: AbortSignal;
 }
@@ -38,31 +59,33 @@ export async function buildZipSnapshot(request: ZipSnapshotRequest): Promise<Zip
   const tmpZipPath = `${zipPath}.tmp`;
   const zip = new yazl.ZipFile();
 
-  const { fileEntries, backedUp, errors, totalSize } = await addFilesToZip(
+  const { fileEntries, backedUp, errors, totalSize } = await addFilesToZip({
     zip,
     files,
     projectPath,
     timestamp,
-    abortSignal,
-  );
-  await finalizeZip(zip, fileEntries, timestamp, tmpZipPath, zipPath, abortSignal);
+    ...(abortSignal !== undefined ? { abortSignal } : {}),
+  });
+  await finalizeZip({
+    zip,
+    fileEntries,
+    timestamp,
+    tmpZipPath,
+    zipPath,
+    ...(abortSignal !== undefined ? { abortSignal } : {}),
+  });
 
   return { backedUp, errors, totalSize, fileEntries };
 }
 
 /** 逐个文件写入 zip：计算哈希与大小，记录清单条目 */
-async function addFilesToZip(
-  zip: yazl.ZipFile,
-  files: string[],
-  projectPath: string,
-  timestamp: string,
-  abortSignal?: AbortSignal,
-): Promise<{
+async function addFilesToZip(params: AddFilesToZipParams): Promise<{
   fileEntries: LocalBackupFileEntry[];
   backedUp: number;
   errors: number;
   totalSize: number;
 }> {
+  const { zip, files, projectPath, timestamp, abortSignal } = params;
   const fileEntries: LocalBackupFileEntry[] = [];
   let backedUp = 0;
   let errors = 0;
@@ -134,14 +157,8 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
 }
 
 /** 写入清单并落盘：先写 .tmp 再原子改名，失败清理临时文件 */
-async function finalizeZip(
-  zip: yazl.ZipFile,
-  fileEntries: LocalBackupFileEntry[],
-  timestamp: string,
-  tmpZipPath: string,
-  zipPath: string,
-  abortSignal?: AbortSignal,
-): Promise<void> {
+async function finalizeZip(params: FinalizeZipParams): Promise<void> {
+  const { zip, fileEntries, timestamp, tmpZipPath, zipPath, abortSignal } = params;
   try {
     const manifest: LocalBackupManifest = {
       version: '1.0',

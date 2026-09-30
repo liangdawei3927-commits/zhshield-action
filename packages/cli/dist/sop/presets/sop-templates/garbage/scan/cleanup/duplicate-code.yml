@@ -65,10 +65,18 @@ conditions:
     - "**/generated/**"
     - "**/*.min.*"
 
+# jscpd 默认阈值 minLines=5 / minTokens=50 对本仓标定过激：实测 191 条中位仅 11 行 / 65 token，
+# 6-8 行样板巧合占 22%，信号被噪音淹没。100 token 对齐 SonarQube 重复检测默认阈值，
+# 10 行高于样板聚集带；定标后残留 26 条，逐条核验均为实质重复。
+# 传递链：顶层 thresholds → ContentInterpreter 并入 toolConfig.thresholds
+#        → JscpdAdapter 读 options.config.thresholds → --min-lines / --min-tokens
+thresholds:
+  minLines: 10
+  minTokens: 100
+
 check:
   # ── 覆盖范围声明（诚实标注）───────────────────────────────────────────────
-  # 真实执行：jscpd --mode strict 报告的重复代码块（阈值与 ignore 由 JscpdAdapter
-  #   持有：适配器不消费 toolConfig，故此处不声明会被忽略的 minLines / minTokens）。
+  # 真实执行：jscpd --mode strict 报告的重复代码块（阈值见上 thresholds；ignore 由 JscpdAdapter 持有）。
   # 本规则与「代码重构」域的重复检测分工：
   #   · 本规则 = 清理视角：跨文件重复片段的"可提取为 Helper"清单
   #   · 重构域   = 重构视角：AST 级异味与结构化重构建议（含圈复杂度等）

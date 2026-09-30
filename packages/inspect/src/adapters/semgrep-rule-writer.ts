@@ -11,7 +11,7 @@ const INLINE_RULE_TMP_PREFIX = 'zhshield-semgrep-';
  * 缓存规则 JSON 以 kebab-case 键声明（pattern-not / metavariable-regex / pattern-either），
  * SOP 内联声明使用 camelCase——两种键同时声明并在规范化时归一到 camelCase。
  */
-interface SemgrepPatternEntry {
+export interface SemgrepPatternEntry {
   pattern?: string;
   patternEither?: string[];
   patternNot?: string;
@@ -23,8 +23,13 @@ interface SemgrepPatternEntry {
   'metavariable-regex'?: { metavariable: string; regex: string };
 }
 
-/** 内联规则声明（来自 config.rules，原始声明为 string[]，此处按对象结构访问） */
-interface SemgrepRule {
+/**
+ * 内联规则声明（来自 config.rules，原始声明为 string[]，此处按对象结构访问）。
+ *
+ * 唯一声明点：SemgrepAdapter.resolveScanSetup 需要同一形状做可用性判定，
+ * 此前两处各写一份 interface 逐字重复（jscpd 同包命中），现统一由此处导出。
+ */
+export interface SemgrepRule {
   id?: string;
   severity?: string;
   language?: string;
@@ -36,6 +41,13 @@ interface SemgrepRule {
   message?: string;
   metavariableRegex?: Array<{ metavariable: string; regex: string }>;
   patterns?: SemgrepPatternEntry[];
+}
+
+/** 运行期校验：config.rules 声明为 string[]，实际语义为对象数组，此处按运行期形状收窄 */
+export function isSemgrepRuleArray(value: unknown): value is SemgrepRule[] {
+  return (
+    Array.isArray(value) && value.every((v) => typeof v === 'object' && v !== null)
+  );
 }
 
 /** 规范化后用于生成 YAML 的规则 */
@@ -74,7 +86,9 @@ function normalizePatternEntry(entry: SemgrepPatternEntry): SemgrepPatternEntry 
  */
 export class SemgrepRuleWriter {
   async writeInlineRuleConfig(options: ToolScanOptions): Promise<string | null> {
-    const rules = options.config?.rules as unknown as SemgrepRule[] | undefined;
+    const rules = isSemgrepRuleArray(options.config?.rules)
+      ? options.config.rules
+      : undefined;
     if (rules && rules.length > 0) {
       return this.writeInlineRules(rules);
     }
@@ -132,79 +146,106 @@ export class SemgrepRuleWriter {
   }
 
   private appendRuleMatch(lines: string[], r: SemgrepRuleYaml): void {
-    if (r.patterns && r.patterns.length > 0) {
-      lines.push('    patterns:');
-      for (const p of r.patterns) {
-        if (typeof p.pattern === 'string' && p.pattern.length > 0) {
-          lines.push('      - pattern: |');
-          for (const line of p.pattern.split('\n')) lines.push(`          ${line}`);
-        } else if (p.patternEither && p.patternEither.length > 0) {
-          lines.push('      - pattern-either:');
-          for (const pe of p.patternEither) {
-            lines.push('          - pattern: |');
-            for (const line of pe.split('\n')) lines.push(`              ${line}`);
-          }
-        }
-        if (typeof p.patternNot === 'string' && p.patternNot.length > 0) {
-          lines.push('      - pattern-not: |');
-          for (const line of p.patternNot.split('\n')) lines.push(`          ${line}`);
-        }
-        if (typeof p.patternRegex === 'string' && p.patternRegex.length > 0) {
-          lines.push(`      - pattern-regex: ${JSON.stringify(p.patternRegex)}`);
-        }
-        if (p.metavariableRegex) {
-          lines.push('      - metavariable-regex:');
-          lines.push(`          metavariable: ${JSON.stringify(p.metavariableRegex.metavariable)}`);
-          lines.push(`          regex: ${JSON.stringify(p.metavariableRegex.regex)}`);
-        }
-      }
-      return;
-    }
-
-    if (typeof r.patternRegex === 'string' && r.patternRegex.length > 0) {
-      lines.push(`    pattern-regex: ${JSON.stringify(r.patternRegex)}`);
-      return;
-    }
-
-    if (r.patternEither && r.patternEither.length > 0) {
-      lines.push('    patterns:');
-      lines.push('      - pattern-either:');
-      for (const p of r.patternEither) {
-        lines.push('          - pattern: |');
-        for (const line of p.split('\n')) lines.push(`              ${line}`);
-      }
-      this.appendPatternNot(lines, r, '      ');
-      this.appendMetavariableRegex(lines, r, '      ');
-      return;
-    }
-
-    const constrained = (r.metavariableRegex?.length ?? 0) > 0 || (r.patternNot?.length ?? 0) > 0;
-    if (constrained) {
-      lines.push('    patterns:');
-      lines.push('      - pattern: |');
-      for (const line of (r.pattern || '').split('\n')) lines.push(`          ${line}`);
-      this.appendPatternNot(lines, r, '      ');
-      this.appendMetavariableRegex(lines, r, '      ');
-      return;
-    }
-
-    lines.push('    pattern: |');
-    for (const line of (r.pattern || '').split('\n')) lines.push(`      ${line}`);
+    if (appendPatternsMatch(lines, r.patterns)) return;
+    if (appendSimplePattern(lines, r)) return;
+    if (appendPatternEitherMatch(lines, r)) return;
+    if (appendConstrainedPatternMatch(lines, r)) return;
+    appendPlainPattern(lines, r);
   }
+}
 
-  private appendPatternNot(lines: string[], r: SemgrepRuleYaml, indent: string): void {
-    for (const p of r.patternNot ?? []) {
-      lines.push(`${indent}- pattern-not: |`);
-      for (const line of p.split('\n')) lines.push(`${indent}    ${line}`);
+/** 单个 patterns 条目：按 pattern → pattern-either → pattern-not → pattern-regex → metavariable-regex 顺序写入 */
+function appendPatternEntry(lines: string[], p: SemgrepPatternEntry): void {
+  if (typeof p.pattern === 'string' && p.pattern.length > 0) {
+    lines.push('      - pattern: |');
+    for (const line of p.pattern.split('\n')) lines.push(`          ${line}`);
+  } else if (p.patternEither && p.patternEither.length > 0) {
+    lines.push('      - pattern-either:');
+    for (const pe of p.patternEither) {
+      lines.push('          - pattern: |');
+      appendPatternEitherBody(lines, pe);
     }
   }
+  if (typeof p.patternNot === 'string' && p.patternNot.length > 0) {
+    lines.push('      - pattern-not: |');
+    for (const line of p.patternNot.split('\n')) lines.push(`          ${line}`);
+  }
+  if (typeof p.patternRegex === 'string' && p.patternRegex.length > 0) {
+    lines.push(`      - pattern-regex: ${JSON.stringify(p.patternRegex)}`);
+  }
+  if (p.metavariableRegex) {
+    lines.push('      - metavariable-regex:');
+    lines.push(`          metavariable: ${JSON.stringify(p.metavariableRegex.metavariable)}`);
+    lines.push(`          regex: ${JSON.stringify(p.metavariableRegex.regex)}`);
+  }
+}
 
-  private appendMetavariableRegex(lines: string[], r: SemgrepRuleYaml, indent: string): void {
-    for (const m of r.metavariableRegex ?? []) {
-      lines.push(`${indent}- metavariable-regex:`);
-      lines.push(`${indent}    metavariable: ${JSON.stringify(m.metavariable)}`);
-      lines.push(`${indent}    regex: ${JSON.stringify(m.regex)}`);
-    }
+/** 复合 patterns 分支：写入 patterns 数组（含 pattern-not / pattern-regex / metavariable-regex 子项） */
+function appendPatternsMatch(lines: string[], patterns: SemgrepPatternEntry[] | undefined): boolean {
+  if (!patterns || patterns.length === 0) return false;
+  lines.push('    patterns:');
+  for (const p of patterns) appendPatternEntry(lines, p);
+  return true;
+}
+
+/** pattern-either 子项的 pattern 正文（YAML 块标量缩进 14 空格）逐行写入 */
+function appendPatternEitherBody(lines: string[], pattern: string): void {
+  for (const line of pattern.split('\n')) lines.push(`              ${line}`);
+}
+
+/** 简单 pattern-regex 分支：命中则写入并返回 true */
+function appendSimplePattern(lines: string[], r: SemgrepRuleYaml): boolean {
+  if (typeof r.patternRegex === 'string' && r.patternRegex.length > 0) {
+    lines.push(`    pattern-regex: ${JSON.stringify(r.patternRegex)}`);
+    return true;
+  }
+  return false;
+}
+
+/** pattern-either 分支：写入 patterns 数组并追加 pattern-not / metavariable-regex 约束 */
+function appendPatternEitherMatch(lines: string[], r: SemgrepRuleYaml): boolean {
+  if (!r.patternEither || r.patternEither.length === 0) return false;
+  lines.push('    patterns:');
+  lines.push('      - pattern-either:');
+  for (const p of r.patternEither) {
+    lines.push('          - pattern: |');
+    for (const line of p.split('\n')) lines.push(`              ${line}`);
+  }
+  appendPatternNot(lines, r, '      ');
+  appendMetavariableRegex(lines, r, '      ');
+  return true;
+}
+
+/** 带约束的 pattern 分支：pattern 主体 + pattern-not / metavariable-regex 约束 */
+function appendConstrainedPatternMatch(lines: string[], r: SemgrepRuleYaml): boolean {
+  const constrained = (r.metavariableRegex?.length ?? 0) > 0 || (r.patternNot?.length ?? 0) > 0;
+  if (!constrained) return false;
+  lines.push('    patterns:');
+  lines.push('      - pattern: |');
+  for (const line of (r.pattern || '').split('\n')) lines.push(`          ${line}`);
+  appendPatternNot(lines, r, '      ');
+  appendMetavariableRegex(lines, r, '      ');
+  return true;
+}
+
+/** 兜底：无任何约束的纯 pattern 分支 */
+function appendPlainPattern(lines: string[], r: SemgrepRuleYaml): void {
+  lines.push('    pattern: |');
+  for (const line of (r.pattern || '').split('\n')) lines.push(`      ${line}`);
+}
+
+function appendPatternNot(lines: string[], r: SemgrepRuleYaml, indent: string): void {
+  for (const p of r.patternNot ?? []) {
+    lines.push(`${indent}- pattern-not: |`);
+    for (const line of p.split('\n')) lines.push(`${indent}    ${line}`);
+  }
+}
+
+function appendMetavariableRegex(lines: string[], r: SemgrepRuleYaml, indent: string): void {
+  for (const m of r.metavariableRegex ?? []) {
+    lines.push(`${indent}- metavariable-regex:`);
+    lines.push(`${indent}    metavariable: ${JSON.stringify(m.metavariable)}`);
+    lines.push(`${indent}    regex: ${JSON.stringify(m.regex)}`);
   }
 }
 

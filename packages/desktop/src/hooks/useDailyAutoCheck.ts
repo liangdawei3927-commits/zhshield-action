@@ -1,6 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { dailyAutoKey, needsDailyRun } from './daily-auto-check-logic';
 
+/** 读取今日自动检查记录（localStorage 不可用（极少见）→ 视为无记录，仍触发） */
+function readStoredAuto(scope: string, projectPath: string): string | null {
+  try {
+    return localStorage.getItem(dailyAutoKey(scope, projectPath));
+  } catch {
+    return null;
+  }
+}
+
+/** 写入今日自动检查记录（写不进也照样跑，只是同日再进页面会多跑一次） */
+function writeStoredAuto(scope: string, projectPath: string, stamp: string): void {
+  try {
+    localStorage.setItem(dailyAutoKey(scope, projectPath), stamp);
+  } catch {
+    /* 写不进也照样跑 */
+  }
+}
+
 /**
  * 每天首次进入页面时自动触发一次回调（体检页 / 代码重构页共用，无需用户配置）。
  *
@@ -15,19 +33,10 @@ export function useDailyAutoCheck(scope: string, projectPath: string, onSchedule
 
   useEffect(() => {
     if (!projectPath) return;
-    let stored: string | null = null;
-    try {
-      stored = localStorage.getItem(dailyAutoKey(scope, projectPath));
-    } catch {
-      /* localStorage 不可用（极少见）→ 视为无记录，仍触发 */
-    }
+    const stored = readStoredAuto(scope, projectPath);
     const today = needsDailyRun(stored);
     if (!today) return;
-    try {
-      localStorage.setItem(dailyAutoKey(scope, projectPath), today);
-    } catch {
-      /* 写不进也照样跑，只是同日再进页面会多跑一次 */
-    }
+    writeStoredAuto(scope, projectPath, today);
     setLastAutoAt(new Date().toLocaleString());
     onScheduledRef.current();
   }, [scope, projectPath]);

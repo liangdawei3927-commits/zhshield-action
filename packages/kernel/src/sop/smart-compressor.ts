@@ -1,3 +1,4 @@
+/** 压缩策略：仅对不小于 minSize 的数据生效，compress / decompress 需成对实现 */
 export interface CompressionStrategy {
   name: string;
   minSize: number;
@@ -5,6 +6,7 @@ export interface CompressionStrategy {
   decompress: (data: string) => string;
 }
 
+/** 压缩结果：所用策略名 + 压缩前后体积对比 + 压缩数据本体 */
 export interface CompressedData {
   strategy: string;
   originalSize: number;

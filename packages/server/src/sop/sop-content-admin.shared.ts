@@ -15,13 +15,17 @@ export class AdminError extends Error {
   }
 }
 
+/** 审计写入参数：目标实体（规则/工具）、实体 ID、操作名与详情 */
+export interface AuditParams {
+  db: ReturnType<DbConnection['getDb']>;
+  entityType: 'rule' | 'tool';
+  entityId: string;
+  action: string;
+  detail: string;
+}
+
 /** 写审计日志（operator 恒为 admin，P0 无账号体系） */
-export function audit(
-  db: ReturnType<DbConnection['getDb']>,
-  entityType: 'rule' | 'tool',
-  entityId: string,
-  action: string,
-  detail: string,
-): void {
+export function audit(params: AuditParams): void {
+  const { db, entityType, entityId, action, detail } = params;
   appendAuditLog(db, { id: randomUUID(), entityType, entityId, action, detail, operator: 'admin' });
 }

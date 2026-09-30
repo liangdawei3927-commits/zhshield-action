@@ -14,8 +14,13 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+/** 工具标识：工具规则同步通道的工具 ID 联合类型 */
 export type ToolId = SyncToolId;
 
+/**
+ * 工具规则版本锁：能力回收期内固定工具规则版本，避免中途切换导致规则抖动。
+ * reason 记录加锁原因，lockedAt 记录加锁时刻。
+ */
 export interface VersionLock {
   toolId: ToolId;
   lockedVersion: string;
@@ -23,16 +28,24 @@ export interface VersionLock {
   reason: string;
 }
 
+/** 经验回写请求体：待上传的经验记录集合 */
 export interface ExperienceSyncPayload {
   experiences: ExperienceRecord[];
 }
 
+/** 智汇大脑同步总结果：各工具规则同步明细、经验回写结果（未执行时为 null）与本次加锁清单 */
 export interface WisdomBrainSyncResult {
   ruleSyncResults: ToolRuleSyncResult[];
   experienceResult: ExperienceReportResult | null;
   lockedVersions: VersionLock[];
 }
 
+/**
+ * WisdomBrainSync — 智汇大脑同步协调器
+ *
+ * 聚合三条通道：云端工具规则下发、经验回写、工具规则版本锁定（能力回收期内固定版本），
+ * 并负责到期规则清理与锁文件持久化。
+ */
 export class WisdomBrainSync {
   private toolRuleSync: ToolRuleSync;
   private experienceReporter: ExperienceReporter;

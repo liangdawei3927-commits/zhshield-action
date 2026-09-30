@@ -61,20 +61,41 @@ function readBodyField(body: unknown, field: string): string | undefined {
 
 export function csrfProtection(req: CsrfRequest, res: CsrfResponse, next: CsrfNext): void {
   const cookieHeader = typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined;
-  let token = readCookie(cookieHeader, CSRF_COOKIE);
-  if (!token) {
-    token = randomBytes(32).toString('hex');
-    res.cookie(CSRF_COOKIE, token, { httpOnly: false, sameSite: 'strict', path: '/' });
-  }
+  const token = ensureCsrfToken(req, res, cookieHeader);
 
-  if (SAFE_METHODS.has(req.method)) return next();
-
-  if (!readCookie(cookieHeader, SESSION_COOKIE)) return next();
-
-  if (API_CREDENTIAL_HEADERS.some((header) => readHeader(req.headers, header))) return next();
-
-  const echo = readHeader(req.headers, CSRF_HEADER) ?? readBodyField(req.body, '_csrf') ?? '';
-  if (echo.length > 0 && echo === token) return next();
+  if (isSafeMethod(req)) return next();
+  if (!hasSessionCookie(cookieHeader)) return next();
+  if (hasApiCredentials(req)) return next();
+  if (isValidEcho(req, token)) return next();
 
   res.status(403).json({ statusCode: 403, message: 'CSRF 令牌校验失败' });
+}
+
+function ensureCsrfToken(
+  req: CsrfRequest,
+  res: CsrfResponse,
+  cookieHeader: string | undefined,
+): string {
+  const existing = readCookie(cookieHeader, CSRF_COOKIE);
+  if (existing) return existing;
+  const token = randomBytes(32).toString('hex');
+  res.cookie(CSRF_COOKIE, token, { httpOnly: false, sameSite: 'strict', path: '/' });
+  return token;
+}
+
+function isSafeMethod(req: CsrfRequest): boolean {
+  return SAFE_METHODS.has(req.method);
+}
+
+function hasSessionCookie(cookieHeader: string | undefined): boolean {
+  return Boolean(readCookie(cookieHeader, SESSION_COOKIE));
+}
+
+function hasApiCredentials(req: CsrfRequest): boolean {
+  return API_CREDENTIAL_HEADERS.some((header) => readHeader(req.headers, header));
+}
+
+function isValidEcho(req: CsrfRequest, token: string): boolean {
+  const echo = readHeader(req.headers, CSRF_HEADER) ?? readBodyField(req.body, '_csrf') ?? '';
+  return echo.length > 0 && echo === token;
 }

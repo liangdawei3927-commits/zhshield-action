@@ -62,6 +62,54 @@ describe('cleanGarbage', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it('拒绝清理 dead-code / duplicate-code：代码分析结论需人工判断，不是可删垃圾', () => {
+    const dir = tmpProject();
+    const source = path.join(dir, 'orphan.ts');
+    fs.writeFileSync(source, 'export const a = 1;');
+    const items: GarbageItem[] = [
+      { id: 'd1', type: 'dead-code', path: 'orphan.ts', size: 20, reason: 'unused export' },
+      { id: 'd2', type: 'duplicate-code', path: 'orphan.ts', size: 20, reason: 'duplicated block' },
+    ];
+
+    const result = cleanGarbage(dir, items);
+
+    expect(result.cleaned).toHaveLength(0);
+    expect(fs.existsSync(source)).toBe(true);
+    expect(result.failed.some((m) => m.includes('dead-code'))).toBe(true);
+    expect(result.failed.some((m) => m.includes('duplicate-code'))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('白名单守卫：源码路径即使被标成 unused-file 也不移动（clean-never-moves-source）', () => {
+    const dir = tmpProject();
+    const source = path.join(dir, 'src', 'index.ts');
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(source, 'export const a = 1;');
+
+    const result = cleanGarbage(dir, [
+      { id: 's1', type: 'unused-file', path: 'src/index.ts', size: 20, reason: 'Empty file: index.ts' },
+    ]);
+
+    expect(result.cleaned).toHaveLength(0);
+    expect(fs.existsSync(source)).toBe(true);
+    expect(result.failed.some((m) => m.includes('src/index.ts'))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('白名单仍允许清理散落在源码目录里的垃圾文件', async () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src', 'stray.log'), 'x');
+    const items = (await detectFsGarbage(dir)).filter((i) => i.path === 'src/stray.log');
+
+    const result = cleanGarbage(dir, items);
+
+    expect(result.failed).toHaveLength(0);
+    expect(result.cleaned).toHaveLength(1);
+    expect(fs.existsSync(path.join(dir, 'src', 'stray.log'))).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it('拒绝越界路径，不移动项目外文件', () => {
     const dir = tmpProject();
     const outside = path.join(os.tmpdir(), `zh-outside-${Date.now()}`);

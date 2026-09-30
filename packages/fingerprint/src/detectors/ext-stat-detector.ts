@@ -44,10 +44,16 @@ export class ExtStatDetector implements Detector {
       }
       if (count === 0) continue;
       signals.push(
-        makeSignal(KIND, `ext-stat:${lang}`, '.', this.weight, {
-          count,
-          ratio: count / total,
-          byDir: dirs,
+        makeSignal({
+          kind: KIND,
+          ruleId: `ext-stat:${lang}`,
+          file: '.',
+          weight: this.weight,
+          payload: {
+            count,
+            ratio: count / total,
+            byDir: dirs,
+          },
         }),
       );
     }

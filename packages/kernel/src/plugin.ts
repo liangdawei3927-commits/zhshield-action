@@ -1,3 +1,7 @@
+/**
+ * 插件定义：name 为唯一标识，由 {@link PluginLoader} 负责加载与卸载。
+ * init / destroy 为可选生命周期钩子，缺失时对应操作直接跳过。
+ */
 export interface Plugin {
   name: string;
   version: string;

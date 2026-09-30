@@ -60,7 +60,7 @@ export function EngineStatusSection({
             />
           </button>
         </div>
-        <p className="text-[11px] leading-relaxed text-zh-muted">
+        <p className="text-xs leading-relaxed text-zh-muted">
           {intelligentEnabled ? t('layout.engineSubtitle') : t('layout.enginePromptOff')}
         </p>
       </BounceCard>
@@ -121,7 +121,7 @@ export function WisdomBrainCard() {
             {level === null ? t('layout.brainChecking') : status.text}
           </span>
         </div>
-        <p className="text-[11px] leading-relaxed text-zh-muted">{t('layout.brainSubtitle')}</p>
+        <p className="text-xs leading-relaxed text-zh-muted">{t('layout.brainSubtitle')}</p>
       </BounceCard>
     </section>
   );

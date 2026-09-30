@@ -1,4 +1,5 @@
 import { PageShell } from '../components/business/PageShell';
+import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useReportsPage, useModuleScores } from './reports-logic';
 import {
   StackedDocs,
@@ -45,58 +46,30 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
       featureList={[
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
+            <FeatureIcon>
+              <ClockGlyph />
+            </FeatureIcon>
           ),
           title: t('page.reports.empty.feature.scoring.title'),
           desc: t('page.reports.empty.feature.scoring.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
               <polyline points="17 6 23 6 23 12" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.reports.empty.feature.trend.title'),
           desc: t('page.reports.empty.feature.trend.desc'),
         },
         {
           icon: (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <FeatureIcon>
               <line x1="6" y1="20" x2="6" y2="16" />
               <line x1="12" y1="20" x2="12" y2="10" />
               <line x1="18" y1="20" x2="18" y2="4" />
-            </svg>
+            </FeatureIcon>
           ),
           title: t('page.reports.empty.feature.module.title'),
           desc: t('page.reports.empty.feature.module.desc'),

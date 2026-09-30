@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldLogo } from '../components/ui/Icons';
+import { EngineStatusIndicator } from '../components/ui/EngineStatusIndicator';
 import {
   useMacOSTrafficLightInset,
   TRAFFIC_LIGHT_OFFSET,
@@ -62,14 +63,7 @@ function ScreensaverHeader({
         className="absolute top-8 right-10 flex items-center gap-2 pointer-events-none transition-all duration-700 ease-out"
         style={{ opacity: visible ? 0.7 : 0, transitionDelay: '400ms' }}
       >
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{
-            background: intelligentEnabled ? '#27c93f' : '#ef4444',
-            boxShadow: `0 0 6px ${intelligentEnabled ? '#27c93f' : '#ef4444'}`,
-          }}
-        />
-        <span className="text-sm text-white/80">智能引擎</span>
+        <EngineStatusIndicator enabled={intelligentEnabled} />
       </div>
     </>
   );

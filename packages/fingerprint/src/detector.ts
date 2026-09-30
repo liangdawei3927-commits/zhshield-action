@@ -12,6 +12,7 @@ export const DETECTOR_IDS = [
   'lockfile-detector',
 ] as const;
 
+/** 探测器标识：取自 {@link DETECTOR_IDS} 的联合类型 */
 export type DetectorId = (typeof DETECTOR_IDS)[number];
 
 /**

@@ -6,8 +6,7 @@
  * 读写归桌面接线层，不把 .zhshield 路径约定带进通用引擎包。
  * 写入 tmp+rename 原子替换；读取失败降级为 null（无基线行为），绝不抛异常。
  */
-import { join } from 'node:path';
-import { readJsonBaseline, writeJsonBaselineAtomic } from '@zh/shared';
+import { createBaselineIo } from '@zh/shared';
 import type { DependencyNode } from '@zh/dependency';
 
 /** 依赖完整性基线（deps-baseline.json）：抓取时间 + 包名→integrity 映射 */
@@ -18,60 +17,40 @@ export interface DepsBaseline {
 }
 
 const BASELINE_VERSION = 1;
-const BASELINE_DIR = '.zhshield';
 const BASELINE_FILE = 'deps-baseline.json';
 
 /** 完整性失败消息形如 [direct] lodash@4.17.21 校验和不匹配：期望 …，实际 … */
 const MISMATCHED_INTEGRITY_RE = /^\[[^\]]*\] (\S+) 校验和不匹配/;
 
-export function depsBaselinePath(projectRoot: string): string {
-  return join(projectRoot, BASELINE_DIR, BASELINE_FILE);
+function isIntegrityMap(value: unknown): value is Record<string, string> {
+  return typeof value === 'object' && value !== null;
 }
 
-function validateDepsBaseline(parsed: unknown): DepsBaseline | null {
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const { version, capturedAt, integrity } = parsed as Partial<DepsBaseline>;
-  if (
-    version !== BASELINE_VERSION ||
-    typeof capturedAt !== 'string' ||
-    typeof integrity !== 'object' ||
-    integrity === null
-  ) {
-    return null;
-  }
-  return {
-    version: BASELINE_VERSION,
-    capturedAt,
-    integrity: integrity as Record<string, string>,
-  };
+const depsBaselineIo = createBaselineIo<DepsBaseline, Record<string, string>>({
+  fileName: BASELINE_FILE,
+  version: BASELINE_VERSION,
+  payloadKey: 'integrity',
+  isPayload: isIntegrityMap,
+  buildRecord: (capturedAt, integrity) => ({ version: BASELINE_VERSION, capturedAt, integrity }),
+  warnTag: 'deps-baseline',
+  warnOnNotFound: true,
+});
+
+export function depsBaselinePath(projectRoot: string): string {
+  return depsBaselineIo.path(projectRoot);
 }
 
 /** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为，ENOENT 亦告警以暴露调用时序异常） */
 export function loadDepsBaseline(projectRoot: string): Promise<DepsBaseline | null> {
-  return readJsonBaseline(
-    depsBaselinePath(projectRoot),
-    validateDepsBaseline,
-    'deps-baseline',
-    true,
-  );
+  return depsBaselineIo.load(projectRoot);
 }
 
 /** 写入基线（tmp+rename 原子替换），返回落盘基线 */
-export async function saveDepsBaseline(
+export function saveDepsBaseline(
   projectRoot: string,
   integrityMap: Record<string, string>,
 ): Promise<DepsBaseline> {
-  const baseline: DepsBaseline = {
-    version: BASELINE_VERSION,
-    capturedAt: new Date().toISOString(),
-    integrity: integrityMap,
-  };
-  await writeJsonBaselineAtomic(
-    join(projectRoot, BASELINE_DIR),
-    depsBaselinePath(projectRoot),
-    baseline,
-  );
-  return baseline;
+  return depsBaselineIo.save(projectRoot, integrityMap);
 }
 
 /** 节点 id → integrity 快照（仅含带哈希的节点）；node.id 即 name@version，与 verifier key 一致 */

@@ -38,10 +38,6 @@ const BASELINE_DIR = '.zhshield';
 const BASELINE_FILE = 'baseline.json';
 const RE_PATH_SEPARATOR = /[\\/]/;
 
-export function baselinePath(projectRoot: string): string {
-  return join(projectRoot, BASELINE_DIR, BASELINE_FILE);
-}
-
 /** 文件归一化：绝对路径 → 相对 projectRoot；统一正斜杠（兼容 win32 反斜杠产出） */
 export function normalizeBaselineFile(file: string, projectRoot: string): string {
   const resolved = isAbsolute(file) ? relative(projectRoot, file) : file;
@@ -128,50 +124,107 @@ export async function writeJsonBaselineAtomic(
   await rename(tmp, filePath);
 }
 
-function validateBaseline(parsed: unknown): Baseline | null {
+/**
+ * 通用「版本 + 采集时间 + 载荷」信封校验：顶层非对象 / 版本不符 / 缺 capturedAt /
+ * 载荷形状不符 → null。载荷形状由 isPayload 判定，成功时返回 { capturedAt, payload }。
+ */
+export function parseVersionedEnvelope<TPayload>(
+  parsed: unknown,
+  expectedVersion: number,
+  payloadKey: string,
+  isPayload: (value: unknown) => value is TPayload,
+): { capturedAt: string; payload: TPayload } | null {
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const { version, capturedAt, entries } = parsed as Partial<Baseline>;
-  if (
-    version !== BASELINE_VERSION ||
-    typeof capturedAt !== 'string' ||
-    !Array.isArray(entries) ||
-    entries.some((e) => typeof e !== 'object' || e === null)
-  ) {
-    return null;
-  }
+  const record = parsed as Record<string, unknown>;
+  if (record.version !== expectedVersion) return null;
+  const { capturedAt } = record;
+  if (typeof capturedAt !== 'string') return null;
+  const payload = record[payloadKey];
+  if (!isPayload(payload)) return null;
+  return { capturedAt, payload };
+}
+
+/** `<projectRoot>/.zhshield/<fileName>` 基线的读写口 */
+export interface BaselineIo<TRecord, TPayload> {
+  path(projectRoot: string): string;
+  load(projectRoot: string): Promise<TRecord | null>;
+  save(projectRoot: string, payload: TPayload): Promise<TRecord>;
+  clear(projectRoot: string): Promise<void>;
+}
+
+/**
+ * 按文件配置生成基线读写口：路径约定、版本信封校验、读取降级为 null、tmp+rename 原子写
+ * 全部单一来源。各基线文件形态一致，仅文件名 / 版本号 / 载荷键名 / 载荷判定 / 记录组装不同。
+ *
+ * @param config.warnOnNotFound ENOENT 是否也告警（默认否），用于暴露调用时序异常
+ */
+export function createBaselineIo<TRecord, TPayload>(config: {
+  fileName: string;
+  version: number;
+  payloadKey: string;
+  isPayload: (value: unknown) => value is TPayload;
+  buildRecord: (capturedAt: string, payload: TPayload) => TRecord;
+  warnTag: string;
+  warnOnNotFound?: boolean;
+}): BaselineIo<TRecord, TPayload> {
+  const { fileName, version, payloadKey, isPayload, buildRecord, warnTag, warnOnNotFound } = config;
+  const path = (projectRoot: string): string => join(projectRoot, BASELINE_DIR, fileName);
   return {
-    version: BASELINE_VERSION,
-    capturedAt,
-    entries: entries as BaselineEntry[],
+    path,
+    load: (projectRoot) =>
+      readJsonBaseline(
+        path(projectRoot),
+        (parsed) => {
+          const envelope = parseVersionedEnvelope(parsed, version, payloadKey, isPayload);
+          return envelope === null ? null : buildRecord(envelope.capturedAt, envelope.payload);
+        },
+        warnTag,
+        warnOnNotFound,
+      ),
+    save: async (projectRoot, payload) => {
+      const record = buildRecord(new Date().toISOString(), payload);
+      await writeJsonBaselineAtomic(join(projectRoot, BASELINE_DIR), path(projectRoot), record);
+      return record;
+    },
+    clear: async (projectRoot) => {
+      await rm(path(projectRoot), { force: true });
+    },
   };
+}
+
+// 刻意只做浅校验：补深层字段校验会改变既有降级行为
+function isBaselineEntries(value: unknown): value is BaselineEntry[] {
+  return (
+    Array.isArray(value) && value.every((entry) => typeof entry === 'object' && entry !== null)
+  );
+}
+
+const baselineIo = createBaselineIo<Baseline, BaselineEntry[]>({
+  fileName: BASELINE_FILE,
+  version: BASELINE_VERSION,
+  payloadKey: 'entries',
+  isPayload: isBaselineEntries,
+  buildRecord: (capturedAt, entries) => ({ version: BASELINE_VERSION, capturedAt, entries }),
+  warnTag: 'baseline',
+});
+
+export function baselinePath(projectRoot: string): string {
+  return baselineIo.path(projectRoot);
 }
 
 /** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为） */
 export function loadBaseline(projectRoot: string): Promise<Baseline | null> {
-  return readJsonBaseline(baselinePath(projectRoot), validateBaseline, 'baseline');
+  return baselineIo.load(projectRoot);
 }
 
 /** 写入基线（tmp+rename 原子替换），返回落盘基线 */
-export async function saveBaseline(
-  projectRoot: string,
-  entries: BaselineEntry[],
-): Promise<Baseline> {
-  const baseline: Baseline = {
-    version: BASELINE_VERSION,
-    capturedAt: new Date().toISOString(),
-    entries,
-  };
-  await writeJsonBaselineAtomic(
-    join(projectRoot, BASELINE_DIR),
-    baselinePath(projectRoot),
-    baseline,
-  );
-  return baseline;
+export function saveBaseline(projectRoot: string, entries: BaselineEntry[]): Promise<Baseline> {
+  return baselineIo.save(projectRoot, entries);
 }
 
 /** 清空基线文件；文件不存在时静默成功 */
-export async function clearBaseline(projectRoot: string): Promise<void> {
-  await rm(baselinePath(projectRoot), { force: true });
+export function clearBaseline(projectRoot: string): Promise<void> {
+  return baselineIo.clear(projectRoot);
 }
 
 /** 从 issue 列表批量生成基线条目（供 CLI baseline capture 使用） */

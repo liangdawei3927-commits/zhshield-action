@@ -193,6 +193,9 @@ export {
   type BaselineFilterResult,
   readJsonBaseline,
   writeJsonBaselineAtomic,
+  parseVersionedEnvelope,
+  createBaselineIo,
+  type BaselineIo,
 } from './baseline';
 export { safeReadDirEntries } from './fs-safe';
 export { escapeRegExp } from './text-utils';

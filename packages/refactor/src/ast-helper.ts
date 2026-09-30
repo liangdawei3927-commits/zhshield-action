@@ -413,8 +413,11 @@ interface DuplicateBlock {
   lineCount: number;
 }
 
+/** 单次重复区扫描的报告上限：超出部分不进入 smells，但计入统计以便如实上报截断 */
+const DUPLICATE_REGION_LIMIT = 50;
+
 /**
- * 跨文件查找重复代码块：滑动窗口取归一化块 → 两两比对 → 合并连续窗口 → 截断至 50 条。
+ * 跨文件查找重复代码块：滑动窗口取归一化块 → 两两比对 → 合并连续窗口 → 截断至报告上限。
  * @param files 已解析的文件集合
  * @param minLines 判定重复所需的最小连续行数（默认 6）
  * @returns 去重合并后的重复区列表（`DuplicateBlock` 为模块内类型，不对外暴露）
@@ -423,10 +426,27 @@ export function findDuplicateCodeBlocks(
   files: ParsedFile[],
   minLines: number = 6,
 ): DuplicateBlock[] {
+  return scanDuplicateCodeBlocks(files, minLines).regions;
+}
+
+/**
+ * 与 findDuplicateCodeBlocks 同源，但额外返回截断前的真实去重区总量，
+ * 供上层在命中报告上限时如实上报「已截断」而非静默丢数。
+ * @returns regions 前 DUPLICATE_REGION_LIMIT 条；totalRegions 截断前总数；truncated 是否被截断
+ */
+export function scanDuplicateCodeBlocks(
+  files: ParsedFile[],
+  minLines: number = 6,
+): { regions: DuplicateBlock[]; totalRegions: number; truncated: boolean } {
   const blocks = collectCodeBlocks(files, minLines);
   // 先合并再截断：截断必须落在「重复区」粒度上，否则会把同一段重复区切成
   // 多条并挤掉后面真正不同的重复区
-  return mergeDuplicateRegions(findDuplicatePairs(blocks, minLines)).slice(0, 50);
+  const merged = mergeDuplicateRegions(findDuplicatePairs(blocks, minLines));
+  return {
+    regions: merged.slice(0, DUPLICATE_REGION_LIMIT),
+    totalRegions: merged.length,
+    truncated: merged.length > DUPLICATE_REGION_LIMIT,
+  };
 }
 
 /**

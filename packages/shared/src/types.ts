@@ -186,70 +186,13 @@ export interface InspectionReport {
   };
 }
 
-// ─── 哨兵事件（SentinelEvent）────────────────────────────
-
-/** 事件类型：哨兵监控采集的运行时异常/错误/性能退化等信号分类 */
-export type EventType =
-  | 'runtime-exception'
-  | 'http-error'
-  | 'performance-degradation'
-  | 'crash'
-  | 'frontend-error'
-  | 'white-screen'
-  | 'security-incident'
-  | 'memory-leak'
-  | 'timeout';
-
-/** 事件严重级别：决定告警响应优先级与是否立即通知 */
-export type EventSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-
-/** 事件来源层：后端服务 / 前端页面 / 中间件 / 基础设施 */
-export type EventSource = 'backend' | 'frontend' | 'middleware' | 'infrastructure';
-
-/** 代码位置：事件发生的文件与调用栈定位信息 */
-export interface CodeLocation {
-  file: string;
-  line?: number;
-  column?: number;
-  function?: string;
-  module?: string;
-  stackTrace?: string;
-}
-
-/** 事件上下文：请求信息与运行环境/版本等辅助定位信息 */
-export interface EventContext {
-  request?: { method: string; path: string; statusCode?: number; duration?: number };
-  environment?: string;
-  version?: string;
-}
-
-/** 诊断结论：哨兵对事件归因后的影响面说明与修复建议 */
-export interface Diagnosis {
-  category: string;
-  impact: string;
-  suggestion: string;
-  autoFixable: boolean;
-}
+// ─── 哨兵事件复现统计（SentinelOccurrence）────────────────
 
 /** 哨兵事件复现统计：累计出现次数与首末次出现时间（@zh/sentinel、@zh/db 入参三处复用） */
 export interface SentinelOccurrence {
   occurrenceCount: number;
   firstSeen: Date;
   lastSeen: Date;
-}
-
-/** 哨兵事件：运行时监控采集的一条异常记录，fingerprint 用于去重、occurrenceCount 累计重复次数 */
-export interface SentinelEvent extends SentinelOccurrence {
-  id: string;
-  projectId: string;
-  timestamp: Date;
-  type: EventType;
-  severity: EventSeverity;
-  source: EventSource;
-  location: CodeLocation;
-  context: EventContext;
-  diagnosis: Diagnosis;
-  fingerprint: string;
 }
 
 // ─── 漏洞信息（Vulnerability）────────────────────────────

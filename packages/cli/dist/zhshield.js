@@ -13956,9 +13956,6 @@ var init_machine_profile = __esm({
 });
 
 // ../shared/src/baseline.ts
-function baselinePath(projectRoot) {
-  return (0, import_node_path.join)(projectRoot, BASELINE_DIR, BASELINE_FILE);
-}
 function normalizeBaselineFile(file, projectRoot) {
   const resolved = (0, import_node_path.isAbsolute)(file) ? (0, import_node_path.relative)(projectRoot, file) : file;
   return resolved.split(RE_PATH_SEPARATOR).join("/");
@@ -14015,41 +14012,59 @@ async function writeJsonBaselineAtomic(dir2, filePath, data) {
   await (0, import_promises2.writeFile)(tmp, JSON.stringify(data, null, 2), "utf-8");
   await (0, import_promises2.rename)(tmp, filePath);
 }
-function validateBaseline(parsed) {
+function parseVersionedEnvelope(parsed, expectedVersion, payloadKey, isPayload) {
   if (typeof parsed !== "object" || parsed === null) return null;
-  const { version, capturedAt, entries } = parsed;
-  if (version !== BASELINE_VERSION || typeof capturedAt !== "string" || !Array.isArray(entries) || entries.some((e) => typeof e !== "object" || e === null)) {
-    return null;
-  }
+  const record = parsed;
+  if (record.version !== expectedVersion) return null;
+  const { capturedAt } = record;
+  if (typeof capturedAt !== "string") return null;
+  const payload = record[payloadKey];
+  if (!isPayload(payload)) return null;
+  return { capturedAt, payload };
+}
+function createBaselineIo(config) {
+  const { fileName, version, payloadKey, isPayload, buildRecord, warnTag, warnOnNotFound } = config;
+  const path51 = (projectRoot) => (0, import_node_path.join)(projectRoot, BASELINE_DIR, fileName);
   return {
-    version: BASELINE_VERSION,
-    capturedAt,
-    entries
+    path: path51,
+    load: (projectRoot) => readJsonBaseline(
+      path51(projectRoot),
+      (parsed) => {
+        const envelope = parseVersionedEnvelope(parsed, version, payloadKey, isPayload);
+        return envelope === null ? null : buildRecord(envelope.capturedAt, envelope.payload);
+      },
+      warnTag,
+      warnOnNotFound
+    ),
+    save: async (projectRoot, payload) => {
+      const record = buildRecord((/* @__PURE__ */ new Date()).toISOString(), payload);
+      await writeJsonBaselineAtomic((0, import_node_path.join)(projectRoot, BASELINE_DIR), path51(projectRoot), record);
+      return record;
+    },
+    clear: async (projectRoot) => {
+      await (0, import_promises2.rm)(path51(projectRoot), { force: true });
+    }
   };
+}
+function isBaselineEntries(value2) {
+  return Array.isArray(value2) && value2.every((entry) => typeof entry === "object" && entry !== null);
+}
+function baselinePath(projectRoot) {
+  return baselineIo.path(projectRoot);
 }
 function loadBaseline(projectRoot) {
-  return readJsonBaseline(baselinePath(projectRoot), validateBaseline, "baseline");
+  return baselineIo.load(projectRoot);
 }
-async function saveBaseline(projectRoot, entries) {
-  const baseline = {
-    version: BASELINE_VERSION,
-    capturedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    entries
-  };
-  await writeJsonBaselineAtomic(
-    (0, import_node_path.join)(projectRoot, BASELINE_DIR),
-    baselinePath(projectRoot),
-    baseline
-  );
-  return baseline;
+function saveBaseline(projectRoot, entries) {
+  return baselineIo.save(projectRoot, entries);
 }
-async function clearBaseline(projectRoot) {
-  await (0, import_promises2.rm)(baselinePath(projectRoot), { force: true });
+function clearBaseline(projectRoot) {
+  return baselineIo.clear(projectRoot);
 }
 function issuesToBaselineEntries(issues, projectRoot) {
   return issues.map((issue) => toBaselineEntry(issue, projectRoot));
 }
-var import_promises2, import_node_path, BASELINE_VERSION, BASELINE_DIR, BASELINE_FILE, RE_PATH_SEPARATOR;
+var import_promises2, import_node_path, BASELINE_VERSION, BASELINE_DIR, BASELINE_FILE, RE_PATH_SEPARATOR, baselineIo;
 var init_baseline = __esm({
   "../shared/src/baseline.ts"() {
     "use strict";
@@ -14059,6 +14074,14 @@ var init_baseline = __esm({
     BASELINE_DIR = ".zhshield";
     BASELINE_FILE = "baseline.json";
     RE_PATH_SEPARATOR = /[\\/]/;
+    baselineIo = createBaselineIo({
+      fileName: BASELINE_FILE,
+      version: BASELINE_VERSION,
+      payloadKey: "entries",
+      isPayload: isBaselineEntries,
+      buildRecord: (capturedAt, entries) => ({ version: BASELINE_VERSION, capturedAt, entries }),
+      warnTag: "baseline"
+    });
   }
 });
 
@@ -593199,9 +593222,15 @@ function collectExternalCalls(node, className, sourceFile) {
   visit(node);
   return calls;
 }
-function findDuplicateCodeBlocks(files, minLines = 6) {
+var DUPLICATE_REGION_LIMIT = 50;
+function scanDuplicateCodeBlocks(files, minLines = 6) {
   const blocks = collectCodeBlocks(files, minLines);
-  return mergeDuplicateRegions(findDuplicatePairs(blocks, minLines)).slice(0, 50);
+  const merged = mergeDuplicateRegions(findDuplicatePairs(blocks, minLines));
+  return {
+    regions: merged.slice(0, DUPLICATE_REGION_LIMIT),
+    totalRegions: merged.length,
+    truncated: merged.length > DUPLICATE_REGION_LIMIT
+  };
 }
 function mergeDuplicateRegions(pairs) {
   const groups = groupByFilePair(pairs);
@@ -593838,9 +593867,13 @@ function detectDuplicateCode(parsed, allFiles, config) {
   const smells = [];
   const minLines = config.thresholds.minDuplicateLines;
   if (_dupCache === null || _dupCacheFiles !== allFiles || _dupCacheMinLines !== minLines) {
-    _dupCache = findDuplicateCodeBlocks(allFiles, minLines);
+    const scan = scanDuplicateCodeBlocks(allFiles, minLines);
+    _dupCache = scan.regions;
     _dupCacheFiles = allFiles;
     _dupCacheMinLines = minLines;
+    if (scan.truncated) {
+      smells.push(makeTruncationNotice(parsed.filePath, scan.totalRegions, scan.regions.length));
+    }
   }
   const duplicates = _dupCache;
   const fileDups = duplicates.filter(
@@ -593876,6 +593909,26 @@ function detectDuplicateCode(parsed, allFiles, config) {
     );
   }
   return smells;
+}
+function makeTruncationNotice(filePath, total, shown) {
+  return makeSmell({
+    ruleId: "duplicated-code",
+    severity: "info",
+    message: `\u91CD\u590D\u533A\u5171\u68C0\u51FA ${total} \u5904\uFF0C\u53D7\u62A5\u544A\u4E0A\u9650\u7EA6\u675F\u4EC5\u4E0A\u62A5\u524D ${shown} \u5904\uFF08\u622A\u65AD ${total - shown} \u5904\uFF09`,
+    filePath,
+    line: 1,
+    column: 1,
+    metric: "duplicateRegionCount",
+    value: total,
+    threshold: shown,
+    suggestion: {
+      type: "Reduce Duplication",
+      description: "\u6D88\u9664\u771F\u5B9E\u91CD\u590D\u533A\u53EF\u817E\u51FA\u62A5\u544A\u914D\u989D\uFF0C\u4F7F\u88AB\u622A\u65AD\u7684\u91CD\u590D\u533A\u5F97\u4EE5\u66B4\u9732",
+      priority: "low",
+      effort: "medium",
+      autoFixable: false
+    }
+  });
 }
 function detectCallbackHell(parsed, config) {
   const smells = [];

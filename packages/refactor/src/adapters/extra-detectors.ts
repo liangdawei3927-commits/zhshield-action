@@ -3,10 +3,8 @@ import * as ts from 'typescript';
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
+import { extractMessageChains } from './chain-text-utils';
 
-const IDENT_CHAR_PAREN = /[a-zA-Z0-9_$)]/;
-const IDENT_CHAR = /[a-zA-Z0-9_$]/;
-const IDENT_FULL = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 const COLLECTION_TYPE_RE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 
 export function detectInappropriateIntimacy(
@@ -270,72 +268,57 @@ export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig):
   return smells;
 }
 
-/** 提取方法文本中所有长度 ≥ 3 的链式调用片段 */
-function extractMessageChains(methodText: string): string[] {
-  const matches: string[] = [];
-  let idx = 0;
-  while (idx < methodText.length) {
-    const dotIdx = methodText.indexOf('.', idx);
-    if (dotIdx === -1) break;
+/** 语义豁免 refused-bequest：这些继承形态下「薄子类」是设计意图而非反模式——
+ *  - extends Error：TS 里自定义错误必须子类化 Error 才能被 instanceof/catch 收窄，错误类天然没有新成员；
+ *  - extends *Adapter：适配器按契约实现钩子（模板方法模式），子类薄是实现设计（提供策略而非添加成员）；
+ *  - extends Component/PureComponent：React 类组件必须继承组件基类才能获得生命周期与状态能力；
+ *  - 子类引用了继承成员（super.x() 或 this.<基类成员>）：遗产被实际使用，不是「拒绝遗产」。
+ */
+function isRefusedBequestExempt(cls: ParsedClass, sourceFile: ts.SourceFile): boolean {
+  const base = cls.extendsClass ?? '';
+  const baseName = base.replace(/<.*>/, '').trim(); // 剥掉泛型参数，如 Component<Props, State> → Component
+  if (baseName === 'Error') return true;
+  if (baseName === 'Component' || baseName === 'PureComponent') return true;
+  if (baseName.endsWith('Adapter')) return true;
+  return referencesInheritedMember(cls, sourceFile);
+}
 
-    const chain = extractChainAtDot(methodText, dotIdx);
-    if (chain) matches.push(chain);
-    idx = dotIdx + 1;
+/** 判断子类是否引用了继承成员：super.x 调用，或 this.<成员> 指向未在本类声明的成员。
+ *  引用了说明继承能力被实际使用——不是「只借了类型」。 */
+function referencesInheritedMember(cls: ParsedClass, sourceFile: ts.SourceFile): boolean {
+  const ownNames = new Set<string>();
+  for (const m of cls.members.methods) ownNames.add(m.name);
+  for (const f of cls.members.fields) ownNames.add(f.name);
+
+  let found = false;
+  function visit(node: ts.Node): void {
+    if (found) return;
+    if (ts.isPropertyAccessExpression(node)) {
+      const expr = node.expression;
+      if (expr.kind === ts.SyntaxKind.SuperKeyword) {
+        found = true;
+        return;
+      }
+      if (
+        expr.kind === ts.SyntaxKind.ThisKeyword &&
+        ts.isIdentifier(node.name) &&
+        !ownNames.has(node.name.text)
+      ) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
   }
-  return matches;
-}
-
-function extractChainAtDot(methodText: string, dotIdx: number): string | null {
-  const { before, after } = readChainTokens(methodText, dotIdx);
-  if (!isValidChainBoundary(before, after)) return null;
-
-  const { length: chainLen, endIdx: searchIdx } = measureChainLength(methodText, dotIdx);
-  if (chainLen < 3) return null;
-
-  const chainEnd = Math.min(searchIdx + 30, methodText.length);
-  return methodText.slice(dotIdx - 10, chainEnd).trim();
-}
-
-/** 读取点号两侧的标识符 token */
-function readChainTokens(methodText: string, dotIdx: number): { before: string; after: string } {
-  let start = dotIdx - 1;
-  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
-  const before = methodText.slice(start + 1, dotIdx);
-
-  let end = dotIdx + 1;
-  while (end < methodText.length && IDENT_CHAR.test(methodText[end])) end++;
-  const after = methodText.slice(dotIdx + 1, end);
-
-  return { before, after };
-}
-
-/** 校验点号两侧是否为合法链式边界（排除 this. 与括号 / 花括号后缀） */
-function isValidChainBoundary(before: string, after: string): boolean {
-  return Boolean(before) && Boolean(after) && before !== 'this' && ![')', '}'].includes(before);
-}
-
-function measureChainLength(
-  methodText: string,
-  dotIdx: number,
-): { length: number; endIdx: number } {
-  let chainLen = 0;
-  let searchIdx = dotIdx;
-  while (searchIdx < methodText.length) {
-    const nextDot = methodText.indexOf('.', searchIdx + 1);
-    if (nextDot === -1) break;
-    const between = methodText.slice(searchIdx + 1, nextDot);
-    if (!IDENT_FULL.test(between.trim())) break;
-    chainLen++;
-    searchIdx = nextDot;
-  }
-  return { length: chainLen, endIdx: searchIdx };
+  visit(cls.node);
+  return found;
 }
 
 export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
   for (const cls of parsed.classes) {
-    if (cls.extendsClass) {
+    if (cls.extendsClass && !isRefusedBequestExempt(cls, parsed.sourceFile)) {
       const ownMethods = cls.members.methods.filter((m) => m.accessModifier === 'public').length;
       const ownFields = cls.members.fields.length;
 
@@ -413,6 +396,19 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): Cod
   return smells;
 }
 
+/** 判断 switch 是否为纯分发表：所有含语句的 case（含 default）都以 return/throw 结束。
+ *  纯分发表是「以值分发的查表」形态，多态化只能得到等价的策略 Map，属于仪式性重写；
+ *  真正值得用多态替代的是带共享可变状态、命令式语句的 switch（case 内修改外部变量、fall-through 累积状态等）。 */
+function isPureDispatchSwitch(node: ts.SwitchStatement): boolean {
+  for (const clause of node.caseBlock.clauses) {
+    const stmts = clause.statements;
+    if (stmts.length === 0) continue; // 空 case（fall-through 分组）无语句，不构成反模式
+    const last = stmts[stmts.length - 1];
+    if (!ts.isReturnStatement(last) && !ts.isThrowStatement(last)) return false;
+  }
+  return true;
+}
+
 export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
@@ -420,7 +416,12 @@ export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig
     for (const method of cls.members.methods) {
       let switchCount = 0;
       function countSwitches(node: import('typescript').Node) {
-        if (node.kind === ts.SyntaxKind.SwitchStatement) {
+        // 纯分发表（每个非空 case 以 return/throw 结束）是构造器，不是反模式：
+        // 多态化只是把 switch 换成等价的策略分发表，属于仪式性重写
+        if (
+          node.kind === ts.SyntaxKind.SwitchStatement &&
+          !isPureDispatchSwitch(node as ts.SwitchStatement)
+        ) {
           switchCount++;
         }
         node.forEachChild(countSwitches);

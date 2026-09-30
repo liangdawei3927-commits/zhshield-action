@@ -126760,7 +126760,7 @@ var require_typescript = __commonJS({
         forEachAncestor: () => forEachAncestor,
         forEachAncestorDirectory: () => forEachAncestorDirectory,
         forEachAncestorDirectoryStoppingAtGlobalCache: () => forEachAncestorDirectoryStoppingAtGlobalCache,
-        forEachChild: () => forEachChild3,
+        forEachChild: () => forEachChild4,
         forEachChildRecursively: () => forEachChildRecursively,
         forEachDynamicImportOrRequireCall: () => forEachDynamicImportOrRequireCall,
         forEachEmittedFile: () => forEachEmittedFile,
@@ -127927,7 +127927,7 @@ var require_typescript = __commonJS({
         isThisTypeNode: () => isThisTypeNode,
         isThisTypeParameter: () => isThisTypeParameter,
         isThisTypePredicate: () => isThisTypePredicate,
-        isThrowStatement: () => isThrowStatement,
+        isThrowStatement: () => isThrowStatement2,
         isToken: () => isToken,
         isTokenKind: () => isTokenKind,
         isTraceEnabled: () => isTraceEnabled,
@@ -143057,7 +143057,7 @@ ${lanes.join("\n")}
       }
       function aggregateChildData(node) {
         if (!(node.flags & 2097152)) {
-          const thisNodeOrAnySubNodesHasError = (node.flags & 262144) !== 0 || forEachChild3(node, containsParseError);
+          const thisNodeOrAnySubNodesHasError = (node.flags & 262144) !== 0 || forEachChild4(node, containsParseError);
           if (thisNodeOrAnySubNodesHasError) {
             node.flags |= 1048576;
           }
@@ -144555,7 +144555,7 @@ ${lanes.join("\n")}
             case 257:
             case 259:
             case 300:
-              return forEachChild3(node, traverse);
+              return forEachChild4(node, traverse);
           }
         }
       }
@@ -144582,7 +144582,7 @@ ${lanes.join("\n")}
                   return;
                 }
               } else if (!isPartOfTypeNode(node)) {
-                forEachChild3(node, traverse);
+                forEachChild4(node, traverse);
               }
           }
         }
@@ -148128,7 +148128,7 @@ ${lanes.join("\n")}
       }
       function getLastChild(node) {
         let lastChild;
-        forEachChild3(node, (child) => {
+        forEachChild4(node, (child) => {
           if (nodeIsPresent(child)) lastChild = child;
         }, (children) => {
           for (let i = children.length - 1; i >= 0; i--) {
@@ -148592,7 +148592,7 @@ ${lanes.join("\n")}
       }
       function walkTreeForJSXTags(node) {
         if (!(node.transformFlags & 2)) return void 0;
-        return isJsxOpeningLikeElement(node) || isJsxFragment(node) ? node : forEachChild3(node, walkTreeForJSXTags);
+        return isJsxOpeningLikeElement(node) || isJsxFragment(node) ? node : forEachChild4(node, walkTreeForJSXTags);
       }
       function isFileModuleFromUsingJSXTag(file) {
         return !file.isDeclarationFile ? walkTreeForJSXTags(file) : void 0;
@@ -150762,7 +150762,7 @@ ${lanes.join("\n")}
                   return target < 4;
                 }
                 if (isTypeNode(node)) return false;
-                return forEachChild3(node, requiresScopeChangeWorker) || false;
+                return forEachChild4(node, requiresScopeChangeWorker) || false;
             }
           }
         }
@@ -150969,7 +150969,7 @@ ${lanes.join("\n")}
           }
         };
         while (true) {
-          const child = isJavaScriptFile && includeJSDoc && hasJSDocNodes(current) && forEach(current.jsDoc, getContainingChild) || forEachChild3(current, getContainingChild);
+          const child = isJavaScriptFile && includeJSDoc && hasJSDocNodes(current) && forEach(current.jsDoc, getContainingChild) || forEachChild4(current, getContainingChild);
           if (!child || isMetaProperty(child)) {
             return current;
           }
@@ -151111,7 +151111,7 @@ ${lanes.join("\n")}
         if (child) addEmitFlagsRecursively(child, flag, getChild);
       }
       function getFirstChild(node) {
-        return forEachChild3(node, (child) => child);
+        return forEachChild4(node, (child) => child);
       }
       function createBaseNodeFactory() {
         let NodeConstructor2;
@@ -158731,7 +158731,7 @@ ${lanes.join("\n")}
       function isLabeledStatement(node) {
         return node.kind === 257;
       }
-      function isThrowStatement(node) {
+      function isThrowStatement2(node) {
         return node.kind === 258;
       }
       function isTryStatement2(node) {
@@ -160204,7 +160204,7 @@ ${lanes.join("\n")}
         return sourceFile.flags & 8388608 ? walkTreeForImportMeta(sourceFile) : void 0;
       }
       function walkTreeForImportMeta(node) {
-        return isImportMeta2(node) ? node : forEachChild3(node, walkTreeForImportMeta);
+        return isImportMeta2(node) ? node : forEachChild4(node, walkTreeForImportMeta);
       }
       function hasModifierOfKind(node, kind) {
         return some(node.modifiers, (m) => m.kind === kind);
@@ -161217,7 +161217,7 @@ ${lanes.join("\n")}
       function forEachChildInPartiallyEmittedExpression(node, cbNode, _cbNodes) {
         return visitNode2(cbNode, node.expression);
       }
-      function forEachChild3(node, cbNode, cbNodes) {
+      function forEachChild4(node, cbNode, cbNodes) {
         if (node === void 0 || node.kind <= 166) {
           return;
         }
@@ -161262,7 +161262,7 @@ ${lanes.join("\n")}
       }
       function gatherPossibleChildren(node) {
         const children = [];
-        forEachChild3(node, addWorkItem, addWorkItem);
+        forEachChild4(node, addWorkItem, addWorkItem);
         return children;
         function addWorkItem(n) {
           children.unshift(n);
@@ -169362,7 +169362,7 @@ ${lanes.join("\n")}
             if (aggressiveChecks && shouldCheckNode(node)) {
               Debug.assert(text === newText.substring(node.pos, node.end));
             }
-            forEachChild3(node, visitNode3, visitArray2);
+            forEachChild4(node, visitNode3, visitArray2);
             if (hasJSDocNodes(node)) {
               for (const jsDocComment of node.jsDoc) {
                 visitNode3(jsDocComment);
@@ -169419,7 +169419,7 @@ ${lanes.join("\n")}
                 visitNode3(jsDocComment);
               }
             }
-            forEachChild3(node, visitNode3);
+            forEachChild4(node, visitNode3);
             Debug.assert(pos <= node.end);
           }
         }
@@ -169446,7 +169446,7 @@ ${lanes.join("\n")}
               markAsIntersectingIncrementalChange(child);
               unsetNodeChildren(child, sourceFile);
               adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
-              forEachChild3(child, visitNode3, visitArray2);
+              forEachChild4(child, visitNode3, visitArray2);
               if (hasJSDocNodes(child)) {
                 for (const jsDocComment of child.jsDoc) {
                   visitNode3(jsDocComment);
@@ -169500,7 +169500,7 @@ ${lanes.join("\n")}
         function findNearestNodeStartingBeforeOrAtPosition(sourceFile, position) {
           let bestResult = sourceFile;
           let lastNodeEntirelyBeforePosition;
-          forEachChild3(sourceFile, visit);
+          forEachChild4(sourceFile, visit);
           if (lastNodeEntirelyBeforePosition) {
             const lastChildOfLastEntireNodeBeforePosition = getLastDescendant(lastNodeEntirelyBeforePosition);
             if (lastChildOfLastEntireNodeBeforePosition.pos > bestResult.pos) {
@@ -169527,7 +169527,7 @@ ${lanes.join("\n")}
                 bestResult = child;
               }
               if (position < child.end) {
-                forEachChild3(child, visit);
+                forEachChild4(child, visit);
                 return true;
               } else {
                 Debug.assert(child.end <= position);
@@ -169582,11 +169582,11 @@ ${lanes.join("\n")}
             currentArray = void 0;
             currentArrayIndex = -1;
             current = void 0;
-            forEachChild3(sourceFile, visitNode3, visitArray2);
+            forEachChild4(sourceFile, visitNode3, visitArray2);
             return;
             function visitNode3(node) {
               if (position >= node.pos && position < node.end) {
-                forEachChild3(node, visitNode3, visitArray2);
+                forEachChild4(node, visitNode3, visitArray2);
                 return true;
               }
               return false;
@@ -169603,7 +169603,7 @@ ${lanes.join("\n")}
                       return true;
                     } else {
                       if (child.pos < position && position < child.end) {
-                        forEachChild3(child, visitNode3, visitArray2);
+                        forEachChild4(child, visitNode3, visitArray2);
                         return true;
                       }
                     }
@@ -176150,7 +176150,7 @@ ${lanes.join("\n")}
           // 5. other uninstantiated module declarations.
           case 269: {
             let state = 0;
-            forEachChild3(node, (n) => {
+            forEachChild4(node, (n) => {
               const childState = getModuleInstanceStateCached(n, visited);
               switch (childState) {
                 case 0:
@@ -176685,7 +176685,7 @@ ${lanes.join("\n")}
           forEach(nodes, bindFunction);
         }
         function bindEachChild(node) {
-          forEachChild3(node, bind, bindEach);
+          forEachChild4(node, bind, bindEach);
         }
         function bindChildren(node) {
           const saveInAssignmentPattern = inAssignmentPattern;
@@ -195068,7 +195068,7 @@ ${lanes.join("\n")}
               case 304:
                 return traverse(node.initializer);
               default:
-                return !nodeStartsNewLexicalEnvironment(node) && !isPartOfTypeNode(node) && !!forEachChild3(node, traverse);
+                return !nodeStartsNewLexicalEnvironment(node) && !isPartOfTypeNode(node) && !!forEachChild4(node, traverse);
             }
           }
         }
@@ -199042,7 +199042,7 @@ ${lanes.join("\n")}
           if (tp.symbol && tp.symbol.declarations && tp.symbol.declarations.length === 1) {
             const container = tp.symbol.declarations[0].parent;
             for (let n = node; n !== container; n = n.parent) {
-              if (!n || n.kind === 242 || n.kind === 195 && forEachChild3(n.extendsType, containsReference)) {
+              if (!n || n.kind === 242 || n.kind === 195 && forEachChild4(n.extendsType, containsReference)) {
                 return true;
               }
             }
@@ -199078,7 +199078,7 @@ ${lanes.join("\n")}
               case 174:
                 return !node2.type && !!node2.body || some(node2.typeParameters, containsReference) || some(node2.parameters, containsReference) || !!node2.type && containsReference(node2.type);
             }
-            return !!forEachChild3(node2, containsReference);
+            return !!forEachChild4(node2, containsReference);
           }
         }
         function getHomomorphicTypeVariable(type) {
@@ -207607,7 +207607,7 @@ ${lanes.join("\n")}
           if (isTypeNode(node)) {
             return;
           }
-          forEachChild3(node, markNodeAssignments);
+          forEachChild4(node, markNodeAssignments);
         }
         function extendAssignmentPosition(node, declaration) {
           let pos = node.pos;
@@ -208414,7 +208414,7 @@ ${lanes.join("\n")}
           }
         }
         function findFirstSuperCall(node) {
-          return isSuperCall(node) ? node : isFunctionLike(node) ? void 0 : forEachChild3(node, findFirstSuperCall);
+          return isSuperCall(node) ? node : isFunctionLike(node) ? void 0 : forEachChild4(node, findFirstSuperCall);
         }
         function classDeclarationExtendsNull(classDecl) {
           const classSymbol = getSymbolOfDeclaration(classDecl);
@@ -218455,7 +218455,7 @@ ${lanes.join("\n")}
         }
         function checkClassStaticBlockDeclaration(node) {
           checkGrammarModifiers(node);
-          forEachChild3(node, checkSourceElement);
+          forEachChild4(node, checkSourceElement);
         }
         function checkConstructorDeclaration(node) {
           checkSignatureDeclaration(node);
@@ -218528,7 +218528,7 @@ ${lanes.join("\n")}
           if (isThisContainerOrFunctionBlock(node)) {
             return false;
           }
-          return !!forEachChild3(node, nodeImmediatelyReferencesSuperOrThis);
+          return !!forEachChild4(node, nodeImmediatelyReferencesSuperOrThis);
         }
         function checkAccessorDeclaration(node) {
           if (isIdentifier4(node.name) && idText(node.name) === "constructor" && isClassLike(node.parent)) {
@@ -218800,7 +218800,7 @@ ${lanes.join("\n")}
           checkSourceElement(node.type);
         }
         function checkConditionalType(node) {
-          forEachChild3(node, checkSourceElement);
+          forEachChild4(node, checkSourceElement);
         }
         function checkInferType(node) {
           if (!findAncestor(node, (n) => n.parent && n.parent.kind === 195 && n.parent.extendsType === n)) {
@@ -218931,7 +218931,7 @@ ${lanes.join("\n")}
               return;
             }
             let seen = false;
-            const subsequentNode = forEachChild3(node.parent, (c) => {
+            const subsequentNode = forEachChild4(node.parent, (c) => {
               if (seen) {
                 return c;
               } else {
@@ -220668,7 +220668,7 @@ ${lanes.join("\n")}
           }
         }
         function isSymbolUsedInConditionBody(expr, body, testedNode, testedSymbol) {
-          return !!forEachChild3(body, function check(childNode) {
+          return !!forEachChild4(body, function check(childNode) {
             if (isIdentifier4(childNode)) {
               const childSymbol = getSymbolAtLocation(childNode);
               if (childSymbol && childSymbol === testedSymbol) {
@@ -220695,19 +220695,19 @@ ${lanes.join("\n")}
                 }
               }
             }
-            return forEachChild3(childNode, check);
+            return forEachChild4(childNode, check);
           });
         }
         function isSymbolUsedInBinaryExpressionChain(node, testedSymbol) {
           while (isBinaryExpression2(node) && node.operatorToken.kind === 56) {
-            const isUsed = forEachChild3(node.right, function visit(child) {
+            const isUsed = forEachChild4(node.right, function visit(child) {
               if (isIdentifier4(child)) {
                 const symbol = getSymbolAtLocation(child);
                 if (symbol && symbol === testedSymbol) {
                   return true;
                 }
               }
-              return forEachChild3(child, visit);
+              return forEachChild4(child, visit);
             });
             if (isUsed) {
               return true;
@@ -221897,7 +221897,7 @@ ${lanes.join("\n")}
                 }
               }
             }
-            forEachChild3(node, visit);
+            forEachChild4(node, visit);
           }
         }
         function checkTypeParameterListsIdentical(symbol) {
@@ -223807,7 +223807,7 @@ ${lanes.join("\n")}
             case 314:
             case 323:
               checkJSDocTypeIsInJsFile(node);
-              forEachChild3(node, checkSourceElement);
+              forEachChild4(node, checkSourceElement);
               return;
             case 319:
               checkJSDocVariadicType(node);
@@ -225199,7 +225199,7 @@ ${lanes.join("\n")}
             }
           }
           if (checkChildren) {
-            return !!forEachChild3(node, (node2) => isReferencedAliasDeclaration(node2, checkChildren));
+            return !!forEachChild4(node, (node2) => isReferencedAliasDeclaration(node2, checkChildren));
           }
           return false;
         }
@@ -243800,12 +243800,12 @@ ${lanes.join("\n")}
             case 173: {
               const named = node;
               if (isComputedPropertyName(named.name)) {
-                return !!forEachChild3(named.name, containsSuperCall);
+                return !!forEachChild4(named.name, containsSuperCall);
               }
               return false;
             }
           }
-          return !!forEachChild3(node, containsSuperCall);
+          return !!forEachChild4(node, containsSuperCall);
         }
         function transformConstructorBody(constructor, node, extendsClauseElement, hasSynthesizedSuper) {
           const isDerivedClass = !!extendsClauseElement && skipOuterExpressions(extendsClauseElement.expression).kind !== 106;
@@ -255996,7 +255996,7 @@ ${lanes.join("\n")}
             );
             return;
           }
-          forEachChild3(node, collectLinkedAliases);
+          forEachChild4(node, collectLinkedAliases);
         }
         function markLinkedReferences(file) {
           if (isSourceFileJS(file)) return;
@@ -277306,7 +277306,7 @@ ${lanes.join("\n")}
         let withSemicolon = 0;
         let withoutSemicolon = 0;
         const nStatementsToObserve = 5;
-        forEachChild3(sourceFile, function visit(node) {
+        forEachChild4(sourceFile, function visit(node) {
           if (syntaxRequiresTrailingSemicolonOrASI(node.kind)) {
             const lastToken = node.getLastToken(sourceFile);
             if ((lastToken == null ? void 0 : lastToken.kind) === 27) {
@@ -277329,7 +277329,7 @@ ${lanes.join("\n")}
           if (withSemicolon + withoutSemicolon >= nStatementsToObserve) {
             return true;
           }
-          return forEachChild3(node, visit);
+          return forEachChild4(node, visit);
         });
         if (withSemicolon === 0 && withoutSemicolon <= 1) {
           return true;
@@ -279383,7 +279383,7 @@ ${lanes.join("\n")}
             case 107:
               return useParent(node.parent, isReturnStatement2, getReturnOccurrences);
             case 111:
-              return useParent(node.parent, isThrowStatement, getThrowOccurrences);
+              return useParent(node.parent, isThrowStatement2, getThrowOccurrences);
             case 113:
             case 85:
             case 98:
@@ -279447,7 +279447,7 @@ ${lanes.join("\n")}
           }
         }
         function aggregateOwnedThrowStatements(node) {
-          if (isThrowStatement(node)) {
+          if (isThrowStatement2(node)) {
             return [node];
           } else if (isTryStatement2(node)) {
             return concatenate(
@@ -279708,7 +279708,7 @@ ${lanes.join("\n")}
               );
             });
           }
-          forEachChild3(func, (child) => {
+          forEachChild4(func, (child) => {
             traverseWithoutCrossingFunction(child, (node2) => {
               if (isAwaitExpression2(node2)) {
                 pushKeywordIf(
@@ -279728,7 +279728,7 @@ ${lanes.join("\n")}
             return void 0;
           }
           const keywords = [];
-          forEachChild3(func, (child) => {
+          forEachChild4(func, (child) => {
             traverseWithoutCrossingFunction(child, (node2) => {
               if (isYieldExpression(node2)) {
                 pushKeywordIf(
@@ -279745,7 +279745,7 @@ ${lanes.join("\n")}
         function traverseWithoutCrossingFunction(node, cb) {
           cb(node);
           if (!isFunctionLike(node) && !isClassLike(node) && !isInterfaceDeclaration(node) && !isModuleDeclaration(node) && !isTypeAliasDeclaration(node) && !isTypeNode(node)) {
-            forEachChild3(node, (child) => traverseWithoutCrossingFunction(child, cb));
+            forEachChild4(node, (child) => traverseWithoutCrossingFunction(child, cb));
           }
         }
         function getIfElseOccurrences(ifStatement, sourceFile) {
@@ -281665,7 +281665,7 @@ interface Symbol {
       function addNodeWithRecursiveInitializer(node) {
         if (node.initializer && isFunctionOrClassExpression(node.initializer)) {
           startNode(node);
-          forEachChild3(node.initializer, addChildrenRecursively);
+          forEachChild4(node.initializer, addChildrenRecursively);
           endNode();
         } else {
           addNodeWithRecursiveChild(node, node.initializer);
@@ -281824,7 +281824,7 @@ interface Symbol {
                   if (isObjectLiteralExpression(binaryExpression.right)) {
                     if (binaryExpression.right.properties.length > 0) {
                       startNode(binaryExpression, className);
-                      forEachChild3(binaryExpression.right, addChildrenRecursively);
+                      forEachChild4(binaryExpression.right, addChildrenRecursively);
                       endNode();
                     }
                   }
@@ -281887,7 +281887,7 @@ interface Symbol {
                 });
               });
             }
-            forEachChild3(node, addChildrenRecursively);
+            forEachChild4(node, addChildrenRecursively);
         }
       }
       function mergeChildren(children, node) {
@@ -283095,7 +283095,7 @@ interface Symbol {
               /* SingleLine */
             );
           }
-          return forEachChild3(node, visitor);
+          return forEachChild4(node, visitor);
         }
       }
       function doTypeAliasChange(changes, file, name, info) {
@@ -284772,7 +284772,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
             return;
           }
           if (!isClassLike(child) && !isFunctionDeclaration3(child) && !isFunctionExpression2(child)) {
-            forEachChild3(child, checkThis);
+            forEachChild4(child, checkThis);
           }
         });
         return containsThis;
@@ -286255,14 +286255,14 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
                 }
                 break;
               case 220:
-                forEachChild3(node2, function check(n) {
+                forEachChild4(node2, function check(n) {
                   if (isThis(n)) {
                     rangeFacts |= 8;
                     thisNode = node2;
                   } else if (isClassLike(n) || isFunctionLike(n) && !isArrowFunction2(n)) {
                     return false;
                   } else {
-                    forEachChild3(n, check);
+                    forEachChild4(n, check);
                   }
                 });
               // falls through
@@ -286316,7 +286316,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               case 257: {
                 const label = node2.label;
                 (seenLabels || (seenLabels = [])).push(label.escapedText);
-                forEachChild3(node2, visit);
+                forEachChild4(node2, visit);
                 seenLabels.pop();
                 break;
               }
@@ -286348,7 +286348,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
                 }
                 break;
               default:
-                forEachChild3(node2, visit);
+                forEachChild4(node2, visit);
                 break;
             }
             permittedJumps = savedPermittedJumps;
@@ -287323,7 +287323,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
         }
         if (visibleDeclarationsInExtractedRange.length) {
           const containingLexicalScopeOfExtraction = isBlockScope(scopes[0], scopes[0].parent) ? scopes[0] : getEnclosingBlockScopeContainer(scopes[0]);
-          forEachChild3(containingLexicalScopeOfExtraction, checkForUsedDeclarations);
+          forEachChild4(containingLexicalScopeOfExtraction, checkForUsedDeclarations);
         }
         for (let i = 0; i < scopes.length; i++) {
           const scopeUsages = usagesPerScope[i];
@@ -287398,7 +287398,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               /* Write */
             );
           } else if (isPropertyAccessExpression3(node) || isElementAccessExpression(node)) {
-            forEachChild3(node, collectUsages);
+            forEachChild4(node, collectUsages);
           } else if (isIdentifier4(node)) {
             if (!node.parent) {
               return;
@@ -287416,7 +287416,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               isPartOfTypeNode(node)
             );
           } else {
-            forEachChild3(node, collectUsages);
+            forEachChild4(node, collectUsages);
           }
         }
         function recordUsage(n, usage, isTypeNode2) {
@@ -287515,7 +287515,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               }
             }
           }
-          forEachChild3(node, checkForUsedDeclarations);
+          forEachChild4(node, checkForUsedDeclarations);
         }
         function getSymbolReferencedByIdentifier(identifier) {
           return identifier.parent && isShorthandPropertyAssignment(identifier.parent) && identifier.parent.name === identifier ? checker.getShorthandAssignmentValueSymbol(identifier.parent) : checker.getSymbolAtLocation(identifier);
@@ -287859,7 +287859,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               }
             }
           }
-          forEachChild3(node, visit);
+          forEachChild4(node, visit);
           inJSXElement = prevInJSXElement;
         }
         visit(sourceFile);
@@ -288126,7 +288126,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
           return child.kind < 167 ? child : child.getLastToken(sourceFile);
         }
         forEachChild(cbNode, cbNodeArray) {
-          return forEachChild3(this, cbNode, cbNodeArray);
+          return forEachChild4(this, cbNode, cbNodeArray);
         }
       };
       function createChildren(node, sourceFile) {
@@ -288642,7 +288642,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
                     declarations.push(functionDeclaration);
                   }
                 }
-                forEachChild3(node, visit);
+                forEachChild4(node, visit);
                 break;
               case 264:
               case 232:
@@ -288659,7 +288659,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               case 179:
               case 188:
                 addDeclaration(node);
-                forEachChild3(node, visit);
+                forEachChild4(node, visit);
                 break;
               case 170:
                 if (!hasSyntacticModifier(
@@ -288674,7 +288674,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               case 209: {
                 const decl = node;
                 if (isBindingPattern(decl.name)) {
-                  forEachChild3(decl.name, visit);
+                  forEachChild4(decl.name, visit);
                   break;
                 }
                 if (decl.initializer) {
@@ -288718,7 +288718,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
                 }
               // falls through
               default:
-                forEachChild3(node, visit);
+                forEachChild4(node, visit);
             }
           }
         }
@@ -290356,10 +290356,10 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
             const text = node.escapedText;
             nameTable.set(text, nameTable.get(text) === void 0 ? node.pos : -1);
           }
-          forEachChild3(node, walk2);
+          forEachChild4(node, walk2);
           if (hasJSDocNodes(node)) {
             for (const jsDoc of node.jsDoc) {
-              forEachChild3(jsDoc, walk2);
+              forEachChild4(jsDoc, walk2);
             }
           }
         });
@@ -291308,7 +291308,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
             case 212:
             case 213:
               recordCallSite(node);
-              forEachChild3(node, collect);
+              forEachChild4(node, collect);
               break;
             case 239:
               collect(node.expression);
@@ -291317,7 +291317,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
           if (isPartOfTypeNode(node)) {
             return;
           }
-          forEachChild3(node, collect);
+          forEachChild4(node, collect);
         }
         return collect;
       }
@@ -292788,7 +292788,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
         const pos = skipTrivia(sourceFile.text, moveRangePastModifiers(functionToConvert).pos);
         changes.insertModifierAt(sourceFile, pos, 134, { suffix: " " });
         for (const returnStatement of returnStatements) {
-          forEachChild3(returnStatement, function visit(node) {
+          forEachChild4(returnStatement, function visit(node) {
             if (isCallExpression4(node)) {
               const newNodes = transformExpression(
                 node,
@@ -292802,7 +292802,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               }
               changes.replaceNodeWithNodes(sourceFile, returnStatement, newNodes);
             } else if (!isFunctionLike(node)) {
-              forEachChild3(node, visit);
+              forEachChild4(node, visit);
               if (hasFailed()) {
                 return true;
               }
@@ -292825,17 +292825,17 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
           return /* @__PURE__ */ new Set();
         }
         const setOfExpressionsToReturn = /* @__PURE__ */ new Set();
-        forEachChild3(func.body, function visit(node) {
+        forEachChild4(func.body, function visit(node) {
           if (isPromiseReturningCallExpression(node, checker, "then")) {
             setOfExpressionsToReturn.add(getNodeId(node));
             forEach(node.arguments, visit);
           } else if (isPromiseReturningCallExpression(node, checker, "catch") || isPromiseReturningCallExpression(node, checker, "finally")) {
             setOfExpressionsToReturn.add(getNodeId(node));
-            forEachChild3(node, visit);
+            forEachChild4(node, visit);
           } else if (isPromiseTypedExpression(node, checker)) {
             setOfExpressionsToReturn.add(getNodeId(node));
           } else {
-            forEachChild3(node, visit);
+            forEachChild4(node, visit);
           }
         });
         return setOfExpressionsToReturn;
@@ -292873,9 +292873,9 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
       function renameCollidingVarNames(nodeToRename, checker, synthNamesMap) {
         const identsToRenameMap = /* @__PURE__ */ new Map();
         const collidingSymbolMap = createMultiMap();
-        forEachChild3(nodeToRename, function visit(node) {
+        forEachChild4(nodeToRename, function visit(node) {
           if (!isIdentifier4(node)) {
-            forEachChild3(node, visit);
+            forEachChild4(node, visit);
             return;
           }
           const symbol = checker.getSymbolAtLocation(node);
@@ -293378,7 +293378,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
       }
       function transformReturnStatementWithFixablePromiseHandler(transformer, innerRetStmt, hasContinuation, continuationArgName) {
         let innerCbBody = [];
-        forEachChild3(innerRetStmt, function visit(node) {
+        forEachChild4(innerRetStmt, function visit(node) {
           if (isCallExpression4(node)) {
             const temp = transformExpression(node, node, transformer, hasContinuation, continuationArgName);
             innerCbBody = innerCbBody.concat(temp);
@@ -293386,7 +293386,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               return;
             }
           } else if (!isFunctionLike(node)) {
-            forEachChild3(node, visit);
+            forEachChild4(node, visit);
           }
         });
         return innerCbBody;
@@ -298281,7 +298281,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
         return superCall && !superCall.expression.arguments.some((arg) => isPropertyAccessExpression3(arg) && arg.expression === token) ? { constructor, superCall } : void 0;
       }
       function findSuperCall(n) {
-        return isExpressionStatement2(n) && isSuperCall(n.expression) ? n : isFunctionLike(n) ? void 0 : forEachChild3(n, findSuperCall);
+        return isExpressionStatement2(n) && isSuperCall(n.expression) ? n : isFunctionLike(n) ? void 0 : forEachChild4(n, findSuperCall);
       }
       var fixId28 = "constructorForDerivedNeedSuperCall";
       var errorCodes34 = [Diagnostics.Constructors_for_derived_classes_must_contain_a_super_call.code];
@@ -311226,7 +311226,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
         }
         Core2.getReferenceEntriesForShorthandPropertyAssignment = getReferenceEntriesForShorthandPropertyAssignment;
         function forEachDescendantOfKind(node, kind, action) {
-          forEachChild3(node, (child) => {
+          forEachChild4(node, (child) => {
             if (child.kind === kind) {
               action(child);
             }
@@ -311880,7 +311880,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
               visitFunctionDeclarationLikeForReturnType(node);
             }
           }
-          return forEachChild3(node, visitor);
+          return forEachChild4(node, visitor);
         }
         function isSignatureSupportingReturnAnnotation(node) {
           return isArrowFunction2(node) || isFunctionExpression2(node) || isFunctionDeclaration3(node) || isMethodDeclaration2(node) || isGetAccessorDeclaration(node);
@@ -320094,7 +320094,7 @@ ${options2.prefix}` : "\n" : options2.prefix
       function findEnclosingNode(range, sourceFile) {
         return find2(sourceFile);
         function find2(n) {
-          const candidate = forEachChild3(n, (c) => startEndContainsRange(c.getStart(sourceFile), c.end, range) && c);
+          const candidate = forEachChild4(n, (c) => startEndContainsRange(c.getStart(sourceFile), c.end, range) && c);
           if (candidate) {
             const result = find2(candidate);
             if (result) {
@@ -320428,7 +320428,7 @@ ${options2.prefix}` : "\n" : options2.prefix
           }
           const nodeDynamicIndentation = getDynamicIndentation(node, nodeStartLine, indentation, delta2);
           let childContextNode = contextNode;
-          forEachChild3(
+          forEachChild4(
             node,
             (child) => {
               processChildNode(
@@ -321569,7 +321569,7 @@ ${options2.prefix}` : "\n" : options2.prefix
             (ancestorNode) => rangeContainsRange(ancestorNode, range)
           );
           if (!enclosingNode) return;
-          forEachChild3(enclosingNode, function checkNameResolution(node) {
+          forEachChild4(enclosingNode, function checkNameResolution(node) {
             var _a;
             if (shouldProvidePasteEdits) return;
             if (isIdentifier4(node) && rangeContainsPosition(range, node.getStart(sourceFile))) {
@@ -321659,7 +321659,7 @@ ${options2.prefix}` : "\n" : options2.prefix
                 (ancestorNode) => rangeContainsRange(ancestorNode, range)
               );
               if (!enclosingNode) return;
-              forEachChild3(enclosingNode, function importUnresolvedIdentifiers(node) {
+              forEachChild4(enclosingNode, function importUnresolvedIdentifiers(node) {
                 const isImportCandidate = isIdentifier4(node) && rangeContainsPosition(range, node.getStart(updatedFile)) && !(updatedProgram == null ? void 0 : updatedProgram.getTypeChecker().resolveName(
                   node.text,
                   node,
@@ -322263,7 +322263,7 @@ ${options2.prefix}` : "\n" : options2.prefix
         forEachAncestor: () => forEachAncestor,
         forEachAncestorDirectory: () => forEachAncestorDirectory,
         forEachAncestorDirectoryStoppingAtGlobalCache: () => forEachAncestorDirectoryStoppingAtGlobalCache,
-        forEachChild: () => forEachChild3,
+        forEachChild: () => forEachChild4,
         forEachChildRecursively: () => forEachChildRecursively,
         forEachDynamicImportOrRequireCall: () => forEachDynamicImportOrRequireCall,
         forEachEmittedFile: () => forEachEmittedFile,
@@ -323430,7 +323430,7 @@ ${options2.prefix}` : "\n" : options2.prefix
         isThisTypeNode: () => isThisTypeNode,
         isThisTypeParameter: () => isThisTypeParameter,
         isThisTypePredicate: () => isThisTypePredicate,
-        isThrowStatement: () => isThrowStatement,
+        isThrowStatement: () => isThrowStatement2,
         isToken: () => isToken,
         isTokenKind: () => isTokenKind,
         isTraceEnabled: () => isTraceEnabled,
@@ -345342,7 +345342,7 @@ var require_ast3 = __commonJS({
     exports2.getProgramStatements = getProgramStatements;
     exports2.isIfStatement = isIfStatement2;
     exports2.isMemberWithProperty = isMemberWithProperty;
-    exports2.isThrowStatement = isThrowStatement;
+    exports2.isThrowStatement = isThrowStatement2;
     exports2.isMemberExpression = isMemberExpression;
     exports2.isLogicalExpression = isLogicalExpression;
     exports2.isBinaryPlus = isBinaryPlus;
@@ -345442,7 +345442,7 @@ var require_ast3 = __commonJS({
     function isMemberWithProperty(node, ...values) {
       return node.type === "MemberExpression" && isIdentifier4(node.property, ...values);
     }
-    function isThrowStatement(node) {
+    function isThrowStatement2(node) {
       return node?.type === "ThrowStatement";
     }
     function isMemberExpression(node, objectValue, ...propertyValue) {
@@ -422104,7 +422104,7 @@ var require_lib5 = __commonJS({
           }
           return ts9__default.default.forEachChild(node, cb);
         };
-        const continueWithScope = (node, scope, next = forEachChild3) => {
+        const continueWithScope = (node, scope, next = forEachChild4) => {
           const savedScope = this.#scope;
           this.#scope = scope;
           next(node);
@@ -422124,7 +422124,7 @@ var require_lib5 = __commonJS({
         ts9__default.default.forEachChild(sourceFile, cb);
         this.#scope.end(variableCallback);
         return this.#result;
-        function forEachChild3(node) {
+        function forEachChild4(node) {
           return ts9__default.default.forEachChild(node, cb);
         }
       }
@@ -594215,9 +594215,126 @@ function collectPrimitiveFieldCounts(parsed) {
 
 // ../refactor/src/adapters/extra-detectors.ts
 var ts4 = __toESM(require_typescript());
+
+// ../refactor/src/adapters/chain-text-utils.ts
 var IDENT_CHAR_PAREN = /[a-zA-Z0-9_$)]/;
 var IDENT_CHAR = /[a-zA-Z0-9_$]/;
 var IDENT_FULL = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+function extractMessageChains(methodText) {
+  const stringRanges = collectStringRanges(methodText);
+  const isInsideString = (idx2) => stringRanges.some(([start, end]) => idx2 >= start && idx2 < end);
+  const matches = [];
+  let idx = 0;
+  while (idx < methodText.length) {
+    const dotIdx = methodText.indexOf(".", idx);
+    if (dotIdx === -1) break;
+    if (!isInsideString(dotIdx)) {
+      const chain = extractChainAtDot(methodText, dotIdx);
+      if (chain) matches.push(chain);
+    }
+    idx = dotIdx + 1;
+  }
+  return matches;
+}
+function collectStringRanges(methodText) {
+  const ranges = [];
+  let i = 0;
+  while (i < methodText.length) {
+    const ch = methodText[i];
+    if (ch === "'" || ch === '"') {
+      i = scanQuotedString(methodText, i, ch, ranges);
+    } else if (ch === "`") {
+      i = scanTemplateString(methodText, i, ranges);
+    } else {
+      i++;
+    }
+  }
+  return ranges;
+}
+function scanQuotedString(text, start, quote, ranges) {
+  let i = start + 1;
+  while (i < text.length) {
+    if (text[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (text[i] === quote) {
+      i++;
+      break;
+    }
+    i++;
+  }
+  ranges.push([start, i]);
+  return i;
+}
+function scanTemplateString(text, start, ranges) {
+  let i = start + 1;
+  let literalFrom = i;
+  while (i < text.length) {
+    if (text[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (text[i] === "`") {
+      ranges.push([literalFrom, i]);
+      return i + 1;
+    }
+    if (text[i] === "$" && text[i + 1] === "{") {
+      ranges.push([literalFrom, i]);
+      i = skipInterpolation(text, i + 2);
+      literalFrom = i;
+      continue;
+    }
+    i++;
+  }
+  ranges.push([literalFrom, Math.min(i, text.length)]);
+  return i;
+}
+function skipInterpolation(text, start) {
+  let depth = 1;
+  let i = start;
+  while (i < text.length && depth > 0) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") depth--;
+    i++;
+  }
+  return i;
+}
+function extractChainAtDot(methodText, dotIdx) {
+  const { before, after } = readChainTokens(methodText, dotIdx);
+  if (!isValidChainBoundary(before, after)) return null;
+  const { length: chainLen, endIdx: searchIdx } = measureChainLength(methodText, dotIdx);
+  if (chainLen < 3) return null;
+  const chainEnd = Math.min(searchIdx + 30, methodText.length);
+  return methodText.slice(dotIdx - 10, chainEnd).trim();
+}
+function readChainTokens(methodText, dotIdx) {
+  let start = dotIdx - 1;
+  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
+  const before = methodText.slice(start + 1, dotIdx);
+  let end = dotIdx + 1;
+  while (end < methodText.length && IDENT_CHAR.test(methodText[end])) end++;
+  const after = methodText.slice(dotIdx + 1, end);
+  return { before, after };
+}
+function isValidChainBoundary(before, after) {
+  return Boolean(before) && Boolean(after) && before !== "this" && ![")", "}"].includes(before);
+}
+function measureChainLength(methodText, dotIdx) {
+  let chainLen = 0;
+  let searchIdx = dotIdx;
+  while (searchIdx < methodText.length) {
+    const nextDot = methodText.indexOf(".", searchIdx + 1);
+    if (nextDot === -1) break;
+    const between = methodText.slice(searchIdx + 1, nextDot);
+    if (!IDENT_FULL.test(between.trim())) break;
+    chainLen++;
+    searchIdx = nextDot;
+  }
+  return { length: chainLen, endIdx: searchIdx };
+}
+
+// ../refactor/src/adapters/extra-detectors.ts
 var COLLECTION_TYPE_RE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
 function detectInappropriateIntimacy(parsed, config) {
   const smells = [];
@@ -594397,55 +594514,41 @@ function detectMessageChains(parsed, config) {
   }
   return smells;
 }
-function extractMessageChains(methodText) {
-  const matches = [];
-  let idx = 0;
-  while (idx < methodText.length) {
-    const dotIdx = methodText.indexOf(".", idx);
-    if (dotIdx === -1) break;
-    const chain = extractChainAtDot(methodText, dotIdx);
-    if (chain) matches.push(chain);
-    idx = dotIdx + 1;
+function isRefusedBequestExempt(cls, sourceFile) {
+  const base = cls.extendsClass ?? "";
+  const baseName = base.replace(/<.*>/, "").trim();
+  if (baseName === "Error") return true;
+  if (baseName === "Component" || baseName === "PureComponent") return true;
+  if (baseName.endsWith("Adapter")) return true;
+  return referencesInheritedMember(cls, sourceFile);
+}
+function referencesInheritedMember(cls, sourceFile) {
+  const ownNames = /* @__PURE__ */ new Set();
+  for (const m of cls.members.methods) ownNames.add(m.name);
+  for (const f of cls.members.fields) ownNames.add(f.name);
+  let found = false;
+  function visit(node) {
+    if (found) return;
+    if (ts4.isPropertyAccessExpression(node)) {
+      const expr = node.expression;
+      if (expr.kind === ts4.SyntaxKind.SuperKeyword) {
+        found = true;
+        return;
+      }
+      if (expr.kind === ts4.SyntaxKind.ThisKeyword && ts4.isIdentifier(node.name) && !ownNames.has(node.name.text)) {
+        found = true;
+        return;
+      }
+    }
+    ts4.forEachChild(node, visit);
   }
-  return matches;
-}
-function extractChainAtDot(methodText, dotIdx) {
-  const { before, after } = readChainTokens(methodText, dotIdx);
-  if (!isValidChainBoundary(before, after)) return null;
-  const { length: chainLen, endIdx: searchIdx } = measureChainLength(methodText, dotIdx);
-  if (chainLen < 3) return null;
-  const chainEnd = Math.min(searchIdx + 30, methodText.length);
-  return methodText.slice(dotIdx - 10, chainEnd).trim();
-}
-function readChainTokens(methodText, dotIdx) {
-  let start = dotIdx - 1;
-  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
-  const before = methodText.slice(start + 1, dotIdx);
-  let end = dotIdx + 1;
-  while (end < methodText.length && IDENT_CHAR.test(methodText[end])) end++;
-  const after = methodText.slice(dotIdx + 1, end);
-  return { before, after };
-}
-function isValidChainBoundary(before, after) {
-  return Boolean(before) && Boolean(after) && before !== "this" && ![")", "}"].includes(before);
-}
-function measureChainLength(methodText, dotIdx) {
-  let chainLen = 0;
-  let searchIdx = dotIdx;
-  while (searchIdx < methodText.length) {
-    const nextDot = methodText.indexOf(".", searchIdx + 1);
-    if (nextDot === -1) break;
-    const between = methodText.slice(searchIdx + 1, nextDot);
-    if (!IDENT_FULL.test(between.trim())) break;
-    chainLen++;
-    searchIdx = nextDot;
-  }
-  return { length: chainLen, endIdx: searchIdx };
+  visit(cls.node);
+  return found;
 }
 function detectRefusedBequest(parsed, config) {
   const smells = [];
   for (const cls of parsed.classes) {
-    if (cls.extendsClass) {
+    if (cls.extendsClass && !isRefusedBequestExempt(cls, parsed.sourceFile)) {
       const ownMethods = cls.members.methods.filter((m) => m.accessModifier === "public").length;
       const ownFields = cls.members.fields.length;
       if (ownMethods <= 2 && ownFields <= 1) {
@@ -594509,12 +594612,21 @@ function detectLazyClass(parsed, config) {
   }
   return smells;
 }
+function isPureDispatchSwitch(node) {
+  for (const clause of node.caseBlock.clauses) {
+    const stmts = clause.statements;
+    if (stmts.length === 0) continue;
+    const last = stmts[stmts.length - 1];
+    if (!ts4.isReturnStatement(last) && !ts4.isThrowStatement(last)) return false;
+  }
+  return true;
+}
 function detectSwitchStatement(parsed, config) {
   const smells = [];
   for (const cls of parsed.classes) {
     for (const method of cls.members.methods) {
       let countSwitches2 = function(node) {
-        if (node.kind === ts4.SyntaxKind.SwitchStatement) {
+        if (node.kind === ts4.SyntaxKind.SwitchStatement && !isPureDispatchSwitch(node)) {
           switchCount++;
         }
         node.forEachChild(countSwitches2);

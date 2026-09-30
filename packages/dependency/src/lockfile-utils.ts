@@ -126,12 +126,26 @@ export function readPnpmImporterEntries(
 
 // ────────────────────────────── yarn.lock v1 ──────────────────────────────
 
-/** 换行符拆分 */
-const NEWLINE_RE = /\r?\n/;
+/** 换行符拆分（env-consistency 等跨实现复用，避免逐字重复定义） */
+export const NEWLINE_RE = /\r?\n/;
 /** 行首缩进检测 */
-const INDENT_RE = /^\s*/;
+export const INDENT_RE = /^\s*/;
 /** yarn 块字段行 'key value' */
 const YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
+
+/** yarn 行迭代骨架：按行拆分、trim、跳过空行/注释、计算缩进。
+ *  解析实现（parseYarnLock / collectYarnVersions）共用同一遍历前导，避免逐字重复。 */
+export function forEachYarnLine(
+  content: string,
+  visit: (trimmed: string, indent: number) => void,
+): void {
+  for (const rawLine of content.split(NEWLINE_RE)) {
+    const trimmed = rawLine.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
+    visit(trimmed, indent);
+  }
+}
 
 /** yarn.lock v1 块 */
 export interface YarnBlock {
@@ -165,19 +179,16 @@ function collectYarnField(current: YarnBlock, trimmed: string): void {
 export function parseYarnLock(content: string): YarnBlock[] {
   const blocks: YarnBlock[] = [];
   let current: YarnBlock | null = null;
-  for (const rawLine of content.split(NEWLINE_RE)) {
-    const trimmed = rawLine.trim();
-    if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
+  forEachYarnLine(content, (trimmed, indent) => {
     if (indent === 0 && trimmed.endsWith(':')) {
       current = { keys: parseYarnBlockKeys(trimmed), fields: new Map() };
       blocks.push(current);
-      continue;
+      return;
     }
     if (current) {
       collectYarnField(current, trimmed);
     }
-  }
+  });
   return blocks;
 }
 

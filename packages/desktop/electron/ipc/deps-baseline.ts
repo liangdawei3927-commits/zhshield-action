@@ -6,8 +6,8 @@
  * 读写归桌面接线层，不把 .zhshield 路径约定带进通用引擎包。
  * 写入 tmp+rename 原子替换；读取失败降级为 null（无基线行为），绝不抛异常。
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readJsonBaseline, writeJsonBaselineAtomic } from '@zh/shared';
 import type { DependencyNode } from '@zh/dependency';
 
 /** 依赖完整性基线（deps-baseline.json）：抓取时间 + 包名→integrity 映射 */
@@ -28,34 +28,32 @@ export function depsBaselinePath(projectRoot: string): string {
   return join(projectRoot, BASELINE_DIR, BASELINE_FILE);
 }
 
-/** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为） */
-export async function loadDepsBaseline(projectRoot: string): Promise<DepsBaseline | null> {
-  const file = depsBaselinePath(projectRoot);
-  try {
-    const parsed = JSON.parse(await readFile(file, 'utf-8')) as unknown;
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const { version, capturedAt, integrity } = parsed as Partial<DepsBaseline>;
-    if (
-      version !== BASELINE_VERSION ||
-      typeof capturedAt !== 'string' ||
-      typeof integrity !== 'object' ||
-      integrity === null
-    ) {
-      return null;
-    }
-    return {
-      version: BASELINE_VERSION,
-      capturedAt,
-      integrity: integrity as Record<string, string>,
-    };
-  } catch (err) {
-    // 文件缺失（ENOENT）或损坏均降级为无基线，绝不抛异常
-    console.warn(
-      '[deps-baseline] 读取失败，降级为无基线:',
-      err instanceof Error ? err.message : String(err),
-    );
+function validateDepsBaseline(parsed: unknown): DepsBaseline | null {
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { version, capturedAt, integrity } = parsed as Partial<DepsBaseline>;
+  if (
+    version !== BASELINE_VERSION ||
+    typeof capturedAt !== 'string' ||
+    typeof integrity !== 'object' ||
+    integrity === null
+  ) {
     return null;
   }
+  return {
+    version: BASELINE_VERSION,
+    capturedAt,
+    integrity: integrity as Record<string, string>,
+  };
+}
+
+/** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为，ENOENT 亦告警以暴露调用时序异常） */
+export function loadDepsBaseline(projectRoot: string): Promise<DepsBaseline | null> {
+  return readJsonBaseline(
+    depsBaselinePath(projectRoot),
+    validateDepsBaseline,
+    'deps-baseline',
+    true,
+  );
 }
 
 /** 写入基线（tmp+rename 原子替换），返回落盘基线 */
@@ -63,17 +61,16 @@ export async function saveDepsBaseline(
   projectRoot: string,
   integrityMap: Record<string, string>,
 ): Promise<DepsBaseline> {
-  const dir = join(projectRoot, BASELINE_DIR);
-  await mkdir(dir, { recursive: true });
   const baseline: DepsBaseline = {
     version: BASELINE_VERSION,
     capturedAt: new Date().toISOString(),
     integrity: integrityMap,
   };
-  const file = depsBaselinePath(projectRoot);
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(baseline, null, 2), 'utf-8');
-  await rename(tmp, file);
+  await writeJsonBaselineAtomic(
+    join(projectRoot, BASELINE_DIR),
+    depsBaselinePath(projectRoot),
+    baseline,
+  );
   return baseline;
 }
 

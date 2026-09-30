@@ -231,8 +231,15 @@ export interface Diagnosis {
   autoFixable: boolean;
 }
 
+/** 哨兵事件复现统计：累计出现次数与首末次出现时间（@zh/sentinel、@zh/db 入参三处复用） */
+export interface SentinelOccurrence {
+  occurrenceCount: number;
+  firstSeen: Date;
+  lastSeen: Date;
+}
+
 /** 哨兵事件：运行时监控采集的一条异常记录，fingerprint 用于去重、occurrenceCount 累计重复次数 */
-export interface SentinelEvent {
+export interface SentinelEvent extends SentinelOccurrence {
   id: string;
   projectId: string;
   timestamp: Date;
@@ -243,9 +250,6 @@ export interface SentinelEvent {
   context: EventContext;
   diagnosis: Diagnosis;
   fingerprint: string;
-  occurrenceCount: number;
-  firstSeen: Date;
-  lastSeen: Date;
 }
 
 // ─── 漏洞信息（Vulnerability）────────────────────────────

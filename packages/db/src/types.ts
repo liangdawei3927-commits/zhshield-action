@@ -1,3 +1,5 @@
+import type { SentinelOccurrence } from '@zh/shared';
+
 // ─── 数据库行类型 ─────────────────────────────────────────
 
 /** projects 表行：被巡检项目登记项，path 唯一（迁移 001；迁移 009 另加可空 org_id） */
@@ -115,7 +117,7 @@ export interface SentinelEventRow {
 }
 
 /** 新增哨兵事件入参（首次落库；时间字段在此以 Date 传入，落库转文本） */
-export interface CreateSentinelEventParams {
+export interface CreateSentinelEventParams extends SentinelOccurrence {
   id: string;
   projectId: string;
   timestamp: Date;
@@ -128,9 +130,6 @@ export interface CreateSentinelEventParams {
   validation: string;
   context: string;
   history: string;
-  occurrenceCount: number;
-  firstSeen: Date;
-  lastSeen: Date;
 }
 
 /** 哨兵事件局部更新入参：仅写入显式传入的字段（undefined 跳过），用于状态流转与去重累加 */

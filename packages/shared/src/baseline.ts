@@ -94,32 +94,21 @@ export function filterIssuesByBaseline<
   return { kept, suppressed };
 }
 
-/** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为） */
-export async function loadBaseline(projectRoot: string): Promise<Baseline | null> {
-  const file = baselinePath(projectRoot);
+/** 通用 JSON 读取：文件缺失 → null；validate 返回 null 表示结构/版本校验失败 → null；其他错误 → warn 并降级为 null（绝不抛异常）。warnTag 为日志前缀，warnOnNotFound 控制 ENOENT 是否也告警。 */
+export async function readJsonBaseline<T>(
+  filePath: string,
+  validate: (parsed: unknown) => T | null,
+  warnTag: string,
+  warnOnNotFound = false,
+): Promise<T | null> {
   try {
-    const parsed = JSON.parse(await readFile(file, 'utf-8')) as unknown;
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const { version, capturedAt, entries } = parsed as Partial<Baseline>;
-    if (
-      version !== BASELINE_VERSION ||
-      typeof capturedAt !== 'string' ||
-      !Array.isArray(entries) ||
-      entries.some((e) => typeof e !== 'object' || e === null)
-    ) {
-      return null;
-    }
-    return {
-      version: BASELINE_VERSION,
-      capturedAt,
-      entries: entries as BaselineEntry[],
-    };
+    const parsed = JSON.parse(await readFile(filePath, 'utf-8')) as unknown;
+    return validate(parsed);
   } catch (err) {
-    // ENOENT（尚无基线）是正常态，静默降级；其余（损坏/权限等）保留告警以便排查
     const code = (err as NodeJS.ErrnoException | null)?.code;
-    if (code !== 'ENOENT') {
+    if (warnOnNotFound || code !== 'ENOENT') {
       console.warn(
-        '[baseline] 读取失败，降级为无基线:',
+        `[${warnTag}] 读取失败，降级为无基线:`,
         err instanceof Error ? err.message : String(err),
       );
     }
@@ -127,22 +116,56 @@ export async function loadBaseline(projectRoot: string): Promise<Baseline | null
   }
 }
 
+/** 通用原子写入 JSON（mkdir + tmp+rename）：先写临时文件再重命名，避免读到半写内容 */
+export async function writeJsonBaselineAtomic(
+  dir: string,
+  filePath: string,
+  data: unknown,
+): Promise<void> {
+  await mkdir(dir, { recursive: true });
+  const tmp = `${filePath}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8');
+  await rename(tmp, filePath);
+}
+
+function validateBaseline(parsed: unknown): Baseline | null {
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { version, capturedAt, entries } = parsed as Partial<Baseline>;
+  if (
+    version !== BASELINE_VERSION ||
+    typeof capturedAt !== 'string' ||
+    !Array.isArray(entries) ||
+    entries.some((e) => typeof e !== 'object' || e === null)
+  ) {
+    return null;
+  }
+  return {
+    version: BASELINE_VERSION,
+    capturedAt,
+    entries: entries as BaselineEntry[],
+  };
+}
+
+/** 读取基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线行为） */
+export function loadBaseline(projectRoot: string): Promise<Baseline | null> {
+  return readJsonBaseline(baselinePath(projectRoot), validateBaseline, 'baseline');
+}
+
 /** 写入基线（tmp+rename 原子替换），返回落盘基线 */
 export async function saveBaseline(
   projectRoot: string,
   entries: BaselineEntry[],
 ): Promise<Baseline> {
-  const dir = join(projectRoot, BASELINE_DIR);
-  await mkdir(dir, { recursive: true });
   const baseline: Baseline = {
     version: BASELINE_VERSION,
     capturedAt: new Date().toISOString(),
     entries,
   };
-  const file = baselinePath(projectRoot);
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(baseline, null, 2), 'utf-8');
-  await rename(tmp, file);
+  await writeJsonBaselineAtomic(
+    join(projectRoot, BASELINE_DIR),
+    baselinePath(projectRoot),
+    baseline,
+  );
   return baseline;
 }
 

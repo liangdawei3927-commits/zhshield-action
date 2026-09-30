@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+import { escapeRegExp } from '@zh/shared';
+
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type { Violation } from '../sop/_meta/rule-evaluation';
@@ -49,11 +51,6 @@ const MAX_SCAN_DEPTH = 12;
 
 /** 单次扫描收集文件数上限，超限即停止，防止超大仓库撑爆内存 */
 const MAX_SCAN_FILES = 2000;
-
-/** 转义正则特殊字符（层名来自配置，按不可信输入处理） */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /**
  * 正则模式安全校验：拒绝可能导致灾难性回溯（ReDoS）的模式。

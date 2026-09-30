@@ -16,7 +16,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { DependencyNode } from '../types';
-import { safeJoin } from '@zh/shared';
+import { safeJoin, escapeRegExp } from '@zh/shared';
 
 /** 升级评估器：对单个依赖节点产出升级评估 */
 export interface UpgradeEvaluator {
@@ -200,11 +200,6 @@ const DEFAULT_SCAN_LIMIT = 50;
 
 /** 目录中禁止扫描的目录名 */
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
-
-/** 转义正则特殊字符（包名可能含 @ / - .） */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /** npm 包名安全字符集：支持 scoped（@scope/name）与普通名，仅允许安全字符 */
 const SAFE_PACKAGE_NAME_RE = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;

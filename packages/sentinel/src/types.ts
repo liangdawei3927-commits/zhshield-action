@@ -1,3 +1,5 @@
+import type { SentinelOccurrence } from '@zh/shared';
+
 /** 事件在自动修复流水线中的生命周期状态（检测 → 派单 → 修复 → 验证 → 合并/部署，含人工接管与回滚） */
 export type EventStatus =
   | 'detected'
@@ -27,7 +29,7 @@ export type EventType =
   | 'timeout';
 
 /** 哨兵事件实体：一次异常的上报记录，含去重键、验证结论、上下文与状态流转历史 */
-export interface SentinelEvent {
+export interface SentinelEvent extends SentinelOccurrence {
   id: string;
   projectId: string;
   timestamp: Date;
@@ -49,9 +51,6 @@ export interface SentinelEvent {
     operator: string;
     detail: string;
   }>;
-  occurrenceCount: number;
-  firstSeen: Date;
-  lastSeen: Date;
 }
 
 /** 告警通知负载（Alertmanager 兼容结构），转发至各接收渠道 */

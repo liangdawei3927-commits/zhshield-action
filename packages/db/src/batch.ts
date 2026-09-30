@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { DEBT_ACTION_UPSERT_SQL } from './sql';
 import type {
   CreateProjectParams,
   SaveScoreParams,
@@ -87,21 +88,7 @@ export function createSentinelEventsBatch(
 }
 
 export function saveDebtActionsBatch(db: Database.Database, actions: SaveDebtActionParams[]): void {
-  const insert = db.prepare(
-    `INSERT INTO debt_actions (project_id, action_id, status, module, category, issue_ids, interest_score, principal_estimate, roi, sprint, gate)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(project_id, action_id) DO UPDATE SET
-       status = excluded.status,
-       module = excluded.module,
-       category = excluded.category,
-       issue_ids = excluded.issue_ids,
-       interest_score = excluded.interest_score,
-       principal_estimate = excluded.principal_estimate,
-       roi = excluded.roi,
-       sprint = excluded.sprint,
-       gate = excluded.gate,
-       updated_at = CURRENT_TIMESTAMP`,
-  );
+  const insert = db.prepare(DEBT_ACTION_UPSERT_SQL);
   db.transaction((rows: SaveDebtActionParams[]) => {
     for (const a of rows) {
       insert.run(

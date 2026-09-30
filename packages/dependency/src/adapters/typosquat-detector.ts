@@ -10,6 +10,7 @@
  *
  * 失败语义：信息不足的节点直接跳过，绝不抛异常。
  */
+import { escapeRegExp } from '@zh/shared';
 import type { DependencyGraph, DependencyNode } from '../types';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
@@ -18,11 +19,6 @@ const CONTAINS_DIGIT_RE = /\d/;
 
 /** 知名包名安全字符集（target 来自常量清单，仍按不可信输入校验） */
 const SAFE_TARGET_RE = /^[a-z0-9._-]{1,64}$/i;
-
-/** 转义正则特殊字符（target 为常量清单项，转义后作为字面量匹配） */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 // ────────────────────────────── 公开接口（附 B.3 ①） ──────────────────────────────
 

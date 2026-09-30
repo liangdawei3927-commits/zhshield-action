@@ -13994,43 +13994,53 @@ function filterIssuesByBaseline(issues, baseline, projectRoot) {
   }
   return { kept, suppressed };
 }
-async function loadBaseline(projectRoot) {
-  const file = baselinePath(projectRoot);
+async function readJsonBaseline(filePath, validate, warnTag, warnOnNotFound = false) {
   try {
-    const parsed = JSON.parse(await (0, import_promises2.readFile)(file, "utf-8"));
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const { version, capturedAt, entries } = parsed;
-    if (version !== BASELINE_VERSION || typeof capturedAt !== "string" || !Array.isArray(entries) || entries.some((e) => typeof e !== "object" || e === null)) {
-      return null;
-    }
-    return {
-      version: BASELINE_VERSION,
-      capturedAt,
-      entries
-    };
+    const parsed = JSON.parse(await (0, import_promises2.readFile)(filePath, "utf-8"));
+    return validate(parsed);
   } catch (err) {
     const code = err?.code;
-    if (code !== "ENOENT") {
+    if (warnOnNotFound || code !== "ENOENT") {
       console.warn(
-        "[baseline] \u8BFB\u53D6\u5931\u8D25\uFF0C\u964D\u7EA7\u4E3A\u65E0\u57FA\u7EBF:",
+        `[${warnTag}] \u8BFB\u53D6\u5931\u8D25\uFF0C\u964D\u7EA7\u4E3A\u65E0\u57FA\u7EBF:`,
         err instanceof Error ? err.message : String(err)
       );
     }
     return null;
   }
 }
-async function saveBaseline(projectRoot, entries) {
-  const dir2 = (0, import_node_path.join)(projectRoot, BASELINE_DIR);
+async function writeJsonBaselineAtomic(dir2, filePath, data) {
   await (0, import_promises2.mkdir)(dir2, { recursive: true });
+  const tmp = `${filePath}.${process.pid}.tmp`;
+  await (0, import_promises2.writeFile)(tmp, JSON.stringify(data, null, 2), "utf-8");
+  await (0, import_promises2.rename)(tmp, filePath);
+}
+function validateBaseline(parsed) {
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const { version, capturedAt, entries } = parsed;
+  if (version !== BASELINE_VERSION || typeof capturedAt !== "string" || !Array.isArray(entries) || entries.some((e) => typeof e !== "object" || e === null)) {
+    return null;
+  }
+  return {
+    version: BASELINE_VERSION,
+    capturedAt,
+    entries
+  };
+}
+function loadBaseline(projectRoot) {
+  return readJsonBaseline(baselinePath(projectRoot), validateBaseline, "baseline");
+}
+async function saveBaseline(projectRoot, entries) {
   const baseline = {
     version: BASELINE_VERSION,
     capturedAt: (/* @__PURE__ */ new Date()).toISOString(),
     entries
   };
-  const file = baselinePath(projectRoot);
-  const tmp = `${file}.${process.pid}.tmp`;
-  await (0, import_promises2.writeFile)(tmp, JSON.stringify(baseline, null, 2), "utf-8");
-  await (0, import_promises2.rename)(tmp, file);
+  await writeJsonBaselineAtomic(
+    (0, import_node_path.join)(projectRoot, BASELINE_DIR),
+    baselinePath(projectRoot),
+    baseline
+  );
   return baseline;
 }
 async function clearBaseline(projectRoot) {
@@ -14055,6 +14065,16 @@ var init_baseline = __esm({
 // ../shared/src/fs-safe.ts
 var init_fs_safe = __esm({
   "../shared/src/fs-safe.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/text-utils.ts
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+var init_text_utils = __esm({
+  "../shared/src/text-utils.ts"() {
     "use strict";
   }
 });
@@ -14393,6 +14413,7 @@ var init_src2 = __esm({
     init_machine_profile();
     init_baseline();
     init_fs_safe();
+    init_text_utils();
     init_promise_timeout();
     init_process_env();
     init_path_augment();
@@ -23363,7 +23384,7 @@ var require_ast_utils2 = __commonJS({
     var { KEYS: eslintVisitorKeys } = require_eslint_visitor_keys();
     var esutils = require_utils();
     var espree = require_espree();
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var {
       breakableTypePattern,
       createGlobalLinebreakMatcher,
@@ -24832,7 +24853,7 @@ var require_ast_utils2 = __commonJS({
        */
       getNameLocationInGlobalDirectiveComment(sourceCode, comment, name) {
         const namePattern = new RegExp(
-          `[\\s,]${escapeRegExp3(name)}(?:$|[\\s,:])`,
+          `[\\s,]${escapeRegExp2(name)}(?:$|[\\s,:])`,
           "gu"
         );
         namePattern.lastIndex = comment.value.indexOf("global") + 6;
@@ -63721,7 +63742,7 @@ var require_no_void = __commonJS({
 var require_no_warning_comments = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/rules/no-warning-comments.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var astUtils = require_ast_utils2();
     var CHAR_LIMIT = 40;
     module2.exports = {
@@ -63772,12 +63793,12 @@ var require_no_warning_comments = __commonJS({
       create(context) {
         const sourceCode = context.sourceCode;
         const [{ decoration, location, terms: warningTerms }] = context.options;
-        const escapedDecoration = escapeRegExp3(
+        const escapedDecoration = escapeRegExp2(
           decoration ? decoration.join("") : ""
         );
         const selfConfigRegEx = /\bno-warning-comments\b/u;
         function convertToRegExp(term) {
-          const escaped = escapeRegExp3(term);
+          const escaped = escapeRegExp2(term);
           const wordBoundary = "\\b";
           let prefix = "";
           if (location === "start") {
@@ -72453,10 +72474,10 @@ var require_space_unary_ops = __commonJS({
 var require_spaced_comment = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/rules/spaced-comment.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var astUtils = require_ast_utils2();
     function escape3(s) {
-      return `(?:${escapeRegExp3(s)})`;
+      return `(?:${escapeRegExp2(s)})`;
     }
     function escapeAndRepeat(s) {
       return `${escape3(s)}+`;
@@ -99645,7 +99666,7 @@ ${validateRule.errors.map((error) => {
 var require_apply_disable_directives = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/linter/apply-disable-directives.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var { Config } = require_config();
     function compareLocations(itemA, itemB) {
       return itemA.line - itemB.line || itemA.column - itemB.column;
@@ -99673,7 +99694,7 @@ var require_apply_disable_directives = __commonJS({
       return directives.map((directive) => {
         const { ruleId } = directive;
         const regex = new RegExp(
-          String.raw`(?:^|\s*,\s*)(?<quote>['"]?)${escapeRegExp3(ruleId)}\k<quote>(?:\s*,\s*|$)`,
+          String.raw`(?:^|\s*,\s*)(?<quote>['"]?)${escapeRegExp2(ruleId)}\k<quote>(?:\s*,\s*|$)`,
           "u"
         );
         const match = regex.exec(listText);
@@ -116901,7 +116922,7 @@ var require_file_enumerator = __commonJS({
     var path51 = require("node:path");
     var getGlobParent = require_glob_parent();
     var isGlob = require_is_glob();
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var { Minimatch } = require_minimatch();
     var {
       Legacy: { IgnorePattern, CascadingConfigArrayFactory }
@@ -116939,7 +116960,7 @@ var require_file_enumerator = __commonJS({
     function createExtensionRegExp(extensions) {
       if (extensions) {
         const normalizedExts = extensions.map(
-          (ext) => escapeRegExp3(ext.startsWith(".") ? ext.slice(1) : ext)
+          (ext) => escapeRegExp2(ext.startsWith(".") ? ext.slice(1) : ext)
         );
         return new RegExp(`.\\.(?:${normalizedExts.join("|")})$`, "u");
       }
@@ -290126,7 +290147,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
             }
           }
           return result;
-          function escapeRegExp3(str) {
+          function escapeRegExp2(str) {
             return str.replace(/[-[\]/{}()*+?.\\^$|]/g, "\\$&");
           }
           function getTodoCommentsRegExp() {
@@ -290134,7 +290155,7 @@ ${newComment.split("\n").map((c) => ` * ${c}`).join("\n")}
             const multiLineCommentStart = /(?:\/\*+\s*)/.source;
             const anyNumberOfSpacesAndAsterisksAtStartOfLine = /(?:^(?:\s|\*)*)/.source;
             const preamble = "(" + anyNumberOfSpacesAndAsterisksAtStartOfLine + "|" + singleLineCommentStart + "|" + multiLineCommentStart + ")";
-            const literals = "(?:" + map(descriptors, (d) => "(" + escapeRegExp3(d.text) + ")").join("|") + ")";
+            const literals = "(?:" + map(descriptors, (d) => "(" + escapeRegExp2(d.text) + ")").join("|") + ")";
             const endOfLineOrEndOfComment = /(?:$|\*\/)/.source;
             const messageRemainder = /(?:.*?)/.source;
             const messagePortion = "(" + literals + messageRemainder + ")";
@@ -449766,10 +449787,10 @@ var require_escapeRegExp = __commonJS({
   "../../node_modules/.pnpm/@typescript-eslint+eslint-plugin@8.65.0_@typescript-eslint+parser@8.65.0_eslint@9.39.5__d9448e2502ab64ad924852c38a4e07ef/node_modules/@typescript-eslint/eslint-plugin/dist/util/escapeRegExp.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.escapeRegExp = escapeRegExp3;
+    exports2.escapeRegExp = escapeRegExp2;
     var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
     var reHasRegExpChar = RegExp(reRegExpChar.source);
-    function escapeRegExp3(string = "") {
+    function escapeRegExp2(string = "") {
       return string && reHasRegExpChar.test(string) ? string.replaceAll(reRegExpChar, "\\$&") : string;
     }
   }
@@ -490908,7 +490929,7 @@ var require_ast_utils5 = __commonJS({
     var { KEYS: eslintVisitorKeys } = require_eslint_visitor_keys();
     var esutils = require_utils();
     var espree = require_espree();
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var {
       breakableTypePattern,
       createGlobalLinebreakMatcher,
@@ -492377,7 +492398,7 @@ var require_ast_utils5 = __commonJS({
        */
       getNameLocationInGlobalDirectiveComment(sourceCode, comment, name) {
         const namePattern = new RegExp(
-          `[\\s,]${escapeRegExp3(name)}(?:$|[\\s,:])`,
+          `[\\s,]${escapeRegExp2(name)}(?:$|[\\s,:])`,
           "gu"
         );
         namePattern.lastIndex = comment.value.indexOf("global") + 6;
@@ -527672,7 +527693,7 @@ var require_no_void2 = __commonJS({
 var require_no_warning_comments2 = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0/node_modules/eslint/lib/rules/no-warning-comments.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var astUtils = require_ast_utils5();
     var CHAR_LIMIT = 40;
     module2.exports = {
@@ -527723,12 +527744,12 @@ var require_no_warning_comments2 = __commonJS({
       create(context) {
         const sourceCode = context.sourceCode;
         const [{ decoration, location, terms: warningTerms }] = context.options;
-        const escapedDecoration = escapeRegExp3(
+        const escapedDecoration = escapeRegExp2(
           decoration ? decoration.join("") : ""
         );
         const selfConfigRegEx = /\bno-warning-comments\b/u;
         function convertToRegExp(term) {
-          const escaped = escapeRegExp3(term);
+          const escaped = escapeRegExp2(term);
           const wordBoundary = "\\b";
           let prefix = "";
           if (location === "start") {
@@ -536371,10 +536392,10 @@ var require_space_unary_ops2 = __commonJS({
 var require_spaced_comment2 = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0/node_modules/eslint/lib/rules/spaced-comment.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var astUtils = require_ast_utils5();
     function escape3(s) {
-      return `(?:${escapeRegExp3(s)})`;
+      return `(?:${escapeRegExp2(s)})`;
     }
     function escapeAndRepeat(s) {
       return `${escape3(s)}+`;
@@ -544155,7 +544176,7 @@ ${validateRule.errors.map((error) => {
 var require_apply_disable_directives2 = __commonJS({
   "../../node_modules/.pnpm/eslint@9.39.5_jiti@1.21.7_supports-color@7.2.0/node_modules/eslint/lib/linter/apply-disable-directives.js"(exports2, module2) {
     "use strict";
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var { Config } = require_config26();
     function compareLocations(itemA, itemB) {
       return itemA.line - itemB.line || itemA.column - itemB.column;
@@ -544183,7 +544204,7 @@ var require_apply_disable_directives2 = __commonJS({
       return directives.map((directive) => {
         const { ruleId } = directive;
         const regex = new RegExp(
-          String.raw`(?:^|\s*,\s*)(?<quote>['"]?)${escapeRegExp3(ruleId)}\k<quote>(?:\s*,\s*|$)`,
+          String.raw`(?:^|\s*,\s*)(?<quote>['"]?)${escapeRegExp2(ruleId)}\k<quote>(?:\s*,\s*|$)`,
           "u"
         );
         const match = regex.exec(listText);
@@ -555346,11 +555367,11 @@ One of the following config files must be in the directory tree: "${_index.ROOT_
           const parts = _path().resolve(dirname16, pattern).split(_path().sep);
           return new RegExp(["^", ...parts.map(((part, i) => {
             const last = i === parts.length - 1;
-            return "**" === part ? last ? starStarPatLast : starStarPat : "*" === part ? last ? starPatLast : starPat : 0 === part.indexOf("*.") ? substitution + escapeRegExp3(part.slice(1)) + (last ? endSep : sep4) : escapeRegExp3(part) + (last ? endSep : sep4);
+            return "**" === part ? last ? starStarPatLast : starStarPat : "*" === part ? last ? starPatLast : starPat : 0 === part.indexOf("*.") ? substitution + escapeRegExp2(part.slice(1)) + (last ? endSep : sep4) : escapeRegExp2(part) + (last ? endSep : sep4);
           }))].join(""));
         };
         const sep4 = `\\${_path().sep}`, endSep = `(?:${sep4}|$)`, substitution = `[^${sep4}]+`, starPat = `(?:${substitution}${sep4})`, starPatLast = `(?:${substitution}${endSep})`, starStarPat = `${starPat}*?`, starStarPatLast = `${starPat}*?${starPatLast}?`;
-        function escapeRegExp3(string) {
+        function escapeRegExp2(string) {
           return string.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
         }
       }, "./node_modules/.pnpm/@babel+core@7.26.0/node_modules/@babel/core/lib/config/plugin.js": (__unused_webpack_module, exports3, __webpack_require__2) => {
@@ -580211,7 +580232,7 @@ var require_file_enumerator2 = __commonJS({
     var path51 = require("node:path");
     var getGlobParent = require_glob_parent();
     var isGlob = require_is_glob();
-    var escapeRegExp3 = require_escape_string_regexp();
+    var escapeRegExp2 = require_escape_string_regexp();
     var { Minimatch } = require_minimatch();
     var {
       Legacy: { IgnorePattern, CascadingConfigArrayFactory }
@@ -580249,7 +580270,7 @@ var require_file_enumerator2 = __commonJS({
     function createExtensionRegExp(extensions) {
       if (extensions) {
         const normalizedExts = extensions.map(
-          (ext) => escapeRegExp3(ext.startsWith(".") ? ext.slice(1) : ext)
+          (ext) => escapeRegExp2(ext.startsWith(".") ? ext.slice(1) : ext)
         );
         return new RegExp(`.\\.(?:${normalizedExts.join("|")})$`, "u");
       }
@@ -585161,6 +585182,7 @@ var import_node_fs = require("node:fs");
 var fs13 = __toESM(require("node:fs"));
 var path18 = __toESM(require("node:path"));
 var import_node_crypto = require("node:crypto");
+init_src2();
 var MAX_FILE_SIZE = 1048576;
 var MAX_PATTERN_LENGTH = 512;
 var RE_DANGEROUS_GROUP = /\([^()]*[+*?{][^()]*\)[+*?{]/;
@@ -585179,9 +585201,6 @@ var NOISE_DIRS = /* @__PURE__ */ new Set([
 var ROOT_DENSITY_THRESHOLD = 3;
 var MAX_SCAN_DEPTH = 12;
 var MAX_SCAN_FILES = 2e3;
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 function isSafeRegexPattern(pattern) {
   if (pattern.length > MAX_PATTERN_LENGTH) return false;
   const stripped = pattern.replace(/\\[^]/g, "").replace(/\[[^\]]*\]/g, "X").replace(RE_GROUP_MODIFIER, "(");
@@ -588271,6 +588290,14 @@ function readPnpmImporterEntries(lock, sectionKeys) {
 var NEWLINE_RE2 = /\r?\n/;
 var INDENT_RE = /^\s*/;
 var YARN_FIELD_RE = /^(\S+)\s+(.+)$/;
+function forEachYarnLine(content, visit) {
+  for (const rawLine of content.split(NEWLINE_RE2)) {
+    const trimmed = rawLine.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
+    visit(trimmed, indent);
+  }
+}
 function parseYarnBlockKeys(headerLine) {
   let keysText = headerLine.slice(0, -1).trim();
   if (keysText.length >= 2 && keysText.startsWith('"') && keysText.endsWith('"')) {
@@ -588290,19 +588317,16 @@ function collectYarnField(current, trimmed) {
 function parseYarnLock(content) {
   const blocks = [];
   let current = null;
-  for (const rawLine of content.split(NEWLINE_RE2)) {
-    const trimmed = rawLine.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) continue;
-    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
+  forEachYarnLine(content, (trimmed, indent) => {
     if (indent === 0 && trimmed.endsWith(":")) {
       current = { keys: parseYarnBlockKeys(trimmed), fields: /* @__PURE__ */ new Map() };
       blocks.push(current);
-      continue;
+      return;
     }
     if (current) {
       collectYarnField(current, trimmed);
     }
-  }
+  });
   return blocks;
 }
 var TOML_SECTION_RE = /^\s*\[/m;
@@ -588828,11 +588852,9 @@ var lockfileVerifier = new LockfileVerifierImpl();
 init_src();
 
 // ../dependency/src/adapters/typosquat-detector.ts
+init_src2();
 var CONTAINS_DIGIT_RE = /\d/;
 var SAFE_TARGET_RE = /^[a-z0-9._-]{1,64}$/i;
-function escapeRegExp2(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 var HIGH_RISK_MAX_EDIT_DISTANCE = 1;
 var MEDIUM_RISK_MAX_EDIT_DISTANCE = 2;
 var LOW_RISK_MAX_EDIT_DISTANCE = 3;
@@ -588999,7 +589021,7 @@ function collectBehaviorFlags(name, target) {
   const flags = [];
   if (CONTAINS_DIGIT_RE.test(name)) flags.push("name-contains-digit");
   if (name.includes("-")) flags.push("name-contains-hyphen");
-  if (SAFE_TARGET_RE.test(target) && new RegExp(`^${escapeRegExp2(target)}-\\d+$`).test(name)) {
+  if (SAFE_TARGET_RE.test(target) && new RegExp(`^${escapeRegExp(target)}-\\d+$`).test(name)) {
     flags.push("known-name-version-suffix");
   }
   return flags;

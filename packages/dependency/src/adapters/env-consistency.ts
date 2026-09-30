@@ -20,6 +20,8 @@ import {
   collectManifestRanges,
   parseYarnBlockKeys,
   readPnpmImporterEntries,
+  forEachYarnLine,
+  NEWLINE_RE,
 } from '../lockfile-utils';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
@@ -38,10 +40,6 @@ const TILDE_RANGE_RE = /^~(\d+)\.(\d+)\.(\d+)$/;
 const PREFIXED_VERSION_RE = /^[v~^]*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
 /** npm package-lock.json packages 键 */
 const NPM_PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
-/** 换行符拆分 */
-const NEWLINE_RE = /\r?\n/;
-/** 行首缩进检测 */
-const INDENT_RE = /^\s*/;
 /** yarn 包名提取 'name@' */
 const YARN_PKG_NAME_RE = /^(@[^/]+\/)?([^@]+)@/;
 /** 空白拆分 */
@@ -233,15 +231,12 @@ function collectPnpmVersions(lock: Record<string, unknown>): Map<string, string>
 function collectYarnVersions(content: string): Map<string, string> {
   const versions = new Map<string, string>();
   let currentName: string | null = null;
-  for (const rawLine of content.split(NEWLINE_RE)) {
-    const trimmed = rawLine.trim();
-    if (trimmed === '' || trimmed.startsWith('#')) continue;
-    const indent = rawLine.match(INDENT_RE)?.[0].length ?? 0;
+  forEachYarnLine(content, (trimmed, indent) => {
     if (indent === 0 && trimmed.endsWith(':')) {
       const first = parseYarnBlockKeys(trimmed)[0] ?? '';
       const m = first.match(YARN_PKG_NAME_RE);
       currentName = m ? `${m[1] ?? ''}${m[2]}` : null;
-      continue;
+      return;
     }
     if (currentName && trimmed.startsWith('version ')) {
       let value = trimmed.slice('version'.length).trim();
@@ -250,7 +245,7 @@ function collectYarnVersions(content: string): Map<string, string> {
       if (!versions.has(currentName)) versions.set(currentName, value);
       currentName = null;
     }
-  }
+  });
   return versions;
 }
 

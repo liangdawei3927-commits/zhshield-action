@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { DEBT_ACTION_UPSERT_SQL } from './sql';
 import type {
   ProjectRow,
   ScoreRow,
@@ -430,21 +431,7 @@ export function getExperienceStats(
 // ─── Tech Debt Actions & Snapshots ────────────────────────
 
 export function saveDebtAction(db: Database.Database, params: SaveDebtActionParams): void {
-  db.prepare(
-    `INSERT INTO debt_actions (project_id, action_id, status, module, category, issue_ids, interest_score, principal_estimate, roi, sprint, gate)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(project_id, action_id) DO UPDATE SET
-       status = excluded.status,
-       module = excluded.module,
-       category = excluded.category,
-       issue_ids = excluded.issue_ids,
-       interest_score = excluded.interest_score,
-       principal_estimate = excluded.principal_estimate,
-       roi = excluded.roi,
-       sprint = excluded.sprint,
-       gate = excluded.gate,
-       updated_at = CURRENT_TIMESTAMP`,
-  ).run(
+  db.prepare(DEBT_ACTION_UPSERT_SQL).run(
     params.projectId,
     params.actionId,
     params.status,

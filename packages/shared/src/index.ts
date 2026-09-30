@@ -28,6 +28,7 @@ export type {
   AdapterResult,
   InspectionReport,
   SentinelEvent,
+  SentinelOccurrence,
   EventType,
   EventSeverity,
   EventSource,
@@ -190,8 +191,11 @@ export {
   type Baseline,
   type BaselineEntry,
   type BaselineFilterResult,
+  readJsonBaseline,
+  writeJsonBaselineAtomic,
 } from './baseline';
 export { safeReadDirEntries } from './fs-safe';
+export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';

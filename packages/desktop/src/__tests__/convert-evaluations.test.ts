@@ -12,7 +12,9 @@ import {
 
 type InspectEval = {
   status?: string;
-  rule?: { severity?: string; tags?: string[] };
+  rule?: { id?: string; severity?: string; tags?: string[] };
+  files?: string[];
+  violations?: Array<{ file?: string }>;
 };
 
 describe('convertInspectEvaluations', () => {
@@ -39,8 +41,38 @@ describe('convertInspectEvaluations', () => {
     ];
     const out = convertInspectEvaluations(evals);
     expect(out).toHaveLength(2);
-    expect(out[0]).toEqual({ severity: 'error', category: 'security' });
-    expect(out[1]).toEqual({ severity: 'warning', category: 'architecture' });
+    expect(out[0]).toMatchObject({ severity: 'error', category: 'security' });
+    expect(out[1]).toMatchObject({ severity: 'warning', category: 'architecture' });
+  });
+
+  it('ruleId 从 rule.id 透传（S1 单规则扣分封顶聚合的输入）', () => {
+    const evals: InspectEval[] = [
+      { status: 'failed', rule: { id: 'SEC-001', severity: 'high', tags: ['security'] } },
+    ];
+    const out = convertInspectEvaluations(evals);
+    expect(out[0].ruleId).toBe('SEC-001');
+  });
+
+  it('rule.id 缺省时 ruleId 为 undefined —— 该条 issue 独立计分，不参与规则聚合', () => {
+    const evals: InspectEval[] = [
+      { status: 'failed', rule: { severity: 'high', tags: ['security'] } },
+    ];
+    const out = convertInspectEvaluations(evals);
+    expect(out[0].ruleId).toBeUndefined();
+  });
+
+  it('file 取 files[0]，缺省时回退首条 violation 的 file（模块分桶依据）', () => {
+    const evals: InspectEval[] = [
+      { status: 'failed', rule: { severity: 'high', tags: ['security'] }, files: ['src/a.ts'] },
+      {
+        status: 'failed',
+        rule: { severity: 'high', tags: ['security'] },
+        violations: [{ file: 'src/b.ts' }],
+      },
+    ];
+    const out = convertInspectEvaluations(evals);
+    expect(out[0].file).toBe('src/a.ts');
+    expect(out[1].file).toBe('src/b.ts');
   });
 
   it('Bug3: dependency 标签 → category "dependency"（落入 dependencies 维度）', () => {
@@ -77,8 +109,18 @@ describe('convertGuardEvaluations', () => {
     ];
     const out = convertGuardEvaluations(evals);
     expect(out).toHaveLength(2);
-    expect(out[0]).toEqual({ severity: 'error', status: 'passed', blocking: false });
-    expect(out[1]).toEqual({ severity: 'error', status: 'failed', blocking: true });
+    expect(out[0]).toMatchObject({ severity: 'error', status: 'passed', blocking: false });
+    expect(out[1]).toMatchObject({ severity: 'error', status: 'failed', blocking: true });
+  });
+
+  it('file 取 files[0]，缺省时回退首条 violation 的 file（monorepo 子模块归桶）', () => {
+    const evals = [
+      { status: 'failed', rule: { severity: 'high' }, files: ['packages/a/src/x.ts'] },
+      { status: 'failed', rule: { severity: 'high' }, violations: [{ file: 'packages/b/src/y.ts' }] },
+    ];
+    const out = convertGuardEvaluations(evals);
+    expect(out[0].file).toBe('packages/a/src/x.ts');
+    expect(out[1].file).toBe('packages/b/src/y.ts');
   });
 
   it('skipped 评估被过滤，不产生输出条目（工具未安装不应扣分）', () => {
@@ -89,7 +131,7 @@ describe('convertGuardEvaluations', () => {
     ];
     const out = convertGuardEvaluations(evals);
     expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({ severity: 'error', status: 'passed', blocking: false });
+    expect(out[0]).toMatchObject({ severity: 'error', status: 'passed', blocking: false });
   });
 
   it('全 skipped 输入返回空数组', () => {
@@ -104,6 +146,6 @@ describe('convertGuardEvaluations', () => {
     const evals = [{ status: 'error', rule: { severity: 'low' } }];
     const out = convertGuardEvaluations(evals);
     expect(out).toHaveLength(1);
-    expect(out[0]).toEqual({ severity: 'info', status: 'error', blocking: false });
+    expect(out[0]).toMatchObject({ severity: 'info', status: 'error', blocking: false });
   });
 });

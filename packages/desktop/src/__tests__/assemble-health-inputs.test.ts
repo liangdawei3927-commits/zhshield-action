@@ -79,8 +79,8 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
     }));
 
     expect(inputs.inspectIssues).toEqual([
-      { severity: 'error', category: 'security' },
-      { severity: 'warning', category: 'dependency' },
+      { severity: 'error', category: 'security', ruleId: 'rule-x' },
+      { severity: 'warning', category: 'dependency', ruleId: 'rule-x' },
     ]);
 
     // 喂给 buildHealthDimensions：security/deps 维终于被计分（此前只读 inspect 快照 → 永远 not-run）

@@ -80,15 +80,15 @@ describe('guard 报告记录 → gate 维度输入', () => {
 });
 
 describe('inspect 快照 → quality/security/dependencies 维度输入', () => {
-  it('只保留 severity 与 category（维度映射所需字段）', () => {
+  it('只保留维度映射所需字段（severity / category / ruleId——ruleId 供 S1 单规则扣分封顶聚合）', () => {
     expect(
       toInspectIssues([
         entry({ severity: 'error', category: 'security' }),
         entry({ severity: 'info', category: 'architecture' }),
       ]),
     ).toEqual([
-      { severity: 'error', category: 'security' },
-      { severity: 'info', category: 'architecture' },
+      { severity: 'error', category: 'security', ruleId: 'rule' },
+      { severity: 'info', category: 'architecture', ruleId: 'rule' },
     ]);
   });
 });

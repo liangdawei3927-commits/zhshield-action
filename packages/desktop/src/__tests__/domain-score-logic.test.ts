@@ -136,7 +136,7 @@ describe('pickDomainScore（实时快照优先，回退汇总）', () => {
     const v = domainScoreView({
       dim: picked.dim,
       generatedAt: picked.generatedAt,
-      now: Date.now(),
+      now: NOW,
       tr: t,
       previousScore: picked.previousScore,
     });

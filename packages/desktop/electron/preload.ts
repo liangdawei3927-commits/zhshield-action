@@ -122,6 +122,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getProfile: (projectPath: string) => ipcRenderer.invoke('engine:getProfile', projectPath),
     runRefactor: (projectPath: string) => ipcRenderer.invoke('engine:runRefactor', projectPath),
     runDeps: (projectPath: string) => ipcRenderer.invoke('engine:runDeps', projectPath),
+    depsRelockBaseline: (projectPath: string) =>
+      ipcRenderer.invoke('engine:depsRelockBaseline', projectPath),
     runTechDebt: (projectPath: string) => ipcRenderer.invoke('engine:runTechDebt', projectPath),
     planDebtRepayment: (
       projectPath: string,

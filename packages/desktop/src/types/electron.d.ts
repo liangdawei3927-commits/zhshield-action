@@ -677,7 +677,7 @@ export interface BackupAPI {
   getConfig: (projectPath: string) => Promise<BackupConfigData>;
   saveConfig: (projectPath: string, config: BackupConfigData) => Promise<void>;
   authorizeGitHub: () => Promise<boolean>;
-  openFolder: (folderPath: string) => Promise<boolean>;
+  openFolder: (projectPath: string, folderPath: string) => Promise<boolean>;
   onProgress: (callback: (payload: BackupProgressData) => void) => () => void;
   onCompleted: (callback: (payload: unknown) => void) => () => void;
   onFailed: (callback: (payload: unknown) => void) => () => void;

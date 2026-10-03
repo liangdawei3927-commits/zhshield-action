@@ -48,7 +48,7 @@ export function formatTime(iso: string): string {
 }
 
 /** 备份记录数据：列表状态 + 拉取 */
-function useBackupRecordData(): {
+function useBackupRecordData(projectPath: string): {
   records: BackupRecordData[];
   setRecords: Dispatch<SetStateAction<BackupRecordData[]>>;
   fetchRecords: () => Promise<void>;
@@ -57,23 +57,25 @@ function useBackupRecordData(): {
 
   const fetchRecords = useCallback(async () => {
     try {
-      const data = await getBackupRecords();
+      // 必须传 projectPath：主进程 getRecords 无参时返回全部项目的记录，
+      // 会把其他项目的快照列进本页并暴露在删除确认框里（进度推送已按 projectId 过滤，此处须一致）
+      const data = await getBackupRecords(projectPath);
       setRecords(data);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [projectPath]);
 
   return { records, setRecords, fetchRecords };
 }
 
 /** 备份记录加载：初始加载副作用 */
-function useBackupRecords(): {
+function useBackupRecords(projectPath: string): {
   records: BackupRecordData[];
   setRecords: Dispatch<SetStateAction<BackupRecordData[]>>;
   loadRecords: () => Promise<void>;
 } {
-  const { records, setRecords, fetchRecords } = useBackupRecordData();
+  const { records, setRecords, fetchRecords } = useBackupRecordData(projectPath);
 
   useEffect(() => {
     void fetchRecords();
@@ -239,7 +241,7 @@ export function useBackupSchedule(projectPath: string) {
 
 /** 备份页全部状态与副作用：记录加载（含定时备份后台刷新）、一键备份+进度、删除确认 */
 export function useBackupPage(projectPath: string) {
-  const { records, setRecords, loadRecords } = useBackupRecords();
+  const { records, setRecords, loadRecords } = useBackupRecords(projectPath);
   const { isBackingUp, progress, lastResult, error, handleBackup } = useBackupRun(
     projectPath,
     loadRecords,

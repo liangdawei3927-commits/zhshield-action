@@ -7,7 +7,8 @@
  */
 import { app, ipcMain } from 'electron';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { safeResolveReal } from '@zh/shared';
 import { t } from '@zh/i18n';
 import {
   BackupOrchestrator,
@@ -18,6 +19,7 @@ import {
   type BackupConfig,
   type BackupScheduleConfig,
 } from '@zh/kernel';
+import { DEFAULT_BACKUP_ROOT } from '@zh/kernel';
 import { eventBus, getMainWindow } from '../ipc-context';
 
 // @zh/kernel 顶层同时导出旧版增量备份与新版一键备份的 BackupResult/BackupRecord，
@@ -216,18 +218,67 @@ async function revealOrOpenTarget(target: string): Promise<boolean> {
   return !errMsg;
 }
 
-/** 打开备份目录（backup:openFolder）：目录回退解析 + 文件高亮 / 目录打开 */
-async function openBackupFolder(folderPath: string): Promise<boolean> {
+/**
+ * 解析该项目的备份根目录（含向上回退，用于定位被轮转清理掉的快照所在根）。
+ *
+ * 渲染层传来的 folderPath 完全不可信：它逐字取自 <userData>/backup-records.json，
+ * 该文件只被 JSON.parse 而无任何校验。篡改该文件即可让一次点击把 Finder 指向
+ * 任意绝对路径，因此开目录前必须确认目标仍落在备份根内。
+ */
+async function resolveBackupRoots(projectPath: string): Promise<string[]> {
+  const roots = new Set<string>();
+  try {
+    const config = await new BackupConfigManager().loadProjectConfig(projectPath);
+    if (config?.local?.backupDir) roots.add(resolve(config.local.backupDir));
+  } catch {
+    /* 配置不可读时下方回退到默认根 */
+  }
+  roots.add(resolve(DEFAULT_BACKUP_ROOT));
+  // 不接纳「根的父级」：快照形如 <root>/<project>/<snapshot>，resolveOpenTarget 的
+  // 单层回退目标是 <root>/<project>，本就在根内。若把父级也列为合法根，同级任意
+  // 目录（如 /tmp）都会被放行，包含性校验形同虚设。
+  return [...roots];
+}
+
+/** 目标是否位于任一备份根之内（含符号链接判定，逃逸则拒绝）。导出以便单测直接验证。 */
+export function isInsideBackupRoots(target: string, roots: string[]): boolean {
+  return roots.some((root) => {
+    try {
+      safeResolveReal(root, target);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * 打开备份目录（backup:openFolder）：目录回退解析 + 包含性校验 + 文件高亮 / 目录打开。
+ *
+ * 导出 openBackupFolder 而非只导出判定函数：真正的修复点是「调用前先校验」这一环，
+ * 只测判定函数无法证明校验确实接在开目录路径上（曾出现删除守卫后测试仍全绿）。
+ */
+export async function openBackupFolder(
+  projectPath: string,
+  folderPath: string,
+): Promise<boolean> {
   if (!folderPath || typeof folderPath !== 'string') return false;
   const target = await resolveOpenTarget(folderPath);
   if (target === null) return false;
+  if (!isInsideBackupRoots(target, await resolveBackupRoots(projectPath))) {
+    console.warn('[backup] 拒绝打开备份根之外的路径:', target);
+    return false;
+  }
   return revealOrOpenTarget(target);
 }
 
 function registerOpenFolderHandler(): void {
-  ipcMain.handle('backup:openFolder', async (_event, folderPath: string): Promise<boolean> => {
-    return openBackupFolder(folderPath);
-  });
+  ipcMain.handle(
+    'backup:openFolder',
+    async (_event, projectPath: string, folderPath: string): Promise<boolean> => {
+      return openBackupFolder(projectPath, folderPath);
+    },
+  );
 }
 
 // ─── 定时备份调度（此前 BackupScheduler 是死代码，从未接线）──────

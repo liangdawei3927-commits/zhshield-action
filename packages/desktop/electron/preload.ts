@@ -235,7 +235,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveConfig: (projectPath: string, config: unknown) =>
       ipcRenderer.invoke('backup:saveConfig', projectPath, config),
     authorizeGitHub: () => ipcRenderer.invoke('backup:authorizeGitHub'),
-    openFolder: (folderPath: string) => ipcRenderer.invoke('backup:openFolder', folderPath),
+    openFolder: (projectPath: string, folderPath: string) =>
+      ipcRenderer.invoke('backup:openFolder', projectPath, folderPath),
     // 备份进度/完成/失败推送（主进程 eventBus 转发）；返回退订函数
     onProgress: (callback: (payload: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);

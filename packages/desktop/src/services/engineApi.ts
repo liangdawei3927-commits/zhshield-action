@@ -678,10 +678,13 @@ export function onBackupRecordsUpdated(callback: (payload: unknown) => void): ()
   return api?.backup?.onRecordsUpdated?.(callback) ?? (() => {});
 }
 
-export async function openBackupFolder(folderPath: string): Promise<boolean> {
+export async function openBackupFolder(
+  projectPath: string,
+  folderPath: string,
+): Promise<boolean> {
   const api = getAPI();
   if (!api?.backup) return false;
-  return api.backup.openFolder(folderPath);
+  return api.backup.openFolder(projectPath, folderPath);
 }
 
 /** SOP 统计；`sop:getStats` IPC 链路已实现，UI 未接入。 */

@@ -26,7 +26,7 @@ function BackupRecordRow({
   };
 
   const openFolder = async (target: string): Promise<void> => {
-    const ok = await openBackupFolder(target);
+    const ok = await openBackupFolder(record.projectPath, target);
     if (!ok) toast(t('page.backup.toast.openFailed'), 'error');
   };
   // 行图标打开备份根目录（可见该项目全部历史快照）；详情内链接直达本次快照本身。

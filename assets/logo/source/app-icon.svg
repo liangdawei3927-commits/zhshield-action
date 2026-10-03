@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 智汇码盾 App 图标专用源（macOS iconset 母版）
+       图形取自 packages/desktop/src/components/ui/Icons.tsx:4 ShieldLogo，坐标未改动，等比 scale=38
+       底色：600 盾青 #0E8C7F → 700 墨青 #0A6B61（规范 §2.2） -->
+  <defs>
+    <linearGradient id="zh-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E8C7F"/>
+      <stop offset="1" stop-color="#0A6B61"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="url(#zh-bg)"/>
+
+  <g transform="translate(56 27.5) scale(38)"
+     fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2L3 6.5V12C3 17.25 6.84 22.09 12 23.5C17.16 22.09 21 17.25 21 12V6.5L12 2Z"
+          stroke-width="1.5"/>
+    <path d="M8 10L5.5 12.5L8 15" stroke-width="1.8"/>
+    <line x1="12" y1="15" x2="17" y2="15" stroke-width="1.8"/>
+  </g>
+</svg>

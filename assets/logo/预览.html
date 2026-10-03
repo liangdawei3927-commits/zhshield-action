@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智汇码盾 · 品牌资源包</title>
+<style>
+  :root { --brand: #0E8C7F; --brand-700: #0A6B61; --ink: #0F1F1E; --ink-2: #4B5E5C; --bg: #F5F8F7; --card: #FFFFFF; --line: #E2EBE8; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--bg); color: var(--ink); padding: 44px; }
+  h1 { font-size: 28px; }
+  .sub { color: var(--ink-2); font-size: 14px; margin: 8px 0 34px; line-height: 1.8; }
+  section { max-width: 1180px; margin-bottom: 34px; }
+  h2 { font-size: 15px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .cell { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; width: 148px; }
+  .cell img, .cell object { display: block; margin: 0 auto 10px; }
+  .cell .name { font-size: 12px; color: var(--ink-2); line-height: 1.6; word-break: break-all; }
+  .cell .px { font-size: 11px; color: #9AA8A5; }
+  .darkstrip { background: #0B1211; border-radius: 14px; padding: 22px 26px; display: flex; align-items: center; gap: 26px; }
+  .darkstrip img { width: 96px; }
+  .darkstrip .cap { color: #9FB0AC; font-size: 13px; line-height: 1.9; }
+  code { background: #EAF5F3; color: var(--brand-700); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+  <h1>智汇码盾 · 品牌资源包</h1>
+  <p class="sub">
+    位置 <code>assets/logo/</code> · 图形源 <code>packages/desktop/src/components/ui/Icons.tsx:4 ShieldLogo</code>（尖顶盾 + <code>&lt;_</code>）<br>
+    色板遵循《07-品牌视觉规范》v1.0：主色 <code>#0E8C7F</code> / 深端 <code>#0A6B61</code> / 暗底提亮 <code>#2DD4BF</code>
+  </p>
+
+  <section>
+    <h2>App 图标（青底圆角 · Dock / DMG / 安装包）</h2>
+    <div class="row">
+      <div class="cell"><img src="png/app-icon-1024.png" width="112" height="112"><div class="name">app-icon-1024.png</div><div class="px">1024px</div></div>
+      <div class="cell"><img src="png/app-icon-512.png" width="72" height="72" style="margin-top:20px"><div class="name">512</div><div class="px">安装包</div></div>
+      <div class="cell"><img src="png/app-icon-256.png" width="56" height="56" style="margin-top:28px"><div class="name">256</div><div class="px">Finder</div></div>
+      <div class="cell"><img src="png/app-icon-128.png" width="40" height="40" style="margin-top:36px"><div class="name">128</div><div class="px">系统</div></div>
+      <div class="cell"><img src="png/app-icon-64.png" width="32" height="32" style="margin-top:40px"><div class="name">64</div><div class="px">加粗变体</div></div>
+      <div class="cell"><img src="png/app-icon-32.png" width="24" height="24" style="margin-top:44px"><div class="name">32</div><div class="px">加粗变体</div></div>
+      <div class="cell"><img src="png/app-icon-16.png" width="16" height="16" style="margin-top:48px"><div class="name">16</div><div class="px">加粗变体</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>主 LOGO 展示版（文档 / 报告 / 对外物料）</h2>
+    <div class="row">
+      <div class="cell"><img src="png/logo-1024.png" width="112" height="112"><div class="name">logo-1024.png</div><div class="px">1024px</div></div>
+      <div class="cell"><img src="png/logo-512.png" width="72" height="72" style="margin-top:20px"><div class="name">logo-512.png</div><div class="px">512px</div></div>
+      <div class="cell"><img src="source/logo-mark.svg" width="72" height="72" style="margin-top:20px"><div class="name">logo-mark.svg</div><div class="px">透明底</div></div>
+      <div class="cell" style="background:#0B1211;border-color:#0B1211"><img src="png/logo-dark-1024.png" width="72" height="72" style="margin-top:20px"><div class="name" style="color:#E8F0EE">logo-dark-1024.png</div><div class="px">暗色场景</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>打包产物</h2>
+    <div class="row">
+      <div class="cell"><img src="png/app-icon-256.png" width="56" height="56" style="margin-top:20px"><div class="name">icon.icns</div><div class="px">macOS · 11 档</div></div>
+      <div class="cell"><img src="png/app-icon-32.png" width="32" height="32" style="margin-top:32px"><div class="name">favicon.ico</div><div class="px">16 / 32 / 48</div></div>
+      <div class="cell"><img src="source/favicon.svg" width="32" height="32" style="margin-top:32px"><div class="name">favicon.svg</div><div class="px">站点图标</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>暗底使用示意</h2>
+    <div class="darkstrip">
+      <img src="source/logo-dark.svg" alt="暗色场景版">
+      <div class="cap">
+        暗底上必须使用提亮档 <code style="background:#22302D;color:#2DD4BF">#2DD4BF</code>，<br>
+        禁止直接使用 600 号 <code style="background:#22302D;color:#9FB0AC">#0E8C7F</code>（规范 §6.2 第 7 条，暗底对比度不足）。
+      </div>
+    </div>
+  </section>
+</body>
+</html>

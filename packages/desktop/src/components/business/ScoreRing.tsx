@@ -8,24 +8,27 @@ interface ScoreRingProps {
 export function ScoreRing({ score, size = 160 }: ScoreRingProps) {
   const t = useT();
   const circumference = 2 * Math.PI * 45;
-  const offset = circumference - (score / 100) * circumference;
+  // 与 HealthRing 同口径收敛到 [0,100]：进度弧按 score/100 算 dashoffset，
+  // 越界值（>100 或 NaN）会得到负/非法偏移，弧整个画不出来
+  const progress = Math.min(Math.max(Number.isFinite(score) ? score : 0, 0), 100);
+  const offset = circumference - (progress / 100) * circumference;
   const grade =
-    score >= 90
+    progress >= 90
       ? t('score.gradeExcellent')
-      : score >= 75
+      : progress >= 75
         ? t('score.gradeGood')
-        : score >= 60
+        : progress >= 60
           ? t('score.gradePass')
           : t('score.gradeWarning');
   const gradeColor =
-    score >= 90
+    progress >= 90
       ? 'rgb(var(--zh-success))'
-      : score >= 75
+      : progress >= 75
         ? 'rgb(var(--zh-info))'
-        : score >= 60
+        : progress >= 60
           ? 'rgb(var(--zh-warning))'
           : 'rgb(var(--zh-danger))';
-  const gradeLetter = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : 'D';
+  const gradeLetter = progress >= 90 ? 'A' : progress >= 75 ? 'B' : progress >= 60 ? 'C' : 'D';
 
   return (
     <div
@@ -66,7 +69,7 @@ export function ScoreRing({ score, size = 160 }: ScoreRingProps) {
           className="font-bold"
           style={{ fontSize: size * 0.22, color: gradeColor, lineHeight: 1 }}
         >
-          {score}
+          {progress}
         </span>
         <span className="font-semibold mt-0.5" style={{ fontSize: size * 0.08, color: gradeColor }}>
           {t('score.gradeBadge', { letter: gradeLetter, grade })}

@@ -22,6 +22,13 @@ export function matchesExcludePattern(relativePath: string, excludePatterns: str
     if (pattern.startsWith('*.')) {
       return relativePath.endsWith(pattern.slice(1));
     }
+    // 形如 '.env*'：按 basename 前缀匹配，使该模式在任意深度生效。
+    // 缺少这一形式时，兜底的精确相等只能排除根级同名文件，嵌套目录（如 packages/x/.env）
+    // 仍会被打进备份包——密钥泄露面被静默保留。
+    if (pattern.endsWith('*') && !pattern.startsWith('*')) {
+      const base = relativePath.slice(relativePath.lastIndexOf('/') + 1);
+      return base.startsWith(pattern.slice(0, -1));
+    }
     return relativePath === pattern;
   });
 }

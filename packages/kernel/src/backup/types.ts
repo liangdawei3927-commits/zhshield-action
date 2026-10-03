@@ -101,6 +101,23 @@ const TRAILING_SLASHES = /[/\\]+$/;
  * 早先这里硬编码 `~/zhshield-backups`，导致全局配置项 defaultBackupDir
  * 写进文件也永远不生效（用户改了备份位置却毫无变化）。
  */
+/**
+ * 默认排除的凭据文件（本地 zip 与 GitHub 两侧共用，避免两套默认值漂移）。
+ *
+ * 「一键备份」无二次确认，且默认落到 ~/zhshield-backups 明文目录；若不排除这些文件，
+ * 一次点击就会把 .env / 私钥复制出项目。'.env*' 依赖 matchesExcludePattern 的
+ * basename 前缀形式，才能覆盖任意深度的嵌套 .env。
+ */
+export const DEFAULT_SECRET_EXCLUDE_PATTERNS: readonly string[] = [
+  '.env*',
+  '*.pem',
+  '*.key',
+  '*.p12',
+  '*.pfx',
+  'id_rsa*',
+  '.npmrc',
+];
+
 export function defaultBackupConfig(
   identity?: BackupIdentity,
   rootDir: string = DEFAULT_BACKUP_ROOT,
@@ -118,13 +135,13 @@ export function defaultBackupConfig(
       repo: '',
       branch: 'main',
       commitPrefix: '[智汇码盾]',
-      excludePatterns: ['node_modules/', '.git/', 'dist/', '*.log'],
+      excludePatterns: ['node_modules/', '.git/', 'dist/', '*.log', ...DEFAULT_SECRET_EXCLUDE_PATTERNS],
     },
     local: {
       enabled: true,
       backupDir,
       maxBackups: 10,
-      excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/'],
+      excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/', ...DEFAULT_SECRET_EXCLUDE_PATTERNS],
       compress: false,
       format: 'zip',
     },

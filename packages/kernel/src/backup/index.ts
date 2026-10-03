@@ -56,6 +56,11 @@ export type {
   BackupConfigUpdatedPayload as BackupConfigUpdated,
 } from './types';
 
-export { defaultBackupConfig, DEFAULT_EXCLUDE_PATTERNS } from './types';
+export {
+  defaultBackupConfig,
+  DEFAULT_EXCLUDE_PATTERNS,
+  DEFAULT_SECRET_EXCLUDE_PATTERNS,
+  DEFAULT_BACKUP_ROOT,
+} from './types';
 export type { BackupIdentity } from './types';
 export { sanitizeDirSegment, projectBackupSegment } from './utils';

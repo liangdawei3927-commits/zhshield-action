@@ -1347,7 +1347,15 @@ async function dismissDebtActionHandler(projectPath: string, actionId: string): 
     )
       return;
     const db = getDb();
-    updateDebtActionStatus(db, { projectId: projectPath, actionId, status: 'dismissed' });
+    // projectId 必须是 resolve 后的绝对路径：本文件其余技术债写点（mergeDebtPersistence /
+    // planDebtRepayment / verifyDebtRepaid）都用 snapshot.projectId，而 updateDebtActionStatus
+    // 是纯 UPDATE（非 upsert）。此处若传原始 projectPath，当二者不一致（尾斜杠、./.. 段）
+    // 时 WHERE 命中 0 行，dismiss 会静默失效，而 UI 已乐观置为 dismissed。
+    updateDebtActionStatus(db, {
+      projectId: path.resolve(projectPath),
+      actionId,
+      status: 'dismissed',
+    });
   } catch (err) {
     console.warn(
       '[engine:debt:dismiss] 忽略操作失败:',

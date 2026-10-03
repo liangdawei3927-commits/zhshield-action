@@ -148,7 +148,9 @@ function buildActionFromGroup(
   const { issues: groupIssues, category } = group;
   const module = key.split('::')[0];
   const severitySum = groupIssues.reduce((acc, i) => acc + SEVERITY_WEIGHT[i.severity], 0);
-  const avgSeverity = severitySum / groupIssues.length;
+  // groupByDebtAction 只会 put 非空组，故当前不可达 0；此处仍守 1，
+  // 避免将来新增调用方传入空组时把 avgSeverity 变成 NaN 并污染 interestScore/roi
+  const avgSeverity = severitySum / Math.max(groupIssues.length, 1);
   const severityFactor = avgSeverity;
   const hotnessFactorValue = hotnessFactor(hotnessByModule.get(module) ?? 0);
   const densityFactorValue = densityFactor(groupIssues.length);

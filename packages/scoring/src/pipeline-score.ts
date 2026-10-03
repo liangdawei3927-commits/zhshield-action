@@ -53,6 +53,14 @@ export interface InspectionReportLike {
  */
 export const RULE_PENALTY_CAP = 20;
 
+/**
+ * 无 ruleId 的 issue 汇总桶的单桶封顶（P2-4 口径补齐，2026-10-02）。
+ * 原实现把 untagged 直接线性累加进 penalty（`let penalty = untagged`），
+ * 13 条无 ruleId 的 error（13×8=104）即触底 0 —— 而无 ruleId 恰恰是
+ * 最常见形态（外部工具产出的 issue 多不带 ruleId），故该路径最易触发分辨率归零。
+ */
+export const UNTAGGED_PENALTY_CAP = 40;
+
 /** S2 密度归一化（章程修正②）：项目 ESLOC 达到该值时密度因子 = 1，超过则按比例稀释 */
 export const DENSITY_REF_ESLOC = 20_000;
 
@@ -80,8 +88,46 @@ const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
   info: 1,
 };
 
+/**
+ * 各 severity 单级最大贡献（P2-4 口径补齐，2026-10-02）。
+ *
+ * 与 PERFORMANCE_SEVERITY_CAP / REFACTOR_SEVERITY_CAP / GARBAGE_TYPE_CAP 同构：
+ * Σ = 100 对齐全局上限。修复前 security/dependencies 走纯线性累加，
+ * 13 条 error（13×8=104）即触底 0，其后无论再堆多少条，分数恒为 0 ——
+ * 用户改完问题看不到分数回升，失去了「修复有进展」的反馈。
+ * 单级封顶后：单级封顶内仍有分辨率，超出后由其余级与 issues 计数继续表达严重度。
+ */
+export const ISSUE_SEVERITY_CAP: Readonly<Record<'error' | 'warning' | 'info', number>> = {
+  error: 48,
+  warning: 40,
+  info: 12,
+};
+
+/** 全部 issue 级 severity 的稳定遍历序（封顶表与累加共用，避免两处漏键） */
+const ISSUE_SEVERITY_KEYS = ['error', 'warning', 'info'] as const;
+
+/**
+ * 落盘的 issue 来自旧版本快照或被外部改写，severity 未必落在受支持的三档内。
+ * 直接索引命中未知键得到 undefined，求和后整条链路污染为 NaN，而
+ * `Math.max(0, NaN) === NaN` —— 分数环直接空白。未知 severity 归入 info 档：
+ * 既不虚增严重度，也不让这条 issue 从统计里凭空消失（漏计风险比误报更危险）。
+ * 返回收敛后的键，使下游 `ISSUE_PENALTY[key]` 保持类型安全、无需断言。
+ */
+function normalizeIssueSeverity(severity: string): keyof typeof ISSUE_PENALTY {
+  return severity in ISSUE_PENALTY ? (severity as keyof typeof ISSUE_PENALTY) : 'info';
+}
+
 function penaltyForIssues(issues: InspectIssueLike[]): number {
-  return issues.reduce((sum, issue) => sum + ISSUE_PENALTY[issue.severity], 0);
+  const bySeverity = new Map<string, number>();
+  for (const issue of issues) {
+    const key = normalizeIssueSeverity(issue.severity);
+    bySeverity.set(key, (bySeverity.get(key) ?? 0) + ISSUE_PENALTY[key]);
+  }
+  let sum = 0;
+  for (const key of ISSUE_SEVERITY_KEYS) {
+    sum += Math.min(ISSUE_SEVERITY_CAP[key], bySeverity.get(key) ?? 0);
+  }
+  return Math.min(100, sum);
 }
 
 /**
@@ -95,14 +141,14 @@ function qualityPenalty(issues: InspectIssueLike[], esloc: number | undefined): 
   const byRule = new Map<string, number>();
   let untagged = 0;
   for (const issue of issues) {
-    const p = ISSUE_PENALTY[issue.severity];
+    const p = ISSUE_PENALTY[normalizeIssueSeverity(issue.severity)];
     if (issue.ruleId) {
       byRule.set(issue.ruleId, (byRule.get(issue.ruleId) ?? 0) + p);
     } else {
       untagged += p;
     }
   }
-  let penalty = untagged;
+  let penalty = Math.min(untagged, UNTAGGED_PENALTY_CAP);
   for (const raw of byRule.values()) penalty += Math.min(raw, RULE_PENALTY_CAP);
   const density =
     typeof esloc === 'number' && Number.isFinite(esloc) && esloc > 0
@@ -111,13 +157,21 @@ function qualityPenalty(issues: InspectIssueLike[], esloc: number | undefined): 
   return penalty * density;
 }
 
-/** guard 失败/警告计入 gate 维度的扣分 */
+/** gate 各级结果单级最大贡献（P2-4 口径补齐，2026-10-02；Σ = 100 对齐全局上限） */
+export const GUARD_SEVERITY_CAP: Readonly<Record<'blocking' | 'warning', number>> = {
+  blocking: 60,
+  warning: 40,
+};
+
+/** guard 失败/警告计入 gate 维度的扣分（单级封顶，理由同 ISSUE_SEVERITY_CAP） */
 function guardPenalty(results: GuardCheckLike[]): number {
-  return results.reduce((sum, r) => {
-    if (r.status === 'failed' || r.status === 'error' || r.blocking) return sum + 8;
-    if (r.status === 'warning') return sum + 4;
-    return sum;
-  }, 0);
+  let blocking = 0;
+  let warning = 0;
+  for (const r of results) {
+    if (r.status === 'failed' || r.status === 'error' || r.blocking) blocking += 1;
+    else if (r.status === 'warning') warning += 1;
+  }
+  return Math.min(100, Math.min(GUARD_SEVERITY_CAP.blocking, blocking * 8) + Math.min(GUARD_SEVERITY_CAP.warning, warning * 4));
 }
 
 /** guard 中非 passed 的结果数（与 guardPenalty 的判定口径一致） */
@@ -138,9 +192,19 @@ function depsPenalty(deps: DepsDataLike): number {
   );
 }
 
-/** sentinel 扣分：criticalEvents -10 / warningEvents -5，上限 100（十域评分章程 #9，哨兵独立成维） */
+/** sentinel 各级事件单级最大贡献（P2-4 口径补齐，2026-10-02；Σ = 100 对齐全局上限） */
+export const SENTINEL_SEVERITY_CAP: Readonly<Record<'critical' | 'warning', number>> = {
+  critical: 60,
+  warning: 40,
+};
+
+/** sentinel 扣分（十域评分章程 #9，哨兵独立成维；单级封顶，理由同 ISSUE_SEVERITY_CAP） */
 function sentinelPenalty(sentinel: SentinelDataLike): number {
-  return Math.min(100, sentinel.criticalEvents * 10 + sentinel.warningEvents * 5);
+  return Math.min(
+    100,
+    Math.min(SENTINEL_SEVERITY_CAP.critical, sentinel.criticalEvents * 10) +
+      Math.min(SENTINEL_SEVERITY_CAP.warning, sentinel.warningEvents * 5),
+  );
 }
 
 /**
@@ -228,10 +292,16 @@ export const REFACTOR_SEVERITY_PENALTY: Readonly<Record<'error' | 'warning' | 'i
   info: 1,
 };
 
-/** refactor 各级 severity 的单级最大贡献（P2-3 调参点；Σ = 100 与全局上限对齐） */
+/**
+ * refactor 各级 severity 的单级最大贡献（P2-4 修正单调性，2026-10-02；Σ = 100 与全局上限对齐）。
+ *
+ * 原值 error 40 / warning 48 —— 低severity 的封顶反而高于高 severity，
+ * 12 条 warning（48）比 5 条 error（40）先把该级打满，分辨率在最高两档之间倒挂。
+ * 改为 error 48 / warning 40 / info 12：封顶随 severity 单调递减，Σ 仍为 100。
+ */
 export const REFACTOR_SEVERITY_CAP: Readonly<Record<'error' | 'warning' | 'info', number>> = {
-  error: 40,
-  warning: 48,
+  error: 48,
+  warning: 40,
   info: 12,
 };
 
@@ -476,6 +546,20 @@ function notRunDimension(
   return null;
 }
 
+/**
+ * 维度分统一出口：扣分 → [0, 100] 闭区间分数（1 位小数）。
+ *
+ * 原实现 8 处各写 `Math.max(0, ...)`，只有下界没有上界：任何算出负扣分的路径
+ * （未来新增的加分项，或除零/溢出产生的 -Infinity）都会让分数 > 100，
+ * 而 HealthRing / ScoreRing 的进度弧按 `score / 100` 算 dashoffset，
+ * >100 即负偏移，弧整个画不出来。同时兜住非有限值：
+ * `Math.max(0, NaN) === NaN`，非有限扣分会让分数环渲染成空白而非显示 0。
+ */
+function toDimensionScore(penalty: number): number {
+  if (!Number.isFinite(penalty)) return 0;
+  return Math.round(Math.min(100, Math.max(0, 100 - penalty)) * 10) / 10;
+}
+
 function scoreTechdebt(
   name: string,
   weight: number,
@@ -487,7 +571,7 @@ function scoreTechdebt(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - debtIndex) * 10) / 10),
+    score: toDimensionScore(debtIndex),
     issues: techdebt.issueCount,
     status: 'scored',
   };
@@ -503,7 +587,7 @@ function scoreRefactor(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    score: toDimensionScore(penalty),
     issues: refactor.totalSmells,
     status: 'scored',
   };
@@ -519,7 +603,7 @@ function scorePerformance(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    score: toDimensionScore(penalty),
     issues: performance.total,
     status: 'scored',
   };
@@ -532,7 +616,7 @@ function scoreGate(name: string, weight: number, guard: GuardReportLike | null):
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - gPenalty) * 10) / 10),
+    score: toDimensionScore(gPenalty),
     issues: gCount,
     status: 'scored',
   };
@@ -548,7 +632,7 @@ function scoreSentinel(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - sPenalty) * 10) / 10),
+    score: toDimensionScore(sPenalty),
     issues: sentinel.criticalEvents + sentinel.warningEvents,
     status: 'scored',
   };
@@ -564,7 +648,7 @@ function scoreGarbage(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    score: toDimensionScore(penalty),
     issues: garbage.total,
     status: 'scored',
   };
@@ -581,7 +665,7 @@ function scoreBackup(
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - penalty) * 10) / 10),
+    score: toDimensionScore(penalty),
     issues: bad,
     status: 'scored',
   };
@@ -604,7 +688,7 @@ function scoreInspectBased(params: {
   return {
     name,
     weight,
-    score: Math.max(0, Math.round((100 - withDeps.penalty) * 10) / 10),
+    score: toDimensionScore(withDeps.penalty),
     issues: withDeps.issueCount,
     status: 'scored',
   };

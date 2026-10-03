@@ -299,3 +299,84 @@ describe('tech-debt: computeTrendDelta', () => {
     expect(computeTrendDelta(42, 42)).toBe(0);
   });
 });
+
+/**
+ * 非有限值不变量（2026-10-02 回归）。
+ *
+ * dashboard 内部用 Math.max(len, 1) 防除零，但真正该守住的是「对外快照里
+ * 不出现 NaN/Infinity」——NaN 一旦进 interestScore/roi/sort，会静默把整张
+ * 推荐榜排成乱序，而不是抛错。此处对公开 API 全量递归扫描，边界入参全覆盖。
+ */
+describe('tech-debt: 快照不含 NaN/Infinity', () => {
+  function findNonFinite(value: unknown, path = '$'): string[] {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? [] : [`${path}=${String(value)}`];
+    }
+    if (Array.isArray(value)) {
+      return value.flatMap((v, i) => findNonFinite(v, `${path}[${i}]`));
+    }
+    if (value && typeof value === 'object') {
+      return Object.entries(value).flatMap(([k, v]) => findNonFinite(v, `${path}.${k}`));
+    }
+    return [];
+  }
+
+  const CASES: Array<[string, DebtIssueInput[], ModuleHotnessInput[], string[]]> = [
+    ['空输入', [], [], []],
+    [
+      '单条 error',
+      [{ id: '1', severity: 'error', category: 'security', file: 'src/a.ts' }],
+      [],
+      [],
+    ],
+    [
+      '单条 info（零权重路径）',
+      [{ id: '1', severity: 'info', category: 'documentation', file: 'src/a.ts' }],
+      [],
+      [],
+    ],
+    [
+      '同模块多类别聚合',
+      [
+        { id: 'a', severity: 'error', category: 'security', file: 'src/api/a.ts' },
+        { id: 'b', severity: 'warning', category: 'performance', file: 'src/api/a.ts' },
+        { id: 'c', severity: 'info', category: 'quality', file: 'src/api/a.ts' },
+      ],
+      [{ module: 'src/api/a.ts', commitCount: 999 }],
+      ['src/api/a.ts'],
+    ],
+    [
+      '全部 info（severitySum=0 除以非零长度）',
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `i${i}`,
+        severity: 'info' as const,
+        category: 'quality' as const,
+        file: `src/q${i}.ts`,
+      })),
+      [],
+      [],
+    ],
+    [
+      '根路径模块（(root) 分组）',
+      [{ id: 'r', severity: 'error', category: 'security', file: '/' }],
+      [],
+      [],
+    ],
+  ];
+
+  it.each(CASES)('%s → 全快照数值均有限', (_label, issues, hotness, exposed) => {
+    const snap = buildTechDebtDashboard(makeInput(issues, hotness, exposed));
+    expect(findNonFinite(snap)).toEqual([]);
+  });
+
+  it('单条 info 不产生 0/0：interestScore 必须是有限数', () => {
+    const snap = buildTechDebtDashboard(
+      makeInput([{ id: 'z', severity: 'info', category: 'quality', file: 'src/z.ts' }]),
+    );
+    for (const action of snap.actionList) {
+      expect(Number.isFinite(action.interestScore)).toBe(true);
+      expect(Number.isFinite(action.roi)).toBe(true);
+      expect(Number.isFinite(action.interestBreakdown.severityFactor)).toBe(true);
+    }
+  });
+});

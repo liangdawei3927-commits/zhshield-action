@@ -107,6 +107,14 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
         projectRoot: projectPath,
         profile: null,
       });
+      // 有意不传 computeRedLine(extras)：PipelineReport 只携带 guard/inspect/refactor，
+      // 不含 secrets.activeCount / deps.vulnerabilities / sentinel 事件 —— 红线判定所需的
+      // 事实根本不在本进程手里，构造 extras 等于凭空编造风险数据，会给出虚假的安全分。
+      // 代价是本路径算出的总分高于桌面端同项目（桌面两处写入点均传 computeRedLine）：
+      // 桌面按已检测域归一化 + 红线封顶；此处仅 guard/inspect 能构造维度，至多
+      // quality/security/dependencies/gate 四域（取决于 inspect 实际产出的 issue 类别）且无红线封顶。
+      // 属数据可得性差异，非代码缺陷；若将来 PipelineReport 补齐 extras 字段，
+      // 应在此同步传入以与桌面对齐。
       const score = this.engine.calculate(projectPath, dimensions);
       this.logger.log(`健康评分已落库: ${projectPath} ${score.overall} (${score.grade})`);
       return score;

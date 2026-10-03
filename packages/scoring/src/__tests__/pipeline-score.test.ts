@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildHealthDimensions,
   PERFORMANCE_SEVERITY_CAP,
+  REFACTOR_SEVERITY_CAP,
   type GuardReportLike,
   type InspectionReportLike,
 } from '../pipeline-score';
@@ -112,16 +113,59 @@ describe('buildHealthDimensions', () => {
   });
 
   it('floors dimension score at 0', () => {
+    // 三级封顶 Σ=100（error 48 + warning 40 + info 12），故触底需各级同时打满：
+    // 6 error(48) + 10 warning(40) + 12 info(12) = 100 → 0
     const dims = buildHealthDimensions({
       guard: cleanGuard,
       inspect: {
-        issues: Array.from({ length: 20 }, () => ({
-          severity: 'error' as const,
-          category: 'security',
-        })),
+        issues: [
+          ...Array.from({ length: 6 }, () => ({ severity: 'error' as const, category: 'security' })),
+          ...Array.from({ length: 10 }, () => ({ severity: 'warning' as const, category: 'security' })),
+          ...Array.from({ length: 12 }, () => ({ severity: 'info' as const, category: 'security' })),
+        ],
       },
     });
     expect(dims.find((d) => d.name === 'security')!.score).toBe(0);
+  });
+
+  it('security 分辨率不再归零（P2-4 回归）：error 6→12 条期间分数必须逐条下降', () => {
+    // 旧口径线性累加：error 第 13 条（13×8=104）即触底 0，之后恒为 0，
+    // 用户修完问题看不到分数回升。单级封顶后 error 级内 1..6 条仍有分辨率。
+    const scoreAt = (errorCount: number): number => {
+      const built = buildHealthDimensions({
+        guard: cleanGuard,
+        inspect: {
+          issues: Array.from({ length: errorCount }, () => ({
+            severity: 'error' as const,
+            category: 'security',
+          })),
+        },
+      });
+      return built.find((d) => d.name === 'security')!.score;
+    };
+    const scores = [1, 2, 3, 4, 5, 6].map(scoreAt);
+    for (let i = 1; i < scores.length; i++) {
+      expect(scores[i]).toBeLessThan(scores[i - 1]);
+    }
+    // 1..6 条 error → 8/16/24/32/40/48 扣分 → 92/84/76/68/60/52
+    expect(scores).toEqual([92, 84, 76, 68, 60, 52]);
+  });
+
+  it('未知 severity 不产出 NaN（P2-4 回归）：落盘脏数据按 info 计，分数仍是有限值', () => {
+    const dims = buildHealthDimensions({
+      guard: cleanGuard,
+      inspect: {
+        issues: [
+          // 落盘快照来自旧版本/外部改写，severity 越界
+          { severity: 'critical' as 'error', category: 'security' },
+          { severity: 'error' as const, category: 'security' },
+        ],
+      },
+    });
+    const score = dims.find((d) => d.name === 'security')!.score;
+    expect(Number.isFinite(score)).toBe(true);
+    // 未知档按 info(1) + error(8) = 9 → 91
+    expect(score).toBe(91);
   });
 });
 
@@ -158,32 +202,39 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
     expect(performance.issues).toBe(3);
   });
 
-  it('refactor 单级封顶：error 20 → penalty 40 → 60（旧口径 160 触顶 0）', () => {
+  it('refactor 单级封顶：error 20 → penalty 48 → 52（旧口径 160 触顶 0）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 20, bySeverity: { error: 20, warning: 0, info: 0 } },
     }});
     const refactor = dims.find((d) => d.name === 'refactor')!;
-    expect(refactor.score).toBe(60);
+    expect(refactor.score).toBe(52);
     expect(refactor.issues).toBe(20);
   });
 
   it('refactor 真实量级回归：403 warning + 19 info 不得触底 0（2026-09-22 修复）', () => {
     // zhihui-codeshield 实扫 shape：{ error:0, warning:403, info:19 }
-    // 罚分 min(40,0) + min(48,1612) + min(12,19) = 60 → 40（旧口径 1631 → 100 → 0）
+    // 罚分 min(48,0) + min(40,1612) + min(12,19) = 52 → 48（旧口径 1631 → 100 → 0）
     const real = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 422, bySeverity: { error: 0, warning: 403, info: 19 } },
     }});
     const refactor = real.find((d) => d.name === 'refactor')!;
     expect(refactor.status).toBe('scored');
-    expect(refactor.score).toBe(40);
+    expect(refactor.score).toBe(48);
     expect(refactor.issues).toBe(422);
+  });
+
+  it('refactor 封顶随 severity 单调递减（P2-4 回归）：error 级封顶不得低于 warning 级', () => {
+    expect(REFACTOR_SEVERITY_CAP.error).toBeGreaterThan(REFACTOR_SEVERITY_CAP.warning);
+    expect(REFACTOR_SEVERITY_CAP.warning).toBeGreaterThan(REFACTOR_SEVERITY_CAP.info);
+    const capSum = Object.values(REFACTOR_SEVERITY_CAP).reduce((a, b) => a + b, 0);
+    expect(capSum).toBe(100);
   });
 
   it('refactor 全局上限 100：error/warning/info 全部触顶叠加后仍封顶', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 300, bySeverity: { error: 100, warning: 100, info: 100 } },
     }});
-    // 40 + 48 + 12 = 100 → 0
+    // 48 + 40 + 12 = 100 → 0
     expect(dims.find((d) => d.name === 'refactor')!.score).toBe(0);
   });
 

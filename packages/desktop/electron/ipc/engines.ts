@@ -701,7 +701,7 @@ async function runPerformanceHandler(
     const result = (await manager.waitFor(task.id)) as PerformanceReportData;
     try {
       await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result), [
-        'inspect',
+        'performance',
       ]);
     } catch (e) {
       console.warn(
@@ -1570,7 +1570,8 @@ type DomainScoreDataLike = Omit<DomainScoreData, 'generatedAt'> & { generatedAt:
  * buildHealthDimensions 直接算该维分数，不落库、不写任何快照。
  *
  * - quality 走快照快路径：inspect 快照落盘时已当场出分（含 previousScore 对比基线），
- *   直接透传，保持既有语义与 e2e。
+ *   直接透传，保持既有语义与 e2e；但 performance 条目落在自己的域快照里，
+ *   故一并读入并由 qualityFastPathScore 合并后重算（无 performance 条目时仍是零算分）。
  * - 其余 9 维 compose-on-read：与报告中心汇总共用 assembleHealthInputs 组装输入，
  *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
  */
@@ -1586,9 +1587,14 @@ async function getDomainScoreHandler(
     if (!isScoreDimension(dimension)) {
       throw new Error(`unknown dimension: ${String(dimension)}`);
     }
-    // quality 快路径：保持既有行为（快照自带评分 + previousScore 对比基线）
+    // quality 快路径：透传 inspect 快照自带评分 + previousScore 对比基线。
+    // performance 条目落在自己的域快照里，必须一并传入，否则 quality 维丢掉 performance 扣分。
     if (dimension === 'quality') {
-      return qualityFastPathScore(await readDomainSnapshot(projectPath, 'inspect'));
+      const [inspectSnapshot, performanceSnapshot] = await Promise.all([
+        readDomainSnapshot(projectPath, 'inspect'),
+        readDomainSnapshot(projectPath, 'performance'),
+      ]);
+      return qualityFastPathScore(inspectSnapshot, performanceSnapshot);
     }
     // 其余 9 维：compose-on-read，与报告中心汇总共用同一输入组装
     const inputs = await assembleHealthInputs(projectPath, {

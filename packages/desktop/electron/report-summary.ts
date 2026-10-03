@@ -9,6 +9,7 @@
  * ScoringEngine.calculate），差别只在数据来源：pipeline 吃刚跑完的报告，
  * 汇总吃各域已持久化的结果。因此需要「落盘结果 → 算法输入形状」的映射，即本模块职责。
  */
+import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { GuardCheckLike, GuardReportLike, InspectIssueLike } from '@zh/scoring';
 import type { GuardReportRecord } from '@zh/guard';
 import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics';
@@ -164,11 +165,46 @@ export type QualityFastPathScore = {
   previousScore?: { score: number; generatedAt: string };
 };
 
-/** quality 快路径：透传 inspect 快照落盘时当场算好的 dimensionScore + previousScore */
-export function qualityFastPathScore(snap: DiagnosticsReport | null): QualityFastPathScore | null {
+/**
+ * quality 快路径：透传 inspect 快照落盘时当场算好的 dimensionScore + previousScore。
+ *
+ * performance 条目落在 `domains/performance.json`（按域分文件，不覆盖 inspect 快照），
+ * 因此 inspect 快照自带评分里**不含**它们。有 performance 条目时按
+ * 「inspect + performance」并集走一次 buildHealthDimensions 重算，与
+ * {@link assembleHealthInputs} 交给 quality 维的输入完全同构（两者都只把
+ * DIMENSION_CATEGORIES.quality 覆盖的类别计入），两条路径不可能漂移；
+ * 没有 performance 条目时原样透传，快路径仍是零算分。
+ */
+export function qualityFastPathScore(
+  snap: DiagnosticsReport | null,
+  performanceSnap: DiagnosticsReport | null = null,
+): QualityFastPathScore | null {
   if (!snap?.dimensionScore) return null;
-  return {
+  const passthrough = {
     ...snap.dimensionScore,
+    generatedAt: snap.generatedAt,
+    previousScore: snap.previousScore,
+  };
+  const performanceIssues = toInspectIssues(
+    (performanceSnap?.issues ?? []).filter((issue) => issue.category === 'performance'),
+  );
+  if (performanceIssues.length === 0) return passthrough;
+  // 调用形状与 zh-diagnostics 的 enrichInspectSnapshot 一致（不带 projectRoot/profile：
+  // 维度分与权重无关），重算结果与落盘出分同口径。
+  const [quality] = buildHealthDimensions({
+    guard: null,
+    inspect: {
+      issues: [...toInspectIssues(snap.issues), ...performanceIssues],
+      esloc: snap.esloc,
+    },
+  });
+  if (quality?.name !== 'quality' || !quality.status) return passthrough;
+  return {
+    dimension: 'quality',
+    score: quality.score,
+    issues: quality.issues,
+    status: quality.status,
+    version: SCORE_VERSION,
     generatedAt: snap.generatedAt,
     previousScore: snap.previousScore,
   };
@@ -184,8 +220,12 @@ export function qualityFastPathScore(snap: DiagnosticsReport | null): QualityFas
  * malware/license/environment 不在十域映射内，不并入），使专用扫描结果终于进入
  * buildHealthDimensions。
  *
+ * 同理并入 performance 快照的 performance 类条目：按域分文件后它们落在
+ * domains/performance.json，而 DIMENSION_CATEGORIES.quality 含 'performance'，
+ * 不并入则 quality 维会静默丢掉这部分扣分（历史上它们是被写进 inspect 快照顺带进入的）。
+ *
  * timestamps 各维度锚点来源：
- * - quality：inspect 快照 generatedAt（巡检完成时间）
+ * - quality：max(inspect 快照 generatedAt, performance 快照 generatedAt)（巡检/性能两类数据源）
  * - gate：guard 报告记录 timestamp（listGuardReports 新→旧取 [0]）
  * - security：max(dashboard-state.secrets.lastRunAt, security 快照 generatedAt)（合并来源）
  * - dependencies：max(dashboard-state.deps.lastRunAt, deps 快照 generatedAt)（合并来源）
@@ -197,13 +237,15 @@ export async function assembleHealthInputs(
   reads: HealthInputReads,
 ): Promise<HealthInputs> {
   const guardRecord = reads.listGuardReports(projectPath)[0] ?? null;
-  const [inspectSnapshot, securitySnapshot, depsSnapshot, state, extras] = await Promise.all([
-    reads.readDomainSnapshot(projectPath, 'inspect'),
-    reads.readDomainSnapshot(projectPath, 'security'),
-    reads.readDomainSnapshot(projectPath, 'deps'),
-    reads.readDashboardState(projectPath),
-    reads.buildPipelineExtras(projectPath),
-  ]);
+  const [inspectSnapshot, securitySnapshot, depsSnapshot, performanceSnapshot, state, extras] =
+    await Promise.all([
+      reads.readDomainSnapshot(projectPath, 'inspect'),
+      reads.readDomainSnapshot(projectPath, 'security'),
+      reads.readDomainSnapshot(projectPath, 'deps'),
+      reads.readDomainSnapshot(projectPath, 'performance'),
+      reads.readDashboardState(projectPath),
+      reads.buildPipelineExtras(projectPath),
+    ]);
 
   const mergedIssues: InspectIssueLike[] = [];
   if (inspectSnapshot) mergedIssues.push(...toInspectIssues(inspectSnapshot.issues));
@@ -217,10 +259,17 @@ export async function assembleHealthInputs(
       ...toInspectIssues(depsSnapshot.issues.filter((issue) => issue.category === 'dependency')),
     );
   }
+  if (performanceSnapshot) {
+    mergedIssues.push(
+      ...toInspectIssues(
+        performanceSnapshot.issues.filter((issue) => issue.category === 'performance'),
+      ),
+    );
+  }
 
   const now = reads.now?.() ?? new Date().toISOString();
   const timestamps: Record<ScoreDimension, string | null> = {
-    quality: inspectSnapshot?.generatedAt ?? null,
+    quality: maxTimestamp(inspectSnapshot?.generatedAt, performanceSnapshot?.generatedAt),
     gate: guardRecord?.timestamp ?? null,
     security: maxTimestamp(state.secrets?.lastRunAt, securitySnapshot?.generatedAt),
     dependencies: maxTimestamp(state.deps?.lastRunAt, depsSnapshot?.generatedAt),

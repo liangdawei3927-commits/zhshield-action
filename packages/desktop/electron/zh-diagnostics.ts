@@ -31,8 +31,12 @@ export interface DiagnosticEntry {
   column?: number;
   suggestion?: string;
   autoFixable: boolean;
-  /** 来源引擎：guard | inspect | refactor | deps | techdebt | security */
-  source: 'guard' | 'inspect' | 'refactor' | 'deps' | 'techdebt' | 'security';
+  /**
+   * 来源引擎，同时是按域快照的落盘键（`domains/<source>.json`）。
+   * **不得借用别域的 source**：`buildPerSourceEntries` 按本字段分桶，
+   * `writeDomainSnapshots` 对每桶整份覆盖写 —— 借用他域键等于用本域数据抹掉他域快照。
+   */
+  source: 'guard' | 'inspect' | 'refactor' | 'deps' | 'techdebt' | 'security' | 'performance';
   /** 去重指纹 */
   fingerprint: string;
 }
@@ -659,8 +663,10 @@ function mapPerformanceSeverity(severity: string): DiagnosticSeverity {
 
 /**
  * 把 PerformanceReportData 归一化为 DiagnosticEntry[]。
- * performance 属于 inspect 维度，source 标 'inspect'，category 标 'performance'，
- * 便于 Trae/MCP 端按维度过滤。
+ * category 标 'performance'（@zh/scoring 的 quality 维含该类别），source 标 'performance'
+ * 使其落进 `domains/performance.json`，便于 Trae/MCP 端按维度过滤，
+ * 且不覆盖 `domains/inspect.json` 里的真实巡检结果。
+ * performance 条目对 quality 维的计分由 report-summary 合并该域快照后补上。
  */
 export function normalizePerformanceData(data: PerformanceDataLike): readonly DiagnosticEntry[] {
   return data.issues.map((issue) => ({
@@ -672,7 +678,7 @@ export function normalizePerformanceData(data: PerformanceDataLike): readonly Di
     line: issue.line,
     suggestion: issue.suggestion,
     autoFixable: issue.autoFixable,
-    source: 'inspect' as const,
+    source: 'performance' as const,
     fingerprint: `${issue.ruleId}:${issue.file}:${issue.line ?? 0}`,
   }));
 }

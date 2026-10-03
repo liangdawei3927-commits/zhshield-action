@@ -267,23 +267,30 @@ function groupEditsByFile(fixes: Fix[]): Map<string, TextEdit[]> {
 function applyEditsToFile(filePath: string, edits: TextEdit[]): { fixed: number; error?: string } {
   edits.sort((a, b) => b.startLine - a.startLine || b.startColumn - a.startColumn);
 
-  let fixed = 0;
   try {
-    let content = fs.readFileSync(filePath, 'utf-8');
+    const original = fs.readFileSync(filePath, 'utf-8');
+    let content = original;
+    // 多行整段替换会即时落盘（行数变化会使后续编辑的行号失效）；
+    // 单行替换只在内存累积，循环结束后统一落盘一次。
+    let persisted = original;
+    let changed = false;
     for (const edit of edits) {
       const result = applyEdit(content, edit);
-      if (!result) continue;
+      if (!result || result.content === content) continue;
       content = result.content;
+      changed = true;
       if (result.wroteFile) {
         fs.writeFileSync(filePath, content, 'utf-8');
-        fixed++;
+        persisted = content;
       }
     }
-    fs.writeFileSync(filePath, content, 'utf-8');
-    fixed++;
-    return { fixed };
+    // 无实际改动时不得落盘，否则未命中的文件会被无谓重写并计入 fixed，
+    // 使 applyFixes().fixed 超过真正被修复的文件数（fixed 的语义是「文件数」）。
+    if (!changed) return { fixed: 0 };
+    if (content !== persisted) fs.writeFileSync(filePath, content, 'utf-8');
+    return { fixed: 1 };
   } catch (e: unknown) {
-    return { fixed, error: e instanceof Error ? e.message : String(e) };
+    return { fixed: 0, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

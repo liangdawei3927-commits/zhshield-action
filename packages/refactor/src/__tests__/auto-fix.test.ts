@@ -355,3 +355,81 @@ describe('applyFixes', () => {
     expect(result.failed).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('applyFixes 的 fixed 语义是「被改动的文件数」', () => {
+  const multiLineFile = path.join('/tmp', 'auto-fix-multiline-target.ts');
+  const noopFile = path.join('/tmp', 'auto-fix-noop-target.ts');
+
+  afterAll(() => {
+    for (const f of [multiLineFile, noopFile]) {
+      try {
+        fs.unlinkSync(f);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('单个多行编辑只计 1（回归：曾经计 2，使 fixed 超过文件数）', () => {
+    const original = 'export class Multi {\n  public a: number;\n  public b: string;\n}\n';
+    fs.writeFileSync(multiLineFile, original, 'utf-8');
+
+    const result = applyFixes([
+      {
+        smellId: 'multi',
+        ruleId: 'inappropriate-intimacy',
+        description: '合并两个公开字段',
+        edits: [
+          {
+            filePath: multiLineFile,
+            startLine: 2,
+            startColumn: 1,
+            endLine: 3,
+            endColumn: 1,
+            replacement: '  private merged: number;',
+          },
+        ],
+      },
+    ]);
+
+    expect(result.failed).toBe(0);
+    expect(result.errors).toEqual([]);
+    // 关键断言：旧实现中多行编辑在循环内与循环外各自 +1，这里会得到 2
+    expect(result.fixed).toBe(1);
+
+    const content = fs.readFileSync(multiLineFile, 'utf-8');
+    expect(content).toContain('private merged: number;');
+    expect(content).not.toContain('public a:');
+    expect(content).not.toContain('public b:');
+  });
+
+  it('全部编辑未命中时不落盘且 fixed 为 0（回归：曾经重写文件并计为已修复）', () => {
+    const original = 'export class Noop {\n  keep: number;\n}\n';
+    fs.writeFileSync(noopFile, original, 'utf-8');
+    const mtimeBefore = fs.statSync(noopFile).mtimeMs;
+
+    const result = applyFixes([
+      {
+        smellId: 'noop',
+        ruleId: 'inappropriate-intimacy',
+        description: '行号越界的编辑',
+        edits: [
+          {
+            filePath: noopFile,
+            startLine: 999,
+            startColumn: 1,
+            endLine: 999,
+            endColumn: 1,
+            replacement: '  never: number;',
+          },
+        ],
+      },
+    ]);
+
+    expect(result.failed).toBe(0);
+    // 未产生任何实际改动，不得计入已修复文件数
+    expect(result.fixed).toBe(0);
+    expect(fs.readFileSync(noopFile, 'utf-8')).toBe(original);
+    expect(fs.statSync(noopFile).mtimeMs).toBe(mtimeBefore);
+  });
+});

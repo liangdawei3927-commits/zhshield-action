@@ -4306,11 +4306,7 @@ var init_zh_Hans = __esm({
           noDataHintLive: "\u5B8C\u6210\u4E00\u6B21\u5DE1\u68C0\u540E\uFF0C\u8FD9\u91CC\u5F53\u573A\u663E\u793A\u8BC4\u5206",
           notRunHint: "\u8FD0\u884C\u672C\u529F\u80FD\u5E76\u6C47\u603B\u540E\u8BA1\u5165\u603B\u5206",
           scoreDelta: "\u4E0A\u6B21 {{prev}} \u2192 \u672C\u6B21 {{now}}",
-          ring: {
-            gaugeMin: "\u8BC4",
-            gaugeMid: "",
-            gaugeMax: "\u5206"
-          }
+          unit: "\u5206"
         },
         reportShell: {
           backHome: "\u8FD4\u56DE\u4E3B\u9875"
@@ -5027,6 +5023,10 @@ var init_zh_Hans = __esm({
             dependency: {
               desc: "\u8BC6\u522B\u5B58\u5728\u5DF2\u77E5 CVE \u7684\u8FC7\u671F\u6216\u4E0D\u5B89\u5168\u4F9D\u8D56",
               title: "\u4F9D\u8D56\u68C0\u67E5"
+            },
+            secrets: {
+              desc: "\u8BC6\u522B\u4EE3\u7801\u4E2D\u786C\u7F16\u7801\u7684\u5BC6\u94A5\u3001\u5BC6\u7801\u4E0E\u8BBF\u95EE\u4EE4\u724C",
+              title: "\u5BC6\u94A5\u68C0\u67E5"
             },
             malware: {
               desc: "\u626B\u63CF\u53CD\u5F39Shell\u3001\u540E\u95E8\u3001\u4F9B\u5E94\u94FE\u6295\u6BD2\u7B49\u6076\u610F\u4EE3\u7801\u7279\u5F81"
@@ -6372,11 +6372,7 @@ var init_zh_Hant = __esm({
           noDataHintLive: "\u5B8C\u6210\u4E00\u6B21\u5DE1\u6AA2\u5F8C\uFF0C\u9019\u88E1\u5373\u6642\u986F\u793A\u8A55\u5206",
           notRunHint: "\u57F7\u884C\u672C\u529F\u80FD\u4E26\u5F59\u7E3D\u5F8C\u8A08\u5165\u7E3D\u5206",
           scoreDelta: "\u4E0A\u6B21 {{prev}} \u2192 \u672C\u6B21 {{now}}",
-          ring: {
-            gaugeMin: "\u8A55",
-            gaugeMid: "",
-            gaugeMax: "\u5206"
-          }
+          unit: "\u5206"
         },
         reportShell: {
           backHome: "\u8FD4\u56DE\u4E3B\u9801"
@@ -7015,6 +7011,10 @@ var init_zh_Hant = __esm({
             dependency: {
               desc: "\u8B58\u5225\u5B58\u5728\u5DF2\u77E5 CVE \u7684\u904E\u671F\u6216\u4E0D\u5B89\u5168\u4F9D\u8CF4",
               title: "\u4F9D\u8CF4\u6AA2\u67E5"
+            },
+            secrets: {
+              desc: "\u8B58\u5225\u7A0B\u5F0F\u78BC\u4E2D\u786C\u7DE8\u78BC\u7684\u91D1\u9470\u3001\u5BC6\u78BC\u8207\u5B58\u53D6\u6B0A\u6756",
+              title: "\u5BC6\u9470\u6AA2\u67E5"
             },
             malware: {
               desc: "\u6383\u63CF\u53CD\u5F48Shell\u3001\u5F8C\u9580\u3001\u4F9B\u61C9\u93C8\u6295\u6BD2\u7B49\u60E1\u610F\u7A0B\u5F0F\u78BC\u7279\u5FB5"
@@ -8438,11 +8438,7 @@ var init_en = __esm({
           noDataHintLive: "Run an inspection and the score appears here instantly",
           notRunHint: "Run this check and summarize to count toward the total score",
           scoreDelta: "Previous {{prev}} \u2192 Now {{now}}",
-          ring: {
-            gaugeMin: "0",
-            gaugeMid: "50",
-            gaugeMax: "100"
-          }
+          unit: "pts"
         },
         reportShell: {
           backHome: "Back to Home"
@@ -9159,6 +9155,10 @@ var init_en = __esm({
             dependency: {
               desc: "Identifies outdated or unsafe dependencies with known CVEs",
               title: "Dependency check"
+            },
+            secrets: {
+              desc: "Detects hardcoded secrets, passwords, and access tokens in code",
+              title: "Secret check"
             },
             malware: {
               desc: "Scans for reverse shells, backdoors, supply-chain poisoning, and other malicious code patterns"
@@ -10504,11 +10504,7 @@ var init_ko = __esm({
           noDataHintLive: "\uC810\uAC80\uC744 \uC2E4\uD589\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC989\uC2DC \uC810\uC218\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4",
           notRunHint: "\uC774 \uAE30\uB2A5\uC744 \uC2E4\uD589\uD558\uACE0 \uC694\uC57D\uD558\uBA74 \uCD1D\uC810\uC5D0 \uBC18\uC601\uB429\uB2C8\uB2E4",
           scoreDelta: "\uC774\uC804 {{prev}} \u2192 \uD604\uC7AC {{now}}",
-          ring: {
-            gaugeMin: "\uAC74",
-            gaugeMid: "\uAC15",
-            gaugeMax: "\uC810"
-          }
+          unit: "\uC810"
         },
         reportShell: {
           backHome: "\uD648\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"
@@ -11147,6 +11143,10 @@ var init_ko = __esm({
             dependency: {
               desc: "\uC54C\uB824\uC9C4 CVE\uAC00 \uC788\uB294 \uC624\uB798\uB418\uC5C8\uAC70\uB098 \uC548\uC804\uD558\uC9C0 \uC54A\uC740 \uC758\uC874\uC131 \uC2DD\uBCC4",
               title: "\uC758\uC874\uC131 \uAC80\uC0AC"
+            },
+            secrets: {
+              desc: "\uCF54\uB4DC\uC5D0 \uD558\uB4DC\uCF54\uB529\uB41C \uBE44\uBC00\uD0A4, \uBE44\uBC00\uBC88\uD638, \uC561\uC138\uC2A4 \uD1A0\uD070 \uC2DD\uBCC4",
+              title: "\uC2DC\uD06C\uB9BF \uAC80\uC0AC"
             },
             malware: {
               desc: "\uB9AC\uBC84\uC2A4 \uC178, \uBC31\uB3C4\uC5B4, \uACF5\uAE09\uB9DD \uC911\uB3C5 \uB4F1 \uC545\uC131 \uCF54\uB4DC \uD2B9\uC131 \uC2A4\uCE94"
@@ -12570,11 +12570,7 @@ var init_ja = __esm({
           noDataHintLive: "\u5DE1\u56DE\u3092\u5B9F\u884C\u3059\u308B\u3068\u3001\u3053\u3053\u306B\u5373\u5EA7\u306B\u30B9\u30B3\u30A2\u304C\u8868\u793A\u3055\u308C\u307E\u3059",
           notRunHint: "\u3053\u306E\u6A5F\u80FD\u3092\u5B9F\u884C\u3057\u3066\u96C6\u8A08\u3059\u308B\u3068\u7DCF\u5408\u30B9\u30B3\u30A2\u306B\u53CD\u6620\u3055\u308C\u307E\u3059",
           scoreDelta: "\u524D\u56DE {{prev}} \u2192 \u4ECA\u56DE {{now}}",
-          ring: {
-            gaugeMin: "\u5065",
-            gaugeMid: "\u5EB7",
-            gaugeMax: "\u70B9"
-          }
+          unit: "\u70B9"
         },
         reportShell: {
           backHome: "\u30DB\u30FC\u30E0\u306B\u623B\u308B"
@@ -13213,6 +13209,10 @@ var init_ja = __esm({
             dependency: {
               desc: "\u65E2\u77E5\u306E CVE \u3092\u6301\u3064\u53E4\u3044\u3001\u307E\u305F\u306F\u5B89\u5168\u3067\u306A\u3044\u4F9D\u5B58\u95A2\u4FC2\u3092\u8B58\u5225",
               title: "\u4F9D\u5B58\u95A2\u4FC2\u30C1\u30A7\u30C3\u30AF"
+            },
+            secrets: {
+              desc: "\u30B3\u30FC\u30C9\u5185\u306B\u30CF\u30FC\u30C9\u30B3\u30FC\u30C9\u3055\u308C\u305F\u79D8\u5BC6\u9375\u30FB\u30D1\u30B9\u30EF\u30FC\u30C9\u30FB\u30A2\u30AF\u30BB\u30B9\u30C8\u30FC\u30AF\u30F3\u3092\u691C\u51FA",
+              title: "\u30B7\u30FC\u30AF\u30EC\u30C3\u30C8\u30C1\u30A7\u30C3\u30AF"
             },
             malware: {
               desc: "\u30EA\u30D0\u30FC\u30B9\u30B7\u30A7\u30EB\u3001\u30D0\u30C3\u30AF\u30C9\u30A2\u3001\u30B5\u30D7\u30E9\u30A4\u30C1\u30A7\u30FC\u30F3\u6C5A\u67D3\u306A\u3069\u306E\u60AA\u610F\u306E\u3042\u308B\u30B3\u30FC\u30C9\u306E\u7279\u5FB4\u3092\u30B9\u30AD\u30E3\u30F3"
@@ -595143,23 +595143,26 @@ function groupEditsByFile(fixes) {
 }
 function applyEditsToFile(filePath, edits) {
   edits.sort((a, b) => b.startLine - a.startLine || b.startColumn - a.startColumn);
-  let fixed = 0;
   try {
-    let content = fs35.readFileSync(filePath, "utf-8");
+    const original = fs35.readFileSync(filePath, "utf-8");
+    let content = original;
+    let persisted = original;
+    let changed = false;
     for (const edit of edits) {
       const result = applyEdit(content, edit);
-      if (!result) continue;
+      if (!result || result.content === content) continue;
       content = result.content;
+      changed = true;
       if (result.wroteFile) {
         fs35.writeFileSync(filePath, content, "utf-8");
-        fixed++;
+        persisted = content;
       }
     }
-    fs35.writeFileSync(filePath, content, "utf-8");
-    fixed++;
-    return { fixed };
+    if (!changed) return { fixed: 0 };
+    if (content !== persisted) fs35.writeFileSync(filePath, content, "utf-8");
+    return { fixed: 1 };
   } catch (e) {
-    return { fixed, error: e instanceof Error ? e.message : String(e) };
+    return { fixed: 0, error: e instanceof Error ? e.message : String(e) };
   }
 }
 function applyEdit(content, edit) {

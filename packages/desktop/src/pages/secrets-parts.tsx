@@ -309,6 +309,7 @@ function SecretsFindingItem({
 
 export function SecretsListCard({
   findings,
+  error,
   onMarkRotating,
   onVerifyRotated,
   onDismiss,
@@ -316,6 +317,7 @@ export function SecretsListCard({
   onCopyAll,
 }: {
   findings: SecretReportData['findings'];
+  error?: string | null;
   onMarkRotating: (secretId: string) => void;
   onVerifyRotated: (secretId: string) => void;
   onDismiss: (secretId: string) => void;
@@ -335,6 +337,19 @@ export function SecretsListCard({
         label={t('page.secrets.list.title')}
         right={<span className="text-xs text-zh-muted">{t('page.secrets.list.hint')}</span>}
       />
+      {/* 扫描失败必须显式呈现：engine 不可用时 runSecrets 返回空 findings + error，
+          若只渲染 findings，用户看到的是「无密钥」的绿色空态，会误判为扫描通过。 */}
+      {error && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircleIcon />
+          <div>
+            <div className="text-sm font-medium text-danger-700">
+              {t('page.secrets.errorTitle')}
+            </div>
+            <div className="text-xs text-danger-500 mt-0.5">{error}</div>
+          </div>
+        </div>
+      )}
       {findings.length === 0 ? (
         <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🟢</span>

@@ -167,6 +167,7 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
         ) : secretsReport ? (
           <SecretsListCard
             findings={secretsReport.findings}
+            error={secretsReport.error}
             onMarkRotating={handleMarkRotating}
             onVerifyRotated={handleVerifyRotated}
             onDismiss={handleDismiss}

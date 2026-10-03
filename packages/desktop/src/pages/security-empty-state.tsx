@@ -31,7 +31,16 @@ export function SecurityEmptyState({
         {
           icon: (
             <FeatureIcon>
-              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3" />
+              <circle cx="12" cy="12" r="6.5" />
+              <circle cx="12" cy="12" r="1.8" />
+              <path d="M12 5.5V3" />
+              <path d="M12 18.5V21" />
+              <path d="M5.5 12H3" />
+              <path d="M18.5 12H21" />
+              <path d="M7.4 7.4L5.6 5.6" />
+              <path d="M16.6 16.6l1.8 1.8" />
+              <path d="M16.6 7.4l1.8-1.8" />
+              <path d="M7.4 16.6l-1.8 1.8" />
             </FeatureIcon>
           ),
           title: t('page.security.tab.malware'),
@@ -40,13 +49,13 @@ export function SecurityEmptyState({
         {
           icon: (
             <FeatureIcon>
-              <path d="M4 7V4h16v3" />
-              <path d="M9 20h6" />
-              <path d="M12 4v16" />
+              <circle cx="7.5" cy="15.5" r="4.5" />
+              <path d="M11 12L21 2" />
+              <path d="M15.5 7.5l3 3L22 7l-3-3" />
             </FeatureIcon>
           ),
-          title: t('page.security.feature.dependency.title'),
-          desc: t('page.security.feature.dependency.desc'),
+          title: t('page.security.feature.secrets.title'),
+          desc: t('page.security.feature.secrets.desc'),
         },
         {
           icon: (

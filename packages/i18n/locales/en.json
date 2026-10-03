@@ -849,11 +849,7 @@
       "noDataHintLive": "Run an inspection and the score appears here instantly",
       "notRunHint": "Run this check and summarize to count toward the total score",
       "scoreDelta": "Previous {{prev}} → Now {{now}}",
-      "ring": {
-        "gaugeMin": "0",
-        "gaugeMid": "50",
-        "gaugeMax": "100"
-      }
+      "unit": "pts"
     },
     "reportShell": {
       "backHome": "Back to Home"
@@ -1570,6 +1566,10 @@
         "dependency": {
           "desc": "Identifies outdated or unsafe dependencies with known CVEs",
           "title": "Dependency check"
+        },
+        "secrets": {
+          "desc": "Detects hardcoded secrets, passwords, and access tokens in code",
+          "title": "Secret check"
         },
         "malware": {
           "desc": "Scans for reverse shells, backdoors, supply-chain poisoning, and other malicious code patterns"

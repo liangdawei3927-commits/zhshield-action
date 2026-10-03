@@ -12,7 +12,7 @@ export function ShieldLogo({ size = 24 }: { size?: number }) {
         strokeLinejoin="round"
         fill="none"
       />
-      {/* <- 箭头符号 */}
+      {/* <_ 终端提示符符号（`<` + 底部横线，与<底边齐平） */}
       {/* < 符号 */}
       <path
         d="M8 10L5.5 12.5L8 15"

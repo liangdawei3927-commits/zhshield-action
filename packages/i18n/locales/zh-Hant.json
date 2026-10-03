@@ -849,11 +849,7 @@
       "noDataHintLive": "完成一次巡檢後，這裡即時顯示評分",
       "notRunHint": "執行本功能並彙總後計入總分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
-      "ring": {
-        "gaugeMin": "評",
-        "gaugeMid": "",
-        "gaugeMax": "分"
-      }
+      "unit": "分"
     },
     "reportShell": {
       "backHome": "返回主頁"
@@ -1492,6 +1488,10 @@
         "dependency": {
           "desc": "識別存在已知 CVE 的過期或不安全依賴",
           "title": "依賴檢查"
+        },
+        "secrets": {
+          "desc": "識別程式碼中硬編碼的金鑰、密碼與存取權杖",
+          "title": "密鑰檢查"
         },
         "malware": {
           "desc": "掃描反彈Shell、後門、供應鏈投毒等惡意程式碼特徵"

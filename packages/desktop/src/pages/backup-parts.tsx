@@ -20,20 +20,42 @@ const WEEKDAY_KEYS = [
   'page.backup.schedule.weekday.6',
 ] as const;
 
-/** 定时备份卡片顶行：图标 + 标题 + 启用状态徽章 + 外部评分 + 启用开关 */
+/** 定时备份卡片（单行）：图标 + 标题 + 状态徽章 + 评分 + 频率/时间/保存 + 启用开关 */
 function ScheduleHeaderRow({
   enabled,
   score,
   onToggle,
+  schedule,
+  saving,
+  onUpdate,
+  onSave,
   t,
 }: {
   enabled: boolean;
   score?: ReactNode;
   onToggle: () => void;
+  schedule: BackupScheduleData | null;
+  saving: boolean;
+  onUpdate: (patch: Partial<BackupScheduleData>) => void;
+  onSave: () => void;
   t: ReturnType<typeof useT>;
 }) {
+  const toggleBtn = (mlAuto: boolean) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${mlAuto ? 'ml-auto' : ''}`}
+      style={{
+        borderColor: enabled ? 'rgb(var(--zh-muted) / 0.3)' : 'rgb(var(--zh-brand))',
+        color: enabled ? 'rgb(var(--zh-muted))' : 'rgb(var(--zh-brand))',
+      }}
+    >
+      {t(enabled ? 'page.backup.schedule.disable' : 'page.backup.schedule.enable')}
+    </button>
+  );
+
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center flex-wrap gap-3">
       <svg
         width="18"
         height="18"
@@ -57,101 +79,79 @@ function ScheduleHeaderRow({
         {t(enabled ? 'page.backup.schedule.enabled' : 'page.backup.schedule.disabled')}
       </span>
       {score}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="ml-auto text-xs px-3 py-1.5 rounded-lg border transition-colors"
-        style={{
-          borderColor: enabled ? 'rgb(var(--zh-muted) / 0.3)' : 'rgb(var(--zh-brand))',
-          color: enabled ? 'rgb(var(--zh-muted))' : 'rgb(var(--zh-brand))',
-        }}
-      >
-        {t(enabled ? 'page.backup.schedule.disable' : 'page.backup.schedule.enable')}
-      </button>
+      {enabled && schedule ? (
+        <>
+          <div className="ml-auto flex items-center flex-wrap gap-3 text-sm text-zh-ink">
+            <select
+              aria-label={t('page.backup.schedule.frequency')}
+              value={schedule.frequency}
+              onChange={(e) => onUpdate({ frequency: e.target.value })}
+              className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
+            >
+              <option value="daily">{t('page.backup.schedule.freqDaily')}</option>
+              <option value="weekly">{t('page.backup.schedule.freqWeekly')}</option>
+              <option value="monthly">{t('page.backup.schedule.freqMonthly')}</option>
+            </select>
+            {schedule.frequency === 'weekly' && (
+              <select
+                aria-label={t('page.backup.schedule.dayOfWeek')}
+                value={String(schedule.dayOfWeek ?? 0)}
+                onChange={(e) => onUpdate({ dayOfWeek: Number(e.target.value) })}
+                className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
+              >
+                {WEEKDAY_KEYS.map((key, idx) => (
+                  <option key={idx} value={idx}>
+                    {t(key)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {schedule.frequency === 'monthly' && (
+              <label className="flex items-center gap-1.5">
+                <span className="text-zh-muted">{t('page.backup.schedule.dayOfMonth')}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={schedule.dayOfMonth ?? 1}
+                  onChange={(e) =>
+                    onUpdate({ dayOfMonth: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })
+                  }
+                  className="w-16 px-2 py-1.5 rounded-lg border border-black/10 bg-white"
+                />
+              </label>
+            )}
+            <input
+              type="time"
+              aria-label={t('page.backup.schedule.time')}
+              value={schedule.time}
+              onChange={(e) => onUpdate({ time: e.target.value })}
+              className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
+            />
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{
+                background: 'rgb(var(--zh-brand))',
+                color: '#fff',
+              }}
+            >
+              {t(saving ? 'page.backup.schedule.saving' : 'page.backup.schedule.save')}
+            </button>
+          </div>
+          {toggleBtn(false)}
+        </>
+      ) : (
+        toggleBtn(true)
+      )}
     </div>
   );
 }
 
-/** 定时备份频率/时间选择 + 保存按钮（仅启用时渲染） */
-function ScheduleControls({
-  schedule,
-  saving,
-  onUpdate,
-  onSave,
-  t,
-}: {
-  schedule: BackupScheduleData;
-  saving: boolean;
-  onUpdate: (patch: Partial<BackupScheduleData>) => void;
-  onSave: () => void;
-  t: ReturnType<typeof useT>;
-}) {
-  return (
-    <div className="flex items-center flex-wrap gap-3 mt-3 text-sm text-zh-ink">
-      <select
-        aria-label={t('page.backup.schedule.frequency')}
-        value={schedule.frequency}
-        onChange={(e) => onUpdate({ frequency: e.target.value })}
-        className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
-      >
-        <option value="daily">{t('page.backup.schedule.freqDaily')}</option>
-        <option value="weekly">{t('page.backup.schedule.freqWeekly')}</option>
-        <option value="monthly">{t('page.backup.schedule.freqMonthly')}</option>
-      </select>
-      {schedule.frequency === 'weekly' && (
-        <select
-          aria-label={t('page.backup.schedule.dayOfWeek')}
-          value={String(schedule.dayOfWeek ?? 0)}
-          onChange={(e) => onUpdate({ dayOfWeek: Number(e.target.value) })}
-          className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
-        >
-          {WEEKDAY_KEYS.map((key, idx) => (
-            <option key={idx} value={idx}>
-              {t(key)}
-            </option>
-          ))}
-        </select>
-      )}
-      {schedule.frequency === 'monthly' && (
-        <label className="flex items-center gap-1.5">
-          <span className="text-zh-muted">{t('page.backup.schedule.dayOfMonth')}</span>
-          <input
-            type="number"
-            min={1}
-            max={28}
-            value={schedule.dayOfMonth ?? 1}
-            onChange={(e) =>
-              onUpdate({ dayOfMonth: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })
-            }
-            className="w-16 px-2 py-1.5 rounded-lg border border-black/10 bg-white"
-          />
-        </label>
-      )}
-      <input
-        type="time"
-        aria-label={t('page.backup.schedule.time')}
-        value={schedule.time}
-        onChange={(e) => onUpdate({ time: e.target.value })}
-        className="px-2 py-1.5 rounded-lg border border-black/10 bg-white"
-      />
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="ml-auto text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-        style={{
-          background: 'rgb(var(--zh-brand))',
-          color: '#fff',
-        }}
-      >
-        {t(saving ? 'page.backup.schedule.saving' : 'page.backup.schedule.save')}
-      </button>
-    </div>
-  );
-}
-
-/** 定时备份设置卡片：启用开关 + 频率/时间选择 + 保存（保存后调度器即时生效） */
-export function BackupScheduleCard({
+/** 定时备份设置区块（无独立卡片容器，嵌入备份记录卡片头部）：单行开关/频率/时间/保存 */
+export function BackupScheduleRow({
   projectPath,
   score,
 }: {
@@ -163,24 +163,19 @@ export function BackupScheduleCard({
   const enabled = schedule?.enabled === true;
 
   return (
-    <div className="mb-8 px-5 py-4 rounded-xl bg-white border border-black/5 shadow-sm">
+    <>
       <ScheduleHeaderRow
         enabled={enabled}
         score={score}
+        schedule={schedule}
+        saving={saving}
         onToggle={() => update({ enabled: !enabled })}
+        onUpdate={update}
+        onSave={() => void save()}
         t={t}
       />
-      {schedule && enabled && (
-        <ScheduleControls
-          schedule={schedule}
-          saving={saving}
-          onUpdate={update}
-          onSave={() => void save()}
-          t={t}
-        />
-      )}
       {!enabled && <p className="mt-2 text-xs text-zh-muted">{t('page.backup.schedule.descOff')}</p>}
-    </div>
+    </>
   );
 }
 

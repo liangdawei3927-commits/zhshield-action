@@ -5,7 +5,7 @@ import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useBackupPage } from './backup-logic';
-import { BackupScheduleCard, BackupProgressBar, BackupResultCard } from './backup-parts';
+import { BackupScheduleRow, BackupProgressBar, BackupResultCard } from './backup-parts';
 import { BackupRecordsPanel } from './backup-records';
 import { BackupEmptyState } from './backup-empty-state';
 
@@ -93,7 +93,6 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
           },
         ]}
       >
-        <BackupScheduleCard projectPath={projectPath} />
         {isBackingUp && <BackupProgressBar progress={progress} />}
         {lastResult && <BackupResultCard result={lastResult} error={error} />}
         <BackupRecordsPanel
@@ -101,6 +100,7 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
           expandedId={expandedId}
           onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
           onDelete={setDeleteTarget}
+          scheduleHeader={<BackupScheduleRow projectPath={projectPath} />}
         />
         <ConfirmDialog
           open={deleteTarget !== null}

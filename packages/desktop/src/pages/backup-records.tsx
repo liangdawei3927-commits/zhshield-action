@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { BackupRecordData } from '../types/electron';
 import { Bounce, BounceCard } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
@@ -140,15 +141,20 @@ export function BackupRecordsPanel({
   expandedId,
   onToggle,
   onDelete,
+  scheduleHeader,
 }: {
   records: BackupRecordData[];
   expandedId: string | null;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  scheduleHeader?: ReactNode;
 }) {
   const t = useT();
   return (
     <ResultCard variant="list">
+      {scheduleHeader && (
+        <div className="px-5 py-4 border-b border-zh-line">{scheduleHeader}</div>
+      )}
       <div className="px-5 py-4 border-b border-zh-line">
         <h3 className="text-sm font-semibold text-zh-ink-2">
           {t('page.backup.recordsTitle')}

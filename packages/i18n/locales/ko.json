@@ -849,11 +849,7 @@
       "noDataHintLive": "점검을 실행하면 여기에 즉시 점수가 표시됩니다",
       "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다",
       "scoreDelta": "이전 {{prev}} → 현재 {{now}}",
-      "ring": {
-        "gaugeMin": "건",
-        "gaugeMid": "강",
-        "gaugeMax": "점"
-      }
+      "unit": "점"
     },
     "reportShell": {
       "backHome": "홈으로 돌아가기"
@@ -1492,6 +1488,10 @@
         "dependency": {
           "desc": "알려진 CVE가 있는 오래되었거나 안전하지 않은 의존성 식별",
           "title": "의존성 검사"
+        },
+        "secrets": {
+          "desc": "코드에 하드코딩된 비밀키, 비밀번호, 액세스 토큰 식별",
+          "title": "시크릿 검사"
         },
         "malware": {
           "desc": "리버스 셸, 백도어, 공급망 중독 등 악성 코드 특성 스캔"

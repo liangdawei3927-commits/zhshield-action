@@ -849,11 +849,7 @@
       "noDataHintLive": "完成一次巡检后，这里当场显示评分",
       "notRunHint": "运行本功能并汇总后计入总分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
-      "ring": {
-        "gaugeMin": "评",
-        "gaugeMid": "",
-        "gaugeMax": "分"
-      }
+      "unit": "分"
     },
     "reportShell": {
       "backHome": "返回主页"
@@ -1570,6 +1566,10 @@
         "dependency": {
           "desc": "识别存在已知 CVE 的过期或不安全依赖",
           "title": "依赖检查"
+        },
+        "secrets": {
+          "desc": "识别代码中硬编码的密钥、密码与访问令牌",
+          "title": "密钥检查"
         },
         "malware": {
           "desc": "扫描反弹Shell、后门、供应链投毒等恶意代码特征"

@@ -9,6 +9,7 @@ import {
 } from '../services/engineApi';
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { AiFixIssue } from '../utils/copyToAi';
+import { useLoadingAction } from '../hooks/useLoadingAction';
 
 /** 哨兵事件展示条目：事件元信息 + 定位/诊断/上下文证据 */
 export interface SentinelEventItem {
@@ -250,7 +251,7 @@ function useSentinelEvents(projectPath: string): {
   const markLoaded = useCallback(() => setLoading(false), [setLoading]);
   const { events, refreshEvents } = useSentinelEventData(markLoaded);
   const { monitoring, startMonitoring } = useSentinelMonitoring(projectPath, refreshEvents);
-  const startWithLoading = useSentinelStartWithLoading(startMonitoring, setLoading);
+  const startWithLoading = useLoadingAction(startMonitoring, setLoading);
 
   useEffect(() => {
     refreshEvents();
@@ -259,20 +260,6 @@ function useSentinelEvents(projectPath: string): {
   useSentinelPolling(monitoring, refreshEvents);
 
   return { events, loading, monitoring, refreshEvents, startMonitoring: startWithLoading };
-}
-
-function useSentinelStartWithLoading(
-  startMonitoring: () => Promise<void>,
-  setLoading: (v: boolean) => void,
-): () => Promise<void> {
-  return useCallback(async () => {
-    setLoading(true);
-    try {
-      await startMonitoring();
-    } finally {
-      setLoading(false);
-    }
-  }, [startMonitoring]);
 }
 
 /** 事件严重度 / 活跃状态统计 */

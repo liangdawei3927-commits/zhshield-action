@@ -7,8 +7,8 @@ import {
   runSecrets,
   verifySecretRotated,
 } from '../services/engineApi';
-import { useToast } from '../components/ui/Toast';
-import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
+import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
+import type { AiFixIssue } from '../utils/copyToAi';
 import type { SecretReportData } from '../types/electron';
 
 const logger = new Logger('secrets-logic');
@@ -192,23 +192,7 @@ function useSecretsCopyToAi(projectPath: string): {
   copyToAi: (finding: SecretReportData['findings'][number]) => void;
   copyAllToAi: (findings: SecretReportData['findings']) => void;
 } {
-  const { toast } = useToast();
-
-  const copyToAi = useCallback(
-    (finding: SecretReportData['findings'][number]) =>
-      copyIssuesToAi(projectPath, toast, [toAiIssue(finding)]),
-    [projectPath, toast],
-  );
-
-  const copyAllToAi = useCallback(
-    (findings: SecretReportData['findings']) => {
-      if (findings.length === 0) return;
-      copyIssuesToAi(projectPath, toast, findings.map(toAiIssue));
-    },
-    [projectPath, toast],
-  );
-
-  return { copyToAi, copyAllToAi };
+  return useCopyIssuesToAi(projectPath, toAiIssue);
 }
 
 export function useSecretsPage(projectPath: string) {

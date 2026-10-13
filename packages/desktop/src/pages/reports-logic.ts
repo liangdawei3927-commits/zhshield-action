@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/Toast';
 import { collectModuleScores, type ModuleScoreView } from './module-scores-logic';
 import type { HealthScoreData } from '../types/electron';
 import { getScoreColor } from '../components/business/score-grade';
+import { useLoadingAction } from '../hooks/useLoadingAction';
 
 /** 预别名类型 — 避免 .tsx 中出现泛型尖括号（会被 JSX 深度检测误判） */
 export type HealthScoreRow = Readonly<HealthScoreData>;
@@ -139,27 +140,13 @@ function useScoreHistory(projectPath: string): {
 } {
   const { data, fetchHistory } = useScoreHistoryData(projectPath);
   const [loading, setLoading] = useState(true);
-  const load = useScoreHistoryLoader(fetchHistory, setLoading);
+  const load = useLoadingAction(fetchHistory, setLoading);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   return { data, loading, load };
-}
-
-function useScoreHistoryLoader(
-  fetchHistory: () => Promise<void>,
-  setLoading: (v: boolean) => void,
-): () => Promise<void> {
-  return useCallback(async () => {
-    setLoading(true);
-    try {
-      await fetchHistory();
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchHistory]);
 }
 
 /**

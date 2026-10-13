@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
-import { useToast } from '../components/ui/Toast';
-import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
+import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
+import type { AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 /**
@@ -197,22 +197,7 @@ function useDependencyCopyToAi(projectPath: string): {
   copyToAi: (finding: TyposquatFindingData) => void;
   copyAllToAi: (findings: TyposquatFindingData[]) => void;
 } {
-  const { toast } = useToast();
-
-  const copyToAi = useCallback(
-    (finding: TyposquatFindingData) => copyIssuesToAi(projectPath, toast, [toAiIssue(finding)]),
-    [projectPath, toast],
-  );
-
-  const copyAllToAi = useCallback(
-    (findings: TyposquatFindingData[]) => {
-      if (findings.length === 0) return;
-      copyIssuesToAi(projectPath, toast, findings.map(toAiIssue));
-    },
-    [projectPath, toast],
-  );
-
-  return { copyToAi, copyAllToAi };
+  return useCopyIssuesToAi(projectPath, toAiIssue);
 }
 
 export function useDependencyPage(projectPath: string) {

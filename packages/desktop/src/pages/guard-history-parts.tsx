@@ -4,19 +4,10 @@ import { STATUS_LABELS } from './guard-logic';
 import { Bounce } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
+import { SEVERITY_STYLES } from './severity-styles';
 
 const RISK_LABELS: Record<string, { textKey: string; color: string; bg: string }> = {
-  high: {
-    textKey: 'severity.high',
-    color: 'rgb(var(--zh-danger))',
-    bg: 'rgb(var(--zh-danger) / 0.1)',
-  },
-  medium: {
-    textKey: 'severity.medium',
-    color: 'rgb(var(--zh-warning))',
-    bg: 'rgb(var(--zh-warning) / 0.1)',
-  },
-  low: { textKey: 'severity.low', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)' },
+  ...SEVERITY_STYLES,
 };
 
 const TRIGGER_LABELS: Record<string, string> = {

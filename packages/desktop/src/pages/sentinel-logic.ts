@@ -10,6 +10,7 @@ import {
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { AiFixIssue } from '../utils/copyToAi';
 import { useLoadingAction } from '../hooks/useLoadingAction';
+import { SEVERITY_STYLES } from './severity-styles';
 
 /** 哨兵事件展示条目：事件元信息 + 定位/诊断/上下文证据 */
 export interface SentinelEventItem {
@@ -38,17 +39,7 @@ export const SEVERITY_CONFIG: Record<string, { textKey: string; color: string; b
     color: 'rgb(var(--zh-danger-dark))',
     bg: 'rgb(var(--zh-danger) / 0.1)',
   },
-  high: {
-    textKey: 'severity.high',
-    color: 'rgb(var(--zh-danger))',
-    bg: 'rgb(var(--zh-danger) / 0.1)',
-  },
-  medium: {
-    textKey: 'severity.medium',
-    color: 'rgb(var(--zh-warning))',
-    bg: 'rgb(var(--zh-warning) / 0.1)',
-  },
-  low: { textKey: 'severity.low', color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)' },
+  ...SEVERITY_STYLES,
   info: {
     textKey: 'severity.info',
     color: 'rgb(var(--zh-muted))',

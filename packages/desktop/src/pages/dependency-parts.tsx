@@ -18,10 +18,10 @@ import {
   ENV_SEVERITY_CONFIG,
 } from './dependency-logic';
 
-/** 依赖图谱小图标（24×24，线性风格） */
-function DependencyGraphIcon() {
+/** 依赖图谱 SVG 字形（24×24 线性风格；尺寸/描边由宿主 `<svg>` 决定） */
+export function DependencyGraphGlyph() {
   return (
-    <BrandMarkIcon>
+    <>
       <circle cx="12" cy="5" r="2.5" />
       <circle cx="5" cy="18" r="2.5" />
       <circle cx="19" cy="18" r="2.5" />
@@ -31,6 +31,15 @@ function DependencyGraphIcon() {
       <path d="M13.5 12h3" />
       <path d="M6.5 16.5l2-2" />
       <path d="M17.5 16.5l-2-2" />
+    </>
+  );
+}
+
+/** 依赖图谱小图标（BrandMarkIcon 包裹） */
+function DependencyGraphIcon() {
+  return (
+    <BrandMarkIcon>
+      <DependencyGraphGlyph />
     </BrandMarkIcon>
   );
 }

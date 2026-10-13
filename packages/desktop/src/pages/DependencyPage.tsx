@@ -10,6 +10,7 @@ import {
   DependencyUpgradeCard,
   DependencyEnvCard,
   DependencyOutdatedCard,
+  DependencyGraphGlyph,
 } from './dependency-parts';
 import { ReportShell } from '../components/business/ReportShell';
 import { Bounce } from '../components/ui/Bounce';
@@ -58,15 +59,7 @@ function DependencyReportView({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <circle cx="12" cy="5" r="2.5" />
-            <circle cx="5" cy="18" r="2.5" />
-            <circle cx="19" cy="18" r="2.5" />
-            <circle cx="12" cy="12" r="2.5" />
-            <path d="M12 7.5V9.5" />
-            <path d="M10.5 12H7.5" />
-            <path d="M13.5 12h3" />
-            <path d="M6.5 16.5l2-2" />
-            <path d="M17.5 16.5l-2-2" />
+            <DependencyGraphGlyph />
           </svg>
         </Bounce>
       }

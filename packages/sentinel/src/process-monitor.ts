@@ -1,14 +1,18 @@
-import { spawn, type ChildProcess } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { EventCenter } from './event-center';
 import { reportHealthCheckFailure, runHealthProbe } from './health-probe';
+import { spawnInGroup, terminateProcessTree } from './process-tree';
 import { eventKey } from './event-key';
 import type { SentinelEvent, EventSeverity } from './types';
 
 /** 命令串按空白切分（spawnProcess 每次启动复用，避免热路径重建正则） */
 const RE_WHITESPACE = /\s+/;
 
-/** 单次拉起累计输出的字符上限：只为给分类器一个有界输入、限制常驻内存占用，非行为调参常量 */
+/** 本轮输出尾部保留上限：仅供 restart-limit 事件的诊断上下文，故障判定不依赖它 */
 const LAUNCH_OUTPUT_MAX_CHARS = 8192;
+
+/** 故障签名匹配窗口：只需容纳最长签名（"address already in use" 等），远小于整段输出 */
+const FAULT_WINDOW_CHARS = 1024;
 
 /**
  * p3 生命周期事件（进程启动 / 正常退出）属于"事件"而非"待处理问题"。
@@ -64,11 +68,37 @@ export function classifyNonRemediableFault(output: string): NonRemediableFault {
   return { kind: 'port-in-use', port: null };
 }
 
-/** 有界累计本轮输出：只保留前 MAX 字符，错误行在进程崩溃时最先输出，故截尾不截头 */
-function appendBoundedOutput(current: string, chunk: Buffer): string {
-  const room = LAUNCH_OUTPUT_MAX_CHARS - current.length;
-  if (room <= 0) return current;
-  return current + chunk.toString().slice(0, room);
+/**
+ * 增量故障检测器：逐块累积一个短滑动窗口并即时匹配，命中即锁定。
+ * 相比"对整段输出做一次分类"：跨块签名（"Port 51"|"73 is already"|" in use"）仍可识别；
+ * 命中后锁定，随后再长的启动横幅也无法把已确认的故障挤出窗口（对截断免疫）；
+ * 常驻内存恒为窗口大小。
+ */
+export class FaultDetector {
+  private window = '';
+  private latched: NonRemediableFault = { kind: 'none' };
+
+  feed(chunk: string): void {
+    this.window = (this.window + chunk).slice(-FAULT_WINDOW_CHARS);
+    if (this.latched.kind === 'none') {
+      const detected = classifyNonRemediableFault(this.window);
+      if (detected.kind !== 'none') this.latched = detected;
+    }
+  }
+
+  fault(): NonRemediableFault {
+    return this.latched;
+  }
+
+  reset(): void {
+    this.window = '';
+    this.latched = { kind: 'none' };
+  }
+}
+
+/** 保留本轮输出尾部，作为 restart-limit 事件的诊断上下文（截头不截尾） */
+function appendBoundedOutput(current: string, chunk: string): string {
+  return (current + chunk).slice(-LAUNCH_OUTPUT_MAX_CHARS);
 }
 
 // ─── 重启预算结算（纯函数） ───────────────────────────────────
@@ -108,14 +138,14 @@ interface ProcessEventSpec {
   context: Record<string, unknown>;
 }
 
-/** 以管道 stdio 启动子进程（不继承终端） */
+/** 以管道 stdio、独立进程组启动子进程（不继承终端） */
 function spawnProcess(cmd: string, args: string[], cwd: string): ChildProcess {
   // detectRunCommand 等调用方可能传入 "npm run dev" 式命令串；shell:false 下
   // spawn 会把整串当可执行文件路径导致 ENOENT，需拆分为可执行名 + 参数。
   const tokens = cmd.trim().split(RE_WHITESPACE);
   const executable = tokens[0];
   const resolvedArgs = args.length > 0 ? args : tokens.slice(1);
-  return spawn(executable, resolvedArgs, {
+  return spawnInGroup(executable, resolvedArgs, {
     cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
@@ -196,15 +226,22 @@ function portInUseSpec(cmd: string, port: number | null): ProcessEventSpec {
   };
 }
 
-function restartLimitSpec(command: string, used: number, max: number): ProcessEventSpec {
+function restartLimitSpec(
+  command: string,
+  used: number,
+  max: number,
+  outputTail: string,
+): ProcessEventSpec {
+  const tail = outputTail.slice(-2000);
   return {
     title: 'Process restart limit reached',
     severity: 'p2',
-    context: { command, restarts: used },
+    context: { command, restarts: used, outputTail: tail },
     action: 'restart-limit-reached',
     detail:
       `Process ${command} exhausted the restart budget ` +
-      `(${used} of max ${max} restarts used); monitoring stopped`,
+      `(${used} of max ${max} restarts used); monitoring stopped. ` +
+      `Last output: ${tail.slice(-500)}`,
   };
 }
 
@@ -237,8 +274,12 @@ export class ProcessMonitor {
   private running = false;
   /** 每次拉起进程时递增；用于阻断陈旧健康探测回调查出新一轮后的重复重启 */
   private probeEpoch = 0;
-  /** 当前这次拉起的输出累计（stdout + stderr），每次 launchProcess 清空，保证分类只看到本轮 */
+  /** 已有一次健康探测在途；避免探测命令挂死时定时器每轮再叠加一个探测进程 */
+  private probeInFlight = false;
+  /** 本轮输出尾部（stdout + stderr），每次 launchProcess 清空；仅供事件诊断上下文 */
   private launchOutput = '';
+  /** 本轮不可修复故障的增量检测器（对输出截断免疫） */
+  private faultDetector = new FaultDetector();
   /** 已有一次重启在途；在途期间的再次请求不再消耗预算 */
   private relaunchInFlight = false;
   /** 终止原因；null 表示非终态，用于把"已终止"与"从未启动"区分开 */
@@ -259,14 +300,13 @@ export class ProcessMonitor {
   stop(): void {
     this.running = false;
     this.terminalState = null;
+    this.probeInFlight = false;
     if (this.healthTimer) {
       clearInterval(this.healthTimer);
       this.healthTimer = null;
     }
-    if (this.proc) {
-      this.proc.kill('SIGTERM');
-      this.proc = null;
-    }
+    terminateProcessTree(this.proc);
+    this.proc = null;
   }
 
   /** 生命周期状态：预算耗尽 / 不可修复故障后永久静默时可被观测到；重新武装只能由用户显式 start() 发起 */
@@ -291,10 +331,8 @@ export class ProcessMonitor {
     }
     if (decision.kind === 'suppress') return decision;
 
-    if (this.proc) {
-      this.proc.kill('SIGTERM');
-      this.proc = null;
-    }
+    terminateProcessTree(this.proc);
+    this.proc = null;
     this.restarts++;
     this.relaunchInFlight = true;
     const delay = config.restartDelayMs ?? 2000;
@@ -324,6 +362,7 @@ export class ProcessMonitor {
     const cwd = this.config.cwd;
     this.probeEpoch++;
     this.launchOutput = '';
+    this.faultDetector.reset();
     this.relaunchInFlight = false;
     try {
       this.proc = spawnProcess(cmd, args, cwd);
@@ -344,10 +383,14 @@ export class ProcessMonitor {
 
     this.proc.stdout?.on('data', (data: Buffer) => {
       // stdout is piped for potential log collection integration
-      this.launchOutput = appendBoundedOutput(this.launchOutput, data);
+      const text = data.toString();
+      this.launchOutput = appendBoundedOutput(this.launchOutput, text);
+      this.faultDetector.feed(text);
     });
     this.proc.stderr?.on('data', (data: Buffer) => {
-      this.launchOutput = appendBoundedOutput(this.launchOutput, data);
+      const text = data.toString();
+      this.launchOutput = appendBoundedOutput(this.launchOutput, text);
+      this.faultDetector.feed(text);
       this.emitProcessStderr(cmd, pid, data);
     });
     this.proc.on('exit', (code, signal) => this.handleProcessExit(cmd, code, signal));
@@ -386,7 +429,7 @@ export class ProcessMonitor {
     this.emit(exitedSpec(cmd, code, signal, pid2, severity));
 
     if (!this.running || code === 0) return;
-    const fault = classifyNonRemediableFault(this.launchOutput);
+    const fault = this.faultDetector.fault();
     if (fault.kind === 'port-in-use') return this.suppressForPortConflict(cmd, fault.port);
     this.restart();
   }
@@ -409,7 +452,7 @@ export class ProcessMonitor {
 
   /** 重启预算耗尽属"我方重试策略"的事实（无东西丢失 / 损坏 / 暴露），不构成用户系统的危急故障 */
   private emitRestartLimitReached(command: string, maxRestarts: number): void {
-    this.emit(restartLimitSpec(command, this.restarts, maxRestarts));
+    this.emit(restartLimitSpec(command, this.restarts, maxRestarts, this.launchOutput));
   }
 
   /** 进程命令级失败（error 事件 / 启动异常）：两者同属 p1，仅措辞不同，故共用一个出口 */
@@ -442,7 +485,8 @@ export class ProcessMonitor {
 
   private probeIfConfigured(): void {
     const config = this.config;
-    if (!config?.healthCommand) return;
+    if (!config?.healthCommand || this.probeInFlight) return;
+    this.probeInFlight = true;
     const epoch = this.probeEpoch;
     runHealthProbe(
       { command: config.healthCommand, args: config.healthArgs, cwd: config.cwd },
@@ -452,6 +496,9 @@ export class ProcessMonitor {
           if (!this.running) return;
           this.reportHealthCheckFailure(output);
           if (this.running) this.restart();
+        },
+        onSettled: () => {
+          this.probeInFlight = false;
         },
       },
     );

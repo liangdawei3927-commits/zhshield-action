@@ -177,6 +177,7 @@ export {
   clearBaseline,
   baselineEntryKey,
   baselineKeySet,
+  isBaselineEntryActive,
   toBaselineEntry,
   issuesToBaselineEntries,
   filterIssuesByBaseline,
@@ -184,6 +185,7 @@ export {
   type Baseline,
   type BaselineEntry,
   type BaselineFilterResult,
+  type SuppressedIssue,
   readJsonBaseline,
   writeJsonBaselineAtomic,
   parseVersionedEnvelope,
@@ -217,3 +219,6 @@ export {
   extractPyprojectDeps,
   extractRequirementsNames,
 } from './manifest-parsers';
+export type { ProjectLanguage, PackageManager, ProjectProfile } from './project-profile';
+export { HEALTH_SCORE_DIMENSIONS, SCORE_DIMENSIONS, isScoreDimension } from './score-dimensions';
+export type { HealthScoreDimension, ScoreDimension } from './score-dimensions';

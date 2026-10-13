@@ -81,7 +81,7 @@ function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]
   if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) return;
   try {
     for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
+      if (entry.isDirectory() && !isNoiseDir(entry.name)) {
         pushCandidateMatch(projectRoot, parts, globIdx, baseDir, entry, dirs);
       }
     }

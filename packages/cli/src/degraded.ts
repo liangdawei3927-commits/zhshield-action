@@ -38,6 +38,10 @@ export function countDegraded(report: unknown): number {
   }
   // GuardReport：没有任何检查结果 = 什么都没查，与规则 0 条同级盲检
   if (Array.isArray(r.results) && !!r.summary && typeof r.summary === 'object') {
+    const degradedInResults = (r.results as unknown[]).filter(
+      (a) => !!a && typeof a === 'object' && (a as DegradableReport).degraded === true,
+    ).length;
+    if (degradedInResults > 0) return degradedInResults;
     const total = (r.summary as { total?: unknown }).total;
     return total === 0 ? 1 : 0;
   }

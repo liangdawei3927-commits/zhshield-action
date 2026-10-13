@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useT } from '../../i18n';
 import { useTaskRun } from '../../task-store';
-import type { ScoreDimension } from '../../pages/domain-score-logic';
+import type { ScoreDimension } from '@zh/shared';
 import { PageShell } from './PageShell';
 import { DomainScoreRing } from './DomainScoreRing';
 

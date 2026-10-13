@@ -1277,6 +1277,11 @@
       "scanNow": "一键体检",
       "scanning": "巡检中...",
       "source": "巡检",
+      "attention": "未检测",
+      "attentionHint": "以下检查未执行或未产出结论，不计入通过",
+      "errorTitle": "体检失败",
+      "errorNoReport": "体检未返回有效结果，请重试或查看运行日志",
+      "errorRetry": "重新体检",
       "status": {
         "fail": "失败",
         "pass": "通过",

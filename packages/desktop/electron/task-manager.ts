@@ -10,6 +10,7 @@ import {
   runGarbageCleanInWorker,
   runGarbageRestoreInWorker,
   runPerformanceInWorker,
+  cancelJob,
 } from './pipeline-host';
 
 /** 任务类型：各引擎检查域（巡检/安全/垃圾/性能/门禁/重构） */
@@ -58,6 +59,73 @@ interface QueuedJob {
 }
 
 /**
+ * 将请求载荷规范化为稳定的字符串键，用于去重时的「请求身份」比对。
+ *
+ * - 对象键按字典序排序：{ a, b } 与 { b, a } 得到同一键（键序稳定）；
+ * - 数组保持顺序：顺序是载荷语义的一部分，不得视为相等；
+ * - 原始值语义与 JSON.stringify 对齐；
+ * - undefined / 函数 / Symbol 无 JSON 表示 → 统一固定哨兵 `'null'`
+ *   （因此扫描类任务 request 为 undefined 时全部落到同一键，保持既有合并语义）。
+ */
+export function canonicalRequestKey(request: unknown): string {
+  return stableStringify(request);
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null) return 'null';
+  const type = typeof value;
+  if (type === 'number' || type === 'boolean' || type === 'string') {
+    return JSON.stringify(value) ?? 'null';
+  }
+  if (typeof value === 'bigint') return JSON.stringify(value.toString()) ?? 'null';
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (type === 'object') {
+    const record = value as Record<string, unknown>;
+    const parts: string[] = [];
+    for (const key of Object.keys(record).sort()) {
+      const item = record[key];
+      if (item === undefined) continue; // 与 JSON.stringify 一致：跳过 undefined 属性
+      parts.push(`${JSON.stringify(key)}:${stableStringify(item)}`);
+    }
+    return `{${parts.join(',')}}`;
+  }
+  // undefined / function / symbol：无 JSON 表示，统一哨兵
+  return 'null';
+}
+
+/**
+ * 纯谓词：在任务列表中寻找可复用（复用而非新建）的任务。
+ *
+ * 命中条件（全部满足）：状态为 queued|running、kind 相同、projectPath 相同，
+ * 且该任务的请求键（由调用方经 requestKeys 映射提供）与 requestKey 相同。
+ *
+ * 请求键不放进公开的 TaskInfo（避免广播给渲染进程），因此以独立映射传入，
+ * 既保持谓词纯函数（无副作用、无外部状态读取），又让请求身份参与比对。
+ */
+export function findReusableTask(
+  tasks: Iterable<TaskInfo>,
+  kind: TaskKind,
+  projectPath: string,
+  requestKey: string,
+  requestKeys: ReadonlyMap<string, string>,
+): TaskInfo | undefined {
+  for (const task of tasks) {
+    const active = task.status === 'queued' || task.status === 'running';
+    if (
+      active &&
+      task.kind === kind &&
+      task.projectPath === projectPath &&
+      requestKeys.get(task.id) === requestKey
+    ) {
+      return task;
+    }
+  }
+  return undefined;
+}
+
+/**
  * 全局任务注册表：统一调度所有引擎检查任务（360 卫士式）。
  * 受限并发 + 排队，状态/进度变化通过 tasks:changed 事件广播给渲染进程。
  */
@@ -69,6 +137,8 @@ export class TaskManager {
   >();
   private readonly queue: QueuedJob[] = [];
   private readonly lastBroadcast = new Map<string, number>();
+  // 任务 id → 请求键。刻意不并入 TaskInfo，避免随 tasks:changed 广播给渲染进程。
+  private readonly requestKeys = new Map<string, string>();
   private running = 0;
   private seq = 0;
 
@@ -78,11 +148,13 @@ export class TaskManager {
   ) {}
 
   start(kind: TaskKind, projectPath: string, request?: unknown): TaskInfo {
-    const existing = [...this.tasks.values()].find(
-      (t) =>
-        t.kind === kind &&
-        t.projectPath === projectPath &&
-        (t.status === 'queued' || t.status === 'running'),
+    const requestKey = canonicalRequestKey(request);
+    const existing = findReusableTask(
+      this.tasks.values(),
+      kind,
+      projectPath,
+      requestKey,
+      this.requestKeys,
     );
     if (existing) return existing;
 
@@ -95,6 +167,7 @@ export class TaskManager {
       startedAt: new Date().toISOString(),
     };
     this.tasks.set(task.id, task);
+    this.requestKeys.set(task.id, requestKey);
     this.queue.push({ task, request });
     this.updateQueuePositions();
     this.pump();
@@ -132,14 +205,19 @@ export class TaskManager {
       if (idx >= 0) this.queue.splice(idx, 1);
       task.status = 'cancelled';
       task.finishedAt = new Date().toISOString();
+      this.requestKeys.delete(task.id);
       this.settle(task);
       this.updateQueuePositions();
       this.broadcast(task);
       return true;
     }
     if (task.status === 'running') {
+      try {
+        cancelJob(task.id);
+      } catch {}
       task.status = 'cancelled';
       task.finishedAt = new Date().toISOString();
+      this.requestKeys.delete(task.id);
       this.broadcast(task);
       return true;
     }
@@ -184,6 +262,7 @@ export class TaskManager {
       })
       .finally(() => {
         task.finishedAt = new Date().toISOString();
+        this.requestKeys.delete(task.id);
         this.broadcast(task);
         this.settle(task);
         this.running--;

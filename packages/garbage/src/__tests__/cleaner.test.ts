@@ -155,6 +155,57 @@ describe('cleanGarbage', () => {
       fs.rmSync(outside, { recursive: true, force: true });
     }
   });
+
+  it('拒绝伪装成 dist 子路径的根文件清理（dist/../package.json 不得绕过白名单）', () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"x"}');
+
+    const result = cleanGarbage(dir, [
+      { id: 'n1', type: 'unused-file', path: 'dist/../package.json', size: 15, reason: 'x' },
+    ]);
+
+    expect(result.cleaned).toHaveLength(0);
+    expect(result.failed.length).toBeGreaterThan(0);
+    expect(fs.existsSync(path.join(dir, 'package.json'))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('拒绝伪装成 build 子路径的源码清理（build/../src/index.ts 不得绕过白名单）', () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'build'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src', 'index.ts'), 'export const a = 1;');
+
+    const result = cleanGarbage(dir, [
+      { id: 'n2', type: 'unused-file', path: 'build/../src/index.ts', size: 20, reason: 'x' },
+    ]);
+
+    expect(result.cleaned).toHaveLength(0);
+    expect(result.failed.length).toBeGreaterThan(0);
+    expect(fs.existsSync(path.join(dir, 'src', 'index.ts'))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('合法清理仍成功并正确统计 cleaned 与 freedBytes', () => {
+    const dir = tmpProject();
+    fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'dist', 'bundle.js'), 'x'.repeat(2048));
+    fs.writeFileSync(path.join(dir, 'debug.log'), 'y'.repeat(16));
+    const items: GarbageItem[] = [
+      { id: 'l1', type: 'build-artifact', path: 'dist', size: 2048, reason: 'build output' },
+      { id: 'l2', type: 'unused-file', path: 'debug.log', size: 16, reason: 'log file' },
+    ];
+
+    const result = cleanGarbage(dir, items);
+
+    expect(result.failed).toHaveLength(0);
+    expect(result.cleaned).toHaveLength(2);
+    expect(result.freedBytes).toBe(2064);
+    expect(fs.existsSync(path.join(dir, 'dist'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'debug.log'))).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe('restoreGarbage', () => {
@@ -191,6 +242,15 @@ describe('restoreGarbage', () => {
   it('批次不存在时抛错', () => {
     const dir = tmpProject();
     expect(() => restoreGarbage(dir, 'nonexistent-batch')).toThrow();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('拒绝非法 batchId（.. / . / 空 / 含分隔符），合法但不存在的仍报"不存在"', () => {
+    const dir = tmpProject();
+    for (const bad of ['..', '.', '', 'a/b', 'a\\b']) {
+      expect(() => restoreGarbage(dir, bad)).toThrow(/非法 batchId/);
+    }
+    expect(() => restoreGarbage(dir, 'nonexistent-batch')).toThrow(/不存在/);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 

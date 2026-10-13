@@ -435,7 +435,6 @@ export type {
   RuleEvaluation,
   RuleEngineReport,
   ContentInstruction,
-  ToolDispatchInstruction,
 } from './sop/_meta/rule-evaluation';
 export type { RuleContext } from './sop/_meta/rule-context';
 export type { ToolAdapter } from '@zh/shared';

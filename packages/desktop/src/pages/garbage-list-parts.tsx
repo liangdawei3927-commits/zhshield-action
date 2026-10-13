@@ -20,33 +20,6 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-export function GarbageStats({ report }: { report: GarbageScanReportData }) {
-  const t = useT();
-  const items = report.items;
-  const countByType = items.reduce<Record<string, number>>((acc, g) => {
-    acc[g.type] = (acc[g.type] ?? 0) + 1;
-    return acc;
-  }, {});
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-success-600">{items.length}</div>
-        <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.items')}</div>
-      </ResultCard>
-      <ResultCard variant="stats">
-        <div className="text-2xl font-bold text-success-600">{formatSize(report.summary.size)}</div>
-        <div className="text-xs text-zh-muted mt-1">{t('page.garbage.stats.freeable')}</div>
-      </ResultCard>
-      {(['unused-dependency', 'unused-file'] as const).map((type) => (
-        <ResultCard key={type} variant="stats">
-          <div className="text-2xl font-bold text-zh-ink-2">{countByType[type] ?? 0}</div>
-          <div className="text-xs text-zh-muted mt-1">{t(GARBAGE_TYPE_LABEL[type] ?? type)}</div>
-        </ResultCard>
-      ))}
-    </div>
-  );
-}
-
 interface GarbageListProps {
   items: GarbageScanReportData['items'];
   selected: Set<string>;

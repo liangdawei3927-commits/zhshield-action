@@ -14,11 +14,8 @@ export class ConfigLoader {
     return this.loadJson<CheckConfig[]>('checks.json') ?? [];
   }
 
-  loadSeverities(): Record<string, { level: string; blocking: boolean }> {
-    return (
-      this.loadJson<Record<string, { level: string; blocking: boolean }>>('severities.json') ?? {}
-    );
-  }
+
+
 
   private resolveConfigPath(fileName: string): string {
     return safeJoin(this.configDir, fileName);

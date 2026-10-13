@@ -47,22 +47,6 @@ export function useTask(kind: TaskKind, projectPath: string): TaskInfo | undefin
   return all.filter((t) => t.kind === kind && t.projectPath === projectPath).at(-1);
 }
 
-export function startTask(
-  kind: TaskKind,
-  projectPath: string,
-  options?: Record<string, unknown>,
-): Promise<TaskInfo> {
-  const api = window.electronAPI?.tasks;
-  if (!api) return Promise.reject(new Error(t('task.schedulerUnavailable')));
-  return api.start(kind, projectPath, options);
-}
-
-export function cancelTask(id: string): Promise<boolean> {
-  const api = window.electronAPI?.tasks;
-  if (!api) return Promise.resolve(false);
-  return api.cancel(id);
-}
-
 /** 任务类型默认操作文案（用于进度提示缺省值） */
 export const TASK_KIND_DEFAULT_LABELS: Record<TaskKind, string> = {
   pipeline: 'task.kind.pipeline',

@@ -1,22 +1,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { normalizePackageName, extractPyprojectDeps, extractRequirementsNames } from '@zh/shared';
+import {
+  normalizePackageName,
+  extractPyprojectDeps,
+  extractRequirementsNames,
+  type ProjectLanguage,
+  type PackageManager,
+  type ProjectProfile,
+} from '@zh/shared';
 
-/** 项目语言（JS/TS 走 package.json 判定，Python 走清单信号判定） */
-export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
-
-/** 包管理器（JS 侧按锁文件判定，Python 侧按 poetry/uv/Pipfile 等锁定文件判定） */
-export type PackageManager =
-  'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
-
-/** 项目画像：语言、框架、包管理器与是否含 TypeScript（供流水线选择应启用的域） */
-export interface ProjectProfile {
-  projectPath: string;
-  language: ProjectLanguage;
-  framework: string | null;
-  packageManager: PackageManager;
-  hasTypeScript: boolean;
-}
+// 项目画像类型统一由 @zh/shared 定义（跨包单一事实源）；此处重新导出以保持
+// @zh/pipeline 既有公开 API（index.ts 的 export type 与下游消费不变）。
+export type { ProjectLanguage, PackageManager, ProjectProfile };
 
 const FRAMEWORK_KEYWORDS: Array<{ name: string; keywords: string[] }> = [
   { name: 'NestJS', keywords: ['@nestjs/core', '@nestjs/common'] },

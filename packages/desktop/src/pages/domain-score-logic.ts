@@ -1,18 +1,6 @@
 import { t } from '@zh/i18n';
 import { dimensionView, scoreFreshness } from './reports-logic';
-
-/** 参与总分的 10 个评分维度（与 @zh/scoring 的 DIMENSION_CATEGORIES 键一致，十域评分体系 v2） */
-export type ScoreDimension =
-  | 'quality'
-  | 'gate'
-  | 'security'
-  | 'dependencies'
-  | 'techdebt'
-  | 'refactor'
-  | 'performance'
-  | 'sentinel'
-  | 'garbage'
-  | 'backup';
+import type { ScoreDimension } from '@zh/shared';
 
 /**
  * 分类页「评分」卡的展示视图（纯函数，供 DomainScoreCard 消费）。

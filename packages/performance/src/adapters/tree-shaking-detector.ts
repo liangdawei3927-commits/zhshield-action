@@ -303,8 +303,6 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   }
 }
 
-/** 便捷入口：单例类实例 */
-export const treeShakingDetector: TreeShakingDetector = new TreeShakingDetectorImpl();
 
 /** 排序：严重度降序，其次文件路径升序 */
 function sortTreeShakingIssues(issues: PerformanceIssue[]): PerformanceIssue[] {

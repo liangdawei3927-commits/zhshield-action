@@ -16,12 +16,7 @@ export type {
   TrivySecret,
   SemgrepOutput,
   SemgrepResult,
-  SemgrepDataflowTrace,
-  SemgrepCodeFlow,
-  SemgrepThreadFlow,
-  SemgrepFlowLocation,
   GrypeOutput,
-  GrypeMatch,
   DepcheckOutput,
 } from '@zh/shared';
 

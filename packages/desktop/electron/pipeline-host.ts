@@ -26,14 +26,23 @@ const WORKER_SCRIPT = path.join(__dirname, 'pipeline-worker.js');
 // 生成「0 检查项、全通过」的误导性空报告。放宽到 30 分钟以拿到真实结果。
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 const STDERR_TAIL_LIMIT = 4000;
+const CANCEL_GRACE_MS = 2500;
+
+/** ChildProcess 本身无 gen 字段，此处补挂「代数」标记以识别 stale 回调。 */
+type GenChild = ChildProcess & { gen?: number };
 
 interface PendingJob {
+  id: string;
   resolve: (report: unknown) => void;
   reject: (err: Error) => void;
   onProgress?: ProgressHandler;
   timer: ReturnType<typeof setTimeout>;
+  timeoutMs: number;
+  timeoutLabel: string;
   lastStage?: string;
   lastMessage?: string;
+  cancelled?: boolean;
+  killedByEscalation?: boolean;
 }
 
 interface SendJobOptions {
@@ -48,6 +57,7 @@ let readyWaiters: Array<() => void> = [];
 let seq = 0;
 const pending = new Map<string, PendingJob>();
 let stderrTail = '';
+let workerGen = 0;
 
 function rejectAll(err: Error): void {
   for (const [, job] of pending) {
@@ -164,8 +174,12 @@ function attachWorker(child: ChildProcess): void {
 
   child.on('exit', (code, signal) => {
     console.warn(`[pipeline-host] 子进程退出 code=${code} signal=${signal}`);
-    ready = false;
-    worker = null;
+    const childGen = (child as GenChild).gen;
+    const isCurrent = worker === child && workerGen === childGen;
+    if (isCurrent) {
+      ready = false;
+      worker = null;
+    }
     if (pending.size > 0) {
       rejectAll(buildExitError(code, signal));
     }
@@ -198,8 +212,11 @@ export function ensurePipelineWorker(): ChildProcess {
         .join(' '),
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    detached: process.platform !== 'win32',
   });
 
+  workerGen += 1;
+  (child as GenChild).gen = workerGen;
   worker = child;
   attachWorker(child);
   return child;
@@ -213,16 +230,37 @@ export function preheatPipelineWorker(): void {
   }
 }
 
-/** 任务超时处理：终结待办任务并终止子进程 */
 function handleJobTimeout(child: ChildProcess, id: string): void {
-  pending.delete(id);
-  try {
-    child.kill('SIGTERM');
-  } catch {
-    /* ignore */
+  const job = pending.get(id);
+  if (job) {
+    job.cancelled = true;
+    job.reject(new Error(`[pipeline-host] 任务超时（${job.timeoutLabel}, ${job.timeoutMs}ms）`));
+    pending.delete(id);
+  } else {
+    pending.delete(id);
   }
-  worker = null;
-  ready = false;
+  try {
+    child.send({ type: 'cancel', id });
+  } catch {}
+  const pid = child.pid;
+  const gen = (child as GenChild).gen;
+  setTimeout(() => {
+    if (worker === child && (child as GenChild).gen === gen) {
+      try {
+        if (typeof pid === 'number') {
+          try {
+            process.kill(-pid, 'SIGTERM');
+          } catch {
+            child.kill('SIGTERM');
+          }
+        } else {
+          child.kill('SIGTERM');
+        }
+      } catch {}
+      worker = null;
+      ready = false;
+    }
+  }, CANCEL_GRACE_MS);
 }
 
 /** 发送失败处理：清理定时器与待办任务 */
@@ -254,7 +292,15 @@ function sendJob(
       );
     }, options.timeoutMs);
 
-    pending.set(id, { resolve, reject, onProgress: options.onProgress, timer });
+    pending.set(id, {
+      id,
+      resolve,
+      reject,
+      onProgress: options.onProgress,
+      timer,
+      timeoutMs: options.timeoutMs,
+      timeoutLabel: options.timeoutLabel,
+    });
 
     try {
       child.send(payload);
@@ -402,6 +448,13 @@ export async function runPerformanceInWorker(
     'engine:runPerformance',
     onProgress,
   );
+}
+
+export function cancelJob(id: string): boolean {
+  try {
+    worker?.send({ type: 'cancel', id });
+  } catch {}
+  return true;
 }
 
 export function disposePipelineWorker(): void {

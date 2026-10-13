@@ -462,11 +462,15 @@ export class PipelineRunner {
     return report;
   }
 
-  async runSopInspect(context?: Partial<RuleContext>): Promise<RuleEngineReport> {
+  async runSopInspect(
+    context?: Partial<RuleContext>,
+    options?: { skipBaseline?: boolean },
+  ): Promise<RuleEngineReport> {
     this.logger.info('开始 SOP 驱动型 Inspect 巡检...');
     const report = await this.sopRuleEngine.runInspect(
       composeRuleContext(this.repoRoot, 'inspect', context),
     );
+    if (options?.skipBaseline) return report;
     // R3d(b) 链路对齐：SOP 巡检报告同样消费 .zhshield/baseline.json 基线豁免
     // （与 runInspect 直扫链路一致；无基线时原样返回，零回归）。
     const baseline = await loadBaseline(this.repoRoot);

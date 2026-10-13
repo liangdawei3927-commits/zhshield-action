@@ -631,4 +631,92 @@ describe('ConsoleReporter — 报告格式化', () => {
     expect(result.text).toContain('TypeScript 类型错误检查（真 tsc）');
     expect(result.text).not.toContain('⚠ 检出');
   });
+
+  // ─── 豁免清单审计：休眠/过期条目可见性 ──────────────
+
+  it('休眠与过期豁免条目须显式列出——否则豁免清单会静默虚增成仪式', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: {
+        ok: true,
+        summary: { total: 0, passed: 0, failed: 0 },
+        mode: 'guard',
+        target: '/tmp',
+        timestamp: new Date(),
+        results: [],
+      },
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 100, grade: 'A' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [],
+        recommendations: [],
+        suppressedIssues: [],
+        dormantEntries: [
+          {
+            ruleId: 'inspect.scan.depcruiser.circular-dependency',
+            file: 'packages/kernel/src/backup/local-backup.ts',
+            line: 0,
+            column: 0,
+            owner: 'arch',
+            expiresAt: '2027-01-01T00:00:00.000Z',
+          },
+        ],
+        expiredEntries: [
+          { ruleId: 'inspect.scan.stale.thing', file: 'src/old.ts', line: 3, column: 1 },
+        ],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).toContain('豁免清单待复核');
+    expect(result.text).toContain('inspect.scan.depcruiser.circular-dependency');
+    expect(result.text).toContain('本轮未命中');
+    expect(result.text).toContain('arch');
+    expect(result.text).toContain('inspect.scan.stale.thing');
+    expect(result.text).toContain('已过期');
+  });
+
+  it('清单干净时不得产出审计噪音——休眠与过期均为 0 时整段不出现', () => {
+    const report: PipelineReport = {
+      timestamp: new Date(),
+      guard: {
+        ok: true,
+        summary: { total: 0, passed: 0, failed: 0 },
+        mode: 'guard',
+        target: '/tmp',
+        timestamp: new Date(),
+        results: [],
+      },
+      inspect: {
+        projectId: 'test',
+        timestamp: new Date(),
+        scanType: 'full',
+        duration: 100,
+        score: { overall: 100, grade: 'A' },
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        adapterResults: [],
+        recommendations: [],
+        suppressedIssues: [],
+        dormantEntries: [],
+        expiredEntries: [],
+      },
+      passed: true,
+      stage: 'complete',
+    };
+
+    const reporter = new ConsoleReporter({ color: false });
+    const result = reporter.format(report);
+
+    expect(result.text).not.toContain('豁免清单待复核');
+  });
 });

@@ -71,6 +71,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
   const [showHome, setShowHome] = useState(false);
   const {
     report,
+    failure,
     loading,
     progress,
     progressLabel,
@@ -80,9 +81,42 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     startInspect,
   } = useInspectPage(projectPath);
 
+  // runPipeline 后端报错是 resolve 出来的（不抛异常），此分支是失败唯一的显式信号，
+  // 缺了它失败会退化成「从未体检」的空态。
+  if (failure) {
+    const failureDetail = failure.detail ?? '';
+
+    return (
+      <PageShell
+        illustration={<DomainScoreRing projectPath={projectPath} dimension="quality" />}
+        title={t(failure.messageKey)}
+        subtitle={t('page.inspect.empty.subtitle')}
+        buttonText={t('page.inspect.errorRetry')}
+        onAction={() => {
+          setShowHome(false);
+          startInspect();
+        }}
+        loading={loading}
+        progress={Math.round(progress * 100)}
+        progressLabel={t('page.inspect.scanning')}
+        progressMessage={statusMessage}
+        extra={
+          failureDetail.length > 0 ? (
+            <p className="mt-4 text-sm text-danger-500 text-center max-w-2xl break-all">
+              {failureDetail}
+            </p>
+          ) : null
+        }
+      />
+    );
+  }
+
   if (report && report.checks.length > 0 && !showHome) {
     const items = report.checks;
     const passCount = items.filter((i) => i.status === 'pass').length;
+    // attention（规则引擎 error/skipped → 未检测）计入 items.length 分母却不是问题，
+    // 单靠 passed/issues 两张卡会让这批检查彻底不可见，用户无从判断哪些规则根本没跑。
+    const attentionChecks = items.filter((i) => i.status === 'attention');
 
     return (
       <ReportShell
@@ -150,6 +184,27 @@ export function InspectPage({ projectPath }: InspectPageProps) {
               hint: t('page.inspect.issuesHint'),
             },
           },
+          ...(attentionChecks.length > 0
+            ? [
+                {
+                  key: 'attention',
+                  label: t('page.inspect.attention'),
+                  value: attentionChecks.length,
+                  color: 'rgb(var(--zh-muted))',
+                  detail: {
+                    items: attentionChecks,
+                    render: (sub: unknown[]) => (
+                      <CheckList
+                        items={sub as InspectionReportData['checks']}
+                        onCopyToAi={copyToAi}
+                        onCopyAll={copyAllToAi}
+                      />
+                    ),
+                    hint: t('page.inspect.attentionHint'),
+                  },
+                },
+              ]
+            : []),
         ]}
       >
         <p className="text-xs text-zh-muted mb-4">{t('page.inspect.guardAlsoRan')}</p>

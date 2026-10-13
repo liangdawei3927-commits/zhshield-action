@@ -1,6 +1,133 @@
 import * as ts from 'typescript';
 import * as fs from 'fs';
 
+// ---------------------------------------------------------------------------
+// RE_* 正则常量：全部提升到模块作用域（module scope）。
+// 这些正则原先内联在函数体内，每次函数调用都会重新编译一次字面量；
+// 提升为模块级 const 后只在模块加载时编译一次，随后复用同一实例。
+// pattern 文本、flags 与 test/replace 语义均与原内联写法完全一致。
+// ---------------------------------------------------------------------------
+
+// —— 重复块收集（collectCodeBlocks）——
+/** 归一化文本中是否含至少一个标识符字符（字母/数字/_/$，忽略大小写） */
+const RE_HAS_IDENTIFIER = /[a-z0-9_$]/i;
+
+// —— import 语句识别（isImportStatementLine）——
+/** `import ... from '...'` 声明行 */
+const RE_IMPORT_FROM = /^import\s+.*from\s+['"]/;
+/** `import {` / `import type {` / `import (` 开头的具名或默认导入列表行 */
+const RE_IMPORT_LIST_START = /^import\s+(?:type\s+)?[({]/;
+/** `export ... from '...'` 再导出声明行 */
+const RE_EXPORT_FROM = /^export\s+.*from\s+['"]/;
+/** `require('...')` 调用行 */
+const RE_REQUIRE_CALL = /^require\s*\(/;
+/** 多行 import 列表的 `} from '...'` / `from '...'` 续行 */
+const RE_FROM_CLAUSE = /^}?\s*from\s+['"]/;
+/** 多行 import 列表的裸成员行（`X,` / `type X as Y,` 等） */
+const RE_IMPORT_MEMBER_LINE =
+  /^}?\s*(?:type\s+)?[A-Za-z_$][\w$]*\s*(?:as\s+[A-Za-z_$][\w$]*)?\s*,?\s*$/;
+
+// —— 配置声明样板行识别（isConfigBoilerplateLine）——
+/** `export default <name>(` 配置导出调用行 */
+const RE_EXPORT_DEFAULT_CALL = /^export\s+default\s+[A-Za-z_$][\w$]*\s*\(/;
+/** 对象字段名 + `:`（如 `resolve:`、`alias:`） */
+const RE_OBJECT_FIELD_NAME = /^[A-Za-z_$][\w$]*\s*:/;
+/** 字符串键 + `:`（如 vitest alias 映射的 `'@x': ...`） */
+const RE_STRING_KEY = /^['"][^'"]+['"]\s*:/;
+/** 独占一行的 `{` */
+const RE_LONE_OPEN_BRACE = /^\{$/;
+
+// —— 通用不可提取样板（isUniversalBoilerplate，匹配 normalizeCode 归一化后的文本）——
+// 错误日志收尾
+const RE_ERR_INSTANCEOF =
+  /err\s+instanceof\s+error\s*\?\s*err\.message\s*:\s*string\(err\)/;
+// 安全读目录 / 安全读文件兜底
+const RE_SAFE_READDIR = /readdirsync\s*\([^)]*withfiletypes/;
+const RE_SAFE_READFILE =
+  /fs\.readfilesync\([^)]*\);\s*\}\s*catch\s*\{\s*return\s+null/;
+// isRecord 类型守卫（函数体特征 / 函数签名特征）
+const RE_ISARRAY_GUARD =
+  /typeof\s+\w+\s*===\s*'object'\s*&&\s*\w+\s*!==\s*null\s*&&\s*!array\.isarray\(/;
+const RE_ISRECORD_FUNC =
+  /function\s+isrecord\(value:unknown\):value is record<string,unknown>/;
+// SVG 图标属性样板（viewbox 开头与 strokeLinecap/strokeLinejoin 结尾）
+const RE_SVG_VIEWBOX_FILL = /viewbox="0 0 24 24"\s*fill="none"/;
+const RE_SVG_SIZED_TAG =
+  /<\s*svg\s+width="1[0-9]"\s+height="1[0-9]"\s+viewbox="0 0 24 24"/;
+const RE_SVG_LINECAP_JOIN = /strokelinecap="round"\s*strokelinejoin="round"/;
+const RE_SVG_STROKE = /fill="none"\s*stroke="currentcolor"/;
+// ToolAdapter 骨架：scan / isAvailable / buildErrorResult / 结果汇总 / stdout 检查
+const RE_TOOL_SCAN_SIG = /async\s+scan\(options:toolscanoptions\):promise<toolresult>/;
+const RE_TOOL_ISAVAILABLE =
+  /async\s+isavailable\(\):promise<boolean>\s*\{\s*return this\.commands\.isavailable\(/;
+const RE_TOOL_BUILDERRORRESULT_SIG =
+  /builderrorresult\(start:number,err:execerror\):toolresult/;
+const RE_TOOL_BUILDERRORRESULT_CALL =
+  /return this\.builderrorresult\(start,error as execerror\)/;
+const RE_TOOL_RESULT_META =
+  /duration:date\.now\(\)\s*-\s*start,timestamp:new date\(\),filecount:0/;
+const RE_TOOL_STDOUT_CHECK =
+  /return stdout\.length\s*>\s*0;\s*\}\s*catch\s*\{\s*return\s+false/;
+// ToolAdapter 输出归一化骨架：各适配器把原始输出塞进统一的 violation/issue 结构
+const RE_VIOLATIONS_PUSH = /violations\.push\(\{id:randomuuid\(\),ruleid:rule\.id/;
+const RE_AUTOFIXABLE_ENDLINE = /autofixable:false,\s*\}\s*,\s*endline:cls\.endline/;
+const RE_PARSED_GETLINE = /line:parsed\.sourcefile\.getlineandcharacterofposition/;
+const RE_VIOLATION_FILEPATH_LINE =
+  /filepath:parsed\.filepath,\s*line:parsed\.sourcefile\.getlineandcharacterofp/;
+const RE_PROJECTID_FILE = /projectid:options\.projectid,\s*file:violation\.file/;
+const RE_FILE_WEIGHT_PAYLOAD = /file:rel,\s*weight:this\.weight,\s*payload:\{\},/;
+const RE_SUCCESS_DATA_TIMESTAMP =
+  /success:true,\s*data:result,\s*timestamp:new date\(\)\.toisostring\(\)/;
+const RE_DATA_TIMESTAMP =
+  /data:result,\s*timestamp:new date\(\)\.toisostring\(\)/;
+const RE_DURATIONMS_ENGINE = /durationms:0,\s*targetengine:'inspect'/;
+const RE_ENGINE_TIMESTAMP = /targetengine:'inspect',\s*timestamp:new date\(\)/;
+// 工具页 hook 接线骨架（useT / showHome 状态声明）
+const RE_USET_SHOWHOME =
+  /const t\s*=\s*uset\(\);const \[showhome,setshowhome\]\s*=\s*usestate\(false\)/;
+const RE_SHOWHOME_LOADING =
+  /const \[showhome,setshowhome\]\s*=\s*usestate\(false\);const\{loading,progress,/;
+// 类成员骨架（方法签名 / 工具管理器 / 扫描结果结构）
+const RE_FORMATVIOLATION_SIG =
+  /private formatviolation\(violation:violation,\s*lines:string\[\],\s*indent:st/;
+const RE_RESOLVESCANSETUP_SIG = /private resolvescansetup\(options:toolscanoptions\):/;
+const RE_BUILDRESULT_SIG =
+  /private buildresult\(start:number,status:'available' \| 'unavailable'/;
+const RE_TOOLTIMEOUT_BUILDERROR =
+  /if\(\s*istooltimeout\(err\)\s*\)\{\s*return this\.builderror\(start,/;
+const RE_GETTOOLMANAGER = /gettoolmanager\(\):toolmanager{\s*return this\.toolmanager;\s*\}/;
+const RE_RULE_STATUS_RETURN =
+  /return\{rule,status:violations\.length === 0 \? 'passed':'failed',/;
+const RE_SCANEMPTYSTATE_RETURN =
+  /return\(\s*<scanemptystatebranch\{\.\.\.emptystateparams\}/;
+const RE_LOADING_PROGRESS_DECL = /const\{loading,progress,progresslabel,statusmessage,/;
+const RE_CONSTRUCTOR_EVENTCENTER =
+  /constructor\(eventcenter:eventcenter\)\{\s*this\.eventcenter\s*=\s*eventcenter;\s*\}/;
+const RE_EXPORT_TOOLBINS =
+  /export\{findlocaltoolbin,\s*findzhshieldtoolbin,\s*getzhshieldtoolbindir,\s*reso/;
+// score 区段外壳 + hook 接线收尾（语义头在窗口外，只剩结构尾巴雷同）
+const RE_RESULTCARD_SECTIONTITLE =
+  /return\s*\(\s*<resultcard\s+variant="score">\s*<sectiontitle/;
+const RE_RETURN_COPY_TO_AI = /return\s*\{\s*copytoai,copyalltoai\}/;
+const RE_RETURN_LOADING_PROGRESS =
+  /return\s*\{\s*loading,progress,progresslabel,statusmessage/;
+const RE_USE_HOOK_ARRAY =
+  /\[\w+,\w+\]\s*,\s*\)\s*;\s*const\s+\w+\s*=\s*use(?:memo|callback|state)\(/;
+// 其余通用防御/结构样板
+const RE_TIMINGSAFEEQUAL =
+  /crypto\.timingsafeequal\(left,right\);?\s*\}\s*catch\s*\{\s*return\s+false/;
+const RE_FEATUREICON_GLYPH = /\{\s*icon:\s*\(\s*<featureicon>\s*<\w+glyph\s*\/>/;
+
+// —— 归一化管线（normalizeCode）——
+// 行注释：`//` 至行尾（多行模式 gm）
+const RE_LINE_COMMENT = /\/\/.*$/gm;
+// 块注释：斜杠星号 … 星号斜杠，非贪婪（全局 g）
+const RE_BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
+// 连续空白压缩为单个空格（全局 g）
+const RE_WHITESPACE_RUN = /\s+/g;
+// 标点两侧空白紧贴标点（全局 g，`$1` 为捕获的标点本身）
+const RE_PUNCTUATION_SPACING = /\s*([{}();,.:])\s*/g;
+
 /** 解析后的单文件视图：AST 根 + 收集到的类/函数/导入/导出 + 有效代码行数 */
 export interface ParsedFile {
   filePath: string;
@@ -565,7 +692,7 @@ function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
       if (normalized.length === 0) continue;
       // 无任何标识符（如单个 "}"）或归一化后过短（如 "}catch{return null;}}"）的窗口
       // 是普遍性防御写法/结构收尾，提取只会制造噪声
-      if (!/[a-z0-9_$]/i.test(normalized)) continue;
+      if (!RE_HAS_IDENTIFIER.test(normalized)) continue;
       if (normalized.length < MIN_DUPLICATE_NORMALIZED_LENGTH) continue;
       // 通用不可提取样板（SVG 图标属性、ToolAdapter 骨架、安全读写兜底、hook 接线收尾等）
       // 在所有同类文件中必然雷同，且语义头各异，不是可提取的重复逻辑
@@ -582,12 +709,12 @@ const MIN_DUPLICATE_NORMALIZED_LENGTH = 40;
 
 /** 判断一行是否整行属于 import/require/export-from 声明（含多行 import 列表的成员行与续行） */
 function isImportStatementLine(line: string): boolean {
-  if (/^import\s+.*from\s+['"]/.test(line)) return true;
-  if (/^import\s+(?:type\s+)?[({]/.test(line)) return true;
-  if (/^export\s+.*from\s+['"]/.test(line)) return true;
-  if (/^require\s*\(/.test(line)) return true;
-  if (/^}?\s*from\s+['"]/.test(line)) return true;
-  return /^}?\s*(?:type\s+)?[A-Za-z_$][\w$]*\s*(?:as\s+[A-Za-z_$][\w$]*)?\s*,?\s*$/.test(line);
+  if (RE_IMPORT_FROM.test(line)) return true;
+  if (RE_IMPORT_LIST_START.test(line)) return true;
+  if (RE_EXPORT_FROM.test(line)) return true;
+  if (RE_REQUIRE_CALL.test(line)) return true;
+  if (RE_FROM_CLAUSE.test(line)) return true;
+  return RE_IMPORT_MEMBER_LINE.test(line);
 }
 
 /** 判断窗口是否整窗由 import/require/export-from 或配置声明样板构成（跨包复制的项目模板，非业务重复） */
@@ -603,10 +730,10 @@ function isBoilerplateWindow(window: string[]): boolean {
 
 /** 判断一行是否属于配置声明样板：export default 调用 / 对象字段名 + `{` / 纯 `{` / 字符串键（如 vitest alias 映射） */
 function isConfigBoilerplateLine(line: string): boolean {
-  if (/^export\s+default\s+[A-Za-z_$][\w$]*\s*\(/.test(line)) return true;
-  if (/^[A-Za-z_$][\w$]*\s*:/.test(line)) return true;
-  if (/^['"][^'"]+['"]\s*:/.test(line)) return true;
-  return /^\{$/.test(line);
+  if (RE_EXPORT_DEFAULT_CALL.test(line)) return true;
+  if (RE_OBJECT_FIELD_NAME.test(line)) return true;
+  if (RE_STRING_KEY.test(line)) return true;
+  return RE_LONE_OPEN_BRACE.test(line);
 }
 
 /**
@@ -621,74 +748,70 @@ function isConfigBoilerplateLine(line: string): boolean {
  */
 function isUniversalBoilerplate(normalized: string): boolean {
   // 错误日志收尾
-  if (/err\s+instanceof\s+error\s*\?\s*err\.message\s*:\s*string\(err\)/.test(normalized)) return true;
+  if (RE_ERR_INSTANCEOF.test(normalized)) return true;
   // 安全读目录 / 安全读文件
-  if (/readdirsync\s*\([^)]*withfiletypes/.test(normalized)) return true;
-  if (/fs\.readfilesync\([^)]*\);\s*\}\s*catch\s*\{\s*return\s+null/.test(normalized)) return true;
+  if (RE_SAFE_READDIR.test(normalized)) return true;
+  if (RE_SAFE_READFILE.test(normalized)) return true;
   // isRecord 类型守卫
-  if (
-    /typeof\s+\w+\s*===\s*'object'\s*&&\s*\w+\s*!==\s*null\s*&&\s*!array\.isarray\(/.test(
-      normalized,
-    )
-  ) {
+  if (RE_ISARRAY_GUARD.test(normalized)) {
     return true;
   }
-  if (/function\s+isrecord\(value:unknown\):value is record<string,unknown>/.test(normalized)) {
+  if (RE_ISRECORD_FUNC.test(normalized)) {
     return true;
   }
   // SVG 图标属性样板（头尾两段：viewbox 开头与 strokeLinecap/strokeLinejoin 结尾）
-  if (/viewbox="0 0 24 24"\s*fill="none"/.test(normalized)) return true;
-  if (/<\s*svg\s+width="1[0-9]"\s+height="1[0-9]"\s+viewbox="0 0 24 24"/.test(normalized)) return true;
-  if (/strokelinecap="round"\s*strokelinejoin="round"/.test(normalized)) return true;
-  if (/fill="none"\s*stroke="currentcolor"/.test(normalized)) return true;
+  if (RE_SVG_VIEWBOX_FILL.test(normalized)) return true;
+  if (RE_SVG_SIZED_TAG.test(normalized)) return true;
+  if (RE_SVG_LINECAP_JOIN.test(normalized)) return true;
+  if (RE_SVG_STROKE.test(normalized)) return true;
   // ToolAdapter 骨架：scan / isAvailable / buildErrorResult / 空结果汇总 / 可用性检查
-  if (/async\s+scan\(options:toolscanoptions\):promise<toolresult>/.test(normalized)) return true;
-  if (/async\s+isavailable\(\):promise<boolean>\s*\{\s*return this\.commands\.isavailable\(/.test(normalized)) return true;
-  if (/builderrorresult\(start:number,err:execerror\):toolresult/.test(normalized)) return true;
-  if (/return this\.builderrorresult\(start,error as execerror\)/.test(normalized)) return true;
-  if (/duration:date\.now\(\)\s*-\s*start,timestamp:new date\(\),filecount:0/.test(normalized)) return true;
-  if (/return stdout\.length\s*>\s*0;\s*\}\s*catch\s*\{\s*return\s+false/.test(normalized)) return true;
+  if (RE_TOOL_SCAN_SIG.test(normalized)) return true;
+  if (RE_TOOL_ISAVAILABLE.test(normalized)) return true;
+  if (RE_TOOL_BUILDERRORRESULT_SIG.test(normalized)) return true;
+  if (RE_TOOL_BUILDERRORRESULT_CALL.test(normalized)) return true;
+  if (RE_TOOL_RESULT_META.test(normalized)) return true;
+  if (RE_TOOL_STDOUT_CHECK.test(normalized)) return true;
   // ToolAdapter 输出归一化骨架：各工具适配器把原始输出塞进统一的 violation/issue 结构
-  if (/violations\.push\(\{id:randomuuid\(\),ruleid:rule\.id/.test(normalized)) return true;
-  if (/autofixable:false,\s*\}\s*,\s*endline:cls\.endline/.test(normalized)) return true;
-  if (/line:parsed\.sourcefile\.getlineandcharacterofposition/.test(normalized)) return true;
-  if (/filepath:parsed\.filepath,\s*line:parsed\.sourcefile\.getlineandcharacterofp/.test(normalized)) return true;
-  if (/projectid:options\.projectid,\s*file:violation\.file/.test(normalized)) return true;
-  if (/file:rel,\s*weight:this\.weight,\s*payload:\{\},/.test(normalized)) return true;
-  if (/success:true,\s*data:result,\s*timestamp:new date\(\)\.toisostring\(\)/.test(normalized)) return true;
-  if (/data:result,\s*timestamp:new date\(\)\.toisostring\(\)/.test(normalized)) return true;
-  if (/durationms:0,\s*targetengine:'inspect'/.test(normalized)) return true;
-  if (/targetengine:'inspect',\s*timestamp:new date\(\)/.test(normalized)) return true;
+  if (RE_VIOLATIONS_PUSH.test(normalized)) return true;
+  if (RE_AUTOFIXABLE_ENDLINE.test(normalized)) return true;
+  if (RE_PARSED_GETLINE.test(normalized)) return true;
+  if (RE_VIOLATION_FILEPATH_LINE.test(normalized)) return true;
+  if (RE_PROJECTID_FILE.test(normalized)) return true;
+  if (RE_FILE_WEIGHT_PAYLOAD.test(normalized)) return true;
+  if (RE_SUCCESS_DATA_TIMESTAMP.test(normalized)) return true;
+  if (RE_DATA_TIMESTAMP.test(normalized)) return true;
+  if (RE_DURATIONMS_ENGINE.test(normalized)) return true;
+  if (RE_ENGINE_TIMESTAMP.test(normalized)) return true;
   // 工具类骨架
-  if (/const t\s*=\s*uset\(\);const \[showhome,setshowhome\]\s*=\s*usestate\(false\)/.test(normalized)) return true;
-  if (/const \[showhome,setshowhome\]\s*=\s*usestate\(false\);const\{loading,progress,/.test(normalized)) return true;
-  if (/private formatviolation\(violation:violation,\s*lines:string\[\],\s*indent:st/.test(normalized)) return true;
-  if (/private resolvescansetup\(options:toolscanoptions\):/.test(normalized)) return true;
-  if (/private buildresult\(start:number,status:'available' \| 'unavailable'/.test(normalized)) return true;
-  if (/if\(\s*istooltimeout\(err\)\s*\)\{\s*return this\.builderror\(start,/.test(normalized)) return true;
-  if (/gettoolmanager\(\):toolmanager\{\s*return this\.toolmanager;\s*\}/.test(normalized)) return true;
-  if (/return\{rule,status:violations\.length === 0 \? 'passed':'failed',/.test(normalized)) return true;
-  if (/return\(\s*<scanemptystatebranch\{\.\.\.emptystateparams\}/.test(normalized)) return true;
-  if (/const\{loading,progress,progresslabel,statusmessage,/.test(normalized)) return true;
-  if (/constructor\(eventcenter:eventcenter\)\{\s*this\.eventcenter\s*=\s*eventcenter;\s*\}/.test(normalized)) return true;
-  if (/export\{findlocaltoolbin,\s*findzhshieldtoolbin,\s*getzhshieldtoolbindir,\s*reso/.test(normalized)) return true;
+  if (RE_USET_SHOWHOME.test(normalized)) return true;
+  if (RE_SHOWHOME_LOADING.test(normalized)) return true;
+  if (RE_FORMATVIOLATION_SIG.test(normalized)) return true;
+  if (RE_RESOLVESCANSETUP_SIG.test(normalized)) return true;
+  if (RE_BUILDRESULT_SIG.test(normalized)) return true;
+  if (RE_TOOLTIMEOUT_BUILDERROR.test(normalized)) return true;
+  if (RE_GETTOOLMANAGER.test(normalized)) return true;
+  if (RE_RULE_STATUS_RETURN.test(normalized)) return true;
+  if (RE_SCANEMPTYSTATE_RETURN.test(normalized)) return true;
+  if (RE_LOADING_PROGRESS_DECL.test(normalized)) return true;
+  if (RE_CONSTRUCTOR_EVENTCENTER.test(normalized)) return true;
+  if (RE_EXPORT_TOOLBINS.test(normalized)) return true;
   // score 区段外壳 + hook 接线收尾（语义头在窗口外，只剩结构尾巴雷同）
-  if (/return\s*\(\s*<resultcard\s+variant="score">\s*<sectiontitle/.test(normalized)) return true;
-  if (/return\s*\{\s*copytoai,copyalltoai\}/.test(normalized)) return true;
-  if (/return\s*\{\s*loading,progress,progresslabel,statusmessage/.test(normalized)) return true;
-  if (/\[\w+,\w+\]\s*,\s*\)\s*;\s*const\s+\w+\s*=\s*use(?:memo|callback|state)\(/.test(normalized)) return true;
+  if (RE_RESULTCARD_SECTIONTITLE.test(normalized)) return true;
+  if (RE_RETURN_COPY_TO_AI.test(normalized)) return true;
+  if (RE_RETURN_LOADING_PROGRESS.test(normalized)) return true;
+  if (RE_USE_HOOK_ARRAY.test(normalized)) return true;
   // 其余通用防御/结构样板
-  if (/crypto\.timingsafeequal\(left,right\);?\s*\}\s*catch\s*\{\s*return\s+false/.test(normalized)) return true;
-  if (/\{\s*icon:\s*\(\s*<featureicon>\s*<\w+glyph\s*\/>/.test(normalized)) return true;
+  if (RE_TIMINGSAFEEQUAL.test(normalized)) return true;
+  if (RE_FEATUREICON_GLYPH.test(normalized)) return true;
   return false;
 }
 
 function normalizeCode(code: string): string {
   return code
-    .replace(/\/\/.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*([{}();,.:])\s*/g, '$1')
+    .replace(RE_LINE_COMMENT, '')
+    .replace(RE_BLOCK_COMMENT, '')
+    .replace(RE_WHITESPACE_RUN, ' ')
+    .replace(RE_PUNCTUATION_SPACING, '$1')
     .trim()
     .toLowerCase();
 }

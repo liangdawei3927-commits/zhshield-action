@@ -284,9 +284,6 @@ this.makeIssue({
   }
 }
 
-/** 便捷入口：同步语义的检测器单例 */
-export const buildConfigDetector: BuildConfigDetector = new BuildConfigDetectorImpl();
-
 /** 读取 package.json 的 build 脚本；缺失时返回空串 */
 function readBuildScript(projectRoot: string): string {
   const pkg = readPackageJson(projectRoot);

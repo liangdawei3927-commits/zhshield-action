@@ -62,13 +62,15 @@ export class TargetBuilder {
   /** 架构形态判定（简化版） */
   determineArchitecture(signals: readonly Signal[]): MatchResult<ArchitectureForm> {
     // 检查 monorepo 信号
-    const hasWorkspaceSignal = signals.some((s) => s.ruleId === 'manifest:workspace');
+    const workspaceSignals = signals.filter(
+      (s) => s.ruleId === 'manifest:workspace' || s.ruleId === 'config:workspace',
+    );
 
-    if (hasWorkspaceSignal) {
+    if (workspaceSignals.length > 0) {
       return {
         value: 'modular-monolith',
         confidence: 0.8,
-        signals: signals.filter((s) => s.ruleId === 'manifest:workspace'),
+        signals: workspaceSignals,
       };
     }
 

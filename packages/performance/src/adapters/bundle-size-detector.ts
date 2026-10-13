@@ -172,5 +172,3 @@ function sortBundleIssues(issues: PerformanceIssue[]): PerformanceIssue[] {
   });
 }
 
-/** 便捷入口 */
-export const bundleSizeDetector: BundleSizeDetector = new BundleSizeDetectorImpl();

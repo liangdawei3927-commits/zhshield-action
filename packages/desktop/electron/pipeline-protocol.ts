@@ -91,6 +91,12 @@ export interface PerformanceRunMsg {
   projectPath: string;
 }
 
+/** 主进程 → 引擎子进程：取消指定任务 */
+export interface PipelineCancelMsg {
+  type: 'cancel';
+  id: string;
+}
+
 /** 主进程 → 引擎子进程 的全部命令联合类型（可序列化） */
 export type PipelineWorkerInbound =
   | PipelineRunMsg
@@ -100,7 +106,8 @@ export type PipelineWorkerInbound =
   | GarbageCleanRunMsg
   | GarbageRestoreRunMsg
   | GarbageScanRunMsg
-  | PerformanceRunMsg;
+  | PerformanceRunMsg
+  | PipelineCancelMsg;
 
 /** 将报告转为可跨进程传输的纯 JSON（Date → ISO 字符串） */
 export function serializePipelineReport(report: unknown): unknown {

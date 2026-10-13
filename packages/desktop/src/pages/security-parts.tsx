@@ -6,8 +6,6 @@ import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { SeverityBadge } from '../components/ui/SeverityBadge';
 
-export { SecurityScoreCard } from './security-score-parts';
-
 function FindingCard({
   finding,
   onCopyToAi,

@@ -82,47 +82,6 @@ export interface CodeFlow {
   threadFlows: CodeFlowThreadFlow[];
 }
 
-// ─── 重构模板（RefactoringTemplate）────────────────────────
-
-/** 抽取建议：重构方案中的一条「把某段代码提取为独立单元」建议，sourceLines 为 null 表示待定位置 */
-export interface ExtractionSuggestion {
-  name: string;
-  sourceLines: [number, number] | null;
-  type: 'function' | 'class' | 'component' | 'module' | 'type' | 'config';
-  confidence: 'high' | 'medium' | 'low';
-  reason: string;
-  parameters?: string[];
-  returns?: string;
-}
-
-/** 重构模板：重构域 SOP 规则的完整方案（诊断 → 计划 → 可选 AI 载荷），供 CLI/面板消费 */
-export interface RefactoringTemplate {
-  ruleId: string;
-  target: {
-    file: string;
-    lines: [number, number];
-    symbol?: string;
-    type: 'function' | 'class' | 'module' | 'component' | 'type';
-  };
-  diagnosis: {
-    summary: string;
-    details?: string;
-    metrics: { lines: number; cyclomaticComplexity: number; responsibilityCount: number };
-    hotspots?: Array<{ lines: [number, number]; complexity: number; reason?: string }>;
-  };
-  plan: {
-    extractions: ExtractionSuggestion[];
-    expectedImprovement?: { linesAfter: number; complexityAfter: number };
-  };
-  aiPayload?: {
-    systemPrompt: string;
-    sourceCode: string;
-    constraints: string[];
-    acceptanceCriteria?: string[];
-  };
-  confidence: 'high' | 'medium' | 'low';
-}
-
 // ─── 检查结果（CheckResult）──────────────────────────────
 
 /** 检查结果：一次检查/巡检的结论（通过与否 + 问题清单 + 分级统计） */

@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
 import { runPipeline } from '../services/engineApi';
 import type { InspectionReportData } from '../types/electron';
-import { selectIssueChecks, toInspectionReportDataFromRuleEngine } from './inspect-sop-mapper';
+import { selectIssueChecks, toInspectOutcome } from './inspect-sop-mapper';
+import type { InspectFailure } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
@@ -40,39 +41,55 @@ export const STATUS_CONFIG: Record<
 
 /**
  * 巡检报告状态：跑 SOP 质量流水线并映射 InspectionReportData（见 inspect-sop-mapper）。
+ * failure 与 report 互斥：执行失败必须落到 failure，不得静默退化为 report=null 的空态。
  */
 function useInspectReport(projectPath: string): {
   report: InspectionReportData | null;
+  failure: InspectFailure | null;
   run: () => Promise<void>;
 } {
   const [report, setReport] = useState<InspectionReportData | null>(null);
+  const [failure, setFailure] = useState<InspectFailure | null>(null);
   const run = useCallback(async () => {
+    setFailure(null);
     try {
       const pipeline = await runPipeline(projectPath, { sop: true });
-      setReport(toInspectionReportDataFromRuleEngine(pipeline.inspect));
-    } catch {
+      const outcome = toInspectOutcome(pipeline);
+      if (outcome.kind === 'failed') {
+        setReport(null);
+        setFailure(outcome);
+        return;
+      }
+      setReport(outcome.report);
+    } catch (err: unknown) {
       setReport(null);
+      setFailure({
+        kind: 'failed',
+        messageKey: 'page.inspect.errorTitle',
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   }, [projectPath]);
-  return { report, run };
+  return { report, failure, run };
 }
 
 /** 巡检运行：loading/进度来自任务中心，手动触发 */
 function useInspectRun(projectPath: string): {
   report: InspectionReportData | null;
+  failure: InspectFailure | null;
   loading: boolean;
   progress: number;
   progressLabel: string;
   statusMessage: string;
   startInspect: () => Promise<void>;
 } {
-  const { report, run } = useInspectReport(projectPath);
+  const { report, failure, run } = useInspectReport(projectPath);
   // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）
   const { loading, progress, progressLabel, statusMessage } = useTaskRun('pipeline', projectPath);
 
   const startInspect = useCallback(() => run(), [run]);
 
-  return { report, loading, progress, progressLabel, statusMessage, startInspect };
+  return { report, failure, loading, progress, progressLabel, statusMessage, startInspect };
 }
 
 function useInspectCopyToAi(projectPath: string): {
@@ -117,13 +134,21 @@ function useInspectCopyToAi(projectPath: string): {
 
 /** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
-  const { report, loading, progress, progressLabel, statusMessage, startInspect } =
-    useInspectRun(projectPath);
+  const {
+    report,
+    failure,
+    loading,
+    progress,
+    progressLabel,
+    statusMessage,
+    startInspect,
+  } = useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
   useDailyAutoCheck('inspect', projectPath, () => void startInspect());
 
   return {
     report,
+    failure,
     loading,
     progress,
     progressLabel,

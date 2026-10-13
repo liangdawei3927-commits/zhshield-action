@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ProjectProfile } from '@zh/dependency';
 import { HallucinatedDependencyCheckImpl } from '../ai-code/hallucinated-dependency';
-import { listNodeModules, packageNameFromSpecifier } from '../ai-code/files';
+import { extractImportReferences, listNodeModules, packageNameFromSpecifier } from '../ai-code/files';
 import { collectNpmPackages, collectPnpmPackages, collectYarnPackages } from '../ai-code/lockfile';
 
 function profile(projectPath: string): ProjectProfile {
@@ -270,5 +270,63 @@ describe('monorepo 闭包解析（根因修复）', () => {
     /* @zh/shared 无对应目录时仍应报 not-found，但首个用例 kernel 自己没声明它且工作区无此包 → not-found */
     const shared = findings.find((f) => f.packageName === '@zh/shared');
     expect(shared?.registryStatus).toBe('not-found');
+  });
+});
+
+describe('extractImportReferences 注释感知', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'zh-ai-comment-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("JSDoc 里的 import('x') 示例不算依赖，真实 import 仍提取", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'sample.ts'),
+      [
+        "/** 收集 `require('x')` / `import('x')` 形式的模块说明符 */",
+        'export function collect(): void {}',
+        "import lodash from 'lodash';",
+      ].join('\n'),
+      'utf8',
+    );
+    const names = extractImportReferences(tmpDir).map((r) => r.packageName);
+    expect(names).not.toContain('x');
+    expect(names).toContain('lodash');
+  });
+
+  it('跨行块注释内的 import 不算引用，注释后的真实代码仍提取', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'multi.ts'),
+      [
+        '/*',
+        " * 复制的示例：import('ghost-pkg')",
+        ' */',
+        "import ms from 'ms';",
+        "// require('nope')",
+        "const lazy = require('real-pkg');",
+      ].join('\n'),
+      'utf8',
+    );
+    const names = extractImportReferences(tmpDir).map((r) => r.packageName);
+    expect(names).not.toContain('ghost-pkg');
+    expect(names).not.toContain('nope');
+    expect(names).toContain('ms');
+    expect(names).toContain('real-pkg');
+  });
+
+  it("字符串字面量里的 // 不截断代码，同行行注释仍剥离", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'url.ts'),
+      ["const u = 'http://example.com/a'; import qs from 'qs'; // import('ghost')"].join('\n'),
+      'utf8',
+    );
+    const names = extractImportReferences(tmpDir).map((r) => r.packageName);
+    expect(names).toContain('qs');
+    expect(names).not.toContain('ghost');
   });
 });

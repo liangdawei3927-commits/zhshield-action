@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ExperienceRecord } from '@zh/kernel';
 import type { ExperienceEntry } from '@zh/evolve';
-import type { ScoreDimension } from '../src/pages/domain-score-logic';
+import type { ScoreDimension } from '@zh/shared';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // 应用信息

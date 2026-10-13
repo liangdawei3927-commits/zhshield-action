@@ -5,10 +5,7 @@ import * as path from 'node:path';
 import { SKIP_DIRS } from './detector';
 import { cachedWalkFiles } from './walk-cache';
 
-/** 相对路径统一为 posix 风格（'/' 分隔），保证跨平台可复现。 */
-export function toPosix(p: string): string {
-  return p.split(path.sep).join('/');
-}
+
 
 /** 目录名是否属于噪声目录（vendored / 依赖产物 / 构建输出，判定依据 SKIP_DIRS） */
 export function isNoiseDir(name: string): boolean {
@@ -124,19 +121,6 @@ export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** 解析 JSON 内容为记录类型；解析失败返回 null（空 catch 禁止 → 用返回值表达失败）。 */
-export function parseJsonRecord(content: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(content);
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
 
-/** 取记录中字符串数组键（用于依赖名列表），非字符串数组返回空数组。 */
-export function stringArrayFrom(record: Record<string, unknown>, key: string): string[] {
-  const value = record[key];
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string');
-}
+
+

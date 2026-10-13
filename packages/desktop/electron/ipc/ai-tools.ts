@@ -17,6 +17,7 @@ import {
   type AiToolConfig,
 } from '../ai-tool-config';
 import { PROJECTS_FILE } from './projects';
+import { FEATURE_AI_TOOL_ENABLED } from '../../src/feature-flags';
 
 const AI_TOOL_FILE = path.join(app.getPath('userData'), 'ai-tool.json');
 
@@ -178,6 +179,7 @@ async function readProjectPaths(): Promise<string[]> {
  * 对齐 ai-tool.json 与 projects.json，已启用则补齐集成文件，失败仅告警不阻断启动。
  */
 export async function syncAiIntegrationOnStartup(): Promise<void> {
+  if (!FEATURE_AI_TOOL_ENABLED) return;
   try {
     const config = await loadSavedAiToolConfig();
     if (!config?.enabled) return;
@@ -200,6 +202,7 @@ export async function syncAiIntegrationOnStartup(): Promise<void> {
 }
 
 export function registerAiToolsIpc(): void {
+  if (!FEATURE_AI_TOOL_ENABLED) return;
   ipcMain.handle('ai:loadConfig', async (): Promise<AiToolConfig> => {
     try {
       return (await loadSavedAiToolConfig()) ?? { ...AI_TOOL_PRESETS.opencode };

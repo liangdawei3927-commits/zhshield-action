@@ -3,7 +3,16 @@ import {
   isIssueStatus,
   selectIssueChecks,
   toInspectionReportDataFromRuleEngine,
+  toInspectOutcome,
 } from '../pages/inspect-sop-mapper';
+
+/**
+ * P0-3（2026-10-04）：巡检执行失败被静默吞掉，落成"从未运行"空态。
+ * runPipeline 失败时不抛异常，而是返回 { passed:false, error:'IPC not available' }
+ * 且不带 inspect 字段；inspect-logic 直接把 pipeline.inspect（undefined）喂给映射器，
+ * 映射器返回 null，页面于是显示"一键体检"空态——用户看不出体检根本没跑成。
+ * toInspectOutcome 把三种结果（成功 / 后端报错 / 无有效载荷）显式区分。
+ */
 
 /**
  * P0-1（2026-09-24 排查闭环）：巡检页把 skipped 评估显示为"问题"。
@@ -124,5 +133,58 @@ describe('toInspectionReportDataFromRuleEngine — skipped 评估不产问题条
     expect(data).not.toBeNull();
     const issues = selectIssueChecks(data!.checks);
     expect(issues.map((c) => c.id)).toEqual(['r-fail']);
+  });
+});
+
+describe('toInspectOutcome — 执行失败不再退化为"从未运行"空态', () => {
+  const validReport = {
+    total: 1,
+    passed: 1,
+    failed: 0,
+    errors: 0,
+    skipped: 0,
+    ok: true,
+    durationMs: 120,
+    timestamp: '2026-10-04T08:00:00.000Z',
+    evaluations: [
+      {
+        rule: { id: 'r-pass', name: 'Passed Rule', domain: 'inspect' },
+        status: 'passed' as const,
+      },
+    ],
+  };
+
+  it('Given 后端回报 error 且无 inspect，Then 判定为 failed 并透出后端原因', () => {
+    const outcome = toInspectOutcome({ error: 'IPC not available' });
+    expect(outcome).toMatchObject({ kind: 'failed', detail: 'IPC not available' });
+  });
+
+  it('Given 无 error 但 inspect 缺失，Then 判定为 failed（无载荷）而非 report', () => {
+    const outcome = toInspectOutcome({});
+    expect(outcome.kind).toBe('failed');
+    expect(outcome).toMatchObject({ messageKey: 'page.inspect.errorNoReport' });
+  });
+
+  it('Given inspect 形状非法，Then 判定为 failed 而非静默落空态', () => {
+    const outcome = toInspectOutcome({ inspect: { unexpected: true } });
+    expect(outcome.kind).toBe('failed');
+  });
+
+  it('Given 合法 inspect 载荷，Then 判定为 report 并带上映射后的检查项', () => {
+    const outcome = toInspectOutcome({ inspect: validReport });
+    if (outcome.kind !== 'report') {
+      throw new Error(`期望 report，实际 ${outcome.kind}`);
+    }
+    expect(outcome.report.checks).toHaveLength(1);
+    expect(outcome.report.checks[0]?.status).toBe('pass');
+  });
+
+  it('Given error 为 null（后端显式无错），Then 不算失败', () => {
+    expect(toInspectOutcome({ error: null, inspect: validReport }).kind).toBe('report');
+  });
+
+  it('Given 后端 error 与有效载荷并存，Then 以 error 为准（失败优先）', () => {
+    const outcome = toInspectOutcome({ error: 'boom', inspect: validReport });
+    expect(outcome.kind).toBe('failed');
   });
 });

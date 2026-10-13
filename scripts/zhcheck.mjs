@@ -42,25 +42,36 @@ function importEngine(name) {
 }
 
 // ── Linter 格式化 ───────────────────────────────────────────
+function resolveRelPath(...candidates) {
+  const raw = candidates.find((c) => typeof c === 'string' && c !== '');
+  return raw ? relative(PROJECT_ROOT, raw) : '';
+}
+
+// 无文件路径时不伪造 "path:1:1:" 前缀：空路径经relative 会得到 ''（cwd 即根目录），
+// 直接拼接会输出 ":1:1: warning: rule: msg"，冒号开头且位置是编造的。
+function formatLoc(relPath, line, col) {
+  return relPath === '' ? '' : `${relPath}:${line}:${col}: `;
+}
+
 function formatLinter(smell, filePath) {
   const loc = smell.location || {};
-  const relPath = relative(PROJECT_ROOT, filePath || loc.filePath || '');
+  const relPath = resolveRelPath(filePath, loc.filePath);
   const line = loc.line || 1;
   const col = loc.column || 1;
   const sev = smell.severity || 'warning';
   const rule = smell.ruleId || 'unknown';
   const msg = smell.message || '';
-  return `${relPath}:${line}:${col}: ${sev}: ${rule}: ${msg}`;
+  return `${formatLoc(relPath, line, col)}${sev}: ${rule}: ${msg}`;
 }
 
 function formatLinterIssue(issue, filePath) {
-  const relPath = relative(PROJECT_ROOT, filePath || '');
+  const relPath = resolveRelPath(filePath);
   const line = issue.line || 1;
   const col = issue.column || 1;
   const sev = issue.severity || 'warning';
   const rule = issue.rule || 'unknown';
   const msg = issue.message || '';
-  return `${relPath}:${line}:${col}: ${sev}: ${rule}: ${msg}`;
+  return `${formatLoc(relPath, line, col)}${sev}: ${rule}: ${msg}`;
 }
 
 // ── 重构检查 ──────────────────────────────────────────────
@@ -95,40 +106,30 @@ async function runRefactor(files, opts, projectRoot) {
   return { total: report.totalSmells, warnings: warningCount, errors: errorCount };
 }
 
-// ── 巡检检查 ──────────────────────────────────────────────
-/** inspect 域适配器注册表（与 pipeline-runner.registerDefaultAdapters 对齐的
- *  @zh/inspect 内置子集；pipeline 独有的 Sonarway/Trivy/AutoPerf 不在此列） */
-const INSPECT_ADAPTERS = [
-  'ESLintAdapter',
-  'GitleaksAdapter',
-  'DependencyCruiserAdapter',
-  'JscpdAdapter',
-  'TsPruneAdapter',
-  'SemgrepAdapter',
-  'DepcheckAdapter',
-  'TypeScriptAdapter',
-  'PrettierAdapter',
-  'CommitLintAdapter',
-  'NpmAuditAdapter',
-];
-
-async function runInspect(files, opts, projectRoot) {
-  // InspectEngine 与适配器从包入口加载（engine.js 不含适配器类）
-  const entry = resolve(PKGS_ROOT, 'inspect', 'dist', 'index.js');
+/**
+ * 构建已装配默认适配器与 SOP 规则的产品 pipeline runner。
+ *
+ * 巡检与门禁共用产品同一条编排：适配器注册和 SOP 规则加载都由 pipeline 单一
+ * 来源决定。脚本曾分别自建 InspectEngine（手抄一份适配器名单）与裸 GuardEngine
+ * （未注册任何适配器），既漏 SOP 规则加载，也会随 registerDefaultAdapters
+ * 演进而静默漂移成两套口径。
+ */
+async function createPipelineRunner(projectRoot) {
+  const entry = resolve(PKGS_ROOT, 'pipeline', 'dist', 'index.js');
   if (!existsSync(entry)) {
-    console.error('zhcheck: inspect engine not built. Run pnpm build first.');
+    console.error('zhcheck: pipeline runner not built. Run pnpm build first.');
     process.exit(2);
   }
-  const inspectMod = await import(entry);
-  const engine = new inspectMod.InspectEngine();
-  for (const name of INSPECT_ADAPTERS) {
-    if (inspectMod[name]) engine.registerAdapter(new inspectMod[name]());
-  }
+  const { PipelineRunner } = await import(entry);
+  const runner = new PipelineRunner(projectRoot);
+  await runner.loadSopRules();
+  return runner;
+}
 
-  // P1（复查4）：inspect 引擎为项目级扫描（runScan），无 per-file API。
-  // 旧代码调用已不存在的 engine.run() 且异常被静默吞掉——--inspect 自
-  // 引擎 API 变更起从未真正执行过。现按现行 API 接通；暂存区/单文件模式
-  // 显式声明跳过（refactor 检查仍生效），不再伪装成"0 问题 = 通过"。
+// ── 巡检检查 ──────────────────────────────────────────────
+async function runInspect(files, opts, projectRoot) {
+  // 巡检为项目级扫描（runScan），无 per-file API：暂存区/单文件模式显式声明跳过
+  // （refactor 检查仍生效），不再伪装成"0 问题 = 通过"。
   if (files.length > 0) {
     console.log(
       'zhcheck: inspect 引擎为项目级扫描，暂不支持单文件/暂存区模式，本次跳过（refactor 检查仍生效）。',
@@ -136,9 +137,11 @@ async function runInspect(files, opts, projectRoot) {
     return { total: 0, warnings: 0, errors: 0 };
   }
 
+  const runner = await createPipelineRunner(projectRoot);
+
   let report;
   try {
-    report = await engine.runScan(projectRoot);
+    report = await runner.runInspect();
   } catch (e) {
     // 引擎异常不得静默放行（复查4 P1）：显式失败（exit 2）。
     console.error(`zhcheck: inspect engine error: ${e?.message ?? e}`);
@@ -159,7 +162,11 @@ async function runInspect(files, opts, projectRoot) {
   // 降级可见性：未实际执行的检查如实展示，不计入通过
   const degraded = report?.degraded ?? 0;
   if (degraded > 0 && !opts.json) {
-    console.log(`zhcheck: ${degraded} 项检查未实际执行（工具不可用）——未检测不计为通过。`);
+    console.log(`zhcheck: ${degraded} 项检查未实际执行（工具不可用或执行失败）——未检测不计为通过。`);
+    const failed = (report?.adapterResults ?? []).filter((r) => r.status === 'error');
+    for (const one of failed) {
+      console.log(`  - ${one.adapterId}: ${one.errorDetail ?? '执行失败（无详情）'}`);
+    }
   }
   if (opts.json && report) {
     console.log(JSON.stringify(report, null, 2));
@@ -219,37 +226,44 @@ async function runSecurity(files, opts, projectRoot) {
 }
 
 // ── 门禁检查 ──────────────────────────────────────────────
-async function runGuard(files, opts, _projectRoot) {
-  const { GuardEngine } = await importEngine('guard');
-  const engine = new GuardEngine();
+async function runGuard(files, opts) {
+  // 门禁为项目级检查（GuardEngine.run 只接 target，无 per-file API）：
+  // 暂存区模式显式跳过，避免在 pre-commit 场景下用整仓结论阻断与本次改动无关的提交。
+  if (files.length > 0) {
+    console.log('zhcheck: guard 门禁为项目级检查，暂不支持仅暂存区模式，本次跳过。');
+    return { total: 0, warnings: 0, errors: 0 };
+  }
+
+  const runner = await createPipelineRunner(PROJECT_ROOT);
 
   let report;
   try {
-    if (files.length > 0) {
-      report = await engine.checkFiles(files);
-    } else {
-      report = await engine.check();
-    }
+    report = await runner.runGuard();
   } catch (e) {
     // P1（复查4）：同 runInspect——异常静默返回 0 问题 = 静默放行，显式失败。
     console.error(`zhcheck: guard engine error: ${e?.message ?? e}`);
     process.exit(2);
   }
 
-  const warningCount = 0;
+  let warningCount = 0;
   let errorCount = 0;
 
-  for (const check of report?.checks || []) {
-    if (!check.passed) {
-      if (!opts.json) {
-        console.log(`${check.name}: ${check.status}: error: guard: ${check.message || '未通过'}`);
-      }
+  for (const check of report?.results || []) {
+    if (check.status === 'passed') continue;
+    if (check.status === 'warning') {
+      warningCount++;
+    } else {
       errorCount++;
+    }
+    if (!opts.json) {
+      console.log(
+        `${check.checkId}: ${check.status}: ${check.severity}: guard: ${check.message || '未通过'}`,
+      );
     }
   }
 
   return {
-    total: report?.checks?.filter((c) => !c.passed).length || 0,
+    total: report?.results?.filter((c) => c.status !== 'passed').length || 0,
     warnings: warningCount,
     errors: errorCount,
   };

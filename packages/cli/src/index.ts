@@ -30,6 +30,8 @@ import {
   loadBaseline,
   clearBaseline,
   baselinePath,
+  baselineEntryKey,
+  isBaselineEntryActive,
 } from '@zh/shared';
 import * as path from 'node:path';
 import { writeFileSync } from 'node:fs';
@@ -414,11 +416,25 @@ async function runBaselineCommand(
   switch (opts.baselineAction) {
     case 'capture': {
       const report = await runner.runInspect({ skipBaseline: true });
-      const entries = issuesToBaselineEntries(report.issues, projectDir);
+      const sopReport = await runner.runSopInspect(undefined, { skipBaseline: true });
+      const sopViolations = sopReport.evaluations.flatMap((ev) => ev.violations ?? []);
+      // 两个来源可能产出同一条（直扫与 SOP 规则重叠），按匹配键去重避免基线里出现重复条目
+      const merged = [
+        ...issuesToBaselineEntries(report.issues, projectDir),
+        ...issuesToBaselineEntries(sopViolations, projectDir),
+      ];
+      const seen = new Set<string>();
+      const entries = merged.filter((e) => {
+        const key = baselineEntryKey(e);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       const saved = await saveBaseline(projectDir, entries);
       console.log(
-        `基线已捕获: ${entries.length} 项问题 → ${baselinePath(projectDir)} (${saved.capturedAt})`,
+        `基线已捕获: ${entries.length} 项问题（直扫 ${report.issues.length} + SOP ${sopViolations.length}，去重后 ${entries.length}）→ ${baselinePath(projectDir)} (${saved.capturedAt})`,
       );
+      console.log('提示：带 reason/owner/expiresAt 的条目才是可审计豁免，建议手工补齐后再入库');
       process.exit(process.exitCode);
       break;
     }
@@ -429,9 +445,19 @@ async function runBaselineCommand(
         process.exit(0);
         break;
       }
+      const expired = baseline.entries.filter((e) => !isBaselineEntryActive(e)).length;
       console.log(`基线 ${baseline.entries.length} 项，捕获于 ${baseline.capturedAt}`);
+      if (expired > 0) {
+        console.log(`其中 ${expired} 项已过期失效（不参与豁免，问题会重新计入报告）`);
+      }
       for (const entry of baseline.entries) {
-        console.log(`  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}`);
+        const state = isBaselineEntryActive(entry) ? '' : '  [已过期]';
+        const reason = entry.reason ? `  理由: ${entry.reason}` : '  [未记录理由]';
+        const owner = entry.owner ? `  责任人: ${entry.owner}` : '';
+        const expires = entry.expiresAt ? `  到期: ${entry.expiresAt}` : '  [永久]';
+        console.log(
+          `  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}${state}${reason}${owner}${expires}`,
+        );
       }
       process.exit(process.exitCode);
       break;

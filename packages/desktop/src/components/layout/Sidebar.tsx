@@ -3,6 +3,7 @@ import type { AiToolConfigData } from '../../types/electron';
 import { FEATURE_AI_TOOL_ENABLED, FEATURE_EVOLVE_ENABLED } from '../../feature-flags';
 import { SidebarHeader, ProjectsSection, AiToolSection, EvolveSection } from './sidebar-interactive';
 import { ThemeSection, LanguageSection, AboutSection } from './sidebar-about';
+import { SidebarOverlay } from './sidebar-common';
 import { EngineStatusSection, WisdomBrainCard, type EngineCardProps } from './sidebar-status';
 import type { ProjectInfo } from './sidebar-interactive';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -24,10 +25,6 @@ interface SidebarProps {
   intelligentEnabled: boolean;
   setIntelligentEnabled: (enabled: boolean) => void;
   intelligentLoading: boolean;
-}
-
-function SidebarOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return open ? <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} /> : null;
 }
 
 function SidebarPanel({

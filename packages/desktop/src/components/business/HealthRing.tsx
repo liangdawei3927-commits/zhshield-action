@@ -10,7 +10,7 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
  * 颜色阈值与 scoring 的 gradeOf 严格同源（A>=90 success / B>=75 info / C>=60 warning /
  * D<60 danger），保证环色与等级徽章一致；score=null 时灰色占位并显示 '--'。
  */
-export function HealthRing({ score, size = 220 }: { score: number | null; size?: number }) {
+export function HealthRing({ score, size = 260 }: { score: number | null; size?: number }) {
   const t = useT();
   const progress = score === null ? 0 : Math.min(Math.max(score, 0), 100);
   const color =
@@ -26,6 +26,10 @@ export function HealthRing({ score, size = 220 }: { score: number | null; size?:
   const arcLen = (CIRCUMFERENCE * progress) / 100;
   const cx = 75;
   const cy = 75;
+  // 数字宽度自适应：3 位（100 分）降档，避免数字+单位超出环内径贴到圆弧
+  const numberFont = (score === null ? 2 : String(Math.round(progress)).length) >= 3
+    ? size * 0.26
+    : size * 0.33;
 
   return (
     <div
@@ -62,13 +66,13 @@ export function HealthRing({ score, size = 220 }: { score: number | null; size?:
         )}
       </svg>
       <div className="relative z-10 flex items-baseline justify-center">
-        <span className="font-bold leading-none" style={{ fontSize: size * 0.33, color }}>
+        <span className="font-bold leading-none" style={{ fontSize: numberFont, color }}>
           {score === null ? '--' : Math.round(progress)}
         </span>
         {score !== null && (
           <span
             style={{
-              fontSize: size * 0.14,
+              fontSize: size * 0.1,
               color: 'rgb(var(--zh-muted))',
               marginLeft: 2,
             }}

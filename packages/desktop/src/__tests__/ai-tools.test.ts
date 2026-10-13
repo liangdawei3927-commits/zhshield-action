@@ -20,6 +20,10 @@ vi.mock('electron', () => ({
   ipcMain: { handle: handleMock },
 }));
 
+// AI 工具开关产品态为关闭（功能未闭环），而该闸门会让 syncAiIntegrationOnStartup
+// 提前 return，日志注入净化分支根本走不到。此处显式打开开关以保住这项安全覆盖。
+vi.mock('../../src/feature-flags', () => ({ FEATURE_AI_TOOL_ENABLED: true }));
+
 import { syncAiIntegrationOnStartup } from '../../electron/ipc/ai-tools';
 
 describe('syncAiIntegrationOnStartup 日志注入防护', () => {

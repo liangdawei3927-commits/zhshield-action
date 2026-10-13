@@ -84,36 +84,11 @@ export function hasAnyExtraResult(extras: PipelineExtras): boolean {
 
 // ─── 输入组装（报告中心汇总 ② 与分类页实时评分共用） ─────────────────
 
-/** 参与总分的 10 个评分维度（与 @zh/scoring 的 DIMENSION_CATEGORIES 键一致，十域评分体系 v2） */
-export type ScoreDimension =
-  | 'quality'
-  | 'gate'
-  | 'security'
-  | 'dependencies'
-  | 'techdebt'
-  | 'refactor'
-  | 'performance'
-  | 'sentinel'
-  | 'garbage'
-  | 'backup';
+import { SCORE_DIMENSIONS, isScoreDimension } from '@zh/shared';
+import type { ScoreDimension } from '@zh/shared';
 
-export const SCORE_DIMENSIONS: readonly ScoreDimension[] = [
-  'quality',
-  'gate',
-  'security',
-  'dependencies',
-  'techdebt',
-  'refactor',
-  'performance',
-  'sentinel',
-  'garbage',
-  'backup',
-];
-
-export function isScoreDimension(value: unknown): value is ScoreDimension {
-  return typeof value === 'string' && (SCORE_DIMENSIONS as readonly string[]).includes(value);
-}
-
+export { SCORE_DIMENSIONS, isScoreDimension };
+export type { ScoreDimension };
 /**
  * buildHealthDimensions 的输入（报告中心汇总 ② 与分类页实时评分共用，
  * 两条路径结构上不可能漂移）。

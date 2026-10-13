@@ -1282,7 +1282,12 @@
         "pass": "合格",
         "warn": "警告",
         "attention": "未検出"
-      }
+      },
+      "attention": "未検出",
+      "attentionHint": "以下のチェックは未実行または結論が出ていないため、合格に含まれません",
+      "errorTitle": "巡回に失敗しました",
+      "errorNoReport": "巡回が有効な結果を返しませんでした。再実行するか実行ログを確認してください",
+      "errorRetry": "再巡回"
     },
     "performance": {
       "autoFixable": "自動修正可能",

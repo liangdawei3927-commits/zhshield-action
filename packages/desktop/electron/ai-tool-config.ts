@@ -125,12 +125,6 @@ export interface OpenCodeMcpBlock {
   enabled: boolean;
 }
 
-/** opencode.json 的最小结构：$schema + 可选 mcp 映射（合并时保留用户既有键） */
-export interface OpenCodeConfigJson {
-  $schema: string;
-  mcp?: Record<string, unknown>;
-}
-
 /** 解析既有 opencode.json（JSONC 注释会被剥离），失败返回 null */
 function parseOpenCodeConfig(raw: string | null): Record<string, unknown> | null {
   if (!raw || raw.trim() === '') return {};

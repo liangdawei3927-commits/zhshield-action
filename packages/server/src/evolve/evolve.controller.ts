@@ -3,6 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { EvolveService } from './evolve.service';
 import type { ExperienceType, RuleState } from '@zh/evolve';
 
+const EVOLVE_ENABLED = process.env.FEATURE_EVOLVE_ENABLED === 'true';
+
 @ApiTags('evolve')
 @Controller('evolve')
 export class EvolveController {
@@ -12,6 +14,7 @@ export class EvolveController {
 
   @Get('suggestions/:projectId')
   async getSuggestions(@Param('projectId') projectId: string) {
+    if (!EVOLVE_ENABLED) return { success: true, data: [], timestamp: new Date().toISOString() };
     this.logger.log(`Suggestions request for project: ${projectId}`);
     const data = await this.evolveService.getSuggestions(projectId);
     return { success: true, data, timestamp: new Date().toISOString() };
@@ -31,6 +34,7 @@ export class EvolveController {
       confidence?: number;
     },
   ) {
+    if (!EVOLVE_ENABLED) return { success: true, data: null, timestamp: new Date().toISOString() };
     this.logger.log(`Record experience for rule: ${body.ruleId}`);
     const result = await this.evolveService.recordExperience({
       projectId: body.projectId,
@@ -48,33 +52,38 @@ export class EvolveController {
   }
 
   @Get('experiences/:projectId')
-  async listExperiences(@Param('projectId') projectId: string) {
-    const data = await this.evolveService.listExperiences(projectId);
-    return { success: true, data, timestamp: new Date().toISOString() };
+  async getExperiences(@Param('projectId') projectId: string) {
+    if (!EVOLVE_ENABLED) return { success: true, data: [] };
+    const experiences = await this.evolveService.listExperiences(projectId);
+    return { success: true, data: experiences };
   }
 
   @Post('weights/adjust')
   async autoAdjustWeights() {
+    if (!EVOLVE_ENABLED) return { success: true, data: null, timestamp: new Date().toISOString() };
     const data = await this.evolveService.autoAdjustWeights();
     return { success: true, data, timestamp: new Date().toISOString() };
   }
 
   @Get('weights')
   async getRuleWeights() {
+    if (!EVOLVE_ENABLED) return { success: true, data: [], timestamp: new Date().toISOString() };
     const data = await this.evolveService.getRuleWeights();
     return { success: true, data, timestamp: new Date().toISOString() };
   }
 
   @Get('weights/:ruleId')
   async getRuleWeight(@Param('ruleId') ruleId: string) {
+    if (!EVOLVE_ENABLED) return { success: true, data: null };
     const data = await this.evolveService.getRuleWeight(ruleId);
-    return { success: true, data, timestamp: new Date().toISOString() };
+    return { success: true, data };
   }
 
   @Post('rule-state')
   async changeRuleState(
     @Body() body: { ruleId: string; state: string; reason: string; changedBy: string },
   ) {
+    if (!EVOLVE_ENABLED) return { success: true, data: null, timestamp: new Date().toISOString() };
     const data = await this.evolveService.changeRuleState(
       body.ruleId,
       body.state as RuleState,
@@ -86,7 +95,8 @@ export class EvolveController {
 
   @Get('rule-state/:ruleId')
   async getRuleState(@Param('ruleId') ruleId: string) {
+    if (!EVOLVE_ENABLED) return { success: true, data: null };
     const data = await this.evolveService.getRuleState(ruleId);
-    return { success: true, data, timestamp: new Date().toISOString() };
+    return { success: true, data };
   }
 }

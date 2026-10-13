@@ -1282,7 +1282,12 @@
         "pass": "Passed",
         "warn": "Warnings",
         "attention": "Not checked"
-      }
+      },
+      "attention": "Not detected",
+      "attentionHint": "The following checks did not run or produced no conclusion; they do not count as passed",
+      "errorTitle": "Inspection failed",
+      "errorNoReport": "The inspection returned no valid result. Try again or check the run log",
+      "errorRetry": "Re-run inspection"
     },
     "performance": {
       "autoFixable": "Auto-fixable",

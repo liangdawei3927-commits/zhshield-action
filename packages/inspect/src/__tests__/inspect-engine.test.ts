@@ -45,9 +45,12 @@ describe('InspectEngine', () => {
       expect(report.projectId).toBe(path.resolve('proj-1'));
       expect(report.scanType).toBe('full');
       expect(report.summary.total).toBe(0);
-      expect(report.score.overall).toBe(100);
-      expect(report.score.grade).toBe('A');
       expect(report.adapterResults).toHaveLength(0);
+      // 零适配器 = 一个检查都没跑。原断言为 overall 100 / grade A，等于把"什么都没查"
+      // 报成满分（InspectService 未注册适配器时正是此形态）；覆盖率封顶后必须落到 D。
+      expect(report.coverage).toBe(0);
+      expect(report.score.overall).toBe(59);
+      expect(report.score.grade).toBe('D');
     });
 
     it('should run scan with registered adapter and return results', async () => {

@@ -272,6 +272,7 @@ export class GuardEngine {
       message: ev.message || `${ev.status}: ${ev.rule?.name || ev.rule?.id || '未知规则'}`,
       details: ev.violations ? { violations: ev.violations, files: ev.files } : undefined,
       duration: ev.durationMs,
+      ...(ev.degraded ? { degraded: true } : {}),
     };
   }
 

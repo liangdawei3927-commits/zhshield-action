@@ -117,10 +117,60 @@ export function isInScope(relPath: string, scope?: readonly string[]): boolean {
 const SPECIFIER_RE =
   /(?:import|export)[^;\n]*?\bfrom\s*['"]([^'"]+)['"]|\bimport\s*['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-const LINE_COMMENT_RE = /^\s*\/\//;
+/** 跨行块注释状态：注释可跨行延续，须逐行传递，不能逐行独立判定 */
+interface CommentState {
+  inBlockComment: boolean;
+}
 
+/**
+ * 剥离单行注释，仅保留可执行代码；字符串字面量原样保留。
+ * 必要性：SPECIFIER_RE 是纯文本匹配，不剥离注释就会把 JSDoc 里的
+ * `import('x')` 示例当成真实依赖引用 → 误报幻觉依赖（security/error）。
+ */
+function stripComments(line: string, state: CommentState): string {
+  let out = '';
+  let i = 0;
+  while (i < line.length) {
+    const ch = line[i];
+    const next = line[i + 1];
+    if (state.inBlockComment) {
+      if (ch === '*' && next === '/') {
+        state.inBlockComment = false;
+        i += 2;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      let j = i + 1;
+      while (j < line.length) {
+        const c = line[j];
+        if (c === '\\') {
+          j += 2;
+          continue;
+        }
+        if (c === ch) break;
+        j += 1;
+      }
+      out += line.slice(i, Math.min(j + 1, line.length));
+      i = j + 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') break;
+    if (ch === '/' && next === '*') {
+      state.inBlockComment = true;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/** 入参须为已剥离注释的代码行（见 stripComments） */
 function extractSpecifiers(line: string): string[] {
-  if (LINE_COMMENT_RE.test(line)) return [];
   const specs: string[] = [];
   let m: RegExpExecArray | null;
   SPECIFIER_RE.lastIndex = 0;
@@ -214,10 +264,11 @@ export function extractImportReferences(
     const content = readTextFileSafe(projectPath, file);
     if (content === null) continue;
     const lines = content.split(NEWLINE_RE);
+    const state: CommentState = { inBlockComment: false };
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line === undefined) continue;
-      collectLineRefs(refs, file, i + 1, line);
+      collectLineRefs(refs, file, i + 1, stripComments(line, state));
     }
   }
   return refs;

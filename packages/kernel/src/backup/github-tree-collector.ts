@@ -29,15 +29,13 @@ async function collectBlobEntry(
   tree: GitHubTreeItem[],
 ): Promise<void> {
   if (ctx.abortSignal?.aborted) return;
-  // perf rule false positive: arg depends on loop var via dataflow
-  // eslint-disable-next-line perf/perf-no-serial-await
+  
   const stat = await fs.stat(fullPath);
   if (stat.size > MAX_BLOB_BYTES) {
     console.warn(`[github-backup] 跳过超大文件（>100MB）: ${relativePath}`);
     return;
   }
-  // perf rule false positive: arg depends on loop var via dataflow
-  // eslint-disable-next-line perf/perf-no-serial-await
+  
   const content = await fs.readFile(fullPath, 'base64');
   tree.push({
     path: relativePath,

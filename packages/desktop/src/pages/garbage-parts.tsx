@@ -9,7 +9,6 @@ import { formatSize } from './garbage-list-parts';
 export {
   GARBAGE_TYPE_LABEL,
   formatSize,
-  GarbageStats,
   GarbageList,
   GarbageActionBar,
 } from './garbage-list-parts';

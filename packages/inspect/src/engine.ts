@@ -214,7 +214,8 @@ export class InspectEngine {
    */
   private async finalizeScan(params: FinalizeScanParams): Promise<InspectionReport> {
     const { projectId, scanType, start, baseline, allIssues, adapterResults } = params;
-    const { kept, suppressed } = filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
+    const { kept, suppressed, suppressedIssues, dormantEntries, expiredEntries } =
+      filterIssuesByBaseline(allIssues, baseline ?? null, projectId);
     const reconciled = this.reconcileAdapterResults(adapterResults, baseline ?? null, projectId);
     await this.reportBuilder.emitScanCompleted(projectId, Date.now() - start, kept);
     return this.reportBuilder.buildReport({
@@ -225,6 +226,9 @@ export class InspectEngine {
       adapterResults: reconciled,
       penalizeInfo: params.penalizeInfo,
       suppressedCount: suppressed,
+      suppressedIssues,
+      dormantEntries,
+      expiredEntries,
     });
   }
 

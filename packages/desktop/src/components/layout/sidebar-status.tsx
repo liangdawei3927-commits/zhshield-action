@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SectionTitle } from './sidebar-interactive';
+import { SectionTitle } from './sidebar-common';
 import { BounceCard } from '../ui/Bounce';
 import { useT } from '../../i18n';
 

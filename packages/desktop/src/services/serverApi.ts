@@ -121,13 +121,6 @@ export async function getRuleVersionViaHttp(): Promise<string> {
   }
 }
 
-interface SopStats {
-  totalRules: number;
-  byDomain: Record<string, number>;
-  byAction: Record<string, number>;
-  byStatus: Record<string, number>;
-}
-
 // ─── Sentinel ────────────────────────────────────────────
 
 export async function getSentinelEventsViaHttp(options?: {
@@ -163,15 +156,6 @@ export async function startSentinelViaHttp(
   });
   started.push('log-collector');
   return { ok: true, started };
-}
-
-export async function getSopStatsViaHttp(): Promise<SopStats | null> {
-  try {
-    await request<SopVersion>('/sop/version');
-    return { totalRules: 0, byDomain: {}, byAction: {}, byStatus: {} };
-  } catch {
-    return null;
-  }
 }
 
 // ─── Backup ──────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
-import { FeatureIcon } from '../components/ui/Icons';
+import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 
 /** 空态：引导深度扫描（props 即 ScanEmptyStateBranch 的共享契约，由 SecurityPage 展开传递） */
@@ -47,13 +47,7 @@ export function SecurityEmptyState({
           desc: t('page.security.feature.malware.desc'),
         },
         {
-          icon: (
-            <FeatureIcon>
-              <circle cx="7.5" cy="15.5" r="4.5" />
-              <path d="M11 12L21 2" />
-              <path d="M15.5 7.5l3 3L22 7l-3-3" />
-            </FeatureIcon>
-          ),
+          icon: <LockKeyIcon />,
           title: t('page.security.feature.secrets.title'),
           desc: t('page.security.feature.secrets.desc'),
         },

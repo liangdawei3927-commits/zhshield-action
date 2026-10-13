@@ -29,6 +29,14 @@ import {
 // 子进程独立 i18n 实例：语言由主进程 fork 时通过 LNG 环境变量传入
 initI18n({ lng: resolveLanguage(process.env.LNG ?? null, null).value });
 
+interface RunningJob {
+  id: string;
+  controller: AbortController;
+  cancelAt?: number;
+}
+
+const runningJobs = new Map<string, RunningJob>();
+
 // 按运行模式分派到 SOP 或完整流水线 Job
 async function runPipelineByMode(
   id: string,
@@ -80,33 +88,66 @@ async function runPipeline(
 }
 
 /** 并发执行收到的所有任务：并发度由主进程 TaskManager 控制（同时最多 MAX_CONCURRENT 个） */
+function wrapJob(id: string, fn: (ctrl: AbortController) => Promise<void>): void {
+  const ctrl = new AbortController();
+  runningJobs.set(id, { id, controller: ctrl });
+  void fn(ctrl).finally(() => {
+    runningJobs.delete(id);
+  });
+}
+
 process.on('message', (raw: PipelineWorkerInbound) => {
   if (!raw || typeof raw !== 'object') return;
 
   switch (raw.type) {
+    case 'cancel':
+      if (raw.id) {
+        const j = runningJobs.get(raw.id);
+        if (j) {
+          j.cancelAt = Date.now();
+          j.controller.abort();
+        }
+      }
+      break;
     case 'run':
-      void runPipeline(raw.id, raw.projectPath, raw.options);
+      wrapJob(raw.id, async () => {
+        await runPipeline(raw.id, raw.projectPath, raw.options);
+      });
       break;
     case 'runRefactor':
-      void runRefactorJob(raw.id, raw.projectPath);
+      wrapJob(raw.id, async () => {
+        await runRefactorJob(raw.id, raw.projectPath);
+      });
       break;
     case 'runGuard':
-      void runGuardJob(raw.id, raw.projectPath, raw.options);
+      wrapJob(raw.id, async () => {
+        await runGuardJob(raw.id, raw.projectPath, raw.options);
+      });
       break;
     case 'runSecurity':
-      void runSecurityJob(raw.id, raw.projectPath);
+      wrapJob(raw.id, async () => {
+        await runSecurityJob(raw.id, raw.projectPath);
+      });
       break;
     case 'runGarbageScan':
-      void runGarbageScanJob(raw.id, raw.projectPath);
+      wrapJob(raw.id, async () => {
+        await runGarbageScanJob(raw.id, raw.projectPath);
+      });
       break;
     case 'runGarbageClean':
-      void runGarbageCleanJob(raw.id, raw.projectPath, raw.items);
+      wrapJob(raw.id, async () => {
+        await runGarbageCleanJob(raw.id, raw.projectPath, raw.items);
+      });
       break;
     case 'runGarbageRestore':
-      void runGarbageRestoreJob(raw.id, raw.projectPath, raw.batchId);
+      wrapJob(raw.id, async () => {
+        await runGarbageRestoreJob(raw.id, raw.projectPath, raw.batchId);
+      });
       break;
     case 'runPerformance':
-      void runPerformanceJob(raw.id, raw.projectPath);
+      wrapJob(raw.id, async () => {
+        await runPerformanceJob(raw.id, raw.projectPath);
+      });
       break;
     default:
       break;

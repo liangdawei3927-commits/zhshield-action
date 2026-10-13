@@ -15,6 +15,16 @@ export interface BaselineEntry {
   file: string;
   line: number;
   column: number;
+  /**
+   * 豁免理由：为什么这条可以不修。
+   * 与产品的 `.zhshield/whitelist.yml` 豁免语言对齐（reason/operator/expiresAt），
+   * 缺失视为早期版本遗留条目。
+   */
+  reason?: string;
+  /** 责任人：谁认领了这条豁免。缺省时无法定位复核人。 */
+  owner?: string;
+  /** 到期时间（ISO）。过期后条目自动失效，问题重新计入报告。缺省视为永久豁免。 */
+  expiresAt?: string;
 }
 
 /** 基线文件内容：持久化到 .zhshield/baseline.json 的顶层结构，version 当前固定为 1 */
@@ -24,13 +34,28 @@ export interface Baseline {
   entries: BaselineEntry[];
 }
 
+/** 被基线豁免的一条问题：连同命中的条目一起带出，供报告层展示豁免理由而非只给一个计数 */
+export interface SuppressedIssue<T> {
+  issue: T;
+  entry: BaselineEntry;
+}
+
 /**
  * 基线过滤结果。
- * @typeParam T 被过滤的问题元素类型（通常为 Issue），kept 保留原类型以便调用方继续处理。
+ * @typeParam T 被过滤的问题元素类型（通常为 Issue），保留原类型以便调用方继续处理。
  */
 export interface BaselineFilterResult<T> {
   kept: T[];
   suppressed: number;
+  suppressedIssues: SuppressedIssue<T>[];
+  /**
+   * 活跃但本轮一条都没命中的条目（休眠）。
+   * 休眠本身不违规——它可能在防护尚未出现的回归；但长期休眠的条目通常意味着
+   * 该处问题已修复或条目本身已腐化，应当复核后移除，否则豁免清单会虚增成仪式。
+   */
+  dormantEntries: BaselineEntry[];
+  /** 已过期的条目：已不参与匹配，留着只让清单看起来比实际防护范围更大，应复核后移除。 */
+  expiredEntries: BaselineEntry[];
 }
 
 const BASELINE_VERSION = 1;
@@ -64,30 +89,79 @@ export function toBaselineEntry(
   };
 }
 
-/** 基线 → 键集合（供引擎 O(1) 过滤） */
-export function baselineKeySet(baseline: Baseline): Set<string> {
-  return new Set(baseline.entries.map((e) => baselineEntryKey(e)));
+/**
+ * 条目当前是否仍生效：无 expiresAt 视为永久豁免（早期条目）；已到期或到期时间非法则失效。
+ * 非法时间判为失效是刻意的保守选择——坏数据不该把问题永久藏起来。
+ *
+ * @param now 注入时钟以便测试，默认取当前时间。
+ */
+export function isBaselineEntryActive(entry: BaselineEntry, now: number = Date.now()): boolean {
+  if (entry.expiresAt === undefined) return true;
+  const expiresAtMs = Date.parse(entry.expiresAt);
+  if (Number.isNaN(expiresAtMs)) return false;
+  return expiresAtMs > now;
 }
 
-/** 用基线过滤 issue 列表：命中基线键的 issue 移除并计数（不修改原数组） */
+/** 基线 → 键集合（供引擎 O(1) 过滤）；已过期条目不进集合，其问题会重新计入报告 */
+export function baselineKeySet(baseline: Baseline, now?: number): Set<string> {
+  return new Set(
+    baseline.entries.filter((e) => isBaselineEntryActive(e, now)).map((e) => baselineEntryKey(e)),
+  );
+}
+
+/** 基线 → 键到条目的映射：过滤时需要回连命中的条目，才能把豁免理由带给报告层 */
+function activeEntryMap(baseline: Baseline, now?: number): Map<string, BaselineEntry> {
+  const map = new Map<string, BaselineEntry>();
+  for (const entry of baseline.entries) {
+    if (!isBaselineEntryActive(entry, now)) continue;
+    map.set(baselineEntryKey(entry), entry);
+  }
+  return map;
+}
+
+/** 用基线过滤 issue 列表：命中基线键的 issue 移出并连同命中的条目一起记录（不修改原数组）。已过期条目不参与匹配。 */
 export function filterIssuesByBaseline<
   T extends { ruleId: string; file: string; line?: number; column?: number },
->(issues: readonly T[], baseline: Baseline | null, projectRoot: string): BaselineFilterResult<T> {
+>(
+  issues: readonly T[],
+  baseline: Baseline | null,
+  projectRoot: string,
+  now?: number,
+): BaselineFilterResult<T> {
   if (!baseline || baseline.entries.length === 0) {
-    return { kept: [...issues], suppressed: 0 };
+    return {
+      kept: [...issues],
+      suppressed: 0,
+      suppressedIssues: [],
+      dormantEntries: [],
+      expiredEntries: [],
+    };
   }
-  const keys = baselineKeySet(baseline);
+  const entries = activeEntryMap(baseline, now);
   const kept: T[] = [];
-  let suppressed = 0;
+  const suppressedIssues: SuppressedIssue<T>[] = [];
+  const matchedKeys = new Set<string>();
   for (const issue of issues) {
-    const entry = toBaselineEntry(issue, projectRoot);
-    if (keys.has(baselineEntryKey(entry))) {
-      suppressed += 1;
+    const key = baselineEntryKey(toBaselineEntry(issue, projectRoot));
+    const matched = entries.get(key);
+    if (matched) {
+      matchedKeys.add(key);
+      suppressedIssues.push({ issue, entry: matched });
     } else {
       kept.push(issue);
     }
   }
-  return { kept, suppressed };
+  const dormantEntries = [...entries.values()].filter(
+    (entry) => !matchedKeys.has(baselineEntryKey(entry)),
+  );
+  const expiredEntries = baseline.entries.filter((e) => !isBaselineEntryActive(e, now));
+  return {
+    kept,
+    suppressed: suppressedIssues.length,
+    suppressedIssues,
+    dormantEntries,
+    expiredEntries,
+  };
 }
 
 /** 通用 JSON 读取：文件缺失 → null；validate 返回 null 表示结构/版本校验失败 → null；其他错误 → warn 并降级为 null（绝不抛异常）。warnTag 为日志前缀，warnOnNotFound 控制 ENOENT 是否也告警。 */

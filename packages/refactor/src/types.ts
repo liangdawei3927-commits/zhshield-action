@@ -42,19 +42,6 @@ export interface FileSmellReport {
   refactorPriority: 'critical' | 'high' | 'medium' | 'low';
 }
 
-/** 坏味道分类计数：结构性（规模/职责）、耦合性、继承体系三类 */
-export interface ByCategory {
-  structural: number;
-  coupling: number;
-  inheritance: number;
-}
-
-/** 坏味道分类键（对应 {@link ByCategory} 的字段名） */
-export type SmellCategory = keyof ByCategory;
-
-/** 坏味道严重级（复用 @zh/shared 的 IssueSeverity，保证跨域严重级可比较） */
-export type SmellSeverity = IssueSeverity;
-
 /** 重构报告：全量扫描的时间、范围、分类/严重级分布、逐文件明细与汇总建议 */
 export interface RefactorReport {
   timestamp: string;

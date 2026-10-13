@@ -146,5 +146,3 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
   }
 }
 
-/** 复杂度检测器单例（供适配器注册表直接引用） */
-export const complexityDetector: ComplexityDetector = new ComplexityDetectorImpl();

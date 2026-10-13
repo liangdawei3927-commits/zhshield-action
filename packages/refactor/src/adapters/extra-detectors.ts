@@ -6,6 +6,7 @@ import { makeSmell } from './adapter-types';
 import { extractMessageChains } from './chain-text-utils';
 
 const COLLECTION_TYPE_RE = /^(Map|Set|Array|Record|WeakMap|WeakSet)\b/;
+const GENERIC_ARGS_RE = /<.*>/;
 
 export function detectInappropriateIntimacy(
   parsed: ParsedFile,
@@ -276,7 +277,7 @@ export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig):
  */
 function isRefusedBequestExempt(cls: ParsedClass, sourceFile: ts.SourceFile): boolean {
   const base = cls.extendsClass ?? '';
-  const baseName = base.replace(/<.*>/, '').trim(); // 剥掉泛型参数，如 Component<Props, State> → Component
+  const baseName = base.replace(GENERIC_ARGS_RE, '').trim(); // 剥掉泛型参数，如 Component<Props, State> → Component
   if (baseName === 'Error') return true;
   if (baseName === 'Component' || baseName === 'PureComponent') return true;
   if (baseName.endsWith('Adapter')) return true;
@@ -285,7 +286,7 @@ function isRefusedBequestExempt(cls: ParsedClass, sourceFile: ts.SourceFile): bo
 
 /** 判断子类是否引用了继承成员：super.x 调用，或 this.<成员> 指向未在本类声明的成员。
  *  引用了说明继承能力被实际使用——不是「只借了类型」。 */
-function referencesInheritedMember(cls: ParsedClass, sourceFile: ts.SourceFile): boolean {
+function referencesInheritedMember(cls: ParsedClass, _sourceFile: ts.SourceFile): boolean {
   const ownNames = new Set<string>();
   for (const m of cls.members.methods) ownNames.add(m.name);
   for (const f of cls.members.fields) ownNames.add(f.name);
@@ -403,8 +404,8 @@ function isPureDispatchSwitch(node: ts.SwitchStatement): boolean {
   for (const clause of node.caseBlock.clauses) {
     const stmts = clause.statements;
     if (stmts.length === 0) continue; // 空 case（fall-through 分组）无语句，不构成反模式
-    const last = stmts[stmts.length - 1];
-    if (!ts.isReturnStatement(last) && !ts.isThrowStatement(last)) return false;
+    const last = stmts.at(-1);
+    if (!last || (!ts.isReturnStatement(last) && !ts.isThrowStatement(last))) return false;
   }
   return true;
 }

@@ -66,8 +66,7 @@ async function copySingleFile(
     const [hash, stat] = await Promise.all([hashFile(file), fs.stat(file)]);
     const storedAs = opts.compress ? `${relativePath}.gz` : relativePath;
     const targetPath = safeJoinReal(opts.backupDir, storedAs);
-    // perf rule false positive: arg depends on loop var via dataflow
-    // eslint-disable-next-line perf/perf-no-serial-await
+    
     await fs.mkdir(path.dirname(targetPath), { recursive: true });
     if (opts.compress) {
       await pipeline(

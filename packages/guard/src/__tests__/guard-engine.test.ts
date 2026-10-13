@@ -120,10 +120,6 @@ describe('ConfigLoader', () => {
     fs.rmSync(dir, { recursive: true });
   });
 
-  it('should return empty object for non-existent severities', () => {
-    const loader = new ConfigLoader('/nonexistent');
-    expect(loader.loadSeverities()).toEqual({});
-  });
 });
 
 // ─── GuardEngine ──────────────────────────────────────────

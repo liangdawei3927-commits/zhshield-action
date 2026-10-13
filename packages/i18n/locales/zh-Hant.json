@@ -1282,7 +1282,12 @@
       "issues": "問題",
       "issuesHint": "僅問題項，點擊卡內複製只會複製這些問題",
       "passed": "通過",
-      "total": "檢查項"
+      "total": "檢查項",
+      "attention": "未檢測",
+      "attentionHint": "以下檢查未執行或未產出結論，不計入通過",
+      "errorTitle": "體檢失敗",
+      "errorNoReport": "體檢未回傳有效結果，請重試或查看執行日誌",
+      "errorRetry": "重新體檢"
     },
     "performance": {
       "autoFixable": "可自動修復",

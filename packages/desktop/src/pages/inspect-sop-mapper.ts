@@ -132,3 +132,36 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
     },
   };
 }
+
+/**
+ * runPipeline 的结果判定入参。
+ * inspect 声明为 InspectionReportData 属历史类型谎言（运行时为序列化 RuleEngineReport），
+ * 故此处按 unknown 收口，与本文件既有校验策略一致；PipelineReportData 可结构化传入。
+ */
+export interface InspectOutcomeInput {
+  readonly error?: string | null;
+  readonly inspect?: unknown;
+}
+
+/** 巡检一次执行的三态结果：成功 / 后端报错 / 无有效载荷（后两者都须显式呈现，不得退化为空态） */
+export type InspectOutcome =
+  | { readonly kind: 'report'; readonly report: InspectionReportData }
+  | { readonly kind: 'failed'; readonly messageKey: string; readonly detail?: string };
+
+/** 巡检失败态：InspectOutcome 中 kind 为 'failed' 的分支，携带 i18n messageKey 与可选 detail */
+export type InspectFailure = Extract<InspectOutcome, { kind: 'failed' }>;
+
+/**
+ * 判定巡检执行结果。
+ * 后端 error 优先于载荷：error 非空即失败，即便同时带着 inspect。
+ */
+export function toInspectOutcome(pipeline: InspectOutcomeInput): InspectOutcome {
+  if (pipeline.error) {
+    return { kind: 'failed', messageKey: 'page.inspect.errorTitle', detail: pipeline.error };
+  }
+  const report = toInspectionReportDataFromRuleEngine(pipeline.inspect);
+  if (report === null) {
+    return { kind: 'failed', messageKey: 'page.inspect.errorNoReport' };
+  }
+  return { kind: 'report', report };
+}

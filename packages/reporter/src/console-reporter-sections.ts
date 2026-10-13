@@ -111,7 +111,75 @@ export class StageSectionFormatter {
       );
     }
 
+    this.formatSuppressedIssues(report, lines, indent);
+    this.formatBaselineAudit(report, lines, indent);
     this.formatToolAvailability(report, lines, indent);
+  }
+
+  /**
+   * 渲染基线豁免区：豁免项已从 issues 中移除，若不在此显式列出，报告读者无法区分
+   * "工具没报出来" 与 "报出来了但被豁免"，也无法复核豁免理由是否仍然成立。
+   */
+  private formatSuppressedIssues(
+    report: InspectionReport,
+    lines: string[],
+    indent: string,
+  ): void {
+    const suppressed = report.suppressedIssues ?? [];
+    if (suppressed.length === 0) return;
+
+    lines.push('');
+    lines.push(
+      `${indent}${this.fmt.yellow('基线豁免')}: ${this.fmt.bold(String(suppressed.length))} ${this.fmt.dim('项（不计入评分）')}`,
+    );
+    for (const { issue, entry } of suppressed) {
+      const location = `${issue.file}:${issue.line ?? 0}`;
+      lines.push(`${indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`);
+      lines.push(
+        `${indent}    ${this.fmt.dim('理由')}: ${entry.reason ?? this.fmt.dim('[未记录，需补齐]')}`,
+      );
+      if (entry.owner) {
+        lines.push(`${indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
+      }
+      lines.push(
+        `${indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
+      );
+    }
+  }
+
+  /**
+   * 渲染豁免清单审计区：列出"活跃但本轮未命中"的休眠条目与"已过期"条目。
+   * 豁免清单本身不自证——10 条看着像在防护的条目可能一条都没生效；不显式暴露，
+   * 清单就会随时间虚增成无人能复核的仪式，满分也随之失去可信度。
+   */
+  private formatBaselineAudit(report: InspectionReport, lines: string[], indent: string): void {
+    const dormant = report.dormantEntries ?? [];
+    const expired = report.expiredEntries ?? [];
+    if (dormant.length === 0 && expired.length === 0) return;
+
+    lines.push('');
+    lines.push(
+      `${indent}${this.fmt.yellow('豁免清单待复核')}: ${this.fmt.bold(String(dormant.length))} ${this.fmt.dim('休眠')} / ${this.fmt.bold(String(expired.length))} ${this.fmt.dim('过期')}`,
+    );
+    for (const entry of dormant) {
+      const location = `${entry.file}:${entry.line}`;
+      lines.push(`${indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`);
+      lines.push(
+        `${indent}    ${this.fmt.dim('本轮未命中。若对应问题已修复请删除该条目；若属防护尚未触发的回归防线，请确认仍需保留。')}`,
+      );
+      if (entry.owner) {
+        lines.push(`${indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
+      }
+      lines.push(
+        `${indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
+      );
+    }
+    for (const entry of expired) {
+      const location = `${entry.file}:${entry.line}`;
+      lines.push(
+        `${indent}  ${this.fmt.dim('✗')} ${entry.ruleId}  ${this.fmt.dim(location)} ${this.fmt.dim('已过期，已不再豁免，请清理')}`,
+      );
+    }
   }
 
   /** 渲染工具可用性矩阵：显式上报每个外部扫描工具的可用状态，消除"工具缺失静默跳过"盲区 */

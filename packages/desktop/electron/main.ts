@@ -36,6 +36,7 @@ import { registerE2eObservationIpc } from './ipc/e2e-observation';
 import { preheatPipelineWorker, disposePipelineWorker } from './pipeline-host';
 import { setupAutoUpdater } from './auto-updater';
 import { enforceTrustedIpcSender } from './ipc-security';
+import { FEATURE_AI_TOOL_ENABLED, FEATURE_EVOLVE_ENABLED } from '../src/feature-flags';
 
 // ─── 安全：IPC sender 来源校验（须在注册任何 handler 之前调用）────
 enforceTrustedIpcSender();
@@ -311,7 +312,9 @@ ipcMain.handle(
 
 // ─── 各功能域 IPC 注册 ─────────────────────────────────────
 registerProjectsIpc();
-registerAiToolsIpc();
+if (FEATURE_AI_TOOL_ENABLED) {
+  registerAiToolsIpc();
+}
 registerSyncIpc();
 registerToolsIpc();
 const taskManager = buildTaskManager();
@@ -321,7 +324,9 @@ registerGuardHooksIpc();
 registerGuardConfigIpc();
 registerSentinelIpc();
 registerFeedbackIpc();
-registerEvolveIpc();
+if (FEATURE_EVOLVE_ENABLED) {
+  registerEvolveIpc();
+}
 registerBackupIpc();
 registerSchedulerIpc();
 
@@ -426,7 +431,9 @@ app.whenReady().then(async () => {
   });
   // 后台预热体检子进程，避免首次点击冷启动过久
   preheatPipelineWorker();
-  void syncAiIntegrationOnStartup();
+  if (FEATURE_AI_TOOL_ENABLED) {
+    void syncAiIntegrationOnStartup();
+  }
 
   // macOS: 点击 dock 图标时重新创建窗口
   app.on('activate', () => {

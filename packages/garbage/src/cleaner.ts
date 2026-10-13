@@ -28,7 +28,7 @@ export function cleanGarbage(projectPath: string, items: GarbageCleanInput[]): G
     if (type === null) continue;
     const absPath = resolveItemPath(root, item, state.failed);
     if (absPath === null) continue;
-    if (!authorizeDelete(item, state.failed)) continue;
+    if (!authorizeDelete(item, absPath, root, state.failed)) continue;
     moveToTrash({ item, type, absPath, root, state });
   }
 
@@ -64,9 +64,20 @@ function validateCleanItem(item: GarbageCleanInput, failed: string[]): GarbageTy
   return item.type;
 }
 
-/** 删除授权：须在 resolveItemPath 之后调用，否则越界路径会被降级成普通拒绝而丢掉越界诊断 */
-function authorizeDelete(item: GarbageCleanInput, failed: string[]): boolean {
-  if (isDeletablePath(item.path)) return true;
+/**
+ * 删除授权：以 resolveItemPath 解析出的绝对路径为准（项目相对 POSIX 路径），
+ * 而非原始 item.path —— 原始字符串未做规范化，`dist/../package.json` 这类
+ * 伪装路径会用 `dist` 段骗过白名单却实际指向包根文件。须在 resolveItemPath
+ * 之后调用，否则越界路径会被降级成普通拒绝而丢掉越界诊断。
+ */
+function authorizeDelete(
+  item: GarbageCleanInput,
+  absPath: string,
+  root: string,
+  failed: string[],
+): boolean {
+  const relativePath = path.relative(root, absPath).split(path.sep).join('/');
+  if (isDeletablePath(relativePath)) return true;
   failed.push(`${item.id}: ${item.path} 非可再生路径，已拒绝（仅允许清理构建产物与垃圾文件）`);
   return false;
 }
@@ -115,6 +126,7 @@ function moveToTrash(params: MoveToTrashParams): void {
 }
 
 export function restoreGarbage(projectPath: string, batchId: string): GarbageRestoreResult {
+  assertSafeBatchId(batchId);
   const root = safeResolveReal(projectPath, '.');
   const batchDir = safeJoinReal(root, '.zhshield', 'trash', batchId);
   if (!fs.existsSync(batchDir)) {
@@ -134,6 +146,19 @@ interface RestoreState {
   restored: number;
   restoredBytes: number;
   failed: string[];
+}
+
+/** batchId 必须为单个安全路径段，防止 `..` 等值经规范化逃出 trash 目录 */
+function assertSafeBatchId(batchId: string): void {
+  const unsafe =
+    batchId === '' ||
+    batchId === '.' ||
+    batchId === '..' ||
+    batchId.includes('/') ||
+    batchId.includes('\\');
+  if (unsafe) {
+    throw new Error(`非法 batchId: ${batchId}`);
+  }
 }
 
 function restoreDirectory(dir: string, batchDir: string, root: string, state: RestoreState): void {

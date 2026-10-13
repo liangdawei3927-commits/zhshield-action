@@ -3,6 +3,11 @@ import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
 import * as ts from 'typescript';
 
+/** React 组件名判定：大写开头（模块级复用，避免每次调用重编译） */
+const UPPERCASE_START_RE = /^[A-Z]/;
+/** React 组件继承基类判定：(React.)?(Pure)Component 结尾 */
+const REACT_COMPONENT_RE = /(?:React\.)?(?:Pure)?Component$/;
+
 export function detectLongMethod(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
 
@@ -276,13 +281,13 @@ function findWorstComponent(sourceFile: ts.SourceFile): ComponentSize | null {
  * 非组件节点返回 null。
  */
 function componentNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
-  if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text)) {
+  if (ts.isFunctionDeclaration(node) && node.name && UPPERCASE_START_RE.test(node.name.text)) {
     return node.name.text;
   }
   if (
     ts.isVariableDeclaration(node) &&
     ts.isIdentifier(node.name) &&
-    /^[A-Z]/.test(node.name.text)
+    UPPERCASE_START_RE.test(node.name.text)
   ) {
     const initializer = node.initializer;
     if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) {
@@ -301,10 +306,10 @@ function componentNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | nul
   if (
     ts.isClassDeclaration(node) &&
     node.name &&
-    /^[A-Z]/.test(node.name.text) &&
+    UPPERCASE_START_RE.test(node.name.text) &&
     (node.heritageClauses ?? []).some((clause) =>
       clause.types.some((t) =>
-        /(?:React\.)?(?:Pure)?Component$/.test(t.expression.getText(sourceFile)),
+        REACT_COMPONENT_RE.test(t.expression.getText(sourceFile)),
       ),
     )
   ) {

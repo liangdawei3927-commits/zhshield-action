@@ -75,7 +75,4 @@ export function resolveLanguage(
   return { source: 'fallback', value: DEFAULT_LANGUAGE };
 }
 
-/** 从环境变量（ZH_LANG / LANG / LC_ALL 等）探测语言；无则返回 null */
-export function detectLanguageFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
-  return env.ZH_LANG ?? env.LANG ?? env.LC_ALL ?? env.LC_MESSAGES ?? null;
-}
+

@@ -44,6 +44,7 @@ import {
 } from './score-converters';
 import { loadBackupHealthSnapshot } from './backup';
 import { getSentinelHealthData } from './sentinel';
+import { validateGarbageCleanItems, isValidBatchId } from '../garbage-input';
 import {
   loadDepsBaseline,
   saveDepsBaseline,
@@ -313,10 +314,14 @@ async function probeProjectProfile(projectPath: string): Promise<ScoringProjectP
 
 /** 将探测到的项目画像投影为 kernel 兼容的 ProjectFeature 并写入画像缓存（供工具规则按画像裁剪） */
 function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): void {
+  const features: string[] = [];
+  if (profile.type && profile.type !== 'unknown') features.push(String(profile.type));
+  if (profile.runtime && profile.runtime !== 'unknown') features.push(String(profile.runtime));
+  if (profile.isMonorepo) features.push('modular-monolith');
   const feature: CachedProjectFeature = {
     language: profile.language === 'unknown' ? undefined : profile.language,
     framework: profile.framework,
-    features: [],
+    features,
   };
   setCachedProfile(feature, projectPath);
   if (projectPath) {
@@ -461,13 +466,8 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runGarbageScan', (_e, projectPath: string) =>
     runGarbageScanHandler(manager, projectPath),
   );
-  ipcMain.handle(
-    'engine:garbageClean',
-    (
-      _e,
-      projectPath: string,
-      items: Array<{ id: string; path: string; size: number; type: string }>,
-    ) => garbageCleanHandler(manager, projectPath, items),
+  ipcMain.handle('engine:garbageClean', (_e, projectPath: string, items: unknown) =>
+    garbageCleanHandler(manager, projectPath, items),
   );
   ipcMain.handle('engine:garbageRestore', (_e, projectPath: string, batchId: string) =>
     garbageRestoreHandler(manager, projectPath, batchId),
@@ -650,13 +650,19 @@ async function syncGarbageDashboard(projectPath: string, result: GarbageCleanRes
 async function garbageCleanHandler(
   manager: TaskManager,
   projectPath: string,
-  items: Array<{ id: string; path: string; size: number; type: string }>,
+  items: unknown,
 ): Promise<GarbageCleanResult> {
+  // 边界校验：渲染进程入参不可信（同源 XSS 可提交任意 payload）。
+  // 校验失败必须在 try 之外抛出，使 IPC invoke 直接 reject，绝不把脏数据交给清理器。
+  const validated = validateGarbageCleanItems(items);
+  if (!validated.ok) {
+    throw new Error(validated.error);
+  }
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const task = manager.start('garbageClean', projectPath, { items });
+    const task = manager.start('garbageClean', projectPath, { items: validated.items });
     const result = (await manager.waitFor(task.id)) as GarbageCleanResult;
     await syncGarbageDashboard(projectPath, result);
     return result;
@@ -671,13 +677,13 @@ async function garbageRestoreHandler(
   projectPath: string,
   batchId: string,
 ): Promise<GarbageRestoreResult> {
+  // 边界校验：batchId 必须是规范 UUID（产品侧由 randomUUID 生成）。
+  // 在 try 之外抛出，使非法 batchId 的 IPC invoke 直接 reject，不进入恢复流程。
+  if (!isValidBatchId(batchId)) {
+    throw new Error(t('electron.invalidParams'));
+  }
   try {
-    if (
-      !projectPath ||
-      typeof projectPath !== 'string' ||
-      !batchId ||
-      typeof batchId !== 'string'
-    ) {
+    if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidParams'));
     }
     const task = manager.start('garbageRestore', projectPath, { batchId });
@@ -1505,10 +1511,20 @@ export function cacheProfileFromFingerprintResult(result: unknown, projectPath: 
       console.warn('[engine:runProfile] 画像无 targets，跳过缓存（同步保持全量）');
       return;
     }
+    const features: string[] = [];
+    const productForm = target.productForm;
+    if (productForm?.value) features.push(String(productForm.value));
+    // architecture / environments 挂在 ProjectProfile 上而非 TargetProfile：原代码用
+    // 宽松类型断言掩盖了这个错位，两次读取恒为 undefined → 这两类特征从未进入缓存。
+    const arch = profile?.architecture;
+    if (arch?.value) features.push(String(arch.value));
+    for (const e of profile?.environments ?? []) {
+      if (e?.value) features.push(String(e.value));
+    }
     const feature: CachedProjectFeature = {
       language: target.language?.value,
       framework: target.frameworks?.[0]?.value,
-      features: [],
+      features,
     };
     setCachedProfile(feature, projectPath);
     void registerProjectFeaturesToCloud(feature, projectPath);

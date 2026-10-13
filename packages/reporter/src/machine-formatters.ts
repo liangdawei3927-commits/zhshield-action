@@ -9,6 +9,7 @@
  * - 与 ConsoleReporter 解耦：本模块只产出「机器可读」产物，不参与文本渲染。
  * - 通过结构化类型守卫识别报告种类，避免硬依赖具体运行时类型。
  */
+import type { BaselineEntry } from '@zh/shared';
 import type { GuardReport } from '@zh/guard';
 import type { RuleEngineReport, Violation } from '@zh/kernel';
 import type { InspectionReport } from '@zh/inspect';
@@ -43,6 +44,12 @@ export interface Finding {
   category?: string;
   source: FindingSource;
   suggestion?: string;
+  /**
+   * 基线豁免标注：映射为 SARIF 原生 suppressions。
+   * kind 固定 external —— 豁免由 .zhshield/baseline.json 在源码之外施加，
+   * SARIF 规范中 inSource 表示源码内抑制标记，此处不适用。
+   */
+  suppression?: { kind: 'external'; justification: string };
 }
 
 /** 严重级 → 数值秩（error 最高），用于 fail-on 阈值比较 */
@@ -211,6 +218,17 @@ function ruleEngineFindings(report: RuleEngineReport): Finding[] {
   return findings;
 }
 
+/**
+ * 把基线条目的治理字段拼成 SARIF suppressions.justification 要求的可读字符串。
+ * 豁免理由缺失时显式标注"未记录"，避免机器输出里出现一条无据可查的静默豁免。
+ */
+function baselineJustification(entry: BaselineEntry): string {
+  const reason = entry.reason ? entry.reason : '未记录豁免理由（需补齐）';
+  const owner = entry.owner ? entry.owner : '未指定责任人';
+  const expires = entry.expiresAt ? entry.expiresAt : '永久';
+  return `基线豁免：${reason}（责任人: ${owner}，到期: ${expires}）`;
+}
+
 function inspectionFindings(report: InspectionReport): Finding[] {
   const findings: Finding[] = [];
   for (const issue of report.issues) {
@@ -224,6 +242,20 @@ function inspectionFindings(report: InspectionReport): Finding[] {
       category: issue.category,
       source: (issue.source as FindingSource) || 'inspect',
       suggestion: issue.suggestion,
+    });
+  }
+  for (const { issue, entry } of report.suppressedIssues ?? []) {
+    findings.push({
+      ruleId: entry.ruleId,
+      severity: issue.severity,
+      message: issue.message,
+      file: issue.file,
+      line: issue.line,
+      column: issue.column,
+      category: issue.category,
+      source: (issue.source as FindingSource) || 'inspect',
+      suggestion: issue.suggestion,
+      suppression: { kind: 'external', justification: baselineJustification(entry) },
     });
   }
   // P0（复查4）：降级跳过的检查项必须出现在 findings（SARIF/CI 可见）
@@ -325,6 +357,15 @@ export function toSarif(findings: Finding[], toolName = 'zhshield'): string {
         },
       },
     ];
+    if (f.suppression) {
+      result.suppressions = [
+        {
+          kind: f.suppression.kind,
+          status: 'accepted',
+          justification: f.suppression.justification,
+        },
+      ];
+    }
     return result;
   });
 

@@ -450,6 +450,7 @@ function buildToolScanResult(
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: new Date(),
+    ...(result.status === 'unavailable' ? { degraded: true as const } : {}),
   };
 }
 

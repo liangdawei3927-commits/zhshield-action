@@ -11,7 +11,7 @@
  * - ci-vs-local：.github/workflows/*.yml 中 Node / 包管理器版本 vs 本地清单（不一致 → warning，无 CI → 不产出）
  */
 import * as fs from 'fs';
-import { safeJoin } from '@zh/shared';
+import { safeJoin, type ProjectProfile } from '@zh/shared';
 import {
   isRecord,
   readJsonSafe,
@@ -51,24 +51,9 @@ const VERSION_EXTRACT_RE = /(\d+)(?:\.\d+){0,2}/;
 /** YAML 工作流文件名匹配 */
 const YAML_FILE_RE = /\.ya?ml$/i;
 
-/** 项目语言（与 pipeline 的 ProjectLanguage 结构对齐，本地定义不跨包引用） */
-export type ProjectLanguage = 'typescript' | 'javascript' | 'python' | 'unknown';
-
-/** 包管理器（与 pipeline 的 PackageManager 结构对齐） */
-export type PackageManager =
-  'npm' | 'pnpm' | 'yarn' | 'pip' | 'poetry' | 'uv' | 'pipenv' | 'unknown';
-
-/**
- * 项目画像：仅消费 projectPath 定位清单文件。
- * 本地结构类型，与 @zh/pipeline 的 ProjectProfile 形状一致，但不跨包 import。
- */
-export interface ProjectProfile {
-  projectPath: string;
-  language: ProjectLanguage;
-  framework: string | null;
-  packageManager: PackageManager;
-  hasTypeScript: boolean;
-}
+// 项目画像类型统一由 @zh/shared 定义（跨包单一事实源）；此处重新导出以保持
+// @zh/dependency 既有公开 API（如 @zh/inspect 从本包 import ProjectProfile）。
+export type { ProjectLanguage, PackageManager, ProjectProfile } from '@zh/shared';
 
 /** 环境一致性检查选项：projectRoot 为清单所在目录（默认取 profile.projectPath） */
 export interface EnvConsistencyOptions {

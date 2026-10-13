@@ -7,8 +7,6 @@ import { SopRuleParser } from './sop-loader-parser';
 import { SopRuleFileCollector } from './sop-loader-fs';
 import { SopRuleRegistrar } from './sop-loader-registry';
 
-export { SopRuleConfigError } from './dynamic-severity-config';
-
 /** SOP 加载器配置：三项路径均可省略，省略时使用内置默认值 */
 export interface SopLoaderOptions {
   /** SOP 规则文件的根目录，默认从 __dirname 向上查找 */
@@ -43,8 +41,10 @@ export class SopLoader {
   constructor(registry: SopRegistry, options: SopLoaderOptions = {}) {
     this.registry = registry;
 
-    // 默认规则目录：本文件所在目录的上级
-    const defaultRulesDir = path.resolve(__dirname, '..');
+    // 默认规则目录：优先 presets/sop-templates（现行模板布局），不存在时回退旧版根布局，保证 src/dist 一致
+    const sopRoot = path.resolve(__dirname, '..');
+    const templatesDir = path.resolve(sopRoot, 'presets', 'sop-templates');
+    const defaultRulesDir = fs.existsSync(templatesDir) ? templatesDir : sopRoot;
 
     this.options = {
       rulesDir: options.rulesDir ?? defaultRulesDir,

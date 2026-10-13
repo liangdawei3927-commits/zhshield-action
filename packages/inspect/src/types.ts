@@ -1,7 +1,6 @@
-import type { Issue as SharedIssue } from '@zh/shared';
+import type { BaselineEntry, Issue as SharedIssue, SuppressedIssue } from '@zh/shared';
 
-/** 问题严重级别（跨域单一来源：与 @zh/shared 的 IssueSeverity 同源） */
-export type { IssueSeverity } from '@zh/shared';
+
 /** 问题分类维度（跨域单一来源：与 @zh/shared 的 IssueCategory 同源） */
 export type { IssueCategory } from '@zh/shared';
 
@@ -66,9 +65,28 @@ export interface InspectionReport {
   adapterResults: AdapterResult[];
   /** 非预期降级数（工具不可用/引擎缺失导致"未检测"）：与 ok 判定联动——未检测 ≠ 通过 */
   degraded?: number;
+  /**
+   * 巡检覆盖率（0~1）：真正执行的检查数 / 应执行检查数（out-of-scope 不计入分母）。
+   * 未执行的检查恒产出零 issues，故覆盖率越低 overall 越不可信——score 已据此封顶。
+   */
+  coverage?: number;
   recommendations: string[];
   /** 基线豁免命中数（无基线/未启用时为 0） */
   suppressedCount?: number;
+  /**
+   * 被基线豁免的问题明细（含命中条目的豁免理由/责任人/到期时间）。
+   * 豁免项不再出现在 issues 里，若不在此显式带出，报告消费者就无法区分
+   * "本就没检查出来" 与 "检查出来了但被豁免" —— 审计场景下这是关键差异。
+   */
+  suppressedIssues?: SuppressedIssue<Issue>[];
+  /**
+   * 活跃但本轮未命中任何问题的豁免条目（休眠）。
+   * 与 suppressedIssues 的差异是关键：suppressedIssues 是"清单在干活"，
+   * 这里是"清单在占位"。不暴露出来，豁免清单会随时间虚增成无法复核的仪式。
+   */
+  dormantEntries?: BaselineEntry[];
+  /** 已过期、已不参与匹配的豁免条目。因匹配时就被剔除，从 suppressedCount 永远看不见它们。 */
+  expiredEntries?: BaselineEntry[];
 }
 
 /** 单次巡检运行上下文：项目、扫描方式与项目画像（用于工具 scope 裁剪） */

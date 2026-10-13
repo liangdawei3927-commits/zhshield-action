@@ -16,7 +16,7 @@
   "dependencies": {
     "@nestjs/common": "^11.1.29",
     "@nestjs/core": "^11.1.29",
-    "@nestjs/platform-express": "^11.2.3",
+    "@nestjs/platform-express": "^11.2.7",
     "@nestjs/swagger": "^11.4.7",
     "@zh/db": "workspace:*",
     "@zh/evolve": "workspace:*",

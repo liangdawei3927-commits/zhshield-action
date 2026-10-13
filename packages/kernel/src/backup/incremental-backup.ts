@@ -211,11 +211,9 @@ export class BackupManager {
     try {
       const sourcePath = safeJoinReal(backupDir, relativePath);
       const targetPath = safeJoinReal(restoreTo, relativePath);
-      // perf rule false positive: arg depends on loop var via dataflow
-      // eslint-disable-next-line perf/perf-no-serial-await
+      
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      // perf rule false positive: arg depends on loop var via dataflow
-      // eslint-disable-next-line perf/perf-no-serial-await
+      
       await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
       return true;
     } catch {
@@ -278,8 +276,7 @@ export class BackupManager {
     if (this.excludePatterns.some((p) => p.test(relativePath))) return;
 
     if (entry.isDirectory()) {
-      // perf rule false positive: arg depends on loop var via dataflow
-      // eslint-disable-next-line perf/perf-no-serial-await
+      
       await this.walkFiles(fullPath, results, depth + 1);
       return;
     }

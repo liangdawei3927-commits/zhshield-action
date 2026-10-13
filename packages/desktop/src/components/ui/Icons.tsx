@@ -201,6 +201,17 @@ export function FeatureIcon({ children }: { children: ReactNode }) {
   );
 }
 
+/** 密钥/安全空态的锁孔图标：FeatureIcon 外壳 + 共用锁孔路径（secrets 与 security 空态曾各写一份） */
+export function LockKeyIcon() {
+  return (
+    <FeatureIcon>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M11 12L21 2" />
+      <path d="M15.5 7.5l3 3L22 7l-3-3" />
+    </FeatureIcon>
+  );
+}
+
 /** 结果卡分区标题图标外壳：14×14、currentColor、2 描边（与功能卡 1.8 描边规格不同，故独立导出） */
 export function SectionIcon({ children }: { children: ReactNode }) {
   return (

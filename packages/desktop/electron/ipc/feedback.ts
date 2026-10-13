@@ -12,6 +12,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { t } from '@zh/i18n';
 import { getEvolve } from '../ipc-context';
+import { FEATURE_EVOLVE_ENABLED } from '../../src/feature-flags';
 
 /** 前端提交的误报反馈条目（不携带来源细节，仅问题定位信息） */
 export interface FalsePositiveFeedbackItem {
@@ -77,18 +78,20 @@ async function recordFeedbackExperience(
 ): Promise<void> {
   try {
     const evolve = await getEvolve();
-    evolve.recordExperience({
-      projectId: projectPath,
-      ruleId: item.ruleId,
-      type: 'false-positive',
-      pattern: item.title ?? item.ruleId,
-      message: item.message,
-      feedback: item.message,
-      source: 'user',
-      confidence: 0.8,
-      verified: false,
-    });
-    evolve.autoAdjustWeights();
+    if (FEATURE_EVOLVE_ENABLED) {
+      evolve.recordExperience({
+        projectId: projectPath,
+        ruleId: item.ruleId,
+        type: 'false-positive',
+        pattern: item.title ?? item.ruleId,
+        message: item.message,
+        feedback: item.message,
+        source: 'user',
+        confidence: 0.8,
+        verified: false,
+      });
+      evolve.autoAdjustWeights();
+    }
   } catch {
     // 经验回写失败不影响误报反馈主流程
   }

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
-import type { ScoreDimension } from '../../pages/domain-score-logic';
+import type { ScoreDimension } from '@zh/shared';
 import { DomainScoreCard } from '../DomainScoreCard';
 import { ResultCard } from '../../components/ui/ResultCard';
 

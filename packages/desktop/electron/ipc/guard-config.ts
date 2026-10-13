@@ -51,11 +51,6 @@ async function writeConfig(config: GuardConfig): Promise<void> {
   await fsAsync.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
 }
 
-/** 异步读取门禁配置（供流水线子进程等无法使用 IPC 的场景调用） */
-export async function readGuardConfigFile(): Promise<GuardConfig> {
-  return readConfig();
-}
-
 export function registerGuardConfigIpc(): void {
   ipcMain.handle('guard:readConfig', (): Promise<GuardConfig> => readConfig());
   ipcMain.handle('guard:writeConfig', (_event, config: GuardConfig): Promise<void> =>

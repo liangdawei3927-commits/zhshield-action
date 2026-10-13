@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SectionTitle } from './sidebar-common';
 import { ShieldLogo, NavIcon } from '../ui/Icons';
 import type { AiToolConfigData } from '../../types/electron';
 import { Bounce, BounceCard } from '../ui/Bounce';
@@ -7,15 +8,6 @@ import { useT } from '../../i18n';
 export interface ProjectInfo {
   name: string;
   path: string;
-}
-
-export function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <h3 className="text-[10px] font-semibold text-zh-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-      {icon}
-      {label}
-    </h3>
-  );
 }
 
 function ProjectRow({

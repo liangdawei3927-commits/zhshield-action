@@ -3,6 +3,7 @@ import type { ProcessMonitorConfig } from '../process-monitor';
 import {
   classifyNonRemediableFault,
   decideRestart,
+  FaultDetector,
   isInformationalEvent,
 } from '../process-monitor';
 
@@ -503,6 +504,65 @@ describe('ProcessMonitor — 进程监控', () => {
     monitor.start(makeConfig());
     expect(monitor.getState()).toBe('running');
   });
+
+  it('32. 端口占用签名位于长输出尾部时仍识别（bounded 窗口必须保留尾部）', () => {
+    monitor.start(makeConfig({ maxRestarts: 3 }));
+
+    const proc = latestProc();
+    // 复刻 npm/turbo 包装命令：先刷远超窗口上限的构建日志，致命错误最后到达
+    proc.stderr.emit('data', Buffer.from('x'.repeat(20000)));
+    proc.stderr.emit('data', Buffer.from('Error: Port 5173 is already in use'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    expect(monitor.getState()).toBe('suppressed');
+    expect(findEventByAction(ec, 'port-in-use-suppressed')!.context.port).toBe(5173);
+    expect(findEventByAction(ec, 'restart-limit-reached')).toBeUndefined();
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── 进程组生命周期 & 诊断可观测 ───────────────────────────
+
+  it('33. spawn 以独立进程组启动（POSIX detach，便于退出/重启时整树回收）', () => {
+    monitor.start(makeConfig());
+
+    const opts = spawnSpy.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
+    expect(opts?.detached).toBe(process.platform !== 'win32');
+  });
+
+  it('34. restart-limit-reached 事件携带输出尾部供现场诊断', () => {
+    monitor.start(makeConfig({ maxRestarts: 0 }));
+
+    const proc = latestProc();
+    proc.stderr.emit('data', Buffer.from('boom: something exploded at startup'));
+    proc.exitCode = 1;
+    proc.emit('exit', 1, null);
+
+    const limitEvent = findEventByAction(ec, 'restart-limit-reached');
+    expect(limitEvent).toBeDefined();
+    expect(String(limitEvent!.context.outputTail)).toContain('something exploded');
+    expect(limitEvent!.history[0]?.detail).toContain('something exploded');
+  });
+
+  it('35. 健康探测挂死：越过硬超时判定失败并回收探测进程（不再叠加探测）', () => {
+    monitor.start(
+      makeConfig({
+        healthCommand: 'curl',
+        healthArgs: ['-f', 'http://slow'],
+        healthCheckIntervalMs: 10000,
+        restartDelayMs: 100000,
+      }),
+    );
+
+    vi.advanceTimersByTime(10000); // 触发一次探测；此后探测进程始终不退出
+    const probe = latestProc();
+    expect(probe.killed).toBe(false);
+
+    vi.advanceTimersByTime(5000); // 越过探测硬超时
+
+    expect(findEventByAction(ec, 'health-check-failed')).toBeDefined();
+    expect(probe.killed).toBe(true);
+  });
 });
 
 // ─── 纯函数单测（无定时器） ───────────────────────────────
@@ -571,5 +631,33 @@ describe('decideRestart — 重启预算结算', () => {
     expect(decideRestart(1, 3, true)).toEqual({ kind: 'suppress' });
     // 即使已达上限，在途标志仍优先：这一次失败已被结算过
     expect(decideRestart(3, 3, true)).toEqual({ kind: 'suppress' });
+  });
+});
+
+describe('FaultDetector — 增量故障检测', () => {
+  it('C1. 命中后锁定：后续超长横幅无法把已确认的故障挤出窗口', () => {
+    const detector = new FaultDetector();
+    detector.feed('Error: Port 5173 is already in use');
+    detector.feed('x'.repeat(50000));
+
+    expect(detector.fault()).toEqual({ kind: 'port-in-use', port: 5173 });
+  });
+
+  it('C2. 跨块签名仍可识别（窗口累积）', () => {
+    const detector = new FaultDetector();
+    ['Error: Port 51', '73 is already', ' in use'].forEach((chunk) => detector.feed(chunk));
+
+    expect(detector.fault()).toEqual({ kind: 'port-in-use', port: 5173 });
+  });
+
+  it('C3. reset() 清空窗口与锁定结论（供每轮重新武装）', () => {
+    const detector = new FaultDetector();
+    detector.feed('EADDRINUSE');
+    expect(detector.fault().kind).toBe('port-in-use');
+
+    detector.reset();
+    detector.feed('normal startup output');
+
+    expect(detector.fault()).toEqual({ kind: 'none' });
   });
 });

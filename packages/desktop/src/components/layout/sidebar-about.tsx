@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SectionTitle } from './sidebar-interactive';
+import { SectionTitle } from './sidebar-common';
 import { BounceCard } from '../ui/Bounce';
 import { MiniSectionIcon } from '../ui/Icons';
 import { useT, useI18n, SUPPORTED_LANGUAGES } from '../../i18n';

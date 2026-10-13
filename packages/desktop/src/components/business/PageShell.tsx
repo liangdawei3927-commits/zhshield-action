@@ -15,7 +15,7 @@ interface FeatureItem {
 }
 
 interface PageShellProps {
-  /** 中心插图（环类插槽固定 220x220，内容居中） */
+  /** 中心插图（环类插槽固定 260x260，内容居中） */
   illustration: ReactNode;
   /** 大标题（28px） */
   title: string;
@@ -171,7 +171,7 @@ function PageHero({
   const showSecondary = Boolean(secondaryText && onSecondary);
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 min-h-0">
-      <div className="w-[220px] h-[220px] flex items-center justify-center mb-6 [&>svg]:w-[220px] [&>svg]:h-[220px]">
+      <div className="w-[260px] h-[260px] flex items-center justify-center mb-6 [&>svg]:w-[260px] [&>svg]:h-[260px]">
         {illustration}
       </div>
       <h1 className="text-[28px] font-bold text-zh-ink mb-2 leading-tight text-center">{title}</h1>
@@ -202,7 +202,7 @@ function PageHero({
 
 /**
  * 全站统一页面骨架：所有页面共用同一排版（插图→标题→副标题→主按钮→贴底卡片网格），
- * 切换页面无隔离感。放大档统一：插图槽 220x220 / 标题 28px / 副标题 16px / 主按钮 220x56。
+ * 切换页面无隔离感。放大档统一：插图槽 260x260 / 标题 28px / 副标题 16px / 主按钮 220x56。
  */
 export function PageShell({
   illustration,

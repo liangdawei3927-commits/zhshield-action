@@ -153,11 +153,3 @@ export function startResolveReconcileTimer(intervalMs = DEFAULT_INTERVAL_MS): vo
   }, intervalMs);
   reconcileTimer.unref?.();
 }
-
-/** 停止对账循环（测试 / 退出清理用） */
-export function stopResolveReconcileTimer(): void {
-  if (reconcileTimer) {
-    clearInterval(reconcileTimer);
-    reconcileTimer = null;
-  }
-}

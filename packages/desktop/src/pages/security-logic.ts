@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { t } from '@zh/i18n';
 import { runSecurity } from '../services/engineApi';
 import type { SecurityScanReportData } from '../types/electron';
-import { useToast } from '../components/ui/Toast';
-import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
+import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
+import { useRunWithReport } from '../hooks/useRunWithReport';
+import type { AiFixIssue } from '../utils/copyToAi';
 import { useTaskRun } from '../task-store';
 
 export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
@@ -57,15 +58,7 @@ function useSecurityRun(projectPath: string): {
 } {
   const [report, setReport] = useState<SecurityScanReportData | null>(null);
   const { loading, progress, progressLabel, statusMessage } = useTaskRun('security', projectPath);
-
-  const handleScan = useCallback(async () => {
-    try {
-      const result = await runSecurity(projectPath);
-      setReport(result);
-    } catch {
-      setReport(null);
-    }
-  }, [projectPath]);
+  const { handleScan } = useRunWithReport(projectPath, runSecurity, setReport);
 
   return { loading, progress, progressLabel, statusMessage, report, handleScan };
 }
@@ -98,55 +91,15 @@ function toMalwareAiIssue(item: SecurityScanReportData['malware'][number]): AiFi
   };
 }
 
-/** 漏洞条目 → AI 修复（vuln 域） */
-function useVulnCopyToAi(projectPath: string): {
-  copyToAi: (issue: SecurityIssue) => void;
-  copyAllToAi: (issues: SecurityIssue[]) => void;
-} {
-  const { toast } = useToast();
-  const copyToAi = useCallback(
-    (issue: SecurityIssue) => copyIssuesToAi(projectPath, toast, [toAiIssue(issue)]),
-    [projectPath, toast],
-  );
-  const copyAllToAi = useCallback(
-    (issues: SecurityIssue[]) => {
-      if (issues.length === 0) return;
-      copyIssuesToAi(projectPath, toast, issues.map(toAiIssue));
-    },
-    [projectPath, toast],
-  );
-  return { copyToAi, copyAllToAi };
-}
-
-/** 恶意代码条目 → AI 修复（malware 域） */
-function useMalwareCopyToAi(projectPath: string): {
-  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
-  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
-} {
-  const { toast } = useToast();
-  const copyMalwareToAi = useCallback(
-    (item: SecurityScanReportData['malware'][number]) =>
-      copyIssuesToAi(projectPath, toast, [toMalwareAiIssue(item)]),
-    [projectPath, toast],
-  );
-  const copyMalwareAllToAi = useCallback(
-    (items: SecurityScanReportData['malware']) => {
-      if (items.length === 0) return;
-      copyIssuesToAi(projectPath, toast, items.map(toMalwareAiIssue));
-    },
-    [projectPath, toast],
-  );
-  return { copyMalwareToAi, copyMalwareAllToAi };
-}
-
 function useSecurityCopyToAi(projectPath: string): {
   copyToAi: (issue: SecurityIssue) => void;
   copyAllToAi: (issues: SecurityIssue[]) => void;
   copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
   copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
 } {
-  const { copyToAi, copyAllToAi } = useVulnCopyToAi(projectPath);
-  const { copyMalwareToAi, copyMalwareAllToAi } = useMalwareCopyToAi(projectPath);
+  const { copyToAi, copyAllToAi } = useCopyIssuesToAi(projectPath, toAiIssue);
+  const { copyToAi: copyMalwareToAi, copyAllToAi: copyMalwareAllToAi } =
+    useCopyIssuesToAi(projectPath, toMalwareAiIssue);
 
   return { copyToAi, copyAllToAi, copyMalwareToAi, copyMalwareAllToAi };
 }

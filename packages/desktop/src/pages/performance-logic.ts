@@ -4,6 +4,7 @@ import { runPerformance } from '../services/engineApi';
 import type { ElectronAPI, PerformanceReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard } from '../utils/copyToAi';
+import { useRunWithReport } from '../hooks/useRunWithReport';
 import { useTaskRun } from '../task-store';
 
 /** preload 已暴露 openExternal（trae:// 唤起），但 ElectronAPI 类型未声明，此处补齐 */
@@ -69,15 +70,7 @@ function usePerformanceRun(projectPath: string): {
     'performance',
     projectPath,
   );
-
-  const handleScan = useCallback(async () => {
-    try {
-      const result = await runPerformance(projectPath);
-      setReport(result);
-    } catch {
-      setReport(null);
-    }
-  }, [projectPath]);
+  const { handleScan } = useRunWithReport(projectPath, runPerformance, setReport);
 
   return { loading, progress, progressLabel, statusMessage, report, handleScan };
 }

@@ -9,16 +9,14 @@ import {
 import { useToast } from '../components/ui/Toast';
 import { collectModuleScores, type ModuleScoreView } from './module-scores-logic';
 import type { HealthScoreData } from '../types/electron';
+import { getScoreColor } from '../components/business/score-grade';
 
 /** 预别名类型 — 避免 .tsx 中出现泛型尖括号（会被 JSX 深度检测误判） */
 export type HealthScoreRow = Readonly<HealthScoreData>;
 
-export function getScoreColor(score: number) {
-  if (score >= 90) return 'rgb(var(--zh-success))';
-  if (score >= 75) return 'rgb(var(--zh-info))';
-  if (score >= 60) return 'rgb(var(--zh-warning))';
-  return 'rgb(var(--zh-danger))';
-}
+// 分数→等级色为跨页面共享逻辑（评分环 / 报告表格 / 演化页……），
+// 实现已提取到 components/business/score-grade；此处保持原有 named export 对外契约不变。
+export { getScoreColor };
 
 export function getScoreLabel(score: number, tr: typeof t = t) {
   if (score >= 90) return tr('page.reports.scoreLabel.excellent');

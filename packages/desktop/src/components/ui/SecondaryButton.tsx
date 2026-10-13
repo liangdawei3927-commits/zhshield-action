@@ -1,13 +1,6 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { BaseButton } from './BaseButton';
+import { BaseButton, type ButtonBaseProps } from './BaseButton';
 
-export interface SecondaryButtonProps extends Omit<
-  ComponentPropsWithoutRef<'button'>,
-  'className' | 'children'
-> {
-  children: ReactNode;
-  className?: string;
-}
+export type SecondaryButtonProps = ButtonBaseProps;
 
 export function SecondaryButton({ children, className, disabled, ...rest }: SecondaryButtonProps) {
   return (

@@ -1,13 +1,7 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { useT } from '../../i18n';
-import { BaseButton, type ButtonVariant } from './BaseButton';
+import { BaseButton, type ButtonBaseProps } from './BaseButton';
 
-export interface PrimaryButtonProps extends Omit<
-  ComponentPropsWithoutRef<'button'>,
-  'className' | 'children'
-> {
-  children: ReactNode;
-  className?: string;
+export interface PrimaryButtonProps extends ButtonBaseProps {
   loading?: boolean;
   loadingLabel?: string;
 }

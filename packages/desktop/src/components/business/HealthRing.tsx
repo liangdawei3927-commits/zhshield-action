@@ -1,4 +1,5 @@
 import { useT } from '../../i18n';
+import { getScoreColor } from './score-grade';
 
 const R = 54; // 环半径（150 视口坐标）
 const CIRCUMFERENCE = 2 * Math.PI * R;
@@ -13,16 +14,7 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 export function HealthRing({ score, size = 260 }: { score: number | null; size?: number }) {
   const t = useT();
   const progress = score === null ? 0 : Math.min(Math.max(score, 0), 100);
-  const color =
-    score === null
-      ? 'rgb(var(--zh-muted))'
-      : progress >= 90
-        ? 'rgb(var(--zh-success))'
-        : progress >= 75
-          ? 'rgb(var(--zh-info))'
-          : progress >= 60
-            ? 'rgb(var(--zh-warning))'
-            : 'rgb(var(--zh-danger))';
+  const color = score === null ? 'rgb(var(--zh-muted))' : getScoreColor(progress);
   const arcLen = (CIRCUMFERENCE * progress) / 100;
   const cx = 75;
   const cy = 75;

@@ -3,12 +3,15 @@ import { Bounce } from './Bounce';
 
 export type ButtonVariant = 'primary' | 'secondary';
 
-export interface BaseButtonProps extends Omit<
+export interface ButtonBaseProps extends Omit<
   ComponentPropsWithoutRef<'button'>,
   'className' | 'children'
 > {
   children: ReactNode;
   className?: string;
+}
+
+export interface BaseButtonProps extends ButtonBaseProps {
   variant?: ButtonVariant;
   loading?: boolean;
   loadingLabel?: string;

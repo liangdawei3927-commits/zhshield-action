@@ -1,4 +1,5 @@
 import { useT } from '../../i18n';
+import { getScoreColor } from './score-grade';
 
 interface ScoreRingProps {
   score: number;
@@ -20,14 +21,7 @@ export function ScoreRing({ score, size = 160 }: ScoreRingProps) {
         : progress >= 60
           ? t('score.gradePass')
           : t('score.gradeWarning');
-  const gradeColor =
-    progress >= 90
-      ? 'rgb(var(--zh-success))'
-      : progress >= 75
-        ? 'rgb(var(--zh-info))'
-        : progress >= 60
-          ? 'rgb(var(--zh-warning))'
-          : 'rgb(var(--zh-danger))';
+  const gradeColor = getScoreColor(progress);
   const gradeLetter = progress >= 90 ? 'A' : progress >= 75 ? 'B' : progress >= 60 ? 'C' : 'D';
 
   return (

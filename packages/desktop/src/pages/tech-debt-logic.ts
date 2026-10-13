@@ -9,6 +9,7 @@ import {
 import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
+import { useScanWithLoading } from '../hooks/useScanWithLoading';
 
 /**
  * 债务类别配置（与 @zh/scoring tech-debt DebtCategory 对齐，5 类 4 色）：
@@ -220,12 +221,7 @@ function useTechDebtRun(projectPath: string): {
   const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } =
     useTechDebtActions(projectPath, setReport);
 
-  const handleScan = useCallback(async () => {
-    setLoading(true);
-    const result = await scanTechDebt(projectPath);
-    setReport(result);
-    setLoading(false);
-  }, [projectPath]);
+  const { handleScan } = useScanWithLoading(projectPath, scanTechDebt, setReport, setLoading);
 
   return {
     loading,

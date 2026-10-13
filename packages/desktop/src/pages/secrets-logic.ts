@@ -8,6 +8,7 @@ import {
   verifySecretRotated,
 } from '../services/engineApi';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
+import { useScanWithLoading } from '../hooks/useScanWithLoading';
 import type { AiFixIssue } from '../utils/copyToAi';
 import type { SecretReportData } from '../types/electron';
 
@@ -129,12 +130,7 @@ function useSecretsRun(projectPath: string): {
   const [report, setReport] = useState<SecretReportData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleScan = useCallback(async () => {
-    setLoading(true);
-    const result = await scanSecrets(projectPath);
-    setReport(result);
-    setLoading(false);
-  }, [projectPath]);
+  const { handleScan } = useScanWithLoading(projectPath, scanSecrets, setReport, setLoading);
 
   const refresh = useCallback(async () => {
     const result = await refreshSecrets(projectPath);

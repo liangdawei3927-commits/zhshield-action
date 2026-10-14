@@ -10,6 +10,7 @@ import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
 import type { PipelineReport } from '@zh/pipeline';
 import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { DependencyReportData, TechDebtReportData } from '../src/types/electron';
+import type { PerformanceReportIssue } from './pipeline-report';
 
 // ─── 诊断条目（归一化，跨 guard/inspect/refactor） ─────────────────────
 
@@ -634,18 +635,9 @@ export async function persistDiagnosticsFromEntries(
   return await writeDiagnosticsFile(diagnostics, ranSources);
 }
 
-/** PerformanceReportData 形状（结构化类型，避免与 report-format.ts 形成循环依赖） */
+/** 性能报告 issue 形状：复用 pipeline-report.PerformanceReportIssue（不依赖 report-format.ts） */
 interface PerformanceDataLike {
-  issues: ReadonlyArray<{
-    id: string;
-    ruleId: string;
-    severity: string;
-    file: string;
-    line?: number;
-    message: string;
-    suggestion?: string;
-    autoFixable: boolean;
-  }>;
+  issues: ReadonlyArray<PerformanceReportIssue>;
 }
 
 /** 性能引擎 severity（critical/high/medium/low/info）→ DiagnosticSeverity */

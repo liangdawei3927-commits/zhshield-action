@@ -8,6 +8,7 @@ import type { GuardReport } from '@zh/guard';
 import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport } from '@zh/security';
 import type { HealthScore } from '@zh/scoring';
+import type { PerformanceReportIssue } from '../pipeline-report';
 
 /** 门禁报告的页面序列化类型：门禁检查项列表 + 汇总计数 + 耗时/时间戳元信息 */
 export interface GuardReportData {
@@ -74,16 +75,7 @@ export interface SecurityScanReportData {
 /** 性能报告的页面序列化类型：问题明细（含行号与自动修复可行性）+ 总数/可自动修复计数 */
 export interface PerformanceReportData {
   summary: { total: number; autoFixable: number };
-  issues: Array<{
-    id: string;
-    ruleId: string;
-    severity: string;
-    file: string;
-    line?: number;
-    message: string;
-    suggestion?: string;
-    autoFixable: boolean;
-  }>;
+  issues: Array<PerformanceReportIssue>;
   metadata: { duration: number; timestamp: string };
 }
 

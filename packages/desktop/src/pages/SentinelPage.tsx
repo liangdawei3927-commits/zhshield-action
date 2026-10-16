@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { PageShell } from '../components/business/PageShell';
 import { ReportShell } from '../components/business/ReportShell';
-import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
@@ -128,13 +127,7 @@ function SentinelReportView({
   );
 }
 
-function SentinelEmptyView({
-  projectPath,
-  monitoring,
-  loading,
-  onAction,
-  t,
-}: {
+function SentinelEmptyView(props: {
   projectPath: string;
   monitoring: boolean;
   loading: boolean;
@@ -142,25 +135,28 @@ function SentinelEmptyView({
   t: (key: string, opts?: { defaultValue?: string }) => string;
 }) {
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="sentinel" />}
+    <DomainEmptyView
+      projectPath={props.projectPath}
+      dimension="sentinel"
       title={
-        monitoring ? t('page.sentinel.shell.titleMonitoring') : t('page.sentinel.shell.titleIdle')
+        props.monitoring
+          ? props.t('page.sentinel.shell.titleMonitoring')
+          : props.t('page.sentinel.shell.titleIdle')
       }
       subtitle={
-        monitoring
-          ? t('page.sentinel.shell.subtitleMonitoring')
-          : t('page.sentinel.shell.subtitleIdle')
+        props.monitoring
+          ? props.t('page.sentinel.shell.subtitleMonitoring')
+          : props.t('page.sentinel.shell.subtitleIdle')
       }
-      featureList={[
+      features={[
         {
           icon: (
             <FeatureIcon>
               <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
             </FeatureIcon>
           ),
-          title: t('page.sentinel.shell.featureRealtime.title'),
-          desc: t('page.sentinel.shell.featureRealtime.desc'),
+          title: props.t('page.sentinel.shell.featureRealtime.title'),
+          desc: props.t('page.sentinel.shell.featureRealtime.desc'),
         },
         {
           icon: (
@@ -169,8 +165,8 @@ function SentinelEmptyView({
               <path d="M13.73 21a2 2 0 01-3.46 0" />
             </FeatureIcon>
           ),
-          title: t('page.sentinel.shell.featureAlert.title'),
-          desc: t('page.sentinel.shell.featureAlert.desc'),
+          title: props.t('page.sentinel.shell.featureAlert.title'),
+          desc: props.t('page.sentinel.shell.featureAlert.desc'),
         },
         {
           icon: (
@@ -179,8 +175,8 @@ function SentinelEmptyView({
               <polyline points="12 6 12 12 16 14" />
             </FeatureIcon>
           ),
-          title: t('page.sentinel.shell.featureHistory.title'),
-          desc: t('page.sentinel.shell.featureHistory.desc'),
+          title: props.t('page.sentinel.shell.featureHistory.title'),
+          desc: props.t('page.sentinel.shell.featureHistory.desc'),
         },
         {
           icon: (
@@ -188,15 +184,17 @@ function SentinelEmptyView({
               <LayersGlyph />
             </FeatureIcon>
           ),
-          title: t('page.sentinel.shell.featureScope.title'),
-          desc: t('page.sentinel.shell.featureScope.desc'),
+          title: props.t('page.sentinel.shell.featureScope.title'),
+          desc: props.t('page.sentinel.shell.featureScope.desc'),
         },
       ]}
       buttonText={
-        monitoring ? t('page.sentinel.shell.buttonRunning') : t('page.sentinel.shell.buttonStart')
+        props.monitoring
+          ? props.t('page.sentinel.shell.buttonRunning')
+          : props.t('page.sentinel.shell.buttonStart')
       }
-      onAction={onAction}
-      loading={loading}
+      onAction={props.onAction}
+      loading={props.loading}
     />
   );
 }

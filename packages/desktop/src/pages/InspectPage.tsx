@@ -4,6 +4,7 @@ import { PageShell } from '../components/business/PageShell';
 import { ReportShell } from '../components/business/ReportShell';
 import type { ReportStatCard } from '../components/business/ReportShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
@@ -251,14 +252,7 @@ function InspectReportView({
 }
 
 /** 空态：引导发起体检 */
-function InspectEmptyView({
-  projectPath,
-  loading,
-  progress,
-  statusMessage,
-  onScan,
-  t,
-}: {
+function InspectEmptyView(props: {
   projectPath: string;
   loading: boolean;
   progress: number;
@@ -267,38 +261,39 @@ function InspectEmptyView({
   t: Translate;
 }) {
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="quality" />}
-      title={t('page.inspect.empty.title')}
-      subtitle={t('page.inspect.empty.subtitle')}
-      featureList={[
+    <DomainEmptyView
+      projectPath={props.projectPath}
+      dimension="quality"
+      title={props.t('page.inspect.empty.title')}
+      subtitle={props.t('page.inspect.empty.subtitle')}
+      features={[
         {
           icon: <ArchitectureIcon />,
-          title: t('page.inspect.feature.architecture.title'),
-          desc: t('page.inspect.feature.architecture.desc'),
+          title: props.t('page.inspect.feature.architecture.title'),
+          desc: props.t('page.inspect.feature.architecture.desc'),
         },
         {
           icon: <ModuleBoundaryIcon />,
-          title: t('page.inspect.feature.moduleBoundary.title'),
-          desc: t('page.inspect.feature.moduleBoundary.desc'),
+          title: props.t('page.inspect.feature.moduleBoundary.title'),
+          desc: props.t('page.inspect.feature.moduleBoundary.desc'),
         },
         {
           icon: <TypeSafetyIcon />,
-          title: t('page.inspect.feature.typeSafety.title'),
-          desc: t('page.inspect.feature.typeSafety.desc'),
+          title: props.t('page.inspect.feature.typeSafety.title'),
+          desc: props.t('page.inspect.feature.typeSafety.desc'),
         },
         {
           icon: <CodeStyleIcon />,
-          title: t('page.inspect.feature.codeStyle.title'),
-          desc: t('page.inspect.feature.codeStyle.desc'),
+          title: props.t('page.inspect.feature.codeStyle.title'),
+          desc: props.t('page.inspect.feature.codeStyle.desc'),
         },
       ]}
-      buttonText={t('page.inspect.scanNow')}
-      onAction={onScan}
-      loading={loading}
-      progress={Math.round(progress * 100)}
-      progressLabel={t('page.inspect.scanning')}
-      progressMessage={statusMessage}
+      buttonText={props.t('page.inspect.scanNow')}
+      onAction={props.onScan}
+      loading={props.loading}
+      progress={Math.round(props.progress * 100)}
+      statusMessage={props.statusMessage}
+      progressLabel={props.t('page.inspect.scanning')}
     />
   );
 }

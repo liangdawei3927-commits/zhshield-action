@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { PageShell } from '../components/business/PageShell';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
-import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
@@ -89,11 +88,12 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
   }
 
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="performance" />}
+    <DomainEmptyView
+      projectPath={projectPath}
+      dimension="performance"
       title={t('page.performance.shell.title')}
       subtitle={t('page.performance.shell.subtitle')}
-      featureList={[
+      features={[
         {
           icon: (
             <FeatureIcon>
@@ -139,7 +139,7 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
       loading={loading}
       progress={Math.round(progress * 100)}
       progressLabel={t('page.performance.scanning')}
-      progressMessage={statusMessage}
+      statusMessage={statusMessage}
     />
   );
 }

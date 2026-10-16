@@ -1,24 +1,18 @@
 import { useT } from '../i18n';
-import { PageShell } from '../components/business/PageShell';
-import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 
 /** 空态：引导深度扫描（props 即 ScanEmptyStateBranch 的共享契约，由 SecurityPage 展开传递） */
-export function SecurityEmptyState({
-  projectPath,
-  loading,
-  progress,
-  statusMessage,
-  onScan,
-}: ScanEmptyStateParams) {
+export function SecurityEmptyState(props: ScanEmptyStateParams) {
   const t = useT();
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="security" />}
+    <DomainEmptyView
+      projectPath={props.projectPath}
+      dimension="security"
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
-      featureList={[
+      features={[
         {
           icon: (
             <FeatureIcon>
@@ -63,11 +57,11 @@ export function SecurityEmptyState({
         },
       ]}
       buttonText={t('page.security.fixAll')}
-      onAction={onScan}
-      loading={loading}
-      progress={progress}
+      onAction={props.onScan}
+      loading={props.loading}
+      progress={props.progress}
+      statusMessage={props.statusMessage}
       progressLabel={t('page.security.checking')}
-      progressMessage={statusMessage}
     />
   );
 }

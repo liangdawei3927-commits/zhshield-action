@@ -1,31 +1,18 @@
 import { useT } from '../i18n';
-import { PageShell } from '../components/business/PageShell';
-import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon } from '../components/ui/Icons';
+import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 
-interface GarbageEmptyStateProps {
-  projectPath: string;
-  loading: boolean;
-  progress?: number;
-  statusMessage?: string;
-  onScan: () => void;
-}
-
-/** 空态：引导扫描无用文件 */
-export function GarbageEmptyState({
-  projectPath,
-  loading,
-  progress,
-  statusMessage,
-  onScan,
-}: GarbageEmptyStateProps) {
+/** 空态：引导扫描无用文件（props 即 ScanEmptyStateBranch 的共享契约，由 GarbagePage 展开传递） */
+export function GarbageEmptyState(props: ScanEmptyStateParams) {
   const t = useT();
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="garbage" />}
+    <DomainEmptyView
+      projectPath={props.projectPath}
+      dimension="garbage"
       title={t('page.garbage.empty.title')}
       subtitle={t('page.garbage.empty.subtitle')}
-      featureList={[
+      features={[
         {
           icon: (
             <FeatureIcon>
@@ -71,11 +58,11 @@ export function GarbageEmptyState({
         },
       ]}
       buttonText={t('page.garbage.startScan')}
-      onAction={onScan}
-      loading={loading}
-      progress={progress}
+      onAction={props.onScan}
+      loading={props.loading}
+      progress={props.progress}
+      statusMessage={props.statusMessage}
       progressLabel={t('page.garbage.scanning')}
-      progressMessage={statusMessage}
     />
   );
 }

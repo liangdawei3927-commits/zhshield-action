@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
-import { PageShell } from '../components/business/PageShell';
-import { DomainScoreRing } from '../components/business/DomainScoreRing';
+import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -172,14 +171,7 @@ function GuardReportView({
   );
 }
 
-function GuardEmptyView({
-  projectPath,
-  loading,
-  progress,
-  statusMessage,
-  onScan,
-  t,
-}: {
+function GuardEmptyView(props: {
   projectPath: string;
   loading: boolean;
   progress?: number;
@@ -188,11 +180,12 @@ function GuardEmptyView({
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
-    <PageShell
-      illustration={<DomainScoreRing projectPath={projectPath} dimension="gate" />}
-      title={t('nav.guard')}
-      subtitle={t('page.guard.idleSubtitle')}
-      featureList={[
+    <DomainEmptyView
+      projectPath={props.projectPath}
+      dimension="gate"
+      title={props.t('nav.guard')}
+      subtitle={props.t('page.guard.idleSubtitle')}
+      features={[
         {
           icon: (
             <FeatureIcon>
@@ -202,8 +195,8 @@ function GuardEmptyView({
               <path d="M18 9a9 9 0 01-9 9" />
             </FeatureIcon>
           ),
-          title: t('page.guard.feature.preCommit.title'),
-          desc: t('page.guard.feature.preCommit.desc'),
+          title: props.t('page.guard.feature.preCommit.title'),
+          desc: props.t('page.guard.feature.preCommit.desc'),
         },
         {
           icon: (
@@ -213,8 +206,8 @@ function GuardEmptyView({
               <line x1="12" y1="3" x2="12" y2="15" />
             </FeatureIcon>
           ),
-          title: t('page.guard.feature.prePush.title'),
-          desc: t('page.guard.feature.prePush.desc'),
+          title: props.t('page.guard.feature.prePush.title'),
+          desc: props.t('page.guard.feature.prePush.desc'),
         },
         {
           icon: (
@@ -223,8 +216,8 @@ function GuardEmptyView({
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
             </FeatureIcon>
           ),
-          title: t('page.guard.feature.ci.title'),
-          desc: t('page.guard.feature.ci.desc'),
+          title: props.t('page.guard.feature.ci.title'),
+          desc: props.t('page.guard.feature.ci.desc'),
         },
         {
           icon: (
@@ -239,16 +232,16 @@ function GuardEmptyView({
               <path d="M13.41 10.59L17.99 11.66" />
             </FeatureIcon>
           ),
-          title: t('page.guard.feature.manual.title'),
-          desc: t('page.guard.feature.manual.desc'),
+          title: props.t('page.guard.feature.manual.title'),
+          desc: props.t('page.guard.feature.manual.desc'),
         },
       ]}
-      buttonText={t('page.guard.scan')}
-      onAction={onScan}
-      loading={loading}
-      progress={progress}
-      progressLabel={t('page.guard.scanning')}
-      progressMessage={statusMessage}
+      buttonText={props.t('page.guard.scan')}
+      onAction={props.onScan}
+      loading={props.loading}
+      progress={props.progress}
+      statusMessage={props.statusMessage}
+      progressLabel={props.t('page.guard.scanning')}
     />
   );
 }

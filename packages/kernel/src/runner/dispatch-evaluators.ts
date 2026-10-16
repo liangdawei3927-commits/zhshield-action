@@ -245,7 +245,7 @@ export async function evalToolDispatch(
   if (resolution.kind === 'skipped') return resolution.result;
   const unavailable = await checkAdapterAvailability(host, resolution.adapter, rule, instr);
   if (unavailable) return unavailable;
-  return runToolScanWithCache(host, resolution.adapter, rule, instr, context);
+  return runToolScanWithCache({ host, adapter: resolution.adapter, rule, instr, context });
 }
 
 type AdapterResolution =
@@ -313,17 +313,20 @@ async function checkAdapterAvailability(
   return null;
 }
 
+interface RunToolScanWithCacheParams {
+  host: EngineHost;
+  adapter: ToolAdapter;
+  rule: SopRule;
+  instr: ToolDispatchInstruction;
+  context: RuleContext;
+}
+
 /**
  * M1b 工具调用去重：同一次调用内同 (tool, configHash) 的规则共享一次真实扫描（single-flight）。
  * 可用性检查始终前置（不进缓存），保证各消费者得到各自的 skipped 语义。
  */
-async function runToolScanWithCache(
-  host: EngineHost,
-  adapter: ToolAdapter,
-  rule: SopRule,
-  instr: ToolDispatchInstruction,
-  context: RuleContext,
-): Promise<RuleEvaluation> {
+async function runToolScanWithCache(params: RunToolScanWithCacheParams): Promise<RuleEvaluation> {
+  const { host, adapter, rule, instr, context } = params;
   const cache = context.toolScanCache;
   if (!cache) {
     // 无缓存（旧调用路径）→ 保守直扫，行为与去重前一致

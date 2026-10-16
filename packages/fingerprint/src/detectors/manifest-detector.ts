@@ -50,15 +50,18 @@ function readPnpmWorkspacePatterns(projectRoot: string): string[] {
   return patterns;
 }
 
+/** pushCandidateMatch 的上下文：项目根、glob 剩余段与结果收集容器 */
+interface PushCandidateMatchContext {
+  projectRoot: string;
+  parts: string[];
+  globIdx: number;
+  baseDir: string;
+  dirs: string[];
+}
+
 /** baseDir 下单个子目录是否符合 glob 剩余路径（存在且为目录则加入结果） */
-function pushCandidateMatch(
-  projectRoot: string,
-  parts: string[],
-  globIdx: number,
-  baseDir: string,
-  entry: fs.Dirent,
-  dirs: string[],
-): void {
+function pushCandidateMatch(ctx: PushCandidateMatchContext, entry: fs.Dirent): void {
+  const { projectRoot, parts, globIdx, baseDir, dirs } = ctx;
   const rest = parts.slice(globIdx + 1).join('/');
   const candidate =
     rest.length > 0 ? path.join(baseDir, entry.name, rest) : path.join(baseDir, entry.name);
@@ -82,7 +85,7 @@ function collectGlobMatches(projectRoot: string, pattern: string, dirs: string[]
   try {
     for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
       if (entry.isDirectory() && !isNoiseDir(entry.name)) {
-        pushCandidateMatch(projectRoot, parts, globIdx, baseDir, entry, dirs);
+        pushCandidateMatch({ projectRoot, parts, globIdx, baseDir, dirs }, entry);
       }
     }
   } catch {

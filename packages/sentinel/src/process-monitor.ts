@@ -199,13 +199,16 @@ function stderrSpec(cmd: string, pid: number | undefined, text: string): Process
   };
 }
 
-function exitedSpec(
-  cmd: string,
-  code: number | null,
-  signal: NodeJS.Signals | null,
-  pid: number | undefined,
-  severity: EventSeverity,
-): ProcessEventSpec {
+interface ExitedSpecParams {
+  cmd: string;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  pid: number | undefined;
+  severity: EventSeverity;
+}
+
+function exitedSpec(params: ExitedSpecParams): ProcessEventSpec {
+  const { cmd, code, signal, pid, severity } = params;
   return {
     title: `Process exited: ${cmd} (code=${code}, signal=${signal})`,
     severity,
@@ -426,7 +429,7 @@ export class ProcessMonitor {
     const pid2 = this.proc?.pid;
     this.proc = null;
     const severity: EventSeverity = code === 0 ? 'p3' : 'p2';
-    this.emit(exitedSpec(cmd, code, signal, pid2, severity));
+    this.emit(exitedSpec({ cmd, code, signal, pid: pid2, severity }));
 
     if (!this.running || code === 0) return;
     const fault = this.faultDetector.fault();

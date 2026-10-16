@@ -27,6 +27,15 @@ const META: ToolMeta = {
   license: 'LGPL-2.1',
 };
 
+/** runScanWithCleanup 的参数对象：扫描选项、命令行参数、类别、起始时间与内联规则临时文件 */
+interface RunScanWithCleanupParams {
+  options: ToolScanOptions;
+  args: string[];
+  category: IssueCategory;
+  start: number;
+  ruleFile: string | null;
+}
+
 export class SemgrepAdapter implements ToolAdapter {
   meta = META;
   private readonly commands: ToolCommandResolver;
@@ -75,7 +84,7 @@ export class SemgrepAdapter implements ToolAdapter {
 
     const { args, ruleFile } = await this.argsBuilder.build(options, configs, targetDir);
     const command = await this.resolveCommandForScan(options);
-    return this.runScanWithCleanup(command, options, args, category, start, ruleFile);
+    return this.runScanWithCleanup(command, { options, args, category, start, ruleFile });
   }
 
   /** 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析 */
@@ -86,12 +95,9 @@ export class SemgrepAdapter implements ToolAdapter {
   /** 执行 semgrep 扫描，结束后（含抛错）清理内联规则临时文件 */
   private async runScanWithCleanup(
     command: string,
-    options: ToolScanOptions,
-    args: string[],
-    category: IssueCategory,
-    start: number,
-    ruleFile: string | null,
+    params: RunScanWithCleanupParams,
   ): Promise<ToolResult> {
+    const { options, args, category, start, ruleFile } = params;
     try {
       return await this.runner.run({ command, options, args, category, start });
     } finally {

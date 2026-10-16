@@ -103,23 +103,35 @@ describe('findReusableTask — 纯谓词', () => {
 
   it('命中：active + kind + path + requestKey 全等', () => {
     const queued: TaskInfo = { ...active, status: 'queued' };
-    expect(findReusableTask([active], 'garbageClean', '/p', 'K', keys)).toBe(active);
-    expect(findReusableTask([queued], 'garbageClean', '/p', 'K', keys)).toBe(queued);
+    expect(
+      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+    ).toBe(active);
+    expect(
+      findReusableTask({ tasks: [queued], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+    ).toBe(queued);
   });
 
   it('未命中：kind / path / requestKey / 状态任一不符', () => {
-    expect(findReusableTask([active], 'garbageRestore', '/p', 'K', keys)).toBeUndefined();
-    expect(findReusableTask([active], 'garbageClean', '/other', 'K', keys)).toBeUndefined();
-    expect(findReusableTask([active], 'garbageClean', '/p', 'OTHER', keys)).toBeUndefined();
-    expect(findReusableTask([active], 'garbageClean', '/p', 'K', new Map())).toBeUndefined();
     expect(
-      findReusableTask([{ ...active, status: 'done' }], 'garbageClean', '/p', 'K', keys),
+      findReusableTask({ tasks: [active], kind: 'garbageRestore', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
     ).toBeUndefined();
     expect(
-      findReusableTask([{ ...active, status: 'failed' }], 'garbageClean', '/p', 'K', keys),
+      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/other', requestKey: 'K', requestKeys: keys }),
     ).toBeUndefined();
     expect(
-      findReusableTask([{ ...active, status: 'cancelled' }], 'garbageClean', '/p', 'K', keys),
+      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'OTHER', requestKeys: keys }),
+    ).toBeUndefined();
+    expect(
+      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: new Map() }),
+    ).toBeUndefined();
+    expect(
+      findReusableTask({ tasks: [{ ...active, status: 'done' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+    ).toBeUndefined();
+    expect(
+      findReusableTask({ tasks: [{ ...active, status: 'failed' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+    ).toBeUndefined();
+    expect(
+      findReusableTask({ tasks: [{ ...active, status: 'cancelled' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
     ).toBeUndefined();
   });
 });

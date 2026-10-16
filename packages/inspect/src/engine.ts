@@ -50,6 +50,14 @@ interface SopFeatureContext {
   projectFeature?: ProjectFeature;
 }
 
+/** InspectEngine.buildSopReport 的执行参数：扫描类型、起始时间、基线与 SOP 报告 */
+interface BuildSopReportParams {
+  scanType: InspectionReport['scanType'];
+  start: number;
+  baseline: Baseline | null | undefined;
+  sopReport: RuleEngineReport;
+}
+
 /** InspectEngine.finalizeScan 的执行参数（直扫 / SOP 两分支共用的报告收尾） */
 interface FinalizeScanParams {
   projectId: string;
@@ -321,7 +329,7 @@ export class InspectEngine {
       throw new Error('SOP engine not registered');
     }
     const sopReport = await this.evaluateSopReports(sopEngine, projectId, featureCtx);
-    return this.buildSopReport(projectId, scanType, start, baseline, sopReport);
+    return this.buildSopReport(projectId, { scanType, start, baseline, sopReport });
   }
 
   /** 评估 inspect / security 两个域的规则并合并报告（避免拉入 guard/evolve 等规则形成交叉重入） */
@@ -346,11 +354,9 @@ export class InspectEngine {
   /** 汇总 SOP 报告：扁平化违规 → 基线过滤 → 适配器结果重算 → 事件与报告构建 */
   private async buildSopReport(
     projectId: string,
-    scanType: InspectionReport['scanType'],
-    start: number,
-    baseline: Baseline | null | undefined,
-    sopReport: RuleEngineReport,
+    params: BuildSopReportParams,
   ): Promise<InspectionReport> {
+    const { scanType, start, baseline, sopReport } = params;
     return this.finalizeScan({
       projectId,
       scanType,

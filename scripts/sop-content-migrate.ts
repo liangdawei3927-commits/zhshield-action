@@ -147,8 +147,8 @@ function apply(
   const tx = db.transaction(() => {
     const existingRuleIds = loadExistingRuleIds(db);
     const existingToolIds = loadExistingToolIds(db);
-    upsertRules(rules, existingRuleIds, insertRule, insertVersion, insertAudit);
-    upsertTools(tools, existingToolIds, insertTool, insertToolVersion, insertAudit);
+    upsertRules({ rules, existingRuleIds, insertRule, insertVersion, insertAudit });
+    upsertTools({ tools, existingToolIds, insertTool, insertToolVersion, insertAudit });
   });
 
   tx();
@@ -226,13 +226,16 @@ function loadExistingToolIds(db: Database.Database): Set<string> {
   );
 }
 
-function upsertRules(
-  rules: SopRule[],
-  existingRuleIds: Set<string>,
-  insertRule: Database.Statement,
-  insertVersion: Database.Statement,
-  insertAudit: Database.Statement,
-): void {
+interface UpsertRulesParams {
+  rules: SopRule[];
+  existingRuleIds: Set<string>;
+  insertRule: Database.Statement;
+  insertVersion: Database.Statement;
+  insertAudit: Database.Statement;
+}
+
+function upsertRules(params: UpsertRulesParams): void {
+  const { rules, existingRuleIds, insertRule, insertVersion, insertAudit } = params;
   // 幂等：audit 仅对真正新插入的行记录，重跑不重复追加
   for (const rule of rules) {
     const contentSha = computeRuleContentSha(rule);
@@ -284,13 +287,16 @@ function upsertRules(
   }
 }
 
-function upsertTools(
-  tools: { toolId: string; files: { filename: string; content: string }[]; sha256: string }[],
-  existingToolIds: Set<string>,
-  insertTool: Database.Statement,
-  insertToolVersion: Database.Statement,
-  insertAudit: Database.Statement,
-): void {
+interface UpsertToolsParams {
+  tools: { toolId: string; files: { filename: string; content: string }[]; sha256: string }[];
+  existingToolIds: Set<string>;
+  insertTool: Database.Statement;
+  insertToolVersion: Database.Statement;
+  insertAudit: Database.Statement;
+}
+
+function upsertTools(params: UpsertToolsParams): void {
+  const { tools, existingToolIds, insertTool, insertToolVersion, insertAudit } = params;
   for (const tool of tools) {
     const version = `1.${tool.sha256.slice(0, 12)}`;
     const filesJson = JSON.stringify(tool.files);

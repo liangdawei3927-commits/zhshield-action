@@ -367,14 +367,17 @@ async function computePipelineHealthScore(
   console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
 }
 
+interface ScorePipelineModulesParams {
+  projectPath: string;
+  report: PipelineReport;
+  resolved: ResolvedPipelineReports;
+  profilingResult: ScoringProjectProfile | null;
+  scoring: Awaited<ReturnType<typeof getScoring>>;
+}
+
 /** 模块级独立评分：跳过根级兜底卡，各模块用自身类型权重评分后逐模块落库 */
-async function scorePipelineModules(
-  projectPath: string,
-  report: PipelineReport,
-  resolved: ResolvedPipelineReports,
-  profilingResult: ScoringProjectProfile | null,
-  scoring: Awaited<ReturnType<typeof getScoring>>,
-): Promise<void> {
+async function scorePipelineModules(params: ScorePipelineModulesParams): Promise<void> {
+  const { projectPath, report, resolved, profilingResult, scoring } = params;
   if (!profilingResult?.modules?.length) return;
   const moduleGuardResults = resolved.isSop
     ? resolved.guardResults
@@ -394,7 +397,7 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     const scoring = await getScoring();
     const profilingResult = await probeProjectProfile(projectPath);
     await computePipelineHealthScore(projectPath, resolved, profilingResult, scoring);
-    await scorePipelineModules(projectPath, report, resolved, profilingResult, scoring);
+    await scorePipelineModules({ projectPath, report, resolved, profilingResult, scoring });
   } catch (err) {
     console.warn(
       '[engine:runPipeline] 健康评分落库失败:',

@@ -40,7 +40,7 @@ export class FileHelper {
   static async glob(pattern: string, dir: string): Promise<string[]> {
     const isMatch = picomatch(pattern);
     const results: string[] = [];
-    await walkGlob(dir, dir, isMatch, results);
+    await walkGlob(dir, { rootDir: dir, isMatch, results });
     return results;
   }
 
@@ -54,13 +54,18 @@ export class FileHelper {
   }
 }
 
+interface WalkGlobOptions {
+  rootDir: string;
+  isMatch: (value: string) => boolean;
+  results: string[];
+}
+
 async function walkGlob(
   currentDir: string,
-  rootDir: string,
-  isMatch: (value: string) => boolean,
-  results: string[],
+  options: WalkGlobOptions,
   depth = 0,
 ): Promise<void> {
+  const { rootDir, isMatch, results } = options;
   if (depth > MAX_GLOB_DEPTH) return;
   let dirEntries: fs.Dirent[];
   try {
@@ -76,7 +81,7 @@ async function walkGlob(
       if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
       // perf rule false positive: arg depends on loop var via dataflow
       // eslint-disable-next-line perf/perf-no-serial-await
-      await walkGlob(fullPath, rootDir, isMatch, results, depth + 1);
+      await walkGlob(fullPath, options, depth + 1);
       continue;
     }
     if (!entry.isFile()) continue;

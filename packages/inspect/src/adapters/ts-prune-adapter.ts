@@ -145,14 +145,13 @@ export function buildMonorepoPruneOverlay(
   if (pkgDirs === null) return null;
 
   const { relRoot, fromConfigDir, fromBaseUrl } = createOverlayPathHelpers(projectPath);
-  const { include, exclude, paths, foundPackage } = collectPackageOverlay(
-    pkgDirs,
+  const { include, exclude, paths, foundPackage } = collectPackageOverlay(pkgDirs, {
     packagesRoot,
     fromConfigDir,
     fromBaseUrl,
     readFile,
     exists,
-  );
+  });
   if (!foundPackage || include.length === 0) return null;
 
   return assembleOverlay(relRoot, paths, include, exclude);
@@ -184,20 +183,45 @@ function createOverlayPathHelpers(projectPath: string): {
   return { relRoot, fromConfigDir, fromBaseUrl };
 }
 
+/** collectPackageOverlay 的参数对象：包根目录、路径辅助函数与文件访问器 */
+interface CollectPackageOverlayParams {
+  packagesRoot: string;
+  fromConfigDir: (p: string) => string;
+  fromBaseUrl: (p: string) => string;
+  readFile: (p: string) => string;
+  exists: (p: string) => boolean;
+}
+
+/** aggregatePackage 的参数对象：包根目录、文件访问器、聚合目标集合与路径辅助函数 */
+interface AggregatePackageParams {
+  packagesRoot: string;
+  readFile: (p: string) => string;
+  include: string[];
+  exclude: Set<string>;
+  paths: Record<string, string[]>;
+  fromConfigDir: (p: string) => string;
+  fromBaseUrl: (p: string) => string;
+}
+
+/** aggregatePackageIncludes 的参数对象：包 tsconfig、聚合目标集合与路径辅助函数 */
+interface AggregatePackageIncludesParams {
+  cfg: PackageTsConfigShape;
+  include: string[];
+  exclude: Set<string>;
+  fromConfigDir: (p: string) => string;
+}
+
 /** 逐包聚合 include/exclude/paths 与包入口映射 */
 function collectPackageOverlay(
   pkgDirs: fs.Dirent[],
-  packagesRoot: string,
-  fromConfigDir: (p: string) => string,
-  fromBaseUrl: (p: string) => string,
-  readFile: (p: string) => string,
-  exists: (p: string) => boolean,
+  params: CollectPackageOverlayParams,
 ): {
   include: string[];
   exclude: Set<string>;
   paths: Record<string, string[]>;
   foundPackage: boolean;
 } {
+  const { packagesRoot, fromConfigDir, fromBaseUrl, readFile, exists } = params;
   const include: string[] = [];
   const exclude = new Set([
     fromConfigDir('node_modules'),
@@ -213,28 +237,28 @@ function collectPackageOverlay(
     const pkgTsConfig = path.join(packagesRoot, pkg, 'tsconfig.json');
     if (!exists(pkgTsConfig)) continue;
     foundPackage = true;
-    aggregatePackage(pkg, packagesRoot, readFile, include, exclude, paths, fromConfigDir, fromBaseUrl);
+    aggregatePackage(pkg, {
+      packagesRoot,
+      readFile,
+      include,
+      exclude,
+      paths,
+      fromConfigDir,
+      fromBaseUrl,
+    });
   }
 
   return { include, exclude, paths, foundPackage };
 }
 
 /** 聚合单个包：解析 tsconfig 后并入 include/exclude/paths 与包入口映射 */
-function aggregatePackage(
-  pkg: string,
-  packagesRoot: string,
-  readFile: (p: string) => string,
-  include: string[],
-  exclude: Set<string>,
-  paths: Record<string, string[]>,
-  fromConfigDir: (p: string) => string,
-  fromBaseUrl: (p: string) => string,
-): void {
+function aggregatePackage(pkg: string, params: AggregatePackageParams): void {
+  const { packagesRoot, readFile, include, exclude, paths, fromConfigDir, fromBaseUrl } = params;
   const pkgTsConfig = path.join(packagesRoot, pkg, 'tsconfig.json');
   const cfg = parsePackageTsConfig(pkgTsConfig, readFile);
   if (cfg === null) return;
 
-  aggregatePackageIncludes(pkg, cfg, include, exclude, fromConfigDir);
+  aggregatePackageIncludes(pkg, { cfg, include, exclude, fromConfigDir });
   aggregatePackagePaths(pkg, cfg, paths, fromBaseUrl);
 }
 
@@ -261,13 +285,8 @@ function parsePackageTsConfig(
  * 仅排除编译产物（.js / .d.ts / dist）：它们是 include 通配带入的重复副本，
  * 参与分析会互相"引用"并掩盖真实死代码。
  */
-function aggregatePackageIncludes(
-  pkg: string,
-  cfg: PackageTsConfigShape,
-  include: string[],
-  exclude: Set<string>,
-  fromConfigDir: (p: string) => string,
-): void {
+function aggregatePackageIncludes(pkg: string, params: AggregatePackageIncludesParams): void {
+  const { cfg, include, exclude, fromConfigDir } = params;
   const pkgIncludes = asStringArray(cfg.include);
   const scope = pkgIncludes.length > 0 ? pkgIncludes : ['src'];
   for (const inc of scope) {

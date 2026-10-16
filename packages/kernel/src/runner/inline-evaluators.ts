@@ -512,7 +512,7 @@ function checkRequiredJson(
   }
 
   const effective = resolveEffectiveConfig(filePath, parsed);
-  violations.push(...checkJsonKeyPaths(rule, item, relativePath, effective, entries));
+  violations.push(...checkJsonKeyPaths({ rule, item, relativePath, effective, entries }));
   return violations;
 }
 
@@ -527,13 +527,16 @@ function resolveEffectiveConfig(filePath: string, parsed: unknown): unknown {
     : parsed;
 }
 
-function checkJsonKeyPaths(
-  rule: SopRule,
-  item: RequiredContentInstruction['items'][number],
-  relativePath: string,
-  effective: unknown,
-  entries: [string, unknown][],
-): Violation[] {
+interface CheckJsonKeyPathsParams {
+  rule: SopRule;
+  item: RequiredContentInstruction['items'][number];
+  relativePath: string;
+  effective: unknown;
+  entries: [string, unknown][];
+}
+
+function checkJsonKeyPaths(params: CheckJsonKeyPathsParams): Violation[] {
+  const { rule, item, relativePath, effective, entries } = params;
   const violations: Violation[] = [];
   for (const [keyPath, expected] of entries) {
     const actual = getJsonPathValue(effective, keyPath);

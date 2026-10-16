@@ -104,13 +104,16 @@ function stableStringify(value: unknown): string {
  * 请求键不放进公开的 TaskInfo（避免广播给渲染进程），因此以独立映射传入，
  * 既保持谓词纯函数（无副作用、无外部状态读取），又让请求身份参与比对。
  */
-export function findReusableTask(
-  tasks: Iterable<TaskInfo>,
-  kind: TaskKind,
-  projectPath: string,
-  requestKey: string,
-  requestKeys: ReadonlyMap<string, string>,
-): TaskInfo | undefined {
+interface FindReusableTaskParams {
+  tasks: Iterable<TaskInfo>;
+  kind: TaskKind;
+  projectPath: string;
+  requestKey: string;
+  requestKeys: ReadonlyMap<string, string>;
+}
+
+export function findReusableTask(params: FindReusableTaskParams): TaskInfo | undefined {
+  const { tasks, kind, projectPath, requestKey, requestKeys } = params;
   for (const task of tasks) {
     const active = task.status === 'queued' || task.status === 'running';
     if (
@@ -149,13 +152,13 @@ export class TaskManager {
 
   start(kind: TaskKind, projectPath: string, request?: unknown): TaskInfo {
     const requestKey = canonicalRequestKey(request);
-    const existing = findReusableTask(
-      this.tasks.values(),
+    const existing = findReusableTask({
+      tasks: this.tasks.values(),
       kind,
       projectPath,
       requestKey,
-      this.requestKeys,
-    );
+      requestKeys: this.requestKeys,
+    });
     if (existing) return existing;
 
     const task: TaskInfo = {

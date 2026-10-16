@@ -74,7 +74,7 @@ export class SopDiffCalculator {
     const { diffContent, hash } = this.buildDiffSummary(added, modified, removed);
     this.storeVersionHashes(toVersion, this.hashAll(allRules));
 
-    return buildDiffResult(
+    return buildDiffResult({
       toVersion,
       fromVersion,
       allRules,
@@ -84,7 +84,7 @@ export class SopDiffCalculator {
       unchanged,
       diffContent,
       hash,
-    );
+    });
   }
 
   private classifyDiff(
@@ -230,17 +230,21 @@ function isEmptyBaseline(fromVersion: string): boolean {
   return fromVersion === '' || fromVersion === '0.0.0';
 }
 
-function buildDiffResult(
-  toVersion: string,
-  fromVersion: string,
-  allRules: SopRule[],
-  added: SopRule[],
-  removed: string[],
-  modified: SopRule[],
-  unchanged: string[],
-  diffContent: string,
-  hash: string,
-): SopDiff {
+interface BuildDiffResultParams {
+  toVersion: string;
+  fromVersion: string;
+  allRules: SopRule[];
+  added: SopRule[];
+  removed: string[];
+  modified: SopRule[];
+  unchanged: string[];
+  diffContent: string;
+  hash: string;
+}
+
+function buildDiffResult(params: BuildDiffResultParams): SopDiff {
+  const { toVersion, fromVersion, allRules, added, removed, modified, unchanged, diffContent, hash } =
+    params;
   return {
     version: toVersion,
     fromVersion,

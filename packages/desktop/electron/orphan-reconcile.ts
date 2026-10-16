@@ -440,16 +440,19 @@ interface CandidateReconcileResult {
   suspectedOrphans: OrphanReconcileReport['suspectedOrphans'];
 }
 
+interface ReconcileSingleCandidateParams {
+  db: ReturnType<typeof getDb>;
+  projectId: string;
+  state: OrphanState;
+  now: number;
+  upgradeMs: number;
+  confirmedOrphans: OrphanReconcileReport['confirmedOrphans'];
+  suspectedOrphans: OrphanReconcileReport['suspectedOrphans'];
+}
+
 /** 单个 candidate 判定：确认孤儿（dir_missing/dir_empty）软删；疑似孤儿（有内容）按 30 天阈值升级或登记。单项目失败由调用方捕获跳过 */
-async function reconcileSingleCandidate(
-  db: ReturnType<typeof getDb>,
-  projectId: string,
-  state: OrphanState,
-  now: number,
-  upgradeMs: number,
-  confirmedOrphans: OrphanReconcileReport['confirmedOrphans'],
-  suspectedOrphans: OrphanReconcileReport['suspectedOrphans'],
-): Promise<void> {
+async function reconcileSingleCandidate(params: ReconcileSingleCandidateParams): Promise<void> {
+  const { db, projectId, state, now, upgradeMs, confirmedOrphans, suspectedOrphans } = params;
   const reason = await classifyDir(projectId);
   if (reason === 'dir_present_with_content') {
     // 疑似孤儿：状态持久化 + 30 天升级
@@ -490,7 +493,7 @@ async function reconcileCandidates(
   const upgradeMs = UPGRADE_DAYS * 24 * 60 * 60 * 1000;
   for (const projectId of candidates) {
     try {
-      await reconcileSingleCandidate(
+      await reconcileSingleCandidate({
         db,
         projectId,
         state,
@@ -498,7 +501,7 @@ async function reconcileCandidates(
         upgradeMs,
         confirmedOrphans,
         suspectedOrphans,
-      );
+      });
     } catch (err) {
       warn(`[orphan-reconcile] 项目 ${projectId} 判定失败，跳过:`, err);
     }

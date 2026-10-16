@@ -26,6 +26,14 @@ interface DepcheckResult {
 /** 分步执行结果：成功携带值，失败携带已构建的 ToolResult（提前返回） */
 type StepOutcome<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
 
+/** runDepcheckCommand 的参数对象：命令行参数、扫描选项、目标路径与起始时间 */
+interface RunDepcheckCommandParams {
+  args: string[];
+  options: ToolScanOptions;
+  projectPath: string;
+  start: number;
+}
+
 /**
  * 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
  * depcheck 以自身 cwd 解析导致扫描失败。
@@ -52,7 +60,12 @@ export class DepcheckAdapter extends ToolCommandAdapter {
 
     const command = await this.commands.resolve(options.projectPath);
     const args = buildDepcheckArgs(options, projectPath);
-    const runResult = await this.runDepcheckCommand(command, args, options, projectPath, start);
+    const runResult = await this.runDepcheckCommand(command, {
+      args,
+      options,
+      projectPath,
+      start,
+    });
     if (!runResult.ok) return runResult.result;
 
     const parseResult = this.parseDepcheckOutput(runResult.value, start);
@@ -86,11 +99,9 @@ export class DepcheckAdapter extends ToolCommandAdapter {
   /** 执行 depcheck 命令：检出未使用依赖时以非零码退出但 stdout 仍是合法 JSON（本项目实测 exit 255） */
   private async runDepcheckCommand(
     command: string,
-    args: string[],
-    options: ToolScanOptions,
-    projectPath: string,
-    start: number,
+    params: RunDepcheckCommandParams,
   ): Promise<StepOutcome<string>> {
+    const { args, options, projectPath, start } = params;
     try {
       const { stdout } = await execTool(command, args, {
         cwd: projectPath,

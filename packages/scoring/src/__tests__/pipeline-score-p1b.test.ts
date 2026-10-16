@@ -27,10 +27,10 @@ describe('P1b 验收 — 未检测域不参与加权（spec G）', () => {
     expect(deps.weight).toBe(0.1);
 
     const score = new ScoringEngine().calculate('p', dims);
-    // quality 92 (0.10) + gate 92 (0.10)，weightSum 0.20 → 92
-    expect(score.overall).toBe(92);
-    // 若 dependencies 按满分 100 参与加权，overall = (92×0.10 + 92×0.10 + 100×0.10)/0.30 = 94.67
-    // 实际 92 证明未检测域被排除在分子与分母之外
+    // quality 92 (0.10) + gate 92.9 (0.10)，weightSum 0.20 → 92.45
+    expect(score.overall).toBe(92.45);
+    // 若 dependencies 按满分 100 参与加权，overall = (92×0.10 + 92.9×0.10 + 100×0.10)/0.30 = 94.97
+    // 实际 92.45 证明未检测域被排除在分子与分母之外
   });
 
   it('全部域未运行 → overall 0（weightSum 为 0 兜底）', () => {
@@ -176,12 +176,12 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
       extras: { sentinel: { active: true, criticalEvents: 2, warningEvents: 1 } },
     });
     const gate = dims.find((d) => d.name === 'gate')!;
-    expect(gate.score).toBe(92); // 100 − 8(guard)，哨兵事件不再进 gate
+    expect(gate.score).toBe(92.9); // 100 − 7.06(guard，软饱和)，哨兵事件不再进 gate
     expect(gate.issues).toBe(1); // 仅 1 条 guard 检查项
 
     const sentinel = dims.find((d) => d.name === 'sentinel')!;
     expect(sentinel.status).toBe('scored');
-    expect(sentinel.score).toBe(75); // 100 − (2×10 + 1×5)
+    expect(sentinel.score).toBe(80.6); // 100 − (softBand(2,10,60)=15.0 + softBand(1,5,40)=4.44)
     expect(sentinel.issues).toBe(3);
   });
 });

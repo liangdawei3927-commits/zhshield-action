@@ -68,14 +68,14 @@ describe('buildHealthDimensions', () => {
     });
 
     const byName = Object.fromEntries(dims.map((d) => [d.name, d]));
-    // security: 1 error → 92
-    expect(byName.security.score).toBe(92);
+    // security: 1 error → softBand(1,8,48)=6.86 → 93.1
+    expect(byName.security.score).toBe(93.1);
     expect(byName.security.issues).toBe(1);
     // quality: arch warning(4) + perf error(8) + doc info(1) + test warning(4) + refactor error(8) + quality info(1) = 26 → 74
     expect(byName.quality.score).toBe(74);
     expect(byName.quality.issues).toBe(6);
-    // dependencies: dependency warning(4) → 96
-    expect(byName.dependencies.score).toBe(96);
+    // dependencies: dependency warning → softBand(1,4,40)=3.64 → 96.4
+    expect(byName.dependencies.score).toBe(96.4);
     expect(byName.dependencies.issues).toBe(1);
     // techdebt: debtIndex 0 → 100
     expect(byName.techdebt.score).toBe(100);
@@ -104,17 +104,17 @@ describe('buildHealthDimensions', () => {
     });
 
     const byName = Object.fromEntries(dims.map((d) => [d.name, d]));
-    // gate: failed(8) + warning(4) = 12 → 88，issues 2
-    expect(byName.gate.score).toBe(88);
+    // gate: softBand(1,8,60)=7.06 + softBand(1,4,40)=3.64 = 10.70 → 89.3，issues 2
+    expect(byName.gate.score).toBe(89.3);
     expect(byName.gate.issues).toBe(2);
     expect(byName.quality.score).toBe(100);
     // guard 不再计入 security 维
     expect(byName.security.status).toBe('not-run');
   });
 
-  it('floors dimension score at 0', () => {
-    // 三级封顶 Σ=100（error 48 + warning 40 + info 12），故触底需各级同时打满：
-    // 6 error(48) + 10 warning(40) + 12 info(12) = 100 → 0
+  it('security 三级同时打满仍不触底 0（软饱和渐近）', () => {
+    // 软饱和各级渐近于 cap（error 48 + warning 40 + info 12），同时打满也为有限正分：
+    // softBand(6,8,48)=24 + softBand(10,4,40)=20 + softBand(12,1,12)=6 = 50 → 50
     const dims = buildHealthDimensions({
       guard: cleanGuard,
       inspect: {
@@ -125,7 +125,7 @@ describe('buildHealthDimensions', () => {
         ],
       },
     });
-    expect(dims.find((d) => d.name === 'security')!.score).toBe(0);
+    expect(dims.find((d) => d.name === 'security')!.score).toBe(50);
   });
 
   it('security 分辨率不再归零（P2-4 回归）：error 6→12 条期间分数必须逐条下降', () => {
@@ -147,8 +147,8 @@ describe('buildHealthDimensions', () => {
     for (let i = 1; i < scores.length; i++) {
       expect(scores[i]).toBeLessThan(scores[i - 1]);
     }
-    // 1..6 条 error → 8/16/24/32/40/48 扣分 → 92/84/76/68/60/52
-    expect(scores).toEqual([92, 84, 76, 68, 60, 52]);
+    // 1..6 条 error 软饱和扣分 6.86/12/16/19.2/21.82/24 → 93.1/88/84/80.8/78.2/76
+    expect(scores).toEqual([93.1, 88, 84, 80.8, 78.2, 76]);
   });
 
   it('未知 severity 不产出 NaN（P2-4 回归）：落盘脏数据按 info 计，分数仍是有限值', () => {
@@ -164,8 +164,8 @@ describe('buildHealthDimensions', () => {
     });
     const score = dims.find((d) => d.name === 'security')!.score;
     expect(Number.isFinite(score)).toBe(true);
-    // 未知档按 info(1) + error(8) = 9 → 91
-    expect(score).toBe(91);
+    // 未知档按 info：softBand(1,1,12)=0.92 + softBand(1,8,48)=6.86 = 7.78 → 92.2
+    expect(score).toBe(92.2);
   });
 });
 
@@ -180,9 +180,9 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
       refactor: { totalSmells: 5, bySeverity: { error: 1, warning: 1, info: 3 } },
     }});
     const refactor = dims.find((d) => d.name === 'refactor')!;
-    // penalty 8+4+3 = 15 → 85，issues 5
+    // 软饱和 penalty = 6.8571(error) + 3.6364(warning) + 2.4(info) = 12.8935 → 87.1，issues 5
     expect(refactor.status).toBe('scored');
-    expect(refactor.score).toBe(85);
+    expect(refactor.score).toBe(87.1);
     expect(refactor.issues).toBe(5);
   });
 
@@ -196,30 +196,31 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
       performance: { total: 3, bySeverity: { critical: 1, high: 0, medium: 1, low: 1, info: 0 } },
     }});
     const performance = dims.find((d) => d.name === 'performance')!;
-    // penalty 8+2+1 = 11 → 89，issues 3
+    // penalty softBand(1,8,40)=6.67 + softBand(1,2,15)=1.76 + softBand(1,1,5)=0.83 = 9.27 → 90.7，issues 3
     expect(performance.status).toBe('scored');
-    expect(performance.score).toBe(89);
+    expect(performance.score).toBe(90.7);
     expect(performance.issues).toBe(3);
   });
 
-  it('refactor 单级封顶：error 20 → penalty 48 → 52（旧口径 160 触顶 0）', () => {
+  it('refactor 软饱和：error 20 → penalty 36.9 → 63.1（旧口径 160 触顶 0；原硬封顶恒 48）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 20, bySeverity: { error: 20, warning: 0, info: 0 } },
     }});
     const refactor = dims.find((d) => d.name === 'refactor')!;
-    expect(refactor.score).toBe(52);
+    // softBand(20, 8, 48) = 160/(1+160/48) = 36.9231 → 63.1
+    expect(refactor.score).toBe(63.1);
     expect(refactor.issues).toBe(20);
   });
 
   it('refactor 真实量级回归：403 warning + 19 info 不得触底 0（2026-09-22 修复）', () => {
     // zhihui-codeshield 实扫 shape：{ error:0, warning:403, info:19 }
-    // 罚分 min(48,0) + min(40,1612) + min(12,19) = 52 → 48（旧口径 1631 → 100 → 0）
+    // 软饱和罚分 0 + 39.0315(warning) + 7.3548(info) = 46.3863 → 53.6
     const real = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 422, bySeverity: { error: 0, warning: 403, info: 19 } },
     }});
     const refactor = real.find((d) => d.name === 'refactor')!;
     expect(refactor.status).toBe('scored');
-    expect(refactor.score).toBe(48);
+    expect(refactor.score).toBe(53.6);
     expect(refactor.issues).toBe(422);
   });
 
@@ -230,15 +231,52 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
     expect(capSum).toBe(100);
   });
 
-  it('refactor 全局上限 100：error/warning/info 全部触顶叠加后仍封顶', () => {
+  it('refactor 软饱和不触底：error/warning/info 各 100 时分数渐近但恒 > 0', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       refactor: { totalSmells: 300, bySeverity: { error: 100, warning: 100, info: 100 } },
     }});
-    // 48 + 40 + 12 = 100 → 0
-    expect(dims.find((d) => d.name === 'refactor')!.score).toBe(0);
+    // 软饱和 45.2830 + 36.3636 + 10.7143 = 92.3609 → 7.6（cap 为渐近上界，永不触底 0）
+    const score = dims.find((d) => d.name === 'refactor')!.score;
+    expect(score).toBe(7.6);
+    expect(score).toBeGreaterThan(0);
   });
 
-  it('performance 单级封顶：high 100 → penalty 40 → 60（旧口径 400 触底 0）', () => {
+  it('refactor 软饱和单调性：warning 计数增大分数严格下降，高量级仍不饱和', () => {
+    const scoreAtWarning = (warning: number): number => {
+      const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
+        refactor: { totalSmells: warning, bySeverity: { error: 0, warning, info: 0 } },
+      }});
+      return dims.find((d) => d.name === 'refactor')!.score;
+    };
+    const s10 = scoreAtWarning(10);
+    const s100 = scoreAtWarning(100);
+    const s1000 = scoreAtWarning(1000);
+    const s5000 = scoreAtWarning(5000);
+    expect(s10).toBeGreaterThan(s100);
+    expect(s100).toBeGreaterThan(s1000);
+    expect(s1000).toBeGreaterThan(s5000);
+  });
+
+  it('refactor 渐近无下限：error/warning/info 各 1000 时分数仍严格 > 0', () => {
+    const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
+      refactor: { totalSmells: 3000, bySeverity: { error: 1000, warning: 1000, info: 1000 } },
+    }});
+    const score = dims.find((d) => d.name === 'refactor')!.score;
+    expect(score).toBeGreaterThan(0);
+  });
+
+  it('refactor 清理坏味道后分数回升（P2-5 回归）：减少 warning 必须提高分数', () => {
+    const scoreFor = (warning: number, info: number): number => {
+      const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
+        refactor: { totalSmells: warning + info, bySeverity: { error: 0, warning, info } },
+      }});
+      return dims.find((d) => d.name === 'refactor')!.score;
+    };
+    // 修复前硬封顶：warning 均 ≥10 恒扣 40，清理 209→100 分数纹丝不动
+    expect(scoreFor(209, 22)).toBeLessThan(scoreFor(100, 22));
+  });
+
+  it('performance 单级软饱和：high 100 → penalty 36.36 → 63.6（旧口径 400 触底 0）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       performance: {
         total: 100,
@@ -246,13 +284,13 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
       },
     }});
     const performance = dims.find((d) => d.name === 'performance')!;
-    expect(performance.score).toBe(60);
+    expect(performance.score).toBe(63.6);
     expect(performance.issues).toBe(100);
   });
 
   it('performance 真实量级回归：45 high + 5 medium 不得触底 0（2026-09-22 P2-3 同批修复）', () => {
     // zhihui-codeshield 实扫 shape：{ critical:0, high:45, medium:5, low:0, info:0 }
-    // 罚分 min(40,0) + min(40,180) + min(15,10) + min(5,0) = 50 → 50（旧口径 190 → 100 → 0）
+    // 软饱和 softBand(45,4,40)=32.73 + softBand(5,2,15)=6 = 38.73 → 61.3（旧口径 190 → 100 → 0）
     const real = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       performance: {
         total: 50,
@@ -261,19 +299,19 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
     }});
     const performance = real.find((d) => d.name === 'performance')!;
     expect(performance.status).toBe('scored');
-    expect(performance.score).toBe(50);
+    expect(performance.score).toBe(61.3);
     expect(performance.issues).toBe(50);
   });
 
-  it('performance 全局上限 100：五级全部触顶叠加后仍封顶', () => {
+  it('performance 五级全部打满仍为有限正分（软饱和渐近 cap 100）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       performance: {
         total: 500,
         bySeverity: { critical: 100, high: 100, medium: 100, low: 100, info: 100 },
       },
     }});
-    // 40 + 40 + 15 + 5 + 0 = 100 → 0
-    expect(dims.find((d) => d.name === 'performance')!.score).toBe(0);
+    // 软饱和各级渐近 cap：38.10+36.36+13.95+4.76+0 = 93.17 → 6.8
+    expect(dims.find((d) => d.name === 'performance')!.score).toBe(6.8);
   });
 
   it('performance 封顶对齐不变量：Σ 各 severity 封顶 === 100', () => {
@@ -290,7 +328,7 @@ describe('P2 refactor/performance 维度（spec 新增）', () => {
 });
 
 describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
-  it('sentinel null → not-run；有事件 → critical -10 / warning -5', () => {
+  it('sentinel null → not-run；有事件 → 软饱和 critical/warning 计权', () => {
     const notRun = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect });
     const sentinelNotRun = notRun.find((d) => d.name === 'sentinel')!;
     expect(sentinelNotRun.status).toBe('not-run');
@@ -299,9 +337,9 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
       sentinel: { active: true, criticalEvents: 1, warningEvents: 2 },
     }});
     const sentinel = dims.find((d) => d.name === 'sentinel')!;
-    // penalty 10 + 10 = 20 → 80，issues 3
+    // penalty softBand(1,10,60)=8.57 + softBand(2,5,40)=8.0 = 16.57 → 83.4，issues 3
     expect(sentinel.status).toBe('scored');
-    expect(sentinel.score).toBe(80);
+    expect(sentinel.score).toBe(83.4);
     expect(sentinel.issues).toBe(3);
   });
 
@@ -310,10 +348,10 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
       sentinel: { active: true, criticalEvents: 2, warningEvents: 0 },
     }});
     expect(dims.find((d) => d.name === 'gate')!.score).toBe(100);
-    expect(dims.find((d) => d.name === 'sentinel')!.score).toBe(80);
+    expect(dims.find((d) => d.name === 'sentinel')!.score).toBe(85);
   });
 
-  it('garbage null → not-run；按类型计权扣分（1/2/3/4/6）', () => {
+  it('garbage null → not-run；按类型软饱和计权扣分', () => {
     const notRun = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect });
     expect(notRun.find((d) => d.name === 'garbage')!.status).toBe('not-run');
 
@@ -324,9 +362,9 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
       },
     }});
     const garbage = dims.find((d) => d.name === 'garbage')!;
-    // penalty 1 + 2 + 4 = 7 → 93，issues 3（total 字段口径为条目总数）
+    // penalty softBand(1,1,10)=0.91 + softBand(1,2,15)=1.76 + softBand(1,4,25)=3.45 = 6.12 → 93.9，issues 3（total 字段口径为条目总数）
     expect(garbage.status).toBe('scored');
-    expect(garbage.score).toBe(93);
+    expect(garbage.score).toBe(93.9);
     expect(garbage.issues).toBe(6);
   });
 
@@ -334,26 +372,26 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       garbage: { total: 3, byType: { 'mystery-type': 3 } },
     }});
-    expect(dims.find((d) => d.name === 'garbage')!.score).toBe(94);
+    expect(dims.find((d) => d.name === 'garbage')!.score).toBe(96.3);
   });
 
   it('garbage 单类型封顶：单类型堆积不再把整维砸到 0（章程 P2-3 初校）', () => {
-    // 100 个 unused-dependency：6×100=600 → 单类型封顶 30 → 70（旧口径触底 0）
+    // 100 个 unused-dependency：softBand(100,6,30)=28.57 → 71.4（旧口径触底 0）
     const heavy = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       garbage: { total: 100, byType: { 'unused-dependency': 100 } },
     }});
-    expect(heavy.find((d) => d.name === 'garbage')!.score).toBe(70);
+    expect(heavy.find((d) => d.name === 'garbage')!.score).toBe(71.4);
 
-    // 100 个 build-artifact：单元最轻 → 封顶 10 → 90
+    // 100 个 build-artifact：单元最轻 → softBand(100,1,10)=9.09 → 90.9
     const artifacts = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       garbage: { total: 100, byType: { 'build-artifact': 100 } },
     }});
-    expect(artifacts.find((d) => d.name === 'garbage')!.score).toBe(90);
+    expect(artifacts.find((d) => d.name === 'garbage')!.score).toBe(90.9);
   });
 
   it('garbage 真实量级回归：百级死代码/重复代码项目不得触底 0（2026-09-22 修复）', () => {
     // zhihui-codeshield 实扫 shape：{ build-artifact:1, unused-file:63, dead-code:468, duplicate-code:616 }
-    // 罚分 1 + min(15,126) + min(25,1872) + min(20,1848) = 61 → 39（旧口径 3847 → 100 → 0）
+    // 软饱和 softBand(1,1,10)+softBand(63,2,15)+softBand(468,4,25)+softBand(616,3,20) = 58.77 → 41.2（旧口径 3847 → 100 → 0）
     const real = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       garbage: {
         total: 1148,
@@ -362,11 +400,11 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
     }});
     const garbage = real.find((d) => d.name === 'garbage')!;
     expect(garbage.status).toBe('scored');
-    expect(garbage.score).toBe(39);
+    expect(garbage.score).toBe(41.2);
     expect(garbage.issues).toBe(1148);
   });
 
-  it('garbage 全局上限 100：五类型全部触顶叠加后仍封顶（触底不为负）', () => {
+  it('garbage 五类型全部打满仍为有限正分（软饱和渐近，触底不为负）', () => {
     const dims = buildHealthDimensions({ guard: cleanGuard, inspect: cleanInspect, extras: {
       garbage: {
         total: 1000,
@@ -379,8 +417,8 @@ describe('十域评分体系 v2（sentinel/garbage/backup）', () => {
         },
       },
     }});
-    // 10 + 15 + 20 + 25 + 30 = 100 → 0
-    expect(dims.find((d) => d.name === 'garbage')!.score).toBe(0);
+    // 软饱和各级渐近 cap：9.09+13.95+18.75+23.53+28.57 = 93.89 → 6.1
+    expect(dims.find((d) => d.name === 'garbage')!.score).toBe(6.1);
   });
 
   it('backup null → not-run；新鲜度 + 失败率健康度', () => {

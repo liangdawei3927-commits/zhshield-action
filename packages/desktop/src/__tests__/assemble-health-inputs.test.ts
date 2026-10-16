@@ -93,9 +93,9 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
     const security = dims.find((d) => d.name === 'security');
     const deps = dims.find((d) => d.name === 'dependencies');
     expect(security?.status).toBe('scored');
-    expect(security?.score).toBe(92); // 100 - error 8
+    expect(security?.score).toBe(93.1); // 100 − softBand(1,8,48)=6.86
     expect(deps?.status).toBe('scored');
-    expect(deps?.score).toBe(96); // 100 - warning 4
+    expect(deps?.score).toBe(96.4); // 100 − softBand(1,4,40)=3.64
   });
 
   it('只跑了 security 扫描（无 inspect 快照）→ inspectIssues 非空，security 维可计分', async () => {

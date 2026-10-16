@@ -89,13 +89,11 @@ const ISSUE_PENALTY: Record<'error' | 'warning' | 'info', number> = {
 };
 
 /**
- * 各 severity 单级最大贡献（P2-4 口径补齐，2026-10-02）。
+ * 各 severity 单级最大贡献（P2-5 口径修正，2026-10-02）。
  *
  * 与 PERFORMANCE_SEVERITY_CAP / REFACTOR_SEVERITY_CAP / GARBAGE_TYPE_CAP 同构：
- * Σ = 100 对齐全局上限。修复前 security/dependencies 走纯线性累加，
- * 13 条 error（13×8=104）即触底 0，其后无论再堆多少条，分数恒为 0 ——
- * 用户改完问题看不到分数回升，失去了「修复有进展」的反馈。
- * 单级封顶后：单级封顶内仍有分辨率，超出后由其余级与 issues 计数继续表达严重度。
+ * Σ = 100 对齐全局上限。原硬封顶路径已替换为 {@link softBand} 软饱和（cap 为渐近上界），
+ * 单级扣分随 count 严格递增，保留高量级下的区分度与「修复有回升」的反馈。
  */
 export const ISSUE_SEVERITY_CAP: Readonly<Record<'error' | 'warning' | 'info', number>> = {
   error: 48,
@@ -118,14 +116,14 @@ function normalizeIssueSeverity(severity: string): keyof typeof ISSUE_PENALTY {
 }
 
 function penaltyForIssues(issues: InspectIssueLike[]): number {
-  const bySeverity = new Map<string, number>();
+  const counts = new Map<keyof typeof ISSUE_PENALTY, number>();
   for (const issue of issues) {
     const key = normalizeIssueSeverity(issue.severity);
-    bySeverity.set(key, (bySeverity.get(key) ?? 0) + ISSUE_PENALTY[key]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   let sum = 0;
   for (const key of ISSUE_SEVERITY_KEYS) {
-    sum += Math.min(ISSUE_SEVERITY_CAP[key], bySeverity.get(key) ?? 0);
+    sum += softBand(counts.get(key) ?? 0, ISSUE_PENALTY[key], ISSUE_SEVERITY_CAP[key]);
   }
   return Math.min(100, sum);
 }
@@ -157,13 +155,13 @@ function qualityPenalty(issues: InspectIssueLike[], esloc: number | undefined): 
   return penalty * density;
 }
 
-/** gate 各级结果单级最大贡献（P2-4 口径补齐，2026-10-02；Σ = 100 对齐全局上限） */
+/** gate 各级结果单级最大贡献（P2-5 口径修正，2026-10-02；Σ = 100 对齐全局上限） */
 export const GUARD_SEVERITY_CAP: Readonly<Record<'blocking' | 'warning', number>> = {
   blocking: 60,
   warning: 40,
 };
 
-/** guard 失败/警告计入 gate 维度的扣分（单级封顶，理由同 ISSUE_SEVERITY_CAP） */
+/** guard 失败/警告计入 gate 维度的扣分（单级贡献走 softBand 软饱和，理由同 ISSUE_SEVERITY_CAP） */
 function guardPenalty(results: GuardCheckLike[]): number {
   let blocking = 0;
   let warning = 0;
@@ -171,7 +169,7 @@ function guardPenalty(results: GuardCheckLike[]): number {
     if (r.status === 'failed' || r.status === 'error' || r.blocking) blocking += 1;
     else if (r.status === 'warning') warning += 1;
   }
-  return Math.min(100, Math.min(GUARD_SEVERITY_CAP.blocking, blocking * 8) + Math.min(GUARD_SEVERITY_CAP.warning, warning * 4));
+  return Math.min(100, softBand(blocking, 8, GUARD_SEVERITY_CAP.blocking) + softBand(warning, 4, GUARD_SEVERITY_CAP.warning));
 }
 
 /** guard 中非 passed 的结果数（与 guardPenalty 的判定口径一致） */
@@ -192,29 +190,29 @@ function depsPenalty(deps: DepsDataLike): number {
   );
 }
 
-/** sentinel 各级事件单级最大贡献（P2-4 口径补齐，2026-10-02；Σ = 100 对齐全局上限） */
+/** sentinel 各级事件单级最大贡献（P2-5 口径修正，2026-10-02；Σ = 100 对齐全局上限） */
 export const SENTINEL_SEVERITY_CAP: Readonly<Record<'critical' | 'warning', number>> = {
   critical: 60,
   warning: 40,
 };
 
-/** sentinel 扣分（十域评分章程 #9，哨兵独立成维；单级封顶，理由同 ISSUE_SEVERITY_CAP） */
+/** sentinel 扣分（十域评分章程 #9，哨兵独立成维；单级贡献走 softBand 软饱和，理由同 ISSUE_SEVERITY_CAP） */
 function sentinelPenalty(sentinel: SentinelDataLike): number {
   return Math.min(
     100,
-    Math.min(SENTINEL_SEVERITY_CAP.critical, sentinel.criticalEvents * 10) +
-      Math.min(SENTINEL_SEVERITY_CAP.warning, sentinel.warningEvents * 5),
+    softBand(sentinel.criticalEvents, 10, SENTINEL_SEVERITY_CAP.critical) +
+      softBand(sentinel.warningEvents, 5, SENTINEL_SEVERITY_CAP.warning),
   );
 }
 
 /**
  * garbage 扣分：按类型单条计权（build-artifact 1 / unused-file 2 / duplicate-code 3 /
- * dead-code 4 / unused-dependency 6），单类型贡献封顶 GARBAGE_TYPE_CAP，整体上限 100
- * （章程 #5，2026-09-22 P2-3 初校）。
+ * dead-code 4 / unused-dependency 6），单类型贡献走 {@link softBand} 软饱和，整体上限 100
+ * （章程 #5，P2-5 全维度统一）。
  *
- * 初校背景：旧口径线性逐项扣分 + 全局 100 上限，真实项目（ts-prune/jscpd 命中数百项）
- * 加权罚分立即触顶 → 该维退化为二元（0/100）且几乎恒为 0。单类型封顶保证某一类垃圾
- * 堆积再多也不独占整维，保留区分度；Σ 各类型封顶恰好 100，与全局上限对齐（触底不为负）。
+ * P2-5 口径修正（替代原 min(cap, weight·n) 硬封顶）：硬封顶下各级一旦越过
+ * 半饱和点即恒定封顶，单级扣分随 count 严格递增，保留高量级下的区分度与「修复有回升」的反馈。
+ * cap 为渐近上界，永不触底 0。
  */
 export const GARBAGE_TYPE_PENALTY: Readonly<Record<string, number>> = {
   'build-artifact': 1,
@@ -242,7 +240,7 @@ function garbagePenalty(garbage: GarbageDataLike): number {
   for (const [type, count] of Object.entries(garbage.byType)) {
     const unit = GARBAGE_TYPE_PENALTY[type] ?? GARBAGE_UNKNOWN_PENALTY;
     const cap = GARBAGE_TYPE_CAP[type] ?? GARBAGE_UNKNOWN_CAP;
-    sum += Math.min(cap, count * unit);
+    sum += softBand(count, unit, cap);
   }
   return Math.min(100, sum);
 }
@@ -305,32 +303,45 @@ export const REFACTOR_SEVERITY_CAP: Readonly<Record<'error' | 'warning' | 'info'
   info: 12,
 };
 
+/**
+ * 单级“软饱和”扣分（P2-5 口径修正）：cap·n/(n+K)，K = cap/weight（半饱和点）。
+ * 严格递增、上界为 cap，替代原 min(cap, n*weight) 硬封顶——
+ * 硬封顶下 warning≥10 即恒扣 40，10 条与 1000 条同分，删坏味道分数不动；
+ * 软饱和下单级扣分随 count 持续上升（渐近于 cap），分数永不被钉死。
+ * 初始斜率在 n→0 时等于 weight（与原逐项口径连续）。
+ */
+function softBand(count: number, weight: number, cap: number): number {
+  if (cap <= 0) return 0;
+  const burden = count * weight;
+  return burden / (1 + burden / cap);
+}
+
+/**
+ * refactor 扣分：smell 按 error 8 / warning 4 / info 1 计权，单级贡献走
+ * {@link softBand} 软饱和（cap·n/(n+K)）后叠加，整体上限 100（章程 #8）。
+ *
+ * P2-5 口径修正（替代原 min(cap, weight·n) 硬封顶）：硬封顶下各级一旦越过
+ * 半饱和点即恒定封顶——warning≥10 恒扣 40、info≥12 恒扣 12，于是任何 ≥10 条
+ * warning 的仓库都恰好扣 48，10 条与 1000 条同分、清理坏味道分数毫无变化。
+ * 软饱和以 REFACTOR_SEVERITY_CAP 为渐近上界（fixture 越大越逼近但永不达到），
+ * 单级扣分随 count 严格递增，保留高量级下的区分度与「修复有回升」的反馈。
+ */
 function refactorPenalty(refactor: RefactorDataLike): number {
   const keys = ['error', 'warning', 'info'] as const;
   let sum = 0;
   for (const key of keys) {
-    sum += Math.min(REFACTOR_SEVERITY_CAP[key], refactor.bySeverity[key] * REFACTOR_SEVERITY_PENALTY[key]);
+    sum += softBand(refactor.bySeverity[key], REFACTOR_SEVERITY_PENALTY[key], REFACTOR_SEVERITY_CAP[key]);
   }
   return Math.min(100, sum);
 }
 
 /**
- * performance 扣分：critical 8 / high 4 / medium 2 / low 1 / info 0，单级贡献封顶
- * PERFORMANCE_SEVERITY_CAP，整体上限 100（2026-09-22 P2-3 同批补校）。
+ * performance 扣分：critical 8 / high 4 / medium 2 / low 1 / info 0，单级贡献走
+ * {@link softBand} 软饱和（cap·n/(n+K)）后叠加，整体上限 100（章程 P2-5 全维度统一）。
  *
- * 补校背景：performance 与 refactor / garbage 在 2026-09-22 P2-3 同批初校时被漏掉，仍是
- * 裸「线性逐项扣分 + 全局 100 上限」。真实证据：改分前基线实扫 45 条 complexity.sync-io
- * （high）+ 5 条 complexity.nested-loop（medium），加权 45×4 + 5×2 = 190 → 全局触顶 100 →
- * 该维 0 分，即 1% 的问题项对分数零影响、其余 99% 全部不可见（23 条 high 之后分辨率归零）。
- * 单级封顶保证某一级堆积再多也不独占整维；Σ 五级封顶恰好 100，与全局上限对齐（触底不为负）。
- *
- * 注：上述 45/5 是改分前基线，不是当前实扫值。同步 IO 一侧已按运行时上下文修正
- * （Node CLI/批处理/启动期不报），实扫 0 条。嵌套循环一侧原先只数 AST 层数、不看代价结构：
- * 逐条实测 6 条全是线性分层遍历（4 倍输入耗时 2.2~4.0 倍），其中 4 条每层集合都由上一层
- * 那一轮派生、总量等于叶子数。现补「乘数层」判据——某一层既不引用外层循环绑定、也不引用
- * 外层体内的派生量、且遍历的不是固定长度配置集合时才算独立维度——只有存在独立维度才报。
- * 当前实扫 0 条；`input × 固定配置` 形态（如「文件数 × 规则表」）在单文件静态分析里与真实
- * 交叉乘法不可区分，按设计保留告警。本封顶的回归测试不依赖具体条数。
+ * P2-5 口径修正（替代原 min(cap, weight·n) 硬封顶）：硬封顶下各级一旦越过
+ * 半饱和点即恒定封顶，单级扣分随 count 严格递增，保留高量级下的区分度与「修复有回升」的反馈。
+ * cap 为渐近上界，永不触底 0。
  */
 export const PERFORMANCE_SEVERITY_PENALTY: Readonly<
   Record<'critical' | 'high' | 'medium' | 'low' | 'info', number>
@@ -357,10 +368,7 @@ function performancePenalty(performance: PerformanceDataLike): number {
   const keys = ['critical', 'high', 'medium', 'low', 'info'] as const;
   let sum = 0;
   for (const key of keys) {
-    sum += Math.min(
-      PERFORMANCE_SEVERITY_CAP[key],
-      performance.bySeverity[key] * PERFORMANCE_SEVERITY_PENALTY[key],
-    );
+    sum += softBand(performance.bySeverity[key], PERFORMANCE_SEVERITY_PENALTY[key], PERFORMANCE_SEVERITY_CAP[key]);
   }
   return Math.min(100, sum);
 }

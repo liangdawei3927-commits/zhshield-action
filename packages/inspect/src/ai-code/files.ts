@@ -127,6 +127,23 @@ interface CommentState {
  * 必要性：SPECIFIER_RE 是纯文本匹配，不剥离注释就会把 JSDoc 里的
  * `import('x')` 示例当成真实依赖引用 → 误报幻觉依赖（security/error）。
  */
+function scanStringLiteral(line: string, i: number): { text: string; nextIndex: number } {
+  const ch = line[i];
+  let j = i + 1;
+  while (j < line.length) {
+    const c = line[j];
+    if (c === '\\') {
+      j += 2;
+      continue;
+    }
+    if (c === ch) break;
+    j += 1;
+  }
+  const nextIndex = j + 1;
+  const text = line.slice(i, Math.min(nextIndex, line.length));
+  return { text, nextIndex };
+}
+
 function stripComments(line: string, state: CommentState): string {
   let out = '';
   let i = 0;
@@ -143,18 +160,9 @@ function stripComments(line: string, state: CommentState): string {
       continue;
     }
     if (ch === "'" || ch === '"' || ch === '`') {
-      let j = i + 1;
-      while (j < line.length) {
-        const c = line[j];
-        if (c === '\\') {
-          j += 2;
-          continue;
-        }
-        if (c === ch) break;
-        j += 1;
-      }
-      out += line.slice(i, Math.min(j + 1, line.length));
-      i = j + 1;
+      const { text, nextIndex } = scanStringLiteral(line, i);
+      out += text;
+      i = nextIndex;
       continue;
     }
     if (ch === '/' && next === '/') break;

@@ -230,37 +230,36 @@ export function preheatPipelineWorker(): void {
   }
 }
 
+function terminateChild(child: ChildProcess, pid: number | undefined, gen: number | undefined): void {
+  if (worker !== child || (child as GenChild).gen !== gen) return;
+  try {
+    if (typeof pid === 'number') {
+      try {
+        process.kill(-pid, 'SIGTERM');
+      } catch {
+        child.kill('SIGTERM');
+      }
+    } else {
+      child.kill('SIGTERM');
+    }
+  } catch {}
+  worker = null;
+  ready = false;
+}
+
 function handleJobTimeout(child: ChildProcess, id: string): void {
   const job = pending.get(id);
   if (job) {
     job.cancelled = true;
     job.reject(new Error(`[pipeline-host] 任务超时（${job.timeoutLabel}, ${job.timeoutMs}ms）`));
-    pending.delete(id);
-  } else {
-    pending.delete(id);
   }
+  pending.delete(id);
   try {
     child.send({ type: 'cancel', id });
   } catch {}
   const pid = child.pid;
   const gen = (child as GenChild).gen;
-  setTimeout(() => {
-    if (worker === child && (child as GenChild).gen === gen) {
-      try {
-        if (typeof pid === 'number') {
-          try {
-            process.kill(-pid, 'SIGTERM');
-          } catch {
-            child.kill('SIGTERM');
-          }
-        } else {
-          child.kill('SIGTERM');
-        }
-      } catch {}
-      worker = null;
-      ready = false;
-    }
-  }, CANCEL_GRACE_MS);
+  setTimeout(() => terminateChild(child, pid, gen), CANCEL_GRACE_MS);
 }
 
 /** 发送失败处理：清理定时器与待办任务 */

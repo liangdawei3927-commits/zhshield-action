@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PageShell } from '../components/business/PageShell';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
@@ -44,18 +44,9 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         dimension="performance"
         refreshKey={report}
         icon={
-          <Bounce className="w-14 h-14 rounded-xl bg-warning-50 flex items-center justify-center">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgb(var(--zh-warning))"
-              strokeWidth="2"
-            >
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-          </Bounce>
+          <PageGlyph bg="warning" stroke="warning">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </PageGlyph>
         }
         title={t('page.performance.header.title')}
         action={

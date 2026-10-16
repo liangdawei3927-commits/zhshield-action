@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useT } from '../i18n';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { useGarbagePage } from './garbage-logic';
@@ -25,23 +25,12 @@ interface GarbagePageProps {
 /** 顶行分类图标：绿色垃圾桶（与 GarbageHeader 原标记一致） */
 function GarbageIcon() {
   return (
-    <Bounce className="w-14 h-14 rounded-xl bg-success-50 flex items-center justify-center">
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="rgb(var(--zh-success))"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 6h18" />
-        <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-        <path d="M10 11v6M14 11v6" />
-      </svg>
-    </Bounce>
+    <PageGlyph bg="success" stroke="success" round>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </PageGlyph>
   );
 }
 

@@ -3,7 +3,7 @@ import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon } from '../components/ui/Icons';
 import {
@@ -105,21 +105,10 @@ function GuardReportView({
       dimension="gate"
       refreshKey={report}
       icon={
-        <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgb(var(--zh-brand))"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
-            <path d="M12 6.5l-3 4h2.2L10 14.5l3.5-4.5h-2.2L12 6.5z" />
-          </svg>
-        </Bounce>
+        <PageGlyph bg="brand" stroke="brand" round>
+          <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
+          <path d="M12 6.5l-3 4h2.2L10 14.5l3.5-4.5h-2.2L12 6.5z" />
+        </PageGlyph>
       }
       title={t('nav.guard')}
       action={

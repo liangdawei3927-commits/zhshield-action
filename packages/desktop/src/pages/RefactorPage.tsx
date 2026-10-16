@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
 import { ReportShell } from '../components/business/ReportShell';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useRefactorPage } from './refactor-logic';
@@ -39,18 +39,9 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         dimension="refactor"
         refreshKey={report}
         icon={
-          <Bounce className="w-14 h-14 rounded-xl bg-info-50 flex items-center justify-center">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgb(var(--zh-info))"
-              strokeWidth="2"
-            >
-              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-            </svg>
-          </Bounce>
+          <PageGlyph bg="info" stroke="info">
+            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+          </PageGlyph>
         }
         title={t('page.refactor.header.title')}
         action={

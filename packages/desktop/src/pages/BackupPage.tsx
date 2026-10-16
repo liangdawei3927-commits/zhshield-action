@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
 import { ReportShell } from '../components/business/ReportShell';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useBackupPage } from './backup-logic';
@@ -43,22 +43,11 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
         refreshKey={lastResult}
         containerClassName="h-full w-full bg-zh-bg flex flex-col"
         icon={
-          <Bounce className="w-14 h-14 rounded-xl bg-success-50 flex items-center justify-center">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgb(var(--zh-brand))"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-          </Bounce>
+          <PageGlyph bg="success" stroke="brand" round>
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </PageGlyph>
         }
         title={t('page.backup.title')}
         action={

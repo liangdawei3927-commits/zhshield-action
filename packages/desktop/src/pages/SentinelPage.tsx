@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '../components/business/PageShell';
 import { ReportShell } from '../components/business/ReportShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
@@ -65,21 +65,12 @@ function SentinelReportView({
       dimension="sentinel"
       refreshKey={events}
       icon={
-        <Bounce className="w-14 h-14 rounded-xl bg-info-50 flex items-center justify-center">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgb(var(--zh-info))"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <circle cx="12" cy="12" r="5" strokeWidth="1.2" />
-            <circle cx="12" cy="12" r="1.5" fill="rgb(var(--zh-info))" />
-            <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeWidth="1.2" />
-          </svg>
-        </Bounce>
+        <PageGlyph bg="info" stroke="info">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" strokeWidth="1.2" />
+          <circle cx="12" cy="12" r="1.5" fill="rgb(var(--zh-info))" />
+          <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeWidth="1.2" />
+        </PageGlyph>
       }
       title={t('nav.sentinel')}
       action={

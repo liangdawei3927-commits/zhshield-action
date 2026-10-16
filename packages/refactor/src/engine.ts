@@ -27,6 +27,7 @@ const EXCLUDED_DIRS = new Set([
   'fixtures',
   '__fixtures__',
   'spec',
+  'e2e',
 ]);
 
 function yieldToEventLoop(): Promise<void> {

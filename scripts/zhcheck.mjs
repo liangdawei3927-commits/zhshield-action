@@ -22,7 +22,7 @@
 
 import { parseArgs } from 'node:util';
 import { resolve, relative } from 'path';
-import { existsSync, writeFileSync, chmodSync, statSync } from 'fs';
+import { existsSync, writeFileSync, chmodSync, statSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 
 const PKGS_ROOT = resolve(import.meta.dirname, '..', 'packages');
@@ -36,6 +36,15 @@ function importEngine(name) {
   const p = resolve(PKGS_ROOT, name, 'dist', 'engine.js');
   if (!existsSync(p)) {
     console.error(`zhcheck: engine "${name}" not built. Run pnpm build first.`);
+    process.exit(2);
+  }
+  return import(p);
+}
+
+function importRefactorIndex() {
+  const p = resolve(PKGS_ROOT, 'refactor', 'dist', 'index.js');
+  if (!existsSync(p)) {
+    console.error(`zhcheck: engine "refactor" not built. Run pnpm build first.`);
     process.exit(2);
   }
   return import(p);
@@ -103,7 +112,7 @@ async function runRefactor(files, opts, projectRoot) {
     console.log(JSON.stringify(report, null, 2));
   }
 
-  return { total: report.totalSmells, warnings: warningCount, errors: errorCount };
+  return { total: report.totalSmells, warnings: warningCount, errors: errorCount, report };
 }
 
 /**
@@ -333,8 +342,8 @@ SCRIPT="$(dirname "$0")/../../scripts/zhcheck.mjs"
 ROOT="$(dirname "$0")/../.."
 
 if [ -f "$ROOT/scripts/zhcheck.mjs" ]; then
-  # 默认模式：仅 error 阻断提交，warning/info 为 advisory 提示
-  $NODE "$ROOT/scripts/zhcheck.mjs" --refactor --inspect --staged
+  # 门禁：error 阻断；相对 .refactor-baseline.json 的新增坏味道阻断；存量 warning 为 advisory
+  $NODE "$ROOT/scripts/zhcheck.mjs" --refactor --inspect --staged --baseline --ci
   RESULT=$?
   if [ $RESULT -ne 0 ]; then
     echo ""
@@ -370,6 +379,8 @@ async function main() {
       project: { type: 'string' },
       'install-hooks': { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
+      'write-baseline': { type: 'boolean', default: false },
+      baseline: { type: 'boolean', default: false },
     },
   });
 
@@ -386,6 +397,9 @@ async function main() {
   node scripts/zhcheck.mjs --refactor --file a.ts  # 检查单个文件
   node scripts/zhcheck.mjs --refactor --ci         # CI 模式 (发现问题 exit 1)
   node scripts/zhcheck.mjs --refactor --json       # JSON 格式输出
+  node scripts/zhcheck.mjs --refactor --write-baseline   # 写入重构基线
+  node scripts/zhcheck.mjs --refactor --baseline         # 对比基线（advisory）
+  node scripts/zhcheck.mjs --refactor --baseline --ci    # 对比基线（新增即 exit 1）
   node scripts/zhcheck.mjs --install-hooks         # 安装 pre-commit hook
   node scripts/zhcheck.mjs --refactor --project /path/to/project  # 检查外部项目
 
@@ -452,9 +466,11 @@ Linter 输出格式:
   let grandWarnings = 0;
   let grandErrors = 0;
 
+  let refactorResult = null;
   for (const engine of engines) {
     if (opts.json) console.log(`\n=== ${engine.name} ===`);
     const result = await engine.fn(files, opts, projectRoot);
+    if (engine.name === 'refactor') refactorResult = result;
     grandTotal += result.total;
     grandWarnings += result.warnings;
     grandErrors += result.errors;
@@ -471,6 +487,72 @@ Linter 输出格式:
       if (grandWarnings > 0) parts.push(`\x1b[1;33m${grandWarnings} warnings\x1b[0m`);
       console.log(`zhcheck: 发现 ${parts.join(', ')} 共 ${grandTotal} 个问题。`);
     }
+  }
+
+  // ── Baseline handling ──────────────────
+  if (values['write-baseline']) {
+    if (!refactorResult || !refactorResult.report) {
+      console.error('zhcheck: refactor report not available for baseline write');
+      process.exit(2);
+    }
+    const refactorIdx = await importRefactorIndex();
+    const { countSmellsByFileAndRule } = refactorIdx;
+    const entries = countSmellsByFileAndRule(refactorResult.report, projectRoot);
+    const baseline = {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      entries,
+    };
+    const baselinePath = resolve(projectRoot, '.refactor-baseline.json');
+    writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n');
+    const fileCount = Object.keys(entries).length;
+    const smellCount = Object.values(entries).reduce((sum, m) => sum + Object.values(m).reduce((s, v) => s + v, 0), 0);
+    console.log(`zhcheck: baseline written (${fileCount} files, ${smellCount} smells)`);
+    process.exit(0);
+  }
+
+  if (values.baseline) {
+    const baselinePath = resolve(projectRoot, '.refactor-baseline.json');
+    if (!existsSync(baselinePath)) {
+      console.error('zhcheck: baseline file not found');
+      process.exit(2);
+    }
+    const baseline = JSON.parse(readFileSync(baselinePath, 'utf-8'));
+    if (!refactorResult || !refactorResult.report) {
+      console.error('zhcheck: refactor report not available for baseline diff');
+      process.exit(2);
+    }
+    const refactorIdx = await importRefactorIndex();
+    const { countSmellsByFileAndRule, diffBaseline } = refactorIdx;
+    const current = countSmellsByFileAndRule(refactorResult.report, projectRoot);
+    // 部分扫描（--staged/--file）只覆盖被扫文件：基线须收窄到同一范围，否则未扫描的
+    // 基线文件会因 current 缺项而被误报为 resolved。
+    const scopedBaseline =
+      values.staged || values.file
+        ? Object.fromEntries(
+            Object.entries(baseline.entries || {}).filter(([f]) => f in current),
+          )
+        : baseline.entries || {};
+    const diff = diffBaseline(current, scopedBaseline);
+    const introCount = diff.introduced.length;
+    const resCount = diff.resolved.length;
+    console.log(`zhcheck: baseline diff — introduced: ${introCount}, resolved: ${resCount}`);
+    if (introCount > 0) {
+      console.log('\x1b[1;31mintroduced:\x1b[0m');
+      for (const it of diff.introduced) {
+        console.log(`  ${it.file}: ${it.rule} (current ${it.current}, baseline ${it.baseline})`);
+      }
+    }
+    if (resCount > 0) {
+      console.log('\x1b[1;32mresolved:\x1b[0m');
+      for (const it of diff.resolved) {
+        console.log(`  ${it.file}: ${it.rule} (current ${it.current}, baseline ${it.baseline})`);
+      }
+    }
+    let exitCode = 0;
+    if (grandErrors > 0) exitCode = 1;
+    if (opts.ci && introCount > 0) exitCode = 1;
+    process.exit(exitCode);
   }
 
   // ── Exit code ──────────────────

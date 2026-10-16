@@ -38,6 +38,12 @@ jobs:
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
+      # 重构坏味道基线门禁：仅拦截「相对 .refactor-baseline.json 的新增」，
+      # 存量放行（ratchet）。zhcheck 从 packages/refactor/dist 导入引擎，
+      # 故必须在上一步构建之后运行。
+      - name: Refactor baseline gate
+        run: pnpm check:refactor:ci
+
       # desktop 的 injected 依赖副本在 install 时快照（早于构建，副本内无 dist），
       # 删除后重装让副本带上构建产物，desktop 类型检查才能解析 @zh/* 声明
       - name: Refresh desktop injected dependency copies

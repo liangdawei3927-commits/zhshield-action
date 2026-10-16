@@ -53,12 +53,18 @@ function checkLongMethod(
 ): void {
   const threshold = config.thresholds.maxMethodLines;
   const complexityThreshold = config.thresholds.maxComplexity;
-  if (params.lineCount <= threshold && params.complexity <= complexityThreshold) return;
+  const lineTriggered = params.lineCount > threshold;
+  const complexityTriggered = params.complexity > complexityThreshold;
+  if (!lineTriggered && !complexityTriggered) return;
 
   const parts: string[] = [];
-  if (params.lineCount > threshold) parts.push(`${params.lineCount} 行 (阈值 ${threshold})`);
-  if (params.complexity > complexityThreshold)
+  if (lineTriggered) parts.push(`${params.lineCount} 行 (阈值 ${threshold})`);
+  if (complexityTriggered)
     parts.push(`圈复杂度 ${params.complexity} (阈值 ${complexityThreshold})`);
+
+  // 主触发度量：context.value 与 context.threshold 必须同口径，否则复杂度单独
+  // 触发时会呈现 value(37) < threshold(80) 的观感误报。
+  const byComplexityOnly = complexityTriggered && !lineTriggered;
 
   smells.push(
     makeSmell({
@@ -68,9 +74,9 @@ function checkLongMethod(
       filePath: parsed.filePath,
       line: params.nodeLine,
       column: 1,
-      metric: 'methodLineCount',
-      value: Math.max(params.lineCount, params.complexity),
-      threshold: Math.max(threshold, complexityThreshold),
+      metric: byComplexityOnly ? 'cyclomaticComplexity' : 'methodLineCount',
+      value: byComplexityOnly ? params.complexity : params.lineCount,
+      threshold: byComplexityOnly ? complexityThreshold : threshold,
       suggestion: {
         type: 'Extract Method',
         description: `将 ${params.container}${params.name} 按职责拆分为多个小函数，每个不超过 ${threshold} 行`,

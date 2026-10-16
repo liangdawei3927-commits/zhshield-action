@@ -9,6 +9,8 @@ export {
   findDuplicateCodeBlocks,
 } from './ast-helper';
 export { ALL_DETECTORS } from './adapters/index';
+export { countSmellsByFileAndRule, diffBaseline } from './baseline';
+export type { RefactorBaseline } from './baseline';
 
 export type {
   CodeSmell,

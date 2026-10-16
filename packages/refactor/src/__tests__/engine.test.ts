@@ -74,6 +74,45 @@ describe('detectLongMethod', () => {
   });
 });
 
+describe('long-method metric 口径 (TDD)', () => {
+  async function longMethodSmells(
+    filePaths: string[],
+    thresholds: Partial<typeof DEFAULT_CONFIG.thresholds>,
+  ) {
+    const engine = new RefactorEngine({
+      enabledRules: ['long-method'],
+      thresholds: { ...DEFAULT_CONFIG.thresholds, ...thresholds },
+    });
+    const report = await engine.analyzeFiles('/tmp', filePaths);
+    return report.files.flatMap((f) => f.smells.filter((s) => s.ruleId === 'long-method'));
+  }
+
+  it('圈复杂度单独触发时上报 cyclomaticComplexity 且 value/threshold 同口径', async () => {
+    const smells = await longMethodSmells([path.join(FIXTURES_DIR, 'deep-nesting.fixture.ts')], {
+      maxMethodLines: 10000,
+      maxComplexity: 1,
+    });
+    expect(smells.length).toBeGreaterThanOrEqual(1);
+    for (const s of smells) {
+      expect(s.context.metric).toBe('cyclomaticComplexity');
+      expect(s.context.threshold).toBe(1);
+      expect(s.context.value).toBeGreaterThan(s.context.threshold);
+    }
+  });
+
+  it('行数单独触发时上报 methodLineCount 且 value/threshold 同口径', async () => {
+    const smells = await longMethodSmells([path.join(FIXTURES_DIR, 'long-method.fixture.ts')], {
+      maxMethodLines: 10,
+      maxComplexity: 10000,
+    });
+    expect(smells.length).toBeGreaterThanOrEqual(1);
+    for (const s of smells) {
+      expect(s.context.metric).toBe('methodLineCount');
+      expect(s.context.value).toBeGreaterThan(s.context.threshold);
+    }
+  });
+});
+
 describe('detectLargeClass', () => {
   it('returns empty for small fixture classes', () => {
     const parsed = parseFile(path.join(FIXTURES_DIR, 'long-method.fixture.ts'));

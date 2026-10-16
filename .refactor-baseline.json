@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-15T17:05:11.446Z",
+  "entries": {
+    "packages/autoperf/src/adapter.ts": {
+      "duplicated-code": 1
+    },
+    "packages/dependency/src/adapters/npm-outdated.ts": {
+      "lazy-class": 1
+    },
+    "packages/fingerprint/src/profiler-form.ts": {
+      "data-clumps": 1
+    },
+    "packages/fingerprint/src/profiler.ts": {
+      "primitive-obsession": 1
+    },
+    "packages/kernel/src/backup/local-backup.ts": {
+      "primitive-obsession": 1
+    },
+    "packages/kernel/src/sop/_meta/dynamic-severity-config.ts": {
+      "lazy-class": 1
+    },
+    "packages/kernel/src/sop/_meta/sop-rule-index.ts": {
+      "primitive-obsession": 1
+    },
+    "packages/kernel/src/sop/sync/retry.ts": {
+      "lazy-class": 1
+    },
+    "packages/scoring/src/project-scoring-config.ts": {
+      "lazy-class": 1
+    },
+    "packages/security/src/garbage-scanner.ts": {
+      "lazy-class": 1
+    },
+    "packages/sentinel/src/file-monitor.ts": {
+      "primitive-obsession": 1
+    },
+    "packages/sentinel/src/process-monitor.ts": {
+      "primitive-obsession": 1
+    },
+    "packages/server/src/admin/admin-pages.controller.ts": {
+      "data-clumps": 1
+    },
+    "packages/server/src/sop/sop-content-admin.shared.ts": {
+      "lazy-class": 1
+    },
+    "packages/shared/src/security/safe-path.ts": {
+      "lazy-class": 1
+    },
+    "packages/reporter/src/console-reporter-rule-engine.ts": {
+      "data-clumps": 2
+    },
+    "packages/reporter/src/console-reporter-sections.ts": {
+      "data-clumps": 2
+    },
+    "packages/desktop/electron/garbage-input.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ipc/backup.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ipc/dashboard-state.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ipc/e2e-observation.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ipc/guard-config.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/pipeline-host.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/pipeline-report.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/profile-host.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/profile-worker.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/business/HealthRing.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/business/ScoreRing.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/layout/Sidebar.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/layout/TopNav.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/ui/Icons.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/contexts/NotificationContext.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/InspectPage.tsx": {
+      "mixed-responsibilities": 1
+    },
+    "packages/desktop/src/pages/RefactorPage.tsx": {
+      "long-method": 1
+    },
+    "packages/desktop/src/pages/ScreensaverPage.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/backup-empty-state.tsx": {
+      "mixed-responsibilities": 1
+    },
+    "packages/desktop/src/pages/backup-logic.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/desktop/src/pages/dependency-cards.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/refactor-empty-state.tsx": {
+      "mixed-responsibilities": 1
+    },
+    "packages/desktop/src/pages/reports-parts.tsx": {
+      "long-method": 1
+    },
+    "packages/desktop/src/pages/secrets-parts.tsx": {
+      "long-method": 1
+    },
+    "packages/desktop/src/pages/tech-debt-parts.tsx": {
+      "oversized-file": 1
+    },
+    "packages/fingerprint/src/detectors/form-detector.ts": {
+      "long-method": 1
+    },
+    "packages/fingerprint/src/detectors/manifest-detector.ts": {
+      "oversized-file": 1
+    },
+    "packages/fingerprint/src/profiler-target.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/garbage/src/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/eslint-adapter.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/inspect/src/adapters/gitleaks-adapter.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/inspect/src/adapters/semgrep-adapter.ts": {
+      "feature-envy": 1
+    },
+    "packages/inspect/src/adapters/semgrep-rule-writer.ts": {
+      "feature-envy": 1
+    },
+    "packages/inspect/src/adapters/ts-prune-adapter.ts": {
+      "oversized-file": 1
+    },
+    "packages/inspect/src/adapters/typescript-adapter.ts": {
+      "feature-envy": 1
+    },
+    "packages/inspect/src/ai-code/files.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/engine.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/notification/service.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/runner/dispatch-evaluators.ts": {
+      "oversized-file": 1
+    },
+    "packages/kernel/src/runner/inline-evaluators.ts": {
+      "oversized-file": 1
+    },
+    "packages/kernel/src/scheduler/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/cache/sop-conflict-policy.ts": {
+      "data-class": 1
+    },
+    "packages/kernel/src/sop/quality/rule-accuracy.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/performance/src/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/pipeline/src/pipeline-runner.ts": {
+      "oversized-file": 1
+    },
+    "packages/reporter/src/console-reporter.ts": {
+      "feature-envy": 1
+    },
+    "packages/reporter/src/machine-formatters.ts": {
+      "duplicated-code": 1
+    },
+    "packages/scoring/src/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/security/src/security-check-engine.ts": {
+      "long-method": 1
+    },
+    "packages/sentinel/src/health-probe.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/server/src/sop/sop.service.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/shared/src/garbage-scan.ts": {
+      "mixed-responsibilities": 1
+    },
+    "packages/shared/src/types.ts": {
+      "oversized-file": 1
+    },
+    "packages/desktop/electron/task-manager.ts": {
+      "duplicated-code": 1,
+      "primitive-obsession": 1
+    },
+    "packages/security/src/secrets/lifecycle.ts": {
+      "oversized-file": 1,
+      "lazy-class": 1
+    },
+    "packages/cli/src/index.ts": {
+      "long-method": 1,
+      "oversized-file": 1
+    },
+    "packages/db/src/queries.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ipc/scheduler.ts": {
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/App.tsx": {
+      "long-method": 2
+    },
+    "packages/desktop/src/components/layout/sidebar-status.tsx": {
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/components/layout/title-bar.tsx": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/BackupPage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/PerformancePage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/SecurityPage.tsx": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/dependency-parts.tsx": {
+      "oversized-file": 1,
+      "oversized-component": 1
+    },
+    "packages/desktop/src/pages/guard-parts.tsx": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/profile-store.ts": {
+      "duplicated-code": 2
+    },
+    "packages/inspect/src/adapters/jscpd-adapter.ts": {
+      "long-method": 1,
+      "feature-envy": 1
+    },
+    "packages/performance/src/adapters/ast-scan.ts": {
+      "long-method": 1,
+      "mixed-responsibilities": 1
+    },
+    "packages/refactor/src/adapters/scale-detectors.ts": {
+      "long-method": 1,
+      "mixed-responsibilities": 1
+    },
+    "packages/refactor/src/ast-helper.ts": {
+      "long-method": 1,
+      "oversized-file": 1
+    },
+    "packages/scoring/src/pipeline-score.ts": {
+      "long-method": 1,
+      "oversized-file": 1
+    },
+    "packages/kernel/src/sop/security/sop-signer.ts": {
+      "feature-envy": 2,
+      "data-clumps": 1
+    },
+    "packages/dependency/src/adapters/env-consistency.ts": {
+      "long-method": 2,
+      "oversized-file": 1
+    },
+    "packages/dependency/src/graph-builder.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/electron/ipc/feedback.ts": {
+      "duplicated-code": 3
+    },
+    "packages/desktop/electron/orphan-reconcile.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/electron/preload.ts": {
+      "duplicated-code": 3
+    },
+    "packages/desktop/src/app-logic.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/EvolvePage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/GuardPage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/TechDebtPage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 2
+    },
+    "packages/server/src/scoring/scoring.service.ts": {
+      "duplicated-code": 2,
+      "feature-envy": 1
+    },
+    "packages/dependency/src/adapters/lockfile-verifier.ts": {
+      "long-method": 1,
+      "oversized-file": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/electron/zh-diagnostics.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 3
+    },
+    "packages/desktop/src/components/layout/sidebar-interactive.tsx": {
+      "long-method": 2,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/GarbagePage.tsx": {
+      "long-method": 1,
+      "mixed-responsibilities": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/WelcomePage.tsx": {
+      "duplicated-code": 4
+    },
+    "packages/desktop/src/pages/SentinelPage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 4
+    },
+    "packages/desktop/src/pages/DependencyPage.tsx": {
+      "long-method": 1,
+      "duplicated-code": 5
+    },
+    "packages/desktop/electron/ipc/engines.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 6
+    },
+    "packages/desktop/src/components/onboarding/ProjectOnboardingPage.tsx": {
+      "long-method": 2,
+      "oversized-file": 1,
+      "duplicated-code": 5
+    },
+    "packages/desktop/src/services/engineApi.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 9
+    }
+  }
+}

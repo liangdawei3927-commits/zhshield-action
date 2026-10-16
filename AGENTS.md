@@ -93,3 +93,34 @@ rm -rf packages/<消费者包>/node_modules && pnpm install --prefer-offline   #
 - **工具探测**：inspect adapters 使用 `packages/inspect/src/adapters/tool-bin.ts` 的 `resolveToolCommand()` 做 PATH + node_modules/.bin 二级解析
 - **路径拼接安全（防路径穿越 CWE-22）**：任何拼接可能涉及外部/不可信片段（用户输入、HTTP 请求参数、文件名、仓库名、扫描目标等）的文件路径，必须使用 `@zh/shared` 的 `safeJoin(base, ...segments)` / `safeResolve(base, target)`，**禁止**直接用 `path.join` / `path.resolve` 拼接不可信片段。`safeJoin`/`safeResolve` 在目标逃出 `base` 时抛出 `PathTraversalError`。回归用例见各包 `src/__tests__/safe-path-regression.test.ts`；CI 巡检由 `packages/kernel/assets/semgrep/path-traversal.yml` 规则抽查（report-only）。注意：`safeJoin`/`safeResolve` 仅做词法校验（不解析 symlink）；当 `base` 可能包含不可信 symlink（如扫描不可信仓库、或路径来自 workspace/manifest 输入）时，改用 `safeJoinReal`（realpath 包含性校验）。
 - **无新依赖**：不引入任何新的 npm 包，所有功能使用 Node.js 内置 API
+
+## 重构健康度治理（Refactor Health Governance）
+
+本仓库已引入 zhcheck 重构坏味道巡检 + **基线（baseline）+ ratchet 门禁**机制，用于防止坏味道回退并逐步收敛存量。
+
+### 基线与门禁
+- **基线文件**：`.refactor-baseline.json`（已提交）。记录当前存量坏味道：`{ "entries": { "<file>": { "<rule>": count, ... } }, "meta": {...} }`。
+- **生成/更新基线**：`pnpm baseline:write`（等同 `node scripts/zhcheck.mjs --refactor --write-baseline`）
+- **本地门禁（推荐）**：`pnpm check:staged`（`--refactor --inspect --staged --baseline --ci`）——仅对**新增**坏味道阻断提交。
+- **全量校验**：`pnpm check:refactor:ci`（`--refactor --baseline --ci`）
+- **语义**：`--baseline` 加载基线；`--ci` 时，若 `introduced > 0` 则 `exit 1`。存量坏味道（`resolved`）**不**阻断。`--staged` 模式会将基线收窄到被扫描文件，避免误报已修复文件。
+
+### DoD（Definition of Done，坏味道预算）
+修改代码前后必须满足：
+- [ ] **类型检查全绿**：`node scripts/typecheck.mjs` 全部 21 包通过（或仅改动包 `tsc --noEmit` 通过且不影响上游类型）
+- [ ] **相关测试全绿**：受影响包的 Vitest 全部通过（refactor 包改动需 `pnpm --filter @zh/refactor test` 全绿）
+- [ ] **重构门禁通过**：`node scripts/zhcheck.mjs --refactor --baseline --ci`（全量）或 `pnpm check:staged`（暂存区）均需 `baseline diff — introduced: 0` 且退出码 0
+- [ ] **最小改动**：优先抽取私有函数/常量消除重复，**不要**顺手大规模重命名、格式化无关代码
+- [ ] **行为不变**：修复坏味道时不得改变公开 API、业务逻辑或 I/O 语义
+- [ ] **验证证据**：必要时附上前后对比（行数、坏味道计数）并确保 lsp_diagnostics 在改动文件上清零
+
+### 新文件约束
+- **不得引入新增坏味道**：新增文件的坏味道计入 `introduced`，将直接触发门禁。原则上新增文件应**零**长方法（>80 行）、零超大文件（>400 行）、零文件内/跨文件高重复。
+- **复用优先**：优先复用 `packages/shared` 已有工具（如 `escapeRegExp` 已集中于 `@zh/shared`），避免复制常量/正则。
+- **e2e 豁免**：`packages/desktop/e2e/**` 已从 refactor 扫描范围排除（目录名匹配），但**产品代码**不得通过新增到 e2e 目录规避门禁。
+- **谨慎豁免**：IPC 镜像等架构强制对（triage A 类）已由基线冻结。一般不新增引擎级 `ignoreGlobs`，仅在真实复用需求且有充足理由时再评估。
+
+### 长期原则
+- **分数非 KPI，净减少存量才是 KPI**：门禁只看「新增」（introduced），旨在**只降不升**，而非一味刷分。
+- **小步迭代**：每次改动聚焦单个文件或极小范围，逐文件验证。大型页面重构需拆分为多次提交。
+- **基线严肃对待**：`.refactor-baseline.json` 与治理改动一同提交。**不要**擅自重写基线来“通过”门禁；只有在**已验证修复**存量坏味道且改动范围可控时，才考虑配合 `baseline:write` 更新基线。

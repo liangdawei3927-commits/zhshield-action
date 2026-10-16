@@ -5,15 +5,17 @@ import {
   DependencyLockfileCard,
   DependencyTrustCard,
   DependencyLicenseCard,
-  DependencyTyposquatCard,
-  DependencyLockfileVerificationCard,
-  DependencyUpgradeCard,
   DependencyEnvCard,
   DependencyOutdatedCard,
   DependencyGraphGlyph,
 } from './dependency-parts';
+import {
+  DependencyTyposquatCard,
+  DependencyLockfileVerificationCard,
+  DependencyUpgradeCard,
+} from './dependency-cards';
 import { ReportShell } from '../components/business/ReportShell';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
@@ -48,20 +50,9 @@ function DependencyReportView({
       dimension="dependencies"
       refreshKey={report}
       icon={
-        <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgb(var(--zh-brand))"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <DependencyGraphGlyph />
-          </svg>
-        </Bounce>
+        <PageGlyph bg="brand" stroke="brand" round>
+          <DependencyGraphGlyph />
+        </PageGlyph>
       }
       title={t('page.deps.done')}
       action={

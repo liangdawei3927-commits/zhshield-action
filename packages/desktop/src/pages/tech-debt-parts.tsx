@@ -134,6 +134,181 @@ export function TechDebtCategoryCard({
   );
 }
 
+type TechDebtAction = TechDebtReportData['actionList'][number];
+
+type TechDebtConfigEntry = { color: string; bg: string; labelKey: string };
+
+/** 头部行：模块名 + 类别徽章 + 推荐徽章 + 复制到 AI + 状态文本 */
+function TechDebtActionHeader({
+  action,
+  catCfg,
+  statusCfg,
+  onCopyToAi,
+}: {
+  action: TechDebtAction;
+  catCfg: TechDebtConfigEntry;
+  statusCfg: TechDebtConfigEntry;
+  onCopyToAi?: (action: TechDebtAction) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium text-zh-ink-2 truncate" title={action.module}>
+        {action.module}
+      </span>
+      <span
+        className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
+        style={{ background: catCfg.bg, color: catCfg.color }}
+      >
+        {t(catCfg.labelKey)}
+      </span>
+      {action.recommended && (
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-50 text-brand-700 shrink-0">
+          {t('page.techdebt.recommended')}
+        </span>
+      )}
+      <CopyToAiButton className="ml-auto" onClick={() => onCopyToAi?.(action)} />
+      <span className="text-[11px] shrink-0" style={{ color: statusCfg.color }}>
+        {t(statusCfg.labelKey)}
+      </span>
+    </div>
+  );
+}
+
+/** 指标行：ROI / 利息分 / 本金估算 + 利息明细展开开关 */
+function TechDebtActionMetrics({
+  action,
+  open,
+  onToggle,
+}: {
+  action: TechDebtAction;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-2 flex items-center gap-4">
+      <span className="text-sm font-bold text-zh-ink">
+        {t('page.techdebt.roi', { roi: action.roi })}
+      </span>
+      <span className="text-xs text-zh-muted">
+        {t('page.techdebt.interestScore', { score: action.interestScore })}
+      </span>
+      <span className="text-xs text-zh-muted">
+        {t('page.techdebt.principalEstimate', { value: action.principalEstimate })}
+      </span>
+      <button
+        onClick={onToggle}
+        className="ml-auto flex items-center gap-1 text-xs font-medium text-zh-ink-2 bg-zh-panel px-2.5 py-1 rounded-lg border-none cursor-pointer hover:bg-zh-line transition-colors"
+      >
+        {t('page.techdebt.interestBreakdown')}
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/** 操作按钮区域：pending → 计划偿还，planned/in-progress → 验证完成 */
+function TechDebtActionButtons({
+  action,
+  onPlan,
+  onVerify,
+  onDismiss,
+  planLoading,
+  verifyLoading,
+}: {
+  action: TechDebtAction;
+  onPlan?: (actionId: string) => void;
+  onVerify?: (actionId: string) => void;
+  onDismiss?: (actionId: string) => void;
+  planLoading?: boolean;
+  verifyLoading?: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-3 pt-3 border-t border-zh-line flex items-center gap-2">
+      {action.status === 'pending' && (
+        <button
+          onClick={() => onPlan?.(action.actionId)}
+          disabled={planLoading}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
+          style={{
+            background: 'rgb(var(--zh-info) / 0.1)',
+            color: 'rgb(var(--zh-info))',
+            opacity: planLoading ? 0.6 : 1,
+          }}
+        >
+          {planLoading ? t('page.techdebt.action.planning') : t('page.techdebt.action.plan')}
+        </button>
+      )}
+      {(action.status === 'planned' || action.status === 'in-progress') && (
+        <button
+          onClick={() => onVerify?.(action.actionId)}
+          disabled={verifyLoading}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
+          style={{
+            background: 'rgb(var(--zh-success) / 0.1)',
+            color: 'rgb(var(--zh-success-700))',
+            opacity: verifyLoading ? 0.6 : 1,
+          }}
+        >
+          {verifyLoading ? t('page.techdebt.action.verifying') : t('page.techdebt.action.verify')}
+        </button>
+      )}
+      <button
+        onClick={() => onDismiss?.(action.actionId)}
+        className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors ml-auto"
+        style={{ background: 'rgb(var(--zh-muted) / 0.08)', color: 'rgb(var(--zh-muted))' }}
+      >
+        {t('page.techdebt.action.dismiss')}
+      </button>
+    </div>
+  );
+}
+
+/** 利息四因子明细网格（展开显示） */
+function TechDebtInterestBreakdown({ action }: { action: TechDebtAction }) {
+  const t = useT();
+  return (
+    <div className="mt-3 pt-3 border-t border-zh-line grid grid-cols-4 gap-4">
+      {INTEREST_FACTOR_CONFIG.map((factor) => {
+        const value = action.interestBreakdown[factor.key];
+        return (
+          <div key={factor.key}>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] text-zh-muted">{t(factor.labelKey)}</span>
+              <span className="text-xs font-semibold" style={{ color: factor.color }}>
+                {value}
+              </span>
+            </div>
+            <div className="mt-1 h-1 rounded-full bg-zh-panel overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, (value / INTEREST_FACTOR_MAX) * 100)}%`,
+                  background: factor.color,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** 单条偿还建议：ROI + 模块 + 类别 + 本金（估算）+ 利息四因子（可展开）+ 操作按钮 */
 function TechDebtActionItem({
   action,
@@ -144,140 +319,40 @@ function TechDebtActionItem({
   planLoading,
   verifyLoading,
 }: {
-  action: TechDebtReportData['actionList'][number];
-  onCopyToAi?: (action: TechDebtReportData['actionList'][number]) => void;
+  action: TechDebtAction;
+  onCopyToAi?: (action: TechDebtAction) => void;
   onPlan?: (actionId: string) => void;
   onVerify?: (actionId: string) => void;
   onDismiss?: (actionId: string) => void;
   planLoading?: boolean;
   verifyLoading?: boolean;
 }) {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const catCfg = DEBT_CATEGORY_CONFIG[action.category] ?? DEBT_CATEGORY_CONFIG.duplication;
   const statusCfg = ACTION_STATUS_CONFIG[action.status] ?? ACTION_STATUS_CONFIG.pending;
   return (
     <ResultCard>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-zh-ink-2 truncate" title={action.module}>
-          {action.module}
-        </span>
-        <span
-          className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
-          style={{ background: catCfg.bg, color: catCfg.color }}
-        >
-          {t(catCfg.labelKey)}
-        </span>
-        {action.recommended && (
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-50 text-brand-700 shrink-0">
-            {t('page.techdebt.recommended')}
-          </span>
-        )}
-        <CopyToAiButton className="ml-auto" onClick={() => onCopyToAi?.(action)} />
-        <span className="text-[11px] shrink-0" style={{ color: statusCfg.color }}>
-          {t(statusCfg.labelKey)}
-        </span>
-      </div>
-      <div className="mt-2 flex items-center gap-4">
-        <span className="text-sm font-bold text-zh-ink">
-          {t('page.techdebt.roi', { roi: action.roi })}
-        </span>
-        <span className="text-xs text-zh-muted">
-          {t('page.techdebt.interestScore', { score: action.interestScore })}
-        </span>
-        <span className="text-xs text-zh-muted">
-          {t('page.techdebt.principalEstimate', { value: action.principalEstimate })}
-        </span>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="ml-auto flex items-center gap-1 text-xs font-medium text-zh-ink-2 bg-zh-panel px-2.5 py-1 rounded-lg border-none cursor-pointer hover:bg-zh-line transition-colors"
-        >
-          {t('page.techdebt.interestBreakdown')}
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-      </div>
+      <TechDebtActionHeader
+        action={action}
+        catCfg={catCfg}
+        statusCfg={statusCfg}
+        onCopyToAi={onCopyToAi}
+      />
+      <TechDebtActionMetrics action={action} open={open} onToggle={() => setOpen((v) => !v)} />
       {/* 操作按钮区域：pending → 计划偿还，planned/in-progress → 验证完成，repaid/dismissed → 不显示 */}
       {(action.status === 'pending' ||
         action.status === 'planned' ||
         action.status === 'in-progress') && (
-        <div className="mt-3 pt-3 border-t border-zh-line flex items-center gap-2">
-          {action.status === 'pending' && (
-            <button
-              onClick={() => onPlan?.(action.actionId)}
-              disabled={planLoading}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
-              style={{
-                background: 'rgb(var(--zh-info) / 0.1)',
-                color: 'rgb(var(--zh-info))',
-                opacity: planLoading ? 0.6 : 1,
-              }}
-            >
-              {planLoading ? t('page.techdebt.action.planning') : t('page.techdebt.action.plan')}
-            </button>
-          )}
-          {(action.status === 'planned' || action.status === 'in-progress') && (
-            <button
-              onClick={() => onVerify?.(action.actionId)}
-              disabled={verifyLoading}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors"
-              style={{
-                background: 'rgb(var(--zh-success) / 0.1)',
-                color: 'rgb(var(--zh-success-700))',
-                opacity: verifyLoading ? 0.6 : 1,
-              }}
-            >
-              {verifyLoading
-                ? t('page.techdebt.action.verifying')
-                : t('page.techdebt.action.verify')}
-            </button>
-          )}
-          <button
-            onClick={() => onDismiss?.(action.actionId)}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors ml-auto"
-            style={{ background: 'rgb(var(--zh-muted) / 0.08)', color: 'rgb(var(--zh-muted))' }}
-          >
-            {t('page.techdebt.action.dismiss')}
-          </button>
-        </div>
+        <TechDebtActionButtons
+          action={action}
+          onPlan={onPlan}
+          onVerify={onVerify}
+          onDismiss={onDismiss}
+          planLoading={planLoading}
+          verifyLoading={verifyLoading}
+        />
       )}
-      {open && (
-        <div className="mt-3 pt-3 border-t border-zh-line grid grid-cols-4 gap-4">
-          {INTEREST_FACTOR_CONFIG.map((factor) => {
-            const value = action.interestBreakdown[factor.key];
-            return (
-              <div key={factor.key}>
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-[11px] text-zh-muted">{t(factor.labelKey)}</span>
-                  <span className="text-xs font-semibold" style={{ color: factor.color }}>
-                    {value}
-                  </span>
-                </div>
-                <div className="mt-1 h-1 rounded-full bg-zh-panel overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min(100, (value / INTEREST_FACTOR_MAX) * 100)}%`,
-                      background: factor.color,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {open && <TechDebtInterestBreakdown action={action} />}
     </ResultCard>
   );
 }

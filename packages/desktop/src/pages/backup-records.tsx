@@ -8,6 +8,73 @@ import { NavIcon } from '../components/ui/Icons';
 import { useToast } from '../components/ui/Toast';
 import { useT } from '../i18n';
 
+/** 备份记录展开详情：备份 ID / 触发方式 / GitHub / 本地路径 / 大小 / 文件数 / 错误 */
+function BackupRecordDetail({
+  record,
+  snapshot,
+  onOpenFolder,
+  t,
+}: {
+  record: BackupRecordData;
+  snapshot: string | null;
+  onOpenFolder: (target: string) => void;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <div className="px-4 pb-3 pt-1 text-xs bg-zh-panel text-zh-muted">
+      <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+        <div>{t('page.backup.detail.backupId', { id: record.id })}</div>
+        <div>
+          {t('page.backup.detail.trigger', {
+            mode:
+              record.trigger === 'manual'
+                ? t('page.backup.trigger.manual')
+                : record.trigger === 'schedule'
+                  ? t('page.backup.trigger.schedule')
+                  : 'API',
+          })}
+        </div>
+        {record.githubRepoUrl && (
+          <div>
+            {t('page.backup.detail.github')}
+            <a href={record.githubRepoUrl} target="_blank" className="text-info-500">
+              {record.githubRepoUrl}
+            </a>
+          </div>
+        )}
+        {record.githubCommitHash && (
+          <div>{t('page.backup.detail.commit', { hash: record.githubCommitHash.slice(0, 7) })}</div>
+        )}
+        {snapshot && (
+          <div className="flex items-center gap-2">
+            <span>{t('page.backup.detail.localPath', { path: snapshot })}</span>
+            <button
+              onClick={() => {
+                void onOpenFolder(snapshot);
+              }}
+              className="inline-flex items-center gap-1 text-xs text-info-500 hover:underline cursor-pointer border-none bg-transparent"
+            >
+              <NavIcon id="folder" size={14} />
+              {t('page.backup.openFolder')}
+            </button>
+          </div>
+        )}
+        {record.backupSize != null && (
+          <div>{t('page.backup.detail.size', { size: formatSize(record.backupSize) })}</div>
+        )}
+        {record.fileCount != null && (
+          <div>{t('page.backup.detail.fileCount', { count: record.fileCount })}</div>
+        )}
+        {record.error && (
+          <div className="col-span-2 text-danger-500">
+            {t('page.backup.detail.error', { error: record.error })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BackupRecordRow({
   record,
   isExpanded,
@@ -78,59 +145,7 @@ function BackupRecordRow({
         </div>
       </div>
       {isExpanded && (
-        <div className="px-4 pb-3 pt-1 text-xs bg-zh-panel text-zh-muted">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
-            <div>{t('page.backup.detail.backupId', { id: record.id })}</div>
-            <div>
-              {t('page.backup.detail.trigger', {
-                mode:
-                  record.trigger === 'manual'
-                    ? t('page.backup.trigger.manual')
-                    : record.trigger === 'schedule'
-                      ? t('page.backup.trigger.schedule')
-                      : 'API',
-              })}
-            </div>
-            {record.githubRepoUrl && (
-              <div>
-                {t('page.backup.detail.github')}
-                <a href={record.githubRepoUrl} target="_blank" className="text-info-500">
-                  {record.githubRepoUrl}
-                </a>
-              </div>
-            )}
-            {record.githubCommitHash && (
-              <div>
-                {t('page.backup.detail.commit', { hash: record.githubCommitHash.slice(0, 7) })}
-              </div>
-            )}
-            {snapshot && (
-              <div className="flex items-center gap-2">
-                <span>{t('page.backup.detail.localPath', { path: snapshot })}</span>
-                <button
-                  onClick={() => {
-                    void openFolder(snapshot);
-                  }}
-                  className="inline-flex items-center gap-1 text-xs text-info-500 hover:underline cursor-pointer border-none bg-transparent"
-                >
-                  <NavIcon id="folder" size={14} />
-                  {t('page.backup.openFolder')}
-                </button>
-              </div>
-            )}
-            {record.backupSize != null && (
-              <div>{t('page.backup.detail.size', { size: formatSize(record.backupSize) })}</div>
-            )}
-            {record.fileCount != null && (
-              <div>{t('page.backup.detail.fileCount', { count: record.fileCount })}</div>
-            )}
-            {record.error && (
-              <div className="col-span-2 text-danger-500">
-                {t('page.backup.detail.error', { error: record.error })}
-              </div>
-            )}
-          </div>
-        </div>
+        <BackupRecordDetail record={record} snapshot={snapshot} onOpenFolder={openFolder} t={t} />
       )}
     </BounceCard>
   );

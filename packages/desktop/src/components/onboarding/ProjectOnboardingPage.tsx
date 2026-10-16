@@ -2,6 +2,14 @@ import { useState, useEffect, type Dispatch, type SetStateAction, type ReactNode
 import { ShieldLogo } from '../ui/Icons';
 import { EngineStatusIndicator } from '../ui/EngineStatusIndicator';
 import { useT } from '../../i18n';
+import {
+  AnalyzeStepIcon,
+  ConfirmStepIcon,
+  ProfileStepIcon,
+  SkillsStepIcon,
+  PresetStepIcon,
+  ReadyStepIcon,
+} from './step-icons';
 
 interface ProjectOnboardingPageProps {
   projectName: string;
@@ -78,6 +86,112 @@ interface BuildStepsParams {
   onToolsStatus: (status: ToolsStatusSummary | null) => void;
 }
 
+/** 轮询等待布尔标志变为 true（100ms 间隔，命中后清除定时器再 resolve） */
+function waitForFlag(getFlag: () => boolean): Promise<void> {
+  return new Promise((resolve) => {
+    const check = setInterval(() => {
+      if (getFlag()) {
+        clearInterval(check);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+function analyzeStep(
+  projectPath: string,
+  onProfileDetected: (summary: OnboardingProfileSummary | null) => void,
+): Step {
+  return {
+    id: 'analyze',
+    labelKey: 'page.onboarding.step.analyze',
+    execute: async () => {
+      const result = await window.electronAPI?.engine?.runProfile(projectPath);
+      onProfileDetected(toProfileSummary(result));
+    },
+    icon: <AnalyzeStepIcon />,
+  };
+}
+
+function confirmStep(profileDetected: boolean, profileConfirmed: boolean): Step {
+  return {
+    id: 'confirm',
+    labelKey: 'page.onboarding.step.confirm',
+    execute: async () => {
+      // 画像未识别（null）时无需确认，直接进入同步；已识别则等待用户确认
+      if (!profileDetected) return;
+      await waitForFlag(() => profileConfirmed);
+    },
+    icon: <ConfirmStepIcon />,
+  };
+}
+
+function profileStep(
+  projectPath: string,
+  onRuleSyncResult: (summary: RuleSyncSummary) => void,
+  onToolsStatus: (status: ToolsStatusSummary | null) => void,
+): Step {
+  return {
+    id: 'profile',
+    labelKey: 'page.onboarding.step.profile',
+    execute: async () => {
+      await window.electronAPI?.sync?.syncRules();
+      const outcome = await window.electronAPI?.sync?.resolveRules();
+      onRuleSyncResult({
+        ok: outcome?.ok ?? false,
+        total: outcome?.total ?? 0,
+        changedCount: outcome?.changed?.length ?? 0,
+      });
+      // 工具就绪探测（云端清单优先；失败/离线时主进程降级本地默认）
+      try {
+        const status = await window.electronAPI?.tools?.status(projectPath);
+        onToolsStatus(status ?? null);
+      } catch {
+        onToolsStatus(null);
+      }
+    },
+    icon: <ProfileStepIcon />,
+  };
+}
+
+function skillsStep(): Step {
+  return {
+    id: 'skills',
+    labelKey: 'page.onboarding.step.skills',
+    execute: async () => {
+      await window.electronAPI?.sop?.getStats();
+    },
+    icon: <SkillsStepIcon />,
+  };
+}
+
+function presetStep(presetConfirmed: boolean): Step {
+  return {
+    id: 'preset',
+    labelKey: 'page.onboarding.step.preset',
+    execute: async () => {
+      if (!presetConfirmed) {
+        await waitForFlag(() => presetConfirmed);
+      }
+    },
+    icon: <PresetStepIcon />,
+  };
+}
+
+function readyStep(projectPath: string, selectedPreset: string | null): Step {
+  return {
+    id: 'ready',
+    labelKey: 'page.onboarding.step.ready',
+    execute: async () => {
+      await window.electronAPI?.engine?.runPipeline(projectPath, {
+        sop: true,
+        presetName: selectedPreset || undefined,
+      });
+    },
+    icon: <ReadyStepIcon />,
+  };
+}
+
 function buildSteps({
   projectPath,
   presetConfirmed,
@@ -89,177 +203,12 @@ function buildSteps({
   onToolsStatus,
 }: BuildStepsParams): Step[] {
   return [
-    {
-      id: 'analyze',
-      labelKey: 'page.onboarding.step.analyze',
-      execute: async () => {
-        const result = await window.electronAPI?.engine?.runProfile(projectPath);
-        onProfileDetected(toProfileSummary(result));
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-      ),
-    },
-    {
-      id: 'confirm',
-      labelKey: 'page.onboarding.step.confirm',
-      execute: async () => {
-        // 画像未识别（null）时无需确认，直接进入同步；已识别则等待用户确认
-        if (!profileDetected) return;
-        await new Promise<void>((resolve) => {
-          const check = setInterval(() => {
-            if (profileConfirmed) {
-              clearInterval(check);
-              resolve();
-            }
-          }, 100);
-        });
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M9 12l2 2 4-4" />
-          <path d="M21 12c.552 0 1-.448 1-1V8.5L12 3 2 8.5V11c0 5.523 4.477 10 10 10 2.145 0 4.13-.676 5.76-1.826" />
-        </svg>
-      ),
-    },
-    {
-      id: 'profile',
-      labelKey: 'page.onboarding.step.profile',
-      execute: async () => {
-        await window.electronAPI?.sync?.syncRules();
-        const outcome = await window.electronAPI?.sync?.resolveRules();
-        onRuleSyncResult({
-          ok: outcome?.ok ?? false,
-          total: outcome?.total ?? 0,
-          changedCount: outcome?.changed?.length ?? 0,
-        });
-        // 工具就绪探测（云端清单优先；失败/离线时主进程降级本地默认）
-        try {
-          const status = await window.electronAPI?.tools?.status(projectPath);
-          onToolsStatus(status ?? null);
-        } catch {
-          onToolsStatus(null);
-        }
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>
-      ),
-    },
-    {
-      id: 'skills',
-      labelKey: 'page.onboarding.step.skills',
-      execute: async () => {
-        await window.electronAPI?.sop?.getStats();
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ),
-    },
-    {
-      id: 'preset',
-      labelKey: 'page.onboarding.step.preset',
-      execute: async () => {
-        if (!presetConfirmed) {
-          await new Promise<void>((resolve) => {
-            const check = setInterval(() => {
-              if (presetConfirmed) {
-                clearInterval(check);
-                resolve();
-              }
-            }, 100);
-          });
-        }
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="3" width="7" height="7" />
-          <rect x="14" y="3" width="7" height="7" />
-          <rect x="14" y="14" width="7" height="7" />
-          <rect x="3" y="14" width="7" height="7" />
-        </svg>
-      ),
-    },
-    {
-      id: 'ready',
-      labelKey: 'page.onboarding.step.ready',
-      execute: async () => {
-        await window.electronAPI?.engine?.runPipeline(projectPath, {
-          sop: true,
-          presetName: selectedPreset || undefined,
-        });
-      },
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-          <polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-      ),
-    },
+    analyzeStep(projectPath, onProfileDetected),
+    confirmStep(profileDetected, profileConfirmed),
+    profileStep(projectPath, onRuleSyncResult, onToolsStatus),
+    skillsStep(),
+    presetStep(presetConfirmed),
+    readyStep(projectPath, selectedPreset),
   ];
 }
 

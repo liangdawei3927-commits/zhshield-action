@@ -6,16 +6,20 @@ import { SecurityEmptyState } from './security-empty-state';
 import { FindingsPanel, MalwarePanel } from './security-parts';
 import { SecretsListCard } from './secrets-parts';
 import { ReportShell } from '../components/business/ReportShell';
+import type { ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
-import type { SecurityScanReportData } from '../types/electron';
+import type { SecurityIssue } from './security-logic';
+import type { SecurityScanReportData, SecretReportData } from '../types/electron';
 
 interface SecurityPageProps {
   projectPath: string;
 }
 
 type SecurityTab = 'vuln' | 'malware' | 'secrets';
+
+type Translate = (key: string, params?: Record<string, unknown>) => string;
 
 const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
   { id: 'vuln', labelKey: 'page.security.tab.vuln' },
@@ -24,6 +28,251 @@ const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
 ];
 
 const SEVERITY_KEYS = ['critical', 'high', 'medium', 'low'] as const;
+
+/** 报告统计卡：总数 + 各严重级别 + 恶意代码，明细复用 FindingsPanel/MalwarePanel */
+function buildSecurityStats({
+  report,
+  copyToAi,
+  copyAllToAi,
+  copyMalwareToAi,
+  copyMalwareAllToAi,
+  t,
+}: {
+  report: SecurityScanReportData;
+  copyToAi: (issue: SecurityIssue) => void;
+  copyAllToAi: (issues: SecurityIssue[]) => void;
+  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
+  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
+  t: Translate;
+}): ReportStatCard[] {
+  return [
+    { key: 'total', label: t('page.security.stats.total'), value: report.summary.total },
+    ...SEVERITY_KEYS.map((sev) => {
+      const items = report.findings.filter((f) => f.severity === sev);
+      return {
+        key: sev,
+        label: t(`severity.${sev}`),
+        value: report.summary[sev],
+        detail: {
+          items,
+          render: (sub: unknown[]) => (
+            <FindingsPanel
+              findings={sub as SecurityScanReportData['findings']}
+              onCopyToAi={copyToAi}
+              onCopyAll={copyAllToAi}
+            />
+          ),
+          hint: t('page.security.copyAllPrompt', { count: items.length }),
+        },
+      };
+    }),
+    {
+      key: 'malware',
+      label: t('page.security.stats.malware'),
+      value: report.summary.malwareTotal,
+      detail: {
+        items: report.malware,
+        render: (sub: unknown[]) => (
+          <MalwarePanel
+            items={sub as SecurityScanReportData['malware']}
+            onCopyToAi={copyMalwareToAi}
+            onCopyAll={copyMalwareAllToAi}
+          />
+        ),
+      },
+    },
+  ];
+}
+
+/** 分类切换标签栏 */
+function SecurityTabBar({
+  tab,
+  onTabChange,
+  t,
+}: {
+  tab: SecurityTab;
+  onTabChange: (tab: SecurityTab) => void;
+  t: Translate;
+}) {
+  return (
+    <div className="flex gap-2 mb-6">
+      {TABS.map((t2) => (
+        <button
+          key={t2.id}
+          onClick={() => onTabChange(t2.id)}
+          className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
+            tab === t2.id
+              ? 'bg-danger-600 text-white'
+              : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
+          }`}
+        >
+          {t(t2.labelKey)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface SecurityTabContentProps {
+  report: SecurityScanReportData;
+  secretsReport: SecretReportData | null;
+  tab: SecurityTab;
+  copyToAi: (issue: SecurityIssue) => void;
+  copyAllToAi: (issues: SecurityIssue[]) => void;
+  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
+  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
+  onMarkRotating: (secretId: string) => void;
+  onVerifyRotated: (secretId: string) => void;
+  onDismiss: (secretId: string) => void;
+  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
+  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
+  t: Translate;
+}
+
+/** 当前分类的明细面板（漏洞 / 恶意代码 / 密钥） */
+function SecurityTabContent({
+  report,
+  secretsReport,
+  tab,
+  copyToAi,
+  copyAllToAi,
+  copyMalwareToAi,
+  copyMalwareAllToAi,
+  onMarkRotating,
+  onVerifyRotated,
+  onDismiss,
+  secretsCopyToAi,
+  secretsCopyAllToAi,
+  t,
+}: SecurityTabContentProps) {
+  if (tab === 'vuln') {
+    return (
+      <FindingsPanel findings={report.findings} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
+    );
+  }
+  if (tab === 'malware') {
+    return (
+      <MalwarePanel
+        items={report.malware}
+        onCopyToAi={copyMalwareToAi}
+        onCopyAll={copyMalwareAllToAi}
+      />
+    );
+  }
+  if (secretsReport) {
+    return (
+      <SecretsListCard
+        findings={secretsReport.findings}
+        error={secretsReport.error}
+        onMarkRotating={onMarkRotating}
+        onVerifyRotated={onVerifyRotated}
+        onDismiss={onDismiss}
+        onCopyToAi={secretsCopyToAi}
+        onCopyAll={secretsCopyAllToAi}
+      />
+    );
+  }
+  return (
+    <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
+      <span className="text-sm text-zh-muted">{t('page.secrets.checking')}</span>
+    </div>
+  );
+}
+
+interface SecurityReportViewProps {
+  projectPath: string;
+  report: SecurityScanReportData;
+  secretsReport: SecretReportData | null;
+  loading: boolean;
+  progressLabel: string;
+  tab: SecurityTab;
+  onTabChange: (tab: SecurityTab) => void;
+  onRescan: () => void;
+  onBackHome: () => void;
+  copyToAi: (issue: SecurityIssue) => void;
+  copyAllToAi: (issues: SecurityIssue[]) => void;
+  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
+  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
+  onMarkRotating: (secretId: string) => void;
+  onVerifyRotated: (secretId: string) => void;
+  onDismiss: (secretId: string) => void;
+  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
+  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
+  t: Translate;
+}
+
+/** 报告态：统计卡 + 分类标签栏 + 明细面板 */
+function SecurityReportView({
+  projectPath,
+  report,
+  secretsReport,
+  loading,
+  progressLabel,
+  tab,
+  onTabChange,
+  onRescan,
+  onBackHome,
+  copyToAi,
+  copyAllToAi,
+  copyMalwareToAi,
+  copyMalwareAllToAi,
+  onMarkRotating,
+  onVerifyRotated,
+  onDismiss,
+  secretsCopyToAi,
+  secretsCopyAllToAi,
+  t,
+}: SecurityReportViewProps) {
+  return (
+    <ReportShell
+      projectPath={projectPath}
+      dimension="security"
+      refreshKey={report}
+      icon={
+        <PageGlyph bg="danger" stroke="danger">
+          <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
+          <path d="M9 13l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </PageGlyph>
+      }
+      title={t('page.security.done')}
+      action={
+        <PrimaryButton
+          onClick={onRescan}
+          loading={loading}
+          loadingLabel={progressLabel || t('page.security.checking')}
+        >
+          {t('page.security.rescan')}
+        </PrimaryButton>
+      }
+      onBackHome={onBackHome}
+      stats={buildSecurityStats({
+        report,
+        copyToAi,
+        copyAllToAi,
+        copyMalwareToAi,
+        copyMalwareAllToAi,
+        t,
+      })}
+    >
+      <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
+      <SecurityTabContent
+        report={report}
+        secretsReport={secretsReport}
+        tab={tab}
+        copyToAi={copyToAi}
+        copyAllToAi={copyAllToAi}
+        copyMalwareToAi={copyMalwareToAi}
+        copyMalwareAllToAi={copyMalwareAllToAi}
+        onMarkRotating={onMarkRotating}
+        onVerifyRotated={onVerifyRotated}
+        onDismiss={onDismiss}
+        secretsCopyToAi={secretsCopyToAi}
+        secretsCopyAllToAi={secretsCopyAllToAi}
+        t={t}
+      />
+    </ReportShell>
+  );
+}
 
 export function SecurityPage({ projectPath }: SecurityPageProps) {
   const t = useT();
@@ -69,117 +318,27 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
 
   if (report && !showHome) {
     return (
-      <ReportShell
+      <SecurityReportView
         projectPath={projectPath}
-        dimension="security"
-        refreshKey={report}
-        icon={
-          <Bounce className="w-14 h-14 rounded-xl bg-danger-50 flex items-center justify-center">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgb(var(--zh-danger))"
-              strokeWidth="2"
-            >
-              <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
-              <path d="M9 13l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Bounce>
-        }
-        title={t('page.security.done')}
-        action={
-          <PrimaryButton
-            onClick={handleScan}
-            loading={loading}
-            loadingLabel={progressLabel || t('page.security.checking')}
-          >
-            {t('page.security.rescan')}
-          </PrimaryButton>
-        }
+        report={report}
+        secretsReport={secretsReport}
+        loading={loading}
+        progressLabel={progressLabel}
+        tab={tab}
+        onTabChange={setTab}
+        onRescan={handleScan}
         onBackHome={() => setShowHome(true)}
-        stats={[
-          { key: 'total', label: t('page.security.stats.total'), value: report.summary.total },
-          ...SEVERITY_KEYS.map((sev) => {
-            const items = report.findings.filter((f) => f.severity === sev);
-            return {
-              key: sev,
-              label: t(`severity.${sev}`),
-              value: report.summary[sev],
-              detail: {
-                items,
-                render: (sub: unknown[]) => (
-                  <FindingsPanel
-                    findings={sub as SecurityScanReportData['findings']}
-                    onCopyToAi={copyToAi}
-                    onCopyAll={copyAllToAi}
-                  />
-                ),
-                hint: t('page.security.copyAllPrompt', { count: items.length }),
-              },
-            };
-          }),
-          {
-            key: 'malware',
-            label: t('page.security.stats.malware'),
-            value: report.summary.malwareTotal,
-            detail: {
-              items: report.malware,
-              render: (sub) => (
-                <MalwarePanel
-                  items={sub as SecurityScanReportData['malware']}
-                  onCopyToAi={copyMalwareToAi}
-                  onCopyAll={copyMalwareAllToAi}
-                />
-              ),
-            },
-          },
-        ]}
-      >
-        <div className="flex gap-2 mb-6">
-          {TABS.map((t2) => (
-            <button
-              key={t2.id}
-              onClick={() => setTab(t2.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
-                tab === t2.id
-                  ? 'bg-danger-600 text-white'
-                  : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
-              }`}
-            >
-              {t(t2.labelKey)}
-            </button>
-          ))}
-        </div>
-        {tab === 'vuln' ? (
-          <FindingsPanel
-            findings={report.findings}
-            onCopyToAi={copyToAi}
-            onCopyAll={copyAllToAi}
-          />
-        ) : tab === 'malware' ? (
-          <MalwarePanel
-            items={report.malware}
-            onCopyToAi={copyMalwareToAi}
-            onCopyAll={copyMalwareAllToAi}
-          />
-        ) : secretsReport ? (
-          <SecretsListCard
-            findings={secretsReport.findings}
-            error={secretsReport.error}
-            onMarkRotating={handleMarkRotating}
-            onVerifyRotated={handleVerifyRotated}
-            onDismiss={handleDismiss}
-            onCopyToAi={secretsCopyToAi}
-            onCopyAll={secretsCopyAllToAi}
-          />
-        ) : (
-          <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
-            <span className="text-sm text-zh-muted">{t('page.secrets.checking')}</span>
-          </div>
-        )}
-      </ReportShell>
+        copyToAi={copyToAi}
+        copyAllToAi={copyAllToAi}
+        copyMalwareToAi={copyMalwareToAi}
+        copyMalwareAllToAi={copyMalwareAllToAi}
+        onMarkRotating={handleMarkRotating}
+        onVerifyRotated={handleVerifyRotated}
+        onDismiss={handleDismiss}
+        secretsCopyToAi={secretsCopyToAi}
+        secretsCopyAllToAi={secretsCopyAllToAi}
+        t={t}
+      />
     );
   }
 

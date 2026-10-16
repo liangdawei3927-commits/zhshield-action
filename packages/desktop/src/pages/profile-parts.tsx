@@ -157,6 +157,20 @@ export function SignalList({ signals }: { signals: readonly Signal[] }) {
 
 // ─── 目标卡片 ────────────────────────────────────────────────────────
 
+/** 目标框架徽章列表：每个框架值 + 置信度徽章（右对齐换行） */
+function TargetFrameworkList({ frameworks }: { frameworks: readonly MatchResult[] }) {
+  return (
+    <span className="flex flex-wrap gap-1 justify-end">
+      {frameworks.map((fw, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          <span>{fw.value}</span>
+          <ConfidenceBadge confidence={fw.confidence} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function TargetCard({ target }: { target: TargetProfile }) {
   return (
     <div className="bg-zh-card rounded-xl border border-zh-line p-5 mb-4">
@@ -176,19 +190,7 @@ export function TargetCard({ target }: { target: TargetProfile }) {
           value={target.language.value}
           badge={<ConfidenceBadge confidence={target.language.confidence} />}
         />
-        <DataRow
-          label="框架"
-          value={
-            <span className="flex flex-wrap gap-1 justify-end">
-              {target.frameworks.map((fw, i) => (
-                <span key={i} className="inline-flex items-center gap-1">
-                  <span>{fw.value}</span>
-                  <ConfidenceBadge confidence={fw.confidence} />
-                </span>
-              ))}
-            </span>
-          }
-        />
+        <DataRow label="框架" value={<TargetFrameworkList frameworks={target.frameworks} />} />
         {target.productForm && (
           <DataRow
             label="交付形态"

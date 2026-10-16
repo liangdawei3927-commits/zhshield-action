@@ -532,7 +532,7 @@ interface CodeBlock {
 }
 
 /** 跨文件重复的代码片段 */
-interface DuplicateBlock {
+export interface DuplicateBlock {
   files: [string, string];
   lines: [number, number];
   code: string;
@@ -540,40 +540,33 @@ interface DuplicateBlock {
   lineCount: number;
 }
 
-/** 单次重复区扫描的报告上限：超出部分不进入 smells，但计入统计以便如实上报截断 */
-const DUPLICATE_REGION_LIMIT = 50;
-
 /**
- * 跨文件查找重复代码块：滑动窗口取归一化块 → 两两比对 → 合并连续窗口 → 截断至报告上限。
+ * 跨文件查找重复代码块：滑动窗口取归一化块 → 两两比对 → 合并连续窗口。
+ *
+ * 数据路径不设上限：报告上限属于展示层职责（见 scripts/zhcheck.mjs 的文本打印），
+ * 若在此截断，消除一处真实重复会移动截断窗口、把此前被隐藏的存量重复区挤进计数集，
+ * 使 ratchet 基线对比产生假阳性 introduced。
  * @param files 已解析的文件集合
  * @param minLines 判定重复所需的最小连续行数（默认 6）
- * @returns 去重合并后的重复区列表（`DuplicateBlock` 为模块内类型，不对外暴露）
+ * @returns 去重合并后的完整重复区列表
+ */
+export function scanDuplicateCodeBlocks(
+  files: ParsedFile[],
+  minLines: number = 6,
+): DuplicateBlock[] {
+  const blocks = collectCodeBlocks(files, minLines);
+  return mergeDuplicateRegions(findDuplicatePairs(blocks, minLines));
+}
+
+/**
+ * findDuplicateCodeBlocks 与 scanDuplicateCodeBlocks 同源，保留为语义化别名。
+ * @returns 去重合并后的完整重复区列表
  */
 export function findDuplicateCodeBlocks(
   files: ParsedFile[],
   minLines: number = 6,
 ): DuplicateBlock[] {
-  return scanDuplicateCodeBlocks(files, minLines).regions;
-}
-
-/**
- * 与 findDuplicateCodeBlocks 同源，但额外返回截断前的真实去重区总量，
- * 供上层在命中报告上限时如实上报「已截断」而非静默丢数。
- * @returns regions 前 DUPLICATE_REGION_LIMIT 条；totalRegions 截断前总数；truncated 是否被截断
- */
-export function scanDuplicateCodeBlocks(
-  files: ParsedFile[],
-  minLines: number = 6,
-): { regions: DuplicateBlock[]; totalRegions: number; truncated: boolean } {
-  const blocks = collectCodeBlocks(files, minLines);
-  // 先合并再截断：截断必须落在「重复区」粒度上，否则会把同一段重复区切成
-  // 多条并挤掉后面真正不同的重复区
-  const merged = mergeDuplicateRegions(findDuplicatePairs(blocks, minLines));
-  return {
-    regions: merged.slice(0, DUPLICATE_REGION_LIMIT),
-    totalRegions: merged.length,
-    truncated: merged.length > DUPLICATE_REGION_LIMIT,
-  };
+  return scanDuplicateCodeBlocks(files, minLines);
 }
 
 /**

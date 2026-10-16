@@ -1,4 +1,4 @@
-import type { ParsedFile } from '../ast-helper';
+import type { DuplicateBlock, ParsedFile } from '../ast-helper';
 import { computeNestingDepth, scanDuplicateCodeBlocks } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
@@ -169,7 +169,7 @@ function countTryCatchBlocks(source: string): number {
   return tryCatchBlocks ? tryCatchBlocks.length : 0;
 }
 
-let _dupCache: ReturnType<typeof scanDuplicateCodeBlocks>['regions'] | null = null;
+let _dupCache: DuplicateBlock[] | null = null;
 let _dupCacheFiles: ParsedFile[] | null = null;
 let _dupCacheMinLines: number = 0;
 
@@ -182,13 +182,11 @@ export function detectDuplicateCode(
   const minLines = config.thresholds.minDuplicateLines;
 
   if (_dupCache === null || _dupCacheFiles !== allFiles || _dupCacheMinLines !== minLines) {
-    const scan = scanDuplicateCodeBlocks(allFiles, minLines);
-    _dupCache = scan.regions;
+    // 缓存完整重复区列表：报告上限只在展示层（zhcheck 文本打印）生效，
+    // 数据路径不截断，否则基线计数会随窗口移动而漂移。
+    _dupCache = scanDuplicateCodeBlocks(allFiles, minLines);
     _dupCacheFiles = allFiles;
     _dupCacheMinLines = minLines;
-    if (scan.truncated) {
-      smells.push(makeTruncationNotice(parsed.filePath, scan.totalRegions, scan.regions.length));
-    }
   }
   const duplicates = _dupCache;
   const fileDups = duplicates.filter(
@@ -227,27 +225,6 @@ export function detectDuplicateCode(
   }
 
   return smells;
-}
-
-function makeTruncationNotice(filePath: string, total: number, shown: number): CodeSmell {
-  return makeSmell({
-    ruleId: 'duplicated-code',
-    severity: 'info',
-    message: `重复区共检出 ${total} 处，受报告上限约束仅上报前 ${shown} 处（截断 ${total - shown} 处）`,
-    filePath,
-    line: 1,
-    column: 1,
-    metric: 'duplicateRegionCount',
-    value: total,
-    threshold: shown,
-    suggestion: {
-      type: 'Reduce Duplication',
-      description: '消除真实重复区可腾出报告配额，使被截断的重复区得以暴露',
-      priority: 'low',
-      effort: 'medium',
-      autoFixable: false,
-    },
-  });
 }
 
 export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {

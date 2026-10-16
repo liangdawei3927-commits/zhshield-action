@@ -32,6 +32,10 @@ const PROJECT_ROOT = resolve(import.meta.dirname, '..');
 const RE_DIST = /(^|\/)dist(\/|$)/;
 const RE_DIST_ELECTRON = /(^|\/)dist-electron(\/|$)/;
 
+// 基线格式版本：v1 为重复区被截断的旧口径，v2 起数据路径全量。
+// 版本不匹配时拒绝对比，避免用旧截断基线误判全量计数。
+const BASELINE_VERSION = 2;
+
 function importEngine(name) {
   const p = resolve(PKGS_ROOT, name, 'dist', 'engine.js');
   if (!existsSync(p)) {
@@ -97,15 +101,38 @@ async function runRefactor(files, opts, projectRoot) {
 
   let warningCount = 0;
   let errorCount = 0;
+  // 展示层上限：数据路径（report）保持全量，仅文本打印逐条列出前 N 处，
+  // 避免重复区过多时刷屏；--json 输出全量，门禁计数不受影响。
+  const DUP_DISPLAY_CAP = 10;
+  let dupSmellTotal = 0;
 
   for (const fr of report.files) {
+    let dupShown = 0;
+    let dupHidden = 0;
     for (const smell of fr.smells) {
+      const isDup = smell.ruleId === 'duplicated-code';
+      if (isDup) dupSmellTotal++;
       if (!opts.json) {
-        console.log(formatLinter(smell, fr.filePath));
+        if (isDup && dupShown >= DUP_DISPLAY_CAP) {
+          dupHidden++;
+        } else {
+          console.log(formatLinter(smell, fr.filePath));
+          if (isDup) dupShown++;
+        }
       }
       if (smell.severity === 'error') errorCount++;
       if (smell.severity === 'warning') warningCount++;
     }
+    if (!opts.json && dupHidden > 0) {
+      console.log(
+        `  ${resolveRelPath(fr.filePath)}: duplicated-code 另有 ${dupHidden} 处未逐条列出（--json 可见全量）`,
+      );
+    }
+  }
+
+  if (!opts.json && dupSmellTotal > 0) {
+    // 每个重复区在参与的两个文件各产生 1 条 smell，故重复区数 = smell 总数 / 2
+    console.log(`zhcheck: duplicated-code 共 ${dupSmellTotal / 2} 个重复区`);
   }
 
   if (opts.json) {
@@ -499,7 +526,7 @@ Linter 输出格式:
     const { countSmellsByFileAndRule } = refactorIdx;
     const entries = countSmellsByFileAndRule(refactorResult.report, projectRoot);
     const baseline = {
-      version: 1,
+      version: BASELINE_VERSION,
       generatedAt: new Date().toISOString(),
       entries,
     };
@@ -518,6 +545,12 @@ Linter 输出格式:
       process.exit(2);
     }
     const baseline = JSON.parse(readFileSync(baselinePath, 'utf-8'));
+    if (baseline.version !== BASELINE_VERSION) {
+      console.error(
+        `zhcheck: baseline version mismatch (found ${baseline.version}, expected ${BASELINE_VERSION}); re-run --write-baseline`,
+      );
+      process.exit(2);
+    }
     if (!refactorResult || !refactorResult.report) {
       console.error('zhcheck: refactor report not available for baseline diff');
       process.exit(2);

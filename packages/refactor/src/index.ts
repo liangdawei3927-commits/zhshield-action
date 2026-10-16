@@ -7,6 +7,7 @@ export {
   computeCyclomaticComplexity,
   computeNestingDepth,
   findDuplicateCodeBlocks,
+  scanDuplicateCodeBlocks,
 } from './ast-helper';
 export { ALL_DETECTORS } from './adapters/index';
 export { countSmellsByFileAndRule, diffBaseline } from './baseline';
@@ -22,4 +23,4 @@ export type {
   FixResult,
 } from './types';
 
-export type { ParsedFile, ParsedClass, ParsedFunction } from './ast-helper';
+export type { ParsedFile, ParsedClass, ParsedFunction, DuplicateBlock } from './ast-helper';

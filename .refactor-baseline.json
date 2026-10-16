@@ -1,10 +1,7 @@
 {
-  "version": 1,
-  "generatedAt": "2026-10-15T17:05:11.446Z",
+  "version": 2,
+  "generatedAt": "2026-10-16T19:36:28.285Z",
   "entries": {
-    "packages/autoperf/src/adapter.ts": {
-      "duplicated-code": 1
-    },
     "packages/dependency/src/adapters/npm-outdated.ts": {
       "lazy-class": 1
     },
@@ -12,9 +9,6 @@
       "data-clumps": 1
     },
     "packages/fingerprint/src/profiler.ts": {
-      "primitive-obsession": 1
-    },
-    "packages/kernel/src/backup/local-backup.ts": {
       "primitive-obsession": 1
     },
     "packages/kernel/src/sop/_meta/dynamic-severity-config.ts": {
@@ -25,15 +19,6 @@
     },
     "packages/kernel/src/sop/sync/retry.ts": {
       "lazy-class": 1
-    },
-    "packages/scoring/src/project-scoring-config.ts": {
-      "lazy-class": 1
-    },
-    "packages/security/src/garbage-scanner.ts": {
-      "lazy-class": 1
-    },
-    "packages/sentinel/src/file-monitor.ts": {
-      "primitive-obsession": 1
     },
     "packages/sentinel/src/process-monitor.ts": {
       "primitive-obsession": 1
@@ -46,9 +31,6 @@
     },
     "packages/shared/src/security/safe-path.ts": {
       "lazy-class": 1
-    },
-    "packages/reporter/src/console-reporter-rule-engine.ts": {
-      "data-clumps": 2
     },
     "packages/reporter/src/console-reporter-sections.ts": {
       "data-clumps": 2
@@ -98,95 +80,206 @@
     "packages/desktop/src/contexts/NotificationContext.tsx": {
       "duplicated-code": 1
     },
+    "packages/desktop/src/pages/BackupPage.tsx": {
+      "long-method": 1
+    },
     "packages/desktop/src/pages/InspectPage.tsx": {
       "mixed-responsibilities": 1
     },
-    "packages/desktop/src/pages/RefactorPage.tsx": {
-      "long-method": 1
+    "packages/desktop/src/pages/ProfilePage.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/ReportsPage.tsx": {
+      "duplicated-code": 1
     },
     "packages/desktop/src/pages/ScreensaverPage.tsx": {
       "duplicated-code": 1
     },
-    "packages/desktop/src/pages/backup-empty-state.tsx": {
-      "mixed-responsibilities": 1
-    },
     "packages/desktop/src/pages/backup-logic.ts": {
       "mixed-responsibilities": 1
     },
-    "packages/desktop/src/pages/dependency-cards.tsx": {
+    "packages/desktop/src/pages/garbage-logic.ts": {
       "duplicated-code": 1
-    },
-    "packages/desktop/src/pages/refactor-empty-state.tsx": {
-      "mixed-responsibilities": 1
     },
     "packages/desktop/src/pages/reports-parts.tsx": {
       "long-method": 1
     },
-    "packages/desktop/src/pages/secrets-parts.tsx": {
-      "long-method": 1
+    "packages/desktop/vitest.config.ts": {
+      "duplicated-code": 1
     },
-    "packages/desktop/src/pages/tech-debt-parts.tsx": {
-      "oversized-file": 1
+    "packages/evolve/vitest.config.ts": {
+      "duplicated-code": 1
     },
-    "packages/fingerprint/src/detectors/form-detector.ts": {
-      "long-method": 1
+    "packages/fingerprint/src/detector.ts": {
+      "duplicated-code": 1
     },
     "packages/fingerprint/src/detectors/manifest-detector.ts": {
       "oversized-file": 1
     },
+    "packages/fingerprint/src/detectors/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/drift-detector.ts": {
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/language-map.ts": {
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/profiler-framework.ts": {
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/profiler-language.ts": {
+      "duplicated-code": 1
+    },
     "packages/fingerprint/src/profiler-target.ts": {
       "mixed-responsibilities": 1
     },
-    "packages/garbage/src/types.ts": {
+    "packages/fingerprint/src/projection.ts": {
       "duplicated-code": 1
     },
-    "packages/inspect/src/adapters/eslint-adapter.ts": {
-      "mixed-responsibilities": 1
+    "packages/fingerprint/src/question-set.ts": {
+      "duplicated-code": 1
     },
-    "packages/inspect/src/adapters/gitleaks-adapter.ts": {
-      "mixed-responsibilities": 1
+    "packages/fingerprint/src/scoring/file-scanner.ts": {
+      "duplicated-code": 1
     },
-    "packages/inspect/src/adapters/semgrep-adapter.ts": {
-      "feature-envy": 1
+    "packages/fingerprint/src/scoring/profiler.ts": {
+      "duplicated-code": 1
+    },
+    "packages/fingerprint/src/walk-cache.ts": {
+      "duplicated-code": 1
+    },
+    "packages/garbage/src/cleaner.ts": {
+      "duplicated-code": 1
+    },
+    "packages/garbage/src/junk-rules.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/adapters/adapter-result.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/adapters/test-command-detector.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/guard-report-store.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/result-normalizer.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/src/whitelist-manager.ts": {
+      "duplicated-code": 1
+    },
+    "packages/guard/vitest.config.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapter-runner.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/depcheck-adapter.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/dependency-cruiser-adapter.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/injected-config.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/prettier-adapter.ts": {
+      "duplicated-code": 1
     },
     "packages/inspect/src/adapters/semgrep-rule-writer.ts": {
       "feature-envy": 1
     },
-    "packages/inspect/src/adapters/ts-prune-adapter.ts": {
-      "oversized-file": 1
-    },
-    "packages/inspect/src/adapters/typescript-adapter.ts": {
-      "feature-envy": 1
-    },
-    "packages/inspect/src/ai-code/files.ts": {
+    "packages/inspect/src/adapters/tool-available.ts": {
       "duplicated-code": 1
     },
-    "packages/inspect/src/engine.ts": {
+    "packages/inspect/src/scan-report-builder.ts": {
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/tool-adapter-executor.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/backup/events.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/backup/local-backup-copier.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/backup/local-backup-manifest.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/file.ts": {
       "duplicated-code": 1
     },
     "packages/kernel/src/notification/service.ts": {
       "duplicated-code": 1
     },
-    "packages/kernel/src/runner/dispatch-evaluators.ts": {
-      "oversized-file": 1
+    "packages/kernel/src/runner/evaluation-builders.ts": {
+      "duplicated-code": 1
     },
     "packages/kernel/src/runner/inline-evaluators.ts": {
       "oversized-file": 1
     },
+    "packages/kernel/src/runner/scan-utils.ts": {
+      "duplicated-code": 1
+    },
     "packages/kernel/src/scheduler/types.ts": {
       "duplicated-code": 1
     },
-    "packages/kernel/src/sop/cache/sop-conflict-policy.ts": {
-      "data-class": 1
+    "packages/kernel/src/sop/cache/sop-cache-maintenance.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/cache/sop-lazy-loader.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/cache/sop-sqlite-store.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/cache/sop-sync-scheduler.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/index.ts": {
+      "duplicated-code": 1
     },
     "packages/kernel/src/sop/quality/rule-accuracy.ts": {
       "mixed-responsibilities": 1
     },
+    "packages/kernel/src/sop/sync/capability-refs-reader.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/sync/experience-reporter.ts": {
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/sync/index.ts": {
+      "duplicated-code": 1
+    },
+    "packages/performance/src/adapters/tree-shaking-detector.ts": {
+      "duplicated-code": 1
+    },
+    "packages/performance/src/source-roots.ts": {
+      "duplicated-code": 1
+    },
     "packages/performance/src/types.ts": {
       "duplicated-code": 1
     },
-    "packages/pipeline/src/pipeline-runner.ts": {
-      "oversized-file": 1
+    "packages/refactor/src/adapters/adapter-types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/refactor/src/engine.ts": {
+      "duplicated-code": 1
+    },
+    "packages/refactor/src/types.ts": {
+      "duplicated-code": 1
+    },
+    "packages/reporter/src/console-color.ts": {
+      "duplicated-code": 1
+    },
+    "packages/reporter/src/console-reporter-format.ts": {
+      "duplicated-code": 1
     },
     "packages/reporter/src/console-reporter.ts": {
       "feature-envy": 1
@@ -194,31 +287,86 @@
     "packages/reporter/src/machine-formatters.ts": {
       "duplicated-code": 1
     },
-    "packages/scoring/src/types.ts": {
+    "packages/reporter/src/rule-engine-formatter.ts": {
       "duplicated-code": 1
     },
-    "packages/security/src/security-check-engine.ts": {
-      "long-method": 1
+    "packages/security/src/adapters/depcheck-adapter.ts": {
+      "duplicated-code": 1
+    },
+    "packages/security/src/npm-threat-scanner.ts": {
+      "duplicated-code": 1
+    },
+    "packages/security/src/pypi-threat-scanner.ts": {
+      "duplicated-code": 1
     },
     "packages/sentinel/src/health-probe.ts": {
       "mixed-responsibilities": 1
     },
-    "packages/server/src/sop/sop.service.ts": {
-      "mixed-responsibilities": 1
+    "packages/sentinel/src/log-collector.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/admin/admin-token.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/admin/admin.service.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/inspect/inspect.service.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/security/security.service.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/sentinel/sentinel.guard.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/sop/tool-rule-store.ts": {
+      "duplicated-code": 1
+    },
+    "packages/server/src/tenancy/tenancy.controller.ts": {
+      "duplicated-code": 1
+    },
+    "packages/shared/src/eslint-config.ts": {
+      "duplicated-code": 1
     },
     "packages/shared/src/garbage-scan.ts": {
       "mixed-responsibilities": 1
     },
-    "packages/shared/src/types.ts": {
-      "oversized-file": 1
+    "packages/shared/src/path-augment.ts": {
+      "duplicated-code": 1
+    },
+    "packages/shared/src/promise-timeout.ts": {
+      "duplicated-code": 1
+    },
+    "packages/shared/src/tool-scope.ts": {
+      "duplicated-code": 1
+    },
+    "vitest.shared.ts": {
+      "duplicated-code": 1
     },
     "packages/desktop/electron/task-manager.ts": {
       "duplicated-code": 1,
       "primitive-obsession": 1
     },
+    "packages/kernel/src/backup/local-backup.ts": {
+      "duplicated-code": 1,
+      "primitive-obsession": 1
+    },
+    "packages/scoring/src/project-scoring-config.ts": {
+      "duplicated-code": 1,
+      "lazy-class": 1
+    },
+    "packages/security/src/garbage-scanner.ts": {
+      "duplicated-code": 1,
+      "lazy-class": 1
+    },
     "packages/security/src/secrets/lifecycle.ts": {
       "oversized-file": 1,
       "lazy-class": 1
+    },
+    "packages/reporter/src/console-reporter-rule-engine.ts": {
+      "duplicated-code": 1,
+      "data-clumps": 2
     },
     "packages/cli/src/index.ts": {
       "long-method": 1,
@@ -241,11 +389,11 @@
       "long-method": 1,
       "duplicated-code": 1
     },
-    "packages/desktop/src/pages/BackupPage.tsx": {
+    "packages/desktop/src/pages/GuardPage.tsx": {
       "long-method": 1,
       "duplicated-code": 1
     },
-    "packages/desktop/src/pages/PerformancePage.tsx": {
+    "packages/desktop/src/pages/RefactorPage.tsx": {
       "long-method": 1,
       "duplicated-code": 1
     },
@@ -253,40 +401,155 @@
       "mixed-responsibilities": 1,
       "duplicated-code": 1
     },
-    "packages/desktop/src/pages/dependency-parts.tsx": {
-      "oversized-file": 1,
-      "oversized-component": 1
+    "packages/desktop/src/pages/garbage-empty-state.tsx": {
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/guard-logic.ts": {
+      "duplicated-code": 2
     },
     "packages/desktop/src/pages/guard-parts.tsx": {
       "long-method": 1,
       "duplicated-code": 1
     },
+    "packages/desktop/src/pages/profile-parts.tsx": {
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/secrets-parts.tsx": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/evolve/src/engine.ts": {
+      "duplicated-code": 2
+    },
+    "packages/evolve/src/types.ts": {
+      "duplicated-code": 2
+    },
     "packages/fingerprint/src/profile-store.ts": {
       "duplicated-code": 2
     },
-    "packages/inspect/src/adapters/jscpd-adapter.ts": {
-      "long-method": 1,
+    "packages/garbage/src/types.ts": {
+      "duplicated-code": 2
+    },
+    "packages/guard/src/adapters/trivy-adapter.ts": {
+      "duplicated-code": 2
+    },
+    "packages/inspect/src/adapters/dependency-cruiser-mapper.ts": {
+      "duplicated-code": 2
+    },
+    "packages/inspect/src/adapters/semgrep-adapter.ts": {
+      "duplicated-code": 1,
       "feature-envy": 1
+    },
+    "packages/inspect/src/adapters/semgrep-result-mapper.ts": {
+      "duplicated-code": 2
+    },
+    "packages/inspect/src/adapters/ts-prune-adapter.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 1
+    },
+    "packages/inspect/src/adapters/typescript-adapter.ts": {
+      "duplicated-code": 1,
+      "feature-envy": 1
+    },
+    "packages/kernel/src/backup/incremental-backup.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/backup/index.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/backup/local-backup-restorer.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/backup/zip-snapshot.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/runner/dispatch-evaluators.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 1
+    },
+    "packages/kernel/src/sop/cache/sop-conflict-policy.ts": {
+      "duplicated-code": 1,
+      "data-class": 1
+    },
+    "packages/kernel/src/sop/cache/sop-verified-sync-client.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/sop/sync/resolve-api.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/sop/sync/tool-rule-sync.ts": {
+      "duplicated-code": 2
+    },
+    "packages/kernel/src/sop/sync/wisdom-brain-sync.ts": {
+      "duplicated-code": 2
     },
     "packages/performance/src/adapters/ast-scan.ts": {
       "long-method": 1,
       "mixed-responsibilities": 1
     },
-    "packages/refactor/src/adapters/scale-detectors.ts": {
-      "long-method": 1,
-      "mixed-responsibilities": 1
+    "packages/pipeline/src/pipeline-runner.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 1
+    },
+    "packages/refactor/src/adapters/extra-detectors.ts": {
+      "duplicated-code": 2
     },
     "packages/refactor/src/ast-helper.ts": {
       "long-method": 1,
       "oversized-file": 1
     },
+    "packages/scoring/src/module-score.ts": {
+      "duplicated-code": 2
+    },
     "packages/scoring/src/pipeline-score.ts": {
       "long-method": 1,
       "oversized-file": 1
     },
+    "packages/scoring/src/scoring-engine.ts": {
+      "duplicated-code": 2
+    },
+    "packages/security/src/adapters/trivy-adapter.ts": {
+      "duplicated-code": 2
+    },
+    "packages/security/src/engine.ts": {
+      "duplicated-code": 2
+    },
+    "packages/security/src/injection-guard.ts": {
+      "duplicated-code": 2
+    },
+    "packages/security/src/malware-scanner.ts": {
+      "duplicated-code": 2
+    },
+    "packages/security/src/security-check-engine.ts": {
+      "long-method": 1,
+      "duplicated-code": 1
+    },
+    "packages/server/src/admin/admin-rules.controller.ts": {
+      "duplicated-code": 2
+    },
+    "packages/server/src/sop/sop.service.ts": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 1
+    },
+    "packages/server/src/tenancy/tenancy.service.ts": {
+      "duplicated-code": 2
+    },
+    "packages/shared/src/dimension-mapper.ts": {
+      "duplicated-code": 2
+    },
+    "packages/shared/src/tool-manager.ts": {
+      "duplicated-code": 2
+    },
+    "packages/shared/src/tools-config-loader.ts": {
+      "duplicated-code": 2
+    },
     "packages/kernel/src/sop/security/sop-signer.ts": {
       "feature-envy": 2,
       "data-clumps": 1
+    },
+    "packages/sentinel/src/file-monitor.ts": {
+      "duplicated-code": 2,
+      "primitive-obsession": 1
     },
     "packages/dependency/src/adapters/env-consistency.ts": {
       "long-method": 2,
@@ -314,17 +577,111 @@
       "long-method": 1,
       "duplicated-code": 2
     },
-    "packages/desktop/src/pages/GuardPage.tsx": {
+    "packages/desktop/src/pages/GarbagePage.tsx": {
+      "long-method": 1,
+      "mixed-responsibilities": 1,
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/PerformancePage.tsx": {
       "long-method": 1,
       "duplicated-code": 2
     },
-    "packages/desktop/src/pages/TechDebtPage.tsx": {
-      "long-method": 1,
+    "packages/desktop/src/pages/backup-empty-state.tsx": {
+      "mixed-responsibilities": 1,
       "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/refactor-empty-state.tsx": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 2
+    },
+    "packages/desktop/src/pages/tech-debt-parts.tsx": {
+      "oversized-file": 1,
+      "duplicated-code": 2
+    },
+    "packages/fingerprint/src/detectors/content-detector.ts": {
+      "duplicated-code": 3
+    },
+    "packages/fingerprint/src/detectors/lockfile-detector.ts": {
+      "duplicated-code": 3
+    },
+    "packages/fingerprint/src/types.ts": {
+      "duplicated-code": 3
+    },
+    "packages/guard/src/adapters/security-scan-adapter.ts": {
+      "duplicated-code": 3
+    },
+    "packages/guard/src/engine.ts": {
+      "duplicated-code": 3
+    },
+    "packages/inspect/src/adapters/commit-lint-adapter.ts": {
+      "duplicated-code": 3
+    },
+    "packages/inspect/src/adapters/gitleaks-adapter.ts": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 2
+    },
+    "packages/inspect/src/adapters/jscpd-adapter.ts": {
+      "long-method": 1,
+      "duplicated-code": 1,
+      "feature-envy": 1
+    },
+    "packages/inspect/src/adapters/npm-audit-adapter.ts": {
+      "duplicated-code": 3
+    },
+    "packages/inspect/src/ai-code/files.ts": {
+      "duplicated-code": 3
+    },
+    "packages/inspect/src/engine.ts": {
+      "duplicated-code": 3
+    },
+    "packages/inspect/src/types.ts": {
+      "duplicated-code": 3
+    },
+    "packages/kernel/src/sop/_meta/sop-types.ts": {
+      "duplicated-code": 3
+    },
+    "packages/kernel/src/sop/cache/sop-sync-client.ts": {
+      "duplicated-code": 3
+    },
+    "packages/kernel/src/sop/cache/sop-sync-coordinator.ts": {
+      "duplicated-code": 3
+    },
+    "packages/pipeline/src/sonarway-tool-adapter.ts": {
+      "duplicated-code": 3
+    },
+    "packages/refactor/src/adapters/coupling-detectors.ts": {
+      "duplicated-code": 3
+    },
+    "packages/refactor/src/adapters/scale-detectors.ts": {
+      "long-method": 1,
+      "mixed-responsibilities": 1,
+      "duplicated-code": 1
+    },
+    "packages/refactor/src/adapters/structure-detectors.ts": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 2
+    },
+    "packages/scoring/src/sop-converters.ts": {
+      "duplicated-code": 3
+    },
+    "packages/scoring/src/types.ts": {
+      "duplicated-code": 3
+    },
+    "packages/security/src/scan-walk.ts": {
+      "duplicated-code": 3
+    },
+    "packages/server/src/admin/admin-tools.controller.ts": {
+      "duplicated-code": 3
     },
     "packages/server/src/scoring/scoring.service.ts": {
       "duplicated-code": 2,
       "feature-envy": 1
+    },
+    "packages/server/src/sop/sop-content-admin.repository.ts": {
+      "duplicated-code": 3
+    },
+    "packages/server/src/sop/sop-tool-admin.repository.ts": {
+      "duplicated-code": 3
     },
     "packages/dependency/src/adapters/lockfile-verifier.ts": {
       "long-method": 1,
@@ -339,25 +696,69 @@
       "long-method": 2,
       "duplicated-code": 2
     },
-    "packages/desktop/src/pages/GarbagePage.tsx": {
+    "packages/desktop/src/pages/DependencyPage.tsx": {
+      "duplicated-code": 4
+    },
+    "packages/desktop/src/pages/TechDebtPage.tsx": {
       "long-method": 1,
-      "mixed-responsibilities": 1,
-      "duplicated-code": 2
+      "duplicated-code": 3
     },
     "packages/desktop/src/pages/WelcomePage.tsx": {
+      "duplicated-code": 4
+    },
+    "packages/fingerprint/src/detectors/config-detector.ts": {
+      "duplicated-code": 4
+    },
+    "packages/fingerprint/src/scoring/detectors/language-detector.ts": {
+      "duplicated-code": 4
+    },
+    "packages/fingerprint/src/scoring/detectors/package-manager-detector.ts": {
+      "duplicated-code": 4
+    },
+    "packages/inspect/src/adapters/eslint-adapter.ts": {
+      "mixed-responsibilities": 1,
+      "duplicated-code": 3
+    },
+    "packages/kernel/src/sop/cache/sop-cache-manager.ts": {
+      "duplicated-code": 4
+    },
+    "packages/security/src/adapters/grype-adapter.ts": {
+      "duplicated-code": 4
+    },
+    "packages/security/src/types.ts": {
       "duplicated-code": 4
     },
     "packages/desktop/src/pages/SentinelPage.tsx": {
       "long-method": 1,
       "duplicated-code": 4
     },
-    "packages/desktop/src/pages/DependencyPage.tsx": {
-      "long-method": 1,
+    "packages/desktop/src/pages/dependency-cards.tsx": {
       "duplicated-code": 5
+    },
+    "packages/fingerprint/src/detectors/form-detector.ts": {
+      "long-method": 1,
+      "duplicated-code": 4
+    },
+    "packages/guard/src/adapters/eslint-check-adapter.ts": {
+      "duplicated-code": 5
+    },
+    "packages/guard/src/adapters/sonarway-eslint-adapter.ts": {
+      "duplicated-code": 5
+    },
+    "packages/security/src/adapters/semgrep-adapter.ts": {
+      "duplicated-code": 6
     },
     "packages/desktop/electron/ipc/engines.ts": {
       "oversized-file": 1,
       "duplicated-code": 6
+    },
+    "packages/desktop/src/pages/dependency-parts.tsx": {
+      "oversized-file": 1,
+      "duplicated-code": 5,
+      "oversized-component": 1
+    },
+    "packages/shared/src/output-mappers.ts": {
+      "duplicated-code": 7
     },
     "packages/desktop/src/components/onboarding/ProjectOnboardingPage.tsx": {
       "long-method": 2,
@@ -367,6 +768,10 @@
     "packages/desktop/src/services/engineApi.ts": {
       "oversized-file": 1,
       "duplicated-code": 9
+    },
+    "packages/shared/src/types.ts": {
+      "oversized-file": 1,
+      "duplicated-code": 13
     }
   }
 }

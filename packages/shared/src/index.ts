@@ -24,15 +24,9 @@ export type {
   CodeFlowLocation,
   CheckResult,
   DimensionScore,
-  HealthScore,
-  AdapterResult,
-  InspectionReport,
   SentinelOccurrence,
-  Vulnerability,
-  MalwareItem,
   GarbageItem,
   GarbageItemType,
-  ExperienceEntry,
   // Tool integration types
   ToolId,
   ToolCategory,
@@ -52,7 +46,6 @@ export type {
   AuditLogEntry,
   AuditEntry,
   WhitelistScope,
-  WhitelistEntry,
   ToolsConfig,
   DegradationLevel,
   ToolOutputMapper,
@@ -64,13 +57,9 @@ export type {
   CloudSyncRule,
   CloudSyncConfig,
   GovernanceDomain,
-  ActionType,
-  DataSource,
-  RuleLifecycleStatus,
   SopVersion,
   SopDiff,
   SopDiffMetadata,
-  SyncResult,
 } from './types';
 export { ToolManager } from './tool-manager';
 export {

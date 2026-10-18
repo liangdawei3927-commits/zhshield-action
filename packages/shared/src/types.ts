@@ -105,45 +105,9 @@ export interface DimensionScore {
   issues: number;
 }
 
-/** 健康评分：项目总分 + 分级（A~D）+ 各维度明细 + 相对上次的变化趋势 */
-export interface HealthScore {
-  projectId: string;
-  timestamp: Date;
-  overall: number;
-  grade: 'A' | 'B' | 'C' | 'D';
-  dimensions: DimensionScore[];
-  trend: 'improving' | 'stable' | 'declining';
-}
 
 // ─── 巡检报告（InspectionReport）─────────────────────────
 
-/** 单个工具适配器的执行结果：巡检报告中按适配器切分的明细 */
-export interface AdapterResult {
-  adapterId: string;
-  adapterName: string;
-  duration: number;
-  issueCount: number;
-  passed: boolean;
-  issues: Issue[];
-}
-
-/** 巡检报告：一次巡检的完整产出（评分 + 问题 + 各适配器结果 + 建议，增量巡检附 diff） */
-export interface InspectionReport {
-  projectId: string;
-  timestamp: Date;
-  scanType: 'full' | 'incremental' | 'scheduled';
-  duration: number;
-  score: HealthScore;
-  issues: Issue[];
-  summary: { total: number; error: number; warning: number; info: number };
-  adapterResults: AdapterResult[];
-  recommendations: string[];
-  diff?: {
-    newIssues: Issue[];
-    resolvedIssues: Issue[];
-    scoreChange: number;
-  };
-}
 
 // ─── 哨兵事件复现统计（SentinelOccurrence）────────────────
 
@@ -215,22 +179,6 @@ export interface GarbageItem {
 
 // ─── 经验记录（ExperienceEntry）──────────────────────────
 
-/** 经验条目：evolve 域沉淀的规则调优经验（真阳/误报/已修复/最佳实践），供规则校准消费 */
-export interface ExperienceEntry {
-  id: string;
-  projectId: string;
-  type: 'true-positive' | 'false-positive' | 'fix-applied' | 'best-practice';
-  ruleId: string;
-  issueId?: string;
-  pattern: string;
-  message: string;
-  feedback: string;
-  source: 'user' | 'auto';
-  confidence: number;
-  verified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 // ─── 开源工具集成（Tool Adapter）────────────────────────
 
@@ -418,18 +366,6 @@ export interface AuditEntry {
 /** 白名单作用范围：整项目 / 单文件 / 单规则 */
 export type WhitelistScope = 'project' | 'file' | 'rule';
 
-/** 白名单条目：豁免记录，target 的含义随 scope 变化（路径或 ruleId） */
-export interface WhitelistEntry {
-  id: string;
-  projectId: string;
-  scope: WhitelistScope;
-  target: string;
-  ruleId?: string;
-  reason: string;
-  operator: string;
-  expiresAt?: Date;
-  createdAt: Date;
-}
 
 // ─── 工具配置文件（tools.yml 对应类型）─────────────────
 
@@ -493,24 +429,6 @@ export type GovernanceDomain = (typeof GOVERNANCE_DOMAINS)[number];
  */
 export const INSPECT_SCOPE_DOMAINS = ['inspect', 'security', 'garbage'] as const;
 
-/** SOP 动作类型：三维分类中的「行动」维度，决定规则触发后采取何种动作 */
-export type ActionType =
-  | 'scan' // 扫描检测
-  | 'block' // 拦截阻断
-  | 'score' // 评分量化
-  | 'alert' // 告警响应
-  | 'suggest' // 修复建议
-  | 'calibrate'; // 进化校准
-
-/** 知识来源：三维分类中的「来源」维度，标示知识是外部标准、内部沉淀、社区贡献还是官方维护 */
-export type DataSource =
-  | 'external' // 外部标准
-  | 'internal' // 内部模式
-  | 'community' // 社区贡献
-  | 'official'; // 官方维护
-
-/** 规则生命周期状态：草稿 → 试用 → 生效 → 废弃，决定规则是否参与巡检/门禁 */
-export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
 
 /** SOP 知识包版本：一次云脑发布产出的知识/经验/恶意库快照及其哈希 */
 export interface SopVersion {
@@ -547,14 +465,6 @@ export interface SopDiff<T = unknown> {
   metadata: SopDiffMetadata;
 }
 
-/** 同步结果：云脑同步结论，reason 说明未更新或失败的原因（已是最新/兼容性错误/哈希不符/网络错误） */
-export interface SyncResult {
-  updated: boolean;
-  reason?: 'already_latest' | 'compatibility_error' | 'hash_mismatch' | 'network_error';
-  fromVersion?: string;
-  toVersion?: string;
-  ruleCount?: number;
-}
 
 // ─── 输出映射器（Output Mapper）──────────────────────────
 

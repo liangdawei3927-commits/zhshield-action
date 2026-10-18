@@ -17,11 +17,11 @@ import {
 import {
   detectFeatureEnvy,
   detectShotgunSurgery,
-  detectDataClass,
   detectGodObject,
   detectDataClumps,
   detectPrimitiveObsession,
 } from './coupling-detectors';
+import { detectDataClass } from './data-class-detector';
 import {
   detectInappropriateIntimacy,
   detectMiddleMan,

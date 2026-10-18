@@ -259,7 +259,7 @@ function handleJobTimeout(child: ChildProcess, id: string): void {
   } catch {}
   const pid = child.pid;
   const gen = (child as GenChild).gen;
-  setTimeout(() => terminateChild(child, pid, gen), CANCEL_GRACE_MS);
+  setTimeout(terminateChild, CANCEL_GRACE_MS, child, pid, gen);
 }
 
 /** 发送失败处理：清理定时器与待办任务 */

@@ -30,14 +30,18 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const DRIVE_LETTER_RE = /^[a-zA-Z]:[\\/]/;
+
 /** 是否绝对路径：POSIX `/`、Windows 盘符 `C:\` / `C:/`、UNC `\\` 前缀 */
 function isAbsolutePath(p: string): boolean {
-  return p.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
+  return p.startsWith('/') || DRIVE_LETTER_RE.test(p) || p.startsWith('\\\\');
 }
+
+const PATH_SPLIT_RE = /[\\/]/;
 
 /** 路径是否含 `..` 段（同时按 `/` 与 `\` 切分，兼容两种分隔符） */
 function hasParentSegment(p: string): boolean {
-  return p.split(/[\\/]/).some((segment) => segment === '..');
+  return p.split(PATH_SPLIT_RE).some((segment) => segment === '..');
 }
 
 /**

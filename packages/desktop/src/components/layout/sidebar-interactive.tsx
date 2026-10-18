@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { SectionTitle } from './sidebar-common';
 import { ShieldLogo, NavIcon } from '../ui/Icons';
 import type { AiToolConfigData } from '../../types/electron';

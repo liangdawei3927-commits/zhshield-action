@@ -29,6 +29,38 @@ const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
 
 const SEVERITY_KEYS = ['critical', 'high', 'medium', 'low'] as const;
 
+interface SecurityReportCopyProps {
+  copyToAi: (issue: SecurityIssue) => void;
+  copyAllToAi: (issues: SecurityIssue[]) => void;
+  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
+  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
+}
+
+interface SecuritySecretsProps {
+  onMarkRotating: (secretId: string) => void;
+  onVerifyRotated: (secretId: string) => void;
+  onDismiss: (secretId: string) => void;
+  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
+  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
+  t: Translate;
+}
+
+function renderFindingsPanel(
+  items: SecurityScanReportData['findings'],
+  onCopyToAi: (issue: SecurityIssue) => void,
+  onCopyAll: (issues: SecurityIssue[]) => void,
+) {
+  return <FindingsPanel findings={items} onCopyToAi={onCopyToAi} onCopyAll={onCopyAll} />;
+}
+
+function renderMalwarePanel(
+  items: SecurityScanReportData['malware'],
+  onCopyToAi: (item: SecurityScanReportData['malware'][number]) => void,
+  onCopyAll: (items: SecurityScanReportData['malware']) => void,
+) {
+  return <MalwarePanel items={items} onCopyToAi={onCopyToAi} onCopyAll={onCopyAll} />;
+}
+
 /** 报告统计卡：总数 + 各严重级别 + 恶意代码，明细复用 FindingsPanel/MalwarePanel */
 function buildSecurityStats({
   report,
@@ -39,12 +71,8 @@ function buildSecurityStats({
   t,
 }: {
   report: SecurityScanReportData;
-  copyToAi: (issue: SecurityIssue) => void;
-  copyAllToAi: (issues: SecurityIssue[]) => void;
-  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
-  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
   t: Translate;
-}): ReportStatCard[] {
+} & SecurityReportCopyProps): ReportStatCard[] {
   return [
     { key: 'total', label: t('page.security.stats.total'), value: report.summary.total },
     ...SEVERITY_KEYS.map((sev) => {
@@ -55,13 +83,8 @@ function buildSecurityStats({
         value: report.summary[sev],
         detail: {
           items,
-          render: (sub: unknown[]) => (
-            <FindingsPanel
-              findings={sub as SecurityScanReportData['findings']}
-              onCopyToAi={copyToAi}
-              onCopyAll={copyAllToAi}
-            />
-          ),
+          render: (sub: unknown[]) =>
+            renderFindingsPanel(sub as SecurityScanReportData['findings'], copyToAi, copyAllToAi),
           hint: t('page.security.copyAllPrompt', { count: items.length }),
         },
       };
@@ -72,13 +95,8 @@ function buildSecurityStats({
       value: report.summary.malwareTotal,
       detail: {
         items: report.malware,
-        render: (sub: unknown[]) => (
-          <MalwarePanel
-            items={sub as SecurityScanReportData['malware']}
-            onCopyToAi={copyMalwareToAi}
-            onCopyAll={copyMalwareAllToAi}
-          />
-        ),
+        render: (sub: unknown[]) =>
+          renderMalwarePanel(sub as SecurityScanReportData['malware'], copyMalwareToAi, copyMalwareAllToAi),
       },
     },
   ];
@@ -113,20 +131,10 @@ function SecurityTabBar({
   );
 }
 
-interface SecurityTabContentProps {
+interface SecurityTabContentProps extends SecurityReportCopyProps, SecuritySecretsProps {
   report: SecurityScanReportData;
   secretsReport: SecretReportData | null;
   tab: SecurityTab;
-  copyToAi: (issue: SecurityIssue) => void;
-  copyAllToAi: (issues: SecurityIssue[]) => void;
-  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
-  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
-  onMarkRotating: (secretId: string) => void;
-  onVerifyRotated: (secretId: string) => void;
-  onDismiss: (secretId: string) => void;
-  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
-  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
-  t: Translate;
 }
 
 /** 当前分类的明细面板（漏洞 / 恶意代码 / 密钥） */
@@ -146,18 +154,10 @@ function SecurityTabContent({
   t,
 }: SecurityTabContentProps) {
   if (tab === 'vuln') {
-    return (
-      <FindingsPanel findings={report.findings} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
-    );
+    return renderFindingsPanel(report.findings, copyToAi, copyAllToAi);
   }
   if (tab === 'malware') {
-    return (
-      <MalwarePanel
-        items={report.malware}
-        onCopyToAi={copyMalwareToAi}
-        onCopyAll={copyMalwareAllToAi}
-      />
-    );
+    return renderMalwarePanel(report.malware, copyMalwareToAi, copyMalwareAllToAi);
   }
   if (secretsReport) {
     return (
@@ -179,7 +179,7 @@ function SecurityTabContent({
   );
 }
 
-interface SecurityReportViewProps {
+interface SecurityReportViewProps extends SecurityReportCopyProps, SecuritySecretsProps {
   projectPath: string;
   report: SecurityScanReportData;
   secretsReport: SecretReportData | null;
@@ -189,16 +189,6 @@ interface SecurityReportViewProps {
   onTabChange: (tab: SecurityTab) => void;
   onRescan: () => void;
   onBackHome: () => void;
-  copyToAi: (issue: SecurityIssue) => void;
-  copyAllToAi: (issues: SecurityIssue[]) => void;
-  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
-  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
-  onMarkRotating: (secretId: string) => void;
-  onVerifyRotated: (secretId: string) => void;
-  onDismiss: (secretId: string) => void;
-  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
-  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
-  t: Translate;
 }
 
 /** 报告态：统计卡 + 分类标签栏 + 明细面板 */

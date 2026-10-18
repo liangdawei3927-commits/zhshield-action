@@ -22,7 +22,7 @@ export function BaseButton({
   className,
   variant = 'primary',
   loading = false,
-  loadingLabel,
+  loadingLabel: _loadingLabel,
   disabled,
   ...rest
 }: BaseButtonProps) {

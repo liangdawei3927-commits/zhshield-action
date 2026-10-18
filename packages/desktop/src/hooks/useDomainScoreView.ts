@@ -7,6 +7,7 @@ import {
   type DomainScoreView,
 } from '../pages/domain-score-logic';
 
+/** 域评分视图 Hook 的配置选项 */
 export interface UseDomainScoreViewOptions {
   projectPath: string;
   dimension: ScoreDimension;

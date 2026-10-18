@@ -14,6 +14,7 @@ import {
   resolveLockfileCheck,
   ENV_SEVERITY_CONFIG,
 } from './dependency-logic';
+import type { LockfileCheckState } from './dependency-logic';
 import { AdapterErrorNote } from './dependency-cards';
 
 /** 依赖图谱 SVG 字形（24×24 线性风格；尺寸/描边由宿主 `<svg>` 决定） */
@@ -42,6 +43,61 @@ function DependencyGraphIcon() {
   );
 }
 
+/** 锁文件单项校验形态：三态图标（勾选 / 灰点 / 叉号）+ 状态文案 */
+function LockfileCheckRow({
+  state,
+  check,
+}: {
+  state: LockfileCheckState;
+  check: (typeof LOCKFILE_CHECKS)[number];
+}) {
+  const t = useT();
+  const ok = state === 'ok';
+  const na = state === 'na';
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-success-50' : na ? 'bg-zh-panel' : 'bg-danger-50'}`}
+      >
+        {ok ? (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-success-700))"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        ) : na ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-zh-muted" />
+        ) : (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgb(var(--zh-danger))"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        )}
+      </span>
+      <span
+        className={`text-sm ${ok ? 'text-success-700' : na ? 'text-zh-muted' : 'text-danger-600'}`}
+      >
+        {t(ok ? check.okKey : na ? check.naKey : check.failKey)}
+      </span>
+    </div>
+  );
+}
+
 /** 锁文件状态卡片：存在性 / 一致性 / 哈希完整性（勾选 / 叉号 + 文案） */
 export function DependencyLockfileCard({
   lockfile,
@@ -62,53 +118,13 @@ export function DependencyLockfileCard({
         label={t('page.deps.lockfile')}
       />
       <div className="space-y-3">
-        {LOCKFILE_CHECKS.map((check) => {
-          const state = resolveLockfileCheck(lockfile, check.key);
-          const ok = state === 'ok';
-          const na = state === 'na';
-          return (
-            <div key={check.key} className="flex items-center gap-3">
-              <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${ok ? 'bg-success-50' : na ? 'bg-zh-panel' : 'bg-danger-50'}`}
-              >
-                {ok ? (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="rgb(var(--zh-success-700))"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                ) : na ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-zh-muted" />
-                ) : (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="rgb(var(--zh-danger))"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                )}
-              </span>
-              <span
-                className={`text-sm ${ok ? 'text-success-700' : na ? 'text-zh-muted' : 'text-danger-600'}`}
-              >
-                {t(ok ? check.okKey : na ? check.naKey : check.failKey)}
-              </span>
-            </div>
-          );
-        })}
+        {LOCKFILE_CHECKS.map((check) => (
+          <LockfileCheckRow
+            key={check.key}
+            state={resolveLockfileCheck(lockfile, check.key)}
+            check={check}
+          />
+        ))}
       </div>
     </ResultCard>
   );

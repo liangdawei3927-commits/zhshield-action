@@ -1,3 +1,4 @@
+/** 健康评分维度 */
 export type HealthScoreDimension =
   | 'quality'
   | 'gate'
@@ -23,9 +24,10 @@ export const HEALTH_SCORE_DIMENSIONS: readonly HealthScoreDimension[] = [
   'backup',
 ] as const;
 
+/** 评分维度 */
 export type ScoreDimension = HealthScoreDimension;
 export const SCORE_DIMENSIONS = HEALTH_SCORE_DIMENSIONS;
 
 export function isScoreDimension(value: unknown): value is ScoreDimension {
-  return typeof value === 'string' && SCORE_DIMENSIONS.includes(value as any);
+  return typeof value === 'string' && (SCORE_DIMENSIONS as readonly string[]).includes(value);
 }

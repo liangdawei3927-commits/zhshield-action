@@ -9,6 +9,17 @@ const GRAY = '\x1b[90m';
 const DIM = '\x1b[2m';
 
 /**
+ * 渲染目标：输出行缓冲 + 当前缩进
+ *
+ * 封装 (lines, indent) 参数泥团：各段落渲染方法只需携带数据 + 渲染目标，
+ * 调用方构造一次即可逐层下传（行为不变，仅结构收敛）。
+ */
+export interface RenderTarget {
+  readonly lines: string[];
+  readonly indent: string;
+}
+
+/**
  * ConsoleReporterFormat — ConsoleReporter 的终端 ANSI 颜色工具
  *
  * 关闭颜色时所有方法原样返回输入，保证管道输出纯净。

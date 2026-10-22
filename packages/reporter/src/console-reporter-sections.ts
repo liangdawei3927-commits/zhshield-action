@@ -3,7 +3,7 @@ import type { RuleEngineReport } from '@zh/kernel';
 import type { GuardReport } from '@zh/guard';
 import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
-import type { ConsoleReporterFormat } from './console-reporter-format';
+import type { ConsoleReporterFormat, RenderTarget } from './console-reporter-format';
 import type { RuleEngineSectionFormatter } from './console-reporter-rule-engine';
 
 /**
@@ -42,7 +42,7 @@ export class StageSectionFormatter {
     } else if (this.isRuleEngineReport(report.inspect)) {
       this.ruleEngine.format(report.inspect, lines, '  ');
     } else {
-      this.formatInspectReport(report.inspect, lines, '  ');
+      this.formatInspectReport(report.inspect, { lines, indent: '  ' });
     }
     lines.push('');
   }
@@ -86,15 +86,15 @@ export class StageSectionFormatter {
     });
   }
 
-  private formatInspectReport(report: InspectionReport, lines: string[], indent: string): void {
+  private formatInspectReport(report: InspectionReport, rt: RenderTarget): void {
     const summary = report.summary;
     const total = summary?.total ?? 0;
 
-    lines.push(
-      `${indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('个问题')}`}`,
+    rt.lines.push(
+      `${rt.indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('个问题')}`}`,
     );
-    lines.push(
-      `${indent}  Error: ${this.fmt.red(String(summary?.error ?? 0))}  ` +
+    rt.lines.push(
+      `${rt.indent}  Error: ${this.fmt.red(String(summary?.error ?? 0))}  ` +
         `Warning: ${this.fmt.yellow(String(summary?.warning ?? 0))}  ` +
         `Info: ${this.fmt.gray(String(summary?.info ?? 0))}`,
     );
@@ -106,43 +106,41 @@ export class StageSectionFormatter {
           : report.score.grade === 'B'
             ? this.fmt.yellow(report.score.grade)
             : this.fmt.red(report.score.grade);
-      lines.push(
-        `${indent}${this.fmt.dim(`评分: ${this.fmt.bold(String(report.score.overall))} (${gradeS})`)}`,
+      rt.lines.push(
+        `${rt.indent}${this.fmt.dim(`评分: ${this.fmt.bold(String(report.score.overall))} (${gradeS})`)}`,
       );
     }
 
-    this.formatSuppressedIssues(report, lines, indent);
-    this.formatBaselineAudit(report, lines, indent);
-    this.formatToolAvailability(report, lines, indent);
+    this.formatSuppressedIssues(report, rt);
+    this.formatBaselineAudit(report, rt);
+    this.formatToolAvailability(report, rt);
   }
 
   /**
    * 渲染基线豁免区：豁免项已从 issues 中移除，若不在此显式列出，报告读者无法区分
    * "工具没报出来" 与 "报出来了但被豁免"，也无法复核豁免理由是否仍然成立。
    */
-  private formatSuppressedIssues(
-    report: InspectionReport,
-    lines: string[],
-    indent: string,
-  ): void {
+  private formatSuppressedIssues(report: InspectionReport, rt: RenderTarget): void {
     const suppressed = report.suppressedIssues ?? [];
     if (suppressed.length === 0) return;
 
-    lines.push('');
-    lines.push(
-      `${indent}${this.fmt.yellow('基线豁免')}: ${this.fmt.bold(String(suppressed.length))} ${this.fmt.dim('项（不计入评分）')}`,
+    rt.lines.push('');
+    rt.lines.push(
+      `${rt.indent}${this.fmt.yellow('基线豁免')}: ${this.fmt.bold(String(suppressed.length))} ${this.fmt.dim('项（不计入评分）')}`,
     );
     for (const { issue, entry } of suppressed) {
       const location = `${issue.file}:${issue.line ?? 0}`;
-      lines.push(`${indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`);
-      lines.push(
-        `${indent}    ${this.fmt.dim('理由')}: ${entry.reason ?? this.fmt.dim('[未记录，需补齐]')}`,
+      rt.lines.push(
+        `${rt.indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`,
+      );
+      rt.lines.push(
+        `${rt.indent}    ${this.fmt.dim('理由')}: ${entry.reason ?? this.fmt.dim('[未记录，需补齐]')}`,
       );
       if (entry.owner) {
-        lines.push(`${indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
+        rt.lines.push(`${rt.indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
       }
-      lines.push(
-        `${indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
+      rt.lines.push(
+        `${rt.indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
       );
     }
   }
@@ -152,38 +150,40 @@ export class StageSectionFormatter {
    * 豁免清单本身不自证——10 条看着像在防护的条目可能一条都没生效；不显式暴露，
    * 清单就会随时间虚增成无人能复核的仪式，满分也随之失去可信度。
    */
-  private formatBaselineAudit(report: InspectionReport, lines: string[], indent: string): void {
+  private formatBaselineAudit(report: InspectionReport, rt: RenderTarget): void {
     const dormant = report.dormantEntries ?? [];
     const expired = report.expiredEntries ?? [];
     if (dormant.length === 0 && expired.length === 0) return;
 
-    lines.push('');
-    lines.push(
-      `${indent}${this.fmt.yellow('豁免清单待复核')}: ${this.fmt.bold(String(dormant.length))} ${this.fmt.dim('休眠')} / ${this.fmt.bold(String(expired.length))} ${this.fmt.dim('过期')}`,
+    rt.lines.push('');
+    rt.lines.push(
+      `${rt.indent}${this.fmt.yellow('豁免清单待复核')}: ${this.fmt.bold(String(dormant.length))} ${this.fmt.dim('休眠')} / ${this.fmt.bold(String(expired.length))} ${this.fmt.dim('过期')}`,
     );
     for (const entry of dormant) {
       const location = `${entry.file}:${entry.line}`;
-      lines.push(`${indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`);
-      lines.push(
-        `${indent}    ${this.fmt.dim('本轮未命中。若对应问题已修复请删除该条目；若属防护尚未触发的回归防线，请确认仍需保留。')}`,
+      rt.lines.push(
+        `${rt.indent}  ${this.fmt.dim('○')} ${entry.ruleId}  ${this.fmt.dim(location)}`,
+      );
+      rt.lines.push(
+        `${rt.indent}    ${this.fmt.dim('本轮未命中。若对应问题已修复请删除该条目；若属防护尚未触发的回归防线，请确认仍需保留。')}`,
       );
       if (entry.owner) {
-        lines.push(`${indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
+        rt.lines.push(`${rt.indent}    ${this.fmt.dim('责任人')}: ${entry.owner}`);
       }
-      lines.push(
-        `${indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
+      rt.lines.push(
+        `${rt.indent}    ${this.fmt.dim('到期')}: ${entry.expiresAt ?? this.fmt.dim('永久（建议设置到期时间）')}`,
       );
     }
     for (const entry of expired) {
       const location = `${entry.file}:${entry.line}`;
-      lines.push(
-        `${indent}  ${this.fmt.dim('✗')} ${entry.ruleId}  ${this.fmt.dim(location)} ${this.fmt.dim('已过期，已不再豁免，请清理')}`,
+      rt.lines.push(
+        `${rt.indent}  ${this.fmt.dim('✗')} ${entry.ruleId}  ${this.fmt.dim(location)} ${this.fmt.dim('已过期，已不再豁免，请清理')}`,
       );
     }
   }
 
   /** 渲染工具可用性矩阵：显式上报每个外部扫描工具的可用状态，消除"工具缺失静默跳过"盲区 */
-  private formatToolAvailability(report: InspectionReport, lines: string[], indent: string): void {
+  private formatToolAvailability(report: InspectionReport, rt: RenderTarget): void {
     const results = report.adapterResults;
     if (!results || results.length === 0) return;
 
@@ -193,47 +193,43 @@ export class StageSectionFormatter {
     const normal = results.filter((r) => r.status === 'passed' || r.status === undefined);
 
     if (unavailable.length === 0 && errors.length === 0 && skipped.length === 0) {
-      this.formatNormalTools(normal, lines, indent);
+      this.formatNormalTools(normal, rt);
       return;
     }
 
-    this.formatUnavailableTools(unavailable, lines, indent);
-    this.formatErrorTools(errors, lines, indent);
-    this.formatSkippedTools(skipped, lines, indent);
-    this.formatNormalTools(normal, lines, indent);
+    this.formatUnavailableTools(unavailable, rt);
+    this.formatErrorTools(errors, rt);
+    this.formatSkippedTools(skipped, rt);
+    this.formatNormalTools(normal, rt);
   }
 
-  private formatUnavailableTools(
-    unavailable: AdapterResult[],
-    lines: string[],
-    indent: string,
-  ): void {
+  private formatUnavailableTools(unavailable: AdapterResult[], rt: RenderTarget): void {
     if (unavailable.length === 0) return;
     const names = unavailable.map((r) => this.fmt.yellow(r.adapterName)).join('、');
-    lines.push(
-      `${indent}${this.fmt.yellow('⚠ 工具不可用')}: ${names}（未安装，可用 zhshield tools install 安装）`,
+    rt.lines.push(
+      `${rt.indent}${this.fmt.yellow('⚠ 工具不可用')}: ${names}（未安装，可用 zhshield tools install 安装）`,
     );
   }
 
-  private formatErrorTools(errors: AdapterResult[], lines: string[], indent: string): void {
+  private formatErrorTools(errors: AdapterResult[], rt: RenderTarget): void {
     if (errors.length === 0) return;
     const withFindings = errors.filter((r) => r.issueCount > 0 || r.issues.length > 0);
     const trulyFailed = errors.filter((r) => r.issueCount === 0 && r.issues.length === 0);
-    this.formatWithFindings(withFindings, lines, indent);
-    this.formatTrulyFailed(trulyFailed, lines, indent);
+    this.formatWithFindings(withFindings, rt);
+    this.formatTrulyFailed(trulyFailed, rt);
   }
 
-  private formatWithFindings(withFindings: AdapterResult[], lines: string[], indent: string): void {
+  private formatWithFindings(withFindings: AdapterResult[], rt: RenderTarget): void {
     if (withFindings.length === 0) return;
     // 非零退出码 ≠ 失败：有产出（issueCount>0）→ 检出问题；无产出（issueCount===0）→ 真失败
     const total = withFindings.reduce((sum, r) => sum + r.issueCount, 0);
     const names = withFindings
       .map((r) => `${this.fmt.yellow(r.adapterName)}${this.fmt.dim(`(${r.issueCount})`)}`)
       .join('、');
-    lines.push(`${indent}${this.fmt.yellow(`⚠ 检出 ${total} 个问题`)}: ${names}`);
+    rt.lines.push(`${rt.indent}${this.fmt.yellow(`⚠ 检出 ${total} 个问题`)}: ${names}`);
   }
 
-  private formatTrulyFailed(trulyFailed: AdapterResult[], lines: string[], indent: string): void {
+  private formatTrulyFailed(trulyFailed: AdapterResult[], rt: RenderTarget): void {
     if (trulyFailed.length === 0) return;
     // P1（复查5）：此前无条件写"(错误详情已在 issues 中)"，但 status==='error' 且
     // issues 为空的适配器（ESLint 缺配置 / dep-cruiser 解析失败）根本没有 issue，
@@ -242,10 +238,10 @@ export class StageSectionFormatter {
       const reason = r.errorDetail ?? '未提供失败原因';
       return `${this.fmt.red(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
     });
-    lines.push(`${indent}${this.fmt.red('✗ 工具执行失败')}: ${parts.join('  ')}`);
+    rt.lines.push(`${rt.indent}${this.fmt.red('✗ 工具执行失败')}: ${parts.join('  ')}`);
   }
 
-  private formatSkippedTools(skipped: AdapterResult[], lines: string[], indent: string): void {
+  private formatSkippedTools(skipped: AdapterResult[], rt: RenderTarget): void {
     if (skipped.length === 0) return;
     const parts = skipped.map((r) => {
       const reason =
@@ -257,16 +253,16 @@ export class StageSectionFormatter {
             : '已跳过');
       return `${this.fmt.gray(r.adapterName)}${this.fmt.dim(`(${reason})`)}`;
     });
-    lines.push(`${indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);
+    rt.lines.push(`${rt.indent}${this.fmt.gray('- 已跳过')}: ${parts.join('  ')}`);
   }
 
-  private formatNormalTools(normal: AdapterResult[], lines: string[], indent: string): void {
+  private formatNormalTools(normal: AdapterResult[], rt: RenderTarget): void {
     if (normal.length === 0) return;
     const parts = normal.map(
       (r) =>
         `${this.fmt.dim(r.adapterName)}${r.duration > 0 ? this.fmt.dim(`(${(r.duration / 1000).toFixed(1)}s)`) : ''}`,
     );
-    lines.push(`${indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
+    rt.lines.push(`${rt.indent}${this.fmt.dim('工具')}: ${parts.join('  ')}`);
   }
 
   private isRuleEngineReport(r: unknown): r is RuleEngineReport {

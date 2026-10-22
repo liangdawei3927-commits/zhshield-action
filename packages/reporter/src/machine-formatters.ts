@@ -163,7 +163,10 @@ function guardFindings(report: GuardReport): Finding[] {
     } else {
       findings.push({
         ruleId: res.checkId,
-        severity: res.severity,
+        // 与 violations 分支同规：severity 必须过 toFindingSeverity 归一。
+        // 透传原始值时，越界 severity（如磁盘反序列化带入的 critical）会让
+        // severityRank 返回 undefined，阈值比较恒 false → 门禁静默放行。
+        severity: toFindingSeverity(res.severity),
         message: res.message,
         source: 'guard',
       });
@@ -391,7 +394,9 @@ export function toSarif(findings: Finding[], toolName = 'zhshield'): string {
   return JSON.stringify(log, null, 2);
 }
 
-/** 原始报告序列化为 JSON（供 action 输出 report 产物 / 人工排查） */
+/** 原始报告序列化为 JSON（供 action 输出 report 产物 / 人工排查）。
+ *  undefined 兜底为 null：JSON.stringify 对 undefined 原生返回 undefined（违反 string 签名），
+ *  透传给 writeFileSync 会让落盘链路 TypeError 崩溃。 */
 export function formatReportJson(report: unknown): string {
-  return JSON.stringify(report, null, 2);
+  return JSON.stringify(report ?? null, null, 2);
 }

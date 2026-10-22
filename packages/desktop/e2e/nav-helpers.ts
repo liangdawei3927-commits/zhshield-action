@@ -30,7 +30,7 @@ export const ELECTRON_BIN = (() => {
 export const FIXTURE = process.env.ZH_NAV_FIXTURE ?? '/tmp/zh-nav-fixture';
 export const SHOT_DIR = process.env.ZH_NAV_SHOTS ?? '/tmp/zh-nav-shots';
 
-/** 顶部入口（TopNav 10 项 + 各页右上角报告中心），来源区分按钮所在容器。
+/** 顶部入口（TopNav 10 项 + 侧边栏项目行报告中心），来源区分按钮所在容器。
  *  ⛔ 规则进化 / AI 工具已暂下线（见 src/feature-flags.ts），其侧边栏入口不在此表。 */
 export interface NavEntry {
   id: string;
@@ -42,8 +42,8 @@ export interface NavEntry {
 }
 
 /**
- * 与 `src/components/layout/nav-items.ts` 的 10 项 + 页面右上角入口 1 项（报告中心）
- * 严格一一对应。报告中心已移出导航栏，入口收敛到各页 PageShell 右上角按钮（where: 'shell'）。
+ * 与 `src/components/layout/nav-items.ts` 的 10 项 + 侧边栏项目行入口 1 项（报告中心）
+ * 严格一一对应。报告中心已移出导航栏，入口迁到侧边栏「项目管理」项目行（画像按钮之后，where: 'sidebar'）。
  * ⛔ 规则进化（原侧边栏入口）与 AI 工具已暂下线：见 `src/feature-flags.ts`，
  * 恢复入口时必须同步本表。
  *
@@ -64,7 +64,7 @@ export const ENTRIES: NavEntry[] = [
   { id: 'techdebt', label: '技术债务', where: 'nav', markers: ['量化技术债', '开始盘点', '债务'], action: '开始盘点' },
   { id: 'refactor', label: '代码重构', where: 'nav', markers: ['优化代码结构', '马上检查', '重构'], action: '马上检查' },
   { id: 'backup', label: '备份中心', where: 'nav', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },
-  { id: 'reports', label: '报告中心', where: 'shell', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
+  { id: 'reports', label: '报告中心', where: 'sidebar', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
 ];
 
 const { ELECTRON_RUN_AS_NODE: _d1, NODE_OPTIONS: _d2, ...CLEAN_ENV } = process.env;
@@ -110,8 +110,8 @@ export function entryButton(page: Page, e: NavEntry) {
     return page.getByRole('navigation').getByRole('button', { name: e.label });
   }
   if (e.where === 'sidebar') {
-    // ⛔ 侧边栏入口当前全部暂下线（规则进化 / AI 工具，见 src/feature-flags.ts）。
-    // 本分支保留给未来恢复侧边栏入口时使用，恢复时需同步该表。
+    // 侧边栏内的项目级入口（当前为项目行「报告中心」，画像按钮之后）。
+    // 用 complementary 作用域限定，避免与 PageShell 右上角同名按钮（暂共存）冲突。
     return page.getByRole('complementary').getByRole('button', { name: e.label });
   }
   if (e.where === 'shell') {

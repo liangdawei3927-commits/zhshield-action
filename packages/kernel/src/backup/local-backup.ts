@@ -61,11 +61,11 @@ interface RunDirectoryBackupParams {
 
 export class LocalBackup {
   private backupRoot: string;
-  private readonly scanner = new LocalBackupScanner();
-  private readonly manifestStore = new LocalBackupManifestStore();
-  private readonly copier = new LocalBackupCopier();
-  private readonly pruner = new LocalBackupPruner();
-  private readonly restorer = new LocalBackupRestorer();
+  private readonly scanner: LocalBackupScanner = new LocalBackupScanner();
+  private readonly manifestStore: LocalBackupManifestStore = new LocalBackupManifestStore();
+  private readonly copier: LocalBackupCopier = new LocalBackupCopier();
+  private readonly pruner: LocalBackupPruner = new LocalBackupPruner();
+  private readonly restorer: LocalBackupRestorer = new LocalBackupRestorer();
 
   constructor(backupRoot?: string) {
     this.backupRoot = backupRoot ?? path.join(os.homedir(), 'zhshield-backups');
@@ -149,7 +149,9 @@ export class LocalBackup {
   }
 
   /** 目录格式备份：增量复制文件、写清单并轮换旧备份 */
-  private async runDirectoryBackup(params: RunDirectoryBackupParams): Promise<LocalBackupSubResult> {
+  private async runDirectoryBackup(
+    params: RunDirectoryBackupParams,
+  ): Promise<LocalBackupSubResult> {
     const {
       resolvedBackupDir,
       snapshotName,

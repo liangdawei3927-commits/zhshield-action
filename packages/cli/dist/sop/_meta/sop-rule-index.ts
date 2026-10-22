@@ -8,12 +8,12 @@ import type {
 
 // ─── 倒排索引：字段值 → 规则 id 集合（查询 O(1) 定位，避免全表扫描）
 export class RuleIndex {
-  private domainIndex = new Map<GovernanceDomain, Set<string>>();
-  private actionIndex = new Map<ActionType, Set<string>>();
-  private sourceIndex = new Map<string, Set<string>>();
-  private statusIndex = new Map<RuleLifecycleStatus, Set<string>>();
-  private severityIndex = new Map<string, Set<string>>();
-  private tagsIndex = new Map<string, Set<string>>();
+  private domainIndex: Map<GovernanceDomain, Set<string>> = new Map();
+  private actionIndex: Map<ActionType, Set<string>> = new Map();
+  private sourceIndex: Map<string, Set<string>> = new Map();
+  private statusIndex: Map<RuleLifecycleStatus, Set<string>> = new Map();
+  private severityIndex: Map<string, Set<string>> = new Map();
+  private tagsIndex: Map<string, Set<string>> = new Map();
 
   add(rule: SopRule): void {
     this.insert(this.domainIndex, rule.domain, rule.id);

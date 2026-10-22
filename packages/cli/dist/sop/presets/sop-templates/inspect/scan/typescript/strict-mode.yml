@@ -7,7 +7,7 @@
 # 数据来源: 内部模式 (internal)
 # 对应适配器: Inspect TS · strict-mode
 # 内部标准源: TypeScript strict config · IronNest#13 ESLint+TypeScript
-# 最后更新: 2026-07-29
+# 最后更新: 2026-10-21（补 metadata.tags=typescript，栈限定随画像裁剪）
 # =============================================================================
 
 apiVersion: sop/v1
@@ -16,13 +16,18 @@ metadata:
   id: "inspect.scan.internal.strict-mode"
   name: "TypeScript 严格模式配置检查"
   description: "检查 tsconfig.json 是否启用 strict、noUncheckedIndexedAccess、exactOptionalPropertyTypes 三项关键严格标志"
-  version: "1.0.0"
+  version: "1.1.0"
   author: "智汇码盾官方"
   created: "2026-07-29"
-  updated: "2026-07-29"
+  updated: "2026-10-21"
   status: "active"
   source: "internal"
   sourceRef: "TypeScript strict · IronNest rules/13"
+  # 栈限定标签：TypeScript 独占栈规则，必须声明，否则 ruleMatchesProject 按"通用规则"处理，
+  # 对不含 TypeScript 的项目（文档仓 / 纯资源仓）也会评估并报「缺少 tsconfig.json」误报。
+  # 与云端同源规则 inspect.scan.official.strict-mode 的 tags 口径一致。
+  tags:
+    - "typescript"
 
 governance:
   domain: "inspect"

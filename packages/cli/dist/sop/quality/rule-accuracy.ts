@@ -184,20 +184,13 @@ export function formatRuleAccuracyReport(report: RuleAccuracyReport): string {
 
 // ─── 内部实现 ───
 
-function evaluateRule(
-  file: RuleGoldenFile,
-  allFindings: readonly RuleFinding[],
-  strictUnlabeled: boolean,
-): RuleEvaluation {
-  const findings = allFindings.filter((f) => f.ruleId === file.ruleId);
-  const violations = file.assertions.filter((a) => a.expect === 'violation');
-  const cleans = file.assertions.filter((a) => a.expect === 'clean');
-  const tolerance = file.lineTolerance ?? DEFAULT_LINE_TOLERANCE;
-
+function claimTruePositives(
+  findings: readonly RuleFinding[],
+  violations: readonly RuleGoldenAssertion[],
+  tolerance: number,
+): { claimedAssertion: Set<number>; claimedFinding: Set<number> } {
   const claimedAssertion = new Set<number>();
   const claimedFinding = new Set<number>();
-
-  // TP：finding 认领某条 violation 断言（一条断言只能被认领一次）
   findings.forEach((finding, fi) => {
     for (let ai = 0; ai < violations.length; ai++) {
       if (claimedAssertion.has(ai)) continue;
@@ -208,8 +201,15 @@ function evaluateRule(
       }
     }
   });
+  return { claimedAssertion, claimedFinding };
+}
 
-  // FP：未被任何 violation 断言认领的 finding
+function countUnclaimedFindings(
+  findings: readonly RuleFinding[],
+  claimedFinding: Set<number>,
+  cleans: readonly RuleGoldenAssertion[],
+  tolerance: number,
+): { explicitFalsePositives: number; unlabeled: number } {
   let explicitFalsePositives = 0;
   let unlabeled = 0;
   findings.forEach((finding, fi) => {
@@ -217,29 +217,90 @@ function evaluateRule(
     if (cleans.some((c) => matches(finding, c, tolerance))) explicitFalsePositives++;
     else unlabeled++;
   });
+  return { explicitFalsePositives, unlabeled };
+}
 
-  const truePositives = claimedAssertion.size;
-  const falseNegatives = violations.length - truePositives;
-  const falsePositives = explicitFalsePositives + (strictUnlabeled ? unlabeled : 0);
+interface RuleMetrics {
+  readonly truePositives: number;
+  readonly falsePositives: number;
+  readonly falseNegatives: number;
+  readonly unlabeled: number;
+  readonly precision: number;
+  readonly recall: number;
+}
 
+function computeMetrics(input: {
+  claimedAssertion: Set<number>;
+  violationCount: number;
+  explicitFalsePositives: number;
+  unlabeled: number;
+  strictUnlabeled: boolean;
+}): RuleMetrics {
+  const truePositives = input.claimedAssertion.size;
+  const falseNegatives = input.violationCount - truePositives;
+  const falsePositives =
+    input.explicitFalsePositives + (input.strictUnlabeled ? input.unlabeled : 0);
   // 无输出 ⇒ 无 FP，precision 记 1（漏报由 recall 暴露）；无 violation 断言 ⇒ recall 记 1
   const precision =
     truePositives + falsePositives > 0 ? truePositives / (truePositives + falsePositives) : 1;
-  const recall = violations.length > 0 ? truePositives / violations.length : 1;
-
-  const precisionThreshold = file.thresholds?.precision ?? RULE_PRECISION_THRESHOLD;
-  const recallThreshold = file.thresholds?.recall ?? RULE_RECALL_THRESHOLD;
-
+  const recall = input.violationCount > 0 ? truePositives / input.violationCount : 1;
   return {
-    ruleId: file.ruleId,
     truePositives,
     falsePositives,
     falseNegatives,
-    unlabeledFindings: unlabeled,
+    unlabeled: input.unlabeled,
     precision,
     recall,
-    passes: precision >= precisionThreshold && recall >= recallThreshold,
   };
+}
+
+function getThresholds(file: RuleGoldenFile): { precisionThreshold: number; recallThreshold: number } {
+  return {
+    precisionThreshold: file.thresholds?.precision ?? RULE_PRECISION_THRESHOLD,
+    recallThreshold: file.thresholds?.recall ?? RULE_RECALL_THRESHOLD,
+  };
+}
+
+function buildEvaluation(file: RuleGoldenFile, metrics: RuleMetrics): RuleEvaluation {
+  const { precisionThreshold, recallThreshold } = getThresholds(file);
+  return {
+    ruleId: file.ruleId,
+    truePositives: metrics.truePositives,
+    falsePositives: metrics.falsePositives,
+    falseNegatives: metrics.falseNegatives,
+    unlabeledFindings: metrics.unlabeled,
+    precision: metrics.precision,
+    recall: metrics.recall,
+    passes: metrics.precision >= precisionThreshold && metrics.recall >= recallThreshold,
+  };
+}
+
+function evaluateRule(
+  file: RuleGoldenFile,
+  allFindings: readonly RuleFinding[],
+  strictUnlabeled: boolean,
+): RuleEvaluation {
+  const findings = allFindings.filter((f) => f.ruleId === file.ruleId);
+  const violations = file.assertions.filter((a) => a.expect === 'violation');
+  const cleans = file.assertions.filter((a) => a.expect === 'clean');
+  const tolerance = file.lineTolerance ?? DEFAULT_LINE_TOLERANCE;
+
+  const { claimedAssertion, claimedFinding } = claimTruePositives(findings, violations, tolerance);
+  const { explicitFalsePositives, unlabeled } = countUnclaimedFindings(
+    findings,
+    claimedFinding,
+    cleans,
+    tolerance,
+  );
+  const metrics = computeMetrics({
+    claimedAssertion,
+    violationCount: violations.length,
+    explicitFalsePositives,
+    unlabeled,
+    strictUnlabeled,
+  });
+
+  return buildEvaluation(file, metrics);
 }
 
 /** finding 是否匹配断言（文件路径归一化后比对；断言给了行号才校验行） */

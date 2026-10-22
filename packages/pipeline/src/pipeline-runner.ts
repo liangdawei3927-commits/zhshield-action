@@ -37,6 +37,7 @@ import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
 import { toMessage } from './runner-utils';
 import { buildSuccessReport } from './report-builders';
+import { resolveEffectiveProjectRoot } from './project-profile';
 import {
   composeRuleContext,
   deriveProjectFeature,
@@ -186,7 +187,9 @@ export class PipelineRunner {
     // 归一化 repoRoot 为绝对路径：相对路径会原样流入 SOP tool-dispatch 的
     // ToolScanOptions.projectPath，外部工具（semgrep/gitleaks 等）以自身 cwd 解析导致
     // "no such file" / "unable to find a config"。共享构造缝统一 resolve，下游全部拿到绝对路径。
-    this.repoRoot = path.resolve(repoRoot);
+    // 容器目录下探：目标无 package.json 且存在唯一嵌套仓库根时解析为该根，
+    // 使画像裁剪（toolScope）与工具适配器（depcheck 等）不被容器路径误跳过。
+    this.repoRoot = resolveEffectiveProjectRoot(repoRoot);
     this.logger = new Logger('Pipeline', 'info');
 
     this.eventBus = new EventBus();

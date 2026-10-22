@@ -222,10 +222,10 @@ function collectExposedFiles(projectPath: string): string[] {
   return [...new Set(exposed)];
 }
 
-/** @zh/pipeline 项目画像识别（同步 fs，现移入 worker 执行） */
+/** @zh/pipeline 项目画像识别（同步 fs，现移入 worker 执行）；容器目录先下探解析唯一嵌套仓库根，与扫描路径口径一致 */
 async function detectProjectProfileInWorker(projectPath: string): Promise<unknown> {
-  const { detectProjectProfile } = await import('@zh/pipeline');
-  return detectProjectProfile(projectPath);
+  const { detectProjectProfile, resolveEffectiveProjectRoot } = await import('@zh/pipeline');
+  return detectProjectProfile(resolveEffectiveProjectRoot(projectPath));
 }
 
 /** @zh/fingerprint 完整画像流程：探测 + 落盘 + 问题集 + 漂移 */

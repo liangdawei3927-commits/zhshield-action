@@ -3,7 +3,7 @@ import type { InspectionReport } from '@zh/inspect';
 import { Logger } from '@zh/kernel';
 import type { RuleContext, RuleEngineReport, ProjectFeature } from '@zh/kernel';
 import type { PipelineReport } from './types';
-import { detectProjectProfile } from './project-profile';
+import { detectProjectProfile, resolveEffectiveProjectRoot } from './project-profile';
 import { toFeatureFromProfile } from '@zh/fingerprint';
 import { toMessage } from './runner-utils';
 import { buildFailureReport } from './report-builders';
@@ -11,10 +11,12 @@ import { buildFailureReport } from './report-builders';
 /** 从本项目既有的 detectProjectProfile 探测结果派生 kernel 兼容的 ProjectFeature。
  *  投影委托给 fingerprint 的 toFeatureFromProfile（§11.1 投影资产，唯一投影家），
  *  本处仅保留探测调用与异常降级。失败/未知时返回 undefined（退化为不按画像过滤的安全行为）。
+ *  探测前先经容器目录下探：直接以容器路径调用本函数（绕过 PipelineRunner 构造缝）时，
+ *  画像同样识别到唯一嵌套仓库根（resolveEffectiveProjectRoot 对已解析根幂等）。
  */
 export function deriveProjectFeature(repoRoot: string): ProjectFeature | undefined {
   try {
-    const profile = detectProjectProfile(repoRoot);
+    const profile = detectProjectProfile(resolveEffectiveProjectRoot(repoRoot));
     return toFeatureFromProfile(profile);
   } catch {
     // 画像探测异常不影响体检主流程，退化为不按画像过滤（全量规则）的既有行为。

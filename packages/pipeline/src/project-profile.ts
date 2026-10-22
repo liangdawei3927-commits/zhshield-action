@@ -158,3 +158,59 @@ function readPackageJson(pkgPath: string): Record<string, unknown> {
     return {};
   }
 }
+
+/** 嵌套仓库下探时跳过的噪声目录（语义对齐 kernel scan-utils 的 NOISE_DIRS） */
+const NESTED_PROBE_NOISE_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  'release',
+  '.turbo',
+  '.cache',
+]);
+
+/**
+ * 解析有效项目根（容器目录下探）。
+ *
+ * 扫描目标无 package.json 且非 Python 项目时，若一层子目录中恰好存在唯一
+ * 含合法 package.json 的嵌套仓库根（如容器目录 → zhihui-codeshield/），
+ * 则返回该子目录；其余情况（本身是项目根 / 无候选 / 多候选）原样返回，
+ * 不擅自猜测。供 PipelineRunner 与 desktop 画像探测在链路早期统一调用，
+ * 使画像识别（→ toolScope 裁剪）与各工具适配器（→ depcheck 等 package.json
+ * 前置校验）看到同一个真实项目根。
+ */
+export function resolveEffectiveProjectRoot(projectPath: string): string {
+  const root = path.resolve(projectPath);
+  if (fs.existsSync(path.join(root, 'package.json'))) return root;
+  if (hasPythonManifest(root)) return root;
+
+  const candidates = listNestedProjectRootCandidates(root);
+  return candidates.length === 1 ? candidates[0] : root;
+}
+
+/** 列出一层子目录中含合法 package.json 的候选项目根（跳过点开头与噪声目录） */
+function listNestedProjectRootCandidates(root: string): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    // 目录不可读：无候选，调用方回退原目标
+    return [];
+  }
+
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith('.') || NESTED_PROBE_NOISE_DIRS.has(entry.name)) continue;
+    const pkgPath = path.join(root, entry.name, 'package.json');
+    try {
+      JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    } catch {
+      // 无 package.json 或清单损坏：不作为候选
+      continue;
+    }
+    candidates.push(path.join(root, entry.name));
+  }
+  return candidates;
+}

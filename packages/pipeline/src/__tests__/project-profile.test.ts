@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { detectProjectProfile } from '../project-profile';
+import { detectProjectProfile, resolveEffectiveProjectRoot } from '../project-profile';
+import { deriveProjectFeature } from '../pipeline-runner-phase-helpers';
 
 describe('detectProjectProfile — M0 项目识别', () => {
   let tmpDir: string;
@@ -117,5 +118,91 @@ describe('detectProjectProfile — M0 项目识别', () => {
     expect(profile.language).toBe('python');
     expect(profile.packageManager).toBe('uv');
     expect(profile.hasTypeScript).toBe(false);
+  });
+});
+
+describe('resolveEffectiveProjectRoot — 容器目录下探唯一嵌套仓库根', () => {
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-nested-root-'));
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeProjectDir(rel: string, pkg: Record<string, unknown>): string {
+    const dir = path.join(tmpDir, rel);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkg));
+    return dir;
+  }
+
+  it('容器目录含唯一嵌套仓库 → 解析为该子目录（补检场景根因）', () => {
+    const container = path.join(tmpDir, 'container-unique');
+    const nested = makeProjectDir('container-unique/real-project', { name: 'real' });
+    fs.writeFileSync(path.join(container, 'readme.txt'), 'docs only');
+
+    expect(resolveEffectiveProjectRoot(container)).toBe(nested);
+  });
+
+  it('目标本身有 package.json → 原样返回', () => {
+    const project = makeProjectDir('self-project', { name: 'self' });
+    expect(resolveEffectiveProjectRoot(project)).toBe(project);
+  });
+
+  it('Python 项目（无 package.json，有 pyproject.toml）→ 原样返回', () => {
+    const pyDir = path.join(tmpDir, 'py-root');
+    fs.mkdirSync(pyDir, { recursive: true });
+    fs.writeFileSync(path.join(pyDir, 'pyproject.toml'), '[project]\n');
+
+    expect(resolveEffectiveProjectRoot(pyDir)).toBe(pyDir);
+  });
+
+  it('无候选（空容器）→ 原样返回', () => {
+    const empty = path.join(tmpDir, 'container-empty');
+    fs.mkdirSync(empty, { recursive: true });
+    fs.writeFileSync(path.join(empty, 'note.md'), '');
+
+    expect(resolveEffectiveProjectRoot(empty)).toBe(empty);
+  });
+
+  it('多候选（两个嵌套项目）→ 不猜测，原样返回', () => {
+    const container = path.join(tmpDir, 'container-multi');
+    makeProjectDir('container-multi/project-a', { name: 'a' });
+    makeProjectDir('container-multi/project-b', { name: 'b' });
+
+    expect(resolveEffectiveProjectRoot(container)).toBe(container);
+  });
+
+  it('点开头与噪声目录中的 package.json 不作为候选', () => {
+    const container = path.join(tmpDir, 'container-noise');
+    makeProjectDir('container-noise/node_modules/ghost', { name: 'ghost' });
+    makeProjectDir('container-noise/.hidden/ghost', { name: 'ghost' });
+    const real = makeProjectDir('container-noise/real', { name: 'real' });
+
+    expect(resolveEffectiveProjectRoot(container)).toBe(real);
+  });
+
+  it('清单损坏的子目录不作为候选（可避免静默扫错目标）', () => {
+    const container = path.join(tmpDir, 'container-broken');
+    fs.mkdirSync(path.join(container, 'broken'), { recursive: true });
+    fs.writeFileSync(path.join(container, 'broken', 'package.json'), '{ not json');
+    const real = makeProjectDir('container-broken/real', { name: 'real' });
+
+    expect(resolveEffectiveProjectRoot(container)).toBe(real);
+  });
+
+  it('回归：容器路径经 deriveProjectFeature 得到 typescript 画像（ts-prune 不再被 scope 裁剪）', () => {
+    const container = path.join(tmpDir, 'container-feature');
+    const nested = makeProjectDir('container-feature/zhihui-like', {
+      name: 'repo-root',
+      devDependencies: { typescript: '^5' },
+    });
+    fs.writeFileSync(path.join(nested, 'tsconfig.json'), '{}');
+
+    // 不下探时容器画像为 unknown（无 language 字段）→ ts-prune 被裁剪；下探后应识别 typescript
+    expect(deriveProjectFeature(container)?.language).toBe('typescript');
   });
 });

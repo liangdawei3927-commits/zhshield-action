@@ -47,6 +47,8 @@ packages/
   guard      Git Hook / CI 门禁
   inspect    质量扫描适配器
   security   漏洞 / 垃圾 / 恶意代码
+  garbage    垃圾文件检测与清理引擎
+  autoperf   性能自治引擎（基准运行数据 + 静态分析 → Issue）
   dependency 依赖治理（依赖图 / SBOM / 许可证矩阵）
   performance 前端性能静态分析（包体积 / 构建配置 / tree-shaking）
   refactor   AST 异味与自动修复

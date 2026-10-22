@@ -1,6 +1,6 @@
 # zhihui-codeshield 代码仓库规则
 
-pnpm + Turborepo monorepo，19 个 `@zh/*` 包。依赖方向：客户端 → 引擎 → `kernel` / `shared` / `db`；引擎之间不互相 import，横向通信走 EventBus。
+pnpm + Turborepo monorepo，21 个 `@zh/*` 包。依赖方向：客户端 → 引擎 → `kernel` / `shared` / `db`；引擎之间不互相 import，横向通信走 EventBus。
 
 ## ⛔ Git 安全红线（最高优先级）
 

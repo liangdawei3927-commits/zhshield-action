@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
 import type { ScoreDimension } from '@zh/shared';
 import { DomainScoreCard } from '../DomainScoreCard';
+import { DomainScanProgress } from './DomainScanProgress';
 import { ResultCard } from '../../components/ui/ResultCard';
 
 /** 统计卡：点击后展开 detail 明细（无 detail 的卡不响应点击） */
@@ -35,6 +36,12 @@ export interface ReportShellProps {
   score?: ReactNode;
   /** 顶行右侧原有按钮（重扫/刷新等），最右 */
   action: ReactNode;
+  /** 重新扫描是否进行中（结果态下的运行反馈） */
+  loading?: boolean;
+  /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
+  progress?: number;
+  /** 进度条上方状态消息（task.message） */
+  progressMessage?: string;
   /** 返回本分类「主页」（空态）回调 */
   onBackHome: () => void;
   /** 返回主页按钮 title/aria-label（默认 t('page.reportShell.backHome')） */
@@ -173,6 +180,9 @@ export function ReportShell({
   title,
   score,
   action,
+  loading,
+  progress,
+  progressMessage,
   onBackHome,
   backHomeTitle,
   stats,
@@ -202,6 +212,12 @@ export function ReportShell({
             )
           }
           action={action}
+        />
+        <DomainScanProgress
+          loading={loading ?? false}
+          progress={progress}
+          label={progressMessage}
+          className="mb-6"
         />
         <ReportStatsRow
           stats={stats}

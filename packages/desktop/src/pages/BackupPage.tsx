@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { ReportShell } from '../components/business/ReportShell';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -31,11 +32,11 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
     handleDeleteConfirm,
   } = useBackupPage(projectPath);
 
-  if ((records.length > 0 || lastResult) && !showHome) {
-    const successCount = records.filter((r) => r.status === 'success').length;
-    const partialCount = records.filter((r) => r.status === 'partial').length;
-    const failedCount = records.filter((r) => r.status === 'failed').length;
+  // 单一判定源：有备份记录或最近一次结果 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = records.length > 0 || lastResult ? { records, lastResult } : null;
+  const hasDetail = detailReport !== null;
 
+  if (hasDetail && !showHome) {
     return (
       <ReportShell
         projectPath={projectPath}
@@ -60,59 +61,121 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
           </PrimaryButton>
         }
         onBackHome={() => setShowHome(true)}
-        stats={[
-          { key: 'records', label: t('page.backup.recordsTitle'), value: records.length },
-          {
-            key: 'success',
-            label: t('page.backup.status.success'),
-            value: successCount,
-            color: 'rgb(var(--zh-success))',
-          },
-          {
-            key: 'partial',
-            label: t('page.backup.status.partial'),
-            value: partialCount,
-            color: 'rgb(var(--zh-warning))',
-          },
-          {
-            key: 'failed',
-            label: t('page.backup.status.failed'),
-            value: failedCount,
-            color: 'rgb(var(--zh-danger))',
-          },
-        ]}
+        stats={backupReportStats(t, records)}
       >
-        {isBackingUp && <BackupProgressBar progress={progress} />}
-        {lastResult && <BackupResultCard result={lastResult} error={error} />}
-        <BackupRecordsPanel
+        <BackupRecordsSection
+          t={t}
+          projectPath={projectPath}
+          isBackingUp={isBackingUp}
+          progress={progress}
+          lastResult={lastResult}
+          error={error}
           records={records}
           expandedId={expandedId}
-          onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
-          onDelete={setDeleteTarget}
-          scheduleHeader={<BackupScheduleRow projectPath={projectPath} />}
-        />
-        <ConfirmDialog
-          open={deleteTarget !== null}
-          title={t('page.backup.deleteTitle')}
-          message={t('page.backup.deleteMessage')}
-          confirmLabel={t('common.delete')}
-          variant="danger"
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
+          setExpandedId={setExpandedId}
+          deleteTarget={deleteTarget}
+          setDeleteTarget={setDeleteTarget}
+          handleDeleteConfirm={handleDeleteConfirm}
         />
       </ReportShell>
     );
   }
 
   return (
-    <BackupEmptyState
-      projectPath={projectPath}
-      isBackingUp={isBackingUp}
-      progress={progress}
-      onBackup={() => {
-        setShowHome(false);
-        handleBackup();
-      }}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <BackupEmptyState
+        projectPath={projectPath}
+        isBackingUp={isBackingUp}
+        progress={progress}
+        onBackup={() => {
+          setShowHome(false);
+          handleBackup();
+        }}
+      />
+    </DetailEntryProvider>
+  );
+}
+
+type BackupState = ReturnType<typeof useBackupPage>;
+type BackupT = ReturnType<typeof useT>;
+
+function backupReportStats(t: BackupT, records: BackupState['records']) {
+  const successCount = records.filter((r) => r.status === 'success').length;
+  const partialCount = records.filter((r) => r.status === 'partial').length;
+  const failedCount = records.filter((r) => r.status === 'failed').length;
+
+  return [
+    { key: 'records', label: t('page.backup.recordsTitle'), value: records.length },
+    {
+      key: 'success',
+      label: t('page.backup.status.success'),
+      value: successCount,
+      color: 'rgb(var(--zh-success))',
+    },
+    {
+      key: 'partial',
+      label: t('page.backup.status.partial'),
+      value: partialCount,
+      color: 'rgb(var(--zh-warning))',
+    },
+    {
+      key: 'failed',
+      label: t('page.backup.status.failed'),
+      value: failedCount,
+      color: 'rgb(var(--zh-danger))',
+    },
+  ];
+}
+
+interface BackupRecordsSectionProps {
+  t: BackupT;
+  projectPath: string;
+  isBackingUp: BackupState['isBackingUp'];
+  progress: BackupState['progress'];
+  lastResult: BackupState['lastResult'];
+  error: BackupState['error'];
+  records: BackupState['records'];
+  expandedId: BackupState['expandedId'];
+  setExpandedId: BackupState['setExpandedId'];
+  deleteTarget: BackupState['deleteTarget'];
+  setDeleteTarget: BackupState['setDeleteTarget'];
+  handleDeleteConfirm: BackupState['handleDeleteConfirm'];
+}
+
+function BackupRecordsSection({
+  t,
+  projectPath,
+  isBackingUp,
+  progress,
+  lastResult,
+  error,
+  records,
+  expandedId,
+  setExpandedId,
+  deleteTarget,
+  setDeleteTarget,
+  handleDeleteConfirm,
+}: BackupRecordsSectionProps) {
+  return (
+    <>
+      {isBackingUp && <BackupProgressBar progress={progress} />}
+      {lastResult && <BackupResultCard result={lastResult} error={error} />}
+      <BackupRecordsPanel
+        records={records}
+        expandedId={expandedId}
+        onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
+        onDelete={setDeleteTarget}
+        scheduleHeader={<BackupScheduleRow projectPath={projectPath} />}
+      />
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t('page.backup.deleteTitle')}
+        message={t('page.backup.deleteMessage')}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </>
   );
 }

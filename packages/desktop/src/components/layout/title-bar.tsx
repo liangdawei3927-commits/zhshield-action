@@ -40,50 +40,7 @@ export function TitleBar({
       </div>
 
       {/* 中：项目文件夹（绝对定位，相对窗口中心线真居中，不受左右块宽度影响） */}
-      <div
-        className="flex items-center justify-center gap-2"
-        style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          maxWidth: '45%',
-          overflow: 'hidden',
-          WebkitAppRegion: 'drag',
-        }}
-      >
-        {projectName ? (
-          <>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-            </svg>
-            <span
-              style={{
-                fontSize: 'var(--zh-font-sm)',
-                opacity: 0.95,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {projectName}
-            </span>
-          </>
-        ) : (
-          <span style={{ fontSize: 'var(--zh-font-sm)', opacity: 0.75, whiteSpace: 'nowrap' }}>
-            {t('layout.noProject')}
-          </span>
-        )}
-      </div>
+      <TitleBarProject projectName={projectName} t={t} />
 
       {/* 右：侧边栏按钮（备份中心已归入下方分类导航栏，不再占顶行）。
           中块 absolute 脱离文档流后，右块需 margin-left:auto 保持在行尾 */}
@@ -119,6 +76,61 @@ export function TitleBar({
           </svg>
         </button>
       </div>
+    </div>
+  );
+}
+
+function TitleBarProject({
+  projectName,
+  t,
+}: {
+  projectName?: string;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <div
+      className="flex items-center justify-center gap-2"
+      style={{
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        maxWidth: '45%',
+        overflow: 'hidden',
+        WebkitAppRegion: 'drag',
+      }}
+    >
+      {projectName ? (
+        <>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+          </svg>
+          <span
+            style={{
+              fontSize: 'var(--zh-font-sm)',
+              opacity: 0.95,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {projectName}
+          </span>
+        </>
+      ) : (
+        <span style={{ fontSize: 'var(--zh-font-sm)', opacity: 0.75, whiteSpace: 'nowrap' }}>
+          {t('layout.noProject')}
+        </span>
+      )}
     </div>
   );
 }

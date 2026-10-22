@@ -2,8 +2,8 @@ import type { CSSProperties, ReactNode } from 'react';
 import { EntryCard } from '../ui/EntryCard';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
-import { ScanProgress } from '../ui/ScanProgress';
-import { useNavigation } from '../../contexts/NavigationContext';
+import { DomainScanProgress } from './DomainScanProgress';
+import { useDetailEntry } from '../../contexts/DetailEntryContext';
 import { useT } from '../../i18n';
 
 interface FeatureItem {
@@ -35,7 +35,7 @@ interface PageShellProps {
   loading?: boolean;
   /** 按钮加载短文案（spinner 旁，静态文案） */
   progressLabel?: string;
-  /** 扫描进度百分比 0-100（loading 且 >0 时在主按钮上方渲染进度条） */
+  /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源；百分比换算由 DomainScanProgress 收口） */
   progress?: number;
   /** 进度条上方状态消息（task.message，不重复百分比/按钮文案） */
   progressMessage?: string;
@@ -107,17 +107,22 @@ function FeatureList({
   );
 }
 
-/** 右上角报告中心入口：全站页面统一悬挂；报告中心页自身不再重复展示 */
-function ReportsCornerLink() {
+/**
+ * 右上角「查看详情」入口：全站页面统一悬挂；是否渲染完全由 DetailEntryContext
+ * 决定（页面单一判定 hasDetail 同时控制详情分支与本图标），无数据直接不渲染。
+ * 报告中心入口已迁至侧边栏项目行，此处不再负责跳转报告页。
+ */
+function DetailCornerLink() {
   const t = useT();
-  const nav = useNavigation();
-  if (nav === null || nav.currentPage === 'reports') return null;
+  const entry = useDetailEntry();
+  if (!entry?.available) return null;
   return (
     <button
       type="button"
-      onClick={() => nav.navigate('reports')}
-      title={t('nav.reports')}
-      aria-label={t('nav.reports')}
+      onClick={entry.onOpen}
+      title={t('page.detail.view')}
+      aria-label={t('page.detail.view')}
+      data-testid="page-detail-entry"
       className="absolute top-6 right-6 z-20 w-10 h-10 rounded-full flex items-center justify-center text-brand-600 border border-brand-600 hover:bg-brand-50 hover:text-brand-700 transition-colors cursor-pointer"
     >
       <svg
@@ -131,8 +136,8 @@ function ReportsCornerLink() {
         strokeLinejoin="round"
         className="shrink-0"
       >
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <path d="M14 2v6h6M8 13h8M8 17h5" />
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+        <circle cx="12" cy="12" r="3" />
       </svg>
     </button>
   );
@@ -176,11 +181,12 @@ function PageHero({
       </div>
       <h1 className="text-[28px] font-bold text-zh-ink mb-2 leading-tight text-center">{title}</h1>
       <p className="text-base text-zh-muted mb-6 text-center max-w-2xl">{subtitle}</p>
-      {loading && typeof progress === 'number' && progress > 0 && (
-        <div className="mb-4">
-          <ScanProgress progress={progress} label={progressMessage} />
-        </div>
-      )}
+      <DomainScanProgress
+        loading={loading}
+        progress={progress}
+        label={progressMessage}
+        className="mb-4"
+      />
       <div className="flex flex-wrap items-center justify-center gap-3">
         <ActionButton
           onClick={onAction}
@@ -224,7 +230,7 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div className="h-full w-full flex flex-col items-center bg-zh-bg select-none relative overflow-auto">
-      <ReportsCornerLink />
+      <DetailCornerLink />
       <PageHero
         illustration={illustration}
         title={title}

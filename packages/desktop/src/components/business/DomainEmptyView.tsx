@@ -12,6 +12,7 @@ export interface DomainEmptyViewProps {
   buttonText: string;
   onAction: () => void;
   loading: boolean;
+  /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
   progress?: number;
   progressLabel?: string;
   statusMessage?: string;

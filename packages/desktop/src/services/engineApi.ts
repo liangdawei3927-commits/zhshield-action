@@ -9,70 +9,91 @@
 import { t } from '@zh/i18n';
 import type {
   GuardReportData,
-  GuardReportRecordData,
   GuardConfig,
-  SecurityScanReportData,
-  PerformanceReportData,
-  HealthScoreData,
-  ProjectProfileData,
-  RefactorReportData,
-  PipelineReportData,
-  SuggestionData,
-  RuleWeightData,
-  BackupRecordData,
-  BackupResultData,
-  BackupConfigData,
-  BackupProgressData,
-  GarbageScanReportData,
-  GarbageCleanResultData,
-  GarbageRestoreResultData,
   FalsePositiveFeedbackRecord,
-  DependencyReportData,
-  DepsRelockResult,
+  GarbageScanReportData,
+  PerformanceReportData,
   TechDebtReportData,
-  SecretReportData,
-  DomainScoreData,
-  ScoreDimension,
 } from '../types/electron';
-import type { SentinelEvent } from '@zh/sentinel';
-import {
-  runGuardViaHttp,
-  runSecurityViaHttp,
-  getScoreViaHttp,
-  getScoreHistoryViaHttp,
-  runRefactorViaHttp,
-  runPipelineViaHttp,
-  getRuleVersionViaHttp,
-  getSentinelEventsViaHttp,
-  startSentinelViaHttp,
-  getEvolveSuggestionsViaHttp,
-  getEvolveWeightsViaHttp,
-  autoAdjustWeightsViaHttp,
-  runBackupViaHttp,
-  getBackupRecordsViaHttp,
-  getBackupRecordViaHttp,
-  deleteBackupRecordViaHttp,
-  getBackupConfigViaHttp,
-  saveBackupConfigViaHttp,
-} from './serverApi';
-import {
-  emptyDependencyReportData,
-  emptySecurityScanReportData,
-} from './empty-engine-reports';
+import { runGuardViaHttp } from './serverApi';
+import { isHttpMode, getAPI } from './engineApi-transport';
 
-// ─── 模式检测 ─────────────────────────────────────────────
+// ─── 功能分片再导出（签名与原导出完全一致，消费方无需改动）──
 
-function isHttpMode(): boolean {
-  try {
-    return typeof import.meta !== 'undefined' && !!import.meta.env?.VITE_API_BASE;
-  } catch {
-    return false;
-  }
-}
+export type {
+  GuardHooksStatusData,
+  GuardHooksInstallResultData,
+} from './engineApi-hooks';
 
-function getAPI() {
-  return window.electronAPI;
-}
+export {
+  getGuardHooksStatus,
+  installGuardHooks,
+  uninstallGuardHooks,
+  listGuardReports,
+} from './engineApi-hooks';
+
+export { runSecurity } from './engineApi-security';
+
+export { cleanGarbage, restoreGarbage } from './engineApi-garbage';
+
+export { runRefactor } from './engineApi-refactor';
+
+export { runPipeline } from './engineApi-pipeline';
+
+export { runDeps, depsRelockBaseline } from './engineApi-dependency';
+
+export {
+  planDebtRepayment,
+  verifyDebtRepaid,
+  dismissDebtAction,
+} from './engineApi-techdebt';
+
+export {
+  runSecrets,
+  markSecretRotating,
+  verifySecretRotated,
+  dismissSecret,
+} from './engineApi-secrets';
+
+export {
+  getScore,
+  getDomainScore,
+  getScoreHistory,
+  getProfile,
+  generateReportSummary,
+} from './engineApi-scoring';
+
+export {
+  getSentinelEvents,
+  startSentinelMonitoring,
+  getSentinelState,
+  setSentinelEnabled,
+} from './engineApi-sentinel';
+
+export {
+  getEvolveSuggestions,
+  getEvolveRuleWeights,
+  autoAdjustWeights,
+} from './engineApi-evolve';
+
+export { getRuleVersion, syncRules, getSyncHealth, getSopStats } from './engineApi-sop';
+
+export {
+  runBackup,
+  getBackupRecords,
+  getBackupRecord,
+  deleteBackupRecord,
+  getBackupConfig,
+  saveBackupConfig,
+  authorizeGitHub,
+  onBackupProgress,
+  onBackupCompleted,
+  onBackupFailed,
+  onBackupRecordsUpdated,
+  openBackupFolder,
+} from './engineApi-backup';
+
+export { showSaveDialog, writeFile } from './engineApi-dialog';
 
 // ─── Guard 门禁引擎 ────────────────────────────────────────
 
@@ -87,64 +108,6 @@ export async function runGuard(projectPath: string): Promise<GuardReportData> {
     };
   }
   return api.engine.runGuard(projectPath);
-}
-
-// ─── 门禁 git hooks（本地自动守护）─────────────────────────
-
-/** 门禁 git hooks 安装状态：是否为 git 仓库 + 已安装的 hook 脚本列表 */
-export interface GuardHooksStatusData {
-  hasGitDir: boolean;
-  installed: string[];
-}
-
-/** 门禁 git hooks 安装结果：成功标记、已安装/跳过列表与失败原因 */
-export interface GuardHooksInstallResultData {
-  ok: boolean;
-  installed: string[];
-  skipped: string[];
-  reason?: string;
-}
-
-/**
- * 查询 git hooks 安装状态。
- *
- * IPC handler（`guard:hooksStatus`）与 preload 桥接均已实现，UI 尚未接入消费方。
- * ts-prune 会将本导出报告为「未使用」，但这不代表可删除——删除会连带作废
- * electron 侧已完成的 guard:hooksStatus 能力。
- */
-export async function getGuardHooksStatus(projectPath: string): Promise<GuardHooksStatusData> {
-  const api = getAPI();
-  if (!api?.guardHooks) return { hasGitDir: false, installed: [] };
-  return api.guardHooks.getStatus(projectPath);
-}
-
-export async function installGuardHooks(projectPath: string): Promise<GuardHooksInstallResultData> {
-  const api = getAPI();
-  if (!api?.guardHooks)
-    return { ok: false, installed: [], skipped: [], reason: t('engine.hooksUnavailable') };
-  return api.guardHooks.install(projectPath);
-}
-
-/**
- * 卸载 git hooks。`guard:uninstallHooks` handler 与 preload 桥接已实现，UI 尚未接入。
- * 卸载 git hooks。`guardHooks.uninstall` preload 桥接与 `guard:uninstallHooks` handler
- * 已实现，UI 未接入，故 ts-prune 报为未使用。
- */
-export async function uninstallGuardHooks(
-  projectPath: string,
-): Promise<{ ok: boolean; removed: string[] }> {
-  const api = getAPI();
-  if (!api?.guardHooks) return { ok: false, removed: [] };
-  return api.guardHooks.uninstall(projectPath);
-}
-
-export async function listGuardReports(
-  projectPath: string,
-  limit = 20,
-): Promise<GuardReportRecordData[]> {
-  const api = getAPI();
-  if (!api?.guardHooks) return [];
-  return api.guardHooks.listReports(projectPath, limit);
 }
 
 const DEFAULT_GUARD_CONFIG: GuardConfig = {
@@ -201,17 +164,6 @@ export async function listFalsePositives(
   return api.feedback.listFalsePositives(projectPath, source);
 }
 
-// ─── Security 安全引擎 ─────────────────────────────────────
-
-export async function runSecurity(projectPath: string): Promise<SecurityScanReportData> {
-  if (isHttpMode()) return runSecurityViaHttp(projectPath);
-  const api = getAPI();
-  if (!api?.engine) {
-    return emptySecurityScanReportData();
-  }
-  return api.engine.runSecurity(projectPath);
-}
-
 // ─── 垃圾清理扫描（垃圾清理域自有通道）─────────────────────
 
 export async function runGarbageScan(projectPath: string): Promise<GarbageScanReportData> {
@@ -229,37 +181,6 @@ export async function runGarbageScan(projectPath: string): Promise<GarbageScanRe
   return api.engine.runGarbageScan(projectPath);
 }
 
-// ─── 垃圾清理 ───────────────────────────────────────────
-
-export async function cleanGarbage(
-  projectPath: string,
-  items: Array<{ id: string; path: string; size: number; type: string }>,
-): Promise<GarbageCleanResultData> {
-  if (isHttpMode())
-    return {
-      batchId: '',
-      cleaned: [],
-      freedBytes: 0,
-      failed: [t('engine.remoteCleanUnsupported')],
-    };
-  const api = getAPI();
-  if (!api?.engine)
-    return { batchId: '', cleaned: [], freedBytes: 0, failed: [t('engine.engineUnavailable')] };
-  return api.engine.cleanGarbage(projectPath, items);
-}
-
-export async function restoreGarbage(
-  projectPath: string,
-  batchId: string,
-): Promise<GarbageRestoreResultData> {
-  if (isHttpMode())
-    return { restored: 0, restoredBytes: 0, failed: [t('engine.remoteRestoreUnsupported')] };
-  const api = getAPI();
-  if (!api?.engine)
-    return { restored: 0, restoredBytes: 0, failed: [t('engine.engineUnavailable')] };
-  return api.engine.restoreGarbage(projectPath, batchId);
-}
-
 // ─── Performance 性能优化引擎 ─────────────────────────────
 
 export async function runPerformance(projectPath: string): Promise<PerformanceReportData> {
@@ -272,25 +193,6 @@ export async function runPerformance(projectPath: string): Promise<PerformanceRe
     };
   }
   return api.engine.runPerformance(projectPath);
-}
-
-// ─── Dependency 依赖管家引擎 ─────────────────────────────
-
-export async function runDeps(projectPath: string): Promise<DependencyReportData> {
-  const api = getAPI();
-  if (!api?.engine) {
-    return emptyDependencyReportData(t('engine.engineUnavailable'));
-  }
-  return api.engine.runDeps(projectPath);
-}
-
-/** 显式重锁依赖哈希基线（引擎无可用时返回错误，不 throw） */
-export async function depsRelockBaseline(projectPath: string): Promise<DepsRelockResult> {
-  const api = getAPI();
-  if (!api?.engine) {
-    return { ok: false, error: t('engine.engineUnavailable') };
-  }
-  return api.engine.depsRelockBaseline(projectPath);
 }
 
 // ─── Tech Debt 技术债仪表盘引擎 ────────────────────────────
@@ -310,393 +212,6 @@ export async function runTechDebt(projectPath: string): Promise<TechDebtReportDa
     };
   }
   return api.engine.runTechDebt(projectPath);
-}
-
-export async function planDebtRepayment(
-  projectPath: string,
-  actionId: string,
-  opts?: { sprint?: string; gate?: 'allow-with-record' },
-): Promise<void> {
-  const api = getAPI();
-  if (!api?.engine) return;
-  return api.engine.planDebtRepayment(projectPath, actionId, opts);
-}
-
-export async function verifyDebtRepaid(projectPath: string, actionId: string): Promise<boolean> {
-  const api = getAPI();
-  if (!api?.engine) return false;
-  return api.engine.verifyDebtRepaid(projectPath, actionId);
-}
-
-export async function dismissDebtAction(projectPath: string, actionId: string): Promise<void> {
-  const api = getAPI();
-  if (!api?.engine) return;
-  return api.engine.dismissDebtAction(projectPath, actionId);
-}
-
-// ─── Secrets 密钥全生命周期引擎 ────────────────────────────
-
-export async function runSecrets(projectPath: string): Promise<SecretReportData> {
-  const api = getAPI();
-  if (!api?.engine) {
-    return {
-      findings: [],
-      summary: { total: 0, critical: 0, active: 0, historyFound: 0 },
-      lastScannedCommit: '',
-      error: t('engine.engineUnavailable'),
-    };
-  }
-  return api.engine.runSecrets(projectPath);
-}
-
-export async function markSecretRotating(secretId: string): Promise<void> {
-  const api = getAPI();
-  if (!api?.engine) return;
-  return api.engine.markSecretRotating(secretId);
-}
-
-export async function verifySecretRotated(secretId: string): Promise<boolean> {
-  const api = getAPI();
-  if (!api?.engine) return false;
-  return api.engine.verifySecretRotated(secretId);
-}
-
-export async function dismissSecret(secretId: string, reason: string): Promise<void> {
-  const api = getAPI();
-  if (!api?.engine) return;
-  return api.engine.dismissSecret(secretId, reason);
-}
-
-// ─── Scoring 评分引擎 ──────────────────────────────────────
-
-export async function getScore(projectId: string): Promise<HealthScoreData | null> {
-  if (isHttpMode()) return getScoreViaHttp(projectId);
-  const api = getAPI();
-  if (!api?.engine) return null;
-  try {
-    return await api.engine.getScore(projectId);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 分类页实时评分：读该域最近一次检查落盘的按域快照自带评分（跑完即有）。
- * 快照缺失 / 旧格式（无评分）时返回 null，由调用方回退到 getScore 汇总数据。
- */
-export async function getDomainScore(
-  projectPath: string,
-  dimension: ScoreDimension,
-): Promise<DomainScoreData | null> {
-  if (isHttpMode()) return null;
-  const api = getAPI();
-  if (!api?.engine) return null;
-  try {
-    return await api.engine.getDomainScore(projectPath, dimension);
-  } catch {
-    return null;
-  }
-}
-
-export async function getScoreHistory(projectId: string): Promise<HealthScoreData[]> {
-  if (isHttpMode()) return getScoreHistoryViaHttp(projectId);
-  const api = getAPI();
-  if (!api?.engine) return [];
-  try {
-    return await api.engine.getScoreHistory(projectId);
-  } catch {
-    return [];
-  }
-}
-
-/** 项目画像（含子模块列表），供报告页展示模块级评分卡；HTTP 模式服务端未暴露画像接口时返回 null */
-export async function getProfile(projectPath: string): Promise<ProjectProfileData | null> {
-  if (isHttpMode()) return null;
-  const api = getAPI();
-  if (!api?.engine) return null;
-  try {
-    return await api.engine.getProfile(projectPath);
-  } catch {
-    return null;
-  }
-}
-
-// ─── Refactor 重构引擎 ──────────────────────────────────────
-
-export async function runRefactor(projectPath: string): Promise<RefactorReportData> {
-  if (isHttpMode()) return runRefactorViaHttp(projectPath);
-  const api = getAPI();
-  if (!api?.engine) {
-    return {
-      timestamp: new Date().toISOString(),
-      projectRoot: projectPath,
-      totalFiles: 0,
-      scannedFiles: 0,
-      totalSmells: 0,
-      byCategory: { structural: 0, coupling: 0, inheritance: 0 },
-      bySeverity: { error: 0, warning: 0, info: 0 },
-      files: [],
-      summary: { criticalFiles: 0, needsImmediateAction: 0, suggestionsByType: {} },
-    };
-  }
-  return api.engine.runRefactor(projectPath);
-}
-
-// ─── Pipeline 流水线引擎 ──────────────────────────────────
-
-export async function runPipeline(
-  projectPath: string,
-  options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
-): Promise<PipelineReportData> {
-  if (isHttpMode()) return runPipelineViaHttp(projectPath, options);
-  const api = getAPI();
-  if (!api?.engine) {
-    return {
-      passed: false,
-      stage: 'idle',
-      timestamp: new Date().toISOString(),
-      error: 'IPC not available',
-    };
-  }
-  return api.engine.runPipeline(projectPath, options);
-}
-
-// ─── 结果汇总（只读，不发起检查）──────────────────────────
-
-/**
- * 汇总生成报告：只读各域最新落盘结果 → 统一维度加权 → 落库。
- * 不触发任何扫描；各域都没有可用结果时返回 null（由 UI 提示先运行检查）。
- */
-export async function generateReportSummary(projectPath: string): Promise<HealthScoreData | null> {
-  if (isHttpMode()) return null;
-  const api = getAPI();
-  if (!api?.engine) return null;
-  try {
-    return await api.engine.generateReportSummary(projectPath);
-  } catch {
-    return null;
-  }
-}
-
-// ─── Sentinel 哨兵监控 ────────────────────────────────────
-
-export async function getSentinelEvents(options?: {
-  status?: string;
-  severity?: string;
-}): Promise<SentinelEvent[]> {
-  if (isHttpMode()) return getSentinelEventsViaHttp(options);
-  const api = getAPI();
-  if (!api?.sentinel) return [];
-  return api.sentinel.getEvents(options);
-}
-
-export async function startSentinelMonitoring(
-  projectPath: string,
-): Promise<{ ok: boolean; started: string[]; disabled?: boolean }> {
-  if (isHttpMode()) return startSentinelViaHttp(projectPath);
-  const api = getAPI();
-  if (!api?.sentinel) return { ok: false, started: [] };
-  return api.sentinel.startMonitoring(projectPath, projectPath);
-}
-
-export async function getSentinelState(): Promise<{ enabled: boolean }> {
-  const api = getAPI();
-  if (!api?.sentinel) return { enabled: true };
-  try {
-    return await api.sentinel.getState();
-  } catch {
-    return { enabled: true };
-  }
-}
-
-export async function setSentinelEnabled(enabled: boolean): Promise<{ ok: boolean }> {
-  const api = getAPI();
-  if (!api?.sentinel) return { ok: false };
-  return api.sentinel.setEnabled(enabled);
-}
-
-// ─── Evolve 演进引擎 ──────────────────────────────────────
-
-export async function getEvolveSuggestions(projectId: string): Promise<SuggestionData[]> {
-  if (isHttpMode()) return getEvolveSuggestionsViaHttp(projectId);
-  const api = getAPI();
-  if (!api?.evolve) return [];
-  return api.evolve.getSuggestions(projectId);
-}
-
-export async function getEvolveRuleWeights(): Promise<RuleWeightData[]> {
-  if (isHttpMode()) return getEvolveWeightsViaHttp();
-  const api = getAPI();
-  if (!api?.evolve) return [];
-  return api.evolve.getRuleWeights();
-}
-
-export async function autoAdjustWeights(): Promise<RuleWeightData[]> {
-  if (isHttpMode()) return autoAdjustWeightsViaHttp();
-  const api = getAPI();
-  if (!api?.evolve) return [];
-  return api.evolve.autoAdjustWeights();
-}
-
-// ─── SOP 规则同步 ─────────────────────────────────────────
-
-function getSopAPI() {
-  return window.electronAPI?.sop;
-}
-
-/** SOP 规则版本；`sop:getVersion` IPC 链路已实现，UI 未接入。 */
-export async function getRuleVersion(): Promise<string> {
-  if (isHttpMode()) return getRuleVersionViaHttp();
-  try {
-    const api = getSopAPI();
-    if (!api) return '0.0.0';
-    const version = await api.getVersion();
-    return version?.version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
-export async function syncRules(): Promise<{ added: number; updated: number }> {
-  if (isHttpMode()) return { added: 0, updated: 0 };
-  try {
-    const api = getAPI();
-    if (!api?.sync) return { added: 0, updated: 0 };
-    const result = (await api.sync.syncRules()) as Array<{
-      toolId: string;
-      stale: boolean;
-    }>;
-    const updated = result.filter((r) => r.stale).length;
-    return { added: result.length, updated };
-  } catch {
-    return { added: 0, updated: 0 };
-  }
-}
-
-export async function getSyncHealth(): Promise<{
-  level: number;
-  stale: boolean;
-  lastSync: string | null;
-}> {
-  if (isHttpMode()) return { level: 4, stale: true, lastSync: null };
-  try {
-    const api = getSopAPI();
-    if (!api) return { level: 4, stale: true, lastSync: null };
-    return await api.getSyncHealth();
-  } catch {
-    return { level: 4, stale: true, lastSync: null };
-  }
-}
-
-// ─── Backup 备份系统 ─────────────────────────────────────
-
-export async function runBackup(projectPath: string, trigger?: string): Promise<BackupResultData> {
-  if (isHttpMode()) return runBackupViaHttp(projectPath, trigger) as Promise<BackupResultData>;
-  const api = getAPI();
-  if (!api?.backup) {
-    return {
-      projectId: 'default',
-      projectName: t('engine.unknownProject'),
-      trigger: trigger ?? 'manual',
-      overallStatus: 'failed',
-      timestamp: new Date().toISOString(),
-      duration: 0,
-      error: t('engine.backupModuleUnavailable'),
-      results: [],
-    };
-  }
-  return api.backup.executeBackup(projectPath, trigger);
-}
-
-export async function getBackupRecords(projectId?: string): Promise<BackupRecordData[]> {
-  if (isHttpMode()) return getBackupRecordsViaHttp(projectId) as Promise<BackupRecordData[]>;
-  const api = getAPI();
-  if (!api?.backup) return [];
-  return api.backup.getRecords(projectId);
-}
-
-/** 单条备份记录查询；UI 未接入，故 ts-prune 报为未使用。 */
-export async function getBackupRecord(recordId: string): Promise<BackupRecordData | null> {
-  if (isHttpMode()) return getBackupRecordViaHttp(recordId) as Promise<BackupRecordData | null>;
-  const api = getAPI();
-  if (!api?.backup) return null;
-  return api.backup.getRecord(recordId);
-}
-
-export async function deleteBackupRecord(recordId: string): Promise<boolean> {
-  if (isHttpMode()) return deleteBackupRecordViaHttp(recordId);
-  const api = getAPI();
-  if (!api?.backup) return false;
-  return api.backup.deleteRecord(recordId);
-}
-
-export async function getBackupConfig(projectPath: string): Promise<BackupConfigData | null> {
-  if (isHttpMode()) return getBackupConfigViaHttp(projectPath) as Promise<BackupConfigData>;
-  const api = getAPI();
-  if (!api?.backup) return null;
-  return api.backup.getConfig(projectPath);
-}
-
-export async function saveBackupConfig(
-  projectPath: string,
-  config: BackupConfigData,
-): Promise<void> {
-  if (isHttpMode()) return saveBackupConfigViaHttp(projectPath, config);
-  const api = getAPI();
-  if (!api?.backup) return;
-  return api.backup.saveConfig(projectPath, config);
-}
-
-export async function authorizeGitHub(): Promise<boolean> {
-  if (isHttpMode()) return false;
-  const api = getAPI();
-  if (!api?.backup) return false;
-  return api.backup.authorizeGitHub();
-}
-
-/** 订阅备份进度推送；无 Electron API 时返回空退订函数 */
-export function onBackupProgress(callback: (payload: BackupProgressData) => void): () => void {
-  const api = getAPI();
-  return api?.backup?.onProgress?.(callback) ?? (() => {});
-}
-
-/** 订阅备份完成推送。`backup:completed` 事件已在 preload 桥接，UI 未订阅。 */
-export function onBackupCompleted(callback: (payload: unknown) => void): () => void {
-  const api = getAPI();
-  return api?.backup?.onCompleted?.(callback) ?? (() => {});
-}
-
-/** 订阅备份失败推送。`backup:failed` 事件已在 preload 桥接，UI 未订阅。 */
-export function onBackupFailed(callback: (payload: unknown) => void): () => void {
-  const api = getAPI();
-  return api?.backup?.onFailed?.(callback) ?? (() => {});
-}
-
-/** 订阅备份记录更新推送（定时备份在后台完成时通知刷新列表） */
-export function onBackupRecordsUpdated(callback: (payload: unknown) => void): () => void {
-  const api = getAPI();
-  return api?.backup?.onRecordsUpdated?.(callback) ?? (() => {});
-}
-
-export async function openBackupFolder(
-  projectPath: string,
-  folderPath: string,
-): Promise<boolean> {
-  const api = getAPI();
-  if (!api?.backup) return false;
-  return api.backup.openFolder(projectPath, folderPath);
-}
-
-/** SOP 统计；`sop:getStats` IPC 链路已实现，UI 未接入。 */
-export async function getSopStats() {
-  if (isHttpMode()) return null;
-  try {
-    const api = getSopAPI();
-    if (!api) return null;
-    return await api.getStats();
-  } catch {
-    return null;
-  }
 }
 
 // ─── Scheduler 调度器状态持久化 ───────────────────────────────
@@ -727,21 +242,4 @@ export async function writeSchedulerState(state: SchedulerStateData): Promise<vo
   const api = getAPI();
   if (!api?.scheduler) return;
   return api.scheduler.writeState(state);
-}
-
-// ─── 原生对话框 & 文件写入 ─────────────────────────────────
-
-export async function showSaveDialog(options: {
-  defaultPath: string;
-  filters: Array<{ name: string; extensions: string[] }>;
-}): Promise<{ canceled: boolean; filePath?: string }> {
-  const api = getAPI();
-  if (!api) return { canceled: true };
-  return api.showSaveDialog(options);
-}
-
-export async function writeFile(filePath: string, content: string): Promise<void> {
-  const api = getAPI();
-  if (!api) return;
-  return api.writeFile(filePath, content);
 }

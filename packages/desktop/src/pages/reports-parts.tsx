@@ -59,45 +59,27 @@ function SparklineChart({ data }: { data: HealthScoreData[] }) {
   );
 }
 
-/** 文档堆叠 SVG（线性风格） */
-export function StackedDocs() {
+function DocLayer({
+  x,
+  y,
+  fill,
+  stroke,
+  strokeWidth,
+}: {
+  x: string;
+  y: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: string;
+}) {
   return (
-    <svg width="150" height="150" viewBox="0 0 150 150" fill="none">
-      <circle cx="75" cy="75" r="65" fill="rgb(var(--zh-info) / 0.05)" />
-      {/* 底层文档 */}
-      <rect
-        x="35"
-        y="55"
-        width="70"
-        height="50"
-        rx="4"
-        fill="rgb(var(--zh-info) / 0.06)"
-        stroke="rgb(var(--zh-info) / 0.25)"
-        strokeWidth="1.2"
-      />
-      {/* 中层文档 */}
-      <rect
-        x="42"
-        y="48"
-        width="70"
-        height="50"
-        rx="4"
-        fill="rgb(var(--zh-info) / 0.08)"
-        stroke="rgb(var(--zh-info) / 0.2)"
-        strokeWidth="1.2"
-      />
-      {/* 顶层文档 */}
-      <rect
-        x="49"
-        y="41"
-        width="70"
-        height="50"
-        rx="4"
-        fill="none"
-        stroke="rgb(var(--zh-info))"
-        strokeWidth="1.8"
-      />
-      {/* 文档上的线 */}
+    <rect x={x} y={y} width="70" height="50" rx="4" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+  );
+}
+
+function DocDetails() {
+  return (
+    <>
       <line
         x1="62"
         y1="55"
@@ -125,7 +107,6 @@ export function StackedDocs() {
         strokeWidth="1"
         strokeLinecap="round"
       />
-      {/* 图表小元素 */}
       <rect
         x="62"
         y="73"
@@ -146,6 +127,41 @@ export function StackedDocs() {
         stroke="rgb(var(--zh-info))"
         strokeWidth="1.2"
       />
+    </>
+  );
+}
+
+/** 文档堆叠 SVG（线性风格） */
+export function StackedDocs() {
+  return (
+    <svg width="150" height="150" viewBox="0 0 150 150" fill="none">
+      <circle cx="75" cy="75" r="65" fill="rgb(var(--zh-info) / 0.05)" />
+      {/* 底层文档 */}
+      <DocLayer
+        x="35"
+        y="55"
+        fill="rgb(var(--zh-info) / 0.06)"
+        stroke="rgb(var(--zh-info) / 0.25)"
+        strokeWidth="1.2"
+      />
+      {/* 中层文档 */}
+      <DocLayer
+        x="42"
+        y="48"
+        fill="rgb(var(--zh-info) / 0.08)"
+        stroke="rgb(var(--zh-info) / 0.2)"
+        strokeWidth="1.2"
+      />
+      {/* 顶层文档 */}
+      <DocLayer
+        x="49"
+        y="41"
+        fill="none"
+        stroke="rgb(var(--zh-info))"
+        strokeWidth="1.8"
+      />
+      {/* 文档上的线 */}
+      <DocDetails />
     </svg>
   );
 }

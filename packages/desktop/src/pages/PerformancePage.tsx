@@ -5,6 +5,7 @@ import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { usePerformancePage } from './performance-logic';
 import { IssuesPanel } from './performance-parts';
 import type { PerformanceReportData } from '../types/electron';
@@ -19,29 +20,16 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
   const { loading, progress, progressLabel, statusMessage, report, copyToAi, copyAllToAi, handleScan } =
     usePerformancePage(projectPath);
 
-  if (report && !showHome) {
-    const mediumIssues = report.issues.filter((i) => i.severity === 'medium');
-    const lowIssues = report.issues.filter((i) => i.severity === 'low');
-    // 两张严重度卡的明细子表都是「同一张 IssuesPanel + 按卡过滤 issues」，只有子集不同
-    const statDetail = (items: PerformanceReportData['issues']): ReportStatCard['detail'] => ({
-      items,
-      render: (sub) => {
-        const subset = sub as PerformanceReportData['issues'];
-        return (
-          <IssuesPanel
-            issues={subset}
-            onCopyToAi={copyToAi}
-            onCopyAll={() => void Promise.all(subset.map((i) => copyToAi(i)))}
-          />
-        );
-      },
-    });
+  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = report;
+  const hasDetail = detailReport !== null;
 
+  if (detailReport && !showHome) {
     return (
       <ReportShell
         projectPath={projectPath}
         dimension="performance"
-        refreshKey={report}
+        refreshKey={detailReport}
         icon={
           <PageGlyph bg="warning" stroke="warning">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -58,35 +46,100 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
           </PrimaryButton>
         }
         onBackHome={() => setShowHome(true)}
-        stats={[
-          { key: 'total', label: t('page.performance.stats.total'), value: report.issues.length },
-          {
-            key: 'medium',
-            label: t('page.performance.severity.medium'),
-            value: mediumIssues.length,
-            color: 'rgb(var(--zh-warning))',
-            detail: statDetail(mediumIssues),
-          },
-          {
-            key: 'low',
-            label: t('page.performance.severity.low'),
-            value: lowIssues.length,
-            color: 'rgb(var(--zh-info))',
-            detail: statDetail(lowIssues),
-          },
-          {
-            key: 'autoFixable',
-            label: t('page.performance.autoFixable'),
-            value: report.issues.filter((i) => i.autoFixable).length,
-            color: 'rgb(var(--zh-success))',
-          },
-        ]}
+        loading={loading}
+        progress={progress}
+        progressMessage={statusMessage}
+        stats={performanceReportStats(t, detailReport, copyToAi)}
       >
-        <IssuesPanel issues={report.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
+        <IssuesPanel issues={detailReport.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
       </ReportShell>
     );
   }
 
+  return (
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <PerformanceEmptyView
+        projectPath={projectPath}
+        t={t}
+        loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
+        onAction={() => {
+          setShowHome(false);
+          handleScan();
+        }}
+      />
+    </DetailEntryProvider>
+  );
+}
+
+type PerformanceState = ReturnType<typeof usePerformancePage>;
+type PerformanceT = ReturnType<typeof useT>;
+
+function performanceReportStats(
+  t: PerformanceT,
+  report: NonNullable<PerformanceState['report']>,
+  copyToAi: PerformanceState['copyToAi'],
+) {
+  const mediumIssues = report.issues.filter((i) => i.severity === 'medium');
+  const lowIssues = report.issues.filter((i) => i.severity === 'low');
+  // 两张严重度卡的明细子表都是「同一张 IssuesPanel + 按卡过滤 issues」，只有子集不同
+  const statDetail = (items: PerformanceReportData['issues']): ReportStatCard['detail'] => ({
+    items,
+    render: (sub) => {
+      const subset = sub as PerformanceReportData['issues'];
+      return (
+        <IssuesPanel
+          issues={subset}
+          onCopyToAi={copyToAi}
+          onCopyAll={() => void Promise.all(subset.map((i) => copyToAi(i)))}
+        />
+      );
+    },
+  });
+
+  return [
+    { key: 'total', label: t('page.performance.stats.total'), value: report.issues.length },
+    {
+      key: 'medium',
+      label: t('page.performance.severity.medium'),
+      value: mediumIssues.length,
+      color: 'rgb(var(--zh-warning))',
+      detail: statDetail(mediumIssues),
+    },
+    {
+      key: 'low',
+      label: t('page.performance.severity.low'),
+      value: lowIssues.length,
+      color: 'rgb(var(--zh-info))',
+      detail: statDetail(lowIssues),
+    },
+    {
+      key: 'autoFixable',
+      label: t('page.performance.autoFixable'),
+      value: report.issues.filter((i) => i.autoFixable).length,
+      color: 'rgb(var(--zh-success))',
+    },
+  ];
+}
+
+interface PerformanceEmptyViewProps {
+  projectPath: string;
+  t: PerformanceT;
+  loading: boolean;
+  progress: number;
+  statusMessage: PerformanceState['statusMessage'];
+  onAction: () => void;
+}
+
+function PerformanceEmptyView({
+  projectPath,
+  t,
+  loading,
+  progress,
+  statusMessage,
+  onAction,
+}: PerformanceEmptyViewProps) {
   return (
     <DomainEmptyView
       projectPath={projectPath}
@@ -132,12 +185,9 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         },
       ]}
       buttonText={t('page.performance.shell.start')}
-      onAction={() => {
-        setShowHome(false);
-        handleScan();
-      }}
+      onAction={onAction}
       loading={loading}
-      progress={Math.round(progress * 100)}
+      progress={progress}
       progressLabel={t('page.performance.scanning')}
       statusMessage={statusMessage}
     />

@@ -41,6 +41,21 @@ function PageView({
     return <WelcomePage onAddProject={onAddProject} />;
   }
   const projectPath = activeProjectPath || projects[0]?.path || '';
+  return (
+    <ProjectPageView currentPage={currentPage} projectPath={projectPath} onNavigate={onNavigate} />
+  );
+}
+
+/** 功能页路由：按页面键分发到对应功能页，兜底「项目体检」 */
+function ProjectPageView({
+  currentPage,
+  projectPath,
+  onNavigate,
+}: {
+  currentPage: Page;
+  projectPath: string;
+  onNavigate: (page: string) => void;
+}) {
   switch (currentPage) {
     case 'guard':
       return <GuardPage projectPath={projectPath} />;
@@ -61,12 +76,7 @@ function PageView({
     case 'refactor':
       return <RefactorPage projectPath={projectPath} />;
     case 'evolve':
-      // ⛔ 规则进化暂下线：用户规模未达门槛（见 feature-flags.ts）。保持关闭，勿直接改回 EvolvePage
-      return FEATURE_EVOLVE_ENABLED ? (
-        <EvolvePage projectPath={projectPath} />
-      ) : (
-        <InspectPage projectPath={projectPath} />
-      );
+      return <EvolveRoute projectPath={projectPath} />;
     case 'reports':
       return <ReportsPage projectPath={projectPath} />;
     case 'backup':
@@ -77,6 +87,16 @@ function PageView({
       // 兜底落到「项目体检」：导航首项，也是全站唯一发起源码检查的入口
       return <InspectPage projectPath={projectPath} />;
   }
+}
+
+/** 规则进化路由：功能未达门槛时回退到「项目体检」 */
+function EvolveRoute({ projectPath }: { projectPath: string }) {
+  // ⛔ 规则进化暂下线：用户规模未达门槛（见 feature-flags.ts）。保持关闭，勿直接改回 EvolvePage
+  return FEATURE_EVOLVE_ENABLED ? (
+    <EvolvePage projectPath={projectPath} />
+  ) : (
+    <InspectPage projectPath={projectPath} />
+  );
 }
 
 function AppLoadingView() {
@@ -163,13 +183,33 @@ function AppShell({
 }
 
 function App() {
+  const appState = useAppState();
+  const { idle, reset: resetInactivity } = useInactivityTimer(7 * 60 * 1000);
+  if (!appState.loaded) return <AppLoadingView />;
+
+  return (
+    <NavigationProvider
+      navigate={(p) => appState.setCurrentPage(p as Page)}
+      currentPage={appState.currentPage}
+    >
+      <div className="flex flex-col h-screen bg-zh-bg font-sans">
+        <MainContent appState={appState} />
+        {idle && appState.projects.length > 0 && !appState.onboardingProject && (
+          <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={appState.intelligentEnabled} />
+        )}
+      </div>
+    </NavigationProvider>
+  );
+}
+
+/** 主内容区：项目引导 / 欢迎页 / 应用壳层三态切换 */
+function MainContent({ appState }: { appState: ReturnType<typeof useAppState> }) {
   const {
     currentPage,
     setCurrentPage,
     projects,
     sidebarOpen,
     setSidebarOpen,
-    loaded,
     aiTool,
     aiApplying,
     openFolderAndAddProject,
@@ -179,21 +219,12 @@ function App() {
     setIntelligentEnabled,
     intelligentLoading,
     onboardedPaths,
-    markOnboarded,
     onboardingProject,
     setOnboardingProject,
     currentProjectIndex,
     switchCurrentProject,
-  } = useAppState();
-  const { idle, reset: resetInactivity } = useInactivityTimer(7 * 60 * 1000);
-  if (!loaded) return <AppLoadingView />;
+  } = appState;
   const activeProject = projects[currentProjectIndex] ?? projects[0];
-  const handleOnboardingComplete = () => {
-    const path = projects.find((p) => p.name === onboardingProject)?.path;
-    if (path) markOnboarded(path);
-    setOnboardingProject(null);
-    setCurrentPage('inspect');
-  };
   const handleOpenProjectProfile = (project: ProjectInfo, index: number) => {
     switchCurrentProject(index);
     if (onboardedPaths.has(project.path)) {
@@ -210,47 +241,58 @@ function App() {
     onAddProject: openFolderAndAddProject,
   } as const;
 
-  return (
-    <NavigationProvider navigate={(p) => setCurrentPage(p as Page)} currentPage={currentPage}>
-      <div className="flex flex-col h-screen bg-zh-bg font-sans">
-        {onboardingProject ? (
-          <ProjectOnboardingPage
-            projectName={onboardingProject}
-            projectPath={projects.find((p) => p.name === onboardingProject)?.path ?? ''}
-            onComplete={handleOnboardingComplete}
-            onClose={() => setOnboardingProject(null)}
-            intelligentEnabled={intelligentEnabled}
-          />
-        ) : projects.length === 0 && currentPage === 'welcome' ? (
-          <PageView {...viewProps} />
-        ) : (
-          <AppShell
-            sidebarOpen={sidebarOpen}
-            setSidebarOpen={setSidebarOpen}
-            projects={projects}
-            currentProjectIndex={currentProjectIndex}
-            switchCurrentProject={switchCurrentProject}
-            currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
-            openFolderAndAddProject={openFolderAndAddProject}
-            removeProject={removeProject}
-            aiTool={aiTool}
-            aiApplying={aiApplying}
-            toggleAiTool={toggleAiTool}
-            activeProject={activeProject}
-            intelligentEnabled={intelligentEnabled}
-            setIntelligentEnabled={setIntelligentEnabled}
-            intelligentLoading={intelligentLoading}
-            onOpenProjectProfile={handleOpenProjectProfile}
-            viewProps={viewProps}
-          />
-        )}
+  return onboardingProject ? (
+    <OnboardingView projectName={onboardingProject} appState={appState} />
+  ) : projects.length === 0 && currentPage === 'welcome' ? (
+    <PageView {...viewProps} />
+  ) : (
+    <AppShell
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+      projects={projects}
+      currentProjectIndex={currentProjectIndex}
+      switchCurrentProject={switchCurrentProject}
+      currentPage={currentPage}
+      setCurrentPage={setCurrentPage}
+      openFolderAndAddProject={openFolderAndAddProject}
+      removeProject={removeProject}
+      aiTool={aiTool}
+      aiApplying={aiApplying}
+      toggleAiTool={toggleAiTool}
+      activeProject={activeProject}
+      intelligentEnabled={intelligentEnabled}
+      setIntelligentEnabled={setIntelligentEnabled}
+      intelligentLoading={intelligentLoading}
+      onOpenProjectProfile={handleOpenProjectProfile}
+      viewProps={viewProps}
+    />
+  );
+}
 
-        {idle && projects.length > 0 && !onboardingProject && (
-          <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={intelligentEnabled} />
-        )}
-      </div>
-    </NavigationProvider>
+/** 项目引导页：完成后标记已引导并跳转「项目体检」 */
+function OnboardingView({
+  projectName,
+  appState,
+}: {
+  projectName: string;
+  appState: ReturnType<typeof useAppState>;
+}) {
+  const { projects, markOnboarded, setOnboardingProject, setCurrentPage, intelligentEnabled } =
+    appState;
+  const handleOnboardingComplete = () => {
+    const path = projects.find((p) => p.name === projectName)?.path;
+    if (path) markOnboarded(path);
+    setOnboardingProject(null);
+    setCurrentPage('inspect');
+  };
+  return (
+    <ProjectOnboardingPage
+      projectName={projectName}
+      projectPath={projects.find((p) => p.name === projectName)?.path ?? ''}
+      onComplete={handleOnboardingComplete}
+      onClose={() => setOnboardingProject(null)}
+      intelligentEnabled={intelligentEnabled}
+    />
   );
 }
 

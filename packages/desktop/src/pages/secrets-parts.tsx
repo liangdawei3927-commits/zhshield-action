@@ -33,6 +33,130 @@ function ActionButton({
   );
 }
 
+function SecretsFindingHeader({
+  finding,
+  t,
+}: {
+  finding: SecretReportData['findings'][number];
+  t: ReturnType<typeof useT>;
+}) {
+  const sevCfg = SECRET_SEVERITY_CONFIG[finding.severity] ?? SECRET_SEVERITY_CONFIG.low;
+  const statusCfg = SECRET_STATUS_CONFIG[finding.status] ?? SECRET_STATUS_CONFIG.active;
+  const typeKey = SECRET_TYPE_LABEL[finding.type] ?? 'page.secrets.type.genericApiKey';
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="font-mono text-sm font-semibold text-zh-ink break-all">
+        {finding.displayValue}
+      </span>
+      <span
+        className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
+        style={{ background: sevCfg.bg, color: sevCfg.color }}
+      >
+        {t(sevCfg.labelKey)}
+      </span>
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-zh-panel text-zh-ink-2 shrink-0">
+        {t(typeKey)}
+      </span>
+      <span className="ml-auto text-[11px] shrink-0" style={{ color: statusCfg.color }}>
+        {t(statusCfg.labelKey)}
+      </span>
+    </div>
+  );
+}
+
+function SecretsFindingBadges({
+  finding,
+  t,
+}: {
+  finding: SecretReportData['findings'][number];
+  t: ReturnType<typeof useT>;
+}) {
+  const commit = finding.location.commit ? finding.location.commit.slice(0, 7) : '';
+  return (
+    <>
+      <span className="text-xs text-zh-muted font-mono">
+        {finding.location.file}:{finding.location.line}
+      </span>
+      {commit && <span className="text-xs text-zh-muted font-mono">{commit}</span>}
+      {finding.stillReferenced ? (
+        <span
+          className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-50"
+          style={{ color: 'rgb(var(--zh-success-700))' }}
+        >
+          {t('page.secrets.badge.active')}
+        </span>
+      ) : (
+        <span
+          className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
+          style={{ color: 'rgb(var(--zh-muted))' }}
+        >
+          {t('page.secrets.badge.historyOnly')}
+        </span>
+      )}
+      {finding.pushedToRemote && (
+        <span
+          className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
+          style={{ color: 'rgb(var(--zh-info))' }}
+        >
+          {t('page.secrets.badge.pushedToRemote')}
+        </span>
+      )}
+    </>
+  );
+}
+
+function SecretsFindingActions({
+  finding,
+  t,
+  onMarkRotating,
+  onVerifyRotated,
+  onDismiss,
+  onCopyToAi,
+}: {
+  finding: SecretReportData['findings'][number];
+  t: ReturnType<typeof useT>;
+  onMarkRotating: (secretId: string) => void;
+  onVerifyRotated: (secretId: string) => void;
+  onDismiss: (secretId: string) => void;
+  onCopyToAi: (finding: SecretReportData['findings'][number]) => void;
+}) {
+  return (
+    <span className="ml-auto flex items-center gap-2">
+      <CopyToAiButton onClick={() => onCopyToAi(finding)} />
+      {finding.status === 'active' && (
+        <ActionButton
+          primary
+          label={t('page.secrets.action.markRotating')}
+          title={t('page.secrets.action.markRotatingConfirm')}
+          onClick={() => onMarkRotating(finding.secretId)}
+        />
+      )}
+      {finding.status === 'rotating' && (
+        <>
+          <ActionButton
+            primary
+            label={t('page.secrets.action.verifyRotated')}
+            title={t('page.secrets.action.verifyRotatedConfirm')}
+            onClick={() => onVerifyRotated(finding.secretId)}
+          />
+          <ActionButton
+            label={t('page.secrets.action.dismiss')}
+            title={t('page.secrets.action.dismissConfirm')}
+            onClick={() => onDismiss(finding.secretId)}
+          />
+        </>
+      )}
+      {finding.status === 'rotated' && (
+        <ActionButton
+          label={t('page.secrets.action.dismiss')}
+          title={t('page.secrets.action.dismissConfirm')}
+          onClick={() => onDismiss(finding.secretId)}
+        />
+      )}
+    </span>
+  );
+}
+
 function SecretsFindingItem({
   finding,
   onMarkRotating,
@@ -47,90 +171,19 @@ function SecretsFindingItem({
   onCopyToAi: (finding: SecretReportData['findings'][number]) => void;
 }) {
   const t = useT();
-  const sevCfg = SECRET_SEVERITY_CONFIG[finding.severity] ?? SECRET_SEVERITY_CONFIG.low;
-  const statusCfg = SECRET_STATUS_CONFIG[finding.status] ?? SECRET_STATUS_CONFIG.active;
-  const typeKey = SECRET_TYPE_LABEL[finding.type] ?? 'page.secrets.type.genericApiKey';
-  const commit = finding.location.commit ? finding.location.commit.slice(0, 7) : '';
   return (
     <ResultCard>
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-mono text-sm font-semibold text-zh-ink break-all">
-          {finding.displayValue}
-        </span>
-        <span
-          className="px-2 py-0.5 rounded text-xs font-medium shrink-0"
-          style={{ background: sevCfg.bg, color: sevCfg.color }}
-        >
-          {t(sevCfg.labelKey)}
-        </span>
-        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zh-panel text-zh-ink-2 shrink-0">
-          {t(typeKey)}
-        </span>
-        <span className="ml-auto text-[11px] shrink-0" style={{ color: statusCfg.color }}>
-          {t(statusCfg.labelKey)}
-        </span>
-      </div>
+      <SecretsFindingHeader finding={finding} t={t} />
       <div className="mt-2 flex items-center gap-3 flex-wrap">
-        <span className="text-xs text-zh-muted font-mono">
-          {finding.location.file}:{finding.location.line}
-        </span>
-        {commit && <span className="text-xs text-zh-muted font-mono">{commit}</span>}
-        {finding.stillReferenced ? (
-          <span
-            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-50"
-            style={{ color: 'rgb(var(--zh-success-700))' }}
-          >
-            {t('page.secrets.badge.active')}
-          </span>
-        ) : (
-          <span
-            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
-            style={{ color: 'rgb(var(--zh-muted))' }}
-          >
-            {t('page.secrets.badge.historyOnly')}
-          </span>
-        )}
-        {finding.pushedToRemote && (
-          <span
-            className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-zh-panel"
-            style={{ color: 'rgb(var(--zh-info))' }}
-          >
-            {t('page.secrets.badge.pushedToRemote')}
-          </span>
-        )}
-        <span className="ml-auto flex items-center gap-2">
-          <CopyToAiButton onClick={() => onCopyToAi(finding)} />
-          {finding.status === 'active' && (
-            <ActionButton
-              primary
-              label={t('page.secrets.action.markRotating')}
-              title={t('page.secrets.action.markRotatingConfirm')}
-              onClick={() => onMarkRotating(finding.secretId)}
-            />
-          )}
-          {finding.status === 'rotating' && (
-            <>
-              <ActionButton
-                primary
-                label={t('page.secrets.action.verifyRotated')}
-                title={t('page.secrets.action.verifyRotatedConfirm')}
-                onClick={() => onVerifyRotated(finding.secretId)}
-              />
-              <ActionButton
-                label={t('page.secrets.action.dismiss')}
-                title={t('page.secrets.action.dismissConfirm')}
-                onClick={() => onDismiss(finding.secretId)}
-              />
-            </>
-          )}
-          {finding.status === 'rotated' && (
-            <ActionButton
-              label={t('page.secrets.action.dismiss')}
-              title={t('page.secrets.action.dismissConfirm')}
-              onClick={() => onDismiss(finding.secretId)}
-            />
-          )}
-        </span>
+        <SecretsFindingBadges finding={finding} t={t} />
+        <SecretsFindingActions
+          finding={finding}
+          t={t}
+          onMarkRotating={onMarkRotating}
+          onVerifyRotated={onVerifyRotated}
+          onDismiss={onDismiss}
+          onCopyToAi={onCopyToAi}
+        />
       </div>
     </ResultCard>
   );

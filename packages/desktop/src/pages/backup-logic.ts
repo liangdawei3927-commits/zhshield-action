@@ -47,6 +47,20 @@ export function formatTime(iso: string): string {
   }
 }
 
+/** 拉取项目备份记录。必须传 projectPath：主进程 getRecords 无参时返回全部项目的记录，
+ * 会把其他项目的快照列进本页并暴露在删除确认框里（进度推送已按 projectId 过滤，此处须一致） */
+async function loadBackupRecords(
+  projectPath: string,
+  setRecords: Dispatch<SetStateAction<BackupRecordData[]>>,
+): Promise<void> {
+  try {
+    const data = await getBackupRecords(projectPath);
+    setRecords(data);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 备份记录数据：列表状态 + 拉取 */
 function useBackupRecordData(projectPath: string): {
   records: BackupRecordData[];
@@ -55,16 +69,10 @@ function useBackupRecordData(projectPath: string): {
 } {
   const [records, setRecords] = useState<BackupRecordData[]>([]);
 
-  const fetchRecords = useCallback(async () => {
-    try {
-      // 必须传 projectPath：主进程 getRecords 无参时返回全部项目的记录，
-      // 会把其他项目的快照列进本页并暴露在删除确认框里（进度推送已按 projectId 过滤，此处须一致）
-      const data = await getBackupRecords(projectPath);
-      setRecords(data);
-    } catch {
-      /* ignore */
-    }
-  }, [projectPath]);
+  const fetchRecords = useCallback(
+    () => loadBackupRecords(projectPath, setRecords),
+    [projectPath],
+  );
 
   return { records, setRecords, fetchRecords };
 }

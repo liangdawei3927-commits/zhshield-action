@@ -155,6 +155,79 @@ function useGuardConfigSave(cfg: {
   );
 }
 
+function GuardConfigHeader({ t }: { t: ReturnType<typeof useT> }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <h2 className="text-lg font-bold text-zh-ink">
+        {t('page.guard.config.title', { defaultValue: '门禁配置' })}
+      </h2>
+    </div>
+  );
+}
+
+function GuardConfigToggles({
+  t,
+  preCommit,
+  setPreCommit,
+  prePush,
+  setPrePush,
+  blockCritical,
+  setBlockCritical,
+  saveConfig,
+}: {
+  t: ReturnType<typeof useT>;
+  preCommit: boolean;
+  setPreCommit: Dispatch<SetStateAction<boolean>>;
+  prePush: boolean;
+  setPrePush: Dispatch<SetStateAction<boolean>>;
+  blockCritical: boolean;
+  setBlockCritical: Dispatch<SetStateAction<boolean>>;
+  saveConfig: (
+    update: Partial<{ preCommit: boolean; prePush: boolean; blockOnCritical: boolean }>,
+  ) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <ConfigRow
+        title={t('page.guard.config.preCommit', { defaultValue: '提交前检查' })}
+        desc={t('page.guard.config.preCommitDesc', {
+          defaultValue: '每次 git commit 前自动执行门禁检查',
+        })}
+        enabled={preCommit}
+        onToggle={() => {
+          const next = !preCommit;
+          setPreCommit(next);
+          saveConfig({ preCommit: next });
+        }}
+      />
+      <ConfigRow
+        title={t('page.guard.config.prePush', { defaultValue: '推送前检查' })}
+        desc={t('page.guard.config.prePushDesc', {
+          defaultValue: '每次 git push 前自动执行门禁检查',
+        })}
+        enabled={prePush}
+        onToggle={() => {
+          const next = !prePush;
+          setPrePush(next);
+          saveConfig({ prePush: next });
+        }}
+      />
+      <ConfigRow
+        title={t('page.guard.config.blockOnCritical', { defaultValue: '严重问题阻止提交' })}
+        desc={t('page.guard.config.blockOnCriticalDesc', {
+          defaultValue: '当检测到严重级别问题时阻止提交操作',
+        })}
+        enabled={blockCritical}
+        onToggle={() => {
+          const next = !blockCritical;
+          setBlockCritical(next);
+          saveConfig({ blockOnCritical: next });
+        }}
+      />
+    </div>
+  );
+}
+
 export function GuardConfigCard() {
   const t = useT();
   const {
@@ -177,11 +250,7 @@ export function GuardConfigCard() {
   if (loading) {
     return (
       <ResultCard variant="section" className="mt-8">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-lg font-bold text-zh-ink">
-            {t('page.guard.config.title', { defaultValue: '门禁配置' })}
-          </h2>
-        </div>
+        <GuardConfigHeader t={t} />
         <div className="text-sm text-zh-muted">
           {t('page.guard.config.loading', { defaultValue: '加载中...' })}
         </div>
@@ -191,49 +260,17 @@ export function GuardConfigCard() {
 
   return (
     <ResultCard variant="section" className="mt-8">
-      <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-lg font-bold text-zh-ink">
-          {t('page.guard.config.title', { defaultValue: '门禁配置' })}
-        </h2>
-      </div>
-      <div className="space-y-4">
-        <ConfigRow
-          title={t('page.guard.config.preCommit', { defaultValue: '提交前检查' })}
-          desc={t('page.guard.config.preCommitDesc', {
-            defaultValue: '每次 git commit 前自动执行门禁检查',
-          })}
-          enabled={preCommit}
-          onToggle={() => {
-            const next = !preCommit;
-            setPreCommit(next);
-            saveConfig({ preCommit: next });
-          }}
-        />
-        <ConfigRow
-          title={t('page.guard.config.prePush', { defaultValue: '推送前检查' })}
-          desc={t('page.guard.config.prePushDesc', {
-            defaultValue: '每次 git push 前自动执行门禁检查',
-          })}
-          enabled={prePush}
-          onToggle={() => {
-            const next = !prePush;
-            setPrePush(next);
-            saveConfig({ prePush: next });
-          }}
-        />
-        <ConfigRow
-          title={t('page.guard.config.blockOnCritical', { defaultValue: '严重问题阻止提交' })}
-          desc={t('page.guard.config.blockOnCriticalDesc', {
-            defaultValue: '当检测到严重级别问题时阻止提交操作',
-          })}
-          enabled={blockCritical}
-          onToggle={() => {
-            const next = !blockCritical;
-            setBlockCritical(next);
-            saveConfig({ blockOnCritical: next });
-          }}
-        />
-      </div>
+      <GuardConfigHeader t={t} />
+      <GuardConfigToggles
+        t={t}
+        preCommit={preCommit}
+        setPreCommit={setPreCommit}
+        prePush={prePush}
+        setPrePush={setPrePush}
+        blockCritical={blockCritical}
+        setBlockCritical={setBlockCritical}
+        saveConfig={saveConfig}
+      />
     </ResultCard>
   );
 }

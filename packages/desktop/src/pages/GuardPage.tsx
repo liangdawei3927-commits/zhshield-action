@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { PageGlyph } from '../components/business/page-glyph';
@@ -51,23 +52,11 @@ function notifyGuardBlocked(
   });
 }
 
-function GuardReportView({
-  report,
-  loading,
-  progressLabel,
-  onRescan,
-  onBackHome,
-  levels,
-  copyToAi,
-  copyAllToAi,
-  reportFalsePositive,
-  history,
-  falsePositiveCount,
-  projectPath,
-  t,
-}: {
+interface GuardReportViewProps {
   report: GuardReportData;
   loading: boolean;
+  progress: number;
+  statusMessage: string;
   progressLabel: string;
   onRescan: () => void;
   onBackHome: () => void;
@@ -79,7 +68,21 @@ function GuardReportView({
   falsePositiveCount: number;
   projectPath: string;
   t: (key: string, params?: Record<string, unknown>) => string;
-}) {
+}
+
+function buildGuardStats({
+  report,
+  copyToAi,
+  copyAllToAi,
+  reportFalsePositive,
+  t,
+}: {
+  report: GuardReportData;
+  copyToAi: (check: GuardReportData['checks'][number]) => void;
+  copyAllToAi: (checks: GuardReportData['checks'][number][]) => void;
+  reportFalsePositive: (check: GuardReportData['checks'][number]) => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}): ReportStatCard[] {
   const checks = report.checks;
   const passed = checks.filter((c) => c.status === 'pass');
   const warnings = checks.filter((c) => c.status === 'warn');
@@ -97,6 +100,56 @@ function GuardReportView({
       />
     ),
   });
+
+  return [
+    {
+      key: 'total',
+      label: t('page.guard.stats.totalChecks'),
+      value: report.summary.totalChecks,
+      detail: statDetail(checks),
+    },
+    {
+      key: 'passed',
+      label: t('page.guard.stats.passed'),
+      value: report.summary.passed,
+      color: 'rgb(var(--zh-success))',
+      detail: statDetail(passed),
+    },
+    {
+      key: 'warnings',
+      label: t('page.guard.stats.warnings'),
+      value: report.summary.warnings,
+      color: 'rgb(var(--zh-warning))',
+      detail: statDetail(warnings),
+    },
+    {
+      key: 'blocked',
+      label: t('page.guard.stats.blocked'),
+      value: report.summary.blocked,
+      color: 'rgb(var(--zh-danger))',
+      detail: statDetail(blocked),
+    },
+  ];
+}
+
+function GuardReportView({
+  report,
+  loading,
+  progress,
+  statusMessage,
+  progressLabel,
+  onRescan,
+  onBackHome,
+  levels,
+  copyToAi,
+  copyAllToAi,
+  reportFalsePositive,
+  history,
+  falsePositiveCount,
+  projectPath,
+  t,
+}: GuardReportViewProps) {
+  const stats = buildGuardStats({ report, copyToAi, copyAllToAi, reportFalsePositive, t });
 
   return (
     <ReportShell
@@ -120,35 +173,10 @@ function GuardReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
-      stats={[
-        {
-          key: 'total',
-          label: t('page.guard.stats.totalChecks'),
-          value: report.summary.totalChecks,
-          detail: statDetail(checks),
-        },
-        {
-          key: 'passed',
-          label: t('page.guard.stats.passed'),
-          value: report.summary.passed,
-          color: 'rgb(var(--zh-success))',
-          detail: statDetail(passed),
-        },
-        {
-          key: 'warnings',
-          label: t('page.guard.stats.warnings'),
-          value: report.summary.warnings,
-          color: 'rgb(var(--zh-warning))',
-          detail: statDetail(warnings),
-        },
-        {
-          key: 'blocked',
-          label: t('page.guard.stats.blocked'),
-          value: report.summary.blocked,
-          color: 'rgb(var(--zh-danger))',
-          detail: statDetail(blocked),
-        },
-      ]}
+      loading={loading}
+      progress={progress}
+      progressMessage={statusMessage}
+      stats={stats}
     >
       <GuardLevels levels={levels} />
       <GuardTable
@@ -277,11 +305,17 @@ export function GuardPage({ projectPath }: GuardPageProps) {
   const { notify } = useNotification();
   useGuardBlockNotification(report, notify);
 
-  if (report && !showHome) {
+  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = report;
+  const hasDetail = detailReport !== null;
+
+  if (detailReport && !showHome) {
     return (
       <GuardReportView
-        report={report}
+        report={detailReport}
         loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
         progressLabel={progressLabel}
         onRescan={handleScan}
         onBackHome={() => setShowHome(true)}
@@ -298,16 +332,18 @@ export function GuardPage({ projectPath }: GuardPageProps) {
   }
 
   return (
-    <GuardEmptyView
-      projectPath={projectPath}
-      loading={loading}
-      progress={Math.round(progress * 100)}
-      statusMessage={statusMessage}
-      onScan={() => {
-        setShowHome(false);
-        handleScan();
-      }}
-      t={t}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <GuardEmptyView
+        projectPath={projectPath}
+        loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
+        onScan={() => {
+          setShowHome(false);
+          handleScan();
+        }}
+        t={t}
+      />
+    </DetailEntryProvider>
   );
 }

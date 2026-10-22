@@ -9,6 +9,7 @@ import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
 import { useInspectPage } from './inspect-logic';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
 import { ProgressBar, CheckList } from './inspect-parts';
@@ -102,7 +103,7 @@ function InspectFailureView({
       buttonText={t('page.inspect.errorRetry')}
       onAction={onRetry}
       loading={loading}
-      progress={Math.round(progress * 100)}
+      progress={progress}
       progressLabel={t('page.inspect.scanning')}
       progressMessage={statusMessage}
       extra={
@@ -200,6 +201,8 @@ function InspectReportView({
   projectPath,
   report,
   loading,
+  progress,
+  statusMessage,
   progressLabel,
   onRescan,
   onBackHome,
@@ -210,6 +213,8 @@ function InspectReportView({
   projectPath: string;
   report: InspectionReportData;
   loading: boolean;
+  progress: number;
+  statusMessage: string;
   progressLabel: string;
   onRescan: () => void;
   onBackHome: () => void;
@@ -243,6 +248,9 @@ function InspectReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={statusMessage}
       stats={buildInspectStats({ items, passCount, attentionChecks, copyToAi, copyAllToAi, t })}
     >
       <p className="text-xs text-zh-muted mb-4">{t('page.inspect.guardAlsoRan')}</p>
@@ -291,16 +299,28 @@ function InspectEmptyView(props: {
       buttonText={props.t('page.inspect.scanNow')}
       onAction={props.onScan}
       loading={props.loading}
-      progress={Math.round(props.progress * 100)}
+      progress={props.progress}
       statusMessage={props.statusMessage}
       progressLabel={props.t('page.inspect.scanning')}
     />
   );
 }
 
+function useInspectPageState(projectPath: string) {
+  const page = useInspectPage(projectPath);
+  const [showHome, setShowHome] = useState(false);
+  const startScan = () => {
+    setShowHome(false);
+    page.startInspect();
+  };
+  const backHome = () => setShowHome(true);
+  // 打开详情（回详情分支）——供 DetailEntryProvider.onOpen 使用
+  const openDetail = () => setShowHome(false);
+  return { ...page, showHome, startScan, backHome, openDetail };
+}
+
 export function InspectPage({ projectPath }: InspectPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
   const {
     report,
     failure,
@@ -311,12 +331,15 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     copyToAi,
     copyAllToAi,
     startInspect,
-  } = useInspectPage(projectPath);
+    showHome,
+    startScan,
+    backHome,
+    openDetail,
+  } = useInspectPageState(projectPath);
 
-  const startScan = () => {
-    setShowHome(false);
-    startInspect();
-  };
+  // 单一判定源：有检查结果的报告 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = report && report.checks.length > 0 ? report : null;
+  const hasDetail = detailReport !== null;
 
   if (failure) {
     return (
@@ -332,15 +355,17 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     );
   }
 
-  if (report && report.checks.length > 0 && !showHome) {
+  if (detailReport && !showHome) {
     return (
       <InspectReportView
         projectPath={projectPath}
-        report={report}
+        report={detailReport}
         loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
         progressLabel={progressLabel}
         onRescan={startInspect}
-        onBackHome={() => setShowHome(true)}
+        onBackHome={backHome}
         copyToAi={copyToAi}
         copyAllToAi={copyAllToAi}
         t={t}
@@ -349,13 +374,15 @@ export function InspectPage({ projectPath }: InspectPageProps) {
   }
 
   return (
-    <InspectEmptyView
-      projectPath={projectPath}
-      loading={loading}
-      progress={progress}
-      statusMessage={statusMessage}
-      onScan={startScan}
-      t={t}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
+      <InspectEmptyView
+        projectPath={projectPath}
+        loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
+        onScan={startScan}
+        t={t}
+      />
+    </DetailEntryProvider>
   );
 }

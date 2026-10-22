@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ReportShell } from '../components/business/ReportShell';
+import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSentinelPage, type SentinelEventItem } from './sentinel-logic';
 import { SentinelTimeline, EventsPanel } from './sentinel-parts';
 import { useNotification } from '../contexts/NotificationContext';
@@ -33,6 +34,65 @@ function notifyCriticalEvents(
       read: false,
     });
   }
+}
+
+/** 顶行统计卡：总数 / 活跃 / 高危 / 严重，明细为对应事件子集 */
+function buildSentinelStats({
+  events,
+  sorted,
+  activeCount,
+  highCount,
+  criticalCount,
+  projectPath,
+  t,
+}: {
+  events: SentinelEventItem[];
+  sorted: SentinelEventItem[];
+  activeCount: number;
+  highCount: number;
+  criticalCount: number;
+  projectPath: string;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}): ReportStatCard[] {
+  return [
+    { key: 'total', label: t('page.sentinel.total'), value: events.length },
+    {
+      key: 'active',
+      label: t('page.sentinel.active'),
+      value: activeCount,
+      color: 'rgb(var(--zh-warning))',
+      detail: {
+        items: sorted.filter((e) => ['detected', 'assigned', 'fixing'].includes(e.status)),
+        render: (sub) => (
+          <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+        ),
+      },
+    },
+    {
+      key: 'high',
+      label: t('page.sentinel.high'),
+      value: highCount,
+      color: 'rgb(var(--zh-danger))',
+      detail: {
+        items: sorted.filter((e) => e.severity === 'high'),
+        render: (sub) => (
+          <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+        ),
+      },
+    },
+    {
+      key: 'critical',
+      label: t('page.sentinel.critical'),
+      value: criticalCount,
+      color: 'rgb(var(--zh-danger))',
+      detail: {
+        items: sorted.filter((e) => e.severity === 'critical'),
+        render: (sub) => (
+          <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
+        ),
+      },
+    },
+  ];
 }
 
 function SentinelReportView({
@@ -82,45 +142,15 @@ function SentinelReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
-      stats={[
-        { key: 'total', label: t('page.sentinel.total'), value: events.length },
-        {
-          key: 'active',
-          label: t('page.sentinel.active'),
-          value: activeCount,
-          color: 'rgb(var(--zh-warning))',
-          detail: {
-            items: sorted.filter((e) => ['detected', 'assigned', 'fixing'].includes(e.status)),
-            render: (sub) => (
-              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
-            ),
-          },
-        },
-        {
-          key: 'high',
-          label: t('page.sentinel.high'),
-          value: highCount,
-          color: 'rgb(var(--zh-danger))',
-          detail: {
-            items: sorted.filter((e) => e.severity === 'high'),
-            render: (sub) => (
-              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
-            ),
-          },
-        },
-        {
-          key: 'critical',
-          label: t('page.sentinel.critical'),
-          value: criticalCount,
-          color: 'rgb(var(--zh-danger))',
-          detail: {
-            items: sorted.filter((e) => e.severity === 'critical'),
-            render: (sub) => (
-              <EventsPanel events={sub as SentinelEventItem[]} projectPath={projectPath} />
-            ),
-          },
-        },
-      ]}
+      stats={buildSentinelStats({
+        events,
+        sorted,
+        activeCount,
+        highCount,
+        criticalCount,
+        projectPath,
+        t,
+      })}
     >
       <SentinelTimeline events={sorted} />
     </ReportShell>
@@ -225,7 +255,11 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
   const { notify } = useNotification();
   useSentinelCriticalNotification(events, notify);
 
-  if (events.length > 0 && !showHome) {
+  // 单一判定源：有事件 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = events.length > 0 ? events : null;
+  const hasDetail = detailReport !== null;
+
+  if (hasDetail && !showHome) {
     return (
       <SentinelReportView
         events={events}
@@ -243,15 +277,17 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
   }
 
   return (
-    <SentinelEmptyView
-      projectPath={projectPath}
-      monitoring={monitoring}
-      loading={loading}
-      onAction={() => {
-        setShowHome(false);
-        startMonitoring();
-      }}
-      t={t}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <SentinelEmptyView
+        projectPath={projectPath}
+        monitoring={monitoring}
+        loading={loading}
+        onAction={() => {
+          setShowHome(false);
+          startMonitoring();
+        }}
+        t={t}
+      />
+    </DetailEntryProvider>
   );
 }

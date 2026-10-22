@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSecurityPage } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
 import { SecurityEmptyState } from './security-empty-state';
@@ -184,6 +185,8 @@ interface SecurityReportViewProps extends SecurityReportCopyProps, SecuritySecre
   report: SecurityScanReportData;
   secretsReport: SecretReportData | null;
   loading: boolean;
+  progress: number;
+  statusMessage: string;
   progressLabel: string;
   tab: SecurityTab;
   onTabChange: (tab: SecurityTab) => void;
@@ -197,6 +200,8 @@ function SecurityReportView({
   report,
   secretsReport,
   loading,
+  progress,
+  statusMessage,
   progressLabel,
   tab,
   onTabChange,
@@ -235,6 +240,9 @@ function SecurityReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={statusMessage}
       stats={buildSecurityStats({
         report,
         copyToAi,
@@ -264,9 +272,9 @@ function SecurityReportView({
   );
 }
 
-export function SecurityPage({ projectPath }: SecurityPageProps) {
-  const t = useT();
+function useSecurityPageState(projectPath: string) {
   const [showHome, setShowHome] = useState(false);
+  const [tab, setTab] = useState<SecurityTab>('vuln');
   const {
     loading,
     progress,
@@ -288,7 +296,6 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
     copyToAi: secretsCopyToAi,
     copyAllToAi: secretsCopyAllToAi,
   } = useSecretsPage(projectPath);
-  const [tab, setTab] = useState<SecurityTab>('vuln');
 
   const handleScan = useCallback(async () => {
     await Promise.all([handleSecurityScan(), handleSecretsScan()]);
@@ -298,6 +305,57 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
     setShowHome(false);
     handleScan();
   };
+
+  return {
+    showHome,
+    setShowHome,
+    tab,
+    setTab,
+    loading,
+    progress,
+    progressLabel,
+    statusMessage,
+    report,
+    copyToAi,
+    copyAllToAi,
+    copyMalwareToAi,
+    copyMalwareAllToAi,
+    secretsReport,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    secretsCopyToAi,
+    secretsCopyAllToAi,
+    handleScan,
+    startScan,
+  };
+}
+
+export function SecurityPage({ projectPath }: SecurityPageProps) {
+  const t = useT();
+  const {
+    showHome,
+    setShowHome,
+    tab,
+    setTab,
+    loading,
+    progress,
+    progressLabel,
+    statusMessage,
+    report,
+    copyToAi,
+    copyAllToAi,
+    copyMalwareToAi,
+    copyMalwareAllToAi,
+    secretsReport,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    secretsCopyToAi,
+    secretsCopyAllToAi,
+    handleScan,
+    startScan,
+  } = useSecurityPageState(projectPath);
   const emptyStateParams = {
     projectPath,
     loading,
@@ -306,13 +364,19 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
     onScan: startScan,
   };
 
-  if (report && !showHome) {
+  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = report;
+  const hasDetail = detailReport !== null;
+
+  if (detailReport && !showHome) {
     return (
       <SecurityReportView
         projectPath={projectPath}
-        report={report}
+        report={detailReport}
         secretsReport={secretsReport}
         loading={loading}
+        progress={progress}
+        statusMessage={statusMessage}
         progressLabel={progressLabel}
         tab={tab}
         onTabChange={setTab}
@@ -333,9 +397,11 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
   }
 
   return (
-    <ScanEmptyStateBranch
-      {...emptyStateParams}
-      render={(empty) => <SecurityEmptyState {...empty} />}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <ScanEmptyStateBranch
+        {...emptyStateParams}
+        render={(empty) => <SecurityEmptyState {...empty} />}
+      />
+    </DetailEntryProvider>
   );
 }

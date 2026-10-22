@@ -52,7 +52,7 @@ export function PipelineTaskEmptyState({
       buttonText={t(buttonTextKey)}
       onAction={onScan}
       loading={loading}
-      progress={Math.round(progress * 100)}
+      progress={progress}
       progressLabel={t(progressLabelKey)}
       progressMessage={statusMessage}
     />

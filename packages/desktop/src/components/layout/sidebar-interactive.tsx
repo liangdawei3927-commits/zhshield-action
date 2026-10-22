@@ -29,6 +29,12 @@ function ProjectRow({
   onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
 }) {
   const t = useT();
+  // 报告中心：必须先切项目再跳转，否则 ReportsPage 会拿旧 projectPath 显示错项目数据
+  const openProjectReports = () => {
+    onSwitchProject(index);
+    onNavigate('reports');
+    onClose();
+  };
   return (
     <Bounce
       as="div"
@@ -59,6 +65,38 @@ function ProjectRow({
           {project.name}
         </span>
       </button>
+      <ProjectRowActions
+        project={project}
+        index={index}
+        onClose={onClose}
+        onRequestDelete={onRequestDelete}
+        onOpenProjectProfile={onOpenProjectProfile}
+        onOpenProjectReports={openProjectReports}
+        t={t}
+      />
+    </Bounce>
+  );
+}
+
+function ProjectRowActions({
+  project,
+  index,
+  onClose,
+  onRequestDelete,
+  onOpenProjectProfile,
+  onOpenProjectReports,
+  t,
+}: {
+  project: ProjectInfo;
+  index: number;
+  onClose: () => void;
+  onRequestDelete: (p: ProjectInfo) => void;
+  onOpenProjectProfile: (project: ProjectInfo, index: number) => void;
+  onOpenProjectReports: () => void;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <>
       <button
         onClick={() => {
           onOpenProjectProfile(project, index);
@@ -82,6 +120,26 @@ function ProjectRow({
         </svg>
       </button>
       <button
+        onClick={onOpenProjectReports}
+        aria-label={t('nav.reports')}
+        title={t('nav.reports')}
+        className="shrink-0 flex items-center justify-center w-7 h-7 rounded-md border-none cursor-pointer text-zh-muted hover:text-zh-ink-2 hover:bg-zh-panel transition-colors"
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <path d="M14 2v6h6M8 13h8M8 17h5" />
+        </svg>
+      </button>
+      <button
         onClick={() => onRequestDelete(project)}
         aria-label={t('layout.deleteProject', { name: project.name })}
         className="shrink-0 mr-2 flex items-center justify-center w-7 h-7 rounded-md border-none cursor-pointer text-zh-muted hover:text-danger-500 hover:bg-danger-50 transition-colors"
@@ -100,7 +158,7 @@ function ProjectRow({
           <path d="M10 11v6M14 11v6" />
         </svg>
       </button>
-    </Bounce>
+    </>
   );
 }
 
@@ -192,29 +250,47 @@ export function ProjectsSection({
             />
           ))
         )}
-        <Bounce
-          as="button"
-          onClick={() => {
-            onAddProject();
-            onClose();
-          }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left border-none cursor-pointer transition-colors hover:bg-success-50 text-success-800"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          <span className="text-xs font-medium">{t('layout.addProject')}</span>
-        </Bounce>
+        <AddProjectButton
+          onAddProject={onAddProject}
+          onClose={onClose}
+          t={t}
+        />
       </div>
     </section>
+  );
+}
+
+function AddProjectButton({
+  onAddProject,
+  onClose,
+  t,
+}: {
+  onAddProject: () => void;
+  onClose: () => void;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <Bounce
+      as="button"
+      onClick={() => {
+        onAddProject();
+        onClose();
+      }}
+      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left border-none cursor-pointer transition-colors hover:bg-success-50 text-success-800"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      <span className="text-xs font-medium">{t('layout.addProject')}</span>
+    </Bounce>
   );
 }
 

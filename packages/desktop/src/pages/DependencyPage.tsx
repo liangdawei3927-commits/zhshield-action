@@ -19,6 +19,7 @@ import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 interface DependencyPageProps {
@@ -110,10 +111,14 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   const t = useT();
   const [showHome, setShowHome] = useState(false);
 
-  if (report && !showHome) {
+  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
+  const detailReport = report;
+  const hasDetail = detailReport !== null;
+
+  if (detailReport && !showHome) {
     return (
       <DependencyReportView
-        report={report}
+        report={detailReport}
         loading={loading}
         onRescan={handleScan}
         onCopyTyposquat={copyToAi}
@@ -126,13 +131,15 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }
 
   return (
-    <DependencyEmptyState
-      projectPath={projectPath}
-      loading={loading}
-      onScan={() => {
-        setShowHome(false);
-        handleScan();
-      }}
-    />
+    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+      <DependencyEmptyState
+        projectPath={projectPath}
+        loading={loading}
+        onScan={() => {
+          setShowHome(false);
+          handleScan();
+        }}
+      />
+    </DetailEntryProvider>
   );
 }

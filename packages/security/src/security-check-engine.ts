@@ -147,8 +147,19 @@ export class SecurityCheckEngine {
     };
   }
 
+  // 顺序分段判定：各段接管互不相交的检查名集合，未命中返回 null 顺延下一段（与原 switch 语义一致）
   private evaluateCheck(params: EvaluateCheckParams): SecurityCheckResult {
-    const { check, items, threats, deps, source } = params;
+    const evidence = this.itemEvidenceVerdict(params);
+    if (evidence !== null) return evidence;
+    const dependency = this.dependencyVerdict(params);
+    if (dependency !== null) return dependency;
+    const threats = this.threatDbVerdict(params);
+    if (threats !== null) return threats;
+    return this.guardPatternVerdict(params);
+  }
+
+  private itemEvidenceVerdict(params: EvaluateCheckParams): SecurityCheckResult | null {
+    const { check, items, source } = params;
     switch (check) {
       case 'env-tracked-in-scan-set':
         // InjectionGuard 的 .env 检出以 title 标识（pattern 为文件名，无法按下发名匹配）
@@ -174,6 +185,13 @@ export class SecurityCheckEngine {
           ),
           (i) => `${i.file}:${i.line} ${i.evidence}`,
         );
+    }
+    return null;
+  }
+
+  private dependencyVerdict(params: EvaluateCheckParams): SecurityCheckResult | null {
+    const { check, deps, source } = params;
+    switch (check) {
       case 'helmet-configured':
       case 'content-security-policy':
       case 'x-frame-options':
@@ -183,6 +201,28 @@ export class SecurityCheckEngine {
       case 'same-site-cookie':
       case 'origin-header-validation':
         return this.csrfVerdict(check, deps, source);
+      case 'dependency-confusion':
+        return this.dependencyConfusionVerdict(check, deps);
+    }
+    return null;
+  }
+
+  private dependencyConfusionVerdict(check: string, deps: DepsScan): SecurityCheckResult {
+    if (deps.localUnscopedDeps.length === 0) {
+      return {
+        status: 'passed',
+        message: `${check}: 未发现未加作用域（可被公共源抢占）的本地/git 依赖`,
+      };
+    }
+    return {
+      status: 'failed',
+      message: `${check}: 检测到 ${deps.localUnscopedDeps.length} 个本地/git 来源依赖缺少 @scope 前缀，存在被同名公共包抢占的风险（${deps.localUnscopedDeps.slice(0, 5).join(', ')}）`,
+    };
+  }
+
+  private threatDbVerdict(params: EvaluateCheckParams): SecurityCheckResult | null {
+    const { check, items, threats } = params;
+    switch (check) {
       case 'package-name-typosquatting':
         return this.verdict(
           check,
@@ -202,19 +242,12 @@ export class SecurityCheckEngine {
           items.filter((i) => i.type === 'supply-chain'),
           (i) => `${i.file}:${i.title}`,
         );
-      case 'dependency-confusion':
-        if (deps.localUnscopedDeps.length === 0) {
-          return {
-            status: 'passed',
-            message: `${check}: 未发现未加作用域（可被公共源抢占）的本地/git 依赖`,
-          };
-        }
-        return {
-          status: 'failed',
-          message: `${check}: 检测到 ${deps.localUnscopedDeps.length} 个本地/git 来源依赖缺少 @scope 前缀，存在被同名公共包抢占的风险（${deps.localUnscopedDeps.slice(0, 5).join(', ')}）`,
-        };
     }
+    return null;
+  }
 
+  private guardPatternVerdict(params: EvaluateCheckParams): SecurityCheckResult {
+    const { check, items } = params;
     // comment-instruction 4 项 / dependency-scripts 4 项 → InjectionGuard pattern 名直接匹配
     const KNOWN_PATTERNS = new Set([
       'ignore-previous-instructions',

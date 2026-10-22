@@ -56,36 +56,59 @@ function checkLongMethod(
   const lineTriggered = params.lineCount > threshold;
   const complexityTriggered = params.complexity > complexityThreshold;
   if (!lineTriggered && !complexityTriggered) return;
+  smells.push(
+    buildLongMethodSmell(parsed, config, params, {
+      threshold,
+      complexityThreshold,
+      lineTriggered,
+      complexityTriggered,
+    }),
+  );
+}
 
+function buildLongMethodSmell(
+  parsed: ParsedFile,
+  config: RefactorConfig,
+  params: {
+    name: string;
+    container: string;
+    lineCount: number;
+    complexity: number;
+    nodeLine: number;
+  },
+  triggers: {
+    threshold: number;
+    complexityThreshold: number;
+    lineTriggered: boolean;
+    complexityTriggered: boolean;
+  },
+): CodeSmell {
+  const { threshold, complexityThreshold, lineTriggered, complexityTriggered } = triggers;
   const parts: string[] = [];
   if (lineTriggered) parts.push(`${params.lineCount} 行 (阈值 ${threshold})`);
   if (complexityTriggered)
     parts.push(`圈复杂度 ${params.complexity} (阈值 ${complexityThreshold})`);
-
   // 主触发度量：context.value 与 context.threshold 必须同口径，否则复杂度单独
   // 触发时会呈现 value(37) < threshold(80) 的观感误报。
   const byComplexityOnly = complexityTriggered && !lineTriggered;
-
-  smells.push(
-    makeSmell({
-      ruleId: 'long-method',
-      severity: config.severities['long-method'],
-      message: `${params.container}${params.name} 过大 (${parts.join('，')})，建议拆分为更小的函数`,
-      filePath: parsed.filePath,
-      line: params.nodeLine,
-      column: 1,
-      metric: byComplexityOnly ? 'cyclomaticComplexity' : 'methodLineCount',
-      value: byComplexityOnly ? params.complexity : params.lineCount,
-      threshold: byComplexityOnly ? complexityThreshold : threshold,
-      suggestion: {
-        type: 'Extract Method',
-        description: `将 ${params.container}${params.name} 按职责拆分为多个小函数，每个不超过 ${threshold} 行`,
-        priority: params.lineCount > threshold * 1.5 ? 'high' : 'medium',
-        effort: params.lineCount > threshold * 2 ? 'large' : 'small',
-        autoFixable: false,
-      },
-    }),
-  );
+  return makeSmell({
+    ruleId: 'long-method',
+    severity: config.severities['long-method'],
+    message: `${params.container}${params.name} 过大 (${parts.join('，')})，建议拆分为更小的函数`,
+    filePath: parsed.filePath,
+    line: params.nodeLine,
+    column: 1,
+    metric: byComplexityOnly ? 'cyclomaticComplexity' : 'methodLineCount',
+    value: byComplexityOnly ? params.complexity : params.lineCount,
+    threshold: byComplexityOnly ? complexityThreshold : threshold,
+    suggestion: {
+      type: 'Extract Method',
+      description: `将 ${params.container}${params.name} 按职责拆分为多个小函数，每个不超过 ${threshold} 行`,
+      priority: params.lineCount > threshold * 1.5 ? 'high' : 'medium',
+      effort: params.lineCount > threshold * 2 ? 'large' : 'small',
+      autoFixable: false,
+    },
+  });
 }
 
 export function detectLargeClass(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
@@ -287,9 +310,28 @@ function findWorstComponent(sourceFile: ts.SourceFile): ComponentSize | null {
  * 非组件节点返回 null。
  */
 function componentNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
+  const checkers: Array<(n: ts.Node, sf: ts.SourceFile) => string | null> = [
+    checkFunctionDeclaration,
+    checkVariableDeclaration,
+    checkClassDeclaration,
+  ];
+  for (const checker of checkers) {
+    const result = checker(node, sourceFile);
+    if (result !== null) {
+      return result;
+    }
+  }
+  return null;
+}
+
+function checkFunctionDeclaration(node: ts.Node): string | null {
   if (ts.isFunctionDeclaration(node) && node.name && UPPERCASE_START_RE.test(node.name.text)) {
     return node.name.text;
   }
+  return null;
+}
+
+function checkVariableDeclaration(node: ts.Node): string | null {
   if (
     ts.isVariableDeclaration(node) &&
     ts.isIdentifier(node.name) &&
@@ -309,14 +351,16 @@ function componentNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | nul
     }
     return null;
   }
+  return null;
+}
+
+function checkClassDeclaration(node: ts.Node, sourceFile: ts.SourceFile): string | null {
   if (
     ts.isClassDeclaration(node) &&
     node.name &&
     UPPERCASE_START_RE.test(node.name.text) &&
     (node.heritageClauses ?? []).some((clause) =>
-      clause.types.some((t) =>
-        REACT_COMPONENT_RE.test(t.expression.getText(sourceFile)),
-      ),
+      clause.types.some((t) => REACT_COMPONENT_RE.test(t.expression.getText(sourceFile))),
     )
   ) {
     return node.name.text;

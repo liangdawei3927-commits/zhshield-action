@@ -18,6 +18,7 @@ import {
   isToolTimeout,
   ToolCommandResolver,
 } from './tool-runner';
+import type { ToolExecError } from './tool-runner';
 import { resolveInjectedConfigPath } from './injected-config';
 
 /**
@@ -192,31 +193,33 @@ export class ESLintAdapter implements ToolAdapter {
   /** 处理 ESLint 执行错误：未安装 / 超时被杀 / 部分输出 / 失败 */
   private handleEslintError(error: unknown, start: number, category: IssueCategory): ToolResult {
     const err = asToolExecError(error);
-    if (err.code === 'ENOENT') {
+    if (err.code === 'ENOENT')
       return this.buildUnavailable(start, 'ESLint 未安装或未在 PATH 中找到');
-    }
-
-    let rawOutput: unknown = null;
-    if (err.stdout) {
-      try {
-        rawOutput = JSON.parse(err.stdout);
-      } catch {
-        /* ignore */
-      }
-    }
-    if (rawOutput) {
+    const rawOutput = this.tryParseEslintStdout(err);
+    if (rawOutput)
       return this.buildAvailable(start, rawOutput, this.mapOutput(rawOutput, category));
-    }
-
-    if (isToolTimeout(err)) {
-      return this.buildError(
-        start,
-        `ESLint 扫描超时（${DEFAULT_SCAN_TIMEOUT_MS}ms 内未完成，已终止进程）：` +
-          '本仓为大型 monorepo，请缩小扫描范围或在 SOP 规则的 check.toolConfig.timeout 中显式放宽预算。',
-      );
-    }
-
+    if (isToolTimeout(err)) return this.buildTimeoutError(start);
     return this.buildError(start, err.stderr || err.message || 'ESLint 执行失败');
+  }
+
+  /** 尝试解析失败前已写出的 ESLint JSON 报告；无输出或解析失败时返回 null */
+  private tryParseEslintStdout(err: ToolExecError): unknown | null {
+    if (!err.stdout) return null;
+    try {
+      return JSON.parse(err.stdout);
+    } catch {
+      /* ignore */
+      return null;
+    }
+  }
+
+  /** 构造 ESLint 扫描超时的错误结果（提示缩小范围或放宽 timeout 预算） */
+  private buildTimeoutError(start: number): ToolResult {
+    return this.buildError(
+      start,
+      `ESLint 扫描超时（${DEFAULT_SCAN_TIMEOUT_MS}ms 内未完成，已终止进程）：` +
+        '本仓为大型 monorepo，请缩小扫描范围或在 SOP 规则的 check.toolConfig.timeout 中显式放宽预算。',
+    );
   }
 
   private buildAvailable(start: number, rawOutput: unknown, issues: Issue[]): ToolResult {

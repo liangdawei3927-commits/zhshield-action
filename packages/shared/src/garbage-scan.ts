@@ -82,62 +82,88 @@ export interface GarbageScanOptions {
  * 产出顺序即遍历顺序（readdirSync 返回序，目录先于其下文件）；目录不可读、
  * 文件 stat 失败均按静默跳过处理，绝不抛异常。
  */
+interface GarbageScanContext {
+  projectPath: string;
+  options: GarbageScanOptions;
+  maxDepth: number;
+  items: GarbageItem[];
+}
+
+function createUnusedFileItem(name: string, relativePath: string, size: number): GarbageItem {
+  return {
+    id: randomUUID(),
+    type: 'unused-file' as const,
+    path: relativePath,
+    size,
+    reason: `Unwanted file: ${name}`,
+  };
+}
+
+function createEmptyFileItem(name: string, relativePath: string, size: number): GarbageItem {
+  return {
+    id: randomUUID(),
+    type: 'unused-file' as const,
+    path: relativePath,
+    size,
+    reason: `Empty file: ${name}`,
+  };
+}
+
+function readFileSize(fullPath: string): number | null {
+  try {
+    return fs.statSync(fullPath).size;
+  } catch {
+    return null;
+  }
+}
+
+function collectFileItem(ctx: GarbageScanContext, fullPath: string, entryName: string): void {
+  const size = readFileSize(fullPath);
+  if (size === null) return;
+  const relativePath = path.relative(ctx.projectPath, fullPath);
+  if (ctx.options.isJunkFileName(entryName)) {
+    ctx.items.push(createUnusedFileItem(entryName, relativePath, size));
+    return;
+  }
+  if (size === 0 && !EMPTY_FILE_PATTERN.test(entryName)) {
+    ctx.items.push(createEmptyFileItem(entryName, relativePath, size));
+  }
+}
+
+function collectBuildArtifact(ctx: GarbageScanContext, fullPath: string, depth: number): boolean {
+  if (depth !== 0 || !ctx.options.buildArtifactDirs.has(path.basename(fullPath))) return false;
+  ctx.items.push({
+    id: randomUUID(),
+    type: 'build-artifact',
+    path: path.relative(ctx.projectPath, fullPath),
+    size: ctx.options.measureDirSize(fullPath),
+    reason: '可再生成的构建产物目录',
+  });
+  return true;
+}
+
+function visitDir(dir: string, depth: number, ctx: GarbageScanContext): void {
+  if (depth > ctx.maxDepth) return;
+  for (const entry of safeReadDirEntries(dir)) {
+    const fullPath = safeJoin(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (collectBuildArtifact(ctx, fullPath, depth)) continue;
+      if (!ctx.options.ignoreDirs.has(entry.name)) visitDir(fullPath, depth + 1, ctx);
+      continue;
+    }
+    if (entry.isFile()) {
+      collectFileItem(ctx, fullPath, entry.name);
+    }
+  }
+}
+
 export function scanGarbageDir(projectPath: string, options: GarbageScanOptions): GarbageItem[] {
-  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
-  const items: GarbageItem[] = [];
-
-  const collectFileItem = (name: string, relativePath: string, size: number): void => {
-    if (options.isJunkFileName(name)) {
-      items.push({
-        id: randomUUID(),
-        type: 'unused-file',
-        path: relativePath,
-        size,
-        reason: `Unwanted file: ${name}`,
-      });
-      return;
-    }
-    // 空文件（非常见入口）视为垃圾候选
-    if (size === 0 && !EMPTY_FILE_PATTERN.test(name)) {
-      items.push({
-        id: randomUUID(),
-        type: 'unused-file',
-        path: relativePath,
-        size: 0,
-        reason: `Empty file: ${name}`,
-      });
-    }
+  const ctx: GarbageScanContext = {
+    projectPath,
+    options,
+    maxDepth: options.maxDepth ?? DEFAULT_MAX_DEPTH,
+    items: [],
   };
-
-  const visit = (dir: string, depth: number): void => {
-    if (depth > maxDepth) return;
-    for (const entry of safeReadDirEntries(dir)) {
-      const fullPath = safeJoin(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (depth === 0 && options.buildArtifactDirs.has(entry.name)) {
-          items.push({
-            id: randomUUID(),
-            type: 'build-artifact',
-            path: path.relative(projectPath, fullPath),
-            size: options.measureDirSize(fullPath),
-            reason: '可再生成的构建产物目录',
-          });
-          continue;
-        }
-        if (!options.ignoreDirs.has(entry.name)) visit(fullPath, depth + 1);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(fullPath);
-      } catch {
-        continue;
-      }
-      collectFileItem(entry.name, path.relative(projectPath, fullPath), stat.size);
-    }
-  };
-
-  visit(projectPath, 0);
-  return items;
+  visitDir(projectPath, 0, ctx);
+  return ctx.items;
 }

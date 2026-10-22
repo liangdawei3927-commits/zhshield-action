@@ -109,6 +109,16 @@ interface WalkFrame {
   readonly ipcHandler: boolean;
 }
 
+interface WalkContext {
+  readonly sourceFile: ts.SourceFile;
+  readonly identifierNames: Set<string>;
+  readonly moduleSpecifiers: Set<string>;
+  readonly staticLengthConsts: ReadonlySet<string>;
+  readonly syncCalls: SyncCallSite[];
+  readonly classStack: string[][];
+  deepestLoops: DeepestLoopChain | null;
+}
+
 /**
  * 判定一条循环链里是否存在乘数层：逐层看「本层遍历的集合」是否由上一层那一轮的元素派生。
  *
@@ -169,90 +179,109 @@ export function scanSourceFile(filePath: string, content: string): FileScan {
     true,
     scriptKindOf(filePath),
   );
-  const identifierNames = new Set<string>();
-  const moduleSpecifiers = new Set<string>();
-  const staticLengthConsts = topLevelArrayConstNames(sourceFile);
-  const syncCalls: SyncCallSite[] = [];
-  const classStack: string[][] = [];
-  let deepestLoops: DeepestLoopChain | null = null;
-
-  const line = (node: ts.Node): number => lineOf(node, sourceFile);
-
-  /** 进入函数/方法/字段初始化时切换作用域；其余节点沿用外层作用域 */
-  const scopeOf = (node: ts.Node, inherited: ScopeFacts): ScopeFacts => {
-    const implementsInterfaces = classStack.at(-1) ?? [];
-    if (ts.isConstructorDeclaration(node)) {
-      return { ...MODULE_SCOPE, kind: 'constructor', implementsInterfaces };
-    }
-    if (ts.isPropertyDeclaration(node) && !isFunctionLike(node.initializer)) {
-      return { ...MODULE_SCOPE, kind: 'field-init', implementsInterfaces };
-    }
-    if (!isFunctionLike(node)) return inherited;
-    return {
-      kind: isClassMember(node) ? 'method' : 'function',
-      decorators: decoratorNamesOf(node, sourceFile),
-      implementsInterfaces,
-      paramTypes: paramTypesOf(node, sourceFile),
-    };
+  const ctx: WalkContext = {
+    sourceFile,
+    identifierNames: new Set<string>(),
+    moduleSpecifiers: new Set<string>(),
+    staticLengthConsts: topLevelArrayConstNames(sourceFile),
+    syncCalls: [],
+    classStack: [],
+    deepestLoops: null,
   };
-
-  const visit = (node: ts.Node, frame: WalkFrame): void => {
-    if (ts.isIdentifier(node)) identifierNames.add(node.text);
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      moduleSpecifiers.add(node.moduleSpecifier.text);
-    }
-    if (ts.isCallExpression(node)) {
-      const apiName = syncApiNameOf(node);
-      if (apiName !== null) {
-        syncCalls.push({
-          ...frame.scope,
-          apiName,
-          line: line(node),
-          loopDepth: frame.loopDepth,
-          ipcHandler: frame.ipcHandler,
-        });
-      }
-      addDynamicSpecifier(node, moduleSpecifiers);
-    }
-
-    const isLoop = LOOP_KINDS.has(node.kind);
-    const loopDepth = isLoop ? frame.loopDepth + 1 : frame.loopDepth;
-    const loopChain = isLoop ? [...frame.loopChain, line(node)] : frame.loopChain;
-    // 层数刷新纪录才替换；同层时优先保留「存在乘数」那条，避免良性链把同文件里的真乘法循环挤掉
-    if (isLoop) {
-      const current = deepestLoops;
-      const deeper = loopDepth > (current?.depth ?? 0);
-      const outranksTie =
-        current !== null && loopDepth === current.depth && !current.amplifies;
-      if (deeper || outranksTie) {
-        deepestLoops = {
-          depth: loopDepth,
-          innermostIterable: iterableTextOf(node, sourceFile),
-          outermostLine: loopChain[0] ?? line(node),
-          amplifies: chainAmplifies(node, staticLengthConsts),
-        };
-      }
-    }
-
-    const isClass = ts.isClassDeclaration(node) || ts.isClassExpression(node);
-    if (isClass) classStack.push(implementedInterfacesOf(node, sourceFile));
-    const childFrame: WalkFrame = {
-      loopDepth,
-      loopChain,
-      scope: scopeOf(node, frame.scope),
-      ipcHandler: isFunctionLike(node) ? isIpcListener(node) : frame.ipcHandler,
-    };
-    ts.forEachChild(node, (child) => visit(child, childFrame));
-    if (isClass) classStack.pop();
+  walkNode(
+    sourceFile,
+    { loopDepth: 0, loopChain: [], scope: MODULE_SCOPE, ipcHandler: false },
+    ctx,
+  );
+  return {
+    deepestLoops: ctx.deepestLoops,
+    syncCalls: ctx.syncCalls,
+    moduleSpecifiers: ctx.moduleSpecifiers,
+    identifierNames: ctx.identifierNames,
   };
+}
 
-  visit(sourceFile, {
-    loopDepth: 0,
-    loopChain: [],
-    scope: MODULE_SCOPE,
-    ipcHandler: false,
-  });
-  return { deepestLoops, syncCalls, moduleSpecifiers, identifierNames };
+function walkNode(node: ts.Node, frame: WalkFrame, ctx: WalkContext): void {
+  collectModuleFacts(node, ctx);
+  collectCallFacts(node, frame, ctx);
+
+  const isLoop = LOOP_KINDS.has(node.kind);
+  const loopDepth = isLoop ? frame.loopDepth + 1 : frame.loopDepth;
+  const loopChain = isLoop
+    ? [...frame.loopChain, lineOf(node, ctx.sourceFile)]
+    : frame.loopChain;
+  if (isLoop) refreshDeepestLoops(node, loopDepth, loopChain, ctx);
+
+  const isClass = ts.isClassDeclaration(node) || ts.isClassExpression(node);
+  if (isClass) ctx.classStack.push(implementedInterfacesOf(node, ctx.sourceFile));
+  const childFrame: WalkFrame = {
+    loopDepth,
+    loopChain,
+    scope: scopeOf(node, frame.scope, ctx),
+    ipcHandler: isFunctionLike(node) ? isIpcListener(node) : frame.ipcHandler,
+  };
+  ts.forEachChild(node, (child) => walkNode(child, childFrame, ctx));
+  if (isClass) ctx.classStack.pop();
+}
+
+function collectModuleFacts(node: ts.Node, ctx: WalkContext): void {
+  if (ts.isIdentifier(node)) ctx.identifierNames.add(node.text);
+  if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+    ctx.moduleSpecifiers.add(node.moduleSpecifier.text);
+  }
+}
+
+function collectCallFacts(node: ts.Node, frame: WalkFrame, ctx: WalkContext): void {
+  if (!ts.isCallExpression(node)) return;
+  const apiName = syncApiNameOf(node);
+  if (apiName !== null) {
+    ctx.syncCalls.push({
+      ...frame.scope,
+      apiName,
+      line: lineOf(node, ctx.sourceFile),
+      loopDepth: frame.loopDepth,
+      ipcHandler: frame.ipcHandler,
+    });
+  }
+  addDynamicSpecifier(node, ctx.moduleSpecifiers);
+}
+
+/** 刷新最深循环链纪录：层数刷新才替换；同层时优先保留「存在乘数」那条，避免良性链把同文件里的真乘法循环挤掉 */
+function refreshDeepestLoops(
+  node: ts.Node,
+  loopDepth: number,
+  loopChain: readonly number[],
+  ctx: WalkContext,
+): void {
+  const current = ctx.deepestLoops;
+  const deeper = loopDepth > (current?.depth ?? 0);
+  const outranksTie = current !== null && loopDepth === current.depth && !current.amplifies;
+  if (deeper || outranksTie) {
+    ctx.deepestLoops = {
+      depth: loopDepth,
+      innermostIterable: iterableTextOf(node, ctx.sourceFile),
+      outermostLine: loopChain[0] ?? lineOf(node, ctx.sourceFile),
+      amplifies: chainAmplifies(node, ctx.staticLengthConsts),
+    };
+  }
+}
+
+/** 进入函数/方法/字段初始化时切换作用域；其余节点沿用外层作用域 */
+function scopeOf(node: ts.Node, inherited: ScopeFacts, ctx: WalkContext): ScopeFacts {
+  const implementsInterfaces = ctx.classStack.at(-1) ?? [];
+  if (ts.isConstructorDeclaration(node)) {
+    return { ...MODULE_SCOPE, kind: 'constructor', implementsInterfaces };
+  }
+  if (ts.isPropertyDeclaration(node) && !isFunctionLike(node.initializer)) {
+    return { ...MODULE_SCOPE, kind: 'field-init', implementsInterfaces };
+  }
+  if (!isFunctionLike(node)) return inherited;
+  return {
+    kind: isClassMember(node) ? 'method' : 'function',
+    decorators: decoratorNamesOf(node, ctx.sourceFile),
+    implementsInterfaces,
+    paramTypes: paramTypesOf(node, ctx.sourceFile),
+  };
 }
 
 /** 取出被调用 API 的名字；不在追踪集合内返回 null */

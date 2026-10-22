@@ -92,6 +92,28 @@ export class GitleaksAdapter extends ToolCommandAdapter {
     return this.runGitleaks(options, start, isStaged);
   }
 
+  private normalizeProjectPath(projectPath: string): string {
+    return path.resolve(projectPath);
+  }
+
+  private async executeGitleaks(
+    projectPath: string,
+    options: ToolScanOptions,
+    isStaged: boolean,
+  ): Promise<{ stdout: string }> {
+    const command = await this.commands.resolve(projectPath);
+    const args = this.buildArgs(options, isStaged, projectPath);
+    return execTool(command, args, {
+      cwd: projectPath,
+      timeout: options.timeout || DEFAULT_SCAN_TIMEOUT_MS,
+    });
+  }
+
+  private parseFindingsFromStdout(stdout: string): Record<string, unknown>[] {
+    const parsed = JSON.parse(stdout);
+    return Array.isArray(parsed) ? parsed : parsed?.findings || [];
+  }
+
   /** 执行 gitleaks 并映射输出为可用结果 */
   private async runGitleaks(
     options: ToolScanOptions,
@@ -100,21 +122,9 @@ export class GitleaksAdapter extends ToolCommandAdapter {
   ): Promise<ToolResult> {
     // 归一化 projectPath 为绝对路径：相对路径会作为 --source/位置参数传给 gitleaks，
     // gitleaks 以自身 cwd 解析导致 "stat ./scripts/fixtures/sample-repo: no such file or directory"。
-    const projectPath = path.resolve(options.projectPath);
-    const command = await this.commands.resolve(projectPath);
-    const args = this.buildArgs(options, isStaged, projectPath);
-    const { stdout } = await execTool(command, args, {
-      cwd: projectPath,
-      // 对齐 SOP 引擎硬上限 DEFAULT_TOOL_SCAN_TIMEOUT_MS（300s）。此前为 120s：
-      // 本仓 331 次提交的全历史扫描实测约 24s，但与 semgrep/trivy/eslint 并行时
-      // CPU 争用可突破 120s 被 SIGTERM。gitleaks 同样在末尾一次性写报告，
-      // 被杀时 stdout 为空，适配器捞不回 findings，只能落到 buildExecErrorResult
-      // 把带 ANSI 的 banner + WRN 原样当「错误原因」吐给门禁 —— 掩盖了真正的超时。
-      timeout: options.timeout || DEFAULT_SCAN_TIMEOUT_MS,
-    });
-
-    const parsed = JSON.parse(stdout);
-    const findings = Array.isArray(parsed) ? parsed : parsed?.findings || [];
+    const projectPath = this.normalizeProjectPath(options.projectPath);
+    const { stdout } = await this.executeGitleaks(projectPath, options, isStaged);
+    const findings = this.parseFindingsFromStdout(stdout);
     return this.buildAvailable(findings, start, projectPath);
   }
 

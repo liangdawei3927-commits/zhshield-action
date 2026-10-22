@@ -15,13 +15,25 @@ const LAUNCH_OUTPUT_MAX_CHARS = 8192;
 const FAULT_WINDOW_CHARS = 1024;
 
 /**
- * p3 生命周期事件（进程启动 / 正常退出）属于"事件"而非"待处理问题"。
- * 可执行告警/派单通道应据此过滤，避免每次进程启动都派发出噪声任务。
+ * p3 通知类事件属于"事件"而非"待处理问题"：进程生命周期（启动 / 正常退出）
+ * 与文件变更通知（新增 / 内容变更）都只是状态播报，不含可执行的修复语义。
+ * 可执行告警/派单通道应据此过滤，避免每次进程启动、每次文件写入都派发出噪声任务。
+ *
+ * p2 的 file-unlink（文件删除）不在此列：删除是需要人确认的真实信号。
  */
+const INFORMATIONAL_P3_ACTIONS: ReadonlySet<string> = new Set([
+  'process-started',
+  'process-exited',
+  'file-add',
+  'file-change',
+  'file-changed',
+  'file-rename',
+]);
+
 export function isInformationalEvent(event: Pick<SentinelEvent, 'severity' | 'history'>): boolean {
   if (event.severity !== 'p3') return false;
   const action = event.history[0]?.action;
-  return action === 'process-started' || action === 'process-exited';
+  return action !== undefined && INFORMATIONAL_P3_ACTIONS.has(action);
 }
 
 /** 进程监控器配置：启动命令、健康探测间隔与命令、重启延迟与次数上限 */
@@ -75,7 +87,7 @@ export function classifyNonRemediableFault(output: string): NonRemediableFault {
  * 常驻内存恒为窗口大小。
  */
 export class FaultDetector {
-  private window = '';
+  private window: string = '';
   private latched: NonRemediableFault = { kind: 'none' };
 
   feed(chunk: string): void {
@@ -272,19 +284,20 @@ export class ProcessMonitor {
   private eventCenter: EventCenter;
   private proc: ChildProcess | null = null;
   private healthTimer: ReturnType<typeof setInterval> | null = null;
-  private restarts = 0;
+  private readonly restartBudget: { used: number; inFlight: boolean } = {
+    used: 0,
+    inFlight: false,
+  };
   private config: ProcessMonitorConfig | null = null;
-  private running = false;
+  private running: boolean = false;
   /** 每次拉起进程时递增；用于阻断陈旧健康探测回调查出新一轮后的重复重启 */
-  private probeEpoch = 0;
+  private probeEpoch: number = 0;
   /** 已有一次健康探测在途；避免探测命令挂死时定时器每轮再叠加一个探测进程 */
-  private probeInFlight = false;
+  private probeInFlight: boolean = false;
   /** 本轮输出尾部（stdout + stderr），每次 launchProcess 清空；仅供事件诊断上下文 */
-  private launchOutput = '';
+  private launchOutput: string = '';
   /** 本轮不可修复故障的增量检测器（对输出截断免疫） */
-  private faultDetector = new FaultDetector();
-  /** 已有一次重启在途；在途期间的再次请求不再消耗预算 */
-  private relaunchInFlight = false;
+  private faultDetector: FaultDetector = new FaultDetector();
   /** 终止原因；null 表示非终态，用于把"已终止"与"从未启动"区分开 */
   private terminalState: 'suppressed' | 'exhausted' | null = null;
 
@@ -295,7 +308,7 @@ export class ProcessMonitor {
   start(config: ProcessMonitorConfig): void {
     this.config = config;
     this.running = true;
-    this.restarts = 0;
+    this.restartBudget.used = 0;
     this.terminalState = null;
     this.launchProcess();
   }
@@ -324,7 +337,11 @@ export class ProcessMonitor {
     const config = this.config;
     if (!config) return { kind: 'suppress' };
     const maxRestarts = config.maxRestarts ?? 3;
-    const decision = decideRestart(this.restarts, maxRestarts, this.relaunchInFlight);
+    const decision = decideRestart(
+      this.restartBudget.used,
+      maxRestarts,
+      this.restartBudget.inFlight,
+    );
 
     if (decision.kind === 'exhausted') {
       this.emitRestartLimitReached(config.command, maxRestarts);
@@ -336,8 +353,8 @@ export class ProcessMonitor {
 
     terminateProcessTree(this.proc);
     this.proc = null;
-    this.restarts++;
-    this.relaunchInFlight = true;
+    this.restartBudget.used++;
+    this.restartBudget.inFlight = true;
     const delay = config.restartDelayMs ?? 2000;
     setTimeout(() => {
       if (this.running) this.launchProcess();
@@ -366,7 +383,7 @@ export class ProcessMonitor {
     this.probeEpoch++;
     this.launchOutput = '';
     this.faultDetector.reset();
-    this.relaunchInFlight = false;
+    this.restartBudget.inFlight = false;
     try {
       this.proc = spawnProcess(cmd, args, cwd);
       this.attachProcessHandlers(cmd, this.proc.pid);
@@ -455,7 +472,7 @@ export class ProcessMonitor {
 
   /** 重启预算耗尽属"我方重试策略"的事实（无东西丢失 / 损坏 / 暴露），不构成用户系统的危急故障 */
   private emitRestartLimitReached(command: string, maxRestarts: number): void {
-    this.emit(restartLimitSpec(command, this.restarts, maxRestarts, this.launchOutput));
+    this.emit(restartLimitSpec(command, this.restartBudget.used, maxRestarts, this.launchOutput));
   }
 
   /** 进程命令级失败（error 事件 / 启动异常）：两者同属 p1，仅措辞不同，故共用一个出口 */

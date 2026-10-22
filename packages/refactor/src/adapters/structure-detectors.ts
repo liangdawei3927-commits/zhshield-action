@@ -178,9 +178,13 @@ export function detectDuplicateCode(
   allFiles: ParsedFile[],
   config: RefactorConfig,
 ): CodeSmell[] {
-  const smells: CodeSmell[] = [];
   const minLines = config.thresholds.minDuplicateLines;
+  return getDuplicateBlocks(allFiles, minLines)
+    .filter((d) => d.files[0] === parsed.filePath || d.files[1] === parsed.filePath)
+    .map((dup) => buildDuplicateSmell(parsed, dup, config, minLines));
+}
 
+function getDuplicateBlocks(allFiles: ParsedFile[], minLines: number): DuplicateBlock[] {
   if (_dupCache === null || _dupCacheFiles !== allFiles || _dupCacheMinLines !== minLines) {
     // 缓存完整重复区列表：报告上限只在展示层（zhcheck 文本打印）生效，
     // 数据路径不截断，否则基线计数会随窗口移动而漂移。
@@ -188,43 +192,40 @@ export function detectDuplicateCode(
     _dupCacheFiles = allFiles;
     _dupCacheMinLines = minLines;
   }
-  const duplicates = _dupCache;
-  const fileDups = duplicates.filter(
-    (d) => d.files[0] === parsed.filePath || d.files[1] === parsed.filePath,
-  );
+  return _dupCache;
+}
 
-  for (const dup of fileDups) {
-    const isFirst = dup.files[0] === parsed.filePath;
-    const otherFile = isFirst ? dup.files[1] : dup.files[0];
-    const myLine = isFirst ? dup.lines[0] : dup.lines[1];
-    const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
-
-    smells.push(
-      makeSmell({
-        ruleId: 'duplicated-code',
-        severity: config.severities['duplicated-code'],
-        message: `代码块与 ${otherFile}:${otherLine} 重复，建议提取为公共函数`,
-        filePath: parsed.filePath,
-        line: myLine,
-        column: 1,
-        metric: 'duplicateLines',
-        // 值为重复区实际行数（原本误用 dup.code.length —— 那是被截断到 80 的
-        // 归一化字符数，与 metric 名 duplicateLines 语义不符，且恒不超 80）
-        value: dup.lineCount,
-        threshold: minLines,
-        suggestion: {
-          type: 'Extract Common Function',
-          description: `将重复代码提取为公共函数，通过参数化差异点统一调用`,
-          priority: 'medium',
-          effort: 'medium',
-          autoFixable: false,
-        },
-        endLine: myLine + dup.lineCount - 1,
-      }),
-    );
-  }
-
-  return smells;
+function buildDuplicateSmell(
+  parsed: ParsedFile,
+  dup: DuplicateBlock,
+  config: RefactorConfig,
+  minLines: number,
+): CodeSmell {
+  const isFirst = dup.files[0] === parsed.filePath;
+  const otherFile = isFirst ? dup.files[1] : dup.files[0];
+  const myLine = isFirst ? dup.lines[0] : dup.lines[1];
+  const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
+  return makeSmell({
+    ruleId: 'duplicated-code',
+    severity: config.severities['duplicated-code'],
+    message: `代码块与 ${otherFile}:${otherLine} 重复，建议提取为公共函数`,
+    filePath: parsed.filePath,
+    line: myLine,
+    column: 1,
+    metric: 'duplicateLines',
+    // 值为重复区实际行数（原本误用 dup.code.length —— 那是被截断到 80 的
+    // 归一化字符数，与 metric 名 duplicateLines 语义不符，且恒不超 80）
+    value: dup.lineCount,
+    threshold: minLines,
+    suggestion: {
+      type: 'Extract Common Function',
+      description: `将重复代码提取为公共函数，通过参数化差异点统一调用`,
+      priority: 'medium',
+      effort: 'medium',
+      autoFixable: false,
+    },
+    endLine: myLine + dup.lineCount - 1,
+  });
 }
 
 export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {

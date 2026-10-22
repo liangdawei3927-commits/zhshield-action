@@ -6,10 +6,12 @@ import {
   FileMonitor,
   EventCenter,
   resolveChangeType,
+  isInformationalEvent,
   DEFAULT_IGNORE_DIRS,
   DEFAULT_IGNORE_RE,
   defaultFileWatchFilter,
 } from '../index';
+import type { SentinelEvent } from '../index';
 import { computePollDelay, MAX_POLL_BACKOFF_MS } from '../file-monitor';
 
 describe('resolveChangeType fs.watch 事件类型归一化', () => {
@@ -429,5 +431,97 @@ describe('FileMonitor 默认 ignoreDirs 与退避（新增行为）', () => {
       monitor.stop();
       readdirSpy.mockRestore();
     }
+  });
+});
+
+describe('file-monitor 事件的信息性分类（派单通道过滤）', () => {
+  const tmpDirs: string[] = [];
+
+  function makeTmpDir(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-sentinel-info-'));
+    tmpDirs.push(dir);
+    return dir;
+  }
+
+  /** 轮询直到出现满足条件的文件监控事件；fs.watch 回调时机受负载影响，固定 sleep 会假失败 */
+  async function waitForFileEvent(
+    events: () => SentinelEvent[],
+    predicate: (e: SentinelEvent) => boolean,
+    timeoutMs = 5_000,
+  ): Promise<SentinelEvent | undefined> {
+    for (let waited = 0; waited < timeoutMs; waited += 25) {
+      const hit = events().find(predicate);
+      if (hit) return hit;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return undefined;
+  }
+
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('文件新增（p3）是通知类事件，文件删除（p2）仍为可处置信号', async () => {
+    const root = makeTmpDir();
+    const eventCenter = new EventCenter();
+    const monitor = new FileMonitor(eventCenter);
+    monitor.start({
+      projectId: 'proj-informational',
+      watchPaths: [root],
+      intervalMs: 60_000,
+      ignoreDirs: DEFAULT_IGNORE_DIRS,
+      filter: defaultFileWatchFilter,
+    });
+    try {
+      const target = path.join(root, 'src', 'app.ts');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'v1');
+
+      const added = await waitForFileEvent(
+        () => eventCenter.listEvents(),
+        (e) => e.module === 'file-monitor' && e.context?.changeType === 'add',
+      );
+      expect(added, '应产生文件新增事件').toBeDefined();
+      expect(added!.severity, '文件新增应为 p3').toBe('p3');
+      expect(isInformationalEvent(added!), '文件新增属状态播报，不应被派单').toBe(true);
+
+      fs.rmSync(target);
+      const removed = await waitForFileEvent(
+        () => eventCenter.listEvents(),
+        (e) => e.module === 'file-monitor' && e.context?.changeType === 'unlink',
+      );
+      expect(removed, '应产生文件删除事件').toBeDefined();
+      expect(removed!.severity, '文件删除应为 p2').toBe('p2');
+      expect(isInformationalEvent(removed!), '文件删除属真实信号，不应被当作通知过滤').toBe(false);
+    } finally {
+      monitor.stop();
+    }
+  });
+
+  it('轮询路径的 file-changed 与历史 file-rename 通知同样属信息类', () => {
+    const eventCenter = new EventCenter();
+    const polled = eventCenter.createEvent({
+      projectId: 'proj-informational',
+      title: 'File changed: src/app.ts',
+      service: 'sentinel',
+      module: 'file-monitor',
+      severity: 'p3',
+      action: 'file-changed',
+    });
+    expect(isInformationalEvent(polled)).toBe(true);
+
+    // 当前代码已不再产出 file-rename（resolveChangeType 归一化为 add/change/unlink），
+    // 但历史事件库仍有存量行；重命名通知同样只是状态播报，不能漏成可处置信号。
+    const legacyRename = eventCenter.createEvent({
+      projectId: 'proj-informational',
+      title: 'File renamed: src/app.ts',
+      service: 'sentinel',
+      module: 'file-monitor',
+      severity: 'p3',
+      action: 'file-rename',
+    });
+    expect(isInformationalEvent(legacyRename)).toBe(true);
   });
 });

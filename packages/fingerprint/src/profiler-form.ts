@@ -10,6 +10,14 @@ export interface FormCandidate {
   readonly isDecisive: boolean; // 决定性信号存在（架构文档 §6.2 形态识别信号表）
 }
 
+/** 形态验证入参：validate* 家族共用的 (form, score, language, signals) 参数泥团封装 */
+interface FormValidationContext {
+  readonly form: ProductFormId;
+  readonly score: number;
+  readonly language: LanguageId;
+  readonly signals: readonly Signal[];
+}
+
 /** 计算形态置信度 */
 export function calculateFormConfidence(score: number, isDecisive: boolean): number {
   // 决定性信号存在 → 高置信度
@@ -73,7 +81,12 @@ export class FormDeterminer {
   ): FormCandidate[] {
     const validatedCandidates: FormCandidate[] = [];
     for (const [form, { score, signals: sigs, isDecisive }] of candidates) {
-      const validatedScore = this.validateWithContext(form, score, primaryLanguage, sigs);
+      const validatedScore = this.validateWithContext({
+        form,
+        score,
+        language: primaryLanguage,
+        signals: sigs,
+      });
       validatedCandidates.push({
         form,
         score: validatedScore,
@@ -118,65 +131,45 @@ export class FormDeterminer {
   }
 
   /** 语言上下文验证形态判定 */
-  private validateWithContext(
-    form: ProductFormId,
-    score: number,
-    language: LanguageId,
-    signals: readonly Signal[],
-  ): number {
-    const mobileScore = this.validateMobile(form, score, language, signals);
+  private validateWithContext(ctx: FormValidationContext): number {
+    const mobileScore = this.validateMobile(ctx);
     if (mobileScore !== undefined) return mobileScore;
-    const pcScore = this.validatePc(form, score, language, signals);
+    const pcScore = this.validatePc(ctx);
     if (pcScore !== undefined) return pcScore;
-    const miniappScore = this.validateMiniapp(form, score, language, signals);
+    const miniappScore = this.validateMiniapp(ctx);
     if (miniappScore !== undefined) return miniappScore;
-    const backendScore = this.validateBackend(form, score, signals);
+    const backendScore = this.validateBackend(ctx.form, ctx.score, ctx.signals);
     if (backendScore !== undefined) return backendScore;
-    return score;
+    return ctx.score;
   }
 
   /** React Native + iOS/Android 信号 → 移动端（RN 壳），语言是 TS 时降权 */
-  private validateMobile(
-    form: ProductFormId,
-    score: number,
-    language: LanguageId,
-    signals: readonly Signal[],
-  ): number | undefined {
-    if (form !== 'ios' && form !== 'android') return undefined;
-    const hasRNSignal = signals.some((s) => s.ruleId === 'form:react-native');
-    if (hasRNSignal && language === 'typescript') {
-      return score * 0.7;
+  private validateMobile(ctx: FormValidationContext): number | undefined {
+    if (ctx.form !== 'ios' && ctx.form !== 'android') return undefined;
+    const hasRNSignal = ctx.signals.some((s) => s.ruleId === 'form:react-native');
+    if (hasRNSignal && ctx.language === 'typescript') {
+      return ctx.score * 0.7;
     }
     return undefined;
   }
 
   /** Electron + PC 信号 → 确认 PC，升权 */
-  private validatePc(
-    form: ProductFormId,
-    score: number,
-    language: LanguageId,
-    signals: readonly Signal[],
-  ): number | undefined {
-    if (form !== 'pc') return undefined;
-    const hasElectronSignal = signals.some((s) => s.ruleId === 'form:electron');
-    if (hasElectronSignal && (language === 'typescript' || language === 'javascript')) {
-      return score * 1.2;
+  private validatePc(ctx: FormValidationContext): number | undefined {
+    if (ctx.form !== 'pc') return undefined;
+    const hasElectronSignal = ctx.signals.some((s) => s.ruleId === 'form:electron');
+    if (hasElectronSignal && (ctx.language === 'typescript' || ctx.language === 'javascript')) {
+      return ctx.score * 1.2;
     }
     return undefined;
   }
 
   /** 小程序 + Taro/uni-app → 确认小程序，升权 */
-  private validateMiniapp(
-    form: ProductFormId,
-    score: number,
-    language: LanguageId,
-    signals: readonly Signal[],
-  ): number | undefined {
-    if (form !== 'miniapp') return undefined;
-    const hasTaroSignal = signals.some((s) => s.ruleId === 'form:taro');
-    const hasUniAppSignal = signals.some((s) => s.ruleId === 'form:uni-app');
-    if ((hasTaroSignal || hasUniAppSignal) && language === 'typescript') {
-      return score * 1.2;
+  private validateMiniapp(ctx: FormValidationContext): number | undefined {
+    if (ctx.form !== 'miniapp') return undefined;
+    const hasTaroSignal = ctx.signals.some((s) => s.ruleId === 'form:taro');
+    const hasUniAppSignal = ctx.signals.some((s) => s.ruleId === 'form:uni-app');
+    if ((hasTaroSignal || hasUniAppSignal) && ctx.language === 'typescript') {
+      return ctx.score * 1.2;
     }
     return undefined;
   }

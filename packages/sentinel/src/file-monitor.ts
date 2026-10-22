@@ -106,12 +106,12 @@ interface ScanState {
 
 export class FileMonitor {
   private eventCenter: EventCenter;
-  private watchers = new Map<string, fs.FSWatcher>();
-  private pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private lastMtimes = new Map<string, number>();
-  private lastEventAt = new Map<string, number>();
-  private pollInFlight = new Set<string>();
-  private running = false;
+  private watchers: Map<string, fs.FSWatcher> = new Map();
+  private pollTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private lastMtimes: Map<string, number> = new Map();
+  private lastEventAt: Map<string, number> = new Map();
+  private pollInFlight: Set<string> = new Set();
+  private running: boolean = false;
 
   constructor(eventCenter: EventCenter) {
     this.eventCenter = eventCenter;

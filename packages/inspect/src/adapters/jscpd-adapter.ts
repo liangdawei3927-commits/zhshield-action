@@ -29,6 +29,9 @@ const JSCPD_VERSION_RE = /(\d+)\.(\d+)/;
  * - package.json 头部样板 / 测试与夹具结构（__tests__、*.test.*、e2e、fixtures）按脚手架约定重复为常态
  * - Markdown 不是代码：jscpd 5.x 的 markdown 解析器会把同一段落的两个半边报成互相克隆
  *   （firstFile/secondFile 指向同一文件同一行区间），产生无法处理的噪声条目
+ * - HTML / SVG 同样不是代码：jscpd 的 markup 解析器按结构相似度比对，独立的 HTML 交付报告
+ *   （每份自带完整 CSS 样板，刻意保持自包含可单独分发）与品牌 SVG 变体（同图不同线宽/尺寸）
+ *   必然"重复"，但这是设计意图而非可提取 Helper 的代码重复——误报为重复代码会让巡检报告失真
  * - sop-templates / test-fixtures / assets / db/migrations 是模板与迁移脚本样板
  */
 const JSCPD_IGNORED_PATHS: readonly string[] = [
@@ -50,6 +53,8 @@ const JSCPD_IGNORED_PATHS: readonly string[] = [
   '**/assets/**',
   '**/db/migrations/**',
   '**/*.md',
+  '**/*.html',
+  '**/*.svg',
 ];
 
 const META: ToolMeta = {
@@ -276,30 +281,64 @@ export class JscpdAdapter implements ToolAdapter {
     if (!out?.duplicates || !Array.isArray(out.duplicates)) return [];
     const issues: Issue[] = [];
     for (const [idx, d] of out.duplicates.entries()) {
-      const firstFile = d.firstFile?.name || d.first?.location?.path || d.first?.path || '';
-      const firstLines = d.firstFile?.startLoc?.line || d.first?.location?.start?.line || d.first?.position?.start?.line || 0;
-      const secondFile = d.secondFile?.name || d.second?.location?.path || d.second?.path || d.second?.position?.path || '';
-      const secondStart = d.secondFile?.startLoc?.line || d.second?.location?.start?.line || d.second?.position?.start?.line || 0;
-      const secondEnd = d.secondFile?.endLoc?.line || d.secondFile?.startLoc?.line || d.second?.location?.end?.line || d.second?.position?.end?.line || secondStart;
-      // 克隆须位于两个不同位置：上游对非代码格式偶发上报「同一文件同一行」自比条目，
-      // 该类记录定位不到可提取的第二个代码块，只会污染报告
-      if (firstFile === secondFile && firstLines === secondStart) continue;
-      const format = d.format || 'code';
-      issues.push({
-        id: randomUUID(),
-        ruleId: 'jscpd/duplicate',
-        severity: 'warning',
-        category: 'quality',
-        message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}:${secondStart}`,
-        file: firstFile,
-        line: firstLines,
-        column: 0,
-        suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile}:${secondStart}-${secondEnd})`,
-        autoFixable: false,
-        source: 'inspect',
-        fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,
-      });
+      const issue = this.mapDuplicate(d, idx);
+      if (issue !== null) issues.push(issue);
     }
     return issues;
   }
+
+  private mapDuplicate(d: JscpdDuplicate, idx: number): Issue | null {
+    const firstFile = duplicatePath(d.firstFile?.name, d.first);
+    const firstLines = duplicateStartLine(
+      d.firstFile?.startLoc?.line,
+      d.first?.location?.start?.line,
+      d.first?.position?.start?.line,
+    );
+    const secondFile = duplicatePath(d.secondFile?.name, d.second, d.second?.position?.path);
+    const secondStart = duplicateStartLine(
+      d.secondFile?.startLoc?.line,
+      d.second?.location?.start?.line,
+      d.second?.position?.start?.line,
+    );
+    const secondEnd =
+      d.secondFile?.endLoc?.line ||
+      d.secondFile?.startLoc?.line ||
+      d.second?.location?.end?.line ||
+      d.second?.position?.end?.line ||
+      secondStart;
+    // 克隆须位于两个不同位置：上游对非代码格式偶发上报「同一文件同一行」自比条目，
+    // 该类记录定位不到可提取的第二个代码块，只会污染报告
+    if (firstFile === secondFile && firstLines === secondStart) return null;
+    const format = d.format || 'code';
+    return {
+      id: randomUUID(),
+      ruleId: 'jscpd/duplicate',
+      severity: 'warning',
+      category: 'quality',
+      message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}:${secondStart}`,
+      file: firstFile,
+      line: firstLines,
+      column: 0,
+      suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile}:${secondStart}-${secondEnd})`,
+      autoFixable: false,
+      source: 'inspect',
+      fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,
+    };
+  }
+}
+
+function duplicatePath(
+  modernName: string | undefined,
+  legacy: JscpdDuplicate['first'],
+  legacyPositionPath?: string,
+): string {
+  return modernName || legacy?.location?.path || legacy?.path || legacyPositionPath || '';
+}
+
+function duplicateStartLine(
+  modernStartLine: number | undefined,
+  legacyLocationLine: number | undefined,
+  legacyPositionLine: number | undefined,
+): number {
+  return modernStartLine || legacyLocationLine || legacyPositionLine || 0;
 }

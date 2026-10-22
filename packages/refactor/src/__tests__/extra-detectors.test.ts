@@ -6,6 +6,7 @@ import {
   detectMessageChains,
   detectSwitchStatement,
   detectRefusedBequest,
+  detectLazyClass,
 } from '../adapters/extra-detectors';
 
 const FIXTURES_DIR = path.resolve(__dirname, 'fixtures');
@@ -60,6 +61,18 @@ describe('detectRefusedBequest', () => {
 
   it('still flags empty subclasses that use nothing from the base', () => {
     const smells = detectRefusedBequest(parsed, DEFAULT_CONFIG);
+    expect(smells.some((s) => s.message.includes('EmptyLazySubclass'))).toBe(true);
+  });
+});
+
+describe('detectLazyClass', () => {
+  it('exempts Error subclasses (typed-error contract needs instanceof identity)', () => {
+    const smells = detectLazyClass(parsed, DEFAULT_CONFIG);
+    expect(smells.some((s) => s.message.includes('ToolUnavailableError'))).toBe(false);
+  });
+
+  it('still flags tiny non-Error classes', () => {
+    const smells = detectLazyClass(parsed, DEFAULT_CONFIG);
     expect(smells.some((s) => s.message.includes('EmptyLazySubclass'))).toBe(true);
   });
 });

@@ -16,12 +16,12 @@ import { OverrideMerger } from './profiler-overrides';
 
 export class Profiler {
   private readonly detectors: readonly Detector[];
-  private readonly languageAggregator = new LanguageAggregator();
-  private readonly frameworkAggregator = new FrameworkAggregator();
-  private readonly environmentAggregator = new EnvironmentAggregator();
-  private readonly formDeterminer = new FormDeterminer();
-  private readonly targetBuilder = new TargetBuilder();
-  private readonly overrideMerger = new OverrideMerger();
+  private readonly languageAggregator: LanguageAggregator = new LanguageAggregator();
+  private readonly frameworkAggregator: FrameworkAggregator = new FrameworkAggregator();
+  private readonly environmentAggregator: EnvironmentAggregator = new EnvironmentAggregator();
+  private readonly formDeterminer: FormDeterminer = new FormDeterminer();
+  private readonly targetBuilder: TargetBuilder = new TargetBuilder();
+  private readonly overrideMerger: OverrideMerger = new OverrideMerger();
 
   constructor(detectors: readonly Detector[]) {
     this.detectors = detectors;

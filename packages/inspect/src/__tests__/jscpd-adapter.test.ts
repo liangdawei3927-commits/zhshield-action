@@ -192,4 +192,17 @@ describe('JscpdAdapter', () => {
     expect(args).not.toContain('--min-lines');
     expect(args).not.toContain('--min-tokens');
   });
+
+  it('excludes HTML and SVG markup from duplication detection', async () => {
+    mockExecVersion('5.0.14');
+    mockReadJSON({ duplicates: [] });
+
+    await adapter.scan({ projectPath: '/work' } as never);
+
+    const scanCall = execFileMock.mock.calls.find(([, args]) => args.includes('--mode'));
+    const args = scanCall![1] as string[];
+    const ignore = (args[args.indexOf('--ignore') + 1] as string).split(',');
+    expect(ignore).toContain('**/*.html');
+    expect(ignore).toContain('**/*.svg');
+  });
 });

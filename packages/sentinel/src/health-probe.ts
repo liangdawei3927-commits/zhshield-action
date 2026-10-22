@@ -26,44 +26,81 @@ export interface HealthProbeCallbacks {
   onSettled: () => void;
 }
 
+function resolveProbeCommand(config: HealthProbeConfig): { executable: string; args: string[] } | null {
+  if (!config.command) return null;
+  const tokens = config.command.trim().split(RE_WHITESPACE);
+  if (tokens.length === 0) return null;
+  const executable = tokens[0];
+  const args = config.args && config.args.length > 0 ? config.args : tokens.slice(1);
+  return { executable, args };
+}
+
+interface ProbeState {
+  output: string;
+  settled: boolean;
+  timeout: ReturnType<typeof setTimeout> | null;
+}
+
+function createProbeState(): ProbeState {
+  return {
+    output: '',
+    settled: false,
+    timeout: null,
+  };
+}
+
+function finishProbe(
+  state: ProbeState,
+  callbacks: HealthProbeCallbacks,
+  failed: boolean,
+  out?: string,
+): void {
+  if (state.settled) return;
+  state.settled = true;
+  if (state.timeout) {
+    clearTimeout(state.timeout);
+    state.timeout = null;
+  }
+  if (callbacks.isEpochCurrent() && failed) callbacks.onFailure(out);
+  callbacks.onSettled();
+}
+
+function startProbeProcess(
+  command: { executable: string; args: string[] },
+  config: HealthProbeConfig,
+  state: ProbeState,
+  finish: (failed: boolean, out?: string) => void,
+): void {
+  const probeProc = spawnInGroup(command.executable, command.args, {
+    cwd: config.cwd,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+
+  state.timeout = setTimeout(() => {
+    finish(true, 'health probe timed out');
+    terminateProcessTree(probeProc);
+  }, config.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS);
+
+  probeProc.stderr?.on('data', (chunk: Buffer) => {
+    state.output += chunk.toString();
+  });
+  probeProc.on('exit', (code) => finish(code !== 0, state.output));
+  probeProc.on('error', () => finish(true));
+}
+
 export function runHealthProbe(
   config: HealthProbeConfig,
   callbacks: HealthProbeCallbacks,
 ): void {
-  if (!config.command) {
+  const command = resolveProbeCommand(config);
+  if (!command) {
     callbacks.onSettled();
     return;
   }
   try {
-    const tokens = config.command.trim().split(RE_WHITESPACE);
-    const executable = tokens[0];
-    const args = config.args && config.args.length > 0 ? config.args : tokens.slice(1);
-    const probeProc = spawnInGroup(executable, args, {
-      cwd: config.cwd,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-
-    let output = '';
-    let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const finish = (failed: boolean, out?: string): void => {
-      if (settled) return;
-      settled = true;
-      if (timeout) clearTimeout(timeout);
-      if (callbacks.isEpochCurrent() && failed) callbacks.onFailure(out);
-      callbacks.onSettled();
-    };
-
-    timeout = setTimeout(() => {
-      finish(true, 'health probe timed out');
-      terminateProcessTree(probeProc);
-    }, config.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS);
-
-    probeProc.stderr?.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    probeProc.on('exit', (code) => finish(code !== 0, output));
-    probeProc.on('error', () => finish(true));
+    const state = createProbeState();
+    const finish = (failed: boolean, out?: string): void => finishProbe(state, callbacks, failed, out);
+    startProbeProcess(command, config, state, finish);
   } catch {
     if (callbacks.isEpochCurrent()) callbacks.onFailure();
     callbacks.onSettled();

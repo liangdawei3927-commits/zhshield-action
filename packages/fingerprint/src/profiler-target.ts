@@ -7,6 +7,7 @@ import type {
   MatchResult,
   TargetProfile,
   DependencySummary,
+  ProductFormId,
 } from './types';
 import { calculateFormConfidence } from './profiler-form';
 import type { FormCandidate } from './profiler-form';
@@ -27,33 +28,48 @@ export interface BuildParams {
 
 /** 目标画像构建器 */
 export class TargetBuilder {
+  private selectPrimaryForm(forms: readonly FormCandidate[]): FormCandidate | undefined {
+    return forms.length > 0 ? forms[0] : undefined;
+  }
+
+  private buildRouteKey(
+    language: MatchResult<LanguageId>,
+    frameworks: readonly MatchResult<string>[],
+    primaryForm: FormCandidate | undefined,
+  ): string {
+    return [language.value, frameworks.length > 0 ? frameworks[0].value : '*', primaryForm?.form ?? '*'].join(
+      ':',
+    );
+  }
+
+  private buildProductForm(primaryForm: FormCandidate | undefined):
+    | {
+        value: ProductFormId;
+        confidence: number;
+        signals: readonly Signal[];
+      }
+    | undefined {
+    if (primaryForm === undefined) return undefined;
+    return {
+      value: primaryForm.form,
+      confidence: calculateFormConfidence(primaryForm.score, primaryForm.isDecisive),
+      signals: primaryForm.signals,
+    };
+  }
+
   /** 构建 TargetProfile */
   build(params: BuildParams): TargetProfile {
     const { projectPath, language, frameworks, forms, packageManager } = params;
-
-    // 选择最高置信度的形态
-    const primaryForm = forms.length > 0 ? forms[0] : undefined;
-
-    // 构建 routeKey：${language}:${framework}:${form}
-    const routeKey = [
-      language.value,
-      frameworks.length > 0 ? frameworks[0].value : '*',
-      primaryForm?.form ?? '*',
-    ].join(':');
+    const primaryForm = this.selectPrimaryForm(forms);
+    const routeKey = this.buildRouteKey(language, frameworks, primaryForm);
+    const productForm = this.buildProductForm(primaryForm);
 
     return {
       id: 'default',
       path: projectPath,
       language,
       frameworks,
-      productForm:
-        primaryForm !== undefined
-          ? {
-              value: primaryForm.form,
-              confidence: calculateFormConfidence(primaryForm.score, primaryForm.isDecisive),
-              signals: primaryForm.signals,
-            }
-          : undefined,
+      productForm,
       packageManager,
       routeKey,
     };

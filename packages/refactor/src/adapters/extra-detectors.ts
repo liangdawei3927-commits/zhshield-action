@@ -340,6 +340,9 @@ export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig)
   return smells;
 }
 
+// 跳过 Error 子类：TS 类型化错误必须子类化 Error 才能被 instanceof/catch 收窄
+// （与 refused-bequest 的 Error 豁免同一理由）；其「小」是错误契约的本质——
+// 携带判别字段与类型身份、跨模块抛出/捕获，合并或移除会破坏错误区分。
 export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): CodeSmell[] {
   const smells: CodeSmell[] = [];
   const threshold = config.thresholds.minClassLines;
@@ -352,6 +355,8 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): Cod
     if (decorators && decorators.length > 0) continue;
     const modifiers = ts.canHaveModifiers(cls.node) ? ts.getModifiers(cls.node) : undefined;
     if (modifiers?.some((m) => m.kind === ts.SyntaxKind.AbstractKeyword)) continue;
+    const baseName = (cls.extendsClass ?? '').replace(GENERIC_ARGS_RE, '').trim();
+    if (baseName === 'Error') continue;
 
     if (
       cls.lineCount < threshold &&

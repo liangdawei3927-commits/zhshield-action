@@ -5,6 +5,8 @@ import { collectExternalCalls } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
 import { makeSmell } from './adapter-types';
 
+type ParsedMethod = ParsedClass['members']['methods'][number];
+
 const UPPER_CASE_START = /^[A-Z0-9_]/;
 
 /** 统计方法的外部调用占比 */
@@ -230,7 +232,68 @@ export function detectGodObject(parsed: ParsedFile, config: RefactorConfig): Cod
   return smells;
 }
 
-/** 收集重复出现的参数组合（以类型序列为键） */
+/** data-clumps 语义豁免 1：框架注入装饰器白名单（NestJS 路由/DI 契约常用集）。
+ *  只认注入语义的装饰器——@Injectable/@Get 等类/方法级装饰器不在其列，
+ *  避免"带任意装饰器即豁免"的过宽口径。 */
+const FRAMEWORK_INJECTION_DECORATORS = new Set([
+  'Param',
+  'Body',
+  'Res',
+  'Req',
+  'Query',
+  'Headers',
+  'Session',
+]);
+
+/** 取装饰器表达式最左侧的标识符名：@Param('id') → Param，@a.b.C() → a（保底兜底用全文本判断前先归一） */
+function decoratorBaseName(decorator: ts.Decorator): string {
+  let expr: ts.Expression = decorator.expression;
+  while (ts.isCallExpression(expr) || ts.isPropertyAccessExpression(expr)) {
+    expr = expr.expression;
+  }
+  return ts.isIdentifier(expr) ? expr.text : '';
+}
+
+/** data-clumps 语义豁免 1：框架注入签名。
+ *  NestJS 等框架的路由/DI 处理器签名由装饰器契约决定，参数必须各自独立装饰、
+ *  不可封装，属必要结构而非数据泥团。仅当【每个】参数都至少携带一个注入类
+ *  装饰器（Param/Body/Res/Req/Query/Headers/Session）才豁免；零参数方法与
+ *  存在未装饰参数的方法一律不豁免（后者可能是真泥团，见 mixed 签名回归用例）。 */
+function isFrameworkInjectionSignature(params: readonly ts.ParameterDeclaration[]): boolean {
+  if (params.length === 0) return false; // 零参数方法不参与豁免
+  return params.every((p) => {
+    const decorators = ts.canHaveDecorators(p) ? ts.getDecorators(p) : undefined;
+    if (!decorators || decorators.length === 0) return false;
+    return decorators.some((d) => FRAMEWORK_INJECTION_DECORATORS.has(decoratorBaseName(d)));
+  });
+}
+
+/** data-clumps 语义豁免 2：单行同参转发的委托别名。
+ *  单行同参转发的委托别名（如 verifyPackageWithKey → verifyPackage，@deprecated
+ *  兼容别名）签名必须镜像主方法，重复属刻意设计而非数据泥团。
+ *  判定必须同时满足：方法体恰好一条语句、该语句为 return、表达式为函数调用、
+ *  实参个数 === 形参个数、被调用者为 this.<name> 或 <标识符>.<name> 属性访问——
+ *  任一条件不满足（如多语句实现、参数被改写、本地计算后返回）都不豁免。 */
+function isPureDelegatingAlias(method: ParsedMethod): boolean {
+  const body = method.node.body;
+  if (!body || body.statements.length !== 1) return false;
+
+  const statement = body.statements[0];
+  if (!ts.isReturnStatement(statement) || !statement.expression) return false;
+
+  const expr = statement.expression;
+  if (!ts.isCallExpression(expr)) return false;
+  if (expr.arguments.length !== method.node.parameters.length) return false;
+
+  const callee = expr.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return false;
+  const target = callee.expression;
+  return target.kind === ts.SyntaxKind.ThisKeyword || ts.isIdentifier(target);
+}
+
+/** 收集重复出现的参数组合（以类型序列为键）。
+ *  参数类型文本保持 string[] 直到消息渲染，禁止 join(',').split(',') 往返：
+ *  含逗号的泛型（Record<string, unknown>）会被切碎，消息丢参数并出现双空格。 */
 function collectParamGroups(
   parsed: ParsedFile,
 ): Map<string, { methods: string[]; params: string[] }> {
@@ -240,17 +303,15 @@ function collectParamGroups(
     for (const method of cls.members.methods) {
       const params = method.node.parameters;
       if (params.length < 3) continue;
+      if (isFrameworkInjectionSignature(params)) continue;
+      if (isPureDelegatingAlias(method)) continue;
 
-      const paramTypes = params
-        .map((p) => {
-          if (p.type) return p.type.getText(parsed.sourceFile);
-          return 'any';
-        })
-        .join(',');
-      let group = paramGroups.get(paramTypes);
+      const paramTypes = params.map((p) => (p.type ? p.type.getText(parsed.sourceFile) : 'any'));
+      const groupKey = paramTypes.join(',');
+      let group = paramGroups.get(groupKey);
       if (!group) {
-        group = { methods: [], params: paramTypes.split(',') };
-        paramGroups.set(paramTypes, group);
+        group = { methods: [], params: paramTypes };
+        paramGroups.set(groupKey, group);
       }
       group.methods.push(`${cls.name}.${method.name}`);
     }

@@ -25,6 +25,68 @@ async function readZhshieldJson(root: string, relativePath: string): Promise<str
   }
 }
 
+// ─── 辅助：静默读取 .zhshield 下的 JSON 文件（缺失返回 null） ──
+async function tryReadZhshieldJson(root: string, relativePath: string): Promise<string | null> {
+  try {
+    return await readFile(join(root, '.zhshield', relativePath), 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+// ─── 辅助：诊断读取（含首次引导） ──────────────────────────
+// AI 工具接入全新项目的常态是目标项目从未做过体检（无 latest.json）。
+// 直接返回 fileNotFound 会让调用方一无所获——首次引导自动触发一次巡检，
+// 保证冷启动调用必有结果。巡检后仍无 latest.json（该文件是桌面端专属
+// 缓存，CLI 不落盘），则回退读取 CLI 写出的巡检报告 zhshield.json。
+interface DiagnosticsRead {
+  text: string;
+  bootstrapped: boolean;
+}
+
+async function readDiagnosticsWithBootstrap(root: string): Promise<DiagnosticsRead> {
+  const existing = await tryReadZhshieldJson(root, 'diagnostics/latest.json');
+  if (existing !== null) return { text: existing, bootstrapped: false };
+
+  // --format json：CLI 仅在 json 格式下落盘巡检报告 zhshield.json，
+  // text 格式只打印不写文件，首次引导将拿不到任何持久化结果
+  await runCli('inspect', root, { format: 'json' });
+
+  const afterScan = await tryReadZhshieldJson(root, 'diagnostics/latest.json');
+  if (afterScan !== null) return { text: afterScan, bootstrapped: true };
+
+  try {
+    const report = await readFile(join(root, 'zhshield.json'), 'utf-8');
+    return {
+      text: JSON.stringify({
+        ok: true,
+        bootstrapped: true,
+        note: t('mcp.bootstrapReportFallback'),
+        report: JSON.parse(report),
+      }),
+      bootstrapped: true,
+    };
+  } catch {
+    return {
+      text: JSON.stringify({
+        ok: false,
+        bootstrapped: true,
+        error: t('mcp.fileNotFound', { relativePath: 'diagnostics/latest.json' }),
+      }),
+      bootstrapped: true,
+    };
+  }
+}
+
+// ─── 辅助：toolError 与 finding 分离 ───────────────────────
+// ruleId 含 `.external.` 的条目来自外部工具执行（trivy/依赖审计等），
+// 内容是工具运行状态乃至报错原文（如 trivy FATAL），不是代码发现；
+// 混入 issues 会污染 AI 的输入信号，故单独归入 toolErrors 通道。
+// 结构化分离的完整方案在 Tool Registry 落地后收口（阶段 3.3）。
+function isToolErrorEntry(issue: Record<string, unknown>): boolean {
+  return typeof issue.ruleId === 'string' && issue.ruleId.includes('.external.');
+}
+
 // ─── 辅助：探测 zhshield CLI 启动方式（dist 优先，否则 src + 本地 tsx） ──
 interface CliInvocation {
   cmd: string;
@@ -65,7 +127,7 @@ async function resolveCliInvocation(
 async function runCli(
   command: 'inspect' | 'guard' | 'refactor' | 'pipeline',
   projectPath: string,
-  opts: { sop?: boolean; dryRun?: boolean } = {},
+  opts: { sop?: boolean; dryRun?: boolean; format?: 'json' | 'text' } = {},
 ): Promise<string> {
   const invocation = await resolveCliInvocation(command, projectPath);
   if (!invocation) {
@@ -75,6 +137,7 @@ async function runCli(
   const args = [...invocation.args];
   if (opts.sop) args.push('--sop');
   if (opts.dryRun) args.push('--dry-run');
+  if (opts.format) args.push('--format', opts.format);
 
   try {
     const { stdout } = await execFileAsync(invocation.cmd, args, {
@@ -106,7 +169,7 @@ server.tool(
   { projectPath: z.string().optional().describe(t('mcp.projectPathDesc')) },
   async ({ projectPath }) => {
     const root = projectPath ?? process.cwd();
-    const text = await readZhshieldJson(root, 'diagnostics/latest.json');
+    const { text } = await readDiagnosticsWithBootstrap(root);
     return { content: [{ type: 'text', text }] };
   },
 );
@@ -123,8 +186,11 @@ server.tool(
   },
   async ({ projectPath, severity, category, source }) => {
     const root = projectPath ?? process.cwd();
-    const text = await readZhshieldJson(root, 'diagnostics/latest.json');
-    let parsed: { issues?: ReadonlyArray<Record<string, unknown>> };
+    const { text } = await readDiagnosticsWithBootstrap(root);
+    let parsed: {
+      issues?: ReadonlyArray<Record<string, unknown>>;
+      report?: Record<string, unknown>;
+    };
     try {
       parsed = JSON.parse(text);
     } catch {
@@ -137,12 +203,28 @@ server.tool(
         ],
       };
     }
-    let issues = parsed.issues ?? [];
+    // 首次引导的回退形态：无 latest.json 时返回的是巡检报告包装，没有 issues 数组
+    if (!Array.isArray(parsed.issues)) {
+      return { content: [{ type: 'text', text }] };
+    }
+    // toolError 与 finding 分离：外部工具执行条目不进入 issues 主列表
+    const toolErrors = parsed.issues.filter(isToolErrorEntry);
+    let issues = parsed.issues.filter((i) => !isToolErrorEntry(i));
     if (severity) issues = issues.filter((i) => i.severity === severity);
     if (category) issues = issues.filter((i) => i.category === category);
     if (source) issues = issues.filter((i) => i.source === source);
     return {
-      content: [{ type: 'text', text: JSON.stringify({ ok: true, total: issues.length, issues }) }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: true,
+            total: issues.length,
+            issues,
+            toolErrors: { count: toolErrors.length, note: t('mcp.toolErrorsNote'), items: toolErrors },
+          }),
+        },
+      ],
     };
   },
 );

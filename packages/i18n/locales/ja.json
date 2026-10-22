@@ -808,15 +808,16 @@
     "validate": "検証"
   },
   "mcp": {
+    "bootstrapReportFallback": "初回巡回が完了しました。診断キャッシュ（latest.json）はデスクトップアプリが生成するため、今回は未経由です。代わりに CLI 巡回レポート（zhshield.json）の内容を返します",
     "categoryFilterDesc": "カテゴリでフィルタリング（例: performance / security / quality / architecture）",
     "cliNotFound": "zhshield CLI が見つかりません。先に pnpm build を実行してください",
     "commandDoneNoOutput": "{{command}} が完了しました（出力なし）",
     "commandFailed": "{{command}} の実行に失敗しました",
     "diagnosticsUnparseable": "診断ファイルを解析できません",
     "fileNotFound": "ファイルが存在しません: .zhshield/{{relativePath}}",
-    "getDiagnosticsDesc": "CodeShield の直近の点検結果（診断）を読み取ります（.zhshield/diagnostics/latest.json）",
+    "getDiagnosticsDesc": "CodeShield の直近の点検結果（診断）を読み取ります（.zhshield/diagnostics/latest.json）。データがない場合は初回巡回を自動実行します",
     "getIntegrationDesc": "CodeShield の統合設定（.zhshield/integration.json）を読み取ります。自動トリガー、フィルタ、自動修正などの設定を含みます",
-    "getIssuesDesc": "CodeShield の直近の点検で検出された issues を取得します（深刻度/カテゴリ/ソースによるフィルタリングに対応）。{ok,total,issues} JSON を返します",
+    "getIssuesDesc": "CodeShield の直近の点検で検出された issues を取得します（深刻度/カテゴリ/ソースによるフィルタリングに対応）。{ok,total,issues,toolErrors} JSON を返します。データがない場合は初回巡回を自動実行します",
     "guardProjectPathDesc": "チェック対象のプロジェクトルートディレクトリ",
     "guardSopModeDesc": "SOP ルール駆動モードを使用",
     "inspectProjectPathDesc": "巡回対象のプロジェクトルートディレクトリ",
@@ -825,7 +826,8 @@
     "runInspectDesc": "CodeShield の巡回を実行します（zhshield inspect を呼び出し）、コード品質の問題をスキャンしてレポートを返します",
     "severityFilterDesc": "深刻度でフィルタリング",
     "sopModeDesc": "SOP ルール駆動モードを使用（デフォルトは checks.json モード）",
-    "sourceFilterDesc": "ソースエンジンでフィルタリング"
+    "sourceFilterDesc": "ソースエンジンでフィルタリング",
+    "toolErrorsNote": "外部ツールの実行状態（trivy / 依存監査などのエラー原文）。コードの問題ではありません"
   },
   "nav": {
     "backup": "バックアップセンター",
@@ -850,6 +852,9 @@
       "notRunHint": "この機能を実行して集計すると総合スコアに反映されます",
       "scoreDelta": "前回 {{prev}} → 今回 {{now}}",
       "unit": "点"
+    },
+    "detail": {
+      "view": "詳細を見る"
     },
     "reportShell": {
       "backHome": "ホームに戻る"

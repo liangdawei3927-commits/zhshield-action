@@ -808,15 +808,16 @@
     "validate": "Validate"
   },
   "mcp": {
+    "bootstrapReportFallback": "First-run inspection completed; the diagnostics cache (latest.json) is produced by the desktop app, which did not participate this time — the CLI inspection report (zhshield.json) is returned instead",
     "categoryFilterDesc": "Filter by category (e.g., performance / security / quality / architecture)",
     "cliNotFound": "zhshield CLI not found; run pnpm build first",
     "commandDoneNoOutput": "{{command}} completed (no output)",
     "commandFailed": "{{command}} execution failed",
     "diagnosticsUnparseable": "Diagnostics file cannot be parsed",
     "fileNotFound": "File not found: .zhshield/{{relativePath}}",
-    "getDiagnosticsDesc": "Read the diagnostics from ZhiHui CodeShield's most recent checkup (.zhshield/diagnostics/latest.json)",
+    "getDiagnosticsDesc": "Read the diagnostics from ZhiHui CodeShield's most recent checkup (.zhshield/diagnostics/latest.json); automatically runs a first inspection when data is missing",
     "getIntegrationDesc": "Read ZhiHui CodeShield's integration config (.zhshield/integration.json), including auto-trigger, filters, and auto-fix settings",
-    "getIssuesDesc": "Get issues from ZhiHui CodeShield's most recent checkup (filterable by severity/category/source); returns a {ok,total,issues} JSON",
+    "getIssuesDesc": "Get issues from ZhiHui CodeShield's most recent checkup (filterable by severity/category/source); returns a {ok,total,issues,toolErrors} JSON; automatically runs a first inspection when data is missing",
     "guardProjectPathDesc": "Project root directory to check",
     "guardSopModeDesc": "Use SOP rule-driven mode",
     "inspectProjectPathDesc": "Project root directory to inspect",
@@ -825,7 +826,8 @@
     "runInspectDesc": "Trigger a ZhiHui CodeShield inspection (calls zhshield inspect) to scan for code quality issues and return a report",
     "severityFilterDesc": "Filter by severity",
     "sopModeDesc": "Use SOP rule-driven mode (default: checks.json mode)",
-    "sourceFilterDesc": "Filter by source engine"
+    "sourceFilterDesc": "Filter by source engine",
+    "toolErrorsNote": "External tool execution status (e.g., raw trivy / dependency-audit errors), not code findings"
   },
   "nav": {
     "backup": "Backup",
@@ -850,6 +852,9 @@
       "notRunHint": "Run this check and summarize to count toward the total score",
       "scoreDelta": "Previous {{prev}} → Now {{now}}",
       "unit": "pts"
+    },
+    "detail": {
+      "view": "View details"
     },
     "reportShell": {
       "backHome": "Back to Home"

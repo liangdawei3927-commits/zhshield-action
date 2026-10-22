@@ -808,15 +808,16 @@
     "validate": "驗證"
   },
   "mcp": {
+    "bootstrapReportFallback": "首次巡檢已完成；診斷快取（latest.json）由桌面端產生、本次未經桌面端，以下為 CLI 巡檢報告（zhshield.json）內容",
     "categoryFilterDesc": "按類別過濾（如 performance / security / quality / architecture）",
     "cliNotFound": "未找到 zhshield CLI，請先執行 pnpm build",
     "commandDoneNoOutput": "{{command}} 完成（無輸出）",
     "commandFailed": "{{command}} 執行失敗",
     "diagnosticsUnparseable": "診斷檔案無法解析",
     "fileNotFound": "檔案不存在: .zhshield/{{relativePath}}",
-    "getDiagnosticsDesc": "讀取智匯碼盾最近一次體檢的診斷結果（.zhshield/diagnostics/latest.json）",
+    "getDiagnosticsDesc": "讀取智匯碼盾最近一次體檢的診斷結果（.zhshield/diagnostics/latest.json）；資料缺失時自動觸發一次巡檢（首次引導）",
     "getIntegrationDesc": "讀取智匯碼盾的整合配置（.zhshield/integration.json），含自動觸發、過濾器、自動修復等設定",
-    "getIssuesDesc": "獲取智匯碼盾最近一次體檢的 issues（支援按嚴重等級/類別/來源過濾），返回 {ok,total,issues} JSON",
+    "getIssuesDesc": "獲取智匯碼盾最近一次體檢的 issues（支援按嚴重等級/類別/來源過濾），返回 {ok,total,issues,toolErrors} JSON；資料缺失時自動觸發一次巡檢",
     "guardProjectPathDesc": "要檢查的專案根目錄",
     "guardSopModeDesc": "使用 SOP 規則驅動模式",
     "inspectProjectPathDesc": "要巡檢的專案根目錄",
@@ -825,7 +826,8 @@
     "runInspectDesc": "觸發智匯碼盾巡檢（呼叫 zhshield inspect），掃描程式碼質量問題並返回報告",
     "severityFilterDesc": "按嚴重等級過濾",
     "sopModeDesc": "使用 SOP 規則驅動模式（預設 checks.json 模式）",
-    "sourceFilterDesc": "按來源引擎過濾"
+    "sourceFilterDesc": "按來源引擎過濾",
+    "toolErrorsNote": "外部工具執行狀態（如 trivy / 依賴審計的報錯原文），非程式碼問題"
   },
   "nav": {
     "backup": "備份中心",
@@ -850,6 +852,9 @@
       "notRunHint": "執行本功能並彙總後計入總分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
       "unit": "分"
+    },
+    "detail": {
+      "view": "查看詳情"
     },
     "reportShell": {
       "backHome": "返回主頁"

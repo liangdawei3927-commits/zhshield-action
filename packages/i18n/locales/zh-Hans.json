@@ -808,15 +808,16 @@
     "validate": "验证"
   },
   "mcp": {
+    "bootstrapReportFallback": "首次巡检已完成；诊断缓存（latest.json）由桌面端生成、本次未经桌面端，以下为 CLI 巡检报告（zhshield.json）内容",
     "categoryFilterDesc": "按类别过滤（如 performance / security / quality / architecture）",
     "cliNotFound": "未找到 zhshield CLI，请先运行 pnpm build",
     "commandDoneNoOutput": "{{command}} 完成（无输出）",
     "commandFailed": "{{command}} 执行失败",
     "diagnosticsUnparseable": "诊断文件无法解析",
     "fileNotFound": "文件不存在: .zhshield/{{relativePath}}",
-    "getDiagnosticsDesc": "读取智汇码盾最近一次体检的诊断结果（.zhshield/diagnostics/latest.json）",
+    "getDiagnosticsDesc": "读取智汇码盾最近一次体检的诊断结果（.zhshield/diagnostics/latest.json）；数据缺失时自动触发一次巡检（首次引导）",
     "getIntegrationDesc": "读取智汇码盾的集成配置（.zhshield/integration.json），含自动触发、过滤器、自动修复等设置",
-    "getIssuesDesc": "获取智汇码盾最近一次体检的 issues（支持按严重等级/类别/来源过滤），返回 {ok,total,issues} JSON",
+    "getIssuesDesc": "获取智汇码盾最近一次体检的 issues（支持按严重等级/类别/来源过滤），返回 {ok,total,issues,toolErrors} JSON；数据缺失时自动触发一次巡检",
     "guardProjectPathDesc": "要检查的项目根目录",
     "guardSopModeDesc": "使用 SOP 规则驱动模式",
     "inspectProjectPathDesc": "要巡检的项目根目录",
@@ -825,7 +826,8 @@
     "runInspectDesc": "触发智汇码盾巡检（调用 zhshield inspect），扫描代码质量问题并返回报告",
     "severityFilterDesc": "按严重等级过滤",
     "sopModeDesc": "使用 SOP 规则驱动模式（默认 checks.json 模式）",
-    "sourceFilterDesc": "按来源引擎过滤"
+    "sourceFilterDesc": "按来源引擎过滤",
+    "toolErrorsNote": "外部工具执行状态（如 trivy / 依赖审计的报错原文），非代码问题"
   },
   "nav": {
     "backup": "备份中心",
@@ -850,6 +852,9 @@
       "notRunHint": "运行本功能并汇总后计入总分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
       "unit": "分"
+    },
+    "detail": {
+      "view": "查看详情"
     },
     "reportShell": {
       "backHome": "返回主页"

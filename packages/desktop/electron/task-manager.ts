@@ -133,17 +133,17 @@ export function findReusableTask(params: FindReusableTaskParams): TaskInfo | und
  * 受限并发 + 排队，状态/进度变化通过 tasks:changed 事件广播给渲染进程。
  */
 export class TaskManager {
-  private readonly tasks = new Map<string, TaskInfo>();
-  private readonly waiters = new Map<
+  private readonly tasks: Map<string, TaskInfo> = new Map();
+  private readonly waiters: Map<
     string,
     Set<{ resolve: (v: unknown) => void; reject: (e: Error) => void }>
-  >();
+  > = new Map();
   private readonly queue: QueuedJob[] = [];
-  private readonly lastBroadcast = new Map<string, number>();
+  private readonly lastBroadcast: Map<string, number> = new Map();
   // 任务 id → 请求键。刻意不并入 TaskInfo，避免随 tasks:changed 广播给渲染进程。
-  private readonly requestKeys = new Map<string, string>();
-  private running = 0;
-  private seq = 0;
+  private readonly requestKeys: Map<string, string> = new Map();
+  private running: number = 0;
+  private seq: number = 0;
 
   constructor(
     private readonly runnerByKind: Record<TaskKind, TaskRunner>,

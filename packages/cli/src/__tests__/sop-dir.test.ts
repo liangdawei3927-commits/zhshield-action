@@ -35,6 +35,22 @@ describe('resolveBundledSopDir', () => {
     expect(resolveBundledSopDir(base)).toBeUndefined();
     fs.rmSync(base, { recursive: true, force: true });
   });
+
+  it('sop 路径是文件而非目录时返回 undefined 而非抛 ENOTDIR——existsSync 对文件同样为 true，透传给 readdirSync 会让 CLI 启动直接崩溃', () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-sop-file-'));
+    fs.writeFileSync(path.join(base, 'sop'), 'not a directory', 'utf8');
+    expect(() => resolveBundledSopDir(base)).not.toThrow();
+    expect(resolveBundledSopDir(base)).toBeUndefined();
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it('sop-templates 路径是文件而非目录时同样返回 undefined（同一根因的深层触发点）', () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-sop-tplfile-'));
+    fs.mkdirSync(path.join(base, 'sop', 'presets'), { recursive: true });
+    fs.writeFileSync(path.join(base, 'sop', 'presets', 'sop-templates'), 'not a directory', 'utf8');
+    expect(resolveBundledSopDir(base)).toBeUndefined();
+    fs.rmSync(base, { recursive: true, force: true });
+  });
 });
 
 describe.skipIf(!fs.existsSync(path.resolve(__dirname, '..', '..', 'dist', 'sop')))(

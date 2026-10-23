@@ -11,7 +11,7 @@ description: 通过智汇码盾 MCP 工具获取项目代码健康度、结构�
 
 | 工具 | 作用 | 关键参数 | 何时调用 |
 |---|---|---|---|
-| `getIssues` | 取最近一次体检的 issues，可按严重等级/类别/来源过滤 | `projectPath`（可省，默认 cwd）、`severity`、`category`、`source` | **首选入口**。需要具体问题清单时 |
+| `getIssues` | 取最近一次体检的 issues，可按严重等级/类别/来源过滤 | `projectPath`（可省，默认 cwd）、`severity`、`category`、`source`、`limit`（默认 50） | **首选入口**。需要具体问题清单时 |
 | `getDiagnostics` | 取原始体检诊断 JSON | `projectPath`（可省） | 需要完整报告而非过滤后的 issues 时 |
 | `runInspect` | 重新执行巡检，刷新诊断 | `projectPath`（**必填**）、`sop` | 代码改动后需要最新结果时 |
 | `runGuard` | 执行门禁检查（dry-run 只报告不阻断） | `projectPath`（**必填**）、`sop` | 提交/合并前，或用户明确要求门禁 |
@@ -40,7 +40,8 @@ description: 通过智汇码盾 MCP 工具获取项目代码健康度、结构�
 
 - `issues[]` 是**代码发现**，每条含 `ruleId` / `severity` / `category` / `message` / `file` / `autoFixable` / `source`
 - `severity` 只有三档：`error` / `warning` / `info`
-- `source` 只有三种：`guard`（门禁）/ `inspect`（巡检）/ `refactor`（重构分析）
+- `source` 共七种：`guard`（门禁）/ `inspect`（巡检）/ `refactor`（重构分析）/ `deps`（依赖）/ `security`（安全）/ `techdebt`（技术债）/ `performance`（性能）。结果按域聚合，不是只有最后跑的那个引擎
+- 返回体带 `total`（过滤后总数）、`returned`（本次实际返回）、`truncated`（是否被截断）。**`truncated` 为 true 时不要直接下结论**：说明还有更多问题，应继续用过滤器收窄或告知用户总数
 - `toolErrors` 是**外部工具的执行状态**（trivy、依赖审计等的报错原文），**不是代码缺陷**。不要把它混进问题清单汇报给用户
 - 无数据时返回的 `bootstrapped: true` 表示已自动跑过首轮巡检
 

@@ -25,6 +25,7 @@ export {
   domainSnapshotPath,
   writeDiagnosticsFile,
   readDomainSnapshot,
+  readAggregatedDiagnostics,
   persistDiagnostics,
   persistDiagnosticsFromEntries,
 } from './zh-diagnostics-persist';

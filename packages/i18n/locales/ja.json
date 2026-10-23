@@ -814,6 +814,7 @@
     "commandDoneNoOutput": "{{command}} が完了しました（出力なし）",
     "commandFailed": "{{command}} の実行に失敗しました",
     "diagnosticsUnparseable": "診断ファイルを解析できません",
+    "emptyFile": "ファイルは存在しますが空です: .zhshield/{{relativePath}}",
     "fileNotFound": "ファイルが存在しません: .zhshield/{{relativePath}}",
     "getDiagnosticsDesc": "CodeShield の直近の点検結果（診断）を読み取ります（.zhshield/diagnostics/latest.json）。データがない場合は初回巡回を自動実行します",
     "getIntegrationDesc": "CodeShield の統合設定（.zhshield/integration.json）を読み取ります。自動トリガー、フィルタ、自動修正などの設定を含みます",
@@ -821,6 +822,7 @@
     "guardProjectPathDesc": "チェック対象のプロジェクトルートディレクトリ",
     "guardSopModeDesc": "SOP ルール駆動モードを使用",
     "inspectProjectPathDesc": "巡回対象のプロジェクトルートディレクトリ",
+    "limitDesc": "返却する最大件数（既定 50、深刻度 error→warning→info の順に並べ替え）",
     "projectPathDesc": "プロジェクトルートディレクトリ。省略時は現在の作業ディレクトリ",
     "runGuardDesc": "CodeShield のゲートチェックを実行します（zhshield guard --dry-run を呼び出し）、報告のみでブロックしないモードでコードをチェックします",
     "runInspectDesc": "CodeShield の巡回を実行します（zhshield inspect を呼び出し）、コード品質の問題をスキャンしてレポートを返します",
@@ -1763,6 +1765,68 @@
         "allReady": "{{count}} 件すべてのツールが準備完了"
       }
     },
+    "profile": {
+      "title": "プロジェクトプロファイル",
+      "detecting": "プロジェクトを分析中…",
+      "detectedAt": "検出日時: {{time}}",
+      "confirmedAt": "確認日時: {{time}}",
+      "stale": "プロファイルが期限切れです",
+      "error": {
+        "title": "プロファイル分析に失敗しました",
+        "unknown": "不明なエラー"
+      },
+      "section": {
+        "overview": "概要",
+        "targets": "ターゲット一覧",
+        "environments": "実行環境",
+        "dependencies": "依存関係サマリー",
+        "overrides": "手動修正履歴",
+        "signals": "シグナル追跡",
+        "notifications": "通知設定"
+      },
+      "overview": {
+        "architecture": "アーキテクチャ",
+        "targetCount": "ターゲット数",
+        "environments": "実行環境",
+        "signalCount": "シグナル総数"
+      },
+      "env": {
+        "confirmed": "確認済み",
+        "candidate": "候補"
+      },
+      "deps": {
+        "packageManager": "パッケージマネージャー",
+        "lockfile": "ロックファイル",
+        "direct": "直接依存",
+        "count": "{{count}} 件",
+        "unknown": "不明",
+        "notDetected": "未検出"
+      },
+      "notify": {
+        "title": "システム通知",
+        "desc": "ガードブロックとセンチネル警告時にシステム通知を送信"
+      },
+      "signals": {
+        "none": "支援シグナルなし",
+        "expand": "すべて展開 ({{count}})",
+        "collapse": "折りたたむ"
+      },
+      "target": {
+        "language": "言語",
+        "frameworks": "フレームワーク",
+        "productForm": "提供形態",
+        "packageManager": "パッケージマネージャー",
+        "languageBasis": "言語判定根拠"
+      },
+      "overrides": {
+        "none": "手動修正履歴なし",
+        "architecture": "アーキテクチャ修正",
+        "target": "ターゲット修正: {{key}}",
+        "language": "言語={{value}}",
+        "productForm": "形態={{value}}",
+        "updatedAt": "最終修正: {{time}}"
+      }
+    },
     "secrets": {
       "copyAllPrompt": "{{count}} 項目の処理が必要です。ワンクリックですべてコピーして AI に修正させられます",
       "source": "シークレット管理",
@@ -1851,6 +1915,12 @@
       "foundIssues": "点検で {{count}} 件の問題を検出しました",
       "total": "点検完了: {{count}} 項目のチェック"
     },
+    "deps": {
+      "buildingGraph": "依存グラフを構築中…",
+      "checking": "タイポスクワットとロックファイルを検証中…",
+      "loadingBaseline": "依存ベースラインを読み込み中…",
+      "reporting": "依存レポートを集計中…"
+    },
     "exitError": {
       "logHintPrefix": "；子プロセスのログ: ",
       "message": "エンジン子プロセスが異常終了しました (code={{code}}, signal={{signal}})",
@@ -1903,6 +1973,10 @@
     "security": {
       "done": "セキュリティスキャン完了",
       "scanning": "セキュリティスキャン中…"
+    },
+    "techdebt": {
+      "computing": "技術的負債指数を計算中…",
+      "loadingSnapshot": "点検スナップショットを読み込み中…"
     },
     "shuttingDown": "アプリケーションを終了しています",
     "workerTimeout": "子プロセスの起動がタイムアウトしました",
@@ -2013,6 +2087,7 @@
     "cancelled": "タスクはキャンセルされました",
     "executionFailed": "タスクの実行に失敗しました",
     "kind": {
+      "deps": "依存スキャン",
       "garbage": "ゴミ清掃",
       "garbageClean": "クリーンアップ",
       "garbageRestore": "復元",
@@ -2021,7 +2096,8 @@
       "performance": "検出",
       "pipeline": "点検",
       "refactor": "リファクタリングスキャン",
-      "security": "チェック"
+      "security": "チェック",
+      "techdebt": "技術的負債分析"
     },
     "notCompleted": "タスクは未完了です",
     "notFound": "タスクが存在しません",

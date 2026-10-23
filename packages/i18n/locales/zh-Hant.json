@@ -814,6 +814,7 @@
     "commandDoneNoOutput": "{{command}} 完成（無輸出）",
     "commandFailed": "{{command}} 執行失敗",
     "diagnosticsUnparseable": "診斷檔案無法解析",
+    "emptyFile": "檔案存在但為空: .zhshield/{{relativePath}}",
     "fileNotFound": "檔案不存在: .zhshield/{{relativePath}}",
     "getDiagnosticsDesc": "讀取智匯碼盾最近一次體檢的診斷結果（.zhshield/diagnostics/latest.json）；資料缺失時自動觸發一次巡檢（首次引導）",
     "getIntegrationDesc": "讀取智匯碼盾的整合配置（.zhshield/integration.json），含自動觸發、過濾器、自動修復等設定",
@@ -821,6 +822,7 @@
     "guardProjectPathDesc": "要檢查的專案根目錄",
     "guardSopModeDesc": "使用 SOP 規則驅動模式",
     "inspectProjectPathDesc": "要巡檢的專案根目錄",
+    "limitDesc": "最多回傳筆數（預設 50，依嚴重等級 error→warning→info 排序）",
     "projectPathDesc": "專案根目錄；預設為當前工作目錄",
     "runGuardDesc": "觸發智匯碼盾門禁檢查（呼叫 zhshield guard --dry-run），以只報告不阻斷模式檢查程式碼",
     "runInspectDesc": "觸發智匯碼盾巡檢（呼叫 zhshield inspect），掃描程式碼質量問題並返回報告",
@@ -1763,6 +1765,68 @@
         "allReady": "全部 {{count}} 個工具就緒"
       }
     },
+    "profile": {
+      "title": "專案畫像",
+      "detecting": "正在分析專案…",
+      "detectedAt": "檢測於 {{time}}",
+      "confirmedAt": "確認於 {{time}}",
+      "stale": "畫像已過期",
+      "error": {
+        "title": "畫像分析失敗",
+        "unknown": "未知錯誤"
+      },
+      "section": {
+        "overview": "總覽",
+        "targets": "目標清單",
+        "environments": "執行環境",
+        "dependencies": "依賴摘要",
+        "overrides": "人工修正記錄",
+        "signals": "訊號追溯",
+        "notifications": "通知設定"
+      },
+      "overview": {
+        "architecture": "架構形態",
+        "targetCount": "目標數",
+        "environments": "執行環境",
+        "signalCount": "訊號總數"
+      },
+      "env": {
+        "confirmed": "確認",
+        "candidate": "候選"
+      },
+      "deps": {
+        "packageManager": "套件管理器",
+        "lockfile": "鎖定檔",
+        "direct": "直接依賴",
+        "count": "{{count}} 個",
+        "unknown": "未知",
+        "notDetected": "未檢測"
+      },
+      "notify": {
+        "title": "系統通知",
+        "desc": "門禁攔截和哨兵告警時傳送系統通知"
+      },
+      "signals": {
+        "none": "無支撐訊號",
+        "expand": "展開全部 ({{count}})",
+        "collapse": "收起"
+      },
+      "target": {
+        "language": "語言",
+        "frameworks": "框架",
+        "productForm": "交付形態",
+        "packageManager": "套件管理器",
+        "languageBasis": "語言判定依據"
+      },
+      "overrides": {
+        "none": "暫無人工修正記錄",
+        "architecture": "架構修正",
+        "target": "目標修正: {{key}}",
+        "language": "語言={{value}}",
+        "productForm": "形態={{value}}",
+        "updatedAt": "最後修正：{{time}}"
+      }
+    },
     "secrets": {
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "source": "金鑰管理",
@@ -1851,6 +1915,12 @@
       "foundIssues": "體檢發現 {{count}} 項問題",
       "total": "體檢完成：{{count}} 項檢查"
     },
+    "deps": {
+      "buildingGraph": "建置依賴圖…",
+      "checking": "校驗投毒與鎖檔…",
+      "loadingBaseline": "載入依賴基線…",
+      "reporting": "彙總依賴報告…"
+    },
     "exitError": {
       "logHintPrefix": "；子程式日誌: ",
       "message": "引擎子程式異常退出 (code={{code}}, signal={{signal}})",
@@ -1903,6 +1973,10 @@
     "security": {
       "done": "安全掃描完成",
       "scanning": "安全掃描中…"
+    },
+    "techdebt": {
+      "computing": "計算技術債指數…",
+      "loadingSnapshot": "讀取體檢快照…"
     },
     "shuttingDown": "應用正在退出",
     "workerTimeout": "子程式啟動超時",
@@ -2013,6 +2087,7 @@
     "cancelled": "任務已取消",
     "executionFailed": "任務執行失敗",
     "kind": {
+      "deps": "依賴掃描",
       "garbage": "垃圾清理",
       "garbageClean": "清理",
       "garbageRestore": "恢復",
@@ -2021,7 +2096,8 @@
       "performance": "檢測",
       "pipeline": "體檢",
       "refactor": "重構掃描",
-      "security": "檢查"
+      "security": "檢查",
+      "techdebt": "技術債分析"
     },
     "notCompleted": "任務未完成",
     "notFound": "任務不存在",

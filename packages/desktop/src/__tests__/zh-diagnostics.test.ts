@@ -16,6 +16,7 @@ import {
   persistDiagnostics,
   persistDiagnosticsFromEntries,
   readDomainSnapshot,
+  readAggregatedDiagnostics,
   domainSnapshotPath,
   type DiagnosticEntry,
 } from '../../electron/zh-diagnostics';
@@ -477,6 +478,111 @@ describe('按域快照 domains/<source>.json', () => {
       });
       expect(dashboard.actionList.length).toBeGreaterThan(0);
       expect(dashboard.debtIndex).toBeGreaterThanOrEqual(0);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * 聚合读取（跨域完整性）。
+ * 目的：latest.json 是整份覆盖写，单引擎扫描（refactor/guard/…）会把其他域的
+ * 结果冲掉。聚合读取按域取最新一份合并，保证调用方看到完整治理视图而非
+ * 最后一次运行的切片——否则 AI 只能拿到一个引擎的视角。
+ */
+describe('readAggregatedDiagnostics 跨域聚合', () => {
+  const inspectEntry: DiagnosticEntry = {
+    ruleId: 'typescript/no-any',
+    severity: 'warning',
+    category: 'quality',
+    message: 'inspect 域条目',
+    file: 'src/a.ts',
+    autoFixable: false,
+    source: 'inspect',
+    fingerprint: 'inspect::a',
+  };
+  const securityEntry: DiagnosticEntry = {
+    ruleId: 'secret/hardcoded',
+    severity: 'error',
+    category: 'security',
+    message: 'security 域条目',
+    file: 'src/b.ts',
+    autoFixable: false,
+    source: 'security',
+    fingerprint: 'security::b',
+  };
+  const refactorEntry: DiagnosticEntry = {
+    ruleId: 'duplicated-code',
+    severity: 'info',
+    category: 'structural',
+    message: 'refactor 域条目',
+    file: 'src/c.ts',
+    autoFixable: false,
+    source: 'refactor',
+    fingerprint: 'refactor::c',
+  };
+
+  it('单引擎覆盖 latest.json 后，仍能读到其他域的既有结果', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-agg-merge-'));
+    try {
+      await persistDiagnosticsFromEntries(project, [inspectEntry, securityEntry], [
+        'inspect',
+        'security',
+      ]);
+      // 模拟单引擎扫描：latest.json 被 refactor 独占覆盖
+      await persistDiagnosticsFromEntries(project, [refactorEntry], ['refactor']);
+
+      const latest = JSON.parse(
+        readFileSync(join(project, '.zhshield', 'diagnostics', 'latest.json'), 'utf-8'),
+      );
+      expect(latest.issues.map((i: DiagnosticEntry) => i.source)).toEqual(['refactor']);
+
+      // 聚合后三个域必须在场
+      const agg = await readAggregatedDiagnostics(project);
+      expect(agg).not.toBeNull();
+      expect(agg!.issues.map((i) => i.source).sort()).toEqual(['inspect', 'refactor', 'security']);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('同域以最新一份为准，不重复计入旧快照条目', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-agg-newest-'));
+    try {
+      await persistDiagnosticsFromEntries(project, [inspectEntry], ['inspect']);
+      const newer: DiagnosticEntry = {
+        ...inspectEntry,
+        message: '新版条目',
+        fingerprint: 'inspect::a2',
+      };
+      await persistDiagnosticsFromEntries(project, [newer], ['inspect']);
+
+      const agg = await readAggregatedDiagnostics(project);
+      expect(agg!.issues.map((i) => i.fingerprint)).toEqual(['inspect::a2']);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('无域快照目录时回退 latest.json', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-agg-fallback-'));
+    try {
+      const report = buildDiagnosticsReport({ path: project, name: 'tmp' }, [inspectEntry], 'T1');
+      await writeDiagnosticsFile(report);
+      rmSync(join(project, '.zhshield', 'diagnostics', 'domains'), { recursive: true, force: true });
+
+      const agg = await readAggregatedDiagnostics(project);
+      expect(agg!.issues).toHaveLength(1);
+      expect(agg!.issues[0].fingerprint).toBe('inspect::a');
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('全无数据时返回 null', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-agg-empty-'));
+    try {
+      expect(await readAggregatedDiagnostics(project)).toBeNull();
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

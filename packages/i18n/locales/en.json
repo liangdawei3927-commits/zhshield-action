@@ -814,6 +814,7 @@
     "commandDoneNoOutput": "{{command}} completed (no output)",
     "commandFailed": "{{command}} execution failed",
     "diagnosticsUnparseable": "Diagnostics file cannot be parsed",
+    "emptyFile": "File exists but is empty: .zhshield/{{relativePath}}",
     "fileNotFound": "File not found: .zhshield/{{relativePath}}",
     "getDiagnosticsDesc": "Read the diagnostics from ZhiHui CodeShield's most recent checkup (.zhshield/diagnostics/latest.json); automatically runs a first inspection when data is missing",
     "getIntegrationDesc": "Read ZhiHui CodeShield's integration config (.zhshield/integration.json), including auto-trigger, filters, and auto-fix settings",
@@ -821,6 +822,7 @@
     "guardProjectPathDesc": "Project root directory to check",
     "guardSopModeDesc": "Use SOP rule-driven mode",
     "inspectProjectPathDesc": "Project root directory to inspect",
+    "limitDesc": "Maximum number of issues to return (default 50, sorted by severity error then warning then info)",
     "projectPathDesc": "Project root directory; defaults to the current working directory",
     "runGuardDesc": "Trigger a ZhiHui CodeShield gate check (calls zhshield guard --dry-run) to examine code in report-only, non-blocking mode",
     "runInspectDesc": "Trigger a ZhiHui CodeShield inspection (calls zhshield inspect) to scan for code quality issues and return a report",
@@ -1840,6 +1842,68 @@
         "installFailed": "Installation failed, please retry later",
         "allReady": "All {{count}} tools ready"
       }
+    },
+    "profile": {
+      "title": "Project Profile",
+      "detecting": "Analyzing project…",
+      "detectedAt": "Detected {{time}}",
+      "confirmedAt": "Confirmed {{time}}",
+      "stale": "Profile outdated",
+      "error": {
+        "title": "Profile analysis failed",
+        "unknown": "Unknown error"
+      },
+      "section": {
+        "overview": "Overview",
+        "targets": "Targets",
+        "environments": "Environments",
+        "dependencies": "Dependencies",
+        "overrides": "Manual Overrides",
+        "signals": "Signal Trace",
+        "notifications": "Notifications"
+      },
+      "overview": {
+        "architecture": "Architecture",
+        "targetCount": "Targets",
+        "environments": "Environments",
+        "signalCount": "Total Signals"
+      },
+      "env": {
+        "confirmed": "Confirmed",
+        "candidate": "Candidate"
+      },
+      "deps": {
+        "packageManager": "Package manager",
+        "lockfile": "Lockfile",
+        "direct": "Direct dependencies",
+        "count": "{{count}}",
+        "unknown": "Unknown",
+        "notDetected": "Not detected"
+      },
+      "notify": {
+        "title": "System notifications",
+        "desc": "Send system notifications on guard blocks and sentinel alerts"
+      },
+      "signals": {
+        "none": "No supporting signals",
+        "expand": "Show all ({{count}})",
+        "collapse": "Collapse"
+      },
+      "target": {
+        "language": "Language",
+        "frameworks": "Frameworks",
+        "productForm": "Delivery form",
+        "packageManager": "Package manager",
+        "languageBasis": "Language detection basis"
+      },
+      "overrides": {
+        "none": "No manual overrides yet",
+        "architecture": "Architecture override",
+        "target": "Target override: {{key}}",
+        "language": "lang={{value}}",
+        "productForm": "form={{value}}",
+        "updatedAt": "Last updated: {{time}}"
+      }
     }
   },
   "pipeline": {
@@ -1850,6 +1914,12 @@
       "done": "Checkup complete",
       "foundIssues": "Checkup found {{count}} issues",
       "total": "Checkup complete: {{count}} checks"
+    },
+    "deps": {
+      "buildingGraph": "Building dependency graph…",
+      "checking": "Checking typosquatting & lockfile…",
+      "loadingBaseline": "Loading dependency baseline…",
+      "reporting": "Summarizing dependency report…"
     },
     "exitError": {
       "logHintPrefix": "; subprocess log: ",
@@ -1903,6 +1973,10 @@
     "security": {
       "done": "Security scan complete",
       "scanning": "Running security scan…"
+    },
+    "techdebt": {
+      "computing": "Computing tech debt index…",
+      "loadingSnapshot": "Reading checkup snapshot…"
     },
     "shuttingDown": "Application is exiting",
     "workerTimeout": "Subprocess startup timed out",
@@ -2013,6 +2087,7 @@
     "cancelled": "Task cancelled",
     "executionFailed": "Task execution failed",
     "kind": {
+      "deps": "Dependency scan",
       "garbage": "Garbage cleanup",
       "garbageClean": "Clean",
       "garbageRestore": "Restore",
@@ -2021,7 +2096,8 @@
       "performance": "Detection",
       "pipeline": "Checkup",
       "refactor": "Refactor scan",
-      "security": "Check"
+      "security": "Check",
+      "techdebt": "Tech debt analysis"
     },
     "notCompleted": "Task not completed",
     "notFound": "Task not found",

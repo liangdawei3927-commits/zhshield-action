@@ -9,7 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { listGuardReports } from '@zh/guard';
 import type { GuardReportRecord } from '@zh/guard';
-import { persistDiagnosticsFromEntries } from './zh-diagnostics';
+import { persistDiagnosticsFromEntries, readAggregatedDiagnostics } from './zh-diagnostics';
 import type { DiagnosticEntry } from './zh-diagnostics';
 
 const execFileAsync = promisify(execFile);
@@ -19,7 +19,12 @@ const server = new McpServer({ name: 'zhshield', version: '1.1.0' });
 async function readZhshieldJson(root: string, relativePath: string): Promise<string> {
   const filePath = join(root, '.zhshield', relativePath);
   try {
-    return await readFile(filePath, 'utf-8');
+    const text = await readFile(filePath, 'utf-8');
+    // 空文件（如未配置的 integration.json）返回结构化错误，避免调用方拿到非法 JSON
+    if (text.trim() === '') {
+      return JSON.stringify({ ok: false, error: t('mcp.emptyFile', { relativePath }) });
+    }
+    return text;
   } catch {
     return JSON.stringify({ ok: false, error: t('mcp.fileNotFound', { relativePath }) });
   }
@@ -44,16 +49,33 @@ interface DiagnosticsRead {
   bootstrapped: boolean;
 }
 
+/** 聚合各域快照：latest.json 只保留最后写入的引擎结果，直读会丢失其他域 */
+async function aggregateDiagnostics(root: string, text: string): Promise<string> {
+  try {
+    const parsed = JSON.parse(text) as { issues?: unknown };
+    // 首次引导的回退包装形态没有 issues 数组，保持原样
+    if (!Array.isArray(parsed.issues)) return text;
+  } catch {
+    return text;
+  }
+  const aggregated = await readAggregatedDiagnostics(root);
+  return aggregated ? JSON.stringify(aggregated) : text;
+}
+
 async function readDiagnosticsWithBootstrap(root: string): Promise<DiagnosticsRead> {
   const existing = await tryReadZhshieldJson(root, 'diagnostics/latest.json');
-  if (existing !== null) return { text: existing, bootstrapped: false };
+  if (existing !== null) {
+    return { text: await aggregateDiagnostics(root, existing), bootstrapped: false };
+  }
 
   // --format json：CLI 仅在 json 格式下落盘巡检报告 zhshield.json，
   // text 格式只打印不写文件，首次引导将拿不到任何持久化结果
   await runCli('inspect', root, { format: 'json' });
 
   const afterScan = await tryReadZhshieldJson(root, 'diagnostics/latest.json');
-  if (afterScan !== null) return { text: afterScan, bootstrapped: true };
+  if (afterScan !== null) {
+    return { text: await aggregateDiagnostics(root, afterScan), bootstrapped: true };
+  }
 
   try {
     const report = await readFile(join(root, 'zhshield.json'), 'utf-8');
@@ -85,6 +107,16 @@ async function readDiagnosticsWithBootstrap(root: string): Promise<DiagnosticsRe
 // 结构化分离的完整方案在 Tool Registry 落地后收口（阶段 3.3）。
 function isToolErrorEntry(issue: Record<string, unknown>): boolean {
   return typeof issue.ruleId === 'string' && issue.ruleId.includes('.external.');
+}
+
+// ─── 辅助：issues 排序与截断 ────────────────────────────────
+// 大型项目一次体检可产生数百条条目（如 refactor 结构性异味），全量返回会
+// 占用 AI 上下文并挤掉用户自己的代码，故默认只返回 severity 最高的若干条。
+const DEFAULT_ISSUE_LIMIT = 50;
+const SEVERITY_RANK: Readonly<Record<string, number>> = { error: 0, warning: 1, info: 2 };
+
+function severityRank(issue: Record<string, unknown>): number {
+  return typeof issue.severity === 'string' ? (SEVERITY_RANK[issue.severity] ?? 3) : 3;
 }
 
 // ─── 辅助：探测 zhshield CLI 启动方式（dist 优先，否则 src + 本地 tsx） ──
@@ -182,9 +214,13 @@ server.tool(
     projectPath: z.string().optional().describe(t('mcp.projectPathDesc')),
     severity: z.enum(['error', 'warning', 'info']).optional().describe(t('mcp.severityFilterDesc')),
     category: z.string().optional().describe(t('mcp.categoryFilterDesc')),
-    source: z.enum(['guard', 'inspect', 'refactor']).optional().describe(t('mcp.sourceFilterDesc')),
+    source: z
+      .enum(['guard', 'inspect', 'refactor', 'deps', 'techdebt', 'security', 'performance'])
+      .optional()
+      .describe(t('mcp.sourceFilterDesc')),
+    limit: z.number().int().min(1).max(500).optional().describe(t('mcp.limitDesc')),
   },
-  async ({ projectPath, severity, category, source }) => {
+  async ({ projectPath, severity, category, source, limit }) => {
     const root = projectPath ?? process.cwd();
     const { text } = await readDiagnosticsWithBootstrap(root);
     let parsed: {
@@ -213,13 +249,21 @@ server.tool(
     if (severity) issues = issues.filter((i) => i.severity === severity);
     if (category) issues = issues.filter((i) => i.category === category);
     if (source) issues = issues.filter((i) => i.source === source);
+    // error 优先、其次 warning、最后 info；同等级保持原顺序（稳定排序）
+    issues = [...issues].sort((a, b) => severityRank(a) - severityRank(b));
+    const total = issues.length;
+    const capped = limit ?? DEFAULT_ISSUE_LIMIT;
+    const truncated = total > capped;
+    if (truncated) issues = issues.slice(0, capped);
     return {
       content: [
         {
           type: 'text',
           text: JSON.stringify({
             ok: true,
-            total: issues.length,
+            total,
+            returned: issues.length,
+            truncated,
             issues,
             toolErrors: { count: toolErrors.length, note: t('mcp.toolErrorsNote'), items: toolErrors },
           }),

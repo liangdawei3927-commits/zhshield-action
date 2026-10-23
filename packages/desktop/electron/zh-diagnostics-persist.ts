@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { WhitelistManager } from '@zh/guard';
 import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
@@ -161,14 +161,93 @@ export async function readDomainSnapshot(
   projectPath: string,
   source: DiagnosticSource,
 ): Promise<DiagnosticsReport | null> {
+  return await readReportFile(domainSnapshotPath(projectPath, source));
+}
+
+/** 读取单份诊断报告文件（解析 + 结构校验，失败返回 null） */
+async function readReportFile(absPath: string): Promise<DiagnosticsReport | null> {
   try {
-    const raw = await readFile(domainSnapshotPath(projectPath, source), 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
-    if (!isDiagnosticsReport(parsed)) return null;
-    return parsed;
+    const parsed: unknown = JSON.parse(await readFile(absPath, 'utf-8'));
+    return isDiagnosticsReport(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+interface DomainGroup {
+  generatedAt: string;
+  issues: DiagnosticEntry[];
+}
+
+/**
+ * 聚合读取：latest.json 是「最后写入者覆盖」，单引擎扫描（guard/refactor/…）
+ * 会把它整体替换成该引擎的结果，导致跨引擎视图残缺。
+ * 域快照（domains/<source>.json）彼此独立、互不覆盖，故按 source 取最新一份合并，
+ * 保证调用方始终看到完整的治理结果。
+ */
+export async function readAggregatedDiagnostics(
+  projectPath: string,
+): Promise<DiagnosticsReport | null> {
+  const latest = await readReportFile(
+    join(projectPath, '.zhshield', 'diagnostics', 'latest.json'),
+  );
+  const groups = new Map<DiagnosticSource, DomainGroup>();
+
+  // 1) 域快照先入组（文件名为域键；条目自带 source，分桶仍以条目为准）
+  let files: string[] = [];
+  try {
+    files = await readdir(join(projectPath, '.zhshield', 'diagnostics', 'domains'));
+  } catch {
+    // 目录不存在 = 从未按域落盘，交由 latest.json 兜底
+    files = [];
+  }
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const source = file.slice(0, -'.json'.length) as DiagnosticSource;
+    const snapshot = await readDomainSnapshot(projectPath, source);
+    if (!snapshot) continue;
+    groups.set(source, { generatedAt: snapshot.generatedAt, issues: [...snapshot.issues] });
+  }
+
+  // 2) latest.json 仅在比同域快照更新（或该域无快照）时覆盖该域
+  if (latest) {
+    const bySource = new Map<DiagnosticSource, DiagnosticEntry[]>();
+    for (const entry of latest.issues) {
+      const bucket = bySource.get(entry.source);
+      if (bucket) bucket.push(entry);
+      else bySource.set(entry.source, [entry]);
+    }
+    for (const [source, issues] of bySource) {
+      const existing = groups.get(source);
+      if (!existing || latest.generatedAt >= existing.generatedAt) {
+        groups.set(source, { generatedAt: latest.generatedAt, issues });
+      }
+    }
+  }
+  if (groups.size === 0) return latest;
+
+  // 3) 合并去重（fingerprint 相同的只保留一条）
+  const seen = new Set<string>();
+  const issues: DiagnosticEntry[] = [];
+  let newest = '';
+  for (const group of groups.values()) {
+    if (group.generatedAt > newest) newest = group.generatedAt;
+    for (const entry of group.issues) {
+      const key =
+        entry.fingerprint || `${entry.source}:${entry.ruleId}:${entry.file}:${entry.line ?? 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      issues.push(entry);
+    }
+  }
+  const shell =
+    latest ??
+    buildDiagnosticsReport(
+      { path: projectPath, name: basename(projectPath) },
+      issues,
+      newest || new Date().toISOString(),
+    );
+  return { ...shell, generatedAt: newest || shell.generatedAt, issues };
 }
 
 /** 最小结构校验：快照必须带 version/project/issues 数组 */

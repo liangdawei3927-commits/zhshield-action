@@ -814,6 +814,7 @@
     "commandDoneNoOutput": "{{command}} 完成（无输出）",
     "commandFailed": "{{command}} 执行失败",
     "diagnosticsUnparseable": "诊断文件无法解析",
+    "emptyFile": "文件存在但为空: .zhshield/{{relativePath}}",
     "fileNotFound": "文件不存在: .zhshield/{{relativePath}}",
     "getDiagnosticsDesc": "读取智汇码盾最近一次体检的诊断结果（.zhshield/diagnostics/latest.json）；数据缺失时自动触发一次巡检（首次引导）",
     "getIntegrationDesc": "读取智汇码盾的集成配置（.zhshield/integration.json），含自动触发、过滤器、自动修复等设置",
@@ -821,6 +822,7 @@
     "guardProjectPathDesc": "要检查的项目根目录",
     "guardSopModeDesc": "使用 SOP 规则驱动模式",
     "inspectProjectPathDesc": "要巡检的项目根目录",
+    "limitDesc": "最多返回条数（默认 50，按严重等级 error→warning→info 排序）",
     "projectPathDesc": "项目根目录；缺省为当前工作目录",
     "runGuardDesc": "触发智汇码盾门禁检查（调用 zhshield guard --dry-run），以只报告不阻断模式检查代码",
     "runInspectDesc": "触发智汇码盾巡检（调用 zhshield inspect），扫描代码质量问题并返回报告",
@@ -1840,6 +1842,68 @@
         "installFailed": "安装失败，请稍后重试",
         "allReady": "全部 {{count}} 个工具就绪"
       }
+    },
+    "profile": {
+      "title": "项目画像",
+      "detecting": "正在分析项目…",
+      "detectedAt": "检测于 {{time}}",
+      "confirmedAt": "确认于 {{time}}",
+      "stale": "画像已过期",
+      "error": {
+        "title": "画像分析失败",
+        "unknown": "未知错误"
+      },
+      "section": {
+        "overview": "概览",
+        "targets": "目标列表",
+        "environments": "运行环境",
+        "dependencies": "依赖摘要",
+        "overrides": "人工修正记录",
+        "signals": "信号追溯",
+        "notifications": "通知设置"
+      },
+      "overview": {
+        "architecture": "架构形态",
+        "targetCount": "目标数",
+        "environments": "运行环境",
+        "signalCount": "信号总数"
+      },
+      "env": {
+        "confirmed": "确认",
+        "candidate": "候选"
+      },
+      "deps": {
+        "packageManager": "包管理器",
+        "lockfile": "锁文件",
+        "direct": "直接依赖",
+        "count": "{{count}} 个",
+        "unknown": "未知",
+        "notDetected": "未检测"
+      },
+      "notify": {
+        "title": "系统通知",
+        "desc": "门禁拦截和哨兵告警时发送系统通知"
+      },
+      "signals": {
+        "none": "无支撑信号",
+        "expand": "展开全部 ({{count}})",
+        "collapse": "收起"
+      },
+      "target": {
+        "language": "语言",
+        "frameworks": "框架",
+        "productForm": "交付形态",
+        "packageManager": "包管理器",
+        "languageBasis": "语言判定依据"
+      },
+      "overrides": {
+        "none": "暂无人工修正记录",
+        "architecture": "架构修正",
+        "target": "目标修正: {{key}}",
+        "language": "语言={{value}}",
+        "productForm": "形态={{value}}",
+        "updatedAt": "最后修正：{{time}}"
+      }
     }
   },
   "pipeline": {
@@ -1850,6 +1914,12 @@
       "done": "体检完成",
       "foundIssues": "体检发现 {{count}} 项问题",
       "total": "体检完成：{{count}} 项检查"
+    },
+    "deps": {
+      "buildingGraph": "构建依赖图…",
+      "checking": "校验投毒与锁文件…",
+      "loadingBaseline": "加载依赖基线…",
+      "reporting": "汇总依赖报告…"
     },
     "exitError": {
       "logHintPrefix": "；子进程日志: ",
@@ -1903,6 +1973,10 @@
     "security": {
       "done": "安全扫描完成",
       "scanning": "安全扫描中…"
+    },
+    "techdebt": {
+      "computing": "计算技术债指数…",
+      "loadingSnapshot": "读取体检快照…"
     },
     "shuttingDown": "应用正在退出",
     "workerTimeout": "子进程启动超时",
@@ -2013,6 +2087,7 @@
     "cancelled": "任务已取消",
     "executionFailed": "任务执行失败",
     "kind": {
+      "deps": "依赖扫描",
       "garbage": "垃圾清理",
       "garbageClean": "清理",
       "garbageRestore": "恢复",
@@ -2021,7 +2096,8 @@
       "performance": "检测",
       "pipeline": "体检",
       "refactor": "重构扫描",
-      "security": "检查"
+      "security": "检查",
+      "techdebt": "技术债分析"
     },
     "notCompleted": "任务未完成",
     "notFound": "任务不存在",

@@ -7,7 +7,7 @@ import {
   countRunDimensions,
   scoreFreshness,
 } from './reports-logic';
-import { Bounce } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { ScoreRing } from '../components/business/ScoreRing';
@@ -177,20 +177,11 @@ export function ReportsHeader({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-info-50 flex items-center justify-center">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="rgb(var(--zh-info))"
-          strokeWidth="1.8"
-        >
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      </Bounce>
+    <div className="flex items-center gap-4 mb-6">
+      <PageGlyph bg="info" stroke="info">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </PageGlyph>
       <div>
         <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.reports.title')}</h1>
         <p className="text-sm text-zh-muted">
@@ -291,7 +282,7 @@ export function DimensionCards({ dimensions }: { dimensions: HealthScoreData['di
             <div className="text-lg font-bold" style={{ color: view.color }}>
               {view.scoreText}
             </div>
-            <div className="w-full h-1.5 rounded-full bg-zh-panel mt-2">
+            <div className="w-full h-1.5 rounded-full bg-zh-line mt-2">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${(d.weight || 0.5) * 100}%`, background: view.color }}

@@ -25,31 +25,35 @@ describe('导航分类的扫描进度映射', () => {
     expect(noProgress.sort()).toEqual(['backup', 'sentinel']);
   });
 
-  it('own 归属的任务类型必须是任务中心真实存在的 kind', () => {
+  it('每个分类订阅的任务类型都必须是任务中心真实存在的 kind', () => {
     for (const item of navItems) {
       const source = item.scanProgress;
-      if (!source || source.owner !== 'own') continue;
+      if (!source) continue;
       expect(VALID_TASK_KINDS, `${item.id} 指向了不存在的任务类型`).toContain(source.taskKind);
     }
   });
 
-  it('有独立任务源的分类走 own，且订阅自身 kind', () => {
-    const own: Record<string, string> = {
+  it('8 个扫描分类各自拥有独立任务类型（不再借用 pipeline）', () => {
+    const expected: Record<string, string> = {
       inspect: 'pipeline',
       guard: 'guard',
       security: 'security',
+      deps: 'deps',
       garbage: 'garbage',
       performance: 'performance',
+      techdebt: 'techdebt',
       refactor: 'refactor',
     };
-    for (const [id, kind] of Object.entries(own)) {
-      expect(navScanProgress(id), `${id} 缺少进度映射`).toEqual({ taskKind: kind, owner: 'own' });
+    for (const [id, kind] of Object.entries(expected)) {
+      expect(navScanProgress(id), `${id} 缺少进度映射`).toEqual({ taskKind: kind });
     }
   });
 
-  it('未注册独立 kind 的分类标记为 borrowed（进度非本域真实进度，待收口）', () => {
-    expect(navScanProgress('deps')).toEqual({ taskKind: 'pipeline', owner: 'borrowed' });
-    expect(navScanProgress('techdebt')).toEqual({ taskKind: 'pipeline', owner: 'borrowed' });
+  it('任务类型映射唯一：同一 kind 至多归属一个分类', () => {
+    const kinds = navItems.flatMap((item) =>
+      item.scanProgress ? [item.scanProgress.taskKind] : [],
+    );
+    expect(kinds).toHaveLength(new Set(kinds).size);
   });
 });
 

@@ -226,21 +226,20 @@ let db: ReturnType<DbConnection['connect']> | null = null;
 let dbReady: Promise<void> = Promise.resolve();
 try {
   db = dbConn.connect();
-  // 迁移目录按存在性探测而非 VITE_DEV_SERVER_URL 开关：
-  // 生产打包（electron-builder extraResources）→ resources/db/migrations；
-  // dev / e2e 裸跑 vite build 产物无 resources → 回退仓库源码迁移目录（packages/db/migrations），
-  // 保证迁移真实执行（否则 DB 空库、写表 IPC 报 no such table）。
+  // 迁移目录只有一条路径，dev 与打包同构：
+  //   dev   → packages/desktop/dist-electron/../../db/migrations = packages/db/migrations
+  //   打包  → Resources/app.asar/dist-electron/../../db/migrations  = Resources/db/migrations
+  //          （由 electron-builder extraResources 复制，见 package.json build.extraResources）
+  // 曾用「探测 resources/db/migrations 是否存在」判断打包态，但该路径解析到 app.asar 内部，
+  // 永远不会命中 —— 等于没有打包分支，全新安装会拿到空库。
   // 探测放在异步链内（主进程禁止 fs 同步 IO，no-fs-sync 门禁）。
-  const packagedMigrations = path.resolve(__dirname, 'resources/db/migrations');
-  const fallbackMigrations = path.resolve(__dirname, '../../db/migrations');
+  const migrationsDir = path.resolve(__dirname, '../../db/migrations');
   // 迁移在微任务中异步执行，远早于任何 IPC 处理器（处理器仅在窗口创建后触发）
   // access 失败（目录缺失）或 migrate 抛错均吞掉：
   // migrate 内部对目录缺失已优雅处理（existsSync 短路），解析为空 Promise 即可。
   dbReady = fs.promises
-    .access(packagedMigrations)
-    .then(() => packagedMigrations)
-    .catch(() => fallbackMigrations)
-    .then((migrationsDir) => dbConn.migrate(migrationsDir))
+    .access(migrationsDir)
+    .then(() => dbConn.migrate(migrationsDir))
     .catch(() => {});
   void dbReady;
 } catch (err) {

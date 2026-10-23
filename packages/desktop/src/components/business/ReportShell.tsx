@@ -3,6 +3,7 @@ import { useT } from '../../i18n';
 import type { ScoreDimension } from '@zh/shared';
 import { DomainScoreCard } from '../DomainScoreCard';
 import { DomainScanProgress } from './DomainScanProgress';
+import { DomainHistoryPanel } from './DomainHistoryPanel';
 import { ResultCard } from '../../components/ui/ResultCard';
 
 /** 统计卡：点击后展开 detail 明细（无 detail 的卡不响应点击） */
@@ -50,6 +51,12 @@ export interface ReportShellProps {
   stats?: ReportStatCard[];
   /** 统计卡行下方明细区内容 */
   children?: ReactNode;
+  /**
+   * 该页对应的域键（inspect/refactor/deps/…）。
+   * 传了即在明细区下方追加「历史记录」面板（每次检查一条、带涨跌）；
+   * 不传或该域无历史 → 不渲染，不影响任何既有布局。
+   */
+  historyDomain?: string;
   /** 外壳 className 变体 */
   containerClassName?: string;
 }
@@ -187,6 +194,7 @@ export function ReportShell({
   backHomeTitle,
   stats,
   children,
+  historyDomain,
   containerClassName = 'h-full w-full bg-zh-bg overflow-auto',
 }: ReportShellProps) {
   const t = useT();
@@ -226,6 +234,7 @@ export function ReportShell({
         />
         <ReportStatDetail stat={expandedStat} />
         {children}
+        <DomainHistoryPanel projectPath={projectPath} domain={historyDomain} />
       </div>
     </div>
   );

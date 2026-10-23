@@ -249,8 +249,8 @@ server.tool(
     if (severity) issues = issues.filter((i) => i.severity === severity);
     if (category) issues = issues.filter((i) => i.category === category);
     if (source) issues = issues.filter((i) => i.source === source);
-    // error 优先、其次 warning、最后 info；同等级保持原顺序（稳定排序）
-    issues = [...issues].sort((a, b) => severityRank(a) - severityRank(b));
+    // error 优先、其次 warning、最后 info；toSorted 复制后排序（不改原数组），同等级保持原顺序（稳定排序）
+    issues = issues.toSorted((a, b) => severityRank(a) - severityRank(b));
     const total = issues.length;
     const capped = limit ?? DEFAULT_ISSUE_LIMIT;
     const truncated = total > capped;

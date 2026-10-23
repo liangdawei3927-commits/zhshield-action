@@ -46,3 +46,36 @@ describe('collectModuleScores — 模块级评分汇集', () => {
     expect(getScore).not.toHaveBeenCalled();
   });
 });
+
+describe('collectModuleScores — 拒绝相对路径（跨项目串数据防线）', () => {
+  it('相对路径不发起查询、score 为 null，并打告警', async () => {
+    const getScore = vi.fn(async () => scoreOf(95));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const views = await collectModuleScores(
+        [{ path: 'packages/ui', type: 'frontend' }],
+        getScore,
+      );
+      expect(getScore).not.toHaveBeenCalled();
+      expect(views[0].score).toBeNull();
+      expect(views[0].name).toBe('ui');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('不是绝对路径'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('绝对路径正常查询（POSIX 与 Windows 两种形态都放行）', async () => {
+    const getScore = vi.fn(async (p: string) => scoreOf(p.endsWith('ui') ? 96 : 88));
+    const views = await collectModuleScores(
+      [
+        { path: '/proj/a/packages/ui', type: 'frontend' },
+        { path: 'C:\\proj\\a\\packages\\cli', type: 'cli' },
+      ],
+      getScore,
+    );
+    expect(getScore).toHaveBeenCalledTimes(2);
+    expect(views.find((v) => v.path === '/proj/a/packages/ui')!.score).toBe(96);
+    expect(views.find((v) => v.path.startsWith('C:'))!.score).toBe(88);
+  });
+});

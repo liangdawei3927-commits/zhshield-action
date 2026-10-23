@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   bucketFindingsByModule,
+  resolveModuleId,
   scoreProjectModules,
   scoreProjectByModules,
 } from '../module-score';
+import { ScoringEngine } from '../engine';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
 
 function makeProfile(type: ScoringProjectProfile['type']): ScoringProjectProfile {
@@ -101,6 +103,7 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
     // 两份完全相同的安全问题报告：backend 更看重 security（权重更高），整体分更低
     const backend = {
       path: '/p/packages/server',
+      id: '/p/packages/server',
       profile: makeProfile('backend'),
       guard: {
         results: [
@@ -121,6 +124,7 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
     };
     const frontend = {
       path: '/p/packages/web',
+      id: '/p/packages/web',
       profile: makeProfile('frontend'),
       guard: {
         results: [
@@ -155,6 +159,7 @@ describe('scoreProjectModules — 模块独立评分 + 聚合', () => {
   it('单模块时退化为该模块自身评分（向后兼容）', () => {
     const only = {
       path: '/p',
+      id: '/p',
       profile: makeProfile('backend'),
       guard: emptyGuard,
       inspect: emptyInspect,
@@ -237,5 +242,95 @@ describe('scoreProjectByModules — 组合分桶 + 逐模块评分（即 recordP
     expect(agg.modules).toHaveLength(1);
     expect(agg.modules[0].path).toBe('/p');
     expect(agg.overall).toBeGreaterThanOrEqual(99);
+  });
+});
+
+// ─── 身份键（id）：模块评分落库不得用相对路径 ────────────────────────────
+// 背景：`scores.project_id` 曾直接取画像给的相对路径（packages/ui），
+// 任意两个 monorepo 只要有同名子包就写进同一行、历史曲线互相污染。
+// 修复：path（相对，分桶匹配用）与 id（绝对，落库用）显式分开。
+
+/** 真实画像形态：modules 是相对项目根的路径（与 findings.file 同前缀） */
+function makeRelativeProfile(root: string): ScoringProjectProfile {
+  return {
+    ...makeProfile('backend'),
+    projectRoot: root,
+    modules: [
+      { path: 'packages/ui', language: 'typescript', framework: 'react', type: 'frontend' },
+      { path: 'packages/api-sdk', language: 'typescript', framework: 'unknown', type: 'library' },
+    ],
+  };
+}
+
+describe('resolveModuleId — 相对路径解析为绝对身份键', () => {
+  it('相对路径按项目根拼接', () => {
+    expect(resolveModuleId('/a/b', 'packages/ui')).toBe('/a/b/packages/ui');
+  });
+
+  it('已是绝对路径时原样保留（不重复拼接）', () => {
+    expect(resolveModuleId('/a/b', '/abs/x')).toBe('/abs/x');
+  });
+
+  it('空模块路径退化为项目根本身', () => {
+    expect(resolveModuleId('/a/b', '')).toBe('/a/b');
+  });
+});
+
+describe('模块身份键 — 同名子包跨项目不得撞车', () => {
+  it('两个项目根下的同名模块解析出不同的 id', () => {
+    const a = resolveModuleId('/proj/tianyin', 'packages/ui');
+    const b = resolveModuleId('/proj/other', 'packages/ui');
+    expect(a).not.toBe(b);
+    expect(a).toBe('/proj/tianyin/packages/ui');
+    expect(b).toBe('/proj/other/packages/ui');
+  });
+
+  it('bucketFindingsByModule 产出绝对 id，同时保留相对 path 供分桶匹配', () => {
+    const bucketed = bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect);
+    const ui = bucketed.find((m) => m.path === 'packages/ui')!;
+    expect(ui).toBeDefined();
+    expect(ui.path).toBe('packages/ui');
+    expect(ui.id).toBe('/proj/a/packages/ui');
+    // 分桶仍按相对前缀匹配（findings.file 也是相对）
+    const withFiles = bucketFindingsByModule(
+      makeRelativeProfile('/proj/a'),
+      { results: [] },
+      {
+        issues: [
+          { severity: 'error' as const, category: 'quality', file: 'packages/ui/src/x.ts' },
+        ],
+      },
+    );
+    expect(withFiles.find((m) => m.path === 'packages/ui')!.inspect.issues).toHaveLength(1);
+  });
+
+  it('根级兜底卡的 id 等于项目根绝对路径', () => {
+    const bucketed = bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect);
+    expect(bucketed.at(-1)!.id).toBe('/proj/a');
+  });
+
+  it('落库键（calculate 的首参）必须是绝对路径', () => {
+    const spy = vi.spyOn(ScoringEngine.prototype, 'calculate');
+    try {
+      scoreProjectModules(bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect));
+      const ids = spy.mock.calls.map((c) => c[0]);
+      expect(ids).toHaveLength(3); // 2 子模块 + 根兜底
+      for (const id of ids) {
+        expect(id.startsWith('/')).toBe(true);
+      }
+      expect(ids).toContain('/proj/a/packages/ui');
+      expect(ids).not.toContain('packages/ui');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('模块卡同时暴露 path 与 id，两者语义不同', () => {
+    const agg = scoreProjectModules(
+      bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect),
+    );
+    const ui = agg.modules.find((m) => m.path === 'packages/ui')!;
+    expect(ui.path).toBe('packages/ui');
+    expect(ui.id).toBe('/proj/a/packages/ui');
   });
 });

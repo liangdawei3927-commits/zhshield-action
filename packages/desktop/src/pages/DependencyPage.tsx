@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDependencyPage } from './dependency-logic';
 import {
   DependencyEmptyState,
@@ -20,6 +20,10 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
+import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
+import { useHasDomainResult } from '../hooks/useHasDomainResult';
+import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 interface DependencyPageProps {
@@ -29,6 +33,8 @@ interface DependencyPageProps {
 function DependencyReportView({
   report,
   loading,
+  progress,
+  progressMessage,
   onRescan,
   onCopyTyposquat,
   onCopyAllTyposquat,
@@ -38,6 +44,8 @@ function DependencyReportView({
 }: {
   report: DependencyReportData;
   loading: boolean;
+  progress: number;
+  progressMessage: string;
   onRescan: () => void;
   onCopyTyposquat: (finding: TyposquatFindingData) => void;
   onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
@@ -49,6 +57,7 @@ function DependencyReportView({
     <ReportShell
       projectPath={projectPath}
       dimension="dependencies"
+      historyDomain="deps"
       refreshKey={report}
       icon={
         <PageGlyph bg="brand" stroke="brand" round>
@@ -66,6 +75,9 @@ function DependencyReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={progressMessage}
       stats={[
         { key: 'total', label: t('page.deps.overviewTotal'), value: report.total },
         { key: 'direct', label: t('page.deps.overviewDirect'), value: report.direct },
@@ -107,19 +119,71 @@ function DependencyReportView({
 }
 
 export function DependencyPage({ projectPath }: DependencyPageProps) {
-  const { loading, report, handleScan, copyToAi, copyAllToAi } = useDependencyPage(projectPath);
+  const { loading, progress, progressMessage, report, handleScan, copyToAi, copyAllToAi } =
+    useDependencyPage(projectPath);
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与改动前一致：report 初值为 null，原本也是停在主页）。
+  // 读回的历史报告只让「详情按钮可见」，不把人自动带进详情页。
+  const [showHome, setShowHome] = useState(true);
 
-  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
-  const detailReport = report;
-  const hasDetail = detailReport !== null;
+  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。
+  // 这里读回该域上次扫描的完整报告（同一份数据，不做字段再造）。
+  const savedReport = useSavedDomainReport<DependencyReportData>(projectPath, 'deps', report);
+  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
+  const hadPreviousResult = useHasDomainResult(projectPath, 'deps');
+
+  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替（保持「扫描中看进度」）。
+  const detailReport = report ?? (loading ? null : savedReport);
+  const hasDetail = detailReport !== null || hadPreviousResult;
+
+  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫。
+  // 点详情不该替用户发起检查 —— 要看新结果，由详情页里的「重新检查」自己点。
+  const snapshot = useDomainSnapshot(projectPath, 'deps');
+  const [showSnapshot, setShowSnapshot] = useState(false);
+
+  const openDetail = () => {
+    if (detailReport) {
+      setShowHome(false);
+      return;
+    }
+    snapshot.reload();
+    setShowSnapshot(true);
+  };
+
+  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
+  useEffect(() => {
+    if (report) {
+      setShowHome(false);
+      setShowSnapshot(false);
+    }
+  }, [report]);
+
+  if (showSnapshot) {
+    return (
+      <DomainSnapshotReport
+        projectPath={projectPath}
+        dimension="dependencies"
+        icon={
+          <PageGlyph bg="brand" stroke="brand" round>
+            <DependencyGraphGlyph />
+          </PageGlyph>
+        }
+        snapshot={snapshot.snapshot}
+        loading={snapshot.loading}
+        rescanning={loading}
+        onRescan={handleScan}
+        onBackHome={() => setShowSnapshot(false)}
+      />
+    );
+  }
 
   if (detailReport && !showHome) {
     return (
       <DependencyReportView
         report={detailReport}
         loading={loading}
+        progress={progress}
+        progressMessage={progressMessage}
         onRescan={handleScan}
         onCopyTyposquat={copyToAi}
         onCopyAllTyposquat={copyAllToAi}
@@ -131,7 +195,7 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
       <DependencyEmptyState
         projectPath={projectPath}
         loading={loading}

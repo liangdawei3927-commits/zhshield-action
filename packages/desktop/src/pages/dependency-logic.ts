@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
+import { useTaskRun } from '../task-store';
 import type { AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
@@ -157,28 +158,27 @@ export const ENV_SEVERITY_CONFIG: Record<string, { color: string; bg: string; la
     },
   };
 
-/** 依赖管家运行：loading 为本地状态（engine:runDeps 直连主进程，不经任务中心） */
+/** 依赖管家运行：loading / 进度统一来自任务中心 deps 任务 */
 function useDependencyRun(projectPath: string): {
   loading: boolean;
+  progress: number;
+  progressMessage: string;
   report: DependencyReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<DependencyReportData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { loading, progress, statusMessage } = useTaskRun('deps', projectPath);
 
   const handleScan = useCallback(async () => {
-    setLoading(true);
     try {
       const result = await runDeps(projectPath);
       setReport(result);
     } catch {
       setReport(null);
-    } finally {
-      setLoading(false);
     }
   }, [projectPath]);
 
-  return { loading, report, handleScan };
+  return { loading, progress, progressMessage: statusMessage, report, handleScan };
 }
 
 function toAiIssue(finding: TyposquatFindingData): AiFixIssue {
@@ -201,7 +201,7 @@ function useDependencyCopyToAi(projectPath: string): {
 }
 
 export function useDependencyPage(projectPath: string) {
-  const { loading, report, handleScan } = useDependencyRun(projectPath);
+  const { loading, progress, progressMessage, report, handleScan } = useDependencyRun(projectPath);
   const { copyToAi, copyAllToAi } = useDependencyCopyToAi(projectPath);
-  return { loading, report, handleScan, copyToAi, copyAllToAi };
+  return { loading, progress, progressMessage, report, handleScan, copyToAi, copyAllToAi };
 }

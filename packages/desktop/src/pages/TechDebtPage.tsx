@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
+import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
+import { useHasDomainResult } from '../hooks/useHasDomainResult';
+import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -44,6 +48,8 @@ interface TechDebtReportViewProps {
   projectPath: string;
   report: TechDebtReportData;
   loading: boolean;
+  progress: number;
+  progressMessage: string;
   onRescan: () => void;
   onBackHome: () => void;
   copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
@@ -70,20 +76,18 @@ function buildTechDebtStats({
   handleDismiss,
   planLoading,
   verifyLoading,
-}: {
-  report: TechDebtReportData;
-  t: (key: string, params?: Record<string, unknown>) => string;
-  copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
-  copyAllToAi: (actions: TechDebtReportData['actionList']) => void;
-  handlePlan: (
-    actionId: string,
-    opts?: { sprint?: string; gate?: 'allow-with-record' },
-  ) => Promise<void>;
-  handleVerify: (actionId: string) => Promise<void>;
-  handleDismiss: (actionId: string) => Promise<void>;
-  planLoading: string | null;
-  verifyLoading: string | null;
-}): ReportStatCard[] {
+}: Pick<
+  TechDebtReportViewProps,
+  | 'report'
+  | 't'
+  | 'copyToAi'
+  | 'copyAllToAi'
+  | 'handlePlan'
+  | 'handleVerify'
+  | 'handleDismiss'
+  | 'planLoading'
+  | 'verifyLoading'
+>): ReportStatCard[] {
   return [
     { key: 'debtIndex', label: t('page.techdebt.debtIndex'), value: report.debtIndex },
     {
@@ -124,6 +128,8 @@ function TechDebtReportView({
   projectPath,
   report,
   loading,
+  progress,
+  progressMessage,
   onRescan,
   onBackHome,
   copyToAi,
@@ -151,6 +157,7 @@ function TechDebtReportView({
     <ReportShell
       projectPath={projectPath}
       dimension="techdebt"
+      historyDomain="techdebt"
       refreshKey={report}
       icon={
         <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
@@ -168,6 +175,9 @@ function TechDebtReportView({
         </PrimaryButton>
       }
       onBackHome={onBackHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={progressMessage}
       stats={stats}
     >
       {report.error && (
@@ -200,9 +210,12 @@ function TechDebtReportView({
 
 export function TechDebtPage({ projectPath }: TechDebtPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
+  const [showHome, setShowHome] = useState(true);
   const {
     loading,
+    progress,
+    progressMessage,
     report,
     planLoading,
     verifyLoading,
@@ -214,9 +227,54 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
     copyAllToAi,
   } = useTechDebtPage(projectPath);
 
-  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
-  const detailReport = report;
-  const hasDetail = detailReport !== null;
+  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。读回上次完整报告（同口径）。
+  const savedReport = useSavedDomainReport(projectPath, 'techdebt', report);
+  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
+  const hadPreviousResult = useHasDomainResult(projectPath, 'techdebt');
+
+  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
+  const detailReport = report ?? (loading ? null : savedReport);
+  const hasDetail = detailReport !== null || hadPreviousResult;
+
+  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
+  const snapshot = useDomainSnapshot(projectPath, 'techdebt');
+  const [showSnapshot, setShowSnapshot] = useState(false);
+
+  const openDetail = () => {
+    if (detailReport) {
+      setShowHome(false);
+      return;
+    }
+    snapshot.reload();
+    setShowSnapshot(true);
+  };
+
+  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
+  useEffect(() => {
+    if (report) {
+      setShowHome(false);
+      setShowSnapshot(false);
+    }
+  }, [report]);
+
+  if (showSnapshot) {
+    return (
+      <DomainSnapshotReport
+        projectPath={projectPath}
+        dimension="techdebt"
+        icon={
+          <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
+            <TechDebtGaugeIcon />
+          </Bounce>
+        }
+        snapshot={snapshot.snapshot}
+        loading={snapshot.loading}
+        rescanning={loading}
+        onRescan={handleScan}
+        onBackHome={() => setShowSnapshot(false)}
+      />
+    );
+  }
 
   if (detailReport && !showHome) {
     return (
@@ -224,6 +282,8 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
         projectPath={projectPath}
         report={detailReport}
         loading={loading}
+        progress={progress}
+        progressMessage={progressMessage}
         onRescan={handleScan}
         onBackHome={() => setShowHome(true)}
         copyToAi={copyToAi}
@@ -239,7 +299,7 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
       <TechDebtEmptyState
         projectPath={projectPath}
         loading={loading}

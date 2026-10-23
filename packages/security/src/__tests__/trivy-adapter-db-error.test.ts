@@ -7,6 +7,8 @@ const state = vi.hoisted(() => ({
     stderr: string;
     message: string;
   },
+  // package.json 存在性（dependency 扫描前置检查）：默认存在，走真实扫描路径
+  packageJsonExists: true,
 }));
 
 vi.mock('node:child_process', () => ({
@@ -20,6 +22,18 @@ vi.mock('node:child_process', () => ({
   }),
 }));
 
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(() => state.packageJsonExists),
+  // 适配 trivy-adapter 的 async 化改造：package.json 存在性检查改用 fs.promises.access，
+  // 必须跟随同一 state.packageJsonExists 开关；否则 mock 模块缺 promises 属性时，
+  // fs.promises.access 抛错被 try/catch 捕获，会误判为"无 package.json"短路返回 unavailable。
+  promises: {
+    access: vi.fn(() =>
+      state.packageJsonExists ? Promise.resolve() : Promise.reject(new Error('ENOENT')),
+    ),
+  },
+}));
+
 import { execFile } from 'node:child_process';
 import { TrivyAdapter } from '../adapters/trivy-adapter';
 
@@ -27,6 +41,7 @@ const execFileMock = vi.mocked(execFile);
 
 afterEach(() => {
   execFileMock.mockClear();
+  state.packageJsonExists = true;
 });
 
 describe('TrivyAdapter — 漏洞库下载失败提示', () => {
@@ -94,5 +109,46 @@ describe('TrivyAdapter — 漏洞库下载失败提示', () => {
     expect(result.status).toBe('error');
     expect(result.error).toContain('Trivy 漏洞库不可用');
     expect(result.error).toContain('--download-db-only');
+  });
+});
+
+describe('TrivyAdapter — 无 package.json 的 dependency 扫描（防 (root) 伪债务）', () => {
+  // 回归背景：扫描根无 Node 清单时 trivy 对 package.json lstat FATAL，
+  // 错误曾被诊断链路聚合为 (root) 伪债务项（td-quality-44c4ce057952）。
+  it('dependency 扫描且根目录无 package.json 时返回 unavailable 且不执行 trivy', async () => {
+    state.packageJsonExists = false;
+
+    const adapter = new TrivyAdapter();
+    const result = await adapter.scan({
+      projectPath: '/tmp/trivyprobe',
+      projectId: '/tmp/trivyprobe',
+      config: { scanners: ['dependency'] },
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.issues).toEqual([]);
+    expect(result.error).toContain('无 package.json');
+    // 范围外跳过：绝不能真的拉起 trivy（否则又产出 lstat FATAL 伪 error）
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it('filesystem 扫描不受 package.json 前置检查影响（全目录扫描无清单也可执行）', async () => {
+    state.packageJsonExists = false;
+    state.mockError = {
+      code: 1,
+      stderr: '2026-10-22T23:19:48+08:00\tFATAL\tFatal error\trun error: fs scan error',
+      message: 'Command failed',
+    };
+
+    const adapter = new TrivyAdapter();
+    const result = await adapter.scan({
+      projectPath: '/tmp/trivyprobe',
+      projectId: '/tmp/trivyprobe',
+      config: { scanners: ['filesystem'] },
+    });
+
+    // 未被前置检查短路：真实拉起了 trivy（此处 mock 失败 → 透传 error）
+    expect(execFileMock).toHaveBeenCalled();
+    expect(result.status).toBe('error');
   });
 });

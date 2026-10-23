@@ -15,9 +15,9 @@ export function ProgressBar({ passCount, total }: { passCount: number; total: nu
         </div>
         <div className="text-xs text-zh-muted mt-1">{t('page.inspect.checksPassed')}</div>
       </div>
-      <div className="flex-1 h-2.5 rounded-full bg-zh-panel">
+      <div className="flex-1 h-1.5 rounded-full bg-zh-line">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-success-600 to-success-700 transition-all"
+          className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-800 transition-all"
           style={{ width: `${total ? (passCount / total) * 100 : 0}%` }}
         />
       </div>

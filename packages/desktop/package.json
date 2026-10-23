@@ -119,6 +119,12 @@
     "directories": {
       "output": "../../../build-output"
     },
+    "extraResources": [
+      {
+        "from": "../db/migrations",
+        "to": "db/migrations"
+      }
+    ],
     "publish": {
       "provider": "github",
       "owner": "liangdawei3927-commits",

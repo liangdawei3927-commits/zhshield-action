@@ -1294,7 +1294,8 @@
         "pass": "通过",
         "warn": "警告",
         "attention": "未检测"
-      }
+      },
+      "snapshotNote": "以上为最近一次巡检的落盘快照，仅保留问题项：通过项未落盘，因此「总检查」「通过」显示为 —。点「重新体检」可获取完整结果。"
     },
     "performance": {
       "autoFixable": "可自动修复",
@@ -1904,6 +1905,22 @@
         "productForm": "形态={{value}}",
         "updatedAt": "最后修正：{{time}}"
       }
+    },
+    "snapshotReport": {
+      "title": "最近一次检查结果",
+      "notice": "这是该分类最近一次检查保存下来的结果，页面评分与它同源。如需完整报告（含通过项等明细），请点「重新检查」。",
+      "total": "问题总数",
+      "error": "错误",
+      "warning": "警告",
+      "info": "提示",
+      "empty": "最近一次检查没有记录到问题条目。",
+      "rescan": "重新检查",
+      "rescanning": "检查中",
+      "loading": "正在读取最近一次结果…",
+      "suggestion": "建议",
+      "autoFixable": "可自动修复",
+      "truncated": "仅显示前 {{shown}} 条，共 {{total}} 条。",
+      "unavailable": "读取不到该分类的历史结果文件，请点「重新检查」生成一次。"
     }
   },
   "pipeline": {

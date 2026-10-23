@@ -97,6 +97,9 @@ _tmp_*
 .temp/
 .zhshield/
 
+# 一次性复现脚本（硬编码绝对路径，仅供本地调试，非仓库资产）
+/run-detect-primitive.ts
+
 # Semgrep inline 临时规则（semgrep ci --config inline 生成）
 **/.semgrep/
 

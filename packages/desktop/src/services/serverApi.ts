@@ -14,6 +14,7 @@ import type {
   RuleWeightData,
   BackupRecordData,
   BackupConfigData,
+  SentinelEventQuery,
 } from '../types/electron';
 import type { SentinelEvent } from '@zh/sentinel';
 
@@ -123,14 +124,14 @@ export async function getRuleVersionViaHttp(): Promise<string> {
 
 // ─── Sentinel ────────────────────────────────────────────
 
-export async function getSentinelEventsViaHttp(options?: {
-  status?: string;
-  severity?: string;
-}): Promise<SentinelEvent[]> {
+export async function getSentinelEventsViaHttp(
+  options?: SentinelEventQuery,
+): Promise<SentinelEvent[]> {
   try {
     const params = new URLSearchParams();
     if (options?.status) params.set('status', options.status);
     if (options?.severity) params.set('severity', options.severity);
+    if (options?.excludeInformational) params.set('excludeInformational', 'true');
     const qs = params.toString();
     return await request<SentinelEvent[]>(`/system/sentinel/event-center${qs ? `?${qs}` : ''}`);
   } catch {

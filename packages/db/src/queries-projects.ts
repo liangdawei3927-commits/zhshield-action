@@ -48,15 +48,50 @@ export function saveScore(db: Database.Database, params: SaveScoreParams): void 
   ).run(params.projectId, params.overall, params.grade, params.dimensions, params.trend);
 }
 
+/**
+ * 最新一条评分（**排除软删记录**）。
+ *
+ * `deleted_at IS NOT NULL` 的行只在地理位置（project 被移除后的 TTL 窗口）里存活，
+ * 语义上已不属于该项目的当前状态；读取路径不过滤 = 已删除项目的旧分仍然能当「当前分」返回。
+ *
+ * `id` 作为第二排序键：`created_at` 只有秒级精度，同一秒内多次落分（一次 pipeline
+ * 里汇总 + 单域写分会同秒）会出现并列，只按时间排会让「哪条算最新」变成不确定行为。
+ */
 export function getLatestScore(db: Database.Database, projectId: string): ScoreRow | undefined {
   return db
-    .prepare('SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT 1')
+    .prepare(
+      'SELECT * FROM scores WHERE project_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
+    )
     .get(projectId) as ScoreRow | undefined;
 }
 
+/**
+ * 评分历史：取**最新的 N 条**，但按**时间升序**返回。
+ *
+ * ⚠️ 这里曾经是 `ORDER BY created_at DESC LIMIT ?`，直接返回倒序 —— 而所有消费方都
+ * 按「旧 → 新」使用这个数组：
+ * - 渲染层 `ReportsPage` 取 `data.at(-1)` 当「最新总分」；
+ * - `HistoryTable` 用 `data.toReversed()` 把表翻成最新在上；
+ * - `ScoringEngine.getTrendReport` 取 `history.slice(-windowSize)` 当近期窗口；
+ * - 单测（`scoring.service.test.ts`、`engine.test.ts`）断言 `history[0]` 是最旧一条。
+ *
+ * 倒序返回的后果不是「顺序不同」而是**内容取反**：报告中心显示的「最新总分」实际是
+ * 项目历史上第一条记录，卡片数量也随那条老记录的维度集变化（详见回归用例
+ * `score-history-order.test.ts`）。
+ *
+ * 正确形态：内层按 `created_at DESC, id DESC` 取最新 N 条，外层再升序吐出，
+ * 既保住「取最新」的截断语义，又满足升序契约。
+ */
 export function getScoreHistory(db: Database.Database, projectId: string, limit = 30): ScoreRow[] {
   return db
-    .prepare('SELECT * FROM scores WHERE project_id = ? ORDER BY created_at DESC LIMIT ?')
+    .prepare(
+      `SELECT * FROM (
+         SELECT * FROM scores
+         WHERE project_id = ? AND deleted_at IS NULL
+         ORDER BY created_at DESC, id DESC
+         LIMIT ?
+       ) ORDER BY created_at ASC, id ASC`,
+    )
     .all(projectId, limit) as ScoreRow[];
 }
 

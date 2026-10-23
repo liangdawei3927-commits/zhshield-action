@@ -18,6 +18,11 @@ import type { CheckOptions } from '@zh/guard';
 import type { GarbageEvaluationLike, GarbageScanReport } from '@zh/garbage';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  appendDomainHistory,
+  buildRecordFromFingerprints,
+  normalizeFingerprint,
+} from './domain-history';
 
 /** garbage 快照串行化写入队列：并发并发多轮扫描时避免 writeFile 交错覆盖（对齐 dashboard-state writeQueue 模式） */
 let garbageSnapshotQueue: Promise<void> = Promise.resolve();
@@ -157,11 +162,53 @@ async function writeGarbageSnapshot(projectPath: string, report: GarbageScanRepo
       const dir = join(projectPath, '.zhshield', 'diagnostics', 'domains');
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, 'garbage.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
+      await appendGarbageHistory(projectPath, report);
     });
     await garbageSnapshotQueue;
   } catch (err) {
     console.warn(
       '[pipeline-worker] garbage 快照落盘失败（扫描结果仍照常上报）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * 垃圾清理的域级历史。
+ *
+ * 为什么单独一条路径：garbage 不走 `writeDomainSnapshots`（它的快照结构是
+ * `items/checks/skipped`，不是归一化诊断条目），但同样需要「每次一条」的历史，
+ * 否则一天扫 10 次只剩最后 30 条死代码，看不出增减。
+ *
+ * 指纹用 `类型 + 相对路径`（不含 reason）：reason 文案可能随规则更新变化，
+ * 把文案算进指纹会让同一处垃圾每次都「新增 + 消失」各一次。
+ * 该域没有 severity 概念 → `severityApplicable: false`，不用 0 冒充「都是 info」。
+ */
+async function appendGarbageHistory(
+  projectPath: string,
+  report: GarbageScanReport,
+): Promise<void> {
+  try {
+    const fingerprints = report.items.map(
+      (item) => `garbage:${item.type}:${normalizeFingerprint(item.path, projectPath)}`,
+    );
+    const ranChecks = report.checks.filter((check) => check.ran).length;
+    await appendDomainHistory(
+      projectPath,
+      buildRecordFromFingerprints({
+        domain: 'garbage',
+        scannedAt: report.timestamp,
+        recordedAt: new Date().toISOString(),
+        fingerprints,
+        total: report.summary.total,
+        score: null,
+        severityApplicable: false,
+        coverage: { files: ranChecks, skipped: report.skipped },
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      '[pipeline-worker] garbage 历史写入失败（快照已落盘）:',
       err instanceof Error ? err.message : String(err),
     );
   }

@@ -122,7 +122,7 @@ export function TechDebtInterestBreakdown({ action }: { action: TechDebtAction }
                 {value}
               </span>
             </div>
-            <div className="mt-1 h-1 rounded-full bg-zh-panel overflow-hidden">
+            <div className="mt-1 h-1.5 rounded-full bg-zh-line overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{

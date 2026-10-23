@@ -1,6 +1,6 @@
 // 项目引导页类型定义
-import type { Dispatch, SetStateAction } from 'react';
 
+/** 引导页组件入参：项目名/路径、完成与关闭回调、是否开启智能能力 */
 export interface ProjectOnboardingPageProps {
   projectName: string;
   projectPath: string;
@@ -38,6 +38,7 @@ export interface ToolsStatusSummary {
 /** 低置信度阈值：低于此值确认面板需提示人工核对（对齐 06-多语言自适应架构 §七） */
 export const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
+/** 引导步骤：步骤 id、i18n 文案键、执行体与图标 */
 export interface Step {
   id: string;
   labelKey: string;
@@ -45,6 +46,7 @@ export interface Step {
   icon: JSX.Element;
 }
 
+/** 构建步骤列表所需参数：项目路径、模板确认状态与三个结果回调 */
 export interface BuildStepsParams {
   projectPath: string;
   presetConfirmed: boolean;
@@ -56,6 +58,7 @@ export interface BuildStepsParams {
   onToolsStatus: (status: ToolsStatusSummary | null) => void;
 }
 
+/** 执行当前步骤所需参数：步骤列表、当前下标、三项确认状态与完成回调 */
 export interface RunCurrentStepParams {
   steps: Step[];
   index: number;
@@ -65,6 +68,7 @@ export interface RunCurrentStepParams {
   onDone: () => void;
 }
 
+/** 步骤推进 hook 的入参：步骤列表、三项确认状态与完成回调 */
 export interface UseStepAdvanceParams {
   steps: Step[];
   presetConfirmed: boolean;
@@ -97,5 +101,7 @@ export type OnboardingStageProps = {
   onRefreshTools: () => Promise<void>;
 };
 
+/** 工具行状态取值：从 ToolsStatusSummary 的单项 status 派生 */
 export type ToolRowStatus = ToolsStatusSummary['tools'][number]['status'];
+/** 翻译函数签名：key + 可选插值参数 → 本地化文案 */
 export type TFunc = (key: string, params?: Record<string, unknown>) => string;

@@ -1294,7 +1294,8 @@
       "attentionHint": "다음 검사는 실행되지 않았거나 결론이 없어 통과에 포함되지 않습니다",
       "errorTitle": "점검 실패",
       "errorNoReport": "점검이 유효한 결과를 반환하지 않았습니다. 다시 실행하거나 실행 로그를 확인하세요",
-      "errorRetry": "다시 점검"
+      "errorRetry": "다시 점검",
+      "snapshotNote": "최근에 저장된 검사 스냅샷으로 문제 항목만 보관합니다(통과 항목은 저장되지 않음). 따라서 \"총 검사\"와 \"통과\"는 —로 표시됩니다. 다시 검사하면 전체 결과를 얻을 수 있습니다."
     },
     "performance": {
       "autoFixable": "자동 수정 가능",
@@ -1904,6 +1905,22 @@
         "stripeKey": "Stripe Key",
         "twilioKey": "Twilio Key"
       }
+    },
+    "snapshotReport": {
+      "title": "최근 검사 결과",
+      "notice": "이 분류의 가장 최근 검사에서 저장된 결과이며, 페이지 점수도 같은 데이터에서 나옵니다. 전체 보고서(통과 항목 등 포함)가 필요하면 \"다시 검사\"를 누르세요.",
+      "total": "문제 총수",
+      "error": "오류",
+      "warning": "경고",
+      "info": "정보",
+      "empty": "최근 검사에서 문제 항목이 기록되지 않았습니다.",
+      "rescan": "다시 검사",
+      "rescanning": "검사 중",
+      "loading": "최근 결과를 불러오는 중…",
+      "suggestion": "제안",
+      "autoFixable": "자동 수정 가능",
+      "truncated": "앞의 {{shown}}건만 표시됩니다(전체 {{total}}건).",
+      "unavailable": "이 분류의 이전 결과 파일을 읽을 수 없습니다. \"다시 검사\"로 생성하세요."
     }
   },
   "pipeline": {

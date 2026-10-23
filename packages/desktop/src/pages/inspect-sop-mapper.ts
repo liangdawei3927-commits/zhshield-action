@@ -55,7 +55,8 @@ type CheckLike = InspectionReportData['checks'][number];
 
 /** P0-1：问题判定——仅 fail/warn（实际违规）算问题，attention（未检测）不算。 */
 export function isIssueStatus(status: CheckStatus): boolean {
-  return status === 'fail' || status === 'warn';
+  // info 仅历史快照（issues-only）会出现，属真问题条目（-1 分），必须计入问题项。
+  return status === 'fail' || status === 'warn' || status === 'info';
 }
 
 /** issues 数据源：从全量 checks 挑出问题项（排除 attention/pass）。 */

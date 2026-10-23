@@ -120,6 +120,29 @@ export function scoreFreshness(timestamp: string, now: number = Date.now()): Sco
   return { stale: ageMs > SCORE_FRESH_MS, ageHours: Math.floor(ageMs / 3_600_000) };
 }
 
+/**
+ * 把评分历史规整为「旧 → 新」。
+ *
+ * 报告中心所有读法都建立在这个顺序上：`data.at(-1)` 是「最新总分」，
+ * `HistoryTable` 靠 `toReversed()` 翻成最新在上，窗口聚合按相邻两条算涨跌，
+ * sparkline 按数组顺序画线。顺序一旦反了，**不是排列不同，而是内容全错** ——
+ * 2026-10-24 实测过：主进程历史查询按 `created_at DESC` 返回，页面把项目史上第一条
+ * 记录（2026-08-29、98.6 分、5 个维度）当成「当前状态」展示了很久。
+ *
+ * 顺序的第一责任方是 SQL（`getScoreHistory` 已改为内层取最新 N 条、外层升序）。
+ * 这里再排一次是渲染边界守卫：跨 IPC/HTTP 边界后顺序无法靠类型保证，而显示错误的
+ * 代价远高于一次 O(n log n) 排序。`sort` 是稳定排序，同时间戳（同秒落分）保持原序。
+ */
+export function toChronological<T extends { timestamp: string }>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = Date.parse(a.timestamp);
+    const tb = Date.parse(b.timestamp);
+    // 时间戳不可解析时保持原位置（返回 0），避免把坏数据甩到数组两端改变「最新」语义
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return 0;
+    return ta - tb;
+  });
+}
+
 /** 历史分数数据加载：数据状态 + 拉取 */
 function useScoreHistoryData(projectPath: string): {
   data: HealthScoreData[];
@@ -127,7 +150,7 @@ function useScoreHistoryData(projectPath: string): {
 } {
   const [data, setData] = useState<HealthScoreData[]>([]);
   const fetchHistory = useCallback(async () => {
-    setData(await getScoreHistory(projectPath));
+    setData(toChronological(await getScoreHistory(projectPath)));
   }, [projectPath]);
   return { data, fetchHistory };
 }

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { ResultCard } from '../components/ui/ResultCard';
+import { useT } from '../i18n';
 
 type ArchitectureForm = 'monolith' | 'modular-monolith' | 'microservices' | 'unknown';
 
@@ -73,6 +75,7 @@ export function ConfidenceBadge({ confidence }: { confidence: number }) {
 }
 
 export function StaleBadge() {
+  const t = useT();
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-warning-100 text-warning-800">
       <svg
@@ -88,17 +91,18 @@ export function StaleBadge() {
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v6l4 2" />
       </svg>
-      画像已过期
+      {t('page.profile.stale')}
     </span>
   );
 }
 
+/** 分区容器：统一走 ResultCard variant="section"（与其他检查页卡片同规格） */
 export function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-zh-card rounded-xl border border-zh-line p-5 mb-5">
+    <ResultCard variant="section" className="mb-5">
       <h3 className="text-sm font-semibold text-zh-ink mb-4">{title}</h3>
       {children}
-    </div>
+    </ResultCard>
   );
 }
 
@@ -125,10 +129,11 @@ export function DataRow({
 // ─── 信号列表 ────────────────────────────────────────────────────────
 
 export function SignalList({ signals }: { signals: readonly Signal[] }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? signals : signals.slice(0, 5);
 
-  if (signals.length === 0) return <p className="text-xs text-zh-muted">无支撑信号</p>;
+  if (signals.length === 0) return <p className="text-xs text-zh-muted">{t('page.profile.signals.none')}</p>;
 
   return (
     <div>
@@ -148,7 +153,9 @@ export function SignalList({ signals }: { signals: readonly Signal[] }) {
           onClick={() => setExpanded(!expanded)}
           className="mt-2 text-[11px] text-info-600 hover:text-info-800 bg-transparent border-none cursor-pointer p-0"
         >
-          {expanded ? '收起' : `展开全部 (${signals.length})`}
+          {expanded
+            ? t('page.profile.signals.collapse')
+            : t('page.profile.signals.expand', { count: signals.length })}
         </button>
       )}
     </div>
@@ -172,8 +179,9 @@ function TargetFrameworkList({ frameworks }: { frameworks: readonly MatchResult[
 }
 
 export function TargetCard({ target }: { target: TargetProfile }) {
+  const t = useT();
   return (
-    <div className="bg-zh-card rounded-xl border border-zh-line p-5 mb-4">
+    <ResultCard variant="section" className="mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-zh-ink">{target.id}</span>
@@ -186,21 +194,21 @@ export function TargetCard({ target }: { target: TargetProfile }) {
 
       <div className="grid grid-cols-2 gap-x-6">
         <DataRow
-          label="语言"
+          label={t('page.profile.target.language')}
           value={target.language.value}
           badge={<ConfidenceBadge confidence={target.language.confidence} />}
         />
-        <DataRow label="框架" value={<TargetFrameworkList frameworks={target.frameworks} />} />
+        <DataRow label={t('page.profile.target.frameworks')} value={<TargetFrameworkList frameworks={target.frameworks} />} />
         {target.productForm && (
           <DataRow
-            label="交付形态"
+            label={t('page.profile.target.productForm')}
             value={target.productForm.value}
             badge={<ConfidenceBadge confidence={target.productForm.confidence} />}
           />
         )}
         {target.packageManager && (
           <DataRow
-            label="包管理器"
+            label={t('page.profile.target.packageManager')}
             value={target.packageManager.value}
             badge={<ConfidenceBadge confidence={target.packageManager.confidence} />}
           />
@@ -209,47 +217,52 @@ export function TargetCard({ target }: { target: TargetProfile }) {
 
       {target.language.signals.length > 0 && (
         <div className="mt-3 pt-3 border-t border-zh-line/50">
-          <p className="text-[11px] text-zh-muted mb-2">语言判定依据</p>
+          <p className="text-[11px] text-zh-muted mb-2">{t('page.profile.target.languageBasis')}</p>
           <SignalList signals={target.language.signals} />
         </div>
       )}
-    </div>
+    </ResultCard>
   );
 }
 
 // ─── 覆写信息 ────────────────────────────────────────────────────────
 
 export function OverridesPanel({ overrides }: { overrides: UserOverrides }) {
+  const t = useT();
   const hasOverrides = overrides.architecture || overrides.targets;
 
   if (!hasOverrides) {
     return (
       <div className="text-center py-4">
-        <p className="text-xs text-zh-muted">暂无人工修正记录</p>
+        <p className="text-xs text-zh-muted">{t('page.profile.overrides.none')}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {overrides.architecture && <DataRow label="架构修正" value={overrides.architecture} />}
+      {overrides.architecture && (
+        <DataRow label={t('page.profile.overrides.architecture')} value={overrides.architecture} />
+      )}
       {overrides.targets &&
         Object.entries(overrides.targets).map(([key, val]) => (
           <DataRow
             key={key}
-            label={`目标修正: ${key}`}
+            label={t('page.profile.overrides.target', { key })}
             value={
               <span className="text-[11px] font-mono">
-                {val.language && `语言=${val.language}`}
+                {val.language && t('page.profile.overrides.language', { value: val.language })}
                 {val.language && val.productForm && ' / '}
-                {val.productForm && `形态=${val.productForm}`}
+                {val.productForm && t('page.profile.overrides.productForm', { value: val.productForm })}
               </span>
             }
           />
         ))}
       {overrides.updatedAt && (
         <p className="text-[11px] text-zh-muted mt-2">
-          最后修正：{new Date(overrides.updatedAt).toLocaleString()}
+          {t('page.profile.overrides.updatedAt', {
+            time: new Date(overrides.updatedAt).toLocaleString(),
+          })}
         </p>
       )}
     </div>

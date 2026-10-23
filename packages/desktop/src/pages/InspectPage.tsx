@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
 import { ReportShell } from '../components/business/ReportShell';
@@ -10,6 +10,7 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
 import { useInspectPage } from './inspect-logic';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
+import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
 import { ProgressBar, CheckList } from './inspect-parts';
@@ -129,6 +130,7 @@ function buildInspectStats({
   copyToAi,
   copyAllToAi,
   t,
+  isSnapshot,
 }: {
   items: InspectionReportData['checks'];
   passCount: number;
@@ -136,24 +138,31 @@ function buildInspectStats({
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
   t: Translate;
+  /** 历史快照（仅问题项）：通过项未落盘，通过数未知 → 显示「—」而非 0 */
+  isSnapshot?: boolean;
 }): ReportStatCard[] {
   return [
-    { key: 'total', label: t('page.inspect.total'), value: items.length },
+    { key: 'total', label: t('page.inspect.total'), value: isSnapshot ? '—' : items.length },
     {
       key: 'passed',
       label: t('page.inspect.passed'),
-      value: passCount,
+      value: isSnapshot ? '—' : passCount,
       color: 'rgb(var(--zh-success))',
-      detail: {
-        items: items.filter((i) => i.status === 'pass'),
-        render: (sub: unknown[]) => (
-          <CheckList
-            items={sub as InspectionReportData['checks']}
-            onCopyToAi={copyToAi}
-            onCopyAll={copyAllToAi}
-          />
-        ),
-      },
+      // 快照下明细为空，点开只会是空列表 → 不给 detail（卡片不响应点击）
+      ...(isSnapshot
+        ? {}
+        : {
+            detail: {
+              items: items.filter((i) => i.status === 'pass'),
+              render: (sub: unknown[]) => (
+                <CheckList
+                  items={sub as InspectionReportData['checks']}
+                  onCopyToAi={copyToAi}
+                  onCopyAll={copyAllToAi}
+                />
+              ),
+            },
+          }),
     },
     {
       key: 'issues',
@@ -225,11 +234,15 @@ function InspectReportView({
   const items = report.checks;
   const passCount = items.filter((i) => i.status === 'pass').length;
   const attentionChecks = items.filter((i) => i.status === 'attention');
+  // 历史快照只落盘问题项 → 通过项未知。此时「总检查/通过」显示「—」，
+  // 不用 0 冒充（0 会读成「一项都没通过」，是谎报）。
+  const isSnapshot = report.coverage === 'issues-only';
 
   return (
     <ReportShell
       projectPath={projectPath}
       dimension="quality"
+      historyDomain="inspect"
       refreshKey={report}
       icon={
         <PageGlyph bg="warning" stroke="warning">
@@ -251,10 +264,25 @@ function InspectReportView({
       loading={loading}
       progress={progress}
       progressMessage={statusMessage}
-      stats={buildInspectStats({ items, passCount, attentionChecks, copyToAi, copyAllToAi, t })}
+      stats={buildInspectStats({
+        items,
+        passCount,
+        attentionChecks,
+        copyToAi,
+        copyAllToAi,
+        t,
+        isSnapshot,
+      })}
     >
-      <p className="text-xs text-zh-muted mb-4">{t('page.inspect.guardAlsoRan')}</p>
-      <ProgressBar passCount={passCount} total={items.length} />
+      <p className="text-xs text-zh-muted mb-4">
+        {isSnapshot
+          ? t('page.inspect.snapshotNote', {
+              defaultValue:
+                '以上为最近一次巡检的落盘快照，仅保留问题项：通过项未落盘，因此「总检查」「通过」显示为 —。点「重新体检」可获取完整结果。',
+            })
+          : t('page.inspect.guardAlsoRan')}
+      </p>
+      {isSnapshot ? null : <ProgressBar passCount={passCount} total={items.length} />}
     </ReportShell>
   );
 }
@@ -308,7 +336,13 @@ function InspectEmptyView(props: {
 
 function useInspectPageState(projectPath: string) {
   const page = useInspectPage(projectPath);
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与改动前一致：那时 report 为空，即使 showHome=false 也停主页）。
+  // 读回的历史快照只让「详情按钮可见」，不把人自动带进详情页。
+  const [showHome, setShowHome] = useState(true);
+  // 实时扫描/每日自动巡检产出结果时进入详情 —— 保持原有「扫完直接看报告」的行为。
+  useEffect(() => {
+    if (page.report) setShowHome(false);
+  }, [page.report]);
   const startScan = () => {
     setShowHome(false);
     page.startInspect();
@@ -323,6 +357,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
   const t = useT();
   const {
     report,
+    persisted,
     failure,
     loading,
     progress,
@@ -337,8 +372,11 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     openDetail,
   } = useInspectPageState(projectPath);
 
-  // 单一判定源：有检查结果的报告 = 有详情（同时决定详情分支与右上角图标）
-  const detailReport = report && report.checks.length > 0 ? report : null;
+  // 单一判定源：本次实时结果 > 上次扫描的完整报告 > 归一化快照（仅问题项）。
+  // 完整报告含通过项 → 数字精确；只有本次修复之前的旧数据才回退到快照。
+  // 扫描进行中不拿旧结果顶替，保持「扫描中显示进度空态」的原行为。
+  const savedReport = useSavedDomainReport(projectPath, 'inspect', report);
+  const detailReport = report ?? (loading ? null : (savedReport ?? persisted));
   const hasDetail = detailReport !== null;
 
   if (failure) {

@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
+import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
+import { useHasDomainResult } from '../hooks/useHasDomainResult';
+import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { ReportShell } from '../components/business/ReportShell';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -16,7 +20,8 @@ interface RefactorPageProps {
 
 export function RefactorPage({ projectPath }: RefactorPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
+  const [showHome, setShowHome] = useState(true);
   const {
     scanning,
     progress,
@@ -33,15 +38,61 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
     handleScan,
   } = useRefactorPage(projectPath);
 
-  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
-  const detailReport = report;
-  const hasDetail = detailReport !== null;
+  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。读回上次完整报告（同口径）。
+  const savedReport = useSavedDomainReport(projectPath, 'refactor', report);
+  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
+  const hadPreviousResult = useHasDomainResult(projectPath, 'refactor');
+
+  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
+  const detailReport = report ?? (scanning ? null : savedReport);
+  const hasDetail = detailReport !== null || hadPreviousResult;
+
+  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
+  const snapshot = useDomainSnapshot(projectPath, 'refactor');
+  const [showSnapshot, setShowSnapshot] = useState(false);
+
+  const openDetail = () => {
+    if (detailReport) {
+      setShowHome(false);
+      return;
+    }
+    snapshot.reload();
+    setShowSnapshot(true);
+  };
+
+  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
+  useEffect(() => {
+    if (report) {
+      setShowHome(false);
+      setShowSnapshot(false);
+    }
+  }, [report]);
+
+  if (showSnapshot) {
+    return (
+      <DomainSnapshotReport
+        projectPath={projectPath}
+        dimension="refactor"
+        icon={
+          <PageGlyph bg="info" stroke="info">
+            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+          </PageGlyph>
+        }
+        snapshot={snapshot.snapshot}
+        loading={snapshot.loading}
+        rescanning={scanning}
+        onRescan={() => void handleScan()}
+        onBackHome={() => setShowSnapshot(false)}
+      />
+    );
+  }
 
   if (detailReport && !showHome) {
     return (
       <ReportShell
         projectPath={projectPath}
         dimension="refactor"
+        historyDomain="refactor"
         refreshKey={detailReport}
         icon={
           <PageGlyph bg="info" stroke="info">
@@ -80,7 +131,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
       <RefactorEmptyState
         projectPath={projectPath}
         error={error}

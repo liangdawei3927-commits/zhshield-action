@@ -38,14 +38,22 @@ function ProjectRow({
   return (
     <Bounce
       as="div"
-      className={`w-full flex items-center gap-1 rounded-lg transition-colors hover:bg-zh-panel ${isActive ? 'bg-zh-panel/50' : ''}`}
+      className={`relative w-full flex items-center gap-1 rounded-lg transition-colors hover:bg-zh-panel ${isActive ? 'bg-zh-panel/50' : ''}`}
     >
+      {/* 当前项目竖条：选中项跨重启保持后，需要一眼能认出来是哪一个 */}
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-zh-brand"
+        />
+      )}
       <button
         onClick={() => {
           onSwitchProject(index);
           onNavigate('inspect');
           onClose();
         }}
+        aria-current={isActive ? 'true' : undefined}
         className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-1 py-2 rounded-lg text-left border-none cursor-pointer bg-transparent"
       >
         <svg

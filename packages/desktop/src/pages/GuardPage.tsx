@@ -155,6 +155,7 @@ function GuardReportView({
     <ReportShell
       projectPath={projectPath}
       dimension="gate"
+      historyDomain="guard"
       refreshKey={report}
       icon={
         <PageGlyph bg="brand" stroke="brand" round>

@@ -106,6 +106,33 @@ export class TrivyAdapter implements ToolAdapter {
       'dependency',
     ];
 
+    // 依赖审计以 package.json 为扫描前提：扫描根无 Node 清单属范围外，
+    // 返回 unavailable（SOP 链路 → skipped/degraded，不产生诊断条目），
+    // 而非让 trivy 对不存在的清单 lstat FATAL 产生伪 error——该 error 曾被
+    // 诊断链路聚合为 (root) 伪债务项（td-quality-44c4ce057952）。
+    const depRootPackageJson = path.join(path.resolve(options.projectPath), 'package.json');
+    let hasRootPackageJson = false;
+    try {
+      await fs.promises.access(depRootPackageJson);
+      hasRootPackageJson = true;
+    } catch {
+      hasRootPackageJson = false;
+    }
+    if (scanTypes.includes('dependency') && !hasRootPackageJson) {
+      return {
+        tool: 'trivy',
+        status: 'unavailable',
+        issues: [],
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
+        error: '扫描根目录无 package.json，依赖审计范围外未执行（如需依赖审计请在含 Node 清单的项目根运行）',
+      };
+    }
+
     try {
       const allIssues: Issue[] = [];
       for (const scanType of scanTypes) {

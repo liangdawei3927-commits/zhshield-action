@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { ExperienceRecord } from '@zh/kernel';
 import type { ExperienceEntry } from '@zh/evolve';
 import type { ScoreDimension } from '@zh/shared';
+import type { SentinelEventQuery, DomainReportSource } from '../src/types/electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // 应用信息
@@ -119,6 +120,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getScoreHistory: (projectId: string) => ipcRenderer.invoke('engine:getScoreHistory', projectId),
     getDomainScore: (projectPath: string, dimension: ScoreDimension) =>
       ipcRenderer.invoke('engine:getDomainScore', projectPath, dimension),
+    getDomainReport: (projectPath: string, source: DomainReportSource) =>
+      ipcRenderer.invoke('engine:getDomainReport', projectPath, source),
+    saveDomainReport: (projectPath: string, domain: string, report: unknown) =>
+      ipcRenderer.invoke('engine:saveDomainReport', projectPath, domain, report),
+    getSavedDomainReport: (projectPath: string, domain: string) =>
+      ipcRenderer.invoke('engine:getSavedDomainReport', projectPath, domain),
+    getDomainSnapshotRaw: (projectPath: string, domain: string) =>
+      ipcRenderer.invoke('engine:getDomainSnapshotRaw', projectPath, domain),
+    hasDomainResult: (projectPath: string, domain: string) =>
+      ipcRenderer.invoke('engine:hasDomainResult', projectPath, domain),
+    listDomainHistory: (projectPath: string, domain: string, limit?: number) =>
+      ipcRenderer.invoke('engine:listDomainHistory', projectPath, domain, limit),
+    getDomainScanBlob: (projectPath: string, blob: string) =>
+      ipcRenderer.invoke('engine:getDomainScanBlob', projectPath, blob),
+    getLatestDomainScan: (projectPath: string, domain: string) =>
+      ipcRenderer.invoke('engine:getLatestDomainScan', projectPath, domain),
     getProfile: (projectPath: string) => ipcRenderer.invoke('engine:getProfile', projectPath),
     runRefactor: (projectPath: string) => ipcRenderer.invoke('engine:runRefactor', projectPath),
     runDeps: (projectPath: string) => ipcRenderer.invoke('engine:runDeps', projectPath),
@@ -217,7 +234,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── 哨兵监控 ──────────────────────────────────────────────
   sentinel: {
-    getEvents: (options?: { status?: string; severity?: string }) =>
+    getEvents: (options?: SentinelEventQuery) =>
       ipcRenderer.invoke('sentinel:getEvents', options),
     getEvent: (id: string) => ipcRenderer.invoke('sentinel:getEvent', id),
     startMonitoring: (projectId: string, projectPath: string) =>

@@ -26,6 +26,7 @@ import { updateDashboardState } from './dashboard-state';
 import { collectExposedFilesInWorker } from '../profile-host';
 import { getDb } from '../ipc-context';
 import type { TechDebtReportData } from '../../src/types/electron';
+import type { TaskProgressReporter } from '../task-progress';
 
 /**
  * 统计项目近 90 天模块热度：只读 `git log --since=90.days --name-only`，
@@ -305,5 +306,50 @@ export async function dismissDebtActionHandler(projectPath: string, actionId: st
       '[engine:debt:dismiss] 忽略操作失败:',
       err instanceof Error ? err.message : String(err),
     );
+  }
+}
+
+/** 技术债仪表盘失败时的空报告（error 携带失败原因，不 throw） */
+function emptyTechDebtReport(error: string): TechDebtReportData {
+  return {
+    projectId: '',
+    generatedAt: new Date().toISOString(),
+    debtIndex: 0,
+    trend: { period: 'week', delta: 0 },
+    byModule: [],
+    byCategory: [],
+    actionList: [],
+    error,
+  };
+}
+
+/**
+ * 硬前置：无 inspect 快照时返回携带 `error` 的空报告而非抛错 ——
+ * 任务中心据此以 done + 空报告结束，UI 展示「请先运行项目体检」。
+ */
+export async function runTechDebtHandler(
+  projectPath: string,
+  onProgress?: TaskProgressReporter,
+): Promise<TechDebtReportData> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    onProgress?.('techdebt', t('pipeline.techdebt.loadingSnapshot'), 0.1);
+    const input = await loadDebtInputFromSnapshot(projectPath);
+    if (!input.ok) {
+      console.warn('[engine:runTechDebt] 无 inspect 域快照，提示先运行项目体检');
+      return emptyTechDebtReport(t('electron.techDebtNoSnapshot'));
+    }
+    onProgress?.('techdebt', t('pipeline.techdebt.computing'), 0.35);
+    const snapshot = await buildTechDebtSnapshot(projectPath, input);
+    const finalSnapshot = await mergeDebtPersistence(snapshot);
+    const report: TechDebtReportData = { ...finalSnapshot, error: null };
+    await persistTechDebtDiagnostics(projectPath, report);
+    await updateTechDebtDashboard(projectPath, report);
+    return report;
+  } catch (err) {
+    console.error('[engine:runTechDebt] Error:', err);
+    return emptyTechDebtReport(err instanceof Error ? err.message : String(err));
   }
 }

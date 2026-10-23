@@ -12,8 +12,10 @@ import {
   runPerformanceInWorker,
   cancelJob,
 } from './pipeline-host';
+import { runDepsHandler } from './ipc/engines-deps';
+import { runTechDebtHandler } from './ipc/engines-techdebt';
 
-/** 任务类型：各引擎检查域（巡检/安全/垃圾/性能/门禁/重构） */
+/** 任务类型：各引擎检查域（巡检/安全/垃圾/性能/门禁/重构/依赖/技术债） */
 export type TaskKind =
   | 'pipeline'
   | 'security'
@@ -22,7 +24,9 @@ export type TaskKind =
   | 'garbageRestore'
   | 'performance'
   | 'guard'
-  | 'refactor';
+  | 'refactor'
+  | 'deps'
+  | 'techdebt';
 
 /** 任务状态机取值：排队 → 运行 → 完成/失败/取消 */
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
@@ -325,6 +329,8 @@ export function buildTaskManager(): TaskManager {
     guard: (task, request, onProgress) =>
       runGuardInWorker(task.projectPath, (request ?? {}) as Record<string, unknown>, onProgress),
     refactor: (task, _request, onProgress) => runRefactorInWorker(task.projectPath, onProgress),
+    deps: (task, _request, onProgress) => runDepsHandler(task.projectPath, onProgress),
+    techdebt: (task, _request, onProgress) => runTechDebtHandler(task.projectPath, onProgress),
   };
   return new TaskManager(runnerByKind);
 }

@@ -165,7 +165,7 @@ function useSentinelEventData(onLoaded: () => void): {
   const [events, setEvents] = useState<SentinelEventItem[]>([]);
 
   const refreshEvents = useCallback(() => {
-    getSentinelEvents()
+    getSentinelEvents({ excludeInformational: true })
       .then((data) => setEvents((data ?? []).map(toSentinelEventItem)))
       .finally(onLoaded);
   }, [onLoaded]);

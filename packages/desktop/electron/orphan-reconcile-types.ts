@@ -25,6 +25,7 @@ export interface OrphanReconcileReport {
   cleanReset?: CleanResetReport;
 }
 
+/** 疑似孤儿的首见时刻持久化状态（键为项目 id，另有空项目集宽限键） */
 export interface OrphanState {
   /** 疑似孤儿项目 → 首次发现时刻（升级阈值起算）；保留键 __orphan_empty_since__ 存空项目集宽限起点（epoch ms） */
   [projectId: string]: { firstSeenAt: string } | number | undefined;

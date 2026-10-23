@@ -9,6 +9,7 @@ import {
   ModuleScoreCards,
 } from './reports-parts';
 import { HistoryTable } from './reports-table';
+import { ReportWindowSection } from './report-window-parts';
 import { useT } from '../i18n';
 
 interface ReportsPageProps {
@@ -29,6 +30,7 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
           <LatestScoreCard latest={latest} data={data} />
           <DimensionCards dimensions={latest.dimensions} />
           <ModuleScoreCards modules={modules} />
+          <ReportWindowSection data={data} />
           <HistoryTable data={data} />
         </div>
       </div>

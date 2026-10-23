@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
+import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
+import { useHasDomainResult } from '../hooks/useHasDomainResult';
+import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
 import { PageGlyph } from '../components/business/page-glyph';
@@ -129,6 +133,7 @@ function GarbageReportView({
     <ReportShell
       projectPath={projectPath}
       dimension="garbage"
+      historyDomain="garbage"
       refreshKey={report}
       icon={<GarbageIcon />}
       title={t('page.garbage.done')}
@@ -179,7 +184,8 @@ function GarbageReportView({
 
 export function GarbagePage({ projectPath }: GarbagePageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
+  const [showHome, setShowHome] = useState(true);
   const {
     loading,
     progress,
@@ -211,9 +217,50 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
     onScan: startScan,
   };
 
-  // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
-  const detailReport = report;
-  const hasDetail = detailReport !== null;
+  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。读回上次完整报告（同口径）。
+  const savedReport = useSavedDomainReport(projectPath, 'garbage', report);
+  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
+  const hadPreviousResult = useHasDomainResult(projectPath, 'garbage');
+
+  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
+  const detailReport = report ?? (loading ? null : savedReport);
+  const hasDetail = detailReport !== null || hadPreviousResult;
+
+  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
+  const snapshot = useDomainSnapshot(projectPath, 'garbage');
+  const [showSnapshot, setShowSnapshot] = useState(false);
+
+  const openDetail = () => {
+    if (detailReport) {
+      setShowHome(false);
+      return;
+    }
+    snapshot.reload();
+    setShowSnapshot(true);
+  };
+
+  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
+  useEffect(() => {
+    if (report) {
+      setShowHome(false);
+      setShowSnapshot(false);
+    }
+  }, [report]);
+
+  if (showSnapshot) {
+    return (
+      <DomainSnapshotReport
+        projectPath={projectPath}
+        dimension="garbage"
+        icon={<GarbageIcon />}
+        snapshot={snapshot.snapshot}
+        loading={snapshot.loading}
+        rescanning={loading}
+        onRescan={handleScan}
+        onBackHome={() => setShowSnapshot(false)}
+      />
+    );
+  }
 
   if (detailReport && !showHome) {
     return (
@@ -242,7 +289,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
       <ScanEmptyStateBranch
         {...emptyStateParams}
         render={(empty) => <GarbageEmptyState {...empty} />}

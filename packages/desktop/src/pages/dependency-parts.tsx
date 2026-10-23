@@ -293,6 +293,7 @@ export function DependencyEmptyState({
     <PipelineTaskEmptyState
       projectPath={projectPath}
       dimension="dependencies"
+      taskKind="deps"
       titleKey="page.deps.empty.title"
       subtitleKey="page.deps.empty.subtitle"
       buttonTextKey="page.deps.empty.start"

@@ -4,15 +4,15 @@
  * HTTP 模式直连服务端接口；IPC 桥接缺失时返回空列表 / 默认状态兜底。
  */
 import type { SentinelEvent } from '@zh/sentinel';
+import type { SentinelEventQuery } from '../types/electron';
 import { getSentinelEventsViaHttp, startSentinelViaHttp } from './serverApi';
 import { isHttpMode, getAPI } from './engineApi-transport';
 
 // ─── Sentinel 哨兵监控 ────────────────────────────────────
 
-export async function getSentinelEvents(options?: {
-  status?: string;
-  severity?: string;
-}): Promise<SentinelEvent[]> {
+export async function getSentinelEvents(
+  options?: SentinelEventQuery,
+): Promise<SentinelEvent[]> {
   if (isHttpMode()) return getSentinelEventsViaHttp(options);
   const api = getAPI();
   if (!api?.sentinel) return [];

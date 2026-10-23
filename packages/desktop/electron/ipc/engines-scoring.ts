@@ -5,6 +5,7 @@
  * 由 engines.ts 引用，依赖方向单向：engines.ts → 本文件（本文件不得 import engines.ts）。
  */
 
+import path from 'node:path';
 import { t } from '@zh/i18n';
 import { buildHealthDimensions, computeRedLine, scoreProjectByModules } from '@zh/scoring';
 import type { ConvertedGuardResult, ConvertedInspectIssue } from '@zh/scoring';
@@ -16,6 +17,7 @@ import { convertTraditionalGuardResults } from './score-converters';
 import { loadBackupHealthSnapshot } from './backup';
 import { getSentinelHealthData } from './sentinel';
 import { readDomainSnapshot } from '../zh-diagnostics';
+import type { DiagnosticSource, DiagnosticsReport } from '../zh-diagnostics-types';
 import { readDashboardState } from './dashboard-state';
 import {
   getScoring,
@@ -35,17 +37,22 @@ import {
   type ScoreDimension,
 } from '../report-summary';
 
-/** 模块级独立评分：跳过根级兜底卡（path === projectPath），各模块用自身类型权重评分后逐模块落库 */
+/**
+ * 模块级独立评分：跳过根级兜底卡（id === projectPath），各模块用自身类型权重评分后逐模块落库。
+ *
+ * 落库键用 `card.id`（绝对路径）而非 `card.path`（相对路径）：
+ * `packages/ui` 这类相对路径在两个 monorepo 之间会撞车，写进同一行记录、历史互相污染。
+ */
 function scoreProjectModules(
   scoring: Awaited<ReturnType<typeof getScoring>>,
   aggregate: ReturnType<typeof scoreProjectByModules>,
   projectPath: string,
 ): void {
   for (const card of aggregate.modules) {
-    if (card.path === projectPath) continue;
-    const moduleScore = scoring.calculate(card.path, card.dimensions);
+    if (card.id === projectPath) continue;
+    const moduleScore = scoring.calculate(card.id, card.dimensions);
     console.log(
-      `[engine:runPipeline] 模块评分已落库: ${card.path} ${moduleScore.overall} (${moduleScore.grade})`,
+      `[engine:runPipeline] 模块评分已落库: ${card.id} ${moduleScore.overall} (${moduleScore.grade})`,
     );
   }
 }
@@ -339,6 +346,25 @@ type DomainScoreDataLike = Omit<DomainScoreData, 'generatedAt'> & { generatedAt:
  * - 其余 9 维 compose-on-read：与报告中心汇总共用 assembleHealthInputs 组装输入，
  *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
  */
+/**
+ * 读某治理域最近一次落盘快照（仅问题项）。
+ *
+ * 供分类页「有历史评分即可查看详情」使用：无快照/损坏返回 null，
+ * 由 UI 自行决定是否渲染详情入口 —— 不得据 null 宣称「该域无问题」。
+ */
+export async function getDomainReportHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectPath: string,
+  source: DiagnosticSource,
+): Promise<DiagnosticsReport | null> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') return null;
+    return await readDomainSnapshot(projectPath, source);
+  } catch {
+    return null;
+  }
+}
+
 export async function getDomainScoreHandler(
   _event: Electron.IpcMainInvokeEvent,
   projectPath: string,
@@ -391,7 +417,13 @@ export async function getDomainScoreHandler(
   }
 }
 
-/** 项目画像（含子模块列表）：供报告页列出模块用于模块级评分卡展示；探测失败时返回 null */
+/**
+ * 项目画像（含子模块列表）：供报告页列出模块用于模块级评分卡展示；探测失败时返回 null。
+ *
+ * 子模块 `path` 在这里统一解析为**绝对路径**：它同时被渲染层当作 `engine:getScore` 的查询键，
+ * 也是 `scores.project_id` 的写入键。画像原始值是相对路径（`packages/ui`），直接外传会让
+ * 两个 monorepo 的同名子包读同一行记录。渲染层不再做任何路径拼装。
+ */
 export async function getProfileHandler(
   _event: Electron.IpcMainInvokeEvent,
   projectPath: string,
@@ -401,7 +433,10 @@ export async function getProfileHandler(
     cacheProfile(profilingResult, projectPath);
     return {
       type: profilingResult.type,
-      modules: (profilingResult.modules ?? []).map((m) => ({ path: m.path, type: m.type })),
+      modules: (profilingResult.modules ?? []).map((m) => ({
+        path: path.resolve(projectPath, m.path),
+        type: m.type,
+      })),
     };
   } catch (err) {
     console.warn(

@@ -9,7 +9,7 @@ import {
 import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
-import { useScanWithLoading } from '../hooks/useScanWithLoading';
+import { useTaskRun } from '../task-store';
 
 /**
  * 债务类别配置（与 @zh/scoring tech-debt DebtCategory 对齐，5 类 4 色）：
@@ -118,7 +118,7 @@ export function debtIndexColor(index: number): string {
   return 'rgb(var(--zh-success-700))';
 }
 
-/** 技术债盘点运行：loading 本地状态（engine:runTechDebt 直连主进程，不经任务中心） */
+/** 技术债盘点运行：loading / 进度统一来自任务中心 techdebt 任务 */
 async function scanTechDebt(projectPath: string): Promise<TechDebtReportData | null> {
   try {
     return await runTechDebt(projectPath);
@@ -205,6 +205,8 @@ function useTechDebtActions(
 
 function useTechDebtRun(projectPath: string): {
   loading: boolean;
+  progress: number;
+  progressMessage: string;
   report: TechDebtReportData | null;
   planLoading: string | null;
   verifyLoading: string | null;
@@ -217,14 +219,18 @@ function useTechDebtRun(projectPath: string): {
   handleDismiss: (actionId: string) => Promise<void>;
 } {
   const [report, setReport] = useState<TechDebtReportData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { loading, progress, statusMessage } = useTaskRun('techdebt', projectPath);
   const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } =
     useTechDebtActions(projectPath, setReport);
 
-  const { handleScan } = useScanWithLoading(projectPath, scanTechDebt, setReport, setLoading);
+  const handleScan = useCallback(async () => {
+    setReport(await scanTechDebt(projectPath));
+  }, [projectPath]);
 
   return {
     loading,
+    progress,
+    progressMessage: statusMessage,
     report,
     planLoading,
     verifyLoading,

@@ -307,6 +307,7 @@ export function TechDebtEmptyState({
     <PipelineTaskEmptyState
       projectPath={projectPath}
       dimension="techdebt"
+      taskKind="techdebt"
       titleKey="page.techdebt.empty.title"
       subtitleKey="page.techdebt.empty.subtitle"
       buttonTextKey="page.techdebt.empty.start"

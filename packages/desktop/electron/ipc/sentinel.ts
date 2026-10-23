@@ -15,7 +15,9 @@ import {
   discoverLogPaths,
   defaultFileWatchFilter,
   DEFAULT_IGNORE_DIRS,
+  isInformationalEvent,
 } from '@zh/sentinel';
+import type { SentinelEventQuery } from '../../src/types/electron';
 import { getSentinel, stopAllMonitoring, type SentinelRuntime } from '../ipc-context';
 
 const STATE_FILE = 'sentinel-state.json';
@@ -159,11 +161,13 @@ async function startMonitors(
 function registerEventQuery(): void {
   ipcMain.handle(
     'sentinel:getEvents',
-    async (_event, options?: { status?: string; severity?: string }): Promise<SentinelEvent[]> => {
+    async (_event, options?: SentinelEventQuery): Promise<SentinelEvent[]> => {
       const { eventCenter } = await getSentinel();
-      return eventCenter.listEvents(
+      const events = eventCenter.listEvents(
         options as { status?: EventStatus; severity?: EventSeverity } | undefined,
       );
+      if (options?.excludeInformational !== true) return events;
+      return events.filter((event) => !isInformationalEvent(event));
     },
   );
 

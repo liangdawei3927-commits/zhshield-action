@@ -17,6 +17,12 @@ import {
   writeGuardConfig,
 } from './services/engineApi';
 import { useSentinelSwitch } from './app-logic-sentinel';
+import {
+  readSelectedProjectPath,
+  resolveCanonicalPath,
+  resolveSelectedIndex,
+  writeSelectedProjectPath,
+} from './project-selection';
 
 /** 应用页面路由标识：欢迎页 + 各治理域页面 + 报告/备份/画像等汇总页 */
 export type Page =
@@ -220,6 +226,7 @@ function useAddProject(
   setCurrentPage: Dispatch<SetStateAction<Page>>,
   toast: (msg: string, variant?: ToastVariant) => void,
   setOnboardingProject: (name: string | null) => void,
+  selectProjectByPath: (path: string | null) => void,
 ): { openFolderAndAddProject: () => Promise<void> } {
   const openFolderAndAddProject = useCallback(async () => {
     const api = window.electronAPI;
@@ -231,27 +238,67 @@ function useAddProject(
     if (!path) return; // 用户主动取消对话框，保持静默
     const name = path.split('/').pop() || path.split('\\').pop() || '';
     setProjects((prev) => [...prev, { name, path }]);
+    // 新添加的项目即成为当前项目：否则引导完成后「项目体检」跑的仍是旧项目
+    selectProjectByPath(path);
     setOnboardingProject(name);
     toast(t('toast.projectAdded', { projectName: name }), 'success');
     void installGuardHooks(path).catch(() => {});
     void startSentinelMonitoring(path).catch(() => {});
-  }, [toast, setProjects, setCurrentPage, setOnboardingProject]);
+  }, [toast, setProjects, setCurrentPage, setOnboardingProject, selectProjectByPath]);
 
   return { openFolderAndAddProject };
 }
 
-function useCurrentProjectIndex(projectCount: number): {
+/** 取 localStorage（node 环境 / 隐私模式下为 null，调用方需容错） */
+function getLocalStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 当前选中项目：按 path 持久化，重启后回到上次选中的项目。
+ *
+ * 为什么用 path 而不是 index：项目增删或顺序变化都会让 index 漂移
+ * （删掉第 1 个后，原本的第 2 个变成第 0 个 → 选中项悄悄换成别的项目）。
+ * path 是稳定标识，下标每次由 path 反查，天然跟随列表变化。
+ */
+function useSelectedProject(projects: ProjectInfo[]): {
   currentProjectIndex: number;
   switchCurrentProject: (index: number) => void;
+  selectProjectByPath: (path: string | null) => void;
 } {
-  const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
-  useEffect(() => {
-    setCurrentProjectIndex((idx) => Math.min(idx, Math.max(projectCount - 1, 0)));
-  }, [projectCount]);
-  const switchCurrentProject = useCallback((index: number) => {
-    setCurrentProjectIndex(index);
+  const [selectedPath, setSelectedPath] = useState<string | null>(() =>
+    readSelectedProjectPath(getLocalStorage()),
+  );
+
+  const selectProjectByPath = useCallback((path: string | null) => {
+    setSelectedPath(path);
+    writeSelectedProjectPath(getLocalStorage(), path);
   }, []);
-  return { currentProjectIndex, switchCurrentProject };
+
+  const currentProjectIndex = resolveSelectedIndex(projects, selectedPath);
+  const canonicalPath = resolveCanonicalPath(projects, selectedPath);
+
+  // 自愈：首次运行 / 选中的项目被移除 / 路径失效（目录改名）→ 收敛到列表第一项并落盘。
+  // 项目列表尚空（异步加载中）时 canonicalPath 为 null，不做任何写入。
+  useEffect(() => {
+    if (!canonicalPath || canonicalPath === selectedPath) return;
+    selectProjectByPath(canonicalPath);
+  }, [canonicalPath, selectedPath, selectProjectByPath]);
+
+  const switchCurrentProject = useCallback(
+    (index: number) => {
+      const target = projects[index];
+      if (!target) return;
+      selectProjectByPath(target.path);
+    },
+    [projects, selectProjectByPath],
+  );
+
+  return { currentProjectIndex, switchCurrentProject, selectProjectByPath };
 }
 
 /** 从 localStorage 读取已完成「添加项目诊断」的项目路径集合（解析失败视为空） */
@@ -311,14 +358,16 @@ export function useAppState() {
   usePersistProjects(projects, loaded);
   const [onboardingProject, setOnboardingProject] = useState<string | null>(null);
   const { onboardedPaths, markOnboarded } = useOnboardedProjects();
+  const { currentProjectIndex, switchCurrentProject, selectProjectByPath } =
+    useSelectedProject(projects);
   const { openFolderAndAddProject } = useAddProject(
     setProjects,
     setCurrentPage,
     toast,
     setOnboardingProject,
+    selectProjectByPath,
   );
   const { removeProject } = useRemoveProject(projects, setProjects, setCurrentPage, toast);
-  const { currentProjectIndex, switchCurrentProject } = useCurrentProjectIndex(projects.length);
 
   return {
     currentPage,

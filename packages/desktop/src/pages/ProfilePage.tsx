@@ -9,47 +9,65 @@ import {
   TargetCard,
   OverridesPanel,
 } from './profile-parts';
+import { PageGlyph } from '../components/business/page-glyph';
 import { useNotification } from '../contexts/NotificationContext';
+import { useT } from '../i18n';
 
 interface ProfilePageProps {
   projectPath: string;
 }
 
 function ProfileLoadingView() {
+  const t = useT();
   return (
     <div className="h-full w-full bg-zh-bg flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zh-info mx-auto mb-3" />
-        <p className="text-sm text-zh-muted">正在分析项目…</p>
+        <p className="text-sm text-zh-muted">{t('page.profile.detecting')}</p>
       </div>
     </div>
   );
 }
 
 function ProfileErrorView({ error }: { error: string | null }) {
+  const t = useT();
   return (
     <div className="h-full w-full bg-zh-bg flex items-center justify-center">
       <div className="text-center">
-        <p className="text-sm text-danger-600 mb-2">画像分析失败</p>
-        <p className="text-xs text-zh-muted">{error ?? '未知错误'}</p>
+        <p className="text-sm text-danger-600 mb-2">{t('page.profile.error.title')}</p>
+        <p className="text-xs text-zh-muted">{error ?? t('page.profile.error.unknown')}</p>
       </div>
     </div>
   );
 }
 
 function ProfileHeader({ profile }: { profile: ProjectProfile }) {
+  const t = useT();
   return (
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-bold text-zh-ink">项目画像</h1>
-        {profile.stale && <StaleBadge />}
-      </div>
-      <div className="flex items-center gap-2 text-xs text-zh-muted">
-        <span>检测于 {new Date(profile.detectedAt).toLocaleString()}</span>
-        {profile.lastConfirmedAt && (
-          <span>· 确认于 {new Date(profile.lastConfirmedAt).toLocaleString()}</span>
-        )}
-        <span className="font-mono bg-zh-panel px-2 py-0.5 rounded">v{profile.schemaVersion}</span>
+    <div className="flex items-center gap-4 mb-6">
+      <PageGlyph bg="brand" stroke="brand">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+      </PageGlyph>
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-zh-ink flex items-center gap-2">
+          {t('page.profile.title')}
+          {profile.stale && <StaleBadge />}
+        </h1>
+        <p className="text-sm text-zh-muted mt-1">
+          {t('page.profile.detectedAt', { time: new Date(profile.detectedAt).toLocaleString() })}
+          {profile.lastConfirmedAt && (
+            <span>
+              {' · '}
+              {t('page.profile.confirmedAt', {
+                time: new Date(profile.lastConfirmedAt).toLocaleString(),
+              })}
+            </span>
+          )}
+          <span className="font-mono bg-zh-panel px-2 py-0.5 rounded ml-2">
+            v{profile.schemaVersion}
+          </span>
+        </p>
       </div>
     </div>
   );
@@ -62,26 +80,33 @@ function ProfileOverview({
   profile: ProjectProfile;
   signalCount: number;
 }) {
+  const t = useT();
   return (
-    <SectionCard title="概览">
+    <SectionCard title={t('page.profile.section.overview')}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="text-center p-3 bg-zh-bg rounded-lg">
-          <div className="text-[11px] text-zh-muted mb-1">架构形态</div>
+          <div className="text-[11px] text-zh-muted mb-1">
+            {t('page.profile.overview.architecture')}
+          </div>
           <div className="text-sm font-semibold text-zh-ink">{profile.architecture.value}</div>
           <ConfidenceBadge confidence={profile.architecture.confidence} />
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
-          <div className="text-[11px] text-zh-muted mb-1">目标数</div>
+          <div className="text-[11px] text-zh-muted mb-1">{t('page.profile.overview.targetCount')}</div>
           <div className="text-sm font-semibold text-zh-ink">{profile.targets.length}</div>
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
-          <div className="text-[11px] text-zh-muted mb-1">运行环境</div>
+          <div className="text-[11px] text-zh-muted mb-1">
+            {t('page.profile.overview.environments')}
+          </div>
           <div className="text-sm font-semibold text-zh-ink">
             {profile.environments.map((e) => e.value).join(', ')}
           </div>
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
-          <div className="text-[11px] text-zh-muted mb-1">信号总数</div>
+          <div className="text-[11px] text-zh-muted mb-1">
+            {t('page.profile.overview.signalCount')}
+          </div>
           <div className="text-sm font-semibold text-zh-ink">{signalCount}</div>
         </div>
       </div>
@@ -90,8 +115,9 @@ function ProfileOverview({
 }
 
 function ProfileTargets({ profile }: { profile: ProjectProfile }) {
+  const t = useT();
   return (
-    <SectionCard title="目标列表">
+    <SectionCard title={t('page.profile.section.targets')}>
       {profile.targets.map((target) => (
         <TargetCard key={target.id} target={target} />
       ))}
@@ -100,14 +126,21 @@ function ProfileTargets({ profile }: { profile: ProjectProfile }) {
 }
 
 function ProfileEnvironments({ profile }: { profile: ProjectProfile }) {
+  const t = useT();
   return (
-    <SectionCard title="运行环境">
+    <SectionCard title={t('page.profile.section.environments')}>
       <div className="space-y-1">
         {profile.environments.map((env, i) => (
           <DataRow
             key={i}
             label={env.value}
-            value={<span className="font-mono">{env.confidence >= 0.9 ? '确认' : '候选'}</span>}
+            value={
+              <span className="font-mono">
+                {env.confidence >= 0.9
+                  ? t('page.profile.env.confirmed')
+                  : t('page.profile.env.candidate')}
+              </span>
+            }
             badge={<ConfidenceBadge confidence={env.confidence} />}
           />
         ))}
@@ -117,14 +150,23 @@ function ProfileEnvironments({ profile }: { profile: ProjectProfile }) {
 }
 
 function ProfileDependencies({ profile }: { profile: ProjectProfile }) {
+  const t = useT();
   return (
-    <SectionCard title="依赖摘要">
-      <DataRow label="包管理器" value={profile.dependencies.packageManager ?? '未知'} />
-      <DataRow label="锁文件" value={profile.dependencies.lockfilePath ?? '未检测'} />
+    <SectionCard title={t('page.profile.section.dependencies')}>
       <DataRow
-        label="直接依赖"
+        label={t('page.profile.deps.packageManager')}
+        value={profile.dependencies.packageManager ?? t('page.profile.deps.unknown')}
+      />
+      <DataRow
+        label={t('page.profile.deps.lockfile')}
+        value={profile.dependencies.lockfilePath ?? t('page.profile.deps.notDetected')}
+      />
+      <DataRow
+        label={t('page.profile.deps.direct')}
         value={
-          <span className="text-[11px] font-mono">{profile.dependencies.direct.length} 个</span>
+          <span className="text-[11px] font-mono">
+            {t('page.profile.deps.count', { count: profile.dependencies.direct.length })}
+          </span>
         }
       />
       {profile.dependencies.direct.length > 0 && (
@@ -145,8 +187,9 @@ function ProfileDependencies({ profile }: { profile: ProjectProfile }) {
 }
 
 function ProfileOverrides({ profile }: { profile: ProjectProfile }) {
+  const t = useT();
   return (
-    <SectionCard title="人工修正记录">
+    <SectionCard title={t('page.profile.section.overrides')}>
       <OverridesPanel overrides={profile.overrides} />
     </SectionCard>
   );
@@ -157,20 +200,22 @@ function ProfileSignals({
 }: {
   signals: ProjectProfile['targets'][number]['language']['signals'];
 }) {
+  const t = useT();
   return (
-    <SectionCard title="信号追溯">
+    <SectionCard title={t('page.profile.section.signals')}>
       <SignalList signals={signals} />
     </SectionCard>
   );
 }
 
 function ProfileNotifications({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  const t = useT();
   return (
-    <SectionCard title="通知设置">
+    <SectionCard title={t('page.profile.section.notifications')}>
       <div className="flex items-center justify-between py-2">
         <div>
-          <div className="text-sm font-medium text-zh-ink">系统通知</div>
-          <div className="text-xs text-zh-muted">门禁拦截和哨兵告警时发送系统通知</div>
+          <div className="text-sm font-medium text-zh-ink">{t('page.profile.notify.title')}</div>
+          <div className="text-xs text-zh-muted">{t('page.profile.notify.desc')}</div>
         </div>
         <button
           type="button"

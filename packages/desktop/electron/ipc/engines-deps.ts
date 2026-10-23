@@ -38,6 +38,7 @@ import { updateDashboardState, type DashboardDepsState } from './dashboard-state
 import { detectProfileInWorker } from '../profile-host';
 import type { DependencyReportData, DepsRelockResult } from '../../src/types/electron';
 import { emptyDependencyReportData } from '../../src/services/empty-engine-reports';
+import type { TaskProgressReporter } from '../task-progress';
 
 /** 按信任状态统计节点数（verified / suspicious / compromised / unknown） */
 function countTrustCounts(nodes: DependencyNode[]): Record<string, number> {
@@ -135,22 +136,29 @@ async function updateDepsDashboard(
   await updateDashboardState(projectPath, { deps: depsDashboardPatch(report) });
 }
 
-export async function runDepsHandler(projectPath: string): Promise<DependencyReportData> {
+export async function runDepsHandler(
+  projectPath: string,
+  onProgress?: TaskProgressReporter,
+): Promise<DependencyReportData> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
+    onProgress?.('deps', t('pipeline.deps.loadingBaseline'), 0.05);
     const projectRoot = resolveProjectRoot(projectPath);
     const baseline = await loadDepsBaseline(projectRoot);
+    onProgress?.('deps', t('pipeline.deps.buildingGraph'), 0.15);
     const graph = buildDependencyGraph(projectRoot);
     const matrix = buildLicenseMatrix(graph);
     let nodes = graph.nodes;
+    onProgress?.('deps', t('pipeline.deps.checking'), 0.45);
     const [typosquat, lockfileCheck, upgrade, env] = await Promise.all([
       runTyposquatChecks(graph),
       runLockfileChecks(projectRoot, baseline?.integrity),
       runUpgradeChecks(nodes),
       runEnvConsistencyChecks(projectRoot),
     ]);
+    onProgress?.('deps', t('pipeline.deps.reporting'), 0.85);
     // 与基线哈希不符的节点 → 最高危 trust（须在 countTrustCounts 之前覆盖；浅拷贝替换，不原地改）
     // mismatchedNodeIds 由 verify() 的 actual !== undefined 语义保证：仅同版本哈希真实改变才命中，
     // 升级（版本号变化）天然免疫，不误报。

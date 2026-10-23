@@ -22,7 +22,12 @@ function notRun(name: string, weight: number): DimensionScore {
   return { name, weight, score: 0, issues: 0, status: 'not-run' };
 }
 
-// 导出原因：composite 项目声明产物需要（ScoreDimensionParams 引用本类型），未经枢纽 re-export，包公开 API 不变
+/**
+ * 各附加域数据（安全/依赖/技术债/哨兵/重构/性能/垃圾/备份）的归一化结果，
+ * 未提供该域数据时为 null。
+ *
+ * 导出原因：composite 项目声明产物需要（ScoreDimensionParams 引用本类型），未经枢纽 re-export，包公开 API 不变
+ */
 export interface ExtrasResolved {
   secrets: SecretDataLike | null;
   deps: DepsDataLike | null;

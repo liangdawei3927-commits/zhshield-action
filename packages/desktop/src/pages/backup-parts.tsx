@@ -220,12 +220,11 @@ export function BackupProgressBar({ progress }: { progress: BackupProgressData |
         <span className="text-zh-ink">{progress.message}</span>
         <span className="text-zh-muted tabular-nums">{progress.percent}%</span>
       </div>
-      <div className="h-1.5 rounded-full bg-brand-100 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-zh-line overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-500"
+          className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-brand-600 to-brand-800"
           style={{
             width: `${Math.min(100, Math.max(0, progress.percent))}%`,
-            background: 'rgb(var(--zh-brand))',
           }}
         />
       </div>

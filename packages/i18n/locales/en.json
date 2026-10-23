@@ -1294,7 +1294,8 @@
       "attentionHint": "The following checks did not run or produced no conclusion; they do not count as passed",
       "errorTitle": "Inspection failed",
       "errorNoReport": "The inspection returned no valid result. Try again or check the run log",
-      "errorRetry": "Re-run inspection"
+      "errorRetry": "Re-run inspection",
+      "snapshotNote": "This is the last persisted inspection snapshot, which keeps only issues (passed checks are not persisted); \"Total\" and \"Passed\" therefore show —. Run a new inspection for complete results."
     },
     "performance": {
       "autoFixable": "Auto-fixable",
@@ -1904,6 +1905,22 @@
         "productForm": "form={{value}}",
         "updatedAt": "Last updated: {{time}}"
       }
+    },
+    "snapshotReport": {
+      "title": "Last check result",
+      "notice": "This is the result saved by the most recent check of this category; the page score comes from the same data. For a full report (including passed checks), click \"Re-check\".",
+      "total": "Total issues",
+      "error": "Errors",
+      "warning": "Warnings",
+      "info": "Info",
+      "empty": "The last check recorded no issues.",
+      "rescan": "Re-check",
+      "rescanning": "Checking",
+      "loading": "Loading the last result…",
+      "suggestion": "Suggestion",
+      "autoFixable": "Auto-fixable",
+      "truncated": "Showing the first {{shown}} of {{total}} entries.",
+      "unavailable": "The saved result for this category could not be read. Click \"Re-check\" to generate one."
     }
   },
   "pipeline": {

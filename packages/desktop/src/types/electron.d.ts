@@ -64,7 +64,7 @@ export interface InspectionReportData {
   checks: Array<{
     id: string;
     name: string;
-    status: 'pass' | 'warn' | 'fail' | 'attention';
+    status: 'pass' | 'warn' | 'fail' | 'attention' | 'info';
     detail: string;
     category?: string;
     /** 来源引擎/适配器标识（如 'ai-code-review' / 'semgrep' / 'eslint'） */
@@ -74,6 +74,109 @@ export interface InspectionReportData {
     duration: number;
     timestamp: string;
   };
+  /**
+   * 数据覆盖度（缺省 = full，向后兼容）。
+   * - full：本次完整扫描，checks 含通过项与未检测项；
+   * - issues-only：读自历史落盘快照（`domains/<source>.json`），**仅含问题项**，
+   *   通过项不落盘 → UI 不得据此宣称「通过数/通过率」。
+   */
+  coverage?: 'full' | 'issues-only';
+}
+
+/** 诊断来源（按域快照落盘键，与主进程 DiagnosticSource 对齐） */
+export type DomainReportSource =
+  | 'guard'
+  | 'inspect'
+  | 'refactor'
+  | 'deps'
+  | 'techdebt'
+  | 'security'
+  | 'performance';
+
+/**
+ * 按域落盘快照的渲染侧镜像（`.zhshield/diagnostics/domains/<source>.json`）。
+ * 只含问题条目（通过项不落盘），用于「有历史评分即可查看详情」的场景。
+ */
+export interface DomainReportSnapshot {
+  generatedAt: string;
+  summary: { total: number; error: number; warning: number; info: number };
+  issues: Array<{
+    ruleId: string;
+    severity: 'error' | 'warning' | 'info';
+    category: string;
+    message: string;
+    file: string;
+    line?: number;
+    column?: number;
+    suggestion?: string;
+    autoFixable: boolean;
+    source: string;
+    fingerprint: string;
+  }>;
+  dimensionScore?: {
+    dimension: 'quality';
+    score: number;
+    issues: number;
+    status: 'scored' | 'not-run';
+    version?: number;
+  };
+}
+
+/**
+ * 一次域扫描的历史摘要（渲染侧镜像，`.zhshield/history/<domain>.jsonl` 的一行）。
+ *
+ * 与 `DomainReportSnapshot` 的区别：快照是「最近一次」的覆盖写，本类型是「每一次」。
+ * 指纹集已由主进程解压（写入时的 `sameAs` 指针补齐），可直接与上一条做 diff。
+ */
+export interface DomainScanRecordData {
+  scanId: string;
+  domain: string;
+  /** 该次扫描的时间（快照 generatedAt） */
+  scannedAt: string;
+  /** 记录写入时间（补写旧快照时会晚于 scannedAt） */
+  recordedAt: string;
+  /** 该域分数；该域当时不出分则为 null（不是 0 分） */
+  score: number | null;
+  scoreVersion?: number;
+  total: number;
+  error: number;
+  warning: number;
+  info: number;
+  /** false = 该域问题不带严重级别（如垃圾清理），error/warning/info 恒为 0，不可推断为「都是 info」 */
+  severityApplicable?: boolean;
+  esloc?: number;
+  /** 相对项目根的指纹集（绝对路径前缀已剥离，换目录/换机仍可比） */
+  fingerprints: string[];
+  fingerprintsHash: string;
+  sameAs?: string;
+  coverage?: { files?: number; skipped?: number };
+  /** 明细 blob 名；null/缺省 = 本次未保存明细 */
+  blob?: string | null;
+  /**
+   * true = 由「最近一次快照」临时回填（升级前的数据，无逐次历史）。
+   * 这类记录只读、不落盘，用于让上次检查时间立刻可见。
+   */
+  backfilled?: boolean;
+}
+
+/** 某次扫描的明细（L3）：只在该次指纹集发生变化时落盘 */
+export interface DomainScanBlobData {
+  scanId: string;
+  domain: string;
+  scannedAt: string;
+  entries: Array<{
+    ruleId: string;
+    severity: 'error' | 'warning' | 'info';
+    category: string;
+    message: string;
+    file: string;
+    line?: number;
+    column?: number;
+    suggestion?: string;
+    autoFixable: boolean;
+    source: string;
+    fingerprint: string;
+  }>;
 }
 
 /** @zh/security SecurityScanReport shape (serializable)。
@@ -192,6 +295,10 @@ export interface HealthScoreData {
 
 /** 项目画像（可序列化子集，供前端列出模块用于模块级评分） */
 export interface ModuleProfileData {
+  /**
+   * 模块**绝对路径**（主进程已解析，与 `scores.project_id` 同源）。
+   * 不要拿它当相对路径拼 URL 或做前缀匹配；画像原始相对值只在主进程内部使用。
+   */
   path: string;
   type: string;
 }
@@ -518,6 +625,38 @@ export interface EngineAPI {
     projectPath: string,
     dimension: ScoreDimension,
   ) => Promise<DomainScoreData | null>;
+  /** 读该域最近一次落盘快照（仅问题项）；无快照/损坏返回 null，UI 据此决定是否可查看详情 */
+  getDomainReport: (
+    projectPath: string,
+    source: DomainReportSource,
+  ) => Promise<DomainReportSnapshot | null>;
+  /** 某域完整报告落盘（扫描成功后调用）：详情页可原样回看上次结果 */
+  saveDomainReport: (projectPath: string, domain: string, report: unknown) => Promise<boolean>;
+  /** 读回某域最近一次完整报告；不存在/损坏返回 null */
+  getSavedDomainReport: (projectPath: string, domain: string) => Promise<unknown | null>;
+  /**
+   * 原样读回归一化快照（`diagnostics/domains/<domain>.json`），不做结构校验。
+   * 旧数据（无完整报告）唯一可回看的内容来源；渲染层按实际字段展示。
+   */
+  getDomainSnapshotRaw: (projectPath: string, domain: string) => Promise<unknown | null>;
+  /**
+   * 该域是否跑过（完整报告 or 归一化快照任一存在）。
+   * 「详情入口」与「详情视图」共用同一判据：有结果才给按钮，避免亮着却点进空态。
+   */
+  hasDomainResult: (projectPath: string, domain: string) => Promise<boolean>;
+  /**
+   * 某域扫描历史（新 → 旧）。每次扫描一条，含分数 / 问题数 / severity 分布 / 指纹集。
+   * 用于「这次比上次涨了还是跌了」与趋势回溯；无历史返回空数组。
+   */
+  listDomainHistory: (
+    projectPath: string,
+    domain: string,
+    limit?: number,
+  ) => Promise<DomainScanRecordData[]>;
+  /** 某次扫描的明细；该次未保存明细或文件损坏 → null */
+  getDomainScanBlob: (projectPath: string, blob: string) => Promise<DomainScanBlobData | null>;
+  /** 某域最近一次扫描记录（供分类页显示「上次检查 · 时间」）；无历史 → null */
+  getLatestDomainScan: (projectPath: string, domain: string) => Promise<DomainScanRecordData | null>;
   getProfile: (projectPath: string) => Promise<ProjectProfileData | null>;
   runPipeline: (
     projectPath: string,
@@ -566,9 +705,17 @@ export interface ToolsAPI {
   }>;
 }
 
+/** 哨兵事件查询条件：与 server 端 GET /system/sentinel/event-center 的查询参数同名同义 */
+export interface SentinelEventQuery {
+  readonly status?: string;
+  readonly severity?: string;
+  /** true 时排除不含可执行语义的通知类事件（进程生命周期、文件新增与内容变更） */
+  readonly excludeInformational?: boolean;
+}
+
 /** 哨兵（持续监控）API（主进程 IPC 桥接）：事件读取、单条查询与监控启停 */
 export interface SentinelAPI {
-  getEvents: (options?: { status?: string; severity?: string }) => Promise<SentinelEvent[]>;
+  getEvents: (options?: SentinelEventQuery) => Promise<SentinelEvent[]>;
   getEvent: (id: string) => Promise<SentinelEvent | undefined>;
   startMonitoring: (
     projectId: string,
@@ -701,7 +848,9 @@ export type TaskKind =
   | 'garbageRestore' // 回收站恢复
   | 'performance' // 优化加速
   | 'guard' // 门禁扫描
-  | 'refactor'; // 代码重构
+  | 'refactor' // 代码重构
+  | 'deps' // 依赖管家（依赖图 / 许可证 / 投毒 / 锁文件）
+  | 'techdebt'; // 技术债盘点
 
 /** 任务状态（主进程任务注册表中的生命周期状态） */
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';

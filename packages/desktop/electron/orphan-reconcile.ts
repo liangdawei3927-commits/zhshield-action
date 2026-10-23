@@ -33,7 +33,6 @@ import {
 import type { Db } from './orphan-reconcile-shared';
 import type {
   OrphanReconcileReport,
-  OrphanReason,
   OrphanState,
   CleanResetReport,
 } from './orphan-reconcile-types';

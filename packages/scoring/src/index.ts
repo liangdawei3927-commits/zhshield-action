@@ -21,7 +21,12 @@ export {
   applyWeightDeltas,
   applyDisabledDimensions,
 } from './profile-scoring-resolver';
-export { bucketFindingsByModule, scoreProjectModules, scoreProjectByModules } from './module-score';
+export {
+  bucketFindingsByModule,
+  resolveModuleId,
+  scoreProjectModules,
+  scoreProjectByModules,
+} from './module-score';
 export type {
   ModuleScoreInput,
   ModuleGuardInput,

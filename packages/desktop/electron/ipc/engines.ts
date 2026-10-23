@@ -29,7 +29,7 @@ import { shouldAutoFix, countFixableIssues, resolveOpenCodeBin } from '../ai-aut
 import { getScoring } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
 import { toGuardReportData, type GuardReportData, type PerformanceReportData } from './report-format';
-import type { TechDebtReportData } from '../../src/types/electron';
+import type { DependencyReportData, TechDebtReportData } from '../../src/types/electron';
 
 import {
   ResolvedPipelineReports,
@@ -40,9 +40,21 @@ import {
   getScoreHandler,
   getScoreHistoryHandler,
   getDomainScoreHandler,
+  getDomainReportHandler,
   runProfileHandler,
   getProfileHandler,
 } from './engines-scoring';
+import {
+  saveDomainReportHandler,
+  getSavedDomainReportHandler,
+  getDomainSnapshotRawHandler,
+  hasDomainResultHandler,
+} from './domain-reports';
+import {
+  getDomainScanBlobHandler,
+  getLatestDomainScanHandler,
+  listDomainHistoryHandler,
+} from './domain-history-ipc';
 import {
   readDiagnosticsReport,
   collectOpenCodeCandidates,
@@ -54,13 +66,8 @@ import {
   garbageDashboardPatch,
   performanceDashboardPatch,
 } from './engines-scanners';
-import { runDepsHandler, depsRelockBaselineHandler } from './engines-deps';
+import { depsRelockBaselineHandler } from './engines-deps';
 import {
-  loadDebtInputFromSnapshot,
-  buildTechDebtSnapshot,
-  mergeDebtPersistence,
-  persistTechDebtDiagnostics,
-  updateTechDebtDashboard,
   planDebtRepaymentHandler,
   verifyDebtRepaidHandler,
   dismissDebtActionHandler,
@@ -146,15 +153,51 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
   }
 }
 
+/**
+ * 单域扫描后的「总分补记」。
+ *
+ * 为什么需要：七个单域扫描（guard / security / garbage / performance / refactor /
+ * deps / techdebt）此前只更新域快照 + dashboard-state，**不写总分**；只有跑完整
+ * pipeline 或手动点「汇总生成报告」才落一条。结果是「一天扫十几次」在报告中心
+ * 只表现为「点过汇总的那几次」，趋势分析的分母与真实扫描次数不符。
+ *
+ * 口径：直接复用写分点 2/2 `generateReportSummaryHandler`（只读各域最新落盘结果，
+ * 不触发任何扫描），不新开第三条算分路径 —— 否则同一时刻会写出两个分、历史趋势断裂。
+ *
+ * 失败只 warn：补记失败不能让扫描结果丢失，也不能让扫描本身报错。
+ */
+async function recordDomainScanScore(projectPath: string): Promise<void> {
+  try {
+    await generateReportSummaryHandler(projectPath);
+  } catch (err) {
+    console.warn(
+      '[engine:runDomain] 扫描后总分补记失败（扫描结果不受影响）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * 包裹单域扫描：先拿到扫描结果，再补记总分。
+ *
+ * ⚠️ 只用于「不写总分」的单域扫描。`runPipeline` 自带 `recordPipelineScore`，
+ * 再包一层会让一次扫描写两条总分（历史曲线出现重复点）。
+ */
+async function withDomainScore<T>(projectPath: string, run: () => Promise<T>): Promise<T> {
+  const result = await run();
+  await recordDomainScanScore(projectPath);
+  return result;
+}
+
 export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) =>
-    runGuardHandler(manager, projectPath, options),
+    withDomainScore(projectPath, () => runGuardHandler(manager, projectPath, options)),
   );
   ipcMain.handle('engine:runSecurity', (_e, projectPath: string) =>
-    runSecurityHandler(manager, projectPath),
+    withDomainScore(projectPath, () => runSecurityHandler(manager, projectPath)),
   );
   ipcMain.handle('engine:runGarbageScan', (_e, projectPath: string) =>
-    runGarbageScanHandler(manager, projectPath),
+    withDomainScore(projectPath, () => runGarbageScanHandler(manager, projectPath)),
   );
   ipcMain.handle('engine:garbageClean', (_e, projectPath: string, items: unknown) =>
     garbageCleanHandler(manager, projectPath, items),
@@ -163,18 +206,28 @@ export function registerEnginesIpc(manager: TaskManager): void {
     garbageRestoreHandler(manager, projectPath, batchId),
   );
   ipcMain.handle('engine:runPerformance', (_e, projectPath: string) =>
-    runPerformanceHandler(manager, projectPath),
+    withDomainScore(projectPath, () => runPerformanceHandler(manager, projectPath)),
   );
   ipcMain.handle('engine:runRefactor', (_e, projectPath: string) =>
-    runRefactorHandler(manager, projectPath),
+    withDomainScore(projectPath, () => runRefactorHandler(manager, projectPath)),
   );
-  ipcMain.handle('engine:runDeps', (_e, projectPath: string) => runDepsHandler(projectPath));
+  ipcMain.handle('engine:runDeps', async (_e, projectPath: string) => {
+    const task = manager.start('deps', projectPath);
+    return withDomainScore(
+      projectPath,
+      async () => (await manager.waitFor(task.id)) as DependencyReportData,
+    );
+  });
   ipcMain.handle('engine:depsRelockBaseline', (_e, projectPath: string) =>
     depsRelockBaselineHandler(projectPath),
   );
-  ipcMain.handle('engine:runTechDebt', (_e, projectPath: string) =>
-    runTechDebtHandler(projectPath),
-  );
+  ipcMain.handle('engine:runTechDebt', async (_e, projectPath: string) => {
+    const task = manager.start('techdebt', projectPath);
+    return withDomainScore(
+      projectPath,
+      async () => (await manager.waitFor(task.id)) as TechDebtReportData,
+    );
+  });
   ipcMain.handle(
     'debt:planRepayment',
     (
@@ -208,6 +261,19 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:getScore', getScoreHandler);
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
   ipcMain.handle('engine:getDomainScore', getDomainScoreHandler);
+  // 读该域最近一次落盘快照（仅问题项）：供分类页「有历史结果即可查看详情」
+  ipcMain.handle('engine:getDomainReport', getDomainReportHandler);
+  // 各域「完整报告」落盘 / 读回：详情页可原样回看上次结果（不靠内存 report）
+  ipcMain.handle('engine:saveDomainReport', saveDomainReportHandler);
+  ipcMain.handle('engine:getSavedDomainReport', getSavedDomainReportHandler);
+  // 原样读回归一化快照（评分赖以计算的那份）：旧数据的唯一可回看内容
+  ipcMain.handle('engine:getDomainSnapshotRaw', getDomainSnapshotRawHandler);
+  // 该域是否跑过（完整报告 or 归一化快照任一存在）：决定「详情入口」是否可见
+  ipcMain.handle('engine:hasDomainResult', hasDomainResultHandler);
+  // 域级扫描历史：每次扫描一条（含分数/问题数/指纹集），供「涨了还是跌了」与趋势回溯
+  ipcMain.handle('engine:listDomainHistory', listDomainHistoryHandler);
+  ipcMain.handle('engine:getDomainScanBlob', getDomainScanBlobHandler);
+  ipcMain.handle('engine:getLatestDomainScan', getLatestDomainScanHandler);
   ipcMain.handle('engine:getProfile', getProfileHandler);
   ipcMain.handle('engine:runProfile', (_e, projectPath: string) => runProfileHandler(projectPath));
   // 报告中心：只读汇总各域最新结果并落库（不发起检查；无结果时返回 null）
@@ -318,42 +384,6 @@ async function runPerformanceHandler(
       issues: [],
       metadata: { duration: 0, timestamp: new Date().toISOString() },
     };
-  }
-}
-
-/** 技术债仪表盘失败时的空报告（error 携带失败原因，不 throw） */
-function emptyTechDebtReport(error: string): TechDebtReportData {
-  return {
-    projectId: '',
-    generatedAt: new Date().toISOString(),
-    debtIndex: 0,
-    trend: { period: 'week', delta: 0 },
-    byModule: [],
-    byCategory: [],
-    actionList: [],
-    error,
-  };
-}
-
-async function runTechDebtHandler(projectPath: string): Promise<TechDebtReportData> {
-  try {
-    if (!projectPath || typeof projectPath !== 'string') {
-      throw new Error(t('electron.invalidProjectPath'));
-    }
-    const input = await loadDebtInputFromSnapshot(projectPath);
-    if (!input.ok) {
-      console.warn('[engine:runTechDebt] 无 inspect 域快照，提示先运行项目体检');
-      return emptyTechDebtReport(t('electron.techDebtNoSnapshot'));
-    }
-    const snapshot = await buildTechDebtSnapshot(projectPath, input);
-    const finalSnapshot = await mergeDebtPersistence(snapshot);
-    const report: TechDebtReportData = { ...finalSnapshot, error: null };
-    await persistTechDebtDiagnostics(projectPath, report);
-    await updateTechDebtDashboard(projectPath, report);
-    return report;
-  } catch (err) {
-    console.error('[engine:runTechDebt] Error:', err);
-    return emptyTechDebtReport(err instanceof Error ? err.message : String(err));
   }
 }
 

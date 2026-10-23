@@ -3,16 +3,15 @@ import type { TaskKind } from '../../types/electron';
 /**
  * 分类的扫描进度来源 —— 导航分类与任务中心任务类型的唯一映射。
  *
- * owner 语义：
- * - own：本分类的扫描任务就是该 kind，进度即本域真实进度；
- * - borrowed：借用他域任务（未注册独立 kind），进度条显示的不是本域进度，待收口。
+ * taskKind 必须是本分类**自己**的任务类型。借用他域任务会让进度条显示非本域进度，
+ * 故不提供「借用」标记：没有独立任务源的分类（哨兵长驻监控 / 备份自有进度总线）
+ * 直接缺省 scanProgress。
  *
  * 缺省 scanProgress = 该分类没有统一进度条（无任务源，或用自建进度条）。
  */
 export interface NavScanProgress {
   /** 进度条订阅的任务中心任务类型 */
   taskKind: TaskKind;
-  owner: 'own' | 'borrowed';
 }
 
 /**
@@ -40,35 +39,24 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { id: 'inspect', labelKey: 'nav.inspect', scanProgress: { taskKind: 'pipeline', owner: 'own' } },
-  { id: 'guard', labelKey: 'nav.guard', scanProgress: { taskKind: 'guard', owner: 'own' } },
+  { id: 'inspect', labelKey: 'nav.inspect', scanProgress: { taskKind: 'pipeline' } },
+  { id: 'guard', labelKey: 'nav.guard', scanProgress: { taskKind: 'guard' } },
   { id: 'sentinel', labelKey: 'nav.sentinel' },
-  {
-    id: 'security',
-    labelKey: 'nav.security',
-    scanProgress: { taskKind: 'security', owner: 'own' },
-  },
-  { id: 'deps', labelKey: 'nav.deps', scanProgress: { taskKind: 'pipeline', owner: 'borrowed' } },
-  { id: 'garbage', labelKey: 'nav.garbage', scanProgress: { taskKind: 'garbage', owner: 'own' } },
-  {
-    id: 'performance',
-    labelKey: 'nav.performance',
-    scanProgress: { taskKind: 'performance', owner: 'own' },
-  },
-  {
-    id: 'techdebt',
-    labelKey: 'nav.techdebt',
-    scanProgress: { taskKind: 'pipeline', owner: 'borrowed' },
-  },
-  {
-    id: 'refactor',
-    labelKey: 'nav.refactor',
-    scanProgress: { taskKind: 'refactor', owner: 'own' },
-  },
+  { id: 'security', labelKey: 'nav.security', scanProgress: { taskKind: 'security' } },
+  { id: 'deps', labelKey: 'nav.deps', scanProgress: { taskKind: 'deps' } },
+  { id: 'garbage', labelKey: 'nav.garbage', scanProgress: { taskKind: 'garbage' } },
+  { id: 'performance', labelKey: 'nav.performance', scanProgress: { taskKind: 'performance' } },
+  { id: 'techdebt', labelKey: 'nav.techdebt', scanProgress: { taskKind: 'techdebt' } },
+  { id: 'refactor', labelKey: 'nav.refactor', scanProgress: { taskKind: 'refactor' } },
   { id: 'backup', labelKey: 'nav.backup' },
 ];
 
 /** 查某分类的扫描进度来源（无则 undefined） */
 export function navScanProgress(id: string): NavScanProgress | undefined {
   return navItems.find((item) => item.id === id)?.scanProgress;
+}
+
+/** 反查任务类型所属的导航分类（用于全局进度指示器点击跳转）；映射唯一，取首个命中 */
+export function navIdForTaskKind(kind: TaskKind): string | undefined {
+  return navItems.find((item) => item.scanProgress?.taskKind === kind)?.id;
 }

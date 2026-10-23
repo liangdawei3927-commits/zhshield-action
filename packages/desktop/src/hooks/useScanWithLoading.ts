@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 /**
  * 「置 loading → 运行扫描 → 回填报告 → 关 loading」骨架。
  *
- * 仅覆盖 secrets / tech-debt 两处**逐字一致**的 `handleScan`
+ * 仅覆盖 secrets 一处**直连主进程**的 `handleScan`
  *（`setLoading(true); const result = await scan(path); setReport(result); setLoading(false);`，
  * 无 try/finally —— 与原实现一致，失败时会跳过 `setLoading(false)`）。
  *

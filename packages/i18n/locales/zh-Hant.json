@@ -1294,7 +1294,8 @@
       "attentionHint": "以下檢查未執行或未產出結論，不計入通過",
       "errorTitle": "體檢失敗",
       "errorNoReport": "體檢未回傳有效結果，請重試或查看執行日誌",
-      "errorRetry": "重新體檢"
+      "errorRetry": "重新體檢",
+      "snapshotNote": "以上為最近一次巡檢的落盤快照，僅保留問題項：通過項未落盤，因此「總檢查」「通過」顯示為 —。點「重新體檢」可取得完整結果。"
     },
     "performance": {
       "autoFixable": "可自動修復",
@@ -1904,6 +1905,22 @@
         "stripeKey": "Stripe Key",
         "twilioKey": "Twilio Key"
       }
+    },
+    "snapshotReport": {
+      "title": "最近一次檢查結果",
+      "notice": "這是該分類最近一次檢查保存下來的結果，頁面評分與它同源。如需完整報告（含通過項等明細），請點「重新檢查」。",
+      "total": "問題總數",
+      "error": "錯誤",
+      "warning": "警告",
+      "info": "提示",
+      "empty": "最近一次檢查沒有記錄到問題條目。",
+      "rescan": "重新檢查",
+      "rescanning": "檢查中",
+      "loading": "正在讀取最近一次結果…",
+      "suggestion": "建議",
+      "autoFixable": "可自動修復",
+      "truncated": "僅顯示前 {{shown}} 條，共 {{total}} 條。",
+      "unavailable": "讀取不到該分類的歷史結果檔案，請點「重新檢查」產生一次。"
     }
   },
   "pipeline": {

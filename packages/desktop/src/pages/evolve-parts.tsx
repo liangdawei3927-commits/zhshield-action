@@ -1,5 +1,6 @@
 import type { SuggestionData, RuleWeightData } from '../types/electron';
-import { Bounce, BounceCard } from '../components/ui/Bounce';
+import { BounceCard } from '../components/ui/Bounce';
+import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { getScoreColor } from './reports-logic';
@@ -46,21 +47,12 @@ export function EvolveHeader({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-4 mb-8">
-      <Bounce className="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="rgb(var(--zh-info))"
-          strokeWidth="1.8"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06" />
-          <path d="M4.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06" />
-        </svg>
-      </Bounce>
+    <div className="flex items-center gap-4 mb-6">
+      <PageGlyph bg="info" stroke="info">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06" />
+        <path d="M4.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06" />
+      </PageGlyph>
       <div>
         <h1 className="text-2xl font-bold text-zh-ink mb-1">{t('page.evolve.title')}</h1>
         <p className="text-sm text-zh-muted">

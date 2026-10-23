@@ -6,6 +6,7 @@ import type { PipelineReport } from '@zh/pipeline';
 import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics-types';
 import { buildDiagnosticsReport, countSourceEsloc } from './zh-diagnostics-esloc';
 import { normalizePipelineReport } from './zh-diagnostics-normalize';
+import { appendDomainHistory, buildScanRecord } from './domain-history';
 
 // ─── 落盘 ──────────────────────────────────────────────────────────────
 
@@ -55,8 +56,48 @@ async function writeDomainSnapshots(
         'utf-8',
       ),
     );
+    writes.push(recordScanHistory(report, source, issues, snapshot, esloc));
   }
   await Promise.all(writes);
+}
+
+/**
+ * 把本次域扫描写进历史（`history/<domain>.jsonl`）。
+ *
+ * 与快照覆盖写并行：快照只保留「最近一次」，历史保留每一次 —— 这是
+ * 「今天为什么掉 5 分」「这条问题是我修的还是它自己消失的」唯一可回溯的依据。
+ *
+ * 独立性：历史写入失败只 warn，**不得**影响快照落盘（否则为了记历史反而丢了当前结果）。
+ */
+async function recordScanHistory(
+  report: DiagnosticsReport,
+  source: DiagnosticSource,
+  issues: readonly DiagnosticEntry[],
+  snapshot: DiagnosticsReport,
+  esloc: number,
+): Promise<void> {
+  try {
+    const dimensionScore = snapshot.dimensionScore;
+    const record = buildScanRecord({
+      domain: source,
+      scannedAt: report.generatedAt,
+      recordedAt: new Date().toISOString(),
+      projectPath: report.project.path,
+      issues,
+      score: dimensionScore?.score ?? null,
+      ...(dimensionScore?.version === undefined
+        ? {}
+        : { scoreVersion: dimensionScore.version }),
+      // esloc 只对 inspect 有意义（其他域没有密度归一化分母），传 0 会被误读成「零行项目」
+      ...(source === 'inspect' && esloc > 0 ? { esloc } : {}),
+    });
+    await appendDomainHistory(report.project.path, record, issues);
+  } catch (err) {
+    console.warn(
+      '[zh-diagnostics] 域历史写入失败（快照已落盘，不影响当前结果）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }
 
 async function buildDomainSnapshot(
@@ -179,7 +220,8 @@ interface DomainGroup {
   issues: DiagnosticEntry[];
 }
 
-/** 收集各域快照（文件名为域键） */
+/** 收集各域快照（文件名为域键）。
+ *  读取目标固定为 <项目>/.zhshield/diagnostics/domains 单层目录，不递归、不触达 node_modules。 */
 async function collectDomainGroups(
   projectPath: string,
 ): Promise<Map<DiagnosticSource, DomainGroup>> {
@@ -191,10 +233,17 @@ async function collectDomainGroups(
     // 目录不存在 = 从未按域落盘，交由 latest.json 兜底
     files = [];
   }
-  for (const file of files) {
-    if (!file.endsWith('.json')) continue;
-    const source = file.slice(0, -'.json'.length) as DiagnosticSource;
-    const snapshot = await readDomainSnapshot(projectPath, source);
+  // 各域快照互相独立 → 并行读取（顺序由 sources 决定，与串行版一致）
+  const sources = files
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => file.slice(0, -'.json'.length) as DiagnosticSource);
+  const snapshots = await Promise.all(
+    sources.map(async (source) => ({
+      source,
+      snapshot: await readDomainSnapshot(projectPath, source),
+    })),
+  );
+  for (const { source, snapshot } of snapshots) {
     if (!snapshot) continue;
     groups.set(source, { generatedAt: snapshot.generatedAt, issues: [...snapshot.issues] });
   }

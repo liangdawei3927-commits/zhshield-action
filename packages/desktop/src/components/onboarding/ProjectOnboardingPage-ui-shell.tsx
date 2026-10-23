@@ -1,7 +1,7 @@
 // 项目引导页外壳 UI 组件
 import { EngineStatusIndicator } from '../ui/EngineStatusIndicator';
 import type { OnboardingStageProps } from './ProjectOnboardingPage-types';
-import { OnboardingLogo, OnboardingShield, OnboardingProgressBar } from './ProjectOnboardingPage-ui-core';
+import { OnboardingShield, OnboardingProgressBar } from './ProjectOnboardingPage-ui-core';
 import { OnboardingStepList } from './ProjectOnboardingPage-ui-steps';
 import {
   OnboardingRuleSyncSummary,

@@ -38,7 +38,8 @@ function getSnapshot(): TaskInfo[] {
 }
 
 export function useTasks(): TaskInfo[] {
-  return useSyncExternalStore(subscribe, getSnapshot);
+  // 第三个参数是 SSR/静态渲染快照：任务存储是模块级单例，服务端不订阅，返回同一快照即可。
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 /** 指定 kind + 项目的最新任务（含已完成；无则 undefined） */
@@ -58,6 +59,8 @@ export const TASK_KIND_DEFAULT_LABELS: Record<TaskKind, string> = {
   performance: 'task.kind.performance',
   guard: 'task.kind.guard',
   refactor: 'task.kind.refactor',
+  deps: 'task.kind.deps',
+  techdebt: 'task.kind.techdebt',
 };
 
 /** useTaskRun 的返回值：loading/排队/进度/状态文案 + 对应任务条目 */

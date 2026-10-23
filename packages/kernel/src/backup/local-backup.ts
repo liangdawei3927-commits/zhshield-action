@@ -16,7 +16,7 @@ import {
   type LocalBackupRestoreResult,
 } from './types';
 import { buildZipSnapshot, restoreFromZipArchive } from './zip-snapshot';
-import { safeJoinReal } from '@zh/shared';
+import { expandHome, safeJoinReal } from '@zh/shared';
 import { LocalBackupScanner } from './local-backup-scanner';
 import { LocalBackupManifestStore } from './local-backup-manifest';
 import { LocalBackupCopier } from './local-backup-copier';
@@ -30,8 +30,6 @@ export type {
   LocalBackupManifest,
   LocalBackupRestoreResult,
 };
-
-const TILDE_PREFIX = /^~/;
 
 /** 快照条目名（ISO 时间戳目录或同名 .zip）；不匹配的条目（pre-restore-*、MANIFEST.json 等）不参与轮换 */
 const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(\.zip)?$/;
@@ -120,11 +118,9 @@ export class LocalBackup {
     }
   }
 
-  /** 解析备份根目录（支持 ~ 前缀展开） */
+  /** 解析备份根目录（支持 ~ 前缀展开，展开语义见 @zh/shared 的 expandHome） */
   private resolveBackupDir(config: LocalBackupConfig): string {
-    return config.backupDir
-      ? config.backupDir.replace(TILDE_PREFIX, os.homedir())
-      : this.backupRoot;
+    return config.backupDir ? expandHome(config.backupDir) : this.backupRoot;
   }
 
   /** zip 格式备份：构建快照归档并轮换旧备份 */

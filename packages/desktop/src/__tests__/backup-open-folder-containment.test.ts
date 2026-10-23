@@ -128,4 +128,34 @@ describe('backup:openFolder 越界路径不得抵达 shell', () => {
     await expect(openBackupFolder('/proj', '')).resolves.toBe(false);
     expect(OPENED).toEqual([]);
   });
+
+  /**
+   * 2026-10-24 回归：真实 .zhshield/backup.yml 里写的是 `~/zhshield-backups/<project>`
+   * （字面量 ~，BackupConfigManager 不做展开）。旧实现求根时用 resolve('~/…')，
+   * 得到 `<cwd>/~/…`，与打开端自行展开后的绝对路径永不包含 → 所有备份目录都打不开，
+   * 界面却提示「路径可能已被清理」。上面所有用例都传绝对路径，因此全部漏掉了这个情形。
+   */
+  it('配置里的备份根为 ~ 前缀时仍能打开（~ 必须展开后再做包含性校验）', async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.homedir(), '.zh-openfolder-tilde-'));
+    try {
+      const snap = path.join(homeRoot, 'proj', 'snapshot-1');
+      fs.mkdirSync(snap, { recursive: true });
+      CONFIG_BACKUP_DIR.value = `~/${path.relative(os.homedir(), homeRoot)}`;
+      await expect(openBackupFolder('/proj', snap)).resolves.toBe(true);
+      expect(OPENED).toEqual([snap]);
+    } finally {
+      fs.rmSync(homeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('~ 前缀的根同样不能放行根外路径', async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.homedir(), '.zh-openfolder-tilde-'));
+    try {
+      CONFIG_BACKUP_DIR.value = `~/${path.relative(os.homedir(), homeRoot)}`;
+      await expect(openBackupFolder('/proj', outside)).resolves.toBe(false);
+      expect(OPENED).toEqual([]);
+    } finally {
+      fs.rmSync(homeRoot, { recursive: true, force: true });
+    }
+  });
 });

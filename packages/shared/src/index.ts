@@ -181,7 +181,7 @@ export {
   createBaselineIo,
   type BaselineIo,
 } from './baseline';
-export { safeReadDirEntries } from './fs-safe';
+export { safeReadDirEntries, expandHome } from './fs-safe';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export { sanitizeEnv } from './process-env';

@@ -8,7 +8,7 @@
 import { app, ipcMain } from 'electron';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { safeResolveReal } from '@zh/shared';
+import { expandHome, safeResolveReal } from '@zh/shared';
 import { t } from '@zh/i18n';
 import {
   BackupOrchestrator,
@@ -190,8 +190,7 @@ function registerAuthorizeHandler(): void {
 
 /** 解析打开目标：快照目录可能已被 maxBackups 轮换清理，回退到其所在备份根目录 */
 async function resolveOpenTarget(folderPath: string): Promise<string | null> {
-  const { homedir } = await import('node:os');
-  let target = folderPath.startsWith('~') ? join(homedir(), folderPath.slice(1)) : folderPath;
+  let target = expandHome(folderPath);
   try {
     await stat(target);
   } catch {
@@ -229,11 +228,13 @@ async function resolveBackupRoots(projectPath: string): Promise<string[]> {
   const roots = new Set<string>();
   try {
     const config = await new BackupConfigManager().loadProjectConfig(projectPath);
-    if (config?.local?.backupDir) roots.add(resolve(config.local.backupDir));
+    // backupDir 是配置里的字面量（形如 `~/zhshield-backups/<project>`），必须先展开 `~`
+    // 再 resolve —— 否则根会变成 `<cwd>/~/zhshield-backups/...`，与真实快照路径永不包含。
+    if (config?.local?.backupDir) roots.add(resolve(expandHome(config.local.backupDir)));
   } catch {
     /* 配置不可读时下方回退到默认根 */
   }
-  roots.add(resolve(DEFAULT_BACKUP_ROOT));
+  roots.add(resolve(expandHome(DEFAULT_BACKUP_ROOT)));
   // 不接纳「根的父级」：快照形如 <root>/<project>/<snapshot>，resolveOpenTarget 的
   // 单层回退目标是 <root>/<project>，本就在根内。若把父级也列为合法根，同级任意
   // 目录（如 /tmp）都会被放行，包含性校验形同虚设。

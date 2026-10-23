@@ -30,6 +30,7 @@ pnpm + Turborepo monorepo，21 个 `@zh/*` 包。依赖方向：客户端 → �
 
 - 小步原子提交，语义化前缀（`feat:` / `fix:` / `chore:` / `refactor:`）
 - **提交后必须推送**：commit ≠ 备份，push 才是。2026-10-24 发现 365 个提交里 87 个从未推送、远端只有 277 个，本地磁盘是唯一副本。推送后核对 `git rev-list --left-right --count origin/main...HEAD` 应为 `0	0`
+- **未推送提示钩子**：`scripts/git-hooks/post-commit` 会在每次提交后打印未推送数量。`.git/hooks/` 不入库，换机器后需重装：`cp scripts/git-hooks/post-commit .git/hooks/ && chmod +x .git/hooks/post-commit`
 - **push protection 会拦测试夹具里的假密钥**：`packages/inspect/e2e/fixtures/zh-inspect-fixture/src/secret2.ts:4` 的假 `ghp_` 与 Stripe 官方测试键，会让任何含其变更的分支被拒。报错措辞是 `push declined due to repository rule violations`，**不是** rulesets（查 rulesets 是空的）而是 secret scanning；且 `--dry-run` 不触发服务端扫描，**别用它验证可推性**。要彻底解决需把该夹具改成 gitleaks allowlist 形态
 - 本地备份（`.zhshield/backups/` 与 `~/zhshield-backups/`）现已包含 `.git/`，恢复时会带回完整提交历史
 - zhcheck pre-commit 门禁已两次真实拦截提交（large-class 300 行阈值）。被拦时**禁止 `--no-verify`**：优先把不依赖实例状态的纯函数提为模块级函数给类体瘦身（runner.ts / pipeline-runner.ts 均有先例）

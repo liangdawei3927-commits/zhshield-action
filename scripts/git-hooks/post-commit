@@ -1,0 +1,28 @@
+#!/bin/sh
+# 提交后提示：还有多少提交未推送。
+#
+# 为什么需要：2026-10-24 发现本仓库 365 个提交里 87 个从未推送、远端只有 277 个，
+# 连续多日的工作只存在于本地磁盘。commit ≠ 备份，push 才是。
+#
+# 为什么只提示不自动推：push 依赖网络且可能耗时/失败，挂在 commit 流程里会拖慢
+# 每次提交并干扰提交流程。自动推送交给独立的定时任务，这里只做可见性提醒。
+#
+# 安装：cp scripts/git-hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null) || exit 0
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
+
+if [ -z "$upstream" ]; then
+    ahead=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    printf '\n\033[1;33m[git-hint] 分支 %s 没有上游，%s 个提交从未推送\033[0m\n' "$branch" "$ahead"
+    printf '           git push -u origin %s\n\n' "$branch"
+    exit 0
+fi
+
+ahead=$(git rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)
+if [ "${ahead:-0}" -gt 0 ] 2>/dev/null; then
+    printf '\n\033[1;33m[git-hint] %s 有 %s 个提交未推送（commit ≠ 备份，push 才是）\033[0m\n' "$branch" "$ahead"
+    printf '           git push origin %s\n\n' "$branch"
+fi
+
+exit 0

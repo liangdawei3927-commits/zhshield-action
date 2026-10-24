@@ -35,6 +35,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ⚠️ 必须在 Build 之前：build-cli.mjs 会先 rm -rf dist/sop 再 cp -r 从 kernel/src/sop
+      # 重建，若本校验排在其后，比较对象就变成"刚刚重新生成的产物"，结构上永不红。
+      # 2026-10-25 实测：提交里的 dist/sop 已漂移（cache/sop-sync-scheduler.ts 陈旧），
+      # 而 CI 因这个顺序一直绿 —— 门禁看着最严谨时恰恰什么都没测。
+      # 本步只读仓库文件，无需构建产物。
+      - name: Verify dist/sop sync with kernel source (before build)
+        run: pnpm --filter zhshield-cli verify:sop
+
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
@@ -54,9 +62,6 @@ jobs:
       # 下游报 "Cannot find module './xxx'" 且单跑也不过，极易误判为代码缺陷。
       - name: Check injected dependency copies are in sync
         run: pnpm check:copies
-
-      - name: Verify dist/sop sync with kernel source
-        run: pnpm --filter zhshield-cli verify:sop
 
       - name: Full typecheck (15 packages)
         run: pnpm typecheck

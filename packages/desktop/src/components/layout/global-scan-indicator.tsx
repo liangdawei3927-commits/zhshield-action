@@ -2,6 +2,7 @@ import { useNavigation } from '../../contexts/NavigationContext';
 import { useT } from '../../i18n';
 import { TASK_KIND_DEFAULT_LABELS, useTasks } from '../../task-store';
 import { DomainScanProgress } from '../business/DomainScanProgress';
+import { requestDetailIntent } from '../../hooks/nav-detail-intent';
 import { countActiveTasks, pickActiveTask } from './global-scan-indicator-logic';
 import { navIdForTaskKind } from './nav-items';
 
@@ -63,10 +64,17 @@ export function GlobalScanIndicator() {
     );
   }
 
+  // 点进度条的语义是「我要看这条任务的结果」，不是「我要逛这个分类」：
+  // 走后登记一次直达详情意图，归属页挂载时据此直接展开详情（否则要再点一次详情图标）
+  const openTaskOwner = () => {
+    requestDetailIntent(navId);
+    nav?.navigate(navId);
+  };
+
   return (
     <button
       type="button"
-      onClick={() => nav?.navigate(navId)}
+      onClick={openTaskOwner}
       title={kindName}
       aria-label={kindName}
       className={`${shellClass} cursor-pointer hover:shadow-xl transition-shadow`}

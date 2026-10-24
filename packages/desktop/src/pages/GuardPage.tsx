@@ -18,6 +18,7 @@ import {
   GuardConfigCard,
 } from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
+import { useDetailIntentEffect } from '../hooks/useDetailIntent';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
 import type { AppNotification } from '@zh/kernel';
 
@@ -292,6 +293,8 @@ export function GuardPage({ projectPath }: GuardPageProps) {
   // 可见，不自动把人带进详情页。实时扫描出结果时由下面的 onScan 切详情。
   // 曾经的 false 是在「report 恒为空」年代写的，数据改成挂载即读回后它变成了「直接进详情」。
   const [showHome, setShowHome] = useState(true);
+  // 本次跳转带「看结果」意图（扫描进度条点进来）→ 直接展开详情，扫完自动重渲染即进详情
+  useDetailIntentEffect('guard', () => setShowHome(false));
   const {
     loading,
     progress,

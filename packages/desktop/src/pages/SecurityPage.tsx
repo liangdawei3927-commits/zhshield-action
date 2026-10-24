@@ -4,6 +4,7 @@ import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useHasDomainResult } from '../hooks/useHasDomainResult';
 import { useDomainDetailEntry } from '../hooks/useDomainDetailEntry';
+import { useDetailIntentEffect } from '../hooks/useDetailIntent';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { useSecurityPage, SEVERITY_CONFIG } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
@@ -285,6 +286,8 @@ function SecurityReportView({
 function useSecurityPageState(projectPath: string) {
   // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
   const [showHome, setShowHome] = useState(true);
+  // 本次跳转带「看结果」意图（扫描进度条点进来）→ 直接展开详情
+  useDetailIntentEffect('security', () => setShowHome(false));
   const [tab, setTab] = useState<SecurityTab>('vuln');
   const {
     loading,

@@ -69,7 +69,10 @@ export function BackupEmptyState({
         projectPath={projectPath}
         dimension="backup"
         title={t('page.backup.empty.title')}
-        subtitle={t('page.backup.empty.lastBackup', { date: new Date().toLocaleString('zh-CN') })}
+        // 副标题只讲能力，不报「上次备份」：本组件同时充当分类主页（showHome=true），
+        // 有历史记录时也会渲染。此前传的是 `new Date()` 现编时间 —— 从未备份过也显示
+        // 「上次备份：刚刚」，且看不出是假的。真实上次备份时间由详情页的记录面板承担。
+        subtitle={t('page.backup.empty.subtitle')}
         features={buildBackupFeatures(t)}
         buttonText={t('page.backup.oneClickBackup')}
         onAction={onBackup}

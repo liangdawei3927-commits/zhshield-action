@@ -63,10 +63,7 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
     <PageShell
       illustration={<StackedDocs />}
       title={t('page.reports.empty.title')}
-      subtitle={t('page.reports.empty.subtitle', {
-        count: 0,
-        date: new Date().toLocaleDateString(),
-      })}
+      subtitle={t('page.reports.empty.subtitle')}
       featureList={[
         {
           icon: (

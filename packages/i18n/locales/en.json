@@ -912,7 +912,7 @@
             "title": "Auto sync"
           }
         },
-        "lastBackup": "Last backup: {{date}}",
+        "subtitle": "Keeps rollback-ready snapshots of project config and key files, on local and GitHub channels",
         "title": "Protect important config; your data never gets lost"
       },
       "noRecords": "No backup records yet",
@@ -1461,7 +1461,7 @@
             "title": "Trend comparison"
           }
         },
-        "subtitle": "{{count}} reports generated, last updated {{date}}",
+        "subtitle": "No score reports yet — run a project inspection and every health score and trend lands here",
         "title": "Multi-dimension analysis reports, better decisions"
       },
       "generate": "Summarize report",

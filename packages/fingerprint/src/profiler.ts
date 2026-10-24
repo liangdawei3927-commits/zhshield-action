@@ -51,11 +51,16 @@ export class Profiler {
     });
     const architecture = this.targetBuilder.determineArchitecture(allSignals);
     const dependencies = this.targetBuilder.extractDependencySummary(allSignals);
-    const mergedOverrides = this.overrideMerger.merge(overrides, target);
+    // target 级人工修正（语言/形态）必须套用到返回的画像目标上，
+    // 否则修正只停留在 mergedOverrides 里、不反映到 targets。
+    const { overrides: mergedOverrides, target: mergedTarget } = this.overrideMerger.merge(
+      overrides,
+      target,
+    );
     return {
       schemaVersion: 1,
       architecture,
-      targets: [target],
+      targets: [mergedTarget],
       environments: environmentResults,
       dependencies,
       detectedAt: new Date().toISOString(),

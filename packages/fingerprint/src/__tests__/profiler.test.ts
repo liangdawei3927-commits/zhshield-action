@@ -443,4 +443,52 @@ describe('Profiler', () => {
       }
     });
   });
+
+  describe('target 级人工修正必须生效', () => {
+    it('GIVEN target 级语言修正 WHEN profile THEN 修正反映到 targets[0].language', async () => {
+      const root = makeTempProject({
+        'package.json': JSON.stringify({
+          name: 'test',
+          dependencies: { react: '^18.0.0' },
+        }),
+      });
+
+      try {
+        const profiler = new Profiler([new ManifestDetector()]);
+        const base = await profiler.profile(root);
+        const targetId = base.targets[0].id;
+        expect(base.targets[0].language.value).not.toBe('python');
+
+        const profile = await profiler.profile(root, {
+          targets: { [targetId]: { language: 'python' } },
+        });
+
+        // 修正前：merge() 算好修正后的 target 却丢弃，画像仍返回未修正的原 target
+        expect(profile.targets[0].language.value).toBe('python');
+        expect(profile.targets[0].language.confidence).toBe(1.0);
+      } finally {
+        cleanupTempProject(root);
+      }
+    });
+
+    it('GIVEN 无 target 级修正 WHEN profile THEN 维持自动检测结果不变', async () => {
+      const root = makeTempProject({
+        'package.json': JSON.stringify({
+          name: 'test',
+          dependencies: { react: '^18.0.0' },
+        }),
+      });
+
+      try {
+        const profiler = new Profiler([new ManifestDetector()]);
+        const profile = await profiler.profile(root, { architecture: 'monolith' });
+
+        expect(profile.targets[0].language.value).toBe('javascript');
+        expect(profile.targets[0].language.confidence).toBeGreaterThan(0.5);
+        expect(profile.targets[0].language.signals.length).toBeGreaterThan(0);
+      } finally {
+        cleanupTempProject(root);
+      }
+    });
+  });
 });

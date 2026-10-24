@@ -31,10 +31,6 @@ governance:
 
 execution:
   mode: "sync"
-  timeout: 10
-  maxConcurrency: 5
-  retryCount: 0
-  scope: "results"
 
 conditions:
   languages:

@@ -32,10 +32,6 @@ governance:
 
 execution:
   mode: "event"               # 事件驱动，实时
-  timeout: 5
-  maxConcurrency: 10
-  retryCount: 0
-  scope: "all"
 
 conditions:
   languages:

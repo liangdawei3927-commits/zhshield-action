@@ -32,10 +32,6 @@ governance:
 
 execution:
   mode: "event"
-  timeout: 10
-  maxConcurrency: 5
-  retryCount: 1
-  scope: "all"
 
 conditions:
   languages:

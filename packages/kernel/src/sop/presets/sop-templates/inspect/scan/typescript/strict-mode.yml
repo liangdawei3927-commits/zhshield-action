@@ -37,11 +37,6 @@ governance:
 
 execution:
   mode: "async"
-  timeout: 30
-  maxConcurrency: 1
-  retryCount: 0
-  scope: "all"
-  schedule: "on-push"
 
 conditions:
   languages:

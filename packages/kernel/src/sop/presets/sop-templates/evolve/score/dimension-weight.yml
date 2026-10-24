@@ -32,11 +32,6 @@ governance:
 
 execution:
   mode: "sync"
-  timeout: 5
-  maxConcurrency: 1
-  retryCount: 0
-  scope: "all"
-  schedule: "on-demand"        # on-demand | periodic | event
 
 conditions:
   languages:

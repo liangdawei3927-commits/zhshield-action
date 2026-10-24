@@ -33,10 +33,6 @@ governance:
 
 execution:
   mode: "sync"
-  timeout: 30
-  maxConcurrency: 1
-  retryCount: 0
-  scope: "all"
 
 conditions:
   languages:

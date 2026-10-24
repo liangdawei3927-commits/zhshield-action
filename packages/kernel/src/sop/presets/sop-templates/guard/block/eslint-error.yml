@@ -36,10 +36,6 @@ governance:
 # ---- 执行配置 ----
 execution:
   mode: "sync"                 # sync | async | periodic | event
-  timeout: 5                   # 超时秒数
-  maxConcurrency: 1            # 同一规则最大并发
-  retryCount: 0                # 失败重试次数
-  scope: "staged"              # staged | all | changed
 
 # ---- 规则条件 ----
 conditions:

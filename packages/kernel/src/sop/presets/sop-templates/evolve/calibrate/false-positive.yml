@@ -32,11 +32,6 @@ governance:
 
 execution:
   mode: "periodic"
-  timeout: 30
-  maxConcurrency: 1
-  retryCount: 0
-  scope: "all"
-  schedule: "0 3 * * *"         # 每天凌晨 3 点执行
 
 conditions:
   languages:

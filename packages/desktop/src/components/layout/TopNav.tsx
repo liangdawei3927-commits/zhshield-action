@@ -1,8 +1,9 @@
+import { Fragment } from 'react';
 import { NavIcon } from '../ui/Icons';
 import { TitleBar } from './title-bar';
 import { Bounce } from '../ui/Bounce';
 import { useT } from '../../i18n';
-import { navItems, type NavItem } from './nav-items';
+import { navGroupSegments, type NavItem } from './nav-items';
 
 interface TopNavProps {
   currentPage: string;
@@ -45,8 +46,33 @@ function CategoryNavItem({ item, active, onNavigate }: CategoryNavItemProps) {
   );
 }
 
+/**
+ * 组间分隔线：一条竖线 + 两侧留白。
+ *
+ * 只画线不写组名 —— 导航行高（图标 30 + 文字 13）塞不下第二行标签，10 项平铺也
+ * 挤不出横向空间；组名退到 hover 提示（title）里，语义仍可达。
+ */
+function GroupDivider({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden
+      data-testid="nav-group-divider"
+      title={label}
+      className="shrink-0 self-center"
+      style={{ width: 1, height: 22, margin: '0 8px', background: 'rgba(255,255,255,0.45)' }}
+    />
+  );
+}
+
 /** 第二行：薄荷绿分类导航 banner（360 风格：顶部大图标、底部文字） */
 function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage' | 'onNavigate'>) {
+  const t = useT();
+  // 按性质分段渲染：按需检查在前、常驻守护在后，两组之间一条竖线
+  // defaultValue 兜底：dev 下 Vite 只监听 desktop root，语言包新键不会热更新
+  const groupLabel = (group: string) =>
+    t(`nav.group.${group}`, {
+      defaultValue: group === 'daemon' ? '常驻守护' : '按需检查',
+    });
   return (
     <nav
       className="flex items-center shrink-0 select-none"
@@ -57,13 +83,18 @@ function CategoryNav({ currentPage, onNavigate }: Pick<TopNavProps, 'currentPage
         WebkitAppRegion: 'no-drag' as const,
       }}
     >
-      {navItems.map((item) => (
-        <CategoryNavItem
-          key={item.id}
-          item={item}
-          active={currentPage === item.id}
-          onNavigate={onNavigate}
-        />
+      {navGroupSegments().map((segment, index) => (
+        <Fragment key={segment.group}>
+          {index > 0 && <GroupDivider label={groupLabel(segment.group)} />}
+          {segment.items.map((item) => (
+            <CategoryNavItem
+              key={item.id}
+              item={item}
+              active={currentPage === item.id}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </Fragment>
       ))}
     </nav>
   );

@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
-import { ToolCommandAdapter, buildAccessScope, buildToolResult, execTool } from './tool-runner';
+import {
+  ToolCommandAdapter,
+  DEFAULT_TOOL_SCAN_TIMEOUT_MS,
+  buildAccessScope,
+  buildToolResult,
+  execTool,
+} from './tool-runner';
 
 const META: ToolMeta = {
   id: 'depcheck',
@@ -105,7 +111,7 @@ export class DepcheckAdapter extends ToolCommandAdapter {
     try {
       const { stdout } = await execTool(command, args, {
         cwd: projectPath,
-        timeout: options.timeout || 60000,
+        timeout: options.timeout || DEFAULT_TOOL_SCAN_TIMEOUT_MS,
       });
       return { ok: true, value: stdout };
     } catch (error) {

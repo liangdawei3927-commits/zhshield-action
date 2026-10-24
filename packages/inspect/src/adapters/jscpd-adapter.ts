@@ -16,6 +16,7 @@ import {
   buildToolResult,
   execTool,
   ToolCommandResolver,
+  DEFAULT_TOOL_SCAN_TIMEOUT_MS,
 } from './tool-runner';
 
 /** jscpd `--version` 输出解析（模块级复用，避免每次探测重建） */
@@ -208,7 +209,7 @@ export class JscpdAdapter implements ToolAdapter {
         : ['--output', reportPath, '--format', 'json', '--mode', 'strict', '--ignore', JSCPD_IGNORED_PATHS.join(','), ...thresholdArgs, target];
     await execTool(command, args, {
       cwd: projectPath,
-      timeout: options.timeout || 60000,
+      timeout: options.timeout || DEFAULT_TOOL_SCAN_TIMEOUT_MS,
     });
   }
 

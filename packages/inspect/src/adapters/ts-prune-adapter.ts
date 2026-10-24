@@ -15,6 +15,7 @@ import {
   buildAccessScope,
   execTool,
   ToolCommandResolver,
+  DEFAULT_TOOL_SCAN_TIMEOUT_MS,
 } from './tool-runner';
 import {
   buildMonorepoPruneOverlay,
@@ -115,7 +116,9 @@ export class TsPruneAdapter implements ToolAdapter {
       await writeOverlayFile(overlay, overlayAbsPath);
       const { stdout } = await execTool(command, buildTsPruneArgs(options, tsConfigPath), {
         cwd: projectPath,
-        timeout: options.timeout || 60000,
+        // 与上层 300s 硬上限对齐：原先写死 60s，全仓扫描实测 60–90s 卡在临界，
+        // 同一命令会在 available / error 之间随机器负载漂移。
+        timeout: options.timeout || DEFAULT_TOOL_SCAN_TIMEOUT_MS,
       });
       return this.buildAvailableResult(stdout, start, projectPath);
     } finally {

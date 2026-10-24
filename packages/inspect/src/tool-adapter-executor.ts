@@ -7,6 +7,7 @@ import {
   isToolInScope,
   withHardTimeout,
 } from '@zh/shared';
+import { DEFAULT_TOOL_SCAN_TIMEOUT_MS } from './adapters/tool-runner';
 
 /** ToolAdapterExecutor 依赖注入项：降级管理器、审计日志、事件发射器与单次扫描硬超时 */
 export interface ToolAdapterExecutorDeps {
@@ -45,7 +46,7 @@ export class ToolAdapterExecutor {
     this.degradationManager = deps.degradationManager;
     this.auditLogger = deps.auditLogger;
     this.emitter = deps.emitter;
-    this.hardTimeoutMs = deps.hardTimeoutMs ?? 300_000;
+    this.hardTimeoutMs = deps.hardTimeoutMs ?? DEFAULT_TOOL_SCAN_TIMEOUT_MS;
   }
 
   async runAll(
@@ -147,7 +148,10 @@ export class ToolAdapterExecutor {
         // 否则 CLI --dir / 引擎 repoRoot 传不到适配器，ts-prune/semgrep/trivy 会扫错目录
         projectPath: projectId,
         projectId,
-        timeout: 60000,
+        // 适配器内部超时必须跟随硬上限，不能另写一个更小的值：原先这里写死
+        // 60000，适配器在 60s 就先失败（返回 status=error），外层 300s 硬上限
+        // 永远轮不到生效 —— 大项目上表现为「工具执行失败」而非「零检出」。
+        timeout: this.hardTimeoutMs,
       }),
       this.hardTimeoutMs,
       adapter.meta.id,

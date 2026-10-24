@@ -26,6 +26,21 @@ import { isCommandAvailable } from './tool-available';
 /** 11 个适配器共用的 promise 化 execFile（各适配器不再单独 promisify） */
 const execFileAsync = promisify(execFile);
 
+/**
+ * 单次工具扫描的默认超时（ms）。
+ *
+ * 必须与上层硬上限对齐，否则护栏形同虚设：InspectEngine 的
+ * ToolAdapterExecutor.hardTimeoutMs 与内核 dispatch 的 DEFAULT_TOOL_SCAN_TIMEOUT_MS
+ * 都是 300_000，而各适配器原先各自写死 `options.timeout || 60000` —— 内层在 60s
+ * 先死，外层那个 5 分钟护栏永远没有机会生效。
+ *
+ * 实测代价（本仓 1155 个 TS 源文件，8GB Intel Mac）：全仓 ts-prune 需 60–90s，
+ * 卡在原 60s 默认值的临界点上，同一命令四次运行得到 available(59.9s) /
+ * error(60.3s) / error(60.5s) 三种结果 —— 死代码规则在大项目上表现为
+ * 「工具执行失败」而非「零检出」，且随机器负载漂移。
+ */
+export const DEFAULT_TOOL_SCAN_TIMEOUT_MS = 300_000;
+
 /** stdout 默认缓冲上限：10MB，与各适配器原先硬编码的 `10 * 1024 * 1024` 一致 */
 const DEFAULT_MAX_BUFFER = 10 * 1024 * 1024;
 

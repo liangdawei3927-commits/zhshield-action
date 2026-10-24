@@ -24,11 +24,28 @@ import {
   type MonorepoPruneOverlay,
   writeOverlayFile,
 } from './ts-prune-adapter-overlay';
-import { buildTsPruneArgs, parseTsPruneOutput } from './ts-prune-adapter-core';
+import {
+  buildTsPruneArgs,
+  parseTsPruneOutput,
+  filterReExportEdges,
+  filterInlineImportTypeRefs,
+} from './ts-prune-adapter-core';
 
 // 测试与外部消费方从本模块导入解析/参数组装函数，保持既有导入路径不变
-export { buildTsPruneArgs, parseTsPruneOutput, parsePruneLine } from './ts-prune-adapter-core';
-export type { PruneEntry } from './ts-prune-adapter-core';
+export {
+  buildTsPruneArgs,
+  parseTsPruneOutput,
+  parsePruneLine,
+  filterReExportEdges,
+  filterInlineImportTypeRefs,
+  resolveRelativeModuleFile,
+  resetReExportStatementCache,
+} from './ts-prune-adapter-core';
+export type {
+  PruneEntry,
+  ReExportFilterResult,
+  InlineImportFilterResult,
+} from './ts-prune-adapter-core';
 
 // monorepo tsconfig overlay 相关能力（测试通过本模块导入，保持既有导入路径不变）
 export {
@@ -85,7 +102,7 @@ export class TsPruneAdapter implements ToolAdapter {
     try {
       return await this.runTsPrune(options, start);
     } catch (error: unknown) {
-      return this.handleTsPruneError(error, start);
+      return this.handleTsPruneError(error, start, options.projectPath);
     }
   }
 
@@ -100,7 +117,7 @@ export class TsPruneAdapter implements ToolAdapter {
         cwd: projectPath,
         timeout: options.timeout || 60000,
       });
-      return this.buildAvailableResult(stdout, start);
+      return this.buildAvailableResult(stdout, start, projectPath);
     } finally {
       await cleanupOverlay(overlay, overlayAbsPath);
     }
@@ -135,13 +152,13 @@ export class TsPruneAdapter implements ToolAdapter {
   }
 
   /** 将 ts-prune stdout 映射为可用扫描结果 */
-  private buildAvailableResult(stdout: string, start: number): ToolResult {
-    const issues = this.mapOutput(stdout);
+  private buildAvailableResult(stdout: string, start: number, projectPath: string): ToolResult {
+    const issues = this.mapOutput(stdout, projectPath);
     return buildToolResult({ tool: 'ts-prune', status: 'available', issues, start });
   }
 
   /** 处理 ts-prune 执行错误：未安装 / 部分输出 / 失败 */
-  private handleTsPruneError(error: unknown, start: number): ToolResult {
+  private handleTsPruneError(error: unknown, start: number, projectPath: string): ToolResult {
     const err = asToolExecError(error);
     if (err.code === 'ENOENT') {
       return buildToolResult({
@@ -153,11 +170,16 @@ export class TsPruneAdapter implements ToolAdapter {
       });
     }
 
-    if (err.stdout) {
-      const issues = this.mapOutput(err.stdout);
-      if (issues.length > 0) {
-        return buildToolResult({ tool: 'ts-prune', status: 'available', issues, start });
-      }
+    // 可用性判据必须用**未过滤**的解析条数：工具确实吐出了报告，不能因为它
+    // 吐的全是再导出边（过滤后为 0）就把「部分成功」判成「执行失败」——那会在
+    // barrel 密集的项目上凭空造出降级红（exit 2）。
+    if (err.stdout && parseTsPruneOutput(err.stdout).length > 0) {
+      return buildToolResult({
+        tool: 'ts-prune',
+        status: 'available',
+        issues: this.mapOutput(err.stdout, projectPath),
+        start,
+      });
     }
 
     return buildToolResult({
@@ -169,8 +191,17 @@ export class TsPruneAdapter implements ToolAdapter {
     });
   }
 
-  private mapOutput(raw: string): Issue[] {
-    return parseTsPruneOutput(raw).map(({ file, line, symbol }) => ({
+  private mapOutput(raw: string, projectPath: string): Issue[] {
+    const root = path.resolve(projectPath);
+    // 顺序不可颠倒：再导出过滤只读命中文件（便宜），内联引用过滤要遍历全项目（贵）。
+    // 便宜的一层先跑，剩余为空时直接省掉整轮目录遍历。
+    //   · 再导出边（export ... from './y'）：符号在叶子模块内部活着，只是没人从
+    //     barrel 这个路径 import —— 死代码应当报在定义处，报在过路点无意义。
+    //   · 内联 import 类型引用（import('./m').T）：ts-prune 只统计顶层 import/export
+    //     语句形成的引用边，这类引用它看不见。
+    const { kept } = filterReExportEdges(parseTsPruneOutput(raw), root);
+    const { kept: entries } = filterInlineImportTypeRefs(kept, root);
+    return entries.map(({ file, line, symbol }) => ({
       id: randomUUID(),
       ruleId: 'ts-prune/unused-export',
       severity: 'info',

@@ -118,48 +118,6 @@ export interface SentinelOccurrence {
   lastSeen: Date;
 }
 
-// ─── 漏洞信息（Vulnerability）────────────────────────────
-
-/** 漏洞信息：依赖扫描（Trivy/Grype/ORT）产出的单条已知漏洞及其依赖路径 */
-export interface Vulnerability {
-  id: string;
-  cveId?: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  package: string;
-  currentVersion: string;
-  vulnerableRange: string;
-  fixedVersion?: string;
-  dependencyPath: string[];
-  isDirectDependency: boolean;
-  cvssScore?: number;
-  recommendation: string;
-  autoFixable: boolean;
-}
-
-// ─── 恶意代码（MalwareItem）──────────────────────────────
-
-/** 恶意代码条目：安全域扫描命中的反Shell/外传/提权等恶意模式及其证据 */
-export interface MalwareItem {
-  id: string;
-  type:
-    | 'reverse-shell'
-    | 'data-exfiltration'
-    | 'privilege-escalation'
-    | 'crypto-ransomware'
-    | 'backdoor'
-    | 'supply-chain'
-    | 'suspicious-behavior';
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  file: string;
-  line: number;
-  pattern: string;
-  evidence: string;
-}
-
 // ─── 垃圾项（GarbageItem）────────────────────────────────
 
 /** 垃圾项类型（垃圾清理域 owner = @zh/garbage）：

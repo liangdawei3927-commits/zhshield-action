@@ -58,6 +58,7 @@ export {
 export {
   getScore,
   getDomainScore,
+  getHealthOverview,
   getDomainReport,
   getSavedDomainReport,
   getDomainSnapshotRaw,

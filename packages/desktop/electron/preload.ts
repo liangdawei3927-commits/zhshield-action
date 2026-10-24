@@ -120,6 +120,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getScoreHistory: (projectId: string) => ipcRenderer.invoke('engine:getScoreHistory', projectId),
     getDomainScore: (projectPath: string, dimension: ScoreDimension) =>
       ipcRenderer.invoke('engine:getDomainScore', projectPath, dimension),
+    getHealthOverview: (projectPath: string) =>
+      ipcRenderer.invoke('engine:getHealthOverview', projectPath),
     getDomainReport: (projectPath: string, source: DomainReportSource) =>
       ipcRenderer.invoke('engine:getDomainReport', projectPath, source),
     saveDomainReport: (projectPath: string, domain: string, report: unknown) =>

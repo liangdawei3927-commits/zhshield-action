@@ -12,6 +12,7 @@ import type {
   DomainReportSource,
   DomainScanBlobData,
   DomainScanRecordData,
+  HealthOverviewData,
   ScoreDimension,
 } from '../types/electron';
 import { getScoreViaHttp, getScoreHistoryViaHttp } from './serverApi';
@@ -43,6 +44,24 @@ export async function getDomainScore(
   if (!api?.engine) return null;
   try {
     return await api.engine.getDomainScore(projectPath, dimension);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 报告中心总览的实时视图：十维一次取齐 + 实时总评，**只读不落库**。
+ *
+ * 与 `getScore`（scores 表最近一条历史汇总记录）的区别：那是「上次汇总那一刻」的快照，
+ * 这是「当下」的值。总览卡片必须用它，否则卡片与分类页必然对不上。
+ * IPC 不可用 / 各域都没跑过 → null，调用方回退到汇总记录（并标注数据时间）。
+ */
+export async function getHealthOverview(projectPath: string): Promise<HealthOverviewData | null> {
+  if (isHttpMode()) return null;
+  const api = getAPI();
+  if (!api?.engine) return null;
+  try {
+    return await api.engine.getHealthOverview(projectPath);
   } catch {
     return null;
   }

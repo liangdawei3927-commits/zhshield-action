@@ -91,6 +91,30 @@ function computeGrade(overall: number): HealthScore['grade'] {
   return overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
 }
 
+/**
+ * 只读总评：与 `ScoringEngine.calculate` **同一套**加权 / 红线封顶 / 分级规则，
+ * 但**不落库、不写历史、不算趋势**（2026-10-24 新增）。
+ *
+ * 为什么单独开一个入口：报告中心总览与分类页要显示「当下」的分，而 `calculate`
+ * 一调用就往 `scores` 表插一条 —— 用它出实时分等于把「打开页面」当成一次评估，
+ * 历史曲线会被浏览行为污染（实测过：每 5~6 分钟一条记录里混着扫描记录与补记记录）。
+ *
+ * 规则实现直接复用上面三个私有函数，**不得**在这里另写一份加权公式：
+ * 第三套算法会让「总分 ≠ 十张卡加权」这类问题以更隐蔽的形式复发。
+ */
+export function computeOverallSnapshot(
+  dimensionScores: readonly DimensionScore[],
+  redLine?: RedLineInfo | null,
+): { overall: number; grade: HealthScore['grade']; redLine?: RedLineInfo } {
+  const raw = computeOverall([...dimensionScores]);
+  const { overall, appliedRedLine } = applyRedLineCap(raw, redLine);
+  return {
+    overall: Math.round(overall * 100) / 100,
+    grade: computeGrade(overall),
+    ...(appliedRedLine ? { redLine: appliedRedLine } : {}),
+  };
+}
+
 function buildScore(params: {
   projectId: string;
   dimensionScores: DimensionScore[];

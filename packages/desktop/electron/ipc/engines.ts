@@ -40,6 +40,7 @@ import {
   getScoreHandler,
   getScoreHistoryHandler,
   getDomainScoreHandler,
+  getHealthOverviewHandler,
   getDomainReportHandler,
   runProfileHandler,
   getProfileHandler,
@@ -143,7 +144,9 @@ async function recordPipelineScore(projectPath: string, report: PipelineReport):
     if (!resolved) return;
     const scoring = await getScoring();
     const profilingResult = await probeProjectProfile(projectPath);
-    await computePipelineHealthScore(projectPath, resolved, profilingResult, scoring);
+    // 总分走「各域最新落盘结果汇总」（与报告中心/分类页同一函数、同一份输入）；
+    // 模块级评分仍消费本次报告（模块分不进总分）。
+    await computePipelineHealthScore(projectPath);
     await scorePipelineModules({ projectPath, report, resolved, profilingResult, scoring });
   } catch (err) {
     console.warn(
@@ -261,6 +264,8 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:getScore', getScoreHandler);
   ipcMain.handle('engine:getScoreHistory', getScoreHistoryHandler);
   ipcMain.handle('engine:getDomainScore', getDomainScoreHandler);
+  // 报告中心总览实时视图：十维一次取齐（与分类页同源），只读不落库
+  ipcMain.handle('engine:getHealthOverview', getHealthOverviewHandler);
   // 读该域最近一次落盘快照（仅问题项）：供分类页「有历史结果即可查看详情」
   ipcMain.handle('engine:getDomainReport', getDomainReportHandler);
   // 各域「完整报告」落盘 / 读回：详情页可原样回看上次结果（不靠内存 report）

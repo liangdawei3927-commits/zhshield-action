@@ -7,7 +7,7 @@
 
 import path from 'node:path';
 import { t } from '@zh/i18n';
-import { buildHealthDimensions, computeRedLine, scoreProjectByModules } from '@zh/scoring';
+import { buildHealthDimensions, computeOverallSnapshot, computeRedLine, scoreProjectByModules } from '@zh/scoring';
 import type { ConvertedGuardResult, ConvertedInspectIssue } from '@zh/scoring';
 import { listGuardReports } from '@zh/guard';
 import type { GuardReport } from '@zh/guard';
@@ -99,41 +99,60 @@ function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): voi
 }
 
 /**
- * 写分点 1/2：体检完成后将 guard + inspect 报告转化为健康维度分并落库。
+ * 写分点 1/2（已合并为一个函数）：把各域最新落盘结果汇总成健康总分并落库。
  *
- * 🔴 落分口径铁律（T14）：健康总分在全仓**只有两个写分点** ——
- *   ① 本函数：消费刚跑完的 PipelineReport（真实发起检查后落分）
- *   ② `generateReportSummaryHandler`：只读各域最近落盘结果汇总（报告中心）
- * 两者必须共用 `buildHealthDimensions` + `ScoringEngine.calculate`，
- * 否则同一时刻两条路径会写出两个分，历史趋势断裂。
- * 另：总分是**对已有结果的汇总**而非实时值，UI 侧由 `scoreFreshness` 标注数据时间。
+ * 🔴 2026-10-24 修正：原先「pipeline 跑完写分」消费**内存里的本次报告**，
+ * 「报告中心汇总」消费**磁盘上的最新快照** —— 同一时刻两条路径能写出两个分
+ * （实测：inspect 快照落盘 quality=80.2，同一分钟的 scores 记录里写的是 95），
+ * 历史趋势因此在 98.1 / 94.1 / 95 / 81 / 80.2 之间反复横跳，用户看到的
+ * 「卡片与分类页对不上」有一半来自这里。
  *
- * 支持两种报告格式：
- * 1. 传统格式：GuardReport（有 results）+ InspectionReport（有 issues）
- * 2. SOP 格式：RuleEngineReport（有 evaluations）— 需要转换
+ * 现在两条路径调用**同一个函数、同一份输入**（`assembleHealthInputs`），
+ * 与分类页实时评分也是同一份输入 ⇒ 三者结构上不可能漂移。pipeline 路径同样读盘是
+ * 安全的：`persistDiagnostics` 先于本函数执行（runPipelineHandler 406→416），
+ * 本次结果已落盘后再汇总。
+ *
+ * 各域都没有可用结果时返回 null：不写一条 0 分记录污染历史（未检测 ≠ 0 分）。
  */
-/** 组装评分输入并计算健康总分（P1b extras + S2 esloc 同口径），落库并记录日志 */
-export async function computePipelineHealthScore(
+export async function summarizeAndPersistScore(
   projectPath: string,
-  resolved: ResolvedPipelineReports,
-  profilingResult: ScoringProjectProfile | null,
-  scoring: Awaited<ReturnType<typeof getScoring>>,
-): Promise<void> {
-  // P1b: 从 dashboard-state.json 读取 secrets/deps/techdebt/refactor/performance 最新数据组装 extras，
-  // 传入 buildHealthDimensions 第 5 参（DimensionExtras 契约），保证 pipeline 分与 dashboard 分一致。
-  const extras = await buildPipelineExtras(projectPath);
-  // S2 密度归一化分母：persistDiagnostics 先于本函数执行（runPipelineHandler 1399→1409），
-  // 快照已存落盘口径的 esloc，读同一值保证两条写分路径同口径。
-  const esloc = (await readDomainSnapshot(projectPath, 'inspect'))?.esloc;
+): Promise<HealthScoreData | null> {
+  if (!projectPath || typeof projectPath !== 'string') {
+    throw new Error(t('electron.invalidProjectPath'));
+  }
+  // 输入组装与分类页实时评分共用 assembleHealthInputs（含 Q4 评分输入缺口修复：
+  // security/deps 专用扫描发现并入），两条路径结构上不可能漂移。
+  const inputs = await assembleHealthInputs(projectPath, {
+    listGuardReports,
+    readDomainSnapshot,
+    readDashboardState,
+    buildPipelineExtras,
+  });
+  const hasResults =
+    inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
+  if (!hasResults) return null;
+
+  const scoring = await getScoring();
+  const profilingResult = await probeProjectProfile(projectPath);
   const dimensions = buildHealthDimensions({
-    guard: { results: resolved.guardResults },
-    inspect: { issues: resolved.inspectIssues, esloc },
+    guard: inputs.guard,
+    inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
     projectRoot: projectPath,
     profile: profilingResult,
-    extras,
+    extras: inputs.extras,
   });
-  const score = scoring.calculate(projectPath, dimensions, computeRedLine(extras));
-  console.log(`[engine:runPipeline] 健康评分已落库: ${score.overall} (${score.grade})`);
+  const score = scoring.calculate(projectPath, dimensions, computeRedLine(inputs.extras));
+  return toHealthScoreData(score);
+}
+
+/**
+ * 体检（pipeline）完成后的写分。
+ *
+ * 与报告中心「生成报告」走同一个 `summarizeAndPersistScore`：都是「各域最新落盘结果
+ * 的汇总」，不存在第二条算分路径。模块级评分仍消费本次报告（模块分不落库到总分）。
+ */
+export async function computePipelineHealthScore(projectPath: string): Promise<void> {
+  await summarizeAndPersistScore(projectPath);
 }
 
 interface ScorePipelineModulesParams {
@@ -178,33 +197,7 @@ export async function generateReportSummaryHandler(
   projectPath: string,
 ): Promise<HealthScoreData | null> {
   try {
-    if (!projectPath || typeof projectPath !== 'string') {
-      throw new Error(t('electron.invalidProjectPath'));
-    }
-    // 输入组装与分类页实时评分共用 assembleHealthInputs（含 Q4 评分输入缺口修复：
-    // security/deps 专用扫描发现并入），两条路径结构上不可能漂移。
-    const inputs = await assembleHealthInputs(projectPath, {
-      listGuardReports,
-      readDomainSnapshot,
-      readDashboardState,
-      buildPipelineExtras,
-    });
-    const hasResults =
-      inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
-    if (!hasResults) return null;
-
-    const scoring = await getScoring();
-    const profilingResult = await probeProjectProfile(projectPath);
-    const dimensions = buildHealthDimensions({
-      guard: inputs.guard,
-      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
-      projectRoot: projectPath,
-      profile: profilingResult,
-      extras: inputs.extras,
-    });
-    const score = scoring.calculate(projectPath, dimensions, computeRedLine(inputs.extras));
-    console.log(`[engine:generateReportSummary] 汇总评分已落库: ${score.overall} (${score.grade})`);
-    return toHealthScoreData(score);
+    return await summarizeAndPersistScore(projectPath);
   } catch (err) {
     console.warn(
       '[engine:generateReportSummary] 汇总失败:',
@@ -411,6 +404,93 @@ export async function getDomainScoreHandler(
   } catch (err) {
     console.warn(
       '[engine:getDomainScore] 实时评分读取失败:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
+/**
+ * 报告中心「评分总览」的实时视图（engine:getHealthOverview）——**只读，不落库**。
+ *
+ * 为什么必须单独开这一条（2026-10-24 P0，用户实测「卡片 100 分、点进去 92.9」）：
+ * 卡片行原先读 `scores` 表里最近一条**历史汇总记录**（生成那一刻的时点快照），
+ * 而分类页走 `getDomainScore` **实时重算**。两条链不同源 ⇒ 中间任何一次扫描都会让
+ * 它们分叉，对不上是必然的、不是偶发。
+ *
+ * 两条同源保证：
+ * 1. 与分类页共用 `assembleHealthInputs` + `buildHealthDimensions`（同一函数、同一输入形状）；
+ * 2. **一次组装取满十维** —— 若改成调十次 `getDomainScore`，十张卡会跨越两次扫描、
+ *    各自属于不同时刻，等于换个姿势继续对不上。
+ *
+ * 不落库：总分走 `computeOverallSnapshot`（与 `ScoringEngine.calculate` 同一套
+ * 加权/封顶/分级规则，但不写 `scores` 表）。否则「打开报告中心」本身就变成一次评估，
+ * 历史曲线会被浏览行为污染。
+ */
+export interface HealthOverviewDimension {
+  name: ScoreDimension;
+  score: number;
+  issues: number;
+  weight: number;
+  status: 'scored' | 'not-run';
+  /** 该维数据时间（域快照 / 门禁报告落盘时间）；该域从未跑过 → null */
+  generatedAt: string | null;
+}
+
+export interface HealthOverviewData {
+  overall: number;
+  grade: 'A' | 'B' | 'C' | 'D';
+  dimensions: HealthOverviewDimension[];
+  redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
+  /** 本次读取时刻（不是域数据时间；各维时间见 dimensions[].generatedAt） */
+  readAt: string;
+}
+
+export async function getHealthOverviewHandler(
+  _event: Electron.IpcMainInvokeEvent,
+  projectPath: string,
+): Promise<HealthOverviewData | null> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    const inputs = await assembleHealthInputs(projectPath, {
+      listGuardReports,
+      readDomainSnapshot,
+      readDashboardState,
+      buildPipelineExtras,
+    });
+    const hasResults =
+      inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
+    // 一穷二白的新项目返回 null（由 UI 提示先跑检查），绝不返回一条 0 分总览
+    if (!hasResults) return null;
+
+    const profilingResult = await probeProjectProfile(projectPath);
+    const dimensions = buildHealthDimensions({
+      guard: inputs.guard,
+      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
+      projectRoot: projectPath,
+      profile: profilingResult,
+      extras: inputs.extras,
+    });
+    const snapshot = computeOverallSnapshot(dimensions, computeRedLine(inputs.extras));
+    return {
+      overall: snapshot.overall,
+      grade: snapshot.grade,
+      dimensions: dimensions.map((d) => ({
+        name: d.name as ScoreDimension,
+        score: d.score,
+        issues: d.issues,
+        weight: d.weight,
+        status: d.status === 'not-run' ? 'not-run' : 'scored',
+        generatedAt: inputs.timestamps[d.name as ScoreDimension] ?? null,
+      })),
+      ...(snapshot.redLine ? { redLine: snapshot.redLine } : {}),
+      readAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn(
+      '[engine:getHealthOverview] 实时总览读取失败:',
       err instanceof Error ? err.message : String(err),
     );
     return null;

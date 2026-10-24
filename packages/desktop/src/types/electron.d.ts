@@ -422,6 +422,32 @@ export interface DomainScoreData {
 }
 
 /**
+ * 报告中心「评分总览」实时视图（engine:getHealthOverview 返回值）。
+ *
+ * 与 `HealthScoreData`（scores 表里的历史汇总记录）的区别：
+ * 后者是**生成那一刻的时点快照**，前者是**当下按磁盘最新结果算出来的值**。
+ * 总览卡片必须用前者，否则「卡片 100 分、点进分类页 92.9」这类对不上必然发生。
+ */
+export interface HealthOverviewData {
+  /** 实时总评（与 ScoringEngine.calculate 同一套加权 / 红线封顶规则，但不落库） */
+  overall: number;
+  grade: 'A' | 'B' | 'C' | 'D';
+  /** 十维，一次输入组装取齐 ⇒ 十张卡同一时刻、同一口径 */
+  dimensions: Array<{
+    name: ScoreDimension;
+    score: number;
+    issues: number;
+    weight: number;
+    status: 'scored' | 'not-run';
+    /** 该维数据时间（域快照 / 门禁报告落盘时间）；该域从未跑过 → null */
+    generatedAt: string | null;
+  }>;
+  redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
+  /** 本次读取时刻（不是域数据时间） */
+  readAt: string;
+}
+
+/**
  * 参与总分的 10 个评分维度（与 @zh/scoring 的 DIMENSION_CATEGORIES 键一致）。
  * 源类型定义在 src/pages/domain-score-logic.ts（ScoreDimension），此处内联以保持
  * electron.d.ts 作为共享契约文件自包含（主进程 / 渲染层均可引用）。
@@ -644,6 +670,12 @@ export interface EngineAPI {
     projectPath: string,
     dimension: ScoreDimension,
   ) => Promise<DomainScoreData | null>;
+  /**
+   * 报告中心总览的实时视图：十维**一次取齐**（同一次输入组装，十张卡同一时刻）+ 实时总评。
+   * 与分类页同源（共用 assembleHealthInputs + buildHealthDimensions），**只读不落库**。
+   * 各域都没跑过时返回 null，由 UI 回退到最近一次汇总记录。
+   */
+  getHealthOverview: (projectPath: string) => Promise<HealthOverviewData | null>;
   /** 读该域最近一次落盘快照（仅问题项）；无快照/损坏返回 null，UI 据此决定是否可查看详情 */
   getDomainReport: (
     projectPath: string,

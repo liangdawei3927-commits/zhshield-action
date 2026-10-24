@@ -36,10 +36,14 @@
 #
 #   09-24 更新：desktop/electron 的 PATH → path.join（engines.ts collectOpenCodeCandidates）与
 #   inspect 的 PATH → path.join（ts-prune-adapter.ts findExecutableOnPath）已改用 @zh/shared
-#   safeJoin 修复（界内行为与 path.join 一致），两处命中清零。现全仓仅剩唯一保留命中：
-#   cli/src/index.ts:43 resolveBaseDir() 对 process.argv[1]（Node 已解析并执行的脚本自身路径）
+#   safeJoin 修复（界内行为与 path.join 一致），两处命中清零。全仓最后 1 处命中：
+#   cli/src/index.ts resolveBaseDir() 对 process.argv[1]（Node 已解析并执行的脚本自身路径）
 #   的 path.resolve —— 非可注入边界（能改写 argv[1] 者已具代码执行），且脚本可位于任意绝对
-#   路径（bundle/开发态双模），safeResolve 需人为假定的 base 会破坏该语义，故按校准基线保留。
+#   路径（bundle/开发态双模），safeResolve 需人为假定的 base 会破坏该语义。
+#   2026-10-24：该处改为**源码内定点抑制**（`// nosemgrep: detect-path-traversal` + 理由注释），
+#   仍不改用 safeResolve。实测单文件命中 1 → 0（抑制前 1，抑制后 0，规则本身未改动）。
+#   注意：抑制的是「这处已知良性流」，**不是**把规则降级——其他文件的 argv/env/请求参数
+#   流向 path.join / path.resolve 仍会照常报出。
 #
 # 状态：report-only（severity: WARNING）——**已完成误报率实测并据此收敛**。
 #   v1 头注释自称「提升为阻断前，需在 CI 跑一次 semgrep 统计误报率并据此收敛」，

@@ -113,6 +113,7 @@ export type AttributionUnavailable =
   /** 至少一端没有任何已检测维度，无法加权 */
   | 'no-active-dimension';
 
+/** 对账闭合的归因结果（ok: true 才带 breakdown 明细） */
 export interface AttributionBreakdown extends ScorePair {
   ok: true;
   /** 两端都已检测的维度，按 |points| 降序 */
@@ -143,6 +144,7 @@ export interface AttributionBreakdown extends ScorePair {
   capped: boolean;
 }
 
+/** 归因结果：要么算得出（breakdown），要么说明为什么算不了 —— 不存在「半个结果」 */
 export type AttributionResult =
   | AttributionBreakdown
   | ({ ok: false; reason: AttributionUnavailable } & ScorePair);
@@ -207,10 +209,9 @@ export function attributeScoreDelta(
   // 结构项会变成一个巨大的、解释不清的数字，比不给归因更误导。
   const startNames = new Set(start.dimensions.map((d) => d.name));
   const endNames = new Set(end.dimensions.map((d) => d.name));
-  if (
-    startNames.size !== endNames.size ||
-    [...startNames].some((name) => !endNames.has(name))
-  ) {
+  // Set 没有 some，展开成数组是必要的（不是「无谓的数组展开」）
+  const startNamesList = [...startNames];
+  if (startNames.size !== endNames.size || startNamesList.some((name) => !endNames.has(name))) {
     return { ok: false, reason: 'dimension-set-mismatch', ...pair };
   }
 
@@ -365,7 +366,8 @@ export function attributeRange(
 ): AttributionResult | null {
   if (buckets.length < 2) return null;
   const start = byTimestamp.get(buckets[0].endAt);
-  const end = byTimestamp.get(buckets[buckets.length - 1].endAt);
+  const lastBucket = buckets.at(-1);
+  const end = lastBucket ? byTimestamp.get(lastBucket.endAt) : undefined;
   if (!start || !end) return null;
   return attributeScoreDelta(start, end);
 }

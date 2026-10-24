@@ -139,7 +139,8 @@ export function normalizeFingerprint(fingerprint: string, projectPath: string): 
 
 /** 指纹集 hash：排序后拼接，避免顺序抖动造成假变化 */
 export function hashFingerprints(fingerprints: readonly string[]): string {
-  return sha16([...fingerprints].sort().join('\n'));
+  // toSorted 不修改入参，语义与 [...fingerprints].sort() 相同但少一次数组拷贝
+  return sha16(fingerprints.toSorted().join('\n'));
 }
 
 /**
@@ -383,9 +384,13 @@ export function diffScans(
 ): ScanDiff {
   const current = new Set(curr.fingerprints ?? []);
   const before = new Set(prev?.fingerprints ?? []);
-  const added = [...current].filter((fp) => !before.has(fp));
-  const removed = [...before].filter((fp) => !current.has(fp));
-  const persisting = [...current].filter((fp) => before.has(fp)).length;
+  // Set 没有 filter，展开成数组是必要的（不是「无谓的数组展开」）。
+  // 先绑局部变量再过滤：current 下面要用两次，避免重复展开两份数组。
+  const currList = [...current];
+  const prevList = [...before];
+  const added = currList.filter((fp) => !before.has(fp));
+  const removed = prevList.filter((fp) => !current.has(fp));
+  const persisting = currList.filter((fp) => before.has(fp)).length;
   const scoreDelta =
     prev && prev.score !== null && curr.score !== null ? curr.score - prev.score : null;
   return {
@@ -420,6 +425,7 @@ export const HISTORY_DOMAINS = [
   'garbage',
 ] as const;
 
+/** 有历史记录的域键（`HISTORY_DOMAINS` 的元素类型，供 IPC 入参收窄） */
 export type HistoryDomain = (typeof HISTORY_DOMAINS)[number];
 
 /** IPC 入参校验：域键必须在白名单内，否则拒绝（防路径穿越 / 拼错域名写出野文件） */

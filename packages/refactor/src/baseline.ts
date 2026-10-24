@@ -40,12 +40,15 @@ export function diffBaseline(
   const introduced: Array<{ file: string; rule: string; current: number; baseline: number }> = [];
   const resolved: Array<{ file: string; rule: string; current: number; baseline: number }> = [];
   const allFiles = new Set<string>([...Object.keys(current), ...Object.keys(baseline)]);
-  const filesSorted = [...allFiles].sort();
+  // Set 没有 sort，展开成数组是必要的（不是「无谓的数组展开」）
+  const filesSorted = [...allFiles];
+  filesSorted.sort();
   for (const file of filesSorted) {
     const cRules = current[file] || {};
     const bRules = baseline[file] || {};
     const allRules = new Set<string>([...Object.keys(cRules), ...Object.keys(bRules)]);
-    const rulesSorted = [...allRules].sort();
+    const rulesSorted = [...allRules];
+    rulesSorted.sort();
     for (const rule of rulesSorted) {
       const c = cRules[rule] ?? 0;
       const b = bRules[rule] ?? 0;

@@ -30,7 +30,10 @@ import {
 function resolveBaseDir(): string {
   if (typeof __dirname !== 'undefined') return __dirname;
   const invoked = process.argv[1];
-  if (invoked) return path.dirname(path.resolve(invoked));
+  // 经复核的非注入点：argv[1] 是 Node 已解析并执行的脚本自身路径（能改写它者已具代码执行
+  // 能力），且这里没有「被限制在某个 base 内」的语义；改用 safeResolve(base, ...) 必须人为
+  // 假定一个 base，反而会破坏 bundle / 开发态双模。故在此定点抑制（见下一行注释）。
+  if (invoked) return path.dirname(path.resolve(invoked)); // nosemgrep: detect-path-traversal
   return process.cwd();
 }
 const baseDir = resolveBaseDir();

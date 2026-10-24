@@ -111,7 +111,7 @@ export class TrivyAdapter implements ToolAdapter {
     // 而非让 trivy 对不存在的清单 lstat FATAL 产生伪 error——该 error 曾被
     // 诊断链路聚合为 (root) 伪债务项（td-quality-44c4ce057952）。
     const depRootPackageJson = path.join(path.resolve(options.projectPath), 'package.json');
-    let hasRootPackageJson = false;
+    let hasRootPackageJson: boolean;
     try {
       await fs.promises.access(depRootPackageJson);
       hasRootPackageJson = true;

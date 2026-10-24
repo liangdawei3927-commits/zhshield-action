@@ -226,7 +226,7 @@ async function collectDomainGroups(
   projectPath: string,
 ): Promise<Map<DiagnosticSource, DomainGroup>> {
   const groups = new Map<DiagnosticSource, DomainGroup>();
-  let files: string[] = [];
+  let files: string[];
   try {
     files = await readdir(join(projectPath, '.zhshield', 'diagnostics', 'domains'));
   } catch {

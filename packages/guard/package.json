@@ -15,16 +15,16 @@
   "dependencies": {
     "@zh/kernel": "workspace:*",
     "@zh/shared": "workspace:*",
-    "eslint": "^9.22.0",
+    "eslint": "^10.13.0",
     "eslint-plugin-sonarjs": "^4.2.0",
-    "typescript-eslint": "^8.26.0"
+    "typescript-eslint": "^8.72.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "eslint": "^9.39.5",
+    "eslint": "^10.13.0",
     "eslint-plugin-sonarjs": "^4.2.0",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.65.0",
+    "typescript-eslint": "^8.72.0",
     "vitest": "^4.1.0"
   },
   "exports": {

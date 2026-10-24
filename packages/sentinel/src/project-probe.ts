@@ -56,7 +56,7 @@ function collectLogCandidates(
   extension: string,
   candidates: Array<{ file: string; mtimeMs: number }>,
 ): void {
-  let entries: fs.Dirent[] = [];
+  let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {

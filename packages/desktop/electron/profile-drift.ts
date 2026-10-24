@@ -110,7 +110,7 @@ function closeWatchers(): void {
 
 async function watchAllProjects(): Promise<void> {
   closeWatchers();
-  let projects: Array<{ path: string }> = [];
+  let projects: Array<{ path: string }>;
   try {
     projects = JSON.parse(await readFile(PROJECTS_FILE, 'utf-8')) as Array<{ path: string }>;
   } catch {

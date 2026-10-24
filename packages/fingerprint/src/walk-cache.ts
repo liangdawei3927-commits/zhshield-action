@@ -142,7 +142,7 @@ function walkAndSign(
   const walk = (relDir: string, depth: number): void => {
     if (depth > maxDepth) return;
     const absDir = relDir === '' ? root : path.join(root, ...relDir.split('/'));
-    let entries: fs.Dirent[] = [];
+    let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(absDir, { withFileTypes: true });
     } catch {

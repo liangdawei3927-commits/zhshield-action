@@ -51,7 +51,7 @@ async function writeOpenCodeConfig(
 ): Promise<string | null> {
   if (config.id !== 'opencode') return null;
   const configPath = path.join(projectPath, 'opencode.json');
-  let existing: string | null = null;
+  let existing: string | null;
   try {
     existing = await readFile(configPath, 'utf-8');
   } catch {
@@ -76,7 +76,7 @@ async function writeTraeMcpConfig(
 ): Promise<string | null> {
   if (config.id !== 'trae') return null;
   const configPath = path.join(projectPath, '.trae', 'mcp.json');
-  let existing: string | null = null;
+  let existing: string | null;
   try {
     existing = await readFile(configPath, 'utf-8');
   } catch {

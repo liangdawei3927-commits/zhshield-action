@@ -89,7 +89,7 @@ export class PrettierAdapter extends ToolCommandAdapter {
     projectPath: string,
     timeout: number,
   ): Promise<string> {
-    let stdout = '';
+    let stdout: string;
     try {
       ({ stdout } = await execTool(command, args, { cwd: projectPath, timeout }));
     } catch (error: unknown) {

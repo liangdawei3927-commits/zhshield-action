@@ -160,7 +160,10 @@ export const defaultRunner: CommandRunner = {
     } catch (err) {
       const e = err as { stdout?: string; stderr?: string; message?: string };
       if (e.stdout) return { stdout: e.stdout };
-      throw new Error(e.stderr || e.message || `command failed: ${command} ${args.join(' ')}`);
+      // cause 必须是捕获到的原始 err：否则上层只能看到拼装后的消息，丢失退出的真实原因
+      throw new Error(e.stderr || e.message || `command failed: ${command} ${args.join(' ')}`, {
+        cause: err,
+      });
     }
   },
 };

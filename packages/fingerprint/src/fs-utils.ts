@@ -14,7 +14,7 @@ export function isNoiseDir(name: string): boolean {
 
 /** 列出项目根目录下的文件（不递归），返回 posix 相对路径，按字典序排序。 */
 export function listRootFiles(projectRoot: string): string[] {
-  let entries: fs.Dirent[] = [];
+  let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(projectRoot, { withFileTypes: true });
   } catch {
@@ -38,7 +38,7 @@ export function findMarkerProjectRoot(
   hasMarker: (name: string) => boolean,
 ): string {
   if (listRootFiles(projectPath).some(hasMarker)) return projectPath;
-  let entries: fs.Dirent[] = [];
+  let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(projectPath, { withFileTypes: true });
   } catch {
@@ -84,7 +84,7 @@ export function findDirsMatching(
   const walk = (relDir: string, depth: number): void => {
     if (depth > maxDepth) return;
     const absDir = relDir === '' ? projectRoot : path.join(projectRoot, ...relDir.split('/'));
-    let entries: fs.Dirent[] = [];
+    let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(absDir, { withFileTypes: true });
     } catch {

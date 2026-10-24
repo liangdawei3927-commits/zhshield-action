@@ -93,7 +93,7 @@ export function resolveTscProjects(projectPath: string): string[] {
     return [path.join(projectPath, 'tsconfig.json')];
   }
 
-  let entries: string[] = [];
+  let entries: string[];
   try {
     entries = fs.readdirSync(projectPath);
   } catch {

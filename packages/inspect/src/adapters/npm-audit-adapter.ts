@@ -117,7 +117,7 @@ export class NpmAuditAdapter extends BuiltinToolAdapter {
     projectPath: string,
     timeout: number,
   ): Promise<{ raw: string; errorMessage?: string }> {
-    let raw = '';
+    let raw: string;
     try {
       ({ stdout: raw } = await execTool(command.cmd, command.args, {
         cwd: projectPath,

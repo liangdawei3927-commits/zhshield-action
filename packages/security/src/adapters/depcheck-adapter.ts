@@ -55,7 +55,7 @@ export class DepcheckAdapter implements ToolAdapter {
   }
 
   private async runDepcheck(options: ToolScanOptions): Promise<DepcheckOutput> {
-    let stdout = '';
+    let stdout: string;
     try {
       // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
       // depcheck 以自身 cwd 解析导致扫描失败。

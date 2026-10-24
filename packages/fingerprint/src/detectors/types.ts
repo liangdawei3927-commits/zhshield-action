@@ -89,7 +89,7 @@ export function frameworkSignalsFromDeps(
 /** 顶层目录形态约定信号（admin/web/app/miniapp/api/ios/android，depth=1，只出候选）。 */
 export function conventionDirSignals(projectRoot: string, weight: number): Signal[] {
   const signals: Signal[] = [];
-  let entries: fs.Dirent[] = [];
+  let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(projectRoot, { withFileTypes: true });
   } catch {

@@ -40,7 +40,12 @@ describe('engine:getHealthOverview（总览实时视图）', () => {
 
   it('与分类页共用 assembleHealthInputs（同一份输入组装）', () => {
     const domainBody = bodyOf(scoringSrc, 'export async function getDomainScoreHandler');
-    expect(overviewBody).toMatch(/assembleHealthInputs\(/);
+    // 总览与写分点已收敛到唯一 helper：两者只经 collectScoringInputs 取数，
+    // 不再各自复制一份 assembleHealthInputs 调用（复制品一旦分叉就会写两个分）
+    expect(overviewBody).toMatch(/collectScoringInputs\(/);
+    const collectBody = bodyOf(scoringSrc, 'async function collectScoringInputs');
+    expect(collectBody).toMatch(/assembleHealthInputs\(/);
+    // 分类页实时评分仍用同一个组装函数（同一输入形状）
     expect(domainBody).toMatch(/assembleHealthInputs\(/);
   });
 

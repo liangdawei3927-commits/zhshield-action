@@ -99,6 +99,25 @@ function cacheProfile(profile: ScoringProjectProfile, projectPath?: string): voi
 }
 
 /**
+ * 汇总评分输入，并判定「是否至少有一个域出过结果」。
+ *
+ * 「写分」与「总览」两条入口此前各自复制同一段输入组装 + hasResults 判定。
+ * 复制品一旦分叉就会重现 2026-10-24 那两个分的故障（同一时刻写出两个总分），
+ * 故收敛为唯一实现：两条入口结构上不可能既不同源又都正确。
+ */
+async function collectScoringInputs(projectPath: string) {
+  const inputs = await assembleHealthInputs(projectPath, {
+    listGuardReports,
+    readDomainSnapshot,
+    readDashboardState,
+    buildPipelineExtras,
+  });
+  const hasResults =
+    inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
+  return { inputs, hasResults };
+}
+
+/**
  * 写分点 1/2（已合并为一个函数）：把各域最新落盘结果汇总成健康总分并落库。
  *
  * 🔴 2026-10-24 修正：原先「pipeline 跑完写分」消费**内存里的本次报告**，
@@ -122,14 +141,7 @@ export async function summarizeAndPersistScore(
   }
   // 输入组装与分类页实时评分共用 assembleHealthInputs（含 Q4 评分输入缺口修复：
   // security/deps 专用扫描发现并入），两条路径结构上不可能漂移。
-  const inputs = await assembleHealthInputs(projectPath, {
-    listGuardReports,
-    readDomainSnapshot,
-    readDashboardState,
-    buildPipelineExtras,
-  });
-  const hasResults =
-    inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
+  const { inputs, hasResults } = await collectScoringInputs(projectPath);
   if (!hasResults) return null;
 
   const scoring = await getScoring();
@@ -437,6 +449,7 @@ export interface HealthOverviewDimension {
   generatedAt: string | null;
 }
 
+/** 健康总览：读磁盘最新快照实时计算（不落库，浏览报告中心不会污染历史曲线） */
 export interface HealthOverviewData {
   overall: number;
   grade: 'A' | 'B' | 'C' | 'D';
@@ -454,14 +467,7 @@ export async function getHealthOverviewHandler(
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const inputs = await assembleHealthInputs(projectPath, {
-      listGuardReports,
-      readDomainSnapshot,
-      readDashboardState,
-      buildPipelineExtras,
-    });
-    const hasResults =
-      inputs.guard !== null || inputs.inspectIssues !== null || hasAnyExtraResult(inputs.extras);
+    const { inputs, hasResults } = await collectScoringInputs(projectPath);
     // 一穷二白的新项目返回 null（由 UI 提示先跑检查），绝不返回一条 0 分总览
     if (!hasResults) return null;
 

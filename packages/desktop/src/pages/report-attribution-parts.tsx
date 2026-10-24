@@ -25,8 +25,7 @@ import {
   type AttributionResult,
   type AttributionUnavailable,
 } from './report-attribution';
-import { dimensionName, getScoreColor } from './reports-logic';
-import { deltaColor, formatDelta } from './report-window-parts';
+import { deltaColor, dimensionName, formatDelta, getScoreColor } from './reports-logic';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useT } from '../i18n';
 
@@ -42,7 +41,8 @@ export function attributionOptions(
 ): Array<{ value: string; label: string }> {
   if (buckets.length < 2) return [];
   const first = buckets[0];
-  const last = buckets[buckets.length - 1];
+  // 上面已保证至少 2 个窗口，`?? first` 只是给 at() 的 `undefined` 兜类型，不改变取值
+  const last = buckets.at(-1) ?? first;
   const options = [{ value: RANGE_VALUE, label: `${first.label} → ${last.label}` }];
   for (let i = 1; i < buckets.length; i += 1) {
     options.push({

@@ -56,6 +56,7 @@ export interface DimensionEntry {
   generatedAt?: string | null;
 }
 
+/** 分类评分卡入参：维度数组 + 汇总时间 + 总分输入 */
 export interface CategoryScoreCardsParams {
   /** 汇总记录的维度数组（可缺维：老记录只有已跑过的域） */
   dimensions: readonly DimensionEntry[];

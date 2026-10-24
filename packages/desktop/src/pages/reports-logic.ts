@@ -26,6 +26,26 @@ export function getScoreLabel(score: number, tr: typeof t = t) {
   return tr('page.reports.scoreLabel.danger');
 }
 
+/**
+ * 涨跌配色：健康分涨=好（绿），跌=差（红），与评分卡同一语义。
+ *
+ * 放在本文件而不是 report-window-parts：趋势表与分数归因两个区块都要用它，
+ * 而两者互相引用（窗口区块挂归因区块）—— 任一侧持有实现都会形成循环依赖。
+ * 本文件是两者共同的下游，故由它承载。
+ */
+export function deltaColor(delta: number): string {
+  if (delta > 0) return 'rgb(var(--zh-success))';
+  if (delta < 0) return 'rgb(var(--zh-danger))';
+  return 'rgb(var(--zh-muted))';
+}
+
+/** 带符号的变化值；null 显示破折号（不是 0 —— 0 会被读成「没变化」） */
+export function formatDelta(delta: number | null): string {
+  if (delta === null) return '—';
+  if (delta > 0) return `+${delta}`;
+  return `${delta}`;
+}
+
 /** 未检测维度的中性色（该域从未运行：既不是好也不是坏，不参与总分加权） */
 const NOT_RUN_COLOR = 'rgb(var(--zh-muted))';
 
@@ -134,7 +154,8 @@ export function scoreFreshness(timestamp: string, now: number = Date.now()): Sco
  * 代价远高于一次 O(n log n) 排序。`sort` 是稳定排序，同时间戳（同秒落分）保持原序。
  */
 export function toChronological<T extends { timestamp: string }>(rows: readonly T[]): T[] {
-  return [...rows].sort((a, b) => {
+  // toSorted 不改入参（等价于 [...rows].sort），调用方可能直接持有 IPC 返回的数组
+  return rows.toSorted((a, b) => {
     const ta = Date.parse(a.timestamp);
     const tb = Date.parse(b.timestamp);
     // 时间戳不可解析时保持原位置（返回 0），避免把坏数据甩到数组两端改变「最新」语义

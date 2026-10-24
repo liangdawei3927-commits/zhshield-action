@@ -247,7 +247,7 @@ export function buildWindowBuckets(
 ): WindowBucket[] {
   if (history.length === 0) return [];
 
-  const sorted = [...history].sort(
+  const sorted = history.toSorted(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
@@ -370,11 +370,3 @@ export function summarizeWindows(buckets: readonly WindowBucket[]): {
     gapCount,
   };
 }
-
-/** 窗口粒度对应的中文名（不依赖 i18n 文件，避免 Vite root 外新增键不热更） */
-export const GRANULARITY_LABEL: Record<WindowGranularity, string> = {
-  day: '日报',
-  week: '周报',
-  month: '月报',
-  year: '年报',
-};

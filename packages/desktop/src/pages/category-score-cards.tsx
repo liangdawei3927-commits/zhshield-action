@@ -68,16 +68,21 @@ export function ScoreOverviewRow({
 
       <div className="grid grid-cols-11 gap-2">
         <OverallScoreTile score={overall.score} label={t('page.reports.categoryScore.overall')} />
-        {cards.map((card, index) => (
-          <CategoryScoreTile
-            key={card.navId}
-            card={card}
-            onSelect={navigation?.navigate}
-            openLabel={t('page.reports.categoryScore.open', { name: card.title })}
-            // 组间留缝：与导航栏同一处分段（按需检查 ‖ 常驻守护），不留缝则两类分又混成一片
-            startsGroup={index > 0 && card.group !== cards[index - 1]!.group}
-          />
-        ))}
+        {cards.map((card, index) => {
+          // 组间留缝：与导航栏同一处分段（按需检查 ‖ 常驻守护），不留缝则两类分又混成一片
+          // 用可选链而非 `cards[index - 1]!.group`：非空断言会静默跳过 null 检查，
+          // 这里改为「没有上一张卡就不分段」，语义等价且不依赖断言。
+          const prevGroup = index > 0 ? cards[index - 1]?.group : undefined;
+          return (
+            <CategoryScoreTile
+              key={card.navId}
+              card={card}
+              onSelect={navigation?.navigate}
+              openLabel={t('page.reports.categoryScore.open', { name: card.title })}
+              startsGroup={prevGroup !== undefined && card.group !== prevGroup}
+            />
+          );
+        })}
       </div>
 
       <ScoreNotices overall={overall} freshness={freshness} />

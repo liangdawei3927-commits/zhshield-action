@@ -22,26 +22,12 @@ import {
   type WindowBucket,
   type WindowGranularity,
 } from './report-windows';
-import { dimensionName, getScoreColor } from './reports-logic';
+import { deltaColor, dimensionName, formatDelta, getScoreColor } from './reports-logic';
 import { AttributionSection } from './report-attribution-parts';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useT } from '../i18n';
 
 const GRANULARITIES: WindowGranularity[] = ['day', 'week', 'month', 'year'];
-
-/** 涨跌配色：健康分涨=好（绿），跌=差（红），与评分卡同一语义 */
-export function deltaColor(delta: number): string {
-  if (delta > 0) return 'rgb(var(--zh-success))';
-  if (delta < 0) return 'rgb(var(--zh-danger))';
-  return 'rgb(var(--zh-muted))';
-}
-
-/** 带符号的变化值；null 显示破折号（不是 0 —— 0 会被读成「没变化」） */
-export function formatDelta(delta: number | null): string {
-  if (delta === null) return '—';
-  if (delta > 0) return `+${delta}`;
-  return `${delta}`;
-}
 
 function GranularityTabs({
   value,

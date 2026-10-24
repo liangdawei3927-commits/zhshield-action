@@ -79,12 +79,20 @@ function buildGarbageTypeCards({
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
   toggleSelect: (id: string) => void;
 }): ReportStatCard[] {
+  /**
+   * 类型卡配色：只区分「影响面大小」，不虚构严重级。
+   * - unused-dependency 动的是依赖树（安装体积 + 供应链攻击面）→ warning
+   * - 其余三类是仓库内的整洁度问题 → info
+   */
+  const typeColor = (type: string): string =>
+    type === 'unused-dependency' ? 'rgb(var(--zh-warning))' : 'rgb(var(--zh-info))';
   return (
     ['unused-dependency', 'unused-file', 'dead-code', 'duplicate-code'] as const
   ).map((type) => ({
     key: `type-${type}`,
     label: t(GARBAGE_TYPE_LABEL[type] ?? type),
     value: report.summary.byType[type] ?? 0,
+    color: typeColor(type),
     detail: {
       items: report.items.filter((i) => i.type === type),
       render: (sub: unknown[]) => (
@@ -156,6 +164,8 @@ function GarbageReportView({
           key: 'freeable',
           label: t('page.garbage.stats.freeable'),
           value: formatSize(report.summary.size),
+          // 可释放空间 = 当前被占用的浪费量，越大越该处理
+          color: 'rgb(var(--zh-warning))',
         },
         ...typeCards,
       ]}

@@ -9,7 +9,7 @@ import { ReportShell, type ReportStatCard } from '../components/business/ReportS
 import { Bounce } from '../components/ui/Bounce';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
-import { useTechDebtPage } from './tech-debt-logic';
+import { useTechDebtPage, debtIndexColor } from './tech-debt-logic';
 import type { TechDebtReportData } from '../types/electron';
 import {
   TechDebtEmptyState,
@@ -89,7 +89,14 @@ function buildTechDebtStats({
   | 'verifyLoading'
 >): ReportStatCard[] {
   return [
-    { key: 'debtIndex', label: t('page.techdebt.debtIndex'), value: report.debtIndex },
+    {
+      key: 'debtIndex',
+      label: t('page.techdebt.debtIndex'),
+      value: report.debtIndex,
+      // 分档函数已在 tech-debt-logic 定义并被单测锁定（<40 绿 / <70 橙 / ≥70 红），
+      // 此前只定义没渲染 —— 指数卡与旁边读数一个色，看不出债务轻重。
+      color: debtIndexColor(report.debtIndex),
+    },
     {
       key: 'modules',
       label: t('page.techdebt.overviewModules'),
@@ -104,6 +111,8 @@ function buildTechDebtStats({
       key: 'actions',
       label: t('page.techdebt.overviewActions'),
       value: report.actionList.length,
+      // 待办动作是「要处理的事」，不是好坏评分
+      color: 'rgb(var(--zh-warning))',
       detail: {
         items: report.actionList,
         render: (sub) => (

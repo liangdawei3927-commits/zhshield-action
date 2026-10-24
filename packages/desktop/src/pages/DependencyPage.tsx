@@ -79,6 +79,8 @@ function DependencyReportView({
       progress={progress}
       progressMessage={progressMessage}
       stats={[
+        // 四张卡都是「规模统计」（总数/直接/传递/依赖边），大不等于坏 —— 按统计卡配色约定
+        // 只有表达好坏极性的数字才上色，纯计数保持墨色。别把它们当遗漏补成彩色。
         { key: 'total', label: t('page.deps.overviewTotal'), value: report.total },
         { key: 'direct', label: t('page.deps.overviewDirect'), value: report.direct },
         { key: 'transitive', label: t('page.deps.overviewTransitive'), value: report.transitive },

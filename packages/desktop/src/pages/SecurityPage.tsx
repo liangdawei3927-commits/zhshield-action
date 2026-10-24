@@ -5,7 +5,7 @@ import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useHasDomainResult } from '../hooks/useHasDomainResult';
 import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
-import { useSecurityPage } from './security-logic';
+import { useSecurityPage, SEVERITY_CONFIG } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
 import { SecurityEmptyState } from './security-empty-state';
 import { FindingsPanel, MalwarePanel } from './security-parts';
@@ -86,6 +86,9 @@ function buildSecurityStats({
         key: sev,
         label: t(`severity.${sev}`),
         value: report.summary[sev],
+        // 与明细徽章同源（security-logic 的 SEVERITY_CONFIG）：一处定义、两处消费，
+        // 避免统计卡与问题清单对同一严重级给出不同颜色。
+        color: SEVERITY_CONFIG[sev]?.color,
         detail: {
           items,
           render: (sub: unknown[]) =>
@@ -98,6 +101,8 @@ function buildSecurityStats({
       key: 'malware',
       label: t('page.security.stats.malware'),
       value: report.summary.malwareTotal,
+      // 恶意代码属最高危，与 critical 同档
+      color: 'rgb(var(--zh-danger-dark))',
       detail: {
         items: report.malware,
         render: (sub: unknown[]) =>

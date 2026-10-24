@@ -19,6 +19,7 @@ export interface PathStorage {
   removeItem(key: string): void;
 }
 
+/** 项目引用：path 为绝对路径 —— 它才是稳定标识（index 会随增删与排序漂移） */
 export interface ProjectRef {
   name: string;
   path: string;

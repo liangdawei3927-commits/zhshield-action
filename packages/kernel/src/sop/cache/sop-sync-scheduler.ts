@@ -181,10 +181,13 @@ function parseIsoDate(value: string | null): Date | null {
  * 只做字符串匹配、不猜语义：认不出的原因保留 'unknown' 并由 UI 原样透出，
  * 不做「大概是网络问题」这种替用户编解释的事。
  */
+/** 失败原因归类用的签名类信号词（模块级常量：避免每次调用重建正则对象） */
+const SIGNATURE_HINT_RE = /signature|verify|verification|hash mismatch|integrity/i;
+
 function classifyFailure(reason: string | null): SyncFailureKind {
   if (!reason) return 'none';
   if (reason === 'network_error' || reason === 'offline' || reason === 'timeout') return 'network';
   if (reason === 'compatibility_error') return 'compatibility';
-  if (/signature|verify|verification|hash mismatch|integrity/i.test(reason)) return 'signature';
+  if (SIGNATURE_HINT_RE.test(reason)) return 'signature';
   return 'unknown';
 }

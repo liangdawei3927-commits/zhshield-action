@@ -15,12 +15,17 @@
 
 import { countSentinelEventsBySeverity, type DbConnection } from '@zh/db';
 
-// desktop 包不直接依赖 better-sqlite3（只有 @zh/db 依赖），句柄类型从连接类推导
+/**
+ * @zh/db 连接的底层句柄类型。
+ *
+ * desktop 包不直接依赖 better-sqlite3（只有 @zh/db 依赖），故从连接类推导而非直接引用驱动类型。
+ */
 export type SentinelDbHandle = ReturnType<DbConnection['connect']>;
 
 /** 终态事件：已处理完的告警不再计入扣分（对应原内存实现的过滤条件） */
 export const TERMINAL_EVENT_STATUSES: readonly string[] = ['passed', 'merged', 'deployed'];
 
+/** 哨兵健康度计数：按 severity 汇总，只统计未结束的事件 */
 export interface SentinelHealthCounts {
   /** 是否正在监控（由调用方传入：主进程持有该状态） */
   active: boolean;

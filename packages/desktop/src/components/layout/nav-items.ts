@@ -50,6 +50,7 @@ export type NavGroup = 'onDemand' | 'daemon';
 /** 分组在导航里的先后顺序（按需检查在前：首屏第一动作应是「体检」而不是「开启监控」） */
 export const NAV_GROUP_ORDER: readonly NavGroup[] = ['onDemand', 'daemon'];
 
+/** 顶部导航项：id 与页面/路由一一对应，labelKey 走 i18n */
 export interface NavItem {
   id: string;
   labelKey: string;
@@ -150,6 +151,7 @@ export function navScanProgress(id: string): NavScanProgress | undefined {
   return navItems.find((item) => item.id === id)?.scanProgress;
 }
 
+/** 导航分段：同一 group 的连续项之间不留缝，让两类功能在视觉上分开 */
 export interface NavGroupSegment {
   group: NavGroup;
   items: NavItem[];

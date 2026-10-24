@@ -79,6 +79,7 @@ describe('resolveProjectRoot', () => {
     const parent = tmpDir('zh-root-down1-');
     const child = path.join(parent, 'project-a');
     fs.mkdirSync(child, { recursive: true });
+    writeFile(child, 'package.json', '{}');
     writeFile(child, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     expect(resolveProjectRoot(parent)).toBe(path.resolve(child));
   });
@@ -88,8 +89,26 @@ describe('resolveProjectRoot', () => {
     for (const name of ['a', 'b']) {
       const child = path.join(parent, name);
       fs.mkdirSync(child, { recursive: true });
+      writeFile(child, 'package.json', '{}');
       writeFile(child, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
     }
+    expect(resolveProjectRoot(parent)).toBe(path.resolve(parent));
+  });
+
+  it('点开头工具目录（.opencode 等）的锁文件不参与下探，仍解析到真实项目子目录', () => {
+    // 现场复现：文档容器目录下 .opencode/package-lock.json 与 zhihui-codeshield/pnpm-lock.yaml
+    // 曾同为候选 → 判"多个候选不猜测" → 返回容器目录 → 锁文件误报缺失、依赖图谱 0 节点。
+    const parent = tmpDir('zh-root-dotdir-');
+    writeFile(path.join(parent, '.opencode'), 'package-lock.json', '{}');
+    const project = path.join(parent, 'real-project');
+    writeFile(project, 'package.json', '{}');
+    writeFile(project, 'pnpm-lock.yaml', "lockfileVersion: '9.0'\n");
+    expect(resolveProjectRoot(parent)).toBe(path.resolve(project));
+  });
+
+  it('只有锁文件、没有清单文件的子目录不作为候选（避免把缓存目录当项目）', () => {
+    const parent = tmpDir('zh-root-nomanifest-');
+    writeFile(path.join(parent, 'cache-only'), 'package-lock.json', '{}');
     expect(resolveProjectRoot(parent)).toBe(path.resolve(parent));
   });
 });

@@ -24,9 +24,39 @@ const LOCKFILE_NAMES = [
 /** 向上查找的保守边界（层数）：workspace 嵌套通常 ≤ 3 层，10 层足够且避免误伤无关祖先 */
 const MAX_UPWARD_LEVELS = 10;
 
+/**
+ * 向下探测时跳过的噪声目录（与 @zh/pipeline 的 resolveEffectiveProjectRoot 同口径）。
+ * 容器目录里常混有构建产物与工具缓存，它们自身可能带锁文件，但不是用户项目。
+ */
+const NESTED_PROBE_NOISE_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  'release',
+  '.turbo',
+  '.cache',
+]);
+
+/** 受支持的清单文件：无清单的目录不算项目（防止 AI 工具缓存目录被当成项目） */
+const MANIFEST_NAMES = ['package.json', 'pyproject.toml', 'Pipfile', 'requirements.txt'] as const;
+
 /** 目录下是否存在任意受支持锁文件 */
 export function hasRecognizedLockfile(dir: string): boolean {
   return LOCKFILE_NAMES.some((name) => fs.existsSync(path.join(dir, name)));
+}
+
+/** 目录下是否含可识别清单；package.json 额外要求可解析（损坏清单不算项目） */
+function hasProjectManifest(dir: string): boolean {
+  if (fs.existsSync(path.join(dir, 'package.json'))) {
+    try {
+      JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8'));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return MANIFEST_NAMES.slice(1).some((name) => fs.existsSync(path.join(dir, name)));
 }
 
 /** 从 start 向上寻找最近一个含锁文件的祖先目录（含自身）；找不到返回 null */
@@ -41,7 +71,15 @@ function findLockfileAncestor(start: string): string | null {
   return null;
 }
 
-/** 向下探测：仅当"恰好一个直接子目录含锁文件"时返回该子目录；零个/多个返回 null（不猜测） */
+/**
+ * 向下探测：仅当"恰好一个直接子目录同时含锁文件与清单"时返回该子目录；
+ * 零个/多个返回 null（不猜测）。
+ *
+ * 必须同时过滤三类干扰，否则会与 @zh/pipeline 的解析结论相反（同一项目两个根）：
+ * 1. 点开头目录（`.opencode` / `.vscode` / `.trae` 等工具自身的依赖目录）；
+ * 2. 噪声目录（构建产物、依赖目录）；
+ * 3. 只有锁文件、没有清单的目录（缓存/临时目录不是用户项目）。
+ */
 function findUniqueLockfileChild(dir: string): string | null {
   let entries: fs.Dirent[];
   try {
@@ -51,8 +89,9 @@ function findUniqueLockfileChild(dir: string): string | null {
   }
   const candidates = entries
     .filter((entry) => entry.isDirectory())
+    .filter((entry) => !entry.name.startsWith('.') && !NESTED_PROBE_NOISE_DIRS.has(entry.name))
     .map((entry) => path.join(dir, entry.name))
-    .filter((candidate) => hasRecognizedLockfile(candidate));
+    .filter((candidate) => hasRecognizedLockfile(candidate) && hasProjectManifest(candidate));
   return candidates.length === 1 ? candidates[0] : null;
 }
 

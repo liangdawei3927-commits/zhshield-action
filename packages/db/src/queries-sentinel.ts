@@ -90,8 +90,13 @@ export function findSentinelEventByDedupeKey(
   db: Database.Database,
   dedupeKey: string,
 ): SentinelEventRow | undefined {
+  // 软删事件不参与去重：用户删掉的那条不该在 10 分钟窗口里继续抑制同类新事件
   return db
-    .prepare('SELECT * FROM sentinel_events WHERE dedupe_key = ? ORDER BY last_seen DESC LIMIT 1')
+    .prepare(
+      `SELECT * FROM sentinel_events
+       WHERE dedupe_key = ? AND deleted_at IS NULL
+       ORDER BY last_seen DESC LIMIT 1`,
+    )
     .get(dedupeKey) as SentinelEventRow | undefined;
 }
 
@@ -107,9 +112,10 @@ export function listSentinelEvents(
  * 按 severity 统计某项目**未软删**的哨兵事件数（供评分取数）。
  *
  * 为什么单列一个计数函数，而不是复用 `listSentinelEvents`：
- * 1. `listSentinelEvents` **不带 `deleted_at IS NULL`**（会把软删事件算进来）；
- * 2. 它默认 `LIMIT 100`，用于统计会被静默截断 —— 事件一多就少算；
- * 3. 评分只需要三个计数，`GROUP BY` 一次取回比拉全量行再在内存里数更可靠。
+ * 1. `listSentinelEvents` 默认 `LIMIT 100`，用于统计会被静默截断 —— 事件一多就少算；
+ * 2. 评分只需要三个计数，`GROUP BY` 一次取回比拉全量行再在内存里数更可靠。
+ *    （软删过滤两边现在都有；`listSentinelEvents` 原先缺 `deleted_at IS NULL`，
+ *    2026-10-25 已补，否则默认 100 条会全是软删的历史噪音。）
  *
  * 曾经评分侧直接读 `EventCenter.listEvents()`（**内存 Map**），库里落盘的事件一条
  * 也读不到 ⇒ 哨兵域恒 100 分。计数必须落回 DB，这是该缺陷的修复落点。
@@ -165,7 +171,9 @@ function buildSentinelQuery(filter?: ListSentinelEventsFilter): { sql: string; p
 
 /** 构建 WHERE 过滤条件 */
 function buildSentinelWhere(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
-  let sql = '';
+  // 软删事件不对外：本项目实测表里 38144 行中有 37809 行是软删的，
+  // 不带这个条件读取 = 默认 LIMIT 100 会全是已删除的历史噪音。
+  let sql = ' AND deleted_at IS NULL';
   const params: unknown[] = [];
   if (filter?.projectId) {
     sql += ' AND project_id = ?';

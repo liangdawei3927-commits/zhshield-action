@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import Database from 'better-sqlite3';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createSentinelEvent } from '@zh/db';
 import { EventCenter } from '../event-center';
 
 describe('EventCenter', () => {
@@ -208,5 +212,88 @@ describe('EventCenter', () => {
       expect(ec.processAlert(make('warning')).event.severity).toBe('p3');
       expect(ec.processAlert(make('unknown')).event.severity).toBe('p3');
     });
+  });
+});
+
+/**
+ * 事件列表必须能从 DB 读回（2026-10-25）
+ *
+ * 用户侧现象：哨兵页切走再回来 / 重启应用后，事件列表空白，详情入口消失
+ * —— 看起来像「从来没监控过」。而库里事实上有几百条（实测未软删 335 条）。
+ *
+ * 成因：`listEvents()` 只遍历内存 Map，重启即空；DB 落盘事件从未被读回。
+ * 正确语义：DB 提供全量事实，内存态覆盖同 id（本次进程的状态流转不得被 DB 盖回去）。
+ */
+describe('EventCenter.listEvents 读回 DB', () => {
+  let db: Database.Database;
+  let ec: EventCenter;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    const migrationsDir = path.resolve(__dirname, '../../../db/migrations');
+    for (const f of fs.readdirSync(migrationsDir).filter((n) => n.endsWith('.sql')).sort()) {
+      db.exec(fs.readFileSync(path.join(migrationsDir, f), 'utf-8'));
+    }
+    ec = new EventCenter(db);
+  });
+
+  afterEach(() => db.close());
+
+  function insert(id: string, title: string, deleted = false): void {
+    createSentinelEvent(db, {
+      id,
+      projectId: 'proj-1',
+      timestamp: new Date('2026-10-20T10:00:00.000Z'),
+      dedupeKey: `dk-${id}`,
+      title,
+      service: 'api',
+      module: 'core',
+      severity: 'p2',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: new Date('2026-10-20T10:00:00.000Z'),
+      lastSeen: new Date('2026-10-20T10:00:00.000Z'),
+    });
+    if (deleted) {
+      db.prepare("UPDATE sentinel_events SET deleted_at = datetime('now') WHERE id = ?").run(id);
+    }
+  }
+
+  it('内存为空时，DB 里的事件必须能列出来（重启后的回填路径）', () => {
+    insert('e1', '库里的事件 1');
+    insert('e2', '库里的事件 2');
+
+    const events = ec.listEvents();
+    expect(events).toHaveLength(2);
+    // rowToEvent 必须把 JSON 字段还原成对象，否则页面拿到字符串会崩
+    expect(Array.isArray(events[0].history)).toBe(true);
+    expect(typeof events[0].context).toBe('object');
+  });
+
+  it('软删事件不进列表', () => {
+    insert('alive', '活着');
+    insert('gone', '已删', true);
+
+    expect(ec.listEvents().map((e) => e.id)).toEqual(['alive']);
+  });
+
+  it('合并两侧：本次进程新建的事件与库里的历史事件同时可见', () => {
+    insert('old', '库里的历史事件');
+    const fresh = ec.createEvent({ projectId: 'proj-1', title: '本次新建' });
+
+    const ids = ec.listEvents().map((e) => e.id);
+    expect(ids).toContain('old');
+    expect(ids).toContain(fresh.id);
+  });
+
+  it('筛选条件在合并后仍然生效', () => {
+    insert('a', 'a');
+    insert('b', 'b');
+    db.prepare("UPDATE sentinel_events SET severity = 'p1' WHERE id = 'a'").run();
+
+    expect(ec.listEvents({ severity: 'p1' }).map((e) => e.id)).toEqual(['a']);
   });
 });

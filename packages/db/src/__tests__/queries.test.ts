@@ -469,6 +469,66 @@ describe('Sentinel Events CRUD', () => {
     deleteSentinelEvent(db, 'evt-del');
     expect(getSentinelEvent(db, 'evt-del')).toBeUndefined();
   });
+
+  /**
+   * 软删事件不得对外（2026-10-25）。
+   *
+   * 实测桌面库：sentinel_events 共 38144 行，其中 37809 行已软删、只有 335 行活着。
+   * `listSentinelEvents` 不带 `deleted_at IS NULL` 时，默认 `LIMIT 100` 取回的几乎
+   * 全是已删除的历史噪音 —— 哨兵页接上 DB 回填后会显示一堆"用户已经删掉"的事件。
+   */
+  it('listSentinelEvents 不返回软删事件', () => {
+    const mk = (id: string): void => {
+      createSentinelEvent(db, {
+        id,
+        projectId: 'proj-1',
+        timestamp: now,
+        dedupeKey: `dk-${id}`,
+        title: id,
+        service: 'api',
+        module: 'core',
+        severity: 'p2',
+        status: 'detected',
+        validation: '{}',
+        context: '{}',
+        history: '[]',
+        occurrenceCount: 1,
+        firstSeen: now,
+        lastSeen: now,
+      });
+    };
+    mk('alive-1');
+    mk('gone-1');
+    db.prepare("UPDATE sentinel_events SET deleted_at = datetime('now') WHERE id = ?").run('gone-1');
+
+    const ids = listSentinelEvents(db).map((r) => r.id);
+    expect(ids).toContain('alive-1');
+    expect(ids).not.toContain('gone-1');
+  });
+
+  it('去重查询跳过软删事件（删掉的那条不该继续抑制同类新事件）', () => {
+    createSentinelEvent(db, {
+      id: 'dup-1',
+      projectId: 'proj-1',
+      timestamp: now,
+      dedupeKey: 'same-key',
+      title: 'dup',
+      service: 'api',
+      module: 'core',
+      severity: 'p2',
+      status: 'detected',
+      validation: '{}',
+      context: '{}',
+      history: '[]',
+      occurrenceCount: 1,
+      firstSeen: now,
+      lastSeen: now,
+    });
+    expect(findSentinelEventByDedupeKey(db, 'same-key')).toBeDefined();
+
+    db.prepare("UPDATE sentinel_events SET deleted_at = datetime('now') WHERE id = ?").run('dup-1');
+    expect(findSentinelEventByDedupeKey(db, 'same-key')).toBeUndefined();
+  });
 });
 
 describe('Foreign key relaxation', () => {

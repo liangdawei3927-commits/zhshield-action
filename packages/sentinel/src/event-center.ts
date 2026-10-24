@@ -1,14 +1,10 @@
 import { randomUUID } from 'crypto';
 import type Database from 'better-sqlite3';
 import type { SentinelEvent, EventStatus, EventSeverity, AlertPayload } from './types';
-import type { SentinelEventRow } from '@zh/db';
-import {
-  createSentinelEvent,
-  updateSentinelEvent,
-  findSentinelEventByDedupeKey,
-  getSentinelEvent,
-} from '@zh/db';
+import { findSentinelEventByDedupeKey, getSentinelEvent } from '@zh/db';
 import type { AuditLogger } from '@zh/shared';
+import { listMergedEvents, rowToEvent } from './event-list';
+import { persistNewEvent, persistEventUpdate } from './event-persist';
 
 /** 告警 severity → 事件优先级映射表（替代 mapSeverity 中的 switch 分派） */
 const SEVERITY_TO_PRIORITY = new Map<string, 'p1' | 'p2' | 'p3'>([
@@ -70,7 +66,7 @@ export class EventCenter {
         operator: 'system',
         detail: `Alert repeated (${existing.occurrenceCount} times)`,
       });
-      this.persistUpdate(existing);
+      persistEventUpdate(this.db, existing);
       return { event: existing, isNew: false };
     }
 
@@ -100,7 +96,7 @@ export class EventCenter {
     };
 
     this.events.set(event.id, event);
-    this.persistEvent(event);
+    persistNewEvent(this.db, event);
     this.writeAuditLog('alert-received', event);
     return { event, isNew: true };
   }
@@ -130,7 +126,7 @@ export class EventCenter {
         operator: params.operator || 'system',
         detail: `Event repeated (${existing.occurrenceCount} times)`,
       });
-      this.persistUpdate(existing);
+      persistEventUpdate(this.db, existing);
       this.writeAuditLog('event-repeat', existing);
       return existing;
     }
@@ -162,7 +158,7 @@ export class EventCenter {
     };
 
     this.events.set(event.id, event);
-    this.persistEvent(event);
+    persistNewEvent(this.db, event);
     this.writeAuditLog('event-created', event);
     return event;
   }
@@ -183,7 +179,7 @@ export class EventCenter {
       detail: `Status changed from ${prev} to ${status}`,
     });
     this.events.set(event.id, event);
-    this.persistUpdate(event);
+    persistEventUpdate(this.db, event);
     this.writeAuditLog('status-changed', event);
     return event;
   }
@@ -203,7 +199,7 @@ export class EventCenter {
       detail: `Validation result: ${result}`,
     });
     this.events.set(event.id, event);
-    this.persistUpdate(event);
+    persistEventUpdate(this.db, event);
     this.writeAuditLog('validation-updated', event);
     return event;
   }
@@ -212,11 +208,15 @@ export class EventCenter {
     return this.events.get(eventId) || this.loadFromDb(eventId);
   }
 
+  /**
+   * 事件列表：**DB 为准，内存覆盖同 id**，按时间倒序。
+   *
+   * 实现在 `event-list.ts`（纯函数，可单独测）。核心事实：原先只返回内存 Map
+   * 里的条目，进程一重启库里几百条事件就全都读不到了（实测本项目 338 条），
+   * 哨兵页因此显示空白、详情入口消失。
+   */
   listEvents(filters?: { status?: EventStatus; severity?: EventSeverity }): SentinelEvent[] {
-    let results = [...this.events.values()];
-    if (filters?.status) results = results.filter((e) => e.status === filters.status);
-    if (filters?.severity) results = results.filter((e) => e.severity === filters.severity);
-    return results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return listMergedEvents(this.db, this.events, filters);
   }
 
   private findEventByDedupeKey(dedupeKey: string): SentinelEvent | undefined {
@@ -224,7 +224,7 @@ export class EventCenter {
     if (found) return found;
     if (this.db) {
       const row = findSentinelEventByDedupeKey(this.db, dedupeKey);
-      if (row) return this.rowToEvent(row);
+      if (row) return rowToEvent(row);
     }
     return undefined;
   }
@@ -233,70 +233,9 @@ export class EventCenter {
     if (!this.db) return undefined;
     const row = getSentinelEvent(this.db, eventId);
     if (!row) return undefined;
-    const event = this.rowToEvent(row);
+    const event = rowToEvent(row);
     this.events.set(event.id, event);
     return event;
-  }
-
-  private rowToEvent(row: SentinelEventRow): SentinelEvent {
-    return {
-      id: row.id,
-      projectId: row.project_id,
-      timestamp: new Date(row.timestamp),
-      dedupeKey: row.dedupe_key,
-      title: row.title,
-      service: row.service,
-      module: row.module,
-      severity: row.severity as EventSeverity,
-      status: row.status as EventStatus,
-      validation: typeof row.validation === 'string' ? JSON.parse(row.validation) : row.validation,
-      context: typeof row.context === 'string' ? JSON.parse(row.context) : row.context,
-      history: typeof row.history === 'string' ? JSON.parse(row.history) : row.history,
-      occurrenceCount: row.occurrence_count,
-      firstSeen: new Date(row.first_seen),
-      lastSeen: new Date(row.last_seen),
-    };
-  }
-
-  private persistEvent(event: SentinelEvent): void {
-    if (!this.db) return;
-    try {
-      createSentinelEvent(this.db, {
-        id: event.id,
-        projectId: event.projectId,
-        timestamp: event.timestamp,
-        dedupeKey: event.dedupeKey,
-        title: event.title,
-        service: event.service,
-        module: event.module,
-        severity: event.severity,
-        status: event.status,
-        validation: JSON.stringify(event.validation),
-        context: JSON.stringify(event.context),
-        history: JSON.stringify(event.history),
-        occurrenceCount: event.occurrenceCount,
-        firstSeen: event.firstSeen,
-        lastSeen: event.lastSeen,
-      });
-    } catch (err) {
-      console.error('[EventCenter] Failed to persist event:', err);
-    }
-  }
-
-  private persistUpdate(event: SentinelEvent): void {
-    if (!this.db) return;
-    try {
-      updateSentinelEvent(this.db, {
-        id: event.id,
-        status: event.status,
-        validation: JSON.stringify(event.validation),
-        history: JSON.stringify(event.history),
-        occurrenceCount: event.occurrenceCount,
-        lastSeen: event.lastSeen,
-      });
-    } catch (err) {
-      console.error('[EventCenter] Failed to persist update:', err);
-    }
   }
 
   private writeAuditLog(action: string, event: SentinelEvent): void {

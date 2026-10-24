@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useDependencyPage } from './dependency-logic';
 import {
   DependencyEmptyState,
@@ -20,9 +19,7 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
-import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
-import { useHasDomainResult } from '../hooks/useHasDomainResult';
-import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
@@ -124,72 +121,36 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   const { loading, progress, progressMessage, report, handleScan, copyToAi, copyAllToAi } =
     useDependencyPage(projectPath);
   const t = useT();
-  // 打开先落在主页（与改动前一致：report 初值为 null，原本也是停在主页）。
-  // 读回的历史报告只让「详情按钮可见」，不把人自动带进详情页。
-  const [showHome, setShowHome] = useState(true);
 
-  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。
-  // 这里读回该域上次扫描的完整报告（同一份数据，不做字段再造）。
-  const savedReport = useSavedDomainReport<DependencyReportData>(projectPath, 'deps', report);
-  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
-  const hadPreviousResult = useHasDomainResult(projectPath, 'deps');
+  // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配，
+  // 四个域页面共用同一份实现；页面只声明自己的 domain 与扫描入口。
+  const detail = useDomainDetailPage(projectPath, 'deps', report, loading, handleScan);
 
-  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替（保持「扫描中看进度」）。
-  const detailReport = report ?? (loading ? null : savedReport);
-  const hasDetail = detailReport !== null || hadPreviousResult;
-
-  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫。
-  // 点详情不该替用户发起检查 —— 要看新结果，由详情页里的「重新检查」自己点。
-  const snapshot = useDomainSnapshot(projectPath, 'deps');
-  const [showSnapshot, setShowSnapshot] = useState(false);
-
-  const openDetail = () => {
-    if (detailReport) {
-      setShowHome(false);
-      return;
-    }
-    snapshot.reload();
-    setShowSnapshot(true);
-  };
-
-  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
-  useEffect(() => {
-    if (report) {
-      setShowHome(false);
-      setShowSnapshot(false);
-    }
-  }, [report]);
-
-  if (showSnapshot) {
+  if (detail.showSnapshot) {
     return (
       <DomainSnapshotReport
-        projectPath={projectPath}
         dimension="dependencies"
         icon={
           <PageGlyph bg="brand" stroke="brand" round>
             <DependencyGraphGlyph />
           </PageGlyph>
         }
-        snapshot={snapshot.snapshot}
-        loading={snapshot.loading}
-        rescanning={loading}
-        onRescan={handleScan}
-        onBackHome={() => setShowSnapshot(false)}
+        {...detail.snapshotViewProps}
       />
     );
   }
 
-  if (detailReport && !showHome) {
+  if (detail.detailReport && !detail.showHome) {
     return (
       <DependencyReportView
-        report={detailReport}
+        report={detail.detailReport}
         loading={loading}
         progress={progress}
         progressMessage={progressMessage}
         onRescan={handleScan}
         onCopyTyposquat={copyToAi}
         onCopyAllTyposquat={copyAllToAi}
-        onBackHome={() => setShowHome(true)}
+        onBackHome={detail.backHome}
         projectPath={projectPath}
         t={t}
       />
@@ -197,14 +158,11 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
+    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
       <DependencyEmptyState
         projectPath={projectPath}
         loading={loading}
-        onScan={() => {
-          setShowHome(false);
-          handleScan();
-        }}
+        onScan={detail.startScan}
       />
     </DetailEntryProvider>
   );

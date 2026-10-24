@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { PageGlyph } from '../components/business/page-glyph';
@@ -6,9 +5,7 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
-import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
-import { useHasDomainResult } from '../hooks/useHasDomainResult';
-import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { usePerformancePage } from './performance-logic';
 import { IssuesPanel } from './performance-parts';
@@ -20,67 +17,33 @@ interface PerformancePageProps {
 
 export function PerformancePage({ projectPath }: PerformancePageProps) {
   const t = useT();
-  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
-  const [showHome, setShowHome] = useState(true);
   const { loading, progress, progressLabel, statusMessage, report, copyToAi, copyAllToAi, handleScan } =
     usePerformancePage(projectPath);
 
-  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。读回上次完整报告（同口径）。
-  const savedReport = useSavedDomainReport(projectPath, 'performance', report);
-  // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
-  const hadPreviousResult = useHasDomainResult(projectPath, 'performance');
+  // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配
+  const detail = useDomainDetailPage(projectPath, 'performance', report, loading, handleScan);
 
-  // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
-  const detailReport = report ?? (loading ? null : savedReport);
-  const hasDetail = detailReport !== null || hadPreviousResult;
-
-  // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
-  const snapshot = useDomainSnapshot(projectPath, 'performance');
-  const [showSnapshot, setShowSnapshot] = useState(false);
-
-  const openDetail = () => {
-    if (detailReport) {
-      setShowHome(false);
-      return;
-    }
-    snapshot.reload();
-    setShowSnapshot(true);
-  };
-
-  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
-  useEffect(() => {
-    if (report) {
-      setShowHome(false);
-      setShowSnapshot(false);
-    }
-  }, [report]);
-
-  if (showSnapshot) {
+  if (detail.showSnapshot) {
     return (
       <DomainSnapshotReport
-        projectPath={projectPath}
         dimension="performance"
         icon={
           <PageGlyph bg="warning" stroke="warning">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </PageGlyph>
         }
-        snapshot={snapshot.snapshot}
-        loading={snapshot.loading}
-        rescanning={loading}
-        onRescan={handleScan}
-        onBackHome={() => setShowSnapshot(false)}
+        {...detail.snapshotViewProps}
       />
     );
   }
 
-  if (detailReport && !showHome) {
+  if (detail.detailReport && !detail.showHome) {
     return (
       <ReportShell
         projectPath={projectPath}
         dimension="performance"
         historyDomain="performance"
-        refreshKey={detailReport}
+        refreshKey={detail.detailReport}
         icon={
           <PageGlyph bg="warning" stroke="warning">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -96,29 +59,30 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
             {t('page.performance.rescan')}
           </PrimaryButton>
         }
-        onBackHome={() => setShowHome(true)}
+        onBackHome={detail.backHome}
         loading={loading}
         progress={progress}
         progressMessage={statusMessage}
-        stats={performanceReportStats(t, detailReport, copyToAi)}
+        stats={performanceReportStats(t, detail.detailReport, copyToAi)}
       >
-        <IssuesPanel issues={detailReport.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
+        <IssuesPanel
+          issues={detail.detailReport.issues}
+          onCopyToAi={copyToAi}
+          onCopyAll={copyAllToAi}
+        />
       </ReportShell>
     );
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
+    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
       <PerformanceEmptyView
         projectPath={projectPath}
         t={t}
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
-        onAction={() => {
-          setShowHome(false);
-          handleScan();
-        }}
+        onAction={detail.startScan}
       />
     </DetailEntryProvider>
   );

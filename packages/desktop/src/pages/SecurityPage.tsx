@@ -3,7 +3,7 @@ import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useHasDomainResult } from '../hooks/useHasDomainResult';
-import { useDomainSnapshot } from '../hooks/useDomainSnapshot';
+import { useDomainDetailEntry } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { useSecurityPage, SEVERITY_CONFIG } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
@@ -397,17 +397,14 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
   const hasDetail = detailReport !== null || hadPreviousResult;
 
   // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
-  const snapshot = useDomainSnapshot(projectPath, 'security');
-  const [showSnapshot, setShowSnapshot] = useState(false);
-
-  const openDetail = () => {
-    if (detailReport) {
-      setShowHome(false);
-      return;
-    }
-    snapshot.reload();
-    setShowSnapshot(true);
-  };
+  const { showSnapshot, setShowSnapshot, openDetail, snapshotViewProps } = useDomainDetailEntry({
+    projectPath,
+    domain: 'security',
+    detailReport,
+    onEnterDetail: () => setShowHome(false),
+    rescanning: loading,
+    onRescan: handleScan,
+  });
 
   // 实时扫描出结果时退出快照视图 —— 复刻原有「扫完直接看报告」
   useEffect(() => {
@@ -417,7 +414,6 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
   if (showSnapshot) {
     return (
       <DomainSnapshotReport
-        projectPath={projectPath}
         dimension="security"
         icon={
           <PageGlyph bg="danger" stroke="danger">
@@ -425,11 +421,7 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
             <path d="M9 13l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
           </PageGlyph>
         }
-        snapshot={snapshot.snapshot}
-        loading={snapshot.loading}
-        rescanning={loading}
-        onRescan={handleScan}
-        onBackHome={() => setShowSnapshot(false)}
+        {...snapshotViewProps}
       />
     );
   }

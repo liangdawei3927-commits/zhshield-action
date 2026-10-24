@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getDomainSnapshotRaw } from '../services/engineApi';
 import { toSnapshotReport, type SnapshotReport } from '../pages/domain-snapshot-logic';
 
+/** 域快照读取状态；snapshot 为 null 表示该域从未落盘过 */
 export interface DomainSnapshotState {
   snapshot: SnapshotReport | null;
   /** 首次读取中（视图显示占位，不显示「无结果」以免误判） */

@@ -799,7 +799,20 @@
     "toggleGate": "自动化 L1 L2 L3 门禁检查",
     "toggleGateLabel": "门禁",
     "toggleSentinel": "7X24 全天候守护",
-    "toggleSentinelLabel": "哨兵"
+    "toggleSentinelLabel": "哨兵",
+    "brainNotConnected": "未接入云端",
+    "brainNeverSynced": "尚未完成首次同步",
+    "brainStaleDays": "已 {{days}} 天未同步",
+    "brainLastSync": "上次成功同步：{{time}}",
+    "brainToday": "今天",
+    "brainYesterday": "昨天",
+    "brainDaysAgo": "{{days}} 天前",
+    "brainErrorNetwork": "云端不可达",
+    "brainErrorCompat": "客户端版本不兼容",
+    "brainErrorSignature": "规则签名校验失败",
+    "brainErrorUnknown": "同步失败",
+    "brainRetry": "立即重试",
+    "brainRetrying": "正在同步…"
   },
   "lifecycle": {
     "archive": "归档",
@@ -832,6 +845,10 @@
     "toolErrorsNote": "外部工具执行状态（如 trivy / 依赖审计的报错原文），非代码问题"
   },
   "nav": {
+    "group": {
+      "onDemand": "按需检查",
+      "daemon": "常驻守护"
+    },
     "backup": "备份中心",
     "deps": "依赖管家",
     "evolve": "规则进化",
@@ -1467,9 +1484,16 @@
         "notRun": "未检测"
       },
       "summaryDone": "已汇总各域最新结果，健康总分 {{score}}",
-      "dataAsOf": "数据时间 {{date}}（总分基于各域最近一次结果汇总）",
       "dataStale": "基于 {{hours}} 小时前的数据，建议重新汇总",
       "partialDimensions": "总分仅由已检测的 {{run}} / {{total}} 个维度加权（未检测维度不计入）",
+      "categoryScore": {
+        "title": "评分总览",
+        "open": "进入{{name}}",
+        "overall": "总分"
+      },
+      "moduleScore": {
+        "title": "模块评分"
+      },
       "table": {
         "abnormal": "异常",
         "col": {

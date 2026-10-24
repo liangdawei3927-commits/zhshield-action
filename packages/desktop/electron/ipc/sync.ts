@@ -269,11 +269,9 @@ function registerSopVersionQuery(): void {
   });
 
   ipcMain.handle('sop:getSyncHealth', async () => {
-    return {
-      level: sopCache.getSyncHealthLevel(),
-      stale: sopCache.isStale(),
-      lastSync: (await sopCache.getLocalVersion())?.publishedAt ?? null,
-    };
+    // 完整快照由调度器给出：包含「是否曾经成功过」与失败原因，
+    // 使 UI 能区分「从未接入云端」与「接入过但已过期」——两者处置完全不同。
+    return sopCache.getSyncHealthDetail();
   });
 }
 

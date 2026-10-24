@@ -799,7 +799,20 @@
     "toggleGate": "自動化 L1 L2 L3 ゲートチェック",
     "toggleGateLabel": "ゲート",
     "toggleSentinel": "24時間365日フルタイム保護",
-    "toggleSentinelLabel": "センチネル"
+    "toggleSentinelLabel": "センチネル",
+    "brainNotConnected": "クラウド未接続",
+    "brainNeverSynced": "初回同期が未完了",
+    "brainStaleDays": "{{days}} 日間同期なし",
+    "brainLastSync": "最終同期成功：{{time}}",
+    "brainToday": "今日",
+    "brainYesterday": "昨日",
+    "brainDaysAgo": "{{days}} 日前",
+    "brainErrorNetwork": "クラウドに到達できません",
+    "brainErrorCompat": "クライアント版が非互換",
+    "brainErrorSignature": "ルール署名検証に失敗",
+    "brainErrorUnknown": "同期に失敗",
+    "brainRetry": "今すぐ再試行",
+    "brainRetrying": "同期中…"
   },
   "lifecycle": {
     "archive": "アーカイブ",
@@ -832,6 +845,10 @@
     "toolErrorsNote": "外部ツールの実行状態（trivy / 依存監査などのエラー原文）。コードの問題ではありません"
   },
   "nav": {
+    "group": {
+      "onDemand": "オンデマンド検査",
+      "daemon": "常駐監視"
+    },
     "backup": "バックアップセンター",
     "deps": "依存関係",
     "evolve": "ルール進化",
@@ -1467,9 +1484,16 @@
         "notRun": "未実行"
       },
       "summaryDone": "各ドメインの最新結果を集約しました。総合スコア {{score}}",
-      "dataAsOf": "データ時点 {{date}}（スコアは各ドメインの最新結果の集約です）",
       "dataStale": "{{hours}} 時間前のデータに基づきます。再集約を推奨します",
       "partialDimensions": "スコアは検出済みの {{run}} / {{total}} 次元のみで重み付けされています（未検出の次元は除外）",
+      "categoryScore": {
+        "title": "スコア総覧",
+        "open": "{{name}}を開く",
+        "overall": "総合点"
+      },
+      "moduleScore": {
+        "title": "モジュールスコア"
+      },
       "table": {
         "abnormal": "異常",
         "col": {

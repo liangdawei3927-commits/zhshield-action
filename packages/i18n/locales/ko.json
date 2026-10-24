@@ -799,7 +799,20 @@
     "toggleGate": "자동화 L1 L2 L3 게이트 검사",
     "toggleGateLabel": "게이트",
     "toggleSentinel": "24/7 연중무휴 보호",
-    "toggleSentinelLabel": "센티넬"
+    "toggleSentinelLabel": "센티넬",
+    "brainNotConnected": "클라우드 미연결",
+    "brainNeverSynced": "첫 동기화 미완료",
+    "brainStaleDays": "{{days}}일간 동기화 안 됨",
+    "brainLastSync": "마지막 성공 동기화: {{time}}",
+    "brainToday": "오늘",
+    "brainYesterday": "어제",
+    "brainDaysAgo": "{{days}}일 전",
+    "brainErrorNetwork": "클라우드 연결 불가",
+    "brainErrorCompat": "클라이언트 버전 비호환",
+    "brainErrorSignature": "규칙 서명 검증 실패",
+    "brainErrorUnknown": "동기화 실패",
+    "brainRetry": "지금 재시도",
+    "brainRetrying": "동기화 중…"
   },
   "lifecycle": {
     "archive": "보관",
@@ -832,6 +845,10 @@
     "toolErrorsNote": "외부 도구 실행 상태(예: trivy / 종속성 감사 오류 원문). 코드 문제가 아닙니다"
   },
   "nav": {
+    "group": {
+      "onDemand": "필요 시 검사",
+      "daemon": "상시 보호"
+    },
     "backup": "백업 센터",
     "deps": "의존성 점검",
     "evolve": "규칙 진화",
@@ -1467,9 +1484,16 @@
         "notRun": "미실행"
       },
       "summaryDone": "각 도메인의 최신 결과를 집계했습니다. 종합 점수 {{score}}",
-      "dataAsOf": "데이터 시각 {{date}} (점수는 각 도메인의 최신 결과 집계입니다)",
       "dataStale": "{{hours}}시간 전 데이터 기준입니다. 다시 집계하는 것을 권장합니다",
       "partialDimensions": "점수는 검출된 {{run}} / {{total}} 차원만 가중치에 반영됩니다(미검출 차원 제외)",
+      "categoryScore": {
+        "title": "점수 개요",
+        "open": "{{name}} 열기",
+        "overall": "총점"
+      },
+      "moduleScore": {
+        "title": "모듈 점수"
+      },
       "table": {
         "abnormal": "이상",
         "col": {

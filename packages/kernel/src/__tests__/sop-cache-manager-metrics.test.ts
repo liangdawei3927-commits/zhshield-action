@@ -12,6 +12,7 @@ import { EventBus } from '../bus';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 import type { SopDiff } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
+import * as kernelEntry from '../index';
 
 function makeDiff(added: SopRule[]): SopDiff {
   return {
@@ -55,12 +56,15 @@ describe('SopCacheManager 指标接入（MetricsCollector）', () => {
       );
   }
 
-  it('GIVEN 离线状态 WHEN syncFromCloud THEN 记录同步成功次数与耗时直方图', async () => {
+  it('GIVEN 离线状态 WHEN syncFromCloud THEN 记为失败而非成功（指标不得撒谎）', async () => {
     manager.setOnline(false);
     const result = await manager.syncFromCloud();
 
     expect(result.updated).toBe(false);
-    expect(counter('sop_sync_total', { result: 'success' })?.value).toBe(1);
+    expect(result.reason).toBe('network_error');
+    // 旧口径：只要 coordinator 不抛异常就记 success —— 离线被计成同步成功，故障长期不可见
+    expect(counter('sop_sync_total', { result: 'success' })).toBeUndefined();
+    expect(counter('sop_sync_total', { result: 'failure' })?.value).toBe(1);
     const duration = manager
       .getMetricsSnapshot()
       .histograms.find((h) => h.name === 'sop_sync_duration_ms');
@@ -133,13 +137,14 @@ describe('SopCacheMetrics 失败路径（单元）', () => {
 });
 
 describe('kernel 入口导出（新增协作者可达）', () => {
-  it('GIVEN kernel 入口 WHEN 导入 THEN MetricsCollector/ConflictResolution/DataCleanup 可用', async () => {
-    const entry = await import('../index');
-    expect(typeof entry.MetricsCollector).toBe('function');
-    expect(entry.ConflictResolution.REMOTE_WINS).toBe('remote-wins');
-    expect(typeof entry.DataCleanup).toBe('function');
-    expect(typeof entry.SmartCompressor).toBe('function');
-    expect(typeof entry.SyncConflictResolver).toBe('function');
-    expect(typeof entry.SopCacheMaintenance).toBe('function');
+  // 用静态导入而非 await import('../index')：整个入口的 transform 在 8GB Intel Mac 上约 12s，
+  // 放在用例内必然撞超时。断言不变，只是把模块加载开销移出单测计时窗口。
+  it('GIVEN kernel 入口 WHEN 导入 THEN MetricsCollector/ConflictResolution/DataCleanup 可用', () => {
+    expect(typeof kernelEntry.MetricsCollector).toBe('function');
+    expect(kernelEntry.ConflictResolution.REMOTE_WINS).toBe('remote-wins');
+    expect(typeof kernelEntry.DataCleanup).toBe('function');
+    expect(typeof kernelEntry.SmartCompressor).toBe('function');
+    expect(typeof kernelEntry.SyncConflictResolver).toBe('function');
+    expect(typeof kernelEntry.SopCacheMaintenance).toBe('function');
   });
 });

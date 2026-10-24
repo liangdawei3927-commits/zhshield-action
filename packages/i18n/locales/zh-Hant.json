@@ -799,7 +799,20 @@
     "toggleGate": "自動化 L1 L2 L3 門禁檢查",
     "toggleGateLabel": "門禁",
     "toggleSentinel": "7X24 全天候守護",
-    "toggleSentinelLabel": "哨兵"
+    "toggleSentinelLabel": "哨兵",
+    "brainNotConnected": "未接入雲端",
+    "brainNeverSynced": "尚未完成首次同步",
+    "brainStaleDays": "已 {{days}} 天未同步",
+    "brainLastSync": "上次成功同步：{{time}}",
+    "brainToday": "今天",
+    "brainYesterday": "昨天",
+    "brainDaysAgo": "{{days}} 天前",
+    "brainErrorNetwork": "雲端不可達",
+    "brainErrorCompat": "客戶端版本不相容",
+    "brainErrorSignature": "規則簽名校驗失敗",
+    "brainErrorUnknown": "同步失敗",
+    "brainRetry": "立即重試",
+    "brainRetrying": "正在同步…"
   },
   "lifecycle": {
     "archive": "歸檔",
@@ -832,6 +845,10 @@
     "toolErrorsNote": "外部工具執行狀態（如 trivy / 依賴審計的報錯原文），非程式碼問題"
   },
   "nav": {
+    "group": {
+      "onDemand": "按需檢查",
+      "daemon": "常駐守護"
+    },
     "backup": "備份中心",
     "deps": "依賴盤點",
     "evolve": "規則進化",
@@ -1467,9 +1484,16 @@
         "notRun": "未檢測"
       },
       "summaryDone": "已彙總各域最新結果，健康總分 {{score}}",
-      "dataAsOf": "資料時間 {{date}}（總分基於各域最近一次結果彙總）",
       "dataStale": "基於 {{hours}} 小時前的資料，建議重新彙總",
       "partialDimensions": "總分僅由已檢測的 {{run}} / {{total}} 個維度加權（未檢測維度不計入）",
+      "categoryScore": {
+        "title": "評分總覽",
+        "open": "進入{{name}}",
+        "overall": "總分"
+      },
+      "moduleScore": {
+        "title": "模組評分"
+      },
       "table": {
         "abnormal": "異常",
         "col": {

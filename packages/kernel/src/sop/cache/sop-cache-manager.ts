@@ -23,6 +23,7 @@ import { SopSyncClient, type ApiTokenProvider } from './sop-sync-client';
 import { VerifiedSopSyncClient } from './sop-verified-sync-client';
 import { SopSyncCoordinator } from './sop-sync-coordinator';
 import { SopSyncScheduler } from './sop-sync-scheduler';
+import type { SyncHealthDetail } from './sop-sync-scheduler';
 import { SyncConflictResolver, ConflictResolution } from '../sync-conflict';
 import { SmartCompressor } from '../smart-compressor';
 import { DataCleanup } from '../data-cleanup';
@@ -34,6 +35,8 @@ import { SopCacheMaintenance } from './sop-cache-maintenance';
 
 export { createSyncPolicy } from './sop-sync-policy';
 export type { SyncPolicyOptions } from './sop-sync-policy';
+export type { SyncFailureKind, SyncHealthDetail } from './sop-sync-scheduler';
+export type { SopSyncState } from './sop-version-store';
 
 /** SOP 缓存管理器配置：全部字段可选，成员均带内联说明；省略项使用默认值 */
 export interface SopCacheManagerOptions {
@@ -173,6 +176,11 @@ export class SopCacheManager {
 
   /**
    * 完整同步流程（文档 7.4 节）
+   *
+   * 指标口径：只有「确实完成了一次有效交互」才算成功。
+   * 原先只要 coordinator 不抛异常就记成功——网络不可达时它返回
+   * { updated:false, reason:'network_error' } 而不抛错，于是失败被计成成功，
+   * 指标长期全绿、故障无人发现。
    */
   async syncFromCloud(): Promise<SyncResult> {
     const startedAt = Date.now();
@@ -180,8 +188,17 @@ export class SopCacheManager {
     try {
       const result = await this.coordinator.syncFromCloud();
       await refreshModuleCaches(this.lazyLoader);
-      this.metrics.recordSyncSuccess(Date.now() - startedAt);
-      emitEvent(this.eventBus,'sop:sync-completed', { result, timestamp: new Date() });
+      const succeeded = result.updated || result.reason === 'already_latest';
+      if (succeeded) {
+        this.metrics.recordSyncSuccess(Date.now() - startedAt);
+        emitEvent(this.eventBus,'sop:sync-completed', { result, timestamp: new Date() });
+      } else {
+        this.metrics.recordSyncFailure(Date.now() - startedAt);
+        emitEvent(this.eventBus,'sop:sync-failed', {
+          error: result.reason ?? 'unknown',
+          timestamp: new Date(),
+        });
+      }
       return result;
     } catch (err) {
       this.metrics.recordSyncFailure(Date.now() - startedAt);
@@ -309,11 +326,9 @@ export class SopCacheManager {
     return this.scheduler.getSyncHealthLevel();
   }
 
-  /**
-   * 判断规则是否可能过期（需要显示警告）
-   */
-  isStale(): boolean {
-    return this.scheduler.isStale();
+  /** 完整同步健康度快照（等级 + 上次成功时间 + 失败原因分类）——level 4 既可能是「断了 30 天」也可能是「从未接入云端」，界面必须能区分 */
+  getSyncHealthDetail(): SyncHealthDetail {
+    return this.scheduler.getSyncHealthDetail();
   }
 
   // ─── 按项目特征同步（懒加载 9.5 节） ───────────────────────

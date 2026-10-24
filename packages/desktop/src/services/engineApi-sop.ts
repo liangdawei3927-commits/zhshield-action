@@ -5,6 +5,7 @@
  */
 import { getRuleVersionViaHttp } from './serverApi';
 import { isHttpMode, getAPI } from './engineApi-transport';
+import type { SopSyncHealth } from '../types/electron';
 
 function getSopAPI() {
   return window.electronAPI?.sop;
@@ -41,18 +42,32 @@ export async function syncRules(): Promise<{ added: number; updated: number }> {
   }
 }
 
-export async function getSyncHealth(): Promise<{
-  level: number;
-  stale: boolean;
-  lastSync: string | null;
-}> {
-  if (isHttpMode()) return { level: 4, stale: true, lastSync: null };
+/**
+ * 同步健康度；不可用时给出「从未接入」形态而非「已过期」。
+ *
+ * HTTP 模式与 IPC 缺失都意味着这台客户端根本没有同步通道，
+ * 语义是「未接入云端」而不是「同步过期 28 天」——后者会误导用户去查网络。
+ */
+function unknownSyncHealth(): SopSyncHealth {
+  return {
+    level: 4,
+    everSucceeded: false,
+    lastSuccessAt: null,
+    lastAttemptAt: null,
+    lastError: null,
+    daysSinceSuccess: null,
+    failureKind: 'none',
+  };
+}
+
+export async function getSyncHealth(): Promise<SopSyncHealth> {
+  if (isHttpMode()) return unknownSyncHealth();
   try {
     const api = getSopAPI();
-    if (!api) return { level: 4, stale: true, lastSync: null };
+    if (!api) return unknownSyncHealth();
     return await api.getSyncHealth();
   } catch {
-    return { level: 4, stale: true, lastSync: null };
+    return unknownSyncHealth();
   }
 }
 

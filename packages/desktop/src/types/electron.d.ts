@@ -1,5 +1,28 @@
 /// <reference types="vite/client" />
 
+/**
+ * 同步健康度快照（主进程 SopSyncScheduler 产出）
+ *
+ * everSucceeded 是关键字段：它把「从未接入云端」与「接入过但已过期」分开。
+ * 没有它时，桌面端每次重启内存归零，一天的正常离线也会被显示成「严重过期」。
+ */
+export interface SopSyncHealth {
+  /** 降级等级：0 正常 / 1-3 待更新 / 4 严重过期 */
+  level: 0 | 1 | 2 | 3 | 4;
+  /** 是否曾经成功同步过；false = 从未接入云端，而非过期 */
+  everSucceeded: boolean;
+  /** 最近一次成功同步的 ISO 时间 */
+  lastSuccessAt: string | null;
+  /** 最近一次尝试同步的 ISO 时间（无论成败） */
+  lastAttemptAt: string | null;
+  /** 最近一次失败原因原文；最近一次成功则为 null */
+  lastError: string | null;
+  /** 距最近一次成功同步的天数（含小数）；从未成功为 null */
+  daysSinceSuccess: number | null;
+  /** lastError 的语义分类：none/network/compatibility/signature/unknown */
+  failureKind: 'none' | 'network' | 'compatibility' | 'signature' | 'unknown';
+}
+
 /** SOP 规则中心 API（主进程 IPC 桥接）：版本查询、规则同步、统计与应急更新 */
 export interface SopAPI {
   getVersion: () => Promise<{
@@ -22,11 +45,7 @@ export interface SopAPI {
     byAction: Record<string, number>;
     byStatus: Record<string, number>;
   }>;
-  getSyncHealth: () => Promise<{
-    level: number;
-    stale: boolean;
-    lastSync: string | null;
-  }>;
+  getSyncHealth: () => Promise<SopSyncHealth>;
   emergencyUpdate: (rulesJson: string) => Promise<{ success: boolean; reason?: string }>;
   checkRules: (domain?: string) => Promise<unknown[]>;
 }

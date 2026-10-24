@@ -799,7 +799,20 @@
     "toggleGate": "Automated L1 L2 L3 gate check",
     "toggleGateLabel": "Gate",
     "toggleSentinel": "24/7 round-the-clock protection",
-    "toggleSentinelLabel": "Sentinel"
+    "toggleSentinelLabel": "Sentinel",
+    "brainNotConnected": "Not connected to cloud",
+    "brainNeverSynced": "First sync not completed",
+    "brainStaleDays": "Not synced for {{days}} days",
+    "brainLastSync": "Last successful sync: {{time}}",
+    "brainToday": "today",
+    "brainYesterday": "yesterday",
+    "brainDaysAgo": "{{days}} days ago",
+    "brainErrorNetwork": "Cloud unreachable",
+    "brainErrorCompat": "Client version incompatible",
+    "brainErrorSignature": "Rule signature verification failed",
+    "brainErrorUnknown": "Sync failed",
+    "brainRetry": "Retry now",
+    "brainRetrying": "Syncing…"
   },
   "lifecycle": {
     "archive": "Archive",
@@ -832,6 +845,10 @@
     "toolErrorsNote": "External tool execution status (e.g., raw trivy / dependency-audit errors), not code findings"
   },
   "nav": {
+    "group": {
+      "onDemand": "On-demand checks",
+      "daemon": "Always-on guards"
+    },
     "backup": "Backup",
     "deps": "Dependencies",
     "evolve": "Evolve",
@@ -1467,9 +1484,16 @@
         "notRun": "Not run"
       },
       "summaryDone": "Summarized the latest results from every domain. Overall score {{score}}.",
-      "dataAsOf": "Data as of {{date}} (score summarizes each domain's latest result)",
       "dataStale": "Based on data from {{hours}}h ago — regenerate to refresh",
       "partialDimensions": "Score covers only {{run}} of {{total}} dimensions — undetected dimensions are excluded from weighting",
+      "categoryScore": {
+        "title": "Score overview",
+        "open": "Open {{name}}",
+        "overall": "Overall"
+      },
+      "moduleScore": {
+        "title": "Module scores"
+      },
       "table": {
         "abnormal": "Abnormal",
         "col": {

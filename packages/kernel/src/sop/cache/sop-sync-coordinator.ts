@@ -66,9 +66,10 @@ export class SopSyncCoordinator {
 
   // ─── 初始化 ────────────────────────────────────────────────
 
-  /** 读取本地版本号并加载本地缓存的规则到注册中心 */
+  /** 读取本地版本号、恢复同步状态（健康度基于磁盘上的历史成功时间，而非本进程内存），并加载本地缓存规则 */
   async initialize(): Promise<void> {
     this.localVersion = await this.versionStore.load();
+    this.scheduler.hydrate(await this.versionStore.loadSyncState());
 
     const rules = this.sqliteStore.loadAll();
     if (rules.length > 0) {
@@ -87,6 +88,19 @@ export class SopSyncCoordinator {
     this.localVersion = version;
   }
 
+  /** 记录一次成功同步并落盘（内存态重启即丢，必须持久化） */
+  private async markSuccess(): Promise<void> {
+    this.scheduler.recordSync();
+    await this.versionStore.saveSyncState(this.scheduler.getState());
+  }
+
+  /** 记录一次失败尝试并落盘 + 打日志（不刷 lastSuccessAt：失败不能掩盖上次成功时间；此前失败路径全程静默） */
+  private async markFailure(reason: string): Promise<void> {
+    this.scheduler.recordSyncFailure(reason);
+    await this.versionStore.saveSyncState(this.scheduler.getState());
+    console.warn(`[SopCacheManager] 同步未成功: ${reason}`);
+  }
+
   // ─── 云端同步（7.4 完整同步流程） ───────────────────────────
 
   /**
@@ -97,7 +111,7 @@ export class SopSyncCoordinator {
   }
 
   /**
-   * 完整同步流程（文档 7.4 节）：
+   * 完整同步流程（7.4 节）：
    * 1. 检查版本
    * 2. 对比本地版本
    * 3. 下载增量更新
@@ -107,6 +121,7 @@ export class SopSyncCoordinator {
   async syncFromCloud(): Promise<SyncResult> {
     const remoteVersion = await this.resolveRemoteVersion();
     if (!remoteVersion) {
+      await this.markFailure('network_error');
       return { updated: false, reason: 'network_error' };
     }
 
@@ -114,7 +129,12 @@ export class SopSyncCoordinator {
     const stateResult = await this.handleVersionState(state);
     if (stateResult) return stateResult;
 
-    return this.syncDiffOrFull(remoteVersion);
+    const result = await this.syncDiffOrFull(remoteVersion);
+    // already_latest 已在 handleVersionState 内记过成功，其余未更新的结果一律视为失败尝试
+    if (!result.updated && result.reason !== 'already_latest') {
+      await this.markFailure(result.reason ?? 'unknown');
+    }
+    return result;
   }
 
   /** 检查在线状态并获取云端版本；不可用返回 null */
@@ -130,7 +150,7 @@ export class SopSyncCoordinator {
     state: 'latest' | 'reset' | 'proceed',
   ): Promise<SyncResult | null> {
     if (state === 'latest') {
-      this.scheduler.recordSync();
+      await this.markSuccess();
       return { updated: false, reason: 'already_latest' };
     }
     if (state === 'reset') {
@@ -147,7 +167,7 @@ export class SopSyncCoordinator {
     if (!diff) {
       return this.fullSync(remoteVersion);
     }
-    if (!this.checkCompatibility(diff.compatibility)) {
+    if (!isCompatibleClient(this.clientVersion, diff.compatibility)) {
       return { updated: false, reason: 'compatibility_error' };
     }
     try {
@@ -175,7 +195,7 @@ export class SopSyncCoordinator {
   ): Promise<SyncResult> {
     await this.applyDiff(diff);
     await this.saveVersion(remoteVersion);
-    this.scheduler.recordSync();
+    await this.markSuccess();
     await this.versionStore.logSync({
       from: fromVersion,
       to: remoteVersion.version,
@@ -208,7 +228,7 @@ export class SopSyncCoordinator {
       this.registry.loadAll(rules);
       this.sqliteStore.persist(rules);
       await this.saveVersion(remoteVersion);
-      this.scheduler.recordSync();
+      await this.markSuccess();
       await this.versionStore.logSync({ from: '0.0.0', to: remoteVersion.version, type: 'full' });
       this.eventBus?.emit('sop:cache-synced', {
         type: 'full',
@@ -278,7 +298,7 @@ export class SopSyncCoordinator {
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
     this.upsertRules(rules);
     this.sqliteStore.persist(rules);
-    this.scheduler.recordSync();
+    await this.markSuccess();
 
     await this.versionStore.logSync({
       to: 'emergency',
@@ -303,24 +323,19 @@ export class SopSyncCoordinator {
     this.sqliteStore.clear();
     this.localVersion = null;
   }
+}
 
-  // ─── 版本兼容性检查 ────────────────────────────────────────
+/** 版本兼容性判定（文档 8.4 节）：主版本号比较，任一侧无法解析时按兼容处理（保守放行） */
+function isCompatibleClient(clientVersion: string, requiredVersion: string): boolean {
+  const localMajor = extractMajor(clientVersion);
+  const requiredMajor = extractMajor(requiredVersion);
+  if (localMajor === null || requiredMajor === null) return true;
+  return localMajor >= requiredMajor;
+}
 
-  /**
-   * 检查规则兼容性（文档 8.4 节）
-   * 防止旧版客户端加载不兼容的新规则
-   */
-  private checkCompatibility(requiredVersion: string): boolean {
-    const localMajor = SopSyncCoordinator.extractMajor(this.clientVersion);
-    const requiredMajor = SopSyncCoordinator.extractMajor(requiredVersion);
-    if (localMajor === null || requiredMajor === null) return true;
-    return localMajor >= requiredMajor;
-  }
-
-  private static extractMajor(version: string): number | null {
-    const match = MAJOR_VERSION.exec(version);
-    return match ? parseInt(match[1], 10) : null;
-  }
+function extractMajor(version: string): number | null {
+  const match = MAJOR_VERSION.exec(version);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 /** 验证版本连续性：本地版本须等于 diff.fromVersion，且内容哈希须与下发 metadata.hash 一致，否则抛错 */

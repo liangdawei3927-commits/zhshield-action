@@ -166,13 +166,20 @@ export function useSmellGroups(report: RefactorReportData | null) {
   return { activeRuleId, setActiveRuleId, groups, activeGroup };
 }
 
-/** 重构页全部状态与副作用：扫描、每日自动检查、复制到 AI、分类聚合 */
+/**
+ * 重构页全部状态与副作用：扫描、每日自动检查、复制到 AI。
+ *
+ * 注意：**分类聚合（`useSmellGroups`）故意不在这里做**。
+ * 这里能拿到的只有内存 `report`，而页面真正渲染的可能是落盘读回的完整报告
+ * （`detailReport = report ?? savedReport`）。早先在这里聚合，导致「重开页面 →
+ * 报告读回来了，但 groups 仍按 null 算」⇒ 分类 tab 全消失、只剩「暂无重构异味」。
+ * 聚合必须由页面拿 `detailReport` 调用，见 RefactorPage。
+ */
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
   const { scanning, progress, progressLabel, statusMessage, report, error, handleScan } =
     useRefactorScan(projectPath);
   const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan());
-  const { activeRuleId, setActiveRuleId, groups, activeGroup } = useSmellGroups(report);
   return {
     scanning,
     progress,
@@ -181,10 +188,6 @@ export function useRefactorPage(projectPath: string) {
     report,
     error,
     lastAutoAt,
-    activeRuleId,
-    setActiveRuleId,
-    activeGroup,
-    groups,
     copyToAi,
     copyGroupToAi,
     handleScan,

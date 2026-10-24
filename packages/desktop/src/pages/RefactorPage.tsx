@@ -9,7 +9,7 @@ import { ReportShell } from '../components/business/ReportShell';
 import { PageGlyph } from '../components/business/page-glyph';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { ResultCard } from '../components/ui/ResultCard';
-import { useRefactorPage } from './refactor-logic';
+import { useRefactorPage, useSmellGroups } from './refactor-logic';
 import { RuleTabs } from './refactor-parts';
 import { SmellGroupPanel } from './refactor-panel';
 import { RefactorEmptyState } from './refactor-empty-state';
@@ -29,10 +29,6 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
     statusMessage,
     report,
     error,
-    activeRuleId,
-    setActiveRuleId,
-    activeGroup,
-    groups,
     copyToAi,
     copyGroupToAi,
     handleScan,
@@ -45,6 +41,12 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
 
   // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
   const detailReport = report ?? (scanning ? null : savedReport);
+
+  // 分类聚合必须从「真正要渲染的那份报告」派生。
+  // 绑在内存 report 上会出现：重开页面 → 完整报告已从磁盘读回，
+  // 但 groups 仍按 null 算 ⇒ 分类 tab 全没了，只剩「暂无重构异味」。
+  const { activeRuleId, setActiveRuleId, groups, activeGroup } = useSmellGroups(detailReport);
+
   const hasDetail = detailReport !== null || hadPreviousResult;
 
   // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
@@ -57,7 +59,9 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
     onRescan: () => void handleScan(),
   });
 
-  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
+  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为。
+  // 注：「落盘报告读回后退出快照」不在这里做，已下移到 useDomainDetailEntry
+  // （那处是派生判定，六个域页面共用一份，避免各页各写一条 effect 还漏写）。
   useEffect(() => {
     if (report) {
       setShowHome(false);
@@ -140,6 +144,8 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
 }
 
 type RefactorState = ReturnType<typeof useRefactorPage>;
+/** 分类聚合的状态（来自 useSmellGroups，入参是 detailReport 而非内存 report） */
+type SmellGroupsState = ReturnType<typeof useSmellGroups>;
 type RefactorT = ReturnType<typeof useT>;
 
 function refactorReportStats(t: RefactorT, report: NonNullable<RefactorState['report']>) {
@@ -169,10 +175,10 @@ interface RefactorGroupsSectionProps {
   t: RefactorT;
   report: NonNullable<RefactorState['report']>;
   error: RefactorState['error'];
-  groups: RefactorState['groups'];
-  activeRuleId: RefactorState['activeRuleId'];
-  setActiveRuleId: RefactorState['setActiveRuleId'];
-  activeGroup: RefactorState['activeGroup'];
+  groups: SmellGroupsState['groups'];
+  activeRuleId: SmellGroupsState['activeRuleId'];
+  setActiveRuleId: SmellGroupsState['setActiveRuleId'];
+  activeGroup: SmellGroupsState['activeGroup'];
   copyGroupToAi: RefactorState['copyGroupToAi'];
   copyToAi: RefactorState['copyToAi'];
 }

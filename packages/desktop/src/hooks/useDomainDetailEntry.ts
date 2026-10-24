@@ -11,7 +11,7 @@
  * 3. 要新结果，由详情页里的「重新检查」按钮自己触发。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDomainSnapshot, type DomainSnapshotState } from './useDomainSnapshot';
 import { useSavedDomainReport } from './useSavedDomainReport';
 import { useHasDomainResult } from './useHasDomainResult';
@@ -61,19 +61,62 @@ export function useDomainDetailEntry<T>(params: {
 }): DomainDetailEntry {
   const { projectPath, domain, detailReport, onEnterDetail, rescanning, onRescan } = params;
   const snapshot = useDomainSnapshot(projectPath, domain);
-  const [showSnapshot, setShowSnapshot] = useState(false);
+  const [snapshotRequested, setSnapshotRequested] = useState(false);
+  /** 用户点过「详情」但当时没有完整报告（正等落盘报告读回） */
+  const [detailIntent, setDetailIntent] = useState(false);
   const { reload } = snapshot;
+
+  // onEnterDetail 在页面里常是内联箭头函数，每次渲染都是新引用；
+  // 用 ref 持有可让下面的 effect 只依赖数据、不因父组件重渲染而空转。
+  const onEnterRef = useRef(onEnterDetail);
+  useEffect(() => {
+    onEnterRef.current = onEnterDetail;
+  }, [onEnterDetail]);
+
+  /**
+   * 快照视图是否可见 —— **派生**而非直接下发。
+   *
+   * 直下发的失效形态（2026-10-25 实测，重构页最明显）：页面挂载后落盘报告是
+   * 异步读回的，若用户在这几十~几百毫秒内点开详情，`openDetail` 看到的是
+   * `detailReport === null`，于是标记「看快照」；报告随后读回来，这个标记仍是
+   * true，页面就永久停在「最近一次检查结果」的平铺条目列表上，原本的分类 tab
+   * 再也回不来（重构域报告 710KB，窗口足够大到必现）。
+   *
+   * 判据只有一个：**报告就绪就不该再渲染快照**。因此这里让报告状态直接压过标记，
+   * 不依赖 effect 的渲染时序；下面那条 effect 负责把标记清干净。
+   */
+  const showSnapshot = snapshotRequested && detailReport === null;
+  const setShowSnapshot = useCallback((next: boolean) => setSnapshotRequested(next), []);
+
+  /**
+   * 报告读回来了就把「点过详情」的意图兑现掉。
+   *
+   * 少了这一步：快照被压掉后 `showHome` 仍是 true，页面会退回分类主页 ——
+   * 用户明明点了详情，却被弹回列表，看起来像「分类又没了」。
+   */
+  useEffect(() => {
+    if (detailReport === null) return;
+    setSnapshotRequested(false);
+    if (detailIntent) {
+      setDetailIntent(false);
+      onEnterRef.current();
+    }
+  }, [detailReport, detailIntent]);
 
   const openDetail = useCallback(() => {
     if (detailReport) {
       onEnterDetail();
       return;
     }
+    setDetailIntent(true);
     reload();
     setShowSnapshot(true);
-  }, [detailReport, onEnterDetail, reload]);
+  }, [detailReport, onEnterDetail, reload, setShowSnapshot]);
 
-  const backHome = useCallback(() => setShowSnapshot(false), []);
+  const backHome = useCallback(() => {
+    setDetailIntent(false);
+    setShowSnapshot(false);
+  }, [setShowSnapshot]);
 
   return {
     snapshot,

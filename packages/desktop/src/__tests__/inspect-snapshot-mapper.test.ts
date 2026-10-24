@@ -118,4 +118,35 @@ describe('体检页挂载 hydrate（结构守卫，防接线被删）', () => {
     // 实时报告的通过进度条必须保留（快照回退时才隐藏，因为通过项未知）
     expect(src).toContain('<ProgressBar passCount={passCount} total={items.length} />');
   });
+
+  /**
+   * 「打开先落主页」是全站唯一口径（见 nav-items.ts 与 InspectPage 的注释）。
+   *
+   * 2026-10-25 实测：门禁 / 哨兵 / 备份三页仍是 `useState(false)`。那个 false 写于
+   * 「report/events/records 恒为空」的年代 —— 当时落主页是副作用，不是意图；后来数据
+   * 改成挂载即从磁盘读回，hasDetail 一进来就为真，同一个 false 立刻变成「点进去直接
+   * 是详情页」，与其余七个分类相反。这类「初值随数据源变更而变质」的漂移不会报错、
+   * 不会被行为测试抓到（页面各自有快照/空态分支都正常渲染），只能按源码口径锁住。
+   */
+  it('分类页「打开先落主页」口径统一：showHome 初值一律为 true', () => {
+    const files = fs.readdirSync(pagesDir).filter((f) => f.endsWith('.tsx'));
+    const read = (f: string) => fs.readFileSync(path.join(pagesDir, f), 'utf-8');
+    const withToggle = files.filter((f) =>
+      read(f).includes('const [showHome, setShowHome] = useState('),
+    );
+    // 初值不是 true 的页面 = 违反了「打开先落主页」
+    const offenders = withToggle.filter(
+      (f) => !read(f).includes('const [showHome, setShowHome] = useState(true);'),
+    );
+    expect(offenders).toEqual([]);
+    // inspect / security / refactor / guard / sentinel / backup 六个页面显式持有视图状态；
+    // 依赖、垃圾、性能、技术债走 useDomainDetailPage 内部的同一初值（下面单独断言）。
+    expect(withToggle.length).toBeGreaterThanOrEqual(6);
+
+    const hookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../hooks/useDomainDetailEntry.ts'),
+      'utf-8',
+    );
+    expect(hookSrc).toContain('const [showHome, setShowHome] = useState(true);');
+  });
 });

@@ -288,7 +288,10 @@ function useGuardBlockNotification(
 
 export function GuardPage({ projectPath }: GuardPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与其余分类同一口径）：挂载即读回的历史报告只让右上角详情入口
+  // 可见，不自动把人带进详情页。实时扫描出结果时由下面的 onScan 切详情。
+  // 曾经的 false 是在「report 恒为空」年代写的，数据改成挂载即读回后它变成了「直接进详情」。
+  const [showHome, setShowHome] = useState(true);
   const {
     loading,
     progress,

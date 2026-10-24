@@ -17,7 +17,9 @@ interface BackupPageProps {
 
 export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与其余分类同一口径）：挂载即读回的备份记录只让右上角详情入口
+  // 可见，不自动把人带进详情页。点「一键备份」时由下面的 onBackup 切详情。
+  const [showHome, setShowHome] = useState(true);
   const {
     records,
     isBackingUp,

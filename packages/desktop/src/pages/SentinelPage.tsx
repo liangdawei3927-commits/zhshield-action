@@ -241,7 +241,9 @@ function useSentinelCriticalNotification(
 
 export function SentinelPage({ projectPath }: SentinelPageProps) {
   const t = useT();
-  const [showHome, setShowHome] = useState(false);
+  // 打开先落在主页（与其余分类同一口径）：挂载即读回的事件列表只让右上角详情入口
+  // 可见，不自动把人带进详情页。开启监控/刷新时由下面的 onAction 切详情。
+  const [showHome, setShowHome] = useState(true);
   const {
     events,
     loading,

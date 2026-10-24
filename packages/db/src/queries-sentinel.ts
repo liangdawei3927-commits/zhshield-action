@@ -103,6 +103,56 @@ export function listSentinelEvents(
   return db.prepare(sql).all(...params) as SentinelEventRow[];
 }
 
+/**
+ * 按 severity 统计某项目**未软删**的哨兵事件数（供评分取数）。
+ *
+ * 为什么单列一个计数函数，而不是复用 `listSentinelEvents`：
+ * 1. `listSentinelEvents` **不带 `deleted_at IS NULL`**（会把软删事件算进来）；
+ * 2. 它默认 `LIMIT 100`，用于统计会被静默截断 —— 事件一多就少算；
+ * 3. 评分只需要三个计数，`GROUP BY` 一次取回比拉全量行再在内存里数更可靠。
+ *
+ * 曾经评分侧直接读 `EventCenter.listEvents()`（**内存 Map**），库里落盘的事件一条
+ * 也读不到 ⇒ 哨兵域恒 100 分。计数必须落回 DB，这是该缺陷的修复落点。
+ */
+export interface SentinelSeverityCounts {
+  p1: number;
+  p2: number;
+  p3: number;
+  /** 未软删且未被排除的事件总数 */
+  total: number;
+}
+
+export function countSentinelEventsBySeverity(
+  db: Database.Database,
+  projectId: string,
+  options?: { excludeStatuses?: readonly string[] },
+): SentinelSeverityCounts {
+  const params: unknown[] = [projectId];
+  let statusClause = '';
+  const excluded = (options?.excludeStatuses ?? []).filter((s) => typeof s === 'string');
+  if (excluded.length > 0) {
+    statusClause = ` AND status NOT IN (${excluded.map(() => '?').join(', ')})`;
+    params.push(...excluded);
+  }
+  const rows = db
+    .prepare(
+      `SELECT severity, COUNT(*) AS c FROM sentinel_events
+       WHERE deleted_at IS NULL AND project_id = ?${statusClause}
+       GROUP BY severity`,
+    )
+    .all(...params) as Array<{ severity: string; c: number }>;
+
+  const counts: SentinelSeverityCounts = { p1: 0, p2: 0, p3: 0, total: 0 };
+  for (const row of rows) {
+    const n = Number(row.c) || 0;
+    if (row.severity === 'p1') counts.p1 += n;
+    else if (row.severity === 'p2') counts.p2 += n;
+    else if (row.severity === 'p3') counts.p3 += n;
+    counts.total += n;
+  }
+  return counts;
+}
+
 /** 构建 sentinel_events 查询 SQL 与参数 */
 function buildSentinelQuery(filter?: ListSentinelEventsFilter): { sql: string; params: unknown[] } {
   const where = buildSentinelWhere(filter);

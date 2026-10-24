@@ -18,7 +18,8 @@ import {
   isInformationalEvent,
 } from '@zh/sentinel';
 import type { SentinelEventQuery } from '../../src/types/electron';
-import { getSentinel, stopAllMonitoring, type SentinelRuntime } from '../ipc-context';
+import { getSentinel, stopAllMonitoring, getDb, type SentinelRuntime } from '../ipc-context';
+import { readSentinelHealthFromDb } from '../sentinel-health';
 
 const STATE_FILE = 'sentinel-state.json';
 
@@ -223,27 +224,48 @@ export function registerSentinelIpc(): void {
 
 // ─── 哨兵健康数据（十域评分章程 #9，报告中心汇总只读消费）──────
 
-/** 未终态的事件状态：仍在处理链路上的告警才计入扣分（passed/merged/deployed 已解决） */
-const TERMINAL_EVENT_STATUSES = new Set(['passed', 'merged', 'deployed']);
+/** 未终态的事件状态：仍在处理链路上的告警才计入扣分（passed/merged/deployed 已解决）。
+ *  仅 DB 不可用时的内存回退分支使用；主路径由 `sentinel-health.ts` 持有同一份常量。 */
+const TERMINAL = new Set(['passed', 'merged', 'deployed']);
 
 /**
  * 只读指定项目的哨兵健康数据，供 buildPipelineExtras 组装 @zh/scoring 的 SentinelDataLike。
  * 返回 null = 该项目当前未在监控且从未产生事件 → 评分侧按 not-run 处理。
  * severity 映射：p1 → critical，p2 → warning，p3 不计入。
+ *
+ * **取数以 DB 为准**（2026-10-24 修复）：原先读 `eventCenter.listEvents()`（内存 Map），
+ * 库里落盘的事件一条也读不到 ⇒ 哨兵域恒 100 分。实现见 `electron/sentinel-health.ts`。
+ * DB 不可用（降级无持久化模式）时才退回内存，并在日志里说明计数可能偏低。
  */
 export async function getSentinelHealthData(
   projectId: string,
 ): Promise<{ active: boolean; criticalEvents: number; warningEvents: number } | null> {
+  const monitoring = monitoredProjects.has(projectId);
+  const db = getDb();
+  if (db) {
+    try {
+      const health = readSentinelHealthFromDb(db, projectId, { monitoring });
+      return health
+        ? {
+            active: health.active,
+            criticalEvents: health.criticalEvents,
+            warningEvents: health.warningEvents,
+          }
+        : null;
+    } catch (err) {
+      console.warn(
+        '[sentinel] DB 健康数据读取失败（退回内存态，计数可能偏低）:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
   try {
     const runtime = await getSentinel();
     const events = runtime.eventCenter.listEvents();
-    const own = events.filter(
-      (e) => e.projectId === projectId && !TERMINAL_EVENT_STATUSES.has(e.status),
-    );
-    const active = monitoredProjects.has(projectId);
-    if (!active && own.length === 0) return null;
+    const own = events.filter((e) => e.projectId === projectId && !TERMINAL.has(e.status));
+    if (!monitoring && own.length === 0) return null;
     return {
-      active,
+      active: monitoring,
       criticalEvents: own.filter((e) => e.severity === 'p1').length,
       warningEvents: own.filter((e) => e.severity === 'p2').length,
     };

@@ -19,8 +19,10 @@ overrides:
   # 2026-10-24 第二轮（8 high / 15 moderate / 3 low）：仅把已钉死的下限抬到新一轮 GHSA 的
   #   patched 版本，无新增 major 跨越。直接依赖（zod / vite）改的是
   #   packages/desktop/package.json 里的声明范围，不在此重复 override。
-  #   结果：8 high → 1、15 moderate → 1、3 low → 0。
-  #   残留：1 moderate（postcss-selector-parser，见文末）；high 归零。
+  #   结果：8 high → 0、15 moderate → 1、3 low → 0。
+  #   残留：仅 1 moderate（postcss-selector-parser，见文末）；high / low 归零。
+  #   注：electron 的 HIGH 同日销项（42.11.12 → 42.11.18，二进制离线装入），
+  #       561b2e4 那次提交信息写作「→ 1H/1M/0L」是销项前的中间状态，以此处为准。
   electron: '42.11.18'                         # HIGH eMudhra 中间证书信任缓解（GHSA 要求 >=42.11.16）。
                                                # 必须**精确**钉版本：写成 >=42.11.16 会被解析到 45.0.0
                                                # （跨 major，且二进制没缓存）。42.11.18 是本机已离线缓存

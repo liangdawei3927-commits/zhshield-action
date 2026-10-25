@@ -4,6 +4,7 @@ import type { SentinelEvent } from '@zh/sentinel';
 import {
   getSentinelEvents,
   startSentinelMonitoring,
+  stopSentinelMonitoring,
   getSentinelState,
   type FalsePositiveFeedbackItem,
 } from '../services/engineApi';
@@ -189,15 +190,19 @@ function toSentinelEventItem(e: SentinelEvent): SentinelEventItem {
   };
 }
 
-/** 监控启停：监控状态 + 开启动作（挂载即自动启动，IPC 侧幂等） */
+/** 监控启停：监控状态 + 开启/停止动作（挂载即自动启动，IPC 侧幂等） */
 function useSentinelMonitoring(
   projectPath: string,
   refreshEvents: () => void,
 ): {
   monitoring: boolean;
+  stopping: boolean;
   startMonitoring: () => Promise<void>;
+  stopMonitoring: () => Promise<void>;
 } {
   const [monitoring, setMonitoring] = useState(false);
+  /** 已发出停止、等主进程确认（按钮显示「停止中」并禁用，防连点） */
+  const [stopping, setStopping] = useState(false);
 
   const startMonitoring = useCallback(async () => {
     const result = await startSentinelMonitoring(projectPath);
@@ -210,6 +215,23 @@ function useSentinelMonitoring(
       await refreshEvents();
     }
   }, [projectPath, refreshEvents]);
+
+  /**
+   * 停止监控（用户诉求：开了就停不了）。
+   *
+   * 主进程说 `stopped=false`（该项目本就不在监控中）时，同样按"没在监控"处理 ——
+   * 页面状态可能比主进程新（主进程重启后内存表清空），以主进程为准才不会
+   * 显示"已停止"而后台还在跑。
+   */
+  const stopMonitoring = useCallback(async () => {
+    setStopping(true);
+    try {
+      await stopSentinelMonitoring(projectPath);
+      setMonitoring(false);
+    } finally {
+      setStopping(false);
+    }
+  }, [projectPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,7 +249,7 @@ function useSentinelMonitoring(
     };
   }, [startMonitoring]);
 
-  return { monitoring, startMonitoring };
+  return { monitoring, stopping, startMonitoring, stopMonitoring };
 }
 
 /** 事件列表状态：加载 + 监控启停 */
@@ -235,13 +257,18 @@ function useSentinelEvents(projectPath: string): {
   events: SentinelEventItem[];
   loading: boolean;
   monitoring: boolean;
+  stopping: boolean;
   refreshEvents: () => void;
   startMonitoring: () => Promise<void>;
+  stopMonitoring: () => Promise<void>;
 } {
   const [loading, setLoading] = useState(true);
   const markLoaded = useCallback(() => setLoading(false), [setLoading]);
   const { events, refreshEvents } = useSentinelEventData(markLoaded);
-  const { monitoring, startMonitoring } = useSentinelMonitoring(projectPath, refreshEvents);
+  const { monitoring, stopping, startMonitoring, stopMonitoring } = useSentinelMonitoring(
+    projectPath,
+    refreshEvents,
+  );
   const startWithLoading = useLoadingAction(startMonitoring, setLoading);
 
   useEffect(() => {
@@ -250,7 +277,60 @@ function useSentinelEvents(projectPath: string): {
 
   useSentinelPolling(monitoring, refreshEvents);
 
-  return { events, loading, monitoring, refreshEvents, startMonitoring: startWithLoading };
+  return {
+    events,
+    loading,
+    monitoring,
+    stopping,
+    refreshEvents,
+    startMonitoring: startWithLoading,
+    stopMonitoring,
+  };
+}
+
+/**
+ * 哨兵主按钮的忙态判定 —— 主页与详情页**唯一同源口径**。
+ *
+ * 背景（2026-10-26 用户反馈）：「为什么哨兵监控里面的主页按钮上面没有停止按钮
+ * 功能，详情页按钮上面才有暂停功能？」
+ *
+ * 根因不是停止能力缺失（`sentinel:stopMonitoring` 通道 / preload / engineApi
+ * 三层都在），而是**两个视图各算各的忙态**：
+ *   - 详情页 `loading={monitoring || loading}` ⇒ 监控中进入忙态 ⇒ hover 出「停止」；
+ *   - 主页   `loading={loading}`                ⇒ **漏了 monitoring** ⇒ 监控中不忙
+ *     ⇒ 不出「停止」；点击落到 onAction（切详情 + 幂等重启动）⇒ 表现为"点了
+ *     没反应"，而且永远停不掉。
+ *
+ * 哨兵是**常驻守护**：monitoring 才是"在跑"的真实状态，loading 只是拉事件列表
+ * 那一瞬。所以两边都必须把 monitoring 算进忙态。本函数把这套判定收成一处，
+ * 页面只调一次，两个视图都从它取值 —— 口径不再分叉，也就不用再各修各的。
+ */
+export interface SentinelActionState {
+  /** 按钮是否处于忙态（忙态才可能 hover 出「停止」） */
+  busy: boolean;
+  /** 运行态文案归属：监控中用 sentinelMonitor（"监控中…"），其余用 sentinel（"刷新中…"） */
+  domain: 'sentinelMonitor' | 'sentinel';
+  /** 忙态是否可停（只有监控中可停；拉事件列表时没有可取消的执行器） */
+  cancellable: boolean;
+  /** 已发出取消、等主进程确认（显示「停止中…」并禁用，防连点） */
+  stopping: boolean;
+}
+
+export function deriveSentinelActionState(input: {
+  monitoring: boolean;
+  loading: boolean;
+  stopping: boolean;
+}): SentinelActionState {
+  if (input.monitoring) {
+    return {
+      busy: true,
+      domain: 'sentinelMonitor',
+      cancellable: true,
+      stopping: input.stopping,
+    };
+  }
+  // 未监控：只有"正在拉事件列表"这一瞬是忙态，而刷新没有可取消的执行器 ⇒ 不可停
+  return { busy: input.loading, domain: 'sentinel', cancellable: false, stopping: false };
 }
 
 /** 事件严重度 / 活跃状态统计 */
@@ -277,7 +357,7 @@ function sortSentinelEvents(events: SentinelEventItem[]): SentinelEventItem[] {
 
 /** 误报反馈数量（按来源过滤，用于 KPI 卡展示） */
 export function useSentinelPage(projectPath: string) {
-  const { events, loading, monitoring, refreshEvents, startMonitoring } =
+  const { events, loading, monitoring, stopping, refreshEvents, startMonitoring, stopMonitoring } =
     useSentinelEvents(projectPath);
   const falsePositiveCount = useFalsePositiveCount(projectPath, 'sentinel');
 
@@ -285,11 +365,13 @@ export function useSentinelPage(projectPath: string) {
     events,
     loading,
     monitoring,
+    stopping,
     ...countSentinelStats(events),
     falsePositiveCount,
     sorted: sortSentinelEvents(events),
     refreshEvents,
     startMonitoring,
+    stopMonitoring,
   };
 }
 

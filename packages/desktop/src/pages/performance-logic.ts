@@ -60,19 +60,26 @@ function toPerformanceAiIssue(issue: PerformanceReportData['issues'][number]) {
 function usePerformanceRun(projectPath: string): {
   loading: boolean;
   progress: number;
-  progressLabel: string;
   statusMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   report: PerformanceReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<PerformanceReportData | null>(null);
-  const { loading, progress, progressLabel, statusMessage } = useTaskRun(
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun(
     'performance',
     projectPath,
   );
   const { handleScan } = useRunWithReport(projectPath, runPerformance, setReport);
 
-  return { loading, progress, progressLabel, statusMessage, report, handleScan };
+  return { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan };
 }
 
 /** 单条 / 全部复制到 AI（并唤起 Trae） */
@@ -131,15 +138,18 @@ function usePerformanceCopy(
 
 /** 性能页全部状态与副作用：扫描、单条/全部复制到 AI（并唤起 Trae） */
 export function usePerformancePage(projectPath: string) {
-  const { loading, progress, progressLabel, statusMessage, report, handleScan } =
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
     usePerformanceRun(projectPath);
   const { copyToAi, copyAllToAi } = usePerformanceCopy(projectPath, report);
 
   return {
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     copyToAi,
     copyAllToAi,

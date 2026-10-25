@@ -10,6 +10,7 @@ import { useTaskRun } from '../task-store';
 import { useToast } from '../components/ui/Toast';
 import { isDeletableItem } from '@zh/garbage/policy';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
+import { isCancelledError } from '../services/cancel-error';
 
 /**
  * 该项能否被"一键清理"真正移走。
@@ -93,7 +94,9 @@ async function performClean(
       prev ? { ...prev, items: prev.items.filter((g) => !cleanedIds.has(g.id)) } : prev,
     );
     setters.onSelectionCleared();
-  } catch {
+  } catch (err) {
+    // 用户点「停止」不是失败：不该报「清理失败」
+    if (isCancelledError(err)) return;
     setters.setCleanResult({
       batchId: '',
       cleaned: [],
@@ -123,7 +126,9 @@ async function performRestore(
     setters.setRestoreResult(result);
     setters.onRestored();
     await setters.onRefresh();
-  } catch {
+  } catch (err) {
+    // 用户点「停止」不是失败：不该报「恢复失败」
+    if (isCancelledError(err)) return;
     setters.setRestoreResult({
       restored: 0,
       restoredBytes: 0,
@@ -297,7 +302,9 @@ async function refreshGarbageReport(
     const result = await runGarbageScan(projectPath);
     setReport(result);
     clearSelection();
-  } catch {
+  } catch (err: unknown) {
+    // 用户点「停止」不是失败：保留已有报告与勾选状态
+    if (isCancelledError(err)) return;
     setReport(null);
   }
 }
@@ -306,8 +313,15 @@ async function refreshGarbageReport(
 export function useGarbagePage(projectPath: string): {
   loading: boolean;
   progress: number;
-  progressLabel: string;
   statusMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   report: GarbageScanReportData | null;
   selected: Set<string>;
   cleaning: boolean;
@@ -322,7 +336,7 @@ export function useGarbagePage(projectPath: string): {
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
 } {
   const [report, setReport] = useState<GarbageScanReportData | null>(null);
-  const { loading, progress, progressLabel, statusMessage } = useTaskRun('garbage', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('garbage', projectPath);
   const { selected, toggleSelect, toggleAll, clearSelection } = useGarbageSelection(report);
   const refreshReport = useCallback(
     () => refreshGarbageReport(projectPath, setReport, clearSelection),
@@ -356,8 +370,11 @@ export function useGarbagePage(projectPath: string): {
   return {
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     selected,
     cleaning,

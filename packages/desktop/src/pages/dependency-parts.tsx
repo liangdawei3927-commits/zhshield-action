@@ -297,7 +297,7 @@ export function DependencyEmptyState({
       titleKey="page.deps.empty.title"
       subtitleKey="page.deps.empty.subtitle"
       buttonTextKey="page.deps.empty.start"
-      progressLabelKey="page.deps.checking"
+      actionDomain="deps"
       loading={loading}
       onScan={onScan}
       featureList={[

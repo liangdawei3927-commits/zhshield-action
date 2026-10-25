@@ -57,6 +57,7 @@ export function EvolvePage({ projectPath }: EvolvePageProps) {
       featureList={evolveFeatureList(t)}
       buttonText={t('page.evolve.analyze')}
       onAction={() => void analyze()}
+      actionDomain="evolve"
       loading={loading}
     />
   );

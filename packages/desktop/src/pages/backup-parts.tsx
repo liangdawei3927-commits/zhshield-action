@@ -205,6 +205,13 @@ export function BackupScheduleRow({
 }
 
 /** 备份进行中进度条：主进程 eventBus 实时推送（无进度事件时显示不确定态提示） */
+/**
+ * 备份进度条（详情页内嵌版）。
+ *
+ * 与空态页的 ScanProgress 同属一个视觉家族：轨道 + 填充段（宽度=进度）+ 内部向右流动的光带 +
+ * 右侧百分比。区别只在容器：这里嵌在浅色卡片里，不跟 220px 主按钮对齐，所以保留卡片外壳。
+ * 任务消息（phase message）与新 ScanProgress 一致，降级为整块 title，不再占可见行。
+ */
 export function BackupProgressBar({ progress }: { progress: BackupProgressData | null }) {
   const t = useT();
   if (!progress) {
@@ -214,19 +221,22 @@ export function BackupProgressBar({ progress }: { progress: BackupProgressData |
       </div>
     );
   }
+  const percent = Math.min(Math.max(progress.percent, 0), 100);
+  const hint = progress.message?.trim() || undefined;
   return (
-    <div className="mb-6 px-4 py-3 rounded-xl bg-brand-50">
-      <div className="flex items-center justify-between text-sm mb-2">
-        <span className="text-zh-ink">{progress.message}</span>
-        <span className="text-zh-muted tabular-nums">{progress.percent}%</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-zh-line overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-brand-600 to-brand-800"
-          style={{
-            width: `${Math.min(100, Math.max(0, progress.percent))}%`,
-          }}
-        />
+    <div className="mb-6 px-4 py-3 rounded-xl bg-brand-50" title={hint}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 rounded-full bg-zh-line overflow-hidden relative">
+          <div
+            className="relative h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-800 overflow-hidden transition-[width] duration-300"
+            style={{ width: `${percent}%` }}
+          >
+            <div className="absolute inset-y-0 left-0 w-2/5 bg-white/45 animate-[zh-progress-flow_1.4s_linear_infinite]" />
+          </div>
+        </div>
+        <span className="shrink-0 w-9 text-right text-sm font-semibold text-zh-ink tabular-nums">
+          {percent}%
+        </span>
       </div>
     </div>
   );

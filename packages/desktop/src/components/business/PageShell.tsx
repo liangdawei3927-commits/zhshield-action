@@ -1,8 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { EntryCard } from '../ui/EntryCard';
-import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { DomainScanProgress } from './DomainScanProgress';
+import { DomainActionButton } from './DomainActionButton';
+import type { ActionRunningKey } from './domain-action-text';
 import { useDetailEntry } from '../../contexts/DetailEntryContext';
 import { useT } from '../../i18n';
 
@@ -25,6 +26,11 @@ interface PageShellProps {
   buttonText: string;
   /** 按钮点击 */
   onAction?: () => void;
+  /**
+   * 动作归属（决定按钮运行态文案）。必填：空态按钮与详情页按钮必须同源，
+   * 不允许各页面再各自传一句 loading 文案 —— 见 DomainActionButton。
+   */
+  actionDomain: ActionRunningKey;
   /** 功能清单：这个页面能做什么 */
   featureList?: FeatureItem[];
   /** 底部自定义插槽（替代 featureList 网格） */
@@ -33,8 +39,20 @@ interface PageShellProps {
   columns?: 2 | 3 | 4 | 6;
   /** 是否加载中 */
   loading?: boolean;
-  /** 按钮加载短文案（spinner 旁，静态文案） */
-  progressLabel?: string;
+  /**
+   * 任务已入队但还没真正开始（主进程并发槽被占）。
+   * 按钮据此显示「排队中…」，进度条据此显示「排队中（第 N 位）…」。
+   */
+  queued?: boolean;
+  /** 排队位置（1 起；仅 queued 时有意义） */
+  queuePosition?: number;
+  /**
+   * 停止当前任务。传了就由**主按钮本身**承担停止入口（忙态 hover 显「停止」，
+   * 点击取消）；没传表示这个域没有可取消的执行器 —— 不摆一个点了没反应的入口。
+   */
+  onCancel?: () => void;
+  /** 已发出取消、等确认：主按钮显示「停止中…」并禁用 */
+  stopping?: boolean;
   /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源；百分比换算由 DomainScanProgress 收口） */
   progress?: number;
   /** 进度条上方状态消息（task.message，不重复百分比/按钮文案） */
@@ -47,32 +65,6 @@ interface PageShellProps {
   onSecondary?: () => void;
   /** 副操作是否禁用（默认跟随 loading） */
   secondaryDisabled?: boolean;
-}
-
-/** 主操作按钮（含加载态）——统一走全局 PrimaryButton */
-function ActionButton({
-  onClick,
-  disabled,
-  buttonText,
-  loading,
-  progressLabel,
-}: {
-  onClick?: () => void;
-  disabled: boolean;
-  buttonText: string;
-  loading: boolean;
-  progressLabel?: string;
-}) {
-  return (
-    <PrimaryButton
-      onClick={onClick}
-      disabled={disabled}
-      loading={loading}
-      loadingLabel={progressLabel}
-    >
-      {buttonText}
-    </PrimaryButton>
-  );
 }
 
 /** 底部功能清单 — 全站统一贴底卡片网格（EntryCard md，列数可配置） */
@@ -143,6 +135,16 @@ function DetailCornerLink() {
   );
 }
 
+/**
+ * 上半区独占的 props：与 {@link PageShellProps} 同源（排队/取消/进度同一套口径），
+ * 只多一条「loading 必填」，且不带底部功能网格那几项。
+ * 用 Omit 派生而非照抄一份字段清单，避免两处声明随迭代漂移。
+ */
+type PageHeroProps = Omit<
+  PageShellProps,
+  'loading' | 'featureList' | 'footer' | 'columns'
+> & { loading: boolean };
+
 /** 上半部分：插图 + 标题 + 副标题 + 进度 + 主/副按钮 + 附加内容，垂直居中 */
 function PageHero({
   illustration,
@@ -150,30 +152,28 @@ function PageHero({
   subtitle,
   buttonText,
   onAction,
+  actionDomain,
   loading,
-  progressLabel,
+  queued = false,
+  queuePosition,
+  onCancel,
+  stopping = false,
   progress,
   progressMessage,
   extra,
   secondaryText,
   onSecondary,
   secondaryDisabled,
-}: {
-  illustration: ReactNode;
-  title: string;
-  subtitle: string;
-  buttonText: string;
-  onAction?: () => void;
-  loading: boolean;
-  progressLabel?: string;
-  progress?: number;
-  progressMessage?: string;
-  extra?: ReactNode;
-  secondaryText?: string;
-  onSecondary?: () => void;
-  secondaryDisabled?: boolean;
-}) {
+}: PageHeroProps) {
+  const t = useT();
   const showSecondary = Boolean(secondaryText && onSecondary);
+  // 排队时任务还没开始，没有任务消息可显示 —— 进度条报排队位置，
+  // 让用户知道"不是卡住了，是在等前面的任务"。
+  // ⚠️ 变量名刻意避开 useTaskRun 里那个「含百分比 + 任务消息」的字段名：
+  // 该标识符在 domain-action-label 门禁里属于按钮禁区，进度条文案是另一回事。
+  const barLabel = queued
+    ? t('task.queuedLabel', { position: queuePosition ?? '?' })
+    : progressMessage;
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 min-h-0">
       <div className="w-[260px] h-[260px] flex items-center justify-center mb-6 [&>svg]:w-[260px] [&>svg]:h-[260px]">
@@ -182,18 +182,20 @@ function PageHero({
       <h1 className="text-[28px] font-bold text-zh-ink mb-2 leading-tight text-center">{title}</h1>
       <p className="text-base text-zh-muted mb-6 text-center max-w-2xl">{subtitle}</p>
       <DomainScanProgress
-        loading={loading}
+        loading={loading || queued}
         progress={progress}
-        label={progressMessage}
+        label={barLabel}
         className="mb-4"
       />
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <ActionButton
-          onClick={onAction}
-          disabled={loading}
-          buttonText={buttonText}
+        <DomainActionButton
+          domain={actionDomain}
+          label={buttonText}
           loading={loading}
-          progressLabel={progressLabel}
+          queued={queued}
+          onCancel={onCancel}
+          stopping={stopping}
+          onClick={onAction}
         />
         {showSecondary && (
           <SecondaryButton onClick={onSecondary} disabled={secondaryDisabled ?? loading}>
@@ -216,11 +218,15 @@ export function PageShell({
   subtitle,
   buttonText,
   onAction,
+  actionDomain,
   featureList,
   footer,
   columns = 4,
   loading = false,
-  progressLabel,
+  queued = false,
+  queuePosition,
+  onCancel,
+  stopping = false,
   progress,
   progressMessage,
   extra,
@@ -237,8 +243,12 @@ export function PageShell({
         subtitle={subtitle}
         buttonText={buttonText}
         onAction={onAction}
+        actionDomain={actionDomain}
         loading={loading}
-        progressLabel={progressLabel}
+        queued={queued}
+        queuePosition={queuePosition}
+        onCancel={onCancel}
+        stopping={stopping}
         progress={progress}
         progressMessage={progressMessage}
         extra={extra}

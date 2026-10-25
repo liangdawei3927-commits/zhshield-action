@@ -9,6 +9,7 @@ import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useTaskRun } from '../task-store';
+import { isCancelledError } from '../services/cancel-error';
 
 export const STATUS_CONFIG: Record<
   string,
@@ -94,6 +95,11 @@ function useInspectReport(projectPath: string): {
     try {
       const pipeline = await runPipeline(projectPath, { sop: true });
       const outcome = toInspectOutcome(pipeline);
+      if (outcome.kind === 'cancelled') {
+        // 用户点「停止」不是失败：不落失败页、保留已有报告。
+        // 落了失败页就等于把取消说成故障，还会在按钮下方顶出一行红色错误文案。
+        return;
+      }
       if (outcome.kind === 'failed') {
         setReport(null);
         setFailure(outcome);
@@ -101,6 +107,8 @@ function useInspectReport(projectPath: string): {
       }
       setReport(outcome.report);
     } catch (err: unknown) {
+      // 用户点「停止」不是失败：不落失败页，保留已有报告
+      if (isCancelledError(err)) return;
       setReport(null);
       setFailure({
         kind: 'failed',
@@ -119,13 +127,20 @@ function useInspectRun(projectPath: string): {
   failure: InspectFailure | null;
   loading: boolean;
   progress: number;
-  progressLabel: string;
   statusMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   startInspect: () => Promise<void>;
 } {
   const { report, persisted, failure, run } = useInspectReport(projectPath);
   // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）
-  const { loading, progress, progressLabel, statusMessage } = useTaskRun('pipeline', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('pipeline', projectPath);
 
   const startInspect = useCallback(() => run(), [run]);
 
@@ -135,8 +150,11 @@ function useInspectRun(projectPath: string): {
     failure,
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     startInspect,
   };
 }
@@ -189,12 +207,15 @@ export function useInspectPage(projectPath: string) {
     failure,
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     startInspect,
   } = useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
-  useDailyAutoCheck('inspect', projectPath, () => void startInspect());
+  useDailyAutoCheck('inspect', projectPath, () => void startInspect(), 'pipeline');
 
   return {
     report,
@@ -202,8 +223,11 @@ export function useInspectPage(projectPath: string) {
     failure,
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     copyToAi,
     copyAllToAi,
     startInspect,

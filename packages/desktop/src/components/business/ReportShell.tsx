@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
 import type { ScoreDimension } from '@zh/shared';
 import { DomainScoreCard } from '../DomainScoreCard';
-import { DomainScanProgress } from './DomainScanProgress';
 import { DomainHistoryPanel } from './DomainHistoryPanel';
 import { ResultCard } from '../../components/ui/ResultCard';
 
@@ -37,11 +36,14 @@ export interface ReportShellProps {
   score?: ReactNode;
   /** 顶行右侧原有按钮（重扫/刷新等），最右 */
   action: ReactNode;
-  /** 重新扫描是否进行中（结果态下的运行反馈） */
+  /**
+   * @deprecated 详情页不再渲染页内进度条，运行反馈交给按钮自身的运行态文案。
+   * 字段保留仅为兼容 10 个分类页的现有调用，不再产生渲染效果。
+   */
   loading?: boolean;
-  /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
+  /** @deprecated 详情页不再渲染页内进度条，本字段无渲染效果。 */
   progress?: number;
-  /** 进度条上方状态消息（task.message） */
+  /** @deprecated 同上，详情页不再渲染页内进度条，本字段无渲染效果。 */
   progressMessage?: string;
   /** 返回本分类「主页」（空态）回调 */
   onBackHome: () => void;
@@ -128,12 +130,19 @@ function ReportStatsRow({
       {stats.map((s) => {
         const clickable = Boolean(s.detail);
         const expanded = expandedKey === s.key;
+        // 只有真能点的卡才给手型与 hover 高亮：无 detail 的卡渲染成 div，
+        // 若仍带着 cursor-pointer + hover 边框，用户点下去毫无反应 = 交互骗人。
+        const interactivity = clickable
+          ? 'text-left cursor-pointer hover:border-brand-600 hover:shadow-md transition-all'
+          : '';
         return (
           <ResultCard
             key={s.key}
             as={clickable ? 'button' : 'div'}
             variant="stats"
-            className="flex-1 min-w-[160px] text-left cursor-pointer hover:border-brand-600 hover:shadow-md transition-all"
+            className={`flex-1 min-w-[160px] ${interactivity}`.trim()}
+            data-stat-key={s.key}
+            data-stat-clickable={clickable ? 'true' : 'false'}
             onClick={clickable ? () => onToggle(expanded ? null : s) : undefined}
           >
             <div className="flex items-center justify-between gap-2">
@@ -187,9 +196,6 @@ export function ReportShell({
   title,
   score,
   action,
-  loading,
-  progress,
-  progressMessage,
   onBackHome,
   backHomeTitle,
   stats,
@@ -220,12 +226,6 @@ export function ReportShell({
             )
           }
           action={action}
-        />
-        <DomainScanProgress
-          loading={loading ?? false}
-          progress={progress}
-          label={progressMessage}
-          className="mb-6"
         />
         <ReportStatsRow
           stats={stats}

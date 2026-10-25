@@ -6,7 +6,12 @@ import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
-import { useSentinelPage, type SentinelEventItem } from './sentinel-logic';
+import {
+  useSentinelPage,
+  deriveSentinelActionState,
+  type SentinelEventItem,
+  type SentinelActionState,
+} from './sentinel-logic';
 import { SentinelTimeline, EventsPanel } from './sentinel-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import type { AppNotification } from '@zh/kernel';
@@ -95,15 +100,20 @@ function buildSentinelStats({
   ];
 }
 
-function SentinelReportView({
+/**
+ * 详情页视图（导出供行为级门禁直接渲染：主页→详情要点击，静态渲染点不了）。
+ *
+ * 忙态一律来自 `action`（deriveSentinelActionState 的唯一结果），本页不自己拼
+ * `monitoring || loading` —— 两个视图各拼一次就必然分叉（2026-10-26 的主页漏
+ * monitoring 就是这么来的）。
+ */
+export function SentinelReportView({
   events,
   sorted,
   activeCount,
   highCount,
   criticalCount,
-  loading,
-  monitoring,
-  stopping,
+  action,
   onRefresh,
   onStopMonitoring,
   onBackHome,
@@ -115,9 +125,7 @@ function SentinelReportView({
   activeCount: number;
   highCount: number;
   criticalCount: number;
-  loading: boolean;
-  monitoring: boolean;
-  stopping: boolean;
+  action: SentinelActionState;
   onRefresh: () => void;
   onStopMonitoring: () => void;
   onBackHome: () => void;
@@ -135,11 +143,11 @@ function SentinelReportView({
         <DomainActionButton
           // 监控中：按钮进入「监控中…」，hover 出「停止」点它即停（监控 5s 一轮自动刷新，
           // 无需再摆刷新入口）；未监控时才退化成一次性刷新。
-          domain={monitoring ? 'sentinelMonitor' : 'sentinel'}
-          onClick={monitoring ? undefined : onRefresh}
-          loading={monitoring || loading}
-          onCancel={monitoring ? onStopMonitoring : undefined}
-          stopping={monitoring ? stopping : false}
+          domain={action.domain}
+          onClick={action.cancellable ? undefined : onRefresh}
+          loading={action.busy}
+          onCancel={action.cancellable ? onStopMonitoring : undefined}
+          stopping={action.stopping}
           label={t('common.refresh')}
         />
       }
@@ -162,8 +170,7 @@ function SentinelReportView({
 function SentinelEmptyView(props: {
   projectPath: string;
   monitoring: boolean;
-  loading: boolean;
-  stopping: boolean;
+  action: SentinelActionState;
   onAction: () => void;
   onStopMonitoring: () => void;
   t: (key: string, opts?: { defaultValue?: string }) => string;
@@ -222,17 +229,13 @@ function SentinelEmptyView(props: {
           desc: props.t('page.sentinel.shell.featureScope.desc'),
         },
       ]}
-      buttonText={
-        props.monitoring
-          ? props.t('page.sentinel.shell.buttonRunning')
-          : props.t('page.sentinel.shell.buttonStart')
-      }
+      buttonText={props.t('page.sentinel.shell.buttonStart')}
       onAction={props.onAction}
-      actionDomain={props.monitoring ? 'sentinelMonitor' : 'sentinel'}
-      loading={props.loading}
+      actionDomain={props.action.domain}
+      loading={props.action.busy}
       // 监控中：同一颗按钮 hover 出「停止」，点它真的停掉监视器
-      onCancel={props.monitoring ? props.onStopMonitoring : undefined}
-      stopping={props.monitoring ? props.stopping : false}
+      onCancel={props.action.cancellable ? props.onStopMonitoring : undefined}
+      stopping={props.action.stopping}
     />
   );
 }
@@ -267,6 +270,16 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
   const { notify } = useNotification();
   useSentinelCriticalNotification(events, notify);
 
+  /**
+   * 忙态判定**只在这里做一次**（唯一口径）。
+   *
+   * 哨兵是常驻守护：`monitoring` 才是"在跑"的真实状态，`loading` 只是拉事件
+   * 列表那一瞬。此前主页只把 loading 接进按钮（漏了 monitoring），于是监控中
+   * 主页按钮不进入忙态 ⇒ 不出「停止」、点了也只是幂等重启 ⇒ 用户表现为
+   * "停不掉"。主页与详情页都从这一个 action 取值，口径不再分叉。
+   */
+  const action = deriveSentinelActionState({ monitoring, loading, stopping });
+
   // 单一判定源：有事件 = 有详情（同时决定详情分支与右上角图标）
   const detailReport = events.length > 0 ? events : null;
   const hasDetail = detailReport !== null;
@@ -279,9 +292,7 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         activeCount={activeCount}
         highCount={highCount}
         criticalCount={criticalCount}
-        loading={loading}
-        monitoring={monitoring}
-        stopping={stopping}
+        action={action}
         onRefresh={startMonitoring}
         onStopMonitoring={stopMonitoring}
         onBackHome={() => setShowHome(true)}
@@ -296,8 +307,7 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
       <SentinelEmptyView
         projectPath={projectPath}
         monitoring={monitoring}
-        loading={loading}
-        stopping={stopping}
+        action={action}
         onAction={() => {
           setShowHome(false);
           startMonitoring();

@@ -132,14 +132,15 @@ export function resolveStatus(
 }
 
 /**
- * 智汇大脑卡：云协同状态展示（SOP 规则下发 / 经验回写），不设开关，常驻服务
+ * 智汇大脑健康度的取数通道：拉取 + 低频轮询 + 可见即刷 + 手动重试。
  *
- * 状态必须区分「从未接入云端」与「接入过但已过期」：两者用户处置完全不同，
- * 前者是配置问题（云端地址未部署/未连通），后者是链路中断。
- * 过去二者都显示为「同步已过期」，用户无从判断该检查什么。
+ * 从 WisdomBrainCard 拆出：组件只管「拿到状态怎么画」，取数与生命周期只有这一份。
  */
-export function WisdomBrainCard() {
-  const t = useT();
+function useSopSyncHealth(): {
+  health: SopSyncHealth | null;
+  retrying: boolean;
+  retry: () => Promise<void>;
+} {
   const [health, setHealth] = useState<SopSyncHealth | null>(null);
   const [retrying, setRetrying] = useState(false);
 
@@ -188,6 +189,40 @@ export function WisdomBrainCard() {
     await load();
   }, [load]);
 
+  return { health, retrying, retry };
+}
+
+/** 标题行的智汇大脑图标（12×12 线性大脑） */
+function BrainGlyph() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
+    </svg>
+  );
+}
+
+/**
+ * 智汇大脑卡：云协同状态展示（SOP 规则下发 / 经验回写），不设开关，常驻服务
+ *
+ * 状态必须区分「从未接入云端」与「接入过但已过期」：两者用户处置完全不同，
+ * 前者是配置问题（云端地址未部署/未连通），后者是链路中断。
+ * 过去二者都显示为「同步已过期」，用户无从判断该检查什么。
+ */
+export function WisdomBrainCard() {
+  const t = useT();
+  const { health, retrying, retry } = useSopSyncHealth();
+
   const status = resolveStatus(health, t);
   const failureText = health ? describeFailure(health.failureKind, t) : null;
   const lastSuccessText = health ? formatRelativeDay(health.lastSuccessAt, t) : null;
@@ -199,22 +234,7 @@ export function WisdomBrainCard() {
     <section>
       <SectionTitle
         label={t('layout.brainTitle')}
-        icon={
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
-            <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
-            <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
-          </svg>
-        }
+        icon={<BrainGlyph />}
       />
       <BounceCard className="rounded-xl bg-zh-panel/60 p-3 space-y-2">
         <div className="flex items-center gap-2">

@@ -311,7 +311,7 @@ export function TechDebtEmptyState({
       titleKey="page.techdebt.empty.title"
       subtitleKey="page.techdebt.empty.subtitle"
       buttonTextKey="page.techdebt.empty.start"
-      progressLabelKey="page.techdebt.checking"
+      actionDomain="techdebt"
       loading={loading}
       onScan={onScan}
       featureList={[

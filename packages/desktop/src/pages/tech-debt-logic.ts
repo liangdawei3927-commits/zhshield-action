@@ -10,6 +10,8 @@ import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
 import { useTaskRun } from '../task-store';
+import { useRunWithReport } from '../hooks/useRunWithReport';
+import { isCancelledError } from '../services/cancel-error';
 
 /**
  * 债务类别配置（与 @zh/scoring tech-debt DebtCategory 对齐，5 类 4 色）：
@@ -122,7 +124,10 @@ export function debtIndexColor(index: number): string {
 async function scanTechDebt(projectPath: string): Promise<TechDebtReportData | null> {
   try {
     return await runTechDebt(projectPath);
-  } catch {
+  } catch (err) {
+    // 用户点「停止」不是失败：原样抛给共用骨架，由它识别取消并**保留已有报告**
+    // （吞成 null 会把用户正在看的报告一起清掉）。
+    if (isCancelledError(err)) throw err;
     return null;
   }
 }
@@ -207,6 +212,14 @@ function useTechDebtRun(projectPath: string): {
   loading: boolean;
   progress: number;
   progressMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   report: TechDebtReportData | null;
   planLoading: string | null;
   verifyLoading: string | null;
@@ -219,18 +232,26 @@ function useTechDebtRun(projectPath: string): {
   handleDismiss: (actionId: string) => Promise<void>;
 } {
   const [report, setReport] = useState<TechDebtReportData | null>(null);
-  const { loading, progress, statusMessage } = useTaskRun('techdebt', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('techdebt', projectPath);
   const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } =
     useTechDebtActions(projectPath, setReport);
 
-  const handleScan = useCallback(async () => {
-    setReport(await scanTechDebt(projectPath));
-  }, [projectPath]);
+  // 共用骨架：成功回填报告、取消保留已有报告、真故障清空（与 security/performance/dependency 同一实现）
+  // 显式传 T：scanTechDebt 出错时自身返回 null（不回填），与 setReport 的 SetStateAction 推断冲突
+  const { handleScan } = useRunWithReport<TechDebtReportData | null>(
+    projectPath,
+    scanTechDebt,
+    setReport,
+  );
 
   return {
     loading,
     progress,
     progressMessage: statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     planLoading,
     verifyLoading,

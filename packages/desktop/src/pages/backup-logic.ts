@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { t } from '@zh/i18n';
 import {
   runBackup,
+  cancelBackup,
   getBackupRecords,
   deleteBackupRecord,
   getBackupConfig,
@@ -109,18 +110,22 @@ function useBackupProgressState(
   return [progress, setProgress];
 }
 
-/** 一键备份执行：状态 + 进度推送 + 结果提示 */
+/** 一键备份执行：状态 + 进度推送 + 结果提示 + 停止 */
 function useBackupRun(
   projectPath: string,
   loadRecords: () => Promise<void>,
 ): {
   isBackingUp: boolean;
+  isStopping: boolean;
   progress: BackupProgressData | null;
   lastResult: BackupResultData | null;
   error: string | null;
   handleBackup: () => Promise<void>;
+  handleStopBackup: () => Promise<void>;
 } {
   const [isBackingUp, setIsBackingUp] = useState(false);
+  /** 已发出停止、等主进程确认（按钮显示「停止中」并禁用，防连点） */
+  const [isStopping, setIsStopping] = useState(false);
   const [progress, setProgress] = useBackupProgressState(projectPath);
   const [lastResult, setLastResult] = useState<BackupResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +140,11 @@ function useBackupRun(
       const result = await runBackup(projectPath, 'manual');
       setLastResult(result);
       await loadRecords();
+      if (result.overallStatus === 'cancelled') {
+        // 用户主动停止 ≠ 失败：不落记录（kernel 已跳过），这里也不报 error
+        toast(t('page.backup.toast.cancelled'), 'info');
+        return;
+      }
       toast(
         result.overallStatus === 'success'
           ? t('page.backup.toast.success')
@@ -147,11 +157,27 @@ function useBackupRun(
       toast(msg, 'error');
     } finally {
       setIsBackingUp(false);
+      setIsStopping(false);
       setProgress(null);
     }
   }, [projectPath, toast, loadRecords]);
 
-  return { isBackingUp, progress, lastResult, error, handleBackup };
+  /**
+   * 停止进行中的备份（用户诉求：点下去停不了）。
+   *
+   * kernel 会在最近的检查点停下：未写完的 zip / 清单不落盘，也不会记一条失败记录。
+   * 目录格式下 <snapshot>/ 里可能留下部分已复制的文件（无清单，不会被当作一次有效
+   * 备份），下次备份的轮换会清掉 —— 强删正在写的目录更危险，故不做。
+   */
+  const handleStopBackup = useCallback(async () => {
+    // 不在这里清 isStopping：备份仍在收尾（kernel 走到下一个检查点才返回），
+    // 由 handleBackup 的 finally 统一清。否则按钮会先恢复成「一键备份」，
+    // 而这一次备份其实还没结束 —— 用户再点就是并发跑两个备份。
+    setIsStopping(true);
+    await cancelBackup(projectPath);
+  }, [projectPath]);
+
+  return { isBackingUp, isStopping, progress, lastResult, error, handleBackup, handleStopBackup };
 }
 
 /** 删除确认：目标状态 + 确认执行 */
@@ -250,10 +276,8 @@ export function useBackupSchedule(projectPath: string) {
 /** 备份页全部状态与副作用：记录加载（含定时备份后台刷新）、一键备份+进度、删除确认 */
 export function useBackupPage(projectPath: string) {
   const { records, setRecords, loadRecords } = useBackupRecords(projectPath);
-  const { isBackingUp, progress, lastResult, error, handleBackup } = useBackupRun(
-    projectPath,
-    loadRecords,
-  );
+  const { isBackingUp, isStopping, progress, lastResult, error, handleBackup, handleStopBackup } =
+    useBackupRun(projectPath, loadRecords);
   const { deleteTarget, setDeleteTarget, handleDeleteConfirm } = useBackupDelete((id) =>
     setRecords((prev) => prev.filter((r) => r.id !== id)),
   );
@@ -265,6 +289,7 @@ export function useBackupPage(projectPath: string) {
   return {
     records,
     isBackingUp,
+    isStopping,
     progress,
     lastResult,
     expandedId,
@@ -273,6 +298,7 @@ export function useBackupPage(projectPath: string) {
     deleteTarget,
     setDeleteTarget,
     handleBackup,
+    handleStopBackup,
     handleDeleteConfirm,
   };
 }

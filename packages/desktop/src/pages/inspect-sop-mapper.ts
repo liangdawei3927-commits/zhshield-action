@@ -12,6 +12,7 @@
  */
 
 import type { InspectionReportData } from '../types/electron';
+import { isCancelledMessage } from '../services/cancel-error';
 
 /** 序列化后的单条规则评估（RuleEvaluation 的 JSON 最小字段） */
 export interface SerializedRuleEvaluation {
@@ -144,20 +145,33 @@ export interface InspectOutcomeInput {
   readonly inspect?: unknown;
 }
 
-/** 巡检一次执行的三态结果：成功 / 后端报错 / 无有效载荷（后两者都须显式呈现，不得退化为空态） */
+/**
+ * 巡检一次执行的结果状态：成功 / 后端报错 / 用户取消 / 无有效载荷。
+ *
+ * 「用户取消」是独立一态，不是失败：用户点「停止」后主进程会把取消文案（带
+ * `[cancelled]` 标记）塞进 error 字段，若把它当失败渲染，页面会变成「体检失败」
+ * 并在按钮下方顶出一行红色错误文案 —— 把用户的主动操作报成系统故障。
+ */
 export type InspectOutcome =
   | { readonly kind: 'report'; readonly report: InspectionReportData }
-  | { readonly kind: 'failed'; readonly messageKey: string; readonly detail?: string };
+  | { readonly kind: 'failed'; readonly messageKey: string; readonly detail?: string }
+  | { readonly kind: 'cancelled' };
 
 /** 巡检失败态：InspectOutcome 中 kind 为 'failed' 的分支，携带 i18n messageKey 与可选 detail */
 export type InspectFailure = Extract<InspectOutcome, { kind: 'failed' }>;
 
 /**
  * 判定巡检执行结果。
+ *
  * 后端 error 优先于载荷：error 非空即失败，即便同时带着 inspect。
+ *
+ * 例外：**取消**。主进程降级兜底时会把取消文案（带 `[cancelled]` 标记）放进 error
+ * 字段；用户点「停止」后那不是失败，必须单独成一态，否则页面会渲染成「体检失败」
+ * 并在按钮下方显示一行红色错误文案。
  */
 export function toInspectOutcome(pipeline: InspectOutcomeInput): InspectOutcome {
   if (pipeline.error) {
+    if (isCancelledMessage(pipeline.error)) return { kind: 'cancelled' };
     return { kind: 'failed', messageKey: 'page.inspect.errorTitle', detail: pipeline.error };
   }
   const report = toInspectionReportDataFromRuleEngine(pipeline.inspect);

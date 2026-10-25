@@ -30,6 +30,28 @@ export {
   OnboardingEngineStatus,
 } from './ProjectOnboardingPage-ui-shell';
 
+/** 引导页内容区入参（原先是内联在函数签名里的对象类型，抽出来单独声明） */
+export interface OnboardingContentProps {
+  t: (key: string, params?: Record<string, unknown>) => string;
+  projectName: string;
+  steps: import('./ProjectOnboardingPage-types').Step[];
+  currentStepIndex: number;
+  completedSteps: Set<number>;
+  progress: number;
+  selectedPreset: string | null;
+  onSelectPreset: (id: string) => void;
+  onConfirmPreset: () => void;
+  showPreset: boolean;
+  showConfirm: boolean;
+  profileSummary: OnboardingProfileSummary | null;
+  onConfirmProfile: () => void;
+  ruleSyncSummary: RuleSyncSummary | null;
+  toolsStatus: ToolsStatusSummary | null;
+  onRefreshTools: () => Promise<void>;
+  onClose?: () => void;
+  intelligentEnabled?: boolean;
+}
+
 export function OnboardingContent({
   t,
   projectName,
@@ -49,26 +71,7 @@ export function OnboardingContent({
   onRefreshTools,
   onClose,
   intelligentEnabled = true,
-}: {
-  t: (key: string, params?: Record<string, unknown>) => string;
-  projectName: string;
-  steps: import('./ProjectOnboardingPage-types').Step[];
-  currentStepIndex: number;
-  completedSteps: Set<number>;
-  progress: number;
-  selectedPreset: string | null;
-  onSelectPreset: (id: string) => void;
-  onConfirmPreset: () => void;
-  showPreset: boolean;
-  showConfirm: boolean;
-  profileSummary: OnboardingProfileSummary | null;
-  onConfirmProfile: () => void;
-  ruleSyncSummary: RuleSyncSummary | null;
-  toolsStatus: ToolsStatusSummary | null;
-  onRefreshTools: () => Promise<void>;
-  onClose?: () => void;
-  intelligentEnabled?: boolean;
-}) {
+}: OnboardingContentProps) {
   return (
     <div
       className="relative flex h-full w-full flex-col overflow-hidden"

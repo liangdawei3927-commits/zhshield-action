@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
 import { useTaskRun } from '../task-store';
+import { useRunWithReport } from '../hooks/useRunWithReport';
 import type { AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
@@ -163,22 +164,34 @@ function useDependencyRun(projectPath: string): {
   loading: boolean;
   progress: number;
   progressMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   report: DependencyReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<DependencyReportData | null>(null);
-  const { loading, progress, statusMessage } = useTaskRun('deps', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('deps', projectPath);
 
-  const handleScan = useCallback(async () => {
-    try {
-      const result = await runDeps(projectPath);
-      setReport(result);
-    } catch {
-      setReport(null);
-    }
-  }, [projectPath]);
+  // 共用骨架：成功回填报告、取消保留已有报告、真故障清空（与 security/performance 同一实现）
+  const { handleScan } = useRunWithReport(projectPath, runDeps, setReport);
 
-  return { loading, progress, progressMessage: statusMessage, report, handleScan };
+  return {
+    loading,
+    progress,
+    progressMessage: statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
+    report,
+    handleScan,
+  };
 }
 
 function toAiIssue(finding: TyposquatFindingData): AiFixIssue {
@@ -201,7 +214,20 @@ function useDependencyCopyToAi(projectPath: string): {
 }
 
 export function useDependencyPage(projectPath: string) {
-  const { loading, progress, progressMessage, report, handleScan } = useDependencyRun(projectPath);
+  const { loading, progress, progressMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
+    useDependencyRun(projectPath);
   const { copyToAi, copyAllToAi } = useDependencyCopyToAi(projectPath);
-  return { loading, progress, progressMessage, report, handleScan, copyToAi, copyAllToAi };
+  return {
+    loading,
+    progress,
+    progressMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
+    report,
+    handleScan,
+    copyToAi,
+    copyAllToAi,
+  };
 }

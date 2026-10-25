@@ -63,7 +63,7 @@ export function EvolveHeader({
         className="ml-auto"
         onClick={onRefresh}
         loading={loading}
-        loadingLabel={t('common.loading')}
+        loadingLabel={t('common.refreshing')}
       >
         {t('common.refresh')}
       </PrimaryButton>

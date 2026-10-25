@@ -54,13 +54,17 @@ function buildBackupFeatures(
 export function BackupEmptyState({
   projectPath,
   isBackingUp,
+  isStopping,
   progress,
   onBackup,
+  onStopBackup,
 }: {
   projectPath: string;
   isBackingUp: boolean;
+  isStopping: boolean;
   progress: BackupProgressData | null;
   onBackup: () => void;
+  onStopBackup: () => void;
 }) {
   const t = useT();
   return (
@@ -76,10 +80,16 @@ export function BackupEmptyState({
         features={buildBackupFeatures(t)}
         buttonText={t('page.backup.oneClickBackup')}
         onAction={onBackup}
+        actionDomain="backup"
         loading={isBackingUp}
-        progressLabel={t('page.backup.backingUp')}
+        // 备份中：同一颗按钮 hover 出「停止」（此前一键备份点了就只能等它跑完）
+        onCancel={isBackingUp ? onStopBackup : undefined}
+        stopping={isStopping}
         statusMessage={progress?.message}
-        progress={progress?.percent ?? 0}
+        // 单位换算：kernel 推的 percent 是 0..100（orchestrator 发 40/70/100），
+        // 而 DomainEmptyView/PageShell 的 progress 契约是 0..1，由 DomainScanProgress 收口 ×100。
+        // 此前直接透传 percent ⇒ 40×100 被 clamp 成 100，备份进度条一出现就是满条。
+        progress={(progress?.percent ?? 0) / 100}
       />
     </div>
   );

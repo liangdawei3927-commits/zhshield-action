@@ -15,6 +15,7 @@ import {
   type AiFixIssue,
 } from '../utils/copyToAi';
 import { useTaskRun } from '../task-store';
+import { isCancelledError } from '../services/cancel-error';
 
 export const SEVERITY_LABELS: Record<string, string> = {
   critical: 'severity.critical',
@@ -151,13 +152,20 @@ async function loadLatestGuardReport(projectPath: string): Promise<GuardReportDa
 function useGuardRun(projectPath: string): {
   loading: boolean;
   progress: number;
-  progressLabel: string;
   statusMessage: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
+  cancel: () => void;
+  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
+  stopping: boolean;
+  queued: boolean;
+  /** 排队位置（1 起；仅 queued 时有值） */
+  queuePosition?: number;
   report: GuardReportData | null;
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<GuardReportData | null>(null);
-  const { loading, progress, progressLabel, statusMessage } = useTaskRun('guard', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('guard', projectPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,11 +180,13 @@ function useGuardRun(projectPath: string): {
   const handleScan = useCallback(async () => {
     try {
       setReport(await runGuard(projectPath));
-    } catch {
+    } catch (err: unknown) {
+      // 用户点「停止」不是失败：保留已有报告，不清成空态
+      if (isCancelledError(err)) return;
       setReport(null);
     }
   }, [projectPath]);
-  return { loading, progress, progressLabel, statusMessage, report, handleScan };
+  return { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan };
 }
 
 /** 门禁检查项 → AI 修复问题条目 */
@@ -279,7 +289,7 @@ function useGuardReportFalsePositive(projectPath: string): {
 
 /** 门禁页全部状态与副作用：扫描、复制到 AI、误报反馈、历史拦截记录 */
 export function useGuardPage(projectPath: string) {
-  const { loading, progress, progressLabel, statusMessage, report, handleScan } =
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
     useGuardRun(projectPath);
   const { copyToAi, copyAllToAi } = useGuardCopyToAi(projectPath);
   const { reportFalsePositive } = useGuardReportFalsePositive(projectPath);
@@ -294,8 +304,11 @@ export function useGuardPage(projectPath: string) {
   return {
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     copyToAi,
     copyAllToAi,

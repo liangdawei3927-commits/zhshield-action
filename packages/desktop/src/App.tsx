@@ -18,7 +18,6 @@ import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TopNav } from './components/layout/TopNav';
 import { Sidebar } from './components/layout/Sidebar';
-import { GlobalScanIndicator } from './components/layout/global-scan-indicator';
 import { ScreensaverPage } from './pages/ScreensaverPage';
 import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboardingPage';
 import { useInactivityTimer } from './hooks/useInactivityTimer';
@@ -179,7 +178,6 @@ function AppShell({
       <main className="flex-1 overflow-auto bg-zh-bg">
         <PageView {...viewProps} />
       </main>
-      <GlobalScanIndicator />
     </>
   );
 }

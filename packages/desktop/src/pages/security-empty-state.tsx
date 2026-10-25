@@ -2,6 +2,7 @@ import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
+import { scanRunProps } from '../components/business/ScanEmptyState';
 
 /** 空态：引导深度扫描（props 即 ScanEmptyStateBranch 的共享契约，由 SecurityPage 展开传递） */
 export function SecurityEmptyState(props: ScanEmptyStateParams) {
@@ -58,10 +59,8 @@ export function SecurityEmptyState(props: ScanEmptyStateParams) {
       ]}
       buttonText={t('page.security.fixAll')}
       onAction={props.onScan}
-      loading={props.loading}
-      progress={props.progress}
-      statusMessage={props.statusMessage}
-      progressLabel={t('page.security.checking')}
+      actionDomain="security"
+      {...scanRunProps(props)}
     />
   );
 }

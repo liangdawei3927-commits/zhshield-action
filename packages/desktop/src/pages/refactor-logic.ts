@@ -6,9 +6,13 @@ import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useTaskRun } from '../task-store';
+import { isCancelledError } from '../services/cancel-error';
 
 /** 单个代码异味条目（与 @zh/refactor 报告结构对齐） */
 export type Smell = RefactorReportData['files'][number]['smells'][number];
+
+/** 单个文件的重构条目（含异味列表、可维护性分与文件级优先级） */
+export type RefactorFile = RefactorReportData['files'][number];
 
 /** 按 ruleId 聚合后的一个分类 */
 export interface SmellGroup {
@@ -123,10 +127,8 @@ export function useRefactorScan(projectPath: string) {
   const [report, setReport] = useState<RefactorReportData | null>(null);
   const [error, setError] = useState('');
   const scanningRef = useRef(false);
-  const { loading: scanning, progress, progressLabel, statusMessage } = useTaskRun(
-    'refactor',
-    projectPath,
-  );
+  const { loading: scanning, progress, statusMessage, queued, queuePosition, cancel, stopping } =
+    useTaskRun('refactor', projectPath);
   const handleScan = useCallback(async () => {
     if (!projectPath) {
       setError(t('page.refactor.addProjectFirst'));
@@ -139,13 +141,26 @@ export function useRefactorScan(projectPath: string) {
       const result = await runRefactor(projectPath);
       setReport(result);
     } catch (e: unknown) {
+      // 用户点「停止」不是失败：不写错误横幅
+      if (isCancelledError(e)) return;
       const msg = e instanceof Error ? e.message : String(e);
       setError(t('page.refactor.scanFailed', { message: msg }));
     } finally {
       scanningRef.current = false;
     }
   }, [projectPath, t]);
-  return { scanning, progress, progressLabel, statusMessage, report, error, handleScan };
+  return {
+    scanning,
+    progress,
+    statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
+    report,
+    error,
+    handleScan,
+  };
 }
 
 /** 按 ruleId 分类聚合 + 当前选中分类 */
@@ -177,14 +192,17 @@ export function useSmellGroups(report: RefactorReportData | null) {
  */
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
-  const { scanning, progress, progressLabel, statusMessage, report, error, handleScan } =
+  const { scanning, progress, statusMessage, queued, queuePosition, cancel, stopping, report, error, handleScan } =
     useRefactorScan(projectPath);
-  const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan());
+  const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan(), 'refactor');
   return {
     scanning,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     error,
     lastAutoAt,

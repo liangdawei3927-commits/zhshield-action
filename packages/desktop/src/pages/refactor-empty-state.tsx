@@ -10,6 +10,13 @@ interface EmptyStateProps {
   /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
   progress?: number;
   statusMessage?: string;
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  queued?: boolean;
+  queuePosition?: number;
+  /** 停止本次重构扫描（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   onScan: () => void;
 }
 
@@ -71,9 +78,13 @@ export function RefactorEmptyState(props: EmptyStateProps) {
         features={buildRefactorFeatures(t)}
         buttonText={t('page.refactor.scanNow')}
         onAction={props.onScan}
+        actionDomain="refactor"
+        queued={props.queued}
+        queuePosition={props.queuePosition}
+        onCancel={props.onCancel}
+        stopping={props.stopping}
         loading={props.scanning}
         progress={props.progress}
-        progressLabel={t('page.refactor.scanningEllipsis')}
         statusMessage={props.statusMessage}
       />
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">

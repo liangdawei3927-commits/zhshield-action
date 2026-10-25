@@ -16,7 +16,7 @@ import type { ScoreDimension } from '@zh/shared';
 import { useT } from '../../i18n';
 import { ReportShell } from './ReportShell';
 import { ResultCard } from '../ui/ResultCard';
-import { PrimaryButton } from '../ui/PrimaryButton';
+import { DomainActionButton } from './DomainActionButton';
 import {
   SNAPSHOT_ENTRY_LIMIT,
   type SnapshotEntry,
@@ -93,23 +93,9 @@ function SnapshotEntryRow({ entry, last }: { entry: SnapshotEntry; last: boolean
   );
 }
 
-export function DomainSnapshotReport({
-  projectPath,
-  dimension,
-  icon,
-  snapshot,
-  loading,
-  rescanning,
-  onRescan,
-  onBackHome,
-}: DomainSnapshotReportProps) {
-  const t = useT();
-  const entries = snapshot?.entries ?? [];
-  const shown = entries.slice(0, SNAPSHOT_ENTRY_LIMIT);
-  const truncated = entries.length > shown.length;
-  const stamp = snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : '';
-
-  const stats = [
+/** 顶行统计卡：问题总数 / 错误 / 警告 / 提示（快照缺字段按 0，不补造通过率） */
+function buildSnapshotStats(t: ReturnType<typeof useT>, snapshot: SnapshotReport | null) {
+  return [
     {
       key: 'total',
       label: t('page.snapshotReport.total', { defaultValue: '问题总数' }),
@@ -134,6 +120,57 @@ export function DomainSnapshotReport({
       color: 'rgb(var(--zh-muted))',
     },
   ];
+}
+
+/** 说明条：这张页面是什么 / 数据来自哪一次检查（有落盘时间时附上） */
+function SnapshotNotice({ stamp }: { stamp: string }) {
+  const t = useT();
+  return (
+    <p className="text-xs text-zh-muted mb-4">
+      {t('page.snapshotReport.notice', {
+        defaultValue:
+          '这是该分类最近一次检查保存下来的结果，页面评分就是由这些条目算出的。如需完整报告（含通过项等明细），请点「重新检查」。',
+      })}
+      {stamp ? ` · ${stamp}` : ''}
+    </p>
+  );
+}
+
+/** 三种「没有条目可看」的占位说明：读盘中 / 读不到 / 确实为空 */
+function SnapshotPlaceholder({ kind }: { kind: 'loading' | 'unavailable' | 'empty' }) {
+  const t = useT();
+  const text = {
+    loading: t('page.snapshotReport.loading', { defaultValue: '正在读取最近一次结果…' }),
+    unavailable: t('page.snapshotReport.unavailable', {
+      defaultValue: '读取不到该分类的历史结果文件，请点「重新检查」生成一次。',
+    }),
+    empty: t('page.snapshotReport.empty', {
+      defaultValue: '最近一次检查没有记录到问题条目。',
+    }),
+  }[kind];
+  return (
+    <ResultCard variant="section" className="text-sm text-zh-muted">
+      {text}
+    </ResultCard>
+  );
+}
+
+export function DomainSnapshotReport({
+  projectPath,
+  dimension,
+  icon,
+  snapshot,
+  loading,
+  rescanning,
+  onRescan,
+  onBackHome,
+}: DomainSnapshotReportProps) {
+  const t = useT();
+  const entries = snapshot?.entries ?? [];
+  const shown = entries.slice(0, SNAPSHOT_ENTRY_LIMIT);
+  const truncated = entries.length > shown.length;
+  const stamp = snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : '';
+  const stats = buildSnapshotStats(t, snapshot);
 
   return (
     <ReportShell
@@ -142,47 +179,24 @@ export function DomainSnapshotReport({
       icon={icon}
       title={t('page.snapshotReport.title', { defaultValue: '最近一次检查结果' })}
       action={
-        <PrimaryButton
+        <DomainActionButton
+          domain="snapshot"
           onClick={onRescan}
           loading={rescanning}
-          loadingLabel={t('page.snapshotReport.rescanning', { defaultValue: '检查中' })}
-        >
-          {t('page.snapshotReport.rescan', { defaultValue: '重新检查' })}
-        </PrimaryButton>
+          label={t('page.snapshotReport.rescan', { defaultValue: '重新检查' })}
+        />
       }
       onBackHome={onBackHome}
       loading={rescanning}
       stats={stats}
     >
-      <p className="text-xs text-zh-muted mb-4">
-        {t('page.snapshotReport.notice', {
-          defaultValue:
-            '这是该分类最近一次检查保存下来的结果，页面评分就是由这些条目算出的。如需完整报告（含通过项等明细），请点「重新检查」。',
-        })}
-        {stamp ? ` · ${stamp}` : ''}
-      </p>
+      <SnapshotNotice stamp={stamp} />
 
-      {loading && (
-        <ResultCard variant="section" className="text-sm text-zh-muted">
-          {t('page.snapshotReport.loading', { defaultValue: '正在读取最近一次结果…' })}
-        </ResultCard>
-      )}
+      {loading && <SnapshotPlaceholder kind="loading" />}
 
-      {!loading && !snapshot && (
-        <ResultCard variant="section" className="text-sm text-zh-muted">
-          {t('page.snapshotReport.unavailable', {
-            defaultValue: '读取不到该分类的历史结果文件，请点「重新检查」生成一次。',
-          })}
-        </ResultCard>
-      )}
+      {!loading && !snapshot && <SnapshotPlaceholder kind="unavailable" />}
 
-      {!loading && snapshot && shown.length === 0 && (
-        <ResultCard variant="section" className="text-sm text-zh-muted">
-          {t('page.snapshotReport.empty', {
-            defaultValue: '最近一次检查没有记录到问题条目。',
-          })}
-        </ResultCard>
-      )}
+      {!loading && snapshot && shown.length === 0 && <SnapshotPlaceholder kind="empty" />}
 
       {shown.length > 0 && (
         <ResultCard variant="list" className="overflow-hidden">

@@ -5,6 +5,7 @@ import type { TaskKind } from '../../types/electron';
 import type { ScoreDimension } from '@zh/shared';
 import { PageShell } from './PageShell';
 import { DomainScoreRing } from './DomainScoreRing';
+import type { ActionRunningKey } from './domain-action-text';
 
 /** 空态功能清单条目（结构与 PageShell 的 FeatureItem 一致） */
 interface EmptyStateFeature {
@@ -27,7 +28,7 @@ export function PipelineTaskEmptyState({
   subtitleKey,
   featureList,
   buttonTextKey,
-  progressLabelKey,
+  actionDomain,
   loading,
   onScan,
 }: {
@@ -38,12 +39,17 @@ export function PipelineTaskEmptyState({
   subtitleKey: string;
   featureList: EmptyStateFeature[];
   buttonTextKey: string;
-  progressLabelKey: string;
+  /** 动作归属：决定按钮运行态文案（与详情页按钮同源） */
+  actionDomain: ActionRunningKey;
   loading: boolean;
   onScan: () => void;
 }) {
   const t = useT();
-  const { progress, statusMessage } = useTaskRun(taskKind, projectPath);
+  // 排队/停止都由本组件自己订阅（调用方已经传了 taskKind），无需各页再接线
+  const { progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun(
+    taskKind,
+    projectPath,
+  );
   return (
     <PageShell
       illustration={<DomainScoreRing projectPath={projectPath} dimension={dimension} />}
@@ -52,9 +58,15 @@ export function PipelineTaskEmptyState({
       featureList={featureList}
       buttonText={t(buttonTextKey)}
       onAction={onScan}
+      actionDomain={actionDomain}
       loading={loading}
+      queued={queued}
+      queuePosition={queuePosition}
+      // 依赖/技术债的执行器不在 pipeline 子进程里（走 profile-host + 主进程），
+      // 取消只能做到"立刻止损、结果不再采用"，无法杀进程。UI 语义一致即可。
+      onCancel={cancel}
+      stopping={stopping}
       progress={progress}
-      progressLabel={t(progressLabelKey)}
       progressMessage={statusMessage}
     />
   );

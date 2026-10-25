@@ -22,6 +22,7 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
   const {
     records,
     isBackingUp,
+    isStopping,
     progress,
     lastResult,
     expandedId,
@@ -30,6 +31,7 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
     deleteTarget,
     setDeleteTarget,
     handleBackup,
+    handleStopBackup,
     handleDeleteConfirm,
   } = useBackupPage(projectPath);
 
@@ -51,6 +53,9 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
             domain="backup"
             onClick={handleBackup}
             loading={isBackingUp}
+            // 同一颗按钮：备份中 hover 出「停止」，点它真的 abort（kernel 检查点收尾）
+            onCancel={isBackingUp ? handleStopBackup : undefined}
+            stopping={isStopping}
             label={t('page.backup.oneClickBackup')}
           />
         }
@@ -85,6 +90,8 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
           setShowHome(false);
           handleBackup();
         }}
+        onStopBackup={handleStopBackup}
+        isStopping={isStopping}
       />
     </DetailEntryProvider>
   );

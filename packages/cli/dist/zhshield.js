@@ -1235,8 +1235,8 @@ var init_i18next = __esm({
     defer = () => {
       let res;
       let rej;
-      const promise = new Promise((resolve25, reject) => {
-        res = resolve25;
+      const promise = new Promise((resolve26, reject) => {
+        res = resolve26;
         rej = reject;
       });
       promise.resolve = res;
@@ -3623,6 +3623,8 @@ var init_zh_Hans = __esm({
       },
       common: {
         cancel: "\u53D6\u6D88",
+        stop: "\u505C\u6B62",
+        stopping: "\u505C\u6B62\u4E2D",
         close: "\u5173\u95ED",
         confirm: "\u786E\u8BA4",
         copied: "\u5DF2\u590D\u5236",
@@ -3633,6 +3635,7 @@ var init_zh_Hans = __esm({
         loading: "\u52A0\u8F7D\u4E2D",
         no: "\u5426",
         refresh: "\u5237\u65B0",
+        refreshing: "\u5237\u65B0\u4E2D...",
         remove: "\u79FB\u9664",
         retry: "\u91CD\u8BD5",
         save: "\u4FDD\u5B58",
@@ -4369,7 +4372,7 @@ var init_zh_Hans = __esm({
                 title: "\u81EA\u52A8\u540C\u6B65"
               }
             },
-            lastBackup: "\u4E0A\u6B21\u5907\u4EFD\uFF1A{{date}}",
+            subtitle: "\u4E3A\u9879\u76EE\u914D\u7F6E\u4E0E\u5173\u952E\u6587\u4EF6\u4FDD\u7559\u53EF\u56DE\u6EDA\u5FEB\u7167\uFF0C\u652F\u6301\u672C\u5730\u4E0E GitHub \u53CC\u901A\u9053",
             title: "\u4FDD\u62A4\u91CD\u8981\u914D\u7F6E\uFF0C\u6570\u636E\u6C38\u4E0D\u4E22\u5931"
           },
           noRecords: "\u6682\u65E0\u5907\u4EFD\u8BB0\u5F55",
@@ -4392,6 +4395,7 @@ var init_zh_Hans = __esm({
             deleteFailed: "\u5220\u9664\u5931\u8D25",
             deleted: "\u5907\u4EFD\u8BB0\u5F55\u5DF2\u5220\u9664",
             failed: "\u5907\u4EFD\u6267\u884C\u5931\u8D25",
+            cancelled: "\u5DF2\u505C\u6B62\u5907\u4EFD",
             openFailed: "\u65E0\u6CD5\u6253\u5F00\u5907\u4EFD\u6587\u4EF6\u5939\uFF0C\u8DEF\u5F84\u53EF\u80FD\u5DF2\u88AB\u6E05\u7406",
             success: "\u5907\u4EFD\u6210\u529F"
           },
@@ -4540,6 +4544,7 @@ var init_zh_Hans = __esm({
         },
         evolve: {
           analyze: "\u67B6\u6784\u5206\u6790",
+          analyzing: "\u5206\u6790\u4E2D...",
           archScore: "\u67B6\u6784\u5065\u5EB7\u5EA6",
           empty: {
             feature: {
@@ -4756,7 +4761,7 @@ var init_zh_Hans = __esm({
           total: "\u68C0\u67E5\u9879",
           passedCount: "{{passed}}/{{total}} \u9879\u901A\u8FC7",
           scanNow: "\u4E00\u952E\u4F53\u68C0",
-          scanning: "\u5DE1\u68C0\u4E2D...",
+          scanning: "\u4F53\u68C0\u4E2D...",
           source: "\u5DE1\u68C0",
           attention: "\u672A\u68C0\u6D4B",
           attentionHint: "\u4EE5\u4E0B\u68C0\u67E5\u672A\u6267\u884C\u6216\u672A\u4EA7\u51FA\u7ED3\u8BBA\uFF0C\u4E0D\u8BA1\u5165\u901A\u8FC7",
@@ -4808,7 +4813,7 @@ var init_zh_Hans = __esm({
               desc: "\u68C0\u6D4B setTimeout / setInterval \u6EE5\u7528\u4E0E\u5185\u5B58\u6CC4\u6F0F",
               title: "\u5B9A\u65F6\u5668\u4F18\u5316"
             },
-            start: "\u5F00\u59CB\u6027\u80FD\u68C0\u6D4B",
+            start: "\u5F00\u59CB\u68C0\u6D4B",
             subtitle: "\u626B\u63CF\u4F4E\u6548\u6570\u7EC4\u904D\u5386\u3001\u6B63\u5219\u91CD\u590D\u7F16\u8BD1\u3001\u5197\u4F59\u5206\u914D\u7B49\u6027\u80FD\u95EE\u9898",
             title: "\u68C0\u6D4B\u8FD0\u884C\u65F6\u6027\u80FD\u53CD\u6A21\u5F0F\uFF0C\u4F18\u5316\u6267\u884C\u6548\u7387"
           },
@@ -4884,9 +4889,23 @@ var init_zh_Hans = __esm({
           stats: {
             files: "\u9700\u91CD\u6784\u6587\u4EF6",
             highPriority: "\u9AD8\u4F18\u5148\u7EA7",
-            smells: "\u4EE3\u7801\u5F02\u5473"
+            smells: "\u4EE3\u7801\u5F02\u5473",
+            smellsHint: "\u5168\u90E8\u4EE3\u7801\u5F02\u5473\u6E05\u5355\uFF08\u6309\u6587\u4EF6\u6C47\u603B\uFF09",
+            filesHint: "\u5B58\u5728\u4EE3\u7801\u5F02\u5473\u7684\u6587\u4EF6\uFF0C\u542B\u5F02\u5473\u5904\u6570\u4E0E\u53EF\u7EF4\u62A4\u6027\u8BC4\u5206",
+            highPriorityHint: "\u6587\u4EF6\u7EA7\u4F18\u5148\u7EA7\u4E3A\u300C\u7D27\u6025 / \u9AD8\u300D\u7684\u6587\u4EF6\uFF0C\u5EFA\u8BAE\u4F18\u5148\u5904\u7406"
           },
-          suggestion: "\u5EFA\u8BAE: {{suggestion}}"
+          suggestion: "\u5EFA\u8BAE: {{suggestion}}",
+          priority: {
+            critical: "\u7D27\u6025",
+            high: "\u9AD8",
+            medium: "\u4E2D",
+            low: "\u4F4E"
+          },
+          maintainability: "\u53EF\u7EF4\u62A4\u6027",
+          detail: {
+            empty: "\u8BE5\u5206\u7C7B\u4E0B\u6682\u65E0\u660E\u7EC6",
+            truncated: "\u4EC5\u663E\u793A\u524D {{shown}} \u6761\uFF0C\u5B8C\u6574\u6E05\u5355\u89C1\u4E0B\u65B9\u300C\u91CD\u6784\u95EE\u9898\uFF08\u6309\u7C7B\u578B\u5206\u7EC4\uFF09\u300D"
+          }
         },
         reports: {
           dimension: {
@@ -4918,10 +4937,11 @@ var init_zh_Hans = __esm({
                 title: "\u8D8B\u52BF\u5BF9\u6BD4"
               }
             },
-            subtitle: "\u5DF2\u751F\u6210 {{count}} \u4EFD\u62A5\u544A\uFF0C\u6700\u8FD1\u66F4\u65B0\u4E8E {{date}}",
+            subtitle: "\u5C1A\u65E0\u8BC4\u5206\u62A5\u544A \u2014\u2014 \u8DD1\u4E00\u6B21\u9879\u76EE\u4F53\u68C0\uFF0C\u8FD9\u91CC\u4F1A\u6C89\u6DC0\u6BCF\u6B21\u7684\u5065\u5EB7\u5206\u4E0E\u8D8B\u52BF",
             title: "\u591A\u7EF4\u5EA6\u5206\u6790\u62A5\u544A\uFF0C\u51B3\u7B56\u66F4\u6709\u4F9D\u636E"
           },
           generate: "\u6C47\u603B\u751F\u6210\u62A5\u544A",
+          generating: "\u751F\u6210\u4E2D...",
           grade: {
             A: "A \u7EA7",
             B: "B \u7EA7",
@@ -5117,8 +5137,8 @@ var init_zh_Hans = __esm({
           markFalsePositive: "\u6807\u8BB0\u8BEF\u62A5",
           occurrenceCount: "\u53D1\u751F {{count}} \u6B21",
           refreshing: "\u5237\u65B0\u4E2D...",
+          monitoring: "\u76D1\u63A7\u4E2D...",
           shell: {
-            buttonRunning: "\u76D1\u63A7\u8FD0\u884C\u4E2D",
             buttonStart: "\u542F\u52A8\u76D1\u63A7",
             featureAlert: {
               desc: "\u9AD8\u5371 / Critical \u4E8B\u4EF6\u89E6\u53D1\u901A\u77E5\u63D0\u9192",
@@ -5458,7 +5478,8 @@ var init_zh_Hans = __esm({
         refactor: {
           analyzing: "\u91CD\u6784\u5F02\u5473\u5206\u6790\u4E2D\u2026",
           collecting: "\u6B63\u5728\u6536\u96C6\u6E90\u7801\u6587\u4EF6\u2026",
-          done: "\u91CD\u6784\u5206\u6790\u5B8C\u6210\uFF1A{{count}} \u5904\u5F02\u5473"
+          done: "\u91CD\u6784\u5206\u6790\u5B8C\u6210\uFF1A{{count}} \u5904\u5F02\u5473",
+          baselineSuppressed: "\uFF08\u57FA\u7EBF\u8C41\u514D {{count}} \u9879\u5B58\u91CF\u5F02\u5473\uFF09"
         },
         report: {
           executionError: "\u6267\u884C\u51FA\u9519",
@@ -5600,6 +5621,7 @@ var init_zh_Hans = __esm({
         notCompleted: "\u4EFB\u52A1\u672A\u5B8C\u6210",
         notFound: "\u4EFB\u52A1\u4E0D\u5B58\u5728",
         queuedLabel: "\u6392\u961F\u4E2D\uFF08\u7B2C {{position}} \u4F4D\uFF09...",
+        queuedShort: "\u6392\u961F\u4E2D...",
         runningLabel: "{{kind}}\u4E2D... {{percent}}%{{suffix}}",
         schedulerUnavailable: "\u4EFB\u52A1\u8C03\u5EA6\u4E0D\u53EF\u7528\uFF08\u975E\u684C\u9762\u73AF\u5883\uFF09"
       },
@@ -5816,6 +5838,8 @@ var init_zh_Hant = __esm({
       },
       common: {
         cancel: "\u53D6\u6D88",
+        stop: "\u505C\u6B62",
+        stopping: "\u505C\u6B62\u4E2D",
         close: "\u95DC\u9589",
         confirm: "\u78BA\u8A8D",
         copied: "\u5DF2\u8907\u88FD",
@@ -5826,6 +5850,7 @@ var init_zh_Hant = __esm({
         loading: "\u8F09\u5165\u4E2D",
         no: "\u5426",
         refresh: "\u91CD\u65B0\u6574\u7406",
+        refreshing: "\u91CD\u65B0\u6574\u7406\u4E2D...",
         remove: "\u79FB\u9664",
         retry: "\u91CD\u8A66",
         save: "\u5132\u5B58",
@@ -6562,7 +6587,7 @@ var init_zh_Hant = __esm({
                 title: "\u81EA\u52D5\u540C\u6B65"
               }
             },
-            lastBackup: "\u4E0A\u6B21\u5099\u4EFD\uFF1A{{date}}",
+            subtitle: "\u70BA\u5C08\u6848\u8A2D\u5B9A\u8207\u95DC\u9375\u6A94\u6848\u4FDD\u7559\u53EF\u56DE\u6EFE\u5FEB\u7167\uFF0C\u652F\u63F4\u672C\u5730\u8207 GitHub \u96D9\u901A\u9053",
             title: "\u4FDD\u8B77\u91CD\u8981\u914D\u7F6E\uFF0C\u8CC7\u6599\u6C38\u4E0D\u4E1F\u5931"
           },
           noRecords: "\u66AB\u7121\u5099\u4EFD\u8A18\u9304",
@@ -6585,6 +6610,7 @@ var init_zh_Hant = __esm({
             deleteFailed: "\u522A\u9664\u5931\u6557",
             deleted: "\u5099\u4EFD\u8A18\u9304\u5DF2\u522A\u9664",
             failed: "\u5099\u4EFD\u57F7\u884C\u5931\u6557",
+            cancelled: "\u5DF2\u505C\u6B62\u5099\u4EFD",
             success: "\u5099\u4EFD\u6210\u529F",
             openFailed: "\u7121\u6CD5\u958B\u555F\u5099\u4EFD\u8CC7\u6599\u593E\uFF0C\u8DEF\u5F91\u53EF\u80FD\u5DF2\u88AB\u6E05\u7406"
           },
@@ -6733,6 +6759,7 @@ var init_zh_Hant = __esm({
         },
         evolve: {
           analyze: "\u67B6\u69CB\u5206\u6790",
+          analyzing: "\u5206\u6790\u4E2D...",
           archScore: "\u67B6\u69CB\u5065\u5EB7\u5EA6",
           empty: {
             feature: {
@@ -6944,7 +6971,7 @@ var init_zh_Hant = __esm({
           },
           passedCount: "{{passed}}/{{total}} \u9805\u901A\u904E",
           scanNow: "\u4E00\u9375\u9AD4\u6AA2",
-          scanning: "\u5DE1\u6AA2\u4E2D...",
+          scanning: "\u9AD4\u6AA2\u4E2D...",
           source: "\u5DE1\u6AA2",
           status: {
             fail: "\u5931\u6557",
@@ -7001,7 +7028,7 @@ var init_zh_Hant = __esm({
               desc: "\u6AA2\u6E2C setTimeout / setInterval \u6FEB\u7528\u8207\u8A18\u61B6\u9AD4\u6D29\u6F0F",
               title: "\u5B9A\u6642\u5668\u6700\u4F73\u5316"
             },
-            start: "\u958B\u59CB\u6548\u80FD\u6AA2\u6E2C",
+            start: "\u958B\u59CB\u6AA2\u6E2C",
             subtitle: "\u6383\u63CF\u4F4E\u6548\u9663\u5217\u904D\u6B77\u3001\u6B63\u5247\u91CD\u8907\u7DE8\u8B6F\u3001\u5197\u9918\u5206\u914D\u7B49\u6548\u80FD\u554F\u984C",
             title: "\u6AA2\u6E2C\u57F7\u884C\u6642\u6548\u80FD\u53CD\u6A21\u5F0F\uFF0C\u6700\u4F73\u5316\u57F7\u884C\u6548\u7387"
           },
@@ -7077,9 +7104,23 @@ var init_zh_Hant = __esm({
           stats: {
             files: "\u9700\u91CD\u69CB\u6A94\u6848",
             highPriority: "\u9AD8\u512A\u5148\u9806\u5E8F",
-            smells: "\u7A0B\u5F0F\u78BC\u7570\u5473"
+            smells: "\u7A0B\u5F0F\u78BC\u7570\u5473",
+            smellsHint: "\u5168\u90E8\u7A0B\u5F0F\u78BC\u7570\u5473\u6E05\u55AE\uFF08\u6309\u6A94\u6848\u5F59\u7E3D\uFF09",
+            filesHint: "\u5B58\u5728\u7A0B\u5F0F\u78BC\u7570\u5473\u7684\u6A94\u6848\uFF0C\u542B\u7570\u5473\u8655\u6578\u8207\u53EF\u7DAD\u8B77\u6027\u8A55\u5206",
+            highPriorityHint: "\u6A94\u6848\u7D1A\u512A\u5148\u7D1A\u70BA\u300C\u7DCA\u6025 / \u9AD8\u300D\u7684\u6A94\u6848\uFF0C\u5EFA\u8B70\u512A\u5148\u8655\u7406"
           },
-          suggestion: "\u5EFA\u8B70: {{suggestion}}"
+          suggestion: "\u5EFA\u8B70: {{suggestion}}",
+          priority: {
+            critical: "\u7DCA\u6025",
+            high: "\u9AD8",
+            medium: "\u4E2D",
+            low: "\u4F4E"
+          },
+          maintainability: "\u53EF\u7DAD\u8B77\u6027",
+          detail: {
+            empty: "\u8A72\u5206\u985E\u4E0B\u66AB\u7121\u660E\u7D30",
+            truncated: "\u50C5\u986F\u793A\u524D {{shown}} \u689D\uFF0C\u5B8C\u6574\u6E05\u55AE\u898B\u4E0B\u65B9\u300C\u91CD\u69CB\u554F\u984C\uFF08\u6309\u985E\u578B\u5206\u7D44\uFF09\u300D"
+          }
         },
         reports: {
           dimension: {
@@ -7111,10 +7152,11 @@ var init_zh_Hant = __esm({
                 title: "\u8DA8\u52E2\u5C0D\u6BD4"
               }
             },
-            subtitle: "\u5DF2\u751F\u6210 {{count}} \u4EFD\u5831\u544A\uFF0C\u6700\u8FD1\u66F4\u65B0\u65BC {{date}}",
+            subtitle: "\u5C1A\u7121\u8A55\u5206\u5831\u544A \u2014\u2014 \u57F7\u884C\u4E00\u6B21\u5C08\u6848\u9AD4\u6AA2\uFF0C\u9019\u88E1\u6703\u6C89\u6FB1\u6BCF\u6B21\u7684\u5065\u5EB7\u5206\u8207\u8DA8\u52E2",
             title: "\u591A\u7DAD\u5EA6\u5206\u6790\u5831\u544A\uFF0C\u6C7A\u7B56\u66F4\u6709\u4F9D\u64DA"
           },
           generate: "\u5F59\u7E3D\u751F\u6210\u5831\u544A",
+          generating: "\u7522\u751F\u4E2D...",
           grade: {
             A: "A \u7D1A",
             B: "B \u7D1A",
@@ -7232,8 +7274,8 @@ var init_zh_Hant = __esm({
           markFalsePositive: "\u6A19\u8A18\u8AA4\u5831",
           occurrenceCount: "\u767C\u751F {{count}} \u6B21",
           refreshing: "\u91CD\u65B0\u6574\u7406\u4E2D...",
+          monitoring: "\u76E3\u63A7\u4E2D...",
           shell: {
-            buttonRunning: "\u76E3\u63A7\u57F7\u884C\u4E2D",
             buttonStart: "\u555F\u52D5\u76E3\u63A7",
             featureAlert: {
               desc: "\u9AD8\u5371 / Critical \u4E8B\u4EF6\u89F8\u767C\u901A\u77E5\u63D0\u9192",
@@ -7651,7 +7693,8 @@ var init_zh_Hant = __esm({
         refactor: {
           analyzing: "\u91CD\u69CB\u7570\u5473\u5206\u6790\u4E2D\u2026",
           collecting: "\u6B63\u5728\u6536\u96C6\u539F\u59CB\u78BC\u6A94\u6848\u2026",
-          done: "\u91CD\u69CB\u5206\u6790\u5B8C\u6210\uFF1A{{count}} \u8655\u7570\u5473"
+          done: "\u91CD\u69CB\u5206\u6790\u5B8C\u6210\uFF1A{{count}} \u8655\u7570\u5473",
+          baselineSuppressed: "\uFF08\u57FA\u7DDA\u8C41\u514D {{count}} \u9805\u5B58\u91CF\u7570\u5473\uFF09"
         },
         report: {
           executionError: "\u57F7\u884C\u51FA\u932F",
@@ -7793,6 +7836,7 @@ var init_zh_Hant = __esm({
         notCompleted: "\u4EFB\u52D9\u672A\u5B8C\u6210",
         notFound: "\u4EFB\u52D9\u4E0D\u5B58\u5728",
         queuedLabel: "\u6392\u968A\u4E2D\uFF08\u7B2C {{position}} \u4F4D\uFF09...",
+        queuedShort: "\u6392\u968A\u4E2D...",
         runningLabel: "{{kind}}\u4E2D... {{percent}}%{{suffix}}",
         schedulerUnavailable: "\u4EFB\u52D9\u6392\u7A0B\u4E0D\u53EF\u7528\uFF08\u975E\u684C\u9762\u74B0\u5883\uFF09"
       },
@@ -8009,6 +8053,8 @@ var init_en = __esm({
       },
       common: {
         cancel: "Cancel",
+        stop: "Stop",
+        stopping: "Stopping",
         close: "Close",
         confirm: "Confirm",
         copied: "Copied",
@@ -8019,6 +8065,7 @@ var init_en = __esm({
         loading: "Loading\u2026",
         no: "No",
         refresh: "Refresh",
+        refreshing: "Refreshing...",
         remove: "Remove",
         retry: "Retry",
         save: "Save",
@@ -8755,7 +8802,7 @@ var init_en = __esm({
                 title: "Auto sync"
               }
             },
-            lastBackup: "Last backup: {{date}}",
+            subtitle: "Keeps rollback-ready snapshots of project config and key files, on local and GitHub channels",
             title: "Protect important config; your data never gets lost"
           },
           noRecords: "No backup records yet",
@@ -8778,6 +8825,7 @@ var init_en = __esm({
             deleteFailed: "Delete failed",
             deleted: "Backup record deleted",
             failed: "Backup execution failed",
+            cancelled: "Backup stopped",
             openFailed: "Could not open the backup folder. It may have been cleaned up.",
             success: "Backup succeeded"
           },
@@ -8926,6 +8974,7 @@ var init_en = __esm({
         },
         evolve: {
           analyze: "Architecture analysis",
+          analyzing: "Analyzing...",
           archScore: "Architecture health",
           empty: {
             feature: {
@@ -9194,7 +9243,7 @@ var init_en = __esm({
               desc: "Detects setTimeout / setInterval misuse and memory leaks",
               title: "Timer optimization"
             },
-            start: "Start performance detection",
+            start: "Start check",
             subtitle: "Scans for inefficient array traversal, repeated regex compilation, redundant allocations, and other performance issues",
             title: "Detect runtime performance anti-patterns, optimize execution efficiency"
           },
@@ -9270,9 +9319,23 @@ var init_en = __esm({
           stats: {
             files: "Files to refactor",
             highPriority: "High priority",
-            smells: "Code smells"
+            smells: "Code smells",
+            smellsHint: "Full list of code smells, grouped by file",
+            filesHint: "Files with code smells, including smell count and maintainability score",
+            highPriorityHint: "Files rated Critical/High priority \u2014 handle these first"
           },
-          suggestion: "Suggestion: {{suggestion}}"
+          suggestion: "Suggestion: {{suggestion}}",
+          priority: {
+            critical: "Critical",
+            high: "High",
+            medium: "Medium",
+            low: "Low"
+          },
+          maintainability: "Maintainability ",
+          detail: {
+            empty: "No details in this category",
+            truncated: 'Showing the first {{shown}} only \u2014 see "Refactoring issues (grouped by type)" below for the full list'
+          }
         },
         reports: {
           dimension: {
@@ -9304,10 +9367,11 @@ var init_en = __esm({
                 title: "Trend comparison"
               }
             },
-            subtitle: "{{count}} reports generated, last updated {{date}}",
+            subtitle: "No score reports yet \u2014 run a project inspection and every health score and trend lands here",
             title: "Multi-dimension analysis reports, better decisions"
           },
           generate: "Summarize report",
+          generating: "Generating...",
           grade: {
             A: "Grade A",
             B: "Grade B",
@@ -9503,8 +9567,8 @@ var init_en = __esm({
           markFalsePositive: "Mark false positive",
           occurrenceCount: "Occurred {{count}} times",
           refreshing: "Refreshing...",
+          monitoring: "Monitoring...",
           shell: {
-            buttonRunning: "Monitoring active",
             buttonStart: "Start monitoring",
             featureAlert: {
               desc: "High / Critical events trigger notifications",
@@ -9844,7 +9908,8 @@ var init_en = __esm({
         refactor: {
           analyzing: "Analyzing refactor smells\u2026",
           collecting: "Collecting source files\u2026",
-          done: "Refactor analysis complete: {{count}} smells"
+          done: "Refactor analysis complete: {{count}} smells",
+          baselineSuppressed: "({{count}} legacy items suppressed by baseline)"
         },
         report: {
           executionError: "Execution error",
@@ -9986,6 +10051,7 @@ var init_en = __esm({
         notCompleted: "Task not completed",
         notFound: "Task not found",
         queuedLabel: "Queued (position {{position}})...",
+        queuedShort: "Queued...",
         runningLabel: "{{kind}} in progress... {{percent}}%{{suffix}}",
         schedulerUnavailable: "Task scheduler unavailable (non-desktop environment)"
       },
@@ -10202,6 +10268,8 @@ var init_ko = __esm({
       },
       common: {
         cancel: "\uCDE8\uC18C",
+        stop: "\uC911\uC9C0",
+        stopping: "\uC911\uC9C0 \uC911",
         close: "\uB2EB\uAE30",
         confirm: "\uD655\uC778",
         copied: "\uBCF5\uC0AC\uB428",
@@ -10212,6 +10280,7 @@ var init_ko = __esm({
         loading: "\uB85C\uB529 \uC911\u2026",
         no: "\uC544\uB2C8\uC694",
         refresh: "\uC0C8\uB85C\uACE0\uCE68",
+        refreshing: "\uC0C8\uB85C\uACE0\uCE68 \uC911...",
         remove: "\uC81C\uAC70",
         retry: "\uB2E4\uC2DC \uC2DC\uB3C4",
         save: "\uC800\uC7A5",
@@ -10948,7 +11017,7 @@ var init_ko = __esm({
                 title: "\uC790\uB3D9 \uB3D9\uAE30\uD654"
               }
             },
-            lastBackup: "\uB9C8\uC9C0\uB9C9 \uBC31\uC5C5: {{date}}",
+            subtitle: "\uD504\uB85C\uC81D\uD2B8 \uC124\uC815\uACFC \uC8FC\uC694 \uD30C\uC77C\uC758 \uB864\uBC31 \uAC00\uB2A5\uD55C \uC2A4\uB0C5\uC0F7\uC744 \uBCF4\uAD00\uD569\uB2C8\uB2E4 (\uB85C\uCEEC / GitHub \uC774\uC911 \uCC44\uB110)",
             title: "\uC911\uC694\uD55C \uC124\uC815\uC744 \uBCF4\uD638\uD574 \uB370\uC774\uD130\uB97C \uC783\uC9C0 \uB9C8\uC138\uC694"
           },
           noRecords: "\uBC31\uC5C5 \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
@@ -10971,6 +11040,7 @@ var init_ko = __esm({
             deleteFailed: "\uC0AD\uC81C \uC2E4\uD328",
             deleted: "\uBC31\uC5C5 \uAE30\uB85D\uC774 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
             failed: "\uBC31\uC5C5 \uC2E4\uD589 \uC2E4\uD328",
+            cancelled: "\uBC31\uC5C5\uC744 \uC911\uC9C0\uD588\uC2B5\uB2C8\uB2E4",
             success: "\uBC31\uC5C5 \uC131\uACF5",
             openFailed: "\uBC31\uC5C5 \uD3F4\uB354\uB97C \uC5F4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uACBD\uB85C\uAC00 \uC815\uB9AC\uB418\uC5C8\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
           },
@@ -11119,6 +11189,7 @@ var init_ko = __esm({
         },
         evolve: {
           analyze: "\uC544\uD0A4\uD14D\uCC98 \uBD84\uC11D",
+          analyzing: "\uBD84\uC11D \uC911...",
           archScore: "\uC544\uD0A4\uD14D\uCC98 \uAC74\uAC15\uB3C4",
           empty: {
             feature: {
@@ -11387,7 +11458,7 @@ var init_ko = __esm({
               desc: "setTimeout / setInterval \uB0A8\uC6A9\uACFC \uBA54\uBAA8\uB9AC \uB204\uC218 \uAC10\uC9C0",
               title: "\uD0C0\uC774\uBA38 \uCD5C\uC801\uD654"
             },
-            start: "\uC131\uB2A5 \uAC10\uC9C0 \uC2DC\uC791",
+            start: "\uAC10\uC9C0 \uC2DC\uC791",
             subtitle: "\uBE44\uD6A8\uC728\uC801\uC778 \uBC30\uC5F4 \uC21C\uD68C, \uC815\uADDC\uC2DD \uBC18\uBCF5 \uCEF4\uD30C\uC77C, \uC911\uBCF5 \uD560\uB2F9 \uB4F1 \uC131\uB2A5 \uBB38\uC81C \uC2A4\uCE94",
             title: "\uB7F0\uD0C0\uC784 \uC131\uB2A5 \uC548\uD2F0\uD328\uD134\uC744 \uAC10\uC9C0\uD574 \uC2E4\uD589 \uD6A8\uC728\uC744 \uCD5C\uC801\uD654\uD558\uC138\uC694"
           },
@@ -11463,9 +11534,23 @@ var init_ko = __esm({
           stats: {
             files: "\uB9AC\uD329\uD1A0\uB9C1 \uD544\uC694 \uD30C\uC77C",
             highPriority: "\uB192\uC740 \uC6B0\uC120\uC21C\uC704",
-            smells: "\uCF54\uB4DC \uC545\uCDE8"
+            smells: "\uCF54\uB4DC \uC545\uCDE8",
+            smellsHint: "\uC804\uCCB4 \uCF54\uB4DC \uC2A4\uBA5C \uBAA9\uB85D(\uD30C\uC77C\uBCC4)",
+            filesHint: "\uCF54\uB4DC \uC2A4\uBA5C\uC774 \uC788\uB294 \uD30C\uC77C(\uC2A4\uBA5C \uC218\uC640 \uC720\uC9C0\uBCF4\uC218\uC131 \uC810\uC218 \uD3EC\uD568)",
+            highPriorityHint: '\uD30C\uC77C \uC6B0\uC120\uC21C\uC704\uAC00 "\uAE34\uAE09/\uB192\uC74C"\uC778 \uD30C\uC77C\uC785\uB2C8\uB2E4. \uC6B0\uC120 \uCC98\uB9AC\uD558\uC138\uC694'
           },
-          suggestion: "\uC81C\uC548: {{suggestion}}"
+          suggestion: "\uC81C\uC548: {{suggestion}}",
+          priority: {
+            critical: "\uAE34\uAE09",
+            high: "\uB192\uC74C",
+            medium: "\uBCF4\uD1B5",
+            low: "\uB0AE\uC74C"
+          },
+          maintainability: "\uC720\uC9C0\uBCF4\uC218\uC131 ",
+          detail: {
+            empty: "\uC774 \uBD84\uB958\uC5D0 \uC138\uBD80 \uD56D\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+            truncated: '\uCC98\uC74C {{shown}}\uAC1C\uB9CC \uD45C\uC2DC\uB429\uB2C8\uB2E4. \uC804\uCCB4 \uBAA9\uB85D\uC740 \uC544\uB798 "\uB9AC\uD329\uD130\uB9C1 \uBB38\uC81C(\uC720\uD615\uBCC4)"\uB97C \uCC38\uACE0\uD558\uC138\uC694'
+          }
         },
         reports: {
           dimension: {
@@ -11497,10 +11582,11 @@ var init_ko = __esm({
                 title: "\uCD94\uC138 \uBE44\uAD50"
               }
             },
-            subtitle: "\uBCF4\uACE0\uC11C {{count}}\uAC74\uC774 \uC0DD\uC131\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uCD5C\uADFC \uC5C5\uB370\uC774\uD2B8: {{date}}",
+            subtitle: "\uC544\uC9C1 \uC810\uC218 \uB9AC\uD3EC\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uD504\uB85C\uC81D\uD2B8 \uAC80\uC9C4\uC744 \uC2E4\uD589\uD558\uBA74 \uB9E4\uBC88\uC758 \uAC74\uAC15 \uC810\uC218\uC640 \uCD94\uC138\uAC00 \uC5EC\uAE30\uC5D0 \uC313\uC785\uB2C8\uB2E4",
             title: "\uB2E4\uCC28\uC6D0 \uBD84\uC11D \uBCF4\uACE0\uC11C\uB85C \uB354 \uADFC\uAC70 \uC788\uB294 \uC758\uC0AC\uACB0\uC815\uC744 \uD558\uC138\uC694"
           },
           generate: "\uBCF4\uACE0\uC11C \uC9D1\uACC4",
+          generating: "\uC0DD\uC131 \uC911...",
           grade: {
             A: "A \uB4F1\uAE09",
             B: "B \uB4F1\uAE09",
@@ -11618,8 +11704,8 @@ var init_ko = __esm({
           markFalsePositive: "\uC624\uD0D0\uC73C\uB85C \uD45C\uC2DC",
           occurrenceCount: "\uBC1C\uC0DD {{count}}\uD68C",
           refreshing: "\uC0C8\uB85C\uACE0\uCE68 \uC911...",
+          monitoring: "\uBAA8\uB2C8\uD130\uB9C1 \uC911...",
           shell: {
-            buttonRunning: "\uBAA8\uB2C8\uD130\uB9C1 \uC2E4\uD589 \uC911",
             buttonStart: "\uBAA8\uB2C8\uD130\uB9C1 \uC2DC\uC791",
             featureAlert: {
               desc: "\uACE0\uC704\uD5D8 / Critical \uC774\uBCA4\uD2B8 \uBC1C\uC0DD \uC2DC \uC54C\uB9BC",
@@ -12037,7 +12123,8 @@ var init_ko = __esm({
         refactor: {
           analyzing: "\uB9AC\uD329\uD1A0\uB9C1 \uC545\uCDE8 \uBD84\uC11D \uC911\u2026",
           collecting: "\uC18C\uC2A4 \uD30C\uC77C \uC218\uC9D1 \uC911\u2026",
-          done: "\uB9AC\uD329\uD1A0\uB9C1 \uBD84\uC11D \uC644\uB8CC: \uCF54\uB4DC \uC545\uCDE8 {{count}}\uACF3"
+          done: "\uB9AC\uD329\uD1A0\uB9C1 \uBD84\uC11D \uC644\uB8CC: \uCF54\uB4DC \uC545\uCDE8 {{count}}\uACF3",
+          baselineSuppressed: "(\uBCA0\uC774\uC2A4\uB77C\uC778\uC73C\uB85C \uAE30\uC874 {{count}}\uAC74 \uC81C\uC678)"
         },
         report: {
           executionError: "\uC2E4\uD589 \uC624\uB958",
@@ -12179,6 +12266,7 @@ var init_ko = __esm({
         notCompleted: "\uC791\uC5C5\uC774 \uC644\uB8CC\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4",
         notFound: "\uC791\uC5C5\uC774 \uC874\uC7AC\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
         queuedLabel: "\uB300\uAE30 \uC911 ({{position}}\uBC88\uC9F8)...",
+        queuedShort: "\uB300\uAE30 \uC911...",
         runningLabel: "{{kind}} \uC911... {{percent}}%{{suffix}}",
         schedulerUnavailable: "\uC791\uC5C5 \uC2A4\uCF00\uC904\uB7EC\uB97C \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4 (\uB370\uC2A4\uD06C\uD1B1 \uD658\uACBD\uC774 \uC544\uB2D8)"
       },
@@ -12395,6 +12483,8 @@ var init_ja = __esm({
       },
       common: {
         cancel: "\u30AD\u30E3\u30F3\u30BB\u30EB",
+        stop: "\u505C\u6B62",
+        stopping: "\u505C\u6B62\u4E2D",
         close: "\u9589\u3058\u308B",
         confirm: "\u78BA\u8A8D",
         copied: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F",
@@ -12405,6 +12495,7 @@ var init_ja = __esm({
         loading: "\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026",
         no: "\u3044\u3044\u3048",
         refresh: "\u66F4\u65B0",
+        refreshing: "\u66F4\u65B0\u4E2D...",
         remove: "\u524A\u9664",
         retry: "\u518D\u8A66\u884C",
         save: "\u4FDD\u5B58",
@@ -13141,7 +13232,7 @@ var init_ja = __esm({
                 title: "\u81EA\u52D5\u540C\u671F"
               }
             },
-            lastBackup: "\u524D\u56DE\u306E\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7: {{date}}",
+            subtitle: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u8A2D\u5B9A\u3068\u91CD\u8981\u30D5\u30A1\u30A4\u30EB\u306E\u30ED\u30FC\u30EB\u30D0\u30C3\u30AF\u53EF\u80FD\u306A\u30B9\u30CA\u30C3\u30D7\u30B7\u30E7\u30C3\u30C8\u3092\u4FDD\u6301\uFF08\u30ED\u30FC\u30AB\u30EB / GitHub \u306E\u4E8C\u7D4C\u8DEF\uFF09",
             title: "\u91CD\u8981\u306A\u8A2D\u5B9A\u3092\u4FDD\u8B77\u3057\u3001\u30C7\u30FC\u30BF\u3092\u5931\u308F\u306A\u3044"
           },
           noRecords: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u8A18\u9332\u306F\u3042\u308A\u307E\u305B\u3093",
@@ -13164,6 +13255,7 @@ var init_ja = __esm({
             deleteFailed: "\u524A\u9664\u306B\u5931\u6557\u3057\u307E\u3057\u305F",
             deleted: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u8A18\u9332\u3092\u524A\u9664\u3057\u307E\u3057\u305F",
             failed: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u306E\u5B9F\u884C\u306B\u5931\u6557\u3057\u307E\u3057\u305F",
+            cancelled: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u3092\u505C\u6B62\u3057\u307E\u3057\u305F",
             success: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u306B\u6210\u529F\u3057\u307E\u3057\u305F",
             openFailed: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u30D5\u30A9\u30EB\u30C0\u3092\u958B\u3051\u307E\u305B\u3093\u3002\u30D1\u30B9\u304C\u524A\u9664\u3055\u308C\u305F\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059"
           },
@@ -13312,6 +13404,7 @@ var init_ja = __esm({
         },
         evolve: {
           analyze: "\u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u5206\u6790",
+          analyzing: "\u5206\u6790\u4E2D...",
           archScore: "\u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u5065\u5168\u6027",
           empty: {
             feature: {
@@ -13528,7 +13621,7 @@ var init_ja = __esm({
           total: "\u691C\u67FB\u9805\u76EE",
           passedCount: "{{passed}}/{{total}} \u9805\u76EE\u5408\u683C",
           scanNow: "\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u5DE1\u56DE",
-          scanning: "\u5DE1\u56DE\u4E2D...",
+          scanning: "\u8A3A\u65B7\u4E2D...",
           source: "\u5DE1\u56DE",
           status: {
             fail: "\u5931\u6557",
@@ -13580,7 +13673,7 @@ var init_ja = __esm({
               desc: "setTimeout / setInterval \u306E\u4E71\u7528\u3068\u30E1\u30E2\u30EA\u30EA\u30FC\u30AF\u3092\u691C\u51FA",
               title: "\u30BF\u30A4\u30DE\u30FC\u6700\u9069\u5316"
             },
-            start: "\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u691C\u51FA\u3092\u958B\u59CB",
+            start: "\u691C\u51FA\u958B\u59CB",
             subtitle: "\u975E\u52B9\u7387\u306A\u914D\u5217\u8D70\u67FB\u3001\u6B63\u898F\u8868\u73FE\u306E\u7E70\u308A\u8FD4\u3057\u30B3\u30F3\u30D1\u30A4\u30EB\u3001\u5197\u9577\u306A\u30A2\u30ED\u30B1\u30FC\u30B7\u30E7\u30F3\u306A\u3069\u306E\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u554F\u984C\u3092\u30B9\u30AD\u30E3\u30F3",
             title: "\u5B9F\u884C\u6642\u306E\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u30A2\u30F3\u30C1\u30D1\u30BF\u30FC\u30F3\u3092\u691C\u51FA\u3057\u3001\u5B9F\u884C\u52B9\u7387\u3092\u6700\u9069\u5316"
           },
@@ -13656,9 +13749,23 @@ var init_ja = __esm({
           stats: {
             files: "\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u5BFE\u8C61\u30D5\u30A1\u30A4\u30EB",
             highPriority: "\u512A\u5148\u5EA6\u9AD8",
-            smells: "\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB"
+            smells: "\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB",
+            smellsHint: "\u3059\u3079\u3066\u306E\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB\u4E00\u89A7\uFF08\u30D5\u30A1\u30A4\u30EB\u5225\uFF09",
+            filesHint: "\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB\u304C\u3042\u308B\u30D5\u30A1\u30A4\u30EB\uFF08\u30B9\u30E1\u30EB\u6570\u3068\u4FDD\u5B88\u6027\u30B9\u30B3\u30A2\u4ED8\u304D\uFF09",
+            highPriorityHint: "\u30D5\u30A1\u30A4\u30EB\u512A\u5148\u5EA6\u304C\u300C\u7DCA\u6025 / \u9AD8\u300D\u306E\u30D5\u30A1\u30A4\u30EB\u3002\u512A\u5148\u7684\u306B\u5BFE\u5FDC\u3057\u3066\u304F\u3060\u3055\u3044"
           },
-          suggestion: "\u63D0\u6848: {{suggestion}}"
+          suggestion: "\u63D0\u6848: {{suggestion}}",
+          priority: {
+            critical: "\u7DCA\u6025",
+            high: "\u9AD8",
+            medium: "\u4E2D",
+            low: "\u4F4E"
+          },
+          maintainability: "\u4FDD\u5B88\u6027 ",
+          detail: {
+            empty: "\u3053\u306E\u5206\u985E\u306B\u660E\u7D30\u306F\u3042\u308A\u307E\u305B\u3093",
+            truncated: "\u5148\u982D {{shown}} \u4EF6\u306E\u307F\u8868\u793A\u3002\u5168\u4EF6\u306F\u4E0B\u306E\u300C\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u554F\u984C\uFF08\u7A2E\u985E\u5225\uFF09\u300D\u3092\u53C2\u7167"
+          }
         },
         reports: {
           dimension: {
@@ -13690,10 +13797,11 @@ var init_ja = __esm({
                 title: "\u30C8\u30EC\u30F3\u30C9\u6BD4\u8F03"
               }
             },
-            subtitle: "{{count}} \u4EF6\u306E\u30EC\u30DD\u30FC\u30C8\u3092\u751F\u6210\u6E08\u307F\u3002\u6700\u7D42\u66F4\u65B0: {{date}}",
+            subtitle: "\u30B9\u30B3\u30A2\u30EC\u30DD\u30FC\u30C8\u306F\u307E\u3060\u3042\u308A\u307E\u305B\u3093 \u2014 \u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u691C\u67FB\u3092\u5B9F\u884C\u3059\u308B\u3068\u3001\u6BCE\u56DE\u306E\u30D8\u30EB\u30B9\u30B9\u30B3\u30A2\u3068\u63A8\u79FB\u304C\u3053\u3053\u306B\u84C4\u7A4D\u3055\u308C\u307E\u3059",
             title: "\u591A\u6B21\u5143\u5206\u6790\u30EC\u30DD\u30FC\u30C8\u3067\u3001\u610F\u601D\u6C7A\u5B9A\u306E\u6839\u62E0\u306B"
           },
           generate: "\u30EC\u30DD\u30FC\u30C8\u3092\u96C6\u7D04",
+          generating: "\u751F\u6210\u4E2D...",
           grade: {
             A: "A \u7D1A",
             B: "B \u7D1A",
@@ -13811,8 +13919,8 @@ var init_ja = __esm({
           markFalsePositive: "\u8AA4\u691C\u51FA\u3068\u3057\u3066\u30DE\u30FC\u30AF",
           occurrenceCount: "\u767A\u751F {{count}} \u56DE",
           refreshing: "\u66F4\u65B0\u4E2D...",
+          monitoring: "\u76E3\u8996\u4E2D...",
           shell: {
-            buttonRunning: "\u76E3\u8996\u5B9F\u884C\u4E2D",
             buttonStart: "\u76E3\u8996\u3092\u958B\u59CB",
             featureAlert: {
               desc: "\u9AD8\u30EA\u30B9\u30AF / Critical \u306E\u30A4\u30D9\u30F3\u30C8\u3067\u901A\u77E5\u30A2\u30E9\u30FC\u30C8\u3092\u767A\u706B",
@@ -14230,7 +14338,8 @@ var init_ja = __esm({
         refactor: {
           analyzing: "\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u30B9\u30E1\u30EB\u5206\u6790\u4E2D\u2026",
           collecting: "\u30BD\u30FC\u30B9\u30B3\u30FC\u30C9\u30D5\u30A1\u30A4\u30EB\u3092\u53CE\u96C6\u4E2D\u2026",
-          done: "\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u5206\u6790\u5B8C\u4E86: {{count}} \u7B87\u6240\u306E\u30B9\u30E1\u30EB"
+          done: "\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u5206\u6790\u5B8C\u4E86: {{count}} \u7B87\u6240\u306E\u30B9\u30E1\u30EB",
+          baselineSuppressed: "\uFF08\u30D9\u30FC\u30B9\u30E9\u30A4\u30F3\u306B\u3088\u308A\u65E2\u5B58\u306E {{count}} \u4EF6\u3092\u9664\u5916\uFF09"
         },
         report: {
           executionError: "\u5B9F\u884C\u30A8\u30E9\u30FC",
@@ -14372,6 +14481,7 @@ var init_ja = __esm({
         notCompleted: "\u30BF\u30B9\u30AF\u306F\u672A\u5B8C\u4E86\u3067\u3059",
         notFound: "\u30BF\u30B9\u30AF\u304C\u5B58\u5728\u3057\u307E\u305B\u3093",
         queuedLabel: "\u5F85\u6A5F\u4E2D\uFF08{{position}} \u756A\u76EE\uFF09...",
+        queuedShort: "\u5F85\u6A5F\u4E2D...",
         runningLabel: "{{kind}}\u4E2D... {{percent}}%{{suffix}}",
         schedulerUnavailable: "\u30BF\u30B9\u30AF\u30B9\u30B1\u30B8\u30E5\u30FC\u30E9\u304C\u5229\u7528\u3067\u304D\u307E\u305B\u3093\uFF08\u30C7\u30B9\u30AF\u30C8\u30C3\u30D7\u74B0\u5883\u4EE5\u5916\uFF09"
       },
@@ -14750,6 +14860,47 @@ var init_baseline = __esm({
   }
 });
 
+// ../shared/src/refactor-baseline-io.ts
+function isRefactorBaselineCounts(value) {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value;
+  return Object.values(record).every(
+    (rules) => typeof rules === "object" && rules !== null && Object.values(rules).every((n) => typeof n === "number")
+  );
+}
+function refactorBaselinePath(projectRoot) {
+  return refactorBaselineIo.path(projectRoot);
+}
+function loadRefactorBaseline(projectRoot) {
+  return refactorBaselineIo.load(projectRoot).then((r) => r === null ? null : r.counts);
+}
+function saveRefactorBaseline(projectRoot, counts) {
+  return refactorBaselineIo.save(projectRoot, counts);
+}
+function clearRefactorBaseline(projectRoot) {
+  return refactorBaselineIo.clear(projectRoot);
+}
+var REFACTOR_BASELINE_VERSION, refactorBaselineIo;
+var init_refactor_baseline_io = __esm({
+  "../shared/src/refactor-baseline-io.ts"() {
+    "use strict";
+    init_baseline();
+    REFACTOR_BASELINE_VERSION = 1;
+    refactorBaselineIo = createBaselineIo({
+      fileName: "refactor-baseline.json",
+      version: REFACTOR_BASELINE_VERSION,
+      payloadKey: "counts",
+      isPayload: isRefactorBaselineCounts,
+      buildRecord: (capturedAt, counts) => ({
+        version: REFACTOR_BASELINE_VERSION,
+        capturedAt,
+        counts
+      }),
+      warnTag: "refactor-baseline"
+    });
+  }
+});
+
 // ../shared/src/fs-safe.ts
 var init_fs_safe = __esm({
   "../shared/src/fs-safe.ts"() {
@@ -14769,12 +14920,12 @@ var init_text_utils = __esm({
 
 // ../shared/src/promise-timeout.ts
 function withHardTimeout(promise, ms, timeoutMessage) {
-  return new Promise((resolve25, reject) => {
+  return new Promise((resolve26, reject) => {
     const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
     promise.then(
       (value) => {
         clearTimeout(timer);
-        resolve25(value);
+        resolve26(value);
       },
       (error) => {
         clearTimeout(timer);
@@ -15107,6 +15258,7 @@ var init_src2 = __esm({
     init_events();
     init_machine_profile();
     init_baseline();
+    init_refactor_baseline_io();
     init_fs_safe();
     init_text_utils();
     init_promise_timeout();
@@ -88798,7 +88950,7 @@ var require_posix = __commonJS({
       } else if (isAbsolute9) ret.dir = "/";
       return ret;
     }
-    function resolve25(...pathSegments) {
+    function resolve26(...pathSegments) {
       let resolvedPath = "";
       let resolvedAbsolute = false;
       for (let i = pathSegments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
@@ -88830,10 +88982,10 @@ var require_posix = __commonJS({
       assertPath(to);
       if (from === to) return "";
     }
-    function relative17(from, to) {
+    function relative18(from, to) {
       assertArgs(from, to);
-      from = resolve25(from);
-      to = resolve25(to);
+      from = resolve26(from);
+      to = resolve26(to);
       if (from === to) return "";
       let fromStart = 1;
       const fromEnd = from.length;
@@ -89225,8 +89377,8 @@ var require_posix = __commonJS({
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
     exports2.parse = parse;
-    exports2.relative = relative17;
-    exports2.resolve = resolve25;
+    exports2.relative = relative18;
+    exports2.resolve = resolve26;
     exports2.toFileUrl = toFileUrl;
     exports2.toNamespacedPath = toNamespacedPath;
   }
@@ -89765,7 +89917,7 @@ var require_windows = __commonJS({
       } else ret.dir = ret.root;
       return ret;
     }
-    function resolve25(...pathSegments) {
+    function resolve26(...pathSegments) {
       let resolvedDevice = "";
       let resolvedTail = "";
       let resolvedAbsolute = false;
@@ -89863,10 +90015,10 @@ var require_windows = __commonJS({
       assertPath(to);
       if (from === to) return "";
     }
-    function relative17(from, to) {
+    function relative18(from, to) {
       assertArgs(from, to);
-      const fromOrig = resolve25(from);
-      const toOrig = resolve25(to);
+      const fromOrig = resolve26(from);
+      const toOrig = resolve26(to);
       if (fromOrig === toOrig) return "";
       from = fromOrig.toLowerCase();
       to = toOrig.toLowerCase();
@@ -89965,7 +90117,7 @@ var require_windows = __commonJS({
     function toNamespacedPath(path54) {
       if (typeof path54 !== "string") return path54;
       if (path54.length === 0) return "";
-      const resolvedPath = resolve25(path54);
+      const resolvedPath = resolve26(path54);
       if (resolvedPath.length >= 3) {
         if (resolvedPath.charCodeAt(0) === CHAR_BACKWARD_SLASH) {
           if (resolvedPath.charCodeAt(1) === CHAR_BACKWARD_SLASH) {
@@ -90298,8 +90450,8 @@ var require_windows = __commonJS({
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
     exports2.parse = parse;
-    exports2.relative = relative17;
-    exports2.resolve = resolve25;
+    exports2.relative = relative18;
+    exports2.resolve = resolve26;
     exports2.toFileUrl = toFileUrl;
     exports2.toNamespacedPath = toNamespacedPath;
   }
@@ -92280,51 +92432,51 @@ var require_uri_all = __commonJS({
         }
         return uriTokens.join("");
       }
-      function resolveComponents(base2, relative17) {
+      function resolveComponents(base2, relative18) {
         var options2 = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : {};
         var skipNormalization = arguments[3];
         var target = {};
         if (!skipNormalization) {
           base2 = parse(serialize(base2, options2), options2);
-          relative17 = parse(serialize(relative17, options2), options2);
+          relative18 = parse(serialize(relative18, options2), options2);
         }
         options2 = options2 || {};
-        if (!options2.tolerant && relative17.scheme) {
-          target.scheme = relative17.scheme;
-          target.userinfo = relative17.userinfo;
-          target.host = relative17.host;
-          target.port = relative17.port;
-          target.path = removeDotSegments(relative17.path || "");
-          target.query = relative17.query;
+        if (!options2.tolerant && relative18.scheme) {
+          target.scheme = relative18.scheme;
+          target.userinfo = relative18.userinfo;
+          target.host = relative18.host;
+          target.port = relative18.port;
+          target.path = removeDotSegments(relative18.path || "");
+          target.query = relative18.query;
         } else {
-          if (relative17.userinfo !== void 0 || relative17.host !== void 0 || relative17.port !== void 0) {
-            target.userinfo = relative17.userinfo;
-            target.host = relative17.host;
-            target.port = relative17.port;
-            target.path = removeDotSegments(relative17.path || "");
-            target.query = relative17.query;
+          if (relative18.userinfo !== void 0 || relative18.host !== void 0 || relative18.port !== void 0) {
+            target.userinfo = relative18.userinfo;
+            target.host = relative18.host;
+            target.port = relative18.port;
+            target.path = removeDotSegments(relative18.path || "");
+            target.query = relative18.query;
           } else {
-            if (!relative17.path) {
+            if (!relative18.path) {
               target.path = base2.path;
-              if (relative17.query !== void 0) {
-                target.query = relative17.query;
+              if (relative18.query !== void 0) {
+                target.query = relative18.query;
               } else {
                 target.query = base2.query;
               }
             } else {
-              if (relative17.path.charAt(0) === "/") {
-                target.path = removeDotSegments(relative17.path);
+              if (relative18.path.charAt(0) === "/") {
+                target.path = removeDotSegments(relative18.path);
               } else {
                 if ((base2.userinfo !== void 0 || base2.host !== void 0 || base2.port !== void 0) && !base2.path) {
-                  target.path = "/" + relative17.path;
+                  target.path = "/" + relative18.path;
                 } else if (!base2.path) {
-                  target.path = relative17.path;
+                  target.path = relative18.path;
                 } else {
-                  target.path = base2.path.slice(0, base2.path.lastIndexOf("/") + 1) + relative17.path;
+                  target.path = base2.path.slice(0, base2.path.lastIndexOf("/") + 1) + relative18.path;
                 }
                 target.path = removeDotSegments(target.path);
               }
-              target.query = relative17.query;
+              target.query = relative18.query;
             }
             target.userinfo = base2.userinfo;
             target.host = base2.host;
@@ -92332,10 +92484,10 @@ var require_uri_all = __commonJS({
           }
           target.scheme = base2.scheme;
         }
-        target.fragment = relative17.fragment;
+        target.fragment = relative18.fragment;
         return target;
       }
-      function resolve25(baseURI, relativeURI, options2) {
+      function resolve26(baseURI, relativeURI, options2) {
         var schemelessOptions = assign({ scheme: "null" }, options2);
         return serialize(resolveComponents(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true), schemelessOptions);
       }
@@ -92600,7 +92752,7 @@ var require_uri_all = __commonJS({
       exports3.removeDotSegments = removeDotSegments;
       exports3.serialize = serialize;
       exports3.resolveComponents = resolveComponents;
-      exports3.resolve = resolve25;
+      exports3.resolve = resolve26;
       exports3.normalize = normalize;
       exports3.equal = equal;
       exports3.escapeComponent = escapeComponent;
@@ -92953,18 +93105,18 @@ var require_resolve = __commonJS({
     var util = require_util();
     var SchemaObject = require_schema_obj();
     var traverse = require_json_schema_traverse();
-    module2.exports = resolve25;
-    resolve25.normalizeId = normalizeId;
-    resolve25.fullPath = getFullPath;
-    resolve25.url = resolveUrl;
-    resolve25.ids = resolveIds;
-    resolve25.inlineRef = inlineRef;
-    resolve25.schema = resolveSchema;
-    function resolve25(compile, root, ref) {
+    module2.exports = resolve26;
+    resolve26.normalizeId = normalizeId;
+    resolve26.fullPath = getFullPath;
+    resolve26.url = resolveUrl;
+    resolve26.ids = resolveIds;
+    resolve26.inlineRef = inlineRef;
+    resolve26.schema = resolveSchema;
+    function resolve26(compile, root, ref) {
       var refVal = this._refs[ref];
       if (typeof refVal == "string") {
         if (this._refs[refVal]) refVal = this._refs[refVal];
-        else return resolve25.call(this, compile, root, refVal);
+        else return resolve26.call(this, compile, root, refVal);
       }
       refVal = refVal || this._schemas[ref];
       if (refVal instanceof SchemaObject) {
@@ -93169,7 +93321,7 @@ var require_resolve = __commonJS({
 var require_error_classes = __commonJS({
   "../../node_modules/.pnpm/ajv@6.15.0/node_modules/ajv/lib/compile/error_classes.js"(exports2, module2) {
     "use strict";
-    var resolve25 = require_resolve();
+    var resolve26 = require_resolve();
     module2.exports = {
       Validation: errorSubclass(ValidationError),
       MissingRef: errorSubclass(MissingRefError)
@@ -93184,8 +93336,8 @@ var require_error_classes = __commonJS({
     };
     function MissingRefError(baseId, ref, message) {
       this.message = message || MissingRefError.message(baseId, ref);
-      this.missingRef = resolve25.url(baseId, ref);
-      this.missingSchema = resolve25.normalizeId(resolve25.fullPath(this.missingRef));
+      this.missingRef = resolve26.url(baseId, ref);
+      this.missingSchema = resolve26.normalizeId(resolve26.fullPath(this.missingRef));
     }
     function errorSubclass(Subclass) {
       Subclass.prototype = Object.create(Error.prototype);
@@ -93713,7 +93865,7 @@ var require_validate = __commonJS({
 var require_compile = __commonJS({
   "../../node_modules/.pnpm/ajv@6.15.0/node_modules/ajv/lib/compile/index.js"(exports2, module2) {
     "use strict";
-    var resolve25 = require_resolve();
+    var resolve26 = require_resolve();
     var util = require_util();
     var errorClasses = require_error_classes();
     var stableStringify = require_fast_json_stable_stringify();
@@ -93775,7 +93927,7 @@ var require_compile = __commonJS({
           RULES,
           validate: validateGenerator,
           util,
-          resolve: resolve25,
+          resolve: resolve26,
           resolveRef,
           usePattern,
           useDefault,
@@ -93837,7 +93989,7 @@ var require_compile = __commonJS({
         return validate;
       }
       function resolveRef(baseId2, ref, isRoot) {
-        ref = resolve25.url(baseId2, ref);
+        ref = resolve26.url(baseId2, ref);
         var refIndex = refs[ref];
         var _refVal, refCode;
         if (refIndex !== void 0) {
@@ -93854,11 +94006,11 @@ var require_compile = __commonJS({
           }
         }
         refCode = addLocalRef(ref);
-        var v2 = resolve25.call(self2, localCompile, root, ref);
+        var v2 = resolve26.call(self2, localCompile, root, ref);
         if (v2 === void 0) {
           var localSchema = localRefs && localRefs[ref];
           if (localSchema) {
-            v2 = resolve25.inlineRef(localSchema, opts.inlineRefs) ? localSchema : compile.call(self2, localSchema, root, localRefs, baseId2);
+            v2 = resolve26.inlineRef(localSchema, opts.inlineRefs) ? localSchema : compile.call(self2, localSchema, root, localRefs, baseId2);
           }
         }
         if (v2 === void 0) {
@@ -97475,7 +97627,7 @@ var require_ajv = __commonJS({
   "../../node_modules/.pnpm/ajv@6.15.0/node_modules/ajv/lib/ajv.js"(exports2, module2) {
     "use strict";
     var compileSchema = require_compile();
-    var resolve25 = require_resolve();
+    var resolve26 = require_resolve();
     var Cache = require_cache();
     var SchemaObject = require_schema_obj();
     var stableStringify = require_fast_json_stable_stringify();
@@ -97557,7 +97709,7 @@ var require_ajv = __commonJS({
       var id = this._getId(schema);
       if (id !== void 0 && typeof id != "string")
         throw new Error("schema id must be string");
-      key = resolve25.normalizeId(key || id);
+      key = resolve26.normalizeId(key || id);
       checkUnique(this, key);
       this._schemas[key] = this._addSchema(schema, _skipValidation, _meta, true);
       return this;
@@ -97601,7 +97753,7 @@ var require_ajv = __commonJS({
       }
     }
     function _getSchemaFragment(self2, ref) {
-      var res = resolve25.schema.call(self2, { schema: {} }, ref);
+      var res = resolve26.schema.call(self2, { schema: {} }, ref);
       if (res) {
         var schema = res.schema, root = res.root, baseId = res.baseId;
         var v = compileSchema.call(self2, schema, root, void 0, baseId);
@@ -97617,7 +97769,7 @@ var require_ajv = __commonJS({
       }
     }
     function _getSchemaObj(self2, keyRef) {
-      keyRef = resolve25.normalizeId(keyRef);
+      keyRef = resolve26.normalizeId(keyRef);
       return self2._schemas[keyRef] || self2._refs[keyRef] || self2._fragments[keyRef];
     }
     function removeSchema(schemaKeyRef) {
@@ -97644,7 +97796,7 @@ var require_ajv = __commonJS({
           this._cache.del(cacheKey);
           var id = this._getId(schemaKeyRef);
           if (id) {
-            id = resolve25.normalizeId(id);
+            id = resolve26.normalizeId(id);
             delete this._schemas[id];
             delete this._refs[id];
           }
@@ -97668,13 +97820,13 @@ var require_ajv = __commonJS({
       var cached = this._cache.get(cacheKey);
       if (cached) return cached;
       shouldAddSchema = shouldAddSchema || this._opts.addUsedSchema !== false;
-      var id = resolve25.normalizeId(this._getId(schema));
+      var id = resolve26.normalizeId(this._getId(schema));
       if (id && shouldAddSchema) checkUnique(this, id);
       var willValidate = this._opts.validateSchema !== false && !skipValidation;
       var recursiveMeta;
-      if (willValidate && !(recursiveMeta = id && id == resolve25.normalizeId(schema.$schema)))
+      if (willValidate && !(recursiveMeta = id && id == resolve26.normalizeId(schema.$schema)))
         this.validateSchema(schema, true);
-      var localRefs = resolve25.ids.call(this, schema);
+      var localRefs = resolve26.ids.call(this, schema);
       var schemaObj = new SchemaObject({
         id,
         schema,
@@ -105627,9 +105779,9 @@ var require_dist3 = __commonJS({
       return callbacks.get(key) ?? [];
     }
     async function enqueue(key) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         addCallbackToKey(key, {
-          resolve: resolve25,
+          resolve: resolve26,
           reject
         });
       });
@@ -105874,7 +106026,7 @@ var require_dist3 = __commonJS({
     function runIfFn(valueOrFunction, ...arguments_) {
       return typeof valueOrFunction === "function" ? valueOrFunction(...arguments_) : valueOrFunction;
     }
-    var sleep = async (ms) => new Promise((resolve25) => setTimeout(resolve25, ms));
+    var sleep = async (ms) => new Promise((resolve26) => setTimeout(resolve26, ms));
     var nodeCacheStatsEventMap = {
       set: (stats, key) => {
         stats.increment("sets");
@@ -111480,18 +111632,18 @@ var require_p_limit = __commonJS({
           queue.dequeue()();
         }
       };
-      const run = async (fn, resolve25, ...args) => {
+      const run = async (fn, resolve26, ...args) => {
         activeCount++;
         const result = (async () => fn(...args))();
-        resolve25(result);
+        resolve26(result);
         try {
           await result;
         } catch {
         }
         next();
       };
-      const enqueue = (fn, resolve25, ...args) => {
-        queue.enqueue(run.bind(null, fn, resolve25, ...args));
+      const enqueue = (fn, resolve26, ...args) => {
+        queue.enqueue(run.bind(null, fn, resolve26, ...args));
         (async () => {
           await Promise.resolve();
           if (activeCount < concurrency && queue.size > 0) {
@@ -111499,8 +111651,8 @@ var require_p_limit = __commonJS({
           }
         })();
       };
-      const generator = (fn, ...args) => new Promise((resolve25) => {
-        enqueue(fn, resolve25, ...args);
+      const generator = (fn, ...args) => new Promise((resolve26) => {
+        enqueue(fn, resolve26, ...args);
       });
       Object.defineProperties(generator, {
         activeCount: {
@@ -117013,15 +117165,15 @@ function createPromise() {
   if (Promise.withResolvers) {
     return Promise.withResolvers();
   }
-  let resolve25, reject;
+  let resolve26, reject;
   const promise = new Promise((res, rej) => {
-    resolve25 = res;
+    resolve26 = res;
     reject = rej;
   });
-  if (resolve25 === void 0 || reject === void 0) {
+  if (resolve26 === void 0 || reject === void 0) {
     throw new Error("Promise executor did not initialize resolve or reject.");
   }
-  return { promise, resolve: resolve25, reject };
+  return { promise, resolve: resolve26, reject };
 }
 var MAX_TASK_TIMEOUT, MAX_TASK_DELAY, MAX_CONCURRENCY, RetryTask, Retrier;
 var init_retrier = __esm({
@@ -117078,12 +117230,12 @@ var init_retrier = __esm({
        * @param {Function} reject The reject function for the promise.
        * @param {AbortSignal|undefined} signal The AbortSignal to monitor for cancellation.
        */
-      constructor(fn, error, resolve25, reject, signal) {
+      constructor(fn, error, resolve26, reject, signal) {
         this.fn = fn;
         this.error = error;
         this.timestamp = Date.now();
         this.lastAttempt = Date.now();
-        this.resolve = resolve25;
+        this.resolve = resolve26;
         this.reject = reject;
         this.signal = signal;
       }
@@ -117186,7 +117338,7 @@ var init_retrier = __esm({
        * @returns {Promise<any>} A promise that resolves when the function is
        * called successfully.
        */
-      #call(fn, { signal, promise, resolve: resolve25, reject }) {
+      #call(fn, { signal, promise, resolve: resolve26, reject }) {
         let result;
         try {
           result = fn();
@@ -117206,13 +117358,13 @@ var init_retrier = __esm({
         });
         Promise.resolve(result).then((value) => {
           debug("Function called successfully without retry.");
-          resolve25(value);
+          resolve26(value);
         }).catch((error) => {
           if (!this.#check(error)) {
             reject(error);
             return;
           }
-          const task = new RetryTask(fn, error, resolve25, reject, signal);
+          const task = new RetryTask(fn, error, resolve26, reject, signal);
           debug(`Function failed, queuing for retry with task ${task.id}.`);
           this.#retrying.push(task);
           signal?.addEventListener("abort", () => {
@@ -117234,8 +117386,8 @@ var init_retrier = __esm({
        */
       retry(fn, { signal } = {}) {
         signal?.throwIfAborted();
-        const { promise, resolve: resolve25, reject } = createPromise();
-        this.#pending.push(() => this.#call(fn, { signal, promise, resolve: resolve25, reject }));
+        const { promise, resolve: resolve26, reject } = createPromise();
+        this.#pending.push(() => this.#call(fn, { signal, promise, resolve: resolve26, reject }));
         this.#processPending();
         return promise;
       }
@@ -118487,15 +118639,15 @@ var require_retrier = __commonJS({
       if (Promise.withResolvers) {
         return Promise.withResolvers();
       }
-      let resolve25, reject;
+      let resolve26, reject;
       const promise = new Promise((res, rej) => {
-        resolve25 = res;
+        resolve26 = res;
         reject = rej;
       });
-      if (resolve25 === void 0 || reject === void 0) {
+      if (resolve26 === void 0 || reject === void 0) {
         throw new Error("Promise executor did not initialize resolve or reject.");
       }
-      return { promise, resolve: resolve25, reject };
+      return { promise, resolve: resolve26, reject };
     }
     var RetryTask2 = class {
       /**
@@ -118546,12 +118698,12 @@ var require_retrier = __commonJS({
        * @param {Function} reject The reject function for the promise.
        * @param {AbortSignal|undefined} signal The AbortSignal to monitor for cancellation.
        */
-      constructor(fn, error, resolve25, reject, signal) {
+      constructor(fn, error, resolve26, reject, signal) {
         this.fn = fn;
         this.error = error;
         this.timestamp = Date.now();
         this.lastAttempt = Date.now();
-        this.resolve = resolve25;
+        this.resolve = resolve26;
         this.reject = reject;
         this.signal = signal;
       }
@@ -118654,7 +118806,7 @@ var require_retrier = __commonJS({
        * @returns {Promise<any>} A promise that resolves when the function is
        * called successfully.
        */
-      #call(fn, { signal, promise, resolve: resolve25, reject }) {
+      #call(fn, { signal, promise, resolve: resolve26, reject }) {
         let result;
         try {
           result = fn();
@@ -118674,13 +118826,13 @@ var require_retrier = __commonJS({
         });
         Promise.resolve(result).then((value) => {
           debug2("Function called successfully without retry.");
-          resolve25(value);
+          resolve26(value);
         }).catch((error) => {
           if (!this.#check(error)) {
             reject(error);
             return;
           }
-          const task = new RetryTask2(fn, error, resolve25, reject, signal);
+          const task = new RetryTask2(fn, error, resolve26, reject, signal);
           debug2(`Function failed, queuing for retry with task ${task.id}.`);
           this.#retrying.push(task);
           signal?.addEventListener("abort", () => {
@@ -118702,8 +118854,8 @@ var require_retrier = __commonJS({
        */
       retry(fn, { signal } = {}) {
         signal?.throwIfAborted();
-        const { promise, resolve: resolve25, reject } = createPromise2();
-        this.#pending.push(() => this.#call(fn, { signal, promise, resolve: resolve25, reject }));
+        const { promise, resolve: resolve26, reject } = createPromise2();
+        this.#pending.push(() => this.#call(fn, { signal, promise, resolve: resolve26, reject }));
         this.#processPending();
         return promise;
       }
@@ -118795,10 +118947,10 @@ var require_relative_module_resolver = __commonJS({
     "use strict";
     var Module = require("node:module");
     var createRequire4 = Module.createRequire;
-    function resolve25(moduleName, relativeToPath) {
+    function resolve26(moduleName, relativeToPath) {
       return createRequire4(relativeToPath).resolve(moduleName);
     }
-    exports2.resolve = resolve25;
+    exports2.resolve = resolve26;
   }
 });
 
@@ -118844,7 +118996,7 @@ var require_eslint = __commonJS({
       getNamespaceFromTerm,
       normalizePackageName: normalizePackageName2
     } = require_naming();
-    var { resolve: resolve25 } = require_relative_module_resolver();
+    var { resolve: resolve26 } = require_relative_module_resolver();
     var hrtimeBigint = process.hrtime.bigint;
     var debug2 = createDebug("eslint:eslint");
     var privateMembers = /* @__PURE__ */ new WeakMap();
@@ -119597,7 +119749,7 @@ var require_eslint = __commonJS({
               normalizedFormatName,
               "eslint-formatter"
             );
-            formatterPath = resolve25(npmFormat, getPlaceholderPath(cwd));
+            formatterPath = resolve26(npmFormat, getPlaceholderPath(cwd));
           } catch {
             formatterPath = path54.resolve(
               __dirname,
@@ -120124,7 +120276,7 @@ var require_rule_tester = __commonJS({
       }
       checkDuplicateTestCase(item, seenTestCases);
     }
-    function getInvocationLocation(relative17 = getInvocationLocation) {
+    function getInvocationLocation(relative18 = getInvocationLocation) {
       const dummyObject = {};
       let location;
       const { prepareStackTrace } = Error;
@@ -120135,7 +120287,7 @@ var require_rule_tester = __commonJS({
           sourceColumn: callSite.getColumnNumber() ?? 1
         };
       };
-      Error.captureStackTrace(dummyObject, relative17);
+      Error.captureStackTrace(dummyObject, relative18);
       void dummyObject.stack;
       Error.prepareStackTrace = prepareStackTrace;
       return location;
@@ -123671,7 +123823,7 @@ var require_util2 = __commonJS({
     exports2.isAbsolute = function(aPath) {
       return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
     };
-    function relative17(aRoot, aPath) {
+    function relative18(aRoot, aPath) {
       if (aRoot === "") {
         aRoot = ".";
       }
@@ -123690,7 +123842,7 @@ var require_util2 = __commonJS({
       }
       return Array(level + 1).join("../") + aPath.substr(aRoot.length + 1);
     }
-    exports2.relative = relative17;
+    exports2.relative = relative18;
     var supportsNullProto = (function() {
       var obj = /* @__PURE__ */ Object.create(null);
       return !("__proto__" in obj);
@@ -133667,7 +133819,7 @@ ${lanes.join("\n")}
                 dirName,
                 (fileName) => {
                   var _a;
-                  if (isIgnoredPath(fileName, options2)) return;
+                  if (isIgnoredPath2(fileName, options2)) return;
                   if (options2 == null ? void 0 : options2.synchronousWatchDirectory) {
                     if (!((_a = cache.get(dirPath)) == null ? void 0 : _a.targetWatcher)) invokeCallbacks(dirName, dirPath, fileName);
                     updateChildWatches(dirName, dirPath, options2);
@@ -133832,7 +133984,7 @@ ${lanes.join("\n")}
                 /* Directory */
               ) ? mapDefined(getAccessibleSortedChildDirectories(parentDir), (child) => {
                 const childFullName = getNormalizedAbsolutePath(child, parentDir);
-                return !isIgnoredPath(childFullName, options2) && filePathComparer(childFullName, normalizePath2(realpath(childFullName))) === 0 ? childFullName : void 0;
+                return !isIgnoredPath2(childFullName, options2) && filePathComparer(childFullName, normalizePath2(realpath(childFullName))) === 0 ? childFullName : void 0;
               }) : emptyArray,
               parentWatcher.childWatches,
               (child, childWatcher) => filePathComparer(child, childWatcher.dirName),
@@ -133865,7 +134017,7 @@ ${lanes.join("\n")}
             (newChildWatches || (newChildWatches = [])).push(childWatcher);
           }
         }
-        function isIgnoredPath(path54, options2) {
+        function isIgnoredPath2(path54, options2) {
           return some(ignoredPaths, (searchPath) => isInPath(path54, searchPath)) || isIgnoredByWatchOptions(path54, options2, useCaseSensitiveFileNames2, getCurrentDirectory);
         }
         function isInPath(path54, searchPath) {
@@ -135110,11 +135262,11 @@ ${lanes.join("\n")}
           return toComponents;
         }
         const components = toComponents.slice(start);
-        const relative17 = [];
+        const relative18 = [];
         for (; start < fromComponents.length; start++) {
-          relative17.push("..");
+          relative18.push("..");
         }
-        return ["", ...relative17, ...components];
+        return ["", ...relative18, ...components];
       }
       function getRelativePathFromDirectory(fromDirectory, to, getCanonicalFileNameOrIgnoreCase) {
         Debug.assert(getRootLength(fromDirectory) > 0 === getRootLength(to) > 0, "Paths must either both be absolute or both be relative");
@@ -179593,9 +179745,9 @@ ${lanes.join("\n")}
               if (!startsWithDirectory(target, realPathDirectory, getCanonicalFileName)) {
                 return;
               }
-              const relative17 = getRelativePathFromDirectory(realPathDirectory, target, getCanonicalFileName);
+              const relative18 = getRelativePathFromDirectory(realPathDirectory, target, getCanonicalFileName);
               for (const symlinkDirectory of symlinkDirectories) {
-                const option = resolvePath(symlinkDirectory, relative17);
+                const option = resolvePath(symlinkDirectory, relative18);
                 const result2 = cb(option, target === referenceRedirect);
                 shouldFilterIgnoredPaths = true;
                 if (result2) return result2;
@@ -249432,7 +249584,7 @@ ${lanes.join("\n")}
           }
         }
         function createImportCallExpressionAMD(arg, containsLexicalThis) {
-          const resolve25 = factory2.createUniqueName("resolve");
+          const resolve26 = factory2.createUniqueName("resolve");
           const reject = factory2.createUniqueName("reject");
           const parameters = [
             factory2.createParameterDeclaration(
@@ -249441,7 +249593,7 @@ ${lanes.join("\n")}
               /*dotDotDotToken*/
               void 0,
               /*name*/
-              resolve25
+              resolve26
             ),
             factory2.createParameterDeclaration(
               /*modifiers*/
@@ -249458,7 +249610,7 @@ ${lanes.join("\n")}
                 factory2.createIdentifier("require"),
                 /*typeArguments*/
                 void 0,
-                [factory2.createArrayLiteralExpression([arg || factory2.createOmittedExpression()]), resolve25, reject]
+                [factory2.createArrayLiteralExpression([arg || factory2.createOmittedExpression()]), resolve26, reject]
               )
             )
           ]);
@@ -336176,8 +336328,8 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
         installPackage(options2) {
           this.packageInstallId++;
           const request = { kind: "installPackage", ...options2, id: this.packageInstallId };
-          const promise = new Promise((resolve25, reject) => {
-            (this.packageInstalledPromise ?? (this.packageInstalledPromise = /* @__PURE__ */ new Map())).set(this.packageInstallId, { resolve: resolve25, reject });
+          const promise = new Promise((resolve26, reject) => {
+            (this.packageInstalledPromise ?? (this.packageInstalledPromise = /* @__PURE__ */ new Map())).set(this.packageInstallId, { resolve: resolve26, reject });
           });
           this.installer.send(request);
           return promise;
@@ -435696,7 +435848,7 @@ var require_ScopeBase = __commonJS({
         } while (current);
       };
       #staticCloseRef = (ref) => {
-        const resolve25 = () => {
+        const resolve26 = () => {
           const name = ref.identifier.name;
           const variable = this.set.get(name);
           if (!variable) {
@@ -435714,7 +435866,7 @@ var require_ScopeBase = __commonJS({
           ref.resolved = variable;
           return true;
         };
-        if (!resolve25()) {
+        if (!resolve26()) {
           this.delegateToUpperScope(ref);
         }
       };
@@ -442697,17 +442849,17 @@ var require_describeFilePath = __commonJS({
     exports2.describeFilePath = describeFilePath;
     var node_path_1 = __importDefault(require("node:path"));
     function describeFilePath(filePath, tsconfigRootDir) {
-      const relative17 = node_path_1.default.relative(tsconfigRootDir, filePath);
-      if (relative17 && !relative17.startsWith("..") && !node_path_1.default.isAbsolute(relative17)) {
-        return `<tsconfigRootDir>/${relative17}`;
+      const relative18 = node_path_1.default.relative(tsconfigRootDir, filePath);
+      if (relative18 && !relative18.startsWith("..") && !node_path_1.default.isAbsolute(relative18)) {
+        return `<tsconfigRootDir>/${relative18}`;
       }
       if (/^[(\w+:)\\/~]/.test(filePath)) {
         return filePath;
       }
-      if (/\.\.[/\\]\.\./.test(relative17)) {
+      if (/\.\.[/\\]\.\./.test(relative18)) {
         return filePath;
       }
-      return `<tsconfigRootDir>/${relative17}`;
+      return `<tsconfigRootDir>/${relative18}`;
     }
   }
 });
@@ -446054,12 +446206,12 @@ var require_dist16 = __commonJS({
       return patterns.length > 0 ? buildCrawler(options2, patterns) : [];
     }
     async function glob(globInput, options2) {
-      const [crawler, relative17] = getCrawler(globInput, options2);
-      return crawler ? formatPaths(await crawler.withPromise(), relative17) : [];
+      const [crawler, relative18] = getCrawler(globInput, options2);
+      return crawler ? formatPaths(await crawler.withPromise(), relative18) : [];
     }
     function globSync(globInput, options2) {
-      const [crawler, relative17] = getCrawler(globInput, options2);
-      return crawler ? formatPaths(crawler.sync(), relative17) : [];
+      const [crawler, relative18] = getCrawler(globInput, options2);
+      return crawler ? formatPaths(crawler.sync(), relative18) : [];
     }
     exports2.convertPathToPattern = convertPathToPattern;
     exports2.escapePath = escapePath;
@@ -490650,13 +490802,13 @@ var require_backup = __commonJS({
     var runBackup = (backup, handler) => {
       let rate = 0;
       let useDefault = true;
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         setImmediate(function step() {
           try {
             const progress = backup.transfer(rate);
             if (!progress.remainingPages) {
               backup.close();
-              resolve25(progress);
+              resolve26(progress);
               return;
             }
             if (useDefault) {
@@ -492564,34 +492716,34 @@ var require_yauzl = __commonJS({
     exports2.LocalFileHeader = LocalFileHeader;
     exports2.RandomAccessReader = RandomAccessReader;
     function openPromise(path54, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         open(path54, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
-          resolve25(zipfile);
+          resolve26(zipfile);
         });
       });
     }
     function fromFdPromise(fd, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         fromFd(fd, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
-          resolve25(zipfile);
+          resolve26(zipfile);
         });
       });
     }
     function fromBufferPromise(buffer, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         fromBuffer(buffer, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
-          resolve25(zipfile);
+          resolve26(zipfile);
         });
       });
     }
     function fromRandomAccessReaderPromise(reader, totalSize, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         fromRandomAccessReader(reader, totalSize, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
-          resolve25(zipfile);
+          resolve26(zipfile);
         });
       });
     }
@@ -492875,15 +493027,15 @@ var require_yauzl = __commonJS({
         if (self2.autoClose) self2.close();
       }
       function onEntry(entry) {
-        let { resolve: resolve25 } = pendingResolveReject;
+        let { resolve: resolve26 } = pendingResolveReject;
         pendingResolveReject = null;
-        resolve25({ value: entry });
+        resolve26({ value: entry });
       }
       function onEnd() {
-        let { resolve: resolve25 } = pendingResolveReject;
+        let { resolve: resolve26 } = pendingResolveReject;
         pendingResolveReject = null;
         cleanup();
-        resolve25({ done: true });
+        resolve26({ done: true });
       }
       function onError2(err) {
         let { reject } = pendingResolveReject;
@@ -492896,9 +493048,9 @@ var require_yauzl = __commonJS({
           return this;
         },
         next() {
-          const promise = new Promise((resolve25, reject) => {
+          const promise = new Promise((resolve26, reject) => {
             if (pendingResolveReject != null) throw new Error("next() called before previous Promise was resolved.");
-            pendingResolveReject = { resolve: resolve25, reject };
+            pendingResolveReject = { resolve: resolve26, reject };
           });
           self2.readEntry();
           return promise;
@@ -493087,26 +493239,26 @@ var require_yauzl = __commonJS({
       });
     };
     ZipFile2.prototype.openReadStreamPromise = function(entry, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         this.openReadStream(entry, options2, function(err, readStream) {
           if (err) return reject(err);
-          resolve25(readStream);
+          resolve26(readStream);
         });
       });
     };
     ZipFile2.prototype.openReadStreamLowLevelPromise = function(fileDataStart, compressedSize, relativeStart, relativeEnd, decompress, uncompressedSize) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         this.openReadStream(fileDataStart, compressedSize, relativeStart, relativeEnd, decompress, uncompressedSize, function(err, readStream) {
           if (err) return reject(err);
-          resolve25(readStream);
+          resolve26(readStream);
         });
       });
     };
     ZipFile2.prototype.readLocalFileHeaderPromise = function(entry, options2) {
-      return new Promise((resolve25, reject) => {
+      return new Promise((resolve26, reject) => {
         this.readLocalFileHeader(entry, options2, function(err, localFileHeader) {
           if (err) return reject(err);
-          resolve25(localFileHeader);
+          resolve26(localFileHeader);
         });
       });
     };
@@ -493610,7 +493762,7 @@ var init_engine = __esm({
       async probeEventLoopDelay() {
         const histogram = (0, import_node_perf_hooks.monitorEventLoopDelay)({ resolution: 10 });
         histogram.enable();
-        await new Promise((resolve25) => setTimeout(resolve25, 200));
+        await new Promise((resolve26) => setTimeout(resolve26, 200));
         histogram.disable();
         const elapsedMs = (histogram.mean || 0) / 1e6;
         return {
@@ -497092,8 +497244,19 @@ function aggregate(evaluations, durationMs) {
 
 // ../kernel/src/runner/dispatch-check-list.ts
 async function evalCheckList(host, rule, instr, context) {
-  if (rule.domain === "security" && host.securityCheckEngine) {
+  if (rule.domain === "security") {
+    if (!host.securityCheckEngine) {
+      return skipEvaluation(rule, "SecurityCheckEngine \u672A\u6CE8\u518C\uFF0C\u65E0\u6CD5\u6267\u884C check-list", "inspect");
+    }
     return runSecurityCheck(host.securityCheckEngine, rule, instr, context);
+  }
+  if (rule.domain !== "guard") {
+    const names = instr.checks.map((c) => c.rule || "(\u672A\u547D\u540D)").join("\u3001") || "(\u65E0)";
+    return skipEvaluation(
+      rule,
+      `\u8BE5\u57DF\u65E0 check-list \u6267\u884C\u5668\uFF1A\u58F0\u660E ${instr.checks.length} \u9879\u68C0\u67E5\uFF08${names}\uFF09\u6CA1\u6709\u4EFB\u4F55\u5F15\u64CE\u5B9E\u73B0\uFF0C\u672A\u6267\u884C\u4EFB\u4F55\u68C0\u67E5`,
+      "inspect"
+    );
   }
   if (!host.guardEngine) {
     return skipEvaluation(rule, "GuardEngine \u672A\u6CE8\u518C\uFF0C\u65E0\u6CD5\u6267\u884C check-list", "guard", true);
@@ -498653,7 +498816,7 @@ var AdapterRunner = class {
   }
   /** 单适配器硬上限：与 ToolAdapterExecutor.withHardTimeout 同语义，超时即 reject 走 catch 降级 */
   withTimeout(promise, adapterId) {
-    return new Promise((resolve25, reject) => {
+    return new Promise((resolve26, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`[inspect] ${adapterId} \u626B\u63CF\u8D85\u8FC7 ${this.timeoutMs}ms \u786C\u4E0A\u9650\uFF0C\u5DF2\u8DF3\u8FC7`)),
         this.timeoutMs
@@ -498661,7 +498824,7 @@ var AdapterRunner = class {
       promise.then(
         (value) => {
           clearTimeout(timer);
-          resolve25(value);
+          resolve26(value);
         },
         (error) => {
           clearTimeout(timer);
@@ -502837,6 +503000,9 @@ var MAX_RE_EXPORT_BLOCK_LINES = 300;
 var RE_EXPORT_HEAD = /^\s*export\s+(type\s+)?(\*|\{)/;
 var RE_LOCAL_DEFINITION_HEAD = /^\s*export\s+(default\b|function\b|async\b|class\b|abstract\b|const\b|let\b|var\b|interface\b|enum\b|declare\b|type\s+[A-Za-z_$])/;
 var RE_FROM_CLAUSE = /\bfrom\s+['"]/;
+var RE_TYPE_PREFIX = /^type\s+/;
+var RE_AS_ALIAS = /\sas\s+([A-Za-z_$][\w$]*)$/;
+var RE_LINE_BREAK = /\r?\n/;
 var statementCache = /* @__PURE__ */ new Map();
 function extractExportedNames(statement) {
   const names = /* @__PURE__ */ new Set();
@@ -502846,8 +503012,8 @@ function extractExportedNames(statement) {
   for (const part of statement.slice(braceStart + 1, braceEnd).split(",")) {
     let name = part.replace(/\s+/g, " ").trim();
     if (!name) continue;
-    name = name.replace(/^type\s+/, "");
-    const alias = name.match(/\sas\s+([A-Za-z_$][\w$]*)$/);
+    name = name.replace(RE_TYPE_PREFIX, "");
+    const alias = name.match(RE_AS_ALIAS);
     names.add(alias ? alias[1] : name);
   }
   return names;
@@ -502862,7 +503028,7 @@ function collectReExportStatements(absPath) {
     statementCache.set(absPath, null);
     return null;
   }
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(RE_LINE_BREAK);
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const head = lines[i];
@@ -502961,44 +503127,52 @@ function collectInlineRefCandidates(dir2, out, limit) {
   }
   return true;
 }
-function filterInlineImportTypeRefs(entries, projectRoot) {
-  if (entries.length === 0) return { kept: [], dropped: [], degraded: false };
+function toAbsolute(file, projectRoot) {
+  return path33.isAbsolute(file) ? file : path33.resolve(projectRoot, file);
+}
+function collectTargetSymbols(entries, projectRoot) {
   const targets = /* @__PURE__ */ new Map();
   for (const entry of entries) {
-    const abs = path33.isAbsolute(entry.file) ? entry.file : path33.resolve(projectRoot, entry.file);
+    const abs = toAbsolute(entry.file, projectRoot);
     const set = targets.get(abs);
     if (set) set.add(entry.symbol);
     else targets.set(abs, /* @__PURE__ */ new Set([entry.symbol]));
   }
+  return targets;
+}
+function collectInlineRefsFromFile(file, targets, referenced) {
+  let text;
+  try {
+    if (fs28.statSync(file).size > INLINE_REF_MAX_BYTES) return;
+    text = fs28.readFileSync(file, "utf8");
+  } catch {
+    return;
+  }
+  const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, "g");
+  for (const match of text.matchAll(re)) {
+    const specifier = match[1];
+    const symbol = match[2];
+    if (!specifier || !symbol) continue;
+    const target = resolveRelativeModuleFile(file, specifier);
+    if (target === null) continue;
+    const symbols = targets.get(target);
+    if (!symbols || !symbols.has(symbol)) continue;
+    referenced.add(`${target}\0${symbol}`);
+  }
+}
+function filterInlineImportTypeRefs(entries, projectRoot) {
+  if (entries.length === 0) return { kept: [], dropped: [], degraded: false };
+  const targets = collectTargetSymbols(entries, projectRoot);
   const files = [];
   if (!collectInlineRefCandidates(projectRoot, files, INLINE_REF_MAX_FILES)) {
     return { kept: [...entries], dropped: [], degraded: true };
   }
   const referenced = /* @__PURE__ */ new Set();
-  for (const file of files) {
-    let text;
-    try {
-      if (fs28.statSync(file).size > INLINE_REF_MAX_BYTES) continue;
-      text = fs28.readFileSync(file, "utf8");
-    } catch {
-      continue;
-    }
-    const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, "g");
-    for (const match of text.matchAll(re)) {
-      const specifier = match[1];
-      const symbol = match[2];
-      if (!specifier || !symbol) continue;
-      const target = resolveRelativeModuleFile(file, specifier);
-      if (target === null) continue;
-      const symbols = targets.get(target);
-      if (!symbols || !symbols.has(symbol)) continue;
-      referenced.add(`${target}\0${symbol}`);
-    }
-  }
+  for (const file of files) collectInlineRefsFromFile(file, targets, referenced);
   const kept = [];
   const dropped = [];
   for (const entry of entries) {
-    const abs = path33.isAbsolute(entry.file) ? entry.file : path33.resolve(projectRoot, entry.file);
+    const abs = toAbsolute(entry.file, projectRoot);
     (referenced.has(`${abs}\0${entry.symbol}`) ? dropped : kept).push(entry);
   }
   return { kept, dropped, degraded: false };
@@ -504266,9 +504440,23 @@ function resolveAuditCommand(projectPath) {
   const command = AUDIT_COMMANDS.find((c) => fs35.existsSync(path41.join(resolved, c.lockfile)));
   return { command, projectPath: resolved };
 }
+var SEVERITY_KEYS = ["info", "low", "moderate", "high", "critical"];
+function countAdvisories(advisories) {
+  const counts = {};
+  for (const advisory of Object.values(advisories)) {
+    const key = (advisory?.severity || "").toLowerCase();
+    if (!SEVERITY_KEYS.includes(key)) continue;
+    const typed = key;
+    counts[typed] = (counts[typed] ?? 0) + 1;
+  }
+  return counts;
+}
 function parseAuditVulnerabilities(raw) {
   try {
     const parsed = JSON.parse(raw);
+    if (parsed.advisories && typeof parsed.advisories === "object") {
+      return countAdvisories(parsed.advisories);
+    }
     const v = parsed.metadata?.vulnerabilities;
     if (!v || typeof v !== "object") return null;
     return v;
@@ -505558,6 +505746,19 @@ function getDuplicateBlocks(allFiles, minLines) {
   }
   return _dupCache;
 }
+var PACKAGE_PATH_RE = /packages\/([^/]+)\//;
+function packageNameOf(filePath) {
+  const m = filePath.match(PACKAGE_PATH_RE);
+  return m ? m[1] : null;
+}
+function landingAdvice(myFile, otherFile) {
+  const mine = packageNameOf(myFile);
+  const other = packageNameOf(otherFile);
+  if (mine && other && mine !== other) {
+    return `\u4E24\u6587\u4EF6\u5206\u5C5E @zh/${mine} \u4E0E @zh/${other}\uFF0C\u4E0D\u53EF\u76F4\u63A5\u4E92\u5F15\uFF1A\u843D\u70B9\u4E0A\u63D0\u81F3 @zh/shared / @zh/kernel\uFF08\u6216\u4F9D\u8D56\u65B9\u5411\u4E0A\u7684\u4E0B\u6E38\u5305\uFF09`;
+  }
+  return `\u843D\u70B9\u9009\u5728 ${mine ? `@zh/${mine}` : "\u6240\u5728\u5305"} \u7684\u516C\u5171\u6A21\u5757\uFF0C\u907F\u514D\u7B2C\u4E09\u5904\u590D\u5236`;
+}
 function buildDuplicateSmell(parsed, dup, config, minLines) {
   const isFirst = dup.files[0] === parsed.filePath;
   const otherFile = isFirst ? dup.files[1] : dup.files[0];
@@ -505577,7 +505778,7 @@ function buildDuplicateSmell(parsed, dup, config, minLines) {
     threshold: minLines,
     suggestion: {
       type: "Extract Common Function",
-      description: `\u5C06\u91CD\u590D\u4EE3\u7801\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570\uFF0C\u901A\u8FC7\u53C2\u6570\u5316\u5DEE\u5F02\u70B9\u7EDF\u4E00\u8C03\u7528`,
+      description: `\u5C06\u91CD\u590D\u4EE3\u7801\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570\uFF0C\u901A\u8FC7\u53C2\u6570\u5316\u5DEE\u5F02\u70B9\u7EDF\u4E00\u8C03\u7528\u3002${landingAdvice(parsed.filePath, otherFile)}`,
       priority: "medium",
       effort: "medium",
       autoFixable: false
@@ -506644,7 +506845,11 @@ var DEFAULT_CONFIG = {
     "lazy-class",
     "switch-statement",
     "oversized-file",
-    "mixed-responsibilities",
+    // 'mixed-responsibilities' 默认下线（2026-10-25）：其"职责数" = 注释分区数 + 空行块数
+    // + try 个数（structure-detectors.ts countResponsibilities），纯字面量代理，与职责无关。
+    // 实测对自家代码库 32 处命中 0 处可用（22 行的 hook 被判 4 个职责），精确率 0%。
+    // 误报回归集与真阳性样本见 __tests__/mixed-responsibilities-gate.test.ts；
+    // 换语义信号重写并通过该回归集后，方可恢复默认启用。
     "duplicated-code",
     "callback-hell",
     "oversized-component",
@@ -506913,6 +507118,26 @@ function pathJoin(...parts) {
   return parts.join("/").replace(/\/+/g, "/");
 }
 
+// ../refactor/src/report-math.ts
+function calculateMaintainability(smells) {
+  if (smells.length === 0) return 100;
+  const weights = { error: 15, warning: 8, info: 3 };
+  const totalWeight = smells.reduce((sum, s) => {
+    const w = weights[s.severity] || 3;
+    return sum + w;
+  }, 0);
+  const score = 100 - totalWeight;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function calculatePriority(smells) {
+  const errorCount = smells.filter((s) => s.severity === "error").length;
+  const warningCount = smells.filter((s) => s.severity === "warning").length;
+  if (errorCount >= 3) return "critical";
+  if (errorCount >= 1 || warningCount >= 5) return "high";
+  if (warningCount >= 2) return "medium";
+  return "low";
+}
+
 // ../refactor/src/engine.ts
 var TS_FILE_PATTERN = /\.tsx?$/;
 var EXCLUDED_DIRS3 = /* @__PURE__ */ new Set([
@@ -506932,7 +507157,7 @@ var EXCLUDED_DIRS3 = /* @__PURE__ */ new Set([
   "e2e"
 ]);
 function yieldToEventLoop() {
-  return new Promise((resolve25) => setImmediate(resolve25));
+  return new Promise((resolve26) => setImmediate(resolve26));
 }
 function warn(msg) {
   if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
@@ -507026,8 +507251,8 @@ var RefactorEngine = class {
   processFileReport(parsed, parsedFiles, state) {
     const fileSmells = this.detectAllSmells(parsed, parsedFiles);
     if (fileSmells.length === 0) return;
-    const maintainabilityScore = this.calculateMaintainability(fileSmells);
-    const priority = this.calculatePriority(fileSmells);
+    const maintainabilityScore = calculateMaintainability(fileSmells);
+    const priority = calculatePriority(fileSmells);
     state.fileReports.push({
       filePath: parsed.filePath,
       totalSmells: fileSmells.length,
@@ -507068,24 +507293,6 @@ var RefactorEngine = class {
       }
     }
     return allSmells;
-  }
-  calculateMaintainability(smells) {
-    if (smells.length === 0) return 100;
-    const weights = { error: 15, warning: 8, info: 3 };
-    const totalWeight = smells.reduce((sum, s) => {
-      const w = weights[s.severity] || 3;
-      return sum + w;
-    }, 0);
-    const score = 100 - totalWeight;
-    return Math.max(0, Math.min(100, Math.round(score)));
-  }
-  calculatePriority(smells) {
-    const errorCount = smells.filter((s) => s.severity === "error").length;
-    const warningCount = smells.filter((s) => s.severity === "warning").length;
-    if (errorCount >= 3) return "critical";
-    if (errorCount >= 1 || warningCount >= 5) return "high";
-    if (warningCount >= 2) return "medium";
-    return "low";
   }
   /** 为指定代码异味生成自动修复建议 */
   async generateFixes(projectRoot, smells) {
@@ -507136,6 +507343,105 @@ var RefactorEngine = class {
     return TS_FILE_PATTERN.test(name) && !name.endsWith(".d.ts");
   }
 };
+
+// ../refactor/src/baseline.ts
+var import_node_path7 = require("node:path");
+function countSmellsByFileAndRule(report, projectRoot) {
+  const entries = {};
+  for (const fr of report.files) {
+    const abs = fr.filePath;
+    let rel = (0, import_node_path7.relative)(projectRoot, abs);
+    rel = rel.replace(/\\/g, "/");
+    if (!entries[rel]) {
+      entries[rel] = {};
+    }
+    for (const s of fr.smells) {
+      const rid = s.ruleId;
+      const map = entries[rel];
+      map[rid] = (map[rid] || 0) + 1;
+    }
+  }
+  return entries;
+}
+function diffBaseline(current, baseline) {
+  const introduced = [];
+  const resolved = [];
+  const allFiles = /* @__PURE__ */ new Set([...Object.keys(current), ...Object.keys(baseline)]);
+  const filesSorted = [...allFiles];
+  filesSorted.sort();
+  for (const file of filesSorted) {
+    const cRules = current[file] || {};
+    const bRules = baseline[file] || {};
+    const allRules = /* @__PURE__ */ new Set([...Object.keys(cRules), ...Object.keys(bRules)]);
+    const rulesSorted = [...allRules];
+    rulesSorted.sort();
+    for (const rule of rulesSorted) {
+      const c = cRules[rule] ?? 0;
+      const b = bRules[rule] ?? 0;
+      if (c > b) {
+        introduced.push({ file, rule, current: c, baseline: b });
+      }
+      if (c < b) {
+        resolved.push({ file, rule, current: c, baseline: b });
+      }
+    }
+  }
+  return { introduced, resolved };
+}
+function applyRefactorBaseline(report, baselineCounts, projectRoot) {
+  const current = countSmellsByFileAndRule(report, projectRoot);
+  const { introduced, resolved } = diffBaseline(current, baselineCounts);
+  let suppressedCount = 0;
+  const files = [];
+  const byCategory = {};
+  const bySeverity = { error: 0, warning: 0, info: 0 };
+  const suggestionsByType = {};
+  let totalSmells = 0;
+  for (const fr of report.files) {
+    const rel = (0, import_node_path7.relative)(projectRoot, fr.filePath).replace(/\\/g, "/");
+    const allowedByRule = baselineCounts[rel] ?? {};
+    const usedByRule = {};
+    const kept = [];
+    for (const s of fr.smells) {
+      const allowed = allowedByRule[s.ruleId] ?? 0;
+      const used = usedByRule[s.ruleId] ?? 0;
+      if (used < allowed) {
+        usedByRule[s.ruleId] = used + 1;
+        suppressedCount++;
+        continue;
+      }
+      kept.push(s);
+    }
+    if (kept.length === 0) continue;
+    totalSmells += kept.length;
+    files.push({
+      ...fr,
+      totalSmells: kept.length,
+      smells: kept,
+      maintainabilityScore: calculateMaintainability(kept),
+      refactorPriority: calculatePriority(kept)
+    });
+    for (const s of kept) {
+      byCategory[s.category] = (byCategory[s.category] || 0) + 1;
+      bySeverity[s.severity]++;
+      const type = s.suggestion.type;
+      suggestionsByType[type] = (suggestionsByType[type] || 0) + 1;
+    }
+  }
+  const criticalFiles = files.filter((f) => f.refactorPriority === "critical").length;
+  const needsImmediateAction = files.filter(
+    (f) => f.refactorPriority === "critical" || f.refactorPriority === "high"
+  ).length;
+  const filteredReport = {
+    ...report,
+    totalSmells,
+    byCategory,
+    bySeverity,
+    files,
+    summary: { criticalFiles, needsImmediateAction, suggestionsByType }
+  };
+  return { report: filteredReport, suppressedCount, introduced, resolved };
+}
 
 // ../security/src/vulnerability-scanner.ts
 var import_node_child_process8 = require("node:child_process");
@@ -508326,7 +508632,88 @@ var NAME_EXEMPT_SET = /* @__PURE__ */ new Set(["typescript", "vite", "rollup", "
 
 // ../sentinel/src/event-center.ts
 var import_crypto2 = require("crypto");
+
+// ../sentinel/src/event-list.ts
 var LIST_EVENTS_LIMIT = 500;
+function rowToEvent(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    timestamp: new Date(row.timestamp),
+    dedupeKey: row.dedupe_key,
+    title: row.title,
+    service: row.service,
+    module: row.module,
+    severity: row.severity,
+    status: row.status,
+    validation: typeof row.validation === "string" ? JSON.parse(row.validation) : row.validation,
+    context: typeof row.context === "string" ? JSON.parse(row.context) : row.context,
+    history: typeof row.history === "string" ? JSON.parse(row.history) : row.history,
+    occurrenceCount: row.occurrence_count,
+    firstSeen: new Date(row.first_seen),
+    lastSeen: new Date(row.last_seen)
+  };
+}
+function listMergedEvents(db, memory, filters) {
+  const merged = /* @__PURE__ */ new Map();
+  if (db) {
+    try {
+      for (const row of listSentinelEvents(db, { limit: LIST_EVENTS_LIMIT })) {
+        merged.set(row.id, rowToEvent(row));
+      }
+    } catch (err) {
+      console.error("[EventCenter] Failed to list events from DB:", err);
+    }
+  }
+  for (const [id, event] of memory) merged.set(id, event);
+  let results = [...merged.values()];
+  if (filters?.status) results = results.filter((e) => e.status === filters.status);
+  if (filters?.severity) results = results.filter((e) => e.severity === filters.severity);
+  return results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+}
+
+// ../sentinel/src/event-persist.ts
+function persistNewEvent(db, event) {
+  if (!db) return;
+  try {
+    createSentinelEvent(db, {
+      id: event.id,
+      projectId: event.projectId,
+      timestamp: event.timestamp,
+      dedupeKey: event.dedupeKey,
+      title: event.title,
+      service: event.service,
+      module: event.module,
+      severity: event.severity,
+      status: event.status,
+      validation: JSON.stringify(event.validation),
+      context: JSON.stringify(event.context),
+      history: JSON.stringify(event.history),
+      occurrenceCount: event.occurrenceCount,
+      firstSeen: event.firstSeen,
+      lastSeen: event.lastSeen
+    });
+  } catch (err) {
+    console.error("[EventCenter] Failed to persist event:", err);
+  }
+}
+function persistEventUpdate(db, event) {
+  if (!db) return;
+  try {
+    updateSentinelEvent(db, {
+      id: event.id,
+      status: event.status,
+      validation: JSON.stringify(event.validation),
+      history: JSON.stringify(event.history),
+      occurrenceCount: event.occurrenceCount,
+      lastSeen: event.lastSeen
+    });
+  } catch (err) {
+    console.error("[EventCenter] Failed to persist update:", err);
+  }
+}
+
+// ../sentinel/src/event-center.ts
 var SEVERITY_TO_PRIORITY = /* @__PURE__ */ new Map([
   ["critical", "p1"],
   ["high", "p2"],
@@ -508368,92 +508755,107 @@ var EventCenter = class {
     const firstAlert = payload.alerts[0];
     const labels = firstAlert.labels;
     const dedupeKey = this.generateDedupeKey(firstAlert, labels);
-    if (this.isDuplicate(dedupeKey)) {
-      const existing = this.findEventByDedupeKey(dedupeKey);
-      existing.occurrenceCount += 1;
-      existing.lastSeen = /* @__PURE__ */ new Date();
-      existing.history.push({
-        timestamp: /* @__PURE__ */ new Date(),
-        action: "alert-repeat",
-        operator: "system",
-        detail: `Alert repeated (${existing.occurrenceCount} times)`
-      });
-      this.persistUpdate(existing);
-      return { event: existing, isNew: false };
-    }
-    const event = {
-      id: (0, import_crypto2.randomUUID)(),
+    const repeated = this.mergeIntoExisting(dedupeKey, "alert-repeat", "system", "Alert");
+    if (repeated) return { event: repeated, isNew: false };
+    const event = this.buildEvent({
       projectId: labels.repo || "unknown",
-      timestamp: /* @__PURE__ */ new Date(),
       dedupeKey,
       title: firstAlert.annotations.summary || labels.alertname,
       service: labels.service,
       module: labels.module,
       severity: this.mapSeverity(labels.severity),
-      status: "detected",
-      validation: { status: "pending" },
       context: { ...labels },
-      history: [
-        {
-          timestamp: /* @__PURE__ */ new Date(),
-          action: "alert-received",
-          operator: "alertmanager",
-          detail: `Alert received: ${labels.alertname}`
-        }
-      ],
-      occurrenceCount: 1,
-      firstSeen: /* @__PURE__ */ new Date(),
-      lastSeen: /* @__PURE__ */ new Date()
-    };
-    this.events.set(event.id, event);
-    this.persistEvent(event);
-    this.writeAuditLog("alert-received", event);
-    return { event, isNew: true };
+      action: "alert-received",
+      operator: "alertmanager",
+      detail: `Alert received: ${labels.alertname}`
+    });
+    return { event: this.persistCreated(event, "alert-received"), isNew: true };
   }
   createEvent(params) {
-    if (params.dedupeKey && this.isDuplicate(params.dedupeKey)) {
-      const existing = this.findEventByDedupeKey(params.dedupeKey);
-      existing.occurrenceCount += 1;
-      existing.lastSeen = /* @__PURE__ */ new Date();
-      existing.history.push({
-        timestamp: /* @__PURE__ */ new Date(),
-        action: "event-repeat",
-        operator: params.operator || "system",
-        detail: `Event repeated (${existing.occurrenceCount} times)`
-      });
-      this.persistUpdate(existing);
-      this.writeAuditLog("event-repeat", existing);
-      return existing;
+    if (params.dedupeKey) {
+      const repeated = this.mergeIntoExisting(
+        params.dedupeKey,
+        "event-repeat",
+        params.operator || "system",
+        "Event"
+      );
+      if (repeated) {
+        this.writeAuditLog("event-repeat", repeated);
+        return repeated;
+      }
     }
-    const dedupeKey = params.dedupeKey ?? `${params.projectId}|${params.title}|${Date.now()}`;
-    const event = {
-      id: (0, import_crypto2.randomUUID)(),
+    const event = this.buildEvent({
       projectId: params.projectId,
-      timestamp: /* @__PURE__ */ new Date(),
-      dedupeKey,
+      dedupeKey: params.dedupeKey ?? `${params.projectId}|${params.title}|${Date.now()}`,
       title: params.title,
       service: params.service || "",
       module: params.module || "",
       severity: params.severity || "p3",
+      context: params.context || {},
+      action: params.action || "event-created",
+      operator: params.operator || "system",
+      detail: params.detail || params.title
+    });
+    return this.persistCreated(event, "event-created");
+  }
+  /**
+   * 新建事件的公共构造：`processAlert` 与 `createEvent` 的字段**取值**不同，
+   * 但事件**结构**完全一致，原先各写一遍、改一处漏一处。这里统一收敛。
+   */
+  buildEvent(input) {
+    return {
+      id: (0, import_crypto2.randomUUID)(),
+      projectId: input.projectId,
+      timestamp: /* @__PURE__ */ new Date(),
+      dedupeKey: input.dedupeKey,
+      title: input.title,
+      service: input.service,
+      module: input.module,
+      severity: input.severity,
       status: "detected",
       validation: { status: "pending" },
-      context: params.context || {},
+      context: input.context,
       history: [
         {
           timestamp: /* @__PURE__ */ new Date(),
-          action: params.action || "event-created",
-          operator: params.operator || "system",
-          detail: params.detail || params.title
+          action: input.action,
+          operator: input.operator,
+          detail: input.detail
         }
       ],
       occurrenceCount: 1,
       firstSeen: /* @__PURE__ */ new Date(),
       lastSeen: /* @__PURE__ */ new Date()
     };
+  }
+  /** 新建路径的公共尾段：入内存 → 落库 → 写审计 */
+  persistCreated(event, auditAction) {
     this.events.set(event.id, event);
-    this.persistEvent(event);
-    this.writeAuditLog("event-created", event);
+    persistNewEvent(this.db, event);
+    this.writeAuditLog(auditAction, event);
     return event;
+  }
+  /**
+   * 合并到已有事件：命中去重窗口则 `occurrenceCount` 递增并追加一条 repeat 历史，
+   * 返回已有事件；未命中返回 null，由调用方按新建处理。
+   *
+   * `subject` 只决定历史文案前缀（Alert / Event）。审计**不在这里写**：
+   * 告警重复与内部事件重复的审计口径不同（前者收到时已写过，不重复写），
+   * 保留给调用方决定。
+   */
+  mergeIntoExisting(dedupeKey, action, operator, subject) {
+    if (!this.isDuplicate(dedupeKey)) return null;
+    const existing = this.findEventByDedupeKey(dedupeKey);
+    existing.occurrenceCount += 1;
+    existing.lastSeen = /* @__PURE__ */ new Date();
+    existing.history.push({
+      timestamp: /* @__PURE__ */ new Date(),
+      action,
+      operator,
+      detail: `${subject} repeated (${existing.occurrenceCount} times)`
+    });
+    persistEventUpdate(this.db, existing);
+    return existing;
   }
   updateStatus(eventId, status, operator = "system") {
     const event = this.events.get(eventId) || this.loadFromDb(eventId);
@@ -508467,7 +508869,7 @@ var EventCenter = class {
       detail: `Status changed from ${prev} to ${status}`
     });
     this.events.set(event.id, event);
-    this.persistUpdate(event);
+    persistEventUpdate(this.db, event);
     this.writeAuditLog("status-changed", event);
     return event;
   }
@@ -508482,7 +508884,7 @@ var EventCenter = class {
       detail: `Validation result: ${result}`
     });
     this.events.set(event.id, event);
-    this.persistUpdate(event);
+    persistEventUpdate(this.db, event);
     this.writeAuditLog("validation-updated", event);
     return event;
   }
@@ -508490,42 +508892,21 @@ var EventCenter = class {
     return this.events.get(eventId) || this.loadFromDb(eventId);
   }
   /**
-   * 事件列表：**DB 为准，内存覆盖同 id**。
+   * 事件列表：**DB 为准，内存覆盖同 id**，按时间倒序。
    *
-   * 原先只返回内存 Map 里的条目，于是进程一重启（或用「关闭窗口重新打开」），
-   * 库里落盘的几百条事件一条也读不到 ⇒ 哨兵页事件列表空 ⇒ 详情入口消失，
-   * 用户点开看到的是「从未运行过」。实测本项目库中未软删 335 条，页面显示 0。
-   *
-   * 合并规则：
-   * - DB 提供全量事实（含上次进程产生、重启后内存里没有的历史事件）；
-   * - 内存态覆盖同 id（本次进程的状态流转 / 验证结果落后于内存，不能让 DB 盖回去）。
-   *
-   * `rowToEvent` 已把 validation/context/history 从 JSON 字符串还原成对象，
-   * 与内存条目的结构完全一致，调用方无需区分来源。
+   * 实现在 `event-list.ts`（纯函数，可单独测）。核心事实：原先只返回内存 Map
+   * 里的条目，进程一重启库里几百条事件就全都读不到了（实测本项目 338 条），
+   * 哨兵页因此显示空白、详情入口消失。
    */
   listEvents(filters) {
-    const merged = /* @__PURE__ */ new Map();
-    if (this.db) {
-      try {
-        for (const row of listSentinelEvents(this.db, { limit: LIST_EVENTS_LIMIT })) {
-          merged.set(row.id, this.rowToEvent(row));
-        }
-      } catch (err) {
-        console.error("[EventCenter] Failed to list events from DB:", err);
-      }
-    }
-    for (const [id, event] of this.events) merged.set(id, event);
-    let results = [...merged.values()];
-    if (filters?.status) results = results.filter((e) => e.status === filters.status);
-    if (filters?.severity) results = results.filter((e) => e.severity === filters.severity);
-    return results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return listMergedEvents(this.db, this.events, filters);
   }
   findEventByDedupeKey(dedupeKey) {
     const found = [...this.events.values()].find((e) => e.dedupeKey === dedupeKey);
     if (found) return found;
     if (this.db) {
       const row = findSentinelEventByDedupeKey(this.db, dedupeKey);
-      if (row) return this.rowToEvent(row);
+      if (row) return rowToEvent(row);
     }
     return void 0;
   }
@@ -508533,67 +508914,9 @@ var EventCenter = class {
     if (!this.db) return void 0;
     const row = getSentinelEvent(this.db, eventId);
     if (!row) return void 0;
-    const event = this.rowToEvent(row);
+    const event = rowToEvent(row);
     this.events.set(event.id, event);
     return event;
-  }
-  rowToEvent(row) {
-    return {
-      id: row.id,
-      projectId: row.project_id,
-      timestamp: new Date(row.timestamp),
-      dedupeKey: row.dedupe_key,
-      title: row.title,
-      service: row.service,
-      module: row.module,
-      severity: row.severity,
-      status: row.status,
-      validation: typeof row.validation === "string" ? JSON.parse(row.validation) : row.validation,
-      context: typeof row.context === "string" ? JSON.parse(row.context) : row.context,
-      history: typeof row.history === "string" ? JSON.parse(row.history) : row.history,
-      occurrenceCount: row.occurrence_count,
-      firstSeen: new Date(row.first_seen),
-      lastSeen: new Date(row.last_seen)
-    };
-  }
-  persistEvent(event) {
-    if (!this.db) return;
-    try {
-      createSentinelEvent(this.db, {
-        id: event.id,
-        projectId: event.projectId,
-        timestamp: event.timestamp,
-        dedupeKey: event.dedupeKey,
-        title: event.title,
-        service: event.service,
-        module: event.module,
-        severity: event.severity,
-        status: event.status,
-        validation: JSON.stringify(event.validation),
-        context: JSON.stringify(event.context),
-        history: JSON.stringify(event.history),
-        occurrenceCount: event.occurrenceCount,
-        firstSeen: event.firstSeen,
-        lastSeen: event.lastSeen
-      });
-    } catch (err) {
-      console.error("[EventCenter] Failed to persist event:", err);
-    }
-  }
-  persistUpdate(event) {
-    if (!this.db) return;
-    try {
-      updateSentinelEvent(this.db, {
-        id: event.id,
-        status: event.status,
-        validation: JSON.stringify(event.validation),
-        history: JSON.stringify(event.history),
-        occurrenceCount: event.occurrenceCount,
-        lastSeen: event.lastSeen
-      });
-    } catch (err) {
-      console.error("[EventCenter] Failed to persist update:", err);
-    }
   }
   writeAuditLog(action, event) {
     if (!this.auditLogger) return;
@@ -508632,8 +508955,13 @@ function subscribeScopeViolations(bus, center) {
 
 // ../sentinel/src/file-monitor.ts
 init_src2();
+
+// ../sentinel/src/git-index.ts
+var GIT_MAX_BUFFER = 64 * 1024 * 1024;
+
+// ../sentinel/src/file-monitor.ts
 var DEFAULT_IGNORE_RE = new RegExp(
-  "(?:^|[\\\\/])(?:node_modules|dist-electron|coverage|test-results|\\.playwright-mcp|\\.playwright-artifacts-\\d+|\\.omo|\\.opencode|\\.zhshield)(?:[\\\\/]|$)|(?:^|[\\\\/])_tmp_\\d+_|\\.tsbuildinfo$|(?:^|[\\\\/])\\.!\\d+!|(?:^|[\\\\/])\\.#|\\.sw[po]?$|(?:^|[\\\\/])\\.DS_Store$"
+  "(?:^|[\\\\/])(?:node_modules|dist-electron|coverage|test-results|\\.playwright-mcp|\\.playwright-artifacts-\\d+|\\.omo|\\.opencode|\\.zhshield)(?:[\\\\/]|$)|(?:^|[\\\\/])[^\\\\/]+\\.(?:app|framework|xpc|appex)(?:[\\\\/]|$)|(?:^|[\\\\/])_tmp_\\d+_|\\.tsbuildinfo$|(?:^|[\\\\/])\\.!\\d+!|(?:^|[\\\\/])\\.#|\\.sw[po]?$|(?:^|[\\\\/])\\.DS_Store$"
 );
 
 // ../sentinel/src/process-tree.ts
@@ -508647,6 +508975,9 @@ for (let i = 0; i < B64_ALPHABET.length; i++) B64_INDEX.set(B64_ALPHABET[i], i);
 
 // ../sentinel/src/project-probe.ts
 init_src2();
+
+// ../sentinel/src/out-of-scope-prune.ts
+var DEFAULT_UNLINK_TTL_MS = 12 * 60 * 60 * 1e3;
 
 // ../pipeline/src/pipeline-runner.ts
 init_src2();
@@ -508959,6 +509290,12 @@ function listNestedProjectRootCandidates(root) {
     candidates.push(path49.join(root, entry.name));
   }
   return candidates;
+}
+
+// ../pipeline/src/sop-rules-dir.ts
+var import_node_path8 = require("node:path");
+function resolveDefaultSopRulesDir() {
+  return __dirname.includes("/dist/") ? (0, import_node_path8.resolve)(__dirname, "..", "..", "kernel", "dist", "sop", "presets", "sop-templates") : (0, import_node_path8.resolve)(__dirname, "..", "..", "kernel", "src", "sop", "presets", "sop-templates");
 }
 
 // ../fingerprint/src/language-map.ts
@@ -510283,26 +510620,7 @@ var PipelineRunner = class {
     subscribeScopeViolations(this.eventBus, this.eventCenter);
     this.pluginLoader = new PluginLoader();
     this.sopRegistry = new SopRegistry(this.eventBus);
-    const defaultRulesDir = __dirname.includes("/dist/") ? require("path").resolve(
-      __dirname,
-      "..",
-      "..",
-      "kernel",
-      "dist",
-      "sop",
-      "presets",
-      "sop-templates"
-    ) : require("path").resolve(
-      __dirname,
-      "..",
-      "..",
-      "kernel",
-      "src",
-      "sop",
-      "presets",
-      "sop-templates"
-    );
-    this.sopRulesDir = options2?.configDir || defaultRulesDir;
+    this.sopRulesDir = options2?.configDir || resolveDefaultSopRulesDir();
     this.sopLoader = new SopLoader(this.sopRegistry, { rulesDir: this.sopRulesDir });
     this.guardEngine = new GuardEngine(this.repoRoot, options2?.configDir, {
       emit: (event) => this.eventBus.emit(event.type, event.payload)
@@ -510386,13 +510704,28 @@ var PipelineRunner = class {
     );
     return report;
   }
-  async runRefactor() {
+  async runRefactor(options2) {
     this.logger.info("\u5F00\u59CB Refactor \u91CD\u6784\u68C0\u6D4B...");
     const report = await this.refactorEngine.analyzeDirectory(this.repoRoot);
+    if (options2?.skipBaseline) {
+      this.logger.info(
+        `\u91CD\u6784\u68C0\u6D4B\u5B8C\u6210: ${report.totalSmells} \u5904\u5F02\u5473 (${report.summary.criticalFiles} \u4E2A\u6587\u4EF6\u9700\u8981\u5173\u6CE8)`
+      );
+      return report;
+    }
+    const baselineCounts = await loadRefactorBaseline(this.repoRoot);
+    if (!baselineCounts) {
+      this.logger.info(
+        `\u91CD\u6784\u68C0\u6D4B\u5B8C\u6210: ${report.totalSmells} \u5904\u5F02\u5473 (${report.summary.criticalFiles} \u4E2A\u6587\u4EF6\u9700\u8981\u5173\u6CE8)`
+      );
+      return report;
+    }
+    const filtered = applyRefactorBaseline(report, baselineCounts, this.repoRoot);
+    const note = filtered.suppressedCount > 0 ? `\uFF08\u57FA\u7EBF\u8C41\u514D ${filtered.suppressedCount} \u9879\u5B58\u91CF\uFF09` : "";
     this.logger.info(
-      `\u91CD\u6784\u68C0\u6D4B\u5B8C\u6210: ${report.totalSmells} \u5904\u5F02\u5473 (${report.summary.criticalFiles} \u4E2A\u6587\u4EF6\u9700\u8981\u5173\u6CE8)`
+      `\u91CD\u6784\u68C0\u6D4B\u5B8C\u6210: ${filtered.report.totalSmells} \u5904\u5F02\u5473 (${filtered.report.summary.criticalFiles} \u4E2A\u6587\u4EF6\u9700\u8981\u5173\u6CE8)${note}`
     );
-    return report;
+    return filtered.report;
   }
   // ─── SOP 规则驱动模式 ───
   async runSopGuard(context) {
@@ -510508,7 +510841,7 @@ function resolveBundledSopDir(base) {
   return hasLegacyDomains ? bundled : void 0;
 }
 
-// ../reporter/src/console-reporter-format.ts
+// ../reporter/src/console-color.ts
 var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var RED = "\x1B[31m";
@@ -510518,7 +510851,7 @@ var CYAN = "\x1B[36m";
 var MAGENTA = "\x1B[35m";
 var GRAY = "\x1B[90m";
 var DIM = "\x1B[2m";
-var ConsoleReporterFormat = class {
+var ConsoleColor = class {
   color;
   constructor(color) {
     this.color = color;
@@ -511002,7 +511335,7 @@ var ConsoleReporter = class {
   ruleEngine;
   stages;
   constructor(options2) {
-    this.fmt = new ConsoleReporterFormat(options2?.color ?? true);
+    this.fmt = new ConsoleColor(options2?.color ?? true);
     this.ruleEngine = new RuleEngineSectionFormatter(this.fmt);
     this.stages = new StageSectionFormatter(this.fmt, this.ruleEngine);
   }
@@ -511531,8 +511864,26 @@ async function runBaselineCommand(runner, opts, _reporter, projectDir) {
       process.exit(process.exitCode);
       break;
     }
+    case "capture-refactor": {
+      const report = await runner.runRefactor({ skipBaseline: true });
+      const counts = countSmellsByFileAndRule(report, projectDir);
+      const fileCount = Object.keys(counts).length;
+      const saved = await saveRefactorBaseline(projectDir, counts);
+      console.log(
+        `\u91CD\u6784\u68D8\u8F6E\u57FA\u7EBF\u5DF2\u6355\u83B7: ${report.totalSmells} \u5904\u5B58\u91CF\u5F02\u5473\uFF08${fileCount} \u4E2A\u6587\u4EF6\uFF09\u2192 ${refactorBaselinePath(projectDir)} (${saved.capturedAt})`
+      );
+      console.log("\u63D0\u793A\uFF1A\u6B64\u540E refactor \u62A5\u544A\u53EA\u663E\u793A\u8D85\u51FA\u57FA\u7EBF\u7684\u589E\u91CF\uFF1B\u4FEE\u590D\u5B58\u91CF\u540E\u53EF\u91CD\u65B0\u6355\u83B7\u6536\u7D27\u68D8\u8F6E");
+      process.exit(process.exitCode);
+      break;
+    }
+    case "clear-refactor": {
+      await clearRefactorBaseline(projectDir);
+      console.log(`\u91CD\u6784\u68D8\u8F6E\u57FA\u7EBF\u5DF2\u6E05\u9664: ${refactorBaselinePath(projectDir)}`);
+      process.exit(process.exitCode);
+      break;
+    }
   }
-  console.error("\u672A\u77E5 baseline \u5B50\u547D\u4EE4\uFF0C\u652F\u6301: capture | list | clear");
+  console.error("\u672A\u77E5 baseline \u5B50\u547D\u4EE4\uFF0C\u652F\u6301: capture | list | clear | capture-refactor | clear-refactor");
   process.exit(1);
 }
 async function runPipelineCommand(runner, opts, reporter, projectDir) {
@@ -511568,6 +511919,8 @@ zhshield \u2014 \u667A\u6C47\u7801\u76FE \u4EE3\u7801\u8D28\u91CF\u6CBB\u7406
   zhshield baseline capture [--dir <path>]  \u6355\u83B7\u5F53\u524D\u95EE\u9898\u4E3A\u8C41\u514D\u57FA\u7EBF
   zhshield baseline list [--dir <path>]     \u5217\u51FA\u57FA\u7EBF\u6761\u76EE
   zhshield baseline clear [--dir <path>]    \u6E05\u9664\u57FA\u7EBF\u6587\u4EF6
+  zhshield baseline capture-refactor [--dir <path>]  \u6355\u83B7\u91CD\u6784\u5B58\u91CF\u5F02\u5473\u4E3A\u68D8\u8F6E\u57FA\u7EBF\uFF08\u6B64\u540E\u53EA\u62A5\u589E\u91CF\uFF09
+  zhshield baseline clear-refactor [--dir <path>]    \u6E05\u9664\u91CD\u6784\u68D8\u8F6E\u57FA\u7EBF
   zhshield help                \u663E\u793A\u6B64\u5E2E\u52A9
 
 \u9009\u9879:

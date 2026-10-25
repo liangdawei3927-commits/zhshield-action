@@ -35,7 +35,11 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..', '..');
  * 路径相对仓库根；文件移动时同步更新此清单（测试会对存在性失败）。
  */
 const FP_CORPUS: readonly string[] = [
-  'packages/desktop/src/components/layout/global-scan-indicator.tsx',
+  // 2026-10-26：原条目 global-scan-indicator.tsx（右下角全局扫描浮窗组件）随浮窗
+  // 下线被删除，清单同步改指同族存活的 global-scan-indicator-logic.ts（纯逻辑：
+  // isActiveTask / countActiveTasks，仍被 useDailyAutoCheck 消费）。路径不跟着改，
+  // 「误报回归集文件全部存在」会红 —— 这道断言就是防样本漂移的。
+  'packages/desktop/src/components/layout/global-scan-indicator-logic.ts',
   'packages/desktop/src/hooks/useHealthOverview.ts',
   'packages/desktop/src/pages/PerformancePage.tsx',
   'packages/desktop/src/pages/BackupPage.tsx',
@@ -129,7 +133,7 @@ describe('mixed-responsibilities 规则质量门', () => {
   it('默认引擎对误报回归集产出 0 条命中', async () => {
     const hits = await countHitsDefault(FP_CORPUS);
     expect(hits).toBe(0);
-  });
+  }, 120_000); // 29 个真实文件 × 全检测器，全量套件下机器负载高，5s 默认超时会假红
 
   it('负向自证：显式启用时回归集必产生命中（判据确会红、样本确被扫到）', async () => {
     const { hits, scanned } = await scanWithRule(FP_CORPUS);
@@ -139,7 +143,7 @@ describe('mixed-responsibilities 规则质量门', () => {
     // 打印真阳性计数：绿灯必须带数字，防止"0 命中却判通过"的形态⑩假绿
     console.log(`[mixed-resp gate] 回归集显式启用命中数（当前未重写检测器的已知误报）: ${hits}`);
     expect(hits).toBeGreaterThan(0);
-  });
+  }, 120_000);
 
   it('真阳性 golden：多职责合成函数必报（检测器代码路径未被下线破坏）', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'mixed-resp-gate-'));

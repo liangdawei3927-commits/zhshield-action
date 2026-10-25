@@ -12,6 +12,5 @@ export interface SopSyncResult {
   problems: string[];
 }
 
-export function collectSopTreeFiles(dir: string): string[];
 export function compareSopTrees(srcDir: string, dstDir: string): SopSyncResult;
 export function describeSopSyncProblems(result: SopSyncResult): string[];

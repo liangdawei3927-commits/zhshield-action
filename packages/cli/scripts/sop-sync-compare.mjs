@@ -29,7 +29,7 @@ import { join, relative } from 'node:path';
  * @param {string} dir
  * @returns {string[]}
  */
-export function collectSopTreeFiles(dir) {
+function collectSopTreeFiles(dir) {
   /** @type {string[]} */
   const files = [];
   /** @param {string} current */

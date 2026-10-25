@@ -56,9 +56,29 @@ async function writeDomainSnapshots(
         'utf-8',
       ),
     );
-    writes.push(recordScanHistory(report, source, issues, snapshot, esloc));
+    writes.push(recordScanHistory({ report, source, issues, snapshot, esloc }));
   }
   await Promise.all(writes);
+}
+
+/**
+ * 一次域扫描的历史落盘入参。
+ *
+ * 这五个值同属「本次域扫描的产物」，位置式传参时 `issues`/`snapshot` 两个
+ * 同为报告形态的入参极易传反（且都是「报告 + 条目」相关），收敛成对象后
+ * 由字段名自解释。
+ */
+interface ScanHistoryInput {
+  /** 本次整体报告（提供项目路径与扫描时间） */
+  report: DiagnosticsReport;
+  /** 域键 */
+  source: DiagnosticSource;
+  /** 该域的条目 */
+  issues: readonly DiagnosticEntry[];
+  /** 该域的单域快照（出分口径以此为准） */
+  snapshot: DiagnosticsReport;
+  /** inspect 域源码有效行数（其他域无意义） */
+  esloc: number;
 }
 
 /**
@@ -69,13 +89,13 @@ async function writeDomainSnapshots(
  *
  * 独立性：历史写入失败只 warn，**不得**影响快照落盘（否则为了记历史反而丢了当前结果）。
  */
-async function recordScanHistory(
-  report: DiagnosticsReport,
-  source: DiagnosticSource,
-  issues: readonly DiagnosticEntry[],
-  snapshot: DiagnosticsReport,
-  esloc: number,
-): Promise<void> {
+async function recordScanHistory({
+  report,
+  source,
+  issues,
+  snapshot,
+  esloc,
+}: ScanHistoryInput): Promise<void> {
   try {
     const dimensionScore = snapshot.dimensionScore;
     const record = buildScanRecord({

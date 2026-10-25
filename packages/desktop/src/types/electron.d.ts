@@ -772,6 +772,8 @@ export interface SentinelAPI {
     projectId: string,
     projectPath: string,
   ) => Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }>;
+  /** 停止该项目的监控（真的停监视器；stopped=false = 该项目本就不在监控中） */
+  stopMonitoring: (projectId: string) => Promise<{ ok: boolean; stopped: boolean; restarted: string[] }>;
   getState: () => Promise<{ enabled: boolean }>;
   setEnabled: (enabled: boolean) => Promise<{ ok: boolean }>;
 }
@@ -869,6 +871,8 @@ export interface BackupProgressData {
 /** 备份 API（主进程 IPC 桥接）：执行备份、记录管理、配置读写与进度/完成事件订阅 */
 export interface BackupAPI {
   executeBackup: (projectPath: string, trigger?: string) => Promise<BackupResultData>;
+  /** 停止进行中的备份（abortSignal 传给 kernel；无在跑的备份时 cancelled=false） */
+  cancelBackup: (projectPath: string) => Promise<{ ok: boolean; cancelled: boolean }>;
   getRecords: (projectId?: string) => Promise<BackupRecordData[]>;
   getRecord: (recordId: string) => Promise<BackupRecordData | null>;
   deleteRecord: (recordId: string) => Promise<boolean>;

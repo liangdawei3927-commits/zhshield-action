@@ -60,7 +60,7 @@ export const ENTRIES: NavEntry[] = [
   { id: 'security', label: '安全中心', where: 'nav', markers: ['深度扫描漏洞', '安全评分', '漏洞扫描'], action: '一键扫描' },
   { id: 'deps', label: '依赖管家', where: 'nav', markers: ['管家盘点', '开始盘点', '依赖图谱'], action: '开始盘点' },
   { id: 'garbage', label: '垃圾清理', where: 'nav', markers: ['清理无用文件', '开始扫描', '可清理'], action: '开始扫描' },
-  { id: 'performance', label: '性能优化', where: 'nav', markers: ['检测运行时性能反模式', '开始性能检测', '性能'], action: '开始性能检测' },
+  { id: 'performance', label: '性能优化', where: 'nav', markers: ['检测运行时性能反模式', '开始检测', '性能'], action: '开始检测' },
   { id: 'techdebt', label: '技术债务', where: 'nav', markers: ['量化技术债', '开始盘点', '债务'], action: '开始盘点' },
   { id: 'refactor', label: '代码重构', where: 'nav', markers: ['优化代码结构', '马上检查', '重构'], action: '马上检查' },
   { id: 'backup', label: '备份中心', where: 'nav', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },

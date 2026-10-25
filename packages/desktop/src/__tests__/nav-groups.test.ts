@@ -9,7 +9,8 @@
  *    （哨兵长驻监听 / 备份自有进度总线，本就没有"扫一次"的语义）；
  * 4) **首屏第一动作仍是可发起检查的分类**：首位必须是 inspect。
  *
- * 另有一条源码结构断言：TopNav 必须走 navGroupSegments 渲染（否则分段只是数据层的摆设）。
+ * 另有一条源码结构断言：TopNav 平铺渲染全部导航项，且**不得**再出现分组竖线
+ * （2026-10-25 需求：10 个分类按钮等距平铺，竖线占用宽度会让末两项间距与其他不一致）。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -79,8 +80,8 @@ describe('导航分组', () => {
   });
 });
 
-describe('TopNav 必须按分组渲染（防回归）', () => {
-  it('CategoryNav 走 navGroupSegments，并真的渲染出组间分隔线', () => {
+describe('TopNav 平铺渲染（防回归）', () => {
+  it('CategoryNav 平铺 navItems，且分组竖线彻底删除', () => {
     const src = readFileSync(
       new URL('../components/layout/TopNav.tsx', import.meta.url),
       'utf-8',
@@ -88,9 +89,13 @@ describe('TopNav 必须按分组渲染（防回归）', () => {
     // 断言**调用边**（CategoryNav 函数体内），而不是组件定义仍在文件里：
     // 定义存在、调用被删时，只看 data-testid 的断言照样绿（负向自证抓到过一次）
     const body = src.slice(src.indexOf('function CategoryNav'), src.indexOf('export function TopNav'));
-    expect(body).toMatch(/navGroupSegments\(\)/);
-    expect(body).toMatch(/<GroupDivider/);
-    // 不再直接平铺 navItems（那会让分组形同虚设）
-    expect(body).not.toMatch(/navItems\.map\(/);
+    // 十项平铺：直接 map navItems（顺序仍由 nav-items 的声明锁定）
+    expect(body).toMatch(/navItems\.map\(/);
+    expect(body).not.toMatch(/navGroupSegments\(\)/);
+    // 竖线必须彻底删除：组件定义、调用边、data-testid 一个都不许留。
+    // 只删调用会留下「定义存在但没人用」的死代码，下次有人顺手接回去又变回不统一。
+    expect(src).not.toMatch(/GroupDivider|nav-group-divider/);
+    // 平铺时不许漏项：导航项总数锁死为 10（8 按需 + 哨兵 + 备份）
+    expect(navItems).toHaveLength(10);
   });
 });

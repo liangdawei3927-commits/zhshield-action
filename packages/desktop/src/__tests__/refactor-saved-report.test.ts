@@ -124,8 +124,12 @@ describe('重构详情页接线（防退回旧写法）', () => {
   });
 
   it('快照视图可见性必须是派生判定：报告就绪时压过「看快照」标记', () => {
-    // 直下发 state 的失效形态：竞态点进快照后，报告回来了也退不出来
-    expect(entrySource).toMatch(/const showSnapshot = snapshotRequested && detailReport === null/);
+    // 派生判定可内联也可抽成纯函数（当前抽成了 isSnapshotVisible），但两件事必须都在：
+    // ① 调用点是「算出来的值」而非 state；② 判定本体仍是「报告就绪压过标记」
+    expect(entrySource).toMatch(
+      /const showSnapshot = isSnapshotVisible\(snapshotRequested, detailReport\)/,
+    );
+    expect(entrySource).toMatch(/return snapshotRequested && detailReport === null;/);
     // 旧形态：直接 useState 下发，报告到位也不会自动失效
     expect(entrySource).not.toMatch(/const \[showSnapshot, setShowSnapshot\] = useState/);
     // 报告读回后要把「点过详情」的意图兑现，否则会退回分类主页（用户视角＝又被弹回）

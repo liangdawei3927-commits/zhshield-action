@@ -117,10 +117,15 @@ describe('六个分类页都已接上「读回上次报告 → 详情入口」',
   for (const [file, domain] of sharedPages) {
     it(`${file}：接线到合并入口（domain=${domain}），快照视图仍在页面`, () => {
       const src = fs.readFileSync(path.join(pagesDir, file), 'utf-8');
-      // 页面必须把本域 domain / 实时报告 / 扫描入口交给合并入口，不能自带一份派生逻辑
-      expect(src).toContain(
-        `useDomainDetailPage(projectPath, '${domain}', report, loading, handleScan)`,
-      );
+      // 页面必须把本域 domain / 实时报告 / 扫描入口交给合并入口，不能自带一份派生逻辑。
+      // 入参已由位置式改为对象：断言取「调用点到文件末」的切片再逐字段校验，
+      // 不绑死换行与字段顺序（否则一次格式化就会让守卫假红）。
+      const callAt = src.indexOf('useDomainDetailPage({');
+      expect(callAt, `${file} 未接线到合并入口`).toBeGreaterThan(-1);
+      const call = src.slice(callAt, callAt + 300);
+      expect(call).toContain(`domain: '${domain}'`);
+      expect(call).toContain('liveReport: report');
+      expect(call).toContain('onScan: handleScan');
       // 详情入口是否可见仍以合并入口的判定为唯一来源
       expect(src).toContain('detail.hasDetail');
       // 无完整报告时打开「上次结果」视图（快照视图渲染仍在页面，故断言页面）
@@ -135,8 +140,8 @@ describe('六个分类页都已接上「读回上次报告 → 详情入口」',
     it(`${file}：使用 useSavedDomainReport，且实时结果优先`, () => {
       const src = fs.readFileSync(path.join(pagesDir, file), 'utf-8');
       expect(src).toContain('useSavedDomainReport');
-      // 实时优先 + 扫描中不用旧报告顶替
-      expect(src).toMatch(/report \?\? \((loading|scanning) \? null : saved(Report)?\)/);
+      // 实时优先 + 扫描中不用旧报告顶替（容忍 page.report / page.scanning 这类成员前缀）
+      expect(src).toMatch(/report \?\? \([\w.]*?(loading|scanning) \? null : saved(Report)?\)/);
     });
 
     it(`${file}：详情入口 = 「有结果」(实时/完整报告/历史落盘)，无结果不显示`, () => {

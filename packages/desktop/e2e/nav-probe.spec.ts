@@ -12,7 +12,19 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { SHOT_DIR, launchApp, mainText } from './nav-helpers';
 
-const BUSY = ['扫描中', '检测中', '盘点中', '巡检中', '正在', '检查中', '加载', '排队中'];
+const BUSY = [
+  '扫描中',
+  '检测中',
+  '盘点中',
+  '体检中',
+  '巡检中',
+  '生成中',
+  '刷新中',
+  '正在',
+  '检查中',
+  '加载',
+  '排队中',
+];
 
 async function waitQuiet(page: import('@playwright/test').Page, maxMs = 300_000) {
   const t0 = Date.now();

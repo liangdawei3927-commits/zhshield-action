@@ -28,6 +28,7 @@ import { updateDashboardState } from './dashboard-state';
 import { shouldAutoFix, countFixableIssues, resolveOpenCodeBin } from '../ai-auto-fix';
 import { getScoring } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
+import { rethrowIfCancelled } from '../pipeline-protocol';
 import { toGuardReportData, type GuardReportData, type PerformanceReportData } from './report-format';
 import type { DependencyReportData, TechDebtReportData } from '../../src/types/electron';
 
@@ -192,7 +193,8 @@ async function withDomainScore<T>(projectPath: string, run: () => Promise<T>): P
   return result;
 }
 
-export function registerEnginesIpc(manager: TaskManager): void {
+/** 域扫描入口：各域 run* + 垃圾清理/恢复（除 deps/techdebt 需先起任务再等结果） */
+function registerEngineRunHandlers(manager: TaskManager): void {
   ipcMain.handle('engine:runGuard', (_e, projectPath: string, options?: Partial<CheckOptions>) =>
     withDomainScore(projectPath, () => runGuardHandler(manager, projectPath, options)),
   );
@@ -231,6 +233,10 @@ export function registerEnginesIpc(manager: TaskManager): void {
       async () => (await manager.waitFor(task.id)) as TechDebtReportData,
     );
   });
+}
+
+/** 技术债行动与密钥生命周期：不依赖 TaskManager，纯落库动作 */
+function registerDebtAndSecretHandlers(): void {
   ipcMain.handle(
     'debt:planRepayment',
     (
@@ -256,6 +262,10 @@ export function registerEnginesIpc(manager: TaskManager): void {
   ipcMain.handle('engine:secretDismiss', (_e, secretId: string, reason: string) =>
     dismissSecretHandler(secretId, reason),
   );
+}
+
+/** 查询与报告通道：分数 / 历史 / 落盘报告 / 快照 / 画像 / 汇总，全部只读（除 save 与 pipeline） */
+function registerEngineQueryHandlers(manager: TaskManager): void {
   ipcMain.handle(
     'engine:runPipeline',
     (_e, projectPath: string, options?: { dryRun?: boolean; sop?: boolean }) =>
@@ -287,6 +297,13 @@ export function registerEnginesIpc(manager: TaskManager): void {
   );
 }
 
+export function registerEnginesIpc(manager: TaskManager): void {
+  // 三组按原注册顺序依次挂载；通道名与 handler 的对应关系不变
+  registerEngineRunHandlers(manager);
+  registerDebtAndSecretHandlers();
+  registerEngineQueryHandlers(manager);
+}
+
 async function runGuardHandler(
   manager: TaskManager,
   projectPath: string,
@@ -313,6 +330,7 @@ async function runGuardHandler(
     }
     return toGuardReportData(report);
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:runGuard] Error:', err);
     return {
       summary: { totalChecks: 0, passed: 0, blocked: 0, warnings: 0 },
@@ -347,6 +365,7 @@ async function runGarbageScanHandler(
     }
     return report;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:runGarbageScan] Error:', err);
     return {
       projectPath,
@@ -383,6 +402,7 @@ async function runPerformanceHandler(
     await updateDashboardState(projectPath, { performance: performanceDashboardPatch(result) });
     return result;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:runPerformance] Error:', err);
     return {
       summary: { total: 0, autoFixable: 0 },
@@ -419,6 +439,7 @@ async function runPipelineHandler(
     }
     return report;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error(
       '[engine:runPipeline] 流水线执行异常:',
       err instanceof Error ? err.stack || err.message : String(err),

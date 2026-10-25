@@ -12,9 +12,9 @@ import {
 import { navItems } from '../components/layout/nav-items';
 
 /**
- * 跨页「直达详情」意图 —— 全局扫描进度条点进来要直接看到结果，而不是落在主页。
+ * 跨页「直达详情」意图 —— 任务中心的归属页入口点进来要直接看到结果，而不是落在主页。
  *
- * 背景：分类页统一「打开先落在主页」（历史结果只让详情入口可见）。右下角进度条
+ * 背景：分类页统一「打开先落在主页」（历史结果只让详情入口可见）。归属页入口
  * 的语义不是「逛分类」，而是「看这条任务」。若它只做普通导航，用户点完还得再点
  * 一次右上角详情图标 —— 动作被拆成两步。
  *
@@ -105,9 +105,12 @@ describe('nav-detail-intent: 接线完整性（源码级）', () => {
   });
 
   it('四个 hook 驱动的页面，域键必须等于导航 id（否则取不到意图）', () => {
-    const offenders = Object.entries(hookDriven).filter(
-      ([id, file]) => !readPage(file).includes(`useDomainDetailPage(projectPath, '${id}'`),
-    );
+    const offenders = Object.entries(hookDriven).filter(([id, file]) => {
+      const src = readPage(file);
+      // 入参为对象字面量（跨行）：取调用点切片再校验 domain 字段，不绑死格式
+      const callAt = src.indexOf('useDomainDetailPage({');
+      return callAt < 0 || !src.slice(callAt, callAt + 300).includes(`domain: '${id}'`);
+    });
     expect(offenders).toEqual([]);
     // hook 内部必须真的把 navId 交给意图通道
     const hookSrc = fs.readFileSync(
@@ -117,12 +120,6 @@ describe('nav-detail-intent: 接线完整性（源码级）', () => {
     expect(hookSrc).toContain('useDetailIntentEffect(navId');
   });
 
-  it('全局进度条点击同时「登记意图 + 导航」——两件事不能少一件', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/layout/global-scan-indicator.tsx'),
-      'utf-8',
-    );
-    expect(src).toContain('requestDetailIntent(navId);');
-    expect(src).toContain('nav?.navigate(navId);');
-  });
+  // 原有一条「全局进度条点击同时『登记意图 + 导航』」：右下角 GlobalScanIndicator
+  // 已于 2026-10-26 下线（用户明确不要该浮窗），随之删除，不再保留源码级断言。
 });

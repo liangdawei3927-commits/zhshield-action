@@ -97,6 +97,49 @@ export interface PipelineCancelMsg {
   id: string;
 }
 
+/**
+ * 取消错误的统一标记（跨进程、跨语言稳定）。
+ *
+ * 用户点「停止」不是故障，但取消走的是 IPC reject 通道，和真实失败同一条路。
+ * 若靠本地化文案（「任务已取消」/「Task cancelled」）来区分，任何一次
+ * 文案改动或语言切换都会让取消退化成红色失败页。故用固定 ASCII 标记做判据：
+ * - 主进程 reject 时加前缀（见 pipeline-host / task-manager）
+ * - 渲染层 services/cancel-error.ts 用同一字面量识别
+ * 两处一致性由 __tests__/task-cancelled-silent.test.ts 与
+ * task-cancel-reach-executor.test.ts 锁住。
+ */
+export const CANCELLED_ERR_TAG = '[cancelled]';
+
+/**
+ * 判断一个错误是否是「用户主动取消」。
+ *
+ * 取消走的是与真实故障同一条 reject 通道（见 task-manager 的 settle）。handler 的
+ * 降级兜底（catch 里返回空报告 / 带 error 的失败报告）若把它吞掉，用户点「停止」
+ * 后会看到「体检失败」+ 一行红色错误文案 —— 把用户的主动操作报成系统故障。
+ *
+ * 判据只用固定 ASCII 标记，不依赖本地化文案（语言切换/措辞改动都不会让判据失效）。
+ */
+export function isCancelledFailure(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  return message.includes(CANCELLED_ERR_TAG);
+}
+
+/**
+ * handler 降级兜底前的「取消短路」：取消必须原样抛给渲染层。
+ *
+ * 抛出去后由渲染层 services/cancel-error.ts 用同一标记识别并**静默处理**
+ * （不落失败页、保留已有报告）。真实故障不走这里，仍按各 handler 既有的降级
+ * 兜底返回（空报告 / 失败结果），行为不变。
+ *
+ * ⚠️ 每个会 `await manager.waitFor(...)` 的 handler 都必须在 catch 的**第一句**
+ * 调它 —— 漏一个，那个域就会把用户的取消说成失败。
+ */
+export function rethrowIfCancelled(err: unknown): void {
+  if (isCancelledFailure(err)) {
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
 /** 主进程 → 引擎子进程 的全部命令联合类型（可序列化） */
 export type PipelineWorkerInbound =
   | PipelineRunMsg

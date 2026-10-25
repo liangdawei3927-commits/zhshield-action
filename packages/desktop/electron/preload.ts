@@ -241,6 +241,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getEvent: (id: string) => ipcRenderer.invoke('sentinel:getEvent', id),
     startMonitoring: (projectId: string, projectPath: string) =>
       ipcRenderer.invoke('sentinel:startMonitoring', projectId, projectPath),
+    stopMonitoring: (projectId: string) =>
+      ipcRenderer.invoke('sentinel:stopMonitoring', projectId),
     getState: () => ipcRenderer.invoke('sentinel:getState'),
     setEnabled: (enabled: boolean) => ipcRenderer.invoke('sentinel:setEnabled', enabled),
   },
@@ -249,6 +251,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backup: {
     executeBackup: (projectPath: string, trigger?: string) =>
       ipcRenderer.invoke('backup:execute', projectPath, trigger),
+    cancelBackup: (projectPath: string) => ipcRenderer.invoke('backup:cancel', projectPath),
     getRecords: (projectId?: string) => ipcRenderer.invoke('backup:records', projectId),
     getRecord: (recordId: string) => ipcRenderer.invoke('backup:record', recordId),
     deleteRecord: (recordId: string) => ipcRenderer.invoke('backup:deleteRecord', recordId),

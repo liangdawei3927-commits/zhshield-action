@@ -32,6 +32,7 @@ import { buildFixPrompt, resolveOpenCodeModel } from '../ai-auto-fix';
 import { validateGarbageCleanItems, isValidBatchId } from '../garbage-input';
 import { sendProgress } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
+import { rethrowIfCancelled } from '../pipeline-protocol';
 import {
   toSecurityScanReportData,
   type SecurityScanReportData,
@@ -131,6 +132,7 @@ export async function runSecurityHandler(
     }
     return data;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:runSecurity] Error:', err);
     return emptySecurityScanReportData();
   }
@@ -182,6 +184,7 @@ export async function garbageCleanHandler(
     await syncGarbageDashboard(projectPath, result);
     return result;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:garbageClean] Error:', err);
     return { batchId: '', cleaned: [], freedBytes: 0, failed: [t('electron.cleanFailed')] };
   }
@@ -205,6 +208,7 @@ export async function garbageRestoreHandler(
     const result = (await manager.waitFor(task.id)) as GarbageRestoreResult;
     return result;
   } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     console.error('[engine:garbageRestore] Error:', err);
     return { restored: 0, restoredBytes: 0, failed: [t('electron.restoreFailed')] };
   }

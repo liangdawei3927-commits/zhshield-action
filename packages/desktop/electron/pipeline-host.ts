@@ -16,6 +16,7 @@ import type {
   PipelineErrorMsg,
   PipelineWorkerOutbound,
 } from './pipeline-protocol';
+import { CANCELLED_ERR_TAG } from './pipeline-protocol';
 import { readConfig } from './ipc/guard-config';
 
 /** 子进程进度回调：(阶段, 阶段说明, 0-100 进度) */
@@ -56,6 +57,17 @@ let ready = false;
 let readyWaiters: Array<() => void> = [];
 let seq = 0;
 const pending = new Map<string, PendingJob>();
+/**
+ * 取消键 → 内部 job id 的翻译表。
+ *
+ * 任务中心的 `task.id`（`pipeline-<ts>-<Manager seq>`）与本文件 `dispatchJob`
+ * 生成的内部 id（`pipeline-<ts>-<host seq>`）是**两套序号**，值不同。取消消息
+ * 一旦直接拿 `task.id` 去 worker 里查 `runningJobs`，必然查不到 —— 消息静默丢弃，
+ * 界面显示"已取消"而扫描仍在跑（2026-10-25 实查到的真实缺陷）。
+ *
+ * 这里把两者的对应关系记下来，`cancelJob(taskId)` 才能翻译成 worker 认识的 id。
+ */
+const jobIdByCancelKey = new Map<string, string>();
 let stderrTail = '';
 let workerGen = 0;
 
@@ -314,6 +326,8 @@ function dispatchJob(
   timeoutMs: number,
   timeoutLabel: string,
   onProgress?: ProgressHandler,
+  /** 任务中心的 task.id：仅用于把取消请求翻译到内部 job id */
+  cancelKey?: string,
 ): Promise<unknown> {
   ensurePipelineWorker();
   return waitUntilReady().then(() => {
@@ -323,7 +337,12 @@ function dispatchJob(
       throw new Error(`[pipeline-host] ${t('pipeline.workerUnavailable')}`);
     }
 
-    return sendJob(child, id, payload, { timeoutMs, timeoutLabel, onProgress });
+    if (cancelKey) jobIdByCancelKey.set(cancelKey, id);
+    const clearKey = (): void => {
+      if (cancelKey && jobIdByCancelKey.get(cancelKey) === id) jobIdByCancelKey.delete(cancelKey);
+    };
+
+    return sendJob(child, id, payload, { timeoutMs, timeoutLabel, onProgress }).finally(clearKey);
   });
 }
 
@@ -332,6 +351,7 @@ export async function runPipelineInWorker(
   options?: { dryRun?: boolean; sop?: boolean },
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<PipelineReport> {
   const id = `pipeline-${Date.now()}-${++seq}`;
   const guardConfig = await readConfig().catch(() => ({
@@ -345,6 +365,7 @@ export async function runPipelineInWorker(
     timeoutMs,
     'engine:runPipeline',
     onProgress,
+    cancelKey,
   );
   return report as PipelineReport;
 }
@@ -354,6 +375,7 @@ export async function runRefactorInWorker(
   projectPath: string,
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<RefactorReport> {
   const id = `refactor-${Date.now()}-${++seq}`;
   const report = await dispatchJob(
@@ -361,6 +383,7 @@ export async function runRefactorInWorker(
     timeoutMs,
     'engine:runRefactor',
     onProgress,
+    cancelKey,
   );
   return report as RefactorReport;
 }
@@ -370,6 +393,7 @@ export async function runGuardInWorker(
   options?: Record<string, unknown>,
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `guard-${Date.now()}-${++seq}`;
   return dispatchJob(
@@ -377,6 +401,7 @@ export async function runGuardInWorker(
     timeoutMs,
     'engine:runGuard',
     onProgress,
+    cancelKey,
   );
 }
 
@@ -384,6 +409,7 @@ export async function runSecurityInWorker(
   projectPath: string,
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `security-${Date.now()}-${++seq}`;
   return dispatchJob(
@@ -391,6 +417,7 @@ export async function runSecurityInWorker(
     timeoutMs,
     'engine:runSecurity',
     onProgress,
+    cancelKey,
   );
 }
 
@@ -399,6 +426,7 @@ export async function runGarbageScanInWorker(
   projectPath: string,
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `garbage-scan-${Date.now()}-${++seq}`;
   return dispatchJob(
@@ -406,6 +434,7 @@ export async function runGarbageScanInWorker(
     timeoutMs,
     'engine:runGarbageScan',
     onProgress,
+    cancelKey,
   );
 }
 
@@ -413,12 +442,15 @@ export async function runGarbageCleanInWorker(
   projectPath: string,
   items: Array<{ id: string; path: string; size: number; type: string }>,
   timeoutMs = 120000,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `garbage-clean-${Date.now()}-${++seq}`;
   return dispatchJob(
     { type: 'runGarbageClean', id, projectPath, items },
     timeoutMs,
     'engine:garbageClean',
+    undefined,
+    cancelKey,
   );
 }
 
@@ -426,12 +458,15 @@ export async function runGarbageRestoreInWorker(
   projectPath: string,
   batchId: string,
   timeoutMs = 120000,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `garbage-restore-${Date.now()}-${++seq}`;
   return dispatchJob(
     { type: 'runGarbageRestore', id, projectPath, batchId },
     timeoutMs,
     'engine:garbageRestore',
+    undefined,
+    cancelKey,
   );
 }
 
@@ -439,6 +474,7 @@ export async function runPerformanceInWorker(
   projectPath: string,
   onProgress?: ProgressHandler,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
 ): Promise<unknown> {
   const id = `performance-${Date.now()}-${++seq}`;
   return dispatchJob(
@@ -446,13 +482,54 @@ export async function runPerformanceInWorker(
     timeoutMs,
     'engine:runPerformance',
     onProgress,
+    cancelKey,
   );
 }
 
-export function cancelJob(id: string): boolean {
+/**
+ * 取消任务。
+ *
+ * `cancelKey` 是任务中心的 `task.id`；若没有对应映射（例如传入的已是内部 job id），
+ * 则按原值处理，保持旧调用点不至于失效。
+ *
+ * 三件事必须一起做，否则用户看到的是"点了停止没反应"：
+ * 1. 把取消请求翻译成 worker 认识的内部 id 并发过去；
+ * 2. **立刻** reject 等待方并清掉 pending —— 不等引擎回应，UI 才能瞬时恢复；
+ * 3. 宽限期后若已无其他任务在跑，终止子进程（引擎目前不消费 AbortSignal，
+ *    abort 只是标记，不杀进程则 CPU 仍在烧）。
+ */
+export function cancelJob(cancelKey: string): boolean {
+  const jobId = jobIdByCancelKey.get(cancelKey) ?? cancelKey;
+  const job = pending.get(jobId);
+  if (!job) {
+    jobIdByCancelKey.delete(cancelKey);
+    return false;
+  }
+
+  const child = worker;
   try {
-    worker?.send({ type: 'cancel', id });
-  } catch {}
+    child?.send({ type: 'cancel', id: jobId });
+  } catch {
+    /* 子进程已不可写：下面的 reject 仍然要执行 */
+  }
+
+  job.cancelled = true;
+  clearTimeout(job.timer);
+  pending.delete(jobId);
+  jobIdByCancelKey.delete(cancelKey);
+  job.reject(new Error(`${CANCELLED_ERR_TAG} ${t('task.cancelled')}`));
+
+  if (child) {
+    const pid = child.pid;
+    const gen = (child as GenChild).gen;
+    setTimeout(() => {
+      // 还有别的任务在跑就不连坐：此时取消的语义退化为"结果不再采用"，
+      // 由 TaskManager 把状态置 cancelled 保证界面一致。
+      if (pending.size > 0) return;
+      if (worker !== child || workerGen !== gen) return;
+      terminateChild(child, pid, gen);
+    }, CANCEL_GRACE_MS);
+  }
   return true;
 }
 

@@ -14,6 +14,7 @@ import {
 } from './pipeline-host';
 import { runDepsHandler } from './ipc/engines-deps';
 import { runTechDebtHandler } from './ipc/engines-techdebt';
+import { CANCELLED_ERR_TAG } from './pipeline-protocol';
 
 /** 任务类型：各引擎检查域（巡检/安全/垃圾/性能/门禁/重构/依赖/技术债） */
 export type TaskKind =
@@ -196,7 +197,8 @@ export class TaskManager {
     if (task.status === 'done') return Promise.resolve(task.result);
     if (task.status === 'failed')
       return Promise.reject(new Error(task.error ?? t('task.executionFailed')));
-    if (task.status === 'cancelled') return Promise.reject(new Error(t('task.cancelled')));
+    if (task.status === 'cancelled')
+      return Promise.reject(new Error(`${CANCELLED_ERR_TAG} ${t('task.cancelled')}`));
     return new Promise((resolve, reject) => {
       const set = this.waiters.get(id) ?? new Set();
       set.add({ resolve, reject });
@@ -226,6 +228,9 @@ export class TaskManager {
       task.finishedAt = new Date().toISOString();
       this.requestKeys.delete(task.id);
       this.broadcast(task);
+      // 必须立刻唤醒等待方：否则 engine:runXxx 的 IPC 要等执行器自己结束才返回，
+      // 页面在「点了停止」之后仍会转圈到任务自然结束（卡住时等于永不返回）。
+      this.settle(task);
       return true;
     }
     return false;
@@ -264,8 +269,14 @@ export class TaskManager {
       })
       .catch((err) => {
         if (task.status === 'cancelled') return;
+        // 取消是用户主动操作，不是故障：执行器把取消当异常抛出时，落 cancelled 而非 failed
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes(CANCELLED_ERR_TAG)) {
+          task.status = 'cancelled';
+          return;
+        }
         task.status = 'failed';
-        task.error = err instanceof Error ? err.message : String(err);
+        task.error = message;
       })
       .finally(() => {
         task.finishedAt = new Date().toISOString();
@@ -284,6 +295,9 @@ export class TaskManager {
     for (const waiter of set) {
       if (task.status === 'done') {
         waiter.resolve(task.result);
+      } else if (task.status === 'cancelled') {
+        // 带标记：渲染层据此把"用户取消"从"失败"里摘出来，不弹红页
+        waiter.reject(new Error(`${CANCELLED_ERR_TAG} ${t('task.cancelled')}`));
       } else {
         waiter.reject(new Error(task.error ?? t('task.notCompleted')));
       }
@@ -307,28 +321,48 @@ export class TaskManager {
 }
 
 export function buildTaskManager(): TaskManager {
+  // 每个 runner 都把 task.id 作为最后一个参数传给执行器：取消消息要能被翻译成
+  // worker 内部的 job id（见 pipeline-host 的 jobIdByCancelKey），否则 cancel 静默失效。
   const runnerByKind: Record<TaskKind, TaskRunner> = {
     pipeline: (task, request, onProgress) =>
       runPipelineInWorker(
         task.projectPath,
         (request ?? {}) as { dryRun?: boolean; sop?: boolean },
         onProgress,
+        undefined,
+        task.id,
       ),
-    security: (task, _request, onProgress) => runSecurityInWorker(task.projectPath, onProgress),
-    garbage: (task, _request, onProgress) => runGarbageScanInWorker(task.projectPath, onProgress),
+    security: (task, _request, onProgress) =>
+      runSecurityInWorker(task.projectPath, onProgress, undefined, task.id),
+    garbage: (task, _request, onProgress) =>
+      runGarbageScanInWorker(task.projectPath, onProgress, undefined, task.id),
     garbageClean: (task, request) =>
       runGarbageCleanInWorker(
         task.projectPath,
         (request as { items: Array<{ id: string; path: string; size: number; type: string }> })
           .items,
+        undefined,
+        task.id,
       ),
     garbageRestore: (task, request) =>
-      runGarbageRestoreInWorker(task.projectPath, (request as { batchId: string }).batchId),
+      runGarbageRestoreInWorker(
+        task.projectPath,
+        (request as { batchId: string }).batchId,
+        undefined,
+        task.id,
+      ),
     performance: (task, _request, onProgress) =>
-      runPerformanceInWorker(task.projectPath, onProgress),
+      runPerformanceInWorker(task.projectPath, onProgress, undefined, task.id),
     guard: (task, request, onProgress) =>
-      runGuardInWorker(task.projectPath, (request ?? {}) as Record<string, unknown>, onProgress),
-    refactor: (task, _request, onProgress) => runRefactorInWorker(task.projectPath, onProgress),
+      runGuardInWorker(
+        task.projectPath,
+        (request ?? {}) as Record<string, unknown>,
+        onProgress,
+        undefined,
+        task.id,
+      ),
+    refactor: (task, _request, onProgress) =>
+      runRefactorInWorker(task.projectPath, onProgress, undefined, task.id),
     deps: (task, _request, onProgress) => runDepsHandler(task.projectPath, onProgress),
     techdebt: (task, _request, onProgress) => runTechDebtHandler(task.projectPath, onProgress),
   };

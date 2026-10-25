@@ -114,6 +114,17 @@ function fromConfigData(data: Record<string, unknown>, projectPath?: string): Ba
   };
 }
 
+/**
+ * 进行中的手动备份 → 取消句柄。
+ *
+ * kernel 的备份链路（扫描 / 复制 / 打包 / GitHub 请求）**本就支持 abortSignal**，
+ * 但此前没有任何调用方传它 ⇒ 用户点下「一键备份」就只能等它跑完。这里把句柄接上，
+ * 「停止」才有真实落点（而不是 UI 上假装停了、后台还在写盘）。
+ *
+ * 只管手动备份：定时备份走 scheduler 直连 orchestrator，不经本句柄。
+ */
+const runningBackups = new Map<string, AbortController>();
+
 function registerExecuteHandler(orchestrator: BackupOrchestrator): void {
   ipcMain.handle(
     'backup:execute',
@@ -121,13 +132,37 @@ function registerExecuteHandler(orchestrator: BackupOrchestrator): void {
       if (!projectPath || typeof projectPath !== 'string') {
         throw new Error(t('electron.invalidProjectPath'));
       }
-      const result = await orchestrator.execute({
-        projectId: projectPath,
-        projectPath,
-        trigger: trigger === 'schedule' || trigger === 'api' ? trigger : 'manual',
-      });
-      await persistRecords(orchestrator);
-      return serializeResult(result);
+      const controller = new AbortController();
+      runningBackups.set(projectPath, controller);
+      try {
+        const result = await orchestrator.execute({
+          projectId: projectPath,
+          projectPath,
+          trigger: trigger === 'schedule' || trigger === 'api' ? trigger : 'manual',
+          abortSignal: controller.signal,
+        });
+        await persistRecords(orchestrator);
+        return serializeResult(result);
+      } finally {
+        runningBackups.delete(projectPath);
+      }
+    },
+  );
+}
+
+/** 停止进行中的备份：abort 交给 kernel 的检查点，未跑完的 zip/清单不会落盘 */
+function registerCancelHandler(): void {
+  ipcMain.handle(
+    'backup:cancel',
+    async (_event, projectPath: string): Promise<{ ok: boolean; cancelled: boolean }> => {
+      if (!projectPath || typeof projectPath !== 'string') return { ok: false, cancelled: false };
+      const controller = runningBackups.get(projectPath);
+      if (!controller) {
+        // 没有在跑的备份：如实说没取消成什么，不粉饰成"已停止"
+        return { ok: true, cancelled: false };
+      }
+      controller.abort();
+      return { ok: true, cancelled: true };
     },
   );
 }
@@ -491,6 +526,7 @@ export function registerBackupIpc(): void {
   const scheduleDeps = setupScheduledBackups(configManager, orchestrator);
   loadHistoricalRecords(orchestrator);
   registerExecuteHandler(orchestrator);
+  registerCancelHandler();
   registerRecordsHandler(orchestrator);
   registerRecordHandler(orchestrator);
   registerDeleteRecordHandler(orchestrator);

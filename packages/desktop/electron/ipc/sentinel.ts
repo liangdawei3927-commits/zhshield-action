@@ -16,10 +16,12 @@ import {
   defaultFileWatchFilter,
   DEFAULT_IGNORE_DIRS,
   isInformationalEvent,
+  pruneStaleFileEvents,
 } from '@zh/sentinel';
 import type { SentinelEventQuery } from '../../src/types/electron';
 import { getSentinel, stopAllMonitoring, getDb, type SentinelRuntime } from '../ipc-context';
 import { readSentinelHealthFromDb } from '../sentinel-health';
+import { applyMonitoringStop } from '../sentinel-monitoring';
 
 const STATE_FILE = 'sentinel-state.json';
 
@@ -56,7 +58,39 @@ async function writeState(state: SentinelState): Promise<void> {
 }
 
 // 已启动监控的项目（幂等保护：重复 startMonitoring 不重复启动进程/日志监听）
-const monitoredProjects = new Set<string>();
+// 值保留项目路径：暂停某项目后，其余项目的监视器要按它重新挂回（见 stopMonitoringForProject）
+const monitoredProjects = new Map<string, string>();
+/** 已做过历史事件收敛的项目（每进程每项目一次，避免每次刷新都扫库） */
+const prunedProjects = new Set<string>();
+
+/**
+ * 历史越界事件收敛：忽略规则收紧后，库里那批旧事件描述的路径本就不该被监控。
+ *
+ * 为什么必须有这一步：只修生成端时，库里 270 条旧 unlink 事件仍是
+ * `deleted_at IS NULL`，页面与「复制到AI」会一直显示它们 —— 用户看到的是
+ * 「代码明明修好了，为什么还是 270 个问题」。收敛是维护动作，失败只告警，
+ * 绝不阻断监控启动。
+ */
+function pruneOutOfScopeEventsOnce(projectId: string): void {
+  if (prunedProjects.has(projectId)) return;
+  prunedProjects.add(projectId);
+  // 收敛函数要读一次项目 git 索引（判据 C），因此是异步的；这里不 await 结果，
+  // 只保证不阻塞监控启动 —— 失败同样只告警。无持久化模式下 getDb 抛错，等同跳过。
+  void (async (): Promise<number> => {
+    const removed = await pruneStaleFileEvents(getDb(), projectId);
+    if (removed > 0) {
+      console.info(
+        `[sentinel] 已收敛 ${removed} 条失效历史事件（路径越界 / 删除未落地 / 未跟踪临时文件）`,
+      );
+    }
+    return removed;
+  })().catch((err: unknown) => {
+    console.warn(
+      '[sentinel] 历史事件收敛失败（不影响监控）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+}
 
 function registerStateIpc(): void {
   ipcMain.handle('sentinel:getState', async (): Promise<SentinelState> => readState());
@@ -192,12 +226,13 @@ async function startMonitoringForProject(
   }
 
   const runtime = await getSentinel();
+  pruneOutOfScopeEventsOnce(projectId);
   if (monitoredProjects.has(projectId)) {
     return { ok: true, started: ['already-running'], skipped: [] };
   }
 
   const { started, skipped } = await startMonitors(runtime, projectId, projectPath);
-  if (started.length > 0) monitoredProjects.add(projectId);
+  if (started.length > 0) monitoredProjects.set(projectId, projectPath);
 
   return { ok: started.length > 0, started, skipped };
 }
@@ -216,10 +251,57 @@ function registerMonitoringStart(): void {
   );
 }
 
+/**
+ * 停止指定项目的监控。
+ *
+ * 必须真的停，而不是只在前端改状态 —— 用户诉求就是「点下去停不了」。
+ * 三个监视器是进程内单例（stop() 无参数、只能整体停），所以：
+ *   - 该项目是最后一个 ⇒ 直接整体停；
+ *   - 还有别的项目在监控 ⇒ 整体停后按监控表重新挂回其余项目。
+ * 后者的代价是其余项目的文件监听会重建（进程监控随重启重建子进程），这是单例
+ * 模型的固有限制，比"点停止什么都没发生"诚实。
+ */
+async function stopMonitoringForProject(
+  projectId: string,
+): Promise<{ ok: boolean; stopped: boolean; restarted: string[] }> {
+  const { stopped, remaining } = applyMonitoringStop(monitoredProjects, projectId);
+  if (!stopped) {
+    return { ok: true, stopped: false, restarted: [] };
+  }
+  if (remaining.length === 0) {
+    stopAllMonitoring();
+    return { ok: true, stopped: true, restarted: [] };
+  }
+  stopAllMonitoring();
+  const runtime = await getSentinel();
+  const restarted: string[] = [];
+  for (const [id, path] of remaining) {
+    const { started } = await startMonitors(runtime, id, path);
+    if (started.length > 0) {
+      restarted.push(id);
+    } else {
+      // 重启失败的项目不许再留在监控表里：否则页面仍显示"监控中"，而实际没在跑
+      monitoredProjects.delete(id);
+    }
+  }
+  return { ok: true, stopped: true, restarted };
+}
+
+/** 停止监控 IPC：真的停掉监视器（用户诉求：点下去要能停） */
+function registerMonitoringStop(): void {
+  ipcMain.handle(
+    'sentinel:stopMonitoring',
+    async (_event, projectId: string): Promise<{ ok: boolean; stopped: boolean; restarted: string[] }> => {
+      return stopMonitoringForProject(projectId);
+    },
+  );
+}
+
 export function registerSentinelIpc(): void {
   registerStateIpc();
   registerEventQuery();
   registerMonitoringStart();
+  registerMonitoringStop();
 }
 
 // ─── 哨兵健康数据（十域评分章程 #9，报告中心汇总只读消费）──────

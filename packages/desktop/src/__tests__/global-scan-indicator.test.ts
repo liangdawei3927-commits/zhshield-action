@@ -3,7 +3,6 @@ import type { TaskInfo, TaskKind } from '../types/electron';
 import {
   countActiveTasks,
   isActiveTask,
-  pickActiveTask,
 } from '../components/layout/global-scan-indicator-logic';
 import { navIdForTaskKind } from '../components/layout/nav-items';
 
@@ -18,40 +17,17 @@ function task(overrides: Partial<TaskInfo> & { id: string }): TaskInfo {
   };
 }
 
-describe('global-scan-indicator: 活动任务选取', () => {
-  it('无任务时不展示', () => {
-    expect(pickActiveTask([])).toBeUndefined();
-  });
-
-  it('只有已完成/失败/取消的任务时不展示', () => {
+// ⚠️ 浮窗专属的 pickActiveTask（选中要展示的那条任务）已于 2026-10-26 随右下角
+// GlobalScanIndicator 一并删除，其 4 条用例同时移除。本文件剩下的部分测的是
+// 仍被 useDailyAutoCheck 消费的 countActiveTasks / isActiveTask。
+describe('活动任务计数（useDailyAutoCheck 去重用）', () => {
+  it('只有已完成/失败/取消的任务时计数为 0', () => {
     const tasks = [
       task({ id: 'a', status: 'done' }),
       task({ id: 'b', status: 'failed' }),
       task({ id: 'c', status: 'cancelled' }),
     ];
-    expect(pickActiveTask(tasks)).toBeUndefined();
     expect(countActiveTasks(tasks)).toBe(0);
-  });
-
-  it('运行中优先于排队中，即使排队任务更晚发起', () => {
-    const tasks = [
-      task({ id: 'running', status: 'running', startedAt: '2026-01-01T00:00:00.000Z' }),
-      task({ id: 'queued', status: 'queued', startedAt: '2026-01-01T00:00:09.000Z' }),
-    ];
-    expect(pickActiveTask(tasks)?.id).toBe('running');
-  });
-
-  it('多个运行中任务取最近发起的那条', () => {
-    const tasks = [
-      task({ id: 'old', startedAt: '2026-01-01T00:00:00.000Z' }),
-      task({ id: 'new', startedAt: '2026-01-01T00:00:05.000Z' }),
-    ];
-    expect(pickActiveTask(tasks)?.id).toBe('new');
-  });
-
-  it('没有运行中任务时退回排队任务', () => {
-    const tasks = [task({ id: 'q1', status: 'queued' }), task({ id: 'q2', status: 'queued' })];
-    expect(pickActiveTask(tasks)?.id).toBe('q2');
   });
 
   it('活动任务计数只含运行中与排队中', () => {
@@ -65,7 +41,7 @@ describe('global-scan-indicator: 活动任务选取', () => {
   });
 });
 
-describe('global-scan-indicator: 任务类型反查导航分类', () => {
+describe('nav-items: 任务类型反查导航分类', () => {
   it('pipeline 归巡检页（own 优先于借用方 deps/techdebt）', () => {
     expect(navIdForTaskKind('pipeline')).toBe('inspect');
   });

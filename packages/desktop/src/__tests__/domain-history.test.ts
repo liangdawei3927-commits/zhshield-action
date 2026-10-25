@@ -4,7 +4,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   appendDomainHistory,
-  attachScore,
   buildRecordFromFingerprints,
   buildScanRecord,
   diffScans,
@@ -241,24 +240,6 @@ describe('diffScans', () => {
   it('任一侧无分数 → scoreDelta 为 null（不把 null 当 0）', () => {
     const noScore = recordInput('/p', '2026-10-24T02:00:00.000Z', ['a'], null);
     expect(diffScans(noScore, next).scoreDelta).toBeNull();
-  });
-});
-
-describe('attachScore', () => {
-  it('按 scanId 回填分数，不新增记录', async () => {
-    const project = tempProject();
-    const record = recordInput(project, '2026-10-24T00:00:00.000Z', ['a'], null);
-    await appendDomainHistory(project, record);
-    expect(await attachScore(project, 'inspect', record.scanId, 91.2, 3)).toBe(true);
-    const history = await listDomainHistory(project, 'inspect');
-    expect(history).toHaveLength(1);
-    expect(history[0].score).toBe(91.2);
-    expect(history[0].scoreVersion).toBe(3);
-  });
-
-  it('找不到 scanId → false', async () => {
-    const project = tempProject();
-    expect(await attachScore(project, 'inspect', 'deadbeefdeadbeef', 90)).toBe(false);
   });
 });
 

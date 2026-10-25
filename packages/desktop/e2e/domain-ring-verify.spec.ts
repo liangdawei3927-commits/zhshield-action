@@ -41,7 +41,7 @@ const ACTION_CANDIDATES: Record<string, string[]> = {
   security: ['一键扫描', '重新检查', '开始扫描'],
   deps: ['开始盘点', '重新盘点'],
   garbage: ['开始扫描', '重新扫描'],
-  performance: ['开始性能检测', '重新检测'],
+  performance: ['开始检测', '重新检测'],
   techdebt: ['开始盘点', '重新盘点'],
   refactor: ['马上检查', '重新检查'],
   backup: ['一键备份'],

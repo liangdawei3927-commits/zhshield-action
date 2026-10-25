@@ -224,24 +224,33 @@ function domainContribution(
  * 两端必须是真实的评分记录（`HealthScoreData`，来自 scores 历史），
  * 不能是现场重算的临时对象 —— 否则归因的是「现在算出来的分」而不是「当时记下的分」。
  */
-export function attributeScoreDelta(
+/** 前置闸门结果：要么带不可用原因直接返回，要么交出两端参与加权的维度 */
+type PreconditionOutcome =
+  | { ok: false; result: AttributionResult }
+  | { ok: true; startActive: Dimension[]; endActive: Dimension[] };
+
+/**
+ * 归因的四道前置闸门：版本一致 → 两端都有参与域 → 维度集一致 → 权重齐备。
+ *
+ * 每道闸门失败都返回「不可用 + 具体原因」，绝不静默按 0 处理。
+ */
+function checkPreconditions(
   start: HealthScoreData,
   end: HealthScoreData,
-): AttributionResult {
-  const pair = emptyPair(start, end);
-
+  pair: ScorePair,
+): PreconditionOutcome {
   if (
     typeof start.scoreVersion === 'number' &&
     typeof end.scoreVersion === 'number' &&
     start.scoreVersion !== end.scoreVersion
   ) {
-    return { ok: false, reason: 'version-mismatch', ...pair };
+    return { ok: false, result: { ok: false, reason: 'version-mismatch', ...pair } };
   }
 
   const startActive = start.dimensions.filter((d) => d.status !== 'not-run');
   const endActive = end.dimensions.filter((d) => d.status !== 'not-run');
   if (startActive.length === 0 || endActive.length === 0) {
-    return { ok: false, reason: 'no-active-dimension', ...pair };
+    return { ok: false, result: { ok: false, reason: 'no-active-dimension', ...pair } };
   }
 
   // 维度集必须一致。`not-run` 的域仍留在 dimensions 里（score 0 + status），所以
@@ -252,7 +261,7 @@ export function attributeScoreDelta(
   // Set 没有 some，展开成数组是必要的（不是「无谓的数组展开」）
   const startNamesList = [...startNames];
   if (startNames.size !== endNames.size || startNamesList.some((name) => !endNames.has(name))) {
-    return { ok: false, reason: 'dimension-set-mismatch', ...pair };
+    return { ok: false, result: { ok: false, reason: 'dimension-set-mismatch', ...pair } };
   }
 
   // 只有参与加权的域需要权重；not-run 域的 weight 不进入任何分母
@@ -260,34 +269,67 @@ export function attributeScoreDelta(
     startActive.every((d) => isPositiveWeight(d.weight)) &&
     endActive.every((d) => isPositiveWeight(d.weight));
   if (!weightOk) {
-    return { ok: false, reason: 'missing-weight', ...pair };
+    return { ok: false, result: { ok: false, reason: 'missing-weight', ...pair } };
   }
 
-  const startMap = new Map(start.dimensions.map((d) => [d.name, d]));
-  const endMap = new Map(end.dimensions.map((d) => [d.name, d]));
-  /** 域名取并集，保持「本期顺序优先」以便 UI 稳定 */
-  const names: string[] = end.dimensions.map((d) => d.name);
+  return { ok: true, startActive, endActive };
+}
+
+/** 参与域的权重和（归一化分母） */
+function weightSum(active: readonly Dimension[]): number {
+  return active.reduce((sum, d) => sum + d.weight, 0);
+}
+
+/** 未封顶的加权总分（分母用调用方算好的权重和，保证与有效权重同源） */
+function weightedRawScore(active: readonly Dimension[], sum: number): number {
+  return active.reduce((acc, d) => acc + d.score * d.weight, 0) / sum;
+}
+
+/** 域名取并集，保持「本期顺序优先」以便 UI 稳定 */
+function collectDomainNames(
+  start: HealthScoreData,
+  endMap: ReadonlyMap<string, Dimension>,
+): string[] {
+  const names: string[] = [];
+  for (const dim of endMap.values()) names.push(dim.name);
   for (const dim of start.dimensions) {
     if (!endMap.has(dim.name)) names.push(dim.name);
   }
+  return names;
+}
 
-  const startWeightSum = startActive.reduce((sum, d) => sum + d.weight, 0);
-  const endWeightSum = endActive.reduce((sum, d) => sum + d.weight, 0);
-
-  const rawStartScore =
-    startActive.reduce((sum, d) => sum + d.score * d.weight, 0) / startWeightSum;
-  const rawEndScore = endActive.reduce((sum, d) => sum + d.score * d.weight, 0) / endWeightSum;
-
-  const domains: AttributionDomain[] = [];
-  const entered: string[] = [];
-  const exited: string[] = [];
-  const weightChanged: string[] = [];
+interface DomainAccumulation {
+  domains: AttributionDomain[];
+  entered: string[];
+  exited: string[];
+  weightChanged: string[];
   /**
    * 域贡献的**未舍入**总和，专供对账用。
    *
    * 不能拿 `domains` 里的 `delta`（已 round1）再乘权重：每域最多引入 0.05 × 权重 的误差，
    * 10 域累加会逼近 0.1 的容差边缘，让「数据坏了」和「舍入」混在一起分不清。
    */
+  domainsRaw: number;
+}
+
+/**
+ * 逐域累计对总分变化的贡献。
+ *
+ * 累加顺序严格按 `names`（本期优先的并集）—— 浮点求和顺序变了对账残差就变。
+ * 三种去向互斥，所以用 guard clause 平铺：两端都已检测 → 产生域贡献；
+ * 进 / 出参与集的域只记名字（影响走结构项）。写成 if / else-if 链会让
+ * 三条平级分支被当成逐层嵌套。
+ */
+function accumulateDomains(
+  names: readonly string[],
+  startMap: ReadonlyMap<string, Dimension>,
+  endMap: ReadonlyMap<string, Dimension>,
+  startWeightSum: number,
+): DomainAccumulation {
+  const domains: AttributionDomain[] = [];
+  const entered: string[] = [];
+  const exited: string[] = [];
+  const weightChanged: string[] = [];
   let domainsRaw = 0;
 
   for (const name of names) {
@@ -296,9 +338,6 @@ export function attributeScoreDelta(
     const beforeStatus = statusOf(before);
     const afterStatus = statusOf(after);
 
-    // 三种去向互斥，所以用 guard clause 平铺：两端都已检测 → 产生域贡献；
-    // 进 / 出参与集的域只记名字（影响走结构项）。写成 if / else-if 链会让
-    // 三条平级分支被当成逐层嵌套。
     if (beforeStatus === 'scored' && afterStatus === 'scored' && before && after) {
       const contribution = domainContribution(name, before, after, startWeightSum);
       domainsRaw += contribution.raw;
@@ -314,9 +353,53 @@ export function attributeScoreDelta(
   }
 
   domains.sort((a, b) => Math.abs(b.points) - Math.abs(a.points) || a.name.localeCompare(b.name));
+  return { domains, entered, exited, weightChanged, domainsRaw };
+}
 
-  const rawDelta = rawEndScore - rawStartScore;
-  const structurePoints = rawDelta - domainsRaw;
+/** 封顶项：本期封顶效应 − 上期封顶效应 */
+function computeCapPoints(
+  start: HealthScoreData,
+  end: HealthScoreData,
+  rawStartScore: number,
+  rawEndScore: number,
+): number {
+  const capStartEffect = start.redLine?.capped === true ? start.score - rawStartScore : 0;
+  const capEndEffect = end.redLine?.capped === true ? end.score - rawEndScore : 0;
+  return capEndEffect - capStartEffect;
+}
+
+/**
+ * 把「上期记录 → 本期记录」的总分变化拆到各维度。
+ *
+ * 两端必须是真实的评分记录（`HealthScoreData`，来自 scores 历史），
+ * 不能是现场重算的临时对象 —— 否则归因的是「现在算出来的分」而不是「当时记下的分」。
+ */
+export function attributeScoreDelta(
+  start: HealthScoreData,
+  end: HealthScoreData,
+): AttributionResult {
+  const pair = emptyPair(start, end);
+
+  const pre = checkPreconditions(start, end, pair);
+  if (!pre.ok) return pre.result;
+  const { startActive, endActive } = pre;
+
+  const startMap = new Map(start.dimensions.map((d) => [d.name, d]));
+  const endMap = new Map(end.dimensions.map((d) => [d.name, d]));
+  const names = collectDomainNames(start, endMap);
+
+  const startWeightSum = weightSum(startActive);
+  const rawStartScore = weightedRawScore(startActive, startWeightSum);
+  const rawEndScore = weightedRawScore(endActive, weightSum(endActive));
+
+  const { domains, entered, exited, weightChanged, domainsRaw } = accumulateDomains(
+    names,
+    startMap,
+    endMap,
+    startWeightSum,
+  );
+
+  const structurePoints = rawEndScore - rawStartScore - domainsRaw;
 
   /**
    * 封顶项只在**记录自己声明了 `redLine.capped`** 时才计算。
@@ -326,9 +409,7 @@ export function attributeScoreDelta(
    * 全都会被显示成「红线压制」，而且恒等式照样闭合、照样打绿勾。
    * 没声明封顶的差额留在 residual 里，让 `reconciled` 变红 —— 这是本模块唯一能自证的方式。
    */
-  const capStartEffect = start.redLine?.capped === true ? start.score - rawStartScore : 0;
-  const capEndEffect = end.redLine?.capped === true ? end.score - rawEndScore : 0;
-  const capPoints = capEndEffect - capStartEffect;
+  const capPoints = computeCapPoints(start, end, rawStartScore, rawEndScore);
 
   // 用精确差值而非 1 位小数的 actualDelta 对账，避免把显示精度当成公式误差
   const residual = end.score - start.score - (domainsRaw + structurePoints + capPoints);

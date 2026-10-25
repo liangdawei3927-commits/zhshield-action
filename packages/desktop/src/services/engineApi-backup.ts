@@ -40,6 +40,22 @@ export async function runBackup(projectPath: string, trigger?: string): Promise<
   return api.backup.executeBackup(projectPath, trigger);
 }
 
+/**
+ * 停止进行中的备份。
+ *
+ * `cancelled=false` = 该项目此刻没有在跑的备份（如实返回）。取消后 kernel 会在最近
+ * 的检查点停下，未写完的 zip / 清单不落盘，也不会记一条"失败"记录。
+ */
+export async function cancelBackup(projectPath: string): Promise<{ ok: boolean; cancelled: boolean }> {
+  const api = getAPI();
+  if (!api?.backup?.cancelBackup) return { ok: false, cancelled: false };
+  try {
+    return await api.backup.cancelBackup(projectPath);
+  } catch {
+    return { ok: false, cancelled: false };
+  }
+}
+
 export async function getBackupRecords(projectId?: string): Promise<BackupRecordData[]> {
   if (isHttpMode()) return getBackupRecordsViaHttp(projectId) as Promise<BackupRecordData[]>;
   const api = getAPI();

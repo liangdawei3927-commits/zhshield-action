@@ -75,6 +75,7 @@ export {
 export {
   getSentinelEvents,
   startSentinelMonitoring,
+  stopSentinelMonitoring,
   getSentinelState,
   setSentinelEnabled,
 } from './engineApi-sentinel';
@@ -89,6 +90,7 @@ export { getRuleVersion, syncRules, getSyncHealth, getSopStats } from './engineA
 
 export {
   runBackup,
+  cancelBackup,
   getBackupRecords,
   getBackupRecord,
   deleteBackupRecord,

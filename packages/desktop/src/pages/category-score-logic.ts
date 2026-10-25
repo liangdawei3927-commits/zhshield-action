@@ -94,20 +94,28 @@ export function categoryScoreCards({
         group: item.group,
         title,
         view,
-        hint: cardHint(title, dimension, dim?.weight, view, tr),
+        hint: cardHint({ title, dimension, weight: dim?.weight, view, tr }),
       },
     ];
   });
 }
 
+/** hover 提示入参：一维卡片的展示要素（除 `weight` 外全部必填，故不用可选链吞缺） */
+interface CardHintParams {
+  /** 分类名（与导航同名） */
+  title: string;
+  /** 评分维度 */
+  dimension: ScoreDimension;
+  /** 该维权重；未参与汇总时为 undefined（不拼百分比） */
+  weight: number | undefined;
+  /** 该维分数视图（陈旧时补数据时间） */
+  view: DomainScoreView;
+  /** 翻译函数 */
+  tr: typeof t;
+}
+
 /** hover 提示：分类名 · 维度名 · 权重（可选）；陈旧时补一句数据时间 */
-function cardHint(
-  title: string,
-  dimension: ScoreDimension,
-  weight: number | undefined,
-  view: DomainScoreView,
-  tr: typeof t,
-): string {
+function cardHint({ title, dimension, weight, view, tr }: CardHintParams): string {
   const parts = [title, dimensionName(dimension, tr)];
   if (typeof weight === 'number' && weight > 0) {
     parts.push(`${Math.round(weight * 100)}%`);

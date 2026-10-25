@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { t } from '@zh/i18n';
 import type { TaskInfo, TaskKind } from './types/electron';
 
@@ -67,10 +67,40 @@ export const TASK_KIND_DEFAULT_LABELS: Record<TaskKind, string> = {
 export interface TaskRunState {
   loading: boolean;
   queued: boolean;
+  /**
+   * 排队位置（1 起；仅 queued 时有值）。
+   * 按钮只显示「排队中…」纯状态词，位置归进度条文案（task.queuedLabel）。
+   */
+  queuePosition?: number;
   progress: number;
+  /**
+   * 「体检中... 42% · 正在检查 src/a.ts」这类**含进度与任务消息的整串**。
+   *
+   * ⚠️ 禁止接进按钮（loadingLabel）：按钮只许显示「体检中…」这类状态词，
+   * 百分比与任务消息归进度条。域主操作按钮统一走 DomainActionButton，
+   * 由 __tests__/domain-action-label.test.ts 锁住（页面里出现 progressLabel 即红）。
+   */
   progressLabel: string;
   statusMessage: string;
   task: TaskInfo | undefined;
+  /** 取消当前任务（用户点「停止」）。空闲时为 no-op，可安全接到按钮 onClick */
+  cancel: () => void;
+  /** 已发出取消、等任务中心推送确认：按钮据此显示「停止中…」并禁用防连点 */
+  stopping: boolean;
+}
+
+/**
+ * 取消任务。
+ *
+ * 主进程收到后立刻 awake 等待方（见 TaskManager.cancel 的 settle），UI 不等执行器
+ * 收尾；执行器若不在宽限期内退出，会被终止（见 pipeline-host 的 cancelJob）。
+ *
+ * 失败不弹错：任务可能刚好跑完（cancel 返回 false），此时状态由任务中心推送纠正，
+ * 对用户来说"已经结束了"与"刚停掉"结果相同，报错只会制造噪音。
+ */
+export function cancelTask(taskId: string): void {
+  const run = window.electronAPI?.tasks?.cancel?.(taskId);
+  void run?.catch(() => undefined);
 }
 
 /**
@@ -79,6 +109,19 @@ export interface TaskRunState {
  */
 export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
   const task = useTask(kind, projectPath);
+  // 记录"用户已经为哪个任务点过停止"：从点击到任务中心推送 cancelled 之间有个
+  // 几毫秒到几百毫秒的窗口，期间按钮必须显示「停止中…」并锁住，否则会连点出第二次取消。
+  const [cancelRequestedFor, setCancelRequestedFor] = useState<string | null>(null);
+
+  const activeId = task && (task.status === 'queued' || task.status === 'running') ? task.id : null;
+  const stopping = activeId !== null && cancelRequestedFor === activeId;
+
+  const cancel = useCallback(() => {
+    if (!activeId || cancelRequestedFor === activeId) return;
+    setCancelRequestedFor(activeId);
+    cancelTask(activeId);
+  }, [activeId, cancelRequestedFor]);
+
   const idle: TaskRunState = {
     loading: false,
     queued: false,
@@ -86,8 +129,10 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
     progressLabel: '',
     statusMessage: '',
     task: undefined,
+    cancel,
+    stopping: false,
   };
-  if (!task || (task.status !== 'queued' && task.status !== 'running')) return idle;
+  if (!task || activeId === null) return idle;
 
   const base = t(TASK_KIND_DEFAULT_LABELS[kind]);
   if (task.status === 'queued') {
@@ -95,10 +140,13 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
     return {
       loading: true,
       queued: true,
+      queuePosition: task.queuePosition,
       progress: 0,
       progressLabel: t('task.queuedLabel', { position: pos }),
       statusMessage: '',
       task,
+      cancel,
+      stopping,
     };
   }
   const percent = Math.min(Math.max(Math.round((task.progress || 0) * 100), 0), 100);
@@ -110,5 +158,7 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
     progressLabel: t('task.runningLabel', { kind: base, percent, suffix }),
     statusMessage: task.message?.trim() ?? '',
     task,
+    cancel,
+    stopping,
   };
 }

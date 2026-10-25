@@ -82,6 +82,47 @@ function HistoryRowView({
   );
 }
 
+/** 历史表格：表头 + 数据行。与面板外壳（标题/脚注）分离，行渲染在 HistoryRowView */
+function HistoryTable({
+  rows,
+  t,
+}: {
+  rows: HistoryRow[];
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <table className="w-full text-left">
+      <thead>
+        <tr className="text-[11px] text-zh-muted">
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.time', { defaultValue: '检查时间' })}
+          </th>
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.score', { defaultValue: '分数' })}
+          </th>
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.issues', { defaultValue: '问题数' })}
+          </th>
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.severity', { defaultValue: '错/警/提' })}
+          </th>
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.delta', { defaultValue: '较上次' })}
+          </th>
+          <th className="px-5 py-2 font-medium">
+            {t('page.domainHistory.column.change', { defaultValue: '新增/修复' })}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, index) => (
+          <HistoryRowView key={row.record.scanId} row={row} index={index} t={t} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export interface DomainHistoryPanelProps {
   projectPath: string;
   /** 域键（inspect/refactor/deps/…）；缺省不渲染 */
@@ -111,35 +152,7 @@ export function DomainHistoryPanel({ projectPath, domain, limit }: DomainHistory
         </span>
       </div>
       <ResultCard variant="list" className="overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="text-[11px] text-zh-muted">
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.time', { defaultValue: '检查时间' })}
-              </th>
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.score', { defaultValue: '分数' })}
-              </th>
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.issues', { defaultValue: '问题数' })}
-              </th>
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.severity', { defaultValue: '错/警/提' })}
-              </th>
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.delta', { defaultValue: '较上次' })}
-              </th>
-              <th className="px-5 py-2 font-medium">
-                {t('page.domainHistory.column.change', { defaultValue: '新增/修复' })}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <HistoryRowView key={row.record.scanId} row={row} index={index} t={t} />
-            ))}
-          </tbody>
-        </table>
+        <HistoryTable rows={rows} t={t} />
       </ResultCard>
       <p className="mt-2 text-[11px] text-zh-muted">
         {records[0]?.backfilled

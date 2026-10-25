@@ -63,6 +63,80 @@ function GranularityTabs({
   );
 }
 
+type WindowSummaryData = NonNullable<ReturnType<typeof summarizeWindows>>;
+
+/** 覆盖率：按整百分比显示；100% 时不标色，低于 50% 提示「这段时间大部分没被观测」 */
+function CoverageItem({ summary }: { summary: WindowSummaryData }) {
+  const t = useT();
+  const coveragePct = Math.round(summary.coverage * 100);
+  const color =
+    coveragePct >= 100
+      ? 'rgb(var(--zh-text))'
+      : coveragePct >= 50
+        ? 'rgb(var(--zh-muted))'
+        : 'rgb(var(--zh-danger))';
+  return (
+    <span className="text-zh-muted">
+      {t('page.reports.window.coverage', { defaultValue: '覆盖率' })}{' '}
+      <span className="font-bold" style={{ color }}>
+        {coveragePct}%
+      </span>
+    </span>
+  );
+}
+
+/** 最大空档：有缺口时标红，并点明断在哪个窗口 */
+function MaxGapItem({ summary }: { summary: WindowSummaryData }) {
+  const t = useT();
+  if (summary.maxGapDays === null || summary.maxGapDays <= 0) return null;
+  return (
+    <span className="text-zh-muted">
+      {t('page.reports.window.maxGap', { defaultValue: '最大空档' })}{' '}
+      <span
+        className="font-bold"
+        style={{ color: summary.gapCount > 0 ? 'rgb(var(--zh-danger))' : 'rgb(var(--zh-text))' }}
+      >
+        {summary.maxGapDays} {t('page.reports.window.dayUnit', { defaultValue: '天' })}
+      </span>
+      {summary.maxGapWindow && (
+        <span className="text-zh-muted"> · {summary.maxGapWindow.key}</span>
+      )}
+    </span>
+  );
+}
+
+/** 波峰 / 波谷：两端分别按分档上色 */
+function BestWorstItem({ summary }: { summary: WindowSummaryData }) {
+  const t = useT();
+  return (
+    <span className="text-zh-muted">
+      {t('page.reports.window.bestWorst', { defaultValue: '最高 / 最低' })}{' '}
+      <span className="font-bold" style={{ color: getScoreColor(summary.bestScore) }}>
+        {summary.bestScore}
+      </span>
+      <span className="text-zh-muted"> / </span>
+      <span className="font-bold" style={{ color: getScoreColor(summary.worstScore) }}>
+        {summary.worstScore}
+      </span>
+    </span>
+  );
+}
+
+/** 跌幅最大的窗口（含「较上期」的真实差值） */
+function WorstDropItem({ summary }: { summary: WindowSummaryData }) {
+  const t = useT();
+  if (!summary.worstWindow) return null;
+  return (
+    <span className="text-zh-muted">
+      {t('page.reports.window.worstDrop', { defaultValue: '跌幅最大' })}{' '}
+      <span className="font-bold text-zh-text">{summary.worstWindow.label}</span>{' '}
+      <span style={{ color: deltaColor(summary.worstWindow.deltaVsPrevWindow ?? 0) }}>
+        {formatDelta(summary.worstWindow.deltaVsPrevWindow)}
+      </span>
+    </span>
+  );
+}
+
 /** 结论条：窗口数 / 扫描次数 / 总变化 / 最好最差 / **可观测性（覆盖率与最大空档）** */
 function WindowSummary({ buckets }: { buckets: readonly WindowBucket[] }) {
   const t = useT();
@@ -76,14 +150,6 @@ function WindowSummary({ buckets }: { buckets: readonly WindowBucket[] }) {
       </p>
     );
   }
-  // 覆盖率按整百分比显示；100% 时不标色，低于 100% 提示「这段时间大部分没被观测」
-  const coveragePct = Math.round(summary.coverage * 100);
-  const coverageColor =
-    coveragePct >= 100
-      ? 'rgb(var(--zh-text))'
-      : coveragePct >= 50
-        ? 'rgb(var(--zh-muted))'
-        : 'rgb(var(--zh-danger))';
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-2 text-xs">
       <span className="text-zh-muted">
@@ -91,12 +157,7 @@ function WindowSummary({ buckets }: { buckets: readonly WindowBucket[] }) {
         <span className="font-bold text-zh-text">{summary.windows}</span>
         <span className="text-zh-muted"> / {summary.expectedWindows}</span>
       </span>
-      <span className="text-zh-muted">
-        {t('page.reports.window.coverage', { defaultValue: '覆盖率' })}{' '}
-        <span className="font-bold" style={{ color: coverageColor }}>
-          {coveragePct}%
-        </span>
-      </span>
+      <CoverageItem summary={summary} />
       <span className="text-zh-muted">
         {t('page.reports.window.scans', { defaultValue: '累计检查' })}{' '}
         <span className="font-bold text-zh-text">{summary.scans}</span>
@@ -107,45 +168,15 @@ function WindowSummary({ buckets }: { buckets: readonly WindowBucket[] }) {
           {summary.spanDays} {t('page.reports.window.dayUnit', { defaultValue: '天' })}
         </span>
       </span>
-      {summary.maxGapDays !== null && summary.maxGapDays > 0 && (
-        <span className="text-zh-muted">
-          {t('page.reports.window.maxGap', { defaultValue: '最大空档' })}{' '}
-          <span
-            className="font-bold"
-            style={{ color: summary.gapCount > 0 ? 'rgb(var(--zh-danger))' : 'rgb(var(--zh-text))' }}
-          >
-            {summary.maxGapDays} {t('page.reports.window.dayUnit', { defaultValue: '天' })}
-          </span>
-          {summary.maxGapWindow && (
-            <span className="text-zh-muted"> · {summary.maxGapWindow.key}</span>
-          )}
-        </span>
-      )}
+      <MaxGapItem summary={summary} />
       <span className="text-zh-muted">
         {t('page.reports.window.totalDelta', { defaultValue: '区间总变化' })}{' '}
         <span className="font-bold" style={{ color: deltaColor(summary.totalDelta) }}>
           {formatDelta(summary.totalDelta)}
         </span>
       </span>
-      <span className="text-zh-muted">
-        {t('page.reports.window.bestWorst', { defaultValue: '最高 / 最低' })}{' '}
-        <span className="font-bold" style={{ color: getScoreColor(summary.bestScore) }}>
-          {summary.bestScore}
-        </span>
-        <span className="text-zh-muted"> / </span>
-        <span className="font-bold" style={{ color: getScoreColor(summary.worstScore) }}>
-          {summary.worstScore}
-        </span>
-      </span>
-      {summary.worstWindow && (
-        <span className="text-zh-muted">
-          {t('page.reports.window.worstDrop', { defaultValue: '跌幅最大' })}{' '}
-          <span className="font-bold text-zh-text">{summary.worstWindow.label}</span>{' '}
-          <span style={{ color: deltaColor(summary.worstWindow.deltaVsPrevWindow ?? 0) }}>
-            {formatDelta(summary.worstWindow.deltaVsPrevWindow)}
-          </span>
-        </span>
-      )}
+      <BestWorstItem summary={summary} />
+      <WorstDropItem summary={summary} />
     </div>
   );
 }

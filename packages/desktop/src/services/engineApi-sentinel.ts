@@ -28,6 +28,26 @@ export async function startSentinelMonitoring(
   return api.sentinel.startMonitoring(projectPath, projectPath);
 }
 
+/**
+ * 停止该项目的哨兵监控。
+ *
+ * 与 start 一样用 projectPath 兼作 projectId（主进程幂等键），调用方不必再知道
+ * "主进程内部还另有一套 id" 这个细节 —— 那是此前取消链路两套序号对不上的根因。
+ * `stopped=false` = 该项目本就不在监控中（如实返回，不粉饰成"已停止"）。
+ */
+export async function stopSentinelMonitoring(
+  projectPath: string,
+): Promise<{ ok: boolean; stopped: boolean }> {
+  const api = getAPI();
+  if (!api?.sentinel) return { ok: false, stopped: false };
+  try {
+    const result = await api.sentinel.stopMonitoring(projectPath);
+    return { ok: result.ok, stopped: result.stopped };
+  } catch {
+    return { ok: false, stopped: false };
+  }
+}
+
 export async function getSentinelState(): Promise<{ enabled: boolean }> {
   const api = getAPI();
   if (!api?.sentinel) return { enabled: true };

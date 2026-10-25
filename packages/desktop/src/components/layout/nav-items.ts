@@ -27,7 +27,8 @@ export interface NavScanProgress {
  * - 中间 8 项各是独立治理域，触发权与判定权域内独占，互不借调。
  * - **两段式**：前段 `onDemand`（按需检查 8 项）、后段 `daemon`（常驻守护：哨兵、备份）。
  *   哨兵与备份没有"扫一次"的语义（前者开启后长驻监听、后者定时执行），
- *   曾与扫描项平铺混排而看不出区别，现由 `group` 显式声明并分段渲染。
+ *   曾与扫描项平铺混排而看不出区别，现由 `group` 显式声明。导航条**不再画组间
+ *   竖线**（2026-10-25 移除：竖线占宽导致十项横向空间不统一），分段只剩语义与排序约束。
  *
  * 独立成模块（而非内联在 TopNav 组件里）的两个原因：
  *   1) 组件文件带 React/图标依赖，测试想断言导航结构就得整棵加载；
@@ -61,8 +62,9 @@ export interface NavItem {
   /**
    * 本分类的性质分组（必填）。
    *
-   * 导航与报告中心「评分总览」卡片行都按本字段分段渲染：同组必须连续，
-   * 组间加分隔。不允许漏字段后静默混进「按需检查」段 —— 那正是哨兵曾经
+   * 报告中心「评分总览」卡片行按本字段分段渲染：同组必须连续。导航条只按原顺序
+   * 平铺（不画组间分隔线），但顺序仍受本字段约束。不允许漏字段后静默混进
+   * 「按需检查」段 —— 那正是哨兵曾经
    * 的处境（常驻监听被排在体检/门禁之后，看起来和一键扫描项是同一种东西）。
    */
   group: NavGroup;
@@ -151,18 +153,31 @@ export function navScanProgress(id: string): NavScanProgress | undefined {
   return navItems.find((item) => item.id === id)?.scanProgress;
 }
 
-/** 导航分段：同一 group 的连续项之间不留缝，让两类功能在视觉上分开 */
+/**
+ * 查某分类对应的评分维度（导航 id → 十域维度；未知 id 返回 undefined）。
+ *
+ * 给「扫描结束后要不要自动进详情」用：判定要看该域的分，而分类页只知道自己
+ * 的导航 id。映射仍以 navItems 为唯一来源 —— 页面不另建第二张「id → 维度」表。
+ */
+export function navScoreDimension(id: string): HealthScoreDimension | null | undefined {
+  return navItems.find((item) => item.id === id)?.scoreDimension;
+}
+
+/** 导航分段：同组连续项归为一段（导航条已不画分隔，仅作分组语义与顺序校验用） */
 export interface NavGroupSegment {
   group: NavGroup;
   items: NavItem[];
 }
 
 /**
- * 按 `group` 把导航切成连续段（段边界 = group 变化处），供导航条与评分卡片行分段渲染。
+ * 按 `group` 把导航切成连续段（段边界 = group 变化处），供评分卡片行分段渲染与测试校验。
  *
  * 不变量：**同组必须连续**。若某组被切成两段（如把哨兵挪回扫描项中间），
  * 段数就会大于组数 —— 导航测试用这一点锁住"不许再混排"。
  * 段内保持 navItems 的原顺序，不重排、不过滤。
+ *
+ * 注意：**不要在导航条里用它画组间分隔线** —— 竖线占 1px + 左右 8px 外边距，
+ * 会让末两项与前八项的横向空间不一致（2026-10-25 已移除并加了反向断言）。
  */
 export function navGroupSegments(): NavGroupSegment[] {
   const segments: NavGroupSegment[] = [];

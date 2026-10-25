@@ -174,7 +174,11 @@ export const DEFAULT_CONFIG: RefactorConfig = {
     'lazy-class',
     'switch-statement',
     'oversized-file',
-    'mixed-responsibilities',
+    // 'mixed-responsibilities' 默认下线（2026-10-25）：其"职责数" = 注释分区数 + 空行块数
+    // + try 个数（structure-detectors.ts countResponsibilities），纯字面量代理，与职责无关。
+    // 实测对自家代码库 32 处命中 0 处可用（22 行的 hook 被判 4 个职责），精确率 0%。
+    // 误报回归集与真阳性样本见 __tests__/mixed-responsibilities-gate.test.ts；
+    // 换语义信号重写并通过该回归集后，方可恢复默认启用。
     'duplicated-code',
     'callback-hell',
     'oversized-component',

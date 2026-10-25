@@ -2001,7 +2001,8 @@
     "refactor": {
       "analyzing": "重构异味分析中…",
       "collecting": "正在收集源码文件…",
-      "done": "重构分析完成：{{count}} 处异味"
+      "done": "重构分析完成：{{count}} 处异味",
+      "baselineSuppressed": "（基线豁免 {{count}} 项存量异味）"
     },
     "report": {
       "executionError": "执行出错",

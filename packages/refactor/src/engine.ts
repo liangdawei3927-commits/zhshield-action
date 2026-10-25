@@ -5,6 +5,7 @@ import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
 import type { CodeSmell, FileSmellReport, RefactorReport, RefactorConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
 import { generateFixes, applyFixes } from './auto-fix';
+import { calculateMaintainability, calculatePriority } from './report-math';
 import type { Fix, FixResult } from './types';
 
 const TS_FILE_PATTERN = /\.tsx?$/;
@@ -166,8 +167,8 @@ export class RefactorEngine {
     const fileSmells = this.detectAllSmells(parsed, parsedFiles);
     if (fileSmells.length === 0) return;
 
-    const maintainabilityScore = this.calculateMaintainability(fileSmells);
-    const priority = this.calculatePriority(fileSmells);
+    const maintainabilityScore = calculateMaintainability(fileSmells);
+    const priority = calculatePriority(fileSmells);
     state.fileReports.push({
       filePath: parsed.filePath,
       totalSmells: fileSmells.length,
@@ -214,26 +215,6 @@ export class RefactorEngine {
       }
     }
     return allSmells;
-  }
-
-  private calculateMaintainability(smells: CodeSmell[]): number {
-    if (smells.length === 0) return 100;
-    const weights = { error: 15, warning: 8, info: 3 };
-    const totalWeight = smells.reduce((sum, s) => {
-      const w = weights[s.severity as keyof typeof weights] || 3;
-      return sum + w;
-    }, 0);
-    const score = 100 - totalWeight;
-    return Math.max(0, Math.min(100, Math.round(score)));
-  }
-
-  private calculatePriority(smells: CodeSmell[]): 'critical' | 'high' | 'medium' | 'low' {
-    const errorCount = smells.filter((s) => s.severity === 'error').length;
-    const warningCount = smells.filter((s) => s.severity === 'warning').length;
-    if (errorCount >= 3) return 'critical';
-    if (errorCount >= 1 || warningCount >= 5) return 'high';
-    if (warningCount >= 2) return 'medium';
-    return 'low';
   }
 
   /** 为指定代码异味生成自动修复建议 */

@@ -10,8 +10,12 @@ export {
   scanDuplicateCodeBlocks,
 } from './ast-helper';
 export { ALL_DETECTORS } from './adapters/index';
-export { countSmellsByFileAndRule, diffBaseline } from './baseline';
-export type { RefactorBaseline } from './baseline';
+export {
+  countSmellsByFileAndRule,
+  diffBaseline,
+  applyRefactorBaseline,
+} from './baseline';
+export type { RefactorBaseline, RefactorBaselineFilterResult } from './baseline';
 
 export type {
   CodeSmell,

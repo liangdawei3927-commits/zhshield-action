@@ -21,7 +21,11 @@ import {
   baselinePath,
   baselineEntryKey,
   isBaselineEntryActive,
+  saveRefactorBaseline,
+  clearRefactorBaseline,
+  refactorBaselinePath,
 } from '@zh/shared';
+import { countSmellsByFileAndRule } from '@zh/refactor';
 import * as path from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { countDegraded } from './degraded';
@@ -257,8 +261,27 @@ export async function runBaselineCommand(
       process.exit(process.exitCode);
       break;
     }
+    case 'capture-refactor': {
+      // skipBaseline：捕获时必须拿全量报告（否则存量会被已有基线压掉，棘轮永远收不进新存量）
+      const report = await runner.runRefactor({ skipBaseline: true });
+      const counts = countSmellsByFileAndRule(report, projectDir);
+      const fileCount = Object.keys(counts).length;
+      const saved = await saveRefactorBaseline(projectDir, counts);
+      console.log(
+        `重构棘轮基线已捕获: ${report.totalSmells} 处存量异味（${fileCount} 个文件）→ ${refactorBaselinePath(projectDir)} (${saved.capturedAt})`,
+      );
+      console.log('提示：此后 refactor 报告只显示超出基线的增量；修复存量后可重新捕获收紧棘轮');
+      process.exit(process.exitCode);
+      break;
+    }
+    case 'clear-refactor': {
+      await clearRefactorBaseline(projectDir);
+      console.log(`重构棘轮基线已清除: ${refactorBaselinePath(projectDir)}`);
+      process.exit(process.exitCode);
+      break;
+    }
   }
-  console.error('未知 baseline 子命令，支持: capture | list | clear');
+  console.error('未知 baseline 子命令，支持: capture | list | clear | capture-refactor | clear-refactor');
   process.exit(1);
 }
 

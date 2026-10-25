@@ -14,5 +14,5 @@ export interface CLIOptions {
   format: 'text' | 'json' | 'sarif';
   report: string;
   failOn: FailOn;
-  baselineAction?: 'capture' | 'list' | 'clear';
+  baselineAction?: 'capture' | 'list' | 'clear' | 'capture-refactor' | 'clear-refactor';
 }

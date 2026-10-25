@@ -20,7 +20,9 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 50"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@zh/refactor": "workspace:*"
+  },
   "devDependencies": {
     "@zh/pipeline": "workspace:*",
     "@zh/reporter": "workspace:*",

@@ -57,6 +57,8 @@ zhshield — 智汇码盾 代码质量治理
   zhshield baseline capture [--dir <path>]  捕获当前问题为豁免基线
   zhshield baseline list [--dir <path>]     列出基线条目
   zhshield baseline clear [--dir <path>]    清除基线文件
+  zhshield baseline capture-refactor [--dir <path>]  捕获重构存量异味为棘轮基线（此后只报增量）
+  zhshield baseline clear-refactor [--dir <path>]    清除重构棘轮基线
   zhshield help                显示此帮助
 
 选项:

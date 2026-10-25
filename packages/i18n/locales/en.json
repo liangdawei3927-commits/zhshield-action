@@ -2001,7 +2001,8 @@
     "refactor": {
       "analyzing": "Analyzing refactor smells…",
       "collecting": "Collecting source files…",
-      "done": "Refactor analysis complete: {{count}} smells"
+      "done": "Refactor analysis complete: {{count}} smells",
+      "baselineSuppressed": "({{count}} legacy items suppressed by baseline)"
     },
     "report": {
       "executionError": "Execution error",

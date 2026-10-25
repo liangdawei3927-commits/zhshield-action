@@ -29,13 +29,29 @@ let garbageSnapshotQueue: Promise<void> = Promise.resolve();
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);
-  const { RefactorEngine } = await import('@zh/refactor');
+  const { RefactorEngine, applyRefactorBaseline } = await import('@zh/refactor');
+  const { loadRefactorBaseline } = await import('@zh/shared');
   const engine = new RefactorEngine();
   try {
     progress(id, 'refactor', t('pipeline.refactor.analyzing'), 0.2);
     const report = await engine.analyzeDirectory(projectPath);
-    progress(id, 'done', t('pipeline.refactor.done', { count: report.totalSmells }), 1.0);
-    send({ type: 'result', id, report: serializePipelineReport(report) });
+    // 棘轮基线：.zhshield/refactor-baseline.json 存在时只报增量；无基线全量（历史行为）
+    const baselineCounts = await loadRefactorBaseline(projectPath);
+    const filtered = baselineCounts
+      ? applyRefactorBaseline(report, baselineCounts, projectPath)
+      : null;
+    const finalReport = filtered ? filtered.report : report;
+    const note =
+      filtered && filtered.suppressedCount > 0
+        ? t('pipeline.refactor.baselineSuppressed', { count: filtered.suppressedCount })
+        : '';
+    progress(
+      id,
+      'done',
+      t('pipeline.refactor.done', { count: finalReport.totalSmells }) + note,
+      1.0,
+    );
+    send({ type: 'result', id, report: serializePipelineReport(finalReport) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(

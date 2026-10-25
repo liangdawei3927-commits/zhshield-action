@@ -31,13 +31,20 @@ import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
-import { loadBaseline, filterIssuesByBaseline, type Baseline } from '@zh/shared';
+import {
+  loadBaseline,
+  filterIssuesByBaseline,
+  loadRefactorBaseline,
+  type Baseline,
+} from '@zh/shared';
+import { applyRefactorBaseline } from '@zh/refactor';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
 import { toMessage } from './runner-utils';
 import { buildSuccessReport } from './report-builders';
 import { resolveEffectiveProjectRoot } from './project-profile';
+import { resolveDefaultSopRulesDir } from './sop-rules-dir';
 import {
   composeRuleContext,
   deriveProjectFeature,
@@ -200,33 +207,8 @@ export class PipelineRunner {
     // SOP 系统
     this.sopRegistry = new SopRegistry(this.eventBus);
 
-    // SOP 规则目录：指向内置规则模板（{domain}/{action}/**/*.yml，44 条）。
-    // 注：根目录 kernel/src/sop 已无 {guard,inspect,...}/{action} 一层，规则都在
-    // presets/sop-templates 下，若指向 src/sop 会加载到 0 条 → 体检 0 检查项 + 默认满分。
-    // 运行于 dist 树时（打包后）用 kernel/dist 的模板（构建会把 yml 一并拷贝），dev 走 src。
-    const defaultRulesDir = __dirname.includes('/dist/')
-      ? require('path').resolve(
-          __dirname,
-          '..',
-          '..',
-          'kernel',
-          'dist',
-          'sop',
-          'presets',
-          'sop-templates',
-        )
-      : require('path').resolve(
-          __dirname,
-          '..',
-          '..',
-          'kernel',
-          'src',
-          'sop',
-          'presets',
-          'sop-templates',
-        );
-
-    this.sopRulesDir = options?.configDir || defaultRulesDir;
+    // SOP 规则目录：内置规则模板解析已提取至 sop-rules-dir.ts（单一来源）
+    this.sopRulesDir = options?.configDir || resolveDefaultSopRulesDir();
     this.sopLoader = new SopLoader(this.sopRegistry, { rulesDir: this.sopRulesDir });
 
     this.guardEngine = new GuardEngine(this.repoRoot, options?.configDir, {
@@ -326,14 +308,32 @@ export class PipelineRunner {
     );
     return report;
   }
-  async runRefactor(): Promise<RefactorReport> {
+  async runRefactor(options?: { skipBaseline?: boolean }): Promise<RefactorReport> {
     this.logger.info('开始 Refactor 重构检测...');
 
     const report = await this.refactorEngine.analyzeDirectory(this.repoRoot);
+    if (options?.skipBaseline) {
+      this.logger.info(
+        `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)`,
+      );
+      return report;
+    }
+    // 棘轮基线：.zhshield/refactor-baseline.json 存在时只报增量（存量压制）；
+    // 无基线时原样返回全量报告，行为与历史版本一致（零回归）。
+    const baselineCounts = await loadRefactorBaseline(this.repoRoot);
+    if (!baselineCounts) {
+      this.logger.info(
+        `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)`,
+      );
+      return report;
+    }
+    const filtered = applyRefactorBaseline(report, baselineCounts, this.repoRoot);
+    const note =
+      filtered.suppressedCount > 0 ? `（基线豁免 ${filtered.suppressedCount} 项存量）` : '';
     this.logger.info(
-      `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)`,
+      `重构检测完成: ${filtered.report.totalSmells} 处异味 (${filtered.report.summary.criticalFiles} 个文件需要关注)${note}`,
     );
-    return report;
+    return filtered.report;
   }
   // ─── SOP 规则驱动模式 ───
   async runSopGuard(context?: Partial<RuleContext>): Promise<RuleEngineReport> {

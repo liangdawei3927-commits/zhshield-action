@@ -35,15 +35,21 @@ export function mapDepcheckIssuesToGarbage(issues: Issue[]): GarbageItem[] {
     }));
 }
 
-export class GarbageScanner {
-  async scan(projectPath: string): Promise<GarbageItem[]> {
-    return scanGarbageDir(projectPath, {
-      ignoreDirs: IGNORE_DIRS,
-      buildArtifactDirs: BUILD_ARTIFACT_DIRS,
-      isJunkFileName: isJunkFile,
-      measureDirSize: dirSize,
-    });
-  }
+/**
+ * 扫描项目根层的构建产物目录与垃圾文件。
+ *
+ * 与 @zh/garbage 的 fs-detector 同一模式：目录遍历骨架已收敛到 @zh/shared 的
+ * scanGarbageDir，本域只注入自身口径（忽略目录集 / 构建产物目录集 / 垃圾文件名
+ * 规则 / 体积统计）。原 GarbageScanner 为无状态单方法薄壳类，按 lazy-class 建议
+ * 内联为函数；保留 async 以维持原有的 Promise 返回契约。
+ */
+export async function scanGarbage(projectPath: string): Promise<GarbageItem[]> {
+  return scanGarbageDir(projectPath, {
+    ignoreDirs: IGNORE_DIRS,
+    buildArtifactDirs: BUILD_ARTIFACT_DIRS,
+    isJunkFileName: isJunkFile,
+    measureDirSize: dirSize,
+  });
 }
 
 /** 判断文件名是否为垃圾文件（系统残留 / 临时文件 / 备份文件） */

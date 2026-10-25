@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Issue } from '@zh/shared';
 import type { Vulnerability, GarbageItem, MalwareItem } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
-import { GarbageScanner, mapDepcheckIssuesToGarbage } from './garbage-scanner';
+import { mapDepcheckIssuesToGarbage } from './garbage-scanner';
 import { MalwareScanner, mapSemgrepIssuesToMalware } from './malware-scanner';
 import type { CrossValidationReport } from './cross-validator';
 import { InjectionGuard } from './injection-guard';
@@ -94,20 +94,20 @@ export interface ResultAggregatorResult {
  */
 export class ResultAggregator {
   private vulnerabilityScanner: VulnerabilityScanner;
-  private garbageScanner: GarbageScanner;
+  private garbageScan: (projectPath: string) => Promise<GarbageItem[]>;
   private malwareScanner: MalwareScanner;
   private crossValidator: { validate(trivy: Issue[], grype: Issue[]): CrossValidationReport };
   private ruleConflictResolver: RuleConflictResolver;
 
   constructor(
     vulnerabilityScanner: VulnerabilityScanner,
-    garbageScanner: GarbageScanner,
+    garbageScan: (projectPath: string) => Promise<GarbageItem[]>,
     malwareScanner: MalwareScanner,
     crossValidator: { validate(trivy: Issue[], grype: Issue[]): CrossValidationReport },
     ruleConflictResolver: RuleConflictResolver,
   ) {
     this.vulnerabilityScanner = vulnerabilityScanner;
-    this.garbageScanner = garbageScanner;
+    this.garbageScan = garbageScan;
     this.malwareScanner = malwareScanner;
     this.crossValidator = crossValidator;
     this.ruleConflictResolver = ruleConflictResolver;
@@ -144,7 +144,7 @@ export class ResultAggregator {
     injectionMalware: MalwareItem[];
   }> {
     const legacyVulns = await this.vulnerabilityScanner.scan(projectPath);
-    const legacyGarbage = await this.garbageScanner.scan(projectPath);
+    const legacyGarbage = await this.garbageScan(projectPath);
     const legacyMalware = await this.malwareScanner.scan(projectPath);
     const injectionMalware = await this.runInjectionGuard(projectPath);
     return { legacyVulns, legacyGarbage, legacyMalware, injectionMalware };

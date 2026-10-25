@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { MalwareScanner, mapSemgrepIssuesToMalware } from '../malware-scanner';
-import { GarbageScanner, mapDepcheckIssuesToGarbage } from '../garbage-scanner';
+import { scanGarbage, mapDepcheckIssuesToGarbage } from '../garbage-scanner';
 import type { Issue } from '@zh/shared';
 
 function makeIssue(partial: Partial<Issue> & Pick<Issue, 'ruleId' | 'message' | 'file'>): Issue {
@@ -36,12 +36,12 @@ describe('MalwareScanner', () => {
   });
 });
 
-describe('GarbageScanner', () => {
+describe('scanGarbage', () => {
   it('flags .log and .DS_Store files', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-garbage-'));
     fs.writeFileSync(path.join(dir, 'debug.log'), 'x');
     fs.writeFileSync(path.join(dir, '.DS_Store'), '');
-    const items = await new GarbageScanner().scan(dir);
+    const items = await scanGarbage(dir);
     expect(items.some((i) => i.path.endsWith('debug.log'))).toBe(true);
     expect(items.some((i) => i.path.endsWith('.DS_Store'))).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });

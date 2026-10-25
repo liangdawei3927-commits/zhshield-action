@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import type { Vulnerability, SecurityScanReport, GarbageItem, MalwareItem } from './types';
 import { calculateSecurityScore } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
-import { GarbageScanner } from './garbage-scanner';
+import { scanGarbage } from './garbage-scanner';
 import { MalwareScanner } from './malware-scanner';
 import { GrypeCrossValidator } from './cross-validator';
 import { RuleConflictResolver } from './rule-conflict-resolver';
@@ -53,7 +53,7 @@ export class SecurityEngine {
     );
     this.resultAggregator = new ResultAggregator(
       new VulnerabilityScanner(),
-      new GarbageScanner(),
+      scanGarbage,
       new MalwareScanner(),
       new GrypeCrossValidator(),
       new RuleConflictResolver(),

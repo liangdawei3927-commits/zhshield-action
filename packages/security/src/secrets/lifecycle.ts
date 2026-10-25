@@ -36,7 +36,16 @@ export {
   isPublicRemoteUrl,
 } from './lifecycle-utils';
 
-/** 内存存储（默认，测试友好） */
+/**
+ * 内存存储（默认，测试友好）。
+ *
+ * 经核实不是冗余薄壳（lazy-class 误报）：它是 SecretStore 的第二个实现——
+ * 生产侧 FileSecretStore 落盘 .zhshield/secrets-state.json 供 engines-secrets 注入，
+ * 此处供测试与无盘场景注入，二者共同支撑 SecretLifecycleManager 的构造注入，
+ * 并经 @zh/security 公开导出；移除会破坏对外 API，内联进调用方会拆掉注入接缝。
+ * 另外 load/save 的双向浅拷贝是行为契约：transition() 在 load() 之后原地改
+ * state.secrets，若无拷贝会直接污染 store 的内部状态。
+ */
 export class InMemorySecretStore implements SecretStore {
   private state: SecretPersistState = { lastScannedCommit: '', secrets: {} };
 

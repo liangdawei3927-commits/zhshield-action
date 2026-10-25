@@ -108,6 +108,12 @@ const RE_LOCAL_DEFINITION_HEAD =
   /^\s*export\s+(default\b|function\b|async\b|class\b|abstract\b|const\b|let\b|var\b|interface\b|enum\b|declare\b|type\s+[A-Za-z_$])/;
 /** 结尾判据：出现 from '...' 或 from "..." */
 const RE_FROM_CLAUSE = /\bfrom\s+['"]/;
+/** 再导出名前缀：export { type Foo } 里的 type 修饰符 */
+const RE_TYPE_PREFIX = /^type\s+/;
+/** 别名后缀：`original as alias` 里的别名捕获组 */
+const RE_AS_ALIAS = /\sas\s+([A-Za-z_$][\w$]*)$/;
+/** 行分隔：兼容 CRLF 与 LF */
+const RE_LINE_BREAK = /\r?\n/;
 
 const statementCache = new Map<string, ReExportStatement[] | null>();
 
@@ -125,8 +131,8 @@ function extractExportedNames(statement: string): Set<string> {
   for (const part of statement.slice(braceStart + 1, braceEnd).split(',')) {
     let name = part.replace(/\s+/g, ' ').trim();
     if (!name) continue;
-    name = name.replace(/^type\s+/, '');
-    const alias = name.match(/\sas\s+([A-Za-z_$][\w$]*)$/);
+    name = name.replace(RE_TYPE_PREFIX, '');
+    const alias = name.match(RE_AS_ALIAS);
     names.add(alias ? alias[1] : name);
   }
   return names;
@@ -148,7 +154,7 @@ function collectReExportStatements(absPath: string): ReExportStatement[] | null 
     return null;
   }
 
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(RE_LINE_BREAK);
   const out: ReExportStatement[] = [];
   for (let i = 0; i < lines.length; i++) {
     const head = lines[i];
@@ -323,20 +329,71 @@ export interface InlineImportFilterResult {
  * specifier 则以引用所在文件为基准解析——两者都必须落到同一个绝对路径且
  * 符号名精确相等，才判定为已引用。任一环节不确定即保留。
  */
+/** ts-prune 输出的 file 字段 → 绝对路径（输出可能是绝对路径，也可能相对 projectRoot） */
+function toAbsolute(file: string, projectRoot: string): string {
+  return path.isAbsolute(file) ? file : path.resolve(projectRoot, file);
+}
+
+/** 只关心「命中文件（绝对化）→ 该文件被报的符号名」，缩小比对集合 */
+function collectTargetSymbols(
+  entries: readonly PruneEntry[],
+  projectRoot: string,
+): Map<string, Set<string>> {
+  const targets = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    const abs = toAbsolute(entry.file, projectRoot);
+    const set = targets.get(abs);
+    if (set) set.add(entry.symbol);
+    else targets.set(abs, new Set([entry.symbol]));
+  }
+  return targets;
+}
+
+/**
+ * 在单个源文件里找内联 import 引用证据，命中记入 `referenced`。
+ *
+ * fail-open：文件超限 / 读不到 / specifier 解析不出，都只是少一条证据，
+ * 不影响判定方向（找不到证据 ⇒ 照报）。
+ */
+function collectInlineRefsFromFile(
+  file: string,
+  targets: ReadonlyMap<string, Set<string>>,
+  referenced: Set<string>,
+): void {
+  let text: string;
+  try {
+    if (fs.statSync(file).size > INLINE_REF_MAX_BYTES) return;
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return; // 单个文件读不到：少一条证据，不影响判定方向
+  }
+  const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, 'g');
+  for (const match of text.matchAll(re)) {
+    const specifier = match[1];
+    const symbol = match[2];
+    if (!specifier || !symbol) continue;
+    const target = resolveRelativeModuleFile(file, specifier);
+    if (target === null) continue;
+    const symbols = targets.get(target);
+    if (!symbols || !symbols.has(symbol)) continue;
+    referenced.add(`${target}\u0000${symbol}`);
+  }
+}
+
+/**
+ * 剥离「只被内联 import 类型引用」的命中。
+ *
+ * projectRoot 用于把 ts-prune 输出的相对路径解析成绝对路径；内联引用的
+ * specifier 则以引用所在文件为基准解析——两者都必须落到同一个绝对路径且
+ * 符号名精确相等，才判定为已引用。任一环节不确定即保留。
+ */
 export function filterInlineImportTypeRefs(
   entries: readonly PruneEntry[],
   projectRoot: string,
 ): InlineImportFilterResult {
   if (entries.length === 0) return { kept: [], dropped: [], degraded: false };
 
-  // 只关心「命中文件 → 该文件被报的符号名」，缩小比对集合
-  const targets = new Map<string, Set<string>>();
-  for (const entry of entries) {
-    const abs = path.isAbsolute(entry.file) ? entry.file : path.resolve(projectRoot, entry.file);
-    const set = targets.get(abs);
-    if (set) set.add(entry.symbol);
-    else targets.set(abs, new Set([entry.symbol]));
-  }
+  const targets = collectTargetSymbols(entries, projectRoot);
 
   const files: string[] = [];
   if (!collectInlineRefCandidates(projectRoot, files, INLINE_REF_MAX_FILES)) {
@@ -344,31 +401,12 @@ export function filterInlineImportTypeRefs(
   }
 
   const referenced = new Set<string>();
-  for (const file of files) {
-    let text: string;
-    try {
-      if (fs.statSync(file).size > INLINE_REF_MAX_BYTES) continue;
-      text = fs.readFileSync(file, 'utf8');
-    } catch {
-      continue; // 单个文件读不到：少一条证据，不影响判定方向
-    }
-    const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, 'g');
-    for (const match of text.matchAll(re)) {
-      const specifier = match[1];
-      const symbol = match[2];
-      if (!specifier || !symbol) continue;
-      const target = resolveRelativeModuleFile(file, specifier);
-      if (target === null) continue;
-      const symbols = targets.get(target);
-      if (!symbols || !symbols.has(symbol)) continue;
-      referenced.add(`${target}\u0000${symbol}`);
-    }
-  }
+  for (const file of files) collectInlineRefsFromFile(file, targets, referenced);
 
   const kept: PruneEntry[] = [];
   const dropped: PruneEntry[] = [];
   for (const entry of entries) {
-    const abs = path.isAbsolute(entry.file) ? entry.file : path.resolve(projectRoot, entry.file);
+    const abs = toAbsolute(entry.file, projectRoot);
     (referenced.has(`${abs}\u0000${entry.symbol}`) ? dropped : kept).push(entry);
   }
   return { kept, dropped, degraded: false };

@@ -50,12 +50,56 @@ interface AuditVulnerabilities {
   critical?: number;
 }
 
-/** 防御性解析 audit JSON：提取各严重级漏洞计数，解析失败返回 null */
+/** pnpm 报告里的 advisory 条目（只取本模块用到的字段） */
+interface AuditAdvisory {
+  severity?: string;
+}
+
+const SEVERITY_KEYS = ['info', 'low', 'moderate', 'high', 'critical'] as const;
+
+/**
+ * 按 advisory 逐条统计各严重级条数（未知 severity 跳过）。
+ *
+ * 与 `metadata.vulnerabilities` 的口径差异：metadata 数的是**受影响包数**，
+ * 这里数的是**漏洞条数**，与 issue 文案「发现 N 个 X 级依赖漏洞」一致。
+ */
+function countAdvisories(advisories: Record<string, AuditAdvisory>): AuditVulnerabilities {
+  const counts: AuditVulnerabilities = {};
+  for (const advisory of Object.values(advisories)) {
+    const key = (advisory?.severity || '').toLowerCase();
+    if (!(SEVERITY_KEYS as readonly string[]).includes(key)) continue;
+    const typed = key as keyof AuditVulnerabilities;
+    counts[typed] = (counts[typed] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * 防御性解析 audit JSON：提取各严重级漏洞计数，解析失败返回 null。
+ *
+ * 真相源优先级（2026-10-25 修正，勿改回只读 metadata）：
+ * 1. `advisories` 映射存在时以它为准 —— pnpm 会先把**已登记例外**从该映射剔除；
+ * 2. 否则回退 `metadata.vulnerabilities`（npm 新版 JSON 无 advisories）。
+ *
+ * 为何不能只读 metadata：pnpm 11 的 `audit.ignore`（及已废弃的
+ * `auditConfig.ignoreGhsas`）只过滤 `advisories`，**不修改 metadata**。
+ * 实机基线（同一 lockfile，仅改 ignore 配置）：
+ *   - 无 ignore → advisories=1 条、metadata.moderate=1、EXIT=1
+ *   - 有 ignore → advisories=0 条、metadata.moderate=1、EXIT=0
+ * 若此时仍读 metadata，就会在 pnpm 自己已判定「没有待处理漏洞」（EXIT=0）
+ * 的情况下继续产出「发现 1 个 moderate 级依赖漏洞」，同一份数据给出互斥结论；
+ * 该 issue 的 `file` 为空串 ⇒ `moduleOf('')` 落 `(root)` 桶 ⇒ 技术债面板
+ * 持续再生伪债务项 `td-quality-44c4ce057952`，点开还没有对应文件。
+ */
 export function parseAuditVulnerabilities(raw: string): AuditVulnerabilities | null {
   try {
     const parsed = JSON.parse(raw) as {
+      advisories?: unknown;
       metadata?: { vulnerabilities?: AuditVulnerabilities };
     };
+    if (parsed.advisories && typeof parsed.advisories === 'object') {
+      return countAdvisories(parsed.advisories as Record<string, AuditAdvisory>);
+    }
     const v = parsed.metadata?.vulnerabilities;
     if (!v || typeof v !== 'object') return null;
     return v;

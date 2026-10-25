@@ -21,8 +21,27 @@ export async function evalCheckList(
   // 仅有 ARCH/LINT/TEST/SEC 四条 → 路由到 GuardEngine.run 会永久「无可匹配」跳过。
   // SecurityCheckEngine 为纯文件检测，不回调 evaluateRules（无重入），故先于 evalDepth
   // 切断路由——既消除『防重入』误跳，也避免并行评估时共享 evalDepth 计数器导致的漂移。
-  if (rule.domain === 'security' && host.securityCheckEngine) {
+  if (rule.domain === 'security') {
+    if (!host.securityCheckEngine) {
+      return skipEvaluation(rule, 'SecurityCheckEngine 未注册，无法执行 check-list', 'inspect');
+    }
     return runSecurityCheck(host.securityCheckEngine, rule, instr, context);
+  }
+  // 非 guard 域没有 check-list 执行器。
+  // 旧实现把 inspect 域的 check-list 规则也派发给 GuardEngine：GuardEngine.run 带 SOP 引擎时
+  // 会重入 evaluateRules 全量评估 guard 域，再按 options.checks 过滤结果 —— 与本规则声明的
+  // 检查项毫无关系。实证：inspect.scan.official.null-safety（checks 三项均为 Guard 不存在的
+  // 语义项）以「Guard 检查通过」假通过；同一批规则在并行池里遇到兄弟规则的嵌套派发时又被
+  // 判成「跳过 check-list→GuardEngine.run（防止规则引擎重入）」→ 面板显示未检查。
+  // 两者都是假象：这条规则从来没有被任何引擎执行过。故此处显式跳过并说明真实原因，
+  // 既不假通过，也不再借用 GuardEngine 的结果冒充他域规则。
+  if (rule.domain !== 'guard') {
+    const names = instr.checks.map((c) => c.rule || '(未命名)').join('、') || '(无)';
+    return skipEvaluation(
+      rule,
+      `该域无 check-list 执行器：声明 ${instr.checks.length} 项检查（${names}）没有任何引擎实现，未执行任何检查`,
+      'inspect',
+    );
   }
   if (!host.guardEngine) {
     return skipEvaluation(rule, 'GuardEngine 未注册，无法执行 check-list', 'guard', true);

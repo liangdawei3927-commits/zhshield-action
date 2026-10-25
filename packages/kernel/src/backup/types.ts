@@ -9,8 +9,14 @@ import { projectBackupSegment } from './utils';
 
 /** 备份方式：全量（同时走 GitHub 与本地）、仅 GitHub、仅本地 */
 export type BackupType = 'full' | 'github-only' | 'local-only';
-/** 备份整体状态：partial 表示部分子备份成功、部分失败 */
-export type BackupStatus = 'success' | 'partial' | 'failed';
+/**
+ * 备份整体状态：partial 表示部分子备份成功、部分失败。
+ *
+ * `cancelled` = 用户主动停止（abortSignal 被 abort）。**它不是失败**：不落记录、
+ * 不发 FAILED 事件。把它并入 failed 会让历史记录里躺着一条假失败，用户刚点的
+ * 「停止」被自己的系统报成错误。
+ */
+export type BackupStatus = 'success' | 'partial' | 'failed' | 'cancelled';
 /** 备份触发来源：手动、定时调度或 API 调用 */
 export type BackupTrigger = 'manual' | 'schedule' | 'api';
 /** 备份执行阶段：GitHub 提交、GitHub 推送、本地拷贝、本地元数据写入 */

@@ -71,7 +71,10 @@ export class BackupOrchestrator {
       backupId,
       ...(abortSignal !== undefined ? { abortSignal } : {}),
     });
-    const overallStatus = this.calculateOverallStatus(results);
+    // 取消优先于子结果求和：子备份若在 abort 前已部分完成，其 success 会让
+    // calculateOverallStatus 得出 partial —— 那是"跑了一半"而不是"用户要停"。
+    const aborted = abortSignal?.aborted === true;
+    const overallStatus = aborted ? 'cancelled' : this.calculateOverallStatus(results);
     const duration = Date.now() - startTime;
     const result: BackupResult = {
       projectId,
@@ -83,8 +86,12 @@ export class BackupOrchestrator {
       duration,
     };
 
-    this.saveRecord(result, projectPath);
-    this.emitCompletionEvents(result, projectId, backupId, overallStatus);
+    // 取消 = 没跑完 = 不构成一次备份：不落记录、不发完成/失败事件。
+    // 落记录会让记录列表与评分口径里多出一条"失败"，等于把用户主动停止记成故障。
+    if (!aborted) {
+      this.saveRecord(result, projectPath);
+      this.emitCompletionEvents(result, projectId, backupId, overallStatus);
+    }
 
     return result;
   }

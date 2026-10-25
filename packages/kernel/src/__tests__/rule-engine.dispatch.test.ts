@@ -54,6 +54,38 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     expect(report.evaluations[0].status).toBe('failed');
   });
 
+  it('check-list: 非 guard 域不再借调 GuardEngine，显式说明「无执行器」', async () => {
+    // 回归：inspect.scan.official.type-consistency / null-safety 这类云壳规则
+    // content 只有 checks（声明的检查项无任何引擎实现）。旧实现把它们派发给
+    // GuardEngine.run → 带 SOP 引擎时重入 evaluateRules 全量评估 guard 域并按
+    // options.checks 过滤 → 过滤不到就得到空结果集 → 「Guard 检查通过」（假通过）；
+    // 并行时又被 evalDepth 漂移判成「防止规则引擎重入」（未检查）。两者皆假象。
+    let guardCalled = false;
+    const mockGuard = {
+      run: async () => {
+        guardCalled = true;
+        return { summary: { total: 0, passed: 0, failed: 0 }, results: [] };
+      },
+    };
+
+    const engineWithGuard = new SopRuleEngine(registry, { guardEngine: mockGuard });
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.official.type-consistency',
+        domain: 'inspect',
+        content: { checks: ['no-implicit-any', 'no-type-assertion'] },
+      }),
+    );
+
+    const report = await engineWithGuard.evaluateRules({ repoRoot: '/tmp' });
+    expect(guardCalled).toBe(false);
+    expect(report.evaluations[0].status).toBe('skipped');
+    // 非 degraded：这是「规则本身没有实现」，不是运行时工具不可用 ⇒ 不应阻断体检
+    expect(report.evaluations[0].degraded).toBeUndefined();
+    expect(report.evaluations[0].message).toContain('无 check-list 执行器');
+    expect(report.evaluations[0].message).toContain('no-implicit-any');
+  });
+
   it('scanner-dispatch: 全部扫描器未注册时返回 skipped 并附原因（不再回退 InspectEngine）', async () => {
     let inspectCalled = false;
     const mockInspect = {

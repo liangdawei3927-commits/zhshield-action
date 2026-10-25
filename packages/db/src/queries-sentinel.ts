@@ -36,6 +36,31 @@ export function createSentinelEvent(
   );
 }
 
+/**
+ * 批量软删哨兵事件（打 `deleted_at`，不物理删）。
+ *
+ * 用途：收敛「规则收紧后已越界」的历史事件。忽略目录/应用包规则改了以后，
+ * 库里那批旧事件本身已经失效（它们描述的是**不该被监控的路径**），
+ * 但 `listSentinelEvents` 只过滤 `deleted_at IS NULL`，没人打标记就永远显示。
+ * 2026-10-25 实测：修好 file-monitor 后新事件归零，页面上仍恒为 270 条。
+ *
+ * 返回实际被标记的行数（已软删的不会被重复计数）。
+ */
+export function softDeleteSentinelEvents(db: Database.Database, ids: readonly string[]): number {
+  const unique = [...new Set(ids.filter((id) => typeof id === 'string' && id.length > 0))];
+  if (unique.length === 0) return 0;
+  const now = new Date().toISOString();
+  const stmt = db.prepare(
+    'UPDATE sentinel_events SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL',
+  );
+  const apply = db.transaction((list: readonly string[]): number => {
+    let changed = 0;
+    for (const id of list) changed += stmt.run(now, id).changes;
+    return changed;
+  });
+  return apply(unique);
+}
+
 export function updateSentinelEvent(
   db: Database.Database,
   params: UpdateSentinelEventParams,

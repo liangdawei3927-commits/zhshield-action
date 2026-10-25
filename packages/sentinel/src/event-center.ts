@@ -56,49 +56,22 @@ export class EventCenter {
     const labels = firstAlert.labels;
     const dedupeKey = this.generateDedupeKey(firstAlert, labels);
 
-    if (this.isDuplicate(dedupeKey)) {
-      const existing = this.findEventByDedupeKey(dedupeKey)!;
-      existing.occurrenceCount += 1;
-      existing.lastSeen = new Date();
-      existing.history.push({
-        timestamp: new Date(),
-        action: 'alert-repeat',
-        operator: 'system',
-        detail: `Alert repeated (${existing.occurrenceCount} times)`,
-      });
-      persistEventUpdate(this.db, existing);
-      return { event: existing, isNew: false };
-    }
+    const repeated = this.mergeIntoExisting(dedupeKey, 'alert-repeat', 'system', 'Alert');
+    if (repeated) return { event: repeated, isNew: false };
 
-    const event: SentinelEvent = {
-      id: randomUUID(),
+    const event = this.buildEvent({
       projectId: labels.repo || 'unknown',
-      timestamp: new Date(),
       dedupeKey,
       title: firstAlert.annotations.summary || labels.alertname,
       service: labels.service,
       module: labels.module,
       severity: this.mapSeverity(labels.severity),
-      status: 'detected',
-      validation: { status: 'pending' },
       context: { ...labels },
-      history: [
-        {
-          timestamp: new Date(),
-          action: 'alert-received',
-          operator: 'alertmanager',
-          detail: `Alert received: ${labels.alertname}`,
-        },
-      ],
-      occurrenceCount: 1,
-      firstSeen: new Date(),
-      lastSeen: new Date(),
-    };
-
-    this.events.set(event.id, event);
-    persistNewEvent(this.db, event);
-    this.writeAuditLog('alert-received', event);
-    return { event, isNew: true };
+      action: 'alert-received',
+      operator: 'alertmanager',
+      detail: `Alert received: ${labels.alertname}`,
+    });
+    return { event: this.persistCreated(event, 'alert-received'), isNew: true };
   }
 
   createEvent(params: {
@@ -116,51 +89,110 @@ export class EventCenter {
     dedupeKey?: string;
   }): SentinelEvent {
     // 内部事件去重：显式稳定键且在去重窗口内的重复事件合并，而非新建行。
-    if (params.dedupeKey && this.isDuplicate(params.dedupeKey)) {
-      const existing = this.findEventByDedupeKey(params.dedupeKey)!;
-      existing.occurrenceCount += 1;
-      existing.lastSeen = new Date();
-      existing.history.push({
-        timestamp: new Date(),
-        action: 'event-repeat',
-        operator: params.operator || 'system',
-        detail: `Event repeated (${existing.occurrenceCount} times)`,
-      });
-      persistEventUpdate(this.db, existing);
-      this.writeAuditLog('event-repeat', existing);
-      return existing;
+    if (params.dedupeKey) {
+      const repeated = this.mergeIntoExisting(
+        params.dedupeKey,
+        'event-repeat',
+        params.operator || 'system',
+        'Event',
+      );
+      if (repeated) {
+        this.writeAuditLog('event-repeat', repeated);
+        return repeated;
+      }
     }
 
-    const dedupeKey = params.dedupeKey ?? `${params.projectId}|${params.title}|${Date.now()}`;
-    const event: SentinelEvent = {
-      id: randomUUID(),
+    const event = this.buildEvent({
       projectId: params.projectId,
-      timestamp: new Date(),
-      dedupeKey,
+      dedupeKey: params.dedupeKey ?? `${params.projectId}|${params.title}|${Date.now()}`,
       title: params.title,
       service: params.service || '',
       module: params.module || '',
       severity: params.severity || 'p3',
+      context: (params.context || {}) as Record<string, unknown>,
+      action: params.action || 'event-created',
+      operator: params.operator || 'system',
+      detail: params.detail || params.title,
+    });
+    return this.persistCreated(event, 'event-created');
+  }
+
+  /**
+   * 新建事件的公共构造：`processAlert` 与 `createEvent` 的字段**取值**不同，
+   * 但事件**结构**完全一致，原先各写一遍、改一处漏一处。这里统一收敛。
+   */
+  private buildEvent(input: {
+    projectId: string;
+    dedupeKey: string;
+    title: string;
+    service: string;
+    module: string;
+    severity: EventSeverity;
+    context: Record<string, unknown>;
+    action: string;
+    operator: string;
+    detail: string;
+  }): SentinelEvent {
+    return {
+      id: randomUUID(),
+      projectId: input.projectId,
+      timestamp: new Date(),
+      dedupeKey: input.dedupeKey,
+      title: input.title,
+      service: input.service,
+      module: input.module,
+      severity: input.severity,
       status: 'detected',
       validation: { status: 'pending' },
-      context: (params.context || {}) as Record<string, unknown>,
+      context: input.context,
       history: [
         {
           timestamp: new Date(),
-          action: params.action || 'event-created',
-          operator: params.operator || 'system',
-          detail: params.detail || params.title,
+          action: input.action,
+          operator: input.operator,
+          detail: input.detail,
         },
       ],
       occurrenceCount: 1,
       firstSeen: new Date(),
       lastSeen: new Date(),
     };
+  }
 
+  /** 新建路径的公共尾段：入内存 → 落库 → 写审计 */
+  private persistCreated(event: SentinelEvent, auditAction: string): SentinelEvent {
     this.events.set(event.id, event);
     persistNewEvent(this.db, event);
-    this.writeAuditLog('event-created', event);
+    this.writeAuditLog(auditAction, event);
     return event;
+  }
+
+  /**
+   * 合并到已有事件：命中去重窗口则 `occurrenceCount` 递增并追加一条 repeat 历史，
+   * 返回已有事件；未命中返回 null，由调用方按新建处理。
+   *
+   * `subject` 只决定历史文案前缀（Alert / Event）。审计**不在这里写**：
+   * 告警重复与内部事件重复的审计口径不同（前者收到时已写过，不重复写），
+   * 保留给调用方决定。
+   */
+  private mergeIntoExisting(
+    dedupeKey: string,
+    action: 'alert-repeat' | 'event-repeat',
+    operator: string,
+    subject: 'Alert' | 'Event',
+  ): SentinelEvent | null {
+    if (!this.isDuplicate(dedupeKey)) return null;
+    const existing = this.findEventByDedupeKey(dedupeKey)!;
+    existing.occurrenceCount += 1;
+    existing.lastSeen = new Date();
+    existing.history.push({
+      timestamp: new Date(),
+      action,
+      operator,
+      detail: `${subject} repeated (${existing.occurrenceCount} times)`,
+    });
+    persistEventUpdate(this.db, existing);
+    return existing;
   }
 
   updateStatus(

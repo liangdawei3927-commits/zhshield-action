@@ -18,7 +18,24 @@ export {
   defaultFileWatchFilter,
   DEFAULT_IGNORE_DIRS,
   DEFAULT_IGNORE_RE,
+  isIgnoredPath,
   resolveChangeType,
 } from './file-monitor';
+export {
+  collectStaleEventIds,
+  pruneStaleFileEvents,
+  readEventFilePath,
+  DEFAULT_UNLINK_TTL_MS,
+  PRUNE_SCAN_LIMIT,
+  PRUNABLE_MODULE,
+} from './out-of-scope-prune';
+export type { PrunableEventLike, PruneCriteria } from './out-of-scope-prune';
+export {
+  hasTrackedUnder,
+  readGitIndex,
+  readGitIndexSync,
+  findRepoRootFor,
+  GitIndexCache,
+} from './git-index';
 
 export type { SentinelEvent, AlertPayload, EventStatus, EventSeverity, EventType } from './types';

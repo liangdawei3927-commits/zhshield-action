@@ -166,6 +166,8 @@
   },
   "common": {
     "cancel": "取消",
+    "stop": "停止",
+    "stopping": "停止中",
     "close": "关闭",
     "confirm": "确认",
     "copied": "已复制",
@@ -176,6 +178,7 @@
     "loading": "加载中",
     "no": "否",
     "refresh": "刷新",
+    "refreshing": "刷新中...",
     "remove": "移除",
     "retry": "重试",
     "save": "保存",
@@ -935,6 +938,7 @@
         "deleteFailed": "删除失败",
         "deleted": "备份记录已删除",
         "failed": "备份执行失败",
+        "cancelled": "已停止备份",
         "openFailed": "无法打开备份文件夹，路径可能已被清理",
         "success": "备份成功"
       },
@@ -1083,6 +1087,7 @@
     },
     "evolve": {
       "analyze": "架构分析",
+      "analyzing": "分析中...",
       "archScore": "架构健康度",
       "empty": {
         "feature": {
@@ -1299,7 +1304,7 @@
       "total": "检查项",
       "passedCount": "{{passed}}/{{total}} 项通过",
       "scanNow": "一键体检",
-      "scanning": "巡检中...",
+      "scanning": "体检中...",
       "source": "巡检",
       "attention": "未检测",
       "attentionHint": "以下检查未执行或未产出结论，不计入通过",
@@ -1351,7 +1356,7 @@
           "desc": "检测 setTimeout / setInterval 滥用与内存泄漏",
           "title": "定时器优化"
         },
-        "start": "开始性能检测",
+        "start": "开始检测",
         "subtitle": "扫描低效数组遍历、正则重复编译、冗余分配等性能问题",
         "title": "检测运行时性能反模式，优化执行效率"
       },
@@ -1427,9 +1432,23 @@
       "stats": {
         "files": "需重构文件",
         "highPriority": "高优先级",
-        "smells": "代码异味"
+        "smells": "代码异味",
+        "smellsHint": "全部代码异味清单（按文件汇总）",
+        "filesHint": "存在代码异味的文件，含异味处数与可维护性评分",
+        "highPriorityHint": "文件级优先级为「紧急 / 高」的文件，建议优先处理"
       },
-      "suggestion": "建议: {{suggestion}}"
+      "suggestion": "建议: {{suggestion}}",
+      "priority": {
+        "critical": "紧急",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "maintainability": "可维护性",
+      "detail": {
+        "empty": "该分类下暂无明细",
+        "truncated": "仅显示前 {{shown}} 条，完整清单见下方「重构问题（按类型分组）」"
+      }
     },
     "reports": {
       "dimension": {
@@ -1465,6 +1484,7 @@
         "title": "多维度分析报告，决策更有依据"
       },
       "generate": "汇总生成报告",
+      "generating": "生成中...",
       "grade": {
         "A": "A 级",
         "B": "B 级",
@@ -1660,8 +1680,8 @@
       "markFalsePositive": "标记误报",
       "occurrenceCount": "发生 {{count}} 次",
       "refreshing": "刷新中...",
+      "monitoring": "监控中...",
       "shell": {
-        "buttonRunning": "监控运行中",
         "buttonStart": "启动监控",
         "featureAlert": {
           "desc": "高危 / Critical 事件触发通知提醒",
@@ -2144,6 +2164,7 @@
     "notCompleted": "任务未完成",
     "notFound": "任务不存在",
     "queuedLabel": "排队中（第 {{position}} 位）...",
+    "queuedShort": "排队中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
     "schedulerUnavailable": "任务调度不可用（非桌面环境）"
   },

@@ -166,6 +166,8 @@
   },
   "common": {
     "cancel": "取消",
+    "stop": "停止",
+    "stopping": "停止中",
     "close": "關閉",
     "confirm": "確認",
     "copied": "已複製",
@@ -176,6 +178,7 @@
     "loading": "載入中",
     "no": "否",
     "refresh": "重新整理",
+    "refreshing": "重新整理中...",
     "remove": "移除",
     "retry": "重試",
     "save": "儲存",
@@ -935,6 +938,7 @@
         "deleteFailed": "刪除失敗",
         "deleted": "備份記錄已刪除",
         "failed": "備份執行失敗",
+        "cancelled": "已停止備份",
         "success": "備份成功",
         "openFailed": "無法開啟備份資料夾，路徑可能已被清理"
       },
@@ -1083,6 +1087,7 @@
     },
     "evolve": {
       "analyze": "架構分析",
+      "analyzing": "分析中...",
       "archScore": "架構健康度",
       "empty": {
         "feature": {
@@ -1294,7 +1299,7 @@
       },
       "passedCount": "{{passed}}/{{total}} 項通過",
       "scanNow": "一鍵體檢",
-      "scanning": "巡檢中...",
+      "scanning": "體檢中...",
       "source": "巡檢",
       "status": {
         "fail": "失敗",
@@ -1351,7 +1356,7 @@
           "desc": "檢測 setTimeout / setInterval 濫用與記憶體洩漏",
           "title": "定時器最佳化"
         },
-        "start": "開始效能檢測",
+        "start": "開始檢測",
         "subtitle": "掃描低效陣列遍歷、正則重複編譯、冗餘分配等效能問題",
         "title": "檢測執行時效能反模式，最佳化執行效率"
       },
@@ -1427,9 +1432,23 @@
       "stats": {
         "files": "需重構檔案",
         "highPriority": "高優先順序",
-        "smells": "程式碼異味"
+        "smells": "程式碼異味",
+        "smellsHint": "全部程式碼異味清單（按檔案彙總）",
+        "filesHint": "存在程式碼異味的檔案，含異味處數與可維護性評分",
+        "highPriorityHint": "檔案級優先級為「緊急 / 高」的檔案，建議優先處理"
       },
-      "suggestion": "建議: {{suggestion}}"
+      "suggestion": "建議: {{suggestion}}",
+      "priority": {
+        "critical": "緊急",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "maintainability": "可維護性",
+      "detail": {
+        "empty": "該分類下暫無明細",
+        "truncated": "僅顯示前 {{shown}} 條，完整清單見下方「重構問題（按類型分組）」"
+      }
     },
     "reports": {
       "dimension": {
@@ -1465,6 +1484,7 @@
         "title": "多維度分析報告，決策更有依據"
       },
       "generate": "彙總生成報告",
+      "generating": "產生中...",
       "grade": {
         "A": "A 級",
         "B": "B 級",
@@ -1582,8 +1602,8 @@
       "markFalsePositive": "標記誤報",
       "occurrenceCount": "發生 {{count}} 次",
       "refreshing": "重新整理中...",
+      "monitoring": "監控中...",
       "shell": {
-        "buttonRunning": "監控執行中",
         "buttonStart": "啟動監控",
         "featureAlert": {
           "desc": "高危 / Critical 事件觸發通知提醒",
@@ -2001,7 +2021,8 @@
     "refactor": {
       "analyzing": "重構異味分析中…",
       "collecting": "正在收集原始碼檔案…",
-      "done": "重構分析完成：{{count}} 處異味"
+      "done": "重構分析完成：{{count}} 處異味",
+      "baselineSuppressed": "（基線豁免 {{count}} 項存量異味）"
     },
     "report": {
       "executionError": "執行出錯",
@@ -2143,6 +2164,7 @@
     "notCompleted": "任務未完成",
     "notFound": "任務不存在",
     "queuedLabel": "排隊中（第 {{position}} 位）...",
+    "queuedShort": "排隊中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
     "schedulerUnavailable": "任務排程不可用（非桌面環境）"
   },

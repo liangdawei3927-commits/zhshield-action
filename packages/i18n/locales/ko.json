@@ -166,6 +166,8 @@
   },
   "common": {
     "cancel": "취소",
+    "stop": "중지",
+    "stopping": "중지 중",
     "close": "닫기",
     "confirm": "확인",
     "copied": "복사됨",
@@ -176,6 +178,7 @@
     "loading": "로딩 중…",
     "no": "아니요",
     "refresh": "새로고침",
+    "refreshing": "새로고침 중...",
     "remove": "제거",
     "retry": "다시 시도",
     "save": "저장",
@@ -935,6 +938,7 @@
         "deleteFailed": "삭제 실패",
         "deleted": "백업 기록이 삭제되었습니다",
         "failed": "백업 실행 실패",
+        "cancelled": "백업을 중지했습니다",
         "success": "백업 성공",
         "openFailed": "백업 폴더를 열 수 없습니다. 경로가 정리되었을 수 있습니다"
       },
@@ -1083,6 +1087,7 @@
     },
     "evolve": {
       "analyze": "아키텍처 분석",
+      "analyzing": "분석 중...",
       "archScore": "아키텍처 건강도",
       "empty": {
         "feature": {
@@ -1351,7 +1356,7 @@
           "desc": "setTimeout / setInterval 남용과 메모리 누수 감지",
           "title": "타이머 최적화"
         },
-        "start": "성능 감지 시작",
+        "start": "감지 시작",
         "subtitle": "비효율적인 배열 순회, 정규식 반복 컴파일, 중복 할당 등 성능 문제 스캔",
         "title": "런타임 성능 안티패턴을 감지해 실행 효율을 최적화하세요"
       },
@@ -1427,9 +1432,23 @@
       "stats": {
         "files": "리팩토링 필요 파일",
         "highPriority": "높은 우선순위",
-        "smells": "코드 악취"
+        "smells": "코드 악취",
+        "smellsHint": "전체 코드 스멜 목록(파일별)",
+        "filesHint": "코드 스멜이 있는 파일(스멜 수와 유지보수성 점수 포함)",
+        "highPriorityHint": "파일 우선순위가 \"긴급/높음\"인 파일입니다. 우선 처리하세요"
       },
-      "suggestion": "제안: {{suggestion}}"
+      "suggestion": "제안: {{suggestion}}",
+      "priority": {
+        "critical": "긴급",
+        "high": "높음",
+        "medium": "보통",
+        "low": "낮음"
+      },
+      "maintainability": "유지보수성 ",
+      "detail": {
+        "empty": "이 분류에 세부 항목이 없습니다",
+        "truncated": "처음 {{shown}}개만 표시됩니다. 전체 목록은 아래 \"리팩터링 문제(유형별)\"를 참고하세요"
+      }
     },
     "reports": {
       "dimension": {
@@ -1465,6 +1484,7 @@
         "title": "다차원 분석 보고서로 더 근거 있는 의사결정을 하세요"
       },
       "generate": "보고서 집계",
+      "generating": "생성 중...",
       "grade": {
         "A": "A 등급",
         "B": "B 등급",
@@ -1582,8 +1602,8 @@
       "markFalsePositive": "오탐으로 표시",
       "occurrenceCount": "발생 {{count}}회",
       "refreshing": "새로고침 중...",
+      "monitoring": "모니터링 중...",
       "shell": {
-        "buttonRunning": "모니터링 실행 중",
         "buttonStart": "모니터링 시작",
         "featureAlert": {
           "desc": "고위험 / Critical 이벤트 발생 시 알림",
@@ -2001,7 +2021,8 @@
     "refactor": {
       "analyzing": "리팩토링 악취 분석 중…",
       "collecting": "소스 파일 수집 중…",
-      "done": "리팩토링 분석 완료: 코드 악취 {{count}}곳"
+      "done": "리팩토링 분석 완료: 코드 악취 {{count}}곳",
+      "baselineSuppressed": "(베이스라인으로 기존 {{count}}건 제외)"
     },
     "report": {
       "executionError": "실행 오류",
@@ -2143,6 +2164,7 @@
     "notCompleted": "작업이 완료되지 않았습니다",
     "notFound": "작업이 존재하지 않습니다",
     "queuedLabel": "대기 중 ({{position}}번째)...",
+    "queuedShort": "대기 중...",
     "runningLabel": "{{kind}} 중... {{percent}}%{{suffix}}",
     "schedulerUnavailable": "작업 스케줄러를 사용할 수 없습니다 (데스크톱 환경이 아님)"
   },

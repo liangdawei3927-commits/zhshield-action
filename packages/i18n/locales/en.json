@@ -166,6 +166,8 @@
   },
   "common": {
     "cancel": "Cancel",
+    "stop": "Stop",
+    "stopping": "Stopping",
     "close": "Close",
     "confirm": "Confirm",
     "copied": "Copied",
@@ -176,6 +178,7 @@
     "loading": "Loading…",
     "no": "No",
     "refresh": "Refresh",
+    "refreshing": "Refreshing...",
     "remove": "Remove",
     "retry": "Retry",
     "save": "Save",
@@ -935,6 +938,7 @@
         "deleteFailed": "Delete failed",
         "deleted": "Backup record deleted",
         "failed": "Backup execution failed",
+        "cancelled": "Backup stopped",
         "openFailed": "Could not open the backup folder. It may have been cleaned up.",
         "success": "Backup succeeded"
       },
@@ -1083,6 +1087,7 @@
     },
     "evolve": {
       "analyze": "Architecture analysis",
+      "analyzing": "Analyzing...",
       "archScore": "Architecture health",
       "empty": {
         "feature": {
@@ -1351,7 +1356,7 @@
           "desc": "Detects setTimeout / setInterval misuse and memory leaks",
           "title": "Timer optimization"
         },
-        "start": "Start performance detection",
+        "start": "Start check",
         "subtitle": "Scans for inefficient array traversal, repeated regex compilation, redundant allocations, and other performance issues",
         "title": "Detect runtime performance anti-patterns, optimize execution efficiency"
       },
@@ -1427,9 +1432,23 @@
       "stats": {
         "files": "Files to refactor",
         "highPriority": "High priority",
-        "smells": "Code smells"
+        "smells": "Code smells",
+        "smellsHint": "Full list of code smells, grouped by file",
+        "filesHint": "Files with code smells, including smell count and maintainability score",
+        "highPriorityHint": "Files rated Critical/High priority — handle these first"
       },
-      "suggestion": "Suggestion: {{suggestion}}"
+      "suggestion": "Suggestion: {{suggestion}}",
+      "priority": {
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "maintainability": "Maintainability ",
+      "detail": {
+        "empty": "No details in this category",
+        "truncated": "Showing the first {{shown}} only — see \"Refactoring issues (grouped by type)\" below for the full list"
+      }
     },
     "reports": {
       "dimension": {
@@ -1465,6 +1484,7 @@
         "title": "Multi-dimension analysis reports, better decisions"
       },
       "generate": "Summarize report",
+      "generating": "Generating...",
       "grade": {
         "A": "Grade A",
         "B": "Grade B",
@@ -1660,8 +1680,8 @@
       "markFalsePositive": "Mark false positive",
       "occurrenceCount": "Occurred {{count}} times",
       "refreshing": "Refreshing...",
+      "monitoring": "Monitoring...",
       "shell": {
-        "buttonRunning": "Monitoring active",
         "buttonStart": "Start monitoring",
         "featureAlert": {
           "desc": "High / Critical events trigger notifications",
@@ -2144,6 +2164,7 @@
     "notCompleted": "Task not completed",
     "notFound": "Task not found",
     "queuedLabel": "Queued (position {{position}})...",
+    "queuedShort": "Queued...",
     "runningLabel": "{{kind}} in progress... {{percent}}%{{suffix}}",
     "schedulerUnavailable": "Task scheduler unavailable (non-desktop environment)"
   },

@@ -166,6 +166,8 @@
   },
   "common": {
     "cancel": "キャンセル",
+    "stop": "停止",
+    "stopping": "停止中",
     "close": "閉じる",
     "confirm": "確認",
     "copied": "コピーしました",
@@ -176,6 +178,7 @@
     "loading": "読み込み中…",
     "no": "いいえ",
     "refresh": "更新",
+    "refreshing": "更新中...",
     "remove": "削除",
     "retry": "再試行",
     "save": "保存",
@@ -935,6 +938,7 @@
         "deleteFailed": "削除に失敗しました",
         "deleted": "バックアップ記録を削除しました",
         "failed": "バックアップの実行に失敗しました",
+        "cancelled": "バックアップを停止しました",
         "success": "バックアップに成功しました",
         "openFailed": "バックアップフォルダを開けません。パスが削除された可能性があります"
       },
@@ -1083,6 +1087,7 @@
     },
     "evolve": {
       "analyze": "アーキテクチャ分析",
+      "analyzing": "分析中...",
       "archScore": "アーキテクチャ健全性",
       "empty": {
         "feature": {
@@ -1299,7 +1304,7 @@
       "total": "検査項目",
       "passedCount": "{{passed}}/{{total}} 項目合格",
       "scanNow": "ワンクリック巡回",
-      "scanning": "巡回中...",
+      "scanning": "診斷中...",
       "source": "巡回",
       "status": {
         "fail": "失敗",
@@ -1351,7 +1356,7 @@
           "desc": "setTimeout / setInterval の乱用とメモリリークを検出",
           "title": "タイマー最適化"
         },
-        "start": "パフォーマンス検出を開始",
+        "start": "検出開始",
         "subtitle": "非効率な配列走査、正規表現の繰り返しコンパイル、冗長なアロケーションなどのパフォーマンス問題をスキャン",
         "title": "実行時のパフォーマンスアンチパターンを検出し、実行効率を最適化"
       },
@@ -1427,9 +1432,23 @@
       "stats": {
         "files": "リファクタリング対象ファイル",
         "highPriority": "優先度高",
-        "smells": "コードスメル"
+        "smells": "コードスメル",
+        "smellsHint": "すべてのコードスメル一覧（ファイル別）",
+        "filesHint": "コードスメルがあるファイル（スメル数と保守性スコア付き）",
+        "highPriorityHint": "ファイル優先度が「緊急 / 高」のファイル。優先的に対応してください"
       },
-      "suggestion": "提案: {{suggestion}}"
+      "suggestion": "提案: {{suggestion}}",
+      "priority": {
+        "critical": "緊急",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "maintainability": "保守性 ",
+      "detail": {
+        "empty": "この分類に明細はありません",
+        "truncated": "先頭 {{shown}} 件のみ表示。全件は下の「リファクタリング問題（種類別）」を参照"
+      }
     },
     "reports": {
       "dimension": {
@@ -1465,6 +1484,7 @@
         "title": "多次元分析レポートで、意思決定の根拠に"
       },
       "generate": "レポートを集約",
+      "generating": "生成中...",
       "grade": {
         "A": "A 級",
         "B": "B 級",
@@ -1582,8 +1602,8 @@
       "markFalsePositive": "誤検出としてマーク",
       "occurrenceCount": "発生 {{count}} 回",
       "refreshing": "更新中...",
+      "monitoring": "監視中...",
       "shell": {
-        "buttonRunning": "監視実行中",
         "buttonStart": "監視を開始",
         "featureAlert": {
           "desc": "高リスク / Critical のイベントで通知アラートを発火",
@@ -2001,7 +2021,8 @@
     "refactor": {
       "analyzing": "リファクタリングスメル分析中…",
       "collecting": "ソースコードファイルを収集中…",
-      "done": "リファクタリング分析完了: {{count}} 箇所のスメル"
+      "done": "リファクタリング分析完了: {{count}} 箇所のスメル",
+      "baselineSuppressed": "（ベースラインにより既存の {{count}} 件を除外）"
     },
     "report": {
       "executionError": "実行エラー",
@@ -2143,6 +2164,7 @@
     "notCompleted": "タスクは未完了です",
     "notFound": "タスクが存在しません",
     "queuedLabel": "待機中（{{position}} 番目）...",
+    "queuedShort": "待機中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
     "schedulerUnavailable": "タスクスケジューラが利用できません（デスクトップ環境以外）"
   },

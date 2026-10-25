@@ -178,6 +178,46 @@ function emptyPair(start: HealthScoreData, end: HealthScoreData): ScorePair {
   };
 }
 
+/** 单个域对总分变化的贡献（只在「两端都已检测」时产生） */
+interface DomainContribution {
+  /** 落入结果的明细（分数与贡献按展示精度舍入） */
+  entry: AttributionDomain;
+  /** 未舍入的贡献，专供对账（理由见 `attributeScoreDelta` 里 `domainsRaw` 的说明） */
+  raw: number;
+  /** 两端权重是否变化（画像调整会改权重，差额由结构项吸收） */
+  weightChanged: boolean;
+}
+
+/**
+ * 算一个域的贡献：只做「两端都已检测」前提下的算术，不含任何分支判断。
+ *
+ * 归一化口径统一按**上期**：归因描述的是「从上期走到本期」这个过程，
+ * 起点的分母决定「每 1 分域内变化值多少总分」。权重若在本期变化（画像调整），
+ * 差额不在这里掰扯归属，全部由结构项精确吸收。
+ */
+function domainContribution(
+  name: string,
+  before: Dimension,
+  after: Dimension,
+  startWeightSum: number,
+): DomainContribution {
+  const effectiveWeight = before.weight / startWeightSum;
+  const delta = after.score - before.score;
+  return {
+    entry: {
+      name,
+      startScore: round1(before.score),
+      endScore: round1(after.score),
+      delta: round1(delta),
+      weight: before.weight,
+      effectiveWeight,
+      points: round2(delta * effectiveWeight),
+    },
+    raw: delta * effectiveWeight,
+    weightChanged: Math.abs(before.weight - after.weight) > 1e-9,
+  };
+}
+
 /**
  * 把「上期记录 → 本期记录」的总分变化拆到各维度。
  *
@@ -256,28 +296,21 @@ export function attributeScoreDelta(
     const beforeStatus = statusOf(before);
     const afterStatus = statusOf(after);
 
+    // 三种去向互斥，所以用 guard clause 平铺：两端都已检测 → 产生域贡献；
+    // 进 / 出参与集的域只记名字（影响走结构项）。写成 if / else-if 链会让
+    // 三条平级分支被当成逐层嵌套。
     if (beforeStatus === 'scored' && afterStatus === 'scored' && before && after) {
-      // 归一化口径统一按**上期**：归因描述的是「从上期走到本期」这个过程，
-      // 起点的分母决定「每 1 分域内变化值多少总分」。权重若在本期变化（画像调整），
-      // 差额不去掰扯归属，全部由结构项精确吸收。
-      const effectiveWeight = before.weight / startWeightSum;
-      const delta = after.score - before.score;
-      domainsRaw += delta * effectiveWeight;
-      domains.push({
-        name,
-        startScore: round1(before.score),
-        endScore: round1(after.score),
-        delta: round1(delta),
-        weight: before.weight,
-        effectiveWeight,
-        points: round2(delta * effectiveWeight),
-      });
-      if (Math.abs(before.weight - after.weight) > 1e-9) weightChanged.push(name);
-    } else if (afterStatus === 'scored') {
-      entered.push(name);
-    } else if (beforeStatus === 'scored') {
-      exited.push(name);
+      const contribution = domainContribution(name, before, after, startWeightSum);
+      domainsRaw += contribution.raw;
+      domains.push(contribution.entry);
+      if (contribution.weightChanged) weightChanged.push(name);
+      continue;
     }
+    if (afterStatus === 'scored') {
+      entered.push(name);
+      continue;
+    }
+    if (beforeStatus === 'scored') exited.push(name);
   }
 
   domains.sort((a, b) => Math.abs(b.points) - Math.abs(a.points) || a.name.localeCompare(b.name));

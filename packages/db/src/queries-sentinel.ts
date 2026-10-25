@@ -148,12 +148,13 @@ export function countSentinelEventsBySeverity(
     )
     .all(...params) as Array<{ severity: string; c: number }>;
 
+  // 三档累加写成查表自增而不是 if / else-if 链：这里只有一个「是不是已知 severity」
+  // 的判断，链式写法会把它叠成多层分支，且加第四档时还得再加一层。
   const counts: SentinelSeverityCounts = { p1: 0, p2: 0, p3: 0, total: 0 };
   for (const row of rows) {
     const n = Number(row.c) || 0;
-    if (row.severity === 'p1') counts.p1 += n;
-    else if (row.severity === 'p2') counts.p2 += n;
-    else if (row.severity === 'p3') counts.p3 += n;
+    const severity = row.severity;
+    if (severity === 'p1' || severity === 'p2' || severity === 'p3') counts[severity] += n;
     counts.total += n;
   }
   return counts;

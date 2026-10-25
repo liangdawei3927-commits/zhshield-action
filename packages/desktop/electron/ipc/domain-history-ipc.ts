@@ -79,11 +79,14 @@ async function snapshotFallbackRecord(
     const fingerprints = issues
       .map((issue) => normalizeFingerprint(issue.fingerprint ?? '', projectPath))
       .filter((fingerprint) => fingerprint.length > 0);
+    // 三档统计本质是「按 severity 累加」，不是三层条件判断 —— 写成查表自增，
+    // 既不会被嵌套深度检测误读成深层分支，也不会在加第四档时继续加一层 else-if。
     const counts = { error: 0, warning: 0, info: 0 };
     for (const issue of issues) {
-      if (issue.severity === 'error') counts.error += 1;
-      else if (issue.severity === 'info') counts.info += 1;
-      else if (issue.severity === 'warning') counts.warning += 1;
+      const severity = issue.severity;
+      if (severity === 'error' || severity === 'info' || severity === 'warning') {
+        counts[severity] += 1;
+      }
     }
     return {
       ...buildRecordFromFingerprints({

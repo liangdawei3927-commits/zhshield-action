@@ -195,6 +195,29 @@ function getDuplicateBlocks(allFiles: ParsedFile[], minLines: number): Duplicate
   return _dupCache;
 }
 
+/** monorepo 包路径段 `packages/<name>/`；模块级复用，避免每次调用重新编译正则 */
+const PACKAGE_PATH_RE = /packages\/([^/]+)\//;
+
+/** 从绝对路径提取 monorepo 包名（packages/<name>/ 段），非包内文件返回 null */
+function packageNameOf(filePath: string): string | null {
+  const m = filePath.match(PACKAGE_PATH_RE);
+  return m ? m[1] : null;
+}
+
+/**
+ * 跨包重复的落点启发：只说「提取为公共函数」会诱导直接互引——
+ * 当两侧分属互不依赖的平级包（如 guard 与 inspect）时会制造依赖倒挂。
+ * 同包 → 落在本包公共模块；跨包 → 上提 @zh/shared / @zh/kernel 或依赖方向上的下游包。
+ */
+function landingAdvice(myFile: string, otherFile: string): string {
+  const mine = packageNameOf(myFile);
+  const other = packageNameOf(otherFile);
+  if (mine && other && mine !== other) {
+    return `两文件分属 @zh/${mine} 与 @zh/${other}，不可直接互引：落点上提至 @zh/shared / @zh/kernel（或依赖方向上的下游包）`;
+  }
+  return `落点选在 ${mine ? `@zh/${mine}` : '所在包'} 的公共模块，避免第三处复制`;
+}
+
 function buildDuplicateSmell(
   parsed: ParsedFile,
   dup: DuplicateBlock,
@@ -219,7 +242,7 @@ function buildDuplicateSmell(
     threshold: minLines,
     suggestion: {
       type: 'Extract Common Function',
-      description: `将重复代码提取为公共函数，通过参数化差异点统一调用`,
+      description: `将重复代码提取为公共函数，通过参数化差异点统一调用。${landingAdvice(parsed.filePath, otherFile)}`,
       priority: 'medium',
       effort: 'medium',
       autoFixable: false,

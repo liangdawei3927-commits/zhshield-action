@@ -9,50 +9,53 @@ const GRAY = '\x1b[90m';
 const DIM = '\x1b[2m';
 
 /**
- * ConsoleColor — 终端 ANSI 颜色工具
+ * ConsoleColor — 终端 ANSI 颜色工具（本包唯一实现）
  *
- * 关闭颜色时所有方法原样返回输入，保证管道输出纯净
+ * 关闭颜色时所有方法原样返回输入，保证管道输出纯净。
+ *
+ * `color` 为公开只读字段：ConsoleReporter 系列（sections）直接用 `fmt.color`
+ * 判断是否着色，故不能继续私有化。
  */
 export class ConsoleColor {
-  private enabled: boolean;
+  readonly color: boolean;
 
-  constructor(enabled: boolean) {
-    this.enabled = enabled;
+  constructor(color: boolean) {
+    this.color = color;
   }
 
   bold(s: string): string {
-    return this.enabled ? `${BOLD}${s}${RESET}` : s;
+    return this.color ? `${BOLD}${s}${RESET}` : s;
   }
 
   red(s: string): string {
-    return this.enabled ? `${RED}${s}${RESET}` : s;
+    return this.color ? `${RED}${s}${RESET}` : s;
   }
 
   green(s: string): string {
-    return this.enabled ? `${GREEN}${s}${RESET}` : s;
+    return this.color ? `${GREEN}${s}${RESET}` : s;
   }
 
   yellow(s: string): string {
-    return this.enabled ? `${YELLOW}${s}${RESET}` : s;
+    return this.color ? `${YELLOW}${s}${RESET}` : s;
   }
 
   cyan(s: string): string {
-    return this.enabled ? `${CYAN}${s}${RESET}` : s;
+    return this.color ? `${CYAN}${s}${RESET}` : s;
   }
 
   magenta(s: string): string {
-    return this.enabled ? `${MAGENTA}${s}${RESET}` : s;
+    return this.color ? `${MAGENTA}${s}${RESET}` : s;
   }
 
   gray(s: string): string {
-    return this.enabled ? `${GRAY}${s}${RESET}` : s;
+    return this.color ? `${GRAY}${s}${RESET}` : s;
   }
 
   dim(s: string): string {
-    return this.enabled ? `${DIM}${s}${RESET}` : s;
+    return this.color ? `${DIM}${s}${RESET}` : s;
   }
 
   header(text: string): string {
-    return this.enabled ? `${BOLD}${CYAN}${text}${RESET}` : `== ${text} ==`;
+    return this.color ? `${BOLD}${CYAN}${text}${RESET}` : `== ${text} ==`;
   }
 }

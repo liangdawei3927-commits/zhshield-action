@@ -23,18 +23,19 @@ overrides:
   #   残留：仅 1 moderate（postcss-selector-parser，见文末）；high / low 归零。
   #   注：electron 的 HIGH 同日销项（42.11.12 → 42.11.18，二进制离线装入），
   #       561b2e4 那次提交信息写作「→ 1H/1M/0L」是销项前的中间状态，以此处为准。
-  electron: '42.11.18'                         # HIGH eMudhra 中间证书信任缓解（GHSA 要求 >=42.11.16）。
-                                               # 必须**精确**钉版本：写成 >=42.11.16 会被解析到 45.0.0
-                                               # （跨 major，且二进制没缓存）。42.11.18 是本机已离线缓存
-                                               # 的 darwin-x64 二进制版本，见文末「残余风险 4」。
-  proxy-addr: '>=2.0.8'                        # CRITICAL IPv4-mapped IPv6 IP 欺骗（express 链）
-  shell-quote: '>=1.11.0'                      # CRITICAL quote() 命令注入（@changesets/cli>launch-editor）
-  source-map-js: '>=1.2.2'                     # HIGH 事件循环 DoS（vitest/vite/postcss 链）
-  http-cache-semantics: '>=4.2.1'              # HIGH max-stale 跨用户缓存泄漏（electron-builder>got 链）
-  ip-address: '>=10.7.4'                       # MODERATE isInSubnet()/isLinkLocal()/NAT64 判定错误（express-rate-limit 链）
-  launch-editor: '>=2.14.2'                    # HIGH Windows 上 existsSync 存在性校验可绕过（vite 开发服务器链）
-  'node-gyp>undici': '6.29.1'                  # undici 6.x 线补丁版（@electron/rebuild>node-gyp，声明 ^6.25.0）
-  '@electron/get>undici': '7.30.1'             # undici 7.x 线补丁版（electron@42>@electron/get@5.1.0，3.1.0 线不依赖 undici）
+  electron: '42.11.18'
+    # HIGH eMudhra 中间证书信任缓解（GHSA 要求 >=42.11.16）。
+    # 必须**精确**钉版本：写成 >=42.11.16 会被解析到 45.0.0
+    # （跨 major，且二进制没缓存）。42.11.18 是本机已离线缓存
+    # 的 darwin-x64 二进制版本，见文末「残余风险 4」。
+  proxy-addr: '>=2.0.8' # CRITICAL IPv4-mapped IPv6 IP 欺骗（express 链）
+  shell-quote: '>=1.11.0' # CRITICAL quote() 命令注入（@changesets/cli>launch-editor）
+  source-map-js: '>=1.2.2' # HIGH 事件循环 DoS（vitest/vite/postcss 链）
+  http-cache-semantics: '>=4.2.1' # HIGH max-stale 跨用户缓存泄漏（electron-builder>got 链）
+  ip-address: '>=10.7.4' # MODERATE isInSubnet()/isLinkLocal()/NAT64 判定错误（express-rate-limit 链）
+  launch-editor: '>=2.14.2' # HIGH Windows 上 existsSync 存在性校验可绕过（vite 开发服务器链）
+  'node-gyp>undici': '6.29.1' # undici 6.x 线补丁版（@electron/rebuild>node-gyp，声明 ^6.25.0）
+  '@electron/get>undici': '7.30.1' # undici 7.x 线补丁版（electron@42>@electron/get@5.1.0，3.1.0 线不依赖 undici）
   # brace-expansion 分两条版本线：1.x（minimatch@3.1.5，GHSA-gvg9 补丁 >=1.1.21）
   # 与 5.x（minimatch@5.1.9/7.4.9/9.0.9/10.2.5，GHSA-x895 补丁 >=5.0.12）
   'minimatch@3.1.5>brace-expansion': '1.1.21'
@@ -47,10 +48,18 @@ overrides:
   # electron-builder 26.15.3 经 app-builder-lib 引入 plist@3.1.0：其 parse() 未传 mimeType，
   # 与 @xmldom/xmldom 0.9.x 组合在打包 Info.plist 时直接崩溃（DMG 无法产出）。3.1.1 已修。
   plist: '3.1.1'
+  # postcss-selector-parser：6.x 线官方补丁版（2026-10-19 发布，backport 自 7.1.6），
+  #   修 CVE-2026-104844 / GHSA-rj75-hqrm-r3gf（flat selector 二次复杂度 ⇒ CPU 耗尽）。
+  #   **必须精确钉 6.1.5**：该版本走 `legacy-v6` dist-tag，latest 仍指向 7.x；
+  #   写成 `>=6.1.5` 会被解析到 7.1.7 —— 那是破坏性 major，而
+  #   tailwindcss@3.4.19 / postcss-nested@6.2.0 声明的是 `^6.x`，强升 7 会让
+  #   桌面 UI 构建崩掉，与 electron 那条同因（见上）。
+  postcss-selector-parser: '6.1.5'
   # 已知残余风险（不可安全修复，不强制 override）：
-  # 1. postcss-selector-parser 需 >=7.1.6（GHSA，flat selector 二次复杂度 DoS），
-  #    但 6.1.4 无 6.x 补丁且 7.x 为破坏性 major：tailwindcss@3.4.19 与 postcss-nested@6.2.0
-  #    声明 ^6.0.0，强制 7.x 会使桌面 UI 构建崩溃。moderate + 构建期 DoS，待 tailwindcss 4.x 升级。
+  # 1. （已销项 2026-10-25）postcss-selector-parser 6.1.4 → 6.1.5：上游已在 6.x 线补发
+  #    CVE-2026-104844 / GHSA-rj75-hqrm-r3gf 的补丁（backport 自 7.1.6，走 legacy-v6
+  #    dist-tag，须精确钉版本），此前记录的「6.x 无补丁、只能跨到 7.x」不再成立。
+  #    待 tailwindcss 升到 4.x（不再依赖本包）时，该 override 可一并删除。
   # 2. braces 需 >=3.0.4（HIGH，栈耗尽 DoS，micromatch/chokidar 链），但 npm 最新仅为 3.0.3，
   #    advisory 引用了未发布版本，无 override 目标。保持 3.0.3。
   # 3. sprintf-js 需 >=1.1.4（MODERATE，无界内存分配 DoS，electron-builder 工具链），但 npm 最新
@@ -83,3 +92,32 @@ onlyBuiltDependencies:
 
 minimumReleaseAgeExclude:
   - electron@42.11.18
+
+# ── 审计例外登记（2026-10-25）───────────────────────────────────────────────
+# 只忽略 GHSA-rj75-hqrm-r3gf 这一条（CVE-2026-104844，postcss-selector-parser）。
+# 忽略的**不是漏洞本身，而是审计库的误判**：
+#   1. 本仓已钉到 6.1.5，而 6.1.5 正是上游为该 CVE 补发的 6.x 线补丁版
+#      （CHANGELOG 明写 "backported from 7.1.6"，走 legacy-v6 dist-tag）；
+#      实测 6.1.4→6.1.5 的 parser.js diff 只有三处，与 advisory 描述的
+#      「three passes now use Set membership tests」逐条吻合：
+#      uniqs() 改 Set、Sass-interpolation filter 改 Set、
+#      hasClass/hasId.indexOf 改 Set。上游声明解析结果 byte-identical。
+#   2. advisory 的 vulnerable_versions 仍是纯版本号比较 "<7.1.6"，
+#      未把 6.1.5 列为 6.x 线例外 ⇒ 即使已修，pnpm audit 仍会命中。
+#      属审计数据源滞后，不是本仓未修。
+#   3. 可达性：该包经 tailwindcss@3.4.19 / postcss-nested 传入，dev:true，
+#      只用在本仓自己的 CSS 上。advisory 原文即写明
+#      "Ordinary build-time use on trusted sources is not affected"，
+#      受影响的仅是在请求路径里解析**不可信**选择器的场景（CSS 消毒器、
+#      CSS-in-JS 服务、在线 playground），本仓不属于此类。
+# 撤销条件（满足任一即删除本段）：
+#   - advisory 把 6.x 补丁版补进 patched 范围，告警自然消失；
+#   - tailwindcss 升到 4.x（不再依赖本包），override 与本段一并删除；
+#   - 该包被提升到 >=7.1.6（届时需同步验证桌面 UI 构建）。
+# 注意：本段只精确匹配这一条 GHSA，不会掩盖该包未来的其他 advisory。
+#   （同一例外此前也以 `auditConfig.ignoreGhsas` 写过一份：两者并存时 pnpm 会
+#    打印 "Both the audit and auditConfig settings are set" 并忽略后者，
+#    且 pnpm 11 已标记 auditConfig 为 deprecated ⇒ 已合并为此处 `audit.ignore`。）
+audit:
+  ignore:
+    - GHSA-rj75-hqrm-r3gf

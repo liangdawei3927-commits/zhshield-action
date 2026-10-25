@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useT } from '../i18n';
 import { PageShell } from '../components/business/PageShell';
 import { ReportShell } from '../components/business/ReportShell';
 import type { ReportStatCard } from '../components/business/ReportShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
 import { useInspectPage } from './inspect-logic';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useDetailIntentEffect } from '../hooks/useDetailIntent';
+import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
 import { ProgressBar, CheckList } from './inspect-parts';
@@ -84,6 +86,8 @@ function InspectFailureView({
   loading,
   progress,
   statusMessage,
+  queued,
+  queuePosition,
   onRetry,
   t,
 }: {
@@ -92,6 +96,9 @@ function InspectFailureView({
   loading: boolean;
   progress: number;
   statusMessage: string;
+  /** 排队中：重试按钮显示「排队中…」而不是「体检中…」 */
+  queued?: boolean;
+  queuePosition?: number;
   onRetry: () => void;
   t: Translate;
 }) {
@@ -104,9 +111,11 @@ function InspectFailureView({
       subtitle={t('page.inspect.empty.subtitle')}
       buttonText={t('page.inspect.errorRetry')}
       onAction={onRetry}
+      actionDomain="inspect"
+      queued={queued}
+      queuePosition={queuePosition}
       loading={loading}
       progress={progress}
-      progressLabel={t('page.inspect.scanning')}
       progressMessage={statusMessage}
       extra={
         failureDetail.length > 0 ? (
@@ -117,6 +126,26 @@ function InspectFailureView({
       }
     />
   );
+}
+
+/** 统计卡明细：把一批检查项交给 CheckList 渲染（通过/问题/未检测三类共用同一套交互） */
+function checkDetail(
+  items: InspectionReportData['checks'],
+  copyToAi: (item: InspectionReportData['checks'][number]) => void,
+  copyAllToAi: (items: InspectionReportData['checks']) => void,
+  hint?: string,
+): { items: unknown[]; render: (sub: unknown[]) => ReactNode; hint?: string } {
+  return {
+    items,
+    render: (sub: unknown[]) => (
+      <CheckList
+        items={sub as InspectionReportData['checks']}
+        onCopyToAi={copyToAi}
+        onCopyAll={copyAllToAi}
+      />
+    ),
+    hint,
+  };
 }
 
 /**
@@ -153,16 +182,11 @@ function buildInspectStats({
       ...(isSnapshot
         ? {}
         : {
-            detail: {
-              items: items.filter((i) => i.status === 'pass'),
-              render: (sub: unknown[]) => (
-                <CheckList
-                  items={sub as InspectionReportData['checks']}
-                  onCopyToAi={copyToAi}
-                  onCopyAll={copyAllToAi}
-                />
-              ),
-            },
+            detail: checkDetail(
+              items.filter((i) => i.status === 'pass'),
+              copyToAi,
+              copyAllToAi,
+            ),
           }),
     },
     {
@@ -170,17 +194,12 @@ function buildInspectStats({
       label: t('page.inspect.issues'),
       value: selectIssueChecks(items).length,
       color: 'rgb(var(--zh-danger))',
-      detail: {
-        items: selectIssueChecks(items),
-        render: (sub: unknown[]) => (
-          <CheckList
-            items={sub as InspectionReportData['checks']}
-            onCopyToAi={copyToAi}
-            onCopyAll={copyAllToAi}
-          />
-        ),
-        hint: t('page.inspect.issuesHint'),
-      },
+      detail: checkDetail(
+        selectIssueChecks(items),
+        copyToAi,
+        copyAllToAi,
+        t('page.inspect.issuesHint'),
+      ),
     },
     ...(attentionChecks.length > 0
       ? [
@@ -189,17 +208,12 @@ function buildInspectStats({
             label: t('page.inspect.attention'),
             value: attentionChecks.length,
             color: 'rgb(var(--zh-muted))',
-            detail: {
-              items: attentionChecks,
-              render: (sub: unknown[]) => (
-                <CheckList
-                  items={sub as InspectionReportData['checks']}
-                  onCopyToAi={copyToAi}
-                  onCopyAll={copyAllToAi}
-                />
-              ),
-              hint: t('page.inspect.attentionHint'),
-            },
+            detail: checkDetail(
+              attentionChecks,
+              copyToAi,
+              copyAllToAi,
+              t('page.inspect.attentionHint'),
+            ),
           },
         ]
       : []),
@@ -213,7 +227,9 @@ function InspectReportView({
   loading,
   progress,
   statusMessage,
-  progressLabel,
+  queued,
+  onCancel,
+  stopping,
   onRescan,
   onBackHome,
   copyToAi,
@@ -225,7 +241,12 @@ function InspectReportView({
   loading: boolean;
   progress: number;
   statusMessage: string;
-  progressLabel: string;
+  /** 排队中：按钮显示「排队中…」而不是「体检中…」 */
+  queued?: boolean;
+  /** 停止本次体检（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
@@ -245,21 +266,18 @@ function InspectReportView({
       dimension="quality"
       historyDomain="inspect"
       refreshKey={report}
-      icon={
-        <PageGlyph bg="warning" stroke="warning">
-          <circle cx="11" cy="12" r="2.5" />
-          <path d="M13 14l2 2" />
-        </PageGlyph>
-      }
+      icon={<NavGlyph navId="inspect" />}
       title={t('page.inspect.done')}
       action={
-        <PrimaryButton
+        <DomainActionButton
+          domain="inspect"
+          onCancel={onCancel}
+          stopping={stopping}
           onClick={onRescan}
           loading={loading}
-          loadingLabel={progressLabel || t('page.inspect.scanning')}
-        >
-          {t('page.inspect.scanNow')}
-        </PrimaryButton>
+          queued={queued}
+          label={t('page.inspect.scanNow')}
+        />
       }
       onBackHome={onBackHome}
       loading={loading}
@@ -294,6 +312,11 @@ function InspectEmptyView(props: {
   loading: boolean;
   progress: number;
   statusMessage: string;
+  queued?: boolean;
+  queuePosition?: number;
+  /** 停止本次体检 */
+  onCancel: () => void;
+  stopping: boolean;
   onScan: () => void;
   t: Translate;
 }) {
@@ -327,10 +350,14 @@ function InspectEmptyView(props: {
       ]}
       buttonText={props.t('page.inspect.scanNow')}
       onAction={props.onScan}
+      actionDomain="inspect"
       loading={props.loading}
+      queued={props.queued}
+      queuePosition={props.queuePosition}
+      onCancel={props.onCancel}
+      stopping={props.stopping}
       progress={props.progress}
       statusMessage={props.statusMessage}
-      progressLabel={props.t('page.inspect.scanning')}
     />
   );
 }
@@ -342,18 +369,20 @@ function useInspectPageState(projectPath: string) {
   const [showHome, setShowHome] = useState(true);
   // 本次跳转带「看结果」意图（扫描进度条点进来）→ 直接展开详情
   useDetailIntentEffect('inspect', () => setShowHome(false));
-  // 实时扫描/每日自动巡检产出结果时进入详情 —— 保持原有「扫完直接看报告」的行为。
-  useEffect(() => {
-    if (page.report) setShowHome(false);
-  }, [page.report]);
-  const startScan = () => {
-    setShowHome(false);
-    page.startInspect();
-  };
+  // 扫完要不要进详情：只在「本次体检产出新结果」时判，且满分 100 不进（唯一口径）
+  const { scanVersion } = useScanResultEntry({
+    projectPath,
+    navId: 'inspect',
+    liveReport: page.report,
+    loading: page.loading,
+    onEnterDetail: () => setShowHome(false),
+  });
+  // 一键体检只跑检查、不换页：扫完停主页还是进详情由 useScanResultEntry 按分数决定
+  const startScan = () => page.startInspect();
   const backHome = () => setShowHome(true);
   // 打开详情（回详情分支）——供 DetailEntryProvider.onOpen 使用
   const openDetail = () => setShowHome(false);
-  return { ...page, showHome, startScan, backHome, openDetail };
+  return { ...page, showHome, scanVersion, startScan, backHome, openDetail };
 }
 
 export function InspectPage({ projectPath }: InspectPageProps) {
@@ -364,12 +393,16 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     failure,
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     copyToAi,
     copyAllToAi,
     startInspect,
     showHome,
+    scanVersion,
     startScan,
     backHome,
     openDetail,
@@ -390,6 +423,8 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
+        queued={queued}
+        queuePosition={queuePosition}
         onRetry={startScan}
         t={t}
       />
@@ -404,7 +439,9 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
-        progressLabel={progressLabel}
+        queued={queued}
+        onCancel={cancel}
+        stopping={stopping}
         onRescan={startInspect}
         onBackHome={backHome}
         copyToAi={copyToAi}
@@ -415,12 +452,17 @@ export function InspectPage({ projectPath }: InspectPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
+    // key = 扫描版本：满分留在主页时强制重挂载，评分环与详情入口重新读盘
+    <DetailEntryProvider key={scanVersion} available={hasDetail} onOpen={openDetail}>
       <InspectEmptyView
         projectPath={projectPath}
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
+        queued={queued}
+        queuePosition={queuePosition}
+        onCancel={cancel}
+        stopping={stopping}
         onScan={startScan}
         t={t}
       />

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
@@ -102,7 +102,10 @@ function SentinelReportView({
   highCount,
   criticalCount,
   loading,
+  monitoring,
+  stopping,
   onRefresh,
+  onStopMonitoring,
   onBackHome,
   projectPath,
   t,
@@ -113,7 +116,10 @@ function SentinelReportView({
   highCount: number;
   criticalCount: number;
   loading: boolean;
+  monitoring: boolean;
+  stopping: boolean;
   onRefresh: () => void;
+  onStopMonitoring: () => void;
   onBackHome: () => void;
   projectPath: string;
   t: (key: string, params?: Record<string, unknown>) => string;
@@ -123,23 +129,19 @@ function SentinelReportView({
       projectPath={projectPath}
       dimension="sentinel"
       refreshKey={events}
-      icon={
-        <PageGlyph bg="info" stroke="info">
-          <circle cx="12" cy="12" r="9" />
-          <circle cx="12" cy="12" r="5" strokeWidth="1.2" />
-          <circle cx="12" cy="12" r="1.5" fill="rgb(var(--zh-info))" />
-          <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeWidth="1.2" />
-        </PageGlyph>
-      }
+      icon={<NavGlyph navId="sentinel" />}
       title={t('nav.sentinel')}
       action={
-        <PrimaryButton
-          onClick={onRefresh}
-          loading={loading}
-          loadingLabel={t('page.sentinel.refreshing')}
-        >
-          {t('common.refresh')}
-        </PrimaryButton>
+        <DomainActionButton
+          // 监控中：按钮进入「监控中…」，hover 出「停止」点它即停（监控 5s 一轮自动刷新，
+          // 无需再摆刷新入口）；未监控时才退化成一次性刷新。
+          domain={monitoring ? 'sentinelMonitor' : 'sentinel'}
+          onClick={monitoring ? undefined : onRefresh}
+          loading={monitoring || loading}
+          onCancel={monitoring ? onStopMonitoring : undefined}
+          stopping={monitoring ? stopping : false}
+          label={t('common.refresh')}
+        />
       }
       onBackHome={onBackHome}
       stats={buildSentinelStats({
@@ -161,7 +163,9 @@ function SentinelEmptyView(props: {
   projectPath: string;
   monitoring: boolean;
   loading: boolean;
+  stopping: boolean;
   onAction: () => void;
+  onStopMonitoring: () => void;
   t: (key: string, opts?: { defaultValue?: string }) => string;
 }) {
   return (
@@ -224,7 +228,11 @@ function SentinelEmptyView(props: {
           : props.t('page.sentinel.shell.buttonStart')
       }
       onAction={props.onAction}
+      actionDomain={props.monitoring ? 'sentinelMonitor' : 'sentinel'}
       loading={props.loading}
+      // 监控中：同一颗按钮 hover 出「停止」，点它真的停掉监视器
+      onCancel={props.monitoring ? props.onStopMonitoring : undefined}
+      stopping={props.monitoring ? props.stopping : false}
     />
   );
 }
@@ -248,11 +256,13 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
     events,
     loading,
     monitoring,
+    stopping,
     activeCount,
     highCount,
     criticalCount,
     sorted,
     startMonitoring,
+    stopMonitoring,
   } = useSentinelPage(projectPath);
   const { notify } = useNotification();
   useSentinelCriticalNotification(events, notify);
@@ -270,7 +280,10 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         highCount={highCount}
         criticalCount={criticalCount}
         loading={loading}
+        monitoring={monitoring}
+        stopping={stopping}
         onRefresh={startMonitoring}
+        onStopMonitoring={stopMonitoring}
         onBackHome={() => setShowHome(true)}
         projectPath={projectPath}
         t={t}
@@ -284,10 +297,12 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         projectPath={projectPath}
         monitoring={monitoring}
         loading={loading}
+        stopping={stopping}
         onAction={() => {
           setShowHome(false);
           startMonitoring();
         }}
+        onStopMonitoring={stopMonitoring}
         t={t}
       />
     </DetailEntryProvider>

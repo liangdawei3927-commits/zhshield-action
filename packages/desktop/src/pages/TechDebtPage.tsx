@@ -3,8 +3,8 @@ import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
-import { Bounce } from '../components/ui/Bounce';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useTechDebtPage, debtIndexColor } from './tech-debt-logic';
 import type { TechDebtReportData } from '../types/electron';
@@ -20,33 +20,18 @@ interface TechDebtPageProps {
   projectPath: string;
 }
 
-/** 技术债仪表小图标（24×24，线性风格） */
-function TechDebtGaugeIcon() {
-  return (
-    <svg
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="rgb(var(--zh-brand))"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 19A8 8 0 0 1 20 19" />
-      <path d="M12 13V8" />
-      <circle cx="12" cy="6" r="1.5" />
-      <path d="M4 19h16" />
-    </svg>
-  );
-}
-
 interface TechDebtReportViewProps {
   projectPath: string;
   report: TechDebtReportData;
   loading: boolean;
   progress: number;
   progressMessage: string;
+  /** 排队中：按钮显示「排队中…」而不是「检查中…」 */
+  queued?: boolean;
+  /** 停止本次技术债检查（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
@@ -129,6 +114,20 @@ function buildTechDebtStats({
   ];
 }
 
+/** 报告级错误横幅：扫描失败但仍有历史数据时 report 会带 error，必须当场显示 */
+function TechDebtErrorBanner({ message }: { message: string }) {
+  const t = useT();
+  return (
+    <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+      <AlertCircleIcon />
+      <div>
+        <div className="text-sm font-medium text-danger-700">{t('page.techdebt.errorTitle')}</div>
+        <div className="text-xs text-danger-500 mt-0.5">{message}</div>
+      </div>
+    </div>
+  );
+}
+
 /** 技术债报告视图：统计卡 + 错误横幅 + 模块/构成/类别/行动项卡片 */
 function TechDebtReportView({
   projectPath,
@@ -136,6 +135,9 @@ function TechDebtReportView({
   loading,
   progress,
   progressMessage,
+  queued,
+  onCancel,
+  stopping,
   onRescan,
   onBackHome,
   copyToAi,
@@ -165,20 +167,18 @@ function TechDebtReportView({
       dimension="techdebt"
       historyDomain="techdebt"
       refreshKey={report}
-      icon={
-        <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
-          <TechDebtGaugeIcon />
-        </Bounce>
-      }
+      icon={<NavGlyph navId="techdebt" />}
       title={t('page.techdebt.done')}
       action={
-        <PrimaryButton
+        <DomainActionButton
+          domain="techdebt"
+          onCancel={onCancel}
+          stopping={stopping}
+          queued={queued}
           onClick={onRescan}
           loading={loading}
-          loadingLabel={t('page.techdebt.checking')}
-        >
-          {t('page.techdebt.rescan')}
-        </PrimaryButton>
+          label={t('page.techdebt.rescan')}
+        />
       }
       onBackHome={onBackHome}
       loading={loading}
@@ -186,17 +186,7 @@ function TechDebtReportView({
       progressMessage={progressMessage}
       stats={stats}
     >
-      {report.error && (
-        <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
-          <AlertCircleIcon />
-          <div>
-            <div className="text-sm font-medium text-danger-700">
-              {t('page.techdebt.errorTitle')}
-            </div>
-            <div className="text-xs text-danger-500 mt-0.5">{report.error}</div>
-          </div>
-        </div>
-      )}
+      {report.error && <TechDebtErrorBanner message={report.error} />}
       <TechDebtModuleCard modules={report.byModule} />
       <TechDebtCompositionIntroCard />
       <TechDebtCategoryCard categories={report.byCategory} />
@@ -220,6 +210,7 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
     loading,
     progress,
     progressMessage,
+    queued,
     report,
     planLoading,
     verifyLoading,
@@ -229,20 +220,24 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
     handleDismiss,
     copyToAi,
     copyAllToAi,
+    cancel,
+    stopping,
   } = useTechDebtPage(projectPath);
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配
-  const detail = useDomainDetailPage(projectPath, 'techdebt', report, loading, handleScan);
+  const detail = useDomainDetailPage({
+    projectPath,
+    domain: 'techdebt',
+    liveReport: report,
+    loading,
+    onScan: handleScan,
+  });
 
   if (detail.showSnapshot) {
     return (
       <DomainSnapshotReport
         dimension="techdebt"
-        icon={
-          <Bounce className="w-14 h-14 rounded-xl bg-brand-50 flex items-center justify-center">
-            <TechDebtGaugeIcon />
-          </Bounce>
-        }
+        icon={<NavGlyph navId="techdebt" />}
         {...detail.snapshotViewProps}
       />
     );
@@ -256,6 +251,9 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
         loading={loading}
         progress={progress}
         progressMessage={progressMessage}
+        queued={queued}
+        onCancel={cancel}
+        stopping={stopping}
         onRescan={handleScan}
         onBackHome={detail.backHome}
         copyToAi={copyToAi}
@@ -271,7 +269,7 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
       <TechDebtEmptyState
         projectPath={projectPath}
         loading={loading}

@@ -1,145 +1,30 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useHasDomainResult } from '../hooks/useHasDomainResult';
-import { useDomainDetailEntry } from '../hooks/useDomainDetailEntry';
+import { useDomainDetailEntry, type DomainSnapshotViewProps } from '../hooks/useDomainDetailEntry';
 import { useDetailIntentEffect } from '../hooks/useDetailIntent';
+import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
-import { useSecurityPage, SEVERITY_CONFIG } from './security-logic';
+import { useSecurityPage } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
 import { SecurityEmptyState } from './security-empty-state';
-import { FindingsPanel, MalwarePanel } from './security-parts';
 import { SecretsListCard } from './secrets-parts';
-import { ReportShell } from '../components/business/ReportShell';
-import type { ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
-import type { SecurityIssue } from './security-logic';
-import type { SecurityScanReportData, SecretReportData } from '../types/electron';
+import { NavGlyph } from '../components/business/page-glyph';
+import type { SecretReportData, SecurityScanReportData } from '../types/electron';
+import {
+  SecurityReportView,
+  renderFindingsPanel,
+  renderMalwarePanel,
+  type SecurityReportCopyProps,
+  type SecuritySecretsProps,
+  type SecurityTab,
+} from './security-report-parts';
 
 interface SecurityPageProps {
   projectPath: string;
-}
-
-type SecurityTab = 'vuln' | 'malware' | 'secrets';
-
-type Translate = (key: string, params?: Record<string, unknown>) => string;
-
-const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
-  { id: 'vuln', labelKey: 'page.security.tab.vuln' },
-  { id: 'malware', labelKey: 'page.security.tab.malware' },
-  { id: 'secrets', labelKey: 'page.security.tab.secrets' },
-];
-
-const SEVERITY_KEYS = ['critical', 'high', 'medium', 'low'] as const;
-
-interface SecurityReportCopyProps {
-  copyToAi: (issue: SecurityIssue) => void;
-  copyAllToAi: (issues: SecurityIssue[]) => void;
-  copyMalwareToAi: (item: SecurityScanReportData['malware'][number]) => void;
-  copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
-}
-
-interface SecuritySecretsProps {
-  onMarkRotating: (secretId: string) => void;
-  onVerifyRotated: (secretId: string) => void;
-  onDismiss: (secretId: string) => void;
-  secretsCopyToAi: (finding: SecretReportData['findings'][number]) => void;
-  secretsCopyAllToAi: (findings: SecretReportData['findings']) => void;
-  t: Translate;
-}
-
-function renderFindingsPanel(
-  items: SecurityScanReportData['findings'],
-  onCopyToAi: (issue: SecurityIssue) => void,
-  onCopyAll: (issues: SecurityIssue[]) => void,
-) {
-  return <FindingsPanel findings={items} onCopyToAi={onCopyToAi} onCopyAll={onCopyAll} />;
-}
-
-function renderMalwarePanel(
-  items: SecurityScanReportData['malware'],
-  onCopyToAi: (item: SecurityScanReportData['malware'][number]) => void,
-  onCopyAll: (items: SecurityScanReportData['malware']) => void,
-) {
-  return <MalwarePanel items={items} onCopyToAi={onCopyToAi} onCopyAll={onCopyAll} />;
-}
-
-/** 报告统计卡：总数 + 各严重级别 + 恶意代码，明细复用 FindingsPanel/MalwarePanel */
-function buildSecurityStats({
-  report,
-  copyToAi,
-  copyAllToAi,
-  copyMalwareToAi,
-  copyMalwareAllToAi,
-  t,
-}: {
-  report: SecurityScanReportData;
-  t: Translate;
-} & SecurityReportCopyProps): ReportStatCard[] {
-  return [
-    { key: 'total', label: t('page.security.stats.total'), value: report.summary.total },
-    ...SEVERITY_KEYS.map((sev) => {
-      const items = report.findings.filter((f) => f.severity === sev);
-      return {
-        key: sev,
-        label: t(`severity.${sev}`),
-        value: report.summary[sev],
-        // 与明细徽章同源（security-logic 的 SEVERITY_CONFIG）：一处定义、两处消费，
-        // 避免统计卡与问题清单对同一严重级给出不同颜色。
-        color: SEVERITY_CONFIG[sev]?.color,
-        detail: {
-          items,
-          render: (sub: unknown[]) =>
-            renderFindingsPanel(sub as SecurityScanReportData['findings'], copyToAi, copyAllToAi),
-          hint: t('page.security.copyAllPrompt', { count: items.length }),
-        },
-      };
-    }),
-    {
-      key: 'malware',
-      label: t('page.security.stats.malware'),
-      value: report.summary.malwareTotal,
-      // 恶意代码属最高危，与 critical 同档
-      color: 'rgb(var(--zh-danger-dark))',
-      detail: {
-        items: report.malware,
-        render: (sub: unknown[]) =>
-          renderMalwarePanel(sub as SecurityScanReportData['malware'], copyMalwareToAi, copyMalwareAllToAi),
-      },
-    },
-  ];
-}
-
-/** 分类切换标签栏 */
-function SecurityTabBar({
-  tab,
-  onTabChange,
-  t,
-}: {
-  tab: SecurityTab;
-  onTabChange: (tab: SecurityTab) => void;
-  t: Translate;
-}) {
-  return (
-    <div className="flex gap-2 mb-6">
-      {TABS.map((t2) => (
-        <button
-          key={t2.id}
-          onClick={() => onTabChange(t2.id)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
-            tab === t2.id
-              ? 'bg-danger-600 text-white'
-              : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
-          }`}
-        >
-          {t(t2.labelKey)}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 interface SecurityTabContentProps extends SecurityReportCopyProps, SecuritySecretsProps {
@@ -190,99 +75,6 @@ function SecurityTabContent({
   );
 }
 
-interface SecurityReportViewProps extends SecurityReportCopyProps, SecuritySecretsProps {
-  projectPath: string;
-  report: SecurityScanReportData;
-  secretsReport: SecretReportData | null;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  progressLabel: string;
-  tab: SecurityTab;
-  onTabChange: (tab: SecurityTab) => void;
-  onRescan: () => void;
-  onBackHome: () => void;
-}
-
-/** 报告态：统计卡 + 分类标签栏 + 明细面板 */
-function SecurityReportView({
-  projectPath,
-  report,
-  secretsReport,
-  loading,
-  progress,
-  statusMessage,
-  progressLabel,
-  tab,
-  onTabChange,
-  onRescan,
-  onBackHome,
-  copyToAi,
-  copyAllToAi,
-  copyMalwareToAi,
-  copyMalwareAllToAi,
-  onMarkRotating,
-  onVerifyRotated,
-  onDismiss,
-  secretsCopyToAi,
-  secretsCopyAllToAi,
-  t,
-}: SecurityReportViewProps) {
-  return (
-    <ReportShell
-      projectPath={projectPath}
-      dimension="security"
-      historyDomain="security"
-      refreshKey={report}
-      icon={
-        <PageGlyph bg="danger" stroke="danger">
-          <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
-          <path d="M9 13l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </PageGlyph>
-      }
-      title={t('page.security.done')}
-      action={
-        <PrimaryButton
-          onClick={onRescan}
-          loading={loading}
-          loadingLabel={progressLabel || t('page.security.checking')}
-        >
-          {t('page.security.rescan')}
-        </PrimaryButton>
-      }
-      onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
-      stats={buildSecurityStats({
-        report,
-        copyToAi,
-        copyAllToAi,
-        copyMalwareToAi,
-        copyMalwareAllToAi,
-        t,
-      })}
-    >
-      <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
-      <SecurityTabContent
-        report={report}
-        secretsReport={secretsReport}
-        tab={tab}
-        copyToAi={copyToAi}
-        copyAllToAi={copyAllToAi}
-        copyMalwareToAi={copyMalwareToAi}
-        copyMalwareAllToAi={copyMalwareAllToAi}
-        onMarkRotating={onMarkRotating}
-        onVerifyRotated={onVerifyRotated}
-        onDismiss={onDismiss}
-        secretsCopyToAi={secretsCopyToAi}
-        secretsCopyAllToAi={secretsCopyAllToAi}
-        t={t}
-      />
-    </ReportShell>
-  );
-}
-
 function useSecurityPageState(projectPath: string) {
   // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
   const [showHome, setShowHome] = useState(true);
@@ -292,8 +84,11 @@ function useSecurityPageState(projectPath: string) {
   const {
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     copyToAi,
     copyAllToAi,
@@ -324,25 +119,35 @@ function useSecurityPageState(projectPath: string) {
   const detailReport = report ?? (loading ? null : savedReport);
   const detailSecretsReport = secretsReport ?? (loading ? null : savedSecretsReport);
 
-  // 实时扫描出结果时进入详情 —— 复刻原有「扫完直接看报告」的行为
-  useEffect(() => {
-    if (report || secretsReport) setShowHome(false);
-  }, [report, secretsReport]);
+  // 扫完要不要进详情：满分 100 留在主页，不满分（或判断不了）才自动展开详情。
+  // 两个数据源（漏洞扫描 / 密钥扫描）任一产出新结果都算一次扫描结束，故拼成一个
+  // 「本次结果」对象交给判据：它的引用只在两者变化时改变，正好当"新结果"的信标。
+  const scanResult = useMemo(
+    () => (report === null && secretsReport === null ? null : { report, secretsReport }),
+    [report, secretsReport],
+  );
+  const { scanVersion } = useScanResultEntry({
+    projectPath,
+    navId: 'security',
+    liveReport: scanResult,
+    loading,
+    onEnterDetail: () => setShowHome(false),
+  });
 
-  const startScan = () => {
-    setShowHome(false);
-    handleScan();
-  };
+  // 安全中心的主按钮只跑检查、不换页（扫完停主页还是进详情由上面按分数决定）
+  const startScan = handleScan;
 
   return {
     showHome,
     setShowHome,
+    scanVersion,
     tab,
     setTab,
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
     report,
     detailReport,
     copyToAi,
@@ -358,109 +163,137 @@ function useSecurityPageState(projectPath: string) {
     secretsCopyAllToAi,
     handleScan,
     startScan,
+    cancel,
+    stopping,
   };
+}
+
+type SecurityPageState = ReturnType<typeof useSecurityPageState>;
+type SecurityTranslate = ReturnType<typeof useT>;
+
+/** 快照视图分支：有历史分但无完整报告时，直接回看上次落盘结果（不替用户重扫） */
+function SecuritySnapshotView({
+  snapshotViewProps,
+}: {
+  snapshotViewProps: DomainSnapshotViewProps;
+}) {
+  return (
+    <DomainSnapshotReport
+      dimension="security"
+      icon={<NavGlyph navId="security" />}
+      {...snapshotViewProps}
+    />
+  );
+}
+
+/** SecurityReportView 的入参装配（页面状态 → 视图 props，SecurityPage 只留分支） */
+function securityReportViewProps(
+  state: SecurityPageState,
+  report: NonNullable<SecurityPageState['detailReport']>,
+  projectPath: string,
+) {
+  return {
+    projectPath,
+    report,
+    loading: state.loading,
+    progress: state.progress,
+    statusMessage: state.statusMessage,
+    queued: state.queued,
+    onCancel: state.cancel,
+    stopping: state.stopping,
+    tab: state.tab,
+    onTabChange: state.setTab,
+    onRescan: state.handleScan,
+    onBackHome: () => state.setShowHome(true),
+    copyToAi: state.copyToAi,
+    copyAllToAi: state.copyAllToAi,
+    copyMalwareToAi: state.copyMalwareToAi,
+    copyMalwareAllToAi: state.copyMalwareAllToAi,
+  };
+}
+
+/** 报告正文：当前分类（漏洞 / 恶意代码 / 密钥）的明细面板 */
+function securityTabContent(
+  state: SecurityPageState,
+  report: NonNullable<SecurityPageState['detailReport']>,
+  t: SecurityTranslate,
+) {
+  return (
+    <SecurityTabContent
+      report={report}
+      secretsReport={state.detailSecretsReport}
+      tab={state.tab}
+      copyToAi={state.copyToAi}
+      copyAllToAi={state.copyAllToAi}
+      copyMalwareToAi={state.copyMalwareToAi}
+      copyMalwareAllToAi={state.copyMalwareAllToAi}
+      onMarkRotating={state.handleMarkRotating}
+      onVerifyRotated={state.handleVerifyRotated}
+      onDismiss={state.handleDismiss}
+      secretsCopyToAi={state.secretsCopyToAi}
+      secretsCopyAllToAi={state.secretsCopyAllToAi}
+      t={t}
+    />
+  );
 }
 
 export function SecurityPage({ projectPath }: SecurityPageProps) {
   const t = useT();
-  const {
-    showHome,
-    setShowHome,
-    tab,
-    setTab,
-    loading,
-    progress,
-    progressLabel,
-    statusMessage,
-    detailReport,
-    copyToAi,
-    copyAllToAi,
-    copyMalwareToAi,
-    copyMalwareAllToAi,
-    detailSecretsReport,
-    handleMarkRotating,
-    handleVerifyRotated,
-    handleDismiss,
-    secretsCopyToAi,
-    secretsCopyAllToAi,
-    handleScan,
-    startScan,
-  } = useSecurityPageState(projectPath);
-  const emptyStateParams = {
-    projectPath,
-    loading,
-    progress,
-    statusMessage,
-    onScan: startScan,
-  };
+  const state = useSecurityPageState(projectPath);
 
   // 该域跑过（磁盘有结果 = 页面上有分）→ 详情入口可见；没跑过 → 不显示
   const hadPreviousResult = useHasDomainResult(projectPath, 'security');
-  // 单一判定源：实时结果优先，其次落盘读回的历史报告（扫描中不用旧报告顶替）
+  // 单一判定源：实时结果优先，其次落盘读回的历史报告（扫描中不用旧报告顶替）。
+  // 此处刻意用解构后的裸名：`domain-reports` 守卫按 `hasDetail = detailReport !== null ||`
+  // 逐字断言六个分类页，写成 `state.detailReport` 会让守卫假红。
+  const { detailReport } = state;
   const hasDetail = detailReport !== null || hadPreviousResult;
 
   // 有分但还没有完整报告（本次升级前扫的）：直接展示上次落盘结果，不重扫
   const { showSnapshot, setShowSnapshot, openDetail, snapshotViewProps } = useDomainDetailEntry({
     projectPath,
     domain: 'security',
-    detailReport,
-    onEnterDetail: () => setShowHome(false),
-    rescanning: loading,
-    onRescan: handleScan,
+    detailReport: state.detailReport,
+    onEnterDetail: () => state.setShowHome(false),
+    rescanning: state.loading,
+    onRescan: state.handleScan,
   });
 
   // 实时扫描出结果时退出快照视图 —— 复刻原有「扫完直接看报告」
   useEffect(() => {
-    if (detailReport) setShowSnapshot(false);
-  }, [detailReport]);
+    if (state.detailReport) setShowSnapshot(false);
+  }, [state.detailReport]);
 
   if (showSnapshot) {
-    return (
-      <DomainSnapshotReport
-        dimension="security"
-        icon={
-          <PageGlyph bg="danger" stroke="danger">
-            <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
-            <path d="M9 13l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          </PageGlyph>
-        }
-        {...snapshotViewProps}
-      />
-    );
+    return <SecuritySnapshotView snapshotViewProps={snapshotViewProps} />;
   }
 
-  if (detailReport && !showHome) {
+  if (state.detailReport && !state.showHome) {
     return (
       <SecurityReportView
-        projectPath={projectPath}
-        report={detailReport}
-        secretsReport={detailSecretsReport}
-        loading={loading}
-        progress={progress}
-        statusMessage={statusMessage}
-        progressLabel={progressLabel}
-        tab={tab}
-        onTabChange={setTab}
-        onRescan={handleScan}
-        onBackHome={() => setShowHome(true)}
-        copyToAi={copyToAi}
-        copyAllToAi={copyAllToAi}
-        copyMalwareToAi={copyMalwareToAi}
-        copyMalwareAllToAi={copyMalwareAllToAi}
-        onMarkRotating={handleMarkRotating}
-        onVerifyRotated={handleVerifyRotated}
-        onDismiss={handleDismiss}
-        secretsCopyToAi={secretsCopyToAi}
-        secretsCopyAllToAi={secretsCopyAllToAi}
-        t={t}
-      />
+        {...securityReportViewProps(state, state.detailReport, projectPath)}
+      >
+        {securityTabContent(state, state.detailReport, t)}
+      </SecurityReportView>
     );
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={openDetail}>
+    <DetailEntryProvider
+      key={state.scanVersion}
+      available={hasDetail}
+      onOpen={openDetail}
+    >
       <ScanEmptyStateBranch
-        {...emptyStateParams}
+        projectPath={projectPath}
+        loading={state.loading}
+        progress={state.progress}
+        statusMessage={state.statusMessage}
+        queued={state.queued}
+        queuePosition={state.queuePosition}
+        onCancel={state.cancel}
+        stopping={state.stopping}
+        onScan={state.startScan}
         render={(empty) => <SecurityEmptyState {...empty} />}
       />
     </DetailEntryProvider>

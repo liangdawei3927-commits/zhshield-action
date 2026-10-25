@@ -4,8 +4,8 @@ import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { useGarbagePage } from './garbage-logic';
 import { GarbageEmptyState } from './garbage-empty-state';
@@ -28,16 +28,14 @@ interface GarbagePageProps {
   projectPath: string;
 }
 
-/** 顶行分类图标：绿色垃圾桶（与 GarbageHeader 原标记一致） */
+/**
+ * 顶行分类图标 —— 与顶部导航栏「垃圾清理」按钮同一个图形。
+ *
+ * 此前这里内联了一份绿色垃圾桶 path，与导航栏的垃圾桶是两份实现（形状略有差异）。
+ * 现统一走 `NavGlyph navId="garbage"`，图形只存在 NAV_ICON_CONTENT 一处。
+ */
 function GarbageIcon() {
-  return (
-    <PageGlyph bg="success" stroke="success" round>
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-    </PageGlyph>
-  );
+  return <NavGlyph navId="garbage" />;
 }
 
 interface GarbageReportViewProps {
@@ -46,7 +44,12 @@ interface GarbageReportViewProps {
   loading: boolean;
   progress: number;
   statusMessage: string;
-  progressLabel: string;
+  /** 排队中：按钮显示「排队中…」而不是「扫描中…」 */
+  queued?: boolean;
+  /** 停止本次盘点（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   selected: Set<string>;
   cleaning: boolean;
   restoring: boolean;
@@ -117,7 +120,9 @@ function GarbageReportView({
   loading,
   progress,
   statusMessage,
-  progressLabel,
+  queued,
+  onCancel,
+  stopping,
   selected,
   cleaning,
   restoring,
@@ -143,13 +148,15 @@ function GarbageReportView({
       icon={<GarbageIcon />}
       title={t('page.garbage.done')}
       action={
-        <PrimaryButton
+        <DomainActionButton
+          domain="garbage"
+          onCancel={onCancel}
+          stopping={stopping}
+          queued={queued}
           onClick={onRescan}
           loading={loading}
-          loadingLabel={progressLabel || t('page.garbage.scanning')}
-        >
-          {t('page.garbage.rescan')}
-        </PrimaryButton>
+          label={t('page.garbage.rescan')}
+        />
       }
       onBackHome={onBackHome}
       loading={loading}
@@ -194,8 +201,11 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
   const {
     loading,
     progress,
-    progressLabel,
     statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
     report,
     selected,
     cleaning,
@@ -211,13 +221,23 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
   } = useGarbagePage(projectPath);
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配
-  const detail = useDomainDetailPage(projectPath, 'garbage', report, loading, handleScan);
+  const detail = useDomainDetailPage({
+    projectPath,
+    domain: 'garbage',
+    liveReport: report,
+    loading,
+    onScan: handleScan,
+  });
 
   const emptyStateParams = {
     projectPath,
     loading,
     progress,
     statusMessage,
+    queued,
+    queuePosition,
+    onCancel: cancel,
+    stopping,
     onScan: detail.startScan,
   };
 
@@ -239,7 +259,9 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
-        progressLabel={progressLabel}
+        queued={queued}
+        onCancel={cancel}
+        stopping={stopping}
         selected={selected}
         cleaning={cleaning}
         restoring={restoring}
@@ -258,7 +280,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
   }
 
   return (
-    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
       <ScanEmptyStateBranch
         {...emptyStateParams}
         render={(empty) => <GarbageEmptyState {...empty} />}

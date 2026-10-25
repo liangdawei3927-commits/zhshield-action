@@ -163,8 +163,23 @@ const NAV_ICON_CONTENT: Record<string, ReactNode> = {
   ),
 };
 
-/** 分类图标（24×24，极简 stroke 风格） */
-export function NavIcon({ id, size = 24 }: { id: string; size?: number }) {
+/**
+ * 分类图标（24×24，极简 stroke 风格）—— 顶部导航栏与分类页标题的**唯一图标来源**。
+ *
+ * 2026-10-25：此前分类详情页各自内联一份 path（体检页是放大镜、门禁页是盾牌+闪电、
+ * 重构页是扳手、备份页是软盘），与导航栏同一分类的图形对不上 —— 名字一致、图标两套。
+ * 现规定：任何展示「某分类」的地方一律 `<NavIcon id={navId}>`，禁止再写第二份图形。
+ */
+export function NavIcon({
+  id,
+  size = 24,
+  strokeWidth = 1.7,
+}: {
+  id: string;
+  size?: number;
+  /** 大尺寸场景（分类页标题 32px）用 2 才与 PageGlyph 原观感一致 */
+  strokeWidth?: number;
+}) {
   const content = NAV_ICON_CONTENT[id];
   if (!content) return null;
   return (
@@ -174,13 +189,19 @@ export function NavIcon({ id, size = 24 }: { id: string; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.7}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
+      data-nav-icon={id}
     >
       {content}
     </svg>
   );
+}
+
+/** 该分类是否有图标（供 parity 测试锁「导航项 ↔ 图标」一一对应，避免漏画成空白块） */
+export function hasNavIcon(id: string): boolean {
+  return Boolean(NAV_ICON_CONTENT[id]);
 }
 
 /** 功能卡图标外壳：18×18、currentColor、1.8 描边；仅收敛外壳，图形路径由 children 传入 */

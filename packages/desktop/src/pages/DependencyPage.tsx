@@ -6,7 +6,6 @@ import {
   DependencyLicenseCard,
   DependencyEnvCard,
   DependencyOutdatedCard,
-  DependencyGraphGlyph,
 } from './dependency-parts';
 import {
   DependencyTyposquatCard,
@@ -14,8 +13,8 @@ import {
   DependencyUpgradeCard,
 } from './dependency-cards';
 import { ReportShell } from '../components/business/ReportShell';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
@@ -27,63 +26,36 @@ interface DependencyPageProps {
   projectPath: string;
 }
 
-function DependencyReportView({
+/**
+ * 顶行统计卡：四张卡都是「规模统计」（总数/直接/传递/依赖边），大不等于坏 —— 按统计卡配色约定
+ * 只有表达好坏极性的数字才上色，纯计数保持墨色。别把它们当遗漏补成彩色。
+ */
+function depsOverviewStats(
+  t: (key: string, params?: Record<string, unknown>) => string,
+  report: DependencyReportData,
+): { key: string; label: string; value: number }[] {
+  return [
+    { key: 'total', label: t('page.deps.overviewTotal'), value: report.total },
+    { key: 'direct', label: t('page.deps.overviewDirect'), value: report.direct },
+    { key: 'transitive', label: t('page.deps.overviewTransitive'), value: report.transitive },
+    { key: 'edges', label: t('page.deps.overviewEdges'), value: report.edgeCount },
+  ];
+}
+
+/** 报告正文：错误横幅 + 锁文件/可信度/许可证/仿冒/升级/环境/过期七块卡片 */
+function DependencyReportBody({
   report,
-  loading,
-  progress,
-  progressMessage,
-  onRescan,
   onCopyTyposquat,
   onCopyAllTyposquat,
-  onBackHome,
-  projectPath,
   t,
 }: {
   report: DependencyReportData;
-  loading: boolean;
-  progress: number;
-  progressMessage: string;
-  onRescan: () => void;
   onCopyTyposquat: (finding: TyposquatFindingData) => void;
   onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
-  onBackHome: () => void;
-  projectPath: string;
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
-    <ReportShell
-      projectPath={projectPath}
-      dimension="dependencies"
-      historyDomain="deps"
-      refreshKey={report}
-      icon={
-        <PageGlyph bg="brand" stroke="brand" round>
-          <DependencyGraphGlyph />
-        </PageGlyph>
-      }
-      title={t('page.deps.done')}
-      action={
-        <PrimaryButton
-          onClick={onRescan}
-          loading={loading}
-          loadingLabel={t('page.deps.checking')}
-        >
-          {t('page.deps.rescan')}
-        </PrimaryButton>
-      }
-      onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={progressMessage}
-      stats={[
-        // 四张卡都是「规模统计」（总数/直接/传递/依赖边），大不等于坏 —— 按统计卡配色约定
-        // 只有表达好坏极性的数字才上色，纯计数保持墨色。别把它们当遗漏补成彩色。
-        { key: 'total', label: t('page.deps.overviewTotal'), value: report.total },
-        { key: 'direct', label: t('page.deps.overviewDirect'), value: report.direct },
-        { key: 'transitive', label: t('page.deps.overviewTransitive'), value: report.transitive },
-        { key: 'edges', label: t('page.deps.overviewEdges'), value: report.edgeCount },
-      ]}
-    >
+    <>
       {report.error && (
         <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
           <AlertCircleIcon />
@@ -113,28 +85,107 @@ function DependencyReportView({
       <div className="mt-6">
         <DependencyOutdatedCard report={report} />
       </div>
+    </>
+  );
+}
+
+function DependencyReportView({
+  report,
+  loading,
+  progress,
+  progressMessage,
+  queued,
+  onCancel,
+  stopping,
+  onRescan,
+  onCopyTyposquat,
+  onCopyAllTyposquat,
+  onBackHome,
+  projectPath,
+  t,
+}: {
+  report: DependencyReportData;
+  loading: boolean;
+  progress: number;
+  progressMessage: string;
+  /** 排队中：按钮显示「排队中…」而不是「检查中…」 */
+  queued?: boolean;
+  /** 停止本次依赖盘点（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
+  onRescan: () => void;
+  onCopyTyposquat: (finding: TyposquatFindingData) => void;
+  onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
+  onBackHome: () => void;
+  projectPath: string;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
+  return (
+    <ReportShell
+      projectPath={projectPath}
+      dimension="dependencies"
+      historyDomain="deps"
+      refreshKey={report}
+      icon={<NavGlyph navId="deps" />}
+      title={t('page.deps.done')}
+      action={
+        <DomainActionButton
+          domain="deps"
+          onCancel={onCancel}
+          stopping={stopping}
+          queued={queued}
+          onClick={onRescan}
+          loading={loading}
+          label={t('page.deps.rescan')}
+        />
+      }
+      onBackHome={onBackHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={progressMessage}
+      stats={depsOverviewStats(t, report)}
+    >
+      <DependencyReportBody
+        report={report}
+        onCopyTyposquat={onCopyTyposquat}
+        onCopyAllTyposquat={onCopyAllTyposquat}
+        t={t}
+      />
     </ReportShell>
   );
 }
 
 export function DependencyPage({ projectPath }: DependencyPageProps) {
-  const { loading, progress, progressMessage, report, handleScan, copyToAi, copyAllToAi } =
-    useDependencyPage(projectPath);
+  const {
+    loading,
+    progress,
+    progressMessage,
+    queued,
+    report,
+    handleScan,
+    copyToAi,
+    copyAllToAi,
+    cancel,
+    stopping,
+  } = useDependencyPage(projectPath);
   const t = useT();
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配，
   // 四个域页面共用同一份实现；页面只声明自己的 domain 与扫描入口。
-  const detail = useDomainDetailPage(projectPath, 'deps', report, loading, handleScan);
+  const detail = useDomainDetailPage({
+    projectPath,
+    domain: 'deps',
+    liveReport: report,
+    loading,
+    onScan: handleScan,
+  });
 
   if (detail.showSnapshot) {
     return (
       <DomainSnapshotReport
         dimension="dependencies"
-        icon={
-          <PageGlyph bg="brand" stroke="brand" round>
-            <DependencyGraphGlyph />
-          </PageGlyph>
-        }
+        icon={<NavGlyph navId="deps" />}
         {...detail.snapshotViewProps}
       />
     );
@@ -147,6 +198,9 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
         loading={loading}
         progress={progress}
         progressMessage={progressMessage}
+        queued={queued}
+        onCancel={cancel}
+        stopping={stopping}
         onRescan={handleScan}
         onCopyTyposquat={copyToAi}
         onCopyAllTyposquat={copyAllToAi}
@@ -158,7 +212,7 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
       <DependencyEmptyState
         projectPath={projectPath}
         loading={loading}

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { ReportShell } from '../components/business/ReportShell';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useBackupPage } from './backup-logic';
 import { BackupScheduleRow, BackupProgressBar, BackupResultCard } from './backup-parts';
@@ -44,22 +44,15 @@ export function BackupPage({ projectPath, onNavigate: _onNavigate }: BackupPageP
         dimension="backup"
         refreshKey={lastResult}
         containerClassName="h-full w-full bg-zh-bg flex flex-col"
-        icon={
-          <PageGlyph bg="success" stroke="brand" round>
-            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-            <polyline points="17 21 17 13 7 13 7 21" />
-            <polyline points="7 3 7 8 15 8" />
-          </PageGlyph>
-        }
+        icon={<NavGlyph navId="backup" />}
         title={t('page.backup.title')}
         action={
-          <PrimaryButton
+          <DomainActionButton
+            domain="backup"
             onClick={handleBackup}
             loading={isBackingUp}
-            loadingLabel={t('page.backup.backingUp')}
-          >
-            {t('page.backup.oneClickBackup')}
-          </PrimaryButton>
+            label={t('page.backup.oneClickBackup')}
+          />
         }
         onBackHome={() => setShowHome(true)}
         stats={backupReportStats(t, records)}

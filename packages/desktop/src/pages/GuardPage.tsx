@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
+import { scanRunProps } from '../components/business/ScanEmptyState';
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon } from '../components/ui/Icons';
 import {
   useGuardPage,
@@ -19,6 +20,7 @@ import {
 } from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useDetailIntentEffect } from '../hooks/useDetailIntent';
+import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
 import type { AppNotification } from '@zh/kernel';
 
@@ -58,7 +60,12 @@ interface GuardReportViewProps {
   loading: boolean;
   progress: number;
   statusMessage: string;
-  progressLabel: string;
+  /** 排队中：按钮显示「排队中…」而不是「扫描中…」 */
+  queued?: boolean;
+  /** 停止本次门禁扫描（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   levels: GuardLevelInfo[];
@@ -138,7 +145,9 @@ function GuardReportView({
   loading,
   progress,
   statusMessage,
-  progressLabel,
+  queued,
+  onCancel,
+  stopping,
   onRescan,
   onBackHome,
   levels,
@@ -158,21 +167,18 @@ function GuardReportView({
       dimension="gate"
       historyDomain="guard"
       refreshKey={report}
-      icon={
-        <PageGlyph bg="brand" stroke="brand" round>
-          <path d="M12 2L3 7v6c0 5.25 3.83 10.13 9 11.25C17.17 23.13 21 18.25 21 13V7l-9-5z" />
-          <path d="M12 6.5l-3 4h2.2L10 14.5l3.5-4.5h-2.2L12 6.5z" />
-        </PageGlyph>
-      }
+      icon={<NavGlyph navId="guard" />}
       title={t('nav.guard')}
       action={
-        <PrimaryButton
+        <DomainActionButton
+          domain="guard"
+          onCancel={onCancel}
+          stopping={stopping}
+          queued={queued}
           onClick={onRescan}
           loading={loading}
-          loadingLabel={progressLabel || t('page.guard.scanning')}
-        >
-          {t('page.guard.scan')}
-        </PrimaryButton>
+          label={t('page.guard.scan')}
+        />
       }
       onBackHome={onBackHome}
       loading={loading}
@@ -206,6 +212,11 @@ function GuardEmptyView(props: {
   loading: boolean;
   progress?: number;
   statusMessage?: string;
+  queued?: boolean;
+  queuePosition?: number;
+  /** 停止本次门禁扫描 */
+  onCancel: () => void;
+  stopping: boolean;
   onScan: () => void;
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
@@ -268,10 +279,8 @@ function GuardEmptyView(props: {
       ]}
       buttonText={props.t('page.guard.scan')}
       onAction={props.onScan}
-      loading={props.loading}
-      progress={props.progress}
-      statusMessage={props.statusMessage}
-      progressLabel={props.t('page.guard.scanning')}
+      actionDomain="guard"
+      {...scanRunProps(props)}
     />
   );
 }
@@ -290,7 +299,7 @@ function useGuardBlockNotification(
 export function GuardPage({ projectPath }: GuardPageProps) {
   const t = useT();
   // 打开先落在主页（与其余分类同一口径）：挂载即读回的历史报告只让右上角详情入口
-  // 可见，不自动把人带进详情页。实时扫描出结果时由下面的 onScan 切详情。
+  // 可见，不自动把人带进详情页。实时扫描的不满分结果才由 useScanResultEntry 展开详情。
   // 曾经的 false 是在「report 恒为空」年代写的，数据改成挂载即读回后它变成了「直接进详情」。
   const [showHome, setShowHome] = useState(true);
   // 本次跳转带「看结果」意图（扫描进度条点进来）→ 直接展开详情，扫完自动重渲染即进详情
@@ -298,19 +307,31 @@ export function GuardPage({ projectPath }: GuardPageProps) {
   const {
     loading,
     progress,
-    progressLabel,
     statusMessage,
-    report,
-    copyToAi,
-    copyAllToAi,
-    reportFalsePositive,
-    handleScan,
-    history,
-    falsePositiveCount,
-  } = useGuardPage(projectPath);
+  queued,
+  queuePosition,
+  report,
+  copyToAi,
+  copyAllToAi,
+  reportFalsePositive,
+  handleScan,
+  history,
+  falsePositiveCount,
+  cancel,
+  stopping,
+} = useGuardPage(projectPath);
   const levels = buildGuardLevels(history);
   const { notify } = useNotification();
   useGuardBlockNotification(report, notify);
+
+  // 扫完要不要进详情：只在「本次门禁扫描产出新结果」时判，且满分 100 不进（唯一口径）
+  const { scanVersion } = useScanResultEntry({
+    projectPath,
+    navId: 'guard',
+    liveReport: report,
+    loading,
+    onEnterDetail: () => setShowHome(false),
+  });
 
   // 单一判定源：report 非空 = 有详情（同时决定详情分支与右上角图标）
   const detailReport = report;
@@ -323,7 +344,9 @@ export function GuardPage({ projectPath }: GuardPageProps) {
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
-        progressLabel={progressLabel}
+        queued={queued}
+        onCancel={cancel}
+        stopping={stopping}
         onRescan={handleScan}
         onBackHome={() => setShowHome(true)}
         levels={levels}
@@ -339,16 +362,17 @@ export function GuardPage({ projectPath }: GuardPageProps) {
   }
 
   return (
-    <DetailEntryProvider available={hasDetail} onOpen={() => setShowHome(false)}>
+    <DetailEntryProvider key={scanVersion} available={hasDetail} onOpen={() => setShowHome(false)}>
       <GuardEmptyView
         projectPath={projectPath}
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
-        onScan={() => {
-          setShowHome(false);
-          handleScan();
-        }}
+        queued={queued}
+        queuePosition={queuePosition}
+        onCancel={cancel}
+        stopping={stopping}
+        onScan={handleScan}
         t={t}
       />
     </DetailEntryProvider>

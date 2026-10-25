@@ -1,7 +1,7 @@
 import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
-import { PageGlyph } from '../components/business/page-glyph';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { NavGlyph } from '../components/business/page-glyph';
+import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
@@ -17,21 +17,34 @@ interface PerformancePageProps {
 
 export function PerformancePage({ projectPath }: PerformancePageProps) {
   const t = useT();
-  const { loading, progress, progressLabel, statusMessage, report, copyToAi, copyAllToAi, handleScan } =
-    usePerformancePage(projectPath);
+  const {
+    loading,
+    progress,
+    statusMessage,
+    queued,
+    queuePosition,
+    cancel,
+    stopping,
+    report,
+    copyToAi,
+    copyAllToAi,
+    handleScan,
+  } = usePerformancePage(projectPath);
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配
-  const detail = useDomainDetailPage(projectPath, 'performance', report, loading, handleScan);
+  const detail = useDomainDetailPage({
+    projectPath,
+    domain: 'performance',
+    liveReport: report,
+    loading,
+    onScan: handleScan,
+  });
 
   if (detail.showSnapshot) {
     return (
       <DomainSnapshotReport
         dimension="performance"
-        icon={
-          <PageGlyph bg="warning" stroke="warning">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </PageGlyph>
-        }
+        icon={<NavGlyph navId="performance" />}
         {...detail.snapshotViewProps}
       />
     );
@@ -44,20 +57,18 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         dimension="performance"
         historyDomain="performance"
         refreshKey={detail.detailReport}
-        icon={
-          <PageGlyph bg="warning" stroke="warning">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </PageGlyph>
-        }
+        icon={<NavGlyph navId="performance" />}
         title={t('page.performance.header.title')}
         action={
-          <PrimaryButton
+          <DomainActionButton
+            domain="performance"
+            onCancel={cancel}
+            stopping={stopping}
+            queued={queued}
             onClick={handleScan}
             loading={loading}
-            loadingLabel={progressLabel || t('page.performance.detecting')}
-          >
-            {t('page.performance.rescan')}
-          </PrimaryButton>
+            label={t('page.performance.rescan')}
+          />
         }
         onBackHome={detail.backHome}
         loading={loading}
@@ -75,13 +86,17 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
   }
 
   return (
-    <DetailEntryProvider available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
       <PerformanceEmptyView
         projectPath={projectPath}
         t={t}
         loading={loading}
         progress={progress}
         statusMessage={statusMessage}
+        queued={queued}
+        queuePosition={queuePosition}
+        onCancel={cancel}
+        stopping={stopping}
         onAction={detail.startScan}
       />
     </DetailEntryProvider>
@@ -144,6 +159,13 @@ interface PerformanceEmptyViewProps {
   loading: boolean;
   progress: number;
   statusMessage: PerformanceState['statusMessage'];
+  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
+  queued?: boolean;
+  queuePosition?: number;
+  /** 停止本次性能检测（运行/排队时按钮旁出现「停止」） */
+  onCancel: () => void;
+  /** 已发出取消、等确认 */
+  stopping: boolean;
   onAction: () => void;
 }
 
@@ -153,6 +175,10 @@ function PerformanceEmptyView({
   loading,
   progress,
   statusMessage,
+  queued,
+  queuePosition,
+  onCancel,
+  stopping,
   onAction,
 }: PerformanceEmptyViewProps) {
   return (
@@ -201,9 +227,13 @@ function PerformanceEmptyView({
       ]}
       buttonText={t('page.performance.shell.start')}
       onAction={onAction}
+      actionDomain="performance"
+      queued={queued}
+      queuePosition={queuePosition}
+      onCancel={onCancel}
+      stopping={stopping}
       loading={loading}
       progress={progress}
-      progressLabel={t('page.performance.scanning')}
       statusMessage={statusMessage}
     />
   );

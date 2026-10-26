@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import * as path from 'path';
+
+const P1 = path.resolve('p1');
+const PA = path.resolve('p-active');
+const SCORE_PROJ = path.resolve('proj-1');
 import * as fs from 'fs';
 import {
   createProject,
@@ -54,22 +58,22 @@ describe('listActiveProjectIds', () => {
 
   it('returns project_ids that have active (non-soft-deleted) rows', () => {
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
-    saveScanResult(db, { projectId: 'p1', source: 'eslint', passed: true, summary: 'OK' });
+    saveScanResult(db, { projectId: P1, source: 'eslint', passed: true, summary: 'OK' });
 
     const ids = listActiveProjectIds(db);
-    expect(ids).toContain('p1');
+    expect(ids).toContain(P1);
   });
 
   it('excludes soft-deleted rows', () => {
-    createProject(db, { id: 'proj-1', name: 'Test', path: '/test' });
+    createProject(db, { id: SCORE_PROJ, name: 'Test', path: '/test' });
     saveScore(db, {
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
@@ -78,20 +82,20 @@ describe('listActiveProjectIds', () => {
 
     softDeleteProjectData(db, '/test');
 
-    expect(listActiveProjectIds(db)).not.toContain('proj-1');
+    expect(listActiveProjectIds(db)).not.toContain(SCORE_PROJ);
   });
 
   it('UNION deduplicates across tables', () => {
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
-    saveScanResult(db, { projectId: 'p1', source: 'eslint', passed: true, summary: 'OK' });
+    saveScanResult(db, { projectId: P1, source: 'eslint', passed: true, summary: 'OK' });
     saveDebtAction(db, {
-      projectId: 'p1',
+      projectId: P1,
       actionId: 'a1',
       status: 'pending',
       module: 'm',
@@ -101,10 +105,10 @@ describe('listActiveProjectIds', () => {
       principalEstimate: 2,
       roi: 3,
     });
-    saveDebtSnapshot(db, { projectId: 'p1', debtIndex: 1 });
+    saveDebtSnapshot(db, { projectId: P1, debtIndex: 1 });
     createSentinelEvent(db, {
       id: 'evt-1',
-      projectId: 'p1',
+      projectId: P1,
       timestamp: now,
       dedupeKey: 'dk-1',
       title: 'Error',
@@ -121,7 +125,7 @@ describe('listActiveProjectIds', () => {
     });
 
     const ids = listActiveProjectIds(db);
-    const p1Count = ids.filter((id) => id === 'p1').length;
+    const p1Count = ids.filter((id) => id === P1).length;
     expect(p1Count).toBe(1);
   });
 });
@@ -138,9 +142,9 @@ describe('listSoftDeletedProjectIds', () => {
   });
 
   it('returns project_ids that have soft-deleted rows', () => {
-    createProject(db, { id: 'proj-1', name: 'Test', path: '/test' });
+    createProject(db, { id: SCORE_PROJ, name: 'Test', path: '/test' });
     saveScore(db, {
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
@@ -150,36 +154,36 @@ describe('listSoftDeletedProjectIds', () => {
     softDeleteProjectData(db, '/test');
 
     const ids = listSoftDeletedProjectIds(db);
-    expect(ids).toContain('proj-1');
+    expect(ids).toContain(SCORE_PROJ);
   });
 
   it('excludes active (non-deleted) rows', () => {
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
 
-    expect(listSoftDeletedProjectIds(db)).not.toContain('p1');
+    expect(listSoftDeletedProjectIds(db)).not.toContain(P1);
   });
 
   it('UNION deduplicates across tables', () => {
-    createProject(db, { id: 'proj-1', name: 'Test', path: '/test' });
+    createProject(db, { id: SCORE_PROJ, name: 'Test', path: '/test' });
     saveScore(db, {
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
-    saveScanResult(db, { projectId: 'proj-1', source: 'eslint', passed: true, summary: 'OK' });
+    saveScanResult(db, { projectId: SCORE_PROJ, source: 'eslint', passed: true, summary: 'OK' });
 
     softDeleteProjectData(db, '/test');
 
     const ids = listSoftDeletedProjectIds(db);
-    const proj1Count = ids.filter((id) => id === 'proj-1').length;
+    const proj1Count = ids.filter((id) => id === SCORE_PROJ).length;
     expect(proj1Count).toBe(1);
   });
 });
@@ -279,18 +283,18 @@ describe('purgeExpiredSoftDeleted', () => {
     ).run('p-purge', 50, 'D', '{}', 'declining', oldDate.toISOString());
 
     saveScore(db, {
-      projectId: 'p-active',
+      projectId: PA,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
 
-    expect(listActiveProjectIds(db)).toContain('p-active');
+    expect(listActiveProjectIds(db)).toContain(PA);
 
     purgeExpiredSoftDeleted(db, 30);
 
-    expect(listActiveProjectIds(db)).toContain('p-active');
+    expect(listActiveProjectIds(db)).toContain(PA);
     expect(listActiveProjectIds(db)).not.toContain('p-purge');
   });
 
@@ -359,53 +363,53 @@ describe('countActiveRows', () => {
 
   it('counts active (non-deleted) rows per table', () => {
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 90,
       grade: 'A',
       dimensions: '{}',
       trend: 'improving',
     });
-    saveScanResult(db, { projectId: 'p1', source: 'eslint', passed: true, summary: 'OK' });
+    saveScanResult(db, { projectId: P1, source: 'eslint', passed: true, summary: 'OK' });
 
-    const counts = countActiveRows(db, 'p1');
+    const counts = countActiveRows(db, P1);
     expect(counts).toContainEqual({ table: 'scores', count: 2 });
     expect(counts).toContainEqual({ table: 'scanning_results', count: 1 });
   });
 
   it('excludes soft-deleted rows from count', () => {
-    createProject(db, { id: 'proj-1', name: 'Test', path: '/test' });
+    createProject(db, { id: SCORE_PROJ, name: 'Test', path: '/test' });
     saveScore(db, {
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
-    saveScanResult(db, { projectId: 'proj-1', source: 'eslint', passed: true, summary: 'OK' });
+    saveScanResult(db, { projectId: SCORE_PROJ, source: 'eslint', passed: true, summary: 'OK' });
 
     softDeleteProjectData(db, '/test');
 
-    const counts = countActiveRows(db, 'proj-1');
+    const counts = countActiveRows(db, SCORE_PROJ);
     expect(counts).toEqual([]);
   });
 
   it('only includes tables with count > 0', () => {
     saveScore(db, {
-      projectId: 'p1',
+      projectId: P1,
       overall: 80,
       grade: 'B',
       dimensions: '{}',
       trend: 'stable',
     });
 
-    const counts = countActiveRows(db, 'p1');
+    const counts = countActiveRows(db, P1);
     expect(counts).toHaveLength(1);
     expect(counts[0].table).toBe('scores');
     expect(counts[0].count).toBe(1);

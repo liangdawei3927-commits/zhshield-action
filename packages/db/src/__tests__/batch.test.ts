@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import * as path from 'path';
+
+const SCORE_PROJ = path.resolve('proj-1');
 import * as fs from 'fs';
 import {
   createProject,
@@ -61,9 +63,9 @@ describe('Batch writes', () => {
   });
 
   it('saveScoresBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = Array.from({ length: 10 }, (_, i) => ({
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 70 + i,
       grade: 'B' as const,
       dimensions: '{}',
@@ -71,27 +73,27 @@ describe('Batch writes', () => {
     }));
     saveScoresBatch(db, rows);
     expect(count(db, 'scores')).toBe(10);
-    expect(getScoreHistory(db, 'proj-1')).toHaveLength(10);
+    expect(getScoreHistory(db, SCORE_PROJ)).toHaveLength(10);
   });
 
   it('saveScanResultsBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = Array.from({ length: 4 }, (_, i) => ({
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       source: `src-${i}`,
       passed: i % 2 === 0,
       summary: 'ok',
     }));
     saveScanResultsBatch(db, rows);
     expect(count(db, 'scanning_results')).toBe(4);
-    expect(getLatestScanResult(db, 'proj-1', 'src-3')!.passed).toBe(0);
+    expect(getLatestScanResult(db, SCORE_PROJ, 'src-3')!.passed).toBe(0);
   });
 
   it('saveExperiencesBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = Array.from({ length: 3 }, (_, i) => ({
       id: `exp-${i}`,
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       ruleId: 'R',
       type: 'true-positive' as const,
     }));
@@ -101,11 +103,11 @@ describe('Batch writes', () => {
   });
 
   it('createSentinelEventsBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const now = new Date('2026-07-29T12:00:00Z');
     const rows = Array.from({ length: 3 }, (_, i) => ({
       id: `evt-${i}`,
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       timestamp: now,
       dedupeKey: `dk-${i}`,
       title: 't',
@@ -126,9 +128,9 @@ describe('Batch writes', () => {
   });
 
   it('saveDebtActionsBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = Array.from({ length: 3 }, (_, i) => ({
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       actionId: `a-${i}`,
       status: 'pending' as const,
       module: 'm',
@@ -140,29 +142,29 @@ describe('Batch writes', () => {
     }));
     saveDebtActionsBatch(db, rows);
     expect(count(db, 'debt_actions')).toBe(3);
-    expect(getDebtActionsByProject(db, 'proj-1')).toHaveLength(3);
+    expect(getDebtActionsByProject(db, SCORE_PROJ)).toHaveLength(3);
   });
 
   it('saveDebtSnapshotsBatch inserts N rows', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
-    const rows = Array.from({ length: 3 }, (_, i) => ({ projectId: 'proj-1', debtIndex: i }));
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
+    const rows = Array.from({ length: 3 }, (_, i) => ({ projectId: SCORE_PROJ, debtIndex: i }));
     saveDebtSnapshotsBatch(db, rows);
     expect(count(db, 'debt_snapshots')).toBe(3);
-    expect(getLatestDebtSnapshot(db, 'proj-1')!.debt_index).toBe(2);
+    expect(getLatestDebtSnapshot(db, SCORE_PROJ)!.debt_index).toBe(2);
   });
 
   it('rolls back entire batch when a row fails (all-or-nothing)', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = [
       {
-        projectId: 'proj-1',
+        projectId: SCORE_PROJ,
         overall: 80,
         grade: 'B' as const,
         dimensions: '{}',
         trend: 'improving' as const,
       },
       {
-        projectId: 'proj-1',
+        projectId: SCORE_PROJ,
         overall: 50,
         grade: 'E' as unknown as 'A' | 'B' | 'C' | 'D',
         dimensions: '{}',
@@ -175,17 +177,17 @@ describe('Batch writes', () => {
 
   it('rolls back entire batch on duplicate primary key', () => {
     const rows = [
-      { id: 'proj-1', name: 'A', path: '/a' },
-      { id: 'proj-1', name: 'B', path: '/b' },
+      { id: SCORE_PROJ, name: 'A', path: '/a' },
+      { id: SCORE_PROJ, name: 'B', path: '/b' },
     ];
     expect(() => createProjectsBatch(db, rows)).toThrow();
     expect(count(db, 'projects')).toBe(0);
   });
 
   it('batch insert is equivalent to repeated single-row inserts', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     const rows = Array.from({ length: 5 }, (_, i) => ({
-      projectId: 'proj-1',
+      projectId: SCORE_PROJ,
       overall: 60 + i,
       grade: 'B' as const,
       dimensions: '{}',
@@ -193,7 +195,7 @@ describe('Batch writes', () => {
     }));
     saveScoresBatch(db, rows);
     for (const r of rows) saveScore(db, r);
-    const history = getScoreHistory(db, 'proj-1');
+    const history = getScoreHistory(db, SCORE_PROJ);
     expect(history).toHaveLength(10);
     // created_at 为秒级精度，同秒内排序不保证插入顺序；按 overall 排序后比对全集
     const overalls = history.map((s) => s.overall).sort((a, b) => a - b);
@@ -204,7 +206,7 @@ describe('Batch writes', () => {
   });
 
   it('empty batch is a no-op', () => {
-    createProject(db, { id: 'proj-1', name: 'T', path: '/t' });
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
     saveScoresBatch(db, []);
     expect(count(db, 'scores')).toBe(0);
   });

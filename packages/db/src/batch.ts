@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { DEBT_ACTION_UPSERT_SQL } from './sql';
+import { normalizeScoreProjectId } from './queries-projects';
 import type {
   CreateProjectParams,
   SaveScoreParams,
@@ -26,7 +27,8 @@ export function saveScoresBatch(db: Database.Database, scores: SaveScoreParams[]
     'INSERT INTO scores (project_id, overall, grade, dimensions, trend) VALUES (?, ?, ?, ?, ?)',
   );
   db.transaction((rows: SaveScoreParams[]) => {
-    for (const s of rows) insert.run(s.projectId, s.overall, s.grade, s.dimensions, s.trend);
+    for (const s of rows)
+      insert.run(normalizeScoreProjectId(s.projectId), s.overall, s.grade, s.dimensions, s.trend);
   })(scores);
 }
 

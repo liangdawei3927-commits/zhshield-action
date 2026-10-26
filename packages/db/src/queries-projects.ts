@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import type Database from 'better-sqlite3';
 import { DEBT_ACTION_UPSERT_SQL } from './sql';
 import type {
@@ -42,10 +43,20 @@ export function deleteProject(db: Database.Database, id: string): void {
 
 // ─── Scores ───────────────────────────────────────────────
 
+/**
+ * project_id 锚定绝对路径（评分历史按项目聚合、与 projects.path 精确匹配）。
+ * CLI 从子目录执行时会透传相对 cwd 的路径，落库成永远无法匹配的死行
+ * （2026-10-26 实测真库 75 条 `packages/xxx` 死行）。单条与批量写入共用本实现。
+ */
+export function normalizeScoreProjectId(projectId: string): string {
+  return path.isAbsolute(projectId) ? projectId : path.resolve(projectId);
+}
+
 export function saveScore(db: Database.Database, params: SaveScoreParams): void {
+  const projectId = normalizeScoreProjectId(params.projectId);
   db.prepare(
     'INSERT INTO scores (project_id, overall, grade, dimensions, trend) VALUES (?, ?, ?, ?, ?)',
-  ).run(params.projectId, params.overall, params.grade, params.dimensions, params.trend);
+  ).run(projectId, params.overall, params.grade, params.dimensions, params.trend);
 }
 
 /**

@@ -2147,6 +2147,7 @@
   },
   "task": {
     "cancelled": "任务已取消",
+    "elapsedLabel": "已用时 {{time}}",
     "executionFailed": "任务执行失败",
     "kind": {
       "deps": "依赖扫描",
@@ -2166,7 +2167,8 @@
     "queuedLabel": "排队中（第 {{position}} 位）...",
     "queuedShort": "排队中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
-    "schedulerUnavailable": "任务调度不可用（非桌面环境）"
+    "schedulerUnavailable": "任务调度不可用（非桌面环境）",
+    "stalledTimeout": "任务超过 {{minutes}} 分钟无进展，已自动终止以释放队列"
   },
   "toast": {
     "aiToolDisabled": "已停用 OpenCode 集成（项目内集成文件保留）",

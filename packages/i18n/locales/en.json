@@ -2147,6 +2147,7 @@
   },
   "task": {
     "cancelled": "Task cancelled",
+    "elapsedLabel": "Elapsed {{time}}",
     "executionFailed": "Task execution failed",
     "kind": {
       "deps": "Dependency scan",
@@ -2166,7 +2167,8 @@
     "queuedLabel": "Queued (position {{position}})...",
     "queuedShort": "Queued...",
     "runningLabel": "{{kind}} in progress... {{percent}}%{{suffix}}",
-    "schedulerUnavailable": "Task scheduler unavailable (non-desktop environment)"
+    "schedulerUnavailable": "Task scheduler unavailable (non-desktop environment)",
+    "stalledTimeout": "Task stalled for over {{minutes}} minutes with no progress and was aborted to free the queue"
   },
   "toast": {
     "aiToolDisabled": "OpenCode integration disabled (integration files kept in the project)",

@@ -2147,6 +2147,7 @@
   },
   "task": {
     "cancelled": "任務已取消",
+    "elapsedLabel": "已用時 {{time}}",
     "executionFailed": "任務執行失敗",
     "kind": {
       "deps": "依賴掃描",
@@ -2166,7 +2167,8 @@
     "queuedLabel": "排隊中（第 {{position}} 位）...",
     "queuedShort": "排隊中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
-    "schedulerUnavailable": "任務排程不可用（非桌面環境）"
+    "schedulerUnavailable": "任務排程不可用（非桌面環境）",
+    "stalledTimeout": "任務超過 {{minutes}} 分鐘無進展，已自動終止以釋放佇列"
   },
   "toast": {
     "aiToolDisabled": "已停用 OpenCode 整合（專案內整合檔案保留）",

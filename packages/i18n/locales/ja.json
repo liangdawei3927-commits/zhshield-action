@@ -2147,6 +2147,7 @@
   },
   "task": {
     "cancelled": "タスクはキャンセルされました",
+    "elapsedLabel": "経過時間 {{time}}",
     "executionFailed": "タスクの実行に失敗しました",
     "kind": {
       "deps": "依存スキャン",
@@ -2166,7 +2167,8 @@
     "queuedLabel": "待機中（{{position}} 番目）...",
     "queuedShort": "待機中...",
     "runningLabel": "{{kind}}中... {{percent}}%{{suffix}}",
-    "schedulerUnavailable": "タスクスケジューラが利用できません（デスクトップ環境以外）"
+    "schedulerUnavailable": "タスクスケジューラが利用できません（デスクトップ環境以外）",
+    "stalledTimeout": "タスクが{{minutes}}分間進行しなかったため、キュー解放のため自動終了しました"
   },
   "toast": {
     "aiToolDisabled": "OpenCode 統合を無効にしました（プロジェクト内の統合ファイルは保持されます）",

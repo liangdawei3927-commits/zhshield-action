@@ -65,6 +65,18 @@ type TaskRunner = (
 const MAX_CONCURRENT = 2;
 const PROGRESS_BROADCAST_THROTTLE_MS = 150;
 
+/** 看门狗巡检间隔：每 30 秒检查一次有无「无进展」的 running 任务 */
+const STALL_WATCHDOG_INTERVAL_MS = 30_000;
+
+/**
+ * 任务无进展超时阈值：running 任务超过该时长没有任何 progress 回调
+ * （心跳）即判为卡死，自动标 failed 并释放并发槽位，放行后续排队任务。
+ * 背景：deps/techdebt 两个 runner 直连主进程执行器、无内建超时，worker 侧
+ * 兜底超时长达 30 分钟——卡死任务会占满 MAX_CONCURRENT 槽位，让整个队列
+ * 出现「永远排队中」的僵尸（P0-2）。
+ */
+export const TASK_STALL_TIMEOUT_MS = 5 * 60_000;
+
 interface QueuedJob {
   task: TaskInfo;
   request?: unknown;
@@ -156,6 +168,11 @@ export class TaskManager {
   private readonly requestKeys: Map<string, string> = new Map();
   private running: number = 0;
   private seq: number = 0;
+  /** running 任务 id → 最近一次 progress 心跳时间戳（runTask 启动时初始化） */
+  private readonly lastProgressAt: Map<string, number> = new Map();
+  /** 被看门狗强制终止的任务 id：其底层 Promise 稍后收尾时据此跳过二次释放槽位 */
+  private readonly watchdogKilled: Set<string> = new Set();
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly runnerByKind: Record<TaskKind, TaskRunner>,
@@ -267,12 +284,15 @@ export class TaskManager {
     this.running++;
     task.status = 'running';
     task.queuePosition = undefined;
+    this.lastProgressAt.set(task.id, Date.now());
+    this.ensureWatchdog();
     this.broadcast(task);
 
     Promise.resolve()
       .then(() =>
         runner(task, request, (stage, message, pct) => {
-          if (task.status === 'cancelled') return;
+          if (task.status !== 'running') return;
+          this.lastProgressAt.set(task.id, Date.now());
           task.stage = stage;
           task.message = message;
           task.progress = pct;
@@ -280,13 +300,14 @@ export class TaskManager {
         }),
       )
       .then((result) => {
-        if (task.status === 'cancelled') return;
+        // 看门狗可能已把任务标为 failed（槽位已释放），此处不得再改状态
+        if (task.status !== 'running') return;
         task.status = 'done';
         task.result = result;
         task.progress = 1;
       })
       .catch((err) => {
-        if (task.status === 'cancelled') return;
+        if (task.status !== 'running') return;
         // 取消是用户主动操作，不是故障：执行器把取消当异常抛出时，落 cancelled 而非 failed
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes(CANCELLED_ERR_TAG)) {
@@ -297,6 +318,10 @@ export class TaskManager {
         task.error = message;
       })
       .finally(() => {
+        const killedByWatchdog = this.watchdogKilled.delete(task.id);
+        this.lastProgressAt.delete(task.id);
+        this.stopWatchdogIfIdle();
+        if (killedByWatchdog) return; // 槽位/等待方已由看门狗处理，避免二次释放
         task.finishedAt = new Date().toISOString();
         this.requestKeys.delete(task.id);
         this.broadcast(task);
@@ -304,6 +329,50 @@ export class TaskManager {
         this.running--;
         this.pump();
       });
+  }
+
+  /**
+   * 启动看门狗定时器（惰性）：有 running 任务才需要巡检。
+   * unref 保证纯 Node 测试环境下定时器不阻塞进程退出。
+   */
+  private ensureWatchdog(): void {
+    if (this.watchdogTimer) return;
+    this.watchdogTimer = setInterval(() => this.checkStalledTasks(), STALL_WATCHDOG_INTERVAL_MS);
+    this.watchdogTimer.unref?.();
+  }
+
+  private stopWatchdogIfIdle(): void {
+    if (this.watchdogTimer && this.running <= 0) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
+  /** 看门狗：running 任务超过 TASK_STALL_TIMEOUT_MS 无任何 progress 心跳 → 强制失败并释放槽位 */
+  private checkStalledTasks(): void {
+    const now = Date.now();
+    for (const task of this.tasks.values()) {
+      if (task.status !== 'running') continue;
+      const last = this.lastProgressAt.get(task.id) ?? now;
+      if (now - last < TASK_STALL_TIMEOUT_MS) continue;
+      this.forceFailStalled(task);
+    }
+  }
+
+  private forceFailStalled(task: TaskInfo): void {
+    this.watchdogKilled.add(task.id);
+    this.running--; // 立即释放并发槽位，放行排队任务；底层 Promise 收尾时据此跳过
+    try {
+      // worker 型 runner 把 task.id 注册为取消键，尽力终止底层作业（直连执行器无此映射，静默即可）
+      cancelJob(task.id);
+    } catch {}
+    task.status = 'failed';
+    task.error = t('task.stalledTimeout', { minutes: Math.round(TASK_STALL_TIMEOUT_MS / 60_000) });
+    task.finishedAt = new Date().toISOString();
+    this.requestKeys.delete(task.id);
+    this.broadcast(task);
+    this.settle(task);
+    this.pump();
   }
 
   private settle(task: TaskInfo): void {

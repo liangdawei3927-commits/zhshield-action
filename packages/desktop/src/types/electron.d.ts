@@ -928,7 +928,7 @@ export interface TaskInfo {
   error?: string;
   /** 排队位置（仅 status === 'queued' 时存在） */
   queuePosition?: number;
-  /** 触发来源（仅 'auto' 时存在）：每日自动巡检发起的任务，按钮/进度据此显示「自动巡检」 */
+  /** 触发来源（仅 'auto' 时存在）：每日自动巡检发起的任务。诊断元数据，不上 UI 文案 */
   origin?: 'auto';
 }
 

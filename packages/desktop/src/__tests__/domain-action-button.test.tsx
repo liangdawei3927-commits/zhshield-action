@@ -1,7 +1,7 @@
 /**
  * 域主操作按钮的渲染行为（用户可见的那一面）。
  *
- * 用户的原话：「这个按钮上面只能显示比如体检中…、扫描中…、盘点中…、检查中…，
+ * 用户的原话：「这个按钮上面只能显示比如巡检中…、扫描中…、盘点中…、检查中…，
  * 不应该显示其他文字」。这里用静态渲染锁住按钮文本，而不是只锁源码形状。
  */
 
@@ -44,7 +44,7 @@ describe('域主操作按钮渲染', () => {
 
   it('运行中只显示状态词，不出现百分比 / 任务消息 / 通用「加载中」', () => {
     const busy = buttonText(render({ domain: 'inspect', label: '一键体检', loading: true }));
-    expect(busy).toContain('体检中');
+    expect(busy).toContain('巡检中');
     expect(busy).not.toContain('一键体检');
     expect(busy).not.toMatch(/%|·/);
     expect(busy).not.toContain('加载');
@@ -85,7 +85,7 @@ describe('域主操作按钮渲染', () => {
       render({ domain: 'inspect', label: '一键体检', loading: true, queued: true }),
     );
     expect(queued).toContain('排队中');
-    expect(queued).not.toContain('体检中');
+    expect(queued).not.toContain('巡检中');
     expect(queued).not.toContain('一键体检');
   });
 
@@ -107,37 +107,25 @@ describe('域主操作按钮渲染', () => {
   });
 
   /**
-   * 自动巡检可见化（2026-10-26 用户原话：触发自动巡检后，按钮上最起码能看到
-   * 系统正在巡检——不然点一键体检显示「排队中」，不知道怎么回事就手动再点）。
+   * 忙态一视同仁（2026-10-26 用户原话：不管是首次添加/每日首开/定时/手动触发，
+   * 只要在巡检，一键巡检按钮就应同步显示「正在巡检中」）——因此没有 autoActive
+   * 之类的来源区分 prop：触发来源只作任务上的诊断元数据，不上按钮。
    */
-  it('autoActive 运行态显示「自动巡检中」而不是普通域状态词', () => {
+  it('巡检任务运行中，按钮一律显示「巡检中」（不区分触发来源）', () => {
     const text = buttonText(
-      render({ domain: 'inspect', label: '一键体检', loading: true, autoActive: true }),
+      render({ domain: 'inspect', label: '一键体检', loading: true }),
     );
-    expect(text).toContain('自动巡检中');
+    expect(text).toContain('巡检中');
     expect(text).not.toContain('一键体检');
+    expect(text).not.toContain('自动');
   });
 
-  it('autoActive 排队态显示「自动巡检排队中」且不带位置数字', () => {
+  it('排队态显示「排队中」且不带位置数字（位置归进度条）', () => {
     const text = buttonText(
-      render({ domain: 'inspect', label: '一键体检', loading: true, queued: true, autoActive: true }),
+      render({ domain: 'inspect', label: '一键体检', loading: true, queued: true }),
     );
-    expect(text).toContain('自动巡检排队中');
+    expect(text).toContain('排队中');
     expect(text).not.toContain('一键体检');
-    // 位置归进度条（task.autoQueuedLabel），按钮宽度只有 220px
     expect(text).not.toMatch(/\d/);
-  });
-
-  it('autoActive 为假时行为与旧版完全一致（回归守卫）', () => {
-    const queued = buttonText(
-      render({ domain: 'inspect', label: '一键体检', loading: true, queued: true, autoActive: false }),
-    );
-    expect(queued).toContain('排队中');
-    expect(queued).not.toContain('自动巡检');
-    const running = buttonText(
-      render({ domain: 'inspect', label: '一键体检', loading: true, autoActive: false }),
-    );
-    expect(running).toContain('体检中');
-    expect(running).not.toContain('自动巡检');
   });
 });

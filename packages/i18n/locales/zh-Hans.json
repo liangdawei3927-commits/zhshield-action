@@ -1304,7 +1304,7 @@
       "total": "检查项",
       "passedCount": "{{passed}}/{{total}} 项通过",
       "scanNow": "一键体检",
-      "scanning": "体检中...",
+      "scanning": "巡检中...",
       "source": "巡检",
       "attention": "未检测",
       "attentionHint": "以下检查未执行或未产出结论，不计入通过",
@@ -2156,7 +2156,7 @@
       "guard": "门禁扫描",
       "inspect": "巡检",
       "performance": "检测",
-      "pipeline": "体检",
+      "pipeline": "巡检",
       "refactor": "重构扫描",
       "security": "检查",
       "techdebt": "技术债分析"

@@ -47,12 +47,6 @@ interface PageShellProps {
   /** 排队位置（1 起；仅 queued 时有意义） */
   queuePosition?: number;
   /**
-   * 活跃任务是每日自动巡检发起的（task.origin === 'auto'）。
-   * 按钮显示「自动巡检中/自动巡检排队中」，进度条显示「自动巡检排队中 · 第 N 位」——
-   * 用户才看得出系统在自己检查，而不是以为手动点击被莫名卡住。
-   */
-  autoActive?: boolean;
-  /**
    * 停止当前任务。传了就由**主按钮本身**承担停止入口（忙态 hover 显「停止」，
    * 点击取消）；没传表示这个域没有可取消的执行器 —— 不摆一个点了没反应的入口。
    */
@@ -162,7 +156,6 @@ function PageHero({
   loading,
   queued = false,
   queuePosition,
-  autoActive = false,
   onCancel,
   stopping = false,
   progress,
@@ -179,12 +172,7 @@ function PageHero({
   // ⚠️ 变量名刻意避开 useTaskRun 里那个「含百分比 + 任务消息」的字段名：
   // 该标识符在 domain-action-label 门禁里属于按钮禁区，进度条文案是另一回事。
   const barLabel = queued
-    ? autoActive
-      ? t('task.autoQueuedLabel', {
-          position: queuePosition ?? '?',
-          defaultValue: '自动巡检排队中 · 第 {{position}} 位',
-        })
-      : t('task.queuedLabel', { position: queuePosition ?? '?' })
+    ? t('task.queuedLabel', { position: queuePosition ?? '?' })
     : progressMessage;
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 min-h-0">
@@ -205,7 +193,6 @@ function PageHero({
           label={buttonText}
           loading={loading}
           queued={queued}
-          autoActive={autoActive}
           onCancel={onCancel}
           stopping={stopping}
           onClick={onAction}
@@ -238,7 +225,6 @@ export function PageShell({
   loading = false,
   queued = false,
   queuePosition,
-  autoActive = false,
   onCancel,
   stopping = false,
   progress,
@@ -261,7 +247,6 @@ export function PageShell({
         loading={loading}
         queued={queued}
         queuePosition={queuePosition}
-        autoActive={autoActive}
         onCancel={onCancel}
         stopping={stopping}
         progress={progress}

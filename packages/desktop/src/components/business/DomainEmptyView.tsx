@@ -18,8 +18,6 @@ export interface DomainEmptyViewProps {
   /** 任务已入队但还没真正开始（按钮显示「排队中…」，进度条显示排队位置） */
   queued?: boolean;
   queuePosition?: number;
-  /** 活跃任务是每日自动巡检发起的：按钮/进度条显示「自动巡检」 */
-  autoActive?: boolean;
   /** 停止当前任务（运行/排队时出现停止按钮） */
   onCancel?: () => void;
   /** 已发出取消、等确认 */
@@ -43,7 +41,6 @@ export function DomainEmptyView(props: DomainEmptyViewProps) {
       loading={props.loading}
       queued={props.queued}
       queuePosition={props.queuePosition}
-      autoActive={props.autoActive}
       onCancel={props.onCancel}
       stopping={props.stopping}
       progress={props.progress}

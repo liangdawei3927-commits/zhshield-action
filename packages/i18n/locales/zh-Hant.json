@@ -1299,7 +1299,7 @@
       },
       "passedCount": "{{passed}}/{{total}} 項通過",
       "scanNow": "一鍵體檢",
-      "scanning": "體檢中...",
+      "scanning": "巡檢中...",
       "source": "巡檢",
       "status": {
         "fail": "失敗",
@@ -2156,7 +2156,7 @@
       "guard": "門禁掃描",
       "inspect": "巡檢",
       "performance": "檢測",
-      "pipeline": "體檢",
+      "pipeline": "巡檢",
       "refactor": "重構掃描",
       "security": "檢查",
       "techdebt": "技術債分析"

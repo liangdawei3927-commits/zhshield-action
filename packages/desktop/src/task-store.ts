@@ -68,12 +68,6 @@ export interface TaskRunState {
   loading: boolean;
   queued: boolean;
   /**
-   * 当前活跃任务是否由每日自动巡检发起（task.origin === 'auto'）。
-   * 按钮据此显示「自动巡检中/自动巡检排队中」——让用户看懂"系统在自己检查"，
-   * 而不是对着一个「排队中」猜为什么点一下还要等。
-   */
-  auto: boolean;
-  /**
    * 排队位置（1 起；仅 queued 时有值）。
    * 按钮只显示「排队中…」纯状态词，位置归进度条文案（task.queuedLabel）。
    */
@@ -131,7 +125,6 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
   const idle: TaskRunState = {
     loading: false,
     queued: false,
-    auto: false,
     progress: 0,
     progressLabel: '',
     statusMessage: '',
@@ -141,23 +134,17 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
   };
   if (!task || activeId === null) return idle;
 
-  // 自动巡检任务：按钮/进度条文案前缀「自动巡检」，用户才知道是系统自己在查
-  const auto = task.origin === 'auto';
+  // 忙态文案不区分触发来源（自动巡检/手动点击/首扫一律同一套）：
+  // 任务在跑按钮就显示「巡检中…」，用户不需要知道也不该关心是谁扣的扳机。
   const base = t(TASK_KIND_DEFAULT_LABELS[kind]);
   if (task.status === 'queued') {
     const pos = task.queuePosition ?? '?';
     return {
       loading: true,
       queued: true,
-      auto,
       queuePosition: task.queuePosition,
       progress: 0,
-      progressLabel: auto
-        ? t('task.autoQueuedLabel', {
-            position: pos,
-            defaultValue: '自动巡检排队中 · 第 {{position}} 位',
-          })
-        : t('task.queuedLabel', { position: pos }),
+      progressLabel: t('task.queuedLabel', { position: pos }),
       statusMessage: '',
       task,
       cancel,
@@ -169,7 +156,6 @@ export function useTaskRun(kind: TaskKind, projectPath: string): TaskRunState {
   return {
     loading: true,
     queued: false,
-    auto,
     progress: task.progress || 0,
     progressLabel: t('task.runningLabel', { kind: base, percent, suffix }),
     statusMessage: task.message?.trim() ?? '',

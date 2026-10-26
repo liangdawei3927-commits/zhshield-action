@@ -93,7 +93,7 @@ describe('停止入口与主按钮是同一颗（不许第二个按钮）', () =
     expect(html).toContain('group-hover:hidden');
     expect(html).toContain('group-hover:inline');
     expect(html).toContain('data-stoppable="true"');
-    expect(textOf(html)).toContain('体检中');
+    expect(textOf(html)).toContain('巡检中');
     expect(textOf(html)).toContain('停止');
   });
 

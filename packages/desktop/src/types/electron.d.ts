@@ -711,7 +711,7 @@ export interface EngineAPI {
   getProfile: (projectPath: string) => Promise<ProjectProfileData | null>;
   runPipeline: (
     projectPath: string,
-    options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
+    options?: { dryRun?: boolean; sop?: boolean; presetName?: string; origin?: 'auto' },
   ) => Promise<PipelineReportData>;
   runProfile: (
     projectPath: string,
@@ -928,6 +928,8 @@ export interface TaskInfo {
   error?: string;
   /** 排队位置（仅 status === 'queued' 时存在） */
   queuePosition?: number;
+  /** 触发来源（仅 'auto' 时存在）：每日自动巡检发起的任务，按钮/进度据此显示「自动巡检」 */
+  origin?: 'auto';
 }
 
 /** 任务 API（主进程 IPC 桥接）：启动/列举/取消任务与任务变更事件订阅 */

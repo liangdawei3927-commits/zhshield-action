@@ -203,6 +203,40 @@ describe('TaskManager.start — 请求身份参与去重', () => {
   });
 });
 
+describe('TaskManager.start — origin 触发来源（自动巡检可见化）', () => {
+  /**
+   * 自动巡检可见化（2026-10-26 用户反馈：打开客户端自动巡检占槽，手动点一键体检
+   * 只看到「排队中」不知道系统在巡检）。origin 必须满足三条：
+   * ① 挂到 TaskInfo 上广播给渲染层；② 不参与请求身份键（手动/自动互相复用）；
+   * ③ 复用既有任务时保留原 origin 不被覆盖。
+   */
+  it('opts.origin 挂到任务上，手动触发不带 origin', () => {
+    const mgr = makeManager(pendingRunner());
+    const autoTask = mgr.start('pipeline', '/p', { sop: true }, { origin: 'auto' });
+    expect(autoTask.origin).toBe('auto');
+
+    const manualTask = mgr.start('pipeline', '/q', { sop: true });
+    expect(manualTask.origin).toBeUndefined();
+  });
+
+  it('origin 不参与请求身份：自动任务在跑，同载荷手动调用复用它', () => {
+    const mgr = makeManager(pendingRunner());
+    const autoTask = mgr.start('pipeline', '/p', { sop: true }, { origin: 'auto' });
+    // 手动一键体检：载荷与自动巡检相同（主进程已把 origin 从 request 里剥掉）
+    const manual = mgr.start('pipeline', '/p', { sop: true });
+    expect(manual.id).toBe(autoTask.id);
+    expect(manual.origin).toBe('auto');
+  });
+
+  it('复用时保留既有任务 origin：手动任务在跑，自动触发不把它改成 auto', () => {
+    const mgr = makeManager(pendingRunner());
+    const manualTask = mgr.start('pipeline', '/p', { sop: true });
+    const auto = mgr.start('pipeline', '/p', { sop: true }, { origin: 'auto' });
+    expect(auto.id).toBe(manualTask.id);
+    expect(auto.origin).toBeUndefined();
+  });
+});
+
 describe('结构性守卫 — start 必须经由请求身份去重', () => {
   it('task-manager.ts 的 start 引用了两个纯函数', () => {
     const src = fs.readFileSync(

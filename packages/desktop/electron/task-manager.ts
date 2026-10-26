@@ -46,6 +46,13 @@ export interface TaskInfo {
   result?: unknown;
   error?: string;
   queuePosition?: number;
+  /**
+   * 触发来源（仅 'auto' 时携带）：每日自动巡检发起的任务。
+   * 渲染层据此把按钮文案从「体检中/排队中」换成「自动巡检中/自动巡检排队中」，
+   * 让用户看懂"系统自己在检查，不是我点的那个没反应"。
+   * 手动触发不写此字段（undefined = manual），广播体积与旧任务零变化。
+   */
+  origin?: 'auto';
 }
 
 type TaskRunner = (
@@ -155,7 +162,17 @@ export class TaskManager {
     private readonly getWindow: () => BrowserWindow | null = getMainWindow,
   ) {}
 
-  start(kind: TaskKind, projectPath: string, request?: unknown): TaskInfo {
+  /**
+   * opts.origin 不参与 requestKey（请求身份）：它是"谁按的按钮"不是"查什么"。
+   * 因此自动触发与手动触发的同参数任务仍互相复用（去重语义不变），
+   * 复用时保留既有任务的 origin 不被覆盖。
+   */
+  start(
+    kind: TaskKind,
+    projectPath: string,
+    request?: unknown,
+    opts?: { origin?: 'auto' },
+  ): TaskInfo {
     const requestKey = canonicalRequestKey(request);
     const existing = findReusableTask({
       tasks: this.tasks.values(),
@@ -173,6 +190,7 @@ export class TaskManager {
       status: 'queued',
       progress: 0,
       startedAt: new Date().toISOString(),
+      ...(opts?.origin ? { origin: opts.origin } : {}),
     };
     this.tasks.set(task.id, task);
     this.requestKeys.set(task.id, requestKey);

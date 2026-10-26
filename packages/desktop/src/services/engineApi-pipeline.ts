@@ -11,7 +11,7 @@ import { isHttpMode, getAPI } from './engineApi-transport';
 
 export async function runPipeline(
   projectPath: string,
-  options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
+  options?: { dryRun?: boolean; sop?: boolean; presetName?: string; origin?: 'auto' },
 ): Promise<PipelineReportData> {
   if (isHttpMode()) return runPipelineViaHttp(projectPath, options);
   const api = getAPI();

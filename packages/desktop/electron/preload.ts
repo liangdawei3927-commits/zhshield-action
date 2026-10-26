@@ -160,7 +160,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('engine:secretDismiss', secretId, reason),
     runPipeline: (
       projectPath: string,
-      options?: { dryRun?: boolean; sop?: boolean; presetName?: string },
+      options?: { dryRun?: boolean; sop?: boolean; presetName?: string; origin?: 'auto' },
     ) => ipcRenderer.invoke('engine:runPipeline', projectPath, options),
     runProfile: (projectPath: string) => ipcRenderer.invoke('engine:runProfile', projectPath),
     generateReportSummary: (projectPath: string) =>

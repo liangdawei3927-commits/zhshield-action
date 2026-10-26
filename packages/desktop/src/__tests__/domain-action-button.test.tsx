@@ -105,4 +105,39 @@ describe('域主操作按钮渲染', () => {
     expect(buttonText(html)).toContain('排队中');
     expect(buttonText(html)).not.toContain('开始盘点');
   });
+
+  /**
+   * 自动巡检可见化（2026-10-26 用户原话：触发自动巡检后，按钮上最起码能看到
+   * 系统正在巡检——不然点一键体检显示「排队中」，不知道怎么回事就手动再点）。
+   */
+  it('autoActive 运行态显示「自动巡检中」而不是普通域状态词', () => {
+    const text = buttonText(
+      render({ domain: 'inspect', label: '一键体检', loading: true, autoActive: true }),
+    );
+    expect(text).toContain('自动巡检中');
+    expect(text).not.toContain('一键体检');
+  });
+
+  it('autoActive 排队态显示「自动巡检排队中」且不带位置数字', () => {
+    const text = buttonText(
+      render({ domain: 'inspect', label: '一键体检', loading: true, queued: true, autoActive: true }),
+    );
+    expect(text).toContain('自动巡检排队中');
+    expect(text).not.toContain('一键体检');
+    // 位置归进度条（task.autoQueuedLabel），按钮宽度只有 220px
+    expect(text).not.toMatch(/\d/);
+  });
+
+  it('autoActive 为假时行为与旧版完全一致（回归守卫）', () => {
+    const queued = buttonText(
+      render({ domain: 'inspect', label: '一键体检', loading: true, queued: true, autoActive: false }),
+    );
+    expect(queued).toContain('排队中');
+    expect(queued).not.toContain('自动巡检');
+    const running = buttonText(
+      render({ domain: 'inspect', label: '一键体检', loading: true, autoActive: false }),
+    );
+    expect(running).toContain('体检中');
+    expect(running).not.toContain('自动巡检');
+  });
 });

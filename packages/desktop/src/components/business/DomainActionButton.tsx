@@ -21,6 +21,13 @@ export interface DomainActionButtonProps {
    */
   queued?: boolean;
   /**
+   * 活跃任务是每日自动巡检发起的（task.origin === 'auto'）。
+   * 忙态文案从「体检中/排队中」换成「自动巡检中/自动巡检排队中」：
+   * 用户点一键体检撞上自动巡检时，看得到"系统正在自己检查"，而不是
+   * 对着一个莫名的「排队中」怀疑应用卡死。
+   */
+  autoActive?: boolean;
+  /**
    * 停止当前任务。传了才会在忙态把主按钮变成停止入口 —— 没传表示这个域没有
    * 可取消的执行器，不摆一个点了没反应的入口。
    */
@@ -53,6 +60,7 @@ export function DomainActionButton({
   label,
   loading = false,
   queued = false,
+  autoActive = false,
   onCancel,
   stopping = false,
   onClick,
@@ -60,9 +68,13 @@ export function DomainActionButton({
 }: DomainActionButtonProps) {
   const t = useT();
   // 削成纯状态词：百分比/任务消息一律不进按钮（进度条才是它们的落点）
-  const runningLabel = toPureStatusLabel(t(ACTION_RUNNING_LABEL_KEY[domain]));
+  const runningLabel = autoActive
+    ? toPureStatusLabel(t('task.autoRunningShort', { defaultValue: '自动巡检中...' }))
+    : toPureStatusLabel(t(ACTION_RUNNING_LABEL_KEY[domain]));
   // 排队同样是"纯状态词"：只报状态，不报位置（见 props.queued 注释）
-  const queuedLabel = toPureStatusLabel(t('task.queuedShort', { defaultValue: '排队中...' }));
+  const queuedLabel = autoActive
+    ? toPureStatusLabel(t('task.autoQueuedShort', { defaultValue: '自动巡检排队中...' }))
+    : toPureStatusLabel(t('task.queuedShort', { defaultValue: '排队中...' }));
   const statusLabel = queued ? queuedLabel : runningLabel;
   const busy = loading || queued;
 

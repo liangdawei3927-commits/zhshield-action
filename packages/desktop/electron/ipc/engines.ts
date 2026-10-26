@@ -415,13 +415,17 @@ async function runPerformanceHandler(
 async function runPipelineHandler(
   manager: TaskManager,
   projectPath: string,
-  options?: { dryRun?: boolean; sop?: boolean },
+  options?: { dryRun?: boolean; sop?: boolean; origin?: 'auto' },
 ): Promise<PipelineReport> {
   try {
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const task = manager.start('pipeline', projectPath, options ?? {});
+    // origin（触发来源）必须从 request 里剥掉：它不参与去重请求键，
+    // 否则自动巡检 {sop,origin:'auto'} 与手动一键体检 {sop} 会被当成两个任务，
+    // 用户手动点击时不再复用自动任务，反而排出一个重复扫描。
+    const { origin, ...request } = options ?? {};
+    const task = manager.start('pipeline', projectPath, request, { origin });
     const report = (await manager.waitFor(task.id)) as PipelineReport;
     if (!options?.dryRun) {
       try {

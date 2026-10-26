@@ -88,6 +88,7 @@ function InspectFailureView({
   statusMessage,
   queued,
   queuePosition,
+  autoActive,
   onRetry,
   t,
 }: {
@@ -99,6 +100,8 @@ function InspectFailureView({
   /** 排队中：重试按钮显示「排队中…」而不是「体检中…」 */
   queued?: boolean;
   queuePosition?: number;
+  /** 活跃任务是每日自动巡检发起的：按钮显示「自动巡检中/自动巡检排队中」 */
+  autoActive?: boolean;
   onRetry: () => void;
   t: Translate;
 }) {
@@ -114,6 +117,7 @@ function InspectFailureView({
       actionDomain="inspect"
       queued={queued}
       queuePosition={queuePosition}
+      autoActive={autoActive}
       loading={loading}
       progress={progress}
       progressMessage={statusMessage}
@@ -228,6 +232,7 @@ function InspectReportView({
   progress,
   statusMessage,
   queued,
+  autoActive,
   onCancel,
   stopping,
   onRescan,
@@ -243,6 +248,8 @@ function InspectReportView({
   statusMessage: string;
   /** 排队中：按钮显示「排队中…」而不是「体检中…」 */
   queued?: boolean;
+  /** 活跃任务是每日自动巡检发起的：按钮显示「自动巡检中/自动巡检排队中」 */
+  autoActive?: boolean;
   /** 停止本次体检（运行/排队时按钮旁出现「停止」） */
   onCancel: () => void;
   /** 已发出取消、等确认 */
@@ -276,6 +283,7 @@ function InspectReportView({
           onClick={onRescan}
           loading={loading}
           queued={queued}
+          autoActive={autoActive}
           label={t('page.inspect.scanNow')}
         />
       }
@@ -314,6 +322,8 @@ function InspectEmptyView(props: {
   statusMessage: string;
   queued?: boolean;
   queuePosition?: number;
+  /** 活跃任务是每日自动巡检发起的：按钮显示「自动巡检中/自动巡检排队中」 */
+  autoActive?: boolean;
   /** 停止本次体检 */
   onCancel: () => void;
   stopping: boolean;
@@ -354,6 +364,7 @@ function InspectEmptyView(props: {
       loading={props.loading}
       queued={props.queued}
       queuePosition={props.queuePosition}
+      autoActive={props.autoActive}
       onCancel={props.onCancel}
       stopping={props.stopping}
       progress={props.progress}
@@ -396,6 +407,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     statusMessage,
     queued,
     queuePosition,
+    auto,
     cancel,
     stopping,
     copyToAi,
@@ -425,6 +437,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         statusMessage={statusMessage}
         queued={queued}
         queuePosition={queuePosition}
+        autoActive={auto}
         onRetry={startScan}
         t={t}
       />
@@ -440,6 +453,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         progress={progress}
         statusMessage={statusMessage}
         queued={queued}
+        autoActive={auto}
         onCancel={cancel}
         stopping={stopping}
         onRescan={startInspect}
@@ -461,6 +475,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         statusMessage={statusMessage}
         queued={queued}
         queuePosition={queuePosition}
+        autoActive={auto}
         onCancel={cancel}
         stopping={stopping}
         onScan={startScan}

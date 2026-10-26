@@ -84,16 +84,22 @@ function useInspectReport(projectPath: string): {
   report: InspectionReportData | null;
   persisted: InspectionReportData | null;
   failure: InspectFailure | null;
-  run: () => Promise<void>;
+  run: (opts?: { origin?: 'auto' }) => Promise<void>;
 } {
   const [report, setReport] = useState<InspectionReportData | null>(null);
   const [failure, setFailure] = useState<InspectFailure | null>(null);
   const persisted = usePersistedReport(projectPath);
 
-  const run = useCallback(async () => {
-    setFailure(null);
-    try {
-      const pipeline = await runPipeline(projectPath, { sop: true });
+  const run = useCallback(
+    async (opts?: { origin?: 'auto' }) => {
+      setFailure(null);
+      try {
+        // origin（触发来源）随 options 传给主进程：主进程会把它从去重请求键里剥掉，
+        // 只挂在任务上供按钮显示「自动巡检」——手动/自动任务依然互相复用不重复扫。
+        const pipeline = await runPipeline(
+          projectPath,
+          opts?.origin ? { sop: true, origin: opts.origin } : { sop: true },
+        );
       const outcome = toInspectOutcome(pipeline);
       if (outcome.kind === 'cancelled') {
         // 用户点「停止」不是失败：不落失败页、保留已有报告。
@@ -136,13 +142,16 @@ function useInspectRun(projectPath: string): {
   queued: boolean;
   /** 排队位置（1 起；仅 queued 时有值） */
   queuePosition?: number;
-  startInspect: () => Promise<void>;
+  /** 活跃任务是每日自动巡检发起的（按钮/进度显示「自动巡检」） */
+  auto: boolean;
+  startInspect: (opts?: { origin?: 'auto' }) => Promise<void>;
 } {
   const { report, persisted, failure, run } = useInspectReport(projectPath);
   // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('pipeline', projectPath);
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, auto } =
+    useTaskRun('pipeline', projectPath);
 
-  const startInspect = useCallback(() => run(), [run]);
+  const startInspect = useCallback((opts?: { origin?: 'auto' }) => run(opts), [run]);
 
   return {
     report,
@@ -155,6 +164,7 @@ function useInspectRun(projectPath: string): {
     queuePosition,
     cancel,
     stopping,
+    auto,
     startInspect,
   };
 }
@@ -212,10 +222,13 @@ export function useInspectPage(projectPath: string) {
     queuePosition,
     cancel,
     stopping,
+    auto,
     startInspect,
   } = useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
-  useDailyAutoCheck('inspect', projectPath, () => void startInspect(), 'pipeline');
+  // 自动巡检带 origin='auto'：任务广播后按钮/进度条显示「自动巡检」，
+  // 用户点一键体检撞上它时看得到"系统正在自己检查"而不是莫名的「排队中」。
+  useDailyAutoCheck('inspect', projectPath, () => void startInspect({ origin: 'auto' }), 'pipeline');
 
   return {
     report,
@@ -228,6 +241,7 @@ export function useInspectPage(projectPath: string) {
     queuePosition,
     cancel,
     stopping,
+    auto,
     copyToAi,
     copyAllToAi,
     startInspect,

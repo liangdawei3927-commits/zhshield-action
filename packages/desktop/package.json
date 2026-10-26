@@ -135,7 +135,8 @@
     },
     "asarUnpack": [
       "dist-electron/zhshield-mcp.js",
-      "**/*.node"
+      "**/*.node",
+      "**/node_modules/@zh/kernel/dist/assets/**"
     ],
     "npmRebuild": false
   }

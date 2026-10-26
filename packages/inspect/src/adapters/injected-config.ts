@@ -22,6 +22,21 @@ function isFile(p: string): boolean {
   }
 }
 
+/**
+ * 打包态（Electron asar）路径改写：asar 归档内的文件对**外部子进程**不可读
+ * （semgrep 是 Python 子进程、dep-cruiser/eslint 走真实 fs），
+ * electron-builder 的 asarUnpack 会把 kernel 资产解到 app.asar.unpacked 下的真实文件。
+ * 主进程内 require.resolve 命中的是 app.asar/... 路径，这里改指解包后的真实路径。
+ * 非打包态（无 app.asar 段）原样返回；unpacked 下不存在时保持原路径（交由上层降级）。
+ * （2026-10-26 实测：打包版 semgrep/dep-cruiser/eslint 因 asar 内配置不可读全部报错，
+ * 体检退化为盲检。）
+ */
+export function toRealFsPath(p: string): string {
+  if (!p.includes('app.asar') || p.includes('app.asar.unpacked')) return p;
+  const unpacked = p.replace('app.asar', 'app.asar.unpacked');
+  return isFile(unpacked) ? unpacked : p;
+}
+
 /** 尝试从 paths 中定位 @zh/kernel 包根目录，失败返回 null */
 function locateKernelPackageRoot(paths: string[]): string | null {
   // 锚点文件仅需合法格式（inspect 以 CJS 编译，不能用 import.meta.url）。
@@ -49,11 +64,12 @@ export function resolveInjectedConfigPath(
   cwd: string,
   projectPath: string,
 ): string | null {
-  return (
+  const resolved =
     resolveByCwd(config, cwd) ??
     resolveByProject(config, projectPath) ??
-    resolveKernelAsset(config, cwd, projectPath)
-  );
+    resolveKernelAsset(config, cwd, projectPath);
+  // asar 内路径对外部子进程不可读：命中打包态解包路径时改写（见 toRealFsPath）
+  return resolved === null ? null : toRealFsPath(resolved);
 }
 
 /** 1. 相对被扫描目录（ESLint v9 以 cwd 查找配置） */

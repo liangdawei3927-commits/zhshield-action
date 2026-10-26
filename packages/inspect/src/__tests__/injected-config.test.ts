@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { resolveInjectedConfigPath } from '../adapters/injected-config';
+import { resolveInjectedConfigPath, toRealFsPath } from '../adapters/injected-config';
 
 /**
  * SOP 规则声明的工具配置路径解析（2026-09-22 建立）
@@ -72,5 +73,44 @@ describe('resolveInjectedConfigPath — 内核资产回退链', () => {
     } finally {
       if (!existed) fs.rmSync(abs, { force: true });
     }
+  });
+});
+
+/**
+ * asar 打包态路径改写（2026-10-26）：
+ * 打包版 semgrep/dep-cruiser/eslint 因配置落在 app.asar 归档内、外部子进程不可读
+ * 而全部报错（体检退化盲检）。toRealFsPath 必须把命中 unpacked 的路径改指真实文件。
+ */
+describe('toRealFsPath（asar 打包态改写）', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-asar-'));
+  const asarDir = path.join(base, 'app.asar');
+  const unpackedDir = path.join(base, 'app.asar.unpacked');
+  fs.mkdirSync(path.join(asarDir, 'assets'), { recursive: true });
+  fs.mkdirSync(path.join(unpackedDir, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(asarDir, 'assets', 'a.yml'), 'x: 1\n');
+  fs.writeFileSync(path.join(unpackedDir, 'assets', 'a.yml'), 'x: 1\n');
+
+  afterAll(() => {
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it('app.asar 路径且 unpacked 下存在同名文件 → 改指 unpacked', () => {
+    const p = path.join(asarDir, 'assets', 'a.yml');
+    expect(toRealFsPath(p)).toBe(path.join(unpackedDir, 'assets', 'a.yml'));
+  });
+
+  it('app.asar 路径但 unpacked 下不存在 → 原样返回（交由上层降级）', () => {
+    const p = path.join(asarDir, 'assets', 'missing.yml');
+    expect(toRealFsPath(p)).toBe(p);
+  });
+
+  it('无 app.asar 段 → 原样返回（开发态/CLI 不受影响）', () => {
+    const p = path.join(base, 'assets', 'a.yml');
+    expect(toRealFsPath(p)).toBe(p);
+  });
+
+  it('已是 app.asar.unpacked 路径 → 原样返回（幂等）', () => {
+    const p = path.join(unpackedDir, 'assets', 'a.yml');
+    expect(toRealFsPath(p)).toBe(p);
   });
 });

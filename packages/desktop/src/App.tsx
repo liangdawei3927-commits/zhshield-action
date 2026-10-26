@@ -21,6 +21,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { ScreensaverPage } from './pages/ScreensaverPage';
 import { ProjectOnboardingPage } from './components/onboarding/ProjectOnboardingPage';
 import { useInactivityTimer } from './hooks/useInactivityTimer';
+import { useAppDailyCheck } from './hooks/useAppDailyCheck';
 import { NavigationProvider } from './contexts/NavigationContext';
 
 /** 根据当前页面渲染对应内容区（欢迎页 / 各功能页） */
@@ -225,6 +226,9 @@ function MainContent({ appState }: { appState: ReturnType<typeof useAppState> })
     switchCurrentProject,
   } = appState;
   const activeProject = projects[currentProjectIndex] ?? projects[0];
+  // App 级每日巡检：打开客户端 / 切换项目 / 首次添加（切为当前项目）→
+  // 当日首次系统空闲自动跑一次体检流水线。空串由 hook 内部守卫跳过。
+  useAppDailyCheck(activeProject?.path ?? '');
   const handleOpenProjectProfile = (project: ProjectInfo, index: number) => {
     switchCurrentProject(index);
     if (onboardedPaths.has(project.path)) {

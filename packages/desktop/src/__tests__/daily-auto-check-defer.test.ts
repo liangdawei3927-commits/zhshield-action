@@ -110,3 +110,36 @@ describe('useDailyAutoCheck 接线守卫', () => {
     expect(src).toMatch(/AUTO_DEFER_MAX_MS/);
   });
 });
+
+/**
+ * App 级每日巡检接线守卫（2026-10-26 用户拍板：触发模式补全①+②）。
+ *
+ * 页面级触发条件是「每天第一次进入体检页」，用户直奔哨兵页/分类页时体检数据
+ * 旧了没人知道。useAppDailyCheck 把兜底升级到 App 级：打开客户端/切换项目/
+ * 首次添加（切为当前项目）→ 当日首次系统空闲自动跑一次。
+ * 「声明了却没执行」是本项目有前科的缺陷形态，接线必须锁住。
+ */
+describe('useAppDailyCheck 接线守卫（App 级每日巡检）', () => {
+  const hookSrc = read('hooks/useAppDailyCheck.ts');
+  const appSrc = read('App.tsx');
+
+  it('App.tsx 必须真实挂载 hook（声明了就要执行）', () => {
+    expect(appSrc).toMatch(/useAppDailyCheck\(/);
+  });
+
+  it('scope 必须是 app（与页面级 inspect/refactor 的 localStorage 记录隔离）', () => {
+    expect(hookSrc).toMatch(/useDailyAutoCheck\(\s*'app'/);
+  });
+
+  it('taskKind 必须是 pipeline（与页面级 ranToday 联动：本会话谁先跑过都不补跑）', () => {
+    expect(hookSrc).toMatch(/'pipeline'\s*\)/);
+  });
+
+  it('触发必须带 origin:auto（诊断元数据；手动/自动同参数请求键互复用）', () => {
+    expect(hookSrc).toMatch(/origin:\s*'auto'/);
+  });
+
+  it('必须透传 projectPath（切换项目/首次添加才触发重新登记）', () => {
+    expect(appSrc).toMatch(/useAppDailyCheck\(activeProject\?\.path\s*\?\?\s*''\)/);
+  });
+});

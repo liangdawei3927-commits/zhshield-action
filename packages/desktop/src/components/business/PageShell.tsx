@@ -6,7 +6,6 @@ import { DomainActionButton } from './DomainActionButton';
 import type { ActionRunningKey } from './domain-action-text';
 import { useDetailEntry } from '../../contexts/DetailEntryContext';
 import { useT } from '../../i18n';
-
 interface FeatureItem {
   icon: ReactNode;
   title: string;
@@ -145,6 +144,25 @@ type PageHeroProps = Omit<
   'loading' | 'featureList' | 'footer' | 'columns'
 > & { loading: boolean };
 
+/** 分数环下钻入口（P2-7）：详情可用时整环可点，与右上角图标同源（DetailEntryContext） */
+function IllustrationSlot({ children }: { children: ReactNode }) {
+  const t = useT();
+  const entry = useDetailEntry();
+  if (!entry?.available) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      onClick={entry.onOpen}
+      title={t('page.detail.view')}
+      aria-label={t('page.detail.view')}
+      data-testid="score-ring-detail-entry"
+      className="w-[260px] h-[260px] rounded-full cursor-pointer transition-transform hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+    >
+      {children}
+    </button>
+  );
+}
+
 /** 上半部分：插图 + 标题 + 副标题 + 进度 + 主/副按钮 + 附加内容，垂直居中 */
 function PageHero({
   illustration,
@@ -177,7 +195,7 @@ function PageHero({
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 min-h-0">
       <div className="w-[260px] h-[260px] flex items-center justify-center mb-6 [&>svg]:w-[260px] [&>svg]:h-[260px]">
-        {illustration}
+        <IllustrationSlot>{illustration}</IllustrationSlot>
       </div>
       <h1 className="text-[28px] font-bold text-zh-ink mb-2 leading-tight text-center">{title}</h1>
       <p className="text-base text-zh-muted mb-6 text-center max-w-2xl">{subtitle}</p>

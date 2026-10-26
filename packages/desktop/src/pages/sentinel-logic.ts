@@ -158,18 +158,21 @@ function useSentinelPolling(monitoring: boolean, refreshEvents: () => void): voi
   }, [monitoring, refreshEvents]);
 }
 
-/** 事件列表数据：事件状态 + 刷新 */
-function useSentinelEventData(onLoaded: () => void): {
+/** 事件列表数据：事件状态 + 刷新（**只取当前项目**的事件，projectId 必传） */
+function useSentinelEventData(projectPath: string, onLoaded: () => void): {
   events: SentinelEventItem[];
   refreshEvents: () => void;
 } {
   const [events, setEvents] = useState<SentinelEventItem[]>([]);
 
   const refreshEvents = useCallback(() => {
-    getSentinelEvents({ excludeInformational: true })
+    // projectId 必须传：事件表是多项目共用的，缺省会把别的项目的待处理事件
+    // 显示到当前项目名下，而评分卡按项目算分 ⇒「3 个问题却 100 分」的口径分裂
+    //（2026-10-26 实测修复）。
+    getSentinelEvents({ projectId: projectPath, excludeInformational: true })
       .then((data) => setEvents((data ?? []).map(toSentinelEventItem)))
       .finally(onLoaded);
-  }, [onLoaded]);
+  }, [projectPath, onLoaded]);
 
   return { events, refreshEvents };
 }
@@ -264,7 +267,7 @@ function useSentinelEvents(projectPath: string): {
 } {
   const [loading, setLoading] = useState(true);
   const markLoaded = useCallback(() => setLoading(false), [setLoading]);
-  const { events, refreshEvents } = useSentinelEventData(markLoaded);
+  const { events, refreshEvents } = useSentinelEventData(projectPath, markLoaded);
   const { monitoring, stopping, startMonitoring, stopMonitoring } = useSentinelMonitoring(
     projectPath,
     refreshEvents,

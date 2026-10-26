@@ -758,6 +758,8 @@ export interface ToolsAPI {
 
 /** 哨兵事件查询条件：与 server 端 GET /system/sentinel/event-center 的查询参数同名同义 */
 export interface SentinelEventQuery {
+  /** 只返回该项目的事件。缺省 = 跨项目全量（历史行为，会串显其他项目的事件，勿再使用） */
+  readonly projectId?: string;
   readonly status?: string;
   readonly severity?: string;
   /** true 时排除不含可执行语义的通知类事件（进程生命周期、文件新增与内容变更） */

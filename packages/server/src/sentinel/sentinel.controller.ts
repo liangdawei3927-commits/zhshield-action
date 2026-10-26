@@ -40,11 +40,12 @@ export class SentinelController {
 
   @Get('event-center')
   listEvents(
+    @Query('projectId') projectId?: string,
     @Query('status') status?: string,
     @Query('severity') severity?: string,
     @Query('excludeInformational') excludeInformational?: string,
   ): SentinelEvent[] {
-    const events = this.sentinelService.listEvents({ status, severity });
+    const events = this.sentinelService.listEvents({ projectId, status, severity });
     if (excludeInformational === 'true') {
       return events.filter((e) => !isInformationalEvent(e));
     }

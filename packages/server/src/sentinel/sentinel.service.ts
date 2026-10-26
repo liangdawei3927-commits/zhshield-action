@@ -92,8 +92,13 @@ export class SentinelService implements OnModuleDestroy {
     }
   }
 
-  listEvents(filters?: { status?: string; severity?: string }): SentinelEvent[] {
+  listEvents(filters?: {
+    projectId?: string;
+    status?: string;
+    severity?: string;
+  }): SentinelEvent[] {
     return this.eventCenter.listEvents({
+      projectId: filters?.projectId,
       status: filters?.status as EventStatus | undefined,
       severity: filters?.severity as EventSeverity | undefined,
     });

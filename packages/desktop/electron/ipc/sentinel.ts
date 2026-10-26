@@ -9,7 +9,7 @@ import { ipcMain, app } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
-import type { SentinelEvent, EventStatus, EventSeverity } from '@zh/sentinel';
+import type { SentinelEvent, EventFilters } from '@zh/sentinel';
 import {
   detectRunCommand,
   discoverLogPaths,
@@ -198,9 +198,9 @@ function registerEventQuery(): void {
     'sentinel:getEvents',
     async (_event, options?: SentinelEventQuery): Promise<SentinelEvent[]> => {
       const { eventCenter } = await getSentinel();
-      const events = eventCenter.listEvents(
-        options as { status?: EventStatus; severity?: EventSeverity } | undefined,
-      );
+      // projectId 必须透传：事件表是多项目共用的，缺省会跨项目串显
+      //（2026-10-26 实测：外层项目页面显示了内层项目的 3 条 p2 待处理事件）
+      const events = eventCenter.listEvents(options as EventFilters | undefined);
       if (options?.excludeInformational !== true) return events;
       return events.filter((event) => !isInformationalEvent(event));
     },

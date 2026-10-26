@@ -129,6 +129,7 @@ export async function getSentinelEventsViaHttp(
 ): Promise<SentinelEvent[]> {
   try {
     const params = new URLSearchParams();
+    if (options?.projectId) params.set('projectId', options.projectId);
     if (options?.status) params.set('status', options.status);
     if (options?.severity) params.set('severity', options.severity);
     if (options?.excludeInformational) params.set('excludeInformational', 'true');

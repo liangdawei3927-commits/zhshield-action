@@ -24,6 +24,11 @@ export const LIST_EVENTS_LIMIT = 500;
 
 /** 事件查询筛选条件（与 IPC `SentinelEventQuery` 的 status/severity 同义） */
 export interface EventFilters {
+  /** 只返回该项目的事件。**必须由调用方传入**：事件表是多项目共用的，
+   * 缺省 = 跨项目全量返回 —— 曾因此让哨兵页把别的项目的待处理事件
+   * 显示在当前项目名下，而评分卡按项目算分，出现「3 个问题却 100 分」的口径分裂
+   * （2026-10-26 实测修复）。 */
+  projectId?: string;
   status?: EventStatus;
   severity?: EventSeverity;
 }
@@ -74,16 +79,24 @@ export function listMergedEvents(
   const merged = new Map<string, SentinelEvent>();
   if (db) {
     try {
-      for (const row of listSentinelEvents(db, { limit: LIST_EVENTS_LIMIT })) {
+      // projectId 必须下推到 SQL：全表拉回再内存过滤会在事件量大的库上白拉几万行
+      for (const row of listSentinelEvents(db, {
+        limit: LIST_EVENTS_LIMIT,
+        projectId: filters?.projectId,
+      })) {
         merged.set(row.id, rowToEvent(row));
       }
     } catch (err) {
       console.error('[EventCenter] Failed to list events from DB:', err);
     }
   }
-  for (const [id, event] of memory) merged.set(id, event);
+  for (const [id, event] of memory) {
+    if (filters?.projectId && event.projectId !== filters.projectId) continue;
+    merged.set(id, event);
+  }
 
   let results = [...merged.values()];
+  if (filters?.projectId) results = results.filter((e) => e.projectId === filters.projectId);
   if (filters?.status) results = results.filter((e) => e.status === filters.status);
   if (filters?.severity) results = results.filter((e) => e.severity === filters.severity);
   return results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

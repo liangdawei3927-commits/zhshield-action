@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 import type { SentinelEvent, EventStatus, EventSeverity, AlertPayload } from './types';
 import { findSentinelEventByDedupeKey, getSentinelEvent } from '@zh/db';
 import type { AuditLogger } from '@zh/shared';
-import { listMergedEvents, rowToEvent } from './event-list';
+import { listMergedEvents, rowToEvent, type EventFilters } from './event-list';
 import { persistNewEvent, persistEventUpdate } from './event-persist';
 
 /** 告警 severity → 事件优先级映射表（替代 mapSeverity 中的 switch 分派） */
@@ -247,7 +247,7 @@ export class EventCenter {
    * 里的条目，进程一重启库里几百条事件就全都读不到了（实测本项目 338 条），
    * 哨兵页因此显示空白、详情入口消失。
    */
-  listEvents(filters?: { status?: EventStatus; severity?: EventSeverity }): SentinelEvent[] {
+  listEvents(filters?: EventFilters): SentinelEvent[] {
     return listMergedEvents(this.db, this.events, filters);
   }
 

@@ -873,6 +873,7 @@
       "noDataHintLive": "Run an inspection and the score appears here instantly",
       "notRunHint": "Run this check and summarize to count toward the total score",
       "scoreDelta": "Previous {{prev}} → Now {{now}}",
+      "sources": "Sources: {{sources}}",
       "unit": "pts"
     },
     "detail": {
@@ -983,6 +984,10 @@
     },
     "deps": {
       "checking": "Taking inventory...",
+      "cve.dataUnavailable": "Vulnerability database unreachable; CVEs were not checked this run",
+      "cve.none": "No known vulnerabilities found (source: OSV)",
+      "cve.title": "Known vulnerabilities (CVE)",
+      "cve.unavailable": "CVEs not checked",
       "source": "Dependency Manager",
       "done": "Dependency Manager complete",
       "ecosystem": "Ecosystem",
@@ -1616,7 +1621,7 @@
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Security check complete",
       "empty": {
-        "subtitle": "Checked 0 files, found 0 high-risk vulnerabilities",
+        "subtitle": "Multi-engine deep scan for vulnerabilities and malware; results are shown together with tool availability",
         "title": "Deep-scan vulnerabilities, fix security issues"
       },
       "feature": {
@@ -1666,6 +1671,11 @@
       "stats": {
         "total": "Vulnerabilities",
         "malware": "Malware"
+      },
+      "degraded": {
+        "title": "Scan degraded; results may be incomplete",
+        "detail": "Unavailable tools: {{tools}}. {{audit}}Not checked does not mean no vulnerabilities — restore tools or go online and rescan.",
+        "none": "(none)"
       }
     },
     "sentinel": {

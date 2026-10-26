@@ -873,6 +873,7 @@
       "noDataHintLive": "完成一次巡檢後，這裡即時顯示評分",
       "notRunHint": "執行本功能並彙總後計入總分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
+      "sources": "資料來源：{{sources}}",
       "unit": "分"
     },
     "detail": {
@@ -983,6 +984,10 @@
     },
     "deps": {
       "checking": "盤點中...",
+      "cve.dataUnavailable": "漏洞庫不可達，本次未檢測 CVE",
+      "cve.none": "未發現已知漏洞（資料來源：OSV）",
+      "cve.title": "已知漏洞（CVE）",
+      "cve.unavailable": "CVE 未檢測",
       "source": "依賴管家",
       "done": "依賴盤點完成",
       "ecosystem": "生態",
@@ -1538,7 +1543,7 @@
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "done": "安全檢查完成",
       "empty": {
-        "subtitle": "已檢查 0 個檔案，發現 0 個高危漏洞",
+        "subtitle": "多引擎深度掃描漏洞與惡意程式碼，結果與工具可用性一併呈現",
         "title": "深度掃描漏洞，修復安全隱患"
       },
       "feature": {
@@ -1588,6 +1593,11 @@
       "stats": {
         "total": "總漏洞",
         "malware": "惡意程式碼"
+      },
+      "degraded": {
+        "title": "本次掃描已降級，結果可能不完整",
+        "detail": "不可用工具：{{tools}}。{{audit}}未檢測 ≠ 沒有漏洞，恢復工具或連網後重新檢查。",
+        "none": "（無）"
       }
     },
     "sentinel": {

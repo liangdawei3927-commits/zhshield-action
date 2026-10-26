@@ -3,6 +3,7 @@ import {
   DependencyEmptyState,
   DependencyLockfileCard,
   DependencyTrustCard,
+  DependencyCveCard,
   DependencyLicenseCard,
   DependencyEnvCard,
   DependencyOutdatedCard,
@@ -70,6 +71,9 @@ function DependencyReportBody({
         <DependencyTrustCard trustCounts={report.trustCounts} />
       </div>
       <DependencyLicenseCard matrix={report.licenseMatrix} />
+      <div className="my-6">
+        <DependencyCveCard report={report} />
+      </div>
       <div className="grid grid-cols-2 gap-6 my-6">
         <DependencyTyposquatCard
           report={report}

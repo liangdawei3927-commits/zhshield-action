@@ -88,6 +88,31 @@ export function findDimension(
   return data?.dimensions.find((d) => d.name === dimension);
 }
 
+/**
+ * 各评分维度的数据来源（诊断 source 名）——P1-6 来源标注。
+ *
+ * 这是维度的静态派生信息（与实时/汇总数据源无关），故用纯函数映射而非 IPC 传参：
+ * - quality 吃 inspect + performance 两个域快照（快路径两路并行读取）；
+ * - security 吃 security 域快照（含 secrets 双路合并写入的 secret:* 条目）；
+ * - dependencies 吃 deps 域快照；gate 吃 guard 报告。
+ */
+const DIMENSION_SOURCE_MAP: Record<ScoreDimension, readonly string[]> = {
+  quality: ['inspect', 'performance'],
+  security: ['security', 'secrets'],
+  dependencies: ['deps'],
+  gate: ['guard'],
+  techdebt: ['techdebt'],
+  refactor: ['refactor'],
+  performance: ['performance'],
+  sentinel: ['sentinel'],
+  garbage: ['garbage'],
+  backup: ['backup'],
+};
+
+export function dimensionSources(dimension: ScoreDimension): readonly string[] {
+  return DIMENSION_SOURCE_MAP[dimension] ?? [dimension];
+}
+
 /** 实时评分：引擎在检查落盘时写进按域快照的 dimensionScore（engine:getDomainScore 返回值） */
 export interface LiveScore {
   score: number;

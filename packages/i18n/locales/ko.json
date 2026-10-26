@@ -873,6 +873,7 @@
       "noDataHintLive": "점검을 실행하면 여기에 즉시 점수가 표시됩니다",
       "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다",
       "scoreDelta": "이전 {{prev}} → 현재 {{now}}",
+      "sources": "데이터 출처: {{sources}}",
       "unit": "점"
     },
     "detail": {
@@ -983,6 +984,10 @@
     },
     "deps": {
       "checking": "점검 중...",
+      "cve.dataUnavailable": "취약성 데이터베이스에 연결할 수 없어 이번 실행에서 CVE를 검사하지 않았습니다",
+      "cve.none": "알려진 취약성이 발견되지 않았습니다 (출처: OSV)",
+      "cve.title": "알려진 취약성 (CVE)",
+      "cve.unavailable": "CVE 미검사",
       "source": "의존성 관리자",
       "done": "의존성 점검 완료",
       "ecosystem": "생태계",
@@ -1538,7 +1543,7 @@
       "copyAllPrompt": "처리할 항목 {{count}}개. 전체를 한 번에 복사해 AI로 수정할 수 있습니다",
       "done": "보안 검사 완료",
       "empty": {
-        "subtitle": "파일 0개 검사, 고위험 취약점 0개 발견",
+        "subtitle": "멀티 엔진으로 취약점과 악성 코드를 심층 스캔하며, 결과는 도구 가용성과 함께 표시됩니다",
         "title": "취약점을 심층 스캔하고 보안 위험을 수정하세요"
       },
       "feature": {
@@ -1588,6 +1593,11 @@
       "stats": {
         "total": "총 취약점",
         "malware": "악성 코드"
+      },
+      "degraded": {
+        "title": "스캔이 성능 저하되어 결과가 불완전할 수 있습니다",
+        "detail": "사용 불가 도구: {{tools}}. {{audit}}미검출은 취약점이 없다는 뜻이 아닙니다. 도구를 복구하거나 온라인 상태에서 다시 검사하세요.",
+        "none": "(없음)"
       }
     },
     "sentinel": {

@@ -873,6 +873,7 @@
       "noDataHintLive": "完成一次巡检后，这里当场显示评分",
       "notRunHint": "运行本功能并汇总后计入总分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
+      "sources": "数据来源：{{sources}}",
       "unit": "分"
     },
     "detail": {
@@ -983,6 +984,10 @@
     },
     "deps": {
       "checking": "盘点中...",
+      "cve.dataUnavailable": "漏洞库不可达，本次未检测 CVE",
+      "cve.none": "未发现已知漏洞（数据源：OSV）",
+      "cve.title": "已知漏洞（CVE）",
+      "cve.unavailable": "CVE 未检测",
       "source": "依赖管家",
       "done": "依赖管家盘点完成",
       "ecosystem": "生态",
@@ -1616,7 +1621,7 @@
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "done": "安全检查完成",
       "empty": {
-        "subtitle": "已检查 0 个文件，发现 0 个高危漏洞",
+        "subtitle": "多引擎深度扫描漏洞与恶意代码，结果与工具可用性一并呈现",
         "title": "深度扫描漏洞，修复安全隐患"
       },
       "feature": {
@@ -1666,6 +1671,11 @@
       "stats": {
         "total": "总漏洞",
         "malware": "恶意代码"
+      },
+      "degraded": {
+        "title": "本次扫描已降级，结果可能不完整",
+        "detail": "不可用工具：{{tools}}。{{audit}}未检测 ≠ 没有漏洞，恢复工具或联网后重新检查。",
+        "none": "（无）"
       }
     },
     "sentinel": {

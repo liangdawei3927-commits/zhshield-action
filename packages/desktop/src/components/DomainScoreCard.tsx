@@ -1,5 +1,6 @@
 import { useT } from '../i18n';
 import type { DomainScoreView } from '../pages/domain-score-logic';
+import { dimensionSources } from '../pages/domain-score-logic';
 import type { ScoreDimension } from '@zh/shared';
 
 /** 评分数据拉取：live 快照优先、汇总回退，构建展示视图（refreshKey 变化时重新拉取） */
@@ -65,7 +66,7 @@ function FullDomainScore({
       className="flex items-center gap-4 mb-6 px-5 py-3.5 rounded-xl border border-zh-line bg-white"
       data-testid={`domain-score-${dimension}`}
     >
-      <DomainScoreBadges view={view} dimension={dimension} t={t} />
+      <DomainScoreBadges view={view} dimension={dimension} t={t} showSources />
       <div className="text-xs text-zh-muted ml-auto text-right">
         {view.kind === 'no-data' &&
           (live ? t('page.domainScore.noDataHintLive') : t('page.domainScore.noDataHint'))}
@@ -81,10 +82,13 @@ function DomainScoreBadges({
   view,
   dimension,
   t,
+  showSources = false,
 }: {
   view: DomainScoreView;
   dimension: ScoreDimension;
   t: ReturnType<typeof useT>;
+  /** P1-6：完整模式显示"数据来源"标注（inline 模式不显示以免挤占） */
+  showSources?: boolean;
 }) {
   return (
     <>
@@ -101,6 +105,16 @@ function DomainScoreBadges({
       >
         {view.label}
       </span>
+      {showSources && view.kind !== 'no-data' && (
+        <span
+          className="text-[11px] text-zh-muted shrink-0"
+          data-testid={`domain-score-sources-${dimension}`}
+        >
+          {t('page.domainScore.sources', {
+            sources: dimensionSources(dimension).join(' + '),
+          })}
+        </span>
+      )}
       {typeof view.previousScore === 'number' && (
         <span
           className="text-xs shrink-0"

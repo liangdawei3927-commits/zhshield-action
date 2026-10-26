@@ -167,6 +167,28 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps {
   children?: ReactNode;
 }
 
+/** P1-4：扫描降级横幅——工具不可用/审计失败时 0 检出 ≠ 安全，必须显形 */
+function SecurityDegradedBanner({ report, t }: { report: SecurityScanReportData; t: Translate }) {
+  if (!report.degraded) return null;
+  const { unavailableTools, auditError } = report.degraded;
+  const tools = unavailableTools.join(', ');
+  return (
+    <div className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-warning-700">
+          {t('page.security.degraded.title')}
+        </div>
+        <div className="text-xs text-warning-500 mt-0.5 break-all">
+          {t('page.security.degraded.detail', {
+            tools: tools || t('page.security.degraded.none'),
+            audit: auditError ?? '',
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 报告态：统计卡 + 分类标签栏 + 明细面板（插槽） */
 export function SecurityReportView({
   projectPath,
@@ -220,6 +242,7 @@ export function SecurityReportView({
         t,
       })}
     >
+      <SecurityDegradedBanner report={report} t={t} />
       <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
       {children}
     </ReportShell>

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getDomainSnapshotRaw } from '../services/engineApi';
+import { taskKindForDomain, useTaskSettledTick } from '../task-store';
 import { toSnapshotReport, type SnapshotReport } from '../pages/domain-snapshot-logic';
 
 /** 域快照读取状态；snapshot 为 null 表示该域从未落盘过 */
@@ -25,6 +26,8 @@ export function useDomainSnapshot(projectPath: string, domain: string): DomainSn
   const [snapshot, setSnapshot] = useState<SnapshotReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  // P0-1：该域后台任务落定 → 重读刚落盘的快照
+  const settledTick = useTaskSettledTick(taskKindForDomain(domain), projectPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +40,7 @@ export function useDomainSnapshot(projectPath: string, domain: string): DomainSn
     return () => {
       cancelled = true;
     };
-  }, [projectPath, domain, tick]);
+  }, [projectPath, domain, tick, settledTick]);
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
 

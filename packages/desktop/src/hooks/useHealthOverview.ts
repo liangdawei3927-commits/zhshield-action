@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getHealthOverview } from '../services/engineApi';
+import { useProjectSettledTick } from '../task-store';
 import type { HealthOverviewData } from '../types/electron';
 
 /**
@@ -30,9 +31,12 @@ export function useHealthOverview(
     }
   }, [projectPath]);
 
+  // P0-1：任意域任务落定 → 总览自动重拉（总览聚合全部维度，任一域跑完都该刷新）
+  const settledTick = useProjectSettledTick(projectPath);
+
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+  }, [load, refreshKey, settledTick]);
 
   return { overview, loading, reload: load };
 }

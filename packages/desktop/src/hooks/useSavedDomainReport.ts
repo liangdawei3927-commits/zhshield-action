@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { getSavedDomainReport, saveDomainReport } from '../services/engineApi';
+import { taskKindForDomain, useTaskSettledTick } from '../task-store';
 
 export function useSavedDomainReport<T>(
   projectPath: string,
@@ -25,6 +26,8 @@ export function useSavedDomainReport<T>(
   liveReport: T | null,
 ): T | null {
   const [saved, setSaved] = useState<T | null>(null);
+  // P0-1：该域后台任务落定 → 重读磁盘上刚落盘的新报告
+  const settledTick = useTaskSettledTick(taskKindForDomain(domain), projectPath);
 
   // 挂载 / 切换项目：读回该域最近一次完整报告
   useEffect(() => {
@@ -36,7 +39,7 @@ export function useSavedDomainReport<T>(
     return () => {
       cancelled = true;
     };
-  }, [projectPath, domain]);
+  }, [projectPath, domain, settledTick]);
 
   // 本次扫描产出结果：立即落盘，供下次打开回看
   useEffect(() => {

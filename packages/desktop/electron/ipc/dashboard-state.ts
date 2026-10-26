@@ -27,6 +27,11 @@ export interface DashboardDepsState {
   vulnerabilities: { critical: number; high: number; medium: number };
   /** 可升级依赖数：upgradeAssessments 中 candidates.length > 0 的依赖数 */
   upgradable: number;
+  /**
+   * P1-8：CVE 检测状态。unavailable = 漏洞库不可达、本次未检测（计数恒 0 但**不是**安全），
+   * 前端必须显示降级提示；旧数据无此字段（undefined）按未检测对待。
+   */
+  cve?: { status: 'ok' | 'unavailable'; critical: number; high: number; medium: number };
   lastRunAt: string;
 }
 
@@ -52,6 +57,13 @@ export interface DashboardRefactorState {
   totalSmells: number;
   /** 按严重度分布（error/warning/info）：来自 RefactorReport.bySeverity */
   bySeverity: { error: number; warning: number; info: number };
+  /**
+   * 本次实际扫描的文件数：来自 RefactorReport.scannedFiles（P1-9）。
+   * 0 = 该项目一个文件都没进检测器（如纯 JS 项目，重构引擎只收 .ts/.tsx）
+   * → 评分侧按 not-run 处理，不得把"没看"当成"干净"给满分。
+   * 旧版 dashboard-state 无此字段（undefined）→ 评分侧保持 scored，不误判历史数据。
+   */
+  scannedFiles?: number;
   lastRunAt: string;
 }
 

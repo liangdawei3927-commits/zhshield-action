@@ -10,6 +10,8 @@ import path from 'node:path';
 import { t } from '@zh/i18n';
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import { updateDashboardState } from './dashboard-state';
+import { persistSecurityDomainEntries } from '../zh-diagnostics-persist';
+import type { DiagnosticEntry } from '../zh-diagnostics-types';
 import type { SecretReportData } from '../../src/types/electron';
 
 /** 各项目已实例化的密钥生命周期管理器（key = projectPath，状态变更按 secretId 反查项目） */
@@ -17,6 +19,30 @@ const secretManagers = new Map<
   string,
   { manager: SecretLifecycleManager; store: FileSecretStore }
 >();
+
+/**
+ * P1-6（口径统一）：active 密钥 → security 域诊断条目。
+ * security 维的 issueCount 只数域快照里真实存在的条目（applySecurityPenalty 不再把
+ * activeCount 加进 issues），所以 active 密钥必须落进快照——否则「security 扣了分 /
+ * 域报告 0 条」无法向用户交代。
+ * 只有 active 参与评分与落盘；rotating/rotated/dismissed 不算未处理问题。
+ */
+function activeSecretEntries(report: SecretReportData): DiagnosticEntry[] {
+  return report.findings
+    .filter((finding) => finding.status === 'active')
+    .map((finding) => ({
+      ruleId: `secret:${finding.secretId}`,
+      severity:
+        finding.severity === 'critical' || finding.severity === 'high' ? ('error' as const) : ('warning' as const),
+      category: 'security',
+      message: `未处理密钥 ${finding.type}（${finding.displayValue}）位于 ${finding.location.file}:${finding.location.line}`,
+      file: finding.location.file,
+      line: finding.location.line,
+      autoFixable: false,
+      source: 'security' as const,
+      fingerprint: `secret:${finding.secretId}:0`,
+    }));
+}
 
 /** 密钥扫描失败时的空报告（error 携带失败原因，不 throw） */
 function emptySecretsReport(error: string): SecretReportData {
@@ -46,6 +72,16 @@ export async function runSecretsHandler(projectPath: string): Promise<SecretRepo
     await updateDashboardState(projectPath, {
       secrets: { activeCount: report.summary.active, lastRunAt: new Date().toISOString() },
     });
+    // P1-6：active 密钥落 security 域快照（与漏洞扫描双路合并，互不覆盖）。
+    // best-effort：快照写入失败不阻断扫描返回（dashboard-state 已记 activeCount）。
+    try {
+      await persistSecurityDomainEntries(projectPath, activeSecretEntries(report), 'secret');
+    } catch (e) {
+      console.warn(
+        '[engine:runSecrets] security 域快照写入失败:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
     return { ...report, error: null };
   } catch (err) {
     console.error('[engine:runSecrets] Error:', err);

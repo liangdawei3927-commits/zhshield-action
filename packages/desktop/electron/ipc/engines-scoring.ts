@@ -237,7 +237,13 @@ export async function buildPipelineExtras(projectPath: string): Promise<Pipeline
       ? { debtIndex: state.techdebt.debtIndex, issueCount: state.techdebt.issueCount }
       : null,
     refactor: state.refactor
-      ? { totalSmells: state.refactor.totalSmells, bySeverity: state.refactor.bySeverity }
+      ? {
+          totalSmells: state.refactor.totalSmells,
+          bySeverity: state.refactor.bySeverity,
+          ...(state.refactor.scannedFiles !== undefined
+            ? { scannedFiles: state.refactor.scannedFiles }
+            : {}),
+        }
       : null,
     performance: state.performance
       ? { total: state.performance.total, bySeverity: state.performance.bySeverity }

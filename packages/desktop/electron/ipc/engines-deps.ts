@@ -39,6 +39,7 @@ import { detectProfileInWorker } from '../profile-host';
 import type { DependencyReportData, DepsRelockResult } from '../../src/types/electron';
 import { emptyDependencyReportData } from '../../src/services/empty-engine-reports';
 import type { TaskProgressReporter } from '../task-progress';
+import { runCveChecks, cveCounts, type CveCheckResult } from './deps-cve';
 
 /** 按信任状态统计节点数（verified / suspicious / compromised / unknown） */
 function countTrustCounts(nodes: DependencyNode[]): Record<string, number> {
@@ -68,6 +69,11 @@ function depsDashboardPatch(report: DependencyReportData): DashboardDepsState {
       medium: typosquatMedium,
     },
     upgradable,
+    // P1-8：CVE 检测结果随盘点写入。unavailable 时计数恒 0，但 status 必须随行——
+    // 前端据此显示「漏洞库不可用，本次未检测」，绝不把离线呈现成 0 漏洞的安全。
+    ...(report.cve
+      ? { cve: { status: report.cve.status, ...cveCounts(report.cve) } }
+      : {}),
     lastRunAt: new Date().toISOString(),
   };
 }
@@ -82,6 +88,8 @@ type DepsChecks = {
   lockfileCheck: { verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string };
   upgrade: { assessments: UpgradeAssessment[]; error?: string };
   env: { entries: EnvEntry[]; error?: string };
+  /** P1-8：CVE 检测（OSV 数据源；不可达时 status='unavailable'，绝不静默 0） */
+  cve: CveCheckResult;
 };
 
 /** 组装依赖盘点报告（含各检查结果与错误透传） */
@@ -91,7 +99,7 @@ function buildDepsReport(
   nodes: DependencyNode[],
   checks: DepsChecks,
 ): DependencyReportData {
-  const { typosquat, lockfileCheck, upgrade, env } = checks;
+  const { typosquat, lockfileCheck, upgrade, env, cve } = checks;
   return {
     schemaVersion: graph.schemaVersion,
     targetId: graph.targetId,
@@ -109,6 +117,7 @@ function buildDepsReport(
     lockfileVerification: lockfileCheck.verification,
     upgradeAssessments: upgrade.assessments,
     envEntries: env.entries,
+    cve,
     ...(typosquat.error ? { typosquatError: typosquat.error } : {}),
     ...(lockfileCheck.error ? { lockfileError: lockfileCheck.error } : {}),
     ...(upgrade.error ? { upgradeError: upgrade.error } : {}),
@@ -152,11 +161,12 @@ export async function runDepsHandler(
     const matrix = buildLicenseMatrix(graph);
     let nodes = graph.nodes;
     onProgress?.('deps', t('pipeline.deps.checking'), 0.45);
-    const [typosquat, lockfileCheck, upgrade, env] = await Promise.all([
+    const [typosquat, lockfileCheck, upgrade, env, cve] = await Promise.all([
       runTyposquatChecks(graph),
       runLockfileChecks(projectRoot, baseline?.integrity),
       runUpgradeChecks(nodes),
       runEnvConsistencyChecks(projectRoot),
+      runCveChecks(nodes),
     ]);
     onProgress?.('deps', t('pipeline.deps.reporting'), 0.85);
     // 与基线哈希不符的节点 → 最高危 trust（须在 countTrustCounts 之前覆盖；浅拷贝替换，不原地改）
@@ -172,6 +182,7 @@ export async function runDepsHandler(
       lockfileCheck,
       upgrade,
       env,
+      cve,
     });
     await persistDepsDiagnostics(projectPath, report);
     await updateDepsDashboard(projectPath, report);

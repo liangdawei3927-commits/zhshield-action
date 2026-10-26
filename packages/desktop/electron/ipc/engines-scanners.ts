@@ -18,6 +18,7 @@ import type { RefactorReport } from '@zh/refactor';
 import type { GarbageScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/garbage';
 import {
   persistDiagnosticsFromEntries,
+  persistSecurityDomainEntries,
   normalizeSecuritySource,
   normalizeRefactorSource,
 } from '../zh-diagnostics';
@@ -123,7 +124,8 @@ export async function runSecurityHandler(
     const report = (await manager.waitFor(task.id)) as SecurityScanReport;
     const data = toSecurityScanReportData(report);
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource(data), ['security']);
+      // P1-6: 安全域条目只归 vuln 类，覆盖 vuln、保留 secrets 已写的 secret 条目
+      await persistSecurityDomainEntries(projectPath, normalizeSecuritySource(data), 'vuln');
     } catch (e) {
       console.warn(
         '[engine:runSecurity] 诊断落盘失败:',
@@ -251,7 +253,13 @@ function refactorDashboardPatch(report: RefactorReport): DashboardRefactorState 
     warning: report.bySeverity.warning ?? 0,
     info: report.bySeverity.info ?? 0,
   };
-  return { totalSmells: report.totalSmells, bySeverity, lastRunAt: new Date().toISOString() };
+  // P1-9：保留扫描覆盖数——0 文件是"没扫到"不是"干净"，评分侧据此判 not-run
+  return {
+    totalSmells: report.totalSmells,
+    bySeverity,
+    scannedFiles: report.scannedFiles,
+    lastRunAt: new Date().toISOString(),
+  };
 }
 
 /** 从 PerformanceReportData 提取 performance 域 dashboard-state patch */

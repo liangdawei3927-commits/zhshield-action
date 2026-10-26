@@ -28,6 +28,7 @@ export {
   readAggregatedDiagnostics,
   persistDiagnostics,
   persistDiagnosticsFromEntries,
+  persistSecurityDomainEntries,
 } from './zh-diagnostics-persist';
 
 export {

@@ -212,6 +212,15 @@ export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanRep
       evidence: m.evidence,
     })),
     securityScore: r.securityScore,
+    // P1-4：降级信息透传——0 检出 + 工具不可用 = 「没检测成」，前端必须显形
+    ...(r.degraded
+      ? {
+          degraded: {
+            unavailableTools: r.degraded.unavailableTools,
+            ...(r.degraded.auditError ? { auditError: r.degraded.auditError } : {}),
+          },
+        }
+      : {}),
     metadata: {
       duration: 0,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),

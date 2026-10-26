@@ -29,6 +29,8 @@ export interface PipelineExtras {
   refactor?: {
     totalSmells: number;
     bySeverity: { error: number; warning: number; info: number };
+    /** P1-9：实际扫描文件数；undefined = 旧数据无此字段（不参与 0 覆盖判定） */
+    scannedFiles?: number;
   } | null;
   performance?: {
     total: number;

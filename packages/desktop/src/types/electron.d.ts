@@ -131,6 +131,8 @@ export interface DomainReportSnapshot {
     autoFixable: boolean;
     source: string;
     fingerprint: string;
+    /** P1-7：工具执行失败（非代码问题）标记；读回展示归「未检测」不计问题数 */
+    toolError?: boolean;
   }>;
   dimensionScore?: {
     dimension: 'quality';
@@ -208,6 +210,14 @@ export interface SecurityScanReportData {
     medium: number;
     low: number;
     malwareTotal: number;
+  };
+  /**
+   * P1-4：扫描降级信息（工具不可用/依赖审计失败）。带此字段的 0 检出 =
+   * 「没检测成」，前端必须显示降级横幅；无此字段的 0 才是「查过且干净」。
+   */
+  degraded?: {
+    unavailableTools: string[];
+    auditError?: string;
   };
   findings: Array<{
     id: string;
@@ -521,6 +531,8 @@ export interface DependencyReportData {
   envEntries: EnvEntryData[];
   /** 环境一致性检查失败信息（未失败时不返回） */
   envError?: string;
+  /** P1-8：CVE 检测结果（OSV 数据源）；unavailable = 漏洞库不可达，本次未检测（≠ 0 漏洞） */
+  cve?: CveCheckData;
   /** 可更新依赖列表 */
   outdatedDeps?: OutdatedDependencyData[];
   /** 生成时间（ISO 8601） */
@@ -538,6 +550,25 @@ export interface TyposquatFindingData {
     behaviorFlags?: string[];
   };
   evidence: string[];
+}
+
+/** P1-8：CVE 检测结果（OSV 数据源；deps 盘点第 5 路检查） */
+export interface CveCheckData {
+  /** ok = 漏洞库可达并完成查询；unavailable = 离线/不可达，本次未检测（≠ 0 漏洞） */
+  status: 'ok' | 'unavailable';
+  /** 命中的漏洞列表（仅 status='ok' 时有值） */
+  findings: Array<{
+    name: string;
+    version: string;
+    /** 漏洞标识（CVE/GHSA id），多条以「, 」连接 */
+    ids: string;
+    summary: string;
+    severity: 'critical' | 'high' | 'medium';
+  }>;
+  /** status='unavailable' 时的原因（HTTP 状态/超时/网络错误） */
+  reason?: string;
+  /** 查询完成时间（ISO 8601） */
+  checkedAt: string;
 }
 
 /** 锁文件完整性校验结果（serializable，镜像 @zh/dependency LockfileVerification） */

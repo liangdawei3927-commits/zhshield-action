@@ -94,6 +94,48 @@ describe('toInspectionReportDataFromSnapshot', () => {
     expect(report.coverage).toBe('issues-only');
     expect(report.summary.passed).toBe(0);
   });
+
+  /**
+   * P1-7（实测报告 2026-10-27）：纯 JS 项目没有 tsconfig，dep-cruiser 报 TS5083、
+   * ESLint 装不起来报 ERR_MODULE_NOT_FOUND——这是「我们的工具没跑起来」，不是
+   * 「你的代码有问题」。快照读回若把 toolError 条目映成 warn 问题项，用户读到的是
+   * 虚假的项目缺陷。必须归 attention（未检测），不进问题计数，与实时路径
+   * mapStatus 的 error→attention 口径对齐。
+   */
+  it('toolError 条目归 attention（未检测），不冒充项目问题（P1-7）', () => {
+    const toolErrorIssue = {
+      ...issue('inspect.scan.official.circular-dependency', 'warning', '工具 dep-cruiser 错误: TS5083'),
+      toolError: true as const,
+    };
+    const report = toInspectionReportDataFromSnapshot(
+      snapshot({
+        issues: [
+          issue('real-rule', 'error', '真实代码问题'),
+          toolErrorIssue,
+        ],
+      }),
+    )!;
+    const byId = Object.fromEntries(report.checks.map((c) => [c.id, c]));
+    expect(byId['inspect.scan.official.circular-dependency'].status).toBe('attention');
+    expect(byId['real-rule'].status).toBe('fail');
+    // 问题计数只含真问题：failures=1（真实问题），warnings=0（工具错误不算）
+    expect(report.summary).toMatchObject({ total: 2, failures: 1, warnings: 0 });
+    // isIssueStatus 只认 fail/warn/info → 问题列表不含工具错误
+    expect(report.checks.filter((c) => c.status === 'warn' || c.status === 'fail')).toHaveLength(1);
+  });
+
+  it('混合规则组：同规则下真问题(error)与工具错误并存 → 按真问题计 fail', () => {
+    const report = toInspectionReportDataFromSnapshot(
+      snapshot({
+        issues: [
+          { ...issue('mixed-rule', 'warning', '工具失败'), toolError: true as const },
+          issue('mixed-rule', 'error', '真实违规'),
+        ],
+      }),
+    )!;
+    expect(report.checks[0].status).toBe('fail');
+    expect(report.summary.failures).toBe(1);
+  });
 });
 
 describe('体检页挂载 hydrate（结构守卫，防接线被删）', () => {

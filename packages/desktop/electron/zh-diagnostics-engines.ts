@@ -107,6 +107,38 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
       fingerprint: `env:${env.name}:0`,
     });
   }
+  // P1-6（口径统一）：可升级依赖逐条落快照。维度 issues 只数**域快照里真实存在的条目**
+  // （assembleHealthInputs 把 deps 快照的 dependency 类条目并入 matched），
+  // applyDepsPenalty 不再把 upgradable 加进 issues——双计消灭的前提是快照里有这几条：
+  // 有几个可升级评估就落几条（candidates>0 口径，与 depsDashboardPatch 的
+  // upgradable 计数严格一致），Σ域条数 == 维度 issues 可验算。
+  for (const assessment of data.upgradeAssessments) {
+    if (!assessment.candidates || assessment.candidates.length === 0) continue;
+    entries.push({
+      ruleId: `upgrade:${assessment.nodeId}`,
+      severity: 'warning',
+      category: 'dependency',
+      message: `${assessment.nodeId} 存在可升级版本（${assessment.candidates.length} 个候选）`,
+      file: '',
+      autoFixable: false,
+      source: 'deps',
+      fingerprint: `upgrade:${assessment.nodeId}:0`,
+    });
+  }
+  // P1-8：CVE 检出条目（status='unavailable' 不产生条目——降级由 dashboard/UI 标注，
+  // 不落「0 漏洞」假象）
+  for (const finding of data.cve?.findings ?? []) {
+    entries.push({
+      ruleId: `cve:${finding.name}@${finding.version}`,
+      severity: finding.severity === 'medium' ? 'warning' : 'error',
+      category: 'dependency',
+      message: `${finding.name}@${finding.version} 命中漏洞 ${finding.ids}${finding.summary ? `：${finding.summary}` : ''}`,
+      file: '',
+      autoFixable: false,
+      source: 'deps',
+      fingerprint: `cve:${finding.name}@${finding.version}:${finding.ids}`,
+    });
+  }
   return entries;
 }
 

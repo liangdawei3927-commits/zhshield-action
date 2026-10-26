@@ -73,7 +73,9 @@ export function toInspectionReportDataFromSnapshot(
     checks.push({
       id: ruleId,
       name: ruleId,
-      status: statusFor(worst.severity),
+      // P1-7：工具执行失败（toolError）不是代码问题——归「未检测」（attention），
+      // 与实时路径 mapStatus 的 error→attention 口径对齐，不进问题计数、不冒充项目缺陷
+      status: worst.toolError === true ? 'attention' : statusFor(worst.severity),
       detail: buildDetail(issues),
       ...(worst.category ? { category: worst.category } : {}),
       source: worst.source,

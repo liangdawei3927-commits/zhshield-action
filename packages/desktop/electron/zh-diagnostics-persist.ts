@@ -401,3 +401,32 @@ export async function persistDiagnosticsFromEntries(
   );
   return await writeDiagnosticsFile(diagnostics, ranSources);
 }
+
+/**
+ * P1-6：security 域快照「双路合并写入」。
+ *
+ * 漏洞扫描（runSecurityHandler）与密钥扫描（runSecretsHandler）都往 security 域
+ * 落条目——security 维的扣分同时吃两路（findings + active 密钥），域快照必须
+ * 两类都可见，否则 Σ域条数 ≠ 维度 issues（实测报告 2026-10-27：security 0 条
+ * 却有 2 个 issues，全靠密钥域代算）。
+ *
+ * 合并规则：各自**覆盖自己那类**条目、保留另一类——密钥条目 ruleId 以 `secret:`
+ * 开头，凭此区分。两路谁后写都不能抹掉对方的发现。
+ */
+export async function persistSecurityDomainEntries(
+  projectPath: string,
+  entries: readonly DiagnosticEntry[],
+  kind: 'vuln' | 'secret',
+): Promise<string> {
+  const isSecretEntry = (issue: { ruleId: string }): boolean =>
+    issue.ruleId.startsWith('secret:');
+  const prev = await readDomainSnapshot(projectPath, 'security');
+  const prevIssues = (prev?.issues ?? []) as unknown as DiagnosticEntry[];
+  const write =
+    kind === 'vuln'
+      ? // 写漏洞：新漏洞条目全量覆盖 + 保留既有密钥条目
+        [...entries, ...prevIssues.filter(isSecretEntry)]
+      : // 写密钥：新密钥条目全量覆盖（含 0 条=全部已处理）+ 保留既有漏洞条目
+        [...prevIssues.filter((e) => !isSecretEntry(e)), ...entries];
+  return await persistDiagnosticsFromEntries(projectPath, write, ['security']);
+}

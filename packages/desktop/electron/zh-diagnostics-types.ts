@@ -26,6 +26,14 @@ export interface DiagnosticEntry {
   source: 'guard' | 'inspect' | 'refactor' | 'deps' | 'techdebt' | 'security' | 'performance';
   /** 去重指纹 */
   fingerprint: string;
+  /**
+   * 工具执行失败标记（规则评估 status=error 且无 violation 明细，如外部工具崩溃/
+   * 配置缺失）。**不是项目的代码问题**：UI 与详情列表照常展示（信息不丢），
+   * 但评分链路必须豁免 —— 否则「工具坏了」以 warning 档（-4/条）污染业务分数，
+   * 与 CLI 侧 degraded 护栏（exit 2）语义不一致（2026-10-26 实测打包版 4 条
+   * 工具报错吃掉 16 分 × 密度稀释 ≈ 3.1 分）。
+   */
+  toolError?: boolean;
 }
 
 // ─── LSP 风格按文件视图（模拟 publishDiagnostics） ─────────────────────

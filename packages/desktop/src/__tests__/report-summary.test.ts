@@ -104,3 +104,23 @@ describe('扩展域结果判定', () => {
     expect(hasAnyExtraResult({ deps: null, techdebt: { debtIndex: 0, issueCount: 0 } })).toBe(true);
   });
 });
+
+/**
+ * toolError 豁免（2026-10-26）：工具执行失败不是代码问题。
+ * 打包版 4 条工具报错曾以 warning 档混入 quality 扣分（-16 × 密度稀释 ≈ -3.1），
+ * 与 CLI 侧 degraded 护栏语义不一致。评分输入必须过滤，展示链路不丢信息。
+ */
+describe('toInspectIssues 的 toolError 豁免', () => {
+  it('toolError 条目不进入评分输入', () => {
+    const issues = toInspectIssues([
+      entry({ ruleId: 'r-tool', severity: 'warning', toolError: true }),
+      entry({ ruleId: 'r-real', severity: 'warning' }),
+    ]);
+    expect(issues.map((i) => i.ruleId)).toEqual(['r-real']);
+  });
+
+  it('无 toolError 标记的条目全部保留（向后兼容旧快照）', () => {
+    const issues = toInspectIssues([entry({ ruleId: 'r-1' }), entry({ ruleId: 'r-2' })]);
+    expect(issues).toHaveLength(2);
+  });
+});

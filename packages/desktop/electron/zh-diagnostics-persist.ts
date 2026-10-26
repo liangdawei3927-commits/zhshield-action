@@ -141,11 +141,14 @@ async function enrichInspectSnapshot(
   const [quality] = buildHealthDimensions({
     guard: null,
     inspect: {
-      issues: snapshot.issues.map((e) => ({
-        severity: e.severity,
-        category: e.category,
-        ruleId: e.ruleId,
-      })),
+      // toolError（工具执行失败）不是代码问题，不参与 quality 扣分（见 DiagnosticEntry.toolError）
+      issues: snapshot.issues
+        .filter((e) => e.toolError !== true)
+        .map((e) => ({
+          severity: e.severity,
+          category: e.category,
+          ruleId: e.ruleId,
+        })),
       esloc,
     },
   });

@@ -92,7 +92,9 @@ function normalizeRuleEngine(
       continue;
     }
     // 整规则失败且无 violation 明细（如依赖审计、工具链报错）：用 evaluation 级信息生成条目，
-    // 否则 UI 显示失败而诊断文件为空，OpenCode 侧拿不到任何问题
+    // 否则 UI 显示失败而诊断文件为空，OpenCode 侧拿不到任何问题。
+    // error（工具执行失败）打 toolError 标记：评分链路豁免（见 DiagnosticEntry.toolError），
+    // failed（规则真检出失败）仍是业务问题照常扣分。
     if (evaluation.status === 'failed' || evaluation.status === 'error') {
       const ruleId = evaluation.rule?.id ?? 'guard/rule';
       const file = evaluation.files?.[0] ?? '';
@@ -105,6 +107,7 @@ function normalizeRuleEngine(
         autoFixable: false,
         source,
         fingerprint: `${ruleId}:${file}:0`,
+        ...(evaluation.status === 'error' ? { toolError: true as const } : {}),
       });
     }
   }

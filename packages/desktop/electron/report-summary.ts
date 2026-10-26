@@ -64,11 +64,13 @@ export function toGuardChecks(checks: readonly GuardReportCheck[]): GuardCheckLi
 
 /** 诊断条目 → quality/security/dependencies 维度用的 inspect 问题（维度映射用 severity+category，S1 规则聚合另需 ruleId） */
 export function toInspectIssues(issues: readonly DiagnosticEntry[]): InspectIssueLike[] {
-  return issues.map((issue) => ({
-    severity: issue.severity,
-    category: issue.category,
-    ruleId: issue.ruleId,
-  }));
+  return issues
+    .filter((issue) => issue.toolError !== true)
+    .map((issue) => ({
+      severity: issue.severity,
+      category: issue.category,
+      ruleId: issue.ruleId,
+    }));
 }
 
 /**

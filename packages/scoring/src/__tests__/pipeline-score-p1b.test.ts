@@ -135,7 +135,7 @@ describe('P1b 验收 — null vs 空数组（spec G）', () => {
 });
 
 describe('P1b 验收 — 新扣分公式（spec D）', () => {
-  it('secrets 扣分：active 每条 -15，上限 60', () => {
+  it('secrets 扣分：active 每条 -15，上限 60（issues 由域快照条目承载，不加成）', () => {
     const dims = buildHealthDimensions({
       guard: emptyGuard,
       inspect: emptyInspect,
@@ -144,7 +144,7 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
     const security = dims.find((d) => d.name === 'security')!;
     expect(security.status).toBe('scored');
     expect(security.score).toBe(40); // 100 − min(60, 4×15)
-    expect(security.issues).toBe(4);
+    expect(security.issues).toBe(0); // P1-6: activeCount 不计入 issues，避免与 security 域快照双计
   });
 
   it('deps 扣分：critical -12 / high -8 / medium -4，upgradable 仅展示', () => {
@@ -155,7 +155,7 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
     });
     const deps = dims.find((d) => d.name === 'dependencies')!;
     expect(deps.score).toBe(76); // 100 − (12+8+4)
-    expect(deps.issues).toBe(3); // upgradable 计入展示
+    expect(deps.issues).toBe(0); // P1-6: upgradable 不计入 issues，改由 deps 域快照 upgrade:* 条目承载
   });
 
   it('techdebt 维 = 100 − debtIndex（固定口径，自身无 inspect 扣分）', () => {

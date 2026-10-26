@@ -81,6 +81,16 @@ export interface SecurityScanReport {
   securityScore: number;
   /** F3 二次校验报告 — malware lane 的 confirmed/falsePositives/conflicts 分流明细 */
   conflictReport?: RuleConflictReport;
+  /**
+   * P1-4：扫描降级信息。外部工具不可用（trivy/grype/depcheck/semgrep/ort 未安装
+   * 或执行失败）或依赖审计（pnpm/npm audit 需联网）失败时，vulnTotal=0 的含义是
+   * 「没检测成」而不是「没有漏洞」——必须随报告显形，调用方/前端据此标注降级，
+   * 绝不允许静默把 0 检出呈现成安全。全部工具可用且审计成功时无此字段。
+   */
+  degraded?: {
+    unavailableTools: string[];
+    auditError?: string;
+  };
   summary: {
     vulnTotal: number;
     vulnCritical: number;

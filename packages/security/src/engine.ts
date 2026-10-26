@@ -31,6 +31,8 @@ interface SecurityBuildReportParams {
   garbage: GarbageItem[];
   malware: MalwareItem[];
   conflictReport: RuleConflictReport;
+  /** 依赖审计失败原因（VulnerabilityScanner.lastError；成功为空） */
+  auditError?: string;
 }
 
 export class SecurityEngine {
@@ -40,6 +42,8 @@ export class SecurityEngine {
   private emitter: EventEmitter;
   private scanOrchestrator: ScanOrchestrator;
   private resultAggregator: ResultAggregator;
+  /** 持有引用以便扫描后读取 lastError（P1-4：审计失败必须显形，不许静默 0） */
+  private readonly vulnerabilityScanner = new VulnerabilityScanner();
 
   constructor(emitter?: EventEmitter) {
     this.toolManager = new ToolManager();
@@ -52,7 +56,7 @@ export class SecurityEngine {
       this.emitter,
     );
     this.resultAggregator = new ResultAggregator(
-      new VulnerabilityScanner(),
+      this.vulnerabilityScanner,
       scanGarbage,
       new MalwareScanner(),
       new GrypeCrossValidator(),
@@ -117,13 +121,30 @@ export class SecurityEngine {
         grypeIssues,
       });
     await this.emitScanCompleted(projectId, start, allIssues, vulnerabilities);
-    return this.buildReport({ projectId, vulnerabilities, garbage, malware, conflictReport });
+    return this.buildReport({
+      projectId,
+      vulnerabilities,
+      garbage,
+      malware,
+      conflictReport,
+      auditError: this.vulnerabilityScanner.lastError || undefined,
+    });
   }
 
   private buildReport(params: SecurityBuildReportParams): SecurityScanReport {
-    const { projectId, vulnerabilities, garbage, malware, conflictReport } = params;
+    const { projectId, vulnerabilities, garbage, malware, conflictReport, auditError } = params;
     const summary = summarizeFindings(vulnerabilities, garbage, malware);
     const securityScore = calculateSecurityScore(vulnerabilities);
+    // P1-4：工具不可用 / 审计失败 → 随报告带 degraded。0 检出的语义由调用方解读：
+    // 带 degraded 的 0 是「没检测成」，不带 degraded 的 0 才是「查过且干净」。
+    const unavailableTools = [...this.degradationManager.getToolErrors().keys()];
+    const degraded =
+      unavailableTools.length > 0 || auditError
+        ? {
+            unavailableTools,
+            ...(auditError ? { auditError } : {}),
+          }
+        : undefined;
     return {
       projectId,
       timestamp: new Date(),
@@ -133,6 +154,7 @@ export class SecurityEngine {
       securityScore,
       summary,
       conflictReport,
+      ...(degraded ? { degraded } : {}),
     };
   }
 

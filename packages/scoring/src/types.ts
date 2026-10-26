@@ -44,6 +44,11 @@ export interface SentinelDataLike {
 export interface RefactorDataLike {
   totalSmells: number;
   bySeverity: { error: number; warning: number; info: number };
+  /**
+   * P1-9：实际扫描文件数。0 = 检测器一个文件都没看（如纯 JS 项目），
+   * 评分按 not-run 处理而非满分；undefined = 旧数据未上报覆盖数（保持 scored）。
+   */
+  scannedFiles?: number;
 }
 
 /** performance 域数据：性能报告摘要，按 5 级 severity 计权 */

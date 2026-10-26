@@ -237,6 +237,10 @@ function scoreRefactor(
   refactor: ExtrasResolved['refactor'],
 ): DimensionScore {
   if (refactor === null) return notRun(name, weight);
+  // P1-9：0 覆盖 ≠ 干净。检测器一个文件都没看（如纯 JS 项目，refactor 引擎
+  // 只收 .ts/.tsx）时给 100 分是把"没扫"谎报成"没问题"——按 not-run 处理。
+  // scannedFiles 缺省（旧版 dashboard-state）无法判定覆盖，保持 scored 不误伤。
+  if (refactor.scannedFiles === 0) return notRun(name, weight);
   const penalty = refactorPenalty(refactor);
   return {
     name,
@@ -348,6 +352,16 @@ function scoreInspectBased(params: {
   };
 }
 
+/**
+ * P1-6（口径统一）：secrets/deps 的**计数**不再并入维度 issues。
+ *
+ * 实测报告 2026-10-27 P1-6：同一项目多套互相矛盾的质量数字——依赖域报告 1 条
+ * 却显示 3 issues（matched 1 + upgradable 2），security 域 0 条却显示 2 issues
+ * （全靠 secrets.activeCount 代算）。计数与扣分是两条线：绝对扣分（secretsPenalty /
+ * depsPenalty）保留，但 issues 数只数**域快照里真实存在的条目**——
+ * active 密钥与可升级依赖由各自扫描落进域快照（engines-secrets / normalizeDepsSource），
+ * 快照条数即维度 issues，Σ域条数 == 维度 issues 可验算。
+ */
 function applySecurityPenalty(
   penalty: number,
   issueCount: number,
@@ -356,7 +370,7 @@ function applySecurityPenalty(
   if (!secrets) return { penalty, issueCount };
   return {
     penalty: penalty + secretsPenalty(secrets),
-    issueCount: issueCount + secrets.activeCount,
+    issueCount,
   };
 }
 
@@ -368,6 +382,6 @@ function applyDepsPenalty(
   if (!deps) return { penalty, issueCount };
   return {
     penalty: penalty + depsPenalty(deps),
-    issueCount: issueCount + deps.upgradable,
+    issueCount,
   };
 }

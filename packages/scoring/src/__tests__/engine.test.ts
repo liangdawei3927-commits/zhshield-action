@@ -171,18 +171,20 @@ describe('ScoringEngine (persistent)', () => {
     const { engine, db, conn, dbPath } = createScoringEngine(false);
 
     try {
-      ensureProject(db, 'persist-proj');
-      engine.calculate('persist-proj', [
+      // saveScore 将 project_id 归一化为绝对路径，此处键统一用绝对路径
+      const projId = resolve('persist-proj');
+      ensureProject(db, projId);
+      engine.calculate(projId, [
         { name: 'quality', score: 85, weight: 0.5, issues: 1 },
         { name: 'security', score: 90, weight: 0.5, issues: 0 },
       ]);
 
-      const current = engine.getCurrent('persist-proj');
+      const current = engine.getCurrent(projId);
       expect(current?.overall).toBe(87.5);
       expect(current?.grade).toBe('B');
 
       // history should include the persisted entry
-      const history = engine.getHistory('persist-proj');
+      const history = engine.getHistory(projId);
       expect(history.length).toBeGreaterThanOrEqual(1);
     } finally {
       conn.close();

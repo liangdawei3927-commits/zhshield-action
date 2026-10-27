@@ -16,6 +16,51 @@ export function normalizePipelineReport(report: PipelineReport): readonly Diagno
   return entries;
 }
 
+/** GuardReport 分支：check.details 里可能携带的定位明细（P1-5 透传用） */
+interface GuardCheckDetailHints {
+  violations?: Array<{ file?: string; line?: number; message?: string }>;
+  findings?: Array<{ file?: string; line?: number; message?: string }>;
+}
+
+/** message 最多附带的定位明细条数（防止巨型报告把 message 撑爆） */
+const MAX_LOCATION_LINES = 20;
+
+/**
+ * 从 check 结果中提取定位明细（P1-5 门禁结果无文件定位）。
+ *
+ * SOP 路径（guard engine evalToCheckResult）把 violations 塞进 details；
+ * 传统 adapter 路径（security/sensitive-info scan）把 findings 塞进 details。
+ * 此前 GuardReport 分支只透传聚合 message（"扫描器发现 1 个问题"），
+ * file 恒为空串——定位信息躺在 details 里没人读，用户只知道"有问题"不知道改哪。
+ */
+function extractGuardLocations(details: unknown): GuardCheckDetailHints | null {
+  if (!details || typeof details !== 'object') return null;
+  const d = details as GuardCheckDetailHints;
+  const items = d.violations ?? d.findings;
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return {
+    ...(Array.isArray(d.violations) ? { violations: d.violations } : {}),
+    ...(Array.isArray(d.findings) ? { findings: d.findings } : {}),
+  };
+}
+
+/** 把定位明细拼进 message（每条 file:line message，超出上限截断计数） */
+function appendLocationsToMessage(
+  message: string,
+  items: Array<{ file?: string; line?: number; message?: string }>,
+): string {
+  const shown = items.slice(0, MAX_LOCATION_LINES);
+  const lines = shown.map((v) => {
+    const loc = [v.file, v.line !== undefined ? String(v.line) : '']
+      .filter(Boolean)
+      .join(':');
+    return `- ${loc || '(无定位)'} ${v.message ?? ''}`.trimEnd();
+  });
+  const rest = items.length - shown.length;
+  const body = lines.join('\n');
+  return rest > 0 ? `${message}\n${body}\n…等共 ${items.length} 条` : `${message}\n${body}`;
+}
+
 /** guard 输出可能是 GuardReport（adapter 模式）或 RuleEngineReport（SOP 模式） */
 export function normalizeGuardSource(
   guard: GuardReport | RuleEngineReport,
@@ -29,16 +74,25 @@ export function normalizeGuardSource(
   if (!Array.isArray(guardResults)) return [];
   return guardResults
     .filter((result) => result.status !== 'passed')
-    .map((result) => ({
-      ruleId: result.checkId,
-      severity: result.severity,
-      category: 'quality',
-      message: result.message,
-      file: '',
-      autoFixable: false,
-      source: 'guard' as const,
-      fingerprint: `${result.checkId}:${result.adapter}:0`,
-    }));
+    .map((result) => {
+      const hints = extractGuardLocations(result.details);
+      const items = hints?.violations ?? hints?.findings;
+      const first = items?.[0];
+      return {
+        ruleId: result.checkId,
+        severity: result.severity,
+        category: 'quality',
+        message:
+          items && items.length > 0
+            ? appendLocationsToMessage(result.message, items)
+            : result.message,
+        file: first?.file ?? '',
+        ...(first?.line !== undefined ? { line: first.line } : {}),
+        autoFixable: false,
+        source: 'guard' as const,
+        fingerprint: `${result.checkId}:${result.adapter}:0`,
+      };
+    });
 }
 
 /** inspect 输出可能是 InspectionReport 或 RuleEngineReport（SOP 模式） */

@@ -8,7 +8,7 @@ import {
   ReadyStepIcon,
 } from './step-icons';
 import type { BuildStepsParams, Step } from './ProjectOnboardingPage-types';
-import { toProfileSummary, waitForFlag } from './ProjectOnboardingPage-utils';
+import { toProfileSummary, waitForFlag, withOfflineTimeout } from './ProjectOnboardingPage-utils';
 
 function analyzeStep(
   projectPath: string,
@@ -47,16 +47,30 @@ function profileStep(
     id: 'profile',
     labelKey: 'page.onboarding.step.profile',
     execute: async () => {
-      await window.electronAPI?.sync?.syncRules();
-      const outcome = await window.electronAPI?.sync?.resolveRules();
+      // P1-3：云端不可达时 syncRules/resolveRules 曾无限挂起（实测 45s+ 卡死第二步）。
+      // 每个网络调用都包 15s 硬超时，到点按离线降级继续——本地 SOP 规则照常可用，
+      // 向导主流程绝不因云端阻塞。同步结果 ok:false 时 UI 会如实标注离线。
+      const synced = await withOfflineTimeout(
+        window.electronAPI?.sync?.syncRules(),
+        () => null,
+      );
+      // synced 为 null/undefined = 超时或 API 缺失 → 离线降级：跳过 resolveRules（它也要访问云端）
+      const outcome =
+        synced != null
+          ? await withOfflineTimeout(window.electronAPI?.sync?.resolveRules(), () => null)
+          : null;
       onRuleSyncResult({
+        // 超时/失败 → ok:false，OnboardingRuleSyncSummary 会显示既有离线降级文案
         ok: outcome?.ok ?? false,
         total: outcome?.total ?? 0,
         changedCount: outcome?.changed?.length ?? 0,
       });
       // 工具就绪探测（云端清单优先；失败/离线时主进程降级本地默认）
       try {
-        const status = await window.electronAPI?.tools?.status(projectPath);
+        const status = await withOfflineTimeout(
+          window.electronAPI?.tools?.status(projectPath),
+          () => null,
+        );
         onToolsStatus(status ?? null);
       } catch {
         onToolsStatus(null);

@@ -357,6 +357,10 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): Cod
     if (modifiers?.some((m) => m.kind === ts.SyntaxKind.AbstractKeyword)) continue;
     const baseName = (cls.extendsClass ?? '').replace(GENERIC_ARGS_RE, '').trim();
     if (baseName === 'Error') continue;
+    // 接口实现类同样是契约载体：它在履行一段被接口定义好的行为（DI 第二实现、
+    // 测试替身、平台适配器），薄是接口要求的，不是设计冗余。实测误报见 2026-10-25
+    // 惰性类会话：InMemorySecretStore 命中 4 条，逐条核对全是刻意设计。
+    if (cls.implementsInterfaces.length > 0) continue;
 
     if (
       cls.lineCount < threshold &&

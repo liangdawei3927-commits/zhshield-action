@@ -89,3 +89,21 @@ export class VerifiedClient extends BaseClient {
 
 // === refused-bequest 反例: 空子类且不使用继承成员, 应仍被报告 ===
 export class EmptyLazySubclass extends BaseService {}
+
+// === lazy-class 豁免: implements 接口的契约载体 (DI 第二实现 / 测试替身) ===
+export interface SecretStore {
+  read(key: string): string | null;
+  write(key: string, value: string): void;
+}
+
+export class InMemorySecretStore implements SecretStore {
+  private readonly map = new Map<string, string>();
+
+  read(key: string): string | null {
+    return this.map.get(key) ?? null;
+  }
+
+  write(key: string, value: string): void {
+    this.map.set(key, value);
+  }
+}

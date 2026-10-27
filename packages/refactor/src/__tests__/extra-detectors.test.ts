@@ -75,4 +75,17 @@ describe('detectLazyClass', () => {
     const smells = detectLazyClass(parsed, DEFAULT_CONFIG);
     expect(smells.some((s) => s.message.includes('EmptyLazySubclass'))).toBe(true);
   });
+
+  // 2026-10-27 核实修复：接口实现类是契约载体（DI 第二实现 / 测试替身 / 平台适配器），
+  // 薄由接口决定，不是设计冗余。此前只豁免装饰器类 / abstract / extends Error。
+  it('exempts classes implementing an interface (contract carrier)', () => {
+    const smells = detectLazyClass(parsed, DEFAULT_CONFIG);
+    expect(smells.some((s) => s.message.includes('InMemorySecretStore'))).toBe(false);
+  });
+
+  // 双自证：豁免收紧到 implements，普通小类必须仍被报（否则等于整条规则失效）
+  it('does not blanket-exempt every small class (guard against over-suppression)', () => {
+    const smells = detectLazyClass(parsed, DEFAULT_CONFIG);
+    expect(smells.length).toBeGreaterThan(0);
+  });
 });

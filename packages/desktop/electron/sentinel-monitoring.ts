@@ -15,6 +15,7 @@
 /** 监控表条目：项目 id → 项目路径 */
 export type MonitoringTable = Map<string, string>;
 
+/** applyMonitoringStop 的返回值：停止是否命中 + 剩余监控项 */
 export interface MonitoringStopResult {
   /** 该项目此前确实在监控中（false = 用户点了停止但该压根没在监控，不该显示"已停止"） */
   stopped: boolean;

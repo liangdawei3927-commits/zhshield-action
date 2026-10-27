@@ -86,12 +86,19 @@ export async function loadDebtInputFromSnapshot(projectPath: string): Promise<De
     ok: true,
     projectId: path.resolve(projectPath),
     generatedAt: snapshot.generatedAt,
-    issues: snapshot.issues.map((entry) => ({
-      id: entry.fingerprint,
-      severity: entry.severity,
-      category: entry.category,
-      file: entry.file,
-    })),
+    // file 为空串的 issue（工具执行报错、依赖告警等无定位条目）经 moduleOf('') 落 (root)
+    // 桶，会再生永不可还清的伪债务项 td-quality-44c4ce057952（2026-10-26 实锤：已安装
+    // app 内 dep-cruiser/eslint/semgrep 配置在 asar 中不可读 → 4 条 file='' 工具错误）。
+    // 技术债面板是按模块定位的还款清单：无 file 无法定位也无法验证还款，且这类 issue
+    // 在 inspect 域报告中本就可见（不静默），故在此唯一消费口过滤，不动规则引擎。
+    issues: snapshot.issues
+      .filter((entry) => typeof entry.file === 'string' && entry.file.trim() !== '')
+      .map((entry) => ({
+        id: entry.fingerprint,
+        severity: entry.severity,
+        category: entry.category,
+        file: entry.file,
+      })),
   };
 }
 

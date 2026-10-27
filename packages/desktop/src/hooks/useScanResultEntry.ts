@@ -20,6 +20,7 @@ import { navScoreDimension } from '../components/layout/nav-items';
 import { useLatestRef } from './useLatestRef';
 import { scanTransition, shouldAutoEnterDetail, type ScanWatch } from './scan-entry-logic';
 
+/** useScanResultEntry 的入参：项目路径、域键、实时报告与进入详情回调 */
 export interface ScanResultEntryParams {
   /** 项目绝对路径 */
   projectPath: string;
@@ -33,6 +34,7 @@ export interface ScanResultEntryParams {
   onEnterDetail: () => void;
 }
 
+/** useScanResultEntry 的返回值：主页重挂载版本号 */
 export interface ScanResultEntry {
   /**
    * 主页重挂载版本号：每次「扫描产出新结果」加一。

@@ -15,7 +15,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useDomainSnapshot, type DomainSnapshotState } from './useDomainSnapshot';
 import { useSavedDomainReport } from './useSavedDomainReport';
 import { useHasDomainResult } from './useHasDomainResult';
-import { useDetailIntentEffect } from './useDetailIntent';
 import { useLatestRef } from './useLatestRef';
 import { useScanResultEntry } from './useScanResultEntry';
 import type { SnapshotReport } from '../pages/domain-snapshot-logic';
@@ -232,9 +231,6 @@ export function useDomainDetailPage<T>({
 }: DomainDetailPageParams<T>): DomainDetailPageState<T> {
   // 打开先落在主页：历史报告只让「详情按钮」可见，不自动把人带进详情
   const [showHome, setShowHome] = useState(true);
-
-  // 唯一的例外：本次跳转带着「看结果」意图（全局扫描进度条点进来）→ 直接展开详情
-  useDetailIntentEffect(navId, () => setShowHome(false));
 
   // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。这里读回该域完整报告
   const savedReport = useSavedDomainReport<T>(projectPath, domain, liveReport);

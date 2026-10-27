@@ -12,7 +12,6 @@ import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
 import { useInspectPage } from './inspect-logic';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
-import { useDetailIntentEffect } from '../hooks/useDetailIntent';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
@@ -367,8 +366,6 @@ function useInspectPageState(projectPath: string) {
   // 打开先落在主页（与改动前一致：那时 report 为空，即使 showHome=false 也停主页）。
   // 读回的历史快照只让「详情按钮可见」，不把人自动带进详情页。
   const [showHome, setShowHome] = useState(true);
-  // 本次跳转带「看结果」意图（扫描进度条点进来）→ 直接展开详情
-  useDetailIntentEffect('inspect', () => setShowHome(false));
   // 扫完要不要进详情：只在「本次体检产出新结果」时判，且满分 100 不进（唯一口径）
   const { scanVersion } = useScanResultEntry({
     projectPath,

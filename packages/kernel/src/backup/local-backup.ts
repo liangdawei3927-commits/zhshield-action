@@ -82,6 +82,15 @@ export class LocalBackup {
     try {
       const resolvedBackupDir = this.resolveBackupDir(config);
       await fs.mkdir(resolvedBackupDir, { recursive: true });
+      // A3：先清掉上次中断留下的 .zip.tmp（mtime 超过 24h 才算死文件，
+      // 正在写的临时文件 mtime 会持续更新），否则它们永远进不了轮换清理
+      const staleTmp = await this.pruner.pruneStaleTmpFiles(resolvedBackupDir);
+      if (staleTmp.removed.length > 0) {
+        console.info(`[backup] 清理 ${staleTmp.removed.length} 份中断残留快照`);
+      }
+      if (staleTmp.failed.length > 0) {
+        console.warn(`[backup] ${staleTmp.failed.length} 份残留快照清理失败`);
+      }
 
       const manifest = await this.manifestStore.loadManifest(resolvedBackupDir);
       const files = await this.scanner.scanFiles(projectPath, config.excludePatterns, abortSignal);

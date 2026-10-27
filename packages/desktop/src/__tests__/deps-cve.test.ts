@@ -194,3 +194,92 @@ describe('结构守卫 — P1-8 链路接线（防改回去）', () => {
     expect(page).toContain('<DependencyCveCard report={report} />');
   });
 });
+
+/**
+ * 详情补拉回归（2026-10-27 实机验收发现）。
+ *
+ * OSV **querybatch 是精简响应**，每个命中只有 { id, modified }：
+ * 不补 GET /v1/vulns/{id} 则 severity 恒落 medium 兜底、summary 为空、
+ * CVE 别名缺失。实机跑 lodash@4.17.20 得到 6 条全 medium 且只有 GHSA 号，
+ * 修复后同一输入为 critical:1 / high:2 / medium:3 并带 CVE-2021-23337 等别名。
+ */
+describe('OSV 详情补拉 — querybatch 精简响应必须补全', () => {
+  const batchOnly = (ids: string[]): typeof fetch =>
+    vi.fn(async () =>
+      new Response(
+        JSON.stringify({ results: [{ vulns: ids.map((id) => ({ id, modified: '2024-01-01T00:00:00Z' })) }] }),
+        { status: 200 },
+      ),
+    ) as unknown as typeof fetch;
+
+  /** 路由式 mock：批量走精简响应，详情走完整响应 */
+  function routedFetch(
+    batchIds: string[],
+    details: Record<string, unknown>,
+  ): { impl: typeof fetch; calls: string[] } {
+    const calls: string[] = [];
+    const impl = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('querybatch')) {
+        return new Response(
+          JSON.stringify({ results: [{ vulns: batchIds.map((id) => ({ id })) }] }),
+          { status: 200 },
+        );
+      }
+      const id = decodeURIComponent(url.split('/vulns/')[1] ?? '');
+      const body = details[id];
+      if (!body) return new Response('nf', { status: 404 });
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as unknown as typeof fetch;
+    return { impl, calls };
+  }
+
+  it('补拉后 severity / summary / CVE 别名全部到位', async () => {
+    const { impl } = routedFetch(['GHSA-35jh-r3h4-6jhm'], {
+      'GHSA-35jh-r3h4-6jhm': {
+        id: 'GHSA-35jh-r3h4-6jhm',
+        aliases: ['CVE-2021-23337'],
+        summary: 'Command Injection in lodash',
+        database_specific: { severity: 'HIGH' },
+      },
+    });
+    const res = await runCveChecks([{ name: 'lodash', version: '4.17.20', kind: 'direct' }], impl);
+    expect(res.status).toBe('ok');
+    expect(res.findings[0].severity).toBe('high');
+    expect(res.findings[0].summary).toBe('Command Injection in lodash');
+    expect(res.findings[0].ids).toContain('CVE-2021-23337');
+  });
+
+  it('详情拉取失败 → 保留精简数据（漏洞不丢），severity 落 medium 兜底', async () => {
+    const { impl } = routedFetch(['GHSA-29mw-wpgm-hmr9'], {}); // 详情全 404
+    const res = await runCveChecks([{ name: 'lodash', version: '4.17.20', kind: 'direct' }], impl);
+    expect(res.status).toBe('ok');
+    expect(res.findings).toHaveLength(1); // 命中没被丢弃
+    expect(res.findings[0].ids).toBe('GHSA-29mw-wpgm-hmr9');
+    expect(res.findings[0].severity).toBe('medium');
+  });
+
+  it('补拉有上限：命中远超上限时详情请求 ≤ 30，其余保留精简数据', async () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `GHSA-aaaa-bbbb-${String(i).padStart(4, '0')}`);
+    const details = Object.fromEntries(
+      ids.map((id) => [id, { id, aliases: ['CVE-2020-0001'], summary: 'x', database_specific: { severity: 'CRITICAL' } }]),
+    );
+    const { impl, calls } = routedFetch(ids, details);
+    const res = await runCveChecks([{ name: 'pkg', version: '1.0.0', kind: 'direct' }], impl);
+    expect(res.status).toBe('ok');
+    expect(res.findings).toHaveLength(40); // 一条不丢
+    const detailCalls = calls.filter((u) => u.includes('/vulns/'));
+    expect(detailCalls.length).toBe(30);
+    expect(res.findings.filter((f) => f.severity === 'critical')).toHaveLength(30);
+    expect(res.findings.filter((f) => f.severity === 'medium')).toHaveLength(10);
+  });
+
+  it('全部无漏洞时一次详情请求都不发（零开销快路径）', async () => {
+    const impl = batchOnly([]);
+    const res = await runCveChecks([{ name: 'left-pad', version: '1.3.0', kind: 'direct' }], impl);
+    expect(res.status).toBe('ok');
+    expect(res.findings).toHaveLength(0);
+    expect((impl as unknown as { mock: { calls: unknown[][] } }).mock.calls).toHaveLength(1);
+  });
+});

@@ -17,6 +17,15 @@
 const MAX_QUERIES = 200;
 const OSV_QUERYBATCH_URL = 'https://api.osv.dev/v1/querybatch';
 const OSV_TIMEOUT_MS = 8_000;
+/**
+ * 详情补充拉取上限。querybatch 是**精简响应**（只有 id + modified），
+ * 不补详情则 severity 恒落 medium 兜底、summary 为空、CVE 别名缺失。
+ * 一次批量 + K 条详情（K = 命中漏洞数）比逐依赖 /v1/query 省得多；
+ * 上限只为防止极端项目把请求数打爆（超出部分保留精简数据，不丢漏洞）。
+ */
+const MAX_DETAIL_FETCHES = 30;
+const OSV_DETAIL_URL = (id: string): string => `https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`;
+
 
 export interface CveFinding {
   name: string;
@@ -53,6 +62,25 @@ interface OsvVuln {
 
 interface OsvBatchResult {
   results?: Array<{ vulns?: OsvVuln[] } | undefined>;
+}
+
+/**
+ * 补拉单条漏洞详情（GET /v1/vulns/{id}）。
+ * 失败/超时返回 null —— 调用方保留该条的批量精简数据，绝不因为补详情失败就丢掉漏洞。
+ */
+async function fetchVulnDetail(
+  id: string,
+  fetchImpl: typeof fetch,
+  signal: AbortSignal,
+): Promise<OsvVuln | null> {
+  try {
+    const res = await fetchImpl(OSV_DETAIL_URL(id), { signal });
+    if (!res.ok) return null;
+    const detail = (await res.json()) as OsvVuln;
+    return detail?.id ? detail : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -145,12 +173,30 @@ export async function runCveChecks(
     if (!payload || !Array.isArray(payload.results)) {
       return { status: 'unavailable', findings: [], reason: 'OSV 响应形状不符', checkedAt };
     }
-    const findings: CveFinding[] = [];
+    // 命中逐依赖归组：批量响应只有 id/modified，先记下「哪个依赖命中哪些 id」
+    const hits: Array<{ dep: CveQueryableDep; vulns: OsvVuln[] }> = [];
     payload.results.forEach((slot, i) => {
       const dep = deps[i];
       if (!dep || !slot?.vulns?.length) return;
-      findings.push(...vulnsToFindings(dep, slot.vulns));
+      hits.push({ dep, vulns: slot.vulns.filter((v) => typeof v?.id === 'string') });
     });
+    // 详情补拉（限并发=全量 Promise.all，上限 MAX_DETAIL_FETCHES）：
+    // 不补则 severity 恒 medium、summary 空、无 CVE 号——实测发现的关键缺口。
+    const ids = [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id as string)))];
+    const detailIds = ids.slice(0, MAX_DETAIL_FETCHES);
+    const details = await Promise.all(
+      detailIds.map((id) => fetchVulnDetail(id, fetchImpl, controller.signal)),
+    );
+    const byId = new Map<string, OsvVuln>();
+    for (const detail of details) {
+      if (detail?.id) byId.set(detail.id, detail);
+    }
+    clearTimeout(timer);
+    const findings: CveFinding[] = [];
+    for (const hit of hits) {
+      const hydrated = hit.vulns.map((v) => (v.id ? (byId.get(v.id) ?? v) : v));
+      findings.push(...vulnsToFindings(hit.dep, hydrated));
+    }
     return { status: 'ok', findings, checkedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

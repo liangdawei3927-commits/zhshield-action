@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as path from 'node:path';
-import { depcheckMapper } from '@zh/shared';
+import { depcheckMapper, resolveToolCommandDetailed } from '@zh/shared';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
 import type { ExecError, DepcheckOutput } from './tool-output-types';
 
@@ -23,12 +23,10 @@ export class DepcheckAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execFileAsync('depcheck', ['--version'], { timeout: 5000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    // 与 InspectEngine / trivy 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
+    // depcheck 装入码盾目录时裸命令只认 PATH 会误报未安装。
+    const { origin } = await resolveToolCommandDetailed('depcheck');
+    return origin !== 'unresolved';
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -60,7 +58,9 @@ export class DepcheckAdapter implements ToolAdapter {
       // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 depcheck，
       // depcheck 以自身 cwd 解析导致扫描失败。
       const projectPath = path.resolve(options.projectPath);
-      const res = await execFileAsync('depcheck', [projectPath, '--json'], {
+      // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
+      const { command } = await resolveToolCommandDetailed('depcheck', options.projectPath);
+      const res = await execFileAsync(command, [projectPath, '--json'], {
         cwd: projectPath,
         timeout: options.timeout || 30000,
         maxBuffer: 10 * 1024 * 1024,

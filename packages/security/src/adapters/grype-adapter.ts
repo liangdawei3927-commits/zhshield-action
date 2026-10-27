@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import { grypeMapper } from '@zh/shared';
+import { grypeMapper, resolveToolCommandDetailed } from '@zh/shared';
 import type { ExecError, GrypeOutput } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -23,12 +23,10 @@ export class GrypeAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execFileAsync('grype', ['version'], { timeout: 10000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    // 与 InspectEngine / trivy / semgrep 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
+    // grype 由 install-tools 装入码盾目录，裸命令只认 PATH 会误报未安装。
+    const { origin } = await resolveToolCommandDetailed('grype');
+    return origin !== 'unresolved';
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -65,7 +63,9 @@ export class GrypeAdapter implements ToolAdapter {
   }
 
   private async runGrype(source: string, options: ToolScanOptions): Promise<GrypeOutput> {
-    const { stdout } = await execFileAsync('grype', [source, '-o', 'json'], {
+    // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
+    const { command } = await resolveToolCommandDetailed('grype', options.projectPath);
+    const { stdout } = await execFileAsync(command, [source, '-o', 'json'], {
       cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 120000,
       maxBuffer: 20 * 1024 * 1024,
@@ -85,7 +85,7 @@ export class GrypeAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error: 'Grype 未安装',
+        error: 'Grype 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
       };
     }
     const partialIssues = this.parsePartialOutput(err.stdout);

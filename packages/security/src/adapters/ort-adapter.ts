@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
+import { resolveToolCommandDetailed } from '@zh/shared';
 import type { ExecError } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -62,12 +63,10 @@ export class ORTAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execFileAsync('ort', ['--version'], { timeout: 10000 });
-      return stdout.length > 0;
-    } catch {
-      return false;
-    }
+    // 与 InspectEngine / trivy / semgrep 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
+    // ort 装入码盾目录时裸命令只认 PATH 会误报未安装。
+    const { origin } = await resolveToolCommandDetailed('ort');
+    return origin !== 'unresolved';
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -112,8 +111,10 @@ export class ORTAdapter implements ToolAdapter {
   ): Promise<void> {
     await fs.promises.mkdir(outputDir, { recursive: true });
     const pm = options.config?.packageManagers?.[0] || 'NPM';
+    // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
+    const { command } = await resolveToolCommandDetailed('ort', options.projectPath);
     await execFileAsync(
-      'ort',
+      command,
       ['analyze', '-i', projectPath, '-o', outputDir, '--package-managers', pm],
       {
         cwd: projectPath,
@@ -164,7 +165,7 @@ export class ORTAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error: 'ORT 未安装',
+        error: 'ORT 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
       };
     }
     return {

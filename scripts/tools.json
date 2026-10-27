@@ -48,6 +48,29 @@
       }
     },
     {
+      "name": "grype",
+      "displayName": "Grype",
+      "category": "security",
+      "install": "binary",
+      "version": "0.121.0",
+      "desc": "依赖漏洞交叉复核（SBOM），guard 侧 grype-adapter 调用",
+      "checked": {
+        "date": "2026-10-27",
+        "source": "GitHub release v0.121.0，资产 grype_0.121.0_{os}_{arch}.tar.gz + grype_0.121.0_checksums.txt"
+      },
+      "binary": {
+        "binName": "grype",
+        "downloadSource": "github-release",
+        "repo": "anchore/grype",
+        "urlTemplate": "https://github.com/anchore/grype/releases/download/v{version}/grype_{version}_{os}_{arch}.{ext}",
+        "checksumTemplate": "https://github.com/anchore/grype/releases/download/v{version}/grype_{version}_checksums.txt",
+        "archive": "tar.gz",
+        "osMap": { "darwin": "darwin", "linux": "linux", "win32": "windows" },
+        "archMap": { "arm64": "arm64", "x64": "amd64" },
+        "extMap": { "darwin": "tar.gz", "linux": "tar.gz", "win32": "zip" }
+      }
+    },
+    {
       "name": "trivy",
       "displayName": "Trivy",
       "category": "security",

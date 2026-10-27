@@ -20,7 +20,6 @@ import {
   GrypeAdapter,
   DepcheckAdapter,
   SemgrepAdapter,
-  ORTAdapter,
 } from './adapters';
 import { ScanOrchestrator } from './engine-scan-orchestrator';
 import { ResultAggregator } from './engine-result-aggregator';
@@ -85,16 +84,25 @@ export class SecurityEngine {
   }
 
   /**
-   * 注册生产路径默认安全适配器（Trivy/Grype/Depcheck/Semgrep/ORT）。
+   * 注册生产路径默认安全适配器（Trivy/Grype/Depcheck/Semgrep）。
    * 不放构造函数，以保留「无适配器」测试构造路径（security-engine.test 断言）。
    * 消除 guard 侧用 GuardTrivyAdapter 而 security 侧 TrivyAdapter 闲置的分裂。
+   *
+   * ORT 不在此列（2026-10-28 决策）：它是「半接线」适配器，净收益为负——
+   * ① 结果不落地：engine-scan-orchestrator 的 TOOL_ISSUE_COLLECTORS 无 ort 分流器，
+   *    ORT 产出的许可证 issue 只进 allIssues，而 ResultAggregator 只消费
+   *    trivy/grype/depcheck/semgrep 四路，故不落到报告任何字段（能力实际未生效）；
+   * ② 却只增成本：ORT 不可用时 recordToolExecution 仍 escalate 进
+   *    degraded.unavailableTools，令整份报告显示「结果可能不完整」；
+   * ③ 装不上：ORT 是 JVM 分发包，install-tools 的 binary 模式无法纳管。
+   * 许可证合规改由 trivy 承接（已实装 0.74.0，实机验证支持 --scanners license），
+   * 待报告模型新增 license 维度后再评估是否重新启用 ORT。
    */
   registerDefaultAdapters(): void {
     this.registerAdapter(new TrivyAdapter());
     this.registerAdapter(new GrypeAdapter());
     this.registerAdapter(new DepcheckAdapter());
     this.registerAdapter(new SemgrepAdapter());
-    this.registerAdapter(new ORTAdapter());
   }
 
   getToolManager(): ToolManager {

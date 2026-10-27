@@ -5,6 +5,11 @@ import { buildTsPruneArgs } from '../adapters/ts-prune-adapter';
 import { DEFAULT_TOOL_SCAN_TIMEOUT_MS } from '../adapters/tool-runner';
 import type { ToolScanOptions } from '@zh/shared';
 
+/** 包根目录（`packages/inspect`）：跟文件位置走，不跟 `process.cwd()` 走。
+ *  用 cwd 会在「从仓库根跑 `vitest run packages/inspect`」时解析到不存在的路径，
+ *  表现为 2 个假失败（2026-10-27 核实为 G2）。 */
+const PKG_ROOT = path.resolve(__dirname, '../..');
+
 function options(config?: Record<string, unknown>): ToolScanOptions {
   return {
     projectPath: '/p',
@@ -58,7 +63,7 @@ describe('工具扫描默认超时 — 适配器不得早于外层护栏放弃',
 
   it('与内核 dispatch 的硬上限取值一致（改一边必须同步改另一边）', () => {
     const kernelSrc = readFileSync(
-      path.resolve(process.cwd(), '../kernel/src/runner/dispatch-shared.ts'),
+      path.resolve(PKG_ROOT, '../kernel/src/runner/dispatch-shared.ts'),
       'utf8',
     );
     const matched = kernelSrc.match(
@@ -71,7 +76,7 @@ describe('工具扫描默认超时 — 适配器不得早于外层护栏放弃',
 
   it('三个适配器不再写死 60s 默认值（防复制粘贴回退）', () => {
     for (const file of ['ts-prune-adapter.ts', 'jscpd-adapter.ts', 'depcheck-adapter.ts']) {
-      const src = readFileSync(path.resolve(process.cwd(), 'src/adapters', file), 'utf8');
+      const src = readFileSync(path.resolve(PKG_ROOT, 'src/adapters', file), 'utf8');
       expect(src, `${file} 仍在用 60s 默认超时`).not.toMatch(/\|\|\s*60_?000/);
     }
   });

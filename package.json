@@ -5,6 +5,7 @@
   "description": "智汇码盾 - 模块化单体代码治理平台",
   "scripts": {
     "build": "turbo run build --concurrency=$(node scripts/turbo-concurrency.mjs) && node scripts/sync-snapshot-links.mjs",
+    "version:check": "node scripts/check-app-version.mjs",
     "dev": "turbo run dev --concurrency=$(node scripts/turbo-concurrency.mjs)",
     "sync:snapshot-links": "node scripts/sync-snapshot-links.mjs",
     "sync:snapshot-links:check": "node scripts/sync-snapshot-links.mjs --check",

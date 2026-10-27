@@ -67,6 +67,18 @@ jobs:
       - name: Build desktop app (tsc && vite build)
         run: pnpm turbo run build --filter=@zh/desktop
 
+      # 版本号唯一真源 = packages/desktop/package.json 的 version。
+      # 发布通道由 tag 触发：tag 与 version 不一致会导致「发布版本 ≠ 安装包版本」，
+      # latest-mac.yml 的版本与 app.getVersion() 比对直接错位，更新链路失效。
+      # 故发布通道（require-signing=true）用 --strict-tag 硬失败，内部构建只提示。
+      - name: Check app version source
+        run: |
+          if [ "${{ inputs.require-signing }}" = "true" ]; then
+            node scripts/check-app-version.mjs --strict-tag
+          else
+            node scripts/check-app-version.mjs
+          fi
+
       - name: Build desktop macOS artifacts
         working-directory: packages/desktop
         env:

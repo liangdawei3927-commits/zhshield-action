@@ -33,7 +33,27 @@ pnpm --filter @zh/server dev
 | `pnpm test` | 运行全部 Vitest |
 | `pnpm lint` | ESLint（各包 `src`） |
 | `pnpm check` | 智汇码盾自检（refactor / inspect） |
+| `pnpm version:check` | 校验应用版本号（真源与 tag 一致性） |
 | `./start.sh build:mac` | 打包 macOS DMG |
+
+## 版本号（唯一真源）
+
+应用版本号**只认 `packages/desktop/package.json` 的 `version`**，改这一处即可，其余全部自动跟随：
+
+| 消费方 | 取值方式 |
+|--------|----------|
+| 安装包（DMG 的 `Info.plist`） | electron-builder 读该字段写 `CFBundleShortVersionString` |
+| 运行时 `app.getVersion()` | 同源，即安装后的实际版本 |
+| 侧边栏「关于」显示 | vite `define` 注入 `__APP_VERSION__`（`vite.config.ts` 读同一字段），挂载后用 `getAppInfo()` 校正 |
+
+**不要再在 UI 里手写版本字符串**：`sidebar-about.tsx` 曾硬编码旧版本号，导致装上新包界面仍报旧版本。回归测试见 `packages/desktop/src/__tests__/sidebar-version-source.test.tsx`。
+
+明确**不参与**版本的两处：
+
+- 根 `package.json` 的 `version` —— monorepo 私有根包，与产品版本无关；
+- git tag —— 发版标记，命名应写成 `v<version>`，但不作为读取源。
+
+`build:mac` 已前置 `scripts/check-app-version.mjs`：版本非合法 semver 会直接阻断打包；最近 tag 与版本不一致只提示（tag 通常晚于版本号）。
 
 ## 包结构
 

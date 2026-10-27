@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm exec turbo run build --filter=@zh/desktop^... && node ../../scripts/sync-snapshot-links.mjs && vite",
     "build": "tsc && vite build",
-    "build:mac": "tsc && vite build && electron-builder --mac",
+    "build:mac": "node ../../scripts/check-app-version.mjs && tsc && vite build && electron-builder --mac",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

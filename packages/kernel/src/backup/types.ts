@@ -37,12 +37,17 @@ export interface GitHubBackupConfig {
 /** 快照载体形态：zip 为单文件归档，directory 为目录镜像（旧行为） */
 export type LocalBackupFormat = 'zip' | 'directory';
 
-/** 本地备份配置：存放目录、保留份数、排除规则与压缩/载体格式开关 */
+/** 本地备份配置：存放目录、保留份数、排除规则、体积上限与压缩/载体格式开关 */
 export interface LocalBackupConfig {
   enabled: boolean;
   backupDir: string;
   maxBackups: number;
   excludePatterns: string[];
+  /**
+   * P2-6：单次快照源文件总体积上限（MB）。实测曾有单包 1.5GB 默默打满磁盘。
+   * 打包前按扫描文件 size 预估，超限直接失败并给出处置提示，不再静默写盘。
+   */
+  maxTotalSizeMB: number;
   compress: boolean;
   format: LocalBackupFormat;
 }
@@ -124,6 +129,18 @@ export const DEFAULT_SECRET_EXCLUDE_PATTERNS: readonly string[] = [
   '.npmrc',
 ];
 
+/**
+ * P2-3：治理产物目录默认排除（本地 zip 与 GitHub 两侧共用）。
+ *
+ * 备份的价值是"可回滚源码"，把智汇码盾自身的诊断/哨兵/能力账本打进快照，
+ * 既膨胀体积（实测单包 1.5GB 的主要成分之一），又让恢复时覆盖掉新鲜的诊断状态。
+ * 这些目录在任何项目里都不是源码，故随默认配置强制排除（用户仍可追加自己的排除项）。
+ */
+export const DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS: readonly string[] = ['.zhshield/', '.omo/'];
+
+/** P2-6：单次快照源文件总体积默认上限（MB）。8GB 常见机型磁盘长期紧张的保守值 */
+export const DEFAULT_MAX_BACKUP_SIZE_MB = 512;
+
 export function defaultBackupConfig(
   identity?: BackupIdentity,
   rootDir: string = DEFAULT_BACKUP_ROOT,
@@ -141,13 +158,28 @@ export function defaultBackupConfig(
       repo: '',
       branch: 'main',
       commitPrefix: '[智汇码盾]',
-      excludePatterns: ['node_modules/', '.git/', 'dist/', '*.log', ...DEFAULT_SECRET_EXCLUDE_PATTERNS],
+      excludePatterns: [
+        'node_modules/',
+        '.git/',
+        'dist/',
+        '*.log',
+        ...DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+        ...DEFAULT_SECRET_EXCLUDE_PATTERNS,
+      ],
     },
     local: {
       enabled: true,
       backupDir,
       maxBackups: 10,
-      excludePatterns: ['node_modules/', '.git/', 'dist/', 'coverage/', ...DEFAULT_SECRET_EXCLUDE_PATTERNS],
+      excludePatterns: [
+        'node_modules/',
+        '.git/',
+        'dist/',
+        'coverage/',
+        ...DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+        ...DEFAULT_SECRET_EXCLUDE_PATTERNS,
+      ],
+      maxTotalSizeMB: DEFAULT_MAX_BACKUP_SIZE_MB,
       compress: false,
       format: 'zip',
     },

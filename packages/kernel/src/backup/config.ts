@@ -13,10 +13,31 @@ import {
   type LocalBackupConfig,
   type BackupScheduleConfig,
   DEFAULT_BACKUP_ROOT,
+  DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
   defaultBackupConfig,
 } from './types';
 import { safeJoinReal } from '@zh/shared';
 import { normalizeKeepCount } from './retention';
+
+/**
+ * P2-3：把治理产物目录（.zhshield/.omo）强制并入用户的排除清单。
+ *
+ * 旧版本备份配置文件里持久化的 excludePatterns 不含治理目录（修复前的默认值），
+ * 若只改默认值、直接沿用 `raw?.excludePatterns ?? def.excludePatterns`，
+ * 已有项目的快照会继续打包 .zhshield/.omo。治理目录在任何项目里都不是源码，
+ * 这里做并集而非覆盖——用户自己的排除项原样保留。
+ */
+function withGovernanceExcludes(patterns: string[] | undefined): string[] {
+  const merged = new Set(patterns ?? []);
+  for (const p of DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS) merged.add(p);
+  return [...merged];
+}
+
+/** P2-6：体积上限归并——非正数/非法值回退默认（0 表示"不限制"的用法不开放，避免语义分叉） */
+function normalizeSizeLimit(raw: unknown, def: number): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return def;
+  return raw;
+}
 
 /**
  * 备份全局默认配置：持久化于 ~/.zhshield-backup-global.json，
@@ -173,7 +194,7 @@ export class BackupConfigManager {
       repo: raw?.repo ?? def.repo,
       branch: raw?.branch ?? def.branch,
       commitPrefix: raw?.commitPrefix ?? def.commitPrefix,
-      excludePatterns: raw?.excludePatterns ?? def.excludePatterns,
+      excludePatterns: withGovernanceExcludes(raw?.excludePatterns ?? def.excludePatterns),
     };
   }
 
@@ -185,7 +206,8 @@ export class BackupConfigManager {
       enabled: raw?.enabled ?? def.enabled,
       backupDir: raw?.backupDir ?? def.backupDir,
       maxBackups: normalizeKeepCount(raw?.maxBackups, def.maxBackups),
-      excludePatterns: raw?.excludePatterns ?? def.excludePatterns,
+      excludePatterns: withGovernanceExcludes(raw?.excludePatterns ?? def.excludePatterns),
+      maxTotalSizeMB: normalizeSizeLimit(raw?.maxTotalSizeMB, def.maxTotalSizeMB),
       compress: raw?.compress ?? def.compress,
       format: raw?.format === 'directory' ? 'directory' : 'zip',
     };
@@ -220,6 +242,7 @@ export class BackupConfigManager {
           backupDir: config.local.backupDir,
           maxBackups: config.local.maxBackups,
           excludePatterns: config.local.excludePatterns,
+          maxTotalSizeMB: config.local.maxTotalSizeMB,
           compress: config.local.compress,
           format: config.local.format,
         },

@@ -17,6 +17,7 @@ import {
 } from './types';
 import { buildZipSnapshot, restoreFromZipArchive } from './zip-snapshot';
 import { expandHome, safeJoinReal } from '@zh/shared';
+import { estimateFilesTotalSize, backupSizeLimitError } from './utils';
 import { LocalBackupScanner } from './local-backup-scanner';
 import { LocalBackupManifestStore } from './local-backup-manifest';
 import { LocalBackupCopier } from './local-backup-copier';
@@ -84,6 +85,14 @@ export class LocalBackup {
 
       const manifest = await this.manifestStore.loadManifest(resolvedBackupDir);
       const files = await this.scanner.scanFiles(projectPath, config.excludePatterns, abortSignal);
+      // P2-6：打包前体积闸门——超限直接失败并给处置提示，不再默默写 1.5GB 快照
+      const sizeError = backupSizeLimitError(
+        await estimateFilesTotalSize(files),
+        config.maxTotalSizeMB,
+      );
+      if (sizeError) {
+        return { type: 'local', success: false, error: sizeError };
+      }
       const timestamp = new Date().toISOString();
       const snapshotName = timestamp.replace(/[:.]/g, '-');
 

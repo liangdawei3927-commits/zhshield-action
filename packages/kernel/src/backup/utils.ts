@@ -33,6 +33,31 @@ export function matchesExcludePattern(relativePath: string, excludePatterns: str
   });
 }
 
+/** P2-6：估算待备份文件总字节数（纯求和，单文件 stat 失败按 0 计不阻断） */
+export async function estimateFilesTotalSize(files: string[]): Promise<number> {
+  let total = 0;
+  for (const file of files) {
+    // perf rule false positive: arg depends on loop var via dataflow
+    // eslint-disable-next-line perf/perf-no-serial-await
+    const s = await fs.stat(file).catch(() => null);
+    total += s?.size ?? 0;
+  }
+  return total;
+}
+
+/**
+ * P2-6：体积上限判定（纯函数便于单测）。
+ * 超限返回面向用户的处置提示——上限来自配置 maxTotalSizeMB（默认 512），
+ * 解法是收窄 excludePatterns 或调大上限，绝不静默打爆磁盘。
+ */
+export function backupSizeLimitError(totalBytes: number, limitMB: number): string | null {
+  if (!Number.isFinite(limitMB) || limitMB <= 0 || totalBytes <= limitMB * 1024 * 1024) {
+    return null;
+  }
+  const totalGB = (totalBytes / 1024 ** 3).toFixed(1);
+  return `待备份内容 ${totalGB}GB 超过单次快照上限 ${limitMB}MB：请在备份设置中排除大目录（如 node_modules/dist/.zhshield）或调大 maxTotalSizeMB 后重试`;
+}
+
 /** 清洗为可安全用作单层目录名的片段（去除路径分隔符与文件系统保留字符，限长64） */
 export function sanitizeDirSegment(input: string): string {
   const cleaned = input

@@ -4,6 +4,7 @@ import { BounceCard } from '../ui/Bounce';
 import { MiniSectionIcon } from '../ui/Icons';
 import { useT, useI18n, SUPPORTED_LANGUAGES } from '../../i18n';
 import { useTheme, type ThemeMode } from '../../hooks/useTheme';
+import { useAppVersion } from '../../hooks/useAppVersion';
 import type { LanguageCode } from '@zh/i18n';
 
 const THEME_OPTIONS: { value: ThemeMode; labelKey: string; icon: string }[] = [
@@ -134,6 +135,7 @@ export function LanguageSection() {
 
 export function AboutSection() {
   const t = useT();
+  const version = useAppVersion();
   return (
     <section>
       <SectionTitle
@@ -147,7 +149,12 @@ export function AboutSection() {
       />
       <div className="px-3 py-2">
         <div className="text-xs text-zh-muted">
-          {t('layout.aboutVersion', { version: 'v0.1.0' })}
+          {/* 版本号来自 package.json（编译期注入）+ app.getVersion()（运行时校正）。
+              此前这里写死了旧版本号字面量，package.json 升到 0.2.0 后界面仍在报旧版本。
+              取不到版本时只显示产品名，不留一个孤零零的 `v`。 */}
+          {version
+            ? t('layout.aboutVersion', { version: `v${version}` })
+            : t('layout.about')}
         </div>
       </div>
     </section>

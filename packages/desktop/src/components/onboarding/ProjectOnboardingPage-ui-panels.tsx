@@ -144,7 +144,7 @@ export function OnboardingProfileConfirm({
           )}
         </div>
         {lowConfidence && (
-          <div className="mb-3 text-center text-[11px] leading-snug text-amber-300">
+          <div className="mb-3 text-center text-[11px] leading-snug text-[rgb(var(--zh-warning))]">
             {t('page.onboarding.profileConfirm.lowConfidence')}
           </div>
         )}
@@ -229,7 +229,7 @@ export function OnboardingToolsInstall({
         </div>
       )}
       {done === 'fail' && (
-        <div className="mt-2 text-center text-[11px] text-amber-300">
+        <div className="mt-2 text-center text-[11px] text-[rgb(var(--zh-warning))]">
           {t('page.onboarding.tools.installFailed')}
         </div>
       )}
@@ -289,7 +289,7 @@ export function OnboardingToolsPanel({
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full ${
                   row.status === 'missing'
-                    ? 'bg-amber-500/20 text-amber-300'
+                    ? 'bg-[rgb(var(--zh-warning)/0.2)] text-[rgb(var(--zh-warning))]'
                     : 'bg-success-500/20 text-success-400'
                 }`}
               >

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SopSyncClient } from '../sop/cache/sop-sync-client';
+import {
+  SopSyncClient,
+  type SopFetchResult,
+  type SopFetchFailure,
+} from '../sop/cache/sop-sync-client';
 import { SopCompressor, CompressionFormat } from '../sop/cache/sop-compressor';
 import type { SopVersion, SopDiff, SopRule } from '../sop/_meta/sop-types';
 import { makeRule } from './helpers/rule-factory';
@@ -16,10 +20,32 @@ function makeResponse(
   return {
     ok,
     status,
+    statusText: '',
     headers,
     json: async () => body as never,
     arrayBuffer: async () => body as ArrayBuffer,
   } as unknown as Response;
+}
+
+/** 断言成功并取出数据；失败时把归因打出来，避免"期望成功"这种无信息量的报错 */
+function expectOk<T>(result: SopFetchResult<T>): T {
+  if (!result.ok) {
+    throw new Error(`期望成功，实际失败: ${result.failure.kind} — ${result.failure.detail}`);
+  }
+  return result.data;
+}
+
+/** 断言失败并取出归因 */
+function expectFail<T>(result: SopFetchResult<T>): SopFetchFailure {
+  if (result.ok) throw new Error('期望失败，实际成功');
+  return result.failure;
+}
+
+/** 构造指定 name 的异常（AbortSignal.timeout 抛的是 TimeoutError） */
+function errorNamed(name: string, message: string): Error {
+  const err = new Error(message);
+  err.name = name;
+  return err;
 }
 
 describe('SopSyncClient', () => {
@@ -50,9 +76,8 @@ describe('SopSyncClient', () => {
         size: 1024,
       };
       fetchMock.mockResolvedValueOnce(makeResponse(version));
-      const result = await client.checkRemoteVersion();
-      expect(result).not.toBeNull();
-      expect(result?.version).toBe('1.2026.08.01.001');
+      const data = expectOk(await client.checkRemoteVersion());
+      expect(data.version).toBe('1.2026.08.01.001');
       // 应请求 /version 端点
       expect(fetchMock).toHaveBeenCalledWith(
         `${baseUrl}/version`,
@@ -60,14 +85,38 @@ describe('SopSyncClient', () => {
       );
     });
 
-    it('HTTP 非 2xx 应返回 null', async () => {
+    it('HTTP 非 2xx 应归 http_error 并带状态码', async () => {
       fetchMock.mockResolvedValueOnce(makeResponse(null, { ok: false, status: 500 }));
-      expect(await client.checkRemoteVersion()).toBeNull();
+      const failure = expectFail(await client.checkRemoteVersion());
+      expect(failure.kind).toBe('http_error');
+      expect(failure.status).toBe(500);
     });
 
-    it('fetch 抛错应返回 null（网络故障容错）', async () => {
+    it('fetch 抛错应归 network_error（网络故障容错）', async () => {
       fetchMock.mockRejectedValueOnce(new Error('network down'));
-      expect(await client.checkRemoteVersion()).toBeNull();
+      const failure = expectFail(await client.checkRemoteVersion());
+      expect(failure.kind).toBe('network_error');
+      expect(failure.detail).toContain('network down');
+    });
+
+    it('AbortSignal 超时抛 TimeoutError 应归 timeout（与网络层失败区分）', async () => {
+      fetchMock.mockRejectedValueOnce(errorNamed('TimeoutError', 'The operation was aborted'));
+      expect(expectFail(await client.checkRemoteVersion()).kind).toBe('timeout');
+    });
+
+    it('响应体不是合法 JSON 应归 decode_error（云端返回 HTML 错误页的典型表现）', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: '',
+        headers: new Headers(),
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON at position 0');
+        },
+      } as unknown as Response);
+      const failure = expectFail(await client.checkRemoteVersion());
+      expect(failure.kind).toBe('decode_error');
+      expect(failure.detail).toContain('JSON');
     });
   });
 
@@ -88,11 +137,10 @@ describe('SopSyncClient', () => {
       fetchMock.mockResolvedValueOnce(
         makeResponse(sampleDiff, { contentType: 'application/json' }),
       );
-      const result = await client.fetchDiff('1.0.0', '2.0.0');
-      expect(result).not.toBeNull();
-      expect(result?.version).toBe('2.0.0');
-      expect(result?.added.length).toBe(1);
-      expect(result?.removed).toContain('old-rule');
+      const data = expectOk(await client.fetchDiff('1.0.0', '2.0.0'));
+      expect(data.version).toBe('2.0.0');
+      expect(data.added.length).toBe(1);
+      expect(data.removed).toContain('old-rule');
       // URL 应包含 from/to 查询参数
       expect(fetchMock).toHaveBeenCalledWith(
         `${baseUrl}/diff?from=1.0.0&to=2.0.0`,
@@ -115,10 +163,9 @@ describe('SopSyncClient', () => {
       fetchMock.mockResolvedValueOnce(
         makeResponse(buffer, { contentType: 'application/octet-stream' }),
       );
-      const result = await client.fetchDiff('1.0.0', '2.0.0');
-      expect(result).not.toBeNull();
-      expect(result?.version).toBe('2.0.0');
-      expect(result?.added[0].id).toBe('new-rule');
+      const data = expectOk(await client.fetchDiff('1.0.0', '2.0.0'));
+      expect(data.version).toBe('2.0.0');
+      expect(data.added[0].id).toBe('new-rule');
     });
 
     it('cbor content-type 也应走解压分支', async () => {
@@ -134,19 +181,19 @@ describe('SopSyncClient', () => {
       );
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer, { contentType: 'application/cbor' }));
-      const result = await client.fetchDiff('1.0.0', '2.0.0');
-      expect(result).not.toBeNull();
-      expect(result?.version).toBe('2.0.0');
+      expect(expectOk(await client.fetchDiff('1.0.0', '2.0.0')).version).toBe('2.0.0');
     });
 
-    it('HTTP 错误应返回 null', async () => {
+    it('HTTP 404 应归 http_error（增量端点不存在 → 上层据此降级全量）', async () => {
       fetchMock.mockResolvedValueOnce(makeResponse(null, { ok: false, status: 404 }));
-      expect(await client.fetchDiff('1.0.0', '2.0.0')).toBeNull();
+      const failure = expectFail(await client.fetchDiff('1.0.0', '2.0.0'));
+      expect(failure.kind).toBe('http_error');
+      expect(failure.status).toBe(404);
     });
 
-    it('fetch 抛错应返回 null', async () => {
+    it('fetch 抛错应归 network_error', async () => {
       fetchMock.mockRejectedValueOnce(new Error('timeout'));
-      expect(await client.fetchDiff('1.0.0', '2.0.0')).toBeNull();
+      expect(expectFail(await client.fetchDiff('1.0.0', '2.0.0')).kind).toBe('network_error');
     });
   });
 
@@ -166,28 +213,38 @@ describe('SopSyncClient', () => {
       );
 
       fetchMock.mockResolvedValueOnce(makeResponse(buffer));
-      const result = await client.fetchFull('3.0.0');
-      expect(result).not.toBeNull();
-      expect(result?.length).toBe(2);
-      expect(result?.[0].id).toBe('r-1');
+      const data = expectOk(await client.fetchFull('3.0.0'));
+      expect(data.length).toBe(2);
+      expect(data[0].id).toBe('r-1');
       // URL 应包含版本路径
       expect(fetchMock).toHaveBeenCalledWith(`${baseUrl}/full/3.0.0`, expect.any(Object));
     });
 
-    it('HTTP 错误应返回 null', async () => {
+    it('HTTP 错误应归 http_error', async () => {
       fetchMock.mockResolvedValueOnce(makeResponse(null, { ok: false, status: 500 }));
-      expect(await client.fetchFull('3.0.0')).toBeNull();
+      expect(expectFail(await client.fetchFull('3.0.0')).status).toBe(500);
     });
 
-    it('fetch 抛错应返回 null', async () => {
+    it('fetch 抛错应归 network_error', async () => {
       fetchMock.mockRejectedValueOnce(new Error('network'));
-      expect(await client.fetchFull('3.0.0')).toBeNull();
+      expect(expectFail(await client.fetchFull('3.0.0')).kind).toBe('network_error');
     });
 
-    it('解压失败应返回 null（容错）', async () => {
-      // 提供非法压缩数据 → decompress 抛错 → catch 返回 null
+    it('解压失败应归 decode_error（不是网络错误）', async () => {
+      // 提供非法压缩数据 → decompress 抛错
       fetchMock.mockResolvedValueOnce(makeResponse(new ArrayBuffer(8)));
-      expect(await client.fetchFull('3.0.0')).toBeNull();
+      const failure = expectFail(await client.fetchFull('3.0.0'));
+      expect(failure.kind).toBe('decode_error');
+      expect(failure.detail).toContain('解压');
+    });
+
+    it('全量下载须带超时信号（原实现无 signal 会无限挂起）', async () => {
+      fetchMock.mockResolvedValueOnce(makeResponse(new ArrayBuffer(8)));
+      await client.fetchFull('3.0.0');
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${baseUrl}/full/3.0.0`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
   });
 
@@ -224,7 +281,9 @@ describe('SopSyncClient', () => {
       await authed.checkRemoteVersion();
       expect(fetchMock).toHaveBeenCalledWith(
         `${baseUrl}/version`,
-        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-123' }) }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-api-token': 'tok-123' }),
+        }),
       );
     });
 
@@ -235,7 +294,9 @@ describe('SopSyncClient', () => {
       await authed.fetchDiff('1.0.0', '2.0.0');
       expect(fetchMock).toHaveBeenCalledWith(
         `${baseUrl}/diff?from=1.0.0&to=2.0.0`,
-        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-123' }) }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-api-token': 'tok-123' }),
+        }),
       );
     });
 
@@ -251,7 +312,9 @@ describe('SopSyncClient', () => {
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
         `${baseUrl}/version`,
-        expect.objectContaining({ headers: expect.objectContaining({ 'x-api-token': 'tok-b' }) }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-api-token': 'tok-b' }),
+        }),
       );
     });
 

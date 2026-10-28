@@ -88,9 +88,33 @@ describe('SopSignatureVerifier.getPublicKey / verifySignature', () => {
   });
 
   describe('verifySignature', () => {
-    it('GIVEN 未配置 publicKey WHEN 验证任意包 THEN 返回 true（向后兼容）', async () => {
+    /**
+     * 口径变更（2026-10-29）：原实现未配置 publicKey ⇒ **放行**（向后兼容），
+     * 且带一个全仓无人传的 strict 开关。那等于「忘了配公钥 = 不验签」，
+     * 与桌面端 ipc/sync.ts 的 no_public_key → 拒绝口径相反。
+     * 现统一为 fail-closed：拿不到公钥就拒收，并告警一次。
+     */
+    it('GIVEN 未配置 publicKey WHEN 验证任意包 THEN 拒绝（fail-closed，不再向后兼容放行）', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const pkg = SopSigner.signPackage(makeRules(), OTHER_SECRET);
-      expect(await makeVerifier().verifySignature(pkg)).toBe(true);
+
+      expect(await makeVerifier().verifySignature(pkg)).toBe(false);
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('未配置验签公钥');
+
+      warnSpy.mockRestore();
+    });
+
+    it('未配置公钥的告警只打一次（周期同步不得刷屏）', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const verifier = makeVerifier();
+      const pkg = SopSigner.signPackage(makeRules(), SECRET);
+
+      await verifier.verifySignature(pkg);
+      await verifier.verifySignature(pkg);
+      await verifier.verifySignature(pkg);
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      warnSpy.mockRestore();
     });
 
     it('GIVEN 公钥函数返回 null WHEN 验证 THEN 返回 false（fail-closed）', async () => {
@@ -148,32 +172,46 @@ describe('VerifiedSopSyncClient.fetchFull — 远程数据验签拦截', () => {
   it('GIVEN 裸规则数组响应 WHEN fetchFull THEN 原样放行（向后兼容）', async () => {
     fetchMock.mockResolvedValueOnce(makeResponse(await brotliBody(makeRules())));
     const result = await client.fetchFull('3.0.0');
-    expect(result).not.toBeNull();
-    expect(result?.length).toBe(3);
+    if (!result.ok) throw new Error(`期望放行，实际被拒: ${result.failure.kind}`);
+    expect(result.data.length).toBe(3);
   });
 
   it('GIVEN 合法签名包响应 WHEN fetchFull THEN 返回包内规则', async () => {
     const pkg = SopSigner.signPackage(makeRules(), SECRET, '3.0.0');
     fetchMock.mockResolvedValueOnce(makeResponse(await brotliBody(pkg)));
     const result = await client.fetchFull('3.0.0');
-    expect(result).not.toBeNull();
-    expect(result?.map((r) => r.id)).toEqual(['a.rule', 'b.rule', 'c.rule']);
+    if (!result.ok) throw new Error(`期望通过验签，实际被拒: ${result.failure.kind}`);
+    expect(result.data.map((r) => r.id)).toEqual(['a.rule', 'b.rule', 'c.rule']);
   });
 
-  it('GIVEN 被篡改的签名包响应 WHEN fetchFull THEN 返回 null（拒绝投毒数据）', async () => {
+  it('GIVEN 被篡改的签名包响应 WHEN fetchFull THEN 拒收并归 signature_rejected（安全事件不得伪装成网络错误）', async () => {
     const pkg = SopSigner.signPackage(makeRules(), SECRET);
     const tampered = {
       ...pkg,
       rules: [{ ...pkg.rules[0], content: { injected: true } }, ...pkg.rules.slice(1)],
     };
     fetchMock.mockResolvedValueOnce(makeResponse(await brotliBody(tampered)));
-    expect(await client.fetchFull('3.0.0')).toBeNull();
+    const result = await client.fetchFull('3.0.0');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('signature_rejected');
   });
 
-  it('GIVEN 错误密钥签名的响应 WHEN fetchFull THEN 返回 null', async () => {
+  it('GIVEN 错误密钥签名的响应 WHEN fetchFull THEN 拒收并归 signature_rejected', async () => {
     const pkg = SopSigner.signPackage(makeRules(), OTHER_SECRET);
     fetchMock.mockResolvedValueOnce(makeResponse(await brotliBody(pkg)));
-    expect(await client.fetchFull('3.0.0')).toBeNull();
+    const result = await client.fetchFull('3.0.0');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('signature_rejected');
+  });
+
+  it('GIVEN 既非规则数组也非签名包的响应 WHEN fetchFull THEN 归 decode_error（协议不匹配）', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(await brotliBody({ hello: 'world' })));
+    const result = await client.fetchFull('3.0.0');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('decode_error');
   });
 });
 
@@ -256,6 +294,9 @@ describe('SopCacheManager.syncFromCloud — 全量同步前强制验签', () => 
     const result = await manager.syncFromCloud();
 
     expect(result.updated).toBe(false);
+    // 归因必须一路透到 SyncResult：原来一律报 network_error，投毒被伪装成"网络不好"
+    expect(result.reason).toBe('signature_rejected');
+    expect(result.detail).toContain('验签');
     expect(registryMock.loadAll).not.toHaveBeenCalled();
   });
 });

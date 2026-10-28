@@ -151,12 +151,38 @@ export interface SignedSopPackage {
 
 // ─── 同步结果 ────────────────────────────────────────────────
 /**
+ * 同步失败归因。
+ *
+ * 划分依据是「重试有没有意义」——原来只有 `network_error` 一个笼统值，
+ * 令牌过期（重试一万次也没用）与服务端 500（重试可能好）在日志里完全同形。
+ * · `network_error` / `timeout` / `http_error` —— 服务侧暂时不可用，重试有意义
+ * · `auth_error` —— 令牌无效/缺失/无权限，重试无意义，须改配置
+ * · `decode_error` —— 响应不合协议（云端返回 HTML 错误页、压缩包损坏）
+ * · `signature_rejected` —— 验签未通过（安全事件，绝不重试）
+ * · `apply_error` —— 数据合法但落地失败（版本不连续、写库异常）
+ * · `compatibility_error` / `hash_mismatch` —— 客户端过旧 / 内容被篡改
+ */
+export type SyncFailureReason =
+  | 'already_latest'
+  | 'compatibility_error'
+  | 'hash_mismatch'
+  | 'network_error'
+  | 'http_error'
+  | 'auth_error'
+  | 'timeout'
+  | 'decode_error'
+  | 'signature_rejected'
+  | 'apply_error';
+
+/**
  * 知识库同步结果。
- * updated=false 时 reason 必填，标明未更新的具体原因。
+ * updated=false 时 reason 必填，标明未更新的具体原因；detail 为可直接落日志的诊断细节。
  */
 export interface SyncResult {
   updated: boolean;
-  reason?: 'already_latest' | 'compatibility_error' | 'hash_mismatch' | 'network_error';
+  reason?: SyncFailureReason;
+  /** 失败细节（HTTP 状态、解析异常消息等），供日志与面板诊断；成功时缺省 */
+  detail?: string;
   fromVersion?: string;
   toVersion?: string;
   ruleCount?: number;

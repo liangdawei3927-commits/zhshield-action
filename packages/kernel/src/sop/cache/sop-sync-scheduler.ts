@@ -186,8 +186,20 @@ const SIGNATURE_HINT_RE = /signature|verify|verification|hash mismatch|integrity
 
 function classifyFailure(reason: string | null): SyncFailureKind {
   if (!reason) return 'none';
-  if (reason === 'network_error' || reason === 'offline' || reason === 'timeout') return 'network';
+  // 服务侧暂时不可用（5xx / 超时）与"完全连不上"对用户是同一件事，都归 network
+  if (
+    reason === 'network_error' ||
+    reason === 'offline' ||
+    reason === 'timeout' ||
+    reason === 'http_error'
+  ) {
+    return 'network';
+  }
   if (reason === 'compatibility_error') return 'compatibility';
+  // 显式列出：验签失败是安全事件，不能靠下面的正则"碰巧"命中
+  if (reason === 'signature_rejected') return 'signature';
   if (SIGNATURE_HINT_RE.test(reason)) return 'signature';
+  // auth_error / decode_error / apply_error 保持 unknown：由 UI 原样透出 lastError 原文，
+  // 不替用户编"大概是网络问题"这种解释（新增分类须同步改 electron.d.ts 手写联合类型）。
   return 'unknown';
 }

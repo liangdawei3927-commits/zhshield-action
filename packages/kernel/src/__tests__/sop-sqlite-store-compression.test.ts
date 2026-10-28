@@ -22,7 +22,10 @@ class SpyCompressor extends SmartCompressor {
 }
 
 function bigRule(id: string): SopRule {
-  return makeRule({ id, content: { script: 'x'.repeat(400), engine: 'semgrep' } });
+  // content 必须是 ContentInterpreter 能解释的真实形态：准入校验会拒收
+  // 无执行段的规则（原夹具用 script/engine 这类不存在的键，已随校验上线被拒）。
+  // 用 patterns 撑体积，语义与真实规则的 pattern-scan 一致。
+  return makeRule({ id, content: { patterns: ['x'.repeat(400)] } });
 }
 
 function makeDiff(added: SopRule[]): SopDiff {

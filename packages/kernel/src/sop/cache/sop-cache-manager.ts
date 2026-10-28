@@ -125,6 +125,8 @@ export class SopCacheManager {
       metrics: this.metrics,
       eventBus: this.eventBus,
     });
+    // 关闭验签必须显式且有声音：不传 publicKey ⇒ 走裸客户端，规则包零校验
+    warnIfVerificationDisabled(options.publicKey);
     const signatureVerifier = new SopSignatureVerifier(options.publicKey);
     const syncClient =
       options.publicKey !== undefined
@@ -426,4 +428,18 @@ async function refreshModuleCaches(lazyLoader: SopLazyLoader | undefined): Promi
   } catch (err) {
     console.error('[SopCacheManager] 模块缓存重建失败，扫描仍将读取陈旧模块规则:', err);
   }
+}
+
+/**
+ * 未配置 publicKey 时告警一次。
+ *
+ * 原实现此处完全静默：配置缺失时看起来"一切正常"，实际规则包零校验。
+ * 与桌面端另一条链路（`electron/ipc/sync.ts` 无公钥即拒绝）口径相反 ——
+ * 关闭验签必须是显式且有声音的。
+ */
+function warnIfVerificationDisabled(publicKey: unknown): void {
+  if (publicKey !== undefined) return;
+  console.warn(
+    '[SopCacheManager] SOP 验签未启用（未配置 publicKey）：规则包不做签名校验，仅适用于本地开发',
+  );
 }

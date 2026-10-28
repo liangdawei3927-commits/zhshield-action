@@ -46,7 +46,8 @@ function makeCoordinator(cached: SopRule[], fetched: SopRule[] = []) {
       saveSyncState: async () => {},
       logSync: async () => {},
     } as never,
-    syncClient: { fetchFull: async () => fetched } as never,
+    // 返回值形状必须与真实契约一致（SopFetchResult）：裸数组会让 fullSync 走进失败分支
+    syncClient: { fetchFull: async () => ({ ok: true, data: fetched }) } as never,
     scheduler: {
       hydrate: () => {},
       recordSync: () => {},

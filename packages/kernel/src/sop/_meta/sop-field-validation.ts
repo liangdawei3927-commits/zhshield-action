@@ -7,6 +7,7 @@ import {
   sanitizeLogField,
 } from '@zh/shared';
 import type { GovernanceDomain, ActionType, SopRule } from './sop-types';
+import { validateRuleContent } from './sop-content-validation';
 
 /**
  * SOP 规则加载期字段校验 — 把「类型断言」换成「运行期白名单」。
@@ -288,6 +289,11 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
       }
     }
   }
+
+  // content 段能否真跑起来 —— 元数据字段合法 ≠ 检查内容可执行。
+  // 分级：active 规则无执行段判 fatal（每次体检固定降级却零产出），
+  // draft/trial 判 warn（内容未完成是正常阶段，但必须留痕）。
+  for (const issue of validateRuleContent(rule, locator)) push(issue);
 
   return issues;
 }

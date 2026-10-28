@@ -137,6 +137,28 @@ describe('EnvConsistencyCheckerImpl', () => {
     expect(report.entries.filter((e) => e.kind === 'runtime-version')).toHaveLength(0);
   });
 
+  it('runtime-version：.nvmrc 22 与 engines 22.0.0 → 不报（双固定版本按三元组比，补零差异不是矛盾，2026-10-28 审查回归）', async () => {
+    const dir = tmpDir('zh-env-runtime-zero-pad-');
+    writeFile(dir, '.nvmrc', '22\n');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '22.0.0' } }));
+
+    const report = await checker.check(profileOf(dir));
+
+    expect(report.entries.filter((e) => e.kind === 'runtime-version')).toHaveLength(0);
+  });
+
+  it('runtime-version：.nvmrc 20 与 engines 22 → 仍报 error（双固定版本真矛盾不放过）', async () => {
+    const dir = tmpDir('zh-env-runtime-fixed-ne-');
+    writeFile(dir, '.nvmrc', '20\n');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '22' } }));
+
+    const report = await checker.check(profileOf(dir));
+
+    const runtime = report.entries.filter((e) => e.kind === 'runtime-version');
+    expect(runtime).toHaveLength(1);
+    expect(runtime[0]).toMatchObject({ kind: 'runtime-version', severity: 'error' });
+  });
+
   it('ci-vs-local：CI Node 24 满足 engines >=20.0.0 → 不报（语义兼容）', async () => {
     const dir = tmpDir('zh-env-ci-ge-');
     writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '>=20.0.0' } }));

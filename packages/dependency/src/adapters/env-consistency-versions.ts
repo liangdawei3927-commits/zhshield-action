@@ -194,11 +194,13 @@ export function runtimeVersionsCompatible(a: string, b: string): boolean {
   const bIsRange = RANGE_HINT_RE.test(b);
   if (aIsRange && bIsRange) return true;
   if (!aIsRange && !bIsRange) {
-    // 双固定版本且字面不等 → 矛盾（任一侧解析失败则不判定）
+    // 双固定版本：按语义三元组比较而非字面相等——'22' 与 '22.0.0' 是同一版本，
+    // 字面比对会把补零差异误报为矛盾（2026-10-28 审查发现）。任一侧解析失败
+    // （如非版本字符串）则不判定。
     const ta = versionTriple(a);
     const tb = versionTriple(b);
     if (!ta || !tb) return true;
-    return false;
+    return ta[0] === tb[0] && ta[1] === tb[1] && ta[2] === tb[2];
   }
   // 单范围 + 单固定：按「固定版本是否满足范围」判定
   if (aIsRange) {

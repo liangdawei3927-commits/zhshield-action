@@ -332,7 +332,11 @@ registerSchedulerIpc();
 
 // ─── 测试专用观测 IPC（仅 e2e 门控，不污染生产 API 面）────
 // 供 e2e 删除全链用例观测主进程内存态（5 表软删计数 / cachedProfile 归属 / 孤儿行预置）。
-if (process.env.E2E === '1') {
+// 双条件缺一不可：
+// ① E2E=1 —— 由 e2e 用例显式注入（e2e/app.spec.ts、garbage-cleanup.spec.ts、nav-helpers.ts）
+// ② !app.isPackaged —— DMG 内即使环境误带 E2E=1 也绝不注册，杜绝 e2e:seedOrphanData 写用户库。
+//    e2e 以未打包的 dist-electron/main.js 启动，故该条件不影响任何用例。
+if (process.env.E2E === '1' && !app.isPackaged) {
   registerE2eObservationIpc();
 }
 

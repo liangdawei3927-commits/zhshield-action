@@ -135,6 +135,56 @@ describe('computeDomainSnapshotScore：performance / garbage 维（摘要计权�
   });
 });
 
+describe('computeDomainSnapshotScore：techdebt 维（100 − debtIndex）', () => {
+  it('debtIndex 30 / 3 个动作 = 70 分（与 pipeline-score-p1b 规范口径一致）', () => {
+    const score = computeDomainSnapshotScore({
+      dimension: 'techdebt',
+      techdebt: { debtIndex: 30, issueCount: 3 },
+    });
+    expect(score).toBeDefined();
+    expect(score?.dimension).toBe('techdebt');
+    expect(score?.score).toBe(70);
+    expect(score?.issues).toBe(3);
+    expect(score?.status).toBe('scored');
+    expect(score?.version).toBe(SCORE_VERSION);
+  });
+
+  it('真跑了且债务指数为 0 → 满分 100（scored，不是 not-run）', () => {
+    const score = computeDomainSnapshotScore({
+      dimension: 'techdebt',
+      techdebt: { debtIndex: 0, issueCount: 0 },
+    });
+    expect(score?.score).toBe(100);
+    expect(score?.status).toBe('scored');
+  });
+
+  it('techdebt 为 null（未真跑，如无 inspect 快照）→ undefined，不冒充 100 分', () => {
+    const score = computeDomainSnapshotScore({ dimension: 'techdebt', techdebt: null });
+    expect(score).toBeUndefined();
+  });
+});
+
+describe('techdebt 域落盘接线（防回归：历史表「分数」列的唯一来源）', () => {
+  it('persistTechDebtDiagnostics 必须透传 dimensionScore', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../electron/ipc/engines-techdebt.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('dimensionScore ? { techdebt: dimensionScore } : undefined');
+  });
+
+  it('runTechDebtHandler 真跑分支必须带分落盘（空报告分支不得带分）', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../electron/ipc/engines-techdebt.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('persistTechDebtDiagnostics(projectPath, report, computeTechDebtScore(');
+    // 全仓只有一处调用点（函数定义自身不算）：无 inspect 快照分支走 emptyTechDebtReport，
+    // 若将来给它也补上带分落盘，这里会先红 —— 那是「没查」被写成 100 分
+    expect(src.match(/await persistTechDebtDiagnostics\(/g)?.length ?? 0).toBe(1);
+  });
+});
+
 describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史', () => {
   let projectDir: string;
 
@@ -167,6 +217,28 @@ describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史',
     const records = await listDomainHistory(projectDir, 'security', 10);
     expect(records.length).toBe(1);
     expect(records[0].score).toBe(92);
+    expect(records[0].scoreVersion).toBe(SCORE_VERSION);
+  });
+
+  it('techdebt 域带分写入：历史 score 非空（分类页历史表不再恒「—」）', async () => {
+    const dimensionScore: DomainDimensionScore = {
+      dimension: 'techdebt',
+      score: 70,
+      issues: 3,
+      status: 'scored',
+      version: SCORE_VERSION,
+    };
+    await persistDiagnosticsFromEntries(
+      projectDir,
+      [entry({ source: 'techdebt', category: 'techdebt:quality', fingerprint: 'fp-3' })],
+      ['techdebt'],
+      { techdebt: dimensionScore },
+    );
+    const snap = await readDomainSnapshot(projectDir, 'techdebt');
+    expect(snap?.dimensionScore).toEqual(dimensionScore);
+
+    const records = await listDomainHistory(projectDir, 'techdebt', 10);
+    expect(records[0].score).toBe(70);
     expect(records[0].scoreVersion).toBe(SCORE_VERSION);
   });
 

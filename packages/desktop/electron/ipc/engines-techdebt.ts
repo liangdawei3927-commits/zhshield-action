@@ -23,8 +23,10 @@ import {
   readDomainSnapshot,
 } from '../zh-diagnostics';
 import { updateDashboardState } from './dashboard-state';
+import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import { collectExposedFilesInWorker } from '../profile-host';
 import { getDb } from '../ipc-context';
+import type { DomainDimensionScore } from '../zh-diagnostics-types';
 import type { TechDebtReportData } from '../../src/types/electron';
 import type { TaskProgressReporter } from '../task-progress';
 
@@ -157,19 +159,47 @@ export async function mergeDebtPersistence(
   }
 }
 
-/** 技术债报告落盘诊断（best-effort，失败仅记录日志） */
+/**
+ * 技术债报告落盘诊断（best-effort，失败仅记录日志）。
+ *
+ * `dimensionScore` 此前从未传入 —— 域历史表「分数」列因此恒「—」、较上次恒「无基线」
+ * （2026-10-28 修）。techdebt 维 = 100 − debtIndex，与 dashboard-state.techdebt
+ * 同源同形，故本域不传就永远出不了分。
+ *
+ * **未真跑（无 inspect 快照）时必须传 undefined**：空报告 debtIndex=0 会算出
+ * 100 分，那是「没查」被当成「零债务」——比不出分更糟。
+ */
 export async function persistTechDebtDiagnostics(
   projectPath: string,
   report: TechDebtReportData,
+  dimensionScore?: DomainDimensionScore,
 ): Promise<void> {
   try {
-    await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report), ['techdebt']);
+    await persistDiagnosticsFromEntries(
+      projectPath,
+      normalizeTechDebtSource(report),
+      ['techdebt'],
+      dimensionScore ? { techdebt: dimensionScore } : undefined,
+    );
   } catch (e) {
     console.warn(
       '[engine:runTechDebt] 诊断落盘失败:',
       e instanceof Error ? e.message : String(e),
     );
   }
+}
+
+/**
+ * techdebt 维当场出分（100 − debtIndex）。
+ *
+ * 与 updateTechDebtDashboard 写进 dashboard-state 的是同一组数（debtIndex + 动作数），
+ * 再经同一个 buildHealthDimensions ⇒ 与报告中心汇总、分类页实时评分不可能漂移。
+ */
+export function computeTechDebtScore(report: TechDebtReportData): DomainDimensionScore | undefined {
+  return computeDomainSnapshotScore({
+    dimension: 'techdebt',
+    techdebt: { debtIndex: report.debtIndex, issueCount: report.actionList.length },
+  });
 }
 
 /** P1b: 补写 dashboard-state techdebt 域（debtIndex + 动作数 + lastRunAt） */
@@ -352,7 +382,9 @@ export async function runTechDebtHandler(
     const snapshot = await buildTechDebtSnapshot(projectPath, input);
     const finalSnapshot = await mergeDebtPersistence(snapshot);
     const report: TechDebtReportData = { ...finalSnapshot, error: null };
-    await persistTechDebtDiagnostics(projectPath, report);
+    // input.ok 已保证这次真算了债务指数（无 inspect 快照时走 emptyTechDebtReport 分支，
+    // 那里 debtIndex=0 是「没算」而非「零债务」，不带分落盘）。
+    await persistTechDebtDiagnostics(projectPath, report, computeTechDebtScore(report));
     await updateTechDebtDashboard(projectPath, report);
     return report;
   } catch (err) {

@@ -11,7 +11,10 @@
  *   同源的 activeSecrets 绝对扣分 —— 与 assembleHealthInputs 的合并口径一致；
  * - dependencies 维 = 该域快照条目（category==='dependency'）+ deps 漏洞计数绝对扣分；
  * - performance / garbage 维 = 摘要数据计权（与 dashboard-state patch 同源同形），
- *   这两维不吃条目（性能/垃圾类条目归 quality 维扣分，见 DIMENSION_CATEGORIES）。
+ *   这两维不吃条目（性能/垃圾类条目归 quality 维扣分，见 DIMENSION_CATEGORIES）；
+ * - techdebt 维 = 100 − debtIndex（与 dashboard-state.techdebt 同源同形），
+ *   同样不吃条目 —— 债务动作条目归 inspect 快照的 quality 维，techdebt 维自己
+ *   没有 category 映射（DIMENSION_CATEGORIES.techdebt 为空数组）。
  *
  * 零 Electron 依赖：纯计算，可直接单测。
  */
@@ -21,11 +24,22 @@ import {
   type DepsDataLike,
   type PerformanceDataLike,
   type GarbageDataLike,
+  type TechDebtDataLike,
 } from '@zh/scoring';
 import type { DiagnosticEntry, DomainDimensionScore } from './zh-diagnostics-types';
 
-/** 四个此前不出分的域（quality 已由 enrichInspectSnapshot 覆盖；gate 语义不同暂不出分） */
-export type SnapshotScoreDimension = 'security' | 'dependencies' | 'performance' | 'garbage';
+/**
+ * 五个此前不出分的域（quality 已由 enrichInspectSnapshot 覆盖；gate 语义不同暂不出分）。
+ *
+ * techdebt 在此列（2026-10-28 补）：它此前落盘时压根没传 dimensionScore，
+ * 分类页历史表「分数」列恒「—」、较上次恒「无基线」——不是该域不出分，是漏了接线。
+ */
+export type SnapshotScoreDimension =
+  | 'security'
+  | 'dependencies'
+  | 'performance'
+  | 'garbage'
+  | 'techdebt';
 
 /** 各域评分输入（判别联合：字段名自解释，防 position 传参传反） */
 export type DomainSnapshotScoreInput =
@@ -44,7 +58,15 @@ export type DomainSnapshotScoreInput =
       deps: DepsDataLike | null;
     }
   | { dimension: 'performance'; performance: PerformanceDataLike }
-  | { dimension: 'garbage'; garbage: GarbageDataLike };
+  | { dimension: 'garbage'; garbage: GarbageDataLike }
+  | {
+      dimension: 'techdebt';
+      /**
+       * 债务指数 + 动作数（updateTechDebtDashboard 写进 dashboard-state 的同形数据）。
+       * null = 本次没算出债务指数（如无 inspect 快照、未真跑）→ not-run，不冒充 100 分。
+       */
+      techdebt: TechDebtDataLike | null;
+    };
 
 /**
  * 计算某域快照的 dimensionScore。
@@ -58,7 +80,7 @@ export function computeDomainSnapshotScore(
 ): DomainDimensionScore | undefined {
   const extras = buildExtras(input);
   // security/dependencies 维吃该域条目（scoreInspectBased 按 category 过滤）；
-  // performance/garbage 维不吃条目 → inspect 传 null（quality 维 not-run 与本域无关）。
+  // performance/garbage/techdebt 维不吃条目 → inspect 传 null（quality 维 not-run 与本域无关）。
   const inspect =
     input.dimension === 'security' || input.dimension === 'dependencies'
       ? { issues: toScoreIssues(input.entries), esloc: 0 }
@@ -88,6 +110,8 @@ function buildExtras(input: DomainSnapshotScoreInput): Record<string, unknown> {
       return { performance: input.performance };
     case 'garbage':
       return { garbage: input.garbage };
+    case 'techdebt':
+      return { techdebt: input.techdebt };
   }
 }
 

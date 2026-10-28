@@ -41,14 +41,36 @@ const ALLOW = process.argv.includes('--allow');
 
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
-/** 纳入漂移统计的路径：能进入发布产物的源码目录 */
-const RELEVANT_PATHS = [
-  'packages/*/src',
-  'packages/*/electron',
-  'packages/*/bin',
-  'packages/*/assets',
-  'packages/*/presets',
-  'packages/*/package.json',
+/**
+ * 纳入漂移统计的路径：能进入发布产物的源码目录。
+ *
+ * 这里用 JS 正则过滤，**不用 git pathspec**（2026-10-29 修的真缺陷）：
+ * 原实现把路径交给了 `git diff --name-only tag..HEAD -- <pathspec...>`，
+ * 其中「通配符 + 目录名」形式的 pathspec 恒不匹配 —— git 的通配 pathspec
+ * 不做隐式递归补全，必须显式写到 `/**`。10-29 实测（同一 commit 区间）：
+ *   git diff -- 带 `packages/(星)/src`        → 0 条
+ *   git diff -- 带 `packages/(星)/src/(星)(星)` → 2 条
+ * 于是门禁对**所有源码改动视而不见**，只剩 packages 下各包的直接文件
+ * （如 package.json）能命中 ⇒ 一道看着在跑、实际 95% 恒绿的假门。
+ * 发现契机：改完 electron/main.ts 后门禁仍报「自 v0.3.0 以来无发布产物改动」。
+ * 改为「先取全量 diff，再在 JS 里过滤」，路径语义不再依赖 git 的 glob 规则。
+ */
+const INCLUDE_RE = [
+  /^packages\/[^/]+\/(src|electron|bin|assets|presets)\//,
+  /^packages\/[^/]+\/package\.json$/,
+  /^packages\/desktop\/vite\.config\.ts$/,
+];
+
+/**
+ * 反空转自检样本：每个样本都必须能被 INCLUDE_RE 命中至少一次。
+ * 防止将来改正则时写成「永不匹配」，把门禁悄悄变回假绿。
+ */
+const INCLUDE_SAMPLES = [
+  'packages/desktop/electron/main.ts',
+  'packages/kernel/src/runner.ts',
+  'packages/cli/bin/zhshield.mjs',
+  'packages/kernel/assets/eslint/eslint.config.mjs',
+  'packages/desktop/package.json',
   'packages/desktop/vite.config.ts',
 ];
 
@@ -97,9 +119,9 @@ function cmpVersion(a, b) {
   return 0;
 }
 
-/** tag..HEAD 之间影响发布产物的改动文件 */
+/** tag..HEAD 之间影响发布产物的改动文件（全量 diff + JS 过滤） */
 function driftFilesSince(tag) {
-  const out = execFileSync('git', ['diff', '--name-only', `${tag}..HEAD`, '--', ...RELEVANT_PATHS], {
+  const out = execFileSync('git', ['diff', '--name-only', `${tag}..HEAD`], {
     cwd: ROOT,
     encoding: 'utf-8',
     maxBuffer: 32 * 1024 * 1024,
@@ -109,7 +131,18 @@ function driftFilesSince(tag) {
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean)
+    .filter((f) => INCLUDE_RE.some((re) => re.test(f)))
     .filter((f) => !EXCLUDE_RE.some((re) => re.test(f)));
+}
+
+// 反空转自检（fail-closed）：样本必须被命中，否则门禁会退化成「永远说无改动」
+const unmatchedSamples = INCLUDE_SAMPLES.filter((s) => !INCLUDE_RE.some((re) => re.test(s)));
+if (unmatchedSamples.length > 0) {
+  console.error(
+    `[release-drift] ✗ 内部自检失败：以下样本路径未被任何 INCLUDE_RE 命中 —— ${unmatchedSamples.join(', ')}\n` +
+      '  说明路径过滤器写坏了，门禁会静默放行所有源码改动。请先修正 INCLUDE_RE。',
+  );
+  process.exit(1);
 }
 
 const pkgVersion = readVersion();

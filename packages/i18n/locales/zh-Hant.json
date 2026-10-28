@@ -1613,6 +1613,18 @@
       "occurrenceCount": "發生 {{count}} 次",
       "refreshing": "重新整理中...",
       "monitoring": "監控中...",
+      "scope": {
+        "title": "目前監控源",
+        "fileMonitor": "檔案監控",
+        "logCollector": "日誌收集",
+        "processMonitor": "行程監控",
+        "running": "已啟動",
+        "notStarted": "未啟動",
+        "skipNoLogs": "未發現日誌檔案",
+        "skipNoScript": "未識別到 dev/start/build 指令稿",
+        "skipNoPath": "專案目錄不存在",
+        "partialHint": "僅 {{started}}/{{total}} 個監視器運作中，分數不代表完整監控"
+      },
       "shell": {
         "buttonStart": "啟動監控",
         "featureAlert": {
@@ -1628,8 +1640,8 @@
           "title": "即時監控"
         },
         "featureScope": {
-          "desc": "自定義監聽檔案、目錄與規則範圍",
-          "title": "監控範圍"
+          "desc": "檔案變更 / 日誌 / 執行行程，依專案自動偵測",
+          "title": "三源監控"
         },
         "subtitleIdle": "當前監控 0 個檔案，點選下方按鈕啟動",
         "subtitleMonitoring": "監控中（自動，7×24）——正在守護當前專案",

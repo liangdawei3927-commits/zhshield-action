@@ -60,8 +60,27 @@ async function writeState(state: SentinelState): Promise<void> {
 // 已启动监控的项目（幂等保护：重复 startMonitoring 不重复启动进程/日志监听）
 // 值保留项目路径：暂停某项目后，其余项目的监视器要按它重新挂回（见 stopMonitoringForProject）
 const monitoredProjects = new Map<string, string>();
+/**
+ * 各项目**实际启停结果**的监视器明细（started / skipped 原文）。
+ *
+ * 为什么单独存一份：评分侧不能只看"有没有事件"——三个监视器全被跳过的项目
+ * 事件恒为 0 ⇒ 100 分，那是"没监控"被显示成"没问题"。有了这份明细才能把
+ * 实际启动的监视器数（`monitorsStarted`）交给 @zh/scoring 判 not-run。
+ */
+const monitorScopeById = new Map<string, { started: string[]; skipped: string[] }>();
 /** 已做过历史事件收敛的项目（每进程每项目一次，避免每次刷新都扫库） */
 const prunedProjects = new Set<string>();
+
+/**
+ * 计入覆盖的启动项数。
+ *
+ * `already-running` 是幂等重启的占位符（同一项目重复 start 时主进程不再逐个
+ * 启动监视器），不代表某个监视器真的起来了 ⇒ 不计入覆盖，否则会把"不知道"
+ * 当成"起来了"。
+ */
+export function countStartedMonitors(started: readonly string[]): number {
+  return started.filter((s) => !s.includes('already-running')).length;
+}
 
 /**
  * 历史越界事件收敛：忽略规则收紧后，库里那批旧事件描述的路径本就不该被监控。
@@ -102,6 +121,7 @@ function registerStateIpc(): void {
       if (!enabled) {
         stopAllMonitoring();
         monitoredProjects.clear();
+        monitorScopeById.clear();
       }
       return { ok: true };
     },
@@ -232,7 +252,10 @@ async function startMonitoringForProject(
   }
 
   const { started, skipped } = await startMonitors(runtime, projectId, projectPath);
-  if (started.length > 0) monitoredProjects.set(projectId, projectPath);
+  if (started.length > 0) {
+    monitoredProjects.set(projectId, projectPath);
+    monitorScopeById.set(projectId, { started, skipped });
+  }
 
   return { ok: started.length > 0, started, skipped };
 }
@@ -268,6 +291,8 @@ async function stopMonitoringForProject(
   if (!stopped) {
     return { ok: true, stopped: false, restarted: [] };
   }
+  // 停止后没有明细可依：留着会让人以为"还在监控这些"
+  monitorScopeById.delete(projectId);
   if (remaining.length === 0) {
     stopAllMonitoring();
     return { ok: true, stopped: true, restarted: [] };
@@ -282,6 +307,7 @@ async function stopMonitoringForProject(
     } else {
       // 重启失败的项目不许再留在监控表里：否则页面仍显示"监控中"，而实际没在跑
       monitoredProjects.delete(id);
+      monitorScopeById.delete(id);
     }
   }
   return { ok: true, stopped: true, restarted };
@@ -319,10 +345,26 @@ const TERMINAL = new Set(['passed', 'merged', 'deployed']);
  * 库里落盘的事件一条也读不到 ⇒ 哨兵域恒 100 分。实现见 `electron/sentinel-health.ts`。
  * DB 不可用（降级无持久化模式）时才退回内存，并在日志里说明计数可能偏低。
  */
+/** 哨兵健康数据（供 @zh/scoring 的 SentinelDataLike 组装） */
+export interface SentinelHealthData {
+  active: boolean;
+  criticalEvents: number;
+  warningEvents: number;
+  /**
+   * 实际启动的监视器数（0~3）。**0 ⇒ 评分侧判 not-run**：一个监视器都没起来时
+   * 事件恒为 0，给 100 分等于把"没监控"说成"没问题"。
+   * undefined = 本进程没启动过该项目的监控（无从判定覆盖），评分侧保持 scored。
+   */
+  monitorsStarted?: number;
+}
+
 export async function getSentinelHealthData(
   projectId: string,
-): Promise<{ active: boolean; criticalEvents: number; warningEvents: number } | null> {
+): Promise<SentinelHealthData | null> {
   const monitoring = monitoredProjects.has(projectId);
+  const scope = monitorScopeById.get(projectId);
+  const monitorsStarted = scope ? countStartedMonitors(scope.started) : undefined;
+  const coverage = monitorsStarted === undefined ? {} : { monitorsStarted };
   const db = getDb();
   if (db) {
     try {
@@ -332,6 +374,7 @@ export async function getSentinelHealthData(
             active: health.active,
             criticalEvents: health.criticalEvents,
             warningEvents: health.warningEvents,
+            ...coverage,
           }
         : null;
     } catch (err) {
@@ -350,6 +393,7 @@ export async function getSentinelHealthData(
       active: monitoring,
       criticalEvents: own.filter((e) => e.severity === 'p1').length,
       warningEvents: own.filter((e) => e.severity === 'p2').length,
+      ...coverage,
     };
   } catch (err) {
     console.warn(

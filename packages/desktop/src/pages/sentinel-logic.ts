@@ -193,6 +193,12 @@ function toSentinelEventItem(e: SentinelEvent): SentinelEventItem {
   };
 }
 
+/** 监控启停的结果明细：主进程实际启动了哪些监视器、跳过了哪些 */
+export interface SentinelMonitorScope {
+  readonly started: readonly string[];
+  readonly skipped: readonly string[];
+}
+
 /** 监控启停：监控状态 + 开启/停止动作（挂载即自动启动，IPC 侧幂等） */
 function useSentinelMonitoring(
   projectPath: string,
@@ -200,12 +206,15 @@ function useSentinelMonitoring(
 ): {
   monitoring: boolean;
   stopping: boolean;
+  scope: SentinelMonitorScope | null;
   startMonitoring: () => Promise<void>;
   stopMonitoring: () => Promise<void>;
 } {
   const [monitoring, setMonitoring] = useState(false);
   /** 已发出停止、等主进程确认（按钮显示「停止中」并禁用，防连点） */
   const [stopping, setStopping] = useState(false);
+  /** 最近一次启动的监视器明细（停止后清空：没在监控就没有"监控范围"可展示） */
+  const [scope, setScope] = useState<SentinelMonitorScope | null>(null);
 
   const startMonitoring = useCallback(async () => {
     const result = await startSentinelMonitoring(projectPath);
@@ -214,6 +223,7 @@ function useSentinelMonitoring(
       return;
     }
     if (result.ok) {
+      setScope({ started: result.started ?? [], skipped: result.skipped ?? [] });
       setMonitoring(true);
       await refreshEvents();
     }
@@ -231,6 +241,7 @@ function useSentinelMonitoring(
     try {
       await stopSentinelMonitoring(projectPath);
       setMonitoring(false);
+      setScope(null);
     } finally {
       setStopping(false);
     }
@@ -252,7 +263,7 @@ function useSentinelMonitoring(
     };
   }, [startMonitoring]);
 
-  return { monitoring, stopping, startMonitoring, stopMonitoring };
+  return { monitoring, stopping, scope, startMonitoring, stopMonitoring };
 }
 
 /** 事件列表状态：加载 + 监控启停 */
@@ -261,6 +272,7 @@ function useSentinelEvents(projectPath: string): {
   loading: boolean;
   monitoring: boolean;
   stopping: boolean;
+  scope: SentinelMonitorScope | null;
   refreshEvents: () => void;
   startMonitoring: () => Promise<void>;
   stopMonitoring: () => Promise<void>;
@@ -268,7 +280,7 @@ function useSentinelEvents(projectPath: string): {
   const [loading, setLoading] = useState(true);
   const markLoaded = useCallback(() => setLoading(false), [setLoading]);
   const { events, refreshEvents } = useSentinelEventData(projectPath, markLoaded);
-  const { monitoring, stopping, startMonitoring, stopMonitoring } = useSentinelMonitoring(
+  const { monitoring, stopping, scope, startMonitoring, stopMonitoring } = useSentinelMonitoring(
     projectPath,
     refreshEvents,
   );
@@ -285,6 +297,7 @@ function useSentinelEvents(projectPath: string): {
     loading,
     monitoring,
     stopping,
+    scope,
     refreshEvents,
     startMonitoring: startWithLoading,
     stopMonitoring,
@@ -336,6 +349,64 @@ export function deriveSentinelActionState(input: {
   return { busy: input.loading, domain: 'sentinel', cancellable: false, stopping: false };
 }
 
+// ─── 监控范围：三个监视器的实际启停结果 → 可展示清单 ──────────────
+
+/**
+ * 主进程启动说明的前缀（`ipc/sentinel.ts` 的 startMonitors）→ 展示文案键。
+ *
+ * 为什么必须有这一层：主进程**明明知道**哪个监视器起来了、哪个因为"没日志文件
+ * / 没 dev 脚本"被跳过，但渲染层此前只取 `ok` ⇒ 界面上永远看不出「三个源里有
+ * 两个压根没跑」，于是「0 覆盖的项目也显示 100 分」这类假象无从被用户发现。
+ */
+const MONITOR_SPECS: readonly { prefix: string; labelKey: string }[] = [
+  { prefix: 'file-monitor', labelKey: 'page.sentinel.scope.fileMonitor' },
+  { prefix: 'log-collector', labelKey: 'page.sentinel.scope.logCollector' },
+  { prefix: 'process-monitor', labelKey: 'page.sentinel.scope.processMonitor' },
+];
+
+/** 跳过原因关键字 → 文案键（与 ipc/sentinel.ts 的 skipped 说明字面量对应） */
+const SKIP_REASONS: readonly { match: string; textKey: string }[] = [
+  { match: 'no log files', textKey: 'page.sentinel.scope.skipNoLogs' },
+  { match: 'no dev/start/build', textKey: 'page.sentinel.scope.skipNoScript' },
+  { match: 'path not found', textKey: 'page.sentinel.scope.skipNoPath' },
+];
+
+/** 单个监视器的展示态：是否在运行 + 未启动原因（识别不出时缺省） */
+export interface MonitorScopeItem {
+  readonly key: string;
+  readonly label: string;
+  readonly running: boolean;
+  readonly reason?: string;
+}
+
+/**
+ * 把主进程返回的 started / skipped 翻成监视器清单。
+ *
+ * 返回 **null = 拿不到清单**（`already-running` 幂等重启时主进程不给明细），
+ * 调用方必须**不渲染**——绝不许退化成「3/3 都在跑」或「0/3」任何一种假象。
+ */
+export function describeMonitorScope(
+  started: readonly string[],
+  skipped: readonly string[],
+  t: (key: string, params?: Record<string, unknown>) => string,
+): MonitorScopeItem[] | null {
+  const hasConcrete = started.some((s) => MONITOR_SPECS.some((m) => s.startsWith(m.prefix)));
+  if (!hasConcrete && skipped.length === 0) return null;
+  return MONITOR_SPECS.map((spec) => {
+    const hit = skipped.find((s) => s.startsWith(spec.prefix));
+    if (hit) {
+      const reason = SKIP_REASONS.find((r) => hit.includes(r.match));
+      return {
+        key: spec.prefix,
+        label: t(spec.labelKey),
+        running: false,
+        ...(reason ? { reason: t(reason.textKey) } : {}),
+      };
+    }
+    return { key: spec.prefix, label: t(spec.labelKey), running: started.some((s) => s.startsWith(spec.prefix)) };
+  });
+}
+
 /** 事件严重度 / 活跃状态统计 */
 function countSentinelStats(events: SentinelEventItem[]): {
   criticalCount: number;
@@ -360,7 +431,7 @@ function sortSentinelEvents(events: SentinelEventItem[]): SentinelEventItem[] {
 
 /** 误报反馈数量（按来源过滤，用于 KPI 卡展示） */
 export function useSentinelPage(projectPath: string) {
-  const { events, loading, monitoring, stopping, refreshEvents, startMonitoring, stopMonitoring } =
+  const { events, loading, monitoring, stopping, scope, refreshEvents, startMonitoring, stopMonitoring } =
     useSentinelEvents(projectPath);
   const falsePositiveCount = useFalsePositiveCount(projectPath, 'sentinel');
 
@@ -369,6 +440,12 @@ export function useSentinelPage(projectPath: string) {
     loading,
     monitoring,
     stopping,
+    scope,
+    /**
+     * 监视器清单（null = 主进程没给明细，UI 不渲染）。
+     * 与「是否监控中」分开：这是"监控了哪些"，不是"有没有在跑"。
+     */
+    monitorScope: scope ? describeMonitorScope(scope.started, scope.skipped, t) : null,
     ...countSentinelStats(events),
     falsePositiveCount,
     sorted: sortSentinelEvents(events),

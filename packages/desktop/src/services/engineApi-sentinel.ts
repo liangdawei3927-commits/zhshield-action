@@ -19,12 +19,21 @@ export async function getSentinelEvents(
   return api.sentinel.getEvents(options);
 }
 
+/**
+ * 启动监控。
+ *
+ * `started` / `skipped` 是主进程三个监视器（文件 / 日志 / 进程）的实际启停结果，
+ * 例：`['file-monitor']` / `['log-collector: no log files found']`。
+ * **这两个字段此前在返回类型里被漏掉**（只声明了 started，skipped 直接丢），
+ * 于是「到底监控了什么」在界面上永远看不到 —— 只有 0 覆盖也照样显示 100 分。
+ * 渲染层据此展示监控范围，见 `sentinel-logic.describeMonitorScope`。
+ */
 export async function startSentinelMonitoring(
   projectPath: string,
-): Promise<{ ok: boolean; started: string[]; disabled?: boolean }> {
+): Promise<{ ok: boolean; started: string[]; skipped: string[]; disabled?: boolean }> {
   if (isHttpMode()) return startSentinelViaHttp(projectPath);
   const api = getAPI();
-  if (!api?.sentinel) return { ok: false, started: [] };
+  if (!api?.sentinel) return { ok: false, started: [], skipped: [] };
   return api.sentinel.startMonitoring(projectPath, projectPath);
 }
 

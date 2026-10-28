@@ -1613,6 +1613,18 @@
       "occurrenceCount": "発生 {{count}} 回",
       "refreshing": "更新中...",
       "monitoring": "監視中...",
+      "scope": {
+        "title": "現在の監視源",
+        "fileMonitor": "ファイル監視",
+        "logCollector": "ログ収集",
+        "processMonitor": "プロセス監視",
+        "running": "実行中",
+        "notStarted": "未起動",
+        "skipNoLogs": "ログファイルが見つかりません",
+        "skipNoScript": "dev/start/build スクリプトが見つかりません",
+        "skipNoPath": "プロジェクトディレクトリが存在しません",
+        "partialHint": "稼働中は {{started}}/{{total}} 個のみ。スコアは完全な監視を表しません"
+      },
       "shell": {
         "buttonStart": "監視を開始",
         "featureAlert": {
@@ -1628,8 +1640,8 @@
           "title": "リアルタイム監視"
         },
         "featureScope": {
-          "desc": "監視するファイル、ディレクトリ、ルール範囲をカスタマイズ",
-          "title": "監視範囲"
+          "desc": "ファイル変更・ログ・プロセスをプロジェクトごとに自動検出",
+          "title": "3つの監視源"
         },
         "subtitleIdle": "現在 0 個のファイルを監視しています。下のボタンをクリックして開始してください",
         "subtitleMonitoring": "監視中（自動、7×24）——現在のプロジェクトをガードしています",

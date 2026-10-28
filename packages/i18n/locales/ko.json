@@ -1613,6 +1613,18 @@
       "occurrenceCount": "발생 {{count}}회",
       "refreshing": "새로고침 중...",
       "monitoring": "모니터링 중...",
+      "scope": {
+        "title": "현재 모니터링 소스",
+        "fileMonitor": "파일 모니터링",
+        "logCollector": "로그 수집",
+        "processMonitor": "프로세스 모니터링",
+        "running": "실행 중",
+        "notStarted": "시작되지 않음",
+        "skipNoLogs": "로그 파일을 찾을 수 없음",
+        "skipNoScript": "dev/start/build 스크립트를 찾을 수 없음",
+        "skipNoPath": "프로젝트 디렉터리를 찾을 수 없음",
+        "partialHint": "{{started}}/{{total}}개 모니터만 실행 중입니다. 점수는 전체 모니터링을 반영하지 않습니다"
+      },
       "shell": {
         "buttonStart": "모니터링 시작",
         "featureAlert": {
@@ -1628,8 +1640,8 @@
           "title": "실시간 모니터링"
         },
         "featureScope": {
-          "desc": "모니터링할 파일, 디렉터리, 규칙 범위 커스터마이징",
-          "title": "모니터링 범위"
+          "desc": "파일 변경·로그·프로세스를 프로젝트별로 자동 감지",
+          "title": "세 가지 모니터 소스"
         },
         "subtitleIdle": "현재 0개 파일을 모니터링 중입니다. 아래 버튼을 눌러 시작하세요",
         "subtitleMonitoring": "모니터링 중 (자동, 24/7) — 현재 프로젝트를 보호하고 있습니다",

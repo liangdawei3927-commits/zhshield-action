@@ -1691,6 +1691,18 @@
       "occurrenceCount": "发生 {{count}} 次",
       "refreshing": "刷新中...",
       "monitoring": "监控中...",
+      "scope": {
+        "title": "当前监控源",
+        "fileMonitor": "文件监控",
+        "logCollector": "日志采集",
+        "processMonitor": "进程监控",
+        "running": "已启动",
+        "notStarted": "未启动",
+        "skipNoLogs": "未发现日志文件",
+        "skipNoScript": "未识别到 dev/start/build 脚本",
+        "skipNoPath": "项目目录不存在",
+        "partialHint": "仅 {{started}}/{{total}} 个监视器在跑，分数不代表完整监控"
+      },
       "shell": {
         "buttonStart": "启动监控",
         "featureAlert": {
@@ -1706,8 +1718,8 @@
           "title": "实时监控"
         },
         "featureScope": {
-          "desc": "自定义监听文件、目录与规则范围",
-          "title": "监控范围"
+          "desc": "文件变更 / 日志 / 运行进程，按项目自动探测",
+          "title": "三源监控"
         },
         "subtitleIdle": "当前监控 0 个文件，点击下方按钮启动",
         "subtitleMonitoring": "监控中（自动，7×24）——正在守护当前项目",

@@ -1691,6 +1691,18 @@
       "occurrenceCount": "Occurred {{count}} times",
       "refreshing": "Refreshing...",
       "monitoring": "Monitoring...",
+      "scope": {
+        "title": "Active monitor sources",
+        "fileMonitor": "File monitoring",
+        "logCollector": "Log collection",
+        "processMonitor": "Process monitoring",
+        "running": "Running",
+        "notStarted": "Not started",
+        "skipNoLogs": "No log files found",
+        "skipNoScript": "No dev/start/build script found",
+        "skipNoPath": "Project path not found",
+        "partialHint": "Only {{started}}/{{total}} monitors running; score does not reflect full monitoring"
+      },
       "shell": {
         "buttonStart": "Start monitoring",
         "featureAlert": {
@@ -1706,8 +1718,8 @@
           "title": "Real-time monitoring"
         },
         "featureScope": {
-          "desc": "Customize monitored files, directories, and rule scope",
-          "title": "Monitor scope"
+          "desc": "File changes, logs and processes — auto-detected per project",
+          "title": "Three monitor sources"
         },
         "subtitleIdle": "Currently monitoring 0 files; click the button below to start",
         "subtitleMonitoring": "Monitoring (automatic, 7×24) — guarding the current project",

@@ -25,6 +25,8 @@ export interface DomainEmptyViewProps {
   /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
   progress?: number;
   statusMessage?: string;
+  /** 主按钮下方的附加内容（如哨兵的「监控范围」清单） */
+  extra?: ReactNode;
 }
 
 /** 各域空态统一骨架：DomainScoreRing 插图 + PageShell 版式，仅参数化差异字段 */
@@ -45,6 +47,7 @@ export function DomainEmptyView(props: DomainEmptyViewProps) {
       stopping={props.stopping}
       progress={props.progress}
       progressMessage={props.statusMessage}
+      extra={props.extra}
     />
   );
 }

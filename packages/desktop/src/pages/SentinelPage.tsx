@@ -11,6 +11,7 @@ import {
   deriveSentinelActionState,
   type SentinelEventItem,
   type SentinelActionState,
+  type MonitorScopeItem,
 } from './sentinel-logic';
 import { SentinelTimeline, EventsPanel } from './sentinel-parts';
 import { useNotification } from '../contexts/NotificationContext';
@@ -167,10 +168,45 @@ export function SentinelReportView({
   );
 }
 
+/**
+ * 监控范围清单：把主进程「哪些监视器起来了、哪些因为什么没起来」摆到台面上。
+ *
+ * 为什么必须有它：哨兵域此前只看有没有 p1/p2 事件，于是「三个监视器只起来一个、
+ * 另外两个压根没跑」的项目照样显示 100 分，用户无从判断这个分是"监控过了没问题"
+ * 还是"根本没监控到"。清单 + 覆盖不足提示把这两种情况区分开。
+ */
+function MonitorScopeList({ items }: { items: MonitorScopeItem[] }) {
+  const t = useT();
+  const running = items.filter((i) => i.running).length;
+  return (
+    <div className="mt-6 w-[420px] max-w-full rounded-lg border border-zh-line bg-zh-card px-4 py-3 text-left">
+      <div className="text-sm text-zh-ink mb-2">{t('page.sentinel.scope.title')}</div>
+      <ul className="space-y-1">
+        {items.map((item) => (
+          <li key={item.key} className="flex items-center justify-between text-[13px]">
+            <span className="text-zh-ink">{item.label}</span>
+            <span className={item.running ? 'text-zh-ink' : 'text-zh-muted'}>
+              {item.running
+                ? t('page.sentinel.scope.running')
+                : (item.reason ?? t('page.sentinel.scope.notStarted'))}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {running < items.length && (
+        <p className="mt-2 text-xs text-zh-muted">
+          {t('page.sentinel.scope.partialHint', { started: running, total: items.length })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SentinelEmptyView(props: {
   projectPath: string;
   monitoring: boolean;
   action: SentinelActionState;
+  monitorScope: MonitorScopeItem[] | null;
   onAction: () => void;
   onStopMonitoring: () => void;
   t: (key: string, opts?: { defaultValue?: string }) => string;
@@ -236,6 +272,7 @@ function SentinelEmptyView(props: {
       // 监控中：同一颗按钮 hover 出「停止」，点它真的停掉监视器
       onCancel={props.action.cancellable ? props.onStopMonitoring : undefined}
       stopping={props.action.stopping}
+      extra={props.monitorScope ? <MonitorScopeList items={props.monitorScope} /> : undefined}
     />
   );
 }
@@ -263,6 +300,7 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
     activeCount,
     highCount,
     criticalCount,
+    monitorScope,
     sorted,
     startMonitoring,
     stopMonitoring,
@@ -308,6 +346,7 @@ export function SentinelPage({ projectPath }: SentinelPageProps) {
         projectPath={projectPath}
         monitoring={monitoring}
         action={action}
+        monitorScope={monitorScope}
         onAction={() => {
           setShowHome(false);
           startMonitoring();

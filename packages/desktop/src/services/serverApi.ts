@@ -142,7 +142,7 @@ export async function getSentinelEventsViaHttp(
 
 export async function startSentinelViaHttp(
   projectPath: string,
-): Promise<{ ok: boolean; started: string[] }> {
+): Promise<{ ok: boolean; started: string[]; skipped: string[] }> {
   const started: string[] = [];
   await request('/system/sentinel/file-monitor/start', {
     method: 'POST',
@@ -157,7 +157,10 @@ export async function startSentinelViaHttp(
     body: JSON.stringify({ projectId: projectPath, logPaths }),
   });
   started.push('log-collector');
-  return { ok: true, started };
+  // 进程监控在 HTTP 模式没有对应接口，如实标为未启动（不因为"没报错"就算已覆盖）。
+  // ⚠️ 已知不实（本次未改）：日志采集在无日志文件时这里仍计为 started，
+  //    服务端未返回逐监视器结果；IPC 模式由主进程按实际探测判定，以那边为准。
+  return { ok: true, started, skipped: ['process-monitor: not supported in http mode'] };
 }
 
 // ─── Backup ──────────────────────────────────────────────

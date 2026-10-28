@@ -65,4 +65,31 @@ describe('门禁 / 巡检入口 — 装配同源', () => {
       'loadSopRulesFromCache',
     );
   });
+
+  it('安全任务必须接通引擎事件（P1-A：emit 丢弃 = 5 分钟扫描零进度反馈）', () => {
+    const src = read('pipeline-jobs.ts');
+    expect(
+      src,
+      'runSecurityJob 不得用 noop emit 丢弃引擎事件（用户会重新失去进度反馈）',
+    ).not.toContain('emit: () => undefined');
+    // 进度接线形态：tool:scan-started / tool:executed 必须映射到 progress 通道
+    expect(src).toContain("event.type === 'tool:scan-started'");
+    expect(src).toContain("event.type === 'tool:executed'");
+  });
+
+  it('扫描失败不得返回空报告伪装满分（P1-B：宁可红不可假绿）', () => {
+    // security：空报告 = 0 问题 = 满分 100，主进程侧已改为抛错
+    expect(
+      read('ipc/engines-scanners.ts'),
+      'security 失败路径不得再返回 emptySecurityScanReportData',
+    ).not.toContain('emptySecurityScanReportData');
+    // performance / garbage：空报告字面量不得在失败 catch 里复活
+    const engines = read('ipc/engines.ts');
+    expect(engines, 'performance 失败不得返回 0 问题空报告').not.toContain(
+      'summary: { total: 0, autoFixable: 0 }',
+    );
+    expect(engines, 'garbage 失败不得返回 0 垃圾空报告').not.toContain(
+      'summary: { total: 0, size: 0, byType: {} }',
+    );
+  });
 });

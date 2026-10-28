@@ -66,13 +66,14 @@ export interface FileDiagnostics {
 
 /**
  * 按域快照附带的实时维度评分（落盘时由 @zh/scoring 统一计算，渲染层只读不算）。
- * 目前仅 inspect → quality（巡检与 quality 维的扣分口径一一对应）；
+ * inspect → quality（enrichInspectSnapshot）；security/deps/garbage/performance →
+ * 同名维（computeDomainSnapshotScore，与 compose-on-read 同口径）；
  * gate 维需 status/blocking 语义（快照条目不带），暂不实时评分。
  * version = 评分算法版本（scoreVersion 2 起）；跨版本快照的 previousScore 不参与对比。
  */
 export interface DomainDimensionScore {
   /** 对应 @zh/scoring 的评分维度 */
-  dimension: 'quality';
+  dimension: 'quality' | 'security' | 'dependencies' | 'performance' | 'garbage';
   /** 0-100（error -8 / warning -4 / info -1，下限 0） */
   score: number;
   /** 计分所依据的问题条数 */

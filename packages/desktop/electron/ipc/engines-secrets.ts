@@ -10,7 +10,8 @@ import path from 'node:path';
 import { t } from '@zh/i18n';
 import { SecretLifecycleManager, FileSecretStore } from '@zh/security';
 import { updateDashboardState } from './dashboard-state';
-import { persistSecurityDomainEntries } from '../zh-diagnostics-persist';
+import { persistSecurityDomainEntries, mergeSecurityEntries, readDomainSnapshot } from '../zh-diagnostics-persist';
+import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import type { DiagnosticEntry } from '../zh-diagnostics-types';
 import type { SecretReportData } from '../../src/types/electron';
 
@@ -73,9 +74,23 @@ export async function runSecretsHandler(projectPath: string): Promise<SecretRepo
       secrets: { activeCount: report.summary.active, lastRunAt: new Date().toISOString() },
     });
     // P1-6：active 密钥落 security 域快照（与漏洞扫描双路合并，互不覆盖）。
+    // P2：写快照同时当场出分（合并条目 + 本次 activeCount），否则密钥扫描覆盖写
+    // security 快照时会把漏洞扫描刚写的 dimensionScore 抹掉。
     // best-effort：快照写入失败不阻断扫描返回（dashboard-state 已记 activeCount）。
     try {
-      await persistSecurityDomainEntries(projectPath, activeSecretEntries(report), 'secret');
+      const secretEntries = activeSecretEntries(report);
+      const prevSnapshot = await readDomainSnapshot(projectPath, 'security').catch(() => null);
+      const mergedEntries = mergeSecurityEntries(
+        prevSnapshot?.issues ?? [],
+        secretEntries,
+        'secret',
+      );
+      const dimensionScore = computeDomainSnapshotScore({
+        dimension: 'security',
+        entries: mergedEntries,
+        activeSecrets: report.summary.active,
+      });
+      await persistSecurityDomainEntries(projectPath, secretEntries, 'secret', dimensionScore);
     } catch (e) {
       console.warn(
         '[engine:runSecrets] security 域快照写入失败:',

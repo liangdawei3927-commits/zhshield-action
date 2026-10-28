@@ -36,6 +36,8 @@ import {
 import { persistDiagnosticsFromEntries, normalizeDepsSource } from '../zh-diagnostics';
 import { updateDashboardState, type DashboardDepsState } from './dashboard-state';
 import { detectProfileInWorker } from '../profile-host';
+import type { DiagnosticEntry } from '../zh-diagnostics-types';
+import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import type { DependencyReportData, DepsRelockResult } from '../../src/types/electron';
 import { emptyDependencyReportData } from '../../src/services/empty-engine-reports';
 import type { TaskProgressReporter } from '../task-progress';
@@ -129,9 +131,22 @@ function buildDepsReport(
 async function persistDepsDiagnostics(
   projectPath: string,
   report: DependencyReportData,
+  entries: readonly DiagnosticEntry[],
 ): Promise<void> {
   try {
-    await persistDiagnosticsFromEntries(projectPath, normalizeDepsSource(report), ['deps']);
+    // P2：deps 域快照当场出分（条目 + deps 漏洞计数，与 compose-on-read 同口径）
+    const patch = depsDashboardPatch(report);
+    const dimensionScore = computeDomainSnapshotScore({
+      dimension: 'dependencies',
+      entries,
+      deps: { vulnerabilities: patch.vulnerabilities, upgradable: patch.upgradable },
+    });
+    await persistDiagnosticsFromEntries(
+      projectPath,
+      entries,
+      ['deps'],
+      dimensionScore ? { deps: dimensionScore } : undefined,
+    );
   } catch (e) {
     console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
   }
@@ -184,7 +199,7 @@ export async function runDepsHandler(
       env,
       cve,
     });
-    await persistDepsDiagnostics(projectPath, report);
+    await persistDepsDiagnostics(projectPath, report, normalizeDepsSource(report));
     await updateDepsDashboard(projectPath, report);
     return report;
   } catch (err) {

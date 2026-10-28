@@ -29,6 +29,7 @@ export {
   persistDiagnostics,
   persistDiagnosticsFromEntries,
   persistSecurityDomainEntries,
+  mergeSecurityEntries,
 } from './zh-diagnostics-persist';
 
 export {

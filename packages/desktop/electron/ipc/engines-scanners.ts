@@ -19,6 +19,8 @@ import type { GarbageScanReport, GarbageCleanResult, GarbageRestoreResult } from
 import {
   persistDiagnosticsFromEntries,
   persistSecurityDomainEntries,
+  mergeSecurityEntries,
+  readDomainSnapshot,
   normalizeSecuritySource,
   normalizeRefactorSource,
 } from '../zh-diagnostics';
@@ -34,12 +36,12 @@ import { validateGarbageCleanItems, isValidBatchId } from '../garbage-input';
 import { sendProgress } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
 import { rethrowIfCancelled } from '../pipeline-protocol';
+import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import {
   toSecurityScanReportData,
   type SecurityScanReportData,
   type PerformanceReportData,
 } from './report-format';
-import { emptySecurityScanReportData } from '../../src/services/empty-engine-reports';
 
 export async function isExecutable(p: string): Promise<boolean> {
   try {
@@ -123,9 +125,27 @@ export async function runSecurityHandler(
     const task = manager.start('security', projectPath);
     const report = (await manager.waitFor(task.id)) as SecurityScanReport;
     const data = toSecurityScanReportData(report);
+    // P2：security 域快照当场出分（与 compose-on-read 同口径）：
+    // 条目 = 双路合并结果（新漏洞 + 既有密钥），activeSecrets 取 dashboard-state 同源。
+    const vulnEntries = normalizeSecuritySource(data);
+    const [prevSnapshot, state] = await Promise.all([
+      readDomainSnapshot(projectPath, 'security').catch(() => null),
+      readDashboardState(projectPath).catch(() => null),
+    ]);
+    const mergedEntries = mergeSecurityEntries(
+      prevSnapshot?.issues ?? [],
+      vulnEntries,
+      'vuln',
+    );
+    const activeSecrets = state?.secrets?.activeCount ?? null;
+    const dimensionScore = computeDomainSnapshotScore({
+      dimension: 'security',
+      entries: mergedEntries,
+      activeSecrets,
+    });
     try {
       // P1-6: 安全域条目只归 vuln 类，覆盖 vuln、保留 secrets 已写的 secret 条目
-      await persistSecurityDomainEntries(projectPath, normalizeSecuritySource(data), 'vuln');
+      await persistSecurityDomainEntries(projectPath, vulnEntries, 'vuln', dimensionScore);
     } catch (e) {
       console.warn(
         '[engine:runSecurity] 诊断落盘失败:',
@@ -135,8 +155,10 @@ export async function runSecurityHandler(
     return data;
   } catch (err) {
     rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
+    // P1-B：失败不再返回空报告。空报告 = 0 问题 = 满分 100，
+    // 会把「没查成」伪装成「干净」；抛错让渲染层走失败路径（宁可红不可假绿）。
     console.error('[engine:runSecurity] Error:', err);
-    return emptySecurityScanReportData();
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 

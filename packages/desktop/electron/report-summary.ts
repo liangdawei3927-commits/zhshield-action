@@ -159,8 +159,11 @@ export function qualityFastPathScore(
   performanceSnap: DiagnosticsReport | null = null,
 ): QualityFastPathScore | null {
   if (!snap?.dimensionScore) return null;
+  // dimension 显式收窄为 'quality'：DomainDimensionScore.dimension 已放宽为五域联合
+  // （security/deps/garbage/performance 快照也带分了），inspect 快照恒为 quality 维
   const passthrough = {
     ...snap.dimensionScore,
+    dimension: 'quality' as const,
     generatedAt: snap.generatedAt,
     previousScore: snap.previousScore,
   };

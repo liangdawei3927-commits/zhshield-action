@@ -3,7 +3,12 @@ import { basename, join } from 'node:path';
 import { WhitelistManager } from '@zh/guard';
 import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { PipelineReport } from '@zh/pipeline';
-import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics-types';
+import type {
+  DiagnosticEntry,
+  DiagnosticSource,
+  DiagnosticsReport,
+  DomainDimensionScore,
+} from './zh-diagnostics-types';
 import { buildDiagnosticsReport, countSourceEsloc } from './zh-diagnostics-esloc';
 import { normalizePipelineReport } from './zh-diagnostics-normalize';
 import { appendDomainHistory, buildScanRecord } from './domain-history';
@@ -40,6 +45,7 @@ function buildPerSourceEntries(
 async function writeDomainSnapshots(
   report: DiagnosticsReport,
   perSource: Map<DiagnosticSource, DiagnosticEntry[]>,
+  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
 ): Promise<void> {
   if (perSource.size === 0) return;
   await mkdir(join(report.project.path, '.zhshield', 'diagnostics', 'domains'), {
@@ -48,7 +54,7 @@ async function writeDomainSnapshots(
   const writes: Promise<void>[] = [];
   const esloc = perSource.has('inspect') ? await countSourceEsloc(report.project.path) : 0;
   for (const [source, issues] of perSource) {
-    const snapshot = await buildDomainSnapshot(report, source, issues, esloc);
+    const snapshot = await buildDomainSnapshot(report, source, issues, esloc, dimensionScores?.[source]);
     writes.push(
       writeFile(
         domainSnapshotPath(report.project.path, source),
@@ -125,9 +131,15 @@ async function buildDomainSnapshot(
   source: DiagnosticSource,
   issues: readonly DiagnosticEntry[],
   esloc: number,
+  dimensionScore?: DomainDimensionScore,
 ): Promise<DiagnosticsReport> {
   const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
-  if (source !== 'inspect') return snapshot;
+  if (source !== 'inspect') {
+    // P2：security/deps/garbage/performance 快照当场出分（computeDomainSnapshotScore，
+    // 与 compose-on-read 同口径）。undefined = 规范口径 not-run，不附加、不冒充分数。
+    if (dimensionScore) snapshot.dimensionScore = dimensionScore;
+    return snapshot;
+  }
   await enrichInspectSnapshot(report, snapshot, esloc);
   return snapshot;
 }
@@ -195,6 +207,7 @@ async function rescuePreviousScore(
 export async function writeDiagnosticsFile(
   report: DiagnosticsReport,
   ranSources: readonly DiagnosticSource[] = [],
+  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
 ): Promise<string> {
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
   const absPath = join(dir, 'latest.json');
@@ -205,7 +218,7 @@ export async function writeDiagnosticsFile(
     .then(async () => {
       await mkdir(dir, { recursive: true });
       await writeFile(absPath, payload, 'utf-8');
-      await writeDomainSnapshots(report, perSource);
+      await writeDomainSnapshots(report, perSource, dimensionScores);
     })
     .catch((err) => {
       // 自愈：单次写入失败只记 warn 复位队列，writeQueue 不永久 reject。
@@ -391,6 +404,7 @@ export async function persistDiagnosticsFromEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
   ranSources: readonly DiagnosticSource[],
+  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
 ): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
@@ -399,7 +413,28 @@ export async function persistDiagnosticsFromEntries(
     filterWhitelisted(whitelist, entries),
     new Date().toISOString(),
   );
-  return await writeDiagnosticsFile(diagnostics, ranSources);
+  return await writeDiagnosticsFile(diagnostics, ranSources, dimensionScores);
+}
+
+/** security 域条目分类：密钥条目 ruleId 以 `secret:` 开头，凭此区分两路 */
+function isSecretEntry(issue: { ruleId: string }): boolean {
+  return issue.ruleId.startsWith('secret:');
+}
+
+/**
+ * security 域「双路合并」纯函数（供 persistSecurityDomainEntries 与
+ * runSecurityHandler 出分共用 —— 合并规则只此一份，出分与落盘不可能漂移）。
+ */
+export function mergeSecurityEntries(
+  prevIssues: readonly DiagnosticEntry[],
+  entries: readonly DiagnosticEntry[],
+  kind: 'vuln' | 'secret',
+): DiagnosticEntry[] {
+  return kind === 'vuln'
+    ? // 写漏洞：新漏洞条目全量覆盖 + 保留既有密钥条目
+      [...entries, ...prevIssues.filter(isSecretEntry)]
+    : // 写密钥：新密钥条目全量覆盖（含 0 条=全部已处理）+ 保留既有漏洞条目
+      [...prevIssues.filter((e) => !isSecretEntry(e)), ...entries];
 }
 
 /**
@@ -410,25 +445,24 @@ export async function persistDiagnosticsFromEntries(
  * 两类都可见，否则 Σ域条数 ≠ 维度 issues（实测报告 2026-10-27：security 0 条
  * 却有 2 个 issues，全靠密钥域代算）。
  *
- * 合并规则：各自**覆盖自己那类**条目、保留另一类——密钥条目 ruleId 以 `secret:`
- * 开头，凭此区分。两路谁后写都不能抹掉对方的发现。
+ * 合并规则：各自**覆盖自己那类**条目、保留另一类（见 {@link mergeSecurityEntries}）。
+ * 两路谁后写都不能抹掉对方的发现。
  */
 export async function persistSecurityDomainEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
   kind: 'vuln' | 'secret',
+  dimensionScore?: DomainDimensionScore,
 ): Promise<string> {
-  const isSecretEntry = (issue: { ruleId: string }): boolean =>
-    issue.ruleId.startsWith('secret:');
   const prev = await readDomainSnapshot(projectPath, 'security');
   // issues 本就是 readonly DiagnosticEntry[]（isDiagnosticsReport 守卫已保证），
   // 展开进数组字面量即得可变数组，无需断言——此前的 as unknown as 是历史残留
   const prevIssues: readonly DiagnosticEntry[] = prev?.issues ?? [];
-  const write =
-    kind === 'vuln'
-      ? // 写漏洞：新漏洞条目全量覆盖 + 保留既有密钥条目
-        [...entries, ...prevIssues.filter(isSecretEntry)]
-      : // 写密钥：新密钥条目全量覆盖（含 0 条=全部已处理）+ 保留既有漏洞条目
-        [...prevIssues.filter((e) => !isSecretEntry(e)), ...entries];
-  return await persistDiagnosticsFromEntries(projectPath, write, ['security']);
+  const write = mergeSecurityEntries(prevIssues, entries, kind);
+  return await persistDiagnosticsFromEntries(
+    projectPath,
+    write,
+    ['security'],
+    dimensionScore ? { security: dimensionScore } : undefined,
+  );
 }

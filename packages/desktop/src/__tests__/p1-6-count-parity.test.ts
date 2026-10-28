@@ -154,13 +154,15 @@ describe('P1-6 结构守卫（落盘调用点不被回退）', () => {
 
   it('runSecurityHandler 用双路合并写 vuln 类，不再整段覆盖 security 域', () => {
     const src = read('../../electron/ipc/engines-scanners.ts');
-    expect(src).toContain("persistSecurityDomainEntries(projectPath, normalizeSecuritySource(data), 'vuln')");
+    // P2 后：条目先提出为 vulnEntries，出分与落盘共用同一份合并口径
+    expect(src).toContain("persistSecurityDomainEntries(projectPath, vulnEntries, 'vuln'");
+    expect(src).toContain('mergeSecurityEntries(');
     expect(src).not.toContain('persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource');
   });
 
   it('runSecretsHandler 落 active 密钥条目为 secret 类', () => {
     const src = read('../../electron/ipc/engines-secrets.ts');
-    expect(src).toContain("persistSecurityDomainEntries(projectPath, activeSecretEntries(report), 'secret')");
+    expect(src).toContain("persistSecurityDomainEntries(projectPath, secretEntries, 'secret'");
     expect(src).toContain("finding.status === 'active'");
   });
 

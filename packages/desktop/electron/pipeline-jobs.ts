@@ -23,6 +23,7 @@ import {
   buildRecordFromFingerprints,
   normalizeFingerprint,
 } from './domain-history';
+import { computeDomainSnapshotScore } from './domain-snapshot-score';
 
 /** garbage 快照串行化写入队列：并发并发多轮扫描时避免 writeFile 交错覆盖（对齐 dashboard-state writeQueue 模式） */
 let garbageSnapshotQueue: Promise<void> = Promise.resolve();
@@ -107,7 +108,36 @@ export async function runGuardJob(
 export async function runSecurityJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'security', t('pipeline.security.scanning'), 0.1);
   const { SecurityEngine } = await import('@zh/security');
-  const engine = new SecurityEngine({ emit: () => undefined });
+  // P1-A：引擎事件接通 worker progress 通道。此前 emit 为 noop、事件全被丢弃，
+  // 5 分钟安全扫描全程只有开头一条 10% → 用户毫无进度感、"一下跳 100"。
+  // 编排器串行跑 4 个外部工具（trivy/grype/depcheck/semgrep）：
+  // 每个工具开始/完成各上报一次，步进覆盖 10%→90%（步长 0.2 与默认 4 工具对齐）。
+  let toolsDone = 0;
+  const engine = new SecurityEngine({
+    emit: (event) => {
+      if (event.type === 'tool:scan-started') {
+        progress(
+          id,
+          'security',
+          t('pipeline.security.toolRunning', { tool: event.payload.tool }),
+          Math.min(0.9, 0.1 + toolsDone * 0.2),
+        );
+        return;
+      }
+      if (event.type === 'tool:executed') {
+        toolsDone += 1;
+        progress(
+          id,
+          'security',
+          t('pipeline.security.toolDone', {
+            tool: event.payload.tool,
+            count: event.payload.issueCount,
+          }),
+          Math.min(0.9, 0.1 + toolsDone * 0.2),
+        );
+      }
+    },
+  });
   engine.registerDefaultAdapters();
   try {
     const report = await engine.runSecurityScan(projectPath, projectPath);
@@ -209,6 +239,12 @@ async function appendGarbageHistory(
       (item) => `garbage:${item.type}:${normalizeFingerprint(item.path, projectPath)}`,
     );
     const ranChecks = report.checks.filter((check) => check.ran).length;
+    // P2：garbage 域当场出分（garbagePenalty({total, byType})，与 dashboard-state patch
+    // 同源同形；compose-on-read 同口径）。该域无 severity 概念，条目不参与计分。
+    const dimensionScore = computeDomainSnapshotScore({
+      dimension: 'garbage',
+      garbage: { total: report.summary.total, byType: report.summary.byType },
+    });
     await appendDomainHistory(
       projectPath,
       buildRecordFromFingerprints({
@@ -217,7 +253,10 @@ async function appendGarbageHistory(
         recordedAt: new Date().toISOString(),
         fingerprints,
         total: report.summary.total,
-        score: null,
+        score: dimensionScore?.score ?? null,
+        ...(dimensionScore?.version === undefined
+          ? {}
+          : { scoreVersion: dimensionScore.version }),
         severityApplicable: false,
         coverage: { files: ranChecks, skipped: report.skipped },
       }),

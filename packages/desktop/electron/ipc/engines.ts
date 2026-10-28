@@ -69,6 +69,7 @@ import {
   performanceDashboardPatch,
 } from './engines-scanners';
 import { depsRelockBaselineHandler } from './engines-deps';
+import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import {
   planDebtRepaymentHandler,
   verifyDebtRepaidHandler,
@@ -366,15 +367,9 @@ async function runGarbageScanHandler(
     return report;
   } catch (err) {
     rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
+    // P1-B：失败不再返回空扫描报告（空报告 = 0 垃圾 = 伪装干净），抛错走失败路径
     console.error('[engine:runGarbageScan] Error:', err);
-    return {
-      projectPath,
-      items: [],
-      summary: { total: 0, size: 0, byType: {} },
-      checks: [],
-      skipped: 0,
-      timestamp: new Date().toISOString(),
-    };
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -388,10 +383,21 @@ async function runPerformanceHandler(
     }
     const task = manager.start('performance', projectPath);
     const result = (await manager.waitFor(task.id)) as PerformanceReportData;
+    // P2：performance 域快照当场出分（performancePenalty({total, bySeverity})，
+    // 与 dashboard-state patch / compose-on-read 同口径；性能类条目归 quality 维扣分，
+    // performance 维只吃摘要 → 直接用报告摘要出分）
+    const perfPatch = performanceDashboardPatch(result);
+    const dimensionScore = computeDomainSnapshotScore({
+      dimension: 'performance',
+      performance: { total: perfPatch.total, bySeverity: perfPatch.bySeverity },
+    });
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizePerformanceData(result), [
-        'performance',
-      ]);
+      await persistDiagnosticsFromEntries(
+        projectPath,
+        normalizePerformanceData(result),
+        ['performance'],
+        dimensionScore ? { performance: dimensionScore } : undefined,
+      );
     } catch (e) {
       console.warn(
         '[engine:runPerformance] 诊断落盘失败:',
@@ -399,16 +405,13 @@ async function runPerformanceHandler(
       );
     }
     // P1b: 补写 dashboard-state performance 域（问题总数 + severity 分布 + lastRunAt）
-    await updateDashboardState(projectPath, { performance: performanceDashboardPatch(result) });
+    await updateDashboardState(projectPath, { performance: perfPatch });
     return result;
   } catch (err) {
     rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
+    // P1-B：失败不再返回空报告（空报告 = 0 问题 = 伪装满分），抛错走失败路径
     console.error('[engine:runPerformance] Error:', err);
-    return {
-      summary: { total: 0, autoFixable: 0 },
-      issues: [],
-      metadata: { duration: 0, timestamp: new Date().toISOString() },
-    };
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 

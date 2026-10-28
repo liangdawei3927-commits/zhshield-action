@@ -2044,7 +2044,9 @@
     },
     "security": {
       "done": "Security scan complete",
-      "scanning": "Running security scan…"
+      "scanning": "Running security scan…",
+      "toolDone": "{{tool}} finished: {{count}} findings",
+      "toolRunning": "Running {{tool}} scan…"
     },
     "techdebt": {
       "computing": "Computing tech debt index…",

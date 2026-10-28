@@ -2044,7 +2044,9 @@
     },
     "security": {
       "done": "安全掃描完成",
-      "scanning": "安全掃描中…"
+      "scanning": "安全掃描中…",
+      "toolDone": "{{tool}} 完成：{{count}} 項發現",
+      "toolRunning": "正在執行 {{tool}} 掃描…"
     },
     "techdebt": {
       "computing": "計算技術債指數…",

@@ -2044,7 +2044,9 @@
     },
     "security": {
       "done": "セキュリティスキャン完了",
-      "scanning": "セキュリティスキャン中…"
+      "scanning": "セキュリティスキャン中…",
+      "toolDone": "{{tool}} 完了：{{count}} 件を検出",
+      "toolRunning": "{{tool}} スキャンを実行中…"
     },
     "techdebt": {
       "computing": "技術的負債指数を計算中…",

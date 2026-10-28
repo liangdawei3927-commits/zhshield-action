@@ -2044,7 +2044,9 @@
     },
     "security": {
       "done": "보안 스캔 완료",
-      "scanning": "보안 스캔 중…"
+      "scanning": "보안 스캔 중…",
+      "toolDone": "{{tool}} 완료: {{count}}건 발견",
+      "toolRunning": "{{tool}} 스캔 실행 중…"
     },
     "techdebt": {
       "computing": "기술 부채 지수 계산 중…",

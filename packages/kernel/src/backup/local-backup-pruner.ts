@@ -78,20 +78,27 @@ export class LocalBackupPruner {
       // 目录还不存在（首次备份）——无事可清
       return outcome;
     }
-    for (const entry of entries) {
-      if (!entry.endsWith(TMP_SNAPSHOT_SUFFIX)) continue;
-      const fullPath = path.join(backupRoot, entry);
-      const stat = await fs.stat(fullPath).catch(() => null);
-      if (stat === null) continue;
-      // 未来时间（时钟回拨）按新鲜处理，宁可留着也不误删
-      if (now - stat.mtimeMs < ttlMs) continue;
-      try {
-        await fs.rm(fullPath, { force: true });
-        outcome.removed.push(fullPath);
-      } catch {
-        outcome.failed.push(fullPath);
-      }
-    }
+    // 语境说明（perf/perf-walk-requires-ignore 豁免）：backupRoot 是备份存放目录，
+    // 只含 `<iso>.zip` / `<iso>/` 快照与 `.zip.tmp` 残片，是平坦单层结构，
+    // 不存在也不可能出现 node_modules；walk-ignore 的「递归遍历须跳过
+    // node_modules」前提在此不成立，故不做无效的跳过分支。
+    // stat/rm 并行：条目互相独立，成果/失败分桶在各自回调内完成，与串行语义一致。
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (!entry.endsWith(TMP_SNAPSHOT_SUFFIX)) return;
+        const fullPath = path.join(backupRoot, entry);
+        const stat = await fs.stat(fullPath).catch(() => null);
+        if (stat === null) return;
+        // 未来时间（时钟回拨）按新鲜处理，宁可留着也不误删
+        if (now - stat.mtimeMs < ttlMs) return;
+        try {
+          await fs.rm(fullPath, { force: true });
+          outcome.removed.push(fullPath);
+        } catch {
+          outcome.failed.push(fullPath);
+        }
+      }),
+    );
     return outcome;
   }
 }

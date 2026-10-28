@@ -37,8 +37,7 @@ export function matchesExcludePattern(relativePath: string, excludePatterns: str
 export async function estimateFilesTotalSize(files: string[]): Promise<number> {
   let total = 0;
   for (const file of files) {
-    // perf rule false positive: arg depends on loop var via dataflow
-    // eslint-disable-next-line perf/perf-no-serial-await
+    // 串行有意为之：size 估算不追求吞吐，且逐个 stat 失败只按 0 计不中断
     const s = await fs.stat(file).catch(() => null);
     total += s?.size ?? 0;
   }

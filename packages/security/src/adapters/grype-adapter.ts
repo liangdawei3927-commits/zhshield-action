@@ -7,6 +7,36 @@ import type { ExecError, GrypeOutput } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * grype 漏洞库就绪探测（实机取证 2026-10-28：DB 从未下载成功时，每次扫描都在
+ * 下载重试上干等 300s（worker timeout 上限）才降级——用户观感是安全中心卡 5 分钟。
+ * `grype db status` 0.2s 纯只读，可作快速探测；未就绪时跳过本次扫描并后台初始化，
+ * 「跳过」经 degradationManager 进 report.degraded 横幅显形，绝不伪装 0 检出。）
+ */
+let dbUpdateInFlight = false;
+
+async function triggerDbUpdateInBackground(command: string): Promise<void> {
+  if (dbUpdateInFlight) return;
+  dbUpdateInFlight = true;
+  // fire-and-forget：初始化不阻塞扫描返回；完成（无论成败）后重置防重标记，
+  // 网络恢复后下次扫描自动重试——否则长驻 worker 进程内只会尝试一次
+  void execFileAsync(command, ['db', 'update'], { timeout: 600000 })
+    .catch(() => undefined)
+    .finally(() => {
+      dbUpdateInFlight = false;
+    });
+}
+
+async function isDbReady(command: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync(command, ['db', 'status'], { timeout: 15000 });
+    // 未就绪特征（0.121 实测）：「Status:    invalid」/「ERROR database does not exist」
+    return !/invalid|does not exist/i.test(stdout);
+  } catch {
+    return false;
+  }
+}
+
 const META: ToolMeta = {
   id: 'grype',
   name: 'Grype',
@@ -65,6 +95,13 @@ export class GrypeAdapter implements ToolAdapter {
   private async runGrype(source: string, options: ToolScanOptions): Promise<GrypeOutput> {
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
     const { command } = await resolveToolCommandDetailed('grype', options.projectPath);
+    // DB 未就绪 → 不进 300s 下载等待；跳过本次 + 后台初始化（下次扫描 DB 生效）
+    if (!(await isDbReady(command))) {
+      await triggerDbUpdateInBackground(command);
+      throw new Error(
+        'grype 漏洞库未就绪（首次使用需联网下载，已后台初始化，稍后重新扫描即生效）',
+      );
+    }
     const { stdout } = await execFileAsync(command, [source, '-o', 'json'], {
       cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 120000,

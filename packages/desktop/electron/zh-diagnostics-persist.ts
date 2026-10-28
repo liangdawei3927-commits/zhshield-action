@@ -421,7 +421,9 @@ export async function persistSecurityDomainEntries(
   const isSecretEntry = (issue: { ruleId: string }): boolean =>
     issue.ruleId.startsWith('secret:');
   const prev = await readDomainSnapshot(projectPath, 'security');
-  const prevIssues = (prev?.issues ?? []) as unknown as DiagnosticEntry[];
+  // issues 本就是 readonly DiagnosticEntry[]（isDiagnosticsReport 守卫已保证），
+  // 展开进数组字面量即得可变数组，无需断言——此前的 as unknown as 是历史残留
+  const prevIssues: readonly DiagnosticEntry[] = prev?.issues ?? [];
   const write =
     kind === 'vuln'
       ? // 写漏洞：新漏洞条目全量覆盖 + 保留既有密钥条目

@@ -7,6 +7,7 @@
  */
 import { app, ipcMain } from 'electron';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expandHome, safeResolveReal } from '@zh/shared';
 import { t } from '@zh/i18n';
@@ -449,13 +450,38 @@ async function isScheduleEnabled(projectPath: string): Promise<boolean> {
   }
 }
 
+/**
+ * 项目路径同一性判定（备份记录匹配用）。
+ *
+ * backup-records 的 projectId 落盘的是添加项目时的原始路径字符串，macOS 上
+ * `/tmp/x` 与 `/private/tmp/x` 是同一目录（symlink），字面相等会把同一项目
+ * 误判成两个——后果是备份补跑判定静默失配（该补没补且无人知晓，正是
+ * cc84d13 要治的故障形态的同族复发）。两侧先 realpath 归一再比较；
+ * 路径已不存在时（realpath 抛错）退 resolve，至少消除尾斜杠/相对段差异。
+ */
+export function isSameProjectPath(
+  a: string,
+  b: string,
+  realpathFn: (p: string) => string = realpathSync,
+): boolean {
+  if (a === b) return true;
+  const norm = (p: string): string => {
+    try {
+      return realpathFn(p);
+    } catch {
+      return resolve(p);
+    }
+  };
+  return norm(a) === norm(b);
+}
+
 /** 只读指定项目的备份健康快照（从磁盘记录 + 项目配置聚合，不触发任何备份）。 */
 export async function loadBackupHealthSnapshot(
   projectPath: string,
 ): Promise<BackupHealthSnapshot | null> {
   try {
     const records = await loadRecordsFromDisk();
-    const own = records.filter((r) => r.projectId === projectPath);
+    const own = records.filter((r) => isSameProjectPath(r.projectId, projectPath));
     const scheduleEnabled = await isScheduleEnabled(projectPath);
     return buildBackupHealthSnapshot(own, scheduleEnabled);
   } catch (err) {
@@ -508,7 +534,9 @@ function setupScheduledBackups(
       try {
         const records = await loadRecordsFromDisk();
         const own = records
-          .filter((r) => r.projectId === projectPath && r.status === 'success')
+          .filter(
+            (r) => isSameProjectPath(r.projectId, projectPath) && r.status === 'success',
+          )
           .map((r) => Date.parse(r.timestamp))
           .filter((t) => Number.isFinite(t));
         return own.length ? Math.max(...own) : undefined;

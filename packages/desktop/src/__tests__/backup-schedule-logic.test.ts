@@ -14,7 +14,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp/zh-backup-ipc-test') },
 }));
 
-import { createScheduleRunner, minuteKey, syncProjectSchedule } from '../../electron/ipc/backup';
+import { createScheduleRunner, minuteKey, syncProjectSchedule, isSameProjectPath } from '../../electron/ipc/backup';
 import type { BackupScheduleConfig } from '@zh/kernel';
 
 describe('minuteKey 同分钟归桶', () => {
@@ -22,6 +22,32 @@ describe('minuteKey 同分钟归桶', () => {
     const t0 = Date.UTC(2026, 8, 3, 2, 0, 0);
     expect(minuteKey(t0)).toBe(minuteKey(t0 + 59_999));
     expect(minuteKey(t0)).not.toBe(minuteKey(t0 + 60_000));
+  });
+});
+
+describe('isSameProjectPath 路径归一匹配（2026-10-28 审查 P2-2）', () => {
+  // 模拟 macOS 的 /tmp → /private/tmp 符号链接语义
+  const fakeRealpath = (p: string): string => (p.startsWith('/tmp/') ? `/private${p}` : p);
+
+  it('字面相等直接判同（短路，不触发 realpath）', () => {
+    expect(isSameProjectPath('/proj/a', '/proj/a', fakeRealpath)).toBe(true);
+  });
+
+  it('符号链接别名（/tmp/x ↔ /private/tmp/x）经 realpath 归一后判同', () => {
+    expect(isSameProjectPath('/tmp/demo', '/private/tmp/demo', fakeRealpath)).toBe(true);
+  });
+
+  it('真实不同的路径仍判异', () => {
+    expect(isSameProjectPath('/tmp/demo', '/tmp/other', fakeRealpath)).toBe(false);
+  });
+
+  it('路径不存在（realpath 抛错）退 resolve 比较，不向外抛错', () => {
+    const enoent = (): string => {
+      throw new Error('ENOENT');
+    };
+    // 同一路径不同写法（尾斜杠）经 resolve 归一后判同
+    expect(isSameProjectPath('/gone/a', '/gone/a/', enoent)).toBe(true);
+    expect(isSameProjectPath('/gone/a', '/gone/b', enoent)).toBe(false);
   });
 });
 

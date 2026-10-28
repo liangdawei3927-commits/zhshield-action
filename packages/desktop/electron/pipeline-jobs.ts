@@ -126,13 +126,20 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
       }
       if (event.type === 'tool:executed') {
         toolsDone += 1;
+        // 状态诚实分支：error/unavailable/skipped（如 grype 漏洞库未就绪）不得显示「完成：0 项发现」
+        // ——那会把「没检测成」读成「查过且干净」；失败/跳过文案配合报告 degraded 横幅。
+        // success/warning 视为跑完（warning 是带告警的完成）。
+        const { status } = event.payload;
+        const failed = status === 'error' || status === 'unavailable' || status === 'skipped';
         progress(
           id,
           'security',
-          t('pipeline.security.toolDone', {
-            tool: event.payload.tool,
-            count: event.payload.issueCount,
-          }),
+          failed
+            ? t('pipeline.security.toolFailed', { tool: event.payload.tool })
+            : t('pipeline.security.toolDone', {
+                tool: event.payload.tool,
+                count: event.payload.issueCount,
+              }),
           Math.min(0.9, 0.1 + toolsDone * 0.2),
         );
       }

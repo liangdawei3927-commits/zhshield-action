@@ -1,30 +1,11 @@
 /**
  * 引擎空报告构造器（主进程与渲染进程共用）
  *
- * 主进程（electron/ipc/engines.ts）在引擎执行失败时、渲染进程
- * （src/services/engineApi.ts）在引擎通道不可用（window.electronAPI.engine
- * 缺失 / mock 模式）时，此前各内联一份逐字相同的空报告字面量。此处单源化，
- * 两侧失败回退的数据形状与时间戳语义保持不变。
+ * 依赖报告（DependencyReportData）保留唯一空报告构造器——它有带内 error 横幅，
+ * 失败以数据形状表达。安全/性能/垃圾清理已全部改为显式失败（throw），
+ * 不再提供「零发现 + 满分」的空报告：那会把「没查成」伪装成「查过且干净」。
  */
-import type { DependencyReportData, SecurityScanReportData } from '../types/electron';
-
-/** 安全扫描空报告：零发现 + 满分 100（无可用引擎/执行失败时的保守回退） */
-export function emptySecurityScanReportData(): SecurityScanReportData {
-  return {
-    summary: {
-      total: 0,
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-      malwareTotal: 0,
-    },
-    findings: [],
-    malware: [],
-    securityScore: 100,
-    metadata: { duration: 0, timestamp: new Date().toISOString() },
-  };
-}
+import type { DependencyReportData } from '../types/electron';
 
 /** 依赖报告空报告：零依赖 + 无 lockfile，`error` 携带失败原因（不 throw） */
 export function emptyDependencyReportData(error: string): DependencyReportData {

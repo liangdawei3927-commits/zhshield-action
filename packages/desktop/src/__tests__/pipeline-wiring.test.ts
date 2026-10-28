@@ -91,5 +91,19 @@ describe('门禁 / 巡检入口 — 装配同源', () => {
     expect(engines, 'garbage 失败不得返回 0 垃圾空报告').not.toContain(
       'summary: { total: 0, size: 0, byType: {} }',
     );
+    // 渲染层 engineApi-security：引擎通道缺失同样必须显式失败（mock 兜底也是伪装满分）
+    const apiSecurity = read('../src/services/engineApi-security.ts');
+    expect(apiSecurity, 'engineApi-security 不得复活空报告兜底').not.toContain(
+      'emptySecurityScanReportData',
+    );
+    expect(apiSecurity, '引擎通道缺失必须显式 throw').toContain('throw new Error');
+  });
+
+  it('安全进度按工具状态诚实分支（error/unavailable/skipped 不得显示「完成：0 项发现」）', () => {
+    const src = read('pipeline-jobs.ts');
+    expect(src, '必须存在失败/跳过文案分支 toolFailed').toContain('toolFailed');
+    expect(src).toContain("status === 'error'");
+    expect(src).toContain("status === 'unavailable'");
+    expect(src).toContain("status === 'skipped'");
   });
 });

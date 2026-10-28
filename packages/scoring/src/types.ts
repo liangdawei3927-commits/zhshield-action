@@ -38,6 +38,17 @@ export interface SentinelDataLike {
   active: boolean;
   criticalEvents: number;
   warningEvents: number;
+  /**
+   * 实际启动的监视器数（0~3：文件 / 日志 / 进程）。
+   *
+   * **0 = 一个监视器都没起来**（项目没有 package.json、没有日志文件、路径不存在等）。
+   * 此时事件恒为 0 ⇒ penalty 0 ⇒ 100 分，等于把「根本没监控」谎报成「监控过没问题」
+   *（实测：外层文档仓库 236 条 p3 文件变更、0 条 p1/p2，哨兵域 100 分，而日志与
+   * 进程两个监视器压根没启动）。按 not-run 处理，与 refactor 的 scannedFiles===0 同口径。
+   *
+   * undefined = 旧数据 / 未启动监控时无覆盖信息，保持 scored 不误伤历史。
+   */
+  monitorsStarted?: number;
 }
 
 /** refactor 域数据：重构报告摘要，按 severity 计权 */

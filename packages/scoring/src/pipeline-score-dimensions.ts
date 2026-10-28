@@ -286,6 +286,10 @@ function scoreSentinel(
   sentinel: ExtrasResolved['sentinel'],
 ): DimensionScore {
   if (sentinel === null) return notRun(name, weight);
+  // 0 覆盖 ≠ 无告警（与 scoreRefactor 的 scannedFiles===0 同一口径）：
+  // 一个监视器都没起来时事件恒为 0 ⇒ penalty 0 ⇒ 100 分，那是"没监控"不是"没问题"。
+  // monitorsStarted 缺省（旧数据 / 未启动监控）无法判定覆盖，保持 scored 不误伤。
+  if (sentinel.monitorsStarted === 0) return notRun(name, weight);
   const sPenalty = sentinelPenalty(sentinel);
   return {
     name,

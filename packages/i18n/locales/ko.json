@@ -2046,6 +2046,7 @@
       "done": "보안 스캔 완료",
       "scanning": "보안 스캔 중…",
       "toolDone": "{{tool}} 완료: {{count}}건 발견",
+      "toolFailed": "{{tool}} 사용 불가로 이번 실행은 건너뜀(리포트의 성능 저하 안내 참조)",
       "toolRunning": "{{tool}} 스캔 실행 중…"
     },
     "techdebt": {

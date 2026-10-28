@@ -2046,6 +2046,7 @@
       "done": "Security scan complete",
       "scanning": "Running security scan…",
       "toolDone": "{{tool}} finished: {{count}} findings",
+      "toolFailed": "{{tool}} unavailable, skipped this run (see degraded notice in report)",
       "toolRunning": "Running {{tool}} scan…"
     },
     "techdebt": {

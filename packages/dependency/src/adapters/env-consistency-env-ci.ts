@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import { safeJoin, type ProjectProfile } from '@zh/shared';
 import { isRecord, readYamlSafe, readTextSafe, NEWLINE_RE } from '../lockfile-utils';
 import type { EnvEntry } from './env-consistency-types';
-import { collectRuntimeSources } from './env-consistency-versions';
+import { collectRuntimeSources, runtimeVersionsCompatible } from './env-consistency-versions';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 
@@ -190,22 +190,25 @@ export function checkCiVsLocal(
   return entries;
 }
 
+/**
+ * 本地 Node 声明：优先保留 engines.node 原始范围（如 '>=20.0.0'），
+ * 不再截断成下界——2026-10-28 对账实证：extractVersion('>=20.0.0') → '20'
+ * 再与 CI '22' 字面比对，制造了「版本不一致」误报。无 engines 时回退 .nvmrc。
+ */
 function resolveLocalNode(
   projectRoot: string,
   pkgJson: Record<string, unknown> | null,
 ): string | null {
-  let localNode: string | null = null;
   if (pkgJson) {
     const engines = pkgJson.engines;
-    if (isRecord(engines) && typeof engines.node === 'string') {
-      localNode = extractVersion(engines.node);
+    if (isRecord(engines) && typeof engines.node === 'string' && engines.node.trim() !== '') {
+      return engines.node.trim();
     }
   }
-  if (localNode !== null) return localNode;
   const runtime = collectRuntimeSources(projectRoot, pkgJson);
   const nvmrc = runtime.find((s) => s.source === '.nvmrc' || s.source === '.node-version');
-  if (nvmrc) localNode = extractVersion(nvmrc.value);
-  return localNode;
+  if (nvmrc) return nvmrc.value;
+  return null;
 }
 
 function addNodeMismatch(
@@ -213,16 +216,19 @@ function addNodeMismatch(
   workflow: CiWorkflowInfo,
   localNode: string | null,
 ): void {
-  if (workflow.nodeVersion !== null && localNode !== null && workflow.nodeVersion !== localNode) {
-    entries.push({
-      kind: 'ci-vs-local',
-      name: `${workflow.file} node`,
-      expected: `本地 ${localNode}`,
-      actual: `CI ${workflow.nodeVersion}`,
-      severity: 'warning',
-      detail: `工作流 ${workflow.file} 使用 Node ${workflow.nodeVersion}，本地清单声明 ${localNode}`,
-    });
-  }
+  const ciVersion = workflow.nodeVersion;
+  if (ciVersion === null || localNode === null) return;
+  // '${{ … }}' 表达式占位符无法静态解析出真实版本，跳过而非误报
+  if (ciVersion.includes('${{') || localNode.includes('${{')) return;
+  if (runtimeVersionsCompatible(localNode, ciVersion)) return;
+  entries.push({
+    kind: 'ci-vs-local',
+    name: `${workflow.file} node`,
+    expected: `本地 ${localNode}`,
+    actual: `CI ${ciVersion}`,
+    severity: 'warning',
+    detail: `工作流 ${workflow.file} 使用 Node ${ciVersion}，不满足本地清单声明 ${localNode}`,
+  });
 }
 
 function addPackageManagerMismatch(

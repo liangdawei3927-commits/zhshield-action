@@ -115,6 +115,80 @@ describe('EnvConsistencyCheckerImpl', () => {
     expect(runtime[0]).toMatchObject({ kind: 'runtime-version', severity: 'info' });
   });
 
+  it('runtime-version：.nvmrc 18 不满足 engines >=20 → error（语义矛盾仍报）', async () => {
+    const dir = tmpDir('zh-env-runtime-lt-');
+    writeFile(dir, '.nvmrc', '18.20.2\n');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '>=20.0.0' } }));
+
+    const report = await checker.check(profileOf(dir));
+
+    const runtime = report.entries.filter((e) => e.kind === 'runtime-version');
+    expect(runtime).toHaveLength(1);
+    expect(runtime[0]).toMatchObject({ kind: 'runtime-version', severity: 'error' });
+  });
+
+  it('runtime-version：.nvmrc 22 满足 engines >=20.0.0 → 不报（语义兼容，2026-10-28 对账回归）', async () => {
+    const dir = tmpDir('zh-env-runtime-ge-');
+    writeFile(dir, '.nvmrc', '22\n');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '>=20.0.0' } }));
+
+    const report = await checker.check(profileOf(dir));
+
+    expect(report.entries.filter((e) => e.kind === 'runtime-version')).toHaveLength(0);
+  });
+
+  it('ci-vs-local：CI Node 24 满足 engines >=20.0.0 → 不报（语义兼容）', async () => {
+    const dir = tmpDir('zh-env-ci-ge-');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '>=20.0.0' } }));
+    writeNested(
+      dir,
+      '.github/workflows/ci.yml',
+      [
+        'name: CI',
+        'on: [push]',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - uses: actions/checkout@v4',
+        '      - uses: actions/setup-node@v4',
+        '        with:',
+        '          node-version: "24"',
+      ].join('\n'),
+    );
+
+    const report = await checker.check(profileOf(dir));
+
+    expect(report.entries.filter((e) => e.kind === 'ci-vs-local')).toHaveLength(0);
+  });
+
+  it('ci-vs-local：CI 使用 ${{ matrix.node-version }} 表达式 → 无法静态解析，跳过不报', async () => {
+    const dir = tmpDir('zh-env-ci-expr-');
+    writeFile(dir, 'package.json', JSON.stringify({ engines: { node: '>=20.0.0' } }));
+    writeNested(
+      dir,
+      '.github/workflows/ci.yml',
+      [
+        'name: CI',
+        'on: [push]',
+        'jobs:',
+        '  build:',
+        '    runs-on: ubuntu-latest',
+        '    strategy:',
+        '      matrix:',
+        '        node-version: ${{ matrix.node-version }}',
+        '    steps:',
+        '      - uses: actions/setup-node@v4',
+        '        with:',
+        '          node-version: ${{ matrix.node-version }}',
+      ].join('\n'),
+    );
+
+    const report = await checker.check(profileOf(dir));
+
+    expect(report.entries.filter((e) => e.kind === 'ci-vs-local')).toHaveLength(0);
+  });
+
   it('env-file-diff：.env 缺少 .env.example 键 → warning；.env 多余键 → info', async () => {
     const dir = tmpDir('zh-env-file-');
     writeFile(dir, '.env.example', 'API_KEY=\nDB_HOST=localhost\nLOG_LEVEL=info\n');

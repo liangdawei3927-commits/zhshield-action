@@ -36,6 +36,12 @@ const CARET_RANGE_RE = /^\^(\d+)\.(\d+)\.(\d+)$/;
 const TILDE_RANGE_RE = /^~(\d+)\.(\d+)\.(\d+)$/;
 /** 带前缀的版本匹配 */
 const PREFIXED_VERSION_RE = /^[v~^]*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
+/** >= 范围匹配（engines.node 常见写法，如 '>=20.0.0' / '>=20'） */
+const GE_RANGE_RE = /^>=(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
+/** > 范围匹配 */
+const GT_RANGE_RE = /^>(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
+/** 范围特征：含比较符 / 波浪符 / 插字符 / 通配符即视为范围而非固定版本 */
+const RANGE_HINT_RE = /[\^~><*]/;
 /** npm package-lock.json packages 键 */
 const NPM_PACKAGE_KEY_RE = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
 /** yarn 包名提取 'name@' */
@@ -115,6 +121,94 @@ function matchesPrefixed(
   if (sm !== minor) return false;
   if (star[3] === undefined) return true;
   return patch >= sP;
+}
+
+/** >=x[.y[.z]] 范围匹配（不足段按 0 补齐） */
+function matchesGe(
+  ge: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
+  const [gM, gm, gp] = [Number(ge[1]), Number(ge[2] ?? 0), Number(ge[3] ?? 0)];
+  if (major !== gM) return major > gM;
+  if (minor !== gm) return minor > gm;
+  return patch >= gp;
+}
+
+/** >x[.y[.z]] 范围匹配（不足段按 0 补齐） */
+function matchesGt(
+  gt: RegExpMatchArray,
+  major: number,
+  minor: number,
+  patch: number,
+): boolean {
+  const [gM, gm, gp] = [Number(gt[1]), Number(gt[2] ?? 0), Number(gt[3] ?? 0)];
+  if (major !== gM) return major > gM;
+  if (minor !== gm) return minor > gm;
+  return patch > gp;
+}
+
+/** 版本解析为 (major, minor, patch) 三元组；不足段按 0 补齐，无法解析返回 null */
+function versionTriple(value: string): [number, number, number] | null {
+  const m = value.match(PREFIXED_VERSION_RE);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+}
+
+/**
+ * 固定版本是否满足范围声明。返回值语义：
+ * true / false = 判定成立与否；null = 范围形态不受支持（如 `||` 组合），不做判定。
+ */
+function versionSatisfies(range: string, triple: [number, number, number]): boolean | null {
+  const r = range.trim();
+  if (r === '' || r === '*' || r === 'x' || r === 'latest') return true;
+  const ge = r.match(GE_RANGE_RE);
+  if (ge) return matchesGe(ge, ...triple);
+  const gt = r.match(GT_RANGE_RE);
+  if (gt) return matchesGt(gt, ...triple);
+  const exact = r.match(EXACT_VERSION_RE);
+  if (exact) return matchesExact(exact, ...triple);
+  const caret = r.match(CARET_RANGE_RE);
+  if (caret) return matchesCaret(caret, ...triple);
+  const tilde = r.match(TILDE_RANGE_RE);
+  if (tilde) return matchesTilde(tilde, ...triple);
+  const prefixed = r.match(PREFIXED_VERSION_RE);
+  if (prefixed) return matchesPrefixed(prefixed, ...triple);
+  return null;
+}
+
+/**
+ * 运行时版本声明的语义兼容判定（对照字面相等而言）：
+ * - 一侧为范围（>=/>/^/~/精确/通配）、另一侧为固定版本 → 按「固定版本是否满足范围」判定；
+ * - 两侧均为范围 → 不做静态判定（视为兼容，避免误报）；
+ * - 两侧均为固定版本且不等 → 矛盾；
+ * - 任一侧无法解析为版本（如 CI 表达式占位符）→ 不判定矛盾。
+ *
+ * 背景（2026-10-28 对账）：此前的字面比对把 engines.node `>=20.0.0` 截成
+ * `20.0.0` 再与 .nvmrc `22` 比对，把「22 满足 >=20」的正常配置误报为 P0 error。
+ */
+export function runtimeVersionsCompatible(a: string, b: string): boolean {
+  if (a === b) return true;
+  const aIsRange = RANGE_HINT_RE.test(a);
+  const bIsRange = RANGE_HINT_RE.test(b);
+  if (aIsRange && bIsRange) return true;
+  if (!aIsRange && !bIsRange) {
+    // 双固定版本且字面不等 → 矛盾（任一侧解析失败则不判定）
+    const ta = versionTriple(a);
+    const tb = versionTriple(b);
+    if (!ta || !tb) return true;
+    return false;
+  }
+  // 单范围 + 单固定：按「固定版本是否满足范围」判定
+  if (aIsRange) {
+    const tb = versionTriple(b);
+    if (!tb) return true;
+    return versionSatisfies(a, tb) !== false;
+  }
+  const ta = versionTriple(a);
+  if (!ta) return true;
+  return versionSatisfies(b, ta) !== false;
 }
 
 /** package.json 直接依赖声明：name → 范围 */
@@ -316,14 +410,16 @@ export function checkRuntimeVersion(
 
   for (let i = 1; i < sources.length; i++) {
     const source = sources[i];
-    if (normalizeVersion(source.value) === normalizeVersion(first.value)) continue;
+    const firstValue = normalizeVersion(first.value);
+    const currentValue = normalizeVersion(source.value);
+    if (runtimeVersionsCompatible(firstValue, currentValue)) continue;
     entries.push({
       kind: 'runtime-version',
       name: 'node',
       expected: `${first.source}: ${first.value}`,
       actual: `${source.source}: ${source.value}`,
       severity: 'error',
-      detail: `${first.source} 与 ${source.source} 声明的 Node 版本不一致`,
+      detail: `${first.source}（${first.value}）与 ${source.source}（${source.value}）声明的 Node 版本矛盾`,
     });
   }
   return entries;

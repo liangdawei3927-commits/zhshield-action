@@ -1,45 +1,37 @@
-import type { SopDiff as SharedSopDiff } from '@zh/shared';
+import {
+  ACTION_TYPES,
+  DATA_SOURCES,
+  RULE_LIFECYCLE_STATUSES,
+  EXECUTION_MODES,
+  SEVERITIES,
+  type SopDiff as SharedSopDiff,
+  type GovernanceDomain as SharedGovernanceDomain,
+} from '@zh/shared';
 
 // ─── 三维分类体系：治理域 ──────────────────────────────────
-/** 治理域：规则所属的能力分区，取值与规则 ID 的第一段一致 */
-export type GovernanceDomain =
-  | 'guard' // 拦截域 — 门禁拦截（L1/L2/L3）
-  | 'inspect' // 巡检域 — 巡检扫描（20+ 适配器）
-  | 'security' // 安全域 — 漏洞扫描 + 病毒查杀（不产出垃圾清单，垃圾归 cleanup 域）
-  | 'sentinel' // 监控域 — 运行时监控、告警、事件管理
-  | 'evolve' // 演进域 — 评分量化 + AI 规则自优化
-  | 'refactor' // 重构域 — 代码异味检测 + 自动重构 + AST 分析
-  | 'garbage'; // 垃圾清理域 — 垃圾文件/死代码/重复代码/无用依赖/无用文件
+/** 治理域：规则所属的能力分区，取值与规则 ID 的第一段一致。
+ *  真源在 `@zh/shared` 的 `GOVERNANCE_DOMAINS` —— 本文件只做别名，勿再列一份字面量。 */
+export type GovernanceDomain = SharedGovernanceDomain;
 
 // ─── 三维分类体系：动作类型 ──────────────────────────────────
 /** 动作类型：规则在运行时采取的行为方式，取值与规则 ID 的第二段一致 */
-export type ActionType =
-  | 'scan' // 扫描检测 — 主动发现代码/依赖/运行时中的问题
-  | 'block' // 拦截阻断 — 在关键节点阻止不合格行为
-  | 'score' // 评分量化 — 将检测结果转化为量化评分
-  | 'alert' // 告警响应 — 发现异常后通知和分级响应
-  | 'suggest' // 修复建议 — 基于经验库生成可执行的修复方案
-  | 'calibrate'; // 进化校准 — 根据反馈调整规则本身
+export type ActionType = (typeof ACTION_TYPES)[number];
 
 // ─── 三维分类体系：数据来源 ──────────────────────────────────
 /** 数据来源：规则依据的知识出处，取值与规则 ID 的第三段一致 */
-export type DataSource =
-  | 'external' // 外部标准 — GitHub Advisory、CVE、npm audit、开源规范库
-  | 'internal' // 内部模式 — 项目实际问题模式、代码异味、架构违规
-  | 'community' // 社区贡献 — 开发者提交的新规则、最佳实践
-  | 'official'; // 官方维护 — 智汇码盾官方定义的检查标准
+export type DataSource = (typeof DATA_SOURCES)[number];
 
 // ─── 规则生命周期 ────────────────────────────────────────────
 /** 规则生命周期状态：draft 草稿 → trial 试运行 → active 生效 → deprecated 废弃 */
-export type RuleLifecycleStatus = 'draft' | 'trial' | 'active' | 'deprecated';
+export type RuleLifecycleStatus = (typeof RULE_LIFECYCLE_STATUSES)[number];
 
 // ─── 执行模式 ────────────────────────────────────────────────
 /** 执行模式：规则触发时机 —— 同步校验、异步任务、周期轮询或事件驱动 */
-export type ExecutionMode = 'sync' | 'async' | 'periodic' | 'event';
+export type ExecutionMode = (typeof EXECUTION_MODES)[number];
 
 // ─── 严重级别 ────────────────────────────────────────────────
 /** 规则严重级别（F1 起含 'error'：对齐 ESLint/semgrep 的 ERROR 档，使存量 YAML 首次成为一等合法值） */
-export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'error';
+export type Severity = (typeof SEVERITIES)[number];
 
 // ─── 能力声明 ────────────────────────────────────────────────
 /** 规则能力声明：描述规则适用的语言、产品形态与架构，供引擎筛选可执行规则 */

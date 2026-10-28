@@ -1,6 +1,15 @@
 // @zh/shared - 所有模块共用的类型定义
 export const VERSION = '0.1.0';
-export { TOOL_IDS, GOVERNANCE_DOMAINS, INSPECT_SCOPE_DOMAINS } from './types';
+export {
+  TOOL_IDS,
+  GOVERNANCE_DOMAINS,
+  INSPECT_SCOPE_DOMAINS,
+  ACTION_TYPES,
+  DATA_SOURCES,
+  RULE_LIFECYCLE_STATUSES,
+  EXECUTION_MODES,
+  SEVERITIES,
+} from './types';
 // 跨域单一来源（T8 口径统一）：门禁 与 体检/安全中心 共用同一份规则定义
 export {
   CLEAN_ARCH_LAYERS,

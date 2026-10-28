@@ -6,6 +6,10 @@ import { SopRegistry } from './sop-registry';
 import { SopRuleParser } from './sop-loader-parser';
 import { SopRuleFileCollector } from './sop-loader-fs';
 import { SopRuleRegistrar } from './sop-loader-registry';
+import { filterBuiltRules, type SopRuleIssue } from './sop-field-validation';
+
+/** 云端同步路径的问题归因标识（与文件路径区分，便于诊断时判断来源） */
+const CLOUD_SYNC_ORIGIN = 'cloud-sync';
 
 /** SOP 加载器配置：三项路径均可省略，省略时使用内置默认值 */
 export interface SopLoaderOptions {
@@ -37,6 +41,7 @@ export class SopLoader {
   private options: Required<SopLoaderOptions>;
   private collector: SopRuleFileCollector;
   private registrar: SopRuleRegistrar;
+  private parser: SopRuleParser;
 
   constructor(registry: SopRegistry, options: SopLoaderOptions = {}) {
     this.registry = registry;
@@ -52,8 +57,19 @@ export class SopLoader {
       experienceBasePath: options.experienceBasePath ?? '',
     };
 
-    this.collector = new SopRuleFileCollector(new SopRuleParser());
+    this.parser = new SopRuleParser();
+    this.collector = new SopRuleFileCollector(this.parser);
     this.registrar = new SopRuleRegistrar(registry);
+  }
+
+  /** 本次进程内累计的加载期校验问题（fatal 已拒 / warn 已纠正），供诊断消费 */
+  getRuleIssues(): readonly SopRuleIssue[] {
+    return this.parser.getIssues();
+  }
+
+  /** 清空问题累计；调用方在开始新一轮整库加载前使用 */
+  clearRuleIssues(): void {
+    this.parser.clearIssues();
   }
 
   // ─── 从文件系统加载 ────────────────────────────────────────
@@ -86,8 +102,18 @@ export class SopLoader {
 
   // ─── 从知识库加载 ──────────────────────────────────────────
 
+  /**
+   * 从知识库（云端同步）加载规则。
+   *
+   * 🔴 这条路径**不经过 parser**：`PipelineRunner` 拿到的是已构建的扁平 `SopRule`，
+   * 原实现直接交给 registrar 写库 ⇒ 云端下发 `status: "actived"`（拼错）会让规则
+   * 进入 registry 却永远匹配不到 `getActive()`，**静默空跑且本地零告警**。
+   * 此处补对象级白名单校验，拒收非法规则并留痕。
+   */
   async loadFromKnowledgeBase(rules: SopRule[]): Promise<void> {
-    this.registrar.loadFromKnowledgeBase(rules);
+    const { accepted, issues } = filterBuiltRules(rules, CLOUD_SYNC_ORIGIN);
+    this.parser.reportIssues(issues);
+    this.registrar.loadFromKnowledgeBase(accepted);
   }
 
   // ─── 按项目特征加载 ────────────────────────────────────────

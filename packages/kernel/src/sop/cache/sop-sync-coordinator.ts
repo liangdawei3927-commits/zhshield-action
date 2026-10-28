@@ -9,6 +9,8 @@ import type { SopSyncClient } from './sop-sync-client';
 import type { SopSyncScheduler } from './sop-sync-scheduler';
 import type { SopCacheMetrics } from './sop-cache-metrics';
 import { SopConflictPolicy } from './sop-conflict-policy';
+import { SopRuleAdmission } from './sop-rule-admission';
+import { SopDiffApplier } from './sop-diff-applier';
 
 const MAJOR_VERSION = /^(\d+)\./;
 
@@ -43,9 +45,14 @@ export class SopSyncCoordinator {
   private versionStore: SopVersionStore;
   private syncClient: SopSyncClient;
   private scheduler: SopSyncScheduler;
-  private conflictPolicy: SopConflictPolicy;
 
   private localVersion: SopVersion | null = null;
+
+  /** 云端规则准入关口：拒收 / 纠正的字段问题通过 `admission.getIssues()` 查询 */
+  readonly admission: SopRuleAdmission;
+
+  /** 变更应用器：所有写 registry 的动作收口在它内部，必须先过 admission */
+  private applier: SopDiffApplier;
 
   constructor(options: SopSyncCoordinatorOptions) {
     this.registry = options.registry;
@@ -55,12 +62,19 @@ export class SopSyncCoordinator {
     this.versionStore = options.versionStore;
     this.syncClient = options.syncClient;
     this.scheduler = options.scheduler;
-    this.conflictPolicy = new SopConflictPolicy({
+    const conflictPolicy = new SopConflictPolicy({
       registry: options.registry,
       resolver: options.conflictResolver,
       strategy: options.conflictStrategy,
       metrics: options.metrics,
       eventBus: options.eventBus,
+    });
+    this.admission = new SopRuleAdmission();
+    this.applier = new SopDiffApplier({
+      registry: options.registry,
+      admission: this.admission,
+      conflictPolicy,
+      persist: (rules) => this.sqliteStore.persist(rules),
     });
   }
 
@@ -71,10 +85,8 @@ export class SopSyncCoordinator {
     this.localVersion = await this.versionStore.load();
     this.scheduler.hydrate(await this.versionStore.loadSyncState());
 
-    const rules = this.sqliteStore.loadAll();
-    if (rules.length > 0) {
-      this.registry.loadAll(rules);
-    }
+    // 缓存里可能是历史版本持久化的脏数据，恢复时同样过准入校验
+    this.applier.restore(this.sqliteStore.loadAll());
   }
 
   // ─── 版本管理 ──────────────────────────────────────────────
@@ -225,18 +237,18 @@ export class SopSyncCoordinator {
     try {
       const rules = await this.syncClient.fetchFull(remoteVersion.version);
       if (!rules) return { updated: false, reason: 'network_error' };
-      this.registry.loadAll(rules);
-      this.sqliteStore.persist(rules);
+      // 全量替换是最危险的入口：一条坏规则会连带覆盖本地可用规则，准入校验在 applier 内部
+      const admitted = this.applier.applyFull(rules);
       await this.saveVersion(remoteVersion);
       await this.markSuccess();
       await this.versionStore.logSync({ from: '0.0.0', to: remoteVersion.version, type: 'full' });
       this.eventBus?.emit('sop:cache-synced', {
         type: 'full',
         toVersion: remoteVersion.version,
-        ruleCount: rules.length,
+        ruleCount: admitted.length,
         timestamp: new Date(),
       });
-      return { updated: true, toVersion: remoteVersion.version, ruleCount: rules.length };
+      return { updated: true, toVersion: remoteVersion.version, ruleCount: admitted.length };
     } catch {
       return { updated: false, reason: 'network_error' };
     }
@@ -250,8 +262,8 @@ export class SopSyncCoordinator {
    */
   async applyDiff(diff: SopDiff): Promise<void> {
     verifyVersionContinuity(this.localVersion, diff);
-    this.applyChanges(diff);
-    this.sqliteStore.persist(this.registry.getAll());
+    this.applier.applyChanges(diff);
+    this.applier.persistRegistry();
 
     await this.versionStore.logSync({
       from: diff.fromVersion,
@@ -263,32 +275,6 @@ export class SopSyncCoordinator {
     });
   }
 
-  private applyChanges(diff: SopDiff): void {
-    for (const ruleId of diff.removed) {
-      this.registry.remove(ruleId);
-    }
-    for (const rule of diff.modified) {
-      const effective = this.conflictPolicy.resolveIncoming(rule);
-      if (this.registry.has(effective.id)) {
-        this.registry.update(effective.id, effective);
-      } else {
-        this.registry.register(effective);
-      }
-    }
-    this.upsertRules(diff.added);
-  }
-
-  private upsertRules(rules: SopRule[]): void {
-    for (const rule of rules) {
-      const effective = this.conflictPolicy.resolveIncoming(rule);
-      try {
-        this.registry.register(effective);
-      } catch {
-        this.registry.update(effective.id, effective);
-      }
-    }
-  }
-
   // ─── 紧急更新（7.2 节） ────────────────────────────────────
 
   /**
@@ -296,8 +282,9 @@ export class SopSyncCoordinator {
    * 安全漏洞发现后立即下发，不等待每日定时同步
    */
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
-    this.upsertRules(rules);
-    this.sqliteStore.persist(rules);
+    // 持久化「被接纳」而非原始列表：否则坏规则会落进缓存，下次启动再被拒一次
+    const admitted = this.applier.upsert(rules);
+    this.sqliteStore.persist(admitted);
     await this.markSuccess();
 
     await this.versionStore.logSync({

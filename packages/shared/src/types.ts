@@ -387,6 +387,29 @@ export type GovernanceDomain = (typeof GOVERNANCE_DOMAINS)[number];
  */
 export const INSPECT_SCOPE_DOMAINS = ['inspect', 'security', 'garbage'] as const;
 
+/**
+ * SOP 规则枚举字段的**运行时常量真源**（与类型同源）。
+ *
+ * 此前这些取值只有 TypeScript 联合类型、没有运行时常量，于是加载器只能写
+ * `meta.status as RuleLifecycleStatus` —— 类型断言在运行期不生效，云端下发
+ * `status: actived`（拼错）会被原样接受：规则进入 registry 却不匹配任何生命周期，
+ * `getActive()` 永远取不到它 ⇒ **规则静默空跑，本地零告警**。
+ * 新增取值请只改这里，类型会自动跟随。
+ */
+export const ACTION_TYPES = ['scan', 'block', 'score', 'alert', 'suggest', 'calibrate'] as const;
+
+/** 数据来源：规则依据的知识出处，取值与规则 ID 的第三段一致 */
+export const DATA_SOURCES = ['external', 'internal', 'community', 'official'] as const;
+
+/** 规则生命周期：draft 草稿 → trial 试运行 → active 生效 → deprecated 废弃 */
+export const RULE_LIFECYCLE_STATUSES = ['draft', 'trial', 'active', 'deprecated'] as const;
+
+/** 执行模式：规则触发时机 */
+export const EXECUTION_MODES = ['sync', 'async', 'periodic', 'event'] as const;
+
+/** 规则严重级别（含 'error'：对齐 ESLint/semgrep 的 ERROR 档） */
+export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info', 'error'] as const;
+
 
 /** SOP 知识包版本：一次云脑发布产出的知识/经验/恶意库快照及其哈希 */
 export interface SopVersion {

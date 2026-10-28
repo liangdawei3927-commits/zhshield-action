@@ -12,6 +12,13 @@ import type {
   ExecutionMode,
 } from './sop-types';
 import { SopRuleConfigError, parseDynamicSeverityConfig } from './dynamic-severity-config';
+import {
+  validateRuleSource,
+  normalizeTags,
+  logIssues,
+  PRIORITY_CANDIDATES,
+  type SopRuleIssue,
+} from './sop-field-validation';
 
 /** 预期缺失判定：ENOENT/ENOTDIR 属「文件不存在」的可恢复场景，与解析失败区分处理 */
 function isNotFoundErr(err: unknown): boolean {
@@ -20,14 +27,19 @@ function isNotFoundErr(err: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
-/** priority → severity 映射表（替代 priorityToSeverity 中的 switch 分派） */
-const PRIORITY_TO_SEVERITY = new Map<string, SopRule['severity']>([
-  ['critical', 'critical'],
-  ['high', 'high'],
-  ['medium', 'medium'],
-  ['low', 'low'],
-  ['error', 'error'],
-]);
+/** 根节点必须是映射对象：排除 null / 数组 / 标量 */
+function isObjectRoot(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * priority → severity 映射表。
+ * 候选集来自 `PRIORITY_CANDIDATES`（与加载期校验共用一份白名单），
+ * 避免「校验说合法、映射却认不出」的两套标准。
+ */
+const PRIORITY_TO_SEVERITY = new Map<string, SopRule['severity']>(
+  PRIORITY_CANDIDATES.map((p) => [p, p as SopRule['severity']]),
+);
 
 /**
  * SOP 规则解析器 — 将单个规则文件内容解析/构建为 SopRule
@@ -38,6 +50,19 @@ const PRIORITY_TO_SEVERITY = new Map<string, SopRule['severity']>([
  * 3. 依据 metadata / governance / execution / judgment 构建 SopRule
  */
 export class SopRuleParser {
+  /** 本次加载过程中发现的问题（fatal 已拒规则 / warn 已纠正），供诊断消费 */
+  private issues: SopRuleIssue[] = [];
+
+  /** 读取累计问题（只读视图） */
+  getIssues(): readonly SopRuleIssue[] {
+    return this.issues;
+  }
+
+  /** 清空问题累计 —— 每次整目录加载前调用，避免跨轮次叠加 */
+  clearIssues(): void {
+    this.issues = [];
+  }
+
   async parseRuleFile(
     filePath: string,
     domain: GovernanceDomain,
@@ -46,26 +71,72 @@ export class SopRuleParser {
     try {
       const parsed = await this.readAndParseFile(filePath);
       if (parsed === null) return null;
-      return this.buildRule(parsed, domain, action, filePath);
+
+      // 运行期白名单校验：拼错的枚举值必须在此拦下，否则规则会静默空跑
+      const validation = validateRuleSource(parsed, domain, action, filePath);
+      this.reportIssues(validation.issues);
+      if (validation.drop) return null;
+
+      const rule = this.buildRule(parsed, domain, action, filePath);
+      return this.applyTagNormalization(rule, validation.issues);
     } catch (err) {
       return this.handleParseError(err, filePath);
     }
   }
 
-  /** 读取并按扩展名解析规则文件（JSON 或 YAML）；无对象根时返回 null */
+  /**
+   * 记录并打印一批校验问题 —— 文件加载与云端同步两条路径共用同一出口，
+   * 保证「问题在哪都留痕」，而不是一条走 console、一条静默丢。
+   */
+  reportIssues(issues: readonly SopRuleIssue[]): void {
+    if (issues.length === 0) return;
+    this.issues.push(...issues);
+    logIssues(issues);
+  }
+
+  /** tags 非法时用归一化结果替换，防止字符串/混合数组流入下游 tags.filter */
+  private applyTagNormalization(rule: SopRule, issues: readonly SopRuleIssue[]): SopRule {
+    const tagIssue = issues.find((i) => i.field === 'metadata.tags' || i.field === 'tags');
+    return tagIssue ? { ...rule, tags: normalizeTags(tagIssue.value) } : rule;
+  }
+
+  /** 读取并按扩展名解析规则文件（JSON 或 YAML）；根不是对象时返回 null */
   private async readAndParseFile(filePath: string): Promise<Record<string, unknown> | null> {
     const ext = path.extname(filePath).toLowerCase();
     const raw = await fs.promises.readFile(filePath, 'utf-8');
 
     if (ext === '.json') {
-      return JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      // 原实现直接 `return JSON.parse(raw)`：根为 null 时 buildRule 抛 TypeError 被吞成
+      // 「解析失败」；根为数组时更糟——所有字段 undefined，产出一条 id 取自文件名的空壳规则。
+      if (!isObjectRoot(parsed)) {
+        this.rejectNonObjectRoot(filePath, parsed);
+        return null;
+      }
+      return parsed;
     }
-    const loaded = yaml.load(raw);
-    if (!loaded || typeof loaded !== 'object') {
-      console.warn(`[SopLoader] Rule file has no object root, skipped: ${filePath}`);
+    const loaded: unknown = yaml.load(raw);
+    if (!isObjectRoot(loaded)) {
+      this.rejectNonObjectRoot(filePath, loaded);
       return null;
     }
-    return loaded as Record<string, unknown>;
+    return loaded;
+  }
+
+  /**
+   * 根节点不是对象：记录问题并打印（不再静默跳过）。
+   * 级别取 warn 而非 fatal —— 语义是「这个文件不是规则」可安全跳过，
+   * 与文件缺失（ENOENT）同级；fatal 留给「是规则但字段非法」这类必须拒收的情况。
+   */
+  private rejectNonObjectRoot(filePath: string, value: unknown): void {
+    const issue: SopRuleIssue = {
+      file: filePath,
+      field: '<root>',
+      value,
+      level: 'warn',
+      reason: '规则文件根节点必须是对象（映射），当前为 null / 数组 / 标量，已跳过',
+    };
+    this.reportIssues([issue]);
   }
 
   /** 解析错误分类处理：配置错误必须上抛，文件缺失/解析失败降级为跳过 */

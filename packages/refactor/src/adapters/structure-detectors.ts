@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { DuplicateBlock, ParsedFile } from '../ast-helper';
 import { computeNestingDepth, scanDuplicateCodeBlocks } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
@@ -180,8 +182,16 @@ export function detectDuplicateCode(
 ): CodeSmell[] {
   const minLines = config.thresholds.minDuplicateLines;
   return getDuplicateBlocks(allFiles, minLines)
-    .filter((d) => d.files[0] === parsed.filePath || d.files[1] === parsed.filePath)
+    // 每对重复区只由字典序在前的文件报告一次。此前两侧各报一条，问题总数虚高
+    // 约一倍（2026-10-28 对账实证：696 条 = 348 对 × 2），且 MCP 分页截断下
+    // 正反两条还会让「同文件被卷入 N 次」的模块统计失真。
+    .filter((d) => canonicalSideOf(d) === parsed.filePath)
     .map((dup) => buildDuplicateSmell(parsed, dup, config, minLines));
+}
+
+/** 重复对的规范报告侧：两文件中字典序在前的那个（确定性，扫描顺序无关） */
+function canonicalSideOf(d: DuplicateBlock): string {
+  return d.files[0] <= d.files[1] ? d.files[0] : d.files[1];
 }
 
 function getDuplicateBlocks(allFiles: ParsedFile[], minLines: number): DuplicateBlock[] {
@@ -205,17 +215,70 @@ function packageNameOf(filePath: string): string | null {
 }
 
 /**
- * 跨包重复的落点启发：只说「提取为公共函数」会诱导直接互引——
- * 当两侧分属互不依赖的平级包（如 guard 与 inspect）时会制造依赖倒挂。
- * 同包 → 落在本包公共模块；跨包 → 上提 @zh/shared / @zh/kernel 或依赖方向上的下游包。
+ * 跨包重复的落点建议：按两侧包的真实依赖方向动态判定（读取各自 package.json
+ * 声明的 @zh/* 依赖，结果按包缓存），不再使用固定的「不可直接互引」模板——
+ * 2026-10-28 对账实证：该文案在跨包场景无条件打印，会把「desktop 已依赖 db」
+ * 这类可正常互引的配对也误描述成依赖倒挂。
+ * - 上游已依赖：落点下沉到被依赖包的公共模块，直接引用；
+ * - 互不依赖：落点上提至共同上游公共包（如 @zh/shared / @zh/kernel）。
  */
 function landingAdvice(myFile: string, otherFile: string): string {
   const mine = packageNameOf(myFile);
   const other = packageNameOf(otherFile);
   if (mine && other && mine !== other) {
-    return `两文件分属 @zh/${mine} 与 @zh/${other}，不可直接互引：落点上提至 @zh/shared / @zh/kernel（或依赖方向上的下游包）`;
+    const root = repoRootOf(myFile) ?? repoRootOf(otherFile);
+    if (root) {
+      if (declaredZhDeps(root, mine).has(other)) {
+        return `两文件分属 @zh/${mine} 与 @zh/${other}，且 @zh/${mine} 已依赖 @zh/${other}：落点下沉到 @zh/${other} 的公共模块，由 @zh/${mine} 直接引用`;
+      }
+      if (declaredZhDeps(root, other).has(mine)) {
+        return `两文件分属 @zh/${mine} 与 @zh/${other}，且 @zh/${other} 已依赖 @zh/${mine}：落点下沉到 @zh/${mine} 的公共模块，由 @zh/${other} 直接引用`;
+      }
+      return `两文件分属 @zh/${mine} 与 @zh/${other}（互相不依赖）：落点上提至两者共同依赖的上游公共包（如 @zh/shared / @zh/kernel）`;
+    }
+    return `两文件分属 @zh/${mine} 与 @zh/${other}：落点上提至 @zh/shared / @zh/kernel 或依赖方向上的下游包`;
   }
   return `落点选在 ${mine ? `@zh/${mine}` : '所在包'} 的公共模块，避免第三处复制`;
+}
+
+/** 从 `…/packages/<pkg>/…` 路径反推 monorepo 根；非包内文件返回 null */
+function repoRootOf(filePath: string): string | null {
+  const marker = '/packages/';
+  const idx = filePath.lastIndexOf(marker);
+  return idx === -1 ? null : filePath.slice(0, idx);
+}
+
+/** 包依赖方向缓存：`repoRoot::pkg` → 其清单声明的 @zh/* 依赖名集合 */
+const pkgDepsCache = new Map<string, ReadonlySet<string>>();
+
+/** 读取包清单里声明的 @zh/* 依赖（四类依赖段合集）；读不到按空集处理 */
+function declaredZhDeps(repoRoot: string, pkg: string): ReadonlySet<string> {
+  const key = `${repoRoot}::${pkg}`;
+  const cached = pkgDepsCache.get(key);
+  if (cached) return cached;
+  const deps = new Set<string>();
+  try {
+    const raw = fs.readFileSync(path.join(repoRoot, 'packages', pkg, 'package.json'), 'utf8');
+    const manifest = JSON.parse(raw) as Record<string, unknown>;
+    for (const section of [
+      'dependencies',
+      'devDependencies',
+      'peerDependencies',
+      'optionalDependencies',
+    ]) {
+      const sec = manifest[section];
+      if (sec && typeof sec === 'object') {
+        for (const name of Object.keys(sec as Record<string, unknown>)) {
+          if (name.startsWith('@zh/')) deps.add(name.slice('@zh/'.length));
+        }
+      }
+    }
+  } catch {
+    // 清单缺失/损坏按无依赖处理：跨包场景回退到「上提 shared/kernel」的保守建议
+  }
+  const frozen: ReadonlySet<string> = deps;
+  pkgDepsCache.set(key, frozen);
+  return frozen;
 }
 
 function buildDuplicateSmell(

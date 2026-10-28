@@ -55,7 +55,8 @@ describe('duplicated-code 规则双自证 golden', () => {
     // 样本确被扫到（形态⑩防线）：解析数必须等于文件数
     expect(scanned).toBe(2);
     console.log(`[duplicated-code golden] 真阳性命中数: ${dupHits}`);
-    expect(dupHits).toBeGreaterThanOrEqual(1);
+    // 双向去重后：一对重复只报 1 条（修复前两侧各报 1 条 = 2）
+    expect(dupHits).toBe(1);
   });
 
   it('干净样本：逻辑相似但无逐字重复 → 0 命中', async () => {

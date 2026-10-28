@@ -300,10 +300,9 @@ describe('duplicated-code regression', () => {
       f.smells.filter((s) => s.ruleId === 'duplicated-code'),
     );
 
-    // 两个夹具共用同一段 14 行实现 → 每侧各 1 条。
-    // 修复前：定长窗口按 1 行步进，该段被切成 14-5+1=10 个窗口 → 每侧 10 条、共 20 条，
-    // 用户看到的是被放大的问题数（实测导航 fixture 上 62 条 → 4 条）。
-    expect(smells).toHaveLength(2);
+    // 两个夹具共用同一段 14 行实现 → 全局只报 1 条（2026-10-28 双向去重：
+    // 此前每侧各 1 条、共 2 条；更早的滑窗 bug 则是每侧 10 条、共 20 条）。
+    expect(smells).toHaveLength(1);
     for (const s of smells) {
       expect(s.context.metric).toBe('duplicateLines');
       // value 必须是重复区行数（此前误用 dup.code.length = 截断到 80 的归一化字符数）
@@ -328,7 +327,7 @@ describe('duplicated-code regression', () => {
     expect(smells).toBe(0);
   });
 
-  it('重复区行号归属当前侧：A 侧报 A 的行、消息指 B 侧行，B 侧反之', async () => {
+  it('行号归属 canonical 侧：字典序在前的 A 报 A 的行，消息指 B 侧行（双向去重后仅 A 报告）', async () => {
     const engine = new RefactorEngine({ enabledRules: ['duplicated-code'] });
     const fileA = path.join(FIXTURES_DIR, 'dup-attrib-a.fixture.ts');
     const fileB = path.join(FIXTURES_DIR, 'dup-attrib-b.fixture.ts');
@@ -337,22 +336,17 @@ describe('duplicated-code regression', () => {
     const smells = report.files.flatMap((f) =>
       f.smells.filter((s) => s.ruleId === 'duplicated-code'),
     );
-    expect(smells).toHaveLength(2);
+    // 双向去重：'dup-attrib-a' 字典序在前 → 只有 A 侧产出
+    expect(smells).toHaveLength(1);
 
     const aSmell = smells.find((s) => s.location.filePath === fileA);
-    const bSmell = smells.find((s) => s.location.filePath === fileB);
     expect(aSmell).toBeDefined();
-    expect(bSmell).toBeDefined();
-    if (!aSmell || !bSmell) return;
+    if (!aSmell) return;
 
-    // A 侧 sharedCalc 在第 4 行起（10 行）；B 侧在第 8 行起
+    // A 侧 sharedCalc 在第 4 行起（10 行）；B 侧在第 8 行起（消息里引用）
     expect(aSmell.location.line).toBe(4);
     expect(aSmell.location.endLine).toBe(13);
     expect(aSmell.message).toContain('dup-attrib-b.fixture.ts:8');
-
-    expect(bSmell.location.line).toBe(8);
-    expect(bSmell.location.endLine).toBe(17);
-    expect(bSmell.message).toContain('dup-attrib-a.fixture.ts:4');
   });
 });
 

@@ -7,6 +7,8 @@ import { countSmellsByFileAndRule } from '../baseline';
 
 // 回归锁：数据路径不得对重复区设上限。修复前 scanDuplicateCodeBlocks 截断到 50，
 // 消除一处真实重复会移动截断窗口、把存量重复区挤进计数集，导致 ratchet 假阳性。
+// 2026-10-28 起重复对只由字典序在前的文件报告一次（双向去重），因此全部计数
+// 落在 canonical 侧文件，另一文件为 0——总量不变仍是 60。
 const REGION_COUNT = 60;
 
 function duplicatedBlock(k: number): string {
@@ -48,7 +50,7 @@ describe('duplicated-code 数据路径不设上限 (TDD 回归)', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('超过 50 个重复区时，countSmellsByFileAndRule 报告每个参与文件的完整计数', async () => {
+  it('超过 50 个重复区时数据不截断：canonical 侧报满 60 对，总数恰为 60', async () => {
     const engine = new RefactorEngine({ enabledRules: ['duplicated-code'] });
     const report = await engine.analyzeFiles(tmpDir, [fileA, fileB]);
     const counts = countSmellsByFileAndRule(report, tmpDir);
@@ -56,9 +58,11 @@ describe('duplicated-code 数据路径不设上限 (TDD 回归)', () => {
     const relA = path.relative(tmpDir, fileA).replace(/\\/g, '/');
     const relB = path.relative(tmpDir, fileB).replace(/\\/g, '/');
 
-    // 修复前：截断到 50 个重复区 → 每文件 50 条（其中一文件因截断提示 +1）。
-    // 断言两侧都 > 50，确保任一文件被截断都会失败。
-    expect(counts[relA]['duplicated-code']).toBeGreaterThan(50);
-    expect(counts[relB]['duplicated-code']).toBeGreaterThan(50);
+    // 双向去重后：'dup-cap-a.ts' 字典序在前 → 60 对全部由 A 报告。
+    // 总数断言保留「数据路径不设上限」的原始防线（修复前截断会让总数 < 60）。
+    const total = (counts[relA]?.['duplicated-code'] ?? 0) + (counts[relB]?.['duplicated-code'] ?? 0);
+    expect(counts[relA]['duplicated-code']).toBe(REGION_COUNT);
+    expect(counts[relB]?.['duplicated-code']).toBeUndefined();
+    expect(total).toBe(REGION_COUNT);
   });
 });

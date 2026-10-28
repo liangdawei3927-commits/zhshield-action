@@ -64,6 +64,16 @@ export class ScanOrchestrator {
       if (this.degradationManager.isToolSkipped(adapter.meta.id)) {
         continue;
       }
+      // 工具开始事件：安全扫描串行跑多个外部工具（可达数分钟），
+      // 开始即上报，UI 才能显示「当前在跑哪个工具」而不是长时间静默
+      await this.emitter.emit({
+        type: 'tool:scan-started',
+        payload: {
+          tool: adapter.meta.id,
+          projectId,
+          timestamp: new Date(),
+        },
+      });
       const toolIssues = await this.executeToolScan(adapter, projectId, projectPath);
       allIssues.push(...toolIssues.all);
       trivyIssues.push(...toolIssues.trivy);

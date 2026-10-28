@@ -18,6 +18,13 @@ export interface ToolExecutedEvent {
   timestamp: Date;
 }
 
+/** 工具开始事件：单个工具适配器 scan 即将开始时 emit（进度反馈用：长扫描期间让 UI 知道当前在跑哪个工具） */
+export interface ToolScanStartedEvent {
+  tool: ToolId;
+  projectId: string;
+  timestamp: Date;
+}
+
 /** 扫描完成事件：inspect / security 模块一次巡检结束后 emit */
 export interface ScanCompletedEvent {
   module: 'inspect' | 'security';
@@ -60,6 +67,7 @@ export interface ScopeViolationEvent {
  * 所有治理引擎事件的联合类型
  */
 export type GovernanceEvent =
+  | { type: 'tool:scan-started'; payload: ToolScanStartedEvent }
   | { type: 'tool:executed'; payload: ToolExecutedEvent }
   | { type: 'scan:completed'; payload: ScanCompletedEvent }
   | { type: 'guard:check-requested'; payload: GuardCheckRequestedEvent }

@@ -1,16 +1,75 @@
 import * as crypto from 'node:crypto';
-import type { SopRule, SopVersion, SopDiff, SyncResult } from '../_meta/sop-types';
+import type {
+  SopRule,
+  SopVersion,
+  SopDiff,
+  SyncResult,
+  SyncFailureReason,
+} from '../_meta/sop-types';
 import type { SopRegistry } from '../_meta/sop-registry';
 import type { EventBus } from '../../bus';
 import type { SyncConflictResolver, ConflictResolution } from '../sync-conflict';
 import type { SopSqliteStore } from './sop-sqlite-store';
 import type { SopVersionStore } from './sop-version-store';
-import type { SopSyncClient } from './sop-sync-client';
+import type { SopSyncClient, SopFetchFailure, SopFetchResult } from './sop-sync-client';
 import type { SopSyncScheduler } from './sop-sync-scheduler';
 import type { SopCacheMetrics } from './sop-cache-metrics';
 import { SopConflictPolicy } from './sop-conflict-policy';
+import { SopRuleAdmission } from './sop-rule-admission';
+import { SopDiffApplier } from './sop-diff-applier';
 
 const MAJOR_VERSION = /^(\d+)\./;
+
+/** 把取数失败映射为同步原因：鉴权失败单独成类 —— 重试无用，须改令牌/权限配置 */
+function toSyncReason(failure: SopFetchFailure): SyncFailureReason {
+  if (failure.kind === 'http_error' && (failure.status === 401 || failure.status === 403)) {
+    return 'auth_error';
+  }
+  return failure.kind;
+}
+
+/** 取数失败 → 同步结果；`cause` 用于保留上游失败原因（增量失败后降级全量时） */
+function toFailureResult(failure: SopFetchFailure, cause?: string): SyncResult {
+  return {
+    updated: false,
+    reason: toSyncReason(failure),
+    detail: cause ? `${failure.detail}；上游原因: ${cause}` : failure.detail,
+  };
+}
+
+/** 异常消息提取（catch 到的值不一定是 Error） */
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * 离线时的取数结果。必须与 `already_latest` 区分 ——
+ * 否则面板会把「没联网」显示成「规则已是最新」。
+ */
+function offlineResult(): SopFetchResult<SopVersion> {
+  return {
+    ok: false,
+    failure: { kind: 'network_error', url: '(scheduler)', detail: '调度器判定当前离线，未发起请求' },
+  };
+}
+
+/** 客户端版本低于云端要求 */
+function compatibilityFailure(clientVersion: string, required: string): SyncResult {
+  return {
+    updated: false,
+    reason: 'compatibility_error',
+    detail: `客户端 ${clientVersion} 低于云端要求 ${required}`,
+  };
+}
+
+/** 规则取到了但落地失败（版本不连续 / 写库异常）——不是网络问题 */
+function applyFailure(detail: string, cause?: string): SyncResult {
+  return {
+    updated: false,
+    reason: 'apply_error',
+    detail: cause ? `${detail}；上游原因: ${cause}` : detail,
+  };
+}
 
 /** 同步协调器依赖：registry / clientVersion / sqliteStore / versionStore / syncClient / scheduler 必需，其余可选 */
 export interface SopSyncCoordinatorOptions {
@@ -43,9 +102,14 @@ export class SopSyncCoordinator {
   private versionStore: SopVersionStore;
   private syncClient: SopSyncClient;
   private scheduler: SopSyncScheduler;
-  private conflictPolicy: SopConflictPolicy;
 
   private localVersion: SopVersion | null = null;
+
+  /** 云端规则准入关口：拒收 / 纠正的字段问题通过 `admission.getIssues()` 查询 */
+  readonly admission: SopRuleAdmission;
+
+  /** 变更应用器：所有写 registry 的动作收口在它内部，必须先过 admission */
+  private applier: SopDiffApplier;
 
   constructor(options: SopSyncCoordinatorOptions) {
     this.registry = options.registry;
@@ -55,12 +119,19 @@ export class SopSyncCoordinator {
     this.versionStore = options.versionStore;
     this.syncClient = options.syncClient;
     this.scheduler = options.scheduler;
-    this.conflictPolicy = new SopConflictPolicy({
+    const conflictPolicy = new SopConflictPolicy({
       registry: options.registry,
       resolver: options.conflictResolver,
       strategy: options.conflictStrategy,
       metrics: options.metrics,
       eventBus: options.eventBus,
+    });
+    this.admission = new SopRuleAdmission();
+    this.applier = new SopDiffApplier({
+      registry: options.registry,
+      admission: this.admission,
+      conflictPolicy,
+      persist: (rules) => this.sqliteStore.persist(rules),
     });
   }
 
@@ -71,10 +142,8 @@ export class SopSyncCoordinator {
     this.localVersion = await this.versionStore.load();
     this.scheduler.hydrate(await this.versionStore.loadSyncState());
 
-    const rules = this.sqliteStore.loadAll();
-    if (rules.length > 0) {
-      this.registry.loadAll(rules);
-    }
+    // 缓存里可能是历史版本持久化的脏数据，恢复时同样过准入校验
+    this.applier.restore(this.sqliteStore.loadAll());
   }
 
   // ─── 版本管理 ──────────────────────────────────────────────
@@ -94,11 +163,14 @@ export class SopSyncCoordinator {
     await this.versionStore.saveSyncState(this.scheduler.getState());
   }
 
-  /** 记录一次失败尝试并落盘 + 打日志（不刷 lastSuccessAt：失败不能掩盖上次成功时间；此前失败路径全程静默） */
-  private async markFailure(reason: string): Promise<void> {
+  /**
+   * 记录一次失败尝试并落盘 + 打日志（不刷 lastSuccessAt：失败不能掩盖上次成功时间；此前失败路径全程静默）
+   * `detail` 必带 —— 只说 "network_error" 无法区分令牌过期与服务端 5xx。
+   */
+  private async markFailure(reason: string, detail?: string): Promise<void> {
     this.scheduler.recordSyncFailure(reason);
     await this.versionStore.saveSyncState(this.scheduler.getState());
-    console.warn(`[SopCacheManager] 同步未成功: ${reason}`);
+    console.warn(`[SopCacheManager] 同步未成功: ${reason}${detail ? ` — ${detail}` : ''}`);
   }
 
   // ─── 云端同步（7.4 完整同步流程） ───────────────────────────
@@ -106,7 +178,7 @@ export class SopSyncCoordinator {
   /**
    * 检查云端版本 — GET /api/sop/version
    */
-  async checkRemoteVersion(): Promise<SopVersion | null> {
+  async checkRemoteVersion(): Promise<SopFetchResult<SopVersion>> {
     return this.syncClient.checkRemoteVersion();
   }
 
@@ -119,29 +191,28 @@ export class SopSyncCoordinator {
    * 5. 校验完整性
    */
   async syncFromCloud(): Promise<SyncResult> {
-    const remoteVersion = await this.resolveRemoteVersion();
-    if (!remoteVersion) {
-      await this.markFailure('network_error');
-      return { updated: false, reason: 'network_error' };
+    const remote = await this.resolveRemoteVersion();
+    if (!remote.ok) {
+      const failed = toFailureResult(remote.failure);
+      await this.markFailure(failed.reason ?? 'network_error', failed.detail);
+      return failed;
     }
 
-    const state = this.compareVersions(remoteVersion);
+    const state = this.compareVersions(remote.data);
     const stateResult = await this.handleVersionState(state);
     if (stateResult) return stateResult;
 
-    const result = await this.syncDiffOrFull(remoteVersion);
+    const result = await this.syncDiffOrFull(remote.data);
     // already_latest 已在 handleVersionState 内记过成功，其余未更新的结果一律视为失败尝试
     if (!result.updated && result.reason !== 'already_latest') {
-      await this.markFailure(result.reason ?? 'unknown');
+      await this.markFailure(result.reason ?? 'unknown', result.detail);
     }
     return result;
   }
 
-  /** 检查在线状态并获取云端版本；不可用返回 null */
-  private async resolveRemoteVersion(): Promise<SopVersion | null> {
-    if (!this.scheduler.isOnline) {
-      return null;
-    }
+  /** 检查在线状态并获取云端版本；离线与云端无更新必须可区分 */
+  private async resolveRemoteVersion(): Promise<SopFetchResult<SopVersion>> {
+    if (!this.scheduler.isOnline) return offlineResult();
     return this.checkRemoteVersion();
   }
 
@@ -160,21 +231,26 @@ export class SopSyncCoordinator {
     return null;
   }
 
-  /** 拉取增量 diff；不可用或兼容性不满足时降级为全量同步 */
+  /**
+   * 拉取增量 diff；取数失败或兼容性不满足时降级为全量同步。
+   * 降级时必须把增量侧的原始归因带下去 —— 否则全量也失败时只剩"最后一步"的原因，
+   * 真正的根因（例如 401）会被噪声盖住。
+   */
   private async syncDiffOrFull(remoteVersion: SopVersion): Promise<SyncResult> {
     const fromVersion = this.localVersion?.version ?? '0.0.0';
     const diff = await this.syncClient.fetchDiff(fromVersion, remoteVersion.version);
-    if (!diff) {
-      return this.fullSync(remoteVersion);
+    if (!diff.ok) {
+      const cause = `增量同步失败 ${diff.failure.kind}: ${diff.failure.detail}`;
+      return this.fullSync(remoteVersion, cause);
     }
-    if (!isCompatibleClient(this.clientVersion, diff.compatibility)) {
-      return { updated: false, reason: 'compatibility_error' };
+    if (!isCompatibleClient(this.clientVersion, diff.data.compatibility)) {
+      return compatibilityFailure(this.clientVersion, diff.data.compatibility);
     }
     try {
-      return await this.applyIncremental(diff, fromVersion, remoteVersion);
+      return await this.applyIncremental(diff.data, fromVersion, remoteVersion);
     } catch (err) {
       console.error('[SopCacheManager] Failed to apply diff:', err);
-      return this.fullSync(remoteVersion);
+      return this.fullSync(remoteVersion, `增量应用失败: ${describeError(err)}`);
     }
   }
 
@@ -220,25 +296,29 @@ export class SopSyncCoordinator {
 
   /**
    * 全量同步（增量失败时的降级）
+   *
+   * 失败分两类且不可混同：取数失败（网络/HTTP/解码/验签）走 `toFailureResult`；
+   * 取到了但落地失败归 `apply_error` —— 原实现把这两种都吞成 network_error。
    */
-  private async fullSync(remoteVersion: SopVersion): Promise<SyncResult> {
+  private async fullSync(remoteVersion: SopVersion, cause?: string): Promise<SyncResult> {
+    const rules = await this.syncClient.fetchFull(remoteVersion.version);
+    if (!rules.ok) return toFailureResult(rules.failure, cause);
+
     try {
-      const rules = await this.syncClient.fetchFull(remoteVersion.version);
-      if (!rules) return { updated: false, reason: 'network_error' };
-      this.registry.loadAll(rules);
-      this.sqliteStore.persist(rules);
+      // 全量替换是最危险的入口：一条坏规则会连带覆盖本地可用规则，准入校验在 applier 内部
+      const admitted = this.applier.applyFull(rules.data);
       await this.saveVersion(remoteVersion);
       await this.markSuccess();
       await this.versionStore.logSync({ from: '0.0.0', to: remoteVersion.version, type: 'full' });
       this.eventBus?.emit('sop:cache-synced', {
         type: 'full',
         toVersion: remoteVersion.version,
-        ruleCount: rules.length,
+        ruleCount: admitted.length,
         timestamp: new Date(),
       });
-      return { updated: true, toVersion: remoteVersion.version, ruleCount: rules.length };
-    } catch {
-      return { updated: false, reason: 'network_error' };
+      return { updated: true, toVersion: remoteVersion.version, ruleCount: admitted.length };
+    } catch (err) {
+      return applyFailure(`全量规则落地失败: ${describeError(err)}`, cause);
     }
   }
 
@@ -250,8 +330,8 @@ export class SopSyncCoordinator {
    */
   async applyDiff(diff: SopDiff): Promise<void> {
     verifyVersionContinuity(this.localVersion, diff);
-    this.applyChanges(diff);
-    this.sqliteStore.persist(this.registry.getAll());
+    this.applier.applyChanges(diff);
+    this.applier.persistRegistry();
 
     await this.versionStore.logSync({
       from: diff.fromVersion,
@@ -263,32 +343,6 @@ export class SopSyncCoordinator {
     });
   }
 
-  private applyChanges(diff: SopDiff): void {
-    for (const ruleId of diff.removed) {
-      this.registry.remove(ruleId);
-    }
-    for (const rule of diff.modified) {
-      const effective = this.conflictPolicy.resolveIncoming(rule);
-      if (this.registry.has(effective.id)) {
-        this.registry.update(effective.id, effective);
-      } else {
-        this.registry.register(effective);
-      }
-    }
-    this.upsertRules(diff.added);
-  }
-
-  private upsertRules(rules: SopRule[]): void {
-    for (const rule of rules) {
-      const effective = this.conflictPolicy.resolveIncoming(rule);
-      try {
-        this.registry.register(effective);
-      } catch {
-        this.registry.update(effective.id, effective);
-      }
-    }
-  }
-
   // ─── 紧急更新（7.2 节） ────────────────────────────────────
 
   /**
@@ -296,8 +350,9 @@ export class SopSyncCoordinator {
    * 安全漏洞发现后立即下发，不等待每日定时同步
    */
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
-    this.upsertRules(rules);
-    this.sqliteStore.persist(rules);
+    // 持久化「被接纳」而非原始列表：否则坏规则会落进缓存，下次启动再被拒一次
+    const admitted = this.applier.upsert(rules);
+    this.sqliteStore.persist(admitted);
     await this.markSuccess();
 
     await this.versionStore.logSync({

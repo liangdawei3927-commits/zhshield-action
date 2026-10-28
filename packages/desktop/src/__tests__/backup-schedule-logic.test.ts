@@ -95,6 +95,8 @@ describe('syncProjectSchedule 配置→任务同步', () => {
       '/proj/a',
       { enabled: true, frequency: 'daily', time: '03:30' },
       expect.any(Function),
+      // 未提供 loadLastRunAt：lastRunAt=undefined ⇒ 从未跑过 ⇒ 不补跑（旧行为）
+      { lastRunAt: undefined },
     );
     expect(deps.scheduler.unregisterSchedule).not.toHaveBeenCalled();
 
@@ -102,6 +104,37 @@ describe('syncProjectSchedule 配置→任务同步', () => {
     const callback = deps.scheduler.registerSchedule.mock.calls[0][2] as () => Promise<void>;
     await callback();
     expect(deps.runBackup).toHaveBeenCalledWith('/proj/a');
+  });
+
+  it('提供 loadLastRunAt 时把最近成功备份时间交给调度器（错过补跑判定）', async () => {
+    const deps = {
+      ...makeDeps({ enabled: true, frequency: 'daily', time: '00:00' }),
+      loadLastRunAt: vi.fn().mockResolvedValue(new Date(2026, 8, 1, 23, 0).getTime()),
+    };
+    await syncProjectSchedule(deps, '/proj/a');
+
+    expect(deps.loadLastRunAt).toHaveBeenCalledWith('/proj/a');
+    expect(deps.scheduler.registerSchedule).toHaveBeenCalledWith(
+      '/proj/a',
+      { enabled: true, frequency: 'daily', time: '00:00' },
+      expect.any(Function),
+      { lastRunAt: new Date(2026, 8, 1, 23, 0).getTime() },
+    );
+  });
+
+  it('loadLastRunAt 读不到记录时传 undefined（视为从未跑过，不补跑）', async () => {
+    const deps = {
+      ...makeDeps({ enabled: true, frequency: 'daily', time: '00:00' }),
+      loadLastRunAt: vi.fn().mockResolvedValue(undefined),
+    };
+    await syncProjectSchedule(deps, '/proj/new');
+
+    expect(deps.scheduler.registerSchedule).toHaveBeenCalledWith(
+      '/proj/new',
+      { enabled: true, frequency: 'daily', time: '00:00' },
+      expect.any(Function),
+      { lastRunAt: undefined },
+    );
   });
 
   it('enabled=false 注销已有任务', async () => {

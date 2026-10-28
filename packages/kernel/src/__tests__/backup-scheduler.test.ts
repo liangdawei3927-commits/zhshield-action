@@ -124,3 +124,76 @@ describe('BackupScheduler 定时触发', () => {
     expect(cb).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('BackupScheduler 错过补跑（2026-10-25 起断备事故对策）', () => {
+  let scheduler: BackupScheduler;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    scheduler = new BackupScheduler();
+  });
+
+  afterEach(() => {
+    scheduler.stop();
+    vi.useRealTimers();
+  });
+
+  it('lastRunAt 早于今日应触发时刻且 App 错过 → 注册即补跑一次', async () => {
+    // 10-03 09:00 开 App；daily 00:00，上次成功备份是 10-01 23:00
+    // ⇒ 10-02 与 10-03 的 00:00 都错过了，取最近一次（10-03 00:00）补跑
+    vi.setSystemTime(new Date(2026, 8, 3, 9, 0, 0));
+    const cb = vi.fn();
+    await scheduler.registerSchedule('p1', dailyAt('00:00'), cb, {
+      lastRunAt: new Date(2026, 8, 1, 23, 0).getTime(),
+    });
+    scheduler.start();
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('同一欠账只补一次：补跑后推进到非匹配分钟不重复触发', async () => {
+    vi.setSystemTime(new Date(2026, 8, 3, 9, 0, 0));
+    const cb = vi.fn();
+    await scheduler.registerSchedule('p1', dailyAt('00:00'), cb, {
+      lastRunAt: new Date(2026, 8, 1, 23, 0).getTime(),
+    });
+    scheduler.start();
+    expect(cb).toHaveBeenCalledTimes(1);
+
+    // 推进 10 分钟：非匹配分钟，且补跑已把 lastFiredAt 记为 dueAt
+    vi.advanceTimersByTime(600_000);
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('lastRunAt 晚于最近应触发时刻 → 不补跑', async () => {
+    vi.setSystemTime(new Date(2026, 8, 3, 9, 0, 0));
+    const cb = vi.fn();
+    await scheduler.registerSchedule('p1', dailyAt('00:00'), cb, {
+      lastRunAt: new Date(2026, 8, 3, 8, 0).getTime(), // 今天 08:00 跑过
+    });
+    scheduler.start();
+    expect(cb).toHaveBeenCalledTimes(0);
+  });
+
+  it('未提供 lastRunAt（从未跑过）→ 不补跑，保持旧行为', async () => {
+    vi.setSystemTime(new Date(2026, 8, 3, 9, 0, 0));
+    const cb = vi.fn();
+    await scheduler.registerSchedule('p1', dailyAt('00:00'), cb);
+    scheduler.start();
+    expect(cb).toHaveBeenCalledTimes(0);
+  });
+
+  it('weekly 错过补跑：上周触发日错过、注册日非触发日也立即补', async () => {
+    // 2026-09-03 是星期四；weekly dayOfWeek=4 (周四) 08:30
+    // 上个触发日 08-27（周四）错过；今天是周四但已过 08:30 ⇒ 今天 08:30 即最近应触发时刻
+    vi.setSystemTime(new Date(2026, 8, 3, 12, 0, 0));
+    const cb = vi.fn();
+    await scheduler.registerSchedule(
+      'p1',
+      { enabled: true, frequency: 'weekly', time: '08:30', dayOfWeek: 4 },
+      cb,
+      { lastRunAt: new Date(2026, 7, 20, 8, 30).getTime() }, // 08-20 周四跑过
+    );
+    scheduler.start();
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+});

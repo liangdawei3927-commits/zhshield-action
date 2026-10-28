@@ -25,9 +25,21 @@ const CRON_BUILDERS: Partial<
 interface ScheduledTask {
   projectId: string;
   cron: string;
+  /** 原始调度配置：补跑判定需要 time/frequency/day* 结构信息，cron 字符串不够 */
+  schedule: BackupScheduleConfig;
   callback: CronCallback;
+  /**
+   * 注册方提供的该项目最近一次成功执行时间（epoch ms）。
+   * 缺省视为「从未跑过」——此时不做补跑（新装/新项目不应注册瞬间立刻备份）。
+   */
+  lastRunAt?: number;
+  /** 本进程内最近一次触发/补跑的时刻（epoch ms），防同一次欠账被重复补跑 */
+  lastFiredAt?: number;
   intervalId?: ReturnType<typeof setInterval>;
 }
+
+/** 向回扫描补跑候选的天数上限（monthly 最长需要 62 天覆盖上个月同日） */
+const CATCHUP_LOOKBACK_DAYS = 62;
 
 export class BackupScheduler {
   private tasks: Map<string, ScheduledTask> = new Map();
@@ -36,11 +48,18 @@ export class BackupScheduler {
 
   /**
    * 注册定时备份任务
+   *
+   * @param opts.lastRunAt 该项目最近一次成功备份的 epoch ms（注册方从持久化
+   *   备份记录读取）。提供后，若「最近一个应触发时刻」晚于它（即 App 不在线
+   *   时错过的那次调度），注册启动时立即补跑一次——这是 2026-10-25 起连续
+   *   多日「零点 App 没开 ⇒ 备份从未触发且无人知晓」故障的直接对策。
+   *   不传则保持旧行为：只等下一个匹配分钟。
    */
   async registerSchedule(
     projectId: string,
     schedule: BackupScheduleConfig,
     callback: CronCallback,
+    opts?: { lastRunAt?: number },
   ): Promise<void> {
     if (!schedule.enabled) return;
 
@@ -48,7 +67,9 @@ export class BackupScheduler {
     this.tasks.set(projectId, {
       projectId,
       cron: cronExpression,
+      schedule,
       callback,
+      lastRunAt: opts?.lastRunAt,
     });
 
     // 如果调度器已启动，立即激活该任务
@@ -142,19 +163,51 @@ export class BackupScheduler {
   }
 
   private evaluateTask(task: ScheduledTask): void {
-    if (this.matchesCron(task.cron)) {
-      const result = task.callback();
-      if (result instanceof Promise) {
-        result.catch(() => {});
-      }
+    const now = new Date();
+    if (this.matchesCron(task.cron, now)) {
+      this.fire(task, now.getTime());
+      return;
+    }
+    // 错过补跑：最近一个应触发时刻已过、且晚于上次实际执行 → 立即补一次。
+    // lastRunAt 缺省（从未跑过）不补，避免新项目注册瞬间被立即备份。
+    const dueAt = this.lastDueAt(task.schedule, now);
+    if (dueAt == null) return;
+    const lastDone = Math.max(task.lastRunAt ?? 0, task.lastFiredAt ?? 0);
+    if (lastDone > 0 && dueAt > lastDone) this.fire(task, dueAt);
+  }
+
+  /** 触发回调并记录触发时刻（取应触发时刻而非当前时间，同一欠账只补一次） */
+  private fire(task: ScheduledTask, firedAt: number): void {
+    task.lastFiredAt = firedAt;
+    const result = task.callback();
+    if (result instanceof Promise) {
+      result.catch(() => {});
     }
   }
 
   /**
-   * 检查当前时间是否匹配 cron 表达式
+   * 计算「最近一个应触发且已过去的时刻」（epoch ms）；从不匹配返回 null。
+   * 从 now 向回逐日构造该日 HH:mm 的候选时刻做 cron 匹配，最多回看 62 天
+   * （monthly 需要覆盖上个月同日；daily 第 1 个候选即命中）。
    */
-  private matchesCron(cron: string): boolean {
-    const now = new Date();
+  private lastDueAt(schedule: BackupScheduleConfig, now: Date): number | null {
+    const [hour, minute] = schedule.time.split(':').map(Number);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    for (let back = 0; back < CATCHUP_LOOKBACK_DAYS; back++) {
+      const day = new Date(now);
+      day.setDate(day.getDate() - back);
+      day.setHours(hour, minute, 0, 0);
+      if (day.getTime() <= now.getTime() && this.matchesCron(this.toCron(schedule), day)) {
+        return day.getTime();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 检查给定时刻是否匹配 cron 表达式
+   */
+  private matchesCron(cron: string, now: Date = new Date()): boolean {
     const minute = now.getMinutes();
     const hour = now.getHours();
     const dayOfWeek = now.getDay();

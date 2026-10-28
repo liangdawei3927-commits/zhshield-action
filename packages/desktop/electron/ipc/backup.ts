@@ -348,6 +348,11 @@ export interface ScheduleSyncDeps {
   scheduler: Pick<BackupScheduler, 'registerSchedule' | 'unregisterSchedule'>;
   loadScheduleConfig: (projectPath: string) => Promise<BackupScheduleConfig>;
   runBackup: (projectPath: string) => Promise<void>;
+  /**
+   * 该项目最近一次成功备份的 epoch ms（供调度器做错过补跑判定）。
+   * 返回 undefined = 从未成功备份，此时调度器不补跑。
+   */
+  loadLastRunAt?: (projectPath: string) => Promise<number | undefined>;
 }
 
 /** 读取项目备份配置，启用则注册 cron 任务、禁用则注销（saveConfig 后即时同步也走这里） */
@@ -358,8 +363,11 @@ export async function syncProjectSchedule(
   try {
     const schedule = await deps.loadScheduleConfig(projectPath);
     if (schedule?.enabled) {
+      // 补跑判定数据：App 不在线期间错过的调度，在启动注册时立即补一次
+      const lastRunAt = deps.loadLastRunAt ? await deps.loadLastRunAt(projectPath) : undefined;
       await deps.scheduler.registerSchedule(projectPath, schedule, () =>
         deps.runBackup(projectPath),
+        { lastRunAt },
       );
     } else {
       deps.scheduler.unregisterSchedule(projectPath);
@@ -496,6 +504,18 @@ function setupScheduledBackups(
       return config.schedule;
     },
     runBackup: runScheduledBackup,
+    loadLastRunAt: async (projectPath) => {
+      try {
+        const records = await loadRecordsFromDisk();
+        const own = records
+          .filter((r) => r.projectId === projectPath && r.status === 'success')
+          .map((r) => Date.parse(r.timestamp))
+          .filter((t) => Number.isFinite(t));
+        return own.length ? Math.max(...own) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
   };
   const syncAllSchedules = async (): Promise<void> => {
     const paths = await loadProjectPaths();

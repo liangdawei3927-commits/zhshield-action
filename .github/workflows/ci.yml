@@ -11,6 +11,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 发布漂移门禁 —— 防止「代码改了一堆，版本号纹丝不动」
+  #
+  # 2026-10-29 实锤背景：0.2.0 之后累计 103 个提交（feat/fix 70 个）从未触发版本递进，
+  # 版本号一直停在 0.2.0。而客户端 electron-updater 的更新判定是
+  # 「latest-mac.yml 的 version > 本地 app.getVersion()」，版本不变 ⇒ 恒判定「已是最新」，
+  # 那批修复一个都送不到用户机器上，且用户会被明确告知「当前已是最新版」。
+  #
+  # ⚠️ 必须 fetch-depth: 0 —— 脚本以「最近一个合法语义 tag」为锚点计算 diff，
+  #    浅克隆取不到锚点会直接失败（而非当作无改动放行），这是刻意的：静默放行等于没有门禁。
+  # 脚本为纯 node + git，无第三方依赖，故无需 pnpm install，秒级反馈。
+  #
+  # 注意：锚点是 tag。v0.3.0 打上之前本门禁处于「版本已递进」的放行态，
+  #       打上 tag 之后才真正进入监控态 —— 所以发版务必补 tag，别让门禁空转。
+  version-drift:
+    name: Release Drift Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for tag anchoring)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Check release drift
+        run: node scripts/check-release-drift.mjs --strict
+
   build-and-test:
     runs-on: ubuntu-latest
     strategy:

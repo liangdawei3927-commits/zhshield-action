@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build --concurrency=$(node scripts/turbo-concurrency.mjs) && node scripts/sync-snapshot-links.mjs",
     "version:check": "node scripts/check-app-version.mjs",
+    "version:drift": "node scripts/check-release-drift.mjs",
     "dev": "turbo run dev --concurrency=$(node scripts/turbo-concurrency.mjs)",
     "sync:snapshot-links": "node scripts/sync-snapshot-links.mjs",
     "sync:snapshot-links:check": "node scripts/sync-snapshot-links.mjs --check",

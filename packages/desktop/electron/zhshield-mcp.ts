@@ -101,11 +101,15 @@ async function readDiagnosticsWithBootstrap(root: string): Promise<DiagnosticsRe
 }
 
 // ─── 辅助：toolError 与 finding 分离 ───────────────────────
-// ruleId 含 `.external.` 的条目来自外部工具执行（trivy/依赖审计等），
-// 内容是工具运行状态乃至报错原文（如 trivy FATAL），不是代码发现；
-// 混入 issues 会污染 AI 的输入信号，故单独归入 toolErrors 通道。
+// 两类工具执行报错都不该混入 issues 主列表（会污染 AI 的输入信号），
+// 单独归入 toolErrors 通道：
+// 1. ruleId 含 `.external.`：外部工具（trivy/依赖审计等）的运行状态乃至报错原文；
+// 2. issue.toolError === true：内置扫描工具执行失败（如 dep-cruiser/eslint 报错），
+//    由 zh-diagnostics-normalize 打标——2026-10-28 对账实证：仅按 ruleId 过滤时
+//    这类条目留在 issues 里且 toolErrors.count 恒为 0，两侧口径自相矛盾。
 // 结构化分离的完整方案在 Tool Registry 落地后收口（阶段 3.3）。
 function isToolErrorEntry(issue: Record<string, unknown>): boolean {
+  if (issue.toolError === true) return true;
   return typeof issue.ruleId === 'string' && issue.ruleId.includes('.external.');
 }
 

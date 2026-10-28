@@ -11,6 +11,7 @@ import { BackupConfigManager } from '../backup/config';
 import {
   defaultBackupConfig,
   DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+  DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS,
   DEFAULT_MAX_BACKUP_SIZE_MB,
 } from '../backup/types';
 import {
@@ -38,6 +39,22 @@ describe('P2-3 备份默认排除治理目录', () => {
     expect(matchesExcludePattern('src/index.ts', patterns)).toBe(false);
   });
 
+  it('defaultBackupConfig 本地与 GitHub 两侧都排除构建产物目录（build-output/out）', () => {
+    const def = defaultBackupConfig({ projectPath: '/tmp/x' });
+    for (const patterns of [def.local.excludePatterns, def.github.excludePatterns]) {
+      for (const artifact of DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS) {
+        expect(patterns).toContain(artifact);
+      }
+    }
+  });
+
+  it('matchesExcludePattern 命中任意深度的 build-output 条目（2026-10-28 复测 P0）', () => {
+    const patterns = defaultBackupConfig().local.excludePatterns;
+    expect(matchesExcludePattern('build-output/mac/智汇码盾.app', patterns)).toBe(true);
+    expect(matchesExcludePattern('nested/out/bundle.js', patterns)).toBe(true);
+    expect(matchesExcludePattern('src/build-output-helper.ts', patterns)).toBe(false);
+  });
+
   it('旧配置文件（无治理目录）加载时并集注入，用户自有排除项保留', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-p2-3-cfg-'));
     try {
@@ -56,6 +73,9 @@ describe('P2-3 备份默认排除治理目录', () => {
       expect(config.local.excludePatterns).toContain('build/');
       expect(config.local.excludePatterns).toContain('.zhshield/');
       expect(config.local.excludePatterns).toContain('.omo/');
+      // 2026-10-28 复测 P0：旧持久化配置也要拿到后补的构建产物排除
+      expect(config.local.excludePatterns).toContain('build-output/');
+      expect(config.local.excludePatterns).toContain('out/');
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

@@ -14,22 +14,27 @@ import {
   type BackupScheduleConfig,
   DEFAULT_BACKUP_ROOT,
   DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+  DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS,
   defaultBackupConfig,
 } from './types';
 import { safeJoinReal } from '@zh/shared';
 import { normalizeKeepCount } from './retention';
 
 /**
- * P2-3：把治理产物目录（.zhshield/.omo）强制并入用户的排除清单。
+ * 把内置强制排除项并入用户的排除清单（治理产物目录 + 构建产物目录）。
  *
- * 旧版本备份配置文件里持久化的 excludePatterns 不含治理目录（修复前的默认值），
+ * 旧版本备份配置文件里持久化的 excludePatterns 是当时默认值的快照，
  * 若只改默认值、直接沿用 `raw?.excludePatterns ?? def.excludePatterns`，
- * 已有项目的快照会继续打包 .zhshield/.omo。治理目录在任何项目里都不是源码，
+ * 已有项目永远不会拿到后补的排除项：
+ * - P2-3：.zhshield/.omo（治理目录在任何项目里都不是源码）；
+ * - 2026-10-28 复测 P0：build-output/out（构建产物可再生且体积巨大，
+ *   用户项目 1.3GB 的 build-output 叠加体积上限后备份必然失败）。
  * 这里做并集而非覆盖——用户自己的排除项原样保留。
  */
-function withGovernanceExcludes(patterns: string[] | undefined): string[] {
+function withBuiltinExcludes(patterns: string[] | undefined): string[] {
   const merged = new Set(patterns ?? []);
   for (const p of DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS) merged.add(p);
+  for (const p of DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS) merged.add(p);
   return [...merged];
 }
 
@@ -194,7 +199,7 @@ export class BackupConfigManager {
       repo: raw?.repo ?? def.repo,
       branch: raw?.branch ?? def.branch,
       commitPrefix: raw?.commitPrefix ?? def.commitPrefix,
-      excludePatterns: withGovernanceExcludes(raw?.excludePatterns ?? def.excludePatterns),
+      excludePatterns: withBuiltinExcludes(raw?.excludePatterns ?? def.excludePatterns),
     };
   }
 
@@ -206,7 +211,7 @@ export class BackupConfigManager {
       enabled: raw?.enabled ?? def.enabled,
       backupDir: raw?.backupDir ?? def.backupDir,
       maxBackups: normalizeKeepCount(raw?.maxBackups, def.maxBackups),
-      excludePatterns: withGovernanceExcludes(raw?.excludePatterns ?? def.excludePatterns),
+      excludePatterns: withBuiltinExcludes(raw?.excludePatterns ?? def.excludePatterns),
       maxTotalSizeMB: normalizeSizeLimit(raw?.maxTotalSizeMB, def.maxTotalSizeMB),
       compress: raw?.compress ?? def.compress,
       format: raw?.format === 'directory' ? 'directory' : 'zip',

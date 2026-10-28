@@ -76,6 +76,8 @@ export const DEFAULT_EXCLUDE_PATTERNS = [
   '.git/',
   'dist/',
   'build/',
+  'build-output/',
+  'out/',
   '.next/',
   '.nyc_output/',
   'coverage/',
@@ -138,6 +140,19 @@ export const DEFAULT_SECRET_EXCLUDE_PATTERNS: readonly string[] = [
  */
 export const DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS: readonly string[] = ['.zhshield/', '.omo/'];
 
+/**
+ * 构建产物目录默认排除（强制并入，同治理目录逻辑）。
+ *
+ * 2026-10-28 复测实锤：用户项目的 `build-output/`（electron-builder 输出到
+ * 项目树内，1.3GB）不在旧持久化配置的排除清单里，叠加 P2-6 的 512MB 上限后
+ * 备份必然失败（1.4GB > 512MB）。这类目录在任何项目里都不是源码、体积巨大
+ * 且完全可再生，故随默认配置强制排除（用户仍可追加自己的排除项）。
+ */
+export const DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS: readonly string[] = [
+  'build-output/',
+  'out/',
+];
+
 /** P2-6：单次快照源文件总体积默认上限（MB）。8GB 常见机型磁盘长期紧张的保守值 */
 export const DEFAULT_MAX_BACKUP_SIZE_MB = 512;
 
@@ -164,6 +179,7 @@ export function defaultBackupConfig(
         'dist/',
         '*.log',
         ...DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+        ...DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS,
         ...DEFAULT_SECRET_EXCLUDE_PATTERNS,
       ],
     },
@@ -177,6 +193,7 @@ export function defaultBackupConfig(
         'dist/',
         'coverage/',
         ...DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS,
+        ...DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS,
         ...DEFAULT_SECRET_EXCLUDE_PATTERNS,
       ],
       maxTotalSizeMB: DEFAULT_MAX_BACKUP_SIZE_MB,

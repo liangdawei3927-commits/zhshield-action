@@ -1,12 +1,13 @@
 {
   "name": "@zh/desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "pnpm exec turbo run build --filter=@zh/desktop^... && node ../../scripts/sync-snapshot-links.mjs && vite",
     "build": "tsc && vite build",
-    "build:mac": "node ../../scripts/check-app-version.mjs && tsc && vite build && electron-builder --mac",
+    "build:mac": "node ../../scripts/check-app-version.mjs && node ../../scripts/check-release-drift.mjs && tsc && vite build && electron-builder --mac",
+    "build:mac:allow-drift": "node ../../scripts/check-release-drift.mjs --allow && tsc && vite build && electron-builder --mac",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

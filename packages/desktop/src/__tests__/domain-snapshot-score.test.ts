@@ -164,6 +164,68 @@ describe('computeDomainSnapshotScore：techdebt 维（100 − debtIndex）', () 
   });
 });
 
+describe('computeDomainSnapshotScore：refactor 维（severity 计权）', () => {
+  it('1 条 error 异味 = 93.1 分（softBand(1,8,48)，与规范 refactorPenalty 同口径）', () => {
+    const score = computeDomainSnapshotScore({
+      dimension: 'refactor',
+      refactor: {
+        totalSmells: 1,
+        bySeverity: { error: 1, warning: 0, info: 0 },
+        scannedFiles: 12,
+      },
+    });
+    expect(score).toBeDefined();
+    expect(score?.dimension).toBe('refactor');
+    expect(score?.score).toBe(93.1);
+    expect(score?.issues).toBe(1);
+    expect(score?.status).toBe('scored');
+    expect(score?.version).toBe(SCORE_VERSION);
+  });
+
+  it('扫了但零异味 = 满分 100（scored，不是 not-run）', () => {
+    const score = computeDomainSnapshotScore({
+      dimension: 'refactor',
+      refactor: {
+        totalSmells: 0,
+        bySeverity: { error: 0, warning: 0, info: 0 },
+        scannedFiles: 3,
+      },
+    });
+    expect(score?.score).toBe(100);
+    expect(score?.status).toBe('scored');
+  });
+
+  it('scannedFiles=0（纯 JS 项目，检测器没扫到文件）→ undefined，不冒充 100 分（P1-9）', () => {
+    const score = computeDomainSnapshotScore({
+      dimension: 'refactor',
+      refactor: {
+        totalSmells: 0,
+        bySeverity: { error: 0, warning: 0, info: 0 },
+        scannedFiles: 0,
+      },
+    });
+    expect(score).toBeUndefined();
+  });
+
+  it('refactor 为 null（没跑过重构分析）→ undefined', () => {
+    expect(computeDomainSnapshotScore({ dimension: 'refactor', refactor: null })).toBeUndefined();
+  });
+});
+
+describe('refactor 域落盘接线（防回归：历史表「分数」列的唯一来源）', () => {
+  it('分类页单独跑（runRefactorHandler）与体检流水线共用 refactorSnapshotScore', () => {
+    const scanners = fs.readFileSync(
+      path.join(__dirname, '../../electron/ipc/engines-scanners.ts'),
+      'utf-8',
+    );
+    const engines = fs.readFileSync(path.join(__dirname, '../../electron/ipc/engines.ts'), 'utf-8');
+    // 唯一实现：两处都调同一个函数，不得各自 computeDomainSnapshotScore 一份投影
+    expect(scanners).toContain('const dimensionScore = refactorSnapshotScore(report);');
+    expect(engines).toContain('refactorSnapshotScore(report.refactor)');
+    expect(engines).not.toContain("dimension: 'refactor'");
+  });
+});
+
 describe('techdebt 域落盘接线（防回归：历史表「分数」列的唯一来源）', () => {
   it('persistTechDebtDiagnostics 必须透传 dimensionScore', () => {
     const src = fs.readFileSync(
@@ -239,6 +301,28 @@ describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史',
 
     const records = await listDomainHistory(projectDir, 'techdebt', 10);
     expect(records[0].score).toBe(70);
+    expect(records[0].scoreVersion).toBe(SCORE_VERSION);
+  });
+
+  it('refactor 域带分写入：历史 score 非空（分类页历史表不再恒「—」）', async () => {
+    const dimensionScore: DomainDimensionScore = {
+      dimension: 'refactor',
+      score: 93.1,
+      issues: 1,
+      status: 'scored',
+      version: SCORE_VERSION,
+    };
+    await persistDiagnosticsFromEntries(
+      projectDir,
+      [entry({ source: 'refactor', category: 'refactor', fingerprint: 'fp-4' })],
+      ['refactor'],
+      { refactor: dimensionScore },
+    );
+    const snap = await readDomainSnapshot(projectDir, 'refactor');
+    expect(snap?.dimensionScore).toEqual(dimensionScore);
+
+    const records = await listDomainHistory(projectDir, 'refactor', 10);
+    expect(records[0].score).toBe(93.1);
     expect(records[0].scoreVersion).toBe(SCORE_VERSION);
   });
 

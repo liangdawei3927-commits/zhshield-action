@@ -378,6 +378,7 @@ function filterWhitelisted(
 export async function persistDiagnostics(
   projectPath: string,
   report: PipelineReport,
+  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
 ): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
@@ -392,7 +393,7 @@ export async function persistDiagnostics(
   if (report.guard) ranSources.push('guard');
   if (report.inspect) ranSources.push('inspect');
   if (report.refactor) ranSources.push('refactor');
-  return await writeDiagnosticsFile(diagnostics, ranSources);
+  return await writeDiagnosticsFile(diagnostics, ranSources, dimensionScores);
 }
 
 /**

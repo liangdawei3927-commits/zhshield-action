@@ -14,7 +14,9 @@
  *   这两维不吃条目（性能/垃圾类条目归 quality 维扣分，见 DIMENSION_CATEGORIES）；
  * - techdebt 维 = 100 − debtIndex（与 dashboard-state.techdebt 同源同形），
  *   同样不吃条目 —— 债务动作条目归 inspect 快照的 quality 维，techdebt 维自己
- *   没有 category 映射（DIMENSION_CATEGORIES.techdebt 为空数组）。
+ *   没有 category 映射（DIMENSION_CATEGORIES.techdebt 为空数组）；
+ * - refactor 维 = 摘要 severity 计权（与 dashboard-state.refactor 同源同形），
+ *   同样不吃条目（DIMENSION_CATEGORIES.refactor 为空数组）。
  *
  * 零 Electron 依赖：纯计算，可直接单测。
  */
@@ -25,13 +27,14 @@ import {
   type PerformanceDataLike,
   type GarbageDataLike,
   type TechDebtDataLike,
+  type RefactorDataLike,
 } from '@zh/scoring';
 import type { DiagnosticEntry, DomainDimensionScore } from './zh-diagnostics-types';
 
 /**
- * 五个此前不出分的域（quality 已由 enrichInspectSnapshot 覆盖；gate 语义不同暂不出分）。
+ * 六个此前不出分的域（quality 已由 enrichInspectSnapshot 覆盖；gate 语义不同暂不出分）。
  *
- * techdebt 在此列（2026-10-28 补）：它此前落盘时压根没传 dimensionScore，
+ * techdebt / refactor 在此列（2026-10-28 补）：二者此前落盘时压根没传 dimensionScore，
  * 分类页历史表「分数」列恒「—」、较上次恒「无基线」——不是该域不出分，是漏了接线。
  */
 export type SnapshotScoreDimension =
@@ -39,7 +42,8 @@ export type SnapshotScoreDimension =
   | 'dependencies'
   | 'performance'
   | 'garbage'
-  | 'techdebt';
+  | 'techdebt'
+  | 'refactor';
 
 /** 各域评分输入（判别联合：字段名自解释，防 position 传参传反） */
 export type DomainSnapshotScoreInput =
@@ -66,6 +70,15 @@ export type DomainSnapshotScoreInput =
        * null = 本次没算出债务指数（如无 inspect 快照、未真跑）→ not-run，不冒充 100 分。
        */
       techdebt: TechDebtDataLike | null;
+    }
+  | {
+      dimension: 'refactor';
+      /**
+       * 异味总数 + severity 分布 + 扫描覆盖数（与 dashboard-state.refactor 同源同形）。
+       * `scannedFiles: 0` = 检测器一个文件都没看（如纯 JS 项目）→ 评分侧判 not-run，
+       * 不把「没扫」写成 100 分（P1-9 口径）；null = 没跑过重构分析，同理 not-run。
+       */
+      refactor: RefactorDataLike | null;
     };
 
 /**
@@ -112,6 +125,8 @@ function buildExtras(input: DomainSnapshotScoreInput): Record<string, unknown> {
       return { garbage: input.garbage };
     case 'techdebt':
       return { techdebt: input.techdebt };
+    case 'refactor':
+      return { refactor: input.refactor };
   }
 }
 

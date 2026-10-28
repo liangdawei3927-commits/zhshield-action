@@ -37,6 +37,7 @@ import { sendProgress } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
 import { rethrowIfCancelled } from '../pipeline-protocol';
 import { computeDomainSnapshotScore } from '../domain-snapshot-score';
+import type { DomainDimensionScore } from '../zh-diagnostics-types';
 import {
   toSecurityScanReportData,
   type SecurityScanReportData,
@@ -249,10 +250,18 @@ export async function runRefactorHandler(
     // 重构分析含同步扫盘 + AST，必须离主进程，否则 macOS 彩球
     const task = manager.start('refactor', projectPath);
     const report = (await manager.waitFor(task.id)) as RefactorReport;
+    // 先取 patch：落盘出分与 dashboard-state 用同一组数（同源同形，两条路径不可能漂移）
+    const patch = refactorDashboardPatch(report);
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeRefactorSource(report), [
-        'refactor',
-      ]);
+      // 带分落盘（2026-10-28 修）：此前不传 dimensionScore → 域历史 score=null
+      // → 分类页历史表「分数」列恒「—」、较上次恒「无基线」。
+      const dimensionScore = refactorSnapshotScore(report);
+      await persistDiagnosticsFromEntries(
+        projectPath,
+        normalizeRefactorSource(report),
+        ['refactor'],
+        dimensionScore ? { refactor: dimensionScore } : undefined,
+      );
     } catch (e) {
       console.warn(
         '[engine:runRefactor] 诊断落盘失败:',
@@ -260,7 +269,7 @@ export async function runRefactorHandler(
       );
     }
     // P1b: 补写 dashboard-state refactor 域（异味总数 + severity 分布 + lastRunAt）
-    await updateDashboardState(projectPath, { refactor: refactorDashboardPatch(report) });
+    await updateDashboardState(projectPath, { refactor: patch });
     return report;
   } catch (err) {
     console.error('[engine:runRefactor] Error:', err);
@@ -268,8 +277,34 @@ export async function runRefactorHandler(
   }
 }
 
-/** 从 RefactorReport 提取 refactor 域 dashboard-state patch */
-function refactorDashboardPatch(report: RefactorReport): DashboardRefactorState {
+/**
+ * 从 RefactorReport 提取 refactor 域 dashboard-state patch。
+ *
+ * 导出给体检流水线（engines.ts）复用：落盘出分与 dashboard-state 必须是同一组数，
+ * 两处各写一份投影必然漂移（「卡片与分类页对不上」的老故障形态）。
+ */
+/**
+ * refactor 维当场出分（100 − refactorPenalty）。
+ *
+ * 唯一实现：分类页单独跑（runRefactorHandler）与体检流水线（engines.ts）都调它，
+ * 输入与 dashboard-state patch 同源同形 ⇒ 两处不可能各算一套。
+ *
+ * `scannedFiles === 0` → not-run（P1-9：0 文件是「没扫到」不是「干净」，
+ * 给 100 分等于把没检测谎报成没问题）。
+ */
+export function refactorSnapshotScore(report: RefactorReport): DomainDimensionScore | undefined {
+  const patch = refactorDashboardPatch(report);
+  return computeDomainSnapshotScore({
+    dimension: 'refactor',
+    refactor: {
+      totalSmells: patch.totalSmells,
+      bySeverity: patch.bySeverity,
+      ...(patch.scannedFiles === undefined ? {} : { scannedFiles: patch.scannedFiles }),
+    },
+  });
+}
+
+export function refactorDashboardPatch(report: RefactorReport): DashboardRefactorState {
   const bySeverity = {
     error: report.bySeverity.error ?? 0,
     warning: report.bySeverity.warning ?? 0,

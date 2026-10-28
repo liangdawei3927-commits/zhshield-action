@@ -29,6 +29,7 @@ import { shouldAutoFix, countFixableIssues, resolveOpenCodeBin } from '../ai-aut
 import { getScoring } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
 import { rethrowIfCancelled } from '../pipeline-protocol';
+import type { DiagnosticSource, DomainDimensionScore } from '../zh-diagnostics-types';
 import { toGuardReportData, type GuardReportData, type PerformanceReportData } from './report-format';
 import type { DependencyReportData, TechDebtReportData } from '../../src/types/electron';
 
@@ -67,6 +68,7 @@ import {
   garbageRestoreHandler,
   garbageDashboardPatch,
   performanceDashboardPatch,
+  refactorSnapshotScore,
 } from './engines-scanners';
 import { depsRelockBaselineHandler } from './engines-deps';
 import { computeDomainSnapshotScore } from '../domain-snapshot-score';
@@ -138,6 +140,24 @@ function resolvePipelineReports(report: PipelineReport): ResolvedPipelineReports
     guardResults: (guardReport as GuardReport).results,
     inspectIssues: (inspectReport as InspectionReport).issues,
   };
+}
+
+/**
+ * 体检流水线的按域快照出分入参。
+ *
+ * 目前只含 refactor：inspect 由 `enrichInspectSnapshot` 自己出 quality 分，
+ * guard（gate 维）需 status/blocking 语义、快照条目不带，按既有约定不实时评分。
+ * refactor 此前落盘不带分 → 代码重构分类页历史表「分数」列恒「—」（2026-10-28 修）。
+ *
+ * 出分输入取 `refactorDashboardPatch`（与 dashboard-state 同源同形），
+ * 与分类页单独跑重构扫描时走的是同一组数，两条路径不可能漂移。
+ */
+function refactorDomainScores(
+  report: PipelineReport,
+): Partial<Record<DiagnosticSource, DomainDimensionScore>> | undefined {
+  if (!report.refactor) return undefined;
+  const dimensionScore = refactorSnapshotScore(report.refactor);
+  return dimensionScore ? { refactor: dimensionScore } : undefined;
 }
 
 async function recordPipelineScore(projectPath: string, report: PipelineReport): Promise<void> {
@@ -432,7 +452,11 @@ async function runPipelineHandler(
     const report = (await manager.waitFor(task.id)) as PipelineReport;
     if (!options?.dryRun) {
       try {
-        const diagnosticsPath = await persistDiagnostics(projectPath, report);
+        const diagnosticsPath = await persistDiagnostics(
+          projectPath,
+          report,
+          refactorDomainScores(report),
+        );
         void triggerOpenCodeAutoFix(projectPath, diagnosticsPath);
       } catch (err) {
         console.warn(

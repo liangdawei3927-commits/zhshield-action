@@ -251,34 +251,50 @@ function repoRootOf(filePath: string): string | null {
 /** 包依赖方向缓存：`repoRoot::pkg` → 其清单声明的 @zh/* 依赖名集合 */
 const pkgDepsCache = new Map<string, ReadonlySet<string>>();
 
+/** 包清单中参与依赖判定的四类依赖段 */
+const DEP_SECTIONS = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+] as const;
+
+/** 取单个依赖段中的 @zh/* 包名（去前缀）；空段/非对象段返回空数组 */
+function zhDepsOfSection(sec: unknown): string[] {
+  if (!sec || typeof sec !== 'object') return [];
+  return Object.keys(sec as Record<string, unknown>)
+    .filter((name) => name.startsWith('@zh/'))
+    .map((name) => name.slice('@zh/'.length));
+}
+
+/** 从已解析的包清单收集全部 @zh/* 依赖名（四类依赖段合集） */
+function zhDepsOfManifest(manifest: Record<string, unknown>): ReadonlySet<string> {
+  const deps = new Set<string>();
+  for (const section of DEP_SECTIONS) {
+    for (const name of zhDepsOfSection(manifest[section])) {
+      deps.add(name);
+    }
+  }
+  return deps;
+}
+
 /** 读取包清单里声明的 @zh/* 依赖（四类依赖段合集）；读不到按空集处理 */
 function declaredZhDeps(repoRoot: string, pkg: string): ReadonlySet<string> {
   const key = `${repoRoot}::${pkg}`;
   const cached = pkgDepsCache.get(key);
   if (cached) return cached;
-  const deps = new Set<string>();
+
+  let deps: ReadonlySet<string>;
   try {
     const raw = fs.readFileSync(path.join(repoRoot, 'packages', pkg, 'package.json'), 'utf8');
-    const manifest = JSON.parse(raw) as Record<string, unknown>;
-    for (const section of [
-      'dependencies',
-      'devDependencies',
-      'peerDependencies',
-      'optionalDependencies',
-    ]) {
-      const sec = manifest[section];
-      if (sec && typeof sec === 'object') {
-        for (const name of Object.keys(sec as Record<string, unknown>)) {
-          if (name.startsWith('@zh/')) deps.add(name.slice('@zh/'.length));
-        }
-      }
-    }
+    deps = zhDepsOfManifest(JSON.parse(raw) as Record<string, unknown>);
   } catch {
     // 清单缺失/损坏按无依赖处理：跨包场景回退到「上提 shared/kernel」的保守建议
+    deps = new Set<string>();
   }
-  const frozen: ReadonlySet<string> = deps;
-  pkgDepsCache.set(key, frozen);
-  return frozen;
+
+  pkgDepsCache.set(key, deps);
+  return deps;
 }
 
 function buildDuplicateSmell(

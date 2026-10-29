@@ -222,6 +222,14 @@ export interface ToolResult {
     fileCount: number;
   };
   error?: string;
+  /**
+   * 跳过原因（与 inspect 侧 AdapterResult.skipReason 同语义）。
+   * `out-of-scope` = 前置条件不满足（如扫描根无 package.json）导致的既定裁剪，
+   *   工具本体可用，**不属于降级** —— 不得进 degraded.unavailableTools，
+   *   否则「本项不适用」会被渲染成「工具不可用」，给出错误的恢复指引。
+   * `degraded` = 工具不可用/执行失败的被迫跳过，属真实降级。
+   */
+  skipReason?: 'out-of-scope' | 'degraded';
 }
 
 /** 工具扫描入参：适配器 scan 的入参（projectPath 锚定扫描根，targetFiles 为空表示全量） */

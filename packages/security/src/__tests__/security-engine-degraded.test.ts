@@ -74,4 +74,49 @@ describe('SecurityEngine 降级显形（P1-4）', () => {
     const report = await engine.runSecurityScan('proj', emptyProject());
     expect(report.degraded).toBeUndefined();
   });
+
+  /**
+   * 回归：范围外跳过（out-of-scope）被误报成「工具不可用」。
+   * 实机取证 2026-10-29：扫无 package.json 的文档仓库时，trivy/depcheck 进
+   * degraded.unavailableTools，横幅指引用户「恢复工具或联网」——重装无效。
+   */
+  it('范围外跳过 → 进 skippedTools，绝不进 degraded.unavailableTools', async () => {
+    const engine = new SecurityEngine();
+    engine.registerAdapter(
+      makeAdapter('out-of-scope-tool', async () => ({
+        status: 'skipped',
+        skipReason: 'out-of-scope',
+        issues: [],
+        metadata: { fileCount: 0 },
+        error: '扫描根目录无 package.json，范围外未执行',
+      })),
+    );
+    const report = await engine.runSecurityScan('proj', emptyProject());
+    // 真阴性：不是降级
+    expect(report.degraded).toBeUndefined();
+    // 真阳性：如实记录为「不适用」
+    expect(report.skippedTools).toHaveLength(1);
+    expect(report.skippedTools?.[0].tool).toBe('out-of-scope-tool');
+    expect(report.skippedTools?.[0].reason).toContain('无 package.json');
+  });
+
+  it('降级级联防护：3 次范围外跳过不得推高 DegradationManager 等级', async () => {
+    const engine = new SecurityEngine();
+    for (const id of ['skip-a', 'skip-b', 'skip-c']) {
+      engine.registerAdapter(
+        makeAdapter(id, async () => ({
+          status: 'skipped',
+          skipReason: 'out-of-scope',
+          issues: [],
+          metadata: { fileCount: 0 },
+          error: '范围外',
+        })),
+      );
+    }
+    const report = await engine.runSecurityScan('proj', emptyProject());
+    expect(report.skippedTools).toHaveLength(3);
+    expect(report.degraded).toBeUndefined();
+    // 等级仍为 0：否则后续扫描会按 isToolSkipped 静默跳过其他工具
+    expect(engine.getDegradationManager().getLevel()).toBe(0);
+  });
 });

@@ -219,6 +219,11 @@ export interface SecurityScanReportData {
     unavailableTools: string[];
     auditError?: string;
   };
+  /**
+   * 范围外跳过的工具：工具本体可用，但当前项目不满足适用前提（如无 package.json）。
+   * 与 degraded 分离展示——重装/联网对它无效，混在一起会给出错误的恢复指引。
+   */
+  skippedTools?: Array<{ tool: string; reason: string }>;
   findings: Array<{
     id: string;
     title: string;

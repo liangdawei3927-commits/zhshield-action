@@ -167,24 +167,55 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps {
   children?: ReactNode;
 }
 
-/** P1-4：扫描降级横幅——工具不可用/审计失败时 0 检出 ≠ 安全，必须显形 */
+/**
+ * P1-4：扫描降级横幅——工具不可用/审计失败时 0 检出 ≠ 安全，必须显形。
+ *
+ * 「范围外跳过」单独成块、用中性色：工具本体可用只是当前项目不适用（如无
+ * package.json 的文档仓库扫 trivy/depcheck），属既定裁剪。与降级混桶会让
+ * 用户按「恢复工具/联网」去做无效动作，也会把真实降级淹没成背景噪音。
+ */
 function SecurityDegradedBanner({ report, t }: { report: SecurityScanReportData; t: Translate }) {
-  if (!report.degraded) return null;
-  const { unavailableTools, auditError } = report.degraded;
-  const tools = unavailableTools.join(', ');
+  const skipped = report.skippedTools ?? [];
+  if (!report.degraded && skipped.length === 0) return null;
+
   return (
-    <div className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-warning-700">
-          {t('page.security.degraded.title')}
+    <div className="mb-6 space-y-2">
+      {report.degraded ? (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-warning-700">
+              {t('page.security.degraded.title')}
+            </div>
+            <div className="text-xs text-warning-500 mt-0.5 break-all">
+              {t('page.security.degraded.detail', {
+                tools: report.degraded.unavailableTools.join(', ') || t('page.security.degraded.none'),
+                audit: report.degraded.auditError ?? '',
+              })}
+            </div>
+          </div>
         </div>
-        <div className="text-xs text-warning-500 mt-0.5 break-all">
-          {t('page.security.degraded.detail', {
-            tools: tools || t('page.security.degraded.none'),
-            audit: auditError ?? '',
-          })}
+      ) : null}
+      {skipped.length > 0 ? (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-info-50 border border-info-100">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-info-700">
+              {t('page.security.skipped.title')}
+            </div>
+            <div className="text-xs text-info-500 mt-0.5 break-all">
+              {t('page.security.skipped.detail', {
+                tools: skipped.map((s) => s.tool).join(', '),
+              })}
+            </div>
+            <ul className="mt-1.5 space-y-0.5">
+              {skipped.map((s) => (
+                <li key={s.tool} className="text-xs text-info-500 break-all">
+                  {s.tool}：{s.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

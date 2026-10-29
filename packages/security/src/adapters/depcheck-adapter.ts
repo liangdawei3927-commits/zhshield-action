@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { depcheckMapper, resolveToolCommandDetailed } from '@zh/shared';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
@@ -32,6 +33,27 @@ export class DepcheckAdapter implements ToolAdapter {
   async scan(options: ToolScanOptions): Promise<ToolResult> {
     const start = Date.now();
 
+    // 前置检查：depcheck 以「扫描根是否存在 package.json」为适用前提。缺少该前提时
+    // depcheck 会输出 "Path ... does not contain a package.json file" 且非 JSON，
+    // 此前经 JSON.parse 抛错落 error 分支，与「工具不可用」混进同一降级横幅（误报）。
+    // 与 trivy 侧口径一致：范围外按 skipped 处理，不进 degraded。
+    if (!(await this.hasRootPackageJson(options.projectPath))) {
+      return {
+        tool: 'depcheck',
+        status: 'skipped',
+        skipReason: 'out-of-scope',
+        issues: [],
+        metadata: {
+          version: '',
+          duration: Date.now() - start,
+          timestamp: new Date(),
+          fileCount: 0,
+        },
+        error:
+          '扫描根目录无 package.json，未使用依赖检测范围外未执行（如需检测请在含 Node 清单的项目根运行）',
+      };
+    }
+
     try {
       const output = await this.runDepcheck(options);
       const issues = depcheckMapper(output);
@@ -49,6 +71,16 @@ export class DepcheckAdapter implements ToolAdapter {
       };
     } catch (error) {
       return this.buildErrorResult(start, error as ExecError);
+    }
+  }
+
+  /** 扫描根是否存在 Node 清单（depcheck 的适用前提） */
+  private async hasRootPackageJson(projectPath: string): Promise<boolean> {
+    try {
+      await fs.promises.access(path.join(path.resolve(projectPath), 'package.json'));
+      return true;
+    } catch {
+      return false;
     }
   }
 

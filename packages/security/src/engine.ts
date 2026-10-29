@@ -7,7 +7,13 @@ import {
   wrapAdapter,
 } from '@zh/shared';
 import * as path from 'node:path';
-import type { Vulnerability, SecurityScanReport, GarbageItem, MalwareItem } from './types';
+import type {
+  Vulnerability,
+  SecurityScanReport,
+  GarbageItem,
+  MalwareItem,
+  SkippedTool,
+} from './types';
 import { calculateSecurityScore } from './types';
 import { VulnerabilityScanner } from './vulnerability-scanner';
 import { scanGarbage } from './garbage-scanner';
@@ -32,6 +38,8 @@ interface SecurityBuildReportParams {
   conflictReport: RuleConflictReport;
   /** 依赖审计失败原因（VulnerabilityScanner.lastError；成功为空） */
   auditError?: string;
+  /** 本次扫描中范围外跳过的工具（与降级分离，见 SecurityScanReport.skippedTools） */
+  skippedTools?: SkippedTool[];
 }
 
 export class SecurityEngine {
@@ -118,7 +126,7 @@ export class SecurityEngine {
     // 归一化 projectPath 为绝对路径：服务端/桌面端直连引擎时可能传入相对路径，
     // 相对路径会流入 ToolScanOptions.projectPath，外部工具以自身 cwd 解析导致扫描失败。
     projectPath = path.resolve(projectPath);
-    const { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues } =
+    const { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues, skippedTools } =
       await this.scanOrchestrator.run(projectId, projectPath);
     const { garbage, malware, vulnerabilities, conflictReport } =
       await this.resultAggregator.collect({
@@ -136,11 +144,13 @@ export class SecurityEngine {
       malware,
       conflictReport,
       auditError: this.vulnerabilityScanner.lastError || undefined,
+      skippedTools,
     });
   }
 
   private buildReport(params: SecurityBuildReportParams): SecurityScanReport {
-    const { projectId, vulnerabilities, garbage, malware, conflictReport, auditError } = params;
+    const { projectId, vulnerabilities, garbage, malware, conflictReport, auditError, skippedTools } =
+      params;
     const summary = summarizeFindings(vulnerabilities, garbage, malware);
     const securityScore = calculateSecurityScore(vulnerabilities);
     // P1-4：工具不可用 / 审计失败 → 随报告带 degraded。0 检出的语义由调用方解读：
@@ -163,6 +173,9 @@ export class SecurityEngine {
       summary,
       conflictReport,
       ...(degraded ? { degraded } : {}),
+      // 范围外跳过单独成字段：工具可用但本项目不适用，是既定裁剪而非能力缺失，
+      // 不得与 degraded 混桶（否则「无 Node 清单」被渲染成「工具未安装」）。
+      ...(skippedTools && skippedTools.length > 0 ? { skippedTools } : {}),
     };
   }
 

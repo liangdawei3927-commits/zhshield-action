@@ -121,7 +121,11 @@ export class TrivyAdapter implements ToolAdapter {
     if (scanTypes.includes('dependency') && !hasRootPackageJson) {
       return {
         tool: 'trivy',
-        status: 'unavailable',
+        // 范围外 = 既定裁剪，不是工具不可用：status 用 skipped 而非 unavailable。
+        // 曾因返回 unavailable 被 security 侧 escalate 进 degraded.unavailableTools，
+        // 令「本项目无 Node 清单」渲染成「Trivy 未安装」并指引用户重装/联网（无效动作）。
+        status: 'skipped',
+        skipReason: 'out-of-scope',
         issues: [],
         metadata: {
           version: '',

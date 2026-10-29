@@ -1,5 +1,6 @@
 import type { ToolAdapter, Issue, EventEmitter, ToolResult } from '@zh/shared';
 import { DegradationManager, AuditLogger } from '@zh/shared';
+import type { SkippedTool } from './types';
 
 interface CollectIssuesByToolParams {
   toolId: string;
@@ -27,6 +28,11 @@ export interface ScanOrchestratorResult {
   grypeIssues: Issue[];
   depcheckIssues: Issue[];
   semgrepIssues: Issue[];
+  /**
+   * 范围外跳过的工具（out-of-scope）。与 degraded 严格分离：
+   * 这是既定裁剪而非能力缺失，不计入降级，也不得渲染成「工具不可用」。
+   */
+  skippedTools: SkippedTool[];
 }
 
 /**
@@ -59,6 +65,7 @@ export class ScanOrchestrator {
     const grypeIssues: Issue[] = [];
     const depcheckIssues: Issue[] = [];
     const semgrepIssues: Issue[] = [];
+    const skippedTools: SkippedTool[] = [];
 
     for (const [, adapter] of this.registeredAdapters) {
       if (this.degradationManager.isToolSkipped(adapter.meta.id)) {
@@ -80,9 +87,10 @@ export class ScanOrchestrator {
       grypeIssues.push(...toolIssues.grype);
       depcheckIssues.push(...toolIssues.depcheck);
       semgrepIssues.push(...toolIssues.semgrep);
+      if (toolIssues.skipped) skippedTools.push(toolIssues.skipped);
     }
 
-    return { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues };
+    return { allIssues, trivyIssues, grypeIssues, depcheckIssues, semgrepIssues, skippedTools };
   }
 
   private async executeToolScan(
@@ -95,13 +103,21 @@ export class ScanOrchestrator {
     grype: Issue[];
     depcheck: Issue[];
     semgrep: Issue[];
+    skipped?: SkippedTool;
   }> {
-    const result = {
-      all: [] as Issue[],
-      trivy: [] as Issue[],
-      grype: [] as Issue[],
-      depcheck: [] as Issue[],
-      semgrep: [] as Issue[],
+    const result: {
+      all: Issue[];
+      trivy: Issue[];
+      grype: Issue[];
+      depcheck: Issue[];
+      semgrep: Issue[];
+      skipped?: SkippedTool;
+    } = {
+      all: [],
+      trivy: [],
+      grype: [],
+      depcheck: [],
+      semgrep: [],
     };
     const toolStart = Date.now();
 
@@ -121,6 +137,15 @@ export class ScanOrchestrator {
         semgrepIssues: result.semgrep,
       });
       await this.recordToolExecution(adapter, scanResult, projectId, toolStart);
+      // 范围外跳过：工具本体可用，只是当前项目不适用 —— 属既定裁剪，
+      // 不得 escalate 进 DegradationManager（否则既误报「工具不可用」，
+      // 又累加 failureCount 推高降级等级，进而连累其他工具被静默跳过）。
+      if (scanResult.status === 'skipped' && scanResult.skipReason === 'out-of-scope') {
+        result.skipped = {
+          tool: adapter.meta.id,
+          reason: scanResult.error || '当前项目不满足该工具的适用前提',
+        };
+      }
     } catch (error) {
       this.handleScanError(adapter, error);
     }

@@ -221,6 +221,12 @@ export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanRep
           },
         }
       : {}),
+    // 范围外跳过：与降级分离透传，UI 单独成行（「不适用」而非「不可用」）
+    ...(r.skippedTools && r.skippedTools.length > 0
+      ? {
+          skippedTools: r.skippedTools.map((s) => ({ tool: s.tool, reason: s.reason })),
+        }
+      : {}),
     metadata: {
       duration: 0,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),

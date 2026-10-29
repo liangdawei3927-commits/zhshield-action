@@ -71,6 +71,12 @@ export interface MalwareItem {
   evidence: string;
 }
 
+/** 范围外跳过条目：工具本体可用，但当前项目不满足其适用前提（如无 package.json） */
+export interface SkippedTool {
+  tool: string;
+  reason: string;
+}
+
 /** 安全扫描报告：漏洞/垃圾/恶意三类结果 + 安全评分 + 计数汇总，附 F3 二次校验的 malware 冲突报告 */
 export interface SecurityScanReport {
   projectId: string;
@@ -91,6 +97,15 @@ export interface SecurityScanReport {
     unavailableTools: string[];
     auditError?: string;
   };
+  /**
+   * 范围外跳过的工具（out-of-scope）：工具本体可用，但当前项目不满足其适用前提
+   * （如无 package.json 的文档仓库扫 trivy/depcheck）。
+   *
+   * 与 degraded.unavailableTools 严格分离——后者是能力缺失（需装工具/联网），
+   * 前者是既定裁剪（重装无效）。混在一个桶里会让 UI 给出错误的恢复指引，
+   * 并让永久性的假降级横幅把真实降级淹没成背景噪音。
+   */
+  skippedTools?: SkippedTool[];
   summary: {
     vulnTotal: number;
     vulnCritical: number;

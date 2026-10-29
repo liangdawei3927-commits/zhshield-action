@@ -115,7 +115,7 @@ describe('TrivyAdapter — 漏洞库下载失败提示', () => {
 describe('TrivyAdapter — 无 package.json 的 dependency 扫描（防 (root) 伪债务）', () => {
   // 回归背景：扫描根无 Node 清单时 trivy 对 package.json lstat FATAL，
   // 错误曾被诊断链路聚合为 (root) 伪债务项（td-quality-44c4ce057952）。
-  it('dependency 扫描且根目录无 package.json 时返回 unavailable 且不执行 trivy', async () => {
+  it('dependency 扫描且根目录无 package.json 时按 skipped/out-of-scope 处理且不执行 trivy', async () => {
     state.packageJsonExists = false;
 
     const adapter = new TrivyAdapter();
@@ -125,7 +125,11 @@ describe('TrivyAdapter — 无 package.json 的 dependency 扫描（防 (root) �
       config: { scanners: ['dependency'] },
     });
 
-    expect(result.status).toBe('unavailable');
+    // 范围外 = 既定裁剪，不是工具不可用：用 skipped 而非 unavailable。
+    // 曾因返回 unavailable 被 escalate 进 degraded.unavailableTools，
+    // 令「本项目无 Node 清单」渲染成「Trivy 未安装」并指引用户重装（无效动作）。
+    expect(result.status).toBe('skipped');
+    expect(result.skipReason).toBe('out-of-scope');
     expect(result.issues).toEqual([]);
     expect(result.error).toContain('无 package.json');
     // 范围外跳过：绝不能真的拉起 trivy（否则又产出 lstat FATAL 伪 error）

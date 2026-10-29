@@ -1676,6 +1676,10 @@
         "title": "Scan degraded; results may be incomplete",
         "detail": "Unavailable tools: {{tools}}. {{audit}}Not checked does not mean no vulnerabilities — restore tools or go online and rescan.",
         "none": "(none)"
+      },
+      "skipped": {
+        "title": "Not applicable to this project; skipped",
+        "detail": "{{tools}}: this project does not meet the prerequisites (e.g. missing package.json). Expected trimming, not a tool failure — no action needed."
       }
     },
     "sentinel": {

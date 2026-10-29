@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- 小尺寸专用变体（≤64px 渲染时用）：加粗描边，保证 16/32px 下 `<_` 仍可辨
-       图形与坐标同 Icons.tsx:4 ShieldLogo，仅线宽放大 -->
+  <!-- 中尺寸变体（64px 档）：几何与 icon.svg 完全一致，仅加粗描边
+       64px 时背景方块约 51px、盾牌约 34px，标准线宽下 `<_` 偏细 -->
   <defs>
     <linearGradient id="zh-bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0E8C7F"/>
@@ -8,13 +8,13 @@
     </linearGradient>
   </defs>
 
-  <rect width="1024" height="1024" rx="224" fill="url(#zh-bg)"/>
+  <rect x="102" y="102" width="820" height="820" rx="185" fill="url(#zh-bg)"/>
 
-  <g transform="translate(56 27.5) scale(38)"
+  <g transform="translate(204.5 185.28) scale(25.625)"
      fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2L3 6.5V12C3 17.25 6.84 22.09 12 23.5C17.16 22.09 21 17.25 21 12V6.5L12 2Z"
-          stroke-width="2.2"/>
-    <path d="M8 10L5.5 12.5L8 15" stroke-width="2.6"/>
-    <line x1="12" y1="15" x2="17" y2="15" stroke-width="2.6"/>
+          stroke-width="2.4"/>
+    <path d="M8 10L5.5 12.5L8 15" stroke-width="2.9"/>
+    <line x1="12" y1="15" x2="17" y2="15" stroke-width="2.9"/>
   </g>
 </svg>

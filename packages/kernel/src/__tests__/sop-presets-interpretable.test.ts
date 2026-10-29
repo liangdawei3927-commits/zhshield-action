@@ -170,6 +170,27 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
     expect(rejected).toEqual([]);
   });
 
+  it('sentinel/evolve 域 5 条引擎内部能力规则已降为 draft（不得再以 active 死接存在）', async () => {
+    // sentinel/evolve/garbage 三域按设计零适配器（引擎内自算）：这 5 条规则原
+    // status=active 却从不执行，是「声明了却没执行」的死接隐患。Phase 1 这些域未启用
+    // （FEATURE_EVOLVE_ENABLED=false；sentinel 由引擎内部聚合调度），故降为 draft
+    // 直到对应引擎能力接入——避免出现「active 但永不执行」的幽灵规则。
+    const { registry } = await loadPresets();
+    const rules = registry.getAll();
+    const ids = [
+      'sentinel.alert.internal.p1-critical',
+      'sentinel.alert.internal.deduplication',
+      'evolve.score.official.dimension-weight',
+      'evolve.suggest.internal.experience-match',
+      'evolve.calibrate.internal.false-positive',
+    ];
+    for (const id of ids) {
+      const rule = rules.find((r) => r.id === id);
+      expect(rule, `${id} 应已加载`).toBeDefined();
+      expect(rule!.status, `${id} 必须降为 draft（不得再以 active 死接存在）`).not.toBe('active');
+    }
+  });
+
   it('tool-dispatch 规则不得声明伪 tool（声明的工具必须有适配器 id）', async () => {
     // T4 在 inspect 域发现 5 处「伪 tool」（custom-ast-scanner / tsc-config-validator /
     // dead-file-analyzer 等），规则永远不会被执行，却在界面上占一个检查项。
@@ -186,11 +207,9 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
       }
     }
 
-    // 已知存量（09-18 新发现，非本批修复范围）：sentinel / evolve 域 5 条 **active** 规则
-    // 声明的「工具」在全仓库中不存在任何适配器与注册点 → 这些规则同样从不执行。
-    // 该清单只能减不能增：新增伪 tool 会立刻红。
-    // 处置建议见方案文档：引擎型能力（评分/校准/去重）应显式建模为引擎调度，
-    // 或把规则降为 draft 直到适配器接入。
+    // 已知存量（sentinel/evolve 域 5 条 draft 规则仍引用不存在的引擎内部工具名，如
+    // sentinel-alert-controller / calibration-controller）：它们已降为 draft，待对应
+    // 引擎能力接入后再转 active。该清单只能减不能增：新增伪 tool 会立刻红。
     const KNOWN_PENDING = [
       'evolve.score.official.dimension-weight → scoring-engine',
       'evolve.calibrate.internal.false-positive → calibration-controller',

@@ -18,7 +18,9 @@ metadata:
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "active"
+  # Phase 1：sentinel 域零适配器（去重能力由引擎内部聚合调度，非 SOP tool-dispatch），
+  # 本规则无执行路径；降为 draft 直到对应引擎能力接入，避免"active 但永不执行"的死接。
+  status: "draft"
   source: "internal"
   sourceRef: "全链路哨兵监控系统.md — 5.2 去重机制"
 

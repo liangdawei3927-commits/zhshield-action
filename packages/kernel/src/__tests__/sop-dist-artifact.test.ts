@@ -17,9 +17,10 @@ import type { SopRule } from '../sop/_meta/sop-types';
  * hash 一致但加载 0 条是可能的。而 CLI 启动时 `resolveBundledSopDir()` 指的
  * 正是这个 dist 目录 —— 一旦它加载为 0，引擎进入盲检、所有检查默认通过。
  *
- * 实测口径（2026-10-25，内核 dist + 本文件的两份资产）：
- *   dist(cli 发布产物) 加载 43 / 活跃 29 / unresolved 0
- *   src (内核源码)     加载 43 / 活跃 29 / unresolved 0
+ * 实测口径（2026-10-29，内核 dist + 本文件的两份资产；本轮把 sentinel/evolve 域
+ * 5 条无执行路径的引擎内部能力规则由 active 降为 draft）：
+ *   dist(cli 发布产物) 加载 43 / 活跃 24 / unresolved 0
+ *   src (内核源码)     加载 43 / 活跃 24 / unresolved 0
  *
  * 故本文件锁三件事，且**不写死条数**（避免数字过期）：
  *   ① dist 能被同一个内核加载器读出非 0 条规则；

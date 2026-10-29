@@ -19,7 +19,9 @@ metadata:
   author: "智汇码盾官方"
   created: "2026-07-29"
   updated: "2026-07-29"
-  status: "active"
+  # Phase 1：evolve 域零适配器（校准能力由引擎内部计算，非 SOP tool-dispatch），
+  # 本规则无执行路径；降为 draft 直到对应引擎能力接入，避免"active 但永不执行"的死接。
+  status: "draft"
   source: "internal"
   sourceRef: "05-健康评分与进化系统.md — 3.2.1 误报校准"
 

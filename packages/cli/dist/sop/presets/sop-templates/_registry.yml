@@ -207,7 +207,7 @@ rules:
     file: "sentinel/alert/p1-critical.yml"
     adapter: "Sentinel · P1 告警"
     priority: "critical"
-    status: "active"
+    status: "draft"
 
   - id: "sentinel.alert.internal.p2-high"
     file: "sentinel/alert/p2-high.yml"
@@ -219,7 +219,7 @@ rules:
     file: "sentinel/alert/deduplication.yml"
     adapter: "Sentinel · 去重策略"
     priority: "high"
-    status: "active"
+    status: "draft"
 
   - id: "sentinel.alert.internal.rollback"
     file: "sentinel/alert/rollback.yml"
@@ -243,7 +243,7 @@ rules:
     file: "evolve/score/dimension-weight.yml"
     adapter: "Scoring · 维度权重"
     priority: "high"
-    status: "active"
+    status: "draft"
 
   - id: "evolve.score.official.grade-boundary"
     file: "evolve/score/grade-boundary.yml"
@@ -262,7 +262,7 @@ rules:
     file: "evolve/suggest/experience-match.yml"
     adapter: "Evolve · 经验匹配"
     priority: "medium"
-    status: "active"
+    status: "draft"
 
   - id: "evolve.suggest.internal.fix-generation"
     file: "evolve/suggest/fix-generation.yml"
@@ -275,7 +275,7 @@ rules:
     file: "evolve/calibrate/false-positive.yml"
     adapter: "Evolve · 误报校准"
     priority: "high"
-    status: "active"
+    status: "draft"
 
   - id: "evolve.calibrate.internal.rule-upgrade"
     file: "evolve/calibrate/rule-upgrade.yml"

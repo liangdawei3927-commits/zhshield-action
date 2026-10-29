@@ -291,8 +291,9 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
   }
 
   // content 段能否真跑起来 —— 元数据字段合法 ≠ 检查内容可执行。
-  // 分级：active 规则无执行段判 fatal（每次体检固定降级却零产出），
-  // draft/trial 判 warn（内容未完成是正常阶段，但必须留痕）。
+  // 无执行段（unresolved）一律 fatal 拒收，不限生命周期状态：客户端是规则纯消费者，
+  // 无执行段的规则永远零产出，拒收即清洗空壳（详见 sop-content-validation.ts 头注释）。
+  // 阈值指标缺取数归属则 active fatal / 非 active warn（指标未接属正常草稿态，已 gate active 炸弹）。
   for (const issue of validateRuleContent(rule, locator)) push(issue);
 
   return issues;

@@ -84,3 +84,42 @@ describe('SemgrepRuleWriter — 内联规则写在临时目录，不落被测项
     await expect(removeInlineRuleFile('/tmp/zhshield-semgrep-not-exist/x.yml')).resolves.toBeUndefined();
   });
 });
+
+/**
+ * CSRF 规则的命中正确性依赖写入器能发射「多行 pattern」：
+ * semgrep 1.180.0 对 TS 装饰器只能用「装饰器 + 方法签名」的多行 pattern 匹配，
+ * 单行 `@Post(...)` / 裸 `@$X` 零命中。csrf.yml 现用多行 patternEither + 多行 pattern-not，
+ * 本用例锁死写入器确实把它们原样发射成 block scalar（否则 csrf 会静默零命中 = 假阴性）。
+ */
+describe('SemgrepRuleWriter — 多行 pattern / pattern-not 发射（csrf 依赖）', () => {
+  it('多行 patternEither 与多行 pattern-not 都被发射为 block scalar', async () => {
+    const projectDir = makeProjectDir();
+    const writer = new SemgrepRuleWriter();
+    const rulePath = await writer.writeInlineRuleConfig({
+      projectPath: projectDir,
+      config: {
+        rules: [
+          {
+            id: 'missing-csrf-nestjs',
+            severity: 'warning',
+            patternEither: ['@Post()\n  $M(...)', '@Post($PATH)\n  $M(...)'],
+            patternNot: ['@UseGuards(...)\n  $M2(...)'],
+            message: 'missing csrf guard',
+          },
+        ],
+      },
+    } as unknown as ToolScanOptions);
+
+    const p = rulePath as string;
+    tempDirs.push(path.dirname(p));
+    const yaml = fs.readFileSync(p, 'utf-8');
+
+    // pattern-either 内存在装饰器 + 方法多行结构
+    expect(yaml).toContain('pattern-either:');
+    expect(yaml).toContain('@Post()');
+    expect(yaml).toContain('$M(...)');
+    // pattern-not 以 block scalar 形式存在（含装饰器 + 方法）
+    expect(yaml).toContain('pattern-not: |');
+    expect(yaml).toContain('@UseGuards(...)');
+  });
+});

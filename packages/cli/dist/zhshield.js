@@ -2465,9 +2465,9 @@ var init_i18next = __esm({
         let value;
         let clonedOptions;
         const handleHasOptions = (key, inheritedOptions) => {
-          const sep5 = this.nestingOptionsSeparator;
-          if (key.indexOf(sep5) < 0) return key;
-          const c = key.split(new RegExp(`${sep5}[ ]*{`));
+          const sep6 = this.nestingOptionsSeparator;
+          if (key.indexOf(sep6) < 0) return key;
+          const c = key.split(new RegExp(`${sep6}[ ]*{`));
           let optionsString = `{${c[1]}`;
           key = c[0];
           optionsString = this.interpolate(optionsString, clonedOptions);
@@ -2484,7 +2484,7 @@ var init_i18next = __esm({
             };
           } catch (e) {
             this.logger.warn(`failed parsing options string in nesting for key ${key}`, e);
-            return `${key}${sep5}${optionsString}`;
+            return `${key}${sep6}${optionsString}`;
           }
           if (clonedOptions.defaultValue && clonedOptions.defaultValue.indexOf(this.prefix) > -1) delete clonedOptions.defaultValue;
           return key;
@@ -3868,7 +3868,9 @@ var init_zh_Hans = __esm({
               description: "TypeScript \u7C7B\u578B\u9519\u8BEF\u68C0\u67E5",
               fixSuggestion: "\u4FEE\u590D TypeScript {{level}}: {{code}}",
               runFailed: "tsc \u6267\u884C\u5931\u8D25",
-              unavailable: "tsc \u672A\u5B89\u88C5\u6216\u672A\u5728 PATH \u4E2D\u627E\u5230"
+              unavailable: "tsc \u672A\u5B89\u88C5\u6216\u672A\u5728 PATH \u4E2D\u627E\u5230",
+              depsMissing: "\u4F9D\u8D56\u672A\u5B89\u88C5\uFF08node_modules \u7F3A\u5931\uFF09\uFF0CTypeScript \u7C7B\u578B\u68C0\u67E5\u65E0\u6CD5\u6267\u884C\uFF0C\u5DF2\u964D\u7EA7\u4E3A\u672A\u6267\u884C\uFF08\u8BF7\u5148\u5B89\u88C5\u4F9D\u8D56\u540E\u91CD\u8BD5\uFF09",
+              unresolvedEnv: "TypeScript \u7C7B\u578B\u68C0\u67E5\u53D7\u4F9D\u8D56/\u7C7B\u578B\u7248\u672C\u5F71\u54CD\u65E0\u6CD5\u7ED9\u51FA\u786E\u5B9A\u7ED3\u8BBA\uFF0C\u5DF2\u964D\u7EA7\u4E3A\u672A\u6267\u884C"
             }
           },
           unknown: "\u672A\u77E5",
@@ -80720,11 +80722,11 @@ var require_Str = __commonJS({
     var capitalize;
     var camelize;
     var dasherize;
-    split = curry$(function(sep5, str) {
-      return str.split(sep5);
+    split = curry$(function(sep6, str) {
+      return str.split(sep6);
     });
-    join46 = curry$(function(sep5, xs) {
-      return xs.join(sep5);
+    join46 = curry$(function(sep6, xs) {
+      return xs.join(sep6);
     });
     lines = function(str) {
       if (!str.length) {
@@ -88963,13 +88965,13 @@ var require_posix = __commonJS({
       }
       return path61.slice(startDot, end);
     }
-    function _format(sep5, pathObject) {
+    function _format(sep6, pathObject) {
       const dir2 = pathObject.dir || pathObject.root;
       const base = pathObject.base || (pathObject.name ?? "") + (pathObject.ext ?? "");
       if (!dir2) return base;
-      if (base === sep5) return dir2;
+      if (base === sep6) return dir2;
       if (dir2 === pathObject.root) return dir2 + base;
-      return dir2 + sep5 + base;
+      return dir2 + sep6 + base;
     }
     function assertArg$1(pathObject) {
       if (pathObject === null || typeof pathObject !== "object") {
@@ -89250,13 +89252,13 @@ var require_posix = __commonJS({
     function toNamespacedPath(path61) {
       return path61;
     }
-    function common$1(paths, sep5) {
+    function common$1(paths, sep6) {
       const [first = "", ...remaining] = paths;
-      const parts = first.split(sep5);
+      const parts = first.split(sep6);
       let endOfPrefix = parts.length;
       let append = "";
       for (const path61 of remaining) {
-        const compare = path61.split(sep5);
+        const compare = path61.split(sep6);
         if (compare.length <= endOfPrefix) {
           endOfPrefix = compare.length;
           append = "";
@@ -89264,12 +89266,12 @@ var require_posix = __commonJS({
         for (let i = 0; i < endOfPrefix; i++) {
           if (compare[i] !== parts[i]) {
             endOfPrefix = i;
-            append = i === 0 ? "" : sep5;
+            append = i === 0 ? "" : sep6;
             break;
           }
         }
       }
-      return parts.slice(0, endOfPrefix).join(sep5) + append;
+      return parts.slice(0, endOfPrefix).join(sep6) + append;
     }
     function common(paths) {
       return common$1(paths, SEPARATOR);
@@ -89793,13 +89795,13 @@ var require_windows = __commonJS({
       }
       return path61.slice(startDot, end);
     }
-    function _format(sep5, pathObject) {
+    function _format(sep6, pathObject) {
       const dir2 = pathObject.dir || pathObject.root;
       const base = pathObject.base || (pathObject.name ?? "") + (pathObject.ext ?? "");
       if (!dir2) return base;
-      if (base === sep5) return dir2;
+      if (base === sep6) return dir2;
       if (dir2 === pathObject.root) return dir2 + base;
-      return dir2 + sep5 + base;
+      return dir2 + sep6 + base;
     }
     function assertArg$1(pathObject) {
       if (pathObject === null || typeof pathObject !== "object") {
@@ -90322,13 +90324,13 @@ var require_windows = __commonJS({
       }
       return path61;
     }
-    function common$1(paths, sep5) {
+    function common$1(paths, sep6) {
       const [first = "", ...remaining] = paths;
-      const parts = first.split(sep5);
+      const parts = first.split(sep6);
       let endOfPrefix = parts.length;
       let append = "";
       for (const path61 of remaining) {
-        const compare = path61.split(sep5);
+        const compare = path61.split(sep6);
         if (compare.length <= endOfPrefix) {
           endOfPrefix = compare.length;
           append = "";
@@ -90336,12 +90338,12 @@ var require_windows = __commonJS({
         for (let i = 0; i < endOfPrefix; i++) {
           if (compare[i] !== parts[i]) {
             endOfPrefix = i;
-            append = i === 0 ? "" : sep5;
+            append = i === 0 ? "" : sep6;
             break;
           }
         }
       }
-      return parts.slice(0, endOfPrefix).join(sep5) + append;
+      return parts.slice(0, endOfPrefix).join(sep6) + append;
     }
     function common(paths) {
       return common$1(paths, SEPARATOR);
@@ -118323,8 +118325,8 @@ var require_eslint_helpers = __commonJS({
           break;
         default:
           {
-            const isInNodeModules = baseDir2 && path61.dirname(path61.relative(baseDir2, filePath)).split(path61.sep).includes("node_modules");
-            if (isInNodeModules) {
+            const isInNodeModules2 = baseDir2 && path61.dirname(path61.relative(baseDir2, filePath)).split(path61.sep).includes("node_modules");
+            if (isInNodeModules2) {
               message = 'File ignored by default because it is located under the node_modules directory. Use ignore pattern "!**/node_modules/" to disable file ignore settings or use "--no-warn-ignored" to suppress this warning.';
             } else {
               message = 'File ignored because of a matching ignore pattern. Use "--no-ignore" to disable file ignore settings or use "--no-warn-ignored" to suppress this warning.';
@@ -174023,11 +174025,11 @@ ${lanes.join("\n")}
             if (i < rootLength) {
               return void 0;
             }
-            const sep5 = directory.lastIndexOf(directorySeparator, i - 1);
-            if (sep5 === -1) {
+            const sep6 = directory.lastIndexOf(directorySeparator, i - 1);
+            if (sep6 === -1) {
               return void 0;
             }
-            return directory.substr(0, Math.max(sep5, rootLength));
+            return directory.substr(0, Math.max(sep6, rootLength));
           }
         }
       }
@@ -180005,18 +180007,18 @@ ${lanes.join("\n")}
           /*preferSymlinks*/
           true,
           (path61, isRedirect) => {
-            const isInNodeModules = pathContainsNodeModules(path61);
-            allFileNames.set(path61, { path: info.getCanonicalFileName(path61), isRedirect, isInNodeModules });
-            importedFileFromNodeModules = importedFileFromNodeModules || isInNodeModules;
+            const isInNodeModules2 = pathContainsNodeModules(path61);
+            allFileNames.set(path61, { path: info.getCanonicalFileName(path61), isRedirect, isInNodeModules: isInNodeModules2 });
+            importedFileFromNodeModules = importedFileFromNodeModules || isInNodeModules2;
           }
         );
         const sortedPaths = [];
         for (let directory = info.canonicalSourceDirectory; allFileNames.size !== 0; ) {
           const directoryStart = ensureTrailingDirectorySeparator(directory);
           let pathsInDirectory;
-          allFileNames.forEach(({ path: path61, isRedirect, isInNodeModules }, fileName) => {
+          allFileNames.forEach(({ path: path61, isRedirect, isInNodeModules: isInNodeModules2 }, fileName) => {
             if (startsWith(path61, directoryStart)) {
-              (pathsInDirectory || (pathsInDirectory = [])).push({ path: fileName, isRedirect, isInNodeModules });
+              (pathsInDirectory || (pathsInDirectory = [])).push({ path: fileName, isRedirect, isInNodeModules: isInNodeModules2 });
               allFileNames.delete(fileName);
             }
           });
@@ -180033,7 +180035,7 @@ ${lanes.join("\n")}
         if (allFileNames.size) {
           const remainingPaths = arrayFrom(
             allFileNames.entries(),
-            ([fileName, { isRedirect, isInNodeModules }]) => ({ path: fileName, isRedirect, isInNodeModules })
+            ([fileName, { isRedirect, isInNodeModules: isInNodeModules2 }]) => ({ path: fileName, isRedirect, isInNodeModules: isInNodeModules2 })
           );
           if (remainingPaths.length > 1) remainingPaths.sort(comparePathsByRedirectAndNumberOfDirectorySeparators);
           sortedPaths.push(...remainingPaths);
@@ -340760,10 +340762,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep: sep5, value } = collItem;
+        const { start, key, sep: sep6, value } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep5?.[0],
+          next: key ?? sep6?.[0],
           offset,
           onError: onError2,
           parentIndent: bm.indent,
@@ -340777,7 +340779,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError2(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep5) {
+          if (!keyProps.anchor && !keyProps.tag && !sep6) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map.comment)
@@ -340801,7 +340803,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
           onError2(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep5 ?? [], {
+        const valueProps = resolveProps.resolveProps(sep6 ?? [], {
           indicator: "map-value-ind",
           next: value,
           offset: keyNode.range[2],
@@ -340817,7 +340819,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError2(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep5, null, valueProps, onError2);
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep6, null, valueProps, onError2);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value, onError2);
           offset = valueNode.range[2];
@@ -340908,7 +340910,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep5 = "";
+        let sep6 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -340922,13 +340924,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep5 + cb;
-              sep5 = "";
+                comment += sep6 + cb;
+              sep6 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep5 += source;
+                sep6 += source;
               hasSpace = true;
               break;
             default:
@@ -340971,18 +340973,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i = 0; i < fc.items.length; ++i) {
         const collItem = fc.items[i];
-        const { start, key, sep: sep5, value } = collItem;
+        const { start, key, sep: sep6, value } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep5?.[0],
+          next: key ?? sep6?.[0],
           offset,
           onError: onError2,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep5 && !value) {
+          if (!props.anchor && !props.tag && !sep6 && !value) {
             if (i === 0 && props.comma)
               onError2(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i < fc.items.length - 1)
@@ -341036,8 +341038,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep5 && !props.found) {
-          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep5, null, props, onError2);
+        if (!isMap && !sep6 && !props.found) {
+          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep6, null, props, onError2);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock2(value))
@@ -341049,7 +341051,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock2(key))
             onError2(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep5 ?? [], {
+          const valueProps = resolveProps.resolveProps(sep6 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value,
@@ -341060,8 +341062,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep5)
-                for (const st of sep5) {
+              if (sep6)
+                for (const st of sep6) {
                   if (st === valueProps.found)
                     break;
                   if (st.type === "newline") {
@@ -341078,7 +341080,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError2(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep5, null, valueProps, onError2) : null;
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep6, null, valueProps, onError2) : null;
           if (valueNode) {
             if (isBlock2(value))
               onError2(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -341258,7 +341260,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i + 1;
       }
       let value = "";
-      let sep5 = "";
+      let sep6 = "";
       let prevMoreIndented = false;
       for (let i = 0; i < contentStart; ++i)
         value += lines[i][0].slice(trimIndent) + "\n";
@@ -341275,24 +341277,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value += sep5 + indent.slice(trimIndent) + content;
-          sep5 = "\n";
+          value += sep6 + indent.slice(trimIndent) + content;
+          sep6 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep5 === " ")
-            sep5 = "\n";
-          else if (!prevMoreIndented && sep5 === "\n")
-            sep5 = "\n\n";
-          value += sep5 + indent.slice(trimIndent) + content;
-          sep5 = "\n";
+          if (sep6 === " ")
+            sep6 = "\n";
+          else if (!prevMoreIndented && sep6 === "\n")
+            sep6 = "\n\n";
+          value += sep6 + indent.slice(trimIndent) + content;
+          sep6 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep5 === "\n")
+          if (sep6 === "\n")
             value += "\n";
           else
-            sep5 = "\n";
+            sep6 = "\n";
         } else {
-          value += sep5 + content;
-          sep5 = " ";
+          value += sep6 + content;
+          sep6 = " ";
           prevMoreIndented = false;
         }
       }
@@ -341474,25 +341476,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match)
         return source;
       let res = match[1];
-      let sep5 = " ";
+      let sep6 = " ";
       let pos = first.lastIndex;
       line.lastIndex = pos;
       while (match = line.exec(source)) {
         if (match[1] === "") {
-          if (sep5 === "\n")
-            res += sep5;
+          if (sep6 === "\n")
+            res += sep6;
           else
-            sep5 = "\n";
+            sep6 = "\n";
         } else {
-          res += sep5 + match[1];
-          sep5 = " ";
+          res += sep6 + match[1];
+          sep6 = " ";
         }
         pos = line.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match = last.exec(source);
-      return res + sep5 + (match?.[1] ?? "");
+      return res + sep6 + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError2) {
       let res = "";
@@ -342302,14 +342304,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep: sep5, value }) {
+    function stringifyItem({ start, key, sep: sep6, value }) {
       let res = "";
       for (const st of start)
         res += st.source;
       if (key)
         res += stringifyToken(key);
-      if (sep5)
-        for (const st of sep5)
+      if (sep6)
+        for (const st of sep6)
           res += st.source;
       if (value)
         res += stringifyToken(value);
@@ -343476,18 +343478,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep5;
+          let sep6;
           if (scalar.end) {
-            sep5 = scalar.end;
-            sep5.push(this.sourceToken);
+            sep6 = scalar.end;
+            sep6.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep5 = [this.sourceToken];
+            sep6 = [this.sourceToken];
           const map = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep: sep5 }]
+            items: [{ start, key: scalar, sep: sep6 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map;
@@ -343640,15 +343642,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it2.key) && !includesToken(it2.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it2.start);
                   const key = it2.key;
-                  const sep5 = it2.sep;
-                  sep5.push(this.sourceToken);
+                  const sep6 = it2.sep;
+                  sep6.push(this.sourceToken);
                   delete it2.key;
                   delete it2.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep: sep5 }]
+                    items: [{ start: start2, key, sep: sep6 }]
                   });
                 } else if (start.length > 0) {
                   it2.sep = it2.sep.concat(start, this.sourceToken);
@@ -343842,13 +343844,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep5 = fc.end.splice(1, fc.end.length);
-            sep5.push(this.sourceToken);
+            const sep6 = fc.end.splice(1, fc.end.length);
+            sep6.push(this.sourceToken);
             const map = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep: sep5 }]
+              items: [{ start, key: fc, sep: sep6 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map;
@@ -361867,8 +361869,8 @@ var require_rule64 = __commonJS({
     function findNextSeparator(str) {
       const separators = ["&", " ", ";"];
       let minIndex = -1;
-      for (const sep5 of separators) {
-        const idx = str.indexOf(sep5);
+      for (const sep6 of separators) {
+        const idx = str.indexOf(sep6);
         if (idx !== -1 && (minIndex === -1 || idx < minIndex)) {
           minIndex = idx;
         }
@@ -496296,7 +496298,7 @@ function validateRuleContent(rule, locator) {
   const issues = [];
   const instr = new ContentInterpreter().interpret(rule);
   if (instr.type === "unresolved") {
-    issues.push(unresolvedIssue(raw, instr, locator, rule.status === "active"));
+    issues.push(unresolvedIssue(raw, instr, locator));
     return issues;
   }
   if (instr.type === "tool-dispatch") {
@@ -496315,14 +496317,14 @@ function validateRuleContent(rule, locator) {
   }
   return issues;
 }
-function unresolvedIssue(raw, instr, locator, isActive) {
+function unresolvedIssue(raw, instr, locator) {
   const topLevelTool = raw.tool;
   if (typeof topLevelTool === "string" && topLevelTool.trim() !== "") {
     return {
       file: locator,
       field: "content.tool",
       value: topLevelTool,
-      level: isActive ? "fatal" : "warn",
+      level: "fatal",
       reason: `\u5DE5\u5177\u540D\u5199\u5728 content \u9876\u5C42\uFF08tool="${topLevelTool}"\uFF09\uFF0C\u800C\u89E3\u91CA\u5668\u53EA\u8BA4 check.tool \u21D2 \u8BE5\u89C4\u5219\u6C38\u8FDC\u4E0D\u4F1A\u88AB\u6D3E\u53D1\u3002\u8BF7\u6539\u5199\u4E3A check: { tool: "${topLevelTool}" }`
     };
   }
@@ -496331,8 +496333,8 @@ function unresolvedIssue(raw, instr, locator, isActive) {
     file: locator,
     field: "content",
     value: instr.keys,
-    level: isActive ? "fatal" : "warn",
-    reason: `\u65E0\u4EFB\u4F55\u53EF\u6267\u884C\u6307\u4EE4\u6BB5\uFF08\u9876\u5C42\u952E\uFF1A${keys}\uFF09\u3002\u8BE5\u89C4\u5219\u6BCF\u6B21\u6267\u884C\u90FD\u843D degraded skipped\uFF1A\u65E2\u4E0D\u4EA7\u51FA\u68C0\u67E5\u7ED3\u679C\uFF0C\u53C8\u4F1A\u8BA9\u6574\u8F6E\u4F53\u68C0\u6052\u4E3A\u964D\u7EA7\u72B6\u6001\u3002`
+    level: "fatal",
+    reason: `\u65E0\u4EFB\u4F55\u53EF\u6267\u884C\u6307\u4EE4\u6BB5\uFF08\u9876\u5C42\u952E\uFF1A${keys}\uFF09\u3002\u8BE5\u89C4\u5219\u5728\u5BA2\u6237\u7AEF\uFF08\u7EAF\u6D88\u8D39\u8005\uFF0C\u53EA\u6267\u884C active \u89C4\u5219\uFF09\u6C38\u8FDC\u96F6\u4EA7\u51FA\uFF1A\u65E2\u843D\u4E0D\u4E86\u4EFB\u4F55\u68C0\u67E5\u7ED3\u679C\uFF0C\u6267\u884C\u65F6\u53C8\u4F1A\u843D degraded skipped\uFF08\u6052\u964D\u7EA7\uFF09\uFF0C\u5E76\u5728\u670D\u52A1\u7AEF\u628A draft \u76F4\u63A5\u53D1\u5E03\u65F6\u53D8\u6210"\u4F53\u68C0\u6052\u964D\u7EA7\u3001\u96F6\u4EA7\u51FA"\u7684\u5E7D\u7075\u89C4\u5219\u3002\u8BF7\u4ECE patterns / forbidden / forbiddenRegex / required / layers / checks / check.tool \u4E2D\u9009\u7528\u4E00\u79CD\u5185\u6838\u53EF\u89E3\u91CA\u7684\u5199\u6CD5\u3002`
   };
 }
 function checkToolName(tool, locator) {
@@ -505202,6 +505204,29 @@ var META8 = {
   license: "Apache-2.0"
 };
 var TS_DIAG_LINE = /^(.+?)\((\d+)(?:,(\d+))?\):\s+(error|warning)\s+(TS\d+):\s+(.+)$/;
+var RESOLUTION_ERROR_CODES = /* @__PURE__ */ new Set(["TS2307", "TS2580"]);
+function tscErrorCode(ruleId) {
+  return ruleId.split("/")[1] ?? "";
+}
+function isResolutionError(ruleId) {
+  return RESOLUTION_ERROR_CODES.has(tscErrorCode(ruleId));
+}
+function isInNodeModules(file, projectPath) {
+  const nm = path38.join(projectPath, "node_modules");
+  return file === nm || file.startsWith(nm + path38.sep) || file.includes(`${path38.sep}node_modules${path38.sep}`);
+}
+function splitTscIssues(all, projectPath) {
+  const issues = [];
+  let envArtifactCount = 0;
+  for (const issue of all) {
+    if (isInNodeModules(issue.file, projectPath) || isResolutionError(issue.ruleId)) {
+      envArtifactCount++;
+    } else {
+      issues.push(issue);
+    }
+  }
+  return { issues, envArtifactCount };
+}
 function parseTscDiagnostics(raw, category = "quality", locale) {
   if (!raw) return [];
   const lng = locale ?? DEFAULT_LANGUAGE;
@@ -505304,25 +505329,46 @@ var TypeScriptAdapter = class {
   /** 解析项目并逐个运行 tsc，聚合结果 */
   async runTscScan(options2, start, category) {
     const projectPath = path38.resolve(options2.projectPath);
-    const command = await this.commands.resolve(projectPath);
     const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
       return this.buildResult(start, category, []);
     }
+    if (!fs33.existsSync(path38.join(projectPath, "node_modules"))) {
+      return this.buildResult(
+        start,
+        category,
+        [],
+        this.tr("engine.inspect.tool.tsc.depsMissing"),
+        "unavailable"
+      );
+    }
+    const command = await this.commands.resolve(projectPath);
     const flags = this.buildFlags(options2);
-    const { issues, infraError } = await this.runAllProjects({
+    const { issues, envArtifactCount, infraError } = await this.runAllProjects({
       command,
       projects,
       flags,
       options: options2,
       category
     });
-    if (infraError && issues.length === 0) {
+    if (issues.length > 0) {
+      return this.buildResult(start, category, issues);
+    }
+    if (infraError) {
       return this.buildResult(start, category, [], infraError);
     }
-    return this.buildResult(start, category, issues);
+    if (envArtifactCount > 0) {
+      return this.buildResult(
+        start,
+        category,
+        [],
+        this.tr("engine.inspect.tool.tsc.unresolvedEnv"),
+        "unavailable"
+      );
+    }
+    return this.buildResult(start, category, []);
   }
-  /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues 与首个基础设施错误 */
+  /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues / 环境伪影数 / 首个基础设施错误 */
   async runAllProjects(params) {
     const { command, projects, flags, options: options2, category } = params;
     const concurrency = Math.min(detectMachineProfile().adapterParallelism, projects.length);
@@ -505343,12 +505389,14 @@ var TypeScriptAdapter = class {
     };
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
     const issues = [];
+    let envArtifactCount = 0;
     let infraError;
     for (const one of results) {
       issues.push(...one.issues);
+      envArtifactCount += one.envArtifactCount;
       if (one.infraError && !infraError) infraError = one.infraError;
     }
-    return { issues, infraError };
+    return { issues, envArtifactCount, infraError };
   }
   buildFlags(options2) {
     const flags = [...options2.config?.flags ?? []];
@@ -505358,34 +505406,41 @@ var TypeScriptAdapter = class {
   }
   async runTsc(params) {
     const { command, tsconfigPath, flags, options: options2, category } = params;
+    const projectPath = path38.resolve(options2.projectPath);
     try {
       const { stdout } = await execTool(command, [...flags, "-p", tsconfigPath], {
-        cwd: path38.resolve(options2.projectPath),
-        timeout: options2.timeout || 12e4
+        cwd: projectPath,
+        timeout: options2.timeout || 3e5
       });
-      return { issues: parseTscDiagnostics(stdout, category) };
+      const { issues, envArtifactCount } = splitTscIssues(
+        parseTscDiagnostics(stdout, category),
+        projectPath
+      );
+      return { issues, envArtifactCount };
     } catch (error) {
       const err = asToolExecError(error);
       if (err.code === "ENOENT") {
-        return { issues: [], infraError: this.tr("engine.inspect.tool.tsc.unavailable") };
+        return { issues: [], envArtifactCount: 0, infraError: this.tr("engine.inspect.tool.tsc.unavailable") };
       }
       const raw = `${err.stdout ?? ""}
 ${err.stderr ?? ""}`;
-      const issues = parseTscDiagnostics(raw, category, this.locale);
-      if (issues.length > 0) {
-        return { issues };
+      const parsed = parseTscDiagnostics(raw, category, this.locale);
+      if (parsed.length > 0) {
+        const { issues, envArtifactCount } = splitTscIssues(parsed, projectPath);
+        return { issues, envArtifactCount };
       }
       return {
         issues: [],
+        envArtifactCount: 0,
         infraError: err.message || this.tr("engine.inspect.tool.tsc.runFailed")
       };
     }
   }
-  buildResult(start, category, issues, error) {
-    const infraFailed = !!error && issues.length === 0;
+  buildResult(start, category, issues, error, statusOverride) {
+    const status = statusOverride ?? (error && issues.length === 0 ? "error" : "available");
     return buildToolResult({
       tool: "tsc",
-      status: infraFailed ? "error" : "available",
+      status,
       issues,
       start,
       error

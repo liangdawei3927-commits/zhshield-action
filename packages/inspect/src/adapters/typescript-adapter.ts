@@ -18,6 +18,7 @@ import {
   buildToolResult,
   execTool,
   ToolCommandResolver,
+  type ToolResultStatus,
 } from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
@@ -33,6 +34,47 @@ const META: Omit<ToolMeta, 'description'> = {
 
 /** tsc 诊断行: /abs/path.ts(12,5): error TS2322: message */
 const TS_DIAG_LINE = /^(.+?)\((\d+)(?:,(\d+))?\):\s+(error|warning)\s+(TS\d+):\s+(.+)$/;
+
+/**
+ * 纯模块/全局解析错误：依赖未安装或 @types 缺失时由 tsc 批量产出（TS2307 找不到模块、
+ * TS2580 找不到全局名如 require/process）。它们是环境/安装问题，**不是用户代码缺陷**，
+ * 绝不该作为门禁阻断依据——否则"clone 后未 npm install"就会被满屏假错误拦死。
+ */
+const RESOLUTION_ERROR_CODES = new Set(['TS2307', 'TS2580']);
+
+/** 从 ruleId（`tsc/TSxxxx`）提取错误码 */
+function tscErrorCode(ruleId: string): string {
+  return ruleId.split('/')[1] ?? '';
+}
+
+/** 判断一条 tsc 诊断是否为环境/安装类解析错误（依赖缺失、全局类型缺失） */
+function isResolutionError(ruleId: string): boolean {
+  return RESOLUTION_ERROR_CODES.has(tscErrorCode(ruleId));
+}
+
+/** 判断一条 tsc 诊断是否落在 node_modules 内（第三方代码，绝不应算作用户缺陷） */
+function isInNodeModules(file: string, projectPath: string): boolean {
+  const nm = path.join(projectPath, 'node_modules');
+  return file === nm || file.startsWith(nm + path.sep) || file.includes(`${path.sep}node_modules${path.sep}`);
+}
+
+/**
+ * 把 tsc 诊断拆分为「用户源码真错误」与「环境/安装类伪影」。
+ * 伪影 = 落在 node_modules 内的诊断 + 纯解析错误（TS2307/TS2580）。
+ * 门禁只认前者；后者说明检查无法给出可信结论，应降级而非阻断。
+ */
+export function splitTscIssues(all: Issue[], projectPath: string): { issues: Issue[]; envArtifactCount: number } {
+  const issues: Issue[] = [];
+  let envArtifactCount = 0;
+  for (const issue of all) {
+    if (isInNodeModules(issue.file, projectPath) || isResolutionError(issue.ruleId)) {
+      envArtifactCount++;
+    } else {
+      issues.push(issue);
+    }
+  }
+  return { issues, envArtifactCount };
+}
 
 /** 解析 tsc stderr 中的类型错误为 Issue 列表（纯函数，便于单测） */
 export function parseTscDiagnostics(
@@ -117,6 +159,8 @@ export function resolveTscProjects(projectPath: string): string[] {
 
 interface TscRunResult {
   issues: Issue[];
+  /** 环境/安装类伪影数（node_modules 内报错 + TS2307/TS2580 解析失败）。>0 且用户源码 0 错误 ⇒ 检查无法给出确定结论，应降级 */
+  envArtifactCount: number;
   infraError?: string;
 }
 
@@ -188,29 +232,58 @@ export class TypeScriptAdapter implements ToolAdapter {
     // 归一化 projectPath 为绝对路径：相对路径会流入 tsconfig 解析与 cwd，
     // tsc 以自身 cwd 解析相对路径导致扫描失败。
     const projectPath = path.resolve(options.projectPath);
-    const command = await this.commands.resolve(projectPath);
     const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
       // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
       return this.buildResult(start, category, []);
     }
+    // 依赖未安装（node_modules 缺失）→ 类型检查无法给出可信结论。
+    // 此时 tsc 会对每个 import 报 TS2307，门禁若据此阻断就等于"clone 后未安装依赖就被拦死"——
+    // 属环境/安装问题，必须降级为未执行，绝不阻断。
+    if (!fs.existsSync(path.join(projectPath, 'node_modules'))) {
+      return this.buildResult(
+        start,
+        category,
+        [],
+        this.tr('engine.inspect.tool.tsc.depsMissing'),
+        'unavailable',
+      );
+    }
+    const command = await this.commands.resolve(projectPath);
     const flags = this.buildFlags(options);
-    const { issues, infraError } = await this.runAllProjects({
+    const { issues, envArtifactCount, infraError } = await this.runAllProjects({
       command,
       projects,
       flags,
       options,
       category,
     });
-    if (infraError && issues.length === 0) {
+    // 真有用户源码类型错误 ⇒ 如实上报（门禁据此合理阻断）
+    if (issues.length > 0) {
+      return this.buildResult(start, category, issues);
+    }
+    // tsc 自身崩溃（无诊断输出）⇒ 执行错误
+    if (infraError) {
       return this.buildResult(start, category, [], infraError);
     }
-    return this.buildResult(start, category, issues);
+    // 只产出环境/安装类伪影（node_modules 报错、模块解析失败）⇒ 无法给出确定结论，降级而非阻断
+    if (envArtifactCount > 0) {
+      return this.buildResult(
+        start,
+        category,
+        [],
+        this.tr('engine.inspect.tool.tsc.unresolvedEnv'),
+        'unavailable',
+      );
+    }
+    // 干净：零错误
+    return this.buildResult(start, category, []);
   }
 
-  /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues 与首个基础设施错误 */
+  /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues / 环境伪影数 / 首个基础设施错误 */
   private async runAllProjects(params: RunAllProjectsParams): Promise<{
     issues: Issue[];
+    envArtifactCount: number;
     infraError?: string;
   }> {
     const { command, projects, flags, options, category } = params;
@@ -234,12 +307,14 @@ export class TypeScriptAdapter implements ToolAdapter {
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
     const issues: Issue[] = [];
+    let envArtifactCount = 0;
     let infraError: string | undefined;
     for (const one of results) {
       issues.push(...one.issues);
+      envArtifactCount += one.envArtifactCount;
       if (one.infraError && !infraError) infraError = one.infraError;
     }
-    return { issues, infraError };
+    return { issues, envArtifactCount, infraError };
   }
 
   private buildFlags(options: ToolScanOptions): string[] {
@@ -252,25 +327,33 @@ export class TypeScriptAdapter implements ToolAdapter {
 
   private async runTsc(params: RunTscParams): Promise<TscRunResult> {
     const { command, tsconfigPath, flags, options, category } = params;
+    const projectPath = path.resolve(options.projectPath);
     try {
       const { stdout } = await execTool(command, [...flags, '-p', tsconfigPath], {
-        cwd: path.resolve(options.projectPath),
-        timeout: options.timeout || 120000,
+        cwd: projectPath,
+        timeout: options.timeout || 300000,
       });
-      return { issues: parseTscDiagnostics(stdout, category) };
+      const { issues, envArtifactCount } = splitTscIssues(
+        parseTscDiagnostics(stdout, category),
+        projectPath,
+      );
+      return { issues, envArtifactCount };
     } catch (error: unknown) {
       const err = asToolExecError(error);
       if (err.code === 'ENOENT') {
-        return { issues: [], infraError: this.tr('engine.inspect.tool.tsc.unavailable') };
+        return { issues: [], envArtifactCount: 0, infraError: this.tr('engine.inspect.tool.tsc.unavailable') };
       }
       // 非 TTY 下 tsc 诊断输出到 stdout，报错场景需同时解析两个流
       const raw = `${err.stdout ?? ''}\n${err.stderr ?? ''}`;
-      const issues = parseTscDiagnostics(raw, category, this.locale);
-      if (issues.length > 0) {
-        return { issues };
+      const parsed = parseTscDiagnostics(raw, category, this.locale);
+      if (parsed.length > 0) {
+        const { issues, envArtifactCount } = splitTscIssues(parsed, projectPath);
+        // 仍有用户源码真错误 ⇒ 上报；只剩环境伪影 ⇒ 不报 findings（由 runTscScan 统一降级）
+        return { issues, envArtifactCount };
       }
       return {
         issues: [],
+        envArtifactCount: 0,
         infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed'),
       };
     }
@@ -281,11 +364,12 @@ export class TypeScriptAdapter implements ToolAdapter {
     category: IssueCategory,
     issues: Issue[],
     error?: string,
+    statusOverride?: ToolResultStatus,
   ): ToolResult {
-    const infraFailed = !!error && issues.length === 0;
+    const status = statusOverride ?? (error && issues.length === 0 ? 'error' : 'available');
     return buildToolResult({
       tool: 'tsc',
-      status: infraFailed ? 'error' : 'available',
+      status,
       issues,
       start,
       error,

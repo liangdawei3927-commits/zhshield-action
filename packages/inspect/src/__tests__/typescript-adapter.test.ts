@@ -2,7 +2,30 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseTscDiagnostics, resolveTscProjects } from '../adapters/typescript-adapter';
+import {
+  parseTscDiagnostics,
+  resolveTscProjects,
+  splitTscIssues,
+  TypeScriptAdapter,
+} from '../adapters/typescript-adapter';
+import type { Issue } from '@zh/shared';
+
+function mkIssue(ruleId: string, file: string): Issue {
+  return {
+    id: ruleId + file,
+    ruleId,
+    severity: 'error',
+    category: 'quality',
+    message: 'x',
+    file,
+    line: 1,
+    column: 1,
+    suggestion: '',
+    autoFixable: false,
+    source: 'inspect',
+    fingerprint: ruleId + file,
+  };
+}
 
 describe('parseTscDiagnostics — tsc 诊断行解析', () => {
   it('解析标准 error 行（含行列号）', () => {
@@ -48,6 +71,56 @@ describe('parseTscDiagnostics — tsc 诊断行解析', () => {
     const issues = parseTscDiagnostics('/repo/dir(a)/file.ts(3,2): error TS1110: boom');
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ file: '/repo/dir(a)/file.ts', line: 3, column: 2 });
+  });
+});
+
+describe('splitTscIssues — 环境/安装类伪影过滤（P0-1 防假阳性）', () => {
+  it('用户源码真错误保留；node_modules 报错与 TS2307/TS2580 解析错误判为伪影', () => {
+    const all = [
+      mkIssue('tsc/TS2322', '/repo/src/index.ts'), // 用户真错误，保留
+      mkIssue('tsc/TS2307', '/repo/src/index.ts'), // 找不到模块，伪影
+      mkIssue('tsc/TS2580', '/repo/src/app.ts'), // 找不到全局名，伪影
+      mkIssue('tsc/TS2344', '/repo/node_modules/@nestjs/common/index.d.ts'), // node_modules，伪影
+    ];
+    const { issues, envArtifactCount } = splitTscIssues(all, '/repo');
+    expect(issues).toHaveLength(1);
+    expect(issues[0].ruleId).toBe('tsc/TS2322');
+    expect(envArtifactCount).toBe(3);
+  });
+
+  it('纯解析错误（TS2307 不含 node_modules 路径）也判为伪影', () => {
+    // 依赖缺失时用户源码里也会报 TS2307，这不该作为门禁阻断依据
+    const all = [mkIssue('tsc/TS2307', '/repo/src/service.ts')];
+    const { issues, envArtifactCount } = splitTscIssues(all, '/repo');
+    expect(issues).toHaveLength(0);
+    expect(envArtifactCount).toBe(1);
+  });
+});
+
+describe('TypeScriptAdapter.scan — 依赖缺失降级为未执行（P0-1）', () => {
+  let tempDir: string;
+  beforeEach(() => {
+    tempDir = mkdtempSync(path.join(tmpdir(), 'tsc-deps-'));
+  });
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('node_modules 缺失时返回 unavailable（降级，不阻断），不执行 tsc', async () => {
+    // 有 tsconfig 但无 node_modules：模拟"clone 后未 npm install"
+    writeFileSync(path.join(tempDir, 'tsconfig.json'), '{}');
+    const adapter = new TypeScriptAdapter();
+    const result = await adapter.scan({ projectPath: tempDir, timeout: 5000 });
+    expect(result.status).toBe('unavailable');
+    expect(result.issues).toHaveLength(0);
+    expect(result.error).toContain('依赖未安装');
+  });
+
+  it('无 tsconfig 的非 TS 项目返回 available 且零问题（不阻断）', async () => {
+    const adapter = new TypeScriptAdapter();
+    const result = await adapter.scan({ projectPath: tempDir, timeout: 5000 });
+    expect(result.status).toBe('available');
+    expect(result.issues).toHaveLength(0);
   });
 });
 

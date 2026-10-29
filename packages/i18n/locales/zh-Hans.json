@@ -388,7 +388,9 @@
           "description": "TypeScript 类型错误检查",
           "fixSuggestion": "修复 TypeScript {{level}}: {{code}}",
           "runFailed": "tsc 执行失败",
-          "unavailable": "tsc 未安装或未在 PATH 中找到"
+          "unavailable": "tsc 未安装或未在 PATH 中找到",
+          "depsMissing": "依赖未安装（node_modules 缺失），TypeScript 类型检查无法执行，已降级为未执行（请先安装依赖后重试）",
+          "unresolvedEnv": "TypeScript 类型检查受依赖/类型版本影响无法给出确定结论，已降级为未执行"
         }
       },
       "unknown": "未知",

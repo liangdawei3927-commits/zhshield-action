@@ -20,12 +20,19 @@ import type { ThresholdInstruction, UnresolvedInstruction } from './rule-evaluat
  * 解释分布：tool-dispatch 23 / check-list 9 / threshold 4 / layer-boundary 2 /
  * forbidden 2 / scanner-dispatch 2 / required-content 2 / preset 1 / **unresolved 7**。
  *
- * ⚠️ 那 7 条 unresolved **全部是 draft**（内容还没写，当前不执行）—— 所以本模块在
- * 现有数据上是 **0 拒收**（存量零误伤），它守的是两道**必然会被踩到**的坑：
- *   ① 服务端 `PUBLISHABLE_STATUSES = {draft, trial}` 允许 draft 直接发布，
- *      转 active 那一刻它们就变成"每次体检固定降级、零产出"的幽灵规则；
- *   ② 其中 `security.scan.internal.unused-file` 把工具名写在 content 顶层
- *      （`tool: ts-prune`），而解释器只认 `check.tool` ⇒ 即便转 active 也永不派发。
+ * 无执行段（unresolved）一律 **fatal 拒收，不限生命周期状态**：
+ *   本模块只在云端同步消费路径（`loadFromKnowledgeBase` → `filterBuiltRules`）被调用，
+ *   客户端是规则**纯消费者**（`SopLoader.getRulesForProject` 只取 `getActive()`，
+ *   没有任何规则编写界面）。一条连可执行指令都没有的规则，无论 draft 还是 active，
+ *   在客户端永远零产出 —— 留在 registry 里只是占位的死重，并在服务端把 draft 直接发布
+ *   （`PUBLISHABLE_STATUSES` 含 draft/trial）时变成"体检恒降级、零产出"的幽灵规则。
+ *   故**不区分状态、无条件拒收**，从云端消费入口彻底清洗空壳。
+ *
+ * 唯一的豁免是**空 content**（`Object.keys === 0`，见 `validateRuleContent` 入口）：
+ * 那是尚未动笔的占位，不是写错，判 fatal 会误伤所有未完成规则 —— 它直接返回、不进本分支。
+ *
+ * 高频写法错误（pit ②）：`security.scan.internal.unused-file` 把工具名写在 content 顶层
+ * （`tool: ts-prune`），解释器只认 `check.tool` ⇒ 永不派发，同样 fatal 拒收。
  */
 
 /** 单条规则最多报告几个「未通过安全校验的正则」：避免一条坏规则刷满日志 */
@@ -47,8 +54,9 @@ export function validateRuleContent(rule: SopRule, locator: string): SopRuleIssu
   const instr = new ContentInterpreter().interpret(rule);
 
   if (instr.type === 'unresolved') {
-    // 解释不了就不可能跑起来：后面的内部结构检查没有意义，直接返回
-    issues.push(unresolvedIssue(raw, instr, locator, rule.status === 'active'));
+    // 解释不了就不可能跑起来：后面的内部结构检查没有意义，直接返回。
+    // 无条件拒收（不限生命周期状态）：客户端是规则纯消费者，无执行段的规则永远零产出。
+    issues.push(unresolvedIssue(raw, instr, locator));
     return issues;
   }
 
@@ -75,20 +83,20 @@ export function validateRuleContent(rule: SopRule, locator: string): SopRuleIssu
 }
 
 /**
- * content 无法解释为任何可执行指令。
+ * content 无法解释为任何可执行指令 ⇒ **一律 fatal 拒收**（不限生命周期状态）。
  *
- * 定级依据：active 规则每次执行都落 degraded skipped（`runner.ts` 的 unresolved 分支
- * 显式设 degraded=true），既不产出检查结果，又让整轮体检的 `ok` 恒为 false。
- * 留它在 registry 里不是「能力」，是「每次体检固定增加一条降级」。
+ * 定级依据：一条连可执行指令段都没有的规则，在客户端（纯消费者，只执行 active 规则）
+ * 永远零产出。若对 draft 只判 warn 保留，它虽当前不执行，却仍滞留在 registry 成为死重，
+ * 且一旦服务端把 draft/trial 直接发布（`PUBLISHABLE_STATUSES` 含二者），就变成
+ * "每次体检固定降级、零产出"的幽灵规则。故无条件拒收，从云端消费入口彻底清洗空壳。
  *
- * 非 active（draft/trial/disabled）判 warn：内容未完成属正常阶段，
- * 拒收会把作者正在写的东西一并清掉。
+ * 空 content（尚未动笔的占位）不在此分支 —— `validateRuleContent` 入口已对
+ * `Object.keys === 0` 直接返回 `[]`，不会进到这里。
  */
 function unresolvedIssue(
   raw: Record<string, unknown>,
   instr: UnresolvedInstruction,
   locator: string,
-  isActive: boolean,
 ): SopRuleIssue {
   const topLevelTool = raw.tool;
 
@@ -99,7 +107,7 @@ function unresolvedIssue(
       file: locator,
       field: 'content.tool',
       value: topLevelTool,
-      level: isActive ? 'fatal' : 'warn',
+      level: 'fatal',
       reason:
         `工具名写在 content 顶层（tool="${topLevelTool}"），而解释器只认 check.tool ⇒ ` +
         '该规则永远不会被派发。请改写为 check: { tool: ' + `"${topLevelTool}"` + ' }',
@@ -111,10 +119,13 @@ function unresolvedIssue(
     file: locator,
     field: 'content',
     value: instr.keys,
-    level: isActive ? 'fatal' : 'warn',
+    level: 'fatal',
     reason:
-      `无任何可执行指令段（顶层键：${keys}）。该规则每次执行都落 degraded skipped：` +
-      '既不产出检查结果，又会让整轮体检恒为降级状态。',
+      `无任何可执行指令段（顶层键：${keys}）。该规则在客户端（纯消费者，只执行 active 规则）` +
+      '永远零产出：既落不了任何检查结果，执行时又会落 degraded skipped（恒降级），' +
+      '并在服务端把 draft 直接发布时变成"体检恒降级、零产出"的幽灵规则。' +
+      '请从 patterns / forbidden / forbiddenRegex / required / layers / checks / check.tool ' +
+      '中选用一种内核可解释的写法。',
   };
 }
 

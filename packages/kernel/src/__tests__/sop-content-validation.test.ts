@@ -41,15 +41,15 @@ describe('validateRuleContent — 无执行段', () => {
     expect(issues[0]?.reason).toContain('degraded');
   });
 
-  it('draft 规则同样无执行段 ⇒ 只 warn（内容未完成属正常阶段，不得拒收）', () => {
-    // 实测：云端 7 条无执行段的规则全部是 draft。若判 fatal，
-    // 会把作者正在写的规则连同标签一起清掉。
+  it('draft 规则同样无执行段 ⇒ 也 fatal（客户端纯消费，空壳无论状态都拒收）', () => {
+    // 客户端是规则纯消费者（只执行 active），连可执行指令都没有的 draft 在客户端
+    // 永远零产出，且服务端把 draft 直接发布时会变成体检恒降级的幽灵 —— 故无条件拒收。
     const rule = makeRule({ id: 'b', status: 'draft', content: META_ONLY_CONTENT });
 
     const issues = validateRuleContent(rule, 'cloud-sync:b');
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.level).toBe('warn');
+    expect(issues[0]).toMatchObject({ field: 'content', level: 'fatal' });
   });
 
   it('content 为空对象 ⇒ 不产生问题（"还没写"不等于"写错了"）', () => {
@@ -77,9 +77,9 @@ describe('validateRuleContent — tool 写错位置', () => {
     expect(issues[0]?.reason).toContain('ts-prune');
   });
 
-  it('draft 且 tool 写在顶层 ⇒ warn（留痕但不拒收）', () => {
+  it('draft 且 tool 写在顶层 ⇒ 也 fatal（同样永不派发，无论状态都拒收）', () => {
     const rule = makeRule({ id: 'e', status: 'draft', content: TOP_LEVEL_TOOL_CONTENT });
-    expect(validateRuleContent(rule, 'cloud-sync:e')[0]?.level).toBe('warn');
+    expect(validateRuleContent(rule, 'cloud-sync:e')[0]?.level).toBe('fatal');
   });
 });
 
@@ -206,7 +206,7 @@ describe('validateRuleContent — forbidden-regex 结构', () => {
 });
 
 describe('filterBuiltRules — 分级拒收', () => {
-  it('只拒 active 幽灵，draft 幽灵保留并留痕', () => {
+  it('无执行段无论 active 还是 draft 都拒收，只留可执行的规则', () => {
     const rules: SopRule[] = [
       makeRule({ id: 'guard.scan.official.good', content: { patterns: ['x'] } }),
       makeRule({ id: 'guard.scan.official.ghost', status: 'active', content: META_ONLY_CONTENT }),
@@ -215,12 +215,10 @@ describe('filterBuiltRules — 分级拒收', () => {
 
     const { accepted, issues } = filterBuiltRules(rules, 'cloud-sync');
 
-    expect(accepted.map((r) => r.id)).toEqual([
-      'guard.scan.official.good',
-      'guard.scan.official.wip',
-    ]);
-    expect(issues.filter((i) => i.level === 'fatal')).toHaveLength(1);
-    expect(issues.filter((i) => i.level === 'warn')).toHaveLength(1);
+    // 两条空壳（active + draft）都被 fatal 拒掉，只有真可执行的规则进 registry
+    expect(accepted.map((r) => r.id)).toEqual(['guard.scan.official.good']);
+    expect(issues.filter((i) => i.level === 'fatal')).toHaveLength(2);
+    expect(issues.filter((i) => i.level === 'warn')).toHaveLength(0);
   });
 });
 

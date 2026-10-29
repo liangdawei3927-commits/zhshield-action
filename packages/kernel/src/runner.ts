@@ -25,21 +25,10 @@ import type {
   GuardEngineLike,
   InspectEngineLike,
   SecurityCheckEngineLike,
+  RuleMetricsProvider,
 } from './runner/evaluator-host';
-import {
-  evalPatternScan,
-  evalForbidden,
-  evalForbiddenRegex,
-  evalRequiredContent,
-  evalThreshold,
-  evalLayerBoundary,
-} from './runner/inline-evaluators';
-import {
-  evalCheckList,
-  evalScannerDispatch,
-  evalToolDispatch,
-  evalPreset,
-} from './runner/dispatch-evaluators';
+import { buildEvaluatorTable } from './runner/evaluator-table';
+import { applyRuleMetrics } from './runner/rule-metrics-binding';
 import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-builders';
 
 /** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
@@ -160,36 +149,11 @@ export class SopRuleEngine {
   /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 undefined → dispatch 用 DEFAULT_TOOL_SCAN_TIMEOUT_MS */
   private readonly toolScanTimeoutMs?: number;
 
-  /** 指令类型 → 评估器策略表（替代 evaluateSingle 中的 switch 分派）。
-   *  映射类型保证每个 handler 收到对应判别联合变体，类型安全；
-   *  分派处对联合索引做一次局部断言以绕过 TS 相关联合的索引限制。 */
-  private readonly evaluators: Partial<{
-    [K in ContentInstruction['type']]: (
-      rule: SopRule,
-      instr: Extract<ContentInstruction, { type: K }>,
-      context: RuleContext,
-    ) => RuleEvaluation | Promise<RuleEvaluation>;
-  }> = {
-    'pattern-scan': (rule, instr, ctx) => evalPatternScan(rule, instr, ctx),
-    forbidden: (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
-    'forbidden-regex': (rule, instr, ctx) => evalForbiddenRegex(rule, instr, ctx),
-    'required-content': (rule, instr, ctx) => evalRequiredContent(rule, instr, ctx),
-    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx),
-    'check-list': (rule, instr, ctx) => evalCheckList(this.host, rule, instr, ctx),
-    'layer-boundary': (rule, instr, ctx) => evalLayerBoundary(rule, instr, ctx),
-    'scanner-dispatch': (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),
-    preset: (rule, instr, ctx) => evalPreset(this.host, rule, instr, ctx),
-    'tool-dispatch': (rule, instr, ctx) => evalToolDispatch(this.host, rule, instr, ctx),
-    // 盲检护栏：content 无法解释为任何可执行指令时不得判通过。
-    // degraded=true → aggregate() 计入 ok 判定（ok=false），面板不再出现假的通过勾。
-    unresolved: (rule, instr) =>
-      skipEvaluation(
-        rule,
-        `规则内容无法解释，未执行任何检查：${instr.reason}`,
-        rule.domain === 'guard' ? 'guard' : 'inspect',
-        true,
-      ),
-  };
+  /** 阈值指令实测值提供者（@zh/refactor 侧实现注入）；缺省 undefined = 阈值规则恒降级 */
+  private readonly metricsProvider?: RuleMetricsProvider;
+
+  /** 指令类型 → 评估器策略表。表本身在 runner/evaluator-table.ts（静态配置，不占类体） */
+  private readonly evaluators = buildEvaluatorTable(() => this.host);
 
   /** 评估重入深度。preset / scanner-dispatch / check-list 会回调
    * InspectEngine.runScan / GuardEngine.run → 再次 evaluateRules，
@@ -217,6 +181,8 @@ export class SopRuleEngine {
       healthBaseline?: number;
       /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 120000（与 InspectEngine 对齐） */
       toolScanTimeoutMs?: number;
+      /** 阈值指令实测值提供者；缺省 undefined = threshold 规则落 degraded skipped */
+      metricsProvider?: RuleMetricsProvider;
     },
   ) {
     this.registry = registry;
@@ -230,6 +196,7 @@ export class SopRuleEngine {
     this.toolCallHooks = options?.hooks ?? [];
     this.healthBaseline = options?.healthBaseline;
     this.toolScanTimeoutMs = options?.toolScanTimeoutMs;
+    this.metricsProvider = options?.metricsProvider;
     if (options?.toolAdapters) {
       for (const { name, adapter } of options.toolAdapters) {
         this.toolAdapters.set(name, wrapWithScopeGuard(adapter, this.toolCallHooks, this.eventBus));
@@ -255,6 +222,7 @@ export class SopRuleEngine {
       eventBus: this.eventBus,
       toolScope: feature ? (toolId: string) => isToolInScope(toolId, feature) : undefined,
       toolScanTimeoutMs: this.toolScanTimeoutMs,
+      metricsProvider: this.metricsProvider,
       get evalDepth() {
         return readEvalDepth();
       },
@@ -417,7 +385,13 @@ export class SopRuleEngine {
         timestamp: new Date(),
       };
     }
-    return evaluator(rule, instruction, context);
+    // 阈值指令需要实测值才能比较。注入结果放进**上下文副本**，绝不原地改 context.extra：
+    // context 由 evaluateAll 的有界并行池内所有 worker 共享，就地写会造成规则间串数据。
+    const resolved =
+      instruction.type === 'threshold'
+        ? await applyRuleMetrics(this.metricsProvider, rule, context, (msg) => this.logger.warn(msg))
+        : context;
+    return evaluator(rule, instruction, resolved);
   }
 
   // ─── 辅助 ──────────────────────────────────────────────

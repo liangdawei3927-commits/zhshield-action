@@ -74,7 +74,7 @@ export async function evalThreshold(
   if (required.length === 0 || missing.length > 0) {
     return skipEvaluation(
       rule,
-      describeMissingMetrics(instr, required, missing),
+      describeMissingMetrics(instr, required, missing, readUnavailableReason(context)),
       targetEngine,
       true,
     );
@@ -103,8 +103,22 @@ function readMetricBag(context: RuleContext): Record<string, number | undefined>
   return bag as Record<string, number | undefined>;
 }
 
+/** 度量口径无法满足的原因（runner.withRuleMetrics 注入）。与「没实现取数」必须区分 */
+function readUnavailableReason(context: RuleContext): string | undefined {
+  const err = context.extra?.metricsUnavailable;
+  return typeof err === 'string' && err.trim() !== '' ? err : undefined;
+}
+
 function isLowerBoundUnit(unit: string | undefined): boolean {
   return unit !== undefined && LOWER_BOUND_UNITS.has(unit.toLowerCase());
+}
+
+/**
+ * 指标显示名：单数 `threshold` 会被解释器折叠成键名 `value`（无任何语义），
+ * 直接显示 "value=85" 对用户毫无信息量，故统一改称「阈值指标」。
+ */
+function metricLabel(metric: string): string {
+  return metric === 'value' ? '阈值指标' : metric;
 }
 
 function compareThresholds(
@@ -127,11 +141,11 @@ function compareThresholds(
       severity: rule.severity,
       file: '',
       message: lowerBound
-        ? `${metric}=${actual}${suffix} 低于阈值 ${limit}${suffix}`
-        : `${metric}=${actual}${suffix} 超过阈值 ${limit}${suffix}`,
+        ? `${metricLabel(metric)}=${actual}${suffix} 低于阈值 ${limit}${suffix}`
+        : `${metricLabel(metric)}=${actual}${suffix} 超过阈值 ${limit}${suffix}`,
       suggestion: lowerBound
-        ? `将 ${metric} 提升到 ${limit}${suffix} 以上`
-        : `将 ${metric} 降到 ${limit}${suffix} 以内`,
+        ? `将 ${metricLabel(metric)} 提升到 ${limit}${suffix} 以上`
+        : `将 ${metricLabel(metric)} 降到 ${limit}${suffix} 以内`,
     });
   }
   return violations;
@@ -142,7 +156,7 @@ function buildThresholdSummary(
   metrics: Record<string, number | undefined>,
 ): string {
   return Object.entries(instr.thresholds)
-    .map(([metric, limit]) => `${metric}=${metrics[metric] ?? '?'}/${limit}`)
+    .map(([metric, limit]) => `${metricLabel(metric)}=${metrics[metric] ?? '?'}/${limit}`)
     .join(', ');
 }
 
@@ -150,11 +164,16 @@ function describeMissingMetrics(
   instr: ThresholdInstruction,
   required: string[],
   missing: string[],
+  unavailableReason?: string,
 ): string {
   if (required.length === 0) {
     return '阈值规则未声明任何可比较指标，未执行任何检查';
   }
   const declared = required.map((key) => `${key}=${instr.thresholds[key]}`).join(', ');
+  // 口径不可满足 ≠ 没接数据源：前者是「这条规则要的东西算不出来」，运维动作完全不同
+  if (unavailableReason) {
+    return `阈值规则未执行任何比较（阈值 ${declared}）：${unavailableReason}。未检测 ≠ 通过`;
+  }
   return (
     `阈值规则缺少度量数据源，未执行任何比较（阈值 ${declared}；缺实测值: ${missing.join(', ')}）。` +
     '阈值本身不产出检查结果，需调用方经 context.extra.metrics 注入实测值后才会比较'

@@ -18,6 +18,7 @@ export { SopRuleEngine, ContentInterpreter } from './runner';
 // 保证同一处违规在门禁与体检得到一致结论（T8 口径统一）。
 export { detectLayer, detectLayerByName } from './runner/scan-utils';
 export type { RuleContext } from './sop/_meta/rule-context';
+export type { RuleMetricsProvider, RuleMetricsResult } from './runner/evaluator-host';
 export type {
   RuleEvaluation,
   RuleEngineReport,

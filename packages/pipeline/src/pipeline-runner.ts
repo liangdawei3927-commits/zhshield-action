@@ -27,6 +27,7 @@ import {
 import type { InspectionReport } from '@zh/inspect';
 import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
+import { createRuleMetricsProvider } from './rule-metrics';
 import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
@@ -224,6 +225,9 @@ export class PipelineRunner {
       guardEngine: this.guardEngine,
       inspectEngine: this.inspectEngine,
       securityCheckEngine: this.securityCheckEngine,
+      // 阈值指令的实测值来源。缺了它，threshold 规则只会在报告里落「降级」——
+      // 2026-10-29 前更糟：恒判 passed（面板显示通过、实际零比较）。
+      metricsProvider: createRuleMetricsProvider(this.repoRoot),
     });
 
     // 连线 SOP 引擎：GuardEngine / InspectEngine 注册的适配器自动传播到 SopRuleEngine

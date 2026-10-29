@@ -5,3 +5,5 @@ export { createReport } from './types';
 export type { PipelineReport } from './types';
 export { detectProjectProfile, resolveEffectiveProjectRoot } from './project-profile';
 export type { ProjectProfile, ProjectLanguage, PackageManager } from './project-profile';
+export { createRuleMetricsProvider } from './rule-metrics';
+export type { RuleMetricsOptions } from './rule-metrics';

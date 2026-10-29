@@ -1,5 +1,7 @@
 import type { ToolAdapter, AuditLogger } from '@zh/shared';
 import type { EventBus } from '../bus';
+import type { SopRule } from '../sop/_meta/sop-types';
+import type { RuleContext } from '../sop/_meta/rule-context';
 
 /**
  * GuardEngine 的最小结构契约 — kernel 不反向依赖 @zh/guard，
@@ -45,6 +47,37 @@ export interface SecurityCheckEngineLike {
 }
 
 /**
+ * 度量采集结果。
+ *
+ * - `metrics`：确实测到的指标（键名须与规则 thresholds 一致）。**测不到的不要填、不要用 0 顶替** ——
+ *   缺项会让 evalThreshold 落 degraded skipped（未检测 ≠ 通过）。
+ * - `unavailableReason`：整条规则的度量口径无法满足时（而非个别指标缺失）给出的人类可读原因，
+ *   让面板上「降级」直接说清是**没实现**、**缺产物**还是**口径不匹配**，而不是笼统的「缺数据源」。
+ */
+export interface RuleMetricsResult {
+  metrics?: Record<string, number | undefined>;
+  unavailableReason?: string;
+}
+
+/**
+ * 规则度量数据源 — threshold 指令的实测值提供者。
+ *
+ * **为什么是「按规则」而不是「按项目一次性给一袋指标」**：
+ * 云端规则里 `threshold: 70`（单数写法）会被解释器折算成 `thresholds = { value: 70 }`，
+ * 即三条不同的分数型规则（健康分 / 质量分 / 覆盖率）共用同一个键 `value`。
+ * 若只按指标名返回一袋数值，这三条规则必然读到同一个数 —— 语义直接错位。
+ * 故签名带 `rule`，由提供方按 rule.id（或 domain+action）决定该条的指标口径。
+ *
+ * **为什么注入而不是 kernel 自己算**：复杂度需要 AST、覆盖率需要读报告文件，
+ * 这些能力在 @zh/refactor / 文件系统侧，kernel 反向依赖它们会形成环
+ * （@zh/pipeline → @zh/kernel 已是单向）。故只在此声明契约，实现放调用方。
+ */
+export type RuleMetricsProvider = (
+  rule: SopRule,
+  context: RuleContext,
+) => Promise<RuleMetricsResult> | RuleMetricsResult;
+
+/**
  * SopRuleEngine 派发依赖的运行时视图。
  *
  * 拆分出的评估函数（inline-evaluators / dispatch-evaluators）通过它访问：
@@ -64,6 +97,8 @@ export interface EngineHost {
   eventBus?: EventBus;
   /** 工具 scope 判定：返回 false 表示工具不在当前项目画像 scope 内，tool-dispatch 应跳过 */
   toolScope?: (toolId: string) => boolean;
+  /** 阈值指令的实测值提供者；缺省时 threshold 规则一律落 degraded skipped（未检测 ≠ 通过） */
+  metricsProvider?: RuleMetricsProvider;
   /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 300000（5 分钟，大型 monorepo trivy/semgrep 需更长时间） */
   toolScanTimeoutMs?: number;
   evalDepth: number;

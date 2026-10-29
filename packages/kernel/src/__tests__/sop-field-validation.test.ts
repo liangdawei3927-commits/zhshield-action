@@ -108,6 +108,8 @@ describe('SOP 字段校验 — 文件加载路径', () => {
     expect(loaded).toBe(1);
     expect(registry.getActive()).toHaveLength(1);
     expect(loader.getRuleIssues()[0]).toMatchObject({ field: 'metadata.source', level: 'warn' });
+    // warn 同样要"变响"：只进 getRuleIssues 而控制台无痕，值班侧等于没有告警
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('bad-source.yml');
   });
 
   it('governance.domain 写非法值：规则被拒（否则会绕过治理域白名单）', async () => {

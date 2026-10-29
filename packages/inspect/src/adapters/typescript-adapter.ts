@@ -240,7 +240,11 @@ export class TypeScriptAdapter implements ToolAdapter {
     // 依赖未安装（node_modules 缺失）→ 类型检查无法给出可信结论。
     // 此时 tsc 会对每个 import 报 TS2307，门禁若据此阻断就等于"clone 后未安装依赖就被拦死"——
     // 属环境/安装问题，必须降级为未执行，绝不阻断。
-    if (!fs.existsSync(path.join(projectPath, 'node_modules'))) {
+    // 异步判存：扫描热路径上禁止同步 IO（perf-no-sync-fs-hotpath），
+    // access 抛 ENOENT 与 existsSync 返回 false 语义等价
+    try {
+      await fs.promises.access(path.join(projectPath, 'node_modules'));
+    } catch {
       return this.buildResult(
         start,
         category,

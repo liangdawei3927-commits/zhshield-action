@@ -24,17 +24,6 @@ const REMOTE: SopVersion = {
   size: 100,
 };
 
-const DIFF: SopDiff = {
-  version: '2.0.0',
-  fromVersion: '0.0.0',
-  compatibility: '1.0.0',
-  added: [makeRule({ id: 'new.rule' })],
-  removed: [],
-  modified: [],
-  unchanged: [],
-  metadata: { totalRules: 1, diffSize: 10, hash: '' },
-};
-
 function okResult<T>(data: T): SopFetchResult<T> {
   return { ok: true, data };
 }

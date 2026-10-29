@@ -89,15 +89,27 @@ export class RuleEngineSectionFormatter {
     }
   }
 
-  /** 渲染跳过的规则明细（含跳过原因） */
+  /**
+   * 渲染跳过的规则明细（含跳过原因）。
+   *
+   * 两类跳过的**后果完全相反**，外观却曾一模一样 —— 这正是「后置门禁规则被当成
+   * 缺陷上报」的来源：清单里 `[降级]` 与刻意让位并列，用户/报告生成器无从分辨。
+   *   · `[降级]` 工具或依赖不可用 ⇒ 计入「未检测 ≠ 通过」护栏（CLI 走 exit 2）；
+   *   · `[让位]` 由其它阶段接管（后置门禁 / 映射规则 / 画像外裁剪）⇒ 完全不计，
+   *     是设计如此，不是环境故障。
+   */
   private formatSkippedRules(report: RuleEngineReport, rt: RenderTarget): void {
     const skippedEvals = report.evaluations.filter((e) => e.status === 'skipped');
     if (skippedEvals.length > 0) {
       rt.lines.push('');
-      rt.lines.push(`${rt.indent}${this.fmt.bold(this.fmt.gray('跳过规则:'))}`);
+      rt.lines.push(
+        `${rt.indent}${this.fmt.bold(this.fmt.gray('跳过规则:'))}` +
+          `${this.fmt.gray('（[降级] 计入未检测护栏；[让位] 由其它阶段接管，不计入）')}`,
+      );
       for (const eval_ of skippedEvals) {
+        const tag = eval_.degraded === true ? '[降级] ' : '[让位] ';
         rt.lines.push(
-          `${rt.indent}  ${this.fmt.gray('-')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
+          `${rt.indent}  ${this.fmt.gray('-')} ${tag}${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
         );
       }
     }

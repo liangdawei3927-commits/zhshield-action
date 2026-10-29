@@ -118,6 +118,31 @@ describe('RuleEngineSectionFormatter — SOP 引擎报告终端渲染', () => {
     expect(text).toContain('✓ r.pass');
   });
 
+  it('跳过清单区分 [降级] 与 [让位]——两类后果相反，外观必须可分', () => {
+    const text = formatText(
+      makeReport([
+        makeEvaluation({
+          rule: makeRule('r.degraded'),
+          status: 'skipped',
+          degraded: true,
+          message: '工具缺失',
+        }),
+        makeEvaluation({
+          rule: makeRule('r.yield'),
+          status: 'skipped',
+          message: '后置门禁规则：由扫描后门禁阶段判定，引擎内不求值',
+        }),
+      ]),
+    );
+
+    expect(text).toContain('[降级] r.degraded');
+    expect(text).toContain('[让位] r.yield');
+    // 双向自证：让位项绝不能被标成降级 —— 那会让「刻意让位」被读成环境缺陷，
+    // 用户据此去修一个不存在的故障（后置门禁两条正是这样被误报成问题的）。
+    expect(text).not.toContain('[降级] r.yield');
+    expect(text).not.toContain('[让位] r.degraded');
+  });
+
   it('失败规则的违规明细展示位置/分类/建议，超出 10 条时截断并提示余量——终端视图必须有界，不得被大报告刷屏', () => {
     const violations = Array.from({ length: 13 }, (_, i) => ({
       id: `v${i}`,

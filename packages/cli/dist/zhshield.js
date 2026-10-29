@@ -496166,7 +496166,12 @@ function validateRuleContent(rule, locator) {
     const toolIssue = checkToolName(instr.tool, locator);
     if (toolIssue) issues.push(toolIssue);
   }
+  if (instr.type === "threshold") {
+    issues.push(...thresholdIssues(instr, raw, locator, rule.status === "active"));
+  }
   if (instr.type === "forbidden-regex") {
+    const shapeIssue = forbiddenRegexShapeIssue(instr.items.length, raw, locator);
+    if (shapeIssue) issues.push(shapeIssue);
     issues.push(...unsafeRegexIssues(instr.items, locator));
   }
   return issues;
@@ -496209,6 +496214,58 @@ function checkToolName(tool, locator) {
     level: "warn",
     reason: `\u5DE5\u5177 "${tool}" \u4E0D\u5728 TOOL_IDS \u5185\uFF1A\u6838\u5FC3\u5E93\u91CC\u6CA1\u6709\u5BF9\u5E94\u9002\u914D\u5668\uFF0C\u89C4\u5219\u5C06\u843D unavailable\uFF08\u4E0D\u4EA7\u51FA\u7ED3\u679C\uFF09`
   };
+}
+function forbiddenRegexShapeIssue(validCount, raw, locator) {
+  if (validCount > 0) return null;
+  const declared = resolveInstructionScope(raw).forbiddenRegex;
+  const declaredCount = Array.isArray(declared) ? declared.length : 0;
+  if (declaredCount === 0) return null;
+  return {
+    file: locator,
+    field: "content.forbiddenRegex",
+    value: declared,
+    level: "warn",
+    reason: `\u58F0\u660E\u4E86 ${declaredCount} \u6761 forbiddenRegex\uFF0C\u4F46\u6CA1\u6709\u4E00\u6761\u542B\u5B57\u7B26\u4E32\u5B57\u6BB5 regex\uFF0C\u5168\u90E8\u88AB\u89E3\u91CA\u5668\u4E22\u5F03 \u21D2 \u8BE5\u89C4\u5219\u6052 0 \u547D\u4E2D\u3001\u6C38\u8FDC\u5224\u901A\u8FC7`
+  };
+}
+function thresholdIssues(instr, raw, locator, isActive) {
+  const level = isActive ? "fatal" : "warn";
+  const scope = resolveInstructionScope(raw);
+  const issues = [];
+  const singular = scope.threshold;
+  if (typeof singular === "string") {
+    issues.push({
+      file: locator,
+      field: "content.threshold",
+      value: singular,
+      level,
+      reason: `threshold \u5199\u6210\u4E86\u5B57\u7B26\u4E32\uFF08"${singular}"\uFF09\uFF1A\u89E3\u91CA\u5668\u53EA\u8BA4 number\uFF0C\u8BE5\u503C\u88AB\u6574\u6761\u4E22\u5F03 \u21D2 \u89C4\u5219\u6CA1\u6709\u4EFB\u4F55\u53EF\u6BD4\u6307\u6807\u3002\u8BF7\u53BB\u6389\u5F15\u53F7\u5199\u6210 threshold: ${singular}`
+    });
+  }
+  const declared = scope.thresholds;
+  if (typeof declared === "object" && declared !== null && !Array.isArray(declared)) {
+    for (const [metric, value] of Object.entries(declared)) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) continue;
+      issues.push({
+        file: locator,
+        field: `content.thresholds.${metric}`,
+        value,
+        level,
+        reason: `\u9608\u503C ${metric} \u4E0D\u662F\u6709\u9650\u6570\u5B57\uFF08Number(${JSON.stringify(value)}) = ${String(numeric)}\uFF09\u21D2 \u6BD4\u8F83\u7ED3\u679C\u6052\u4E3A false\uFF0C\u8BE5\u6307\u6807\u6C38\u8FDC\u5224\u8FBE\u6807`
+      });
+    }
+  }
+  if (issues.length === 0 && Object.keys(instr.thresholds).length === 0) {
+    issues.push({
+      file: locator,
+      field: "content.thresholds",
+      value: declared,
+      level: "warn",
+      reason: "\u9608\u503C\u6307\u4EE4\u672A\u58F0\u660E\u4EFB\u4F55\u53EF\u6BD4\u8F83\u6307\u6807\uFF0C\u89C4\u5219\u6267\u884C\u65F6\u4F1A\u843D degraded\uFF08\u4E0D\u4EA7\u51FA\u68C0\u67E5\u7ED3\u679C\uFF09"
+    });
+  }
+  return issues;
 }
 function unsafeRegexIssues(items, locator) {
   const issues = [];
@@ -497133,6 +497190,51 @@ init_src2();
 // ../kernel/src/runner/inline-evaluators.ts
 var import_node_crypto4 = require("node:crypto");
 
+// ../kernel/src/runner/evaluation-builders.ts
+function skipEvaluation(rule, message, targetEngine, degraded) {
+  return {
+    rule,
+    status: "skipped",
+    message,
+    durationMs: 0,
+    targetEngine,
+    timestamp: /* @__PURE__ */ new Date(),
+    ...degraded ? { degraded: true } : {}
+  };
+}
+function errorEvaluation(rule, message, durationMs) {
+  return {
+    rule,
+    status: "error",
+    message,
+    durationMs,
+    targetEngine: rule.domain === "guard" ? "guard" : "inspect",
+    timestamp: /* @__PURE__ */ new Date(),
+    blocking: false
+  };
+}
+function aggregate(evaluations, durationMs) {
+  const passed = evaluations.filter((e) => e.status === "passed").length;
+  const failed = evaluations.filter((e) => e.status === "failed").length;
+  const errors = evaluations.filter((e) => e.status === "error").length;
+  const skipped = evaluations.filter((e) => e.status === "skipped").length;
+  const degraded = evaluations.filter((e) => e.degraded === true).length;
+  const blockingCount = evaluations.filter((e) => e.blocking === true).length;
+  return {
+    total: evaluations.length,
+    passed,
+    failed,
+    errors,
+    skipped,
+    degraded,
+    ok: failed === 0 && errors === 0 && degraded === 0,
+    blockingCount,
+    evaluations,
+    durationMs,
+    timestamp: /* @__PURE__ */ new Date()
+  };
+}
+
 // ../kernel/src/runner/inline-eval-scan-target.ts
 var import_node_path4 = require("node:path");
 function forEachScanTarget(context, fileExts, excludePatterns, visit) {
@@ -497580,33 +497682,69 @@ async function evalPatternScan(rule, instr, context) {
     timestamp: /* @__PURE__ */ new Date()
   };
 }
-async function evalThreshold(rule, instr, context, guardEngine) {
-  const summary = buildThresholdSummary(instr);
-  await tryQueryThreshold(guardEngine, rule, context);
+var LOWER_BOUND_UNITS = /* @__PURE__ */ new Set(["percent", "percentage", "ratio", "score"]);
+async function evalThreshold(rule, instr, context) {
+  const targetEngine = rule.domain === "guard" ? "guard" : "inspect";
+  const required = Object.keys(instr.thresholds);
+  const metrics = readMetricBag(context);
+  const missing = required.filter((key) => typeof metrics[key] !== "number");
+  if (required.length === 0 || missing.length > 0) {
+    return skipEvaluation(
+      rule,
+      describeMissingMetrics(instr, required, missing),
+      targetEngine,
+      true
+    );
+  }
+  const violations = compareThresholds(rule, instr, metrics);
   return {
     rule,
-    status: "passed",
-    message: `\u9608\u503C\u89C4\u5219 (\u9700\u8981\u5916\u90E8\u6570\u636E): ${summary}`,
+    status: violations.length === 0 ? "passed" : "failed",
+    violations,
+    files: [],
+    message: violations.length === 0 ? `\u9608\u503C\u8FBE\u6807: ${buildThresholdSummary(instr, metrics)}` : `\u9608\u503C\u672A\u8FBE\u6807 ${violations.length} \u9879: ${buildThresholdSummary(instr, metrics)}`,
     durationMs: 0,
-    targetEngine: "guard",
+    targetEngine,
     timestamp: /* @__PURE__ */ new Date()
   };
 }
-function buildThresholdSummary(instr) {
-  const thresholdKeys = Object.keys(instr.thresholds);
-  return thresholdKeys.length > 0 ? `\u9608\u503C: ${thresholdKeys.map((k) => `${k}=${instr.thresholds[k]}`).join(", ")}` : `\u9608\u503C: ${instr.unit ?? ""} ${JSON.stringify(instr.thresholds)}`;
+function readMetricBag(context) {
+  const bag = context.extra?.metrics;
+  if (typeof bag !== "object" || bag === null) return {};
+  return bag;
 }
-async function tryQueryThreshold(guardEngine, rule, context) {
-  if (!guardEngine || !rule.applicableEngines.includes("guard")) return;
-  try {
-    await guardEngine.run({
-      mode: "guard",
-      target: context.repoRoot,
-      checks: [rule.id],
-      dryRun: true
+function isLowerBoundUnit(unit) {
+  return unit !== void 0 && LOWER_BOUND_UNITS.has(unit.toLowerCase());
+}
+function compareThresholds(rule, instr, metrics) {
+  const lowerBound = isLowerBoundUnit(instr.unit);
+  const suffix = instr.unit ? ` ${instr.unit}` : "";
+  const violations = [];
+  for (const [metric, limit] of Object.entries(instr.thresholds)) {
+    const actual = metrics[metric];
+    if (typeof actual !== "number") continue;
+    const breached = lowerBound ? actual < limit : actual > limit;
+    if (!breached) continue;
+    violations.push({
+      id: (0, import_node_crypto4.randomUUID)(),
+      ruleId: rule.id,
+      severity: rule.severity,
+      file: "",
+      message: lowerBound ? `${metric}=${actual}${suffix} \u4F4E\u4E8E\u9608\u503C ${limit}${suffix}` : `${metric}=${actual}${suffix} \u8D85\u8FC7\u9608\u503C ${limit}${suffix}`,
+      suggestion: lowerBound ? `\u5C06 ${metric} \u63D0\u5347\u5230 ${limit}${suffix} \u4EE5\u4E0A` : `\u5C06 ${metric} \u964D\u5230 ${limit}${suffix} \u4EE5\u5185`
     });
-  } catch {
   }
+  return violations;
+}
+function buildThresholdSummary(instr, metrics) {
+  return Object.entries(instr.thresholds).map(([metric, limit]) => `${metric}=${metrics[metric] ?? "?"}/${limit}`).join(", ");
+}
+function describeMissingMetrics(instr, required, missing) {
+  if (required.length === 0) {
+    return "\u9608\u503C\u89C4\u5219\u672A\u58F0\u660E\u4EFB\u4F55\u53EF\u6BD4\u8F83\u6307\u6807\uFF0C\u672A\u6267\u884C\u4EFB\u4F55\u68C0\u67E5";
+  }
+  const declared = required.map((key) => `${key}=${instr.thresholds[key]}`).join(", ");
+  return `\u9608\u503C\u89C4\u5219\u7F3A\u5C11\u5EA6\u91CF\u6570\u636E\u6E90\uFF0C\u672A\u6267\u884C\u4EFB\u4F55\u6BD4\u8F83\uFF08\u9608\u503C ${declared}\uFF1B\u7F3A\u5B9E\u6D4B\u503C: ${missing.join(", ")}\uFF09\u3002\u9608\u503C\u672C\u8EAB\u4E0D\u4EA7\u51FA\u68C0\u67E5\u7ED3\u679C\uFF0C\u9700\u8C03\u7528\u65B9\u7ECF context.extra.metrics \u6CE8\u5165\u5B9E\u6D4B\u503C\u540E\u624D\u4F1A\u6BD4\u8F83`;
 }
 async function evalLayerBoundary(rule, instr, context) {
   const layerMap = buildLayerMap(instr.layers);
@@ -497692,53 +497830,6 @@ function targetEngineOf(rule) {
 
 // ../kernel/src/runner/dispatch-check-list.ts
 var import_node_crypto5 = require("node:crypto");
-
-// ../kernel/src/runner/evaluation-builders.ts
-function skipEvaluation(rule, message, targetEngine, degraded) {
-  return {
-    rule,
-    status: "skipped",
-    message,
-    durationMs: 0,
-    targetEngine,
-    timestamp: /* @__PURE__ */ new Date(),
-    ...degraded ? { degraded: true } : {}
-  };
-}
-function errorEvaluation(rule, message, durationMs) {
-  return {
-    rule,
-    status: "error",
-    message,
-    durationMs,
-    targetEngine: rule.domain === "guard" ? "guard" : "inspect",
-    timestamp: /* @__PURE__ */ new Date(),
-    blocking: false
-  };
-}
-function aggregate(evaluations, durationMs) {
-  const passed = evaluations.filter((e) => e.status === "passed").length;
-  const failed = evaluations.filter((e) => e.status === "failed").length;
-  const errors = evaluations.filter((e) => e.status === "error").length;
-  const skipped = evaluations.filter((e) => e.status === "skipped").length;
-  const degraded = evaluations.filter((e) => e.degraded === true).length;
-  const blockingCount = evaluations.filter((e) => e.blocking === true).length;
-  return {
-    total: evaluations.length,
-    passed,
-    failed,
-    errors,
-    skipped,
-    degraded,
-    ok: failed === 0 && errors === 0 && degraded === 0,
-    blockingCount,
-    evaluations,
-    durationMs,
-    timestamp: /* @__PURE__ */ new Date()
-  };
-}
-
-// ../kernel/src/runner/dispatch-check-list.ts
 async function evalCheckList(host, rule, instr, context) {
   if (rule.domain === "security") {
     if (!host.securityCheckEngine) {
@@ -498192,7 +498283,7 @@ var SopRuleEngine = class {
     forbidden: (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
     "forbidden-regex": (rule, instr, ctx) => evalForbiddenRegex(rule, instr, ctx),
     "required-content": (rule, instr, ctx) => evalRequiredContent(rule, instr, ctx),
-    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx, this.guardEngine),
+    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx),
     "check-list": (rule, instr, ctx) => evalCheckList(this.host, rule, instr, ctx),
     "layer-boundary": (rule, instr, ctx) => evalLayerBoundary(rule, instr, ctx),
     "scanner-dispatch": (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),

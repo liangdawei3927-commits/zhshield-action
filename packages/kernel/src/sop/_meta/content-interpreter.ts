@@ -287,7 +287,7 @@ export type {
  * 顶层字段优先（扁平 schema 或显式覆盖），check 段作为补充；check 键本身保留，
  * 供 hasToolDispatch 读取 check.tool。
  */
-function resolveInstructionScope(raw: Record<string, unknown>): Record<string, unknown> {
+export function resolveInstructionScope(raw: Record<string, unknown>): Record<string, unknown> {
   const check = raw.check;
   if (typeof check !== 'object' || check === null || Array.isArray(check)) return raw;
   return { ...(check as Record<string, unknown>), ...raw };

@@ -141,6 +141,70 @@ describe('validateRuleContent — forbidden-regex 正则安全校验', () => {
   });
 });
 
+describe('validateRuleContent — threshold 字段级', () => {
+  it('threshold 写成字符串 ⇒ fatal 并给出正确写法（解释器只认 number）', () => {
+    const rule = makeRule({
+      id: 'k',
+      status: 'active',
+      content: { threshold: '80', unit: 'percent' },
+    });
+
+    const issues = validateRuleContent(rule, 'cloud-sync:k');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: 'content.threshold', level: 'fatal' });
+    expect(issues[0]?.reason).toContain('threshold: 80');
+  });
+
+  it('thresholds 值不可转数字 ⇒ fatal（Number 得 NaN 后比较恒 false）', () => {
+    const rule = makeRule({
+      id: 'l',
+      status: 'active',
+      content: { thresholds: { nestingDepth: 'four' } },
+    });
+
+    const issues = validateRuleContent(rule, 'cloud-sync:l');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: 'content.thresholds.nestingDepth', level: 'fatal' });
+    expect(issues[0]?.reason).toContain('NaN');
+  });
+
+  it('thresholds 为空对象 ⇒ warn（执行时必然降级）', () => {
+    const rule = makeRule({ id: 'm', status: 'active', content: { thresholds: {} } });
+
+    const issues = validateRuleContent(rule, 'cloud-sync:m');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: 'content.thresholds', level: 'warn' });
+  });
+
+  it('合法数值阈值 ⇒ 无问题（反向用例：不得把正常规则判坏）', () => {
+    const rule = makeRule({
+      id: 'n',
+      status: 'active',
+      content: { thresholds: { cyclomaticComplexity: 10, fileLength: 300 } },
+    });
+
+    expect(validateRuleContent(rule, 'cloud-sync:n')).toEqual([]);
+  });
+});
+
+describe('validateRuleContent — forbidden-regex 结构', () => {
+  it('全部条目缺字符串 regex ⇒ warn（解释器 filter 后为空，恒 0 命中）', () => {
+    const rule = makeRule({
+      id: 'o',
+      content: { forbiddenRegex: [{ pattern: 'as any' }, { regex: 123 }] },
+    });
+
+    const issues = validateRuleContent(rule, 'cloud-sync:o');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: 'content.forbiddenRegex', level: 'warn' });
+    expect(issues[0]?.reason).toContain('2 条');
+  });
+});
+
 describe('filterBuiltRules — 分级拒收', () => {
   it('只拒 active 幽灵，draft 幽灵保留并留痕', () => {
     const rules: SopRule[] = [

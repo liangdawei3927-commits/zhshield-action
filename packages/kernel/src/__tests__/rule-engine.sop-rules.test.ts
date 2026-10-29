@@ -97,19 +97,23 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
   // ─── guard 领域：阈值规则（非 dryRun 内联评估）──────────
 
   describe('guard — threshold 规则（非 dryRun）', () => {
-    it('test-coverage: 无外部数据时 passed', async () => {
+    // 2026-10-29 前这三条断言的是 status==='passed'，即「阈值从未被比较」被当成了规格。
+    // 阈值本身不产出检查结果，缺实测值时必须显式降级，否则面板显示通过、实际零检查。
+    it('test-coverage: 缺实测值时降级跳过，不再假通过', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir });
       const coverageEval = report.evaluations.find((e) => e.rule.id.includes('test-coverage'));
       expect(coverageEval).toBeDefined();
-      expect(coverageEval!.status).toBe('passed');
-      expect(coverageEval!.message).toContain('阈值');
+      expect(coverageEval!.status).toBe('skipped');
+      expect(coverageEval!.degraded).toBe(true);
+      expect(coverageEval!.message).toContain('缺少度量数据源');
     });
 
-    it('health-score: 无外部数据时 passed', async () => {
+    it('health-score: 缺实测值时降级跳过，不再假通过', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir });
       const healthEval = report.evaluations.find((e) => e.rule.id.includes('health-score'));
       expect(healthEval).toBeDefined();
-      expect(healthEval!.status).toBe('passed');
+      expect(healthEval!.status).toBe('skipped');
+      expect(healthEval!.degraded).toBe(true);
     });
   });
 
@@ -299,12 +303,13 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
   // ─── refactor 领域规则：threshold（非 dryRun）─────────
 
   describe('refactor — threshold 规则（非 dryRun）', () => {
-    it('feature-envy: 无外部数据时 passed', async () => {
+    it('feature-envy: 缺实测值时降级跳过，不再假通过', async () => {
       const report = await engine.runInspect({ repoRoot: tempDir, domain: 'refactor' });
       const evalResult = report.evaluations.find((e) => e.rule.id.includes('feature-envy'));
       expect(evalResult).toBeDefined();
-      expect(evalResult!.status).toBe('passed');
-      expect(evalResult!.message).toContain('阈值');
+      expect(evalResult!.status).toBe('skipped');
+      expect(evalResult!.degraded).toBe(true);
+      expect(evalResult!.message).toContain('缺少度量数据源');
     });
   });
 

@@ -174,7 +174,7 @@ export class SopRuleEngine {
     forbidden: (rule, instr, ctx) => evalForbidden(rule, instr, ctx),
     'forbidden-regex': (rule, instr, ctx) => evalForbiddenRegex(rule, instr, ctx),
     'required-content': (rule, instr, ctx) => evalRequiredContent(rule, instr, ctx),
-    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx, this.guardEngine),
+    threshold: (rule, instr, ctx) => evalThreshold(rule, instr, ctx),
     'check-list': (rule, instr, ctx) => evalCheckList(this.host, rule, instr, ctx),
     'layer-boundary': (rule, instr, ctx) => evalLayerBoundary(rule, instr, ctx),
     'scanner-dispatch': (rule, instr, ctx) => evalScannerDispatch(this.host, rule, instr, ctx),

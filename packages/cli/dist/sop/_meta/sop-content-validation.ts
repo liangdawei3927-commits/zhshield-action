@@ -1,9 +1,9 @@
 import { TOOL_IDS } from '@zh/shared';
-import { ContentInterpreter } from './content-interpreter';
+import { ContentInterpreter, resolveInstructionScope } from './content-interpreter';
 import { isSafeRegexPattern } from '../../runner/scan-utils';
 import type { SopRuleIssue } from './sop-field-validation';
 import type { SopRule } from './sop-types';
-import type { UnresolvedInstruction } from './rule-evaluation';
+import type { ThresholdInstruction, UnresolvedInstruction } from './rule-evaluation';
 
 /**
  * SOP 规则 content 级校验 —— 补上「元数据字段对了、但检查内容跑不起来」这层。
@@ -56,7 +56,13 @@ export function validateRuleContent(rule: SopRule, locator: string): SopRuleIssu
     if (toolIssue) issues.push(toolIssue);
   }
 
+  if (instr.type === 'threshold') {
+    issues.push(...thresholdIssues(instr, raw, locator, rule.status === 'active'));
+  }
+
   if (instr.type === 'forbidden-regex') {
+    const shapeIssue = forbiddenRegexShapeIssue(instr.items.length, raw, locator);
+    if (shapeIssue) issues.push(shapeIssue);
     issues.push(...unsafeRegexIssues(instr.items, locator));
   }
 
@@ -133,6 +139,98 @@ function checkToolName(tool: string, locator: string): SopRuleIssue | null {
     level: 'warn',
     reason: `工具 "${tool}" 不在 TOOL_IDS 内：核心库里没有对应适配器，规则将落 unavailable（不产出结果）`,
   };
+}
+
+/**
+ * forbidden-regex 的结构检查：声明了数组，但每一条都缺字符串字段 `regex`。
+ *
+ * 解释器 `toForbiddenRegex` 用 filter 丢掉非法条目后不报错 ⇒ items 变空数组 ⇒
+ * 评估恒 0 命中、判通过的「声明了却没执行」。
+ */
+function forbiddenRegexShapeIssue(
+  validCount: number,
+  raw: Record<string, unknown>,
+  locator: string,
+): SopRuleIssue | null {
+  if (validCount > 0) return null;
+  const declared = resolveInstructionScope(raw).forbiddenRegex;
+  const declaredCount = Array.isArray(declared) ? declared.length : 0;
+  if (declaredCount === 0) return null;
+  return {
+    file: locator,
+    field: 'content.forbiddenRegex',
+    value: declared,
+    level: 'warn',
+    reason:
+      `声明了 ${declaredCount} 条 forbiddenRegex，但没有一条含字符串字段 regex，` +
+      '全部被解释器丢弃 ⇒ 该规则恒 0 命中、永远判通过',
+  };
+}
+
+/**
+ * threshold 指令的字段级检查 —— 补上「指令类型认出来了，但阈值本身不可用」这层。
+ *
+ * 两个真坑，都会让规则看起来在跑、实际恒通过（与 unresolved 同类，只是更隐蔽）：
+ *
+ * ① `threshold: "80"`（YAML 里加了引号）：`hasThresholds` 谓词**接受字符串**，
+ *    但 `toThreshold` 只认 `typeof === 'number'` ⇒ 字符串被整条丢弃，
+ *    解释成 threshold 类型却零指标。
+ * ② `thresholds: { nestingDepth: "four" }`：`toThreshold` 里是 `Number(v)`，
+ *    得 NaN；比较 `actual > NaN` 恒为 false ⇒ 该指标永远判达标。
+ *
+ * 定级：active 判 fatal（这条规则此刻就在产出假的通过），非 active 判 warn。
+ */
+function thresholdIssues(
+  instr: ThresholdInstruction,
+  raw: Record<string, unknown>,
+  locator: string,
+  isActive: boolean,
+): SopRuleIssue[] {
+  const level = isActive ? 'fatal' : 'warn';
+  const scope = resolveInstructionScope(raw);
+  const issues: SopRuleIssue[] = [];
+
+  const singular = scope.threshold;
+  if (typeof singular === 'string') {
+    issues.push({
+      file: locator,
+      field: 'content.threshold',
+      value: singular,
+      level,
+      reason:
+        `threshold 写成了字符串（"${singular}"）：解释器只认 number，该值被整条丢弃 ⇒ ` +
+        `规则没有任何可比指标。请去掉引号写成 threshold: ${singular}`,
+    });
+  }
+
+  const declared = scope.thresholds;
+  if (typeof declared === 'object' && declared !== null && !Array.isArray(declared)) {
+    for (const [metric, value] of Object.entries(declared as Record<string, unknown>)) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) continue;
+      issues.push({
+        file: locator,
+        field: `content.thresholds.${metric}`,
+        value,
+        level,
+        reason:
+          `阈值 ${metric} 不是有限数字（Number(${JSON.stringify(value)}) = ${String(numeric)}）⇒ ` +
+          '比较结果恒为 false，该指标永远判达标',
+      });
+    }
+  }
+
+  if (issues.length === 0 && Object.keys(instr.thresholds).length === 0) {
+    issues.push({
+      file: locator,
+      field: 'content.thresholds',
+      value: declared,
+      level: 'warn',
+      reason: '阈值指令未声明任何可比较指标，规则执行时会落 degraded（不产出检查结果）',
+    });
+  }
+
+  return issues;
 }
 
 /**

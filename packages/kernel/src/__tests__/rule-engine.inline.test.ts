@@ -155,7 +155,7 @@ describe('SopRuleEngine — 内联评估（pattern-scan / forbidden / threshold 
     expect(violations.some((v) => v.message.includes('@ts-ignore'))).toBe(true);
   });
 
-  it('threshold: 无外部数据时返回 passed + 提示信息', async () => {
+  it('threshold: 缺实测值时降级跳过，不再假通过', async () => {
     registry.register(
       makeRule({
         id: 'guard.block.test-coverage',
@@ -166,8 +166,58 @@ describe('SopRuleEngine — 内联评估（pattern-scan / forbidden / threshold 
 
     const report = await engine.evaluateRules({ repoRoot: tempDir });
     expect(report.total).toBe(1);
-    expect(report.passed).toBe(1);
-    expect(report.evaluations[0].message).toContain('阈值');
+    // 2026-10-29 前此处断言 passed —— 那等于把「阈值从未被比较」写成规格。
+    // 阈值本身不产生检查结果，缺实测值时必须显式降级，否则报告会误导用户。
+    expect(report.passed).toBe(0);
+    expect(report.degraded).toBe(1);
+    expect(report.evaluations[0].status).toBe('skipped');
+    expect(report.evaluations[0].degraded).toBe(true);
+    expect(report.evaluations[0].message).toContain('缺少度量数据源');
+    expect(report.evaluations[0].message).toContain('value=80');
+  });
+
+  it('threshold: 注入实测值后按下限型单位比较（覆盖率不足判 failed）', async () => {
+    registry.register(
+      makeRule({
+        id: 'guard.block.test-coverage',
+        domain: 'guard',
+        content: { threshold: 80, unit: 'percent', scope: 'diff' },
+      }),
+    );
+
+    const low = await engine.evaluateRules({
+      repoRoot: tempDir,
+      extra: { metrics: { value: 62 } },
+    });
+    expect(low.evaluations[0].status).toBe('failed');
+    expect(low.evaluations[0].violations).toHaveLength(1);
+    expect(low.evaluations[0].violations[0].message).toContain('低于阈值 80');
+
+    const ok = await engine.evaluateRules({
+      repoRoot: tempDir,
+      extra: { metrics: { value: 91 } },
+    });
+    expect(ok.evaluations[0].status).toBe('passed');
+    expect(ok.evaluations[0].violations).toHaveLength(0);
+  });
+
+  it('threshold: 多指标规则按上限型比较（复杂度超标判 failed）', async () => {
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.complexity',
+        domain: 'inspect',
+        content: { thresholds: { cyclomaticComplexity: 10, fileLength: 300 } },
+      }),
+    );
+
+    const report = await engine.evaluateRules({
+      repoRoot: tempDir,
+      extra: { metrics: { cyclomaticComplexity: 15, fileLength: 120 } },
+    });
+    expect(report.evaluations[0].status).toBe('failed');
+    expect(report.evaluations[0].violations).toHaveLength(1);
+    expect(report.evaluations[0].violations[0].message).toContain('cyclomaticComplexity=15');
+    expect(report.evaluations[0].violations[0].message).toContain('超过阈值 10');
   });
 
   it('layer-boundary: 检测层违规导入', async () => {

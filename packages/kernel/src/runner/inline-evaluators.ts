@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
-import type { GuardEngineLike } from './evaluator-host';
+import { skipEvaluation } from './evaluation-builders';
 import type {
   RuleEvaluation,
   Violation,
@@ -39,48 +39,126 @@ export async function evalPatternScan(
 
 // ─── 内联评估：threshold ───────────────────────────────
 
+/**
+ * 下限型度量单位：数值越高越好（覆盖率、评分）。其余按上限型处理（复杂度、行数、嵌套深度）。
+ *
+ * threshold 指令没有 direction 字段，方向只能由 unit 约定推断 —— **新增单位必须在此登记**，
+ * 否则会按「越大越差」比较，把覆盖率 90% 判成超标。
+ */
+const LOWER_BOUND_UNITS = new Set(['percent', 'percentage', 'ratio', 'score']);
+
+/**
+ * 阈值指令评估。
+ *
+ * 2026-10-29 前的实现恒返回 `status: 'passed'`，只把阈值拼成一句 message 丢掉 ——
+ * 后果是 4 条 active 云端阈值规则（复杂度 / 质量分 / 健康分 / 覆盖率）在报告里
+ * 恒显示「通过」，而全仓没有任何代码把阈值与实测值做过比较（`@zh/scoring` 的
+ * sop-converters 连 threshold 都不读）。这是「面板显示通过、实际零检查」的典型形态。
+ *
+ * 现改为三态：有实测值 ⇒ 真比较；缺实测值 ⇒ `skipped + degraded`（计入 aggregate.ok，
+ * 不再伪装成通过）；未声明指标 ⇒ 同样判未执行。
+ *
+ * 实测值入口：`context.extra.metrics`（指标名 → 数值），键名与规则 thresholds 的键一致。
+ */
 export async function evalThreshold(
   rule: SopRule,
   instr: ThresholdInstruction,
   context: RuleContext,
-  guardEngine?: GuardEngineLike,
 ): Promise<RuleEvaluation> {
-  const summary = buildThresholdSummary(instr);
-  await tryQueryThreshold(guardEngine, rule, context);
+  const targetEngine = rule.domain === 'guard' ? 'guard' : 'inspect';
+  const required = Object.keys(instr.thresholds);
+  const metrics = readMetricBag(context);
+  const missing = required.filter((key) => typeof metrics[key] !== 'number');
 
+  // 阈值本身不产生检查结果 —— 宁可不跑，也不跑一半（部分指标缺失时整条判未执行）
+  if (required.length === 0 || missing.length > 0) {
+    return skipEvaluation(
+      rule,
+      describeMissingMetrics(instr, required, missing),
+      targetEngine,
+      true,
+    );
+  }
+
+  const violations = compareThresholds(rule, instr, metrics);
   return {
     rule,
-    status: 'passed',
-    message: `阈值规则 (需要外部数据): ${summary}`,
+    status: violations.length === 0 ? 'passed' : 'failed',
+    violations,
+    files: [],
+    message:
+      violations.length === 0
+        ? `阈值达标: ${buildThresholdSummary(instr, metrics)}`
+        : `阈值未达标 ${violations.length} 项: ${buildThresholdSummary(instr, metrics)}`,
     durationMs: 0,
-    targetEngine: 'guard',
+    targetEngine,
     timestamp: new Date(),
   };
 }
 
-function buildThresholdSummary(instr: ThresholdInstruction): string {
-  const thresholdKeys = Object.keys(instr.thresholds);
-  return thresholdKeys.length > 0
-    ? `阈值: ${thresholdKeys.map((k) => `${k}=${instr.thresholds[k]}`).join(', ')}`
-    : `阈值: ${instr.unit ?? ''} ${JSON.stringify(instr.thresholds)}`;
+/** 读取调用方注入的实测值；非数值条目一律忽略，交由 missing 判定 */
+function readMetricBag(context: RuleContext): Record<string, number | undefined> {
+  const bag = context.extra?.metrics;
+  if (typeof bag !== 'object' || bag === null) return {};
+  return bag as Record<string, number | undefined>;
 }
 
-async function tryQueryThreshold(
-  guardEngine: GuardEngineLike | undefined,
+function isLowerBoundUnit(unit: string | undefined): boolean {
+  return unit !== undefined && LOWER_BOUND_UNITS.has(unit.toLowerCase());
+}
+
+function compareThresholds(
   rule: SopRule,
-  context: RuleContext,
-): Promise<void> {
-  if (!guardEngine || !rule.applicableEngines.includes('guard')) return;
-  try {
-    await guardEngine.run({
-      mode: 'guard',
-      target: context.repoRoot,
-      checks: [rule.id],
-      dryRun: true,
+  instr: ThresholdInstruction,
+  metrics: Record<string, number | undefined>,
+): Violation[] {
+  const lowerBound = isLowerBoundUnit(instr.unit);
+  const suffix = instr.unit ? ` ${instr.unit}` : '';
+  const violations: Violation[] = [];
+  for (const [metric, limit] of Object.entries(instr.thresholds)) {
+    const actual = metrics[metric];
+    if (typeof actual !== 'number') continue;
+    const breached = lowerBound ? actual < limit : actual > limit;
+    if (!breached) continue;
+    // 阈值是项目级指标，没有具体文件位置 —— 沿用 check-list 的项目级空路径约定
+    violations.push({
+      id: randomUUID(),
+      ruleId: rule.id,
+      severity: rule.severity,
+      file: '',
+      message: lowerBound
+        ? `${metric}=${actual}${suffix} 低于阈值 ${limit}${suffix}`
+        : `${metric}=${actual}${suffix} 超过阈值 ${limit}${suffix}`,
+      suggestion: lowerBound
+        ? `将 ${metric} 提升到 ${limit}${suffix} 以上`
+        : `将 ${metric} 降到 ${limit}${suffix} 以内`,
     });
-  } catch {
-    // 忽略
   }
+  return violations;
+}
+
+function buildThresholdSummary(
+  instr: ThresholdInstruction,
+  metrics: Record<string, number | undefined>,
+): string {
+  return Object.entries(instr.thresholds)
+    .map(([metric, limit]) => `${metric}=${metrics[metric] ?? '?'}/${limit}`)
+    .join(', ');
+}
+
+function describeMissingMetrics(
+  instr: ThresholdInstruction,
+  required: string[],
+  missing: string[],
+): string {
+  if (required.length === 0) {
+    return '阈值规则未声明任何可比较指标，未执行任何检查';
+  }
+  const declared = required.map((key) => `${key}=${instr.thresholds[key]}`).join(', ');
+  return (
+    `阈值规则缺少度量数据源，未执行任何比较（阈值 ${declared}；缺实测值: ${missing.join(', ')}）。` +
+    '阈值本身不产出检查结果，需调用方经 context.extra.metrics 注入实测值后才会比较'
+  );
 }
 
 // ─── 内联评估：layer-boundary ──────────────────────────

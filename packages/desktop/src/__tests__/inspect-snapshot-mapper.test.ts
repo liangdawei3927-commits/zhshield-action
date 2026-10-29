@@ -152,8 +152,9 @@ describe('体检页挂载 hydrate（结构守卫，防接线被删）', () => {
 
   it('InspectPage 详情判定：实时 > 完整报告 > 快照，扫描中不用旧数据顶替', () => {
     const src = fs.readFileSync(path.join(pagesDir, 'InspectPage.tsx'), 'utf-8');
+    // 判定源已下沉进 useInspectPageState（page.report 为实时、page.persisted 为快照），链条不变
     expect(src).toContain(
-      'const detailReport = report ?? (loading ? null : (savedReport ?? persisted));',
+      'const detailReport = page.report ?? (page.loading ? null : (savedReport ?? page.persisted));',
     );
     // 打开页面仍落在主页（不因读回历史结果而自动跳进详情）
     expect(src).toContain('const [showHome, setShowHome] = useState(true);');

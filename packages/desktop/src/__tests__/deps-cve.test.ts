@@ -188,8 +188,13 @@ describe('结构守卫 — P1-8 链路接线（防改回去）', () => {
       path.resolve(__dirname, '../pages/dependency-parts.tsx'),
       'utf-8',
     );
+    // CVE 卡片下沉到 dependency-parts-cve.tsx：原路径必须保留 re-export（调用方接线不变）
     expect(parts).toContain('DependencyCveCard');
-    expect(parts).toContain("t('page.deps.cve.unavailable')");
+    const cveCard = fs.readFileSync(
+      path.resolve(__dirname, '../pages/dependency-parts-cve.tsx'),
+      'utf-8',
+    );
+    expect(cveCard).toContain("t('page.deps.cve.unavailable')");
     const page = fs.readFileSync(path.resolve(__dirname, '../pages/DependencyPage.tsx'), 'utf-8');
     expect(page).toContain('<DependencyCveCard report={report} />');
   });

@@ -27,7 +27,8 @@ function jsxBlock(src: string, marker: string): string {
 }
 
 const EMPTY_VIEWS: [file: string, marker: string][] = [
-  ['pages/InspectPage.tsx', '<DomainEmptyView'],
+  // InspectPage 的空态视图（InspectEmptyView）拆到 inspect-views.tsx，DomainEmptyView 接线随迁
+  ['pages/inspect-views.tsx', '<DomainEmptyView'],
   ['pages/GuardPage.tsx', '<DomainEmptyView'],
   ['pages/security-empty-state.tsx', '<DomainEmptyView'],
   ['pages/garbage-empty-state.tsx', '<DomainEmptyView'],

@@ -408,16 +408,14 @@ export class TaskManager {
 }
 
 export function buildTaskManager(): TaskManager {
-  // 每个 runner 都把 task.id 作为最后一个参数传给执行器：取消消息要能被翻译成
+  // 每个 runner 都把 task.id 通过 runOptions.cancelKey 传给执行器：取消消息要能被翻译成
   // worker 内部的 job id（见 pipeline-host 的 jobIdByCancelKey），否则 cancel 静默失效。
   const runnerByKind: Record<TaskKind, TaskRunner> = {
     pipeline: (task, request, onProgress) =>
       runPipelineInWorker(
         task.projectPath,
         (request ?? {}) as { dryRun?: boolean; sop?: boolean },
-        onProgress,
-        undefined,
-        task.id,
+        { onProgress, cancelKey: task.id },
       ),
     security: (task, _request, onProgress) =>
       runSecurityInWorker(task.projectPath, onProgress, undefined, task.id),
@@ -444,9 +442,7 @@ export function buildTaskManager(): TaskManager {
       runGuardInWorker(
         task.projectPath,
         (request ?? {}) as Record<string, unknown>,
-        onProgress,
-        undefined,
-        task.id,
+        { onProgress, cancelKey: task.id },
       ),
     refactor: (task, _request, onProgress) =>
       runRefactorInWorker(task.projectPath, onProgress, undefined, task.id),

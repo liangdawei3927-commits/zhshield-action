@@ -64,10 +64,11 @@ describe('任务身份必须送到执行器', () => {
     await vi.waitFor(() => expect(host.runPipelineInWorker).toHaveBeenCalledTimes(1));
 
     const args = vi.mocked(host.runPipelineInWorker).mock.calls[0] as unknown[];
+    const runOptions = args[2] as { cancelKey?: string } | undefined;
     expect(
-      args,
+      runOptions?.cancelKey,
       `执行器收到的参数里没有 task.id=${task.id}，取消消息无法翻译到内部 job`,
-    ).toContain(task.id);
+    ).toBe(task.id);
   });
 
   it('启动 security 时同样带 task.id', async () => {

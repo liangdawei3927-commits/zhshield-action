@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { parseFile, computeNestingDepth } from '@zh/refactor';
+import { readGateDeclaration } from '@zh/kernel';
 import type { RuleMetricsProvider, RuleMetricsResult, SopRule } from '@zh/kernel';
 
 /**
@@ -66,12 +67,7 @@ function isSkippedDir(name: string): boolean {
 /** 默认源文件上限：超出即放弃统计（8GB 机解析上万文件会把体检拖成分钟级） */
 const DEFAULT_MAX_FILES = 4000;
 
-/** 默认覆盖率报告候选（相对项目根；istanbul / vitest 的 json-summary 标准产物） */
-const DEFAULT_COVERAGE_REPORTS = ['coverage/coverage-summary.json'];
-
 export interface RuleMetricsOptions {
-  /** 覆盖率报告候选路径（相对 repoRoot），按顺序取第一个存在的 */
-  coverageReportPaths?: string[];
   /** 复杂度统计的源文件上限；超出则不给该指标（宁可不算也不给半截数字） */
   maxScanFiles?: number;
 }
@@ -111,76 +107,25 @@ export function createRuleMetricsProvider(
       return memo('complexity', () => measureComplexity(repoRoot, options));
     }
 
-    const binding = SCORE_RULE_BINDINGS[rule.id];
-    if (!binding) {
-      return {
-        unavailableReason:
-          `未登记度量口径（规则「${rule.id}」声明指标: ${declared.join(', ')}）——` +
-          '新增阈值规则须在 packages/pipeline/src/rule-metrics.ts 登记取数方式，否则无法取数',
-      };
-    }
-    return memo(binding, () => computeScoreMetric(binding, repoRoot, rule, options));
+    return {
+      unavailableReason:
+        `未登记度量口径（规则「${rule.id}」声明指标: ${declared.join(', ')}）——` +
+        '引擎内阈值规则须在 packages/pipeline/src/rule-metrics.ts 登记取数方式；' +
+        '若依赖整轮扫描的聚合结果（健康分/质量分/覆盖率），应登记为扫描后门禁' +
+        '（kernel/src/runner/post-scan-gate.ts），由 gate 阶段判定',
+    };
   };
 }
 
-type ScoreBinding = 'coverage' | 'health-score' | 'quality-score';
-
 /**
- * 分数型规则（单数 `threshold`）→ 度量口径绑定。
+ * 从规则声明中读出「它要哪些指标」。
  *
- * 为什么必须显式列举：解释器把 `threshold: 70` 折叠成 `{ value: 70 }`，
- * 指标名里**不含任何语义**，只能靠规则 id 分辨「这个 value 是覆盖率还是健康分」。
- * 未登记的一律返回 unavailable 原因，不猜 —— 猜错就是又一次「显示通过、实际比错数」。
- */
-const SCORE_RULE_BINDINGS: Record<string, ScoreBinding> = {
-  'guard.block.official.health-score': 'health-score',
-  'guard.block.official.test-coverage': 'coverage',
-  'inspect.score.official.quality-score': 'quality-score',
-};
-
-function computeScoreMetric(
-  binding: ScoreBinding,
-  repoRoot: string,
-  rule: SopRule,
-  options: RuleMetricsOptions,
-): RuleMetricsResult {
-  if (binding === 'coverage') {
-    return measureCoverage(repoRoot, rule, options);
-  }
-  // 健康分 / 质量分都是「整轮扫描结束后」的聚合评分（@zh/scoring 的 computeOverallSnapshot
-  // 吃的是各域 findings）。规则引擎在扫描**过程中**求值，此时聚合分尚未产生，
-  // 拿上一轮的旧分代入等于用陈旧数据判定当前代码 —— 故不做，改为明示。
-  return {
-    unavailableReason:
-      '健康分/质量分是整轮扫描结束后的聚合评分（@zh/scoring），规则引擎在扫描过程中求值，' +
-      '此时聚合分尚未产生；取上一轮旧分会用陈旧数据判定当前代码。' +
-      '该规则应迁为扫描后门禁（评分阶段比较），而非引擎内检查项',
-  };
-}
-
-/**
- * 从规则声明中读出「它要哪些指标」——与 ContentInterpreter.toThreshold 同一口径：
+ * 实现在 kernel 的 `readGateDeclaration`（与门禁判定共用一份读法）：
  * 复数 `thresholds` 取各键名，单数 `threshold` 折叠为 `value`。
+ * 另写一份必然漂移 —— 届时 provider 认为规则要 `value`、gate 认为要 `coverage`。
  */
 export function readDeclaredMetricKeys(rule: SopRule): string[] {
-  const raw = (rule.content ?? {}) as Record<string, unknown>;
-  const check = (raw.check ?? {}) as Record<string, unknown>;
-  // 内置模板是嵌套 schema（metadata/governance/check），云端规则是扁平 schema；两者都要认
-  const scope: Record<string, unknown> = { ...check, ...raw };
-  const thresholds = scope.thresholds;
-  if (typeof thresholds === 'object' && thresholds !== null) {
-    return Object.keys(thresholds as Record<string, unknown>);
-  }
-  if (typeof scope.threshold === 'number') return ['value'];
-  return [];
-}
-
-function readScopeValue(rule: SopRule, key: string): string | undefined {
-  const raw = (rule.content ?? {}) as Record<string, unknown>;
-  const check = (raw.check ?? {}) as Record<string, unknown>;
-  const scope: Record<string, unknown> = { ...check, ...raw };
-  const value = scope[key];
-  return typeof value === 'string' ? value : undefined;
+  return [...readGateDeclaration(rule).declaredMetrics];
 }
 
 // ─── 复杂度 ────────────────────────────────────────────
@@ -332,55 +277,4 @@ function fileSize(full: string): number {
   } catch {
     return 0;
   }
-}
-
-// ─── 覆盖率 ────────────────────────────────────────────
-
-function measureCoverage(
-  repoRoot: string,
-  rule: SopRule,
-  options: RuleMetricsOptions,
-): RuleMetricsResult {
-  const scope = readScopeValue(rule, 'scope');
-  const candidates = options.coverageReportPaths ?? DEFAULT_COVERAGE_REPORTS;
-  const pct = readCoveragePct(repoRoot, candidates);
-
-  if (scope === 'diff') {
-    // 全量覆盖率不能冒充 diff 覆盖率；基线也未在规则中定义（vs HEAD？vs main？）
-    return {
-      unavailableReason:
-        '规则声明 scope=diff（仅统计本次改动行），而当前只能读到全量覆盖率' +
-        (pct === undefined ? '（且未找到覆盖率报告）' : `（全量 ${pct}%）`) +
-        '；diff 基线在规则中未定义，按全量代入会与声明口径不符，故不计算',
-    };
-  }
-  if (pct === undefined) {
-    return {
-      unavailableReason:
-        `未找到覆盖率报告（已查找: ${candidates.join(', ')}）。` +
-        '需先运行带 json-summary reporter 的测试（如 vitest --coverage）',
-    };
-  }
-  return { metrics: { value: pct } };
-}
-
-/** 读取 istanbul json-summary 的总体行覆盖率；不可用返回 undefined */
-function readCoveragePct(repoRoot: string, candidates: string[]): number | undefined {
-  for (const rel of candidates) {
-    const full = path.resolve(repoRoot, rel);
-    let raw: string;
-    try {
-      raw = fs.readFileSync(full, 'utf-8');
-    } catch {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(raw) as { total?: { lines?: { pct?: unknown } } };
-      const pct = parsed.total?.lines?.pct;
-      if (typeof pct === 'number' && Number.isFinite(pct)) return pct;
-    } catch {
-      // 报告文件损坏：当作没找到，继续尝试下一个候选
-    }
-  }
-  return undefined;
 }

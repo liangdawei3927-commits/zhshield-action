@@ -98,22 +98,25 @@ describe('SOP 规则 — 真实 YAML 文件加载与评估', () => {
 
   describe('guard — threshold 规则（非 dryRun）', () => {
     // 2026-10-29 前这三条断言的是 status==='passed'，即「阈值从未被比较」被当成了规格。
-    // 阈值本身不产出检查结果，缺实测值时必须显式降级，否则面板显示通过、实际零检查。
-    it('test-coverage: 缺实测值时降级跳过，不再假通过', async () => {
+    // 之后改成「缺实测值 ⇒ 降级」；但健康分/覆盖率是**整轮扫描后才存在**的聚合值，
+    // 引擎内永远拿不到 ⇒ 每次体检固定背 3 条降级、ok 恒 false，门禁红灯退化成噪音。
+    // 现语义：引擎显式让位（skipped 但不降级），判定移交扫描后门禁（evaluatePostScanGates）。
+    it('test-coverage: 属扫描后门禁，引擎让位且不制造降级', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir });
       const coverageEval = report.evaluations.find((e) => e.rule.id.includes('test-coverage'));
       expect(coverageEval).toBeDefined();
       expect(coverageEval!.status).toBe('skipped');
-      expect(coverageEval!.degraded).toBe(true);
-      expect(coverageEval!.message).toContain('缺少度量数据源');
+      expect(coverageEval!.degraded).toBeUndefined();
+      expect(coverageEval!.message).toContain('后置门禁');
     });
 
-    it('health-score: 缺实测值时降级跳过，不再假通过', async () => {
+    it('health-score: 属扫描后门禁，引擎让位且不制造降级', async () => {
       const report = await engine.runGuard({ repoRoot: tempDir });
       const healthEval = report.evaluations.find((e) => e.rule.id.includes('health-score'));
       expect(healthEval).toBeDefined();
       expect(healthEval!.status).toBe('skipped');
-      expect(healthEval!.degraded).toBe(true);
+      expect(healthEval!.degraded).toBeUndefined();
+      expect(healthEval!.message).toContain('后置门禁');
     });
   });
 

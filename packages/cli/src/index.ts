@@ -8,7 +8,7 @@
  *   tsx packages/cli/src/index.ts pipeline [--dir <path>] [--dry-run] [--sop]
  *   tsx packages/cli/src/index.ts help
  */
-import { PipelineRunner } from '@zh/pipeline';
+import { PipelineRunner, formatGateItems } from '@zh/pipeline';
 import { resolveBundledSopDir } from './sop-dir';
 import { ConsoleReporter, FAIL_ON_VALUES, isFailOnValue } from '@zh/reporter';
 import { augmentProcessPath } from '@zh/shared';
@@ -231,7 +231,34 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
       process.exit(1);
   }
 
+  reportPostScanGates(runner, opts);
   await runner.destroy();
+}
+
+/**
+ * 扫描后门禁输出（健康分 / 质量分 / 覆盖率）。
+ *
+ * 这三项在规则引擎里永远拿不到数（聚合分在扫描后才产生），所以由本入口在命令结束后判一次：
+ *   · 有数且达标 ⇒ ✓；不达标 ⇒ 阻断（退出码 1，与 --fail-on error 同口径）
+ *   · 拿不到数 ⇒ 「未判定」并写明原因，**不计入通过**，也不阻断
+ *     （CLI 不做聚合评分，永久红会把用户逼到关掉整套门禁）
+ */
+function reportPostScanGates(runner: PipelineRunner, opts: CLIOptions): void {
+  if (!opts.sop) return;
+  const report = runner.evaluatePostScanGates();
+  if (report.total === 0) return;
+  console.error('\n[门禁] 扫描后判定（健康分/质量分/覆盖率）');
+  for (const line of formatGateItems(report)) console.error(`  ${line}`);
+  if (report.failed > 0) {
+    console.error(`[门禁] ${report.failed} 项未达标 — 阻断`);
+    if (!process.exitCode) process.exitCode = 1;
+    return;
+  }
+  if (report.undetermined > 0) {
+    console.error(`[门禁] ${report.undetermined} 项未判定（缺数据源，不算通过）`);
+    return;
+  }
+  console.error(`[门禁] 全部 ${report.total} 项达标`);
 }
 
 main();

@@ -19,6 +19,26 @@ export { SopRuleEngine, ContentInterpreter } from './runner';
 export { detectLayer, detectLayerByName } from './runner/scan-utils';
 export type { RuleContext } from './sop/_meta/rule-context';
 export type { RuleMetricsProvider, RuleMetricsResult } from './runner/evaluator-host';
+// 扫描后门禁（健康分/质量分/覆盖率）：引擎内拿不到聚合值，改在扫描结束后判定。
+// 方向约定与引擎内阈值求值共用 metric-direction，避免两处方向表漂移。
+export {
+  evaluatePostScanGates,
+  readGateDeclaration,
+  selectPostScanGates,
+  formatGateItems,
+  POST_SCAN_GATE_BINDINGS,
+  ENGINE_MEASURABLE_METRICS,
+  POST_SCAN_STAGE,
+} from './runner/post-scan-gate';
+export type {
+  GateMetric,
+  GateValue,
+  GateItem,
+  GateStatus,
+  GateDeclaration,
+  PostScanGateReport,
+} from './runner/post-scan-gate';
+export { LOWER_BOUND_UNITS, isLowerBoundUnit, compareMetric } from './runner/metric-direction';
 export type {
   RuleEvaluation,
   RuleEngineReport,

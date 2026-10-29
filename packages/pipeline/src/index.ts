@@ -7,3 +7,9 @@ export { detectProjectProfile, resolveEffectiveProjectRoot } from './project-pro
 export type { ProjectProfile, ProjectLanguage, PackageManager } from './project-profile';
 export { createRuleMetricsProvider } from './rule-metrics';
 export type { RuleMetricsOptions } from './rule-metrics';
+export { createGateMetricResolver, readProjectCoveragePct, DEFAULT_COVERAGE_REPORTS } from './gate-metrics';
+export type { GateMetricInputs } from './gate-metrics';
+// 门禁判定的对外口径由 pipeline 转出：调用方（CLI/桌面端）不必直接依赖 kernel，
+// 避免「谁能算分」这件事散落到各消费方。
+export { formatGateItems } from '@zh/kernel';
+export type { PostScanGateReport, GateItem } from '@zh/kernel';

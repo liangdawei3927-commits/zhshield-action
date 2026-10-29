@@ -240,3 +240,64 @@ describe('filterBuiltRules — 内置 presets 零误伤', () => {
     expect(accepted).toHaveLength(all.length);
   });
 });
+
+/**
+ * 阈值指标「有没有人给它数」—— 决定规则转 active 后是产出结论还是固定降级。
+ *
+ * 实测背景（2026-10-29 云端缓存 5 条阈值规则）：complexity 能真跑；健康分/质量分/覆盖率
+ * 三条声明的是整轮扫描后才存在的聚合值，引擎内必然拿不到。若不加这条准入，
+ * 未来任何一条「指标没有取数实现」的规则都能转 active，然后每次体检固定多一条降级。
+ */
+describe('content 校验 — 阈值指标必须有取数归属', () => {
+  const thresholdRule = (id: string, thresholds: Record<string, number>, status: string) =>
+    makeRule({ id, domain: 'inspect', action: 'scan', status, content: { thresholds } });
+
+  it('GIVEN active 规则声明了没人取数的指标 WHEN 校验 THEN fatal 且指向两条登记路径', () => {
+    const issues = validateRuleContent(
+      thresholdRule('inspect.scan.no-metric-source', { mysteryMetric: 10 }, 'active'),
+      'test',
+    );
+
+    const fatal = issues.filter((i) => i.level === 'fatal');
+    expect(fatal).toHaveLength(1);
+    expect(fatal[0].field).toBe('content.thresholds');
+    expect(fatal[0].reason).toContain('mysteryMetric');
+    expect(fatal[0].reason).toContain('rule-metrics.ts');
+    expect(fatal[0].reason).toContain('POST_SCAN_GATE_BINDINGS');
+  });
+
+  it('GIVEN 同一条规则只是 draft WHEN 校验 THEN 只 warn（草稿阶段未接数据源属正常）', () => {
+    const issues = validateRuleContent(
+      thresholdRule('inspect.scan.no-metric-source', { mysteryMetric: 10 }, 'draft'),
+      'test',
+    );
+
+    expect(issues.filter((i) => i.level === 'fatal')).toEqual([]);
+    expect(issues.some((i) => i.level === 'warn')).toBe(true);
+  });
+
+  it('GIVEN 指标是引擎内可取的复杂度五项 WHEN 校验 THEN 无问题', () => {
+    const issues = validateRuleContent(
+      thresholdRule(
+        'inspect.scan.my-complexity',
+        { cyclomaticComplexity: 10, fileLength: 300 },
+        'active',
+      ),
+      'test',
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('GIVEN 规则登记为扫描后门禁 WHEN 校验 THEN 不算缺取数（它由 gate 阶段判定）', () => {
+    const rule = makeRule({
+      id: 'guard.block.official.health-score',
+      domain: 'guard',
+      action: 'block',
+      status: 'active',
+      content: { threshold: 70, unit: 'score' },
+    });
+
+    expect(validateRuleContent(rule, 'test')).toEqual([]);
+  });
+});

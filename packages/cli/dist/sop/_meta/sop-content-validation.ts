@@ -1,6 +1,7 @@
 import { TOOL_IDS } from '@zh/shared';
 import { ContentInterpreter, resolveInstructionScope } from './content-interpreter';
 import { isSafeRegexPattern } from '../../runner/scan-utils';
+import { readGateDeclaration, ENGINE_MEASURABLE_METRICS } from '../../runner/post-scan-gate';
 import type { SopRuleIssue } from './sop-field-validation';
 import type { SopRule } from './sop-types';
 import type { ThresholdInstruction, UnresolvedInstruction } from './rule-evaluation';
@@ -58,6 +59,8 @@ export function validateRuleContent(rule: SopRule, locator: string): SopRuleIssu
 
   if (instr.type === 'threshold') {
     issues.push(...thresholdIssues(instr, raw, locator, rule.status === 'active'));
+    const coverage = unmeasurableThresholdIssue(rule, instr, locator);
+    if (coverage) issues.push(coverage);
   }
 
   if (instr.type === 'forbidden-regex') {
@@ -231,6 +234,43 @@ function thresholdIssues(
   }
 
   return issues;
+}
+
+/**
+ * 阈值指标「有没有人给它数」——决定这条规则转 active 后是产出结论还是固定降级。
+ *
+ * 三层判定：
+ *   ① 登记为扫描后门禁（`POST_SCAN_GATE_BINDINGS` / 声明 executionStage: post-scan）
+ *      ⇒ 合法。它由 gate 阶段判定，引擎不执行是设计。
+ *   ② 指标全在 `ENGINE_MEASURABLE_METRICS`（复杂度五项，由 pipeline 的 rule-metrics 取数）
+ *      ⇒ 合法。
+ *   ③ 其余 ⇒ **active 判 fatal**：没有任何取数实现，每次执行都落 skipped（degraded），
+ *      既不产出结果又拖累 `ok`。这正是「云端下发了 4 条阈值规则、3 条永远拿不到数」的成因。
+ *
+ * 非 active 判 warn：草稿阶段还没接数据源属正常，拒收会误伤正在写的内容。
+ */
+function unmeasurableThresholdIssue(
+  rule: SopRule,
+  instr: ThresholdInstruction,
+  locator: string,
+): SopRuleIssue | null {
+  if (readGateDeclaration(rule).isGate) return null;
+  const keys = Object.keys(instr.thresholds);
+  if (keys.length === 0) return null; // 未声明指标已由 thresholdIssues 判 warn
+  const unmeasurable = keys.filter((key) => !ENGINE_MEASURABLE_METRICS.includes(key));
+  if (unmeasurable.length === 0) return null;
+  return {
+    file: locator,
+    field: 'content.thresholds',
+    value: unmeasurable,
+    level: rule.status === 'active' ? 'fatal' : 'warn',
+    reason:
+      `阈值指标 ${unmeasurable.join(', ')} 没有任何取数实现：引擎内可取数的指标只有 ` +
+      `${ENGINE_MEASURABLE_METRICS.join('/')}（packages/pipeline/src/rule-metrics.ts）。` +
+      '转 active 后每次执行都拿不到实测值，只会落 skipped（含降级），既不产出结论又拖累整体 ok。' +
+      '依赖整轮扫描聚合的指标（健康分/质量分/覆盖率）必须在 kernel/src/runner/post-scan-gate.ts ' +
+      '的 POST_SCAN_GATE_BINDINGS 登记，或在规则里写 executionStage: post-scan',
+  };
 }
 
 /**

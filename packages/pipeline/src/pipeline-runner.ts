@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import {
   GuardEngine,
   GuardESLintCheckAdapter,
@@ -28,9 +26,11 @@ import type { InspectionReport } from '@zh/inspect';
 import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
 import { createRuleMetricsProvider } from './rule-metrics';
+import { createGateMetricResolver } from './gate-metrics';
+import type { GateMetricInputs } from './gate-metrics';
 import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
-import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine } from '@zh/kernel';
-import type { Plugin, RuleContext, RuleEngineReport } from '@zh/kernel';
+import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine, evaluatePostScanGates } from '@zh/kernel';
+import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import {
   loadBaseline,
@@ -46,6 +46,7 @@ import { toMessage } from './runner-utils';
 import { buildSuccessReport } from './report-builders';
 import { resolveEffectiveProjectRoot } from './project-profile';
 import { resolveDefaultSopRulesDir } from './sop-rules-dir';
+import { loadBundledSopRules, loadSopRulesFromSyncCache } from './sop-rule-loading';
 import {
   composeRuleContext,
   deriveProjectFeature,
@@ -85,35 +86,6 @@ async function registerDefaultAdapters(
   inspectEngine.registerAdapter(new SonarwayToolAdapter());
   inspectEngine.registerAdapter(new TrivyAdapter());
   await registerAutoPerfAdapter(inspectEngine);
-}
-
-type SyncRuleArray = Parameters<SopLoader['loadFromKnowledgeBase']>[0];
-
-async function readModulesDir(logger: Logger, modulesDir: string): Promise<string[] | null> {
-  try {
-    return await fs.promises.readdir(modulesDir);
-  } catch {
-    logger.warn(`同步规则缓存目录不可用，回退内置模板: ${modulesDir}`);
-    return null;
-  }
-}
-
-async function readSyncedRules(
-  logger: Logger,
-  modulesDir: string,
-  dbFiles: string[],
-): Promise<SyncRuleArray> {
-  const synced: SyncRuleArray = [];
-  for (const file of dbFiles) {
-    try {
-      const raw = await fs.promises.readFile(path.join(modulesDir, file), 'utf-8');
-      const rules = JSON.parse(raw) as SyncRuleArray;
-      if (Array.isArray(rules)) synced.push(...rules);
-    } catch (err) {
-      logger.warn(`同步规则模块 ${file} 解析失败: ${toMessage(err)}`);
-    }
-  }
-  return synced;
 }
 
 /**
@@ -242,41 +214,22 @@ export class PipelineRunner {
     this.logger.info(`插件已加载: ${plugin.name}@${plugin.version}`);
   }
   async loadSopRules(): Promise<number> {
-    const count = await this.sopLoader.loadFromFileSystem();
-    const stats = this.sopRegistry.getStats();
-    if (count === 0) {
-      this.logger.error(
-        `SOP 规则加载降级: 0 条规则 — 引擎处于盲检状态，所有检查将默认通过。请检查规则目录: ${this.sopRulesDir}`,
-      );
-    } else {
-      this.logger.info(`SOP 规则已加载: ${count} 条 (活跃: ${stats.byStatus.active || 0})`);
-    }
-    return count;
+    return loadBundledSopRules({
+      loader: this.sopLoader,
+      registry: this.sopRegistry,
+      logger: this.logger,
+      rulesDir: this.sopRulesDir,
+    });
   }
 
-  /**
-   * 从同步缓存加载云端同步的规则（{cacheDir}/modules/*.db，JSON 数组），
-   * 与内置模板合并：按 id 覆盖内置同 id 规则（REMOTE_WINS），
-   * 缓存独有的规则直接注册。返回加载条数；缓存目录缺失或无规则文件时返回 0。
-   */
+  /** 合并云同步缓存规则（`{cacheDir}/modules/*.db`）；目录不可用返回 0 */
   async loadSopRulesFromCache(cacheDir: string): Promise<number> {
-    const modulesDir = path.join(cacheDir, 'modules');
-    const files = await readModulesDir(this.logger, modulesDir);
-    if (!files) return 0;
-
-    const dbFiles = files.filter((f) => f.endsWith('.db') && !f.startsWith('.'));
-    if (dbFiles.length === 0) return 0;
-
-    const synced = await readSyncedRules(this.logger, modulesDir, dbFiles);
-    if (synced.length === 0) return 0;
-
-    await this.sopLoader.loadFromKnowledgeBase(synced);
-    const stats = this.sopRegistry.getStats();
-    this.logger.info(
-      `SOP 同步规则已加载: ${synced.length} 条 (活跃: ${stats.byStatus.active || 0})`,
+    return loadSopRulesFromSyncCache(
+      { loader: this.sopLoader, registry: this.sopRegistry, logger: this.logger },
+      cacheDir,
     );
-    return synced.length;
   }
+
   async runGuard(options?: Partial<CheckOptions>): Promise<GuardReport> {
     this.logger.info('开始 Guard 门禁检查...');
 
@@ -453,6 +406,23 @@ export class PipelineRunner {
 
     this.logger.info('========== 智汇码盾全流水线完成（不含重构） ==========');
     return buildSuccessReport(guardReport, inspectReport);
+  }
+
+  /**
+   * 扫描后门禁判定（健康分 / 质量分 / 覆盖率）。
+   *
+   * 为什么不在 `runSop*` 里顺手做：这三项的数据源是**整轮扫描结束后**才存在的
+   * （`@zh/scoring` 的聚合分、测试产出的 coverage-summary.json）。规则引擎在扫描
+   * 过程中求值，拿不到；硬判只会变成「每次都降级」。故拆成独立阶段，由调用方
+   * 在扫描完成后调用一次 —— CLI 在命令结束后调，桌面端在评分阶段调。
+   *
+   * @param inputs 调用方已知的聚合值（桌面端传评分与覆盖率）；缺项落 undetermined
+   */
+  evaluatePostScanGates(inputs?: GateMetricInputs): PostScanGateReport {
+    return evaluatePostScanGates(
+      this.sopRegistry.getAll(),
+      createGateMetricResolver(this.repoRoot, inputs),
+    );
   }
 
   async destroy(): Promise<void> {

@@ -1,6 +1,7 @@
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type { RuleMetricsProvider } from './evaluator-host';
+import { readGateDeclaration } from './post-scan-gate';
 
 /**
  * 把「这条规则要的实测值」解析进上下文副本（threshold 指令专用）。
@@ -23,6 +24,9 @@ export async function applyRuleMetrics(
   onError: (message: string) => void,
 ): Promise<RuleContext> {
   if (!provider) return context;
+  // 后置门禁（健康分/质量分/覆盖率）在引擎内根本不求值，向度量源要数是纯浪费：
+  // 聚合分在扫描过程中尚未产生，取了也只能拿到「不可用」。
+  if (readGateDeclaration(rule).isGate) return context;
   try {
     const result = await provider(rule, context);
     return {

@@ -12,6 +12,8 @@ import type {
 } from '../sop/_meta/rule-evaluation';
 import { scanPatternsInFile, detectLayer, detectLayerByName } from './scan-utils';
 import { forEachScanTarget } from './inline-eval-scan-target';
+import { isLowerBoundUnit } from './metric-direction';
+import { readGateDeclaration } from './post-scan-gate';
 
 // ─── 内联评估：pattern-scan ────────────────────────────
 
@@ -40,12 +42,9 @@ export async function evalPatternScan(
 // ─── 内联评估：threshold ───────────────────────────────
 
 /**
- * 下限型度量单位：数值越高越好（覆盖率、评分）。其余按上限型处理（复杂度、行数、嵌套深度）。
- *
- * threshold 指令没有 direction 字段，方向只能由 unit 约定推断 —— **新增单位必须在此登记**，
- * 否则会按「越大越差」比较，把覆盖率 90% 判成超标。
+ * 阈值方向约定放在 `metric-direction.ts`（引擎内求值与扫描后门禁共用一份）。
+ * 两处各写一份方向表必然漂移，届时同一条规则在两个阶段结论相反。
  */
-const LOWER_BOUND_UNITS = new Set(['percent', 'percentage', 'ratio', 'score']);
 
 /**
  * 阈值指令评估。
@@ -66,6 +65,19 @@ export async function evalThreshold(
   context: RuleContext,
 ): Promise<RuleEvaluation> {
   const targetEngine = rule.domain === 'guard' ? 'guard' : 'inspect';
+  // 后置门禁（健康分/质量分/覆盖率）：数据源是「整轮扫描结束后的聚合值」，
+  // 扫描过程中必然拿不到。这里显式让位，不做降级 —— 真正的判定由
+  // `evaluatePostScanGates` 在评分阶段完成（见 post-scan-gate.ts 的注释）。
+  const gate = readGateDeclaration(rule);
+  if (gate.isGate) {
+    return skipEvaluation(
+      rule,
+      `后置门禁规则：由扫描后门禁阶段按「${gate.metric ?? '未登记口径'}」判定，引擎内不求值` +
+        '（引擎在扫描过程中运行，此时聚合分/覆盖率尚未产生）',
+      targetEngine,
+      false,
+    );
+  }
   const required = Object.keys(instr.thresholds);
   const metrics = readMetricBag(context);
   const missing = required.filter((key) => typeof metrics[key] !== 'number');
@@ -107,10 +119,6 @@ function readMetricBag(context: RuleContext): Record<string, number | undefined>
 function readUnavailableReason(context: RuleContext): string | undefined {
   const err = context.extra?.metricsUnavailable;
   return typeof err === 'string' && err.trim() !== '' ? err : undefined;
-}
-
-function isLowerBoundUnit(unit: string | undefined): boolean {
-  return unit !== undefined && LOWER_BOUND_UNITS.has(unit.toLowerCase());
 }
 
 /**

@@ -90,23 +90,25 @@ describe('SopRuleEngine — threshold 度量注入', () => {
   });
 
   it('GIVEN 提供者声明口径不可满足 WHEN 评估 THEN 降级文案透出该原因', async () => {
+    // 注意：不能用 test-coverage / health-score 这类后置门禁规则来测这条路径，
+    // 它们已在 evalThreshold 入口让位（不向度量源要数）。此处用普通阈值规则。
     registry.register(
       makeRule({
-        id: 'guard.block.official.test-coverage',
-        domain: 'guard',
-        action: 'block',
-        content: { threshold: 80, unit: 'percent', scope: 'diff' },
+        id: 'inspect.scan.custom-metric',
+        domain: 'inspect',
+        action: 'scan',
+        content: { thresholds: { customMetric: 80 } },
       }),
     );
 
     const report = await evaluate(
-      () => ({ unavailableReason: '规则声明 scope=diff，而只能读到全量覆盖率' }),
-      'guard',
+      () => ({ unavailableReason: '该指标口径未实现，无法取数' }),
+      'inspect',
     );
 
     expect(report.evaluations[0].status).toBe('skipped');
     expect(report.evaluations[0].degraded).toBe(true);
-    expect(report.evaluations[0].message).toContain('scope=diff');
+    expect(report.evaluations[0].message).toContain('口径未实现');
   });
 
   it('GIVEN 两条规则各自不同的指标值 WHEN 并行评估 THEN 结论互不串扰', async () => {
@@ -116,7 +118,7 @@ describe('SopRuleEngine — threshold 度量注入', () => {
     // 若发生串扰，两条会读到同一个数，结论必然同向。
     registry.register(
       makeRule({
-        id: 'guard.block.official.health-score',
+        id: 'guard.block.custom-score-a',
         domain: 'guard',
         action: 'block',
         content: { threshold: 70, unit: 'score' },
@@ -124,7 +126,7 @@ describe('SopRuleEngine — threshold 度量注入', () => {
     );
     registry.register(
       makeRule({
-        id: 'guard.block.official.another-score',
+        id: 'guard.block.custom-score-b',
         domain: 'guard',
         action: 'block',
         content: { threshold: 50, unit: 'score' },
@@ -133,16 +135,16 @@ describe('SopRuleEngine — threshold 度量注入', () => {
 
     const engine = new SopRuleEngine(registry, {
       metricsProvider: (rule) => ({
-        metrics: { value: rule.id.includes('another') ? 30 : 90 },
+        metrics: { value: rule.id.includes('score-b') ? 30 : 90 },
       }),
     });
     const report = await engine.evaluateRules({ repoRoot: tempDir, domain: 'guard' });
 
-    const health = report.evaluations.find((e) => e.rule.id.includes('health'))!;
-    const another = report.evaluations.find((e) => e.rule.id.includes('another'))!;
-    expect(health.status).toBe('passed');
-    expect(another.status).toBe('failed');
-    expect(another.violations![0].message).toContain('阈值指标=30');
+    const scoreA = report.evaluations.find((e) => e.rule.id.endsWith('score-a'))!;
+    const scoreB = report.evaluations.find((e) => e.rule.id.endsWith('score-b'))!;
+    expect(scoreA.status).toBe('passed');
+    expect(scoreB.status).toBe('failed');
+    expect(scoreB.violations![0].message).toContain('阈值指标=30');
   });
 
   it('GIVEN 非 threshold 规则 WHEN 评估 THEN 不触发度量提供者', async () => {
@@ -172,5 +174,32 @@ describe('SopRuleEngine — threshold 度量注入', () => {
     expect(report.evaluations[0].status).toBe('skipped');
     expect(report.evaluations[0].degraded).toBe(true);
     expect(report.evaluations[0].message).toContain('fileLength');
+  });
+
+  it('GIVEN 后置门禁规则（健康分/覆盖率）WHEN 评估 THEN 让位不降级，ok 不受拖累', async () => {
+    // 聚合分与覆盖率在扫描过程中必然拿不到。若仍走 evalThreshold 的缺值分支，
+    // 每次体检都会固定背 3 条降级 ⇒ ok 恒 false、门禁红灯变噪音。
+    // 正确语义：引擎显式让位（skipped 但 degraded=false），判定由 gate 阶段完成。
+    registry.register(
+      makeRule({
+        id: 'guard.block.official.health-score',
+        domain: 'guard',
+        action: 'block',
+        content: { threshold: 70, unit: 'score' },
+      }),
+    );
+
+    let providerCalled = 0;
+    const report = await evaluate(() => {
+      providerCalled += 1;
+      return { metrics: {} };
+    }, 'guard');
+
+    expect(report.evaluations[0].status).toBe('skipped');
+    expect(report.evaluations[0].degraded).toBeUndefined();
+    expect(report.evaluations[0].message).toContain('后置门禁');
+    // 让位不等于放弃：不能再向度量源要数据，也不该拖累 ok
+    expect(providerCalled).toBe(0);
+    expect(report.ok).toBe(true);
   });
 });

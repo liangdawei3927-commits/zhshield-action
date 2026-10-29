@@ -27,6 +27,7 @@ const MAX_DETAIL_FETCHES = 30;
 const OSV_DETAIL_URL = (id: string): string => `https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`;
 
 
+/** 单条依赖漏洞发现（OSV 命中结果，供 dashboard 展示） */
 export interface CveFinding {
   name: string;
   version: string;
@@ -36,6 +37,7 @@ export interface CveFinding {
   severity: 'critical' | 'high' | 'medium';
 }
 
+/** 依赖 CVE 检查结果（runCveChecks 的返回形状） */
 export interface CveCheckResult {
   /** ok = 漏洞库可达并完成查询；unavailable = 离线/不可达（≠ 0 漏洞） */
   status: 'ok' | 'unavailable';

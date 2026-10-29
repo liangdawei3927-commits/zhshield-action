@@ -15,6 +15,9 @@ const execFileAsync = promisify(execFile);
  */
 let dbUpdateInFlight = false;
 
+/** grype DB 未就绪特征（0.121 实测）：「Status:    invalid」/「ERROR database does not exist」 */
+const GRYPE_DB_NOT_READY = /invalid|does not exist/i;
+
 async function triggerDbUpdateInBackground(command: string): Promise<void> {
   if (dbUpdateInFlight) return;
   dbUpdateInFlight = true;
@@ -30,8 +33,7 @@ async function triggerDbUpdateInBackground(command: string): Promise<void> {
 async function isDbReady(command: string): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync(command, ['db', 'status'], { timeout: 15000 });
-    // 未就绪特征（0.121 实测）：「Status:    invalid」/「ERROR database does not exist」
-    return !/invalid|does not exist/i.test(stdout);
+    return !GRYPE_DB_NOT_READY.test(stdout);
   } catch {
     return false;
   }

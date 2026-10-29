@@ -91,6 +91,7 @@ export class VerifiedClient extends BaseClient {
 export class EmptyLazySubclass extends BaseService {}
 
 // === lazy-class 豁免: implements 接口的契约载体 (DI 第二实现 / 测试替身) ===
+/** 契约载体接口（lazy-class 豁免用例：implements 接口不视为 lazy-class） */
 export interface SecretStore {
   read(key: string): string | null;
   write(key: string, value: string): void;

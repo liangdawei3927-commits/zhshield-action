@@ -113,6 +113,25 @@ function buildGarbageTypeCards({
   }));
 }
 
+/** 报告统计卡：总量 + 可释放空间 + 四类分类卡 */
+function garbageReportStats(
+  report: GarbageScanReportData,
+  typeCards: ReportStatCard[],
+  t: (key: string, params?: Record<string, unknown>) => string,
+): ReportStatCard[] {
+  return [
+    { key: 'items', label: t('page.garbage.stats.items'), value: report.items.length },
+    {
+      key: 'freeable',
+      label: t('page.garbage.stats.freeable'),
+      value: formatSize(report.summary.size),
+      // 可释放空间 = 当前被占用的浪费量，越大越该处理
+      color: 'rgb(var(--zh-warning))',
+    },
+    ...typeCards,
+  ];
+}
+
 /** 垃圾清理报告视图：统计卡 + 结果横幅 + 操作栏 + 清单 */
 function GarbageReportView({
   projectPath,
@@ -162,17 +181,7 @@ function GarbageReportView({
       loading={loading}
       progress={progress}
       progressMessage={statusMessage}
-      stats={[
-        { key: 'items', label: t('page.garbage.stats.items'), value: report.items.length },
-        {
-          key: 'freeable',
-          label: t('page.garbage.stats.freeable'),
-          value: formatSize(report.summary.size),
-          // 可释放空间 = 当前被占用的浪费量，越大越该处理
-          color: 'rgb(var(--zh-warning))',
-        },
-        ...typeCards,
-      ]}
+      stats={garbageReportStats(report, typeCards, t)}
     >
       <GarbageSkippedNotice report={report} />
       {restoreResult && <RestoreBanner result={restoreResult} />}
@@ -198,46 +207,28 @@ function GarbageReportView({
 
 export function GarbagePage({ projectPath }: GarbagePageProps) {
   const t = useT();
-  const {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    report,
-    selected,
-    cleaning,
-    restoring,
-    cleanResult,
-    restoreResult,
-    handleScan,
-    toggleSelect,
-    toggleAll,
-    handleClean,
-    handleRestore,
-    copyAllToAi,
-  } = useGarbagePage(projectPath);
+  const page = useGarbagePage(projectPath);
+  // report/handleScan 保持裸名：domain-reports 守卫逐字断言 `liveReport: report`、`onScan: handleScan`
+  const { report, handleScan } = page;
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配
   const detail = useDomainDetailPage({
     projectPath,
     domain: 'garbage',
     liveReport: report,
-    loading,
+    loading: page.loading,
     onScan: handleScan,
   });
 
   const emptyStateParams = {
     projectPath,
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    onCancel: cancel,
-    stopping,
+    loading: page.loading,
+    progress: page.progress,
+    statusMessage: page.statusMessage,
+    queued: page.queued,
+    queuePosition: page.queuePosition,
+    onCancel: page.cancel,
+    stopping: page.stopping,
     onScan: detail.startScan,
   };
 
@@ -256,24 +247,24 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
       <GarbageReportView
         projectPath={projectPath}
         report={detail.detailReport}
-        loading={loading}
-        progress={progress}
-        statusMessage={statusMessage}
-        queued={queued}
-        onCancel={cancel}
-        stopping={stopping}
-        selected={selected}
-        cleaning={cleaning}
-        restoring={restoring}
-        cleanResult={cleanResult}
-        restoreResult={restoreResult}
+        loading={page.loading}
+        progress={page.progress}
+        statusMessage={page.statusMessage}
+        queued={page.queued}
+        onCancel={page.cancel}
+        stopping={page.stopping}
+        selected={page.selected}
+        cleaning={page.cleaning}
+        restoring={page.restoring}
+        cleanResult={page.cleanResult}
+        restoreResult={page.restoreResult}
         onRescan={handleScan}
         onBackHome={detail.backHome}
-        toggleSelect={toggleSelect}
-        toggleAll={toggleAll}
-        handleClean={handleClean}
-        handleRestore={handleRestore}
-        copyAllToAi={copyAllToAi}
+        toggleSelect={page.toggleSelect}
+        toggleAll={page.toggleAll}
+        handleClean={page.handleClean}
+        handleRestore={page.handleRestore}
+        copyAllToAi={page.copyAllToAi}
         t={t}
       />
     );

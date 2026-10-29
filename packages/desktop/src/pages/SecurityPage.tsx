@@ -74,6 +74,89 @@ function SecurityTabContent({
   );
 }
 
+/** 密钥扫描数据源 + 双源合并的一键扫描回调（漏洞扫描与密钥扫描并行执行） */
+function useSecretsScanSource(
+  projectPath: string,
+  handleSecurityScan: ReturnType<typeof useSecurityPage>['handleScan'],
+) {
+  const {
+    report: secretsReport,
+    handleScan: handleSecretsScan,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    copyToAi: secretsCopyToAi,
+    copyAllToAi: secretsCopyAllToAi,
+  } = useSecretsPage(projectPath);
+
+  const handleScan = useCallback(async () => {
+    await Promise.all([handleSecurityScan(), handleSecretsScan()]);
+  }, [handleSecurityScan, handleSecretsScan]);
+
+  return {
+    secretsReport,
+    handleMarkRotating,
+    handleVerifyRotated,
+    handleDismiss,
+    secretsCopyToAi,
+    secretsCopyAllToAi,
+    handleScan,
+  };
+}
+
+/**
+ * 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。
+ * 安全中心有两个数据源（漏洞扫描 + 密钥扫描），各自落盘、各自读回；
+ * 实时结果优先，扫描进行中不拿旧报告顶替（保持「扫描中看进度」）。
+ */
+function useSavedDetailReports(
+  projectPath: string,
+  report: ReturnType<typeof useSecurityPage>['report'],
+  secretsReport: ReturnType<typeof useSecretsPage>['report'],
+  loading: boolean,
+) {
+  const savedReport = useSavedDomainReport(projectPath, 'security', report);
+  const savedSecretsReport = useSavedDomainReport(projectPath, 'secrets', secretsReport);
+  return {
+    detailReport: report ?? (loading ? null : savedReport),
+    detailSecretsReport: secretsReport ?? (loading ? null : savedSecretsReport),
+  };
+}
+
+/**
+ * 扫完要不要进详情：满分 100 留在主页，不满分（或判断不了）才自动展开详情。
+ * 两个数据源（漏洞扫描 / 密钥扫描）任一产出新结果都算一次扫描结束，故拼成一个
+ * 「本次结果」对象交给判据：它的引用只在两者变化时改变，正好当"新结果"的信标。
+ */
+interface SecurityScanEntryParams {
+  projectPath: string;
+  report: ReturnType<typeof useSecurityPage>['report'];
+  secretsReport: ReturnType<typeof useSecretsPage>['report'];
+  loading: boolean;
+  onEnterDetail: () => void;
+}
+
+function useSecurityScanEntry({
+  projectPath,
+  report,
+  secretsReport,
+  loading,
+  onEnterDetail,
+}: SecurityScanEntryParams) {
+  const scanResult = useMemo(
+    () => (report === null && secretsReport === null ? null : { report, secretsReport }),
+    [report, secretsReport],
+  );
+  const { scanVersion } = useScanResultEntry({
+    projectPath,
+    navId: 'security',
+    liveReport: scanResult,
+    loading,
+    onEnterDetail,
+  });
+  return { scanVersion };
+}
+
 function useSecurityPageState(projectPath: string) {
   // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
   const [showHome, setShowHome] = useState(true);
@@ -94,39 +177,24 @@ function useSecurityPageState(projectPath: string) {
     handleScan: handleSecurityScan,
   } = useSecurityPage(projectPath);
   const {
-    report: secretsReport,
-    handleScan: handleSecretsScan,
+    secretsReport,
     handleMarkRotating,
     handleVerifyRotated,
     handleDismiss,
-    copyToAi: secretsCopyToAi,
-    copyAllToAi: secretsCopyAllToAi,
-  } = useSecretsPage(projectPath);
-
-  const handleScan = useCallback(async () => {
-    await Promise.all([handleSecurityScan(), handleSecretsScan()]);
-  }, [handleSecurityScan, handleSecretsScan]);
-
-  // 评分读磁盘、report 读内存：不同源 → 重启后「有分无按钮」。
-  // 安全中心有两个数据源（漏洞扫描 + 密钥扫描），各自落盘、各自读回。
-  const savedReport = useSavedDomainReport(projectPath, 'security', report);
-  const savedSecretsReport = useSavedDomainReport(projectPath, 'secrets', secretsReport);
-
-  // 实时结果优先；扫描进行中不拿旧报告顶替（保持「扫描中看进度」）
-  const detailReport = report ?? (loading ? null : savedReport);
-  const detailSecretsReport = secretsReport ?? (loading ? null : savedSecretsReport);
-
-  // 扫完要不要进详情：满分 100 留在主页，不满分（或判断不了）才自动展开详情。
-  // 两个数据源（漏洞扫描 / 密钥扫描）任一产出新结果都算一次扫描结束，故拼成一个
-  // 「本次结果」对象交给判据：它的引用只在两者变化时改变，正好当"新结果"的信标。
-  const scanResult = useMemo(
-    () => (report === null && secretsReport === null ? null : { report, secretsReport }),
-    [report, secretsReport],
-  );
-  const { scanVersion } = useScanResultEntry({
+    secretsCopyToAi,
+    secretsCopyAllToAi,
+    handleScan,
+  } = useSecretsScanSource(projectPath, handleSecurityScan);
+  const { detailReport, detailSecretsReport } = useSavedDetailReports(
     projectPath,
-    navId: 'security',
-    liveReport: scanResult,
+    report,
+    secretsReport,
+    loading,
+  );
+  const { scanVersion } = useSecurityScanEntry({
+    projectPath,
+    report,
+    secretsReport,
     loading,
     onEnterDetail: () => setShowHome(false),
   });

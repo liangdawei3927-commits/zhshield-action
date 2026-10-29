@@ -52,36 +52,23 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
 
   if (detail.detailReport && !detail.showHome) {
     return (
-      <ReportShell
+      <PerformanceDetailView
         projectPath={projectPath}
-        dimension="performance"
-        historyDomain="performance"
-        refreshKey={detail.detailReport}
-        icon={<NavGlyph navId="performance" />}
-        title={t('page.performance.header.title')}
-        action={
-          <DomainActionButton
-            domain="performance"
-            onCancel={cancel}
-            stopping={stopping}
-            queued={queued}
-            onClick={handleScan}
-            loading={loading}
-            label={t('page.performance.rescan')}
-          />
-        }
-        onBackHome={detail.backHome}
-        loading={loading}
-        progress={progress}
-        progressMessage={statusMessage}
-        stats={performanceReportStats(t, detail.detailReport, copyToAi)}
-      >
-        <IssuesPanel
-          issues={detail.detailReport.issues}
-          onCopyToAi={copyToAi}
-          onCopyAll={copyAllToAi}
-        />
-      </ReportShell>
+        t={t}
+        detailReport={detail.detailReport}
+        backHome={detail.backHome}
+        state={{
+          loading,
+          progress,
+          statusMessage,
+          queued,
+          cancel,
+          stopping,
+          copyToAi,
+          copyAllToAi,
+          handleScan,
+        }}
+      />
     );
   }
 
@@ -105,6 +92,66 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
 
 type PerformanceState = ReturnType<typeof usePerformancePage>;
 type PerformanceT = ReturnType<typeof useT>;
+
+/** 详情分支：完整报告视图（统计卡 + 问题面板），PerformancePage 只留分支路由 */
+function PerformanceDetailView({
+  projectPath,
+  t,
+  detailReport,
+  backHome,
+  state,
+}: {
+  projectPath: string;
+  t: PerformanceT;
+  detailReport: NonNullable<PerformanceState['report']>;
+  backHome: () => void;
+  state: Pick<
+    PerformanceState,
+    | 'loading'
+    | 'progress'
+    | 'statusMessage'
+    | 'queued'
+    | 'cancel'
+    | 'stopping'
+    | 'copyToAi'
+    | 'copyAllToAi'
+    | 'handleScan'
+  >;
+}) {
+  const { loading, progress, statusMessage, queued, cancel, stopping, copyToAi, copyAllToAi, handleScan } = state;
+  return (
+    <ReportShell
+      projectPath={projectPath}
+      dimension="performance"
+      historyDomain="performance"
+      refreshKey={detailReport}
+      icon={<NavGlyph navId="performance" />}
+      title={t('page.performance.header.title')}
+      action={
+        <DomainActionButton
+          domain="performance"
+          onCancel={cancel}
+          stopping={stopping}
+          queued={queued}
+          onClick={handleScan}
+          loading={loading}
+          label={t('page.performance.rescan')}
+        />
+      }
+      onBackHome={backHome}
+      loading={loading}
+      progress={progress}
+      progressMessage={statusMessage}
+      stats={performanceReportStats(t, detailReport, copyToAi)}
+    >
+      <IssuesPanel
+        issues={detailReport.issues}
+        onCopyToAi={copyToAi}
+        onCopyAll={copyAllToAi}
+      />
+    </ReportShell>
+  );
+}
 
 function performanceReportStats(
   t: PerformanceT,

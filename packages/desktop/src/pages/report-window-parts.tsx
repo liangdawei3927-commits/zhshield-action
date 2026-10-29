@@ -301,6 +301,53 @@ function WindowRow({ bucket }: { bucket: WindowBucket }) {
   );
 }
 
+/** 窗口明细表：表头与行渲染独立成组件，主区块保持浅层 JSX */
+function WindowTableHead() {
+  const t = useT();
+  return (
+    <thead>
+      <tr className="bg-zh-panel">
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.period', { defaultValue: '时间窗' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.scans', { defaultValue: '检查' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.endScore', { defaultValue: '期末分' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.delta', { defaultValue: '期内变化' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.vsPrev', { defaultValue: '较上期' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.range', { defaultValue: '波动区间' })}
+        </th>
+        <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
+          {t('page.reports.window.col.dimensions', { defaultValue: '维度变化' })}
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
+function WindowTable({ buckets }: { buckets: readonly WindowBucket[] }) {
+  return (
+    <ResultCard variant="list" className="overflow-hidden">
+      <table className="w-full text-sm">
+        <WindowTableHead />
+        <tbody>
+          {buckets.toReversed().map((bucket) => (
+            <WindowRow key={bucket.key} bucket={bucket} />
+          ))}
+        </tbody>
+      </table>
+    </ResultCard>
+  );
+}
+
 export function ReportWindowSection({ data }: { data: HealthScoreData[] }) {
   const t = useT();
   const [granularity, setGranularity] = useState<WindowGranularity>('day');
@@ -318,40 +365,7 @@ export function ReportWindowSection({ data }: { data: HealthScoreData[] }) {
       </div>
       <WindowSummary buckets={buckets} />
       <GapWarning buckets={buckets} />
-      <ResultCard variant="list" className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-zh-panel">
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.period', { defaultValue: '时间窗' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.scans', { defaultValue: '检查' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.endScore', { defaultValue: '期末分' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.delta', { defaultValue: '期内变化' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.vsPrev', { defaultValue: '较上期' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.range', { defaultValue: '波动区间' })}
-              </th>
-              <th className="text-left px-4 py-2.5 font-medium text-zh-muted text-xs">
-                {t('page.reports.window.col.dimensions', { defaultValue: '维度变化' })}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {buckets.toReversed().map((bucket) => (
-              <WindowRow key={bucket.key} bucket={bucket} />
-            ))}
-          </tbody>
-        </table>
-      </ResultCard>
+      <WindowTable buckets={buckets} />
       <p className="mt-2 text-[11px] text-zh-muted">
         {t('page.reports.window.note', {
           defaultValue:

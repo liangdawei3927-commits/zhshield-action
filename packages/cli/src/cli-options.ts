@@ -15,4 +15,6 @@ export interface CLIOptions {
   report: string;
   failOn: FailOn;
   baselineAction?: 'capture' | 'list' | 'clear' | 'capture-refactor' | 'clear-refactor';
+  /** `sop` 命令的子动作；目前只有 sync（缺省值） */
+  sopAction?: 'sync';
 }

@@ -36,6 +36,20 @@ export { SopCompressor, CompressionFormat } from './cache/sop-compressor';
 export { SopLazyLoader } from './cache/sop-lazy-loader';
 export { SopPredictiveLoader } from './cache/sop-predictive-loader';
 
+// ─── cache: 云端取数原语（给非 Electron 入口用，如 CLI 的 sop sync）──
+// 只导出「取数 + 验签」两个无状态原语，**不导出 SopCacheManager**：后者依赖
+// better-sqlite3（native）与 Electron 生命周期，CLI 打包进去只会得到一个装不起来的模块。
+export { SopSyncClient } from './cache/sop-sync-client';
+export type {
+  ApiTokenProvider,
+  SopFetchFailure,
+  SopFetchFailureKind,
+  SopFetchResult,
+} from './cache/sop-sync-client';
+export { VerifiedSopSyncClient } from './cache/sop-verified-sync-client';
+export type { VerifiedSopSyncClientOptions } from './cache/sop-verified-sync-client';
+export { SopSignatureVerifier } from './cache/sop-signature-verifier';
+
 // ─── security: 签名与加密 ───────────────────────────────────
 export { SopSigner } from './security/sop-signer';
 export type { VerifyResult, EncryptedData } from './security/sop-signer';

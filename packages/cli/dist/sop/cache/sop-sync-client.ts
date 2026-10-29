@@ -66,6 +66,16 @@ function describe(err: unknown): string {
 }
 
 /**
+ * 是否为明文 JSON（跳过 UTF-8 BOM 与空白后首字符是 `{` 或 `[`）。
+ *
+ * 用于区分「响应体未被运行时解压」与「已被透明解压」——压缩流的首字节不是这两个字符。
+ */
+function looksLikeJson(text: string): boolean {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith('{') || trimmed.startsWith('[');
+}
+
+/**
  * SopSyncClient — 云端同步客户端（文档 7.4 节）
  *
  * 负责与远程 API 通信：检查版本、下载增量 diff、下载全量规则包。
@@ -149,9 +159,36 @@ export class SopSyncClient {
     url: string,
   ): Promise<SopFetchResult<T>> {
     return this.readBody<T>(url, `${format} 解压或 JSON 解析`, async () => {
-      const decompressed = await this.compressor.decompress(new Uint8Array(payload), format);
-      return JSON.parse(new TextDecoder().decode(decompressed)) as T;
+      const text = await this.decompressText(new Uint8Array(payload), format);
+      return JSON.parse(text) as T;
     });
+  }
+
+  /**
+   * 把响应体还原成 JSON 文本。
+   *
+   * 这里必须容忍「运行时已经替我们解压过」的情况（2026-10-29 实测）：
+   * 服务端返回 `Content-Encoding: br` + brotli 正文（见 server 的 `/sop/full/:version`），
+   * 而 Node 的 fetch（undici）会**按该头自动解压**，于是客户端拿到的已经是明文 JSON。
+   * 此时再 brotli 解一次必然失败，错误信息是 `Decompression failed` ——
+   * 归因写成「解压失败」，排查者会去怀疑压缩算法、zlib 版本、包体积，
+   * 而真正的原因是**同一份响应有两种形态**：运行时解过 / 没解过。
+   *
+   * 判据：解压失败时看原文是不是 JSON（首字节 `{` 或 `[`）。是 ⇒ 说明已解压；不是 ⇒ 原样抛错。
+   * 顺序不能反过来：先解压是协议正确解释，明文兜底只在解压确实不成立时生效。
+   */
+  private async decompressText(
+    bytes: Uint8Array,
+    format: CompressionFormat,
+  ): Promise<string> {
+    try {
+      const decompressed = await this.compressor.decompress(bytes, format);
+      return new TextDecoder().decode(decompressed);
+    } catch (err) {
+      const plain = new TextDecoder().decode(bytes);
+      if (looksLikeJson(plain)) return plain;
+      throw err;
+    }
   }
 
   /**

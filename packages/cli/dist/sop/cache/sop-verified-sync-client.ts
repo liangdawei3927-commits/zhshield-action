@@ -13,17 +13,33 @@ import { CompressionFormat, type SopCompressor } from './sop-compressor';
  * 归因口径：验签失败是**安全事件**，绝不能与网络故障混为一谈
  * （原实现一律返回 null，被拒收的投毒包在日志里表现为"网络错误"，无人告警）。
  */
+/** 构造选项：签名策略 */
+export interface VerifiedSopSyncClientOptions {
+  /**
+   * 严格签名模式（默认 false，保持桌面端向后兼容）。
+   *
+   * false：服务端返回裸规则数组时原样放行（旧版服务端 / 未配私钥的自建服务端）。
+   * true ：裸数组一律拒收 —— 拿不到签名就意味着**无法证明规则来自云大脑**，
+   *        而规则足以决定一次 CI 阻断，等于把门禁交给链路上任意一个中转。
+   *        CLI 的 `sop sync` 走严格模式：CI 是无人值守的信任边界，不能有 fail-open。
+   */
+  readonly requireSigned?: boolean;
+}
+
 export class VerifiedSopSyncClient extends SopSyncClient {
   private readonly baseUrl: string;
+  private readonly requireSigned: boolean;
 
   constructor(
     remoteBaseUrl: string,
     private readonly verifyPackage: (pkg: SignedSopPackage) => Promise<boolean>,
     compressor?: SopCompressor,
     apiToken?: ApiTokenProvider,
+    options?: VerifiedSopSyncClientOptions,
   ) {
     super(remoteBaseUrl, compressor, apiToken);
     this.baseUrl = remoteBaseUrl;
+    this.requireSigned = options?.requireSigned === true;
   }
 
   /**
@@ -51,7 +67,23 @@ export class VerifiedSopSyncClient extends SopSyncClient {
     parsed: unknown,
     url: string,
   ): Promise<SopFetchResult<SopRule[]>> {
-    if (Array.isArray(parsed)) return { ok: true, data: parsed as SopRule[] };
+    if (Array.isArray(parsed)) {
+      // 严格模式：裸数组 = 无签名，无从证明来源。拒收比"先放行再看日志"正确，
+      // 因为放行之后规则已经进了缓存，下次扫描就按它判门禁了，事后无法追溯。
+      if (this.requireSigned) {
+        return {
+          ok: false,
+          failure: {
+            kind: 'signature_rejected',
+            url,
+            detail:
+              '服务端返回未签名的裸规则数组，严格模式拒收（无法证明规则来自云大脑；' +
+              '请服务端配置 ZH_SOP_PRIVATE_KEY，或显式放开 ZH_SOP_ALLOW_UNSIGNED=1）',
+          },
+        };
+      }
+      return { ok: true, data: parsed as SopRule[] };
+    }
     if (!isSignedSopPackage(parsed)) {
       return {
         ok: false,

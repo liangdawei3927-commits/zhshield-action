@@ -24,6 +24,7 @@
     "@zh/refactor": "workspace:*"
   },
   "devDependencies": {
+    "@zh/kernel": "workspace:*",
     "@zh/pipeline": "workspace:*",
     "@zh/reporter": "workspace:*",
     "@zh/shared": "workspace:*",

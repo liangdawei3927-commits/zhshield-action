@@ -3,6 +3,7 @@ import { formatGateItems } from '@zh/pipeline';
 
 import { STALE_CACHE_DAYS, formatAge } from './sop-source';
 import type { CacheFreshness, SopCacheResolution } from './sop-source';
+import { readBooleanEnv } from './env-flag';
 
 /**
  * CLI 的「规则从哪来」与「门禁到底判了没有」两个出口。
@@ -70,8 +71,7 @@ export const REQUIRE_SOP_ENV = 'ZH_GATE_REQUIRE_SOP';
 
 /** 是否要求本次必须有门禁结论（显式开关，默认宽松 —— 否则没装桌面端的 CI 会永久红） */
 export function isRequireSop(env: NodeJS.ProcessEnv): boolean {
-  const raw = env[REQUIRE_SOP_ENV]?.trim().toLowerCase();
-  return raw === '1' || raw === 'true' || raw === 'yes';
+  return readBooleanEnv(env, REQUIRE_SOP_ENV);
 }
 
 function unavailableReason(summary: SopSourceSummary): string {
@@ -105,6 +105,9 @@ function describeCache(summary: SopSourceSummary): string {
     parts.push(`缓存于 ${formatCacheTime(freshness.updatedAt)}`);
     if (freshness.ageMs !== undefined) parts.push(formatAge(freshness.ageMs));
   }
+  // 两份候选缓存同时存在时，`reason` 记的是「为什么取了这一份」——必须打出来，
+  // 否则「同步过了却还在用旧规则」只能靠猜（见 sop-source.ts 的 pickFreshestCache）。
+  if (cache.reason) parts.push(cache.reason);
   return parts.join('，');
 }
 

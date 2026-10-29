@@ -7,8 +7,10 @@ import {
   STALE_CACHE_DAYS,
   formatAge,
   readCacheFreshness,
+  resolveCliCacheDir,
   resolveDesktopCacheDir,
   resolveSopCacheDir,
+  resolveSopWriteDir,
 } from '../sop-source';
 import type { SopCacheEnv } from '../sop-source';
 
@@ -157,8 +159,7 @@ describe('resolveSopCacheDir — 可用性判据', () => {
   });
 });
 
-describe('readCacheFreshness — 规则有多旧', () => {
-  it('Given 两个模块文件，Then fileCount 计 .db 且 updatedAt 取最新——旧的规则文件不该把新鲜度拉低', () => {
+describe('readCacheFreshness — 规则有多旧', () => {  it('Given 两个模块文件，Then fileCount 计 .db 且 updatedAt 取最新——旧的规则文件不该把新鲜度拉低', () => {
     const dir = makeCacheDir('fresh', { 'old.db': '[]', 'new.db': '[]', 'ignore.txt': '' });
     const oldTime = new Date('2026-01-01T00:00:00Z');
     const newTime = new Date('2026-01-05T00:00:00Z');
@@ -198,5 +199,72 @@ describe('formatAge — 人话时间', () => {
     [9 * 86_400_000, '9 天前'],
   ])('Given %i 毫秒，Then 显示 %s', (ms, expected) => {
     expect(formatAge(ms)).toBe(expected);
+  });
+});
+
+describe('resolveSopWriteDir — sop sync 往哪写', () => {
+  it('Given 未设环境变量，Then 写 CLI 自有缓存而非桌面端 userData——那份目录是桌面端同步器的私有状态', () => {
+    const home = path.join(tmpRoot, 'write-home');
+    const result = resolveSopWriteDir(env({ homeDir: home }));
+    expect(result.dir).toBe(path.join(home, '.zhshield', 'sop-cache'));
+    expect(result.origin).toContain('CLI 自有');
+  });
+
+  it('Given 显式 ZH_SOP_CACHE_DIR，Then 写那里——即便目录还不存在（写路径要能创建）', () => {
+    const explicit = path.join(tmpRoot, 'not-yet');
+    const result = resolveSopWriteDir(env({ env: { ZH_SOP_CACHE_DIR: explicit } }));
+    expect(result.dir).toBe(explicit);
+    expect(fs.existsSync(explicit)).toBe(false);
+  });
+
+  it('Given CLI 自有缓存路径，Then 与读路径的候选一致——写入点必须能被同一次扫描读到', () => {
+    const home = path.join(tmpRoot, 'consistency-home');
+    const write = resolveSopWriteDir(env({ homeDir: home }));
+    expect(resolveCliCacheDir(env({ homeDir: home }))).toBe(write.dir);
+  });
+});
+
+describe('resolveSopCacheDir — 两份候选按新旧取', () => {
+  /** 造一份缓存并把 mtime 固定到指定时刻 */
+  function makeCacheAt(dir: string, at: Date): void {
+    fs.mkdirSync(path.join(dir, 'modules'), { recursive: true });
+    const file = path.join(dir, 'modules', 'guard.db');
+    fs.writeFileSync(file, '[]', 'utf-8');
+    fs.utimesSync(file, at, at);
+  }
+
+  it('Given 只有 CLI 自有缓存，Then 自动发现并标明来源', () => {
+    const home = path.join(tmpRoot, 'cli-only');
+    const cli = path.join(home, '.zhshield', 'sop-cache');
+    makeCacheAt(cli, new Date('2026-10-29T00:00:00Z'));
+
+    const result = resolveSopCacheDir(env({ homeDir: home }));
+    expect(result.dir).toBe(cli);
+    expect(result.origin).toContain('CLI 自有');
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('Given CLI 缓存比桌面端新，Then 取 CLI 那份并在原因里点明另一份也在', () => {
+    const home = path.join(tmpRoot, 'both-cli-new');
+    const cli = path.join(home, '.zhshield', 'sop-cache');
+    const desktop = path.join(home, 'Library', 'Application Support', '@zh', 'desktop', 'sop-cache');
+    makeCacheAt(cli, new Date('2026-10-29T00:00:00Z'));
+    makeCacheAt(desktop, new Date('2026-10-01T00:00:00Z'));
+
+    const result = resolveSopCacheDir(env({ homeDir: home }));
+    expect(result.dir).toBe(cli);
+    expect(result.reason).toContain('桌面端');
+  });
+
+  it('Given 桌面端缓存更新，Then 取桌面端那份——装了桌面端时它按日刷新，比手动同步的新', () => {
+    const home = path.join(tmpRoot, 'both-desktop-new');
+    const cli = path.join(home, '.zhshield', 'sop-cache');
+    const desktop = path.join(home, 'Library', 'Application Support', '@zh', 'desktop', 'sop-cache');
+    makeCacheAt(cli, new Date('2026-10-01T00:00:00Z'));
+    makeCacheAt(desktop, new Date('2026-10-29T00:00:00Z'));
+
+    const result = resolveSopCacheDir(env({ homeDir: home }));
+    expect(result.dir).toBe(desktop);
+    expect(result.reason).toContain('CLI 自有');
   });
 });

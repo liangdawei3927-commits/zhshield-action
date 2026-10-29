@@ -26,6 +26,15 @@ import * as path from 'node:path';
 /** 桌面端写入云端规则缓存的子目录（与 electron/pipeline-host-core.ts 的 userData 布局同源） */
 const DESKTOP_APP_DIR = path.join('@zh', 'desktop', 'sop-cache');
 
+/**
+ * CLI 自己的云端规则缓存（`zhshield sop sync` 的落点）。
+ *
+ * 为什么不写桌面端的 userData：那份目录是桌面端同步器的**私有状态**（单写者原则）。
+ * CLI 往里写会让「模块新鲜窗口 / capability-refs 账本」与桌面端的判断打架。
+ * 反过来读是安全的 —— 两个进程读同一份已落盘的 JSON 不会互相破坏。
+ */
+const CLI_CACHE_SUBDIR = path.join('.zhshield', 'sop-cache');
+
 /** 缓存可用性的判定产物 */
 export interface SopCacheResolution {
   /** 可用的缓存目录（`{dir}/modules/*.db` 所在父目录）；undefined = 不可用 */
@@ -58,6 +67,11 @@ export function resolveDesktopCacheDir(input: SopCacheEnv): string {
   return path.join(configHome, DESKTOP_APP_DIR);
 }
 
+/** CLI 自有缓存目录（`sop sync` 的写入点，与平台无关地落在 HOME 下） */
+export function resolveCliCacheDir(input: SopCacheEnv): string {
+  return path.join(input.homeDir, CLI_CACHE_SUBDIR);
+}
+
 /** `{dir}/modules` 是否存在且为目录 —— 唯一可用性判据 */
 function hasModulesDir(dir: string): boolean {
   try {
@@ -70,8 +84,12 @@ function hasModulesDir(dir: string): boolean {
 /**
  * 解析云端规则缓存目录。
  *
- * 顺序：`ZH_SOP_CACHE_DIR`（显式）→ 平台默认桌面缓存 → 不可用。
+ * 顺序：`ZH_SOP_CACHE_DIR`（显式）→ CLI 自有缓存与桌面端缓存中**较新的一份** → 不可用。
  * 显式值存在但不可用时**直接返回不可用**，不静默回退 —— 见文件头约束 2。
+ *
+ * 为什么两份候选按新旧取：CI 只有 CLI 自有那份；开发机通常装了桌面端、由它按日刷新，
+ * 而 CLI 自有那份只在手动 `sop sync` 时更新。写死任一方都会造成「明明有新的却用了旧的」，
+ * 且这种失真在终端上只表现为一个数字，极难察觉。
  */
 export function resolveSopCacheDir(input: SopCacheEnv): SopCacheResolution {
   const explicit = input.env.ZH_SOP_CACHE_DIR?.trim();
@@ -81,18 +99,67 @@ export function resolveSopCacheDir(input: SopCacheEnv): SopCacheResolution {
     }
     return {
       origin: '环境变量 ZH_SOP_CACHE_DIR',
-      reason: `已显式指定 ${explicit}，但其中没有 modules/ 目录（不会回退到桌面端缓存）`,
+      reason: `已显式指定 ${explicit}，但其中没有 modules/ 目录（不会回退到桌面端或 CLI 自有缓存）`,
     };
   }
 
-  const desktop = resolveDesktopCacheDir(input);
-  if (hasModulesDir(desktop)) {
-    return { dir: desktop, origin: '桌面端云同步缓存' };
+  return pickFreshestCache(input);
+}
+
+/** 两份默认候选（CLI 自有 / 桌面端）按新鲜度取一；都不存在则给出带路径的不可用原因 */
+function pickFreshestCache(input: SopCacheEnv): SopCacheResolution {
+  const cliDir = resolveCliCacheDir(input);
+  const desktopDir = resolveDesktopCacheDir(input);
+  const candidates = [
+    { dir: cliDir, origin: 'CLI 自有缓存（zhshield sop sync）' },
+    { dir: desktopDir, origin: '桌面端云同步缓存' },
+  ].filter((candidate) => hasModulesDir(candidate.dir));
+
+  if (candidates.length === 0) {
+    return {
+      origin: '未找到云端规则缓存',
+      reason:
+        `CLI 自有缓存 ${cliDir}/modules 与桌面端 ${desktopDir}/modules 均不存在` +
+        '（可运行 zhshield sop sync 从云端拉取）',
+    };
   }
+
+  const ranked = candidates
+    .map((candidate) => ({ ...candidate, at: newestRuleMtime(candidate.dir) }))
+    .sort((a, b) => b.at - a.at);
+  const chosen = ranked[0];
+  const other = ranked[1];
+  const base: SopCacheResolution = { dir: chosen.dir, origin: chosen.origin };
+  if (!other) return base;
   return {
-    origin: '桌面端云同步缓存',
-    reason: `未找到 ${desktop}/modules（桌面端可能从未同步过云端规则，或尚未安装）`,
+    ...base,
+    reason:
+      `${other.origin} 也存在（更新于 ${formatMtime(other.at)}），` +
+      `本次取较新的一份；需要固定来源请设 ZH_SOP_CACHE_DIR`,
   };
+}
+
+/** `modules/` 下最新规则文件的 mtime（毫秒）；读不到为 0，让"都不存在"与"都存在但空"同样靠后 */
+function newestRuleMtime(dir: string): number {
+  return readCacheFreshness(dir).updatedAt?.getTime() ?? 0;
+}
+
+function formatMtime(ms: number): string {
+  if (ms === 0) return '未知时间';
+  return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/**
+ * 解析**写入**目录：`sop sync` 把规则放哪儿。
+ *
+ * 与读路径分开是必要的：读要求 `modules/` 已存在（否则说明从没同步过），
+ * 而写恰恰要在它不存在时创建。显式 `ZH_SOP_CACHE_DIR` 仍然生效 —— 用户指定了位置，
+ * 同步结果就必须落在那里，否则「同步成功但读的是别处」无法解释。
+ */
+export function resolveSopWriteDir(input: SopCacheEnv): { dir: string; origin: string } {
+  const explicit = input.env.ZH_SOP_CACHE_DIR?.trim();
+  if (explicit) return { dir: explicit, origin: '环境变量 ZH_SOP_CACHE_DIR' };
+  return { dir: resolveCliCacheDir(input), origin: 'CLI 自有缓存' };
 }
 
 /** 缓存新鲜度：以 modules/ 下最新规则文件的 mtime 为准 */

@@ -18,6 +18,8 @@ import { ConsoleReporter, FAIL_ON_VALUES, isFailOnValue } from '@zh/reporter';
 import { augmentProcessPath } from '@zh/shared';
 import * as path from 'node:path';
 import type { CLIOptions } from './cli-options';
+import { currentSopRemoteEnv, resolveSopRemoteSettings } from './sop-remote-config';
+import { runSopSyncCommand } from './sop-sync-command';
 // 命令实现层（guard/inspect/refactor/pipeline/baseline）与报告落盘已抽出至同目录 commands.ts
 import {
   handleError,
@@ -63,6 +65,7 @@ zhshield — 智汇码盾 代码质量治理
   zhshield baseline clear [--dir <path>]    清除基线文件
   zhshield baseline capture-refactor [--dir <path>]  捕获重构存量异味为棘轮基线（此后只报增量）
   zhshield baseline clear-refactor [--dir <path>]    清除重构棘轮基线
+  zhshield sop sync            从云端拉取 SOP 规则（验签后落盘，供无桌面端的 CI 使用）
   zhshield help                显示此帮助
 
 选项:
@@ -115,6 +118,9 @@ function parseCommand(args: string[], opts: CLIOptions): void {
   }
   if (opts.command === 'baseline') {
     opts.baselineAction = (args[1] as CLIOptions['baselineAction']) ?? 'list';
+  }
+  if (opts.command === 'sop') {
+    opts.sopAction = (args[1] as CLIOptions['sopAction']) ?? 'sync';
   }
 }
 
@@ -198,6 +204,13 @@ async function main(): Promise<void> {
 
 /** 加载 SOP 规则（内置 + 云端同步）并按命令分发执行 */
 async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
+  // `sop sync` 在这里分流：它只取数不扫描，走下面那条路会先白载 43 条内置规则，
+  // 且会打出与本次任务无关的「规则注册 N 条」横幅，掩盖同步本身的输出去向。
+  if (opts.command === 'sop') {
+    await runSopSync(opts);
+    return;
+  }
+
   const projectDir = resolveProjectDir(opts.dir);
   const sopDir = resolveBundledSopDir(baseDir);
   const runner = new PipelineRunner(projectDir, sopDir ? { configDir: sopDir } : undefined);
@@ -241,6 +254,24 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
 
   // 命令若正常返回（未 exit），此处收尾；命令已 exit 时下面两行不会执行
   await runner.destroy();
+}
+
+/**
+ * `sop sync`：从云端拉取规则并落盘。
+ *
+ * 退出码由命令自身给出（0 成功 / 2 环境不完整），这里只承接 —— 不覆盖已有 exitCode，
+ * 也不主动 `process.exit()`：同步完成后进程该自然结束，让 stdout 缓冲刷干净。
+ */
+async function runSopSync(opts: CLIOptions): Promise<void> {
+  if (opts.sopAction !== 'sync') {
+    console.error(`[CLI] 未知的 sop 子命令: ${opts.sopAction}（当前支持: sync）`);
+    printUsage();
+    process.exit(1);
+  }
+  process.exitCode = await runSopSyncCommand({
+    settings: resolveSopRemoteSettings(currentSopRemoteEnv()),
+    cacheEnv: currentSopCacheEnv(),
+  });
 }
 
 /**

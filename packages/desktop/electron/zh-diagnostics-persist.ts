@@ -54,7 +54,13 @@ async function writeDomainSnapshots(
   const writes: Promise<void>[] = [];
   const esloc = perSource.has('inspect') ? await countSourceEsloc(report.project.path) : 0;
   for (const [source, issues] of perSource) {
-    const snapshot = await buildDomainSnapshot(report, source, issues, esloc, dimensionScores?.[source]);
+    const snapshot = await buildDomainSnapshot({
+      report,
+      source,
+      issues,
+      esloc,
+      dimensionScore: dimensionScores?.[source],
+    });
     writes.push(
       writeFile(
         domainSnapshotPath(report.project.path, source),
@@ -126,13 +132,32 @@ async function recordScanHistory({
   }
 }
 
-async function buildDomainSnapshot(
-  report: DiagnosticsReport,
-  source: DiagnosticSource,
-  issues: readonly DiagnosticEntry[],
-  esloc: number,
-  dimensionScore?: DomainDimensionScore,
-): Promise<DiagnosticsReport> {
+/**
+ * 一次域快照构建的入参。
+ *
+ * 五个值同属「本次域快照的输入」，位置式传参时 `report`/`issues` 等报告形态
+ * 的入参容易错位，收敛成对象后由字段名自解释。
+ */
+interface DomainSnapshotInput {
+  /** 本次整体报告（提供项目信息与扫描时间） */
+  report: DiagnosticsReport;
+  /** 域键 */
+  source: DiagnosticSource;
+  /** 该域的条目 */
+  issues: readonly DiagnosticEntry[];
+  /** inspect 域源码有效行数（其他域无意义） */
+  esloc: number;
+  /** 该域当场出分结果（仅非 inspect 域使用；undefined = not-run，不附加） */
+  dimensionScore?: DomainDimensionScore;
+}
+
+async function buildDomainSnapshot({
+  report,
+  source,
+  issues,
+  esloc,
+  dimensionScore,
+}: DomainSnapshotInput): Promise<DiagnosticsReport> {
   const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
   if (source !== 'inspect') {
     // P2：security/deps/garbage/performance 快照当场出分（computeDomainSnapshotScore，

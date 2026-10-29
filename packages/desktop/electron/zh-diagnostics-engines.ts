@@ -42,8 +42,7 @@ export function normalizePerformanceData(data: PerformanceDataLike): readonly Di
   }));
 }
 
-/** deps 引擎：投毒高危、锁文件异常、高风险许可证、环境一致性错误 → 落盘条目 */
-export function normalizeDepsSource(data: DependencyReportData): readonly DiagnosticEntry[] {
+function typosquatEntries(data: DependencyReportData): DiagnosticEntry[] {
   const entries: DiagnosticEntry[] = [];
   for (const finding of data.typosquatFindings) {
     if (finding.risk === 'low') continue;
@@ -58,16 +57,19 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
       fingerprint: `typosquat:${finding.nodeId}:0`,
     });
   }
-  if (
-    data.lockfileVerification.status === 'modified' ||
-    data.lockfileVerification.status === 'missing'
-  ) {
-    const { status, diffs, integrityFailures } = data.lockfileVerification;
-    const detail = [
-      ...diffs.map((d) => `${d.name} 声明 ${d.declaredVersion} ≠ 锁定 ${d.lockedVersion}`),
-      ...integrityFailures,
-    ];
-    entries.push({
+  return entries;
+}
+
+function lockfileEntry(data: DependencyReportData): DiagnosticEntry[] {
+  const lv = data.lockfileVerification;
+  if (lv.status !== 'modified' && lv.status !== 'missing') return [];
+  const { status, diffs, integrityFailures } = lv;
+  const detail = [
+    ...diffs.map((d) => `${d.name} 声明 ${d.declaredVersion} ≠ 锁定 ${d.lockedVersion}`),
+    ...integrityFailures,
+  ];
+  return [
+    {
       ruleId: `lockfile:${status}`,
       severity: status === 'modified' ? 'error' : 'warning',
       category: 'dependency',
@@ -75,12 +77,16 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
         detail.length > 0
           ? detail.join('；')
           : `锁文件${status === 'modified' ? '与声明不一致' : '缺失'}`,
-      file: data.lockfileVerification.lockfilePath ?? '',
+      file: lv.lockfilePath ?? '',
       autoFixable: false,
       source: 'deps',
       fingerprint: `lockfile:${status}:0`,
-    });
-  }
+    },
+  ];
+}
+
+function licenseEntries(data: DependencyReportData): DiagnosticEntry[] {
+  const entries: DiagnosticEntry[] = [];
   for (const entry of data.licenseMatrix.entries) {
     if (entry.risk !== 'high') continue;
     entries.push({
@@ -94,6 +100,11 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
       fingerprint: `license:${entry.name}:${entry.version}`,
     });
   }
+  return entries;
+}
+
+function envEntries(data: DependencyReportData): DiagnosticEntry[] {
+  const entries: DiagnosticEntry[] = [];
   for (const env of data.envEntries) {
     if (env.severity === 'info') continue;
     entries.push({
@@ -107,11 +118,16 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
       fingerprint: `env:${env.name}:0`,
     });
   }
-  // P1-6（口径统一）：可升级依赖逐条落快照。维度 issues 只数**域快照里真实存在的条目**
-  // （assembleHealthInputs 把 deps 快照的 dependency 类条目并入 matched），
-  // applyDepsPenalty 不再把 upgradable 加进 issues——双计消灭的前提是快照里有这几条：
-  // 有几个可升级评估就落几条（candidates>0 口径，与 depsDashboardPatch 的
-  // upgradable 计数严格一致），Σ域条数 == 维度 issues 可验算。
+  return entries;
+}
+
+// P1-6（口径统一）：可升级依赖逐条落快照。维度 issues 只数**域快照里真实存在的条目**
+// （assembleHealthInputs 把 deps 快照的 dependency 类条目并入 matched），
+// applyDepsPenalty 不再把 upgradable 加进 issues——双计消灭的前提是快照里有这几条：
+// 有几个可升级评估就落几条（candidates>0 口径，与 depsDashboardPatch 的
+// upgradable 计数严格一致），Σ域条数 == 维度 issues 可验算。
+function upgradeEntries(data: DependencyReportData): DiagnosticEntry[] {
+  const entries: DiagnosticEntry[] = [];
   for (const assessment of data.upgradeAssessments) {
     if (!assessment.candidates || assessment.candidates.length === 0) continue;
     entries.push({
@@ -125,8 +141,13 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
       fingerprint: `upgrade:${assessment.nodeId}:0`,
     });
   }
-  // P1-8：CVE 检出条目（status='unavailable' 不产生条目——降级由 dashboard/UI 标注，
-  // 不落「0 漏洞」假象）
+  return entries;
+}
+
+// P1-8：CVE 检出条目（status='unavailable' 不产生条目——降级由 dashboard/UI 标注，
+// 不落「0 漏洞」假象）
+function cveEntries(data: DependencyReportData): DiagnosticEntry[] {
+  const entries: DiagnosticEntry[] = [];
   for (const finding of data.cve?.findings ?? []) {
     entries.push({
       ruleId: `cve:${finding.name}@${finding.version}`,
@@ -140,6 +161,18 @@ export function normalizeDepsSource(data: DependencyReportData): readonly Diagno
     });
   }
   return entries;
+}
+
+/** deps 引擎：投毒高危、锁文件异常、高风险许可证、环境一致性错误 → 落盘条目 */
+export function normalizeDepsSource(data: DependencyReportData): readonly DiagnosticEntry[] {
+  return [
+    ...typosquatEntries(data),
+    ...lockfileEntry(data),
+    ...licenseEntries(data),
+    ...envEntries(data),
+    ...upgradeEntries(data),
+    ...cveEntries(data),
+  ];
 }
 
 /** severityFactor 是组内 severity 权重均值（error=3 / warning=2 / info=1），反查回原档位 */

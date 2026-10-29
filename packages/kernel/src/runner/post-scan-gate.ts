@@ -22,8 +22,15 @@ import { compareMetric } from './metric-direction';
  * **拿不到数一律 `undetermined` + 具体原因，绝不按 passed 处理。**
  */
 
-/** 门禁指标口径 —— 决定「拿什么数来比」 */
-export type GateMetric = 'health-score' | 'quality-score' | 'coverage';
+/**
+ * 门禁指标口径 —— 决定「拿什么数来比」。
+ *
+ * 只有「**产品里有唯一权威数值、且能当作通过线**」的量才能进这里。
+ * 质量分没有进：云端 `inspect.score.official.quality-score` 定义的是评分映射
+ * （见下方 MAPPING_RULES），它没有通过线；如果将来真需要「质量分 < N 阻断」，
+ * 应当由一条**新的**规则声明通过线，再把口径加到这里 —— 而不是复用映射规则。
+ */
+export type GateMetric = 'health-score' | 'coverage';
 
 /**
  * 后置门禁显式登记表：规则 id → 指标口径。
@@ -36,8 +43,29 @@ export type GateMetric = 'health-score' | 'quality-score' | 'coverage';
 export const POST_SCAN_GATE_BINDINGS: Readonly<Record<string, GateMetric>> = {
   'guard.block.official.health-score': 'health-score',
   'guard.block.official.test-coverage': 'coverage',
-  'inspect.score.official.quality-score': 'quality-score',
 };
+
+/**
+ * 映射型规则：定义「输入怎么换算出分数」，**不声明通过线**，因此不产生任何判定结论。
+ *
+ * 为什么单列一类（2026-10-29 二次实测）：`inspect.score.official.quality-score` 的
+ * `threshold: 100` 配合自身 `mapping.baseScore: 100` 是**满分基准**，不是合格线
+ * （`action: score` / `severity: info` / `executionMode: periodic`，描述原文是
+ * 「巡检结果到健康评分的映射规则」）。上一轮把它登记成门禁，等于凭空宣布
+ * 「质量分必须满分」—— 任何一条 warning 都会让它 failed，`ok` 又恒为 false。
+ *
+ * 那不是「缺度量」，是**这条规则本来就不该产结论**。所以：
+ *   · 引擎内让位（`skipped` 不 `degraded`），门禁阶段也不出条目；
+ *   · 准入校验算它「有归属」（不 fatal），否则会把一条合法规则判死。
+ *
+ * 登记表仍然显式：不按 `mapping` 字段猜 —— 猜错就会出现「一条规则被静默跳过」。
+ */
+export const MAPPING_RULES: Readonly<Record<string, string>> = {
+  'inspect.score.official.quality-score': '巡检结果 → 质量分的换算映射（threshold 为满分基准，非通过线）',
+};
+
+/** 规则在本系统里到底「怎么被执行」——三者互斥，必须落到其中之一 */
+export type RuleSemantics = 'post-scan-gate' | 'mapping' | 'engine';
 
 /**
  * 引擎内可直接测得的指标（复杂度五项，由 `@zh/pipeline` 的 rule-metrics 取数）。
@@ -66,6 +94,17 @@ export interface GateDeclaration {
   readonly unit?: string;
 }
 
+/**
+ * 规则的执行归属：门禁 / 映射 / 引擎内。
+ *
+ * 调用方只需问「这条规则归谁」，不必自己拼 `isGate || isMapping` —— 那种拼法
+ * 一旦漏掉一个分支，规则就会从两侧同时被跳过（既不判也不报）。
+ */
+export function readRuleSemantics(rule: SopRule): RuleSemantics {
+  if (MAPPING_RULES[rule.id] !== undefined) return 'mapping';
+  return readGateDeclaration(rule).isGate ? 'post-scan-gate' : 'engine';
+}
+
 /** 读取门禁声明。单数 `threshold` 与复数 `thresholds` 都认，与解释器同一口径。 */
 export function readGateDeclaration(rule: SopRule): GateDeclaration {
   const raw = (rule.content ?? {}) as Record<string, unknown>;
@@ -81,9 +120,11 @@ export function readGateDeclaration(rule: SopRule): GateDeclaration {
         : [];
   const threshold = typeof scope.threshold === 'number' ? scope.threshold : undefined;
   const unit = typeof scope.unit === 'string' ? scope.unit : undefined;
+  // 映射型规则即使写了 executionStage=post-scan 也不进判定清单：它没有通过线可判。
+  const isMapping = MAPPING_RULES[rule.id] !== undefined;
   return {
-    isGate: metric !== undefined || stage === POST_SCAN_STAGE,
-    ...(metric !== undefined ? { metric } : {}),
+    isGate: !isMapping && (metric !== undefined || stage === POST_SCAN_STAGE),
+    ...(metric !== undefined && !isMapping ? { metric } : {}),
     declaredMetrics,
     ...(threshold !== undefined ? { threshold } : {}),
     ...(unit !== undefined ? { unit } : {}),
@@ -95,8 +136,14 @@ export function selectPostScanGates(rules: readonly SopRule[]): SopRule[] {
   return rules.filter((rule) => readGateDeclaration(rule).isGate);
 }
 
-/** 调用方给门禁的实测值：有值给 actual，取不到给原因（两者都不是空对象） */
-export type GateValue = { readonly actual: number } | { readonly unavailableReason: string };
+/**
+ * 调用方给门禁的实测值：有值给 actual，取不到给原因（两者都不是空对象）。
+ * `note` 用于补充口径说明（例如 diff 覆盖率里「N 行位于未纳入统计的文件」），
+ * 会拼进 message —— 只给数字不给口径，等于让用户自己去猜这个数怎么来的。
+ */
+export type GateValue =
+  | { readonly actual: number; readonly note?: string }
+  | { readonly unavailableReason: string };
 
 export type GateStatus = 'passed' | 'failed' | 'undetermined';
 
@@ -104,6 +151,15 @@ export interface GateItem {
   readonly ruleId: string;
   readonly metric?: GateMetric;
   readonly status: GateStatus;
+  /**
+   * 是否阻断：由规则自身的 `action === 'block'` 决定，不看 severity。
+   *
+   * 云端规则的 severity 取值很杂（`warning` / `deprecation` / `P1` 都有），
+   * 拿它判阻断会随规则作者写法漂移；`action` 才是规则「要不要拦住」的原话。
+   * 非阻断门禁**照样出现在报告里**（failed/undetermined 都算），只是不拉红 `ok` ——
+   * 隐藏结论和伪造结论一样坏。
+   */
+  readonly blocking: boolean;
   readonly threshold?: number;
   readonly actual?: number;
   readonly unit?: string;
@@ -116,16 +172,19 @@ export interface PostScanGateReport {
   readonly failed: number;
   /** 没有判定（缺数据 / 缺口径 / 缺阈值）——既不算通过也不算失败 */
   readonly undetermined: number;
-  /** 严格通过：全部判定完成且无一越界。undetermined 存在时为 false */
+  /** 阻断型门禁里失败的条数 */
+  readonly blockingFailed: number;
+  /** 阻断型门禁里没判定的条数 */
+  readonly blockingUndetermined: number;
+  /** 严格通过：阻断型门禁全部判定完成且无一越界。未判定存在时为 false */
   readonly ok: boolean;
-  /** 是否全部完成判定（undetermined === 0） */
+  /** 是否全部完成判定（含非阻断门禁，undetermined === 0） */
   readonly complete: boolean;
   readonly items: readonly GateItem[];
 }
 
 const METRIC_LABEL: Record<GateMetric, string> = {
   'health-score': '健康分',
-  'quality-score': '质量分',
   coverage: '测试覆盖率',
 };
 
@@ -151,12 +210,18 @@ export function evaluatePostScanGates(
   const passed = items.filter((item) => item.status === 'passed').length;
   const failed = items.filter((item) => item.status === 'failed').length;
   const undetermined = items.filter((item) => item.status === 'undetermined').length;
+  const blockingFailed = items.filter((i) => i.blocking && i.status === 'failed').length;
+  const blockingUndetermined = items.filter(
+    (i) => i.blocking && i.status === 'undetermined',
+  ).length;
   return {
     total: items.length,
     passed,
     failed,
     undetermined,
-    ok: failed === 0 && undetermined === 0,
+    blockingFailed,
+    blockingUndetermined,
+    ok: blockingFailed === 0 && blockingUndetermined === 0,
     complete: undetermined === 0,
     items,
   };
@@ -164,7 +229,11 @@ export function evaluatePostScanGates(
 
 function judgeGate(rule: SopRule, resolve: (rule: SopRule) => GateValue): GateItem {
   const decl = readGateDeclaration(rule);
-  const base = { ruleId: rule.id, ...(decl.metric ? { metric: decl.metric } : {}) };
+  const base = {
+    ruleId: rule.id,
+    ...(decl.metric ? { metric: decl.metric } : {}),
+    blocking: rule.action === 'block',
+  };
   if (decl.threshold === undefined) {
     return {
       ...base,
@@ -197,13 +266,14 @@ function judgeGate(rule: SopRule, resolve: (rule: SopRule) => GateValue): GateIt
   const verdict = compareMetric(value.actual, decl.threshold, decl.unit);
   const suffix = unitSuffix(decl.unit);
   const head = `${metricLabel(decl.metric)}=${value.actual}${suffix}，阈值 ${decl.threshold}${suffix}`;
+  const note = value.note ? `（${value.note}）` : '';
   return {
     ...base,
     status: verdict === 'breached' ? 'failed' : 'passed',
     threshold: decl.threshold,
     actual: value.actual,
     ...(decl.unit ? { unit: decl.unit } : {}),
-    message: verdict === 'breached' ? `${head} — 未达标` : `${head} — 达标`,
+    message: verdict === 'breached' ? `${head} — 未达标${note}` : `${head} — 达标${note}`,
   };
 }
 
@@ -211,6 +281,7 @@ function judgeGate(rule: SopRule, resolve: (rule: SopRule) => GateValue): GateIt
 export function formatGateItems(report: PostScanGateReport): string[] {
   return report.items.map((item) => {
     const mark = item.status === 'passed' ? '✓' : item.status === 'failed' ? '✗' : '–';
-    return `${mark} ${item.ruleId}: ${item.message}`;
+    const advisory = item.blocking ? '' : ' [不阻断]';
+    return `${mark} ${item.ruleId}${advisory}: ${item.message}`;
   });
 }

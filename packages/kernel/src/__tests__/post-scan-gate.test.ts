@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluatePostScanGates,
   readGateDeclaration,
+  readRuleSemantics,
   selectPostScanGates,
   formatGateItems,
   POST_SCAN_GATE_BINDINGS,
+  MAPPING_RULES,
 } from '../runner/post-scan-gate';
 import type { GateValue } from '../runner/post-scan-gate';
 import { makeRule } from './helpers/rule-factory';
@@ -68,12 +70,37 @@ describe('post-scan gate — 阶段归属', () => {
     expect(selectPostScanGates([rule])).toHaveLength(0);
   });
 
-  it('三条云端聚合规则都在登记表里 —— 登记表漏项会让规则退回「永远降级」', () => {
+  it('两条真门禁在登记表里 —— 登记表漏项会让规则退回「永远降级」', () => {
     expect(Object.keys(POST_SCAN_GATE_BINDINGS).sort()).toEqual([
       'guard.block.official.health-score',
       'guard.block.official.test-coverage',
-      'inspect.score.official.quality-score',
     ]);
+  });
+
+  it('质量分映射规则归 mapping，不进判定清单（它没有通过线）', () => {
+    const rule = makeRule({
+      id: 'inspect.score.official.quality-score',
+      domain: 'inspect',
+      action: 'score',
+      content: { threshold: 100, unit: 'score', mapping: { baseScore: 100, error: -10 } },
+    });
+
+    expect(MAPPING_RULES[rule.id]).toBeDefined();
+    expect(readRuleSemantics(rule)).toBe('mapping');
+    expect(readGateDeclaration(rule).isGate).toBe(false);
+    expect(selectPostScanGates([rule])).toHaveLength(0);
+  });
+
+  it('映射型规则即使写了 executionStage=post-scan 也不进判定清单（不靠声明绕过）', () => {
+    const rule = makeRule({
+      id: 'inspect.score.official.quality-score',
+      domain: 'inspect',
+      action: 'score',
+      content: { threshold: 100, executionStage: 'post-scan' },
+    });
+
+    expect(readGateDeclaration(rule).isGate).toBe(false);
+    expect(readRuleSemantics(rule)).toBe('mapping');
   });
 });
 
@@ -103,9 +130,9 @@ describe('post-scan gate — 判定三态', () => {
     // 已登记口径的规则去掉 unit：没有 unit 时按上限型比较，875 > 300 应判越界。
     // 若方向表写错（一律按下限），875 ≥ 300 会被判「达标」。
     const rule = makeRule({
-      id: 'inspect.score.official.quality-score',
-      domain: 'inspect',
-      action: 'score',
+      id: 'guard.block.official.test-coverage',
+      domain: 'guard',
+      action: 'block',
       content: { threshold: 300 },
     });
     const report = evaluatePostScanGates([rule], always({ actual: 875 }));
@@ -177,5 +204,53 @@ describe('post-scan gate — 门禁有效性自证', () => {
     );
     expect(lines[0].startsWith('✓')).toBe(true);
     expect(lines[1].startsWith('–')).toBe(true);
+  });
+});
+
+describe('post-scan gate — 阻断语义（action 决定，不看 severity）', () => {
+  /**
+   * 同一条覆盖率门禁，只把 action 从 block 改成 scan = 只报不拦。
+   * 用已登记口径的 id 而不是新造 id：新 id 没有指标归属会落 undetermined，
+   * 那样测的就不是「阻断语义」而是「缺口径」了。
+   */
+  const advisoryGate = () =>
+    makeRule({
+      id: 'guard.block.official.test-coverage',
+      domain: 'guard',
+      action: 'scan',
+      content: { threshold: 80, unit: 'percent', severity: 'warning' },
+    });
+
+  it('GIVEN 非阻断门禁未达标 WHEN 判定 THEN 记 failed 但不拉红 ok（结论仍可见）', () => {
+    const report = evaluatePostScanGates([advisoryGate()], always({ actual: 40 }));
+
+    expect(report.items).toHaveLength(1);
+    expect(report.items[0].blocking).toBe(false);
+    expect(report.items[0].status).toBe('failed');
+    expect(report.failed).toBe(1);
+    expect(report.blockingFailed).toBe(0);
+    expect(report.ok).toBe(true);
+  });
+
+  it('GIVEN 阻断门禁未达标 WHEN 判定 THEN ok 为 false 且计数落在 blockingFailed', () => {
+    const report = evaluatePostScanGates([coverageRule(80)], always({ actual: 40 }));
+
+    expect(report.items[0].blocking).toBe(true);
+    expect(report.blockingFailed).toBe(1);
+    expect(report.ok).toBe(false);
+  });
+
+  it('GIVEN 非阻断门禁取不到数 WHEN 判定 THEN 不阻断但 complete 仍为 false', () => {
+    const report = evaluatePostScanGates([advisoryGate()], always({ unavailableReason: '缺数据源' }));
+
+    expect(report.ok).toBe(true);
+    expect(report.blockingUndetermined).toBe(0);
+    expect(report.complete).toBe(false);
+    expect(report.undetermined).toBe(1);
+  });
+
+  it('逐条文本给非阻断门禁加标注，避免面板把 advisory 读成阻断', () => {
+    const lines = formatGateItems(evaluatePostScanGates([advisoryGate()], always({ actual: 40 })));
+    expect(lines[0]).toContain('[不阻断]');
   });
 });

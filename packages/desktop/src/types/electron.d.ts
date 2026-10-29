@@ -455,6 +455,45 @@ export interface HealthOverviewData {
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间） */
   readAt: string;
+  /**
+   * 后置门禁结论（与 `overall` 同一次读取产生）。
+   *
+   * 手写契约必须逐字段对齐 `@zh/kernel` 的 `PostScanGateReport`：
+   * 少写一个字段，渲染层就读不到 —— 形态⑥「上游语义在 IPC 边界被剥掉」。
+   * `total === 0` 表示**没有门禁规则**，不是"全达标"；`ok` 在那种情况下也为 true。
+   */
+  gates?: ProjectGateReportData;
+}
+
+/** 单条门禁结论（与 kernel 的 GateItem 同构） */
+export interface ProjectGateItemData {
+  ruleId: string;
+  /** 指标口径：健康分 / 覆盖率；未登记口径时缺省 */
+  metric?: 'health-score' | 'coverage';
+  status: 'passed' | 'failed' | 'undetermined';
+  /** 是否阻断（规则自身 action === 'block'）；非阻断条目失败不拉红 ok */
+  blocking: boolean;
+  threshold?: number;
+  actual?: number;
+  unit?: string;
+  /** 已格式化好的中文结论，渲染层直接展示，不要自己拼 */
+  message: string;
+}
+
+/** 后置门禁汇总（与 kernel 的 PostScanGateReport 同构） */
+export interface ProjectGateReportData {
+  total: number;
+  passed: number;
+  failed: number;
+  undetermined: number;
+  /** 阻断型门禁里失败 / 未判定的条数 —— ok 只看这两个 */
+  blockingFailed: number;
+  blockingUndetermined: number;
+  /** 阻断型门禁全部判定完成且无一越界 */
+  ok: boolean;
+  /** 所有门禁都完成了判定（含非阻断） */
+  complete: boolean;
+  items: ProjectGateItemData[];
 }
 
 /**

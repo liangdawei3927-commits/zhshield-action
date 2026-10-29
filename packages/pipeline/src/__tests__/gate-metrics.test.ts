@@ -63,14 +63,17 @@ describe('createGateMetricResolver', () => {
       expect(value.unavailableReason).toContain('未找到覆盖率报告');
     });
 
-    it('GIVEN 规则声明 scope=diff WHEN 取数 THEN 不拿全量冒充（即使有报告）', () => {
+    it('GIVEN 规则声明 scope=diff 且仓库无 git 基线 WHEN 取数 THEN 不拿全量冒充', () => {
       writeCoverage(JSON.stringify({ total: { lines: { pct: 92 } } }));
 
       const value = createGateMetricResolver(repoRoot)(coverageRule('diff')) as {
         unavailableReason?: string;
+        actual?: number;
       };
-      expect(value.unavailableReason).toContain('scope=diff');
-      expect(value.unavailableReason).toContain('92');
+      // 关键：92 是全量数，绝不能出现在 diff 口径的结论里
+      expect(value.actual).toBeUndefined();
+      expect(value.unavailableReason).toContain('基线');
+      expect(value.unavailableReason).not.toContain('92');
     });
 
     it('GIVEN 报告文件损坏 WHEN 取数 THEN 按不可用处理而不是抛错', () => {
@@ -89,28 +92,44 @@ describe('createGateMetricResolver', () => {
     });
   });
 
-  describe('评分型门禁', () => {
+  describe('健康分门禁', () => {
+    const healthRule = () =>
+      rule({ threshold: 70, unit: 'score' }, 'guard.block.official.health-score');
+
     it('GIVEN 未传入评分 WHEN 取数 THEN 说明「需在评分阶段判定」而非沉默', () => {
-      const resolve = createGateMetricResolver(repoRoot);
-      for (const id of [
-        'guard.block.official.health-score',
-        'inspect.score.official.quality-score',
-      ]) {
-        const value = resolve(rule({ threshold: 70, unit: 'score' }, id)) as {
-          unavailableReason?: string;
-        };
-        expect(value.unavailableReason).toContain('聚合评分');
-        expect(value.unavailableReason).toContain('评分阶段');
-      }
+      const value = createGateMetricResolver(repoRoot)(healthRule()) as {
+        unavailableReason?: string;
+      };
+
+      expect(value.unavailableReason).toContain('聚合评分');
+      expect(value.unavailableReason).toContain('评分阶段');
     });
 
     it('GIVEN 调用方传入评分 WHEN 取数 THEN 直接可用（桌面端评分后调用即此路径）', () => {
-      const resolve = createGateMetricResolver(repoRoot, { healthScore: 82, qualityScore: 91 });
-      expect(resolve(rule({ threshold: 70, unit: 'score' }, 'guard.block.official.health-score')))
-        .toEqual({ actual: 82 });
-      expect(
-        resolve(rule({ threshold: 90 }, 'inspect.score.official.quality-score')),
-      ).toEqual({ actual: 91 });
+      const resolve = createGateMetricResolver(repoRoot, { healthScore: 82 });
+      expect(resolve(healthRule())).toEqual({ actual: 82 });
+    });
+  });
+
+  describe('映射型规则不参与取数', () => {
+    it('质量分映射规则不在门禁清单里，取数器也给不出数（它没有通过线）', () => {
+      const qualityRule = rule({ threshold: 100, unit: 'score' }, 'inspect.score.official.quality-score');
+
+      const value = createGateMetricResolver(repoRoot)(qualityRule) as {
+        unavailableReason?: string;
+        actual?: number;
+      };
+      expect(value.actual).toBeUndefined();
+      expect(value.unavailableReason).toContain('未登记的门禁指标口径');
+    });
+
+    it('GIVEN 只有映射型规则 WHEN 判定 THEN 报告里零条目（不缺也不算通过）', () => {
+      const qualityRule = rule({ threshold: 100, unit: 'score' }, 'inspect.score.official.quality-score');
+      const report = evaluatePostScanGates([qualityRule], createGateMetricResolver(repoRoot));
+
+      expect(report.total).toBe(0);
+      expect(report.undetermined).toBe(0);
+      expect(report.ok).toBe(true);
     });
   });
 

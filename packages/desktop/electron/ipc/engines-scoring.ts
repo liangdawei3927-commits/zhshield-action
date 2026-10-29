@@ -12,6 +12,7 @@ import type { ConvertedGuardResult, ConvertedInspectIssue } from '@zh/scoring';
 import { listGuardReports } from '@zh/guard';
 import type { GuardReport } from '@zh/guard';
 import type { PipelineReport } from '@zh/pipeline';
+import type { PostScanGateReport } from '@zh/kernel';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
 import { convertTraditionalGuardResults } from './score-converters';
 import { loadBackupHealthSnapshot } from './backup';
@@ -27,6 +28,7 @@ import {
 } from '../ipc-context';
 import { runProfileSyncInWorker, runProfileInWorker } from '../profile-host';
 import { toHealthScoreData, type HealthScoreData } from './report-format';
+import { evaluateProjectGates } from './project-gates';
 import type { DomainScoreData, ProjectProfileData } from '../../src/types/electron';
 import {
   assembleHealthInputs,
@@ -463,6 +465,15 @@ export interface HealthOverviewData {
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间；各维时间见 dimensions[].generatedAt） */
   readAt: string;
+  /**
+   * 后置门禁结论（健康分 / 覆盖率）。
+   *
+   * 与总分同一次读取产生：门禁要拿的「健康分」就是这里的 `overall`，
+   * 分成两次 IPC 取会出现「卡片 92 分、门禁按 88 分判」的错位。
+   * 没有门禁规则时 `total === 0`，`ok` 为 true 但含义是「无门禁」而非「全达标」——
+   * 渲染层必须区分这两者（见 report-gates 组件的空态文案）。
+   */
+  gates?: PostScanGateReport;
 }
 
 export async function getHealthOverviewHandler(
@@ -499,6 +510,8 @@ export async function getHealthOverviewHandler(
       })),
       ...(snapshot.redLine ? { redLine: snapshot.redLine } : {}),
       readAt: new Date().toISOString(),
+      // 门禁判定与总分同源：拿的就是上面这个 overall，不另算一个分
+      gates: evaluateProjectGates(projectPath, snapshot.overall),
     };
   } catch (err) {
     console.warn(

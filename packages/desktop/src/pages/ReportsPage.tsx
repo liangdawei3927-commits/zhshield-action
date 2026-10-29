@@ -11,6 +11,7 @@ import { overviewRowInput } from './category-score-logic';
 import { countRunDimensions } from './reports-logic';
 import { HistoryTable } from './reports-table';
 import { ReportWindowSection } from './report-window-parts';
+import { ProjectGatesSection } from './report-gates';
 import { useHealthOverview } from '../hooks/useHealthOverview';
 import { useT } from '../i18n';
 
@@ -91,6 +92,8 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
             generatedAt={rowInput.generatedAt}
             overall={rowInput.overall}
           />
+          {/* 门禁结论只挂实时总览：历史快照里没有门禁字段，回退分支显示「无门禁」空态 */}
+          <ProjectGatesSection gates={overview?.gates} />
           <ModuleScoreCards modules={modules} />
           <ReportWindowSection data={data} />
           <HistoryTable data={data} />

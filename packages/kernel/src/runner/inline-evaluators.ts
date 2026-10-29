@@ -13,7 +13,7 @@ import type {
 import { scanPatternsInFile, detectLayer, detectLayerByName } from './scan-utils';
 import { forEachScanTarget } from './inline-eval-scan-target';
 import { isLowerBoundUnit } from './metric-direction';
-import { readGateDeclaration } from './post-scan-gate';
+import { readGateDeclaration, readRuleSemantics } from './post-scan-gate';
 
 // ─── 内联评估：pattern-scan ────────────────────────────
 
@@ -65,18 +65,18 @@ export async function evalThreshold(
   context: RuleContext,
 ): Promise<RuleEvaluation> {
   const targetEngine = rule.domain === 'guard' ? 'guard' : 'inspect';
-  // 后置门禁（健康分/质量分/覆盖率）：数据源是「整轮扫描结束后的聚合值」，
+  // 后置门禁（健康分/覆盖率）：数据源是「整轮扫描结束后的聚合值」，
   // 扫描过程中必然拿不到。这里显式让位，不做降级 —— 真正的判定由
   // `evaluatePostScanGates` 在评分阶段完成（见 post-scan-gate.ts 的注释）。
-  const gate = readGateDeclaration(rule);
-  if (gate.isGate) {
-    return skipEvaluation(
-      rule,
-      `后置门禁规则：由扫描后门禁阶段按「${gate.metric ?? '未登记口径'}」判定，引擎内不求值` +
-        '（引擎在扫描过程中运行，此时聚合分/覆盖率尚未产生）',
-      targetEngine,
-      false,
-    );
+  // 映射型规则（质量分映射）同样让位：它定义的是换算关系，没有通过线可判。
+  const semantics = readRuleSemantics(rule);
+  if (semantics !== 'engine') {
+    const reason =
+      semantics === 'mapping'
+        ? '映射型规则：声明的是「输入 → 分数」的换算关系，不设通过线，因此不产生检查结论'
+        : `后置门禁规则：由扫描后门禁阶段按「${readGateDeclaration(rule).metric ?? '未登记口径'}」判定，引擎内不求值` +
+          '（引擎在扫描过程中运行，此时聚合分/覆盖率尚未产生）';
+    return skipEvaluation(rule, reason, targetEngine, false);
   }
   const required = Object.keys(instr.thresholds);
   const metrics = readMetricBag(context);

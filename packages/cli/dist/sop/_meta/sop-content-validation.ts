@@ -1,7 +1,7 @@
 import { TOOL_IDS } from '@zh/shared';
 import { ContentInterpreter, resolveInstructionScope } from './content-interpreter';
 import { isSafeRegexPattern } from '../../runner/scan-utils';
-import { readGateDeclaration, ENGINE_MEASURABLE_METRICS } from '../../runner/post-scan-gate';
+import { readRuleSemantics, ENGINE_MEASURABLE_METRICS } from '../../runner/post-scan-gate';
 import type { SopRuleIssue } from './sop-field-validation';
 import type { SopRule } from './sop-types';
 import type { ThresholdInstruction, UnresolvedInstruction } from './rule-evaluation';
@@ -242,6 +242,8 @@ function thresholdIssues(
  * 三层判定：
  *   ① 登记为扫描后门禁（`POST_SCAN_GATE_BINDINGS` / 声明 executionStage: post-scan）
  *      ⇒ 合法。它由 gate 阶段判定，引擎不执行是设计。
+ *   ①' 登记为映射型规则（`MAPPING_RULES`，如质量分映射）⇒ 合法。它定义换算关系、
+ *      不设通过线，本来就不产生结论 —— 拿「没取数」判它是把语义读错了。
  *   ② 指标全在 `ENGINE_MEASURABLE_METRICS`（复杂度五项，由 pipeline 的 rule-metrics 取数）
  *      ⇒ 合法。
  *   ③ 其余 ⇒ **active 判 fatal**：没有任何取数实现，每次执行都落 skipped（degraded），
@@ -254,7 +256,7 @@ function unmeasurableThresholdIssue(
   instr: ThresholdInstruction,
   locator: string,
 ): SopRuleIssue | null {
-  if (readGateDeclaration(rule).isGate) return null;
+  if (readRuleSemantics(rule) !== 'engine') return null;
   const keys = Object.keys(instr.thresholds);
   if (keys.length === 0) return null; // 未声明指标已由 thresholdIssues 判 warn
   const unmeasurable = keys.filter((key) => !ENGINE_MEASURABLE_METRICS.includes(key));

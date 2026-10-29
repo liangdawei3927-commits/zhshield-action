@@ -24,13 +24,16 @@ export type { RuleMetricsProvider, RuleMetricsResult } from './runner/evaluator-
 export {
   evaluatePostScanGates,
   readGateDeclaration,
+  readRuleSemantics,
   selectPostScanGates,
   formatGateItems,
   POST_SCAN_GATE_BINDINGS,
+  MAPPING_RULES,
   ENGINE_MEASURABLE_METRICS,
   POST_SCAN_STAGE,
 } from './runner/post-scan-gate';
 export type {
+  RuleSemantics,
   GateMetric,
   GateValue,
   GateItem,

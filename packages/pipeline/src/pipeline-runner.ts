@@ -46,7 +46,8 @@ import { toMessage } from './runner-utils';
 import { buildSuccessReport } from './report-builders';
 import { resolveEffectiveProjectRoot } from './project-profile';
 import { resolveDefaultSopRulesDir } from './sop-rules-dir';
-import { loadBundledSopRules, loadSopRulesFromSyncCache } from './sop-rule-loading';
+import { loadBundledSopRules, loadSopRulesFromSyncCache, readSopStats } from './sop-rule-loading';
+import type { SopStats } from './sop-rule-loading';
 import {
   composeRuleContext,
   deriveProjectFeature,
@@ -220,6 +221,11 @@ export class PipelineRunner {
       logger: this.logger,
       rulesDir: this.sopRulesDir,
     });
+  }
+
+  /** 已注册规则统计（条数只认 registry，见 `readSopStats` 的说明） */
+  getSopStats(): SopStats {
+    return readSopStats(this.sopRegistry);
   }
 
   /** 合并云同步缓存规则（`{cacheDir}/modules/*.db`）；目录不可用返回 0 */

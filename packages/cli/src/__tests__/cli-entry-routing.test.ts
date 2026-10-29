@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 // 本文件驱动真实 CLI 入口 index.ts（含模块加载即执行的 main()），
@@ -13,6 +15,10 @@ const state = vi.hoisted(() => {
   return {
     constructed: [] as Array<{ projectDir: string; options: unknown }>,
     ruleCount: 3,
+    /** loadSopRulesFromCache 的返回值（0 = 未装载云端规则） */
+    syncedCount: 0,
+    /** evaluatePostScanGates 的返回；null = 空规则集 */
+    gateReport: null as unknown,
     guardReport: null as unknown,
     inspectReport: null as unknown,
     sopGuardReport: null as unknown,
@@ -33,6 +39,27 @@ vi.mock('@zh/pipeline', () => {
       async loadSopRules(): Promise<number> {
         return state.ruleCount;
       }
+      async loadSopRulesFromCache(): Promise<number> {
+        return state.syncedCount;
+      }
+      getSopStats(): { total: number; active: number } {
+        return { total: state.ruleCount + state.syncedCount, active: state.ruleCount };
+      }
+      evaluatePostScanGates(): unknown {
+        return (
+          state.gateReport ?? {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            undetermined: 0,
+            blockingFailed: 0,
+            blockingUndetermined: 0,
+            ok: true,
+            complete: true,
+            items: [],
+          }
+        );
+      }
       async runGuard(): Promise<unknown> {
         return state.guardReport;
       }
@@ -45,6 +72,8 @@ vi.mock('@zh/pipeline', () => {
       }
       async destroy(): Promise<void> {}
     },
+    formatGateItems: (report: { items: Array<{ ruleId: string; message: string }> }) =>
+      report.items.map((i) => `${i.ruleId}: ${i.message}`),
   };
 });
 
@@ -120,14 +149,20 @@ describe('CLI 入口路由（真实 index.ts + mock 引擎）', () => {
     });
     state.constructed = [];
     state.ruleCount = 3;
+    state.syncedCount = 0;
+    state.gateReport = null;
     state.runSopGuardCalls = 0;
     state.guardReport = null;
     state.inspectReport = null;
     state.sopGuardReport = null;
+    // 固定云端缓存探测结果：不设则当前机器真实存在
+    // ~/Library/.../sop-cache（52 条），用例结果会随开发机环境漂移。
+    vi.stubEnv('ZH_SOP_CACHE_DIR', path.join(os.tmpdir(), 'zh-cli-entry-no-such-cache'));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     process.argv = savedArgv;
     process.exitCode = savedExitCode;
   });
@@ -201,15 +236,61 @@ describe('CLI 入口路由（真实 index.ts + mock 引擎）', () => {
     expect(errors.join('\n')).toContain('error | warning | info | none');
   });
 
-  it('Given --sop 且规则加载为 0 条，When 启动 CLI 跑 guard，Then 输出盲检降级警告并以 exit 2 拦停', async () => {
+  it('Given --sop 且规则注册为 0 条，When 启动 CLI 跑 guard，Then 输出盲检降级警告并以 exit 2 拦停', async () => {
     state.ruleCount = 0;
     state.sopGuardReport = sopRuleEngineReport();
     await runCli('guard', '--sop');
 
     expect(state.runSopGuardCalls).toBe(1);
     expect(firstExitCode()).toBe(2);
-    expect(errors.join('\n')).toContain('已加载 0 条 SOP 规则');
+    expect(errors.join('\n')).toContain('SOP 规则注册 0 条');
     expect(errors.join('\n')).toContain('降级警告');
     expect(errors.join('\n')).toContain('盲检');
+  });
+
+  it('Given --sop 且云端缓存可用，When 启动 CLI，Then 横幅报出云端条数——只报"已加载 N 条"无法分辨云端进没进来', async () => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-cli-cache-'));
+    fs.mkdirSync(path.join(cacheDir, 'modules'), { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'modules', 'quality.db'), '[]');
+    vi.stubEnv('ZH_SOP_CACHE_DIR', cacheDir);
+
+    state.ruleCount = 43;
+    state.syncedCount = 52;
+    await runCli('guard', '--sop');
+
+    const text = errors.join('\n');
+    expect(text).toContain('云端同步 52 条');
+    expect(text).toContain('内置模板 43 条');
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  });
+
+  it('Given --sop 且门禁规则未达标，When 启动 CLI，Then exit 1——门禁必须能拦住命令出口，否则只是打印', async () => {
+    state.ruleCount = 43;
+    state.sopGuardReport = sopRuleEngineReport();
+    state.gateReport = {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      undetermined: 0,
+      blockingFailed: 1,
+      blockingUndetermined: 0,
+      ok: false,
+      complete: true,
+      items: [{ ruleId: 'guard.block.official.test-coverage', status: 'failed', blocking: true, message: '覆盖率 0 < 80' }],
+    };
+    await runCli('guard', '--sop');
+
+    expect(firstExitCode()).toBe(1);
+    expect(errors.join('\n')).toContain('未达标 — 阻断');
+  });
+
+  it('Given --sop 且云端规则未加载导致门禁为空，When 启动 CLI，Then 明示"没有任何门禁结论"——这正是 pre-commit 假绿的成因', async () => {
+    state.ruleCount = 43;
+    state.sopGuardReport = sopRuleEngineReport();
+    await runCli('guard', '--sop');
+
+    const text = errors.join('\n');
+    expect(text).toContain('未加载云端规则');
+    expect(text).toContain('empty ≠ passed');
   });
 });

@@ -8,8 +8,12 @@
  *   tsx packages/cli/src/index.ts pipeline [--dir <path>] [--dry-run] [--sop]
  *   tsx packages/cli/src/index.ts help
  */
-import { PipelineRunner, formatGateItems } from '@zh/pipeline';
+import { PipelineRunner } from '@zh/pipeline';
 import { resolveBundledSopDir } from './sop-dir';
+import { currentSopCacheEnv, readCacheFreshness, resolveSopCacheDir } from './sop-source';
+import type { SopCacheResolution } from './sop-source';
+import { formatSopSourceBanner, setSopSourceSummary } from './sop-banner';
+import type { SopSourceSummary } from './sop-banner';
 import { ConsoleReporter, FAIL_ON_VALUES, isFailOnValue } from '@zh/reporter';
 import { augmentProcessPath } from '@zh/shared';
 import * as path from 'node:path';
@@ -192,17 +196,21 @@ async function main(): Promise<void> {
   }
 }
 
-/** 加载 SOP 规则并按命令分发执行 */
+/** 加载 SOP 规则（内置 + 云端同步）并按命令分发执行 */
 async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise<void> {
   const projectDir = resolveProjectDir(opts.dir);
   const sopDir = resolveBundledSopDir(baseDir);
   const runner = new PipelineRunner(projectDir, sopDir ? { configDir: sopDir } : undefined);
-  const ruleCount = await runner.loadSopRules();
-  console.error(`[CLI] 已加载 ${ruleCount} 条 SOP 规则\n`);
-  if (opts.sop && ruleCount === 0) {
+  const summary = await loadSopRulesWithCloud(runner);
+  for (const line of formatSopSourceBanner(summary)) console.error(line);
+  // 必须在分发**之前**注入：命令实现以 process.exit() 终止进程，switch 之后的所有代码
+  // 在真实进程里都不可达（本轮实测踩到，见 sop-banner.ts 头注释的形态⑧）。
+  setSopSourceSummary(summary);
+
+  if (opts.sop && summary.total === 0) {
     console.error(
       '[CLI] ============================================================\n' +
-        '[CLI] 降级警告: SOP 规则加载为 0 条 — 引擎处于盲检状态，所有检查将默认通过。\n' +
+        '[CLI] 降级警告: SOP 规则注册为 0 条 — 引擎处于盲检状态，所有检查将默认通过。\n' +
         '[CLI] 请检查规则目录（presets/sop-templates 下应包含 guard/inspect/security/sentinel/evolve 域目录）。\n' +
         '[CLI] ============================================================\n',
     );
@@ -231,34 +239,30 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
       process.exit(1);
   }
 
-  reportPostScanGates(runner, opts);
+  // 命令若正常返回（未 exit），此处收尾；命令已 exit 时下面两行不会执行
   await runner.destroy();
 }
 
 /**
- * 扫描后门禁输出（健康分 / 质量分 / 覆盖率）。
+ * 装载规则：内置模板 + 云端同步缓存。
  *
- * 这三项在规则引擎里永远拿不到数（聚合分在扫描后才产生），所以由本入口在命令结束后判一次：
- *   · 有数且达标 ⇒ ✓；不达标 ⇒ 阻断（退出码 1，与 --fail-on error 同口径）
- *   · 拿不到数 ⇒ 「未判定」并写明原因，**不计入通过**，也不阻断
- *     （CLI 不做聚合评分，永久红会把用户逼到关掉整套门禁）
+ * 与桌面端 `pipeline-runner-factory.createLoadedRunner` 同口径 —— 只载内置 43 条
+ * 等于把「桌面端口径 vs CLI 口径」劈成两套：云端那 52 条（含全部阻断型门禁规则）
+ * 在 CLI 侧整段缺席，pre-commit 的绿灯就是一次没发生的判定。
  */
-function reportPostScanGates(runner: PipelineRunner, opts: CLIOptions): void {
-  if (!opts.sop) return;
-  const report = runner.evaluatePostScanGates();
-  if (report.total === 0) return;
-  console.error('\n[门禁] 扫描后判定（健康分/质量分/覆盖率）');
-  for (const line of formatGateItems(report)) console.error(`  ${line}`);
-  if (report.failed > 0) {
-    console.error(`[门禁] ${report.failed} 项未达标 — 阻断`);
-    if (!process.exitCode) process.exitCode = 1;
-    return;
-  }
-  if (report.undetermined > 0) {
-    console.error(`[门禁] ${report.undetermined} 项未判定（缺数据源，不算通过）`);
-    return;
-  }
-  console.error(`[门禁] 全部 ${report.total} 项达标`);
+async function loadSopRulesWithCloud(runner: PipelineRunner): Promise<SopSourceSummary> {
+  const cache: SopCacheResolution = resolveSopCacheDir(currentSopCacheEnv());
+  const bundled = await runner.loadSopRules();
+  const synced = cache.dir ? await runner.loadSopRulesFromCache(cache.dir) : 0;
+  const stats = runner.getSopStats();
+  return {
+    bundled,
+    synced,
+    total: stats.total,
+    active: stats.active,
+    cache,
+    freshness: cache.dir ? readCacheFreshness(cache.dir) : { fileCount: 0 },
+  };
 }
 
 main();

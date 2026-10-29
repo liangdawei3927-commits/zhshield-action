@@ -3,6 +3,8 @@
 // index.ts 保留参数解析（parseFlags 长方法基线）与 main/runPipeline 主流程调度。
 
 import type { PipelineRunner } from '@zh/pipeline';
+// 扫描类命令的统一收尾：门禁判定必须在 process.exit 之前 —— 命令自行 exit 会让门禁永不可达
+import { finalizeScan } from './sop-banner';
 import {
   buildFindings,
   toSarif,
@@ -126,7 +128,7 @@ export async function runGuardCommand(
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, projectDir);
     applyDegradedGuard(report);
-    process.exit(blocked ? 1 : process.exitCode);
+    finalizeScan(runner, opts, blocked);
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
@@ -141,7 +143,7 @@ export async function runGuardCommand(
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
     applyDegradedGuard(report);
-    process.exit(blocked ? 1 : process.exitCode);
+    finalizeScan(runner, opts, blocked);
   }
 }
 
@@ -158,7 +160,7 @@ export async function runInspectCommand(
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, projectDir);
     applyDegradedGuard(report);
-    process.exit(blocked ? 1 : process.exitCode);
+    finalizeScan(runner, opts, blocked);
   } else {
     const report = await runner.runInspect();
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
@@ -173,7 +175,7 @@ export async function runInspectCommand(
     console.log(formatted.text);
     writeReportFile(opts, report, findings, projectDir);
     applyDegradedGuard(report);
-    process.exit(blocked ? 1 : process.exitCode);
+    finalizeScan(runner, opts, blocked);
   }
 }
 
@@ -197,7 +199,81 @@ export async function runRefactorCommand(
   });
   console.log(formatted.text);
   writeReportFile(opts, report, findings, projectDir);
-  process.exit(blocked ? 1 : process.exitCode);
+  finalizeScan(runner, opts, blocked);
+}
+
+/** baseline capture：直扫 + SOP 双源合并、按匹配键去重后落基线 */
+async function baselineCapture(runner: PipelineRunner, projectDir: string): Promise<void> {
+  const report = await runner.runInspect({ skipBaseline: true });
+  const sopReport = await runner.runSopInspect(undefined, { skipBaseline: true });
+  const sopViolations = sopReport.evaluations.flatMap((ev) => ev.violations ?? []);
+  // 两个来源可能产出同一条（直扫与 SOP 规则重叠），按匹配键去重避免基线里出现重复条目
+  const merged = [
+    ...issuesToBaselineEntries(report.issues, projectDir),
+    ...issuesToBaselineEntries(sopViolations, projectDir),
+  ];
+  const seen = new Set<string>();
+  const entries = merged.filter((e) => {
+    const key = baselineEntryKey(e);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const saved = await saveBaseline(projectDir, entries);
+  console.log(
+    `基线已捕获: ${entries.length} 项问题（直扫 ${report.issues.length} + SOP ${sopViolations.length}，去重后 ${entries.length}）→ ${baselinePath(projectDir)} (${saved.capturedAt})`,
+  );
+  console.log('提示：带 reason/owner/expiresAt 的条目才是可审计豁免，建议手工补齐后再入库');
+  process.exit(process.exitCode);
+}
+
+/** baseline list：打印基线条目、理由/责任人/到期与过期状态 */
+async function baselineList(projectDir: string): Promise<void> {
+  const baseline = await loadBaseline(projectDir);
+  if (!baseline) {
+    console.log('尚未捕获基线（无 .zhshield/baseline.json）');
+    process.exit(0);
+  }
+  const expired = baseline.entries.filter((e) => !isBaselineEntryActive(e)).length;
+  console.log(`基线 ${baseline.entries.length} 项，捕获于 ${baseline.capturedAt}`);
+  if (expired > 0) {
+    console.log(`其中 ${expired} 项已过期失效（不参与豁免，问题会重新计入报告）`);
+  }
+  for (const entry of baseline.entries) {
+    const state = isBaselineEntryActive(entry) ? '' : '  [已过期]';
+    const reason = entry.reason ? `  理由: ${entry.reason}` : '  [未记录理由]';
+    const owner = entry.owner ? `  责任人: ${entry.owner}` : '';
+    const expires = entry.expiresAt ? `  到期: ${entry.expiresAt}` : '  [永久]';
+    console.log(
+      `  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}${state}${reason}${owner}${expires}`,
+    );
+  }
+  process.exit(process.exitCode);
+}
+
+async function baselineClear(projectDir: string): Promise<void> {
+  await clearBaseline(projectDir);
+  console.log(`基线已清除: ${baselinePath(projectDir)}`);
+  process.exit(process.exitCode);
+}
+
+/** baseline capture-refactor：skipBaseline 捕获全量报告（否则存量被已有基线压掉，棘轮收不进新存量） */
+async function baselineCaptureRefactor(runner: PipelineRunner, projectDir: string): Promise<void> {
+  const report = await runner.runRefactor({ skipBaseline: true });
+  const counts = countSmellsByFileAndRule(report, projectDir);
+  const fileCount = Object.keys(counts).length;
+  const saved = await saveRefactorBaseline(projectDir, counts);
+  console.log(
+    `重构棘轮基线已捕获: ${report.totalSmells} 处存量异味（${fileCount} 个文件）→ ${refactorBaselinePath(projectDir)} (${saved.capturedAt})`,
+  );
+  console.log('提示：此后 refactor 报告只显示超出基线的增量；修复存量后可重新捕获收紧棘轮');
+  process.exit(process.exitCode);
+}
+
+async function baselineClearRefactor(projectDir: string): Promise<void> {
+  await clearRefactorBaseline(projectDir);
+  console.log(`重构棘轮基线已清除: ${refactorBaselinePath(projectDir)}`);
+  process.exit(process.exitCode);
 }
 
 export async function runBaselineCommand(
@@ -207,79 +283,16 @@ export async function runBaselineCommand(
   projectDir: string,
 ): Promise<void> {
   switch (opts.baselineAction) {
-    case 'capture': {
-      const report = await runner.runInspect({ skipBaseline: true });
-      const sopReport = await runner.runSopInspect(undefined, { skipBaseline: true });
-      const sopViolations = sopReport.evaluations.flatMap((ev) => ev.violations ?? []);
-      // 两个来源可能产出同一条（直扫与 SOP 规则重叠），按匹配键去重避免基线里出现重复条目
-      const merged = [
-        ...issuesToBaselineEntries(report.issues, projectDir),
-        ...issuesToBaselineEntries(sopViolations, projectDir),
-      ];
-      const seen = new Set<string>();
-      const entries = merged.filter((e) => {
-        const key = baselineEntryKey(e);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      const saved = await saveBaseline(projectDir, entries);
-      console.log(
-        `基线已捕获: ${entries.length} 项问题（直扫 ${report.issues.length} + SOP ${sopViolations.length}，去重后 ${entries.length}）→ ${baselinePath(projectDir)} (${saved.capturedAt})`,
-      );
-      console.log('提示：带 reason/owner/expiresAt 的条目才是可审计豁免，建议手工补齐后再入库');
-      process.exit(process.exitCode);
-      break;
-    }
-    case 'list': {
-      const baseline = await loadBaseline(projectDir);
-      if (!baseline) {
-        console.log('尚未捕获基线（无 .zhshield/baseline.json）');
-        process.exit(0);
-        break;
-      }
-      const expired = baseline.entries.filter((e) => !isBaselineEntryActive(e)).length;
-      console.log(`基线 ${baseline.entries.length} 项，捕获于 ${baseline.capturedAt}`);
-      if (expired > 0) {
-        console.log(`其中 ${expired} 项已过期失效（不参与豁免，问题会重新计入报告）`);
-      }
-      for (const entry of baseline.entries) {
-        const state = isBaselineEntryActive(entry) ? '' : '  [已过期]';
-        const reason = entry.reason ? `  理由: ${entry.reason}` : '  [未记录理由]';
-        const owner = entry.owner ? `  责任人: ${entry.owner}` : '';
-        const expires = entry.expiresAt ? `  到期: ${entry.expiresAt}` : '  [永久]';
-        console.log(
-          `  ${entry.ruleId}  ${entry.file}:${entry.line}:${entry.column}${state}${reason}${owner}${expires}`,
-        );
-      }
-      process.exit(process.exitCode);
-      break;
-    }
-    case 'clear': {
-      await clearBaseline(projectDir);
-      console.log(`基线已清除: ${baselinePath(projectDir)}`);
-      process.exit(process.exitCode);
-      break;
-    }
-    case 'capture-refactor': {
-      // skipBaseline：捕获时必须拿全量报告（否则存量会被已有基线压掉，棘轮永远收不进新存量）
-      const report = await runner.runRefactor({ skipBaseline: true });
-      const counts = countSmellsByFileAndRule(report, projectDir);
-      const fileCount = Object.keys(counts).length;
-      const saved = await saveRefactorBaseline(projectDir, counts);
-      console.log(
-        `重构棘轮基线已捕获: ${report.totalSmells} 处存量异味（${fileCount} 个文件）→ ${refactorBaselinePath(projectDir)} (${saved.capturedAt})`,
-      );
-      console.log('提示：此后 refactor 报告只显示超出基线的增量；修复存量后可重新捕获收紧棘轮');
-      process.exit(process.exitCode);
-      break;
-    }
-    case 'clear-refactor': {
-      await clearRefactorBaseline(projectDir);
-      console.log(`重构棘轮基线已清除: ${refactorBaselinePath(projectDir)}`);
-      process.exit(process.exitCode);
-      break;
-    }
+    case 'capture':
+      return baselineCapture(runner, projectDir);
+    case 'list':
+      return baselineList(projectDir);
+    case 'clear':
+      return baselineClear(projectDir);
+    case 'capture-refactor':
+      return baselineCaptureRefactor(runner, projectDir);
+    case 'clear-refactor':
+      return baselineClearRefactor(projectDir);
   }
   console.error('未知 baseline 子命令，支持: capture | list | clear | capture-refactor | clear-refactor');
   process.exit(1);
@@ -300,5 +313,5 @@ export async function runPipelineCommand(
   console.log(formatted.text);
   writeReportFile(opts, report, findings, projectDir);
   applyDegradedGuard(undefined, [report.guard, report.inspect]);
-  process.exit(blocked ? 1 : process.exitCode);
+  finalizeScan(runner, opts, blocked);
 }

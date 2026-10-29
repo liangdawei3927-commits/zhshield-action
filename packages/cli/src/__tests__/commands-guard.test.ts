@@ -52,8 +52,26 @@ function makeOpts(overrides: Partial<CLIOptions>): CLIOptions {
 }
 
 type MockRunner = Record<string, ReturnType<typeof vi.fn>>;
+/**
+ * 假 runner。`evaluatePostScanGates` 必须有默认实现：扫描类命令统一走
+ * `finalizeScan`，--sop 时会调它；缺了抛 TypeError，而 TypeError 会被
+ * 退出码哨兵吞掉，表现为"退出码对不上"，比直接缺方法难查得多。
+ */
 function makeRunner(methods: MockRunner): PipelineRunner {
-  return methods as unknown as PipelineRunner;
+  return {
+    evaluatePostScanGates: vi.fn(() => ({
+      total: 0,
+      passed: 0,
+      failed: 0,
+      undetermined: 0,
+      blockingFailed: 0,
+      blockingUndetermined: 0,
+      ok: true,
+      complete: true,
+      items: [],
+    })),
+    ...methods,
+  } as unknown as PipelineRunner;
 }
 function makeReporter() {
   return {

@@ -16,6 +16,27 @@ import { toMessage } from './runner-utils';
 
 type SyncRuleArray = Parameters<SopLoader['loadFromKnowledgeBase']>[0];
 
+/** 已注册规则的统计口径 */
+export interface SopStats {
+  readonly total: number;
+  readonly active: number;
+}
+
+/**
+ * 读取规则注册表统计。
+ *
+ * 条数**只能**取 `registry.getAll()`：加载器返回值会把缺 metadata 的规则合成
+ * `{domain}.{action}.official.{文件名}` 伪 id 一并计数，用它报条数会偏大，
+ * 进而让「N 条规则参与判定」这句话失真（CLI 横幅与桌面端面板都吃这个数）。
+ *
+ * 之所以放在本模块而不是 `PipelineRunner` 类里：这是**注册表操作**，不含编排状态；
+ * 类体已顶到 `large-class` 阈值，再往里塞纯读写逻辑只能靠删注释腾地方。
+ */
+export function readSopStats(registry: SopRegistry): SopStats {
+  const all = registry.getAll();
+  return { total: all.length, active: all.filter((rule) => rule.status === 'active').length };
+}
+
 export interface SopRuleLoadingDeps {
   loader: SopLoader;
   registry: SopRegistry;

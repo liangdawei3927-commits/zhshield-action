@@ -202,4 +202,23 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
     expect(unexpected, '出现新的伪 tool 声明').toEqual([]);
     expect(bogus.length, '存量伪 tool 数不应增加').toBeLessThanOrEqual(KNOWN_PENDING.length);
   });
+
+  it('supply-chain 规则已脱离虚构工具 sophisticated-sca，改为真实 npm-audit 适配器', async () => {
+    // 该规则 status=trial，因此不被上面的 getActive() 守卫覆盖；这里用 getAll() 显式
+    // 锁死其工具引用的合法性，防止再次出现「声明了却没执行」的死接（T4 伪 tool 类）。
+    // npm-audit 是真实注册进 InspectEngine 的适配器（id 见 @zh/shared TOOL_IDS）。
+    const registry = new SopRegistry();
+    const loader = new SopLoader(registry, { rulesDir: PRESETS_DIR });
+    await loader.loadFromFileSystem();
+
+    const rule = registry.getAll().find((r) => r.id === 'security.scan.malware.supply-chain');
+    expect(rule, 'supply-chain 规则应已加载').toBeDefined();
+    expect(rule!.status).toBe('trial');
+
+    const instr = new ContentInterpreter().interpret(rule!);
+    expect(instr.type, 'supply-chain 应为 tool-dispatch').toBe('tool-dispatch');
+    if (instr.type !== 'tool-dispatch') return;
+    expect(instr.tool, 'supply-chain 不得再指向虚构工具 sophisticated-sca').toBe('npm-audit');
+    expect(TOOL_IDS.includes(instr.tool as (typeof TOOL_IDS)[number]), 'npm-audit 必须是已注册工具 id').toBe(true);
+  });
 });

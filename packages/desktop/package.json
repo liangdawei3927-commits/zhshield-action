@@ -1,6 +1,6 @@
 {
   "name": "@zh/desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -42,23 +42,57 @@
     "zod": "^4.6.6"
   },
   "dependenciesMeta": {
-    "@zh/db": { "injected": true },
-    "@zh/dependency": { "injected": true },
-    "@zh/evolve": { "injected": true },
-    "@zh/fingerprint": { "injected": true },
-    "@zh/garbage": { "injected": true },
-    "@zh/guard": { "injected": true },
-    "@zh/i18n": { "injected": true },
-    "@zh/inspect": { "injected": true },
-    "@zh/kernel": { "injected": true },
-    "@zh/performance": { "injected": true },
-    "@zh/pipeline": { "injected": true },
-    "@zh/refactor": { "injected": true },
-    "@zh/reporter": { "injected": true },
-    "@zh/scoring": { "injected": true },
-    "@zh/security": { "injected": true },
-    "@zh/sentinel": { "injected": true },
-    "@zh/shared": { "injected": true }
+    "@zh/db": {
+      "injected": true
+    },
+    "@zh/dependency": {
+      "injected": true
+    },
+    "@zh/evolve": {
+      "injected": true
+    },
+    "@zh/fingerprint": {
+      "injected": true
+    },
+    "@zh/garbage": {
+      "injected": true
+    },
+    "@zh/guard": {
+      "injected": true
+    },
+    "@zh/i18n": {
+      "injected": true
+    },
+    "@zh/inspect": {
+      "injected": true
+    },
+    "@zh/kernel": {
+      "injected": true
+    },
+    "@zh/performance": {
+      "injected": true
+    },
+    "@zh/pipeline": {
+      "injected": true
+    },
+    "@zh/refactor": {
+      "injected": true
+    },
+    "@zh/reporter": {
+      "injected": true
+    },
+    "@zh/scoring": {
+      "injected": true
+    },
+    "@zh/security": {
+      "injected": true
+    },
+    "@zh/sentinel": {
+      "injected": true
+    },
+    "@zh/shared": {
+      "injected": true
+    }
   },
   "devDependencies": {
     "@electron/windows-sign": "^2.0.6",

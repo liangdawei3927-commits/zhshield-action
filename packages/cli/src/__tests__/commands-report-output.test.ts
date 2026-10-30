@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import type { PipelineRunner } from '@zh/pipeline';
 import type { ConsoleReporter } from '@zh/reporter';
 import type { CLIOptions } from '../cli-options';
-import { runGuardCommand } from '../commands';
+import { runGuardCommand, runInspectCommand } from '../commands';
 
 // 本文件验证 --format/--report 的机器可读报告落盘契约：
 // CI（GitHub Action）依赖 SARIF/JSON 产物上传 Security 面板与状态检查，
@@ -114,7 +114,7 @@ describe('runGuardCommand — 机器可读报告落盘（--format/--report）', 
     return fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-cli-report-'));
   }
 
-  it('Given --format json，When guard，Then 在项目根写入默认名 zhshield.json 且内容为原始报告', async () => {
+  it('Given --format json，When guard，Then 写入独立默认名 zhshield-guard.json（不与 inspect/refactor 报告互相覆盖）', async () => {
     const projectDir = makeTmpProject();
     try {
       const report = makeGuardReportWithViolation(projectDir);
@@ -127,11 +127,39 @@ describe('runGuardCommand — 机器可读报告落盘（--format/--report）', 
         ),
       );
 
-      const outPath = path.join(projectDir, 'zhshield.json');
+      const outPath = path.join(projectDir, 'zhshield-guard.json');
       expect(fs.existsSync(outPath)).toBe(true);
       const parsed = JSON.parse(fs.readFileSync(outPath, 'utf-8')) as { results: Array<{ checkId: string }> };
       expect(parsed.results[0].checkId).toBe('guard.chk.secret');
       expect(errors.join('\n')).toContain('报告已写入');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('Given --format json，When inspect，Then 仍写 zhshield.json（MCP 首次引导回退读取该文件，不可改名）', async () => {
+    const projectDir = makeTmpProject();
+    try {
+      const report = {
+        ok: true,
+        issues: [],
+        summary: { total: 0, error: 0, warning: 0, info: 0 },
+        score: 100,
+        grade: 'A',
+        totalFiles: 0,
+      };
+      const runner = { runInspect: vi.fn(async () => report) } as unknown as PipelineRunner;
+      await exitCodeOf(() =>
+        runInspectCommand(
+          runner,
+          makeOpts({ command: 'inspect', format: 'json' }),
+          makeReporter() as unknown as ConsoleReporter,
+          projectDir,
+        ),
+      );
+
+      expect(fs.existsSync(path.join(projectDir, 'zhshield.json'))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, 'zhshield-guard.json'))).toBe(false);
     } finally {
       fs.rmSync(projectDir, { recursive: true, force: true });
     }
@@ -186,7 +214,7 @@ describe('runGuardCommand — 机器可读报告落盘（--format/--report）', 
         ),
       );
 
-      const outPath = path.join(projectDir, 'zhshield.sarif');
+      const outPath = path.join(projectDir, 'zhshield-guard.sarif');
       expect(fs.existsSync(outPath)).toBe(true);
       const sarif = JSON.parse(fs.readFileSync(outPath, 'utf-8')) as {
         version: string;

@@ -58,16 +58,42 @@ function relativizeFindings(findings: Finding[], projectDir: string): void {
   }
 }
 
+/** 可写机器可读报告的命令；各命令报告 schema 不同，默认落盘名必须区分 */
+type ReportCommand = 'inspect' | 'guard' | 'refactor' | 'pipeline';
+
+/**
+ * 各命令的默认报告名基名。
+ *
+ * 此前四个命令共用 `zhshield.json`：inspect（totalFiles/issues）、refactor
+ * （totalSmells）、guard（results）三套 schema 写同一路径，后跑的覆盖先跑的，
+ * 用户拿到的「最近一次报告」可能根本不是刚跑的命令。inspect 保留 zhshield.json
+ * 是因为 MCP 首次引导回退读该文件（desktop/electron/zhshield-mcp.ts），改名会断。
+ */
+const DEFAULT_REPORT_BASE: Record<ReportCommand, string> = {
+  inspect: 'zhshield',
+  guard: 'zhshield-guard',
+  refactor: 'zhshield-refactor',
+  pipeline: 'zhshield-pipeline',
+};
+
+/** 报告落盘目标：项目根与命令合为一个上下文，避免函数参数列表过长 */
+interface ReportTarget {
+  projectDir: string;
+  command: ReportCommand;
+}
+
 /** 机器可读报告落盘。父目录不存在时递归创建——CI 传 reports/xxx.json
  *  不应要求预建目录，裸抛 ENOENT 会把产物链路变成难排查的崩溃栈。 */
 function writeReportFile(
   opts: CLIOptions,
   report: unknown,
   findings: Finding[],
-  projectDir: string,
+  target: ReportTarget,
 ): void {
+  const { projectDir, command } = target;
+  const base = DEFAULT_REPORT_BASE[command];
   if (opts.format === 'sarif') {
-    const outPath = opts.report || 'zhshield.sarif';
+    const outPath = opts.report || `${base}.sarif`;
     const absPath = path.resolve(projectDir, outPath);
     mkdirSync(path.dirname(absPath), { recursive: true });
     writeFileSync(absPath, toSarif(findings), 'utf8');
@@ -75,7 +101,7 @@ function writeReportFile(
     return;
   }
   if (opts.format === 'json') {
-    const outPath = opts.report || 'zhshield.json';
+    const outPath = opts.report || `${base}.json`;
     const absPath = path.resolve(projectDir, outPath);
     mkdirSync(path.dirname(absPath), { recursive: true });
     writeFileSync(absPath, formatReportJson(report), 'utf8');
@@ -126,7 +152,7 @@ export async function runGuardCommand(
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: 'guard' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -141,7 +167,7 @@ export async function runGuardCommand(
       stage: 'guard',
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: 'guard' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   }
@@ -158,7 +184,7 @@ export async function runInspectCommand(
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: 'inspect' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -173,7 +199,7 @@ export async function runInspectCommand(
       stage: 'inspect',
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: 'inspect' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   }
@@ -198,7 +224,7 @@ export async function runRefactorCommand(
     stage: 'refactor',
   });
   console.log(formatted.text);
-  writeReportFile(opts, report, findings, projectDir);
+  writeReportFile(opts, report, findings, { projectDir, command: 'refactor' });
   finalizeScan(runner, opts, blocked);
 }
 
@@ -311,7 +337,7 @@ export async function runPipelineCommand(
   const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
   const formatted = reporter.format(report);
   console.log(formatted.text);
-  writeReportFile(opts, report, findings, projectDir);
+  writeReportFile(opts, report, findings, { projectDir, command: 'pipeline' });
   applyDegradedGuard(undefined, [report.guard, report.inspect]);
   finalizeScan(runner, opts, blocked);
 }

@@ -514089,7 +514089,9 @@ function relativizeFindings(findings, projectDir) {
 }
 var DEFAULT_REPORT_BASE = {
   inspect: "zhshield",
+  "inspect-sop": "zhshield-sop",
   guard: "zhshield-guard",
+  "guard-sop": "zhshield-guard-sop",
   refactor: "zhshield-refactor",
   pipeline: "zhshield-pipeline"
 };
@@ -514142,7 +514144,7 @@ async function runGuardCommand(runner, opts, reporter, projectDir) {
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    writeReportFile(opts, report, findings, { projectDir, command: "guard" });
+    writeReportFile(opts, report, findings, { projectDir, command: "guard-sop" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -514168,7 +514170,7 @@ async function runInspectCommand(runner, opts, reporter, projectDir) {
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
-    writeReportFile(opts, report, findings, { projectDir, command: "inspect" });
+    writeReportFile(opts, report, findings, { projectDir, command: "inspect-sop" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {

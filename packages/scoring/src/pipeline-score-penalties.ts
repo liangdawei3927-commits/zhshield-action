@@ -11,7 +11,7 @@ import type {
 /** guard 检查的最小结构 — 与 @zh/guard CheckResult 字段兼容，避免包间依赖 */
 export interface GuardCheckLike {
   severity: 'error' | 'warning' | 'info';
-  status: 'passed' | 'failed' | 'error' | 'warning';
+  status: 'passed' | 'failed' | 'error' | 'warning' | 'skipped';
   blocking: boolean;
 }
 
@@ -139,6 +139,10 @@ export function guardPenalty(results: GuardCheckLike[]): number {
   let blocking = 0;
   let warning = 0;
   for (const r of results) {
+    // `skipped`（让位：规则自述由其它阶段判定，如后置门禁）不扣分 ——
+    // 与 `convertGuardEvaluations` 的「工具未安装的跳过项不应扣分」同一口径。
+    // 降级跳过在 guard 引擎侧已是 `warning`，仍按警告扣分，不会因这条豁免漏扣。
+    if (r.status === 'skipped') continue;
     if (r.status === 'failed' || r.status === 'error' || r.blocking) blocking += 1;
     else if (r.status === 'warning') warning += 1;
   }
@@ -147,7 +151,10 @@ export function guardPenalty(results: GuardCheckLike[]): number {
 
 /** guard 中非 passed 的结果数（与 guardPenalty 的判定口径一致） */
 export function guardIssueCount(results: GuardCheckLike[]): number {
-  return results.reduce((sum, r) => sum + (r.status === 'passed' && !r.blocking ? 0 : 1), 0);
+  return results.reduce(
+    (sum, r) => sum + (r.status === 'skipped' || (r.status === 'passed' && !r.blocking) ? 0 : 1),
+    0,
+  );
 }
 
 /** secrets 扣分：active 未处理每条 -15，上限 60（spec D） */

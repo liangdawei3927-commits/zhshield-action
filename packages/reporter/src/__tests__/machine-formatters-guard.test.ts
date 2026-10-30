@@ -27,6 +27,37 @@ describe('buildFindings — GuardReport 归一', () => {
     expect(buildFindings(report)).toHaveLength(0);
   });
 
+  it('skipped（让位：后置门禁由其它阶段判定）不产出 finding——它不是缺陷', () => {
+    const report = makeGuardReport([
+      {
+        checkId: 'guard.block.official.health-score',
+        status: 'skipped',
+        severity: 'warning',
+        message: '后置门禁规则：由扫描后门禁阶段按「health-score」判定，引擎内不求值',
+      },
+      {
+        checkId: 'guard.block.official.test-coverage',
+        status: 'skipped',
+        severity: 'warning',
+        message: '后置门禁规则：由扫描后门禁阶段按「coverage」判定，引擎内不求值',
+      },
+    ]);
+    expect(buildFindings(report)).toHaveLength(0);
+  });
+
+  it('降级跳过（warning + degraded）仍产出 finding——未检测 ≠ 通过，不能被让位豁免吞掉', () => {
+    const report = makeGuardReport([
+      {
+        checkId: 'guard.block.official.typescript-error',
+        status: 'warning',
+        severity: 'warning',
+        degraded: true,
+        message: '工具 tsc 错误: 依赖未安装',
+      },
+    ]);
+    expect(buildFindings(report)).toHaveLength(1);
+  });
+
   it('带 violations 明细的失败检查逐条展开，每条保留位置与修复建议', () => {
     const report = makeGuardReport([
       {

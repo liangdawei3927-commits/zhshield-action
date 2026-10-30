@@ -145,6 +145,9 @@ function guardFindings(report: GuardReport): Finding[] {
   const findings: Finding[] = [];
   for (const res of report.results) {
     if (res.status === 'passed') continue;
+    // 让位（规则自述由其它阶段判定，如后置门禁）不是问题：不产 finding。
+    // 降级跳过仍走下面的普通分支（status='warning' + degraded），保住「未检测 ≠ 通过」的可见性。
+    if (res.status === 'skipped') continue;
     const details = res.details as { violations?: Violation[] } | undefined;
     if (details?.violations?.length) {
       for (const v of details.violations) {

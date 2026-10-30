@@ -70,6 +70,11 @@ export class StageSectionFormatter {
     lines.push(
       `${indent}  通过: ${this.fmt.green(String(passed))}  失败: ${this.fmt.red(String(failed))}`,
     );
+    // 跳过（让位/降级）既不是通过也不是失败：不写出来，用户会以为「通过+失败 ≠ 总数」是算错
+    const skipped = summary?.skipped ?? 0;
+    if (skipped > 0) {
+      lines.push(`${indent}  ${this.fmt.dim(`跳过（未在本阶段执行）: ${skipped}`)}`);
+    }
     lines.push(
       `${indent}${this.fmt.dim(`阻断: ${report.ok === false ? '是' : report.ok === null ? '干运行' : '否'}`)}`,
     );

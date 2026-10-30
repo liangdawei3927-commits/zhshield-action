@@ -24,6 +24,8 @@ export interface GuardReportRecord {
     warnings: number;
     blocking: number;
     errors: number;
+    /** 未执行条数（让位+降级）。历史记录没有该字段，读侧按 undefined 处理 */
+    skipped?: number;
   };
   checks: Array<{
     checkId: string;
@@ -58,6 +60,7 @@ export function toGuardReportRecord(report: GuardReport, triggerSource: string):
     warnings: report.summary.warnings,
     blocking: report.summary.blocking,
     errors: report.summary.errors,
+    skipped: report.summary.skipped ?? 0,
   };
   return {
     timestamp: report.generatedAt || new Date().toISOString(),

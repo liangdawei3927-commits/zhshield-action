@@ -8,7 +8,7 @@
 /** 传统（非 SOP）门禁 CheckResult 的最小结构 — 与 @zh/guard CheckResult 字段兼容 */
 export interface GuardCheckResultLike {
   severity: 'error' | 'warning' | 'info';
-  status: 'passed' | 'failed' | 'error' | 'warning';
+  status: 'passed' | 'failed' | 'error' | 'warning' | 'skipped';
   blocking: boolean;
   details?: unknown;
 }
@@ -16,7 +16,7 @@ export interface GuardCheckResultLike {
 /** 转换后的 guard 结果（模块分桶 / 评分输入共用） */
 export type ConvertedGuardResult = {
   severity: 'error' | 'warning' | 'info';
-  status: 'passed' | 'failed' | 'error' | 'warning';
+  status: 'passed' | 'failed' | 'error' | 'warning' | 'skipped';
   blocking: boolean;
   file?: string;
 };

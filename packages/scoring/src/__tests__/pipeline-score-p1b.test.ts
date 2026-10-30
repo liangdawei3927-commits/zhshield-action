@@ -184,6 +184,24 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
     expect(sentinel.score).toBe(80.6); // 100 − (softBand(2,10,60)=15.0 + softBand(1,5,40)=4.44)
     expect(sentinel.issues).toBe(3);
   });
+
+  it('gate 维不吃 skipped（让位）：后置门禁规则不该扣健康分', () => {
+    const dims = buildHealthDimensions({
+      guard: {
+        results: [
+          {
+            severity: 'warning' as const,
+            status: 'skipped' as const,
+            blocking: false,
+          },
+        ],
+      },
+      inspect: emptyInspect,
+    });
+    const gate = dims.find((d) => d.name === 'gate')!;
+    expect(gate.score).toBe(100);
+    expect(gate.issues).toBe(0);
+  });
 });
 
 describe('P1b 验收 — 各域未检测判定（spec C）', () => {

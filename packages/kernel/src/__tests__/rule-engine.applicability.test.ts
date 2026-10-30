@@ -1,7 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as path from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { describe, it, expect } from 'vitest';
 
 import { SopRuleEngine } from '../runner';
 import { SopRegistry } from '../sop/_meta/sop-registry';
@@ -13,23 +10,12 @@ import { makeRule } from './helpers/rule-factory';
  */
 
 describe('SopRuleEngine — security check-list 的不适用语义', () => {
-  let registry: SopRegistry;
-  let engine: SopRuleEngine;
-  let tempDir: string;
-
-  beforeEach(() => {
-    registry = new SopRegistry();
-    engine = new SopRuleEngine(registry);
-    tempDir = mkdtempSync(path.join(tmpdir(), 'rule-engine-applicability-test-'));
-  });
-
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
-  });
+  // 用例全部走 mock 引擎，不读盘：repoRoot 只需是个合法字符串。
 
   it('security check-list: 全部检测项确知不适用时，规则标为 not-applicable 且不计入通过', async () => {
     // 业务意图：「没得查」不等于「查过且安全」。无 Web 框架的项目没有装配
     // Helmet/CSRF 的位置，若仍算 passed，报告会虚增一条「已验证的安全能力」。
+    const registry = new SopRegistry();
     const mockSecurity = {
       run: async () => ({
         results: [
@@ -64,7 +50,7 @@ describe('SopRuleEngine — security check-list 的不适用语义', () => {
     );
 
     const report = await engineWithSecurity.evaluateRules({
-      repoRoot: tempDir,
+      repoRoot: '/tmp',
       domain: 'security',
     });
     const evalResult = report.evaluations[0];
@@ -81,6 +67,7 @@ describe('SopRuleEngine — security check-list 的不适用语义', () => {
 
   it('security check-list: 只有一个检测项不适用时，规则仍按普通结果判定', async () => {
     // 混合场景（部分可检）表示规则确实被执行过——不能整条标为不适用。
+    const registry = new SopRegistry();
     const mockSecurity = {
       run: async () => ({
         results: [
@@ -111,7 +98,7 @@ describe('SopRuleEngine — security check-list 的不适用语义', () => {
     );
 
     const report = await engineWithSecurity.evaluateRules({
-      repoRoot: tempDir,
+      repoRoot: '/tmp',
       domain: 'security',
     });
     const evalResult = report.evaluations[0];

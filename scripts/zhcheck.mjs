@@ -54,6 +54,19 @@ function importRefactorIndex() {
   return import(p);
 }
 
+/** @zh/kernel 产物：门禁判定与云端规则缓存定位都来自内核，脚本侧不自己重写一份 */
+let kernelModule = null;
+async function loadKernel() {
+  if (kernelModule) return kernelModule;
+  const p = resolve(PKGS_ROOT, 'kernel', 'dist', 'index.js');
+  if (!existsSync(p)) {
+    console.error('zhcheck: kernel not built. Run pnpm build first.');
+    process.exit(2);
+  }
+  kernelModule = await import(p);
+  return kernelModule;
+}
+
 // ── Linter 格式化 ───────────────────────────────────────────
 function resolveRelPath(...candidates) {
   const raw = candidates.find((c) => typeof c === 'string' && c !== '');
@@ -159,7 +172,76 @@ async function createPipelineRunner(projectRoot) {
   const { PipelineRunner } = await import(entry);
   const runner = new PipelineRunner(projectRoot);
   await runner.loadSopRules();
-  return runner;
+  const sop = await loadCloudSopRules(runner);
+  return { runner, sop };
+}
+
+/**
+ * 加载云端规则（含**全部**阻断型门禁）。
+ *
+ * 为什么这一步不能省（2026-10-30 实测）：`guard.block.official.health-score` 与
+ * `guard.block.official.test-coverage` 只在云端下发，内置 43 条模板里根本没有。
+ * 只调 `loadSopRules()` 的话，`evaluatePostScanGates()` 的 `total` 恒为 0 ——
+ * 拿到的"通过"是一次从未发生的判定的绿灯，比红灯危险得多。
+ *
+ * 定位走内核的 `resolveSopCacheDir`（与 CLI 同一实现），不在脚本里另写一份：
+ * 两份定位逻辑一旦漂移，同一份代码会在不同入口得到两套门禁结论且不报错。
+ */
+async function loadCloudSopRules(runner) {
+  const kernel = await loadKernel();
+  const cache = kernel.resolveSopCacheDir(kernel.currentSopCacheEnv());
+  if (!cache.dir) {
+    return { cloud: 0, origin: cache.origin, reason: cache.reason ?? `${cache.origin} 不可用` };
+  }
+  const count = await runner.loadSopRulesFromCache(cache.dir);
+  return {
+    cloud: count,
+    origin: cache.origin,
+    reason: count === 0 ? `${cache.origin} 中没有可用规则模块` : cache.reason,
+  };
+}
+
+/**
+ * 打印扫描后门禁结论（健康分 / 覆盖率）。四态缺一不可，与 CLI 出口同口径：
+ *   ① 全达标 → 说达标；② 有未达标 → 阻断；③ 有未判定 → 明示「不算通过」但不阻断；
+ *   ④ 一条门禁规则都没有 → 区分「规则集里确实没有」与「云端没加载」，绝不沉默。
+ *
+ * ③ 不升格为失败是刻意的：zhcheck 不跑聚合评分，health-score 在这里永远取不到数，
+ * 那是设计如此而非环境缺陷；把它算红会让本地检查恒红，用户第一件事就是关掉门禁。
+ */
+async function reportPostScanGates(runner, sop, opts) {
+  if (opts.json) return { blocking: false };
+  const kernel = await loadKernel();
+
+  if (sop.cloud === 0) {
+    console.log(`zhcheck: 后置门禁未判定 — 本次未加载云端规则（${sop.reason}）`);
+    console.log(
+      'zhcheck: guard.block.official.health-score / test-coverage 只在云端下发，' +
+        '内置模板里没有 ⇒ 本次没有任何门禁结论。没有结论 ≠ 通过。',
+    );
+    return { blocking: false };
+  }
+
+  const report = runner.evaluatePostScanGates();
+  if (report.total === 0) {
+    console.log(
+      `zhcheck: 后置门禁 — 本次规则集（内置 + 云端 ${sop.cloud} 条）不含门禁规则 ⇒ 门禁阶段无结论（不代表通过）`,
+    );
+    return { blocking: false };
+  }
+
+  console.log('zhcheck: 后置门禁（扫描后判定）');
+  for (const line of kernel.formatGateItems(report)) console.log(`  ${line}`);
+  if (report.failed > 0) {
+    console.log(`zhcheck: ${report.failed} 项门禁未达标 — 阻断`);
+    return { blocking: true };
+  }
+  if (report.undetermined > 0) {
+    console.log(`zhcheck: ${report.undetermined} 项门禁未判定（缺数据源，不算通过）`);
+  } else {
+    console.log(`zhcheck: ${report.total} 项门禁全部达标`);
+  }
+  return { blocking: false };
 }
 
 // ── 巡检检查 ──────────────────────────────────────────────
@@ -173,7 +255,7 @@ async function runInspect(files, opts, projectRoot) {
     return { total: 0, warnings: 0, errors: 0 };
   }
 
-  const runner = await createPipelineRunner(projectRoot);
+  const { runner, sop } = await createPipelineRunner(projectRoot);
 
   let report;
   try {
@@ -208,10 +290,14 @@ async function runInspect(files, opts, projectRoot) {
     console.log(JSON.stringify(report, null, 2));
   }
 
+  // 整轮巡检已跑完 ⇒ 聚合数据具备判定条件（缺数据也会如实落「未判定」）
+  const gates = await reportPostScanGates(runner, sop, opts);
+
   return {
     total: (report?.issues || []).length,
     warnings: warningCount,
     errors: errorCount,
+    gates,
   };
 }
 
@@ -270,7 +356,7 @@ async function runGuard(files, opts) {
     return { total: 0, warnings: 0, errors: 0 };
   }
 
-  const runner = await createPipelineRunner(PROJECT_ROOT);
+  const { runner, sop } = await createPipelineRunner(PROJECT_ROOT);
 
   let report;
   try {
@@ -298,10 +384,14 @@ async function runGuard(files, opts) {
     }
   }
 
+  // guard 本身是项目级门禁，跑完后顺带判定扫描后门禁（健康分 / 覆盖率）
+  const gates = await reportPostScanGates(runner, sop, opts);
+
   return {
     total: report?.results?.filter((c) => c.status !== 'passed').length || 0,
     warnings: warningCount,
     errors: errorCount,
+    gates,
   };
 }
 
@@ -492,12 +582,18 @@ Linter 输出格式:
   let grandTotal = 0;
   let grandWarnings = 0;
   let grandErrors = 0;
+  let gateBlocking = false;
+  let gateReported = false;
 
   let refactorResult = null;
   for (const engine of engines) {
     if (opts.json) console.log(`\n=== ${engine.name} ===`);
     const result = await engine.fn(files, opts, projectRoot);
     if (engine.name === 'refactor') refactorResult = result;
+    if (result?.gates) {
+      gateReported = true;
+      if (result.gates.blocking) gateBlocking = true;
+    }
     grandTotal += result.total;
     grandWarnings += result.warnings;
     grandErrors += result.errors;
@@ -514,6 +610,14 @@ Linter 输出格式:
       if (grandWarnings > 0) parts.push(`\x1b[1;33m${grandWarnings} warnings\x1b[0m`);
       console.log(`zhcheck: 发现 ${parts.join(', ')} 共 ${grandTotal} 个问题。`);
     }
+  }
+
+  // 后置门禁：跑过整轮扫描的引擎已各自打印结论；一次都没跑（暂存区/单文件模式，
+  // 或只选了 refactor）时必须明示 —— 否则「检查通过」会被读成「门禁也通过了」。
+  if (!gateReported && !opts.json) {
+    console.log(
+      'zhcheck: 本次未执行整轮巡检 ⇒ 后置门禁（健康分 / 覆盖率）无结论。没有结论 ≠ 通过。',
+    );
   }
 
   // ── Baseline handling ──────────────────
@@ -595,6 +699,10 @@ Linter 输出格式:
     process.exit(1);
   }
   if (opts.ci && grandWarnings > 0) {
+    process.exit(1);
+  }
+  // 阻断型后置门禁未达标 ⇒ 阻断（未判定不阻断，见 reportPostScanGates）
+  if (gateBlocking) {
     process.exit(1);
   }
   process.exit(0);

@@ -57,6 +57,14 @@ interface SourceEvidence {
 export interface SecurityCheckResult {
   status: 'passed' | 'failed' | 'error';
   message?: string;
+  /**
+   * 不适用标注：检测项在本项目**确实不存在可检对象**（如未使用 Web 框架时的
+   * Helmet/CSRF 要求）。仅作为附加语义，status 仍为 passed —— 不新增顶层状态，
+   * 避免破坏既有消费方（GuardEngine 契约、SARIF、评分）的 schema。
+   *
+   * 只在「确知不适用」处设置；无法判定时不得猜测（宁可保持 passed/failed 现状）。
+   */
+  applicability?: 'not-applicable';
 }
 
 interface EvaluateCheckParams {
@@ -279,8 +287,11 @@ export class SecurityCheckEngine {
 
   private helmetVerdict(check: string, deps: DepsScan): SecurityCheckResult {
     if (!deps.hasWebFramework) {
+      // 无 Web 框架 ⇒ 响应头中间件没有装配位置，属「确知不适用」。
+      // 与「已通过」区分：CLI/面板据此显示「不适用」，不把它算作已验证的安全能力。
       return {
         status: 'passed',
+        applicability: 'not-applicable',
         message: `${check}: 项目未使用 Express/NestJS 等 Web 框架，Helmet 检查不适用`,
       };
     }
@@ -298,7 +309,14 @@ export class SecurityCheckEngine {
 
   private csrfVerdict(check: string, deps: DepsScan, source: SourceEvidence): SecurityCheckResult {
     if (!deps.hasWebFramework) {
-      return { status: 'passed', message: `${check}: 项目未使用 Web 框架，CSRF 防护检查不适用` };
+      // 同 helmet：无 Web 框架 ⇒ CSRF 防护没有落点，属确知不适用。
+      // 注意「零目标文件」不等于不适用（可能是扫描失败或路径裁剪），
+      // 该场景无法判定，不在此处猜测，保持原有 passed/failed 判定。
+      return {
+        status: 'passed',
+        applicability: 'not-applicable',
+        message: `${check}: 项目未使用 Web 框架，CSRF 防护检查不适用`,
+      };
     }
     const bucket =
       check === 'csrf-token-present'

@@ -6,6 +6,17 @@ import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 
+/**
+ * 该行是否「可待处理」：只有真问题才给「复制到 AI 修复 / 标记误报」。
+ *
+ * `skip` 是让位（规则自述由其它阶段判定，如后置门禁 health-score / 覆盖率）——
+ * 既不是通过也不是问题，给它复制按钮只会把「引擎内不求值」这句设计说明
+ * 当成缺陷丢给 AI 去「修」。
+ */
+function isActionable(check: GuardReportData['checks'][number]): boolean {
+  return check.status !== 'pass' && check.status !== 'skip';
+}
+
 function GuardRow({
   check,
   isLast,
@@ -45,7 +56,7 @@ function GuardRow({
       <td className="px-5 py-3 text-right">
         <div className="flex flex-col items-end gap-1.5">
           <span className="text-xs text-zh-muted">{check.message}</span>
-          {check.status !== 'pass' && (
+          {isActionable(check) && (
             <div className="flex items-center gap-2">
               <CopyToAiButton onClick={() => onCopyToAi(check)} />
               <Bounce
@@ -75,7 +86,8 @@ export function GuardTable({
   onReportFalsePositive: (check: GuardReportData['checks'][number]) => void;
 }) {
   const t = useT();
-  const failedChecks = report.checks.filter((c) => c.status !== 'pass');
+  // skip（让位）不计入「N 项需处理」，也不进一键复制清单 —— 它没有可修的代码
+  const failedChecks = report.checks.filter((c) => isActionable(c));
   return (
     <ResultCard variant="list" className="overflow-hidden">
       {failedChecks.length > 0 && (

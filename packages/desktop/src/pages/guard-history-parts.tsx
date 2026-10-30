@@ -26,7 +26,15 @@ const SEVERITY_MAP: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
 function recordCheckToView(
   check: GuardReportRecordData['checks'][number],
 ): GuardReportData['checks'][number] {
-  const status = check.status === 'passed' ? 'pass' : check.status === 'warning' ? 'warn' : 'fail';
+  // skipped（让位）不能落 fail：它是「由其它阶段判定」，不是失败
+  const status =
+    check.status === 'passed'
+      ? 'pass'
+      : check.status === 'skipped'
+        ? 'skip'
+        : check.status === 'warning'
+          ? 'warn'
+          : 'fail';
   return {
     id: check.checkId,
     name: check.adapter,
@@ -97,7 +105,10 @@ export function GuardHistory({
         {records.map((record, i) => {
           const risk = RISK_LABELS[record.riskLevel] ?? RISK_LABELS.low;
           const trigger = TRIGGER_LABELS[record.triggerSource] ?? record.triggerSource;
-          const failedChecks = record.checks.filter((c) => c.status !== 'passed');
+          // skipped（让位）不是待处理问题：不进历史问题清单，避免又被「复制到 AI」
+          const failedChecks = record.checks.filter(
+            (c) => c.status !== 'passed' && c.status !== 'skipped',
+          );
           return (
             <div key={i} className="rounded-lg border border-zh-line p-4">
               <div className="flex items-center gap-2 mb-2">

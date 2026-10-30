@@ -1254,6 +1254,7 @@
         "fail": "차단",
         "idle": "미발동",
         "pass": "통과",
+        "skip": "건너뜀",
         "warn": "경고"
       },
       "statusShort": {

@@ -1254,6 +1254,7 @@
         "fail": "Blocked",
         "idle": "Not triggered",
         "pass": "Passed",
+        "skip": "Skipped",
         "warn": "Warnings"
       },
       "statusShort": {

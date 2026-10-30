@@ -1254,6 +1254,7 @@
         "fail": "攔截",
         "idle": "未觸發",
         "pass": "通過",
+        "skip": "跳過",
         "warn": "警告"
       },
       "statusShort": {

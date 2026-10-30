@@ -16,8 +16,37 @@ describe('toGuardReportDataFromRecord 恢复映射', () => {
       checks: [],
     });
 
-    expect(report.summary).toEqual({ totalChecks: 4, passed: 1, blocked: 2, warnings: 1 });
+    expect(report.summary).toEqual({
+      totalChecks: 4,
+      passed: 1,
+      blocked: 2,
+      warnings: 1,
+      skipped: 0,
+    });
     expect(report.metadata.timestamp).toBe('2026-08-06T08:00:00.000Z');
+  });
+
+  it('skipped（让位）恢复为 skip 而非 warn/fail——历史记录不把后置门禁当待修问题', () => {
+    const report = toGuardReportDataFromRecord({
+      timestamp: 't',
+      triggerSource: 'manual',
+      ok: true,
+      riskLevel: 'low',
+      summary: { total: 1, passed: 0, failed: 0, warnings: 0, blocking: 0, errors: 0, skipped: 1 },
+      checks: [
+        {
+          checkId: 'guard.block.official.health-score',
+          adapter: 'sop-engine',
+          status: 'skipped',
+          severity: 'warning',
+          blocking: false,
+          message: '后置门禁规则：引擎内不求值',
+        },
+      ],
+    });
+
+    expect(report.checks[0]?.status).toBe('skip');
+    expect(report.summary.skipped).toBe(1);
   });
 
   it('maps check status and severity like engine toGuardReportData', () => {

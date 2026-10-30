@@ -12,11 +12,11 @@ import type { PerformanceReportIssue } from '../pipeline-report';
 
 /** 门禁报告的页面序列化类型：门禁检查项列表 + 汇总计数 + 耗时/时间戳元信息 */
 export interface GuardReportData {
-  summary: { totalChecks: number; passed: number; blocked: number; warnings: number };
+  summary: { totalChecks: number; passed: number; blocked: number; warnings: number; skipped?: number };
   checks: Array<{
     id: string;
     name: string;
-    status: 'pass' | 'warn' | 'fail';
+    status: 'pass' | 'warn' | 'fail' | 'skip';
     message: string;
     severity?: string;
   }>;
@@ -86,24 +86,38 @@ export function toGuardReportData(r: GuardReport): GuardReportData {
       passed: r.summary.passed,
       blocked: r.summary.failed,
       warnings: r.summary.warnings,
+      skipped: r.summary.skipped ?? 0,
     },
     checks: r.results.map((cr) => ({
       id: cr.checkId,
       name: cr.checkId,
-      status:
-        cr.status === 'passed'
-          ? ('pass' as const)
-          : cr.status === 'failed' || cr.status === 'error'
-            ? ('fail' as const)
-            : ('warn' as const),
+      status: toGuardCheckStatus(cr),
       message: cr.message,
-      severity: cr.severity === 'warning' ? 'medium' : cr.severity === 'error' ? 'high' : 'low',
+      // 跳过（让位）不评级：行上写「跳过」却挂「中危」徽章是自相矛盾的信号
+      ...(cr.status === 'skipped'
+        ? {}
+        : { severity: cr.severity === 'warning' ? 'medium' : cr.severity === 'error' ? 'high' : 'low' }),
     })),
     metadata: {
       duration: r.results.reduce((sum, cr) => sum + (cr.duration ?? 0), 0),
       timestamp: r.generatedAt,
     },
   };
+}
+
+/**
+ * CheckResult 状态 → 页面状态。
+ *
+ * `skipped` 单独落 `skip`（让位：规则自述由其它阶段判定，如后置门禁），不再混进
+ * `warn`：混进去就会以「中危 / N 项需处理」出现，并随「复制到 AI 修复」一并交给
+ * 编码工具去「修」一条本来就写着我方设计说明的规则。降级跳过在引擎侧仍是
+ * `warning`，照旧落 `warn`，不会被这条豁免吞掉。
+ */
+function toGuardCheckStatus(cr: GuardReport['results'][number]): GuardReportData['checks'][number]['status'] {
+  if (cr.status === 'passed') return 'pass';
+  if (cr.status === 'skipped') return 'skip';
+  if (cr.status === 'failed' || cr.status === 'error') return 'fail';
+  return 'warn';
 }
 
 export function toInspectionReportData(r: InspectionReport): InspectionReportData {

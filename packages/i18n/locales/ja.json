@@ -1254,6 +1254,7 @@
         "fail": "ブロック",
         "idle": "未トリガー",
         "pass": "合格",
+        "skip": "スキップ",
         "warn": "警告"
       },
       "statusShort": {

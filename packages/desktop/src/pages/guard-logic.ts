@@ -45,6 +45,12 @@ export const STATUS_LABELS: Record<string, { textKey: string; color: string; bg:
     color: 'rgb(var(--zh-danger))',
     bg: 'rgb(var(--zh-danger) / 0.1)',
   },
+  /** 未在本阶段执行且不是问题（让位）：用 info 色单独成行，不拉红、不计入「需处理」 */
+  skip: {
+    textKey: 'page.guard.status.skip',
+    color: 'rgb(var(--zh-info))',
+    bg: 'rgb(var(--zh-info) / 0.1)',
+  },
 };
 
 /** 单个拦截关卡（L1 pre-commit / L2 pre-push / L3 CI）的聚合展示信息 */
@@ -121,21 +127,33 @@ export function toGuardReportDataFromRecord(record: GuardReportRecordData): Guar
       passed: record.summary.passed,
       blocked: record.summary.blocking,
       warnings: record.summary.warnings,
+      skipped: record.summary.skipped ?? 0,
     },
     checks: record.checks.map((c) => ({
       id: c.checkId,
       name: c.checkId,
-      status:
-        c.status === 'passed'
-          ? 'pass'
-          : c.status === 'failed' || c.status === 'error'
-            ? 'fail'
-            : 'warn',
+      status: toGuardCheckStatusFromRecord(c.status),
       message: c.message,
-      severity: c.severity === 'error' ? 'high' : c.severity === 'warning' ? 'medium' : 'low',
+      // 跳过（让位）不评级，与 electron 侧 toGuardReportData 同口径
+      ...(c.status === 'skipped'
+        ? {}
+        : { severity: c.severity === 'error' ? 'high' : c.severity === 'warning' ? 'medium' : 'low' }),
     })),
     metadata: { duration: 0, timestamp: record.timestamp },
   };
+}
+
+/**
+ * 落库状态 → 页面状态。与 electron 侧 `toGuardCheckStatus` 同一口径，两份必须同步
+ * （IPC 手写类型与引擎类型不会互相约束，只靠注释对齐）。
+ */
+function toGuardCheckStatusFromRecord(
+  status: GuardReportRecordData['checks'][number]['status'],
+): GuardReportData['checks'][number]['status'] {
+  if (status === 'passed') return 'pass';
+  if (status === 'skipped') return 'skip';
+  if (status === 'failed' || status === 'error') return 'fail';
+  return 'warn';
 }
 
 /** 拉取最近一次门禁报告（无记录返回 null） */

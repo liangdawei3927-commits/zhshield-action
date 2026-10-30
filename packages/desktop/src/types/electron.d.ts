@@ -57,11 +57,17 @@ export interface GuardReportData {
     passed: number;
     blocked: number;
     warnings: number;
+    /** 未在本阶段执行（让位 + 降级）；历史落库记录没有该字段，按 0 处理 */
+    skipped?: number;
   };
   checks: Array<{
     id: string;
     name: string;
-    status: 'pass' | 'warn' | 'fail';
+    /**
+     * `skip` = 未在本阶段执行且**不属于**问题（规则自述由其它阶段判定，如后置门禁）。
+     * 与 `warn` 分开是为了不让它进「需处理 / 复制到 AI 修复」清单。
+     */
+    status: 'pass' | 'warn' | 'fail' | 'skip';
     message: string;
     category?: string;
     severity?: 'low' | 'medium' | 'high' | 'critical';
@@ -1075,14 +1081,19 @@ export interface GuardReportRecordData {
     warnings: number;
     blocking: number;
     errors: number;
+    /** 未执行条数（让位+降级）。历史记录无此字段 */
+    skipped?: number;
   };
   checks: Array<{
     checkId: string;
     adapter: string;
-    status: 'passed' | 'failed' | 'error' | 'warning';
+    /** 与 @zh/guard CheckResult 逐项对齐（含 skipped）：漏一项渲染层分支就恒不触发 */
+    status: 'passed' | 'failed' | 'error' | 'warning' | 'skipped';
     severity: 'error' | 'warning' | 'info';
     blocking: boolean;
     message: string;
+    /** 跳过是否属于降级（工具不可用）；缺省/true 更保守，但历史记录无此字段 */
+    degraded?: boolean;
   }>;
 }
 

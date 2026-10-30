@@ -36,7 +36,7 @@ const COMPLEXITY_METRIC_SET = new Set<string>(COMPLEXITY_METRICS);
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
 /**
- * 遍历时跳过的目录（构建产物与依赖，不是被测代码）。
+ * 遍历时跳过的目录（构建产物、依赖与测试资产，不是被测代码）。
  *
  * 2026-10-29 实测教训：只用精确名 `dist` 匹配时，`packages/desktop/dist-electron/`
  * 下 12 个 800KB 的 esbuild 打包产物被当成源码 —— 复杂度统计耗时 250 秒、
@@ -47,6 +47,15 @@ const SKIP_DIR_EXACT = new Set([
   'coverage',
   'vendor',
   'test-fixtures',
+  // 测试资产：@zh/refactor 的 detector-heuristics.isTestFixture 已把 __tests__ 与
+  // fixtures 定义为「刻意构造的样例代码，用于驱动规则测试，不是生产反模式」。
+  // 此处沿用同一口径 —— 两个包各写一份判定必然漂移，届时同一文件的复杂度
+  // 在「重构域」被豁免、在「体检域」被算进产品质量指标。
+  // 2026-10-30 实测遗漏后果：fileLength 峰值 875 落在 complexity-detector.test.ts、
+  // nestingDepth 5 与 parameterCount 6 落在 fixtures/deep-nesting.fixture.ts，
+  // 规则报出的 5 条复杂度告警里有 3 条的峰值来自测试资产（指向的不是要修的产品代码）。
+  '__tests__',
+  'fixtures',
   '__snapshots__',
 ]);
 

@@ -162,6 +162,31 @@ describe('createRuleMetricsProvider', () => {
       expect(result.metrics!.nestingDepth).toBe(0);
     });
 
+    it('GIVEN 测试资产（__tests__ 与 fixtures）WHEN 采集 THEN 不算产品代码', () => {
+      // 2026-10-30 实测：遗漏这两个目录名时，fileLength 峰值取到 875 行的测试文件、
+      // nestingDepth / parameterCount 取到故意构造的 fixture —— 规则报出的告警指向
+      // 测试资产而不是待修的产品代码。口径与 @zh/refactor 的 isTestFixture 保持一致。
+      writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
+      writeSource(
+        'src/__tests__/huge.test.ts',
+        'export function longFixture(a,b,c,d,e,f) {\n' + '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(60) + '}\n',
+      );
+      writeSource(
+        'src/__tests__/fixtures/deep.ts',
+        'export function deep(a,b,c,d,e,f) {\n  if (a) { if (b) { if (c) { if (d) { if (e) { return 1 } } } } }\n}\n',
+      );
+
+      const provider = createRuleMetricsProvider(repoRoot);
+      const result = provider(
+        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { parameterCount: 5 } } }),
+        { repoRoot },
+      ) as { metrics?: Record<string, number> };
+
+      // 若把测试资产算进来，parameterCount 会是 6
+      expect(result.metrics!.parameterCount).toBe(0);
+      expect(result.metrics!.nestingDepth).toBe(0);
+    });
+
     it('GIVEN 存在超大源文件 WHEN 采集 THEN 整体放弃而非静默跳过', () => {
       writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
       writeSource('src/generated-blob.ts', 'export const blob = "' + 'x'.repeat(600 * 1024) + '";\n');

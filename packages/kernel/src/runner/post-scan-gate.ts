@@ -145,8 +145,10 @@ export type GateValue =
   | { readonly actual: number; readonly note?: string }
   | { readonly unavailableReason: string };
 
+/** 单条门禁的判定结果三态：未判定与未达标是两回事，不可合并 */
 export type GateStatus = 'passed' | 'failed' | 'undetermined';
 
+/** 一条门禁规则的判定明细，直接对应报告里的一行 */
 export interface GateItem {
   readonly ruleId: string;
   readonly metric?: GateMetric;
@@ -166,6 +168,7 @@ export interface GateItem {
   readonly message: string;
 }
 
+/** 扫描后门禁的汇总报告：`ok` 是 CI 严格口径，`complete` 只看是否都判完了 */
 export interface PostScanGateReport {
   readonly total: number;
   readonly passed: number;

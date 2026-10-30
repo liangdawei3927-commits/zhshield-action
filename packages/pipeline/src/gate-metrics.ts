@@ -112,7 +112,20 @@ function diffCoverageValue(repoRoot: string, inputs: GateMetricInputs): GateValu
   const changed = readChangedLines(repoRoot, base.base);
   if (typeof changed === 'string') return { unavailableReason: changed };
   if (changed.size === 0) {
-    return { actual: 100, note: `相对基线（${base.how}）无代码改动，视为达标` };
+    // 零改动 ⇒ 没有分母，判「未判定」而不是 100% 达标。
+    //
+    // 为什么不能判达标（2026-10-30）：本模块与 gate-coverage-diff 的铁律是
+    // 「0/0 不是 100%」（改动行全部落在覆盖率统计之外时同样是返回 reason）。
+    // 这里若给 100，一旦基线解析出的 merge-base 恰好等于 HEAD（浅克隆 / 分支指针
+    // 落后 / 二次跑同一提交），diff 恒为空 ⇒ 每次都稳定输出 100% 绿灯，
+    // 而用户会以为覆盖率门禁在正常拦人。那比红灯危险：红灯逼人修，绿灯让人以为修好了。
+    //
+    // 「没改动」与「改动的代码都被覆盖了」是两件事，前者不构成达标证据。
+    return {
+      unavailableReason:
+        `相对基线（${base.how}）没有任何代码改动：diff 覆盖率没有分母，无法判定` +
+        '（零改动不等于测试充分，只是本次没有需要覆盖的新增行）',
+    };
   }
 
   const coverage = readLineCoverage(repoRoot, inputs.coverageReportPaths);

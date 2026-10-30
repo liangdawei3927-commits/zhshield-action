@@ -114,9 +114,12 @@ function readAddedSpan(hunkHeader: string): { start: number; count: number } | u
   return { start, count };
 }
 
+/** git 输出路径的 `b/` 前缀。提在模块作用域：函数内字面量每次调用都会重新编译正则 */
+const DIFF_B_PREFIX_RE = /^b\//;
+
 /** git 输出 `b/src/a.ts`；`/dev/null` 由调用方处理 */
 function mapFileOf(rawPath: string, into: ChangedLines): Set<number> {
-  const normalized = rawPath.replace(/^b\//, '');
+  const normalized = rawPath.replace(DIFF_B_PREFIX_RE, '');
   let set = into.get(normalized);
   if (!set) {
     set = new Set<number>();

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
 import { createGateMetricResolver, readProjectCoveragePct } from '../gate-metrics';
@@ -161,6 +162,75 @@ describe('createGateMetricResolver', () => {
       expect(report.items[0].status).toBe('undetermined');
       expect(report.ok).toBe(false);
       expect(report.complete).toBe(false);
+    });
+  });
+
+  /**
+   * diff 口径的两道自证（门禁有效性，缺一不可）：
+   *   ① 零改动不得判达标 —— 否则基线退化成 HEAD 时门禁恒绿，绿灯里没有判定；
+   *   ② 有改动且未覆盖必须判红 —— 否则①修过头会让门禁永远不红。
+   * 真 git 仓库是必需的：tmpdir 里没有 git，`resolveCoverageBase` 走的
+   * 是「解析不到基线」分支，测不到本分支。
+   */
+  describe('diff 覆盖率：零改动不得判达标', () => {
+    const git = (args: string[]) =>
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.email=gate@example.com',
+          '-c',
+          'user.name=gate',
+          '-c',
+          'commit.gpgsign=false',
+          ...args,
+        ],
+        { cwd: repoRoot, encoding: 'utf-8' },
+      );
+
+    /** 建一个只有一次提交、工作区干净的仓库，返回 HEAD（作显式覆盖率基线） */
+    const initRepo = (): string => {
+      git(['init']);
+      mkdirSync(path.join(repoRoot, 'src'), { recursive: true });
+      writeFileSync(path.join(repoRoot, 'src', 'a.ts'), 'export const a = 1;\n', 'utf-8');
+      git(['add', '.']);
+      git(['commit', '-m', 'init']);
+      return git(['rev-parse', 'HEAD']).trim();
+    };
+
+    it('GIVEN 相对基线零改动 WHEN 取 diff 覆盖率 THEN 判未判定（0/0 不是 100%）', () => {
+      const head = initRepo();
+
+      const value = createGateMetricResolver(repoRoot, { coverageBase: head })(
+        coverageRule('diff'),
+      ) as { actual?: number; unavailableReason?: string };
+
+      expect(value.actual).toBeUndefined();
+      expect(value.unavailableReason).toContain('没有分母');
+    });
+
+    it('GIVEN 改动行未被覆盖 WHEN 取 diff 覆盖率 THEN failed（判据确会红）', () => {
+      const head = initRepo();
+      writeFileSync(
+        path.join(repoRoot, 'src', 'a.ts'),
+        'export const a = 1;\nexport const b = 2;\n',
+        'utf-8',
+      );
+      mkdirSync(path.join(repoRoot, 'coverage'), { recursive: true });
+      writeFileSync(
+        path.join(repoRoot, 'coverage', 'lcov.info'),
+        `SF:${path.join(repoRoot, 'src', 'a.ts')}\nDA:2,0\nend_of_record\n`,
+        'utf-8',
+      );
+
+      const report = evaluatePostScanGates(
+        [coverageRule('diff')],
+        createGateMetricResolver(repoRoot, { coverageBase: head }),
+      );
+
+      expect(report.items[0].status).toBe('failed');
+      expect(report.items[0].actual).toBe(0);
+      expect(report.ok).toBe(false);
     });
   });
 });

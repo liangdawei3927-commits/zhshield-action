@@ -67,6 +67,7 @@ function isSkippedDir(name: string): boolean {
 /** 默认源文件上限：超出即放弃统计（8GB 机解析上万文件会把体检拖成分钟级） */
 const DEFAULT_MAX_FILES = 4000;
 
+/** 规则度量提供者的可选项；不传即用内置默认值 */
 export interface RuleMetricsOptions {
   /** 复杂度统计的源文件上限；超出则不给该指标（宁可不算也不给半截数字） */
   maxScanFiles?: number;
@@ -217,7 +218,7 @@ function measureFile(filePath: string): ComplexityPeaks | undefined {
 function countLines(text: string): number {
   if (text === '') return 0;
   const lines = text.split('\n');
-  return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
+  return lines.at(-1) === '' ? lines.length - 1 : lines.length;
 }
 
 interface CollectResult {

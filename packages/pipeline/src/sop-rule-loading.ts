@@ -37,6 +37,7 @@ export function readSopStats(registry: SopRegistry): SopStats {
   return { total: all.length, active: all.filter((rule) => rule.status === 'active').length };
 }
 
+/** 规则载入所需的三个协作者：加载器、注册表、日志（便于用例注入替身） */
 export interface SopRuleLoadingDeps {
   loader: SopLoader;
   registry: SopRegistry;

@@ -239,3 +239,24 @@ export interface SopRuleStats {
 
 /** 规则评估状态：passed 通过、failed 不通过、error 执行出错、skipped 被跳过 */
 export type EvaluationStatus = 'passed' | 'failed' | 'error' | 'skipped';
+
+// ─── 加载期校验问题（由 sop-field-validation 迁移至此，切断 _meta 内循环 import） ───
+// sop-content-validation 只用这两个类型，原本要反向 import sop-field-validation，
+// 而后者又值导入前者 ⇒ 成环。类型不属于任何一方的实现，放在本叶子模块最合适。
+
+/** 单条校验问题的级别 */
+export type SopRuleIssueLevel = 'fatal' | 'warn';
+
+/** 一条加载期校验问题（供诊断面板 / 日志消费） */
+export interface SopRuleIssue {
+  /** 规则文件路径 */
+  file: string;
+  /** 出问题的字段路径，如 `metadata.status` */
+  field: string;
+  /** 原始取值 */
+  value: unknown;
+  /** 人可读的判定理由 */
+  reason: string;
+  /** 级别：fatal 已导致该规则被拒；warn 已自动纠正 */
+  level: SopRuleIssueLevel;
+}

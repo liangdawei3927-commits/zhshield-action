@@ -40,6 +40,7 @@ export interface SopRemoteSettings {
   readonly problems: readonly string[];
 }
 
+/** 环境读取入参：显式传入 env 与 homeDir，避免单测依赖真实进程环境 */
 export interface SopRemoteEnvInput {
   readonly env: NodeJS.ProcessEnv;
   readonly homeDir: string;

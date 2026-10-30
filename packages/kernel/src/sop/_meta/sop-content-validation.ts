@@ -2,8 +2,7 @@ import { TOOL_IDS } from '@zh/shared';
 import { ContentInterpreter, resolveInstructionScope } from './content-interpreter';
 import { isSafeRegexPattern } from '../../runner/scan-utils';
 import { readRuleSemantics, ENGINE_MEASURABLE_METRICS } from '../../runner/post-scan-gate';
-import type { SopRuleIssue } from './sop-field-validation';
-import type { SopRule } from './sop-types';
+import type { SopRule, SopRuleIssue } from './sop-types';
 import type { ThresholdInstruction, UnresolvedInstruction } from './rule-evaluation';
 
 /**

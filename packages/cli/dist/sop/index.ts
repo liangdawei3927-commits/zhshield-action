@@ -24,6 +24,20 @@ export type { SopLoaderOptions } from './_meta/sop-loader';
 
 // ─── cache: 本地缓存与同步 ──────────────────────────────────
 export { SopCacheManager, createSyncPolicy } from './cache/sop-cache-manager';
+// 云端规则缓存定位（CLI / 本地检查脚本共用）：判错即「门禁整段失声」，
+// 因为两条阻断型门禁只在云端下发、内置模板里没有。
+export {
+  resolveSopCacheDir,
+  resolveDesktopCacheDir,
+  resolveCliCacheDir,
+  readCacheFreshness,
+  currentSopCacheEnv,
+} from './cache/sop-cache-locator';
+export type {
+  SopCacheResolution,
+  SopCacheEnv,
+  CacheFreshness,
+} from './cache/sop-cache-locator';
 export type {
   SopCacheManagerOptions,
   SyncPolicyOptions,

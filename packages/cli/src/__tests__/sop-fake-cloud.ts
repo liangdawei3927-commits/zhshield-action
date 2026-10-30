@@ -24,6 +24,7 @@ export interface FakeCloudOptions {
   readonly fullStatus?: number;
 }
 
+/** 已启动的假云端实例：`base` 可直接当 sopBase 用，`requests` 记录命中过的路径 */
 export interface FakeCloud {
   readonly base: string;
   readonly requests: string[];

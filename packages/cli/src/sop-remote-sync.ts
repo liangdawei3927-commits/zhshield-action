@@ -25,6 +25,7 @@ import type { SopRule } from '@zh/kernel';
 /** 同步失败的阶段归因（决定用户该看哪里） */
 export type SopSyncStage = 'public-key' | 'version' | 'download' | 'verify' | 'write' | 'empty';
 
+/** 同步失败：带失败阶段与原因，供上层决定该提示用户看哪里 */
 export interface SopSyncFailure {
   readonly ok: false;
   readonly stage: SopSyncStage;
@@ -33,6 +34,7 @@ export interface SopSyncFailure {
   readonly detail?: string;
 }
 
+/** 同步成功：含落盘版本、规则条数与是否走了验签 */
 export interface SopSyncSuccess {
   readonly ok: true;
   readonly version: string;
@@ -45,6 +47,7 @@ export interface SopSyncSuccess {
   readonly signed: boolean;
 }
 
+/** 同步结果判别联合：调用方先用 `ok` 收窄，再取各自字段 */
 export type SopSyncResult = SopSyncSuccess | SopSyncFailure;
 
 /** 同步请求：只含已解析好的参数，不再读环境（便于用例直连本地假服务端） */

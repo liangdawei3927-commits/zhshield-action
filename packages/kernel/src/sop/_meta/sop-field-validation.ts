@@ -6,8 +6,18 @@ import {
   SEVERITIES,
   sanitizeLogField,
 } from '@zh/shared';
-import type { GovernanceDomain, ActionType, SopRule } from './sop-types';
+import type {
+  GovernanceDomain,
+  ActionType,
+  SopRule,
+  SopRuleIssue,
+  SopRuleIssueLevel,
+} from './sop-types';
 import { validateRuleContent } from './sop-content-validation';
+
+// SopRuleIssue / SopRuleIssueLevel 已迁到 ./sop-types（切断 _meta 内循环 import），
+// 此处转发，保持既有 import 路径不变。
+export type { SopRuleIssue, SopRuleIssueLevel } from './sop-types';
 
 /**
  * SOP 规则加载期字段校验 — 把「类型断言」换成「运行期白名单」。
@@ -25,23 +35,6 @@ import { validateRuleContent } from './sop-content-validation';
  *   · warn  —— 可纠正 ⇒ 保留规则但归一化，并记录问题供诊断
  * 缺失字段**不**计为问题：由 parser 的缺省值兜底，保持存量规则兼容。
  */
-
-/** 单条校验问题的级别 */
-export type SopRuleIssueLevel = 'fatal' | 'warn';
-
-/** 一条加载期校验问题（供诊断面板 / 日志消费） */
-export interface SopRuleIssue {
-  /** 规则文件路径 */
-  file: string;
-  /** 出问题的字段路径，如 `metadata.status` */
-  field: string;
-  /** 原始取值 */
-  value: unknown;
-  /** 人可读的判定理由 */
-  reason: string;
-  /** 级别：fatal 已导致该规则被拒；warn 已自动纠正 */
-  level: SopRuleIssueLevel;
-}
 
 /** 校验结论 */
 export interface SopRuleValidation {
@@ -238,7 +231,11 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
   const push = (issue: SopRuleIssue | null): void => {
     if (issue && issues.length < MAX_ISSUES_PER_FILE) issues.push(issue);
   };
-  const raw = rule as unknown as Record<string, unknown>;
+  // 按「未知字段集」读：云端下发的字段可能超出 SopRule 声明（写错字段名正是要查的），
+  // 只有把它当字段袋子才能逐字段校验。用展开构造而非 `as unknown as` —— SopRule 是
+  // interface（无隐式索引签名），双重断言虽能通过但等价于放弃检查；展开后由对象字面量
+  // 隐式提供索引签名，取值全程仍是 unknown，后续一律走类型守卫。
+  const raw: Record<string, unknown> = { ...rule };
 
   const id = raw.id;
   // 定位串必须带规则 id：云端一次下发几十条，只说「cloud-sync 拒了 3 条」无法排查

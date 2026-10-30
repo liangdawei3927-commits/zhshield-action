@@ -20,6 +20,7 @@ import type { SopSyncResult } from './sop-remote-sync';
 /** 退出码：2 = 环境不完整（与降级护栏同口径），让 CI 直接判步骤失败 */
 const EXIT_INCOMPLETE = 2;
 
+/** 同步命令入参：已解析好的远端配置 + 缓存环境，不再读进程环境（便于用例直连假服务端） */
 export interface SopSyncCommandInput {
   readonly settings: SopRemoteSettings;
   readonly cacheEnv: SopCacheEnv;

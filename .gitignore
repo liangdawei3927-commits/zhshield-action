@@ -150,8 +150,21 @@ packages/inspect/e2e/fixtures/**/*.js.map
 packages/inspect/e2e/fixtures/**/*.d.ts
 packages/inspect/e2e/fixtures/**/*.d.ts.map
 
-# 扫描运行产物（根级 zhshield.json、fixture 内扫描结果）；源码与配置入库
+# 扫描运行产物（根级各命令报告、fixture 内扫描结果）；源码与配置入库
+# 报告按命令分文件（见 cli/src/commands.ts 的 DEFAULT_REPORT_BASE），逐个列出，
+# 避免用 /zhshield*.json 之类通配把真实配置误伤
 /zhshield.json
+/zhshield-sop.json
+/zhshield-guard.json
+/zhshield-guard-sop.json
+/zhshield-refactor.json
+/zhshield-pipeline.json
+/zhshield.sarif
+/zhshield-sop.sarif
+/zhshield-guard.sarif
+/zhshield-guard-sop.sarif
+/zhshield-refactor.sarif
+/zhshield-pipeline.sarif
 packages/inspect/e2e/fixtures/**/zhshield.json
 
 # OpenCode 运行时状态（会话账本/续跑/boulder），非仓库资产；plans 与报告保留跟踪

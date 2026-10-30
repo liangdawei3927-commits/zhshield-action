@@ -1316,7 +1316,8 @@
         "fail": "失敗",
         "pass": "合格",
         "warn": "警告",
-        "attention": "未検出"
+        "attention": "未検出",
+        "notApplicable": "該当なし"
       },
       "attention": "未検出",
       "attentionHint": "以下のチェックは未実行または結論が出ていないため、合格に含まれません",

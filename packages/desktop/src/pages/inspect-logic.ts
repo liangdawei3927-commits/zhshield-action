@@ -39,6 +39,14 @@ export const STATUS_CONFIG: Record<
     bg: 'rgb(var(--zh-muted) / 0.1)',
     icon: '?',
   },
+  // notApplicable：检测对象在本项目不存在（如无 Web 框架的 Helmet/CSRF）。
+  // 与 attention（未执行/未产出结论）不同：这里「检查过，结论是没有可检对象」。
+  notApplicable: {
+    labelKey: 'page.inspect.status.notApplicable',
+    color: 'rgb(var(--zh-muted))',
+    bg: 'rgb(var(--zh-muted) / 0.1)',
+    icon: '—',
+  },
   // info：仅历史快照（issues-only）会出现（快照含 info 级问题条目）。
   // 与 attention（规则未执行/未产出结论）语义不同，不可混用。
   // 文案复用既有全局键 severity.info，避免新增键（Vite 不监听 root 外的 locale JSON，

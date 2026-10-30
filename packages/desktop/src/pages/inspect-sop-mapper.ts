@@ -23,6 +23,9 @@ export interface SerializedRuleEvaluation {
     domain?: string;
   };
   status: 'passed' | 'failed' | 'error' | 'skipped';
+  /** 不适用标注：检测对象在本项目不存在（如无 Web 框架的 Helmet/CSRF）。
+   *  存在时 status 为 passed，但不可当成「已通过」展示。 */
+  applicability?: 'not-applicable';
   message?: string;
   files?: string[];
   violations?: Array<{
@@ -67,8 +70,11 @@ export function selectIssueChecks(
   return checks.filter((c) => isIssueStatus(c.status));
 }
 
-function mapStatus(status: SerializedRuleEvaluation['status']): CheckStatus {
-  switch (status) {
+function mapStatus(ev: SerializedRuleEvaluation): CheckStatus {
+  // 不适用优先于 status：status 仍是 passed（引擎契约不新增状态），但对用户
+  // 必须显示「不适用」——「没得查」与「查过且安全」是两件事。
+  if (ev.applicability === 'not-applicable') return 'notApplicable';
+  switch (ev.status) {
     case 'passed':
       return 'pass';
     case 'failed':
@@ -109,15 +115,16 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
   const checks: NonNullable<InspectionReportData['checks']> = raw.evaluations.map((ev) => ({
     id: ev.rule.id,
     name: ev.rule.name,
-    status: mapStatus(ev.status),
+    status: mapStatus(ev),
     detail: buildDetail(ev),
     category: ev.violations?.find((v) => v.category)?.category ?? ev.rule.domain ?? undefined,
   }));
 
   const passedCount = checks.filter((c) => c.status === 'pass').length;
   const failureCount = checks.filter((c) => c.status === 'fail').length;
-  // warn 当前不产生（mapStatus 只出 pass/fail/attention），保留按状态统计以维持
-  // total = passed + warnings + failures 不变量与既有 toInspectionReportData 语义对齐。
+  const notApplicableCount = checks.filter((c) => c.status === 'notApplicable').length;
+  // warn 当前不产生（mapStatus 只出 pass/fail/attention/notApplicable），保留按状态统计以维持
+  // total = passed + warnings + failures + notApplicable 不变量与既有 toInspectionReportData 语义对齐。
   const warningCount = checks.filter((c) => c.status === 'warn' || c.status === 'attention').length;
 
   return {
@@ -126,6 +133,7 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
       passed: passedCount,
       warnings: warningCount,
       failures: failureCount,
+      notApplicable: notApplicableCount,
     },
     checks,
     metadata: {

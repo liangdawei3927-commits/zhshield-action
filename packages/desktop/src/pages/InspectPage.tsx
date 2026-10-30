@@ -43,7 +43,29 @@ function checkDetail(
 }
 
 /**
- * 报告统计卡：总/通过/问题（+ 未检测），明细复用 CheckList。
+ * 把一组检查项收成一张统计卡；空组不产卡片（避免永远为 0 的噪音卡）。
+ * 「未检测」与「不适用」都是不该混进 passed/issues 的旁路状态，共用这一构造。
+ */
+function optionalStatCard(
+  group: InspectionReportData['checks'],
+  card: { key: string; label: string; hint?: string },
+  copyToAi: (item: InspectionReportData['checks'][number]) => void,
+  copyAllToAi: (items: InspectionReportData['checks']) => void,
+): ReportStatCard[] {
+  if (group.length === 0) return [];
+  return [
+    {
+      key: card.key,
+      label: card.label,
+      value: group.length,
+      color: 'rgb(var(--zh-muted))',
+      detail: checkDetail(group, copyToAi, copyAllToAi, card.hint),
+    },
+  ];
+}
+
+/**
+ * 报告统计卡：总/通过/问题（+ 未检测/不适用），明细复用 CheckList。
  * attention（规则引擎 error/skipped → 未检测）计入 items.length 分母却不是问题，
  * 单靠 passed/issues 两张卡会让这批检查彻底不可见，用户无从判断哪些规则根本没跑。
  */
@@ -51,6 +73,7 @@ function buildInspectStats({
   items,
   passCount,
   attentionChecks,
+  notApplicableChecks,
   copyToAi,
   copyAllToAi,
   t,
@@ -59,6 +82,7 @@ function buildInspectStats({
   items: InspectionReportData['checks'];
   passCount: number;
   attentionChecks: InspectionReportData['checks'];
+  notApplicableChecks: InspectionReportData['checks'];
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
   t: Translate;
@@ -95,22 +119,23 @@ function buildInspectStats({
         t('page.inspect.issuesHint'),
       ),
     },
-    ...(attentionChecks.length > 0
-      ? [
-          {
-            key: 'attention',
-            label: t('page.inspect.attention'),
-            value: attentionChecks.length,
-            color: 'rgb(var(--zh-muted))',
-            detail: checkDetail(
-              attentionChecks,
-              copyToAi,
-              copyAllToAi,
-              t('page.inspect.attentionHint'),
-            ),
-          },
-        ]
-      : []),
+    ...optionalStatCard(
+      attentionChecks,
+      {
+        key: 'attention',
+        label: t('page.inspect.attention'),
+        hint: t('page.inspect.attentionHint'),
+      },
+      copyToAi,
+      copyAllToAi,
+    ),
+    // 不适用单列：检测对象在本项目不存在，不计入「通过」，也不计入「未检测」。
+    ...optionalStatCard(
+      notApplicableChecks,
+      { key: 'notApplicable', label: t('page.inspect.status.notApplicable') },
+      copyToAi,
+      copyAllToAi,
+    ),
   ];
 }
 
@@ -152,6 +177,9 @@ function InspectReportView({
   const items = report.checks;
   const passCount = items.filter((i) => i.status === 'pass').length;
   const attentionChecks = items.filter((i) => i.status === 'attention');
+  const notApplicableChecks = items.filter((i) => i.status === 'notApplicable');
+  // 不适用项不进「通过率」分母：分母只算可检项，否则每多一条不适用都会拉低通过率。
+  const applicableCount = items.length - notApplicableChecks.length;
   // 历史快照只落盘问题项 → 通过项未知。此时「总检查/通过」显示「—」，
   // 不用 0 冒充（0 会读成「一项都没通过」，是谎报）。
   const isSnapshot = report.coverage === 'issues-only';
@@ -183,6 +211,7 @@ function InspectReportView({
         items,
         passCount,
         attentionChecks,
+        notApplicableChecks,
         copyToAi,
         copyAllToAi,
         t,
@@ -197,7 +226,7 @@ function InspectReportView({
             })
           : t('page.inspect.guardAlsoRan')}
       </p>
-      {isSnapshot ? null : <ProgressBar passCount={passCount} total={items.length} />}
+      {isSnapshot ? null : <ProgressBar passCount={passCount} total={applicableCount} />}
     </ReportShell>
   );
 }

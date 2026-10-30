@@ -85,11 +85,13 @@ export interface InspectionReportData {
     passed: number;
     warnings: number;
     failures: number;
+    /** 不适用检查数（检测对象在本项目不存在，如无 Web 框架的 Helmet/CSRF）：不计数为通过 */
+    notApplicable?: number;
   };
   checks: Array<{
     id: string;
     name: string;
-    status: 'pass' | 'warn' | 'fail' | 'attention' | 'info';
+    status: 'pass' | 'warn' | 'fail' | 'attention' | 'info' | 'notApplicable';
     detail: string;
     category?: string;
     /** 来源引擎/适配器标识（如 'ai-code-review' / 'semgrep' / 'eslint'） */

@@ -1316,7 +1316,8 @@
         "fail": "실패",
         "pass": "통과",
         "warn": "경고",
-        "attention": "미검사"
+        "attention": "미검사",
+        "notApplicable": "해당 없음"
       },
       "attention": "미검출",
       "attentionHint": "다음 검사는 실행되지 않았거나 결론이 없어 통과에 포함되지 않습니다",

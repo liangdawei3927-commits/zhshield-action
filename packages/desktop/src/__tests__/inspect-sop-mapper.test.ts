@@ -188,3 +188,49 @@ describe('toInspectOutcome — 执行失败不再退化为"从未运行"空态',
     expect(outcome.kind).toBe('failed');
   });
 });
+
+describe('toInspectionReportDataFromRuleEngine — 不适用（not-applicable）语义', () => {
+  const notApplicableReport = {
+    total: 2,
+    // 引擎侧已把不适用项从 passed 中剔除
+    passed: 1,
+    failed: 0,
+    errors: 0,
+    skipped: 0,
+    notApplicable: 1,
+    ok: true,
+    durationMs: 500,
+    timestamp: '2026-10-31T08:00:00.000Z',
+    evaluations: [
+      {
+        rule: { id: 'security.web.helmet-check', name: 'Helmet Check', domain: 'security' },
+        status: 'passed' as const,
+        applicability: 'not-applicable' as const,
+        message: '项目未使用 Web 框架，Helmet 检查不适用',
+      },
+      {
+        rule: { id: 'inspect.scan.type-safety', name: 'Type Safety', domain: 'inspect' },
+        status: 'passed' as const,
+      },
+    ],
+  };
+
+  it('不适用评估映射为 notApplicable，而不是 pass', () => {
+    const data = toInspectionReportDataFromRuleEngine(notApplicableReport);
+    expect(data).not.toBeNull();
+    const helmet = data!.checks.find((c) => c.name === 'Helmet Check');
+    expect(helmet?.status).toBe('notApplicable');
+    // 详情保留原因，用户能看到「为什么没查」
+    expect(helmet?.detail).toContain('未使用 Web 框架');
+  });
+
+  it('不适用不进入问题列表，也不计入通过数', () => {
+    const data = toInspectionReportDataFromRuleEngine(notApplicableReport);
+    expect(selectIssueChecks(data!.checks)).toHaveLength(0);
+    // summary.passed 只来自真正通过的检查项（不适用项 status 已不是 pass）
+    expect(data!.summary.passed).toBe(1);
+    expect(data!.summary.notApplicable).toBe(1);
+    // total 仍覆盖全部检查项，且各档之和守恒
+    expect(data!.summary.passed + data!.summary.warnings + data!.summary.failures + (data!.summary.notApplicable ?? 0)).toBe(data!.summary.total);
+  });
+});

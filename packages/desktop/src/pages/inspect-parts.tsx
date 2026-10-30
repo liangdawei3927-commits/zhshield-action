@@ -1,6 +1,7 @@
 import type { InspectionReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { STATUS_CONFIG } from './inspect-logic';
+import { isIssueStatus } from './inspect-sop-mapper';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
@@ -35,7 +36,9 @@ export function CheckList({
   onCopyAll: (items: InspectionReportData['checks']) => void;
 }) {
   const t = useT();
-  const failedCount = items.filter((i) => i.status !== 'pass').length;
+  // 只有真实问题才可「复制到 AI 修复」：attention（未检测）与 notApplicable（不适用）
+  // 都不是待修复项，混进来会让 AI 去「修」一个不存在的问题。
+  const failedCount = items.filter((i) => isIssueStatus(i.status)).length;
   return (
     <ResultCard variant="list" className="overflow-hidden">
       {failedCount > 0 && (
@@ -71,7 +74,7 @@ export function CheckList({
               <span className="text-sm font-medium text-zh-ink-2">{item.name}</span>
               <div className="text-xs mt-0.5 text-zh-muted">{item.detail}</div>
             </div>
-            {item.status !== 'pass' && <CopyToAiButton onClick={() => onCopyToAi(item)} />}
+            {isIssueStatus(item.status) && <CopyToAiButton onClick={() => onCopyToAi(item)} />}
             <span
               className="text-xs px-2 py-0.5 rounded font-medium"
               style={{ background: config.bg, color: config.color }}

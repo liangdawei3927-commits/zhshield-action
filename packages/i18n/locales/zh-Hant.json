@@ -1311,7 +1311,8 @@
         "fail": "失敗",
         "pass": "通過",
         "warn": "警告",
-        "attention": "未檢測"
+        "attention": "未檢測",
+        "notApplicable": "不適用"
       },
       "groupTitle": {},
       "issues": "問題",

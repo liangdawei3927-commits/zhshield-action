@@ -230,4 +230,24 @@ describe('tallyViolationsByCategory — 违规分类统计', () => {
       ['beta', 1],
     ]);
   });
+
+  it('不适用单列、不计入通过——「没得查」不能被读成「查过且安全」', () => {
+    const report = makeReport(
+      [
+        makeEvaluation({
+          rule: makeRule('security.web.helmet-check'),
+          applicability: 'not-applicable',
+          message: 'helmet-configured: 项目未使用 Web 框架，检查不适用',
+        }),
+      ],
+      { passed: 0, notApplicable: 1 },
+    );
+
+    const text = formatText(report);
+    expect(text).toContain('不适用: 1');
+    expect(text).toContain('不适用规则:');
+    expect(text).toContain('security.web.helmet-check');
+    // 不得同时出现在「通过规则」列表：那是两种不同结论
+    expect(text).not.toContain('通过规则:');
+  });
 });

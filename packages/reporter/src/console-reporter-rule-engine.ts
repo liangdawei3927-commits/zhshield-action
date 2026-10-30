@@ -30,6 +30,7 @@ export class RuleEngineSectionFormatter {
     this.formatFailedRules(report, rt);
     this.formatErrorRules(report, rt);
     this.formatSkippedRules(report, rt);
+    this.formatNotApplicableRules(report, rt);
     this.formatPassedRules(report, rt);
   }
 
@@ -41,6 +42,10 @@ export class RuleEngineSectionFormatter {
     const errors = report.errors;
     const skipped = report.skipped;
     const degraded = report.degraded ?? 0;
+    // notApplicable 未计入 passed（aggregate 侧已排除），此处单列，避免「不适用」被读成「已通过」
+    const notApplicable =
+      report.notApplicable ??
+      report.evaluations.filter((e) => e.applicability === 'not-applicable').length;
 
     rt.lines.push(
       `${rt.indent}${this.fmt.bold('汇总')}: ${`${this.fmt.bold(String(total))} ${this.fmt.dim('条规则')}`}`,
@@ -48,6 +53,7 @@ export class RuleEngineSectionFormatter {
     rt.lines.push(
       `${rt.indent}  通过: ${this.fmt.green(String(passed))}  失败: ${this.fmt.red(String(failed))}  ` +
         `错误: ${this.fmt.yellow(String(errors))}  跳过: ${this.fmt.gray(String(skipped))}` +
+        (notApplicable > 0 ? `  不适用: ${this.fmt.dim(String(notApplicable))}` : '') +
         (degraded > 0 ? `  降级: ${this.fmt.yellow(String(degraded))}` : ''),
     );
   }
@@ -115,9 +121,34 @@ export class RuleEngineSectionFormatter {
     }
   }
 
+  /**
+   * 渲染「不适用」的规则。
+   *
+   * 与「通过」必须分开呈现：检测对象在本项目不存在（如无 Web 框架时的 Helmet/CSRF），
+   * 结论是「没得查」而不是「查过且安全」。混入通过列表会让用户误以为该防护已验证。
+   */
+  private formatNotApplicableRules(report: RuleEngineReport, rt: RenderTarget): void {
+    const notApplicableEvals = report.evaluations.filter(
+      (e) => e.applicability === 'not-applicable',
+    );
+    if (notApplicableEvals.length === 0) return;
+    rt.lines.push('');
+    rt.lines.push(
+      `${rt.indent}${this.fmt.bold(this.fmt.gray('不适用规则:'))}` +
+        `${this.fmt.gray('（检测对象在本项目中不存在，不计入通过）')}`,
+    );
+    for (const eval_ of notApplicableEvals) {
+      rt.lines.push(
+        `${rt.indent}  ${this.fmt.gray('—')} ${eval_.rule.id}${eval_.message ? ' — ' + eval_.message : ''}`,
+      );
+    }
+  }
+
   /** 渲染通过的规则（紧凑模式） */
   private formatPassedRules(report: RuleEngineReport, rt: RenderTarget): void {
-    const passedEvals = report.evaluations.filter((e) => e.status === 'passed');
+    const passedEvals = report.evaluations.filter(
+      (e) => e.status === 'passed' && e.applicability !== 'not-applicable',
+    );
     if (passedEvals.length > 0) {
       rt.lines.push('');
       rt.lines.push(`${rt.indent}${this.fmt.bold('通过规则:')}`);

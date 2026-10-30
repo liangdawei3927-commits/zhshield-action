@@ -181,6 +181,9 @@ function guardFindings(report: GuardReport): Finding[] {
 function ruleEngineFindings(report: RuleEngineReport): Finding[] {
   const findings: Finding[] = [];
   for (const ev of report.evaluations) {
+    // 不适用（检测对象在本项目不存在）：既不是问题，也不代表「已通过」——
+    // 不产 finding（SARIF 无结果才是正确表达），由文本报告单列说明。
+    if (ev.applicability === 'not-applicable') continue;
     // P0（复查4）：降级跳过必须可见——"未检测 ≠ 通过"。此前 skipped 被静默略过，
     // CI（SARIF 0 results）完全看不到任何检查没跑。
     if (ev.status === 'skipped') {

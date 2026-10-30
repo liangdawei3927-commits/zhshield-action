@@ -11,7 +11,9 @@ import type { BackupOrchestrator } from '@zh/kernel';
 
 // @zh/kernel 顶层同时导出旧版增量备份与新版一键备份的 BackupResult/BackupRecord，
 // 显式命名导出优先导致顶层类型指向旧版。此处从实例方法签名推导，避免命名冲突。
+/** kernel 一键备份的执行结果（按实例方法签名推导，规避顶层同名旧类型） */
 export type KernelBackupResult = Awaited<ReturnType<BackupOrchestrator['execute']>>;
+/** 单条备份记录（取 getRecords() 返回数组的元素类型） */
 export type KernelBackupRecord = ReturnType<BackupOrchestrator['getRecords']>[number];
 
 /** 序列化后的备份结果（kernel 的 timestamp 为 Date，IPC 传输需转 ISO 字符串） */

@@ -97,9 +97,13 @@ function EmptyGates() {
  *   · 无越界但存在未判定   → 未判定（警示，文案写明不等于通过）
  *   · 其余                 → 通过（绿）
  */
-function resolveVerdict(gates: ProjectGateReportData): 'failed' | 'undetermined' | 'passed' {
+function resolveVerdict(
+  gates: ProjectGateReportData | undefined,
+): 'failed' | 'undetermined' | 'passed' | 'none' {
+  // total===0 = 规则集里没有门禁规则，是合法态而非「全部达标」⇒ 单列 'none'。
   // 阻断型越界与否由 `blockingFailed` 定（非阻断条目失败不拉红，见硬约束③）；
   // 未判定单独一档，不并入失败。
+  if (!gates || (gates.total ?? 0) === 0) return 'none';
   if ((gates.blockingFailed ?? 0) > 0) return 'failed';
   if ((gates.undetermined ?? 0) > 0) return 'undetermined';
   return 'passed';
@@ -108,7 +112,7 @@ function resolveVerdict(gates: ProjectGateReportData): 'failed' | 'undetermined'
 export function ProjectGatesSection({ gates }: { gates?: ProjectGateReportData }) {
   const t = useT();
   const hasRules = (gates?.total ?? 0) > 0;
-  const verdict = hasRules ? resolveVerdict(gates!) : 'none';
+  const verdict = resolveVerdict(gates);
   const stateColor =
     verdict === 'none'
       ? 'rgb(var(--zh-muted))'
@@ -135,7 +139,7 @@ export function ProjectGatesSection({ gates }: { gates?: ProjectGateReportData }
         <span className="text-xs font-medium" style={{ color: stateColor }}>
           {headline}
         </span>
-        {hasRules && <GateSummary gates={gates!} />}
+        {hasRules && gates && <GateSummary gates={gates} />}
       </div>
       {verdict === 'undetermined' && (
         <p className="mb-2 text-[11px] leading-relaxed text-zh-muted">
@@ -148,7 +152,7 @@ export function ProjectGatesSection({ gates }: { gates?: ProjectGateReportData }
       <ResultCard variant="list" className="overflow-hidden">
         {hasRules ? (
           <ul className="divide-y divide-zh-line/40">
-            {gates!.items.map((item) => (
+            {(gates?.items ?? []).map((item) => (
               <GateRow key={item.ruleId} item={item} />
             ))}
           </ul>

@@ -113,6 +113,14 @@ function isToolErrorEntry(issue: Record<string, unknown>): boolean {
   return typeof issue.ruleId === 'string' && issue.ruleId.includes('.external.');
 }
 
+/** 首次引导回退形态：从巡检报告包装里取出 issues 数组（非数组返回 undefined） */
+function extractReportIssues(
+  report: Record<string, unknown> | undefined,
+): ReadonlyArray<Record<string, unknown>> | undefined {
+  const issues = report?.issues;
+  return Array.isArray(issues) ? (issues as ReadonlyArray<Record<string, unknown>>) : undefined;
+}
+
 // ─── 辅助：issues 排序与截断 ────────────────────────────────
 // 大型项目一次体检可产生数百条条目（如 refactor 结构性异味），全量返回会
 // 占用 AI 上下文并挤掉用户自己的代码，故默认只返回 severity 最高的若干条。
@@ -230,6 +238,7 @@ server.tool(
     let parsed: {
       issues?: ReadonlyArray<Record<string, unknown>>;
       report?: Record<string, unknown>;
+      note?: string;
     };
     try {
       parsed = JSON.parse(text);
@@ -243,13 +252,19 @@ server.tool(
         ],
       };
     }
-    // 首次引导的回退形态：无 latest.json 时返回的是巡检报告包装，没有 issues 数组
-    if (!Array.isArray(parsed.issues)) {
+    // 首次引导的回退形态：latest.json 缺失时返回的是巡检报告包装（issues 嵌在 report 内）。
+    // 旧实现在此直接 return 原文 —— source/severity/category/limit 全部失效（实测传入
+    // severity=error 仍返回全量），且调用方拿到的结构与其他分支不一致。改为取 report.issues
+    // 走同一套过滤链路，并把引导说明保留在 note 字段。
+    const rawIssues: ReadonlyArray<Record<string, unknown>> | undefined = Array.isArray(parsed.issues)
+      ? parsed.issues
+      : extractReportIssues(parsed.report);
+    if (!rawIssues) {
       return { content: [{ type: 'text', text }] };
     }
     // toolError 与 finding 分离：外部工具执行条目不进入 issues 主列表
-    const toolErrors = parsed.issues.filter(isToolErrorEntry);
-    let issues = parsed.issues.filter((i) => !isToolErrorEntry(i));
+    const toolErrors = rawIssues.filter(isToolErrorEntry);
+    let issues = rawIssues.filter((i) => !isToolErrorEntry(i));
     if (severity) issues = issues.filter((i) => i.severity === severity);
     if (category) issues = issues.filter((i) => i.category === category);
     if (source) issues = issues.filter((i) => i.source === source);
@@ -269,6 +284,7 @@ server.tool(
             returned: issues.length,
             truncated,
             issues,
+            ...(typeof parsed.note === 'string' ? { note: parsed.note } : {}),
             toolErrors: { count: toolErrors.length, note: t('mcp.toolErrorsNote'), items: toolErrors },
           }),
         },

@@ -259,3 +259,103 @@ describe('runGuardCommand — 机器可读报告落盘（--format/--report）', 
     }
   });
 });
+
+/** SOP 分支产出 RuleEngineReport：evaluations + ok 是 reporter 识别该 schema 的键 */
+function makeSopReport() {
+  return {
+    ok: true,
+    total: 0,
+    passed: 0,
+    failed: 0,
+    errors: 0,
+    skipped: 0,
+    degraded: 0,
+    blockingCount: 0,
+    evaluations: [],
+    durationMs: 0,
+    timestamp: new Date(),
+  };
+}
+
+/** --sop 分支的 runner：必须同时具备 runSop* 与后置门禁入口（finalizeScan 必然调用后者） */
+function makeSopRunner(runSopImpl: () => Promise<unknown>, isGuard: boolean): PipelineRunner {
+  const runner: Record<string, unknown> = {
+    evaluatePostScanGates: vi.fn(() => ({ total: 0, failed: 0, undetermined: 0 })),
+  };
+  runner[isGuard ? 'runSopGuard' : 'runSopInspect'] = vi.fn(runSopImpl);
+  return runner as unknown as PipelineRunner;
+}
+
+function makeSopReporter() {
+  return {
+    format: vi.fn(() => ({ text: 'TEXT', passed: true })),
+    formatRuleEngine: vi.fn(() => ({ text: 'SOP', passed: true })),
+  };
+}
+
+describe('--sop 分支 — 报告文件必须与默认路径分开（两套 schema 不得同文件）', () => {
+  let errors: string[];
+
+  beforeEach(() => {
+    stubProcessExit();
+    process.exitCode = undefined;
+    errors = [];
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.join(' '));
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  function makeTmpProject(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-cli-sop-report-'));
+  }
+
+  it('Given --sop --format json，When inspect，Then 写 zhshield-sop.json 且不产生/覆盖 zhshield.json', async () => {
+    const projectDir = makeTmpProject();
+    try {
+      await exitCodeOf(() =>
+        runInspectCommand(
+          makeSopRunner(async () => makeSopReport(), false),
+          makeOpts({ command: 'inspect', sop: true, format: 'json', dryRun: false }),
+          makeSopReporter() as unknown as ConsoleReporter,
+          projectDir,
+        ),
+      );
+
+      const sopPath = path.join(projectDir, 'zhshield-sop.json');
+      expect(fs.existsSync(sopPath)).toBe(true);
+      const parsed = JSON.parse(fs.readFileSync(sopPath, 'utf-8')) as { evaluations?: unknown };
+      expect(Array.isArray(parsed.evaluations)).toBe(true);
+      // zhshield.json 是 MCP 首次引导回退读取的巡检报告（issues schema），不得被 SOP 报告占用
+      expect(fs.existsSync(path.join(projectDir, 'zhshield.json'))).toBe(false);
+      expect(errors.join('\n')).toContain('zhshield-sop.json');
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('Given --sop --format json，When guard，Then 写 zhshield-guard-sop.json 且不产生/覆盖 zhshield-guard.json', async () => {
+    const projectDir = makeTmpProject();
+    try {
+      await exitCodeOf(() =>
+        runGuardCommand(
+          makeSopRunner(async () => makeSopReport(), true),
+          makeOpts({ command: 'guard', sop: true, format: 'json' }),
+          makeSopReporter() as unknown as ConsoleReporter,
+          projectDir,
+        ),
+      );
+
+      expect(fs.existsSync(path.join(projectDir, 'zhshield-guard-sop.json'))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, 'zhshield-guard.json'))).toBe(false);
+      expect(fs.existsSync(path.join(projectDir, 'zhshield.json'))).toBe(false);
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+});

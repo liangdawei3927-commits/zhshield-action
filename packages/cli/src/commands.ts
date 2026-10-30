@@ -59,7 +59,13 @@ function relativizeFindings(findings: Finding[], projectDir: string): void {
 }
 
 /** 可写机器可读报告的命令；各命令报告 schema 不同，默认落盘名必须区分 */
-type ReportCommand = 'inspect' | 'guard' | 'refactor' | 'pipeline';
+type ReportCommand =
+  | 'inspect'
+  | 'inspect-sop'
+  | 'guard'
+  | 'guard-sop'
+  | 'refactor'
+  | 'pipeline';
 
 /**
  * 各命令的默认报告名基名。
@@ -68,10 +74,16 @@ type ReportCommand = 'inspect' | 'guard' | 'refactor' | 'pipeline';
  * （totalSmells）、guard（results）三套 schema 写同一路径，后跑的覆盖先跑的，
  * 用户拿到的「最近一次报告」可能根本不是刚跑的命令。inspect 保留 zhshield.json
  * 是因为 MCP 首次引导回退读该文件（desktop/electron/zhshield-mcp.ts），改名会断。
+ *
+ * `--sop` 分支产出的是 RuleEngineReport（evaluations/degraded），与默认路径的
+ * InspectionReport / GuardReport 是**不同 schema**。放进同名文件会让解析方
+ * （CI 脚本、MCP）静默拿到错字段（如 `issues` 不存在 → 误判零问题），故单独命名。
  */
 const DEFAULT_REPORT_BASE: Record<ReportCommand, string> = {
   inspect: 'zhshield',
+  'inspect-sop': 'zhshield-sop',
   guard: 'zhshield-guard',
+  'guard-sop': 'zhshield-guard-sop',
   refactor: 'zhshield-refactor',
   pipeline: 'zhshield-pipeline',
 };
@@ -152,7 +164,7 @@ export async function runGuardCommand(
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    writeReportFile(opts, report, findings, { projectDir, command: 'guard' });
+    writeReportFile(opts, report, findings, { projectDir, command: 'guard-sop' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -184,7 +196,7 @@ export async function runInspectCommand(
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
-    writeReportFile(opts, report, findings, { projectDir, command: 'inspect' });
+    writeReportFile(opts, report, findings, { projectDir, command: 'inspect-sop' });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {

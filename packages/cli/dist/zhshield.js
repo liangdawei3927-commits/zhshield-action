@@ -4736,6 +4736,7 @@ var init_zh_Hans = __esm({
             fail: "\u62E6\u622A",
             idle: "\u672A\u89E6\u53D1",
             pass: "\u901A\u8FC7",
+            skip: "\u8DF3\u8FC7",
             warn: "\u8B66\u544A"
           },
           statusShort: {
@@ -6982,6 +6983,7 @@ var init_zh_Hant = __esm({
             fail: "\u6514\u622A",
             idle: "\u672A\u89F8\u767C",
             pass: "\u901A\u904E",
+            skip: "\u8DF3\u904E",
             warn: "\u8B66\u544A"
           },
           statusShort: {
@@ -9228,6 +9230,7 @@ var init_en = __esm({
             fail: "Blocked",
             idle: "Not triggered",
             pass: "Passed",
+            skip: "Skipped",
             warn: "Warnings"
           },
           statusShort: {
@@ -11474,6 +11477,7 @@ var init_ko = __esm({
             fail: "\uCC28\uB2E8",
             idle: "\uBBF8\uBC1C\uB3D9",
             pass: "\uD1B5\uACFC",
+            skip: "\uAC74\uB108\uB700",
             warn: "\uACBD\uACE0"
           },
           statusShort: {
@@ -13720,6 +13724,7 @@ var init_ja = __esm({
             fail: "\u30D6\u30ED\u30C3\u30AF",
             idle: "\u672A\u30C8\u30EA\u30AC\u30FC",
             pass: "\u5408\u683C",
+            skip: "\u30B9\u30AD\u30C3\u30D7",
             warn: "\u8B66\u544A"
           },
           statusShort: {
@@ -494367,8 +494372,12 @@ var EVAL_STATUS_MAP = {
   passed: "passed",
   failed: "failed",
   error: "error",
-  skipped: "warning"
+  skipped: "skipped"
 };
+function resolveEvalStatus(ev) {
+  if (ev.status === "skipped") return ev.degraded === true ? "warning" : "skipped";
+  return EVAL_STATUS_MAP[ev.status] ?? "error";
+}
 var EVAL_SEVERITY_MAP = {
   critical: "error",
   high: "error",
@@ -494376,6 +494385,7 @@ var EVAL_SEVERITY_MAP = {
   low: "info",
   info: "info"
 };
+var isTraditionalWarning = (r) => r.status !== "passed" && r.status !== "skipped" && r.severity === "warning";
 var GuardEngine = class {
   configLoader;
   adapterRegistry;
@@ -494409,18 +494419,7 @@ var GuardEngine = class {
     });
   }
   aggregateReport(results, options2) {
-    const failed = results.filter((r) => r.status === "failed");
-    const errors = results.filter((r) => r.status === "error");
-    const warnings = results.filter(
-      (r) => r.status !== "passed" && r.severity === "warning"
-    ).length;
-    return this.buildReport({
-      results,
-      options: options2,
-      failedCount: failed.length,
-      errorsCount: errors.length,
-      warningsCount: warnings
-    });
+    return this.buildReportFromResults(results, options2, isTraditionalWarning);
   }
   async run(options2) {
     if (this.sopEngine && !this._sopRunning) {
@@ -494536,19 +494535,28 @@ var GuardEngine = class {
     });
   }
   buildSopReport(results, options2) {
-    const failed = results.filter((r) => r.status === "failed");
-    const errors = results.filter((r) => r.status === "error");
-    const warnings = results.filter((r) => r.status === "warning").length;
+    return this.buildReportFromResults(results, options2, (r) => r.status === "warning");
+  }
+  /**
+   * 统计四项计数并组装报告（两条路径共用）。
+   *
+   * warnings 口径由调用方以谓词注入，不能在此折成一个：传统路径判的是「非
+   * passed/skipped 且规则严重级为 warning」，SOP 路径判的是「归一化后的落地状态
+   * 就是 warning」，两者对同一批结果给出的数字不同，合并会把 guard 传统检查的
+   * 警告计数改错。
+   */
+  buildReportFromResults(results, options2, isWarning) {
     return this.buildReport({
       results,
       options: options2,
-      failedCount: failed.length,
-      errorsCount: errors.length,
-      warningsCount: warnings
+      failedCount: results.filter((r) => r.status === "failed").length,
+      errorsCount: results.filter((r) => r.status === "error").length,
+      warningsCount: results.filter(isWarning).length,
+      skippedCount: results.filter((r) => r.status === "skipped").length
     });
   }
   buildReport(params) {
-    const { results, options: options2, failedCount, errorsCount, warningsCount } = params;
+    const { results, options: options2, failedCount, errorsCount, warningsCount, skippedCount } = params;
     return {
       contractVersion: "p0.v1",
       mode: options2.mode,
@@ -494562,7 +494570,8 @@ var GuardEngine = class {
         failed: failedCount,
         warnings: warningsCount,
         blocking: results.filter((r) => r.status !== "passed" && r.blocking).length,
-        errors: errorsCount
+        errors: errorsCount,
+        skipped: skippedCount
       },
       results,
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -494572,14 +494581,14 @@ var GuardEngine = class {
     return {
       checkId: ev.rule?.id || "unknown",
       adapter: "sop-engine",
-      status: EVAL_STATUS_MAP[ev.status] ?? "error",
+      status: resolveEvalStatus(ev),
       severity: this.resolveEvalSeverity(ev),
       // F1-4：优先消费 kernel 附加的阻断判定；存量/外部评估缺省该字段时回退旧行为（failed 即阻断）
       blocking: ev.blocking ?? ev.status === "failed",
       message: ev.message || `${ev.status}: ${ev.rule?.name || ev.rule?.id || "\u672A\u77E5\u89C4\u5219"}`,
       details: ev.violations ? { violations: ev.violations, files: ev.files } : void 0,
       duration: ev.durationMs,
-      ...ev.degraded ? { degraded: true } : {}
+      ...ev.degraded === true ? { degraded: true } : {}
     };
   }
   /** 解析评估的严重级：规则严重级映射，缺省回退 warning */
@@ -504642,7 +504651,7 @@ var SemgrepRuleWriter = class {
   detectLanguages(rule) {
     if (rule.language) return [rule.language];
     if (rule.languages) return rule.languages;
-    return ["typescript"];
+    return ["typescript", "javascript"];
   }
   buildRuleYaml(rules) {
     const lines = ["rules:"];
@@ -508848,6 +508857,15 @@ var SKIP_DIR_EXACT = /* @__PURE__ */ new Set([
   "coverage",
   "vendor",
   "test-fixtures",
+  // 测试资产：@zh/refactor 的 detector-heuristics.isTestFixture 已把 __tests__ 与
+  // fixtures 定义为「刻意构造的样例代码，用于驱动规则测试，不是生产反模式」。
+  // 此处沿用同一口径 —— 两个包各写一份判定必然漂移，届时同一文件的复杂度
+  // 在「重构域」被豁免、在「体检域」被算进产品质量指标。
+  // 2026-10-30 实测遗漏后果：fileLength 峰值 875 落在 complexity-detector.test.ts、
+  // nestingDepth 5 与 parameterCount 6 落在 fixtures/deep-nesting.fixture.ts，
+  // 规则报出的 5 条复杂度告警里有 3 条的峰值来自测试资产（指向的不是要修的产品代码）。
+  "__tests__",
+  "fixtures",
   "__snapshots__"
 ]);
 var SKIP_DIR_PREFIX = /^(dist|build|out|release|output|public|static|generated)([-_.]|$)/i;
@@ -513141,6 +513159,10 @@ var StageSectionFormatter = class {
     lines.push(
       `${indent}  \u901A\u8FC7: ${this.fmt.green(String(passed))}  \u5931\u8D25: ${this.fmt.red(String(failed))}`
     );
+    const skipped = summary?.skipped ?? 0;
+    if (skipped > 0) {
+      lines.push(`${indent}  ${this.fmt.dim(`\u8DF3\u8FC7\uFF08\u672A\u5728\u672C\u9636\u6BB5\u6267\u884C\uFF09: ${skipped}`)}`);
+    }
     lines.push(
       `${indent}${this.fmt.dim(`\u963B\u65AD: ${report.ok === false ? "\u662F" : report.ok === null ? "\u5E72\u8FD0\u884C" : "\u5426"}`)}`
     );
@@ -513480,6 +513502,7 @@ function guardFindings(report) {
   const findings = [];
   for (const res of report.results) {
     if (res.status === "passed") continue;
+    if (res.status === "skipped") continue;
     const details = res.details;
     if (details?.violations?.length) {
       for (const v of details.violations) {
@@ -514064,9 +514087,17 @@ function relativizeFindings(findings, projectDir) {
     }
   }
 }
-function writeReportFile(opts, report, findings, projectDir) {
+var DEFAULT_REPORT_BASE = {
+  inspect: "zhshield",
+  guard: "zhshield-guard",
+  refactor: "zhshield-refactor",
+  pipeline: "zhshield-pipeline"
+};
+function writeReportFile(opts, report, findings, target) {
+  const { projectDir, command } = target;
+  const base = DEFAULT_REPORT_BASE[command];
   if (opts.format === "sarif") {
-    const outPath = opts.report || "zhshield.sarif";
+    const outPath = opts.report || `${base}.sarif`;
     const absPath = path59.resolve(projectDir, outPath);
     (0, import_node_fs3.mkdirSync)(path59.dirname(absPath), { recursive: true });
     (0, import_node_fs3.writeFileSync)(absPath, toSarif(findings), "utf8");
@@ -514074,7 +514105,7 @@ function writeReportFile(opts, report, findings, projectDir) {
     return;
   }
   if (opts.format === "json") {
-    const outPath = opts.report || "zhshield.json";
+    const outPath = opts.report || `${base}.json`;
     const absPath = path59.resolve(projectDir, outPath);
     (0, import_node_fs3.mkdirSync)(path59.dirname(absPath), { recursive: true });
     (0, import_node_fs3.writeFileSync)(absPath, formatReportJson(report), "utf8");
@@ -514111,7 +514142,7 @@ async function runGuardCommand(runner, opts, reporter, projectDir) {
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: "guard" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -514126,7 +514157,7 @@ async function runGuardCommand(runner, opts, reporter, projectDir) {
       stage: "guard"
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: "guard" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   }
@@ -514137,7 +514168,7 @@ async function runInspectCommand(runner, opts, reporter, projectDir) {
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: "inspect" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   } else {
@@ -514152,7 +514183,7 @@ async function runInspectCommand(runner, opts, reporter, projectDir) {
       stage: "inspect"
     });
     console.log(formatted.text);
-    writeReportFile(opts, report, findings, projectDir);
+    writeReportFile(opts, report, findings, { projectDir, command: "inspect" });
     applyDegradedGuard(report);
     finalizeScan(runner, opts, blocked);
   }
@@ -514169,7 +514200,7 @@ async function runRefactorCommand(runner, opts, reporter, projectDir) {
     stage: "refactor"
   });
   console.log(formatted.text);
-  writeReportFile(opts, report, findings, projectDir);
+  writeReportFile(opts, report, findings, { projectDir, command: "refactor" });
   finalizeScan(runner, opts, blocked);
 }
 async function baselineCapture(runner, projectDir) {
@@ -514258,7 +514289,7 @@ async function runPipelineCommand(runner, opts, reporter, projectDir) {
   const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
   const formatted = reporter.format(report);
   console.log(formatted.text);
-  writeReportFile(opts, report, findings, projectDir);
+  writeReportFile(opts, report, findings, { projectDir, command: "pipeline" });
   applyDegradedGuard(void 0, [report.guard, report.inspect]);
   finalizeScan(runner, opts, blocked);
 }

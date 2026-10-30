@@ -12,6 +12,7 @@ overrides:
   fast-uri: '>=4.2.3'
   multer: '>=2.5.0'
   hono: '>=4.13.11'
+  '@hono/node-server': '>=2.1.3'
   nanoid: '>=3.3.18'
   '@xmldom/xmldom': '>=0.9.12'
   vitest: 4.1.12
@@ -101,7 +102,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/cli:
     dependencies:
@@ -135,7 +136,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/db:
     dependencies:
@@ -157,7 +158,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/dependency:
     dependencies:
@@ -182,7 +183,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/desktop:
     dependencies:
@@ -360,7 +361,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/fingerprint:
     dependencies:
@@ -379,7 +380,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/garbage:
     dependencies:
@@ -395,7 +396,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/guard:
     dependencies:
@@ -423,7 +424,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/i18n:
     dependencies:
@@ -439,7 +440,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/inspect:
     dependencies:
@@ -467,7 +468,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/kernel:
     dependencies:
@@ -519,7 +520,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/performance:
     dependencies:
@@ -538,7 +539,7 @@ importers:
         version: 22.20.1
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/pipeline:
     dependencies:
@@ -581,7 +582,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/refactor:
     dependencies:
@@ -600,7 +601,7 @@ importers:
         version: 22.20.1
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/reporter:
     dependencies:
@@ -631,7 +632,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/scoring:
     dependencies:
@@ -662,7 +663,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/security:
     dependencies:
@@ -690,7 +691,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/sentinel:
     dependencies:
@@ -718,7 +719,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/server:
     dependencies:
@@ -797,7 +798,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/shared:
     dependencies:
@@ -813,7 +814,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 4.1.12
-        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
 
 packages:
 
@@ -1415,8 +1416,8 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@hono/node-server@2.0.12':
-    resolution: {integrity: sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==}
+  '@hono/node-server@2.1.5':
+    resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: '>=4.13.11'
@@ -5047,7 +5048,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/node-server@2.0.12(hono@4.13.13)':
+  '@hono/node-server@2.1.5(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
 
@@ -5132,7 +5133,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.1(supports-color@7.2.0)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.0.12(hono@4.13.13)
+      '@hono/node-server': 2.1.5(hono@4.13.13)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -8388,7 +8389,7 @@ snapshots:
       tsx: 4.23.1
       yaml: 2.9.0
 
-  vitest@4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)):
+  vitest@4.1.12(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10(vitest@4.1.12))(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.12
       '@vitest/mocker': 4.1.12(vite@6.4.5(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))

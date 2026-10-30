@@ -128,7 +128,10 @@ export class SemgrepRuleWriter {
   private detectLanguages(rule: SemgrepRule): string[] {
     if (rule.language) return [rule.language];
     if (rule.languages) return rule.languages;
-    return ['typescript'];
+    // 未声明语言的模板规则默认覆盖 TS + JS：此前仅 typescript 会让 .js 文件
+    // 整类漏扫（semgrep 按语言分派目标文件），实测 /tmp 埋雷项目的
+    // command-injection / sql-injection / xss 全部落在 .js 里 → 三条规则静默 0 命中。
+    return ['typescript', 'javascript'];
   }
 
   private buildRuleYaml(rules: SemgrepRuleYaml[]): string {

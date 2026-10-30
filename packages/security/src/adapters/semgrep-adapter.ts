@@ -104,9 +104,17 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private buildScanArgs(rulesDir: string, options: ToolScanOptions): string[] {
-    const isQuick = options.config?.severity?.includes('ERROR');
-    const configArg = isQuick ? path.join(rulesDir, 'high-severity') : rulesDir;
-    const args = ['scan', '--config', configArg, '--json'];
+    // 快速模式只关心 ERROR 级：若规则目录提供 high-severity 子集则用它，否则回退整目录
+    // 并用 semgrep 的 --severity 过滤。此前无条件拼 rulesDir/high-severity，而内置规则
+    // 资产（@zh/kernel/dist/assets/semgrep）从来没有该子目录 → 必然 "unable to find
+    // config" 报 error，快速扫描永远拿不到结果。
+    const errorOnly = options.config?.severity?.includes('ERROR') === true;
+    const highSeverityDir = path.join(rulesDir, 'high-severity');
+    const useHighSeverityDir = errorOnly && fs.existsSync(highSeverityDir);
+    const args = ['scan', '--config', useHighSeverityDir ? highSeverityDir : rulesDir, '--json'];
+    if (errorOnly && !useHighSeverityDir) {
+      args.push('--severity', 'ERROR');
+    }
     if (options.targetFiles && options.targetFiles.length > 0) {
       args.push(...options.targetFiles);
     } else {

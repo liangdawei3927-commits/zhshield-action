@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { SemgrepOutput } from '../adapters/tool-output-types';
 
 // Mutable state accessible from vi.mock factories via vi.hoisted
-const state = vi.hoisted(() => ({ mockStdout: '' }));
+const state = vi.hoisted(() => ({ mockStdout: '', existsHighSeverity: false }));
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
@@ -15,7 +15,11 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
+  // 默认「规则目录存在」；high-severity 子目录由用例显式开关——内置规则资产里
+  // 并没有该子目录，适配器必须能回退到整目录 + --severity 过滤
+  existsSync: vi.fn((p: unknown) =>
+    String(p).includes('high-severity') ? state.existsHighSeverity : true,
+  ),
   // adapter 在规则目录存在后还会调用 fs.promises.access 二次校验
   promises: { access: vi.fn(async () => undefined) },
 }));
@@ -200,5 +204,50 @@ describe('SemgrepAdapter dataflow_trace → codeFlows', () => {
       { location: { file: 'src/source.ts', line: 2, column: 3 }, message: 'entry' },
       { location: { file: 'src/vuln.ts', line: 10, column: 5 }, message: 'sink' },
     ]);
+  });
+});
+
+// 快速模式（config.severity 含 ERROR）此前无条件指向 rulesDir/high-severity，
+// 而内置规则资产从未提供该子目录 → semgrep 必然 "unable to find config" 报 error。
+// 这里锁死「目录缺失时必须回退整目录 + --severity 过滤」这一行为契约。
+describe('SemgrepAdapter 快速模式参数构造', () => {
+  beforeEach(() => {
+    state.mockStdout = JSON.stringify({ results: [] });
+    vi.clearAllMocks();
+  });
+
+  async function lastScanArgs(): Promise<string[]> {
+    const { execFile } =
+      await vi.importMock<typeof import('node:child_process')>('node:child_process');
+    const calls = (execFile as unknown as { mock: { calls: Array<[string, string[]]> } }).mock
+      .calls;
+    return calls.at(-1)![1];
+  }
+
+  it('规则目录没有 high-severity 子目录时，回退整目录并追加 --severity ERROR', async () => {
+    state.existsHighSeverity = false;
+    await new SemgrepAdapter().scan({ projectPath: '/test', config: { severity: ['ERROR'] } });
+
+    const args = await lastScanArgs();
+    expect(args[args.indexOf('--config') + 1]).not.toContain('high-severity');
+    expect(args[args.indexOf('--severity') + 1]).toBe('ERROR');
+  });
+
+  it('规则目录提供 high-severity 子目录时，优先使用该目录且不再重复加 --severity', async () => {
+    state.existsHighSeverity = true;
+    await new SemgrepAdapter().scan({ projectPath: '/test', config: { severity: ['ERROR'] } });
+
+    const args = await lastScanArgs();
+    expect(args[args.indexOf('--config') + 1]).toContain('high-severity');
+    expect(args).not.toContain('--severity');
+  });
+
+  it('非快速模式使用整目录，不做严重级过滤', async () => {
+    state.existsHighSeverity = false;
+    await new SemgrepAdapter().scan({ projectPath: '/test' });
+
+    const args = await lastScanArgs();
+    expect(args[args.indexOf('--config') + 1]).not.toContain('high-severity');
+    expect(args).not.toContain('--severity');
   });
 });

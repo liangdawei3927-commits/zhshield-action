@@ -57,7 +57,10 @@ export function errorEvaluation(
  * 与 P0-2（规则 0 条）同级的盲检/降级护栏——什么都没查 = 不得通过。
  */
 export function aggregate(evaluations: RuleEvaluation[], durationMs: number): RuleEngineReport {
-  const passed = evaluations.filter((e) => e.status === 'passed').length;
+  const notApplicable = evaluations.filter((e) => e.applicability === 'not-applicable').length;
+  const passed = evaluations.filter(
+    (e) => e.status === 'passed' && e.applicability !== 'not-applicable',
+  ).length;
   const failed = evaluations.filter((e) => e.status === 'failed').length;
   const errors = evaluations.filter((e) => e.status === 'error').length;
   const skipped = evaluations.filter((e) => e.status === 'skipped').length;
@@ -71,6 +74,7 @@ export function aggregate(evaluations: RuleEvaluation[], durationMs: number): Ru
     errors,
     skipped,
     degraded,
+    notApplicable,
     ok: failed === 0 && errors === 0 && degraded === 0,
     blockingCount,
     evaluations,

@@ -67,6 +67,26 @@ async function runSecurityCheck(
     });
 
     const violations = collectGuardViolations(result, rule);
+    const results = result?.results ?? [];
+    // 全部检测项都确知不适用（如无 Web 框架时的 Helmet/CSRF）→ 规则整体不适用。
+    // 任一检测项可检即保持普通 passed/failed：混合场景下规则确实被执行过。
+    const notApplicable =
+      results.length > 0 && results.every((r) => r.applicability === 'not-applicable');
+    if (notApplicable) {
+      const reasons = results
+        .map((r) => r.message)
+        .filter((m): m is string => typeof m === 'string' && m.length > 0);
+      return {
+        rule,
+        status: 'passed',
+        applicability: 'not-applicable',
+        violations,
+        message: reasons.join('；') || '规则的检测对象在本项目中不存在，检查不适用',
+        durationMs: 0,
+        targetEngine: 'inspect',
+        timestamp: new Date(),
+      };
+    }
     return {
       rule,
       status: violations.length === 0 ? 'passed' : 'failed',

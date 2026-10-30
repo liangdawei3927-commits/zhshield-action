@@ -41,8 +41,10 @@ export interface InspectEngineLike {
 export interface SecurityCheckEngineLike {
   // opts 设为 unknown：实现侧接受 { mode, target, checks, dryRun }，kernel 不反向依赖 @zh/security，
   // 由调用方（dispatch-evaluators）负责构造（与 GuardEngineLike.run 同一约定）。
+  // applicability：实现侧可标注「确知不适用」（如无 Web 框架的 Helmet/CSRF），
+  // 由派发层聚合为 RuleEvaluation.applicability。
   run(opts: unknown): Promise<{
-    results?: Array<{ status?: string; message?: string }>;
+    results?: Array<{ status?: string; message?: string; applicability?: string }>;
   }>;
 }
 

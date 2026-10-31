@@ -78,7 +78,7 @@ describe('JscpdAdapter', () => {
     expect(issue.line).toBe(13);
     expect(issue.message).toContain('dup-a.ts:13');
     expect(issue.message).toContain('dup-b.ts:7');
-    expect(issue.ruleId).toBe('jscpd/duplicate');
+    expect(issue.ruleId).toBe('refactor.scan.official.duplication');
     expect(issue.severity).toBe('warning');
   });
 

@@ -313,7 +313,9 @@ export class JscpdAdapter implements ToolAdapter {
     const format = d.format || 'code';
     return {
       id: randomUUID(),
-      ruleId: 'jscpd/duplicate',
+      // 《07》O1：重复代码唯一归重构域。此适配器只提供 jscpd 执行能力，
+      // 产出的条目按 canonical ruleId 归 refactor，体检/垃圾不得再列重复明细。
+      ruleId: 'refactor.scan.official.duplication',
       severity: 'warning',
       category: 'quality',
       message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}:${secondStart}`,
@@ -322,7 +324,7 @@ export class JscpdAdapter implements ToolAdapter {
       column: 0,
       suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile}:${secondStart}-${secondEnd})`,
       autoFixable: false,
-      source: 'inspect',
+      source: 'refactor',
       fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,
     };
   }

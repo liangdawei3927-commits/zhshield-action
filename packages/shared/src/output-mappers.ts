@@ -364,7 +364,8 @@ export const jscpdMapper: ToolOutputMapper = (output: unknown): Issue[] => {
     const format = d.format || 'code';
     return {
       id: randomUUID(),
-      ruleId: 'jscpd/duplicate',
+      // 《07》O1：重复代码唯一归重构域（canonical ruleId，避免 jscpd/duplicate 游离在归属表之外）
+      ruleId: 'refactor.scan.official.duplication',
       severity: 'warning',
       category: 'quality',
       message: `发现重复代码 (${format}): ${firstFile}:${firstLines} ↔ ${secondFile || '?'}`,
@@ -373,7 +374,7 @@ export const jscpdMapper: ToolOutputMapper = (output: unknown): Issue[] => {
       column: 0,
       suggestion: `提取公共代码到共享模块 (重复位置: ${secondFile})`,
       autoFixable: false,
-      source: 'inspect',
+      source: 'refactor',
       fingerprint: `jscpd:${idx}:${firstFile}:${firstLines}`,
     };
   });

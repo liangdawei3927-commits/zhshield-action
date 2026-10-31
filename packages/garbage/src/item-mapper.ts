@@ -12,7 +12,8 @@ import type { GarbageItem } from './types';
 /** 规则 id → 垃圾类型。键必须与 garbage/scan/cleanup/*.yml 的 metadata.id 完全一致 */
 export const GARBAGE_RULE_TYPE_MAP: Readonly<Record<string, GarbageItem['type']>> = {
   'garbage.scan.cleanup.dead-code': 'dead-code',
-  'garbage.scan.cleanup.duplicate-code': 'duplicate-code',
+  // 重复代码已按《07》O1 移交重构域：垃圾域不再登记该规则，故无 duplicate-code 条目。
+  // GarbageType 仍保留 duplicate-code —— 历史快照/报告里已有该类型数据，删类型会让旧记录读不出来。
   'garbage.scan.cleanup.unused-dependency': 'unused-dependency',
 };
 

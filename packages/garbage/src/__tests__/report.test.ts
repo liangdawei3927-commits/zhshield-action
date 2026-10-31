@@ -51,9 +51,9 @@ describe('buildGarbageReport', () => {
       fsItems: [],
       evaluations: [
         {
-          rule: { id: 'garbage.scan.cleanup.duplicate-code', name: '重复代码检测' },
+          rule: { id: 'garbage.scan.cleanup.unused-dependency', name: '未用依赖检测' },
           status: 'skipped',
-          message: '工具不可用: jscpd（未安装或在 PATH 中未找到）',
+          message: '工具不可用: depcheck（未安装或在 PATH 中未找到）',
         },
         {
           rule: { id: DEAD_CODE_RULE, name: '死代码检测' },
@@ -66,9 +66,9 @@ describe('buildGarbageReport', () => {
 
     expect(report.skipped).toBe(2);
     expect(report.summary.total).toBe(0);
-    const duplicated = report.checks.find((c) => c.ruleId.includes('duplicate-code'));
-    expect(duplicated?.ran).toBe(false);
-    expect(duplicated?.reason).toContain('jscpd');
+    const unusedDep = report.checks.find((c) => c.ruleId.includes('unused-dependency'));
+    expect(unusedDep?.ran).toBe(false);
+    expect(unusedDep?.reason).toContain('depcheck');
     expect(report.checks.find((c) => c.ruleId === DEAD_CODE_RULE)?.ran).toBe(false);
   });
 

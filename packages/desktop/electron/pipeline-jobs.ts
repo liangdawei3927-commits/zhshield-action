@@ -162,7 +162,8 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
  *
  * 组成两条来源，合并为一份 GarbageScanReport：
  *   ① 文件系统检测器（@zh/garbage detectFsGarbage）：构建产物 / 垃圾文件 / 空文件
- *   ② garbage 域 SOP 规则：死代码（ts-prune）/ 重复代码（jscpd）/ 未用依赖（depcheck）
+ *   ② garbage 域 SOP 规则：死代码（ts-prune）/ 未用依赖（depcheck）
+ *     （重复代码不在此列——《07》O1 已唯一归重构域）
  *
  * 不再调用安全引擎：此前为取 report.garbage 一个字段而完整跑一遍 11 工具安全扫描，
  * 属跨域借调触发权。规则通道异常不阻断，报告 checks 会带 ruleChannelRan=false 显式留痕。
@@ -184,7 +185,7 @@ export async function runGarbageScanJob(id: string, projectPath: string): Promis
   }
 }
 
-/** ② garbage 域 SOP 规则通道：只评估 garbage 域（ts-prune / jscpd / depcheck），异常降级不阻断 */
+/** ② garbage 域 SOP 规则通道：只评估 garbage 域（ts-prune / depcheck），异常降级不阻断 */
 async function runGarbageRuleChannel(
   id: string,
   projectPath: string,

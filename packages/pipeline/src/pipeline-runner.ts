@@ -20,7 +20,6 @@ import {
   TypeScriptAdapter,
   PrettierAdapter,
   CommitLintAdapter,
-  NpmAuditAdapter,
 } from '@zh/inspect';
 import type { InspectionReport } from '@zh/inspect';
 import { RefactorEngine } from '@zh/refactor';
@@ -28,7 +27,7 @@ import type { RefactorReport } from '@zh/refactor';
 import { createRuleMetricsProvider } from './rule-metrics';
 import { createGateMetricResolver } from './gate-metrics';
 import type { GateMetricInputs } from './gate-metrics';
-import { SecurityCheckEngine, TrivyAdapter } from '@zh/security';
+import { SecurityCheckEngine } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine, evaluatePostScanGates } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
@@ -79,13 +78,15 @@ async function registerDefaultAdapters(
   inspectEngine.registerAdapter(new JscpdAdapter());
   inspectEngine.registerAdapter(new TsPruneAdapter());
   inspectEngine.registerAdapter(new SemgrepAdapter());
+  // depcheck 保留注册，但归属不变：只有垃圾域的 unused-dependency 规则经 SOP
+  // tool-dispatch 复用它（《07》O7 未使用依赖唯一归垃圾）。体检域自身不产出此类 issue。
   inspectEngine.registerAdapter(new DepcheckAdapter());
   inspectEngine.registerAdapter(new TypeScriptAdapter());
   inspectEngine.registerAdapter(new PrettierAdapter());
   inspectEngine.registerAdapter(new CommitLintAdapter());
-  inspectEngine.registerAdapter(new NpmAuditAdapter());
   inspectEngine.registerAdapter(new SonarwayToolAdapter());
-  inspectEngine.registerAdapter(new TrivyAdapter());
+  // 《07》O10：依赖审计（npm-audit）唯一归依赖管家（OSV，deps-cve），体检不再注册，
+  // 也不再自行跑 trivy 依赖扫描（O2 依赖包 CVE 唯一归 deps）。
   await registerAutoPerfAdapter(inspectEngine);
 }
 

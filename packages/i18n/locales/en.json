@@ -1508,7 +1508,7 @@
         "excellent": "Excellent",
         "good": "Good",
         "needsImprovement": "Needs improvement",
-        "notRun": "Not run"
+        "notRun": "Not covered"
       },
       "summaryDone": "Summarized the latest results from every domain. Overall score {{score}}.",
       "dataStale": "Based on data from {{hours}}h ago — regenerate to refresh",

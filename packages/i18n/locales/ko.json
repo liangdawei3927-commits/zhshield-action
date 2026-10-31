@@ -1508,7 +1508,7 @@
         "excellent": "우수",
         "good": "양호",
         "needsImprovement": "개선 필요",
-        "notRun": "미실행"
+        "notRun": "미커버"
       },
       "summaryDone": "각 도메인의 최신 결과를 집계했습니다. 종합 점수 {{score}}",
       "dataStale": "{{hours}}시간 전 데이터 기준입니다. 다시 집계하는 것을 권장합니다",

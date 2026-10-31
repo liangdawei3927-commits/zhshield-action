@@ -1510,7 +1510,7 @@
         "excellent": "优秀",
         "good": "良好",
         "needsImprovement": "待改进",
-        "notRun": "未检测"
+        "notRun": "未覆盖"
       },
       "summaryDone": "已汇总各域最新结果，健康总分 {{score}}",
       "dataStale": "基于 {{hours}} 小时前的数据，建议重新汇总",

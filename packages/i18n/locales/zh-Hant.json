@@ -1508,7 +1508,7 @@
         "excellent": "優秀",
         "good": "良好",
         "needsImprovement": "待改進",
-        "notRun": "未檢測"
+        "notRun": "未覆蓋"
       },
       "summaryDone": "已彙總各域最新結果，健康總分 {{score}}",
       "dataStale": "基於 {{hours}} 小時前的資料，建議重新彙總",

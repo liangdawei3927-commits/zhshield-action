@@ -1508,7 +1508,7 @@
         "excellent": "優秀",
         "good": "良好",
         "needsImprovement": "改善が必要",
-        "notRun": "未実行"
+        "notRun": "未カバー"
       },
       "summaryDone": "各ドメインの最新結果を集約しました。総合スコア {{score}}",
       "dataStale": "{{hours}} 時間前のデータに基づきます。再集約を推奨します",

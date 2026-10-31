@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { extname, join, relative, sep } from 'node:path';
+import { toFileUri } from '@zh/shared';
 import type {
   DiagnosticEntry,
   DiagnosticsReport,
@@ -18,7 +19,8 @@ export function buildDiagnosticsReport(
   const byFile = new Map<string, LspDiagnostic[]>();
   for (const issue of issues) {
     if (!issue.file) continue;
-    const uri = `file://${join(project.path, issue.file)}`;
+    // 统一由 toFileUri 拼一次 file://，issue.file 已是绝对路径时不会被再拼一次 projectRoot
+    const uri = toFileUri(project.path, issue.file);
     const list = byFile.get(uri) ?? [];
     list.push(toLspDiagnostic(issue));
     byFile.set(uri, list);

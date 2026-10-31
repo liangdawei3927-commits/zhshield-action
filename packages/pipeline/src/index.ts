@@ -1,6 +1,19 @@
 // @zh/pipeline — 核心流水线编排器
 export const VERSION = '0.1.0';
 export { PipelineRunner } from './pipeline-runner';
+// 执行层骨架（《07》§7.2）：FileIndex → ToolExecutor → Router
+export { buildFileIndex, targetsOfKind } from './execution';
+export type { FileTargetKind, FileTarget, FileIndexOptions, FileIndexResult } from './execution';
+export { ToolExecutor, toolInvocationKey } from './execution';
+export type { ToolInvocation, ExecuteOnceResult } from './execution';
+export { routeFindings } from './execution';
+export type {
+  RoutableFinding,
+  UnroutedReason,
+  UnroutedFinding,
+  DistributionRecord,
+  RouteResult,
+} from './execution';
 export { createReport } from './types';
 export type { PipelineReport } from './types';
 export { detectProjectProfile, resolveEffectiveProjectRoot } from './project-profile';

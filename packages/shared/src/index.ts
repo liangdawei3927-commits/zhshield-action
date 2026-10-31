@@ -167,6 +167,46 @@ export type {
 } from './events';
 export { NOOP_EMITTER } from './events';
 
+// 十域职责边界契约（07 号规范）：统一信封 + 归属/能力注册表 + 路径归一化
+export {
+  DOMAIN_IDS,
+  COVERAGE_THRESHOLD,
+  createDomainReport,
+  toAbsolutePath,
+  toRelativePath,
+  toFileUri,
+  OWNERSHIP_CLAIMS,
+  resolveOwnerClaim,
+  resolveOwnerId,
+  validateOwnershipRegistry,
+  SCAN_DOMAIN_BUDGETS,
+  TOOL_CAPABILITIES,
+  findToolCapability,
+  validateCapabilityRegistry,
+} from './domain-contract';
+export type {
+  DomainId,
+  DomainRunStatus,
+  ScoreBasis,
+  SkippedReason,
+  DomainIssue,
+  SkippedCheck,
+  DomainCoverage,
+  DomainScore,
+  DomainReport,
+  DomainReportInput,
+  OwnershipMatch,
+  OwnershipClaim,
+  OwnershipConflict,
+  OwnershipConflictKind,
+  ToolTargetKind,
+  ToolRunRequirement,
+  RuleFamily,
+  ToolCapability,
+  CapabilityViolation,
+  CapabilityViolationKind,
+} from './domain-contract';
+
 export { detectMachineProfile, type MachineProfile } from './machine-profile';
 export {
   baselinePath,

@@ -102,12 +102,14 @@ function formatLinterIssue(issue, filePath) {
 
 // ── 重构检查 ──────────────────────────────────────────────
 async function runRefactor(files, opts, projectRoot) {
-  const { RefactorEngine } = await importEngine('refactor');
+  const { RefactorEngine, isExcludedScanPath } = await importEngine('refactor');
   const engine = new RefactorEngine();
 
   let report;
   if (files.length > 0) {
-    report = await engine.analyzeFiles(projectRoot, files);
+    // 显式文件列表须与整目录扫描同口径：分析目录时 `__tests__/fixtures` 等从不入选，
+    // 暂存区模式若照单全收，同一文件会在全量门禁里隐形、在暂存门禁里报 introduced。
+    report = await engine.analyzeFiles(projectRoot, files.filter((f) => !isExcludedScanPath(f)));
   } else {
     report = await engine.analyzeDirectory(projectRoot);
   }

@@ -31,6 +31,27 @@ const EXCLUDED_DIRS = new Set([
   'e2e',
 ]);
 
+/** 判断单个目录名是否属于排除名单（黑名单目录或以点开头的隐藏目录） */
+function isExcludedDirName(name: string): boolean {
+  return EXCLUDED_DIRS.has(name) || name.startsWith('.');
+}
+
+/**
+ * 判断**显式给出的文件路径**是否落在全量扫描的排除目录内。
+ *
+ * `analyzeFiles` 本身不预过滤：既有调用方（refactor 包自测、server 暂存区检查）
+ * 会故意把夹具文件交给它解析。但门禁侧（`scripts/zhcheck.mjs` 的 `--staged/--file`）
+ * 必须与 `analyzeDirectory` 同口径 —— 整目录扫描从不下探 `__tests__/fixtures`，
+ * 若暂存区模式对同一批文件计分，同一个文件会在全量门禁里隐形、在暂存门禁里
+ * 突然变成 `introduced`。
+ */
+export function isExcludedScanPath(filePath: string): boolean {
+  return filePath
+    .split(/[/\\]/)
+    .slice(0, -1)
+    .some((dir) => dir !== '' && dir !== '.' && dir !== '..' && isExcludedDirName(dir));
+}
+
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
@@ -253,7 +274,7 @@ export class RefactorEngine {
       if (entry.name === '.' || entry.name === '..') continue;
       const fullPath = safeJoin(current, entry.name);
       if (entry.isDirectory()) {
-        if (this.isExcludedDir(entry.name)) continue;
+        if (isExcludedDirName(entry.name)) continue;
         this.walkTsFiles(fullPath, files);
         continue;
       }
@@ -261,11 +282,6 @@ export class RefactorEngine {
         files.push(fullPath);
       }
     }
-  }
-
-  /** 判断目录是否被排除（黑名单目录或以点开头的隐藏目录） */
-  private isExcludedDir(name: string): boolean {
-    return EXCLUDED_DIRS.has(name) || name.startsWith('.');
   }
 
   /** 判断是否为可检测的 TypeScript 源文件（排除 .d.ts 声明文件） */

@@ -37,15 +37,16 @@ function isExcludedDirName(name: string): boolean {
 }
 
 /**
- * 判断**显式给出的文件路径**是否落在全量扫描的排除目录内。
+ * 判断**显式给出的文件路径**是否落在全量扫描的范围之外（测试/夹具/构建产物目录、`.d.ts` 声明）。
  *
  * `analyzeFiles` 本身不预过滤：既有调用方（refactor 包自测、server 暂存区检查）
  * 会故意把夹具文件交给它解析。但门禁侧（`scripts/zhcheck.mjs` 的 `--staged/--file`）
- * 必须与 `analyzeDirectory` 同口径 —— 整目录扫描从不下探 `__tests__/fixtures`，
- * 若暂存区模式对同一批文件计分，同一个文件会在全量门禁里隐形、在暂存门禁里
- * 突然变成 `introduced`。
+ * 必须与 `analyzeDirectory` 同口径 —— 整目录扫描从不下探 `__tests__/fixtures`、
+ * 也不收 `.d.ts`（`isTsSourceFile`），若暂存区模式对同一批文件计分，同一个文件会在
+ * 全量门禁里隐形、在暂存门禁里突然变成 `introduced`。
  */
 export function isExcludedScanPath(filePath: string): boolean {
+  if (filePath.endsWith('.d.ts')) return true;
   return filePath
     .split(/[/\\]/)
     .slice(0, -1)

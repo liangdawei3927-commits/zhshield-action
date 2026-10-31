@@ -24,6 +24,11 @@ describe('isExcludedScanPath', () => {
     expect(isExcludedScanPath('.zhshield/cache/a.ts')).toBe(true);
   });
 
+  it('声明文件不参与扫描计分（整目录扫描的 isTsSourceFile 已排除 .d.ts）', () => {
+    expect(isExcludedScanPath('packages/x/src/types/electron.d.ts')).toBe(true);
+    expect(isExcludedScanPath('packages/x/src/types/electron.ts')).toBe(false);
+  });
+
   it('产品源码正常计分，不受相对路径前缀影响', () => {
     expect(isExcludedScanPath('packages/x/src/a.ts')).toBe(false);
     expect(isExcludedScanPath('./packages/x/src/a.ts')).toBe(false);

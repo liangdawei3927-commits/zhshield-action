@@ -43,6 +43,33 @@ export interface ScanResultEntry {
   scanVersion: number;
 }
 
+/**
+ * 单个扫描源的「落定版本号」：该源从「在跑」变为「停 + 新结果」时加一。
+ *
+ * 安全中心有两个数据源：漏洞扫描走任务中心（落定会触发 `useDimensionSettledTick`），
+ * 密钥扫描是直连 invoke、**不产生任务**，但它跑完写的是同一份 security 域快照与分数。
+ * 没有任务落定信号可用，就没有任何东西通知主页评分环重读 —— 密钥先跑完时
+ * 页面会一直停在扫描前读到的空值，直到漏洞扫描（trivy/grype 长耗时）结束。
+ * 实测报告 2026-10-31 P0-2 即此形态。
+ *
+ * 判据与 `useScanResultEntry` 同源（复用 `scanTransition`）：只有「上一次在跑、
+ * 这一次停了、且报告换了一份新的」才算落定，所以走上层操作（标记轮换/忽略密钥）
+ * 触发的静默刷新不会误加版本号。
+ */
+export function useScanSettledVersion(loading: boolean, report: unknown): number {
+  const prevRef = useRef<ScanWatch>({ loading, report });
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    const next: ScanWatch = { loading, report };
+    prevRef.current = next;
+    if (scanTransition(prev, next) === 'finished') setVersion((value) => value + 1);
+  }, [loading, report]);
+
+  return version;
+}
+
 export function useScanResultEntry({
   projectPath,
   navId,

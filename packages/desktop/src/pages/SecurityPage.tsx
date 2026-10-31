@@ -4,7 +4,7 @@ import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useHasDomainResult } from '../hooks/useHasDomainResult';
 import { useDomainDetailEntry, type DomainSnapshotViewProps } from '../hooks/useDomainDetailEntry';
-import { useScanResultEntry } from '../hooks/useScanResultEntry';
+import { useScanResultEntry, useScanSettledVersion } from '../hooks/useScanResultEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
 import { useSecurityPage } from './security-logic';
 import { useSecretsPage } from './secrets-logic';
@@ -80,6 +80,7 @@ function useSecretsScanSource(
   handleSecurityScan: ReturnType<typeof useSecurityPage>['handleScan'],
 ) {
   const {
+    loading: secretsLoading,
     report: secretsReport,
     handleScan: handleSecretsScan,
     handleMarkRotating,
@@ -94,6 +95,7 @@ function useSecretsScanSource(
   }, [handleSecurityScan, handleSecretsScan]);
 
   return {
+    secretsLoading,
     secretsReport,
     handleMarkRotating,
     handleVerifyRotated,
@@ -125,14 +127,17 @@ function useSavedDetailReports(
 
 /**
  * 扫完要不要进详情：满分 100 留在主页，不满分（或判断不了）才自动展开详情。
- * 两个数据源（漏洞扫描 / 密钥扫描）任一产出新结果都算一次扫描结束，故拼成一个
- * 「本次结果」对象交给判据：它的引用只在两者变化时改变，正好当"新结果"的信标。
+ * 两个数据源（漏洞扫描 / 密钥扫描）拼成一个「本次结果」对象交给判据：它的引用只在
+ * 两者变化时改变，正好当"新结果"的信标；「还在跑」必须把两者都算上，才是整次扫描的语义。
  */
 interface SecurityScanEntryParams {
   projectPath: string;
   report: ReturnType<typeof useSecurityPage>['report'];
   secretsReport: ReturnType<typeof useSecretsPage>['report'];
+  /** 漏洞扫描是否在跑（任务中心视角，带进度/停止） */
   loading: boolean;
+  /** 密钥扫描是否在跑（直连 invoke，无任务记录） */
+  secretsLoading: boolean;
   onEnterDetail: () => void;
 }
 
@@ -141,6 +146,7 @@ function useSecurityScanEntry({
   report,
   secretsReport,
   loading,
+  secretsLoading,
   onEnterDetail,
 }: SecurityScanEntryParams) {
   const scanResult = useMemo(
@@ -151,10 +157,14 @@ function useSecurityScanEntry({
     projectPath,
     navId: 'security',
     liveReport: scanResult,
-    loading,
+    // 密钥扫描也是「本次扫描」的一半：任一还在跑就不算结束，
+    // 否则密钥先跑完会被当成整次扫描结束（后半截的结论被拆到下一次）
+    loading: loading || secretsLoading,
     onEnterDetail,
   });
-  return { scanVersion };
+  // 密钥扫描没有任务落定信号，靠它自己的落定版本号让主页重新读盘
+  const secretsVersion = useScanSettledVersion(secretsLoading, secretsReport);
+  return { scanVersion: scanVersion + secretsVersion };
 }
 
 function useSecurityPageState(projectPath: string) {
@@ -177,6 +187,7 @@ function useSecurityPageState(projectPath: string) {
     handleScan: handleSecurityScan,
   } = useSecurityPage(projectPath);
   const {
+    secretsLoading,
     secretsReport,
     handleMarkRotating,
     handleVerifyRotated,
@@ -196,6 +207,7 @@ function useSecurityPageState(projectPath: string) {
     report,
     secretsReport,
     loading,
+    secretsLoading,
     onEnterDetail: () => setShowHome(false),
   });
 

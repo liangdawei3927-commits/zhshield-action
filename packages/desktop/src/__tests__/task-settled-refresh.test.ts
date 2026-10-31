@@ -161,4 +161,15 @@ describe('结构守卫 — 数据 hook 必须消费落定信号（防止改回�
     expect(src).toContain('export function useProjectSettledTick');
     expect(src).toContain('export function taskKindForDomain');
   });
+
+  it('SecurityPage：密钥扫描（无任务）落定也进主页重挂载 key（P0-2）', () => {
+    const src = read('src/pages/SecurityPage.tsx');
+    // 密钥扫描是直连 invoke、不产生任务，拿不到 useDimensionSettledTick，
+    // 必须自己算落定版本号（否则密钥先跑完，主页评分环停在扫描前的空值）
+    expect(src).toContain('useScanSettledVersion(secretsLoading, secretsReport)');
+    // 两个版本号都要进 key，少一个就不会重挂载 → 不重新读盘
+    expect(src).toMatch(/scanVersion:\s*scanVersion\s*\+\s*secretsVersion/);
+    // 「整次扫描结束了没」必须同时看两半，只看漏洞任务会把密钥还没跑完当成已结束
+    expect(src).toContain('loading: loading || secretsLoading');
+  });
 });

@@ -13,6 +13,7 @@ import { t } from '@zh/i18n';
 import { serializePipelineReport } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
 import { createLoadedRunner } from './pipeline-runner-factory';
+import { loadGuardConclusions } from './pipeline-sop';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
 import type { GarbageEvaluationLike, GarbageScanReport } from '@zh/garbage';
@@ -89,10 +90,13 @@ export async function runGuardJob(
     progress(id, 'guard', `同步规则已加载 ${syncedRules} 条`, 0.15);
   }
   try {
+    // 《07》O8/C3：门禁纯判定 —— 只读各域已落盘结论，不执行任何扫描器
+    const conclusions = await loadGuardConclusions(runner.repoRoot);
     const report = await runner.runGuard({
       mode: 'guard',
       target: projectPath,
       ...(options ?? {}),
+      conclusions,
     } as Partial<CheckOptions>);
     progress(id, 'done', t('pipeline.guard.jobDone'), 1.0);
     send({ type: 'result', id, report: serializePipelineReport(report) });

@@ -183,6 +183,7 @@ export {
   TOOL_CAPABILITIES,
   findToolCapability,
   validateCapabilityRegistry,
+  resolveSupplierDomain,
 } from './domain-contract';
 export type {
   DomainId,
@@ -205,6 +206,9 @@ export type {
   ToolCapability,
   CapabilityViolation,
   CapabilityViolationKind,
+  ConclusionIssue,
+  DomainConclusion,
+  DomainConclusionSet,
 } from './domain-contract';
 
 export { detectMachineProfile, type MachineProfile } from './machine-profile';

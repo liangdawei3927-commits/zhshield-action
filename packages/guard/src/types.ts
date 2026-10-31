@@ -1,3 +1,5 @@
+import type { DomainConclusionSet } from '@zh/shared';
+
 /** 运行模式：inspection = 只巡检不阻断；guard = 门禁模式 */
 export type CheckMode = 'inspection' | 'guard';
 /**
@@ -20,6 +22,12 @@ export interface CheckOptions {
   environment?: string;
   triggerSource?: string;
   dryRun?: boolean;
+  /**
+   * 各域结论快照（《07》O8）：注入即令门禁走「纯判定」—— 不启动任何扫描器，
+   * 只读体检/安全/依赖域已产出的结论判 pass/fail；缺结论 → skipped（不判通过）。
+   * 缺省 undefined 保持历史行为（门禁自行调用工具）。
+   */
+  conclusions?: DomainConclusionSet;
 }
 
 /** 单条检查结果：归一化后的状态/严重级别/是否阻断 + 人类可读 message

@@ -6,11 +6,13 @@
  * 仅负责编排与进度上报，报告构建委托给 pipeline-report。
  */
 import { t } from '@zh/i18n';
+import type { DomainConclusionSet } from '@zh/shared';
 import { createReport, type PipelineReport } from '@zh/pipeline';
 import type { GuardReport } from '@zh/guard';
 import { serializePipelineReport } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
 import { attachSummary } from './pipeline-report';
+import { readDomainSnapshot } from './zh-diagnostics-persist';
 import type { RuleEngineReport } from '@zh/kernel';
 
 function createSkippedGuardReport(): RuleEngineReport {
@@ -55,6 +57,41 @@ function createSkippedChecksGuardReport(): GuardReport {
 
 type PipelineRunnerInstance = InstanceType<(typeof import('@zh/pipeline'))['PipelineRunner']>;
 
+/**
+ * 门禁纯判定（《07》O8/C3）的结论来源：门禁只读这三域的既有快照，不自行扫描。
+ * 缺某域快照（该域本次未运行）→ 门禁对相关规则记 skipped，不判通过（C4）。
+ */
+const GUARD_CONCLUSION_SOURCES = ['inspect', 'security', 'deps'] as const;
+
+/**
+ * 读取各域最近一次落盘快照，装配为门禁的只读结论集。
+ *
+ * 必须**始终**返回对象（无快照时为空对象）：门禁以「是否注入结论集」区分纯判定
+ * 与历史工具派发模式，传 undefined 会让门禁重新去跑 eslint/gitleaks/trivy。
+ */
+export async function loadGuardConclusions(projectPath: string): Promise<DomainConclusionSet> {
+  const set: DomainConclusionSet = {};
+  for (const source of GUARD_CONCLUSION_SOURCES) {
+    const snapshot = await readDomainSnapshot(projectPath, source);
+    if (!snapshot) continue;
+    set[source] = {
+      domain: source,
+      generatedAt: snapshot.generatedAt,
+      issues: snapshot.issues.map((issue) => ({
+        ruleId: issue.ruleId,
+        severity: issue.severity,
+        file: issue.file,
+        ...(issue.line !== undefined ? { line: issue.line } : {}),
+        ...(issue.column !== undefined ? { column: issue.column } : {}),
+        message: issue.message,
+        ...(issue.suggestion !== undefined ? { suggestion: issue.suggestion } : {}),
+        ...(issue.toolError ? { toolError: true } : {}),
+      })),
+    };
+  }
+  return set;
+}
+
 /** 运行 SOP 门禁阶段：始终返回报告与通过状态（失败不阻断后续巡检） */
 async function runSopGuardStage(
   id: string,
@@ -63,7 +100,8 @@ async function runSopGuardStage(
 ): Promise<{ guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>; ok: boolean }> {
   progress(id, 'guard', t('pipeline.guard.sopScanning'), 0.15);
   try {
-    const guardReport = await runner.runSopGuard({ dryRun });
+    const conclusions = await loadGuardConclusions(runner.repoRoot);
+    const guardReport = await runner.runSopGuard({ dryRun, conclusions });
     if (guardReport.ok === false) {
       progress(id, 'guard', t('pipeline.guard.failed', { count: guardReport.failed }), 0.3);
       return { guardReport, ok: false };

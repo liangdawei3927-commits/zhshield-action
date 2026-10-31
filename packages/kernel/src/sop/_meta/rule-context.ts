@@ -1,6 +1,7 @@
 import type { GovernanceDomain, ActionType } from './sop-types';
 import type { ProjectFeature } from './sop-types';
 import type { ToolResult } from '@zh/shared';
+import type { DomainConclusionSet } from '@zh/shared';
 
 /**
  * ToolScanOutcome — M1b 工具扫描去重的共享结果。
@@ -52,4 +53,13 @@ export interface RuleContext {
 
   /** M1b 工具扫描缓存（可选）。仅 runner.evaluateAll 创建并注入；缺省时工具扫描不去重（保持旧行为） */
   toolScanCache?: ToolScanCache;
+
+  /**
+   * 各域结论快照（可选，《07》O8/C3）。
+   *
+   * 注入即令门禁进入「纯判定」模式：guard 域的 tool-dispatch 不再启动任何工具进程，
+   * 改为读取本集合中供应商域（Owner）的既有结论判 pass/fail；缺该域结论 → skipped
+   * （不判通过）。未注入（undefined）保持历史行为（工具派发），供存量调用方与单测使用。
+   */
+  conclusions?: DomainConclusionSet;
 }

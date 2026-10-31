@@ -20,6 +20,13 @@ export {
 export { toAbsolutePath, toRelativePath, toFileUri } from './path';
 
 export {
+  resolveSupplierDomain,
+  type ConclusionIssue,
+  type DomainConclusion,
+  type DomainConclusionSet,
+} from './conclusions';
+
+export {
   OWNERSHIP_CLAIMS,
   resolveOwnerClaim,
   resolveOwnerId,

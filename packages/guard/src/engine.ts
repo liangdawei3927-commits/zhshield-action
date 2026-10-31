@@ -185,6 +185,8 @@ export class GuardEngine {
       domain: 'guard',
       files: undefined,
       dryRun: options.dryRun,
+      // 《07》O8：调用方注入结论集 → 门禁纯判定（工具调用归零）
+      conclusions: options.conclusions,
     });
   }
 

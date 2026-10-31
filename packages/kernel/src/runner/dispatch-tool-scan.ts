@@ -17,6 +17,7 @@ import {
   targetEngineOf,
 } from './dispatch-shared';
 import { logToolExecutionAudit } from './tool-audit';
+import { evalGuardConclusion } from './dispatch-guard-conclusion';
 
 // ─── 派发评估：tool-dispatch → ToolAdapter ────────────
 
@@ -26,6 +27,12 @@ export async function evalToolDispatch(
   instr: ToolDispatchInstruction,
   context: RuleContext,
 ): Promise<RuleEvaluation> {
+  // 《07》O8：调用方注入结论集时，门禁进入纯判定模式 —— 不启动任何工具进程，
+  // 只读供应商域（Owner）的既有结论判 pass/fail；缺结论 → skipped（C4）。
+  // 未注入结论（存量调用方 / 单测）保持历史工具派发行为。
+  if (rule.domain === 'guard' && context.conclusions !== undefined) {
+    return evalGuardConclusion(rule, instr, context);
+  }
   const resolution = resolveToolAdapter(host, rule, instr);
   if (resolution.kind === 'skipped') return resolution.result;
   const unavailable = await checkAdapterAvailability(host, resolution.adapter, rule, instr);

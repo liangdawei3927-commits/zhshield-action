@@ -1,12 +1,4 @@
-import {
-  GuardEngine,
-  GuardESLintCheckAdapter,
-  GuardSensitiveInfoAdapter,
-  ArchitectureBoundaryAdapter,
-  TestRunnerAdapter,
-  SecurityScanAdapter,
-  GuardTrivyAdapter,
-} from '@zh/guard';
+import { GuardEngine } from '@zh/guard';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import {
   InspectEngine,
@@ -60,18 +52,10 @@ import {
 export { toMessage };
 
 /** 默认适配器注册表 — 纯模块级装配函数，不依赖 PipelineRunner 实例状态。
- *  Guard 适配器走自身 registerAdapter；Inspect ToolAdapter 经 useSopEngine
- *  连线自动注入 SopRuleEngine。AutoPerf 性能自治引擎 fail-soft 注册。 */
-async function registerDefaultAdapters(
-  guardEngine: GuardEngine,
-  inspectEngine: InspectEngine,
-): Promise<void> {
-  guardEngine.registerAdapter('eslint-check', new GuardESLintCheckAdapter());
-  guardEngine.registerAdapter('sensitive-info', new GuardSensitiveInfoAdapter());
-  guardEngine.registerAdapter('architecture-boundary', new ArchitectureBoundaryAdapter());
-  guardEngine.registerAdapter('test-runner', new TestRunnerAdapter());
-  guardEngine.registerAdapter('security-scan', new SecurityScanAdapter());
-  guardEngine.registerAdapter('trivy', new GuardTrivyAdapter());
+ *  Guard **不注册任何扫描适配器**（《07》O8/C3）：门禁是纯判定域，工具执行归各 Owner 域。
+ *  门禁规则经 `conclusions` 读取体检/安全/依赖的既有结论判 pass/fail。
+ *  Inspect ToolAdapter 经 useSopEngine 连线自动注入 SopRuleEngine。AutoPerf 性能自治引擎 fail-soft 注册。 */
+async function registerDefaultAdapters(inspectEngine: InspectEngine): Promise<void> {
   inspectEngine.registerAdapter(new ESLintAdapter());
   // 《07》O3：gitleaks 仅供 SOP tool-dispatch 以「共享执行」形态跑 security 域规则
   // （security.scan.gitleaks.hardcoded-key）；体检域自身不产出密钥 issue。
@@ -211,7 +195,7 @@ export class PipelineRunner {
     this.guardEngine.useSopEngine(this.sopRuleEngine);
     this.inspectEngine.useSopEngine(this.sopRuleEngine);
 
-    void registerDefaultAdapters(this.guardEngine, this.inspectEngine);
+    void registerDefaultAdapters(this.inspectEngine);
   }
 
   async loadPlugin(plugin: Plugin): Promise<void> {

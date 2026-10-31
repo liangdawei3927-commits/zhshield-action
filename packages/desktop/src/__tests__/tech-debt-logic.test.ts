@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   debtIndexColor,
+  debtIndexDisplay,
   DEBT_CATEGORY_CONFIG,
   DEBT_CATEGORY_ORDER,
   ACTION_STATUS_CONFIG,
@@ -25,6 +26,20 @@ describe('debtIndexColor', () => {
   it('returns success for index < 40', () => {
     expect(debtIndexColor(0)).toBe('rgb(var(--zh-success-700))');
     expect(debtIndexColor(39)).toBe('rgb(var(--zh-success-700))');
+  });
+});
+
+describe('debtIndexDisplay（缺快照不得渲染成 0 债务）', () => {
+  it('debtIndex=null（无体检快照 / 引擎不可用）显示未检测且不染色', () => {
+    // 这条是 C4 的落点：把「没算出」渲染成 0 会让用户读成「零债务」，比不显示分数更误导。
+    expect(debtIndexDisplay(null, '未检测')).toEqual({ value: '未检测' });
+  });
+
+  it('有指数时仍走同一套分档颜色', () => {
+    expect(debtIndexDisplay(80, '未检测')).toEqual({
+      value: 80,
+      color: 'rgb(var(--zh-danger))',
+    });
   });
 });
 

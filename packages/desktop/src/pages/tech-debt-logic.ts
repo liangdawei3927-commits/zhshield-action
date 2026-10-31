@@ -120,6 +120,20 @@ export function debtIndexColor(index: number): string {
   return 'rgb(var(--zh-success-700))';
 }
 
+/**
+ * 债务指数卡的展示值。
+ *
+ * `null` = 本次没算出指数（无 inspect 域快照 / 引擎不可用）→ 显示「未检测」且不染色。
+ * 不能退化成 0：0 在这个卡片上的含义是「零债务」，会把「没查」渲染成满分结论（契约 C4）。
+ */
+export function debtIndexDisplay(
+  debtIndex: number | null,
+  notDetectedLabel: string,
+): { value: number | string; color?: string } {
+  if (debtIndex === null) return { value: notDetectedLabel };
+  return { value: debtIndex, color: debtIndexColor(debtIndex) };
+}
+
 /** 技术债盘点运行：loading / 进度统一来自任务中心 techdebt 任务 */
 async function scanTechDebt(projectPath: string): Promise<TechDebtReportData | null> {
   try {

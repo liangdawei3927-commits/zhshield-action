@@ -665,8 +665,12 @@ export interface EnvEntryData {
 export interface TechDebtReportData {
   projectId: string;
   generatedAt: string;
-  /** 债务指数 0-100（越高越重） */
-  debtIndex: number;
+  /**
+   * 债务指数 0-100（越高越重）。
+   * `null` = 本次没算出（无 inspect 域快照 / 引擎不可用）—— UI 必须显示「未检测」，
+   * 不得把「没算」渲染成 0（0 是「零债务」，比不出分更误导，契约 C4）。
+   */
+  debtIndex: number | null;
   trend: { period: string; delta: number };
   byModule: Array<{ module: string; debtShare: number; hotness: number; interestTotal: number }>;
   byCategory: Array<{ category: string; count: number; weight: number }>;

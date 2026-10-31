@@ -6,7 +6,7 @@ import { ReportShell, type ReportStatCard } from '../components/business/ReportS
 import { NavGlyph } from '../components/business/page-glyph';
 import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
-import { useTechDebtPage, debtIndexColor } from './tech-debt-logic';
+import { useTechDebtPage, debtIndexDisplay } from './tech-debt-logic';
 import type { TechDebtReportData } from '../types/electron';
 import {
   TechDebtEmptyState,
@@ -74,10 +74,9 @@ function buildTechDebtStats({
     {
       key: 'debtIndex',
       label: t('page.techdebt.debtIndex'),
-      value: report.debtIndex,
-      // 分档函数已在 tech-debt-logic 定义并被单测锁定（<40 绿 / <70 橙 / ≥70 红），
-      // 此前只定义没渲染 —— 指数卡与旁边读数一个色，看不出债务轻重。
-      color: debtIndexColor(report.debtIndex),
+      // null = 本次没算出（无体检快照）→ 「未检测」，不渲染 0 债务（契约 C4）。
+      // 分档函数已在 tech-debt-logic 定义并被单测锁定（<40 绿 / <70 橙 / ≥70 红）。
+      ...debtIndexDisplay(report.debtIndex, t('page.reports.scoreLabel.notRun')),
     },
     {
       key: 'modules',

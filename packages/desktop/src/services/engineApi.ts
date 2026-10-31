@@ -214,7 +214,8 @@ export async function runTechDebt(projectPath: string): Promise<TechDebtReportDa
     return {
       projectId: '',
       generatedAt: new Date().toISOString(),
-      debtIndex: 0,
+      // 引擎不可用 = 没算出：null 让 UI 显示「未检测」，不冒充 0 债务（C4）
+      debtIndex: null,
       trend: { period: 'week', delta: 0 },
       byModule: [],
       byCategory: [],

@@ -196,6 +196,8 @@ export async function persistTechDebtDiagnostics(
  * 再经同一个 buildHealthDimensions ⇒ 与报告中心汇总、分类页实时评分不可能漂移。
  */
 export function computeTechDebtScore(report: TechDebtReportData): DomainDimensionScore | undefined {
+  // 无快照 / 引擎不可用时 debtIndex 为 null：没算出指数就没有分，按 not-run 处理。
+  if (report.debtIndex === null) return undefined;
   return computeDomainSnapshotScore({
     dimension: 'techdebt',
     techdebt: { debtIndex: report.debtIndex, issueCount: report.actionList.length },
@@ -207,6 +209,9 @@ export async function updateTechDebtDashboard(
   projectPath: string,
   report: TechDebtReportData,
 ): Promise<void> {
+  // 未算出指数（debtIndex=null）时不写 dashboard-state：写了就等于宣称「本域跑过且结论为 0 债务」，
+  // 评分侧会按 scored 出分。留空才能让报告中心按 not-run 展示。
+  if (report.debtIndex === null) return;
   await updateDashboardState(projectPath, {
     techdebt: {
       debtIndex: report.debtIndex,
@@ -351,7 +356,8 @@ function emptyTechDebtReport(error: string): TechDebtReportData {
   return {
     projectId: '',
     generatedAt: new Date().toISOString(),
-    debtIndex: 0,
+    // null = 没算出债务指数。若填 0，UI 会显示「0 债务」——把「没查」误读成「零债务」（C4）。
+    debtIndex: null,
     trend: { period: 'week', delta: 0 },
     byModule: [],
     byCategory: [],

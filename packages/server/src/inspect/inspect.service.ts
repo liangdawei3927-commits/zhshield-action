@@ -3,7 +3,6 @@ import { InspectEngine } from '@zh/inspect';
 import type { InspectionReport } from '@zh/inspect';
 import {
   ESLintAdapter,
-  GitleaksAdapter,
   DependencyCruiserAdapter,
   JscpdAdapter,
   TsPruneAdapter,
@@ -22,10 +21,11 @@ import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
  * registerDefaultAdapters 保持同步（后者的 pipeline 专属项不在此列）。
  * 《07》O7/O10：未使用依赖（depcheck）与依赖审计（npm-audit）的唯一 Owner 分别是
  * 垃圾清理与依赖管家，故不在此处注册——体检直扫不再产出这两类结论。
+ * 《07》O3：密钥（gitleaks）的唯一 Owner 是安全中心，故体检直扫不注册 gitleaks；
+ * 密钥结论由安全域（engine:runSecrets / SecurityCheckEngine）独立产出。
  */
 const INSPECT_ADAPTERS = [
   ESLintAdapter,
-  GitleaksAdapter,
   DependencyCruiserAdapter,
   JscpdAdapter,
   TsPruneAdapter,

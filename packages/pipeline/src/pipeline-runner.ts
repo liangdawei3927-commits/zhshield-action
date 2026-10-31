@@ -73,6 +73,9 @@ async function registerDefaultAdapters(
   guardEngine.registerAdapter('security-scan', new SecurityScanAdapter());
   guardEngine.registerAdapter('trivy', new GuardTrivyAdapter());
   inspectEngine.registerAdapter(new ESLintAdapter());
+  // 《07》O3：gitleaks 仅供 SOP tool-dispatch 以「共享执行」形态跑 security 域规则
+  // （security.scan.gitleaks.hardcoded-key）；体检域自身不产出密钥 issue。
+  // pipeline 的 InspectEngine 恒为 SOP 模式，不会走 runDirectScan 直跑该适配器。
   inspectEngine.registerAdapter(new GitleaksAdapter());
   inspectEngine.registerAdapter(new DependencyCruiserAdapter());
   inspectEngine.registerAdapter(new JscpdAdapter());

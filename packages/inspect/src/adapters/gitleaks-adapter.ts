@@ -243,7 +243,9 @@ export class GitleaksAdapter extends ToolCommandAdapter {
           column: finding.StartColumn || 0,
           suggestion: '移除硬编码密钥，使用环境变量或密钥管理服务',
           autoFixable: false,
-          source: 'inspect',
+          // 《07》O3：密钥唯一归安全中心 —— 即使适配器由通用工具宿主执行，
+          // 产出的 issue 也必须标 security，不能算进体检域。
+          source: 'security',
           fingerprint: `gitleaks:${finding.RuleID || ''}:${file}:${finding.StartLine || 0}`,
         };
       });

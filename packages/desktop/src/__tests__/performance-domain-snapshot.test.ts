@@ -45,7 +45,7 @@ function performanceReport() {
     issues: [
       {
         id: 'perf-1',
-        ruleId: 'complexity.sync-io',
+        ruleId: 'performance.runtime.sync-io',
         severity: 'critical',
         file: 'src/b.ts',
         line: 7,
@@ -88,7 +88,7 @@ describe('performance 扫描不得覆盖 inspect 域快照', () => {
 
     // 性能结果落在自己的域快照里
     const perfSnap = await readDomainSnapshot(projectDir, 'performance');
-    expect(perfSnap?.issues.map((i) => i.ruleId)).toEqual(['complexity.sync-io']);
+    expect(perfSnap?.issues.map((i) => i.ruleId)).toEqual(['performance.runtime.sync-io']);
     expect(perfSnap?.issues.every((i) => i.source === 'performance')).toBe(true);
   });
 

@@ -72,8 +72,8 @@ export class PerformanceEngine {
     if (!fs.existsSync(safeJoin(projectRoot, 'package.json'))) return;
     issues.push({
       id: 'coverage-no-source-root',
-      ruleId: 'coverage.no-source-root',
-      category: 'complexity',
+      ruleId: 'performance.coverage.no-source-root',
+      category: 'coverage',
       severity: 'info',
       file: '',
       message:

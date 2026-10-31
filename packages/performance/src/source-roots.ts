@@ -9,7 +9,7 @@
  * 结果面板显示「复杂度 0 问题 / tree-shaking 0 问题」，而这是「没查」而非「没问题」。
  *
  * 本模块是该解析的**唯一来源**，供两个检测器共用；未发现任何源码根时由
- * PerformanceEngine 显式产出 `coverage.no-source-root` 提示，不静默放行。
+ * PerformanceEngine 显式产出 `performance.coverage.no-source-root` 提示，不静默放行。
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';

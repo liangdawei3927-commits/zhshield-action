@@ -33,9 +33,9 @@ function scan(name: string, files: Record<string, string>): PerformanceIssue[] {
 }
 
 const loopsOf = (issues: PerformanceIssue[]): PerformanceIssue[] =>
-  issues.filter((i) => i.ruleId === 'complexity.nested-loop');
+  issues.filter((i) => i.ruleId === 'performance.runtime.nested-loop');
 const syncOf = (issues: PerformanceIssue[]): PerformanceIssue[] =>
-  issues.filter((i) => i.ruleId === 'complexity.sync-io');
+  issues.filter((i) => i.ruleId === 'performance.runtime.sync-io');
 
 /** 浏览器构建里 fs 由 <script> 注入的 shim 提供，故无 node 内建导入 */
 const BROWSER_SHIM = 'declare function readFileSync(p: string, e: string): string;';
@@ -68,7 +68,7 @@ describe('complexity-detector · nested-loop', () => {
     const hit = loopsOf(issues)[0];
     expect(hit).toBeDefined();
     expect(hit?.severity).toBe('medium');
-    expect(hit?.category).toBe('complexity');
+    expect(hit?.category).toBe('runtime-pattern');
     expect(hit?.file).toBe('src/services/heavy.ts');
     expect(hit?.message).toContain('3 层嵌套循环');
     expect(hit?.message).toMatch(CJK_RE);
@@ -324,7 +324,7 @@ describe('complexity-detector · nested-loop', () => {
     for (const issue of issues) {
       expect(typeof issue.id).toBe('string');
       expect(typeof issue.ruleId).toBe('string');
-      expect(issue.category).toBe('complexity');
+      expect(issue.category).toBe('runtime-pattern');
       expect(['medium', 'high']).toContain(issue.severity);
       expect(typeof issue.file).toBe('string');
       expect(typeof issue.message).toBe('string');
@@ -611,9 +611,9 @@ describe('complexity-detector · sync-io 运行时上下文', () => {
     const hits = syncOf(issues);
     expect(hits).toHaveLength(1);
     const hit = hits[0];
-    expect(hit?.id).toBe('complexity-sync-io-src/render-config.ts-readFileSync');
+    expect(hit?.id).toBe('runtime-sync-io-src/render-config.ts-readFileSync');
     expect(hit?.severity).toBe('high');
-    expect(hit?.category).toBe('complexity');
+    expect(hit?.category).toBe('runtime-pattern');
     expect(hit?.file).toBe('src/render-config.ts');
     expect(hit?.line).toBe(3);
     expect(hit?.message).toContain('页面响应');

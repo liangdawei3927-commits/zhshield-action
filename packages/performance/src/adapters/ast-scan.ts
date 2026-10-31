@@ -30,7 +30,7 @@ import {
 
 /**
  * 本规则追踪的同步阻塞 IO API。
- * 保持历史集合：issue id 内嵌这些名字（`complexity-sync-io-<file>-<api>`），
+ * 保持历史集合：issue id 内嵌这些名字（`runtime-sync-io-<file>-<api>`），
  * 桌面端按 id 去重，增删会改变既有 id 契约。
  */
 export const SYNC_IO_APIS: ReadonlySet<string> = new Set([

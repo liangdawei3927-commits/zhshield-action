@@ -1,13 +1,21 @@
 /**
- * 代码复杂度检测器（complexity-detector.ts）
+ * 运行时反模式检测器（complexity-detector.ts）
  *
- * 纯静态分析源码复杂度（零网络、零执行）：
+ * 纯静态分析源码里的运行时反模式（零网络、零执行）：
  * - nested-loop：三层以上**且存在乘数层**的真实 AST 嵌套循环 → medium
  * - sync-io：落在延迟敏感执行上下文里的同步阻塞 IO → high
  *
  * 判定全部基于 TypeScript 编译器 API（事实见 ast-scan.ts，上下文政策见
  * runtime-context.ts），本文件只负责取文件、组装 issue。
  * 文件缺失 / 目录不存在均按静默跳过处理，不抛异常。
+ *
+ * 《07》O4 指标定义（两个指标口径不同，指纹不得共用）：
+ *   · 体检 inspect：**函数级圈复杂度**（单个函数的分支数，`cyclomaticComplexity`，
+ *     与「这条函数多难懂」有关，不含任何循环层数判定）；
+ *   · 性能 performance：**运行时反模式**（嵌套循环的乘数层放大、延迟敏感路径上的
+ *     同步阻塞 IO，与「这段代码实际跑起来多慢」有关）。
+ * 故本域 ruleId 一律落在 `performance.runtime.*` 命名空间，不使用 `complexity.*`
+ * —— 后者是体检圈复杂度的命名空间，共用会让同一指纹被两个域认领（C1/C2 违约）。
  */
 import * as path from 'path';
 import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
@@ -103,9 +111,9 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     if (!chain.amplifies) return;
     const { depth, innermostIterable, outermostLine } = chain;
     issues.push({
-      id: `complexity-nested-loop-${relFile}`,
-      ruleId: 'complexity.nested-loop',
-      category: 'complexity',
+      id: `runtime-nested-loop-${relFile}`,
+      ruleId: 'performance.runtime.nested-loop',
+      category: 'runtime-pattern',
       severity: 'medium',
       file: relFile,
       line: outermostLine,
@@ -132,9 +140,9 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
       seen.add(site.apiName);
       const { label, impact, advice } = impactOf(context);
       issues.push({
-        id: `complexity-sync-io-${relFile}-${site.apiName}`,
-        ruleId: 'complexity.sync-io',
-        category: 'complexity',
+        id: `runtime-sync-io-${relFile}-${site.apiName}`,
+        ruleId: 'performance.runtime.sync-io',
+        category: 'runtime-pattern',
         severity: 'high',
         file: relFile,
         line: site.line,

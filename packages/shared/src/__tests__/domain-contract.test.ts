@@ -48,6 +48,8 @@ describe('C1 单源归属（规范 §四 O1–O10）', () => {
     ['inspect.scan.official.dependency-audit', 'deps', 'O10 依赖审计唯一归依赖管家'],
     ['deps.scan.official.unused-dependency', 'garbage', 'O7 未使用依赖唯一归垃圾清理'],
     ['performance.scan.official.nested-loop', 'performance', 'O4 运行时反模式归性能域'],
+    ['performance.runtime.nested-loop', 'performance', 'O4 运行时反模式归性能域'],
+    ['performance.runtime.sync-io', 'performance', 'O4 运行时反模式归性能域'],
     ['inspect.scan.official.complexity', 'inspect', 'O4 圈复杂度归体检'],
   ])('Given %s，When 解析 owner，Then 裁定为 %s（%s）', (ruleId, expected) => {
     expect(resolveOwnerId(ruleId)).toBe(expected);

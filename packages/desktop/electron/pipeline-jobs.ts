@@ -375,11 +375,11 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
 
 /**
  * 按 issue.id 去重（引擎 id 已含 file + 具体维度，如
- * `complexity-sync-io-{file}-{fnName}`）。
+ * `runtime-sync-io-{file}-{fnName}`）。
  *
  * 旧实现按 `ruleId:file` 去重 —— 那是双通道合并期的产物，单通道后只会**少报**：
  * 同一文件里 readFileSync 与 execSync 是两条独立问题，ruleId 同为
- * `complexity.sync-io`、file 相同 → 被压成 1 条。
+ * `performance.runtime.sync-io`、file 相同 → 被压成 1 条。
  */
 function dedupePerformanceIssues(issues: PerformanceReportIssue[]): PerformanceReportIssue[] {
   const seen = new Set<string>();

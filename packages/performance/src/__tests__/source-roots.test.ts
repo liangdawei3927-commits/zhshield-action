@@ -87,20 +87,20 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('有 package.json 但无源码根 → 显式产出 coverage.no-source-root', () => {
+  it('有 package.json 但无源码根 → 显式产出 performance.coverage.no-source-root', () => {
     fs.writeFileSync(
       path.join(root, 'package.json'),
       JSON.stringify({ name: 'x', version: '1.0.0' }),
     );
     const report = new PerformanceEngine().scan(root);
-    const coverage = report.issues.find((i) => i.ruleId === 'coverage.no-source-root');
+    const coverage = report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root');
     expect(coverage).toBeDefined();
     expect(coverage!.severity).toBe('info');
   });
 
   it('无 package.json 也无源码根 → 不是项目根，不产出提示', () => {
     const report = new PerformanceEngine().scan(root);
-    expect(report.issues.find((i) => i.ruleId === 'coverage.no-source-root')).toBeUndefined();
+    expect(report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root')).toBeUndefined();
   });
 
   it('monorepo 根（无顶层 src）不再被判为「无源码」', () => {
@@ -115,8 +115,8 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
       'export function f(files: string[]) {\n  for (const a of files) {\n    for (const b of files) {\n      for (const c of files) {\n        console.log(a, b, c);\n      }\n    }\n  }\n}\n',
     );
     const report = new PerformanceEngine().scan(root);
-    expect(report.issues.find((i) => i.ruleId === 'coverage.no-source-root')).toBeUndefined();
-    expect(report.issues.some((i) => i.ruleId === 'complexity.nested-loop')).toBe(true);
+    expect(report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root')).toBeUndefined();
+    expect(report.issues.some((i) => i.ruleId === 'performance.runtime.nested-loop')).toBe(true);
   });
 
   it('测试与夹具代码不参与产品性能判定（误报控制）', () => {
@@ -143,7 +143,7 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
     );
 
     const report = new PerformanceEngine().scan(root);
-    const syncIo = report.issues.filter((i) => i.ruleId === 'complexity.sync-io');
+    const syncIo = report.issues.filter((i) => i.ruleId === 'performance.runtime.sync-io');
     expect(syncIo.map((i) => i.file)).toEqual(['src/real.ts']);
   });
 });

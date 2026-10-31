@@ -17,7 +17,8 @@ export type PerformanceCategory =
   | 'build-config' // 构建配置：缺压缩 / 缺拆包 / 未开启产物优化
   | 'tree-shaking' // tree-shaking：sideEffects 缺失 / 全量引入大包
   | 'chunk-splitting' // chunk 划分：单一 vendor chunk / 缺少代码分割
-  | 'complexity'; // 复杂度：嵌套循环 / 同步阻塞 IO
+  | 'runtime-pattern' // 运行时反模式：嵌套循环乘数层 / 延迟敏感路径同步阻塞 IO（O4）
+  | 'coverage'; // 覆盖缺口：源码根缺失导致检测未执行（没查 ≠ 没问题）
 
 /** 单条性能问题（可解释，含修复建议） */
 export interface PerformanceIssue {

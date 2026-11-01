@@ -46,6 +46,15 @@ export interface InspectionReportLike {
    * 缺省/非法值 → 密度因子 = 1（不稀释不满分，向后兼容）。
    */
   esloc?: number;
+  /**
+   * 这份 issues 是否**真正覆盖**了 quality 维的数据源（巡检 / 性能扫描）。
+   *
+   * 缺省 true（真实报告恒覆盖，向后兼容）。false = 该数组只是别的域（security/deps）
+   * 的条目袋——汇总侧为了让专用扫描结果进入 security/deps 维，会把它们的条目并进同一个
+   * inspect 入参，若据此判「quality 跑过」，一次只跑安全扫描的项目会拿到 100 分
+   * quality（没巡检 ≠ 质量满分，《07》A2 / spec C）。
+   */
+  covered?: boolean;
 }
 
 /**

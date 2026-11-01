@@ -105,6 +105,14 @@ export interface HealthInputs {
    * security/deps 专用扫描条目；无任何来源 → null（各维按 not-run 处理）。
    */
   inspectIssues: InspectIssueLike[] | null;
+  /**
+   * quality 维的数据源是否真的跑过（inspect 巡检或 performance 扫描）。
+   *
+   * `inspectIssues` 是给三个维共用的条目袋，只跑 security 扫描时它非空，
+   * 但那只是 security 条目 —— 据此判 quality 已覆盖会给出 100 分
+   * （没巡检 ≠ 质量满分，《07》A2）。
+   */
+  qualityCovered: boolean;
   /** 项目 ESLOC（S2 密度归一化分母）。来自 inspect 快照落盘时算好的值，与落盘出分同口径 */
   esloc?: number;
   /** 扩展域数据（secrets/deps/techdebt/refactor/performance/garbage/sentinel/backup） */
@@ -270,6 +278,9 @@ export async function assembleHealthInputs(
       ? { results: toGuardChecks(guardRecord.checks), total: guardRecord.summary?.total }
       : null,
     inspectIssues: mergedIssues.length > 0 || inspectSnapshot !== null ? mergedIssues : null,
+    // quality 维的覆盖判定只看自己的数据源：inspect 巡检 / performance 扫描。
+    // security/deps 条目并入只是为了让它们各自的维度计分，不代表质量域跑过。
+    qualityCovered: inspectSnapshot !== null || performanceSnapshot !== null,
     esloc: inspectSnapshot?.esloc,
     extras,
     timestamps,

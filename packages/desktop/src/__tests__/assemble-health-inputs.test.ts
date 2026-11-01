@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildHealthDimensions } from '@zh/scoring';
+import { buildHealthDimensions, computeOverallSnapshot, computeRedLine } from '@zh/scoring';
+import { domainScoreView } from '../pages/domain-score-logic';
 import type { GuardReportRecord } from '@zh/guard';
 import {
   assembleHealthInputs,
@@ -110,12 +111,63 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
     expect(inputs.inspectIssues).not.toBeNull();
     const dims = buildHealthDimensions({
       guard: null,
-      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues } : null,
+      inspect: inputs.inspectIssues
+        ? { issues: inputs.inspectIssues, covered: inputs.qualityCovered }
+        : null,
       projectRoot: '/proj',
       extras: inputs.extras,
     });
     expect(dims.find((d) => d.name === 'security')?.status).toBe('scored');
     expect(inputs.timestamps.security).toBe('2026-09-19T10:00:00.000Z');
+  });
+
+  it('只跑了 security 单域（A2）→ 其余九维 not-run、卡片显示「—」、总分只由 security 加权', async () => {
+    const securitySnap = snapshot(
+      [entry({ category: 'security', severity: 'error', fingerprint: 's1' })],
+      '2026-09-19T10:00:00.000Z',
+    );
+    const inputs = await assembleHealthInputs('/proj', makeReads({
+      readDomainSnapshot: async (_p, source) => (source === 'security' ? securitySnap : null),
+    }));
+    // security 条目并进的是共用条目袋，不代表巡检跑过 —— 这条断言防的就是
+    // 「只跑安全扫描 ⇒ quality 0 条 issue ⇒ 100 分」
+    expect(inputs.qualityCovered).toBe(false);
+
+    const dims = buildHealthDimensions({
+      guard: null,
+      inspect: inputs.inspectIssues
+        ? { issues: inputs.inspectIssues, covered: inputs.qualityCovered }
+        : null,
+      projectRoot: '/proj',
+      extras: inputs.extras,
+    });
+    const scored = dims.filter((d) => d.status !== 'not-run');
+    expect(scored.map((d) => d.name)).toEqual(['security']);
+
+    const notRunNames = dims
+      .filter((d) => d.status === 'not-run')
+      .map((d) => d.name)
+      .sort();
+    expect(notRunNames).toEqual([
+      'backup',
+      'dependencies',
+      'garbage',
+      'gate',
+      'performance',
+      'quality',
+      'refactor',
+      'sentinel',
+      'techdebt',
+    ]);
+
+    // 未运行域在分类页只能显示「—」，绝不显示 0 分（0 会被读成「扫了、很差」）
+    for (const d of dims.filter((dim) => dim.status === 'not-run')) {
+      expect(domainScoreView({ dim: { score: d.score, status: 'not-run' }, generatedAt: undefined }).scoreText).toBe('—');
+    }
+
+    // 总分只由已跑域加权：单域时 overall 必须等于该域分，不掺入任何未检测域
+    const snapshotResult = computeOverallSnapshot(dims, computeRedLine(inputs.extras));
+    expect(snapshotResult.overall).toBe(scored[0]?.score);
   });
 
   it('无任何快照 → inspectIssues 为 null（各维按 not-run 处理）', async () => {

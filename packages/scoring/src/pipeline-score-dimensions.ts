@@ -109,7 +109,11 @@ function checkQualityNotRun(
   inspect: InspectionReportLike | null,
   weight: number,
 ): DimensionScore | null {
-  if (name === 'quality' && inspect === null) return notRun(name, weight);
+  // covered === false（缺省视为覆盖）：该 issues 数组只是 security/deps 的条目袋，
+  // 巡检本身没跑 —— 0 条 quality 类 issue 不等于质量满分（《07》A2）
+  if (name === 'quality' && (inspect === null || inspect.covered === false)) {
+    return notRun(name, weight);
+  }
   return null;
 }
 

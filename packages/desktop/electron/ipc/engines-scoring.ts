@@ -124,7 +124,9 @@ export function buildDimensionsFromInputs(
 ): ReturnType<typeof buildHealthDimensions> {
   return buildHealthDimensions({
     guard: inputs.guard,
-    inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
+    inspect: inputs.inspectIssues
+      ? { issues: inputs.inspectIssues, esloc: inputs.esloc, covered: inputs.qualityCovered }
+      : null,
     projectRoot: projectPath,
     profile,
     extras: inputs.extras,

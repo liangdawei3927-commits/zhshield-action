@@ -108,6 +108,45 @@ export async function collectScoringInputs(projectPath: string) {
   return { inputs, hasResults };
 }
 
+/** `assembleHealthInputs` 的产物形状（十域输入 + 各域时间锚点） */
+type ScoringInputs = Awaited<ReturnType<typeof assembleHealthInputs>>;
+
+/**
+ * 十域输入 → 维度结果（写分 / 总览 / 分类页三条入口共用）。
+ *
+ * 这份映射一旦出现复制品，两条路径就会算出两个分（2026-10-24 事故），故只留一份。
+ * 分类页只取其中一维做展示，不需要画像；写分与总览需要 profile 参与加权前的维度计算。
+ */
+export function buildDimensionsFromInputs(
+  projectPath: string,
+  inputs: ScoringInputs,
+  profile?: ScoringProjectProfile | null,
+): ReturnType<typeof buildHealthDimensions> {
+  return buildHealthDimensions({
+    guard: inputs.guard,
+    inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
+    projectRoot: projectPath,
+    profile,
+    extras: inputs.extras,
+  });
+}
+
+/**
+ * 取十维输入并算出维度结果；各域都没有可用结果时返回 null（未检测 ≠ 0 分）。
+ *
+ * 写分点与报告中心总览共用这一步：输入组装、空结果判定、画像探测的顺序只有一份，
+ * 复制品一旦分叉就会重现「同一时刻两个总分」的故障。
+ */
+export async function collectScoringDimensions(projectPath: string) {
+  if (!projectPath || typeof projectPath !== 'string') {
+    throw new Error(t('electron.invalidProjectPath'));
+  }
+  const { inputs, hasResults } = await collectScoringInputs(projectPath);
+  if (!hasResults) return null;
+  const profile = await probeProjectProfile(projectPath);
+  return { inputs, dimensions: buildDimensionsFromInputs(projectPath, inputs, profile) };
+}
+
 /**
  * 写分点 1/2（已合并为一个函数）：把各域最新落盘结果汇总成健康总分并落库。
  *
@@ -127,24 +166,17 @@ export async function collectScoringInputs(projectPath: string) {
 export async function summarizeAndPersistScore(
   projectPath: string,
 ): Promise<HealthScoreData | null> {
-  if (!projectPath || typeof projectPath !== 'string') {
-    throw new Error(t('electron.invalidProjectPath'));
-  }
-  // 输入组装与分类页实时评分共用 assembleHealthInputs（含 Q4 评分输入缺口修复：
-  // security/deps 专用扫描发现并入），两条路径结构上不可能漂移。
-  const { inputs, hasResults } = await collectScoringInputs(projectPath);
-  if (!hasResults) return null;
+  // 输入组装、空结果判定、画像探测与分类页/总览共用同一实现（Q4 修复：
+  // security/deps 专用扫描发现并入），三条路径结构上不可能漂移。
+  const collected = await collectScoringDimensions(projectPath);
+  if (!collected) return null;
 
   const scoring = await getScoring();
-  const profilingResult = await probeProjectProfile(projectPath);
-  const dimensions = buildHealthDimensions({
-    guard: inputs.guard,
-    inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
-    projectRoot: projectPath,
-    profile: profilingResult,
-    extras: inputs.extras,
-  });
-  const score = scoring.calculate(projectPath, dimensions, computeRedLine(inputs.extras));
+  const score = scoring.calculate(
+    projectPath,
+    collected.dimensions,
+    computeRedLine(collected.inputs.extras),
+  );
   return toHealthScoreData(score);
 }
 

@@ -7,26 +7,20 @@
 
 import path from 'node:path';
 import { t } from '@zh/i18n';
-import { buildHealthDimensions, computeOverallSnapshot, computeRedLine } from '@zh/scoring';
-import { listGuardReports } from '@zh/guard';
+import { computeOverallSnapshot, computeRedLine } from '@zh/scoring';
 import type { PostScanGateReport } from '@zh/kernel';
 import { readDomainSnapshot } from '../zh-diagnostics';
 import type { DiagnosticSource, DiagnosticsReport } from '../zh-diagnostics-types';
-import { readDashboardState } from './dashboard-state';
 import { getScoring } from '../ipc-context';
 import { runProfileSyncInWorker } from '../profile-host';
 import { toHealthScoreData, type HealthScoreData } from './report-format';
 import { evaluateProjectGates } from './project-gates';
 import type { DomainScoreData, ProjectProfileData } from '../../src/types/electron';
+import { isScoreDimension, qualityFastPathScore, type ScoreDimension } from '../report-summary';
 import {
-  assembleHealthInputs,
-  isScoreDimension,
-  qualityFastPathScore,
-  type ScoreDimension,
-} from '../report-summary';
-import {
-  buildPipelineExtras,
+  buildDimensionsFromInputs,
   cacheProfile,
+  collectScoringDimensions,
   collectScoringInputs,
   probeProjectProfile,
 } from './engines-scoring';
@@ -70,18 +64,6 @@ export async function getScoreHistoryHandler(
 type DomainScoreDataLike = Omit<DomainScoreData, 'generatedAt'> & { generatedAt: string | null };
 
 /**
- * 分类页实时评分（engine:getDomainScore）：按维度实时算分，只读不算。
- *
- * 只读不算：绝不调用 calculate（会写库，批 6/铁律）——本路径只调
- * buildHealthDimensions 直接算该维分数，不落库、不写任何快照。
- *
- * - quality 走快照快路径：inspect 快照落盘时已当场出分（含 previousScore 对比基线），
- *   直接透传，保持既有语义与 e2e；但 performance 条目落在自己的域快照里，
- *   故一并读入并由 qualityFastPathScore 合并后重算（无 performance 条目时仍是零算分）。
- * - 其余 9 维 compose-on-read：与报告中心汇总共用 assembleHealthInputs 组装输入，
- *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
- */
-/**
  * 读某治理域最近一次落盘快照（仅问题项）。
  *
  * 供分类页「有历史评分即可查看详情」使用：无快照/损坏返回 null，
@@ -100,6 +82,18 @@ export async function getDomainReportHandler(
   }
 }
 
+/**
+ * 分类页实时评分（engine:getDomainScore）：按维度实时算分，只读不算。
+ *
+ * 只读不算：绝不调用 calculate（会写库，批 6/铁律）——本路径只调
+ * buildHealthDimensions 直接算该维分数，不落库、不写任何快照。
+ *
+ * - quality 走快照快路径：inspect 快照落盘时已当场出分（含 previousScore 对比基线），
+ *   直接透传，保持既有语义与 e2e；但 performance 条目落在自己的域快照里，
+ *   故一并读入并由 qualityFastPathScore 合并后重算（无 performance 条目时仍是零算分）。
+ * - 其余 9 维 compose-on-read：与报告中心汇总共用 collectScoringInputs 组装输入，
+ *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
+ */
 export async function getDomainScoreHandler(
   _event: Electron.IpcMainInvokeEvent,
   projectPath: string,
@@ -122,18 +116,8 @@ export async function getDomainScoreHandler(
       return qualityFastPathScore(inspectSnapshot, performanceSnapshot);
     }
     // 其余 9 维：compose-on-read，与报告中心汇总共用同一输入组装
-    const inputs = await assembleHealthInputs(projectPath, {
-      listGuardReports,
-      readDomainSnapshot,
-      readDashboardState,
-      buildPipelineExtras,
-    });
-    const dimensions = buildHealthDimensions({
-      guard: inputs.guard,
-      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
-      projectRoot: projectPath,
-      extras: inputs.extras,
-    });
+    const { inputs } = await collectScoringInputs(projectPath);
+    const dimensions = buildDimensionsFromInputs(projectPath, inputs);
     const entry = dimensions.find((d) => d.name === dimension);
     if (!entry) return null;
     return {
@@ -161,7 +145,7 @@ export async function getDomainScoreHandler(
  * 它们分叉，对不上是必然的、不是偶发。
  *
  * 两条同源保证：
- * 1. 与分类页共用 `assembleHealthInputs` + `buildHealthDimensions`（同一函数、同一输入形状）；
+ * 1. 与分类页共用 `collectScoringInputs` + `buildDimensionsFromInputs`（同一函数、同一输入形状）；
  * 2. **一次组装取满十维** —— 若改成调十次 `getDomainScore`，十张卡会跨越两次扫描、
  *    各自属于不同时刻，等于换个姿势继续对不上。
  *
@@ -206,18 +190,11 @@ export async function getHealthOverviewHandler(
     if (!projectPath || typeof projectPath !== 'string') {
       throw new Error(t('electron.invalidProjectPath'));
     }
-    const { inputs, hasResults } = await collectScoringInputs(projectPath);
     // 一穷二白的新项目返回 null（由 UI 提示先跑检查），绝不返回一条 0 分总览
-    if (!hasResults) return null;
+    const collected = await collectScoringDimensions(projectPath);
+    if (!collected) return null;
 
-    const profilingResult = await probeProjectProfile(projectPath);
-    const dimensions = buildHealthDimensions({
-      guard: inputs.guard,
-      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
-      projectRoot: projectPath,
-      profile: profilingResult,
-      extras: inputs.extras,
-    });
+    const { inputs, dimensions } = collected;
     const snapshot = computeOverallSnapshot(dimensions, computeRedLine(inputs.extras));
     return {
       overall: snapshot.overall,

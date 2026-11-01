@@ -6,7 +6,7 @@
  * 记录（时点快照），分类页走 `engine:getDomainScore` 实时重算。
  *
  * 本测试锁的是「结构性不可能漂移」，不是锁某个具体分数：
- * 只要两处继续共用 `assembleHealthInputs` + `buildHealthDimensions`，
+ * 只要两处继续共用 `collectScoringInputs` + `buildDimensionsFromInputs`，
  * 卡片上的数与点进去看到的数就是同一个数。
  *
  * 每条断言都做过反向自证（把源码改坏 → 必须变红）：
@@ -41,21 +41,28 @@ const preloadSrc = readSrc('electron/preload.ts');
 describe('engine:getHealthOverview（总览实时视图）', () => {
   const overviewBody = bodyOf(scoringAllSrc, 'export async function getHealthOverviewHandler');
 
-  it('与分类页共用 assembleHealthInputs（同一份输入组装）', () => {
+  it('与分类页共用 collectScoringInputs（同一份输入组装）', () => {
     const domainBody = bodyOf(scoringAllSrc, 'export async function getDomainScoreHandler');
-    // 总览与写分点已收敛到唯一 helper：两者只经 collectScoringInputs 取数，
+    // 总览与写分点收敛到唯一 helper collectScoringDimensions，内部只调 collectScoringInputs，
     // 不再各自复制一份 assembleHealthInputs 调用（复制品一旦分叉就会写两个分）
-    expect(overviewBody).toMatch(/collectScoringInputs\(/);
+    expect(overviewBody).toMatch(/collectScoringDimensions\(/);
+    const collectedBody = bodyOf(scoringSrc, 'function collectScoringDimensions');
+    expect(collectedBody).toMatch(/collectScoringInputs\(/);
     const collectBody = bodyOf(scoringSrc, 'async function collectScoringInputs');
     expect(collectBody).toMatch(/assembleHealthInputs\(/);
-    // 分类页实时评分仍用同一个组装函数（同一输入形状）
-    expect(domainBody).toMatch(/assembleHealthInputs\(/);
+    // 分类页实时评分也走同一个组装函数（同一输入形状）
+    expect(domainBody).toMatch(/collectScoringInputs\(/);
   });
 
-  it('与分类页共用 buildHealthDimensions（同一套算分）', () => {
+  it('与分类页共用 buildDimensionsFromInputs（同一套算分）', () => {
     const domainBody = bodyOf(scoringAllSrc, 'export async function getDomainScoreHandler');
-    expect(overviewBody).toMatch(/buildHealthDimensions\(/);
-    expect(domainBody).toMatch(/buildHealthDimensions\(/);
+    expect(overviewBody).toMatch(/collectScoringDimensions\(/);
+    const collectedBody = bodyOf(scoringSrc, 'function collectScoringDimensions');
+    expect(collectedBody).toMatch(/buildDimensionsFromInputs\(/);
+    expect(domainBody).toMatch(/buildDimensionsFromInputs\(/);
+    // helper 内部必须仍是 buildHealthDimensions：改名不得绕过真正的算分函数
+    const helperBody = bodyOf(scoringSrc, 'function buildDimensionsFromInputs');
+    expect(helperBody).toMatch(/buildHealthDimensions\(/);
   });
 
   it('一次组装取满十维，不是循环调十次单维接口（十张卡必须同一时刻）', () => {

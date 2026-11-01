@@ -290,18 +290,13 @@ rules:
     status: "draft"
 
   # ╔══════════════════════════════════════════════════════════════╗
-  # ║  Garbage (垃圾清理域) — 死代码/重复代码/未用依赖清理规则     ║
+  # ║  Garbage (垃圾清理域) — 死代码/未用依赖清理规则              ║
+  # ║  重复代码已按《07》O1 移交重构域，垃圾域不再上报（2026-10-31）║
   # ╚══════════════════════════════════════════════════════════════╝
   # 2026-09-18 新建：垃圾清理不再借调安全引擎，本域自持规则与判定
   - id: "garbage.scan.cleanup.dead-code"
     file: "garbage/scan/cleanup/dead-code.yml"
     adapter: "Garbage · 死代码（ts-prune）"
-    priority: "low"
-    status: "active"
-
-  - id: "garbage.scan.cleanup.duplicate-code"
-    file: "garbage/scan/cleanup/duplicate-code.yml"
-    adapter: "Garbage · 重复代码（jscpd）"
     priority: "low"
     status: "active"
 
@@ -313,8 +308,8 @@ rules:
 
 # ---- 统计 ----
 statistics:
-  totalRegistered: 191
-  active: 14
+  totalRegistered: 190
+  active: 13
   draft: 31
   trial: 3
   deprecated: 0
@@ -324,7 +319,7 @@ statistics:
     security: 38
     sentinel: 9
     evolve: 12
-    garbage: 3
+    garbage: 2
   bySource:
     external: 101
     internal: 56

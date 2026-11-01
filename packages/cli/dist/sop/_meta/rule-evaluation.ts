@@ -46,6 +46,14 @@ export interface RuleEvaluation {
    *  与 P0-2（规则 0 条）同级的盲检护栏：什么都没查 = 不得通过。
    *  预期跳过（防重入 / dryRun / 画像 scope 裁剪）不标记。 */
   degraded?: boolean;
+
+  /**
+   * 不适用标注：规则的检测对象在本项目确实不存在（如未用 Web 框架的 Helmet/CSRF）。
+   * 附加语义而非新状态——status 仍为 passed，既有消费方（SARIF / 评分 / 门禁）不受影响；
+   * 差别在于聚合时不把这条计入「通过」，展示上单列「不适用」。
+   * 仅当规则**全部**检测项都确知不适用时才设置，无法判定时不得猜测。
+   */
+  applicability?: 'not-applicable';
 }
 
 // ─── 单条违规 ──────────────────────────────────────────
@@ -134,6 +142,10 @@ export interface RuleEngineReport {
 
   /** 非预期降级跳过数（工具不可用 / 引擎未注册 / 适配器缺失等）。ok 为 false 时的可读指示值。聚合报告必写；兼容旧序列化报告缺失场景。 */
   degraded?: number;
+
+  /** 不适用数（规则检测对象在项目中不存在，如无 Web 框架的 Helmet/CSRF）。
+   *  单列统计：不计入 passed，也不计为跳过/降级。可选以兼容旧报告。 */
+  notApplicable?: number;
 
   /** 阻断评估数（F1-4） */
   blockingCount?: number;

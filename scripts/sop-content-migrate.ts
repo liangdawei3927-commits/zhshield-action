@@ -234,6 +234,22 @@ interface UpsertRulesParams {
   insertAudit: Database.Statement;
 }
 
+/** 幂等：audit 仅对真正新插入的行记录，重跑不重复追加 */
+function insertCreateAudit(
+  insertAudit: Database.Statement,
+  rule: SopRule,
+  contentSha: string,
+): void {
+  insertAudit.run({
+    id: randomUUID(),
+    entity_type: 'rule',
+    entity_id: rule.id,
+    action: 'create',
+    detail: `migrate content_sha=${contentSha.slice(0, 12)} version=${INITIAL_VERSION}`,
+    operator: OPERATOR,
+  });
+}
+
 function upsertRules(params: UpsertRulesParams): void {
   const { rules, existingRuleIds, insertRule, insertVersion, insertAudit } = params;
   // 幂等：audit 仅对真正新插入的行记录，重跑不重复追加
@@ -274,16 +290,7 @@ function upsertRules(params: UpsertRulesParams): void {
       released_by: OPERATOR,
       changes: 'C2 初始迁移',
     });
-    if (isNew) {
-      insertAudit.run({
-        id: randomUUID(),
-        entity_type: 'rule',
-        entity_id: rule.id,
-        action: 'create',
-        detail: `migrate content_sha=${contentSha.slice(0, 12)} version=${INITIAL_VERSION}`,
-        operator: OPERATOR,
-      });
-    }
+    if (isNew) insertCreateAudit(insertAudit, rule, contentSha);
   }
 }
 

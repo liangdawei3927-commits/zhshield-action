@@ -39,14 +39,16 @@ import {
   computePipelineHealthScore,
   scorePipelineModules,
   generateReportSummaryHandler,
+  runProfileHandler,
+} from './engines-scoring';
+import {
   getScoreHandler,
   getScoreHistoryHandler,
   getDomainScoreHandler,
   getHealthOverviewHandler,
   getDomainReportHandler,
-  runProfileHandler,
   getProfileHandler,
-} from './engines-scoring';
+} from './engines-scoring-read';
 import {
   saveDomainReportHandler,
   getSavedDomainReportHandler,

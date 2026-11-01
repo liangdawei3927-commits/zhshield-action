@@ -75,12 +75,16 @@ vi.mock('../../electron/ipc/engines-scoring', () => ({
   computePipelineHealthScore: vi.fn(() => 0),
   scorePipelineModules: vi.fn(() => []),
   generateReportSummaryHandler: vi.fn(),
+  runProfileHandler: vi.fn(),
+}));
+
+// 只读处理器已拆到 engines-scoring-read.ts：同样要挡在真实模块之外
+vi.mock('../../electron/ipc/engines-scoring-read', () => ({
   getScoreHandler: vi.fn(),
   getScoreHistoryHandler: vi.fn(),
   getDomainScoreHandler: vi.fn(),
   getHealthOverviewHandler: vi.fn(),
   getDomainReportHandler: vi.fn(),
-  runProfileHandler: vi.fn(),
   getProfileHandler: vi.fn(),
 }));
 

@@ -32,14 +32,17 @@ function bodyOf(src: string, signature: string): string {
 }
 
 const scoringSrc = readSrc('electron/ipc/engines-scoring.ts');
+// 只读处理器已拆到 engines-scoring-read.ts：拼接两份源码，断言的仍是同一个评分模块
+const scoringReadSrc = readSrc('electron/ipc/engines-scoring-read.ts');
+const scoringAllSrc = scoringSrc + scoringReadSrc;
 const enginesSrc = readSrc('electron/ipc/engines.ts');
 const preloadSrc = readSrc('electron/preload.ts');
 
 describe('engine:getHealthOverview（总览实时视图）', () => {
-  const overviewBody = bodyOf(scoringSrc, 'export async function getHealthOverviewHandler');
+  const overviewBody = bodyOf(scoringAllSrc, 'export async function getHealthOverviewHandler');
 
   it('与分类页共用 assembleHealthInputs（同一份输入组装）', () => {
-    const domainBody = bodyOf(scoringSrc, 'export async function getDomainScoreHandler');
+    const domainBody = bodyOf(scoringAllSrc, 'export async function getDomainScoreHandler');
     // 总览与写分点已收敛到唯一 helper：两者只经 collectScoringInputs 取数，
     // 不再各自复制一份 assembleHealthInputs 调用（复制品一旦分叉就会写两个分）
     expect(overviewBody).toMatch(/collectScoringInputs\(/);
@@ -50,7 +53,7 @@ describe('engine:getHealthOverview（总览实时视图）', () => {
   });
 
   it('与分类页共用 buildHealthDimensions（同一套算分）', () => {
-    const domainBody = bodyOf(scoringSrc, 'export async function getDomainScoreHandler');
+    const domainBody = bodyOf(scoringAllSrc, 'export async function getDomainScoreHandler');
     expect(overviewBody).toMatch(/buildHealthDimensions\(/);
     expect(domainBody).toMatch(/buildHealthDimensions\(/);
   });

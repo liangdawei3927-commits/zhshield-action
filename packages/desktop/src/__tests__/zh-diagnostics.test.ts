@@ -564,6 +564,37 @@ describe('readAggregatedDiagnostics 跨域聚合', () => {
     }
   });
 
+  it('A9：聚合报告条目数 == 各域快照条目之和，且无重复计数', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-agg-sum-'));
+    try {
+      const securityExtra: DiagnosticEntry = {
+        ...securityEntry,
+        fingerprint: 'security::c',
+        message: 'security 域第二条',
+      };
+      await persistDiagnosticsFromEntries(project, [inspectEntry], ['inspect']);
+      await persistDiagnosticsFromEntries(project, [securityEntry, securityExtra], ['security']);
+      await persistDiagnosticsFromEntries(project, [refactorEntry], ['refactor']);
+
+      // Σ各域：直接读每份域快照，不经聚合路径，避免「拿聚合结果自证聚合」
+      const perDomain = await Promise.all(
+        (['inspect', 'security', 'refactor'] as const).map((source) =>
+          readDomainSnapshot(project, source),
+        ),
+      );
+      const perDomainSum = perDomain.reduce((sum, snap) => sum + (snap?.issues.length ?? 0), 0);
+      expect(perDomainSum).toBe(4);
+
+      const agg = await readAggregatedDiagnostics(project);
+      expect(agg!.issues).toHaveLength(perDomainSum);
+      // 每条指纹只出现一次 —— 同一个问题在全局视图里被数两次，总分与报告就会自相矛盾
+      const fingerprints = agg!.issues.map((i) => i.fingerprint);
+      expect(new Set(fingerprints).size).toBe(fingerprints.length);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('无域快照目录时回退 latest.json', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-agg-fallback-'));
     try {

@@ -38,6 +38,23 @@ describe('computeOverallSnapshot', () => {
     expect(snapshot.overall).toBe(90);
   });
 
+  it('A10：总分恰等于各维加权（维度分已是扣分后结果，报告中心不再二次扣分）', () => {
+    // 各维分数本身就是「扣完分」的结果（如 security 78.4 = 100 − 21.6 扣分）
+    const dimensions = [
+      dim('quality', 86, 0.3),
+      dim('security', 78.4, 0.25),
+      dim('dependencies', 92, 0.2),
+      dim('techdebt', 70, 0.25),
+    ];
+    const snapshot = computeOverallSnapshot(dimensions);
+
+    // 逐项如实复算：唯一项是 score×weight / Σweight，不得有第二个惩罚项
+    const weightSum = dimensions.reduce((sum, d) => sum + d.weight, 0);
+    const expected = dimensions.reduce((sum, d) => sum + d.score * d.weight, 0) / weightSum;
+    expect(snapshot.overall).toBeCloseTo(expected, 2);
+    expect(snapshot.redLine?.capped ?? false).toBe(false);
+  });
+
   it('红线封顶：capped 时总评被压制到 cap', () => {
     const snapshot = computeOverallSnapshot([dim('quality', 95, 1)], {
       capped: true,

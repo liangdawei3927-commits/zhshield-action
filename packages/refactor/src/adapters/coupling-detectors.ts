@@ -141,8 +141,20 @@ function detectExcessivePublicMethods(
   }
 }
 
+/**
+ * 跨文件重复字符串索引的进程内缓存。
+ *
+ * `detectShotgunSurgery` 按文件逐个调用，若每次都重扫全部文件的全文正则，
+ * 单次扫描就是 O(文件数²)。缓存键用 `allFiles` 数组引用：一次扫描内数组不变，
+ * 换一次扫描（新数组）自然失效，与 structure-detectors 的 `_dupCache` 同款策略。
+ */
+let _literalCache: Map<string, Set<string>> | null = null;
+let _literalCacheFiles: ParsedFile[] | null = null;
+
 /** 跨文件收集大写开头字符串字面量及其出现文件集合 */
 function collectRepeatedStringLiterals(allFiles: ParsedFile[]): Map<string, Set<string>> {
+  if (_literalCache !== null && _literalCacheFiles === allFiles) return _literalCache;
+
   const stringLiterals = new Map<string, Set<string>>();
   for (const otherFile of allFiles) {
     const text = otherFile.sourceFile.getFullText();
@@ -160,6 +172,9 @@ function collectRepeatedStringLiterals(allFiles: ParsedFile[]): Map<string, Set<
       files.add(otherFile.filePath);
     }
   }
+
+  _literalCache = stringLiterals;
+  _literalCacheFiles = allFiles;
   return stringLiterals;
 }
 

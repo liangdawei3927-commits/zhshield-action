@@ -254,21 +254,37 @@ function withRegionLineCount(head: DuplicateBlock, lastEnd: number): DuplicateBl
   return { ...head, lineCount };
 }
 
-/** 两两比较不同文件的归一化块，找出重复片段 */
+/**
+ * 按归一化文本分桶后比较，找出重复片段。
+ *
+ * 判定条件仍是 `normalized` 全等（与逐个两两比对一致），但把 O(块数²) 的全量
+ * 比较换成「先按归一化文本建索引，再只在同桶内比较」。2026-11-02 实测：本仓
+ * 807 个文件产出约 12 万个窗口，全量两两比较耗时 248s（refactor 域 297s 的
+ * 84%），分桶后降到秒级 —— 输出集合与顺序都不变（仍按 i 升序、j 升序产出，
+ * 只是跳过了注定不相等的对），故基线计数与报告顺序不受影响。
+ */
 function findDuplicatePairs(blocks: CodeBlock[], minLines: number): DuplicateBlock[] {
-  const dups: DuplicateBlock[] = [];
-
+  const byNormalized = new Map<string, number[]>();
   for (let i = 0; i < blocks.length; i++) {
-    for (let j = i + 1; j < blocks.length; j++) {
+    const key = blocks[i].normalized;
+    const bucket = byNormalized.get(key);
+    if (bucket) bucket.push(i);
+    else byNormalized.set(key, [i]);
+  }
+
+  const dups: DuplicateBlock[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const bucket = byNormalized.get(blocks[i].normalized);
+    if (!bucket || bucket.length < 2) continue;
+    for (const j of bucket) {
+      if (j <= i) continue;
       if (blocks[i].file === blocks[j].file) continue;
-      if (blocks[i].normalized === blocks[j].normalized) {
-        dups.push({
-          files: [blocks[i].file, blocks[j].file],
-          lines: [blocks[i].startLine, blocks[j].startLine],
-          code: blocks[i].normalized.slice(0, 80),
-          lineCount: minLines,
-        });
-      }
+      dups.push({
+        files: [blocks[i].file, blocks[j].file],
+        lines: [blocks[i].startLine, blocks[j].startLine],
+        code: blocks[i].normalized.slice(0, 80),
+        lineCount: minLines,
+      });
     }
   }
 

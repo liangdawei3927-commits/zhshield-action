@@ -140,18 +140,17 @@ function checkGovernanceDrift(
   filePath: string,
   declared: unknown,
   dirValue: string,
-  allowed: readonly string[],
-  label: '域' | '动作',
+  spec: { allowed: readonly string[]; label: '域' | '动作' },
 ): SopRuleIssue | null {
   if (typeof declared !== 'string' || declared === dirValue) return null;
-  if (!allowed.includes(declared)) return null;
-  const field = label === '域' ? 'governance.domain' : 'governance.action';
+  if (!spec.allowed.includes(declared)) return null;
+  const field = spec.label === '域' ? 'governance.domain' : 'governance.action';
   return {
     file: filePath,
     field,
     value: declared,
     level: 'warn',
-    reason: `与目录推导${label} "${dirValue}" 不一致，规则将归属 "${declared}"`,
+    reason: `与目录推导${spec.label} "${dirValue}" 不一致，规则将归属 "${declared}"`,
   };
 }
 
@@ -206,8 +205,18 @@ export function validateRuleSource(
   }
 
   // ─── 域/动作覆盖可见性：目录在 guard/ 却声明 security 域会把规则挪到别的治理域 ───
-  push(checkGovernanceDrift(filePath, gov?.domain, dirDomain, GOVERNANCE_DOMAINS, '域'));
-  push(checkGovernanceDrift(filePath, gov?.action, dirAction, ACTION_TYPES, '动作'));
+  push(
+    checkGovernanceDrift(filePath, gov?.domain, dirDomain, {
+      allowed: GOVERNANCE_DOMAINS,
+      label: '域',
+    }),
+  );
+  push(
+    checkGovernanceDrift(filePath, gov?.action, dirAction, {
+      allowed: ACTION_TYPES,
+      label: '动作',
+    }),
+  );
 
   return { issues, drop: issues.some((i) => i.level === 'fatal') };
 }

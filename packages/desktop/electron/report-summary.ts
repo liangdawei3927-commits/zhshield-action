@@ -264,7 +264,11 @@ export async function assembleHealthInputs(
   };
 
   return {
-    guard: guardRecord ? { results: toGuardChecks(guardRecord.checks) } : null,
+    // total 显式透传：门禁零覆盖（一条规则都没跑）时 gate 维必须是 not-run 而非 100 分
+    // （契约《07》§八 A8）。历史落库记录可能没有 summary → 省略该字段，退回按 results 计分。
+    guard: guardRecord
+      ? { results: toGuardChecks(guardRecord.checks), total: guardRecord.summary?.total }
+      : null,
     inspectIssues: mergedIssues.length > 0 || inspectSnapshot !== null ? mergedIssues : null,
     esloc: inspectSnapshot?.esloc,
     extras,

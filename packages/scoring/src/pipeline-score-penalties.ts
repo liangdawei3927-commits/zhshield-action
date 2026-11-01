@@ -18,6 +18,16 @@ export interface GuardCheckLike {
 /** guard 报告最小结构 — 与 @zh/guard GuardReport 字段兼容 */
 export interface GuardReportLike {
   results: GuardCheckLike[];
+  /**
+   * 报告声明的检查项总数（`GuardReport.summary.total`）。
+   *
+   * 仅用于**显式**判定「零覆盖」：`total === 0` 表示门禁一条规则都没跑
+   * （空项目 / 无规则环境），gate 维须按 not-run 处理而不是 100 分。
+   * 缺省表示「调用方未声明覆盖率」（如模块级评分的合成 guard），
+   * 此时沿用历史口径按 results 计分，不做任何推断 —— 用 `results.length === 0`
+   * 反推零覆盖会把所有合成 fixture 与模块分一起改口径。
+   */
+  total?: number;
 }
 
 /** inspect 问题的最小结构 — 与 @zh/inspect Issue 字段兼容 */

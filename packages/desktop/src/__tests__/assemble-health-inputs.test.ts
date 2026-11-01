@@ -161,6 +161,36 @@ describe('compose-on-read：not-run 维度原样返回', () => {
     expect(gate?.score).toBe(0);
     expect(inputs.timestamps.gate).toBeNull();
   });
+
+  /**
+   * 契约《07》§八 A8：门禁跑过但一条规则都没跑（空项目 / 无规则环境）时，
+   * 报告落盘的是 `summary.total === 0` + 空 checks —— 这不是「全部达标」。
+   * 本用例锁定 assembleHealthInputs 把 total 透传给评分层（否则 scoring
+   * 侧的分支在真实链路里永不生效，gate 仍会显示 100 分）。
+   */
+  it('gate 报告 total === 0（零覆盖）→ status not-run，不给 100 分', async () => {
+    const guardRecord: GuardReportRecord = {
+      timestamp: '2026-09-19T09:00:00.000Z',
+      triggerSource: 'manual',
+      ok: true,
+      riskLevel: 'low',
+      summary: { total: 0, passed: 0, failed: 0, warnings: 0, blocking: 0, errors: 0 },
+      checks: [],
+    };
+    const inputs = await assembleHealthInputs(
+      '/proj',
+      makeReads({ listGuardReports: () => [guardRecord] }),
+    );
+    expect(inputs.guard?.total).toBe(0);
+    const gate = buildHealthDimensions({
+      guard: inputs.guard,
+      inspect: inputs.inspectIssues ? { issues: inputs.inspectIssues } : null,
+      projectRoot: '/proj',
+      extras: inputs.extras,
+    }).find((d) => d.name === 'gate');
+    expect(gate?.status).toBe('not-run');
+    expect(gate?.score).toBe(0);
+  });
 });
 
 describe('timestamps 各维度锚点来源', () => {

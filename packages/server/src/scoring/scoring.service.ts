@@ -102,7 +102,8 @@ export class ScoringService implements OnModuleInit, OnModuleDestroy {
       }
 
       const dimensions = buildHealthDimensions({
-        guard: { results: formats.guardResults },
+        // total 显式透传：门禁零覆盖时 gate 维按 not-run 处理，不给 100 分（契约《07》§八 A8）
+        guard: { results: formats.guardResults, total: formats.guardTotal },
         inspect: { issues: formats.inspectIssues },
         projectRoot: projectPath,
         profile: null,
@@ -141,7 +142,13 @@ function isRuleEngineReport(r: unknown): r is { total: number; evaluations: unkn
 }
 
 type ReportFormatResult =
-  | { kind: 'ok'; guardResults: ConvertedGuardResult[]; inspectIssues: ConvertedInspectIssue[] }
+  | {
+      kind: 'ok';
+      guardResults: ConvertedGuardResult[];
+      /** 门禁报告的检查项总数（SOP 取 RuleEngineReport.total，传统取 GuardReport.summary.total） */
+      guardTotal: number;
+      inspectIssues: ConvertedInspectIssue[];
+    }
   | { kind: 'missing' }
   | { kind: 'mixed' };
 
@@ -156,6 +163,7 @@ function resolveReportFormats(report: PipelineReport): ReportFormatResult {
     return {
       kind: 'ok',
       guardResults: convertGuardEvaluations(guardReport.evaluations),
+      guardTotal: guardReport.total,
       inspectIssues: convertInspectEvaluations(inspectReport.evaluations),
     };
   }
@@ -165,6 +173,7 @@ function resolveReportFormats(report: PipelineReport): ReportFormatResult {
   return {
     kind: 'ok',
     guardResults: (guardReport as GuardReport).results,
+    guardTotal: (guardReport as GuardReport).summary.total,
     inspectIssues: (inspectReport as InspectionReport).issues,
   };
 }

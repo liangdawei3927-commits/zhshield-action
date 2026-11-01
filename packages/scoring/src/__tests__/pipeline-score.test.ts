@@ -112,6 +112,37 @@ describe('buildHealthDimensions', () => {
     expect(byName.security.status).toBe('not-run');
   });
 
+  /**
+   * 契约《07》§八 A8：0 覆盖 → UI 显示「未覆盖」，非 100/0。
+   *
+   * 门禁一条规则都没跑时 penalty 恒为 0 ⇒ 100 分，那是「没扫」不是「没问题」。
+   * 只认报告自报的 `summary.total === 0`：缺省 total 的合成 fixture（模块级评分
+   * 与其它单测的 `{ results: [] }`）无法区分「零覆盖」与「空结果」，
+   * 必须保持历史 scored 口径，否则全站模块分会被静默重算。
+   */
+  it('gate: 显式零覆盖（total === 0）→ not-run，不给 100 分', () => {
+    const dims = buildHealthDimensions({
+      guard: { results: [], total: 0 },
+      inspect: cleanInspect,
+      extras: allExtras,
+    });
+    const gate = dims.find((d) => d.name === 'gate')!;
+    expect(gate.status).toBe('not-run');
+    expect(gate.score).toBe(0);
+    expect(gate.issues).toBe(0);
+  });
+
+  it('gate: 未声明 total 的空 results 仍是 scored 100（合成 fixture 不回归）', () => {
+    const dims = buildHealthDimensions({
+      guard: { results: [] },
+      inspect: cleanInspect,
+      extras: allExtras,
+    });
+    const gate = dims.find((d) => d.name === 'gate')!;
+    expect(gate.status).toBe('scored');
+    expect(gate.score).toBe(100);
+  });
+
   it('security 三级同时打满仍不触底 0（软饱和渐近）', () => {
     // 软饱和各级渐近于 cap（error 48 + warning 40 + info 12），同时打满也为有限正分：
     // softBand(6,8,48)=24 + softBand(10,4,40)=20 + softBand(12,1,12)=6 = 50 → 50

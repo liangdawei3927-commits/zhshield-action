@@ -169,7 +169,13 @@ function checkGateNotRun(
   guard: GuardReportLike | null,
   weight: number,
 ): DimensionScore | null {
-  if (name === 'gate' && guard === null) return notRun(name, weight);
+  if (name !== 'gate') return null;
+  if (guard === null) return notRun(name, weight);
+  // 0 覆盖 ≠ 全部达标（契约《07》§八 A8）：门禁一条规则都没跑时
+  // penalty 恒为 0 ⇒ 100 分，那是「没扫」不是「没问题」，与 refactor 的
+  // scannedFiles===0、sentinel 的 monitorsStarted===0 同一口径。
+  // 只认**显式** total：缺省时无法区分「零覆盖」与「合成的空 results fixture」。
+  if (guard.total === 0) return notRun(name, weight);
   return null;
 }
 

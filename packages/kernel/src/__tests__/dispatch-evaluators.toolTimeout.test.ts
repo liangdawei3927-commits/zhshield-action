@@ -55,7 +55,7 @@ describe('SopRuleEngine — tool-dispatch 工具扫描硬超时兜底', () => {
     registry = new SopRegistry();
   });
 
-  it('① 工具挂起超过硬上限 → 评估 error + 消息含超时原因（短路返回，不再无限挂起体检）', async () => {
+  it('① 工具挂起超过硬上限 → 评估 skipped + degraded + 消息含超时原因（短路返回，不再无限挂起体检）', async () => {
     const engine = new SopRuleEngine(registry, {
       toolAdapters: [{ name: 'eslint', adapter: hangingAdapter }],
       toolScanTimeoutMs: 50,
@@ -73,8 +73,10 @@ describe('SopRuleEngine — tool-dispatch 工具扫描硬超时兜底', () => {
     const elapsed = Date.now() - start;
 
     expect(report.total).toBe(1);
-    expect(report.errors).toBe(1);
-    expect(report.evaluations[0].status).toBe('error');
+    expect(report.errors).toBe(0);
+    expect(report.skipped).toBe(1);
+    expect(report.evaluations[0].status).toBe('skipped');
+    expect(report.evaluations[0].degraded).toBe(true);
     expect(report.evaluations[0].message).toContain('硬上限');
     // 50ms 超时下应快速返回，而非无限挂起
     expect(elapsed).toBeLessThan(2000);

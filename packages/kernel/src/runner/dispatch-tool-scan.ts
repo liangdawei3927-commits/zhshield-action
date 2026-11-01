@@ -13,7 +13,6 @@ import {
   toMessage,
   DEFAULT_TOOL_SCAN_TIMEOUT_MS,
   withToolScanHardTimeout,
-  errorResult,
   targetEngineOf,
 } from './dispatch-shared';
 import { logToolExecutionAudit } from './tool-audit';
@@ -169,7 +168,7 @@ async function executeToolScan(params: ExecuteToolScanParams): Promise<ToolScanO
   try {
     const toolConfig = instr.toolConfig ?? {};
     // 硬上限保护：对齐 InspectEngine ToolAdapterExecutor——即便工具未遵守 timeout，
-    // 单次扫描也绝不无限挂起体检。超时 reject → 下方 catch → 该规则降级为 error。
+    // 单次扫描也绝不无限挂起体检。超时 reject → 下方 catch → 该规则落 skipped（A7/C4）。
     const result = await withToolScanHardTimeout(
       adapter.scan({
         projectPath: context.repoRoot,
@@ -210,7 +209,14 @@ function consumeToolScan(
   outcome: ToolScanOutcome,
 ): RuleEvaluation {
   if (!outcome.ok) {
-    return errorResult(rule, `工具 ${instr.tool} 执行失败: ${outcome.error}`, targetEngineOf(rule));
+    // 《07》A7 / C4：工具执行失败（超时 / 崩溃 / 缺依赖）是「没查成」，不是代码问题。
+    // 落 skipped + degraded：不进 issues、不进扣分分母，但 ok 仍为 false（不得静默通过）。
+    return skipEvaluation(
+      rule,
+      `工具 ${instr.tool} 执行失败: ${outcome.error}`,
+      targetEngineOf(rule),
+      true,
+    );
   }
   return buildToolScanResult(rule, instr, outcome.result);
 }
@@ -222,14 +228,16 @@ function buildToolScanResult(
   result: ToolResult,
 ): RuleEvaluation {
   const violations = toolScanViolations(result, rule);
-  const status =
-    result.status === 'available' && result.issues.length === 0
+  // 工具自报 error（无违规明细）= 工具故障，同上落 skipped + degraded；
+  // 真检出问题（issues 非空）才走 failed，该扣的分照扣。
+  const toolFailed = result.status === 'error' && result.issues.length === 0;
+  const status: RuleEvaluation['status'] = toolFailed
+    ? 'skipped'
+    : result.status === 'available' && result.issues.length === 0
       ? 'passed'
-      : result.status === 'error'
-        ? 'error'
-        : result.status === 'unavailable'
-          ? 'skipped'
-          : 'failed';
+      : result.status === 'unavailable'
+        ? 'skipped'
+        : 'failed';
 
   return {
     rule,
@@ -245,7 +253,7 @@ function buildToolScanResult(
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: new Date(),
-    ...(result.status === 'unavailable' ? { degraded: true as const } : {}),
+    ...(result.status === 'unavailable' || toolFailed ? { degraded: true as const } : {}),
   };
 }
 

@@ -122,7 +122,7 @@ describe('M1b 工具调用去重（toolScanCache）', () => {
     expect(scanCalls).toHaveLength(2);
   });
 
-  it('验收3：scan 抛错时所有消费者得到等价 error 评估（错误也是结果，Promise 不 reject）', async () => {
+  it('验收3：scan 抛错时所有消费者得到等价 skipped 评估（错误也是结果，Promise 不 reject）', async () => {
     const { adapter, scanCalls } = makeSpyAdapter('semgrep', { throwOnScan: true });
     const engine = new SopRuleEngine(registry, { toolAdapters: [{ name: 'semgrep', adapter }] });
     registerToolRules(2);
@@ -131,7 +131,9 @@ describe('M1b 工具调用去重（toolScanCache）', () => {
     expect(scanCalls).toHaveLength(1); // 仍然只执行一次
     expect(report.evaluations).toHaveLength(2);
     for (const e of report.evaluations) {
-      expect(e.status).toBe('error');
+      // 工具故障 = 没查成，不是代码问题：skipped + degraded（A7/C4）
+      expect(e.status).toBe('skipped');
+      expect(e.degraded).toBe(true);
       expect(e.message).toContain('simulated tool crash');
     }
   });

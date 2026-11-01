@@ -380,7 +380,170 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     expect(report.skipped).toBe(1);
   });
 
-  it('tool-dispatch: scan() 抛出异常时返回 error', async () => {
+  it('A7: 工具摘除后 total 不变，该条转 skipped（工具可用时同一条为 passed）', async () => {
+    // 《07》A7 / C4：工具不可用是「没查成」，不是「查出问题」。两条判据：
+    //   1) 评估总数（total）不因工具缺席而减少 —— 否则「0 条检查」会被当成 0 问题/
+    //      满分，这正是 O5「工具错误混入 total」要根除的假象；
+    //   2) 该条转 skipped + degraded：不进 issues、不进扣分分母，但 ok 仍为 false
+    //      （降级跳过不得静默通过）。
+    const meta = {
+      id: 'semgrep',
+      name: 'Semgrep',
+      category: 'security' as const,
+      priority: 'P1' as const,
+      installMode: 'external' as const,
+      description: '',
+      cliCommand: '',
+      homepage: '',
+      license: '',
+    };
+    const availableAdapter = {
+      meta,
+      isAvailable: async () => true,
+      scan: async () => ({
+        tool: 'semgrep' as const,
+        status: 'available' as const,
+        issues: [],
+        metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 0 },
+      }),
+    };
+    const removedAdapter = {
+      meta,
+      isAvailable: async () => false,
+      scan: async () => {
+        throw new Error('should not be called');
+      },
+    };
+
+    registry.register(
+      makeRule({
+        id: 'inspect.security.semgrep-scan',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { scanners: ['semgrep'] },
+      }),
+    );
+
+    const withTool = await new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'semgrep', adapter: availableAdapter }],
+    }).evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const withoutTool = await new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'semgrep', adapter: removedAdapter }],
+    }).evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+
+    expect(withoutTool.total).toBe(withTool.total);
+    expect(withTool.evaluations[0].status).toBe('passed');
+    expect(withTool.skipped).toBe(0);
+    expect(withoutTool.evaluations[0].status).toBe('skipped');
+    expect(withoutTool.evaluations[0].degraded).toBe(true);
+    expect(withoutTool.evaluations[0].violations ?? []).toHaveLength(0);
+    expect(withoutTool.skipped).toBe(1);
+    expect(withoutTool.degraded).toBe(1);
+    expect(withoutTool.ok).toBe(false);
+  });
+
+  it('A7: 工具执行超过硬上限 → skipped + degraded，total 不变、不产生 issue', async () => {
+    const hangingAdapter = {
+      meta: {
+        id: 'slow-tool',
+        name: 'Slow',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
+      isAvailable: async () => true,
+      scan: async () => {
+        // 模拟工具进程不退出：只能靠硬上限兜底
+        await new Promise<void>(() => {});
+        throw new Error('unreachable');
+      },
+    };
+
+    const timeoutEngine = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'slow-tool', adapter: hangingAdapter }],
+      toolScanTimeoutMs: 20,
+    });
+
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.official.slow-tool',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { check: { tool: 'slow-tool', toolConfig: {} } },
+      }),
+    );
+
+    const report = await timeoutEngine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const evalResult = report.evaluations[0];
+    expect(report.total).toBe(1);
+    expect(evalResult.status).toBe('skipped');
+    expect(evalResult.degraded).toBe(true);
+    expect(evalResult.message).toContain('硬上限');
+    expect(evalResult.violations ?? []).toHaveLength(0);
+    expect(report.skipped).toBe(1);
+    expect(report.errors).toBe(0);
+    expect(report.ok).toBe(false);
+  });
+
+  it('A7: 工具自报 error 状态且无违规明细 → skipped + degraded，不落成问题条目', async () => {
+    const errorStatusAdapter = {
+      meta: {
+        id: 'eslint',
+        name: 'ESLint',
+        category: 'guard' as const,
+        priority: 'P1' as const,
+        installMode: 'builtin' as const,
+        description: '',
+        cliCommand: '',
+        homepage: '',
+        license: '',
+      },
+      isAvailable: async () => true,
+      scan: async () => ({
+        tool: 'eslint' as const,
+        status: 'error' as const,
+        issues: [],
+        metadata: { version: '', duration: 10, timestamp: new Date(), fileCount: 0 },
+        error: 'boom',
+      }),
+    };
+
+    const errorStatusEngine = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'eslint', adapter: errorStatusAdapter }],
+    });
+
+    registry.register(
+      makeRule({
+        id: 'guard.block.external.eslint-error',
+        domain: 'guard',
+        action: 'block',
+        severity: 'high',
+        content: {
+          metadata: { id: 'guard.block.external.eslint-error', name: 'ESLint Error' },
+          governance: { domain: 'guard', action: 'block' },
+          check: { tool: 'eslint', toolConfig: {} },
+        },
+      }),
+    );
+
+    const report = await errorStatusEngine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
+    const evalResult = report.evaluations[0];
+    expect(report.total).toBe(1);
+    expect(evalResult.status).toBe('skipped');
+    expect(evalResult.degraded).toBe(true);
+    expect(evalResult.message).toContain('boom');
+    expect(evalResult.violations ?? []).toHaveLength(0);
+    expect(report.skipped).toBe(1);
+    expect(report.errors).toBe(0);
+  });
+
+  it('tool-dispatch: scan() 抛出异常时返回 skipped（工具故障不是代码问题，《07》A7）', async () => {
     const errorAdapter = {
       meta: {
         id: 'error-tool',
@@ -412,8 +575,13 @@ describe('SopRuleEngine — 派发评估（check-list / scanner-dispatch / tool-
     );
 
     const report = await errorEngine.evaluateRules({ repoRoot: '/tmp', domain: 'guard' });
-    expect(report.evaluations[0].status).toBe('error');
+    // 工具抛异常 = 工具故障，不是代码问题：落 skipped + degraded（A7/C4），
+    // 既不产生 issue 也不计扣分，但 ok 仍为 false，不会静默当通过。
+    expect(report.evaluations[0].status).toBe('skipped');
+    expect(report.evaluations[0].degraded).toBe(true);
     expect(report.evaluations[0].message).toContain('CLI crashed');
+    expect(report.errors).toBe(0);
+    expect(report.ok).toBe(false);
   });
 
   it('preset 派发不得导致 evaluateRules 无限递归', async () => {

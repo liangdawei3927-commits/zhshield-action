@@ -131,7 +131,7 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     expect(registry.get(RULE_ID)?.severity).toBe('medium');
   });
 
-  it('error 评估不阻断：适配器抛异常 → blocking=false 且 blockingCount=0，ok 仍由状态驱动为 false', async () => {
+  it('工具故障不阻断：适配器抛异常 → skipped + degraded，blocking=false 且 blockingCount=0，ok 仍为 false', async () => {
     const crashingAdapter: ToolAdapter = {
       meta: {
         id: 'eslint',
@@ -163,7 +163,9 @@ describe('SopRuleEngine — F1-4 阻断判定集成', () => {
     );
 
     const report = await engine.evaluateRules({ repoRoot: '/proj', domain: 'guard' });
-    expect(report.evaluations[0]?.status).toBe('error');
+    // 《07》A7：工具故障落 skipped + degraded（不是代码问题、也不阻断），但 ok 仍为 false
+    expect(report.evaluations[0]?.status).toBe('skipped');
+    expect(report.evaluations[0]?.degraded).toBe(true);
     expect(report.evaluations[0]?.blocking).toBe(false);
     expect(report.blockingCount).toBe(0);
     expect(report.ok).toBe(false);

@@ -15,7 +15,7 @@ export const DEFAULT_TOOL_SCAN_TIMEOUT_MS = 300_000;
 
 /**
  * 硬上限保护：即便适配器未遵守 timeout（进程未退出），单次工具扫描也绝不
- * 无限挂起整个体检。超时即 reject，由 executeToolScan 的 catch 降级为该规则 error。
+ * 无限挂起整个体检。超时即 reject，由 executeToolScan 的 catch 落为该规则 skipped（A7/C4）。
  */
 export function withToolScanHardTimeout<T>(
   promise: Promise<T>,

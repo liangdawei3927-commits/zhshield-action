@@ -19,6 +19,9 @@ export type {
 
 export { SopRegistry } from './_meta/sop-registry';
 export type { RuleChangeEvent } from './_meta/sop-registry';
+// 规则接线审计（《07》O6）：rules.db 里永远求值不到的规则标 orphan
+export { SOP_SERVED_DOMAINS, classifyRuleWiring, auditRuleWiring } from './_meta/rule-wiring';
+export type { RuleWiringReason, OrphanRule, RuleWiringReport } from './_meta/rule-wiring';
 export { SopLoader } from './_meta/sop-loader';
 export type { SopLoaderOptions } from './_meta/sop-loader';
 

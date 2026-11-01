@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { Logger, SopLoader, SopRegistry } from '@zh/kernel';
+import type { Logger, SopLoader, SopRegistry, RuleWiringReport } from '@zh/kernel';
+import { auditRuleWiring } from '@zh/kernel';
 import { toMessage } from './runner-utils';
 
 /**
@@ -44,6 +45,30 @@ export interface SopRuleLoadingDeps {
   logger: Logger;
 }
 
+/**
+ * 规则接线审计（《07》§四 O6）：找出注册表里**永远求值不到**的规则。
+ *
+ * `rules.db` 同时收内置 presets 与云端同步规则，其中 refactor / sentinel / evolve 域的规则
+ * 没有 SOP 求值入口，伪 tool 与不可解释 content 也派发不出去。这些规则若不标记，
+ * 「N 条规则参与判定」的条数就是假的（实测云端 52 条里 7 条 unresolved）。
+ */
+export function auditSopRuleWiring(registry: SopRegistry): RuleWiringReport {
+  return auditRuleWiring(registry.getAll());
+}
+
+/** orphan 明细写日志（0 条不打扰）；只列前 5 条，避免一条坏包刷满日志 */
+function logOrphanRuleWiring(logger: Logger, report: RuleWiringReport): void {
+  if (report.orphans.length === 0) return;
+  const sample = report.orphans
+    .slice(0, 5)
+    .map((o) => `${o.ruleId}(${o.reason})`)
+    .join(', ');
+  const more = report.orphans.length > 5 ? ` 等 ${report.orphans.length} 条` : '';
+  logger.warn(
+    `SOP 规则接线审计: ${report.orphans.length}/${report.total} 条规则永远求值不到（orphan）: ${sample}${more}`,
+  );
+}
+
 /** 载入内置规则模板；返回加载条数（0 表示盲检，已打 error） */
 export async function loadBundledSopRules(
   deps: SopRuleLoadingDeps & { rulesDir?: string },
@@ -57,6 +82,7 @@ export async function loadBundledSopRules(
   } else {
     deps.logger.info(`SOP 规则已加载: ${count} 条 (活跃: ${stats.byStatus.active || 0})`);
   }
+  logOrphanRuleWiring(deps.logger, auditSopRuleWiring(deps.registry));
   return count;
 }
 
@@ -81,6 +107,7 @@ export async function loadSopRulesFromSyncCache(
   await deps.loader.loadFromKnowledgeBase(synced);
   const stats = deps.registry.getStats();
   deps.logger.info(`SOP 同步规则已加载: ${synced.length} 条 (活跃: ${stats.byStatus.active || 0})`);
+  logOrphanRuleWiring(deps.logger, auditSopRuleWiring(deps.registry));
   return synced.length;
 }
 

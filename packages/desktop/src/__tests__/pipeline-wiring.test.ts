@@ -73,8 +73,8 @@ describe('门禁 / 巡检入口 — 装配同源', () => {
       'runSecurityJob 不得用 noop emit 丢弃引擎事件（用户会重新失去进度反馈）',
     ).not.toContain('emit: () => undefined');
     // 进度接线形态：tool:scan-started / tool:executed 必须映射到 progress 通道
-    expect(src).toContain("event.type === 'tool:scan-started'");
-    expect(src).toContain("event.type === 'tool:executed'");
+    expect(src).toContain("event.kind === 'tool:scan-started'");
+    expect(src).toContain("event.kind === 'tool:executed'");
   });
 
   it('扫描失败不得返回空报告伪装满分（P1-B：宁可红不可假绿）', () => {

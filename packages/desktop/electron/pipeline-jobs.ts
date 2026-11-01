@@ -16,9 +16,11 @@ import { createLoadedRunner } from './pipeline-runner-factory';
 import { loadGuardConclusions } from './pipeline-sop';
 import type { PerformanceReportIssue } from './pipeline-report';
 import type { CheckOptions } from '@zh/guard';
-import type { GarbageEvaluationLike, GarbageScanReport } from '@zh/garbage';
+import type { GarbageScanReport } from '@zh/garbage';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { runDomain } from '@zh/pipeline';
+import type { DomainRunRecord } from '@zh/pipeline';
 import {
   appendDomainHistory,
   buildRecordFromFingerprints,
@@ -29,39 +31,35 @@ import { computeDomainSnapshotScore } from './domain-snapshot-score';
 /** garbage 快照串行化写入队列：并发并发多轮扫描时避免 writeFile 交错覆盖（对齐 dashboard-state writeQueue 模式） */
 let garbageSnapshotQueue: Promise<void> = Promise.resolve();
 
+/**
+ * 域记录 → worker 消息：有报告回结果，没报告（域不可用）回错误。
+ *
+ * 不伪造空报告：空报告 = 0 问题 = 满分，会把「没检测成」读成「干净」（C4/P1-B）。
+ */
+function sendDomainOutcome(id: string, record: DomainRunRecord): void {
+  if (record.report !== undefined) {
+    send({ type: 'result', id, report: serializePipelineReport(record.report) });
+    return;
+  }
+  send({ type: 'error', id, error: record.reason ?? `域 ${record.domain} 未产出报告` });
+}
+
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'refactor', t('pipeline.refactor.collecting'), 0.05);
-  const { RefactorEngine, applyRefactorBaseline } = await import('@zh/refactor');
-  const { loadRefactorBaseline } = await import('@zh/shared');
-  const engine = new RefactorEngine();
-  try {
-    progress(id, 'refactor', t('pipeline.refactor.analyzing'), 0.2);
-    const report = await engine.analyzeDirectory(projectPath);
-    // 棘轮基线：.zhshield/refactor-baseline.json 存在时只报增量；无基线全量（历史行为）
-    const baselineCounts = await loadRefactorBaseline(projectPath);
-    const filtered = baselineCounts
-      ? applyRefactorBaseline(report, baselineCounts, projectPath)
-      : null;
-    const finalReport = filtered ? filtered.report : report;
-    const note =
-      filtered && filtered.suppressedCount > 0
-        ? t('pipeline.refactor.baselineSuppressed', { count: filtered.suppressedCount })
-        : '';
-    progress(
-      id,
-      'done',
-      t('pipeline.refactor.done', { count: finalReport.totalSmells }) + note,
-      1.0,
-    );
-    send({ type: 'result', id, report: serializePipelineReport(finalReport) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(
-      '[pipeline-worker] 重构分析异常:',
-      err instanceof Error ? err.stack || message : message,
-    );
-    send({ type: 'error', id, error: message });
+  progress(id, 'refactor', t('pipeline.refactor.analyzing'), 0.2);
+  // 分析与棘轮基线过滤的唯一实现在 pipeline 的 refactor 执行器（含基线豁免）
+  const record = await runDomain('refactor', { repoRoot: projectPath });
+  if (record.status === 'unavailable') {
+    console.error('[pipeline-worker] 重构分析异常:', record.reason);
+    sendDomainOutcome(id, record);
+    return;
   }
+  const report = record.report as { totalSmells: number };
+  const suppressedCount = Number(record.detail?.suppressedCount ?? 0);
+  const note =
+    suppressedCount > 0 ? t('pipeline.refactor.baselineSuppressed', { count: suppressedCount }) : '';
+  progress(id, 'done', t('pipeline.refactor.done', { count: report.totalSmells }) + note, 1.0);
+  sendDomainOutcome(id, record);
 }
 
 /**
@@ -90,7 +88,9 @@ export async function runGuardJob(
     progress(id, 'guard', `同步规则已加载 ${syncedRules} 条`, 0.15);
   }
   try {
-    // 《07》O8/C3：门禁纯判定 —— 只读各域已落盘结论，不执行任何扫描器
+    // 《07》O8/C3：门禁纯判定 —— 只读各域已落盘结论，不执行任何扫描器。
+    // 门禁页要的是 GuardReport（summary/results），故仍走 runGuard（内部即 SOP 门禁），
+    // 与无头账本用的 runSopGuard 是同一套规则；只是输出契约不同。
     const conclusions = await loadGuardConclusions(runner.repoRoot);
     const report = await runner.runGuard({
       mode: 'guard',
@@ -111,54 +111,53 @@ export async function runGuardJob(
 
 export async function runSecurityJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'security', t('pipeline.security.scanning'), 0.1);
-  const { SecurityEngine } = await import('@zh/security');
   // P1-A：引擎事件接通 worker progress 通道。此前 emit 为 noop、事件全被丢弃，
   // 5 分钟安全扫描全程只有开头一条 10% → 用户毫无进度感、"一下跳 100"。
   // 编排器串行跑 4 个外部工具（trivy/grype/depcheck/semgrep）：
   // 每个工具开始/完成各上报一次，步进覆盖 10%→90%（步长 0.2 与默认 4 工具对齐）。
+  // 引擎的装配与事件透传归 pipeline 的 security 执行器，这里只做文案映射。
   let toolsDone = 0;
-  const engine = new SecurityEngine({
-    emit: (event) => {
-      if (event.type === 'tool:scan-started') {
+  const record = await runDomain('security', {
+    repoRoot: projectPath,
+    onEvent: (event) => {
+      const tool = String(event.payload?.tool ?? '');
+      if (event.kind === 'tool:scan-started') {
         progress(
           id,
           'security',
-          t('pipeline.security.toolRunning', { tool: event.payload.tool }),
+          t('pipeline.security.toolRunning', { tool }),
           Math.min(0.9, 0.1 + toolsDone * 0.2),
         );
         return;
       }
-      if (event.type === 'tool:executed') {
+      if (event.kind === 'tool:executed') {
         toolsDone += 1;
         // 状态诚实分支：error/unavailable/skipped（如 grype 漏洞库未就绪）不得显示「完成：0 项发现」
         // ——那会把「没检测成」读成「查过且干净」；失败/跳过文案配合报告 degraded 横幅。
         // success/warning 视为跑完（warning 是带告警的完成）。
-        const { status } = event.payload;
+        const { status } = event.payload as { status: string };
         const failed = status === 'error' || status === 'unavailable' || status === 'skipped';
         progress(
           id,
           'security',
           failed
-            ? t('pipeline.security.toolFailed', { tool: event.payload.tool })
+            ? t('pipeline.security.toolFailed', { tool })
             : t('pipeline.security.toolDone', {
-                tool: event.payload.tool,
-                count: event.payload.issueCount,
+                tool,
+                count: event.payload?.issueCount as number,
               }),
           Math.min(0.9, 0.1 + toolsDone * 0.2),
         );
       }
     },
   });
-  engine.registerDefaultAdapters();
-  try {
-    const report = await engine.runSecurityScan(projectPath, projectPath);
-    progress(id, 'done', t('pipeline.security.done'), 1.0);
-    send({ type: 'result', id, report: serializePipelineReport(report) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 安全扫描异常:', message);
-    send({ type: 'error', id, error: message });
+  if (record.status === 'unavailable') {
+    console.error('[pipeline-worker] 安全扫描异常:', record.reason);
+    sendDomainOutcome(id, record);
+    return;
   }
+  progress(id, 'done', t('pipeline.security.done'), 1.0);
+  sendDomainOutcome(id, record);
 }
 
 /**
@@ -174,43 +173,30 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
  */
 export async function runGarbageScanJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'garbage', t('pipeline.garbage.scanning'), 0.1);
+  const { runner } = await createLoadedRunner(projectPath);
   try {
-    const { detectFsGarbage, buildGarbageReport } = await import('@zh/garbage');
-    const fsItems = await detectFsGarbage(projectPath);
-    const { evaluations, ruleChannelRan } = await runGarbageRuleChannel(id, projectPath);
-    const report = buildGarbageReport({ projectPath, fsItems, evaluations, ruleChannelRan });
+    // 两条来源的合并、规则通道降级（partial + ruleChannelRan=false）都在 pipeline 执行器里
+    const record = await runDomain('garbage', {
+      repoRoot: projectPath,
+      runner,
+      onEvent: (event) => {
+        if (event.kind === 'rule-channel-started') {
+          progress(id, 'garbage', t('pipeline.garbage.ruleScanning'), 0.5);
+        }
+      },
+    });
+    const report = record.report as GarbageScanReport | undefined;
+    if (!report) {
+      console.error('[pipeline-worker] 垃圾扫描异常:', record.reason);
+      sendDomainOutcome(id, record);
+      return;
+    }
     await writeGarbageSnapshot(projectPath, report);
     progress(id, 'done', t('pipeline.garbage.scanDone', { count: report.summary.total }), 1.0);
     send({ type: 'result', id, report: serializePipelineReport(report) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 垃圾扫描异常:', message);
-    send({ type: 'error', id, error: message });
+  } finally {
+    await runner.destroy().catch(() => undefined);
   }
-}
-
-/** ② garbage 域 SOP 规则通道：只评估 garbage 域（ts-prune / depcheck），异常降级不阻断 */
-async function runGarbageRuleChannel(
-  id: string,
-  projectPath: string,
-): Promise<{ evaluations: GarbageEvaluationLike[]; ruleChannelRan: boolean }> {
-  let evaluations: GarbageEvaluationLike[] = [];
-  let ruleChannelRan = false;
-  try {
-    const { PipelineRunner } = await import('@zh/pipeline');
-    const runner = new PipelineRunner(projectPath);
-    await runner.loadSopRules();
-    progress(id, 'garbage', t('pipeline.garbage.ruleScanning'), 0.5);
-    const sopReport = await runner.runSopInspect({ domains: ['garbage'] });
-    evaluations = sopReport.evaluations ?? [];
-    ruleChannelRan = true;
-  } catch (err) {
-    console.warn(
-      '[pipeline-worker] 垃圾规则通道异常，降级为仅文件系统检测:',
-      err instanceof Error ? err.message : String(err),
-    );
-  }
-  return { evaluations, ruleChannelRan };
 }
 
 /** 全量快照落盘：与 inspect/guard 等域一致，写入 .zhshield/diagnostics/domains/garbage.json；失败静默降级 */
@@ -335,59 +321,17 @@ export async function runGarbageRestoreJob(
  */
 export async function runPerformanceJob(id: string, projectPath: string): Promise<void> {
   progress(id, 'performance', t('pipeline.performance.loadingRules'), 0.1);
-  try {
-    const startedAt = Date.now();
-    // 纯静态分析，不执行项目代码（P0-2 禁令）
-    const { PerformanceEngine } = await import('@zh/performance');
-    const engineReport = new PerformanceEngine().scan(projectPath);
-    progress(id, 'performance', t('pipeline.performance.scanning'), 0.6);
-    const issues: PerformanceReportIssue[] = dedupePerformanceIssues(
-      engineReport.issues.map((issue) => ({
-        id: issue.id,
-        ruleId: issue.ruleId,
-        severity: issue.severity,
-        file: issue.file,
-        line: issue.line,
-        message: issue.message,
-        suggestion: issue.suggestion,
-        autoFixable: issue.autoFixable,
-      })),
-    );
-    const report = {
-      summary: {
-        total: issues.length,
-        autoFixable: issues.filter((i) => i.autoFixable).length,
-      },
-      issues,
-      metadata: {
-        duration: Date.now() - startedAt,
-        timestamp: new Date().toISOString(),
-      },
-    };
-    progress(id, 'done', t('pipeline.performance.done', { count: issues.length }), 1.0);
-    send({ type: 'result', id, report: serializePipelineReport(report) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[pipeline-worker] 性能检测异常:', message);
-    send({ type: 'error', id, error: message });
+  // 纯静态分析，不执行项目代码（P0-2 禁令）；去重与报告形状归 pipeline 执行器
+  const record = await runDomain('performance', { repoRoot: projectPath });
+  const report = record.report as
+    | { summary: { total: number }; issues: PerformanceReportIssue[] }
+    | undefined;
+  if (!report) {
+    console.error('[pipeline-worker] 性能检测异常:', record.reason);
+    sendDomainOutcome(id, record);
+    return;
   }
-}
-
-/**
- * 按 issue.id 去重（引擎 id 已含 file + 具体维度，如
- * `runtime-sync-io-{file}-{fnName}`）。
- *
- * 旧实现按 `ruleId:file` 去重 —— 那是双通道合并期的产物，单通道后只会**少报**：
- * 同一文件里 readFileSync 与 execSync 是两条独立问题，ruleId 同为
- * `performance.runtime.sync-io`、file 相同 → 被压成 1 条。
- */
-function dedupePerformanceIssues(issues: PerformanceReportIssue[]): PerformanceReportIssue[] {
-  const seen = new Set<string>();
-  const result: PerformanceReportIssue[] = [];
-  for (const issue of issues) {
-    if (seen.has(issue.id)) continue;
-    seen.add(issue.id);
-    result.push(issue);
-  }
-  return result;
+  progress(id, 'performance', t('pipeline.performance.scanning'), 0.6);
+  progress(id, 'done', t('pipeline.performance.done', { count: report.summary.total }), 1.0);
+  send({ type: 'result', id, report: serializePipelineReport(report) });
 }

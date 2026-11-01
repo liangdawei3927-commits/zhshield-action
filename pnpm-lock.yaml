@@ -546,9 +546,15 @@ importers:
       '@zh/autoperf':
         specifier: workspace:*
         version: link:../autoperf
+      '@zh/dependency':
+        specifier: workspace:*
+        version: link:../dependency
       '@zh/fingerprint':
         specifier: workspace:*
         version: link:../fingerprint
+      '@zh/garbage':
+        specifier: workspace:*
+        version: link:../garbage
       '@zh/guard':
         specifier: workspace:*
         version: link:../guard
@@ -561,6 +567,9 @@ importers:
       '@zh/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@zh/performance':
+        specifier: workspace:*
+        version: link:../performance
       '@zh/refactor':
         specifier: workspace:*
         version: link:../refactor
@@ -5886,11 +5895,14 @@ snapshots:
   '@zh/pipeline@file:packages/pipeline':
     dependencies:
       '@zh/autoperf': link:packages/autoperf
+      '@zh/dependency': link:packages/dependency
       '@zh/fingerprint': link:packages/fingerprint
+      '@zh/garbage': link:packages/garbage
       '@zh/guard': link:packages/guard
       '@zh/i18n': link:packages/i18n
       '@zh/inspect': link:packages/inspect
       '@zh/kernel': link:packages/kernel
+      '@zh/performance': link:packages/performance
       '@zh/refactor': link:packages/refactor
       '@zh/security': link:packages/security
       '@zh/sentinel': link:packages/sentinel

@@ -7,32 +7,10 @@
  */
 
 import { t } from '@zh/i18n';
-import type {
-  DependencyNode,
-  DependencyGraph,
-  TyposquatFinding,
-  LockfileVerification,
-  UpgradeAssessment,
-  EnvEntry,
-} from '@zh/dependency';
-import {
-  buildDependencyGraph,
-  buildLicenseMatrix,
-  lockfileVerifier,
-  resolveProjectRoot,
-  TyposquatDetectorImpl,
-  UpgradeEvaluatorImpl,
-  EnvConsistencyCheckerImpl,
-  DEFAULT_UPGRADE_CATALOG,
-} from '@zh/dependency';
+import { buildDependencyGraph, resolveProjectRoot } from '@zh/dependency';
 import type { ProjectProfile } from '@zh/pipeline';
-import {
-  loadDepsBaseline,
-  saveDepsBaseline,
-  integritySnapshot,
-  extractMismatchedNodeIds,
-  applyMismatchedTrust,
-} from './deps-baseline';
+import { scanDeps, integritySnapshot } from '@zh/pipeline';
+import { loadDepsBaseline, saveDepsBaseline } from './deps-baseline';
 import { persistDiagnosticsFromEntries, normalizeDepsSource } from '../zh-diagnostics';
 import { updateDashboardState, type DashboardDepsState } from './dashboard-state';
 import { detectProfileInWorker } from '../profile-host';
@@ -41,16 +19,7 @@ import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import type { DependencyReportData, DepsRelockResult } from '../../src/types/electron';
 import { emptyDependencyReportData } from '../../src/services/empty-engine-reports';
 import type { TaskProgressReporter } from '../task-progress';
-import { runCveChecks, cveCounts, type CveCheckResult } from './deps-cve';
-
-/** 按信任状态统计节点数（verified / suspicious / compromised / unknown） */
-function countTrustCounts(nodes: DependencyNode[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const node of nodes) {
-    counts[node.trust] = (counts[node.trust] ?? 0) + 1;
-  }
-  return counts;
-}
+import { runCveChecks, cveCounts } from './deps-cve';
 
 /**
  * 从 DependencyReportData 提取 deps 域 dashboard-state patch。
@@ -77,53 +46,6 @@ function depsDashboardPatch(report: DependencyReportData): DashboardDepsState {
       ? { cve: { status: report.cve.status, ...cveCounts(report.cve) } }
       : {}),
     lastRunAt: new Date().toISOString(),
-  };
-}
-
-/**
- * 依赖管家（engine:runDeps）：纯静态解析锁文件/清单，直连主进程，
- * 不经 TaskManager / worker。返回依赖图谱 + 许可证矩阵 + 投毒检测 +
- * 锁文件校验 + 升级评估 + 环境一致性报告。
- */
-type DepsChecks = {
-  typosquat: { findings: TyposquatFinding[]; error?: string };
-  lockfileCheck: { verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string };
-  upgrade: { assessments: UpgradeAssessment[]; error?: string };
-  env: { entries: EnvEntry[]; error?: string };
-  /** P1-8：CVE 检测（OSV 数据源；不可达时 status='unavailable'，绝不静默 0） */
-  cve: CveCheckResult;
-};
-
-/** 组装依赖盘点报告（含各检查结果与错误透传） */
-function buildDepsReport(
-  graph: DependencyGraph,
-  matrix: ReturnType<typeof buildLicenseMatrix>,
-  nodes: DependencyNode[],
-  checks: DepsChecks,
-): DependencyReportData {
-  const { typosquat, lockfileCheck, upgrade, env, cve } = checks;
-  return {
-    schemaVersion: graph.schemaVersion,
-    targetId: graph.targetId,
-    ecosystem: graph.ecosystem,
-    direct: nodes.filter((node: { kind: string }) => node.kind === 'direct').length,
-    transitive: nodes.filter((node: { kind: string }) => node.kind === 'transitive').length,
-    total: nodes.length,
-    edgeCount: graph.edges.length,
-    lockfile: graph.lockfile,
-    trustCounts: countTrustCounts(nodes),
-    licenseMatrix: matrix,
-    generatedAt: graph.generatedAt,
-    error: null,
-    typosquatFindings: typosquat.findings,
-    lockfileVerification: lockfileCheck.verification,
-    upgradeAssessments: upgrade.assessments,
-    envEntries: env.entries,
-    cve,
-    ...(typosquat.error ? { typosquatError: typosquat.error } : {}),
-    ...(lockfileCheck.error ? { lockfileError: lockfileCheck.error } : {}),
-    ...(upgrade.error ? { upgradeError: upgrade.error } : {}),
-    ...(env.error ? { envError: env.error } : {}),
   };
 }
 
@@ -169,42 +91,42 @@ export async function runDepsHandler(
       throw new Error(t('electron.invalidProjectPath'));
     }
     onProgress?.('deps', t('pipeline.deps.loadingBaseline'), 0.05);
-    const projectRoot = resolveProjectRoot(projectPath);
-    const baseline = await loadDepsBaseline(projectRoot);
+    const baseline = await loadDepsBaseline(projectPath);
+    // 盘点装配（图谱 / 许可证 / 投毒 / 锁文件 / 升级 / 环境 / CVE）唯一实现在 pipeline
+    // 的 deps 执行器；宿主只保留基线读写、CVE 网络、画像 worker 与落盘。
     onProgress?.('deps', t('pipeline.deps.buildingGraph'), 0.15);
-    const graph = buildDependencyGraph(projectRoot);
-    const matrix = buildLicenseMatrix(graph);
-    let nodes = graph.nodes;
     onProgress?.('deps', t('pipeline.deps.checking'), 0.45);
-    const [typosquat, lockfileCheck, upgrade, env, cve] = await Promise.all([
-      runTyposquatChecks(graph),
-      runLockfileChecks(projectRoot, baseline?.integrity),
-      runUpgradeChecks(nodes),
-      runEnvConsistencyChecks(projectRoot),
-      runCveChecks(nodes),
-    ]);
-    onProgress?.('deps', t('pipeline.deps.reporting'), 0.85);
-    // 与基线哈希不符的节点 → 最高危 trust（须在 countTrustCounts 之前覆盖；浅拷贝替换，不原地改）
-    // mismatchedNodeIds 由 verify() 的 actual !== undefined 语义保证：仅同版本哈希真实改变才命中，
-    // 升级（版本号变化）天然免疫，不误报。
-    nodes = applyMismatchedTrust(nodes, lockfileCheck.mismatchedNodeIds);
-    // 首次盘点（无基线）且校验 clean → 自动建基线（幂等；后续仅显式 relock 更新）
-    if (!baseline && lockfileCheck.verification.status === 'clean') {
-      await saveDepsBaseline(projectRoot, integritySnapshot(nodes));
-    }
-    const report = buildDepsReport(graph, matrix, nodes, {
-      typosquat,
-      lockfileCheck,
-      upgrade,
-      env,
-      cve,
+    const profile = await detectProfileSafely(projectPath);
+    const { report, integrityMap } = await scanDeps(projectPath, {
+      ...(baseline?.integrity ? { expectedIntegrity: baseline.integrity } : {}),
+      cveProvider: (nodes) => runCveChecks(nodes),
+      ...(profile ? { profile } : {}),
     });
-    await persistDepsDiagnostics(projectPath, report, normalizeDepsSource(report));
-    await updateDepsDashboard(projectPath, report);
-    return report;
+    onProgress?.('deps', t('pipeline.deps.reporting'), 0.85);
+    // 首次盘点（无基线）且校验 clean → 自动建基线（幂等；后续仅显式 relock 更新）
+    if (!baseline && report.lockfileVerification.status === 'clean') {
+      await saveDepsBaseline(projectPath, integrityMap);
+    }
+    const depsReport = report as DependencyReportData;
+    await persistDepsDiagnostics(projectPath, depsReport, normalizeDepsSource(depsReport));
+    await updateDepsDashboard(projectPath, depsReport);
+    return depsReport;
   } catch (err) {
     console.error('[engine:runDeps] Error:', err);
     return emptyDependencyReportData(err instanceof Error ? err.message : String(err));
+  }
+}
+
+/** 画像探测移到 profile worker（同步扫盘不落主进程）；失败降级为 undefined（由引擎自行同步探测） */
+async function detectProfileSafely(projectPath: string): Promise<ProjectProfile | undefined> {
+  try {
+    return (await detectProfileInWorker(projectPath)) as ProjectProfile;
+  } catch (err) {
+    console.warn(
+      '[engine:runDeps] 项目画像探测失败，降级为引擎内同步探测:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return undefined;
   }
 }
 
@@ -224,89 +146,5 @@ export async function depsRelockBaselineHandler(projectPath: string): Promise<De
   } catch (err) {
     console.error('[engine:depsRelockBaseline] Error:', err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/** 投毒检测接线：单适配器失败 → 空数组 + error，不阻断整个盘点 */
-async function runTyposquatChecks(
-  graph: DependencyGraph,
-): Promise<{ findings: TyposquatFinding[]; error?: string }> {
-  try {
-    const detector = new TyposquatDetectorImpl();
-    return { findings: await detector.detect(graph) };
-  } catch (err) {
-    console.warn(
-      '[engine:runDeps] 投毒检测失败:',
-      err instanceof Error ? err.message : String(err),
-    );
-    return { findings: [], error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/** 锁文件完整性校验接线：校验器契约不抛异常，兜底为 missing + error；返回与基线哈希不符的节点 id 列表 */
-async function runLockfileChecks(
-  projectPath: string,
-  expectedIntegrity?: Record<string, string>,
-): Promise<{ verification: LockfileVerification; mismatchedNodeIds: string[]; error?: string }> {
-  try {
-    const verification = await lockfileVerifier.verify(
-      projectPath,
-      expectedIntegrity ? { expectedIntegrity } : undefined,
-    );
-    return {
-      verification,
-      mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures),
-    };
-  } catch (err) {
-    console.warn(
-      '[engine:runDeps] 锁文件校验失败:',
-      err instanceof Error ? err.message : String(err),
-    );
-    return {
-      verification: { status: 'missing', diffs: [], integrityFailures: [] },
-      mismatchedNodeIds: [],
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
-
-/** 升级评估接线：仅 direct 依赖且命中内置升级目录，不做 code-scan 防主进程阻塞 */
-async function runUpgradeChecks(
-  nodes: readonly DependencyNode[],
-): Promise<{ assessments: UpgradeAssessment[]; error?: string }> {
-  try {
-    const evaluator = new UpgradeEvaluatorImpl();
-    const directNodes = nodes.filter(
-      (node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG,
-    );
-    const assessments: UpgradeAssessment[] = [];
-    for (const node of directNodes) {
-      assessments.push(await evaluator.evaluate(node));
-    }
-    return { assessments };
-  } catch (err) {
-    console.warn(
-      '[engine:runDeps] 升级评估失败:',
-      err instanceof Error ? err.message : String(err),
-    );
-    return { assessments: [], error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/** 环境一致性检查接线：从 projectPath 推导 ProjectProfile（detectProjectProfile 同步 fs，移入 profile worker 执行） */
-async function runEnvConsistencyChecks(
-  projectPath: string,
-): Promise<{ entries: EnvEntry[]; error?: string }> {
-  try {
-    const checker = new EnvConsistencyCheckerImpl();
-    const profile = (await detectProfileInWorker(projectPath)) as ProjectProfile;
-    const report = await checker.check(profile);
-    return { entries: report.entries };
-  } catch (err) {
-    console.warn(
-      '[engine:runDeps] 环境一致性检查失败:',
-      err instanceof Error ? err.message : String(err),
-    );
-    return { entries: [], error: err instanceof Error ? err.message : String(err) };
   }
 }

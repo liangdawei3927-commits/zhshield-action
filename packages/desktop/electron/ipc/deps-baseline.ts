@@ -7,7 +7,6 @@
  * 写入 tmp+rename 原子替换；读取失败降级为 null（无基线行为），绝不抛异常。
  */
 import { createBaselineIo } from '@zh/shared';
-import type { DependencyNode } from '@zh/dependency';
 
 /** 依赖完整性基线（deps-baseline.json）：抓取时间 + 包名→integrity 映射 */
 export interface DepsBaseline {
@@ -18,9 +17,6 @@ export interface DepsBaseline {
 
 const BASELINE_VERSION = 1;
 const BASELINE_FILE = 'deps-baseline.json';
-
-/** 完整性失败消息形如 [direct] lodash@4.17.21 校验和不匹配：期望 …，实际 … */
-const MISMATCHED_INTEGRITY_RE = /^\[[^\]]*\] (\S+) 校验和不匹配/;
 
 function isIntegrityMap(value: unknown): value is Record<string, string> {
   return typeof value === 'object' && value !== null;
@@ -51,33 +47,4 @@ export function saveDepsBaseline(
   integrityMap: Record<string, string>,
 ): Promise<DepsBaseline> {
   return depsBaselineIo.save(projectRoot, integrityMap);
-}
-
-/** 节点 id → integrity 快照（仅含带哈希的节点）；node.id 即 name@version，与 verifier key 一致 */
-export function integritySnapshot(nodes: readonly DependencyNode[]): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const node of nodes) {
-    if (node.integrity !== undefined) map[node.id] = node.integrity;
-  }
-  return map;
-}
-
-/** 从完整性失败清单提取被篡改（哈希真实改变）的节点 id */
-export function extractMismatchedNodeIds(integrityFailures: readonly string[]): string[] {
-  const ids: string[] = [];
-  for (const message of integrityFailures) {
-    const match = MISMATCHED_INTEGRITY_RE.exec(message);
-    if (match) ids.push(match[1]);
-  }
-  return ids;
-}
-
-/** 将被篡改节点覆盖为最高危 trust（浅拷贝替换，不原地修改原数组） */
-export function applyMismatchedTrust(
-  nodes: readonly DependencyNode[],
-  mismatchedNodeIds: readonly string[],
-): DependencyNode[] {
-  if (mismatchedNodeIds.length === 0) return [...nodes];
-  const mismatched = new Set(mismatchedNodeIds);
-  return nodes.map((node) => (mismatched.has(node.id) ? { ...node, trust: 'compromised' } : node));
 }

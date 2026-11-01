@@ -20,6 +20,8 @@ export type {
 } from './domain-snapshot';
 // 执行层骨架（《07》§7.2）：FileIndex → ToolExecutor → Router
 export * from './execution';
+// 按域建任务的无头驱动（《07》§7.4 / C5 / A14）：桌面端、CLI、无头脚本共用
+export * from './domains';
 export { createReport } from './types';
 export type { PipelineReport } from './types';
 export { detectProjectProfile, resolveEffectiveProjectRoot } from './project-profile';

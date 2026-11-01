@@ -3,13 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { DependencyNode } from '@zh/dependency';
+import { integritySnapshot, extractMismatchedNodeIds, applyMismatchedTrust } from '@zh/pipeline';
 import {
   depsBaselinePath,
   loadDepsBaseline,
   saveDepsBaseline,
-  integritySnapshot,
-  extractMismatchedNodeIds,
-  applyMismatchedTrust,
 } from '../../electron/ipc/deps-baseline';
 
 const dirs: string[] = [];

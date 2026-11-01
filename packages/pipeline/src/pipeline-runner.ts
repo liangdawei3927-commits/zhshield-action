@@ -14,7 +14,6 @@ import {
   CommitLintAdapter,
 } from '@zh/inspect';
 import type { InspectionReport } from '@zh/inspect';
-import { RefactorEngine } from '@zh/refactor';
 import type { RefactorReport } from '@zh/refactor';
 import { createRuleMetricsProvider } from './rule-metrics';
 import { createGateMetricResolver } from './gate-metrics';
@@ -23,13 +22,8 @@ import { SecurityCheckEngine } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine, evaluatePostScanGates } from '@zh/kernel';
 import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
-import {
-  loadBaseline,
-  filterIssuesByBaseline,
-  loadRefactorBaseline,
-  type Baseline,
-} from '@zh/shared';
-import { applyRefactorBaseline } from '@zh/refactor';
+import { loadBaseline, filterIssuesByBaseline, type Baseline } from '@zh/shared';
+import { scanRefactor } from './domains/executors';
 import type { PipelineReport } from './types';
 import { registerAutoPerfAdapter } from './autoperf-adapter';
 import { SonarwayToolAdapter } from './sonarway-tool-adapter';
@@ -138,7 +132,6 @@ export class PipelineRunner {
   private securityCheckEngine: SecurityCheckEngine;
   repoRoot: string;
   private sopRuleEngine: SopRuleEngine;
-  private refactorEngine: RefactorEngine;
   private sopRegistry: SopRegistry;
   private sopLoader: SopLoader;
   private pluginLoader: PluginLoader;
@@ -179,7 +172,6 @@ export class PipelineRunner {
     this.inspectEngine = new InspectEngine({
       emit: (event) => this.eventBus.emit(event.type, event.payload),
     });
-    this.refactorEngine = new RefactorEngine();
     this.securityCheckEngine = new SecurityCheckEngine();
     this.sopRuleEngine = new SopRuleEngine(this.sopRegistry, {
       eventBus: this.eventBus,
@@ -261,30 +253,14 @@ export class PipelineRunner {
   }
   async runRefactor(options?: { skipBaseline?: boolean }): Promise<RefactorReport> {
     this.logger.info('开始 Refactor 重构检测...');
-
-    const report = await this.refactorEngine.analyzeDirectory(this.repoRoot);
-    if (options?.skipBaseline) {
-      this.logger.info(
-        `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)`,
-      );
-      return report;
-    }
-    // 棘轮基线：.zhshield/refactor-baseline.json 存在时只报增量（存量压制）；
-    // 无基线时原样返回全量报告，行为与历史版本一致（零回归）。
-    const baselineCounts = await loadRefactorBaseline(this.repoRoot);
-    if (!baselineCounts) {
-      this.logger.info(
-        `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)`,
-      );
-      return report;
-    }
-    const filtered = applyRefactorBaseline(report, baselineCounts, this.repoRoot);
-    const note =
-      filtered.suppressedCount > 0 ? `（基线豁免 ${filtered.suppressedCount} 项存量）` : '';
+    // 分析与棘轮基线过滤的唯一实现在 domains/executors.scanRefactor，
+    // 按域驱动（runDomains）与本方法共用，避免第二份「重构怎么跑」。
+    const { report, suppressedCount } = await scanRefactor(this.repoRoot, options);
+    const note = suppressedCount > 0 ? `（基线豁免 ${suppressedCount} 项存量）` : '';
     this.logger.info(
-      `重构检测完成: ${filtered.report.totalSmells} 处异味 (${filtered.report.summary.criticalFiles} 个文件需要关注)${note}`,
+      `重构检测完成: ${report.totalSmells} 处异味 (${report.summary.criticalFiles} 个文件需要关注)${note}`,
     );
-    return filtered.report;
+    return report;
   }
   // ─── SOP 规则驱动模式 ───
   async runSopGuard(context?: Partial<RuleContext>): Promise<RuleEngineReport> {

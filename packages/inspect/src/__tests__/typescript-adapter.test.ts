@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  buildBuildModeArgs,
   parseTscDiagnostics,
   resolveTscProjects,
   splitTscIssues,
@@ -121,6 +122,20 @@ describe('TypeScriptAdapter.scan — 依赖缺失降级为未执行（P0-1）', 
     const result = await adapter.scan({ projectPath: tempDir, timeout: 5000 });
     expect(result.status).toBe('available');
     expect(result.issues).toHaveLength(0);
+  });
+});
+
+describe('buildBuildModeArgs — monorepo 单进程检查参数', () => {
+  it('一次进程检查全部 tsconfig（-b 而非逐包 -p），且不覆写 composite', () => {
+    // 意图：monorepo 逐包起 tsc 进程会重复解析 lib.d.ts 与 @zh/* 依赖类型（21 包实测 86s），
+    // 构建模式让同一份依赖类型只解析一次；同时不得传 --composite false，
+    // 否则会与项目自身的 composite:true 冲突（TS5053/TS6304）。
+    const projects = ['packages/a/tsconfig.json', 'packages/b/tsconfig.json'];
+    const args = buildBuildModeArgs(projects);
+    expect(args[0]).toBe('-b');
+    expect(args).toContain('--noEmit');
+    expect(args).toEqual(['-b', '--noEmit', ...projects]);
+    expect(args).not.toContain('--composite');
   });
 });
 

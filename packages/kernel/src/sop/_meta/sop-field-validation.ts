@@ -116,6 +116,45 @@ export function logIssues(issues: readonly SopRuleIssue[]): void {
   }
 }
 
+/** 优先级非法会让 severity 静默降为 medium —— 记警告，不拒绝（规则仍可执行）。 */
+function checkPriority(filePath: string, priority: unknown): SopRuleIssue | null {
+  if (priority === undefined || priority === null) return null;
+  const asString = typeof priority === 'string' ? priority : String(priority);
+  if (PRIORITY_CANDIDATES.includes(asString)) return null;
+  return {
+    file: filePath,
+    field: 'judgment.priority',
+    value: priority,
+    level: 'warn',
+    reason: `取值 ${JSON.stringify(priority)} 无法映射到 severity，已降级为 medium`,
+  };
+}
+
+/**
+ * 目录推导的域/动作与显式声明不一致时留痕。
+ *
+ * 这是 parser 的既有行为（governance 字段优先于目录推导），保留但必须可见——
+ * 否则规则会悄悄归属到另一个治理域。
+ */
+function checkGovernanceDrift(
+  filePath: string,
+  declared: unknown,
+  dirValue: string,
+  allowed: readonly string[],
+  label: '域' | '动作',
+): SopRuleIssue | null {
+  if (typeof declared !== 'string' || declared === dirValue) return null;
+  if (!allowed.includes(declared)) return null;
+  const field = label === '域' ? 'governance.domain' : 'governance.action';
+  return {
+    file: filePath,
+    field,
+    value: declared,
+    level: 'warn',
+    reason: `与目录推导${label} "${dirValue}" 不一致，规则将归属 "${declared}"`,
+  };
+}
+
 /**
  * 校验一份规则源对象的枚举字段。
  *
@@ -156,19 +195,7 @@ export function validateRuleSource(
     push(checkTags(filePath, 'metadata.tags', meta.tags));
 
     // 优先级非法会让 severity 静默降为 medium —— 记警告，不拒绝（规则仍可执行）
-    const priority = judgment?.priority;
-    if (priority !== undefined && priority !== null) {
-      const asString = typeof priority === 'string' ? priority : String(priority);
-      if (!PRIORITY_CANDIDATES.includes(asString)) {
-        push({
-          file: filePath,
-          field: 'judgment.priority',
-          value: priority,
-          level: 'warn',
-          reason: `取值 ${JSON.stringify(priority)} 无法映射到 severity，已降级为 medium`,
-        });
-      }
-    }
+    push(checkPriority(filePath, judgment?.priority));
   } else {
     // ─── 简单格式：字段平铺在根对象上 ───
     push(checkEnum(filePath, 'status', parsed.status, RULE_LIFECYCLE_STATUSES));
@@ -179,38 +206,46 @@ export function validateRuleSource(
   }
 
   // ─── 域/动作覆盖可见性：目录在 guard/ 却声明 security 域会把规则挪到别的治理域 ───
-  // 这是 parser 的既有行为（governance 字段优先于目录推导），保留但必须留痕。
-  const declaredDomain = gov?.domain;
-  if (
-    typeof declaredDomain === 'string' &&
-    declaredDomain !== dirDomain &&
-    (GOVERNANCE_DOMAINS as readonly string[]).includes(declaredDomain)
-  ) {
-    push({
-      file: filePath,
-      field: 'governance.domain',
-      value: declaredDomain,
-      level: 'warn',
-      reason: `与目录推导域 "${dirDomain}" 不一致，规则将归属 "${declaredDomain}"`,
-    });
-  }
-
-  const declaredAction = gov?.action;
-  if (
-    typeof declaredAction === 'string' &&
-    declaredAction !== dirAction &&
-    (ACTION_TYPES as readonly string[]).includes(declaredAction)
-  ) {
-    push({
-      file: filePath,
-      field: 'governance.action',
-      value: declaredAction,
-      level: 'warn',
-      reason: `与目录推导动作 "${dirAction}" 不一致，规则将归属 "${declaredAction}"`,
-    });
-  }
+  push(checkGovernanceDrift(filePath, gov?.domain, dirDomain, GOVERNANCE_DOMAINS, '域'));
+  push(checkGovernanceDrift(filePath, gov?.action, dirAction, ACTION_TYPES, '动作'));
 
   return { issues, drop: issues.some((i) => i.level === 'fatal') };
+}
+
+/** 云端规则的问题定位串：必须带规则 id，否则「一次拒了 3 条」无法排查。 */
+function buildLocator(origin: string, id: unknown): string {
+  return `${origin}:${typeof id === 'string' && id.trim() !== '' ? id : '<no-id>'}`;
+}
+
+/** serves 是画像能力声明：结构坏了不致命（当前不参与调度），但必须可见。 */
+function checkServesShape(locator: string, serves: unknown): SopRuleIssue[] {
+  if (serves === undefined || serves === null) return [];
+  if (!isPlainObject(serves)) {
+    return [
+      {
+        file: locator,
+        field: 'serves',
+        value: serves,
+        level: 'warn',
+        reason: '应为 { languages?, productForms?, architectures? } 对象，已忽略',
+      },
+    ];
+  }
+  const issues: SopRuleIssue[] = [];
+  for (const key of ['languages', 'productForms', 'architectures'] as const) {
+    const list = serves[key];
+    if (list === undefined || list === null) continue;
+    if (!Array.isArray(list) || !list.every((v) => typeof v === 'string')) {
+      issues.push({
+        file: locator,
+        field: `serves.${key}`,
+        value: list,
+        level: 'warn',
+        reason: '应为字符串数组，已忽略该项',
+      });
+    }
+  }
+  return issues;
 }
 
 /**
@@ -239,7 +274,7 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
 
   const id = raw.id;
   // 定位串必须带规则 id：云端一次下发几十条，只说「cloud-sync 拒了 3 条」无法排查
-  const locator = `${origin}:${typeof id === 'string' && id.trim() !== '' ? id : '<no-id>'}`;
+  const locator = buildLocator(origin, id);
 
   if (typeof id !== 'string' || id.trim() === '') {
     push({
@@ -262,30 +297,7 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
   push(checkTags(locator, 'tags', raw.tags));
 
   // serves 是画像能力声明：结构坏了不致命（当前不参与调度），但必须可见
-  const serves = raw.serves;
-  if (serves !== undefined && serves !== null && !isPlainObject(serves)) {
-    push({
-      file: locator,
-      field: 'serves',
-      value: serves,
-      level: 'warn',
-      reason: '应为 { languages?, productForms?, architectures? } 对象，已忽略',
-    });
-  } else if (isPlainObject(serves)) {
-    for (const key of ['languages', 'productForms', 'architectures'] as const) {
-      const list = serves[key];
-      if (list === undefined || list === null) continue;
-      if (!Array.isArray(list) || !list.every((v) => typeof v === 'string')) {
-        push({
-          file: locator,
-          field: `serves.${key}`,
-          value: list,
-          level: 'warn',
-          reason: '应为字符串数组，已忽略该项',
-        });
-      }
-    }
-  }
+  for (const issue of checkServesShape(locator, raw.serves)) push(issue);
 
   // content 段能否真跑起来 —— 元数据字段合法 ≠ 检查内容可执行。
   // 无执行段（unresolved）一律 fatal 拒收，不限生命周期状态：客户端是规则纯消费者，

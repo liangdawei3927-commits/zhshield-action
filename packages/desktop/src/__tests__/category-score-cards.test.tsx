@@ -109,11 +109,12 @@ describe('分类评分卡 — 分数口径', () => {
     expect(security.view.label).toBe('良好');
   });
 
-  it('未检测：显示「—」+「未检测」，绝不当 0 分', () => {
+  it('未检测：显示「—」+「未覆盖」，绝不当 0 分', () => {
     const sentinel = cards().find((c) => c.navId === 'sentinel')!;
     expect(sentinel.view.kind).toBe('not-run');
     expect(sentinel.view.scoreText).toBe('—');
-    expect(sentinel.view.label).toBe('未检测');
+    // 文案对齐十域契约 §六的 0 覆盖口径（c64c7f3：未检测 → 未覆盖）
+    expect(sentinel.view.label).toBe('未覆盖');
     expect(sentinel.view.label).not.toBe('危险');
   });
 
@@ -175,7 +176,7 @@ describe('评分总览行 — 合并渲染', () => {
     const sentinel = html.slice(html.indexOf('data-nav-target="sentinel"'));
     const tile = sentinel.slice(0, sentinel.indexOf('</button>'));
     expect(tile).toContain('哨兵监控');
-    expect(tile).toContain('未检测');
+    expect(tile).toContain('未覆盖');
     expect(tile).toContain('data-dimension="sentinel"');
     // 有导航上下文时不得是禁用态
     expect(tile).not.toContain('disabled');

@@ -2,7 +2,7 @@
 // 的执行、报告落盘与降级护栏。自 index.ts 原样抽出（仅搬移，无逻辑改动）；
 // index.ts 保留参数解析（parseFlags 长方法基线）与 main/runPipeline 主流程调度。
 
-import type { PipelineRunner } from '@zh/pipeline';
+import { loadGuardConclusions, type PipelineRunner } from '@zh/pipeline';
 // 扫描类命令的统一收尾：门禁判定必须在 process.exit 之前 —— 命令自行 exit 会让门禁永不可达
 import { finalizeScan } from './sop-banner';
 import {
@@ -160,7 +160,19 @@ export async function runGuardCommand(
   projectDir: string,
 ): Promise<void> {
   if (opts.sop) {
-    const report = await runner.runSopGuard({ dryRun: opts.dryRun });
+    // 《07》A6：门禁是纯判定域，只读各供应商域已落盘的结论，不自行派发工具。
+    // CLI 自身尚无域快照写入能力，故仅当存在快照时才注入；否则沿用 kernel 明示的
+    // 历史工具派发兼容边界，并提示用户先跑对应域，避免「注入空结论集 → 全 skipped → 静默放行」。
+    const conclusions = await loadGuardConclusions(projectDir);
+    const hasConclusions = Object.keys(conclusions).length > 0;
+    if (!hasConclusions) {
+      console.error(
+        '[CLI] 未发现供应商域快照（inspect/security/deps 均未落盘），门禁退回工具派发模式；如需只读判定请先运行对应域。',
+      );
+    }
+    const report = await runner.runSopGuard(
+      hasConclusions ? { dryRun: opts.dryRun, conclusions } : { dryRun: opts.dryRun },
+    );
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);

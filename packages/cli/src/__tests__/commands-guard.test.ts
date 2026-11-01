@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { PipelineRunner } from '@zh/pipeline';
 import type { ConsoleReporter } from '@zh/reporter';
 import type { CLIOptions } from '../cli-options';
@@ -290,5 +293,57 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
     expect(code).toBe(2);
     expect(errors.join('\n')).toContain('降级警告');
     expect(errors.join('\n')).toContain('未检测 ≠ 通过');
+  });
+
+  it('Given 供应商域快照已落盘，When guard --sop，Then 注入只读结论集（A6），不再回退工具派发', async () => {
+    const project = await mkdtemp(join(tmpdir(), 'zhshield-cli-guard-'));
+    try {
+      const domainsDir = join(project, '.zhshield', 'diagnostics', 'domains');
+      await mkdir(domainsDir, { recursive: true });
+      await writeFile(
+        join(domainsDir, 'inspect.json'),
+        JSON.stringify({
+          version: '1.0',
+          project: { path: project, name: 'demo' },
+          generatedAt: '2026-11-01T00:00:00.000Z',
+          summary: { total: 1, error: 1, warning: 0, info: 0 },
+          issues: [
+            {
+              ruleId: 'inspect.official.no-any',
+              severity: 'error',
+              category: 'type',
+              message: 'any 滥用',
+              file: 'src/a.ts',
+              autoFixable: false,
+              fingerprint: 'fp-a',
+              source: 'inspect',
+            },
+          ],
+          files: [],
+        }),
+        'utf-8',
+      );
+
+      const runner = makeRunner({
+        runGuard: vi.fn(async () => makeGuardReport([])),
+        // 断言注入内容前先接住实参，门禁只读判定的输入契约就锁在这里
+        runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
+      });
+      const reporter = makeReporter();
+
+      await exitCodeOf(() =>
+        runGuardCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, project),
+      );
+
+      expect(runner.runSopGuard).toHaveBeenCalledWith({
+        dryRun: false,
+        conclusions: {
+          inspect: expect.objectContaining({ domain: 'inspect', issues: expect.any(Array) }),
+        },
+      });
+      expect(errors.join('\n')).not.toContain('退回工具派发');
+    } finally {
+      await rm(project, { recursive: true, force: true });
+    }
   });
 });

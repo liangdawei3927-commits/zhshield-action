@@ -3,6 +3,11 @@ import { basename, join } from 'node:path';
 import { WhitelistManager } from '@zh/guard';
 import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { PipelineReport } from '@zh/pipeline';
+import {
+  domainSnapshotPath,
+  readDomainSnapshot,
+  readDiagnosticsFile,
+} from '@zh/pipeline';
 import type {
   DiagnosticEntry,
   DiagnosticSource,
@@ -19,12 +24,8 @@ import { appendDomainHistory, buildScanRecord } from './domain-history';
 // 保证 latest.json 的写入互不交错，始终以最后一次写入为准。
 let writeQueue: Promise<unknown> = Promise.resolve();
 
-/**
- * 按域快照目录：`<project>/.zhshield/diagnostics/domains/`。
- */
-export function domainSnapshotPath(projectPath: string, source: DiagnosticSource): string {
-  return join(projectPath, '.zhshield', 'diagnostics', 'domains', `${source}.json`);
-}
+// 域快照的路径与读取口径由 @zh/pipeline 单一实现（CLI 与桌面端共用），此处只转出
+export { domainSnapshotPath, readDomainSnapshot };
 
 /** 按域拆分快照条目：跑过的域先占位（空数组），未跑过的域保留旧快照 */
 function buildPerSourceEntries(
@@ -256,26 +257,6 @@ export async function writeDiagnosticsFile(
   return absPath;
 }
 
-/**
- * 读取某治理域最近一次落盘快照（跨域**只读**消费入口）。
- */
-export async function readDomainSnapshot(
-  projectPath: string,
-  source: DiagnosticSource,
-): Promise<DiagnosticsReport | null> {
-  return await readReportFile(domainSnapshotPath(projectPath, source));
-}
-
-/** 读取单份诊断报告文件（解析 + 结构校验，失败返回 null） */
-async function readReportFile(absPath: string): Promise<DiagnosticsReport | null> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(absPath, 'utf-8'));
-    return isDiagnosticsReport(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 interface DomainGroup {
   generatedAt: string;
   issues: DiagnosticEntry[];
@@ -370,23 +351,11 @@ export async function readAggregatedDiagnostics(
 ): Promise<DiagnosticsReport | null> {
   const [groups, latest] = await Promise.all([
     collectDomainGroups(projectPath),
-    readReportFile(join(projectPath, '.zhshield', 'diagnostics', 'latest.json')),
+    readDiagnosticsFile(join(projectPath, '.zhshield', 'diagnostics', 'latest.json')),
   ]);
   if (latest) applyLatestGroups(groups, latest);
   if (groups.size === 0) return latest;
   return mergeGroups(projectPath, groups, latest);
-}
-
-/** 最小结构校验：快照必须带 version/project/issues 数组 */
-function isDiagnosticsReport(value: unknown): value is DiagnosticsReport {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Partial<DiagnosticsReport>;
-  return (
-    typeof candidate.version === 'string' &&
-    typeof candidate.project === 'object' &&
-    candidate.project !== null &&
-    Array.isArray(candidate.issues)
-  );
 }
 
 /** 依据 <project>/.zhshield/whitelist.yml 过滤被白名单压制的误报条目（rule+file 精确匹配） */

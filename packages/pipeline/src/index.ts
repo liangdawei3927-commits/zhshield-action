@@ -1,6 +1,23 @@
 // @zh/pipeline — 核心流水线编排器
 export const VERSION = '0.1.0';
 export { PipelineRunner } from './pipeline-runner';
+// 域快照 schema 与只读消费入口（《07》A6）：CLI / 桌面端共用同一口径
+export {
+  domainSnapshotPath,
+  readDomainSnapshot,
+  readDiagnosticsFile,
+  loadGuardConclusions,
+  isDiagnosticsReport,
+} from './domain-snapshot';
+export type {
+  DiagnosticSeverity,
+  DiagnosticEntry,
+  LspDiagnostic,
+  FileDiagnostics,
+  DomainDimensionScore,
+  DiagnosticsReport,
+  DiagnosticSource,
+} from './domain-snapshot';
 // 执行层骨架（《07》§7.2）：FileIndex → ToolExecutor → Router
 export * from './execution';
 export { createReport } from './types';

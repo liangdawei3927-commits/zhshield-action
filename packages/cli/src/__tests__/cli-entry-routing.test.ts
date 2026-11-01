@@ -74,6 +74,8 @@ vi.mock('@zh/pipeline', () => {
     },
     formatGateItems: (report: { items: Array<{ ruleId: string; message: string }> }) =>
       report.items.map((i) => `${i.ruleId}: ${i.message}`),
+    // 入口路由用例不关心结论快照：显式返回空集合（命令层据「空集」走工具派发兼容边界）
+    loadGuardConclusions: async () => ({}),
   };
 });
 

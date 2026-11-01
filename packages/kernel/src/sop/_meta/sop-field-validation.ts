@@ -61,17 +61,17 @@ function checkEnum(
   file: string,
   field: string,
   value: unknown,
-  allowed: readonly string[],
-  level: SopRuleIssueLevel = 'fatal',
+  spec: { allowed: readonly string[]; level?: SopRuleIssueLevel },
 ): SopRuleIssue | null {
   if (value === undefined || value === null) return null;
-  if (typeof value === 'string' && allowed.includes(value)) return null;
+  const level = spec.level ?? 'fatal';
+  if (typeof value === 'string' && spec.allowed.includes(value)) return null;
   return {
     file,
     field,
     value,
     level,
-    reason: `取值 ${JSON.stringify(value)} 不在允许集合 {${allowed.join(' | ')}} 内`,
+    reason: `取值 ${JSON.stringify(value)} 不在允许集合 {${spec.allowed.join(' | ')}} 内`,
   };
 }
 
@@ -187,18 +187,22 @@ export function validateRuleSource(
 
   if (meta) {
     // ─── 新格式：字段收在 metadata / governance / judgment 下 ───
-    push(checkEnum(filePath, 'metadata.status', meta.status, RULE_LIFECYCLE_STATUSES));
-    push(checkEnum(filePath, 'governance.domain', gov?.domain, GOVERNANCE_DOMAINS));
-    push(checkEnum(filePath, 'governance.action', gov?.action, ACTION_TYPES));
-    push(checkEnum(filePath, 'metadata.source', meta.source, DATA_SOURCES, 'warn'));
+    push(
+      checkEnum(filePath, 'metadata.status', meta.status, { allowed: RULE_LIFECYCLE_STATUSES }),
+    );
+    push(checkEnum(filePath, 'governance.domain', gov?.domain, { allowed: GOVERNANCE_DOMAINS }));
+    push(checkEnum(filePath, 'governance.action', gov?.action, { allowed: ACTION_TYPES }));
+    push(
+      checkEnum(filePath, 'metadata.source', meta.source, { allowed: DATA_SOURCES, level: 'warn' }),
+    );
     push(checkTags(filePath, 'metadata.tags', meta.tags));
 
     // 优先级非法会让 severity 静默降为 medium —— 记警告，不拒绝（规则仍可执行）
     push(checkPriority(filePath, judgment?.priority));
   } else {
     // ─── 简单格式：字段平铺在根对象上 ───
-    push(checkEnum(filePath, 'status', parsed.status, RULE_LIFECYCLE_STATUSES));
-    push(checkEnum(filePath, 'source', parsed.source, DATA_SOURCES, 'warn'));
+    push(checkEnum(filePath, 'status', parsed.status, { allowed: RULE_LIFECYCLE_STATUSES }));
+    push(checkEnum(filePath, 'source', parsed.source, { allowed: DATA_SOURCES, level: 'warn' }));
     push(checkTags(filePath, 'tags', parsed.tags));
     // severity 不校验：存量 YAML 混用 Issue 侧语义（warning / deprecation / "P1"），
     // 且该字段不参与「规则是否执行」的判定，归一化应单独立项，不在加载器里武断改值。
@@ -296,12 +300,12 @@ export function validateBuiltRule(rule: SopRule, origin: string): SopRuleIssue[]
   }
 
   // 决定「能否被调度到」的字段：非法即永久空跑或归错域 ⇒ fatal
-  push(checkEnum(locator, 'domain', raw.domain, GOVERNANCE_DOMAINS));
-  push(checkEnum(locator, 'action', raw.action, ACTION_TYPES));
-  push(checkEnum(locator, 'status', raw.status, RULE_LIFECYCLE_STATUSES));
+  push(checkEnum(locator, 'domain', raw.domain, { allowed: GOVERNANCE_DOMAINS }));
+  push(checkEnum(locator, 'action', raw.action, { allowed: ACTION_TYPES }));
+  push(checkEnum(locator, 'status', raw.status, { allowed: RULE_LIFECYCLE_STATUSES }));
 
   // 不参与「是否执行」判定 ⇒ warn（拒掉它们等于白丢检出能力）
-  push(checkEnum(locator, 'source', raw.source, DATA_SOURCES, 'warn'));
+  push(checkEnum(locator, 'source', raw.source, { allowed: DATA_SOURCES, level: 'warn' }));
 
   push(checkTags(locator, 'tags', raw.tags));
 

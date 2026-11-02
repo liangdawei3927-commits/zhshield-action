@@ -1,4 +1,5 @@
 import { useT } from '../i18n';
+import type { AsyncScanViewProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
@@ -38,18 +39,9 @@ function GarbageIcon() {
   return <NavGlyph navId="garbage" />;
 }
 
-interface GarbageReportViewProps {
+interface GarbageReportViewProps extends AsyncScanViewProps {
   projectPath: string;
   report: GarbageScanReportData;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「扫描中…」 */
-  queued?: boolean;
-  /** 停止本次盘点（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   selected: Set<string>;
   cleaning: boolean;
   restoring: boolean;

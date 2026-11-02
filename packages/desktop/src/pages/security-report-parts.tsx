@@ -35,6 +35,8 @@ const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
 /** 统计卡按此顺序展开严重级别；与 SEVERITY_CONFIG 的键一一对应 */
 const SEVERITY_KEYS = ['critical', 'high', 'medium', 'low'] as const;
 
+import type { AsyncScanViewProps } from './async-scan-props';
+
 export interface SecurityReportCopyProps {
   copyToAi: (issue: SecurityIssue) => void;
   copyAllToAi: (issues: SecurityIssue[]) => void;
@@ -147,18 +149,11 @@ export function SecurityTabBar({
 }
 
 /** 报告外壳入参：密钥侧的回调已随明细面板一起留在页面，此处不再重复接一遍 */
-export interface SecurityReportViewProps extends SecurityReportCopyProps {
+export interface SecurityReportViewProps
+  extends SecurityReportCopyProps,
+    AsyncScanViewProps {
   projectPath: string;
   report: SecurityScanReportData;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「检查中…」 */
-  queued?: boolean;
-  /** 停止本次安全检查（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   tab: SecurityTab;
   onTabChange: (tab: SecurityTab) => void;
   onRescan: () => void;

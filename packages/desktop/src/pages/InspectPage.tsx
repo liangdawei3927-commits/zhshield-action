@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import type { AsyncScanViewProps } from './async-scan-props';
 import { useT } from '../i18n';
 import { ReportShell } from '../components/business/ReportShell';
 import type { ReportStatCard } from '../components/business/ReportShell';
@@ -139,18 +140,9 @@ function buildInspectStats({
   ];
 }
 
-interface InspectReportViewProps {
+interface InspectReportViewProps extends AsyncScanViewProps {
   projectPath: string;
   report: InspectionReportData;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「巡检中…」 */
-  queued?: boolean;
-  /** 停止本次体检（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   copyToAi: (item: InspectionReportData['checks'][number]) => void;

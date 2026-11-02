@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
+import type { AsyncScanViewProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { scanRunProps } from '../components/business/ScanEmptyState';
@@ -54,17 +55,8 @@ function notifyGuardBlocked(
   });
 }
 
-interface GuardReportViewProps {
+interface GuardReportViewProps extends AsyncScanViewProps {
   report: GuardReportData;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「扫描中…」 */
-  queued?: boolean;
-  /** 停止本次门禁扫描（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   levels: GuardLevelInfo[];

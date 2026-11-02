@@ -5,7 +5,7 @@ import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
 import type { CodeSmell, FileSmellReport, RefactorReport, RefactorConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
 import { generateFixes, applyFixes } from './auto-fix';
-import { backupFixTargets, isWithinProject } from './auto-fix-apply';
+import { applyGeneratedFixes } from './auto-fix-run';
 import { calculateMaintainability, calculatePriority } from './report-math';
 import type { Fix, FixResult, RefactorAutoFixResult } from './types';
 
@@ -271,49 +271,8 @@ export class RefactorEngine {
     const report = await this.analyzeDirectory(projectRoot);
     const allSmells = report.files.flatMap((f) => f.smells);
     const fixes = generateFixes(allSmells, projectRoot);
-    if (fixes.length === 0) {
-      return {
-        applied: false,
-        fixCount: 0,
-        smellCount: 0,
-        fixed: 0,
-        failed: 0,
-        errors: [],
-        backupDir: null,
-        backedUpFiles: [],
-        message:
-          '没有可自动修复的问题（自动修复覆盖：封装性 inappropriate-intimacy、' +
-          '回调地狱 callback-hell）',
-      };
-    }
-
-    // 写盘硬前置（P2-2）：任何目标文件越出项目根（生成器 bug / 路径边界）一律
-    // 拒绝写入并计入 errors，而不是"跳过备份但仍写入"。把"写盘前必然在项目根内"
-    // 从注释承诺固化为代码约束（防御纵深）。
-    const safeFixes: Fix[] = [];
-    const outOfRootErrors: string[] = [];
-    for (const fix of fixes) {
-      const offending = fix.edits.find((e) => !isWithinProject(e.filePath, projectRoot));
-      if (offending) {
-        outOfRootErrors.push(`${offending.filePath}: 目标文件越出项目根，已拒绝写入`);
-      } else {
-        safeFixes.push(fix);
-      }
-    }
-
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const { backupDir, backedUpFiles } = backupFixTargets(safeFixes, projectRoot, stamp);
-    const result = applyFixes(safeFixes);
-    return {
-      applied: result.fixed > 0,
-      fixCount: safeFixes.length,
-      smellCount: new Set(safeFixes.map((f) => f.smellId)).size,
-      fixed: result.fixed,
-      failed: result.failed + outOfRootErrors.length,
-      errors: [...outOfRootErrors, ...result.errors],
-      backupDir,
-      backedUpFiles,
-    };
+    // 落盘编排（越界过滤 / 备份 / 编译校验 / 回滚）下沉到 auto-fix-run，保持引擎类精简。
+    return applyGeneratedFixes(fixes, projectRoot);
   }
 
   private collectTsFiles(dir: string): string[] {

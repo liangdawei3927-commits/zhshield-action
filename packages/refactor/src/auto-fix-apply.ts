@@ -81,3 +81,29 @@ export function backupFixTargets(
   }
   return { backupDir: backedUpFiles.length > 0 ? backupDir : null, backedUpFiles };
 }
+
+/**
+ * 回滚一次自动修复：把已备份的文件恢复原状，并删除本次新建的文件（若有）。
+ *
+ * 用于「编译校验」发现自动修复引入新类型错误时整体撤销（代码审查报告3 P1-2）。
+ * 与 garbage restore 同构：破坏性动作必须可撤销。
+ */
+export function rollbackFixes(
+  projectRoot: string,
+  backupDir: string | null,
+  backedUpFiles: readonly string[],
+  createdFiles: readonly string[],
+): void {
+  if (backupDir) {
+    for (const rel of backedUpFiles) {
+      const src = safeJoin(backupDir, rel);
+      if (!fs.existsSync(src)) continue;
+      const target = safeJoin(projectRoot, rel);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(src, target);
+    }
+  }
+  for (const abs of createdFiles) {
+    fs.rmSync(abs, { force: true });
+  }
+}

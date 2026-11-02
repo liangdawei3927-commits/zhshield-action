@@ -246,7 +246,7 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
       await runRefactorCommand(runner, opts, reporter, projectDir);
       break;
     case 'pipeline':
-      await runPipelineCommand(runner, opts, reporter, projectDir);
+      await runPipelineCommand(runner, opts, { reporter, projectDir });
       break;
     case 'baseline':
       await runBaselineCommand(runner, opts, reporter, projectDir);

@@ -409,16 +409,22 @@ export async function runFullScanCommand(
   }
 }
 
+/** pipeline 命令的宿主上下文：报告器、项目根与可选的域驱动注入 */
+export interface PipelineCommandContext {
+  reporter: ConsoleReporter;
+  projectDir: string;
+  /** `--full` 的域驱动注入（单测替换，避免真跑外部工具） */
+  fullScanDeps?: FullScanDeps;
+}
+
 export async function runPipelineCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
-  reporter: ConsoleReporter,
-  projectDir: string,
-  deps: FullScanDeps = {},
+  ctx: PipelineCommandContext,
 ): Promise<void> {
   // --full：走按域驱动的全量扫描链（与桌面端、无头脚本同一批执行器）
   if (opts.full) {
-    await runFullScanCommand(runner, opts, projectDir, deps);
+    await runFullScanCommand(runner, opts, ctx.projectDir, ctx.fullScanDeps ?? {});
     return;
   }
 
@@ -426,10 +432,10 @@ export async function runPipelineCommand(
     ? await runner.runSopDrivenPipeline()
     : await runner.runFullPipeline({ dryRun: opts.dryRun });
 
-  const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
-  const formatted = reporter.format(report);
+  const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, ctx.projectDir);
+  const formatted = ctx.reporter.format(report);
   console.log(formatted.text);
-  writeReportFile(opts, report, findings, { projectDir, command: 'pipeline' });
+  writeReportFile(opts, report, findings, { projectDir: ctx.projectDir, command: 'pipeline' });
   applyDegradedGuard(undefined, [report.guard, report.inspect]);
   finalizeScan(runner, opts, blocked);
 }

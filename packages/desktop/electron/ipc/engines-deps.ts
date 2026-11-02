@@ -9,7 +9,7 @@
 import { t } from '@zh/i18n';
 import { buildDependencyGraph, resolveProjectRoot } from '@zh/dependency';
 import type { ProjectProfile } from '@zh/pipeline';
-import { scanDeps, integritySnapshot } from '@zh/pipeline';
+import { scanDeps, integritySnapshot, runCveChecks, cveCounts } from '@zh/pipeline';
 import { loadDepsBaseline, saveDepsBaseline } from './deps-baseline';
 import { persistDiagnosticsFromEntries, normalizeDepsSource } from '../zh-diagnostics';
 import { updateDashboardState, type DashboardDepsState } from './dashboard-state';
@@ -19,7 +19,6 @@ import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import type { DependencyReportData, DepsRelockResult } from '../../src/types/electron';
 import { emptyDependencyReportData } from '../../src/services/empty-engine-reports';
 import type { TaskProgressReporter } from '../task-progress';
-import { runCveChecks, cveCounts } from './deps-cve';
 
 /**
  * 从 DependencyReportData 提取 deps 域 dashboard-state patch。

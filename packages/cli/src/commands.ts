@@ -5,6 +5,7 @@
 import {
   loadGuardConclusions,
   runDomains,
+  runCveChecks,
   formatDomainRecord,
   SCAN_CHAIN_DOMAINS,
   type PipelineRunner,
@@ -384,6 +385,9 @@ export async function runFullScanCommand(
     repoRoot: projectDir,
     domains: SCAN_CHAIN_DOMAINS,
     runner,
+    // 依赖域 CVE：与桌面端共用同一份 OSV 查询（O10）。不可达时域记 partial 并 exit 2，
+    // 绝不把「没查成」折算成 0 漏洞（C4/A15）。
+    depsScanInput: { cveProvider: (nodes) => runCveChecks(nodes) },
   });
 
   for (const record of ledger.records) console.log(formatDomainRecord(record));

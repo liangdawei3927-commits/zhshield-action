@@ -19,6 +19,8 @@ export {
 } from './executors';
 export type { RefactorScanResult, PerformanceIssueData } from './executors';
 export { scanDeps, applyMismatchedTrust, extractMismatchedNodeIds, integritySnapshot } from './deps-scan';
+export { runCveChecks, cveCounts } from './deps-cve';
+export type { CveCheckResult, CveFinding, CveQueryableDep } from './deps-cve';
 export type {
   DepsScanReport,
   DepsScanResult,

@@ -1,9 +1,9 @@
 /**
  * 依赖 CVE 检测（P1-8）：OSV 数据源在线查询。
  *
- * 缺陷背景（实测报告 2026-10-27）：deps 引擎完全没有 CVE 检测——
- * `vulnerabilities` 计数实为投毒/信任域数据冒充，lodash@4.17.15 /
- * axios@0.21.0 这类已知 CVE 版本恒显示 0/0/0，用户把「没检测」当成「安全」。
+ * 为什么在 `@zh/pipeline` 而不是某个宿主：CVE 查询是**依赖域**（O10）的检测能力，
+ * 桌面端与 CLI 都是它的消费者。实现若留在桌面端，CLI 的 `pipeline --full` 就永远
+ * 只能报「未检测」——同一份检测能力出现第二份实现则会撞 jscpd 去重门禁。
  *
  * 设计：
  * - 数据源用 OSV.dev 官方 querybatch API（一次批量查全部 direct 依赖，无需密钥）；
@@ -25,7 +25,6 @@ const OSV_TIMEOUT_MS = 8_000;
  */
 const MAX_DETAIL_FETCHES = 30;
 const OSV_DETAIL_URL = (id: string): string => `https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`;
-
 
 /** 单条依赖漏洞发现（OSV 命中结果，供 dashboard 展示） */
 export interface CveFinding {

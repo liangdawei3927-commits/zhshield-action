@@ -268,6 +268,8 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     // A6/A12：门禁是纯判定域，不进扫描链（无域快照时会退回工具派发，同一工具跑第二次）
     expect(seen[0].domains).not.toContain('guard');
     expect(seen[0].domains).toEqual([...SCAN_CHAIN_DOMAINS]);
+    // A15：CLI 必须注入真实 CVE 查询，否则依赖域永远只能报「未检测」
+    expect(seen[0].depsScanInput?.cveProvider).toBeTypeOf('function');
   });
 
   it('Given --full 且存在未完成域，When 全量扫描，Then 逐域打印并以 exit 2 收尾（未检测 ≠ 通过）', async () => {

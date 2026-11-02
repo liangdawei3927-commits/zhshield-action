@@ -25,9 +25,27 @@ export function collectFixTargetFiles(fixes: readonly Fix[]): string[] {
   return [...seen];
 }
 
-/** 判断相对路径是否安全地落在项目根内（非绝对、不以 .. 逃逸） */
+/**
+ * 判断相对路径是否安全地落在项目根内（非绝对、不逃逸到父目录）。
+ *
+ * 注意不能用 `rel.startsWith('..')`：目录名恰为 `..foo` 的合法路径（相对路径以
+ * `..foo/` 开头）会被误判越界，导致「跳过备份却仍被写入」的不一致。正确判据是
+ * 精确匹配父目录逃逸：`..` 单独、或以 `..<sep>` 开头。
+ */
 function isInsideProject(rel: string): boolean {
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  if (rel === '' || path.isAbsolute(rel)) return false;
+  if (rel === '..') return false;
+  return !rel.startsWith('..' + path.sep);
+}
+
+/**
+ * 判断绝对路径是否落在项目根内（写盘前的硬前置校验）。
+ *
+ * 与 {@link isInsideProject} 同源，供 `applyAutoFixes` 在真正写盘前拒绝越界目标，
+ * 实现「生成器 bug 也不越界写」的防御纵深（代码审查报告3 P2-2）。
+ */
+export function isWithinProject(filePath: string, projectRoot: string): boolean {
+  return isInsideProject(path.relative(projectRoot, filePath));
 }
 
 /** 备份单个文件到备份目录；成功返回相对路径，越界/不存在返回 null */

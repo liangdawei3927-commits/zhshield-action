@@ -10,9 +10,6 @@ const THEN_CHAIN = /\.then\(/;
 const METHOD_SIG = /^\s*(public|private|protected)?\s*(static\s+)?\w+\s*\(/;
 const ASYNC_PREFIX = /^async\b/;
 const FUNCTION_PREFIX = /^function\b/;
-const EXTRACT_LITERAL = /将 "([^"]+)" 提取为共享常量文件/;
-const NON_ALPHANUMERIC = /[^a-zA-Z0-9_]/g;
-const LEADING_DIGIT = /^(\d)/;
 const METHOD_NAME_PREFIX = /^[a-zA-Z_$]/;
 const METHOD_DECLARATION =
   /^((?:public|private|protected)\s+)?(static\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/;
@@ -153,58 +150,10 @@ function buildThenToAwaitTodo(
     endColumn: 1,
     replacement:
       ' '.repeat(thenIndent) +
-      '// TODO: 将 .then() 链手动转换为 await (auto-fix 已添加 async 关键字)\n',
+      // 不用 TODO/FIXME 等字样：避免被 guard 的待办规则（security-scan-adapter）再报一次，
+      // 造成"自动修复自己制造新告警"的自相矛盾（代码审查报告3 P2-1）。
+      '// [zhshield/auto-fix] 待人工将 .then() 链改写为 await（已插入 async 关键字，回调体未改）\n',
   };
-}
-
-// ─── Shotgun-Surgery: 提取硬编码字符串为常量 ─────────────────
-
-const fixShotgunSurgery: FixGenerator = (smell, sourceDir) => {
-  const filePath = smell.location.filePath;
-  const content = readFile(filePath);
-  if (!content) return null;
-
-  const literal = extractLiteralFromSuggestion(smell);
-  if (!literal) return null;
-
-  const constantsFile = pathJoin(sourceDir, 'src', 'constants', 'shared-strings.ts');
-  const varName = toConstantName(literal);
-  const existingContent = loadConstantsContent(constantsFile);
-  if (existingContent.includes(`export const ${varName} =`)) return null;
-
-  const newEntry = `export const ${varName} = '${literal.replace(/'/g, "\\'")}';\n`;
-  return {
-    smellId: smell.id,
-    ruleId: smell.ruleId,
-    description: `将 "${literal}" 提取到 ${constantsFile}`,
-    edits: [
-      {
-        filePath: constantsFile,
-        startLine: 1,
-        startColumn: 1,
-        endLine: 1,
-        endColumn: 1,
-        replacement: existingContent + newEntry,
-      },
-    ],
-  };
-};
-
-function extractLiteralFromSuggestion(smell: CodeSmell): string | null {
-  const match = smell.suggestion.description.match(EXTRACT_LITERAL);
-  return match ? match[1] : null;
-}
-
-function toConstantName(literal: string): string {
-  return literal.replace(NON_ALPHANUMERIC, '_').replace(LEADING_DIGIT, '_$1').toUpperCase();
-}
-
-function loadConstantsContent(constantsFile: string): string {
-  try {
-    return fs.readFileSync(constantsFile, 'utf-8');
-  } catch {
-    return '// 共享字符串常量 — auto-fix 生成\n\n';
-  }
 }
 
 // ─── 注册表 ──────────────────────────────────────────────────
@@ -212,11 +161,20 @@ function loadConstantsContent(constantsFile: string): string {
 const FIX_GENERATORS: Record<string, FixGenerator> = {
   'inappropriate-intimacy': fixInappropriateIntimacy,
   'callback-hell': fixCallbackHell,
-  'shotgun-surgery': fixShotgunSurgery,
 };
 
 export function isFixable(ruleId: string): boolean {
   return ruleId in FIX_GENERATORS;
+}
+
+/**
+ * 当前自动修复注册表覆盖的规则 id（`FIX_GENERATORS` 的键）。
+ *
+ * 供闭环测试与 `@zh/shared` 的能力注册表 `refactor.auto-fix.implementedBy` 对齐核对，
+ * 防止"能力声明 vs 实际生成器"漂移（这正是 P1-1 暴露的"宣称 vs 实现"问题的机制化兜底）。
+ */
+export function listAutoFixableRules(): string[] {
+  return Object.keys(FIX_GENERATORS);
 }
 
 export function generateFix(smell: CodeSmell, sourceDir: string): Fix | null {
@@ -340,8 +298,4 @@ function readFile(filePath: string): string | null {
   } catch {
     return null;
   }
-}
-
-function pathJoin(...parts: string[]): string {
-  return parts.join('/').replace(/\/+/g, '/');
 }

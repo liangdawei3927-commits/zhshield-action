@@ -202,7 +202,11 @@ function detectSharedStringLiterals(
           description: `将 "${literal}" 提取为共享常量文件，集中管理一处修改`,
           priority: 'low',
           effort: 'small',
-          autoFixable: true,
+          // 不做 autoFixable：该检测只记录「字面量在哪些文件出现」，不记录每个使用点
+          // 的行列位置，无法安全地在各文件内替换为常量引用并注入 import。盲目字符串
+          // 替换可能误伤同名但语义不同的字面量、破坏调用方。按「宁可漏报不误报」原则，
+          // 此规则仅给建议，交人工处理（详见代码审查报告3 P1-1）。
+          autoFixable: false,
         },
       }),
     );

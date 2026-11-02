@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { RefactorEngine } from '../engine';
+import { isWithinProject } from '../auto-fix-apply';
 
 /**
  * 「一键应用自动修复」的验收：改文件前必须备份、只改可自动修复项、可重复调用。
@@ -60,5 +61,41 @@ describe('RefactorEngine.applyAutoFixes', () => {
     expect(result.message).toBeTruthy();
     // 未改动文件
     expect(fs.readFileSync(file, 'utf-8')).toBe(original);
+  });
+});
+
+/**
+ * 写盘硬前置的判定（代码审查报告3 P2-2）：
+ * 越界目标必须拒绝写入；且目录名恰为 `..foo` 的合法路径不得被误判越界。
+ */
+describe('isWithinProject', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'within-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('项目根内的普通文件 → true', () => {
+    expect(isWithinProject(path.join(root, 'src', 'a.ts'), root)).toBe(true);
+  });
+
+  it('项目根自身（相对路径为空）→ false', () => {
+    expect(isWithinProject(root, root)).toBe(false);
+  });
+
+  it('逃逸到父目录或系统绝对路径 → false', () => {
+    expect(isWithinProject(path.join(path.dirname(root), 'evil.ts'), root)).toBe(false);
+    if (path.parse(root).root !== root) {
+      expect(isWithinProject(path.join(path.parse(root).root, 'etc', 'passwd'), root)).toBe(false);
+    }
+  });
+
+  it('目录名恰为 `..foo` 的合法路径不会被误判越界（回归）', () => {
+    // 旧实现用 startsWith('..') 会把这判成越界，导致"跳过备份但仍写入"
+    expect(isWithinProject(path.join(root, '..foo', 'a.ts'), root)).toBe(true);
   });
 });

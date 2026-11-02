@@ -1,4 +1,4 @@
-import { execFileSync, execSync, spawn } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { EventCenter } from './event-center';
 import type { SentinelEvent, EventStatus } from './types';
 
@@ -92,12 +92,13 @@ export class AutoFixer {
         const config = this.config;
         if (!config) return false;
         const cwd = config.projectPath;
-        // Get the last commit hash for potential rollback
-        execSync('git log --oneline -1', { cwd, timeout: 5000 });
-        // Attempt a soft rollback (revert, not reset)
-        execSync('git revert --no-commit HEAD~1..HEAD 2>/dev/null || true', {
+        // 软回滚（revert，而非 reset）：用 execFileSync 参数数组，不经 shell，消除对
+        // `2>/dev/null || true` 的依赖——revert 失败会抛错并被外层 catch 归为 false，
+        // 避免"回滚其实失败却上报成功"（代码审查报告3 §4 顺带小改）。
+        execFileSync('git', ['revert', '--no-commit', 'HEAD~1..HEAD'], {
           cwd,
           timeout: 15000,
+          stdio: 'pipe',
         });
         this.eventCenter.createEvent({
           projectId: config.projectId,

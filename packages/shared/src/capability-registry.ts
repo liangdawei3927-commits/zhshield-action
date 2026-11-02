@@ -281,13 +281,14 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     label: '一键应用推荐重构方案',
     status: 'implemented',
     // 实现证据 = 存在修复生成器（且检测器把它标为 autoFixable）的高置信坏味道类型。
-    // 这三个类型既有检测器（ruleId 可达），又有 auto-fix 生成器（auto-fix.ts 的 FIX_GENERATORS）。
-    implementedBy: ['inappropriate-intimacy', 'callback-hell', 'shotgun-surgery'],
+    // 现这两类既有检测器（ruleId 可达），又有 auto-fix 生成器（auto-fix.ts 的 FIX_GENERATORS）。
+    implementedBy: ['inappropriate-intimacy', 'callback-hell'],
     note:
       '由 @zh/refactor 的 auto-fix 生成器（generateFixes/applyFixes）+ 桌面端「一键应用」链路实现：' +
-      '主进程子进程内扫描→生成补丁→**备份到 .zhshield/backups/refactor-autofix-<时间戳>/**→写盘，可整目录回滚。' +
-      '覆盖三类高置信坏味道：封装性 inappropriate-intimacy、回调地狱 callback-hell、硬编码字符串 shotgun-surgery；' +
-      '其余坏味道仍只给建议、不自动改写。',
+      '主进程子进程内扫描→生成补丁→**备份到 .zhshield/backups/refactor-autofix-<时间戳>/**→写盘，可整目录回滚；' +
+      '写盘前强制目标文件位于项目根内（越界修复拒绝写入）。' +
+      '覆盖两类高置信坏味道：封装性 inappropriate-intimacy、回调地狱 callback-hell；' +
+      '硬编码字符串 shotgun-surgery 因无法安全替换各使用点（检测仅记录出现文件、不记录使用点位置），已降级为建议、不自动改写。',
   },
 
   // ─── 项目体检域 ──────────────────────────────────────────────────────────

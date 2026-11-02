@@ -20,14 +20,49 @@ describe('isFixable', () => {
     expect(isFixable('callback-hell')).toBe(true);
   });
 
-  it('returns true for shotgun-surgery', () => {
-    expect(isFixable('shotgun-surgery')).toBe(true);
+  it('returns false for shotgun-surgery（仅给建议，不自动修复 — 见代码审查报告3 P1-1）', () => {
+    // 该规则只记录字面量在哪些文件出现，不记录使用点行列，无法安全替换为常量引用；
+    // 故从自动修复注册表移除，避免"一键应用"必然 ENOENT 失败或产出未引用死常量。
+    expect(isFixable('shotgun-surgery')).toBe(false);
   });
 
   it('returns false for unknown rules', () => {
     expect(isFixable('long-method')).toBe(false);
     expect(isFixable('deep-nesting')).toBe(false);
     expect(isFixable('feature-envy')).toBe(false);
+  });
+});
+
+describe('shotgun-surgery 不再进入自动修复（代码审查报告3 P1-1）', () => {
+  const sharedStringSmell: CodeSmell = {
+    id: 'test-shotgun',
+    ruleId: 'shotgun-surgery',
+    category: 'coupling',
+    severity: 'info',
+    message: '字符串 "ACTIVE" 在 5 个文件中出现，建议提取为共享常量',
+    location: {
+      filePath: path.join(FIXTURES_DIR, 'intimacy.fixture.ts'),
+      line: 1,
+      column: 1,
+      endLine: 1,
+      endColumn: 1,
+    },
+    context: { metric: 'hardcodedStrings', value: 5, threshold: 3 },
+    suggestion: {
+      type: 'Extract Constant',
+      description: '将 "ACTIVE" 提取为共享常量文件，集中管理一处修改',
+      priority: 'low',
+      effort: 'small',
+      autoFixable: false,
+    },
+  };
+
+  it('generateFix 对 shotgun-surgery 返回 null（生成器已移除）', () => {
+    expect(generateFix(sharedStringSmell, FIXTURES_DIR)).toBeNull();
+  });
+
+  it('generateFixes 过滤掉 shotgun-surgery（autoFixable=false）', () => {
+    expect(generateFixes([sharedStringSmell], FIXTURES_DIR)).toEqual([]);
   });
 });
 

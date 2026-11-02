@@ -15,6 +15,15 @@ interface CollectScannerFindingsParams {
   semgrepIssues: Issue[];
   trivyIssues: Issue[];
   grypeIssues: Issue[];
+  /**
+   * 是否收集**依赖域 Owner** 的结论（依赖 CVE 归 deps、未使用依赖归 garbage）。
+   *
+   * 域内扫描（`runDomains` 的 security 执行器）传 `false` —— 《07》C3「非 Owner 不重扫」，
+   * 也避免 `pnpm audit` 走网络再算一遍 deps 域已经算过的 CVE（O2），以及 depcheck 重算
+   * garbage 的未使用依赖（O7）。安全中心自身的完整报告（server / 桌面端安全页）仍传
+   * `true`，保留既有产品口径。
+   */
+  includeDependencyOwned: boolean;
 }
 
 /** MalwareItem 的位置归一键 — 跨生产者（启发式/semgrep/injection-guard）对齐同一处发现 */
@@ -119,10 +128,11 @@ export class ResultAggregator {
     semgrepIssues,
     trivyIssues,
     grypeIssues,
+    includeDependencyOwned,
   }: CollectScannerFindingsParams): Promise<ResultAggregatorResult> {
     const crossReport = this.crossValidator.validate(trivyIssues, grypeIssues);
     const { legacyVulns, legacyGarbage, legacyMalware, injectionMalware } =
-      await this.collectLegacyFindings(projectPath);
+      await this.collectLegacyFindings(projectPath, includeDependencyOwned);
     const depcheckGarbage = mapDepcheckIssuesToGarbage(depcheckIssues);
     const semgrepMalware = mapSemgrepIssuesToMalware(semgrepIssues);
     const garbage = [...legacyGarbage, ...depcheckGarbage];
@@ -137,14 +147,20 @@ export class ResultAggregator {
     return { garbage, malware, vulnerabilities, conflictReport };
   }
 
-  private async collectLegacyFindings(projectPath: string): Promise<{
+  private async collectLegacyFindings(
+    projectPath: string,
+    includeDependencyOwned: boolean,
+  ): Promise<{
     legacyVulns: Vulnerability[];
     legacyGarbage: GarbageItem[];
     legacyMalware: MalwareItem[];
     injectionMalware: MalwareItem[];
   }> {
-    const legacyVulns = await this.vulnerabilityScanner.scan(projectPath);
-    const legacyGarbage = await this.garbageScan(projectPath);
+    // 依赖 CVE / 未使用依赖各有 Owner（deps / garbage），非 Owner 域不得重扫（C3）
+    const legacyVulns = includeDependencyOwned
+      ? await this.vulnerabilityScanner.scan(projectPath)
+      : [];
+    const legacyGarbage = includeDependencyOwned ? await this.garbageScan(projectPath) : [];
     const legacyMalware = await this.malwareScanner.scan(projectPath);
     const injectionMalware = await this.runInjectionGuard(projectPath);
     return { legacyVulns, legacyGarbage, legacyMalware, injectionMalware };

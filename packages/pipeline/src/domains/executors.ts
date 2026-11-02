@@ -103,6 +103,9 @@ export async function runRefactorDomain(ctx: DomainExecutionContext): Promise<Do
  *
  * 引擎事件必须接通 `onEvent`：5 分钟安全扫描若丢了 `tool:*` 事件，用户只看到
  * "10% → 一瞬间 100%"，既无进度也无从判断哪个工具失败。
+ *
+ * `includeDependencyOwned=false`：域内扫描不得重扫依赖 CVE（deps）与未使用依赖
+ * （garbage）——《07》C3，且不再为 `pnpm audit` 付网络与 3s 级耗时。
  */
 export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<DomainExecution> {
   const { SecurityEngine } = await import('@zh/security');
@@ -120,7 +123,9 @@ export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<Do
     : undefined;
   const engine = new SecurityEngine(emitter);
   engine.registerDefaultAdapters();
-  const report = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot);
+  const report = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot, {
+    includeDependencyOwned: false,
+  });
   return { report };
 }
 

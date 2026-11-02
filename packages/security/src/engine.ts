@@ -119,8 +119,20 @@ export class SecurityEngine {
     return this.degradationManager;
   }
 
-  async runSecurityScan(projectId: string, projectPath: string): Promise<SecurityScanReport> {
+  /**
+   * 跑一次安全扫描。
+   *
+   * `options.includeDependencyOwned=false` 供**域内扫描**使用：依赖 CVE 与未使用依赖
+   * 分别归 deps / garbage，非 Owner 域不得重扫（《07》C3 / O2 / O7）。缺省 `true`
+   * 保持安全中心完整报告（server / 桌面端安全页）的既有口径。
+   */
+  async runSecurityScan(
+    projectId: string,
+    projectPath: string,
+    options?: { includeDependencyOwned?: boolean },
+  ): Promise<SecurityScanReport> {
     const start = Date.now();
+    const includeDependencyOwned = options?.includeDependencyOwned ?? true;
     // 归一化 projectPath 为绝对路径：服务端/桌面端直连引擎时可能传入相对路径，
     // 相对路径会流入 ToolScanOptions.projectPath，外部工具以自身 cwd 解析导致扫描失败。
     projectPath = path.resolve(projectPath);
@@ -133,6 +145,7 @@ export class SecurityEngine {
         semgrepIssues,
         trivyIssues,
         grypeIssues,
+        includeDependencyOwned,
       });
     await this.emitScanCompleted(projectId, start, allIssues, vulnerabilities);
     return this.buildReport({
@@ -141,7 +154,8 @@ export class SecurityEngine {
       garbage,
       malware,
       conflictReport,
-      auditError: this.vulnerabilityScanner.lastError || undefined,
+      // 未跑依赖审计时不得带 auditError：那是 deps 域的执行健康度，不是安全域的降级
+      auditError: includeDependencyOwned ? this.vulnerabilityScanner.lastError || undefined : undefined,
       skippedTools,
     });
   }

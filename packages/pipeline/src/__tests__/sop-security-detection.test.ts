@@ -42,6 +42,8 @@ describe('安全域 SAST 规则 — 真实检出（非空跑）', () => {
   let engine: SopRuleEngine;
   let semgrepAvailable: boolean;
 
+  // 显式放宽 hook 超时：`semgrep --version` 自带版本自检，本机实测 8.4s（负载高时更久），
+  // 撞默认 10s 会让 4 条用例全部以 "Hook timed out" 红掉 —— 那是环境抖动，不是规则失效。
   beforeEach(async () => {
     fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-sec-detect-'));
     registry = new SopRegistry();
@@ -50,7 +52,7 @@ describe('安全域 SAST 规则 — 真实检出（非空跑）', () => {
     semgrepAvailable = await adapter.isAvailable();
     engine.registerToolAdapter('semgrep', adapter);
     await new SopLoader(registry, { rulesDir: TEMPLATES_DIR }).loadFromFileSystem();
-  });
+  }, 60_000);
 
   afterEach(() => {
     fs.rmSync(fixture, { recursive: true, force: true });

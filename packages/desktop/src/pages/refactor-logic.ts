@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@zh/i18n';
-import { runRefactor } from '../services/engineApi';
+import { runRefactor, applyRefactorFixes } from '../services/engineApi';
 import type { RefactorReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
@@ -190,10 +190,52 @@ export function useSmellGroups(report: RefactorReportData | null) {
  * 报告读回来了，但 groups 仍按 null 算」⇒ 分类 tab 全消失、只剩「暂无重构异味」。
  * 聚合必须由页面拿 `detailReport` 调用，见 RefactorPage。
  */
+/**
+ * 一键应用自动修复：调用主进程（子进程内扫描→生成补丁→备份→写盘），
+ * 成功后自动重扫让页面反映改动。
+ *
+ * 与「复制到 AI」同类交互（都是把修复动作交给用户触发），差别是本动作
+ * **直接改文件**——因此后端先备份到 `.zhshield/backups/refactor-autofix-<时间戳>/`，
+ * 结果回执里带 `backupDir`，用户可整目录回滚。
+ */
+export function useRefactorAutoFix(
+  projectPath: string,
+  rescan: () => Promise<void> | void,
+): { applying: boolean; applyAutoFix: () => Promise<void> } {
+  const { toast } = useToast();
+  const [applying, setApplying] = useState(false);
+  const applyAutoFix = useCallback(async () => {
+    if (!projectPath || applying) return;
+    setApplying(true);
+    try {
+      const result = await applyRefactorFixes(projectPath);
+      if (!result.applied || result.fixCount === 0) {
+        toast(result.message ?? t('page.refactor.autoFix.none'), 'info');
+      } else {
+        toast(
+          t('page.refactor.autoFix.result', {
+            fixed: result.fixed,
+            backup: result.backupDir ?? '-',
+          }),
+          'success',
+        );
+        await rescan();
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast(t('page.refactor.autoFix.failed', { message: msg }), 'error');
+    } finally {
+      setApplying(false);
+    }
+  }, [projectPath, applying, toast, rescan]);
+  return { applying, applyAutoFix };
+}
+
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
   const { scanning, progress, statusMessage, queued, queuePosition, cancel, stopping, report, error, handleScan } =
     useRefactorScan(projectPath);
+  const { applying, applyAutoFix } = useRefactorAutoFix(projectPath, handleScan);
   const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan(), 'refactor');
   return {
     scanning,
@@ -209,5 +251,7 @@ export function useRefactorPage(projectPath: string) {
     copyToAi,
     copyGroupToAi,
     handleScan,
+    applying,
+    applyAutoFix,
   };
 }

@@ -388,7 +388,9 @@
           "description": "TypeScript 型別錯誤檢查",
           "fixSuggestion": "修復 TypeScript {{level}}: {{code}}",
           "runFailed": "tsc 執行失敗",
-          "unavailable": "tsc 未安裝或未在 PATH 中找到"
+          "unavailable": "tsc 未安裝或未在 PATH 中找到",
+          "depsMissing": "相依未安裝（node_modules 缺失），TypeScript 型別檢查無法執行，已降級為未執行（請先安裝相依後重試）",
+          "unresolvedEnv": "TypeScript 型別檢查受相依/型別版本影響無法給出確定結論，已降級為未執行"
         }
       },
       "unknown": "未知",
@@ -1455,6 +1457,15 @@
       "detail": {
         "empty": "該分類下暫無明細",
         "truncated": "僅顯示前 {{shown}} 條，完整清單見下方「重構問題（按類型分組）」"
+      },
+      "autoFix": {
+        "button": "一鍵套用可自動修復（{{count}}）",
+        "confirm": "將先備份到 .zhshield/backups，再修改 {{count}} 處檔案，確認套用？",
+        "confirmYes": "確認套用",
+        "cancel": "取消",
+        "result": "已套用 {{fixed}} 個檔案的自動修復（備份：{{backup}}）",
+        "failed": "套用自動修復失敗：{{message}}",
+        "none": "沒有可自動修復的問題"
       }
     },
     "reports": {
@@ -2050,7 +2061,10 @@
       "analyzing": "重構異味分析中…",
       "collecting": "正在收集原始碼檔案…",
       "done": "重構分析完成：{{count}} 處異味",
-      "baselineSuppressed": "（基線豁免 {{count}} 項存量異味）"
+      "baselineSuppressed": "（基線豁免 {{count}} 項存量異味）",
+      "autofixScanning": "正在掃描並產生自動修復…",
+      "autofixApplying": "正在套用自動修復…",
+      "autofixDone": "自動修復完成：{{count}} 個檔案"
     },
     "report": {
       "executionError": "執行出錯",

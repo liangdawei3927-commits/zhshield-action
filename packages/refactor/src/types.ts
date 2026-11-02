@@ -86,6 +86,34 @@ export interface FixResult {
   errors: string[];
 }
 
+/**
+ * 「一键应用自动修复」结果。
+ *
+ * 与 {@link FixResult} 的区别：这是**面向用户的一次操作**的完整回执，
+ * 必须带上「改了几个文件 / 生成了几条补丁 / 备份在哪」——用户据此判断
+ * 这次自动改写是否可靠、能否回滚。备份目录为空表示本次无文件被改动。
+ */
+export interface RefactorAutoFixResult {
+  /** 是否真的改动了文件（fixed > 0） */
+  applied: boolean;
+  /** 生成的修复补丁条数 */
+  fixCount: number;
+  /** 覆盖的坏味道处数 */
+  smellCount: number;
+  /** 已改写文件数 */
+  fixed: number;
+  /** 失败文件数 */
+  failed: number;
+  /** 失败明细 */
+  errors: string[];
+  /** 备份目录（绝对路径）；无文件可备份时为 null */
+  backupDir: string | null;
+  /** 已备份的相对文件路径（相对被扫描项目根） */
+  backedUpFiles: string[];
+  /** 附加说明（如「没有可自动修复的问题」） */
+  message?: string;
+}
+
 /** 重构配置：度量阈值、规则 → 严重级映射与启用的规则清单 */
 export interface RefactorConfig {
   thresholds: {

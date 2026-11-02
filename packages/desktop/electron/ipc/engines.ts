@@ -66,6 +66,7 @@ import {
   spawnOpenCodeFix,
   runSecurityHandler,
   runRefactorHandler,
+  applyRefactorFixesHandler,
   garbageCleanHandler,
   garbageRestoreHandler,
   garbageDashboardPatch,
@@ -238,6 +239,10 @@ function registerEngineRunHandlers(manager: TaskManager): void {
   );
   ipcMain.handle('engine:runRefactor', (_e, projectPath: string) =>
     withDomainScore(projectPath, () => runRefactorHandler(manager, projectPath)),
+  );
+  // 一键应用自动修复：写盘动作（非扫描），不补记域分数；内部先备份再应用
+  ipcMain.handle('engine:applyRefactorFixes', (_e, projectPath: string) =>
+    applyRefactorFixesHandler(manager, projectPath),
   );
   ipcMain.handle('engine:runDeps', async (_e, projectPath: string) => {
     const task = manager.start('deps', projectPath);

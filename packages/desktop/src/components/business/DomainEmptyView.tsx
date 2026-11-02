@@ -3,6 +3,7 @@ import type { ScoreDimension } from '@zh/shared';
 import { PageShell } from './PageShell';
 import { DomainScoreRing } from './DomainScoreRing';
 import type { ActionRunningKey } from './domain-action-text';
+import type { CapabilityPlannedItem } from './capability-features';
 
 export interface DomainEmptyViewProps {
   projectPath: string;
@@ -12,6 +13,12 @@ export interface DomainEmptyViewProps {
   title: string;
   subtitle: string;
   features: { icon: ReactNode; title: string; desc: string }[];
+  /**
+   * 该域「未实现 / 已移交」的能力（来自能力注册表的 unmet 项）。
+   * 渲染为独立的灰显「规划中」区 —— 只告知用户「宣称过但暂不做」，
+   * 绝不并入 features 网格（那会变成宣称未实现的能力）。
+   */
+  planned?: CapabilityPlannedItem[];
   buttonText: string;
   onAction: () => void;
   loading: boolean;
@@ -37,6 +44,11 @@ export function DomainEmptyView(props: DomainEmptyViewProps) {
       title={props.title}
       subtitle={props.subtitle}
       featureList={props.features}
+      plannedFeatures={props.planned?.map((item) => ({
+        title: item.title,
+        desc: item.desc,
+        badge: item.status === 'deprecated' ? '已移交' : '规划中',
+      }))}
       buttonText={props.buttonText}
       onAction={props.onAction}
       actionDomain={props.actionDomain}

@@ -5,8 +5,9 @@ import { ALL_DETECTORS, type DetectorSet } from './adapters/index';
 import type { CodeSmell, FileSmellReport, RefactorReport, RefactorConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
 import { generateFixes, applyFixes } from './auto-fix';
+import { backupFixTargets } from './auto-fix-apply';
 import { calculateMaintainability, calculatePriority } from './report-math';
-import type { Fix, FixResult } from './types';
+import type { Fix, FixResult, RefactorAutoFixResult } from './types';
 
 const TS_FILE_PATTERN = /\.tsx?$/;
 
@@ -253,6 +254,52 @@ export class RefactorEngine {
   /** 应用修复编辑 */
   applyFixes(fixes: Fix[]): FixResult {
     return applyFixes(fixes);
+  }
+
+  /**
+   * 一键应用自动修复：扫描 → 生成补丁 → **备份目标文件** → 应用。
+   *
+   * 只应用 `suggestion.autoFixable === true` 且存在修复生成器的坏味道
+   * （inappropriate-intimacy / callback-hell / shotgun-surgery）。
+   * 写盘前必然先备份到 `.zhshield/backups/refactor-autofix-<时间戳>/`，
+   * 整个目录可原样回滚 —— 这是「承诺了动作」的能力对用户的安全底线。
+   *
+   * 说明：会重新全量扫描一次（在子进程里跑，不阻塞 UI），据此生成的编辑
+   * 与当前磁盘状态一致，避免用「上一次扫描的行号」去改「已经变过的文件」。
+   */
+  async applyAutoFixes(projectRoot: string): Promise<RefactorAutoFixResult> {
+    const report = await this.analyzeDirectory(projectRoot);
+    const allSmells = report.files.flatMap((f) => f.smells);
+    const fixes = generateFixes(allSmells, projectRoot);
+    if (fixes.length === 0) {
+      return {
+        applied: false,
+        fixCount: 0,
+        smellCount: 0,
+        fixed: 0,
+        failed: 0,
+        errors: [],
+        backupDir: null,
+        backedUpFiles: [],
+        message:
+          '没有可自动修复的问题（自动修复覆盖：封装性 inappropriate-intimacy、' +
+          '回调地狱 callback-hell、硬编码字符串 shotgun-surgery）',
+      };
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const { backupDir, backedUpFiles } = backupFixTargets(fixes, projectRoot, stamp);
+    const result = applyFixes(fixes);
+    return {
+      applied: result.fixed > 0,
+      fixCount: fixes.length,
+      smellCount: new Set(fixes.map((f) => f.smellId)).size,
+      fixed: result.fixed,
+      failed: result.failed,
+      errors: result.errors,
+      backupDir,
+      backedUpFiles,
+    };
   }
 
   private collectTsFiles(dir: string): string[] {

@@ -388,7 +388,9 @@
           "description": "TypeScript の型エラーチェック",
           "fixSuggestion": "TypeScript {{level}} を修正してください: {{code}}",
           "runFailed": "tsc の実行に失敗しました",
-          "unavailable": "tsc がインストールされていないか、PATH に見つかりません"
+          "unavailable": "tsc がインストールされていないか、PATH に見つかりません",
+          "depsMissing": "依存関係が未インストール（node_modules 欠如）のため TypeScript 型チェックを実行できず、未実行に降格しました（依存関係をインストールして再試行してください）",
+          "unresolvedEnv": "依存関係／型バージョンの影響で TypeScript 型チェックの確定した結論を出せず、未実行に降格しました"
         }
       },
       "unknown": "不明",
@@ -1455,6 +1457,15 @@
       "detail": {
         "empty": "この分類に明細はありません",
         "truncated": "先頭 {{shown}} 件のみ表示。全件は下の「リファクタリング問題（種類別）」を参照"
+      },
+      "autoFix": {
+        "button": "自動修正を適用（{{count}}）",
+        "confirm": ".zhshield/backups にバックアップ後、{{count}} 件のファイルを変更します。適用しますか？",
+        "confirmYes": "適用する",
+        "cancel": "キャンセル",
+        "result": "{{fixed}} 件のファイルに自動修正を適用しました（バックアップ: {{backup}}）",
+        "failed": "自動修正の適用に失敗しました: {{message}}",
+        "none": "自動修正できる問題はありません"
       }
     },
     "reports": {
@@ -2050,7 +2061,10 @@
       "analyzing": "リファクタリングスメル分析中…",
       "collecting": "ソースコードファイルを収集中…",
       "done": "リファクタリング分析完了: {{count}} 箇所のスメル",
-      "baselineSuppressed": "（ベースラインにより既存の {{count}} 件を除外）"
+      "baselineSuppressed": "（ベースラインにより既存の {{count}} 件を除外）",
+      "autofixScanning": "スキャンして自動修正を生成中…",
+      "autofixApplying": "自動修正を適用中…",
+      "autofixDone": "自動修正が完了しました: {{count}} 件のファイル"
     },
     "report": {
       "executionError": "実行エラー",

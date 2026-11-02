@@ -20,7 +20,7 @@ import { createGateMetricResolver } from './gate-metrics';
 import type { GateMetricInputs } from './gate-metrics';
 import { SecurityCheckEngine } from '@zh/security';
 import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine, evaluatePostScanGates } from '@zh/kernel';
-import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport } from '@zh/kernel';
+import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport, SopRule } from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import { loadBaseline, filterIssuesByBaseline, type Baseline } from '@zh/shared';
 import { scanRefactor } from './domains/executors';
@@ -206,6 +206,18 @@ export class PipelineRunner {
   /** 已注册规则统计（条数只认 registry，见 `readSopStats` 的说明） */
   getSopStats(): SopStats {
     return readSopStats(this.sopRegistry);
+  }
+
+  /**
+   * 已注册规则全量（内置 presets + 云同步缓存合并后的注册表内容）。
+   *
+   * 供「检测能力闭环审计」消费：它要把「声明了什么」与「实际会执行什么」比对，
+   * 必须拿到规则本身（含 status / domain / content），只拿统计数字是不够的。
+   *
+   * 只读快照（返回新数组，不暴露注册表内部 Map）。
+   */
+  getSopRules(): SopRule[] {
+    return [...this.sopRegistry.getAll()];
   }
 
   /** 合并云同步缓存规则（`{cacheDir}/modules/*.db`）；目录不可用返回 0 */

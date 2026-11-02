@@ -125,6 +125,256 @@ var init_arch_layers = __esm({
   }
 });
 
+// ../shared/src/capability-registry.ts
+function implementedCapabilities(domain) {
+  return (CAPABILITIES_BY_DOMAIN.get(domain) ?? []).filter((c) => c.status === "implemented");
+}
+function unimplementedCapabilities(domain) {
+  return (CAPABILITIES_BY_DOMAIN.get(domain) ?? []).filter((c) => c.status !== "implemented");
+}
+function findCapabilitiesWithoutEvidence(registry = CAPABILITY_REGISTRY) {
+  return registry.filter((c) => c.status === "implemented" && c.implementedBy.length === 0);
+}
+var CAPABILITY_REGISTRY, CAPABILITIES_BY_DOMAIN;
+var init_capability_registry = __esm({
+  "../shared/src/capability-registry.ts"() {
+    "use strict";
+    CAPABILITY_REGISTRY = [
+      // ─── 性能优化域 ──────────────────────────────────────────────────────────
+      {
+        id: "performance.runtime.nested-loop",
+        domain: "performance",
+        label: "\u8FD0\u884C\u65F6\u590D\u6742\u5EA6\uFF08\u5D4C\u5957\u5FAA\u73AF / \u540C\u6B65\u963B\u585E IO\uFF09",
+        status: "implemented",
+        implementedBy: ["performance.runtime.nested-loop", "performance.runtime.sync-io"]
+      },
+      {
+        id: "performance.build-config",
+        domain: "performance",
+        label: "\u6784\u5EFA\u914D\u7F6E\uFF08\u538B\u7F29 / sourcemap / mode\uFF09",
+        status: "implemented",
+        implementedBy: ["build-config"]
+      },
+      {
+        id: "performance.bundle-size",
+        domain: "performance",
+        label: "\u4EA7\u7269\u4F53\u79EF",
+        status: "implemented",
+        implementedBy: ["bundle-size"]
+      },
+      {
+        id: "performance.tree-shaking",
+        domain: "performance",
+        label: "Tree-shaking / \u4EE3\u7801\u5206\u5272",
+        status: "implemented",
+        implementedBy: ["tree-shaking", "chunk-splitting"]
+      },
+      {
+        id: "performance.redos",
+        domain: "performance",
+        label: "ReDoS \u68C0\u6D4B\uFF08\u6B63\u5219\u707E\u96BE\u6027\u56DE\u6EAF\uFF09",
+        status: "planned",
+        implementedBy: [],
+        note: "\u5185\u6838\u6709 redos.yml \u8D44\u4EA7\uFF0C\u4F46\u5F15\u7528\u5B83\u7684 SOP \u89C4\u5219 inspect.scan.performance.semgrep-redos \u4E0D\u5B58\u5728\uFF0C\u8D44\u4EA7\u662F\u6B7B\u6587\u4EF6\u3002\u8865\u89C4\u5219\u6587\u4EF6\u5373\u53EF\u8F6C implemented\u3002"
+      },
+      {
+        id: "performance.modern-api",
+        domain: "performance",
+        label: "\u73B0\u4EE3\u5316 API \u63A8\u8350\uFF08.at / spread\uFF09",
+        status: "planned",
+        implementedBy: [],
+        note: "\u5C1A\u65E0\u63A2\u6D4B\u5668\u3002"
+      },
+      {
+        id: "performance.timer",
+        domain: "performance",
+        label: "\u5B9A\u65F6\u5668\u4F18\u5316\uFF08setTimeout / setInterval \u6EE5\u7528\uFF09",
+        status: "planned",
+        implementedBy: [],
+        note: "\u5C1A\u65E0\u63A2\u6D4B\u5668\u3002"
+      },
+      // ─── 安全中心域 ──────────────────────────────────────────────────────────
+      {
+        id: "security.vuln.sql-injection",
+        domain: "security",
+        label: "SQL \u6CE8\u5165\u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.semgrep.sql-injection"]
+      },
+      {
+        id: "security.vuln.xss",
+        domain: "security",
+        label: "XSS \u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.semgrep.xss"]
+      },
+      {
+        id: "security.vuln.command-injection",
+        domain: "security",
+        label: "\u547D\u4EE4\u6CE8\u5165\u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.semgrep.command-injection"]
+      },
+      {
+        id: "security.vuln.csrf",
+        domain: "security",
+        label: "CSRF \u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.semgrep.csrf"]
+      },
+      {
+        id: "security.vuln.path-traversal",
+        domain: "security",
+        label: "\u8DEF\u5F84\u7A7F\u8D8A\u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.semgrep.path-traversal"]
+      },
+      {
+        id: "security.secrets",
+        domain: "security",
+        label: "\u786C\u7F16\u7801\u5BC6\u94A5\u68C0\u6D4B",
+        status: "implemented",
+        implementedBy: ["security.scan.gitleaks.hardcoded-key"]
+      },
+      {
+        id: "security.malware",
+        domain: "security",
+        label: "\u6076\u610F\u4EE3\u7801\u7279\u5F81\uFF08\u53CD\u5F39 Shell / \u540E\u95E8 / \u4F9B\u5E94\u94FE\u6295\u6BD2\uFF09",
+        status: "implemented",
+        // 实现证据是**恶意代码类型**（@zh/security 的启发式正则通道产出），
+        // 不是 SOP 规则 id —— 那 3 条同名 SOP 规则是 draft/trial，从不求值。
+        // 这里写错会让「实现证据可达」校验红，正是该校验存在的意义。
+        implementedBy: [
+          "reverse-shell",
+          "backdoor",
+          "supply-chain",
+          "data-exfiltration",
+          "privilege-escalation",
+          "crypto-ransomware"
+        ],
+        note: "\u7531 @zh/security \u7684\u542F\u53D1\u5F0F\u6B63\u5219\u901A\u9053\u5B9E\u73B0\uFF08malware-scanner / injection-guard\uFF09\uFF0C\u4E0D\u4F9D\u8D56 SOP \u89C4\u5219\u6C42\u503C\uFF1B\u540C\u540D SOP \u89C4\u5219\uFF08security.scan.malware.*\uFF09\u4ECD\u662F draft/trial\u3002"
+      },
+      {
+        id: "security.standard",
+        domain: "security",
+        label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u4E0E\u5408\u89C4\u57FA\u7EBF\u6821\u9A8C",
+        status: "planned",
+        implementedBy: [],
+        note: "\u5168\u4ED3\u65E0\u5BF9\u5E94\u5B9E\u73B0\u3002\u5B89\u5168\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\u3002"
+      },
+      {
+        id: "security.dependency",
+        domain: "security",
+        label: "\u4F9D\u8D56 CVE \u68C0\u6D4B",
+        status: "deprecated",
+        implementedBy: [],
+        note: "\u6309\u300A07\u300BO2 / O10 \u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF08OSV\uFF09\uFF0C\u5B89\u5168\u57DF\u4E0D\u518D\u4E8C\u6B21\u4E0A\u62A5\u3002\u5B89\u5168\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\uFF1B\u4F9D\u8D56\u9875\u8D1F\u8D23\u3002"
+      },
+      // ─── 垃圾清理域 ──────────────────────────────────────────────────────────
+      {
+        id: "garbage.unused-file",
+        domain: "garbage",
+        label: "\u65E0\u7528\u6587\u4EF6\u4E0E\u6B8B\u7559\u4EA7\u7269",
+        status: "implemented",
+        implementedBy: ["garbage.detect.fs"]
+      },
+      {
+        id: "garbage.dead-code",
+        domain: "garbage",
+        label: "\u6B7B\u4EE3\u7801\uFF08\u672A\u4F7F\u7528\u7684\u5BFC\u51FA\uFF09",
+        status: "implemented",
+        implementedBy: ["garbage.scan.cleanup.dead-code"]
+      },
+      {
+        id: "garbage.unused-dependency",
+        domain: "garbage",
+        label: "\u672A\u4F7F\u7528\u4F9D\u8D56",
+        status: "implemented",
+        implementedBy: ["garbage.scan.cleanup.unused-dependency"]
+      },
+      {
+        id: "garbage.duplicate-code",
+        domain: "garbage",
+        label: "\u91CD\u590D\u4EE3\u7801",
+        status: "deprecated",
+        implementedBy: [],
+        note: "\u6309\u300A07\u300BO1 \u552F\u4E00\u5F52\u91CD\u6784\u57DF\u3002\u5783\u573E\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\u3002"
+      },
+      // ─── 代码重构域 ──────────────────────────────────────────────────────────
+      {
+        id: "refactor.duplicate-code",
+        domain: "refactor",
+        label: "\u91CD\u590D\u4EE3\u7801",
+        status: "implemented",
+        implementedBy: ["duplicated-code"]
+      },
+      {
+        id: "refactor.smells",
+        domain: "refactor",
+        label: "\u4EE3\u7801\u5F02\u5473\uFF08\u8FC7\u957F\u51FD\u6570 / \u5708\u590D\u6742\u5EA6 / \u6DF1\u5C42\u5D4C\u5957\uFF09",
+        status: "implemented",
+        implementedBy: ["long-method", "deep-nesting", "large-class", "god-object"]
+      },
+      {
+        id: "refactor.auto-fix",
+        domain: "refactor",
+        label: "\u4E00\u952E\u5E94\u7528\u63A8\u8350\u91CD\u6784\u65B9\u6848",
+        status: "planned",
+        implementedBy: [],
+        note: "\u6240\u6709\u574F\u5473\u9053\u68C0\u6D4B\u5668\u7684 autoFixable \u5747\u4E3A false\uFF0C\u684C\u9762\u7AEF\u4E5F\u65E0\u300C\u4E00\u952E\u5E94\u7528\u300D\u5165\u53E3 \u2014\u2014 \u7A7A\u6001\u5BA3\u79F0\u7684\u662F\u4E00\u4E2A\u4E0D\u5B58\u5728\u7684\u52A8\u4F5C\u3002\u843D\u5730\u524D\u91CD\u6784\u9875\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\u3002"
+      },
+      // ─── 项目体检域 ──────────────────────────────────────────────────────────
+      {
+        id: "inspect.architecture",
+        domain: "inspect",
+        label: "\u67B6\u6784\u89C4\u8303\uFF08\u5FAA\u73AF\u4F9D\u8D56 / \u5206\u5C42\u8FB9\u754C / \u6A21\u5757\u4F9D\u8D56\uFF09",
+        status: "implemented",
+        implementedBy: [
+          "inspect.scan.depcruiser.circular-dependency",
+          "inspect.scan.depcruiser.layer-boundary",
+          "inspect.scan.depcruiser.module-dependency"
+        ]
+      },
+      {
+        id: "inspect.type-safety",
+        domain: "inspect",
+        label: "\u7C7B\u578B\u5B89\u5168\uFF08\u771F\u5B9E tsc \u68C0\u67E5 + \u7A7A\u5B89\u5168 / \u7C7B\u578B\u4E00\u81F4\u6027\uFF09",
+        status: "implemented",
+        implementedBy: [
+          "inspect.scan.typescript.type-error-check",
+          "inspect.scan.internal.null-safety",
+          "inspect.scan.internal.type-consistency",
+          "inspect.scan.internal.type-safety"
+        ]
+      },
+      {
+        id: "inspect.code-style",
+        domain: "inspect",
+        label: "\u4EE3\u7801\u89C4\u8303\uFF08\u4E25\u683C\u6A21\u5F0F / \u679A\u4E3E\u4F7F\u7528\uFF09",
+        status: "implemented",
+        implementedBy: ["inspect.scan.internal.strict-mode", "inspect.scan.internal.enum-usage"]
+      },
+      {
+        id: "inspect.module-boundary",
+        domain: "inspect",
+        label: "\u6A21\u5757\u8FB9\u754C\u4E0E\u4F9D\u8D56\u6CE8\u5165\u5408\u89C4",
+        status: "implemented",
+        implementedBy: [
+          "inspect.scan.ironnest.dependency-injection",
+          "inspect.scan.ironnest.module-boundary",
+          "inspect.scan.depcruiser.layer-boundary"
+        ]
+      }
+    ];
+    CAPABILITIES_BY_DOMAIN = CAPABILITY_REGISTRY.reduce((map, cap) => {
+      const list = map.get(cap.domain) ?? [];
+      list.push(cap);
+      map.set(cap.domain, list);
+      return map;
+    }, /* @__PURE__ */ new Map());
+  }
+});
+
 // ../shared/src/secret-patterns.ts
 function toNameRegexPatterns(patterns = SECRET_PATTERNS) {
   return patterns.map(({ name, regex }) => ({ name, regex }));
@@ -15690,7 +15940,7 @@ function findToolCapability(tool) {
   return TOOL_CAPABILITIES.find((c) => c.tool === tool) ?? null;
 }
 var SCAN_DOMAIN_BUDGETS, TOOL_CAPABILITIES;
-var init_capability_registry = __esm({
+var init_capability_registry2 = __esm({
   "../shared/src/domain-contract/capability-registry.ts"() {
     "use strict";
     init_ownership_registry();
@@ -15809,7 +16059,7 @@ function resolveSupplierDomain(tool) {
 var init_conclusions = __esm({
   "../shared/src/domain-contract/conclusions.ts"() {
     "use strict";
-    init_capability_registry();
+    init_capability_registry2();
     init_ownership_registry();
   }
 });
@@ -15822,7 +16072,7 @@ var init_domain_contract = __esm({
     init_path();
     init_conclusions();
     init_ownership_registry();
-    init_capability_registry();
+    init_capability_registry2();
   }
 });
 
@@ -16641,6 +16891,8 @@ __export(src_exports, {
   AuditLogger: () => AuditLogger,
   BUILTIN_FALLBACK_RULES: () => BUILTIN_FALLBACK_RULES,
   BuiltinToolAdapter: () => BuiltinToolAdapter,
+  CAPABILITIES_BY_DOMAIN: () => CAPABILITIES_BY_DOMAIN,
+  CAPABILITY_REGISTRY: () => CAPABILITY_REGISTRY,
   CLEAN_ARCH_LAYERS: () => CLEAN_ARCH_LAYERS,
   COVERAGE_THRESHOLD: () => COVERAGE_THRESHOLD,
   DATA_SOURCES: () => DATA_SOURCES,
@@ -16692,6 +16944,7 @@ __export(src_exports, {
   extractRequirementsNames: () => extractRequirementsNames,
   filterIssuesByBaseline: () => filterIssuesByBaseline,
   filterToolsByProfile: () => filterToolsByProfile,
+  findCapabilitiesWithoutEvidence: () => findCapabilitiesWithoutEvidence,
   findEslintConfigDir: () => findEslintConfigDir,
   findLocalToolBin: () => findLocalToolBin,
   findToolCapability: () => findToolCapability,
@@ -16701,6 +16954,7 @@ __export(src_exports, {
   gitleaksMapper: () => gitleaksMapper,
   grypeMapper: () => grypeMapper,
   hasEslintConfig: () => hasEslintConfig,
+  implementedCapabilities: () => implementedCapabilities,
   isBaselineEntryActive: () => isBaselineEntryActive,
   isLayerDependencyAllowed: () => isLayerDependencyAllowed,
   isScoreDimension: () => isScoreDimension,
@@ -16746,6 +17000,7 @@ __export(src_exports, {
   toRelativePath: () => toRelativePath,
   toolMappers: () => toolMappers,
   trivyMapper: () => trivyMapper,
+  unimplementedCapabilities: () => unimplementedCapabilities,
   validateCapabilityRegistry: () => validateCapabilityRegistry,
   validateOwnershipRegistry: () => validateOwnershipRegistry,
   withHardTimeout: () => withHardTimeout,
@@ -16757,6 +17012,7 @@ var init_src2 = __esm({
   "../shared/src/index.ts"() {
     init_types();
     init_arch_layers();
+    init_capability_registry();
     init_secret_patterns();
     init_tool_manager();
     init_tool_resolve();
@@ -501635,6 +501891,7 @@ __export(src_exports4, {
   TrivyAdapter: () => TrivyAdapter2,
   VERSION: () => VERSION3,
   VulnerabilityScanner: () => VulnerabilityScanner,
+  calculateSecurityScore: () => calculateSecurityScore,
   classifySeverity: () => classifySeverity,
   hashSecret: () => hashSecret,
   isPublicRemoteUrl: () => isPublicRemoteUrl,
@@ -501651,10 +501908,125 @@ var init_src6 = __esm({
     init_engine2();
     init_adapters2();
     init_cross_validator();
+    init_types5();
     init_lifecycle();
     init_supply_chain_scheduler();
     init_security_check_engine();
     VERSION3 = "0.1.0";
+  }
+});
+
+// ../pipeline/src/domains/security-sop.ts
+var security_sop_exports = {};
+__export(security_sop_exports, {
+  createSecurityEventForwarder: () => createSecurityEventForwarder,
+  mergeVulnerabilityFindings: () => mergeVulnerabilityFindings,
+  runSecuritySopChannel: () => runSecuritySopChannel,
+  sopViolationsToFindings: () => sopViolationsToFindings
+});
+function mapSeverity2(severity) {
+  switch (severity) {
+    case "critical":
+    case "error":
+      return "critical";
+    case "high":
+      return "high";
+    case "medium":
+    case "warning":
+      return "medium";
+    default:
+      return "low";
+  }
+}
+function sopViolationsToFindings(report) {
+  const findings = [];
+  for (const evaluation of report.evaluations) {
+    if (evaluation.status !== "failed") continue;
+    for (const violation of evaluation.violations ?? []) {
+      const category = violation.category;
+      if (category && category !== "security") continue;
+      findings.push({
+        ruleId: violation.ruleId,
+        severity: mapSeverity2(violation.severity),
+        file: violation.file,
+        ...violation.line !== void 0 ? { line: violation.line } : {},
+        ...violation.column !== void 0 ? { column: violation.column } : {},
+        message: violation.message,
+        ...violation.suggestion ? { suggestion: violation.suggestion } : {}
+      });
+    }
+  }
+  return findings;
+}
+function fingerprintOf(f) {
+  return `${f.ruleId}:${f.file}:${f.line ?? 0}`;
+}
+async function runSecuritySopChannel(ctx) {
+  if (!ctx.runner) {
+    return {
+      vulnerabilities: [],
+      skipped: 0,
+      degraded: 0,
+      ran: false,
+      reason: "\u672A\u63D0\u4F9B PipelineRunner\uFF0C\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u672A\u6267\u884C\uFF08\u4EC5\u542F\u53D1\u5F0F\u901A\u9053\uFF09"
+    };
+  }
+  try {
+    ctx.onEvent?.({ domain: "security", kind: "rule-channel-started" });
+    const report = await ctx.runner.runSopInspect({
+      domains: ["security"]
+    });
+    if (report.total === 0) {
+      return {
+        vulnerabilities: [],
+        skipped: report.skipped,
+        degraded: report.degraded ?? 0,
+        ran: false,
+        reason: "\u65E0\u89C4\u5219\u53EF\u8BC4\u4F30\uFF08\u89C4\u5219\u96C6\u4E3A\u7A7A\uFF09\uFF0CSOP \u89C4\u5219\u901A\u9053\u672C\u6B21\u672A\u6267\u884C"
+      };
+    }
+    return {
+      vulnerabilities: sopViolationsToFindings(report),
+      skipped: report.skipped,
+      degraded: report.degraded ?? 0,
+      ran: true
+    };
+  } catch (err) {
+    return {
+      vulnerabilities: [],
+      skipped: 0,
+      degraded: 0,
+      ran: false,
+      reason: `\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u5F02\u5E38\uFF1A${err instanceof Error ? err.message : String(err)}`
+    };
+  }
+}
+function mergeVulnerabilityFindings(existing, incoming) {
+  const seen = new Set(existing.map(fingerprintOf));
+  const merged = [];
+  for (const finding of incoming) {
+    const key = fingerprintOf(finding);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(finding);
+  }
+  return merged;
+}
+function createSecurityEventForwarder(onEvent) {
+  if (!onEvent) return void 0;
+  return {
+    emit(event) {
+      onEvent({
+        domain: "security",
+        kind: event.type,
+        payload: event.payload
+      });
+    }
+  };
+}
+var init_security_sop = __esm({
+  "../pipeline/src/domains/security-sop.ts"() {
+    "use strict";
   }
 });
 
@@ -505215,6 +505587,115 @@ function auditRuleWiring(rules, interpreter = new ContentInterpreter()) {
     if (found) orphans.push(found);
   }
   return { total: rules.length, wired: rules.length - orphans.length, orphans };
+}
+
+// ../kernel/src/sop/_meta/capability-closure.ts
+init_src2();
+var DOMAIN_EXECUTION_PATHS = {
+  inspect: "sop-rule-engine",
+  guard: "conclusion-only",
+  // security 域现在**同时**跑两条通道（2026-11-02 修复）：
+  //   · SOP 规则通道 → `runSopInspect({domains:['security']})`（@zh/inspect 适配器族，
+  //     支持内联 rules —— 那 7 条 semgrep 规则的唯一载体）
+  //   · 启发式通道   → `SecurityEngine`（恶意代码正则 + 注入指令 taint）
+  // 两条通道的结论在 `runSecurityDomain` 里合并去重后产出最终报告。
+  // 故 security 归为 `sop-rule-engine` —— 它的 SOP 规则**确实会被求值**。
+  security: "sop-rule-engine",
+  deps: "domain-executor",
+  garbage: "sop-rule-engine",
+  performance: "domain-executor",
+  techdebt: "domain-executor",
+  refactor: "domain-executor",
+  sentinel: "runtime-only",
+  backup: "runtime-only",
+  reports: "runtime-only"
+};
+function isSopServedDomain(domain) {
+  return SOP_SERVED_DOMAINS.includes(domain);
+}
+function declaredTool(instruction) {
+  if (instruction.type !== "tool-dispatch") return null;
+  const tool = instruction.tool.trim();
+  return tool === "" ? null : tool;
+}
+function classifyCapability(rule, instruction, path76 = DOMAIN_EXECUTION_PATHS[rule.domain] ?? "domain-executor") {
+  const tool = declaredTool(instruction);
+  const base = {
+    ruleId: rule.id,
+    domain: rule.domain,
+    name: rule.name,
+    tool,
+    active: rule.status === "active",
+    path: path76
+  };
+  if (rule.status !== "active") {
+    return {
+      ...base,
+      effective: false,
+      breakReason: "rule-not-active",
+      detail: `\u89C4\u5219\u72B6\u6001\u4E3A ${rule.status}\uFF0C\u5F15\u64CE\u6309 active \u8FC7\u6EE4\uFF0C\u8BE5\u89C4\u5219\u4E0D\u4F1A\u88AB\u6C42\u503C`
+    };
+  }
+  if (!isSopServedDomain(rule.domain)) {
+    return {
+      ...base,
+      effective: false,
+      breakReason: "domain-not-served",
+      detail: `\u6CBB\u7406\u57DF ${rule.domain} \u4E0D\u5728 SOP \u6C42\u503C\u57DF\u96C6\uFF08${INSPECT_SCOPE_DOMAINS.join("/")}\uFF09\u5185`
+    };
+  }
+  if (instruction.type === "unresolved") {
+    return {
+      ...base,
+      effective: false,
+      breakReason: "unresolved-content",
+      detail: `\u89C4\u5219\u5185\u5BB9\u65E0\u6CD5\u89E3\u91CA\u4E3A\u53EF\u6267\u884C\u6307\u4EE4\uFF1A${instruction.reason}`
+    };
+  }
+  if (tool !== null && !TOOL_IDS.includes(tool)) {
+    return {
+      ...base,
+      effective: false,
+      breakReason: "tool-not-registered",
+      detail: `\u5DE5\u5177 "${tool}" \u4E0D\u5728 TOOL_IDS \u5185\uFF0C\u6CA1\u6709\u5BF9\u5E94\u9002\u914D\u5668\uFF0C\u89C4\u5219\u53EA\u4F1A\u843D skipped`
+    };
+  }
+  if (path76 === "domain-executor" || path76 === "runtime-only") {
+    return {
+      ...base,
+      effective: false,
+      breakReason: "path-bypasses-sop-engine",
+      detail: `\u57DF ${rule.domain} \u8D70\u300C${path76}\u300D\u8DEF\u5F84\uFF0C\u4E0D\u7ECF\u8FC7 SOP \u89C4\u5219\u5F15\u64CE\uFF1B\u8BE5\u89C4\u5219\u7684\u552F\u4E00\u68C0\u6D4B\u8F7D\u4F53\uFF08\u5185\u8054 pattern / \u8D44\u4EA7 config\uFF09\u4E0D\u4F1A\u88AB\u6C42\u503C`
+    };
+  }
+  return { ...base, effective: true };
+}
+function auditCapabilityClosure(rules, interpreter = new ContentInterpreter()) {
+  const items = rules.map((rule) => classifyCapability(rule, interpreter.interpret(rule)));
+  const domainIds = [...new Set(items.map((i) => i.domain))].sort();
+  const domains = domainIds.map((domain) => {
+    const domainItems = items.filter((i) => i.domain === domain);
+    return {
+      domain,
+      path: domainItems[0]?.path ?? "domain-executor",
+      declared: domainItems.length,
+      effective: domainItems.filter((i) => i.effective).length,
+      broken: domainItems.filter((i) => i.active && !i.effective).length,
+      items: domainItems
+    };
+  });
+  const breaks = items.filter((i) => i.active && !i.effective).sort((a, b) => a.domain.localeCompare(b.domain) || a.ruleId.localeCompare(b.ruleId));
+  return {
+    declaredTotal: items.length,
+    activeTotal: items.filter((i) => i.active).length,
+    effectiveTotal: items.filter((i) => i.effective).length,
+    brokenTotal: breaks.length,
+    domains,
+    breaks
+  };
+}
+function isClosureAcceptable(report) {
+  return report.brokenTotal === 0;
 }
 
 // ../kernel/src/sop/_meta/sop-loader.ts
@@ -517402,23 +517883,61 @@ async function runRefactorDomain(ctx) {
   return { report, detail: { suppressedCount } };
 }
 async function runSecurityDomain(ctx) {
-  const { SecurityEngine: SecurityEngine2 } = await Promise.resolve().then(() => (init_src6(), src_exports4));
-  const onEvent = ctx.onEvent;
-  const emitter = onEvent ? {
-    emit: (event) => {
-      onEvent({
-        domain: "security",
-        kind: event.type,
-        payload: event.payload
-      });
-    }
-  } : void 0;
+  const { SecurityEngine: SecurityEngine2, calculateSecurityScore: calculateSecurityScore2 } = await Promise.resolve().then(() => (init_src6(), src_exports4));
+  const { runSecuritySopChannel: runSecuritySopChannel2, mergeVulnerabilityFindings: mergeVulnerabilityFindings2, createSecurityEventForwarder: createSecurityEventForwarder2 } = await Promise.resolve().then(() => (init_security_sop(), security_sop_exports));
+  const emitter = createSecurityEventForwarder2(ctx.onEvent);
   const engine = new SecurityEngine2(emitter);
   engine.registerDefaultAdapters();
-  const report = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot, {
+  const baseReport = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot, {
     includeDependencyOwned: false
   });
-  return { report };
+  const sop = await runSecuritySopChannel2(ctx);
+  const merged = mergeVulnerabilityFindings2([], sop.vulnerabilities);
+  const mergedVulnerabilities = merged.map(toSecurityVulnerability);
+  const report = {
+    ...baseReport,
+    vulnerabilities: mergedVulnerabilities,
+    summary: {
+      ...baseReport.summary,
+      vulnTotal: mergedVulnerabilities.length,
+      vulnCritical: mergedVulnerabilities.filter((v) => v.severity === "critical").length,
+      vulnHigh: mergedVulnerabilities.filter((v) => v.severity === "high").length,
+      vulnMedium: mergedVulnerabilities.filter((v) => v.severity === "medium").length,
+      vulnLow: mergedVulnerabilities.filter((v) => v.severity === "low").length
+    },
+    securityScore: calculateSecurityScore2(mergedVulnerabilities)
+  };
+  const sopNotRan = !sop.ran;
+  return {
+    report,
+    ...sopNotRan ? {
+      status: "partial",
+      reason: sop.reason ?? "\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u672C\u6B21\u672A\u6267\u884C"
+    } : {},
+    detail: {
+      ruleChannelRan: sop.ran,
+      sopVulnerabilities: sop.vulnerabilities.length,
+      sopSkipped: sop.skipped,
+      sopDegraded: sop.degraded
+    }
+  };
+}
+function toSecurityVulnerability(finding) {
+  return {
+    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
+    severity: finding.severity,
+    title: finding.message,
+    description: finding.message,
+    package: finding.file,
+    currentVersion: "",
+    vulnerableRange: "",
+    dependencyPath: [],
+    isDirectDependency: false,
+    recommendation: finding.suggestion ?? "\u8BF7\u590D\u6838\u8BE5\u5904\u4EE3\u7801\u5E76\u6309\u5B89\u5168\u89C4\u8303\u4FEE\u590D",
+    autoFixable: false,
+    confidence: "high_confidence",
+    sourceTools: ["semgrep"]
+  };
 }
 function dedupePerformanceIssues(issues) {
   const seen = /* @__PURE__ */ new Set();
@@ -519062,6 +519581,17 @@ var PipelineRunner = class {
   /** 已注册规则统计（条数只认 registry，见 `readSopStats` 的说明） */
   getSopStats() {
     return readSopStats(this.sopRegistry);
+  }
+  /**
+   * 已注册规则全量（内置 presets + 云同步缓存合并后的注册表内容）。
+   *
+   * 供「检测能力闭环审计」消费：它要把「声明了什么」与「实际会执行什么」比对，
+   * 必须拿到规则本身（含 status / domain / content），只拿统计数字是不够的。
+   *
+   * 只读快照（返回新数组，不暴露注册表内部 Map）。
+   */
+  getSopRules() {
+    return [...this.sopRegistry.getAll()];
   }
   /** 合并云同步缓存规则（`{cacheDir}/modules/*.db`）；目录不可用返回 0 */
   async loadSopRulesFromCache(cacheDir) {
@@ -521062,6 +521592,99 @@ async function runPipelineCommand(runner, opts, ctx) {
   finalizeScan(runner, opts, blocked);
 }
 
+// src/capability-command.ts
+init_src2();
+function formatText(report) {
+  const lines = [];
+  lines.push("");
+  lines.push("\u68C0\u6D4B\u80FD\u529B\u77E9\u9635\uFF08\u58F0\u660E vs \u5B9E\u9645\uFF09");
+  lines.push("=".repeat(72));
+  lines.push(
+    `\u58F0\u660E ${report.declaredTotal} \u6761 | active ${report.activeTotal} \u6761 | \u5B9E\u9645\u751F\u6548 ${report.effectiveTotal} \u6761 | \u65AD\u94FE ${report.brokenTotal} \u6761`
+  );
+  lines.push("");
+  lines.push("\u57DF          \u6267\u884C\u8DEF\u5F84              \u58F0\u660E  \u751F\u6548  \u65AD\u94FE");
+  lines.push("-".repeat(72));
+  for (const d of report.domains) {
+    lines.push(
+      `${d.domain.padEnd(12)} ${d.path.padEnd(20)} ${String(d.declared).padStart(4)}  ${String(d.effective).padStart(4)}  ${String(d.broken).padStart(4)}`
+    );
+  }
+  if (report.breaks.length > 0) {
+    lines.push("");
+    lines.push("\u65AD\u94FE\u660E\u7EC6\uFF08active \u4F46\u6C38\u8FDC\u4E0D\u4F1A\u6267\u884C\uFF09\uFF1A");
+    lines.push("-".repeat(72));
+    for (const b of report.breaks) {
+      lines.push(`  \u2717 ${b.ruleId}`);
+      lines.push(`    \u539F\u56E0\uFF1A${b.breakReason}`);
+      lines.push(`    \u8BF4\u660E\uFF1A${b.detail ?? "(\u65E0)"}`);
+    }
+  } else {
+    lines.push("");
+    lines.push("\u2713 \u65E0\u65AD\u94FE\uFF1A\u6240\u6709 active \u89C4\u5219\u90FD\u4F1A\u771F\u7684\u88AB\u6267\u884C");
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+async function runCapabilityCommand(runner, opts) {
+  const report = auditCapabilityClosure(runner.getSopRules());
+  if (opts.format === "json") {
+    const payload = `${JSON.stringify(
+      {
+        ...report,
+        unimplementedCapabilities: CAPABILITY_REGISTRY.filter((c) => c.status !== "implemented")
+      },
+      null,
+      2
+    )}
+`;
+    if (opts.report) {
+      const { writeFileSync: writeFileSync3, mkdirSync: mkdirSync3 } = await import("node:fs");
+      const { dirname: dirname24, resolve: resolve33 } = await import("node:path");
+      const abs = resolve33(opts.report);
+      mkdirSync3(dirname24(abs), { recursive: true });
+      writeFileSync3(abs, payload, "utf-8");
+      console.error(`[CLI] \u80FD\u529B\u77E9\u9635\u5DF2\u5199\u5165: ${opts.report}`);
+    } else {
+      process.stdout.write(payload);
+    }
+  } else {
+    console.log(formatText(report));
+    console.log(formatCapabilityGaps());
+    console.log("");
+  }
+  if (!isClosureAcceptable(report)) {
+    console.error(
+      `[CLI] \u80FD\u529B\u95ED\u73AF\u65AD\u88C2\uFF1A${report.brokenTotal} \u6761 active \u89C4\u5219\u6C38\u8FDC\u4E0D\u4F1A\u6267\u884C \u2014 \u5BA3\u79F0\u7684\u80FD\u529B\u6CA1\u6709\u5BF9\u5E94\u5B9E\u73B0\uFF08\u672A\u68C0\u6D4B \u2260 \u901A\u8FC7\uFF09\u3002\u4FEE\u590D\u524D\u4E0D\u5E94\u53D1\u7248\u3002`
+    );
+    process.exitCode = 2;
+  }
+}
+function formatCapabilityGaps() {
+  const lines = [];
+  const unimplemented = CAPABILITY_REGISTRY.filter((c) => c.status !== "implemented");
+  if (unimplemented.length === 0) {
+    lines.push("\u2713 \u65E0\u672A\u5B9E\u73B0\u80FD\u529B\uFF1A\u6240\u6709\u767B\u8BB0\u80FD\u529B\u90FD\u5DF2\u843D\u5730");
+    return lines.join("\n");
+  }
+  lines.push(`\u672A\u5B9E\u73B0\u80FD\u529B\uFF08${unimplemented.length} \u9879\uFF0CUI \u4E0D\u5F97\u5BA3\u79F0\uFF09\uFF1A`);
+  lines.push("-".repeat(72));
+  const byDomain = /* @__PURE__ */ new Map();
+  for (const cap of unimplemented) {
+    const list = byDomain.get(cap.domain) ?? [];
+    list.push(cap);
+    byDomain.set(cap.domain, list);
+  }
+  for (const [domain, caps] of byDomain) {
+    lines.push(`  ${domain}:`);
+    for (const cap of caps) {
+      lines.push(`    \xB7 [${cap.status}] ${cap.label}`);
+      if (cap.note) lines.push(`        ${cap.note}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 // src/index.ts
 function resolveBaseDir() {
   if (typeof __dirname !== "undefined") return __dirname;
@@ -521087,6 +521710,8 @@ zhshield \u2014 \u667A\u6C47\u7801\u76FE \u4EE3\u7801\u8D28\u91CF\u6CBB\u7406
   zhshield baseline clear [--dir <path>]    \u6E05\u9664\u57FA\u7EBF\u6587\u4EF6
   zhshield baseline capture-refactor [--dir <path>]  \u6355\u83B7\u91CD\u6784\u5B58\u91CF\u5F02\u5473\u4E3A\u68D8\u8F6E\u57FA\u7EBF\uFF08\u6B64\u540E\u53EA\u62A5\u589E\u91CF\uFF09
   zhshield baseline clear-refactor [--dir <path>]    \u6E05\u9664\u91CD\u6784\u68D8\u8F6E\u57FA\u7EBF
+  zhshield capability               \u68C0\u6D4B\u80FD\u529B\u77E9\u9635\uFF1A\u6BCF\u4E2A\u57DF\u300C\u58F0\u660E\u4E86\u591A\u5C11 / \u5B9E\u9645\u4F1A\u6267\u884C\u591A\u5C11\u300D
+                                     \u6709 active \u89C4\u5219\u6C38\u8FDC\u4E0D\u4F1A\u6267\u884C\u65F6 exit 2\uFF08CI \u95E8\u7981\uFF09
   zhshield sop sync            \u4ECE\u4E91\u7AEF\u62C9\u53D6 SOP \u89C4\u5219\uFF08\u9A8C\u7B7E\u540E\u843D\u76D8\uFF0C\u4F9B\u65E0\u684C\u9762\u7AEF\u7684 CI \u4F7F\u7528\uFF09
   zhshield help                \u663E\u793A\u6B64\u5E2E\u52A9
 
@@ -521248,6 +521873,9 @@ async function runPipeline(opts, reporter) {
       break;
     case "baseline":
       await runBaselineCommand(runner, opts, reporter, projectDir);
+      break;
+    case "capability":
+      await runCapabilityCommand(runner, opts);
       break;
     default:
       console.error(`\u672A\u77E5\u547D\u4EE4: ${opts.command}`);

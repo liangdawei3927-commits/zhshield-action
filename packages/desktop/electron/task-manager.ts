@@ -4,6 +4,7 @@ import { getMainWindow } from './ipc-context';
 import {
   runPipelineInWorker,
   runRefactorInWorker,
+  runRefactorAutoFixInWorker,
   runGuardInWorker,
   runSecurityInWorker,
   runGarbageScanInWorker,
@@ -26,6 +27,7 @@ export type TaskKind =
   | 'performance'
   | 'guard'
   | 'refactor'
+  | 'refactorAutoFix'
   | 'deps'
   | 'techdebt';
 
@@ -446,6 +448,8 @@ export function buildTaskManager(): TaskManager {
       ),
     refactor: (task, _request, onProgress) =>
       runRefactorInWorker(task.projectPath, onProgress, undefined, task.id),
+    refactorAutoFix: (task, _request, onProgress) =>
+      runRefactorAutoFixInWorker(task.projectPath, onProgress, undefined, task.id),
     deps: (task, _request, onProgress) => runDepsHandler(task.projectPath, onProgress),
     techdebt: (task, _request, onProgress) => runTechDebtHandler(task.projectPath, onProgress),
   };

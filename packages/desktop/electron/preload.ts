@@ -140,6 +140,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('engine:getLatestDomainScan', projectPath, domain),
     getProfile: (projectPath: string) => ipcRenderer.invoke('engine:getProfile', projectPath),
     runRefactor: (projectPath: string) => ipcRenderer.invoke('engine:runRefactor', projectPath),
+    applyRefactorFixes: (projectPath: string) =>
+      ipcRenderer.invoke('engine:applyRefactorFixes', projectPath),
     runDeps: (projectPath: string) => ipcRenderer.invoke('engine:runDeps', projectPath),
     depsRelockBaseline: (projectPath: string) =>
       ipcRenderer.invoke('engine:depsRelockBaseline', projectPath),

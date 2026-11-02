@@ -1,7 +1,7 @@
 /**
  * 前端性能引擎（engine.ts）
  *
- * 聚合四个静态分析探测器：构建配置 / 包体积 / tree-shaking+chunk 划分 / 复杂度。
+ * 聚合五个静态分析探测器：构建配置 / 包体积 / tree-shaking+chunk 划分 / 复杂度 / ReDoS。
  * 纯静态分析，绝不执行项目代码（与 P0-2 禁令一致）；零网络；不抛异常。
  */
 import * as fs from 'fs';
@@ -13,6 +13,7 @@ import { BuildConfigDetectorImpl } from './adapters/build-config-detector';
 import { BundleSizeDetectorImpl } from './adapters/bundle-size-detector';
 import { TreeShakingDetectorImpl } from './adapters/tree-shaking-detector';
 import { ComplexityDetectorImpl } from './adapters/complexity-detector';
+import { RedosDetectorImpl } from './adapters/redos-detector';
 
 /** 判断给定路径是否为项目根（存在 package.json / 任意源码根 / 已解析出源码目录） */
 function isProjectRoot(root: string): boolean {
@@ -47,7 +48,7 @@ export class PerformanceEngine {
     return this.buildReport(issues, Date.now() - startedAt);
   }
 
-  /** 聚合四个探测器（内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描） */
+  /** 聚合五个探测器（内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描） */
   private collectIssues(projectRoot: string, issues: PerformanceIssue[]): void {
     try {
       this.reportMissingSourceRoot(projectRoot, issues);
@@ -55,6 +56,7 @@ export class PerformanceEngine {
       issues.push(...new BundleSizeDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new TreeShakingDetectorImpl().detect(projectRoot, this.config));
       issues.push(...new ComplexityDetectorImpl().detect(projectRoot, this.config));
+      issues.push(...new RedosDetectorImpl().detect(projectRoot, this.config));
     } catch {
       // 探测器内部已各自兜底，此处再兜一层：任何异常不阻断整次扫描
     }

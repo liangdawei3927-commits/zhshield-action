@@ -2,8 +2,9 @@ import { ReportShell, type ReportStatCard } from '../components/business/ReportS
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { NavGlyph } from '../components/business/page-glyph';
 import { DomainActionButton } from '../components/business/DomainActionButton';
-import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
+import { FeatureIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
@@ -73,7 +74,11 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
   }
 
   return (
-    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider
+      key={detail.scanVersion}
+      available={detail.hasDetail}
+      onOpen={detail.openDetail}
+    >
       <PerformanceEmptyView
         projectPath={projectPath}
         t={t}
@@ -118,7 +123,17 @@ function PerformanceDetailView({
     | 'handleScan'
   >;
 }) {
-  const { loading, progress, statusMessage, queued, cancel, stopping, copyToAi, copyAllToAi, handleScan } = state;
+  const {
+    loading,
+    progress,
+    statusMessage,
+    queued,
+    cancel,
+    stopping,
+    copyToAi,
+    copyAllToAi,
+    handleScan,
+  } = state;
   return (
     <ReportShell
       projectPath={projectPath}
@@ -144,11 +159,7 @@ function PerformanceDetailView({
       progressMessage={statusMessage}
       stats={performanceReportStats(t, detailReport, copyToAi)}
     >
-      <IssuesPanel
-        issues={detailReport.issues}
-        onCopyToAi={copyToAi}
-        onCopyAll={copyAllToAi}
-      />
+      <IssuesPanel issues={detailReport.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
     </ReportShell>
   );
 }
@@ -234,44 +245,39 @@ function PerformanceEmptyView({
       dimension="performance"
       title={t('page.performance.shell.title')}
       subtitle={t('page.performance.shell.subtitle')}
-      features={[
-        {
-          icon: (
+      features={buildCapabilityFeatures('performance', {
+        // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉
+        icons: {
+          'performance.runtime.nested-loop': (
             <FeatureIcon>
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </FeatureIcon>
           ),
-          title: t('page.performance.shell.featureComplexity.title'),
-          desc: t('page.performance.shell.featureComplexity.desc'),
-        },
-        {
-          icon: (
-            <FeatureIcon>
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </FeatureIcon>
-          ),
-          title: t('page.performance.shell.featureReDoS.title'),
-          desc: t('page.performance.shell.featureReDoS.desc'),
-        },
-        {
-          icon: (
+          'performance.build-config': (
             <FeatureIcon>
               <path d="M2 12h6l3-9 4 18 3-9h4" />
             </FeatureIcon>
           ),
-          title: t('page.performance.shell.featureModernApi.title'),
-          desc: t('page.performance.shell.featureModernApi.desc'),
-        },
-        {
-          icon: (
+          'performance.bundle-size': (
             <FeatureIcon>
-              <ClockGlyph />
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </FeatureIcon>
           ),
-          title: t('page.performance.shell.featureTimer.title'),
-          desc: t('page.performance.shell.featureTimer.desc'),
+          'performance.tree-shaking': (
+            <FeatureIcon>
+              <path d="M12 2L4 6v6c0 5 3.4 9.7 8 10 4.6-.3 8-5 8-10V6l-8-4z" />
+            </FeatureIcon>
+          ),
+          'performance.redos': (
+            <FeatureIcon>
+              <path d="M12 2L4 6v6c0 5 3.4 9.7 8 10 4.6-.3 8-5 8-10V6l-8-4z" />
+              <path d="M12 8v4" />
+              <path d="M12 16h.01" />
+            </FeatureIcon>
+          ),
         },
-      ]}
+      })}
+      planned={buildPlannedCapabilities('performance')}
       buttonText={t('page.performance.shell.start')}
       onAction={onAction}
       actionDomain="performance"

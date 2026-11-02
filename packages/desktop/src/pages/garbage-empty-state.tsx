@@ -1,6 +1,7 @@
 import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon } from '../components/ui/Icons';
+import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 
@@ -13,51 +14,33 @@ export function GarbageEmptyState(props: ScanEmptyStateParams) {
       dimension="garbage"
       title={t('page.garbage.empty.title')}
       subtitle={t('page.garbage.empty.subtitle')}
-      features={[
-        {
-          icon: (
+      features={buildCapabilityFeatures('garbage', {
+        // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉。
+        // 「重复代码」（garbage.duplicate-code）已从清单移除 —— 按《07》O1
+        // 它唯一归重构域，垃圾页宣称它就是宣称了一件本域不做的事。
+        icons: {
+          'garbage.unused-file': (
             <FeatureIcon>
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z" />
               <path d="M14 2v6h6" />
               <path d="M9 15l6 6M15 15l-6 6" />
             </FeatureIcon>
           ),
-          title: t('page.garbage.type.unusedFile'),
-          desc: t('page.garbage.feature.unusedFile.desc'),
-        },
-        {
-          icon: (
+          'garbage.unused-dependency': (
             <FeatureIcon>
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <path d="M3 9h18" />
               <path d="M9 21V9" />
             </FeatureIcon>
           ),
-          title: t('page.garbage.type.unusedDependency'),
-          desc: t('page.garbage.feature.unusedDependency.desc'),
-        },
-        {
-          icon: (
+          'garbage.dead-code': (
             <FeatureIcon>
               <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
             </FeatureIcon>
           ),
-          title: t('page.garbage.type.deadCode'),
-          desc: t('page.garbage.feature.deadCode.desc'),
         },
-        {
-          icon: (
-            <FeatureIcon>
-              <path d="M8 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2" />
-              <path d="M16 2h6v6" />
-              <path d="M11 13l9-9" />
-              <path d="M20 4l-9 9" />
-            </FeatureIcon>
-          ),
-          title: t('page.garbage.type.duplicateCode'),
-          desc: t('page.garbage.feature.duplicateCode.desc'),
-        },
-      ]}
+      })}
+      planned={buildPlannedCapabilities('garbage')}
       buttonText={t('page.garbage.startScan')}
       onAction={props.onScan}
       actionDomain="garbage"

@@ -96,6 +96,23 @@ jobs:
       - name: Full typecheck (15 packages)
         run: pnpm typecheck
 
+      # 检测能力闭环门禁 —— 「声明了什么」vs「实际会执行什么」
+      #
+      # 为什么要有这道门禁（2026-11-02 实测驱动）：
+      #   桌面安全中心此前对 7 条 active semgrep 规则（SQL 注入 / XSS / 命令注入 / CSRF
+      #   / 路径穿越）一次都不会求值 —— security 域走 domain-executor，不经过 SOP 引擎。
+      #   同一份夹具上 CLI `inspect --sop` 检出 1 条、桌面端 0 检出且 status=ok、
+      #   degraded=undefined：用户看到「一切正常」，真相是「什么都没查」。
+      #
+      # 这类断裂在报告里没有任何异常提示，只能靠「声明 vs 实际」比对发现。
+      # 本门禁把该事实变成可执行的断言：存在 active 但永远不会执行的规则 → 失败。
+      #
+      # 判据只看 active 规则；draft / trial 是规则的正常生命周期状态，不拦。
+      # 「尚未实现的能力」（planned / deprecated）也不拦 —— 那是「还没做」的诚实记录，
+      # 由 zhshield capability 打印出来供人决策；UI 侧的能力注册表保证它们不被宣称。
+      - name: Capability closure gate (declaration vs actual)
+        run: pnpm --filter zhshield-cli exec tsx src/index.ts capability
+
       # sop-pipeline.test.ts 的 gitleaks 用例断言 security.scan.gitleaks.hardcoded-key
       # 必须真实检出（status 'failed'），ubuntu-latest 镜像未预装 gitleaks，
       # 需在跑测试前安装到 /usr/local/bin（PATH 内）。semgrep/trivy 不装：

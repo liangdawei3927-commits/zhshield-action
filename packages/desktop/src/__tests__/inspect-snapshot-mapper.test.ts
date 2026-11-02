@@ -159,7 +159,7 @@ describe('体检页挂载 hydrate（结构守卫，防接线被删）', () => {
     // 打开页面仍落在主页（不因读回历史结果而自动跳进详情）
     expect(src).toContain('const [showHome, setShowHome] = useState(true);');
     // 实时报告的通过进度条必须保留（快照回退时才隐藏，因为通过项未知）
-    expect(src).toContain('<ProgressBar passCount={passCount} total={items.length} />');
+    expect(src).toContain('<ProgressBar passCount={passCount} total={applicableCount} />');
   });
 
   /**

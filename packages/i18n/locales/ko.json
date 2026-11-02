@@ -388,7 +388,9 @@
           "description": "TypeScript 타입 오류 검사",
           "fixSuggestion": "TypeScript {{level}} 수정: {{code}}",
           "runFailed": "tsc 실행 실패",
-          "unavailable": "tsc가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다"
+          "unavailable": "tsc가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다",
+          "depsMissing": "의존성이 설치되지 않아(node_modules 없음) TypeScript 타입 검사를 실행할 수 없어 미실행으로 강등되었습니다(의존성 설치 후 다시 시도하세요)",
+          "unresolvedEnv": "의존성/타입 버전 영향으로 TypeScript 타입 검사의 확정된 결론을 낼 수 없어 미실행으로 강등되었습니다"
         }
       },
       "unknown": "알 수 없음",
@@ -1455,6 +1457,15 @@
       "detail": {
         "empty": "이 분류에 세부 항목이 없습니다",
         "truncated": "처음 {{shown}}개만 표시됩니다. 전체 목록은 아래 \"리팩터링 문제(유형별)\"를 참고하세요"
+      },
+      "autoFix": {
+        "button": "자동 수정 적용 ({{count}})",
+        "confirm": ".zhshield/backups 에 백업한 후 {{count}}개 파일을 수정합니다. 적용할까요?",
+        "confirmYes": "적용",
+        "cancel": "취소",
+        "result": "{{fixed}}개 파일에 자동 수정을 적용했습니다 (백업: {{backup}})",
+        "failed": "자동 수정 적용 실패: {{message}}",
+        "none": "자동 수정할 수 있는 문제가 없습니다"
       }
     },
     "reports": {
@@ -2050,7 +2061,10 @@
       "analyzing": "리팩토링 악취 분석 중…",
       "collecting": "소스 파일 수집 중…",
       "done": "리팩토링 분석 완료: 코드 악취 {{count}}곳",
-      "baselineSuppressed": "(베이스라인으로 기존 {{count}}건 제외)"
+      "baselineSuppressed": "(베이스라인으로 기존 {{count}}건 제외)",
+      "autofixScanning": "스캔 및 자동 수정 생성 중…",
+      "autofixApplying": "자동 수정 적용 중…",
+      "autofixDone": "자동 수정 완료: {{count}}개 파일"
     },
     "report": {
       "executionError": "실행 오류",

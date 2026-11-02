@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   type RefactorFile,
   type Smell,
@@ -10,6 +11,67 @@ import { BounceCard } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
+
+/**
+ * 「一键应用自动修复」按钮：带二次确认行（写盘动作，先备份再改）。
+ *
+ * 只有存在可自动修复项（count > 0）时才出现；确认后调用 `onConfirm`，
+ * 由上层触发主进程（子进程内扫描→生成补丁→备份→写盘）。`applying` 时禁止重复点击。
+ */
+export function AutoFixButton({
+  count,
+  applying,
+  onConfirm,
+}: {
+  count: number;
+  applying: boolean;
+  onConfirm: () => void;
+}) {
+  const t = useT();
+  const [confirming, setConfirming] = useState(false);
+  if (count <= 0) return null;
+
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        <span className="text-[11px] text-zh-muted max-w-[280px]">
+          {t('page.refactor.autoFix.confirm', { count })}
+        </span>
+        <button
+          type="button"
+          disabled={applying}
+          onClick={() => {
+            setConfirming(false);
+            onConfirm();
+          }}
+          style={{ background: 'rgb(var(--zh-warning))' }}
+          className="px-3 py-1.5 rounded-full text-xs font-semibold text-white border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {applying ? t('page.refactor.scanning') : t('page.refactor.autoFix.confirmYes')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="text-[11px] text-zh-muted hover:text-zh-ink-2 cursor-pointer bg-transparent border-none"
+        >
+          {t('page.refactor.autoFix.cancel')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={applying}
+      onClick={() => setConfirming(true)}
+      style={{ background: 'rgb(var(--zh-warning))' }}
+      className="px-4 py-1.5 rounded-full text-xs font-semibold text-white border-none cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {applying ? t('page.refactor.scanning') : t('page.refactor.autoFix.button', { count })}
+    </button>
+  );
+}
 
 function SmellRow({ smell, onCopy }: { smell: Smell; onCopy: () => void }) {
   const t = useT();

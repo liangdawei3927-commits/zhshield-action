@@ -17,6 +17,9 @@ export type {
   CrossValidationReport,
 } from './cross-validator';
 export type { Vulnerability, MalwareItem, SecurityScanReport } from './types';
+// 安全评分：域执行器合并 SOP 通道结论后需重算（否则合并前的分数被沿用，
+// 会出现「检出 1 条漏洞却仍显示 100 分」）。
+export { calculateSecurityScore } from './types';
 export type { SecretStore } from './secrets/lifecycle';
 export {
   SecretLifecycleManager,

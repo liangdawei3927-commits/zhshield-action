@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
-import { FeatureIcon, LayersGlyph, GridGlyph, ClockGlyph } from '../components/ui/Icons';
+import { FeatureIcon, LayersGlyph, GridGlyph } from '../components/ui/Icons';
+import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
 import { useT } from '../i18n';
 
 interface EmptyStateProps {
@@ -24,45 +25,34 @@ interface EmptyStateProps {
 function buildRefactorFeatures(
   t: ReturnType<typeof useT>,
 ): ComponentProps<typeof DomainEmptyView>['features'] {
-  return [
-    {
-      icon: (
+  // 注册表决定**渲染哪几项**（只渲染 status='implemented' 的）。
+  // 「一键应用推荐重构方案」（refactor.auto-fix）现已落地（2026-11-03）：
+  // 桌面端入口 + 写盘前自动备份。其余种类的能力若仍是 planned/deprecated，
+  // 会自动落到下方「规划中」灰显区，不会混进这里。
+  // 「每日自动检查」「按类别分组」是运行形态而非检测能力，由页面自身承载，不入注册表。
+  return buildCapabilityFeatures('refactor', {
+    icons: {
+      'refactor.smells': (
         <FeatureIcon>
           <LayersGlyph />
         </FeatureIcon>
       ),
-      title: t('page.refactor.shell.featureSmell.title'),
-      desc: t('page.refactor.shell.featureSmell.desc'),
-    },
-    {
-      icon: (
-        <FeatureIcon>
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </FeatureIcon>
-      ),
-      title: t('page.refactor.shell.featureAutoFix.title'),
-      desc: t('page.refactor.shell.featureAutoFix.desc'),
-    },
-    {
-      icon: (
-        <FeatureIcon>
-          <ClockGlyph />
-        </FeatureIcon>
-      ),
-      title: t('page.refactor.shell.featureDaily.title'),
-      desc: t('page.refactor.shell.featureDaily.desc'),
-    },
-    {
-      icon: (
+      'refactor.duplicate-code': (
         <FeatureIcon>
           <GridGlyph />
         </FeatureIcon>
       ),
-      title: t('page.refactor.shell.featureGrouping.title'),
-      desc: t('page.refactor.shell.featureGrouping.desc'),
+      'refactor.auto-fix': (
+        <FeatureIcon>
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+        </FeatureIcon>
+      ),
     },
-  ];
+    descriptions: {
+      'refactor.smells': t('page.refactor.shell.featureSmell.desc'),
+      'refactor.duplicate-code': t('page.refactor.shell.featureGrouping.desc'),
+    },
+  });
 }
 
 /** 空态：引导检查 */
@@ -76,6 +66,7 @@ export function RefactorEmptyState(props: EmptyStateProps) {
         title={t('page.refactor.shell.title')}
         subtitle={t('page.refactor.shell.subtitle')}
         features={buildRefactorFeatures(t)}
+        planned={buildPlannedCapabilities('refactor')}
         buttonText={t('page.refactor.scanNow')}
         onAction={props.onScan}
         actionDomain="refactor"

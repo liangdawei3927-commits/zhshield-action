@@ -18,6 +18,7 @@ import { createLoadedRunner } from './pipeline-runner-factory';
 import { runSopJob, runFullPipelineJob } from './pipeline-sop';
 import {
   runRefactorJob,
+  runRefactorAutoFixJob,
   runGuardJob,
   runSecurityJob,
   runGarbageScanJob,
@@ -117,6 +118,11 @@ process.on('message', (raw: PipelineWorkerInbound) => {
     case 'runRefactor':
       wrapJob(raw.id, async () => {
         await runRefactorJob(raw.id, raw.projectPath);
+      });
+      break;
+    case 'applyRefactorFixes':
+      wrapJob(raw.id, async () => {
+        await runRefactorAutoFixJob(raw.id, raw.projectPath);
       });
       break;
     case 'runGuard':

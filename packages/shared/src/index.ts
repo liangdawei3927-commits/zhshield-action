@@ -19,6 +19,16 @@ export {
   isLayerDependencyAllowed,
   type ArchLayer,
 } from './arch-layers';
+// 检测能力注册表：「宣称什么」与「实现什么」的唯一对照表。
+// UI 空态只允许宣称 status='implemented' 的能力；planned / deprecated 由本表集中裁决。
+export {
+  CAPABILITY_REGISTRY,
+  CAPABILITIES_BY_DOMAIN,
+  implementedCapabilities,
+  unimplementedCapabilities,
+  findCapabilitiesWithoutEvidence,
+} from './capability-registry';
+export type { CapabilityDeclaration, CapabilityStatus } from './capability-registry';
 export { SECRET_PATTERNS, toNameRegexPatterns, type SecretPattern } from './secret-patterns';
 export type {
   PagedResult,

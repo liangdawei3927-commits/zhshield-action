@@ -18,6 +18,7 @@ export type { ProgressHandler, WorkerRunOptions } from './pipeline-host-core';
 export {
   runPipelineInWorker,
   runRefactorInWorker,
+  runRefactorAutoFixInWorker,
   runGuardInWorker,
   runSecurityInWorker,
   runGarbageScanInWorker,

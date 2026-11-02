@@ -25,6 +25,7 @@ export type {
   TextEdit,
   Fix,
   FixResult,
+  RefactorAutoFixResult,
 } from './types';
 
 export type { ParsedFile, ParsedClass, ParsedFunction, DuplicateBlock } from './ast-helper';

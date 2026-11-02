@@ -1,6 +1,7 @@
 import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
+import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 
@@ -13,18 +14,17 @@ export function SecurityEmptyState(props: ScanEmptyStateParams) {
       dimension="security"
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
-      features={[
-        {
-          icon: (
+      features={buildCapabilityFeatures('security', {
+        // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉。
+        // 「规范检查」（security.standard）已从清单移除 —— 它在注册表里是 planned
+        // （全仓无实现），宣称它就是骗用户。
+        icons: {
+          'security.vuln.sql-injection': (
             <FeatureIcon>
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </FeatureIcon>
           ),
-          title: t('page.security.tab.vuln'),
-          desc: t('page.security.feature.vuln.desc'),
-        },
-        {
-          icon: (
+          'security.vuln.xss': (
             <FeatureIcon>
               <circle cx="12" cy="12" r="6.5" />
               <circle cx="12" cy="12" r="1.8" />
@@ -38,25 +38,16 @@ export function SecurityEmptyState(props: ScanEmptyStateParams) {
               <path d="M7.4 16.6l-1.8 1.8" />
             </FeatureIcon>
           ),
-          title: t('page.security.tab.malware'),
-          desc: t('page.security.feature.malware.desc'),
-        },
-        {
-          icon: <LockKeyIcon />,
-          title: t('page.security.feature.secrets.title'),
-          desc: t('page.security.feature.secrets.desc'),
-        },
-        {
-          icon: (
+          'security.secrets': <LockKeyIcon />,
+          'security.malware': (
             <FeatureIcon>
               <polyline points="9 11 12 14 22 4" />
               <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
             </FeatureIcon>
           ),
-          title: t('page.security.feature.standard.title'),
-          desc: t('page.security.feature.standard.desc'),
         },
-      ]}
+      })}
+      planned={buildPlannedCapabilities('security')}
       buttonText={t('page.security.fixAll')}
       onAction={props.onScan}
       actionDomain="security"

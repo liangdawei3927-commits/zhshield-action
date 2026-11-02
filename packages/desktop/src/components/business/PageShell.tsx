@@ -32,6 +32,13 @@ interface PageShellProps {
   actionDomain: ActionRunningKey;
   /** 功能清单：这个页面能做什么 */
   featureList?: FeatureItem[];
+  /**
+   * 「规划中 / 已移交」能力（未实现，UI 不得宣称）。
+   *
+   * 由能力注册表的 unmet 项派生，仅供**告知**——渲染在独立灰显区，
+   * 绝不并入 featureList 网格（那会变成宣称未实现的能力）。
+   */
+  plannedFeatures?: { title: string; desc: string; badge: string }[];
   /** 底部自定义插槽（替代 featureList 网格） */
   footer?: ReactNode;
   /** 底部卡片网格列数（默认 4） */
@@ -64,6 +71,33 @@ interface PageShellProps {
   onSecondary?: () => void;
   /** 副操作是否禁用（默认跟随 loading） */
   secondaryDisabled?: boolean;
+}
+
+/** 「规划中 / 已移交」能力灰显区：只告知，不并入功能网格，避免变相宣称 */
+function PlannedList({
+  items,
+}: {
+  items: NonNullable<PageShellProps['plannedFeatures']>;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="w-full max-w-2xl px-6 pb-10" data-testid="planned-capabilities">
+      <p className="text-xs font-medium text-zh-muted mb-2 text-center">
+        规划中（未实现，暂不宣称）
+      </p>
+      <ul className="flex flex-col gap-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-[11px] text-zh-muted">
+            <span className="shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-zh-panel">
+              {item.badge}
+            </span>
+            <span className="shrink-0 font-medium text-zh-ink-2/70">{item.title}</span>
+            <span className="flex-1 min-w-0 text-zh-muted/80">{item.desc}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /** 底部功能清单 — 全站统一贴底卡片网格（EntryCard md，列数可配置） */
@@ -238,6 +272,7 @@ export function PageShell({
   onAction,
   actionDomain,
   featureList,
+  plannedFeatures,
   footer,
   columns = 4,
   loading = false,
@@ -277,6 +312,9 @@ export function PageShell({
       {footer}
       {featureList && featureList.length > 0 && (
         <FeatureList features={featureList} columns={columns} />
+      )}
+      {plannedFeatures && plannedFeatures.length > 0 && (
+        <PlannedList items={plannedFeatures} />
       )}
     </div>
   );

@@ -1457,6 +1457,15 @@
       "detail": {
         "empty": "该分类下暂无明细",
         "truncated": "仅显示前 {{shown}} 条，完整清单见下方「重构问题（按类型分组）」"
+      },
+      "autoFix": {
+        "button": "一键应用可自动修复（{{count}}）",
+        "confirm": "将先备份到 .zhshield/backups，再修改 {{count}} 处文件，确认应用？",
+        "confirmYes": "确认应用",
+        "cancel": "取消",
+        "result": "已应用 {{fixed}} 个文件的自动修复（备份：{{backup}}）",
+        "failed": "应用自动修复失败：{{message}}",
+        "none": "没有可自动修复的问题"
       }
     },
     "reports": {
@@ -2052,7 +2061,10 @@
       "analyzing": "重构异味分析中…",
       "collecting": "正在收集源码文件…",
       "done": "重构分析完成：{{count}} 处异味",
-      "baselineSuppressed": "（基线豁免 {{count}} 项存量异味）"
+      "baselineSuppressed": "（基线豁免 {{count}} 项存量异味）",
+      "autofixScanning": "正在扫描并生成自动修复…",
+      "autofixApplying": "正在应用自动修复…",
+      "autofixDone": "自动修复完成：{{count}} 个文件"
     },
     "report": {
       "executionError": "执行出错",

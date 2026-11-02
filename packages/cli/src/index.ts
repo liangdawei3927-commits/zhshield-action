@@ -29,6 +29,8 @@ import {
   runPipelineCommand,
   runBaselineCommand,
 } from './commands';
+// 检测能力矩阵命令：声明 vs 实际（CI 门禁用）
+import { runCapabilityCommand } from './capability-command';
 
 // 双模兼容：bundle 为 CJS（esbuild format:'cjs'），__dirname 原生可用；
 // 开发态（tsx 以 ESM 运行）__dirname 未声明，typeof 安全返回 undefined，
@@ -65,6 +67,8 @@ zhshield — 智汇码盾 代码质量治理
   zhshield baseline clear [--dir <path>]    清除基线文件
   zhshield baseline capture-refactor [--dir <path>]  捕获重构存量异味为棘轮基线（此后只报增量）
   zhshield baseline clear-refactor [--dir <path>]    清除重构棘轮基线
+  zhshield capability               检测能力矩阵：每个域「声明了多少 / 实际会执行多少」
+                                     有 active 规则永远不会执行时 exit 2（CI 门禁）
   zhshield sop sync            从云端拉取 SOP 规则（验签后落盘，供无桌面端的 CI 使用）
   zhshield help                显示此帮助
 
@@ -250,6 +254,9 @@ async function runPipeline(opts: CLIOptions, reporter: ConsoleReporter): Promise
       break;
     case 'baseline':
       await runBaselineCommand(runner, opts, reporter, projectDir);
+      break;
+    case 'capability':
+      await runCapabilityCommand(runner, opts);
       break;
     default:
       console.error(`未知命令: ${opts.command}`);

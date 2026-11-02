@@ -18,6 +18,7 @@ export type PerformanceCategory =
   | 'tree-shaking' // tree-shaking：sideEffects 缺失 / 全量引入大包
   | 'chunk-splitting' // chunk 划分：单一 vendor chunk / 缺少代码分割
   | 'runtime-pattern' // 运行时反模式：嵌套循环乘数层 / 延迟敏感路径同步阻塞 IO（O4）
+  | 'regex-safety' // 正则安全：嵌套不定量词导致的灾难性回溯（ReDoS，CWE-1333）
   | 'coverage'; // 覆盖缺口：源码根缺失导致检测未执行（没查 ≠ 没问题）
 
 /** 单条性能问题（可解释，含修复建议） */

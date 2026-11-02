@@ -12,6 +12,8 @@ export { TreeShakingDetectorImpl } from './adapters/tree-shaking-detector';
 export type { TreeShakingDetector } from './adapters/tree-shaking-detector';
 export { ComplexityDetectorImpl } from './adapters/complexity-detector';
 export type { ComplexityDetector } from './adapters/complexity-detector';
+export { RedosDetectorImpl, hasNestedUnboundedQuantifier } from './adapters/redos-detector';
+export type { RedosDetector } from './adapters/redos-detector';
 
 export type {
   PerformanceIssue,

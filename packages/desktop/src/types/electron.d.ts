@@ -378,7 +378,7 @@ export interface RefactorReportData {
         endColumn: number;
       };
       context: { metric: string; value: number; threshold: number };
-      suggestion: { type: string; description: string; priority: string };
+      suggestion: { type: string; description: string; priority: string; autoFixable?: boolean };
     }>;
   }>;
   summary: {
@@ -418,6 +418,28 @@ export interface GarbageRestoreResultData {
   restored: number;
   restoredBytes: number;
   failed: string[];
+}
+
+/** 重构一键自动修复结果（serializable；写盘前已备份，可整目录回滚） */
+export interface RefactorAutoFixResultData {
+  /** 是否真的改动了文件 */
+  applied: boolean;
+  /** 生成的修复补丁条数 */
+  fixCount: number;
+  /** 覆盖的坏味道处数 */
+  smellCount: number;
+  /** 已改写文件数 */
+  fixed: number;
+  /** 失败文件数 */
+  failed: number;
+  /** 失败明细 */
+  errors: string[];
+  /** 备份目录（绝对路径），无文件被备份时为 null */
+  backupDir: string | null;
+  /** 已备份的相对文件路径 */
+  backedUpFiles: string[];
+  /** 附加说明（如「没有可自动修复的问题」） */
+  message?: string;
 }
 
 /** 可更新依赖条目 */
@@ -736,6 +758,7 @@ export interface EngineAPI {
   restoreGarbage: (projectPath: string, batchId: string) => Promise<GarbageRestoreResultData>;
   runPerformance: (projectPath: string) => Promise<PerformanceReportData>;
   runRefactor: (projectPath: string) => Promise<RefactorReportData>;
+  applyRefactorFixes: (projectPath: string) => Promise<RefactorAutoFixResultData>;
   runDeps: (projectPath: string) => Promise<DependencyReportData>;
   depsRelockBaseline: (projectPath: string) => Promise<DepsRelockResult>;
   runTechDebt: (projectPath: string) => Promise<TechDebtReportData>;

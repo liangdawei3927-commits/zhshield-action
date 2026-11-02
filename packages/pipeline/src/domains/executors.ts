@@ -7,7 +7,7 @@
  *
  * 进度事件只传结构化信息（`DomainEvent`），文案由展示层渲染。
  */
-import type { GovernanceEvent, DomainId } from '@zh/shared';
+import type { DomainId } from '@zh/shared';
 import type { RuleEngineReport } from '@zh/kernel';
 import type { RefactorReport } from '@zh/refactor';
 import type { DomainExecutionContext, DomainExecution, DomainExecutor } from './types';
@@ -111,25 +111,112 @@ export async function runRefactorDomain(ctx: DomainExecutionContext): Promise<Do
  * （garbage）——《07》C3，且不再为 `pnpm audit` 付网络与 3s 级耗时。
  */
 export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<DomainExecution> {
-  const { SecurityEngine } = await import('@zh/security');
-  const onEvent = ctx.onEvent;
-  const emitter = onEvent
-    ? {
-        emit: (event: GovernanceEvent) => {
-          onEvent({
-            domain: 'security',
-            kind: event.type,
-            payload: event.payload as unknown as Record<string, unknown>,
-          });
-        },
-      }
-    : undefined;
+  const { SecurityEngine, calculateSecurityScore } = await import('@zh/security');
+  const { runSecuritySopChannel, mergeVulnerabilityFindings, createSecurityEventForwarder } =
+    await import('./security-sop');
+
+  const emitter = createSecurityEventForwarder(ctx.onEvent);
   const engine = new SecurityEngine(emitter);
   engine.registerDefaultAdapters();
-  const report = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot, {
+  const baseReport = await engine.runSecurityScan(ctx.repoRoot, ctx.repoRoot, {
     includeDependencyOwned: false,
   });
-  return { report };
+
+  // SOP 规则通道：产出代码漏洞（semgrep 内联规则：SQL 注入 / XSS / 命令注入 / CSRF）
+  // 与密钥（gitleaks）。2026-11-02 实测：这 6 条规则在桌面安全中心此前**一次都不会
+  // 被求值**（域走 domain-executor，不经过 SOP 引擎），且 SecurityEngine 的
+  // buildVulnerabilities 不消费 semgrep issue —— 两条断裂叠加导致安全页「0 检出但
+  // status=ok、degraded=undefined」，用户看到的是「很干净」。
+  const sop = await runSecuritySopChannel(ctx);
+
+  // 合并两条通道的漏洞结论（按 ruleId+file+line 去重）
+  // 启发式通道的条目形状是 Vulnerability（无 ruleId/file 字段，位置在 package 里），
+  // 故只把 SOP 通道的结论喂进去 —— 两条通道的 ruleId 命名空间不同，不会误合并。
+  const merged = mergeVulnerabilityFindings([], sop.vulnerabilities);
+  const mergedVulnerabilities = merged.map(toSecurityVulnerability);
+
+  // SOP 通道产出的是**代码漏洞**，不是依赖漏洞，故并入 vulnerabilities；
+  // summary 与 securityScore 同步重算，否则统计卡与明细对不上，
+  // 且会把「检出 1 条 medium 漏洞」显示成 100 分（calculateSecurityScore 的
+  // medium 扣 5 分、最低 60 —— 但 baseReport 的 score 是合并前算的）。
+  const report = {
+    ...baseReport,
+    vulnerabilities: mergedVulnerabilities,
+    summary: {
+      ...baseReport.summary,
+      vulnTotal: mergedVulnerabilities.length,
+      vulnCritical: mergedVulnerabilities.filter((v) => v.severity === 'critical').length,
+      vulnHigh: mergedVulnerabilities.filter((v) => v.severity === 'high').length,
+      vulnMedium: mergedVulnerabilities.filter((v) => v.severity === 'medium').length,
+      vulnLow: mergedVulnerabilities.filter((v) => v.severity === 'low').length,
+    },
+    securityScore: calculateSecurityScore(mergedVulnerabilities),
+  };
+
+  // 执行健康度：任一通道没跑成 → 域记 partial 并说明原因（C4：未检测 ≠ 通过）。
+  const sopNotRan = !sop.ran;
+  return {
+    report,
+    ...(sopNotRan
+      ? {
+          status: 'partial' as const,
+          reason: sop.reason ?? '安全域 SOP 规则通道本次未执行',
+        }
+      : {}),
+    detail: {
+      ruleChannelRan: sop.ran,
+      sopVulnerabilities: sop.vulnerabilities.length,
+      sopSkipped: sop.skipped,
+      sopDegraded: sop.degraded,
+    },
+  };
+}
+
+/**
+ * SOP 通道的漏洞条目 → `@zh/security` 的 Vulnerability 形状。
+ *
+ * `package` 字段承载文件路径（安全域 UI 的「文件」列读它，见
+ * `report-format.ts` 的 `toSecurityScanReportData`：`file: v.package`）。
+ * `isDirectDependency=false` —— 这些是代码问题，不是依赖问题。
+ */
+function toSecurityVulnerability(finding: {
+  ruleId: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  file: string;
+  line?: number;
+  column?: number;
+  message: string;
+  suggestion?: string;
+}): {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  package: string;
+  currentVersion: string;
+  vulnerableRange: string;
+  dependencyPath: string[];
+  isDirectDependency: boolean;
+  recommendation: string;
+  autoFixable: boolean;
+  confidence: 'high_confidence';
+  sourceTools: string[];
+} {
+  return {
+    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
+    severity: finding.severity,
+    title: finding.message,
+    description: finding.message,
+    package: finding.file,
+    currentVersion: '',
+    vulnerableRange: '',
+    dependencyPath: [],
+    isDirectDependency: false,
+    recommendation: finding.suggestion ?? '请复核该处代码并按安全规范修复',
+    autoFixable: false,
+    confidence: 'high_confidence',
+    sourceTools: ['semgrep'],
+  };
 }
 
 /** 性能优化：只出建议、不参与质量扣分（静态分析，不执行项目代码） */

@@ -16,6 +16,7 @@
     "guard": "tsx src/index.ts guard",
     "inspect": "tsx src/index.ts inspect",
     "pipeline": "tsx src/index.ts pipeline",
+    "capability": "tsx src/index.ts capability",
     "test": "vitest run",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 50"

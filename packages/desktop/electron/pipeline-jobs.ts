@@ -57,9 +57,33 @@ export async function runRefactorJob(id: string, projectPath: string): Promise<v
   const report = record.report as { totalSmells: number };
   const suppressedCount = Number(record.detail?.suppressedCount ?? 0);
   const note =
-    suppressedCount > 0 ? t('pipeline.refactor.baselineSuppressed', { count: suppressedCount }) : '';
+    suppressedCount > 0
+      ? t('pipeline.refactor.baselineSuppressed', { count: suppressedCount })
+      : '';
   progress(id, 'done', t('pipeline.refactor.done', { count: report.totalSmells }) + note, 1.0);
   sendDomainOutcome(id, record);
+}
+
+/**
+ * 重构一键自动修复任务。
+ *
+ * 「扫描 → 生成补丁 → 备份目标文件 → 应用」全在子进程里跑（`analyzeDirectory` 是
+ * 全量 AST 扫描，不能放主进程，否则 macOS 彩球）。备份到
+ * `.zhshield/backups/refactor-autofix-<时间戳>/`，可整目录回滚。
+ */
+export async function runRefactorAutoFixJob(id: string, projectPath: string): Promise<void> {
+  progress(id, 'refactor', t('pipeline.refactor.autofixScanning'), 0.2);
+  const { RefactorEngine } = await import('@zh/refactor');
+  try {
+    const result = await new RefactorEngine().applyAutoFixes(projectPath);
+    progress(id, 'refactor', t('pipeline.refactor.autofixApplying'), 0.85);
+    progress(id, 'done', t('pipeline.refactor.autofixDone', { count: result.fixed }), 1.0);
+    send({ type: 'result', id, report: serializePipelineReport(result) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[pipeline-worker] 自动修复异常:', message);
+    send({ type: 'error', id, error: message });
+  }
 }
 
 /**
@@ -116,9 +140,17 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
   // 编排器串行跑 4 个外部工具（trivy/grype/depcheck/semgrep）：
   // 每个工具开始/完成各上报一次，步进覆盖 10%→90%（步长 0.2 与默认 4 工具对齐）。
   // 引擎的装配与事件透传归 pipeline 的 security 执行器，这里只做文案映射。
+  //
+  // ⚠️ runner 必须经 createLoadedRunner 装配（2026-11-02 修复）：
+  //   安全域的 SOP 规则通道需要规则集（runSopInspect({domains:['security']})），
+  //   没有 runner 就只剩启发式通道 —— 那 7 条 semgrep 规则（SQL 注入 / XSS /
+  //   命令注入 / CSRF / 路径穿越）一条都不会求值，用户看到的是「0 检出但状态正常」。
+  //   实测：修复前 CLI 检出 1 条、桌面端 0 检出；修复后两者一致。
+  const { runner } = await createLoadedRunner(projectPath);
   let toolsDone = 0;
   const record = await runDomain('security', {
     repoRoot: projectPath,
+    runner,
     onEvent: (event) => {
       const tool = String(event.payload?.tool ?? '');
       if (event.kind === 'tool:scan-started') {
@@ -151,13 +183,18 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
       }
     },
   });
-  if (record.status === 'unavailable') {
-    console.error('[pipeline-worker] 安全扫描异常:', record.reason);
+  try {
+    if (record.status === 'unavailable') {
+      console.error('[pipeline-worker] 安全扫描异常:', record.reason);
+      sendDomainOutcome(id, record);
+      return;
+    }
+    progress(id, 'done', t('pipeline.security.done'), 1.0);
     sendDomainOutcome(id, record);
-    return;
+  } finally {
+    // runner 持有事件总线与插件句柄，不释放会随扫描次数累积泄漏
+    await runner.destroy().catch(() => undefined);
   }
-  progress(id, 'done', t('pipeline.security.done'), 1.0);
-  sendDomainOutcome(id, record);
 }
 
 /**
@@ -228,10 +265,7 @@ async function writeGarbageSnapshot(projectPath: string, report: GarbageScanRepo
  * 把文案算进指纹会让同一处垃圾每次都「新增 + 消失」各一次。
  * 该域没有 severity 概念 → `severityApplicable: false`，不用 0 冒充「都是 info」。
  */
-async function appendGarbageHistory(
-  projectPath: string,
-  report: GarbageScanReport,
-): Promise<void> {
+async function appendGarbageHistory(projectPath: string, report: GarbageScanReport): Promise<void> {
   try {
     const fingerprints = report.items.map(
       (item) => `garbage:${item.type}:${normalizeFingerprint(item.path, projectPath)}`,
@@ -252,9 +286,7 @@ async function appendGarbageHistory(
         fingerprints,
         total: report.summary.total,
         score: dimensionScore?.score ?? null,
-        ...(dimensionScore?.version === undefined
-          ? {}
-          : { scoreVersion: dimensionScore.version }),
+        ...(dimensionScore?.version === undefined ? {} : { scoreVersion: dimensionScore.version }),
         severityApplicable: false,
         coverage: { files: ranChecks, skipped: report.skipped },
       }),
@@ -324,8 +356,7 @@ export async function runPerformanceJob(id: string, projectPath: string): Promis
   // 纯静态分析，不执行项目代码（P0-2 禁令）；去重与报告形状归 pipeline 执行器
   const record = await runDomain('performance', { repoRoot: projectPath });
   const report = record.report as
-    | { summary: { total: number }; issues: PerformanceReportIssue[] }
-    | undefined;
+    { summary: { total: number }; issues: PerformanceReportIssue[] } | undefined;
   if (!report) {
     console.error('[pipeline-worker] 性能检测异常:', record.reason);
     sendDomainOutcome(id, record);

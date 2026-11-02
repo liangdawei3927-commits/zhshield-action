@@ -36,7 +36,7 @@ export { runSecurity } from './engineApi-security';
 
 export { cleanGarbage, restoreGarbage } from './engineApi-garbage';
 
-export { runRefactor } from './engineApi-refactor';
+export { runRefactor, applyRefactorFixes } from './engineApi-refactor';
 
 export { runPipeline } from './engineApi-pipeline';
 

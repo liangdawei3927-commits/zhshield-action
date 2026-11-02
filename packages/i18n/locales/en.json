@@ -388,7 +388,9 @@
           "description": "TypeScript type error check",
           "fixSuggestion": "Fix TypeScript {{level}}: {{code}}",
           "runFailed": "tsc execution failed",
-          "unavailable": "tsc is not installed or not found in PATH"
+          "unavailable": "tsc is not installed or not found in PATH",
+          "depsMissing": "Dependencies not installed (node_modules missing); TypeScript type check could not run and was skipped (install dependencies and retry)",
+          "unresolvedEnv": "TypeScript type check could not reach a definite conclusion due to dependency/type version issues and was skipped"
         }
       },
       "unknown": "Unknown",
@@ -1455,6 +1457,15 @@
       "detail": {
         "empty": "No details in this category",
         "truncated": "Showing the first {{shown}} only — see \"Refactoring issues (grouped by type)\" below for the full list"
+      },
+      "autoFix": {
+        "button": "Auto-fix ({{count}})",
+        "confirm": "Back up to .zhshield/backups, then modify {{count}} file(s)? Confirm apply?",
+        "confirmYes": "Apply",
+        "cancel": "Cancel",
+        "result": "Applied auto-fix to {{fixed}} file(s) (backup: {{backup}})",
+        "failed": "Failed to apply auto-fix: {{message}}",
+        "none": "No auto-fixable issues"
       }
     },
     "reports": {
@@ -2050,7 +2061,10 @@
       "analyzing": "Analyzing refactor smells…",
       "collecting": "Collecting source files…",
       "done": "Refactor analysis complete: {{count}} smells",
-      "baselineSuppressed": "({{count}} legacy items suppressed by baseline)"
+      "baselineSuppressed": "({{count}} legacy items suppressed by baseline)",
+      "autofixScanning": "Scanning and generating auto-fixes…",
+      "autofixApplying": "Applying auto-fixes…",
+      "autofixDone": "Auto-fix done: {{count}} file(s)"
     },
     "report": {
       "executionError": "Execution error",

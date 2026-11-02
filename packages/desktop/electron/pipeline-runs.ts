@@ -4,7 +4,7 @@
  * 只负责组装 payload 与默认超时，状态管理与取消翻译见 pipeline-host-core.ts。
  */
 import type { PipelineReport } from '@zh/pipeline';
-import type { RefactorReport } from '@zh/refactor';
+import type { RefactorReport, RefactorAutoFixResult } from '@zh/refactor';
 import {
   DEFAULT_TIMEOUT_MS,
   dispatchJob,
@@ -60,6 +60,24 @@ export async function runRefactorInWorker(
     cancelKey,
   });
   return report as RefactorReport;
+}
+
+/** 重构一键自动修复走子进程：全量扫描 + 生成补丁 + 备份 + 应用，均不阻塞主进程 */
+export async function runRefactorAutoFixInWorker(
+  projectPath: string,
+  onProgress?: ProgressHandler,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
+): Promise<RefactorAutoFixResult> {
+  const id = `refactor-autofix-${Date.now()}-${++seq}`;
+  const result = await dispatchJob({
+    payload: { type: 'applyRefactorFixes', id, projectPath },
+    timeoutMs,
+    timeoutLabel: 'engine:applyRefactorFixes',
+    onProgress,
+    cancelKey,
+  });
+  return result as RefactorAutoFixResult;
 }
 
 export async function runGuardInWorker(

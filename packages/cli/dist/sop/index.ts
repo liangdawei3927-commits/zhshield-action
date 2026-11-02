@@ -22,6 +22,24 @@ export type { RuleChangeEvent } from './_meta/sop-registry';
 // 规则接线审计（《07》O6）：rules.db 里永远求值不到的规则标 orphan
 export { SOP_SERVED_DOMAINS, classifyRuleWiring, auditRuleWiring } from './_meta/rule-wiring';
 export type { RuleWiringReason, OrphanRule, RuleWiringReport } from './_meta/rule-wiring';
+// 检测能力闭环审计：把「声明要查什么」与「实际会执行什么」放在同一张表上比对。
+// 与接线审计（rule-wiring）互补：接线审计只问「规则本身能不能被求值」，
+// 闭环审计多问一层「该域的执行路径会不会经过 SOP 引擎」——后者正是
+// 「CLI 检出、桌面端 0 检出」这类架构级断裂的判据。
+export {
+  DOMAIN_EXECUTION_PATHS,
+  classifyCapability,
+  auditCapabilityClosure,
+  isClosureAcceptable,
+  isSopServedDomain,
+} from './_meta/capability-closure';
+export type {
+  CapabilityClosureReport,
+  CapabilityItem,
+  ClosureBreakReason,
+  DomainClosure,
+  DomainExecutionPath,
+} from './_meta/capability-closure';
 export { SopLoader } from './_meta/sop-loader';
 export type { SopLoaderOptions } from './_meta/sop-loader';
 

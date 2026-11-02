@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process';
 import { t } from '@zh/i18n';
 import { safeJoin } from '@zh/shared';
 import type { SecurityScanReport } from '@zh/security';
-import type { RefactorReport } from '@zh/refactor';
+import type { RefactorReport, RefactorAutoFixResult } from '@zh/refactor';
 import type { GarbageScanReport, GarbageCleanResult, GarbageRestoreResult } from '@zh/garbage';
 import {
   persistDiagnosticsFromEntries,
@@ -273,6 +273,30 @@ export async function runRefactorHandler(
     return report;
   } catch (err) {
     console.error('[engine:runRefactor] Error:', err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+/**
+ * 重构一键自动修复处理器（IPC: engine:applyRefactorFixes）。
+ *
+ * 「扫描 → 生成补丁 → 备份 → 写盘」全在子进程里跑（`refactorAutoFix` 任务），
+ * 主进程只等结果。写盘前已备份到 `.zhshield/backups/refactor-autofix-<时间戳>/`，
+ * 用户可整目录回滚。返回改动文件数、生成的补丁条数与备份位置。
+ */
+export async function applyRefactorFixesHandler(
+  manager: TaskManager,
+  projectPath: string,
+): Promise<RefactorAutoFixResult> {
+  try {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error(t('electron.invalidProjectPath'));
+    }
+    const task = manager.start('refactorAutoFix', projectPath);
+    return (await manager.waitFor(task.id)) as RefactorAutoFixResult;
+  } catch (err) {
+    rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
+    console.error('[engine:applyRefactorFixes] Error:', err);
     throw err instanceof Error ? err : new Error(String(err));
   }
 }

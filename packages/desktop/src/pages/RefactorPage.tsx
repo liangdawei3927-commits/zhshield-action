@@ -12,7 +12,7 @@ import { DomainActionButton } from '../components/business/DomainActionButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useRefactorPage, useSmellGroups, type RefactorFile, type Smell } from './refactor-logic';
 import { RuleTabs } from './refactor-parts';
-import { RefactorFileDetailList, SmellDetailList, SmellGroupPanel } from './refactor-panel';
+import { RefactorFileDetailList, SmellDetailList, SmellGroupPanel, AutoFixButton } from './refactor-panel';
 import { RefactorEmptyState } from './refactor-empty-state';
 
 interface RefactorPageProps {
@@ -107,6 +107,10 @@ interface RefactorReportViewProps extends SmellGroupsViewProps {
   stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
+  /** 是否正在应用自动修复 */
+  applying: boolean;
+  /** 触发一键应用自动修复 */
+  applyAutoFix: () => void;
 }
 
 /** 报告态：报告壳（评分/进度/统计）+ 按规则分类的异味面板 */
@@ -129,6 +133,8 @@ function RefactorReportView({
   activeGroup,
   copyGroupToAi,
   copyToAi,
+  applying,
+  applyAutoFix,
 }: RefactorReportViewProps) {
   return (
     <ReportShell
@@ -165,6 +171,8 @@ function RefactorReportView({
         activeGroup={activeGroup}
         copyGroupToAi={copyGroupToAi}
         copyToAi={copyToAi}
+        applying={applying}
+        applyAutoFix={applyAutoFix}
       />
     </ReportShell>
   );
@@ -218,6 +226,8 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         activeGroup={detail.smellGroups.activeGroup}
         copyGroupToAi={page.copyGroupToAi}
         copyToAi={page.copyToAi}
+        applying={page.applying}
+        applyAutoFix={() => void page.applyAutoFix()}
       />
     );
   }
@@ -309,6 +319,8 @@ export function refactorReportStats(
 
 interface RefactorGroupsSectionProps extends SmellGroupsViewProps {
   t: RefactorT;
+  applying: boolean;
+  applyAutoFix: () => void;
 }
 
 function RefactorGroupsSection({
@@ -321,22 +333,32 @@ function RefactorGroupsSection({
   activeGroup,
   copyGroupToAi,
   copyToAi,
+  applying,
+  applyAutoFix,
 }: RefactorGroupsSectionProps) {
+  // 可自动修复的异味数：只有存在才显示「一键应用」按钮（与后端 autoFixable 同源真相）
+  const fixableCount = report.files.reduce(
+    (n, f) => n + f.smells.filter((s) => s.suggestion.autoFixable).length,
+    0,
+  );
   return (
     <>
       {error ? <p className="text-sm text-danger-500 mb-4">{error}</p> : null}
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="text-sm font-semibold text-zh-ink-2">
             {t('page.refactor.groupedIssues')}
           </h3>
-          <span className="text-xs text-zh-muted">
-            {t('page.refactor.groupsSummary', {
-              groups: groups.length,
-              total: report.totalSmells,
-            })}
-          </span>
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            <span className="text-xs text-zh-muted">
+              {t('page.refactor.groupsSummary', {
+                groups: groups.length,
+                total: report.totalSmells,
+              })}
+            </span>
+            <AutoFixButton count={fixableCount} applying={applying} onConfirm={applyAutoFix} />
+          </div>
         </div>
         {groups.length === 0 ? (
           <ResultCard variant="list" className="p-8 text-center">

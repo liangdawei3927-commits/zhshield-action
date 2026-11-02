@@ -46,6 +46,13 @@ export interface RefactorRunMsg {
   projectPath: string;
 }
 
+/** 主进程 → 引擎子进程：一键应用自动修复（扫描 → 生成补丁 → 备份 → 应用） */
+export interface RefactorAutoFixRunMsg {
+  type: 'applyRefactorFixes';
+  id: string;
+  projectPath: string;
+}
+
 /** 主进程 → 引擎子进程：发起门禁检查（options 为门禁开关等透传参数） */
 export interface GuardRunMsg {
   type: 'runGuard';
@@ -144,6 +151,7 @@ export function rethrowIfCancelled(err: unknown): void {
 export type PipelineWorkerInbound =
   | PipelineRunMsg
   | RefactorRunMsg
+  | RefactorAutoFixRunMsg
   | GuardRunMsg
   | SecurityRunMsg
   | GarbageCleanRunMsg

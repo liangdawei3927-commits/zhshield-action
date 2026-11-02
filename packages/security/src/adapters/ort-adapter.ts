@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 import { resolveToolCommandDetailed } from '@zh/shared';
+import { isToolAvailable } from './adapter-helpers';
 import type { ExecError } from './tool-output-types';
 
 const execFileAsync = promisify(execFile);
@@ -63,10 +64,8 @@ export class ORTAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    // 与 InspectEngine / trivy / semgrep 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
-    // ort 装入码盾目录时裸命令只认 PATH 会误报未安装。
-    const { origin } = await resolveToolCommandDetailed('ort');
-    return origin !== 'unresolved';
+    // 项目本地 → ~/.zhshield/bin → PATH 统一解析（ort 装入码盾目录时裸命令只认 PATH 会误报未安装）
+    return isToolAvailable('ort');
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {

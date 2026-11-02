@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 import { grypeMapper, resolveToolCommandDetailed } from '@zh/shared';
 import type { ExecError, GrypeOutput } from './tool-output-types';
+import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
 
 const execFileAsync = promisify(execFile);
 
@@ -55,10 +56,8 @@ export class GrypeAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    // 与 InspectEngine / trivy / semgrep 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
-    // grype 由 install-tools 装入码盾目录，裸命令只认 PATH 会误报未安装。
-    const { origin } = await resolveToolCommandDetailed('grype');
-    return origin !== 'unresolved';
+    // 项目本地 → ~/.zhshield/bin → PATH 统一解析（grype 由 install-tools 装入码盾目录）
+    return isToolAvailable('grype');
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -113,41 +112,12 @@ export class GrypeAdapter implements ToolAdapter {
   }
 
   private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
-      return {
-        tool: 'grype',
-        status: 'unavailable',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: 'Grype 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
-      };
-    }
-    const partialIssues = this.parsePartialOutput(err.stdout);
-    if (partialIssues) {
-      return {
-        tool: 'grype',
-        status: 'available',
-        issues: partialIssues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: partialIssues.length,
-        },
-      };
-    }
-    return {
-      tool: 'grype',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'Grype 执行失败',
-    };
+    return buildStandardErrorResult('grype', start, err, {
+      unavailableHint:
+        'Grype 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
+      failureMessage: 'Grype 执行失败',
+      parsePartial: (stdout) => this.parsePartialOutput(stdout),
+    });
   }
 
   private parsePartialOutput(stdout: string | undefined): Issue[] | null {

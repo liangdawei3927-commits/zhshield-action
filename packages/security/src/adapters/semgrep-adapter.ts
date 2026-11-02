@@ -15,6 +15,7 @@ import type {
 } from '@zh/shared';
 import { resolveToolCommandDetailed } from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
+import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,10 +35,8 @@ export class SemgrepAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    // 与 InspectEngine 用同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
-    // 此前裸命令只认 PATH，导致「工具就绪面板说已装、安全中心却报未安装」。
-    const { origin } = await resolveToolCommandDetailed('semgrep');
-    return origin !== 'unresolved';
+    // 项目本地 → ~/.zhshield/bin → PATH 统一解析
+    return isToolAvailable('semgrep');
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
@@ -137,41 +136,11 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 
   private buildErrorResult(start: number, err: ExecError): ToolResult {
-    if (err.code === 'ENOENT') {
-      return {
-        tool: 'semgrep',
-        status: 'unavailable',
-        issues: [],
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: 0,
-        },
-        error: 'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
-      };
-    }
-    const partialIssues = this.parsePartialOutput(err.stdout);
-    if (partialIssues) {
-      return {
-        tool: 'semgrep',
-        status: 'available',
-        issues: partialIssues,
-        metadata: {
-          version: '',
-          duration: Date.now() - start,
-          timestamp: new Date(),
-          fileCount: partialIssues.length,
-        },
-      };
-    }
-    return {
-      tool: 'semgrep',
-      status: 'error',
-      issues: [],
-      metadata: { version: '', duration: Date.now() - start, timestamp: new Date(), fileCount: 0 },
-      error: err.stderr || err.message || 'Semgrep 执行失败',
-    };
+    return buildStandardErrorResult('semgrep', start, err, {
+      unavailableHint: 'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
+      failureMessage: 'Semgrep 执行失败',
+      parsePartial: (stdout) => this.parsePartialOutput(stdout),
+    });
   }
 
   private parsePartialOutput(stdout: string | undefined): Issue[] | null {

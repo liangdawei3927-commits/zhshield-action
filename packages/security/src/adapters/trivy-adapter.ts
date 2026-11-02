@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
 import { resolveToolCommandDetailed } from '@zh/shared';
+import { isToolAvailable } from './adapter-helpers';
 import type {
   ExecError,
   TrivyOutput,
@@ -94,10 +95,8 @@ export class TrivyAdapter implements ToolAdapter {
   meta = META;
 
   async isAvailable(): Promise<boolean> {
-    // 与 InspectEngine 同一套解析（项目本地 → ~/.zhshield/bin → PATH）：
-    // trivy 由 install-tools 装入码盾目录，裸命令只认 PATH 会误报未安装。
-    const { origin } = await resolveToolCommandDetailed('trivy');
-    return origin !== 'unresolved';
+    // 项目本地 → ~/.zhshield/bin → PATH 统一解析（trivy 由 install-tools 装入码盾目录）
+    return isToolAvailable('trivy');
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {

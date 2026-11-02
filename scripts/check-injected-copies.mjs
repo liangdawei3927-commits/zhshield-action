@@ -74,7 +74,13 @@ function diffTree(pkgDir, real, tree) {
 /** 受校验的两棵树：types 走 src、运行时代码走 dist，缺任一棵都会造成假象 */
 const TREES = ['src', 'dist'];
 
-const pkgs = fs.existsSync('packages') ? fs.readdirSync('packages') : [];
+if (!fs.existsSync('packages')) {
+  console.error('✗ 当前目录没有 packages/ —— 本脚本必须在仓库根目录运行');
+  console.error('  （在别处运行会「检查 0 个副本」并误报一致，等于没查）');
+  process.exit(1);
+}
+
+const pkgs = fs.readdirSync('packages');
 const checked = new Set(); // 同一副本只检查一次（多个消费者共享）
 const problems = [];
 let checkedCount = 0;
@@ -113,6 +119,11 @@ for (const pkg of pkgs) {
       });
     }
   }
+}
+
+if (checkedCount === 0) {
+  console.error('✗ 未发现任何 pnpm 注入副本 —— node_modules 可能未安装，本次校验实际未生效');
+  process.exit(1);
 }
 
 if (problems.length === 0) {

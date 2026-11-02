@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * check-injected-copies.mjs — 校验 pnpm 注入副本与源 dist 是否同步
+ * check-injected-copies.mjs — 校验 pnpm 注入副本与源 src / dist 是否同步
  *
  * 背景（已踩三次的事故）：
  *   pnpm 对 `file:` 目录依赖（本仓库 @zh/* 全部如此）生成的是「实体副本」而非符号链接，
@@ -9,6 +9,12 @@
  *   （`pnpm install` / `--force` 均返回 Already up to date，无效）。
  *   后果：下游包 require 新模块时抛 "Cannot find module './xxx'"，
  *   报错完全不指向真因，极易误判为代码缺陷。
+ *
+ * 为什么要同时比对 src 与 dist：
+ *   `@zh/*` 的 package.json `exports` 对 types 指向 `./src`、import/require 指向 `./dist`。
+ *   只比 dist 会漏掉「新增 .ts 源文件 → 下游 tsc 报 TS2307」这一类事故
+ *   （2026-11-02 实锤：deps-cve.ts 下沉 @zh/pipeline 后，副本只有 dist 被比对，
+ *   脚本报「一致」，而 desktop 的 tsc 已经红灯）。两棵树缺一不可。
  *
  * 本脚本只检查「消费者实际解析到的副本」：
  *   - 遍历 packages/<pkg>/node_modules/@zh/<dep> 的软链并 realpath 解析
@@ -22,6 +28,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * 消费者不会 import 的路径：测试目录与 macOS 垃圾文件。
+ * 把它们算进差异只会制造噪音（副本里没有 __tests__ 并不影响下游编译/运行），
+ * 真出问题时是「新增的**被引用模块**缺失」，那类文件一定会落在这个过滤之外。
+ */
+const IGNORED_PATH = /^(?:__tests__\/|tests\/)|(?:^|\/)(?:\.DS_Store|\.gitkeep)$/;
+
 /** 递归列出目录下所有文件（相对路径，posix 分隔符，已排序） */
 function listFiles(dir) {
   const out = [];
@@ -29,6 +42,7 @@ function listFiles(dir) {
     const abs = rel ? path.join(dir, rel) : dir;
     for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
       const relPath = rel ? `${rel}/${e.name}` : e.name;
+      if (IGNORED_PATH.test(relPath)) continue;
       if (e.isDirectory()) walk(relPath);
       else if (e.isFile()) out.push(relPath);
     }
@@ -42,6 +56,23 @@ function pkgDirFromCopy(realPath) {
   const m = realPath.match(/@zh\+[^@]+@file\+packages\+([^_/]+)/);
   return m ? m[1] : null;
 }
+
+/** 比对单棵树（src 或 dist），返回缺失文件列表（空数组 = 一致） */
+function diffTree(pkgDir, real, tree) {
+  const sourceDir = path.join('packages', pkgDir, tree);
+  if (!fs.existsSync(sourceDir)) return { status: 'skip' };
+  const copyDir = path.join(real, tree);
+  if (!fs.existsSync(copyDir)) {
+    return { status: 'missing-dir', missing: [`(副本缺少整个 ${tree}/ 目录)`] };
+  }
+  const sourceFiles = listFiles(sourceDir);
+  const copyFiles = new Set(listFiles(copyDir));
+  const missing = sourceFiles.filter((f) => !copyFiles.has(f));
+  return { status: missing.length > 0 ? 'missing-files' : 'ok', missing };
+}
+
+/** 受校验的两棵树：types 走 src、运行时代码走 dist，缺任一棵都会造成假象 */
+const TREES = ['src', 'dist'];
 
 const pkgs = fs.existsSync('packages') ? fs.readdirSync('packages') : [];
 const checked = new Set(); // 同一副本只检查一次（多个消费者共享）
@@ -69,33 +100,34 @@ for (const pkg of pkgs) {
     const pkgDir = pkgDirFromCopy(real);
     if (!pkgDir) continue;
 
-    const src = path.join('packages', pkgDir, 'dist');
-    if (!fs.existsSync(src)) continue; // 源包尚未构建
-    const copy = path.join(real, 'dist');
-
     checkedCount++;
-
-    if (!fs.existsSync(copy)) {
-      problems.push({ pkgDir, consumer: pkg, missing: [`(副本缺少整个 dist/ 目录)`] });
-      continue;
+    for (const tree of TREES) {
+      const result = diffTree(pkgDir, real, tree);
+      if (result.status === 'skip' || result.status === 'ok') continue;
+      problems.push({
+        pkgDir,
+        consumer: pkg,
+        tree,
+        missing: result.missing ?? [],
+        wholeDir: result.status === 'missing-dir',
+      });
     }
-
-    const srcFiles = listFiles(src);
-    const copyFiles = new Set(listFiles(copy));
-    const missing = srcFiles.filter((f) => !copyFiles.has(f));
-    if (missing.length > 0) problems.push({ pkgDir, consumer: pkg, missing });
   }
 }
 
 if (problems.length === 0) {
-  console.log(`✓ 注入副本与源 dist 一致（已检查 ${checkedCount} 个注入副本）`);
+  console.log(`✓ 注入副本与源 src/dist 一致（已检查 ${checkedCount} 个注入副本）`);
   process.exit(0);
 }
 
-console.error(`✗ ${problems.length} 个包的注入副本不同步：`);
+console.error(`✗ ${problems.length} 处注入副本不同步：`);
 for (const p of problems) {
+  if (p.wholeDir) {
+    console.error(`\n  packages/${p.pkgDir}（消费者 ${p.consumer}）缺少整个 ${p.tree}/ 目录`);
+    continue;
+  }
   console.error(
-    `\n  packages/${p.pkgDir}（消费者 ${p.consumer}）缺少 ${p.missing.length} 个文件：`,
+    `\n  packages/${p.pkgDir}（消费者 ${p.consumer}）${p.tree}/ 缺少 ${p.missing.length} 个文件：`,
   );
   for (const f of p.missing.slice(0, 5)) console.error(`    - ${f}`);
   if (p.missing.length > 5) console.error(`    … 另有 ${p.missing.length - 5} 个`);

@@ -71,7 +71,7 @@ rm -rf packages/<消费者包>/node_modules && pnpm install --prefer-offline   #
 
 **纪律**：任何「新建 / 删除 / 重命名 `.ts` 源文件」的重构，提交前必须重建受影响消费者的 node_modules 并跑通其测试。
 
-**自检**：`node scripts/check-injected-copies.mjs`（比对消费者实际解析到的注入副本与源 dist，不同步则 exit 1）。`bash scripts/verify-env.sh` 的第 3.5 步已内置该检查。
+**自检**：`node scripts/check-injected-copies.mjs`（比对消费者实际解析到的注入副本与源 `src`/`dist` 两棵树，`__tests__` 与 `.DS_Store` 除外，不同步则 exit 1）。只比 dist 会漏掉「新增 `.ts` 源文件」导致的 TS2307（2026-11-02 实锤），故两棵树都必须比。`bash scripts/verify-env.sh` 的第 3.5 步已内置该检查。
 
 **历史事故**：08-30 security dist 过期导致 desktop typecheck 红灯；09-03 kernel `content-predicates` 与 pipeline `runner-utils` 导致 desktop 两个测试文件加载失败。
 

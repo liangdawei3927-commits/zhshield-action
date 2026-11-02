@@ -36,9 +36,11 @@ import {
   clearRefactorBaseline,
   refactorBaselinePath,
 } from '@zh/shared';
-import { countSmellsByFileAndRule } from '@zh/refactor';
+// 注：@zh/refactor（会传递引入 TypeScript 编译器，体量大）不在模块顶层静态 import，
+// 仅在 baselineCaptureRefactor 里按需动态 import —— 避免「打印用法 / guard / inspect」
+// 等常用命令的冷启动被迫加载整套重构引擎（实测会拖慢 CLI 入口，影响命令路由测试）。
 import * as path from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
 import { countDegraded } from './degraded';
 import type { CLIOptions } from './cli-options';
 
@@ -319,6 +321,7 @@ async function baselineClear(projectDir: string): Promise<void> {
 /** baseline capture-refactor：skipBaseline 捕获全量报告（否则存量被已有基线压掉，棘轮收不进新存量） */
 async function baselineCaptureRefactor(runner: PipelineRunner, projectDir: string): Promise<void> {
   const report = await runner.runRefactor({ skipBaseline: true });
+  const { countSmellsByFileAndRule } = await import('@zh/refactor');
   const counts = countSmellsByFileAndRule(report, projectDir);
   const fileCount = Object.keys(counts).length;
   const saved = await saveRefactorBaseline(projectDir, counts);
@@ -398,8 +401,9 @@ export async function runFullScanCommand(
   if (opts.format === 'json') {
     const outPath = opts.report || 'zhshield-scan-ledger.json';
     const absPath = path.resolve(projectDir, outPath);
-    mkdirSync(path.dirname(absPath), { recursive: true });
-    writeFileSync(absPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
+    // 异步 fs：本函数为 async 热路径入口，禁止同步 IO 阻塞事件循环（perf-no-sync-fs-hotpath）。
+    await fsp.mkdir(path.dirname(absPath), { recursive: true });
+    await fsp.writeFile(absPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
     console.error(`[CLI] 账本已写入: ${outPath}`);
   }
 

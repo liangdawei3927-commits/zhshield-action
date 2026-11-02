@@ -196,7 +196,9 @@ describe('CLI 入口路由（真实 index.ts + mock 引擎）', () => {
     expect(firstExitCode()).toBe(0);
     expect(logs.join('\n')).toContain('用法:');
     expect(logs.join('\n')).toContain('zhshield guard');
-  });
+    // 本用例是文件内第一个，承担「冷启动整条 import 图（vitest 首次转换数百个模块）」的成本，
+    // 在内存受限的 CI 机器上可能 >5s（这是测试运行时开销，非产品真实启动）；放宽超时避免误杀。
+  }, 20_000);
 
   it('Given 未知命令，When 启动 CLI，Then 提示未知命令与用法并 exit 1——静默吞掉拼写错误会让人以为检查通过了', async () => {
     await runCli('frobnicate');

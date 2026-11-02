@@ -6,12 +6,12 @@
  * 仅负责编排与进度上报，报告构建委托给 pipeline-report。
  */
 import { t } from '@zh/i18n';
-import { createReport, type PipelineReport, loadGuardConclusions } from '@zh/pipeline';
+import { createReport, type PipelineReport, loadGuardConclusions, runDomain } from '@zh/pipeline';
 import type { GuardReport } from '@zh/guard';
 import { serializePipelineReport } from './pipeline-protocol';
 import { progress, send } from './pipeline-ipc';
 import { attachSummary } from './pipeline-report';
-import type { RuleEngineReport } from '@zh/kernel';
+import type { RuleEngineReport, SopRule } from '@zh/kernel';
 
 // 门禁结论集的读取由 @zh/pipeline 单一实现（CLI 与桌面端共用），此处只转出
 export { loadGuardConclusions };
@@ -58,6 +58,34 @@ function createSkippedChecksGuardReport(): GuardReport {
 
 type PipelineRunnerInstance = InstanceType<(typeof import('@zh/pipeline'))['PipelineRunner']>;
 
+/** 门禁域的异常报告：域驱动不会抛出，缺报告即"未检测成"（C4） */
+function createGuardErrorReport(message: string): RuleEngineReport {
+  return {
+    total: 1,
+    passed: 0,
+    failed: 0,
+    errors: 1,
+    skipped: 0,
+    degraded: 0,
+    ok: false,
+    blockingCount: 0,
+    evaluations: [
+      {
+        status: 'error',
+        message,
+        durationMs: 0,
+        targetEngine: 'guard',
+        timestamp: new Date(),
+        // 合成条目只用于说清「门禁未产出结论」，不参与规则执行；
+        // 完整 SopRule 的其余字段（domain/action/severity…）在这里没有意义，故只留可读字段。
+        rule: { id: 'guard-stage', name: t('pipeline.guard.sopScanning') } as unknown as SopRule,
+      },
+    ],
+    durationMs: 0,
+    timestamp: new Date(),
+  };
+}
+
 /** 运行 SOP 门禁阶段：始终返回报告与通过状态（失败不阻断后续巡检） */
 async function runSopGuardStage(
   id: string,
@@ -65,39 +93,26 @@ async function runSopGuardStage(
   dryRun: boolean,
 ): Promise<{ guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>; ok: boolean }> {
   progress(id, 'guard', t('pipeline.guard.sopScanning'), 0.15);
-  try {
-    const conclusions = await loadGuardConclusions(runner.repoRoot);
-    const guardReport = await runner.runSopGuard({ dryRun, conclusions });
-    if (guardReport.ok === false) {
-      progress(id, 'guard', t('pipeline.guard.failed', { count: guardReport.failed }), 0.3);
-      return { guardReport, ok: false };
-    }
-    return { guardReport, ok: true };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+  // 与 CLI / 无头脚本同一域执行器：结论读取（A6）与 SOP 规则集不容第二份实现
+  const record = await runDomain('guard', {
+    repoRoot: runner.repoRoot,
+    runner,
+    ...(dryRun ? { dryRun } : {}),
+  });
+  const guardReport = record.report as Awaited<ReturnType<typeof runner.runSopGuard>> | undefined;
+  if (!guardReport) {
     return {
       ok: false,
-      guardReport: {
-        total: 1,
-        passed: 0,
-        failed: 0,
-        errors: 1,
-        skipped: 0,
-        degraded: 0,
-        ok: false,
-        blockingCount: 0,
-        evaluations: [
-          {
-            status: 'error',
-            message,
-            rule: { id: 'guard-stage', name: t('pipeline.guard.sopScanning') },
-          },
-        ],
-        durationMs: 0,
-        timestamp: new Date(),
-      } as Awaited<ReturnType<typeof runner.runSopGuard>>,
+      guardReport: createGuardErrorReport(
+        `门禁域未产出结论（${record.status}）：${record.reason ?? '无原因'}`
+      ) as Awaited<ReturnType<typeof runner.runSopGuard>>,
     };
   }
+  if (guardReport.ok === false) {
+    progress(id, 'guard', t('pipeline.guard.failed', { count: guardReport.failed }), 0.3);
+    return { guardReport, ok: false };
+  }
+  return { guardReport, ok: true };
 }
 
 /** 运行 SOP 巡检阶段：通过时返回报告，异常时返回失败摘要 */
@@ -109,22 +124,22 @@ async function runSopInspectStage(
   { inspectReport: Awaited<ReturnType<typeof runner.runSopInspect>> } | { failure: PipelineReport }
 > {
   progress(id, 'inspect', t('pipeline.inspect.sopScanning'), 0.45);
-  try {
-    const inspectReport = await runner.runSopInspect({ domains: ['inspect'] });
-    return { inspectReport };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+  // 巡检编排同样走域驱动：规则集、基线豁免与单域运行口径只此一份
+  const record = await runDomain('inspect', { repoRoot: runner.repoRoot, runner });
+  const inspectReport = record.report as Awaited<ReturnType<typeof runner.runSopInspect>> | undefined;
+  if (!inspectReport) {
     return {
       failure: attachSummary(
         createReport({
           guard: guardReport,
           stage: 'inspect',
           passed: false,
-          error: message,
+          error: `巡检域未产出结论（${record.status}）：${record.reason ?? '无原因'}`,
         }),
       ),
     };
   }
+  return { inspectReport };
 }
 
 async function runSopPipeline(

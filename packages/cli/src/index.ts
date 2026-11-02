@@ -72,6 +72,8 @@ zhshield — 智汇码盾 代码质量治理
   --dir <path>    项目根目录（默认: 当前目录）
   --dry-run       Guard 模式：只报告不阻断
   --sop           使用 SOP 规则驱动模式（默认: checks.json 模式）
+  --full          pipeline 全量扫描：逐域跑 inspect/security/deps/garbage/performance/refactor/techdebt，
+                  输出逐域账本（不跑门禁判定）
   --verbose       显示详细信息
   --no-color      禁用颜色输出
   --format <fmt>  报告格式: text(默认) | json | sarif
@@ -132,6 +134,9 @@ function applyBooleanFlag(arg: string, opts: CLIOptions): boolean {
       return true;
     case '--sop':
       opts.sop = true;
+      return true;
+    case '--full':
+      opts.full = true;
       return true;
     case '--verbose':
       opts.verbose = true;

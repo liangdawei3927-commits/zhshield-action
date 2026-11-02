@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { runDomains, runDomain, STATIC_SCAN_DOMAINS, formatDomainRecord } from '../domains/run-domains';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  runDomains,
+  runDomain,
+  STATIC_SCAN_DOMAINS,
+  SCAN_CHAIN_DOMAINS,
+  formatDomainRecord,
+} from '../domains/run-domains';
 import type { DomainExecutor } from '../domains/types';
 
 /**
@@ -132,5 +141,95 @@ describe('runDomains — 分域账本', () => {
         reason: 'trivy 不可用',
       }),
     ).toBe('security unavailable 12.35s ⚠超预算 — trivy 不可用');
+  });
+
+  it('全量扫描链排除 guard：门禁是纯判定域，不参与扫描（A6/A12）', () => {
+    expect(SCAN_CHAIN_DOMAINS).not.toContain('guard');
+    expect(SCAN_CHAIN_DOMAINS).toHaveLength(STATIC_SCAN_DOMAINS.length - 1);
+    // 其余域一个不少，避免"排除 guard"顺手漏掉别的域
+    expect(STATIC_SCAN_DOMAINS.filter((domain) => domain !== 'guard')).toEqual([
+      ...SCAN_CHAIN_DOMAINS,
+    ]);
+  });
+});
+
+describe('依赖域 CVE 前提（A15）', () => {
+  /** 最小 npm v3 夹具：图谱只需要 package.json + package-lock.json */
+  async function makeProject(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'zh-deps-'));
+    await writeFile(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'fixture', version: '1.0.0', dependencies: { lodash: '^4.17.21' } }),
+    );
+    await writeFile(
+      join(dir, 'package-lock.json'),
+      JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          'node_modules/lodash': { version: '4.17.21', integrity: 'sha512-x', license: 'MIT' },
+        },
+      }),
+    );
+    return dir;
+  }
+
+  it('Given 漏洞库不可达，When 跑 deps 域，Then cve.status=unavailable、0 条 CVE 结论，且域记 partial', async () => {
+    const dir = await makeProject();
+    try {
+      const record = await runDomain('deps', {
+        repoRoot: dir,
+        depsScanInput: {
+          cveProvider: async () => ({
+            status: 'unavailable',
+            findings: [],
+            reason: 'network unreachable',
+            checkedAt: new Date().toISOString(),
+          }),
+        },
+      });
+      const report = record.report as {
+        cve: { status: string; findings: unknown[]; reason?: string };
+      };
+
+      // 未检测 ≠ 0 漏洞：报告必须留痕，域状态不能是 ok
+      expect(record.status).toBe('partial');
+      expect(record.reason).toContain('漏洞库不可达');
+      expect(report.cve.status).toBe('unavailable');
+      expect(report.cve.findings).toEqual([]);
+      expect(report.cve.reason).toBe('network unreachable');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Given 漏洞库可达且有命中，When 跑 deps 域，Then 结论计入报告、域状态 ok', async () => {
+    const dir = await makeProject();
+    try {
+      const record = await runDomain('deps', {
+        repoRoot: dir,
+        depsScanInput: {
+          cveProvider: async () => ({
+            status: 'ok',
+            findings: [
+              {
+                name: 'lodash',
+                version: '4.17.21',
+                ids: 'CVE-2021-23337',
+                summary: '命令注入',
+                severity: 'high' as const,
+              },
+            ],
+            checkedAt: new Date().toISOString(),
+          }),
+        },
+      });
+      const report = record.report as { cve: { status: string; findings: unknown[] } };
+
+      expect(record.status).toBe('ok');
+      expect(report.cve.status).toBe('ok');
+      expect(report.cve.findings).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

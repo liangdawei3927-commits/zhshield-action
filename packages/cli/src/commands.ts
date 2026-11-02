@@ -2,7 +2,15 @@
 // 的执行、报告落盘与降级护栏。自 index.ts 原样抽出（仅搬移，无逻辑改动）；
 // index.ts 保留参数解析（parseFlags 长方法基线）与 main/runPipeline 主流程调度。
 
-import { loadGuardConclusions, type PipelineRunner } from '@zh/pipeline';
+import {
+  loadGuardConclusions,
+  runDomains,
+  formatDomainRecord,
+  SCAN_CHAIN_DOMAINS,
+  type PipelineRunner,
+  type DomainRunLedger,
+  type DomainRunOptions,
+} from '@zh/pipeline';
 // 扫描类命令的统一收尾：门禁判定必须在 process.exit 之前 —— 命令自行 exit 会让门禁永不可达
 import { finalizeScan } from './sop-banner';
 import {
@@ -348,12 +356,72 @@ export async function runBaselineCommand(
   process.exit(1);
 }
 
+/** 全量扫描命令的注入缝：单测替换域驱动，避免真跑外部工具 */
+export interface FullScanDeps {
+  runDomains?: (options: DomainRunOptions) => Promise<DomainRunLedger>;
+}
+
+/**
+ * `pipeline --full`：全量扫描链（《07》A12/A13/A15）。
+ *
+ * 与桌面端、无头脚本共用 `runDomains` 的同一批执行器与同一份逐域账本 ——
+ * 这是"全量主链路"在 CLI 侧的入口，不再自行拼 guard/inspect 两段编排。
+ *
+ * 不含门禁判定：guard 是纯判定域，只读各域已落盘结论（O8/A6）。CLI 本轮不落域快照，
+ * 把 guard 放进扫描链会在无快照时退回工具派发，反而让同一工具跑第二次（A12）。
+ *
+ * 退出码：任一域 `unavailable`/`partial` → 2（未检测 ≠ 通过）；`not-run`（techdebt
+ * 需宿主注入）不算失败，如实打印原因即可（C4/C5）。
+ */
+export async function runFullScanCommand(
+  runner: PipelineRunner,
+  opts: CLIOptions,
+  projectDir: string,
+  deps: FullScanDeps = {},
+): Promise<void> {
+  const run = deps.runDomains ?? runDomains;
+  const ledger = await run({
+    repoRoot: projectDir,
+    domains: SCAN_CHAIN_DOMAINS,
+    runner,
+  });
+
+  for (const record of ledger.records) console.log(formatDomainRecord(record));
+  console.log(
+    `[CLI] 全量扫描完成：${ledger.records.length} 域，sumMs=${ledger.sumMs} / wallMs=${ledger.wallMs}（并发 ${ledger.concurrency}）`,
+  );
+
+  if (opts.format === 'json') {
+    const outPath = opts.report || 'zhshield-scan-ledger.json';
+    const absPath = path.resolve(projectDir, outPath);
+    mkdirSync(path.dirname(absPath), { recursive: true });
+    writeFileSync(absPath, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
+    console.error(`[CLI] 账本已写入: ${outPath}`);
+  }
+
+  const incomplete = ledger.records.filter(
+    (record) => record.status === 'unavailable' || record.status === 'partial',
+  );
+  if (incomplete.length > 0) {
+    const detail = incomplete.map((record) => `${record.domain}(${record.status})`).join('、');
+    console.error(`[CLI] 全量扫描有 ${incomplete.length} 个域未完成：${detail} — 未检测 ≠ 通过（exit 2）`);
+    process.exitCode = 2;
+  }
+}
+
 export async function runPipelineCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
   reporter: ConsoleReporter,
   projectDir: string,
+  deps: FullScanDeps = {},
 ): Promise<void> {
+  // --full：走按域驱动的全量扫描链（与桌面端、无头脚本同一批执行器）
+  if (opts.full) {
+    await runFullScanCommand(runner, opts, projectDir, deps);
+    return;
+  }
+
   const report = opts.sop
     ? await runner.runSopDrivenPipeline()
     : await runner.runFullPipeline({ dryRun: opts.dryRun });

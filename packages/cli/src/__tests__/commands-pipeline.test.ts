@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { PipelineRunner } from '@zh/pipeline';
+import {
+  SCAN_CHAIN_DOMAINS,
+  type PipelineRunner,
+  type DomainRunLedger,
+  type DomainRunOptions,
+} from '@zh/pipeline';
 import type { ConsoleReporter } from '@zh/reporter';
 import type { CLIOptions } from '../cli-options';
-import { runPipelineCommand } from '../commands';
+import { runPipelineCommand, runFullScanCommand } from '../commands';
+
+// --full（全量扫描链）语义：与桌面端/无头脚本共用同一批执行器与同一份账本；
+// 门禁是纯判定域，不得进扫描链；任一域未完成以 exit 2 收尾，未检测 ≠ 通过。
 
 // 本文件验证完整流水线命令的分发与降级聚合护栏：
 // pipeline 是 CI 主入口，--sop 开关必须正确切换执行引擎；
@@ -70,6 +78,21 @@ function makeRunner(methods: MockRunner): PipelineRunner {
 }
 function makeReporter() {
   return { format: vi.fn(() => ({ text: 'PIPELINE-TEXT', passed: true })) };
+}
+
+/** 逐域账本最小形态：runFullScanCommand 只读 records / 耗时汇总 */
+function makeLedger(
+  records: DomainRunLedger['records'],
+): DomainRunLedger {
+  const sumMs = records.reduce((sum, record) => sum + record.durationMs, 0);
+  return {
+    repoRoot: '/proj',
+    startedAt: new Date().toISOString(),
+    sumMs,
+    wallMs: sumMs,
+    concurrency: 1,
+    records,
+  };
 }
 
 /** PipelineReport 最小形态：buildFindings 识别需 stage 字段 + guard/inspect/refactor 之一 */
@@ -215,6 +238,84 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     expect(code).toBe(2);
     expect(errors.join('\n')).toContain('2 项检查未实际执行');
     expect(errors.join('\n')).toContain('未检测 ≠ 通过');
+  });
+
+  it('Given --full，When pipeline，Then 走全量扫描链而非两段式引擎（同一批执行器）', async () => {
+    const runner = makeRunner({
+      runFullPipeline: vi.fn(async () => makePipelineReport({})),
+      runSopDrivenPipeline: vi.fn(async () => makePipelineReport({})),
+    });
+    const reporter = makeReporter();
+    const seen: DomainRunOptions[] = [];
+
+    await runPipelineCommand(
+      runner,
+      makeOpts({ full: true }),
+      reporter as unknown as ConsoleReporter,
+      '/proj',
+      {
+        runDomains: async (options) => {
+          seen.push(options);
+          return makeLedger([{ domain: 'inspect', status: 'ok', durationMs: 800 }]);
+        },
+      },
+    );
+
+    expect(runner.runFullPipeline).not.toHaveBeenCalled();
+    expect(runner.runSopDrivenPipeline).not.toHaveBeenCalled();
+    // --full 不产出 PipelineReport，reporter 不该被调用（避免两套 schema 混用）
+    expect(reporter.format).not.toHaveBeenCalled();
+    expect(logs.join('\n')).toContain('全量扫描完成');
+
+    // A6/A12：门禁是纯判定域，不进扫描链（无域快照时会退回工具派发，同一工具跑第二次）
+    expect(seen[0].domains).not.toContain('guard');
+    expect(seen[0].domains).toEqual([...SCAN_CHAIN_DOMAINS]);
+  });
+
+  it('Given --full 且存在未完成域，When 全量扫描，Then 逐域打印并以 exit 2 收尾（未检测 ≠ 通过）', async () => {
+    const runner = makeRunner({});
+
+    await runFullScanCommand(runner, makeOpts({ full: true }), '/proj', {
+      runDomains: async () =>
+        makeLedger([
+          { domain: 'inspect', status: 'ok', durationMs: 800 },
+          {
+            domain: 'deps',
+            status: 'partial',
+            durationMs: 434,
+            reason: '依赖 CVE 未检测（漏洞库不可达）',
+          },
+        ]),
+    });
+
+    expect(logs.join('\n')).toContain('inspect ok 0.80s');
+    expect(logs.join('\n')).toContain('deps partial 0.43s — 依赖 CVE 未检测（漏洞库不可达）');
+    expect(logs.join('\n')).toContain('sumMs=1234');
+    expect(errors.join('\n')).toContain('1 个域未完成：deps(partial)');
+    expect(errors.join('\n')).toContain('未检测 ≠ 通过');
+    expect(process.exitCode).toBe(2);
+  });
+
+  it('Given 各域完成或 not-run（techdebt 需宿主注入），When 全量扫描，Then 不置 exitCode——not-run 不等于失败', async () => {
+    const runner = makeRunner({});
+
+    await runFullScanCommand(runner, makeOpts({ full: true }), '/proj', {
+      runDomains: async () =>
+        makeLedger([
+          { domain: 'inspect', status: 'ok', durationMs: 800 },
+          {
+            domain: 'techdebt',
+            status: 'not-run',
+            durationMs: 0,
+            reason: '需调用方注入执行器',
+          },
+        ]),
+    });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(errors.join('\n')).not.toContain('未检测 ≠ 通过');
+    // 未跑的域仍要如实打印，不能静默当作通过（C4/C5）
+    expect(logs.join('\n')).toContain('techdebt not-run 0.00s — 需调用方注入执行器');
   });
 
   it('Given 同时存在阻断级违规与降级，When pipeline，Then exit 1——硬门禁失败优先于降级提醒', async () => {

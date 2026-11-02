@@ -14,6 +14,8 @@ export interface CLIOptions {
   format: 'text' | 'json' | 'sarif';
   report: string;
   failOn: FailOn;
+  /** `pipeline --full`：跑全量扫描链（七域逐域账本），不跑门禁判定 */
+  full?: boolean;
   baselineAction?: 'capture' | 'list' | 'clear' | 'capture-refactor' | 'clear-refactor';
   /** `sop` 命令的子动作；目前只有 sync（缺省值） */
   sopAction?: 'sync';

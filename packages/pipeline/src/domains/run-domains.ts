@@ -34,6 +34,17 @@ export const STATIC_SCAN_DOMAINS: readonly DomainId[] = Object.keys(
   SCAN_DOMAIN_BUDGETS,
 ) as DomainId[];
 
+/**
+ * 全量扫描链：静态扫描域去掉 guard。
+ *
+ * 门禁是**纯判定域**（O8/A6：不调用任何扫描器，只读各域已落盘结论），放进同一次
+ * 扫描里既没有可读的快照，又会在无快照时退回工具派发 —— 正好破坏 A12 的
+ * "同一工具只跑一次"。门禁应在扫描落盘之后单独执行。
+ */
+export const SCAN_CHAIN_DOMAINS: readonly DomainId[] = STATIC_SCAN_DOMAINS.filter(
+  (domain) => domain !== 'guard',
+);
+
 /** 该域的预算：调用方覆盖优先，否则取共享预算表（表内没有的域不设预算） */
 function budgetFor(domain: DomainId, options: DomainRunOptions): number | undefined {
   return (
@@ -111,6 +122,8 @@ async function runOne(
     repoRoot: options.repoRoot,
     ...(options.runner ? { runner: options.runner } : {}),
     ...(options.onEvent ? { onEvent: options.onEvent } : {}),
+    ...(options.dryRun ? { dryRun: options.dryRun } : {}),
+    ...(options.depsScanInput ? { depsScanInput: options.depsScanInput } : {}),
   };
   const timeoutMessage =
     budgetMs === undefined ? undefined : `[domains] 域 ${domain} 超过 ${budgetMs}ms 预算`;

@@ -16,6 +16,7 @@
  */
 import type { DomainId, DomainRunStatus } from '@zh/shared';
 import type { RuleContext, RuleEngineReport } from '@zh/kernel';
+import type { DepsScanInput } from './deps-scan';
 
 /** 执行器向调度层回报的单域结论 */
 export interface DomainExecution {
@@ -41,6 +42,17 @@ export interface DomainExecutionContext {
   runner?: PipelineRunnerLike;
   /** 进度 / 工具事件透传；桌面端映射到 IPC 进度，无头调用可不传 */
   onEvent?: (event: DomainEvent) => void;
+  /**
+   * 门禁域的只判不改（桌面端一键体检可传 `true`）。
+   * 缺省 `false`，与 CLI `guard --sop` 的默认口径一致。
+   */
+  dryRun?: boolean;
+  /**
+   * 依赖域的宿主注入（CVE 网络查询、锁文件基线、画像）。
+   * 缺省 = CVE 未检测（`cve.status=unavailable`，≠ 0 漏洞）——无头调用如实标注，
+   * 不假装"查过且干净"（C4 / A15）。
+   */
+  depsScanInput?: DepsScanInput;
 }
 
 /**
@@ -112,6 +124,10 @@ export interface DomainRunOptions {
   /** 全局并发上限；缺省 1（8GB Intel Mac 资源纪律，见 §7.5） */
   concurrency?: number;
   onEvent?: (event: DomainEvent) => void;
+  /** 门禁域 dry-run；缺省 false */
+  dryRun?: boolean;
+  /** 依赖域宿主注入；缺省 CVE 未检测（`unavailable`，不是 0 漏洞） */
+  depsScanInput?: DepsScanInput;
   /** 时钟（测试注入用，缺省 `Date.now`） */
   now?: () => number;
 }

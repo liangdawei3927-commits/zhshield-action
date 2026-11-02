@@ -65,7 +65,10 @@ export async function runGuardDomain(ctx: DomainExecutionContext): Promise<Domai
     return { status: 'unavailable', reason: '门禁域需要 PipelineRunner（判定规则在装配层）' };
   }
   const conclusions = await loadGuardConclusions(ctx.repoRoot);
-  const report = (await ctx.runner.runSopGuard({ dryRun: false, conclusions })) as RuleEngineReport;
+  const report = (await ctx.runner.runSopGuard({
+    dryRun: ctx.dryRun ?? false,
+    conclusions,
+  })) as RuleEngineReport;
   return ruleEngineExecution(report);
 }
 
@@ -230,8 +233,20 @@ export async function runGarbageDomain(ctx: DomainExecutionContext): Promise<Dom
 
 /** 依赖管家：依赖图谱 / 许可证 / 投毒 / 锁文件 / 升级 / CVE（O10 唯一 Owner） */
 export async function runDepsDomain(ctx: DomainExecutionContext): Promise<DomainExecution> {
-  const { report } = await scanDeps(ctx.repoRoot);
-  return { report, detail: { cve: report.cve.status } };
+  const { report } = await scanDeps(ctx.repoRoot, ctx.depsScanInput);
+  // A15/C4：漏洞库不可达 = 本次未检测，不是 0 漏洞。域记 partial 并在 reason 留痕，
+  // 报告里 `cve.status='unavailable'` 已带原因，消费方不得把它折算成"干净"。
+  const cveUnavailable = report.cve.status === 'unavailable';
+  return {
+    report,
+    ...(cveUnavailable
+      ? {
+          status: 'partial' as const,
+          reason: `依赖 CVE 未检测（漏洞库不可达）：${report.cve.reason ?? '未提供 CVE 查询'}`,
+        }
+      : {}),
+    detail: { cve: report.cve.status },
+  };
 }
 
 /** 默认执行器注册表：只登记本层能独立跑起来的域 */

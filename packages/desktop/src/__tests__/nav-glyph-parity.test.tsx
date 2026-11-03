@@ -20,6 +20,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { navItems } from '../components/layout/nav-items';
 import { NavIcon, hasNavIcon } from '../components/ui/Icons';
 import { NavGlyph, NAV_GLYPH_TONES } from '../components/business/page-glyph';
+import { DOMAIN_REPORT_META } from '../pages/domain-report-meta';
 
 /** 导航分类 → 承载其顶行图标的页面文件（安全域的结果页在 security-report-parts） */
 const PAGE_FILES: Record<string, string[]> = {
@@ -70,15 +71,36 @@ describe('导航项 ↔ 图标 ↔ 色调 一一对应', () => {
 });
 
 describe('分类页顶行图标不再另写一份图形', () => {
-  it('每个分类页都引用了本分类的 NavGlyph，且不再内联 PageGlyph', () => {
+  /**
+   * 2026-11-03：详情页外壳统一为 `DomainReportShell`，顶行图标改由域登记表
+   * `DOMAIN_REPORT_META` 驱动（外壳内部渲染 `<NavGlyph navId={domain} />`）。
+   * 因此「页面图标从哪来」有两处合法落点：
+   *   1) 页面自己写 `navId="<id>"`（历史写法，仍受支持）；
+   *   2) 页面写 `domain="<id>"`，图标由登记表解析（当前九个域页面的写法）。
+   * 两者都不许内联 PageGlyph —— 图形只能来自 NAV_ICON_CONTENT 一处。
+   */
+  it('每个分类页都用 NavGlyph（直接或经域登记表），且不再内联 PageGlyph', () => {
     for (const item of navItems) {
       const files = PAGE_FILES[item.id];
       expect(files, `${item.id} 未登记页面文件`).toBeDefined();
       for (const file of files!) {
         const src = stripComments(readPage(file));
-        expect(src, `${file} 未使用 NavGlyph(${item.id})`).toContain(`navId="${item.id}"`);
+        const usesNavGlyphDirectly = src.includes(`navId="${item.id}"`);
+        const usesDomainRegistry = src.includes(`domain="${item.id}"`);
+        expect(
+          usesNavGlyphDirectly || usesDomainRegistry,
+          `${file} 既没直接用 NavGlyph(${item.id})，也没声明 domain="${item.id}"`,
+        ).toBe(true);
         expect(src, `${file} 仍在内联 PageGlyph`).not.toContain('<PageGlyph');
       }
+    }
+  });
+
+  it('域登记表覆盖全部分类，且每行都能解析出评分维度', () => {
+    for (const item of navItems) {
+      const meta = DOMAIN_REPORT_META[item.id as keyof typeof DOMAIN_REPORT_META];
+      expect(meta, `域登记表缺 ${item.id}`).toBeDefined();
+      expect(meta?.dimension, `${item.id} 缺评分维度`).toBeDefined();
     }
   });
 });

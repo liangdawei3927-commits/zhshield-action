@@ -3,10 +3,9 @@ import { useT } from '../i18n';
 import type { AsyncScanActionProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import { scanRunProps } from '../components/business/ScanEmptyState';
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
-import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
+import { type ReportStatCard } from '../components/business/ReportShell';
 import { FeatureIcon } from '../components/ui/Icons';
 import {
   useGuardPage,
@@ -151,24 +150,17 @@ function GuardReportView({
   const stats = buildGuardStats({ report, copyToAi, copyAllToAi, reportFalsePositive, t });
 
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="gate"
-      historyDomain="guard"
+      domain="guard"
       refreshKey={report}
-      icon={<NavGlyph navId="guard" />}
       title={t('nav.guard')}
-      action={
-        <DomainActionButton
-          domain="guard"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.guard.scan')}
-        />
-      }
+      actionLabel={t('page.guard.scan')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={stats}
     >
@@ -189,7 +181,7 @@ function GuardReportView({
       <div className="mt-4 text-xs text-zh-muted">
         {t('page.guard.duration', { duration: report.metadata.duration })}
       </div>
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 
@@ -209,7 +201,7 @@ function GuardEmptyView(props: {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
-      dimension="gate"
+      domain="guard"
       title={props.t('nav.guard')}
       subtitle={props.t('page.guard.idleSubtitle')}
       features={[
@@ -265,7 +257,6 @@ function GuardEmptyView(props: {
       ]}
       buttonText={props.t('page.guard.scan')}
       onAction={props.onScan}
-      actionDomain="guard"
       {...scanRunProps(props)}
     />
   );

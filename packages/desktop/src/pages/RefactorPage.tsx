@@ -6,9 +6,9 @@ import { useHasDomainResult } from '../hooks/useHasDomainResult';
 import { useDomainDetailEntry } from '../hooks/useDomainDetailEntry';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
+import { type ReportStatCard } from '../components/business/ReportShell';
 import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useRefactorPage, useSmellGroups, type RefactorFile, type Smell } from './refactor-logic';
 import { RuleTabs } from './refactor-parts';
@@ -127,24 +127,17 @@ function RefactorReportView({
   applyAutoFix,
 }: RefactorReportViewProps) {
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="refactor"
-      historyDomain="refactor"
+      domain="refactor"
       refreshKey={report}
-      icon={<RefactorGlyph />}
       title={t('page.refactor.header.title')}
-      action={
-        <DomainActionButton
-          domain="refactor"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.refactor.scanNow')}
-        />
-      }
+      actionLabel={t('page.refactor.scanNow')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={refactorReportStats(t, report, copyToAi)}
     >
@@ -161,7 +154,7 @@ function RefactorReportView({
         applying={applying}
         applyAutoFix={applyAutoFix}
       />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 

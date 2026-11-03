@@ -62,7 +62,7 @@ export function RefactorEmptyState(props: EmptyStateProps) {
     <div className="h-full w-full relative">
       <DomainEmptyView
         projectPath={props.projectPath}
-        dimension="refactor"
+        domain="refactor"
         title={t('page.refactor.shell.title')}
         subtitle={t('page.refactor.shell.subtitle')}
         features={buildRefactorFeatures(t)}

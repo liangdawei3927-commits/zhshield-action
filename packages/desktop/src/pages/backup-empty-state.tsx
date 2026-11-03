@@ -71,7 +71,7 @@ export function BackupEmptyState({
     <div className="h-full w-full bg-zh-bg overflow-auto">
       <DomainEmptyView
         projectPath={projectPath}
-        dimension="backup"
+        domain="backup"
         title={t('page.backup.empty.title')}
         // 副标题只讲能力，不报「上次备份」：本组件同时充当分类主页（showHome=true），
         // 有历史记录时也会渲染。此前传的是 `new Date()` 现编时间 —— 从未备份过也显示

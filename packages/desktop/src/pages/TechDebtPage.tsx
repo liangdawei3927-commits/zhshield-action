@@ -2,9 +2,9 @@ import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { type ReportStatCard } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useTechDebtPage, debtIndexDisplay } from './tech-debt-logic';
 import type { AsyncScanActionProps } from './async-scan-props';
@@ -151,24 +151,17 @@ function TechDebtReportView({
   });
 
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="techdebt"
-      historyDomain="techdebt"
+      domain="techdebt"
       refreshKey={report}
-      icon={<NavGlyph navId="techdebt" />}
       title={t('page.techdebt.done')}
-      action={
-        <DomainActionButton
-          domain="techdebt"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.techdebt.rescan')}
-        />
-      }
+      actionLabel={t('page.techdebt.rescan')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={stats}
     >
@@ -186,7 +179,7 @@ function TechDebtReportView({
         planLoading={planLoading}
         verifyLoading={verifyLoading}
       />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 

@@ -92,13 +92,12 @@ function renderIdleEmptyView(): string {
     <I18nProvider>
       <DomainEmptyView
         projectPath="/tmp/proj"
-        dimension="quality"
+        domain="inspect"
         title="质量巡检"
         subtitle="subtitle"
         features={[{ icon: <span />, title: 'a', desc: 'b' }]}
         buttonText="一键体检"
         onAction={() => undefined}
-        actionDomain="inspect"
         loading={false}
       />
     </I18nProvider>,

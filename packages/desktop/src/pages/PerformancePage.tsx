@@ -1,7 +1,7 @@
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { type ReportStatCard } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
@@ -129,29 +129,22 @@ function PerformanceDetailView({
     handleScan,
   } = state;
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="performance"
-      historyDomain="performance"
+      domain="performance"
       refreshKey={detailReport}
-      icon={<NavGlyph navId="performance" />}
       title={t('page.performance.header.title')}
-      action={
-        <DomainActionButton
-          domain="performance"
-          onCancel={cancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={handleScan}
-          loading={loading}
-          label={t('page.performance.rescan')}
-        />
-      }
+      actionLabel={t('page.performance.rescan')}
+      onAction={handleScan}
+      loading={loading}
+      queued={queued}
+      onCancel={cancel}
+      stopping={stopping}
       onBackHome={backHome}
       stats={performanceReportStats(t, detailReport, copyToAi)}
     >
       <IssuesPanel issues={detailReport.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 
@@ -233,7 +226,7 @@ function PerformanceEmptyView({
   return (
     <DomainEmptyView
       projectPath={projectPath}
-      dimension="performance"
+      domain="performance"
       title={t('page.performance.shell.title')}
       subtitle={t('page.performance.shell.subtitle')}
       features={buildCapabilityFeatures('performance', {
@@ -271,7 +264,6 @@ function PerformanceEmptyView({
       planned={buildPlannedCapabilities('performance')}
       buttonText={t('page.performance.shell.start')}
       onAction={onAction}
-      actionDomain="performance"
       queued={queued}
       queuePosition={queuePosition}
       onCancel={onCancel}

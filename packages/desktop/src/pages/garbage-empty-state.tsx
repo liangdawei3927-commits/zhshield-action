@@ -11,7 +11,7 @@ export function GarbageEmptyState(props: ScanEmptyStateParams) {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
-      dimension="garbage"
+      domain="garbage"
       title={t('page.garbage.empty.title')}
       subtitle={t('page.garbage.empty.subtitle')}
       features={buildCapabilityFeatures('garbage', {

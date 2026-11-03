@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { type ReportStatCard } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
-import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { FeatureIcon, LayersGlyph } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
@@ -134,24 +133,19 @@ export function SentinelReportView({
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="sentinel"
+      domain="sentinel"
       refreshKey={events}
-      icon={<NavGlyph navId="sentinel" />}
       title={t('nav.sentinel')}
-      action={
-        <DomainActionButton
-          // 监控中：按钮进入「监控中…」，hover 出「停止」点它即停（监控 5s 一轮自动刷新，
-          // 无需再摆刷新入口）；未监控时才退化成一次性刷新。
-          domain={action.domain}
-          onClick={action.cancellable ? undefined : onRefresh}
-          loading={action.busy}
-          onCancel={action.cancellable ? onStopMonitoring : undefined}
-          stopping={action.stopping}
-          label={t('common.refresh')}
-        />
-      }
+      actionDomain={action.domain}
+      actionLabel={t('common.refresh')}
+      // 监控中：按钮进入「监控中…」，hover 出「停止」点它即停（监控 5s 一轮自动刷新，
+      // 无需再摆刷新入口）；未监控时才退化成一次性刷新。
+      onAction={action.cancellable ? undefined : onRefresh}
+      loading={action.busy}
+      onCancel={action.cancellable ? onStopMonitoring : undefined}
+      stopping={action.stopping}
       onBackHome={onBackHome}
       stats={buildSentinelStats({
         events,
@@ -164,7 +158,7 @@ export function SentinelReportView({
       })}
     >
       <SentinelTimeline events={sorted} />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 
@@ -214,7 +208,7 @@ function SentinelEmptyView(props: {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
-      dimension="sentinel"
+      domain="sentinel"
       title={
         props.monitoring
           ? props.t('page.sentinel.shell.titleMonitoring')

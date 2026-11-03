@@ -11,7 +11,7 @@ export function SecurityEmptyState(props: ScanEmptyStateParams) {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
-      dimension="security"
+      domain="security"
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
       features={buildCapabilityFeatures('security', {

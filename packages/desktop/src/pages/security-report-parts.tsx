@@ -13,10 +13,8 @@
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
 import { FindingsPanel, MalwarePanel } from './security-parts';
-import { ReportShell } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import type { ReportStatCard } from '../components/business/ReportShell';
-import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { SEVERITY_CONFIG } from './security-logic';
 import type { SecurityIssue } from './security-logic';
 import type { SecurityScanReportData, SecretReportData } from '../types/electron';
@@ -235,24 +233,17 @@ export function SecurityReportView({
 }: SecurityReportViewProps) {
   const t = useT();
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="security"
-      historyDomain="security"
+      domain="security"
       refreshKey={report}
-      icon={<NavGlyph navId="security" />}
       title={t('page.security.done')}
-      action={
-        <DomainActionButton
-          domain="security"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.security.rescan')}
-        />
-      }
+      actionLabel={t('page.security.rescan')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={buildSecurityStats({
         report,
@@ -266,6 +257,6 @@ export function SecurityReportView({
       <SecurityDegradedBanner report={report} t={t} />
       <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
       {children}
-    </ReportShell>
+    </DomainReportShell>
   );
 }

@@ -1,15 +1,29 @@
 import type { ReactNode } from 'react';
-import type { ScoreDimension } from '@zh/shared';
 import { PageShell } from './PageShell';
 import { DomainScoreRing } from './DomainScoreRing';
 import type { ActionRunningKey } from './domain-action-text';
 import type { CapabilityPlannedItem } from './capability-features';
+import {
+  DOMAIN_REPORT_META,
+  defaultActionDomain,
+  type ReportDomainKey,
+} from '../../pages/domain-report-meta';
 
 export interface DomainEmptyViewProps {
   projectPath: string;
-  dimension: ScoreDimension;
-  /** 动作归属：决定按钮运行态文案（与详情页按钮同源） */
-  actionDomain: ActionRunningKey;
+  /**
+   * 所属分类域 —— 评分维度与按钮运行态文案从 `DOMAIN_REPORT_META` 取。
+   *
+   * ⚠️ 评分维度与域键**并不总是同名**：体检域的评分记在 `quality` 维度下，
+   * 依赖域记在 `dependencies` 维度下。这张映射表只在本处定义一次，
+   * 页面照抄域键即可，不会写错维度。
+   */
+  domain: ReportDomainKey;
+  /**
+   * 动作归属覆盖：决定按钮运行态文案（与详情页按钮同源）。
+   * 缺省取域键 —— 只有哨兵需要覆盖（监控中 vs 刷新中）。
+   */
+  actionDomain?: ActionRunningKey;
   title: string;
   subtitle: string;
   features: { icon: ReactNode; title: string; desc: string }[];
@@ -38,9 +52,12 @@ export interface DomainEmptyViewProps {
 
 /** 各域空态统一骨架：DomainScoreRing 插图 + PageShell 版式，仅参数化差异字段 */
 export function DomainEmptyView(props: DomainEmptyViewProps) {
+  const meta = DOMAIN_REPORT_META[props.domain];
   return (
     <PageShell
-      illustration={<DomainScoreRing projectPath={props.projectPath} dimension={props.dimension} />}
+      illustration={
+        <DomainScoreRing projectPath={props.projectPath} dimension={meta.dimension} />
+      }
       title={props.title}
       subtitle={props.subtitle}
       featureList={props.features}
@@ -51,7 +68,7 @@ export function DomainEmptyView(props: DomainEmptyViewProps) {
       }))}
       buttonText={props.buttonText}
       onAction={props.onAction}
-      actionDomain={props.actionDomain}
+      actionDomain={props.actionDomain ?? defaultActionDomain(props.domain)}
       loading={props.loading}
       queued={props.queued}
       queuePosition={props.queuePosition}

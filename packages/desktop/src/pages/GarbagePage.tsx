@@ -3,10 +3,10 @@ import type { AsyncScanViewProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
-import { ReportShell, type ReportStatCard } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
+import { type ReportStatCard } from '../components/business/ReportShell';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
 import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { useGarbagePage } from './garbage-logic';
 import { GarbageEmptyState } from './garbage-empty-state';
@@ -149,24 +149,17 @@ function GarbageReportView({
   const typeCards = buildGarbageTypeCards({ report, selected, t, copyAllToAi, toggleSelect });
 
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="garbage"
-      historyDomain="garbage"
+      domain="garbage"
       refreshKey={report}
-      icon={<GarbageIcon />}
       title={t('page.garbage.done')}
-      action={
-        <DomainActionButton
-          domain="garbage"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.garbage.rescan')}
-        />
-      }
+      actionLabel={t('page.garbage.rescan')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={garbageReportStats(report, typeCards, t)}
     >
@@ -188,7 +181,7 @@ function GarbageReportView({
         cleaning={cleaning}
       />
       <GarbageList items={report.items} selected={selected} onToggle={toggleSelect} />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 

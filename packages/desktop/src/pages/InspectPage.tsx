@@ -2,10 +2,8 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AsyncScanActionProps } from './async-scan-props';
 import { useT } from '../i18n';
-import { ReportShell } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import type { ReportStatCard } from '../components/business/ReportShell';
-import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { useInspectPage } from './inspect-logic';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
@@ -175,24 +173,17 @@ function InspectReportView({
   const isSnapshot = report.coverage === 'issues-only';
 
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="quality"
-      historyDomain="inspect"
+      domain="inspect"
       refreshKey={report}
-      icon={<NavGlyph navId="inspect" />}
       title={t('page.inspect.done')}
-      action={
-        <DomainActionButton
-          domain="inspect"
-          onCancel={onCancel}
-          stopping={stopping}
-          onClick={onRescan}
-          loading={loading}
-          queued={queued}
-          label={t('page.inspect.scanNow')}
-        />
-      }
+      actionLabel={t('page.inspect.scanNow')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={buildInspectStats({
         items,
@@ -214,7 +205,7 @@ function InspectReportView({
           : t('page.inspect.guardAlsoRan')}
       </p>
       {isSnapshot ? null : <ProgressBar passCount={passCount} total={applicableCount} />}
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 

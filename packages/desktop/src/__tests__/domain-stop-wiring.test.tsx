@@ -142,16 +142,23 @@ describe('停止入口与主按钮是同一颗（不许第二个按钮）', () =
 });
 
 describe('详情页顶部：主按钮必须能停止（接线不变）', () => {
-  /** 走任务中心（useTaskRun）的 8 个域详情页 —— 这才是可取消的域 */
+  /**
+   * 走任务中心（useTaskRun）的 8 个域详情页 —— 这才是可取消的域。
+   *
+   * 2026-11-03 起详情页外壳统一为 `DomainReportShell`（原先各页手写
+   * `<ReportShell><DomainActionButton …>`），停止接线的落点随之从
+   * DomainActionButton 换成 DomainReportShell 的 props。**断言内容不变**：
+   * 每个域仍必须把 onCancel / stopping 显式接上 —— 漏一处，那个域就停不下来。
+   */
   const HEADER: [file: string, marker: string][] = [
-    ['pages/InspectPage.tsx', '<DomainActionButton'],
-    ['pages/GuardPage.tsx', '<DomainActionButton'],
-    ['pages/security-report-parts.tsx', '<DomainActionButton'],
-    ['pages/GarbagePage.tsx', '<DomainActionButton'],
-    ['pages/RefactorPage.tsx', '<DomainActionButton'],
-    ['pages/PerformancePage.tsx', '<DomainActionButton'],
-    ['pages/DependencyPage.tsx', '<DomainActionButton'],
-    ['pages/TechDebtPage.tsx', '<DomainActionButton'],
+    ['pages/InspectPage.tsx', '<DomainReportShell'],
+    ['pages/GuardPage.tsx', '<DomainReportShell'],
+    ['pages/security-report-parts.tsx', '<DomainReportShell'],
+    ['pages/GarbagePage.tsx', '<DomainReportShell'],
+    ['pages/RefactorPage.tsx', '<DomainReportShell'],
+    ['pages/PerformancePage.tsx', '<DomainReportShell'],
+    ['pages/DependencyPage.tsx', '<DomainReportShell'],
+    ['pages/TechDebtPage.tsx', '<DomainReportShell'],
   ];
 
   for (const [file, marker] of HEADER) {

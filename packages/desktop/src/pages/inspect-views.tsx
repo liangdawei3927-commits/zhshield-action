@@ -133,7 +133,7 @@ export function InspectEmptyView(props: {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
-      dimension="quality"
+      domain="inspect"
       title={props.t('page.inspect.empty.title')}
       subtitle={props.t('page.inspect.empty.subtitle')}
       features={buildCapabilityFeatures('inspect', {

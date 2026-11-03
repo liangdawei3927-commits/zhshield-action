@@ -13,9 +13,8 @@ import {
   DependencyLockfileVerificationCard,
   DependencyUpgradeCard,
 } from './dependency-cards';
-import { ReportShell } from '../components/business/ReportShell';
+import { DomainReportShell } from '../components/business/domain-report-shell';
 import { NavGlyph } from '../components/business/page-glyph';
-import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
@@ -118,24 +117,17 @@ function DependencyReportView({
   t,
 }: DependencyReportViewProps) {
   return (
-    <ReportShell
+    <DomainReportShell
       projectPath={projectPath}
-      dimension="dependencies"
-      historyDomain="deps"
+      domain="deps"
       refreshKey={report}
-      icon={<NavGlyph navId="deps" />}
       title={t('page.deps.done')}
-      action={
-        <DomainActionButton
-          domain="deps"
-          onCancel={onCancel}
-          stopping={stopping}
-          queued={queued}
-          onClick={onRescan}
-          loading={loading}
-          label={t('page.deps.rescan')}
-        />
-      }
+      actionLabel={t('page.deps.rescan')}
+      onAction={onRescan}
+      loading={loading}
+      queued={queued}
+      onCancel={onCancel}
+      stopping={stopping}
       onBackHome={onBackHome}
       stats={depsOverviewStats(t, report)}
     >
@@ -145,7 +137,7 @@ function DependencyReportView({
         onCopyAllTyposquat={onCopyAllTyposquat}
         t={t}
       />
-    </ReportShell>
+    </DomainReportShell>
   );
 }
 

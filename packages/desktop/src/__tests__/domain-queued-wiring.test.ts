@@ -36,15 +36,24 @@ const EMPTY_VIEWS: [file: string, marker: string][] = [
   ['pages/PerformancePage.tsx', '<DomainEmptyView'],
 ];
 
+/**
+ * 详情页顶部主按钮所在的外壳。
+ *
+ * 2026-11-03 起九个域的详情页统一走 `DomainReportShell`（原先各页手写
+ * `<ReportShell><DomainActionButton …>`），排队/取消/停止中三个接线字段
+ * 现在落在 DomainReportShell 的 props 上 —— 守卫的断言对象随之从
+ * `<DomainActionButton` 换成 `<DomainReportShell`，**断言内容不变**：
+ * 仍然要求每个域把 queued / onCancel / stopping 显式接到详情页外壳上。
+ */
 const HEADER_BUTTONS: [file: string, marker: string][] = [
-  ['pages/InspectPage.tsx', '<DomainActionButton'],
-  ['pages/GuardPage.tsx', '<DomainActionButton'],
-  ['pages/security-report-parts.tsx', '<DomainActionButton'],
-  ['pages/GarbagePage.tsx', '<DomainActionButton'],
-  ['pages/RefactorPage.tsx', '<DomainActionButton'],
-  ['pages/PerformancePage.tsx', '<DomainActionButton'],
-  ['pages/DependencyPage.tsx', '<DomainActionButton'],
-  ['pages/TechDebtPage.tsx', '<DomainActionButton'],
+  ['pages/InspectPage.tsx', '<DomainReportShell'],
+  ['pages/GuardPage.tsx', '<DomainReportShell'],
+  ['pages/security-report-parts.tsx', '<DomainReportShell'],
+  ['pages/GarbagePage.tsx', '<DomainReportShell'],
+  ['pages/RefactorPage.tsx', '<DomainReportShell'],
+  ['pages/PerformancePage.tsx', '<DomainReportShell'],
+  ['pages/DependencyPage.tsx', '<DomainReportShell'],
+  ['pages/TechDebtPage.tsx', '<DomainReportShell'],
 ];
 
 describe('空态（健康环下面的大按钮）必须接排队态', () => {

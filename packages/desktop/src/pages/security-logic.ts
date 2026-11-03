@@ -5,7 +5,7 @@ import type { SecurityScanReportData } from '../types/electron';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
 import { useRunWithReport } from '../hooks/useRunWithReport';
 import type { AiFixIssue } from '../utils/copyToAi';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 
 export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
   critical: {
@@ -64,10 +64,10 @@ function useSecurityRun(projectPath: string): {
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<SecurityScanReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('security', projectPath);
+  const runState = useDomainRunState('security', projectPath);
   const { handleScan } = useRunWithReport(projectPath, runSecurity, setReport);
 
-  return { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan };
+  return { ...runState, report, handleScan };
 }
 
 /** 漏洞发现 → vuln 域（修复动作：修补缺陷本身） */
@@ -112,19 +112,12 @@ function useSecurityCopyToAi(projectPath: string): {
 }
 
 export function useSecurityPage(projectPath: string) {
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
-    useSecurityRun(projectPath);
+  const { report, handleScan, ...runState } = useSecurityRun(projectPath);
   const { copyToAi, copyAllToAi, copyMalwareToAi, copyMalwareAllToAi } =
     useSecurityCopyToAi(projectPath);
 
   return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     copyToAi,
     copyAllToAi,

@@ -7,7 +7,7 @@ import { useT } from '../i18n';
 interface EmptyStateProps {
   projectPath: string;
   error: string;
-  scanning: boolean;
+  loading: boolean;
   /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
   progress?: number;
   statusMessage?: string;
@@ -74,7 +74,7 @@ export function RefactorEmptyState(props: EmptyStateProps) {
         queuePosition={props.queuePosition}
         onCancel={props.onCancel}
         stopping={props.stopping}
-        loading={props.scanning}
+        loading={props.loading}
         progress={props.progress}
         statusMessage={props.statusMessage}
       />

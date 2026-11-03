@@ -220,8 +220,6 @@ export function SecurityReportView({
   projectPath,
   report,
   loading,
-  progress,
-  statusMessage,
   queued,
   onCancel,
   stopping,
@@ -256,9 +254,6 @@ export function SecurityReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={buildSecurityStats({
         report,
         copyToAi,

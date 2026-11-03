@@ -6,7 +6,7 @@ import type {
   GarbageCleanResultData,
   GarbageRestoreResultData,
 } from '../types/electron';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 import { useToast } from '../components/ui/Toast';
 import { isDeletableItem } from '@zh/garbage/policy';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
@@ -336,7 +336,7 @@ export function useGarbagePage(projectPath: string): {
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
 } {
   const [report, setReport] = useState<GarbageScanReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('garbage', projectPath);
+  const runState = useDomainRunState('garbage', projectPath);
   const { selected, toggleSelect, toggleAll, clearSelection } = useGarbageSelection(report);
   const refreshReport = useCallback(
     () => refreshGarbageReport(projectPath, setReport, clearSelection),
@@ -368,13 +368,7 @@ export function useGarbagePage(projectPath: string): {
   const { copyAllToAi } = useGarbageCopyToAi(projectPath);
 
   return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     selected,
     cleaning,

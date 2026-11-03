@@ -60,8 +60,6 @@ export function PerformancePage({ projectPath }: PerformancePageProps) {
         backHome={detail.backHome}
         state={{
           loading,
-          progress,
-          statusMessage,
           queued,
           cancel,
           stopping,
@@ -113,8 +111,6 @@ function PerformanceDetailView({
   state: Pick<
     PerformanceState,
     | 'loading'
-    | 'progress'
-    | 'statusMessage'
     | 'queued'
     | 'cancel'
     | 'stopping'
@@ -125,8 +121,6 @@ function PerformanceDetailView({
 }) {
   const {
     loading,
-    progress,
-    statusMessage,
     queued,
     cancel,
     stopping,
@@ -154,9 +148,6 @@ function PerformanceDetailView({
         />
       }
       onBackHome={backHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={performanceReportStats(t, detailReport, copyToAi)}
     >
       <IssuesPanel issues={detailReport.issues} onCopyToAi={copyToAi} onCopyAll={copyAllToAi} />

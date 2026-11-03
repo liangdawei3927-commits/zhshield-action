@@ -7,6 +7,7 @@ import { NavGlyph } from '../components/business/page-glyph';
 import { DomainActionButton } from '../components/business/DomainActionButton';
 import { AlertCircleIcon } from '../components/ui/Icons';
 import { useTechDebtPage, debtIndexDisplay } from './tech-debt-logic';
+import type { AsyncScanActionProps } from './async-scan-props';
 import type { TechDebtReportData } from '../types/electron';
 import {
   TechDebtEmptyState,
@@ -20,18 +21,9 @@ interface TechDebtPageProps {
   projectPath: string;
 }
 
-interface TechDebtReportViewProps {
+interface TechDebtReportViewProps extends AsyncScanActionProps {
   projectPath: string;
   report: TechDebtReportData;
-  loading: boolean;
-  progress: number;
-  progressMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「检查中…」 */
-  queued?: boolean;
-  /** 停止本次技术债检查（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   copyToAi: (action: TechDebtReportData['actionList'][number]) => void;
@@ -132,8 +124,6 @@ function TechDebtReportView({
   projectPath,
   report,
   loading,
-  progress,
-  progressMessage,
   queued,
   onCancel,
   stopping,
@@ -180,9 +170,6 @@ function TechDebtReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={progressMessage}
       stats={stats}
     >
       {report.error && <TechDebtErrorBanner message={report.error} />}
@@ -207,8 +194,6 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
   const t = useT();
   const {
     loading,
-    progress,
-    progressMessage,
     queued,
     report,
     planLoading,
@@ -248,8 +233,6 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
         projectPath={projectPath}
         report={detail.detailReport}
         loading={loading}
-        progress={progress}
-        progressMessage={progressMessage}
         queued={queued}
         onCancel={cancel}
         stopping={stopping}

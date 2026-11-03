@@ -9,7 +9,7 @@ import {
 import type { TechDebtReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 import { useRunWithReport } from '../hooks/useRunWithReport';
 import { isCancelledError } from '../services/cancel-error';
 
@@ -225,7 +225,7 @@ function useTechDebtActions(
 function useTechDebtRun(projectPath: string): {
   loading: boolean;
   progress: number;
-  progressMessage: string;
+  statusMessage: string;
   /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
   /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
   cancel: () => void;
@@ -246,7 +246,7 @@ function useTechDebtRun(projectPath: string): {
   handleDismiss: (actionId: string) => Promise<void>;
 } {
   const [report, setReport] = useState<TechDebtReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('techdebt', projectPath);
+  const runState = useDomainRunState('techdebt', projectPath);
   const { planLoading, verifyLoading, handlePlan, handleVerify, handleDismiss } =
     useTechDebtActions(projectPath, setReport);
 
@@ -259,13 +259,7 @@ function useTechDebtRun(projectPath: string): {
   );
 
   return {
-    loading,
-    progress,
-    progressMessage: statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     planLoading,
     verifyLoading,

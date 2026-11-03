@@ -21,6 +21,7 @@ import { useT } from '../i18n';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
+import type { AsyncScanActionProps } from './async-scan-props';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
 
 interface DependencyPageProps {
@@ -93,11 +94,19 @@ function DependencyReportBody({
   );
 }
 
+interface DependencyReportViewProps extends AsyncScanActionProps {
+  report: DependencyReportData;
+  onRescan: () => void;
+  onCopyTyposquat: (finding: TyposquatFindingData) => void;
+  onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
+  onBackHome: () => void;
+  projectPath: string;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}
+
 function DependencyReportView({
   report,
   loading,
-  progress,
-  progressMessage,
   queued,
   onCancel,
   stopping,
@@ -107,24 +116,7 @@ function DependencyReportView({
   onBackHome,
   projectPath,
   t,
-}: {
-  report: DependencyReportData;
-  loading: boolean;
-  progress: number;
-  progressMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「检查中…」 */
-  queued?: boolean;
-  /** 停止本次依赖盘点（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
-  onRescan: () => void;
-  onCopyTyposquat: (finding: TyposquatFindingData) => void;
-  onCopyAllTyposquat: (findings: TyposquatFindingData[]) => void;
-  onBackHome: () => void;
-  projectPath: string;
-  t: (key: string, params?: Record<string, unknown>) => string;
-}) {
+}: DependencyReportViewProps) {
   return (
     <ReportShell
       projectPath={projectPath}
@@ -145,9 +137,6 @@ function DependencyReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={progressMessage}
       stats={depsOverviewStats(t, report)}
     >
       <DependencyReportBody
@@ -163,8 +152,6 @@ function DependencyReportView({
 export function DependencyPage({ projectPath }: DependencyPageProps) {
   const {
     loading,
-    progress,
-    progressMessage,
     queued,
     report,
     handleScan,
@@ -200,8 +187,6 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
       <DependencyReportView
         report={detail.detailReport}
         loading={loading}
-        progress={progress}
-        progressMessage={progressMessage}
         queued={queued}
         onCancel={cancel}
         stopping={stopping}

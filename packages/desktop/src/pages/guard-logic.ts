@@ -14,7 +14,7 @@ import {
   copyTextToClipboard,
   type AiFixIssue,
 } from '../utils/copyToAi';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
 
 export const SEVERITY_LABELS: Record<string, string> = {
@@ -183,7 +183,7 @@ function useGuardRun(projectPath: string): {
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<GuardReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('guard', projectPath);
+  const runState = useDomainRunState('guard', projectPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,7 +204,7 @@ function useGuardRun(projectPath: string): {
       setReport(null);
     }
   }, [projectPath]);
-  return { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan };
+  return { ...runState, report, handleScan };
 }
 
 /** 门禁检查项 → AI 修复问题条目 */
@@ -307,8 +307,7 @@ function useGuardReportFalsePositive(projectPath: string): {
 
 /** 门禁页全部状态与副作用：扫描、复制到 AI、误报反馈、历史拦截记录 */
 export function useGuardPage(projectPath: string) {
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
-    useGuardRun(projectPath);
+  const { report, handleScan, ...runState } = useGuardRun(projectPath);
   const { copyToAi, copyAllToAi } = useGuardCopyToAi(projectPath);
   const { reportFalsePositive } = useGuardReportFalsePositive(projectPath);
   const { history, refreshHistory } = useGuardHistory(projectPath);
@@ -320,13 +319,7 @@ export function useGuardPage(projectPath: string) {
   }, [handleScan, refreshHistory]);
 
   return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     copyToAi,
     copyAllToAi,

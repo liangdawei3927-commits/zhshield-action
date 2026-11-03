@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AsyncScanViewProps } from './async-scan-props';
+import type { AsyncScanActionProps } from './async-scan-props';
 import { useT } from '../i18n';
 import { ReportShell } from '../components/business/ReportShell';
 import type { ReportStatCard } from '../components/business/ReportShell';
@@ -140,7 +140,7 @@ function buildInspectStats({
   ];
 }
 
-interface InspectReportViewProps extends AsyncScanViewProps {
+interface InspectReportViewProps extends AsyncScanActionProps {
   projectPath: string;
   report: InspectionReportData;
   onRescan: () => void;
@@ -155,8 +155,6 @@ function InspectReportView({
   projectPath,
   report,
   loading,
-  progress,
-  statusMessage,
   queued,
   onCancel,
   stopping,
@@ -196,9 +194,6 @@ function InspectReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={buildInspectStats({
         items,
         passCount,
@@ -294,8 +289,6 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         projectPath={projectPath}
         report={detailReport}
         loading={loading}
-        progress={progress}
-        statusMessage={statusMessage}
         queued={queued}
         onCancel={cancel}
         stopping={stopping}

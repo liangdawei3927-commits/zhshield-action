@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
-import type { AsyncScanViewProps } from './async-scan-props';
+import type { AsyncScanActionProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { scanRunProps } from '../components/business/ScanEmptyState';
@@ -55,7 +55,7 @@ function notifyGuardBlocked(
   });
 }
 
-interface GuardReportViewProps extends AsyncScanViewProps {
+interface GuardReportViewProps extends AsyncScanActionProps {
   report: GuardReportData;
   onRescan: () => void;
   onBackHome: () => void;
@@ -134,8 +134,6 @@ function buildGuardStats({
 function GuardReportView({
   report,
   loading,
-  progress,
-  statusMessage,
   queued,
   onCancel,
   stopping,
@@ -172,9 +170,6 @@ function GuardReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={stats}
     >
       <GuardLevels levels={levels} />
@@ -297,8 +292,8 @@ export function GuardPage({ projectPath }: GuardPageProps) {
     loading,
     progress,
     statusMessage,
-  queued,
-  queuePosition,
+    queued,
+    queuePosition,
   report,
   copyToAi,
   copyAllToAi,
@@ -331,8 +326,6 @@ export function GuardPage({ projectPath }: GuardPageProps) {
       <GuardReportView
         report={detailReport}
         loading={loading}
-        progress={progress}
-        statusMessage={statusMessage}
         queued={queued}
         onCancel={cancel}
         stopping={stopping}

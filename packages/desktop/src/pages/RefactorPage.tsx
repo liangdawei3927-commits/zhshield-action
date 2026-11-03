@@ -14,6 +14,7 @@ import { useRefactorPage, useSmellGroups, type RefactorFile, type Smell } from '
 import { RuleTabs } from './refactor-parts';
 import { RefactorFileDetailList, SmellDetailList, SmellGroupPanel, AutoFixButton } from './refactor-panel';
 import { RefactorEmptyState } from './refactor-empty-state';
+import type { AsyncScanActionProps } from './async-scan-props';
 
 interface RefactorPageProps {
   projectPath: string;
@@ -48,7 +49,7 @@ function useRefactorDetailState(
   const hadPreviousResult = useHasDomainResult(projectPath, 'refactor');
 
   // 单一判定源：实时结果优先；扫描进行中不拿旧报告顶替
-  const detailReport = page.report ?? (page.scanning ? null : savedReport);
+  const detailReport = page.report ?? (page.loading ? null : savedReport);
 
   // 分类聚合必须从「真正要渲染的那份报告」派生。
   // 绑在内存 report 上会出现：重开页面 → 完整报告已从磁盘读回，
@@ -63,7 +64,7 @@ function useRefactorDetailState(
     domain: 'refactor',
     detailReport,
     onEnterDetail: () => setShowHome(false),
-    rescanning: page.scanning,
+    rescanning: page.loading,
     onRescan: () => void page.handleScan(),
   });
 
@@ -93,18 +94,9 @@ interface SmellGroupsViewProps {
   copyToAi: RefactorState['copyToAi'];
 }
 
-interface RefactorReportViewProps extends SmellGroupsViewProps {
+interface RefactorReportViewProps extends SmellGroupsViewProps, AsyncScanActionProps {
   projectPath: string;
   t: RefactorT;
-  scanning: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 排队中：按钮显示「排队中…」而不是「重构扫描中…」 */
-  queued?: boolean;
-  /** 停止本次重构扫描（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
   onRescan: () => void;
   onBackHome: () => void;
   /** 是否正在应用自动修复 */
@@ -118,9 +110,7 @@ function RefactorReportView({
   projectPath,
   t,
   report,
-  scanning,
-  progress,
-  statusMessage,
+  loading,
   queued,
   onCancel,
   stopping,
@@ -151,14 +141,11 @@ function RefactorReportView({
           stopping={stopping}
           queued={queued}
           onClick={onRescan}
-          loading={scanning}
+          loading={loading}
           label={t('page.refactor.scanNow')}
         />
       }
       onBackHome={onBackHome}
-      loading={scanning}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={refactorReportStats(t, report, copyToAi)}
     >
       <RefactorGroupsSection
@@ -191,7 +178,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
     projectPath,
     navId: 'refactor',
     liveReport: page.report,
-    loading: page.scanning,
+    loading: page.loading,
     onEnterDetail: () => setShowHome(false),
   });
 
@@ -211,9 +198,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         projectPath={projectPath}
         t={t}
         report={detail.detailReport}
-        scanning={page.scanning}
-        progress={page.progress}
-        statusMessage={page.statusMessage}
+        loading={page.loading}
         queued={page.queued}
         onCancel={page.cancel}
         stopping={page.stopping}
@@ -237,7 +222,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
       <RefactorEmptyState
         projectPath={projectPath}
         error={page.error}
-        scanning={page.scanning}
+        loading={page.loading}
         progress={page.progress}
         statusMessage={page.statusMessage}
         queued={page.queued}

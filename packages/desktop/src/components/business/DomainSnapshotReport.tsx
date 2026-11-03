@@ -187,7 +187,6 @@ export function DomainSnapshotReport({
         />
       }
       onBackHome={onBackHome}
-      loading={rescanning}
       stats={stats}
     >
       <SnapshotNotice stamp={stamp} />

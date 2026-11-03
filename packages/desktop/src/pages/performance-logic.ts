@@ -5,7 +5,7 @@ import type { ElectronAPI, PerformanceReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard } from '../utils/copyToAi';
 import { useRunWithReport } from '../hooks/useRunWithReport';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 
 /** preload 已暴露 openExternal（trae:// 唤起），但 ElectronAPI 类型未声明，此处补齐 */
 export type ElectronApiWithExternal = ElectronAPI & {
@@ -73,13 +73,10 @@ function usePerformanceRun(projectPath: string): {
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<PerformanceReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun(
-    'performance',
-    projectPath,
-  );
+  const runState = useDomainRunState('performance', projectPath);
   const { handleScan } = useRunWithReport(projectPath, runPerformance, setReport);
 
-  return { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan };
+  return { ...runState, report, handleScan };
 }
 
 /** 单条 / 全部复制到 AI（并唤起 Trae） */
@@ -138,18 +135,11 @@ function usePerformanceCopy(
 
 /** 性能页全部状态与副作用：扫描、单条/全部复制到 AI（并唤起 Trae） */
 export function usePerformancePage(projectPath: string) {
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
-    usePerformanceRun(projectPath);
+  const { report, handleScan, ...runState } = usePerformanceRun(projectPath);
   const { copyToAi, copyAllToAi } = usePerformanceCopy(projectPath, report);
 
   return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     copyToAi,
     copyAllToAi,

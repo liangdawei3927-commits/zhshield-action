@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 import { useRunWithReport } from '../hooks/useRunWithReport';
 import type { AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
@@ -163,7 +163,7 @@ export const ENV_SEVERITY_CONFIG: Record<string, { color: string; bg: string; la
 function useDependencyRun(projectPath: string): {
   loading: boolean;
   progress: number;
-  progressMessage: string;
+  statusMessage: string;
   /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
   /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
   cancel: () => void;
@@ -176,19 +176,13 @@ function useDependencyRun(projectPath: string): {
   handleScan: () => Promise<void>;
 } {
   const [report, setReport] = useState<DependencyReportData | null>(null);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } = useTaskRun('deps', projectPath);
+  const runState = useDomainRunState('deps', projectPath);
 
   // 共用骨架：成功回填报告、取消保留已有报告、真故障清空（与 security/performance 同一实现）
   const { handleScan } = useRunWithReport(projectPath, runDeps, setReport);
 
   return {
-    loading,
-    progress,
-    progressMessage: statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     handleScan,
   };
@@ -214,17 +208,10 @@ function useDependencyCopyToAi(projectPath: string): {
 }
 
 export function useDependencyPage(projectPath: string) {
-  const { loading, progress, progressMessage, queued, queuePosition, cancel, stopping, report, handleScan } =
-    useDependencyRun(projectPath);
+  const { report, handleScan, ...runState } = useDependencyRun(projectPath);
   const { copyToAi, copyAllToAi } = useDependencyCopyToAi(projectPath);
   return {
-    loading,
-    progress,
-    progressMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
+    ...runState,
     report,
     handleScan,
     copyToAi,

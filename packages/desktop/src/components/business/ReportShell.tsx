@@ -36,15 +36,6 @@ export interface ReportShellProps {
   score?: ReactNode;
   /** 顶行右侧原有按钮（重扫/刷新等），最右 */
   action: ReactNode;
-  /**
-   * @deprecated 详情页不再渲染页内进度条，运行反馈交给按钮自身的运行态文案。
-   * 字段保留仅为兼容 10 个分类页的现有调用，不再产生渲染效果。
-   */
-  loading?: boolean;
-  /** @deprecated 详情页不再渲染页内进度条，本字段无渲染效果。 */
-  progress?: number;
-  /** @deprecated 同上，详情页不再渲染页内进度条，本字段无渲染效果。 */
-  progressMessage?: string;
   /** 返回本分类「主页」（空态）回调 */
   onBackHome: () => void;
   /** 返回主页按钮 title/aria-label（默认 t('page.reportShell.backHome')） */

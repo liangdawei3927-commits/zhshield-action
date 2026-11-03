@@ -127,8 +127,11 @@ describe('单一视觉契约（两种进度条样式已合并）', () => {
 });
 
 describe('详情页不再渲染页内进度条（2026-10-26 下线）', () => {
-  function renderReportShell(props: { loading: boolean; progress: number }): string {
-    return renderToStaticMarkup(
+  it('结果态不渲染进度条（ReportShell 已彻底移除页内进度条相关 props）', () => {
+    // 反转守卫：此处曾是「重新扫描时结果态也渲染进度条」（含 60%）。
+    // 详情页已不要页内进度条，且 ReportShell 的 loading/progress/progressMessage
+    // 已作为死 props 删除 —— 一旦有人把 DomainScanProgress 装回 ReportShell，必红。
+    const markup = renderToStaticMarkup(
       <I18nProvider>
         <ReportShell
           projectPath="/tmp/project"
@@ -138,24 +141,12 @@ describe('详情页不再渲染页内进度条（2026-10-26 下线）', () => {
           score={<span>score</span>}
           action={<span>action</span>}
           onBackHome={() => {}}
-          loading={props.loading}
-          progress={props.progress}
         />
       </I18nProvider>,
     );
-  }
-
-  it('结果态即使传入 loading + progress 也不渲染进度条', () => {
-    // 反转守卫：此处曾是「重新扫描时结果态也渲染进度条」（含 60%）。
-    // 详情页已不要页内进度条，一旦有人把 DomainScanProgress 装回 ReportShell，必红。
-    const markup = renderReportShell({ loading: true, progress: 0.6 });
     expect(markup).not.toContain('zh-progress-flow');
     expect(markup).not.toContain('zh-progress-indeterminate');
-    expect(markup).not.toContain('60%');
-  });
-
-  it('未运行时同样不出现进度条', () => {
-    expect(renderReportShell({ loading: false, progress: 0.6 })).not.toContain('%');
+    expect(markup).not.toContain('%');
   });
 });
 

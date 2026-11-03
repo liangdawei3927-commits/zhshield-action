@@ -129,8 +129,6 @@ function GarbageReportView({
   projectPath,
   report,
   loading,
-  progress,
-  statusMessage,
   queued,
   onCancel,
   stopping,
@@ -170,9 +168,6 @@ function GarbageReportView({
         />
       }
       onBackHome={onBackHome}
-      loading={loading}
-      progress={progress}
-      progressMessage={statusMessage}
       stats={garbageReportStats(report, typeCards, t)}
     >
       <GarbageSkippedNotice report={report} />

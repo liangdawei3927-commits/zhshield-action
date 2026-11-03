@@ -127,7 +127,7 @@ export function useRefactorScan(projectPath: string) {
   const [report, setReport] = useState<RefactorReportData | null>(null);
   const [error, setError] = useState('');
   const scanningRef = useRef(false);
-  const { loading: scanning, progress, statusMessage, queued, queuePosition, cancel, stopping } =
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } =
     useTaskRun('refactor', projectPath);
   const handleScan = useCallback(async () => {
     if (!projectPath) {
@@ -150,7 +150,7 @@ export function useRefactorScan(projectPath: string) {
     }
   }, [projectPath, t]);
   return {
-    scanning,
+    loading,
     progress,
     statusMessage,
     queued,
@@ -233,12 +233,12 @@ export function useRefactorAutoFix(
 
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
-  const { scanning, progress, statusMessage, queued, queuePosition, cancel, stopping, report, error, handleScan } =
+  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, error, handleScan } =
     useRefactorScan(projectPath);
   const { applying, applyAutoFix } = useRefactorAutoFix(projectPath, handleScan);
   const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan(), 'refactor');
   return {
-    scanning,
+    loading,
     progress,
     statusMessage,
     queued,

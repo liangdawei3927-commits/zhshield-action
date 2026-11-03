@@ -8,6 +8,7 @@ import {
   runCveChecks,
   formatDomainRecord,
   SCAN_CHAIN_DOMAINS,
+  STATIC_SCAN_DOMAINS,
   type PipelineRunner,
   type DomainRunLedger,
   type DomainRunOptions,
@@ -35,6 +36,7 @@ import {
   saveRefactorBaseline,
   clearRefactorBaseline,
   refactorBaselinePath,
+  INSPECT_SCOPE_DOMAINS,
 } from '@zh/shared';
 // 注：@zh/refactor（会传递引入 TypeScript 编译器，体量大）不在模块顶层静态 import，
 // 仅在 baselineCaptureRefactor 里按需动态 import —— 避免「打印用法 / guard / inspect」
@@ -43,6 +45,12 @@ import * as path from 'node:path';
 import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
 import { countDegraded } from './degraded';
 import type { CLIOptions } from './cli-options';
+import {
+  asGovernanceDomains,
+  domainsMisapplied,
+  parseDomainList,
+  SOP_DOMAIN_HINT,
+} from './domain-args';
 
 function shouldBlock(
   report: unknown,
@@ -170,6 +178,7 @@ export async function runGuardCommand(
   reporter: ConsoleReporter,
   projectDir: string,
 ): Promise<void> {
+  if (domainsMisapplied(opts)) return;
   if (opts.sop) {
     // 《07》A6：门禁是纯判定域，只读各供应商域已落盘的结论，不自行派发工具。
     // CLI 自身尚无域快照写入能力，故仅当存在快照时才注入；否则沿用 kernel 明示的
@@ -214,8 +223,18 @@ export async function runInspectCommand(
   reporter: ConsoleReporter,
   projectDir: string,
 ): Promise<void> {
+  if (domainsMisapplied(opts)) return;
   if (opts.sop) {
-    const report = await runner.runSopInspect();
+    // `--domains`：SOP 链路的真正收敛手段。不带域过滤的 --sop 是「三域合并一次评估」的历史
+    // 单体路径（无域预算、无硬超时，实测 85 条规则下 4 分 22 秒仍未结束），按域收窄可直接避开。
+    const domains = opts.domains ? parseDomainList(opts.domains, INSPECT_SCOPE_DOMAINS, SOP_DOMAIN_HINT) : undefined;
+    if (domains === null) {
+      process.exitCode = 1;
+      return;
+    }
+    const report = await runner.runSopInspect(
+      domains ? { domains: asGovernanceDomains(domains) } : undefined,
+    );
     const formatted = reporter.formatRuleEngine(report);
     console.log(formatted.text);
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
@@ -246,6 +265,7 @@ export async function runRefactorCommand(
   reporter: ConsoleReporter,
   projectDir: string,
 ): Promise<void> {
+  if (domainsMisapplied(opts)) return;
   const report = await runner.runRefactor();
   const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
   // 注：refactor 是纯 AST 静态分析、不依赖外部工具，无"检查未实际执行"的降级场景
@@ -376,6 +396,9 @@ export interface FullScanDeps {
  *
  * 退出码：任一域 `unavailable`/`partial` → 2（未检测 ≠ 通过）；`not-run`（techdebt
  * 需宿主注入）不算失败，如实打印原因即可（C4/C5）。
+ *
+ * `--domains` 只跑指定子集：这是 C5「单域可独立运行」在 CLI 侧的唯一入口，
+ * 也是验收脚本（`verify-offline-deps` / `verify-tool-dedup`）能用几秒跑完的前提。
  */
 export async function runFullScanCommand(
   runner: PipelineRunner,
@@ -383,10 +406,15 @@ export async function runFullScanCommand(
   projectDir: string,
   deps: FullScanDeps = {},
 ): Promise<void> {
+  const requested = opts.domains ? parseDomainList(opts.domains) : undefined;
+  if (requested === null) {
+    process.exitCode = 1;
+    return;
+  }
   const run = deps.runDomains ?? runDomains;
   const ledger = await run({
     repoRoot: projectDir,
-    domains: SCAN_CHAIN_DOMAINS,
+    domains: requested ?? SCAN_CHAIN_DOMAINS,
     runner,
     // 依赖域 CVE：与桌面端共用同一份 OSV 查询（O10）。不可达时域记 partial 并 exit 2，
     // 绝不把「没查成」折算成 0 漏洞（C4/A15）。
@@ -435,9 +463,21 @@ export async function runPipelineCommand(
     await runFullScanCommand(runner, opts, ctx.projectDir, ctx.fullScanDeps ?? {});
     return;
   }
+  if (domainsMisapplied(opts)) return;
+
+  // --sop：历史单体路径，但可用 --domains 收窄到 SOP 能服务的域（避免三域合并无预算长跑）
+  const sopDomains = opts.domains
+    ? parseDomainList(opts.domains, INSPECT_SCOPE_DOMAINS, SOP_DOMAIN_HINT)
+    : undefined;
+  if (sopDomains === null) {
+    process.exitCode = 1;
+    return;
+  }
 
   const report = opts.sop
-    ? await runner.runSopDrivenPipeline()
+    ? await runner.runSopDrivenPipeline(
+        sopDomains ? { inspectContext: { domains: asGovernanceDomains(sopDomains) } } : undefined,
+      )
     : await runner.runFullPipeline({ dryRun: opts.dryRun });
 
   const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, ctx.projectDir);

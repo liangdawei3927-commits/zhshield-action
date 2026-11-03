@@ -1,0 +1,9 @@
+{
+  "name": "zhshield-offline-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A15 断网端到端验收夹具：只含一个已知带 CVE 的 direct 依赖，不含源码，故 deps 单域几秒内跑完",
+  "dependencies": {
+    "lodash": "4.17.20"
+  }
+}

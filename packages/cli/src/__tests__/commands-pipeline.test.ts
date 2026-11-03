@@ -7,7 +7,7 @@ import {
 } from '@zh/pipeline';
 import type { ConsoleReporter } from '@zh/reporter';
 import type { CLIOptions } from '../cli-options';
-import { runPipelineCommand, runFullScanCommand } from '../commands';
+import { runPipelineCommand, runFullScanCommand, runInspectCommand } from '../commands';
 
 // --full（全量扫描链）语义：与桌面端/无头脚本共用同一批执行器与同一份账本；
 // 门禁是纯判定域，不得进扫描链；任一域未完成以 exit 2 收尾，未检测 ≠ 通过。
@@ -272,6 +272,51 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     expect(seen[0].depsScanInput?.cveProvider).toBeTypeOf('function');
   });
 
+  it('Given --domains 子集，When 全量扫描，Then 只跑该子集（C5 单域入口）', async () => {
+    const runner = makeRunner({});
+    const seen: DomainRunOptions[] = [];
+
+    await runFullScanCommand(runner, makeOpts({ full: true, domains: ' deps , security ,deps' }), '/proj', {
+      runDomains: async (options) => {
+        seen.push(options);
+        return makeLedger([{ domain: 'deps', status: 'ok', durationMs: 100 }]);
+      },
+    });
+
+    // 去重 + 去空白，顺序保持用户书写顺序
+    expect(seen[0].domains).toEqual(['deps', 'security']);
+  });
+
+  it('Given --domains 含未知域名，When 全量扫描，Then 报错 exit 1 且不跑任何域（不静默忽略）', async () => {
+    const runner = makeRunner({});
+    const runDomainsSpy = vi.fn();
+
+    await runFullScanCommand(runner, makeOpts({ full: true, domains: 'deps,depz' }), '/proj', {
+      runDomains: runDomainsSpy,
+    });
+
+    expect(runDomainsSpy).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('未知域名: depz');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('Given --domains 但无 --full/--sop，When pipeline，Then 报错 exit 1（避免用户以为跑了子集）', async () => {
+    const runner = makeRunner({
+      runFullPipeline: vi.fn(async () => makePipelineReport({})),
+      runSopDrivenPipeline: vi.fn(async () => makePipelineReport({})),
+    });
+
+    await runPipelineCommand(runner, makeOpts({ domains: 'deps' }), {
+      reporter: makeReporter() as unknown as ConsoleReporter,
+      projectDir: '/proj',
+    });
+
+    expect(runner.runFullPipeline).not.toHaveBeenCalled();
+    expect(runner.runSopDrivenPipeline).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('--domains 只与 --full');
+    expect(process.exitCode).toBe(1);
+  });
+
   it('Given --full 且存在未完成域，When 全量扫描，Then 逐域打印并以 exit 2 收尾（未检测 ≠ 通过）', async () => {
     const runner = makeRunner({});
 
@@ -365,5 +410,98 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     );
 
     expect(code).toBe(1);
+  });
+});
+
+// `--sop` 是历史单体路径（三域合并、无域预算、无硬超时，实测 85 条规则下 4 分 22 秒未结束）。
+// `--domains` 是它的收敛手段：按域收窄到 SOP 真正会求值的域。这里锁两件事：
+//   ① 指定域必须真的传进引擎（否则等于没收敛）
+//   ② SOP 不求值的域必须报错，不能"跑了 0 条规则却显示通过"
+describe('--domains × --sop（SOP 链路按域收敛，不静默空跑）', () => {
+  let errors: string[];
+
+  beforeEach(() => {
+    stubProcessExit();
+    process.exitCode = undefined;
+    errors = [];
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.join(' '));
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+  it('Given inspect --sop --domains security，Then 只把该域交给 SOP 引擎', async () => {
+    // 用哨兵异常截断：断言只关心"传了什么给引擎"，不必伪造一整份 RuleEngineReport
+    const sentinel = new Error('stop-after-dispatch');
+    const runSopInspect = vi.fn(async () => {
+      throw sentinel;
+    });
+    const runner = makeRunner({ runSopInspect });
+
+    await expect(
+      runInspectCommand(
+        runner,
+        makeOpts({ command: 'inspect', sop: true, domains: 'security' }),
+        makeReporter() as unknown as ConsoleReporter,
+        '/proj',
+      ),
+    ).rejects.toBe(sentinel);
+
+    expect(runSopInspect).toHaveBeenCalledWith({ domains: ['security'] });
+  });
+
+  it('Given inspect --sop --domains deps，Then 报错 exit 1 且不调用引擎（deps 不在 SOP 求值范围）', async () => {
+    const runSopInspect = vi.fn();
+    const runner = makeRunner({ runSopInspect });
+
+    await runInspectCommand(
+      runner,
+      makeOpts({ command: 'inspect', sop: true, domains: 'deps' }),
+      makeReporter() as unknown as ConsoleReporter,
+      '/proj',
+    );
+
+    expect(runSopInspect).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('deps');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('Given pipeline --sop --domains inspect,security，Then 注入 inspectContext.domains', async () => {
+    const runner = makeRunner({
+      runFullPipeline: vi.fn(async () => makePipelineReport({})),
+      runSopDrivenPipeline: vi.fn(async () => makePipelineReport({})),
+    });
+
+    // 命令以 process.exit 收尾，必须经 exitCodeOf 捕获（本组已 stub process.exit）
+    await exitCodeOf(() =>
+      runPipelineCommand(runner, makeOpts({ sop: true, domains: 'inspect,security' }), {
+        reporter: makeReporter() as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
+    );
+
+    expect(runner.runSopDrivenPipeline).toHaveBeenCalledWith({
+      inspectContext: { domains: ['inspect', 'security'] },
+    });
+    expect(runner.runFullPipeline).not.toHaveBeenCalled();
+  });
+
+  it('Given inspect（无 --sop）带 --domains，Then 报错 exit 1（checks.json 链路没有域概念）', async () => {
+    const runner = makeRunner({ runInspect: vi.fn() });
+
+    await runInspectCommand(
+      runner,
+      makeOpts({ command: 'inspect', domains: 'inspect' }),
+      makeReporter() as unknown as ConsoleReporter,
+      '/proj',
+    );
+
+    expect(runner.runInspect).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('--domains 只与 --full');
+    expect(process.exitCode).toBe(1);
   });
 });

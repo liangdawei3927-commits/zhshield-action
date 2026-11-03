@@ -16,6 +16,7 @@ import {
   collectQueryableDeps,
   cveCounts,
   mapOsvSeverity,
+  resolveOsvBaseUrl,
   runCveChecks,
   vulnDisplayIds,
   vulnsToFindings,
@@ -159,6 +160,46 @@ describe('runCveChecks — 在线查询与降级（P1-8 核心）', () => {
     expect(result.status).toBe('ok');
     expect(result.findings).toHaveLength(0);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('OSV 基地址可覆盖 —— A15 端到端验收的前提', () => {
+  it('缺省: api.osv.dev', () => {
+    expect(resolveOsvBaseUrl({})).toBe('https://api.osv.dev');
+    expect(resolveOsvBaseUrl({ ZH_OSV_BASE_URL: '   ' })).toBe('https://api.osv.dev');
+  });
+
+  it('环境变量覆盖：去尾部斜杠，带路径前缀也照用', () => {
+    expect(resolveOsvBaseUrl({ ZH_OSV_BASE_URL: ' http://127.0.0.1:1/ ' })).toBe(
+      'http://127.0.0.1:1',
+    );
+    expect(resolveOsvBaseUrl({ ZH_OSV_BASE_URL: 'http://127.0.0.1:9/stub//' })).toBe(
+      'http://127.0.0.1:9/stub',
+    );
+  });
+
+  it('runCveChecks 真实读取环境变量：批量与详情都走同一基地址', async () => {
+    process.env.ZH_OSV_BASE_URL = 'http://127.0.0.1:1/';
+    try {
+      const calls: string[] = [];
+      const impl = vi.fn(async (input: unknown) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes('querybatch')) {
+          return new Response(JSON.stringify({ results: [{ vulns: [{ id: 'GHSA-x' }] }] }), {
+            status: 200,
+          });
+        }
+        return new Response(JSON.stringify({ id: 'GHSA-x', summary: 's' }), { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const res = await runCveChecks([{ name: 'p', version: '1.0.0', kind: 'direct' }], impl);
+      expect(res.status).toBe('ok');
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+      for (const url of calls) expect(url.startsWith('http://127.0.0.1:1/')).toBe(true);
+    } finally {
+      delete process.env.ZH_OSV_BASE_URL;
+    }
   });
 });
 

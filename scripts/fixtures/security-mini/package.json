@@ -1,0 +1,7 @@
+{
+  "name": "zhshield-security-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A12 工具派发观测夹具：两个小源文件让 security 域在秒级跑完，从而观测到「完整一次运行」的工具派发序列",
+  "dependencies": {}
+}

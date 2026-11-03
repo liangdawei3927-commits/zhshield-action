@@ -15,8 +15,21 @@
 
 /** OSV querybatch 单查询上限（超出截断；direct 依赖通常远小于此） */
 const MAX_QUERIES = 200;
-const OSV_QUERYBATCH_URL = 'https://api.osv.dev/v1/querybatch';
+const DEFAULT_OSV_BASE_URL = 'https://api.osv.dev';
 const OSV_TIMEOUT_MS = 8_000;
+
+/**
+ * OSV 基地址。`ZH_OSV_BASE_URL` 可覆盖，**只为验收**（指向本地桩或已关闭的端口）。
+ *
+ * 为什么留这个口子：A15 要求「漏洞库不可达 → 未检测，不进 0 漏洞」，而此前只能在单测里
+ * 注入假 fetch 验证——构建产物上没有可复现的断网手段，验收脚本就永远只能跑"在线成功"
+ * 那一侧。留环境变量才能在**不拔网线**的前提下跑真实端到端。生产默认值不变。
+ */
+export function resolveOsvBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.ZH_OSV_BASE_URL?.trim();
+  if (!raw) return DEFAULT_OSV_BASE_URL;
+  return raw.replace(/\/+$/, '');
+}
 /**
  * 详情补充拉取上限。querybatch 是**精简响应**（只有 id + modified），
  * 不补详情则 severity 恒落 medium 兜底、summary 为空、CVE 别名缺失。
@@ -24,7 +37,8 @@ const OSV_TIMEOUT_MS = 8_000;
  * 上限只为防止极端项目把请求数打爆（超出部分保留精简数据，不丢漏洞）。
  */
 const MAX_DETAIL_FETCHES = 30;
-const OSV_DETAIL_URL = (id: string): string => `https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`;
+const OSV_DETAIL_URL = (base: string, id: string): string =>
+  `${base}/v1/vulns/${encodeURIComponent(id)}`;
 
 /** 单条依赖漏洞发现（OSV 命中结果，供 dashboard 展示） */
 export interface CveFinding {
@@ -70,12 +84,13 @@ interface OsvBatchResult {
  * 失败/超时返回 null —— 调用方保留该条的批量精简数据，绝不因为补详情失败就丢掉漏洞。
  */
 async function fetchVulnDetail(
+  base: string,
   id: string,
   fetchImpl: typeof fetch,
   signal: AbortSignal,
 ): Promise<OsvVuln | null> {
   try {
-    const res = await fetchImpl(OSV_DETAIL_URL(id), { signal });
+    const res = await fetchImpl(OSV_DETAIL_URL(base, id), { signal });
     if (!res.ok) return null;
     const detail = (await res.json()) as OsvVuln;
     return detail?.id ? detail : null;
@@ -155,8 +170,9 @@ export async function runCveChecks(
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OSV_TIMEOUT_MS);
+  const baseUrl = resolveOsvBaseUrl();
   try {
-    const response = await fetchImpl(OSV_QUERYBATCH_URL, {
+    const response = await fetchImpl(`${baseUrl}/v1/querybatch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
@@ -186,7 +202,7 @@ export async function runCveChecks(
     const ids = [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id as string)))];
     const detailIds = ids.slice(0, MAX_DETAIL_FETCHES);
     const details = await Promise.all(
-      detailIds.map((id) => fetchVulnDetail(id, fetchImpl, controller.signal)),
+      detailIds.map((id) => fetchVulnDetail(baseUrl, id, fetchImpl, controller.signal)),
     );
     const byId = new Map<string, OsvVuln>();
     for (const detail of details) {
@@ -201,7 +217,14 @@ export async function runCveChecks(
     return { status: 'ok', findings, checkedAt };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const reason = message.includes('abort') ? `OSV 请求超时（${OSV_TIMEOUT_MS / 1000}s）` : message;
+    // undici 把真正的原因藏在 cause.code（ECONNREFUSED / ENOTFOUND …）：只报
+    // "fetch failed" 对用户毫无信息量，分不清是断网、DNS 还是对端拒绝。
+    const causeCode = (err as { cause?: { code?: string } })?.cause?.code;
+    const reason = message.includes('abort')
+      ? `OSV 请求超时（${OSV_TIMEOUT_MS / 1000}s）`
+      : causeCode
+        ? `${message}（${causeCode}）`
+        : message;
     return { status: 'unavailable', findings: [], reason, checkedAt };
   } finally {
     clearTimeout(timer);

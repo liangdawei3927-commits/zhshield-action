@@ -78,6 +78,9 @@ zhshield — 智汇码盾 代码质量治理
   --sop           使用 SOP 规则驱动模式（默认: checks.json 模式）
   --full          pipeline 全量扫描：逐域跑 inspect/security/deps/garbage/performance/refactor/techdebt，
                   输出逐域账本（不跑门禁判定）
+  --domains <a,b> 只跑指定域（逗号分隔，如 deps,security）。与 --full（域驱动扫描）或
+                  --sop（SOP 规则按域过滤，仅 inspect/security/garbage）合用；
+                  不带这两个开关时直接报错，不静默忽略。C5「单域可独立运行」的 CLI 入口。
   --verbose       显示详细信息
   --no-color      禁用颜色输出
   --format <fmt>  报告格式: text(默认) | json | sarif
@@ -170,6 +173,9 @@ function parseFlags(args: string[], opts: CLIOptions): boolean {
         break;
       case '--report':
         opts.report = args[++i] || opts.report;
+        break;
+      case '--domains':
+        opts.domains = args[++i] || opts.domains;
         break;
       case '--fail-on': {
         // 解析边界校验：非法值（含缺参/空串）直接报错退出，禁止静默降级为默认阈值

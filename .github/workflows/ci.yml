@@ -76,6 +76,19 @@ jobs:
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
+      # A15 断网端到端门禁 —— 「漏洞库不可达」必须显形，不能折算成 0 漏洞
+      #
+      # 为什么能进 CI：三个场景全部指向 127.0.0.1（本地桩 / 已关闭端口 / 挂起桩），
+      # 通过 ZH_OSV_BASE_URL 覆盖 OSV 基地址 —— 不依赖外网，也不依赖是否装了什么工具，
+      # 因此结果与 CI 网络环境无关、不会抖。
+      #
+      # 为什么必须有：这条判据的价值在「不可达那一侧」——只验在线成功，等于只证明了
+      # 「查得到时能查」，而用户真正受到伤害的是「查不到却显示 0 漏洞」。
+      # 依赖 build 步骤产出的 packages/cli/dist/zhshield.js。
+      - name: A15 offline deps gate (unreachable ≠ clean)
+        if: matrix.node-version == 22
+        run: pnpm verify:offline
+
       # 重构坏味道基线门禁：仅拦截「相对 .refactor-baseline.json 的新增」，
       # 存量放行（ratchet）。zhcheck 从 packages/refactor/dist 导入引擎，
       # 故必须在上一步构建之后运行。

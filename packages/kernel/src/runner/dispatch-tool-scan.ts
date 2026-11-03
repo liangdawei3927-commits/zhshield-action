@@ -1,4 +1,4 @@
-import type { Issue, ToolAdapter, ToolConfig, ToolResult } from '@zh/shared';
+import type { Issue, ToolAdapter, ToolConfig, ToolResult, ToolScanOptions } from '@zh/shared';
 
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext, ToolScanOutcome } from '../sop/_meta/rule-context';
@@ -125,7 +125,7 @@ async function runToolScanWithCache(params: RunToolScanWithCacheParams): Promise
     return consumeToolScan(rule, instr, outcome);
   }
 
-  const key = `${instr.tool}|${stableConfigKey(instr.toolConfig)}`;
+  const key = toolScanCacheKey(instr.tool, instr.toolConfig);
   let inFlight = cache.get(key);
   if (!inFlight) {
     inFlight = executeToolScan({ host, adapter, instr, context, initiatingRule: rule });
@@ -133,6 +133,32 @@ async function runToolScanWithCache(params: RunToolScanWithCacheParams): Promise
   }
   const outcome = await inFlight;
   return consumeToolScan(rule, instr, outcome);
+}
+
+/**
+ * M1b/A12：单次调用内的扫描去重键。批量预取（prefetch-tool-batch）也用同一口径
+ * 往缓存里种结果，保证逐条评估时必然命中。
+ */
+export function toolScanCacheKey(
+  tool: string,
+  toolConfig: Record<string, unknown> | undefined,
+): string {
+  return `${tool}|${stableConfigKey(toolConfig)}`;
+}
+
+/** 构造与逐条派发完全一致的 ToolScanOptions（批量预取必须复用，否则归属/过滤会分叉） */
+export function buildToolScanOptions(
+  context: RuleContext,
+  toolConfig: Record<string, unknown> | undefined,
+): ToolScanOptions {
+  const config = { enabled: true, ...(toolConfig ?? {}) } as ToolConfig;
+  return {
+    projectPath: context.repoRoot,
+    projectId: context.repoRoot,
+    targetFiles: context.files,
+    config,
+    timeout: (toolConfig?.timeout as number) ?? undefined,
+  };
 }
 
 /** 防御性检查：适配器接口不完整（如 guard 旧 Adapter 缺少 isAvailable/scan）时跳过，而非崩溃 */
@@ -170,16 +196,7 @@ async function executeToolScan(params: ExecuteToolScanParams): Promise<ToolScanO
     // 硬上限保护：对齐 InspectEngine ToolAdapterExecutor——即便工具未遵守 timeout，
     // 单次扫描也绝不无限挂起体检。超时 reject → 下方 catch → 该规则落 skipped（A7/C4）。
     const result = await withToolScanHardTimeout(
-      adapter.scan({
-        projectPath: context.repoRoot,
-        projectId: context.repoRoot,
-        targetFiles: context.files,
-        config: {
-          enabled: true,
-          ...toolConfig,
-        } as ToolConfig,
-        timeout: (toolConfig.timeout as number) ?? undefined,
-      }),
+      adapter.scan(buildToolScanOptions(context, toolConfig)),
       host.toolScanTimeoutMs ?? DEFAULT_TOOL_SCAN_TIMEOUT_MS,
       adapter.meta.id,
     );

@@ -84,6 +84,14 @@ export function wrapAdapter(
     ...adapter,
     // 原型方法不会被展开运算符拷贝，必须显式转发，否则下游 typeof isAvailable 校验误判接口不完整
     isAvailable: () => adapter.isAvailable(),
+    // A12 批量派发同样是原型方法：不转发的话，kernel 的批量预取对**注册过的**适配器
+    // 一律看不见 scanBatch（实测：注册表里都是装饰后的适配器，预取静默失效、semgrep 仍逐条起进程）
+    ...(typeof adapter.scanBatch === 'function'
+      ? {
+          scanBatch: (requests: Parameters<NonNullable<ToolAdapter['scanBatch']>>[0]) =>
+            adapter.scanBatch!(requests),
+        }
+      : {}),
     async scan(scanOptions: ToolScanOptions): Promise<HookedToolResult> {
       const before = runBeforeHooks(adapter, hooks, scanOptions);
       if (before.blocked) {

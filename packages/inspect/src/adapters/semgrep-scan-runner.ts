@@ -1,6 +1,6 @@
 import type { ToolScanOptions, ToolResult, Issue, IssueCategory } from '@zh/shared';
 import { asToolExecError, buildToolResult, execTool } from './tool-runner';
-import { SemgrepResultMapper, type SemgrepOutput } from './semgrep-result-mapper';
+import { SemgrepResultMapper, type SemgrepOutput, type SemgrepResult } from './semgrep-result-mapper';
 
 /** 本机 semgrep-core（OCaml 运行时）每次启动都会打印的无害告警，非扫描失败原因 */
 const RUNTIME_NOISE_PATTERNS: readonly RegExp[] = [
@@ -60,6 +60,71 @@ export class SemgrepScanRunner {
     } catch (error: unknown) {
       return this.handleError(error, start, category);
     }
+  }
+
+  /**
+   * A12 批量派发：跑一次合并扫描，把原始命中**按归属分区**后各自映射成 ToolResult。
+   *
+   * 归属正确性是硬要求（不能被"合并"污染）：`keyOf` 只负责把单条原始结果指到某个请求，
+   * 且**同时给出该请求自己的 check id**——所以映射、fingerprint 都基于原始 id 生成，
+   * 与逐条扫描逐字段等价。识别不出的命中直接丢弃（宁可漏给自己，也不能错记到别人头上）。
+   *
+   * 整体执行失败（未安装/超时/解析不出）时，同一失败结果分发给所有 key —— 与逐条
+   * 扫描时每条各自失败等价，绝不把失败折算成"干净"。
+   */
+  async runPartitioned(
+    params: SemgrepRunParams & {
+      keys: string[];
+      keyOf: (result: SemgrepResult) => { key: string; checkId: string } | null;
+    },
+  ): Promise<Map<string, ToolResult>> {
+    const { command, options, args, category, start, keys, keyOf } = params;
+    const out = new Map<string, ToolResult>();
+    let output: SemgrepOutput;
+    try {
+      const { stdout } = await execTool(command, args, {
+        cwd: options.projectPath,
+        timeout: options.timeout || 120000,
+      });
+      output = JSON.parse(stdout) as SemgrepOutput;
+    } catch (error: unknown) {
+      const failure = this.handleError(error, start, category);
+      for (const key of keys) out.set(key, failure);
+      return out;
+    }
+
+    const groups = new Map<string, SemgrepResult[]>();
+    for (const key of keys) groups.set(key, []);
+    let unmapped = 0;
+    for (const result of output?.results ?? []) {
+      const owner = keyOf(result);
+      if (!owner) {
+        unmapped += 1;
+        continue;
+      }
+      const bucket = groups.get(owner.key);
+      if (!bucket) {
+        unmapped += 1;
+        continue;
+      }
+      // 回填原始 check id：映射与 fingerprint 必须与逐条扫描一致（前缀不得外泄）
+      bucket.push({ ...result, check_id: owner.checkId });
+    }
+    // 归属不明 = 合并配置没被正确理解 → 失败关闭。绝不能把"分不清是谁的命中"
+    // 折算成"大家都没命中"（那正是安全工具最危险的假阴性）。
+    if (unmapped > 0) {
+      const failure = this.buildError(
+        start,
+        `批量扫描有 ${unmapped} 条命中无法归属（合并配置可能未被正确解析），已按未检测处理`,
+      );
+      for (const key of keys) out.set(key, failure);
+      return out;
+    }
+    for (const key of keys) {
+      const subset: SemgrepOutput = { results: groups.get(key) ?? [], errors: [] };
+      out.set(key, this.buildAvailable(subset, this.mapper.mapOutput(subset, category), start));
+    }
+    return out;
   }
 
   /** 处理 semgrep 执行错误：未安装 / 超时 / 输出错误 */

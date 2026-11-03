@@ -8,6 +8,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 import { execFile } from 'node:child_process';
+import { __resetToolProbeCache } from '@zh/shared';
 import { SemgrepAdapter } from '../adapters/semgrep-adapter';
 
 const execFileMock = vi.mocked(execFile);
@@ -115,6 +116,9 @@ function lastTargetArg(): string {
 
 afterEach(() => {
   execFileMock.mockReset();
+  // 探测结果在进程内按 TTL 缓存（A12 切片）：不重置会让上一个用例的探测结论漏进下一个用例，
+  // 表现为"isAvailable 恒 false"这种与被测行为无关的红灯。
+  __resetToolProbeCache();
 });
 
 describe('SemgrepAdapter', () => {
@@ -543,12 +547,13 @@ describe('SemgrepAdapter', () => {
       ]);
       expect(results).toEqual([true, true, true]);
 
-      // 无单飞缓存时 3 条并发会执行 3 次 isCommandAvailable 探测 + 1 次命令解析探测 = 4 次；
-      // 单飞后仅 1 次解析探测 + 1 次可用性探测 = 2 次。
+      // 无单飞缓存时 3 条并发会执行 3 次 isCommandAvailable 探测 + 1 次命令解析探测 = 4 次。
+      // 单飞 + 探测结果进程内合并（A12 切片）后：命令解析与可用性探测若落到同一个命令键，
+      // 连那两次也会并成 1 次；解析出绝对路径时是 2 次（两个不同键）。故上界取 2。
       const versionCalls = execFileMock.mock.calls.filter((c) =>
         (c[1] as string[]).includes('--version'),
       );
-      expect(versionCalls.length).toBe(2);
+      expect(versionCalls.length).toBeLessThanOrEqual(2);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }

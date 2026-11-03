@@ -95,6 +95,14 @@ export class SemgrepRuleWriter {
     return null;
   }
 
+  /**
+   * 写入一份**由调用方拼装好的**规则集合（A12 批量派发用：多条 SOP 规则合并成一份配置
+   * 只跑一次 semgrep）。规则 id 由调用方负责加前缀以保证可回填归属。
+   */
+  async writeRuleFile(rules: SemgrepRule[]): Promise<string | null> {
+    return this.writeInlineRules(rules);
+  }
+
   private async writeInlineRules(rules: SemgrepRule[]): Promise<string | null> {
     if (rules.length === 0) return null;
 

@@ -1,5 +1,5 @@
 import type { ToolScanOptions } from '@zh/shared';
-import { SemgrepRuleWriter } from './semgrep-rule-writer';
+import { SemgrepRuleWriter, type SemgrepRule } from './semgrep-rule-writer';
 
 /** 构建结果：命令行参数 + 内联规则临时文件路径（供扫描结束后清理） */
 export interface SemgrepBuildResult {
@@ -30,6 +30,23 @@ export class SemgrepScanArgsBuilder {
     this.appendExcludeArgs(args);
     args.push(targetDir);
     return { args, ruleFile };
+  }
+
+  /**
+   * 用调用方已写好的合并规则文件组装参数（A12 批量派发）。
+   * 与 `build` 共用排除目录与顺序约定，只是省掉"每条规则各写一份临时文件"。
+   */
+  buildForRuleFile(ruleFile: string, targetDir: string): string[] {
+    const args: string[] = ['scan', '--json', '--optimizations', 'all'];
+    args.push('--config', ruleFile);
+    this.appendExcludeArgs(args);
+    args.push(targetDir);
+    return args;
+  }
+
+  /** 把一组规则写成一份临时配置文件（供批量派发复用同一写入实现） */
+  async writeRulesFile(rules: SemgrepRule[]): Promise<string | null> {
+    return this.ruleWriter.writeRuleFile(rules);
   }
 
   /** 追加 --config 参数 */

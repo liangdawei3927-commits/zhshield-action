@@ -4,6 +4,7 @@ import type {
   ToolAdapter,
   ToolMeta,
   ToolResult,
+  ToolScanBatchRequest,
   ToolScanOptions,
   IssueCategory,
   AccessScope,
@@ -85,6 +86,92 @@ export class SemgrepAdapter implements ToolAdapter {
     const { args, ruleFile } = await this.argsBuilder.build(options, configs, targetDir);
     const command = await this.resolveCommandForScan(options);
     return this.runScanWithCleanup(command, { options, args, category, start, ruleFile });
+  }
+
+  /**
+   * A12 批量派发：把 N 条"各自带内联规则"的扫描请求合并成**一次** semgrep 进程。
+   *
+   * 为什么要合并：SOP 巡检里每条 semgrep 规则都会写一份自己的临时 `--config`，
+   * argv 天然不同，运行作用域去重（runToolOnce）看不见它们 —— 实测一轮安全域
+   * `semgrep scan ×11`，几乎全是规则解析与启动开销。合并后 ≥11 → 1。
+   *
+   * 合并的安全边界（不满足就**不合并**，退回逐条 scan，行为与今天完全一致）：
+   *   · 每条请求都必须有内联 rules、且没有路径 config（路径 config 的解析/回退语义
+   *     各请求可能不同，合并会把 A 的失败连累到 B）；
+   *   · 全部请求的 projectPath / targetDir / category 必须一致（目标不同的扫描合并
+   *     会让 A 命中 B 的代码）；
+   *   · 少于 2 条不合并（没有收益）。
+   *
+   * 归属：每条请求的规则 id 加前缀 `zhbN--` 后写进同一份配置；结果按前缀分回各自
+   * 请求，并把 check_id 还原成原始 id，保证映射/fingerprint 与逐条扫描逐字段等价。
+   */
+  async scanBatch(requests: ToolScanBatchRequest[]): Promise<Map<string, ToolResult>> {
+    const merged = new Map<string, ToolResult>();
+    const usable: Array<{
+      key: string;
+      options: ToolScanOptions;
+      setup: ReturnType<SemgrepAdapter['resolveScanSetup']>;
+    }> = [];
+    for (const request of requests) {
+      const setup = this.resolveScanSetup(request.options);
+      const hasInline = (setup.rules?.length ?? 0) > 0;
+      const hasPathConfig = setup.configs.length > 0 || setup.declaredConfigs.length > 0;
+      if (!hasInline || hasPathConfig) continue;
+      usable.push({ key: request.key, options: request.options, setup });
+    }
+    const first = usable[0];
+    if (!first || usable.length < 2) return merged;
+
+    const firstProject = path.resolve(first.options.projectPath);
+    const sameTarget = usable.every(
+      (u) =>
+        path.resolve(u.options.projectPath) === firstProject &&
+        u.setup.targetDir === first.setup.targetDir &&
+        u.setup.category === first.setup.category,
+    );
+    if (!sameTarget) return merged;
+
+    // 前缀只用 semgrep id 允许的字符：[a-zA-Z0-9._-]
+    const prefixOf = (index: number): string => `zhb${index}--`;
+    const ownerOfId = new Map<string, { key: string; checkId: string }>();
+    const combined: SemgrepRule[] = [];
+    usable.forEach((entry, index) => {
+      for (const rule of entry.setup.rules ?? []) {
+        const originalId = rule.id ?? `rule-${combined.length}`;
+        const prefixedId = `${prefixOf(index)}${originalId}`;
+        combined.push({ ...rule, id: prefixedId });
+        ownerOfId.set(prefixedId, { key: entry.key, checkId: originalId });
+      }
+    });
+
+    const ruleFile = await this.argsBuilder.writeRulesFile(combined);
+    if (!ruleFile) return merged;
+
+    try {
+      const command = await this.resolveCommandForScan(first.options);
+      const args = this.argsBuilder.buildForRuleFile(ruleFile, first.setup.targetDir);
+      return await this.runner.runPartitioned({
+        command,
+        options: first.options,
+        args,
+        category: first.setup.category,
+        start: Date.now(),
+        keys: usable.map((u) => u.key),
+        keyOf: (result) => {
+          const raw = result.check_id ?? result.rule?.id;
+          if (!raw) return null;
+          // semgrep 会把 --config 的文件路径当前缀编进 check_id：
+          // `<路径>.zhb2--sql-injection-concat-literal`（2026-11-03 实测，
+          // 只做全等匹配会让所有命中都"认不出归属"→ 全被判干净，是安全工具最危险的假阴性）。
+          // 因此按"末段"取回我们自己的前缀 id。
+          const match = /(?:^|\.)(zhb\d+--[A-Za-z0-9._-]+)$/.exec(raw);
+          if (!match) return null;
+          return ownerOfId.get(match[1]) ?? null;
+        },
+      });
+    } finally {
+      await removeInlineRuleFile(ruleFile);
+    }
   }
 
   /** 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：以扫描目标锚定本地 bin 解析 */

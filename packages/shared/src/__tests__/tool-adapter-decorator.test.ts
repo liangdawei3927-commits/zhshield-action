@@ -214,4 +214,43 @@ describe('wrapAdapter — 原型方法保留（回归）', () => {
     expect(typeof wrapped.isAvailable).toBe('function');
     await expect(wrapped.isAvailable()).resolves.toBe(true);
   });
+
+  it('应转发原型上的 scanBatch（A12 批量派发；丢了它 kernel 的合并预取会静默失效）', async () => {
+    class BatchAdapter {
+      meta = {
+        id: 'semgrep' as const,
+        name: 'Semgrep',
+        category: 'inspect' as const,
+        priority: 'P0' as const,
+        installMode: 'builtin' as const,
+        description: 'mock',
+        cliCommand: 'semgrep',
+        homepage: 'https://semgrep.dev',
+        license: 'MIT',
+      };
+      async isAvailable(): Promise<boolean> {
+        return true;
+      }
+      async scan(): Promise<ToolResult> {
+        return makeResult();
+      }
+      async scanBatch(
+        requests: Array<{ key: string; options: ToolScanOptions }>,
+      ): Promise<Map<string, ToolResult>> {
+        const map = new Map<string, ToolResult>();
+        for (const r of requests) map.set(r.key, makeResult());
+        return map;
+      }
+    }
+
+    const wrapped = wrapAdapter(new BatchAdapter() as unknown as ToolAdapter);
+    expect(typeof wrapped.scanBatch).toBe('function');
+    const batch = await wrapped.scanBatch!([{ key: 'a', options: { projectPath: '/p' } }]);
+    expect([...batch.keys()]).toEqual(['a']);
+  });
+
+  it('底层没有 scanBatch 时包装体也不许假装有（否则预取会拿到 undefined）', () => {
+    const wrapped = wrapAdapter(makeAdapter(async () => makeResult()));
+    expect(wrapped.scanBatch).toBeUndefined();
+  });
 });

@@ -15,6 +15,7 @@ import {
   detectMachineProfile,
   isToolInScope,
   INSPECT_SCOPE_DOMAINS,
+  withToolRunScope,
 } from '@zh/shared';
 import { ContentInterpreter } from './sop/_meta/content-interpreter';
 import { SopRegistry } from './sop/_meta/sop-registry';
@@ -28,6 +29,7 @@ import type {
   RuleMetricsProvider,
 } from './runner/evaluator-host';
 import { buildEvaluatorTable } from './runner/evaluator-table';
+import { prefetchToolBatches } from './runner/prefetch-tool-batch';
 import { applyRuleMetrics } from './runner/rule-metrics-binding';
 import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-builders';
 
@@ -272,6 +274,14 @@ export class SopRuleEngine {
     // M1b 工具调用去重：单次调用内的缓存，调用结束即弃（不跨调用、不跨 guard/inspect 两阶段）。
     // 并行 worker 命中同 (tool, configHash) 时共享同一次真实扫描（single-flight）。
     context.toolScanCache = new Map();
+    // A12：同工具同目标的规则合并成一次进程（当前仅 semgrep；失败/不支持则静默退回逐条）。
+    // 必须在并行池之前跑：预取结果按同一缓存键种进去，逐条评估自然命中。
+    await prefetchToolBatches({
+      host: this.host,
+      rules,
+      context,
+      interpret: (rule) => this.interpreter.interpret(rule),
+    });
     const evaluations: RuleEvaluation[] = new Array<RuleEvaluation>(rules.length);
     const maxConcurrency = Math.min(detectMachineProfile().adapterParallelism, rules.length);
     let next = 0;
@@ -344,7 +354,10 @@ export class SopRuleEngine {
    * SOP 驱动型 Guard 检查 — 筛选 guard domain 规则执行
    */
   async runGuard(context: RuleContext): Promise<RuleEngineReport> {
-    return this.evaluateRules({ ...context, domain: 'guard' });
+    // A12：一次 Guard 阶段 = 一个运行作用域（同参工具调用只执行一次）
+    return withToolRunScope('kernel.sop-guard', () =>
+      this.evaluateRules({ ...context, domain: 'guard' }),
+    );
   }
 
   /**
@@ -354,11 +367,15 @@ export class SopRuleEngine {
   async runInspect(context: RuleContext): Promise<RuleEngineReport> {
     // 显式 domains 优先；未给 domain 时用全量巡检默认域集（对齐本方法 JSDoc 承诺）
     const domains = context.domains ?? (context.domain ? undefined : [...INSPECT_SCOPE_DOMAINS]);
-    return this.evaluateRules({
-      ...context,
-      domain: domains ? undefined : (context.domain ?? 'inspect'),
-      domains,
-    });
+    // A12：一次 SOP 巡检 = 一个运行作用域，同参工具调用跨规则/跨引擎只执行一次。
+    // 这条路径此前逐规则起 semgrep（实测单域 ×10-11），作用域至少先消掉完全同参的重复。
+    return withToolRunScope('kernel.sop-inspect', () =>
+      this.evaluateRules({
+        ...context,
+        domain: domains ? undefined : (context.domain ?? 'inspect'),
+        domains,
+      }),
+    );
   }
 
   // ─── 单条规则评估 ──────────────────────────────────────

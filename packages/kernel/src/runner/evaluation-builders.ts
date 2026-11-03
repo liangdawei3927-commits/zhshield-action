@@ -30,6 +30,13 @@ export function skipEvaluation(
   };
 }
 
+/** 评估结果公共收尾字段（durationMs 恒 0 / targetEngine / timestamp），消除各处字面量重复。 */
+export function evaluationTail(
+  targetEngine: 'guard' | 'inspect',
+): Pick<RuleEvaluation, 'durationMs' | 'targetEngine' | 'timestamp'> {
+  return { durationMs: 0, targetEngine, timestamp: new Date() };
+}
+
 /** 构造 error 评估结果（工具异常等场景） */
 export function errorEvaluation(
   rule: SopRule,

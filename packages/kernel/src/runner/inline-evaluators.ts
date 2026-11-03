@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
-import { skipEvaluation } from './evaluation-builders';
+import { evaluationTail, skipEvaluation } from './evaluation-builders';
 import type {
   RuleEvaluation,
   Violation,
@@ -33,9 +33,7 @@ export async function evalPatternScan(
     violations,
     files: [...new Set(violations.map((v) => v.file))],
     message: violations.length > 0 ? `发现 ${violations.length} 处匹配 (${rule.id})` : undefined,
-    durationMs: 0,
-    targetEngine: 'guard',
-    timestamp: new Date(),
+    ...evaluationTail('guard'),
   };
 }
 
@@ -102,9 +100,7 @@ export async function evalThreshold(
       violations.length === 0
         ? `阈值达标: ${buildThresholdSummary(instr, metrics)}`
         : `阈值未达标 ${violations.length} 项: ${buildThresholdSummary(instr, metrics)}`,
-    durationMs: 0,
-    targetEngine,
-    timestamp: new Date(),
+    ...evaluationTail(targetEngine),
   };
 }
 

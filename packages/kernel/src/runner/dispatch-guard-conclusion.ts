@@ -23,7 +23,7 @@ import type {
   Violation,
   ToolDispatchInstruction,
 } from '../sop/_meta/rule-evaluation';
-import { skipEvaluation } from './evaluation-builders';
+import { evaluationTail, skipEvaluation } from './evaluation-builders';
 
 /** 结论严重级 → 秩（与 SEVERITY_RANK 的 error/high/critical 同档，'warning' 对齐 medium） */
 const CONCLUSION_RANK: Record<ConclusionIssue['severity'], number> = {
@@ -96,9 +96,7 @@ export function evalGuardConclusion(
       status: 'passed',
       violations: [],
       message: `只读判定（O8）：${supplier} 域结论无达到 ${rule.severity} 级的问题（快照 ${generatedAt}）`,
-      durationMs: 0,
-      targetEngine: 'guard',
-      timestamp: new Date(),
+      ...evaluationTail('guard'),
     };
   }
 
@@ -108,9 +106,7 @@ export function evalGuardConclusion(
     violations: findings.map(toViolation(rule)),
     files: [...new Set(findings.map((issue) => issue.file).filter(Boolean))],
     message: `只读判定（O8）：${supplier} 域结论 ${findings.length} 处问题达到 ${rule.severity} 级（快照 ${generatedAt}），门禁未执行任何扫描`,
-    durationMs: 0,
-    targetEngine: 'guard',
-    timestamp: new Date(),
+    ...evaluationTail('guard'),
   };
 }
 

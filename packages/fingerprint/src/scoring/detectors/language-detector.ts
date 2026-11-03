@@ -1,6 +1,7 @@
 import type { ProfileSignal, ProjectLanguage } from '../types';
 import type { ScanResult } from '../file-scanner';
 import { hasFile, countByExtension } from '../file-scanner';
+import { pushFileSignal } from './file-signal';
 
 /**
  * 语言探测器 — 依据配置文件存在性 + 源文件扩展名统计判定主语言。
@@ -33,36 +34,19 @@ export function detectLanguage(scan: ScanResult): ProfileSignal[] {
 }
 
 function pushTsConfigSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'tsconfig.json')) {
-    signals.push({
-      file: 'tsconfig.json',
-      kind: 'config-file',
-      matched: 'tsconfig.json',
-      inferred: { language: 'typescript', runtime: 'node' },
-    });
-  }
+  pushFileSignal(scan, signals, 'tsconfig.json', { language: 'typescript', runtime: 'node' });
 }
 
 function pushGoModSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'go.mod')) {
-    signals.push({
-      file: 'go.mod',
-      kind: 'config-file',
-      matched: 'go.mod',
-      inferred: { language: 'go', runtime: 'go', packageManager: 'go-mod' },
-    });
-  }
+  pushFileSignal(scan, signals, 'go.mod', { language: 'go', runtime: 'go', packageManager: 'go-mod' });
 }
 
 function pushCargoSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'Cargo.toml')) {
-    signals.push({
-      file: 'Cargo.toml',
-      kind: 'config-file',
-      matched: 'Cargo.toml',
-      inferred: { language: 'rust', runtime: 'rust', packageManager: 'cargo' },
-    });
-  }
+  pushFileSignal(scan, signals, 'Cargo.toml', {
+    language: 'rust',
+    runtime: 'rust',
+    packageManager: 'cargo',
+  });
 }
 
 function pushPythonSignal(scan: ScanResult, signals: ProfileSignal[]): void {
@@ -80,14 +64,11 @@ function pushPythonSignal(scan: ScanResult, signals: ProfileSignal[]): void {
 }
 
 function pushJavaSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'pom.xml')) {
-    signals.push({
-      file: 'pom.xml',
-      kind: 'config-file',
-      matched: 'pom.xml',
-      inferred: { language: 'java', runtime: 'jvm', packageManager: 'maven' },
-    });
-  }
+  pushFileSignal(scan, signals, 'pom.xml', {
+    language: 'java',
+    runtime: 'jvm',
+    packageManager: 'maven',
+  });
 }
 
 function pushGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
@@ -107,25 +88,11 @@ function pushGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
 }
 
 function pushPhpSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'composer.json')) {
-    signals.push({
-      file: 'composer.json',
-      kind: 'config-file',
-      matched: 'composer.json',
-      inferred: { language: 'php', packageManager: 'composer' },
-    });
-  }
+  pushFileSignal(scan, signals, 'composer.json', { language: 'php', packageManager: 'composer' });
 }
 
 function pushRubySignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'Gemfile')) {
-    signals.push({
-      file: 'Gemfile',
-      kind: 'config-file',
-      matched: 'Gemfile',
-      inferred: { language: 'ruby' },
-    });
-  }
+  pushFileSignal(scan, signals, 'Gemfile', { language: 'ruby' });
 }
 
 function pushCsprojSignal(scan: ScanResult, signals: ProfileSignal[]): void {

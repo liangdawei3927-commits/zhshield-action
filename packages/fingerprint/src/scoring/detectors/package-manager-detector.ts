@@ -1,6 +1,7 @@
 import type { ProfileSignal } from '../types';
 import type { ScanResult } from '../file-scanner';
 import { hasFile, readConfig } from '../file-scanner';
+import { pushFileSignal } from './file-signal';
 
 const POETRY_SECTION_RE = /\[tool\.poetry\]/;
 
@@ -55,14 +56,7 @@ function pushLockFileSignal(scan: ScanResult, signals: ProfileSignal[]): boolean
 }
 
 function pushGoModSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'go.mod')) {
-    signals.push({
-      file: 'go.mod',
-      kind: 'config-file',
-      matched: 'go.mod',
-      inferred: { packageManager: 'go-mod' },
-    });
-  }
+  pushFileSignal(scan, signals, 'go.mod', { packageManager: 'go-mod' });
 }
 
 function pushPythonPackageManagerSignal(scan: ScanResult, signals: ProfileSignal[]): void {
@@ -87,14 +81,7 @@ function pushPythonPackageManagerSignal(scan: ScanResult, signals: ProfileSignal
 }
 
 function pushCargoSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'Cargo.toml')) {
-    signals.push({
-      file: 'Cargo.toml',
-      kind: 'config-file',
-      matched: 'Cargo.toml',
-      inferred: { packageManager: 'cargo' },
-    });
-  }
+  pushFileSignal(scan, signals, 'Cargo.toml', { packageManager: 'cargo' });
 }
 
 function pushMavenOrGradleSignal(scan: ScanResult, signals: ProfileSignal[]): void {
@@ -116,14 +103,7 @@ function pushMavenOrGradleSignal(scan: ScanResult, signals: ProfileSignal[]): vo
 }
 
 function pushComposerSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  if (hasFile(scan, 'composer.json')) {
-    signals.push({
-      file: 'composer.json',
-      kind: 'config-file',
-      matched: 'composer.json',
-      inferred: { packageManager: 'composer' },
-    });
-  }
+  pushFileSignal(scan, signals, 'composer.json', { packageManager: 'composer' });
 }
 
 function pushDefaultNpmSignal(scan: ScanResult, signals: ProfileSignal[]): void {

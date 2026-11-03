@@ -119,7 +119,16 @@ describe('默认忽略规则（噪音路径）', () => {
   });
 });
 
-describe('FileMonitor 噪音过滤（端到端）', () => {
+/**
+ * 端到端 fs.watch 用例：真实文件系统事件 + 真实定时器，受系统负载影响（macOS FSEvents
+ * 就绪延迟、回调投递抖动）。全量测试并发跑时，个别用例偶发「事件没在窗口内到达」的假失败
+ * （2026-11-03 门禁实锤：同一用例单独跑 22/22 绿、全量跑偶红）。
+ *
+ * 处置：这三个 describe 级 retry: 2。**不弱化任何断言** —— 真回归会连续三次失败；
+ * 只吸收「事件偶发迟到」这类环境抖动。若某条用例需要 3 次以上才过，说明是真 bug 或
+ * 需要更强的同步手段（如给 FileMonitor 加 ready 事件），那时应改产品代码而不是继续加重试。
+ */
+describe('FileMonitor 噪音过滤（端到端）', { retry: 2 }, () => {
   const tmpDirs: string[] = [];
 
   function makeTmpDir(): string {
@@ -359,7 +368,7 @@ describe('computePollDelay 事件驱动退避', () => {
   });
 });
 
-describe('FileMonitor 默认 ignoreDirs 与退避（新增行为）', () => {
+describe('FileMonitor 默认 ignoreDirs 与退避（新增行为）', { retry: 2 }, () => {
   const tmpDirs: string[] = [];
 
   function makeTmpDir(): string {
@@ -434,7 +443,7 @@ describe('FileMonitor 默认 ignoreDirs 与退避（新增行为）', () => {
   });
 });
 
-describe('file-monitor 事件的信息性分类（派单通道过滤）', () => {
+describe('file-monitor 事件的信息性分类（派单通道过滤）', { retry: 2 }, () => {
   const tmpDirs: string[] = [];
 
   function makeTmpDir(): string {

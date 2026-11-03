@@ -157,6 +157,19 @@ export interface ToolResultInput {
  * metadata 固定为 `{ version, duration, timestamp, fileCount }`，
  * `error` 沿用 `...(error ? { error } : {})` 的条件展开（避免空串产生 `error: ''`）。
  */
+/**
+ * 生成「工具名已绑定」的结果构建器，消除各适配器逐字复制的 private buildResult 方法体
+ * （此前 commit-lint / npm-audit 仅工具名不同，其余六行完全相同）。
+ */
+export function toolResultBuilder(tool: ToolResult['tool']) {
+  return (
+    start: number,
+    status: 'available' | 'unavailable' | 'error',
+    issues: Issue[],
+    error?: string,
+  ): ToolResult => buildToolResult({ tool, status, issues, start, error });
+}
+
 export function buildToolResult(input: ToolResultInput): ToolResult {
   return {
     tool: input.tool,

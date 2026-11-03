@@ -10,7 +10,7 @@ import {
   type IssueCategory,
   type AccessScope,
 } from '@zh/shared';
-import { buildAccessScope, buildToolResult, execTool, asToolExecError } from './tool-runner';
+import { buildAccessScope, execTool, asToolExecError, toolResultBuilder } from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
   id: 'npm-audit',
@@ -112,6 +112,9 @@ export class NpmAuditAdapter extends BuiltinToolAdapter {
   meta: ToolMeta;
   private readonly projectRoot?: string;
 
+  /** 结果构建器（工具名已绑定，避免逐字复制 buildToolResult 参数列表） */
+  private readonly buildResult = toolResultBuilder('npm-audit');
+
   /** F5：npm/pnpm audit 读取锁文件并联网查询漏洞库 */
   readonly accessScope: AccessScope = buildAccessScope(
     ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'package.json'],
@@ -209,14 +212,5 @@ export class NpmAuditAdapter extends BuiltinToolAdapter {
       });
     }
     return issues;
-  }
-
-  private buildResult(
-    start: number,
-    status: 'available' | 'unavailable' | 'error',
-    issues: Issue[],
-    error?: string,
-  ): ToolResult {
-    return buildToolResult({ tool: 'npm-audit', status, issues, start, error });
   }
 }

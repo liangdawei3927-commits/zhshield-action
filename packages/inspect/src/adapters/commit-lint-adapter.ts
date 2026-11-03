@@ -9,7 +9,7 @@ import {
   type IssueCategory,
   type AccessScope,
 } from '@zh/shared';
-import { buildAccessScope, buildToolResult, execTool } from './tool-runner';
+import { buildAccessScope, execTool, toolResultBuilder } from './tool-runner';
 
 const META: Omit<ToolMeta, 'description'> = {
   id: 'commit-lint',
@@ -103,6 +103,9 @@ export class CommitLintAdapter extends BuiltinToolAdapter {
   meta: ToolMeta;
   private readonly projectRoot?: string;
 
+  /** 结果构建器（工具名已绑定，避免逐字复制 buildToolResult 参数列表） */
+  private readonly buildResult = toolResultBuilder('commit-lint');
+
   /** F5：commit-lint 读取 .git 提交历史做规范校验 */
   readonly accessScope: AccessScope = buildAccessScope(
     ['.git/HEAD', '.git/refs/**', '.git/logs/**'],
@@ -137,14 +140,5 @@ export class CommitLintAdapter extends BuiltinToolAdapter {
 
     const issues = buildCommitIssues(loaded.subjects, pattern, maxSubjectLength, category);
     return this.buildResult(start, 'available', issues);
-  }
-
-  private buildResult(
-    start: number,
-    status: 'available' | 'unavailable' | 'error',
-    issues: Issue[],
-    error?: string,
-  ): ToolResult {
-    return buildToolResult({ tool: 'commit-lint', status, issues, start, error });
   }
 }

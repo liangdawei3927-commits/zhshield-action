@@ -8,7 +8,7 @@ import type { InspectFailure } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
 
 export const STATUS_CONFIG: Record<
@@ -108,71 +108,49 @@ function useInspectReport(projectPath: string): {
           projectPath,
           opts?.origin ? { sop: true, origin: opts.origin } : { sop: true },
         );
-      const outcome = toInspectOutcome(pipeline);
-      if (outcome.kind === 'cancelled') {
-        // 用户点「停止」不是失败：不落失败页、保留已有报告。
-        // 落了失败页就等于把取消说成故障，还会在按钮下方顶出一行红色错误文案。
-        return;
-      }
-      if (outcome.kind === 'failed') {
+        const outcome = toInspectOutcome(pipeline);
+        if (outcome.kind === 'cancelled') {
+          // 用户点「停止」不是失败：不落失败页、保留已有报告。
+          // 落了失败页就等于把取消说成故障，还会在按钮下方顶出一行红色错误文案。
+          return;
+        }
+        if (outcome.kind === 'failed') {
+          setReport(null);
+          setFailure(outcome);
+          return;
+        }
+        setReport(outcome.report);
+      } catch (err: unknown) {
+        // 用户点「停止」不是失败：不落失败页，保留已有报告
+        if (isCancelledError(err)) return;
         setReport(null);
-        setFailure(outcome);
-        return;
+        setFailure({
+          kind: 'failed',
+          messageKey: 'page.inspect.errorTitle',
+          detail: err instanceof Error ? err.message : String(err),
+        });
       }
-      setReport(outcome.report);
-    } catch (err: unknown) {
-      // 用户点「停止」不是失败：不落失败页，保留已有报告
-      if (isCancelledError(err)) return;
-      setReport(null);
-      setFailure({
-        kind: 'failed',
-        messageKey: 'page.inspect.errorTitle',
-        detail: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, [projectPath]);
+    },
+    [projectPath],
+  );
   return { report, persisted, failure, run };
 }
 
 /** 巡检运行：loading/进度来自任务中心（自动巡检与手动点击共用同一任务通道） */
-function useInspectRun(projectPath: string): {
+function useInspectRun(projectPath: string): DomainRunState & {
   report: InspectionReportData | null;
   persisted: InspectionReportData | null;
   failure: InspectFailure | null;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
   startInspect: (opts?: { origin?: 'auto' }) => Promise<void>;
 } {
   const { report, persisted, failure, run } = useInspectReport(projectPath);
   // 数据源已收敛为 SOP 流水线，任务中心推送同为 pipeline 任务（kind 随主链路对齐）。
   // 忙态文案不区分触发来源：任务在跑按钮就显示「巡检中」，谁扣的扳机用户无需关心。
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } =
-    useTaskRun('pipeline', projectPath);
+  const runState = useDomainRunState('pipeline', projectPath);
 
   const startInspect = useCallback((opts?: { origin?: 'auto' }) => run(opts), [run]);
 
-  return {
-    report,
-    persisted,
-    failure,
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    startInspect,
-  };
+  return { ...runState, report, persisted, failure, startInspect };
 }
 
 function useInspectCopyToAi(projectPath: string): {
@@ -217,37 +195,16 @@ function useInspectCopyToAi(projectPath: string): {
 
 /** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
-  const {
-    report,
-    persisted,
-    failure,
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    startInspect,
-  } = useInspectRun(projectPath);
+  const { report, persisted, failure, startInspect, ...runState } = useInspectRun(projectPath);
   const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
   // 自动巡检带 origin='auto'：仅作为任务上的诊断元数据（首扫/每日/定时/手动
   // 触发的任务在 UI 上一视同仁），手动/自动同参任务互相复用不重复扫。
-  useDailyAutoCheck('inspect', projectPath, () => void startInspect({ origin: 'auto' }), 'pipeline');
+  useDailyAutoCheck(
+    'inspect',
+    projectPath,
+    () => void startInspect({ origin: 'auto' }),
+    'pipeline',
+  );
 
-  return {
-    report,
-    persisted,
-    failure,
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    copyToAi,
-    copyAllToAi,
-    startInspect,
-  };
+  return { ...runState, report, persisted, failure, copyToAi, copyAllToAi, startInspect };
 }

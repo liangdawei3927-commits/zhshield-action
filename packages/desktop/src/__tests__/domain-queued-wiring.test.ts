@@ -26,6 +26,26 @@ function jsxBlock(src: string, marker: string): string {
   return out.join('\n');
 }
 
+/**
+ * 截取一次完整调用（`callee(` 到配对的 `)`），跨行也能吃。
+ *
+ * 不能只取「含 callee 的那一行」：参数一多，格式化成多行是常态，
+ * 而换行后的实参（如 taskKind）就不在同一行了 —— 那会让守卫拦下合法代码。
+ */
+function callExpr(src: string, callee: string): string {
+  const start = src.indexOf(callee);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let i = start + callee.length - 1; i < src.length; i += 1) {
+    if (src[i] === '(') depth += 1;
+    else if (src[i] === ')') {
+      depth -= 1;
+      if (depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  return src.slice(start);
+}
+
 const EMPTY_VIEWS: [file: string, marker: string][] = [
   // InspectPage 的空态视图（InspectEmptyView）拆到 inspect-views.tsx，DomainEmptyView 接线随迁
   ['pages/inspect-views.tsx', '<DomainEmptyView'],
@@ -113,11 +133,9 @@ describe('后台自动检查必须声明本页 taskKind（用于"今天已跑过
 
   for (const [file, kind] of cases) {
     it(`${file} 调用 useDailyAutoCheck 时传了 ${kind}`, () => {
-      const line = read(file)
-        .split('\n')
-        .find((l) => l.includes('useDailyAutoCheck('));
-      expect(line).toBeTruthy();
-      expect(line).toContain(kind);
+      const call = callExpr(read(file), 'useDailyAutoCheck(');
+      expect(call, `${file} 里找不到 useDailyAutoCheck(`).not.toBe('');
+      expect(call).toContain(kind);
     });
   }
 });

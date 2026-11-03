@@ -17,6 +17,7 @@ import { useT } from '../../i18n';
 import { ReportShell } from './ReportShell';
 import { ResultCard } from '../ui/ResultCard';
 import { DomainActionButton } from './DomainActionButton';
+import type { DomainSnapshotViewProps } from '../../hooks/useDomainDetailEntry';
 import {
   SNAPSHOT_ENTRY_LIMIT,
   type SnapshotEntry,
@@ -44,18 +45,10 @@ const SEVERITY_STYLE: Record<
   },
 };
 
-export interface DomainSnapshotReportProps {
-  projectPath: string;
+export interface DomainSnapshotReportProps extends DomainSnapshotViewProps {
   dimension: ScoreDimension;
   /** 分类图标（调用方传入，保持与原报告页一致） */
   icon: ReactNode;
-  snapshot: SnapshotReport | null;
-  /** 首次读盘中 */
-  loading: boolean;
-  /** 「重新检查」是否进行中 */
-  rescanning: boolean;
-  onRescan: () => void;
-  onBackHome: () => void;
 }
 
 /** 一行历史问题 */
@@ -200,11 +193,7 @@ export function DomainSnapshotReport({
       {shown.length > 0 && (
         <ResultCard variant="list" className="overflow-hidden">
           {shown.map((entry, index) => (
-            <SnapshotEntryRow
-              key={entry.key}
-              entry={entry}
-              last={index === shown.length - 1}
-            />
+            <SnapshotEntryRow key={entry.key} entry={entry} last={index === shown.length - 1} />
           ))}
         </ResultCard>
       )}

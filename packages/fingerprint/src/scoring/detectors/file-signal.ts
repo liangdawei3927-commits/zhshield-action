@@ -8,15 +8,19 @@ import type { ProfileSignal } from '../types';
 import type { ScanResult } from '../file-scanner';
 import { hasFile } from '../file-scanner';
 
-/** 若扫描命中某配置文件，则推入一条 config-file 信号（matched 缺省同文件名）。 */
+/**
+ * 若扫描命中某配置文件，则推入一条 config-file 信号（`matched` 恒为文件名本身）。
+ *
+ * 不收 `matched` 覆盖参数：9 处调用无一传它，而「命中文件 ≠ 信号文件名」在
+ * config-file 这一类信号里不存在（那是扩展名/内容类信号的形态）。
+ */
 export function pushFileSignal(
   scan: ScanResult,
   signals: ProfileSignal[],
   file: string,
   inferred: ProfileSignal['inferred'],
-  matched: string = file,
 ): void {
   if (hasFile(scan, file)) {
-    signals.push({ file, kind: 'config-file', matched, inferred });
+    signals.push({ file, kind: 'config-file', matched: file, inferred });
   }
 }

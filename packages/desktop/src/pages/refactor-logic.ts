@@ -5,7 +5,7 @@ import type { RefactorReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
-import { useTaskRun } from '../task-store';
+import { useDomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
 
 /** 单个代码异味条目（与 @zh/refactor 报告结构对齐） */
@@ -127,8 +127,7 @@ export function useRefactorScan(projectPath: string) {
   const [report, setReport] = useState<RefactorReportData | null>(null);
   const [error, setError] = useState('');
   const scanningRef = useRef(false);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping } =
-    useTaskRun('refactor', projectPath);
+  const runState = useDomainRunState('refactor', projectPath);
   const handleScan = useCallback(async () => {
     if (!projectPath) {
       setError(t('page.refactor.addProjectFirst'));
@@ -149,18 +148,7 @@ export function useRefactorScan(projectPath: string) {
       scanningRef.current = false;
     }
   }, [projectPath, t]);
-  return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    report,
-    error,
-    handleScan,
-  };
+  return { ...runState, report, error, handleScan };
 }
 
 /** 按 ruleId 分类聚合 + 当前选中分类 */
@@ -233,25 +221,13 @@ export function useRefactorAutoFix(
 
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
-  const { loading, progress, statusMessage, queued, queuePosition, cancel, stopping, report, error, handleScan } =
-    useRefactorScan(projectPath);
-  const { applying, applyAutoFix } = useRefactorAutoFix(projectPath, handleScan);
-  const { lastAutoAt } = useDailyAutoCheck('refactor', projectPath, () => void handleScan(), 'refactor');
-  return {
-    loading,
-    progress,
-    statusMessage,
-    queued,
-    queuePosition,
-    cancel,
-    stopping,
-    report,
-    error,
-    lastAutoAt,
-    copyToAi,
-    copyGroupToAi,
-    handleScan,
-    applying,
-    applyAutoFix,
-  };
+  const scan = useRefactorScan(projectPath);
+  const { applying, applyAutoFix } = useRefactorAutoFix(projectPath, scan.handleScan);
+  const { lastAutoAt } = useDailyAutoCheck(
+    'refactor',
+    projectPath,
+    () => void scan.handleScan(),
+    'refactor',
+  );
+  return { ...scan, lastAutoAt, copyToAi, copyGroupToAi, applying, applyAutoFix };
 }

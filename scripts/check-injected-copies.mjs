@@ -21,7 +21,8 @@
  *   - 只校验解析结果落在 node_modules/.pnpm/ 内的注入副本
  *     （解析到 packages/ 自身的是工作区直链，永远同步，跳过）
  *
- * 用法: node scripts/check-injected-copies.mjs
+ * 用法: node scripts/check-injected-copies.mjs [--quiet]
+ *   --quiet  一致时不打印成功行（供 pre-commit hook 用；不一致时输出不变）
  * 退出码: 0 一致 / 1 发现不同步
  */
 
@@ -127,7 +128,10 @@ if (checkedCount === 0) {
 }
 
 if (problems.length === 0) {
-  console.log(`✓ 注入副本与源 src/dist 一致（已检查 ${checkedCount} 个注入副本）`);
+  // --quiet：供 pre-commit hook 调用，一致时不刷屏（不一致时的输出照旧，不为静默而静默）
+  if (!process.argv.includes('--quiet')) {
+    console.log(`✓ 注入副本与源 src/dist 一致（已检查 ${checkedCount} 个注入副本）`);
+  }
   process.exit(0);
 }
 

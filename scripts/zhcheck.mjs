@@ -419,11 +419,13 @@ function getStagedFiles() {
     return (
       out
         .split('\n')
-        .filter(
-          (f) =>
-            f.trim() &&
-            (f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.mjs')),
-        )
+        // 只收 .ts/.tsx —— 与全量扫描的 `isTsSourceFile`（/\.tsx?$/）同口径。
+        //
+        // 这里原本也收 .js/.mjs，但 RefactorEngine.analyzeDirectory 只分析 .ts/.tsx，
+        // 于是 scripts/*.mjs 这类文件**只**会出现在暂存区模式里：基线里永远没有它们
+        // （baseline:write 走的是同一条 .ts/.tsx 口径），任何一次脚本改动都会被判
+        // introduced 且无法消除 —— 门禁对这类文件是「不可能通过」而非「有标准」。
+        .filter((f) => f.trim() && (f.endsWith('.ts') || f.endsWith('.tsx')))
         // 跳过构建产物：dist/dist-electron 为自包含 bundle 与 SOP 拷贝（随仓库分发的发布物，非可分析源码）
         .filter((f) => !RE_DIST.test(f) && !RE_DIST_ELECTRON.test(f))
         // 跳过超大文件（压缩 bundle 无法做有意义的静态分析）
@@ -473,6 +475,26 @@ if [ -f "$ROOT/scripts/zhcheck.mjs" ]; then
   echo "\\033[1;32m[智汇码盾] 检查通过\\033[0m"
 else
   echo "\\033[1;33m[智汇码盾] zhcheck.mjs not found, skipping\\033[0m"
+fi
+
+# ── 注入副本同步（pnpm file: 依赖的实体副本陷阱）────────────────────────────
+#
+# 只要暂存区里有 packages/*/src/ 的改动就跑：新增一个 .ts 文件后，下游包的
+# node_modules 副本里**永远不会**出现它，而 tsc（解析 types → src）和单测
+# （跑 src）都是绿的 —— 表现为「门禁全绿，用户点一下按钮就 Cannot find module」。
+# 2026-11-03 真实事故，见《代码审查报告3》§8.1.1。
+#
+# 只在 src 变更时跑：文档/脚本提交不受这 ~7s 拖累。
+if git diff --cached --name-only | grep -qE '^packages/[^/]+/src/'; then
+  if [ -f "$ROOT/scripts/check-injected-copies.mjs" ]; then
+    if ! $NODE "$ROOT/scripts/check-injected-copies.mjs" --quiet; then
+      echo ""
+      echo "\\033[1;31m[智汇码盾] 注入副本与源不同步，提交已阻断\\033[0m"
+      echo "  修复：rm -rf packages/desktop/node_modules && pnpm install --prefer-offline"
+      echo "  （新增文件必须重建副本；pnpm install --force 无效，会返回 Already up to date）"
+      exit 1
+    fi
+  fi
 fi
 `;
 

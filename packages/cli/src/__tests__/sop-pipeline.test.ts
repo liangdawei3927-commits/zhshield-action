@@ -44,10 +44,17 @@ describe('CLI SOP 流水线 — 规则加载与已知问题检测（回归门禁
   beforeAll(async () => {
     // 镜像 CLI 启动行为：补齐外部工具搜索路径（幂等，模块级已调用一次）
     augmentProcessPath();
-    // 在临时目录复制固定样本：外部工具（semgrep 等）扫描时会向目标写入
-    // .semgrep/inline-*.yml 等产物，直接扫固定样本会污染被门禁守护的 fixture。
+    // 在临时目录复制固定样本：外部工具（semgrep 等）扫描时会向目标写入产物，
+    // 直接扫固定样本会污染被门禁守护的 fixture。
+    //
+    // 只复制**版本控制里的**内容：`node_modules/` 与 `.semgrep/` 都被 .gitignore
+    // 忽略，本地跑过一轮后就地残留，而 CI 上没有 —— 不过滤会让本地扫描面比 CI 大，
+    // 耗时随本机残留量漂移（2026-11-03：同一用例 49.7s → 超 120s）。
     projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhshield-sop-'));
-    fs.cpSync(SAMPLE_REPO, projectDir, { recursive: true });
+    fs.cpSync(SAMPLE_REPO, projectDir, {
+      recursive: true,
+      filter: (src) => !/[/\\](?:node_modules|\.semgrep)(?:[/\\]|$)/.test(src),
+    });
 
     runner = new PipelineRunner(projectDir, { configDir: SOP_TEMPLATES });
     ruleCount = await runner.loadSopRules();
@@ -72,9 +79,11 @@ describe('CLI SOP 流水线 — 规则加载与已知问题检测（回归门禁
     const violations = gitleaksEval!.violations ?? [];
     expect(violations.length).toBeGreaterThan(0);
     expect(violations.some((v) => v.file.includes('credentials.ts'))).toBe(true);
-    // security 域为全量扫描（含 semgrep 对 fixutre 全量分析 ~60s），
-    // 门禁同时覆盖 gitleaks 检出 + 全量扫描不崩溃，阈值放宽到 120s
-  }, 120_000);
+    // security 域为全量扫描：每条 active semgrep 规则各起一次 semgrep 进程
+    // （冷启动实测 7.6s/次），合计受机器负载影响很大 —— 本机实测 49.7s（空载）
+    // 到 120s+（同时跑全量测试时）。这是**外部工具的真实成本**，不是被测逻辑变慢，
+    // 故阈值放到 300s；真出现规则漏检仍会因断言失败而红，不靠超时兜底。
+  }, 300_000);
 
   it('Given 植入未使用变量的样本项目与 ESLint flat config，When SOP Guard 门禁，Then eslint-error 规则失败并报告违规', async () => {
     // 不传 domains，跑全 guard 域（guard 域含 eslint-error 规则）。

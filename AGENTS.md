@@ -78,6 +78,8 @@ rm -rf packages/<消费者包>/node_modules && pnpm install --prefer-offline   #
 
 **自检**：`node scripts/check-injected-copies.mjs`（比对消费者实际解析到的注入副本与源 `src`/`dist` 两棵树，`__tests__` 与 `.DS_Store` 除外，不同步则 exit 1）。只比 dist 会漏掉「新增 `.ts` 源文件」导致的 TS2307（2026-11-02 实锤），故两棵树都必须比。`bash scripts/verify-env.sh` 的第 3.5 步已内置该检查。
 
+**源 dist 过期提醒**（2026-11-04 新增）：脚本还会对「源 `dist` 比源 `src` 旧」的包打印 ⚠️ 提醒（不阻断、不 exit 1 —— 改完 src 未 build 是常态，不该因此拦住无关提交）。这条提醒来自一次真实事故：改了 `shared` 的 src、`dist` 只有部分被重建，`desktop` 的 `vitest.config.ts` require 到 `@zh/shared` 的 dist 时抛 `Cannot find module './tool-exec-primitives'` —— 报错完全不指向真因（缺的是"没 build"）。**下游跑测试/构建报 `Cannot find module './<新文件>'` 时，先看这条提醒，再去查代码。**
+
 **历史事故**：08-30 security dist 过期导致 desktop typecheck 红灯；09-03 kernel `content-predicates` 与 pipeline `runner-utils` 导致 desktop 两个测试文件加载失败。
 
 ## ⚠️ 测试隔离与观测保真四条陷阱（2026-11-03 实锤）

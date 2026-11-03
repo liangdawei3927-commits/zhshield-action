@@ -72,6 +72,20 @@ function diffTree(pkgDir, real, tree) {
   return { status: missing.length > 0 ? 'missing-files' : 'ok', missing };
 }
 
+/** 目录内最新 mtime（毫秒）；不存在返回 0 */
+function newestMtime(dir) {
+  let newest = 0;
+  if (!fs.existsSync(dir)) return newest;
+  for (const file of listFiles(dir)) {
+    try {
+      newest = Math.max(newest, fs.statSync(path.join(dir, file)).mtimeMs);
+    } catch {
+      // 并发删改的文件忽略即可
+    }
+  }
+  return newest;
+}
+
 /** 受校验的两棵树：types 走 src、运行时代码走 dist，缺任一棵都会造成假象 */
 const TREES = ['src', 'dist'];
 
@@ -84,6 +98,8 @@ if (!fs.existsSync('packages')) {
 const pkgs = fs.readdirSync('packages');
 const checked = new Set(); // 同一副本只检查一次（多个消费者共享）
 const problems = [];
+/** 源 dist 比源 src 旧（不阻断，只提醒先 build） */
+const staleDists = new Map();
 let checkedCount = 0;
 
 for (const pkg of pkgs) {
@@ -119,12 +135,29 @@ for (const pkg of pkgs) {
         wholeDir: result.status === 'missing-dir',
       });
     }
+
+    // 附加提醒（不阻断）：源 dist 比源 src 旧 ⇒ 下游跑测试/构建会用到过期产物。
+    // 2026-11-04 实锤：这条不提醒时，`dist` 缺文件要等 desktop 的 vitest 起不来才暴露，
+    // 且报错是 "Cannot find module './xxx'"，完全不指向真因。
+    const srcNewest = newestMtime(path.join('packages', pkgDir, 'src'));
+    const distNewest = newestMtime(path.join('packages', pkgDir, 'dist'));
+    if (srcNewest > 0 && distNewest > 0 && srcNewest > distNewest && !staleDists.has(pkgDir)) {
+      staleDists.set(pkgDir, { consumer: pkg, srcNewest, distNewest });
+    }
   }
 }
 
 if (checkedCount === 0) {
   console.error('✗ 未发现任何 pnpm 注入副本 —— node_modules 可能未安装，本次校验实际未生效');
   process.exit(1);
+}
+
+if (staleDists.size > 0) {
+  console.error('⚠️  以下包的源 dist 比 src 旧（下游会用到过期产物，改完记得 pnpm --filter <pkg> build）：');
+  for (const [pkgDir, info] of staleDists) {
+    const lagSec = Math.round((info.srcNewest - info.distNewest) / 1000);
+    console.error(`    packages/${pkgDir}（dist 落后 ${lagSec}s，消费者 ${info.consumer}）`);
+  }
 }
 
 if (problems.length === 0) {
@@ -134,7 +167,6 @@ if (problems.length === 0) {
   }
   process.exit(0);
 }
-
 console.error(`✗ ${problems.length} 处注入副本不同步：`);
 for (const p of problems) {
   if (p.wholeDir) {

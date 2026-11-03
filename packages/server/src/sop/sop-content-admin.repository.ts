@@ -14,7 +14,7 @@ import type { DbConnection, RuleContentRow, SaveRuleContentParams } from '@zh/db
 import { computeRuleContentSha } from '@zh/kernel';
 import type { SopRule } from '@zh/kernel';
 import { AdminError, audit } from './sop-content-admin.shared';
-import { SopContentRepository } from './sop-content.repository';
+import { SopAdminRepositoryBase } from './sop-admin.repository.base';
 
 const MAX_RULE_CONTENT_BYTES = 100 * 1024;
 const RULE_STATUSES = new Set(['draft', 'trial', 'active', 'deprecated', 'disabled']);
@@ -94,25 +94,11 @@ function upsertPlatformScope(
  * - 规则发布写 rule_scope 平台行（org_id = NULL），严禁 org 行
  * - 校验失败抛 AdminError（中文消息），由服务/控制器层翻译为 HTTP 异常
  */
-export class SopRuleAdminRepository extends SopContentRepository {
-  private requireDb(): ReturnType<DbConnection['getDb']> {
-    const db = this.tryReadyDb();
-    if (!db) throw new AdminError('数据库不可用', 'unavailable');
-    return db;
-  }
-
+export class SopRuleAdminRepository extends SopAdminRepositoryBase {
   private requireRule(db: ReturnType<DbConnection['getDb']>, ruleId: string): RuleContentRow {
     const row = getRuleContent(db, ruleId);
     if (!row) throw new AdminError('规则不存在', 'not_found');
     return row;
-  }
-
-  /** requireDb() 成功后 dbConn 必已就绪；返回连接供 transaction 使用 */
-  private requireConn(): DbConnection {
-    this.requireDb();
-    const conn = this.dbConn;
-    if (!conn) throw new AdminError('数据库不可用', 'unavailable');
-    return conn;
   }
 
   /** upsert 规则本体；新规则 version=1.0.0，更新置草稿态（蓝图 §3.1：PUT 只改草稿） */

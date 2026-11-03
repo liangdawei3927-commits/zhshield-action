@@ -11,7 +11,7 @@ import type { DbConnection, ToolPackageRow } from '@zh/db';
 import { hashToolRuleFiles } from '@zh/kernel';
 import type { ToolRuleFile } from '@zh/kernel';
 import { AdminError, audit } from './sop-content-admin.shared';
-import { SopContentRepository } from './sop-content.repository';
+import { SopAdminRepositoryBase } from './sop-admin.repository.base';
 
 const TOOL_STATUSES = new Set(['active', 'deprecated', 'disabled']);
 
@@ -34,25 +34,11 @@ export interface SaveToolPackageInput {
  * - 工具包 sha256 恒为 hashToolRuleFiles(files)（硬约束 H1 同口径）
  * - 校验失败抛 AdminError（中文消息），由服务/控制器层翻译为 HTTP 异常
  */
-export class SopToolAdminRepository extends SopContentRepository {
-  private requireDb(): ReturnType<DbConnection['getDb']> {
-    const db = this.tryReadyDb();
-    if (!db) throw new AdminError('数据库不可用', 'unavailable');
-    return db;
-  }
-
+export class SopToolAdminRepository extends SopAdminRepositoryBase {
   private requireTool(db: ReturnType<DbConnection['getDb']>, toolId: string): ToolPackageRow {
     const row = getToolPackage(db, toolId);
     if (!row) throw new AdminError('工具包不存在', 'not_found');
     return row;
-  }
-
-  /** requireDb() 成功后 dbConn 必已就绪；返回连接供 transaction 使用 */
-  private requireConn(): DbConnection {
-    this.requireDb();
-    const conn = this.dbConn;
-    if (!conn) throw new AdminError('数据库不可用', 'unavailable');
-    return conn;
   }
 
   /** upsert 工具包；sha256 = hashToolRuleFiles，version = 1.<sha256 前 12 位>（与读路径同口径） */

@@ -24,6 +24,7 @@ import {
   parsePipfileLockFile,
   parsePoetryProject,
   createParsedLockfile,
+  emptyParsedLockfile,
   readDeclaredRanges,
   type ParsedLockfile,
 } from './lockfile-verifier-parsers';
@@ -78,10 +79,7 @@ export interface LockfileDiff {
 /** pnpm-lock.yaml → importers 声明范围 + packages 完整性 */
 function parsePnpmLock(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const { declared, locked, integrity } = createParsedLockfile(
-    new Map<string, string>(),
-    failures,
-  );
+  const { declared, locked, integrity } = emptyParsedLockfile(failures);
 
   if (!fs.existsSync(safeJoin(projectRoot, 'package.json'))) {
     failures.push('缺少 package.json 清单');

@@ -44,6 +44,11 @@ export function createParsedLockfile(
   };
 }
 
+/** 空声明集起步的解析结果（pnpm / poetry / Pipfile 等入口统一的初始形态，减少重复样板）。 */
+export function emptyParsedLockfile(failures: string[]): ParsedLockfile {
+  return createParsedLockfile(new Map<string, string>(), failures);
+}
+
 /** package.json 声明范围（dependencies + devDependencies） */
 export function readDeclaredRanges(
   projectRoot: string,
@@ -137,10 +142,7 @@ function collectNpmPackages(
 /** pyproject.toml + poetry.lock → 声明范围 + 锁定版本 */
 export function parsePoetryProject(projectRoot: string, lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const { declared, locked, integrity } = createParsedLockfile(
-    new Map<string, string>(),
-    failures,
-  );
+  const { declared, locked, integrity } = emptyParsedLockfile(failures);
 
   const pyprojectContent = readTextSafe(safeJoin(projectRoot, 'pyproject.toml'));
   if (pyprojectContent === null) {

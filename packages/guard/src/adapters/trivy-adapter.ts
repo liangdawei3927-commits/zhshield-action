@@ -1,7 +1,4 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import { probeToolVersion, runToolOnce } from '@zh/shared';
 
 /** 归一化的 Trivy 命中：漏洞（vulnerability）或配置错误（misconfiguration）+ 所在扫描目标 target */
 export interface TrivyFinding {
@@ -56,15 +53,11 @@ export class TrivyAdapter {
   }
 
   /**
-   * 检查 trivy 是否可用
+   * 检查 trivy 是否可用（A12：走进程级 single-flight 探测，不再每次裸起 --version）
    */
   async isAvailable(): Promise<boolean> {
-    try {
-      await execFileAsync(this.trivyPath, ['--version'], { timeout: 5000 });
-      return true;
-    } catch {
-      return false;
-    }
+    const probe = await probeToolVersion(this.trivyPath, 5000);
+    return probe.ok;
   }
 
   /**
@@ -76,7 +69,8 @@ export class TrivyAdapter {
   ): Promise<TrivyFinding[]> {
     const args = this.buildScanArgs(projectPath, options);
     try {
-      const { stdout } = await execFileAsync(this.trivyPath, args, {
+      // A12：经 runToolOnce 派发（运行作用域内同参只跑一次；作用域外与 execFile 等价）
+      const { stdout } = await runToolOnce(this.trivyPath, args, {
         timeout: 300_000, // 5 minutes for large monorepos
         maxBuffer: 10 * 1024 * 1024, // 10MB
       });
@@ -111,7 +105,7 @@ export class TrivyAdapter {
     const args = ['fs', '--format', 'json', '--scanners', 'config', projectPath];
 
     try {
-      const { stdout } = await execFileAsync(this.trivyPath, args, {
+      const { stdout } = await runToolOnce(this.trivyPath, args, {
         timeout: 300_000,
         maxBuffer: 10 * 1024 * 1024,
       });

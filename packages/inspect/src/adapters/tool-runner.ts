@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import type { AccessScope, Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
+import { runToolOnce } from '@zh/shared';
 import { resolveToolCommand } from './tool-bin';
 import { isCommandAvailable } from './tool-available';
 
@@ -22,9 +21,6 @@ import { isCommandAvailable } from './tool-available';
  * · `execTool` 失败时**原样抛出** child_process 的错误对象（保留 code/stdout/stderr/message），
  *   错误归类（未安装 / 部分输出 / 执行失败）仍由各适配器按自身文案处理。
  */
-
-/** 11 个适配器共用的 promise 化 execFile（各适配器不再单独 promisify） */
-const execFileAsync = promisify(execFile);
 
 /**
  * 单次工具扫描的默认超时（ms）。
@@ -116,13 +112,17 @@ export interface ToolExecOutput {
  * 失败时原样抛出 child_process 的错误对象（携带 code/stdout/stderr/message），
  * 不在此处吞错或改写：各适配器的错误分支需要按自身语义区分「未安装」「命中问题但非零退出」
  * 与「执行失败」，文案与退出码判定必须逐条保持原样。
+ *
+ * A12：经 `runToolOnce` 派发 —— 在 `withToolRunScope` 开启的运行作用域内，
+ * 同一 (command, argv, cwd) 只真正执行一次，其余重放同一结果/错误快照。
+ * 作用域外行为与直接 `execFile` 完全等价。
  */
 export async function execTool(
   command: string,
   args: string[],
   options: ToolExecOptions,
 ): Promise<ToolExecOutput> {
-  return execFileAsync(command, args, {
+  return runToolOnce(command, args, {
     cwd: options.cwd,
     timeout: options.timeout,
     maxBuffer: options.maxBuffer ?? DEFAULT_MAX_BUFFER,

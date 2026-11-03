@@ -21,13 +21,10 @@
  * 本模块自 @zh/inspect 的 adapters/tool-bin.ts 下沉而来（该文件现改为 re-export），
  * 使 Security / Guard 无需依赖 @zh/inspect（后者还拖着 @zh/dependency、@zh/i18n）。
  */
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-
-const execFileAsync = promisify(execFile);
+import { probeToolVersion } from './tool-probe';
 
 /** 单个目录项：若是目录则加入候选集（stat 失败忽略） */
 function addSubdirCandidate(startDir: string, entry: string, candidates: Set<string>): void {
@@ -140,14 +137,11 @@ export async function resolveToolCommandDetailed(
 }
 
 async function probePathCommand(tool: string, timeoutMs: number): Promise<ResolvedToolCommand> {
-  try {
-    // 20s：semgrep 等 Python 工具冷启动 --version 可达 7.6s，5s 会误判 PATH 不可用。
-    // 批量探测场景（如桌面端工具就绪面板一次探 10 个工具）可传更短的值控制总耗时。
-    await execFileAsync(tool, ['--version'], { timeout: timeoutMs });
-    return { command: tool, origin: 'path' };
-  } catch {
-    return { command: tool, origin: 'unresolved' };
-  }
+  // 20s：semgrep 等 Python 工具冷启动 --version 可达 7.6s，5s 会误判 PATH 不可用。
+  // 批量探测场景（如桌面端工具就绪面板一次探 10 个工具）可传更短的值控制总耗时。
+  // 探测本身经 process 内 single-flight 合并（同一命令一次运行不再反复起进程，见 tool-probe.ts）。
+  const probe = await probeToolVersion(tool, timeoutMs);
+  return { command: tool, origin: probe.ok ? 'path' : 'unresolved' };
 }
 
 /**

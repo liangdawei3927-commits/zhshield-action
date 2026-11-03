@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ProjectProfile } from '@zh/dependency';
@@ -112,6 +113,32 @@ describe('listNodeModules', () => {
 
 describe('HallucinatedDependencyCheckImpl', () => {
   let tmpDir: string;
+
+  /**
+   * 宿主隔离自检：本组的边界 3 用例断言「向上全无依赖清单」，因此结果取决于
+   * 系统临时目录的**祖先**是否干净。曾有遗留夹具把 package.json 直接写进
+   * `os.tmpdir()` 根，导致本组恒红、且看起来像规则退化（实测 2026-11-03）。
+   * 与其让人猜，不如把现场直接指出来。
+   */
+  beforeAll(() => {
+    const offenders: string[] = [];
+    let dir = os.tmpdir();
+    for (;;) {
+      for (const name of ['package.json', 'pnpm-lock.yaml', 'package-lock.json']) {
+        const candidate = path.join(dir, name);
+        if (fsSync.existsSync(candidate)) offenders.push(candidate);
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    if (offenders.length > 0) {
+      throw new Error(
+        `临时目录祖先存在依赖清单，会让「无任何依赖清单」用例恒红（与本模块行为无关）：\n  ${offenders.join('\n  ')}\n` +
+          '清理后再跑（例如 `rm <os.tmpdir()>/package.json`）。',
+      );
+    }
+  });
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'zh-ai-halluc-'));

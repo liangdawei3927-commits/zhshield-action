@@ -2,10 +2,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import { grypeMapper, resolveToolCommandDetailed } from '@zh/shared';
+import { grypeMapper, resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
 import type { ExecError, GrypeOutput } from './tool-output-types';
 import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
 
+// 仅失败的后台 DB 初始化（fire-and-forget，600s、不参与扫描去重）仍直连 execFile；
+// 一切"扫描/探测"调用必须走 runToolOnce（A12，见 AGENTS.md「工具调用约定」）。
 const execFileAsync = promisify(execFile);
 
 /**
@@ -33,7 +35,8 @@ async function triggerDbUpdateInBackground(command: string): Promise<void> {
 
 async function isDbReady(command: string): Promise<boolean> {
   try {
-    const { stdout } = await execFileAsync(command, ['db', 'status'], { timeout: 15000 });
+    // A12：经 runToolOnce 派发（一次运行内 db status 只探一次）
+    const { stdout } = await runToolOnce(command, ['db', 'status'], { timeout: 15000 });
     return !GRYPE_DB_NOT_READY.test(stdout);
   } catch {
     return false;
@@ -103,7 +106,8 @@ export class GrypeAdapter implements ToolAdapter {
         'grype 漏洞库未就绪（首次使用需联网下载，已后台初始化，稍后重新扫描即生效）',
       );
     }
-    const { stdout } = await execFileAsync(command, [source, '-o', 'json'], {
+    // A12：经 runToolOnce 派发（运行作用域内同参只跑一次；作用域外与 execFile 等价）
+    const { stdout } = await runToolOnce(command, [source, '-o', 'json'], {
       cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 120000,
       maxBuffer: 20 * 1024 * 1024,

@@ -22,7 +22,8 @@ export interface MachineProfile {
   vitestMaxWorkers: number;
 }
 
-const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), max);
+/** 夹取到 [min, max]（vitest 并发预算等共用，勿在别处重定义） */
+export const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), max);
 
 /**
  * 探测当前机器并推导各环节并发预算。

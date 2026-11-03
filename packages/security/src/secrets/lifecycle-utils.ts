@@ -3,8 +3,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { runToolOnce } from '@zh/shared';
 import type {
   CommandRunner,
   SecretFinding,
@@ -12,8 +11,6 @@ import type {
   SecretSeverity,
   SecretType,
 } from './types';
-
-const execFileAsync = promisify(execFile);
 
 const SCHEME_RE = /^[a-z]+:\/\//i;
 const USER_RE = /^[^@]+@/;
@@ -151,7 +148,9 @@ export function isPublicRemoteUrl(url: string): boolean {
 export const defaultRunner: CommandRunner = {
   async run(command, args, opts) {
     try {
-      const { stdout } = await execFileAsync(command, args, {
+      // A12：经 runToolOnce 派发 —— 运行作用域内同一 (command, argv, cwd) 只执行一次。
+      // 与 inspect 的 gitleaks 适配器共用同一份结果，避免同参扫描各起一次进程。
+      const { stdout } = await runToolOnce(command, args, {
         cwd: opts?.cwd,
         timeout: opts?.timeout ?? 60000,
         maxBuffer: opts?.maxBuffer ?? 16 * 1024 * 1024,

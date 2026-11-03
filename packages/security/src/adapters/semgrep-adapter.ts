@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { semgrepMapper } from '@zh/shared';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -13,11 +11,9 @@ import type {
   CodeFlow,
   CodeFlowThreadFlow,
 } from '@zh/shared';
-import { resolveToolCommandDetailed } from '@zh/shared';
+import { resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
-
-const execFileAsync = promisify(execFile);
 
 const META: ToolMeta = {
   id: 'semgrep',
@@ -127,7 +123,8 @@ export class SemgrepAdapter implements ToolAdapter {
   private async runSemgrep(args: string[], options: ToolScanOptions): Promise<SemgrepOutput> {
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
     const { command } = await resolveToolCommandDetailed('semgrep', options.projectPath);
-    const { stdout } = await execFileAsync(command, args, {
+    // A12：经 runToolOnce 派发（运行作用域内同参只跑一次；作用域外与 execFile 等价）
+    const { stdout } = await runToolOnce(command, args, {
       cwd: path.resolve(options.projectPath),
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,

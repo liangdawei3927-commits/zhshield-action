@@ -1,14 +1,11 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import { resolveToolCommandDetailed } from '@zh/shared';
+import { resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
 import { isToolAvailable } from './adapter-helpers';
 import type { ExecError } from './tool-output-types';
 
-const execFileAsync = promisify(execFile);
 const ORT_TIMEOUT = 300000; // 5 min
 
 /** 需关注/标记的许可证 */
@@ -112,7 +109,7 @@ export class ORTAdapter implements ToolAdapter {
     const pm = options.config?.packageManagers?.[0] || 'NPM';
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
     const { command } = await resolveToolCommandDetailed('ort', options.projectPath);
-    await execFileAsync(
+    await runToolOnce(
       command,
       ['analyze', '-i', projectPath, '-o', outputDir, '--package-managers', pm],
       {

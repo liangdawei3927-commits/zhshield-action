@@ -9,10 +9,8 @@
  * - suggestive  = 单类强证据或弱证据组合
  * - uncertain   = 特征存在但不充分 → 不标记为 AI 生成，仅提示（边界 2）
  */
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-
 import type { ProjectProfile } from '@zh/dependency';
+import { runToolOnce } from '@zh/shared';
 
 import { readTextFileSafe, walkSourceFiles } from './files';
 import { analyzeStyleSignature } from './style-signature';
@@ -20,8 +18,6 @@ import type { AiEvidence, AiOriginFinding, AiStrength, AiToolReport, AiUserTag }
 
 const BLOCK_SPLIT_RE = /\n\s*\n/;
 const NEWLINE_RE = /\r?\n/;
-
-const execFileAsync = promisify(execFile);
 
 /** git 提交证据：解析 git log 输出的单条提交 */
 export interface CommitEvidence {
@@ -138,7 +134,8 @@ function burstCommitIndexes(commits: readonly CommitEvidence[]): ReadonlySet<num
  */
 async function runGitLog(projectPath: string, maxCommits: number): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(
+    // A12：经 runToolOnce 派发（一次运行内同一 git log 只跑一次；作用域外等价 execFile）
+    const { stdout } = await runToolOnce(
       'git',
       [
         '-C',

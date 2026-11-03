@@ -1,11 +1,8 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import type { ToolId, ToolAdapter, ToolVersionInfo } from './types';
-
-const execFileAsync = promisify(execFile);
+import { probeToolVersion } from './tool-probe';
 
 const VERSION_PATTERN = /(\d+\.\d+\.\d+[\w.-]*)/;
 
@@ -85,16 +82,12 @@ export class ToolManager {
   async getVersion(id: ToolId): Promise<string | null> {
     const tool = this.tools.get(id);
     if (!tool) return null;
-    try {
-      const { stdout } = await execFileAsync(tool.meta.cliCommand, ['--version'], {
-        timeout: 5000,
-      });
-      const match = stdout.match(VERSION_PATTERN);
-      // match[1] 在无捕获组命中时为 undefined，?? null 与函数返回契约 string | null 对齐
-      return match ? (match[1] ?? null) : stdout.trim().split('\n')[0] || null;
-    } catch {
-      return null;
-    }
+    // 经 single-flight 探测：就绪面板与各引擎适配器探同一命令时只起一次进程（见 tool-probe.ts）
+    const probe = await probeToolVersion(tool.meta.cliCommand, 5000);
+    if (!probe.ok) return null;
+    const match = probe.stdout.match(VERSION_PATTERN);
+    // match[1] 在无捕获组命中时为 undefined，?? null 与函数返回契约 string | null 对齐
+    return match ? (match[1] ?? null) : probe.stdout.trim().split('\n')[0] || null;
   }
 
   async checkAllAvailability(): Promise<Partial<Record<ToolId, boolean>>> {

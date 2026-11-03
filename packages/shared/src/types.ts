@@ -261,6 +261,20 @@ export interface ToolAdapter {
   accessScope?: AccessScope;
   isAvailable(): Promise<boolean>;
   scan(options: ToolScanOptions): Promise<ToolResult>;
+  /**
+   * A12 批量派发（可选）：调度方把多条同工具、同目标的扫描请求合并成一次进程，
+   * 返回 key → 各自的 ToolResult。返回的 Map 可以缺少某些 key（或整个为空），
+   * 表示"这些请求没被合并"，调度方会退回逐条 scan。
+   *
+   * 归属正确性是硬要求：每个 key 的结果只能包含该请求自己规则产生的 issue。
+   */
+  scanBatch?(requests: ToolScanBatchRequest[]): Promise<Map<string, ToolResult>>;
+}
+
+/** 批量扫描的单条请求：key 由调度方定义（用于把结果分回各自规则），options 与该规则单独扫描时逐字段一致 */
+export interface ToolScanBatchRequest {
+  key: string;
+  options: ToolScanOptions;
 }
 
 /** 扫描前后钩子（F0 Hook/Audit 地基）：before 返回 null 表示阻断本次扫描 */

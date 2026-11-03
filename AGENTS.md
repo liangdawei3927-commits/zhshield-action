@@ -50,6 +50,11 @@ pnpm + Turborepo monorepo，21 个 `@zh/*` 包。依赖方向：客户端 → �
 | `pnpm test` | 全部 Vitest |
 | `pnpm lint` | ESLint（各包 src） |
 | `pnpm --filter @zh/<pkg> exec tsc --noEmit -p tsconfig.json` | 单包类型检查 |
+| `pnpm bench:pipeline` | **A14** 全量流水线时长验收：N 次取中位数、负载门限、产物新鲜度；PASS/FAIL/INVALID 三态 |
+| `pnpm verify:offline` | **A15** 断网端到端：不可达 → `partial` + exit 2；同时用本地桩验证"可达时验得出来" |
+| `pnpm verify:tool-dedup` | **A12** 工具进程去重：从 `child_process` 派发侧观测真实 (cmd, args) 计数 |
+
+三条验收脚本的设计纪律（改它们之前先读）：**没效力的测量判 `INVALID`，不判 PASS/FAIL**；**数字必须带出处**（commit / dist 哈希 / 负载写进 `.zhshield/bench/*.json`）；**观测在进程外**，不采信被测代码自报的计数。详见《07》§7.7。
 
 ## ⚠️ Monorepo 依赖陷阱：pnpm 注入副本不同步（已踩三次，必读）
 
@@ -75,8 +80,28 @@ rm -rf packages/<消费者包>/node_modules && pnpm install --prefer-offline   #
 
 **历史事故**：08-30 security dist 过期导致 desktop typecheck 红灯；09-03 kernel `content-predicates` 与 pipeline `runner-utils` 导致 desktop 两个测试文件加载失败。
 
-## ⛔ 暂下线功能（AI 禁止重新开启）
+## ⚠️ 测试隔离与观测保真四条陷阱（2026-11-03 实锤）
 
+1. **探测缓存是进程级状态**：`@zh/shared/tool-probe.ts` 把 `--version` 探测在进程内合并（A12 切片）。测试环境默认**关闭**缓存（`VITEST === 'true'`），否则同一 worker 里跑多个测试文件时，上一个文件 mock 出来的"工具不可用"会漏进下一个文件——实测表现为 `rule-quality-gate` 的 `path-traversal` 真阳性"0 检出"，红得和规则退化一模一样。要测缓存本身，用 `__resetToolProbeCache()` 显式开启。
+2. **不要往 `os.tmpdir()` 根写夹具**：`hallucinated-dependency` 会向上查找最近的依赖清单，临时目录根若残留一个 `package.json`，「无任何依赖清单」类用例就恒红且看起来像产品缺陷（实测踩过）。夹具一律 `mkdtemp` 到子目录；该用例已加祖先清单自检，命中时直接打印要删的文件。
+3. **改观测器先验观测器**：`scripts/lib/tool-spy.cjs` 包装 `child_process` 时必须复刻 `util.promisify.custom`。缺这一步，产品侧 `promisify(execFile)` 退回回调单值形态、`stdout` 变 undefined，于是**所有工具都被判成不可用**（实测让 `inspect --sop` 报 18 项"工具不可用"、semgrep 一次未派发，几乎被当成产品结论）。观测器失真比不观测更危险。
+4. **mock `node:child_process` 只罩得住「被 Vite 改写的模块」**：用例里 `vi.mock('node:child_process')` 对 `@zh/shared` **内部**的派发有效的前提，是该包的 `vitest.config.ts` 把 `@zh/shared` 别名到 `../shared/src`。不别名时 `@zh/shared` 从 node_modules(dist) 加载、被外部化，mock 完全失效——实测 2026-11-03 工具调用改走 `runToolOnce` 后，`guard` 1 条、`security` 19 条用例假红（期望"没调外部工具"或"按 args 调了"，实际根本没进 mock）。**新增对 `@zh/shared` 派发做断言的用例前，先确认本包 vitest 配置有该别名**（guard/security 已补，注释见两处 config）。
+
+## 工具调用约定（A12 执行面）
+
+外部工具**必须**经 `@zh/shared` 的两个入口派发，不要直接 `execFile`/`spawn`：
+
+- **可用性探测**：`probeToolVersion(command)` —— 进程级 single-flight + 30s TTL，缓存 key 是**可执行文件 realpath**（裸名与绝对路径归一，不同安装不合并），只缓存结论明确的结果（超时/信号不缓存）。
+- **实际执行**：`runToolOnce(command, args, {cwd, timeout, maxBuffer})` —— 运行作用域内同一 `(command, argv, cwd)` 只执行一次，其余重放（成功重放输出；非零退出重放带 stdout 的错误快照；超时/信号/ENOBUFS 重试）。作用域由 `withToolRunScope(label, fn)` 开启，已挂在 `runDomains`、`kernel.runInspect`、`kernel.runGuard`。
+- **可合并的工具**：`ToolAdapter.scanBatch?(requests)` + `kernel/runner/prefetch-tool-batch.ts` —— 同工具、同目标、带内联 rules 的规则合并成**一次**进程（semgrep 已实现：`semgrep scan` 10 → 2，SOP security 域 ≈90s → ≈20s）。新增可合并工具时：在 `BATCHABLE_TOOLS` 登记 + 适配器实现 `scanBatch`（**归属正确性是硬要求**：每个 key 只能拿到自己规则的命中；无法归属必须**失败关闭**，不能落成"干净"）。逃生开关 `ZH_TOOL_BATCH=off`。
+  - ⚠️ 两个必踩的坑：`wrapAdapter` 用展开运算符包装，**原型方法不会被拷贝** → 新能力要在包装器里显式转发（`scanBatch` 已加）；semgrep 会把 `--config` 文件路径当命名空间编进 `check_id`（`<路径>.zhb0--a1`），回填必须按**末段**匹配而非全等。
+
+**已覆盖**：inspect 全部适配器（经 `execTool`）、security 的 secrets/`vulnerability-scanner`/semgrep/trivy/depcheck/ort/grype、guard 的 eslint/trivy、inspect 的 ai-origin `git log`。
+**显式例外**（别"顺手"改）：`guard/test-runner`（跑项目自己的测试套件，带 `env: CI=true`、数分钟级，无去重价值且重放会污染副作用）、`sentinel/*`（文件监听事件驱动，非一次运行）、`grype db update`（600s 后台维护任务，自带防重标志）。
+
+直接 `execFile` 的后果是**逃出去重**：`gitleaks detect` 曾因 inspect 与 security 两套调用各起一次进程（实测一轮 3 次、argv 逐字节相同）。诊断开关：`ZH_TOOL_RUN_DEDUP=off` 关闭作用域去重；`pnpm verify:tool-dedup` 用 `scripts/lib/tool-spy.cjs` 数真实派发。
+
+## ⛔ 暂下线功能（AI 禁止重新开启）
 以下两项功能当前处于**产品性暂下线**状态，开关在 `packages/desktop/src/feature-flags.ts`（`FEATURE_AI_TOOL_ENABLED` / `FEATURE_EVOLVE_ENABLED`）。已从侧边栏隐藏入口并封死路由。
 
 **任何 AI 助手都禁止**把这两个开关改回 `true`，或恢复侧边栏渲染 / 路由 / e2e 入口，除非**用户本人明确指示**重新开放某项功能（并同步恢复入口、文档与 e2e 用例）。原因：

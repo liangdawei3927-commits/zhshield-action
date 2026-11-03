@@ -1,14 +1,11 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import type { Adapter, CheckConfig, CheckResult } from '../types';
 import { makeAdapterResult, makeSkippedAdapterResult } from './adapter-result';
 import {
   findEslintConfigDir,
   resolveEslintTargetDir,
   resolveToolCommandDetailed,
+  runToolOnce,
 } from '@zh/shared';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * 单次 ESLint 扫描的执行预算，对齐 SOP 引擎硬上限 300s。
@@ -90,7 +87,8 @@ export class GuardESLintCheckAdapter implements Adapter {
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH，
     // 会让码盾自装的 eslint 在门禁里报「未安装」）
     const { command } = await resolveToolCommandDetailed('eslint', targetDir);
-    return execFileAsync(command, ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
+    // A12：经 runToolOnce 派发（运行作用域内同参只跑一次；作用域外与 execFile 等价）
+    return runToolOnce(command, ['--format', 'json', '--ext', '.ts,.tsx,.js,.jsx', targetDir], {
       cwd: targetDir,
       timeout: DEFAULT_SCAN_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,

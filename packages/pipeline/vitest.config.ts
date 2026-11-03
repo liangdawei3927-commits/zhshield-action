@@ -1,20 +1,19 @@
-import { makeVitestConfig, packagesDir } from '../shared/src/vitest.config.base';
-import path from 'path';
+import { makeVitestConfig, packagesSrcAlias } from '../shared/src/vitest.config.base';
 
 export default makeVitestConfig({
   resolve: {
-    alias: {
-      '@zh/shared': path.join(packagesDir, 'shared', 'src'),
-      '@zh/kernel': path.join(packagesDir, 'kernel', 'src'),
-      '@zh/guard': path.join(packagesDir, 'guard', 'src'),
-      '@zh/inspect': path.join(packagesDir, 'inspect', 'src'),
-      '@zh/refactor': path.join(packagesDir, 'refactor', 'src'),
-      '@zh/fingerprint': path.join(packagesDir, 'fingerprint', 'src'),
-      '@zh/garbage': path.join(packagesDir, 'garbage', 'src'),
-      '@zh/performance': path.join(packagesDir, 'performance', 'src'),
-      '@zh/dependency': path.join(packagesDir, 'dependency', 'src'),
-      '@zh/security': path.join(packagesDir, 'security', 'src'),
-    },
+    alias: packagesSrcAlias(
+      'shared',
+      'kernel',
+      'guard',
+      'inspect',
+      'refactor',
+      'fingerprint',
+      'garbage',
+      'performance',
+      'dependency',
+      'security',
+    ),
   },
   test: {
     testTimeout: 300000,

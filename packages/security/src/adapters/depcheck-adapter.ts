@@ -1,13 +1,9 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { depcheckMapper, resolveToolCommandDetailed } from '@zh/shared';
+import { depcheckMapper, resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
 import { isToolAvailable } from './adapter-helpers';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
 import type { ExecError, DepcheckOutput } from './tool-output-types';
-
-const execFileAsync = promisify(execFile);
 
 const META: ToolMeta = {
   id: 'depcheck',
@@ -91,7 +87,7 @@ export class DepcheckAdapter implements ToolAdapter {
       const projectPath = path.resolve(options.projectPath);
       // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
       const { command } = await resolveToolCommandDetailed('depcheck', options.projectPath);
-      const res = await execFileAsync(command, [projectPath, '--json'], {
+      const res = await runToolOnce(command, [projectPath, '--json'], {
         cwd: projectPath,
         timeout: options.timeout || 30000,
         maxBuffer: 10 * 1024 * 1024,

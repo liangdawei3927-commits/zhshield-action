@@ -57,6 +57,7 @@ export type {
   ToolResult,
   ToolScanOptions,
   ToolAdapter,
+  ToolScanBatchRequest,
   AccessScope,
   ToolCallHook,
   ToolVersionInfo,
@@ -81,6 +82,19 @@ export type {
   SopDiffMetadata,
 } from './types';
 export { ToolManager } from './tool-manager';
+export {
+  probeToolVersion,
+  invalidateToolProbes,
+  setToolProbeTtlMs,
+  __resetToolProbeCache,
+} from './tool-probe';
+export type { ToolProbeResult } from './tool-probe';
+export {
+  runToolOnce,
+  withToolRunScope,
+  currentToolRunScope,
+} from './tool-run-scope';
+export type { ToolRunScope, ToolRunOptions } from './tool-run-scope';
 export {
   findLocalToolBin,
   findZhshieldToolBin,

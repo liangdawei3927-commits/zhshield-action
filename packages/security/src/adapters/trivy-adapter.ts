@@ -1,11 +1,9 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import { resolveToolCommandDetailed } from '@zh/shared';
+import { resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
 import { isToolAvailable } from './adapter-helpers';
 import type {
   ExecError,
@@ -14,8 +12,6 @@ import type {
   TrivyVulnerability,
   TrivySecret,
 } from './tool-output-types';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * trivy 启动扫描时若本地无漏洞库（或版本过期），会尝试联网更新 DB；
@@ -169,7 +165,7 @@ export class TrivyAdapter implements ToolAdapter {
     this.applyLocalDbArgs(args);
     // 统一解析：项目本地 → ~/.zhshield/bin → PATH（裸命令只认 PATH）
     const { command } = await resolveToolCommandDetailed('trivy', options.projectPath);
-    const { stdout } = await execFileAsync(command, args, {
+    const { stdout } = await runToolOnce(command, args, {
       cwd: projectPath,
       timeout: options.timeout || 300000,
       maxBuffer: 20 * 1024 * 1024,

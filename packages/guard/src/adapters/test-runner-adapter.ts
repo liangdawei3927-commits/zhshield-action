@@ -88,6 +88,9 @@ export class TestRunnerAdapter implements Adapter {
     testArgs: string[],
     projectPath: string,
   ): Promise<{ stdout: string; stderr: string }> {
+    // 不走 runToolOnce（A12 去重）——本调用是"跑项目自己的测试套件"，
+    // 需带 env（CI=true）且一次就是数分钟的重活；同一运行内不存在同参重复派发，
+    // 缓存/重放它反而会把"测试进程的环境与副作用"耦合进运行作用域。
     return execFileAsync(testCmd || 'npx', testArgs.length > 0 ? testArgs : ['vitest', 'run'], {
       cwd: projectPath,
       // 冷缓存跑整套测试约 4 分钟（zhshield-mcp.ts 同款实测结论）：120s 会把

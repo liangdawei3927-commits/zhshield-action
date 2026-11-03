@@ -1,11 +1,23 @@
 import { defineConfig, mergeConfig, type ViteUserConfig } from 'vitest/config';
 import path from 'path';
-import { detectMachineProfile } from './machine-profile';
+import { clamp, detectMachineProfile } from './machine-profile';
 
 /** Absolute path to the monorepo `packages/` directory. */
 export const packagesDir = path.resolve(__dirname, '..', '..');
 
-const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), max);
+/**
+ * 构造 `@zh/<pkg>` → `packages/<pkg>/src` 的别名表（供各包 vitest.config.ts 一起用）。
+ *
+ * 为什么不各写各的：
+ *   ① 被测代码取最新源码，而不是 `node_modules` 里的 dist；
+ *   ② 用例对 `node:child_process` 的 `vi.mock` 才罩得住 `@zh/shared` **内部**的派发
+ *      （`runToolOnce` / `probeToolVersion` 都在 shared 里起进程）。不别名时
+ *      `@zh/shared` 从 dist 外部化加载，mock 静默失效 —— 2026-11-03 实测
+ *      security 19 条、guard 1 条用例因此假红（"期望没调外部工具"其实没进 mock）。
+ */
+export function packagesSrcAlias(...names: string[]): Record<string, string> {
+  return Object.fromEntries(names.map((name) => [`@zh/${name}`, path.join(packagesDir, name, 'src')]));
+}
 
 /**
  * vitest 最大 worker 数：优先读环境变量 ZH_VITEST_MAX_WORKERS（clamp 1..4），

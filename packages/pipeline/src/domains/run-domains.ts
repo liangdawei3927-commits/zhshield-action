@@ -16,6 +16,7 @@
 import {
   SCAN_DOMAIN_BUDGETS,
   withHardTimeout,
+  withToolRunScope,
   type DomainId,
   type DomainRunStatus,
 } from '@zh/shared';
@@ -145,6 +146,12 @@ async function runOne(
  * 每次调用都是独立的一次运行：执行器不共享状态，账本不跨运行累加。
  */
 export async function runDomains(options: DomainRunOptions): Promise<DomainRunLedger> {
+  // A12：整轮按域扫描共用一个运行作用域 —— 同一 (tool, argv, cwd) 跨域只真正执行一次
+  // （典型：gitleaks 在 inspect 与 security 各有一套调用，同参同源，此前各起一次进程）。
+  return withToolRunScope('pipeline.runDomains', () => runDomainsInScope(options));
+}
+
+async function runDomainsInScope(options: DomainRunOptions): Promise<DomainRunLedger> {
   const now = options.now ?? Date.now;
   const domains = options.domains ?? STATIC_SCAN_DOMAINS;
   const concurrency = Math.max(1, Math.floor(options.concurrency ?? 1));

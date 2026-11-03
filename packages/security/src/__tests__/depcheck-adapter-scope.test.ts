@@ -33,6 +33,9 @@ describe('DepcheckAdapter — 适用范围前置检查', () => {
     expect(result.error).toContain('无 package.json');
   });
 
+  // 本用例真的会把 depcheck 跑起来（真阳性自证），而 depcheck 是 Node 程序、
+  // 冷启动随机器负载可达数秒。默认 5s 超时在 8GB 机上会假红（实测 2026-11-03
+  // load 68 时 5015ms 超时），与"前置检查是否短路"这个被测行为无关，故显式放宽。
   it('误报防护：有 package.json 时不得被前置检查短路（真去执行检测）', async () => {
     const dir = tempProject(true);
     const result = await new DepcheckAdapter().scan({ projectPath: dir, projectId: dir });
@@ -41,5 +44,5 @@ describe('DepcheckAdapter — 适用范围前置检查', () => {
     // 但绝不能是 skipped —— 否则就是过度裁剪把该做的检测也裁掉了。
     expect(result.status).not.toBe('skipped');
     expect(result.skipReason).toBeUndefined();
-  });
+  }, 60_000);
 });

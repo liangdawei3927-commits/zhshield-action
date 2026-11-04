@@ -1465,7 +1465,13 @@
         "cancel": "取消",
         "result": "已套用 {{fixed}} 個檔案的自動修復（備份：{{backup}}）",
         "failed": "套用自動修復失敗：{{message}}",
-        "none": "沒有可自動修復的問題"
+        "none": "沒有可自動修復的問題",
+        "undoAvailable": "已修復 {{count}} 個檔案（{{time}}），可復原",
+        "undoButton": "復原本次修復",
+        "undoBusy": "復原中…",
+        "undoSuccess": "已復原：還原 {{count}} 個檔案",
+        "undoFailed": "復原失敗：{{message}}",
+        "undoDone": "已還原 {{count}} 個檔案"
       }
     },
     "reports": {

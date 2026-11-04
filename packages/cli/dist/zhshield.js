@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 53816f550fe155a9
+// @zh-src-hash: 67bfcf0febe4514f
 // @zh-src-files: 424
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -5876,7 +5876,13 @@ var init_zh_Hans = __esm({
             cancel: "\u53D6\u6D88",
             result: "\u5DF2\u5E94\u7528 {{fixed}} \u4E2A\u6587\u4EF6\u7684\u81EA\u52A8\u4FEE\u590D\uFF08\u5907\u4EFD\uFF1A{{backup}}\uFF09",
             failed: "\u5E94\u7528\u81EA\u52A8\u4FEE\u590D\u5931\u8D25\uFF1A{{message}}",
-            none: "\u6CA1\u6709\u53EF\u81EA\u52A8\u4FEE\u590D\u7684\u95EE\u9898"
+            none: "\u6CA1\u6709\u53EF\u81EA\u52A8\u4FEE\u590D\u7684\u95EE\u9898",
+            undoAvailable: "\u5DF2\u4FEE\u590D {{count}} \u4E2A\u6587\u4EF6\uFF08{{time}}\uFF09\uFF0C\u53EF\u64A4\u9500",
+            undoButton: "\u64A4\u9500\u672C\u6B21\u4FEE\u590D",
+            undoBusy: "\u64A4\u9500\u4E2D\u2026",
+            undoSuccess: "\u5DF2\u64A4\u9500\uFF1A\u6062\u590D {{count}} \u4E2A\u6587\u4EF6",
+            undoFailed: "\u64A4\u9500\u5931\u8D25\uFF1A{{message}}",
+            undoDone: "\u5DF2\u6062\u590D {{count}} \u4E2A\u6587\u4EF6"
           }
         },
         reports: {
@@ -8138,7 +8144,13 @@ var init_zh_Hant = __esm({
             cancel: "\u53D6\u6D88",
             result: "\u5DF2\u5957\u7528 {{fixed}} \u500B\u6A94\u6848\u7684\u81EA\u52D5\u4FEE\u5FA9\uFF08\u5099\u4EFD\uFF1A{{backup}}\uFF09",
             failed: "\u5957\u7528\u81EA\u52D5\u4FEE\u5FA9\u5931\u6557\uFF1A{{message}}",
-            none: "\u6C92\u6709\u53EF\u81EA\u52D5\u4FEE\u5FA9\u7684\u554F\u984C"
+            none: "\u6C92\u6709\u53EF\u81EA\u52D5\u4FEE\u5FA9\u7684\u554F\u984C",
+            undoAvailable: "\u5DF2\u4FEE\u5FA9 {{count}} \u500B\u6A94\u6848\uFF08{{time}}\uFF09\uFF0C\u53EF\u5FA9\u539F",
+            undoButton: "\u5FA9\u539F\u672C\u6B21\u4FEE\u5FA9",
+            undoBusy: "\u5FA9\u539F\u4E2D\u2026",
+            undoSuccess: "\u5DF2\u5FA9\u539F\uFF1A\u9084\u539F {{count}} \u500B\u6A94\u6848",
+            undoFailed: "\u5FA9\u539F\u5931\u6557\uFF1A{{message}}",
+            undoDone: "\u5DF2\u9084\u539F {{count}} \u500B\u6A94\u6848"
           }
         },
         reports: {
@@ -10400,7 +10412,13 @@ var init_en = __esm({
             cancel: "Cancel",
             result: "Applied auto-fix to {{fixed}} file(s) (backup: {{backup}})",
             failed: "Failed to apply auto-fix: {{message}}",
-            none: "No auto-fixable issues"
+            none: "No auto-fixable issues",
+            undoAvailable: "Fixed {{count}} file(s) at {{time}} \u2014 undo available",
+            undoButton: "Undo fix",
+            undoBusy: "Undoing\u2026",
+            undoSuccess: "Undone: {{count}} file(s) restored",
+            undoFailed: "Undo failed: {{message}}",
+            undoDone: "Restored {{count}} file(s)"
           }
         },
         reports: {
@@ -12662,7 +12680,13 @@ var init_ko = __esm({
             cancel: "\uCDE8\uC18C",
             result: "{{fixed}}\uAC1C \uD30C\uC77C\uC5D0 \uC790\uB3D9 \uC218\uC815\uC744 \uC801\uC6A9\uD588\uC2B5\uB2C8\uB2E4 (\uBC31\uC5C5: {{backup}})",
             failed: "\uC790\uB3D9 \uC218\uC815 \uC801\uC6A9 \uC2E4\uD328: {{message}}",
-            none: "\uC790\uB3D9 \uC218\uC815\uD560 \uC218 \uC788\uB294 \uBB38\uC81C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4"
+            none: "\uC790\uB3D9 \uC218\uC815\uD560 \uC218 \uC788\uB294 \uBB38\uC81C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4",
+            undoAvailable: "{{time}}\uC5D0 {{count}}\uAC1C \uD30C\uC77C \uC218\uC815\uB428 \u2014 \uB418\uB3CC\uB9B4 \uC218 \uC788\uC74C",
+            undoButton: "\uC774\uBC88 \uC218\uC815 \uB418\uB3CC\uB9AC\uAE30",
+            undoBusy: "\uB418\uB3CC\uB9AC\uB294 \uC911\u2026",
+            undoSuccess: "\uB418\uB3CC\uB838\uC2B5\uB2C8\uB2E4: {{count}}\uAC1C \uD30C\uC77C \uBCF5\uC6D0",
+            undoFailed: "\uB418\uB3CC\uB9AC\uAE30 \uC2E4\uD328: {{message}}",
+            undoDone: "{{count}}\uAC1C \uD30C\uC77C\uC744 \uBCF5\uC6D0\uD588\uC2B5\uB2C8\uB2E4"
           }
         },
         reports: {
@@ -14924,7 +14948,13 @@ var init_ja = __esm({
             cancel: "\u30AD\u30E3\u30F3\u30BB\u30EB",
             result: "{{fixed}} \u4EF6\u306E\u30D5\u30A1\u30A4\u30EB\u306B\u81EA\u52D5\u4FEE\u6B63\u3092\u9069\u7528\u3057\u307E\u3057\u305F\uFF08\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7: {{backup}}\uFF09",
             failed: "\u81EA\u52D5\u4FEE\u6B63\u306E\u9069\u7528\u306B\u5931\u6557\u3057\u307E\u3057\u305F: {{message}}",
-            none: "\u81EA\u52D5\u4FEE\u6B63\u3067\u304D\u308B\u554F\u984C\u306F\u3042\u308A\u307E\u305B\u3093"
+            none: "\u81EA\u52D5\u4FEE\u6B63\u3067\u304D\u308B\u554F\u984C\u306F\u3042\u308A\u307E\u305B\u3093",
+            undoAvailable: "{{time}} \u306B {{count}} \u4EF6\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u4FEE\u6B63\u6E08\u307F \u2014 \u5143\u306B\u623B\u305B\u307E\u3059",
+            undoButton: "\u4ECA\u56DE\u306E\u4FEE\u6B63\u3092\u5143\u306B\u623B\u3059",
+            undoBusy: "\u5143\u306B\u623B\u3057\u3066\u3044\u307E\u3059\u2026",
+            undoSuccess: "\u5143\u306B\u623B\u3057\u307E\u3057\u305F: {{count}} \u4EF6\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u5FA9\u5143",
+            undoFailed: "\u5143\u306B\u623B\u3059\u306E\u306B\u5931\u6557\u3057\u307E\u3057\u305F: {{message}}",
+            undoDone: "{{count}} \u4EF6\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u5FA9\u5143\u3057\u307E\u3057\u305F"
           }
         },
         reports: {

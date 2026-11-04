@@ -442,6 +442,27 @@ export interface RefactorAutoFixResultData {
   message?: string;
 }
 
+/** 一个仍可撤销的自动修复备份（来自磁盘 manifest；跨会话有效） */
+export interface RefactorAutoFixBackupEntryData {
+  /** 备份目录绝对路径（撤销时回传） */
+  backupDir: string;
+  /** 备份创建时间（ISO，缺失为空串） */
+  createdAt: string;
+  /** 可恢复的文件数 */
+  fileCount: number;
+  /** 撤销时会删除的新建文件数 */
+  createdCount: number;
+}
+
+/** 撤销一次自动修复的结果（ok=false 时 message 说明原因） */
+export interface RestoreRefactorAutoFixResultData {
+  ok: boolean;
+  verified: boolean;
+  restoredFiles: string[];
+  removedFiles: string[];
+  message: string;
+}
+
 /** 可更新依赖条目 */
 export interface OutdatedDependencyData {
   name: string;
@@ -759,6 +780,11 @@ export interface EngineAPI {
   runPerformance: (projectPath: string) => Promise<PerformanceReportData>;
   runRefactor: (projectPath: string) => Promise<RefactorReportData>;
   applyRefactorFixes: (projectPath: string) => Promise<RefactorAutoFixResultData>;
+  listRefactorAutoFixBackups: (projectPath: string) => Promise<RefactorAutoFixBackupEntryData[]>;
+  restoreRefactorAutoFix: (
+    projectPath: string,
+    backupDir: string,
+  ) => Promise<RestoreRefactorAutoFixResultData>;
   runDeps: (projectPath: string) => Promise<DependencyReportData>;
   depsRelockBaseline: (projectPath: string) => Promise<DepsRelockResult>;
   runTechDebt: (projectPath: string) => Promise<TechDebtReportData>;

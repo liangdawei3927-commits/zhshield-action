@@ -1465,7 +1465,13 @@
         "cancel": "Cancel",
         "result": "Applied auto-fix to {{fixed}} file(s) (backup: {{backup}})",
         "failed": "Failed to apply auto-fix: {{message}}",
-        "none": "No auto-fixable issues"
+        "none": "No auto-fixable issues",
+        "undoAvailable": "Fixed {{count}} file(s) at {{time}} — undo available",
+        "undoButton": "Undo fix",
+        "undoBusy": "Undoing…",
+        "undoSuccess": "Undone: {{count}} file(s) restored",
+        "undoFailed": "Undo failed: {{message}}",
+        "undoDone": "Restored {{count}} file(s)"
       }
     },
     "reports": {

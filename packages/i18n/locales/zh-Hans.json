@@ -1465,7 +1465,13 @@
         "cancel": "取消",
         "result": "已应用 {{fixed}} 个文件的自动修复（备份：{{backup}}）",
         "failed": "应用自动修复失败：{{message}}",
-        "none": "没有可自动修复的问题"
+        "none": "没有可自动修复的问题",
+        "undoAvailable": "已修复 {{count}} 个文件（{{time}}），可撤销",
+        "undoButton": "撤销本次修复",
+        "undoBusy": "撤销中…",
+        "undoSuccess": "已撤销：恢复 {{count}} 个文件",
+        "undoFailed": "撤销失败：{{message}}",
+        "undoDone": "已恢复 {{count}} 个文件"
       }
     },
     "reports": {

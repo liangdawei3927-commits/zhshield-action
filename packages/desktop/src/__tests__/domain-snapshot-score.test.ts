@@ -219,10 +219,18 @@ describe('refactor 域落盘接线（防回归：历史表「分数」列的唯�
       'utf-8',
     );
     const engines = fs.readFileSync(path.join(__dirname, '../../electron/ipc/engines.ts'), 'utf-8');
-    // 唯一实现：两处都调同一个函数，不得各自 computeDomainSnapshotScore 一份投影
+    // 流水线的 refactor 出分实现在独立模块（engines.ts 已在 400 行体积阈值边缘）。
+    // 本用例守的是「同一函数」这条性质，与它放在哪个文件无关：
+    // 分类页与流水线必须都走 refactorSnapshotScore，不得各自 computeDomainSnapshotScore 一份投影。
+    const pipelineScores = fs.readFileSync(
+      path.join(__dirname, '../../electron/ipc/pipeline-refactor-scores.ts'),
+      'utf-8',
+    );
     expect(scanners).toContain('const dimensionScore = refactorSnapshotScore(report);');
-    expect(engines).toContain('refactorSnapshotScore(report.refactor)');
+    expect(pipelineScores).toContain('refactorSnapshotScore(report.refactor)');
     expect(engines).not.toContain("dimension: 'refactor'");
+    // engines.ts 不得自行算 refactor 域分（它只转发/注册）：出分入口只有上面那个函数
+    expect(engines).not.toContain('refactorSnapshotScore(');
   });
 });
 

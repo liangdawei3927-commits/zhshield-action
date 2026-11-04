@@ -20,10 +20,7 @@ import { isHttpMode, getAPI } from './engineApi-transport';
 
 // ─── 功能分片再导出（签名与原导出完全一致，消费方无需改动）──
 
-export type {
-  GuardHooksStatusData,
-  GuardHooksInstallResultData,
-} from './engineApi-hooks';
+export type { GuardHooksStatusData, GuardHooksInstallResultData } from './engineApi-hooks';
 
 export {
   getGuardHooksStatus,
@@ -36,17 +33,18 @@ export { runSecurity } from './engineApi-security';
 
 export { cleanGarbage, restoreGarbage } from './engineApi-garbage';
 
-export { runRefactor, applyRefactorFixes } from './engineApi-refactor';
+export {
+  runRefactor,
+  applyRefactorFixes,
+  listRefactorAutoFixBackups,
+  restoreRefactorAutoFix,
+} from './engineApi-refactor';
 
 export { runPipeline } from './engineApi-pipeline';
 
 export { runDeps, depsRelockBaseline } from './engineApi-dependency';
 
-export {
-  planDebtRepayment,
-  verifyDebtRepaid,
-  dismissDebtAction,
-} from './engineApi-techdebt';
+export { planDebtRepayment, verifyDebtRepaid, dismissDebtAction } from './engineApi-techdebt';
 
 export {
   runSecrets,
@@ -80,11 +78,7 @@ export {
   setSentinelEnabled,
 } from './engineApi-sentinel';
 
-export {
-  getEvolveSuggestions,
-  getEvolveRuleWeights,
-  autoAdjustWeights,
-} from './engineApi-evolve';
+export { getEvolveSuggestions, getEvolveRuleWeights, autoAdjustWeights } from './engineApi-evolve';
 
 export { getRuleVersion, syncRules, getSyncHealth, getSopStats } from './engineApi-sop';
 

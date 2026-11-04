@@ -1465,7 +1465,13 @@
         "cancel": "キャンセル",
         "result": "{{fixed}} 件のファイルに自動修正を適用しました（バックアップ: {{backup}}）",
         "failed": "自動修正の適用に失敗しました: {{message}}",
-        "none": "自動修正できる問題はありません"
+        "none": "自動修正できる問題はありません",
+        "undoAvailable": "{{time}} に {{count}} 件のファイルを修正済み — 元に戻せます",
+        "undoButton": "今回の修正を元に戻す",
+        "undoBusy": "元に戻しています…",
+        "undoSuccess": "元に戻しました: {{count}} 件のファイルを復元",
+        "undoFailed": "元に戻すのに失敗しました: {{message}}",
+        "undoDone": "{{count}} 件のファイルを復元しました"
       }
     },
     "reports": {

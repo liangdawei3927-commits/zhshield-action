@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@zh/i18n';
-import { runRefactor, applyRefactorFixes } from '../services/engineApi';
-import type { RefactorReportData } from '../types/electron';
+import {
+  runRefactor,
+  applyRefactorFixes,
+  listRefactorAutoFixBackups,
+  restoreRefactorAutoFix,
+} from '../services/engineApi';
+import type { RefactorReportData, RefactorAutoFixBackupEntryData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { copyIssuesToAi, type AiFixIssue } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
@@ -186,48 +191,151 @@ export function useSmellGroups(report: RefactorReportData | null) {
  * **直接改文件**——因此后端先备份到 `.zhshield/backups/refactor-autofix-<时间戳>/`，
  * 结果回执里带 `backupDir`，用户可整目录回滚。
  */
+/** Toast 句柄类型（从 useToast 推导，避免另开一个"真相源"） */
+type ToastFn = ReturnType<typeof useToast>['toast'];
+
+/** 应用自动修复的落点：把一次「应用」的所有分支收在一处，便于主 hook 保持短小 */
+async function performAutoFixApply(params: {
+  projectPath: string;
+  toast: ToastFn;
+  refreshUndo: () => Promise<void>;
+  rescan: () => Promise<void> | void;
+}): Promise<void> {
+  const { projectPath, toast, refreshUndo, rescan } = params;
+  try {
+    const result = await applyRefactorFixes(projectPath);
+    if (!result.applied || result.fixCount === 0) {
+      toast(result.message ?? t('page.refactor.autoFix.none'), 'info');
+      return;
+    }
+    toast(
+      t('page.refactor.autoFix.result', { fixed: result.fixed, backup: result.backupDir ?? '-' }),
+      'success',
+    );
+    await refreshUndo();
+    await rescan();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    toast(t('page.refactor.autoFix.failed', { message: msg }), 'error');
+  }
+}
+
+/**
+ * 撤销最近一次自动修复：调主进程按备份恢复（幂等 + 逐字节校验），随后重扫。
+ *
+ * 撤销是写盘动作，与「应用」同等对待：失败必须让用户看到原因，不能静默。
+ */
+async function performAutoFixUndo(params: {
+  projectPath: string;
+  backupDir: string;
+  toast: ToastFn;
+  refreshUndo: () => Promise<void>;
+  rescan: () => Promise<void> | void;
+}): Promise<void> {
+  const { projectPath, backupDir, toast, refreshUndo, rescan } = params;
+  try {
+    const result = await restoreRefactorAutoFix(projectPath, backupDir);
+    if (result.ok) {
+      toast(
+        t('page.refactor.autoFix.undoSuccess', { count: result.restoredFiles.length }),
+        'success',
+      );
+    } else {
+      toast(t('page.refactor.autoFix.undoFailed', { message: result.message }), 'error');
+    }
+    await refreshUndo();
+    await rescan();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    toast(t('page.refactor.autoFix.undoFailed', { message: msg }), 'error');
+  }
+}
+
 export function useRefactorAutoFix(
   projectPath: string,
   rescan: () => Promise<void> | void,
-): { applying: boolean; applyAutoFix: () => Promise<void> } {
+): {
+  applying: boolean;
+  applyAutoFix: () => Promise<void>;
+  undo: RefactorAutoFixBackupEntryData | null;
+  undoing: boolean;
+  undoAutoFix: () => Promise<void>;
+} {
   const { toast } = useToast();
   const [applying, setApplying] = useState(false);
+  const [undo, setUndo] = useState<RefactorAutoFixBackupEntryData | null>(null);
+  const [undoing, setUndoing] = useState(false);
+
+  /** 读取最近一次仍可撤销的备份（撤销入口来自磁盘 manifest，跨会话有效） */
+  const refreshUndo = useCallback(async () => {
+    if (!projectPath) {
+      setUndo(null);
+      return;
+    }
+    try {
+      const list = await listRefactorAutoFixBackups(projectPath);
+      setUndo(list[0] ?? null);
+    } catch {
+      // 列不出备份不是致命错误：撤销入口消失，但页面照常可用
+      setUndo(null);
+    }
+  }, [projectPath]);
+
+  useEffect(() => {
+    void refreshUndo();
+  }, [refreshUndo]);
+
   const applyAutoFix = useCallback(async () => {
     if (!projectPath || applying) return;
     setApplying(true);
     try {
-      const result = await applyRefactorFixes(projectPath);
-      if (!result.applied || result.fixCount === 0) {
-        toast(result.message ?? t('page.refactor.autoFix.none'), 'info');
-      } else {
-        toast(
-          t('page.refactor.autoFix.result', {
-            fixed: result.fixed,
-            backup: result.backupDir ?? '-',
-          }),
-          'success',
-        );
-        await rescan();
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast(t('page.refactor.autoFix.failed', { message: msg }), 'error');
+      await performAutoFixApply({ projectPath, toast, refreshUndo, rescan });
     } finally {
       setApplying(false);
     }
-  }, [projectPath, applying, toast, rescan]);
-  return { applying, applyAutoFix };
+  }, [projectPath, applying, toast, rescan, refreshUndo]);
+
+  const undoAutoFix = useCallback(async () => {
+    if (!projectPath || !undo || undoing) return;
+    setUndoing(true);
+    try {
+      await performAutoFixUndo({
+        projectPath,
+        backupDir: undo.backupDir,
+        toast,
+        refreshUndo,
+        rescan,
+      });
+    } finally {
+      setUndoing(false);
+    }
+  }, [projectPath, undo, undoing, toast, rescan, refreshUndo]);
+
+  return { applying, applyAutoFix, undo, undoing, undoAutoFix };
 }
 
 export function useRefactorPage(projectPath: string) {
   const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
   const scan = useRefactorScan(projectPath);
-  const { applying, applyAutoFix } = useRefactorAutoFix(projectPath, scan.handleScan);
+  const { applying, applyAutoFix, undo, undoing, undoAutoFix } = useRefactorAutoFix(
+    projectPath,
+    scan.handleScan,
+  );
   const { lastAutoAt } = useDailyAutoCheck(
     'refactor',
     projectPath,
     () => void scan.handleScan(),
     'refactor',
   );
-  return { ...scan, lastAutoAt, copyToAi, copyGroupToAi, applying, applyAutoFix };
+  return {
+    ...scan,
+    lastAutoAt,
+    copyToAi,
+    copyGroupToAi,
+    applying,
+    applyAutoFix,
+    undo,
+    undoing,
+    undoAutoFix,
+  };
 }

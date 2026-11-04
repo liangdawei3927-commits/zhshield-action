@@ -12,7 +12,14 @@ import { NavGlyph } from '../components/business/page-glyph';
 import { ResultCard } from '../components/ui/ResultCard';
 import { useRefactorPage, useSmellGroups, type RefactorFile, type Smell } from './refactor-logic';
 import { RuleTabs } from './refactor-parts';
-import { RefactorFileDetailList, SmellDetailList, SmellGroupPanel, AutoFixButton } from './refactor-panel';
+import {
+  RefactorFileDetailList,
+  SmellDetailList,
+  SmellGroupPanel,
+  AutoFixButton,
+  AutoFixUndoBar,
+} from './refactor-panel';
+import type { RefactorAutoFixBackupEntryData } from '../types/electron';
 import { RefactorEmptyState } from './refactor-empty-state';
 import type { AsyncScanActionProps } from './async-scan-props';
 
@@ -103,6 +110,12 @@ interface RefactorReportViewProps extends SmellGroupsViewProps, AsyncScanActionP
   applying: boolean;
   /** 触发一键应用自动修复 */
   applyAutoFix: () => void;
+  /** 最近一次仍可撤销的自动修复备份（无则 null） */
+  undo: RefactorAutoFixBackupEntryData | null;
+  /** 是否正在撤销 */
+  undoing: boolean;
+  /** 触发撤销最近一次自动修复 */
+  undoAutoFix: () => void;
 }
 
 /** 报告态：报告壳（评分/进度/统计）+ 按规则分类的异味面板 */
@@ -125,6 +138,9 @@ function RefactorReportView({
   copyToAi,
   applying,
   applyAutoFix,
+  undo,
+  undoing,
+  undoAutoFix,
 }: RefactorReportViewProps) {
   return (
     <DomainReportShell
@@ -153,6 +169,9 @@ function RefactorReportView({
         copyToAi={copyToAi}
         applying={applying}
         applyAutoFix={applyAutoFix}
+        undo={undo}
+        undoing={undoing}
+        undoAutoFix={undoAutoFix}
       />
     </DomainReportShell>
   );
@@ -177,11 +196,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
 
   if (detail.entry.showSnapshot) {
     return (
-      <DomainSnapshotReport
-        dimension="refactor"
-        icon={<RefactorGlyph />}
-        {...snapshotViewProps}
-      />
+      <DomainSnapshotReport dimension="refactor" icon={<RefactorGlyph />} {...snapshotViewProps} />
     );
   }
 
@@ -206,6 +221,9 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         copyToAi={page.copyToAi}
         applying={page.applying}
         applyAutoFix={() => void page.applyAutoFix()}
+        undo={page.undo}
+        undoing={page.undoing}
+        undoAutoFix={() => void page.undoAutoFix()}
       />
     );
   }
@@ -257,7 +275,9 @@ export function refactorReportStats(
       color: 'rgb(var(--zh-info))',
       detail: {
         items: allSmells,
-        hint: t('page.refactor.stats.smellsHint', { defaultValue: '全部代码异味清单（按文件汇总）' }),
+        hint: t('page.refactor.stats.smellsHint', {
+          defaultValue: '全部代码异味清单（按文件汇总）',
+        }),
         render: (items) => (
           <SmellDetailList
             items={items as Smell[]}
@@ -299,6 +319,9 @@ interface RefactorGroupsSectionProps extends SmellGroupsViewProps {
   t: RefactorT;
   applying: boolean;
   applyAutoFix: () => void;
+  undo: RefactorAutoFixBackupEntryData | null;
+  undoing: boolean;
+  undoAutoFix: () => void;
 }
 
 function RefactorGroupsSection({
@@ -313,6 +336,9 @@ function RefactorGroupsSection({
   copyToAi,
   applying,
   applyAutoFix,
+  undo,
+  undoing,
+  undoAutoFix,
 }: RefactorGroupsSectionProps) {
   // 可自动修复的异味数：只有存在才显示「一键应用」按钮（与后端 autoFixable 同源真相）
   const fixableCount = report.files.reduce(
@@ -335,6 +361,7 @@ function RefactorGroupsSection({
                 total: report.totalSmells,
               })}
             </span>
+            {undo ? <AutoFixUndoBar entry={undo} undoing={undoing} onUndo={undoAutoFix} /> : null}
             <AutoFixButton count={fixableCount} applying={applying} onConfirm={applyAutoFix} />
           </div>
         </div>

@@ -1465,7 +1465,13 @@
         "cancel": "취소",
         "result": "{{fixed}}개 파일에 자동 수정을 적용했습니다 (백업: {{backup}})",
         "failed": "자동 수정 적용 실패: {{message}}",
-        "none": "자동 수정할 수 있는 문제가 없습니다"
+        "none": "자동 수정할 수 있는 문제가 없습니다",
+        "undoAvailable": "{{time}}에 {{count}}개 파일 수정됨 — 되돌릴 수 있음",
+        "undoButton": "이번 수정 되돌리기",
+        "undoBusy": "되돌리는 중…",
+        "undoSuccess": "되돌렸습니다: {{count}}개 파일 복원",
+        "undoFailed": "되돌리기 실패: {{message}}",
+        "undoDone": "{{count}}개 파일을 복원했습니다"
       }
     },
     "reports": {

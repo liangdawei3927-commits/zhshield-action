@@ -7,6 +7,7 @@ import {
   SEVERITY_LABELS,
 } from './refactor-logic';
 import { useT } from '../i18n';
+import type { RefactorAutoFixBackupEntryData } from '../types/electron';
 import { BounceCard } from '../components/ui/Bounce';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
@@ -70,6 +71,40 @@ export function AutoFixButton({
     >
       {applying ? t('page.refactor.scanning') : t('page.refactor.autoFix.button', { count })}
     </button>
+  );
+}
+
+/**
+ * 「撤销最近一次自动修复」：与 AutoFixButton 成对出现 —— 应用与撤销都不该是单向门。
+ *
+ * 撤销入口来自磁盘 manifest（跨会话有效），因此用户隔天回来仍能撤销；
+ * 没有可撤销备份时不渲染（不制造无效按钮）。
+ */
+export function AutoFixUndoBar({
+  entry,
+  undoing,
+  onUndo,
+}: {
+  entry: RefactorAutoFixBackupEntryData;
+  undoing: boolean;
+  onUndo: () => void;
+}) {
+  const t = useT();
+  const when = entry.createdAt ? entry.createdAt.slice(0, 19).replace('T', ' ') : '-';
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[11px] text-zh-muted max-w-[260px]">
+        {t('page.refactor.autoFix.undoAvailable', { count: entry.fileCount, time: when })}
+      </span>
+      <button
+        type="button"
+        disabled={undoing}
+        onClick={onUndo}
+        className="px-3 py-1.5 rounded-full text-xs font-semibold border border-zh-border text-zh-ink-2 bg-transparent cursor-pointer hover:bg-zh-panel disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {undoing ? t('page.refactor.autoFix.undoBusy') : t('page.refactor.autoFix.undoButton')}
+      </button>
+    </div>
   );
 }
 
@@ -211,10 +246,7 @@ export function RefactorFileDetailList({ files }: { files: RefactorFile[] }) {
       {files.map((file) => {
         const priority = PRIORITY_STYLE[file.refactorPriority] ?? PRIORITY_STYLE.low;
         return (
-          <div
-            key={file.filePath}
-            className="flex items-center gap-3 p-3 rounded-lg bg-zh-panel"
-          >
+          <div key={file.filePath} className="flex items-center gap-3 p-3 rounded-lg bg-zh-panel">
             <span
               className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white shrink-0"
               style={{ background: priority.bg }}

@@ -142,6 +142,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runRefactor: (projectPath: string) => ipcRenderer.invoke('engine:runRefactor', projectPath),
     applyRefactorFixes: (projectPath: string) =>
       ipcRenderer.invoke('engine:applyRefactorFixes', projectPath),
+    listRefactorAutoFixBackups: (projectPath: string) =>
+      ipcRenderer.invoke('engine:listRefactorAutoFixBackups', projectPath),
+    restoreRefactorAutoFix: (projectPath: string, backupDir: string) =>
+      ipcRenderer.invoke('engine:restoreRefactorAutoFix', projectPath, backupDir),
     runDeps: (projectPath: string) => ipcRenderer.invoke('engine:runDeps', projectPath),
     depsRelockBaseline: (projectPath: string) =>
       ipcRenderer.invoke('engine:depsRelockBaseline', projectPath),
@@ -238,13 +242,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── 哨兵监控 ──────────────────────────────────────────────
   sentinel: {
-    getEvents: (options?: SentinelEventQuery) =>
-      ipcRenderer.invoke('sentinel:getEvents', options),
+    getEvents: (options?: SentinelEventQuery) => ipcRenderer.invoke('sentinel:getEvents', options),
     getEvent: (id: string) => ipcRenderer.invoke('sentinel:getEvent', id),
     startMonitoring: (projectId: string, projectPath: string) =>
       ipcRenderer.invoke('sentinel:startMonitoring', projectId, projectPath),
-    stopMonitoring: (projectId: string) =>
-      ipcRenderer.invoke('sentinel:stopMonitoring', projectId),
+    stopMonitoring: (projectId: string) => ipcRenderer.invoke('sentinel:stopMonitoring', projectId),
     getState: () => ipcRenderer.invoke('sentinel:getState'),
     setEnabled: (enabled: boolean) => ipcRenderer.invoke('sentinel:setEnabled', enabled),
   },

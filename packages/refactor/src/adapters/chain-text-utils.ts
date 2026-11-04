@@ -66,11 +66,7 @@ function scanQuotedString(
 }
 
 /** 扫描模板字面量：字面段记入区间，${...} 插值段按真实代码跳过，返回结束后位置 */
-function scanTemplateString(
-  text: string,
-  start: number,
-  ranges: Array<[number, number]>,
-): number {
+function scanTemplateString(text: string, start: number, ranges: Array<[number, number]>): number {
   let i = start + 1;
   let literalFrom = i;
   while (i < text.length) {
@@ -120,11 +116,13 @@ function extractChainAtDot(methodText: string, dotIdx: number): string | null {
 /** 读取点号两侧的标识符 token */
 function readChainTokens(methodText: string, dotIdx: number): { before: string; after: string } {
   let start = dotIdx - 1;
-  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
+  // noUncheckedIndexedAccess：字符串下标为 string | undefined。
+  // 用 charAt 判断字符（越界返回空串，语义正确），避免 undefined 参与正则测试。
+  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText.charAt(start))) start--;
   const before = methodText.slice(start + 1, dotIdx);
 
   let end = dotIdx + 1;
-  while (end < methodText.length && IDENT_CHAR.test(methodText[end])) end++;
+  while (end < methodText.length && IDENT_CHAR.test(methodText.charAt(end))) end++;
   const after = methodText.slice(dotIdx + 1, end);
 
   return { before, after };

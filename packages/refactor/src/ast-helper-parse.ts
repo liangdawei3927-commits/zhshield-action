@@ -37,7 +37,7 @@ export interface ParsedClass {
       accessModifier: string;
     }[];
   };
-  extendsClass?: string;
+  extendsClass?: string | undefined;
   implementsInterfaces: string[];
   lineCount: number;
   startLine: number;
@@ -59,7 +59,7 @@ export interface ParsedFunction {
 export interface ImportInfo {
   modulePath: string;
   namedImports: string[];
-  defaultImport?: string;
+  defaultImport?: string | undefined;
 }
 
 /** 导出声明摘要：导出名与是否为默认导出 */
@@ -177,13 +177,15 @@ function parseClass(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): Parse
 function parseHeritage(
   node: ts.ClassDeclaration,
   sourceFile: ts.SourceFile,
-): { extendsClass?: string; implementsInterfaces: string[] } {
+): { extendsClass?: string | undefined; implementsInterfaces: string[] } {
   let extendsClass: string | undefined;
   const implementsInterfaces: string[] = [];
 
   node.heritageClauses?.forEach((clause) => {
     if (clause.token === ts.SyntaxKind.ExtendsKeyword && clause.types.length > 0) {
-      extendsClass = clause.types[0].getText(sourceFile);
+      // clause.types[0] 在严格索引访问下可能越界：取首个存在的类型
+      const firstExtends = clause.types[0];
+      if (firstExtends) extendsClass = firstExtends.getText(sourceFile);
     }
     if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
       clause.types.forEach((t) => implementsInterfaces.push(t.getText(sourceFile)));

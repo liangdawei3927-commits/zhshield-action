@@ -1,0 +1,32 @@
+{
+  "$comment": "类型严格迁移棘轮清单（报告 §5.2）。migrated 里的包必须真正通过 noUncheckedIndexedAccess + exactOptionalPropertyTypes 检查，且其 tsconfig 不得再显式关闭这两个标志。maxPending 是「尚未合规的包数量」的上限基线 —— 债可以变少，不能变多；compliant 列出已合规但因未显式声明而未列入 migrated 的包（它们继承根级严格标志，校验结果为 0 错误即可，列入 migrated 会让清单与「是否显式声明」两件事耦合）。check-strict-migration.mjs 每次 CI 都会核对本清单与现实。",
+  "updatedAt": "2026-11-04",
+  "migrated": [
+    "db",
+    "performance",
+    "refactor",
+    "security"
+  ],
+  "maxPending": 12,
+  "pendingBaseline": [
+    "cli",
+    "dependency",
+    "desktop",
+    "fingerprint",
+    "guard",
+    "inspect",
+    "kernel",
+    "pipeline",
+    "reporter",
+    "scoring",
+    "sentinel",
+    "server"
+  ],
+  "compliant": [
+    "shared",
+    "garbage",
+    "autoperf",
+    "evolve",
+    "i18n"
+  ]
+}

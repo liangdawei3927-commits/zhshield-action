@@ -12,26 +12,36 @@ export function typosquatThreshold(name: string): number {
   return name.length <= 8 ? 1 : 2;
 }
 
-/** 两字符串的 Levenshtein 编辑距离 */
+/**
+ * 两字符串的 Levenshtein 编辑距离。
+ *
+ * 严格索引访问（noUncheckedIndexedAccess）下的写法要点：
+ * - 字符用 `charAt(i)` 取，而不是 `a[i]`：后者在标志开启后是 `string | undefined`，
+ *   两个 undefined 相等会被误判成"字符相同"（编辑距离算错，且不报错）。
+ * - DP 行的边界值用局部变量承接（`prevDiag` / `prevUp` / `left`），
+ *   避免"读数组再判空"的重复样板。
+ */
 export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
   if (m === 0) return n;
   if (n === 0) return m;
-  const prev = new Array<number>(n + 1).fill(0).map((_, j) => j);
+  let prev: number[] = new Array<number>(n + 1).fill(0).map((_, j) => j);
   for (let i = 1; i <= m; i++) {
-    const curr = new Array<number>(n + 1).fill(0);
+    const curr: number[] = new Array<number>(n + 1).fill(0);
     curr[0] = i;
+    let left = i; // curr[j-1]，随 j 递增滚动
     for (let j = 1; j <= n; j++) {
-      curr[j] = Math.min(
-        prev[j] + 1,
-        curr[j - 1] + 1,
-        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
+      const prevUp = prev[j] ?? 0; // 上一行的 curr[j]
+      const prevDiag = prev[j - 1] ?? 0; // 上一行的 curr[j-1]
+      const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+      const next = Math.min(prevUp + 1, left + 1, prevDiag + cost);
+      curr[j] = next;
+      left = next;
     }
-    prev.splice(0, prev.length, ...curr);
+    prev = curr;
   }
-  return prev[n];
+  return prev[n] ?? m;
 }
 
 /** 构造供应链威胁条目（type='supply-chain' 的 MalwareItem） */

@@ -79,15 +79,18 @@ export function purgeExpiredSoftDeleted(
   ttlDays: number,
 ): { table: string; deleted: number }[] {
   const results: { table: string; deleted: number }[] = [];
-  const statements = PROJECT_DATA_TABLES.map((table) =>
-    db.prepare(
+  // 表名与 prepared statement 成对构造后一起遍历：避免「两个等长数组按下标对齐」
+  // 这种写法在 noUncheckedIndexedAccess 下两处都要判空，且两数组长度一旦分叉就会错位。
+  const statements = PROJECT_DATA_TABLES.map((table) => ({
+    table,
+    stmt: db.prepare(
       `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND julianday(deleted_at) < julianday('now', '-${ttlDays} days')`,
     ),
-  );
+  }));
   db.transaction(() => {
-    for (let i = 0; i < PROJECT_DATA_TABLES.length; i++) {
-      const info = statements[i].run();
-      results.push({ table: PROJECT_DATA_TABLES[i], deleted: info.changes });
+    for (const { table, stmt } of statements) {
+      const info = stmt.run();
+      results.push({ table, deleted: info.changes });
     }
   })();
   return results;
@@ -102,13 +105,17 @@ export function countActiveRows(
   projectId: string,
 ): { table: string; count: number }[] {
   const results: { table: string; count: number }[] = [];
-  const statements = PROJECT_DATA_TABLES.map((table) =>
-    db.prepare(`SELECT COUNT(*) AS cnt FROM ${table} WHERE project_id = ? AND deleted_at IS NULL`),
-  );
-  for (let i = 0; i < PROJECT_DATA_TABLES.length; i++) {
-    const row = statements[i].get(projectId) as { cnt: number };
+  // 同上：表名与 statement 成对绑定，遍历时不按下标对齐两个数组。
+  const statements = PROJECT_DATA_TABLES.map((table) => ({
+    table,
+    stmt: db.prepare(
+      `SELECT COUNT(*) AS cnt FROM ${table} WHERE project_id = ? AND deleted_at IS NULL`,
+    ),
+  }));
+  for (const { table, stmt } of statements) {
+    const row = stmt.get(projectId) as { cnt: number };
     if (row.cnt > 0) {
-      results.push({ table: PROJECT_DATA_TABLES[i], count: row.cnt });
+      results.push({ table, count: row.cnt });
     }
   }
   return results;

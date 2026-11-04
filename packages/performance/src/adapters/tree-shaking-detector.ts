@@ -202,13 +202,16 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
   ): void {
     const deps = pkg.dependencies;
     const depCount = isRecord(deps) ? Object.keys(deps).length : 0;
-    if (chunkFiles.length === 1 && depCount >= 5) {
+    // chunkFiles.length === 1 已保证数组非空，但 noUncheckedIndexedAccess 下索引访问
+    // 仍返回 T | undefined —— 显式判空而不是非空断言（断言在运行时不提供任何保护）。
+    const onlyChunk = chunkFiles.length === 1 ? chunkFiles[0] : undefined;
+    if (onlyChunk && depCount >= 5) {
       issues.push({
         id: 'chunk-splitting-no-code-split',
         ruleId: 'chunk-splitting.no-code-split',
         category: 'chunk-splitting',
         severity: 'medium',
-        file: chunkFiles[0].file,
+        file: onlyChunk.file,
         message: '检测到单一 bundle 且依赖超过 5 个 — 建议启用路由级代码分割',
         suggestion: '按路由懒加载页面，或按需拆分第三方依赖为独立 chunk',
         autoFixable: false,
@@ -277,7 +280,11 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
       for (const m of content.matchAll(
         /(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g,
       )) {
-        this.recordWholeLibraryHit({ hits, seen, projectRoot, filePath, specifier: m[1] });
+        // matchAll 的捕获组在 noUncheckedIndexedAccess 下是 string | undefined：
+        // 正则里该组必存在，但"编译器不知道"，显式收窄比断言诚实。
+        const specifier = m[1];
+        if (specifier === undefined) continue;
+        this.recordWholeLibraryHit({ hits, seen, projectRoot, filePath, specifier });
       }
     }
     return hits;
@@ -302,7 +309,6 @@ export class TreeShakingDetectorImpl implements TreeShakingDetector {
     }
   }
 }
-
 
 /** 排序：严重度降序，其次文件路径升序 */
 function sortTreeShakingIssues(issues: PerformanceIssue[]): PerformanceIssue[] {

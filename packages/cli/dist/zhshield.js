@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 20563be3ee00327a
+// @zh-src-hash: 01ca0db83d20cf56
 // @zh-src-files: 422
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -495734,7 +495734,8 @@ function parseHeritage(node, sourceFile) {
   const implementsInterfaces = [];
   node.heritageClauses?.forEach((clause) => {
     if (clause.token === ts.SyntaxKind.ExtendsKeyword && clause.types.length > 0) {
-      extendsClass = clause.types[0].getText(sourceFile);
+      const firstExtends = clause.types[0];
+      if (firstExtends) extendsClass = firstExtends.getText(sourceFile);
     }
     if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
       clause.types.forEach((t2) => implementsInterfaces.push(t2.getText(sourceFile)));
@@ -496104,7 +496105,9 @@ function mergeDuplicateRegions(pairs) {
 function groupByFilePair(pairs) {
   const groups = /* @__PURE__ */ new Map();
   for (const p of pairs) {
-    const key = `${p.files[0]}\0${p.files[1]}`;
+    const [fileA, fileB] = p.files;
+    if (fileA === void 0 || fileB === void 0) continue;
+    const key = `${fileA}\0${fileB}`;
     const list = groups.get(key);
     if (list) list.push(p);
     else groups.set(key, [p]);
@@ -496114,13 +496117,16 @@ function groupByFilePair(pairs) {
 function mergeGroup(list) {
   list.sort((a, b) => a.lines[0] - b.lines[0] || a.lines[1] - b.lines[1]);
   const merged = [];
-  let head = list[0];
+  const first = list[0];
+  if (first === void 0) return merged;
+  let head = first;
   let lastStart0 = head.lines[0];
   let lastStart1 = head.lines[1];
   let lastEnd0 = head.lines[0] + head.lineCount - 1;
   let lastEnd1 = head.lines[1] + head.lineCount - 1;
   for (let i = 1; i < list.length; i++) {
     const next = list[i];
+    if (next === void 0) continue;
     if (next.lines[0] <= lastStart0 && next.lines[1] <= lastStart1) continue;
     if (next.lines[0] <= lastEnd0 + 1 && next.lines[1] <= lastEnd1 + 1) {
       lastStart0 = Math.min(next.lines[0], lastStart0);
@@ -496146,22 +496152,28 @@ function withRegionLineCount(head, lastEnd) {
 function findDuplicatePairs(blocks, minLines) {
   const byNormalized = /* @__PURE__ */ new Map();
   for (let i = 0; i < blocks.length; i++) {
-    const key = blocks[i].normalized;
+    const block = blocks[i];
+    if (block === void 0) continue;
+    const key = block.normalized;
     const bucket = byNormalized.get(key);
     if (bucket) bucket.push(i);
     else byNormalized.set(key, [i]);
   }
   const dups = [];
   for (let i = 0; i < blocks.length; i++) {
-    const bucket = byNormalized.get(blocks[i].normalized);
+    const blockI = blocks[i];
+    if (blockI === void 0) continue;
+    const bucket = byNormalized.get(blockI.normalized);
     if (!bucket || bucket.length < 2) continue;
     for (const j of bucket) {
       if (j <= i) continue;
-      if (blocks[i].file === blocks[j].file) continue;
+      const blockJ = blocks[j];
+      if (blockJ === void 0) continue;
+      if (blockI.file === blockJ.file) continue;
       dups.push({
-        files: [blocks[i].file, blocks[j].file],
-        lines: [blocks[i].startLine, blocks[j].startLine],
-        code: blocks[i].normalized.slice(0, 80),
+        files: [blockI.file, blockJ.file],
+        lines: [blockI.startLine, blockJ.startLine],
+        code: blockI.normalized.slice(0, 80),
         lineCount: minLines
       });
     }
@@ -496373,6 +496385,91 @@ var init_ast_helper = __esm({
   }
 });
 
+// ../refactor/src/types.ts
+function severityOf(config, ruleId) {
+  const severity = config.severities[ruleId];
+  return severity ?? DEFAULT_SEVERITY;
+}
+var DEFAULT_SEVERITY, DEFAULT_CONFIG;
+var init_types4 = __esm({
+  "../refactor/src/types.ts"() {
+    "use strict";
+    DEFAULT_SEVERITY = "warning";
+    DEFAULT_CONFIG = {
+      thresholds: {
+        maxMethodLines: 80,
+        maxClassLines: 300,
+        maxParameters: 4,
+        maxNestingDepth: 3,
+        maxClassMethods: 20,
+        maxComplexity: 15,
+        minClassLines: 15,
+        featureEnvyRatio: 0.5,
+        maxFileLines: 400,
+        maxTopLevelExports: 10,
+        maxComponentLines: 150,
+        maxJsxNestingDepth: 5,
+        maxCallbackHandlers: 5,
+        minDuplicateLines: 5,
+        minDataClassFields: 5,
+        maxDataClassMethods: 1,
+        maxGodObjectMethods: 20,
+        maxInjectDependencies: 7,
+        minResponsibilities: 3
+      },
+      severities: {
+        "long-method": "warning",
+        "large-class": "error",
+        "long-parameter-list": "warning",
+        "deep-nesting": "warning",
+        "data-clumps": "info",
+        "primitive-obsession": "info",
+        "feature-envy": "warning",
+        "inappropriate-intimacy": "error",
+        "middle-man": "info",
+        "message-chains": "warning",
+        "shotgun-surgery": "warning",
+        "refused-bequest": "warning",
+        "lazy-class": "info",
+        "switch-statement": "warning",
+        "oversized-file": "warning",
+        "mixed-responsibilities": "warning",
+        "duplicated-code": "warning",
+        "callback-hell": "warning",
+        "oversized-component": "warning",
+        "god-object": "error",
+        "data-class": "warning"
+      },
+      enabledRules: [
+        "long-method",
+        "large-class",
+        "long-parameter-list",
+        "deep-nesting",
+        "data-clumps",
+        "primitive-obsession",
+        "feature-envy",
+        "inappropriate-intimacy",
+        "middle-man",
+        "message-chains",
+        "refused-bequest",
+        "lazy-class",
+        "switch-statement",
+        "oversized-file",
+        // 'mixed-responsibilities' 默认下线（2026-10-25）：其"职责数" = 注释分区数 + 空行块数
+        // + try 个数（structure-detectors.ts countResponsibilities），纯字面量代理，与职责无关。
+        // 实测对自家代码库 32 处命中 0 处可用（22 行的 hook 被判 4 个职责），精确率 0%。
+        // 误报回归集与真阳性样本见 __tests__/mixed-responsibilities-gate.test.ts；
+        // 换语义信号重写并通过该回归集后，方可恢复默认启用。
+        "duplicated-code",
+        "callback-hell",
+        "oversized-component",
+        "god-object",
+        "data-class"
+      ]
+    };
+  }
+});
+
 // ../refactor/src/adapters/adapter-types.ts
 function makeSmell(params) {
   const {
@@ -496461,7 +496558,7 @@ function buildLongMethodSmell(parsed, config, params, triggers) {
   const byComplexityOnly = complexityTriggered && !lineTriggered;
   return makeSmell({
     ruleId: "long-method",
-    severity: config.severities["long-method"],
+    severity: severityOf(config, "long-method"),
     message: `${params.container}${params.name} \u8FC7\u5927 (${parts.join("\uFF0C")})\uFF0C\u5EFA\u8BAE\u62C6\u5206\u4E3A\u66F4\u5C0F\u7684\u51FD\u6570`,
     filePath: parsed.filePath,
     line: params.nodeLine,
@@ -496492,7 +496589,7 @@ function detectLargeClass(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "large-class",
-          severity: config.severities["large-class"],
+          severity: severityOf(config, "large-class"),
           message: `${cls.name} \u8FC7\u5927 (${issues.join("\uFF0C")})\uFF0C\u5EFA\u8BAE\u6309\u804C\u8D23\u62C6\u5206`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -496541,7 +496638,7 @@ function checkParameterCount(parsed, config, smells, params) {
   smells.push(
     makeSmell({
       ruleId: "long-parameter-list",
-      severity: config.severities["long-parameter-list"],
+      severity: severityOf(config, "long-parameter-list"),
       message: `${params.container} \u53C2\u6570\u8FC7\u591A (${params.paramCount} \u4E2A\uFF0C\u9608\u503C ${threshold})\uFF0C\u5EFA\u8BAE\u5C01\u88C5\u4E3A\u53C2\u6570\u5BF9\u8C61`,
       filePath: parsed.filePath,
       line: params.nodeLine,
@@ -496628,7 +496725,8 @@ function findWorstComponent(sourceFile) {
   components.sort(
     (a, b) => b.linesOfCode - a.linesOfCode || b.maxJsxDepth - a.maxJsxDepth || b.handlerCount - a.handlerCount
   );
-  return components[0];
+  const largest = components[0];
+  return largest === void 0 ? null : largest;
 }
 function componentNameOf(node, sourceFile) {
   const checkers = [
@@ -496690,7 +496788,7 @@ function buildOversizedComponentSmell(parsed, component, issues, config) {
   const lineThreshold = config.thresholds.maxComponentLines;
   return makeSmell({
     ruleId: "oversized-component",
-    severity: config.severities["oversized-component"],
+    severity: severityOf(config, "oversized-component"),
     message: `\u7EC4\u4EF6 ${component.name} \u8FC7\u5927 (${issues.join("\uFF0C")})\uFF0C\u5EFA\u8BAE\u62C6\u5206\u4E3A\u5B50\u7EC4\u4EF6`,
     filePath: parsed.filePath,
     line: component.startLine,
@@ -496731,6 +496829,7 @@ var ts3, UPPERCASE_START_RE, REACT_COMPONENT_RE;
 var init_scale_detectors = __esm({
   "../refactor/src/adapters/scale-detectors.ts"() {
     "use strict";
+    init_types4();
     init_adapter_types();
     ts3 = __toESM(require_typescript());
     UPPERCASE_START_RE = /^[A-Z]/;
@@ -496748,7 +496847,7 @@ function detectDeepNesting(parsed, config) {
       if (depth > threshold) {
         const sm = makeSmell({
           ruleId: "deep-nesting",
-          severity: config.severities["deep-nesting"],
+          severity: severityOf(config, "deep-nesting"),
           message: `${cls.name}.${method.name}() \u5D4C\u5957\u8FC7\u6DF1 (${depth} \u5C42\uFF0C\u9608\u503C ${threshold})\uFF0C\u5EFA\u8BAE\u4F7F\u7528 guard clause \u6216\u63D0\u53D6\u65B9\u6CD5`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
@@ -496774,7 +496873,7 @@ function detectDeepNesting(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "deep-nesting",
-          severity: config.severities["deep-nesting"],
+          severity: severityOf(config, "deep-nesting"),
           message: `${fn.name}() \u5D4C\u5957\u8FC7\u6DF1 (${depth} \u5C42)`,
           filePath: parsed.filePath,
           line: fn.startLine,
@@ -496806,7 +496905,7 @@ function detectMixedResponsibilities(parsed, config) {
         smells.push(
           makeSmell({
             ruleId: "mixed-responsibilities",
-            severity: config.severities["mixed-responsibilities"],
+            severity: severityOf(config, "mixed-responsibilities"),
             message: `${cls.name}.${method.name}() \u6DF7\u5408\u4E86\u7EA6 ${responsibilityCount} \u4E2A\u804C\u8D23 (\u9608\u503C ${threshold})\uFF0C\u5EFA\u8BAE\u62C6\u5206\u4E3A\u72EC\u7ACB\u51FD\u6570`,
             filePath: parsed.filePath,
             line: parsed.sourceFile.getLineAndCharacterOfPosition(
@@ -496835,7 +496934,7 @@ function detectMixedResponsibilities(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "mixed-responsibilities",
-          severity: config.severities["mixed-responsibilities"],
+          severity: severityOf(config, "mixed-responsibilities"),
           message: `${fn.name}() \u6DF7\u5408\u4E86\u7EA6 ${responsibilityCount} \u4E2A\u804C\u8D23`,
           filePath: parsed.filePath,
           line: fn.startLine,
@@ -496897,7 +496996,8 @@ function getDuplicateBlocks(allFiles, minLines) {
 }
 function packageNameOf(filePath) {
   const m = filePath.match(PACKAGE_PATH_RE);
-  return m ? m[1] : null;
+  const name = m?.[1];
+  return name ?? null;
 }
 function landingAdvice(myFile, otherFile) {
   const mine = packageNameOf(myFile);
@@ -496956,7 +497056,7 @@ function buildDuplicateSmell(parsed, dup, config, minLines) {
   const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
   return makeSmell({
     ruleId: "duplicated-code",
-    severity: config.severities["duplicated-code"],
+    severity: severityOf(config, "duplicated-code"),
     message: `\u4EE3\u7801\u5757\u4E0E ${otherFile}:${otherLine} \u91CD\u590D\uFF0C\u5EFA\u8BAE\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570`,
     filePath: parsed.filePath,
     line: myLine,
@@ -496986,7 +497086,7 @@ function detectCallbackHell(parsed, config) {
         smells.push(
           makeSmell({
             ruleId: "callback-hell",
-            severity: config.severities["callback-hell"],
+            severity: severityOf(config, "callback-hell"),
             message: `${cls.name}.${method.name}() \u5305\u542B ${chainCount} \u5C42 .then() \u94FE\u5F0F\u56DE\u8C03\uFF0C\u5EFA\u8BAE\u8F6C\u6362\u4E3A async/await`,
             filePath: parsed.filePath,
             line: parsed.sourceFile.getLineAndCharacterOfPosition(
@@ -497017,6 +497117,7 @@ var init_structure_detectors = __esm({
     fs42 = __toESM(require("fs"));
     path44 = __toESM(require("path"));
     init_ast_helper();
+    init_types4();
     init_adapter_types();
     BLANK_LINE_BLOCK = /\n\s*\n/;
     _dupCache = null;
@@ -497059,7 +497160,7 @@ function buildFeatureEnvySmell(params) {
   const threshold = config.thresholds.featureEnvyRatio;
   return makeSmell({
     ruleId: "feature-envy",
-    severity: config.severities["feature-envy"],
+    severity: severityOf(config, "feature-envy"),
     message: `${cls.name}.${method.name}() \u5927\u91CF\u8C03\u7528 ${targetName} (${stats.externalCount} \u6B21\u5916\u90E8\u5F15\u7528 vs ${stats.totalStatements} \u884C\u4EE3\u7801)`,
     filePath: parsed.filePath,
     line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
@@ -497099,7 +497200,7 @@ function detectExcessivePublicMethods(parsed, config, smells) {
     smells.push(
       makeSmell({
         ruleId: "shotgun-surgery",
-        severity: config.severities["shotgun-surgery"],
+        severity: severityOf(config, "shotgun-surgery"),
         message: `${cls.name} \u6709 ${publicMethods.length} \u4E2A\u516C\u5171\u65B9\u6CD5\uFF0C\u4FEE\u6539\u67D0\u4E2A\u529F\u80FD\u53EF\u80FD\u9700\u8981\u6539\u52A8\u591A\u4E2A\u65B9\u6CD5`,
         filePath: parsed.filePath,
         line: cls.startLine,
@@ -497182,7 +497283,7 @@ function detectGodObject(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "god-object",
-          severity: config.severities["god-object"],
+          severity: severityOf(config, "god-object"),
           message: `${cls.name} \u6709 ${publicMethodCount} \u4E2A\u516C\u5171\u65B9\u6CD5 (\u9608\u503C ${methodThreshold})\uFF0C\u53EF\u80FD\u662F\u4E0A\u5E1D\u5BF9\u8C61`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -497222,7 +497323,8 @@ function isFrameworkInjectionSignature(params) {
 function isPureDelegatingAlias(method) {
   const body = method.node.body;
   if (!body || body.statements.length !== 1) return false;
-  const statement = body.statements[0];
+  const [statement] = body.statements;
+  if (!statement) return false;
   if (!ts4.isReturnStatement(statement) || !statement.expression) return false;
   const expr = statement.expression;
   if (!ts4.isCallExpression(expr)) return false;
@@ -497256,7 +497358,7 @@ function buildDataClumpSmell(parsed, group, config) {
   const sampleMethods = group.methods.slice(0, 3);
   return makeSmell({
     ruleId: "data-clumps",
-    severity: config.severities["data-clumps"],
+    severity: severityOf(config, "data-clumps"),
     message: `\u53C2\u6570\u7EC4\u5408 [${group.params.slice(0, 3).join(", ")}] \u53CD\u590D\u51FA\u73B0 (${group.methods.length} \u6B21): ${sampleMethods.join(", ")}...`,
     filePath: parsed.filePath,
     line: 1,
@@ -497291,7 +497393,7 @@ function detectPrimitiveObsession(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "primitive-obsession",
-          severity: config.severities["primitive-obsession"],
+          severity: severityOf(config, "primitive-obsession"),
           message: `${className} \u4F7F\u7528\u8FC7\u591A\u539F\u59CB\u7C7B\u578B (${count} \u4E2A\u5B57\u6BB5)\uFF0C\u5EFA\u8BAE\u4E3A\u76F8\u5173\u5B57\u6BB5\u521B\u5EFA\u503C\u5BF9\u8C61`,
           filePath: parsed.filePath,
           line: 1,
@@ -497333,6 +497435,7 @@ var init_coupling_detectors = __esm({
     "use strict";
     ts4 = __toESM(require_typescript());
     init_ast_helper();
+    init_types4();
     init_adapter_types();
     UPPER_CASE_START = /^[A-Z0-9_]/;
     _literalCache = null;
@@ -497384,7 +497487,7 @@ function buildDataClassSmell(params) {
   const { parsed, cls, fieldCount, ownMethods, config } = params;
   return makeSmell({
     ruleId: "data-class",
-    severity: config.severities["data-class"],
+    severity: severityOf(config, "data-class"),
     message: `${cls.name} \u6709 ${fieldCount} \u4E2A\u5B57\u6BB5\u4F46\u53EA\u6709 ${ownMethods} \u4E2A\u65B9\u6CD5\uFF0C\u53EF\u80FD\u662F\u7EAF\u6570\u636E\u7C7B`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -497422,7 +497525,8 @@ function isTrivialAccessor(method) {
   const body = method.body;
   if (!body) return true;
   if (body.statements.length !== 1) return false;
-  const statement = body.statements[0];
+  const [statement] = body.statements;
+  if (!statement) return false;
   if (ts6.isReturnStatement(statement)) {
     return statement.expression !== void 0 && isSelfFieldAccess(statement.expression);
   }
@@ -497442,6 +497546,7 @@ var init_data_class_detector = __esm({
   "../refactor/src/adapters/data-class-detector.ts"() {
     "use strict";
     ts6 = __toESM(require_typescript());
+    init_types4();
     init_adapter_types();
     init_detector_heuristics();
     NON_BEHAVIOR_METHOD_NAMES = /* @__PURE__ */ new Set(["constructor", "toString", "toJSON"]);
@@ -497539,10 +497644,10 @@ function extractChainAtDot(methodText, dotIdx) {
 }
 function readChainTokens(methodText, dotIdx) {
   let start = dotIdx - 1;
-  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText[start])) start--;
+  while (start >= 0 && IDENT_CHAR_PAREN.test(methodText.charAt(start))) start--;
   const before = methodText.slice(start + 1, dotIdx);
   let end = dotIdx + 1;
-  while (end < methodText.length && IDENT_CHAR.test(methodText[end])) end++;
+  while (end < methodText.length && IDENT_CHAR.test(methodText.charAt(end))) end++;
   const after = methodText.slice(dotIdx + 1, end);
   return { before, after };
 }
@@ -497595,7 +497700,7 @@ function collectExcessivePublicFields(cls) {
 function buildIntimacySmell(cls, publicFields, parsed, config) {
   return makeSmell({
     ruleId: "inappropriate-intimacy",
-    severity: config.severities["inappropriate-intimacy"],
+    severity: severityOf(config, "inappropriate-intimacy"),
     message: `${cls.name} \u66B4\u9732\u8FC7\u591A\u516C\u5171\u5B57\u6BB5 (${publicFields.length} \u4E2A)\uFF0C\u7834\u574F\u5C01\u88C5\u6027`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -497641,7 +497746,7 @@ function computeDelegationStats(cls, parsed) {
 function buildMiddleManSmell(cls, parsed, stats, config) {
   return makeSmell({
     ruleId: "middle-man",
-    severity: config.severities["middle-man"],
+    severity: severityOf(config, "middle-man"),
     message: `${cls.name} \u5927\u90E8\u5206\u65B9\u6CD5\u53EA\u662F\u59D4\u6258\u8C03\u7528 (${stats.delegatingMethods} \u6B21\u59D4\u6258 / ${stats.totalMethods} \u4E2A\u65B9\u6CD5)`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -497693,7 +497798,8 @@ function isPureDelegationMethod(method, sourceFile, ownMethodNames, collectionFi
   const body = method.body;
   if (!body || !ts7.isBlock(body)) return false;
   if (body.statements.length !== 1) return false;
-  const stmt = body.statements[0];
+  const [stmt] = body.statements;
+  if (!stmt) return false;
   let expr;
   if (ts7.isReturnStatement(stmt)) {
     expr = stmt.expression;
@@ -497723,7 +497829,7 @@ function detectMessageChains(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "message-chains",
-          severity: config.severities["message-chains"],
+          severity: severityOf(config, "message-chains"),
           message: `${cls.name}.${method.name}() \u5B58\u5728\u94FE\u5F0F\u8C03\u7528: ${uniqueMatches.join(", ")}`,
           filePath: parsed.filePath,
           line: parsed.sourceFile.getLineAndCharacterOfPosition(method.node.getStart(parsed.sourceFile)).line + 1,
@@ -497785,7 +497891,7 @@ function detectRefusedBequest(parsed, config) {
         smells.push(
           makeSmell({
             ruleId: "refused-bequest",
-            severity: config.severities["refused-bequest"],
+            severity: severityOf(config, "refused-bequest"),
             message: `${cls.name} \u7EE7\u627F\u81EA ${cls.extendsClass} \u4F46\u51E0\u4E4E\u6CA1\u6709\u6DFB\u52A0\u65B0\u6210\u5458 (${ownMethods} \u65B9\u6CD5, ${ownFields} \u5B57\u6BB5)\uFF0C\u53EF\u80FD\u4E0D\u9700\u8981\u7EE7\u627F`,
             filePath: parsed.filePath,
             line: cls.startLine,
@@ -497823,7 +497929,7 @@ function detectLazyClass(parsed, config) {
       smells.push(
         makeSmell({
           ruleId: "lazy-class",
-          severity: config.severities["lazy-class"],
+          severity: severityOf(config, "lazy-class"),
           message: `${cls.name} \u592A\u5C0F (${cls.lineCount} \u884C\uFF0C${cls.members.methods.length} \u4E2A\u65B9\u6CD5)\uFF0C\u53EF\u80FD\u4E0D\u503C\u5F97\u4F5C\u4E3A\u72EC\u7ACB\u7C7B`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -497871,7 +497977,7 @@ function detectSwitchStatement(parsed, config) {
         smells.push(
           makeSmell({
             ruleId: "switch-statement",
-            severity: config.severities["switch-statement"],
+            severity: severityOf(config, "switch-statement"),
             message: `${cls.name}.${method.name}() \u4F7F\u7528 ${switchCount} \u5904 switch \u8BED\u53E5\uFF0C\u5EFA\u8BAE\u7528\u591A\u6001\u66FF\u4EE3`,
             filePath: parsed.filePath,
             line: parsed.sourceFile.getLineAndCharacterOfPosition(
@@ -497901,6 +498007,7 @@ var init_extra_detectors = __esm({
   "../refactor/src/adapters/extra-detectors.ts"() {
     "use strict";
     ts7 = __toESM(require_typescript());
+    init_types4();
     init_adapter_types();
     init_chain_text_utils();
     init_detector_heuristics();
@@ -498047,86 +498154,6 @@ var init_adapters = __esm({
         detect: (f, _, c) => detectPrimitiveObsession(f, c)
       }
     ];
-  }
-});
-
-// ../refactor/src/types.ts
-var DEFAULT_CONFIG;
-var init_types4 = __esm({
-  "../refactor/src/types.ts"() {
-    "use strict";
-    DEFAULT_CONFIG = {
-      thresholds: {
-        maxMethodLines: 80,
-        maxClassLines: 300,
-        maxParameters: 4,
-        maxNestingDepth: 3,
-        maxClassMethods: 20,
-        maxComplexity: 15,
-        minClassLines: 15,
-        featureEnvyRatio: 0.5,
-        maxFileLines: 400,
-        maxTopLevelExports: 10,
-        maxComponentLines: 150,
-        maxJsxNestingDepth: 5,
-        maxCallbackHandlers: 5,
-        minDuplicateLines: 5,
-        minDataClassFields: 5,
-        maxDataClassMethods: 1,
-        maxGodObjectMethods: 20,
-        maxInjectDependencies: 7,
-        minResponsibilities: 3
-      },
-      severities: {
-        "long-method": "warning",
-        "large-class": "error",
-        "long-parameter-list": "warning",
-        "deep-nesting": "warning",
-        "data-clumps": "info",
-        "primitive-obsession": "info",
-        "feature-envy": "warning",
-        "inappropriate-intimacy": "error",
-        "middle-man": "info",
-        "message-chains": "warning",
-        "shotgun-surgery": "warning",
-        "refused-bequest": "warning",
-        "lazy-class": "info",
-        "switch-statement": "warning",
-        "oversized-file": "warning",
-        "mixed-responsibilities": "warning",
-        "duplicated-code": "warning",
-        "callback-hell": "warning",
-        "oversized-component": "warning",
-        "god-object": "error",
-        "data-class": "warning"
-      },
-      enabledRules: [
-        "long-method",
-        "large-class",
-        "long-parameter-list",
-        "deep-nesting",
-        "data-clumps",
-        "primitive-obsession",
-        "feature-envy",
-        "inappropriate-intimacy",
-        "middle-man",
-        "message-chains",
-        "refused-bequest",
-        "lazy-class",
-        "switch-statement",
-        "oversized-file",
-        // 'mixed-responsibilities' 默认下线（2026-10-25）：其"职责数" = 注释分区数 + 空行块数
-        // + try 个数（structure-detectors.ts countResponsibilities），纯字面量代理，与职责无关。
-        // 实测对自家代码库 32 处命中 0 处可用（22 行的 hook 被判 4 个职责），精确率 0%。
-        // 误报回归集与真阳性样本见 __tests__/mixed-responsibilities-gate.test.ts；
-        // 换语义信号重写并通过该回归集后，方可恢复默认启用。
-        "duplicated-code",
-        "callback-hell",
-        "oversized-component",
-        "god-object",
-        "data-class"
-      ]
-    };
   }
 });
 
@@ -498308,7 +498335,8 @@ function findMethodSignatureLine(lines, startLine) {
   let methodSigLine = startLine;
   for (let i = startLine; i >= 0; i--) {
     methodSigLine = i;
-    const line = lines[i].trim();
+    const raw = lines[i];
+    const line = (raw ?? "").trim();
     if (line.startsWith("async ") || METHOD_SIG.test(line)) break;
     if (line.includes("function") || line.includes("=>")) break;
   }
@@ -498323,8 +498351,8 @@ function buildAsyncSignature(sigLine) {
   if (METHOD_NAME_PREFIX.test(trimmedSig) && !trimmedSig.startsWith("constructor")) {
     const methodMatch = trimmedSig.match(METHOD_DECLARATION);
     if (!methodMatch) return null;
-    const prefix = methodMatch[1] || "";
-    const staticPrefix = methodMatch[2] || "";
+    const prefix = methodMatch[1] ?? "";
+    const staticPrefix = methodMatch[2] ?? "";
     return " ".repeat(indent) + prefix + staticPrefix + "async " + methodMatch[3] + trimmedSig.slice(methodMatch[0].length - 1);
   }
   return null;
@@ -498334,6 +498362,7 @@ function buildThenToAwaitTodo(lines, filePath, smellLine, methodText) {
   const firstThenLine = smellLine + methodText.split("\n").findIndex((l) => l.includes(".then("));
   if (firstThenLine < smellLine || firstThenLine > lines.length) return null;
   const thenLine = lines[firstThenLine - 1];
+  if (thenLine === void 0) return null;
   const thenIndent = thenLine.length - thenLine.trimStart().length;
   return {
     filePath,
@@ -498422,6 +498451,7 @@ function applyEditToLines(lines, edit) {
 }
 function applySingleLineEdit(lines, edit) {
   const line = lines[edit.startLine - 1];
+  if (line === void 0) return lines.join("\n");
   const startIdx = edit.startColumn - 1;
   const endIdx = Math.min(edit.endColumn - 1, line.length);
   lines[edit.startLine - 1] = line.slice(0, startIdx) + edit.replacement + line.slice(endIdx);
@@ -498462,6 +498492,7 @@ var init_auto_fix = __esm({
       const edits = [];
       for (let i = smell.location.line; i <= Math.min(smell.location.endLine, lines.length); i++) {
         const line = lines[i - 1];
+        if (line === void 0) continue;
         const trimmed = line.trimStart();
         if (FIELD_DECLARATION.test(trimmed)) {
           const indent = line.length - line.trimStart().length;
@@ -498494,6 +498525,7 @@ var init_auto_fix = __esm({
       if (!THEN_CHAIN.test(methodText)) return null;
       const methodSigLine = findMethodSignatureLine(lines, smell.location.line - 1);
       const sigLine = lines[methodSigLine];
+      if (sigLine === void 0) return null;
       if (ASYNC_PREFIX.test(sigLine.trimStart())) return null;
       const asyncSig = buildAsyncSignature(sigLine);
       if (!asyncSig) return null;
@@ -498807,6 +498839,7 @@ var init_engine = __esm({
         const parseErrors = [];
         for (let i = 0; i < filePaths.length; i++) {
           const fp = filePaths[i];
+          if (fp === void 0) continue;
           try {
             const parsed = parseFile(fp);
             parsedFiles.push(parsed);
@@ -498822,7 +498855,9 @@ var init_engine = __esm({
       async detectFileReports(parsedFiles) {
         const state2 = this.initReportState();
         for (let i = 0; i < parsedFiles.length; i++) {
-          this.processFileReport(parsedFiles[i], parsedFiles, state2);
+          const parsed = parsedFiles[i];
+          if (parsed === void 0) continue;
+          this.processFileReport(parsed, parsedFiles, state2);
           if (i > 0 && i % 5 === 0) {
             await yieldToEventLoop();
           }
@@ -498963,8 +498998,9 @@ function countSmellsByFileAndRule(report, projectRoot) {
     }
     for (const s of fr.smells) {
       const rid = s.ruleId;
-      const map = entries[rel];
-      map[rid] = (map[rid] || 0) + 1;
+      const map = entries[rel] ?? {};
+      entries[rel] = map;
+      map[rid] = (map[rid] ?? 0) + 1;
     }
   }
   return entries;
@@ -499501,9 +499537,11 @@ var init_garbage_scanner = __esm({
 function extractCveId(issue) {
   const id = issue.ruleId || "";
   const cveMatch = id.match(CVE_PATTERN);
-  if (cveMatch) return cveMatch[1].toUpperCase();
+  const direct = cveMatch?.[1];
+  if (direct !== void 0) return direct.toUpperCase();
   const altMatch = id.match(CVE_ALT_PATTERN);
-  if (altMatch) return altMatch[1].toUpperCase();
+  const alt = altMatch?.[1];
+  if (alt !== void 0) return alt.toUpperCase();
   return null;
 }
 function extractPkgVersion(issue) {
@@ -499994,10 +500032,11 @@ var init_semgrep_adapter = __esm({
       }
       mapOutput(output) {
         const results = output.results ?? [];
-        return semgrepMapper(output).map((issue, idx) => ({
-          ...issue,
-          codeFlows: this.mapDataflowTrace(results[idx])
-        }));
+        return semgrepMapper(output).map((issue, idx) => {
+          const result = results[idx];
+          const codeFlows = result === void 0 ? void 0 : this.mapDataflowTrace(result);
+          return { ...issue, codeFlows };
+        });
       }
       /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过）。顶层与 extra 嵌套两种落点都接受 */
       mapDataflowTrace(result) {
@@ -500617,7 +500656,9 @@ var init_ort_adapter = __esm({
         const licenseLines = [];
         let i = startLine;
         while (i < lines.length) {
-          const nextLine = lines[i].trimEnd();
+          const raw = lines[i];
+          if (raw === void 0) break;
+          const nextLine = raw.trimEnd();
           const nextIndent = nextLine.length - nextLine.trimStart().length;
           if (nextIndent <= indent + 2) break;
           if (nextLine.trimStart().startsWith("- ")) {
@@ -501432,7 +501473,15 @@ var init_engine2 = __esm({
         });
       }
       buildReport(params) {
-        const { projectId, vulnerabilities, garbage, malware, conflictReport, auditError, skippedTools } = params;
+        const {
+          projectId,
+          vulnerabilities,
+          garbage,
+          malware,
+          conflictReport,
+          auditError,
+          skippedTools
+        } = params;
         const summary = summarizeFindings(vulnerabilities, garbage, malware);
         const securityScore = calculateSecurityScore(vulnerabilities);
         const unavailableTools = [...this.degradationManager.getToolErrors().keys()];
@@ -501916,20 +501965,22 @@ function levenshtein(a, b) {
   const n = b.length;
   if (m === 0) return n;
   if (n === 0) return m;
-  const prev = new Array(n + 1).fill(0).map((_, j) => j);
+  let prev = new Array(n + 1).fill(0).map((_, j) => j);
   for (let i = 1; i <= m; i++) {
     const curr = new Array(n + 1).fill(0);
     curr[0] = i;
+    let left = i;
     for (let j = 1; j <= n; j++) {
-      curr[j] = Math.min(
-        prev[j] + 1,
-        curr[j - 1] + 1,
-        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
+      const prevUp = prev[j] ?? 0;
+      const prevDiag = prev[j - 1] ?? 0;
+      const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+      const next = Math.min(prevUp + 1, left + 1, prevDiag + cost);
+      curr[j] = next;
+      left = next;
     }
-    prev.splice(0, prev.length, ...curr);
+    prev = curr;
   }
-  return prev[n];
+  return prev[n] ?? m;
 }
 function makeThreatItem(filePath, name, meta) {
   return {
@@ -501960,7 +502011,8 @@ function extractPackageNames(lock) {
   if (packages && typeof packages === "object") {
     for (const key of Object.keys(packages)) {
       const m = key.match(PACKAGE_KEY_RE3);
-      if (m) names.add(m[1]);
+      const name = m?.[1];
+      if (name !== void 0) names.add(name);
     }
   }
   const deps = lock.dependencies;
@@ -501985,7 +502037,8 @@ function extractPnpmPackageNames(lock) {
   if (packages && typeof packages === "object") {
     for (const key of Object.keys(packages)) {
       const m = key.match(PNPM_PACKAGE_KEY_RE3);
-      if (m) names.add(m[1]);
+      const name = m?.[1];
+      if (name !== void 0) names.add(name);
     }
   }
   const importers = lock.importers;
@@ -503289,13 +503342,14 @@ var init_tree_shaking_detector = __esm({
       collectNoCodeSplitIssue(pkg, chunkFiles, issues) {
         const deps = pkg.dependencies;
         const depCount = isRecord4(deps) ? Object.keys(deps).length : 0;
-        if (chunkFiles.length === 1 && depCount >= 5) {
+        const onlyChunk = chunkFiles.length === 1 ? chunkFiles[0] : void 0;
+        if (onlyChunk && depCount >= 5) {
           issues.push({
             id: "chunk-splitting-no-code-split",
             ruleId: "chunk-splitting.no-code-split",
             category: "chunk-splitting",
             severity: "medium",
-            file: chunkFiles[0].file,
+            file: onlyChunk.file,
             message: "\u68C0\u6D4B\u5230\u5355\u4E00 bundle \u4E14\u4F9D\u8D56\u8D85\u8FC7 5 \u4E2A \u2014 \u5EFA\u8BAE\u542F\u7528\u8DEF\u7531\u7EA7\u4EE3\u7801\u5206\u5272",
             suggestion: "\u6309\u8DEF\u7531\u61D2\u52A0\u8F7D\u9875\u9762\uFF0C\u6216\u6309\u9700\u62C6\u5206\u7B2C\u4E09\u65B9\u4F9D\u8D56\u4E3A\u72EC\u7ACB chunk",
             autoFixable: false
@@ -503350,7 +503404,9 @@ var init_tree_shaking_detector = __esm({
           for (const m of content.matchAll(
             /(?:import\s+(?:[\w\s*,{}$_]+)\s+from\s+|require\(\s*)['"]([^'"]+)['"]/g
           )) {
-            this.recordWholeLibraryHit({ hits, seen, projectRoot, filePath, specifier: m[1] });
+            const specifier = m[1];
+            if (specifier === void 0) continue;
+            this.recordWholeLibraryHit({ hits, seen, projectRoot, filePath, specifier });
           }
         }
         return hits;

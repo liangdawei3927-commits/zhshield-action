@@ -102,7 +102,10 @@ function extractPackageNames(lock: unknown): string[] {
   if (packages && typeof packages === 'object') {
     for (const key of Object.keys(packages)) {
       const m = key.match(PACKAGE_KEY_RE);
-      if (m) names.add(m[1]);
+      // 捕获组在 noUncheckedIndexedAccess 下是 string | undefined：正则里必存在，
+      // 但编译器无法证明 —— 显式判空，别用非空断言（断言不提供任何运行期保护）。
+      const name = m?.[1];
+      if (name !== undefined) names.add(name);
     }
   }
 
@@ -132,7 +135,8 @@ function extractPnpmPackageNames(lock: unknown): string[] {
   if (packages && typeof packages === 'object') {
     for (const key of Object.keys(packages)) {
       const m = key.match(PNPM_PACKAGE_KEY_RE);
-      if (m) names.add(m[1]);
+      const name = m?.[1];
+      if (name !== undefined) names.add(name);
     }
   }
 

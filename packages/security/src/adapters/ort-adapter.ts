@@ -161,7 +161,8 @@ export class ORTAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error: 'ORT 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
+        error:
+          'ORT 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到），可在工具面板引导安装',
       };
     }
     return {
@@ -321,7 +322,11 @@ export class ORTAdapter implements ToolAdapter {
     const licenseLines: string[] = [];
     let i = startLine;
     while (i < lines.length) {
-      const nextLine = lines[i].trimEnd();
+      // noUncheckedIndexedAccess：越界访问返回 string | undefined。
+      // 用 charAt 之外的显式判空（行内容可能为空串，判空不能写成 !line）。
+      const raw = lines[i];
+      if (raw === undefined) break;
+      const nextLine = raw.trimEnd();
       const nextIndent = nextLine.length - nextLine.trimStart().length;
       if (nextIndent <= indent + 2) break;
       if (nextLine.trimStart().startsWith('- ')) {

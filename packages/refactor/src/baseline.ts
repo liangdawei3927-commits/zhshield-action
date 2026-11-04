@@ -35,8 +35,11 @@ export function countSmellsByFileAndRule(
     }
     for (const s of fr.smells) {
       const rid = s.ruleId;
-      const map = entries[rel];
-      map[rid] = (map[rid] || 0) + 1;
+      // 严格索引访问下 entries[rel] 是 Record | undefined：上面刚确保过它存在，
+      // 但编译器无法跨语句推断 —— 取一次局部变量并显式兜底。
+      const map = entries[rel] ?? {};
+      entries[rel] = map;
+      map[rid] = (map[rid] ?? 0) + 1;
     }
   }
   return entries;

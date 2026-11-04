@@ -27,6 +27,9 @@ const fixInappropriateIntimacy: FixGenerator = (smell) => {
   const edits: TextEdit[] = [];
   for (let i = smell.location.line; i <= Math.min(smell.location.endLine, lines.length); i++) {
     const line = lines[i - 1];
+    // noUncheckedIndexedAccess：行数组下标可能越界（split 末行 / 定位偏移）。
+    // 越界即跳过该行，不猜测内容 —— 生成错误的编辑比不生成更糟。
+    if (line === undefined) continue;
     const trimmed = line.trimStart();
     // Match field declarations without access modifier or with `public`
     // Pattern: [indent][public|static|readonly]* fieldName: Type;
@@ -66,6 +69,7 @@ const fixCallbackHell: FixGenerator = (smell) => {
 
   const methodSigLine = findMethodSignatureLine(lines, smell.location.line - 1);
   const sigLine = lines[methodSigLine];
+  if (sigLine === undefined) return null;
   if (ASYNC_PREFIX.test(sigLine.trimStart())) return null; // Already async
 
   const asyncSig = buildAsyncSignature(sigLine);
@@ -97,7 +101,9 @@ function findMethodSignatureLine(lines: string[], startLine: number): number {
   let methodSigLine = startLine;
   for (let i = startLine; i >= 0; i--) {
     methodSigLine = i;
-    const line = lines[i].trim();
+    const raw = lines[i];
+    // 越界（startLine 超出范围）时按空行处理：不会误判成签名行
+    const line = (raw ?? '').trim();
     if (line.startsWith('async ') || METHOD_SIG.test(line)) break;
     if (line.includes('function') || line.includes('=>')) break;
   }
@@ -115,8 +121,8 @@ function buildAsyncSignature(sigLine: string): string | null {
   if (METHOD_NAME_PREFIX.test(trimmedSig) && !trimmedSig.startsWith('constructor')) {
     const methodMatch = trimmedSig.match(METHOD_DECLARATION);
     if (!methodMatch) return null;
-    const prefix = methodMatch[1] || '';
-    const staticPrefix = methodMatch[2] || '';
+    const prefix = methodMatch[1] ?? '';
+    const staticPrefix = methodMatch[2] ?? '';
     return (
       ' '.repeat(indent) +
       prefix +
@@ -142,6 +148,8 @@ function buildThenToAwaitTodo(
   if (firstThenLine < smellLine || firstThenLine > lines.length) return null;
 
   const thenLine = lines[firstThenLine - 1];
+  // 定位可能落在文件末行之外：越界即放弃该修复（不猜测内容）
+  if (thenLine === undefined) return null;
   const thenIndent = thenLine.length - thenLine.trimStart().length;
   return {
     filePath,
@@ -278,6 +286,8 @@ function applyEditToLines(
 /** 应用单行替换：仅替换行内 startColumn..endColumn 区间 */
 function applySingleLineEdit(lines: string[], edit: TextEdit): string {
   const line = lines[edit.startLine - 1];
+  // 目标行越界（定位漂移）时不做替换：宁可漏修，不可错改用户代码
+  if (line === undefined) return lines.join('\n');
   const startIdx = edit.startColumn - 1;
   const endIdx = Math.min(edit.endColumn - 1, line.length);
   lines[edit.startLine - 1] = line.slice(0, startIdx) + edit.replacement + line.slice(endIdx);

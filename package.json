@@ -21,6 +21,7 @@
     "verify:offline": "node scripts/verify-offline-deps.mjs",
     "verify:tool-dedup": "node scripts/verify-tool-dedup.mjs",
     "verify:dist-fresh": "pnpm --filter zhshield-cli verify:dist-fresh",
+    "check:strict": "node scripts/check-strict-migration.mjs",
     "bench:db": "node packages/db/scripts/bench-batch.mjs",
     "bench:perf": "node packages/autoperf/scripts/bench-scan.mjs",
     "bench:gate": "node scripts/benchmark.mjs --gate",

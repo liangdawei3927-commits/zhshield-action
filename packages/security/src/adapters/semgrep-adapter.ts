@@ -134,7 +134,8 @@ export class SemgrepAdapter implements ToolAdapter {
 
   private buildErrorResult(start: number, err: ExecError): ToolResult {
     return buildStandardErrorResult('semgrep', start, err, {
-      unavailableHint: 'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
+      unavailableHint:
+        'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
       failureMessage: 'Semgrep 执行失败',
       parsePartial: (stdout) => this.parsePartialOutput(stdout),
     });
@@ -187,10 +188,13 @@ export class SemgrepAdapter implements ToolAdapter {
     // 公共字段由 @zh/shared 的 semgrepMapper 产出：它与 data.results 一一对应，
     // 故按下标把本适配器独有的污点链（codeFlows）回填到对应 Issue 上。
     const results = output.results ?? [];
-    return semgrepMapper(output).map((issue, idx) => ({
-      ...issue,
-      codeFlows: this.mapDataflowTrace(results[idx]),
-    }));
+    return semgrepMapper(output).map((issue, idx) => {
+      // results[idx] 在 noUncheckedIndexedAccess 下可能越界（两个数组长度理论上一致，
+      // 但编译器无法证明）—— 越界时该 Issue 没有污点链，而不是崩掉整个扫描。
+      const result = results[idx];
+      const codeFlows = result === undefined ? undefined : this.mapDataflowTrace(result);
+      return { ...issue, codeFlows };
+    });
   }
 
   /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过）。顶层与 extra 嵌套两种落点都接受 */

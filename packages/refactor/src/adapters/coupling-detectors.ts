@@ -3,6 +3,7 @@ import * as ts from 'typescript';
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import { collectExternalCalls } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
+import { severityOf } from '../types';
 import { makeSmell } from './adapter-types';
 
 type ParsedMethod = ParsedClass['members']['methods'][number];
@@ -62,7 +63,7 @@ function buildFeatureEnvySmell(params: BuildFeatureEnvySmellParams): CodeSmell {
   const threshold = config.thresholds.featureEnvyRatio;
   return makeSmell({
     ruleId: 'feature-envy',
-    severity: config.severities['feature-envy'],
+    severity: severityOf(config, 'feature-envy'),
     message: `${cls.name}.${method.name}() 大量调用 ${targetName} (${stats.externalCount} 次外部引用 vs ${stats.totalStatements} 行代码)`,
     filePath: parsed.filePath,
     line:
@@ -120,7 +121,7 @@ function detectExcessivePublicMethods(
     smells.push(
       makeSmell({
         ruleId: 'shotgun-surgery',
-        severity: config.severities['shotgun-surgery'],
+        severity: severityOf(config, 'shotgun-surgery'),
         message: `${cls.name} 有 ${publicMethods.length} 个公共方法，修改某个功能可能需要改动多个方法`,
         filePath: parsed.filePath,
         line: cls.startLine,
@@ -227,7 +228,7 @@ export function detectGodObject(parsed: ParsedFile, config: RefactorConfig): Cod
       smells.push(
         makeSmell({
           ruleId: 'god-object',
-          severity: config.severities['god-object'],
+          severity: severityOf(config, 'god-object'),
           message: `${cls.name} 有 ${publicMethodCount} 个公共方法 (阈值 ${methodThreshold})，可能是上帝对象`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -297,7 +298,9 @@ function isPureDelegatingAlias(method: ParsedMethod): boolean {
   const body = method.node.body;
   if (!body || body.statements.length !== 1) return false;
 
-  const statement = body.statements[0];
+  const [statement] = body.statements;
+
+  if (!statement) return false;
   if (!ts.isReturnStatement(statement) || !statement.expression) return false;
 
   const expr = statement.expression;
@@ -348,7 +351,7 @@ function buildDataClumpSmell(
   const sampleMethods = group.methods.slice(0, 3);
   return makeSmell({
     ruleId: 'data-clumps',
-    severity: config.severities['data-clumps'],
+    severity: severityOf(config, 'data-clumps'),
     message: `参数组合 [${group.params.slice(0, 3).join(', ')}] 反复出现 (${group.methods.length} 次): ${sampleMethods.join(', ')}...`,
     filePath: parsed.filePath,
     line: 1,
@@ -392,7 +395,7 @@ export function detectPrimitiveObsession(parsed: ParsedFile, config: RefactorCon
       smells.push(
         makeSmell({
           ruleId: 'primitive-obsession',
-          severity: config.severities['primitive-obsession'],
+          severity: severityOf(config, 'primitive-obsession'),
           message: `${className} 使用过多原始类型 (${count} 个字段)，建议为相关字段创建值对象`,
           filePath: parsed.filePath,
           line: 1,

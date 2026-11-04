@@ -2,6 +2,7 @@ import * as ts from 'typescript';
 
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
+import { severityOf } from '../types';
 import { makeSmell } from './adapter-types';
 import { extractMessageChains } from './chain-text-utils';
 import { isFrameworkManagedClass, isTestFixture } from './detector-heuristics';
@@ -50,7 +51,7 @@ function buildIntimacySmell(
 ): CodeSmell {
   return makeSmell({
     ruleId: 'inappropriate-intimacy',
-    severity: config.severities['inappropriate-intimacy'],
+    severity: severityOf(config, 'inappropriate-intimacy'),
     message: `${cls.name} 暴露过多公共字段 (${publicFields.length} 个)，破坏封装性`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -121,7 +122,7 @@ function buildMiddleManSmell(
 ): CodeSmell {
   return makeSmell({
     ruleId: 'middle-man',
-    severity: config.severities['middle-man'],
+    severity: severityOf(config, 'middle-man'),
     message: `${cls.name} 大部分方法只是委托调用 (${stats.delegatingMethods} 次委托 / ${stats.totalMethods} 个方法)`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -195,7 +196,9 @@ function isPureDelegationMethod(
   if (!body || !ts.isBlock(body)) return false;
   if (body.statements.length !== 1) return false;
 
-  const stmt = body.statements[0];
+  const [stmt] = body.statements;
+
+  if (!stmt) return false;
   let expr: ts.Expression | undefined;
   if (ts.isReturnStatement(stmt)) {
     expr = stmt.expression;
@@ -232,7 +235,7 @@ export function detectMessageChains(parsed: ParsedFile, config: RefactorConfig):
       smells.push(
         makeSmell({
           ruleId: 'message-chains',
-          severity: config.severities['message-chains'],
+          severity: severityOf(config, 'message-chains'),
           message: `${cls.name}.${method.name}() 存在链式调用: ${uniqueMatches.join(', ')}`,
           filePath: parsed.filePath,
           line:
@@ -315,7 +318,7 @@ export function detectRefusedBequest(parsed: ParsedFile, config: RefactorConfig)
         smells.push(
           makeSmell({
             ruleId: 'refused-bequest',
-            severity: config.severities['refused-bequest'],
+            severity: severityOf(config, 'refused-bequest'),
             message: `${cls.name} 继承自 ${cls.extendsClass} 但几乎没有添加新成员 (${ownMethods} 方法, ${ownFields} 字段)，可能不需要继承`,
             filePath: parsed.filePath,
             line: cls.startLine,
@@ -370,7 +373,7 @@ export function detectLazyClass(parsed: ParsedFile, config: RefactorConfig): Cod
       smells.push(
         makeSmell({
           ruleId: 'lazy-class',
-          severity: config.severities['lazy-class'],
+          severity: severityOf(config, 'lazy-class'),
           message: `${cls.name} 太小 (${cls.lineCount} 行，${cls.members.methods.length} 个方法)，可能不值得作为独立类`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -430,7 +433,7 @@ export function detectSwitchStatement(parsed: ParsedFile, config: RefactorConfig
         smells.push(
           makeSmell({
             ruleId: 'switch-statement',
-            severity: config.severities['switch-statement'],
+            severity: severityOf(config, 'switch-statement'),
             message: `${cls.name}.${method.name}() 使用 ${switchCount} 处 switch 语句，建议用多态替代`,
             filePath: parsed.filePath,
             line:

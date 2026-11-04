@@ -120,7 +120,9 @@ function collectProjectDeps(section: string, names: Set<string>): void {
   if (!depsBlock) return;
   const block = section.slice(section.indexOf(depsBlock[0]) + depsBlock[0].length);
   for (const m of block.matchAll(/"([^"]+)"/g)) {
-    const name = quotedPackageName(m[1]);
+    const quoted = m[1];
+    if (quoted === undefined) continue;
+    const name = quotedPackageName(quoted);
     if (name) names.add(name);
   }
 }
@@ -130,8 +132,9 @@ function collectTableDeps(section: string, names: Set<string>): void {
   for (const line of section.split(NEWLINE_RE)) {
     if (line.trim().startsWith('[')) continue;
     const key = line.match(PYPROJECT_KEY_RE);
-    if (!key) continue;
-    names.add(key[1]);
+    const keyName = key?.[1];
+    if (keyName === undefined) continue;
+    names.add(keyName);
   }
 }
 
@@ -146,8 +149,9 @@ function extractPyprojectNames(content: string): string[] {
   const sections = content.split(SECTION_HEADER_RE);
   for (const section of sections) {
     const header = section.match(HEADER_NAME_RE);
-    if (!header) continue;
-    const sectionName = header[1].trim().toLowerCase();
+    const headerName = header?.[1];
+    if (headerName === undefined) continue;
+    const sectionName = headerName.trim().toLowerCase();
     if (sectionName === 'project') {
       collectProjectDeps(section, names);
       continue;

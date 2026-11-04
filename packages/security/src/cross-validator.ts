@@ -47,10 +47,12 @@ function extractCveId(issue: Issue): string | null {
   const id = issue.ruleId || '';
   // 直接匹配 CVE- 开头的
   const cveMatch = id.match(CVE_PATTERN);
-  if (cveMatch) return cveMatch[1].toUpperCase();
+  const direct = cveMatch?.[1];
+  if (direct !== undefined) return direct.toUpperCase();
   // 有些 ruleId 格式是 trivy/CVE-2024-1234 或 grype:CVE-2024-1234
   const altMatch = id.match(CVE_ALT_PATTERN);
-  if (altMatch) return altMatch[1].toUpperCase();
+  const alt = altMatch?.[1];
+  if (alt !== undefined) return alt.toUpperCase();
   return null;
 }
 

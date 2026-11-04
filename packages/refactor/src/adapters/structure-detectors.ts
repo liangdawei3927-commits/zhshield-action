@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { DuplicateBlock, ParsedFile } from '../ast-helper';
 import { computeNestingDepth, scanDuplicateCodeBlocks } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
+import { severityOf } from '../types';
 import { makeSmell } from './adapter-types';
 
 const BLANK_LINE_BLOCK = /\n\s*\n/;
@@ -17,7 +18,7 @@ export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig): C
       if (depth > threshold) {
         const sm = makeSmell({
           ruleId: 'deep-nesting',
-          severity: config.severities['deep-nesting'],
+          severity: severityOf(config, 'deep-nesting'),
           message: `${cls.name}.${method.name}() 嵌套过深 (${depth} 层，阈值 ${threshold})，建议使用 guard clause 或提取方法`,
           filePath: parsed.filePath,
           line:
@@ -46,7 +47,7 @@ export function detectDeepNesting(parsed: ParsedFile, config: RefactorConfig): C
       smells.push(
         makeSmell({
           ruleId: 'deep-nesting',
-          severity: config.severities['deep-nesting'],
+          severity: severityOf(config, 'deep-nesting'),
           message: `${fn.name}() 嵌套过深 (${depth} 层)`,
           filePath: parsed.filePath,
           line: fn.startLine,
@@ -85,7 +86,7 @@ export function detectMixedResponsibilities(
         smells.push(
           makeSmell({
             ruleId: 'mixed-responsibilities',
-            severity: config.severities['mixed-responsibilities'],
+            severity: severityOf(config, 'mixed-responsibilities'),
             message: `${cls.name}.${method.name}() 混合了约 ${responsibilityCount} 个职责 (阈值 ${threshold})，建议拆分为独立函数`,
             filePath: parsed.filePath,
             line:
@@ -116,7 +117,7 @@ export function detectMixedResponsibilities(
       smells.push(
         makeSmell({
           ruleId: 'mixed-responsibilities',
-          severity: config.severities['mixed-responsibilities'],
+          severity: severityOf(config, 'mixed-responsibilities'),
           message: `${fn.name}() 混合了约 ${responsibilityCount} 个职责`,
           filePath: parsed.filePath,
           line: fn.startLine,
@@ -181,12 +182,14 @@ export function detectDuplicateCode(
   config: RefactorConfig,
 ): CodeSmell[] {
   const minLines = config.thresholds.minDuplicateLines;
-  return getDuplicateBlocks(allFiles, minLines)
-    // 每对重复区只由字典序在前的文件报告一次。此前两侧各报一条，问题总数虚高
-    // 约一倍（2026-10-28 对账实证：696 条 = 348 对 × 2），且 MCP 分页截断下
-    // 正反两条还会让「同文件被卷入 N 次」的模块统计失真。
-    .filter((d) => canonicalSideOf(d) === parsed.filePath)
-    .map((dup) => buildDuplicateSmell(parsed, dup, config, minLines));
+  return (
+    getDuplicateBlocks(allFiles, minLines)
+      // 每对重复区只由字典序在前的文件报告一次。此前两侧各报一条，问题总数虚高
+      // 约一倍（2026-10-28 对账实证：696 条 = 348 对 × 2），且 MCP 分页截断下
+      // 正反两条还会让「同文件被卷入 N 次」的模块统计失真。
+      .filter((d) => canonicalSideOf(d) === parsed.filePath)
+      .map((dup) => buildDuplicateSmell(parsed, dup, config, minLines))
+  );
 }
 
 /** 重复对的规范报告侧：两文件中字典序在前的那个（确定性，扫描顺序无关） */
@@ -211,7 +214,9 @@ const PACKAGE_PATH_RE = /packages\/([^/]+)\//;
 /** 从绝对路径提取 monorepo 包名（packages/<name>/ 段），非包内文件返回 null */
 function packageNameOf(filePath: string): string | null {
   const m = filePath.match(PACKAGE_PATH_RE);
-  return m ? m[1] : null;
+  // 捕获组在严格索引访问下可能 undefined（正则不匹配时 match 为 null，已提前返回）
+  const name = m?.[1];
+  return name ?? null;
 }
 
 /**
@@ -309,7 +314,7 @@ function buildDuplicateSmell(
   const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
   return makeSmell({
     ruleId: 'duplicated-code',
-    severity: config.severities['duplicated-code'],
+    severity: severityOf(config, 'duplicated-code'),
     message: `代码块与 ${otherFile}:${otherLine} 重复，建议提取为公共函数`,
     filePath: parsed.filePath,
     line: myLine,
@@ -342,7 +347,7 @@ export function detectCallbackHell(parsed: ParsedFile, config: RefactorConfig): 
         smells.push(
           makeSmell({
             ruleId: 'callback-hell',
-            severity: config.severities['callback-hell'],
+            severity: severityOf(config, 'callback-hell'),
             message: `${cls.name}.${method.name}() 包含 ${chainCount} 层 .then() 链式回调，建议转换为 async/await`,
             filePath: parsed.filePath,
             line:

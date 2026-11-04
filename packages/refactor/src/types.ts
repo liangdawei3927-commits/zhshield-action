@@ -137,8 +137,32 @@ export interface RefactorConfig {
     maxInjectDependencies: number;
     minResponsibilities: number;
   };
+  /**
+   * 规则 → 严重级映射。
+   *
+   * 键是**开放的**字符串（用户可自定义规则），但取值必须是合法严重级 ——
+   * `Record<string, IssueSeverity>` 只约束"值域"，不保证"键存在"。
+   * 因此取用一律走 {@link severityOf}（缺失回落默认级），不要直接下标访问：
+   * 直接下标在 noUncheckedIndexedAccess 下是 `IssueSeverity | undefined`，
+   * 且「规则名拼错 → 严重级变成 undefined」正是这类开放映射最常见的静默故障。
+   */
   severities: Record<string, IssueSeverity>;
   enabledRules: string[];
+}
+
+/** 规则严重级缺失时的回落值（未知规则按 warning 处理，不静默变成 undefined） */
+export const DEFAULT_SEVERITY: IssueSeverity = 'warning';
+
+/**
+ * 取规则严重级；键不存在或值非法时回落 {@link DEFAULT_SEVERITY}。
+ *
+ * 为什么需要它：`severities` 是开放映射（用户可自定义规则），下标访问必然可能越界。
+ * 集中在这里做回落，好过在 20+ 个 detector 里各写一遍 `?? 'warning'` ——
+ * 更重要的是**回落语义统一**：拼错的规则名不会产出 `severity: undefined` 的坏数据。
+ */
+export function severityOf(config: RefactorConfig, ruleId: string): IssueSeverity {
+  const severity = config.severities[ruleId];
+  return severity ?? DEFAULT_SEVERITY;
 }
 
 /** 默认重构配置：内置度量阈值、规则严重级映射与全量启用规则集（调用方可整体覆盖） */

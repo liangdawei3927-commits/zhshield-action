@@ -2,6 +2,7 @@ import * as ts from 'typescript';
 
 import type { ParsedFile, ParsedClass } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
+import { severityOf } from '../types';
 import { makeSmell } from './adapter-types';
 import { isFrameworkManagedClass, isTestFixture } from './detector-heuristics';
 
@@ -40,7 +41,7 @@ function buildDataClassSmell(params: BuildDataClassSmellParams): CodeSmell {
   const { parsed, cls, fieldCount, ownMethods, config } = params;
   return makeSmell({
     ruleId: 'data-class',
-    severity: config.severities['data-class'],
+    severity: severityOf(config, 'data-class'),
     message: `${cls.name} 有 ${fieldCount} 个字段但只有 ${ownMethods} 个方法，可能是纯数据类`,
     filePath: parsed.filePath,
     line: cls.startLine,
@@ -93,7 +94,8 @@ function isTrivialAccessor(method: ts.MethodDeclaration): boolean {
   const body = method.body;
   if (!body) return true;
   if (body.statements.length !== 1) return false;
-  const statement = body.statements[0];
+  const [statement] = body.statements;
+  if (!statement) return false;
   if (ts.isReturnStatement(statement)) {
     return statement.expression !== undefined && isSelfFieldAccess(statement.expression);
   }

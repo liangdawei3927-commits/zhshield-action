@@ -42,7 +42,14 @@ export type IssueCategory =
 export type IssueSource =
   | 'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor' | 'performance';
 
-/** 问题（Issue）：各域检测结果的统一表示，跨域聚合与展示的公共契约 */
+/**
+ * 问题（Issue）：各域检测结果的统一表示，跨域聚合与展示的公共契约。
+ *
+ * 可选字段一律写作 `?: T | undefined`：exactOptionalPropertyTypes 下 `?: T` 表示
+ * 「键要么不存在、要么是 T」，而各域适配器大量构造「键存在但值可能为 undefined」的条目
+ * （如 trivy 有 suggestion、semgrep 无 suggestion）。在类型上如实写明「可能无值」，
+ * 比在每个适配器里写条件展开更贴近事实，也让"值缺失"在类型层面可见。
+ */
 export interface Issue {
   id: string;
   ruleId: string;
@@ -50,26 +57,26 @@ export interface Issue {
   category: IssueCategory;
   message: string;
   file: string;
-  line?: number;
-  column?: number;
-  suggestion?: string;
+  line?: number | undefined;
+  column?: number | undefined;
+  suggestion?: string | undefined;
   autoFixable: boolean;
   source: IssueSource;
   fingerprint: string;
 
   // ─── 可选扩展字段（SARIF 兼容，§11.3 / ADR #1）──────────
   /** 污点传播链（source→sink 位置链） */
-  codeFlows?: CodeFlow[];
+  codeFlows?: CodeFlow[] | undefined;
   /** 原始栈追踪行 */
-  stack?: string[];
+  stack?: string[] | undefined;
   /** 分类标签（如 validation:NO_VALIDATOR、sca:reachable） */
-  taxonomies?: string[];
+  taxonomies?: string[] | undefined;
 }
 
 /** SARIF 兼容的污点链单条位置 */
 export interface CodeFlowLocation {
-  location: { file: string; line?: number; column?: number };
-  message?: string;
+  location: { file: string; line?: number | undefined; column?: number | undefined };
+  message?: string | undefined;
 }
 
 /** 污点线程流：同一 source→sink 传播链上的位置序列 */

@@ -86,7 +86,7 @@ export interface SecretScanReport {
 export interface SecretStateRecord {
   status: SecretStatus;
   /** dismissed 原因（经验池消费） */
-  reason?: string;
+  reason?: string | undefined;
   /** 最近一次状态变更时间 ISO */
   updatedAt: string;
 }

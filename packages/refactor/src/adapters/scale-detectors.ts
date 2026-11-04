@@ -1,5 +1,6 @@
 import type { ParsedFile } from '../ast-helper';
 import type { CodeSmell, RefactorConfig } from '../types';
+import { severityOf } from '../types';
 import { makeSmell } from './adapter-types';
 import * as ts from 'typescript';
 
@@ -93,7 +94,7 @@ function buildLongMethodSmell(
   const byComplexityOnly = complexityTriggered && !lineTriggered;
   return makeSmell({
     ruleId: 'long-method',
-    severity: config.severities['long-method'],
+    severity: severityOf(config, 'long-method'),
     message: `${params.container}${params.name} 过大 (${parts.join('，')})，建议拆分为更小的函数`,
     filePath: parsed.filePath,
     line: params.nodeLine,
@@ -127,7 +128,7 @@ export function detectLargeClass(parsed: ParsedFile, config: RefactorConfig): Co
       smells.push(
         makeSmell({
           ruleId: 'large-class',
-          severity: config.severities['large-class'],
+          severity: severityOf(config, 'large-class'),
           message: `${cls.name} 过大 (${issues.join('，')})，建议按职责拆分`,
           filePath: parsed.filePath,
           line: cls.startLine,
@@ -190,7 +191,7 @@ function checkParameterCount(
   smells.push(
     makeSmell({
       ruleId: 'long-parameter-list',
-      severity: config.severities['long-parameter-list'],
+      severity: severityOf(config, 'long-parameter-list'),
       message: `${params.container} 参数过多 (${params.paramCount} 个，阈值 ${threshold})，建议封装为参数对象`,
       filePath: parsed.filePath,
       line: params.nodeLine,
@@ -297,9 +298,14 @@ function findWorstComponent(sourceFile: ts.SourceFile): ComponentSize | null {
   if (components.length === 0) return null;
   components.sort(
     (a, b) =>
-      b.linesOfCode - a.linesOfCode || b.maxJsxDepth - a.maxJsxDepth || b.handlerCount - a.handlerCount,
+      b.linesOfCode - a.linesOfCode ||
+      b.maxJsxDepth - a.maxJsxDepth ||
+      b.handlerCount - a.handlerCount,
   );
-  return components[0];
+  // components.length > 0 已保证非空，但严格索引访问下首元素仍是 T | undefined：
+  // 显式判空返回 null（无组件），而不是让 undefined 流入调用方。
+  const largest = components[0];
+  return largest === undefined ? null : largest;
 }
 
 /**
@@ -394,7 +400,8 @@ function countLinesOfCode(text: string): number {
 function computeJsxDepthFromAst(node: ts.Node): number {
   let maxJsxDepth = 0;
   function visit(n: ts.Node, jsxAncestors: number): void {
-    const next = ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) ? jsxAncestors + 1 : jsxAncestors;
+    const next =
+      ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) ? jsxAncestors + 1 : jsxAncestors;
     if (next > maxJsxDepth) maxJsxDepth = next;
     ts.forEachChild(n, (child) => visit(child, next));
   }
@@ -411,7 +418,7 @@ function buildOversizedComponentSmell(
   const lineThreshold = config.thresholds.maxComponentLines;
   return makeSmell({
     ruleId: 'oversized-component',
-    severity: config.severities['oversized-component'],
+    severity: severityOf(config, 'oversized-component'),
     message: `组件 ${component.name} 过大 (${issues.join('，')})，建议拆分为子组件`,
     filePath: parsed.filePath,
     line: component.startLine,
@@ -451,4 +458,3 @@ function collectComponentIssues(component: ComponentSize, config: RefactorConfig
     issues.push(`${component.handlerCount} 个事件处理函数`);
   return issues;
 }
-

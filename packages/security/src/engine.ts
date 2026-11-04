@@ -21,9 +21,7 @@ import { MalwareScanner } from './malware-scanner';
 import { GrypeCrossValidator } from './cross-validator';
 import { RuleConflictResolver } from './rule-conflict-resolver';
 import type { RuleConflictReport } from './rule-conflict-resolver';
-import {
-  SemgrepAdapter,
-} from './adapters';
+import { SemgrepAdapter } from './adapters';
 import { ScanOrchestrator } from './engine-scan-orchestrator';
 import { ResultAggregator } from './engine-result-aggregator';
 
@@ -34,9 +32,9 @@ interface SecurityBuildReportParams {
   malware: MalwareItem[];
   conflictReport: RuleConflictReport;
   /** 依赖审计失败原因（VulnerabilityScanner.lastError；成功为空） */
-  auditError?: string;
+  auditError?: string | undefined;
   /** 本次扫描中范围外跳过的工具（与降级分离，见 SecurityScanReport.skippedTools） */
-  skippedTools?: SkippedTool[];
+  skippedTools?: SkippedTool[] | undefined;
 }
 
 export class SecurityEngine {
@@ -155,14 +153,23 @@ export class SecurityEngine {
       malware,
       conflictReport,
       // 未跑依赖审计时不得带 auditError：那是 deps 域的执行健康度，不是安全域的降级
-      auditError: includeDependencyOwned ? this.vulnerabilityScanner.lastError || undefined : undefined,
+      auditError: includeDependencyOwned
+        ? this.vulnerabilityScanner.lastError || undefined
+        : undefined,
       skippedTools,
     });
   }
 
   private buildReport(params: SecurityBuildReportParams): SecurityScanReport {
-    const { projectId, vulnerabilities, garbage, malware, conflictReport, auditError, skippedTools } =
-      params;
+    const {
+      projectId,
+      vulnerabilities,
+      garbage,
+      malware,
+      conflictReport,
+      auditError,
+      skippedTools,
+    } = params;
     const summary = summarizeFindings(vulnerabilities, garbage, malware);
     const securityScore = calculateSecurityScore(vulnerabilities);
     // P1-4：工具不可用 / 审计失败 → 随报告带 degraded。0 检出的语义由调用方解读：

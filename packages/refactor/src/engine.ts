@@ -139,6 +139,8 @@ export class RefactorEngine {
 
     for (let i = 0; i < filePaths.length; i++) {
       const fp = filePaths[i];
+      // 严格索引访问下可能越界：跳过而不是把 undefined 传给 parseFile
+      if (fp === undefined) continue;
       try {
         const parsed = parseFile(fp);
         parsedFiles.push(parsed);
@@ -159,7 +161,9 @@ export class RefactorEngine {
     const state = this.initReportState();
 
     for (let i = 0; i < parsedFiles.length; i++) {
-      this.processFileReport(parsedFiles[i], parsedFiles, state);
+      const parsed = parsedFiles[i];
+      if (parsed === undefined) continue;
+      this.processFileReport(parsed, parsedFiles, state);
       // 每检测 5 个文件让出事件循环（每个文件跑 20 个检测器，比解析更耗时）
       if (i > 0 && i % 5 === 0) {
         // eslint-disable-next-line perf/perf-no-serial-await -- 有意的协作式让出事件循环，非可删除的串行依赖

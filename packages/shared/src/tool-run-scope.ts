@@ -35,9 +35,10 @@ export interface ToolRunScope {
 }
 
 export interface ToolRunOptions {
-  cwd?: string;
-  timeout?: number;
-  maxBuffer?: number;
+  /** 可选字段写作 `?: T | undefined`：调用方常直接透传可能为 undefined 的运行时值 */
+  cwd?: string | undefined;
+  timeout?: number | undefined;
+  maxBuffer?: number | undefined;
 }
 
 /** 一次调用的可重放快照：成功给 stdout/stderr，失败给错误的可克隆字段 */

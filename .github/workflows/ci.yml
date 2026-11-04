@@ -132,6 +132,15 @@ jobs:
       - name: Capability closure gate (declaration vs actual)
         run: pnpm --filter zhshield-cli exec tsx src/index.ts capability
 
+      # 类型严格迁移棘轮门禁（报告 §5.2）—— 债可以变少，不能变多
+      #
+      # 判据：① 已迁移包不得再显式关闭严格标志；② 待迁移包数量不得超过基线；
+      #        ③ 已迁移/已合规包必须真的通过严格类型检查（清单是手写的，编译才是事实）。
+      # 没有这道门禁，债务会反弹：任何人加一行 "noUncheckedIndexedAccess": false
+      # 就能把整个包的严格性退回去，且没有任何东西会红。
+      - name: Strict type migration ratchet
+        run: node scripts/check-strict-migration.mjs
+
       # sop-pipeline.test.ts 的 gitleaks 用例断言 security.scan.gitleaks.hardcoded-key
       # 必须真实检出（status 'failed'），ubuntu-latest 镜像未预装 gitleaks，
       # 需在跑测试前安装到 /usr/local/bin（PATH 内）。semgrep/trivy 不装：

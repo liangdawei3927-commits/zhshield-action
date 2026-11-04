@@ -51,12 +51,12 @@ export interface AttackPattern {
   readonly patternId: string;
   readonly description: string;
   readonly category: AttackCategory;
-  readonly semgrepRuleId?: string;
+  readonly semgrepRuleId?: string | undefined;
   readonly targetDetector: TargetDetector;
   readonly fileExt: string;
-  readonly defaultFileName?: string;
+  readonly defaultFileName?: string | undefined;
   readonly expectedHit: boolean;
-  readonly expectedFinding?: string;
+  readonly expectedFinding?: string | undefined;
   readonly baseTemplate: string;
   readonly localDiversifiers: readonly Diversifier[];
   readonly globalDiversifiers: readonly Diversifier[];
@@ -72,7 +72,7 @@ export interface GeneratedVariant {
   readonly content: string;
   readonly expectHit: boolean;
   readonly targetDetector: TargetDetector;
-  readonly expectedFinding?: string;
+  readonly expectedFinding?: string | undefined;
   readonly planDescription: string;
 }
 

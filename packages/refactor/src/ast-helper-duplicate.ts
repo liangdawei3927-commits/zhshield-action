@@ -44,35 +44,27 @@ const RE_LONE_OPEN_BRACE = /^\{$/;
 
 // —— 通用不可提取样板（isUniversalBoilerplate，匹配 normalizeCode 归一化后的文本）——
 // 错误日志收尾
-const RE_ERR_INSTANCEOF =
-  /err\s+instanceof\s+error\s*\?\s*err\.message\s*:\s*string\(err\)/;
+const RE_ERR_INSTANCEOF = /err\s+instanceof\s+error\s*\?\s*err\.message\s*:\s*string\(err\)/;
 // 安全读目录 / 安全读文件兜底
 const RE_SAFE_READDIR = /readdirsync\s*\([^)]*withfiletypes/;
-const RE_SAFE_READFILE =
-  /fs\.readfilesync\([^)]*\);\s*\}\s*catch\s*\{\s*return\s+null/;
+const RE_SAFE_READFILE = /fs\.readfilesync\([^)]*\);\s*\}\s*catch\s*\{\s*return\s+null/;
 // isRecord 类型守卫（函数体特征 / 函数签名特征）
 const RE_ISARRAY_GUARD =
   /typeof\s+\w+\s*===\s*'object'\s*&&\s*\w+\s*!==\s*null\s*&&\s*!array\.isarray\(/;
-const RE_ISRECORD_FUNC =
-  /function\s+isrecord\(value:unknown\):value is record<string,unknown>/;
+const RE_ISRECORD_FUNC = /function\s+isrecord\(value:unknown\):value is record<string,unknown>/;
 // SVG 图标属性样板（viewbox 开头与 strokeLinecap/strokeLinejoin 结尾）
 const RE_SVG_VIEWBOX_FILL = /viewbox="0 0 24 24"\s*fill="none"/;
-const RE_SVG_SIZED_TAG =
-  /<\s*svg\s+width="1[0-9]"\s+height="1[0-9]"\s+viewbox="0 0 24 24"/;
+const RE_SVG_SIZED_TAG = /<\s*svg\s+width="1[0-9]"\s+height="1[0-9]"\s+viewbox="0 0 24 24"/;
 const RE_SVG_LINECAP_JOIN = /strokelinecap="round"\s*strokelinejoin="round"/;
 const RE_SVG_STROKE = /fill="none"\s*stroke="currentcolor"/;
 // ToolAdapter 骨架：scan / isAvailable / buildErrorResult / 结果汇总 / stdout 检查
 const RE_TOOL_SCAN_SIG = /async\s+scan\(options:toolscanoptions\):promise<toolresult>/;
 const RE_TOOL_ISAVAILABLE =
   /async\s+isavailable\(\):promise<boolean>\s*\{\s*return this\.commands\.isavailable\(/;
-const RE_TOOL_BUILDERRORRESULT_SIG =
-  /builderrorresult\(start:number,err:execerror\):toolresult/;
-const RE_TOOL_BUILDERRORRESULT_CALL =
-  /return this\.builderrorresult\(start,error as execerror\)/;
-const RE_TOOL_RESULT_META =
-  /duration:date\.now\(\)\s*-\s*start,timestamp:new date\(\),filecount:0/;
-const RE_TOOL_STDOUT_CHECK =
-  /return stdout\.length\s*>\s*0;\s*\}\s*catch\s*\{\s*return\s+false/;
+const RE_TOOL_BUILDERRORRESULT_SIG = /builderrorresult\(start:number,err:execerror\):toolresult/;
+const RE_TOOL_BUILDERRORRESULT_CALL = /return this\.builderrorresult\(start,error as execerror\)/;
+const RE_TOOL_RESULT_META = /duration:date\.now\(\)\s*-\s*start,timestamp:new date\(\),filecount:0/;
+const RE_TOOL_STDOUT_CHECK = /return stdout\.length\s*>\s*0;\s*\}\s*catch\s*\{\s*return\s+false/;
 // ToolAdapter 输出归一化骨架：各适配器把原始输出塞进统一的 violation/issue 结构
 const RE_VIOLATIONS_PUSH = /violations\.push\(\{id:randomuuid\(\),ruleid:rule\.id/;
 const RE_AUTOFIXABLE_ENDLINE = /autofixable:false,\s*\}\s*,\s*endline:cls\.endline/;
@@ -83,8 +75,7 @@ const RE_PROJECTID_FILE = /projectid:options\.projectid,\s*file:violation\.file/
 const RE_FILE_WEIGHT_PAYLOAD = /file:rel,\s*weight:this\.weight,\s*payload:\{\},/;
 const RE_SUCCESS_DATA_TIMESTAMP =
   /success:true,\s*data:result,\s*timestamp:new date\(\)\.toisostring\(\)/;
-const RE_DATA_TIMESTAMP =
-  /data:result,\s*timestamp:new date\(\)\.toisostring\(\)/;
+const RE_DATA_TIMESTAMP = /data:result,\s*timestamp:new date\(\)\.toisostring\(\)/;
 const RE_DURATIONMS_ENGINE = /durationms:0,\s*targetengine:'inspect'/;
 const RE_ENGINE_TIMESTAMP = /targetengine:'inspect',\s*timestamp:new date\(\)/;
 // 工具页 hook 接线骨架（useT / showHome 状态声明）
@@ -96,26 +87,21 @@ const RE_SHOWHOME_LOADING =
 const RE_FORMATVIOLATION_SIG =
   /private formatviolation\(violation:violation,\s*lines:string\[\],\s*indent:st/;
 const RE_RESOLVESCANSETUP_SIG = /private resolvescansetup\(options:toolscanoptions\):/;
-const RE_BUILDRESULT_SIG =
-  /private buildresult\(start:number,status:'available' \| 'unavailable'/;
+const RE_BUILDRESULT_SIG = /private buildresult\(start:number,status:'available' \| 'unavailable'/;
 const RE_TOOLTIMEOUT_BUILDERROR =
   /if\(\s*istooltimeout\(err\)\s*\)\{\s*return this\.builderror\(start,/;
 const RE_GETTOOLMANAGER = /gettoolmanager\(\):toolmanager{\s*return this\.toolmanager;\s*\}/;
-const RE_RULE_STATUS_RETURN =
-  /return\{rule,status:violations\.length === 0 \? 'passed':'failed',/;
-const RE_SCANEMPTYSTATE_RETURN =
-  /return\(\s*<scanemptystatebranch\{\.\.\.emptystateparams\}/;
+const RE_RULE_STATUS_RETURN = /return\{rule,status:violations\.length === 0 \? 'passed':'failed',/;
+const RE_SCANEMPTYSTATE_RETURN = /return\(\s*<scanemptystatebranch\{\.\.\.emptystateparams\}/;
 const RE_LOADING_PROGRESS_DECL = /const\{loading,progress,progresslabel,statusmessage,/;
 const RE_CONSTRUCTOR_EVENTCENTER =
   /constructor\(eventcenter:eventcenter\)\{\s*this\.eventcenter\s*=\s*eventcenter;\s*\}/;
 const RE_EXPORT_TOOLBINS =
   /export\{findlocaltoolbin,\s*findzhshieldtoolbin,\s*getzhshieldtoolbindir,\s*reso/;
 // score 区段外壳 + hook 接线收尾（语义头在窗口外，只剩结构尾巴雷同）
-const RE_RESULTCARD_SECTIONTITLE =
-  /return\s*\(\s*<resultcard\s+variant="score">\s*<sectiontitle/;
+const RE_RESULTCARD_SECTIONTITLE = /return\s*\(\s*<resultcard\s+variant="score">\s*<sectiontitle/;
 const RE_RETURN_COPY_TO_AI = /return\s*\{\s*copytoai,copyalltoai\}/;
-const RE_RETURN_LOADING_PROGRESS =
-  /return\s*\{\s*loading,progress,progresslabel,statusmessage/;
+const RE_RETURN_LOADING_PROGRESS = /return\s*\{\s*loading,progress,progresslabel,statusmessage/;
 const RE_USE_HOOK_ARRAY =
   /\[\w+,\w+\]\s*,\s*\)\s*;\s*const\s+\w+\s*=\s*use(?:memo|callback|state)\(/;
 // 其余通用防御/结构样板
@@ -204,7 +190,11 @@ function mergeDuplicateRegions(pairs: DuplicateBlock[]): DuplicateBlock[] {
 function groupByFilePair(pairs: DuplicateBlock[]): Map<string, DuplicateBlock[]> {
   const groups = new Map<string, DuplicateBlock[]>();
   for (const p of pairs) {
-    const key = `${p.files[0]}\u0000${p.files[1]}`;
+    // files 是二元素元组，但 noUncheckedIndexedAccess 下下标仍是 string | undefined；
+    // 用解构 + 显式判空，而不是非空断言（断言不提供任何运行期保护）。
+    const [fileA, fileB] = p.files;
+    if (fileA === undefined || fileB === undefined) continue;
+    const key = `${fileA}\u0000${fileB}`;
     const list = groups.get(key);
     if (list) list.push(p);
     else groups.set(key, [p]);
@@ -217,7 +207,12 @@ function mergeGroup(list: DuplicateBlock[]): DuplicateBlock[] {
   list.sort((a, b) => a.lines[0] - b.lines[0] || a.lines[1] - b.lines[1]);
 
   const merged: DuplicateBlock[] = [];
-  let head = list[0];
+  // list 非空由调用方保证（groupByFilePair 的每个分组至少一条），但严格索引访问下
+  // 首元素仍是 T | undefined —— 显式判空并早退，胜过让 head 变成可能 undefined 后
+  // 到处加断言。
+  const first = list[0];
+  if (first === undefined) return merged;
+  let head = first;
   let lastStart0 = head.lines[0];
   let lastStart1 = head.lines[1];
   // 当前重复区的最大结束行（起始行 + minLines - 1，随已并入窗口扩展）
@@ -226,6 +221,7 @@ function mergeGroup(list: DuplicateBlock[]): DuplicateBlock[] {
 
   for (let i = 1; i < list.length; i++) {
     const next = list[i];
+    if (next === undefined) continue;
     // 已被当前区覆盖（两侧起始行都不前进）→ 跳过重复报告
     if (next.lines[0] <= lastStart0 && next.lines[1] <= lastStart1) continue;
     // 两侧各自与当前区的尾窗口连片（起始行 ≤ 最大结束行 + 1）：属于同一重复区，
@@ -266,7 +262,9 @@ function withRegionLineCount(head: DuplicateBlock, lastEnd: number): DuplicateBl
 function findDuplicatePairs(blocks: CodeBlock[], minLines: number): DuplicateBlock[] {
   const byNormalized = new Map<string, number[]>();
   for (let i = 0; i < blocks.length; i++) {
-    const key = blocks[i].normalized;
+    const block = blocks[i];
+    if (block === undefined) continue;
+    const key = block.normalized;
     const bucket = byNormalized.get(key);
     if (bucket) bucket.push(i);
     else byNormalized.set(key, [i]);
@@ -274,15 +272,19 @@ function findDuplicatePairs(blocks: CodeBlock[], minLines: number): DuplicateBlo
 
   const dups: DuplicateBlock[] = [];
   for (let i = 0; i < blocks.length; i++) {
-    const bucket = byNormalized.get(blocks[i].normalized);
+    const blockI = blocks[i];
+    if (blockI === undefined) continue;
+    const bucket = byNormalized.get(blockI.normalized);
     if (!bucket || bucket.length < 2) continue;
     for (const j of bucket) {
       if (j <= i) continue;
-      if (blocks[i].file === blocks[j].file) continue;
+      const blockJ = blocks[j];
+      if (blockJ === undefined) continue;
+      if (blockI.file === blockJ.file) continue;
       dups.push({
-        files: [blocks[i].file, blocks[j].file],
-        lines: [blocks[i].startLine, blocks[j].startLine],
-        code: blocks[i].normalized.slice(0, 80),
+        files: [blockI.file, blockJ.file],
+        lines: [blockI.startLine, blockJ.startLine],
+        code: blockI.normalized.slice(0, 80),
         lineCount: minLines,
       });
     }

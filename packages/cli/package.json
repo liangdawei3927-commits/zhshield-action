@@ -13,6 +13,7 @@
   "scripts": {
     "build": "node scripts/build-cli.mjs",
     "verify:sop": "node scripts/verify-sop-sync.mjs",
+    "verify:dist-fresh": "node scripts/verify-dist-fresh.mjs",
     "guard": "tsx src/index.ts guard",
     "inspect": "tsx src/index.ts inspect",
     "pipeline": "tsx src/index.ts pipeline",

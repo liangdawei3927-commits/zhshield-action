@@ -13,9 +13,10 @@
  *    passed to execFile, never imported, so esbuild leaves them out naturally.
  */
 import { build } from 'esbuild';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
@@ -40,16 +41,58 @@ const zhSourcePlugin = {
   },
 };
 
-await build({
+const buildOptions = {
   entryPoints: [resolve(pkgRoot, 'src/index.ts')],
   bundle: true,
   platform: 'node',
   target: 'node20',
   format: 'cjs',
   outfile: resolve(pkgRoot, 'dist/zhshield.js'),
-  banner: { js: '#!/usr/bin/env node' },
   sourcemap: true,
   plugins: [zhSourcePlugin],
+  absWorkingDir: pkgRoot,
+};
+
+/**
+ * 源码指纹：把**实际参与打包的源文件**（esbuild metafile 的 inputs，排除 node_modules）
+ * 按路径排序后逐个取 sha256，再汇总成一个哈希。
+ *
+ * 为什么需要它（代码审查报告3 §5.3）：`dist/zhshield.js` 是**提交进仓库**的产物
+ * （GitHub Action 直装依赖它）。一旦有人改了 src 却没重新 build，仓库里躺着的就是
+ * 一个"和源码对不上"的 bundle —— 用户（GitHub Action / npx）跑的就是旧代码，
+ * 而 `pnpm test` 用 src 跑、永远绿。这类事故此前只能靠人肉记得"改完要 build"。
+ *
+ * 指纹只取决于**文件内容**，与构建平台无关，因此可以在 ubuntu 的 CI 上校验
+ * 在 macOS 上构建并提交的产物（直接比对 bundle 文件内容会因平台差异误报）。
+ */
+async function computeSourceHash() {
+  const probe = await build({ ...buildOptions, metafile: true, write: false, logLevel: 'silent' });
+  const inputs = Object.keys(probe.metafile?.inputs ?? {})
+    .filter((p) => !p.includes(`${sep}node_modules${sep}`) && !p.startsWith('node_modules/'))
+    .map((p) => p.split(sep).join('/'))
+    .sort();
+  if (inputs.length === 0) throw new Error('[build] metafile 未返回任何输入文件，源码指纹不可信');
+  const outer = createHash('sha256');
+  for (const rel of inputs) {
+    const abs = resolve(pkgRoot, rel);
+    const inner = createHash('sha256').update(readFileSync(abs)).digest('hex');
+    outer.update(`${rel}\u0000${inner}\n`);
+  }
+  return { hash: outer.digest('hex').slice(0, 16), fileCount: inputs.length };
+}
+
+const { hash: srcHash, fileCount } = await computeSourceHash();
+
+await build({
+  ...buildOptions,
+  banner: {
+    js: [
+      '#!/usr/bin/env node',
+      `// @zh-src-hash: ${srcHash}`,
+      `// @zh-src-files: ${fileCount}`,
+      '// 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）',
+    ].join('\n'),
+  },
   logLevel: 'info',
 });
 

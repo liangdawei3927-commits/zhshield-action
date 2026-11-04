@@ -76,6 +76,12 @@ jobs:
       - name: Build (exclude desktop)
         run: pnpm turbo run build --filter='!@zh/desktop'
 
+      # 产物新鲜度门禁（报告 §5.3）—— dist/zhshield.js 提交进 git，Action/npx 直装它。
+      # 只在「构建后的产物指纹 ≠ HEAD 里提交的产物指纹」时红，即"改了 src 没重新 build 提交"。
+      # 必须排在 Build 之后：判据是"提交的产物 == 用同一份源码构建出来的产物"。
+      - name: Committed CLI bundle matches sources (dist freshness)
+        run: pnpm --filter zhshield-cli verify:dist-fresh -- --no-build
+
       # A15 断网端到端门禁 —— 「漏洞库不可达」必须显形，不能折算成 0 漏洞
       #
       # 为什么能进 CI：三个场景全部指向 127.0.0.1（本地桩 / 已关闭端口 / 挂起桩），

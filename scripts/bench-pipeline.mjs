@@ -13,8 +13,10 @@
  *   dist 哈希 / 规则数 / 负载）一起写进账本。没有账本的数字一律不作凭据。
  *
  * 判据（三条全满足才 PASS）：
- *   · 负载门限：起跑前 1min load ≤ 核数（`--max-load` 可改；`--allow-load` 允许带载运行，
- *     但结论一律记 INVALID —— 带载跑出的数没有效力，不是"未达标"也不是"达标"）
+ *   · 负载门限：**起跑前** 1min load ≤ 核数（`--max-load` 可改；`--allow-load` 允许带载运行，
+ *     但结论一律记 INVALID —— 带载跑出的数没有效力，不是"未达标"也不是"达标"）。
+ *     「止」load 只作告警记入账本，不参与判定 —— 流水线本身 CPU 密集，跑完 load 必然
+ *     超核数，用它判定会让本门禁**永远 INVALID**（2026-11-04 实测白跑 3 次 11 分钟）
  *   · 产物新鲜：dist 比 `packages/*\/src` 最新改动更新（`--allow-stale` 可跳过）
  *   · 时长与完整性：wallMs 中位数 ≤ 目标（默认 180s），且 N 次里没有域落 `unavailable`/`partial`
  *     —— 域被预算掐断的那次跑的不是"完整流水线"，拿它的时长当 A14 凭据是假通过（C4）
@@ -272,14 +274,25 @@ async function main() {
   );
 
   const anyIncomplete = runs.some((r) => r.incomplete.length > 0);
-  const loadOver = loadBefore > gate || loadAfter > gate;
+  // 负载门限只看**起跑前**的 1min load —— 与本脚本头部和《07》文档的判据一致。
+  //
+  // 为什么不能用「止」load：流水线本身就是 CPU 密集的（实测 security 域一趟能把
+  // 4 核机器的 load 拉到 7+），跑完 load 必然超过核数 ⇒ 该条件自我实现，
+  // **每次都判 INVALID**，A14 永远出不了结论。2026-11-04 实测：起跑前 load=2.41
+  // （达标），跑完 load=7.63 → 判 INVALID，白跑 3 次 11 分钟。
+  //
+  // 「止」load 仍有价值：它说明**测量期间有外部干扰**（若有其它进程抢核，本机读数
+  // 会被拉高）。故保留为**告警**：超门限则结论降级为参考值，但不再作为 INVALID
+  // 的唯一理由 —— 起跑前达标 + N 次无残缺域，结论仍按数据判 PASS/FAIL。
+  const loadBeforeOver = loadBefore > gate;
+  const loadAfterOver = loadAfter > gate;
   let verdict;
   const reasons = [];
-  if (loadOver) {
-    // 负载超门限时，"快"和"慢"都不说明代码质量，只能出参考值 —— 永不判 PASS/FAIL
+  if (loadBeforeOver) {
+    // 起跑前就带载：测出的时长不反映代码质量，只能出参考值 —— 永不判 PASS/FAIL
     verdict = 'INVALID';
     reasons.push(
-      `负载超门限（起 ${loadBefore.toFixed(2)} / 止 ${loadAfter.toFixed(2)} > ${gate}）—— 本次数据不作 A14 凭据，仅供参考`,
+      `起跑前 1min load ${loadBefore.toFixed(2)} 超门限 ${gate} —— 本次数据不作 A14 凭据，仅供参考`,
     );
     if (anyIncomplete) reasons.push('且存在域被预算掐断（unavailable/partial）');
   } else if (distStale && !args.allowStale) {
@@ -296,6 +309,14 @@ async function main() {
   } else {
     verdict = 'PASS';
     reasons.push(`wallMs 中位数 ${medianWallMs}ms ≤ 目标 ${args.targetMs}ms，且 N 次均无未完成域`);
+  }
+  // 测量期间有外部干扰的告警（不改变上面的判定，但必须留在账本里）：
+  // 起跑前达标说明「测量是在干净状态下开始的」，但跑完 load 偏高意味着期间
+  // 可能有其它进程抢核 —— 结论仍可用，只是可信度打折，故显式记录而非静默。
+  if (!loadBeforeOver && loadAfterOver) {
+    reasons.push(
+      `⚠️ 测量期间负载升高（止 ${loadAfter.toFixed(2)} > 门限 ${gate}），可能存在外部进程抢核`,
+    );
   }
 
   const artifact = {

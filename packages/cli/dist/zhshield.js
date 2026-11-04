@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: b118c42a72506db6
-// @zh-src-files: 422
+// @zh-src-hash: 92da7a86ffc7b6d3
+// @zh-src-files: 423
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -16659,6 +16659,31 @@ var init_promise_timeout = __esm({
   }
 });
 
+// ../shared/src/scan-exclude-dirs.ts
+function appendScanExcludeArgs(args) {
+  for (const excl of DEFAULT_SCAN_EXCLUDE_DIRS) {
+    args.push("--exclude", excl);
+  }
+  return args;
+}
+var DEFAULT_SCAN_EXCLUDE_DIRS;
+var init_scan_exclude_dirs = __esm({
+  "../shared/src/scan-exclude-dirs.ts"() {
+    "use strict";
+    DEFAULT_SCAN_EXCLUDE_DIRS = [
+      "node_modules",
+      "dist",
+      "build",
+      ".semgrep",
+      "coverage",
+      "__tests__",
+      "fixtures",
+      "__fixtures__",
+      "__mocks__"
+    ];
+  }
+});
+
 // ../shared/src/process-env.ts
 function isSensitiveKey(key) {
   return SENSITIVE_PATTERNS.some((re) => re.test(key));
@@ -17193,6 +17218,7 @@ __export(src_exports, {
   CLEAN_ARCH_LAYERS: () => CLEAN_ARCH_LAYERS,
   COVERAGE_THRESHOLD: () => COVERAGE_THRESHOLD,
   DATA_SOURCES: () => DATA_SOURCES,
+  DEFAULT_SCAN_EXCLUDE_DIRS: () => DEFAULT_SCAN_EXCLUDE_DIRS,
   DOMAIN_IDS: () => DOMAIN_IDS,
   DegradationManager: () => DegradationManager,
   ESLINT_CONFIG_NAMES: () => ESLINT_CONFIG_NAMES,
@@ -17219,6 +17245,7 @@ __export(src_exports, {
   VERSION: () => VERSION,
   __resetToolProbeCache: () => __resetToolProbeCache,
   allowedDependenciesOf: () => allowedDependenciesOf,
+  appendScanExcludeArgs: () => appendScanExcludeArgs,
   augmentProcessPath: () => augmentProcessPath,
   baselineEntryKey: () => baselineEntryKey,
   baselineKeySet: () => baselineKeySet,
@@ -17342,6 +17369,7 @@ var init_src2 = __esm({
     init_fs_safe();
     init_text_utils();
     init_promise_timeout();
+    init_scan_exclude_dirs();
     init_process_env();
     init_path_augment();
     init_log_sanitize();
@@ -499971,6 +499999,7 @@ var init_semgrep_adapter = __esm({
         if (errorOnly && !useHighSeverityDir) {
           args.push("--severity", "ERROR");
         }
+        appendScanExcludeArgs(args);
         if (options2.targetFiles && options2.targetFiles.length > 0) {
           args.push(...options2.targetFiles);
         } else {
@@ -516334,6 +516363,9 @@ var TsPruneAdapter = class {
 var fs37 = __toESM(require("node:fs"));
 var path39 = __toESM(require("node:path"));
 
+// ../inspect/src/adapters/semgrep-scan-args-builder.ts
+init_src2();
+
 // ../inspect/src/adapters/semgrep-rule-writer.ts
 var fs36 = __toESM(require("node:fs"));
 var os11 = __toESM(require("node:os"));
@@ -516543,19 +516575,7 @@ var SemgrepScanArgsBuilder = class {
   }
   /** 追加排除生成目录与测试夹具目录的参数 */
   appendExcludeArgs(args) {
-    for (const excl of [
-      "node_modules",
-      "dist",
-      "build",
-      ".semgrep",
-      "coverage",
-      "__tests__",
-      "fixtures",
-      "__fixtures__",
-      "__mocks__"
-    ]) {
-      args.push("--exclude", excl);
-    }
+    appendScanExcludeArgs(args);
   }
 };
 

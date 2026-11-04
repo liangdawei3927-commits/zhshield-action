@@ -271,6 +271,7 @@ export type {
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
+export { DEFAULT_SCAN_EXCLUDE_DIRS, appendScanExcludeArgs } from './scan-exclude-dirs';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';

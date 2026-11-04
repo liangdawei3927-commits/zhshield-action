@@ -11,7 +11,7 @@ import type {
   CodeFlow,
   CodeFlowThreadFlow,
 } from '@zh/shared';
-import { resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
+import { resolveToolCommandDetailed, runToolOnce, appendScanExcludeArgs } from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
 
@@ -110,6 +110,11 @@ export class SemgrepAdapter implements ToolAdapter {
     if (errorOnly && !useHighSeverityDir) {
       args.push('--severity', 'ERROR');
     }
+    // 排除生成目录与测试夹具目录，统一走 @zh/shared 的共享实现（清单与用法绑在一起，
+    // 避免两个适配器各写一份而漂移 —— security 侧那次正是「漏写」而非「写错」）。
+    // 漏掉这一步的代价是实测的：不带排除、目标为仓库根时，单次 semgrep 37.1s；
+    // 带排除、目标为源码目录时 3.6s（10 倍差）。
+    appendScanExcludeArgs(args);
     if (options.targetFiles && options.targetFiles.length > 0) {
       args.push(...options.targetFiles);
     } else {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 5fc61ce45e946074
+// @zh-src-hash: 20563be3ee00327a
 // @zh-src-files: 422
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -498182,7 +498182,9 @@ function backupFixTargets(fixes, projectRoot, stamp) {
       existingBefore.add(filePath);
     }
   }
-  const createdFiles = targets.filter((fp) => !existingBefore.has(fp) && isWithinProject(fp, projectRoot));
+  const createdFiles = targets.filter(
+    (fp) => !existingBefore.has(fp) && isWithinProject(fp, projectRoot)
+  );
   const manifest = {
     version: 1,
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -498191,8 +498193,12 @@ function backupFixTargets(fixes, projectRoot, stamp) {
     createdFiles
   };
   fs43.mkdirSync(backupDir, { recursive: true });
-  fs43.writeFileSync(path45.join(backupDir, MANIFEST_NAME), `${JSON.stringify(manifest, null, 2)}
-`, "utf-8");
+  fs43.writeFileSync(
+    path45.join(backupDir, MANIFEST_NAME),
+    `${JSON.stringify(manifest, null, 2)}
+`,
+    "utf-8"
+  );
   return { backupDir, backedUpFiles, createdFiles };
 }
 function readBackupManifest(backupDir) {
@@ -498595,7 +498601,11 @@ function applyGeneratedFixes(fixes, projectRoot) {
   const { safeFixes, outOfRootErrors } = partitionInRoot(fixes, projectRoot);
   const errorsBefore = collectProjectErrors(projectRoot);
   const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const { backupDir, backedUpFiles, createdFiles } = backupFixTargets(safeFixes, projectRoot, stamp);
+  const { backupDir, backedUpFiles, createdFiles } = backupFixTargets(
+    safeFixes,
+    projectRoot,
+    stamp
+  );
   const run = {
     projectRoot,
     safeFixes,

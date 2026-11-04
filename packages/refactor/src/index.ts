@@ -10,11 +10,7 @@ export {
   scanDuplicateCodeBlocks,
 } from './ast-helper';
 export { ALL_DETECTORS } from './adapters/index';
-export {
-  countSmellsByFileAndRule,
-  diffBaseline,
-  applyRefactorBaseline,
-} from './baseline';
+export { countSmellsByFileAndRule, diffBaseline, applyRefactorBaseline } from './baseline';
 export type { RefactorBaseline, RefactorBaselineFilterResult } from './baseline';
 
 // 自动修复的备份 / 恢复（§5.5「可回滚」不变量）：桌面端与 CLI 的事后撤销走这两个入口。

@@ -59,7 +59,11 @@ export function applyGeneratedFixes(
   const errorsBefore = collectProjectErrors(projectRoot);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const { backupDir, backedUpFiles, createdFiles } = backupFixTargets(safeFixes, projectRoot, stamp);
+  const { backupDir, backedUpFiles, createdFiles } = backupFixTargets(
+    safeFixes,
+    projectRoot,
+    stamp,
+  );
   const run: ApplyRun = {
     projectRoot,
     safeFixes,

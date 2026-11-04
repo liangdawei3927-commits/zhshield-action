@@ -127,7 +127,9 @@ export function backupFixTargets(
       existingBefore.add(filePath);
     }
   }
-  const createdFiles = targets.filter((fp) => !existingBefore.has(fp) && isWithinProject(fp, projectRoot));
+  const createdFiles = targets.filter(
+    (fp) => !existingBefore.has(fp) && isWithinProject(fp, projectRoot),
+  );
   const manifest: AutoFixBackupManifest = {
     version: 1,
     createdAt: new Date().toISOString(),
@@ -136,7 +138,11 @@ export function backupFixTargets(
     createdFiles,
   };
   fs.mkdirSync(backupDir, { recursive: true });
-  fs.writeFileSync(path.join(backupDir, MANIFEST_NAME), `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8');
+  fs.writeFileSync(
+    path.join(backupDir, MANIFEST_NAME),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    'utf-8',
+  );
   return { backupDir, backedUpFiles, createdFiles };
 }
 
@@ -145,7 +151,11 @@ export function readBackupManifest(backupDir: string): AutoFixBackupManifest | n
   try {
     const raw = fs.readFileSync(path.join(backupDir, MANIFEST_NAME), 'utf-8');
     const parsed = JSON.parse(raw) as Partial<AutoFixBackupManifest>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.files) || typeof parsed.projectRoot !== 'string') {
+    if (
+      parsed.version !== 1 ||
+      !Array.isArray(parsed.files) ||
+      typeof parsed.projectRoot !== 'string'
+    ) {
       return null;
     }
     return {

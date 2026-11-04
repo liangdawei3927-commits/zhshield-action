@@ -53,8 +53,21 @@ pnpm + Turborepo monorepo，21 个 `@zh/*` 包。依赖方向：客户端 → �
 | `pnpm bench:pipeline` | **A14** 全量流水线时长验收：N 次取中位数、负载门限、产物新鲜度；PASS/FAIL/INVALID 三态 |
 | `pnpm verify:offline` | **A15** 断网端到端：不可达 → `partial` + exit 2；同时用本地桩验证"可达时验得出来" |
 | `pnpm verify:tool-dedup` | **A12** 工具进程去重：从 `child_process` 派发侧观测真实 (cmd, args) 计数 |
+| `pnpm verify:dist-fresh` | **§5.3** 产物新鲜度：提交的 `dist/zhshield.js` 必须由当前源码构建（比对 bundle 头部的源码指纹） |
 
 三条验收脚本的设计纪律（改它们之前先读）：**没效力的测量判 `INVALID`，不判 PASS/FAIL**；**数字必须带出处**（commit / dist 哈希 / 负载写进 `.zhshield/bench/*.json`）；**观测在进程外**，不采信被测代码自报的计数。详见《07》§7.7。
+
+## ⚠️ 提交产物纪律：`dist/zhshield.js` 必须与源码同步（2026-11-04）
+
+`packages/cli/dist/zhshield.js` 是**提交进 git** 的产物（GitHub Action 与 npx 直装依赖它）。
+只要改了任何会被打包的 `packages/*/src`，就必须 `pnpm --filter zhshield-cli build` 并
+把重建后的 bundle 一起提交 —— 否则 `pnpm test`/`typecheck`（跑 src）永远绿，而用户跑的是旧代码。
+
+- 门禁：`pnpm verify:dist-fresh`（CI 在 Build 之后跑 `--no-build`）。判据是 bundle 头部的
+  `// @zh-src-hash:` 指纹（esbuild 实际打包文件的内容哈希），**不是**文件字节比对 ——
+  ubuntu CI 比 macOS 产物会因平台差异误报，指纹只看源码内容，跨平台稳定。
+- 报错 `❌ 已提交的 CLI bundle 与当前源码不一致（产物过期）` 时：`build` 完把
+  `packages/cli/dist/zhshield.js` 一起 `git add` 即可。
 
 ## ⚠️ Monorepo 依赖陷阱：pnpm 注入副本不同步（已踩三次，必读）
 

@@ -36,7 +36,10 @@ function main() {
   // 默认先构建：判据是「提交的产物 == 当前源码的产物」，没有"当前源码的产物"就无从比较。
   // CI 里 Build 步骤已用同一份源码构建过，用 --no-build 跳过以省时间。
   if (!process.argv.includes('--no-build')) {
-    execFileSync('pnpm', ['--filter', 'zhshield-cli', 'build'], { cwd: repoRoot, stdio: 'inherit' });
+    execFileSync('pnpm', ['--filter', 'zhshield-cli', 'build'], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+    });
   }
   if (!existsSync(bundlePath)) {
     console.error(`❌ 找不到工作区产物：${relBundlePath}（先 pnpm --filter zhshield-cli build）`);
@@ -74,7 +77,9 @@ function main() {
     );
   }
   const files = FILES_RE.exec(headOf(workingText))?.[1];
-  console.log(`✅ CLI bundle 与源码一致（指纹 ${workingStamp}${files ? `，覆盖 ${files} 个源文件` : ''}）`);
+  console.log(
+    `✅ CLI bundle 与源码一致（指纹 ${workingStamp}${files ? `，覆盖 ${files} 个源文件` : ''}）`,
+  );
 }
 
 main();

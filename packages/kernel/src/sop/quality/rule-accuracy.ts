@@ -139,7 +139,8 @@ export function toRuleFindings(
   return issues.map((i) => ({
     ruleId: i.ruleId,
     file: baseDir && path.isAbsolute(i.file) ? path.relative(baseDir, i.file) : i.file,
-    line: i.line,
+    // line 在 strict 模式下可能缺失：仅在有值时带上该键
+    ...(i.line !== undefined ? { line: i.line } : {}),
   }));
 }
 
@@ -194,7 +195,9 @@ function claimTruePositives(
   findings.forEach((finding, fi) => {
     for (let ai = 0; ai < violations.length; ai++) {
       if (claimedAssertion.has(ai)) continue;
-      if (matches(finding, violations[ai], tolerance)) {
+      const violation = violations[ai];
+      if (violation === undefined) continue;
+      if (matches(finding, violation, tolerance)) {
         claimedAssertion.add(ai);
         claimedFinding.add(fi);
         break;
@@ -254,7 +257,10 @@ function computeMetrics(input: {
   };
 }
 
-function getThresholds(file: RuleGoldenFile): { precisionThreshold: number; recallThreshold: number } {
+function getThresholds(file: RuleGoldenFile): {
+  precisionThreshold: number;
+  recallThreshold: number;
+} {
   return {
     precisionThreshold: file.thresholds?.precision ?? RULE_PRECISION_THRESHOLD,
     recallThreshold: file.thresholds?.recall ?? RULE_RECALL_THRESHOLD,

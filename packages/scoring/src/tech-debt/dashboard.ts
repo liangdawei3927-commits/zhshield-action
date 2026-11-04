@@ -146,15 +146,21 @@ function buildActionFromGroup(
   exposedFiles: Set<string>,
 ): DebtAction {
   const { issues: groupIssues, category } = group;
-  const module = key.split('::')[0];
-  const severitySum = groupIssues.reduce((acc, i) => acc + SEVERITY_WEIGHT[i.severity], 0);
+  // key 形如 `${module}::${category}`：取首段作为模块名。
+  // 严格索引访问下 split 结果首元素可能 undefined（空字符串 split 出 ['']，
+  // 但类型上仍是 string | undefined）——显式兜底为空串。
+  const module = key.split('::')[0] ?? '';
+  const severitySum = groupIssues.reduce((acc, i) => acc + (SEVERITY_WEIGHT[i.severity] ?? 0), 0);
   // groupByDebtAction 只会 put 非空组，故当前不可达 0；此处仍守 1，
   // 避免将来新增调用方传入空组时把 avgSeverity 变成 NaN 并污染 interestScore/roi
   const avgSeverity = severitySum / Math.max(groupIssues.length, 1);
   const severityFactor = avgSeverity;
   const hotnessFactorValue = hotnessFactor(hotnessByModule.get(module) ?? 0);
   const densityFactorValue = densityFactor(groupIssues.length);
-  const maxExposure = Math.max(...groupIssues.map((i) => exposureFactor(i.file, exposedFiles)), 1);
+  const maxExposure = Math.max(
+    ...groupIssues.map((i) => exposureFactor(i.file ?? '', exposedFiles)),
+    1,
+  );
   const exposureFactorValue = maxExposure;
 
   const interestScore =
@@ -162,13 +168,13 @@ function buildActionFromGroup(
     hotnessFactorValue *
     densityFactorValue *
     exposureFactorValue *
-    CATEGORY_WEIGHT[category];
+    (CATEGORY_WEIGHT[category] ?? 0);
 
-  const principalEstimate = PRINCIPAL_DAYS[category] * groupIssues.length;
+  const principalEstimate = (PRINCIPAL_DAYS[category] ?? 0) * groupIssues.length;
   const roi = principalEstimate > 0 ? interestScore / principalEstimate : interestScore;
 
   return {
-    actionId: debtActionId(category, module),
+    actionId: debtActionId(category, module ?? ''),
     issueIds: groupIssues.map((i) => i.id),
     module,
     category,
@@ -190,7 +196,9 @@ function markRecommended(actions: DebtAction[]): void {
   actions.sort((a, b) => b.roi - a.roi);
   const topCount = Math.min(10, actions.length);
   for (let i = 0; i < topCount; i += 1) {
-    actions[i].recommended = true;
+    const action = actions[i];
+    if (action === undefined) continue;
+    action.recommended = true;
   }
 }
 

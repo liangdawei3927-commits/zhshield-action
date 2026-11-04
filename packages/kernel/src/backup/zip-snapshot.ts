@@ -28,7 +28,7 @@ export interface ZipSnapshotRequest {
   projectPath: string;
   timestamp: string;
   zipPath: string;
-  abortSignal?: AbortSignal;
+  abortSignal?: AbortSignal | undefined;
 }
 
 /** addFilesToZip 参数对象 */

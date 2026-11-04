@@ -17,7 +17,7 @@ import { LocalBackup } from './local-backup';
  * 备份编排器依赖注入选项：四项均可省略，省略时由编排器自行构造默认实现。
  */
 export interface BackupOrchestratorOptions {
-  eventBus?: EventBus;
+  eventBus?: EventBus | undefined;
   configManager?: BackupConfigManager;
   githubBackup?: GitHubBackup;
   localBackup?: LocalBackup;
@@ -42,7 +42,7 @@ interface RunEnabledBackupsParams {
 }
 
 export class BackupOrchestrator {
-  private eventBus?: EventBus;
+  private eventBus?: EventBus | undefined;
   private configManager: BackupConfigManager;
   private githubBackup: GitHubBackup;
   private localBackup: LocalBackup;

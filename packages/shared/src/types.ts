@@ -243,9 +243,9 @@ export interface ToolResult {
 export interface ToolScanOptions {
   projectPath: string;
   projectId: string;
-  targetFiles?: string[];
-  config?: ToolConfig;
-  timeout?: number;
+  targetFiles?: string[] | undefined;
+  config?: ToolConfig | undefined;
+  timeout?: number | undefined;
 }
 
 /**

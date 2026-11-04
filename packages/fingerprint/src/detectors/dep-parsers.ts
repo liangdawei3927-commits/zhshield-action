@@ -3,11 +3,7 @@
 // （与 @zh/pipeline 的 project-profile 共用同一份实现），此处原样重导出以保持既有导入路径。
 
 import { isRecord } from '../fs-utils';
-import {
-  normalizePackageName,
-  extractPyprojectDeps,
-  extractRequirementsNames,
-} from '@zh/shared';
+import { normalizePackageName, extractPyprojectDeps, extractRequirementsNames } from '@zh/shared';
 
 export { normalizePackageName, extractPyprojectDeps, extractRequirementsNames };
 
@@ -21,8 +17,11 @@ const CARGO_KEY_RE = /^([A-Za-z0-9_-]+)\s*=/;
 export function extractPomDependencies(content: string): string[] {
   const deps: string[] = [];
   for (const m of content.matchAll(/<dependency>([\s\S]*?)<\/dependency>/g)) {
-    const artifact = m[1].match(POM_ARTIFACT_RE);
-    if (artifact) deps.push(artifact[1].trim());
+    const body = m[1];
+    if (body === undefined) continue;
+    const artifact = body.match(POM_ARTIFACT_RE);
+    const artifactId = artifact?.[1];
+    if (artifactId !== undefined) deps.push(artifactId.trim());
   }
   return deps;
 }
@@ -30,11 +29,17 @@ export function extractPomDependencies(content: string): string[] {
 /** go.mod 的 require 依赖（单行与括号块两种形态）。 */
 export function extractGoModRequires(content: string): string[] {
   const deps: string[] = [];
-  for (const m of content.matchAll(/^require\s+([^\s]+)\s+[^\s]+$/gm)) deps.push(m[1]);
+  for (const m of content.matchAll(/^require\s+([^\s]+)\s+[^\s]+$/gm)) {
+    const name = m[1];
+    if (name !== undefined) deps.push(name);
+  }
   for (const m of content.matchAll(/^require\s*\(([\s\S]*?)\)/g)) {
-    for (const raw of m[1].split('\n')) {
+    const block = m[1];
+    if (block === undefined) continue;
+    for (const raw of block.split('\n')) {
       const parts = raw.trim().split(WHITESPACE_RE);
-      if (parts.length > 0 && parts[0] && !parts[0].startsWith('//')) deps.push(parts[0]);
+      const first = parts[0];
+      if (first !== undefined && first.length > 0 && !first.startsWith('//')) deps.push(first);
     }
   }
   return deps;
@@ -47,13 +52,15 @@ export function extractCargoDeps(content: string): string[] {
   for (const raw of content.split('\n')) {
     const line = raw.trim();
     const header = line.match(CARGO_SECTION_RE);
-    if (header) {
-      inDeps = CARGO_DEP_SECTION_RE.test(header[1].trim());
+    const sectionName = header?.[1];
+    if (sectionName !== undefined) {
+      inDeps = CARGO_DEP_SECTION_RE.test(sectionName.trim());
       continue;
     }
     if (!inDeps) continue;
     const key = line.match(CARGO_KEY_RE);
-    if (key) deps.push(key[1]);
+    const keyName = key?.[1];
+    if (keyName !== undefined) deps.push(keyName);
   }
   return deps;
 }
@@ -79,6 +86,9 @@ export function extractComposerRequire(content: string): string[] {
 /** Gemfile 的 gem 声明。 */
 export function extractGemfileDeps(content: string): string[] {
   const deps: string[] = [];
-  for (const m of content.matchAll(/^\s*gem\s+['"]([^'"]+)['"]/gm)) deps.push(m[1]);
+  for (const m of content.matchAll(/^\s*gem\s+['"]([^'"]+)['"]/gm)) {
+    const name = m[1];
+    if (name !== undefined) deps.push(name);
+  }
   return deps;
 }

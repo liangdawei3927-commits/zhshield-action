@@ -59,11 +59,16 @@ export async function prefetchToolBatches(params: {
   const candidates = collectCandidates(rules, interpret, cache);
   if (candidates.length < 2) return 0;
 
-  const adapter = host.toolAdapters.get(candidates[0].instr.tool);
+  // candidates.length >= 2 已保证非空，但严格索引访问下首元素仍可能 undefined
+  const first = candidates[0];
+  if (first === undefined) return 0;
+  const toolId = first.instr.tool;
+
+  const adapter = host.toolAdapters.get(toolId);
   if (!adapter || typeof adapter.scanBatch !== 'function') return 0;
   // 与逐条派发同一道 scope 闸：不在项目画像 scope 内的工具，预取也不许起进程
   // （否则批量预取会把"本来会跳过"的扫描变成真实进程开销）
-  if (host.toolScope && !host.toolScope(candidates[0].instr.tool)) return 0;
+  if (host.toolScope && !host.toolScope(toolId)) return 0;
 
   try {
     if (!(await adapter.isAvailable())) return 0;

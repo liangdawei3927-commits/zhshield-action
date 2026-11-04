@@ -18,15 +18,16 @@ export type ConvertedGuardResult = {
   severity: 'error' | 'warning' | 'info';
   status: 'passed' | 'failed' | 'error' | 'warning' | 'skipped';
   blocking: boolean;
-  file?: string;
+  /** 可选字段写 `?: T | undefined`：file 来自"可能不存在"的运行时来源（规则未产出文件路径） */
+  file?: string | undefined;
 };
 
 /** 转换后的 inspect 问题 */
 export type ConvertedInspectIssue = {
   severity: 'error' | 'warning' | 'info';
   category: string;
-  ruleId?: string;
-  file?: string;
+  ruleId?: string | undefined;
+  file?: string | undefined;
 };
 
 const ESLINT_FILE_RE = /\((.+):\d+:\d+\)$/;

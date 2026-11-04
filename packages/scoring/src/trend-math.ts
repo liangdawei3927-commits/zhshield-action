@@ -16,9 +16,12 @@ export function linearRegressionSlope(values: number[]): number {
     sumXY = 0,
     sumX2 = 0;
   for (let i = 0; i < n; i++) {
+    // 严格索引访问下数组下标为 number | undefined：越界点按 0 计（不影响既有行为，
+    // 因为 values.length === n 保证实际不会越界，此处只是让类型显式）
+    const y = values[i] ?? 0;
     sumX += i;
-    sumY += values[i];
-    sumXY += i * values[i];
+    sumY += y;
+    sumXY += i * y;
     sumX2 += i * i;
   }
   const denominator = n * sumX2 - sumX * sumX;
@@ -32,7 +35,10 @@ export function computeVelocity(history: HealthScore[]): number {
   const recent = history.slice(-5);
   const diffs: number[] = [];
   for (let i = 1; i < recent.length; i++) {
-    diffs.push(recent[i].overall - recent[i - 1].overall);
+    const current = recent[i];
+    const previous = recent[i - 1];
+    if (current === undefined || previous === undefined) continue;
+    diffs.push(current.overall - previous.overall);
   }
   return diffs.reduce((a, b) => a + b, 0) / diffs.length;
 }
@@ -67,11 +73,16 @@ export function projectScore(scores: number[], steps: number): number | null {
 /** 连续趋势统计 */
 export function computeStreak(history: HealthScore[]): TrendReport['streak'] {
   if (history.length < 2) return { direction: 'stable', count: 0 };
-  const last = history.at(-1)!;
+  // history.length >= 2 已保证末元素存在；仍显式判空而非用非空断言
+  // （断言在运行期不提供任何保护，且会在未来重构中悄悄失效）。
+  const last = history.at(-1);
+  if (last === undefined) return { direction: 'stable', count: 0 };
   const direction = last.trend;
   let count = 0;
   for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].trend === direction) count++;
+    const point = history[i];
+    if (point === undefined) break;
+    if (point.trend === direction) count++;
     else break;
   }
   return { direction, count };

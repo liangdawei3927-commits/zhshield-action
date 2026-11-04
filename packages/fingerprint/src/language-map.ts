@@ -66,7 +66,15 @@ const AGGREGATOR_EXTENSION_KEYS: readonly string[] = [
 ];
 
 export const AGGREGATOR_EXTENSION_LANGUAGES: Readonly<Record<string, LanguageId>> = Object.freeze(
-  Object.fromEntries(AGGREGATOR_EXTENSION_KEYS.map((ext) => [ext, EXTENSION_LANGUAGES[ext]])),
+  Object.fromEntries(
+    // 扩展名 → 语言是开放映射（EXTENSION_LANGUAGES 覆盖不全时该扩展名无对应语言）。
+    // 严格索引访问下取值为 LanguageId | undefined：过滤掉无映射的扩展名，
+    // 而不是把 undefined 写进 Record（那会让"查不到语言"变成"语言是 undefined"）。
+    AGGREGATOR_EXTENSION_KEYS.flatMap((ext) => {
+      const lang = EXTENSION_LANGUAGES[ext];
+      return lang === undefined ? [] : [[ext, lang] as const];
+    }),
+  ),
 );
 
 /** 参与扩展名统计的语言集合（决定 ext-stat 信号枚举范围）。 */

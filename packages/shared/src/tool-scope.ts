@@ -12,9 +12,9 @@
 
 /** 结构兼容的画像最小投影（与 kernel ProjectFeature: { framework?, language?, features[] } 对齐） */
 export interface ScopeProfile {
-  framework?: string;
-  language?: string;
-  features?: string[];
+  framework?: string | undefined;
+  language?: string | undefined;
+  features?: string[] | undefined;
 }
 
 /** 服务端可下发的工具全集（M3 resolve/tools 的裁剪输入域） */

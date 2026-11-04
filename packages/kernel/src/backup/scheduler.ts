@@ -32,10 +32,10 @@ interface ScheduledTask {
    * 注册方提供的该项目最近一次成功执行时间（epoch ms）。
    * 缺省视为「从未跑过」——此时不做补跑（新装/新项目不应注册瞬间立刻备份）。
    */
-  lastRunAt?: number;
+  lastRunAt?: number | undefined;
   /** 本进程内最近一次触发/补跑的时刻（epoch ms），防同一次欠账被重复补跑 */
-  lastFiredAt?: number;
-  intervalId?: ReturnType<typeof setInterval>;
+  lastFiredAt?: number | undefined;
+  intervalId?: ReturnType<typeof setInterval> | undefined;
 }
 
 /** 向回扫描补跑候选的天数上限（monthly 最长需要 62 天覆盖上个月同日） */
@@ -191,7 +191,11 @@ export class BackupScheduler {
    * （monthly 需要覆盖上个月同日；daily 第 1 个候选即命中）。
    */
   private lastDueAt(schedule: BackupScheduleConfig, now: Date): number | null {
-    const [hour, minute] = schedule.time.split(':').map(Number);
+    // "HH:mm" 拆成两段：严格索引访问下第二段可能不存在（格式错误）——
+    // 解析不出合法数字即视为无效配置，返回 null（不触发备份）。
+    const [hourRaw, minuteRaw] = schedule.time.split(':').map(Number);
+    const hour = hourRaw ?? Number.NaN;
+    const minute = minuteRaw ?? Number.NaN;
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
     for (let back = 0; back < CATCHUP_LOOKBACK_DAYS; back++) {
       const day = new Date(now);
@@ -216,7 +220,20 @@ export class BackupScheduler {
     const parts = cron.trim().split(WHITESPACE);
     if (parts.length < 5) return false;
 
-    const [cronMinute, cronHour, cronDayOfMonth, , cronDayOfWeek] = parts;
+    // cron 五段：分 时 日 月 周。缺段即不匹配（parts.length 已保证 ≥5，
+    // 但严格索引访问下仍需显式判空）。
+    const cronMinute = parts[0];
+    const cronHour = parts[1];
+    const cronDayOfMonth = parts[2];
+    const cronDayOfWeek = parts[4];
+    if (
+      cronMinute === undefined ||
+      cronHour === undefined ||
+      cronDayOfMonth === undefined ||
+      cronDayOfWeek === undefined
+    ) {
+      return false;
+    }
 
     return (
       this.cronFieldMatches(cronMinute, minute) &&
@@ -235,12 +252,18 @@ export class BackupScheduler {
       // 处理步长
       if (part.includes('/')) {
         const [range, step] = part.split('/');
-        const start = range === '*' ? 0 : parseInt(range, 10);
-        return value - start >= 0 && (value - start) % parseInt(step, 10) === 0;
+        // range 缺失时按 '*' 处理（等价于从 0 开始）；step 缺失则该段无效
+        const start = range === undefined || range === '*' ? 0 : parseInt(range, 10);
+        const stepValue = parseInt(step ?? '', 10);
+        // step 缺失或非数字时该段无效（NaN 运算恒 false）
+        if (Number.isNaN(stepValue)) return false;
+        return value - start >= 0 && (value - start) % stepValue === 0;
       }
       // 处理范围
       if (part.includes('-')) {
         const [lo, hi] = part.split('-').map(Number);
+        // 范围端点缺失时该段无效
+        if (lo === undefined || hi === undefined) return false;
         return value >= lo && value <= hi;
       }
       return false;
@@ -251,7 +274,9 @@ export class BackupScheduler {
    * 将调度配置转换为 cron 表达式
    */
   private toCron(schedule: BackupScheduleConfig): string {
-    const [hour, minute] = schedule.time.split(':').map(Number);
+    const [hourRaw, minuteRaw] = schedule.time.split(':').map(Number);
+    const hour = hourRaw ?? 0;
+    const minute = minuteRaw ?? 0;
 
     const build = CRON_BUILDERS[schedule.frequency];
     return build ? build(hour, minute, schedule) : `${minute} ${hour} * * *`;

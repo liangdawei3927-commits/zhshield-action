@@ -6,7 +6,10 @@ function generateId(): string {
 
 function calculateNextRun(config: SchedulerConfig): string {
   const now = new Date();
-  const [hours, minutes] = config.time.split(':').map(Number);
+  // "HH:mm" 拆两段：缺段按 0 处理（与 setHours 的缺省语义一致）
+  const [hoursRaw, minutesRaw] = config.time.split(':').map(Number);
+  const hours = hoursRaw ?? 0;
+  const minutes = minutesRaw ?? 0;
   const next = new Date(now);
   next.setHours(hours, minutes, 0, 0);
 
@@ -29,12 +32,12 @@ function calculateNextRun(config: SchedulerConfig): string {
 export class SchedulerService {
   private jobs: SchedulerJob[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
-  private onJobRun?: (result: SchedulerRunResult) => void;
-  private storage?: SchedulerStorage;
+  private onJobRun?: ((result: SchedulerRunResult) => void | undefined) | undefined;
+  private storage?: SchedulerStorage | undefined;
 
   constructor(options?: {
-    storage?: SchedulerStorage;
-    onJobRun?: (result: SchedulerRunResult) => void;
+    storage?: SchedulerStorage | undefined;
+    onJobRun?: (result: SchedulerRunResult) => void | undefined;
   }) {
     this.storage = options?.storage;
     this.onJobRun = options?.onJobRun;

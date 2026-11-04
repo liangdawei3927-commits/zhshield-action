@@ -126,7 +126,10 @@ function pickFreshestCache(input: SopCacheEnv): SopCacheResolution {
   const ranked = candidates
     .map((candidate) => ({ ...candidate, at: newestRuleMtime(candidate.dir) }))
     .sort((a, b) => b.at - a.at);
+  // ranked 非空由 candidates 非空保证，但严格索引访问下首元素仍可能 undefined：
+  // 无候选时返回"不可用"（dir 缺省 = 不可用，见 SopCacheResolution.dir 的约定）
   const chosen = ranked[0];
+  if (chosen === undefined) return { origin: '无可用缓存目录' };
   const other = ranked[1];
   const base: SopCacheResolution = { dir: chosen.dir, origin: chosen.origin };
   if (!other) return base;

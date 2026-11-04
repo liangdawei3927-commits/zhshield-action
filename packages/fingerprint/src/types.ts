@@ -35,20 +35,34 @@ export interface MatchResult<T = string> {
   readonly signals: readonly Signal[];
 }
 
-/** 人工修正记录（与自动检测分离存储，永不丢失）。 */
+/**
+ * 人工修正记录（与自动检测分离存储，永不丢失）。
+ *
+ * 可选字段写 `?: T | undefined`：这些字段的值本来就常常来自"可能不存在"的运行时来源
+ * （读到的 override 文件、命中的 target 记录），在类型上如实写明「可能无值」，
+ * 比在每个构造点写条件展开更贴近事实。
+ */
 export interface UserOverrides {
-  readonly architecture?: ArchitectureForm;
-  readonly targets?: Readonly<
-    Record<string, { readonly language?: LanguageId; readonly productForm?: ProductFormId }>
-  >;
-  readonly updatedAt?: string;
+  readonly architecture?: ArchitectureForm | undefined;
+  readonly targets?:
+    | Readonly<
+        Record<
+          string,
+          {
+            readonly language?: LanguageId | undefined;
+            readonly productForm?: ProductFormId | undefined;
+          }
+        >
+      >
+    | undefined;
+  readonly updatedAt?: string | undefined;
 }
 
 /** lockfile 解析结果（M0 只存清单供展示 / SCA 后续用）。 */
 export interface DependencySummary {
-  readonly packageManager?: string;
+  readonly packageManager?: string | undefined;
   readonly direct: readonly { readonly name: string; readonly version: string }[];
-  readonly lockfilePath?: string;
+  readonly lockfilePath?: string | undefined;
 }
 
 /** 单目标画像（M0 常驻 ≥1，为 M1 模块级画像预留）。 */
@@ -60,8 +74,8 @@ export interface TargetProfile {
   readonly language: MatchResult<LanguageId>;
   readonly frameworks: readonly MatchResult<string>[];
   /** 仅当规则库声明了该形态才填充 / 询问 */
-  readonly productForm?: MatchResult<ProductFormId>;
-  readonly packageManager?: MatchResult<string>;
+  readonly productForm?: MatchResult<ProductFormId> | undefined;
+  readonly packageManager?: MatchResult<string> | undefined;
   /** `${language}:${framework}:${form}` 能力查询键 */
   readonly routeKey: string;
 }
@@ -77,7 +91,7 @@ export interface ProjectProfile {
   /** lockfile 解析结果 */
   readonly dependencies: DependencySummary;
   readonly detectedAt: string;
-  readonly lastConfirmedAt?: string;
+  readonly lastConfirmedAt?: string | undefined;
   /** 漂移标记（见架构文档 §8） */
   readonly stale: boolean;
   /** 全量检测依据，可追溯、可展示 */

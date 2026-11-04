@@ -115,12 +115,16 @@ function parsePnpmImporters(content: string): DepName[] {
     const header = raw.match(PNPM_HEADER_RE);
     if (header !== null) {
       flush();
-      pending = { name: header[1], version: '' };
+      // 捕获组在严格索引访问下可能 undefined：取不到就跳过该条目
+      const headerName = header[1];
+      if (headerName === undefined) continue;
+      pending = { name: headerName, version: '' };
       continue;
     }
     const version = raw.match(PNPM_VERSION_RE);
     if (version !== null && pending !== null) {
-      pending.version = version[1].trim();
+      const raw = version[1];
+      if (raw !== undefined) pending.version = raw.trim();
     }
   }
   flush();
@@ -142,7 +146,7 @@ function parseYarnLock(root: string, rel: string): ParsedLockfile | null {
   let pending: DepName | null = null;
   for (const raw of content.split('\n')) {
     if (raw.length === 0) continue;
-    if (raw[0] !== ' ' && raw.trimEnd().endsWith(':')) {
+    if (raw.charAt(0) !== ' ' && raw.trimEnd().endsWith(':')) {
       if (pending !== null) direct.push(pending);
       const key = raw.trim().replace(YARN_STRIP_QUOTES_RE, '').replace(YARN_STRIP_COLON_RE, '');
       const at = key.lastIndexOf('@');
@@ -152,7 +156,8 @@ function parseYarnLock(root: string, rel: string): ParsedLockfile | null {
     if (pending === null) continue;
     const version = raw.match(YARN_VERSION_RE);
     if (version !== null) {
-      pending.version = version[1];
+      const raw = version[1];
+      if (raw !== undefined) pending.version = raw;
       direct.push(pending);
       pending = null;
     }
@@ -167,7 +172,11 @@ function parseGoSum(root: string, rel: string): ParsedLockfile | null {
   if (content === null) return null;
   const direct: DepName[] = [];
   for (const match of content.matchAll(/^([^\s]+)\s+(v[^\s]+)/gm)) {
-    direct.push({ name: match[1], version: match[2] });
+    const name = match[1];
+    const version = match[2];
+    // 捕获组在严格索引访问下可能 undefined：跳过不完整条目
+    if (name === undefined || version === undefined) continue;
+    direct.push({ name, version });
   }
   if (direct.length === 0) return null;
   return { ruleId: 'lockfile:go-sum', packageManager: 'go', direct: dedupe(direct) };
@@ -188,12 +197,17 @@ function parsePackageStyle(
     const line = raw.trim();
     const name = line.match(TOML_NAME_RE);
     if (name !== null) {
+      const pkgName = name[1];
+      if (pkgName === undefined) continue;
       if (pending !== null) direct.push(pending);
-      pending = { name: name[1], version: '' };
+      pending = { name: pkgName, version: '' };
       continue;
     }
     const version = line.match(TOML_VERSION_RE);
-    if (version !== null && pending !== null) pending.version = version[1];
+    if (version !== null && pending !== null) {
+      const raw = version[1];
+      if (raw !== undefined) pending.version = raw;
+    }
   }
   if (pending !== null) direct.push(pending);
   if (direct.length === 0) return null;
@@ -205,9 +219,12 @@ function parsePomXml(root: string, rel: string): ParsedLockfile | null {
   if (content === null) return null;
   const direct: DepName[] = [];
   for (const block of content.matchAll(/<dependency>([\s\S]*?)<\/dependency>/g)) {
-    const group = block[1].match(POM_GROUP_RE)?.[1] ?? '';
-    const artifact = block[1].match(POM_ARTIFACT_RE)?.[1] ?? '';
-    const version = block[1].match(POM_VERSION_RE)?.[1] ?? '';
+    // 捕获组在严格索引访问下可能 undefined：先取内容，再从中提取三段
+    const body = block[1];
+    if (body === undefined) continue;
+    const group = body.match(POM_GROUP_RE)?.[1] ?? '';
+    const artifact = body.match(POM_ARTIFACT_RE)?.[1] ?? '';
+    const version = body.match(POM_VERSION_RE)?.[1] ?? '';
     const name = [group, artifact].filter((s) => s.length > 0).join(':');
     if (name.length > 0) direct.push({ name, version: version.trim() });
   }

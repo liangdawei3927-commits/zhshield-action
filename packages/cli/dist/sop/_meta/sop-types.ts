@@ -83,15 +83,15 @@ export interface SopRule {
   /** 动态升级策略（F1）：同类 warning 连续命中 threshold 次后，severity 升级为 escalateTo */
   accumulationPolicy?: {
     /** 触发升级所需的连续同类命中次数（缺省 3） */
-    threshold?: number;
+    threshold?: number | undefined;
     /** 升级目标严重级（必须高于规则静态 severity） */
     escalateTo: Severity;
     /** 统计窗口（按 ruleId+contentKey 计数；预留字段，本期仅计数） */
-    window?: number;
+    window?: number | undefined;
   };
 
   /** 阻断阈值（F1-4 消费）：评估失败且 effective severity >= 此值时 evaluation.blocking=true；缺省不改变现状（undefined = 不阻断） */
-  blockingThreshold?: Severity;
+  blockingThreshold?: Severity | undefined;
 
   /** 引擎可见范围（哪些引擎执行此规则） */
   applicableEngines: string[];
@@ -100,7 +100,7 @@ export interface SopRule {
   content: Record<string, unknown>;
 
   /** 能力声明（语言/产品形态/架构） */
-  serves?: SopServes;
+  serves?: SopServes | undefined;
 
   /** 标签 */
   tags: string[];
@@ -112,7 +112,7 @@ export interface SopRule {
   truePositiveCount: number;
 
   /** 最后使用时间 */
-  lastUsedAt?: Date;
+  lastUsedAt?: Date | undefined;
 
   /** 创建时间 */
   createdAt: Date;
@@ -203,8 +203,8 @@ export interface SopRuleFilter {
 // ─── 模块特征映射 ────────────────────────────────────────────
 /** 项目模块特征：识别出的框架、语言与特性列表，用于规则适用范围匹配 */
 export interface ProjectFeature {
-  framework?: string;
-  language?: string;
+  framework?: string | undefined;
+  language?: string | undefined;
   features: string[];
 }
 

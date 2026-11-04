@@ -56,9 +56,9 @@ export interface QuestionOption {
   /** 选项标签 */
   readonly label: string;
   /** 选项描述 */
-  readonly description?: string;
+  readonly description?: string | undefined;
   /** 是否为推荐值 */
-  readonly recommended?: boolean;
+  readonly recommended?: boolean | undefined;
 }
 
 /** 规则库能力声明（架构文档 §5.2） */
@@ -85,7 +85,8 @@ function buildArchitectureOptions(architecture: MatchResult<ArchitectureForm>): 
   ];
   const recommendedIndex = options.findIndex((o) => o.value === architecture.value);
   if (recommendedIndex >= 0) {
-    options[recommendedIndex] = { ...options[recommendedIndex], recommended: true };
+    const current = options[recommendedIndex];
+    if (current !== undefined) options[recommendedIndex] = { ...current, recommended: true };
   }
   return options;
 }

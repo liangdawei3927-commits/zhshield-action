@@ -90,18 +90,18 @@ export type RuleMetricsProvider = (
  */
 export interface EngineHost {
   toolAdapters: Map<string, ToolAdapter>;
-  guardEngine?: GuardEngineLike;
-  inspectEngine?: InspectEngineLike;
-  securityCheckEngine?: SecurityCheckEngineLike;
+  guardEngine?: GuardEngineLike | undefined;
+  inspectEngine?: InspectEngineLike | undefined;
+  securityCheckEngine?: SecurityCheckEngineLike | undefined;
   /** 审计日志为副作用依赖：缺失或写入失败均不得影响扫描结果 */
-  auditLogger?: AuditLogger;
+  auditLogger?: AuditLogger | undefined;
   /** EventBus — 用于 tool:executed 等事件发射；缺失或发射失败均不得影响扫描结果 */
-  eventBus?: EventBus;
+  eventBus?: EventBus | undefined;
   /** 工具 scope 判定：返回 false 表示工具不在当前项目画像 scope 内，tool-dispatch 应跳过 */
-  toolScope?: (toolId: string) => boolean;
+  toolScope?: ((toolId: string) => boolean | undefined) | undefined;
   /** 阈值指令的实测值提供者；缺省时 threshold 规则一律落 degraded skipped（未检测 ≠ 通过） */
-  metricsProvider?: RuleMetricsProvider;
+  metricsProvider?: RuleMetricsProvider | undefined;
   /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 300000（5 分钟，大型 monorepo trivy/semgrep 需更长时间） */
-  toolScanTimeoutMs?: number;
+  toolScanTimeoutMs?: number | undefined;
   evalDepth: number;
 }

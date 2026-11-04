@@ -16,11 +16,7 @@ type FetchResponse = Awaited<ReturnType<typeof fetch>>;
  * 故障无法收敛，重试策略也无法区分（鉴权失败重试一万次也没用）。
  */
 export type SopFetchFailureKind =
-  | 'http_error'
-  | 'timeout'
-  | 'network_error'
-  | 'decode_error'
-  | 'signature_rejected';
+  'http_error' | 'timeout' | 'network_error' | 'decode_error' | 'signature_rejected';
 
 /** 一次取数失败的完整归因 */
 export interface SopFetchFailure {
@@ -83,7 +79,7 @@ function looksLikeJson(text: string): boolean {
  */
 export class SopSyncClient {
   protected readonly compressor: SopCompressor;
-  private readonly apiToken?: ApiTokenProvider;
+  private readonly apiToken?: ApiTokenProvider | undefined;
 
   /** 版本探测要快失败快返回；全量包容忍大包，给足时间 */
   protected static readonly TIMEOUT_VERSION_MS = 10_000;
@@ -177,10 +173,7 @@ export class SopSyncClient {
    * 判据：解压失败时看原文是不是 JSON（首字节 `{` 或 `[`）。是 ⇒ 说明已解压；不是 ⇒ 原样抛错。
    * 顺序不能反过来：先解压是协议正确解释，明文兜底只在解压确实不成立时生效。
    */
-  private async decompressText(
-    bytes: Uint8Array,
-    format: CompressionFormat,
-  ): Promise<string> {
+  private async decompressText(bytes: Uint8Array, format: CompressionFormat): Promise<string> {
     try {
       const decompressed = await this.compressor.decompress(bytes, format);
       return new TextDecoder().decode(decompressed);

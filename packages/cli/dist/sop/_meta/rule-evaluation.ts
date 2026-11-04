@@ -20,13 +20,13 @@ export interface RuleEvaluation {
   status: EvaluationStatus;
 
   /** 失败/错误的详细信息 */
-  message?: string;
+  message?: string | undefined;
 
   /** 涉及的文件列表 */
-  files?: string[];
+  files?: string[] | undefined;
 
   /** 违规详情（每一条具体问题） */
-  violations?: Violation[];
+  violations?: Violation[] | undefined;
 
   /** 执行耗时 (ms) */
   durationMs: number;
@@ -39,13 +39,13 @@ export interface RuleEvaluation {
 
   /** 阻断判定（F1-4）：failed 且有效严重级达到规则声明的 blockingThreshold；未声明阈值的规则保持旧行为（failed 即阻断）。
    *  可选字段：由 SopRuleEngine.evaluateAll 统一附加；外部/存量评估缺省时消费方按 status==='failed' 回退。 */
-  blocking?: boolean;
+  blocking?: boolean | undefined;
 
   /** 非预期降级跳过（工具不可用 / 引擎未注册 / 适配器缺失）：
    *  degraded=true 的 skipped 评估在 aggregate() 中计入 ok 判定——
    *  与 P0-2（规则 0 条）同级的盲检护栏：什么都没查 = 不得通过。
    *  预期跳过（防重入 / dryRun / 画像 scope 裁剪）不标记。 */
-  degraded?: boolean;
+  degraded?: boolean | undefined;
 
   /**
    * 不适用标注：规则的检测对象在本项目确实不存在（如未用 Web 框架的 Helmet/CSRF）。
@@ -53,7 +53,7 @@ export interface RuleEvaluation {
    * 差别在于聚合时不把这条计入「通过」，展示上单列「不适用」。
    * 仅当规则**全部**检测项都确知不适用时才设置，无法判定时不得猜测。
    */
-  applicability?: 'not-applicable';
+  applicability?: 'not-applicable' | undefined;
 }
 
 // ─── 单条违规 ──────────────────────────────────────────
@@ -73,22 +73,22 @@ export interface Violation {
   file: string;
 
   /** 行号 */
-  line?: number;
+  line?: number | undefined;
 
   /** 列号 */
-  column?: number;
+  column?: number | undefined;
 
   /** 违规描述 */
   message: string;
 
   /** 修复建议 */
-  suggestion?: string;
+  suggestion?: string | undefined;
 
   /** 原始匹配内容 */
-  match?: string;
+  match?: string | undefined;
 
   /** issue 分类（由适配器产出，透传至报告层） */
-  category?: IssueCategory;
+  category?: IssueCategory | undefined;
 }
 
 // ─── 按画像裁剪观测 ────────────────────────────────────
@@ -109,9 +109,9 @@ export interface ProfileTrimObservability {
 
   /** 裁剪使用的项目画像（透传以便下游记录/校验） */
   readonly feature: {
-    readonly framework?: string;
-    readonly language?: string;
-    readonly features?: readonly string[];
+    readonly framework?: string | undefined;
+    readonly language?: string | undefined;
+    readonly features?: readonly string[] | undefined;
   };
 }
 
@@ -218,7 +218,7 @@ export interface PatternScanInstruction {
   type: 'pattern-scan';
   patterns: string[];
   /** 扫描文件扩展名过滤 */
-  fileExts?: string[];
+  fileExts?: string[] | undefined;
 }
 
 /** check-list 指令：按 checks 中列出的规则名清单逐条检查（如 ESLint 规则名单） */
@@ -231,8 +231,8 @@ export interface CheckListInstruction {
 export interface ThresholdInstruction {
   type: 'threshold';
   thresholds: Record<string, number>;
-  unit?: string;
-  scope?: string;
+  unit?: string | undefined;
+  scope?: string | undefined;
 }
 
 /** forbidden 指令：命中 patterns 中任一字面禁止项即违规（正则版见 ForbiddenRegexInstruction） */
@@ -240,9 +240,9 @@ export interface ForbiddenPatternInstruction {
   type: 'forbidden';
   patterns: string[];
   /** 扫描文件扩展名过滤（与 PatternScanInstruction.fileExts 对齐） */
-  fileExts?: string[];
+  fileExts?: string[] | undefined;
   /** 排除模式（相对路径 glob，支持 ** 跨目录与 * 单段通配），如测试文件与构建产物 */
-  excludePatterns?: string[];
+  excludePatterns?: string[] | undefined;
 }
 
 /** layer-boundary 指令：校验架构分层依赖，layers 声明每层允许依赖的层集合 */
@@ -252,7 +252,7 @@ export interface LayerBoundaryInstruction {
   /** 排除模式（相对路径 glob，支持 ** 跨目录与 * 单段通配），如测试文件与构建产物。
    *  09-18 新增：层判定按文件名无关的目录结构进行，测试文件里的 import 同样会被扫描到，
    *  缺此过滤会在真实项目产生大量误报。 */
-  excludePatterns?: string[];
+  excludePatterns?: string[] | undefined;
 }
 
 /**
@@ -268,14 +268,14 @@ export interface ForbiddenRegexInstruction {
     /** 正则源码（逐行匹配，g 标志由评估器附加） */
     regex: string;
     /** 命中时的违规描述（缺省用正则源码） */
-    message?: string;
+    message?: string | undefined;
     /** 修复建议 */
-    suggestion?: string;
+    suggestion?: string | undefined;
   }>;
   /** 扫描文件扩展名过滤 */
-  fileExts?: string[];
+  fileExts?: string[] | undefined;
   /** 排除模式（相对路径 glob） */
-  excludePatterns?: string[];
+  excludePatterns?: string[] | undefined;
 }
 
 /**
@@ -311,7 +311,7 @@ export interface RequiredContentItem {
 export interface ScannerDispatchInstruction {
   type: 'scanner-dispatch';
   scanners: string[];
-  schedule?: string;
+  schedule?: string | undefined;
 }
 
 /** preset 指令：套用配置预设集合（presets 为预设名列表） */
@@ -334,24 +334,30 @@ export interface ToolDispatchInstruction {
   /** 工具配置（模板中的 check.toolConfig） */
   toolConfig: Record<string, unknown>;
   /** 条件过滤 */
-  conditions?: {
-    languages?: string[];
-    filePatterns?: string[];
-    excludePatterns?: string[];
-  };
+  conditions?:
+    | {
+        languages?: string[] | undefined;
+        filePatterns?: string[] | undefined;
+        excludePatterns?: string[] | undefined;
+      }
+    | undefined;
   /** 裁决参数 */
-  judgment?: {
-    passCondition?: string;
-    blocking?: string;
-    priority?: string;
-    maxIssues?: number;
-  };
+  judgment?:
+    | {
+        passCondition?: string | undefined;
+        blocking?: string | undefined;
+        priority?: string | undefined;
+        maxIssues?: number | undefined;
+      }
+    | undefined;
   /** 修复建议 */
-  fix?: {
-    autoFixAvailable?: boolean;
-    suggestionTemplate?: string;
-    resources?: string[];
-  };
+  fix?:
+    | {
+        autoFixAvailable?: boolean | undefined;
+        suggestionTemplate?: string | undefined;
+        resources?: string[] | undefined;
+      }
+    | undefined;
 }
 
 /**

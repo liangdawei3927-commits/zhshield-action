@@ -60,8 +60,8 @@ export interface BackupScheduleConfig {
   enabled: boolean;
   frequency: 'daily' | 'weekly' | 'monthly';
   time: string; // HH:mm
-  dayOfWeek?: number; // 0=Sun, weekly
-  dayOfMonth?: number; // monthly
+  dayOfWeek?: number | undefined; // 0=Sun, weekly
+  dayOfMonth?: number | undefined; // monthly
 }
 
 /** 备份总配置：GitHub、本地与定时三段配置的聚合（项目级 backup.yml 的根结构） */
@@ -93,9 +93,9 @@ export const DEFAULT_EXCLUDE_PATTERNS = [
  * projectPath 优先，其次 projectId，最后退回 projectName。
  */
 export interface BackupIdentity {
-  projectId?: string;
-  projectName?: string;
-  projectPath?: string;
+  projectId?: string | undefined;
+  projectName?: string | undefined;
+  projectPath?: string | undefined;
 }
 
 /**
@@ -148,10 +148,7 @@ export const DEFAULT_GOVERNANCE_EXCLUDE_PATTERNS: readonly string[] = ['.zhshiel
  * 备份必然失败（1.4GB > 512MB）。这类目录在任何项目里都不是源码、体积巨大
  * 且完全可再生，故随默认配置强制排除（用户仍可追加自己的排除项）。
  */
-export const DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS: readonly string[] = [
-  'build-output/',
-  'out/',
-];
+export const DEFAULT_BUILD_ARTIFACT_EXCLUDE_PATTERNS: readonly string[] = ['build-output/', 'out/'];
 
 /** P2-6：单次快照源文件总体积默认上限（MB）。8GB 常见机型磁盘长期紧张的保守值 */
 export const DEFAULT_MAX_BACKUP_SIZE_MB = 512;
@@ -269,17 +266,17 @@ export interface BackupRecord {
   duration: number; // ms
 
   // GitHub
-  githubCommitHash?: string;
-  githubCommitMessage?: string;
-  githubRepoUrl?: string;
-  githubBranch?: string;
+  githubCommitHash?: string | undefined;
+  githubCommitMessage?: string | undefined;
+  githubRepoUrl?: string | undefined;
+  githubBranch?: string | undefined;
 
   // 本地
-  localBackupPath?: string;
-  backupSize?: number;
-  fileCount?: number;
+  localBackupPath?: string | undefined;
+  backupSize?: number | undefined;
+  fileCount?: number | undefined;
 
-  error?: string;
+  error?: string | undefined;
 }
 
 // ─── 事件载荷 ─────────────────────────────────────────────

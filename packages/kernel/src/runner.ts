@@ -129,9 +129,9 @@ export class SopRuleEngine {
   private logger: Logger;
 
   /** 可选的外部引擎引用 — 用于派发 check-list / scanner-dispatch / preset 指令 */
-  private guardEngine?: GuardEngineLike;
-  private inspectEngine?: InspectEngineLike;
-  private securityCheckEngine?: SecurityCheckEngineLike;
+  private guardEngine: GuardEngineLike | undefined;
+  private inspectEngine: InspectEngineLike | undefined;
+  private securityCheckEngine: SecurityCheckEngineLike | undefined;
 
   /** ToolAdapter 注册表 — 用于 tool-dispatch 指令 */
   private toolAdapters = new Map<string, ToolAdapter>();
@@ -146,13 +146,13 @@ export class SopRuleEngine {
   private readonly consecutiveFailures = new Map<string, number>();
 
   /** F1-3：项目健康基线分（@zh/scoring 注入；缺省 undefined = 基线升档关闭） */
-  private readonly healthBaseline?: number;
+  private readonly healthBaseline: number | undefined;
 
   /** tool-dispatch 单次工具扫描硬上限（ms）；缺省 undefined → dispatch 用 DEFAULT_TOOL_SCAN_TIMEOUT_MS */
-  private readonly toolScanTimeoutMs?: number;
+  private readonly toolScanTimeoutMs: number | undefined;
 
   /** 阈值指令实测值提供者（@zh/refactor 侧实现注入）；缺省 undefined = 阈值规则恒降级 */
-  private readonly metricsProvider?: RuleMetricsProvider;
+  private readonly metricsProvider: RuleMetricsProvider | undefined;
 
   /** 指令类型 → 评估器策略表。表本身在 runner/evaluator-table.ts（静态配置，不占类体） */
   private readonly evaluators = buildEvaluatorTable(() => this.host);
@@ -243,7 +243,7 @@ export class SopRuleEngine {
 
     try {
       this.projectFeature = context.projectFeature;
-      const rules = this.filterRulesByContext(context);
+      const rules = filterRulesByContext(this.registry, context);
       const evaluations = rules.length === 0 ? [] : await this.evaluateAll(rules, context, nested);
 
       const report = aggregate(evaluations, Date.now() - start);
@@ -255,10 +255,6 @@ export class SopRuleEngine {
     } finally {
       this.evalDepth -= 1;
     }
-  }
-
-  private filterRulesByContext(context: RuleContext): SopRule[] {
-    return filterRulesByContext(this.registry, context);
   }
 
   private async evaluateAll(
@@ -289,7 +285,9 @@ export class SopRuleEngine {
       while (true) {
         const index = next++;
         if (index >= rules.length) return;
-        evaluations[index] = await this.evaluateSingleRule(rules[index], context, nested);
+        const rule = rules[index];
+        if (rule === undefined) return; // 严格索引：竞态越界时不把 undefined 流入评估器
+        evaluations[index] = await this.evaluateSingleRule(rule, context, nested);
       }
     };
     await Promise.all(Array.from({ length: maxConcurrency }, () => worker()));
@@ -406,7 +404,7 @@ export class SopRuleEngine {
     // context 由 evaluateAll 的有界并行池内所有 worker 共享，就地写会造成规则间串数据。
     const resolved =
       instruction.type === 'threshold'
-        ? await applyRuleMetrics(this.metricsProvider, rule, context, (msg) => this.logger.warn(msg))
+        ? await applyRuleMetrics(this.metricsProvider, rule, context, (m) => this.logger.warn(m))
         : context;
     return evaluator(rule, instruction, resolved);
   }

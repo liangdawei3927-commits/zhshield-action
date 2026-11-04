@@ -160,8 +160,8 @@ export interface ScoringProjectProfile {
   confidence: number;
   /** 探测时间戳 */
   detectedAt: Date;
-  /** 模块级画像（仅 monorepo 时填充） */
-  modules?: ModuleProfile[];
+  /** 模块级画像（仅 monorepo 时填充；非 monorepo 时为 undefined） */
+  modules?: ModuleProfile[] | undefined;
   /** 原始探测信号（审计/调试/经验库回写用） */
   signals: ProfileSignal[];
 }

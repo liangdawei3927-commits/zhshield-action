@@ -6,6 +6,7 @@ import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
 import { FRAMEWORK_KEYWORDS } from '../framework-map';
+import type { FrameworkKeyword } from '../framework-map';
 import { listRootFiles, readText, relDirname, isRecord, findMarkerProjectRoot } from '../fs-utils';
 import { makeSignal, readDependencyNames, frameworkSignalsFromDeps } from './types';
 import {
@@ -44,13 +45,18 @@ interface DetectManifestParams {
   readonly language: LanguageId;
 }
 
-const JS_FRAMEWORKS = [{ language: 'javascript', frameworks: FRAMEWORK_KEYWORDS.javascript }];
-const PYTHON_FRAMEWORKS = [{ language: 'python', frameworks: FRAMEWORK_KEYWORDS.python }];
-const JAVA_FRAMEWORKS = [{ language: 'java', frameworks: FRAMEWORK_KEYWORDS.java }];
-const GO_FRAMEWORKS = [{ language: 'go', frameworks: FRAMEWORK_KEYWORDS.go }];
-const RUST_FRAMEWORKS = [{ language: 'rust', frameworks: FRAMEWORK_KEYWORDS.rust }];
-const PHP_FRAMEWORKS = [{ language: 'php', frameworks: FRAMEWORK_KEYWORDS.php }];
-const RUBY_FRAMEWORKS = [{ language: 'ruby', frameworks: FRAMEWORK_KEYWORDS.ruby }];
+// FRAMEWORK_KEYWORDS 的值可能是 undefined（该语言未配表）：统一回落为空表 ——
+// 「没有配置框架关键词」应表现为「不产出框架信号」，而不是运行期崩溃。
+const frameworksOf = (language: LanguageId): readonly FrameworkKeyword[] =>
+  FRAMEWORK_KEYWORDS[language] ?? [];
+
+const JS_FRAMEWORKS = [{ language: 'javascript', frameworks: frameworksOf('javascript') }];
+const PYTHON_FRAMEWORKS = [{ language: 'python', frameworks: frameworksOf('python') }];
+const JAVA_FRAMEWORKS = [{ language: 'java', frameworks: frameworksOf('java') }];
+const GO_FRAMEWORKS = [{ language: 'go', frameworks: frameworksOf('go') }];
+const RUST_FRAMEWORKS = [{ language: 'rust', frameworks: frameworksOf('rust') }];
+const PHP_FRAMEWORKS = [{ language: 'php', frameworks: frameworksOf('php') }];
+const RUBY_FRAMEWORKS = [{ language: 'ruby', frameworks: frameworksOf('ruby') }];
 
 const JS_MANIFEST_NAMES = new Set([
   'package.json',

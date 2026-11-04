@@ -51,9 +51,9 @@ export interface SopCacheManagerOptions {
   /** 本地桌面端版本号（用于兼容性检查，例 '1.0.0'） */
   clientVersion?: string;
   /** 事件总线（用于通知下游紧急更新等事件） */
-  eventBus?: EventBus;
+  eventBus?: EventBus | undefined;
   /** HMAC-SHA256 签名密钥（用于验证云端规则包完整性） */
-  secretKey?: string;
+  secretKey?: string | undefined;
   /** 验签公钥：字符串或异步解析函数；未配置时验签放行（向后兼容），配置后解析失败则 fail-closed */
   publicKey?: string | (() => Promise<string | null>);
   /** API 令牌（x-api-token 请求头）：固定字符串或懒加载函数；本地后端 LocalOnlyGuard 需校验 */
@@ -93,8 +93,8 @@ export class SopCacheManager {
   private versionStore: SopVersionStore;
   private scheduler: SopSyncScheduler;
   private coordinator: SopSyncCoordinator;
-  private eventBus?: EventBus;
-  private secretKey?: string;
+  private eventBus?: EventBus | undefined;
+  private secretKey?: string | undefined;
   private metrics: SopCacheMetrics;
   private maintenance: SopCacheMaintenance;
 
@@ -186,17 +186,17 @@ export class SopCacheManager {
    */
   async syncFromCloud(): Promise<SyncResult> {
     const startedAt = Date.now();
-    emitEvent(this.eventBus,'sop:sync-started');
+    emitEvent(this.eventBus, 'sop:sync-started');
     try {
       const result = await this.coordinator.syncFromCloud();
       await refreshModuleCaches(this.lazyLoader);
       const succeeded = result.updated || result.reason === 'already_latest';
       if (succeeded) {
         this.metrics.recordSyncSuccess(Date.now() - startedAt);
-        emitEvent(this.eventBus,'sop:sync-completed', { result, timestamp: new Date() });
+        emitEvent(this.eventBus, 'sop:sync-completed', { result, timestamp: new Date() });
       } else {
         this.metrics.recordSyncFailure(Date.now() - startedAt);
-        emitEvent(this.eventBus,'sop:sync-failed', {
+        emitEvent(this.eventBus, 'sop:sync-failed', {
           error: result.reason ?? 'unknown',
           timestamp: new Date(),
         });
@@ -204,7 +204,7 @@ export class SopCacheManager {
       return result;
     } catch (err) {
       this.metrics.recordSyncFailure(Date.now() - startedAt);
-      emitEvent(this.eventBus,'sop:sync-failed', {
+      emitEvent(this.eventBus, 'sop:sync-failed', {
         error: err instanceof Error ? err.message : String(err),
         timestamp: new Date(),
       });
@@ -216,30 +216,28 @@ export class SopCacheManager {
    * 应用增量更新（文档 13.3 节）
    */
   async applyDiff(diff: SopDiff): Promise<void> {
-    emitEvent(this.eventBus,'sop:diff-started', {
+    const ruleCount = diff.added.length + diff.modified.length + diff.removed.length;
+    emitEvent(this.eventBus, 'sop:diff-started', {
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
       timestamp: new Date(),
     });
     await this.coordinator.applyDiff(diff);
     await refreshModuleCaches(this.lazyLoader);
-    emitEvent(this.eventBus,'sop:diff-completed', {
+    emitEvent(this.eventBus, 'sop:diff-completed', {
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
-      ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
+      ruleCount,
       timestamp: new Date(),
     });
-    emitEvent(this.eventBus,'sop:cache-synced', {
+    emitEvent(this.eventBus, 'sop:cache-synced', {
       type: 'diff',
       fromVersion: diff.fromVersion,
       toVersion: diff.version,
-      ruleCount: diff.added.length + diff.modified.length + diff.removed.length,
+      ruleCount,
       timestamp: new Date(),
     });
-    this.metrics.recordRulesApplied(
-      diff.added.length + diff.modified.length + diff.removed.length,
-      'diff',
-    );
+    this.metrics.recordRulesApplied(ruleCount, 'diff');
     await this.maintenance.run('diff');
   }
 
@@ -247,15 +245,18 @@ export class SopCacheManager {
    * 紧急更新（7.2 节）— 高危规则实时推送
    */
   async emergencyUpdate(rules: SopRule[]): Promise<void> {
-    emitEvent(this.eventBus,'sop:emergency-started', { count: rules.length, timestamp: new Date() });
+    emitEvent(this.eventBus, 'sop:emergency-started', {
+      count: rules.length,
+      timestamp: new Date(),
+    });
     await this.coordinator.emergencyUpdate(rules);
     await refreshModuleCaches(this.lazyLoader);
-    emitEvent(this.eventBus,'sop:emergency-completed', {
+    emitEvent(this.eventBus, 'sop:emergency-completed', {
       count: rules.length,
       ruleIds: rules.map((r) => r.id),
       timestamp: new Date(),
     });
-    emitEvent(this.eventBus,'sop:cache-synced', {
+    emitEvent(this.eventBus, 'sop:cache-synced', {
       type: 'emergency',
       ruleCount: rules.length,
       timestamp: new Date(),
@@ -288,8 +289,11 @@ export class SopCacheManager {
    */
   async clearCache(): Promise<void> {
     await this.coordinator.clearCache();
-    emitEvent(this.eventBus,'sop:cache-cleared', { cacheDir: this.cacheDir, timestamp: new Date() });
-    emitEvent(this.eventBus,'sop:cache-synced', { type: 'cleared', timestamp: new Date() });
+    emitEvent(this.eventBus, 'sop:cache-cleared', {
+      cacheDir: this.cacheDir,
+      timestamp: new Date(),
+    });
+    emitEvent(this.eventBus, 'sop:cache-synced', { type: 'cleared', timestamp: new Date() });
     this.metrics.recordCleanup(0, 0);
   }
 

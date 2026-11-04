@@ -30,29 +30,29 @@ export interface RuleContext {
   repoRoot: string;
 
   /** 目标文件列表（可选，为空时扫描整个项目） */
-  files?: string[];
+  files?: string[] | undefined;
 
   /** 治理域筛选（可选，仅评估该 domain 的规则） */
-  domain?: GovernanceDomain;
+  domain?: GovernanceDomain | undefined;
 
   /** 多域筛选（可选）。设置时按该集合过滤（如巡检含安全域 inspect+security）；
    *  优先于单值 {@link domain}。 */
-  domains?: GovernanceDomain[];
+  domains?: GovernanceDomain[] | undefined;
 
   /** 动作类型筛选（可选，仅评估该 action 的规则） */
-  action?: ActionType;
+  action?: ActionType | undefined;
 
   /** 是否干运行（不实际执行阻断） */
-  dryRun?: boolean;
+  dryRun?: boolean | undefined;
 
   /** 项目画像特征（可选）。存在时按画像裁剪规则集（security 域恒包含），实现按项目精准评估 */
-  projectFeature?: ProjectFeature;
+  projectFeature?: ProjectFeature | undefined;
 
   /** 附加参数（透传到适配器） */
   extra?: Record<string, unknown>;
 
   /** M1b 工具扫描缓存（可选）。仅 runner.evaluateAll 创建并注入；缺省时工具扫描不去重（保持旧行为） */
-  toolScanCache?: ToolScanCache;
+  toolScanCache?: ToolScanCache | undefined;
 
   /**
    * 各域结论快照（可选，《07》O8/C3）。
@@ -61,5 +61,5 @@ export interface RuleContext {
    * 改为读取本集合中供应商域（Owner）的既有结论判 pass/fail；缺该域结论 → skipped
    * （不判通过）。未注入（undefined）保持历史行为（工具派发），供存量调用方与单测使用。
    */
-  conclusions?: DomainConclusionSet;
+  conclusions?: DomainConclusionSet | undefined;
 }

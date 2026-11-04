@@ -136,7 +136,13 @@ export class BackupManager {
     const fileEntries: BackupFileEntry[] = [];
 
     for (const filePath of files) {
-      const result = await this.copyOneFile({ filePath, manifest, isFullBackup, backupDir, timestamp });
+      const result = await this.copyOneFile({
+        filePath,
+        manifest,
+        isFullBackup,
+        backupDir,
+        timestamp,
+      });
       if (result === null) {
         errors++;
         continue;
@@ -211,9 +217,9 @@ export class BackupManager {
     try {
       const sourcePath = safeJoinReal(backupDir, relativePath);
       const targetPath = safeJoinReal(restoreTo, relativePath);
-      
+
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      
+
       await fs.cp(sourcePath, targetPath, { preserveTimestamps: true });
       return true;
     } catch {
@@ -276,7 +282,6 @@ export class BackupManager {
     if (this.excludePatterns.some((p) => p.test(relativePath))) return;
 
     if (entry.isDirectory()) {
-      
       await this.walkFiles(fullPath, results, depth + 1);
       return;
     }
@@ -341,7 +346,8 @@ export class BackupManager {
 
   private async findLatestBackup(): Promise<string | null> {
     const dirs = await this.listBackups();
-    return dirs.length > 0 ? dirs[0] : null;
+    // 严格索引访问下首元素可能 undefined：取不到即视为"没有备份"
+    return dirs[0] ?? null;
   }
 
   /**

@@ -2,7 +2,8 @@
 export interface CounterMetric {
   name: string;
   value: number;
-  labels?: Record<string, string>;
+  /** 可选字段写 `?: T | undefined`：调用方按"有无标签"两种形态构造 */
+  labels?: Record<string, string> | undefined;
   timestamp: Date;
 }
 
@@ -10,7 +11,7 @@ export interface CounterMetric {
 export interface GaugeMetric {
   name: string;
   value: number;
-  labels?: Record<string, string>;
+  labels?: Record<string, string> | undefined;
   timestamp: Date;
 }
 
@@ -18,7 +19,7 @@ export interface GaugeMetric {
 export interface HistogramMetric {
   name: string;
   value: number;
-  labels?: Record<string, string>;
+  labels?: Record<string, string> | undefined;
   buckets: number[];
   timestamp: Date;
 }

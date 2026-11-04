@@ -24,8 +24,8 @@ export class OverrideMerger {
     let merged = target;
 
     // 如果有 target 级别的修正，合并到当前 target
-    if (overrides.targets?.[target.id]) {
-      const targetOverride = overrides.targets[target.id];
+    const targetOverride = overrides.targets?.[target.id];
+    if (targetOverride !== undefined) {
       if (targetOverride.language !== undefined) {
         merged = {
           ...merged,

@@ -52,7 +52,9 @@ export class DimensionMapper {
     return grouped;
   }
 
-  validateWeights(): { valid: boolean; sum: number; message?: string } {
+  // message 在「权重合法」时为 undefined：类型上写明「可能无值」，
+  // 而不是让调用方靠 `message?: string` 猜键是否存在。
+  validateWeights(): { valid: boolean; sum: number; message?: string | undefined } {
     const sum = this.config.dimensions.reduce((s, d) => s + d.weight, 0);
     const valid = Math.abs(sum - 1) < 0.001;
     return {

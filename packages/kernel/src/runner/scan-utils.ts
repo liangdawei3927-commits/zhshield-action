@@ -81,11 +81,12 @@ export function globToRegExp(pattern: string): RegExp {
     if (pattern.startsWith('**', i)) {
       out += '.*';
       i += 2;
-    } else if (pattern[i] === '*') {
+    } else if (pattern.charAt(i) === '*') {
       out += '[^/]*';
       i += 1;
     } else {
-      out += escapeRegExp(pattern[i]);
+      // charAt 越界返回空串（与"读到末尾"一致），下标访问则是 string | undefined
+      out += escapeRegExp(pattern.charAt(i));
       i += 1;
     }
   }
@@ -277,8 +278,10 @@ function scanLinesForPattern(params: ScanLinesForPatternParams): void {
   const { lines, regex, relativePath, rule, violations } = params;
   for (let i = 0; i < lines.length; i++) {
     let match: RegExpExecArray | null;
+    const rawLine = lines[i];
+    if (rawLine === undefined) continue;
     regex.lastIndex = 0;
-    while ((match = regex.exec(lines[i])) !== null) {
+    while ((match = regex.exec(rawLine)) !== null) {
       violations.push({
         id: randomUUID(),
         ruleId: rule.id,
@@ -355,7 +358,7 @@ export function scanForbiddenInFile(
     const isBareIdentifier = BARE_IDENTIFIER_RE.test(pattern);
     for (let i = 0; i < lines.length; i++) {
       scanLineForForbidden({
-        line: lines[i],
+        line: lines[i] ?? '',
         pattern,
         isBareIdentifier,
         relativePath,

@@ -84,7 +84,9 @@ export function evalGuardConclusion(
     );
   }
 
-  const floor = RULE_SEVERITY_FLOOR[rule.severity] ?? RULE_SEVERITY_FLOOR.info;
+  // RULE_SEVERITY_FLOOR.info 本身在严格索引访问下也是 possibly undefined：
+  // 取 floor 时显式兜底为 0（"不设下限"，即不过滤任何严重级）
+  const floor = RULE_SEVERITY_FLOOR[rule.severity] ?? RULE_SEVERITY_FLOOR.info ?? 0;
   const findings = issues.filter(
     (issue) => issue.toolError !== true && (CONCLUSION_RANK[issue.severity] ?? 0) >= floor,
   );

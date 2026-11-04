@@ -27,8 +27,9 @@ export function readPnpmWorkspacePatterns(projectRoot: string): string[] {
     }
     if (!inPackages) continue;
     const match = line.match(PNPM_WORKSPACE_RE);
-    if (match !== null) {
-      patterns.push(match[1]);
+    const pattern = match?.[1];
+    if (pattern !== undefined) {
+      patterns.push(pattern);
     } else if (line.trim().length > 0 && !line.startsWith(' ')) {
       break;
     }

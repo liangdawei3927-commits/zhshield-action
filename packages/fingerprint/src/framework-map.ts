@@ -35,7 +35,18 @@ const JS_TS_FRAMEWORK_KEYWORDS: readonly FrameworkKeyword[] = [
   { name: 'Strapi', keywords: ['@strapi/strapi'] },
 ];
 
-export const FRAMEWORK_KEYWORDS: Readonly<Record<LanguageId, readonly FrameworkKeyword[]>> = {
+/**
+ * 语言 → 框架关键词表。
+ *
+ * 键取 `LanguageId` 全集，值类型写成 `readonly FrameworkKeyword[] | undefined`：
+ * `Record<LanguageId, X>` 只保证"键齐全"，不保证"值非 undefined"；而在
+ * noUncheckedIndexedAccess 下，下标访问本来就返回 `X | undefined`。
+ * 把 undefined 写进类型，等于如实告诉调用方"这张表可能缺某个语言"，
+ * 由调用方决定回退策略（此处回退为空表 = 不产出该语言的框架信号）。
+ */
+export const FRAMEWORK_KEYWORDS: Readonly<
+  Record<LanguageId, readonly FrameworkKeyword[] | undefined>
+> = {
   javascript: JS_TS_FRAMEWORK_KEYWORDS,
   typescript: JS_TS_FRAMEWORK_KEYWORDS,
   python: [

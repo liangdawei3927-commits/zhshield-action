@@ -46,7 +46,7 @@ const COMPRESS_MIN_LENGTH = 100;
  */
 export class SopSqliteStore {
   private db: Database | null = null;
-  private readonly compressor?: SmartCompressor;
+  private readonly compressor?: SmartCompressor | undefined;
 
   constructor(
     private readonly dbPath: string,

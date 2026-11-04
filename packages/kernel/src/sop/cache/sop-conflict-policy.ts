@@ -28,11 +28,11 @@ function stableRuleProjection(rule: SopRule): Record<string, unknown> {
 export interface SopConflictPolicyOptions {
   registry: SopRegistry;
   /** 云端/本地规则冲突解决器（sync-conflict 模块接入点）；缺省时保持既有覆盖语义 */
-  resolver?: SyncConflictResolver;
+  resolver?: SyncConflictResolver | undefined;
   /** 冲突自动解决策略，默认 REMOTE_WINS（与既有「云端覆盖本地」行为一致） */
-  strategy?: ConflictResolution;
-  metrics?: SopCacheMetrics;
-  eventBus?: EventBus;
+  strategy?: ConflictResolution | undefined;
+  metrics?: SopCacheMetrics | undefined;
+  eventBus?: EventBus | undefined;
 }
 
 /**
@@ -43,10 +43,10 @@ export interface SopConflictPolicyOptions {
  */
 export class SopConflictPolicy {
   private readonly registry: SopRegistry;
-  private readonly resolver?: SyncConflictResolver;
+  private readonly resolver?: SyncConflictResolver | undefined;
   private readonly strategy: ConflictResolution;
-  private readonly metrics?: SopCacheMetrics;
-  private readonly eventBus?: EventBus;
+  private readonly metrics?: SopCacheMetrics | undefined;
+  private readonly eventBus?: EventBus | undefined;
 
   constructor(options: SopConflictPolicyOptions) {
     this.registry = options.registry;

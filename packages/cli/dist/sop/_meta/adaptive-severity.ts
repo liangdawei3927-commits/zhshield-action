@@ -25,9 +25,9 @@ export function severityRank(sev: string): number {
 /** 动态严重级解析的外部上下文（依赖注入，保持纯函数可测） */
 export interface AdaptiveContext {
   /** 该规则连续未通过（failed/error）的评估次数（由调用方计数器提供） */
-  consecutiveFailures?: number;
+  consecutiveFailures?: number | undefined;
   /** 项目健康基线分（@zh/scoring 注入；缺省 undefined = 基线升档关闭） */
-  healthBaseline?: number;
+  healthBaseline?: number | undefined;
 }
 
 /**

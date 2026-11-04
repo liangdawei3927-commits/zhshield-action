@@ -43,7 +43,13 @@ export class LocalBackupCopier {
 
     for (const file of files) {
       if (abortSignal?.aborted) break;
-      const entry = await copySingleFile(file, { backupDir, projectPath, timestamp, compress });
+      // exactOptionalPropertyTypes：compress 缺失时不要显式传 undefined
+      const entry = await copySingleFile(
+        file,
+        compress === undefined
+          ? { backupDir, projectPath, timestamp }
+          : { backupDir, projectPath, timestamp, compress },
+      );
       if (entry === null) {
         errors++;
         continue;
@@ -66,7 +72,7 @@ async function copySingleFile(
     const [hash, stat] = await Promise.all([hashFile(file), fs.stat(file)]);
     const storedAs = opts.compress ? `${relativePath}.gz` : relativePath;
     const targetPath = safeJoinReal(opts.backupDir, storedAs);
-    
+
     await fs.mkdir(path.dirname(targetPath), { recursive: true });
     if (opts.compress) {
       await pipeline(

@@ -70,7 +70,7 @@ export class BackupConfigManager {
   private globalConfig: BackupGlobalConfig;
   private globalConfigPath: string;
   /** 构造时显式传入的默认备份目录（显式注入优先于持久化文件，便于测试与程序化覆盖） */
-  private explicitDefaultBackupDir?: string;
+  private explicitDefaultBackupDir?: string | undefined;
 
   /**
    * @param globalConfig 全局默认配置（显式注入的 defaultBackupDir 优先于持久化文件）

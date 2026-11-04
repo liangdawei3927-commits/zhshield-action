@@ -201,9 +201,7 @@ export async function evalLayerBoundary(
     ['.ts', '.tsx', '.js', '.jsx'],
     instr.excludePatterns,
     (content, relativePath) => {
-      violations.push(
-        ...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }),
-      );
+      violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }));
     },
   );
 
@@ -251,8 +249,11 @@ function scanFileLayerBoundaries({
     importRegex.lastIndex = 0;
     let m: RegExpExecArray | null;
     // 一行可能有多条 import（如 `import a from 'x'; import b from 'y'`），逐条检查
-    while ((m = importRegex.exec(lines[i])) !== null) {
-      const imported = m[1] || m[2] || '';
+    const rawLine = lines[i];
+    if (rawLine === undefined) continue;
+    while ((m = importRegex.exec(rawLine)) !== null) {
+      // 捕获组在严格索引访问下可能 undefined：两个变体都取不到即跳过
+      const imported = m[1] ?? m[2] ?? '';
       if (!imported) continue;
       // 传**完整导入路径**：detectLayerByName 按目录段匹配层名，相对路径
       // （../services/user）与路径别名（@app/services/user）均能识别。

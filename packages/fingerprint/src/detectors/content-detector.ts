@@ -54,8 +54,9 @@ export class ContentDetector implements Detector {
       }
       sampled += 1;
       const shebang = head.match(SHEBANG_RE);
-      if (shebang !== null) {
-        const lang = shebangLanguage(shebang[1]);
+      const interpreter = shebang?.[1];
+      if (shebang !== null && interpreter !== undefined) {
+        const lang = shebangLanguage(interpreter);
         if (lang !== null) {
           signals.push(
             makeSignal({

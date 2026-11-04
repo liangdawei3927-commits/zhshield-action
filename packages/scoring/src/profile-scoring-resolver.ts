@@ -95,7 +95,9 @@ export function applyWeightDeltas(
   const sum = Object.values(adjusted).reduce((a, b) => a + b, 0);
   if (sum > 0) {
     for (const k of Object.keys(adjusted)) {
-      adjusted[k] = Math.round((adjusted[k] / sum) * 1e6) / 1e6;
+      const value = adjusted[k];
+      if (value === undefined) continue;
+      adjusted[k] = Math.round((value / sum) * 1e6) / 1e6;
     }
   }
   return adjusted;
@@ -112,7 +114,10 @@ export function applyDisabledDimensions(
   const activeSum = Object.values(adjusted).reduce((a, b) => a + b, 0);
   if (activeSum > 0) {
     for (const k of Object.keys(adjusted)) {
-      if (adjusted[k] > 0) adjusted[k] = Math.round((adjusted[k] / activeSum) * 1e6) / 1e6;
+      const value = adjusted[k];
+      if (value !== undefined && value > 0) {
+        adjusted[k] = Math.round((value / activeSum) * 1e6) / 1e6;
+      }
     }
   }
   return adjusted;

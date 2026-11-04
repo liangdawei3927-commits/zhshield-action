@@ -95,7 +95,9 @@ function countTruePositives(
 
   for (const det of detections) {
     for (let i = 0; i < assertions.length; i++) {
-      if (!matchedAssertionIndices.has(i) && matchesAssertion(det, assertions[i])) {
+      const assertion = assertions[i];
+      if (assertion === undefined) continue;
+      if (!matchedAssertionIndices.has(i) && matchesAssertion(det, assertion)) {
         matchedAssertionIndices.add(i);
         truePositives++;
         break;

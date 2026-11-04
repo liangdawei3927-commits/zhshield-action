@@ -40,7 +40,7 @@ export interface ProfileEventBus {
 export class ProfileStore {
   private readonly cache: Map<string, CacheEntry> = new Map();
   private readonly baseDir: string;
-  private readonly eventBus?: ProfileEventBus;
+  private readonly eventBus?: ProfileEventBus | undefined;
 
   constructor(baseDir?: string, eventBus?: ProfileEventBus) {
     this.baseDir = baseDir ?? path.join(os.homedir(), PROFILE_DIR, 'profiles');

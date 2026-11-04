@@ -52,15 +52,15 @@ function checkRequiredFile(
 
   const content = readFileSafe(filePath);
   if (content === null) {
-      violations.push(
-        makeRequiredViolation({
-          rule,
-          file: relativePath,
-          line: 0,
-          message: `缺少必需文件: ${item.path}`,
-          suggestion: `补充 ${item.path}`,
-        }),
-      );
+    violations.push(
+      makeRequiredViolation({
+        rule,
+        file: relativePath,
+        line: 0,
+        message: `缺少必需文件: ${item.path}`,
+        suggestion: `补充 ${item.path}`,
+      }),
+    );
     return violations;
   }
 
@@ -301,14 +301,16 @@ function scanJsdocInFile(
   const violations: Violation[] = [];
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    if (!compiled.some((re) => re.test(lines[i]))) continue;
+    const line = lines[i];
+    if (line === undefined) continue;
+    if (!compiled.some((re) => re.test(line))) continue;
     if (!hasPrecedingJsdoc(lines, i)) {
       violations.push(
         makeRequiredViolation({
           rule,
           file: relativePath,
           line: i + 1,
-          message: `导出声明缺少 JSDoc 注释: ${lines[i].trim().slice(0, 60)}`,
+          message: `导出声明缺少 JSDoc 注释: ${line.trim().slice(0, 60)}`,
           suggestion: '为导出的接口/类型补充 /** ... */ 文档注释',
         }),
       );
@@ -320,7 +322,9 @@ function scanJsdocInFile(
 /** 判定第 i 行（0 基）前是否有紧邻的 JSDoc 块：最近的非空行以块注释结束符结尾即视为已文档化 */
 function hasPrecedingJsdoc(lines: string[], index: number): boolean {
   for (let j = index - 1; j >= 0 && index - j <= 4; j--) {
-    const trimmed = lines[j].trim();
+    const raw = lines[j];
+    if (raw === undefined) continue;
+    const trimmed = raw.trim();
     if (!trimmed) continue;
     return trimmed.endsWith('*/');
   }

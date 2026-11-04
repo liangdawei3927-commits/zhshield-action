@@ -33,5 +33,5 @@ export interface GitHubApiContext {
   owner: string;
   repo: string;
   token: string;
-  abortSignal?: AbortSignal;
+  abortSignal?: AbortSignal | undefined;
 }

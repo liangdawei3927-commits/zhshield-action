@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 01ca0db83d20cf56
+// @zh-src-hash: b118c42a72506db6
 // @zh-src-files: 422
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -506736,11 +506736,11 @@ function globToRegExp2(pattern) {
     if (pattern.startsWith("**", i)) {
       out += ".*";
       i += 2;
-    } else if (pattern[i] === "*") {
+    } else if (pattern.charAt(i) === "*") {
       out += "[^/]*";
       i += 1;
     } else {
-      out += escapeRegExp(pattern[i]);
+      out += escapeRegExp(pattern.charAt(i));
       i += 1;
     }
   }
@@ -506877,8 +506877,10 @@ function scanLinesForPattern(params) {
   const { lines, regex, relativePath, rule, violations } = params;
   for (let i = 0; i < lines.length; i++) {
     let match;
+    const rawLine = lines[i];
+    if (rawLine === void 0) continue;
     regex.lastIndex = 0;
-    while ((match = regex.exec(lines[i])) !== null) {
+    while ((match = regex.exec(rawLine)) !== null) {
       violations.push({
         id: (0, import_node_crypto3.randomUUID)(),
         ruleId: rule.id,
@@ -506933,7 +506935,7 @@ function scanForbiddenInFile(content, relativePath, rule, patterns) {
     const isBareIdentifier = BARE_IDENTIFIER_RE.test(pattern);
     for (let i = 0; i < lines.length; i++) {
       scanLineForForbidden({
-        line: lines[i],
+        line: lines[i] ?? "",
         pattern,
         isBareIdentifier,
         relativePath,
@@ -508578,6 +508580,7 @@ function pickFreshestCache(input) {
   }
   const ranked = candidates.map((candidate) => ({ ...candidate, at: newestRuleMtime(candidate.dir) })).sort((a, b) => b.at - a.at);
   const chosen = ranked[0];
+  if (chosen === void 0) return { origin: "\u65E0\u53EF\u7528\u7F13\u5B58\u76EE\u5F55" };
   const other = ranked[1];
   const base = { dir: chosen.dir, origin: chosen.origin };
   if (!other) return base;
@@ -508739,13 +508742,15 @@ function loadRuleWhitelist(repoRoot) {
     }
     if (section !== "rule") continue;
     const ruleMatch = line.match(RULE_KEY_VALUE_RE);
-    if (ruleMatch) {
-      current = { ruleId: ruleMatch[1], pattern: "" };
+    const ruleId = ruleMatch?.[1];
+    if (ruleId !== void 0) {
+      current = { ruleId, pattern: "" };
       entries.push(current);
       continue;
     }
     const patternMatch = line.match(PATTERN_KEY_VALUE_RE);
-    if (patternMatch && current) current.pattern = patternMatch[1];
+    const pattern = patternMatch?.[1];
+    if (pattern !== void 0 && current) current.pattern = pattern;
   }
   return entries;
 }
@@ -508838,22 +508843,22 @@ function stripLine(line, inTemplate) {
       inTemplate = next.inTemplate;
       continue;
     }
-    if (line[i] === "/" && line[i + 1] === "/") break;
-    if (line[i] === "/" && line[i + 1] === "*") {
+    const ch = line.charAt(i);
+    if (ch === "/" && line.charAt(i + 1) === "/") break;
+    if (ch === "/" && line.charAt(i + 1) === "*") {
       i = indexOfBlockCommentEnd(line, i + 2) + 2;
       continue;
     }
-    if (line[i] === "'" || line[i] === '"') {
-      const q = line[i];
-      i = indexAfterClosingQuote(line, i + 1, q);
+    if (ch === "'" || ch === '"') {
+      i = indexAfterClosingQuote(line, i + 1, ch);
       continue;
     }
-    if (line[i] === "`") {
+    if (ch === "`") {
       inTemplate = true;
       i++;
       continue;
     }
-    result += line[i];
+    result += ch;
     i++;
   }
   return { result, inTemplate };
@@ -508879,6 +508884,7 @@ function scanForbiddenRegexInFile(content, relativePath, rule, compiled) {
   for (const item of compiled) {
     for (let i = 0; i < lines.length; i++) {
       const stripped = lines[i];
+      if (stripped === void 0) continue;
       forEachGlobalMatch(item.regex, stripped, (match) => {
         violations.push({
           id: (0, import_node_crypto4.randomUUID)(),
@@ -509093,14 +509099,16 @@ function scanJsdocInFile(content, relativePath, rule, compiled) {
   const violations = [];
   const lines = content.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    if (!compiled.some((re) => re.test(lines[i]))) continue;
+    const line = lines[i];
+    if (line === void 0) continue;
+    if (!compiled.some((re) => re.test(line))) continue;
     if (!hasPrecedingJsdoc(lines, i)) {
       violations.push(
         makeRequiredViolation({
           rule,
           file: relativePath,
           line: i + 1,
-          message: `\u5BFC\u51FA\u58F0\u660E\u7F3A\u5C11 JSDoc \u6CE8\u91CA: ${lines[i].trim().slice(0, 60)}`,
+          message: `\u5BFC\u51FA\u58F0\u660E\u7F3A\u5C11 JSDoc \u6CE8\u91CA: ${line.trim().slice(0, 60)}`,
           suggestion: "\u4E3A\u5BFC\u51FA\u7684\u63A5\u53E3/\u7C7B\u578B\u8865\u5145 /** ... */ \u6587\u6863\u6CE8\u91CA"
         })
       );
@@ -509110,7 +509118,9 @@ function scanJsdocInFile(content, relativePath, rule, compiled) {
 }
 function hasPrecedingJsdoc(lines, index) {
   for (let j = index - 1; j >= 0 && index - j <= 4; j--) {
-    const trimmed = lines[j].trim();
+    const raw = lines[j];
+    if (raw === void 0) continue;
+    const trimmed = raw.trim();
     if (!trimmed) continue;
     return trimmed.endsWith("*/");
   }
@@ -509225,9 +509235,7 @@ async function evalLayerBoundary(rule, instr, context) {
     [".ts", ".tsx", ".js", ".jsx"],
     instr.excludePatterns,
     (content, relativePath) => {
-      violations.push(
-        ...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap })
-      );
+      violations.push(...scanFileLayerBoundaries({ content, relativePath, rule, instr, layerMap }));
     }
   );
   return {
@@ -509263,8 +509271,10 @@ function scanFileLayerBoundaries({
   for (let i = 0; i < lines.length; i++) {
     importRegex.lastIndex = 0;
     let m;
-    while ((m = importRegex.exec(lines[i])) !== null) {
-      const imported = m[1] || m[2] || "";
+    const rawLine = lines[i];
+    if (rawLine === void 0) continue;
+    while ((m = importRegex.exec(rawLine)) !== null) {
+      const imported = m[1] ?? m[2] ?? "";
       if (!imported) continue;
       const targetLayer = detectLayerByName(imported, instr.layers);
       if (targetLayer && !layerMap.get(fileLayer)?.allowedDeps.includes(targetLayer)) {
@@ -509464,7 +509474,7 @@ function evalGuardConclusion(rule, instr, context) {
       "guard"
     );
   }
-  const floor = RULE_SEVERITY_FLOOR[rule.severity] ?? RULE_SEVERITY_FLOOR.info;
+  const floor = RULE_SEVERITY_FLOOR[rule.severity] ?? RULE_SEVERITY_FLOOR.info ?? 0;
   const findings = issues.filter(
     (issue) => issue.toolError !== true && (CONCLUSION_RANK[issue.severity] ?? 0) >= floor
   );
@@ -509820,9 +509830,12 @@ async function prefetchToolBatches(params) {
   if (BATCH_DISABLED || !cache || rules.length < 2) return 0;
   const candidates = collectCandidates(rules, interpret, cache);
   if (candidates.length < 2) return 0;
-  const adapter = host.toolAdapters.get(candidates[0].instr.tool);
+  const first = candidates[0];
+  if (first === void 0) return 0;
+  const toolId = first.instr.tool;
+  const adapter = host.toolAdapters.get(toolId);
   if (!adapter || typeof adapter.scanBatch !== "function") return 0;
-  if (host.toolScope && !host.toolScope(candidates[0].instr.tool)) return 0;
+  if (host.toolScope && !host.toolScope(toolId)) return 0;
   try {
     if (!await adapter.isAvailable()) return 0;
     const results = await withToolScanHardTimeout(
@@ -510020,7 +510033,7 @@ var SopRuleEngine = class {
     this.evalDepth += 1;
     try {
       this.projectFeature = context.projectFeature;
-      const rules = this.filterRulesByContext(context);
+      const rules = filterRulesByContext(this.registry, context);
       const evaluations = rules.length === 0 ? [] : await this.evaluateAll(rules, context, nested);
       const report = aggregate(evaluations, Date.now() - start);
       if (context.projectFeature) {
@@ -510031,9 +510044,6 @@ var SopRuleEngine = class {
     } finally {
       this.evalDepth -= 1;
     }
-  }
-  filterRulesByContext(context) {
-    return filterRulesByContext(this.registry, context);
   }
   async evaluateAll(rules, context, nested) {
     if (rules.length === 0) return [];
@@ -510051,7 +510061,9 @@ var SopRuleEngine = class {
       while (true) {
         const index = next++;
         if (index >= rules.length) return;
-        evaluations[index] = await this.evaluateSingleRule(rules[index], context, nested);
+        const rule = rules[index];
+        if (rule === void 0) return;
+        evaluations[index] = await this.evaluateSingleRule(rule, context, nested);
       }
     };
     await Promise.all(Array.from({ length: maxConcurrency }, () => worker()));
@@ -510130,7 +510142,7 @@ var SopRuleEngine = class {
         timestamp: /* @__PURE__ */ new Date()
       };
     }
-    const resolved = instruction.type === "threshold" ? await applyRuleMetrics(this.metricsProvider, rule, context, (msg) => this.logger.warn(msg)) : context;
+    const resolved = instruction.type === "threshold" ? await applyRuleMetrics(this.metricsProvider, rule, context, (m) => this.logger.warn(m)) : context;
     return evaluator(rule, instruction, resolved);
   }
   // ─── 辅助 ──────────────────────────────────────────────
@@ -519327,7 +519339,15 @@ var AGGREGATOR_EXTENSION_KEYS = [
   "swift"
 ];
 var AGGREGATOR_EXTENSION_LANGUAGES = Object.freeze(
-  Object.fromEntries(AGGREGATOR_EXTENSION_KEYS.map((ext) => [ext, EXTENSION_LANGUAGES[ext]]))
+  Object.fromEntries(
+    // 扩展名 → 语言是开放映射（EXTENSION_LANGUAGES 覆盖不全时该扩展名无对应语言）。
+    // 严格索引访问下取值为 LanguageId | undefined：过滤掉无映射的扩展名，
+    // 而不是把 undefined 写进 Record（那会让"查不到语言"变成"语言是 undefined"）。
+    AGGREGATOR_EXTENSION_KEYS.flatMap((ext) => {
+      const lang = EXTENSION_LANGUAGES[ext];
+      return lang === void 0 ? [] : [[ext, lang]];
+    })
+  )
 );
 
 // ../fingerprint/src/profile-store.ts
@@ -519442,13 +519462,14 @@ init_src2();
 init_src2();
 
 // ../fingerprint/src/detectors/manifest-detector.ts
-var JS_FRAMEWORKS = [{ language: "javascript", frameworks: FRAMEWORK_KEYWORDS2.javascript }];
-var PYTHON_FRAMEWORKS = [{ language: "python", frameworks: FRAMEWORK_KEYWORDS2.python }];
-var JAVA_FRAMEWORKS = [{ language: "java", frameworks: FRAMEWORK_KEYWORDS2.java }];
-var GO_FRAMEWORKS = [{ language: "go", frameworks: FRAMEWORK_KEYWORDS2.go }];
-var RUST_FRAMEWORKS = [{ language: "rust", frameworks: FRAMEWORK_KEYWORDS2.rust }];
-var PHP_FRAMEWORKS = [{ language: "php", frameworks: FRAMEWORK_KEYWORDS2.php }];
-var RUBY_FRAMEWORKS = [{ language: "ruby", frameworks: FRAMEWORK_KEYWORDS2.ruby }];
+var frameworksOf = (language) => FRAMEWORK_KEYWORDS2[language] ?? [];
+var JS_FRAMEWORKS = [{ language: "javascript", frameworks: frameworksOf("javascript") }];
+var PYTHON_FRAMEWORKS = [{ language: "python", frameworks: frameworksOf("python") }];
+var JAVA_FRAMEWORKS = [{ language: "java", frameworks: frameworksOf("java") }];
+var GO_FRAMEWORKS = [{ language: "go", frameworks: frameworksOf("go") }];
+var RUST_FRAMEWORKS = [{ language: "rust", frameworks: frameworksOf("rust") }];
+var PHP_FRAMEWORKS = [{ language: "php", frameworks: frameworksOf("php") }];
+var RUBY_FRAMEWORKS = [{ language: "ruby", frameworks: frameworksOf("ruby") }];
 
 // ../fingerprint/src/projection.ts
 function toFeatureFromProfile(profile) {

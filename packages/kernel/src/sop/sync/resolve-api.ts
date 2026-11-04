@@ -88,7 +88,7 @@ export function readApiToken(): string {
 interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   endpoint: string;
-  apiBaseOverride?: string;
+  apiBaseOverride?: string | undefined;
   /** 单次请求超时（ms） */
   timeoutMs: number;
   body?: Record<string, unknown>;
@@ -148,7 +148,14 @@ async function apiDelete<T>(
   body?: Record<string, unknown>,
   apiBaseOverride?: string,
 ): Promise<T> {
-  return apiRequest<T>({ method: 'DELETE', endpoint, apiBaseOverride, timeoutMs: 10_000, body });
+  // exactOptionalPropertyTypes：可选参数缺失时不要显式传 undefined
+  return apiRequest<T>({
+    method: 'DELETE',
+    endpoint,
+    timeoutMs: 10_000,
+    ...(apiBaseOverride !== undefined ? { apiBaseOverride } : {}),
+    ...(body !== undefined ? { body } : {}),
+  });
 }
 
 // ─── 公开 API ─────────────────────────────────────────────────

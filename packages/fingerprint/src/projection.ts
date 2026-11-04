@@ -15,14 +15,15 @@ import type { ProjectProfile } from './types';
  *
  * kernel 侧定义：`packages/kernel/src/sop/_meta/sop-types.ts` :204
  * ```ts
- * interface ProjectFeature { framework?: string; language?: string; features: string[] }
+ * interface ProjectFeature { framework?: string | undefined; language?: string | undefined; features: string[] }
  * ```
  *
  * 本接口与之结构完全一致，可直接赋值给 `ProjectFeature`。
  */
 export interface ProjectFeatureLike {
-  framework?: string;
-  language?: string;
+  /** 可选字段写 `?: T | undefined`：投影结果中「未识别」本就以 undefined 表达 */
+  framework?: string | undefined;
+  language?: string | undefined;
   features: string[];
 }
 

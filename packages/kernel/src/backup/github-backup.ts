@@ -170,6 +170,8 @@ export class GitHubBackup {
     options: RequestInit = {},
     abortSignal?: AbortSignal,
   ): Promise<T> {
+    // exactOptionalPropertyTypes 下 RequestInit.signal 不接受显式 undefined ——
+    // 用条件展开而非 `signal: abortSignal`（后者在无取消信号时传 undefined，类型上非法）。
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -178,7 +180,7 @@ export class GitHubBackup {
         'User-Agent': 'zhshield-backup',
         ...(options.headers as Record<string, string>),
       },
-      signal: abortSignal,
+      ...(abortSignal !== undefined ? { signal: abortSignal } : {}),
     });
 
     if (!response.ok) {

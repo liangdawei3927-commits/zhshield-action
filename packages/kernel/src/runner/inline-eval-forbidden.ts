@@ -50,13 +50,15 @@ function loadRuleWhitelist(repoRoot: string): WhitelistRuleEntry[] {
     }
     if (section !== 'rule') continue;
     const ruleMatch = line.match(RULE_KEY_VALUE_RE);
-    if (ruleMatch) {
-      current = { ruleId: ruleMatch[1], pattern: '' };
+    const ruleId = ruleMatch?.[1];
+    if (ruleId !== undefined) {
+      current = { ruleId, pattern: '' };
       entries.push(current);
       continue;
     }
     const patternMatch = line.match(PATTERN_KEY_VALUE_RE);
-    if (patternMatch && current) current.pattern = patternMatch[1];
+    const pattern = patternMatch?.[1];
+    if (pattern !== undefined && current) current.pattern = pattern;
   }
   return entries;
 }
@@ -72,8 +74,8 @@ function isRuleWhitelisted(
 
 /** forbidden / forbidden-regex 共用的指令投影（仅需文件过滤与排除模式） */
 interface ForbiddenScanScope {
-  fileExts?: string[];
-  excludePatterns?: string[];
+  fileExts?: string[] | undefined;
+  excludePatterns?: string[] | undefined;
 }
 
 export async function evalForbidden(
@@ -107,7 +109,8 @@ async function scanForbiddenScope(
     status: violations.length === 0 ? 'passed' : 'failed',
     violations,
     files: [...new Set(violations.map((v) => v.file))],
-    message: violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
+    message:
+      violations.length > 0 ? `发现 ${violations.length} 处禁止模式 (${rule.id})` : undefined,
     durationMs: 0,
     targetEngine: 'inspect',
     timestamp: new Date(),
@@ -209,23 +212,25 @@ function stripLine(line: string, inTemplate: boolean): StripLineResult {
       inTemplate = next.inTemplate;
       continue;
     }
-    if (line[i] === '/' && line[i + 1] === '/') break;
-    if (line[i] === '/' && line[i + 1] === '*') {
+    // 逐字符扫描：用 charAt 而非下标 —— noUncheckedIndexedAccess 下 line[i] 是
+    // string | undefined，而 charAt 越界返回空串，语义与"读到末尾"一致。
+    const ch = line.charAt(i);
+    if (ch === '/' && line.charAt(i + 1) === '/') break;
+    if (ch === '/' && line.charAt(i + 1) === '*') {
       i = indexOfBlockCommentEnd(line, i + 2) + 2;
       continue;
     }
-    if (line[i] === "'" || line[i] === '"') {
-      const q = line[i];
-      i = indexAfterClosingQuote(line, i + 1, q);
+    if (ch === "'" || ch === '"') {
+      i = indexAfterClosingQuote(line, i + 1, ch);
       continue;
     }
-    if (line[i] === '`') {
+    if (ch === '`') {
       // 进入模板字符串：若同行未闭合则状态延续至后续行
       inTemplate = true;
       i++;
       continue;
     }
-    result += line[i];
+    result += ch;
     i++;
   }
   return { result, inTemplate };
@@ -277,6 +282,7 @@ function scanForbiddenRegexInFile(
   for (const item of compiled) {
     for (let i = 0; i < lines.length; i++) {
       const stripped = lines[i];
+      if (stripped === undefined) continue;
       forEachGlobalMatch(item.regex, stripped, (match) => {
         violations.push({
           id: randomUUID(),

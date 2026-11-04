@@ -62,7 +62,7 @@ function aggregateServes(rules: SopRule[]): SopServes {
 export class SopRegistry {
   private rules = new Map<string, SopRule>();
   private index = new RuleIndex();
-  private eventBus?: EventBus;
+  private eventBus?: EventBus | undefined;
 
   constructor(eventBus?: EventBus) {
     this.eventBus = eventBus;

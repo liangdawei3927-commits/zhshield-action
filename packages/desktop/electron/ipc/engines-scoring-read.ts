@@ -22,7 +22,6 @@ import {
   cacheProfile,
   collectScoringDimensions,
   collectScoringInputs,
-  probeProjectProfile,
 } from './engines-scoring';
 
 export async function getScoreHandler(

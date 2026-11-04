@@ -36,9 +36,9 @@ export interface ToolRuleVersion {
 export interface ToolRuleSyncResult {
   toolId: ToolId;
   updated: boolean;
-  reason?: 'already_latest' | 'network_error' | 'hash_mismatch' | 'write_error';
-  fromVersion?: string;
-  toVersion?: string;
+  reason?: 'already_latest' | 'network_error' | 'hash_mismatch' | 'write_error' | undefined;
+  fromVersion?: string | undefined;
+  toVersion?: string | undefined;
 }
 
 /** 待写入的工具规则文件：文件名 + 文本内容（参与 hashToolRuleFiles 的哈希计算） */

@@ -49,7 +49,11 @@ function describeError(err: unknown): string {
 function offlineResult(): SopFetchResult<SopVersion> {
   return {
     ok: false,
-    failure: { kind: 'network_error', url: '(scheduler)', detail: '调度器判定当前离线，未发起请求' },
+    failure: {
+      kind: 'network_error',
+      url: '(scheduler)',
+      detail: '调度器判定当前离线，未发起请求',
+    },
   };
 }
 
@@ -75,7 +79,7 @@ function applyFailure(detail: string, cause?: string): SyncResult {
 export interface SopSyncCoordinatorOptions {
   registry: SopRegistry;
   clientVersion: string;
-  eventBus?: EventBus;
+  eventBus?: EventBus | undefined;
   sqliteStore: SopSqliteStore;
   versionStore: SopVersionStore;
   syncClient: SopSyncClient;
@@ -97,7 +101,7 @@ export interface SopSyncCoordinatorOptions {
 export class SopSyncCoordinator {
   private registry: SopRegistry;
   private clientVersion: string;
-  private eventBus?: EventBus;
+  private eventBus?: EventBus | undefined;
   private sqliteStore: SopSqliteStore;
   private versionStore: SopVersionStore;
   private syncClient: SopSyncClient;
@@ -390,7 +394,10 @@ function isCompatibleClient(clientVersion: string, requiredVersion: string): boo
 
 function extractMajor(version: string): number | null {
   const match = MAJOR_VERSION.exec(version);
-  return match ? parseInt(match[1], 10) : null;
+  // 捕获组在严格索引访问下可能 undefined：取不到即视为"无法解析主版本号"
+  const raw = match?.[1];
+  if (raw === undefined) return null;
+  return parseInt(raw, 10);
 }
 
 /** 验证版本连续性：本地版本须等于 diff.fromVersion，且内容哈希须与下发 metadata.hash 一致，否则抛错 */

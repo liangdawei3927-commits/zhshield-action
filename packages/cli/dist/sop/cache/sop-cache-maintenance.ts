@@ -33,9 +33,9 @@ export interface SopCacheMaintenanceOptions {
   sqliteStore: SopSqliteStore;
   versionStore: SopVersionStore;
   cleanup: DataCleanup;
-  cleanupConfig?: Partial<CleanupConfig>;
-  metrics?: SopCacheMetrics;
-  eventBus?: EventBus;
+  cleanupConfig?: Partial<CleanupConfig> | undefined;
+  metrics?: SopCacheMetrics | undefined;
+  eventBus?: EventBus | undefined;
 }
 
 /**
@@ -52,8 +52,8 @@ export class SopCacheMaintenance {
   private readonly sqliteStore: SopSqliteStore;
   private readonly versionStore: SopVersionStore;
   private readonly cleanup: DataCleanup;
-  private readonly metrics?: SopCacheMetrics;
-  private readonly eventBus?: EventBus;
+  private readonly metrics?: SopCacheMetrics | undefined;
+  private readonly eventBus?: EventBus | undefined;
   private readonly config: Required<CleanupConfig>;
 
   constructor(options: SopCacheMaintenanceOptions) {

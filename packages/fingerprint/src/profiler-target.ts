@@ -37,9 +37,9 @@ export class TargetBuilder {
     frameworks: readonly MatchResult<string>[],
     primaryForm: FormCandidate | undefined,
   ): string {
-    return [language.value, frameworks.length > 0 ? frameworks[0].value : '*', primaryForm?.form ?? '*'].join(
-      ':',
-    );
+    // frameworks[0] 在严格索引访问下可能越界：取首个存在的框架，否则用 '*' 占位
+    const firstFramework = frameworks[0]?.value ?? '*';
+    return [language.value, firstFramework, primaryForm?.form ?? '*'].join(':');
   }
 
   private buildProductForm(primaryForm: FormCandidate | undefined):

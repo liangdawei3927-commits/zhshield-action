@@ -3,22 +3,22 @@
   "updatedAt": "2026-11-04",
   "migrated": [
     "db",
+    "fingerprint",
+    "kernel",
     "performance",
     "refactor",
+    "scoring",
     "security"
   ],
-  "maxPending": 12,
+  "maxPending": 9,
   "pendingBaseline": [
     "cli",
     "dependency",
     "desktop",
-    "fingerprint",
     "guard",
     "inspect",
-    "kernel",
     "pipeline",
     "reporter",
-    "scoring",
     "sentinel",
     "server"
   ],

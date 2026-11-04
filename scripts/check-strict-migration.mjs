@@ -61,8 +61,13 @@ function strictErrorCount(pkg) {
     );
     return 0;
   } catch (err) {
+    // **必须同时数 stdout 和 stderr**：tsc 的类型诊断默认写到 stdout（只有部分场景
+    // 如 tsc 自身崩溃才写 stderr）。早期版本只数 stderr，导致任何编译失败的包都被
+    // 判成「0 错误」而放行 —— 门禁形同虚设（kernel 迁包后实测漏判 8 个 error）。
     const stderr = err.stderr?.toString() ?? '';
-    return stderr.split('\n').filter((l) => l.includes('error TS')).length;
+    const stdout = err.stdout?.toString() ?? '';
+    const count = (s) => s.split('\n').filter((l) => l.includes('error TS')).length;
+    return count(stderr) + count(stdout);
   }
 }
 
@@ -107,6 +112,16 @@ function main() {
     const errs = strictErrorCount(pkg);
     if (errs !== 0) {
       problems.push(`${pkg}: 清单标记为已合规，但严格类型检查未通过（${errs} 个错误）`);
+    }
+  }
+
+  // ④ 被移出清单的包（compliant）也必须通过严格检查 —— 防止「迁完又退回」而不被发现。
+  // 这一条曾经只写在文档里而没有实现：compliant 包完全不被检查，任何人往它们的
+  // tsconfig 里加回 "noUncheckedIndexedAccess": false 都不会被门禁拦下。
+  for (const pkg of compliant) {
+    const errs = strictErrorCount(pkg);
+    if (errs !== 0) {
+      problems.push(`${pkg}: 已合规包严格类型检查未通过（${errs} 个错误），不得迁回待迁移状态`);
     }
   }
 

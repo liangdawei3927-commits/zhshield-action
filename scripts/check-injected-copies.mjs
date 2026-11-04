@@ -26,7 +26,9 @@
  * 退出码: 0 一致 / 1 发现不同步
  */
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -72,18 +74,61 @@ function diffTree(pkgDir, real, tree) {
   return { status: missing.length > 0 ? 'missing-files' : 'ok', missing };
 }
 
-/** 目录内最新 mtime（毫秒）；不存在返回 0 */
-function newestMtime(dir) {
-  let newest = 0;
-  if (!fs.existsSync(dir)) return newest;
-  for (const file of listFiles(dir)) {
-    try {
-      newest = Math.max(newest, fs.statSync(path.join(dir, file)).mtimeMs);
-    } catch {
-      // 并发删改的文件忽略即可
-    }
+/**
+ * 判断「签入的 dist 是否确实是当前 src 编译出来的」——**按内容，不按时间戳**。
+ *
+ * 为什么不能按 mtime：git checkout / stash / apply 会 bump 源文件 mtime，而产物内容
+ * 并没有变。此时 mtime 比较会报「dist 落后 5000s」，但强制重建后逐字节比对显示
+ * dist 与 src 完全一致 —— 纯假警报。更糟的是它会训练人忽略这条提醒，
+ * 真正「dist 缺文件」时反而被一起无视（2026-11-04 实测）。
+ *
+ * 做法：用 tsc 把当前 src 编译到临时目录，再与当前 dist 比内容。
+ * 只有内容真的不一致才算「过期」—— 判据从「猜」变成「实测」。
+ *
+ * ⚠️ 比对方向必须是「**src 有而 dist 没有**」（missing from dist），不是反向。
+ * dist 里多出来的文件是**本地构建残留**（源文件已删、产物没清），对下游无害：
+ * 下游只按需 import，多余文件不会被加载。反过来漏掉的文件才是真事故 ——
+ * 「新增的模块没有产物」正是 Cannot find module 的根因。
+ */
+function distMatchesSrc(pkgDir) {
+  const srcDir = path.join('packages', pkgDir, 'src');
+  const distDir = path.join('packages', pkgDir, 'dist');
+  if (!fs.existsSync(srcDir) || !fs.existsSync(distDir)) return null; // 判不了，不报警
+  const tsconfig = path.join('packages', pkgDir, 'tsconfig.json');
+  if (!fs.existsSync(tsconfig)) return null;
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `zhcs-${pkgDir}-`));
+  try {
+    // --outDir 覆盖 tsconfig 里的 outDir；composite 关掉以免写 tsbuildinfo 到源目录。
+    execFileSync(
+      'npx',
+      ['tsc', '-p', tsconfig, '--outDir', tmpDir, '--composite', 'false', '--declaration', 'false', '--declarationMap', 'false'],
+      { cwd: process.cwd(), stdio: 'pipe', timeout: 300000 },
+    );
+  } catch {
+    // 编译不过（存量类型错误等）→ 判不了，不报警 —— 编译错误由 typecheck 门禁负责。
+    return null;
   }
-  return newest;
+
+  // 只比对 .js（.d.ts/.map 由声明/映射策略决定，跨包可能合法不同）
+  const jsFiles = (dir) => listFiles(dir).filter((f) => f.endsWith('.js'));
+  const tmpJs = new Set(jsFiles(tmpDir));
+  const distJs = new Set(jsFiles(distDir));
+  // src 编译得出、但 dist 里没有 ⇒ 产物缺失，下游 import 会炸
+  const missing = [...tmpJs].filter((f) => !distJs.has(f));
+  if (missing.length > 0) return { status: 'missing', missing };
+  const changed = [...tmpJs].filter((f) => {
+    try {
+      return (
+        fs.readFileSync(path.join(distDir, f)).toString() !==
+        fs.readFileSync(path.join(tmpDir, f)).toString()
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (changed.length > 0) return { status: 'changed', changed };
+  return { status: 'ok' };
 }
 
 /** 受校验的两棵树：types 走 src、运行时代码走 dist，缺任一棵都会造成假象 */
@@ -136,13 +181,16 @@ for (const pkg of pkgs) {
       });
     }
 
-    // 附加提醒（不阻断）：源 dist 比源 src 旧 ⇒ 下游跑测试/构建会用到过期产物。
+    // 附加提醒（不阻断）：签入的 dist 与当前 src 编译结果不一致 ⇒ 下游跑测试/构建会用到过期产物。
     // 2026-11-04 实锤：这条不提醒时，`dist` 缺文件要等 desktop 的 vitest 起不来才暴露，
     // 且报错是 "Cannot find module './xxx'"，完全不指向真因。
-    const srcNewest = newestMtime(path.join('packages', pkgDir, 'src'));
-    const distNewest = newestMtime(path.join('packages', pkgDir, 'dist'));
-    if (srcNewest > 0 && distNewest > 0 && srcNewest > distNewest && !staleDists.has(pkgDir)) {
-      staleDists.set(pkgDir, { consumer: pkg, srcNewest, distNewest });
+    //
+    // 判据是**内容比对**（tsc 重编译后逐文件 diff），不是 mtime —— 见 distMatchesSrc 的说明。
+    if (!staleDists.has(pkgDir)) {
+      const verdict = distMatchesSrc(pkgDir);
+      if (verdict && verdict.status !== 'ok') {
+        staleDists.set(pkgDir, { consumer: pkg, verdict });
+      }
     }
   }
 }
@@ -153,10 +201,14 @@ if (checkedCount === 0) {
 }
 
 if (staleDists.size > 0) {
-  console.error('⚠️  以下包的源 dist 比 src 旧（下游会用到过期产物，改完记得 pnpm --filter <pkg> build）：');
+  console.error('⚠️  以下包的签入 dist 与当前 src 编译结果不一致（下游会用到过期产物，改完记得 pnpm --filter <pkg> build）：');
   for (const [pkgDir, info] of staleDists) {
-    const lagSec = Math.round((info.srcNewest - info.distNewest) / 1000);
-    console.error(`    packages/${pkgDir}（dist 落后 ${lagSec}s，消费者 ${info.consumer}）`);
+    const v = info.verdict;
+    const detail =
+      v.status === 'missing'
+        ? `dist 缺少 ${v.missing.length} 个产物（如 ${v.missing.slice(0, 2).join(', ')}）`
+        : `dist 有 ${v.changed.length} 个文件内容不同`;
+    console.error(`    packages/${pkgDir}（${detail}，消费者 ${info.consumer}）`);
   }
 }
 

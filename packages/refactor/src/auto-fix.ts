@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import type { CodeSmell, TextEdit, Fix, FixResult } from './types';
+import { atomicWriteFileSync } from './auto-fix-apply';
 
 type FixGenerator = (smell: CodeSmell, sourceDir: string) => Fix | null;
 
@@ -238,14 +239,14 @@ function applyEditsToFile(filePath: string, edits: TextEdit[]): { fixed: number;
       content = result.content;
       changed = true;
       if (result.wroteFile) {
-        fs.writeFileSync(filePath, content, 'utf-8');
+        atomicWriteFileSync(filePath, content);
         persisted = content;
       }
     }
     // 无实际改动时不得落盘，否则未命中的文件会被无谓重写并计入 fixed，
     // 使 applyFixes().fixed 超过真正被修复的文件数（fixed 的语义是「文件数」）。
     if (!changed) return { fixed: 0 };
-    if (content !== persisted) fs.writeFileSync(filePath, content, 'utf-8');
+    if (content !== persisted) atomicWriteFileSync(filePath, content);
     return { fixed: 1 };
   } catch (e: unknown) {
     return { fixed: 0, error: e instanceof Error ? e.message : String(e) };

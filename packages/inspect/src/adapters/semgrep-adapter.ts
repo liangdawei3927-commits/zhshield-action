@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   ToolAdapter,
@@ -9,6 +8,7 @@ import type {
   IssueCategory,
   AccessScope,
 } from '@zh/shared';
+import { resolveSourceScanTarget } from '@zh/shared';
 import { isCommandAvailable } from './tool-available';
 import { buildAccessScope, ToolCommandResolver } from './tool-runner';
 import { resolveInjectedConfigPath } from './injected-config';
@@ -211,9 +211,7 @@ export class SemgrepAdapter implements ToolAdapter {
     const configs = declaredConfigs
       .map((c) => resolveInjectedConfigPath(c, projectPath, projectPath))
       .filter((p): p is string => p !== null);
-    const rules = isSemgrepRuleArray(options.config?.rules)
-      ? options.config.rules
-      : undefined;
+    const rules = isSemgrepRuleArray(options.config?.rules) ? options.config.rules : undefined;
     return { targetDir, category, configs, declaredConfigs, rules };
   }
 
@@ -245,28 +243,9 @@ export class SemgrepAdapter implements ToolAdapter {
 
   /** 目标目录解析：src → packages → 项目根；容器根项目下探嵌套代码仓库的 packages 目录，避免全量扫描 */
   private resolveTargetDir(projectPath: string): string {
-    projectPath = path.resolve(projectPath);
-    const srcDir = path.join(projectPath, 'src');
-    if (fs.existsSync(srcDir)) return srcDir;
-    const packagesDir = path.join(projectPath, 'packages');
-    if (fs.existsSync(packagesDir)) return packagesDir;
-
-    try {
-      for (const entry of fs.readdirSync(projectPath, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        if (entry.name === 'node_modules') continue;
-        const child = path.join(projectPath, entry.name);
-        if (
-          fs.existsSync(path.join(child, 'package.json')) &&
-          fs.existsSync(path.join(child, 'packages'))
-        ) {
-          return path.join(child, 'packages');
-        }
-      }
-    } catch {
-      // 目录读取失败则回退项目根
-    }
-    return projectPath;
+    // 统一走 @zh/shared 的 resolveSourceScanTarget —— security 侧的 semgrep 适配器
+    // 曾因另写一份而直接用项目根当目标（慢 4 倍），两侧共用一份即杜绝此类分叉。
+    return resolveSourceScanTarget(projectPath);
   }
 
   private resolveConfigs(options: ToolScanOptions): string[] {

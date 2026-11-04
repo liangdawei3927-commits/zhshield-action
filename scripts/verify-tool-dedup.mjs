@@ -152,7 +152,16 @@ async function main() {
     try {
       const parsed = JSON.parse(line);
       const tool = toolOf(parsed);
-      if (tool) records.push({ tool, kind: parsed.kind, cmd: parsed.cmd, args: parsed.args });
+      // `at` 是派发时刻（毫秒时间戳）：用它算「距上一次派发的间隔」，
+      // 即可在账本里看出各工具的实际耗时分布 —— 光有次数看不出谁慢。
+      if (tool)
+        records.push({
+          tool,
+          kind: parsed.kind,
+          cmd: parsed.cmd,
+          args: parsed.args,
+          at: typeof parsed.at === 'number' ? parsed.at : null,
+        });
     } catch {
       // 单行损坏不影响其余观测
     }
@@ -199,6 +208,32 @@ async function main() {
     const note = entry.count > 1 ? ` ← ${entry.count} 次 / ${entry.argv.size} 组参数` : '';
     console.log(`    ${tool}: ${entry.count}${note}`);
   }
+
+  /**
+   * 各工具的**派发时间跨度**：从该工具第一次派发到最后一次派发的间隔。
+   * 次数说明不了谁慢 —— 只说"semgrep 3 次"看不出它占了 20s 还是 2s。
+   * 这里是近似值（同工具多次派发时中间可能夹着别的工具），但足以定位大头。
+   */
+  const spanByTool = new Map();
+  for (const record of scans) {
+    if (record.at === null) continue;
+    const entry = spanByTool.get(record.tool) ?? { first: record.at, last: record.at };
+    entry.first = Math.min(entry.first, record.at);
+    entry.last = Math.max(entry.last, record.at);
+    spanByTool.set(record.tool, entry);
+  }
+  if (spanByTool.size > 0) {
+    console.log('\n  各工具派发时间跨度（近似墙钟，秒）:');
+    const rows = [...spanByTool.entries()]
+      .map(([tool, span]) => ({ tool, spanSec: (span.last - span.first) / 1000 }))
+      .sort((a, b) => b.spanSec - a.spanSec);
+    const stamps = scans.map((r) => r.at ?? 0);
+    const totalSpanSec = stamps.length > 0 ? (Math.max(...stamps) - Math.min(...stamps)) / 1000 : 0;
+    for (const row of rows) {
+      console.log(`    ${row.tool}: ${row.spanSec.toFixed(2)}s`);
+    }
+    console.log(`    （工具派发总跨度 ${totalSpanSec.toFixed(2)}s）`);
+  }
   if (probeByTool.size > 0) {
     const probeLine = [...probeByTool.entries()]
       .map(([tool, count]) => `${tool}×${count}`)
@@ -216,7 +251,8 @@ async function main() {
    * 但"从 1 变成 N"正是批量派发被绕过的特征，必须显式出现在输出与账本里。
    */
   const inlineRuleScans = scans.filter(
-    (record) => record.tool === 'semgrep' && record.args.some((a) => String(a).includes('zhshield-semgrep-')),
+    (record) =>
+      record.tool === 'semgrep' && record.args.some((a) => String(a).includes('zhshield-semgrep-')),
   );
   if (inlineRuleScans.length > 1) {
     console.log(

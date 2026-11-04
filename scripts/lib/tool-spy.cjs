@@ -34,6 +34,7 @@ function record(kind, cmd, args) {
         kind,
         cmd: String(cmd),
         args: Array.isArray(args) ? args.map(String) : [],
+        at: Date.now(),
       })}\n`,
     );
   } catch {

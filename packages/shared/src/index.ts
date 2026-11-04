@@ -89,11 +89,7 @@ export {
   __resetToolProbeCache,
 } from './tool-probe';
 export type { ToolProbeResult } from './tool-probe';
-export {
-  runToolOnce,
-  withToolRunScope,
-  currentToolRunScope,
-} from './tool-run-scope';
+export { runToolOnce, withToolRunScope, currentToolRunScope } from './tool-run-scope';
 export type { ToolRunScope, ToolRunOptions } from './tool-run-scope';
 export {
   findLocalToolBin,
@@ -264,14 +260,12 @@ export {
   saveRefactorBaseline,
   clearRefactorBaseline,
 } from './refactor-baseline-io';
-export type {
-  RefactorBaselineCounts,
-  RefactorBaselineRecord,
-} from './refactor-baseline-io';
+export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-baseline-io';
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export { DEFAULT_SCAN_EXCLUDE_DIRS, appendScanExcludeArgs } from './scan-exclude-dirs';
+export { resolveSourceScanTarget } from './scan-target';
 export { sanitizeEnv } from './process-env';
 export { augmentProcessPath } from './path-augment';
 export { sanitizeLogField, MAX_LOG_FIELD_LENGTH } from './log-sanitize';

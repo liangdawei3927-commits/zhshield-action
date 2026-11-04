@@ -11,7 +11,12 @@ import type {
   CodeFlow,
   CodeFlowThreadFlow,
 } from '@zh/shared';
-import { resolveToolCommandDetailed, runToolOnce, appendScanExcludeArgs } from '@zh/shared';
+import {
+  resolveToolCommandDetailed,
+  runToolOnce,
+  appendScanExcludeArgs,
+  resolveSourceScanTarget,
+} from '@zh/shared';
 import type { ExecError, SemgrepOutput, SemgrepResult } from './tool-output-types';
 import { buildStandardErrorResult, isToolAvailable } from './adapter-helpers';
 
@@ -118,9 +123,12 @@ export class SemgrepAdapter implements ToolAdapter {
     if (options.targetFiles && options.targetFiles.length > 0) {
       args.push(...options.targetFiles);
     } else {
-      // 归一化 projectPath 为绝对路径：相对路径会作为扫描目标传给 semgrep，
-      // semgrep 以自身 cwd 解析导致 "unable to find a config; path ... does not exist"。
-      args.push(path.resolve(options.projectPath));
+      // 扫描目标取**源码树**而非项目根：项目根里还有 .git / 构建产物 / 报告目录 /
+      // 锁文件，扫它们既慢又会自触发误报。
+      // 实测：目标=仓库根 14.8s，目标=packages/ 3.6s（同一份规则、同一台机器）。
+      // inspect 侧早有正确实现（resolveTargetDir），security 侧此前直接用 projectPath，
+      // 两边行为分叉 —— 现统一走 @zh/shared 的 resolveSourceScanTarget。
+      args.push(resolveSourceScanTarget(options.projectPath));
     }
     return args;
   }

@@ -185,8 +185,13 @@ async function main() {
   const scans = records.filter((record) => !isProbe(record));
 
   const probeByTool = new Map();
-  for (const record of probes)
+  const probeCommands = new Map();
+  for (const record of probes) {
     probeByTool.set(record.tool, (probeByTool.get(record.tool) ?? 0) + 1);
+    const seen = probeCommands.get(record.tool) ?? new Set();
+    seen.add(record.cmd);
+    probeCommands.set(record.tool, seen);
+  }
 
   /** A12 的键：同一工具 + 完整参数 */
   const byKey = new Map();
@@ -240,7 +245,6 @@ async function main() {
       .join('  ');
     console.log(`  可用性探测（--version，不计入 A12 判据）: ${probeLine}`);
   }
-
   const violations = [...byKey.entries()].filter(([, count]) => count > 1);
   const sameToolTwice = [...byTool.entries()].filter(([, entry]) => entry.count > 1);
   const repeatedProbes = [...probeByTool.entries()].filter(([, count]) => count > 1);
@@ -350,7 +354,12 @@ async function main() {
         { count: entry.count, distinctArgv: entry.argv.size, argv: [...entry.argv] },
       ]),
     ),
-    versionProbes: Object.fromEntries(probeByTool),
+    versionProbes: Object.fromEntries(
+      [...probeByTool.entries()].map(([tool, count]) => [
+        tool,
+        { count, commands: [...(probeCommands.get(tool) ?? [])] },
+      ]),
+    ),
     violations: Object.fromEntries(
       violations.map(([key, count]) => [key.replace('\u0000', ' | '), count]),
     ),

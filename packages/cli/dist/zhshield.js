@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 89b833d10151d965
+// @zh-src-hash: a17bcf02ddf8a0b5
 // @zh-src-files: 425
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -515584,6 +515584,7 @@ var GitleaksAdapter = class extends ToolCommandAdapter {
 // ../inspect/src/adapters/dependency-cruiser-adapter.ts
 var fs32 = __toESM(require("node:fs"));
 var path34 = __toESM(require("node:path"));
+init_src2();
 
 // ../inspect/src/adapters/dependency-cruiser-mapper.ts
 var import_node_crypto10 = require("node:crypto");
@@ -515764,12 +515765,9 @@ var DependencyCruiserAdapter = class {
   }
   /** 读取已解析命令的版本号（失败返回空串，不阻断主流程） */
   async probeVersion(command) {
-    try {
-      const { stdout } = await execTool(command, ["--version"], { timeout: 2e4 });
-      return String(stdout).trim().split("\n")[0];
-    } catch {
-      return "";
-    }
+    const probe = await probeToolVersion(command, 2e4);
+    if (!probe.ok) return "";
+    return String(probe.stdout).trim().split("\n")[0] ?? "";
   }
   async isAvailable() {
     return this.commands.isAvailable();
@@ -515941,6 +515939,7 @@ var DependencyCruiserAdapter = class {
 var import_node_crypto12 = require("node:crypto");
 var fs33 = __toESM(require("node:fs"));
 var path35 = __toESM(require("node:path"));
+init_src2();
 var JSCPD_VERSION_RE = /(\d+)\.(\d+)/;
 var JSCPD_IGNORED_PATHS = [
   "**/dist/**",
@@ -516000,8 +515999,8 @@ var JscpdAdapter = class {
     if (this.versionInfo) return this.versionInfo;
     try {
       const command = await this.commands.resolve(projectPath);
-      const { stdout } = await execTool(command, ["--version"], { timeout: 2e4 });
-      const m = JSCPD_VERSION_RE.exec(stdout.trim());
+      const probe = await probeToolVersion(command, 2e4);
+      const m = probe.ok ? JSCPD_VERSION_RE.exec(probe.stdout.trim()) : null;
       this.versionInfo = m ? { major: Number(m[1]), minor: Number(m[2]) } : { major: 0, minor: 0 };
     } catch {
       this.versionInfo = { major: 0, minor: 0 };

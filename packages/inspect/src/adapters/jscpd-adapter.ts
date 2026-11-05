@@ -9,6 +9,7 @@ import type {
   Issue,
   AccessScope,
 } from '@zh/shared';
+import { probeToolVersion } from '@zh/shared';
 import { FileHelper } from '@zh/kernel';
 import {
   asToolExecError,
@@ -142,8 +143,11 @@ export class JscpdAdapter implements ToolAdapter {
     try {
       // 锚定 projectPath，不受 cwd 影响（09-12 复验修复）：版本探测与执行使用同一锚点命令
       const command = await this.commands.resolve(projectPath);
-      const { stdout } = await execTool(command, ['--version'], { timeout: 20000 });
-      const m = JSCPD_VERSION_RE.exec(stdout.trim());
+      // A12：探测统一走 `probeToolVersion`（按可执行文件 realpath 去重，含运行作用域单飞）。
+      // 走 `execTool` 会落进另一套缓存键（原始 command 字符串），同一份 jscpd 被不同锚点
+      // 解析成两种写法时会各探一次 —— 2026-11-05 账本里 jscpd ×2 就是这个原因。
+      const probe = await probeToolVersion(command, 20000);
+      const m = probe.ok ? JSCPD_VERSION_RE.exec(probe.stdout.trim()) : null;
       this.versionInfo = m ? { major: Number(m[1]), minor: Number(m[2]) } : { major: 0, minor: 0 };
     } catch {
       this.versionInfo = { major: 0, minor: 0 };

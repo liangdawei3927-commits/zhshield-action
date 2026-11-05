@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, AccessScope } from '@zh/shared';
+import { probeToolVersion } from '@zh/shared';
 import { resolveToolCommandDetailed, type ToolCommandOrigin } from './tool-bin';
 import {
   asToolExecError,
@@ -99,12 +100,11 @@ export class DependencyCruiserAdapter implements ToolAdapter {
 
   /** 读取已解析命令的版本号（失败返回空串，不阻断主流程） */
   private async probeVersion(command: string): Promise<string> {
-    try {
-      const { stdout } = await execTool(command, ['--version'], { timeout: 20000 });
-      return String(stdout).trim().split('\n')[0];
-    } catch {
-      return '';
-    }
+    // A12：统一走 `probeToolVersion` —— 与 isAvailable / 其它域共用同一份探测结果
+    // （realpath 归一 + 运行作用域单飞），不再自起 `execTool` 的第二套探测。
+    const probe = await probeToolVersion(command, 20000);
+    if (!probe.ok) return '';
+    return String(probe.stdout).trim().split('\n')[0] ?? '';
   }
 
   async isAvailable(): Promise<boolean> {

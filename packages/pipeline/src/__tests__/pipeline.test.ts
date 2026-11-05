@@ -105,7 +105,11 @@ describe.skipIf(!process.env.RUN_E2E)('PipelineRunner — 端到端集成测试'
     expect(report.projectId).toBe(SCAN_TARGET);
     expect(report.scanType).toBe('full');
     expect(report.score.overall).toBeGreaterThanOrEqual(0);
-    expect(['A', 'B', 'C', 'D']).toContain(report.score.grade);
+    // grade 有两种合法形态：裸等级，或工具缺失时追加降级后缀（如 `C [7工具降级]`，
+    // 见 @zh/inspect scan-report-builder 与 ScoreGradeLabel 类型）。
+    // 原先只列了四个裸等级：工具齐全的 runner 上恒绿、工具缺失的 runner 上必红 ——
+    // 同一份代码在 CI 的 node22 / node24 两个 job 上结论相反，就是这个原因。
+    expect(report.score.grade).toMatch(/^[ABCD]( \[\d+工具降级\])?$/);
   });
 
   it('6. 完整流水线', async () => {

@@ -19,6 +19,8 @@ export {
   runPipelineInWorker,
   runRefactorInWorker,
   runRefactorAutoFixInWorker,
+  listRefactorAutoFixBackupsInWorker,
+  restoreRefactorAutoFixInWorker,
   runGuardInWorker,
   runSecurityInWorker,
   runGarbageScanInWorker,

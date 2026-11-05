@@ -22,6 +22,10 @@ export {
 } from './auto-fix-apply';
 export type { AutoFixBackupManifest, RestoreBackupResult } from './auto-fix-apply';
 
+// 自动修复备份的枚举 / 撤销（备份目录约定的唯一真源 —— 写备份与读备份必须同源）
+export { listAutoFixBackups, restoreAutoFixBackup } from './auto-fix-backup';
+export type { AutoFixBackupEntry, RestoreAutoFixResult } from './auto-fix-backup';
+
 export type {
   CodeSmell,
   FileSmellReport,

@@ -25,6 +25,8 @@ import {
   runGarbageCleanJob,
   runGarbageRestoreJob,
   runPerformanceJob,
+  runRefactorAutoFixBackupListJob,
+  runRefactorAutoFixRestoreJob,
 } from './pipeline-jobs';
 
 // 子进程独立 i18n 实例：语言由主进程 fork 时通过 LNG 环境变量传入
@@ -153,6 +155,16 @@ process.on('message', (raw: PipelineWorkerInbound) => {
     case 'runPerformance':
       wrapJob(raw.id, async () => {
         await runPerformanceJob(raw.id, raw.projectPath);
+      });
+      break;
+    case 'listRefactorAutoFixBackups':
+      wrapJob(raw.id, async () => {
+        await runRefactorAutoFixBackupListJob(raw.id, raw.projectPath);
+      });
+      break;
+    case 'restoreRefactorAutoFix':
+      wrapJob(raw.id, async () => {
+        await runRefactorAutoFixRestoreJob(raw.id, raw.projectPath, raw.backupDir);
       });
       break;
     default:

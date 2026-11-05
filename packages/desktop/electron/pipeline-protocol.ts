@@ -98,6 +98,27 @@ export interface PerformanceRunMsg {
   projectPath: string;
 }
 
+/**
+ * 主进程 → 引擎子进程：列出仍可撤销的自动修复备份。
+ *
+ * 为什么走子进程：枚举备份要读磁盘目录 + 读清单，撤销要写回文件。
+ * 主进程禁止 fs 同步 IO（no-fs-sync 门禁），且同步扫盘会阻塞 Electron 主线程
+ * （macOS 彩球）—— 与 refactorAutoFix / garbageRestore 同构，磁盘动作一律离主进程。
+ */
+export interface RefactorAutoFixBackupListMsg {
+  type: 'listRefactorAutoFixBackups';
+  id: string;
+  projectPath: string;
+}
+
+/** 主进程 → 引擎子进程：撤销一次自动修复（按备份目录恢复） */
+export interface RefactorAutoFixRestoreMsg {
+  type: 'restoreRefactorAutoFix';
+  id: string;
+  projectPath: string;
+  backupDir: string;
+}
+
 /** 主进程 → 引擎子进程：取消指定任务 */
 export interface PipelineCancelMsg {
   type: 'cancel';
@@ -158,6 +179,8 @@ export type PipelineWorkerInbound =
   | GarbageRestoreRunMsg
   | GarbageScanRunMsg
   | PerformanceRunMsg
+  | RefactorAutoFixBackupListMsg
+  | RefactorAutoFixRestoreMsg
   | PipelineCancelMsg;
 
 /** 将报告转为可跨进程传输的纯 JSON（Date → ISO 字符串） */

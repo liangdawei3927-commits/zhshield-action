@@ -336,6 +336,46 @@ export async function runGarbageRestoreJob(
 }
 
 /**
+ * 自动修复备份「枚举」任务。
+ *
+ * 读磁盘目录 + 读清单 —— 必须在子进程：主进程禁止 fs 同步 IO（no-fs-sync 门禁），
+ * 且同步扫盘会阻塞 Electron 主线程（macOS 彩球）。
+ */
+export async function runRefactorAutoFixBackupListJob(id: string, projectPath: string): Promise<void> {
+  const { listAutoFixBackups } = await import('@zh/refactor');
+  try {
+    const entries = listAutoFixBackups(projectPath);
+    send({ type: 'result', id, report: serializePipelineReport(entries) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[pipeline-worker] 自动修复备份列举异常:', message);
+    send({ type: 'error', id, error: message });
+  }
+}
+
+/**
+ * 自动修复「撤销」任务（按备份目录恢复）。
+ *
+ * 写盘动作同样离主进程。撤销失败是**用户可理解的业务结果**（不是通道故障），
+ * 故以 ok=false 的结果回传，由渲染层展示原因 —— 不抛成 error 让 UI 显示红条。
+ */
+export async function runRefactorAutoFixRestoreJob(
+  id: string,
+  projectPath: string,
+  backupDir: string,
+): Promise<void> {
+  const { restoreAutoFixBackup } = await import('@zh/refactor');
+  try {
+    const result = restoreAutoFixBackup(projectPath, backupDir);
+    send({ type: 'result', id, report: serializePipelineReport(result) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[pipeline-worker] 自动修复撤销异常:', message);
+    send({ type: 'error', id, error: message });
+  }
+}
+
+/**
  * 性能优化检测 — 性能页自有引擎单通道（@zh/performance）。
  *
  * 历史（T7 去越界）：本任务曾并跑一条「inspect 域 SOP 通道」，注释声称覆盖

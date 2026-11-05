@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import {
-  listRefactorAutoFixBackups,
-  restoreRefactorAutoFix,
-} from '../../electron/ipc/refactor-autofix-backup';
+import { listAutoFixBackups, restoreAutoFixBackup } from '../auto-fix-backup';
 
 /**
  * 自动修复撤销闭环（报告 §5.5 用户侧）：列表来自磁盘 manifest、撤销幂等且带边界校验。
  *
  * 这些用例守的是「用户关掉应用、隔天回来仍能撤销」——撤销入口不能是渲染层内存状态，
- * 必须是磁盘上可枚举的事实；同时 backupDir 来自渲染层，必须 fail-closed 校验，
+ * 必须是磁盘上可枚举的事实；同时 backupDir 来自渲染层（不可信入参），必须 fail-closed，
  * 否则一个笔误就能把任意目录当备份恢复。
+ *
+ * 放在本包而不是桌面端：备份目录约定由本包生成，也只有本包能正确解读；
+ * 桌面端只负责把这里的结果搬过进程边界（见 desktop/electron/ipc/refactor-autofix-backup.ts）。
  */
 
 function writeManifest(dir: string, overrides: Record<string, unknown> = {}): void {
@@ -31,13 +31,13 @@ function writeManifest(dir: string, overrides: Record<string, unknown> = {}): vo
   );
 }
 
-describe('listRefactorAutoFixBackups / restoreRefactorAutoFix', () => {
+describe('listAutoFixBackups / restoreAutoFixBackup', () => {
   let root: string;
   let backupsRoot: string;
   let originalContent: string;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-undo-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'refactor-undo-'));
     backupsRoot = path.join(root, '.zhshield', 'backups');
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     originalContent = 'export class Foo {\n  public a = 1;\n}\n';
@@ -60,6 +60,7 @@ describe('listRefactorAutoFixBackups / restoreRefactorAutoFix', () => {
       projectRoot: path.resolve(root),
       createdAt: '2026-02-02T00:00:00.000Z',
       files: ['src/a.ts', 'src/b.ts'],
+      createdFiles: [path.join(root, 'src', 'new-file.ts')],
     });
     fs.mkdirSync(path.join(backupsRoot, 'refactor-autofix-no-manifest'), { recursive: true });
     writeManifest(path.join(backupsRoot, 'refactor-autofix-foreign'), {
@@ -67,14 +68,20 @@ describe('listRefactorAutoFixBackups / restoreRefactorAutoFix', () => {
     });
     fs.mkdirSync(path.join(backupsRoot, 'garbage-batch-1'), { recursive: true });
 
-    const list = listRefactorAutoFixBackups(root);
+    const list = listAutoFixBackups(root);
 
     expect(list.map((e) => path.basename(e.backupDir))).toEqual([
       'refactor-autofix-2026-02-02T00-00-00-000Z',
       'refactor-autofix-2026-01-01T00-00-00-000Z',
     ]);
     expect(list[0]?.fileCount).toBe(2);
+    expect(list[0]?.createdCount).toBe(1);
     expect(list[0]?.createdAt).toBe('2026-02-02T00:00:00.000Z');
+  });
+
+  it('备份根不存在 / 入参非法时返回空列表（不抛异常）', () => {
+    expect(listAutoFixBackups(root)).toEqual([]);
+    expect(listAutoFixBackups('')).toEqual([]);
   });
 
   it('撤销：恢复备份内容、删除新建文件、ok/verified 为真', () => {
@@ -90,7 +97,7 @@ describe('listRefactorAutoFixBackups / restoreRefactorAutoFix', () => {
     fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'MODIFIED', 'utf-8');
     fs.writeFileSync(path.join(root, 'src', 'new-file.ts'), 'x', 'utf-8');
 
-    const result = restoreRefactorAutoFix(root, backupDir);
+    const result = restoreAutoFixBackup(root, backupDir);
 
     expect(result.ok).toBe(true);
     expect(result.verified).toBe(true);
@@ -108,29 +115,35 @@ describe('listRefactorAutoFixBackups / restoreRefactorAutoFix', () => {
     });
     fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'MODIFIED', 'utf-8');
 
-    const result = restoreRefactorAutoFix(root, backupDir);
+    const result = restoreAutoFixBackup(root, backupDir);
 
     expect(result.ok).toBe(false);
+    expect(result.reason).toBe('backup-manifest-invalid');
     expect(fs.readFileSync(path.join(root, 'src', 'a.ts'), 'utf-8')).toBe('MODIFIED');
   });
 
   it('路径边界 fail-closed：项目外 / 更深层 / 前缀不符 一律拒绝且不动文件', () => {
     fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'MODIFIED', 'utf-8');
-    const outside = path.join(os.tmpdir(), 'refactor-autofix-outside');
+    const outsideBackup = path.join(os.tmpdir(), 'refactor-autofix-outside');
+    writeManifest(outsideBackup);
 
-    expect(() => restoreRefactorAutoFix(root, outside)).toThrow();
+    expect(restoreAutoFixBackup(root, outsideBackup).reason).toBe('invalid-backup-params');
     writeManifest(path.join(backupsRoot, 'refactor-autofix-deep', 'nested'));
-    expect(() =>
-      restoreRefactorAutoFix(root, path.join(backupsRoot, 'refactor-autofix-deep', 'nested')),
-    ).toThrow();
+    expect(
+      restoreAutoFixBackup(root, path.join(backupsRoot, 'refactor-autofix-deep', 'nested')).reason,
+    ).toBe('invalid-backup-params');
     writeManifest(path.join(backupsRoot, 'wrong-prefix'));
-    expect(() => restoreRefactorAutoFix(root, path.join(backupsRoot, 'wrong-prefix'))).toThrow();
+    expect(restoreAutoFixBackup(root, path.join(backupsRoot, 'wrong-prefix')).reason).toBe(
+      'invalid-backup-params',
+    );
+    // 备份根自身不是备份目录
+    expect(restoreAutoFixBackup(root, backupsRoot).reason).toBe('invalid-backup-params');
     expect(fs.readFileSync(path.join(root, 'src', 'a.ts'), 'utf-8')).toBe('MODIFIED');
   });
 
-  it('非字符串入参 → 抛错（渲染层 bug 不该被当成业务结果吞掉）', () => {
-    expect(() => restoreRefactorAutoFix('', 'x')).toThrow();
+  it('非字符串入参 → 返回 ok=false（不进入恢复流程）', () => {
+    expect(restoreAutoFixBackup('', 'x').reason).toBe('invalid-backup-params');
     // @ts-expect-error 故意传错类型：验证运行时防御
-    expect(() => restoreRefactorAutoFix(root, null)).toThrow();
+    expect(restoreAutoFixBackup(root, null).reason).toBe('invalid-backup-params');
   });
 });

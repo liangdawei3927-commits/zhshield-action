@@ -174,3 +174,39 @@ export async function runPerformanceInWorker(
     cancelKey,
   });
 }
+
+/**
+ * 列出仍可撤销的自动修复备份（子进程执行：读磁盘目录 + 读清单）。
+ *
+ * 与 refactorAutoFix / garbageRestore 同构：磁盘动作一律离主进程
+ * （主进程禁止 fs 同步 IO，且同步扫盘会阻塞 Electron 主线程）。
+ */
+export async function listRefactorAutoFixBackupsInWorker(
+  projectPath: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
+): Promise<unknown> {
+  const id = `refactor-autofix-list-${Date.now()}-${++seq}`;
+  return dispatchJob({
+    payload: { type: 'listRefactorAutoFixBackups', id, projectPath },
+    timeoutMs,
+    timeoutLabel: 'engine:listRefactorAutoFixBackups',
+    cancelKey,
+  });
+}
+
+/** 撤销一次自动修复（子进程执行：写回备份 + 删除新建文件 + 逐字节校验） */
+export async function restoreRefactorAutoFixInWorker(
+  projectPath: string,
+  backupDir: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelKey?: string,
+): Promise<unknown> {
+  const id = `refactor-autofix-restore-${Date.now()}-${++seq}`;
+  return dispatchJob({
+    payload: { type: 'restoreRefactorAutoFix', id, projectPath, backupDir },
+    timeoutMs,
+    timeoutLabel: 'engine:restoreRefactorAutoFix',
+    cancelKey,
+  });
+}

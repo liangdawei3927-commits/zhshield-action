@@ -29,7 +29,6 @@ import { shouldAutoFix, countFixableIssues, resolveOpenCodeBin } from '../ai-aut
 import { getScoring } from '../ipc-context';
 import type { TaskManager } from '../task-manager';
 import { rethrowIfCancelled } from '../pipeline-protocol';
-import type { DiagnosticSource, DomainDimensionScore } from '../zh-diagnostics-types';
 import {
   toGuardReportData,
   type GuardReportData,

@@ -13,8 +13,16 @@ import * as path from 'path';
 import { safeJoin } from '@zh/shared';
 import type { Fix } from './types';
 
-/** 备份根目录（相对被扫描项目根） */
-const BACKUP_ROOT = ['.zhshield', 'backups'] as const;
+/**
+ * 备份根目录（相对被扫描项目根）。
+ *
+ * 导出而不是各文件各写一份：撤销（auto-fix-backup.ts）必须按**生成时同一个**目录约定
+ * 去找备份，两份常量一旦漂移，撤销入口就会静默失效（用户点撤销 → 列不出任何备份）。
+ */
+export const BACKUP_ROOT = ['.zhshield', 'backups'] as const;
+
+/** 自动修复备份目录名前缀（生成与撤销共用同一约定） */
+export const BACKUP_PREFIX = 'refactor-autofix-';
 
 /** 备份清单文件名（与备份文件同目录；无清单的备份目录视为不可自动恢复） */
 const MANIFEST_NAME = 'manifest.json';
@@ -117,7 +125,7 @@ export function backupFixTargets(
 ): { backupDir: string | null; backedUpFiles: string[]; createdFiles: string[] } {
   const targets = collectFixTargetFiles(fixes);
   if (targets.length === 0) return { backupDir: null, backedUpFiles: [], createdFiles: [] };
-  const backupDir = path.join(projectRoot, ...BACKUP_ROOT, `refactor-autofix-${stamp}`);
+  const backupDir = path.join(projectRoot, ...BACKUP_ROOT, `${BACKUP_PREFIX}${stamp}`);
   const backedUpFiles: string[] = [];
   const existingBefore = new Set<string>();
   for (const filePath of targets) {

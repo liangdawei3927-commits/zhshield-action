@@ -54,6 +54,9 @@ vi.mock('node:child_process', () => ({
 
 const { probeToolVersion, invalidateToolProbes, setToolProbeTtlMs, __resetToolProbeCache } =
   await import('../tool-probe');
+// 必须与 tool-probe 内部引用的是**同一份** tool-run-scope：下面的用例里 `vi.resetModules()`
+// 会换掉模块副本，动态 import 会拿到另一份 AsyncLocalStorage，作用域就串不上了。
+const { withToolRunScope } = await import('../tool-run-scope');
 
 describe('probeToolVersion — 同一命令只 spawn 一次', () => {
   beforeEach(() => {
@@ -234,4 +237,53 @@ describe('probeToolVersion — 失效与 TTL（桌面端装完工具必须能被
     await probeToolVersion('missing-tool-0');
     expect(spawns.length).toBeGreaterThan(beforeRecovery); // 最旧的已被回收 → 重新探测
   }, 30_000);
+});
+
+/**
+ * 运行作用域是**第二层**合并，解决 TTL 解决不了的问题：
+ * 一次 `--full` 要跑 200–400s，探测点必然散落在多个 30s TTL 窗口里，
+ * 于是同一把刀在同一次运行里被探 2~4 次（2026-11-05 实测 eslint ×2 / jscpd ×3 /
+ * gitleaks ×2 / depcheck ×2，而该次运行只 spawn 了一个 CLI 进程）。
+ */
+describe('probeToolVersion — 一次运行内只探一次（运行作用域层）', () => {
+  beforeEach(() => {
+    __resetToolProbeCache();
+    spawns.length = 0;
+    behavior = 'ok';
+  });
+
+  it('TTL 关闭时，作用域内仍只 spawn 一次（35s+ 的探测间隔不再重复付进程）', async () => {
+    setToolProbeTtlMs(0); // 模拟"探测点跨过了 N 个 TTL 窗口"
+
+    const results = await withToolRunScope('pipeline.full', async () => [
+      await probeToolVersion('jscpd'),
+      await probeToolVersion('jscpd'),
+      await probeToolVersion('jscpd'),
+    ]);
+
+    expect(spawns).toHaveLength(1);
+    expect(results[1]).toBe(results[0]);
+  });
+
+  it('作用域外（桌面端刷新路径）仍按 TTL 各探各的 —— 装完工具不重启也要看得见', async () => {
+    setToolProbeTtlMs(0);
+    await probeToolVersion('eslint');
+    await probeToolVersion('eslint');
+    expect(spawns).toHaveLength(2);
+  });
+
+  it('作用域内的超时结论不保留：下一次调用必须真的重探', async () => {
+    setToolProbeTtlMs(0);
+    behavior = 'timeout';
+
+    await withToolRunScope('pipeline.full', async () => {
+      const first = await probeToolVersion('semgrep');
+      expect(first.conclusive).toBe(false);
+      behavior = 'ok';
+      const second = await probeToolVersion('semgrep');
+      expect(second.ok).toBe(true);
+    });
+
+    expect(spawns).toHaveLength(2);
+  });
 });

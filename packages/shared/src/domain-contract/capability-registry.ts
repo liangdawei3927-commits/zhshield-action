@@ -43,9 +43,17 @@ export interface ToolCapability {
 /**
  * 静态扫描域的预算（§7.5）。哨兵/备份按运行时常量运行，不参与静态扫描预算，
  * 故此处刻意不列（`Partial` 而非 `Record`），避免给它们编造静态预算。
+ *
+ * `inspect` 从 90s 调到 150s（2026-11-05）——**不是为了让谁达标，而是为了让测量有效**：
+ * 85 条规则下体检域实测 92.89s（2026-11-02），而旧预算 90s 让它在四次机器账本里
+ * 每次精确撞 90005ms 熔断（`.zhshield/bench/pipeline-*.json`）。后果是 `inspect`
+ * 恒定 `unavailable` → 整条流水线永远"不完整"，A14 既拿不到 PASS 也拿不到 FAIL，
+ * 只有 INVALID。域预算的职责是掐死跑飞的工具，不是把正常耗时的域做成长期假故障：
+ * 被判"未检测"的健康域比多跑 60s 更伤用户信任（误报疲劳）。
+ * 真实瓶颈（体检 + 安全两域就吃满 180s）仍要靠降低工具成本解决，调预算不解决 A14。
  */
 export const SCAN_DOMAIN_BUDGETS = {
-  inspect: 90_000,
+  inspect: 150_000,
   guard: 10_000,
   security: 120_000,
   deps: 90_000,

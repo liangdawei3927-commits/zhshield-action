@@ -246,17 +246,43 @@ async function main() {
   const repeatedProbes = [...probeByTool.entries()].filter(([, count]) => count > 1);
 
   /**
-   * 合并规则族的回归哨兵：每条 SOP semgrep 规则都带一份 `--config <tmp>/zhshield-semgrep-XXXX/inline-rules.yml`，
-   * 合并成一次进程后这类派发应当 ≤1。它不会触发 VIOLATION（参数不同，契约允许），
-   * 但"从 1 变成 N"正是批量派发被绕过的特征，必须显式出现在输出与账本里。
+   * 域完整性门槛（2026-11-05）。
+   *
+   * 为什么必须有：域被预算掐断（`unavailable`/`partial`）时，该域的工具派发本来就没走完，
+   * "同一 (tool,args) 只扫一次"可以因为**根本没扫第二次**而成立 —— 这种 PASS 是假绿。
+   * 《07》§7.6.2 已把"域超预算截断的半程计数"判作废，本脚本此前只统计次数、
+   * 不看域状态，于是给过一次 462s 的半程运行发了 PASS。口径统一到文档：
+   * 有域没跑完 → `INCOMPLETE`（exit 2，与 `bench:pipeline` 的 INVALID 同类：不是失败，是没有凭据）。
+   */
+  const domainRecords = ledger?.records ?? [];
+  const incompleteDomains = domainRecords
+    .filter((record) => record.status === 'unavailable' || record.status === 'partial')
+    .map((record) => `${record.domain}(${record.status})`);
+
+  /**
+   * 内联 semgrep 规则族的期望次数 = 本次真正跑了 SOP 通道的域个数
+   * （inspect 体检通道 + security 安全通道各一次 `evaluateAll`，每次内部合并成 1 个进程）。
+   * 早先写死"≤1"只在单域运行里成立，全量链路上必然报 WARN —— 那是口径错，不是回归。
+   * 真正的回归特征不是"2"，而是"条数≈内联规则数"（合并被绕过）。
+   */
+  const SOP_CHANNEL_DOMAINS = ['inspect', 'security'];
+  const expectedInlineBatches = domainRecords.filter((record) =>
+    SOP_CHANNEL_DOMAINS.includes(record.domain),
+  ).length;
+
+  /**
+   * 合并规则族的回归哨兵：每条 SOP semgrep 规则都带一份 `--config <tmp>/zhshield-semgrep-XXXX/inline-rules.yml`。
+   * 每个 SOP 通道合并成一次进程后，这类派发应 ≈ 通道数（inspect + security）。它不会触发 VIOLATION
+   * （参数不同，契约允许），但"从通道数跳到规则数"正是批量派发被绕过的特征，必须显式出现在输出与账本里。
    */
   const inlineRuleScans = scans.filter(
     (record) =>
       record.tool === 'semgrep' && record.args.some((a) => String(a).includes('zhshield-semgrep-')),
   );
-  if (inlineRuleScans.length > 1) {
+  const inlineCapacity = Math.max(1, expectedInlineBatches);
+  if (inlineRuleScans.length > inlineCapacity) {
     console.log(
-      `\n  WARN semgrep 内联规则族疑似未合并：${inlineRuleScans.length} 次独立内联规则扫描（应 ≤1）`,
+      `\n  WARN semgrep 内联规则族疑似未合并：${inlineRuleScans.length} 次独立内联规则扫描（应 ≤${inlineCapacity}）`,
     );
   }
 
@@ -283,27 +309,35 @@ async function main() {
     }
   }
 
+  const verdict =
+    violations.length > 0
+      ? 'VIOLATION'
+      : byTool.size === 0 && probeByTool.size === 0
+        ? 'INCONCLUSIVE'
+        : incompleteDomains.length > 0
+          ? 'INCOMPLETE'
+          : 'PASS';
+
   const artifact = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     target: 'A12',
-    criterion: '同一 (tool, args) 的扫描派发次数 = 1（--version 探测不计入，单独统计）',
-    verdict:
-      violations.length > 0
-        ? 'VIOLATION'
-        : byTool.size === 0 && probeByTool.size === 0
-          ? 'INCONCLUSIVE'
-          : 'PASS',
-    // 批量派发的回归哨兵：semgrep 的内联规则族应当合并成 ≤1 次进程
+    criterion:
+      '同一 (tool, args) 的扫描派发次数 = 1（--version 探测不计入，单独统计），且全部域完整跑完',
+    verdict,
+    // 批量派发的回归哨兵：semgrep 的内联规则族应当合并成 ≈ SOP 通道数
     // （每条规则一份 `--config <tmp>/zhshield-semgrep-*/inline-rules.yml` 是合并失效的特征）。
     // 不计入 VIOLATION —— 契约允许"参数不同就多次"，但趋势变了要看得见。
     batching: {
       inlineRuleScans: inlineRuleScans.length,
+      expected: inlineCapacity,
       note:
-        inlineRuleScans.length > 1
-          ? `合并规则族未生效（应 ≤1，实测 ${inlineRuleScans.length}）——检查 prefetch-tool-batch / scanBatch 是否被绕过`
-          : '内联规则族已合并（≤1 次进程）',
+        inlineRuleScans.length > inlineCapacity
+          ? `合并规则族未生效（应 ≤${inlineCapacity}，实测 ${inlineRuleScans.length}）——检查 prefetch-tool-batch / scanBatch 是否被绕过`
+          : `内联规则族已合并（${inlineRuleScans.length} ≤ ${inlineCapacity} 次进程）`,
     },
+    // 域完整性：有域被预算掐断时，本账本不构成 A12 凭据（《07》§7.6.2 数字纪律）
+    incompleteDomains,
     command: `node scripts/verify-tool-dedup.mjs --domains ${args.domains || '(全量扫描链)'}`,
     domains: args.domains || '(全量扫描链)',
     scannedDir: path.relative(ROOT, args.dir) || '.',
@@ -339,7 +373,14 @@ async function main() {
     console.log('⚠️  INCONCLUSIVE — 未观测到任何工具派发，可能预加载未生效或本次域不调用工具');
     process.exit(2);
   }
-  console.log('✅ PASS — 每个 (tool, args) 只扫描了一次');
+  if (artifact.verdict === 'INCOMPLETE') {
+    console.log(
+      `⚠️  INCOMPLETE — 有域被预算掐断（${incompleteDomains.join(', ')}），本次派发计数不完整，不作 A12 凭据\n` +
+        '   放掉负载后复跑；或先解决该域的预算/耗时（inspect 的 tsc/eslint/dep-cruiser 全仓扫描是主因）',
+    );
+    process.exit(2);
+  }
+  console.log('✅ PASS — 每个 (tool, args) 只扫描了一次，且全部域完整跑完');
   process.exit(0);
 }
 

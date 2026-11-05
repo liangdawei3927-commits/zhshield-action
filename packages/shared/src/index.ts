@@ -89,7 +89,7 @@ export {
   __resetToolProbeCache,
 } from './tool-probe';
 export type { ToolProbeResult } from './tool-probe';
-export { runToolOnce, withToolRunScope, currentToolRunScope } from './tool-run-scope';
+export { runToolOnce, withToolRunScope, currentToolRunScope, runOncePerScope } from './tool-run-scope';
 export type { ToolRunScope, ToolRunOptions } from './tool-run-scope';
 export {
   findLocalToolBin,

@@ -48,7 +48,9 @@ vi.mock('node:child_process', () => ({
   },
 }));
 
-const { runToolOnce, withToolRunScope, currentToolRunScope } = await import('../tool-run-scope');
+const { runToolOnce, withToolRunScope, currentToolRunScope, runOncePerScope } = await import(
+  '../tool-run-scope'
+);
 
 describe('runToolOnce — 运行作用域内同参只执行一次', () => {
   beforeEach(() => {
@@ -157,5 +159,76 @@ describe('runToolOnce — 运行作用域内同参只执行一次', () => {
       expect(outer?.hits).toBe(1); // 内层已执行，外层命中重放
     });
     expect(spawns).toHaveLength(1);
+  });
+});
+
+/**
+ * `runOncePerScope`：不是扫描的"一次性调用"（当前用于 `--version` 探测）。
+ *
+ * 为什么要独立于 `runToolOnce`：探测结果是 `ToolProbeResult`，不是 `ToolRunOutcome`；
+ * 混进 `calls` 会让"派发次数"与"缓存条数"对不上，A12 的账本就再也读不准。
+ * 语义保持一致：只保留结论明确的结果，失败不留残影。
+ */
+describe('runOncePerScope — 作用域内同一 key 只算一次', () => {
+  beforeEach(() => {
+    spawns.length = 0;
+    behavior = 'ok';
+  });
+
+  it('作用域内三次调用只真跑一次，返回值共享', async () => {
+    let runs = 0;
+    const run = async (): Promise<string> => {
+      runs += 1;
+      return 'probed';
+    };
+    const values = await withToolRunScope('test', async () => [
+      await runOncePerScope('ns', 'key-1', run),
+      await runOncePerScope('ns', 'key-1', run),
+      await runOncePerScope('ns', 'key-1', run),
+    ]);
+    expect(runs).toBe(1);
+    expect(values).toEqual(['probed', 'probed', 'probed']);
+  });
+
+  it('不同 namespace / key 互不影响', async () => {
+    let runs = 0;
+    const run = async (): Promise<number> => {
+      runs += 1;
+      return runs;
+    };
+    await withToolRunScope('test', async () => {
+      await runOncePerScope('probe', 'k', run);
+      await runOncePerScope('other', 'k', run);
+      await runOncePerScope('probe', 'k2', run);
+    });
+    expect(runs).toBe(3);
+  });
+
+  it('keep 返回 false 的结果不留在表里：下次调用真的重跑', async () => {
+    let runs = 0;
+    const run = async (): Promise<{ conclusive: boolean }> => {
+      runs += 1;
+      return { conclusive: runs > 1 }; // 首次"没测出来"
+    };
+    await withToolRunScope('test', async () => {
+      const first = await runOncePerScope('probe', 'k', run, (v) => v.conclusive);
+      expect(first.conclusive).toBe(false);
+      const second = await runOncePerScope('probe', 'k', run, (v) => v.conclusive);
+      expect(second.conclusive).toBe(true); // 真的重跑了
+      const third = await runOncePerScope('probe', 'k', run, (v) => v.conclusive);
+      expect(third).toBe(second); // 结论明确后重放
+    });
+    expect(runs).toBe(2);
+  });
+
+  it('作用域外不共享（长驻进程不得跨扫描复用）', async () => {
+    let runs = 0;
+    const run = async (): Promise<number> => {
+      runs += 1;
+      return runs;
+    };
+    await runOncePerScope('probe', 'k', run);
+    await runOncePerScope('probe', 'k', run);
+    expect(runs).toBe(2);
   });
 });

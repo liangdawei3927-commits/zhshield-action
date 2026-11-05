@@ -26,6 +26,7 @@ import {
   isConclusiveExecFailure,
   snapshotExecFailure,
 } from './tool-exec-primitives';
+import { runOncePerScope } from './tool-run-scope';
 
 /** 一次探测的原始结果。`ok` 只表示进程成功退出，不代表版本号可解析 */
 export interface ToolProbeResult {
@@ -175,7 +176,7 @@ function evictIfNeeded(cache: Map<string, ProbeCacheEntry>, ttlMs: number): void
   for (const [key] of oldest.slice(0, Math.ceil(oldest.length / 2))) cache.delete(key);
 }
 
-async function runProbe(command: string, timeoutMs: number): Promise<ToolProbeResult> {
+async function executeProbe(command: string, timeoutMs: number): Promise<ToolProbeResult> {
   const probedAt = Date.now();
   try {
     const { stdout, stderr } = await execFileAsync(command, ['--version'], { timeout: timeoutMs });
@@ -198,6 +199,23 @@ async function runProbe(command: string, timeoutMs: number): Promise<ToolProbeRe
       probedAt,
     };
   }
+}
+
+/**
+ * 真正的探测入口：**先用运行作用域合并，再用 TTL 缓存**。
+ *
+ * 两层解决的是两件不同的事：
+ *   1. 作用域（`runOncePerScope`）—— 一次运行内同一可执行文件只真跑一次，
+ *      与这次运行跑多久无关。实测一次 `--full` 200–400s，30s 的 TTL 挡不住
+ *      探测点在多个窗口里重复（2026-11-05：jscpd ×3 / eslint ×2 / gitleaks ×2 / depcheck ×2）。
+ *   2. TTL —— 长驻进程（桌面端）跨运行的新鲜度：装完工具不重启也能看见。
+ *
+ * 作用域外（单测、桌面刷新路径）行为与改动前完全一致。
+ */
+async function runProbe(command: string, timeoutMs: number): Promise<ToolProbeResult> {
+  const probe = () => executeProbe(command, timeoutMs);
+  if (!state().enabled) return probe();
+  return runOncePerScope('tool-probe', identityOf(command), probe, (result) => result.conclusive);
 }
 
 /**

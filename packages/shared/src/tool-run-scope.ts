@@ -30,6 +30,12 @@ export interface ToolRunScope {
   readonly label: string;
   /** key → 一次调用的结果（或重放的错误快照） */
   readonly calls: Map<string, Promise<ToolRunOutcome>>;
+  /**
+   * 非 `ToolRunOutcome` 形状的一次性结果（当前只有可用性探测）。
+   * 与 `calls` 分开：`calls` 的键就是 A12 判据的 (command, argv, cwd)，
+   * 混进别的形状会让"派发次数"与"缓存条数"对不上。
+   */
+  readonly shared: Map<string, Promise<unknown>>;
   /** 统计：命中次数，供账本/诊断使用 */
   hits: number;
 }
@@ -73,8 +79,58 @@ export function currentToolRunScope(): ToolRunScope | undefined {
  */
 export async function withToolRunScope<T>(label: string, fn: () => Promise<T>): Promise<T> {
   if (DEDUP_DISABLED || storage.getStore()) return fn();
-  const scope: ToolRunScope = { label, calls: new Map(), hits: 0 };
+  const scope: ToolRunScope = { label, calls: new Map(), shared: new Map(), hits: 0 };
   return storage.run(scope, fn);
+}
+
+/**
+ * 作用域内"同一 key 只真正算一次"的通用单飞（当前用于 `--version` 探测）。
+ *
+ * 为什么探测不能只用 TTL：TTL 是**时间窗**口径，一次 `--full` 要跑 200–400s，
+ * 探测点必然散落在多个 30s 窗口里 —— 于是同一把刀在**同一次运行**里被探 2~4 次
+ * （2026-11-05 实测 eslint ×2 / jscpd ×3 / gitleaks ×2 / depcheck ×2）。运行作用域
+ * 是**逻辑边界**：一次运行内结论不会变，扫描结束即释放，桌面端长驻也不会串味。
+ *
+ * 语义与 `runToolOnce` 对齐：只保留结论明确的结果（由 `keep` 判定），
+ * 不明确的（探测超时/被杀）不进表，下次调用真的重试。
+ */
+export async function runOncePerScope<T>(
+  namespace: string,
+  key: string,
+  run: () => Promise<T>,
+  keep: (value: T) => boolean = () => true,
+): Promise<T> {
+  const scope = storage.getStore();
+  if (!scope) return run();
+
+  const scopedKey = `${namespace}\u0000${key}`;
+  const hit = scope.shared.get(scopedKey) as Promise<T> | undefined;
+  if (hit) {
+    return hit.then(
+      (value) => {
+        scope.hits += 1;
+        return value;
+      },
+      (err) => {
+        // 失败的重放不留残影：下一次调用重新真跑
+        scope.shared.delete(scopedKey);
+        throw err;
+      },
+    );
+  }
+
+  const promise = run().then(
+    (value) => {
+      if (!keep(value)) scope.shared.delete(scopedKey);
+      return value;
+    },
+    (err) => {
+      scope.shared.delete(scopedKey);
+      throw err;
+    },
+  );
+  scope.shared.set(scopedKey, promise);
+  return promise;
 }
 
 function keyOf(command: string, args: readonly string[], options: ToolRunOptions): string {

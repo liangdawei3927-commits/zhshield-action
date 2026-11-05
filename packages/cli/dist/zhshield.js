@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 2f12de29bed36bf1
+// @zh-src-hash: 89b833d10151d965
 // @zh-src-files: 425
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -458,6 +458,123 @@ var init_tool_exec_primitives = __esm({
   }
 });
 
+// ../shared/src/tool-run-scope.ts
+function currentToolRunScope() {
+  return storage.getStore();
+}
+async function withToolRunScope(label, fn) {
+  if (DEDUP_DISABLED || storage.getStore()) return fn();
+  const scope = { label, calls: /* @__PURE__ */ new Map(), shared: /* @__PURE__ */ new Map(), hits: 0 };
+  return storage.run(scope, fn);
+}
+async function runOncePerScope(namespace, key, run, keep = () => true) {
+  const scope = storage.getStore();
+  if (!scope) return run();
+  const scopedKey = `${namespace}\0${key}`;
+  const hit = scope.shared.get(scopedKey);
+  if (hit) {
+    return hit.then(
+      (value) => {
+        scope.hits += 1;
+        return value;
+      },
+      (err) => {
+        scope.shared.delete(scopedKey);
+        throw err;
+      }
+    );
+  }
+  const promise = run().then(
+    (value) => {
+      if (!keep(value)) scope.shared.delete(scopedKey);
+      return value;
+    },
+    (err) => {
+      scope.shared.delete(scopedKey);
+      throw err;
+    }
+  );
+  scope.shared.set(scopedKey, promise);
+  return promise;
+}
+function keyOf(command, args, options2) {
+  return `${command}\0${options2.cwd ?? ""}\0${args.join("\0")}`;
+}
+function snapshotOfError(err) {
+  const snap = snapshotExecFailure(err);
+  return {
+    ok: false,
+    stdout: snap.stdout,
+    stderr: snap.stderr,
+    error: {
+      message: snap.message,
+      code: snap.code,
+      killed: snap.killed,
+      signal: snap.signal
+    }
+  };
+}
+function isConclusive(outcome) {
+  if (outcome.ok) return true;
+  return isConclusiveExecFailure(outcome.error ?? {});
+}
+function rethrow(outcome) {
+  const err = outcome.error ?? { message: "Command failed" };
+  throw Object.assign(new Error(err.message), {
+    code: err.code,
+    killed: err.killed,
+    signal: err.signal,
+    stdout: outcome.stdout,
+    stderr: outcome.stderr
+  });
+}
+async function rawRun(command, args, options2) {
+  try {
+    const { stdout, stderr } = await execFileAsync(command, [...args], {
+      cwd: options2.cwd,
+      timeout: options2.timeout,
+      maxBuffer: options2.maxBuffer
+    });
+    return { ok: true, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") };
+  } catch (err) {
+    return snapshotOfError(err);
+  }
+}
+async function runToolOnce(command, args, options2 = {}) {
+  const scope = storage.getStore();
+  if (!scope) {
+    const outcome2 = await rawRun(command, args, options2);
+    if (outcome2.ok) return { stdout: outcome2.stdout, stderr: outcome2.stderr };
+    rethrow(outcome2);
+  }
+  const key = keyOf(command, args, options2);
+  const cached = scope.calls.get(key);
+  if (cached) {
+    scope.hits += 1;
+    const outcome2 = await cached;
+    if (outcome2.ok) return { stdout: outcome2.stdout, stderr: outcome2.stderr };
+    rethrow(outcome2);
+  }
+  const promise = rawRun(command, args, options2).then((outcome2) => {
+    if (!isConclusive(outcome2)) scope.calls.delete(key);
+    return outcome2;
+  });
+  scope.calls.set(key, promise);
+  const outcome = await promise;
+  if (outcome.ok) return { stdout: outcome.stdout, stderr: outcome.stderr };
+  rethrow(outcome);
+}
+var import_node_async_hooks, storage, DEDUP_DISABLED;
+var init_tool_run_scope = __esm({
+  "../shared/src/tool-run-scope.ts"() {
+    "use strict";
+    import_node_async_hooks = require("node:async_hooks");
+    init_tool_exec_primitives();
+    storage = new import_node_async_hooks.AsyncLocalStorage();
+    DEDUP_DISABLED = process.env.ZH_TOOL_RUN_DEDUP === "off";
+  }
+});
+
 // ../shared/src/tool-probe.ts
 function state() {
   const host = globalThis;
@@ -513,7 +630,7 @@ function evictIfNeeded(cache, ttlMs) {
   const oldest = [...cache.entries()].sort((a, b) => a[1].at - b[1].at);
   for (const [key] of oldest.slice(0, Math.ceil(oldest.length / 2))) cache.delete(key);
 }
-async function runProbe(command, timeoutMs) {
+async function executeProbe(command, timeoutMs) {
   const probedAt = Date.now();
   try {
     const { stdout, stderr } = await execFileAsync(command, ["--version"], { timeout: timeoutMs });
@@ -534,6 +651,11 @@ async function runProbe(command, timeoutMs) {
       probedAt
     };
   }
+}
+async function runProbe(command, timeoutMs) {
+  const probe = () => executeProbe(command, timeoutMs);
+  if (!state().enabled) return probe();
+  return runOncePerScope("tool-probe", identityOf(command), probe, (result) => result.conclusive);
 }
 function probeToolVersion(command, timeoutMs = 2e4) {
   const shared = state();
@@ -559,6 +681,7 @@ var init_tool_probe = __esm({
     fs = __toESM(require("node:fs"));
     path = __toESM(require("node:path"));
     init_tool_exec_primitives();
+    init_tool_run_scope();
     DEFAULT_TTL_MS = 3e4;
     CACHE_ENV_DISABLED = process.env.ZH_TOOL_PROBE_CACHE === "off" || process.env.VITEST === "true" && process.env.ZH_TOOL_PROBE_CACHE !== "on";
     STATE_KEY = Symbol.for("zh.tool-probe.state.v1");
@@ -677,93 +800,6 @@ var init_tool_manager = __esm({
         return results;
       }
     };
-  }
-});
-
-// ../shared/src/tool-run-scope.ts
-function currentToolRunScope() {
-  return storage.getStore();
-}
-async function withToolRunScope(label, fn) {
-  if (DEDUP_DISABLED || storage.getStore()) return fn();
-  const scope = { label, calls: /* @__PURE__ */ new Map(), hits: 0 };
-  return storage.run(scope, fn);
-}
-function keyOf(command, args, options2) {
-  return `${command}\0${options2.cwd ?? ""}\0${args.join("\0")}`;
-}
-function snapshotOfError(err) {
-  const snap = snapshotExecFailure(err);
-  return {
-    ok: false,
-    stdout: snap.stdout,
-    stderr: snap.stderr,
-    error: {
-      message: snap.message,
-      code: snap.code,
-      killed: snap.killed,
-      signal: snap.signal
-    }
-  };
-}
-function isConclusive(outcome) {
-  if (outcome.ok) return true;
-  return isConclusiveExecFailure(outcome.error ?? {});
-}
-function rethrow(outcome) {
-  const err = outcome.error ?? { message: "Command failed" };
-  throw Object.assign(new Error(err.message), {
-    code: err.code,
-    killed: err.killed,
-    signal: err.signal,
-    stdout: outcome.stdout,
-    stderr: outcome.stderr
-  });
-}
-async function rawRun(command, args, options2) {
-  try {
-    const { stdout, stderr } = await execFileAsync(command, [...args], {
-      cwd: options2.cwd,
-      timeout: options2.timeout,
-      maxBuffer: options2.maxBuffer
-    });
-    return { ok: true, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") };
-  } catch (err) {
-    return snapshotOfError(err);
-  }
-}
-async function runToolOnce(command, args, options2 = {}) {
-  const scope = storage.getStore();
-  if (!scope) {
-    const outcome2 = await rawRun(command, args, options2);
-    if (outcome2.ok) return { stdout: outcome2.stdout, stderr: outcome2.stderr };
-    rethrow(outcome2);
-  }
-  const key = keyOf(command, args, options2);
-  const cached = scope.calls.get(key);
-  if (cached) {
-    scope.hits += 1;
-    const outcome2 = await cached;
-    if (outcome2.ok) return { stdout: outcome2.stdout, stderr: outcome2.stderr };
-    rethrow(outcome2);
-  }
-  const promise = rawRun(command, args, options2).then((outcome2) => {
-    if (!isConclusive(outcome2)) scope.calls.delete(key);
-    return outcome2;
-  });
-  scope.calls.set(key, promise);
-  const outcome = await promise;
-  if (outcome.ok) return { stdout: outcome.stdout, stderr: outcome.stderr };
-  rethrow(outcome);
-}
-var import_node_async_hooks, storage, DEDUP_DISABLED;
-var init_tool_run_scope = __esm({
-  "../shared/src/tool-run-scope.ts"() {
-    "use strict";
-    import_node_async_hooks = require("node:async_hooks");
-    init_tool_exec_primitives();
-    storage = new import_node_async_hooks.AsyncLocalStorage();
-    DEDUP_DISABLED = process.env.ZH_TOOL_RUN_DEDUP === "off";
   }
 });
 
@@ -16382,7 +16418,7 @@ var init_capability_registry2 = __esm({
     "use strict";
     init_ownership_registry();
     SCAN_DOMAIN_BUDGETS = {
-      inspect: 9e4,
+      inspect: 15e4,
       guard: 1e4,
       security: 12e4,
       deps: 9e4,
@@ -17478,6 +17514,7 @@ __export(src_exports, {
   resolveSupplierDomain: () => resolveSupplierDomain,
   resolveToolCommand: () => resolveToolCommand,
   resolveToolCommandDetailed: () => resolveToolCommandDetailed,
+  runOncePerScope: () => runOncePerScope,
   runToolOnce: () => runToolOnce,
   safeJoin: () => safeJoin,
   safeJoinReal: () => safeJoinReal,

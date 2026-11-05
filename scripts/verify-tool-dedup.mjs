@@ -252,16 +252,28 @@ async function main() {
   /**
    * 域完整性门槛（2026-11-05）。
    *
-   * 为什么必须有：域被预算掐断（`unavailable`/`partial`）时，该域的工具派发本来就没走完，
+   * 为什么必须有：域被预算掐断（`unavailable`/`overBudget`）时，该域的工具派发本来就没走完，
    * "同一 (tool,args) 只扫一次"可以因为**根本没扫第二次**而成立 —— 这种 PASS 是假绿。
    * 《07》§7.6.2 已把"域超预算截断的半程计数"判作废，本脚本此前只统计次数、
-   * 不看域状态，于是给过一次 462s 的半程运行发了 PASS。口径统一到文档：
-   * 有域没跑完 → `INCOMPLETE`（exit 2，与 `bench:pipeline` 的 INVALID 同类：不是失败，是没有凭据）。
+   * 不看域状态，于是给过一次 462s 的半程运行发了 PASS。
+   *
+   * 口径（2026-11-05 二次收紧）：只把**截断**判为无凭据。
+   *   · `unavailable` / `overBudget` → 该域没跑完，派发计数不完整 → `INCOMPLETE`
+   *   · `partial` 且未超预算 → 域内检查有跳过（网络不可达、个别工具缺失），
+   *     但工具派发照常发生，A12 的计数仍然有效 → 记入 `partialDomains` 不阻断判据
+   *     （否则无网机器上 A12 永远拿不到凭据，而那与去重无关——A15 自有 `verify:offline` 管）
    */
   const domainRecords = ledger?.records ?? [];
-  const incompleteDomains = domainRecords
-    .filter((record) => record.status === 'unavailable' || record.status === 'partial')
-    .map((record) => `${record.domain}(${record.status})`);
+  const truncatedDomains = domainRecords
+    .filter((record) => record.status === 'unavailable' || record.overBudget === true)
+    .map(
+      (record) =>
+        `${record.domain}(${record.status}${record.overBudget === true ? ',overBudget' : ''})`,
+    );
+  const partialDomains = domainRecords
+    .filter((record) => record.status === 'partial' && record.overBudget !== true)
+    .map((record) => `${record.domain}${record.reason ? `：${record.reason}` : ''}`);
+  const incompleteDomains = truncatedDomains;
 
   /**
    * 内联 semgrep 规则族的期望次数 = 本次真正跑了 SOP 通道的域个数
@@ -318,7 +330,7 @@ async function main() {
       ? 'VIOLATION'
       : byTool.size === 0 && probeByTool.size === 0
         ? 'INCONCLUSIVE'
-        : incompleteDomains.length > 0
+        : truncatedDomains.length > 0
           ? 'INCOMPLETE'
           : 'PASS';
 
@@ -340,8 +352,9 @@ async function main() {
           ? `合并规则族未生效（应 ≤${inlineCapacity}，实测 ${inlineRuleScans.length}）——检查 prefetch-tool-batch / scanBatch 是否被绕过`
           : `内联规则族已合并（${inlineRuleScans.length} ≤ ${inlineCapacity} 次进程）`,
     },
-    // 域完整性：有域被预算掐断时，本账本不构成 A12 凭据（《07》§7.6.2 数字纪律）
-    incompleteDomains,
+    // 域完整性：截断（unavailable/overBudget）才让计数失效；partial 单列备查
+    truncatedDomains,
+    partialDomains,
     command: `node scripts/verify-tool-dedup.mjs --domains ${args.domains || '(全量扫描链)'}`,
     domains: args.domains || '(全量扫描链)',
     scannedDir: path.relative(ROOT, args.dir) || '.',
@@ -384,7 +397,7 @@ async function main() {
   }
   if (artifact.verdict === 'INCOMPLETE') {
     console.log(
-      `⚠️  INCOMPLETE — 有域被预算掐断（${incompleteDomains.join(', ')}），本次派发计数不完整，不作 A12 凭据\n` +
+      `⚠️  INCOMPLETE — 有域被预算掐断（${truncatedDomains.join(', ')}），本次派发计数不完整，不作 A12 凭据\n` +
         '   放掉负载后复跑；或先解决该域的预算/耗时（inspect 的 tsc/eslint/dep-cruiser 全仓扫描是主因）',
     );
     process.exit(2);

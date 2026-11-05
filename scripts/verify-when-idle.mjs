@@ -65,6 +65,7 @@ function parseArgs(argv) {
     steps: ['dedup', 'bench', 'offline'],
     maxWaitMin: 180,
     intervalSec: 60,
+    cooldownSec: 45,
     loadFactor: 1,
     check: false,
     allowLoad: false,
@@ -83,6 +84,7 @@ function parseArgs(argv) {
       args.steps = raw;
     } else if (a === '--max-wait-min') args.maxWaitMin = Number(argv[++i] ?? 0);
     else if (a === '--interval-sec') args.intervalSec = Number(argv[++i] ?? 0);
+    else if (a === '--cooldown-sec') args.cooldownSec = Number(argv[++i] ?? 0);
     else if (a === '--load-factor') args.loadFactor = Number(argv[++i] ?? 1);
     else if (a === '--help' || a === '-h') {
       console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('*/')[0]);
@@ -94,6 +96,7 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(args.maxWaitMin) || args.maxWaitMin < 0) args.maxWaitMin = 180;
   if (!Number.isFinite(args.intervalSec) || args.intervalSec < 5) args.intervalSec = 60;
+  if (!Number.isFinite(args.cooldownSec) || args.cooldownSec < 0) args.cooldownSec = 45;
   if (!Number.isFinite(args.loadFactor) || args.loadFactor <= 0) args.loadFactor = 1;
   return args;
 }
@@ -104,6 +107,26 @@ function loadGate(cores, factor) {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * 等到 1min load ≤ 门限。
+ *
+ * 必须**每一步之前都等一次**：验收本身是重 CPU 负载（一次 `--full` 拉满 4 核数分钟），
+ * 起跑前空、跑完立刻接下一步，后一步自己的负载门限必然读到"不空" —— 2026-11-05 首次
+ * 自动补跑就是这样：dedup 跑完 382s，紧接着 bench 在 364ms 内判 INVALID 退出。
+ */
+async function waitForIdle({ gate, deadline, intervalSec, onWait }) {
+  let waitedMs = 0;
+  let load = os.loadavg()[0];
+  while (load > gate) {
+    if (Date.now() >= deadline) return { idle: false, load, waitedMs };
+    onWait(load, waitedMs);
+    await sleep(intervalSec * 1000);
+    waitedMs += intervalSec * 1000;
+    load = os.loadavg()[0];
+  }
+  return { idle: true, load, waitedMs };
+}
 
 function runStep(key) {
   const step = STEPS[key];
@@ -142,59 +165,83 @@ async function main() {
   console.log(`  步骤：${args.steps.join(' → ')}`);
   console.log(`  负载门限：1min load ≤ ${gate}（核数 × ${args.loadFactor}）`);
 
+  const results = [];
+  const skipped = [];
   let waitedMs = 0;
-  let loadBefore = os.loadavg()[0];
-  while (!args.allowLoad && loadBefore > gate) {
-    if (args.check) {
-      console.log(`\n当前 load ${loadBefore.toFixed(2)} > 门限 ${gate} —— 现在跑只会得到 INVALID/INCOMPLETE`);
+  let loadAtStart = os.loadavg()[0];
+
+  if (args.check) {
+    if (loadAtStart > gate) {
+      console.log(`\n当前 load ${loadAtStart.toFixed(2)} > 门限 ${gate} —— 现在跑只会得到 INVALID/INCOMPLETE`);
       console.log('（--check 只看不跑；去掉 --check 即进入等待）');
       process.exit(2);
     }
-    if (Date.now() >= deadline) {
-      const ledger = buildLedger({
-        args,
-        cores,
-        gate,
-        loadBefore,
-        loadAfter: loadBefore,
-        waitedMs,
-        results: [],
-        verdict: 'TIMEOUT',
-      });
-      const outPath = writeLedger(ledger);
-      console.log(`\n⚠️  TIMEOUT — 等待 ${Math.round(waitedMs / 60_000)} 分钟后 load 仍为 ${loadBefore.toFixed(2)} > ${gate}`);
-      console.log(`   未执行任何验收，未改动任何旧账本。账本: ${path.relative(ROOT, outPath)}`);
-      process.exit(3);
-    }
-    console.log(`  等待中：load ${loadBefore.toFixed(2)} > ${gate}（已等 ${Math.round(waitedMs / 60_000)} 分钟）`);
-    await sleep(args.intervalSec * 1000);
-    waitedMs += args.intervalSec * 1000;
-    loadBefore = os.loadavg()[0];
+    console.log(`\n当前 load ${loadAtStart.toFixed(2)} ≤ 门限 ${gate} —— 现在跑可以拿到凭据`);
+    process.exit(0);
   }
 
-  console.log(`  起跑：load ${loadBefore.toFixed(2)} ≤ ${gate}${args.allowLoad ? '（--allow-load 放行）' : ''}\n`);
-
-  const results = [];
   for (const key of args.steps) {
+    const wait = args.allowLoad
+      ? { idle: true, load: os.loadavg()[0], waitedMs: 0 }
+      : await waitForIdle({
+          gate,
+          deadline,
+          intervalSec: args.intervalSec,
+          onWait: (load, waited) =>
+            console.log(
+              `  等待 ${key}：load ${load.toFixed(2)} > ${gate}（本次已等 ${Math.round(waited / 60_000)} 分钟）`,
+            ),
+        });
+    waitedMs += wait.waitedMs;
+
+    if (!wait.idle) {
+      skipped.push(key);
+      break; // 剩余步骤同样等不到窗口，不再空转
+    }
+
     console.log(`\n=== ${STEPS[key].label} ===`);
+    console.log(`  起跑：load ${wait.load.toFixed(2)} ≤ ${gate}${args.allowLoad ? '（--allow-load 放行）' : ''}`);
     const result = runStep(key);
+    result.loadAtStart = wait.load;
     results.push(result);
     const mark = result.verdict === 'PASS' ? '✅' : result.verdict === 'FAIL' ? '❌' : '⚠️ ';
     console.log(`${mark} ${key}: exit=${result.exitCode} → ${result.verdict}（${(result.elapsedMs / 1000).toFixed(1)}s）`);
+
+    // 冷却：上一步的负载余波会污染下一步起跑前的 1min loadavg
+    if (key !== args.steps[args.steps.length - 1]) {
+      await sleep(args.cooldownSec * 1000);
+      waitedMs += args.cooldownSec * 1000;
+    }
   }
 
   const loadAfter = os.loadavg()[0];
-  const verdict = aggregate(results);
-  const ledger = buildLedger({ args, cores, gate, loadBefore, loadAfter, waitedMs, results, verdict });
+  const verdict =
+    results.length === 0 || skipped.length > 0 ? 'TIMEOUT' : aggregate(results);
+  const ledger = buildLedger({
+    args,
+    cores,
+    gate,
+    loadBefore: loadAtStart,
+    loadAfter,
+    waitedMs,
+    results,
+    verdict,
+    skipped,
+  });
   const outPath = writeLedger(ledger);
 
   console.log(`\n汇总：${verdict}`);
   for (const r of results) console.log(`  ${r.step.padEnd(8)} ${r.verdict.padEnd(14)} exit=${r.exitCode}`);
+  if (skipped.length > 0) console.log(`  未执行（等不到空闲窗口）：${skipped.join(', ')}`);
   console.log(`  账本: ${path.relative(ROOT, outPath)}`);
 
   if (verdict === 'PASS') {
-    console.log('\n✅ PASS — 三项验收全部拿到凭据');
+    console.log('\n✅ PASS — 全部步骤都拿到了凭据');
     process.exit(0);
+  }
+  if (verdict === 'TIMEOUT') {
+    console.log('\n⚠️  TIMEOUT — 有步骤没等到空闲窗口，序列不完整，不作凭据（已完成步骤的结果仍在账本里）');
+    process.exit(3);
   }
   if (verdict === 'NO_CREDENTIAL') {
     console.log('\n⚠️  NO_CREDENTIAL — 有步骤没拿到有效凭据（INVALID/INCOMPLETE），既不算通过也不算未达标');
@@ -204,12 +251,23 @@ async function main() {
   process.exit(1);
 }
 
-function buildLedger({ args, cores, gate, loadBefore, loadAfter, waitedMs, results, verdict }) {
+function buildLedger({
+  args,
+  cores,
+  gate,
+  loadBefore,
+  loadAfter,
+  waitedMs,
+  results,
+  verdict,
+  skipped = [],
+}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     target: 'A12+A14+A15 空闲窗口补跑',
-    criterion: '全部步骤拿到 PASS 凭据才算通过；INVALID/INCOMPLETE 记 NO_CREDENTIAL，不判通过也不判未达标',
+    criterion:
+      '全部步骤拿到 PASS 凭据才算通过；INVALID/INCOMPLETE 记 NO_CREDENTIAL，等不到窗口记 TIMEOUT——两者都不判通过也不判未达标',
     verdict,
     machine: {
       cores,
@@ -222,12 +280,16 @@ function buildLedger({ args, cores, gate, loadBefore, loadAfter, waitedMs, resul
     loadBefore,
     loadAfter,
     waitedMs,
+    cooldownSec: args.cooldownSec,
     allowLoad: args.allowLoad,
     steps: results,
+    skippedSteps: skipped,
     note:
       verdict === 'NO_CREDENTIAL'
         ? '机器仍未真正空闲或域被预算掐断 —— 换窗口重跑，不要把本次结论当凭据'
-        : undefined,
+        : verdict === 'TIMEOUT'
+          ? '序列不完整：已完成步骤的结果仍有效，但整体不构成凭据'
+          : undefined,
   };
 }
 

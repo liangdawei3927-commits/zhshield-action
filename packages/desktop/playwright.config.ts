@@ -24,10 +24,15 @@ export default defineConfig({
    * - `nav-probe.spec.ts`（自述「穿透取证」）：以 `ZH_NAV_FIXTURE`（默认整个 monorepo 根）
    *   跑 `runFullCheck` 全量体检，单次 5 分钟以上量级，且依赖外部夹具，
    *   在 CI 里既慢又不可靠。
+   * - `domain-ring-verify.spec.ts`（自述「实机验证」）：10 个域各跑一次真实扫描再验健康环，
+   *   本机实测约 8 分钟/域（合计 80 分钟量级），CI runner 更慢 —— 放进默认集合等于
+   *   用一个必超时的大用例换"看起来覆盖全"。健康环的渲染由 `app.spec` 的布局用例兜底。
    *
    * 需要时手动跑：`pnpm --filter @zh/desktop test:e2e:verify`。
    */
-  testIgnore: ['**/*.verify.spec.ts', '**/nav-probe.spec.ts'],
+  testIgnore: process.env.ZH_E2E_INCLUDE_HEAVY
+    ? []
+    : ['**/*.verify.spec.ts', '**/nav-probe.spec.ts', '**/domain-ring-verify.spec.ts'],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

@@ -3,7 +3,7 @@
  */
 import { _electron as electron, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -29,6 +29,27 @@ export const ELECTRON_BIN = (() => {
 
 export const FIXTURE = process.env.ZH_NAV_FIXTURE ?? '/tmp/zh-nav-fixture';
 export const SHOT_DIR = process.env.ZH_NAV_SHOTS ?? '/tmp/zh-nav-shots';
+
+/**
+ * 保证夹具目录存在。
+ *
+ * 为什么必须由测试自己建：这些 spec 之前默认 `/tmp/zh-nav-fixture` 已经被人手工造好过
+ * —— 本机碰巧有，CI 上一定没有（全新 runner）。缺目录时应用仍能渲染导航（项目只是
+ * 一个路径字符串），但每个域扫描都会对着不存在的路径跑，用例是"碰运气绿"。
+ * 只补齐缺失的骨架，不动已存在的文件（本机手工夹具可能比这份丰富，别覆盖）。
+ */
+export function ensureFixture(): void {
+  mkdirSync(path.join(FIXTURE, 'src'), { recursive: true });
+  const pkg = path.join(FIXTURE, 'package.json');
+  if (!existsSync(pkg)) {
+    writeFileSync(pkg, JSON.stringify({ name: 'zh-nav-fixture', version: '0.0.0' }, null, 2));
+  }
+  const entry = path.join(FIXTURE, 'src', 'index.ts');
+  if (!existsSync(entry)) {
+    writeFileSync(entry, 'export const fixture = 1;\n');
+  }
+  mkdirSync(SHOT_DIR, { recursive: true });
+}
 
 /** 顶部入口（TopNav 10 项 + 侧边栏项目行报告中心），来源区分按钮所在容器。
  *  ⛔ 规则进化 / AI 工具已暂下线（见 src/feature-flags.ts），其侧边栏入口不在此表。 */
@@ -79,6 +100,7 @@ export async function launchApp(): Promise<{
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'zh-nav-'));
   const fakeHome = path.join(userDataDir, 'home');
   mkdirSync(fakeHome, { recursive: true });
+  ensureFixture();
   writeFileSync(
     path.join(userDataDir, 'projects.json'),
     JSON.stringify([{ name: 'zh-nav-fixture', path: FIXTURE }], null, 2),

@@ -16,7 +16,9 @@ export const packagesDir = path.resolve(__dirname, '..', '..');
  *      security 19 条、guard 1 条用例因此假红（"期望没调外部工具"其实没进 mock）。
  */
 export function packagesSrcAlias(...names: string[]): Record<string, string> {
-  return Object.fromEntries(names.map((name) => [`@zh/${name}`, path.join(packagesDir, name, 'src')]));
+  return Object.fromEntries(
+    names.map((name) => [`@zh/${name}`, path.join(packagesDir, name, 'src')]),
+  );
 }
 
 /**

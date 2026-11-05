@@ -55,9 +55,7 @@ export function DomainEmptyView(props: DomainEmptyViewProps) {
   const meta = DOMAIN_REPORT_META[props.domain];
   return (
     <PageShell
-      illustration={
-        <DomainScoreRing projectPath={props.projectPath} dimension={meta.dimension} />
-      }
+      illustration={<DomainScoreRing projectPath={props.projectPath} dimension={meta.dimension} />}
       title={props.title}
       subtitle={props.subtitle}
       featureList={props.features}

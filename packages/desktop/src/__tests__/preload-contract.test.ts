@@ -76,7 +76,10 @@ function topLevelMembers(body: string): string[] {
 /** 展开嵌套 *API 接口，产出形如 'engine.runGuard' 的叶子路径 */
 function collectLeafPaths(iface: string, prefix: string[] = [], out: string[] = []): string[] {
   for (const raw of topLevelMembers(interfaceBody(iface))) {
-    const decl = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').trim();
+    const decl = raw
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .trim();
     const m = decl.match(/^(\w+)\??\s*:\s*([\s\S]+)$/);
     if (!m) continue;
     const [, name, type] = m;
@@ -101,10 +104,9 @@ describe('preload 桥接面契约（electron.d.ts ↔ preload.ts）', () => {
     const api = exposed.get('electronAPI')!;
     let cursor: unknown = api;
     for (const segment of path.split('.')) {
-      expect(
-        cursor,
-        `electronAPI.${path} 在 ${segment} 段断裂：preload 未暴露该层`,
-      ).toBeTypeOf('object');
+      expect(cursor, `electronAPI.${path} 在 ${segment} 段断裂：preload 未暴露该层`).toBeTypeOf(
+        'object',
+      );
       cursor = (cursor as Record<string, unknown>)[segment];
     }
     expect(cursor, `electronAPI.${path} 缺失：类型已声明但 preload 未桥接`).toBeDefined();

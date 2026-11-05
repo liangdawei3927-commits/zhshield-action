@@ -91,9 +91,7 @@ export function dimensionView(
 }
 
 /** 已检测维度数：总分只由这些维度加权而来，未检测维度被排除在外 */
-export function countRunDimensions(
-  dims: readonly { status?: 'scored' | 'not-run' }[],
-): number {
+export function countRunDimensions(dims: readonly { status?: 'scored' | 'not-run' }[]): number {
   return dims.filter((d) => d.status !== 'not-run').length;
 }
 

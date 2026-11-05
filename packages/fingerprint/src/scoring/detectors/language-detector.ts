@@ -38,7 +38,11 @@ function pushTsConfigSignal(scan: ScanResult, signals: ProfileSignal[]): void {
 }
 
 function pushGoModSignal(scan: ScanResult, signals: ProfileSignal[]): void {
-  pushFileSignal(scan, signals, 'go.mod', { language: 'go', runtime: 'go', packageManager: 'go-mod' });
+  pushFileSignal(scan, signals, 'go.mod', {
+    language: 'go',
+    runtime: 'go',
+    packageManager: 'go-mod',
+  });
 }
 
 function pushCargoSignal(scan: ScanResult, signals: ProfileSignal[]): void {

@@ -10,9 +10,7 @@ import { isHttpMode, getAPI } from './engineApi-transport';
 
 // ─── Sentinel 哨兵监控 ────────────────────────────────────
 
-export async function getSentinelEvents(
-  options?: SentinelEventQuery,
-): Promise<SentinelEvent[]> {
+export async function getSentinelEvents(options?: SentinelEventQuery): Promise<SentinelEvent[]> {
   if (isHttpMode()) return getSentinelEventsViaHttp(options);
   const api = getAPI();
   if (!api?.sentinel) return [];

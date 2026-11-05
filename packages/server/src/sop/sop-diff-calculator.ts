@@ -243,8 +243,17 @@ interface BuildDiffResultParams {
 }
 
 function buildDiffResult(params: BuildDiffResultParams): SopDiff {
-  const { toVersion, fromVersion, allRules, added, removed, modified, unchanged, diffContent, hash } =
-    params;
+  const {
+    toVersion,
+    fromVersion,
+    allRules,
+    added,
+    removed,
+    modified,
+    unchanged,
+    diffContent,
+    hash,
+  } = params;
   return {
     version: toVersion,
     fromVersion,

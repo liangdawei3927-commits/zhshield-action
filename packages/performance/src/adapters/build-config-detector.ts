@@ -156,13 +156,13 @@ export class BuildConfigDetectorImpl implements BuildConfigDetector {
       const limitKb = Number(limitMatch[1]);
       if (limitKb > 1000) {
         issues.push(
-this.makeIssue({
-          ruleId: 'build-config.vite-chunk-size-limit-high',
-          severity: 'medium',
-          file: configFile,
-          message: `${configFile} 将 chunkSizeWarningLimit 设为 ${limitKb}kB，超过默认 500kB，大 chunk 告警被掩盖`,
-          suggestion: `建议将 chunkSizeWarningLimit 调回 500 或更低，暴露超限 chunk 以便拆分`,
-        }),
+          this.makeIssue({
+            ruleId: 'build-config.vite-chunk-size-limit-high',
+            severity: 'medium',
+            file: configFile,
+            message: `${configFile} 将 chunkSizeWarningLimit 设为 ${limitKb}kB，超过默认 500kB，大 chunk 告警被掩盖`,
+            suggestion: `建议将 chunkSizeWarningLimit 调回 500 或更低，暴露超限 chunk 以便拆分`,
+          }),
         );
       }
     }

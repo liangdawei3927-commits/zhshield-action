@@ -36,10 +36,7 @@ afterEach(async () => {
 });
 
 /** 起一个返回固定字节与响应头的服务；返回基址（含 /sop） */
-async function startServer(
-  body: Buffer,
-  headers: Record<string, string>,
-): Promise<string> {
+async function startServer(body: Buffer, headers: Record<string, string>): Promise<string> {
   server = http.createServer((_req, res) => {
     res.writeHead(200, headers).end(body);
   });

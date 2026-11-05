@@ -31,7 +31,12 @@ vi.mock('../../electron/pipeline-host', () => ({
   cancelJob: vi.fn(),
 }));
 
-import { TaskManager, TASK_STALL_TIMEOUT_MS, type TaskInfo, type TaskKind } from '../../electron/task-manager';
+import {
+  TaskManager,
+  TASK_STALL_TIMEOUT_MS,
+  type TaskInfo,
+  type TaskKind,
+} from '../../electron/task-manager';
 import { t } from '@zh/i18n';
 
 type FakeRunner = (
@@ -108,9 +113,7 @@ describe('TaskManager 看门狗 — 无进展任务强制失败并放行队列�
 
     await vi.advanceTimersByTimeAsync(TASK_STALL_TIMEOUT_MS + 60_000);
 
-    await expect(mgr.waitFor(task.id)).rejects.toThrow(
-      t('task.stalledTimeout', { minutes: 5 }),
-    );
+    await expect(mgr.waitFor(task.id)).rejects.toThrow(t('task.stalledTimeout', { minutes: 5 }));
   });
 
   it('误报防护：持续心跳（间隔小于阈值）的任务不被误杀', async () => {

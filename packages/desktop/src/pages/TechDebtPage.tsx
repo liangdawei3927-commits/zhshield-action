@@ -244,12 +244,12 @@ export function TechDebtPage({ projectPath }: TechDebtPageProps) {
   }
 
   return (
-    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
-      <TechDebtEmptyState
-        projectPath={projectPath}
-        loading={loading}
-        onScan={detail.startScan}
-      />
+    <DetailEntryProvider
+      key={detail.scanVersion}
+      available={detail.hasDetail}
+      onOpen={detail.openDetail}
+    >
+      <TechDebtEmptyState projectPath={projectPath} loading={loading} onScan={detail.startScan} />
     </DetailEntryProvider>
   );
 }

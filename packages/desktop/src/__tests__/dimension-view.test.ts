@@ -54,8 +54,7 @@ describe('dimensionView — not-run 维度不得按 0 分渲染', () => {
  * 防的是"补了个函数但渲染点各自仍读 d.score"——单测发现不了，要读源码。
  */
 describe('维度渲染点必须经 dimensionView（防回归）', () => {
-  const read = (rel: string) =>
-    readFileSync(new URL(`../pages/${rel}`, import.meta.url), 'utf-8');
+  const read = (rel: string) => readFileSync(new URL(`../pages/${rel}`, import.meta.url), 'utf-8');
 
   /**
    * 2026-10-24：报告中心的「维度卡」（reports-parts.tsx / DimensionCards）已由
@@ -74,8 +73,12 @@ describe('维度渲染点必须经 dimensionView（防回归）', () => {
     expect(src).toMatch(/categoryScoreCards\(/);
     expect(src).toMatch(/view\.color/);
     expect(src).toMatch(/view\.label/);
-    expect(src).not.toMatch(/getScoreColor\(\s*(card\.view\.score|Number\(card\.view\.scoreText\)|d\.score|dim\.score)/);
-    expect(src).not.toMatch(/getScoreLabel\(\s*(card\.view\.score|Number\(card\.view\.scoreText\)|d\.score|dim\.score)/);
+    expect(src).not.toMatch(
+      /getScoreColor\(\s*(card\.view\.score|Number\(card\.view\.scoreText\)|d\.score|dim\.score)/,
+    );
+    expect(src).not.toMatch(
+      /getScoreLabel\(\s*(card\.view\.score|Number\(card\.view\.scoreText\)|d\.score|dim\.score)/,
+    );
   });
 
   it('category-score-logic.ts 经 domainScoreView 出分（不引入第二套算法）', () => {

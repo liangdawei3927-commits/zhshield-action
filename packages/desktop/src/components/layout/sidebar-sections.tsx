@@ -121,10 +121,7 @@ export function EvolveSection({
   const t = useT();
   return (
     <section>
-      <SectionTitle
-        label={t('layout.evolve')}
-        icon={<NavIcon id="evolve" size={12} />}
-      />
+      <SectionTitle label={t('layout.evolve')} icon={<NavIcon id="evolve" size={12} />} />
       <BounceCard className="rounded-xl bg-zh-panel/60 p-1.5">
         <button
           type="button"

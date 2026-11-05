@@ -74,10 +74,13 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
       ],
       '2026-09-19T11:00:00.000Z',
     );
-    const inputs = await assembleHealthInputs('/proj', makeReads({
-      readDomainSnapshot: async (_p, source) =>
-        source === 'security' ? securitySnap : source === 'deps' ? depsSnap : null,
-    }));
+    const inputs = await assembleHealthInputs(
+      '/proj',
+      makeReads({
+        readDomainSnapshot: async (_p, source) =>
+          source === 'security' ? securitySnap : source === 'deps' ? depsSnap : null,
+      }),
+    );
 
     expect(inputs.inspectIssues).toEqual([
       { severity: 'error', category: 'security', ruleId: 'rule-x' },
@@ -104,9 +107,12 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
       [entry({ category: 'security', severity: 'error', fingerprint: 's1' })],
       '2026-09-19T10:00:00.000Z',
     );
-    const inputs = await assembleHealthInputs('/proj', makeReads({
-      readDomainSnapshot: async (_p, source) => (source === 'security' ? securitySnap : null),
-    }));
+    const inputs = await assembleHealthInputs(
+      '/proj',
+      makeReads({
+        readDomainSnapshot: async (_p, source) => (source === 'security' ? securitySnap : null),
+      }),
+    );
 
     expect(inputs.inspectIssues).not.toBeNull();
     const dims = buildHealthDimensions({
@@ -126,9 +132,12 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
       [entry({ category: 'security', severity: 'error', fingerprint: 's1' })],
       '2026-09-19T10:00:00.000Z',
     );
-    const inputs = await assembleHealthInputs('/proj', makeReads({
-      readDomainSnapshot: async (_p, source) => (source === 'security' ? securitySnap : null),
-    }));
+    const inputs = await assembleHealthInputs(
+      '/proj',
+      makeReads({
+        readDomainSnapshot: async (_p, source) => (source === 'security' ? securitySnap : null),
+      }),
+    );
     // security 条目并进的是共用条目袋，不代表巡检跑过 —— 这条断言防的就是
     // 「只跑安全扫描 ⇒ quality 0 条 issue ⇒ 100 分」
     expect(inputs.qualityCovered).toBe(false);
@@ -162,7 +171,10 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
 
     // 未运行域在分类页只能显示「—」，绝不显示 0 分（0 会被读成「扫了、很差」）
     for (const d of dims.filter((dim) => dim.status === 'not-run')) {
-      expect(domainScoreView({ dim: { score: d.score, status: 'not-run' }, generatedAt: undefined }).scoreText).toBe('—');
+      expect(
+        domainScoreView({ dim: { score: d.score, status: 'not-run' }, generatedAt: undefined })
+          .scoreText,
+      ).toBe('—');
     }
 
     // 总分只由已跑域加权：单域时 overall 必须等于该域分，不掺入任何未检测域
@@ -180,7 +192,13 @@ describe('assembleHealthInputs：Q4 评分输入缺口修复', () => {
 describe('quality 快路径：透传快照自带评分 + previousScore', () => {
   it('有 dimensionScore → 原样返回（含 version 与 previousScore）', () => {
     const snap = snapshot([entry({ category: 'quality' })], '2026-09-19T10:00:00.000Z');
-    snap.dimensionScore = { dimension: 'quality', score: 92, issues: 1, status: 'scored', version: 2 };
+    snap.dimensionScore = {
+      dimension: 'quality',
+      score: 92,
+      issues: 1,
+      status: 'scored',
+      version: 2,
+    };
     snap.previousScore = { score: 85, generatedAt: '2026-09-18T10:00:00.000Z' };
     expect(qualityFastPathScore(snap)).toEqual({
       dimension: 'quality',
@@ -254,7 +272,14 @@ describe('timestamps 各维度锚点来源', () => {
       riskLevel: 'low',
       summary: { total: 1, passed: 1, failed: 0, warnings: 0, blocking: 0, errors: 0 },
       checks: [
-        { checkId: 'c', adapter: 'a', status: 'passed', severity: 'info', blocking: false, message: '' },
+        {
+          checkId: 'c',
+          adapter: 'a',
+          status: 'passed',
+          severity: 'info',
+          blocking: false,
+          message: '',
+        },
       ],
     };
     const inspectSnap = snapshot([], '2026-09-19T08:00:00.000Z');
@@ -286,18 +311,21 @@ describe('timestamps 各维度锚点来源', () => {
       },
       garbage: { total: 2, byType: { 'build-artifact': 2 }, lastRunAt: '2026-09-19T04:00:00.000Z' },
     };
-    const inputs = await assembleHealthInputs('/proj', makeReads({
-      listGuardReports: () => [guardRecord],
-      readDomainSnapshot: async (_p, source) =>
-        source === 'inspect'
-          ? inspectSnap
-          : source === 'security'
-            ? securitySnap
-            : source === 'deps'
-              ? depsSnap
-              : null,
-      readDashboardState: async () => state,
-    }));
+    const inputs = await assembleHealthInputs(
+      '/proj',
+      makeReads({
+        listGuardReports: () => [guardRecord],
+        readDomainSnapshot: async (_p, source) =>
+          source === 'inspect'
+            ? inspectSnap
+            : source === 'security'
+              ? securitySnap
+              : source === 'deps'
+                ? depsSnap
+                : null,
+        readDashboardState: async () => state,
+      }),
+    );
 
     expect(inputs.timestamps).toEqual({
       quality: '2026-09-19T08:00:00.000Z',

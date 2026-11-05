@@ -200,7 +200,12 @@ describe('门禁结论区块', () => {
     const html = render(
       report({
         items: [
-          item({ status: 'undetermined', actual: undefined, threshold: undefined, unit: undefined }),
+          item({
+            status: 'undetermined',
+            actual: undefined,
+            threshold: undefined,
+            unit: undefined,
+          }),
           item({ ruleId: 'guard.block.official.test-coverage', metric: 'coverage' }),
         ],
       }),

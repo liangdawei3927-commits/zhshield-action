@@ -119,7 +119,10 @@ describe('buildMonorepoPruneOverlay', () => {
 
     const overlay = buildMonorepoPruneOverlay(projectPath) as MonorepoPruneOverlay;
     // broken 被跳过，noInclude 正常聚合（include 默认 src）
-    expect(overlay.include).toEqual(['../packages/noInclude/*.ts', '../packages/noInclude/src/**/*']);
+    expect(overlay.include).toEqual([
+      '../packages/noInclude/*.ts',
+      '../packages/noInclude/src/**/*',
+    ]);
     expect(overlay.compilerOptions.paths['@zh/noInclude']).toEqual([
       './packages/noInclude/src/index.ts',
     ]);

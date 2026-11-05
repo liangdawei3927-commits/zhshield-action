@@ -107,12 +107,8 @@ export function AttributionSection({
     ? breakdown.domains.filter((domain) => Math.abs(domain.points) >= 0.01)
     : [];
   // 结论句只留够格看的项：-0.01 这种进结论只是噪声，表格里仍然保留
-  const drops = changed
-    .filter((domain) => domain.points <= -CHIP_MIN_POINTS)
-    .slice(0, 3);
-  const rises = changed
-    .filter((domain) => domain.points >= CHIP_MIN_POINTS)
-    .slice(0, 3);
+  const drops = changed.filter((domain) => domain.points <= -CHIP_MIN_POINTS).slice(0, 3);
+  const rises = changed.filter((domain) => domain.points >= CHIP_MIN_POINTS).slice(0, 3);
 
   return (
     <div className="mt-6">

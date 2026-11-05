@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  validateGarbageCleanItems,
-  isValidBatchId,
-} from '../../electron/garbage-input';
+import { validateGarbageCleanItems, isValidBatchId } from '../../electron/garbage-input';
 
 /**
  * 垃圾清理 IPC 边界校验回归：

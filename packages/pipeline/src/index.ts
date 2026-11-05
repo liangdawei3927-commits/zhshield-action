@@ -28,7 +28,11 @@ export { detectProjectProfile, resolveEffectiveProjectRoot } from './project-pro
 export type { ProjectProfile, ProjectLanguage, PackageManager } from './project-profile';
 export { createRuleMetricsProvider } from './rule-metrics';
 export type { RuleMetricsOptions } from './rule-metrics';
-export { createGateMetricResolver, readProjectCoveragePct, DEFAULT_COVERAGE_REPORTS } from './gate-metrics';
+export {
+  createGateMetricResolver,
+  readProjectCoveragePct,
+  DEFAULT_COVERAGE_REPORTS,
+} from './gate-metrics';
 export type { GateMetricInputs } from './gate-metrics';
 export {
   computeDiffCoverage,

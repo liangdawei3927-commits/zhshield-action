@@ -5,8 +5,6 @@ import * as path from 'node:path';
 import { SKIP_DIRS } from './detector';
 import { cachedWalkFiles } from './walk-cache';
 
-
-
 /** 目录名是否属于噪声目录（vendored / 依赖产物 / 构建输出，判定依据 SKIP_DIRS） */
 export function isNoiseDir(name: string): boolean {
   return SKIP_DIRS.has(name);
@@ -120,7 +118,3 @@ export function relDirname(relPath: string): string {
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
-
-
-
-

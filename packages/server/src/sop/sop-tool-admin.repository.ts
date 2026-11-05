@@ -113,7 +113,13 @@ export class SopToolAdminRepository extends SopAdminRepositoryBase {
         description: row.description,
         createdBy: 'admin',
       });
-      audit({ db: tx, entityType: 'tool', entityId: toolId, action: 'publish', detail: `version=${row.version}` });
+      audit({
+        db: tx,
+        entityType: 'tool',
+        entityId: toolId,
+        action: 'publish',
+        detail: `version=${row.version}`,
+      });
     });
   }
 
@@ -136,7 +142,13 @@ export class SopToolAdminRepository extends SopAdminRepositoryBase {
         description: row.description,
         createdBy: 'admin',
       });
-      audit({ db: tx, entityType: 'tool', entityId: toolId, action: 'rollback', detail: `回滚到 ${version}` });
+      audit({
+        db: tx,
+        entityType: 'tool',
+        entityId: toolId,
+        action: 'rollback',
+        detail: `回滚到 ${version}`,
+      });
     });
   }
 
@@ -145,7 +157,13 @@ export class SopToolAdminRepository extends SopAdminRepositoryBase {
     const db = this.requireDb();
     this.requireTool(db, toolId);
     softDeleteToolPackage(db, toolId);
-    audit({ db, entityType: 'tool', entityId: toolId, action: 'delete', detail: '软删（disabled）' });
+    audit({
+      db,
+      entityType: 'tool',
+      entityId: toolId,
+      action: 'delete',
+      detail: '软删（disabled）',
+    });
   }
 
   listTools(): ToolPackageRow[] {

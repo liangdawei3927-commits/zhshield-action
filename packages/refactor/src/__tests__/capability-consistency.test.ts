@@ -23,9 +23,8 @@ describe('自动修复能力与能力注册表一致（防「宣称 vs 实现」
   it('implementedBy 与 FIX_GENERATORS 覆盖的规则集合严格相等', () => {
     const declared = [...(cap?.implementedBy ?? [])].sort();
     const actual = [...listAutoFixableRules()].sort();
-    expect(
-      actual,
-      'auto-fix.ts 的生成器规则与注册表声明不一致 —— 能力清单与实现漂移了',
-    ).toEqual(declared);
+    expect(actual, 'auto-fix.ts 的生成器规则与注册表声明不一致 —— 能力清单与实现漂移了').toEqual(
+      declared,
+    );
   });
 });

@@ -8,11 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { HealthScoreData } from '../types/electron';
-import {
-  buildWindowBuckets,
-  summarizeWindows,
-  windowKeyOf,
-} from '../pages/report-windows';
+import { buildWindowBuckets, summarizeWindows, windowKeyOf } from '../pages/report-windows';
 
 /** 构造一条评分记录；dimensions 默认给两个维度，便于验证维度变化 */
 function score(
@@ -109,10 +105,7 @@ describe('buildWindowBuckets', () => {
 
   it('输入乱序也按时间升序输出，且首末取真实首末', () => {
     const buckets = buildWindowBuckets(
-      [
-        score('2026-10-24T08:00:00.000Z', 91),
-        score('2026-10-24T01:00:00.000Z', 88),
-      ],
+      [score('2026-10-24T08:00:00.000Z', 91), score('2026-10-24T01:00:00.000Z', 88)],
       'day',
     );
     expect(buckets).toHaveLength(1);

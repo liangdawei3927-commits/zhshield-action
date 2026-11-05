@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { t } from '@zh/i18n';
 import type { ToastVariant } from './components/ui/toast-logic';
 import { getSentinelState, setSentinelEnabled } from './services/engineApi';

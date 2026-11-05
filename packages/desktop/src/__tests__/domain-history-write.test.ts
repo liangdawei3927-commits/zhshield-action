@@ -87,8 +87,6 @@ describe('writeDiagnosticsFile → 域历史', () => {
   it('未运行的域不产生历史（不拿空数组冒充「扫过了」）', async () => {
     const project = tempProject();
     await writeDiagnosticsFile(report(project, [entry]), ['inspect']);
-    expect(
-      fs.existsSync(path.join(project, '.zhshield', 'history', 'refactor.jsonl')),
-    ).toBe(false);
+    expect(fs.existsSync(path.join(project, '.zhshield', 'history', 'refactor.jsonl'))).toBe(false);
   });
 });

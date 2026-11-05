@@ -55,7 +55,11 @@ function isResolutionError(ruleId: string): boolean {
 /** 判断一条 tsc 诊断是否落在 node_modules 内（第三方代码，绝不应算作用户缺陷） */
 function isInNodeModules(file: string, projectPath: string): boolean {
   const nm = path.join(projectPath, 'node_modules');
-  return file === nm || file.startsWith(nm + path.sep) || file.includes(`${path.sep}node_modules${path.sep}`);
+  return (
+    file === nm ||
+    file.startsWith(nm + path.sep) ||
+    file.includes(`${path.sep}node_modules${path.sep}`)
+  );
 }
 
 /**
@@ -63,7 +67,10 @@ function isInNodeModules(file: string, projectPath: string): boolean {
  * 伪影 = 落在 node_modules 内的诊断 + 纯解析错误（TS2307/TS2580）。
  * 门禁只认前者；后者说明检查无法给出可信结论，应降级而非阻断。
  */
-export function splitTscIssues(all: Issue[], projectPath: string): { issues: Issue[]; envArtifactCount: number } {
+export function splitTscIssues(
+  all: Issue[],
+  projectPath: string,
+): { issues: Issue[]; envArtifactCount: number } {
   const issues: Issue[] = [];
   let envArtifactCount = 0;
   for (const issue of all) {
@@ -209,7 +216,10 @@ export class TypeScriptAdapter implements ToolAdapter {
   private readonly locale: LanguageCode;
 
   /** F5：tsc 按 tsconfig 编译检查全部 TS 源文件 */
-  readonly accessScope: AccessScope = buildAccessScope(['**/*.{ts,tsx,mts,cts}', '**/tsconfig.json']);
+  readonly accessScope: AccessScope = buildAccessScope([
+    '**/*.{ts,tsx,mts,cts}',
+    '**/tsconfig.json',
+  ]);
 
   constructor(projectRoot?: string, locale?: LanguageCode) {
     this.commands = new ToolCommandResolver('tsc', projectRoot);
@@ -411,7 +421,11 @@ export class TypeScriptAdapter implements ToolAdapter {
     } catch (error: unknown) {
       const err = asToolExecError(error);
       if (err.code === 'ENOENT') {
-        return { issues: [], envArtifactCount: 0, infraError: this.tr('engine.inspect.tool.tsc.unavailable') };
+        return {
+          issues: [],
+          envArtifactCount: 0,
+          infraError: this.tr('engine.inspect.tool.tsc.unavailable'),
+        };
       }
       // 非 TTY 下 tsc 诊断输出到 stdout，报错场景需同时解析两个流
       const raw = `${err.stdout ?? ''}\n${err.stderr ?? ''}`;

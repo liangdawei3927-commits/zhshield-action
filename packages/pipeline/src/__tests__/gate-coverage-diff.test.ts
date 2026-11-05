@@ -125,7 +125,16 @@ describe('computeDiffCoverage', () => {
   const changed = new Map([['src/a.ts', new Set([1, 2, 3])]]);
 
   it('GIVEN 3 行改动 2 行覆盖 WHEN 计算 THEN 66.7%（保留一位小数）', () => {
-    const coverage = new Map([['src/a.ts', new Map([[1, 1], [2, 4], [3, 0]])]]);
+    const coverage = new Map([
+      [
+        'src/a.ts',
+        new Map([
+          [1, 1],
+          [2, 4],
+          [3, 0],
+        ]),
+      ],
+    ]);
 
     expect(computeDiffCoverage(changed, coverage)).toEqual({
       pct: 66.7,

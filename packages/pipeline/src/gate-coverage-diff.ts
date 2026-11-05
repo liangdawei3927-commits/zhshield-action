@@ -44,8 +44,7 @@ export interface DiffCoverageResult {
 
 /** 基线解析结果 */
 export type CoverageBaseResult =
-  | { readonly base: string; readonly how: string }
-  | { readonly reason: string };
+  { readonly base: string; readonly how: string } | { readonly reason: string };
 
 /**
  * 解析覆盖率基线。
@@ -77,7 +76,14 @@ export function resolveCoverageBase(repoRoot: string, explicit?: string): Covera
 
 /** 取 base..工作区 的改动行 */
 export function readChangedLines(repoRoot: string, base: string): ChangedLines | string {
-  const patch = tryGit(repoRoot, ['diff', '--unified=0', '--no-color', '--no-ext-diff', base, '--']);
+  const patch = tryGit(repoRoot, [
+    'diff',
+    '--unified=0',
+    '--no-color',
+    '--no-ext-diff',
+    base,
+    '--',
+  ]);
   if (patch === undefined) {
     return `读取改动行失败：git diff ${base} 执行失败（仓库可能不可用或该 commit 已被回收）`;
   }

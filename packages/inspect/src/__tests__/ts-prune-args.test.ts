@@ -66,9 +66,7 @@ describe('工具扫描默认超时 — 适配器不得早于外层护栏放弃',
       path.resolve(PKG_ROOT, '../kernel/src/runner/dispatch-shared.ts'),
       'utf8',
     );
-    const matched = kernelSrc.match(
-      /export const DEFAULT_TOOL_SCAN_TIMEOUT_MS\s*=\s*([\d_]+)/,
-    );
+    const matched = kernelSrc.match(/export const DEFAULT_TOOL_SCAN_TIMEOUT_MS\s*=\s*([\d_]+)/);
     expect(matched).not.toBeNull();
     const kernelValue = Number((matched as RegExpMatchArray)[1].replace(/_/g, ''));
     expect(kernelValue).toBe(DEFAULT_TOOL_SCAN_TIMEOUT_MS);

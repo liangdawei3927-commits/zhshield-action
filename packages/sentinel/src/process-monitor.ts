@@ -28,7 +28,12 @@ import {
   type ProcessEventSpec,
 } from './process-events';
 
-export { FaultDetector, classifyNonRemediableFault, decideRestart, isInformationalEvent } from './process-faults';
+export {
+  FaultDetector,
+  classifyNonRemediableFault,
+  decideRestart,
+  isInformationalEvent,
+} from './process-faults';
 export type { NonRemediableFault, ProcessMonitorState, RestartDecision } from './process-faults';
 
 /** 本轮输出尾部保留上限：仅供 restart-limit 事件的诊断上下文，故障判定不依赖它 */

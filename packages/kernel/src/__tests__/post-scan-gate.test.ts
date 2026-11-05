@@ -241,7 +241,10 @@ describe('post-scan gate — 阻断语义（action 决定，不看 severity）',
   });
 
   it('GIVEN 非阻断门禁取不到数 WHEN 判定 THEN 不阻断但 complete 仍为 false', () => {
-    const report = evaluatePostScanGates([advisoryGate()], always({ unavailableReason: '缺数据源' }));
+    const report = evaluatePostScanGates(
+      [advisoryGate()],
+      always({ unavailableReason: '缺数据源' }),
+    );
 
     expect(report.ok).toBe(true);
     expect(report.blockingUndetermined).toBe(0);

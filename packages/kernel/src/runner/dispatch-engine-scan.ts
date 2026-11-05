@@ -127,7 +127,12 @@ export async function evalPreset(
   }
 
   if (!host.inspectEngine) {
-    return skipEvaluation(rule, 'InspectEngine 未注册，且无可用 preset 工具适配器', 'inspect', true);
+    return skipEvaluation(
+      rule,
+      'InspectEngine 未注册，且无可用 preset 工具适配器',
+      'inspect',
+      true,
+    );
   }
   if (host.evalDepth > 1) {
     return skipEvaluation(rule, '跳过 preset→runScan（防止规则引擎重入）', 'inspect');

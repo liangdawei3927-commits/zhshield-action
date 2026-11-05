@@ -40,7 +40,10 @@ function makeEvaluation(overrides: Partial<RuleEvaluation>): RuleEvaluation {
   } as RuleEvaluation;
 }
 
-function makeReport(evaluations: RuleEvaluation[], counts: Partial<RuleEngineReport> = {}): RuleEngineReport {
+function makeReport(
+  evaluations: RuleEvaluation[],
+  counts: Partial<RuleEngineReport> = {},
+): RuleEngineReport {
   return {
     total: evaluations.length,
     passed: evaluations.filter((e) => e.status === 'passed').length,
@@ -101,12 +104,15 @@ describe('RuleEngineSectionFormatter — SOP 引擎报告终端渲染', () => {
 
   it('四类状态各自归入对应分组：失败/错误/跳过/通过', () => {
     const text = formatText(
-      makeReport([
-        makeEvaluation({ rule: makeRule('r.fail'), status: 'failed' }),
-        makeEvaluation({ rule: makeRule('r.err'), status: 'error', message: '超时' }),
-        makeEvaluation({ rule: makeRule('r.skip'), status: 'skipped', message: '工具缺失' }),
-        makeEvaluation({ rule: makeRule('r.pass'), status: 'passed' }),
-      ], { ok: false }),
+      makeReport(
+        [
+          makeEvaluation({ rule: makeRule('r.fail'), status: 'failed' }),
+          makeEvaluation({ rule: makeRule('r.err'), status: 'error', message: '超时' }),
+          makeEvaluation({ rule: makeRule('r.skip'), status: 'skipped', message: '工具缺失' }),
+          makeEvaluation({ rule: makeRule('r.pass'), status: 'passed' }),
+        ],
+        { ok: false },
+      ),
     );
 
     expect(text).toContain('失败规则:');
@@ -155,7 +161,9 @@ describe('RuleEngineSectionFormatter — SOP 引擎报告终端渲染', () => {
       suggestion: '修复它',
     }));
     const text = formatText(
-      makeReport([makeEvaluation({ rule: makeRule('r.bulk'), status: 'failed', violations })], { ok: false }),
+      makeReport([makeEvaluation({ rule: makeRule('r.bulk'), status: 'failed', violations })], {
+        ok: false,
+      }),
     );
 
     expect(text).toContain('src/f0.ts:1');
@@ -168,9 +176,16 @@ describe('RuleEngineSectionFormatter — SOP 引擎报告终端渲染', () => {
 
   it('失败评估带 files 时显示涉及文件数——规模感影响排障优先级判断', () => {
     const text = formatText(
-      makeReport([
-        makeEvaluation({ rule: makeRule('r.files'), status: 'failed', files: ['a.ts', 'b.ts', 'c.ts'] }),
-      ], { ok: false }),
+      makeReport(
+        [
+          makeEvaluation({
+            rule: makeRule('r.files'),
+            status: 'failed',
+            files: ['a.ts', 'b.ts', 'c.ts'],
+          }),
+        ],
+        { ok: false },
+      ),
     );
     expect(text).toContain('涉及文件: 3 个');
   });
@@ -184,13 +199,29 @@ describe('tallyViolationsByCategory — 违规分类统计', () => {
         status: 'failed',
         violations: [
           { id: 'v1', ruleId: 'r', severity: 'low', file: 'a.ts', message: 'm1' },
-          { id: 'v2', ruleId: 'r', severity: 'low', file: 'b.ts', message: 'm2', category: 'security' },
+          {
+            id: 'v2',
+            ruleId: 'r',
+            severity: 'low',
+            file: 'b.ts',
+            message: 'm2',
+            category: 'security',
+          },
         ],
       }),
       makeEvaluation({
         rule: makeRule('r.pass'),
         status: 'passed',
-        violations: [{ id: 'v3', ruleId: 'r', severity: 'low', file: 'c.ts', message: 'm3', category: 'quality' }],
+        violations: [
+          {
+            id: 'v3',
+            ruleId: 'r',
+            severity: 'low',
+            file: 'c.ts',
+            message: 'm3',
+            category: 'quality',
+          },
+        ],
       }),
     ];
 

@@ -74,11 +74,7 @@ interface PageShellProps {
 }
 
 /** 「规划中 / 已移交」能力灰显区：只告知，不并入功能网格，避免变相宣称 */
-function PlannedList({
-  items,
-}: {
-  items: NonNullable<PageShellProps['plannedFeatures']>;
-}) {
+function PlannedList({ items }: { items: NonNullable<PageShellProps['plannedFeatures']> }) {
   if (items.length === 0) return null;
   return (
     <div className="w-full max-w-2xl px-6 pb-10" data-testid="planned-capabilities">
@@ -88,9 +84,7 @@ function PlannedList({
       <ul className="flex flex-col gap-1.5">
         {items.map((item, i) => (
           <li key={i} className="flex items-start gap-2 text-[11px] text-zh-muted">
-            <span className="shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-zh-panel">
-              {item.badge}
-            </span>
+            <span className="shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-zh-panel">{item.badge}</span>
             <span className="shrink-0 font-medium text-zh-ink-2/70">{item.title}</span>
             <span className="flex-1 min-w-0 text-zh-muted/80">{item.desc}</span>
           </li>
@@ -173,10 +167,9 @@ function DetailCornerLink() {
  * 只多一条「loading 必填」，且不带底部功能网格那几项。
  * 用 Omit 派生而非照抄一份字段清单，避免两处声明随迭代漂移。
  */
-type PageHeroProps = Omit<
-  PageShellProps,
-  'loading' | 'featureList' | 'footer' | 'columns'
-> & { loading: boolean };
+type PageHeroProps = Omit<PageShellProps, 'loading' | 'featureList' | 'footer' | 'columns'> & {
+  loading: boolean;
+};
 
 /** 分数环下钻入口（P2-7）：详情可用时整环可点，与右上角图标同源（DetailEntryContext） */
 function IllustrationSlot({ children }: { children: ReactNode }) {
@@ -313,9 +306,7 @@ export function PageShell({
       {featureList && featureList.length > 0 && (
         <FeatureList features={featureList} columns={columns} />
       )}
-      {plannedFeatures && plannedFeatures.length > 0 && (
-        <PlannedList items={plannedFeatures} />
-      )}
+      {plannedFeatures && plannedFeatures.length > 0 && <PlannedList items={plannedFeatures} />}
     </div>
   );
 }

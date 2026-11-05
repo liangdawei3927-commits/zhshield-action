@@ -73,46 +73,30 @@ async function countHits(ruleId: string, sample: string, tag: string): Promise<n
 }
 
 describe('error 级规则双自证 golden', () => {
-  it(
-    'large-class：21 方法类必报，干净小类必不报',
-    async () => {
-      const tp = await countHits('large-class', GOD_CLASS_SAMPLE, 'gate-large-class-tp');
-      console.log(`[large-class golden] 真阳性命中数: ${tp}`);
-      expect(tp).toBeGreaterThanOrEqual(1);
+  it('large-class：21 方法类必报，干净小类必不报', async () => {
+    const tp = await countHits('large-class', GOD_CLASS_SAMPLE, 'gate-large-class-tp');
+    console.log(`[large-class golden] 真阳性命中数: ${tp}`);
+    expect(tp).toBeGreaterThanOrEqual(1);
 
-      const fp = await countHits('large-class', CLEAN_SAMPLE, 'gate-large-class-clean');
-      expect(fp).toBe(0);
-    },
-    30_000,
-  );
+    const fp = await countHits('large-class', CLEAN_SAMPLE, 'gate-large-class-clean');
+    expect(fp).toBe(0);
+  }, 30_000);
 
-  it(
-    'god-object：21 个公共方法必报，干净小类必不报',
-    async () => {
-      const tp = await countHits('god-object', GOD_CLASS_SAMPLE, 'gate-god-object-tp');
-      console.log(`[god-object golden] 真阳性命中数: ${tp}`);
-      expect(tp).toBeGreaterThanOrEqual(1);
+  it('god-object：21 个公共方法必报，干净小类必不报', async () => {
+    const tp = await countHits('god-object', GOD_CLASS_SAMPLE, 'gate-god-object-tp');
+    console.log(`[god-object golden] 真阳性命中数: ${tp}`);
+    expect(tp).toBeGreaterThanOrEqual(1);
 
-      const fp = await countHits('god-object', CLEAN_SAMPLE, 'gate-god-object-clean');
-      expect(fp).toBe(0);
-    },
-    30_000,
-  );
+    const fp = await countHits('god-object', CLEAN_SAMPLE, 'gate-god-object-clean');
+    expect(fp).toBe(0);
+  }, 30_000);
 
-  it(
-    'inappropriate-intimacy：4 个公共字段必报，3 个以内必不报',
-    async () => {
-      const tp = await countHits(
-        'inappropriate-intimacy',
-        PUBLIC_FIELDS_SAMPLE,
-        'gate-intimacy-tp',
-      );
-      console.log(`[inappropriate-intimacy golden] 真阳性命中数: ${tp}`);
-      expect(tp).toBeGreaterThanOrEqual(1);
+  it('inappropriate-intimacy：4 个公共字段必报，3 个以内必不报', async () => {
+    const tp = await countHits('inappropriate-intimacy', PUBLIC_FIELDS_SAMPLE, 'gate-intimacy-tp');
+    console.log(`[inappropriate-intimacy golden] 真阳性命中数: ${tp}`);
+    expect(tp).toBeGreaterThanOrEqual(1);
 
-      const fp = await countHits('inappropriate-intimacy', CLEAN_SAMPLE, 'gate-intimacy-clean');
-      expect(fp).toBe(0);
-    },
-    30_000,
-  );
+    const fp = await countHits('inappropriate-intimacy', CLEAN_SAMPLE, 'gate-intimacy-clean');
+    expect(fp).toBe(0);
+  }, 30_000);
 });

@@ -1,6 +1,5 @@
 import type { BaselineEntry, Issue as SharedIssue, SuppressedIssue } from '@zh/shared';
 
-
 /** 问题分类维度（跨域单一来源：与 @zh/shared 的 IssueCategory 同源） */
 export type { IssueCategory } from '@zh/shared';
 

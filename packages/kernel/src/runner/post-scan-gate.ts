@@ -61,7 +61,8 @@ export const POST_SCAN_GATE_BINDINGS: Readonly<Record<string, GateMetric>> = {
  * 登记表仍然显式：不按 `mapping` 字段猜 —— 猜错就会出现「一条规则被静默跳过」。
  */
 export const MAPPING_RULES: Readonly<Record<string, string>> = {
-  'inspect.score.official.quality-score': '巡检结果 → 质量分的换算映射（threshold 为满分基准，非通过线）',
+  'inspect.score.official.quality-score':
+    '巡检结果 → 质量分的换算映射（threshold 为满分基准，非通过线）',
 };
 
 /** 规则在本系统里到底「怎么被执行」——三者互斥，必须落到其中之一 */
@@ -142,8 +143,7 @@ export function selectPostScanGates(rules: readonly SopRule[]): SopRule[] {
  * 会拼进 message —— 只给数字不给口径，等于让用户自己去猜这个数怎么来的。
  */
 export type GateValue =
-  | { readonly actual: number; readonly note?: string }
-  | { readonly unavailableReason: string };
+  { readonly actual: number; readonly note?: string } | { readonly unavailableReason: string };
 
 /** 单条门禁的判定结果三态：未判定与未达标是两回事，不可合并 */
 export type GateStatus = 'passed' | 'failed' | 'undetermined';

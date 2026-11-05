@@ -30,9 +30,7 @@ export interface HistoryRow {
  * 最后一条（最早的一次）没有更早的记录可比 → added/removed 记 0，
  * scoreDelta 为 null —— 首次扫描不编造涨跌。
  */
-export function buildHistoryRows(
-  records: readonly DomainScanRecordData[],
-): HistoryRow[] {
+export function buildHistoryRows(records: readonly DomainScanRecordData[]): HistoryRow[] {
   return records.map((record, index) => {
     const previous = records[index + 1] ?? null;
     if (!previous) {

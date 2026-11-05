@@ -25,9 +25,13 @@ export function ProjectOnboardingPage({
   const t = useT();
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [presetConfirmed, setPresetConfirmed] = useState(false);
-  const [profileSummary, setProfileSummary] = useState<import('./ProjectOnboardingPage-types').OnboardingProfileSummary | null>(null);
+  const [profileSummary, setProfileSummary] = useState<
+    import('./ProjectOnboardingPage-types').OnboardingProfileSummary | null
+  >(null);
   const [profileConfirmed, setProfileConfirmed] = useState(false);
-  const [ruleSyncSummary, setRuleSyncSummary] = useState<import('./ProjectOnboardingPage-types').RuleSyncSummary | null>(null);
+  const [ruleSyncSummary, setRuleSyncSummary] = useState<
+    import('./ProjectOnboardingPage-types').RuleSyncSummary | null
+  >(null);
   const { toolsStatus, setToolsStatus, refreshTools } = useToolsStatusState(projectPath);
 
   const steps = buildSteps({

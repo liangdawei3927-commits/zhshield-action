@@ -1,11 +1,7 @@
 import { PageShell } from '../components/business/PageShell';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useReportsPage, useModuleScores } from './reports-logic';
-import {
-  StackedDocs,
-  ReportsHeader,
-  ModuleScoreCards,
-} from './reports-parts';
+import { StackedDocs, ReportsHeader, ModuleScoreCards } from './reports-parts';
 import { ScoreOverviewRow } from './category-score-cards';
 import { overviewRowInput } from './category-score-logic';
 import { countRunDimensions } from './reports-logic';

@@ -46,9 +46,7 @@ function TyposquatEmptyState() {
   return (
     <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
       <span className="text-2xl">🛡️</span>
-      <span className="text-sm font-medium text-success-700">
-        {t('page.deps.typosquat.none')}
-      </span>
+      <span className="text-sm font-medium text-success-700">{t('page.deps.typosquat.none')}</span>
     </div>
   );
 }
@@ -212,8 +210,8 @@ function LockfileDiffs({ diffs }: { diffs: LockfileVerificationData['diffs'] }) 
       <div className="space-y-1">
         {diffs.map((diff) => (
           <div key={`${diff.name}:${diff.declaredVersion}`} className="text-[11px] text-zh-muted">
-            <span className="font-medium text-zh-ink-2">{diff.name}</span>{' '}
-            {diff.declaredVersion} → {diff.lockedVersion || '—'}
+            <span className="font-medium text-zh-ink-2">{diff.name}</span> {diff.declaredVersion} →{' '}
+            {diff.lockedVersion || '—'}
           </div>
         ))}
       </div>
@@ -275,9 +273,7 @@ function UpgradeEmptyState() {
   return (
     <div className="rounded-xl flex flex-col items-center justify-center py-12 gap-2 bg-zh-panel border border-dashed border-zh-line">
       <span className="text-2xl">🟢</span>
-      <span className="text-sm font-medium text-success-700">
-        {t('page.deps.upgrade.none')}
-      </span>
+      <span className="text-sm font-medium text-success-700">{t('page.deps.upgrade.none')}</span>
     </div>
   );
 }

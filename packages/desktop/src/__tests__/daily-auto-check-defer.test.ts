@@ -1,11 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  AUTO_DEFER_MAX_MS,
-  ranToday,
-  shouldDeferAutoRun,
-} from '../hooks/daily-auto-check-logic';
+import { AUTO_DEFER_MAX_MS, ranToday, shouldDeferAutoRun } from '../hooks/daily-auto-check-logic';
 
 /**
  * 后台自动检查「让路」守卫（2026-10-25）。
@@ -94,7 +90,9 @@ describe('useDailyAutoCheck 接线守卫', () => {
   });
 
   it('今日记录只允许一个写入点，且必须排在让路判据之后（禁止"先写记录再跑"）', () => {
-    const callSites = src.split('\n').filter((l) => l.includes('writeStoredAuto(scope, projectPath'));
+    const callSites = src
+      .split('\n')
+      .filter((l) => l.includes('writeStoredAuto(scope, projectPath'));
     expect(callSites).toHaveLength(1);
 
     const lines = src.split('\n');

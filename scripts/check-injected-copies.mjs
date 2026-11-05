@@ -102,7 +102,19 @@ function distMatchesSrc(pkgDir) {
     // --outDir 覆盖 tsconfig 里的 outDir；composite 关掉以免写 tsbuildinfo 到源目录。
     execFileSync(
       'npx',
-      ['tsc', '-p', tsconfig, '--outDir', tmpDir, '--composite', 'false', '--declaration', 'false', '--declarationMap', 'false'],
+      [
+        'tsc',
+        '-p',
+        tsconfig,
+        '--outDir',
+        tmpDir,
+        '--composite',
+        'false',
+        '--declaration',
+        'false',
+        '--declarationMap',
+        'false',
+      ],
       { cwd: process.cwd(), stdio: 'pipe', timeout: 300000 },
     );
   } catch {
@@ -201,7 +213,9 @@ if (checkedCount === 0) {
 }
 
 if (staleDists.size > 0) {
-  console.error('⚠️  以下包的签入 dist 与当前 src 编译结果不一致（下游会用到过期产物，改完记得 pnpm --filter <pkg> build）：');
+  console.error(
+    '⚠️  以下包的签入 dist 与当前 src 编译结果不一致（下游会用到过期产物，改完记得 pnpm --filter <pkg> build）：',
+  );
   for (const [pkgDir, info] of staleDists) {
     const v = info.verdict;
     const detail =

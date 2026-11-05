@@ -117,10 +117,7 @@ export function listAutoFixBackups(projectPath: string): AutoFixBackupEntry[] {
  * 返回 ok=false 而不抛异常：撤销失败是**用户可理解的业务结果**（UI 要展示原因），
  * 与"参数非法"（调用方 bug，直接 reject）分级处理。
  */
-export function restoreAutoFixBackup(
-  projectPath: string,
-  backupDir: string,
-): RestoreAutoFixResult {
+export function restoreAutoFixBackup(projectPath: string, backupDir: string): RestoreAutoFixResult {
   if (!projectPath || typeof projectPath !== 'string') return invalidBackup();
   if (!backupDir || typeof backupDir !== 'string') return invalidBackup();
 

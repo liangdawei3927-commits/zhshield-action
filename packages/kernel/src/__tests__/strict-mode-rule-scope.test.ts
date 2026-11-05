@@ -37,8 +37,8 @@ describe('strict-mode 规则的栈限定（随项目画像裁剪）', () => {
 
   it('TypeScript 项目仍保留 strict-mode 规则', async () => {
     const rule = await loadRule('inspect.scan.internal.strict-mode');
-    expect(
-      ruleMatchesProject(rule, { language: 'typescript', features: ['typescript'] }),
-    ).toBe(true);
+    expect(ruleMatchesProject(rule, { language: 'typescript', features: ['typescript'] })).toBe(
+      true,
+    );
   });
 });

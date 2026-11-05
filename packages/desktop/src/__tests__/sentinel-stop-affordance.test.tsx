@@ -139,7 +139,9 @@ const hasDisabledAttr = (html: string): boolean => /\sdisabled(?:=|[\s>])/.test(
 
 describe('哨兵：忙态判定是唯一口径（主页与详情页同源）', () => {
   it('监控中 ⇒ 忙态 + 可停 + 归属 sentinelMonitor', () => {
-    expect(deriveSentinelActionState({ monitoring: true, loading: false, stopping: false })).toEqual({
+    expect(
+      deriveSentinelActionState({ monitoring: true, loading: false, stopping: false }),
+    ).toEqual({
       busy: true,
       domain: 'sentinelMonitor',
       cancellable: true,
@@ -148,7 +150,9 @@ describe('哨兵：忙态判定是唯一口径（主页与详情页同源）', (
   });
 
   it('未监控且空闲 ⇒ 不忙、不可停', () => {
-    expect(deriveSentinelActionState({ monitoring: false, loading: false, stopping: false })).toEqual({
+    expect(
+      deriveSentinelActionState({ monitoring: false, loading: false, stopping: false }),
+    ).toEqual({
       busy: false,
       domain: 'sentinel',
       cancellable: false,
@@ -157,7 +161,9 @@ describe('哨兵：忙态判定是唯一口径（主页与详情页同源）', (
   });
 
   it('未监控但正在拉事件 ⇒ 忙但**不可停**（没有可取消的执行器，不摆假入口）', () => {
-    expect(deriveSentinelActionState({ monitoring: false, loading: true, stopping: false })).toEqual({
+    expect(
+      deriveSentinelActionState({ monitoring: false, loading: true, stopping: false }),
+    ).toEqual({
       busy: true,
       domain: 'sentinel',
       cancellable: false,
@@ -166,12 +172,14 @@ describe('哨兵：忙态判定是唯一口径（主页与详情页同源）', (
   });
 
   it('停止中 ⇒ 透传 stopping（按钮显示「停止中…」并禁用，防连点）', () => {
-    expect(deriveSentinelActionState({ monitoring: true, loading: false, stopping: true })).toEqual({
-      busy: true,
-      domain: 'sentinelMonitor',
-      cancellable: true,
-      stopping: true,
-    });
+    expect(deriveSentinelActionState({ monitoring: true, loading: false, stopping: true })).toEqual(
+      {
+        busy: true,
+        domain: 'sentinelMonitor',
+        cancellable: true,
+        stopping: true,
+      },
+    );
   });
 });
 

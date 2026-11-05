@@ -67,8 +67,9 @@ export class RuleEngineReportFormatter {
     const { report, lines, indent } = ctx;
     const categories = tallyViolationsByCategory(report.evaluations);
     if (categories.length > 0) {
-      const catParts = categories
-        .map(([cat, count]) => `${this.color.magenta(cat)} ${this.color.bold(String(count))}`);
+      const catParts = categories.map(
+        ([cat, count]) => `${this.color.magenta(cat)} ${this.color.bold(String(count))}`,
+      );
       lines.push(
         `${indent}  ${this.tt('reporter.category')}: ${catParts.join(this.color.dim(', '))}`,
       );

@@ -80,13 +80,7 @@ export interface FileDiagnostics {
 export interface DomainDimensionScore {
   /** 对应 @zh/scoring 的评分维度 */
   dimension:
-    | 'quality'
-    | 'security'
-    | 'dependencies'
-    | 'performance'
-    | 'garbage'
-    | 'techdebt'
-    | 'refactor';
+    'quality' | 'security' | 'dependencies' | 'performance' | 'garbage' | 'techdebt' | 'refactor';
   /** 0-100（error -8 / warning -4 / info -1，下限 0） */
   score: number;
   /** 计分所依据的问题条数 */

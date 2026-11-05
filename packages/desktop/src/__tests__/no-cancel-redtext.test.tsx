@@ -128,7 +128,9 @@ describe('锁 2：消费端必须先处理 cancelled 再处理 failed', () => {
     const cancelledIdx = src.indexOf("outcome.kind === 'cancelled'");
     const failedIdx = src.indexOf("outcome.kind === 'failed'");
     expect(cancelledIdx, 'inspect-logic 没处理 cancelled 态').toBeGreaterThan(-1);
-    expect(failedIdx, 'inspect-logic 没了 failed 分支（实现变了请同步更新门禁）').toBeGreaterThan(-1);
+    expect(failedIdx, 'inspect-logic 没了 failed 分支（实现变了请同步更新门禁）').toBeGreaterThan(
+      -1,
+    );
     expect(cancelledIdx, 'cancelled 必须排在 failed 之前，否则取消会先落失败页').toBeLessThan(
       failedIdx,
     );
@@ -173,7 +175,7 @@ describe('锁 4：界面不存在「任务已取消」的渲染点', () => {
     expect(html, '按钮下方出现了「任务已取消」红字').not.toContain('任务已取消');
   });
 
-  it('没有任何组件渲染 t(\'task.cancelled\') 或硬编码「任务已取消」', () => {
+  it("没有任何组件渲染 t('task.cancelled') 或硬编码「任务已取消」", () => {
     const files = collect(SRC);
     expect(files.length, '扫描范围自证：src 文件数').toBeGreaterThan(50);
 

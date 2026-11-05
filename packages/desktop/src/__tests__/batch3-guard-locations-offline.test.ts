@@ -9,10 +9,7 @@ import type { GuardReport } from '@zh/guard';
 import { withOfflineTimeout } from '../components/onboarding/ProjectOnboardingPage-utils';
 
 /** 构造最小 GuardReport：单条非 passed 检查项 */
-function guardReportWith(
-  details: unknown,
-  message = '扫描器发现 1 个问题',
-): GuardReport {
+function guardReportWith(details: unknown, message = '扫描器发现 1 个问题'): GuardReport {
   return {
     contractVersion: 'p0.v1',
     mode: 'manual',
@@ -116,11 +113,7 @@ describe('P1-3 向导离线超时（withOfflineTimeout）', () => {
   });
 
   it('undefined 输入（API 缺失）：直接落 fallback', async () => {
-    const result = await withOfflineTimeout<string | undefined>(
-      undefined,
-      () => undefined,
-      30,
-    );
+    const result = await withOfflineTimeout<string | undefined>(undefined, () => undefined, 30);
     expect(result).toBeUndefined();
   });
 });

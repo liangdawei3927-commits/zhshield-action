@@ -9,6 +9,19 @@ import { SectionIcon } from '../components/ui/Icons';
 import { ConfigCountTile } from './dependency-parts-license';
 
 /**
+ * 严重度 → 计数卡配色。
+ *
+ * 抽成查表而不是在 JSX 里写嵌套三元：那两处三元一旦被 Prettier 展开成多行，
+ * 会把整个组件撑过 long-method 阈值（语义没变却新增一条坏味道）。
+ * 而它本质上就是三档映射，查表本就比嵌套三元更贴切。
+ */
+const SEVERITY_TILE_STYLE = {
+  critical: { bg: 'bg-danger-50', color: 'text-danger-600' },
+  high: { bg: 'bg-warning-50', color: 'text-warning-600' },
+  medium: { bg: 'bg-zh-card', color: 'text-zh-ink' },
+} as const;
+
+/**
  * P1-8：CVE 检测卡片。核心契约——「不可用」必须显形：
  * status='unavailable' 显示「CVE 未检测」+ 原因，绝不静默呈现 0 漏洞的安全假象。
  * 旧数据无 cve 字段（undefined）同样按未检测对待。
@@ -32,7 +45,9 @@ export function DependencyCveCard({ report }: { report: DependencyReportData }) 
       {unavailable ? (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
           <div>
-            <div className="text-sm font-medium text-warning-700">{t('page.deps.cve.unavailable')}</div>
+            <div className="text-sm font-medium text-warning-700">
+              {t('page.deps.cve.unavailable')}
+            </div>
             <div className="text-xs text-warning-500 mt-0.5">
               {cve?.reason ?? t('page.deps.cve.dataUnavailable')}
             </div>
@@ -45,11 +60,12 @@ export function DependencyCveCard({ report }: { report: DependencyReportData }) 
           <div className="grid grid-cols-3 gap-3 mb-3">
             {(['critical', 'high', 'medium'] as const).map((sev) => {
               const count = cve.findings.filter((f) => f.severity === sev).length;
+              const tile = SEVERITY_TILE_STYLE[sev];
               return (
                 <ConfigCountTile
                   key={sev}
-                  bg={sev === 'critical' ? 'bg-danger-50' : sev === 'high' ? 'bg-warning-50' : 'bg-zh-card'}
-                  color={sev === 'critical' ? 'text-danger-600' : sev === 'high' ? 'text-warning-600' : 'text-zh-ink'}
+                  bg={tile.bg}
+                  color={tile.color}
                   count={count}
                   label={t(`severity.${sev}`)}
                 />

@@ -60,11 +60,7 @@ interface WalkGlobOptions {
   results: string[];
 }
 
-async function walkGlob(
-  currentDir: string,
-  options: WalkGlobOptions,
-  depth = 0,
-): Promise<void> {
+async function walkGlob(currentDir: string, options: WalkGlobOptions, depth = 0): Promise<void> {
   const { rootDir, isMatch, results } = options;
   if (depth > MAX_GLOB_DEPTH) return;
   let dirEntries: fs.Dirent[];

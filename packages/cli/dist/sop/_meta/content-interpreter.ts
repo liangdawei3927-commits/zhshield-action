@@ -102,7 +102,11 @@ export class ContentInterpreter {
     // 此前 tool-dispatch 分支只合并 check.toolConfig，顶层 thresholds 直接被丢弃 → 适配器
     // （如 jscpd）永远拿不到规则阈值，只能吃 CLI 默认值导致检出过严。并入 toolConfig 供
     // 适配器从 options.config.thresholds 读取；toolConfig 已显式声明 thresholds 时优先保留。
-    if (toolConfig.thresholds === undefined && typeof c.thresholds === 'object' && c.thresholds !== null) {
+    if (
+      toolConfig.thresholds === undefined &&
+      typeof c.thresholds === 'object' &&
+      c.thresholds !== null
+    ) {
       toolConfig.thresholds = c.thresholds;
     }
 

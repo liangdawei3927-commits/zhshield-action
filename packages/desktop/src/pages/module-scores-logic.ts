@@ -29,9 +29,7 @@ export async function collectModuleScores(
     modules.map(async (m) => {
       const name = m.path.split(PATH_SEP_RE).pop() || m.path;
       if (!ABS_PATH_RE.test(m.path)) {
-        console.warn(
-          `[module-scores] 模块路径不是绝对路径，跳过查询以免跨项目串数据: ${m.path}`,
-        );
+        console.warn(`[module-scores] 模块路径不是绝对路径，跳过查询以免跨项目串数据: ${m.path}`);
         return { path: m.path, name, type: m.type, score: null, summary: null };
       }
       const s = await getScore(m.path);

@@ -102,9 +102,7 @@ export class GrypeAdapter implements ToolAdapter {
     // DB 未就绪 → 不进 300s 下载等待；跳过本次 + 后台初始化（下次扫描 DB 生效）
     if (!(await isDbReady(command))) {
       await triggerDbUpdateInBackground(command);
-      throw new Error(
-        'grype 漏洞库未就绪（首次使用需联网下载，已后台初始化，稍后重新扫描即生效）',
-      );
+      throw new Error('grype 漏洞库未就绪（首次使用需联网下载，已后台初始化，稍后重新扫描即生效）');
     }
     // A12：经 runToolOnce 派发（运行作用域内同参只跑一次；作用域外与 execFile 等价）
     const { stdout } = await runToolOnce(command, [source, '-o', 'json'], {

@@ -8,34 +8,26 @@ const FIXTURES_DIR = path.resolve(__dirname, 'fixtures');
 
 describe('detectOversizedComponent (JSX 深度计量)', () => {
   it('浅 JSX + TS 泛型组件不应被误判为 oversized (TDD RED)', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'));
     const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
     expect(smells).toEqual([]);
   });
 
   it('兄弟组件的 JSX 深度不得在子树间泄漏 (TDD RED)', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-siblings.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-siblings.fixture.tsx'));
     const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
     expect(smells).toEqual([]);
   });
 
   it('多组件文件的组件行数须按组件粒度统计 (TDD RED)', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-multi-small.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-multi-small.fixture.tsx'));
     expect(parsed.linesOfCode).toBeGreaterThan(150);
     const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
     expect(smells).toEqual([]);
   });
 
   it('单个真超大组件仍被报告，且定位到组件起始行', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-siblings.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-siblings.fixture.tsx'));
     const tight = {
       ...DEFAULT_CONFIG,
       thresholds: { ...DEFAULT_CONFIG.thresholds, maxComponentLines: 3 },

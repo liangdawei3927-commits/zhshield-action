@@ -63,10 +63,7 @@ export function LanguageSection() {
   const { language, setLanguage } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
-  const ordered = [
-    language,
-    ...LANGUAGE_DEFAULT_ORDER.filter((code) => code !== language),
-  ];
+  const ordered = [language, ...LANGUAGE_DEFAULT_ORDER.filter((code) => code !== language)];
   const visible = expanded ? ordered : ordered.slice(0, 1);
 
   return (
@@ -152,9 +149,7 @@ export function AboutSection() {
           {/* 版本号来自 package.json（编译期注入）+ app.getVersion()（运行时校正）。
               此前这里写死了旧版本号字面量，package.json 升到 0.2.0 后界面仍在报旧版本。
               取不到版本时只显示产品名，不留一个孤零零的 `v`。 */}
-          {version
-            ? t('layout.aboutVersion', { version: `v${version}` })
-            : t('layout.about')}
+          {version ? t('layout.aboutVersion', { version: `v${version}` }) : t('layout.about')}
         </div>
       </div>
     </section>

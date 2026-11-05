@@ -119,9 +119,7 @@ describe('单一视觉契约（两种进度条样式已合并）', () => {
   });
 
   it('空消息不生成空 title 属性', () => {
-    const markup = renderToStaticMarkup(
-      <DomainScanProgress loading progress={0.42} label="   " />,
-    );
+    const markup = renderToStaticMarkup(<DomainScanProgress loading progress={0.42} label="   " />);
     expect(markup).not.toContain('title=');
   });
 });
@@ -198,9 +196,7 @@ describe('页内进度条下线的源码级守卫', () => {
     // ⚠️ 只盯详情页。分类**主页**（PageShell）按钮上方的进度条是保留项 ——
     // 10-25 刚把它统一成单一视觉，误删会连带毁掉主页的运行反馈。
     const src = read('components/business/ReportShell.tsx');
-    expect(src.includes('DomainScanProgress'), 'ReportShell 又渲染了详情页顶部进度条').toBe(
-      false,
-    );
+    expect(src.includes('DomainScanProgress'), 'ReportShell 又渲染了详情页顶部进度条').toBe(false);
   });
 
   it('分类主页（PageShell）按钮上方的进度条必须还在', () => {

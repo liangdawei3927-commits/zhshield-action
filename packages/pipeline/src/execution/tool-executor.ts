@@ -46,7 +46,10 @@ export class ToolExecutor {
    * @param invocation 去重维度
    * @param run 真正起进程的函数
    */
-  async executeOnce<T>(invocation: ToolInvocation, run: () => Promise<T>): Promise<ExecuteOnceResult<T>> {
+  async executeOnce<T>(
+    invocation: ToolInvocation,
+    run: () => Promise<T>,
+  ): Promise<ExecuteOnceResult<T>> {
     const key = toolInvocationKey(invocation);
     const cached = this.results.get(key);
     if (cached) {

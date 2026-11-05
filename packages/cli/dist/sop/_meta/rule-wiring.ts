@@ -25,10 +25,7 @@ export const SOP_SERVED_DOMAINS = ['guard', ...INSPECT_SCOPE_DOMAINS] as const;
 
 /** orphan 原因 */
 export type RuleWiringReason =
-  | 'domain-not-served'
-  | 'unresolved-content'
-  | 'tool-missing'
-  | 'tool-not-registered';
+  'domain-not-served' | 'unresolved-content' | 'tool-missing' | 'tool-not-registered';
 
 /** 一条永远求值不到的规则 */
 export interface OrphanRule {
@@ -49,7 +46,12 @@ export interface RuleWiringReport {
   orphans: OrphanRule[];
 }
 
-function orphan(rule: SopRule, reason: RuleWiringReason, detail: string, tool?: string): OrphanRule {
+function orphan(
+  rule: SopRule,
+  reason: RuleWiringReason,
+  detail: string,
+  tool?: string,
+): OrphanRule {
   return {
     ruleId: rule.id,
     domain: rule.domain,
@@ -86,7 +88,11 @@ export function classifyRuleWiring(
 
   if (instruction.type === 'tool-dispatch') {
     if (instruction.tool.trim() === '') {
-      return orphan(rule, 'tool-missing', 'check 段声明了 tool 但取值为空，规则无法派发到任何适配器');
+      return orphan(
+        rule,
+        'tool-missing',
+        'check 段声明了 tool 但取值为空，规则无法派发到任何适配器',
+      );
     }
     if (!(TOOL_IDS as readonly string[]).includes(instruction.tool)) {
       return orphan(

@@ -165,7 +165,11 @@ export function guardPenalty(results: GuardCheckLike[]): number {
     if (r.status === 'failed' || r.status === 'error' || r.blocking) blocking += 1;
     else if (r.status === 'warning') warning += 1;
   }
-  return Math.min(100, softBand(blocking, 8, GUARD_SEVERITY_CAP.blocking) + softBand(warning, 4, GUARD_SEVERITY_CAP.warning));
+  return Math.min(
+    100,
+    softBand(blocking, 8, GUARD_SEVERITY_CAP.blocking) +
+      softBand(warning, 4, GUARD_SEVERITY_CAP.warning),
+  );
 }
 
 /** guard 中非 passed 的结果数（与 guardPenalty 的判定口径一致） */
@@ -185,7 +189,9 @@ export function secretsPenalty(secrets: SecretDataLike): number {
 export function depsPenalty(deps: DepsDataLike): number {
   return Math.min(
     100,
-    deps.vulnerabilities.critical * 12 + deps.vulnerabilities.high * 8 + deps.vulnerabilities.medium * 4,
+    deps.vulnerabilities.critical * 12 +
+      deps.vulnerabilities.high * 8 +
+      deps.vulnerabilities.medium * 4,
   );
 }
 
@@ -329,7 +335,11 @@ export function refactorPenalty(refactor: RefactorDataLike): number {
   const keys = ['error', 'warning', 'info'] as const;
   let sum = 0;
   for (const key of keys) {
-    sum += softBand(refactor.bySeverity[key], REFACTOR_SEVERITY_PENALTY[key], REFACTOR_SEVERITY_CAP[key]);
+    sum += softBand(
+      refactor.bySeverity[key],
+      REFACTOR_SEVERITY_PENALTY[key],
+      REFACTOR_SEVERITY_CAP[key],
+    );
   }
   return Math.min(100, sum);
 }
@@ -367,7 +377,11 @@ export function performancePenalty(performance: PerformanceDataLike): number {
   const keys = ['critical', 'high', 'medium', 'low', 'info'] as const;
   let sum = 0;
   for (const key of keys) {
-    sum += softBand(performance.bySeverity[key], PERFORMANCE_SEVERITY_PENALTY[key], PERFORMANCE_SEVERITY_CAP[key]);
+    sum += softBand(
+      performance.bySeverity[key],
+      PERFORMANCE_SEVERITY_PENALTY[key],
+      PERFORMANCE_SEVERITY_CAP[key],
+    );
   }
   return Math.min(100, sum);
 }

@@ -124,12 +124,7 @@ function matchesPrefixed(
 }
 
 /** >=x[.y[.z]] 范围匹配（不足段按 0 补齐） */
-function matchesGe(
-  ge: RegExpMatchArray,
-  major: number,
-  minor: number,
-  patch: number,
-): boolean {
+function matchesGe(ge: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
   const [gM, gm, gp] = [Number(ge[1]), Number(ge[2] ?? 0), Number(ge[3] ?? 0)];
   if (major !== gM) return major > gM;
   if (minor !== gm) return minor > gm;
@@ -137,12 +132,7 @@ function matchesGe(
 }
 
 /** >x[.y[.z]] 范围匹配（不足段按 0 补齐） */
-function matchesGt(
-  gt: RegExpMatchArray,
-  major: number,
-  minor: number,
-  patch: number,
-): boolean {
+function matchesGt(gt: RegExpMatchArray, major: number, minor: number, patch: number): boolean {
   const [gM, gm, gp] = [Number(gt[1]), Number(gt[2] ?? 0), Number(gt[3] ?? 0)];
   if (major !== gM) return major > gM;
   if (minor !== gm) return minor > gm;

@@ -92,7 +92,9 @@ function ProfileOverview({
           <ConfidenceBadge confidence={profile.architecture.confidence} />
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">
-          <div className="text-[11px] text-zh-muted mb-1">{t('page.profile.overview.targetCount')}</div>
+          <div className="text-[11px] text-zh-muted mb-1">
+            {t('page.profile.overview.targetCount')}
+          </div>
           <div className="text-sm font-semibold text-zh-ink">{profile.targets.length}</div>
         </div>
         <div className="text-center p-3 bg-zh-bg rounded-lg">

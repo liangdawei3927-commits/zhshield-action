@@ -32,12 +32,19 @@ describe('门禁纯判定 — 工具调用归零、只读各域结论', () => {
       isAvailable: async () => true,
       scan: async () => {
         scanCounter.calls += 1;
-        return { tool: 'eslint', status: 'available' as const, issues: [], metadata: { duration: 0 } };
+        return {
+          tool: 'eslint',
+          status: 'available' as const,
+          issues: [],
+          metadata: { duration: 0 },
+        };
       },
     } as unknown as ToolAdapter;
     return {
       registry,
-      engine: new SopRuleEngine(registry, { toolAdapters: [{ name: 'eslint', adapter: eslintAdapter }] }),
+      engine: new SopRuleEngine(registry, {
+        toolAdapters: [{ name: 'eslint', adapter: eslintAdapter }],
+      }),
     };
   };
 

@@ -33,7 +33,10 @@ vi.mock('node:child_process', () => ({
       if (behavior === 'timeout') {
         // Node 超时杀掉子进程时的形状：killed + signal，code 为 null
         callback(
-          Object.assign(new Error('Command failed: ETIMEDOUT'), { killed: true, signal: 'SIGTERM' }),
+          Object.assign(new Error('Command failed: ETIMEDOUT'), {
+            killed: true,
+            signal: 'SIGTERM',
+          }),
         );
         return;
       }
@@ -49,12 +52,8 @@ vi.mock('node:child_process', () => ({
   },
 }));
 
-const {
-  probeToolVersion,
-  invalidateToolProbes,
-  setToolProbeTtlMs,
-  __resetToolProbeCache,
-} = await import('../tool-probe');
+const { probeToolVersion, invalidateToolProbes, setToolProbeTtlMs, __resetToolProbeCache } =
+  await import('../tool-probe');
 
 describe('probeToolVersion — 同一命令只 spawn 一次', () => {
   beforeEach(() => {

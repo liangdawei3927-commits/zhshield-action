@@ -88,7 +88,12 @@ function guardReportWithViolation() {
     timestamp: new Date(),
     summary: { total: 1, passed: 0, failed: 1 },
     results: [
-      { checkId: 'guard.chk.eslint', status: 'failed', severity: 'error', message: '存在 ESLint 错误' },
+      {
+        checkId: 'guard.chk.eslint',
+        status: 'failed',
+        severity: 'error',
+        message: '存在 ESLint 错误',
+      },
     ],
   };
 }
@@ -102,7 +107,14 @@ function inspectionReportWithIssue() {
     duration: 1,
     score: { overall: 50, grade: 'D' },
     issues: [
-      { ruleId: 'inspect.r1', severity: 'error', message: '发现问题', file: 'src/a.ts', line: 3, column: 0 },
+      {
+        ruleId: 'inspect.r1',
+        severity: 'error',
+        message: '发现问题',
+        file: 'src/a.ts',
+        line: 3,
+        column: 0,
+      },
     ],
     summary: { total: 1, error: 1, warning: 0, info: 0 },
     adapterResults: [],
@@ -280,7 +292,14 @@ describe('CLI 入口路由（真实 index.ts + mock 引擎）', () => {
       blockingUndetermined: 0,
       ok: false,
       complete: true,
-      items: [{ ruleId: 'guard.block.official.test-coverage', status: 'failed', blocking: true, message: '覆盖率 0 < 80' }],
+      items: [
+        {
+          ruleId: 'guard.block.official.test-coverage',
+          status: 'failed',
+          blocking: true,
+          message: '覆盖率 0 < 80',
+        },
+      ],
     };
     await runCli('guard', '--sop');
 

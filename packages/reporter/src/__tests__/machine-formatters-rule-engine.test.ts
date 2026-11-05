@@ -37,15 +37,34 @@ describe('buildFindings — RuleEngineReport 归一', () => {
       failedEvaluation({
         message: '发现 2 处匹配',
         violations: [
-          { ruleId: 'secret.key', severity: 'critical', message: 'API Key', file: 'src/a.ts', line: 5, column: 1 },
-          { ruleId: 'secret.key', severity: 'medium', message: '弱密码', file: 'src/b.ts', line: 9 },
+          {
+            ruleId: 'secret.key',
+            severity: 'critical',
+            message: 'API Key',
+            file: 'src/a.ts',
+            line: 5,
+            column: 1,
+          },
+          {
+            ruleId: 'secret.key',
+            severity: 'medium',
+            message: '弱密码',
+            file: 'src/b.ts',
+            line: 9,
+          },
         ],
       }),
     ]);
 
     const findings = buildFindings(report);
     expect(findings).toHaveLength(2);
-    expect(findings[0]).toMatchObject({ ruleId: 'secret.key', severity: 'error', file: 'src/a.ts', line: 5, source: 'guard' });
+    expect(findings[0]).toMatchObject({
+      ruleId: 'secret.key',
+      severity: 'error',
+      file: 'src/a.ts',
+      line: 5,
+      source: 'guard',
+    });
     expect(findings[1].severity).toBe('warning');
   });
 
@@ -75,7 +94,10 @@ describe('buildFindings — RuleEngineReport 归一', () => {
 
   it('source 由 targetEngine 决定：inspect→inspect，guard/其他→guard——决定 CI 面板归属与告警路由', () => {
     const report = makeRuleEngineReport([
-      failedEvaluation({ rule: { id: 'inspect.scan.r', name: '巡检规则' }, targetEngine: 'inspect' }),
+      failedEvaluation({
+        rule: { id: 'inspect.scan.r', name: '巡检规则' },
+        targetEngine: 'inspect',
+      }),
       failedEvaluation({ rule: { id: 'guard.block.r', name: '门禁规则' }, targetEngine: 'guard' }),
     ]);
 
@@ -92,8 +114,20 @@ describe('buildFindings — RuleEngineReport 归一', () => {
 
   it('passed 评估与非降级 skipped 评估均不产出 finding——通过不产噪声，预期裁剪不算异常', () => {
     const report = makeRuleEngineReport([
-      { rule: { id: 'r.pass', name: '通过' }, status: 'passed', durationMs: 1, targetEngine: 'guard', timestamp: new Date() },
-      { rule: { id: 'r.scope', name: '被裁剪' }, status: 'skipped', durationMs: 0, targetEngine: 'inspect', timestamp: new Date() },
+      {
+        rule: { id: 'r.pass', name: '通过' },
+        status: 'passed',
+        durationMs: 1,
+        targetEngine: 'guard',
+        timestamp: new Date(),
+      },
+      {
+        rule: { id: 'r.scope', name: '被裁剪' },
+        status: 'skipped',
+        durationMs: 0,
+        targetEngine: 'inspect',
+        timestamp: new Date(),
+      },
     ]);
     expect(buildFindings(report)).toHaveLength(0);
   });

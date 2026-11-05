@@ -262,10 +262,7 @@ describe('filterInlineImportTypeRefs — 内联 import 类型引用不算死代�
   it('目录索引（./types → types/index.ts）也解析得到', () => {
     put('types/index.ts', 'export type T = 1;\n');
     put('user.ts', "type X = import('./types').T;\n");
-    const r = filterInlineImportTypeRefs(
-      [{ file: 'types/index.ts', line: 1, symbol: 'T' }],
-      dir,
-    );
+    const r = filterInlineImportTypeRefs([{ file: 'types/index.ts', line: 1, symbol: 'T' }], dir);
     expect(r.dropped).toHaveLength(1);
   });
 
@@ -292,7 +289,10 @@ describe('filterInlineImportTypeRefs — 内联 import 类型引用不算死代�
   });
 
   it('双自证：1 条内联引用被剥离、2 条真死代码仍在', () => {
-    put('types.ts', 'export interface Used {}\nexport interface DeadOne {}\nexport interface DeadTwo {}\n');
+    put(
+      'types.ts',
+      'export interface Used {}\nexport interface DeadOne {}\nexport interface DeadTwo {}\n',
+    );
     put('user.ts', "type X = import('./types').Used;\n");
     const r = filterInlineImportTypeRefs(
       [

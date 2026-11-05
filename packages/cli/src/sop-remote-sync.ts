@@ -1,6 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SopSyncClient, SopSignatureVerifier, VerifiedSopSyncClient, readRuleSemantics } from '@zh/kernel';
+import {
+  SopSyncClient,
+  SopSignatureVerifier,
+  VerifiedSopSyncClient,
+  readRuleSemantics,
+} from '@zh/kernel';
 import type { SopRule } from '@zh/kernel';
 
 /**
@@ -154,7 +159,9 @@ async function resolveVerificationKey(req: SopSyncRequest): Promise<KeyResolutio
 }
 
 /** 从服务端取公钥（`GET /sop/public-key`）；失败只回原因，不抛 */
-async function fetchServerPublicKey(req: SopSyncRequest): Promise<{ key?: string; detail: string }> {
+async function fetchServerPublicKey(
+  req: SopSyncRequest,
+): Promise<{ key?: string; detail: string }> {
   const url = `${req.sopBase}/public-key`;
   try {
     const res = await fetch(url, {
@@ -220,7 +227,10 @@ interface PersistContext {
 }
 
 /** 按 domain 分组 → 写临时目录 → 整体替换 → 写元信息 */
-async function persistRules(rules: readonly SopRule[], ctx: PersistContext): Promise<SopSyncResult> {
+async function persistRules(
+  rules: readonly SopRule[],
+  ctx: PersistContext,
+): Promise<SopSyncResult> {
   const grouped = groupByDomain(rules);
   const gateCount = rules.filter((rule) => readRuleSemantics(rule) === 'post-scan-gate').length;
   const domains = [...grouped.keys()].sort();

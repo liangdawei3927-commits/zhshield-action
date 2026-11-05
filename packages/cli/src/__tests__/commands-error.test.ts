@@ -27,13 +27,18 @@ describe('handleError — 统一错误出口', () => {
 
   function makeReporter() {
     return {
-      format: vi.fn((): { text: string; passed: boolean } => ({ text: 'ERROR-REPORT', passed: false })),
+      format: vi.fn((): { text: string; passed: boolean } => ({
+        text: 'ERROR-REPORT',
+        passed: false,
+      })),
     };
   }
 
   function captureExit(fn: () => void): number | undefined {
     const spy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string | null) => {
-      const err = new Error(`process.exit(${String(code)})`) as Error & { code?: number | string | null };
+      const err = new Error(`process.exit(${String(code)})`) as Error & {
+        code?: number | string | null;
+      };
       err.code = code;
       throw err;
     });

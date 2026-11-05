@@ -12,7 +12,11 @@ describe('domain-score-logic', () => {
   });
 
   it('汇总里没有该维度条目 → 同样按 no-data 兜底', () => {
-    const v = domainScoreView({ dim: undefined, generatedAt: '2026-09-19T10:00:00+08:00', now: NOW });
+    const v = domainScoreView({
+      dim: undefined,
+      generatedAt: '2026-09-19T10:00:00+08:00',
+      now: NOW,
+    });
     expect(v.kind).toBe('no-data');
   });
 

@@ -71,9 +71,10 @@ function makeRunner(methods: MockRunner): PipelineRunner {
 function makeReporter() {
   return {
     format: vi.fn((): { text: string; passed: boolean } => ({ text: 'TEXT-REPORT', passed: true })),
-    formatRuleEngine: vi.fn(
-      (): { text: string; passed: boolean } => ({ text: 'RULE-REPORT', passed: false }),
-    ),
+    formatRuleEngine: vi.fn((): { text: string; passed: boolean } => ({
+      text: 'RULE-REPORT',
+      passed: false,
+    })),
   };
 }
 
@@ -97,7 +98,10 @@ function errorIssue(file = 'src/a.ts') {
 }
 
 /** RuleEngineReport 最小形态（SOP 分支产出） */
-function makeRuleEngineReport(evaluations: unknown[], counts?: { degraded?: number; ok?: boolean }) {
+function makeRuleEngineReport(
+  evaluations: unknown[],
+  counts?: { degraded?: number; ok?: boolean },
+) {
   return {
     total: evaluations.length,
     passed: 0,
@@ -142,7 +146,12 @@ describe('runInspectCommand — Inspect 巡检命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runInspectCommand(runner, makeOpts({ failOn: 'error' }), reporter as unknown as ConsoleReporter, '/proj'),
+      runInspectCommand(
+        runner,
+        makeOpts({ failOn: 'error' }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(1);
@@ -158,7 +167,12 @@ describe('runInspectCommand — Inspect 巡检命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runInspectCommand(runner, makeOpts({ failOn: 'none' }), reporter as unknown as ConsoleReporter, '/proj'),
+      runInspectCommand(
+        runner,
+        makeOpts({ failOn: 'none' }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBeUndefined();
@@ -194,7 +208,12 @@ describe('runInspectCommand — Inspect 巡检命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runInspectCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, '/proj'),
+      runInspectCommand(
+        runner,
+        makeOpts({ sop: true }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(1);
@@ -225,7 +244,12 @@ describe('runInspectCommand — Inspect 巡检命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runInspectCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, '/proj'),
+      runInspectCommand(
+        runner,
+        makeOpts({ sop: true }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(2);
@@ -287,7 +311,12 @@ describe('runRefactorCommand — Refactor 重构检测命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runRefactorCommand(runner, makeOpts({ command: 'refactor' }), reporter as unknown as ConsoleReporter, '/proj'),
+      runRefactorCommand(
+        runner,
+        makeOpts({ command: 'refactor' }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(1);
@@ -301,7 +330,12 @@ describe('runRefactorCommand — Refactor 重构检测命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runRefactorCommand(runner, makeOpts({ command: 'refactor' }), reporter as unknown as ConsoleReporter, '/proj'),
+      runRefactorCommand(
+        runner,
+        makeOpts({ command: 'refactor' }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBeUndefined();

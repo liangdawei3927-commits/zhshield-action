@@ -23,8 +23,8 @@ import {
 } from '../domains/deps-cve';
 
 function fetchOk(results: unknown): typeof fetch {
-  return vi.fn(async () =>
-    new Response(JSON.stringify({ results }), { status: 200 }),
+  return vi.fn(
+    async () => new Response(JSON.stringify({ results }), { status: 200 }),
   ) as unknown as typeof fetch;
 }
 
@@ -41,17 +41,16 @@ describe('mapOsvSeverity / vulnDisplayIds — 解析纯函数', () => {
   });
 
   it('CVE 别名优先展示，主 id 与 CVE 去重合并', () => {
-    expect(
-      vulnDisplayIds({ id: 'GHSA-xxxx', aliases: ['CVE-2021-23337', 'CVE-2021-23337'] }),
-    ).toBe('GHSA-xxxx, CVE-2021-23337');
+    expect(vulnDisplayIds({ id: 'GHSA-xxxx', aliases: ['CVE-2021-23337', 'CVE-2021-23337'] })).toBe(
+      'GHSA-xxxx, CVE-2021-23337',
+    );
     expect(vulnDisplayIds({ id: 'GHSA-yyyy' })).toBe('GHSA-yyyy');
   });
 
   it('vulnsToFindings：单依赖多漏洞逐条产出，版本/名称对齐', () => {
-    const findings = vulnsToFindings(
-      { name: 'lodash', version: '4.17.15' },
-      [{ id: 'GHSA-a', aliases: ['CVE-2021-23337'], summary: 'cmd injection' }],
-    );
+    const findings = vulnsToFindings({ name: 'lodash', version: '4.17.15' }, [
+      { id: 'GHSA-a', aliases: ['CVE-2021-23337'], summary: 'cmd injection' },
+    ]);
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({
       name: 'lodash',
@@ -147,8 +146,8 @@ describe('runCveChecks — 在线查询与降级（P1-8 核心）', () => {
   });
 
   it('降级显形：响应形状不符 → unavailable（不解析出假 0）', async () => {
-    const bad: typeof fetch = vi.fn(async () =>
-      new Response('{"unexpected": true}', { status: 200 }),
+    const bad: typeof fetch = vi.fn(
+      async () => new Response('{"unexpected": true}', { status: 200 }),
     ) as unknown as typeof fetch;
     const result = await runCveChecks(nodes, bad);
     expect(result.status).toBe('unavailable');
@@ -213,11 +212,14 @@ describe('OSV 基地址可覆盖 —— A15 端到端验收的前提', () => {
  */
 describe('OSV 详情补拉 — querybatch 精简响应必须补全', () => {
   const batchOnly = (ids: string[]): typeof fetch =>
-    vi.fn(async () =>
-      new Response(
-        JSON.stringify({ results: [{ vulns: ids.map((id) => ({ id, modified: '2024-01-01T00:00:00Z' })) }] }),
-        { status: 200 },
-      ),
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            results: [{ vulns: ids.map((id) => ({ id, modified: '2024-01-01T00:00:00Z' })) }],
+          }),
+          { status: 200 },
+        ),
     ) as unknown as typeof fetch;
 
   /** 路由式 mock：批量走精简响应，详情走完整响应 */
@@ -269,9 +271,20 @@ describe('OSV 详情补拉 — querybatch 精简响应必须补全', () => {
   });
 
   it('补拉有上限：命中远超上限时详情请求 ≤ 30，其余保留精简数据', async () => {
-    const ids = Array.from({ length: 40 }, (_, i) => `GHSA-aaaa-bbbb-${String(i).padStart(4, '0')}`);
+    const ids = Array.from(
+      { length: 40 },
+      (_, i) => `GHSA-aaaa-bbbb-${String(i).padStart(4, '0')}`,
+    );
     const details = Object.fromEntries(
-      ids.map((id) => [id, { id, aliases: ['CVE-2020-0001'], summary: 'x', database_specific: { severity: 'CRITICAL' } }]),
+      ids.map((id) => [
+        id,
+        {
+          id,
+          aliases: ['CVE-2020-0001'],
+          summary: 'x',
+          database_specific: { severity: 'CRITICAL' },
+        },
+      ]),
     );
     const { impl, calls } = routedFetch(ids, details);
     const res = await runCveChecks([{ name: 'pkg', version: '1.0.0', kind: 'direct' }], impl);

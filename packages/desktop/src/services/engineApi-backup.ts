@@ -46,7 +46,9 @@ export async function runBackup(projectPath: string, trigger?: string): Promise<
  * `cancelled=false` = 该项目此刻没有在跑的备份（如实返回）。取消后 kernel 会在最近
  * 的检查点停下，未写完的 zip / 清单不落盘，也不会记一条"失败"记录。
  */
-export async function cancelBackup(projectPath: string): Promise<{ ok: boolean; cancelled: boolean }> {
+export async function cancelBackup(
+  projectPath: string,
+): Promise<{ ok: boolean; cancelled: boolean }> {
   const api = getAPI();
   if (!api?.backup?.cancelBackup) return { ok: false, cancelled: false };
   try {
@@ -126,10 +128,7 @@ export function onBackupRecordsUpdated(callback: (payload: unknown) => void): ()
   return api?.backup?.onRecordsUpdated?.(callback) ?? (() => {});
 }
 
-export async function openBackupFolder(
-  projectPath: string,
-  folderPath: string,
-): Promise<boolean> {
+export async function openBackupFolder(projectPath: string, folderPath: string): Promise<boolean> {
   const api = getAPI();
   if (!api?.backup) return false;
   return api.backup.openFolder(projectPath, folderPath);

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskInfo, TaskKind } from '../types/electron';
-import {
-  countActiveTasks,
-  isActiveTask,
-} from '../components/layout/global-scan-indicator-logic';
+import { countActiveTasks, isActiveTask } from '../components/layout/global-scan-indicator-logic';
 import { navIdForTaskKind } from '../components/layout/nav-items';
 
 function task(overrides: Partial<TaskInfo> & { id: string }): TaskInfo {

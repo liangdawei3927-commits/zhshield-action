@@ -347,20 +347,14 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
 
   if (state.detailReport && !state.showHome) {
     return (
-      <SecurityReportView
-        {...securityReportViewProps(state, state.detailReport, projectPath)}
-      >
+      <SecurityReportView {...securityReportViewProps(state, state.detailReport, projectPath)}>
         {securityTabContent(state, state.detailReport, t)}
       </SecurityReportView>
     );
   }
 
   return (
-    <DetailEntryProvider
-      key={state.scanVersion}
-      available={hasDetail}
-      onOpen={openDetail}
-    >
+    <DetailEntryProvider key={state.scanVersion} available={hasDetail} onOpen={openDetail}>
       <ScanEmptyStateBranch
         projectPath={projectPath}
         loading={state.loading}

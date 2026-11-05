@@ -79,9 +79,10 @@ function makeRunner(methods: MockRunner): PipelineRunner {
 function makeReporter() {
   return {
     format: vi.fn((): { text: string; passed: boolean } => ({ text: 'TEXT-REPORT', passed: true })),
-    formatRuleEngine: vi.fn(
-      (): { text: string; passed: boolean } => ({ text: 'RULE-REPORT', passed: false }),
-    ),
+    formatRuleEngine: vi.fn((): { text: string; passed: boolean } => ({
+      text: 'RULE-REPORT',
+      passed: false,
+    })),
   };
 }
 
@@ -98,7 +99,10 @@ function makeGuardReport(results: unknown[], summary = { total: 1, passed: 0, fa
 }
 
 /** RuleEngineReport 最小形态（SOP 分支产出） */
-function makeRuleEngineReport(evaluations: unknown[], counts?: { degraded?: number; ok?: boolean }) {
+function makeRuleEngineReport(
+  evaluations: unknown[],
+  counts?: { degraded?: number; ok?: boolean },
+) {
   return {
     total: evaluations.length,
     passed: 0,
@@ -149,9 +153,16 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
 
   it('Given error 级违规且 failOn=error（默认阈值）、非 dry-run，When guard，Then exit 1——CI 必须因门禁失败而变红', async () => {
     const runner = makeRunner({
-      runGuard: vi.fn(async () => makeGuardReport([
-        { checkId: 'guard.chk.eslint', status: 'failed', severity: 'error', message: '存在 ESLint 错误' },
-      ])),
+      runGuard: vi.fn(async () =>
+        makeGuardReport([
+          {
+            checkId: 'guard.chk.eslint',
+            status: 'failed',
+            severity: 'error',
+            message: '存在 ESLint 错误',
+          },
+        ]),
+      ),
       runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
     });
     const reporter = makeReporter();
@@ -170,15 +181,27 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
 
   it('Given 相同违规但 --dry-run，When guard，Then 不阻断（exit 0）——dry-run 只报告不拦截是用户显式选择', async () => {
     const runner = makeRunner({
-      runGuard: vi.fn(async () => makeGuardReport([
-        { checkId: 'guard.chk.eslint', status: 'failed', severity: 'error', message: '存在 ESLint 错误' },
-      ])),
+      runGuard: vi.fn(async () =>
+        makeGuardReport([
+          {
+            checkId: 'guard.chk.eslint',
+            status: 'failed',
+            severity: 'error',
+            message: '存在 ESLint 错误',
+          },
+        ]),
+      ),
       runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
     });
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runGuardCommand(runner, makeOpts({ dryRun: true }), reporter as unknown as ConsoleReporter, '/proj'),
+      runGuardCommand(
+        runner,
+        makeOpts({ dryRun: true }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBeUndefined(); // process.exit(process.exitCode=undefined) ≡ 0
@@ -186,9 +209,16 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
 
   it('Given warning 级违规且 failOn=error，When guard，Then 不阻断——默认阈值不得因 warning 拦停流水线', async () => {
     const runner = makeRunner({
-      runGuard: vi.fn(async () => makeGuardReport([
-        { checkId: 'guard.chk.style', status: 'failed', severity: 'warning', message: '命名不规范' },
-      ])),
+      runGuard: vi.fn(async () =>
+        makeGuardReport([
+          {
+            checkId: 'guard.chk.style',
+            status: 'failed',
+            severity: 'warning',
+            message: '命名不规范',
+          },
+        ]),
+      ),
       runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
     });
     const reporter = makeReporter();
@@ -202,15 +232,27 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
 
   it('Given error 级违规但 failOn=none，When guard，Then 不阻断——fail-on none 表示用户显式关闭阻断', async () => {
     const runner = makeRunner({
-      runGuard: vi.fn(async () => makeGuardReport([
-        { checkId: 'guard.chk.eslint', status: 'failed', severity: 'error', message: '存在 ESLint 错误' },
-      ])),
+      runGuard: vi.fn(async () =>
+        makeGuardReport([
+          {
+            checkId: 'guard.chk.eslint',
+            status: 'failed',
+            severity: 'error',
+            message: '存在 ESLint 错误',
+          },
+        ]),
+      ),
       runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
     });
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runGuardCommand(runner, makeOpts({ failOn: 'none' }), reporter as unknown as ConsoleReporter, '/proj'),
+      runGuardCommand(
+        runner,
+        makeOpts({ failOn: 'none' }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBeUndefined();
@@ -266,7 +308,12 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runGuardCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, '/proj'),
+      runGuardCommand(
+        runner,
+        makeOpts({ sop: true }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(1);
@@ -276,10 +323,10 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
   });
 
   it('Given --sop 且报告 degraded>0（规则被降级跳过），When guard，Then exit 2——"未检测 ≠ 通过"，盲检不得静默放行', async () => {
-    const sopReport = makeRuleEngineReport(
-      [skippedDegradedEval('guard.chk.tsc', 'tsc 不可用')],
-      { degraded: 1, ok: true },
-    );
+    const sopReport = makeRuleEngineReport([skippedDegradedEval('guard.chk.tsc', 'tsc 不可用')], {
+      degraded: 1,
+      ok: true,
+    });
     const runner = makeRunner({
       runGuard: vi.fn(async () => makeGuardReport([])),
       runSopGuard: vi.fn(async () => sopReport),
@@ -287,7 +334,12 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runGuardCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, '/proj'),
+      runGuardCommand(
+        runner,
+        makeOpts({ sop: true }),
+        reporter as unknown as ConsoleReporter,
+        '/proj',
+      ),
     );
 
     expect(code).toBe(2);
@@ -332,7 +384,12 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
       const reporter = makeReporter();
 
       await exitCodeOf(() =>
-        runGuardCommand(runner, makeOpts({ sop: true }), reporter as unknown as ConsoleReporter, project),
+        runGuardCommand(
+          runner,
+          makeOpts({ sop: true }),
+          reporter as unknown as ConsoleReporter,
+          project,
+        ),
       );
 
       expect(runner.runSopGuard).toHaveBeenCalledWith({

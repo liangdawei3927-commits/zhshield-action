@@ -29,10 +29,10 @@ describe('matchesExcludePattern：新增 basename 前缀形式（凭据排除的
   });
 
   it('不误伤相似但无关的文件名', () => {
-expect(matchesExcludePattern('src/environment.ts', ['.env*'])).toBe(false);
-expect(matchesExcludePattern('docs/env.md', ['.env*'])).toBe(false);
-expect(matchesExcludePattern('src/dotenv.ts', ['.env*'])).toBe(false);
-});
+    expect(matchesExcludePattern('src/environment.ts', ['.env*'])).toBe(false);
+    expect(matchesExcludePattern('docs/env.md', ['.env*'])).toBe(false);
+    expect(matchesExcludePattern('src/dotenv.ts', ['.env*'])).toBe(false);
+  });
 
   it('刻意过度排除 .envrc 一类文件：安全方向宁多勿漏', () => {
     // direnv 的 .envrc 常见 `export SECRET=...`，与 .env 同属凭据载体；
@@ -67,14 +67,8 @@ describe('默认配置必须排除凭据文件（一次点击即复制出项目�
       '.npmrc',
     ];
     for (const p of risky) {
-      expect(
-        matchesExcludePattern(p, cfg.local.excludePatterns),
-        `local 未排除 ${p}`,
-      ).toBe(true);
-      expect(
-        matchesExcludePattern(p, cfg.github.excludePatterns),
-        `github 未排除 ${p}`,
-      ).toBe(true);
+      expect(matchesExcludePattern(p, cfg.local.excludePatterns), `local 未排除 ${p}`).toBe(true);
+      expect(matchesExcludePattern(p, cfg.github.excludePatterns), `github 未排除 ${p}`).toBe(true);
     }
   });
 

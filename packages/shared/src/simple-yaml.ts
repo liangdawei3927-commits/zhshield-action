@@ -68,8 +68,8 @@ function resolveCurrentObj(
   stack: { indent: number; key: string; obj: Record<string, unknown> }[],
   result: Record<string, unknown>,
 ): Record<string, unknown> {
-    const top = stack.at(-1);
-    return top === undefined ? result : top.obj;
+  const top = stack.at(-1);
+  return top === undefined ? result : top.obj;
 }
 
 /** applyValue 参数对象 */

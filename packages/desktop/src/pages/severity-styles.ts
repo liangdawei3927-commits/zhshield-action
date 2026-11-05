@@ -2,11 +2,12 @@
  *
  *  供 sentinel / guard 等页面复用；字段：`textKey`（i18n 键）、`color`、`bg`。
  *  仅收录在多个页面间**逐字一致**的三个级别；critical / info 各页取值不同，故不纳入。 */
-export const SEVERITY_STYLES: Record<
-  string,
-  { textKey: string; color: string; bg: string }
-> = {
-  high: { textKey: 'severity.high', color: 'rgb(var(--zh-danger))', bg: 'rgb(var(--zh-danger) / 0.1)' },
+export const SEVERITY_STYLES: Record<string, { textKey: string; color: string; bg: string }> = {
+  high: {
+    textKey: 'severity.high',
+    color: 'rgb(var(--zh-danger))',
+    bg: 'rgb(var(--zh-danger) / 0.1)',
+  },
   medium: {
     textKey: 'severity.medium',
     color: 'rgb(var(--zh-warning))',

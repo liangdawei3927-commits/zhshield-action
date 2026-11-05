@@ -105,8 +105,10 @@ function useSecurityCopyToAi(projectPath: string): {
   copyMalwareAllToAi: (items: SecurityScanReportData['malware']) => void;
 } {
   const { copyToAi, copyAllToAi } = useCopyIssuesToAi(projectPath, toAiIssue);
-  const { copyToAi: copyMalwareToAi, copyAllToAi: copyMalwareAllToAi } =
-    useCopyIssuesToAi(projectPath, toMalwareAiIssue);
+  const { copyToAi: copyMalwareToAi, copyAllToAi: copyMalwareAllToAi } = useCopyIssuesToAi(
+    projectPath,
+    toMalwareAiIssue,
+  );
 
   return { copyToAi, copyAllToAi, copyMalwareToAi, copyMalwareAllToAi };
 }

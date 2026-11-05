@@ -47,7 +47,9 @@ describe('结构守卫 — useTaskRun 忙态必须携带耗时', () => {
   });
 
   it('running 态 statusMessage = 任务消息 + 已用时（不丢原阶段消息）', () => {
-    expect(src).toMatch(/\[task\.message\?\.trim\(\),\s*elapsedText\]\.filter\(Boolean\)\.join\(' · '\)/);
+    expect(src).toMatch(
+      /\[task\.message\?\.trim\(\),\s*elapsedText\]\.filter\(Boolean\)\.join\(' · '\)/,
+    );
   });
 
   it('queued 态 statusMessage 也带耗时（排队等位时长可感知）', () => {

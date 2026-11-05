@@ -352,9 +352,7 @@ describe('duplicated-code regression', () => {
 
 describe('detectOversizedComponent (TDD 回归)', () => {
   it('浅 JSX 组件因 TS 泛型误计 JSX 深度 → 不应触发 oversized-component', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'));
     const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
     expect(smells).toEqual([]);
   });
@@ -362,9 +360,7 @@ describe('detectOversizedComponent (TDD 回归)', () => {
 
 describe('detectOversizedComponent — 泛型不应当作 JSX 深度 (TDD RED)', () => {
   it('浅 JSX + TS 泛型组件不应被误判为"组件过大"', () => {
-    const parsed = parseFile(
-      path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'),
-    );
+    const parsed = parseFile(path.join(FIXTURES_DIR, 'oversized-shallow-jsx.fixture.tsx'));
     const smells = detectOversizedComponent(parsed, DEFAULT_CONFIG);
     // 泛型 useState<Set<number>> 不是 JSX，不应把 JSX 深度从 2 虚高到 12
     expect(smells).toEqual([]);

@@ -123,19 +123,25 @@ describe('resolveSopRemoteSettings — 汇总与默认值', () => {
     expect(settings.problems).toHaveLength(1);
   });
 
-  it.each(['1', 'true', 'YES', 'on'])('Given ZH_SOP_ALLOW_UNSIGNED=%s，Then allowUnsigned 为真', (raw) => {
-    const settings = resolveSopRemoteSettings({
-      env: { ZH_SOP_ALLOW_UNSIGNED: raw },
-      homeDir: home,
-    });
-    expect(settings.allowUnsigned).toBe(true);
-  });
+  it.each(['1', 'true', 'YES', 'on'])(
+    'Given ZH_SOP_ALLOW_UNSIGNED=%s，Then allowUnsigned 为真',
+    (raw) => {
+      const settings = resolveSopRemoteSettings({
+        env: { ZH_SOP_ALLOW_UNSIGNED: raw },
+        homeDir: home,
+      });
+      expect(settings.allowUnsigned).toBe(true);
+    },
+  );
 
-  it.each(['0', 'false', '', 'off'])('Given ZH_SOP_ALLOW_UNSIGNED=%s，Then allowUnsigned 为假', (raw) => {
-    const settings = resolveSopRemoteSettings({
-      env: { ZH_SOP_ALLOW_UNSIGNED: raw },
-      homeDir: home,
-    });
-    expect(settings.allowUnsigned).toBe(false);
-  });
+  it.each(['0', 'false', '', 'off'])(
+    'Given ZH_SOP_ALLOW_UNSIGNED=%s，Then allowUnsigned 为假',
+    (raw) => {
+      const settings = resolveSopRemoteSettings({
+        env: { ZH_SOP_ALLOW_UNSIGNED: raw },
+        homeDir: home,
+      });
+      expect(settings.allowUnsigned).toBe(false);
+    },
+  );
 });

@@ -101,7 +101,10 @@ export class ScanReportBuilder {
     };
   }
 
-  scoreOf(summary: InspectionReport['summary'], penalizeInfo = true): { overall: number; grade: ScoreGrade } {
+  scoreOf(
+    summary: InspectionReport['summary'],
+    penalizeInfo = true,
+  ): { overall: number; grade: ScoreGrade } {
     const overall =
       summary.total === 0
         ? 100

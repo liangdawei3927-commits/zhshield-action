@@ -207,9 +207,7 @@ function walkNode(node: ts.Node, frame: WalkFrame, ctx: WalkContext): void {
 
   const isLoop = LOOP_KINDS.has(node.kind);
   const loopDepth = isLoop ? frame.loopDepth + 1 : frame.loopDepth;
-  const loopChain = isLoop
-    ? [...frame.loopChain, lineOf(node, ctx.sourceFile)]
-    : frame.loopChain;
+  const loopChain = isLoop ? [...frame.loopChain, lineOf(node, ctx.sourceFile)] : frame.loopChain;
   if (isLoop) refreshDeepestLoops(node, loopDepth, loopChain, ctx);
 
   const isClass = ts.isClassDeclaration(node) || ts.isClassExpression(node);

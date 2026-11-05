@@ -237,10 +237,7 @@ function computeRulesContentHash(rules: SopRule[]): string {
 
 /** 版本日期取规则最大更新时间：升序字符串比较永远判定 remote > local → proceed（增量拉取） */
 function resolveRulesUpdatedAt(rules: SopRule[]): Date {
-  return rules.reduce(
-    (m, r) => (r.updatedAt && r.updatedAt > m ? r.updatedAt : m),
-    new Date(0),
-  );
+  return rules.reduce((m, r) => (r.updatedAt && r.updatedAt > m ? r.updatedAt : m), new Date(0));
 }
 
 /**

@@ -82,7 +82,11 @@ export function routeFindings<T extends RoutableFinding>(
     if (bucket) bucket.push(finding);
     else byOwner[resolved] = [finding];
 
-    distribution.push({ ruleId: finding.ruleId, owner: resolved, fingerprint: finding.fingerprint });
+    distribution.push({
+      ruleId: finding.ruleId,
+      owner: resolved,
+      fingerprint: finding.fingerprint,
+    });
   }
 
   return { byOwner, unrouted, distribution };

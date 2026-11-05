@@ -148,8 +148,12 @@ describe('豁免治理字段：到期失效', () => {
   });
 
   it('未到期仍生效，已到期失效', () => {
-    expect(isBaselineEntryActive({ ...base, expiresAt: '2026-12-01T00:00:00.000Z' }, NOW)).toBe(true);
-    expect(isBaselineEntryActive({ ...base, expiresAt: '2026-01-01T00:00:00.000Z' }, NOW)).toBe(false);
+    expect(isBaselineEntryActive({ ...base, expiresAt: '2026-12-01T00:00:00.000Z' }, NOW)).toBe(
+      true,
+    );
+    expect(isBaselineEntryActive({ ...base, expiresAt: '2026-01-01T00:00:00.000Z' }, NOW)).toBe(
+      false,
+    );
   });
 
   it('到期时间非法时保守判为失效，避免坏数据永久藏问题', () => {

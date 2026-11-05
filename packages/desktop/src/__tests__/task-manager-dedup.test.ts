@@ -104,34 +104,88 @@ describe('findReusableTask — 纯谓词', () => {
   it('命中：active + kind + path + requestKey 全等', () => {
     const queued: TaskInfo = { ...active, status: 'queued' };
     expect(
-      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [active],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBe(active);
     expect(
-      findReusableTask({ tasks: [queued], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [queued],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBe(queued);
   });
 
   it('未命中：kind / path / requestKey / 状态任一不符', () => {
     expect(
-      findReusableTask({ tasks: [active], kind: 'garbageRestore', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [active],
+        kind: 'garbageRestore',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/other', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [active],
+        kind: 'garbageClean',
+        projectPath: '/other',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'OTHER', requestKeys: keys }),
+      findReusableTask({
+        tasks: [active],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'OTHER',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [active], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: new Map() }),
+      findReusableTask({
+        tasks: [active],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: new Map(),
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [{ ...active, status: 'done' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [{ ...active, status: 'done' }],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [{ ...active, status: 'failed' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [{ ...active, status: 'failed' }],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
     expect(
-      findReusableTask({ tasks: [{ ...active, status: 'cancelled' }], kind: 'garbageClean', projectPath: '/p', requestKey: 'K', requestKeys: keys }),
+      findReusableTask({
+        tasks: [{ ...active, status: 'cancelled' }],
+        kind: 'garbageClean',
+        projectPath: '/p',
+        requestKey: 'K',
+        requestKeys: keys,
+      }),
     ).toBeUndefined();
   });
 });
@@ -239,10 +293,7 @@ describe('TaskManager.start — origin 触发来源（自动巡检可见化）',
 
 describe('结构性守卫 — start 必须经由请求身份去重', () => {
   it('task-manager.ts 的 start 引用了两个纯函数', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../electron/task-manager.ts'),
-      'utf-8',
-    );
+    const src = fs.readFileSync(path.resolve(__dirname, '../../electron/task-manager.ts'), 'utf-8');
     expect(src).toContain('canonicalRequestKey(');
     expect(src).toContain('findReusableTask(');
   });

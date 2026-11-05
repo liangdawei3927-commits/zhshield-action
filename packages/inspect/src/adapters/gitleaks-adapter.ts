@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Issue, ToolMeta, ToolResult, ToolScanOptions } from '@zh/shared';
-import { ToolCommandAdapter, buildAccessScope, buildToolResult, execTool, isToolTimeout } from './tool-runner';
+import {
+  ToolCommandAdapter,
+  buildAccessScope,
+  buildToolResult,
+  execTool,
+  isToolTimeout,
+} from './tool-runner';
 
 /** 单次 gitleaks 扫描的执行预算缺省值，对齐 SOP 引擎硬上限 300s（见 runGitleaks 注释） */
 const DEFAULT_SCAN_TIMEOUT_MS = 300_000;
@@ -192,7 +198,12 @@ export class GitleaksAdapter extends ToolCommandAdapter {
     }
   }
 
-  private buildAvailable(findings: Record<string, unknown>[], start: number, projectPath?: string): ToolResult {    return buildToolResult({
+  private buildAvailable(
+    findings: Record<string, unknown>[],
+    start: number,
+    projectPath?: string,
+  ): ToolResult {
+    return buildToolResult({
       tool: 'gitleaks',
       status: 'available',
       issues: this.mapOutput(findings, projectPath),

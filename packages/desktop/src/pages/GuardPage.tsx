@@ -7,17 +7,8 @@ import { DomainReportShell } from '../components/business/domain-report-shell';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 import { type ReportStatCard } from '../components/business/ReportShell';
 import { FeatureIcon } from '../components/ui/Icons';
-import {
-  useGuardPage,
-  buildGuardLevels,
-  type GuardLevelInfo,
-} from './guard-logic';
-import {
-  GuardLevels,
-  GuardTable,
-  GuardHistory,
-  GuardConfigCard,
-} from './guard-parts';
+import { useGuardPage, buildGuardLevels, type GuardLevelInfo } from './guard-logic';
+import { GuardLevels, GuardTable, GuardHistory, GuardConfigCard } from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
@@ -285,16 +276,16 @@ export function GuardPage({ projectPath }: GuardPageProps) {
     statusMessage,
     queued,
     queuePosition,
-  report,
-  copyToAi,
-  copyAllToAi,
-  reportFalsePositive,
-  handleScan,
-  history,
-  falsePositiveCount,
-  cancel,
-  stopping,
-} = useGuardPage(projectPath);
+    report,
+    copyToAi,
+    copyAllToAi,
+    reportFalsePositive,
+    handleScan,
+    history,
+    falsePositiveCount,
+    cancel,
+    stopping,
+  } = useGuardPage(projectPath);
   const levels = buildGuardLevels(history);
   const { notify } = useNotification();
   useGuardBlockNotification(report, notify);

@@ -36,7 +36,12 @@ function makeCheck(overrides: Partial<CheckConfig> = {}): CheckConfig {
 
 /** TEST-001 的真实配置：severity=error 且 blocking=true —— 走 makeResult 会直接阻断门禁 */
 function makeBlockingTestCheck(): CheckConfig {
-  return makeCheck({ checkId: 'TEST-001', adapter: 'test-runner', severity: 'error', blocking: true });
+  return makeCheck({
+    checkId: 'TEST-001',
+    adapter: 'test-runner',
+    severity: 'error',
+    blocking: true,
+  });
 }
 
 function makeTempDir(): string {
@@ -97,7 +102,9 @@ describe('GuardESLintCheckAdapter — 无 ESLint 配置时跳过而不是判失�
           stdout: JSON.stringify([
             {
               filePath: path.join(dir, 'src/index.ts'),
-              messages: [{ ruleId: 'no-console', message: 'no console', severity: 1, line: 1, column: 1 }],
+              messages: [
+                { ruleId: 'no-console', message: 'no console', severity: 1, line: 1, column: 1 },
+              ],
             },
           ]),
           stderr: '',
@@ -127,7 +134,9 @@ describe('GuardESLintCheckAdapter — 无 ESLint 配置时跳过而不是判失�
 
 describe('TestRunnerAdapter — 无测试脚本时跳过而不是阻断门禁', () => {
   it('package.json 没有 test 脚本 → warning / 不阻断 / 文案含「已跳过」', async () => {
-    const dir = tempDirWith({ 'package.json': JSON.stringify({ name: 'x', scripts: { build: 'tsc' } }) });
+    const dir = tempDirWith({
+      'package.json': JSON.stringify({ name: 'x', scripts: { build: 'tsc' } }),
+    });
     const adapter = new TestRunnerAdapter();
     const check = makeBlockingTestCheck();
 

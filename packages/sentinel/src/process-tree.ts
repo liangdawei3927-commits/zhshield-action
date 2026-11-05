@@ -16,7 +16,10 @@ export function spawnInGroup(command: string, args: string[], options: SpawnOpti
  * 回收子进程及其整棵子树：POSIX 先向进程组发 SIGTERM，宽限期后仍存活则 SIGKILL；
  * 无 pid 或非 POSIX 时退化为对直接子进程 kill。任何路径都不抛出。
  */
-export function terminateProcessTree(proc: ChildProcess | null, graceMs = TREE_KILL_GRACE_MS): void {
+export function terminateProcessTree(
+  proc: ChildProcess | null,
+  graceMs = TREE_KILL_GRACE_MS,
+): void {
   if (!proc) return;
   const pid = proc.pid;
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 267c2445b6509d6c
+// @zh-src-hash: 2f12de29bed36bf1
 // @zh-src-files: 425
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -16152,13 +16152,11 @@ var init_ownership_registry = __esm({
     init_types3();
     OWNERSHIP_CLAIMS = [
       // ── 域前缀兜底：`<domain>.scan...` 天然归该域 ─────────────────────────
-      ...DOMAIN_IDS.map(
-        (domain) => ({
-          match: { kind: "prefix", prefix: domain },
-          owner: domain,
-          rationale: "C1 \u57DF\u524D\u7F00\u9ED8\u8BA4\u5F52\u5C5E"
-        })
-      ),
+      ...DOMAIN_IDS.map((domain) => ({
+        match: { kind: "prefix", prefix: domain },
+        owner: domain,
+        rationale: "C1 \u57DF\u524D\u7F00\u9ED8\u8BA4\u5F52\u5C5E"
+      })),
       // ── O1 重复代码：唯一归重构 ────────────────────────────────────────────
       {
         match: { kind: "exact", ruleId: "inspect.scan.official.duplication" },
@@ -16166,54 +16164,158 @@ var init_ownership_registry = __esm({
         rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784\uFF1B\u4F53\u68C0\u53EA\u8BFB\u91CD\u590D\u7387\u6307\u6807",
         previousOwner: "inspect"
       },
-      { match: { kind: "token", token: "duplication" }, owner: "refactor", rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784" },
-      { match: { kind: "token", token: "duplicated-code" }, owner: "refactor", rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784" },
-      { match: { kind: "token", token: "jscpd" }, owner: "refactor", rationale: "O1 jscpd \u4EA7\u51FA\u91CD\u590D\u660E\u7EC6\uFF0C\u5F52\u91CD\u6784" },
+      {
+        match: { kind: "token", token: "duplication" },
+        owner: "refactor",
+        rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784"
+      },
+      {
+        match: { kind: "token", token: "duplicated-code" },
+        owner: "refactor",
+        rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784"
+      },
+      {
+        match: { kind: "token", token: "jscpd" },
+        owner: "refactor",
+        rationale: "O1 jscpd \u4EA7\u51FA\u91CD\u590D\u660E\u7EC6\uFF0C\u5F52\u91CD\u6784"
+      },
       // ── O2 / O10 依赖包 CVE：唯一归依赖管家 ────────────────────────────────
-      { match: { kind: "token", token: "cve" }, owner: "deps", rationale: "O2 \u4F9D\u8D56\u5305 CVE \u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6" },
+      {
+        match: { kind: "token", token: "cve" },
+        owner: "deps",
+        rationale: "O2 \u4F9D\u8D56\u5305 CVE \u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6"
+      },
       {
         match: { kind: "exact", ruleId: "inspect.scan.official.dependency-audit" },
         owner: "deps",
         rationale: "O10 \u4F9D\u8D56\u5BA1\u8BA1\u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u4F53\u68C0\u6539\u53EA\u8BFB",
         previousOwner: "inspect"
       },
-      { match: { kind: "token", token: "trivy" }, owner: "deps", rationale: "O2 trivy \u7684\u4F9D\u8D56\u626B\u63CF\u5F52\u4F9D\u8D56\u7BA1\u5BB6" },
-      { match: { kind: "token", token: "grype" }, owner: "deps", rationale: "O2 grype \u7684\u4F9D\u8D56\u626B\u63CF\u5F52\u4F9D\u8D56\u7BA1\u5BB6" },
+      {
+        match: { kind: "token", token: "trivy" },
+        owner: "deps",
+        rationale: "O2 trivy \u7684\u4F9D\u8D56\u626B\u63CF\u5F52\u4F9D\u8D56\u7BA1\u5BB6"
+      },
+      {
+        match: { kind: "token", token: "grype" },
+        owner: "deps",
+        rationale: "O2 grype \u7684\u4F9D\u8D56\u626B\u63CF\u5F52\u4F9D\u8D56\u7BA1\u5BB6"
+      },
       { match: { kind: "token", token: "osv" }, owner: "deps", rationale: "O2 OSV \u5F52\u4F9D\u8D56\u7BA1\u5BB6" },
       // ── O3 密钥：唯一归安全中心 ────────────────────────────────────────────
-      { match: { kind: "token", token: "secrets" }, owner: "security", rationale: "O3 \u5BC6\u94A5\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3" },
-      { match: { kind: "token", token: "secret" }, owner: "security", rationale: "O3 \u5BC6\u94A5\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3" },
-      { match: { kind: "token", token: "sensitive-info" }, owner: "security", rationale: "O3 \u654F\u611F\u4FE1\u606F\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3" },
-      { match: { kind: "token", token: "gitleaks" }, owner: "security", rationale: "O3 gitleaks \u4EA7\u51FA\u5F52\u5B89\u5168\u4E2D\u5FC3" },
+      {
+        match: { kind: "token", token: "secrets" },
+        owner: "security",
+        rationale: "O3 \u5BC6\u94A5\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
+      {
+        match: { kind: "token", token: "secret" },
+        owner: "security",
+        rationale: "O3 \u5BC6\u94A5\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
+      {
+        match: { kind: "token", token: "sensitive-info" },
+        owner: "security",
+        rationale: "O3 \u654F\u611F\u4FE1\u606F\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
+      {
+        match: { kind: "token", token: "gitleaks" },
+        owner: "security",
+        rationale: "O3 gitleaks \u4EA7\u51FA\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
       // ── O9 代码漏洞：唯一归安全中心 ────────────────────────────────────────
-      { match: { kind: "token", token: "semgrep" }, owner: "security", rationale: "O9 \u4EE3\u7801\u6F0F\u6D1E\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3" },
+      {
+        match: { kind: "token", token: "semgrep" },
+        owner: "security",
+        rationale: "O9 \u4EE3\u7801\u6F0F\u6D1E\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
       {
         match: { kind: "exact", ruleId: "inspect.scan.official.code-vulnerability" },
         owner: "security",
         rationale: "O9 \u4EE3\u7801\u6F0F\u6D1E\u552F\u4E00\u5F52\u5B89\u5168\u4E2D\u5FC3\uFF1B\u4F53\u68C0\u6539\u53EA\u8BFB",
         previousOwner: "inspect"
       },
-      { match: { kind: "token", token: "injection" }, owner: "security", rationale: "O9 \u6CE8\u5165\u7C7B\u95EE\u9898\u5F52\u5B89\u5168\u4E2D\u5FC3" },
+      {
+        match: { kind: "token", token: "injection" },
+        owner: "security",
+        rationale: "O9 \u6CE8\u5165\u7C7B\u95EE\u9898\u5F52\u5B89\u5168\u4E2D\u5FC3"
+      },
       { match: { kind: "token", token: "xss" }, owner: "security", rationale: "O9 XSS \u5F52\u5B89\u5168\u4E2D\u5FC3" },
       { match: { kind: "token", token: "ssrf" }, owner: "security", rationale: "O9 SSRF \u5F52\u5B89\u5168\u4E2D\u5FC3" },
-      { match: { kind: "token", token: "malware" }, owner: "security", rationale: "\u5B89\u5168\u4E2D\u5FC3\u72EC\u5360\u6076\u610F\u4EE3\u7801\u68C0\u6D4B" },
+      {
+        match: { kind: "token", token: "malware" },
+        owner: "security",
+        rationale: "\u5B89\u5168\u4E2D\u5FC3\u72EC\u5360\u6076\u610F\u4EE3\u7801\u68C0\u6D4B"
+      },
       { match: { kind: "token", token: "taint" }, owner: "security", rationale: "\u5B89\u5168\u4E2D\u5FC3\u72EC\u5360\u6C61\u70B9\u94FE" },
       // ── O4 嵌套循环 / 圈复杂度：指纹不同，分属两域 ─────────────────────────
-      { match: { kind: "token", token: "nested-loop" }, owner: "performance", rationale: "O4 \u8FD0\u884C\u65F6\u53CD\u6A21\u5F0F\u5F52\u6027\u80FD\u57DF" },
-      { match: { kind: "token", token: "sync-io" }, owner: "performance", rationale: "O4 \u8FD0\u884C\u65F6\u53CD\u6A21\u5F0F\u5F52\u6027\u80FD\u57DF" },
-      { match: { kind: "token", token: "complexity" }, owner: "inspect", rationale: "O4 \u51FD\u6570\u7EA7\u5708\u590D\u6742\u5EA6\u5F52\u4F53\u68C0" },
+      {
+        match: { kind: "token", token: "nested-loop" },
+        owner: "performance",
+        rationale: "O4 \u8FD0\u884C\u65F6\u53CD\u6A21\u5F0F\u5F52\u6027\u80FD\u57DF"
+      },
+      {
+        match: { kind: "token", token: "sync-io" },
+        owner: "performance",
+        rationale: "O4 \u8FD0\u884C\u65F6\u53CD\u6A21\u5F0F\u5F52\u6027\u80FD\u57DF"
+      },
+      {
+        match: { kind: "token", token: "complexity" },
+        owner: "inspect",
+        rationale: "O4 \u51FD\u6570\u7EA7\u5708\u590D\u6742\u5EA6\u5F52\u4F53\u68C0"
+      },
       // ── O7 未使用依赖：唯一归垃圾清理 ─────────────────────────────────────
-      { match: { kind: "token", token: "unused-dependency" }, owner: "garbage", rationale: "O7 \u672A\u4F7F\u7528\u4F9D\u8D56\u552F\u4E00\u5F52\u5783\u573E\u6E05\u7406" },
-      { match: { kind: "token", token: "unused-deps" }, owner: "garbage", rationale: "O7 \u672A\u4F7F\u7528\u4F9D\u8D56\u552F\u4E00\u5F52\u5783\u573E\u6E05\u7406" },
-      { match: { kind: "token", token: "depcheck" }, owner: "garbage", rationale: "O7 depcheck \u4EA7\u51FA\u5F52\u5783\u573E\u6E05\u7406" },
+      {
+        match: { kind: "token", token: "unused-dependency" },
+        owner: "garbage",
+        rationale: "O7 \u672A\u4F7F\u7528\u4F9D\u8D56\u552F\u4E00\u5F52\u5783\u573E\u6E05\u7406"
+      },
+      {
+        match: { kind: "token", token: "unused-deps" },
+        owner: "garbage",
+        rationale: "O7 \u672A\u4F7F\u7528\u4F9D\u8D56\u552F\u4E00\u5F52\u5783\u573E\u6E05\u7406"
+      },
+      {
+        match: { kind: "token", token: "depcheck" },
+        owner: "garbage",
+        rationale: "O7 depcheck \u4EA7\u51FA\u5F52\u5783\u573E\u6E05\u7406"
+      },
       // ── 其余工具族归属 ────────────────────────────────────────────────────
-      { match: { kind: "token", token: "dead-code" }, owner: "garbage", rationale: "\u5783\u573E\u6E05\u7406\u72EC\u5360\u6B7B\u4EE3\u7801" },
-      { match: { kind: "token", token: "ts-prune" }, owner: "garbage", rationale: "\u5783\u573E\u6E05\u7406\u72EC\u5360\u6B7B\u4EE3\u7801" },
-      { match: { kind: "token", token: "eslint" }, owner: "inspect", rationale: "\u4F53\u68C0\u72EC\u5360\u89C4\u8303/\u98CE\u683C\u68C0\u67E5" },
-      { match: { kind: "token", token: "type-safety" }, owner: "inspect", rationale: "\u4F53\u68C0\u72EC\u5360\u7C7B\u578B\u5B89\u5168" },
-      { match: { kind: "token", token: "circular-dependency" }, owner: "inspect", rationale: "\u4F53\u68C0\u72EC\u5360\u5FAA\u73AF\u4F9D\u8D56" },
-      { match: { kind: "token", token: "module-boundary" }, owner: "inspect", rationale: "\u4F53\u68C0\u72EC\u5360\u6A21\u5757\u8FB9\u754C" },
-      { match: { kind: "token", token: "dep-cruiser" }, owner: "inspect", rationale: "\u4F53\u68C0\u72EC\u5360\u67B6\u6784\u4F9D\u8D56\u89C4\u5219" }
+      {
+        match: { kind: "token", token: "dead-code" },
+        owner: "garbage",
+        rationale: "\u5783\u573E\u6E05\u7406\u72EC\u5360\u6B7B\u4EE3\u7801"
+      },
+      {
+        match: { kind: "token", token: "ts-prune" },
+        owner: "garbage",
+        rationale: "\u5783\u573E\u6E05\u7406\u72EC\u5360\u6B7B\u4EE3\u7801"
+      },
+      {
+        match: { kind: "token", token: "eslint" },
+        owner: "inspect",
+        rationale: "\u4F53\u68C0\u72EC\u5360\u89C4\u8303/\u98CE\u683C\u68C0\u67E5"
+      },
+      {
+        match: { kind: "token", token: "type-safety" },
+        owner: "inspect",
+        rationale: "\u4F53\u68C0\u72EC\u5360\u7C7B\u578B\u5B89\u5168"
+      },
+      {
+        match: { kind: "token", token: "circular-dependency" },
+        owner: "inspect",
+        rationale: "\u4F53\u68C0\u72EC\u5360\u5FAA\u73AF\u4F9D\u8D56"
+      },
+      {
+        match: { kind: "token", token: "module-boundary" },
+        owner: "inspect",
+        rationale: "\u4F53\u68C0\u72EC\u5360\u6A21\u5757\u8FB9\u754C"
+      },
+      {
+        match: { kind: "token", token: "dep-cruiser" },
+        owner: "inspect",
+        rationale: "\u4F53\u68C0\u72EC\u5360\u67B6\u6784\u4F9D\u8D56\u89C4\u5219"
+      }
     ];
   }
 });
@@ -16225,11 +16327,19 @@ function validateCapabilityRegistry() {
   const rules = /* @__PURE__ */ new Map();
   for (const cap of TOOL_CAPABILITIES) {
     if (tools.has(cap.tool)) {
-      violations.push({ kind: "duplicate-tool", tool: cap.tool, message: `\u5DE5\u5177 ${cap.tool} \u91CD\u590D\u6CE8\u518C` });
+      violations.push({
+        kind: "duplicate-tool",
+        tool: cap.tool,
+        message: `\u5DE5\u5177 ${cap.tool} \u91CD\u590D\u6CE8\u518C`
+      });
     }
     tools.add(cap.tool);
     if (cap.targets.length === 0) {
-      violations.push({ kind: "no-targets", tool: cap.tool, message: `\u5DE5\u5177 ${cap.tool} \u672A\u58F0\u660E\u76EE\u6807\u7C7B\u578B` });
+      violations.push({
+        kind: "no-targets",
+        tool: cap.tool,
+        message: `\u5DE5\u5177 ${cap.tool} \u672A\u58F0\u660E\u76EE\u6807\u7C7B\u578B`
+      });
     }
     if (cap.hardTimeoutMs >= cap.budgetMs) {
       violations.push({
@@ -500583,9 +500693,7 @@ var init_grype_adapter = __esm({
         const { command } = await resolveToolCommandDetailed("grype", options2.projectPath);
         if (!await isDbReady(command)) {
           await triggerDbUpdateInBackground(command);
-          throw new Error(
-            "grype \u6F0F\u6D1E\u5E93\u672A\u5C31\u7EEA\uFF08\u9996\u6B21\u4F7F\u7528\u9700\u8054\u7F51\u4E0B\u8F7D\uFF0C\u5DF2\u540E\u53F0\u521D\u59CB\u5316\uFF0C\u7A0D\u540E\u91CD\u65B0\u626B\u63CF\u5373\u751F\u6548\uFF09"
-          );
+          throw new Error("grype \u6F0F\u6D1E\u5E93\u672A\u5C31\u7EEA\uFF08\u9996\u6B21\u4F7F\u7528\u9700\u8054\u7F51\u4E0B\u8F7D\uFF0C\u5DF2\u540E\u53F0\u521D\u59CB\u5316\uFF0C\u7A0D\u540E\u91CD\u65B0\u626B\u63CF\u5373\u751F\u6548\uFF09");
         }
         const { stdout } = await runToolOnce(command, [source, "-o", "json"], {
           cwd: path56.resolve(options2.projectPath),
@@ -504589,7 +504697,11 @@ var init_deletable = __esm({
   "../garbage/src/deletable.ts"() {
     "use strict";
     init_junk_rules();
-    REVIEW_ONLY_TYPES = ["dead-code", "duplicate-code", "unused-dependency"];
+    REVIEW_ONLY_TYPES = [
+      "dead-code",
+      "duplicate-code",
+      "unused-dependency"
+    ];
     ALL_GARBAGE_TYPES = [
       "unused-file",
       "unused-dependency",
@@ -506589,7 +506701,11 @@ function classifyRuleWiring(rule, instruction) {
   }
   if (instruction.type === "tool-dispatch") {
     if (instruction.tool.trim() === "") {
-      return orphan(rule, "tool-missing", "check \u6BB5\u58F0\u660E\u4E86 tool \u4F46\u53D6\u503C\u4E3A\u7A7A\uFF0C\u89C4\u5219\u65E0\u6CD5\u6D3E\u53D1\u5230\u4EFB\u4F55\u9002\u914D\u5668");
+      return orphan(
+        rule,
+        "tool-missing",
+        "check \u6BB5\u58F0\u660E\u4E86 tool \u4F46\u53D6\u503C\u4E3A\u7A7A\uFF0C\u89C4\u5219\u65E0\u6CD5\u6D3E\u53D1\u5230\u4EFB\u4F55\u9002\u914D\u5668"
+      );
     }
     if (!TOOL_IDS.includes(instruction.tool)) {
       return orphan(
@@ -507540,9 +507656,7 @@ function validateRuleSource(parsed, dirDomain, dirAction, filePath) {
   const gov = isPlainObject3(parsed.governance) ? parsed.governance : null;
   const judgment = isPlainObject3(parsed.judgment) ? parsed.judgment : null;
   if (meta) {
-    push(
-      checkEnum(filePath, "metadata.status", meta.status, { allowed: RULE_LIFECYCLE_STATUSES })
-    );
+    push(checkEnum(filePath, "metadata.status", meta.status, { allowed: RULE_LIFECYCLE_STATUSES }));
     push(checkEnum(filePath, "governance.domain", gov?.domain, { allowed: GOVERNANCE_DOMAINS }));
     push(checkEnum(filePath, "governance.action", gov?.action, { allowed: ACTION_TYPES }));
     push(
@@ -509961,7 +510075,12 @@ async function evalPreset(host, rule, instr, context) {
     );
   }
   if (!host.inspectEngine) {
-    return skipEvaluation(rule, "InspectEngine \u672A\u6CE8\u518C\uFF0C\u4E14\u65E0\u53EF\u7528 preset \u5DE5\u5177\u9002\u914D\u5668", "inspect", true);
+    return skipEvaluation(
+      rule,
+      "InspectEngine \u672A\u6CE8\u518C\uFF0C\u4E14\u65E0\u53EF\u7528 preset \u5DE5\u5177\u9002\u914D\u5668",
+      "inspect",
+      true
+    );
   }
   if (host.evalDepth > 1) {
     return skipEvaluation(rule, "\u8DF3\u8FC7 preset\u2192runScan\uFF08\u9632\u6B62\u89C4\u5219\u5F15\u64CE\u91CD\u5165\uFF09", "inspect");
@@ -511874,10 +511993,7 @@ function parsePoetryProject(projectRoot, lockfilePath) {
 }
 function parsePipfileLockFile(lockfilePath) {
   const failures = [];
-  const { declared, locked, integrity } = createParsedLockfile(
-    /* @__PURE__ */ new Map(),
-    failures
-  );
+  const { declared, locked, integrity } = createParsedLockfile(/* @__PURE__ */ new Map(), failures);
   const data = readJsonSafe2(lockfilePath);
   if (!data) {
     failures.push("Pipfile.lock \u89E3\u6790\u5931\u8D25\uFF0C\u65E0\u6CD5\u6821\u9A8C");
@@ -514065,7 +514181,16 @@ var HallucinatedDependencyCheckImpl = class {
   }
   /** 解析单个包的全部引用点：返回未解析引用、是否已解析、是否出现过清单上下文 */
   resolvePackageSites(params) {
-    const { projectPath, pkg, sites, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } = params;
+    const {
+      projectPath,
+      pkg,
+      sites,
+      projectLocked,
+      projectInstalled,
+      declaredCache,
+      closureCache,
+      contextCache
+    } = params;
     const unresolved = [];
     let anyResolved = false;
     let anyManifestContext = false;
@@ -514104,7 +514229,14 @@ var HallucinatedDependencyCheckImpl = class {
   }
   /** 遍历 import 引用，解析每个引用点并收集未解析的幻觉候选 */
   collectCandidates(params) {
-    const { projectPath, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } = params;
+    const {
+      projectPath,
+      projectLocked,
+      projectInstalled,
+      declaredCache,
+      closureCache,
+      contextCache
+    } = params;
     const refs = extractImportReferences(projectPath);
     const candidates = /* @__PURE__ */ new Map();
     const manifestSeen = /* @__PURE__ */ new Map();
@@ -515880,7 +516012,29 @@ var JscpdAdapter = class {
     if (typeof thresholds.minTokens === "number" && Number.isFinite(thresholds.minTokens)) {
       thresholdArgs.push("--min-tokens", String(thresholds.minTokens));
     }
-    const args = major >= 5 ? ["--reporters", "json", "--output", path35.dirname(reportPath), "--mode", "strict", "--ignore", JSCPD_IGNORED_PATHS.join(","), ...thresholdArgs, target] : ["--output", reportPath, "--format", "json", "--mode", "strict", "--ignore", JSCPD_IGNORED_PATHS.join(","), ...thresholdArgs, target];
+    const args = major >= 5 ? [
+      "--reporters",
+      "json",
+      "--output",
+      path35.dirname(reportPath),
+      "--mode",
+      "strict",
+      "--ignore",
+      JSCPD_IGNORED_PATHS.join(","),
+      ...thresholdArgs,
+      target
+    ] : [
+      "--output",
+      reportPath,
+      "--format",
+      "json",
+      "--mode",
+      "strict",
+      "--ignore",
+      JSCPD_IGNORED_PATHS.join(","),
+      ...thresholdArgs,
+      target
+    ];
     await execTool(command, args, {
       cwd: projectPath,
       timeout: options2.timeout || DEFAULT_TOOL_SCAN_TIMEOUT_MS2
@@ -516587,9 +516741,7 @@ var SemgrepRuleWriter = class {
       patterns: r.patterns?.map(normalizePatternEntry)
     }));
     try {
-      const ruleDir = await fs37.promises.mkdtemp(
-        path39.join(os11.tmpdir(), INLINE_RULE_TMP_PREFIX)
-      );
+      const ruleDir = await fs37.promises.mkdtemp(path39.join(os11.tmpdir(), INLINE_RULE_TMP_PREFIX));
       const rulePath = path39.join(ruleDir, "inline-rules.yml");
       await fs37.promises.writeFile(rulePath, this.buildRuleYaml(semgrepRules), "utf-8");
       return rulePath;
@@ -517483,7 +517635,10 @@ var TypeScriptAdapter = class {
   commands;
   locale;
   /** F5：tsc 按 tsconfig 编译检查全部 TS 源文件 */
-  accessScope = buildAccessScope(["**/*.{ts,tsx,mts,cts}", "**/tsconfig.json"]);
+  accessScope = buildAccessScope([
+    "**/*.{ts,tsx,mts,cts}",
+    "**/tsconfig.json"
+  ]);
   constructor(projectRoot, locale) {
     this.commands = new ToolCommandResolver("tsc", projectRoot);
     this.locale = locale ?? DEFAULT_LANGUAGE;
@@ -517648,7 +517803,11 @@ ${err.stderr ?? ""}`;
     } catch (error) {
       const err = asToolExecError(error);
       if (err.code === "ENOENT") {
-        return { issues: [], envArtifactCount: 0, infraError: this.tr("engine.inspect.tool.tsc.unavailable") };
+        return {
+          issues: [],
+          envArtifactCount: 0,
+          infraError: this.tr("engine.inspect.tool.tsc.unavailable")
+        };
       }
       const raw = `${err.stdout ?? ""}
 ${err.stderr ?? ""}`;
@@ -517950,7 +518109,10 @@ function measureComplexity(repoRoot, options2) {
     const measured = measureFile(filePath);
     if (!measured) continue;
     parsed += 1;
-    peaks.cyclomaticComplexity = Math.max(peaks.cyclomaticComplexity, measured.cyclomaticComplexity);
+    peaks.cyclomaticComplexity = Math.max(
+      peaks.cyclomaticComplexity,
+      measured.cyclomaticComplexity
+    );
     peaks.functionLength = Math.max(peaks.functionLength, measured.functionLength);
     peaks.fileLength = Math.max(peaks.fileLength, measured.fileLength);
     peaks.nestingDepth = Math.max(peaks.nestingDepth, measured.nestingDepth);
@@ -518075,7 +518237,14 @@ function resolveCoverageBase(repoRoot, explicit) {
   };
 }
 function readChangedLines(repoRoot, base) {
-  const patch = tryGit(repoRoot, ["diff", "--unified=0", "--no-color", "--no-ext-diff", base, "--"]);
+  const patch = tryGit(repoRoot, [
+    "diff",
+    "--unified=0",
+    "--no-color",
+    "--no-ext-diff",
+    base,
+    "--"
+  ]);
   if (patch === void 0) {
     return `\u8BFB\u53D6\u6539\u52A8\u884C\u5931\u8D25\uFF1Agit diff ${base} \u6267\u884C\u5931\u8D25\uFF08\u4ED3\u5E93\u53EF\u80FD\u4E0D\u53EF\u7528\u6216\u8BE5 commit \u5DF2\u88AB\u56DE\u6536\uFF09`;
   }
@@ -518949,7 +519118,10 @@ async function runLockfileChecks(projectRoot, expectedIntegrity) {
       projectRoot,
       expectedIntegrity ? { expectedIntegrity } : void 0
     );
-    return { verification, mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures) };
+    return {
+      verification,
+      mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures)
+    };
   } catch (err) {
     return {
       verification: { status: "missing", diffs: [], integrityFailures: [] },
@@ -518961,7 +519133,9 @@ async function runLockfileChecks(projectRoot, expectedIntegrity) {
 async function runUpgradeChecks(nodes) {
   try {
     const evaluator = new UpgradeEvaluatorImpl();
-    const direct = nodes.filter((node) => node.kind === "direct" && node.name in DEFAULT_UPGRADE_CATALOG);
+    const direct = nodes.filter(
+      (node) => node.kind === "direct" && node.name in DEFAULT_UPGRADE_CATALOG
+    );
     const assessments = [];
     for (const node of direct) assessments.push(await evaluator.evaluate(node));
     return { assessments };
@@ -519787,7 +519961,11 @@ function pushTsConfigSignal(scan, signals) {
   pushFileSignal(scan, signals, "tsconfig.json", { language: "typescript", runtime: "node" });
 }
 function pushGoModSignal(scan, signals) {
-  pushFileSignal(scan, signals, "go.mod", { language: "go", runtime: "go", packageManager: "go-mod" });
+  pushFileSignal(scan, signals, "go.mod", {
+    language: "go",
+    runtime: "go",
+    packageManager: "go-mod"
+  });
 }
 function pushCargoSignal(scan, signals) {
   pushFileSignal(scan, signals, "Cargo.toml", {
@@ -520831,7 +521009,10 @@ var PipelineRunner = class {
     const baseline = await loadBaseline(this.repoRoot);
     const filtered = applyBaselineToSopReport(report, baseline, this.repoRoot);
     const rawViolations = report.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
-    const keptViolations = filtered.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
+    const keptViolations = filtered.evaluations.reduce(
+      (n, ev) => n + (ev.violations?.length ?? 0),
+      0
+    );
     const suppressedNote = keptViolations < rawViolations ? `\uFF08\u57FA\u7EBF\u8C41\u514D ${rawViolations - keptViolations} \u9879\uFF09` : "";
     this.logger.info(
       `SOP Inspect \u5B8C\u6210: ${filtered.passed} passed, ${filtered.failed} failed, ${filtered.skipped} skipped${suppressedNote}`
@@ -521114,7 +521295,12 @@ async function runCveChecks(nodes, fetchImpl = fetch) {
       })
     });
     if (!response.ok) {
-      return { status: "unavailable", findings: [], reason: `OSV HTTP ${response.status}`, checkedAt };
+      return {
+        status: "unavailable",
+        findings: [],
+        reason: `OSV HTTP ${response.status}`,
+        checkedAt
+      };
     }
     const payload = await response.json();
     if (!payload || !Array.isArray(payload.results)) {
@@ -522214,7 +522400,10 @@ function resolvePublicKey(input, problems) {
   if (raw?.trim()) {
     const resolved = resolvePublicKeyMaterial(raw, input.homeDir);
     if (resolved.problem) problems.push(resolved.problem);
-    return { ...resolved.key !== void 0 ? { key: resolved.key } : {}, source: SOP_PUBLIC_KEY_ENV };
+    return {
+      ...resolved.key !== void 0 ? { key: resolved.key } : {},
+      source: SOP_PUBLIC_KEY_ENV
+    };
   }
   return { source: `\u672A\u8BBE\u7F6E\uFF08\u5C06\u4ECE\u670D\u52A1\u7AEF /sop/public-key \u83B7\u53D6\uFF09` };
 }
@@ -522769,7 +522958,9 @@ async function runBaselineCommand(runner, opts, _reporter, projectDir) {
     case "clear-refactor":
       return baselineClearRefactor(projectDir);
   }
-  console.error("\u672A\u77E5 baseline \u5B50\u547D\u4EE4\uFF0C\u652F\u6301: capture | list | clear | capture-refactor | clear-refactor");
+  console.error(
+    "\u672A\u77E5 baseline \u5B50\u547D\u4EE4\uFF0C\u652F\u6301: capture | list | clear | capture-refactor | clear-refactor"
+  );
   process.exit(1);
 }
 async function runFullScanCommand(runner, opts, projectDir, deps = {}) {
@@ -522804,7 +522995,9 @@ async function runFullScanCommand(runner, opts, projectDir, deps = {}) {
   );
   if (incomplete.length > 0) {
     const detail = incomplete.map((record) => `${record.domain}(${record.status})`).join("\u3001");
-    console.error(`[CLI] \u5168\u91CF\u626B\u63CF\u6709 ${incomplete.length} \u4E2A\u57DF\u672A\u5B8C\u6210\uFF1A${detail} \u2014 \u672A\u68C0\u6D4B \u2260 \u901A\u8FC7\uFF08exit 2\uFF09`);
+    console.error(
+      `[CLI] \u5168\u91CF\u626B\u63CF\u6709 ${incomplete.length} \u4E2A\u57DF\u672A\u5B8C\u6210\uFF1A${detail} \u2014 \u672A\u68C0\u6D4B \u2260 \u901A\u8FC7\uFF08exit 2\uFF09`
+    );
     process.exitCode = 2;
   }
 }

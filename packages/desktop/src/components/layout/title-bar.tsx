@@ -12,11 +12,7 @@ interface TitleBarProps {
 }
 
 /** 顶部统一品牌栏 — 360 风格：LOGO+名称居左，项目文件夹居中，侧边栏开关居右 */
-export function TitleBar({
-  onOpenSettings,
-  projectName,
-  sidebarOpen,
-}: TitleBarProps) {
+export function TitleBar({ onOpenSettings, projectName, sidebarOpen }: TitleBarProps) {
   const maximized = useMacOSTrafficLightInset();
   const t = useT();
 
@@ -80,13 +76,7 @@ export function TitleBar({
   );
 }
 
-function TitleBarProject({
-  projectName,
-  t,
-}: {
-  projectName?: string;
-  t: ReturnType<typeof useT>;
-}) {
+function TitleBarProject({ projectName, t }: { projectName?: string; t: ReturnType<typeof useT> }) {
   return (
     <div
       className="flex items-center justify-center gap-2"

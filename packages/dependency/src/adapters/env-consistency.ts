@@ -30,12 +30,7 @@ import { checkCiVsLocal, checkEnvFileDiff } from './env-consistency-env-ci';
 export type { ProjectLanguage, PackageManager, ProjectProfile } from '@zh/shared';
 
 // 公开类型拆分至 env-consistency-types.ts，此处按原样再导出。
-export type {
-  EnvConsistencyChecker,
-  EnvConsistencyOptions,
-  EnvConsistencyReport,
-  EnvEntry,
-};
+export type { EnvConsistencyChecker, EnvConsistencyOptions, EnvConsistencyReport, EnvEntry };
 
 /**
  * 环境一致性检查器实现。

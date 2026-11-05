@@ -82,7 +82,9 @@ export function domainScoreView({
 
 /** 从汇总数据中取出指定维度的条目（找不到返回 undefined，交由 domainScoreView 兜底） */
 export function findDimension(
-  data: { dimensions: Array<{ name: string; score: number; status?: 'scored' | 'not-run' }> } | null,
+  data: {
+    dimensions: Array<{ name: string; score: number; status?: 'scored' | 'not-run' }>;
+  } | null,
   dimension: ScoreDimension,
 ): { score: number; status?: 'scored' | 'not-run' } | undefined {
   return data?.dimensions.find((d) => d.name === dimension);

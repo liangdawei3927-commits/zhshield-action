@@ -151,7 +151,10 @@ async function runLockfileChecks(
       projectRoot,
       expectedIntegrity ? { expectedIntegrity } : undefined,
     );
-    return { verification, mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures) };
+    return {
+      verification,
+      mismatchedNodeIds: extractMismatchedNodeIds(verification.integrityFailures),
+    };
   } catch (err) {
     return {
       verification: { status: 'missing', diffs: [], integrityFailures: [] },
@@ -167,7 +170,9 @@ async function runUpgradeChecks(
 ): Promise<{ assessments: UpgradeAssessment[]; error?: string }> {
   try {
     const evaluator = new UpgradeEvaluatorImpl();
-    const direct = nodes.filter((node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG);
+    const direct = nodes.filter(
+      (node) => node.kind === 'direct' && node.name in DEFAULT_UPGRADE_CATALOG,
+    );
     const assessments: UpgradeAssessment[] = [];
     for (const node of direct) assessments.push(await evaluator.evaluate(node));
     return { assessments };
@@ -194,7 +199,10 @@ async function runEnvConsistencyChecks(
  *
  * @param repoRoot 项目根（内部再经 `resolveProjectRoot` 归一，与桌面端一致）
  */
-export async function scanDeps(repoRoot: string, input: DepsScanInput = {}): Promise<DepsScanResult> {
+export async function scanDeps(
+  repoRoot: string,
+  input: DepsScanInput = {},
+): Promise<DepsScanResult> {
   const projectRoot = resolveProjectRoot(repoRoot);
   const graph = buildDependencyGraph(projectRoot);
   const matrix = buildLicenseMatrix(graph);

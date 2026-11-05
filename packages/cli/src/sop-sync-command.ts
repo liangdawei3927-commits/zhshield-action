@@ -82,7 +82,12 @@ function formatSyncResult(
     return lines;
   }
 
-  const transition = previous === undefined ? '首次同步' : previous === result.version ? '版本未变，已重新落盘' : `由 ${previous} 更新`;
+  const transition =
+    previous === undefined
+      ? '首次同步'
+      : previous === result.version
+        ? '版本未变，已重新落盘'
+        : `由 ${previous} 更新`;
   const lines = [
     `[CLI] 同步完成 — 云端版本 ${result.version}（${transition}）`,
     `        · ${result.ruleCount} 条规则 / ${result.domains.length} 个模块（${result.domains.join(', ')}）`,

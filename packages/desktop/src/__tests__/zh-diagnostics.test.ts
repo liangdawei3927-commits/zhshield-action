@@ -525,10 +525,11 @@ describe('readAggregatedDiagnostics 跨域聚合', () => {
   it('单引擎覆盖 latest.json 后，仍能读到其他域的既有结果', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-agg-merge-'));
     try {
-      await persistDiagnosticsFromEntries(project, [inspectEntry, securityEntry], [
-        'inspect',
-        'security',
-      ]);
+      await persistDiagnosticsFromEntries(
+        project,
+        [inspectEntry, securityEntry],
+        ['inspect', 'security'],
+      );
       // 模拟单引擎扫描：latest.json 被 refactor 独占覆盖
       await persistDiagnosticsFromEntries(project, [refactorEntry], ['refactor']);
 
@@ -600,7 +601,10 @@ describe('readAggregatedDiagnostics 跨域聚合', () => {
     try {
       const report = buildDiagnosticsReport({ path: project, name: 'tmp' }, [inspectEntry], 'T1');
       await writeDiagnosticsFile(report);
-      rmSync(join(project, '.zhshield', 'diagnostics', 'domains'), { recursive: true, force: true });
+      rmSync(join(project, '.zhshield', 'diagnostics', 'domains'), {
+        recursive: true,
+        force: true,
+      });
 
       const agg = await readAggregatedDiagnostics(project);
       expect(agg!.issues).toHaveLength(1);

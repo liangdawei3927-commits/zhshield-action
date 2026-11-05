@@ -104,15 +104,16 @@ describe('toInspectionReportDataFromSnapshot', () => {
    */
   it('toolError 条目归 attention（未检测），不冒充项目问题（P1-7）', () => {
     const toolErrorIssue = {
-      ...issue('inspect.scan.official.circular-dependency', 'warning', '工具 dep-cruiser 错误: TS5083'),
+      ...issue(
+        'inspect.scan.official.circular-dependency',
+        'warning',
+        '工具 dep-cruiser 错误: TS5083',
+      ),
       toolError: true as const,
     };
     const report = toInspectionReportDataFromSnapshot(
       snapshot({
-        issues: [
-          issue('real-rule', 'error', '真实代码问题'),
-          toolErrorIssue,
-        ],
+        issues: [issue('real-rule', 'error', '真实代码问题'), toolErrorIssue],
       }),
     )!;
     const byId = Object.fromEntries(report.checks.map((c) => [c.id, c]));

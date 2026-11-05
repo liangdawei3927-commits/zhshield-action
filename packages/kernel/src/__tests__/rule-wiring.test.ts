@@ -6,11 +6,7 @@ import { ContentInterpreter } from '../runner';
 import { SopRegistry } from '../sop/_meta/sop-registry';
 import { SopLoader } from '../sop/_meta/sop-loader';
 import type { SopRule } from '../sop/_meta/sop-types';
-import {
-  SOP_SERVED_DOMAINS,
-  auditRuleWiring,
-  classifyRuleWiring,
-} from '../sop/_meta/rule-wiring';
+import { SOP_SERVED_DOMAINS, auditRuleWiring, classifyRuleWiring } from '../sop/_meta/rule-wiring';
 
 /**
  * 规则接线审计（《07》§四 O6）：rules.db 里「永远求值不到」的规则必须能被识别出来。
@@ -116,9 +112,7 @@ describe('SOP 规则接线审计 — orphan 判定', () => {
     const report = auditRuleWiring(rules, interpreter);
     expect(report.total).toBe(4);
     expect(report.wired).toBe(3);
-    expect(report.orphans.map((o) => o.ruleId)).toEqual([
-      'evolve.score.official.dimension-weight',
-    ]);
+    expect(report.orphans.map((o) => o.ruleId)).toEqual(['evolve.score.official.dimension-weight']);
   });
 
   it('服务域清单与引擎过滤口径一致（guard + 全量巡检三域）', () => {

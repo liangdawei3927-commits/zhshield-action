@@ -53,15 +53,17 @@ function env(overrides: Partial<SopCacheEnv> = {}): SopCacheEnv {
 
 describe('resolveDesktopCacheDir — 平台默认路径', () => {
   it('Given macOS，Then 落在 ~/Library/Application Support/@zh/desktop/sop-cache——与 electron userData 同布局，两边读同一份', () => {
-    const dir = resolveDesktopCacheDir(
-      env({ platform: 'darwin', homeDir: '/Users/x', env: {} }),
-    );
+    const dir = resolveDesktopCacheDir(env({ platform: 'darwin', homeDir: '/Users/x', env: {} }));
     expect(dir).toBe('/Users/x/Library/Application Support/@zh/desktop/sop-cache');
   });
 
   it('Given Windows 且有 APPDATA，Then 用 %APPDATA% 而非 HOME——Roaming 才是 userData 的落点', () => {
     const dir = resolveDesktopCacheDir(
-      env({ platform: 'win32', homeDir: 'C:\\Users\\x', env: { APPDATA: 'C:\\Users\\x\\AppData\\Roaming' } }),
+      env({
+        platform: 'win32',
+        homeDir: 'C:\\Users\\x',
+        env: { APPDATA: 'C:\\Users\\x\\AppData\\Roaming' },
+      }),
     );
     expect(dir).toBe(path.join('C:\\Users\\x\\AppData\\Roaming', '@zh', 'desktop', 'sop-cache'));
   });
@@ -111,7 +113,14 @@ describe('resolveSopCacheDir — 可用性判据', () => {
 
   it('Given 显式路径不可用但桌面缓存可用，Then 仍判不可用——显式胜过隐式，静默换源是最难查的失真', () => {
     const desktopHome = path.join(tmpRoot, 'home');
-    const desktopDir = path.join(desktopHome, 'Library', 'Application Support', '@zh', 'desktop', 'sop-cache');
+    const desktopDir = path.join(
+      desktopHome,
+      'Library',
+      'Application Support',
+      '@zh',
+      'desktop',
+      'sop-cache',
+    );
     fs.mkdirSync(path.join(desktopDir, 'modules'), { recursive: true });
     fs.writeFileSync(path.join(desktopDir, 'modules', 'a.db'), '[]');
 
@@ -159,7 +168,8 @@ describe('resolveSopCacheDir — 可用性判据', () => {
   });
 });
 
-describe('readCacheFreshness — 规则有多旧', () => {  it('Given 两个模块文件，Then fileCount 计 .db 且 updatedAt 取最新——旧的规则文件不该把新鲜度拉低', () => {
+describe('readCacheFreshness — 规则有多旧', () => {
+  it('Given 两个模块文件，Then fileCount 计 .db 且 updatedAt 取最新——旧的规则文件不该把新鲜度拉低', () => {
     const dir = makeCacheDir('fresh', { 'old.db': '[]', 'new.db': '[]', 'ignore.txt': '' });
     const oldTime = new Date('2026-01-01T00:00:00Z');
     const newTime = new Date('2026-01-05T00:00:00Z');
@@ -247,7 +257,14 @@ describe('resolveSopCacheDir — 两份候选按新旧取', () => {
   it('Given CLI 缓存比桌面端新，Then 取 CLI 那份并在原因里点明另一份也在', () => {
     const home = path.join(tmpRoot, 'both-cli-new');
     const cli = path.join(home, '.zhshield', 'sop-cache');
-    const desktop = path.join(home, 'Library', 'Application Support', '@zh', 'desktop', 'sop-cache');
+    const desktop = path.join(
+      home,
+      'Library',
+      'Application Support',
+      '@zh',
+      'desktop',
+      'sop-cache',
+    );
     makeCacheAt(cli, new Date('2026-10-29T00:00:00Z'));
     makeCacheAt(desktop, new Date('2026-10-01T00:00:00Z'));
 
@@ -259,7 +276,14 @@ describe('resolveSopCacheDir — 两份候选按新旧取', () => {
   it('Given 桌面端缓存更新，Then 取桌面端那份——装了桌面端时它按日刷新，比手动同步的新', () => {
     const home = path.join(tmpRoot, 'both-desktop-new');
     const cli = path.join(home, '.zhshield', 'sop-cache');
-    const desktop = path.join(home, 'Library', 'Application Support', '@zh', 'desktop', 'sop-cache');
+    const desktop = path.join(
+      home,
+      'Library',
+      'Application Support',
+      '@zh',
+      'desktop',
+      'sop-cache',
+    );
     makeCacheAt(cli, new Date('2026-10-01T00:00:00Z'));
     makeCacheAt(desktop, new Date('2026-10-29T00:00:00Z'));
 

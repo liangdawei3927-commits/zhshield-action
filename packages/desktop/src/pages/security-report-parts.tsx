@@ -147,9 +147,7 @@ export function SecurityTabBar({
 }
 
 /** 报告外壳入参：密钥侧的回调已随明细面板一起留在页面，此处不再重复接一遍 */
-export interface SecurityReportViewProps
-  extends SecurityReportCopyProps,
-    AsyncScanViewProps {
+export interface SecurityReportViewProps extends SecurityReportCopyProps, AsyncScanViewProps {
   projectPath: string;
   report: SecurityScanReportData;
   tab: SecurityTab;
@@ -181,7 +179,8 @@ function SecurityDegradedBanner({ report, t }: { report: SecurityScanReportData;
             </div>
             <div className="text-xs text-warning-500 mt-0.5 break-all">
               {t('page.security.degraded.detail', {
-                tools: report.degraded.unavailableTools.join(', ') || t('page.security.degraded.none'),
+                tools:
+                  report.degraded.unavailableTools.join(', ') || t('page.security.degraded.none'),
                 audit: report.degraded.auditError ?? '',
               })}
             </div>

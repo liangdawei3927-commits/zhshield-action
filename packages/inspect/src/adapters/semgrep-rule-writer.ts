@@ -45,9 +45,7 @@ export interface SemgrepRule {
 
 /** 运行期校验：config.rules 声明为 string[]，实际语义为对象数组，此处按运行期形状收窄 */
 export function isSemgrepRuleArray(value: unknown): value is SemgrepRule[] {
-  return (
-    Array.isArray(value) && value.every((v) => typeof v === 'object' && v !== null)
-  );
+  return Array.isArray(value) && value.every((v) => typeof v === 'object' && v !== null);
 }
 
 /** 规范化后用于生成 YAML 的规则 */
@@ -86,9 +84,7 @@ function normalizePatternEntry(entry: SemgrepPatternEntry): SemgrepPatternEntry 
  */
 export class SemgrepRuleWriter {
   async writeInlineRuleConfig(options: ToolScanOptions): Promise<string | null> {
-    const rules = isSemgrepRuleArray(options.config?.rules)
-      ? options.config.rules
-      : undefined;
+    const rules = isSemgrepRuleArray(options.config?.rules) ? options.config.rules : undefined;
     if (rules && rules.length > 0) {
       return this.writeInlineRules(rules);
     }
@@ -122,9 +118,7 @@ export class SemgrepRuleWriter {
     try {
       // mkdtemp 保证目录唯一（并发/连续扫描互不覆盖），路径为绝对路径，
       // 供 semgrep --config 直接消费。
-      const ruleDir = await fs.promises.mkdtemp(
-        path.join(os.tmpdir(), INLINE_RULE_TMP_PREFIX),
-      );
+      const ruleDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), INLINE_RULE_TMP_PREFIX));
       const rulePath = path.join(ruleDir, 'inline-rules.yml');
       await fs.promises.writeFile(rulePath, this.buildRuleYaml(semgrepRules), 'utf-8');
       return rulePath;
@@ -192,7 +186,10 @@ function appendPatternEntry(lines: string[], p: SemgrepPatternEntry): void {
 }
 
 /** 复合 patterns 分支：写入 patterns 数组（含 pattern-not / pattern-regex / metavariable-regex 子项） */
-function appendPatternsMatch(lines: string[], patterns: SemgrepPatternEntry[] | undefined): boolean {
+function appendPatternsMatch(
+  lines: string[],
+  patterns: SemgrepPatternEntry[] | undefined,
+): boolean {
   if (!patterns || patterns.length === 0) return false;
   lines.push('    patterns:');
   for (const p of patterns) appendPatternEntry(lines, p);

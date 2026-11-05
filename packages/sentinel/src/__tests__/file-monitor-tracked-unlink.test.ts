@@ -44,9 +44,9 @@ const GIT_AVAILABLE = (() => {
 })();
 
 function unlinkEventsOf(center: EventCenter, filePath: string): SentinelEvent[] {
-  return center.listEvents().filter(
-    (e) => e.context?.changeType === 'unlink' && e.context?.filePath === filePath,
-  );
+  return center
+    .listEvents()
+    .filter((e) => e.context?.changeType === 'unlink' && e.context?.filePath === filePath);
 }
 
 describe.skipIf(!GIT_AVAILABLE)('unlink 告警强度按交付物分级', () => {

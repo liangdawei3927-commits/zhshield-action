@@ -54,9 +54,7 @@ export function refactorBaselinePath(projectRoot: string): string {
 }
 
 /** 读取重构基线；文件缺失 / 版本不符 / 损坏 → null（降级为无基线=全量报告行为） */
-export function loadRefactorBaseline(
-  projectRoot: string,
-): Promise<RefactorBaselineCounts | null> {
+export function loadRefactorBaseline(projectRoot: string): Promise<RefactorBaselineCounts | null> {
   return refactorBaselineIo.load(projectRoot).then((r) => (r === null ? null : r.counts));
 }
 

@@ -82,9 +82,7 @@ describe('toInspectionReportDataFromRuleEngine — skipped 评估不产问题条
     const data = toInspectionReportDataFromRuleEngine(skippedOnlyReport);
     expect(data!.summary.failures).toBe(0);
     // 语义不变量：failures 只来自 fail 检查项
-    expect(data!.summary.failures).toBe(
-      data!.checks.filter((c) => c.status === 'fail').length,
-    );
+    expect(data!.summary.failures).toBe(data!.checks.filter((c) => c.status === 'fail').length);
   });
 
   it('selectIssueChecks 从全量 checks 中排除 attention（巡检页问题列表的唯一数据源）', () => {
@@ -231,6 +229,11 @@ describe('toInspectionReportDataFromRuleEngine — 不适用（not-applicable）
     expect(data!.summary.passed).toBe(1);
     expect(data!.summary.notApplicable).toBe(1);
     // total 仍覆盖全部检查项，且各档之和守恒
-    expect(data!.summary.passed + data!.summary.warnings + data!.summary.failures + (data!.summary.notApplicable ?? 0)).toBe(data!.summary.total);
+    expect(
+      data!.summary.passed +
+        data!.summary.warnings +
+        data!.summary.failures +
+        (data!.summary.notApplicable ?? 0),
+    ).toBe(data!.summary.total);
   });
 });

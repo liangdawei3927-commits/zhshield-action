@@ -20,7 +20,16 @@ function DocLayer({
   strokeWidth: string;
 }) {
   return (
-    <rect x={x} y={y} width="70" height="50" rx="4" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+    <rect
+      x={x}
+      y={y}
+      width="70"
+      height="50"
+      rx="4"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+    />
   );
 }
 
@@ -100,13 +109,7 @@ export function StackedDocs() {
         strokeWidth="1.2"
       />
       {/* 顶层文档 */}
-      <DocLayer
-        x="49"
-        y="41"
-        fill="none"
-        stroke="rgb(var(--zh-info))"
-        strokeWidth="1.8"
-      />
+      <DocLayer x="49" y="41" fill="none" stroke="rgb(var(--zh-info))" strokeWidth="1.8" />
       {/* 文档上的线 */}
       <DocDetails />
     </svg>

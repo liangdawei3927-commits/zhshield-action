@@ -45,14 +45,16 @@ const SIZE: Record<
   /** 体检页六域入口：紧凑、图标彩色底、副行加粗数值（w-10/text-sm 与 md 视觉重量对齐，消除与其他页面卡片的高度差） */
   sm: {
     cardVariant: 'stats',
-    iconBox: 'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105',
+    iconBox:
+      'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105',
     title: 'text-sm font-medium text-zh-ink truncate',
     sub: 'text-base font-bold leading-none mt-1',
   },
   /** 空态页功能引导：中号图标块、标题 + 描述（图标块品牌浅色底，与白卡分层） */
   md: {
     cardVariant: 'item',
-    iconBox: 'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-brand-700 bg-brand-50 shadow-sm',
+    iconBox:
+      'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-brand-700 bg-brand-50 shadow-sm',
     title: 'text-sm font-semibold text-zh-ink leading-tight',
     sub: 'text-[11px] text-zh-muted mt-0.5 leading-relaxed',
   },

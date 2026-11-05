@@ -10,11 +10,7 @@ import { useSavedDomainReport } from '../hooks/useSavedDomainReport';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import { ProgressBar, CheckList } from './inspect-parts';
-import {
-  InspectFailureView,
-  InspectEmptyView,
-  type Translate,
-} from './inspect-views';
+import { InspectFailureView, InspectEmptyView, type Translate } from './inspect-views';
 import type { InspectionReportData } from '../types/electron';
 
 interface InspectPageProps {

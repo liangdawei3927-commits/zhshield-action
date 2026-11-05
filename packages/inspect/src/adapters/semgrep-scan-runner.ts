@@ -1,6 +1,10 @@
 import type { ToolScanOptions, ToolResult, Issue, IssueCategory } from '@zh/shared';
 import { asToolExecError, buildToolResult, execTool } from './tool-runner';
-import { SemgrepResultMapper, type SemgrepOutput, type SemgrepResult } from './semgrep-result-mapper';
+import {
+  SemgrepResultMapper,
+  type SemgrepOutput,
+  type SemgrepResult,
+} from './semgrep-result-mapper';
 
 /** 本机 semgrep-core（OCaml 运行时）每次启动都会打印的无害告警，非扫描失败原因 */
 const RUNTIME_NOISE_PATTERNS: readonly RegExp[] = [

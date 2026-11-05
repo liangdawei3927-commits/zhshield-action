@@ -20,14 +20,26 @@ const STROKE: Record<GlyphTone, string> = {
 };
 
 /** 页面顶部分类图标外壳：统一的圆角底色方块 + 描边图标 */
-export function PageGlyph({ bg = 'brand', stroke = 'brand', round = false, children }: {
-  bg?: GlyphTone; stroke?: GlyphTone; round?: boolean; children: ReactNode;
+export function PageGlyph({
+  bg = 'brand',
+  stroke = 'brand',
+  round = false,
+  children,
+}: {
+  bg?: GlyphTone;
+  stroke?: GlyphTone;
+  round?: boolean;
+  children: ReactNode;
 }) {
   return (
     <Bounce className={`w-14 h-14 rounded-xl ${WRAP[bg]} flex items-center justify-center`}>
       <svg
-        width="32" height="32" viewBox="0 0 24 24" fill="none"
-        stroke={STROKE[stroke]} strokeWidth="2"
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={STROKE[stroke]}
+        strokeWidth="2"
         {...(round ? { strokeLinecap: 'round', strokeLinejoin: 'round' } : {})}
       >
         {children}

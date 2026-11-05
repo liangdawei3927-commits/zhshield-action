@@ -109,7 +109,10 @@ async function runRefactor(files, opts, projectRoot) {
   if (files.length > 0) {
     // 显式文件列表须与整目录扫描同口径：分析目录时 `__tests__/fixtures` 等从不入选，
     // 暂存区模式若照单全收，同一文件会在全量门禁里隐形、在暂存门禁里报 introduced。
-    report = await engine.analyzeFiles(projectRoot, files.filter((f) => !isExcludedScanPath(f)));
+    report = await engine.analyzeFiles(
+      projectRoot,
+      files.filter((f) => !isExcludedScanPath(f)),
+    );
   } else {
     report = await engine.analyzeDirectory(projectRoot);
   }
@@ -282,7 +285,9 @@ async function runInspect(files, opts, projectRoot) {
   // 降级可见性：未实际执行的检查如实展示，不计入通过
   const degraded = report?.degraded ?? 0;
   if (degraded > 0 && !opts.json) {
-    console.log(`zhcheck: ${degraded} 项检查未实际执行（工具不可用或执行失败）——未检测不计为通过。`);
+    console.log(
+      `zhcheck: ${degraded} 项检查未实际执行（工具不可用或执行失败）——未检测不计为通过。`,
+    );
     const failed = (report?.adapterResults ?? []).filter((r) => r.status === 'error');
     for (const one of failed) {
       console.log(`  - ${one.adapterId}: ${one.errorDetail ?? '执行失败（无详情）'}`);
@@ -661,7 +666,10 @@ Linter 输出格式:
     const baselinePath = resolve(projectRoot, '.refactor-baseline.json');
     writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n');
     const fileCount = Object.keys(entries).length;
-    const smellCount = Object.values(entries).reduce((sum, m) => sum + Object.values(m).reduce((s, v) => s + v, 0), 0);
+    const smellCount = Object.values(entries).reduce(
+      (sum, m) => sum + Object.values(m).reduce((s, v) => s + v, 0),
+      0,
+    );
     console.log(`zhcheck: baseline written (${fileCount} files, ${smellCount} smells)`);
     process.exit(0);
   }
@@ -690,9 +698,7 @@ Linter 输出格式:
     // 基线文件会因 current 缺项而被误报为 resolved。
     const scopedBaseline =
       values.staged || values.file
-        ? Object.fromEntries(
-            Object.entries(baseline.entries || {}).filter(([f]) => f in current),
-          )
+        ? Object.fromEntries(Object.entries(baseline.entries || {}).filter(([f]) => f in current))
         : baseline.entries || {};
     const diff = diffBaseline(current, scopedBaseline);
     const introCount = diff.introduced.length;

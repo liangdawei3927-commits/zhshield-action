@@ -109,9 +109,7 @@ describe('DepcheckAdapter', () => {
 
     expect(result.status).toBe('available');
 
-    const scanCall = execFileMock.mock.calls.find((c) =>
-      (c[1] as string[]).includes('--json'),
-    );
+    const scanCall = execFileMock.mock.calls.find((c) => (c[1] as string[]).includes('--json'));
     expect(scanCall).toBeDefined();
     const args = scanCall![1] as string[];
     expect(args).toContain('typescript');

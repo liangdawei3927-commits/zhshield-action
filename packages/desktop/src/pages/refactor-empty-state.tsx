@@ -1,7 +1,10 @@
 import type { ComponentProps } from 'react';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LayersGlyph, GridGlyph } from '../components/ui/Icons';
-import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
+import {
+  buildCapabilityFeatures,
+  buildPlannedCapabilities,
+} from '../components/business/capability-features';
 import { useT } from '../i18n';
 
 interface EmptyStateProps {

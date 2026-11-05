@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStatus, describeFailure, formatRelativeDay } from '../components/layout/sidebar-status';
+import {
+  resolveStatus,
+  describeFailure,
+  formatRelativeDay,
+} from '../components/layout/sidebar-status';
 import type { SopSyncHealth } from '../types/electron';
 
 /**

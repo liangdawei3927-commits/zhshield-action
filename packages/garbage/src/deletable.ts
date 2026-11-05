@@ -14,7 +14,11 @@ import type { GarbageType } from './types';
 import { isJunkFileName, isRegenerablePath } from './junk-rules';
 
 /** 需人工判断的分析结论：可导航、不可批量删除 */
-const REVIEW_ONLY_TYPES: readonly GarbageType[] = ['dead-code', 'duplicate-code', 'unused-dependency'];
+const REVIEW_ONLY_TYPES: readonly GarbageType[] = [
+  'dead-code',
+  'duplicate-code',
+  'unused-dependency',
+];
 
 const ALL_GARBAGE_TYPES: readonly GarbageType[] = [
   'unused-file',
@@ -42,7 +46,10 @@ export function isDeletableType(type: GarbageType): boolean {
  */
 export function isDeletablePath(relativePath: string): boolean {
   if (isRegenerablePath(relativePath)) return true;
-  const name = relativePath.split('/').filter((segment) => segment.length > 0).pop();
+  const name = relativePath
+    .split('/')
+    .filter((segment) => segment.length > 0)
+    .pop();
   return name !== undefined && isJunkFileName(name);
 }
 

@@ -81,9 +81,7 @@ function makeReporter() {
 }
 
 /** 逐域账本最小形态：runFullScanCommand 只读 records / 耗时汇总 */
-function makeLedger(
-  records: DomainRunLedger['records'],
-): DomainRunLedger {
+function makeLedger(records: DomainRunLedger['records']): DomainRunLedger {
   const sumMs = records.reduce((sum, record) => sum + record.durationMs, 0);
   return {
     repoRoot: '/proj',
@@ -139,7 +137,10 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runPipelineCommand(runner, makeOpts({ dryRun: true }), { reporter: reporter as unknown as ConsoleReporter, projectDir: '/proj' }),
+      runPipelineCommand(runner, makeOpts({ dryRun: true }), {
+        reporter: reporter as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
     );
 
     expect(code).toBeUndefined();
@@ -157,7 +158,10 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runPipelineCommand(runner, makeOpts({ sop: true }), { reporter: reporter as unknown as ConsoleReporter, projectDir: '/proj' }),
+      runPipelineCommand(runner, makeOpts({ sop: true }), {
+        reporter: reporter as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
     );
 
     expect(code).toBeUndefined();
@@ -185,7 +189,10 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runPipelineCommand(runner, makeOpts({}), { reporter: reporter as unknown as ConsoleReporter, projectDir: '/proj' }),
+      runPipelineCommand(runner, makeOpts({}), {
+        reporter: reporter as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
     );
 
     expect(code).toBe(1);
@@ -232,7 +239,10 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runPipelineCommand(runner, makeOpts({ failOn: 'none' }), { reporter: reporter as unknown as ConsoleReporter, projectDir: '/proj' }),
+      runPipelineCommand(runner, makeOpts({ failOn: 'none' }), {
+        reporter: reporter as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
     );
 
     expect(code).toBe(2);
@@ -276,12 +286,17 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const runner = makeRunner({});
     const seen: DomainRunOptions[] = [];
 
-    await runFullScanCommand(runner, makeOpts({ full: true, domains: ' deps , security ,deps' }), '/proj', {
-      runDomains: async (options) => {
-        seen.push(options);
-        return makeLedger([{ domain: 'deps', status: 'ok', durationMs: 100 }]);
+    await runFullScanCommand(
+      runner,
+      makeOpts({ full: true, domains: ' deps , security ,deps' }),
+      '/proj',
+      {
+        runDomains: async (options) => {
+          seen.push(options);
+          return makeLedger([{ domain: 'deps', status: 'ok', durationMs: 100 }]);
+        },
       },
-    });
+    );
 
     // 去重 + 去空白，顺序保持用户书写顺序
     expect(seen[0].domains).toEqual(['deps', 'security']);
@@ -406,7 +421,10 @@ describe('runPipelineCommand — 完整流水线命令', () => {
     const reporter = makeReporter();
 
     const code = await exitCodeOf(() =>
-      runPipelineCommand(runner, makeOpts({}), { reporter: reporter as unknown as ConsoleReporter, projectDir: '/proj' }),
+      runPipelineCommand(runner, makeOpts({}), {
+        reporter: reporter as unknown as ConsoleReporter,
+        projectDir: '/proj',
+      }),
     );
 
     expect(code).toBe(1);

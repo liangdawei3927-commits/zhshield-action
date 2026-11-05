@@ -199,7 +199,9 @@ export function BackupScheduleRow({
         onSave={() => void save()}
         t={t}
       />
-      {!enabled && <p className="mt-2 text-xs text-zh-muted">{t('page.backup.schedule.descOff')}</p>}
+      {!enabled && (
+        <p className="mt-2 text-xs text-zh-muted">{t('page.backup.schedule.descOff')}</p>
+      )}
     </>
   );
 }

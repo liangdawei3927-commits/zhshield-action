@@ -114,7 +114,10 @@ describe('createGateMetricResolver', () => {
 
   describe('映射型规则不参与取数', () => {
     it('质量分映射规则不在门禁清单里，取数器也给不出数（它没有通过线）', () => {
-      const qualityRule = rule({ threshold: 100, unit: 'score' }, 'inspect.score.official.quality-score');
+      const qualityRule = rule(
+        { threshold: 100, unit: 'score' },
+        'inspect.score.official.quality-score',
+      );
 
       const value = createGateMetricResolver(repoRoot)(qualityRule) as {
         unavailableReason?: string;
@@ -125,7 +128,10 @@ describe('createGateMetricResolver', () => {
     });
 
     it('GIVEN 只有映射型规则 WHEN 判定 THEN 报告里零条目（不缺也不算通过）', () => {
-      const qualityRule = rule({ threshold: 100, unit: 'score' }, 'inspect.score.official.quality-score');
+      const qualityRule = rule(
+        { threshold: 100, unit: 'score' },
+        'inspect.score.official.quality-score',
+      );
       const report = evaluatePostScanGates([qualityRule], createGateMetricResolver(repoRoot));
 
       expect(report.total).toBe(0);

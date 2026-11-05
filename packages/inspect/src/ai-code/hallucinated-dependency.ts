@@ -306,11 +306,21 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
   }
 
   /** 解析单个包的全部引用点：返回未解析引用、是否已解析、是否出现过清单上下文 */
-  private resolvePackageSites(
-    params: ResolvePackageSitesParams,
-  ): { unresolved: RefSite[]; anyResolved: boolean; anyManifestContext: boolean } {
-    const { projectPath, pkg, sites, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
-      params;
+  private resolvePackageSites(params: ResolvePackageSitesParams): {
+    unresolved: RefSite[];
+    anyResolved: boolean;
+    anyManifestContext: boolean;
+  } {
+    const {
+      projectPath,
+      pkg,
+      sites,
+      projectLocked,
+      projectInstalled,
+      declaredCache,
+      closureCache,
+      contextCache,
+    } = params;
     const unresolved: RefSite[] = [];
     let anyResolved = false;
     let anyManifestContext = false;
@@ -354,11 +364,18 @@ export class HallucinatedDependencyCheckImpl implements HallucinatedDependencyCh
   }
 
   /** 遍历 import 引用，解析每个引用点并收集未解析的幻觉候选 */
-  private collectCandidates(
-    params: CollectCandidatesParams,
-  ): { candidates: Map<string, RefSite[]>; manifestSeen: Map<string, boolean> } {
-    const { projectPath, projectLocked, projectInstalled, declaredCache, closureCache, contextCache } =
-      params;
+  private collectCandidates(params: CollectCandidatesParams): {
+    candidates: Map<string, RefSite[]>;
+    manifestSeen: Map<string, boolean>;
+  } {
+    const {
+      projectPath,
+      projectLocked,
+      projectInstalled,
+      declaredCache,
+      closureCache,
+      contextCache,
+    } = params;
     const refs = extractImportReferences(projectPath);
     const candidates = new Map<string, RefSite[]>();
     const manifestSeen = new Map<string, boolean>();

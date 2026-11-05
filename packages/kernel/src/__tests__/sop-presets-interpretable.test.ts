@@ -238,6 +238,9 @@ describe('内置 SOP 规则 presets — 可解释性守卫', () => {
     expect(instr.type, 'supply-chain 应为 tool-dispatch').toBe('tool-dispatch');
     if (instr.type !== 'tool-dispatch') return;
     expect(instr.tool, 'supply-chain 不得再指向虚构工具 sophisticated-sca').toBe('npm-audit');
-    expect(TOOL_IDS.includes(instr.tool as (typeof TOOL_IDS)[number]), 'npm-audit 必须是已注册工具 id').toBe(true);
+    expect(
+      TOOL_IDS.includes(instr.tool as (typeof TOOL_IDS)[number]),
+      'npm-audit 必须是已注册工具 id',
+    ).toBe(true);
   });
 });

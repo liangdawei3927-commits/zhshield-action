@@ -50,10 +50,7 @@ export function emptyParsedLockfile(failures: string[]): ParsedLockfile {
 }
 
 /** package.json 声明范围（dependencies + devDependencies） */
-export function readDeclaredRanges(
-  projectRoot: string,
-  failures: string[],
-): Map<string, string> {
+export function readDeclaredRanges(projectRoot: string, failures: string[]): Map<string, string> {
   const data = readJsonSafe(safeJoin(projectRoot, 'package.json'));
   if (!data) {
     failures.push('缺少可解析的 package.json，无法核对声明范围');
@@ -168,10 +165,7 @@ export function parsePoetryProject(projectRoot: string, lockfilePath: string): P
 /** Pipfile.lock：default / develop 区块，version 为声明范围，hashes 为完整性 */
 export function parsePipfileLockFile(lockfilePath: string): ParsedLockfile {
   const failures: string[] = [];
-  const { declared, locked, integrity } = createParsedLockfile(
-    new Map<string, string>(),
-    failures,
-  );
+  const { declared, locked, integrity } = createParsedLockfile(new Map<string, string>(), failures);
 
   const data = readJsonSafe(lockfilePath);
   if (!data) {

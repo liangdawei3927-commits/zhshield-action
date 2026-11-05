@@ -73,13 +73,18 @@ describe('createRuleMetricsProvider', () => {
 
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: {
-          cyclomaticComplexity: 10,
-          functionLength: 50,
-          fileLength: 300,
-          nestingDepth: 4,
-          parameterCount: 5,
-        } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: {
+            thresholds: {
+              cyclomaticComplexity: 10,
+              functionLength: 50,
+              fileLength: 300,
+              nestingDepth: 4,
+              parameterCount: 5,
+            },
+          },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number> };
 
@@ -104,12 +109,17 @@ describe('createRuleMetricsProvider', () => {
       writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
       writeSource(
         'node_modules/pkg/index.ts',
-        'export function huge(a,b,c,d,e,f,g,h) {\n' + '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(3) + '}\n',
+        'export function huge(a,b,c,d,e,f,g,h) {\n' +
+          '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(3) +
+          '}\n',
       );
 
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { parameterCount: 5 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { parameterCount: 5 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number> };
 
@@ -123,7 +133,10 @@ describe('createRuleMetricsProvider', () => {
 
       const provider = createRuleMetricsProvider(repoRoot, { maxScanFiles: 1 });
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { fileLength: 300 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { fileLength: 300 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number>; unavailableReason?: string };
 
@@ -134,7 +147,10 @@ describe('createRuleMetricsProvider', () => {
     it('GIVEN 无任何源文件 WHEN 采集 THEN 不给指标', () => {
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { fileLength: 300 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { fileLength: 300 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number>; unavailableReason?: string };
 
@@ -154,7 +170,10 @@ describe('createRuleMetricsProvider', () => {
 
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { parameterCount: 5 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { parameterCount: 5 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number> };
 
@@ -169,7 +188,9 @@ describe('createRuleMetricsProvider', () => {
       writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
       writeSource(
         'src/__tests__/huge.test.ts',
-        'export function longFixture(a,b,c,d,e,f) {\n' + '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(60) + '}\n',
+        'export function longFixture(a,b,c,d,e,f) {\n' +
+          '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(60) +
+          '}\n',
       );
       writeSource(
         'src/__tests__/fixtures/deep.ts',
@@ -178,7 +199,10 @@ describe('createRuleMetricsProvider', () => {
 
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { parameterCount: 5 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { parameterCount: 5 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number> };
 
@@ -189,11 +213,17 @@ describe('createRuleMetricsProvider', () => {
 
     it('GIVEN 存在超大源文件 WHEN 采集 THEN 整体放弃而非静默跳过', () => {
       writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
-      writeSource('src/generated-blob.ts', 'export const blob = "' + 'x'.repeat(600 * 1024) + '";\n');
+      writeSource(
+        'src/generated-blob.ts',
+        'export const blob = "' + 'x'.repeat(600 * 1024) + '";\n',
+      );
 
       const provider = createRuleMetricsProvider(repoRoot);
       const result = provider(
-        rule({ id: 'inspect.scan.official.complexity', content: { thresholds: { fileLength: 300 } } }),
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { fileLength: 300 } },
+        }),
         { repoRoot },
       ) as { metrics?: Record<string, number>; unavailableReason?: string };
 
@@ -216,15 +246,19 @@ describe('createRuleMetricsProvider', () => {
 
   describe('readDeclaredMetricKeys — 与解释器同一口径', () => {
     it('复数 thresholds 取键名，单数 threshold 折叠为 value', () => {
-      expect(readDeclaredMetricKeys(rule({ id: 'x', content: { thresholds: { a: 1, b: 2 } } }))).toEqual(
-        ['a', 'b'],
-      );
-      expect(readDeclaredMetricKeys(rule({ id: 'x', content: { threshold: 70 } }))).toEqual(['value']);
+      expect(
+        readDeclaredMetricKeys(rule({ id: 'x', content: { thresholds: { a: 1, b: 2 } } })),
+      ).toEqual(['a', 'b']);
+      expect(readDeclaredMetricKeys(rule({ id: 'x', content: { threshold: 70 } }))).toEqual([
+        'value',
+      ]);
     });
 
     it('嵌套 schema（check 段）与扁平 schema 都能识别', () => {
       expect(
-        readDeclaredMetricKeys(rule({ id: 'x', content: { check: { thresholds: { nestingDepth: 4 } } } })),
+        readDeclaredMetricKeys(
+          rule({ id: 'x', content: { check: { thresholds: { nestingDepth: 4 } } } }),
+        ),
       ).toEqual(['nestingDepth']);
     });
 

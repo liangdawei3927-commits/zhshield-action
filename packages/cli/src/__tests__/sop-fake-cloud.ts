@@ -44,7 +44,11 @@ export async function startFakeCloud(options: FakeCloudOptions): Promise<FakeClo
       return sendJson(res, { publicKey: options.publicKeyPem ?? null });
     }
     if (url === '/sop/version') {
-      return sendJson(res, { version, hash: 'f'.repeat(64), publishedAt: '2026-10-29T00:00:00.000Z' });
+      return sendJson(res, {
+        version,
+        hash: 'f'.repeat(64),
+        publishedAt: '2026-10-29T00:00:00.000Z',
+      });
     }
     if (url.startsWith('/sop/full/')) {
       if (options.fullStatus) {

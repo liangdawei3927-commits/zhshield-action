@@ -159,7 +159,10 @@ function useSentinelPolling(monitoring: boolean, refreshEvents: () => void): voi
 }
 
 /** 事件列表数据：事件状态 + 刷新（**只取当前项目**的事件，projectId 必传） */
-function useSentinelEventData(projectPath: string, onLoaded: () => void): {
+function useSentinelEventData(
+  projectPath: string,
+  onLoaded: () => void,
+): {
   events: SentinelEventItem[];
   refreshEvents: () => void;
 } {
@@ -403,7 +406,11 @@ export function describeMonitorScope(
         ...(reason ? { reason: t(reason.textKey) } : {}),
       };
     }
-    return { key: spec.prefix, label: t(spec.labelKey), running: started.some((s) => s.startsWith(spec.prefix)) };
+    return {
+      key: spec.prefix,
+      label: t(spec.labelKey),
+      running: started.some((s) => s.startsWith(spec.prefix)),
+    };
   });
 }
 
@@ -431,8 +438,16 @@ function sortSentinelEvents(events: SentinelEventItem[]): SentinelEventItem[] {
 
 /** 误报反馈数量（按来源过滤，用于 KPI 卡展示） */
 export function useSentinelPage(projectPath: string) {
-  const { events, loading, monitoring, stopping, scope, refreshEvents, startMonitoring, stopMonitoring } =
-    useSentinelEvents(projectPath);
+  const {
+    events,
+    loading,
+    monitoring,
+    stopping,
+    scope,
+    refreshEvents,
+    startMonitoring,
+    stopMonitoring,
+  } = useSentinelEvents(projectPath);
   const falsePositiveCount = useFalsePositiveCount(projectPath, 'sentinel');
 
   return {

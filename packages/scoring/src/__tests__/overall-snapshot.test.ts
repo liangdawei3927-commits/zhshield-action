@@ -25,7 +25,10 @@ describe('computeOverallSnapshot', () => {
     const dimensions = [dim('quality', 90, 0.4), dim('security', 80, 0.6)];
     const snapshot = computeOverallSnapshot(dimensions);
     const engine = new ScoringEngine();
-    const calculated = engine.calculate('p-same', dimensions.map((d) => ({ ...d })));
+    const calculated = engine.calculate(
+      'p-same',
+      dimensions.map((d) => ({ ...d })),
+    );
     expect(snapshot.overall).toBeCloseTo(calculated.overall, 2);
     expect(snapshot.grade).toBe(calculated.grade);
   });

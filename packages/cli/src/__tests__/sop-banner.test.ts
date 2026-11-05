@@ -194,11 +194,9 @@ describe('reportPostScanGates — 没有结论 ≠ 通过', () => {
     setSopSourceSummary(
       summary({ synced: 0, cache: { origin: '桌面端云同步缓存', reason: '未找到 /x/modules' } }),
     );
-    const outcome = reportPostScanGates(
-      fakeRunner(gateReport({ total: 0, passed: 0 })),
-      log,
-      { [REQUIRE_SOP_ENV]: '1' },
-    );
+    const outcome = reportPostScanGates(fakeRunner(gateReport({ total: 0, passed: 0 })), log, {
+      [REQUIRE_SOP_ENV]: '1',
+    });
     expect(outcome.exitCode).toBe(2);
     expect(lines.join('\n')).toContain('环境不完整');
   });

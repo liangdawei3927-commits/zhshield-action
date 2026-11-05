@@ -96,13 +96,7 @@ interface RequireNumberParams {
   opts?: { min?: number; max?: number };
 }
 
-function requireNumber({
-  container,
-  key,
-  label,
-  filePath,
-  opts = {},
-}: RequireNumberParams): void {
+function requireNumber({ container, key, label, filePath, opts = {} }: RequireNumberParams): void {
   const value = container[key];
   if (value === undefined) return;
   if (typeof value !== 'number' || !Number.isFinite(value)) {

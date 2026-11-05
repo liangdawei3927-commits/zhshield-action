@@ -13,7 +13,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider } from '../i18n';
-import { AttributionSection, attributionOptions, resolveAttribution } from '../pages/report-attribution-parts';
+import {
+  AttributionSection,
+  attributionOptions,
+  resolveAttribution,
+} from '../pages/report-attribution-parts';
 import { buildWindowBuckets } from '../pages/report-windows';
 import { attributeRange, indexRecordsByTimestamp } from '../pages/report-attribution';
 import type { HealthScoreData } from '../types/electron';
@@ -72,7 +76,10 @@ function localIso(y: number, m: number, d: number, h = 12): string {
 const CONSISTENT: HealthScoreData[] = [
   rec({ timestamp: localIso(2026, 10, 20) }),
   rec({ timestamp: localIso(2026, 10, 21), scores: { security: 80, quality: 90 } }),
-  rec({ timestamp: localIso(2026, 10, 22), scores: { security: 80, quality: 90, dependencies: 70 } }),
+  rec({
+    timestamp: localIso(2026, 10, 22),
+    scores: { security: 80, quality: 90, dependencies: 70 },
+  }),
 ];
 
 function render(data: HealthScoreData[]): string {

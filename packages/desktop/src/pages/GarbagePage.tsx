@@ -78,31 +78,31 @@ function buildGarbageTypeCards({
    */
   const typeColor = (type: string): string =>
     type === 'unused-dependency' ? 'rgb(var(--zh-warning))' : 'rgb(var(--zh-info))';
-  return (
-    ['unused-dependency', 'unused-file', 'dead-code', 'duplicate-code'] as const
-  ).map((type) => ({
-    key: `type-${type}`,
-    label: t(GARBAGE_TYPE_LABEL[type] ?? type),
-    value: report.summary.byType[type] ?? 0,
-    color: typeColor(type),
-    detail: {
-      items: report.items.filter((i) => i.type === type),
-      render: (sub: unknown[]) => (
-        <div className="space-y-3">
-          <CopyAllToAiButton
-            className="ml-auto"
-            label={t('page.garbage.copyAllToAi')}
-            onClick={() => copyAllToAi(sub as GarbageScanReportData['items'])}
-          />
-          <GarbageList
-            items={sub as GarbageScanReportData['items']}
-            selected={selected}
-            onToggle={toggleSelect}
-          />
-        </div>
-      ),
-    },
-  }));
+  return (['unused-dependency', 'unused-file', 'dead-code', 'duplicate-code'] as const).map(
+    (type) => ({
+      key: `type-${type}`,
+      label: t(GARBAGE_TYPE_LABEL[type] ?? type),
+      value: report.summary.byType[type] ?? 0,
+      color: typeColor(type),
+      detail: {
+        items: report.items.filter((i) => i.type === type),
+        render: (sub: unknown[]) => (
+          <div className="space-y-3">
+            <CopyAllToAiButton
+              className="ml-auto"
+              label={t('page.garbage.copyAllToAi')}
+              onClick={() => copyAllToAi(sub as GarbageScanReportData['items'])}
+            />
+            <GarbageList
+              items={sub as GarbageScanReportData['items']}
+              selected={selected}
+              onToggle={toggleSelect}
+            />
+          </div>
+        ),
+      },
+    }),
+  );
 }
 
 /** 报告统计卡：总量 + 可释放空间 + 四类分类卡 */
@@ -166,11 +166,7 @@ function GarbageReportView({
       <GarbageSkippedNotice report={report} />
       {restoreResult && <RestoreBanner result={restoreResult} />}
       {cleanResult && (
-        <CleanResultBanner
-          result={cleanResult}
-          onRestore={handleRestore}
-          restoring={restoring}
-        />
+        <CleanResultBanner result={cleanResult} onRestore={handleRestore} restoring={restoring} />
       )}
       <GarbageActionBar
         items={report.items}
@@ -251,7 +247,11 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
   }
 
   return (
-    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
+    <DetailEntryProvider
+      key={detail.scanVersion}
+      available={detail.hasDetail}
+      onOpen={detail.openDetail}
+    >
       <ScanEmptyStateBranch
         {...emptyStateParams}
         render={(empty) => <GarbageEmptyState {...empty} />}

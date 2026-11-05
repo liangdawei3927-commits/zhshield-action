@@ -60,13 +60,25 @@ function DomainChips({
 export function ReconcileBar({ result }: { result: AttributionBreakdown }) {
   const t = useT();
   const parts: Array<{ key: string; label: string; value: number }> = [
-    { key: 'domains', label: t('page.reports.attribution.part.domains', { defaultValue: '域贡献' }), value: result.domainsPoints },
+    {
+      key: 'domains',
+      label: t('page.reports.attribution.part.domains', { defaultValue: '域贡献' }),
+      value: result.domainsPoints,
+    },
   ];
   if (Math.abs(result.structurePoints) >= 0.01) {
-    parts.push({ key: 'structure', label: t('page.reports.attribution.part.structure', { defaultValue: '结构项' }), value: result.structurePoints });
+    parts.push({
+      key: 'structure',
+      label: t('page.reports.attribution.part.structure', { defaultValue: '结构项' }),
+      value: result.structurePoints,
+    });
   }
   if (Math.abs(result.capPoints) >= 0.01) {
-    parts.push({ key: 'cap', label: t('page.reports.attribution.part.cap', { defaultValue: '封顶项' }), value: result.capPoints });
+    parts.push({
+      key: 'cap',
+      label: t('page.reports.attribution.part.cap', { defaultValue: '封顶项' }),
+      value: result.capPoints,
+    });
   }
   const sum = parts.reduce((acc, part) => acc + part.value, 0);
   const ok = result.reconciled;
@@ -88,7 +100,9 @@ export function ReconcileBar({ result }: { result: AttributionBreakdown }) {
         </span>
       ))}
       <span className="text-zh-muted">=</span>
-      <span className="font-bold font-mono text-zh-text">{formatDelta(Math.round(sum * 100) / 100)}</span>
+      <span className="font-bold font-mono text-zh-text">
+        {formatDelta(Math.round(sum * 100) / 100)}
+      </span>
       <span className="text-zh-muted">
         {t('page.reports.attribution.real', { defaultValue: '实际' })}
       </span>
@@ -187,10 +201,7 @@ export function AttributionSummary({
     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3 text-xs">
       <span className="text-zh-muted">
         {t('page.reports.attribution.total', { defaultValue: '本期变化' })}{' '}
-        <span
-          className="font-bold text-sm"
-          style={{ color: deltaColor(breakdown.actualDelta) }}
-        >
+        <span className="font-bold text-sm" style={{ color: deltaColor(breakdown.actualDelta) }}>
           {formatDelta(breakdown.actualDelta)}
         </span>
         <span className="text-zh-muted">

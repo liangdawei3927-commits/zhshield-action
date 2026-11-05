@@ -5,10 +5,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp/zh-backup-health-test') },
 }));
 
-import {
-  buildBackupHealthSnapshot,
-  type BackupRecordLike,
-} from '../../electron/ipc/backup';
+import { buildBackupHealthSnapshot, type BackupRecordLike } from '../../electron/ipc/backup';
 
 /**
  * 备份健康快照聚合（十域评分章程 #10）

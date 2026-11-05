@@ -19,9 +19,8 @@ export function HealthRing({ score, size = 260 }: { score: number | null; size?:
   const cx = 75;
   const cy = 75;
   // 数字宽度自适应：3 位（100 分）降档，避免数字+单位超出环内径贴到圆弧
-  const numberFont = (score === null ? 2 : String(Math.round(progress)).length) >= 3
-    ? size * 0.26
-    : size * 0.33;
+  const numberFont =
+    (score === null ? 2 : String(Math.round(progress)).length) >= 3 ? size * 0.26 : size * 0.33;
 
   return (
     <div

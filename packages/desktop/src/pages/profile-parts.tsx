@@ -133,7 +133,8 @@ export function SignalList({ signals }: { signals: readonly Signal[] }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? signals : signals.slice(0, 5);
 
-  if (signals.length === 0) return <p className="text-xs text-zh-muted">{t('page.profile.signals.none')}</p>;
+  if (signals.length === 0)
+    return <p className="text-xs text-zh-muted">{t('page.profile.signals.none')}</p>;
 
   return (
     <div>
@@ -198,7 +199,10 @@ export function TargetCard({ target }: { target: TargetProfile }) {
           value={target.language.value}
           badge={<ConfidenceBadge confidence={target.language.confidence} />}
         />
-        <DataRow label={t('page.profile.target.frameworks')} value={<TargetFrameworkList frameworks={target.frameworks} />} />
+        <DataRow
+          label={t('page.profile.target.frameworks')}
+          value={<TargetFrameworkList frameworks={target.frameworks} />}
+        />
         {target.productForm && (
           <DataRow
             label={t('page.profile.target.productForm')}
@@ -253,7 +257,8 @@ export function OverridesPanel({ overrides }: { overrides: UserOverrides }) {
               <span className="text-[11px] font-mono">
                 {val.language && t('page.profile.overrides.language', { value: val.language })}
                 {val.language && val.productForm && ' / '}
-                {val.productForm && t('page.profile.overrides.productForm', { value: val.productForm })}
+                {val.productForm &&
+                  t('page.profile.overrides.productForm', { value: val.productForm })}
               </span>
             }
           />

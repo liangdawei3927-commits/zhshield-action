@@ -45,8 +45,11 @@ describe('跨包接缝：kernel 健康度 → 侧边栏文案', () => {
     );
     fs.writeFileSync(
       path.join(cacheDir, 'sync.log'),
-      JSON.stringify({ timestamp: logTimestamp, from: '1.2026.07.28.001', to: '1.2026.09.24.209' }) +
-        '\n',
+      JSON.stringify({
+        timestamp: logTimestamp,
+        from: '1.2026.07.28.001',
+        to: '1.2026.09.24.209',
+      }) + '\n',
     );
   }
 

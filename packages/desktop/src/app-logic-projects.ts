@@ -17,12 +17,7 @@ import { t } from '@zh/i18n';
 import type { AiToolConfigData } from './types/electron';
 import { installGuardHooks, startSentinelMonitoring } from './services/engineApi';
 import type { ToastVariant } from './components/ui/toast-logic';
-import {
-  ONBOARDED_KEY,
-  STORAGE_KEY,
-  type Page,
-  type ProjectInfo,
-} from './app-logic-types';
+import { ONBOARDED_KEY, STORAGE_KEY, type Page, type ProjectInfo } from './app-logic-types';
 import {
   readSelectedProjectPath,
   resolveCanonicalPath,

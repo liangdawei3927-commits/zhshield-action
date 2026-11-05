@@ -108,7 +108,10 @@ describe('runSopSyncCommand — 成功路径', () => {
       publicKeyPem: keys.publicKeyPem,
     });
 
-    await runSopSyncCommand(inputFor(settingsFor(cloud.base, { publicKey: keys.publicKeyPem })), log);
+    await runSopSyncCommand(
+      inputFor(settingsFor(cloud.base, { publicKey: keys.publicKeyPem })),
+      log,
+    );
 
     expect(logs.join('\n')).toContain('由 1.2026.10.01.001 更新');
   });
@@ -121,7 +124,10 @@ describe('runSopSyncCommand — 成功路径', () => {
       publicKeyPem: keys.publicKeyPem,
     });
 
-    await runSopSyncCommand(inputFor(settingsFor(cloud.base, { publicKey: keys.publicKeyPem })), log);
+    await runSopSyncCommand(
+      inputFor(settingsFor(cloud.base, { publicKey: keys.publicKeyPem })),
+      log,
+    );
 
     expect(logs.join('\n')).toContain('不含扫描后门禁规则');
   });

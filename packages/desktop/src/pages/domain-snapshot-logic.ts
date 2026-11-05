@@ -124,7 +124,8 @@ export function toSnapshotReport(raw: unknown): SnapshotReport | null {
 
   const issues = asArray(raw.issues);
   const items = asArray(raw.items);
-  const shape: SnapshotReport['shape'] = issues.length > 0 ? 'issues' : items.length > 0 ? 'items' : 'empty';
+  const shape: SnapshotReport['shape'] =
+    issues.length > 0 ? 'issues' : items.length > 0 ? 'items' : 'empty';
 
   const entries = (shape === 'items' ? fromItems(raw) : fromIssues(raw)).sort(
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
@@ -134,8 +135,7 @@ export function toSnapshotReport(raw: unknown): SnapshotReport | null {
   const countOf = (key: 'total' | 'error' | 'warning' | 'info', fallback: number): number =>
     typeof summary[key] === 'number' ? (summary[key] as number) : fallback;
 
-  const generatedAt =
-    asString(raw.generatedAt) || asString(raw.timestamp) || null;
+  const generatedAt = asString(raw.generatedAt) || asString(raw.timestamp) || null;
 
   return {
     generatedAt,

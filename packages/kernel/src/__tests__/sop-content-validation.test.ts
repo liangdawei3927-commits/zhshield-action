@@ -125,10 +125,7 @@ describe('validateRuleContent — forbidden-regex 正则安全校验', () => {
     const rule = makeRule({
       id: 'j',
       content: {
-        forbiddenRegex: [
-          { regex: 'safe-pattern' },
-          { regex: '(a+)+', message: '危险' },
-        ],
+        forbiddenRegex: [{ regex: 'safe-pattern' }, { regex: '(a+)+', message: '危险' }],
       },
     });
 

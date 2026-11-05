@@ -260,7 +260,12 @@ describe('AdminService 规则管理（C4 写路径 + 读路径刷新）', () => 
     const brokenToolRepo = new SopToolAdminRepository();
     const brokenService = new SopService(brokenRuleRepo);
     const brokenStore = new ToolRuleStore(new ToolRuleLoader(), brokenRuleRepo);
-    const brokenAdmin = new AdminService(brokenRuleRepo, brokenToolRepo, brokenService, brokenStore);
+    const brokenAdmin = new AdminService(
+      brokenRuleRepo,
+      brokenToolRepo,
+      brokenService,
+      brokenStore,
+    );
     await expect(
       brokenAdmin.saveRule(makeRule('security.scan.official.admin-unavailable')),
     ).rejects.toThrow(ServiceUnavailableException);

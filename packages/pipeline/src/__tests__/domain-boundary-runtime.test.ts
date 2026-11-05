@@ -75,7 +75,10 @@ describe('《07》A3 — 重复代码唯一归重构（运行时）', () => {
   });
 
   it('重构域：同一份重复代码在夹具有产出（真阳性）', async () => {
-    const record = await runDomain('refactor', { repoRoot: fixture, budgets: { refactor: 60_000 } });
+    const record = await runDomain('refactor', {
+      repoRoot: fixture,
+      budgets: { refactor: 60_000 },
+    });
 
     expect(record.status).toBe('ok');
     const report = record.report as RefactorReport;
@@ -107,7 +110,9 @@ describe('《07》A3 — 重复代码唯一归重构（运行时）', () => {
     expect(evaluated.length).toBeGreaterThan(0);
 
     // C1：体检域只跑体检规则
-    expect(report.evaluations.every((evaluation) => evaluation.rule.domain === 'inspect')).toBe(true);
+    expect(report.evaluations.every((evaluation) => evaluation.rule.domain === 'inspect')).toBe(
+      true,
+    );
 
     // A3：任何一条规则（含其违规明细）都不得是重复代码类
     const offenders = report.evaluations
@@ -132,8 +137,10 @@ describe('《07》A3 — 重复代码唯一归重构（运行时）', () => {
     expect(report).toBeDefined();
 
     // A3：重复代码明细归重构域；垃圾域无论文件系统检测还是规则通道都不得登记它
-    const offenders = [...report.checks.map((check) => check.ruleId), ...report.items.map((item) => item.type)]
-      .filter(hasDuplicationToken);
+    const offenders = [
+      ...report.checks.map((check) => check.ruleId),
+      ...report.items.map((item) => item.type),
+    ].filter(hasDuplicationToken);
     expect(offenders).toEqual([]);
   });
 });

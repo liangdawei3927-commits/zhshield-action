@@ -193,7 +193,10 @@ describe('SopLazyLoader', () => {
       // 模拟校准：registry 中的 type-safety 规则变为新版本
       const refreshedRules = rules.map((r) =>
         r.id === 'typescript.type-safety'
-          ? { ...r, content: { ...r.content, forbidden: ['as any'], excludePatterns: ['**/*.d.ts'] } }
+          ? {
+              ...r,
+              content: { ...r.content, forbidden: ['as any'], excludePatterns: ['**/*.d.ts'] },
+            }
           : r,
       );
       loader = new SopLazyLoader(makeCacheManagerMock(cacheDir, refreshedRules));

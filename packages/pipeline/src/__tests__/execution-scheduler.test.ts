@@ -26,8 +26,14 @@ describe('Scheduler 合并执行（A12 / C1 / C2）', () => {
       return [finding('security.scan.official.injection', 'inj:1')];
     };
     const plans: DomainPlan<F>[] = [
-      { domain: 'inspect', requests: [{ tool: 'semgrep', targets: ['src/a.ts', 'src/b.ts'], run }] },
-      { domain: 'security', requests: [{ tool: 'semgrep', targets: ['src/b.ts', 'src/a.ts'], run }] },
+      {
+        domain: 'inspect',
+        requests: [{ tool: 'semgrep', targets: ['src/a.ts', 'src/b.ts'], run }],
+      },
+      {
+        domain: 'security',
+        requests: [{ tool: 'semgrep', targets: ['src/b.ts', 'src/a.ts'], run }],
+      },
     ];
 
     const result = await scheduler.run(plans);
@@ -68,7 +74,10 @@ describe('Scheduler 熔断（A13 / §7.5）', () => {
     const scheduler = new Scheduler({ hardTimeouts: { trivy: 20 } });
     const neverResolves = () => new Promise<readonly F[]>(() => {});
     const plans: DomainPlan<F>[] = [
-      { domain: 'deps', requests: [{ tool: 'trivy', targets: ['pnpm-lock.yaml'], run: neverResolves }] },
+      {
+        domain: 'deps',
+        requests: [{ tool: 'trivy', targets: ['pnpm-lock.yaml'], run: neverResolves }],
+      },
       {
         domain: 'inspect',
         requests: [
@@ -166,7 +175,10 @@ describe('Scheduler 运行前提与降级（A15 / Rule 12）', () => {
   it('Given 工具未在能力注册表登记，When 调度，Then 记 skipped 并给出原因（不静默跳过）', async () => {
     const scheduler = new Scheduler();
     const plans: DomainPlan<F>[] = [
-      { domain: 'inspect', requests: [{ tool: 'prettier', targets: ['src/a.ts'], run: async () => [] }] },
+      {
+        domain: 'inspect',
+        requests: [{ tool: 'prettier', targets: ['src/a.ts'], run: async () => [] }],
+      },
     ];
 
     const result = await scheduler.run(plans);
@@ -190,7 +202,10 @@ describe('Scheduler 运行前提与降级（A15 / Rule 12）', () => {
           },
         ],
       },
-      { domain: 'garbage', requests: [{ tool: 'ts-prune', targets: ['src/a.ts'], run: async () => [] }] },
+      {
+        domain: 'garbage',
+        requests: [{ tool: 'ts-prune', targets: ['src/a.ts'], run: async () => [] }],
+      },
     ];
 
     const result = await scheduler.run(plans);

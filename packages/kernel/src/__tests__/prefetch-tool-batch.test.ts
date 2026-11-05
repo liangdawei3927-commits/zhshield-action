@@ -39,7 +39,12 @@ function interpret(r: SopRule): ContentInstruction {
 
 function fakeAdapter(overrides: Partial<ToolAdapter> = {}): ToolAdapter {
   return {
-    meta: { id: 'semgrep', name: 'Semgrep', category: 'inspect', priority: 'P0' } as ToolAdapter['meta'],
+    meta: {
+      id: 'semgrep',
+      name: 'Semgrep',
+      category: 'inspect',
+      priority: 'P0',
+    } as ToolAdapter['meta'],
     isAvailable: async () => true,
     scan: vi.fn(),
     ...overrides,
@@ -47,7 +52,11 @@ function fakeAdapter(overrides: Partial<ToolAdapter> = {}): ToolAdapter {
 }
 
 function fakeContext(): RuleContext {
-  return { repoRoot: '/repo', files: undefined, toolScanCache: new Map() } as unknown as RuleContext;
+  return {
+    repoRoot: '/repo',
+    files: undefined,
+    toolScanCache: new Map(),
+  } as unknown as RuleContext;
 }
 
 function fakeHost(adapters: Map<string, ToolAdapter>): EngineHost {
@@ -95,10 +104,10 @@ describe('prefetchToolBatches — 合并预取并种进缓存', () => {
     const keyA = toolScanCacheKey('semgrep', { rules: undefined } as never);
     // 缓存键必须是逐条派发会算出来的那个（否则预取白跑）
     for (const r of rules) {
-      const expectedKey = toolScanCacheKey(
-        'semgrep',
-        { category: 'security', rules: ((r.content as { tool: string[] }).tool ?? []).map((id) => ({ id })) },
-      );
+      const expectedKey = toolScanCacheKey('semgrep', {
+        category: 'security',
+        rules: ((r.content as { tool: string[] }).tool ?? []).map((id) => ({ id })),
+      });
       expect(context.toolScanCache?.has(expectedKey)).toBe(true);
     }
     expect(context.toolScanCache?.has(keyA)).toBe(false); // 没有多余的槽

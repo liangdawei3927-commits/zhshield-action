@@ -22,11 +22,48 @@ export type RuntimeContext = 'browser' | 'electron-renderer' | 'electron-main' |
 
 /** Node 内建模块名（bare specifier；`node:` 前缀与子路径如 `fs/promises` 另判） */
 const NODE_BUILTINS: ReadonlySet<string> = new Set([
-  'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console', 'constants',
-  'crypto', 'dgram', 'diagnostics_channel', 'dns', 'domain', 'events', 'fs', 'http', 'http2',
-  'https', 'inspector', 'module', 'net', 'os', 'path', 'perf_hooks', 'process', 'punycode',
-  'querystring', 'readline', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
-  'trace_events', 'tty', 'url', 'util', 'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
+  'assert',
+  'async_hooks',
+  'buffer',
+  'child_process',
+  'cluster',
+  'console',
+  'constants',
+  'crypto',
+  'dgram',
+  'diagnostics_channel',
+  'dns',
+  'domain',
+  'events',
+  'fs',
+  'http',
+  'http2',
+  'https',
+  'inspector',
+  'module',
+  'net',
+  'os',
+  'path',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'stream',
+  'string_decoder',
+  'sys',
+  'timers',
+  'tls',
+  'trace_events',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'vm',
+  'wasi',
+  'worker_threads',
+  'zlib',
 ]);
 
 /** 浏览器 / DOM 全局（大小写敏感精确匹配，故 `DocumentBuilder` 之类不算） */
@@ -57,16 +94,32 @@ const NESTJS_REQUEST_INTERFACES: ReadonlySet<string> = new Set([
 
 /** NestJS 请求处理方法上的装饰器（HTTP 方法装饰器 + 请求管道装饰器） */
 const NESTJS_HANDLER_DECORATORS: ReadonlySet<string> = new Set([
-  'Get', 'Post', 'Put', 'Delete', 'Patch', 'All', 'Options', 'Head', 'Sse',
-  'UseGuards', 'UseInterceptors', 'UsePipes',
+  'Get',
+  'Post',
+  'Put',
+  'Delete',
+  'Patch',
+  'All',
+  'Options',
+  'Head',
+  'Sse',
+  'UseGuards',
+  'UseInterceptors',
+  'UsePipes',
 ]);
 
 /** Express 风格处理器的第 1 / 2 形参（类型注解文本；无注解时形参名会退化进来） */
 const EXPRESS_REQUEST_PARAMS: ReadonlySet<string> = new Set([
-  'Request', 'IncomingMessage', 'Express.Request', 'req',
+  'Request',
+  'IncomingMessage',
+  'Express.Request',
+  'req',
 ]);
 const EXPRESS_RESPONSE_PARAMS: ReadonlySet<string> = new Set([
-  'Response', 'ServerResponse', 'Express.Response', 'res',
+  'Response',
+  'ServerResponse',
+  'Express.Response',
+  'res',
 ]);
 
 /**

@@ -69,9 +69,7 @@ describe('buildFindings — InspectionReport 归一', () => {
 
   it('issue 自带 source 时透传——告警路由（security 域走安全面板）依赖该字段', () => {
     const report = makeInspectionReport({
-      issues: [
-        { ruleId: 'r1', severity: 'error', message: 'm', file: 'a.ts', source: 'security' },
-      ],
+      issues: [{ ruleId: 'r1', severity: 'error', message: 'm', file: 'a.ts', source: 'security' }],
     });
 
     expect(buildFindings(report)[0].source).toBe('security');
@@ -168,7 +166,13 @@ describe('buildFindings — RefactorReport 归一', () => {
 
   it('无 smells 的文件不产出 finding', () => {
     const report = makeRefactorReport([
-      { filePath: 'src/clean.ts', totalSmells: 0, maintainabilityScore: 100, refactorPriority: 'low', smells: [] },
+      {
+        filePath: 'src/clean.ts',
+        totalSmells: 0,
+        maintainabilityScore: 100,
+        refactorPriority: 'low',
+        smells: [],
+      },
     ]);
     expect(buildFindings(report)).toHaveLength(0);
   });
@@ -183,7 +187,9 @@ describe('buildFindings — PipelineReport 聚合与容错', () => {
       guard: {
         ok: false,
         summary: { total: 1, passed: 0, failed: 1 },
-        results: [{ checkId: 'guard.chk', status: 'failed', severity: 'error', message: '门禁失败' }],
+        results: [
+          { checkId: 'guard.chk', status: 'failed', severity: 'error', message: '门禁失败' },
+        ],
       },
       inspect: makeInspectionReport({
         issues: [{ ruleId: 'inspect.r', severity: 'warning', message: '巡检问题', file: 'a.ts' }],
@@ -195,7 +201,12 @@ describe('buildFindings — PipelineReport 聚合与容错', () => {
           maintainabilityScore: 50,
           refactorPriority: 'medium',
           smells: [
-            { ruleId: 'refactor.r', severity: 'info', message: '异味', location: { filePath: 'b.ts', line: 1, column: 1 } },
+            {
+              ruleId: 'refactor.r',
+              severity: 'info',
+              message: '异味',
+              location: { filePath: 'b.ts', line: 1, column: 1 },
+            },
           ],
         },
       ]),
@@ -210,6 +221,14 @@ describe('buildFindings — PipelineReport 聚合与容错', () => {
     expect(buildFindings(undefined)).toHaveLength(0);
     expect(buildFindings({})).toHaveLength(0);
     expect(buildFindings('not a report')).toHaveLength(0);
-    expect(buildFindings({ timestamp: new Date(), stage: 'complete', guard: null, inspect: null, refactor: null })).toHaveLength(0);
+    expect(
+      buildFindings({
+        timestamp: new Date(),
+        stage: 'complete',
+        guard: null,
+        inspect: null,
+        refactor: null,
+      }),
+    ).toHaveLength(0);
   });
 });

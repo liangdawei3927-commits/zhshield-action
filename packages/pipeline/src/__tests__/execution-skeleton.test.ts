@@ -60,7 +60,11 @@ describe('ToolExecutor（执行层第二层，A12）', () => {
       runs += 1;
       return ['finding'];
     };
-    const invocation = { tool: 'semgrep' as const, targets: ['src/a.ts', 'src/b.ts'], args: ['--json'] };
+    const invocation = {
+      tool: 'semgrep' as const,
+      targets: ['src/a.ts', 'src/b.ts'],
+      args: ['--json'],
+    };
 
     const first = await executor.executeOnce(invocation, run);
     const second = await executor.executeOnce(

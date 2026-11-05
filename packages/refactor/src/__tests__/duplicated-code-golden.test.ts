@@ -25,7 +25,9 @@ const DUPLICATED_BLOCK = [
   '}',
 ].join('\n');
 
-async function smellCounts(files: Record<string, string>): Promise<{ dupHits: number; scanned: number }> {
+async function smellCounts(
+  files: Record<string, string>,
+): Promise<{ dupHits: number; scanned: number }> {
   const dir = mkdtempSync(path.join(tmpdir(), 'dup-golden-'));
   try {
     const paths: string[] = [];

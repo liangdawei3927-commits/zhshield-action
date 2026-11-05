@@ -378,7 +378,13 @@ export class FileMonitor {
       return;
     }
     this.lastMtimes.delete(fullPath);
-    this.reporter.emitFileChangeEvent({ projectId, fullPath, watchPath, changeType: 'unlink', tracked });
+    this.reporter.emitFileChangeEvent({
+      projectId,
+      fullPath,
+      watchPath,
+      changeType: 'unlink',
+      tracked,
+    });
   }
 
   /**

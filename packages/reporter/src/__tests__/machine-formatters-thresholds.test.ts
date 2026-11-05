@@ -29,8 +29,10 @@ describe('severityRank / failOnRank — 门禁阈值秩', () => {
   it('阈值判定组合语义：warning 违规在 error 阈值下放行、在 warning 阈值下拦停、在 none 阈值下放行', () => {
     // 与 commands.ts shouldBlock 完全一致的表达式：'none' 由显式短路条件兜住，
     // failOnRank('none')=0 的作用是让秩函数在全值域上保持全序（恒低于任何严重级）
-    const blocks = (severity: 'error' | 'warning' | 'info', failOn: 'error' | 'warning' | 'info' | 'none') =>
-      failOn !== 'none' && severityRank(severity) >= failOnRank(failOn);
+    const blocks = (
+      severity: 'error' | 'warning' | 'info',
+      failOn: 'error' | 'warning' | 'info' | 'none',
+    ) => failOn !== 'none' && severityRank(severity) >= failOnRank(failOn);
 
     expect(blocks('warning', 'error')).toBe(false);
     expect(blocks('warning', 'warning')).toBe(true);

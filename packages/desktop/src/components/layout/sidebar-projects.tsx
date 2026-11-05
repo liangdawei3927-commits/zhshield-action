@@ -281,11 +281,7 @@ export function ProjectsSection({
             />
           ))
         )}
-        <AddProjectButton
-          onAddProject={onAddProject}
-          onClose={onClose}
-          t={t}
-        />
+        <AddProjectButton onAddProject={onAddProject} onClose={onClose} t={t} />
       </div>
     </section>
   );

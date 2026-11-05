@@ -56,7 +56,9 @@ function cards(dims = FULL_DIMENSIONS, now = NOW) {
 const OVERALL: OverallScoreInput = { score: 89.5, partial: { run: 10, total: 10 } };
 
 function row(overall: OverallScoreInput = OVERALL): ReactElement {
-  return <ScoreOverviewRow dimensions={FULL_DIMENSIONS} generatedAt={GENERATED_AT} overall={overall} />;
+  return (
+    <ScoreOverviewRow dimensions={FULL_DIMENSIONS} generatedAt={GENERATED_AT} overall={overall} />
+  );
 }
 
 function renderWithNav(node: ReactElement, navigate = () => undefined): string {
@@ -189,9 +191,7 @@ describe('评分总览行 — 合并渲染', () => {
   });
 
   it('只跑了部分域时出现覆盖范围提示；跑全了则没有', () => {
-    const partial = renderWithNav(
-      row({ score: 92, partial: { run: 2, total: 10 } }),
-    );
+    const partial = renderWithNav(row({ score: 92, partial: { run: 2, total: 10 } }));
     expect(partial).toContain('data-testid="partial-notice"');
     expect(partial).toContain('仅由已检测的 2 / 10 个维度加权');
     expect(renderWithNav(row())).not.toContain('partial-notice');
@@ -253,7 +253,10 @@ describe('评分总览行 — 合并渲染', () => {
   });
 
   it('点击只做页面切换：源码里只有 navigate(card.navId)，不触发任何扫描', () => {
-    const src = readFileSync(new URL('../pages/category-score-cards.tsx', import.meta.url), 'utf-8');
+    const src = readFileSync(
+      new URL('../pages/category-score-cards.tsx', import.meta.url),
+      'utf-8',
+    );
     // 唯一跳转调用
     expect(src).toMatch(/onSelect\(card\.navId\)/);
     // 卡片不得自己发起检查（报告中心只读汇总，触发权归各域）

@@ -47,7 +47,10 @@ function resolveCacheDir(): string {
 function hasLocalVulnerabilityDb(): boolean {
   const dbDir = path.join(resolveCacheDir(), 'db');
   try {
-    return fs.existsSync(path.join(dbDir, 'trivy.db')) && fs.existsSync(path.join(dbDir, 'metadata.json'));
+    return (
+      fs.existsSync(path.join(dbDir, 'trivy.db')) &&
+      fs.existsSync(path.join(dbDir, 'metadata.json'))
+    );
   } catch {
     return false;
   }
@@ -128,7 +131,8 @@ export class TrivyAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error: '扫描根目录无 package.json，依赖审计范围外未执行（如需依赖审计请在含 Node 清单的项目根运行）',
+        error:
+          '扫描根目录无 package.json，依赖审计范围外未执行（如需依赖审计请在含 Node 清单的项目根运行）',
       };
     }
 

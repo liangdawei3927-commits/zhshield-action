@@ -87,7 +87,13 @@ describe('cleanGarbage', () => {
     fs.writeFileSync(source, 'export const a = 1;');
 
     const result = cleanGarbage(dir, [
-      { id: 's1', type: 'unused-file', path: 'src/index.ts', size: 20, reason: 'Empty file: index.ts' },
+      {
+        id: 's1',
+        type: 'unused-file',
+        path: 'src/index.ts',
+        size: 20,
+        reason: 'Empty file: index.ts',
+      },
     ]);
 
     expect(result.cleaned).toHaveLength(0);

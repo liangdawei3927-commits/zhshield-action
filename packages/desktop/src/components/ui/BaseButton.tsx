@@ -43,7 +43,12 @@ export function BaseButton({
         cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
       `;
   return (
-    <Bounce as="button" disabled={isDisabled} className={`${baseClass} ${className ?? ''}`} {...rest}>
+    <Bounce
+      as="button"
+      disabled={isDisabled}
+      className={`${baseClass} ${className ?? ''}`}
+      {...rest}
+    >
       {children}
     </Bounce>
   );

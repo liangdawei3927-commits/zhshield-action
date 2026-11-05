@@ -49,9 +49,7 @@ export function isFunctionLike(node: ts.Node | undefined): node is ts.FunctionLi
 /** 是否为类的成员节点（方法 / 构造器 / 存取器），区别于自由函数与箭头函数 */
 export function isClassMember(node: ts.FunctionLikeDeclaration): boolean {
   return (
-    !ts.isFunctionDeclaration(node) &&
-    !ts.isFunctionExpression(node) &&
-    !ts.isArrowFunction(node)
+    !ts.isFunctionDeclaration(node) && !ts.isFunctionExpression(node) && !ts.isArrowFunction(node)
   );
 }
 
@@ -199,7 +197,11 @@ function isFreshCounter(decl: ts.VariableDeclaration): boolean {
 
 function unwrapExpression(expr: ts.Expression | undefined): ts.Expression | undefined {
   if (expr === undefined) return undefined;
-  if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr) || ts.isParenthesizedExpression(expr)) {
+  if (
+    ts.isAsExpression(expr) ||
+    ts.isSatisfiesExpression(expr) ||
+    ts.isParenthesizedExpression(expr)
+  ) {
     return unwrapExpression(expr.expression);
   }
   return expr;
@@ -248,7 +250,11 @@ export function isStaticLengthIterable(
   staticLengthConsts: ReadonlySet<string> = NO_CONST_NAMES,
 ): boolean {
   if (ts.isArrayLiteralExpression(expr)) return true;
-  if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr) || ts.isParenthesizedExpression(expr)) {
+  if (
+    ts.isAsExpression(expr) ||
+    ts.isSatisfiesExpression(expr) ||
+    ts.isParenthesizedExpression(expr)
+  ) {
     return isStaticLengthIterable(expr.expression, staticLengthConsts);
   }
   if (ts.isIdentifier(expr)) return staticLengthConsts.has(expr.text);

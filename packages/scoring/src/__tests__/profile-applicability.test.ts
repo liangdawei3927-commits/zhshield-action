@@ -91,7 +91,11 @@ describe('buildHealthDimensions — 维度适用性端到端', () => {
   it('无 issue 时 mini-program 整体分近满分（剔除维度不影响满分）', () => {
     const r = new ScoringEngine().calculate(
       'p',
-      buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile: makeProfile('mini-program') }),
+      buildHealthDimensions({
+        guard: emptyGuard,
+        inspect: emptyInspect,
+        profile: makeProfile('mini-program'),
+      }),
     );
     expect(r.overall).toBeGreaterThanOrEqual(99);
   });

@@ -81,19 +81,18 @@ describe('巡检实时评分写入按域快照', () => {
       buildDiagnosticsReport(project, [entry({ fingerprint: 'fp-1' })], '2026-09-19T10:00:00.000Z'),
       ['inspect'],
     );
-    await writeDiagnosticsFile(
-      buildDiagnosticsReport(project, [], '2026-09-19T11:00:00.000Z'),
-      ['inspect'],
-    );
+    await writeDiagnosticsFile(buildDiagnosticsReport(project, [], '2026-09-19T11:00:00.000Z'), [
+      'inspect',
+    ]);
 
     const snap = await readDomainSnapshot(projectDir, 'inspect');
     expect(snap?.issues.length).toBe(0);
     expect(snap?.dimensionScore?.score, '修干净后当场应为满分').toBe(100);
     expect(snap?.dimensionScore?.status).toBe('scored');
-    expect(
-      snap?.previousScore,
-      '覆盖写前必须抢救旧分作为对比基线（上一轮 92 分）',
-    ).toEqual({ score: 92, generatedAt: '2026-09-19T10:00:00.000Z' });
+    expect(snap?.previousScore, '覆盖写前必须抢救旧分作为对比基线（上一轮 92 分）').toEqual({
+      score: 92,
+      generatedAt: '2026-09-19T10:00:00.000Z',
+    });
   });
 
   it('同轮重复落盘（generatedAt 相同）不产生对比基线', async () => {

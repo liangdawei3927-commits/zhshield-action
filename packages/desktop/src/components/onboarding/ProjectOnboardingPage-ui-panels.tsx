@@ -10,7 +10,13 @@ import type {
 import { LOW_CONFIDENCE_THRESHOLD } from './ProjectOnboardingPage-types';
 
 /** 面板底部主按钮：品牌渐变 + 悬停透明度反馈（预设选择 / 画像确认两处共用） */
-export function OnboardingPanelAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+export function OnboardingPanelAction({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"

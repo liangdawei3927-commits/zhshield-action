@@ -39,13 +39,11 @@ export interface OwnershipClaim {
 /** 归属声明表。允许出现同 key 的重复声明 —— 那正是 `validateOwnershipRegistry()` 要抓的错 */
 export const OWNERSHIP_CLAIMS: readonly OwnershipClaim[] = [
   // ── 域前缀兜底：`<domain>.scan...` 天然归该域 ─────────────────────────
-  ...DOMAIN_IDS.map(
-    (domain): OwnershipClaim => ({
-      match: { kind: 'prefix', prefix: domain },
-      owner: domain,
-      rationale: 'C1 域前缀默认归属',
-    }),
-  ),
+  ...DOMAIN_IDS.map((domain): OwnershipClaim => ({
+    match: { kind: 'prefix', prefix: domain },
+    owner: domain,
+    rationale: 'C1 域前缀默认归属',
+  })),
 
   // ── O1 重复代码：唯一归重构 ────────────────────────────────────────────
   {
@@ -54,64 +52,169 @@ export const OWNERSHIP_CLAIMS: readonly OwnershipClaim[] = [
     rationale: 'O1 重复代码唯一归重构；体检只读重复率指标',
     previousOwner: 'inspect',
   },
-  { match: { kind: 'token', token: 'duplication' }, owner: 'refactor', rationale: 'O1 重复代码唯一归重构' },
-  { match: { kind: 'token', token: 'duplicated-code' }, owner: 'refactor', rationale: 'O1 重复代码唯一归重构' },
-  { match: { kind: 'token', token: 'jscpd' }, owner: 'refactor', rationale: 'O1 jscpd 产出重复明细，归重构' },
+  {
+    match: { kind: 'token', token: 'duplication' },
+    owner: 'refactor',
+    rationale: 'O1 重复代码唯一归重构',
+  },
+  {
+    match: { kind: 'token', token: 'duplicated-code' },
+    owner: 'refactor',
+    rationale: 'O1 重复代码唯一归重构',
+  },
+  {
+    match: { kind: 'token', token: 'jscpd' },
+    owner: 'refactor',
+    rationale: 'O1 jscpd 产出重复明细，归重构',
+  },
 
   // ── O2 / O10 依赖包 CVE：唯一归依赖管家 ────────────────────────────────
-  { match: { kind: 'token', token: 'cve' }, owner: 'deps', rationale: 'O2 依赖包 CVE 唯一归依赖管家' },
+  {
+    match: { kind: 'token', token: 'cve' },
+    owner: 'deps',
+    rationale: 'O2 依赖包 CVE 唯一归依赖管家',
+  },
   {
     match: { kind: 'exact', ruleId: 'inspect.scan.official.dependency-audit' },
     owner: 'deps',
     rationale: 'O10 依赖审计唯一归依赖管家；体检改只读',
     previousOwner: 'inspect',
   },
-  { match: { kind: 'token', token: 'trivy' }, owner: 'deps', rationale: 'O2 trivy 的依赖扫描归依赖管家' },
-  { match: { kind: 'token', token: 'grype' }, owner: 'deps', rationale: 'O2 grype 的依赖扫描归依赖管家' },
+  {
+    match: { kind: 'token', token: 'trivy' },
+    owner: 'deps',
+    rationale: 'O2 trivy 的依赖扫描归依赖管家',
+  },
+  {
+    match: { kind: 'token', token: 'grype' },
+    owner: 'deps',
+    rationale: 'O2 grype 的依赖扫描归依赖管家',
+  },
   { match: { kind: 'token', token: 'osv' }, owner: 'deps', rationale: 'O2 OSV 归依赖管家' },
 
   // ── O3 密钥：唯一归安全中心 ────────────────────────────────────────────
-  { match: { kind: 'token', token: 'secrets' }, owner: 'security', rationale: 'O3 密钥唯一归安全中心' },
-  { match: { kind: 'token', token: 'secret' }, owner: 'security', rationale: 'O3 密钥唯一归安全中心' },
-  { match: { kind: 'token', token: 'sensitive-info' }, owner: 'security', rationale: 'O3 敏感信息唯一归安全中心' },
-  { match: { kind: 'token', token: 'gitleaks' }, owner: 'security', rationale: 'O3 gitleaks 产出归安全中心' },
+  {
+    match: { kind: 'token', token: 'secrets' },
+    owner: 'security',
+    rationale: 'O3 密钥唯一归安全中心',
+  },
+  {
+    match: { kind: 'token', token: 'secret' },
+    owner: 'security',
+    rationale: 'O3 密钥唯一归安全中心',
+  },
+  {
+    match: { kind: 'token', token: 'sensitive-info' },
+    owner: 'security',
+    rationale: 'O3 敏感信息唯一归安全中心',
+  },
+  {
+    match: { kind: 'token', token: 'gitleaks' },
+    owner: 'security',
+    rationale: 'O3 gitleaks 产出归安全中心',
+  },
 
   // ── O9 代码漏洞：唯一归安全中心 ────────────────────────────────────────
-  { match: { kind: 'token', token: 'semgrep' }, owner: 'security', rationale: 'O9 代码漏洞唯一归安全中心' },
+  {
+    match: { kind: 'token', token: 'semgrep' },
+    owner: 'security',
+    rationale: 'O9 代码漏洞唯一归安全中心',
+  },
   {
     match: { kind: 'exact', ruleId: 'inspect.scan.official.code-vulnerability' },
     owner: 'security',
     rationale: 'O9 代码漏洞唯一归安全中心；体检改只读',
     previousOwner: 'inspect',
   },
-  { match: { kind: 'token', token: 'injection' }, owner: 'security', rationale: 'O9 注入类问题归安全中心' },
+  {
+    match: { kind: 'token', token: 'injection' },
+    owner: 'security',
+    rationale: 'O9 注入类问题归安全中心',
+  },
   { match: { kind: 'token', token: 'xss' }, owner: 'security', rationale: 'O9 XSS 归安全中心' },
   { match: { kind: 'token', token: 'ssrf' }, owner: 'security', rationale: 'O9 SSRF 归安全中心' },
-  { match: { kind: 'token', token: 'malware' }, owner: 'security', rationale: '安全中心独占恶意代码检测' },
+  {
+    match: { kind: 'token', token: 'malware' },
+    owner: 'security',
+    rationale: '安全中心独占恶意代码检测',
+  },
   { match: { kind: 'token', token: 'taint' }, owner: 'security', rationale: '安全中心独占污点链' },
 
   // ── O4 嵌套循环 / 圈复杂度：指纹不同，分属两域 ─────────────────────────
-  { match: { kind: 'token', token: 'nested-loop' }, owner: 'performance', rationale: 'O4 运行时反模式归性能域' },
-  { match: { kind: 'token', token: 'sync-io' }, owner: 'performance', rationale: 'O4 运行时反模式归性能域' },
-  { match: { kind: 'token', token: 'complexity' }, owner: 'inspect', rationale: 'O4 函数级圈复杂度归体检' },
+  {
+    match: { kind: 'token', token: 'nested-loop' },
+    owner: 'performance',
+    rationale: 'O4 运行时反模式归性能域',
+  },
+  {
+    match: { kind: 'token', token: 'sync-io' },
+    owner: 'performance',
+    rationale: 'O4 运行时反模式归性能域',
+  },
+  {
+    match: { kind: 'token', token: 'complexity' },
+    owner: 'inspect',
+    rationale: 'O4 函数级圈复杂度归体检',
+  },
 
   // ── O7 未使用依赖：唯一归垃圾清理 ─────────────────────────────────────
-  { match: { kind: 'token', token: 'unused-dependency' }, owner: 'garbage', rationale: 'O7 未使用依赖唯一归垃圾清理' },
-  { match: { kind: 'token', token: 'unused-deps' }, owner: 'garbage', rationale: 'O7 未使用依赖唯一归垃圾清理' },
-  { match: { kind: 'token', token: 'depcheck' }, owner: 'garbage', rationale: 'O7 depcheck 产出归垃圾清理' },
+  {
+    match: { kind: 'token', token: 'unused-dependency' },
+    owner: 'garbage',
+    rationale: 'O7 未使用依赖唯一归垃圾清理',
+  },
+  {
+    match: { kind: 'token', token: 'unused-deps' },
+    owner: 'garbage',
+    rationale: 'O7 未使用依赖唯一归垃圾清理',
+  },
+  {
+    match: { kind: 'token', token: 'depcheck' },
+    owner: 'garbage',
+    rationale: 'O7 depcheck 产出归垃圾清理',
+  },
 
   // ── 其余工具族归属 ────────────────────────────────────────────────────
-  { match: { kind: 'token', token: 'dead-code' }, owner: 'garbage', rationale: '垃圾清理独占死代码' },
-  { match: { kind: 'token', token: 'ts-prune' }, owner: 'garbage', rationale: '垃圾清理独占死代码' },
-  { match: { kind: 'token', token: 'eslint' }, owner: 'inspect', rationale: '体检独占规范/风格检查' },
-  { match: { kind: 'token', token: 'type-safety' }, owner: 'inspect', rationale: '体检独占类型安全' },
-  { match: { kind: 'token', token: 'circular-dependency' }, owner: 'inspect', rationale: '体检独占循环依赖' },
-  { match: { kind: 'token', token: 'module-boundary' }, owner: 'inspect', rationale: '体检独占模块边界' },
-  { match: { kind: 'token', token: 'dep-cruiser' }, owner: 'inspect', rationale: '体检独占架构依赖规则' },
+  {
+    match: { kind: 'token', token: 'dead-code' },
+    owner: 'garbage',
+    rationale: '垃圾清理独占死代码',
+  },
+  {
+    match: { kind: 'token', token: 'ts-prune' },
+    owner: 'garbage',
+    rationale: '垃圾清理独占死代码',
+  },
+  {
+    match: { kind: 'token', token: 'eslint' },
+    owner: 'inspect',
+    rationale: '体检独占规范/风格检查',
+  },
+  {
+    match: { kind: 'token', token: 'type-safety' },
+    owner: 'inspect',
+    rationale: '体检独占类型安全',
+  },
+  {
+    match: { kind: 'token', token: 'circular-dependency' },
+    owner: 'inspect',
+    rationale: '体检独占循环依赖',
+  },
+  {
+    match: { kind: 'token', token: 'module-boundary' },
+    owner: 'inspect',
+    rationale: '体检独占模块边界',
+  },
+  {
+    match: { kind: 'token', token: 'dep-cruiser' },
+    owner: 'inspect',
+    rationale: '体检独占架构依赖规则',
+  },
 ];
 
 /** 冲突类型（A1 校验输出） */
-export type OwnershipConflictKind = 'duplicate-exact' | 'duplicate-token' | 'duplicate-prefix' | 'invalid-owner';
+export type OwnershipConflictKind =
+  'duplicate-exact' | 'duplicate-token' | 'duplicate-prefix' | 'invalid-owner';
 
 /** A1 校验结果条目 */
 export interface OwnershipConflict {

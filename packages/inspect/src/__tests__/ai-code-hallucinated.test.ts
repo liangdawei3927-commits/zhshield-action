@@ -5,7 +5,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ProjectProfile } from '@zh/dependency';
 import { HallucinatedDependencyCheckImpl } from '../ai-code/hallucinated-dependency';
-import { extractImportReferences, listNodeModules, packageNameFromSpecifier } from '../ai-code/files';
+import {
+  extractImportReferences,
+  listNodeModules,
+  packageNameFromSpecifier,
+} from '../ai-code/files';
 import { collectNpmPackages, collectPnpmPackages, collectYarnPackages } from '../ai-code/lockfile';
 
 function profile(projectPath: string): ProjectProfile {
@@ -346,7 +350,7 @@ describe('extractImportReferences 注释感知', () => {
     expect(names).toContain('real-pkg');
   });
 
-  it("字符串字面量里的 // 不截断代码，同行行注释仍剥离", async () => {
+  it('字符串字面量里的 // 不截断代码，同行行注释仍剥离', async () => {
     await fs.writeFile(
       path.join(tmpDir, 'url.ts'),
       ["const u = 'http://example.com/a'; import qs from 'qs'; // import('ghost')"].join('\n'),

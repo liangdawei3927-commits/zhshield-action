@@ -70,10 +70,7 @@ function useBackupRecordData(projectPath: string): {
 } {
   const [records, setRecords] = useState<BackupRecordData[]>([]);
 
-  const fetchRecords = useCallback(
-    () => loadBackupRecords(projectPath, setRecords),
-    [projectPath],
-  );
+  const fetchRecords = useCallback(() => loadBackupRecords(projectPath, setRecords), [projectPath]);
 
   return { records, setRecords, fetchRecords };
 }

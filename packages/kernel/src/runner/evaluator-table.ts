@@ -11,7 +11,12 @@ import {
   evalThreshold,
   evalLayerBoundary,
 } from './inline-evaluators';
-import { evalCheckList, evalScannerDispatch, evalToolDispatch, evalPreset } from './dispatch-evaluators';
+import {
+  evalCheckList,
+  evalScannerDispatch,
+  evalToolDispatch,
+  evalPreset,
+} from './dispatch-evaluators';
 
 /**
  * 指令类型 → 评估器策略表。

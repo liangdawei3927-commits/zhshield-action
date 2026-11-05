@@ -24,18 +24,14 @@ describe('computeRedLine — 红线事实判定', () => {
     const rl = computeRedLine({ secrets: { activeCount: 3 } });
     expect(rl?.capped).toBe(true);
     expect(rl?.cap).toBe(RED_LINE_CAP);
-    expect(rl?.reasons).toEqual([
-      { domain: 'security', kind: 'activeSecrets', count: 3 },
-    ]);
+    expect(rl?.reasons).toEqual([{ domain: 'security', kind: 'activeSecrets', count: 3 }]);
   });
 
   it('critical 依赖漏洞 → dependencies 红线', () => {
     const rl = computeRedLine({
       deps: { vulnerabilities: { critical: 2, high: 5, medium: 0 }, upgradable: 0 },
     });
-    expect(rl?.reasons).toEqual([
-      { domain: 'dependencies', kind: 'criticalVulns', count: 2 },
-    ]);
+    expect(rl?.reasons).toEqual([{ domain: 'dependencies', kind: 'criticalVulns', count: 2 }]);
   });
 
   it('critical 哨兵事件 → sentinel 红线（warning 不触发）', () => {

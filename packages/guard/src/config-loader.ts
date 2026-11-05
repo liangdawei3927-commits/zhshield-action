@@ -14,9 +14,6 @@ export class ConfigLoader {
     return this.loadJson<CheckConfig[]>('checks.json') ?? [];
   }
 
-
-
-
   private resolveConfigPath(fileName: string): string {
     return safeJoin(this.configDir, fileName);
   }

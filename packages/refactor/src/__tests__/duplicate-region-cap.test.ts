@@ -60,7 +60,8 @@ describe('duplicated-code 数据路径不设上限 (TDD 回归)', () => {
 
     // 双向去重后：'dup-cap-a.ts' 字典序在前 → 60 对全部由 A 报告。
     // 总数断言保留「数据路径不设上限」的原始防线（修复前截断会让总数 < 60）。
-    const total = (counts[relA]?.['duplicated-code'] ?? 0) + (counts[relB]?.['duplicated-code'] ?? 0);
+    const total =
+      (counts[relA]?.['duplicated-code'] ?? 0) + (counts[relB]?.['duplicated-code'] ?? 0);
     expect(counts[relA]['duplicated-code']).toBe(REGION_COUNT);
     expect(counts[relB]?.['duplicated-code']).toBeUndefined();
     expect(total).toBe(REGION_COUNT);

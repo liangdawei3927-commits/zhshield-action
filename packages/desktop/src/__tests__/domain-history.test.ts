@@ -145,7 +145,10 @@ describe('appendDomainHistory', () => {
   it('写入后可按新→旧读回', async () => {
     const project = tempProject();
     await appendDomainHistory(project, recordInput(project, '2026-10-24T00:00:00.000Z', ['a'], 90));
-    await appendDomainHistory(project, recordInput(project, '2026-10-24T01:00:00.000Z', ['a', 'b'], 85));
+    await appendDomainHistory(
+      project,
+      recordInput(project, '2026-10-24T01:00:00.000Z', ['a', 'b'], 85),
+    );
     const history = await listDomainHistory(project, 'inspect');
     expect(history).toHaveLength(2);
     expect(history[0].scannedAt).toBe('2026-10-24T01:00:00.000Z');
@@ -156,21 +159,30 @@ describe('appendDomainHistory', () => {
     const project = tempProject();
     const record = recordInput(project, '2026-10-24T00:00:00.000Z', ['a']);
     expect(await appendDomainHistory(project, record)).toBe('appended');
-    expect(await appendDomainHistory(project, { ...record, recordedAt: new Date().toISOString() })).toBe(
-      'duplicate',
-    );
+    expect(
+      await appendDomainHistory(project, { ...record, recordedAt: new Date().toISOString() }),
+    ).toBe('duplicate');
     expect(await listDomainHistory(project, 'inspect')).toHaveLength(1);
   });
 
   it('指纹集未变 → 只写 sameAs 指针，不重复存全量', async () => {
     const project = tempProject();
-    await appendDomainHistory(project, recordInput(project, '2026-10-24T00:00:00.000Z', ['a', 'b']));
+    await appendDomainHistory(
+      project,
+      recordInput(project, '2026-10-24T00:00:00.000Z', ['a', 'b']),
+    );
     await appendDomainHistory(
       project,
       recordInput(project, '2026-10-24T01:00:00.000Z', ['b', 'a']),
     );
-    const raw = fs.readFileSync(path.join(project, '.zhshield', 'history', 'inspect.jsonl'), 'utf-8');
-    const lines = raw.trim().split('\n').map((line) => JSON.parse(line) as DomainScanRecord);
+    const raw = fs.readFileSync(
+      path.join(project, '.zhshield', 'history', 'inspect.jsonl'),
+      'utf-8',
+    );
+    const lines = raw
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as DomainScanRecord);
     expect(lines[1].fingerprints).toBeUndefined();
     expect(lines[1].sameAs).toBe(lines[0].scanId);
     // 读回时仍然是完整指纹集（指针已解压，复用上一条的数组）
@@ -179,9 +191,7 @@ describe('appendDomainHistory', () => {
 
   it('指纹集变化 + 给了 entries → 落明细 blob 并可读回', async () => {
     const project = tempProject();
-    const entries = [
-      makeEntry({ fingerprint: `${project}/src/a.ts:1`, message: '第一条' }),
-    ];
+    const entries = [makeEntry({ fingerprint: `${project}/src/a.ts:1`, message: '第一条' })];
     const record = buildScanRecord({
       domain: 'inspect',
       scannedAt: '2026-10-24T00:00:00.000Z',
@@ -204,7 +214,10 @@ describe('appendDomainHistory', () => {
       const stamp = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString();
       await appendDomainHistory(project, recordInput(project, stamp, [`fp-${i}`]), undefined, keep);
     }
-    const raw = fs.readFileSync(path.join(project, '.zhshield', 'history', 'inspect.jsonl'), 'utf-8');
+    const raw = fs.readFileSync(
+      path.join(project, '.zhshield', 'history', 'inspect.jsonl'),
+      'utf-8',
+    );
     expect(raw.trim().split('\n')).toHaveLength(keep);
     const history = await listDomainHistory(project, 'inspect', keep);
     expect(history[0].fingerprints).toEqual([`fp-${keep + 2}`]);
@@ -269,7 +282,13 @@ describe('listDomainHistoryHandler 回填（升级前的数据）', () => {
         { fingerprint: `inspect.dup:${project}/src/a.ts:1`, severity: 'error' },
         { fingerprint: `inspect.dup:${project}/src/b.ts:2`, severity: 'warning' },
       ],
-      dimensionScore: { dimension: 'quality', score: 89.5, issues: 2, status: 'scored', version: 3 },
+      dimensionScore: {
+        dimension: 'quality',
+        score: 89.5,
+        issues: 2,
+        status: 'scored',
+        version: 3,
+      },
     });
 
     const list = await listDomainHistoryHandler(evt, project, 'inspect');

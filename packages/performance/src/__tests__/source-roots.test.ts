@@ -100,7 +100,9 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
 
   it('无 package.json 也无源码根 → 不是项目根，不产出提示', () => {
     const report = new PerformanceEngine().scan(root);
-    expect(report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root')).toBeUndefined();
+    expect(
+      report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root'),
+    ).toBeUndefined();
   });
 
   it('monorepo 根（无顶层 src）不再被判为「无源码」', () => {
@@ -115,7 +117,9 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
       'export function f(files: string[]) {\n  for (const a of files) {\n    for (const b of files) {\n      for (const c of files) {\n        console.log(a, b, c);\n      }\n    }\n  }\n}\n',
     );
     const report = new PerformanceEngine().scan(root);
-    expect(report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root')).toBeUndefined();
+    expect(
+      report.issues.find((i) => i.ruleId === 'performance.coverage.no-source-root'),
+    ).toBeUndefined();
     expect(report.issues.some((i) => i.ruleId === 'performance.runtime.nested-loop')).toBe(true);
   });
 
@@ -133,14 +137,8 @@ describe('PerformanceEngine 覆盖缺口提示', () => {
       path.join(src, 'prod.spec.ts'),
       'document.title = "a";\nreadFileSync("/a");\n',
     );
-    fs.writeFileSync(
-      path.join(tests, 'a.test.ts'),
-      'document.title = "b";\nreadFileSync("/b");\n',
-    );
-    fs.writeFileSync(
-      path.join(src, 'real.ts'),
-      'document.title = "c";\nreadFileSync("/c");\n',
-    );
+    fs.writeFileSync(path.join(tests, 'a.test.ts'), 'document.title = "b";\nreadFileSync("/b");\n');
+    fs.writeFileSync(path.join(src, 'real.ts'), 'document.title = "c";\nreadFileSync("/c");\n');
 
     const report = new PerformanceEngine().scan(root);
     const syncIo = report.issues.filter((i) => i.ruleId === 'performance.runtime.sync-io');

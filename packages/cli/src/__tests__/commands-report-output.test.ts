@@ -129,7 +129,9 @@ describe('runGuardCommand — 机器可读报告落盘（--format/--report）', 
 
       const outPath = path.join(projectDir, 'zhshield-guard.json');
       expect(fs.existsSync(outPath)).toBe(true);
-      const parsed = JSON.parse(fs.readFileSync(outPath, 'utf-8')) as { results: Array<{ checkId: string }> };
+      const parsed = JSON.parse(fs.readFileSync(outPath, 'utf-8')) as {
+        results: Array<{ checkId: string }>;
+      };
       expect(parsed.results[0].checkId).toBe('guard.chk.secret');
       expect(errors.join('\n')).toContain('报告已写入');
     } finally {

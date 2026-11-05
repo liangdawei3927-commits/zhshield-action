@@ -218,9 +218,7 @@ export class AuditLogger {
   }
 
   private async listLogFiles(): Promise<string[]> {
-    return (await fs.promises.readdir(this.logDir))
-      .filter((f) => f.endsWith('.jsonl'))
-      .sort();
+    return (await fs.promises.readdir(this.logDir)).filter((f) => f.endsWith('.jsonl')).sort();
   }
 
   private async parseLogFile(file: string): Promise<AuditEntry[]> {

@@ -22,7 +22,9 @@ describe('取消错误判据', () => {
     // Electron 会把远端错误改写成 "Error invoking remote method 'engine:runPipeline': Error: ..."
     expect(
       isCancelledError(
-        new Error("Error invoking remote method 'engine:runPipeline': Error: [cancelled] 任务已取消"),
+        new Error(
+          "Error invoking remote method 'engine:runPipeline': Error: [cancelled] 任务已取消",
+        ),
       ),
     ).toBe(true);
   });

@@ -24,7 +24,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { implementedCapabilities, unimplementedCapabilities } from '@zh/shared';
 import type { DomainId } from '@zh/shared';
 
-import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
+import {
+  buildCapabilityFeatures,
+  buildPlannedCapabilities,
+} from '../components/business/capability-features';
 
 /** 各域已接入注册表的空态页 */
 const WIRED_DOMAINS: DomainId[] = ['inspect', 'security', 'garbage', 'performance', 'refactor'];

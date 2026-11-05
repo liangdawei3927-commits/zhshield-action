@@ -14,7 +14,12 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp/zh-backup-ipc-test') },
 }));
 
-import { createScheduleRunner, minuteKey, syncProjectSchedule, isSameProjectPath } from '../../electron/ipc/backup';
+import {
+  createScheduleRunner,
+  minuteKey,
+  syncProjectSchedule,
+  isSameProjectPath,
+} from '../../electron/ipc/backup';
 import type { BackupScheduleConfig } from '@zh/kernel';
 
 describe('minuteKey 同分钟归桶', () => {

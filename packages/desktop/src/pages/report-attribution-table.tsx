@@ -58,15 +58,7 @@ function DomainRow({
 }
 
 /** 口径类项目（结构项 / 封顶项）单独成行，提示它不属于任何单一域 */
-function StructuralRow({
-  label,
-  hint,
-  points,
-}: {
-  label: string;
-  hint: string;
-  points: number;
-}) {
+function StructuralRow({ label, hint, points }: { label: string; hint: string; points: number }) {
   return (
     <tr className="border-b border-zh-line" style={{ background: 'rgb(var(--zh-panel))' }}>
       <td className="px-4 py-2 text-xs text-zh-text">

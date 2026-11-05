@@ -142,16 +142,8 @@ function DependencyReportView({
 }
 
 export function DependencyPage({ projectPath }: DependencyPageProps) {
-  const {
-    loading,
-    queued,
-    report,
-    handleScan,
-    copyToAi,
-    copyAllToAi,
-    cancel,
-    stopping,
-  } = useDependencyPage(projectPath);
+  const { loading, queued, report, handleScan, copyToAi, copyAllToAi, cancel, stopping } =
+    useDependencyPage(projectPath);
   const t = useT();
 
   // 详情入口（读回落盘报告 + 快照通道 + 主页/详情切换）统一由 hook 装配，
@@ -193,12 +185,12 @@ export function DependencyPage({ projectPath }: DependencyPageProps) {
   }
 
   return (
-    <DetailEntryProvider key={detail.scanVersion} available={detail.hasDetail} onOpen={detail.openDetail}>
-      <DependencyEmptyState
-        projectPath={projectPath}
-        loading={loading}
-        onScan={detail.startScan}
-      />
+    <DetailEntryProvider
+      key={detail.scanVersion}
+      available={detail.hasDetail}
+      onOpen={detail.openDetail}
+    >
+      <DependencyEmptyState projectPath={projectPath} loading={loading} onScan={detail.startScan} />
     </DetailEntryProvider>
   );
 }

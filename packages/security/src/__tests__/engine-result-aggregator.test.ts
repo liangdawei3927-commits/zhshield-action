@@ -5,7 +5,10 @@ import { ResultAggregator } from '../engine-result-aggregator';
 import { GrypeCrossValidator } from '../cross-validator';
 import { RuleConflictResolver } from '../rule-conflict-resolver';
 
-function makeAggregator(vulnScan: () => Promise<Vulnerability[]>, garbageScan: () => Promise<GarbageItem[]>) {
+function makeAggregator(
+  vulnScan: () => Promise<Vulnerability[]>,
+  garbageScan: () => Promise<GarbageItem[]>,
+) {
   const malwareScanner = { scan: async (): Promise<MalwareItem[]> => [] };
   return new ResultAggregator(
     { scan: vulnScan } as unknown as VulnerabilityScanner,

@@ -156,7 +156,14 @@ function fakeManager(rejectWith?: Error): {
   cancel: ReturnType<typeof vi.fn>;
 } {
   return {
-    start: vi.fn(() => ({ id: 'task-1', kind: 'pipeline', projectPath: '/p', status: 'running', progress: 0, startedAt: '2026-10-26T00:00:00.000Z' })),
+    start: vi.fn(() => ({
+      id: 'task-1',
+      kind: 'pipeline',
+      projectPath: '/p',
+      status: 'running',
+      progress: 0,
+      startedAt: '2026-10-26T00:00:00.000Z',
+    })),
     waitFor: vi.fn(() => (rejectWith ? Promise.reject(rejectWith) : Promise.resolve({}))),
     list: vi.fn(() => []),
     get: vi.fn(() => undefined),
@@ -166,7 +173,10 @@ function fakeManager(rejectWith?: Error): {
 
 /** 从 ipcMain.handle 的 mock 里取出某个通道的 handler */
 function handlerFor(channel: string): (...args: unknown[]) => unknown {
-  const calls = vi.mocked(ipcMain.handle).mock.calls as unknown as [string, (...a: unknown[]) => unknown][];
+  const calls = vi.mocked(ipcMain.handle).mock.calls as unknown as [
+    string,
+    (...a: unknown[]) => unknown,
+  ][];
   const hit = calls.find(([name]) => name === channel);
   if (!hit) throw new Error(`通道 ${channel} 没注册`);
   return hit[1];

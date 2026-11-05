@@ -149,7 +149,9 @@ const pkgVersion = readVersion();
 const tag = latestReleaseTag();
 
 if (!SEMVER_RE.test(pkgVersion)) {
-  console.error(`[release-drift] ✗ packages/desktop/package.json 的 version "${pkgVersion}" 不是合法 semver`);
+  console.error(
+    `[release-drift] ✗ packages/desktop/package.json 的 version "${pkgVersion}" 不是合法 semver`,
+  );
   process.exit(1);
 }
 
@@ -220,7 +222,9 @@ if (ALLOW) {
 }
 
 if (!STRICT) {
-  console.error('[release-drift] 本地打包确需跳过，加 --allow；这是留给开发者的临时逃逸舱，CI 通道请勿使用。');
+  console.error(
+    '[release-drift] 本地打包确需跳过，加 --allow；这是留给开发者的临时逃逸舱，CI 通道请勿使用。',
+  );
 }
 
 process.exit(1);

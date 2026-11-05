@@ -133,16 +133,18 @@ describe('哨兵空态页 — 监控范围真的可见', () => {
     injected.monitorScope = describeMonitorScope(REAL_STARTED, REAL_SKIPPED, (k, p) =>
       k === 'page.sentinel.scope.partialHint'
         ? `仅 ${String((p as Record<string, unknown>)?.started)}/${String((p as Record<string, unknown>)?.total)} 个监视器在跑`
-        : ({
-            'page.sentinel.scope.title': '监控范围',
-            'page.sentinel.scope.fileMonitor': '文件监控',
-            'page.sentinel.scope.logCollector': '日志采集',
-            'page.sentinel.scope.processMonitor': '进程监控',
-            'page.sentinel.scope.running': '已启动',
-            'page.sentinel.scope.notStarted': '未启动',
-            'page.sentinel.scope.skipNoLogs': '未发现日志文件',
-            'page.sentinel.scope.skipNoScript': '未识别到 dev/start/build 脚本',
-          } as Record<string, string>)[k] ?? k,
+        : ((
+            {
+              'page.sentinel.scope.title': '监控范围',
+              'page.sentinel.scope.fileMonitor': '文件监控',
+              'page.sentinel.scope.logCollector': '日志采集',
+              'page.sentinel.scope.processMonitor': '进程监控',
+              'page.sentinel.scope.running': '已启动',
+              'page.sentinel.scope.notStarted': '未启动',
+              'page.sentinel.scope.skipNoLogs': '未发现日志文件',
+              'page.sentinel.scope.skipNoScript': '未识别到 dev/start/build 脚本',
+            } as Record<string, string>
+          )[k] ?? k),
     );
     const text = textOf(renderHome());
     // 标题用「当前监控源」而非「监控范围」：空态已有一张同名功能卡（现存能力说明），

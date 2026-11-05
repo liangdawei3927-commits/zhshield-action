@@ -1,12 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  ToolAdapter,
-  ToolMeta,
-  ToolResult,
-  ToolScanOptions,
-  AccessScope,
-} from '@zh/shared';
+import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, AccessScope } from '@zh/shared';
 import { resolveToolCommandDetailed, type ToolCommandOrigin } from './tool-bin';
 import {
   asToolExecError,
@@ -86,10 +80,8 @@ export class DependencyCruiserAdapter implements ToolAdapter {
 
   constructor(projectRoot?: string) {
     this.projectRoot = projectRoot;
-    this.commands = new ToolCommandResolver(
-      'depcruise',
-      projectRoot,
-      (tool, startDir) => resolveToolCommandDetailed(tool, startDir).then((r) => r.command),
+    this.commands = new ToolCommandResolver('depcruise', projectRoot, (tool, startDir) =>
+      resolveToolCommandDetailed(tool, startDir).then((r) => r.command),
     );
   }
 

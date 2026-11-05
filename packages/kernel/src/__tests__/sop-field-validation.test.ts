@@ -37,16 +37,18 @@ function writeRule(relPath: string, content: string): void {
 }
 
 /** 构造一条新格式（metadata/governance/execution/judgment 嵌套）规则 */
-function ruleYaml(overrides: {
-  id?: string;
-  status?: string;
-  source?: string;
-  domain?: string;
-  action?: string;
-  priority?: string;
-  tags?: string;
-  extraMeta?: string;
-} = {}): string {
+function ruleYaml(
+  overrides: {
+    id?: string;
+    status?: string;
+    source?: string;
+    domain?: string;
+    action?: string;
+    priority?: string;
+    tags?: string;
+    extraMeta?: string;
+  } = {},
+): string {
   const lines = [
     'metadata:',
     `  id: ${overrides.id ?? 'guard.scan.official.sample'}`,
@@ -200,7 +202,9 @@ describe('SOP 字段校验 — 云端同步路径（loadFromKnowledgeBase）', (
     const registry = new SopRegistry();
     const loader = new SopLoader(registry);
 
-    await loader.loadFromKnowledgeBase([makeRule({ id: 'cloud.bad-domain', domain: 'gurad' as never })]);
+    await loader.loadFromKnowledgeBase([
+      makeRule({ id: 'cloud.bad-domain', domain: 'gurad' as never }),
+    ]);
 
     expect(registry.count()).toBe(0);
     expect(loader.getRuleIssues()[0]).toMatchObject({ field: 'domain', level: 'fatal' });

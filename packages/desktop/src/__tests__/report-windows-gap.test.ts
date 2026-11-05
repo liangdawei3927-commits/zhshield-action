@@ -69,9 +69,9 @@ describe('calendarDaysBetween', () => {
   });
 
   it('同一天不同时刻算 0 天', () => {
-    expect(calendarDaysBetween(localTime(2026, 10, 23, 1, 0), localTime(2026, 10, 23, 23, 59))).toBe(
-      0,
-    );
+    expect(
+      calendarDaysBetween(localTime(2026, 10, 23, 1, 0), localTime(2026, 10, 23, 23, 59)),
+    ).toBe(0);
   });
 
   it('跨月按真实天数：9-09 → 10-20 是 41 天', () => {

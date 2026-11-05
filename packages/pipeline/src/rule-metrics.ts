@@ -173,7 +173,10 @@ function measureComplexity(repoRoot: string, options: RuleMetricsOptions): RuleM
     const measured = measureFile(filePath);
     if (!measured) continue;
     parsed += 1;
-    peaks.cyclomaticComplexity = Math.max(peaks.cyclomaticComplexity, measured.cyclomaticComplexity);
+    peaks.cyclomaticComplexity = Math.max(
+      peaks.cyclomaticComplexity,
+      measured.cyclomaticComplexity,
+    );
     peaks.functionLength = Math.max(peaks.functionLength, measured.functionLength);
     peaks.fileLength = Math.max(peaks.fileLength, measured.fileLength);
     peaks.nestingDepth = Math.max(peaks.nestingDepth, measured.nestingDepth);

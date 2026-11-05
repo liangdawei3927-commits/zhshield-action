@@ -55,9 +55,7 @@ describe('e2e 观测 IPC — 生产不可达', () => {
 
   it('e2e 用例确实注入了 E2E=1（防止门控与用例口径漂移）', () => {
     const e2eDir = path.resolve(__dirname, '../../e2e');
-    const specs = fs
-      .readdirSync(e2eDir)
-      .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'));
+    const specs = fs.readdirSync(e2eDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'));
     const withE2e = specs.filter((f) =>
       /E2E:\s*'1'/.test(fs.readFileSync(path.join(e2eDir, f), 'utf-8')),
     );

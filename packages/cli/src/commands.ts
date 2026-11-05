@@ -78,13 +78,7 @@ function relativizeFindings(findings: Finding[], projectDir: string): void {
 }
 
 /** 可写机器可读报告的命令；各命令报告 schema 不同，默认落盘名必须区分 */
-type ReportCommand =
-  | 'inspect'
-  | 'inspect-sop'
-  | 'guard'
-  | 'guard-sop'
-  | 'refactor'
-  | 'pipeline';
+type ReportCommand = 'inspect' | 'inspect-sop' | 'guard' | 'guard-sop' | 'refactor' | 'pipeline';
 
 /**
  * 各命令的默认报告名基名。
@@ -227,7 +221,9 @@ export async function runInspectCommand(
   if (opts.sop) {
     // `--domains`：SOP 链路的真正收敛手段。不带域过滤的 --sop 是「三域合并一次评估」的历史
     // 单体路径（无域预算、无硬超时，实测 85 条规则下 4 分 22 秒仍未结束），按域收窄可直接避开。
-    const domains = opts.domains ? parseDomainList(opts.domains, INSPECT_SCOPE_DOMAINS, SOP_DOMAIN_HINT) : undefined;
+    const domains = opts.domains
+      ? parseDomainList(opts.domains, INSPECT_SCOPE_DOMAINS, SOP_DOMAIN_HINT)
+      : undefined;
     if (domains === null) {
       process.exitCode = 1;
       return;
@@ -376,7 +372,9 @@ export async function runBaselineCommand(
     case 'clear-refactor':
       return baselineClearRefactor(projectDir);
   }
-  console.error('未知 baseline 子命令，支持: capture | list | clear | capture-refactor | clear-refactor');
+  console.error(
+    '未知 baseline 子命令，支持: capture | list | clear | capture-refactor | clear-refactor',
+  );
   process.exit(1);
 }
 
@@ -440,7 +438,9 @@ export async function runFullScanCommand(
   );
   if (incomplete.length > 0) {
     const detail = incomplete.map((record) => `${record.domain}(${record.status})`).join('、');
-    console.error(`[CLI] 全量扫描有 ${incomplete.length} 个域未完成：${detail} — 未检测 ≠ 通过（exit 2）`);
+    console.error(
+      `[CLI] 全量扫描有 ${incomplete.length} 个域未完成：${detail} — 未检测 ≠ 通过（exit 2）`,
+    );
     process.exitCode = 2;
   }
 }

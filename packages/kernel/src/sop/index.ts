@@ -54,11 +54,7 @@ export {
   readCacheFreshness,
   currentSopCacheEnv,
 } from './cache/sop-cache-locator';
-export type {
-  SopCacheResolution,
-  SopCacheEnv,
-  CacheFreshness,
-} from './cache/sop-cache-locator';
+export type { SopCacheResolution, SopCacheEnv, CacheFreshness } from './cache/sop-cache-locator';
 export type {
   SopCacheManagerOptions,
   SyncPolicyOptions,
@@ -144,7 +140,7 @@ export type {
   MaintenanceOutcome,
   SopCacheMaintenanceOptions,
 } from './cache/sop-cache-maintenance';
-export { 
+export {
   computeRuleContentSha,
   buildCurrentVersions,
   verifyRuleManifest,

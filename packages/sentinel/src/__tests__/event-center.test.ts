@@ -231,7 +231,10 @@ describe('EventCenter.listEvents 读回 DB', () => {
   beforeEach(() => {
     db = new Database(':memory:');
     const migrationsDir = path.resolve(__dirname, '../../../db/migrations');
-    for (const f of fs.readdirSync(migrationsDir).filter((n) => n.endsWith('.sql')).sort()) {
+    for (const f of fs
+      .readdirSync(migrationsDir)
+      .filter((n) => n.endsWith('.sql'))
+      .sort()) {
       db.exec(fs.readFileSync(path.join(migrationsDir, f), 'utf-8'));
     }
     ec = new EventCenter(db);

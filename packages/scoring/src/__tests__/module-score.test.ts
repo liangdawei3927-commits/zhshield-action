@@ -286,7 +286,11 @@ describe('模块身份键 — 同名子包跨项目不得撞车', () => {
   });
 
   it('bucketFindingsByModule 产出绝对 id，同时保留相对 path 供分桶匹配', () => {
-    const bucketed = bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect);
+    const bucketed = bucketFindingsByModule(
+      makeRelativeProfile('/proj/a'),
+      emptyGuard,
+      emptyInspect,
+    );
     const ui = bucketed.find((m) => m.path === 'packages/ui')!;
     expect(ui).toBeDefined();
     expect(ui.path).toBe('packages/ui');
@@ -296,23 +300,27 @@ describe('模块身份键 — 同名子包跨项目不得撞车', () => {
       makeRelativeProfile('/proj/a'),
       { results: [] },
       {
-        issues: [
-          { severity: 'error' as const, category: 'quality', file: 'packages/ui/src/x.ts' },
-        ],
+        issues: [{ severity: 'error' as const, category: 'quality', file: 'packages/ui/src/x.ts' }],
       },
     );
     expect(withFiles.find((m) => m.path === 'packages/ui')!.inspect.issues).toHaveLength(1);
   });
 
   it('根级兜底卡的 id 等于项目根绝对路径', () => {
-    const bucketed = bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect);
+    const bucketed = bucketFindingsByModule(
+      makeRelativeProfile('/proj/a'),
+      emptyGuard,
+      emptyInspect,
+    );
     expect(bucketed.at(-1)!.id).toBe('/proj/a');
   });
 
   it('落库键（calculate 的首参）必须是绝对路径', () => {
     const spy = vi.spyOn(ScoringEngine.prototype, 'calculate');
     try {
-      scoreProjectModules(bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect));
+      scoreProjectModules(
+        bucketFindingsByModule(makeRelativeProfile('/proj/a'), emptyGuard, emptyInspect),
+      );
       const ids = spy.mock.calls.map((c) => c[0]);
       expect(ids).toHaveLength(3); // 2 子模块 + 根兜底
       for (const id of ids) {

@@ -196,7 +196,10 @@ function App() {
       <div className="flex flex-col h-screen bg-zh-bg font-sans">
         <MainContent appState={appState} />
         {idle && appState.projects.length > 0 && !appState.onboardingProject && (
-          <ScreensaverPage onDismiss={resetInactivity} intelligentEnabled={appState.intelligentEnabled} />
+          <ScreensaverPage
+            onDismiss={resetInactivity}
+            intelligentEnabled={appState.intelligentEnabled}
+          />
         )}
       </div>
     </NavigationProvider>

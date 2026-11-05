@@ -19,7 +19,8 @@ export function formatRelativeDay(iso: string | null, t: Translate): string | nu
   if (!iso) return null;
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return null;
-  const startOfDay = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const startOfDay = (d: Date): number =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86_400_000);
   if (days <= 0) return t('layout.brainToday');
   if (days === 1) return t('layout.brainYesterday');
@@ -123,8 +124,7 @@ export function resolveStatus(
   }
   if (health.level === 0) return { dot: 'bg-success-700', text: t('layout.brainHealthy') };
   if (health.level <= 3) return { dot: 'bg-warning-500', text: t('layout.brainUpdating') };
-  const days =
-    health.daysSinceSuccess === null ? null : Math.floor(health.daysSinceSuccess);
+  const days = health.daysSinceSuccess === null ? null : Math.floor(health.daysSinceSuccess);
   return {
     dot: 'bg-danger-600',
     text: days !== null && days > 0 ? t('layout.brainStaleDays', { days }) : t('layout.brainStale'),
@@ -232,10 +232,7 @@ export function WisdomBrainCard() {
 
   return (
     <section>
-      <SectionTitle
-        label={t('layout.brainTitle')}
-        icon={<BrainGlyph />}
-      />
+      <SectionTitle label={t('layout.brainTitle')} icon={<BrainGlyph />} />
       <BounceCard className="rounded-xl bg-zh-panel/60 p-3 space-y-2">
         <div className="flex items-center gap-2">
           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />

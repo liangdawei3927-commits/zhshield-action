@@ -1,10 +1,5 @@
 import type Database from 'better-sqlite3';
-import type {
-  RuleRow,
-  ExperienceRow,
-  UpsertRuleParams,
-  SaveExperienceParams,
-} from './types';
+import type { RuleRow, ExperienceRow, UpsertRuleParams, SaveExperienceParams } from './types';
 
 // ─── Rules ────────────────────────────────────────────────
 

@@ -98,9 +98,7 @@ function MaxGapItem({ summary }: { summary: WindowSummaryData }) {
       >
         {summary.maxGapDays} {t('page.reports.window.dayUnit', { defaultValue: '天' })}
       </span>
-      {summary.maxGapWindow && (
-        <span className="text-zh-muted"> · {summary.maxGapWindow.key}</span>
-      )}
+      {summary.maxGapWindow && <span className="text-zh-muted"> · {summary.maxGapWindow.key}</span>}
     </span>
   );
 }
@@ -145,7 +143,8 @@ function WindowSummary({ buckets }: { buckets: readonly WindowBucket[] }) {
     return (
       <p className="text-xs text-zh-muted mb-3">
         {t('page.reports.window.insufficient', {
-          defaultValue: '目前只有 1 个时间窗的记录，还不足以比较趋势。再积累一次检查后这里会显示变化。',
+          defaultValue:
+            '目前只有 1 个时间窗的记录，还不足以比较趋势。再积累一次检查后这里会显示变化。',
         })}
       </p>
     );
@@ -210,8 +209,7 @@ function GapWarning({ buckets }: { buckets: readonly WindowBucket[] }) {
       {worst.deltaSpanDays !== null && (
         <span className="text-zh-muted">
           {t('page.reports.window.gapImplication', {
-            defaultValue:
-              '断档前后的「较上期」变化跨了 {{span}} 天，不能当作一个周期的趋势来读。',
+            defaultValue: '断档前后的「较上期」变化跨了 {{span}} 天，不能当作一个周期的趋势来读。',
             span: worst.deltaSpanDays,
           })}
         </span>
@@ -225,7 +223,11 @@ function DimensionDeltaChips({ bucket }: { bucket: WindowBucket }) {
   const t = useT();
   const changed = bucket.dimensions.filter((d) => d.status !== 'not-run' && d.delta !== 0);
   if (changed.length === 0) {
-    return <span className="text-[11px] text-zh-muted">{t('page.reports.window.noChange', { defaultValue: '无变化' })}</span>;
+    return (
+      <span className="text-[11px] text-zh-muted">
+        {t('page.reports.window.noChange', { defaultValue: '无变化' })}
+      </span>
+    );
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -258,7 +260,10 @@ function WindowRow({ bucket }: { bucket: WindowBucket }) {
       <td className="px-4 py-2.5 font-mono text-xs text-zh-text">
         {bucket.label}
         {bucket.isGap && bucket.gapDays !== null && (
-          <div className="text-[10px] font-sans font-bold" style={{ color: 'rgb(var(--zh-danger))' }}>
+          <div
+            className="text-[10px] font-sans font-bold"
+            style={{ color: 'rgb(var(--zh-danger))' }}
+          >
             {t('page.reports.window.gapBadge', {
               defaultValue: '断档 {{days}} 天',
               days: bucket.gapDays,

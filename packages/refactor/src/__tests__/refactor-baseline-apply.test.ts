@@ -23,7 +23,13 @@ function makeSmell(
     category,
     severity,
     message: `${ruleId} #${seq}`,
-    location: { filePath: `${ROOT}/a.ts`, startLine: seq, startColumn: 1, endLine: seq, endColumn: 1 },
+    location: {
+      filePath: `${ROOT}/a.ts`,
+      startLine: seq,
+      startColumn: 1,
+      endLine: seq,
+      endColumn: 1,
+    },
     context: { metric: 'lines', value: seq, threshold: 0 },
     suggestion: { type: 'split', description: '拆分', priority: 'low', effort: 'small', edits: [] },
   } as unknown as CodeSmell;
@@ -40,10 +46,11 @@ function makeReport(file: string, smells: CodeSmell[]): RefactorReport {
       (acc, s) => ({ ...acc, [s.category]: (acc[s.category] ?? 0) + 1 }),
       {} as Record<string, number>,
     ),
-    bySeverity: smells.reduce(
-      (acc, s) => ({ ...acc, [s.severity]: (acc[s.severity] ?? 0) + 1 }),
-      { error: 0, warning: 0, info: 0 } as RefactorReport['bySeverity'],
-    ),
+    bySeverity: smells.reduce((acc, s) => ({ ...acc, [s.severity]: (acc[s.severity] ?? 0) + 1 }), {
+      error: 0,
+      warning: 0,
+      info: 0,
+    } as RefactorReport['bySeverity']),
     files: [
       {
         filePath: `${ROOT}/${file}`,

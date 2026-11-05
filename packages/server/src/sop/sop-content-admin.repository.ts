@@ -189,7 +189,13 @@ export class SopRuleAdminRepository extends SopAdminRepositoryBase {
         contentSha,
         source: 'manual',
       });
-      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'publish', detail: `${row.version} -> ${nextVersion}` });
+      audit({
+        db: tx,
+        entityType: 'rule',
+        entityId: ruleId,
+        action: 'publish',
+        detail: `${row.version} -> ${nextVersion}`,
+      });
     });
   }
 
@@ -217,7 +223,13 @@ export class SopRuleAdminRepository extends SopAdminRepositoryBase {
         contentSha: history.content_sha,
         source: 'manual',
       });
-      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'rollback', detail: `回滚到 ${version}` });
+      audit({
+        db: tx,
+        entityType: 'rule',
+        entityId: ruleId,
+        action: 'rollback',
+        detail: `回滚到 ${version}`,
+      });
     });
   }
 
@@ -229,7 +241,13 @@ export class SopRuleAdminRepository extends SopAdminRepositoryBase {
       throw new AdminError(`非法状态: ${status}`, 'validation');
     }
     setRuleContentStatus(db, ruleId, status);
-    audit({ db, entityType: 'rule', entityId: ruleId, action: 'status_change', detail: `${row.status} -> ${status}` });
+    audit({
+      db,
+      entityType: 'rule',
+      entityId: ruleId,
+      action: 'status_change',
+      detail: `${row.status} -> ${status}`,
+    });
   }
 
   /** 软删：status → deprecated + rule_scope 平台行下架（enabled=0，停止下发） */
@@ -246,7 +264,13 @@ export class SopRuleAdminRepository extends SopAdminRepositoryBase {
         enabled: false,
         source: 'manual',
       });
-      audit({ db: tx, entityType: 'rule', entityId: ruleId, action: 'delete', detail: '软删（deprecated）' });
+      audit({
+        db: tx,
+        entityType: 'rule',
+        entityId: ruleId,
+        action: 'delete',
+        detail: '软删（deprecated）',
+      });
     });
   }
 

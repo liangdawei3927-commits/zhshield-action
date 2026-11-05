@@ -59,8 +59,20 @@ describe('JscpdAdapter', () => {
     mockReadJSON({
       duplicates: [
         {
-          firstFile: { name: 'dup-a.ts', start: 13, end: 41, startLoc: { line: 13, column: 50 }, endLoc: { line: 41 } },
-          secondFile: { name: 'dup-b.ts', start: 7, end: 35, startLoc: { line: 7, column: 10 }, endLoc: { line: 35 } },
+          firstFile: {
+            name: 'dup-a.ts',
+            start: 13,
+            end: 41,
+            startLoc: { line: 13, column: 50 },
+            endLoc: { line: 41 },
+          },
+          secondFile: {
+            name: 'dup-b.ts',
+            start: 7,
+            end: 35,
+            startLoc: { line: 7, column: 10 },
+            endLoc: { line: 35 },
+          },
           format: 'typescript',
           lines: 28,
           tokens: 245,

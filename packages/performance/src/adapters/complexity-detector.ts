@@ -101,11 +101,7 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     return issues;
   }
 
-  private detectNestedLoop(
-    relFile: string,
-    scan: FileScan,
-    issues: PerformanceIssue[],
-  ): void {
+  private detectNestedLoop(relFile: string, scan: FileScan, issues: PerformanceIssue[]): void {
     const chain = scan.deepestLoops;
     if (chain === null || chain.depth < NESTED_LOOP_THRESHOLD) return;
     if (!chain.amplifies) return;
@@ -127,11 +123,7 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     });
   }
 
-  private detectSyncIO(
-    relFile: string,
-    scan: FileScan,
-    issues: PerformanceIssue[],
-  ): void {
+  private detectSyncIO(relFile: string, scan: FileScan, issues: PerformanceIssue[]): void {
     const context = classifyRuntime(scan);
     const seen = new Set<string>();
     for (const site of scan.syncCalls) {
@@ -153,4 +145,3 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     }
   }
 }
-

@@ -178,7 +178,12 @@ describe('Scanning Results CRUD', () => {
   });
 
   it('should save and retrieve scan result', () => {
-    saveScanResult(db, { projectId: SCORE_PROJ, source: 'eslint', passed: true, summary: 'All ok' });
+    saveScanResult(db, {
+      projectId: SCORE_PROJ,
+      source: 'eslint',
+      passed: true,
+      summary: 'All ok',
+    });
     const result = getLatestScanResult(db, SCORE_PROJ, 'eslint');
     expect(result).toBeDefined();
     expect(result!.passed).toBe(1);
@@ -505,7 +510,9 @@ describe('Sentinel Events CRUD', () => {
     };
     mk('alive-1');
     mk('gone-1');
-    db.prepare("UPDATE sentinel_events SET deleted_at = datetime('now') WHERE id = ?").run('gone-1');
+    db.prepare("UPDATE sentinel_events SET deleted_at = datetime('now') WHERE id = ?").run(
+      'gone-1',
+    );
 
     const ids = listSentinelEvents(db).map((r) => r.id);
     expect(ids).toContain('alive-1');

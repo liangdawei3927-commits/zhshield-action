@@ -105,7 +105,8 @@ export class GuardTrivyAdapter implements Adapter {
 
   async run(context: { projectPath?: string }, _check: CheckConfig): Promise<GuardTrivyResult> {
     const projectPath = context.projectPath;
-    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
+    if (!projectPath)
+      throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
     return this.check(projectPath);
   }
 

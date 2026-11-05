@@ -81,10 +81,7 @@ export class DepcheckAdapter extends ToolCommandAdapter {
   }
 
   /** 校验目标目录存在 package.json，缺失时返回 unavailable 结果 */
-  private async ensurePackageJson(
-    projectPath: string,
-    start: number,
-  ): Promise<StepOutcome<true>> {
+  private async ensurePackageJson(projectPath: string, start: number): Promise<StepOutcome<true>> {
     try {
       await fs.promises.access(path.join(projectPath, 'package.json'));
       return { ok: true, value: true };

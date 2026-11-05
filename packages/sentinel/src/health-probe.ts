@@ -26,7 +26,9 @@ export interface HealthProbeCallbacks {
   onSettled: () => void;
 }
 
-function resolveProbeCommand(config: HealthProbeConfig): { executable: string; args: string[] } | null {
+function resolveProbeCommand(
+  config: HealthProbeConfig,
+): { executable: string; args: string[] } | null {
   if (!config.command) return null;
   const tokens = config.command.trim().split(RE_WHITESPACE);
   if (tokens.length === 0) return null;
@@ -88,10 +90,7 @@ function startProbeProcess(
   probeProc.on('error', () => finish(true));
 }
 
-export function runHealthProbe(
-  config: HealthProbeConfig,
-  callbacks: HealthProbeCallbacks,
-): void {
+export function runHealthProbe(config: HealthProbeConfig, callbacks: HealthProbeCallbacks): void {
   const command = resolveProbeCommand(config);
   if (!command) {
     callbacks.onSettled();
@@ -99,7 +98,8 @@ export function runHealthProbe(
   }
   try {
     const state = createProbeState();
-    const finish = (failed: boolean, out?: string): void => finishProbe(state, callbacks, failed, out);
+    const finish = (failed: boolean, out?: string): void =>
+      finishProbe(state, callbacks, failed, out);
     startProbeProcess(command, config, state, finish);
   } catch {
     if (callbacks.isEpochCurrent()) callbacks.onFailure();

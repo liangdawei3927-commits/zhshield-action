@@ -137,7 +137,9 @@ export function toGuardReportDataFromRecord(record: GuardReportRecordData): Guar
       // 跳过（让位）不评级，与 electron 侧 toGuardReportData 同口径
       ...(c.status === 'skipped'
         ? {}
-        : { severity: c.severity === 'error' ? 'high' : c.severity === 'warning' ? 'medium' : 'low' }),
+        : {
+            severity: c.severity === 'error' ? 'high' : c.severity === 'warning' ? 'medium' : 'low',
+          }),
     })),
     metadata: { duration: 0, timestamp: record.timestamp },
   };

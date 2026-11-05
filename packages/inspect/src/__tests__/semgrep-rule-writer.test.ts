@@ -67,7 +67,9 @@ describe('SemgrepRuleWriter — 内联规则写在临时目录，不落被测项
     const projectDir = makeProjectDir();
     const writer = new SemgrepRuleWriter();
 
-    const rulePath = await writer.writeInlineRuleConfig({ projectPath: projectDir } as ToolScanOptions);
+    const rulePath = await writer.writeInlineRuleConfig({
+      projectPath: projectDir,
+    } as ToolScanOptions);
     expect(rulePath).toBeNull();
   });
 
@@ -81,7 +83,9 @@ describe('SemgrepRuleWriter — 内联规则写在临时目录，不落被测项
     expect(fs.existsSync(dir)).toBe(false);
 
     await expect(removeInlineRuleFile(null)).resolves.toBeUndefined();
-    await expect(removeInlineRuleFile('/tmp/zhshield-semgrep-not-exist/x.yml')).resolves.toBeUndefined();
+    await expect(
+      removeInlineRuleFile('/tmp/zhshield-semgrep-not-exist/x.yml'),
+    ).resolves.toBeUndefined();
   });
 });
 

@@ -216,9 +216,8 @@ export class Scheduler {
     }
 
     const hardTimeoutMs = this.hardTimeouts[request.tool] ?? capability.hardTimeoutMs;
-    const { result, reused } = await this.executor.executeOnce(
-      invocationOf(request),
-      () => this.execute(request, hardTimeoutMs, raw),
+    const { result, reused } = await this.executor.executeOnce(invocationOf(request), () =>
+      this.execute(request, hardTimeoutMs, raw),
     );
     return { tool: request.tool, ...result, reused };
   }
@@ -257,7 +256,10 @@ function invocationOf<T extends RoutableFinding>(request: ToolRequest<T>): ToolI
 }
 
 /** 域状态：预算耗尽或无一工具成功 → unavailable；有失败但仍有成功 → partial */
-function domainStatus(tools: readonly ToolRunRecord<RoutableFinding>[], budgetExhausted: boolean): DomainRunStatus {
+function domainStatus(
+  tools: readonly ToolRunRecord<RoutableFinding>[],
+  budgetExhausted: boolean,
+): DomainRunStatus {
   const ok = tools.filter((t) => t.status === 'ok').length;
   if (budgetExhausted) return 'unavailable';
   if (ok === tools.length) return 'ok';

@@ -46,7 +46,11 @@ describe('toChronological', () => {
   });
 
   it('时间戳不可解析时保持原位，不把坏数据甩到两端', () => {
-    const rows = [row('2026-10-01T00:00:00.000Z', 1), row('not-a-date', 2), row('2026-10-02T00:00:00.000Z', 3)];
+    const rows = [
+      row('2026-10-01T00:00:00.000Z', 1),
+      row('not-a-date', 2),
+      row('2026-10-02T00:00:00.000Z', 3),
+    ];
     const out = toChronological(rows);
     expect(out.at(-1)!.score).toBe(3); // 「最新」仍是真实最新
     expect(out).toHaveLength(3);

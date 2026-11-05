@@ -187,9 +187,7 @@ export function validateRuleSource(
 
   if (meta) {
     // ─── 新格式：字段收在 metadata / governance / judgment 下 ───
-    push(
-      checkEnum(filePath, 'metadata.status', meta.status, { allowed: RULE_LIFECYCLE_STATUSES }),
-    );
+    push(checkEnum(filePath, 'metadata.status', meta.status, { allowed: RULE_LIFECYCLE_STATUSES }));
     push(checkEnum(filePath, 'governance.domain', gov?.domain, { allowed: GOVERNANCE_DOMAINS }));
     push(checkEnum(filePath, 'governance.action', gov?.action, { allowed: ACTION_TYPES }));
     push(

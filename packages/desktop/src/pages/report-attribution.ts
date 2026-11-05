@@ -146,8 +146,7 @@ export interface AttributionBreakdown extends ScorePair {
 
 /** 归因结果：要么算得出（breakdown），要么说明为什么算不了 —— 不存在「半个结果」 */
 export type AttributionResult =
-  | AttributionBreakdown
-  | ({ ok: false; reason: AttributionUnavailable } & ScorePair);
+  AttributionBreakdown | ({ ok: false; reason: AttributionUnavailable } & ScorePair);
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;

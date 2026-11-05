@@ -77,9 +77,11 @@ interface FinalizeScanParams {
  * → host.toolScope 生效 → tool-dispatch 按画像裁剪；无画像 → 不携带 → 不裁剪（回归安全）。
  * features 可选入参 → kernel ProjectFeature 必填语义：边界归一化为 []（保守：不裁剪）。
  */
-function buildFeatureContext(
-  projectFeature?: { framework?: string; language?: string; features?: string[] },
-): SopFeatureContext {
+function buildFeatureContext(projectFeature?: {
+  framework?: string;
+  language?: string;
+  features?: string[];
+}): SopFeatureContext {
   return projectFeature
     ? { projectFeature: { ...projectFeature, features: projectFeature.features ?? [] } }
     : {};

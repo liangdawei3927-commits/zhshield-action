@@ -63,8 +63,7 @@ function patternOfRegexLiteral(text: string): string | null {
 /** 从 `new RegExp("...")` / `RegExp("...")` 的首个字符串实参取模式；非静态字符串返回 null */
 function patternOfRegExpCall(node: ts.CallExpression | ts.NewExpression): string | null {
   const callee = node.expression;
-  const isRegExpCtor =
-    ts.isIdentifier(callee) && callee.text === 'RegExp';
+  const isRegExpCtor = ts.isIdentifier(callee) && callee.text === 'RegExp';
   if (!isRegExpCtor) return null;
   const [first] = node.arguments ?? [];
   if (first === undefined) return null;
@@ -133,7 +132,7 @@ function skipGroupModifier(pattern: string, afterParen: number): number {
     i += 1;
     if (pattern[i] === '=' || pattern[i] === '!') return i + 1; // lookbehind
     while (i < pattern.length && pattern[i] !== '>') i += 1;
-    return i + 1; // 跳过命名分组 `>` 
+    return i + 1; // 跳过命名分组 `>`
   }
   if (m === ':' || m === '=' || m === '!') return i + 1;
   return i;
@@ -147,7 +146,8 @@ function skipGroupModifier(pattern: string, afterParen: number): number {
  */
 export function hasNestedUnboundedQuantifier(pattern: string): boolean {
   const stack: Array<{ containsUnbounded: boolean }> = [{ containsUnbounded: false }];
-  const top = (): { containsUnbounded: boolean } => stack[stack.length - 1] as { containsUnbounded: boolean };
+  const top = (): { containsUnbounded: boolean } =>
+    stack[stack.length - 1] as { containsUnbounded: boolean };
   let i = 0;
   while (i < pattern.length) {
     const c = pattern[i];

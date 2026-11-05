@@ -3,8 +3,16 @@ import { buildHealthDimensions } from '../pipeline-score';
 import { ScoringEngine } from '../engine';
 import type { DimensionExtras } from '../types';
 
-const emptyGuard = { results: [] as Array<{ severity: 'error' | 'warning' | 'info'; status: 'passed' | 'failed' | 'error' | 'warning'; blocking: boolean }> };
-const emptyInspect = { issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string }> };
+const emptyGuard = {
+  results: [] as Array<{
+    severity: 'error' | 'warning' | 'info';
+    status: 'passed' | 'failed' | 'error' | 'warning';
+    blocking: boolean;
+  }>,
+};
+const emptyInspect = {
+  issues: [] as Array<{ severity: 'error' | 'warning' | 'info'; category: string }>,
+};
 
 const allExtras: DimensionExtras = {
   secrets: { activeCount: 0 },
@@ -17,7 +25,9 @@ const allExtras: DimensionExtras = {
 
 describe('P1b 验收 — 未检测域不参与加权（spec G）', () => {
   it('deps null → dependencies not-run，overall 按剩余维度归一化', () => {
-    const guard = { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] };
+    const guard = {
+      results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }],
+    };
     const inspect = { issues: [{ severity: 'error' as const, category: 'quality' }] };
     const dims = buildHealthDimensions({ guard, inspect, extras: { deps: null } });
 
@@ -171,7 +181,9 @@ describe('P1b 验收 — 新扣分公式（spec D）', () => {
 
   it('gate 维 = 100 − guardPenalty（v2 起哨兵拆出独立维，gate 不再吃哨兵事件）', () => {
     const dims = buildHealthDimensions({
-      guard: { results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }] },
+      guard: {
+        results: [{ severity: 'error' as const, status: 'failed' as const, blocking: true }],
+      },
       inspect: emptyInspect,
       extras: { sentinel: { active: true, criticalEvents: 2, warningEvents: 1 } },
     });

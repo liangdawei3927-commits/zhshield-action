@@ -51,7 +51,11 @@ describe('P1-6 安全域双路合并（persistSecurityDomainEntries）', () => {
       await persistSecurityDomainEntries(project, [secretEntry('k1'), secretEntry('k2')], 'secret');
       await persistSecurityDomainEntries(project, [vulnEntry('vuln/CVE-1')], 'vuln');
       const snap = await readDomainSnapshot(project, 'security');
-      expect(snap!.issues.map((i) => i.ruleId).sort()).toEqual(['secret:k1', 'secret:k2', 'vuln/CVE-1']);
+      expect(snap!.issues.map((i) => i.ruleId).sort()).toEqual([
+        'secret:k1',
+        'secret:k2',
+        'vuln/CVE-1',
+      ]);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
@@ -74,7 +78,11 @@ describe('P1-6 安全域双路合并（persistSecurityDomainEntries）', () => {
   it('重复写同一类：同类旧条目被覆盖，不出现双份', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-p1-6-sec3-'));
     try {
-      await persistSecurityDomainEntries(project, [vulnEntry('vuln/A'), vulnEntry('vuln/B')], 'vuln');
+      await persistSecurityDomainEntries(
+        project,
+        [vulnEntry('vuln/A'), vulnEntry('vuln/B')],
+        'vuln',
+      );
       await persistSecurityDomainEntries(project, [vulnEntry('vuln/A')], 'vuln');
       const snap = await readDomainSnapshot(project, 'security');
       expect(snap!.issues.filter((i) => i.ruleId === 'vuln/A')).toHaveLength(1);
@@ -90,8 +98,14 @@ describe('P1-6 计数与扣分分离（deps upgrade 条目 ↔ 维度 issues 可
     lockfileVerification: { status: 'clean', diffs: [], integrityFailures: [] },
     licenseMatrix: { total: 0, byCategory: {}, entries: [] },
     upgradeAssessments: [
-      { nodeId: 'pkg-a', candidates: [{ targetVersion: '2.0.0', risk: 'low', breakingChanges: [] }] },
-      { nodeId: 'pkg-b', candidates: [{ targetVersion: '3.1.0', risk: 'medium', breakingChanges: [] }] },
+      {
+        nodeId: 'pkg-a',
+        candidates: [{ targetVersion: '2.0.0', risk: 'low', breakingChanges: [] }],
+      },
+      {
+        nodeId: 'pkg-b',
+        candidates: [{ targetVersion: '3.1.0', risk: 'medium', breakingChanges: [] }],
+      },
       { nodeId: 'pkg-c', candidates: [] },
     ],
     envEntries: [],
@@ -109,7 +123,11 @@ describe('P1-6 计数与扣分分离（deps upgrade 条目 ↔ 维度 issues 可
     const dims = buildHealthDimensions({
       guard: null,
       inspect: {
-        issues: entries.map((e) => ({ severity: e.severity, category: e.category, ruleId: e.ruleId })),
+        issues: entries.map((e) => ({
+          severity: e.severity,
+          category: e.category,
+          ruleId: e.ruleId,
+        })),
       },
       extras: {
         deps: { vulnerabilities: { critical: 0, high: 0, medium: 0 }, upgradable },

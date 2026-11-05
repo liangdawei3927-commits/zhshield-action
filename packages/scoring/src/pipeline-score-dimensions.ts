@@ -1,4 +1,13 @@
-import type { DimensionScore, SecretDataLike, DepsDataLike, SentinelDataLike, RefactorDataLike, PerformanceDataLike, GarbageDataLike, BackupDataLike } from './types';
+import type {
+  DimensionScore,
+  SecretDataLike,
+  DepsDataLike,
+  SentinelDataLike,
+  RefactorDataLike,
+  PerformanceDataLike,
+  GarbageDataLike,
+  BackupDataLike,
+} from './types';
 import type {
   GuardReportLike,
   InspectIssueLike,
@@ -353,7 +362,8 @@ function scoreInspectBased(params: {
   const { name, weight, inspect, extras, matched } = params;
   // quality 维用 S1+S2 口径（规则聚合 + 单规则封顶 + ESLOC 密度归一化）；
   // security/dependencies 保持原线性扣分（各自另有 secrets/deps 绝对扣分上限）。
-  const penalty = name === 'quality' ? qualityPenalty(matched, inspect?.esloc) : penaltyForIssues(matched);
+  const penalty =
+    name === 'quality' ? qualityPenalty(matched, inspect?.esloc) : penaltyForIssues(matched);
   const issueCount = matched.length;
   const withSecrets = applySecurityPenalty(penalty, issueCount, extras.secrets);
   const withDeps = applyDepsPenalty(withSecrets.penalty, withSecrets.issueCount, extras.deps);

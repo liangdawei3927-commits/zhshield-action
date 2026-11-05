@@ -109,7 +109,9 @@ function unresolvedIssue(
       level: 'fatal',
       reason:
         `工具名写在 content 顶层（tool="${topLevelTool}"），而解释器只认 check.tool ⇒ ` +
-        '该规则永远不会被派发。请改写为 check: { tool: ' + `"${topLevelTool}"` + ' }',
+        '该规则永远不会被派发。请改写为 check: { tool: ' +
+        `"${topLevelTool}"` +
+        ' }',
     };
   }
 

@@ -181,7 +181,10 @@ describe('规则质量门禁 — golden 断言回放', () => {
       engine.registerToolAdapter('semgrep', new SemgrepAdapter());
 
       // ⚠️ 扫的是仓库外的副本（runtimeProjectDir），不是 fixtures 原路径 —— 见其注释
-      const report = await engine.evaluateRules({ repoRoot: runtimeProjectDir, domain: 'security' });
+      const report = await engine.evaluateRules({
+        repoRoot: runtimeProjectDir,
+        domain: 'security',
+      });
 
       const findings = toRuleFindings(
         report.evaluations.flatMap((e) => e.violations ?? []),

@@ -17,7 +17,10 @@ const state = vi.hoisted(() => ({
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
     const [, cmdArgs] = args as [string, string[]];
-    const cb = args.at(-1) as (err: Error | null, result?: { stdout: string; stderr: string }) => void;
+    const cb = args.at(-1) as (
+      err: Error | null,
+      result?: { stdout: string; stderr: string },
+    ) => void;
     if (cmdArgs?.includes('status')) {
       if (state.statusFails) cb(new Error('spawn failed'));
       else cb(null, { stdout: state.dbStatusOutput, stderr: '' });

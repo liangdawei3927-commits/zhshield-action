@@ -12,7 +12,9 @@ import { toProfileSummary, waitForFlag, withOfflineTimeout } from './ProjectOnbo
 
 function analyzeStep(
   projectPath: string,
-  onProfileDetected: (summary: import('./ProjectOnboardingPage-types').OnboardingProfileSummary | null) => void,
+  onProfileDetected: (
+    summary: import('./ProjectOnboardingPage-types').OnboardingProfileSummary | null,
+  ) => void,
 ): Step {
   return {
     id: 'analyze',
@@ -41,7 +43,9 @@ function confirmStep(profileDetected: boolean, profileConfirmed: boolean): Step 
 function profileStep(
   projectPath: string,
   onRuleSyncResult: (summary: import('./ProjectOnboardingPage-types').RuleSyncSummary) => void,
-  onToolsStatus: (status: import('./ProjectOnboardingPage-types').ToolsStatusSummary | null) => void,
+  onToolsStatus: (
+    status: import('./ProjectOnboardingPage-types').ToolsStatusSummary | null,
+  ) => void,
 ): Step {
   return {
     id: 'profile',
@@ -50,10 +54,7 @@ function profileStep(
       // P1-3：云端不可达时 syncRules/resolveRules 曾无限挂起（实测 45s+ 卡死第二步）。
       // 每个网络调用都包 15s 硬超时，到点按离线降级继续——本地 SOP 规则照常可用，
       // 向导主流程绝不因云端阻塞。同步结果 ok:false 时 UI 会如实标注离线。
-      const synced = await withOfflineTimeout(
-        window.electronAPI?.sync?.syncRules(),
-        () => null,
-      );
+      const synced = await withOfflineTimeout(window.electronAPI?.sync?.syncRules(), () => null);
       // synced 为 null/undefined = 超时或 API 缺失 → 离线降级：跳过 resolveRules（它也要访问云端）
       const outcome =
         synced != null

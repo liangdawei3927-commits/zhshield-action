@@ -8,20 +8,10 @@
  * 「不该清的绝不碰」—— 正在写的临时文件（mtime 新）与完整快照都必须存活。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  mkdtempSync,
-  mkdirSync,
-  writeFileSync,
-  existsSync,
-  utimesSync,
-  rmSync,
-} from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, utimesSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  LocalBackupPruner,
-  DEFAULT_TMP_SNAPSHOT_TTL_MS,
-} from '../backup/local-backup-pruner';
+import { LocalBackupPruner, DEFAULT_TMP_SNAPSHOT_TTL_MS } from '../backup/local-backup-pruner';
 
 let root: string;
 
@@ -86,9 +76,7 @@ describe('A3 中断残留临时快照清理', () => {
   });
 
   it('备份根目录不存在时安全返回空结果（首次备份）', async () => {
-    const outcome = await new LocalBackupPruner().pruneStaleTmpFiles(
-      join(root, 'not-exist-yet'),
-    );
+    const outcome = await new LocalBackupPruner().pruneStaleTmpFiles(join(root, 'not-exist-yet'));
     expect(outcome).toEqual({ removed: [], failed: [] });
   });
 

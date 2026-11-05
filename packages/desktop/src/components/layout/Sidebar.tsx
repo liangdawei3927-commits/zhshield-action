@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import type { AiToolConfigData } from '../../types/electron';
 import { FEATURE_AI_TOOL_ENABLED, FEATURE_EVOLVE_ENABLED } from '../../feature-flags';
-import { SidebarHeader, ProjectsSection, AiToolSection, EvolveSection } from './sidebar-interactive';
+import {
+  SidebarHeader,
+  ProjectsSection,
+  AiToolSection,
+  EvolveSection,
+} from './sidebar-interactive';
 import { ThemeSection, LanguageSection, AboutSection } from './sidebar-about';
 import { SidebarOverlay } from './sidebar-common';
 import { EngineStatusSection, WisdomBrainCard, type EngineCardProps } from './sidebar-status';

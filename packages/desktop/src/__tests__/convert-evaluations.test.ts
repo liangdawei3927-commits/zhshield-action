@@ -116,7 +116,11 @@ describe('convertGuardEvaluations', () => {
   it('file 取 files[0]，缺省时回退首条 violation 的 file（monorepo 子模块归桶）', () => {
     const evals = [
       { status: 'failed', rule: { severity: 'high' }, files: ['packages/a/src/x.ts'] },
-      { status: 'failed', rule: { severity: 'high' }, violations: [{ file: 'packages/b/src/y.ts' }] },
+      {
+        status: 'failed',
+        rule: { severity: 'high' },
+        violations: [{ file: 'packages/b/src/y.ts' }],
+      },
     ];
     const out = convertGuardEvaluations(evals);
     expect(out[0].file).toBe('packages/a/src/x.ts');

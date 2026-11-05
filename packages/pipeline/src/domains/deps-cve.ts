@@ -113,7 +113,8 @@ export function mapOsvSeverity(vuln: OsvVuln): 'critical' | 'high' | 'medium' {
 /** 漏洞展示标识：别名里的 CVE 优先（用户认知度更高），回退主 id */
 export function vulnDisplayIds(vuln: OsvVuln): string {
   const cve = (vuln.aliases ?? []).filter((a) => a.startsWith('CVE-'));
-  const ids = cve.length > 0 ? [...new Set([vuln.id, ...cve].filter(Boolean))] : [vuln.id ?? 'unknown'];
+  const ids =
+    cve.length > 0 ? [...new Set([vuln.id, ...cve].filter(Boolean))] : [vuln.id ?? 'unknown'];
   return ids.join(', ');
 }
 
@@ -133,15 +134,25 @@ export function collectQueryableDeps(nodes: readonly CveQueryableDep[]): CveQuer
   return list;
 }
 
-function severityCount(findings: readonly CveFinding[]): { critical: number; high: number; medium: number } {
+function severityCount(findings: readonly CveFinding[]): {
+  critical: number;
+  high: number;
+  medium: number;
+} {
   const counts = { critical: 0, high: 0, medium: 0 };
   for (const f of findings) counts[f.severity]++;
   return counts;
 }
 
 /** CveCheckResult → dashboard 计数（status='unavailable' 恒 0，调用方必须同时展示降级态） */
-export function cveCounts(result: CveCheckResult): { critical: number; high: number; medium: number } {
-  return result.status === 'ok' ? severityCount(result.findings) : { critical: 0, high: 0, medium: 0 };
+export function cveCounts(result: CveCheckResult): {
+  critical: number;
+  high: number;
+  medium: number;
+} {
+  return result.status === 'ok'
+    ? severityCount(result.findings)
+    : { critical: 0, high: 0, medium: 0 };
 }
 
 /** OSV 单条响应 → findings（单个依赖可能命中多条漏洞） */
@@ -184,7 +195,12 @@ export async function runCveChecks(
       }),
     });
     if (!response.ok) {
-      return { status: 'unavailable', findings: [], reason: `OSV HTTP ${response.status}`, checkedAt };
+      return {
+        status: 'unavailable',
+        findings: [],
+        reason: `OSV HTTP ${response.status}`,
+        checkedAt,
+      };
     }
     const payload = (await response.json()) as OsvBatchResult;
     if (!payload || !Array.isArray(payload.results)) {

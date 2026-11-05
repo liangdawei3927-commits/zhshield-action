@@ -47,9 +47,10 @@ describe('导航分组', () => {
   it('段内 id 与预期分组一致，且顺序不被分段重排', () => {
     const segments = navGroupSegments();
     for (const segment of segments) {
-      expect(segment.items.map((i) => i.id), segment.group).toEqual(
-        EXPECTED_GROUPS[segment.group],
-      );
+      expect(
+        segment.items.map((i) => i.id),
+        segment.group,
+      ).toEqual(EXPECTED_GROUPS[segment.group]);
     }
     // 分段只是渲染：展开回来必须逐项等于原数组（不增不减不换位）
     expect(segments.flatMap((s) => s.items)).toEqual(navItems);
@@ -82,13 +83,13 @@ describe('导航分组', () => {
 
 describe('TopNav 平铺渲染（防回归）', () => {
   it('CategoryNav 平铺 navItems，且分组竖线彻底删除', () => {
-    const src = readFileSync(
-      new URL('../components/layout/TopNav.tsx', import.meta.url),
-      'utf-8',
-    );
+    const src = readFileSync(new URL('../components/layout/TopNav.tsx', import.meta.url), 'utf-8');
     // 断言**调用边**（CategoryNav 函数体内），而不是组件定义仍在文件里：
     // 定义存在、调用被删时，只看 data-testid 的断言照样绿（负向自证抓到过一次）
-    const body = src.slice(src.indexOf('function CategoryNav'), src.indexOf('export function TopNav'));
+    const body = src.slice(
+      src.indexOf('function CategoryNav'),
+      src.indexOf('export function TopNav'),
+    );
     // 十项平铺：直接 map navItems（顺序仍由 nav-items 的声明锁定）
     expect(body).toMatch(/navItems\.map\(/);
     expect(body).not.toMatch(/navGroupSegments\(\)/);

@@ -1,7 +1,10 @@
 import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon } from '../components/ui/Icons';
-import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
+import {
+  buildCapabilityFeatures,
+  buildPlannedCapabilities,
+} from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 

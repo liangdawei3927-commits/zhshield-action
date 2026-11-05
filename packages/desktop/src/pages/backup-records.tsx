@@ -167,9 +167,7 @@ export function BackupRecordsPanel({
   const t = useT();
   return (
     <ResultCard variant="list">
-      {scheduleHeader && (
-        <div className="px-5 py-4 border-b border-zh-line">{scheduleHeader}</div>
-      )}
+      {scheduleHeader && <div className="px-5 py-4 border-b border-zh-line">{scheduleHeader}</div>}
       <div className="px-5 py-4 border-b border-zh-line">
         <h3 className="text-sm font-semibold text-zh-ink-2">
           {t('page.backup.recordsTitle')}

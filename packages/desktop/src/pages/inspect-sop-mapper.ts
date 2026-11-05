@@ -64,9 +64,7 @@ export function isIssueStatus(status: CheckStatus): boolean {
 }
 
 /** issues 数据源：从全量 checks 挑出问题项（排除 attention/pass）。 */
-export function selectIssueChecks(
-  checks: readonly CheckLike[],
-): InspectionReportData['checks'] {
+export function selectIssueChecks(checks: readonly CheckLike[]): InspectionReportData['checks'] {
   return checks.filter((c) => isIssueStatus(c.status));
 }
 

@@ -24,9 +24,33 @@ describe('快照整形（toSnapshotReport）', () => {
       generatedAt: '2026-10-23T12:00:00.000Z',
       summary: { total: 3, error: 1, warning: 1, info: 1 },
       issues: [
-        { ruleId: 'r-info', severity: 'info', message: '提示项', file: '', autoFixable: false, fingerprint: 'f3' },
-        { ruleId: 'r-err', severity: 'error', message: '错误项', file: 'a.ts', line: 3, column: 5, autoFixable: true, fingerprint: 'f1' },
-        { ruleId: 'r-warn', severity: 'warning', message: '警告项', file: 'b.ts', line: 9, autoFixable: false, fingerprint: 'f2' },
+        {
+          ruleId: 'r-info',
+          severity: 'info',
+          message: '提示项',
+          file: '',
+          autoFixable: false,
+          fingerprint: 'f3',
+        },
+        {
+          ruleId: 'r-err',
+          severity: 'error',
+          message: '错误项',
+          file: 'a.ts',
+          line: 3,
+          column: 5,
+          autoFixable: true,
+          fingerprint: 'f1',
+        },
+        {
+          ruleId: 'r-warn',
+          severity: 'warning',
+          message: '警告项',
+          file: 'b.ts',
+          line: 9,
+          autoFixable: false,
+          fingerprint: 'f2',
+        },
       ],
     });
 
@@ -150,7 +174,12 @@ describe('DomainSnapshotReport 渲染「上次结果」', () => {
 
   it('超过上限时告知被截断（不假装是全量）', () => {
     const many = toSnapshotReport({
-      summary: { total: SNAPSHOT_ENTRY_LIMIT + 5, error: 0, warning: SNAPSHOT_ENTRY_LIMIT + 5, info: 0 },
+      summary: {
+        total: SNAPSHOT_ENTRY_LIMIT + 5,
+        error: 0,
+        warning: SNAPSHOT_ENTRY_LIMIT + 5,
+        info: 0,
+      },
       issues: Array.from({ length: SNAPSHOT_ENTRY_LIMIT + 5 }, (_, i) => ({
         ruleId: `r${i}`,
         severity: 'warning',

@@ -14,7 +14,11 @@
 import { useT } from '../../i18n';
 import { useDomainHistory } from '../../hooks/useDomainHistory';
 import { ResultCard } from '../ui/ResultCard';
-import { buildHistoryRows, deltaDirection, type HistoryRow } from '../../pages/domain-history-logic';
+import {
+  buildHistoryRows,
+  deltaDirection,
+  type HistoryRow,
+} from '../../pages/domain-history-logic';
 
 /** 变化配色：质量分上涨=好（success），下跌=差（danger），持平/无基线=muted */
 const DELTA_COLOR: Record<ReturnType<typeof deltaDirection>, string> = {
@@ -40,9 +44,7 @@ function HistoryRowView({
   const { record, added, removed, scoreDelta } = row;
   const direction = deltaDirection(scoreDelta);
   const severityText =
-    record.severityApplicable === false
-      ? '—'
-      : `${record.error}/${record.warning}/${record.info}`;
+    record.severityApplicable === false ? '—' : `${record.error}/${record.warning}/${record.info}`;
 
   return (
     <tr
@@ -56,7 +58,10 @@ function HistoryRowView({
         {record.score === null ? '—' : record.score}
       </td>
       <td className="px-5 py-3 text-sm text-zh-ink whitespace-nowrap">{record.total}</td>
-      <td className="px-5 py-3 text-xs text-zh-muted whitespace-nowrap" title={t('page.domainHistory.severityHint', { defaultValue: '错误/警告/提示' })}>
+      <td
+        className="px-5 py-3 text-xs text-zh-muted whitespace-nowrap"
+        title={t('page.domainHistory.severityHint', { defaultValue: '错误/警告/提示' })}
+      >
         {severityText}
       </td>
       <td
@@ -83,13 +88,7 @@ function HistoryRowView({
 }
 
 /** 历史表格：表头 + 数据行。与面板外壳（标题/脚注）分离，行渲染在 HistoryRowView */
-function HistoryTable({
-  rows,
-  t,
-}: {
-  rows: HistoryRow[];
-  t: ReturnType<typeof useT>;
-}) {
+function HistoryTable({ rows, t }: { rows: HistoryRow[]; t: ReturnType<typeof useT> }) {
   return (
     <table className="w-full text-left">
       <thead>

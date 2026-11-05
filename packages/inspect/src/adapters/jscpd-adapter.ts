@@ -74,8 +74,20 @@ const META: ToolMeta = {
 interface JscpdDuplicate {
   format?: string;
   /** jscpd ≥5.x: name 为相对路径, start/end 为行号, startLoc/endLoc 含 line */
-  firstFile?: { name?: string; start?: number; end?: number; startLoc?: { line?: number }; endLoc?: { line?: number } };
-  secondFile?: { name?: string; start?: number; end?: number; startLoc?: { line?: number }; endLoc?: { line?: number } };
+  firstFile?: {
+    name?: string;
+    start?: number;
+    end?: number;
+    startLoc?: { line?: number };
+    endLoc?: { line?: number };
+  };
+  secondFile?: {
+    name?: string;
+    start?: number;
+    end?: number;
+    startLoc?: { line?: number };
+    endLoc?: { line?: number };
+  };
   /** jscpd <5 (legacy) */
   first?: {
     location?: { path?: string; start?: { line?: number } };
@@ -132,9 +144,7 @@ export class JscpdAdapter implements ToolAdapter {
       const command = await this.commands.resolve(projectPath);
       const { stdout } = await execTool(command, ['--version'], { timeout: 20000 });
       const m = JSCPD_VERSION_RE.exec(stdout.trim());
-      this.versionInfo = m
-        ? { major: Number(m[1]), minor: Number(m[2]) }
-        : { major: 0, minor: 0 };
+      this.versionInfo = m ? { major: Number(m[1]), minor: Number(m[2]) } : { major: 0, minor: 0 };
     } catch {
       this.versionInfo = { major: 0, minor: 0 };
     }
@@ -205,8 +215,30 @@ export class JscpdAdapter implements ToolAdapter {
     }
     const args =
       major >= 5
-        ? ['--reporters', 'json', '--output', path.dirname(reportPath), '--mode', 'strict', '--ignore', JSCPD_IGNORED_PATHS.join(','), ...thresholdArgs, target]
-        : ['--output', reportPath, '--format', 'json', '--mode', 'strict', '--ignore', JSCPD_IGNORED_PATHS.join(','), ...thresholdArgs, target];
+        ? [
+            '--reporters',
+            'json',
+            '--output',
+            path.dirname(reportPath),
+            '--mode',
+            'strict',
+            '--ignore',
+            JSCPD_IGNORED_PATHS.join(','),
+            ...thresholdArgs,
+            target,
+          ]
+        : [
+            '--output',
+            reportPath,
+            '--format',
+            'json',
+            '--mode',
+            'strict',
+            '--ignore',
+            JSCPD_IGNORED_PATHS.join(','),
+            ...thresholdArgs,
+            target,
+          ];
     await execTool(command, args, {
       cwd: projectPath,
       timeout: options.timeout || DEFAULT_TOOL_SCAN_TIMEOUT_MS,

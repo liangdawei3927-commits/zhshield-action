@@ -33,9 +33,10 @@ const AUDIT_COMMANDS: Array<{ lockfile: string; cmd: string; args: string[] }> =
  * 归一化 projectPath 为绝对路径并探测锁文件对应的 audit 命令。
  * 相对路径会流入锁文件探测与 cwd，npm/pnpm 以自身 cwd 解析相对路径导致扫描失败。
  */
-function resolveAuditCommand(
-  projectPath: string,
-): { command: { cmd: string; args: string[] } | undefined; projectPath: string } {
+function resolveAuditCommand(projectPath: string): {
+  command: { cmd: string; args: string[] } | undefined;
+  projectPath: string;
+} {
   const resolved = path.resolve(projectPath);
   const command = AUDIT_COMMANDS.find((c) => fs.existsSync(path.join(resolved, c.lockfile)));
   return { command, projectPath: resolved };

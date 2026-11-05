@@ -66,7 +66,7 @@ describe('applyWeightDeltas — 权重归一化', () => {
       security: 0.25,
       dependencies: 0.15,
       techdebt: 0.15,
-      gate: 0.10,
+      gate: 0.1,
     };
     const deltas = { security: -0.1, quality: +0.1 };
     const result = applyWeightDeltas(base, deltas);
@@ -90,7 +90,11 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
   it('frontend profile 降低 security 维度权重', () => {
     const profile = makeProfile('frontend');
     const dimsDefault = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
-    const dimsProfiled = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile });
+    const dimsProfiled = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      profile,
+    });
 
     const defaultSecurity = dimsDefault.find((d) => d.name === 'security')!.weight;
     const profiledSecurity = dimsProfiled.find((d) => d.name === 'security')!.weight;
@@ -100,7 +104,11 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
   it('mini-program profile 降低 dependencies 维度权重', () => {
     const profile = makeProfile('mini-program');
     const dimsDefault = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
-    const dimsProfiled = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile });
+    const dimsProfiled = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      profile,
+    });
 
     const defaultDeps = dimsDefault.find((d) => d.name === 'dependencies')!.weight;
     const profiledDeps = dimsProfiled.find((d) => d.name === 'dependencies')!.weight;
@@ -110,7 +118,11 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
   it('backend profile 与默认权重一致', () => {
     const profile = makeProfile('backend');
     const dimsDefault = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect });
-    const dimsProfiled = buildHealthDimensions({ guard: emptyGuard, inspect: emptyInspect, profile });
+    const dimsProfiled = buildHealthDimensions({
+      guard: emptyGuard,
+      inspect: emptyInspect,
+      profile,
+    });
 
     for (let i = 0; i < dimsDefault.length; i++) {
       expect(dimsProfiled[i].weight).toBeCloseTo(dimsDefault[i].weight, 2);
@@ -128,10 +140,10 @@ describe('buildHealthDimensions — 画像驱动评分', () => {
       'cli',
     ] as const) {
       const dims = buildHealthDimensions({
-      guard: emptyGuard,
-      inspect: emptyInspect,
-      profile: makeProfile(type),
-    });
+        guard: emptyGuard,
+        inspect: emptyInspect,
+        profile: makeProfile(type),
+      });
       const sum = dims.reduce((s, d) => s + d.weight, 0);
       expect(Math.abs(sum - 1)).toBeLessThan(0.02);
     }

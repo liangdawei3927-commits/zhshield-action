@@ -48,11 +48,11 @@ function readJson(file) {
 /** 最近的对齐用 tag（只匹配 v 开头且后接数字的），取不到返回空串 */
 function latestVersionTag() {
   try {
-    return execFileSync(
-      'git',
-      ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*'],
-      { cwd: ROOT, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
-    ).trim();
+    return execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*'], {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
   } catch {
     // 无 tag / 非 git 仓库 / git 不可用：不视为错误
     return '';
@@ -79,8 +79,7 @@ const tag = latestVersionTag();
 if (tag) {
   const tagVersion = tag.replace(/^v/, '');
   if (SEMVER_RE.test(tagVersion) && tagVersion !== desktopVersion) {
-    const msg =
-      `最近 tag ${tag} 与当前版本 ${desktopVersion} 不一致（正式发版应让 tag 为 v${desktopVersion}）`;
+    const msg = `最近 tag ${tag} 与当前版本 ${desktopVersion} 不一致（正式发版应让 tag 为 v${desktopVersion}）`;
     if (STRICT_TAG) {
       console.error(`[version] ✗ ${msg}。发布通道已启用 --strict-tag，构建中止。`);
       process.exit(1);

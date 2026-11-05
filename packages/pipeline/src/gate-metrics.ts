@@ -149,7 +149,9 @@ function diffCoverageValue(repoRoot: string, inputs: GateMetricInputs): GateValu
 }
 
 function scoreValue(label: string, preset: number | undefined, reason: string): GateValue {
-  return typeof preset === 'number' ? { actual: preset } : { unavailableReason: `${label}不可用：${reason}` };
+  return typeof preset === 'number'
+    ? { actual: preset }
+    : { unavailableReason: `${label}不可用：${reason}` };
 }
 
 function readScopeValue(rule: SopRule, key: string): string | undefined {

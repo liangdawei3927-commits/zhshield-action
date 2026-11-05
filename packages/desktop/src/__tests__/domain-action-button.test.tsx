@@ -51,7 +51,9 @@ describe('域主操作按钮渲染', () => {
   });
 
   it('十域与三个非域动作都能渲染出状态词（键写错会退化成键名本身）', () => {
-    for (const domain of Object.keys(ACTION_RUNNING_LABEL_KEY) as (keyof typeof ACTION_RUNNING_LABEL_KEY)[]) {
+    for (const domain of Object.keys(
+      ACTION_RUNNING_LABEL_KEY,
+    ) as (keyof typeof ACTION_RUNNING_LABEL_KEY)[]) {
       const text = buttonText(render({ domain, label: 'X', loading: true }));
       expect(text.length, `${domain} 没有运行态文案`).toBeGreaterThan(0);
       expect(text, `${domain} 显示了键名而非文案`).not.toContain('page.');
@@ -112,9 +114,7 @@ describe('域主操作按钮渲染', () => {
    * 之类的来源区分 prop：触发来源只作任务上的诊断元数据，不上按钮。
    */
   it('巡检任务运行中，按钮一律显示「巡检中」（不区分触发来源）', () => {
-    const text = buttonText(
-      render({ domain: 'inspect', label: '一键体检', loading: true }),
-    );
+    const text = buttonText(render({ domain: 'inspect', label: '一键体检', loading: true }));
     expect(text).toContain('巡检中');
     expect(text).not.toContain('一键体检');
     expect(text).not.toContain('自动');

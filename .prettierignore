@@ -39,3 +39,11 @@ sop-templates/
 packages/*/src/**/*.js
 packages/*/src/**/*.d.ts
 packages/*/src/**/*.map
+
+# 测试夹具：这些是**断言输入**，排版本身就是语义的一部分。
+# 例：refactor 的 dup-boiler-*.fixture.tsx 故意一处写成紧凑接口、一处写成展开接口，
+# 用来验证"只共享样板骨架的文件不该被判重复"。2026-11-05 跑 `pnpm format` 把它们
+# 统一了排版，检测器立刻多报 1 处重复 —— 格式化改到了 golden 用例的输入。
+packages/*/src/**/__tests__/fixtures/
+packages/*/src/**/__fixtures__/
+packages/*/src/**/testdata/

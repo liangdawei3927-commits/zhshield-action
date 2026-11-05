@@ -205,7 +205,9 @@ export function filterReExportEdges(
   const dropped: PruneEntry[] = [];
 
   for (const entry of entries) {
-    const absPath = path.isAbsolute(entry.file) ? entry.file : path.resolve(projectRoot, entry.file);
+    const absPath = path.isAbsolute(entry.file)
+      ? entry.file
+      : path.resolve(projectRoot, entry.file);
     const statements = collectReExportStatements(absPath);
     if (statements === null) {
       kept.push(entry);

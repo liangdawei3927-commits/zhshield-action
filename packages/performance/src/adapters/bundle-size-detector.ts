@@ -171,4 +171,3 @@ function sortBundleIssues(issues: PerformanceIssue[]): PerformanceIssue[] {
     return a.file.localeCompare(b.file);
   });
 }
-

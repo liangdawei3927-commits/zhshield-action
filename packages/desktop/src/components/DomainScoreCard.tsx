@@ -40,10 +40,7 @@ function InlineDomainScore({
   t: ReturnType<typeof useT>;
 }) {
   return (
-    <div
-      className="flex items-center gap-3 shrink-0"
-      data-testid={`domain-score-${dimension}`}
-    >
+    <div className="flex items-center gap-3 shrink-0" data-testid={`domain-score-${dimension}`}>
       <DomainScoreBadges view={view} dimension={dimension} t={t} />
     </div>
   );
@@ -76,7 +73,6 @@ function FullDomainScore({
     </div>
   );
 }
-
 
 function DomainScoreBadges({
   view,

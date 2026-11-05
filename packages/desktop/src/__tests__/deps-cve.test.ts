@@ -27,7 +27,7 @@ describe('结构守卫 — P1-8 链路接线（防改回去）', () => {
   it('deps 域诊断归一化产出 CVE 条目；unavailable 不产条目', () => {
     const src = read('zh-diagnostics-engines.ts');
     expect(src).toContain('cve:${finding.name}@${finding.version}');
-    expect(src).toContain("data.cve?.findings ?? []");
+    expect(src).toContain('data.cve?.findings ?? []');
   });
 
   it('dashboard 契约携带 cve.status（unavailable 必须随行）', () => {

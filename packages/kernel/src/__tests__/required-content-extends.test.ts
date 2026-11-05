@@ -98,11 +98,7 @@ describe('SopRuleEngine — required-content extends 链深合并', () => {
       JSON.stringify({ extends: './a.json' }),
       'utf-8',
     );
-    writeFileSync(
-      path.join(tempDir, 'a.json'),
-      JSON.stringify({ extends: './b.json' }),
-      'utf-8',
-    );
+    writeFileSync(path.join(tempDir, 'a.json'), JSON.stringify({ extends: './b.json' }), 'utf-8');
     writeFileSync(
       path.join(tempDir, 'b.json'),
       JSON.stringify({ extends: './tsconfig.json', compilerOptions: { strict: true } }),

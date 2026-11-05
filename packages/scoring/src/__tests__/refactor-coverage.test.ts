@@ -15,9 +15,7 @@ import type { DimensionExtras } from '../types';
 const cleanGuard = { results: [] };
 const cleanInspect = { issues: [] };
 
-function extrasWith(
-  refactor: NonNullable<DimensionExtras['refactor']>,
-): DimensionExtras {
+function extrasWith(refactor: NonNullable<DimensionExtras['refactor']>): DimensionExtras {
   return {
     secrets: { activeCount: 0 },
     deps: { vulnerabilities: { critical: 0, high: 0, medium: 0 }, upgradable: 0 },
@@ -45,7 +43,11 @@ function refactorDim(extras: DimensionExtras): { score: number; issues: number; 
 describe('scoreRefactor — 0 覆盖判 not-run（P1-9）', () => {
   it('真阳性：scannedFiles=0（纯 JS 项目）→ not-run，不出现 100 分', () => {
     const dim = refactorDim(
-      extrasWith({ totalSmells: 0, bySeverity: { error: 0, warning: 0, info: 0 }, scannedFiles: 0 }),
+      extrasWith({
+        totalSmells: 0,
+        bySeverity: { error: 0, warning: 0, info: 0 },
+        scannedFiles: 0,
+      }),
     );
     expect(dim.status).toBe('not-run');
     expect(dim.score).toBe(0);
@@ -54,7 +56,11 @@ describe('scoreRefactor — 0 覆盖判 not-run（P1-9）', () => {
 
   it('误报防护：scannedFiles>0 且无异味 → 正常 scored 100 分', () => {
     const dim = refactorDim(
-      extrasWith({ totalSmells: 0, bySeverity: { error: 0, warning: 0, info: 0 }, scannedFiles: 12 }),
+      extrasWith({
+        totalSmells: 0,
+        bySeverity: { error: 0, warning: 0, info: 0 },
+        scannedFiles: 12,
+      }),
     );
     expect(dim.status).toBe('scored');
     expect(dim.score).toBe(100);

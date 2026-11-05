@@ -40,7 +40,7 @@ export type IssueCategory =
 
 /** 问题来源模块：产出该 Issue 的治理域/工具 */
 export type IssueSource =
-  | 'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor' | 'performance';
+  'guard' | 'inspect' | 'sentinel' | 'security' | 'refactor' | 'performance';
 
 /**
  * 问题（Issue）：各域检测结果的统一表示，跨域聚合与展示的公共契约。
@@ -112,9 +112,7 @@ export interface DimensionScore {
   issues: number;
 }
 
-
 // ─── 巡检报告（InspectionReport）─────────────────────────
-
 
 // ─── 哨兵事件复现统计（SentinelOccurrence）────────────────
 
@@ -143,7 +141,6 @@ export interface GarbageItem {
 }
 
 // ─── 经验记录（ExperienceEntry）──────────────────────────
-
 
 // ─── 开源工具集成（Tool Adapter）────────────────────────
 
@@ -353,7 +350,6 @@ export interface AuditEntry {
 /** 白名单作用范围：整项目 / 单文件 / 单规则 */
 export type WhitelistScope = 'project' | 'file' | 'rule';
 
-
 // ─── 工具配置文件（tools.yml 对应类型）─────────────────
 
 /** 工具配置文件：tools.yml 的对应类型，按工具 id 固定键出各工具配置 */
@@ -439,7 +435,6 @@ export const EXECUTION_MODES = ['sync', 'async', 'periodic', 'event'] as const;
 /** 规则严重级别（含 'error'：对齐 ESLint/semgrep 的 ERROR 档） */
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info', 'error'] as const;
 
-
 /** SOP 知识包版本：一次云脑发布产出的知识/经验/恶意库快照及其哈希 */
 export interface SopVersion {
   version: string;
@@ -474,7 +469,6 @@ export interface SopDiff<T = unknown> {
   unchanged: string[];
   metadata: SopDiffMetadata;
 }
-
 
 // ─── 输出映射器（Output Mapper）──────────────────────────
 

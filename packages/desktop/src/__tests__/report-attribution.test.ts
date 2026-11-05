@@ -76,8 +76,7 @@ function makeRecord(input: RecordInput): HealthScoreData {
   const weightSum = active.reduce((sum, d) => sum + d.weight, 0);
   const raw =
     weightSum > 0 ? active.reduce((sum, d) => sum + d.score * d.weight, 0) / weightSum : 0;
-  const capped =
-    input.redLine?.capped === true ? Math.min(raw, input.redLine.cap) : raw;
+  const capped = input.redLine?.capped === true ? Math.min(raw, input.redLine.cap) : raw;
   const overall = input.overall ?? Math.round(capped * 100) / 100;
   return {
     score: overall,
@@ -222,7 +221,11 @@ describe('attributeScoreDelta — 红线封顶单列', () => {
     const end = makeRecord({
       timestamp: '2026-10-02T10:00:00.000Z',
       scores: { security: 60 },
-      redLine: { capped: true, cap: 45, reasons: [{ domain: 'security', kind: 'secret', count: 2 }] },
+      redLine: {
+        capped: true,
+        cap: 45,
+        reasons: [{ domain: 'security', kind: 'secret', count: 2 }],
+      },
     });
     const result = expectBreakdown(attributeScoreDelta(start, end));
     expect(result.capped).toBe(true);
@@ -239,7 +242,11 @@ describe('attributeScoreDelta — 红线封顶单列', () => {
     const start = makeRecord({
       timestamp: '2026-10-01T10:00:00.000Z',
       scores: { security: 60 },
-      redLine: { capped: true, cap: 45, reasons: [{ domain: 'security', kind: 'secret', count: 2 }] },
+      redLine: {
+        capped: true,
+        cap: 45,
+        reasons: [{ domain: 'security', kind: 'secret', count: 2 }],
+      },
     });
     const end = makeRecord({ timestamp: '2026-10-02T10:00:00.000Z', scores: { security: 96 } });
     const result = expectBreakdown(attributeScoreDelta(start, end));
@@ -362,7 +369,9 @@ describe('与其他口径对齐（防止报告中心出现两套数字）', () =
   });
 
   it('记录缺失时返回 null 而不是拿相邻记录顶替', () => {
-    const data: HealthScoreData[] = [makeRecord({ timestamp: new Date(2026, 9, 20, 9).toISOString() })];
+    const data: HealthScoreData[] = [
+      makeRecord({ timestamp: new Date(2026, 9, 20, 9).toISOString() }),
+    ];
     const buckets = buildWindowBuckets(data, 'day');
     const emptyIndex = indexRecordsByTimestamp([]);
     expect(attributeRange(buckets, emptyIndex)).toBeNull();
@@ -375,11 +384,23 @@ describe('结构项主导判定（防止把口径变化当成改进成果）', (
   const narrow = makeRecord({
     timestamp: '2026-10-01T10:00:00.000Z',
     notRun: ['techdebt', 'gate', 'sentinel', 'garbage', 'backup'],
-    scores: { quality: 83.8, security: 83.8, dependencies: 83.8, refactor: 83.8, performance: 83.8 },
+    scores: {
+      quality: 83.8,
+      security: 83.8,
+      dependencies: 83.8,
+      refactor: 83.8,
+      performance: 83.8,
+    },
   });
   const wide = makeRecord({
     timestamp: '2026-10-02T10:00:00.000Z',
-    scores: { quality: 83.8, security: 83.8, dependencies: 83.8, refactor: 83.8, performance: 83.8 },
+    scores: {
+      quality: 83.8,
+      security: 83.8,
+      dependencies: 83.8,
+      refactor: 83.8,
+      performance: 83.8,
+    },
   });
 
   it('参与域 5 → 10 且域分不变：判为结构主导', () => {

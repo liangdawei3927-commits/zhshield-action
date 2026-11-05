@@ -119,7 +119,6 @@ describe('ConfigLoader', () => {
 
     fs.rmSync(dir, { recursive: true });
   });
-
 });
 
 // ─── GuardEngine ──────────────────────────────────────────

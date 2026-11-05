@@ -1,7 +1,11 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Adapter, CheckConfig, CheckResult } from '../types';
-import { makeAdapterResult, makeSkippedAdapterResult, resolveScanTargetDir } from './adapter-result';
+import {
+  makeAdapterResult,
+  makeSkippedAdapterResult,
+  resolveScanTargetDir,
+} from './adapter-result';
 import type { TestResult } from './test-result';
 import { VitestOutputParser } from './vitest-output-parser';
 import { TestCommandDetector, isNoTestConfiguredReason } from './test-command-detector';

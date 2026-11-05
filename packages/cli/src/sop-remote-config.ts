@@ -76,7 +76,10 @@ export function readCloudToken(input: SopRemoteEnvInput): {
  * 判据用「内容里有没有 PEM 头」而不是「是不是以 / 开头」，因为 CI 里最常见的写法
  * 是把多行 PEM 直接塞进 secret（含换行、含首尾空格），路径判据会把它当文件名去读盘。
  */
-export function resolvePublicKeyMaterial(raw: string, homeDir: string): {
+export function resolvePublicKeyMaterial(
+  raw: string,
+  homeDir: string,
+): {
   key?: string;
   problem?: string;
 } {
@@ -121,7 +124,10 @@ function resolvePublicKey(
   if (raw?.trim()) {
     const resolved = resolvePublicKeyMaterial(raw, input.homeDir);
     if (resolved.problem) problems.push(resolved.problem);
-    return { ...(resolved.key !== undefined ? { key: resolved.key } : {}), source: SOP_PUBLIC_KEY_ENV };
+    return {
+      ...(resolved.key !== undefined ? { key: resolved.key } : {}),
+      source: SOP_PUBLIC_KEY_ENV,
+    };
   }
   return { source: `未设置（将从服务端 /sop/public-key 获取）` };
 }

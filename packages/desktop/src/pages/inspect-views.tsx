@@ -8,7 +8,10 @@ import { PageShell } from '../components/business/PageShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
-import { buildCapabilityFeatures, buildPlannedCapabilities } from '../components/business/capability-features';
+import {
+  buildCapabilityFeatures,
+  buildPlannedCapabilities,
+} from '../components/business/capability-features';
 import type { InspectFailure } from './inspect-sop-mapper';
 
 export type Translate = (key: string, params?: Record<string, unknown>) => string;

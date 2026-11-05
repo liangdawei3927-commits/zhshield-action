@@ -1,5 +1,9 @@
 // 项目引导页 UI 组件（重构后：按功能拆分导出）
-import type { OnboardingProfileSummary, RuleSyncSummary, ToolsStatusSummary } from './ProjectOnboardingPage-types';
+import type {
+  OnboardingProfileSummary,
+  RuleSyncSummary,
+  ToolsStatusSummary,
+} from './ProjectOnboardingPage-types';
 import { OnboardingLogo } from './ProjectOnboardingPage-ui-core';
 import {
   OnboardingCenter,
@@ -109,7 +113,9 @@ export function OnboardingContent({
             toolsStatus={toolsStatus}
             onRefreshTools={onRefreshTools}
           />
-          <div className="mt-6 shrink-0 text-white/40 text-xs text-center">{t('page.onboarding.hint')}</div>
+          <div className="mt-6 shrink-0 text-white/40 text-xs text-center">
+            {t('page.onboarding.hint')}
+          </div>
         </div>
       </div>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

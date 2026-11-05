@@ -29,7 +29,14 @@ const SOP_SRC = path.join(REPO_ROOT, 'packages', 'kernel', 'src', 'sop');
 const SOP_DST = path.join(REPO_ROOT, 'packages', 'cli', 'dist', 'sop');
 
 /** 真实产物作为"必须存在"的样本依据；不存在说明仓库布局变了，本门禁即失效 */
-const PROBE_REL = path.join('presets', 'sop-templates', 'garbage', 'scan', 'cleanup', 'dead-code.yml');
+const PROBE_REL = path.join(
+  'presets',
+  'sop-templates',
+  'garbage',
+  'scan',
+  'cleanup',
+  'dead-code.yml',
+);
 
 const tmpDirs: string[] = [];
 

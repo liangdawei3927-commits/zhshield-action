@@ -19,10 +19,7 @@ import type { ProjectGateItemData, ProjectGateReportData } from '../types/electr
  *    「门禁未通过」。依据见下方 `resolveVerdict`。
  */
 
-const STATUS_STYLE: Record<
-  ProjectGateItemData['status'],
-  { mark: string; color: string }
-> = {
+const STATUS_STYLE: Record<ProjectGateItemData['status'], { mark: string; color: string }> = {
   passed: { mark: '✓', color: 'rgb(var(--zh-success))' },
   failed: { mark: '✗', color: 'rgb(var(--zh-danger))' },
   undetermined: { mark: '–', color: 'rgb(var(--zh-warning))' },

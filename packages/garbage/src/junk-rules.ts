@@ -21,8 +21,6 @@ const JUNK_NAMES: ReadonlySet<string> = new Set(['.DS_Store', 'Thumbs.db', 'desk
 const JUNK_EXTS: readonly string[] = ['.log', '.tmp', '.bak', '.swp', '.swo'];
 const JUNK_PREFIXES: readonly string[] = ['npm-debug.log', 'yarn-error.log', 'pnpm-debug.log'];
 
-
-
 /** 系统残留 / 临时文件 / 备份文件 —— 检测与删除授权共用的唯一定义 */
 export function isJunkFileName(name: string): boolean {
   if (JUNK_NAMES.has(name)) return true;

@@ -178,12 +178,20 @@ export function validateCapabilityRegistry(): CapabilityViolation[] {
 
   for (const cap of TOOL_CAPABILITIES) {
     if (tools.has(cap.tool)) {
-      violations.push({ kind: 'duplicate-tool', tool: cap.tool, message: `工具 ${cap.tool} 重复注册` });
+      violations.push({
+        kind: 'duplicate-tool',
+        tool: cap.tool,
+        message: `工具 ${cap.tool} 重复注册`,
+      });
     }
     tools.add(cap.tool);
 
     if (cap.targets.length === 0) {
-      violations.push({ kind: 'no-targets', tool: cap.tool, message: `工具 ${cap.tool} 未声明目标类型` });
+      violations.push({
+        kind: 'no-targets',
+        tool: cap.tool,
+        message: `工具 ${cap.tool} 未声明目标类型`,
+      });
     }
 
     if (cap.hardTimeoutMs >= cap.budgetMs) {

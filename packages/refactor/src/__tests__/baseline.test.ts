@@ -46,9 +46,7 @@ describe('baseline', () => {
   const root = '/proj';
 
   it('identical → no introduced/resolved', () => {
-    const report = makeReport([
-      { filePath: '/proj/src/a.ts', rules: ['long-method'] },
-    ]);
+    const report = makeReport([{ filePath: '/proj/src/a.ts', rules: ['long-method'] }]);
     const current = countSmellsByFileAndRule(report, root);
     const baseline = countSmellsByFileAndRule(report, root);
     const diff = diffBaseline(current, baseline);
@@ -135,9 +133,6 @@ describe('baseline', () => {
       'a.ts:a-rule',
       'z.ts:b-rule',
     ]);
-    expect(diff.resolved.map((r) => `${r.file}:${r.rule}`)).toEqual([
-      'a.ts:z-rule',
-      'z.ts:a-rule',
-    ]);
+    expect(diff.resolved.map((r) => `${r.file}:${r.rule}`)).toEqual(['a.ts:z-rule', 'z.ts:a-rule']);
   });
 });

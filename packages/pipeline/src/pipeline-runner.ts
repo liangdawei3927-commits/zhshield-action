@@ -19,8 +19,22 @@ import { createRuleMetricsProvider } from './rule-metrics';
 import { createGateMetricResolver } from './gate-metrics';
 import type { GateMetricInputs } from './gate-metrics';
 import { SecurityCheckEngine } from '@zh/security';
-import { SopRegistry, SopLoader, EventBus, PluginLoader, Logger, SopRuleEngine, evaluatePostScanGates } from '@zh/kernel';
-import type { Plugin, RuleContext, RuleEngineReport, PostScanGateReport, SopRule } from '@zh/kernel';
+import {
+  SopRegistry,
+  SopLoader,
+  EventBus,
+  PluginLoader,
+  Logger,
+  SopRuleEngine,
+  evaluatePostScanGates,
+} from '@zh/kernel';
+import type {
+  Plugin,
+  RuleContext,
+  RuleEngineReport,
+  PostScanGateReport,
+  SopRule,
+} from '@zh/kernel';
 import { EventCenter, subscribeScopeViolations } from '@zh/sentinel';
 import { loadBaseline, filterIssuesByBaseline, type Baseline } from '@zh/shared';
 import { scanRefactor } from './domains/executors';
@@ -300,8 +314,12 @@ export class PipelineRunner {
     const baseline = await loadBaseline(this.repoRoot);
     const filtered = applyBaselineToSopReport(report, baseline, this.repoRoot);
     const rawViolations = report.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
-    const keptViolations = filtered.evaluations.reduce((n, ev) => n + (ev.violations?.length ?? 0), 0);
-    const suppressedNote = keptViolations < rawViolations ? `（基线豁免 ${rawViolations - keptViolations} 项）` : '';
+    const keptViolations = filtered.evaluations.reduce(
+      (n, ev) => n + (ev.violations?.length ?? 0),
+      0,
+    );
+    const suppressedNote =
+      keptViolations < rawViolations ? `（基线豁免 ${rawViolations - keptViolations} 项）` : '';
     this.logger.info(
       `SOP Inspect 完成: ${filtered.passed} passed, ${filtered.failed} failed, ${filtered.skipped} skipped${suppressedNote}`,
     );

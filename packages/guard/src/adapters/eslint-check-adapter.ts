@@ -61,7 +61,8 @@ export class GuardESLintCheckAdapter implements Adapter {
     _check: CheckConfig,
   ): Promise<EslintRawResult> {
     const projectPath = context.projectPath;
-    if (!projectPath) throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
+    if (!projectPath)
+      throw new Error(`${_check.checkId}: 缺少 projectPath 上下文，无法确定扫描目录`);
     const targetDir = resolveEslintTargetDir(projectPath);
 
     // 项目自身没有任何 ESLint 配置时，ESLint v9+ 必然以非零退出并打印
@@ -105,7 +106,14 @@ export class GuardESLintCheckAdapter implements Adapter {
 
   /** 处理 ESLint 执行失败：区分未安装 / 超时被杀 / 缺配置（应跳过）/ lint 失败有输出 / 其他错误 */
   private handleRunError(error: unknown): EslintRawResult {
-    const err = error as { code?: string; killed?: boolean; signal?: string | null; stdout?: string; stderr?: string; message?: string };
+    const err = error as {
+      code?: string;
+      killed?: boolean;
+      signal?: string | null;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
     if (err.code === 'ENOENT') return this.notInstalledResult();
     const lintOutput = this.parseLintOutput(err.stdout ?? '');
     if (lintOutput) return { files: lintOutput };
@@ -115,7 +123,13 @@ export class GuardESLintCheckAdapter implements Adapter {
   }
 
   /** 超时判定：Node 超时置 killed=true + signal='SIGTERM' + code=null，stdout/stderr 常双空 */
-  private isTimeoutError(err: { code?: string; killed?: boolean; signal?: string | null; stdout?: string; stderr?: string }): boolean {
+  private isTimeoutError(err: {
+    code?: string;
+    killed?: boolean;
+    signal?: string | null;
+    stdout?: string;
+    stderr?: string;
+  }): boolean {
     if (err.killed === true) return true;
     return err.code === null && err.signal === 'SIGTERM' && !err.stdout && !err.stderr;
   }

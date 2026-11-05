@@ -45,7 +45,14 @@ const SKIP_DIR_NAMES = new Set([
 ]);
 
 /** 构建产物目录：记录但不遍历 */
-const BUILD_OUTPUT_DIR_NAMES = new Set(['dist', 'dist-electron', 'build', 'out', 'coverage', '.next']);
+const BUILD_OUTPUT_DIR_NAMES = new Set([
+  'dist',
+  'dist-electron',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+]);
 
 /** 源码扩展名（各域只在 source 上跑 AST/静态检查） */
 const SOURCE_EXTENSIONS = new Set([
@@ -102,7 +109,10 @@ const LOCKFILE_FILES = new Set([
  * 语义：目录不可读 → 跳过该目录（不抛错）；超过 maxFiles → 停止并置 `truncated`。
  * 各列表末尾排序，保证「同一仓库同一内容 → 同一索引」，便于缓存与断言。
  */
-export function buildFileIndex(projectRoot: string, options: FileIndexOptions = {}): FileIndexResult {
+export function buildFileIndex(
+  projectRoot: string,
+  options: FileIndexOptions = {},
+): FileIndexResult {
   const maxFiles = options.maxFiles ?? 20000;
 
   const source: string[] = [];

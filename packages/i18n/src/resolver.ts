@@ -74,5 +74,3 @@ export function resolveLanguage(
   if (systemLang) return { source: 'system', value: systemLang };
   return { source: 'fallback', value: DEFAULT_LANGUAGE };
 }
-
-

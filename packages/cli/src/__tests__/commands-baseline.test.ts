@@ -108,7 +108,12 @@ describe('runBaselineCommand — 基线子命令（capture / list / clear）', (
       runInspect: vi.fn(async () => ({
         issues: [
           { ruleId: 'r.dup', file: dupFile, line: 10, column: 2 },
-          { ruleId: 'r.only-direct', file: path.join(projectDir, 'src', 'b.ts'), line: 1, column: 0 },
+          {
+            ruleId: 'r.only-direct',
+            file: path.join(projectDir, 'src', 'b.ts'),
+            line: 1,
+            column: 0,
+          },
         ],
       })),
       runSopInspect: vi.fn(async () => ({
@@ -117,7 +122,12 @@ describe('runBaselineCommand — 基线子命令（capture / list / clear）', (
             violations: [
               // 与直扫同 ruleId/file/line/column —— 同一匹配键，应被去重
               { ruleId: 'r.dup', file: dupFile, line: 10, column: 2 },
-              { ruleId: 'r.only-sop', file: path.join(projectDir, 'src', 'c.ts'), line: 5, column: 0 },
+              {
+                ruleId: 'r.only-sop',
+                file: path.join(projectDir, 'src', 'c.ts'),
+                line: 5,
+                column: 0,
+              },
             ],
           },
         ],

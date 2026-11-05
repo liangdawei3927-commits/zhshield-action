@@ -40,8 +40,7 @@ export async function evalToolDispatch(
 }
 
 type AdapterResolution =
-  | { kind: 'adapter'; adapter: ToolAdapter }
-  | { kind: 'skipped'; result: RuleEvaluation };
+  { kind: 'adapter'; adapter: ToolAdapter } | { kind: 'skipped'; result: RuleEvaluation };
 
 /** 解析工具适配器：未注册 / 接口不完整 / 画像 scope 裁剪 → 返回 skipped 结果 */
 function resolveToolAdapter(

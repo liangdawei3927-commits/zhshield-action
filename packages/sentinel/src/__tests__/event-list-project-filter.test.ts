@@ -34,12 +34,7 @@ function createTestDb(): Database.Database {
 const PROJ_A = '/tmp/proj-a';
 const PROJ_B = '/tmp/proj-b';
 
-function seedEvent(
-  db: Database.Database,
-  id: string,
-  projectId: string,
-  timestamp: string,
-): void {
+function seedEvent(db: Database.Database, id: string, projectId: string, timestamp: string): void {
   createSentinelEvent(db, {
     id,
     projectId,

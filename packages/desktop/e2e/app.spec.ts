@@ -135,14 +135,18 @@ test.describe('智汇码盾桌面端 E2E', () => {
   test('有项目时渲染完整布局（TopNav 十项导航）', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     // 断言对象与 nav.* i18n 键对齐：项目体检/门禁系统/哨兵监控…
+    // ⚠️ inspect 已由「质量巡检」改名为「项目体检」：本表是 label 选择器，改名必须同步
     for (const nav of [
       '项目体检',
       '门禁系统',
       '哨兵监控',
-      '质量巡检',
       '安全中心',
       '技术债务',
       '代码重构',
+      '垃圾清理',
+      '性能优化',
+      '依赖管家',
+      '备份中心',
     ]) {
       await expect(navBar(page).getByRole('button', { name: nav })).toBeVisible();
     }
@@ -152,11 +156,11 @@ test.describe('智汇码盾桌面端 E2E', () => {
     await expect(navBar(page).getByRole('button', { name: '门禁系统' })).toBeVisible();
   });
 
-  test('顶部导航切换到质量巡检 / 安全中心 / 技术债务，侧边栏进入报告中心', async () => {
+  test('顶部导航切换到项目体检 / 安全中心 / 技术债务，侧边栏进入报告中心', async () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     // 各页空态标题与 page.<x>.empty.title i18n 键对齐（种子项目无扫描数据 → 空态）
-    await navBar(page).getByRole('button', { name: '质量巡检' }).click();
-    await expect(page.getByText('检查构建产物，确保交付质量')).toBeVisible();
+    await navBar(page).getByRole('button', { name: '项目体检' }).click();
+    await expect(page.getByText('体检项目架构与类型安全')).toBeVisible();
 
     await navBar(page).getByRole('button', { name: '安全中心' }).click();
     await expect(page.getByText('深度扫描漏洞，修复安全隐患')).toBeVisible();

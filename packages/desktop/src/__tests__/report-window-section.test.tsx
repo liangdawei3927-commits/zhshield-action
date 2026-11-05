@@ -30,23 +30,34 @@ function score(timestamp: string, value: number, dims: Array<[string, number]>):
   } as HealthScoreData;
 }
 
-/** 仿真外层项目的真实历史：10-23 三次、10-24 一次 */
+/** 本地时间构造：窗口归属按本地时区，用 ISO 字面量会让测试依赖测试机时区 */
+function localIso(y: number, m: number, d: number, h = 12, min = 0, sec = 0): string {
+  return new Date(y, m - 1, d, h, min, sec).toISOString();
+}
+
+/**
+ * 仿真外层项目的真实历史：10-23 三次、10-24 一次。
+ *
+ * ⚠️ 必须用 localIso 而不是 ISO 字面量。曾经这里写死 `2026-10-23T16:16:19.000Z`
+ * 并注释「= 本地 10-24 00:16（GMT+8）」—— 那是拿开发机时区当成了全局事实：
+ * 在 UTC 的 CI runner 上它仍是 10-23，四次扫描塌成一天，只剩一个窗口，
+ * 于是 5 个依赖「两天两窗」的用例全红，而本机（GMT+8）永远绿。
+ * 断言的是"按日聚合"这个产品行为，时间就必须按本地日来造。
+ */
 const HISTORY: HealthScoreData[] = [
-  score('2026-10-23T03:22:08.000Z', 89.7, [
+  score(localIso(2026, 10, 23, 3, 22, 8), 89.7, [
     ['quality', 89.7],
     ['refactor', 60],
   ]),
-  score('2026-10-23T06:32:21.000Z', 90.2, [
+  score(localIso(2026, 10, 23, 6, 32, 21), 90.2, [
     ['quality', 92],
     ['refactor', 58.9],
   ]),
-  score('2026-10-23T15:57:56.000Z', 86.3, [
+  score(localIso(2026, 10, 23, 15, 57, 56), 86.3, [
     ['quality', 86.3],
     ['refactor', 58.9],
   ]),
-  // 本地 2026-10-24 00:16（GMT+8）= UTC 2026-10-23T16:16Z
-  // 注意不能写成 2026-10-24T16:16Z —— 那在本地已是 10-25，会落进下一个窗口
-  score('2026-10-23T16:16:19.000Z', 90.3, [
+  score(localIso(2026, 10, 24, 0, 16, 19), 90.3, [
     ['quality', 90.3],
     ['refactor', 58.9],
   ]),
@@ -58,11 +69,6 @@ function render(data: HealthScoreData[]): string {
       <ReportWindowSection data={data} />
     </I18nProvider>,
   );
-}
-
-/** 本地时间构造：窗口归属按本地时区，用 ISO 字面量会让测试依赖测试机时区 */
-function localIso(y: number, m: number, d: number, h = 12): string {
-  return new Date(y, m - 1, d, h).toISOString();
 }
 
 /** 稀疏数据：10-20 与 10-24 之间空了 3 天，用来触发缺口分支 */

@@ -32,7 +32,16 @@ export default defineConfig({
    */
   testIgnore: process.env.ZH_E2E_INCLUDE_HEAVY
     ? []
-    : ['**/*.verify.spec.ts', '**/nav-probe.spec.ts', '**/domain-ring-verify.spec.ts'],
+    : [
+        // 「临时验证 / 实机验证 / 一次性排障」三类取证脚本：
+        // 两种命名都要覆盖 —— `empty-home-ring.verify.spec.ts` 是 `.verify.`，
+        // 而 `inspect-score-verify.spec.ts` / `domain-ring-verify.spec.ts` 是 `-verify.`。
+        // 2026-11-05 的教训：只写了 `*.verify.spec.ts`，漏掉横线命名那一批，
+        // 于是 CI 里还剩一条一次性排障脚本在给整条流水线记红。
+        '**/*.verify.spec.ts',
+        '**/*-verify.spec.ts',
+        '**/nav-probe.spec.ts',
+      ],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

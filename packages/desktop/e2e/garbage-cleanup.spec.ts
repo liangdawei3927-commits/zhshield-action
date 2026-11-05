@@ -89,6 +89,40 @@ async function launchApp(projectPath: string): Promise<{
 
 const navBar = (page: Page) => page.getByRole('navigation');
 
+/**
+ * 等一次垃圾扫描真正落定（任务中心视角）。
+ *
+ * 为什么不用"等某段文案出现"：跑完停主页还是自动展开详情，取决于该域分数
+ * （满分留主页、不满分才自动进详情），文案判据只能覆盖其中一种，另一种会干等到超时。
+ */
+async function waitGarbageScanSettled(page: Page, timeoutMs = 240_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const states = await page.evaluate(async () => {
+      const api = (window as unknown as {
+        electronAPI: { tasks: { list: () => Promise<Array<{ kind: string; status: string }>> } };
+      }).electronAPI;
+      const list = await api.tasks.list();
+      return list.filter((t) => t.kind === 'garbage').map((t) => t.status);
+    });
+    if (states.includes('done')) return;
+    const settled = states.find((s) => s !== 'queued' && s !== 'running');
+    if (settled) throw new Error(`垃圾扫描未成功落定：${states.join(',')}`);
+    await page.waitForTimeout(1000);
+  }
+  throw new Error(`等待垃圾扫描落定超时（${timeoutMs}ms）`);
+}
+
+/** 进入报告态：不满分时页面会自动展开，满分则停在主页，需要点右上角「查看详情」 */
+async function enterGarbageDetail(page: Page): Promise<void> {
+  const title = page.getByText('垃圾清理完成').first();
+  if (await title.isVisible().catch(() => false)) return;
+  const entry = page.locator('[data-testid="page-detail-entry"]');
+  await expect(entry).toBeVisible({ timeout: 30_000 });
+  await entry.click();
+  await expect(title).toBeVisible({ timeout: 30_000 });
+}
+
 /** 列出 trash 下所有批次目录 */
 function trashBatches(projectPath: string): string[] {
   const trashRoot = path.join(projectPath, '.zhshield', 'trash');
@@ -122,8 +156,12 @@ test.describe('垃圾清理功能 E2E', () => {
 
     // ① 扫描
     await page.getByRole('button', { name: '开始扫描' }).click();
-    // 报告页出现（标题 = page.garbage.done）
-    await expect(page.getByText('垃圾清理完成')).toBeVisible({ timeout: 240_000 });
+    // 先等任务中心把这次扫描落定，再进报告态。
+    // 为什么不能直接等「垃圾清理完成」：跑完是否自动展开详情取决于该域分数
+    // （满分留主页、不满分才自动进入），两种形态都可能出现；而且扫描本身是异步任务，
+    // 固定等文案超时既慢又分不清"没跑完"和"进了主页"。
+    await waitGarbageScanSettled(page);
+    await enterGarbageDetail(page);
     await expect(page.getByText('可释放空间')).toBeVisible();
 
     // 检测到：构建产物 dist、垃圾文件 debug.log / .DS_Store、空文件 placeholder.txt

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: e1584c44aeea2c05
+// @zh-src-hash: 267c2445b6509d6c
 // @zh-src-files: 425
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -499244,6 +499244,7 @@ function restoreAutoFixBackup(projectPath, backupDir) {
   }
   try {
     const result = restoreFromBackup(dir2);
+    if (result.verified) consumeBackup(dir2);
     return {
       ok: result.verified,
       verified: result.verified,
@@ -499259,6 +499260,16 @@ function restoreAutoFixBackup(projectPath, backupDir) {
       removedFiles: [],
       reason: err instanceof Error ? err.message : String(err)
     };
+  }
+}
+function consumeBackup(dir2) {
+  try {
+    fs46.rmSync(dir2, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(
+      "[refactor] \u64A4\u9500\u540E\u6E05\u7406\u5907\u4EFD\u76EE\u5F55\u5931\u8D25\uFF08\u64A4\u9500\u7ED3\u679C\u4E0D\u53D7\u5F71\u54CD\uFF09:",
+      err instanceof Error ? err.message : String(err)
+    );
   }
 }
 function invalidBackup() {

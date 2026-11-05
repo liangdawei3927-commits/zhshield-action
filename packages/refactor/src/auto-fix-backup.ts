@@ -112,6 +112,7 @@ export function listAutoFixBackups(projectPath: string): AutoFixBackupEntry[] {
 
 /**
  * 撤销一次自动修复：把备份写回、删除本次新建的文件（幂等 + 逐字节校验）。
+ * 校验通过即「消费」掉这份备份（目录会被删除），撤销入口随之消失。
  *
  * 返回 ok=false 而不抛异常：撤销失败是**用户可理解的业务结果**（UI 要展示原因），
  * 与"参数非法"（调用方 bug，直接 reject）分级处理。
@@ -139,6 +140,7 @@ export function restoreAutoFixBackup(
 
   try {
     const result = restoreFromBackup(dir);
+    if (result.verified) consumeBackup(dir);
     return {
       ok: result.verified,
       verified: result.verified,
@@ -154,6 +156,29 @@ export function restoreAutoFixBackup(
       removedFiles: [],
       reason: err instanceof Error ? err.message : String(err),
     };
+  }
+}
+
+/**
+ * 撤销成功后「消费」掉这份备份：删掉整个备份目录。
+ *
+ * 为什么必须删，而不是留着：文件已逐字节回滚，副本不再承载任何信息；留着它会有两个
+ * 具体后果 ——
+ *   ① 撤销入口说谎：`listAutoFixBackups` 仍能列出它，UI 继续显示「已修复 N 个文件，
+ *      可撤销」，用户明明刚撤过；
+ *   ② `.zhshield/backups/` 每修复一次多一份、永不回收，磁盘无声增长。
+ *
+ * 删除失败只 warn：撤销本身已经成功且逐字节校验过，不该因为清理不顺就翻案成失败。
+ * 失败时目录仍在，用户仍能从 UI 重试（幂等）。
+ */
+function consumeBackup(dir: string): void {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(
+      '[refactor] 撤销后清理备份目录失败（撤销结果不受影响）:',
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 

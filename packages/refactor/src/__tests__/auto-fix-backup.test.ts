@@ -84,7 +84,7 @@ describe('listAutoFixBackups / restoreAutoFixBackup', () => {
     expect(listAutoFixBackups('')).toEqual([]);
   });
 
-  it('撤销：恢复备份内容、删除新建文件、ok/verified 为真', () => {
+  it('撤销：恢复备份内容、删除新建文件、ok/verified 为真，并消费掉备份目录', () => {
     const backupDir = path.join(backupsRoot, 'refactor-autofix-2026-03-03T00-00-00-000Z');
     writeManifest(backupDir, {
       projectRoot: path.resolve(root),
@@ -105,9 +105,29 @@ describe('listAutoFixBackups / restoreAutoFixBackup', () => {
     expect(result.removedFiles).toEqual([path.join('src', 'new-file.ts')]);
     expect(fs.readFileSync(path.join(root, 'src', 'a.ts'), 'utf-8')).toBe(originalContent);
     expect(fs.existsSync(path.join(root, 'src', 'new-file.ts'))).toBe(false);
+
+    // 撤销一次 = 这份备份已被用掉：目录删除、列表清空（否则 UI 会一直说"可撤销"）
+    expect(fs.existsSync(backupDir)).toBe(false);
+    expect(listAutoFixBackups(root)).toEqual([]);
   });
 
-  it('清单 projectRoot 与本项目不符 → 拒绝恢复（防跨项目误伤）', () => {
+  it('已撤销的备份不能再撤一次（目录已消费 → 清单不可恢复，不误报成功）', () => {
+    const backupDir = path.join(backupsRoot, 'refactor-autofix-2026-05-05T00-00-00-000Z');
+    writeManifest(backupDir, { projectRoot: path.resolve(root), files: ['src/a.ts'] });
+    fs.mkdirSync(path.join(backupDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(backupDir, 'src', 'a.ts'), originalContent, 'utf-8');
+    fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'MODIFIED', 'utf-8');
+
+    expect(restoreAutoFixBackup(root, backupDir).ok).toBe(true);
+    const again = restoreAutoFixBackup(root, backupDir);
+
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('backup-manifest-invalid');
+    // 文件内容仍是原件（第二次撤销没有把内容倒回去或改坏）
+    expect(fs.readFileSync(path.join(root, 'src', 'a.ts'), 'utf-8')).toBe(originalContent);
+  });
+
+  it('清单 projectRoot 与本项目不符 → 拒绝恢复（防跨项目误伤）且备份不删', () => {
     const backupDir = path.join(backupsRoot, 'refactor-autofix-2026-04-04T00-00-00-000Z');
     writeManifest(backupDir, {
       projectRoot: path.join(root, 'other-project'),
@@ -120,6 +140,8 @@ describe('listAutoFixBackups / restoreAutoFixBackup', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('backup-manifest-invalid');
     expect(fs.readFileSync(path.join(root, 'src', 'a.ts'), 'utf-8')).toBe('MODIFIED');
+    // 被拒绝的备份必须原样保留：删了它，正当项目里的那份数据就真丢了
+    expect(fs.existsSync(backupDir)).toBe(true);
   });
 
   it('路径边界 fail-closed：项目外 / 更深层 / 前缀不符 一律拒绝且不动文件', () => {

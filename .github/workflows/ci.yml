@@ -34,7 +34,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        # ⚠️ 上面这串 SHA 必须是 40 位。2026-11-05 这里少打了 3 个字符（37 位），
+        #    runner 报 "unable to find version"，只有用到这一行的 Release Drift Gate 挂，
+        #    同工作流其他 job 用对的 SHA 全绿 —— 这种错最容易被误判成"CI 抽风"。
         with:
           node-version: 22
 
@@ -215,7 +218,7 @@ jobs:
       # semgrep 提供 taint 数据流分析（path-traversal 规则依赖）。
       # 用 setup-python 的托管解释器：Ubuntu 24.04 系统 pip 受 PEP 668（externally-managed）限制。
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 

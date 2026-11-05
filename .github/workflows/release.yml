@@ -107,7 +107,9 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Download all DMG artifacts
-        uses: actions/download-artifact@6f51ae010c7ef6ff60e435b71f9976b7f56f668a # v4.6.2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        # 旧 pin 6f51ae01… 与注释里的 v4.6.2 都不存在（tag 404、commit 404），
+        # 用到这条的发布链路注定解析失败。此处换成 v4 tag 的真实 commit。
         with:
           # 匹配 build-desktop 产出的两个架构 artifact
           pattern: zhiyan-codeshield-*-${{ github.run_id }}

@@ -20,6 +20,7 @@
     "bench:pipeline": "node scripts/bench-pipeline.mjs",
     "verify:offline": "node scripts/verify-offline-deps.mjs",
     "verify:tool-dedup": "node scripts/verify-tool-dedup.mjs",
+    "verify:idle": "node scripts/verify-when-idle.mjs",
     "verify:dist-fresh": "pnpm --filter zhshield-cli verify:dist-fresh",
     "check:strict": "node scripts/check-strict-migration.mjs",
     "bench:db": "node packages/db/scripts/bench-batch.mjs",

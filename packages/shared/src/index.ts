@@ -264,6 +264,12 @@ export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
+export {
+  withToolProcessScope,
+  trackToolProcess,
+  currentToolProcessScope,
+  type ToolProcessScope,
+} from './tool-process-registry';
 export { DEFAULT_SCAN_EXCLUDE_DIRS, appendScanExcludeArgs } from './scan-exclude-dirs';
 export { resolveSourceScanTarget } from './scan-target';
 export { sanitizeEnv } from './process-env';

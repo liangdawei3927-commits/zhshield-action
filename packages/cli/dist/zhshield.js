@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: a17bcf02ddf8a0b5
-// @zh-src-files: 425
+// @zh-src-hash: 2d208bb78494cfd4
+// @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -421,7 +421,88 @@ var init_secret_patterns = __esm({
   }
 });
 
+// ../shared/src/tool-process-registry.ts
+function currentToolProcessScope() {
+  return storage.getStore();
+}
+async function withToolProcessScope(run) {
+  const existing = storage.getStore();
+  if (existing) return run(existing);
+  const children = /* @__PURE__ */ new Set();
+  const scope = {
+    children,
+    killAll(graceMs = 3e3) {
+      const victims = [...children];
+      if (victims.length === 0) return 0;
+      children.clear();
+      for (const child of victims) {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+        }
+      }
+      const timer = setTimeout(() => {
+        for (const child of victims) {
+          if (child.exitCode !== null || child.signalCode !== null) continue;
+          try {
+            child.kill("SIGKILL");
+          } catch {
+          }
+        }
+      }, graceMs);
+      timer.unref?.();
+      return victims.length;
+    }
+  };
+  return storage.run(scope, () => run(scope));
+}
+function trackToolProcess(child) {
+  const scope = storage.getStore();
+  if (!scope) return;
+  scope.children.add(child);
+  const drop = () => {
+    scope.children.delete(child);
+  };
+  child.once("close", drop);
+  child.once("exit", drop);
+  child.once("error", drop);
+}
+var import_node_async_hooks, storage;
+var init_tool_process_registry = __esm({
+  "../shared/src/tool-process-registry.ts"() {
+    "use strict";
+    import_node_async_hooks = require("node:async_hooks");
+    storage = new import_node_async_hooks.AsyncLocalStorage();
+  }
+});
+
 // ../shared/src/tool-exec-primitives.ts
+function execFileAsync(file, args, options2) {
+  let resolveFn;
+  let rejectFn;
+  const promise = new Promise((resolve36, reject) => {
+    resolveFn = resolve36;
+    rejectFn = reject;
+  });
+  const child = (0, import_node_child_process.execFile)(
+    file,
+    args,
+    options2,
+    (err, stdout, stderr) => {
+      if (err !== null) {
+        const failed = err;
+        failed.stdout = stdout;
+        failed.stderr = stderr;
+        rejectFn(err);
+        return;
+      }
+      resolveFn({ stdout, stderr });
+    }
+  );
+  promise.child = child;
+  trackToolProcess(child);
+  return promise;
+}
 function isConclusiveExecFailure(failure) {
   if (failure.killed || failure.signal) return false;
   const code = failure.code;
@@ -440,13 +521,12 @@ function snapshotExecFailure(err) {
     signal: raw.signal
   };
 }
-var import_node_child_process, import_node_util, execFileAsync, TRANSIENT_ERRNO;
+var import_node_child_process, TRANSIENT_ERRNO;
 var init_tool_exec_primitives = __esm({
   "../shared/src/tool-exec-primitives.ts"() {
     "use strict";
     import_node_child_process = require("node:child_process");
-    import_node_util = require("node:util");
-    execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+    init_tool_process_registry();
     TRANSIENT_ERRNO = /* @__PURE__ */ new Set([
       "EMFILE",
       "ENFILE",
@@ -460,15 +540,15 @@ var init_tool_exec_primitives = __esm({
 
 // ../shared/src/tool-run-scope.ts
 function currentToolRunScope() {
-  return storage.getStore();
+  return storage2.getStore();
 }
 async function withToolRunScope(label, fn) {
-  if (DEDUP_DISABLED || storage.getStore()) return fn();
+  if (DEDUP_DISABLED || storage2.getStore()) return fn();
   const scope = { label, calls: /* @__PURE__ */ new Map(), shared: /* @__PURE__ */ new Map(), hits: 0 };
-  return storage.run(scope, fn);
+  return storage2.run(scope, fn);
 }
 async function runOncePerScope(namespace, key, run, keep = () => true) {
-  const scope = storage.getStore();
+  const scope = storage2.getStore();
   if (!scope) return run();
   const scopedKey = `${namespace}\0${key}`;
   const hit = scope.shared.get(scopedKey);
@@ -541,7 +621,7 @@ async function rawRun(command, args, options2) {
   }
 }
 async function runToolOnce(command, args, options2 = {}) {
-  const scope = storage.getStore();
+  const scope = storage2.getStore();
   if (!scope) {
     const outcome2 = await rawRun(command, args, options2);
     if (outcome2.ok) return { stdout: outcome2.stdout, stderr: outcome2.stderr };
@@ -564,13 +644,13 @@ async function runToolOnce(command, args, options2 = {}) {
   if (outcome.ok) return { stdout: outcome.stdout, stderr: outcome.stderr };
   rethrow(outcome);
 }
-var import_node_async_hooks, storage, DEDUP_DISABLED;
+var import_node_async_hooks2, storage2, DEDUP_DISABLED;
 var init_tool_run_scope = __esm({
   "../shared/src/tool-run-scope.ts"() {
     "use strict";
-    import_node_async_hooks = require("node:async_hooks");
+    import_node_async_hooks2 = require("node:async_hooks");
     init_tool_exec_primitives();
-    storage = new import_node_async_hooks.AsyncLocalStorage();
+    storage2 = new import_node_async_hooks2.AsyncLocalStorage();
     DEDUP_DISABLED = process.env.ZH_TOOL_RUN_DEDUP === "off";
   }
 });
@@ -17460,6 +17540,7 @@ __export(src_exports, {
   computeOverallScore: () => computeOverallScore,
   createBaselineIo: () => createBaselineIo,
   createDomainReport: () => createDomainReport,
+  currentToolProcessScope: () => currentToolProcessScope,
   currentToolRunScope: () => currentToolRunScope,
   defaultToolBinDir: () => defaultToolBinDir,
   defaultToolLockfilePath: () => defaultToolLockfilePath,
@@ -17536,11 +17617,13 @@ __export(src_exports, {
   toNameRegexPatterns: () => toNameRegexPatterns,
   toRelativePath: () => toRelativePath,
   toolMappers: () => toolMappers,
+  trackToolProcess: () => trackToolProcess,
   trivyMapper: () => trivyMapper,
   unimplementedCapabilities: () => unimplementedCapabilities,
   validateCapabilityRegistry: () => validateCapabilityRegistry,
   validateOwnershipRegistry: () => validateOwnershipRegistry,
   withHardTimeout: () => withHardTimeout,
+  withToolProcessScope: () => withToolProcessScope,
   withToolRunScope: () => withToolRunScope,
   wrapAdapter: () => wrapAdapter,
   writeJsonBaselineAtomic: () => writeJsonBaselineAtomic
@@ -17576,6 +17659,7 @@ var init_src2 = __esm({
     init_fs_safe();
     init_text_utils();
     init_promise_timeout();
+    init_tool_process_registry();
     init_scan_exclude_dirs();
     init_scan_target();
     init_process_env();
@@ -111411,18 +111495,18 @@ var require_dist6 = __commonJS({
       * @param storage - The Keyv storage instance to update
       * @param cacheId - The cache ID to identify this instance
       */
-      subscribe(storage2, cacheId) {
-        this._storage = storage2;
+      subscribe(storage3, cacheId) {
+        this._storage = storage3;
         this._cacheId = cacheId;
         const setEvent = this.getPrefixedEvent("cache:set");
         const deleteEvent = this.getPrefixedEvent("cache:delete");
         this._qified.subscribe(setEvent, { handler: async (message) => {
           const data = message.data;
-          if (data.cacheId !== cacheId) await storage2.set(data.key, data.value, data.ttl);
+          if (data.cacheId !== cacheId) await storage3.set(data.key, data.value, data.ttl);
         } });
         this._qified.subscribe(deleteEvent, { handler: async (message) => {
           const data = message.data;
-          if (data.cacheId !== cacheId) await storage2.delete(data.key);
+          if (data.cacheId !== cacheId) await storage3.delete(data.key);
         } });
       }
       /**
@@ -114067,10 +114151,10 @@ var require_locate_path = __commonJS({
     "use strict";
     var path82 = require("path");
     var fs76 = require("fs");
-    var { promisify: promisify6 } = require("util");
+    var { promisify: promisify5 } = require("util");
     var pLocate = require_p_locate();
-    var fsStat = promisify6(fs76.stat);
-    var fsLStat = promisify6(fs76.lstat);
+    var fsStat = promisify5(fs76.stat);
+    var fsLStat = promisify5(fs76.lstat);
     var typeMappings = {
       directory: "isDirectory",
       file: "isFile"
@@ -114127,8 +114211,8 @@ var require_path_exists = __commonJS({
   "../../node_modules/.pnpm/path-exists@4.0.0/node_modules/path-exists/index.js"(exports2, module2) {
     "use strict";
     var fs76 = require("fs");
-    var { promisify: promisify6 } = require("util");
-    var pAccess = promisify6(fs76.access);
+    var { promisify: promisify5 } = require("util");
+    var pAccess = promisify5(fs76.access);
     module2.exports = async (path82) => {
       try {
         await pAccess(path82);
@@ -417620,7 +417704,7 @@ var require_rule228 = __commonJS({
       }
     }));
     var PROPS_ARGUMENT_POSITION = 2;
-    function checkStorage(storage2) {
+    function checkStorage(storage3) {
       return (expr, ctx) => {
         const argument = expr.arguments[PROPS_ARGUMENT_POSITION];
         const props = (0, ast_js_1.getValueOfExpression)(ctx, argument, "ObjectExpression");
@@ -417631,7 +417715,7 @@ var require_rule228 = __commonJS({
           report(expr.callee, "omitted");
           return;
         }
-        if (isException(storage2, props)) {
+        if (isException(storage3, props)) {
           return;
         }
         const propertyKey = (0, ast_js_1.getProperty)(props, "storageEncrypted", ctx);
@@ -417649,13 +417733,13 @@ var require_rule228 = __commonJS({
         function isUnresolved(node, value) {
           return node?.type === "Identifier" && !(0, ast_js_1.isUndefined)(node) && value === void 0;
         }
-        function isException(storage3, props2) {
+        function isException(storage4, props2) {
           if (![
             DatabaseCluster,
             DatabaseClusterFromSnapshot,
             DatabaseInstance,
             DatabaseInstanceReadReplica
-          ].includes(storage3)) {
+          ].includes(storage4)) {
             return false;
           }
           const exceptionKey = (0, ast_js_1.getProperty)(props2, "storageEncryptionKey", ctx);
@@ -493125,9 +493209,9 @@ var require_backup = __commonJS({
     "use strict";
     var fs76 = require("fs");
     var path82 = require("path");
-    var { promisify: promisify6 } = require("util");
+    var { promisify: promisify5 } = require("util");
     var { cppdb } = require_util4();
-    var fsAccess = promisify6(fs76.access);
+    var fsAccess = promisify5(fs76.access);
     module2.exports = async function backup(filename, options2) {
       if (options2 == null) options2 = {};
       if (typeof filename !== "string") throw new TypeError("Expected first argument to be a string");
@@ -500674,16 +500758,16 @@ async function isDbReady(command) {
     return false;
   }
 }
-var import_node_child_process4, import_node_util4, path56, execFileAsync4, dbUpdateInFlight, GRYPE_DB_NOT_READY, META13, GrypeAdapter;
+var import_node_child_process4, import_node_util3, path56, execFileAsync4, dbUpdateInFlight, GRYPE_DB_NOT_READY, META13, GrypeAdapter;
 var init_grype_adapter = __esm({
   "../security/src/adapters/grype-adapter.ts"() {
     "use strict";
     import_node_child_process4 = require("node:child_process");
-    import_node_util4 = require("node:util");
+    import_node_util3 = require("node:util");
     path56 = __toESM(require("node:path"));
     init_src2();
     init_adapter_helpers();
-    execFileAsync4 = (0, import_node_util4.promisify)(import_node_child_process4.execFile);
+    execFileAsync4 = (0, import_node_util3.promisify)(import_node_child_process4.execFile);
     dbUpdateInFlight = false;
     GRYPE_DB_NOT_READY = /invalid|does not exist/i;
     META13 = {
@@ -508546,12 +508630,12 @@ function buildSentinelPagination(filter) {
 }
 
 // ../kernel/src/sop/cache/sop-compressor.ts
-var import_node_util2 = require("node:util");
+var import_node_util = require("node:util");
 var import_node_zlib = require("node:zlib");
-var gzipAsync = (0, import_node_util2.promisify)(import_node_zlib.gzip);
-var gunzipAsync = (0, import_node_util2.promisify)(import_node_zlib.gunzip);
-var brotliCompressAsync = (0, import_node_util2.promisify)(import_node_zlib.brotliCompress);
-var brotliDecompressAsync = (0, import_node_util2.promisify)(import_node_zlib.brotliDecompress);
+var gzipAsync = (0, import_node_util.promisify)(import_node_zlib.gzip);
+var gunzipAsync = (0, import_node_util.promisify)(import_node_zlib.gunzip);
+var brotliCompressAsync = (0, import_node_util.promisify)(import_node_zlib.brotliCompress);
+var brotliDecompressAsync = (0, import_node_util.promisify)(import_node_zlib.brotliDecompress);
 var COMPRESSORS = {
   ["gzip" /* Gzip */]: (data) => gzipAsync(data, { level: 6 }),
   ["br" /* Brotli */]: (data) => brotliCompressAsync(data, {
@@ -510651,13 +510735,13 @@ init_src2();
 
 // ../guard/src/adapters/test-runner-adapter.ts
 var import_node_child_process2 = require("node:child_process");
-var import_node_util3 = require("node:util");
+var import_node_util2 = require("node:util");
 
 // ../guard/src/adapters/vitest-output-parser.ts
 var ANSI_ESCAPE = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*[A-Za-z]", "g");
 
 // ../guard/src/adapters/test-runner-adapter.ts
-var execFileAsync2 = (0, import_node_util3.promisify)(import_node_child_process2.execFile);
+var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
 
 // ../guard/src/adapters/trivy-adapter.ts
 init_src2();
@@ -521204,11 +521288,21 @@ async function runOne(domain, executor, options2, now) {
   };
   const timeoutMessage = budgetMs === void 0 ? void 0 : `[domains] \u57DF ${domain} \u8D85\u8FC7 ${budgetMs}ms \u9884\u7B97`;
   const start = now();
+  let scope;
+  const run = () => withToolProcessScope((domainScope) => {
+    scope = domainScope;
+    return executor(ctx);
+  });
   try {
-    const execution = await (budgetMs === void 0 ? executor(ctx) : withHardTimeout(executor(ctx), budgetMs, timeoutMessage));
+    const execution = await (budgetMs === void 0 ? run() : withHardTimeout(run(), budgetMs, timeoutMessage));
     return successRecord(domain, execution, budgetMs, now() - start);
   } catch (err) {
-    return failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
+    const record = failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
+    if (record.overBudget === true) {
+      const killed = scope?.killAll() ?? 0;
+      if (killed > 0) record.detail = { ...record.detail ?? {}, killedToolProcesses: killed };
+    }
+    return record;
   }
 }
 async function runDomains(options2) {

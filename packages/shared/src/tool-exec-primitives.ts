@@ -8,11 +8,51 @@
  * 踩出来的（load 30+ 时 semgrep 冷启动超 20s，13 条安全规则被整体判成"工具未安装"），
  * 写两份就一定会有一天只改了一份。
  */
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execFile, type ChildProcess, type ExecFileOptions } from 'node:child_process';
+import { trackToolProcess } from './tool-process-registry';
 
-/** 各模块共用的 promise 化 execFile（单一来源，避免每个模块各 promisify 一次） */
-export const execFileAsync = promisify(execFile);
+/**
+ * 各模块共用的 promise 化 execFile（单一来源，避免每个模块各 promisify 一次）。
+ *
+ * 为什么不用 `promisify(execFile)`：promisify 只给结果、**不给 ChildProcess 句柄**，
+ * 于是域超预算时无法把它杀掉（2026-11-06 实测：体检域熔断后 semgrep-core 仍以 199.7% CPU
+ * 扫全仓，把负载顶高、连累下一个域）。用回调形态能拿到 `execFile` 的返回值（就是句柄），
+ * 登记到域作用域后即可整体终止。解析/拒绝形状与 promisify 逐项一致：
+ * 成功 `{ stdout, stderr }`；失败把 stdout/stderr 挂到 error 上再 reject。
+ */
+export function execFileAsync(
+  file: string,
+  args?: readonly string[],
+  options?: ExecFileOptions,
+): Promise<{ stdout: string; stderr: string }> & { child?: ChildProcess } {
+  let resolveFn!: (value: { stdout: string; stderr: string }) => void;
+  let rejectFn!: (reason: unknown) => void;
+  const promise = new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
+  }) as Promise<{ stdout: string; stderr: string }> & { child?: ChildProcess };
+
+  const child = execFile(
+    file,
+    args as string[] | undefined,
+    options,
+    (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
+      if (err !== null) {
+        const failed = err as Error & { stdout?: unknown; stderr?: unknown };
+        failed.stdout = stdout;
+        failed.stderr = stderr;
+        rejectFn(err);
+        return;
+      }
+      resolveFn({ stdout, stderr } as unknown as { stdout: string; stderr: string });
+    },
+  ) as ChildProcess;
+
+  // 与 Node 的 promisify(execFile) 保持一致：句柄挂在 promise.child 上（部分调用方依赖它）
+  promise.child = child;
+  trackToolProcess(child);
+  return promise;
+}
 
 /**
  * 这些 errno 表示「这次没测成」（资源耗尽 / 系统调用被中断），都可能自愈，

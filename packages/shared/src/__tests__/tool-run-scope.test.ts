@@ -23,7 +23,7 @@ vi.mock('node:child_process', () => ({
     command: string,
     args: string[],
     _options: unknown,
-    callback: (err: unknown, result?: { stdout: string; stderr: string }) => void,
+    callback: (err: unknown, stdout?: string, stderr?: string) => void,
   ) => {
     spawns.push({ command, args });
     if (behavior === 'enoent') {
@@ -35,16 +35,11 @@ vi.mock('node:child_process', () => ({
       return;
     }
     if (behavior === 'nonzero-with-stdout') {
-      callback(
-        Object.assign(new Error('exit 1'), {
-          code: 1,
-          stdout: '[{"RuleID":"generic-api-key"}]',
-          stderr: '',
-        }),
-      );
+      // 与 Node 一致：非零退出时 error 上带 code，stdout 作为第三个参数独立传入
+      callback(Object.assign(new Error('exit 1'), { code: 1 }), '[{"RuleID":"generic-api-key"}]', '');
       return;
     }
-    callback(null, { stdout: 'ok-out', stderr: '' });
+    callback(null, 'ok-out', '');
   },
 }));
 

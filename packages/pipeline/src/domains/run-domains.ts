@@ -8,17 +8,20 @@
  *   - **逐域计时**（A14 前置）：每条记录带 `durationMs`，账本给出 `sumMs` 与墙钟 `wallMs`，
  *     优化前后可直接对比，不再靠"感觉变快了"。
  *
- * 预算语义的诚实边界：外部扫描器起的是子进程，本层**无法真正中断**它，
- * 超预算只能把该域记录为 `unavailable` 并继续下一域。因此默认预算取自
- * `@zh/shared` 的 `SCAN_DOMAIN_BUDGETS`（宽于常规耗时），把"超预算"当告警用，
- * 而不是当调度手段用。
+ * 预算语义（2026-11-06 更新）：域执行包在 `withToolProcessScope` 里，子进程按域登记；
+ * 超预算时**把该域还在跑的工具子进程真的杀掉**（SIGTERM → 宽限 → SIGKILL）。
+ * 此前只做到"不再等"，被放弃的执行仍在前台跑满 CPU：实测体检域 150s 熔断后
+ * `semgrep-core` 仍以 199.7% 占用扫全仓，把负载顶高、连累下一个域接着熔断。
+ * 真正的"调度手段"是杀掉作废的工作，而不是调大预算。
  */
 import {
   SCAN_DOMAIN_BUDGETS,
   withHardTimeout,
+  withToolProcessScope,
   withToolRunScope,
   type DomainId,
   type DomainRunStatus,
+  type ToolProcessScope,
 } from '@zh/shared';
 import { DEFAULT_DOMAIN_EXECUTORS, RUNTIME_ONLY_DOMAINS } from './executors';
 import type {
@@ -130,13 +133,27 @@ async function runOne(
     budgetMs === undefined ? undefined : `[domains] 域 ${domain} 超过 ${budgetMs}ms 预算`;
 
   const start = now();
+  let scope: ToolProcessScope | undefined;
+  const run = (): Promise<DomainExecution> =>
+    withToolProcessScope((domainScope) => {
+      scope = domainScope;
+      return executor(ctx);
+    });
+
   try {
     const execution = await (budgetMs === undefined
-      ? executor(ctx)
-      : withHardTimeout(executor(ctx), budgetMs, timeoutMessage as string));
+      ? run()
+      : withHardTimeout(run(), budgetMs, timeoutMessage as string));
     return successRecord(domain, execution, budgetMs, now() - start);
   } catch (err) {
-    return failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
+    const record = failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
+    // 超预算 = 该域的工作已作废：把还在跑的工具子进程真的杀掉。
+    // 不杀的话它会继续占核，把负载推高、让下一个域接着超预算（2026-11-05 三次 bench 全如此）。
+    if (record.overBudget === true) {
+      const killed = scope?.killAll() ?? 0;
+      if (killed > 0) record.detail = { ...(record.detail ?? {}), killedToolProcesses: killed };
+    }
+    return record;
   }
 }
 

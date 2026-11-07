@@ -22,7 +22,7 @@ vi.mock('node:child_process', () => ({
     command: string,
     args: unknown[],
     options: { timeout?: number },
-    callback: (err: unknown, result?: { stdout: string; stderr: string }) => void,
+    callback: (err: unknown, stdout?: string, stderr?: string) => void,
   ) => {
     spawns.push({ command, args, timeoutMs: options?.timeout ?? 0 });
     const respond = (): void => {
@@ -45,7 +45,7 @@ vi.mock('node:child_process', () => ({
         return;
       }
       const stdout = behavior === 'empty' ? '' : `tool 1.2.3\n`;
-      callback(null, { stdout, stderr: '' });
+      callback(null, stdout, '');
     };
     if (behavior === 'slow-ok') setTimeout(respond, 20);
     else respond();

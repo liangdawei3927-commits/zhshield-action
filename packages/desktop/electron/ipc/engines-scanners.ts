@@ -146,7 +146,11 @@ export async function runSecurityHandler(
     });
     try {
       // P1-6: 安全域条目只归 vuln 类，覆盖 vuln、保留 secrets 已写的 secret 条目
-      await persistSecurityDomainEntries(projectPath, vulnEntries, 'vuln', dimensionScore);
+      // A1：vuln 落盘锚原始报告 timestamp（Date），重复落盘落到 duplicate 而不是多一条历史
+      await persistSecurityDomainEntries(projectPath, vulnEntries, 'vuln', {
+        dimensionScore,
+        generatedAt: report.timestamp,
+      });
     } catch (e) {
       console.warn(
         '[engine:runSecurity] 诊断落盘失败:',
@@ -260,7 +264,11 @@ export async function runRefactorHandler(
         projectPath,
         normalizeRefactorSource(report),
         ['refactor'],
-        dimensionScore ? { refactor: dimensionScore } : undefined,
+        {
+          dimensionScores: dimensionScore ? { refactor: dimensionScore } : undefined,
+          // A1：锚报告自带时间，避免同一份结果被多个入口落盘时记成多条历史
+          generatedAt: report.timestamp,
+        },
       );
     } catch (e) {
       console.warn(

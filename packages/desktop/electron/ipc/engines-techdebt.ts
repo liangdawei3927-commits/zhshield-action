@@ -175,12 +175,11 @@ export async function persistTechDebtDiagnostics(
   dimensionScore?: DomainDimensionScore,
 ): Promise<void> {
   try {
-    await persistDiagnosticsFromEntries(
-      projectPath,
-      normalizeTechDebtSource(report),
-      ['techdebt'],
-      dimensionScore ? { techdebt: dimensionScore } : undefined,
-    );
+    await persistDiagnosticsFromEntries(projectPath, normalizeTechDebtSource(report), ['techdebt'], {
+      dimensionScores: dimensionScore ? { techdebt: dimensionScore } : undefined,
+      // A1：锚报告自带 generatedAt，重复落盘只记一条历史
+      generatedAt: report.generatedAt,
+    });
   } catch (e) {
     console.warn(
       '[engine:runTechDebt] 诊断落盘失败:',

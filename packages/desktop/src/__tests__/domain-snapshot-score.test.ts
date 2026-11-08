@@ -279,7 +279,7 @@ describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史',
       projectDir,
       [entry({ fingerprint: 'fp-1' })],
       ['security'],
-      { security: dimensionScore },
+      { dimensionScores: { security: dimensionScore } },
     );
     const snap = await readDomainSnapshot(projectDir, 'security');
     expect(snap?.dimensionScore).toEqual(dimensionScore);
@@ -302,7 +302,7 @@ describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史',
       projectDir,
       [entry({ source: 'techdebt', category: 'techdebt:quality', fingerprint: 'fp-3' })],
       ['techdebt'],
-      { techdebt: dimensionScore },
+      { dimensionScores: { techdebt: dimensionScore } },
     );
     const snap = await readDomainSnapshot(projectDir, 'techdebt');
     expect(snap?.dimensionScore).toEqual(dimensionScore);
@@ -324,7 +324,7 @@ describe('persistDiagnosticsFromEntries：dimensionScore 落快照 + 域历史',
       projectDir,
       [entry({ source: 'refactor', category: 'refactor', fingerprint: 'fp-4' })],
       ['refactor'],
-      { refactor: dimensionScore },
+      { dimensionScores: { refactor: dimensionScore } },
     );
     const snap = await readDomainSnapshot(projectDir, 'refactor');
     expect(snap?.dimensionScore).toEqual(dimensionScore);

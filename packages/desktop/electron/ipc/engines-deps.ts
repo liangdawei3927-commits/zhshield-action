@@ -62,12 +62,11 @@ async function persistDepsDiagnostics(
       entries,
       deps: { vulnerabilities: patch.vulnerabilities, upgradable: patch.upgradable },
     });
-    await persistDiagnosticsFromEntries(
-      projectPath,
-      entries,
-      ['deps'],
-      dimensionScore ? { deps: dimensionScore } : undefined,
-    );
+    await persistDiagnosticsFromEntries(projectPath, entries, ['deps'], {
+      dimensionScores: dimensionScore ? { deps: dimensionScore } : undefined,
+      // A1：锚报告自带生成时间，重复落盘只记一条历史
+      generatedAt: report.generatedAt,
+    });
   } catch (e) {
     console.warn('[engine:runDeps] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
   }

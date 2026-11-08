@@ -368,6 +368,25 @@ function filterWhitelisted(
   );
 }
 
+/**
+ * 本次扫描的时间锚点：**取报告自带时间，不取写盘时刻**。
+ *
+ * 一次 pipeline 结果会被多个入口同时消费（首页一键体检、报告中心、项目引导）：
+ * 任务中心把并发请求合并成同一个 task，几个调用方 `await` 到的是**同一份** report，
+ * 各自落盘时若都取 `new Date()`，两次写盘差几毫秒 —— 历史去重键
+ * `scanId = sha16(domain|scannedAt|指纹hash)` 随之失效，同一次扫描被记成两条
+ * （2026-10-30 实测 19:32:57.393 / 19:32:57.395，指纹与分数完全相同）；
+ * 连带 `rescuePreviousScore` 也把「自己」当成上一轮，凭空多出一条对比基线。
+ *
+ * 报告的 timestamp 同一次扫描恒等 → 重复落盘自然落到 `duplicate`，
+ * 且 `rescuePreviousScore` 的 `generatedAt !== report.generatedAt` 判据继续成立。
+ * 跨进程（worker）传输时 Date 可能已退化成字符串，故两种形态都接住。
+ */
+function scanTimeAnchor(timestamp: unknown): string {
+  const parsed = timestamp instanceof Date ? timestamp : new Date(String(timestamp ?? ''));
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
 /** pipeline 报告一键归一化并落盘（dryRun 由调用方决定是否跳过） */
 export async function persistDiagnostics(
   projectPath: string,
@@ -380,7 +399,7 @@ export async function persistDiagnostics(
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
     issues,
-    new Date().toISOString(),
+    scanTimeAnchor(report.timestamp),
   );
   // PipelineReport 的 guard/inspect/refactor 为可选字段：**字段存在 = 该域跑过**。
   const ranSources: DiagnosticSource[] = [];
@@ -388,6 +407,21 @@ export async function persistDiagnostics(
   if (report.inspect) ranSources.push('inspect');
   if (report.refactor) ranSources.push('refactor');
   return await writeDiagnosticsFile(diagnostics, ranSources, dimensionScores);
+}
+
+/** `persistDiagnosticsFromEntries` 的可选项（收敛位置参数，避免 5 参） */
+export interface PersistEntriesOptions {
+  /** 各域当场出分结果；缺省 = 该域规范口径 not-run，不附加分数 */
+  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>;
+  /**
+   * 本次扫描自带的完成时间（报告里的 timestamp/generatedAt）。
+   *
+   * **必传**：单域结果同样会被多个入口消费（分类页 + 报告中心 + 首屏），若每次落盘
+   * 各取 `new Date()`，同一份结果会差几毫秒 —— 历史去重键 `scanId` 随之失效，同一轮
+   * 扫描被记成多条（A1，实测 performance 一轮三连写）。缺省仍取写盘时刻，仅兼容
+   * 没有时间戳可传的调用方（如密钥扫描）。
+   */
+  generatedAt?: unknown;
 }
 
 /**
@@ -399,16 +433,16 @@ export async function persistDiagnosticsFromEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
   ranSources: readonly DiagnosticSource[],
-  dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
+  options?: PersistEntriesOptions,
 ): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
     filterWhitelisted(whitelist, entries),
-    new Date().toISOString(),
+    scanTimeAnchor(options?.generatedAt),
   );
-  return await writeDiagnosticsFile(diagnostics, ranSources, dimensionScores);
+  return await writeDiagnosticsFile(diagnostics, ranSources, options?.dimensionScores);
 }
 
 /** security 域条目分类：密钥条目 ruleId 以 `secret:` 开头，凭此区分两路 */
@@ -443,21 +477,25 @@ export function mergeSecurityEntries(
  * 合并规则：各自**覆盖自己那类**条目、保留另一类（见 {@link mergeSecurityEntries}）。
  * 两路谁后写都不能抹掉对方的发现。
  */
+export interface SecurityPersistOptions {
+  dimensionScore?: DomainDimensionScore;
+  /** 本次扫描自带的完成时间；语义见 {@link PersistEntriesOptions.generatedAt} */
+  generatedAt?: unknown;
+}
+
 export async function persistSecurityDomainEntries(
   projectPath: string,
   entries: readonly DiagnosticEntry[],
   kind: 'vuln' | 'secret',
-  dimensionScore?: DomainDimensionScore,
+  options?: SecurityPersistOptions,
 ): Promise<string> {
   const prev = await readDomainSnapshot(projectPath, 'security');
   // issues 本就是 readonly DiagnosticEntry[]（isDiagnosticsReport 守卫已保证），
   // 展开进数组字面量即得可变数组，无需断言——此前的 as unknown as 是历史残留
   const prevIssues: readonly DiagnosticEntry[] = prev?.issues ?? [];
   const write = mergeSecurityEntries(prevIssues, entries, kind);
-  return await persistDiagnosticsFromEntries(
-    projectPath,
-    write,
-    ['security'],
-    dimensionScore ? { security: dimensionScore } : undefined,
-  );
+  return await persistDiagnosticsFromEntries(projectPath, write, ['security'], {
+    dimensionScores: options?.dimensionScore ? { security: options.dimensionScore } : undefined,
+    generatedAt: options?.generatedAt,
+  });
 }

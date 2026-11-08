@@ -173,7 +173,8 @@ describe('P1-6 结构守卫（落盘调用点不被回退）', () => {
   it('runSecurityHandler 用双路合并写 vuln 类，不再整段覆盖 security 域', () => {
     const src = read('../../electron/ipc/engines-scanners.ts');
     // P2 后：条目先提出为 vulnEntries，出分与落盘共用同一份合并口径
-    expect(src).toContain("persistSecurityDomainEntries(projectPath, vulnEntries, 'vuln'");
+    // A1 后调用多带一个时间锚、按仓库格式拆成多行，故按跨行正则匹配，断言口径不变
+    expect(src).toMatch(/persistSecurityDomainEntries\(\s*projectPath,\s*vulnEntries,\s*'vuln'/);
     expect(src).toContain('mergeSecurityEntries(');
     expect(src).not.toContain('persistDiagnosticsFromEntries(projectPath, normalizeSecuritySource');
   });

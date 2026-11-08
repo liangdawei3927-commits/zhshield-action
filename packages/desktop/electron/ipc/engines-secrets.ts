@@ -90,7 +90,7 @@ export async function runSecretsHandler(projectPath: string): Promise<SecretRepo
         entries: mergedEntries,
         activeSecrets: report.summary.active,
       });
-      await persistSecurityDomainEntries(projectPath, secretEntries, 'secret', dimensionScore);
+      await persistSecurityDomainEntries(projectPath, secretEntries, 'secret', { dimensionScore });
     } catch (e) {
       console.warn(
         '[engine:runSecrets] security 域快照写入失败:',

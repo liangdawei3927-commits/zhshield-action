@@ -351,9 +351,12 @@ server.tool(
       try {
         const records = listGuardReports(projectPath, 1);
         if (records.length > 0) {
+          // A1：锚门禁记录自带时间，重复落盘只记一条历史
           await persistDiagnosticsFromEntries(projectPath, guardRecordToDiagnostics(records[0]), [
             'guard',
-          ]);
+          ], {
+            generatedAt: records[0].timestamp,
+          });
         }
       } catch (e) {
         console.warn('[zhshield-mcp] 诊断落盘失败:', e instanceof Error ? e.message : String(e));

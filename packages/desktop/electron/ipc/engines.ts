@@ -331,7 +331,10 @@ async function runGuardHandler(
     const task = manager.start('guard', projectPath, options);
     const report = (await manager.waitFor(task.id)) as GuardReport;
     try {
-      await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report), ['guard']);
+      // A1：落盘时间锚取报告自带 generatedAt，同一份结果被多个入口落盘只记一条历史
+      await persistDiagnosticsFromEntries(projectPath, normalizeGuardSource(report), ['guard'], {
+        generatedAt: report.generatedAt,
+      });
     } catch (e) {
       console.warn('[engine:runGuard] 诊断落盘失败:', e instanceof Error ? e.message : String(e));
     }
@@ -410,7 +413,11 @@ async function runPerformanceHandler(
         projectPath,
         normalizePerformanceData(result),
         ['performance'],
-        dimensionScore ? { performance: dimensionScore } : undefined,
+        {
+          dimensionScores: dimensionScore ? { performance: dimensionScore } : undefined,
+          // A1：同一份结果被多个入口落盘时，靠报告自身时间戳去重（实测曾一轮三连写）
+          generatedAt: result.metadata.timestamp,
+        },
       );
     } catch (e) {
       console.warn(

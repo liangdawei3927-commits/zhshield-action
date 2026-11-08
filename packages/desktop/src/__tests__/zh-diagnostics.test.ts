@@ -644,6 +644,70 @@ describe('persistDiagnostics', () => {
       rmSync(project, { recursive: true, force: true });
     }
   });
+
+  /**
+   * A1（2026-11-08 基线）：一次扫描被落盘两次，历史记两条、分数趋势被污染。
+   *
+   * 同一个 pipeline task 的结果会被多个入口（首页一键体检 / 报告中心 / 项目引导）
+   * 同时消费，两次落盘各取一次 `new Date()` 就会差几毫秒，去重键随之失效。
+   */
+  it('同一份 pipeline 报告被重复落盘时，历史只记一条', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-persist-dup-'));
+    try {
+      const pipeline = makePipeline({ inspect: makeInspectionReport() });
+      await persistDiagnostics(project, pipeline);
+      await persistDiagnostics(project, pipeline);
+
+      const historyPath = join(project, '.zhshield', 'history', 'inspect.jsonl');
+      const rows = readFileSync(historyPath, 'utf-8').trim().split('\n');
+      expect(rows, '同一次扫描不得记成两条').toHaveLength(1);
+
+      const snapshot = JSON.parse(
+        readFileSync(join(project, '.zhshield', 'diagnostics', 'domains', 'inspect.json'), 'utf-8'),
+      );
+      // 先证「本用例不是空证」：inspect 快照当场出了分，才有 previousScore 可言
+      expect(snapshot.dimensionScore, 'inspect 快照必须当场出分').toBeDefined();
+      expect(snapshot.previousScore, '不得把「自己」当成上一轮').toBeUndefined();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('persistDiagnosticsFromEntries 历史去重（A1）', () => {
+  const guardEntry = (fingerprint: string): DiagnosticEntry => ({
+    ruleId: 'guard.block.official.health-score',
+    severity: 'warning',
+    category: 'quality',
+    message: '健康分不足',
+    file: '',
+    autoFixable: false,
+    source: 'guard',
+    fingerprint,
+  });
+
+  /**
+   * 单域结果同样会被多个入口消费（分类页 + 报告中心 + 首屏）。
+   * 实测 performance 一轮写了三条历史（scannedAt 15:11:03.849 / 05.564 / 06.267，
+   * total=0 且 fingerprintsHash 相同）—— 根因是每次落盘各取一次 `new Date()`。
+   * 修复后调用方传报告自带的生成时间，重复落盘必须落到 `duplicate`。
+   */
+  it('同一份单域结果重复落盘时，历史只记一条', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-persist-dup-domain-'));
+    try {
+      const entries = [guardEntry('guard.block.official.health-score:sop-engine:0')];
+      const generatedAt = '2026-07-31T00:00:00.000Z';
+      await persistDiagnosticsFromEntries(project, entries, ['guard'], { generatedAt });
+      await persistDiagnosticsFromEntries(project, entries, ['guard'], { generatedAt });
+
+      const rows = readFileSync(join(project, '.zhshield', 'history', 'guard.jsonl'), 'utf-8')
+        .trim()
+        .split('\n');
+      expect(rows, '同一次单域扫描不得记成两条').toHaveLength(1);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('persistDiagnosticsFromEntries whitelist 压制自检误报', () => {

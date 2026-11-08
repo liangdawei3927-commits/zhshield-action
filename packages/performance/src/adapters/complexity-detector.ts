@@ -17,9 +17,8 @@
  * 故本域 ruleId 一律落在 `performance.runtime.*` 命名空间，不使用 `complexity.*`
  * —— 后者是体检圈复杂度的命名空间，共用会让同一指纹被两个域认领（C1/C2 违约）。
  */
-import * as path from 'path';
 import type { PerformanceConfig, PerformanceIssue } from '../types';
-import { preparePerformanceScan, readTextSafe } from '../source-roots';
+import { forEachSourceFile, preparePerformanceScan } from '../source-roots';
 import { scanSourceFile, type FileScan } from './ast-scan';
 import { classifyRuntime, isLatencySensitive, type RuntimeContext } from './runtime-context';
 
@@ -78,14 +77,11 @@ export class ComplexityDetectorImpl implements ComplexityDetector {
     const { files } = preparePerformanceScan(projectRoot, config);
     const issues: PerformanceIssue[] = [];
 
-    for (const filePath of files) {
-      const content = readTextSafe(filePath);
-      if (content === null) continue;
-      const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
+    forEachSourceFile(projectRoot, files, (rel, content) => {
       const scan = scanSourceFile(rel, content);
       this.detectNestedLoop(rel, scan, issues);
       this.detectSyncIO(rel, scan, issues);
-    }
+    });
     return issues;
   }
 

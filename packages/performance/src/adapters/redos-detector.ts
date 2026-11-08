@@ -29,10 +29,9 @@
  *
  * severity=medium、autoFixable=false：期望人工复核，不做机器自动改写正则（改写风险极高）。
  */
-import * as path from 'path';
 import * as ts from 'typescript';
 import type { PerformanceConfig, PerformanceIssue } from '../types';
-import { preparePerformanceScan, readTextSafe } from '../source-roots';
+import { forEachSourceFile, preparePerformanceScan } from '../source-roots';
 import { scriptKindOf } from './ast-nodes';
 
 /** 命中的正则：模式文本 + 起始行（1 基） */
@@ -210,12 +209,9 @@ export class RedosDetectorImpl implements RedosDetector {
     const { files } = preparePerformanceScan(projectRoot, config);
     const issues: PerformanceIssue[] = [];
 
-    for (const filePath of files) {
-      const content = readTextSafe(filePath);
-      if (content === null) continue;
-      const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
-      this.detectInFile(rel, content, issues);
-    }
+    forEachSourceFile(projectRoot, files, (rel, content) =>
+      this.detectInFile(rel, content, issues),
+    );
     return issues;
   }
 

@@ -79,6 +79,24 @@ export const SKIPPED_SOURCE_DIRS: ReadonlySet<string> = new Set<string>([
   ...NON_PRODUCTION_DIRS,
 ]);
 
+/**
+ * 遍历收集到的源文件：读文本、算出相对路径（统一 `/` 分隔），再交给调用方。
+ *
+ * 两个 detector 的「读文件 + 算 rel」样板收敛于此，避免再次漂移。
+ */
+export function forEachSourceFile(
+  projectRoot: string,
+  files: readonly string[],
+  visit: (relFile: string, content: string) => void,
+): void {
+  for (const filePath of files) {
+    const content = readTextSafe(filePath);
+    if (content === null) continue;
+    const rel = path.relative(projectRoot, filePath).split(path.sep).join('/');
+    visit(rel, content);
+  }
+}
+
 /** 安全读取文本文件；读取失败返回 null */
 export function readTextSafe(filePath: string): string | null {
   try {

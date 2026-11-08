@@ -203,3 +203,65 @@ describe('SopRuleEngine — threshold 度量注入', () => {
     expect(report.ok).toBe(true);
   });
 });
+
+describe('SopRuleEngine — 阈值棘轮基线', () => {
+  const registerRatchetRule = (thresholds: Record<string, number>) => {
+    const registry = new SopRegistry();
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.official.complexity',
+        domain: 'inspect',
+        action: 'scan',
+        applicableEngines: ['inspect'],
+        content: { thresholds },
+      }),
+    );
+    return registry;
+  };
+
+  const evaluateWith = async (
+    registry: SopRegistry,
+    metrics: Record<string, number>,
+    metricBaseline: Record<string, Record<string, number>>,
+  ) => {
+    const engine = new SopRuleEngine(registry, { metricsProvider: () => ({ metrics }) });
+    return engine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect', extra: { metricBaseline } });
+  };
+
+  it('GIVEN 实测值等于上次接受值 WHEN 评估 THEN passed（存量不钉红）', async () => {
+    const registry = registerRatchetRule({ nestingDepth: 4 });
+    const report = await evaluateWith(
+      registry,
+      { nestingDepth: 6 },
+      {
+        'inspect.scan.official.complexity': { nestingDepth: 6 },
+      },
+    );
+    expect(report.evaluations[0].status).toBe('passed');
+  });
+
+  it('GIVEN 实测值劣于上次接受值 WHEN 评估 THEN failed 且提示上次接受值', async () => {
+    const registry = registerRatchetRule({ nestingDepth: 4 });
+    const report = await evaluateWith(
+      registry,
+      { nestingDepth: 7 },
+      {
+        'inspect.scan.official.complexity': { nestingDepth: 6 },
+      },
+    );
+    expect(report.evaluations[0].status).toBe('failed');
+    expect(report.evaluations[0].violations![0].message).toContain('超过上次接受值 6');
+  });
+
+  it('GIVEN 实测值优于上次接受值 WHEN 评估 THEN passed（棘轮只降不升）', async () => {
+    const registry = registerRatchetRule({ nestingDepth: 4 });
+    const report = await evaluateWith(
+      registry,
+      { nestingDepth: 5 },
+      {
+        'inspect.scan.official.complexity': { nestingDepth: 6 },
+      },
+    );
+    expect(report.evaluations[0].status).toBe('passed');
+  });
+});

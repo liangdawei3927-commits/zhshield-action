@@ -112,8 +112,12 @@ export async function runRefactorDomain(ctx: DomainExecutionContext): Promise<Do
  */
 export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<DomainExecution> {
   const { SecurityEngine, calculateSecurityScore } = await import('@zh/security');
-  const { runSecuritySopChannel, mergeVulnerabilityFindings, createSecurityEventForwarder } =
-    await import('./security-sop');
+  const {
+    runSecuritySopChannel,
+    mergeVulnerabilityFindings,
+    createSecurityEventForwarder,
+    buildSecurityExecution,
+  } = await import('./security-sop');
 
   const emitter = createSecurityEventForwarder(ctx.onEvent);
   const engine = new SecurityEngine(emitter);
@@ -153,70 +157,7 @@ export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<Do
     securityScore: calculateSecurityScore(mergedVulnerabilities),
   };
 
-  // 执行健康度：任一通道没跑成 → 域记 partial 并说明原因（C4：未检测 ≠ 通过）。
-  const sopNotRan = !sop.ran;
-  return {
-    report,
-    ...(sopNotRan
-      ? {
-          status: 'partial' as const,
-          reason: sop.reason ?? '安全域 SOP 规则通道本次未执行',
-        }
-      : {}),
-    detail: {
-      ruleChannelRan: sop.ran,
-      sopVulnerabilities: sop.vulnerabilities.length,
-      sopSkipped: sop.skipped,
-      sopDegraded: sop.degraded,
-    },
-  };
-}
-
-/**
- * SOP 通道的漏洞条目 → `@zh/security` 的 Vulnerability 形状。
- *
- * `package` 字段承载文件路径（安全域 UI 的「文件」列读它，见
- * `report-format.ts` 的 `toSecurityScanReportData`：`file: v.package`）。
- * `isDirectDependency=false` —— 这些是代码问题，不是依赖问题。
- */
-function toSecurityVulnerability(finding: {
-  ruleId: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  file: string;
-  line?: number;
-  column?: number;
-  message: string;
-  suggestion?: string;
-}): {
-  id: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  package: string;
-  currentVersion: string;
-  vulnerableRange: string;
-  dependencyPath: string[];
-  isDirectDependency: boolean;
-  recommendation: string;
-  autoFixable: boolean;
-  confidence: 'high_confidence';
-  sourceTools: string[];
-} {
-  return {
-    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
-    severity: finding.severity,
-    title: finding.message,
-    description: finding.message,
-    package: finding.file,
-    currentVersion: '',
-    vulnerableRange: '',
-    dependencyPath: [],
-    isDirectDependency: false,
-    recommendation: finding.suggestion ?? '请复核该处代码并按安全规范修复',
-    autoFixable: false,
-    confidence: 'high_confidence',
-    sourceTools: ['semgrep'],
-  };
+  return buildSecurityExecution(report, sop);
 }
 
 /** 性能优化：只出建议、不参与质量扣分（静态分析，不执行项目代码） */
@@ -348,3 +289,50 @@ export const DEFAULT_DOMAIN_EXECUTORS: Partial<Record<DomainId, DomainExecutor>>
   // techdebt 需要 @zh/scoring + 数据库（宿主能力），由调用方注入；
   // sentinel / backup / reports 属运行时域 / 只读聚合，不参与静态扫描。
 };
+
+/**
+ * SOP 通道的漏洞条目 → `@zh/security` 的 Vulnerability 形状。
+ *
+ * `package` 字段承载文件路径（安全域 UI 的「文件」列读它，见
+ * `report-format.ts` 的 `toSecurityScanReportData`：`file: v.package`）。
+ * `isDirectDependency=false` —— 这些是代码问题，不是依赖问题。
+ */
+function toSecurityVulnerability(finding: {
+  ruleId: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  file: string;
+  line?: number;
+  column?: number;
+  message: string;
+  suggestion?: string;
+}): {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  package: string;
+  currentVersion: string;
+  vulnerableRange: string;
+  dependencyPath: string[];
+  isDirectDependency: boolean;
+  recommendation: string;
+  autoFixable: boolean;
+  confidence: 'high_confidence';
+  sourceTools: string[];
+} {
+  return {
+    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
+    severity: finding.severity,
+    title: finding.message,
+    description: finding.message,
+    package: finding.file,
+    currentVersion: '',
+    vulnerableRange: '',
+    dependencyPath: [],
+    isDirectDependency: false,
+    recommendation: finding.suggestion ?? '请复核该处代码并按安全规范修复',
+    autoFixable: false,
+    confidence: 'high_confidence',
+    sourceTools: ['semgrep'],
+  };
+}

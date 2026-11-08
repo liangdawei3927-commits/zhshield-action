@@ -45,10 +45,8 @@ export function getRuleContentById(db: Database.Database, id: string): RuleConte
     RuleContentRow | undefined;
 }
 
-/** upsert 规则本体行（rule_id 冲突则整行更新 + bumped updated_at） */
-export function saveRuleContent(db: Database.Database, params: SaveRuleContentParams): void {
-  db.prepare(
-    `INSERT INTO rule_content (
+/** rule_content 的 upsert SQL（模块级常量：与函数体分离，避免函数长度超限） */
+const UPSERT_RULE_CONTENT_SQL = `INSERT INTO rule_content (
        id, rule_id, domain, action, source, name, description, severity, status,
        execution_mode, tags, applicable_engines, languages, frameworks,
        tool_id, tool_version, content, content_sha, version, created_by, updated_by
@@ -72,8 +70,11 @@ export function saveRuleContent(db: Database.Database, params: SaveRuleContentPa
                    content_sha = excluded.content_sha,
                    version = excluded.version,
                    updated_by = excluded.updated_by,
-                   updated_at = CURRENT_TIMESTAMP`,
-  ).run(
+                   updated_at = CURRENT_TIMESTAMP`;
+
+/** upsert 规则本体行（rule_id 冲突则整行更新 + bumped updated_at） */
+export function saveRuleContent(db: Database.Database, params: SaveRuleContentParams): void {
+  db.prepare(UPSERT_RULE_CONTENT_SQL).run(
     params.id,
     params.ruleId,
     params.domain,

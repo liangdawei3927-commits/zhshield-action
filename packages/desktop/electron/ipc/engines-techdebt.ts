@@ -23,6 +23,7 @@ import {
   readDomainSnapshot,
 } from '../zh-diagnostics';
 import { updateDashboardState } from './dashboard-state';
+import { emptyTechDebtReport } from '../../src/services/empty-engine-reports';
 import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import { collectExposedFilesInWorker } from '../profile-host';
 import { getDb } from '../ipc-context';
@@ -348,21 +349,6 @@ export async function dismissDebtActionHandler(projectPath: string, actionId: st
       err instanceof Error ? err.message : String(err),
     );
   }
-}
-
-/** 技术债仪表盘失败时的空报告（error 携带失败原因，不 throw） */
-function emptyTechDebtReport(error: string): TechDebtReportData {
-  return {
-    projectId: '',
-    generatedAt: new Date().toISOString(),
-    // null = 没算出债务指数。若填 0，UI 会显示「0 债务」——把「没查」误读成「零债务」（C4）。
-    debtIndex: null,
-    trend: { period: 'week', delta: 0 },
-    byModule: [],
-    byCategory: [],
-    actionList: [],
-    error,
-  };
 }
 
 /**

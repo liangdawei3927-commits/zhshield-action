@@ -161,6 +161,18 @@ function useInspectCopyToAi(projectPath: string): {
 
   const copyToAi = useCallback(
     (item: InspectionReportData['checks'][number]) => {
+      // 项目级指标（复杂度/覆盖率阈值等）没有文件位置，不能当单文件问题交给 AI：
+      // 复制出去只会换来一轮「修峰值→换峰值」的无效修复。
+      if (item.projectMetric === true) {
+        toast(
+          t('page.inspect.projectMetricHint', {
+            defaultValue:
+              '这是项目级指标（如复杂度阈值），没有具体文件位置，不能作为单文件问题交给 AI 修复；请在报告中按指标趋势治理。',
+          }),
+          'info',
+        );
+        return;
+      }
       copyIssuesToAi(projectPath, toast, [
         {
           source: t('page.inspect.source'),
@@ -175,7 +187,8 @@ function useInspectCopyToAi(projectPath: string): {
 
   const copyAllToAi = useCallback(
     (items: InspectionReportData['checks']) => {
-      const failed = selectIssueChecks(items);
+      // 同上：项目级指标不进批量 AI 修复队列。
+      const failed = selectIssueChecks(items.filter((item) => item.projectMetric !== true));
       if (failed.length === 0) return;
       copyIssuesToAi(
         projectPath,

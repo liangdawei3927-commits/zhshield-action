@@ -248,6 +248,25 @@ export interface ToolErrorTexts {
 }
 
 /**
+ * 扫描入口骨架：统一起止计时与异常兜底。
+ *
+ * 基类 ToolCommandAdapter 与未继承基类的特殊适配器（dependency-cruiser）共用同一份
+ * 骨架，避免两处逐字复制（jscpd duplication 巡检）。
+ */
+export async function runScanWithGuard(
+  options: ToolScanOptions,
+  runScan: (options: ToolScanOptions, start: number) => Promise<ToolResult>,
+  onError: (error: unknown, start: number) => ToolResult,
+): Promise<ToolResult> {
+  const start = Date.now();
+  try {
+    return await runScan(options, start);
+  } catch (error: unknown) {
+    return onError(error, start);
+  }
+}
+
+/**
  * ToolCommandAdapter — CLI 型工具适配器的基类
  *
  * 收敛各适配器逐字重复的 `ToolAdapter` 骨架：命令解析器持有、`isAvailable` 委托、
@@ -290,12 +309,11 @@ export abstract class ToolCommandAdapter {
 
   /** 扫描入口：统一 start 计时与异常兜底，异常一律降级为 ToolResult 而非上抛 */
   async scan(options: ToolScanOptions): Promise<ToolResult> {
-    const start = Date.now();
-    try {
-      return await this.runScan(options, start);
-    } catch (error: unknown) {
-      return this.buildExecErrorResult(error, start);
-    }
+    return runScanWithGuard(
+      options,
+      (opts, start) => this.runScan(opts, start),
+      (error, start) => this.buildExecErrorResult(error, start),
+    );
   }
 
   /** 把 child_process 失败对象收敛为 ToolExecError（语义判断仍由调用方按需处理） */

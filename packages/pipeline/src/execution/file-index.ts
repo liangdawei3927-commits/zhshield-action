@@ -130,19 +130,13 @@ export function buildFileIndex(
       const rel = toRelativePath(projectRoot, full);
 
       if (entry.isDirectory()) {
-        if (BUILD_OUTPUT_DIR_NAMES.has(entry.name)) {
-          buildOutputDirs.push(rel);
-        } else if (!SKIP_DIR_NAMES.has(entry.name) && !entry.name.startsWith('.')) {
-          pending.push(full);
-        }
+        classifyDirectory({ name: entry.name, rel, full, pending, buildOutputDirs });
         continue;
       }
 
       if (!entry.isFile()) continue;
 
-      if (LOCKFILE_FILES.has(entry.name)) lockfile.push(rel);
-      else if (MANIFEST_FILES.has(entry.name)) manifest.push(rel);
-      else if (SOURCE_EXTENSIONS.has(extname(entry.name))) source.push(rel);
+      classifyFile({ name: entry.name, rel, source, manifest, lockfile });
 
       if (source.length + manifest.length + lockfile.length >= maxFiles) {
         truncated = true;
@@ -164,6 +158,58 @@ export function buildFileIndex(
   ];
 
   return { projectRoot, source, manifest, lockfile, buildOutputDirs, targets, truncated };
+}
+
+/** 目录分类入参（单对象参数：避免形参数量超过上限触发 long-parameter-list） */
+interface ClassifyDirectoryParams {
+  name: string;
+  rel: string;
+  full: string;
+  pending: string[];
+  buildOutputDirs: string[];
+}
+
+/**
+ * 目录分类：构建产物目录只记录不遍历，其余非忽略目录入栈。
+ *
+ * 抽为独立函数是为了让 `buildFileIndex` 的遍历主体保持低嵌套
+ * （复杂度规则 nestingDepth 上限 4；`else if` 会把深度加到 5）。
+ */
+function classifyDirectory(params: ClassifyDirectoryParams): void {
+  const { name, rel, full, pending, buildOutputDirs } = params;
+  if (BUILD_OUTPUT_DIR_NAMES.has(name)) {
+    buildOutputDirs.push(rel);
+    return;
+  }
+  if (!SKIP_DIR_NAMES.has(name) && !name.startsWith('.')) pending.push(full);
+}
+
+/** 文件分类入参（单对象参数：避免形参数量超过上限触发 long-parameter-list） */
+interface ClassifyFileParams {
+  name: string;
+  rel: string;
+  source: string[];
+  manifest: string[];
+  lockfile: string[];
+}
+
+/**
+ * 文件分类：锁文件 → 依赖清单 → 源码，逐个匹配归入对应列表。
+ *
+ * 与 `classifyDirectory` 同样抽为独立函数以压低 `buildFileIndex` 的嵌套：
+ * 三路 `else if` 链会把 nestingDepth 推到 5（规则上限 4）。
+ */
+function classifyFile(params: ClassifyFileParams): void {
+  const { name, rel, source, manifest, lockfile } = params;
+  if (LOCKFILE_FILES.has(name)) {
+    lockfile.push(rel);
+    return;
+  }
+  if (MANIFEST_FILES.has(name)) {
+    manifest.push(rel);
+    return;
+  }
+  if (SOURCE_EXTENSIONS.has(extname(name))) source.push(rel);
 }
 
 /** 按目标类型取相对路径列表（域向 Scheduler 申请 targets 时使用） */

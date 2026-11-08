@@ -116,6 +116,11 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
     status: mapStatus(ev),
     detail: buildDetail(ev),
     category: ev.violations?.find((v) => v.category)?.category ?? ev.rule.domain ?? undefined,
+    // 阈值类规则（复杂度等）的违规 file 为空：项目级指标，不是可定位的单文件问题。
+    // 标记后巡检页「复制到 AI」会跳过它，避免把整条规则反复塞进 AI 修复队列。
+    ...(ev.violations?.length && ev.violations.every((v) => v.file === '')
+      ? { projectMetric: true as const }
+      : {}),
   }));
 
   const passedCount = checks.filter((c) => c.status === 'pass').length;

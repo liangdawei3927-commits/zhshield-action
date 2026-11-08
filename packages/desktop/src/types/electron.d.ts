@@ -96,6 +96,11 @@ export interface InspectionReportData {
     category?: string;
     /** 来源引擎/适配器标识（如 'ai-code-review' / 'semgrep' / 'eslint'） */
     source?: string;
+    /**
+     * 项目级指标（如复杂度阈值）：违规没有具体文件位置，不能当成单文件问题
+     * 交给 AI 修复，否则会陷入「修一个峰值、换下一个峰值」的死循环。
+     */
+    projectMetric?: boolean;
   }>;
   metadata: {
     duration: number;

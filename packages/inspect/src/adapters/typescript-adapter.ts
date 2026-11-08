@@ -198,6 +198,15 @@ interface RunBuildModeParams {
   projectPath: string;
 }
 
+/** TypeScriptAdapter.execAndParseTsc 的执行参数（单对象参数，避免形参超限） */
+interface ExecAndParseTscParams {
+  command: string;
+  args: string[];
+  projectPath: string;
+  category: IssueCategory;
+  timeout?: number | undefined;
+}
+
 /**
  * 构建模式（`tsc -b`）的参数：一次进程检查全部 tsconfig，不再逐包起进程。
  *
@@ -374,31 +383,57 @@ export class TypeScriptAdapter implements ToolAdapter {
     return splitTscIssues(parseTscDiagnostics(stdout, category), projectPath);
   }
 
-  private async runBuildMode(params: RunBuildModeParams): Promise<TscRunResult> {
-    const { command, projects, options, category, projectPath } = params;
-    try {
-      const { stdout } = await execTool(command, buildBuildModeArgs(projects), {
-        cwd: projectPath,
-        timeout: options.timeout || 300000,
-      });
-      return this.parseTscOutput(stdout, category, projectPath);
-    } catch (error: unknown) {
-      const err = asToolExecError(error);
-      if (err.code === 'ENOENT') {
-        return {
-          issues: [],
-          envArtifactCount: 0,
-          infraError: this.tr('engine.inspect.tool.tsc.unavailable'),
-        };
-      }
-      const raw = `${err.stdout ?? ''}\n${err.stderr ?? ''}`;
-      const parsed = parseTscDiagnostics(raw, category, this.locale);
-      if (parsed.length > 0) return splitTscIssues(parsed, projectPath);
+  /**
+   * tsc 执行失败 → 统一降级（构建模式与逐项目模式共用）：
+   * ENOENT ⇒ 未安装；有诊断行 ⇒ 解析并拆分环境伪影；无诊断输出 ⇒ 基础设施错误（不得静默通过）。
+   */
+  private handleTscExecutionError(
+    error: unknown,
+    category: IssueCategory,
+    projectPath: string,
+  ): TscRunResult {
+    const err = asToolExecError(error);
+    if (err.code === 'ENOENT') {
       return {
         issues: [],
         envArtifactCount: 0,
-        infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed'),
+        infraError: this.tr('engine.inspect.tool.tsc.unavailable'),
       };
+    }
+    // 非 TTY 下 tsc 诊断输出到 stdout，报错场景需同时解析两个流
+    const raw = `${err.stdout ?? ''}\n${err.stderr ?? ''}`;
+    const parsed = parseTscDiagnostics(raw, category, this.locale);
+    // 仍有用户源码真错误 ⇒ 上报；只剩环境伪影 ⇒ 不报 findings（由 runTscScan 统一降级）
+    if (parsed.length > 0) return splitTscIssues(parsed, projectPath);
+    return {
+      issues: [],
+      envArtifactCount: 0,
+      infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed'),
+    };
+  }
+
+  /** 执行 tsc 并解析输出（构建模式与逐项目模式的成功路径共用） */
+  private async execAndParseTsc(params: ExecAndParseTscParams): Promise<TscRunResult> {
+    const { command, args, projectPath, category, timeout } = params;
+    const { stdout } = await execTool(command, args, {
+      cwd: projectPath,
+      timeout: timeout || 300000,
+    });
+    return this.parseTscOutput(stdout, category, projectPath);
+  }
+
+  private async runBuildMode(params: RunBuildModeParams): Promise<TscRunResult> {
+    const { command, projects, options, category, projectPath } = params;
+    try {
+      return await this.execAndParseTsc({
+        command,
+        args: buildBuildModeArgs(projects),
+        projectPath,
+        category,
+        timeout: options.timeout,
+      });
+    } catch (error: unknown) {
+      return this.handleTscExecutionError(error, category, projectPath);
     }
   }
 
@@ -414,33 +449,15 @@ export class TypeScriptAdapter implements ToolAdapter {
     const { command, tsconfigPath, flags, options, category } = params;
     const projectPath = path.resolve(options.projectPath);
     try {
-      const { stdout } = await execTool(command, [...flags, '-p', tsconfigPath], {
-        cwd: projectPath,
-        timeout: options.timeout || 300000,
+      return await this.execAndParseTsc({
+        command,
+        args: [...flags, '-p', tsconfigPath],
+        projectPath,
+        category,
+        timeout: options.timeout,
       });
-      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error: unknown) {
-      const err = asToolExecError(error);
-      if (err.code === 'ENOENT') {
-        return {
-          issues: [],
-          envArtifactCount: 0,
-          infraError: this.tr('engine.inspect.tool.tsc.unavailable'),
-        };
-      }
-      // 非 TTY 下 tsc 诊断输出到 stdout，报错场景需同时解析两个流
-      const raw = `${err.stdout ?? ''}\n${err.stderr ?? ''}`;
-      const parsed = parseTscDiagnostics(raw, category, this.locale);
-      if (parsed.length > 0) {
-        const { issues, envArtifactCount } = splitTscIssues(parsed, projectPath);
-        // 仍有用户源码真错误 ⇒ 上报；只剩环境伪影 ⇒ 不报 findings（由 runTscScan 统一降级）
-        return { issues, envArtifactCount };
-      }
-      return {
-        issues: [],
-        envArtifactCount: 0,
-        infraError: err.message || this.tr('engine.inspect.tool.tsc.runFailed'),
-      };
+      return this.handleTscExecutionError(error, category, projectPath);
     }
   }
 

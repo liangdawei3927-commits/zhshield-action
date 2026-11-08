@@ -39,7 +39,7 @@
 import type { RuleEngineReport } from '@zh/kernel';
 import type { EventEmitter, GovernanceEvent } from '@zh/shared';
 
-import type { DomainExecutionContext } from './types';
+import type { DomainExecutionContext, DomainExecution } from './types';
 
 /** 安全域 SOP 通道的结论（并入最终报告前） */
 export interface SecuritySopFindings {
@@ -208,3 +208,35 @@ export function createSecurityEventForwarder(
     },
   };
 }
+
+/**
+ * 安全域结论：任一通道没跑成 → 域记 partial 并说明原因（C4：未检测 ≠ 通过）。
+ * 抽为独立函数是为了让 `runSecurityDomain` 保持低于函数长度上限。
+ */
+export function buildSecurityExecution(
+  report: unknown,
+  sop: {
+    ran: boolean;
+    reason?: string;
+    vulnerabilities: readonly unknown[];
+    skipped?: number;
+    degraded?: number;
+  },
+): DomainExecution {
+  return {
+    report,
+    ...(!sop.ran
+      ? {
+          status: 'partial' as const,
+          reason: sop.reason ?? '安全域 SOP 规则通道本次未执行',
+        }
+      : {}),
+    detail: {
+      ruleChannelRan: sop.ran,
+      sopVulnerabilities: sop.vulnerabilities.length,
+      sopSkipped: sop.skipped,
+      sopDegraded: sop.degraded,
+    },
+  };
+}
+

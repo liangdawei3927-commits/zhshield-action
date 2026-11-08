@@ -35,22 +35,24 @@ export function isSupportedLanguage(value: string | null | undefined): value is 
   return SUPPORTED_LANGUAGES.some((l) => l.code.toLowerCase() === value.toLowerCase());
 }
 
+/** 简体中文判定：zh、zh-CN、zh-Hans、zh-SG、zh-MY；其余 zh-*（zh-TW / zh-HK / zh-MO / zh-Hant）→ 繁体 */
+function isSimplifiedChinese(lower: string): boolean {
+  return (
+    lower === 'zh' ||
+    lower.startsWith('zh-cn') ||
+    lower.startsWith('zh-hans') ||
+    lower.startsWith('zh-sg') ||
+    lower.startsWith('zh-my')
+  );
+}
+
 /** 将任意系统语言标识（BCP 47 / 环境变量 / 平台 locale）归一化为受支持的语言代码；不支持时返回 null */
 export function normalizeLanguage(value: string | null | undefined): LanguageCode | null {
   if (!value) return null;
   const raw = value.replace(/_/g, '-').trim();
   if (isSupportedLanguage(raw)) return raw as LanguageCode;
   const lower = raw.toLowerCase();
-  if (lower.startsWith('zh')) {
-    // 简体：zh、zh-CN、zh-Hans、zh-SG、zh-MY；其余（zh-TW / zh-HK / zh-MO / zh-Hant）→ 繁体
-    return lower === 'zh' ||
-      lower.startsWith('zh-cn') ||
-      lower.startsWith('zh-hans') ||
-      lower.startsWith('zh-sg') ||
-      lower.startsWith('zh-my')
-      ? 'zh-Hans'
-      : 'zh-Hant';
-  }
+  if (lower.startsWith('zh')) return isSimplifiedChinese(lower) ? 'zh-Hans' : 'zh-Hant';
   if (lower.startsWith('ko')) return 'ko';
   if (lower.startsWith('ja')) return 'ja';
   if (lower.startsWith('en')) return 'en';

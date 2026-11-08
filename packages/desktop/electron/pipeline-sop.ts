@@ -58,6 +58,35 @@ function createSkippedChecksGuardReport(): GuardReport {
 
 type PipelineRunnerInstance = InstanceType<(typeof import('@zh/pipeline'))['PipelineRunner']>;
 
+/**
+ * 合成门禁评估用的占位规则。
+ *
+ * `RuleEvaluation.rule` 的类型是完整 SopRule；本条目只用于把「门禁未产出结论」
+ * 表达成一条评估，规则本身不参与执行。逐字段给出合法默认值，避免用
+ * 双重类型断言绕过类型检查（那等于绕过类型系统，字段改名后会静默失效）。
+ */
+function createSyntheticGuardRule(name: string): SopRule {
+  const now = new Date();
+  return {
+    id: 'guard-stage',
+    name,
+    domain: 'guard',
+    action: 'block',
+    source: 'internal',
+    description: name,
+    status: 'active',
+    executionMode: 'sync',
+    severity: 'info',
+    applicableEngines: ['guard'],
+    content: {},
+    tags: [],
+    falsePositiveCount: 0,
+    truePositiveCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 /** 门禁域的异常报告：域驱动不会抛出，缺报告即"未检测成"（C4） */
 function createGuardErrorReport(message: string): RuleEngineReport {
   return {
@@ -76,9 +105,8 @@ function createGuardErrorReport(message: string): RuleEngineReport {
         durationMs: 0,
         targetEngine: 'guard',
         timestamp: new Date(),
-        // 合成条目只用于说清「门禁未产出结论」，不参与规则执行；
-        // 完整 SopRule 的其余字段（domain/action/severity…）在这里没有意义，故只留可读字段。
-        rule: { id: 'guard-stage', name: t('pipeline.guard.sopScanning') } as unknown as SopRule,
+        // 合成条目只用于说清「门禁未产出结论」，不参与规则执行。
+        rule: createSyntheticGuardRule(t('pipeline.guard.sopScanning')),
       },
     ],
     durationMs: 0,

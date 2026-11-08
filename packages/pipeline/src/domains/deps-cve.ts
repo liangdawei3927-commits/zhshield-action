@@ -168,6 +168,75 @@ export function vulnsToFindings(dep: CveQueryableDep, vulns: readonly OsvVuln[])
   }));
 }
 
+/** OSV 命中结果按依赖归组：批量响应只有 id/modified，先记下「哪个依赖命中哪些 id」 */
+interface CveHit {
+  dep: CveQueryableDep;
+  vulns: OsvVuln[];
+}
+
+/** querybatch 请求体：只查 direct 依赖，统一按 npm 生态查询 */
+function buildQueryBatchBody(deps: readonly CveQueryableDep[]): {
+  queries: Array<{ package: { name: string; ecosystem: string }; version: string }>;
+} {
+  return {
+    queries: deps.map((dep) => ({
+      package: { name: dep.name, ecosystem: 'npm' },
+      version: dep.version,
+    })),
+  };
+}
+
+/** 批量响应 → 命中归组（槽位与 deps 按顺序对齐；无 id 的条目不入组） */
+function collectVulnHits(
+  results: NonNullable<OsvBatchResult['results']>,
+  deps: readonly CveQueryableDep[],
+): CveHit[] {
+  const hits: CveHit[] = [];
+  results.forEach((slot, i) => {
+    const dep = deps[i];
+    if (!dep || !slot?.vulns?.length) return;
+    hits.push({ dep, vulns: slot.vulns.filter((v) => typeof v?.id === 'string') });
+  });
+  return hits;
+}
+
+/** 汇总去重后的漏洞 id（详情补拉用，上限由调用方截断） */
+function uniqueVulnIds(hits: readonly CveHit[]): string[] {
+  return [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id as string)))];
+}
+
+/**
+ * 详情回填：批量响应只有 id/modified，用 /v1/vulns 详情补齐 severity/summary/别名。
+ * 补详情失败的条目保留精简数据，绝不因此丢弃漏洞。
+ */
+function buildFindings(
+  hits: readonly CveHit[],
+  details: readonly (OsvVuln | null)[],
+): CveFinding[] {
+  const byId = new Map<string, OsvVuln>();
+  for (const detail of details) {
+    if (detail?.id) byId.set(detail.id, detail);
+  }
+  const findings: CveFinding[] = [];
+  for (const hit of hits) {
+    const hydrated = hit.vulns.map((v) => (v.id ? (byId.get(v.id) ?? v) : v));
+    findings.push(...vulnsToFindings(hit.dep, hydrated));
+  }
+  return findings;
+}
+
+/**
+ * fetch 失败 → 可读原因。
+ * undici 把真正的原因藏在 cause.code（ECONNREFUSED / ENOTFOUND …）：只报
+ * "fetch failed" 对用户毫无信息量，分不清是断网、DNS 还是对端拒绝。
+ */
+function describeFetchFailure(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const causeCode = (err as { cause?: { code?: string } })?.cause?.code;
+  if (message.includes('abort')) return `OSV 请求超时（${OSV_TIMEOUT_MS / 1000}s）`;
+  return causeCode ? `${message}（${causeCode}）` : message;
+}
+
 /**
  * OSV querybatch 批量查询。网络失败 / 非 2xx / 超时 / 响应形状不符 → unavailable（reason 带原因）。
  * @param fetchImpl 网络函数（默认全局 fetch；测试注入假实现）
@@ -178,9 +247,8 @@ export async function runCveChecks(
 ): Promise<CveCheckResult> {
   const checkedAt = new Date().toISOString();
   const deps = collectQueryableDeps(nodes);
-  if (deps.length === 0) {
-    return { status: 'ok', findings: [], checkedAt };
-  }
+  if (deps.length === 0) return { status: 'ok', findings: [], checkedAt };
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OSV_TIMEOUT_MS);
   const baseUrl = resolveOsvBaseUrl();
@@ -189,12 +257,7 @@ export async function runCveChecks(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({
-        queries: deps.map((dep) => ({
-          package: { name: dep.name, ecosystem: 'npm' },
-          version: dep.version,
-        })),
-      }),
+      body: JSON.stringify(buildQueryBatchBody(deps)),
     });
     if (!response.ok) {
       return {
@@ -208,42 +271,18 @@ export async function runCveChecks(
     if (!payload || !Array.isArray(payload.results)) {
       return { status: 'unavailable', findings: [], reason: 'OSV 响应形状不符', checkedAt };
     }
-    // 命中逐依赖归组：批量响应只有 id/modified，先记下「哪个依赖命中哪些 id」
-    const hits: Array<{ dep: CveQueryableDep; vulns: OsvVuln[] }> = [];
-    payload.results.forEach((slot, i) => {
-      const dep = deps[i];
-      if (!dep || !slot?.vulns?.length) return;
-      hits.push({ dep, vulns: slot.vulns.filter((v) => typeof v?.id === 'string') });
-    });
+    const hits = collectVulnHits(payload.results, deps);
     // 详情补拉（限并发=全量 Promise.all，上限 MAX_DETAIL_FETCHES）：
     // 不补则 severity 恒 medium、summary 空、无 CVE 号——实测发现的关键缺口。
-    const ids = [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id as string)))];
-    const detailIds = ids.slice(0, MAX_DETAIL_FETCHES);
     const details = await Promise.all(
-      detailIds.map((id) => fetchVulnDetail(baseUrl, id, fetchImpl, controller.signal)),
+      uniqueVulnIds(hits)
+        .slice(0, MAX_DETAIL_FETCHES)
+        .map((id) => fetchVulnDetail(baseUrl, id, fetchImpl, controller.signal)),
     );
-    const byId = new Map<string, OsvVuln>();
-    for (const detail of details) {
-      if (detail?.id) byId.set(detail.id, detail);
-    }
     clearTimeout(timer);
-    const findings: CveFinding[] = [];
-    for (const hit of hits) {
-      const hydrated = hit.vulns.map((v) => (v.id ? (byId.get(v.id) ?? v) : v));
-      findings.push(...vulnsToFindings(hit.dep, hydrated));
-    }
-    return { status: 'ok', findings, checkedAt };
+    return { status: 'ok', findings: buildFindings(hits, details), checkedAt };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // undici 把真正的原因藏在 cause.code（ECONNREFUSED / ENOTFOUND …）：只报
-    // "fetch failed" 对用户毫无信息量，分不清是断网、DNS 还是对端拒绝。
-    const causeCode = (err as { cause?: { code?: string } })?.cause?.code;
-    const reason = message.includes('abort')
-      ? `OSV 请求超时（${OSV_TIMEOUT_MS / 1000}s）`
-      : causeCode
-        ? `${message}（${causeCode}）`
-        : message;
-    return { status: 'unavailable', findings: [], reason, checkedAt };
+    return { status: 'unavailable', findings: [], reason: describeFetchFailure(err), checkedAt };
   } finally {
     clearTimeout(timer);
   }

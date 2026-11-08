@@ -112,6 +112,31 @@ function failureRecord(input: {
   };
 }
 
+/** 组装域执行上下文：可选字段仅在提供时展开（exactOptionalPropertyTypes 要求） */
+function buildDomainContext(options: DomainRunOptions): DomainExecutionContext {
+  return {
+    repoRoot: options.repoRoot,
+    ...(options.runner ? { runner: options.runner } : {}),
+    ...(options.onEvent ? { onEvent: options.onEvent } : {}),
+    ...(options.dryRun ? { dryRun: options.dryRun } : {}),
+    ...(options.depsScanInput ? { depsScanInput: options.depsScanInput } : {}),
+  };
+}
+
+/**
+ * 超预算 = 该域的工作已作废：把还在跑的工具子进程真的杀掉。
+ * 不杀的话它会继续占核，把负载推高、让下一个域接着超预算（2026-11-05 三次 bench 全如此）。
+ */
+function attachKilledProcesses(
+  record: DomainRunRecord,
+  scope: ToolProcessScope | undefined,
+): DomainRunRecord {
+  if (record.overBudget !== true) return record;
+  const killed = scope?.killAll() ?? 0;
+  if (killed > 0) record.detail = { ...(record.detail ?? {}), killedToolProcesses: killed };
+  return record;
+}
+
 /** 单域执行：把执行器返回收敛成一条记录，异常一律不向上抛（A13） */
 async function runOne(
   domain: DomainId,
@@ -122,13 +147,7 @@ async function runOne(
   const budgetMs = budgetFor(domain, options);
   if (!executor) return notRunRecord(domain, budgetMs);
 
-  const ctx: DomainExecutionContext = {
-    repoRoot: options.repoRoot,
-    ...(options.runner ? { runner: options.runner } : {}),
-    ...(options.onEvent ? { onEvent: options.onEvent } : {}),
-    ...(options.dryRun ? { dryRun: options.dryRun } : {}),
-    ...(options.depsScanInput ? { depsScanInput: options.depsScanInput } : {}),
-  };
+  const ctx = buildDomainContext(options);
   const timeoutMessage =
     budgetMs === undefined ? undefined : `[domains] 域 ${domain} 超过 ${budgetMs}ms 预算`;
 
@@ -146,14 +165,10 @@ async function runOne(
       : withHardTimeout(run(), budgetMs, timeoutMessage as string));
     return successRecord(domain, execution, budgetMs, now() - start);
   } catch (err) {
-    const record = failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
-    // 超预算 = 该域的工作已作废：把还在跑的工具子进程真的杀掉。
-    // 不杀的话它会继续占核，把负载推高、让下一个域接着超预算（2026-11-05 三次 bench 全如此）。
-    if (record.overBudget === true) {
-      const killed = scope?.killAll() ?? 0;
-      if (killed > 0) record.detail = { ...(record.detail ?? {}), killedToolProcesses: killed };
-    }
-    return record;
+    return attachKilledProcesses(
+      failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start }),
+      scope,
+    );
   }
 }
 

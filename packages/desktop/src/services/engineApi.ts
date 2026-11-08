@@ -17,6 +17,7 @@ import type {
 } from '../types/electron';
 import { runGuardViaHttp } from './serverApi';
 import { isHttpMode, getAPI } from './engineApi-transport';
+import { emptyTechDebtReport } from './empty-engine-reports';
 
 // ─── 功能分片再导出（签名与原导出完全一致，消费方无需改动）──
 
@@ -205,17 +206,8 @@ export async function runPerformance(projectPath: string): Promise<PerformanceRe
 export async function runTechDebt(projectPath: string): Promise<TechDebtReportData> {
   const api = getAPI();
   if (!api?.engine) {
-    return {
-      projectId: '',
-      generatedAt: new Date().toISOString(),
-      // 引擎不可用 = 没算出：null 让 UI 显示「未检测」，不冒充 0 债务（C4）
-      debtIndex: null,
-      trend: { period: 'week', delta: 0 },
-      byModule: [],
-      byCategory: [],
-      actionList: [],
-      error: t('engine.engineUnavailable'),
-    };
+    // 引擎不可用 = 没算出：空报告里 debtIndex=null，让 UI 显示「未检测」，不冒充 0 债务（C4）
+    return emptyTechDebtReport(t('engine.engineUnavailable'));
   }
   return api.engine.runTechDebt(projectPath);
 }

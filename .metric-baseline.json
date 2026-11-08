@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "capturedAt": "2026-11-09T03:35:00.000Z",
+  "metrics": {
+    "inspect.scan.official.complexity": {
+      "cyclomaticComplexity": 15,
+      "functionLength": 80,
+      "fileLength": 530
+    }
+  }
+}

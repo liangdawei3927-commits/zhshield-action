@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CheckOptions, GuardReport } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
 import { Logger } from '@zh/kernel';
@@ -25,9 +27,45 @@ export function deriveProjectFeature(repoRoot: string): ProjectFeature | undefin
 }
 
 /**
+ * 读取项目级指标棘轮基线：项目根 `.metric-baseline.json` 的
+ * `{ metrics: { <ruleId>: { <metric>: 上次接受值 } } }`。
+ * 放项目根而非 `.zhshield/`（后者被 gitignore），保证基线能随仓库提交、CI 与各机器一致。
+ * 缺省 / 损坏 / 形状不符一律返回 undefined —— 退回规则静态阈值，绝不因坏数据放宽检查。
+ */
+/** 单条规则的指标归一：非法值丢弃，无有效指标返回 undefined（避免调用方多一层嵌套） */
+function normalizeMetricEntry(metrics: unknown): Record<string, number> | undefined {
+  if (!metrics || typeof metrics !== 'object') return undefined;
+  const entries: Record<string, number> = {};
+  for (const [metric, value] of Object.entries(metrics as Record<string, unknown>)) {
+    if (typeof value === 'number' && Number.isFinite(value)) entries[metric] = value;
+  }
+  return Object.keys(entries).length > 0 ? entries : undefined;
+}
+
+function loadMetricBaseline(repoRoot: string): Record<string, Record<string, number>> | undefined {
+  const file = join(repoRoot, '.metric-baseline.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as { metrics?: unknown };
+    if (!raw || typeof raw.metrics !== 'object' || raw.metrics === null) return undefined;
+    const out: Record<string, Record<string, number>> = {};
+    for (const [ruleId, metrics] of Object.entries(raw.metrics as Record<string, unknown>)) {
+      const entry = normalizeMetricEntry(metrics);
+      if (entry) out[ruleId] = entry;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * 组装引擎所需 context：叠加 repoRoot + 阶段 domain，并在调用方未显式给定
  * projectFeature 时按画像自动注入（M2）。画像探测异常 → undefined → 引擎回退
  * 为不按画像过滤的全量规则评估（安全行为）。
+ *
+ * 同时注入项目级指标棘轮基线（`metricBaseline`）：阈值规则只卡「比上次接受值更差」，
+ * 存量债务不再把规则永久钉红，新增恶化仍会失败。
  */
 export function composeRuleContext(
   repoRoot: string,
@@ -43,6 +81,8 @@ export function composeRuleContext(
     const feature = deriveProjectFeature(repoRoot);
     if (feature) base.projectFeature = feature;
   }
+  const metricBaseline = loadMetricBaseline(repoRoot);
+  if (metricBaseline) base.extra = { ...base.extra, metricBaseline };
   return base;
 }
 

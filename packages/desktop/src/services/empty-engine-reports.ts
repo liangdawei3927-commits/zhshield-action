@@ -5,7 +5,7 @@
  * 失败以数据形状表达。安全/性能/垃圾清理已全部改为显式失败（throw），
  * 不再提供「零发现 + 满分」的空报告：那会把「没查成」伪装成「查过且干净」。
  */
-import type { DependencyReportData } from '../types/electron';
+import type { DependencyReportData, TechDebtReportData } from '../types/electron';
 
 /** 依赖报告空报告：零依赖 + 无 lockfile，`error` 携带失败原因（不 throw） */
 export function emptyDependencyReportData(error: string): DependencyReportData {
@@ -25,6 +25,21 @@ export function emptyDependencyReportData(error: string): DependencyReportData {
     upgradeAssessments: [],
     envEntries: [],
     generatedAt: new Date().toISOString(),
+    error,
+  };
+}
+
+/** 技术债空报告：`debtIndex` 为 null 表示「没算出」，`error` 携带失败原因（不 throw） */
+export function emptyTechDebtReport(error: string): TechDebtReportData {
+  return {
+    projectId: '',
+    generatedAt: new Date().toISOString(),
+    // null = 没算出债务指数。若填 0，UI 会显示「0 债务」——把「没查」误读成「零债务」（C4）。
+    debtIndex: null,
+    trend: { period: 'week', delta: 0 },
+    byModule: [],
+    byCategory: [],
+    actionList: [],
     error,
   };
 }

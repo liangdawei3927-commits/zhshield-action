@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 3274d192be7266af
+// @zh-src-hash: 02d511fb8a5e00a8
 // @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -15886,14 +15886,15 @@ function isSupportedLanguage(value) {
   if (!value) return false;
   return SUPPORTED_LANGUAGES.some((l) => l.code.toLowerCase() === value.toLowerCase());
 }
+function isSimplifiedChinese(lower) {
+  return lower === "zh" || lower.startsWith("zh-cn") || lower.startsWith("zh-hans") || lower.startsWith("zh-sg") || lower.startsWith("zh-my");
+}
 function normalizeLanguage(value) {
   if (!value) return null;
   const raw = value.replace(/_/g, "-").trim();
   if (isSupportedLanguage(raw)) return raw;
   const lower = raw.toLowerCase();
-  if (lower.startsWith("zh")) {
-    return lower === "zh" || lower.startsWith("zh-cn") || lower.startsWith("zh-hans") || lower.startsWith("zh-sg") || lower.startsWith("zh-my") ? "zh-Hans" : "zh-Hant";
-  }
+  if (lower.startsWith("zh")) return isSimplifiedChinese(lower) ? "zh-Hans" : "zh-Hant";
   if (lower.startsWith("ko")) return "ko";
   if (lower.startsWith("ja")) return "ja";
   if (lower.startsWith("en")) return "en";
@@ -82952,7 +82953,7 @@ var require_Obj = __commonJS({
 var require_Str = __commonJS({
   "../../node_modules/.pnpm/prelude-ls@1.2.1/node_modules/prelude-ls/lib/Str.js"(exports2, module2) {
     var split;
-    var join54;
+    var join55;
     var lines;
     var unlines;
     var words;
@@ -82967,7 +82968,7 @@ var require_Str = __commonJS({
     split = curry$(function(sep13, str) {
       return str.split(sep13);
     });
-    join54 = curry$(function(sep13, xs) {
+    join55 = curry$(function(sep13, xs) {
       return xs.join(sep13);
     });
     lines = function(str) {
@@ -83026,7 +83027,7 @@ var require_Str = __commonJS({
     };
     module2.exports = {
       split,
-      join: join54,
+      join: join55,
       lines,
       unlines,
       words,
@@ -91299,7 +91300,7 @@ var require_posix = __commonJS({
       if (isAbsolute13) return `/${path80}`;
       return path80;
     }
-    function join54(path80, ...paths) {
+    function join55(path80, ...paths) {
       if (path80 === void 0) return ".";
       if (path80 instanceof URL) {
         path80 = fromFileUrl(path80);
@@ -91777,7 +91778,7 @@ var require_posix = __commonJS({
     function joinGlobs(globs, options2 = {}) {
       const { globstar = false } = options2;
       if (!globstar || globs.length === 0) {
-        return join54(...globs);
+        return join55(...globs);
       }
       let joined;
       for (const glob of globs) {
@@ -91804,7 +91805,7 @@ var require_posix = __commonJS({
     exports2.globToRegExp = globToRegExp3;
     exports2.isAbsolute = isAbsolute12;
     exports2.isGlob = isGlob;
-    exports2.join = join54;
+    exports2.join = join55;
     exports2.joinGlobs = joinGlobs;
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
@@ -92204,7 +92205,7 @@ var require_windows = __commonJS({
       }
       return device + tail;
     }
-    function join54(path80, ...paths) {
+    function join55(path80, ...paths) {
       if (path80 instanceof URL) {
         path80 = fromFileUrl(path80);
       }
@@ -92850,7 +92851,7 @@ var require_windows = __commonJS({
     function joinGlobs(globs, options2 = {}) {
       const { globstar = false } = options2;
       if (!globstar || globs.length === 0) {
-        return join54(...globs);
+        return join55(...globs);
       }
       let joined;
       for (const glob of globs) {
@@ -92877,7 +92878,7 @@ var require_windows = __commonJS({
     exports2.globToRegExp = globToRegExp3;
     exports2.isAbsolute = isAbsolute12;
     exports2.isGlob = isGlob;
-    exports2.join = join54;
+    exports2.join = join55;
     exports2.joinGlobs = joinGlobs;
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
@@ -121390,7 +121391,7 @@ var require_relative_module_resolver = __commonJS({
 var require_eslint = __commonJS({
   "../../node_modules/.pnpm/eslint@10.13.0_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/eslint/eslint.js"(exports2, module2) {
     "use strict";
-    var { existsSync: existsSync39 } = require("node:fs");
+    var { existsSync: existsSync40 } = require("node:fs");
     var fs76 = require("node:fs/promises");
     var os15 = require("node:os");
     var path80 = require("node:path");
@@ -121826,7 +121827,7 @@ var require_eslint = __commonJS({
           warningService,
           suppressionsService
         });
-        if (existsSync39(path80.resolve(processedOptions.cwd, ".eslintignore"))) {
+        if (existsSync40(path80.resolve(processedOptions.cwd, ".eslintignore"))) {
           warningService.emitESLintIgnoreWarning();
         }
       }
@@ -121995,11 +121996,11 @@ var require_eslint = __commonJS({
         if (!lintResultCache && cacheFilePath) {
           debug2("Deleting cache file at %s", cacheFilePath);
           try {
-            if (existsSync39(cacheFilePath)) {
+            if (existsSync40(cacheFilePath)) {
               await fs76.unlink(cacheFilePath);
             }
           } catch (error) {
-            if (existsSync39(cacheFilePath)) {
+            if (existsSync40(cacheFilePath)) {
               throw error;
             }
           }
@@ -122342,7 +122343,7 @@ var require_rule_tester = __commonJS({
   "../../node_modules/.pnpm/eslint@10.13.0_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/rule-tester/rule-tester.js"(exports2, module2) {
     "use strict";
     var assert = require("node:assert");
-    var { existsSync: existsSync39, readFileSync: readFileSync30 } = require("node:fs");
+    var { existsSync: existsSync40, readFileSync: readFileSync31 } = require("node:fs");
     var util = require("node:util");
     var path80 = require("node:path");
     var equal = require_fast_deep_equal();
@@ -122733,8 +122734,8 @@ var require_rule_tester = __commonJS({
           testLocations = {
             root: `${sourceFile}:${sourceLine}:${sourceColumn}`
           };
-          if (existsSync39(sourceFile)) {
-            let content = readFileSync30(sourceFile, "utf8").split("\n").slice(sourceLine - 1);
+          if (existsSync40(sourceFile)) {
+            let content = readFileSync31(sourceFile, "utf8").split("\n").slice(sourceLine - 1);
             content[0] = content[0].slice(Math.max(0, sourceColumn - 1));
             content = content.map(
               (l) => l.trim().replace(/\s*\/\/.*$(?<!,)/u, "")
@@ -126219,7 +126220,7 @@ var require_util2 = __commonJS({
       return path80;
     }
     exports2.normalize = normalize;
-    function join54(aRoot, aPath) {
+    function join55(aRoot, aPath) {
       if (aRoot === "") {
         aRoot = ".";
       }
@@ -126251,7 +126252,7 @@ var require_util2 = __commonJS({
       }
       return joined;
     }
-    exports2.join = join54;
+    exports2.join = join55;
     exports2.isAbsolute = function(aPath) {
       return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
     };
@@ -126424,7 +126425,7 @@ var require_util2 = __commonJS({
             parsed.path = parsed.path.substring(0, index + 1);
           }
         }
-        sourceURL = join54(urlGenerate(parsed), sourceURL);
+        sourceURL = join55(urlGenerate(parsed), sourceURL);
       }
       return normalize(sourceURL);
     }
@@ -363413,7 +363414,7 @@ var require_rule62 = __commonJS({
       }),
       create(context) {
         const forLoopStack = [];
-        function join54(expressions) {
+        function join55(expressions) {
           return expressions.map((expr) => context.sourceCode.getText(expr)).join(", ");
         }
         function isInsideUpdate(node) {
@@ -363452,8 +363453,8 @@ var require_rule62 = __commonJS({
                 loc: context.sourceCode.getFirstToken(forInfo.forLoop).loc,
                 messageId: "misplacedCounter",
                 data: {
-                  test: join54(forInfo.testedExpressions),
-                  update: join54(forInfo.updatedExpressions)
+                  test: join55(forInfo.testedExpressions),
+                  update: join55(forInfo.updatedExpressions)
                 }
               });
             }
@@ -502998,6 +502999,7 @@ var init_src6 = __esm({
 // ../pipeline/src/domains/security-sop.ts
 var security_sop_exports = {};
 __export(security_sop_exports, {
+  buildSecurityExecution: () => buildSecurityExecution,
   createSecurityEventForwarder: () => createSecurityEventForwarder,
   mergeVulnerabilityFindings: () => mergeVulnerabilityFindings,
   runSecuritySopChannel: () => runSecuritySopChannel,
@@ -503101,6 +503103,21 @@ function createSecurityEventForwarder(onEvent) {
         // 浅拷贝即得普通对象：payload 是联合类型，直接断言成 Record 需要双重断言
         payload: { ...event.payload }
       });
+    }
+  };
+}
+function buildSecurityExecution(report, sop) {
+  return {
+    report,
+    ...!sop.ran ? {
+      status: "partial",
+      reason: sop.reason ?? "\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u672C\u6B21\u672A\u6267\u884C"
+    } : {},
+    detail: {
+      ruleChannelRan: sop.ran,
+      sopVulnerabilities: sop.vulnerabilities.length,
+      sopSkipped: sop.skipped,
+      sopDegraded: sop.degraded
     }
   };
 }
@@ -509613,7 +509630,7 @@ async function evalThreshold(rule, instr, context) {
       true
     );
   }
-  const violations = compareThresholds(rule, instr, metrics);
+  const violations = compareThresholds(rule, instr, metrics, readMetricBaseline(context)[rule.id]);
   return {
     rule,
     status: violations.length === 0 ? "passed" : "failed",
@@ -509622,6 +509639,11 @@ async function evalThreshold(rule, instr, context) {
     message: violations.length === 0 ? `\u9608\u503C\u8FBE\u6807: ${buildThresholdSummary(instr, metrics)}` : `\u9608\u503C\u672A\u8FBE\u6807 ${violations.length} \u9879: ${buildThresholdSummary(instr, metrics)}`,
     ...evaluationTail(targetEngine)
   };
+}
+function readMetricBaseline(context) {
+  const bag = context.extra?.metricBaseline;
+  if (typeof bag !== "object" || bag === null) return {};
+  return bag;
 }
 function readMetricBag(context) {
   const bag = context.extra?.metrics;
@@ -509635,21 +509657,24 @@ function readUnavailableReason(context) {
 function metricLabel2(metric) {
   return metric === "value" ? "\u9608\u503C\u6307\u6807" : metric;
 }
-function compareThresholds(rule, instr, metrics) {
+function compareThresholds(rule, instr, metrics, baseline) {
   const lowerBound = isLowerBoundUnit(instr.unit);
   const suffix = instr.unit ? ` ${instr.unit}` : "";
   const violations = [];
-  for (const [metric, limit] of Object.entries(instr.thresholds)) {
+  for (const [metric, threshold] of Object.entries(instr.thresholds)) {
     const actual = metrics[metric];
     if (typeof actual !== "number") continue;
+    const accepted = baseline?.[metric];
+    const limit = typeof accepted === "number" ? accepted : threshold;
     const breached = lowerBound ? actual < limit : actual > limit;
     if (!breached) continue;
+    const limitLabel = typeof accepted === "number" ? "\u4E0A\u6B21\u63A5\u53D7\u503C" : "\u9608\u503C";
     violations.push({
       id: (0, import_node_crypto6.randomUUID)(),
       ruleId: rule.id,
       severity: rule.severity,
       file: "",
-      message: lowerBound ? `${metricLabel2(metric)}=${actual}${suffix} \u4F4E\u4E8E\u9608\u503C ${limit}${suffix}` : `${metricLabel2(metric)}=${actual}${suffix} \u8D85\u8FC7\u9608\u503C ${limit}${suffix}`,
+      message: lowerBound ? `${metricLabel2(metric)}=${actual}${suffix} \u4F4E\u4E8E${limitLabel} ${limit}${suffix}` : `${metricLabel2(metric)}=${actual}${suffix} \u8D85\u8FC7${limitLabel} ${limit}${suffix}`,
       suggestion: lowerBound ? `\u5C06 ${metricLabel2(metric)} \u63D0\u5347\u5230 ${limit}${suffix} \u4EE5\u4E0A` : `\u5C06 ${metricLabel2(metric)} \u964D\u5230 ${limit}${suffix} \u4EE5\u5185`
     });
   }
@@ -510910,6 +510935,14 @@ var ToolCommandResolver = class {
     return isCommandAvailable(() => this.resolve());
   }
 };
+async function runScanWithGuard(options2, runScan, onError2) {
+  const start = Date.now();
+  try {
+    return await runScan(options2, start);
+  } catch (error) {
+    return onError2(error, start);
+  }
+}
 var ToolCommandAdapter = class {
   /** 失败文案；未覆盖时取「未安装或未在 PATH 中找到」/「<tool> 执行失败」 */
   errorTexts;
@@ -510928,12 +510961,11 @@ var ToolCommandAdapter = class {
   }
   /** 扫描入口：统一 start 计时与异常兜底，异常一律降级为 ToolResult 而非上抛 */
   async scan(options2) {
-    const start = Date.now();
-    try {
-      return await this.runScan(options2, start);
-    } catch (error) {
-      return this.buildExecErrorResult(error, start);
-    }
+    return runScanWithGuard(
+      options2,
+      (opts, start) => this.runScan(opts, start),
+      (error, start) => this.buildExecErrorResult(error, start)
+    );
   }
   /** 把 child_process 失败对象收敛为 ToolExecError（语义判断仍由调用方按需处理） */
   execErrorOf(error) {
@@ -515860,12 +515892,11 @@ var DependencyCruiserAdapter = class {
     return this.commands.isAvailable();
   }
   async scan(options2) {
-    const start = Date.now();
-    try {
-      return await this.runDepCruiser(options2, start);
-    } catch (error) {
-      return this.handleDepCruiserError(error, start);
-    }
+    return runScanWithGuard(
+      options2,
+      (opts, start) => this.runDepCruiser(opts, start),
+      (error, start) => this.handleDepCruiserError(error, start)
+    );
   }
   /**
    * 执行 dependency-cruiser 并映射输出为可用结果。
@@ -517877,32 +517908,50 @@ var TypeScriptAdapter = class {
   parseTscOutput(stdout, category, projectPath) {
     return splitTscIssues(parseTscDiagnostics(stdout, category), projectPath);
   }
-  async runBuildMode(params) {
-    const { command, projects, options: options2, category, projectPath } = params;
-    try {
-      const { stdout } = await execTool(command, buildBuildModeArgs(projects), {
-        cwd: projectPath,
-        timeout: options2.timeout || 3e5
-      });
-      return this.parseTscOutput(stdout, category, projectPath);
-    } catch (error) {
-      const err = asToolExecError(error);
-      if (err.code === "ENOENT") {
-        return {
-          issues: [],
-          envArtifactCount: 0,
-          infraError: this.tr("engine.inspect.tool.tsc.unavailable")
-        };
-      }
-      const raw = `${err.stdout ?? ""}
-${err.stderr ?? ""}`;
-      const parsed = parseTscDiagnostics(raw, category, this.locale);
-      if (parsed.length > 0) return splitTscIssues(parsed, projectPath);
+  /**
+   * tsc 执行失败 → 统一降级（构建模式与逐项目模式共用）：
+   * ENOENT ⇒ 未安装；有诊断行 ⇒ 解析并拆分环境伪影；无诊断输出 ⇒ 基础设施错误（不得静默通过）。
+   */
+  handleTscExecutionError(error, category, projectPath) {
+    const err = asToolExecError(error);
+    if (err.code === "ENOENT") {
       return {
         issues: [],
         envArtifactCount: 0,
-        infraError: err.message || this.tr("engine.inspect.tool.tsc.runFailed")
+        infraError: this.tr("engine.inspect.tool.tsc.unavailable")
       };
+    }
+    const raw = `${err.stdout ?? ""}
+${err.stderr ?? ""}`;
+    const parsed = parseTscDiagnostics(raw, category, this.locale);
+    if (parsed.length > 0) return splitTscIssues(parsed, projectPath);
+    return {
+      issues: [],
+      envArtifactCount: 0,
+      infraError: err.message || this.tr("engine.inspect.tool.tsc.runFailed")
+    };
+  }
+  /** 执行 tsc 并解析输出（构建模式与逐项目模式的成功路径共用） */
+  async execAndParseTsc(params) {
+    const { command, args, projectPath, category, timeout } = params;
+    const { stdout } = await execTool(command, args, {
+      cwd: projectPath,
+      timeout: timeout || 3e5
+    });
+    return this.parseTscOutput(stdout, category, projectPath);
+  }
+  async runBuildMode(params) {
+    const { command, projects, options: options2, category, projectPath } = params;
+    try {
+      return await this.execAndParseTsc({
+        command,
+        args: buildBuildModeArgs(projects),
+        projectPath,
+        category,
+        timeout: options2.timeout
+      });
+    } catch (error) {
+      return this.handleTscExecutionError(error, category, projectPath);
     }
   }
   buildFlags(options2) {
@@ -517915,32 +517964,15 @@ ${err.stderr ?? ""}`;
     const { command, tsconfigPath, flags, options: options2, category } = params;
     const projectPath = path42.resolve(options2.projectPath);
     try {
-      const { stdout } = await execTool(command, [...flags, "-p", tsconfigPath], {
-        cwd: projectPath,
-        timeout: options2.timeout || 3e5
+      return await this.execAndParseTsc({
+        command,
+        args: [...flags, "-p", tsconfigPath],
+        projectPath,
+        category,
+        timeout: options2.timeout
       });
-      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error) {
-      const err = asToolExecError(error);
-      if (err.code === "ENOENT") {
-        return {
-          issues: [],
-          envArtifactCount: 0,
-          infraError: this.tr("engine.inspect.tool.tsc.unavailable")
-        };
-      }
-      const raw = `${err.stdout ?? ""}
-${err.stderr ?? ""}`;
-      const parsed = parseTscDiagnostics(raw, category, this.locale);
-      if (parsed.length > 0) {
-        const { issues, envArtifactCount } = splitTscIssues(parsed, projectPath);
-        return { issues, envArtifactCount };
-      }
-      return {
-        issues: [],
-        envArtifactCount: 0,
-        infraError: err.message || this.tr("engine.inspect.tool.tsc.runFailed")
-      };
+      return this.handleTscExecutionError(error, category, projectPath);
     }
   }
   buildResult(start, category, issues, error, statusOverride) {
@@ -518331,9 +518363,28 @@ var fs49 = __toESM(require("node:fs"));
 var path51 = __toESM(require("node:path"));
 
 // ../pipeline/src/gate-coverage-diff.ts
-var import_node_child_process3 = require("node:child_process");
 var fs48 = __toESM(require("node:fs"));
 var path50 = __toESM(require("node:path"));
+
+// ../pipeline/src/runner-utils.ts
+var import_node_child_process3 = require("node:child_process");
+function toMessage2(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function tryGit(repoRoot, args) {
+  try {
+    return (0, import_node_child_process3.execFileSync)("git", ["-C", repoRoot, ...args], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3e4,
+      maxBuffer: 32 * 1024 * 1024
+    });
+  } catch {
+    return void 0;
+  }
+}
+
+// ../pipeline/src/gate-coverage-diff.ts
 var DEFAULT_DIFF_COVERAGE_REPORTS = [
   "coverage/lcov.info",
   "coverage/coverage-final.json"
@@ -518527,18 +518578,6 @@ function readSpanLine(span, edge) {
 function toRepoRelative(file, repoRoot) {
   const normalized = path50.isAbsolute(file) ? path50.relative(repoRoot, file) : file;
   return normalized.split(path50.sep).join("/");
-}
-function tryGit(repoRoot, args) {
-  try {
-    return (0, import_node_child_process3.execFileSync)("git", ["-C", repoRoot, ...args], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 3e4,
-      maxBuffer: 32 * 1024 * 1024
-    });
-  } catch {
-    return void 0;
-  }
 }
 
 // ../pipeline/src/gate-metrics.ts
@@ -519391,7 +519430,12 @@ async function runRefactorDomain(ctx) {
 }
 async function runSecurityDomain(ctx) {
   const { SecurityEngine: SecurityEngine2, calculateSecurityScore: calculateSecurityScore2 } = await Promise.resolve().then(() => (init_src6(), src_exports4));
-  const { runSecuritySopChannel: runSecuritySopChannel2, mergeVulnerabilityFindings: mergeVulnerabilityFindings2, createSecurityEventForwarder: createSecurityEventForwarder2 } = await Promise.resolve().then(() => (init_security_sop(), security_sop_exports));
+  const {
+    runSecuritySopChannel: runSecuritySopChannel2,
+    mergeVulnerabilityFindings: mergeVulnerabilityFindings2,
+    createSecurityEventForwarder: createSecurityEventForwarder2,
+    buildSecurityExecution: buildSecurityExecution2
+  } = await Promise.resolve().then(() => (init_security_sop(), security_sop_exports));
   const emitter = createSecurityEventForwarder2(ctx.onEvent);
   const engine = new SecurityEngine2(emitter);
   engine.registerDefaultAdapters();
@@ -519414,37 +519458,7 @@ async function runSecurityDomain(ctx) {
     },
     securityScore: calculateSecurityScore2(mergedVulnerabilities)
   };
-  const sopNotRan = !sop.ran;
-  return {
-    report,
-    ...sopNotRan ? {
-      status: "partial",
-      reason: sop.reason ?? "\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u672C\u6B21\u672A\u6267\u884C"
-    } : {},
-    detail: {
-      ruleChannelRan: sop.ran,
-      sopVulnerabilities: sop.vulnerabilities.length,
-      sopSkipped: sop.skipped,
-      sopDegraded: sop.degraded
-    }
-  };
-}
-function toSecurityVulnerability(finding) {
-  return {
-    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
-    severity: finding.severity,
-    title: finding.message,
-    description: finding.message,
-    package: finding.file,
-    currentVersion: "",
-    vulnerableRange: "",
-    dependencyPath: [],
-    isDirectDependency: false,
-    recommendation: finding.suggestion ?? "\u8BF7\u590D\u6838\u8BE5\u5904\u4EE3\u7801\u5E76\u6309\u5B89\u5168\u89C4\u8303\u4FEE\u590D",
-    autoFixable: false,
-    confidence: "high_confidence",
-    sourceTools: ["semgrep"]
-  };
+  return buildSecurityExecution2(report, sop);
 }
 function dedupePerformanceIssues(issues) {
   const seen = /* @__PURE__ */ new Set();
@@ -519537,9 +519551,26 @@ var DEFAULT_DOMAIN_EXECUTORS = {
   // techdebt 需要 @zh/scoring + 数据库（宿主能力），由调用方注入；
   // sentinel / backup / reports 属运行时域 / 只读聚合，不参与静态扫描。
 };
+function toSecurityVulnerability(finding) {
+  return {
+    id: `${finding.ruleId}:${finding.file}:${finding.line ?? 0}`,
+    severity: finding.severity,
+    title: finding.message,
+    description: finding.message,
+    package: finding.file,
+    currentVersion: "",
+    vulnerableRange: "",
+    dependencyPath: [],
+    isDirectDependency: false,
+    recommendation: finding.suggestion ?? "\u8BF7\u590D\u6838\u8BE5\u5904\u4EE3\u7801\u5E76\u6309\u5B89\u5168\u89C4\u8303\u4FEE\u590D",
+    autoFixable: false,
+    confidence: "high_confidence",
+    sourceTools: ["semgrep"]
+  };
+}
 
 // ../pipeline/src/autoperf-adapter.ts
-function toMessage2(error) {
+function toMessage3(error) {
   return error instanceof Error ? error.message : String(error);
 }
 async function registerAutoPerfAdapter(inspectEngine) {
@@ -519547,7 +519578,7 @@ async function registerAutoPerfAdapter(inspectEngine) {
     const { AutoPerfToolAdapter: AutoPerfToolAdapter2 } = await Promise.resolve().then(() => (init_src10(), src_exports8));
     inspectEngine.registerAdapter(new AutoPerfToolAdapter2());
   } catch (err) {
-    console.warn(`[pipeline] AutoPerf \u9002\u914D\u5668\u6CE8\u518C\u5931\u8D25\uFF0C\u8DF3\u8FC7\uFF08\u6027\u80FD\u81EA\u6CBB\u964D\u7EA7\uFF09: ${toMessage2(err)}`);
+    console.warn(`[pipeline] AutoPerf \u9002\u914D\u5668\u6CE8\u518C\u5931\u8D25\uFF0C\u8DF3\u8FC7\uFF08\u6027\u80FD\u81EA\u6CBB\u964D\u7EA7\uFF09: ${toMessage3(err)}`);
   }
 }
 
@@ -519658,11 +519689,6 @@ function buildScanErrorResult(start, error) {
   };
 }
 
-// ../pipeline/src/runner-utils.ts
-function toMessage3(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 // ../pipeline/src/report-builders.ts
 function buildFailureReport(stage, guard, inspect, error) {
   return {
@@ -519753,11 +519779,15 @@ async function readSyncedRules(logger, modulesDir, dbFiles) {
       const rules = JSON.parse(raw);
       if (Array.isArray(rules)) synced.push(...rules);
     } catch (err) {
-      logger.warn(`\u540C\u6B65\u89C4\u5219\u6A21\u5757 ${file} \u89E3\u6790\u5931\u8D25: ${toMessage3(err)}`);
+      logger.warn(`\u540C\u6B65\u89C4\u5219\u6A21\u5757 ${file} \u89E3\u6790\u5931\u8D25: ${toMessage2(err)}`);
     }
   }
   return synced;
 }
+
+// ../pipeline/src/pipeline-runner-phase-helpers.ts
+var import_node_fs2 = require("node:fs");
+var import_node_path11 = require("node:path");
 
 // ../fingerprint/src/language-map.ts
 var EXTENSION_LANGUAGES = {
@@ -520873,6 +520903,30 @@ function deriveProjectFeature(repoRoot) {
     return void 0;
   }
 }
+function normalizeMetricEntry(metrics) {
+  if (!metrics || typeof metrics !== "object") return void 0;
+  const entries = {};
+  for (const [metric, value] of Object.entries(metrics)) {
+    if (typeof value === "number" && Number.isFinite(value)) entries[metric] = value;
+  }
+  return Object.keys(entries).length > 0 ? entries : void 0;
+}
+function loadMetricBaseline(repoRoot) {
+  const file = (0, import_node_path11.join)(repoRoot, ".metric-baseline.json");
+  if (!(0, import_node_fs2.existsSync)(file)) return void 0;
+  try {
+    const raw = JSON.parse((0, import_node_fs2.readFileSync)(file, "utf8"));
+    if (!raw || typeof raw.metrics !== "object" || raw.metrics === null) return void 0;
+    const out = {};
+    for (const [ruleId, metrics] of Object.entries(raw.metrics)) {
+      const entry = normalizeMetricEntry(metrics);
+      if (entry) out[ruleId] = entry;
+    }
+    return Object.keys(out).length > 0 ? out : void 0;
+  } catch {
+    return void 0;
+  }
+}
 function composeRuleContext(repoRoot, domain, partial) {
   const base = {
     dryRun: domain === "guard" ? partial?.dryRun ?? false : partial?.dryRun,
@@ -520883,6 +520937,8 @@ function composeRuleContext(repoRoot, domain, partial) {
     const feature = deriveProjectFeature(repoRoot);
     if (feature) base.projectFeature = feature;
   }
+  const metricBaseline = loadMetricBaseline(repoRoot);
+  if (metricBaseline) base.extra = { ...base.extra, metricBaseline };
   return base;
 }
 function logTrimObservability(logger, report, phase) {
@@ -520905,8 +520961,8 @@ async function runSopGuardPhase(logger, runSopGuard, guardContext) {
     }
     return { report };
   } catch (error) {
-    logger.error(`SOP Guard \u68C0\u67E5\u5931\u8D25: ${toMessage3(error)}`);
-    return { failure: buildFailureReport("guard", null, null, toMessage3(error)) };
+    logger.error(`SOP Guard \u68C0\u67E5\u5931\u8D25: ${toMessage2(error)}`);
+    return { failure: buildFailureReport("guard", null, null, toMessage2(error)) };
   }
 }
 async function runSopInspectPhase(logger, runSopInspect, inspectContext, guardReport) {
@@ -520918,8 +520974,8 @@ async function runSopInspectPhase(logger, runSopInspect, inspectContext, guardRe
     }
     return { report };
   } catch (error) {
-    logger.error(`SOP Inspect \u5DE1\u68C0\u5931\u8D25: ${toMessage3(error)}`);
-    return { failure: buildFailureReport("inspect", guardReport, null, toMessage3(error)) };
+    logger.error(`SOP Inspect \u5DE1\u68C0\u5931\u8D25: ${toMessage2(error)}`);
+    return { failure: buildFailureReport("inspect", guardReport, null, toMessage2(error)) };
   }
 }
 async function runGuardPhase(logger, runGuard, options2) {
@@ -520931,8 +520987,8 @@ async function runGuardPhase(logger, runGuard, options2) {
     }
     return { report };
   } catch (error) {
-    logger.error(`Guard \u68C0\u67E5\u5931\u8D25: ${toMessage3(error)}`);
-    return { failure: buildFailureReport("guard", null, null, toMessage3(error)) };
+    logger.error(`Guard \u68C0\u67E5\u5931\u8D25: ${toMessage2(error)}`);
+    return { failure: buildFailureReport("guard", null, null, toMessage2(error)) };
   }
 }
 async function runInspectPhase(logger, runInspect, guardReport) {
@@ -520940,8 +520996,8 @@ async function runInspectPhase(logger, runInspect, guardReport) {
     const report = await runInspect();
     return { report };
   } catch (error) {
-    logger.error(`Inspect \u5DE1\u68C0\u5931\u8D25: ${toMessage3(error)}`);
-    return { failure: buildFailureReport("inspect", guardReport, null, toMessage3(error)) };
+    logger.error(`Inspect \u5DE1\u68C0\u5931\u8D25: ${toMessage2(error)}`);
+    return { failure: buildFailureReport("inspect", guardReport, null, toMessage2(error)) };
   }
 }
 
@@ -521276,16 +521332,25 @@ function failureRecord(input) {
     ...overBudget ? { overBudget: true } : {}
   };
 }
-async function runOne(domain, executor, options2, now) {
-  const budgetMs = budgetFor(domain, options2);
-  if (!executor) return notRunRecord(domain, budgetMs);
-  const ctx = {
+function buildDomainContext(options2) {
+  return {
     repoRoot: options2.repoRoot,
     ...options2.runner ? { runner: options2.runner } : {},
     ...options2.onEvent ? { onEvent: options2.onEvent } : {},
     ...options2.dryRun ? { dryRun: options2.dryRun } : {},
     ...options2.depsScanInput ? { depsScanInput: options2.depsScanInput } : {}
   };
+}
+function attachKilledProcesses(record, scope) {
+  if (record.overBudget !== true) return record;
+  const killed = scope?.killAll() ?? 0;
+  if (killed > 0) record.detail = { ...record.detail ?? {}, killedToolProcesses: killed };
+  return record;
+}
+async function runOne(domain, executor, options2, now) {
+  const budgetMs = budgetFor(domain, options2);
+  if (!executor) return notRunRecord(domain, budgetMs);
+  const ctx = buildDomainContext(options2);
   const timeoutMessage = budgetMs === void 0 ? void 0 : `[domains] \u57DF ${domain} \u8D85\u8FC7 ${budgetMs}ms \u9884\u7B97`;
   const start = now();
   let scope;
@@ -521297,12 +521362,10 @@ async function runOne(domain, executor, options2, now) {
     const execution = await (budgetMs === void 0 ? run() : withHardTimeout(run(), budgetMs, timeoutMessage));
     return successRecord(domain, execution, budgetMs, now() - start);
   } catch (err) {
-    const record = failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start });
-    if (record.overBudget === true) {
-      const killed = scope?.killAll() ?? 0;
-      if (killed > 0) record.detail = { ...record.detail ?? {}, killedToolProcesses: killed };
-    }
-    return record;
+    return attachKilledProcesses(
+      failureRecord({ domain, err, budgetMs, timeoutMessage, durationMs: now() - start }),
+      scope
+    );
   }
 }
 async function runDomains(options2) {
@@ -521404,12 +521467,48 @@ function vulnsToFindings(dep, vulns) {
     severity: mapOsvSeverity(v)
   }));
 }
+function buildQueryBatchBody(deps) {
+  return {
+    queries: deps.map((dep) => ({
+      package: { name: dep.name, ecosystem: "npm" },
+      version: dep.version
+    }))
+  };
+}
+function collectVulnHits(results, deps) {
+  const hits = [];
+  results.forEach((slot, i) => {
+    const dep = deps[i];
+    if (!dep || !slot?.vulns?.length) return;
+    hits.push({ dep, vulns: slot.vulns.filter((v) => typeof v?.id === "string") });
+  });
+  return hits;
+}
+function uniqueVulnIds(hits) {
+  return [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id)))];
+}
+function buildFindings(hits, details) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const detail of details) {
+    if (detail?.id) byId.set(detail.id, detail);
+  }
+  const findings = [];
+  for (const hit of hits) {
+    const hydrated = hit.vulns.map((v) => v.id ? byId.get(v.id) ?? v : v);
+    findings.push(...vulnsToFindings(hit.dep, hydrated));
+  }
+  return findings;
+}
+function describeFetchFailure(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  const causeCode = err?.cause?.code;
+  if (message.includes("abort")) return `OSV \u8BF7\u6C42\u8D85\u65F6\uFF08${OSV_TIMEOUT_MS / 1e3}s\uFF09`;
+  return causeCode ? `${message}\uFF08${causeCode}\uFF09` : message;
+}
 async function runCveChecks(nodes, fetchImpl = fetch) {
   const checkedAt = (/* @__PURE__ */ new Date()).toISOString();
   const deps = collectQueryableDeps(nodes);
-  if (deps.length === 0) {
-    return { status: "ok", findings: [], checkedAt };
-  }
+  if (deps.length === 0) return { status: "ok", findings: [], checkedAt };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OSV_TIMEOUT_MS);
   const baseUrl = resolveOsvBaseUrl();
@@ -521418,12 +521517,7 @@ async function runCveChecks(nodes, fetchImpl = fetch) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify({
-        queries: deps.map((dep) => ({
-          package: { name: dep.name, ecosystem: "npm" },
-          version: dep.version
-        }))
-      })
+      body: JSON.stringify(buildQueryBatchBody(deps))
     });
     if (!response.ok) {
       return {
@@ -521437,33 +521531,14 @@ async function runCveChecks(nodes, fetchImpl = fetch) {
     if (!payload || !Array.isArray(payload.results)) {
       return { status: "unavailable", findings: [], reason: "OSV \u54CD\u5E94\u5F62\u72B6\u4E0D\u7B26", checkedAt };
     }
-    const hits = [];
-    payload.results.forEach((slot, i) => {
-      const dep = deps[i];
-      if (!dep || !slot?.vulns?.length) return;
-      hits.push({ dep, vulns: slot.vulns.filter((v) => typeof v?.id === "string") });
-    });
-    const ids = [...new Set(hits.flatMap((h) => h.vulns.map((v) => v.id)))];
-    const detailIds = ids.slice(0, MAX_DETAIL_FETCHES);
+    const hits = collectVulnHits(payload.results, deps);
     const details = await Promise.all(
-      detailIds.map((id) => fetchVulnDetail(baseUrl, id, fetchImpl, controller.signal))
+      uniqueVulnIds(hits).slice(0, MAX_DETAIL_FETCHES).map((id) => fetchVulnDetail(baseUrl, id, fetchImpl, controller.signal))
     );
-    const byId = /* @__PURE__ */ new Map();
-    for (const detail of details) {
-      if (detail?.id) byId.set(detail.id, detail);
-    }
     clearTimeout(timer);
-    const findings = [];
-    for (const hit of hits) {
-      const hydrated = hit.vulns.map((v) => v.id ? byId.get(v.id) ?? v : v);
-      findings.push(...vulnsToFindings(hit.dep, hydrated));
-    }
-    return { status: "ok", findings, checkedAt };
+    return { status: "ok", findings: buildFindings(hits, details), checkedAt };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const causeCode = err?.cause?.code;
-    const reason = message.includes("abort") ? `OSV \u8BF7\u6C42\u8D85\u65F6\uFF08${OSV_TIMEOUT_MS / 1e3}s\uFF09` : causeCode ? `${message}\uFF08${causeCode}\uFF09` : message;
-    return { status: "unavailable", findings: [], reason, checkedAt };
+    return { status: "unavailable", findings: [], reason: describeFetchFailure(err), checkedAt };
   } finally {
     clearTimeout(timer);
   }
@@ -521471,18 +521546,18 @@ async function runCveChecks(nodes, fetchImpl = fetch) {
 
 // src/sop-dir.ts
 var path75 = __toESM(require("node:path"));
-var import_node_fs2 = require("node:fs");
+var import_node_fs3 = require("node:fs");
 init_src2();
 var DOMAIN_DIRS = new Set(GOVERNANCE_DOMAINS);
 function isDirectory(p) {
-  return (0, import_node_fs2.existsSync)(p) && (0, import_node_fs2.statSync)(p).isDirectory();
+  return (0, import_node_fs3.existsSync)(p) && (0, import_node_fs3.statSync)(p).isDirectory();
 }
 function resolveBundledSopDir(base) {
   const bundled = path75.join(base, "sop");
   if (!isDirectory(bundled)) return void 0;
   const templates = path75.join(bundled, "presets", "sop-templates");
   if (isDirectory(templates)) return templates;
-  const hasLegacyDomains = (0, import_node_fs2.readdirSync)(bundled, { withFileTypes: true }).some(
+  const hasLegacyDomains = (0, import_node_fs3.readdirSync)(bundled, { withFileTypes: true }).some(
     (entry) => entry.isDirectory() && DOMAIN_DIRS.has(entry.name)
   );
   return hasLegacyDomains ? bundled : void 0;
@@ -522404,7 +522479,7 @@ function refactorFindings(report) {
   }
   return findings;
 }
-function buildFindings(report) {
+function buildFindings2(report) {
   const findings = [];
   if (!report) return findings;
   if (isGuardReport(report)) return guardFindings(report);
@@ -522412,9 +522487,9 @@ function buildFindings(report) {
   if (isInspectionReport(report)) return inspectionFindings(report);
   if (isRefactorReport(report)) return refactorFindings(report);
   if (isPipelineReport(report)) {
-    if (report.guard) findings.push(...buildFindings(report.guard));
-    if (report.inspect) findings.push(...buildFindings(report.inspect));
-    if (report.refactor) findings.push(...buildFindings(report.refactor));
+    if (report.guard) findings.push(...buildFindings2(report.guard));
+    if (report.inspect) findings.push(...buildFindings2(report.inspect));
+    if (report.refactor) findings.push(...buildFindings2(report.refactor));
     return findings;
   }
   return findings;
@@ -522805,7 +522880,7 @@ function stageLabel(stage) {
 // src/commands.ts
 init_src2();
 var path78 = __toESM(require("node:path"));
-var import_node_fs3 = require("node:fs");
+var import_node_fs4 = require("node:fs");
 
 // src/degraded.ts
 function countDegraded(report) {
@@ -522861,7 +522936,7 @@ function asGovernanceDomains(domains) {
 
 // src/commands.ts
 function shouldBlock(report, failOn, dryRun, projectDir) {
-  const findings = buildFindings(report);
+  const findings = buildFindings2(report);
   relativizeFindings(findings, projectDir);
   const blocked = !dryRun && failOn !== "none" && findings.some((f) => severityRank2(f.severity) >= failOnRank(failOn));
   return { findings, blocked };
@@ -522887,16 +522962,16 @@ function writeReportFile(opts, report, findings, target) {
   if (opts.format === "sarif") {
     const outPath = opts.report || `${base}.sarif`;
     const absPath = path78.resolve(projectDir, outPath);
-    (0, import_node_fs3.mkdirSync)(path78.dirname(absPath), { recursive: true });
-    (0, import_node_fs3.writeFileSync)(absPath, toSarif(findings), "utf8");
+    (0, import_node_fs4.mkdirSync)(path78.dirname(absPath), { recursive: true });
+    (0, import_node_fs4.writeFileSync)(absPath, toSarif(findings), "utf8");
     console.error(`[CLI] \u62A5\u544A\u5DF2\u5199\u5165: ${outPath}`);
     return;
   }
   if (opts.format === "json") {
     const outPath = opts.report || `${base}.json`;
     const absPath = path78.resolve(projectDir, outPath);
-    (0, import_node_fs3.mkdirSync)(path78.dirname(absPath), { recursive: true });
-    (0, import_node_fs3.writeFileSync)(absPath, formatReportJson(report), "utf8");
+    (0, import_node_fs4.mkdirSync)(path78.dirname(absPath), { recursive: true });
+    (0, import_node_fs4.writeFileSync)(absPath, formatReportJson(report), "utf8");
     console.error(`[CLI] \u62A5\u544A\u5DF2\u5199\u5165: ${outPath}`);
     return;
   }
@@ -523116,8 +523191,8 @@ async function runFullScanCommand(runner, opts, projectDir, deps = {}) {
   if (opts.format === "json") {
     const outPath = opts.report || "zhshield-scan-ledger.json";
     const absPath = path78.resolve(projectDir, outPath);
-    await import_node_fs3.promises.mkdir(path78.dirname(absPath), { recursive: true });
-    await import_node_fs3.promises.writeFile(absPath, `${JSON.stringify(ledger, null, 2)}
+    await import_node_fs4.promises.mkdir(path78.dirname(absPath), { recursive: true });
+    await import_node_fs4.promises.writeFile(absPath, `${JSON.stringify(ledger, null, 2)}
 `, "utf8");
     console.error(`[CLI] \u8D26\u672C\u5DF2\u5199\u5165: ${outPath}`);
   }

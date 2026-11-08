@@ -237,3 +237,54 @@ describe('toInspectionReportDataFromRuleEngine — 不适用（not-applicable）
     ).toBe(data!.summary.total);
   });
 });
+
+describe('toInspectionReportDataFromRuleEngine — 项目级指标标记', () => {
+  it('阈值规则（违规 file 为空）标记 projectMetric，供 AI 修复队列跳过', () => {
+    const thresholdReport = {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
+      ok: false,
+      durationMs: 0,
+      timestamp: '2026-11-08T00:00:00.000Z',
+      evaluations: [
+        {
+          rule: { id: 'inspect.scan.official.complexity', name: 'Code Complexity Check' },
+          status: 'failed',
+          violations: [
+            { severity: 'warning', file: '', message: 'cyclomaticComplexity=15 超过阈值 10' },
+            { severity: 'warning', file: '', message: 'functionLength=80 超过阈值 50' },
+          ],
+        },
+      ],
+    };
+    const data = toInspectionReportDataFromRuleEngine(thresholdReport);
+    expect(data).not.toBeNull();
+    expect(data!.checks[0]?.projectMetric).toBe(true);
+  });
+
+  it('普通代码问题（有文件位置）不标记 projectMetric', () => {
+    const codeReport = {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      errors: 0,
+      skipped: 0,
+      ok: false,
+      durationMs: 0,
+      timestamp: '2026-11-08T00:00:00.000Z',
+      evaluations: [
+        {
+          rule: { id: 'inspect.scan.official.type-safety', name: 'Type Safety' },
+          status: 'failed',
+          violations: [{ severity: 'warning', file: 'src/a.ts', line: 10, message: 'as any' }],
+        },
+      ],
+    };
+    const data = toInspectionReportDataFromRuleEngine(codeReport);
+    expect(data).not.toBeNull();
+    expect(data!.checks[0]?.projectMetric).toBeUndefined();
+  });
+});

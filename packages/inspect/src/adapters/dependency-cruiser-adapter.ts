@@ -8,6 +8,7 @@ import {
   buildAccessScope,
   buildToolResult,
   execTool,
+  runScanWithGuard,
   ToolCommandResolver,
 } from './tool-runner';
 import { resolveInjectedConfigPath } from './injected-config';
@@ -112,12 +113,11 @@ export class DependencyCruiserAdapter implements ToolAdapter {
   }
 
   async scan(options: ToolScanOptions): Promise<ToolResult> {
-    const start = Date.now();
-    try {
-      return await this.runDepCruiser(options, start);
-    } catch (error: unknown) {
-      return this.handleDepCruiserError(error, start);
-    }
+    return runScanWithGuard(
+      options,
+      (opts, start) => this.runDepCruiser(opts, start),
+      (error, start) => this.handleDepCruiserError(error, start),
+    );
   }
 
   /**

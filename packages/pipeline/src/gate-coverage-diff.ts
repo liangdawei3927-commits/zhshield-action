@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { tryGit } from './runner-utils';
 
 /**
  * diff 覆盖率（`scope: diff`）—— 只统计「本次改动行」的覆盖率。
@@ -293,18 +293,4 @@ function readSpanLine(span: unknown, edge: 'start' | 'end'): number | undefined 
 export function toRepoRelative(file: string, repoRoot: string): string {
   const normalized = path.isAbsolute(file) ? path.relative(repoRoot, file) : file;
   return normalized.split(path.sep).join('/');
-}
-
-/** git 执行失败（非零退出 / 无 git）一律返回 undefined，由调用方给原因 */
-function tryGit(repoRoot: string, args: readonly string[]): string | undefined {
-  try {
-    return execFileSync('git', ['-C', repoRoot, ...args], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 30_000,
-      maxBuffer: 32 * 1024 * 1024,
-    });
-  } catch {
-    return undefined;
-  }
 }

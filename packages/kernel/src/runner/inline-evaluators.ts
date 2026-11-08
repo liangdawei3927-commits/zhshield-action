@@ -90,7 +90,7 @@ export async function evalThreshold(
     );
   }
 
-  const violations = compareThresholds(rule, instr, metrics);
+  const violations = compareThresholds(rule, instr, metrics, readMetricBaseline(context)[rule.id]);
   return {
     rule,
     status: violations.length === 0 ? 'passed' : 'failed',
@@ -102,6 +102,16 @@ export async function evalThreshold(
         : `阈值未达标 ${violations.length} 项: ${buildThresholdSummary(instr, metrics)}`,
     ...evaluationTail(targetEngine),
   };
+}
+
+/**
+ * 读取项目级指标棘轮基线：ruleId → metric → 上次接受值。
+ * 由调用方经 `context.extra.metricBaseline` 注入；缺省时退回规则静态阈值。
+ */
+function readMetricBaseline(context: RuleContext): Record<string, Record<string, number>> {
+  const bag = context.extra?.metricBaseline;
+  if (typeof bag !== 'object' || bag === null) return {};
+  return bag as Record<string, Record<string, number>>;
 }
 
 /** 读取调用方注入的实测值；非数值条目一律忽略，交由 missing 判定 */
@@ -129,15 +139,21 @@ function compareThresholds(
   rule: SopRule,
   instr: ThresholdInstruction,
   metrics: Record<string, number | undefined>,
+  baseline?: Record<string, number>,
 ): Violation[] {
   const lowerBound = isLowerBoundUnit(instr.unit);
   const suffix = instr.unit ? ` ${instr.unit}` : '';
   const violations: Violation[] = [];
-  for (const [metric, limit] of Object.entries(instr.thresholds)) {
+  for (const [metric, threshold] of Object.entries(instr.thresholds)) {
     const actual = metrics[metric];
     if (typeof actual !== 'number') continue;
+    // 棘轮：有「上次接受值」时，以它为线 —— 持平/改善通过，只有变差才失败；
+    // 没有基线时才退回规则静态阈值（存量债务仍在，但规则不再是不可收敛的死循环）。
+    const accepted = baseline?.[metric];
+    const limit = typeof accepted === 'number' ? accepted : threshold;
     const breached = lowerBound ? actual < limit : actual > limit;
     if (!breached) continue;
+    const limitLabel = typeof accepted === 'number' ? '上次接受值' : '阈值';
     // 阈值是项目级指标，没有具体文件位置 —— 沿用 check-list 的项目级空路径约定
     violations.push({
       id: randomUUID(),
@@ -145,8 +161,8 @@ function compareThresholds(
       severity: rule.severity,
       file: '',
       message: lowerBound
-        ? `${metricLabel(metric)}=${actual}${suffix} 低于阈值 ${limit}${suffix}`
-        : `${metricLabel(metric)}=${actual}${suffix} 超过阈值 ${limit}${suffix}`,
+        ? `${metricLabel(metric)}=${actual}${suffix} 低于${limitLabel} ${limit}${suffix}`
+        : `${metricLabel(metric)}=${actual}${suffix} 超过${limitLabel} ${limit}${suffix}`,
       suggestion: lowerBound
         ? `将 ${metricLabel(metric)} 提升到 ${limit}${suffix} 以上`
         : `将 ${metricLabel(metric)} 降到 ${limit}${suffix} 以内`,

@@ -365,6 +365,15 @@ export class TypeScriptAdapter implements ToolAdapter {
    * 副作用：构建模式会写入各项目的 `.tsbuildinfo`（tsc 标准增量产物，多数仓库已
    * gitignore）。已实测其不会导致漏检：新增含类型错误的文件后 `tsc -b` 仍照常报出。
    */
+  /** tsc 成功输出 → 拆分诊断与环境伪影（构建模式/逐项目模式共用，消除重复块） */
+  private parseTscOutput(
+    stdout: string,
+    category: IssueCategory,
+    projectPath: string,
+  ): TscRunResult {
+    return splitTscIssues(parseTscDiagnostics(stdout, category), projectPath);
+  }
+
   private async runBuildMode(params: RunBuildModeParams): Promise<TscRunResult> {
     const { command, projects, options, category, projectPath } = params;
     try {
@@ -372,11 +381,7 @@ export class TypeScriptAdapter implements ToolAdapter {
         cwd: projectPath,
         timeout: options.timeout || 300000,
       });
-      const { issues, envArtifactCount } = splitTscIssues(
-        parseTscDiagnostics(stdout, category),
-        projectPath,
-      );
-      return { issues, envArtifactCount };
+      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error: unknown) {
       const err = asToolExecError(error);
       if (err.code === 'ENOENT') {
@@ -413,11 +418,7 @@ export class TypeScriptAdapter implements ToolAdapter {
         cwd: projectPath,
         timeout: options.timeout || 300000,
       });
-      const { issues, envArtifactCount } = splitTscIssues(
-        parseTscDiagnostics(stdout, category),
-        projectPath,
-      );
-      return { issues, envArtifactCount };
+      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error: unknown) {
       const err = asToolExecError(error);
       if (err.code === 'ENOENT') {

@@ -14,6 +14,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeJoin } from '@zh/shared';
+import { DEFAULT_CONFIG, type PerformanceConfig } from './types';
 
 /** 单包项目常见的源码根目录名（刻意不含 lib/ — 多数项目 lib/ 是产物目录，会引入误报） */
 const SINGLE_ROOT_DIRS: readonly string[] = ['src', 'app'];
@@ -49,6 +50,25 @@ export function isNonProductionFile(name: string): boolean {
 
 /** 源码文件扩展名（ts/tsx/js/jsx） */
 export const SOURCE_EXTS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx'];
+
+/**
+ * 性能检测器共用样板：合并配置 + 解析扫描根 + 收集源文件。
+ *
+ * 两个 detector（complexity / redos）原本各抄一份同样的 8 行 setup，
+ * 收敛到这里避免再次漂移（扫描根/跳过目录口径必须一致）。
+ */
+export function preparePerformanceScan(
+  projectRoot: string,
+  config?: PerformanceConfig,
+): { cfg: PerformanceConfig; files: string[] } {
+  const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
+  const files = collectFilesAcrossRoots(
+    resolveSourceRoots(projectRoot),
+    (root, limit) => collectSourceFiles(root, SOURCE_EXTS, SKIPPED_SOURCE_DIRS, limit),
+    cfg.scanLimit,
+  );
+  return { cfg, files };
+}
 
 /** 遍历源码时跳过的目录名：依赖自身、构建产物与非生产代码 */
 export const SKIPPED_SOURCE_DIRS: ReadonlySet<string> = new Set<string>([

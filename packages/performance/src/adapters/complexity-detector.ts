@@ -18,15 +18,8 @@
  * —— 后者是体检圈复杂度的命名空间，共用会让同一指纹被两个域认领（C1/C2 违约）。
  */
 import * as path from 'path';
-import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
-import {
-  resolveSourceRoots,
-  collectFilesAcrossRoots,
-  collectSourceFiles,
-  readTextSafe,
-  SOURCE_EXTS,
-  SKIPPED_SOURCE_DIRS,
-} from '../source-roots';
+import type { PerformanceConfig, PerformanceIssue } from '../types';
+import { preparePerformanceScan, readTextSafe } from '../source-roots';
 import { scanSourceFile, type FileScan } from './ast-scan';
 import { classifyRuntime, isLatencySensitive, type RuntimeContext } from './runtime-context';
 
@@ -82,13 +75,8 @@ function impactOf(context: RuntimeContext): { label: string; impact: string; adv
  */
 export class ComplexityDetectorImpl implements ComplexityDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
-    const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
+    const { files } = preparePerformanceScan(projectRoot, config);
     const issues: PerformanceIssue[] = [];
-    const files = collectFilesAcrossRoots(
-      resolveSourceRoots(projectRoot),
-      (root, limit) => collectSourceFiles(root, SOURCE_EXTS, SKIPPED_SOURCE_DIRS, limit),
-      cfg.scanLimit,
-    );
 
     for (const filePath of files) {
       const content = readTextSafe(filePath);

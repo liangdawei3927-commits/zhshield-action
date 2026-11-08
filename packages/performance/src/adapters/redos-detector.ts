@@ -31,15 +31,8 @@
  */
 import * as path from 'path';
 import * as ts from 'typescript';
-import { DEFAULT_CONFIG, type PerformanceConfig, type PerformanceIssue } from '../types';
-import {
-  resolveSourceRoots,
-  collectFilesAcrossRoots,
-  collectSourceFiles,
-  readTextSafe,
-  SOURCE_EXTS,
-  SKIPPED_SOURCE_DIRS,
-} from '../source-roots';
+import type { PerformanceConfig, PerformanceIssue } from '../types';
+import { preparePerformanceScan, readTextSafe } from '../source-roots';
 import { scriptKindOf } from './ast-nodes';
 
 /** 命中的正则：模式文本 + 起始行（1 基） */
@@ -214,13 +207,8 @@ function buildRedosIssue(relFile: string, hit: RegexHit, seq: number): Performan
  */
 export class RedosDetectorImpl implements RedosDetector {
   detect(projectRoot: string, config?: PerformanceConfig): PerformanceIssue[] {
-    const cfg: PerformanceConfig = { ...DEFAULT_CONFIG, ...(config ?? {}) };
+    const { files } = preparePerformanceScan(projectRoot, config);
     const issues: PerformanceIssue[] = [];
-    const files = collectFilesAcrossRoots(
-      resolveSourceRoots(projectRoot),
-      (root, limit) => collectSourceFiles(root, SOURCE_EXTS, SKIPPED_SOURCE_DIRS, limit),
-      cfg.scanLimit,
-    );
 
     for (const filePath of files) {
       const content = readTextSafe(filePath);

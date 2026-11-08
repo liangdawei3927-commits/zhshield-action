@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: da62d29022eef30c
+// @zh-src-hash: 3a5aac36cbe2acbe
 // @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -503128,6 +503128,15 @@ var init_types6 = __esm({
 function isNonProductionFile(name) {
   return NON_PRODUCTION_FILE_RE.test(name);
 }
+function preparePerformanceScan(projectRoot, config) {
+  const cfg = { ...DEFAULT_CONFIG2, ...config ?? {} };
+  const files = collectFilesAcrossRoots(
+    resolveSourceRoots(projectRoot),
+    (root, limit) => collectSourceFiles3(root, SOURCE_EXTS3, SKIPPED_SOURCE_DIRS, limit),
+    cfg.scanLimit
+  );
+  return { cfg, files };
+}
 function readTextSafe2(filePath) {
   try {
     return fs62.readFileSync(filePath, "utf-8");
@@ -503206,6 +503215,7 @@ var init_source_roots = __esm({
     fs62 = __toESM(require("node:fs"));
     path66 = __toESM(require("node:path"));
     init_src2();
+    init_types6();
     SINGLE_ROOT_DIRS = ["src", "app"];
     WORKSPACE_DIRS = ["packages", "apps"];
     MAX_WORKSPACE_CHILDREN = 100;
@@ -504375,20 +504385,14 @@ var init_complexity_detector = __esm({
   "../performance/src/adapters/complexity-detector.ts"() {
     "use strict";
     path70 = __toESM(require("path"));
-    init_types6();
     init_source_roots();
     init_ast_scan();
     init_runtime_context();
     NESTED_LOOP_THRESHOLD = 3;
     ComplexityDetectorImpl = class {
       detect(projectRoot, config) {
-        const cfg = { ...DEFAULT_CONFIG2, ...config ?? {} };
+        const { files } = preparePerformanceScan(projectRoot, config);
         const issues = [];
-        const files = collectFilesAcrossRoots(
-          resolveSourceRoots(projectRoot),
-          (root, limit) => collectSourceFiles3(root, SOURCE_EXTS3, SKIPPED_SOURCE_DIRS, limit),
-          cfg.scanLimit
-        );
         for (const filePath of files) {
           const content = readTextSafe2(filePath);
           if (content === null) continue;
@@ -504570,19 +504574,13 @@ var init_redos_detector = __esm({
     "use strict";
     path71 = __toESM(require("path"));
     ts11 = __toESM(require_typescript());
-    init_types6();
     init_source_roots();
     init_ast_nodes();
     BRACE_QUANTIFIER_RE = /^\{(\d+)(,(\d*))?\}/;
     RedosDetectorImpl = class {
       detect(projectRoot, config) {
-        const cfg = { ...DEFAULT_CONFIG2, ...config ?? {} };
+        const { files } = preparePerformanceScan(projectRoot, config);
         const issues = [];
-        const files = collectFilesAcrossRoots(
-          resolveSourceRoots(projectRoot),
-          (root, limit) => collectSourceFiles3(root, SOURCE_EXTS3, SKIPPED_SOURCE_DIRS, limit),
-          cfg.scanLimit
-        );
         for (const filePath of files) {
           const content = readTextSafe2(filePath);
           if (content === null) continue;
@@ -517873,6 +517871,10 @@ var TypeScriptAdapter = class {
    * 副作用：构建模式会写入各项目的 `.tsbuildinfo`（tsc 标准增量产物，多数仓库已
    * gitignore）。已实测其不会导致漏检：新增含类型错误的文件后 `tsc -b` 仍照常报出。
    */
+  /** tsc 成功输出 → 拆分诊断与环境伪影（构建模式/逐项目模式共用，消除重复块） */
+  parseTscOutput(stdout, category, projectPath) {
+    return splitTscIssues(parseTscDiagnostics(stdout, category), projectPath);
+  }
   async runBuildMode(params) {
     const { command, projects, options: options2, category, projectPath } = params;
     try {
@@ -517880,11 +517882,7 @@ var TypeScriptAdapter = class {
         cwd: projectPath,
         timeout: options2.timeout || 3e5
       });
-      const { issues, envArtifactCount } = splitTscIssues(
-        parseTscDiagnostics(stdout, category),
-        projectPath
-      );
-      return { issues, envArtifactCount };
+      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error) {
       const err = asToolExecError(error);
       if (err.code === "ENOENT") {
@@ -517919,11 +517917,7 @@ ${err.stderr ?? ""}`;
         cwd: projectPath,
         timeout: options2.timeout || 3e5
       });
-      const { issues, envArtifactCount } = splitTscIssues(
-        parseTscDiagnostics(stdout, category),
-        projectPath
-      );
-      return { issues, envArtifactCount };
+      return this.parseTscOutput(stdout, category, projectPath);
     } catch (error) {
       const err = asToolExecError(error);
       if (err.code === "ENOENT") {

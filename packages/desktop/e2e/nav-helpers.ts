@@ -39,11 +39,16 @@ export const SHOT_DIR = process.env.ZH_NAV_SHOTS ?? '/tmp/zh-nav-shots';
  * 只补齐缺失的骨架，不动已存在的文件（本机手工夹具可能比这份丰富，别覆盖）。
  */
 export function ensureFixture(): void {
+  // e2e 夹具：base 来自测试专用环境变量（ZH_NAV_FIXTURE，仅本地/CI 用），后缀是固定字面量，
+  // 不构成不可信输入 —— 三条 path.join 均为误报
+  // nosemgrep: detect-path-traversal
   mkdirSync(path.join(FIXTURE, 'src'), { recursive: true });
+  // nosemgrep: detect-path-traversal
   const pkg = path.join(FIXTURE, 'package.json');
   if (!existsSync(pkg)) {
     writeFileSync(pkg, JSON.stringify({ name: 'zh-nav-fixture', version: '0.0.0' }, null, 2));
   }
+  // nosemgrep: detect-path-traversal
   const entry = path.join(FIXTURE, 'src', 'index.ts');
   if (!existsSync(entry)) {
     writeFileSync(entry, 'export const fixture = 1;\n');

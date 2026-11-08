@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 7468c1ac0efbb737
+// @zh-src-hash: da62d29022eef30c
 // @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -657,11 +657,10 @@ var init_tool_run_scope = __esm({
 
 // ../shared/src/tool-probe.ts
 function state() {
-  const host = globalThis;
-  let shared = host[STATE_KEY];
+  let shared = Reflect.get(globalThis, STATE_KEY);
   if (!shared) {
     shared = { ttlMs: DEFAULT_TTL_MS, enabled: !CACHE_ENV_DISABLED, cache: /* @__PURE__ */ new Map() };
-    host[STATE_KEY] = shared;
+    Reflect.set(globalThis, STATE_KEY, shared);
   }
   return shared;
 }
@@ -503099,7 +503098,8 @@ function createSecurityEventForwarder(onEvent) {
       onEvent({
         domain: "security",
         kind: event.type,
-        payload: event.payload
+        // 浅拷贝即得普通对象：payload 是联合类型，直接断言成 Record 需要双重断言
+        payload: { ...event.payload }
       });
     }
   };

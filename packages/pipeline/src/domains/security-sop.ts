@@ -202,7 +202,8 @@ export function createSecurityEventForwarder(
       onEvent({
         domain: 'security',
         kind: event.type,
-        payload: event.payload as unknown as Record<string, unknown>,
+        // 浅拷贝即得普通对象：payload 是联合类型，直接断言成 Record 需要双重断言
+        payload: { ...event.payload },
       });
     },
   };

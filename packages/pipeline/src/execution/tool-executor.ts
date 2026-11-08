@@ -24,8 +24,9 @@ export interface ExecuteOnceResult<T> {
 
 /** 稳定去重 key：tool + 排序后的 targets + 排序后的 args */
 export function toolInvocationKey(invocation: ToolInvocation): string {
-  const targets = [...invocation.targets].sort();
-  const args = [...(invocation.args ?? [])].sort();
+  // ReadonlyArray 同样提供 ES2023 的 toSorted，不必先拷贝再原地排序
+  const targets = invocation.targets.toSorted();
+  const args = (invocation.args ?? []).toSorted();
   // \u0000 分隔：文件路径里不可能出现 NUL，避免 `a/b` 与 `a` `b` 撞 key
   return `${invocation.tool}\u0000${targets.join('\u0001')}\u0000${args.join('\u0001')}`;
 }

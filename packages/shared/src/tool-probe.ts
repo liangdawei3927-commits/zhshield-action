@@ -87,11 +87,11 @@ interface ProbeState {
 }
 
 function state(): ProbeState {
-  const host = globalThis as unknown as Record<symbol, ProbeState | undefined>;
-  let shared = host[STATE_KEY];
+  // 用 Reflect 取/写 symbol 槽：避免「globalThis as unknown as Record<...>」双重断言
+  let shared = Reflect.get(globalThis, STATE_KEY) as ProbeState | undefined;
   if (!shared) {
     shared = { ttlMs: DEFAULT_TTL_MS, enabled: !CACHE_ENV_DISABLED, cache: new Map() };
-    host[STATE_KEY] = shared;
+    Reflect.set(globalThis, STATE_KEY, shared);
   }
   return shared;
 }
@@ -144,6 +144,8 @@ function identityOf(command: string): string {
   const pathEnv = process.env.PATH ?? '';
   for (const dir of pathEnv.split(path.delimiter)) {
     if (!dir) continue;
+    // PATH 目录 + 内部常量工具名，拼出的候选路径只做 existsSync，不读内容、不执行
+    // nosemgrep: detect-path-traversal
     const candidate = path.join(dir, command);
     try {
       if (fs.existsSync(candidate)) return fs.realpathSync(candidate);

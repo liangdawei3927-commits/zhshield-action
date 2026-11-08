@@ -42,7 +42,7 @@ function mockScan(results: Array<{ checkId: string; line: number }>): void {
     _file: string,
     args: string[],
     _opts: unknown,
-    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
   ) => {
     const configIndex = args.indexOf('--config');
     const rulePath = configIndex >= 0 ? args[configIndex + 1] : '';
@@ -65,7 +65,8 @@ function mockScan(results: Array<{ checkId: string; line: number }>): void {
       })),
       errors: [],
     });
-    cb(null, { stdout, stderr: '' });
+    // A13 后 execFileAsync 走真实回调签名 (err, stdout, stderr)
+    cb(null, stdout, '');
   }) as never);
 }
 

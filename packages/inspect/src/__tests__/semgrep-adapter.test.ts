@@ -33,9 +33,10 @@ function mockSuccess(stdout: string, stderr = ''): void {
     _file: string,
     _args: string[],
     _opts: unknown,
-    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
   ) => {
-    cb(null, { stdout, stderr });
+    // A13 后 execFileAsync 走真实回调签名 (err, stdout, stderr)
+    cb(null, stdout, stderr);
   }) as never);
 }
 
@@ -44,9 +45,10 @@ function mockFailure(err: MockExecError): void {
     _file: string,
     _args: string[],
     _opts: unknown,
-    cb: (err: Error) => void,
+    cb: (err: Error | null, stdout?: string, stderr?: string) => void,
   ) => {
-    cb(Object.assign(new Error(err.message ?? 'Command failed'), err) as Error);
+    // A13 后 execFileAsync 从回调第 2/3 参取 stdout/stderr；只传 err 会被覆盖成 undefined
+    cb(Object.assign(new Error(err.message ?? 'Command failed'), err) as Error, err.stdout, err.stderr);
   }) as never);
 }
 
@@ -66,7 +68,7 @@ function captureInlineRuleYaml(): () => string {
     _file: string,
     args: string[],
     _opts: unknown,
-    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
   ) => {
     const i = args.indexOf('--config');
     const candidate = i >= 0 ? args[i + 1] : '';
@@ -77,7 +79,7 @@ function captureInlineRuleYaml(): () => string {
         captured = '';
       }
     }
-    cb(null, { stdout: emptyScanOutput(), stderr: OCAML_NOISE_STDERR });
+    cb(null, emptyScanOutput(), OCAML_NOISE_STDERR);
   }) as never);
   return () => captured;
 }

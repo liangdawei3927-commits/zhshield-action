@@ -17,9 +17,10 @@ function mockSuccess(stdout: string): void {
     _file: string,
     _args: string[],
     _opts: unknown,
-    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
   ) => {
-    cb(null, { stdout, stderr: '' });
+    // A13 后 execFileAsync 走真实回调签名 (err, stdout, stderr)
+    cb(null, stdout, '');
   }) as never);
 }
 

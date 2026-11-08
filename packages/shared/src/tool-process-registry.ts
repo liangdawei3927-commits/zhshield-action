@@ -21,6 +21,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+/** 一次域执行作用域：登记本次运行的工具子进程，超预算时整体终止 */
 export interface ToolProcessScope {
   /** 本作用域内仍在跑的工具子进程 */
   readonly children: Set<ChildProcess>;

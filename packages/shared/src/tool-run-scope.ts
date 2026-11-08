@@ -25,6 +25,7 @@ import {
   snapshotExecFailure,
 } from './tool-exec-primitives';
 
+/** 一次运行内的工具结果共享作用域（A12：同参调用只起一个进程） */
 export interface ToolRunScope {
   /** 便于日志排查：哪个入口开的 scope（如 'pipeline.full' / 'kernel.sop-inspect'） */
   readonly label: string;
@@ -40,6 +41,7 @@ export interface ToolRunScope {
   hits: number;
 }
 
+/** 单次工具调用的执行选项：工作目录、超时与输出上限 */
 export interface ToolRunOptions {
   /** 可选字段写作 `?: T | undefined`：调用方常直接透传可能为 undefined 的运行时值 */
   cwd?: string | undefined;

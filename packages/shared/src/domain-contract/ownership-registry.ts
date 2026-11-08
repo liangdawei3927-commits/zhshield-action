@@ -227,8 +227,11 @@ export interface OwnershipConflict {
 }
 
 /** token 切分：`inspect.scan.official.duplication`、`eslint:no-var` 都要能切出家族名 */
+/** ruleId 的家族切分符（`inspect.scan.x` 与 `eslint:no-var` 两种写法）：模块级复用避免重编译 */
+const RULE_ID_SEPARATOR_RE = /[.:]/;
+
 function segmentsOf(ruleId: string): string[] {
-  return ruleId.split(/[.:]/).filter((s) => s.length > 0);
+  return ruleId.split(RULE_ID_SEPARATOR_RE).filter((s) => s.length > 0);
 }
 
 /**

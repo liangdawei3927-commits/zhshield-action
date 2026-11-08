@@ -68,6 +68,7 @@ export interface DomainRunOutcome<T extends RoutableFinding> {
   reason?: string;
 }
 
+/** 调度器可注入项：执行器、预算/超时覆盖、运行前提探测与时钟（后两者测试用） */
 export interface SchedulerOptions {
   /** 复用同一实例跨域共享；缺省内部新建 */
   executor?: ToolExecutor;

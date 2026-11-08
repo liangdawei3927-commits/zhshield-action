@@ -8,7 +8,6 @@ import {
   runCveChecks,
   formatDomainRecord,
   SCAN_CHAIN_DOMAINS,
-  STATIC_SCAN_DOMAINS,
   type PipelineRunner,
   type DomainRunLedger,
   type DomainRunOptions,

@@ -46,10 +46,13 @@ function isExcludedDirName(name: string): boolean {
  * 也不收 `.d.ts`（`isTsSourceFile`），若暂存区模式对同一批文件计分，同一个文件会在
  * 全量门禁里隐形、在暂存门禁里突然变成 `introduced`。
  */
+/** 路径分隔符（`isExcludedScanPath`）：模块级复用，避免每次调用重编译 */
+const PATH_SEPARATOR_RE = /[/\\]/;
+
 export function isExcludedScanPath(filePath: string): boolean {
   if (filePath.endsWith('.d.ts')) return true;
   return filePath
-    .split(/[/\\]/)
+    .split(PATH_SEPARATOR_RE)
     .slice(0, -1)
     .some((dir) => dir !== '' && dir !== '.' && dir !== '..' && isExcludedDirName(dir));
 }

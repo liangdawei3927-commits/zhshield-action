@@ -50,6 +50,7 @@ export type ReportDomainKey =
   | 'sentinel'
   | 'backup';
 
+/** 域详情页元数据：读哪一维的健康分 + 历史面板用哪个域键（两者可不相等，见下表） */
 export interface DomainReportMeta {
   /** 评分维度（读哪一维的健康分） */
   dimension: ScoreDimension;

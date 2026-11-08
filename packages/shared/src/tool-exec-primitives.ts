@@ -25,8 +25,9 @@ export function execFileAsync(
   args?: readonly string[],
   options?: ExecFileOptions,
 ): Promise<{ stdout: string; stderr: string }> & { child?: ChildProcess } {
-  let resolveFn!: (value: { stdout: string; stderr: string }) => void;
-  let rejectFn!: (reason: unknown) => void;
+  // 初始化为 noop：Promise 构造器同步执行并立刻覆盖，去掉 definite assignment 断言
+  let resolveFn: (value: { stdout: string; stderr: string }) => void = () => undefined;
+  let rejectFn: (reason: unknown) => void = () => undefined;
   const promise = new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
     resolveFn = resolve;
     rejectFn = reject;
@@ -44,7 +45,7 @@ export function execFileAsync(
         rejectFn(err);
         return;
       }
-      resolveFn({ stdout, stderr } as unknown as { stdout: string; stderr: string });
+      resolveFn({ stdout: stdout as string, stderr: stderr as string });
     },
   ) as ChildProcess;
 

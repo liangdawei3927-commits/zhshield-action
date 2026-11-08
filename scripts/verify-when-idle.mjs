@@ -168,7 +168,7 @@ async function main() {
   const results = [];
   const skipped = [];
   let waitedMs = 0;
-  let loadAtStart = os.loadavg()[0];
+  const loadAtStart = os.loadavg()[0];
 
   if (args.check) {
     if (loadAtStart > gate) {

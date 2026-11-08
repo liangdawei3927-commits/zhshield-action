@@ -17,6 +17,8 @@
 const MAX_QUERIES = 200;
 const DEFAULT_OSV_BASE_URL = 'https://api.osv.dev';
 const OSV_TIMEOUT_MS = 8_000;
+/** OSV base URL 末尾斜杠：模块级复用，避免每次调用重编译 */
+const TRAILING_SLASH_RE = /\/+$/;
 
 /**
  * OSV 基地址。`ZH_OSV_BASE_URL` 可覆盖，**只为验收**（指向本地桩或已关闭的端口）。
@@ -28,7 +30,7 @@ const OSV_TIMEOUT_MS = 8_000;
 export function resolveOsvBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env.ZH_OSV_BASE_URL?.trim();
   if (!raw) return DEFAULT_OSV_BASE_URL;
-  return raw.replace(/\/+$/, '');
+  return raw.replace(TRAILING_SLASH_RE, '');
 }
 /**
  * 详情补充拉取上限。querybatch 是**精简响应**（只有 id + modified），

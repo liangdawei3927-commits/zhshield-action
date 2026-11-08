@@ -16,6 +16,7 @@ export interface FileTarget {
   kind: FileTargetKind;
 }
 
+/** 文件索引选项：`maxFiles` 是收录上限，超出即截断并标记 `truncated` */
 export interface FileIndexOptions {
   /** 最大收录文件数，超出即截断并标记 truncated（防大仓库把内存打爆） */
   maxFiles?: number;

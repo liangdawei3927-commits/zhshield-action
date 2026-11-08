@@ -108,13 +108,16 @@ function skipCharClass(pattern: string, start: number): number {
   return i;
 }
 
+/** `{n}` / `{n,m}` / `{n,}` 量词（`{` 之后的部分） */
+const BRACE_QUANTIFIER_RE = /^\{(\d+)(,(\d*))?\}/;
+
 /** 读取位置 idx 处的量词；返回是否不定（`*`/`+`/`{n,}`）与结束位置，非量词返回 null */
 function readQuantifier(pattern: string, idx: number): { unbounded: boolean; end: number } | null {
   const c = pattern[idx];
   if (c === '*' || c === '+') return { unbounded: true, end: idx + 1 };
   if (c === '?') return { unbounded: false, end: idx + 1 };
   if (c === '{') {
-    const m = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(idx));
+    const m = BRACE_QUANTIFIER_RE.exec(pattern.slice(idx));
     if (m === null) return null;
     const hasComma = m[2] !== undefined;
     const upper = m[3] ?? '';
@@ -147,7 +150,7 @@ function skipGroupModifier(pattern: string, afterParen: number): number {
 export function hasNestedUnboundedQuantifier(pattern: string): boolean {
   const stack: Array<{ containsUnbounded: boolean }> = [{ containsUnbounded: false }];
   const top = (): { containsUnbounded: boolean } =>
-    stack[stack.length - 1] as { containsUnbounded: boolean };
+    stack.at(-1) as { containsUnbounded: boolean };
   let i = 0;
   while (i < pattern.length) {
     const c = pattern[i];

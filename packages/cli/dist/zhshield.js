@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 2d208bb78494cfd4
+// @zh-src-hash: 7468c1ac0efbb737
 // @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -478,8 +478,8 @@ var init_tool_process_registry = __esm({
 
 // ../shared/src/tool-exec-primitives.ts
 function execFileAsync(file, args, options2) {
-  let resolveFn;
-  let rejectFn;
+  let resolveFn = () => void 0;
+  let rejectFn = () => void 0;
   const promise = new Promise((resolve36, reject) => {
     resolveFn = resolve36;
     rejectFn = reject;
@@ -1094,14 +1094,15 @@ function evaluateAccessScope(scope, options2) {
   return violations;
 }
 function wrapAdapter(adapter, hooks = [], options2) {
+  const scanBatch = adapter.scanBatch;
   return {
     ...adapter,
     // 原型方法不会被展开运算符拷贝，必须显式转发，否则下游 typeof isAvailable 校验误判接口不完整
     isAvailable: () => adapter.isAvailable(),
     // A12 批量派发同样是原型方法：不转发的话，kernel 的批量预取对**注册过的**适配器
     // 一律看不见 scanBatch（实测：注册表里都是装饰后的适配器，预取静默失效、semgrep 仍逐条起进程）
-    ...typeof adapter.scanBatch === "function" ? {
-      scanBatch: (requests) => adapter.scanBatch(requests)
+    ...typeof scanBatch === "function" ? {
+      scanBatch: (requests) => scanBatch.call(adapter, requests)
     } : {},
     async scan(scanOptions) {
       const before = runBeforeHooks(adapter, hooks, scanOptions);
@@ -16196,7 +16197,7 @@ var init_path = __esm({
 
 // ../shared/src/domain-contract/ownership-registry.ts
 function segmentsOf(ruleId) {
-  return ruleId.split(/[.:]/).filter((s) => s.length > 0);
+  return ruleId.split(RULE_ID_SEPARATOR_RE).filter((s) => s.length > 0);
 }
 function resolveOwnerClaim(ruleId) {
   const exact = OWNERSHIP_CLAIMS.find((c) => c.match.kind === "exact" && c.match.ruleId === ruleId);
@@ -16261,7 +16262,7 @@ function validateOwnershipRegistry() {
   }
   return conflicts;
 }
-var OWNERSHIP_CLAIMS;
+var OWNERSHIP_CLAIMS, RULE_ID_SEPARATOR_RE;
 var init_ownership_registry = __esm({
   "../shared/src/domain-contract/ownership-registry.ts"() {
     "use strict";
@@ -16433,6 +16434,7 @@ var init_ownership_registry = __esm({
         rationale: "\u4F53\u68C0\u72EC\u5360\u67B6\u6784\u4F9D\u8D56\u89C4\u5219"
       }
     ];
+    RULE_ID_SEPARATOR_RE = /[.:]/;
   }
 });
 
@@ -504489,7 +504491,7 @@ function readQuantifier(pattern, idx) {
   if (c === "*" || c === "+") return { unbounded: true, end: idx + 1 };
   if (c === "?") return { unbounded: false, end: idx + 1 };
   if (c === "{") {
-    const m = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(idx));
+    const m = BRACE_QUANTIFIER_RE.exec(pattern.slice(idx));
     if (m === null) return null;
     const hasComma = m[2] !== void 0;
     const upper = m[3] ?? "";
@@ -504512,7 +504514,7 @@ function skipGroupModifier(pattern, afterParen) {
 }
 function hasNestedUnboundedQuantifier(pattern) {
   const stack = [{ containsUnbounded: false }];
-  const top = () => stack[stack.length - 1];
+  const top = () => stack.at(-1);
   let i = 0;
   while (i < pattern.length) {
     const c = pattern[i];
@@ -504562,7 +504564,7 @@ function buildRedosIssue(relFile, hit, seq) {
     autoFixable: false
   };
 }
-var path71, ts11, RedosDetectorImpl;
+var path71, ts11, BRACE_QUANTIFIER_RE, RedosDetectorImpl;
 var init_redos_detector = __esm({
   "../performance/src/adapters/redos-detector.ts"() {
     "use strict";
@@ -504571,6 +504573,7 @@ var init_redos_detector = __esm({
     init_types6();
     init_source_roots();
     init_ast_nodes();
+    BRACE_QUANTIFIER_RE = /^\{(\d+)(,(\d*))?\}/;
     RedosDetectorImpl = class {
       detect(projectRoot, config) {
         const cfg = { ...DEFAULT_CONFIG2, ...config ?? {} };
@@ -517323,6 +517326,7 @@ var SemgrepScanRunner = class {
 };
 
 // ../inspect/src/adapters/semgrep-adapter.ts
+var CHECK_ID_TAIL_RE = /(?:^|\.)(zhb\d+--[A-Za-z0-9._-]+)$/;
 var META6 = {
   id: "semgrep",
   name: "Semgrep",
@@ -517434,7 +517438,7 @@ var SemgrepAdapter = class {
         keyOf: (result) => {
           const raw = result.check_id ?? result.rule?.id;
           if (!raw) return null;
-          const match = /(?:^|\.)(zhb\d+--[A-Za-z0-9._-]+)$/.exec(raw);
+          const match = CHECK_ID_TAIL_RE.exec(raw);
           if (!match) return null;
           return ownerOfId.get(match[1]) ?? null;
         }
@@ -521352,10 +521356,11 @@ function formatDomainRecord(record) {
 var MAX_QUERIES = 200;
 var DEFAULT_OSV_BASE_URL = "https://api.osv.dev";
 var OSV_TIMEOUT_MS = 8e3;
+var TRAILING_SLASH_RE = /\/+$/;
 function resolveOsvBaseUrl(env = process.env) {
   const raw = env.ZH_OSV_BASE_URL?.trim();
   if (!raw) return DEFAULT_OSV_BASE_URL;
-  return raw.replace(/\/+$/, "");
+  return raw.replace(TRAILING_SLASH_RE, "");
 }
 var MAX_DETAIL_FETCHES = 30;
 var OSV_DETAIL_URL = (base, id) => `${base}/v1/vulns/${encodeURIComponent(id)}`;

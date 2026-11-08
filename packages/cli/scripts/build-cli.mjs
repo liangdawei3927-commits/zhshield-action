@@ -13,7 +13,7 @@
  *    passed to execFile, never imported, so esbuild leaves them out naturally.
  */
 import { build } from 'esbuild';
-import { resolve, dirname, join, relative, sep } from 'node:path';
+import { resolve, dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';

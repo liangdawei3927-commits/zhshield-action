@@ -16,6 +16,9 @@ import { SemgrepScanArgsBuilder } from './semgrep-scan-args-builder';
 import { SemgrepScanRunner } from './semgrep-scan-runner';
 import { isSemgrepRuleArray, removeInlineRuleFile, type SemgrepRule } from './semgrep-rule-writer';
 
+/** semgrep 把 --config 路径编进 check_id 前缀（`<路径>.zhb2--...`）：按末段取回自己的前缀 id */
+const CHECK_ID_TAIL_RE = /(?:^|\.)(zhb\d+--[A-Za-z0-9._-]+)$/;
+
 const META: ToolMeta = {
   id: 'semgrep',
   name: 'Semgrep',
@@ -164,7 +167,7 @@ export class SemgrepAdapter implements ToolAdapter {
           // `<路径>.zhb2--sql-injection-concat-literal`（2026-11-03 实测，
           // 只做全等匹配会让所有命中都"认不出归属"→ 全被判干净，是安全工具最危险的假阴性）。
           // 因此按"末段"取回我们自己的前缀 id。
-          const match = /(?:^|\.)(zhb\d+--[A-Za-z0-9._-]+)$/.exec(raw);
+          const match = CHECK_ID_TAIL_RE.exec(raw);
           if (!match) return null;
           return ownerOfId.get(match[1]) ?? null;
         },

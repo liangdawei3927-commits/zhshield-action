@@ -36,6 +36,7 @@ export interface DistributionRecord {
   fingerprint: string;
 }
 
+/** 一次 owner 投递结果：按域分桶、未路由项与分发记录 */
 export interface RouteResult<T> {
   /** 按域分桶；未出现的域没有 key，调用方据此判 `not-run` */
   byOwner: Partial<Record<DomainId, T[]>>;

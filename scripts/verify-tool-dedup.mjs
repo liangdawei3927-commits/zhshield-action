@@ -273,7 +273,6 @@ async function main() {
   const partialDomains = domainRecords
     .filter((record) => record.status === 'partial' && record.overBudget !== true)
     .map((record) => `${record.domain}${record.reason ? `：${record.reason}` : ''}`);
-  const incompleteDomains = truncatedDomains;
 
   /**
    * 内联 semgrep 规则族的期望次数 = 本次真正跑了 SOP 通道的域个数

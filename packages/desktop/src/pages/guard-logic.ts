@@ -4,6 +4,9 @@ import {
   runGuard,
   listGuardReports,
   reportFalsePositive as submitFalsePositive,
+  getGuardHooksStatus,
+  installGuardHooks,
+  uninstallGuardHooks,
 } from '../services/engineApi';
 import { useFalsePositiveCount } from '../components/hooks/useFalsePositiveCount';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
@@ -207,6 +210,73 @@ function useGuardRun(projectPath: string): {
     }
   }, [projectPath]);
   return { ...runState, report, handleScan };
+}
+
+/**
+ * 门禁 git 钩子状态（"运行中"必须是可验证的真实状态）。
+ *
+ * 钩子是否安装只认 `.git/hooks` 下的实际文件（`guard:hooksStatus`），不看配置开关——
+ * 配置说「启用」但文件没装，门就是开着的，不能显示绿色。
+ */
+export interface GuardHooksState {
+  hasGitDir: boolean;
+  installed: string[];
+  loading: boolean;
+  busy: boolean;
+  toggle: () => Promise<void>;
+}
+
+export function useGuardHooks(projectPath: string): GuardHooksState {
+  const { toast } = useToast();
+  const [hasGitDir, setHasGitDir] = useState(false);
+  const [installed, setInstalled] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getGuardHooksStatus(projectPath).then(
+      (status) => {
+        if (cancelled) return;
+        setHasGitDir(status.hasGitDir);
+        setInstalled(status.installed);
+        setLoading(false);
+      },
+      () => {
+        if (!cancelled) setLoading(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [projectPath]);
+
+  const toggle = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const running = installed.includes('pre-commit') || installed.includes('pre-push');
+      if (running) {
+        const result = await uninstallGuardHooks(projectPath);
+        if (result.removed.length > 0) toast(t('page.guard.hooks.stopped'));
+        else toast(t('page.guard.hooks.stopFailed'), 'error');
+      } else {
+        const result = await installGuardHooks(projectPath);
+        if (result.ok) {
+          toast(t('page.guard.hooks.started', { stages: result.installed.join(' · ') }));
+        } else {
+          toast(t('page.guard.hooks.startFailed', { reason: result.reason ?? '' }), 'error');
+        }
+      }
+      const status = await getGuardHooksStatus(projectPath);
+      setHasGitDir(status.hasGitDir);
+      setInstalled(status.installed);
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, installed, projectPath, toast]);
+
+  return { hasGitDir, installed, loading, busy, toggle };
 }
 
 /** 门禁检查项 → AI 修复问题条目 */

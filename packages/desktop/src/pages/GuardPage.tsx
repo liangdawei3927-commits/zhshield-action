@@ -8,7 +8,13 @@ import { scanRunProps } from '../components/business/ScanEmptyState';
 import { type ReportStatCard } from '../components/business/ReportShell';
 import { FeatureIcon } from '../components/ui/Icons';
 import { useGuardPage, buildGuardLevels, type GuardLevelInfo } from './guard-logic';
-import { GuardLevels, GuardTable, GuardHistory, GuardConfigCard } from './guard-parts';
+import {
+  GuardLevels,
+  GuardTable,
+  GuardHistory,
+  GuardConfigCard,
+  GuardHooksStatus,
+} from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
@@ -146,7 +152,7 @@ function GuardReportView({
       domain="guard"
       refreshKey={report}
       title={t('nav.guard')}
-      actionLabel={t('page.guard.scan')}
+      actionLabel={t('page.guard.rejudge')}
       onAction={onRescan}
       loading={loading}
       queued={queued}
@@ -155,6 +161,7 @@ function GuardReportView({
       onBackHome={onBackHome}
       stats={stats}
     >
+      <GuardHooksStatus projectPath={projectPath} lastJudgedAt={report.metadata.timestamp} />
       <GuardLevels levels={levels} />
       <GuardTable
         report={report}
@@ -246,8 +253,9 @@ function GuardEmptyView(props: {
           desc: props.t('page.guard.feature.manual.desc'),
         },
       ]}
-      buttonText={props.t('page.guard.scan')}
+      buttonText={props.t('page.guard.rejudge')}
       onAction={props.onScan}
+      extra={<GuardHooksStatus projectPath={props.projectPath} />}
       {...scanRunProps(props)}
     />
   );

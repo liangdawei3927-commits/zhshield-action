@@ -1276,7 +1276,24 @@
         "preCommit": "Commit gate",
         "prePush": "Push gate"
       },
-      "warningCount": "{{count}} warnings"
+      "warningCount": "{{count}} warnings",
+      "rejudge": "Re-evaluate",
+      "hooks": {
+        "running": "Running",
+        "off": "Guard off",
+        "stop": "Stop guard",
+        "enable": "Enable guard",
+        "loading": "Loading…",
+        "working": "Working…",
+        "installed": "Installed {{stages}}",
+        "started": "Guard enabled: {{stages}}",
+        "stopped": "Guard stopped",
+        "startFailed": "Failed to enable: {{reason}}",
+        "stopFailed": "Failed to stop",
+        "notGit": "This project is not a Git repository; hooks cannot be installed",
+        "hint": "When on, the gate judges automatically on commit/push; it judges, it does not scan the whole repo",
+        "lastJudged": "Last judged {{time}}"
+      }
     },
     "inspect": {
       "checksPassed": "Checks passed",

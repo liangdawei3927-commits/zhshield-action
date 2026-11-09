@@ -1276,7 +1276,24 @@
         "preCommit": "커밋 게이트",
         "prePush": "푸시 게이트"
       },
-      "warningCount": "경고 {{count}}"
+      "warningCount": "경고 {{count}}",
+      "rejudge": "재판정",
+      "hooks": {
+        "running": "실행 중",
+        "off": "가드 꺼짐",
+        "stop": "가드 중지",
+        "enable": "가드 켜기",
+        "loading": "불러오는 중…",
+        "working": "처리 중…",
+        "installed": "설치됨 {{stages}}",
+        "started": "가드 켜짐: {{stages}}",
+        "stopped": "가드 중지됨",
+        "startFailed": "켜기 실패: {{reason}}",
+        "stopFailed": "중지 실패",
+        "notGit": "이 프로젝트는 Git 저장소가 아니어서 훅을 설치할 수 없습니다",
+        "hint": "켜면 commit / push 시 자동으로 판정합니다. 가드는 판정만 하며 전체 저장소를 스캔하지 않습니다",
+        "lastJudged": "마지막 판정 {{time}}"
+      }
     },
     "inspect": {
       "checksPassed": "검사 통과",

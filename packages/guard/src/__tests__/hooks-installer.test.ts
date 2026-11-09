@@ -14,6 +14,8 @@ vi.mock('node:fs', async () => {
     },
     existsSync: vi.fn().mockReturnValue(true),
     readdirSync: vi.fn().mockReturnValue([]),
+    // 默认把已存在钩子视作「本产品安装」：归属标记取自真实脚本
+    readFileSync: vi.fn(() => '#!/bin/sh\n# 智汇码盾 pre-commit hook\n'),
   };
 });
 
@@ -100,6 +102,13 @@ describe('HooksInstaller', () => {
       expect(fs.promises.unlink).toHaveBeenCalledTimes(3);
     });
 
+    it('should not remove a third-party hook (no owner marker)', async () => {
+      vi.mocked(fs.readFileSync).mockReturnValueOnce('#!/bin/sh\n# user own hook\nexit 0\n');
+      const removed = await installer.uninstall('pre-commit');
+      expect(removed).toEqual([]);
+      expect(fs.promises.unlink).not.toHaveBeenCalled();
+    });
+
     it('should silently ignore missing hook files', async () => {
       vi.mocked(fs.promises.unlink).mockRejectedValueOnce(new Error('ENOENT'));
       const removed = await installer.uninstall('pre-commit');
@@ -155,6 +164,13 @@ describe('HooksInstaller', () => {
       ] as unknown as fs.Dirent[]);
       const hooks = installer.listInstalledHooks();
       expect(hooks).toEqual(['pre-commit', 'pre-push']);
+    });
+
+    it('should exclude a third-party hook with the same file name', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue(['pre-commit'] as unknown as fs.Dirent[]);
+      vi.mocked(fs.readFileSync).mockReturnValueOnce('#!/bin/sh\n# user own hook\nexit 0\n');
+      expect(installer.listInstalledHooks()).toEqual([]);
     });
 
     it('should return empty array when hooks directory does not exist', () => {

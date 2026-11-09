@@ -1276,7 +1276,24 @@
         "preCommit": "コミットゲート",
         "prePush": "プッシュゲート"
       },
-      "warningCount": "警告 {{count}}"
+      "warningCount": "警告 {{count}}",
+      "rejudge": "再判定",
+      "hooks": {
+        "running": "稼働中",
+        "off": "ガード未起動",
+        "stop": "ガードを停止",
+        "enable": "ガードを起動",
+        "loading": "読み込み中…",
+        "working": "処理中…",
+        "installed": "インストール済み {{stages}}",
+        "started": "ガードを起動しました：{{stages}}",
+        "stopped": "ガードを停止しました",
+        "startFailed": "起動に失敗：{{reason}}",
+        "stopFailed": "停止に失敗",
+        "notGit": "このプロジェクトは Git リポジトリではないため、フックをインストールできません",
+        "hint": "起動すると commit / push 時に自動判定します。門禁は判定のみで、リポジトリ全体をスキャンしません",
+        "lastJudged": "前回判定 {{time}}"
+      }
     },
     "inspect": {
       "checksPassed": "チェックに合格",

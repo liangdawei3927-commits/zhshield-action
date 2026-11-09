@@ -59,6 +59,9 @@ exit 0
   },
 ];
 
+/** 钩子脚本里的归属标记：区分「我们装的」与「用户/其它工具装的同名钩子」 */
+const OWNER_MARKER = '智汇码盾';
+
 export class HooksInstaller {
   private projectPath: string;
   private hooksDir: string;
@@ -66,6 +69,20 @@ export class HooksInstaller {
   constructor(projectPath: string) {
     this.projectPath = projectPath;
     this.hooksDir = path.join(projectPath, '.git', 'hooks');
+  }
+
+  /**
+   * 该钩子文件是否由本产品安装（读脚本内容找归属标记）。
+   *
+   * 只按文件名判断会把第三方 pre-commit 也算成「运行中」，进而让「停止守护」
+   * 误删用户的钩子 —— 状态可以少报，不能误报/误删。
+   */
+  private ownsHook(hookName: string): boolean {
+    try {
+      return fs.readFileSync(path.join(this.hooksDir, hookName), 'utf8').includes(OWNER_MARKER);
+    } catch {
+      return false;
+    }
   }
 
   async install(hookName?: string): Promise<string[]> {
@@ -88,6 +105,8 @@ export class HooksInstaller {
     const targets = hookName ? HOOKS.filter((h) => h.hook === hookName) : HOOKS;
 
     for (const hook of targets) {
+      // 只删本产品安装的钩子；第三方同名钩子不覆盖、不误删
+      if (!this.ownsHook(hook.hook)) continue;
       const hookPath = path.join(this.hooksDir, hook.hook);
       try {
         // eslint-disable-next-line perf/perf-no-serial-await -- hookPath derived from loop var hook via intermediate assignment
@@ -123,7 +142,10 @@ export class HooksInstaller {
   listInstalledHooks(): string[] {
     if (!fs.existsSync(this.hooksDir)) return [];
     try {
-      return fs.readdirSync(this.hooksDir).filter((f) => HOOKS.some((h) => h.hook === f));
+      return fs
+        .readdirSync(this.hooksDir)
+        .filter((f) => HOOKS.some((h) => h.hook === f))
+        .filter((f) => this.ownsHook(f));
     } catch {
       return [];
     }

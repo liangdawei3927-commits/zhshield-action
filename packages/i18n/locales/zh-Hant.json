@@ -1276,7 +1276,24 @@
         "preCommit": "提交門禁",
         "prePush": "推送門禁"
       },
-      "warningCount": "警告 {{count}}"
+      "warningCount": "警告 {{count}}",
+      "rejudge": "重新判定",
+      "hooks": {
+        "running": "運行中",
+        "off": "未開啟守護",
+        "stop": "停止守護",
+        "enable": "開啟守護",
+        "loading": "讀取中…",
+        "working": "處理中…",
+        "installed": "已安裝 {{stages}}",
+        "started": "已開啟守護：{{stages}}",
+        "stopped": "已停止守護",
+        "startFailed": "開啟失敗：{{reason}}",
+        "stopFailed": "停止失敗",
+        "notGit": "目前專案不是 Git 倉庫，無法安裝鉤子",
+        "hint": "開啟後，git 提交 / 推送時自動判定；門禁只判定，不做全倉掃描",
+        "lastJudged": "上次判定 {{time}}"
+      }
     },
     "inspect": {
       "checksPassed": "檢查通過",

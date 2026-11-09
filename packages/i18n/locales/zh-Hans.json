@@ -1276,7 +1276,24 @@
         "preCommit": "提交门禁",
         "prePush": "推送门禁"
       },
-      "warningCount": "警告 {{count}}"
+      "warningCount": "警告 {{count}}",
+      "rejudge": "重新判定",
+      "hooks": {
+        "running": "运行中",
+        "off": "未开启守护",
+        "stop": "停止守护",
+        "enable": "开启守护",
+        "loading": "读取中…",
+        "working": "处理中…",
+        "installed": "已安装 {{stages}}",
+        "started": "已开启守护：{{stages}}",
+        "stopped": "已停止守护",
+        "startFailed": "开启失败：{{reason}}",
+        "stopFailed": "停止失败",
+        "notGit": "当前项目不是 Git 仓库，无法安装钩子",
+        "hint": "开启后，git 提交 / 推送时自动判定；门禁只判定，不做全仓扫描",
+        "lastJudged": "上次判定 {{time}}"
+      }
     },
     "inspect": {
       "checksPassed": "检查通过",

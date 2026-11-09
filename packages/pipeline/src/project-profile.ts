@@ -179,11 +179,22 @@ const NESTED_PROBE_NOISE_DIRS = new Set([
  * 不擅自猜测。供 PipelineRunner 与 desktop 画像探测在链路早期统一调用，
  * 使画像识别（→ toolScope 裁剪）与各工具适配器（→ depcheck 等 package.json
  * 前置校验）看到同一个真实项目根。
+ *
+ * **目标本身是 git 仓库时一律不下探**（2026-11-09 实测事故）：
+ * 下探的前提是「目标是容器目录」——容器不是某个项目的根。目标带 `.git`
+ * 就说明它自己是项目，子目录里的仓库是**另一个仓库**（本仓 `ZHCodeShield/`
+ * 里放着一份被 .gitignore 排除的 `zhihui-codeshield/` 就是这种结构）。
+ * 此前只按「唯一子目录含 package.json」判定，于是扫 `ZHCodeShield/` 文档仓
+ * 被改判成扫内层 monorepo：安全域把 120s 预算全花在 1.5GB 的内层仓库上被强杀，
+ * 产出 `unavailable`，页面回落到旧报告显示 100 分「优秀」——用户以为扫的是
+ * 文档仓，实际一个文件都没按文档仓扫过。
  */
 export function resolveEffectiveProjectRoot(projectPath: string): string {
   const root = path.resolve(projectPath);
   if (fs.existsSync(path.join(root, 'package.json'))) return root;
   if (hasPythonManifest(root)) return root;
+  // 本身是 git 仓库 = 自己是项目根，不下探（见上方说明）
+  if (fs.existsSync(path.join(root, '.git'))) return root;
 
   const candidates = listNestedProjectRootCandidates(root);
   return candidates.length === 1 ? candidates[0] : root;

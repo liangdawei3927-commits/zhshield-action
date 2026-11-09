@@ -147,6 +147,16 @@ describe('resolveEffectiveProjectRoot — 容器目录下探唯一嵌套仓库�
     expect(resolveEffectiveProjectRoot(container)).toBe(nested);
   });
 
+  it('目标本身是 git 仓库 → 不下探嵌套仓库（内外分离仓库扫描 2026-11-09）', () => {
+    // 复刻真实结构：文档仓（带 .git、无 package.json）里放着一份被 .gitignore
+    // 排除的完整代码仓。目标自身是仓库 ⇒ 子目录属于**另一个项目**，不得改扫它。
+    const container = path.join(tmpDir, 'repo-with-nested');
+    fs.mkdirSync(path.join(container, '.git'), { recursive: true });
+    makeProjectDir('repo-with-nested/nested-monorepo', { name: 'nested' });
+
+    expect(resolveEffectiveProjectRoot(container)).toBe(container);
+  });
+
   it('目标本身有 package.json → 原样返回', () => {
     const project = makeProjectDir('self-project', { name: 'self' });
     expect(resolveEffectiveProjectRoot(project)).toBe(project);

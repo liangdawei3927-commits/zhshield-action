@@ -161,6 +161,13 @@ export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<Do
       vulnLow: mergedVulnerabilities.filter((v) => v.severity === 'low').length,
     },
     securityScore: calculateSecurityScore(mergedVulnerabilities),
+    // 规则通道的求值账：0 检出时用户需要知道「几条规则没跑成」，否则会把
+    // 「规则没能评估」读成「查过且干净」（C4：未检测 ≠ 通过）。
+    ruleChannel: {
+      ran: sop.ran,
+      skipped: sop.skipped ?? 0,
+      degraded: sop.degraded ?? 0,
+    },
   };
 
   return buildSecurityExecution(report, sop);

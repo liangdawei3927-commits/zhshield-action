@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 02d511fb8a5e00a8
+// @zh-src-hash: 42fde6b9d2b3f5c1
 // @zh-src-files: 426
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -519406,7 +519406,7 @@ async function runGuardDomain(ctx) {
   if (!ctx.runner) {
     return { status: "unavailable", reason: "\u95E8\u7981\u57DF\u9700\u8981 PipelineRunner\uFF08\u5224\u5B9A\u89C4\u5219\u5728\u88C5\u914D\u5C42\uFF09" };
   }
-  const conclusions = await loadGuardConclusions(ctx.repoRoot);
+  const conclusions = await loadGuardConclusions(ctx.stateRoot ?? ctx.repoRoot);
   const report = await ctx.runner.runSopGuard({
     dryRun: ctx.dryRun ?? false,
     conclusions
@@ -521335,6 +521335,7 @@ function failureRecord(input) {
 function buildDomainContext(options2) {
   return {
     repoRoot: options2.repoRoot,
+    ...options2.stateRoot ? { stateRoot: options2.stateRoot } : {},
     ...options2.runner ? { runner: options2.runner } : {},
     ...options2.onEvent ? { onEvent: options2.onEvent } : {},
     ...options2.dryRun ? { dryRun: options2.dryRun } : {},

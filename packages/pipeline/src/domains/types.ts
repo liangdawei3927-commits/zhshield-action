@@ -35,6 +35,15 @@ export interface DomainExecutionContext {
   /** 已归一化的项目根（绝对路径） */
   repoRoot: string;
   /**
+   * 状态根：用户打开的原始项目路径（**容器目录下探前**），域快照的读写根。
+   *
+   * `repoRoot` 可能因「容器目录下探」被解析到嵌套仓库，而各域快照（inspect /
+   * deps / security）与 latest.json 都写在用户打开的项目下。门禁按 O8 读结论
+   * 必须用它，否则会读到嵌套仓库里另一份（可能过期的）快照。
+   * 缺省回退 `repoRoot`，兼容无头调用与存量调用方。
+   */
+  stateRoot?: string;
+  /**
    * 规则驱动的域（inspect / guard / garbage）需要的 `PipelineRunner`。
    * 由调用方按各自装配口径创建（桌面端经 `createLoadedRunner` 合并云同步规则，
    * CLI 用内置模板），**本层不自建** —— 否则又会造出第二份规则集。
@@ -114,6 +123,8 @@ export interface PipelineRunnerLike {
 /** 运行参数 */
 export interface DomainRunOptions {
   repoRoot: string;
+  /** 状态根（用户打开的项目路径，下探前）；缺省回退 `repoRoot` */
+  stateRoot?: string;
   /** 要跑的域；缺省 = 静态扫描八域（`SCAN_DOMAIN_BUDGETS` 的键） */
   domains?: readonly DomainId[];
   runner?: PipelineRunnerLike;

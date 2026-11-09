@@ -44,10 +44,14 @@ const runningJobs = new Map<string, RunningJob>();
 async function runPipelineByMode(
   id: string,
   runner: PipelineRunner,
-  opts: { dryRun?: boolean; sop?: boolean; guardEnabled: boolean },
+  opts: { dryRun?: boolean; sop?: boolean; guardEnabled: boolean; projectPath?: string },
 ): Promise<void> {
   if (opts.sop) {
-    await runSopJob(id, runner, opts.dryRun, opts.guardEnabled);
+    await runSopJob(id, runner, {
+      dryRun: opts.dryRun,
+      guardEnabled: opts.guardEnabled,
+      stateRoot: opts.projectPath,
+    });
   } else {
     await runFullPipelineJob(id, runner, opts.dryRun, opts.guardEnabled);
   }
@@ -75,6 +79,9 @@ async function runPipeline(
         dryRun: opts.dryRun,
         sop: opts.sop,
         guardEnabled: opts.guardEnabled !== false,
+        // 状态根：用户打开的项目路径。runner.repoRoot 可能已下探到嵌套仓库，
+        // 而域快照写在这个路径下（门禁读结论要用它）。
+        projectPath,
       });
     } finally {
       await runner.destroy().catch(() => undefined);

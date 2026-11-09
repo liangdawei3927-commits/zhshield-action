@@ -115,7 +115,9 @@ export async function runGuardJob(
     // 《07》O8/C3：门禁纯判定 —— 只读各域已落盘结论，不执行任何扫描器。
     // 门禁页要的是 GuardReport（summary/results），故仍走 runGuard（内部即 SOP 门禁），
     // 与无头账本用的 runSopGuard 是同一套规则；只是输出契约不同。
-    const conclusions = await loadGuardConclusions(runner.repoRoot);
+    // 结论集从用户打开的项目（状态根）读，而不是 runner.repoRoot：
+    // repoRoot 可能已因「容器目录下探」指向嵌套仓库，那里是另一份快照。
+    const conclusions = await loadGuardConclusions(projectPath);
     const report = await runner.runGuard({
       mode: 'guard',
       target: projectPath,

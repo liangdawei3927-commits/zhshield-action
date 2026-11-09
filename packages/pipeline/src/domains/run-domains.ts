@@ -116,6 +116,7 @@ function failureRecord(input: {
 function buildDomainContext(options: DomainRunOptions): DomainExecutionContext {
   return {
     repoRoot: options.repoRoot,
+    ...(options.stateRoot ? { stateRoot: options.stateRoot } : {}),
     ...(options.runner ? { runner: options.runner } : {}),
     ...(options.onEvent ? { onEvent: options.onEvent } : {}),
     ...(options.dryRun ? { dryRun: options.dryRun } : {}),

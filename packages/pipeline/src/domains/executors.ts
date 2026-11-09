@@ -64,7 +64,13 @@ export async function runGuardDomain(ctx: DomainExecutionContext): Promise<Domai
   if (!ctx.runner) {
     return { status: 'unavailable', reason: '门禁域需要 PipelineRunner（判定规则在装配层）' };
   }
-  const conclusions = await loadGuardConclusions(ctx.repoRoot);
+  // 结论集必须从**域快照的写入根**读：域快照由桌面端写在用户打开的项目下
+  // （`persistDiagnostics(projectPath, …)`），而 `ctx.repoRoot` 可能已被「容器目录
+  // 下探」解析到嵌套仓库（如打开的是外层文档仓库、代码在内层 monorepo）。
+  // 用 repoRoot 读会取到嵌套仓库自己那份旧快照 —— 2026-11-09 实测：门禁因此
+  // 报 deps 2026-09-21 / inspect 2026-10-19 的「历史问题」，而项目本身的
+  // 快照（deps 0 问题 / inspect 0 error）就在外层目录里。
+  const conclusions = await loadGuardConclusions(ctx.stateRoot ?? ctx.repoRoot);
   const report = (await ctx.runner.runSopGuard({
     dryRun: ctx.dryRun ?? false,
     conclusions,

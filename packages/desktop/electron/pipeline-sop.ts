@@ -119,11 +119,14 @@ async function runSopGuardStage(
   id: string,
   runner: PipelineRunnerInstance,
   dryRun: boolean,
+  stateRoot?: string,
 ): Promise<{ guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>; ok: boolean }> {
   progress(id, 'guard', t('pipeline.guard.sopScanning'), 0.15);
   // 与 CLI / 无头脚本同一域执行器：结论读取（A6）与 SOP 规则集不容第二份实现
   const record = await runDomain('guard', {
     repoRoot: runner.repoRoot,
+    // 结论集从用户打开的项目（状态根）读；runner.repoRoot 可能已被下探到嵌套仓库
+    ...(stateRoot ? { stateRoot } : {}),
     runner,
     ...(dryRun ? { dryRun } : {}),
   });
@@ -170,12 +173,20 @@ async function runSopInspectStage(
   return { inspectReport };
 }
 
+/** SOP 流水线参数：收敛位置参数，避免 long-parameter-list */
+export interface SopPipelineOptions {
+  dryRun?: boolean;
+  guardEnabled?: boolean;
+  /** 状态根：用户打开的项目路径（域快照写入根）；缺省回退 runner.repoRoot */
+  stateRoot?: string;
+}
+
 async function runSopPipeline(
   id: string,
   runner: PipelineRunnerInstance,
-  dryRun?: boolean,
-  guardEnabled = true,
+  options: SopPipelineOptions = {},
 ): Promise<PipelineReport> {
+  const { dryRun, guardEnabled = true, stateRoot } = options;
   let guardReport: Awaited<ReturnType<typeof runner.runSopGuard>>;
   let guardOk = true;
 
@@ -183,7 +194,7 @@ async function runSopPipeline(
     progress(id, 'guard', t('pipeline.guard.skippedDisabled'), 0.2);
     guardReport = createSkippedGuardReport() as Awaited<ReturnType<typeof runner.runSopGuard>>;
   } else {
-    const guard = await runSopGuardStage(id, runner, dryRun ?? false);
+    const guard = await runSopGuardStage(id, runner, dryRun ?? false, stateRoot);
     guardReport = guard.guardReport;
     guardOk = guard.ok;
   }
@@ -208,10 +219,9 @@ async function runSopPipeline(
 export async function runSopJob(
   id: string,
   runner: PipelineRunnerInstance,
-  dryRun?: boolean,
-  guardEnabled?: boolean,
+  options: SopPipelineOptions = {},
 ): Promise<void> {
-  const report = await runSopPipeline(id, runner, dryRun, guardEnabled);
+  const report = await runSopPipeline(id, runner, options);
   const summary = (report as { summary?: { total?: number; failed?: number; skipped?: number } })
     .summary;
   const doneMsg = report.passed

@@ -152,7 +152,11 @@ export class SemgrepAdapter implements ToolAdapter {
 
     try {
       const command = await this.resolveCommandForScan(first.options);
-      const args = this.argsBuilder.buildForRuleFile(ruleFile, first.setup.targetDir);
+      const args = this.argsBuilder.buildForRuleFile(
+        ruleFile,
+        first.setup.targetDir,
+        first.options.projectPath,
+      );
       return await this.runner.runPartitioned({
         command,
         options: first.options,

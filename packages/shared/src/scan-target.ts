@@ -18,6 +18,13 @@
  *   3. 子目录里同时有 `package.json` 与 `packages/` → 用该子目录的 `packages`
  *      （被扫目标是 monorepo 的某个子目录时）
  *   4. 都判不出 → 回退项目根（宁可多扫，也不能不扫）
+ *
+ * **嵌套的独立仓库不参与第 3 条**（2026-11-09 实测事故）：被扫项目里可能放着一份
+ * 被 `.gitignore` 排除的完整仓库（本仓的 `zhihui-codeshield/` 就是这种内外分离结构）。
+ * 它有自己的 `.git`，是**另一个项目**，不是本项目的源码子目录；若按第 3 条钻进
+ * 它的 `packages/`，等于拿别人的仓库当自己的源码扫 —— 实测把 120s 的安全域预算
+ * 全部耗在它身上，扫描被杀、域判 `unavailable`，页面回落到旧报告显示 100 分。
+ * 判据只看 `.git` 是否存在（哪怕是个 worktree）：宁可少扫嵌套仓库，也不能扫错对象。
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -34,6 +41,8 @@ export function resolveSourceScanTarget(projectPath: string): string {
       if (!entry.isDirectory()) continue;
       if (entry.name === 'node_modules') continue;
       const child = path.join(root, entry.name);
+      // 嵌套的独立仓库 = 另一个项目，不是本项目的源码树（见上方说明）
+      if (fs.existsSync(path.join(child, '.git'))) continue;
       if (
         fs.existsSync(path.join(child, 'package.json')) &&
         fs.existsSync(path.join(child, 'packages'))

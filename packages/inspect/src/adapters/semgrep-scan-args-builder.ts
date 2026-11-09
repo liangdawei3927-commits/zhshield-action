@@ -27,7 +27,7 @@ export class SemgrepScanArgsBuilder {
     const args: string[] = ['scan', '--json', '--optimizations', 'all'];
     this.appendConfigArgs(args, configs);
     const ruleFile = await this.appendInlineRuleArgs(args, options);
-    this.appendExcludeArgs(args);
+    this.appendExcludeArgs(args, options.projectPath);
     args.push(targetDir);
     return { args, ruleFile };
   }
@@ -36,10 +36,10 @@ export class SemgrepScanArgsBuilder {
    * 用调用方已写好的合并规则文件组装参数（A12 批量派发）。
    * 与 `build` 共用排除目录与顺序约定，只是省掉"每条规则各写一份临时文件"。
    */
-  buildForRuleFile(ruleFile: string, targetDir: string): string[] {
+  buildForRuleFile(ruleFile: string, targetDir: string, projectPath?: string): string[] {
     const args: string[] = ['scan', '--json', '--optimizations', 'all'];
     args.push('--config', ruleFile);
-    this.appendExcludeArgs(args);
+    this.appendExcludeArgs(args, projectPath);
     args.push(targetDir);
     return args;
   }
@@ -67,10 +67,10 @@ export class SemgrepScanArgsBuilder {
   }
 
   /** 追加排除生成目录与测试夹具目录的参数 */
-  private appendExcludeArgs(args: string[]): void {
+  private appendExcludeArgs(args: string[], projectPath?: string): void {
     // 排除生成目录与测试夹具目录，避免扫描 dist/assets 下的规则文件触发自身误报，
     // 以及把刻意构造的恶意测试样例（如 __tests__/fixtures/conflict-resolver/evil.ts）当生产代码上报（对齐 refactor 引擎约定）。
     // 清单与用法都在 @zh/shared，两侧共用一份 —— 详见 appendScanExcludeArgs 的说明。
-    appendScanExcludeArgs(args);
+    appendScanExcludeArgs(args, projectPath);
   }
 }

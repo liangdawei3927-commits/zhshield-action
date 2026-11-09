@@ -119,7 +119,9 @@ export class SemgrepAdapter implements ToolAdapter {
     // 避免两个适配器各写一份而漂移 —— security 侧那次正是「漏写」而非「写错」）。
     // 漏掉这一步的代价是实测的：不带排除、目标为仓库根时，单次 semgrep 37.1s；
     // 带排除、目标为源码目录时 3.6s（10 倍差）。
-    appendScanExcludeArgs(args);
+    // 传 projectPath：把「本项目内嵌的独立仓库」一并排除（扫描目标回退到项目根时，
+    // semgrep 会递归钻进那份别人的仓库，实测 1.5GB 仓库把 120s 预算耗光被强杀）
+    appendScanExcludeArgs(args, options.projectPath);
     if (options.targetFiles && options.targetFiles.length > 0) {
       args.push(...options.targetFiles);
     } else {

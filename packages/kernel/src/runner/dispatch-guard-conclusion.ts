@@ -60,6 +60,31 @@ function readConclusion(
   return conclusion ? [...conclusion.issues] : null;
 }
 
+/**
+ * 快照时间注解：把 ISO 时间变成「本地时间 + 距今多久」，并给过期快照打标。
+ *
+ * 门禁「只读判定」拿上一次各域快照当判定依据；快照多旧必须看得见 ——
+ * 否则「昨天扫出来的干净结论」会被读成「刚才查过且干净」（2026-11-10 实测：
+ * 门禁页显示 100 分优秀，下面两条通过项引用的却是 2026-11-09 03:05 / 17:54 的快照）。
+ *
+ * 超过 {@link SNAPSHOT_STALE_HOURS} 追加「未重新检测」告警，但**不改变判定结果**：
+ * 要求每次提交前都全量重扫不现实；这里是让结论可追溯，而不是把门禁变成阻塞源。
+ */
+export const SNAPSHOT_STALE_HOURS = 24;
+
+function snapshotNote(generatedAt: string, now = Date.now()): string {
+  const ts = Date.parse(generatedAt);
+  if (!generatedAt) return '，未提供快照时间';
+  if (!Number.isFinite(ts)) return '，快照时间无法解析';
+  const hours = (now - ts) / 3_600_000;
+  const local = new Date(ts).toLocaleString('zh-CN', { hour12: false });
+  if (hours <= 0) return `，快照 ${local}`;
+  const age =
+    hours < 1 ? `${Math.max(1, Math.round(hours * 60))} 分钟前` : `${Math.round(hours)} 小时前`;
+  const stale = hours >= SNAPSHOT_STALE_HOURS ? '，⚠️ 未重新检测' : '';
+  return `，快照 ${local}（${age}${stale}）`;
+}
+
 /** 门禁纯判定入口：由 tool-dispatch 在 guard 域且已注入结论时调用 */
 export function evalGuardConclusion(
   rule: SopRule,
@@ -97,7 +122,7 @@ export function evalGuardConclusion(
       rule,
       status: 'passed',
       violations: [],
-      message: `只读判定（O8）：${supplier} 域结论无达到 ${rule.severity} 级的问题（快照 ${generatedAt}）`,
+      message: `只读判定（O8）：${supplier} 域结论无达到 ${rule.severity} 级的问题${snapshotNote(generatedAt)}`,
       ...evaluationTail('guard'),
     };
   }
@@ -107,7 +132,7 @@ export function evalGuardConclusion(
     status: 'failed',
     violations: findings.map(toViolation(rule)),
     files: [...new Set(findings.map((issue) => issue.file).filter(Boolean))],
-    message: `只读判定（O8）：${supplier} 域结论 ${findings.length} 处问题达到 ${rule.severity} 级（快照 ${generatedAt}），门禁未执行任何扫描`,
+    message: `只读判定（O8）：${supplier} 域结论 ${findings.length} 处问题达到 ${rule.severity} 级${snapshotNote(generatedAt)}，门禁未执行任何扫描`,
     ...evaluationTail('guard'),
   };
 }

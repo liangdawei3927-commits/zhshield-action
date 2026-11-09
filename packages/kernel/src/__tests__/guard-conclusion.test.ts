@@ -82,6 +82,43 @@ describe('门禁纯判定 — 工具调用归零、只读各域结论', () => {
     expect(counter.calls).toBe(1);
   });
 
+  it('通过项回显快照时间与距今时长；超过 24h 打「未重新检测」标（判定不变）', async () => {
+    const counter = { calls: 0 };
+    const { registry, engine } = buildEngine(counter);
+    registerEslintRule(registry);
+
+    const report = await engine.evaluateRules({
+      repoRoot: '/tmp',
+      conclusions: {
+        inspect: { domain: 'inspect', generatedAt: '2026-01-01T00:00:00.000Z', issues: [] },
+      },
+    });
+
+    const eval0 = report.evaluations[0];
+    expect(counter.calls).toBe(0);
+    expect(eval0.status).toBe('passed');
+    expect(eval0.message).toContain('快照');
+    expect(eval0.message).toContain('小时前');
+    expect(eval0.message).toContain('未重新检测');
+  });
+
+  it('新快照不打过期标（只回显距今年龄）', async () => {
+    const counter = { calls: 0 };
+    const { registry, engine } = buildEngine(counter);
+    registerEslintRule(registry);
+
+    const report = await engine.evaluateRules({
+      repoRoot: '/tmp',
+      conclusions: {
+        inspect: { domain: 'inspect', generatedAt: new Date().toISOString(), issues: [] },
+      },
+    });
+
+    expect(report.evaluations[0].status).toBe('passed');
+    expect(report.evaluations[0].message).toContain('快照');
+    expect(report.evaluations[0].message).not.toContain('未重新检测');
+  });
+
   it('供应商域结论有同级问题 → failed，违规条目来自该域快照', async () => {
     const counter = { calls: 0 };
     const { registry, engine } = buildEngine(counter);

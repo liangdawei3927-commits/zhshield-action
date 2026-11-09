@@ -403,4 +403,152 @@ describe('runGuardCommand — Guard 门禁命令（退出码即门禁契约）',
       await rm(project, { recursive: true, force: true });
     }
   });
+
+  describe('--hook 钩子判定（纯判定 + 缺证据不静默放行）', () => {
+    const HOOK_ENV = 'ZH_GATE_REQUIRE_SOP';
+    let prevEnv: string | undefined;
+
+    beforeEach(() => {
+      prevEnv = process.env[HOOK_ENV];
+      delete process.env[HOOK_ENV];
+    });
+
+    afterEach(() => {
+      if (prevEnv === undefined) delete process.env[HOOK_ENV];
+      else process.env[HOOK_ENV] = prevEnv;
+    });
+
+    /** 落盘一份最小 inspect 域快照：门禁据此认定「有结论可判」 */
+    async function withInspectSnapshot(): Promise<{
+      project: string;
+      cleanup: () => Promise<void>;
+    }> {
+      const project = await mkdtemp(join(tmpdir(), 'zhshield-cli-hook-'));
+      const domainsDir = join(project, '.zhshield', 'diagnostics', 'domains');
+      await mkdir(domainsDir, { recursive: true });
+      await writeFile(
+        join(domainsDir, 'inspect.json'),
+        JSON.stringify({
+          version: '1.0',
+          project: { path: project, name: 'demo' },
+          generatedAt: '2026-11-01T00:00:00.000Z',
+          summary: { total: 0, error: 0, warning: 0, info: 0 },
+          issues: [],
+          files: [],
+        }),
+        'utf-8',
+      );
+      return { project, cleanup: () => rm(project, { recursive: true, force: true }) };
+    }
+
+    it('Given 无供应商域快照，When guard --hook=pre-commit，Then 明确告知「未判定」并宽松放行（exit 0）', async () => {
+      const project = await mkdtemp(join(tmpdir(), 'zhshield-cli-hook-empty-'));
+      try {
+        const runner = makeRunner({
+          runGuard: vi.fn(async () => makeGuardReport([])),
+          runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
+        });
+        const reporter = makeReporter();
+
+        const code = await exitCodeOf(() =>
+          runGuardCommand(
+            runner,
+            makeOpts({ hook: 'pre-commit' }),
+            reporter as unknown as ConsoleReporter,
+            project,
+          ),
+        );
+
+        expect(code).toBeUndefined();
+        expect(runner.runSopGuard).not.toHaveBeenCalled();
+        expect(errors.join('\n')).toContain('无法判定');
+        expect(errors.join('\n')).toContain('未经门禁实际判定');
+      } finally {
+        await rm(project, { recursive: true, force: true });
+      }
+    });
+
+    it('Given 无快照且 ZH_GATE_REQUIRE_SOP=1，When guard --hook=pre-push，Then exit 2——缺证据不得按通过', async () => {
+      process.env[HOOK_ENV] = '1';
+      const project = await mkdtemp(join(tmpdir(), 'zhshield-cli-hook-strict-'));
+      try {
+        const runner = makeRunner({
+          runGuard: vi.fn(async () => makeGuardReport([])),
+          runSopGuard: vi.fn(async () => makeRuleEngineReport([])),
+        });
+        const reporter = makeReporter();
+
+        const code = await exitCodeOf(() =>
+          runGuardCommand(
+            runner,
+            makeOpts({ hook: 'pre-push' }),
+            reporter as unknown as ConsoleReporter,
+            project,
+          ),
+        );
+
+        expect(code).toBe(2);
+        expect(errors.join('\n')).toContain('ZH_GATE_REQUIRE_SOP');
+      } finally {
+        await rm(project, { recursive: true, force: true });
+        delete process.env[HOOK_ENV];
+      }
+    });
+
+    it('Given 快照存在且规则失败，When guard --hook=pre-commit，Then 注入结论集、exit 1，且不跑后置门禁', async () => {
+      const { project, cleanup } = await withInspectSnapshot();
+      try {
+        const sopReport = makeRuleEngineReport(
+          [
+            {
+              rule: { id: 'guard.block.sensitive-info', name: '敏感信息检测' },
+              status: 'failed',
+              message: '发现 1 处匹配',
+              violations: [
+                {
+                  id: 'v1',
+                  ruleId: 'guard.block.sensitive-info',
+                  severity: 'critical',
+                  file: 'src/config.ts',
+                  line: 5,
+                  message: '匹配到 API Key',
+                },
+              ],
+              targetEngine: 'guard',
+              timestamp: new Date(),
+            },
+          ],
+          { ok: false },
+        );
+        const runner = makeRunner({
+          runGuard: vi.fn(async () => makeGuardReport([])),
+          runSopGuard: vi.fn(async () => sopReport),
+        });
+        const reporter = makeReporter();
+
+        const code = await exitCodeOf(() =>
+          runGuardCommand(
+            runner,
+            makeOpts({ hook: 'pre-commit' }),
+            reporter as unknown as ConsoleReporter,
+            project,
+          ),
+        );
+
+        expect(code).toBe(1);
+        expect(runner.runGuard).not.toHaveBeenCalled();
+        expect(runner.runSopGuard).toHaveBeenCalledWith({
+          dryRun: false,
+          conclusions: {
+            inspect: expect.objectContaining({ domain: 'inspect', issues: expect.any(Array) }),
+          },
+        });
+        // 健康分/覆盖率是整轮扫描聚合值，属 L3/评分阶段；提交钩子不判它们
+        expect(runner.evaluatePostScanGates).not.toHaveBeenCalled();
+        expect(logs.join('\n')).toContain('RULE-REPORT');
+      } finally {
+        await cleanup();
+      }
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isFailOnValue, FAIL_ON_VALUES } from '@zh/reporter';
+import { HOOK_STAGES, isHookStage } from '../cli-options';
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -156,5 +157,14 @@ describe('CLI argument parsing', () => {
     expect(isFailOnValue('nonexistent')).toBe(false);
     expect(isFailOnValue('')).toBe(false);
     expect(isFailOnValue(undefined)).toBe(false);
+  });
+});
+
+describe('isHookStage', () => {
+  it('accepts only pre-commit / pre-push', () => {
+    for (const v of HOOK_STAGES) expect(isHookStage(v)).toBe(true);
+    expect(isHookStage('pre-rebase')).toBe(false);
+    expect(isHookStage('')).toBe(false);
+    expect(isHookStage(undefined)).toBe(false);
   });
 });

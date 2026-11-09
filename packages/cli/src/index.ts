@@ -17,7 +17,7 @@ import type { SopSourceSummary } from './sop-banner';
 import { ConsoleReporter, FAIL_ON_VALUES, isFailOnValue } from '@zh/reporter';
 import { augmentProcessPath } from '@zh/shared';
 import * as path from 'node:path';
-import type { CLIOptions } from './cli-options';
+import { applyHookFlag, type CLIOptions } from './cli-options';
 import { currentSopRemoteEnv, resolveSopRemoteSettings } from './sop-remote-config';
 import { runSopSyncCommand } from './sop-sync-command';
 // 命令实现层（guard/inspect/refactor/pipeline/baseline）与报告落盘已抽出至同目录 commands.ts
@@ -76,6 +76,8 @@ zhshield — 智汇码盾 代码质量治理
   --dir <path>    项目根目录（默认: 当前目录）
   --dry-run       Guard 模式：只报告不阻断
   --sop           使用 SOP 规则驱动模式（默认: checks.json 模式）
+  --hook <stage>  git 钩子触发的门禁判定: pre-commit | pre-push（纯判定，只读各域既有结论）
+
   --full          pipeline 全量扫描：逐域跑 inspect/security/deps/garbage/performance/refactor/techdebt，
                   输出逐域账本（不跑门禁判定）
   --domains <a,b> 只跑指定域（逗号分隔，如 deps,security）。与 --full（域驱动扫描）或
@@ -164,6 +166,11 @@ function parseFlags(args: string[], opts: CLIOptions): boolean {
   let explicitFailOn = false;
   for (let i = 1; i < args.length; i++) {
     if (applyBooleanFlag(args[i], opts)) continue;
+    const hookNext = applyHookFlag(args, i, opts);
+    if (hookNext !== undefined) {
+      i = hookNext;
+      continue;
+    }
     switch (args[i]) {
       case '--dir':
         opts.dir = args[++i] || opts.dir;

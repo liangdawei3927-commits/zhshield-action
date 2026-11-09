@@ -14,16 +14,7 @@ import {
 } from '@zh/pipeline';
 // 扫描类命令的统一收尾：门禁判定必须在 process.exit 之前 —— 命令自行 exit 会让门禁永不可达
 import { finalizeScan } from './sop-banner';
-import {
-  buildFindings,
-  toSarif,
-  formatReportJson,
-  severityRank,
-  failOnRank,
-  type ConsoleReporter,
-  type Finding,
-  type FailOn,
-} from '@zh/reporter';
+import { type ConsoleReporter } from '@zh/reporter';
 import {
   issuesToBaselineEntries,
   saveBaseline,
@@ -41,8 +32,9 @@ import {
 // 仅在 baselineCaptureRefactor 里按需动态 import —— 避免「打印用法 / guard / inspect」
 // 等常用命令的冷启动被迫加载整套重构引擎（实测会拖慢 CLI 入口，影响命令路由测试）。
 import * as path from 'node:path';
-import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
-import { countDegraded } from './degraded';
+import { promises as fsp } from 'node:fs';
+import { applyDegradedGuard, shouldBlock, writeReportFile } from './command-support';
+import { runGuardHookCommand } from './guard-hook';
 import type { CLIOptions } from './cli-options';
 import {
   asGovernanceDomains,
@@ -50,90 +42,6 @@ import {
   parseDomainList,
   SOP_DOMAIN_HINT,
 } from './domain-args';
-
-function shouldBlock(
-  report: unknown,
-  failOn: FailOn,
-  dryRun: boolean,
-  projectDir: string,
-): { findings: Finding[]; blocked: boolean } {
-  const findings = buildFindings(report);
-  relativizeFindings(findings, projectDir);
-  const blocked =
-    !dryRun &&
-    failOn !== 'none' &&
-    findings.some((f) => severityRank(f.severity) >= failOnRank(failOn));
-  return { findings, blocked };
-}
-
-/** SARIF artifactLocation 要求仓库相对路径；引擎产出多为绝对路径，
- *  统一转为相对项目根（--dir 解析后的 projectPath），否则 GitHub Code Scanning 无法映射到仓库文件 */
-function relativizeFindings(findings: Finding[], projectDir: string): void {
-  for (const f of findings) {
-    if (f.file && path.isAbsolute(f.file)) {
-      f.file = path.relative(projectDir, f.file);
-    }
-  }
-}
-
-/** 可写机器可读报告的命令；各命令报告 schema 不同，默认落盘名必须区分 */
-type ReportCommand = 'inspect' | 'inspect-sop' | 'guard' | 'guard-sop' | 'refactor' | 'pipeline';
-
-/**
- * 各命令的默认报告名基名。
- *
- * 此前四个命令共用 `zhshield.json`：inspect（totalFiles/issues）、refactor
- * （totalSmells）、guard（results）三套 schema 写同一路径，后跑的覆盖先跑的，
- * 用户拿到的「最近一次报告」可能根本不是刚跑的命令。inspect 保留 zhshield.json
- * 是因为 MCP 首次引导回退读该文件（desktop/electron/zhshield-mcp.ts），改名会断。
- *
- * `--sop` 分支产出的是 RuleEngineReport（evaluations/degraded），与默认路径的
- * InspectionReport / GuardReport 是**不同 schema**。放进同名文件会让解析方
- * （CI 脚本、MCP）静默拿到错字段（如 `issues` 不存在 → 误判零问题），故单独命名。
- */
-const DEFAULT_REPORT_BASE: Record<ReportCommand, string> = {
-  inspect: 'zhshield',
-  'inspect-sop': 'zhshield-sop',
-  guard: 'zhshield-guard',
-  'guard-sop': 'zhshield-guard-sop',
-  refactor: 'zhshield-refactor',
-  pipeline: 'zhshield-pipeline',
-};
-
-/** 报告落盘目标：项目根与命令合为一个上下文，避免函数参数列表过长 */
-interface ReportTarget {
-  projectDir: string;
-  command: ReportCommand;
-}
-
-/** 机器可读报告落盘。父目录不存在时递归创建——CI 传 reports/xxx.json
- *  不应要求预建目录，裸抛 ENOENT 会把产物链路变成难排查的崩溃栈。 */
-function writeReportFile(
-  opts: CLIOptions,
-  report: unknown,
-  findings: Finding[],
-  target: ReportTarget,
-): void {
-  const { projectDir, command } = target;
-  const base = DEFAULT_REPORT_BASE[command];
-  if (opts.format === 'sarif') {
-    const outPath = opts.report || `${base}.sarif`;
-    const absPath = path.resolve(projectDir, outPath);
-    mkdirSync(path.dirname(absPath), { recursive: true });
-    writeFileSync(absPath, toSarif(findings), 'utf8');
-    console.error(`[CLI] 报告已写入: ${outPath}`);
-    return;
-  }
-  if (opts.format === 'json') {
-    const outPath = opts.report || `${base}.json`;
-    const absPath = path.resolve(projectDir, outPath);
-    mkdirSync(path.dirname(absPath), { recursive: true });
-    writeFileSync(absPath, formatReportJson(report), 'utf8');
-    console.error(`[CLI] 报告已写入: ${outPath}`);
-    return;
-  }
-  // text 或未知格式：不写机器可读文件
-}
 
 /** 输出错误报告并退出 */
 export function handleError(reporter: ConsoleReporter, err: unknown): void {
@@ -151,20 +59,6 @@ export function handleError(reporter: ConsoleReporter, err: unknown): void {
   process.exit(1);
 }
 
-/** P0（复查4）降级护栏（全路径统一）：degraded > 0 → 告警 + exit 2。
- *  此前该判定只存在于 --sop 分支，默认路径 8 项全跳过仍 100 分通过（盲检）。 */
-function applyDegradedGuard(report?: unknown, subReports?: unknown[]): void {
-  const degraded = subReports
-    ? subReports.reduce<number>((n, r) => n + countDegraded(r), 0)
-    : countDegraded(report);
-  if (degraded > 0) {
-    console.error(
-      `[CLI] 降级警告: ${degraded} 项检查未实际执行（工具不可用/引擎缺失）—— 未检测 ≠ 通过，按门禁失败处理（exit 2）。`,
-    );
-    process.exitCode = 2;
-  }
-}
-
 export async function runGuardCommand(
   runner: PipelineRunner,
   opts: CLIOptions,
@@ -172,6 +66,10 @@ export async function runGuardCommand(
   projectDir: string,
 ): Promise<void> {
   if (domainsMisapplied(opts)) return;
+  if (opts.hook) {
+    await runGuardHookCommand({ runner, opts, reporter, projectDir, hook: opts.hook });
+    return;
+  }
   if (opts.sop) {
     // 《07》A6：门禁是纯判定域，只读各供应商域已落盘的结论，不自行派发工具。
     // CLI 自身尚无域快照写入能力，故仅当存在快照时才注入；否则沿用 kernel 明示的

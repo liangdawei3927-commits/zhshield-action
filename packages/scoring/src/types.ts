@@ -14,6 +14,12 @@ export interface DimensionScore {
   issues: number;
   /** 缺省 'scored'（旧字段保持兼容）；not-run 维度保留在返回数组但不参与 overall 加权 */
   status?: DimensionStatus;
+  /**
+   * true = 参考维度：有分但不参与总分/覆盖度/等级（当前仅 techdebt）。
+   * 与 `status='not-run'` 是两回事：not-run 是「没检测」，参考维度是「检测了但不计总分」。
+   * 缺省 false（旧记录/普通维度保持兼容）。
+   */
+  excludedFromOverall?: boolean;
 }
 
 /** secrets 域数据（secrets-state.json 子集）：active 为未处理密钥数 */
@@ -121,7 +127,22 @@ export interface RedLineInfo {
   reasons: RedLineReason[];
 }
 
-/** 项目健康总分：总分 + 等级 + 各维度得分 + 趋势 + 评分算法版本 + 红线封顶信息 */
+/**
+ * 覆盖度：参与总分的 9 个计分维度里，本次实际检测了几个。
+ *
+ * `complete=false` 时 `overall` 只能是「已检测部分均分」，不能当完整总分展示，
+ * 也不能用它出 A/B/C/D 等级（见 R5 规格 §3.4）。
+ */
+export interface ScoreCoverage {
+  /** 已检测的计分维度数 */
+  run: number;
+  /** 计分维度总数（当前 9；techdebt 为参考维度，不计入） */
+  total: number;
+  /** run === total */
+  complete: boolean;
+}
+
+/** 项目健康总分：总分 + 等级 + 各维度得分 + 趋势 + 评分算法版本 + 覆盖度 + 红线封顶信息 */
 export interface HealthScore {
   projectId: string;
   timestamp: Date;
@@ -129,8 +150,13 @@ export interface HealthScore {
   grade: ScoreGrade;
   dimensions: DimensionScore[];
   trend: ScoreTrend;
-  /** 评分算法版本（scoreVersion 2 = 十域聚合 + 红线封顶）；跨版本分数不做直接对比 */
+  /**
+   * 评分算法版本（4 = 十域聚合 + 技术债参考化 + 同事实去重 + 短板等级）；
+   * 跨版本分数不做直接对比。
+   */
   scoreVersion?: number;
+  /** 覆盖度；旧记录/旧引擎缺省时由 dimensions 推导 */
+  coverage?: ScoreCoverage;
   /** 红线封顶信息：仅本次汇总存在 critical 事实时有值 */
   redLine?: RedLineInfo;
 }

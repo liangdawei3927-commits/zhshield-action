@@ -47,18 +47,16 @@ afterEach(() => {
   }
 });
 
-/** 合法局部覆盖：security 加权 + quality 减重（十域等权 0.1 基准下保持权重和为 1），并覆盖扣分/加分参数 */
+/**
+ * 合法局部覆盖：security 加权 + quality 减重（十域等权 0.1 基准下保持权重和为 1）。
+ *
+ * R5 起 `.zhshield/scoring.yml` 只接受 `weight`：`penalties` / `positiveRules`
+ * 未接入生产评分路径，加载时显式拒绝（见下方「拒绝未接入字段」用例）。
+ */
 const VALID_OVERRIDE_YML = `# 项目级评分覆盖
 dimensions:
   security:
     weight: 0.15
-    penalties:
-      maxPenalty: 40
-      severityMultipliers:
-        critical: 4
-    positiveRules:
-      no-critical-vulns:
-        points: 15
   quality:
     weight: 0.05
 `;
@@ -117,27 +115,34 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
     // 权重归一化仍然成立
     const sum = config.dimensions.reduce((s, d) => s + d.weight, 0);
     expect(sum).toBeCloseTo(1, 3);
+  });
 
-    // penalties 字段级合并：maxPenalty 覆盖，perIssuePenalty 继承
-    const security = findDim(config, 'security');
-    expect(security.penalties.maxPenalty).toBe(40);
-    expect(security.penalties.perIssuePenalty).toBe(5);
+  it('penalties / positiveRules 显式拒绝：不再「解析成功但生产不消费」', () => {
+    const root = makeProject({
+      '.zhshield/scoring.yml': [
+        'dimensions:',
+        '  security:',
+        '    weight: 0.1',
+        '    penalties:',
+        '      maxPenalty: 40',
+        '',
+      ].join('\n'),
+    });
+    expect(() => loadProjectScoringConfig(root)).toThrow(/penalties.*未接入生产评分路径/);
+    expect(() => loadProjectScoringConfig(root)).toThrow(ProjectScoringConfigError);
 
-    // severityMultipliers 按 key 合并：critical 覆盖，其余保留默认
-    expect(security.penalties.severityMultipliers.critical).toBe(4);
-    expect(security.penalties.severityMultipliers.high).toBe(2);
-    expect(security.penalties.severityMultipliers.medium).toBe(1);
-    expect(security.penalties.severityMultipliers.low).toBe(0.5);
-
-    // positiveRules 按规则 id 匹配：points 覆盖，condition/name/description 继承
-    const rule = security.positiveRules.find((r) => r.id === 'no-critical-vulns')!;
-    expect(rule.points).toBe(15);
-    expect(rule.name).toBe('无严重漏洞');
-    expect(typeof rule.condition).toBe('function');
-    // 未提及的规则不受影响
-    expect(security.positiveRules.find((r) => r.id === 'security-tools-configured')!.points).toBe(
-      5,
-    );
+    const root2 = makeProject({
+      '.zhshield/scoring.yml': [
+        'dimensions:',
+        '  security:',
+        '    weight: 0.1',
+        '    positiveRules:',
+        '      no-critical-vulns:',
+        '        points: 15',
+        '',
+      ].join('\n'),
+    });
+    expect(() => loadProjectScoringConfig(root2)).toThrow(/positiveRules.*未接入生产评分路径/);
   });
 
   it('支持 .yaml 扩展名回退探测', () => {
@@ -197,11 +202,13 @@ describe('loadProjectScoringConfig — 合法局部覆盖', () => {
 
     vi.spyOn(process, 'cwd').mockReturnValue(root);
 
-    // 项目覆盖后：security 扣分 5×4=20 → 维度分 80、权重 0.15；overall = 80×0.15 + 100×0.85 = 97
+    // 项目覆盖只改权重：security 仍用默认 critical×3 → 扣 15 分，维度分 85；
+    // overall = 85×0.15 + 100×0.85 = 97.75。penalties 不再被合并（R5），
+    // 所以这里不再出现「5×4=20」的旧口径。
     const result = new ScoringEngine().score(context);
-    expect(result.overall).toBe(97);
+    expect(result.overall).toBe(97.75);
     expect(result.details.find((d) => d.dimension === 'security')?.weight).toBeCloseTo(0.15, 10);
-    expect(result.details.find((d) => d.dimension === 'security')?.negative).toBe(20);
+    expect(result.details.find((d) => d.dimension === 'security')?.negative).toBe(15);
   });
 });
 
@@ -235,7 +242,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
     expect(() => loadProjectScoringConfig(root)).toThrow(SUM_OVERFLOW_RE);
   });
 
-  it('未知加分规则 id → 报错', () => {
+  it('positiveRules 整段被拒绝（不再按规则 id 逐条合并）', () => {
     const root = makeProject({
       '.zhshield/scoring.yml': [
         'dimensions:',
@@ -247,7 +254,9 @@ describe('非法覆盖 — fail-fast 策略', () => {
       ].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(UNKNOWN_BONUS_RULE_RE);
+    expect(() => loadProjectScoringConfig(root)).toThrow(
+      /positiveRules.*未接入生产评分路径/,
+    );
   });
 
   it('未知顶层字段 → 报错（防止拼写错误静默失效）', () => {
@@ -258,7 +267,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
     expect(() => loadProjectScoringConfig(root)).toThrow(UNKNOWN_FIELD_RE);
   });
 
-  it('负数 perIssuePenalty → 报错', () => {
+  it('penalties 整段被拒绝（不再逐字段解析，负值也一样）', () => {
     const root = makeProject({
       '.zhshield/scoring.yml': [
         'dimensions:',
@@ -269,7 +278,7 @@ describe('非法覆盖 — fail-fast 策略', () => {
       ].join('\n'),
     });
 
-    expect(() => loadProjectScoringConfig(root)).toThrow(NOT_LESS_THAN_ZERO_RE);
+    expect(() => loadProjectScoringConfig(root)).toThrow(/penalties.*未接入生产评分路径/);
   });
 
   it('validateScoringOverrides 拒绝非映射顶层输入', () => {
@@ -283,7 +292,7 @@ describe('mergeScoringOverrides — 纯函数语义', () => {
   it('不修改默认配置（深拷贝），重复调用结果一致', () => {
     const overrides = validateScoringOverrides({
       dimensions: {
-        security: { weight: 0.15, penalties: { severityMultipliers: { critical: 9 } } },
+        security: { weight: 0.15 },
         quality: { weight: 0.05 },
       },
     });
@@ -299,8 +308,9 @@ describe('mergeScoringOverrides — 纯函数语义', () => {
     expect(merged.dimensions).not.toBe(fresh.dimensions);
     expect(merged.dimensions[0]).not.toBe(fresh.dimensions[0]);
 
-    // 合并结果正确
-    expect(findDim(merged, 'security').penalties.severityMultipliers.critical).toBe(9);
+    // 合并结果正确：只合并权重；penalties 不再参与合并（默认值保持 3 / 2）
+    expect(findDim(merged, 'security').weight).toBeCloseTo(0.15, 10);
+    expect(findDim(merged, 'security').penalties.severityMultipliers.critical).toBe(3);
     expect(findDim(merged, 'security').penalties.severityMultipliers.high).toBe(2);
     expect(findDim(merged, 'quality').weight).toBeCloseTo(0.05, 10);
   });

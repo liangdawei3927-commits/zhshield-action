@@ -51,10 +51,14 @@ describe('computeOverallSnapshot', () => {
     ];
     const snapshot = computeOverallSnapshot(dimensions);
 
-    // 逐项如实复算：唯一项是 score×weight / Σweight，不得有第二个惩罚项
-    const weightSum = dimensions.reduce((sum, d) => sum + d.weight, 0);
-    const expected = dimensions.reduce((sum, d) => sum + d.score * d.weight, 0) / weightSum;
+    // 逐项如实复算：唯一项是 score×weight / Σweight，不得有第二个惩罚项。
+    // R5：techdebt 是参考维度，**不进分子/分母**；把它算进去会得到 81.3 而不是 85.07，
+    // 这正是「同一事实重复计分」在总分上的表现。
+    const scored = dimensions.filter((d) => d.name !== 'techdebt');
+    const weightSum = scored.reduce((sum, d) => sum + d.weight, 0);
+    const expected = scored.reduce((sum, d) => sum + d.score * d.weight, 0) / weightSum;
     expect(snapshot.overall).toBeCloseTo(expected, 2);
+    expect(snapshot.coverage).toEqual({ run: 3, total: 3, complete: true });
     expect(snapshot.redLine?.capped ?? false).toBe(false);
   });
 

@@ -1552,7 +1552,14 @@
       "categoryScore": {
         "title": "점수 개요",
         "open": "{{name}} 열기",
-        "overall": "총점"
+        "overall": "총점",
+        "partialOverall": "검사된 항목 평균",
+        "coverageBadge": "{{run}}/{{total}} 항목 검사",
+        "referenceOnly": "참고",
+        "notInOverall": "총점 미포함",
+        "weakestCategory": "최약 항목: {{name}} {{score}}점",
+        "maxContribution": "이 항목 만점 {{points}}점",
+        "maxContributionShort": "만점 {{points}}"
       },
       "moduleScore": {
         "title": "모듈 점수"

@@ -104,16 +104,17 @@ describe('P1b 验收 — 总评分随单域变化可复算（spec G）', () => {
     ).overall;
     expect(worseSecrets).toBeLessThan(base);
 
-    // 增加 techdebt 指数 → 下降
-    const worseDebt = new ScoringEngine().calculate(
-      'p',
-      buildHealthDimensions({
-        guard,
-        inspect: baseInspect,
-        extras: { ...allExtras, techdebt: { debtIndex: 40, issueCount: 3 } },
-      }),
-    ).overall;
-    expect(worseDebt).toBeLessThan(base);
+    // 增加 techdebt 指数 → **总分不变**（参考维度不计总分），但 techdebt 维自身下降。
+    // 这是 R5 的核心口径：debtIndex 由 inspect 问题重算，再计入总分就是同一事实扣两次。
+    const worseDebtDims = buildHealthDimensions({
+      guard,
+      inspect: baseInspect,
+      extras: { ...allExtras, techdebt: { debtIndex: 40, issueCount: 3 } },
+    });
+    const worseDebt = new ScoringEngine().calculate('p', worseDebtDims).overall;
+    expect(worseDebt).toBe(base);
+    expect(worseDebtDims.find((d) => d.name === 'techdebt')!.score).toBe(60);
+    expect(worseDebtDims.find((d) => d.name === 'techdebt')!.excludedFromOverall).toBe(true);
 
     // 减少问题 → 上升
     const better = new ScoringEngine().calculate(

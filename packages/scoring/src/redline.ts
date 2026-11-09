@@ -12,8 +12,12 @@ import type { DimensionExtras, RedLineInfo, RedLineReason } from './types';
 /** 红线封顶上限：存在任一 critical 事实时总评 ≤ 55（<60 强制落入 D 级红色区间） */
 export const RED_LINE_CAP = 55;
 
-/** 评分算法版本：3 = 十域聚合 + 红线封顶 + quality 维规则聚合封顶(S1) + ESLOC 密度归一化(S2)；跨版本分数不做直接对比（前端只提示不比较） */
-export const SCORE_VERSION = 3;
+/**
+ * 评分算法版本：4 = 十域聚合 + 红线封顶 + quality 规则聚合封顶(S1) + ESLOC 密度归一化(S2)
+ * + 技术债参考化（不计总分） + 同一事实只计一次 + 短板等级封顶。
+ * 跨版本分数不做直接对比（前端只提示不比较）。
+ */
+export const SCORE_VERSION = 4;
 
 /**
  * 由扩展域原始数据判定红线事实。数据在 extras 里各域独立持有，

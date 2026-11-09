@@ -1552,7 +1552,14 @@
       "categoryScore": {
         "title": "Score overview",
         "open": "Open {{name}}",
-        "overall": "Overall"
+        "overall": "Overall",
+        "partialOverall": "Checked categories avg.",
+        "coverageBadge": "{{run}}/{{total}} checked",
+        "referenceOnly": "Reference",
+        "notInOverall": "Not in total",
+        "weakestCategory": "Weakest: {{name}} {{score}}",
+        "maxContribution": "Max {{points}} pts",
+        "maxContributionShort": "Max {{points}}"
       },
       "moduleScore": {
         "title": "Module scores"

@@ -55,8 +55,15 @@ export function normalizeScoreProjectId(projectId: string): string {
 export function saveScore(db: Database.Database, params: SaveScoreParams): void {
   const projectId = normalizeScoreProjectId(params.projectId);
   db.prepare(
-    'INSERT INTO scores (project_id, overall, grade, dimensions, trend) VALUES (?, ?, ?, ?, ?)',
-  ).run(projectId, params.overall, params.grade, params.dimensions, params.trend);
+    'INSERT INTO scores (project_id, overall, grade, dimensions, trend, score_version) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(
+    projectId,
+    params.overall,
+    params.grade,
+    params.dimensions,
+    params.trend,
+    params.scoreVersion ?? null,
+  );
 }
 
 /**

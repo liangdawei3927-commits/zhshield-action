@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@zh/i18n';
+import { isReferenceDimension } from '@zh/shared';
 import {
   getProfile,
   getScore,
@@ -90,9 +91,50 @@ export function dimensionView(
   };
 }
 
-/** 已检测维度数：总分只由这些维度加权而来，未检测维度被排除在外 */
-export function countRunDimensions(dims: readonly { status?: 'scored' | 'not-run' }[]): number {
-  return dims.filter((d) => d.status !== 'not-run').length;
+/**
+ * 已检测的**计分**维度数：总分只由这些维度加权而来。
+ *
+ * 参考维度（techdebt）有分但不计总分，必须排除；否则历史回退分支会把
+ * 「覆盖 10/10」报成完整，而真实计分口径只有 9 类。
+ */
+export function countRunDimensions(
+  dims: readonly {
+    name?: string;
+    excludedFromOverall?: boolean;
+    status?: 'scored' | 'not-run';
+  }[],
+): number {
+  return dims.filter(
+    (d) =>
+      !isReferenceDimension(d.name) && d.excludedFromOverall !== true && d.status !== 'not-run',
+  ).length;
+}
+
+/** 计分维度总数（10 张卡去掉参考维度；老记录无 name 时退回数组长度） */
+export function countScoredDimensions(
+  dims: readonly { name?: string; excludedFromOverall?: boolean }[],
+): number {
+  const counted = dims.filter(
+    (d) => !isReferenceDimension(d.name) && d.excludedFromOverall !== true,
+  ).length;
+  return counted > 0 ? counted : dims.length;
+}
+
+/** 最弱计分维度（用于总分卡短板提示；参考/未检测维度不参与） */
+export function weakestScoredDimension<
+  T extends {
+    name?: string;
+    excludedFromOverall?: boolean;
+    status?: 'scored' | 'not-run';
+    score: number;
+  },
+>(dims: readonly T[]): T | undefined {
+  const scored = dims.filter(
+    (d) =>
+      !isReferenceDimension(d.name) && d.excludedFromOverall !== true && d.status !== 'not-run',
+  );
+  if (scored.length === 0) return undefined;
+  return scored.reduce((min, d) => (d.score < min.score ? d : min), scored[0]!);
 }
 
 export function dimensionName(dimKey: string, tr: typeof t = t): string {

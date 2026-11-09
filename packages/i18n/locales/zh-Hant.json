@@ -1552,7 +1552,14 @@
       "categoryScore": {
         "title": "評分總覽",
         "open": "進入{{name}}",
-        "overall": "總分"
+        "overall": "總分",
+        "partialOverall": "已檢測部分平均",
+        "coverageBadge": "涵蓋 {{run}}/{{total}} 類",
+        "referenceOnly": "參考",
+        "notInOverall": "不計總分",
+        "weakestCategory": "最弱分類：{{name}} {{score}} 分",
+        "maxContribution": "本類滿分 {{points}} 分",
+        "maxContributionShort": "滿分 {{points}}"
       },
       "moduleScore": {
         "title": "模組評分"

@@ -258,8 +258,10 @@ export interface HealthScoreData {
   dimensions: HealthScore['dimensions'];
   summary: string;
   timestamp: string;
-  /** 评分算法版本（2 = 十域聚合 + 红线封顶）；跨版本分数不做直接对比 */
+  /** 评分算法版本（4 = 十域聚合 + 技术债参考化 + 同事实去重 + 短板等级） */
   scoreVersion?: number;
+  /** 覆盖度：计分维度里检测了几个；complete=false 时 score 只是「已检测部分均分」 */
+  coverage?: HealthScore['coverage'];
   /** 红线封顶信息：本次汇总存在 critical 事实时有值 */
   redLine?: HealthScore['redLine'];
 }
@@ -272,6 +274,7 @@ export function toHealthScoreData(score: HealthScore): HealthScoreData {
     timestamp:
       score.timestamp instanceof Date ? score.timestamp.toISOString() : String(score.timestamp),
     ...(typeof score.scoreVersion === 'number' ? { scoreVersion: score.scoreVersion } : {}),
+    ...(score.coverage ? { coverage: score.coverage } : {}),
     ...(score.redLine ? { redLine: score.redLine } : {}),
   };
 }

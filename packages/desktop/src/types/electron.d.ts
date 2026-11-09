@@ -336,11 +336,15 @@ export interface HealthScoreData {
      * 此处漏声明曾导致渲染层读不到，把「未检测」显示成「0 分 · 危险」。
      */
     status?: 'scored' | 'not-run';
+    /** true = 参考维度（techdebt）：有分但不参与总分/覆盖度/等级 */
+    excludedFromOverall?: boolean;
   }>;
   summary: string;
   timestamp: string;
-  /** 评分算法版本（2 = 十域聚合 + 红线封顶）；跨版本分数不做直接对比 */
+  /** 评分算法版本（4 = 十域聚合 + 技术债参考化 + 同事实去重 + 短板等级） */
   scoreVersion?: number;
+  /** 覆盖度：complete=false 时 score 只是「已检测部分均分」，不能显示 A/B/C/D */
+  coverage?: { run: number; total: number; complete: boolean };
   /** 红线封顶：本次汇总存在 critical 事实时总评被压制的原因 */
   redLine?: {
     capped: boolean;
@@ -512,6 +516,8 @@ export interface HealthOverviewData {
   /** 实时总评（与 ScoringEngine.calculate 同一套加权 / 红线封顶规则，但不落库） */
   overall: number;
   grade: 'A' | 'B' | 'C' | 'D';
+  /** 覆盖度：计分维度里检测了几个；complete=false 时 overall 只是「已检测部分均分」 */
+  coverage: { run: number; total: number; complete: boolean };
   /** 十维，一次输入组装取齐 ⇒ 十张卡同一时刻、同一口径 */
   dimensions: Array<{
     name: ScoreDimension;
@@ -521,6 +527,12 @@ export interface HealthOverviewData {
     status: 'scored' | 'not-run';
     /** 该维数据时间（域快照 / 门禁报告落盘时间）；该域从未跑过 → null */
     generatedAt: string | null;
+    /** 有效权重 = weight / Σ(参与总分的维度权重)；未检测/参考维度为 0 */
+    effectiveWeight: number;
+    /** 对总分的贡献 = score × effectiveWeight；未检测/参考维度为 0 */
+    contribution: number;
+    /** true = 参考维度（techdebt），有分但不计总分 */
+    excludedFromOverall: boolean;
   }>;
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间） */

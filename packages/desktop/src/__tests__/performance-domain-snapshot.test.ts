@@ -107,7 +107,7 @@ describe('performance 扫描不得覆盖 inspect 域快照', () => {
   });
 });
 
-describe('performance 类条目对 quality 维的贡献不因分家而丢失', () => {
+describe('performance 独立计分：不再并入 quality（同一事实只扣一次）', () => {
   let projectDir: string;
 
   beforeEach(() => {
@@ -136,7 +136,7 @@ describe('performance 类条目对 quality 维的贡献不因分家而丢失', (
     return dims.find((d) => d.name === 'quality');
   }
 
-  it('assembleHealthInputs 并入 performance 快照的 performance 类条目', async () => {
+  it('assembleHealthInputs 不再并入 performance 快照的 performance 类条目', async () => {
     await persistBothDomains();
 
     const inputs = await assembleHealthInputs(projectDir, {
@@ -146,35 +146,29 @@ describe('performance 类条目对 quality 维的贡献不因分家而丢失', (
       buildPipelineExtras: async () => ({}),
     });
 
-    expect(inputs.inspectIssues?.map((i) => i.category)).toEqual(['architecture', 'performance']);
+    // 只保留 inspect 自产的 architecture 条目；performance 域的条目归 performance 维
+    expect(inputs.inspectIssues?.map((i) => i.category)).toEqual(['architecture']);
 
-    // 两条 error 分属不同 ruleId → 各扣 8（S1 按规则聚合），ESLOC=0 时密度因子 = 1
     const quality = qualityOf(
       inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
     );
     expect(quality?.status).toBe('scored');
-    expect(quality?.issues).toBe(2);
-    expect(quality?.score).toBe(84);
+    expect(quality?.issues).toBe(1);
+    expect(quality?.score).toBe(92);
     expect(inputs.timestamps.quality).not.toBeNull();
   });
 
-  it('quality 快路径合并 performance 快照后与汇总路径同口径；无 performance 条目时零算分透传', async () => {
+  it('quality 快路径只透传 inspect 快照；performance 独立计分', async () => {
     await persistBothDomains();
 
     const inspectSnap = await readDomainSnapshot(projectDir, 'inspect');
-    const perfSnap = await readDomainSnapshot(projectDir, 'performance');
 
-    // 仅巡检数据 → 透传落盘时当场算好的分（不重算）
+    // 仅巡检数据 → 透传落盘时当场算好的分（不重算、不吸收 performance）
     expect(qualityFastPathScore(inspectSnap)).toMatchObject({
       score: 92,
       issues: 1,
       status: 'scored',
     });
-
-    // 有 performance 条目 → 并集重算，与 assembleHealthInputs 喂给 quality 维的输入一致
-    const merged = qualityFastPathScore(inspectSnap, perfSnap);
-    expect(merged?.score).toBe(84);
-    expect(merged?.issues).toBe(2);
 
     const inputs = await assembleHealthInputs(projectDir, {
       listGuardReports: () => [],
@@ -185,7 +179,7 @@ describe('performance 类条目对 quality 维的贡献不因分家而丢失', (
     const viaSummary = qualityOf(
       inputs.inspectIssues ? { issues: inputs.inspectIssues, esloc: inputs.esloc } : null,
     );
-    expect(merged?.score).toBe(viaSummary?.score);
-    expect(merged?.issues).toBe(viaSummary?.issues);
+    expect(viaSummary?.score).toBe(92);
+    expect(viaSummary?.issues).toBe(1);
   });
 });

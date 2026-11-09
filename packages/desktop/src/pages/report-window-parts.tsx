@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { isReferenceDimension } from '@zh/shared';
 import type { HealthScoreData } from '../types/electron';
 import {
   buildWindowBuckets,
@@ -221,7 +222,10 @@ function GapWarning({ buckets }: { buckets: readonly WindowBucket[] }) {
 /** 维度变化：只显示真正变化的维度，未检测维度不当成 0 分 */
 function DimensionDeltaChips({ bucket }: { bucket: WindowBucket }) {
   const t = useT();
-  const changed = bucket.dimensions.filter((d) => d.status !== 'not-run' && d.delta !== 0);
+  // 参考维度（techdebt）有分但不计总分，不进入「哪些维度变了」的结论
+  const changed = bucket.dimensions.filter(
+    (d) => !isReferenceDimension(d.name) && d.status !== 'not-run' && d.delta !== 0,
+  );
   if (changed.length === 0) {
     return (
       <span className="text-[11px] text-zh-muted">

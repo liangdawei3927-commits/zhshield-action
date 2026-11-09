@@ -24,11 +24,18 @@ export function createProjectsBatch(db: Database.Database, projects: CreateProje
 
 export function saveScoresBatch(db: Database.Database, scores: SaveScoreParams[]): void {
   const insert = db.prepare(
-    'INSERT INTO scores (project_id, overall, grade, dimensions, trend) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO scores (project_id, overall, grade, dimensions, trend, score_version) VALUES (?, ?, ?, ?, ?, ?)',
   );
   db.transaction((rows: SaveScoreParams[]) => {
     for (const s of rows)
-      insert.run(normalizeScoreProjectId(s.projectId), s.overall, s.grade, s.dimensions, s.trend);
+      insert.run(
+        normalizeScoreProjectId(s.projectId),
+        s.overall,
+        s.grade,
+        s.dimensions,
+        s.trend,
+        s.scoreVersion ?? null,
+      );
   })(scores);
 }
 

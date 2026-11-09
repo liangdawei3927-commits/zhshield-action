@@ -1,10 +1,11 @@
+import type { ScoreDimension } from '@zh/shared';
 import { PageShell } from '../components/business/PageShell';
 import { FeatureIcon, ClockGlyph } from '../components/ui/Icons';
 import { useReportsPage, useModuleScores } from './reports-logic';
 import { StackedDocs, ReportsHeader, ModuleScoreCards } from './reports-parts';
 import { ScoreOverviewRow } from './category-score-cards';
 import { overviewRowInput } from './category-score-logic';
-import { countRunDimensions } from './reports-logic';
+import { countRunDimensions, countScoredDimensions, weakestScoredDimension } from './reports-logic';
 import { HistoryTable } from './reports-table';
 import { ReportWindowSection } from './report-window-parts';
 import { ProjectGatesSection } from './report-gates';
@@ -65,6 +66,9 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
 
   if (data.length > 0) {
     const latest = data.at(-1)!;
+    const fallbackRun = countRunDimensions(latest.dimensions);
+    const fallbackTotal = countScoredDimensions(latest.dimensions);
+    const fallbackWeakest = weakestScoredDimension(latest.dimensions);
     const rowInput = overview
       ? overviewRowInput(overview)
       : {
@@ -72,10 +76,16 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
           generatedAt: latest.timestamp,
           overall: {
             score: latest.score,
-            partial: {
-              run: countRunDimensions(latest.dimensions),
-              total: latest.dimensions.length,
-            },
+            partial: { run: fallbackRun, total: fallbackTotal },
+            complete: fallbackRun === fallbackTotal && fallbackTotal > 0,
+            ...(fallbackWeakest
+              ? {
+                  weakest: {
+                    name: fallbackWeakest.name as ScoreDimension,
+                    score: fallbackWeakest.score,
+                  },
+                }
+              : {}),
             ...(latest.redLine ? { redLine: latest.redLine } : {}),
           },
         };

@@ -9,7 +9,7 @@
  * ScoringEngine.calculate），差别只在数据来源：pipeline 吃刚跑完的报告，
  * 汇总吃各域已持久化的结果。因此需要「落盘结果 → 算法输入形状」的映射，即本模块职责。
  */
-import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
+import { buildHealthDimensions, isPenaltyExemptRuleId, SCORE_VERSION } from '@zh/scoring';
 import type { GuardCheckLike, GuardReportLike, InspectIssueLike } from '@zh/scoring';
 import type { GuardReportRecord } from '@zh/guard';
 import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics';
@@ -72,6 +72,10 @@ export function toInspectIssues(issues: readonly DiagnosticEntry[]): InspectIssu
       severity: issue.severity,
       category: issue.category,
       ruleId: issue.ruleId,
+      // R5：secret:/cve:/upgrade: 由绝对口径（secretsPenalty/depsPenalty/不扣分）接管，
+      // 这里只标记「可计数、不可再扣条目分」，避免同一事实在同一维度扣两次。
+      // 前缀兜底在 scoring 侧也有一份，旧调用方漏标记时仍能去重。
+      ...(issue.ruleId && isPenaltyExemptRuleId(issue.ruleId) ? { penaltyExempt: true } : {}),
     }));
 }
 
@@ -106,11 +110,12 @@ export interface HealthInputs {
    */
   inspectIssues: InspectIssueLike[] | null;
   /**
-   * quality 维的数据源是否真的跑过（inspect 巡检或 performance 扫描）。
+   * quality 维的数据源是否真的跑过（**只认 inspect 巡检**）。
    *
    * `inspectIssues` 是给三个维共用的条目袋，只跑 security 扫描时它非空，
    * 但那只是 security 条目 —— 据此判 quality 已覆盖会给出 100 分
-   * （没巡检 ≠ 质量满分，《07》A2）。
+   * （没巡检 ≠ 质量满分，《07》A2）。performance 是独立计分类，同样不算
+   * quality 覆盖（R5 §3.2）。
    */
   qualityCovered: boolean;
   /** 项目 ESLOC（S2 密度归一化分母）。来自 inspect 快照落盘时算好的值，与落盘出分同口径 */
@@ -155,46 +160,21 @@ export type QualityFastPathScore = {
 /**
  * quality 快路径：透传 inspect 快照落盘时当场算好的 dimensionScore + previousScore。
  *
- * performance 条目落在 `domains/performance.json`（按域分文件，不覆盖 inspect 快照），
- * 因此 inspect 快照自带评分里**不含**它们。有 performance 条目时按
- * 「inspect + performance」并集走一次 buildHealthDimensions 重算，与
- * {@link assembleHealthInputs} 交给 quality 维的输入完全同构（两者都只把
- * DIMENSION_CATEGORIES.quality 覆盖的类别计入），两条路径不可能漂移；
- * 没有 performance 条目时原样透传，快路径仍是零算分。
+ * R5：performance 域条目**不再并入 quality**。performance 是独立计分类
+ * （`dimension='performance'`，输入是 `extras.performance` 摘要），它的问题
+ * 已在 performance 维扣分；再并进 quality 就是同一事实扣两次。
+ * inspect 自己产的 `performance` 类别规则仍留在 inspect 快照里，随本快路径计入
+ * quality——那是 inspect 的 Owner 事实，不是 performance 域的结论。
+ *
+ * 因此本函数不再需要 performance 快照参数：quality 的唯一数据源是 inspect 快照。
  */
-export function qualityFastPathScore(
-  snap: DiagnosticsReport | null,
-  performanceSnap: DiagnosticsReport | null = null,
-): QualityFastPathScore | null {
+export function qualityFastPathScore(snap: DiagnosticsReport | null): QualityFastPathScore | null {
   if (!snap?.dimensionScore) return null;
   // dimension 显式收窄为 'quality'：DomainDimensionScore.dimension 已放宽为五域联合
   // （security/deps/garbage/performance 快照也带分了），inspect 快照恒为 quality 维
-  const passthrough = {
+  return {
     ...snap.dimensionScore,
     dimension: 'quality' as const,
-    generatedAt: snap.generatedAt,
-    previousScore: snap.previousScore,
-  };
-  const performanceIssues = toInspectIssues(
-    (performanceSnap?.issues ?? []).filter((issue) => issue.category === 'performance'),
-  );
-  if (performanceIssues.length === 0) return passthrough;
-  // 调用形状与 zh-diagnostics 的 enrichInspectSnapshot 一致（不带 projectRoot/profile：
-  // 维度分与权重无关），重算结果与落盘出分同口径。
-  const [quality] = buildHealthDimensions({
-    guard: null,
-    inspect: {
-      issues: [...toInspectIssues(snap.issues), ...performanceIssues],
-      esloc: snap.esloc,
-    },
-  });
-  if (quality?.name !== 'quality' || !quality.status) return passthrough;
-  return {
-    dimension: 'quality',
-    score: quality.score,
-    issues: quality.issues,
-    status: quality.status,
-    version: SCORE_VERSION,
     generatedAt: snap.generatedAt,
     previousScore: snap.previousScore,
   };
@@ -210,12 +190,12 @@ export function qualityFastPathScore(
  * malware/license/environment 不在十域映射内，不并入），使专用扫描结果终于进入
  * buildHealthDimensions。
  *
- * 同理并入 performance 快照的 performance 类条目：按域分文件后它们落在
- * domains/performance.json，而 DIMENSION_CATEGORIES.quality 含 'performance'，
- * 不并入则 quality 维会静默丢掉这部分扣分（历史上它们是被写进 inspect 快照顺带进入的）。
+ * **不并入 performance 快照**（R5）：performance 是独立计分类，按
+ * `extras.performance` 摘要计分；把它再并进 quality 会让同一性能问题扣两次。
+ * inspect 自己产的 `performance` 类别条目仍在 inspect 快照里，随 quality 计分。
  *
  * timestamps 各维度锚点来源：
- * - quality：max(inspect 快照 generatedAt, performance 快照 generatedAt)（巡检/性能两类数据源）
+ * - quality：inspect 快照 generatedAt（performance 域有自己的锚点）
  * - gate：guard 报告记录 timestamp（listGuardReports 新→旧取 [0]）
  * - security：max(dashboard-state.secrets.lastRunAt, security 快照 generatedAt)（合并来源）
  * - dependencies：max(dashboard-state.deps.lastRunAt, deps 快照 generatedAt)（合并来源）
@@ -227,15 +207,13 @@ export async function assembleHealthInputs(
   reads: HealthInputReads,
 ): Promise<HealthInputs> {
   const guardRecord = reads.listGuardReports(projectPath)[0] ?? null;
-  const [inspectSnapshot, securitySnapshot, depsSnapshot, performanceSnapshot, state, extras] =
-    await Promise.all([
-      reads.readDomainSnapshot(projectPath, 'inspect'),
-      reads.readDomainSnapshot(projectPath, 'security'),
-      reads.readDomainSnapshot(projectPath, 'deps'),
-      reads.readDomainSnapshot(projectPath, 'performance'),
-      reads.readDashboardState(projectPath),
-      reads.buildPipelineExtras(projectPath),
-    ]);
+  const [inspectSnapshot, securitySnapshot, depsSnapshot, state, extras] = await Promise.all([
+    reads.readDomainSnapshot(projectPath, 'inspect'),
+    reads.readDomainSnapshot(projectPath, 'security'),
+    reads.readDomainSnapshot(projectPath, 'deps'),
+    reads.readDashboardState(projectPath),
+    reads.buildPipelineExtras(projectPath),
+  ]);
 
   const mergedIssues: InspectIssueLike[] = [];
   if (inspectSnapshot) mergedIssues.push(...toInspectIssues(inspectSnapshot.issues));
@@ -249,17 +227,13 @@ export async function assembleHealthInputs(
       ...toInspectIssues(depsSnapshot.issues.filter((issue) => issue.category === 'dependency')),
     );
   }
-  if (performanceSnapshot) {
-    mergedIssues.push(
-      ...toInspectIssues(
-        performanceSnapshot.issues.filter((issue) => issue.category === 'performance'),
-      ),
-    );
-  }
+  // R5：不再并入 performance 快照。performance 是独立计分类，其条目只在
+  // extras.performance 里按摘要计分；并进 quality 会让同一性能问题扣两次。
 
   const now = reads.now?.() ?? new Date().toISOString();
   const timestamps: Record<ScoreDimension, string | null> = {
-    quality: maxTimestamp(inspectSnapshot?.generatedAt, performanceSnapshot?.generatedAt),
+    // quality 的唯一数据源是 inspect 快照（performance 域有自己的时间锚点）
+    quality: inspectSnapshot?.generatedAt ?? null,
     gate: guardRecord?.timestamp ?? null,
     security: maxTimestamp(state.secrets?.lastRunAt, securitySnapshot?.generatedAt),
     dependencies: maxTimestamp(state.deps?.lastRunAt, depsSnapshot?.generatedAt),
@@ -278,9 +252,9 @@ export async function assembleHealthInputs(
       ? { results: toGuardChecks(guardRecord.checks), total: guardRecord.summary?.total }
       : null,
     inspectIssues: mergedIssues.length > 0 || inspectSnapshot !== null ? mergedIssues : null,
-    // quality 维的覆盖判定只看自己的数据源：inspect 巡检 / performance 扫描。
-    // security/deps 条目并入只是为了让它们各自的维度计分，不代表质量域跑过。
-    qualityCovered: inspectSnapshot !== null || performanceSnapshot !== null,
+    // quality 维的覆盖判定只看 inspect 快照：security/deps 条目并入只是为了让它们
+    // 各自的维度计分；performance 是独立计分类，不代表质量域跑过（R5 §3.2）。
+    qualityCovered: inspectSnapshot !== null,
     esloc: inspectSnapshot?.esloc,
     extras,
     timestamps,

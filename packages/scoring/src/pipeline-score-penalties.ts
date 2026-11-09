@@ -36,6 +36,16 @@ export interface InspectIssueLike {
   category: string;
   /** 规则 ID（S1 规则聚合计数用）；缺省时该条 issue 独立计分，行为向后兼容 */
   ruleId?: string;
+  /**
+   * true = 该条只计数/展示，**不进入条目级扣分**（R5：同一事实只计一次）。
+   *
+   * 当前用于 `secret:` / `cve:` / `upgrade:`：这三类事实分别由
+   * `secretsPenalty` / `depsPenalty` / 「不扣分」的绝对口径处理；
+   * 若条目级再扣一次，同一密钥/CVE 会在同一个维度里被扣两次。
+   *
+   * 缺省 false（普通 issue 保持按 severity 扣分）。
+   */
+  penaltyExempt?: boolean;
 }
 
 /** inspect 报告最小结构 — 与 @zh/inspect InspectionReport 字段兼容 */
@@ -107,9 +117,32 @@ function normalizeIssueSeverity(severity: string): keyof typeof ISSUE_PENALTY {
   return severity in ISSUE_PENALTY ? (severity as keyof typeof ISSUE_PENALTY) : 'info';
 }
 
+/**
+ * 由绝对口径（secretsPenalty / depsPenalty / upgradable 不扣分）接管的事实前缀。
+ *
+ * 这些事实在快照里仍保留条目（issues 计数与 UI 明细），但**不得**再走进
+ * 条目级 severity 扣分，否则同一密钥/CVE 会在同一维度里被扣两次。
+ * 用前缀兜底而不是只信 `penaltyExempt` 字段：旧快照/旧调用方没有该字段，
+ * 前缀判据让去重对历史数据同样生效。
+ */
+const ABSOLUTE_COUNTER_RULE_PREFIXES = ['secret:', 'cve:', 'upgrade:'] as const;
+
+/** true = 该条目由绝对口径计分，条目级扣分必须跳过 */
+export function isPenaltyExemptRuleId(ruleId: string | undefined): boolean {
+  return (
+    ruleId !== undefined &&
+    ABSOLUTE_COUNTER_RULE_PREFIXES.some((prefix) => ruleId.startsWith(prefix))
+  );
+}
+
+function isPenaltyExempt(issue: InspectIssueLike): boolean {
+  return issue.penaltyExempt === true || isPenaltyExemptRuleId(issue.ruleId);
+}
+
 export function penaltyForIssues(issues: InspectIssueLike[]): number {
   const counts = new Map<keyof typeof ISSUE_PENALTY, number>();
   for (const issue of issues) {
+    if (isPenaltyExempt(issue)) continue;
     const key = normalizeIssueSeverity(issue.severity);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -131,6 +164,8 @@ export function qualityPenalty(issues: InspectIssueLike[], esloc: number | undef
   const byRule = new Map<string, number>();
   let untagged = 0;
   for (const issue of issues) {
+    // 参考/绝对口径条目只计数，不在这里扣分（R5 §3.2）
+    if (isPenaltyExempt(issue)) continue;
     const p = ISSUE_PENALTY[normalizeIssueSeverity(issue.severity)];
     if (issue.ruleId) {
       byRule.set(issue.ruleId, (byRule.get(issue.ruleId) ?? 0) + p);
@@ -180,12 +215,23 @@ export function guardIssueCount(results: GuardCheckLike[]): number {
   );
 }
 
-/** secrets 扣分：active 未处理每条 -15，上限 60（spec D） */
+/**
+ * secrets 扣分：active 未处理每条 -15，上限 60（spec D）。
+ *
+ * R5：这是 active 密钥的**唯一**扣分线。`secret:` 快照条目只保留计数/展示
+ * （`penaltyExempt`），不再走条目级 severity 扣分，避免同一密钥扣两次。
+ */
 export function secretsPenalty(secrets: SecretDataLike): number {
   return Math.min(60, secrets.activeCount * 15);
 }
 
-/** deps 扣分：漏洞按 critical -12 / high -8 / medium -4，上限 100（spec D） */
+/**
+ * deps 扣分：漏洞按 critical -12 / high -8 / medium -4，上限 100（spec D）。
+ *
+ * R5：这是依赖漏洞的**唯一**扣分线。`cve:` 快照条目只保留计数/展示
+ * （`penaltyExempt`）；`upgrade:` 条目同样不扣分（与 `DepsDataLike.upgradable`
+ * 注释「仅作展示不重扣」一致）。
+ */
 export function depsPenalty(deps: DepsDataLike): number {
   return Math.min(
     100,

@@ -91,8 +91,8 @@ describe('ScoringEngine.calculate — 红线封顶', () => {
 });
 
 describe('SCORE_VERSION / 全域 extras 类型完整性', () => {
-  it('SCORE_VERSION = 3', () => {
-    expect(SCORE_VERSION).toBe(3);
+  it('SCORE_VERSION = 4', () => {
+    expect(SCORE_VERSION).toBe(4);
   });
 
   it('garbage/backup extras 参与 extras 全量运行判定', () => {

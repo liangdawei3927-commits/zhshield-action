@@ -1,5 +1,5 @@
 import { t } from '@zh/i18n';
-import type { ScoreDimension } from '@zh/shared';
+import { isReferenceDimension, type ScoreDimension } from '@zh/shared';
 import { navItems, type NavGroup } from '../components/layout/nav-items';
 import { dimensionName } from './reports-logic';
 import { domainScoreView, type DomainScoreView } from './domain-score-logic';
@@ -35,8 +35,12 @@ export interface CategoryScoreCardView {
   title: string;
   /** 分数 / 等级 / 颜色 / 数据状态（与分类页评分条同源） */
   view: DomainScoreView;
-  /** hover 提示：分类名 · 维度名 · 权重 */
+  /** hover 提示：分类名 · 维度名 · 有效权重 · 满分贡献 */
   hint: string;
+  /** true = 参考维度（techdebt）：有分但不计总分，卡上标「参考」 */
+  reference: boolean;
+  /** 该分类在总分里的满分（有效权重 × 100）；参考维度为 null */
+  maxContribution: number | null;
 }
 
 /** 一维的展示用最小结构（HealthScoreData.dimensions 的子集，便于测试构造） */
@@ -54,6 +58,12 @@ export interface DimensionEntry {
    * 卡片要与分类页同口径就必须也按维取时间；缺省时回退汇总时间。
    */
   generatedAt?: string | null;
+  /** 有效权重（weight / Σ参与总分权重）；缺省时回退 weight */
+  effectiveWeight?: number;
+  /** 对总分的贡献 = score × effectiveWeight */
+  contribution?: number;
+  /** true = 参考维度（techdebt），不计总分 */
+  excludedFromOverall?: boolean;
 }
 
 /** 分类评分卡入参：维度数组 + 汇总时间 + 总分输入 */
@@ -87,6 +97,9 @@ export function categoryScoreCards({
     const dim = dimensions.find((d) => d.name === dimension);
     const view = domainScoreView({ dim, generatedAt: dim?.generatedAt ?? generatedAt, now, tr });
     const title = item.label ?? tr(item.labelKey);
+    // 参考维度（techdebt）不计总分：卡片标「参考」，不显示「满分 X 分」
+    const reference = dim?.excludedFromOverall === true || isReferenceDimension(dimension);
+    const effectiveWeight = reference ? 0 : (dim?.effectiveWeight ?? dim?.weight ?? 0);
     return [
       {
         navId: item.id,
@@ -94,7 +107,9 @@ export function categoryScoreCards({
         group: item.group,
         title,
         view,
-        hint: cardHint({ title, dimension, weight: dim?.weight, view, tr }),
+        reference,
+        maxContribution: reference || effectiveWeight <= 0 ? null : effectiveWeight * 100,
+        hint: cardHint({ title, dimension, weight: effectiveWeight, view, reference, tr }),
       },
     ];
   });
@@ -106,19 +121,28 @@ interface CardHintParams {
   title: string;
   /** 评分维度 */
   dimension: ScoreDimension;
-  /** 该维权重；未参与汇总时为 undefined（不拼百分比） */
-  weight: number | undefined;
+  /** 有效权重；参考/未参与汇总时为 0（不拼百分比） */
+  weight: number;
   /** 该维分数视图（陈旧时补数据时间） */
   view: DomainScoreView;
+  /** true = 参考维度（不计总分） */
+  reference: boolean;
   /** 翻译函数 */
   tr: typeof t;
 }
 
-/** hover 提示：分类名 · 维度名 · 权重（可选）；陈旧时补一句数据时间 */
-function cardHint({ title, dimension, weight, view, tr }: CardHintParams): string {
+/**
+ * hover 提示：分类名 · 维度名 · 有效权重/满分 · 参考标记；陈旧时补数据时间。
+ *
+ * 用**有效权重**而不是配置里的 `weight`：全 9 类检测时每类实际是 11.1%，
+ * 拿 0.1 去乘会少算约 11%，用户按 10% 核对贡献永远对不上。
+ */
+function cardHint({ title, dimension, weight, view, reference, tr }: CardHintParams): string {
   const parts = [title, dimensionName(dimension, tr)];
-  if (typeof weight === 'number' && weight > 0) {
-    parts.push(`${Math.round(weight * 100)}%`);
+  if (reference) {
+    parts.push(tr('page.reports.categoryScore.referenceOnly'));
+  } else if (weight > 0) {
+    parts.push(tr('page.reports.categoryScore.maxContribution', { points: (weight * 100).toFixed(1) }));
   }
   if (view.kind === 'stale') {
     parts.push(tr('page.reports.dataStale', { hours: view.ageHours }));
@@ -134,6 +158,18 @@ function cardHint({ title, dimension, weight, view, tr }: CardHintParams): strin
  * 「3 天前扫过的域」掩盖成新鲜数据，这与陈旧提示「把旧分当当前状态」要防的是同一件事。
  * 没有任何域带时间锚点时，回退本次读取时刻。
  */
+/** 总分卡入参（报告中心与分类卡共用；techdebt 参考维度不在分母里） */
+export interface OverallScoreInput {
+  score: number;
+  /** 只统计计分维度：技术债是参考指标，不在分母里 */
+  partial: { run: number; total: number };
+  /** true = 计分维度全部检测；false 时总分只是「已检测部分均分」 */
+  complete: boolean;
+  /** 最弱计分类（用于总分卡常驻短板提示）；无计分类时为 undefined */
+  weakest?: { name: ScoreDimension; score: number };
+  redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
+}
+
 export function overviewRowInput(overview: {
   overall: number;
   dimensions: readonly DimensionEntry[];
@@ -142,22 +178,28 @@ export function overviewRowInput(overview: {
 }): {
   dimensions: readonly DimensionEntry[];
   generatedAt: string;
-  overall: {
-    score: number;
-    partial: { run: number; total: number };
-    redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
-  };
+  overall: OverallScoreInput;
 } {
-  const scored = overview.dimensions.filter((d) => d.status !== 'not-run');
-  const times = scored
+  // 分母只算计分维度：参考维度（techdebt）检测了也不进总分/覆盖度
+  const scored = overview.dimensions.filter(
+    (d) => !isReferenceDimension(d.name) && d.excludedFromOverall !== true,
+  );
+  const run = scored.filter((d) => d.status !== 'not-run');
+  const times = run
     .map((d) => (d.generatedAt ? Date.parse(d.generatedAt) : Number.NaN))
     .filter((ms) => !Number.isNaN(ms));
+  const weakest =
+    run.length > 0
+      ? run.reduce((min, d) => (d.score < min.score ? d : min), run[0]!)
+      : undefined;
   return {
     dimensions: overview.dimensions,
     generatedAt: times.length > 0 ? new Date(Math.min(...times)).toISOString() : overview.readAt,
     overall: {
       score: overview.overall,
-      partial: { run: scored.length, total: overview.dimensions.length },
+      partial: { run: run.length, total: scored.length },
+      complete: run.length === scored.length && scored.length > 0,
+      ...(weakest ? { weakest: { name: weakest.name as ScoreDimension, score: weakest.score } } : {}),
       ...(overview.redLine ? { redLine: overview.redLine } : {}),
     },
   };

@@ -1,5 +1,6 @@
 import type { DimensionScore, DimensionExtras } from './types';
 import { DimensionMapper } from './dimension-mapper';
+import { isReferenceDimension } from '@zh/shared';
 import type { ScoringProjectProfile } from '@zh/fingerprint';
 import {
   resolveProfileScoring,
@@ -119,8 +120,8 @@ export function buildHealthDimensions({
   const garbage = extras?.garbage ?? null;
   const backup = extras?.backup ?? null;
 
-  return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) =>
-    scoreDimension({
+  return Object.entries(DIMENSION_CATEGORIES).map(([name, categories]) => {
+    const dimension = scoreDimension({
       name,
       categories,
       weightMap,
@@ -136,8 +137,11 @@ export function buildHealthDimensions({
         garbage,
         backup,
       },
-    }),
-  );
+    });
+    // R5：参考维度（techdebt）有分但不计总分。标记放聚合出口而非 scoreDimension 内部，
+    // 保证所有调用方（汇总/分类页/分域快照）拿到的维度语义一致。
+    return isReferenceDimension(name) ? { ...dimension, excludedFromOverall: true } : dimension;
+  });
 }
 
 /** 画像驱动权重适配：增量叠加 + 不适用维度剔除 + 归一化，向后兼容 */

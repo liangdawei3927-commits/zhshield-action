@@ -52,8 +52,12 @@ function cards(dims = FULL_DIMENSIONS, now = NOW) {
   return categoryScoreCards({ dimensions: dims, generatedAt: GENERATED_AT, now });
 }
 
-/** 十域全跑过时的总分入参（run=total ⇒ 不该出现覆盖范围提示） */
-const OVERALL: OverallScoreInput = { score: 89.5, partial: { run: 10, total: 10 } };
+/** 九个计分域全跑过时的总分入参（run=total ⇒ 不该出现覆盖范围提示；techdebt 为参考） */
+const OVERALL: OverallScoreInput = {
+  score: 89.5,
+  partial: { run: 9, total: 9 },
+  complete: true,
+};
 
 function row(overall: OverallScoreInput = OVERALL): ReactElement {
   return (
@@ -99,7 +103,7 @@ describe('分类评分卡 — 顺序与映射', () => {
     expect(byId.get('inspect')!.title).not.toBe('质量');
     // 维度名退到 hover 提示里，作为口径说明
     expect(byId.get('inspect')!.hint).toContain('质量');
-    expect(byId.get('inspect')!.hint).toContain('16%');
+    expect(byId.get('inspect')!.hint).toContain('本类满分 16.0 分');
   });
 });
 
@@ -190,18 +194,39 @@ describe('评分总览行 — 合并渲染', () => {
     expect(firstTile).toContain('disabled');
   });
 
-  it('只跑了部分域时出现覆盖范围提示；跑全了则没有', () => {
-    const partial = renderWithNav(row({ score: 92, partial: { run: 2, total: 10 } }));
+  it('只跑了部分计分域时出现覆盖范围提示；跑全了则没有', () => {
+    const partial = renderWithNav(
+      row({ score: 92, partial: { run: 2, total: 9 }, complete: false }),
+    );
     expect(partial).toContain('data-testid="partial-notice"');
-    expect(partial).toContain('仅由已检测的 2 / 10 个维度加权');
+    expect(partial).toContain('仅由已检测的 2 / 9 个维度加权');
     expect(renderWithNav(row())).not.toContain('partial-notice');
+  });
+
+  it('覆盖不足：总分卡显示「已检测部分均分」+ 覆盖徽章，不显示 A/B/C/D', () => {
+    const html = renderWithNav(
+      row({ score: 100, partial: { run: 1, total: 9 }, complete: false }),
+    );
+    const overall = html.slice(0, html.indexOf('<button'));
+    expect(overall).toContain('已检测部分均分');
+    expect(overall).toContain('覆盖 1/9 类');
+    expect(overall).toContain('data-complete="false"');
+    // 100 分也不能显示「优秀」等级徽章
+    expect(overall).not.toContain('优秀');
+  });
+
+  it('技术债卡标「参考、不计总分」', () => {
+    const html = renderWithNav(row());
+    expect(html).toContain('data-reference="true"');
+    expect(html).toContain('不计总分');
   });
 
   it('红线封顶时提示原因为何被压制；未封顶则不出现', () => {
     const capped = renderWithNav(
       row({
         score: 60,
-        partial: { run: 10, total: 10 },
+        partial: { run: 9, total: 9 },
+        complete: true,
         redLine: { capped: true, cap: 60, reasons: [{ kind: 'critical', count: 3 }] },
       }),
     );

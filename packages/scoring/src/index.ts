@@ -1,6 +1,12 @@
 // @zh/scoring - 健康评分模块
 export const VERSION = '0.1.0';
-export { ScoringEngine, computeOverallSnapshot } from './engine';
+export {
+  ScoringEngine,
+  computeOverallSnapshot,
+  computeCoverage,
+  isOverallDimension,
+} from './engine';
+export { isPenaltyExemptRuleId } from './pipeline-score-penalties';
 export { ScoringEngine as ContextScoringEngine } from './scoring-engine';
 export { DimensionMapper } from './dimension-mapper';
 export { computeRedLine, RED_LINE_CAP, SCORE_VERSION } from './redline';

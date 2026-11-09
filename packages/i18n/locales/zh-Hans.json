@@ -1552,7 +1552,14 @@
       "categoryScore": {
         "title": "评分总览",
         "open": "进入{{name}}",
-        "overall": "总分"
+        "overall": "总分",
+        "partialOverall": "已检测部分均分",
+        "coverageBadge": "覆盖 {{run}}/{{total}} 类",
+        "referenceOnly": "参考",
+        "notInOverall": "不计总分",
+        "weakestCategory": "最弱分类：{{name}} {{score}} 分",
+        "maxContribution": "本类满分 {{points}} 分",
+        "maxContributionShort": "满分 {{points}}"
       },
       "moduleScore": {
         "title": "模块评分"

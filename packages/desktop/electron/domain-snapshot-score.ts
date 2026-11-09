@@ -22,6 +22,7 @@
  */
 import {
   buildHealthDimensions,
+  isPenaltyExemptRuleId,
   SCORE_VERSION,
   type DepsDataLike,
   type PerformanceDataLike,
@@ -130,9 +131,25 @@ function buildExtras(input: DomainSnapshotScoreInput): Record<string, unknown> {
   }
 }
 
-/** DiagnosticEntry → 评分入参的最小投影（severity/category/ruleId 三字段足矣） */
+/**
+ * DiagnosticEntry → 评分入参的最小投影（severity/category/ruleId + 去重标记）。
+ *
+ * `penaltyExempt` 只对 `secret:` / `cve:` / `upgrade:` 生效：它们分别由
+ * `secretsPenalty` / `depsPenalty` / 「不扣分」的绝对口径接管，条目本身只计数。
+ * 不带这个标记，同一密钥/CVE 会在同一个维度里被扣两次（R5 §3.2）。
+ */
 function toScoreIssues(
   entries: readonly DiagnosticEntry[],
-): Array<{ severity: DiagnosticEntry['severity']; category: string; ruleId: string }> {
-  return entries.map((e) => ({ severity: e.severity, category: e.category, ruleId: e.ruleId }));
+): Array<{
+  severity: DiagnosticEntry['severity'];
+  category: string;
+  ruleId: string;
+  penaltyExempt?: boolean;
+}> {
+  return entries.map((e) => ({
+    severity: e.severity,
+    category: e.category,
+    ruleId: e.ruleId,
+    ...(isPenaltyExemptRuleId(e.ruleId) ? { penaltyExempt: true } : {}),
+  }));
 }

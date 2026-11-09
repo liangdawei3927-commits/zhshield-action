@@ -297,5 +297,13 @@ export {
   extractRequirementsNames,
 } from './manifest-parsers';
 export type { ProjectLanguage, PackageManager, ProjectProfile } from './project-profile';
-export { HEALTH_SCORE_DIMENSIONS, SCORE_DIMENSIONS, isScoreDimension } from './score-dimensions';
+export {
+  HEALTH_SCORE_DIMENSIONS,
+  SCORE_DIMENSIONS,
+  REFERENCE_DIMENSIONS,
+  SCORED_DIMENSIONS,
+  isScoreDimension,
+  isReferenceDimension,
+  isScoredDimension,
+} from './score-dimensions';
 export type { HealthScoreDimension, ScoreDimension } from './score-dimensions';

@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { saveScore, getLatestScore, getScoreHistory } from '@zh/db';
+import { isReferenceDimension } from '@zh/shared';
 import {
   linearRegressionSlope,
   computeVelocity,
@@ -9,7 +10,14 @@ import {
   computeStreak,
   computeDimensionTrends,
 } from './trend-math';
-import type { HealthScore, DimensionScore, ScoreTrend, TrendReport, RedLineInfo } from './types';
+import type {
+  HealthScore,
+  DimensionScore,
+  ScoreTrend,
+  TrendReport,
+  RedLineInfo,
+  ScoreCoverage,
+} from './types';
 import { SCORE_VERSION } from './redline';
 
 function emptyTrendReport(projectId: string): TrendReport {
@@ -69,12 +77,37 @@ function decliningDimensionsInsight(
   return `需要关注的维度: ${declining.map((d) => d.name).join('、')}`;
 }
 
-/** 加权总评：not-run 维度不参与加权，仅按已检测维度归一化（spec C：未检测域禁止按满分计） */
+/**
+ * true = 该维度参与总分（计分维度且已检测）。
+ *
+ * 排除两类：
+ * - `status='not-run'`：没检测，禁止按 0 或满分计（spec C）；
+ * - `excludedFromOverall` / 名字属于参考维度：检测了但只作参考（techdebt）。
+ *
+ * 按名字兜底是给旧记录用的：旧 `dimensions` JSON 没有 `excludedFromOverall` 字段，
+ * 但 techdebt 的语义在新旧口径里都不该计总分。
+ */
+export function isOverallDimension(d: DimensionScore): boolean {
+  return d.status !== 'not-run' && d.excludedFromOverall !== true && !isReferenceDimension(d.name);
+}
+
+/** 覆盖度：计分维度里实际检测了几个（参考维度不计入 total） */
+export function computeCoverage(dimensionScores: readonly DimensionScore[]): ScoreCoverage {
+  const scored = dimensionScores.filter((d) => !isReferenceDimension(d.name));
+  const run = scored.filter((d) => d.status !== 'not-run').length;
+  return { run, total: scored.length, complete: run === scored.length };
+}
+
+/** 加权总评：只按计分且已检测的维度归一化（spec C：未检测域禁止按满分计；techdebt 参考化） */
 function computeOverall(dimensionScores: DimensionScore[]): number {
-  const active = dimensionScores.filter((d) => d.status !== 'not-run');
+  const active = dimensionScores.filter(isOverallDimension);
   const weightSum = active.reduce((s, d) => s + d.weight, 0);
   return weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
 }
+
+/** 等级排序：A 最好、D 最差；用于短板封顶取更差的那个 */
+const GRADE_RANK: Record<HealthScore['grade'], number> = { A: 0, B: 1, C: 2, D: 3 };
+const RANK_GRADE: HealthScore['grade'][] = ['A', 'B', 'C', 'D'];
 
 /** 红线封顶（十域评分章程）：任一 critical 事实存在时总评 ≤ cap，一票压制 */
 function applyRedLineCap(
@@ -87,8 +120,23 @@ function applyRedLineCap(
   return { overall, appliedRedLine: undefined };
 }
 
-function computeGrade(overall: number): HealthScore['grade'] {
-  return overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+/**
+ * 等级 = 基础线（A≥90 / B≥75 / C≥60 / D<60）+ 短板封顶。
+ *
+ * 只做平均分会让「9 类满分 + 1 类 0 分」继续显示 A，普通用户不会去看最弱那类；
+ * 因此短板直接封顶等级：任一计分类 <60 → 最高 C；任一 <75 → 最高 B。
+ * 覆盖不足时的等级由 UI 决定不展示（见 `computeCoverage`），这里仍返回可复算的等级。
+ */
+function computeGrade(overall: number, dimensionScores: readonly DimensionScore[]): HealthScore['grade'] {
+  const base: HealthScore['grade'] =
+    overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+  const scored = dimensionScores.filter(isOverallDimension);
+  if (scored.length === 0) return base;
+
+  const weakest = Math.min(...scored.map((d) => d.score));
+  const ceil: HealthScore['grade'] = weakest < 60 ? 'C' : weakest < 75 ? 'B' : 'A';
+  const rank = Math.max(GRADE_RANK[base], GRADE_RANK[ceil]);
+  return RANK_GRADE[rank]!;
 }
 
 /**
@@ -105,12 +153,19 @@ function computeGrade(overall: number): HealthScore['grade'] {
 export function computeOverallSnapshot(
   dimensionScores: readonly DimensionScore[],
   redLine?: RedLineInfo | null,
-): { overall: number; grade: HealthScore['grade']; redLine?: RedLineInfo } {
-  const raw = computeOverall([...dimensionScores]);
+): {
+  overall: number;
+  grade: HealthScore['grade'];
+  coverage: ScoreCoverage;
+  redLine?: RedLineInfo;
+} {
+  const copies = [...dimensionScores];
+  const raw = computeOverall(copies);
   const { overall, appliedRedLine } = applyRedLineCap(raw, redLine);
   return {
     overall: Math.round(overall * 100) / 100,
-    grade: computeGrade(overall),
+    grade: computeGrade(overall, copies),
+    coverage: computeCoverage(copies),
     ...(appliedRedLine ? { redLine: appliedRedLine } : {}),
   };
 }
@@ -131,6 +186,7 @@ function buildScore(params: {
     dimensions: params.dimensionScores,
     trend: params.trend,
     scoreVersion: SCORE_VERSION,
+    coverage: computeCoverage(params.dimensionScores),
     ...(params.appliedRedLine ? { redLine: params.appliedRedLine } : {}),
   };
 }
@@ -153,7 +209,7 @@ export class ScoringEngine {
   ): HealthScore {
     const overall = computeOverall(dimensionScores);
     const { overall: cappedOverall, appliedRedLine } = applyRedLineCap(overall, redLine);
-    const grade = computeGrade(cappedOverall);
+    const grade = computeGrade(cappedOverall, dimensionScores);
     const trend = this.computeTrend(projectId, cappedOverall);
     const score = buildScore({
       projectId,
@@ -247,14 +303,19 @@ export class ScoringEngine {
     dimensions: string;
     trend: string;
     created_at: string;
+    score_version?: number | null;
   }): HealthScore {
+    const dimensions = JSON.parse(row.dimensions) as DimensionScore[];
     return {
       projectId: row.project_id,
       timestamp: new Date(row.created_at),
       overall: row.overall,
       grade: row.grade as HealthScore['grade'],
-      dimensions: JSON.parse(row.dimensions) as DimensionScore[],
+      dimensions,
       trend: row.trend as ScoreTrend,
+      // 旧记录没有该列（null/undefined）→ 不冒充版本号，趋势/归因据此判「不可比」
+      ...(typeof row.score_version === 'number' ? { scoreVersion: row.score_version } : {}),
+      coverage: computeCoverage(dimensions),
     };
   }
 
@@ -287,6 +348,7 @@ export class ScoringEngine {
       grade: score.grade,
       dimensions: JSON.stringify(score.dimensions),
       trend: score.trend,
+      scoreVersion: score.scoreVersion ?? SCORE_VERSION,
     });
   }
 

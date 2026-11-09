@@ -27,14 +27,19 @@ import {
 } from '../pages/report-attribution';
 import { buildWindowBuckets, summarizeWindows } from '../pages/report-windows';
 
-/** 与 @zh/scoring 的 DIMENSION_CATEGORIES 同序的十域 */
+/**
+ * 九个**计分**域（与 @zh/scoring 的 SCORED_DIMENSIONS 同序）。
+ *
+ * techdebt 是参考维度：有分但不参与总分/归因。测试夹具不把它放进来，
+ * 这样 `makeRecord` 算出的总分与 `attributeScoreDelta` 的分子/分母同口径，
+ * 恒等式才能闭合。
+ */
 const DOMAINS = [
   'quality',
   'security',
   'dependencies',
   'refactor',
   'performance',
-  'techdebt',
   'gate',
   'sentinel',
   'garbage',
@@ -106,21 +111,29 @@ describe('attributeScoreDelta — 基本归因', () => {
   const START = makeRecord({ timestamp: '2026-10-01T10:00:00.000Z' });
   const END = makeRecord({
     timestamp: '2026-10-02T10:00:00.000Z',
-    scores: { security: 78.4, quality: 86, techdebt: 92 },
+    scores: { security: 78.4, quality: 86 },
   });
 
   it('把总分变化拆到具体域，且三项相加等于实际变化', () => {
     const result = expectBreakdown(attributeScoreDelta(START, END));
     expectReconciled(result);
-    expect(result.actualDelta).toBe(-4.4); // (78.4+86+92+700)/10 = 95.64 → -4.36 → 1 位 -4.4
+    // 9 个计分域： (78.4 + 86 + 7×100)/9 = 96.04 → 变化 -3.96 → 1 位 -4.0
+    expect(result.actualDelta).toBe(-4);
     expect(result.domains[0].name).toBe('security');
     expect(result.domains[0].delta).toBe(-21.6);
-    expect(result.domains[0].points).toBe(-2.16);
-    expect(result.domains[1].points).toBe(-1.4);
-    expect(result.domains[2].points).toBe(-0.8);
+    // 有效权重 1/9：-21.6/9 = -2.4；quality -14/9 = -1.56
+    expect(result.domains[0].points).toBe(-2.4);
+    expect(result.domains[1].name).toBe('quality');
+    expect(result.domains[1].points).toBe(-1.56);
+    // 只有 security / quality 真实变化；其余 7 个计分域贡献为 0
+    expect(result.domains.filter((d) => d.points !== 0).map((d) => d.name)).toEqual([
+      'security',
+      'quality',
+    ]);
     // 参与域没变、权重没变、没封顶 ⇒ 结构项与封顶项必须为 0
-    expect(result.structurePoints).toBe(0);
-    expect(result.capPoints).toBe(0);
+    // （用 toBeCloseTo 而非 toBe：舍入后的 -0 与 +0 在 Object.is 下不相等）
+    expect(result.structurePoints).toBeCloseTo(0, 10);
+    expect(result.capPoints).toBeCloseTo(0, 10);
     expect(result.entered).toEqual([]);
     expect(result.exited).toEqual([]);
   });
@@ -133,16 +146,16 @@ describe('attributeScoreDelta — 基本归因', () => {
     expect(result.domains.filter((d) => d.points === 0)).toHaveLength(7);
   });
 
-  it('十域满参与时有效权重就是配置权重 0.1（归一化分母为 1）', () => {
+  it('九域满参与时有效权重是 1/9（techdebt 参考维度不进分母）', () => {
     const result = expectBreakdown(attributeScoreDelta(START, END));
-    for (const domain of result.domains) expect(domain.effectiveWeight).toBeCloseTo(0.1, 10);
-    expect(result.activeStart).toBe(10);
-    expect(result.activeEnd).toBe(10);
+    for (const domain of result.domains) expect(domain.effectiveWeight).toBeCloseTo(1 / 9, 10);
+    expect(result.activeStart).toBe(9);
+    expect(result.activeEnd).toBe(9);
   });
 });
 
 describe('attributeScoreDelta — 有效权重必须归一化（not-run 域退出分母）', () => {
-  it('只跑 9 个域时，每个域的有效权重是 1/9 而不是 0.1', () => {
+  it('只跑 8 个计分域时，每个域的有效权重是 1/8 而不是 0.1', () => {
     const start = makeRecord({ timestamp: '2026-10-01T10:00:00.000Z', notRun: ['backup'] });
     const end = makeRecord({
       timestamp: '2026-10-02T10:00:00.000Z',
@@ -151,9 +164,9 @@ describe('attributeScoreDelta — 有效权重必须归一化（not-run 域退�
     });
     const result = expectBreakdown(attributeScoreDelta(start, end));
     const security = result.domains.find((d) => d.name === 'security')!;
-    expect(security.effectiveWeight).toBeCloseTo(1 / 9, 10);
-    // 掉 20 分值 20/9 ≈ 2.22 分；若错用 0.1 硬乘只会算出 2.0（少算 11%）
-    expect(security.points).toBeCloseTo(-2.22, 1);
+    expect(security.effectiveWeight).toBeCloseTo(1 / 8, 10);
+    // 掉 20 分值 20/8 = 2.5 分；若错用 0.1 硬乘只会算出 2.0（少算 20%）
+    expect(security.points).toBeCloseTo(-2.5, 1);
     expect(security.points).not.toBeCloseTo(-2.0, 1);
     expectReconciled(result);
   });
@@ -181,8 +194,8 @@ describe('attributeScoreDelta — 口径变化进结构项，不摊给具体域'
     const result = expectBreakdown(attributeScoreDelta(start, end));
     expect(result.entered).toEqual(['backup']);
     expect(result.exited).toEqual([]);
-    expect(result.activeStart).toBe(9);
-    expect(result.activeEnd).toBe(10);
+    expect(result.activeStart).toBe(8);
+    expect(result.activeEnd).toBe(9);
     // 新增域没有「上期分」，因此不产生域贡献
     expect(result.domains.find((d) => d.name === 'backup')).toBeUndefined();
     // 但总分确实掉了，这部分必须由结构项解释
@@ -229,12 +242,12 @@ describe('attributeScoreDelta — 红线封顶单列', () => {
     });
     const result = expectBreakdown(attributeScoreDelta(start, end));
     expect(result.capped).toBe(true);
-    // 按域分算应为 96（未封顶），实际记录 45 ⇒ 封顶吃掉 51 分
-    expect(result.rawEndScore).toBe(96);
+    // 9 个计分域按域分算应为 (60 + 8×100)/9 = 95.56，实际记录 45 ⇒ 封顶吃掉约 50.6 分
+    expect(result.rawEndScore).toBe(95.6);
     expect(result.endScore).toBe(45);
     expect(result.capPoints).toBeCloseTo(-51, 0);
-    // 域贡献仍然只反映域分本身的变化（-4），不含封顶
-    expect(result.domainsPoints).toBe(-4);
+    // 域贡献仍然只反映域分本身的变化（security -40 × 1/9 ≈ -4.44），不含封顶
+    expect(result.domainsPoints).toBeCloseTo(-4.44, 1);
     expectReconciled(result);
   });
 
@@ -251,7 +264,7 @@ describe('attributeScoreDelta — 红线封顶单列', () => {
     const end = makeRecord({ timestamp: '2026-10-02T10:00:00.000Z', scores: { security: 96 } });
     const result = expectBreakdown(attributeScoreDelta(start, end));
     expect(result.startScore).toBe(45);
-    expect(result.endScore).toBe(99.6); // security 96 + 其余 900 → 99.6
+    expect(result.endScore).toBe(99.56); // security 96 + 其余 8×100 → (896)/9 = 99.56
     expect(result.capPoints).toBeCloseTo(51, 0);
     expectReconciled(result);
   });
@@ -380,10 +393,10 @@ describe('与其他口径对齐（防止报告中心出现两套数字）', () =
 });
 
 describe('结构项主导判定（防止把口径变化当成改进成果）', () => {
-  /** 真实场景复刻：域分完全没变，只是参与域从 5 个变成 10 个，平均分被抬上去 */
+  /** 真实场景复刻：域分完全没变，只是参与域从 5 个变成 9 个，平均分被抬上去 */
   const narrow = makeRecord({
     timestamp: '2026-10-01T10:00:00.000Z',
-    notRun: ['techdebt', 'gate', 'sentinel', 'garbage', 'backup'],
+    notRun: ['gate', 'sentinel', 'garbage', 'backup'],
     scores: {
       quality: 83.8,
       security: 83.8,
@@ -403,11 +416,12 @@ describe('结构项主导判定（防止把口径变化当成改进成果）', (
     },
   });
 
-  it('参与域 5 → 10 且域分不变：判为结构主导', () => {
+  it('参与域 5 → 9 且域分不变：判为结构主导', () => {
     const result = expectBreakdown(attributeScoreDelta(narrow, wide));
-    expect(result.actualDelta).toBeCloseTo(8.1, 1);
+    // 宽口径 = (5×83.8 + 4×100)/9 = 91.0；窄口径 83.8 ⇒ +7.2
+    expect(result.actualDelta).toBeCloseTo(7.2, 1);
     expect(result.domainsPoints).toBe(0); // 没有任何域真的变化
-    expect(result.structurePoints).toBeCloseTo(8.1, 1);
+    expect(result.structurePoints).toBeCloseTo(7.2, 1);
     expect(isStructureDominated(result)).toBe(true);
     expectReconciled(result);
   });
@@ -448,9 +462,10 @@ describe('占比工具', () => {
       scores: { security: 100 },
     });
     const result = expectBreakdown(attributeScoreDelta(neutralStart, end));
-    expect(Math.abs(result.actualDelta)).toBeLessThanOrEqual(1);
+    // security -10 × 1/9 ≈ -1.11，quality 与其余域不变 ⇒ 总变化约 1.11
+    expect(Math.abs(result.actualDelta)).toBeLessThanOrEqual(1.2);
     const total = totalAbsolutePoints(result.domains);
-    expect(total).toBeCloseTo(1, 1);
+    expect(total).toBeCloseTo(1.11, 1);
     const share = contributionShare(result.domains[0].points, total);
     expect(Number.isFinite(share)).toBe(true);
     expect(share).toBeGreaterThan(0);

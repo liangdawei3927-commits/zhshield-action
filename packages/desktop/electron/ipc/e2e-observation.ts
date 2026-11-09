@@ -70,6 +70,7 @@ function seedOrphanRows(projectPath: string): void {
     grade: 'C',
     dimensions: '{}',
     trend: 'stable',
+    scoreVersion: 4,
   });
   saveScanResult(db, { projectId: projectPath, source: 'eslint', passed: true, summary: 'OK' });
   saveDebtAction(db, {

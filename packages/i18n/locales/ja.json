@@ -1552,7 +1552,14 @@
       "categoryScore": {
         "title": "スコア総覧",
         "open": "{{name}}を開く",
-        "overall": "総合点"
+        "overall": "総合点",
+        "partialOverall": "検出済み部分の平均",
+        "coverageBadge": "{{run}}/{{total}} 類を検出",
+        "referenceOnly": "参考",
+        "notInOverall": "総合点に不算入",
+        "weakestCategory": "最弱カテゴリ：{{name}} {{score}} 点",
+        "maxContribution": "この分類の満点 {{points}} 点",
+        "maxContributionShort": "満点 {{points}}"
       },
       "moduleScore": {
         "title": "モジュールスコア"

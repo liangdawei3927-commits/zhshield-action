@@ -25,13 +25,13 @@ import type { HealthScoreData } from '../types/electron';
 // node 环境 navigator.language 为 en-US，固定中文，断言才锚得住文案
 vi.stubGlobal('navigator', { language: 'zh-Hans' });
 
+/** 九个计分域；techdebt 是参考维度，不参与总分/归因 */
 const DOMAINS = [
   'quality',
   'security',
   'dependencies',
   'refactor',
   'performance',
-  'techdebt',
   'gate',
   'sentinel',
   'garbage',
@@ -95,14 +95,14 @@ describe('AttributionSection', () => {
   it('区间归因把总变化拆到具体域，并给出可读的拉低清单', () => {
     const html = render(CONSISTENT);
     expect(html).toContain('分数变化归因');
-    // 100 → 94，总变化 -6
-    expect(html).toContain('-6');
+    // 9 个计分域：100 → 93.33，总变化 -6.67
+    expect(html).toContain('-6.67');
     expect(html).toContain('拉低');
-    // 三个下跌的域按贡献排序：依赖 -3、安全性 -2、质量 -1
+    // 三个下跌的域按贡献排序：依赖 -3.33、安全性 -2.22、质量 -1.11
     expect(html).toContain('依赖');
     expect(html).toContain('安全性');
-    expect(html).toContain('-3');
-    expect(html).toContain('-2');
+    expect(html).toContain('-3.33');
+    expect(html).toContain('-2.22');
   });
 
   it('表格逐域列出上期分 / 本期分 / 域内变化 / 有效权重 / 贡献', () => {
@@ -112,8 +112,8 @@ describe('AttributionSection', () => {
     expect(html).toContain('域内变化');
     expect(html).toContain('有效权重');
     expect(html).toContain('贡献总分');
-    // 十域满参与 ⇒ 有效权重就是 10%
-    expect(html).toContain('10%');
+    // 九个计分域满参与 ⇒ 有效权重是 1/9 ≈ 11.1%
+    expect(html).toContain('11.1%');
     // dependencies 100 → 70
     expect(html).toContain('-30');
   });
@@ -125,28 +125,28 @@ describe('AttributionSection', () => {
     expect(html).toContain('实际');
   });
 
-  it('口径变化单独成行：参与域 9 → 10 且列出新增的域', () => {
+  it('口径变化单独成行：参与域 8 → 9 且列出新增的域', () => {
     const data: HealthScoreData[] = [
       rec({ timestamp: localIso(2026, 10, 20), notRun: ['backup'] }),
       rec({ timestamp: localIso(2026, 10, 21), scores: { backup: 50 } }),
     ];
     const html = render(data);
     expect(html).toContain('结构项（口径变化）');
-    expect(html).toContain('参与域 9 → 10');
+    expect(html).toContain('参与域 8 → 9');
     expect(html).toContain('新增参与：备份');
     // 新增域没有上期分 ⇒ 不许给它编一个域贡献
     expect(html).toContain('✓ 已对账');
   });
 
-  it('未检测域不退化成 0 分贡献（只跑 9 个域时有效权重是 11.1%）', () => {
+  it('未检测域不退化成 0 分贡献（只跑 8 个计分域时有效权重是 12.5%）', () => {
     const data: HealthScoreData[] = [
       rec({ timestamp: localIso(2026, 10, 20), notRun: ['backup'] }),
       rec({ timestamp: localIso(2026, 10, 21), notRun: ['backup'], scores: { security: 80 } }),
     ];
     const html = render(data);
-    expect(html).toContain('11.1%');
-    // 安全 100 → 80，贡献 = -20 × 1/9 ≈ -2.22
-    expect(html).toContain('-2.22');
+    expect(html).toContain('12.5%');
+    // 安全 100 → 80，贡献 = -20 × 1/8 = -2.5
+    expect(html).toContain('-2.5');
   });
 
   it('数据自相矛盾时标「归因未闭合」，不假装已对账（判据会红）', () => {
@@ -175,7 +175,7 @@ describe('AttributionSection', () => {
     const data: HealthScoreData[] = [
       rec({
         timestamp: localIso(2026, 10, 20),
-        notRun: ['techdebt', 'gate', 'sentinel', 'garbage', 'backup'],
+        notRun: ['gate', 'sentinel', 'garbage', 'backup'],
         scores: {
           quality: 83.8,
           security: 83.8,
@@ -198,7 +198,7 @@ describe('AttributionSection', () => {
     ];
     const html = render(data);
     expect(html).toContain('参与加权的域数量变化');
-    expect(html).toContain('5 个 → 10 个');
+    expect(html).toContain('5 个 → 9 个');
     // 同时不许把这次「上涨」显示成任何域的贡献
     expect(html).toContain('拉低');
     expect(html).toContain('✓ 已对账');

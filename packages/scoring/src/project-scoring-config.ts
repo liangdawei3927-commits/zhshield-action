@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseSimpleYaml } from '@zh/shared';
-import type { ScoringConfig, DimensionDefinition, PenaltyConfig } from './types';
+import type { ScoringConfig, DimensionDefinition } from './types';
 import { getDefaultScoringConfig } from './scoring-config';
 
 /**
@@ -178,12 +178,24 @@ function validateDimensionOverride(
   if (!isPlainObject(dimOverride)) {
     throw new ProjectScoringConfigError(filePath, `维度 "${dimId}" 的覆盖项必须是映射`);
   }
-  rejectUnknownKeys(
-    dimOverride,
-    ['weight', 'penalties', 'positiveRules'],
-    `维度 "${dimId}"`,
-    filePath,
-  );
+  // R5：评分引擎只消费权重。历史配置里的 penalties/positiveRules 曾被解析、校验、
+  // 合并，但生产路径（pipeline-score）从不读取它们 —— 用户以为改了扣分参数，
+  // 实际分数一点没变。宁可在加载时明确失败，也不做「看起来生效」的静默忽略。
+  // 先于 rejectUnknownKeys 检查：否则通用「未知字段」错误会盖掉这条可操作的提示。
+  if (dimOverride.penalties !== undefined) {
+    throw new ProjectScoringConfigError(
+      filePath,
+      `维度 "${dimId}" 的 penalties 未接入生产评分路径；当前只支持 weight 覆盖，请删除该字段`,
+    );
+  }
+  if (dimOverride.positiveRules !== undefined) {
+    throw new ProjectScoringConfigError(
+      filePath,
+      `维度 "${dimId}" 的 positiveRules 未接入生产评分路径；当前只支持 weight 覆盖，请删除该字段`,
+    );
+  }
+
+  rejectUnknownKeys(dimOverride, ['weight'], `维度 "${dimId}"`, filePath);
 
   requireNumber({
     container: dimOverride,
@@ -192,106 +204,6 @@ function validateDimensionOverride(
     filePath,
     opts: { min: 0, max: 1 },
   });
-
-  const penalties = dimOverride.penalties;
-  if (penalties !== undefined) {
-    validatePenaltyOverrides(dimId, penalties, filePath);
-  }
-
-  const positiveRules = dimOverride.positiveRules;
-  if (positiveRules !== undefined) {
-    validatePositiveRuleOverrides(dimId, defaultDim, positiveRules, filePath);
-  }
-}
-
-function validatePenaltyOverrides(
-  dimId: string,
-  penalties: unknown,
-  filePath: string | null,
-): void {
-  if (!isPlainObject(penalties)) {
-    throw new ProjectScoringConfigError(filePath, `维度 "${dimId}".penalties 必须是映射`);
-  }
-  rejectUnknownKeys(
-    penalties,
-    ['maxPenalty', 'perIssuePenalty', 'severityMultipliers'],
-    `维度 "${dimId}".penalties`,
-    filePath,
-  );
-  requireNumber({
-    container: penalties,
-    key: 'maxPenalty',
-    label: `维度 "${dimId}".penalties`,
-    filePath,
-    opts: { min: 0 },
-  });
-  requireNumber({
-    container: penalties,
-    key: 'perIssuePenalty',
-    label: `维度 "${dimId}".penalties`,
-    filePath,
-    opts: { min: 0 },
-  });
-
-  const multipliers = penalties.severityMultipliers;
-  if (multipliers !== undefined) {
-    if (!isPlainObject(multipliers)) {
-      throw new ProjectScoringConfigError(
-        filePath,
-        `维度 "${dimId}".penalties.severityMultipliers 必须是映射`,
-      );
-    }
-    for (const [severity, multiplier] of Object.entries(multipliers)) {
-      if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier < 0) {
-        throw new ProjectScoringConfigError(
-          filePath,
-          `维度 "${dimId}".penalties.severityMultipliers.${severity} 必须是不小于 0 的有限数字，实际为 ${JSON.stringify(multiplier)}`,
-        );
-      }
-    }
-  }
-}
-
-function validatePositiveRuleOverrides(
-  dimId: string,
-  defaultDim: DimensionDefinition,
-  positiveRules: unknown,
-  filePath: string | null,
-): void {
-  if (!isPlainObject(positiveRules)) {
-    throw new ProjectScoringConfigError(
-      filePath,
-      `维度 "${dimId}".positiveRules 必须是「规则id → 覆盖项」的映射`,
-    );
-  }
-  for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
-    const defaultRule = defaultDim.positiveRules.find((r) => r.id === ruleId);
-    if (!defaultRule) {
-      throw new ProjectScoringConfigError(
-        filePath,
-        `维度 "${dimId}" 下未知加分规则 "${ruleId}"，可用规则：${defaultDim.positiveRules.map((r) => r.id).join('、') || '（无）'}`,
-      );
-    }
-    if (!isPlainObject(ruleOverride)) {
-      throw new ProjectScoringConfigError(
-        filePath,
-        `维度 "${dimId}".positiveRules.${ruleId} 必须是映射`,
-      );
-    }
-    rejectUnknownKeys(
-      ruleOverride,
-      ['points'],
-      `维度 "${dimId}".positiveRules.${ruleId}`,
-      filePath,
-    );
-    requireNumber({
-      container: ruleOverride,
-      key: 'points',
-      label: `维度 "${dimId}".positiveRules.${ruleId}`,
-      filePath,
-      opts: { min: 0 },
-    });
-  }
 }
 
 /** 深拷贝单个维度定义（PositiveRule.condition 为函数引用，浅拷贝共享即可） */
@@ -337,38 +249,9 @@ export function mergeScoringOverrides(
 }
 
 function mergeDimensionOverride(dim: DimensionDefinition, dimOverride: DimensionOverride): void {
+  // R5：只合并 weight。penalties/positiveRules 在 validateScoringOverrides 已显式拒绝；
+  // 直接调用本函数（绕过校验）时也不得让这些字段产生「看起来生效」的假象。
   if (dimOverride.weight !== undefined) dim.weight = dimOverride.weight;
-  if (dimOverride.penalties) {
-    mergePenaltyOverride(dim.penalties, dimOverride.penalties);
-  }
-  if (dimOverride.positiveRules) {
-    mergePositiveRules(dim, dimOverride.positiveRules);
-  }
-}
-
-function mergePenaltyOverride(p: PenaltyConfig, penaltyOverride: PenaltyOverride): void {
-  if (penaltyOverride.maxPenalty !== undefined) p.maxPenalty = penaltyOverride.maxPenalty;
-  if (penaltyOverride.perIssuePenalty !== undefined) {
-    p.perIssuePenalty = penaltyOverride.perIssuePenalty;
-  }
-  // severityMultipliers 按 key 合并：覆盖 key 优先，未提及的 severity 保留默认
-  Object.assign(p.severityMultipliers, penaltyOverride.severityMultipliers ?? {});
-}
-
-function mergePositiveRules(
-  dim: DimensionDefinition,
-  positiveRules: Record<string, PositiveRuleOverride>,
-): void {
-  for (const [ruleId, ruleOverride] of Object.entries(positiveRules)) {
-    const rule = dim.positiveRules.find((r) => r.id === ruleId);
-    if (!rule) {
-      throw new ProjectScoringConfigError(
-        null,
-        `维度 "${dim.id}" 下未知加分规则 "${ruleId}"，无法合并覆盖`,
-      );
-    }
-    if (ruleOverride.points !== undefined) rule.points = ruleOverride.points;
-  }
 }
 
 function assertWeightsNormalized(mergedDimensions: DimensionDefinition[]): void {

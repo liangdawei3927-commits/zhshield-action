@@ -9,6 +9,7 @@ import {
   getProject,
   saveScore,
   getScoreHistory,
+  getLatestScore,
   getLatestScanResult,
   listExperiences,
   getSentinelEvent,
@@ -74,6 +75,31 @@ describe('Batch writes', () => {
     saveScoresBatch(db, rows);
     expect(count(db, 'scores')).toBe(10);
     expect(getScoreHistory(db, SCORE_PROJ)).toHaveLength(10);
+  });
+
+  it('saveScoresBatch / saveScore 写入 score_version，读取侧能带回', () => {
+    createProject(db, { id: SCORE_PROJ, name: 'T', path: '/t' });
+    saveScoresBatch(db, [
+      {
+        projectId: SCORE_PROJ,
+        overall: 80,
+        grade: 'B',
+        dimensions: '{}',
+        trend: 'stable',
+        scoreVersion: 4,
+      },
+    ]);
+    expect(getLatestScore(db, SCORE_PROJ)!.score_version).toBe(4);
+
+    // 未传版本 → NULL（旧记录/旧调用方不冒充具体版本）
+    saveScore(db, {
+      projectId: SCORE_PROJ,
+      overall: 82,
+      grade: 'B',
+      dimensions: '{}',
+      trend: 'improving',
+    });
+    expect(getLatestScore(db, SCORE_PROJ)!.score_version).toBeNull();
   });
 
   it('saveScanResultsBatch inserts N rows', () => {

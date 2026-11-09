@@ -1,3 +1,4 @@
+import { isReferenceDimension } from '@zh/shared';
 import type { HealthScoreData } from '../types/electron';
 import {
   getScoreColor,
@@ -44,6 +45,11 @@ function HistoryRow({ item, isLast }: { item: HealthScoreRow; isLast: boolean })
                 title={view.label}
               >
                 <span className="text-zh-muted">{dimensionName(d.name, t)}</span>
+                {isReferenceDimension(d.name) ? (
+                  <span className="text-[9px] opacity-60">
+                    {t('page.reports.categoryScore.referenceOnly')}
+                  </span>
+                ) : null}
                 <span className="font-bold">{view.scoreText}</span>
                 <span className="text-[10px] opacity-70">{view.label}</span>
               </span>

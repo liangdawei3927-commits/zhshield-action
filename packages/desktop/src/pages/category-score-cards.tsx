@@ -1,12 +1,14 @@
+import type { ScoreDimension } from '@zh/shared';
 import { useT } from '../i18n';
 import { useNavigation } from '../contexts/NavigationContext';
 import { ResultCard } from '../components/ui/ResultCard';
-import { getScoreColor, getScoreLabel, scoreFreshness } from './reports-logic';
+import { dimensionName, getScoreColor, getScoreLabel, scoreFreshness } from './reports-logic';
 import type { ScoreFreshness } from './reports-logic';
 import {
   categoryScoreCards,
   type CategoryScoreCardView,
   type DimensionEntry,
+  type OverallScoreInput,
 } from './category-score-logic';
 
 /**
@@ -32,18 +34,8 @@ import {
  * 没有 NavigationProvider（组件独立渲染）时分类卡降级为不可点击，不报错、不静默跳默认页。
  */
 
-/** 总分卡入参 */
-export interface OverallScoreInput {
-  score: number;
-  /** 参与加权的维度数 / 总维度数（未检测维度不计入加权） */
-  partial: { run: number; total: number };
-  /** 红线封顶：存在 critical 事实时总评被压制的原因 */
-  redLine?: {
-    capped: boolean;
-    cap: number;
-    reasons: Array<{ kind: string; count: number }>;
-  };
-}
+/** 总分卡入参见 `category-score-logic.ts`（与总览行同源，避免类型重复） */
+export type { OverallScoreInput } from './category-score-logic';
 
 export function ScoreOverviewRow({
   dimensions,
@@ -67,7 +59,10 @@ export function ScoreOverviewRow({
       </h2>
 
       <div className="grid grid-cols-11 gap-2">
-        <OverallScoreTile score={overall.score} label={t('page.reports.categoryScore.overall')} />
+        <OverallScoreTile
+          overall={overall}
+          label={t('page.reports.categoryScore.overall')}
+        />
         {cards.map((card, index) => {
           // 组间留缝：与导航栏同一处分段（按需检查 ‖ 常驻守护），不留缝则两类分又混成一片
           // 用可选链而非 `cards[index - 1]!.group`：非空断言会静默跳过 null 检查，
@@ -90,18 +85,36 @@ export function ScoreOverviewRow({
   );
 }
 
-/** 总分卡：与分类卡同宽，靠面板底色 + 更大字号区分主次；不可点击 */
-function OverallScoreTile({ score, label }: { score: number; label: string }) {
-  const color = getScoreColor(score);
+/**
+ * 总分卡：与分类卡同宽，靠面板底色 + 更大字号区分主次；不可点击。
+ *
+ * 覆盖不足时**不得**显示 A/B/C/D：一个只跑了 1 类的 100 分不是「优秀」，
+ * 而是「已检测部分均分」。标签、徽章、颜色三处同时改口径，避免大号绿字
+ * 继续给出「可以放心发布」的暗示。
+ */
+function OverallScoreTile({ overall, label }: { overall: OverallScoreInput; label: string }) {
+  const t = useT();
+  const { score, complete, partial } = overall;
+  const color = complete ? getScoreColor(score) : 'rgb(var(--zh-warning))';
+  const tileLabel = complete
+    ? label
+    : t('page.reports.categoryScore.partialOverall');
+  const badge = complete
+    ? getScoreLabel(score)
+    : t('page.reports.categoryScore.coverageBadge', {
+        run: partial.run,
+        total: partial.total,
+      });
   return (
     <ResultCard
       variant="tile"
       data-testid="overall-score-tile"
       data-kind="overall"
+      data-complete={complete ? 'true' : 'false'}
       style={{ background: 'rgb(var(--zh-bg-secondary))' }}
       className="flex flex-col items-center justify-center gap-1 min-w-0 text-center"
     >
-      <span className="w-full text-[11px] leading-tight text-zh-muted truncate">{label}</span>
+      <span className="w-full text-[11px] leading-tight text-zh-muted truncate">{tileLabel}</span>
       <span className="text-2xl font-bold leading-none tabular-nums" style={{ color }}>
         {score}
       </span>
@@ -109,7 +122,7 @@ function OverallScoreTile({ score, label }: { score: number; label: string }) {
         className="max-w-full text-[10px] px-1.5 py-0.5 rounded-full font-medium truncate"
         style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
       >
-        {getScoreLabel(score)}
+        {badge}
       </span>
     </ResultCard>
   );
@@ -148,6 +161,18 @@ function ScoreNotices({
       testId: 'partial-notice',
     });
   }
+  if (overall.weakest) {
+    const weakestColor =
+      overall.weakest.score < 60 ? 'rgb(var(--zh-danger))' : 'rgb(var(--zh-warning))';
+    notices.push({
+      text: t('page.reports.categoryScore.weakestCategory', {
+        name: dimensionName(overall.weakest.name, t),
+        score: overall.weakest.score,
+      }),
+      color: weakestColor,
+      testId: 'weakest-notice',
+    });
+  }
   if (overall.redLine?.capped) {
     const reasons = overall.redLine.reasons
       .map((r) => t(`page.reports.redLine.${r.kind}`, { count: r.count }))
@@ -182,6 +207,7 @@ function CategoryScoreTile({
   /** true = 本卡是另一个分组的第一张，左侧加缝与上一组分开 */
   startsGroup?: boolean;
 }) {
+  const t = useT();
   const { view } = card;
   // 未检测 / 无数据：整卡降透明度，避免「灰 —」被当成 0 分看待
   const dimmed = view.kind === 'no-data' || view.kind === 'not-run';
@@ -200,6 +226,7 @@ function CategoryScoreTile({
       data-group={card.group}
       data-starts-group={startsGroup ? 'true' : undefined}
       data-kind={view.kind}
+      data-reference={card.reference ? 'true' : undefined}
       className={`flex flex-col items-center justify-center gap-1 min-w-0 text-center transition-shadow${startsGroup ? ' ml-2' : ''}${dimmed ? ' opacity-60' : ''}${onSelect ? ' cursor-pointer hover:shadow-md' : ''}`}
     >
       <span className="w-full text-[11px] leading-tight text-zh-muted truncate">{card.title}</span>
@@ -213,7 +240,15 @@ function CategoryScoreTile({
           background: `color-mix(in srgb, ${view.color} 12%, transparent)`,
         }}
       >
-        {view.label}
+        {card.reference ? t('page.reports.categoryScore.referenceOnly') : view.label}
+      </span>
+      {/* 满分贡献：9 类计分时每类 11.1 分，让「分类分→总分」的换算在卡上可见 */}
+      <span className="w-full text-[9px] leading-tight text-zh-muted truncate">
+        {card.maxContribution === null
+          ? t('page.reports.categoryScore.notInOverall')
+          : t('page.reports.categoryScore.maxContributionShort', {
+              points: card.maxContribution.toFixed(1),
+            })}
       </span>
     </ResultCard>
   );

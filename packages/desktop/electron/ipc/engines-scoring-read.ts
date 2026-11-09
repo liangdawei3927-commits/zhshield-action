@@ -7,7 +7,8 @@
 
 import path from 'node:path';
 import { t } from '@zh/i18n';
-import { computeOverallSnapshot, computeRedLine } from '@zh/scoring';
+import { isReferenceDimension } from '@zh/shared';
+import { computeOverallSnapshot, computeRedLine, isOverallDimension } from '@zh/scoring';
 import type { PostScanGateReport } from '@zh/kernel';
 import { readDomainSnapshot } from '../zh-diagnostics';
 import type { DiagnosticSource, DiagnosticsReport } from '../zh-diagnostics-types';
@@ -88,8 +89,8 @@ export async function getDomainReportHandler(
  * buildHealthDimensions 直接算该维分数，不落库、不写任何快照。
  *
  * - quality 走快照快路径：inspect 快照落盘时已当场出分（含 previousScore 对比基线），
- *   直接透传，保持既有语义与 e2e；但 performance 条目落在自己的域快照里，
- *   故一并读入并由 qualityFastPathScore 合并后重算（无 performance 条目时仍是零算分）。
+ *   直接透传。R5 起 quality 的唯一数据源是 inspect 快照；performance 是独立计分类，
+ *   不再并入 quality（同一性能问题只扣一次）。
  * - 其余 9 维 compose-on-read：与报告中心汇总共用 collectScoringInputs 组装输入，
  *   保证两条路径同口径、结构上不可能漂移；维度分与权重无关，故不传 profile。
  */
@@ -106,13 +107,10 @@ export async function getDomainScoreHandler(
       throw new Error(`unknown dimension: ${String(dimension)}`);
     }
     // quality 快路径：透传 inspect 快照自带评分 + previousScore 对比基线。
-    // performance 条目落在自己的域快照里，必须一并传入，否则 quality 维丢掉 performance 扣分。
+    // 只读 inspect：performance 条目归 performance 维，不再并入 quality（R5）。
     if (dimension === 'quality') {
-      const [inspectSnapshot, performanceSnapshot] = await Promise.all([
-        readDomainSnapshot(projectPath, 'inspect'),
-        readDomainSnapshot(projectPath, 'performance'),
-      ]);
-      return qualityFastPathScore(inspectSnapshot, performanceSnapshot);
+      const inspectSnapshot = await readDomainSnapshot(projectPath, 'inspect');
+      return qualityFastPathScore(inspectSnapshot);
     }
     // 其余 9 维：compose-on-read，与报告中心汇总共用同一输入组装
     const { inputs } = await collectScoringInputs(projectPath);
@@ -160,12 +158,25 @@ export interface HealthOverviewDimension {
   status: 'scored' | 'not-run';
   /** 该维数据时间（域快照 / 门禁报告落盘时间）；该域从未跑过 → null */
   generatedAt: string | null;
+  /**
+   * 有效权重：`weight / Σ(本次参与总分的维度权重)`。
+   *
+   * 未检测或参考维度为 0。全 9 类检测时每个计分类约 11.11%，UI 据此显示
+   * 「本类满分 X 分」；没有这个字段，用户会拿配置里的 10% 去对 11.1% 的贡献，永远对不上。
+   */
+  effectiveWeight: number;
+  /** 该维对总分的贡献 = score × effectiveWeight；参考/未检测维度为 0 */
+  contribution: number;
+  /** true = 参考维度（techdebt），有分但不计总分 */
+  excludedFromOverall: boolean;
 }
 
 /** 健康总览：读磁盘最新快照实时计算（不落库，浏览报告中心不会污染历史曲线） */
 export interface HealthOverviewData {
   overall: number;
   grade: 'A' | 'B' | 'C' | 'D';
+  /** 覆盖度：计分维度里检测了几个；`complete=false` 时 overall 只是「已检测部分均分」 */
+  coverage: { run: number; total: number; complete: boolean };
   dimensions: HealthOverviewDimension[];
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间；各维时间见 dimensions[].generatedAt） */
@@ -195,17 +206,31 @@ export async function getHealthOverviewHandler(
 
     const { inputs, dimensions } = collected;
     const snapshot = computeOverallSnapshot(dimensions, computeRedLine(inputs.extras));
+    // 有效权重分母 = 本次真正参与总分的维度权重和（未检测/参考维度不进分母）。
+    // 全 9 类检测时每个计分类约 11.11%，与 overall 的公式严格同源。
+    const contributing = dimensions.filter(isOverallDimension);
+    const contributingWeight = contributing.reduce((sum, d) => sum + d.weight, 0);
+    const effectiveWeightOf = (d: (typeof dimensions)[number]): number =>
+      isOverallDimension(d) && contributingWeight > 0 ? d.weight / contributingWeight : 0;
     return {
       overall: snapshot.overall,
       grade: snapshot.grade,
-      dimensions: dimensions.map((d) => ({
-        name: d.name as ScoreDimension,
-        score: d.score,
-        issues: d.issues,
-        weight: d.weight,
-        status: d.status === 'not-run' ? 'not-run' : 'scored',
-        generatedAt: inputs.timestamps[d.name as ScoreDimension] ?? null,
-      })),
+      coverage: snapshot.coverage,
+      dimensions: dimensions.map((d) => {
+        const effectiveWeight = effectiveWeightOf(d);
+        return {
+          name: d.name as ScoreDimension,
+          score: d.score,
+          issues: d.issues,
+          weight: d.weight,
+          status: d.status === 'not-run' ? 'not-run' : 'scored',
+          generatedAt: inputs.timestamps[d.name as ScoreDimension] ?? null,
+          effectiveWeight,
+          contribution: d.score * effectiveWeight,
+          excludedFromOverall:
+            d.excludedFromOverall === true || isReferenceDimension(d.name),
+        };
+      }),
       ...(snapshot.redLine ? { redLine: snapshot.redLine } : {}),
       readAt: new Date().toISOString(),
       // 门禁判定与总分同源：拿的就是上面这个 overall，不另算一个分

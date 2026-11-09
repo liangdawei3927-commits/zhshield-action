@@ -48,6 +48,7 @@
  * - 只有一端参与（进出参与集）的域不产生贡献 —— 它的影响走结构项，不硬算。
  */
 
+import { isReferenceDimension } from '@zh/shared';
 import type { HealthScoreData } from '../types/electron';
 
 type Dimension = HealthScoreData['dimensions'][number];
@@ -246,8 +247,14 @@ function checkPreconditions(
     return { ok: false, result: { ok: false, reason: 'version-mismatch', ...pair } };
   }
 
-  const startActive = start.dimensions.filter((d) => d.status !== 'not-run');
-  const endActive = end.dimensions.filter((d) => d.status !== 'not-run');
+  // 参考维度（techdebt）有分但不参与总分：归因的分子/分母都不能带它，
+  // 否则「Σ 域贡献 + 结构项 + 封顶项 ≡ 实际变化」会被一个不计总分的维度打破。
+  const startActive = start.dimensions.filter(
+    (d) => d.status !== 'not-run' && !isReferenceDimension(d.name) && d.excludedFromOverall !== true,
+  );
+  const endActive = end.dimensions.filter(
+    (d) => d.status !== 'not-run' && !isReferenceDimension(d.name) && d.excludedFromOverall !== true,
+  );
   if (startActive.length === 0 || endActive.length === 0) {
     return { ok: false, result: { ok: false, reason: 'no-active-dimension', ...pair } };
   }
@@ -290,9 +297,11 @@ function collectDomainNames(
   endMap: ReadonlyMap<string, Dimension>,
 ): string[] {
   const names: string[] = [];
-  for (const dim of endMap.values()) names.push(dim.name);
+  for (const dim of endMap.values()) {
+    if (!isReferenceDimension(dim.name)) names.push(dim.name);
+  }
   for (const dim of start.dimensions) {
-    if (!endMap.has(dim.name)) names.push(dim.name);
+    if (!endMap.has(dim.name) && !isReferenceDimension(dim.name)) names.push(dim.name);
   }
   return names;
 }

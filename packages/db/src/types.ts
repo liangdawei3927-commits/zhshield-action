@@ -19,6 +19,8 @@ export interface ScoreRow {
   grade: 'A' | 'B' | 'C' | 'D';
   dimensions: string;
   trend: 'improving' | 'stable' | 'declining';
+  /** 评分算法版本（迁移 014）；旧记录为 null，不冒充具体版本 */
+  score_version: number | null;
   created_at: string;
 }
 
@@ -72,6 +74,8 @@ export interface SaveScoreParams {
   grade: 'A' | 'B' | 'C' | 'D';
   dimensions: string;
   trend: 'improving' | 'stable' | 'declining';
+  /** 评分算法版本（可选：旧调用方未传时写 NULL，前端不拿它做跨版本对比） */
+  scoreVersion?: number;
 }
 
 /** 写入扫描结果入参（passed 为布尔，落库转 0/1；report 缺省写 NULL） */

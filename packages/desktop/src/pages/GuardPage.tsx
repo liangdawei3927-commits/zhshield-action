@@ -82,6 +82,10 @@ function buildGuardStats({
   const passed = checks.filter((c) => c.status === 'pass');
   const warnings = checks.filter((c) => c.status === 'warn');
   const blocked = checks.filter((c) => c.status === 'fail');
+  // 跳过必须单独计数：9 项 = 7 通过 + 0 警告 + 0 拦截 + 2 跳过，
+  // 少了这张卡，用户只能看到 7/9，剩下的 2 项（health-score / coverage 后置门禁）
+  // 会被默认读成「也通过了」。
+  const skipped = checks.filter((c) => c.status === 'skip');
   // 四张统计卡的明细子表都是「同一张 GuardTable + 按卡过滤 checks」，只有子集不同
   const tableActions = { copyToAi, copyAllToAi, reportFalsePositive };
   const statDetail = (items: GuardReportData['checks']): ReportStatCard['detail'] => ({
@@ -116,6 +120,13 @@ function buildGuardStats({
       value: report.summary.warnings,
       color: 'rgb(var(--zh-warning))',
       detail: statDetail(warnings),
+    },
+    {
+      key: 'skipped',
+      label: t('page.guard.stats.skipped'),
+      value: report.summary.skipped ?? 0,
+      color: 'rgb(var(--zh-muted))',
+      detail: statDetail(skipped),
     },
     {
       key: 'blocked',

@@ -1249,6 +1249,7 @@
       "stats": {
         "blocked": "차단",
         "passed": "통과",
+        "skipped": "건너뜀",
         "totalChecks": "검사 항목",
         "warnings": "경고"
       },
@@ -1279,7 +1280,7 @@
       "warningCount": "경고 {{count}}",
       "rejudge": "재판정",
       "hooks": {
-        "running": "실행 중",
+        "running": "가드 중",
         "off": "가드 꺼짐",
         "stop": "가드 중지",
         "enable": "가드 켜기",

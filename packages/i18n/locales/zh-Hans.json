@@ -1249,6 +1249,7 @@
       "stats": {
         "blocked": "拦截",
         "passed": "通过",
+        "skipped": "跳过",
         "totalChecks": "检查项",
         "warnings": "警告"
       },
@@ -1279,7 +1280,7 @@
       "warningCount": "警告 {{count}}",
       "rejudge": "重新判定",
       "hooks": {
-        "running": "运行中",
+        "running": "守护中",
         "off": "未开启守护",
         "stop": "停止守护",
         "enable": "开启守护",

@@ -1280,6 +1280,7 @@
       "warningCount": "警告 {{count}}",
       "rejudge": "再判定",
       "hooks": {
+        "label": "ガード状態",
         "running": "ガード中",
         "off": "ガード未起動",
         "stop": "ガードを停止",

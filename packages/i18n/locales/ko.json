@@ -1280,6 +1280,7 @@
       "warningCount": "경고 {{count}}",
       "rejudge": "재판정",
       "hooks": {
+        "label": "가드 상태",
         "running": "가드 중",
         "off": "가드 꺼짐",
         "stop": "가드 중지",

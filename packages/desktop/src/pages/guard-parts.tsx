@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useT } from '../i18n';
 import { useGuardHooks, STATUS_LABELS, type GuardLevelInfo } from './guard-logic';
 import { ResultCard } from '../components/ui/ResultCard';
-import { readGuardConfig, writeGuardConfig } from '../services/engineApi';
 
 export { GuardTable } from './guard-table-parts';
 export { GuardHistory } from './guard-history-parts';
@@ -90,6 +88,10 @@ function hooksStatusView(params: {
   return { running, canToggle, label, hoverLabel, title, footnote, dotColor, buttonStyle };
 }
 
+/**
+ * 检查项卡头部的一行守护状态（对齐备份中心「定时备份设置」的嵌卡片头做法）：
+ * 左侧胶囊可点击开启/停止，右侧跟着安装明细与上次判定，不再单独占一张卡片。
+ */
 export function GuardHooksStatus({
   projectPath,
   lastJudgedAt,
@@ -103,262 +105,35 @@ export function GuardHooksStatus({
   const view = hooksStatusView({ hasGitDir, stages, loading, busy, t });
 
   return (
-    <div className="flex flex-col items-start gap-1.5 mb-4 text-left" data-testid="guard-hooks-status">
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-zh-line"
+      data-testid="guard-hooks-status"
+    >
+      <span className="text-xs text-zh-muted">
+        {t('page.guard.hooks.label', { defaultValue: '守护状态' })}
+      </span>
       <button
         type="button"
         onClick={() => void toggle()}
         disabled={!view.canToggle}
         title={view.title}
         aria-label={view.title}
-        className="group inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        className="group inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         style={view.buttonStyle}
       >
-        <span className="w-2 h-2 rounded-full" style={{ background: view.dotColor }} />
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: view.dotColor }} />
         <span className={view.canToggle ? 'group-hover:hidden' : undefined}>{view.label}</span>
         {view.canToggle && <span className="hidden group-hover:inline">{view.hoverLabel}</span>}
       </button>
-      <div className="text-[11px] text-zh-muted text-center">{view.footnote}</div>
+      <span className="text-xs text-zh-muted">{view.footnote}</span>
       {view.running && lastJudgedAt && (
-        <div className="text-[11px] text-zh-muted">
+        <span className="text-xs text-zh-muted">
           {t('page.guard.hooks.lastJudged', {
             time: new Date(lastJudgedAt).toLocaleString(),
           })}
-        </div>
+        </span>
       )}
     </div>
   );
 }
 
-function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`w-10 h-6 rounded-full relative cursor-pointer border-none transition-colors ${
-        enabled ? 'bg-brand-500' : 'bg-zh-line'
-      }`}
-    >
-      <div
-        className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
-          enabled ? 'right-0.5' : 'left-0.5'
-        }`}
-      />
-    </button>
-  );
-}
-
-function ConfigRow({
-  title,
-  desc,
-  enabled,
-  onToggle,
-}: {
-  title: string;
-  desc: string;
-  enabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-zh-panel">
-      <div>
-        <div className="text-sm font-medium text-zh-ink-2">{title}</div>
-        <div className="text-xs text-zh-muted">{desc}</div>
-      </div>
-      <Toggle enabled={enabled} onToggle={onToggle} />
-    </div>
-  );
-}
-
-/** 门禁配置状态：读取 guard-config.json + 本地编辑 */
-function useGuardConfigState(): {
-  preCommit: boolean;
-  setPreCommit: Dispatch<SetStateAction<boolean>>;
-  prePush: boolean;
-  setPrePush: Dispatch<SetStateAction<boolean>>;
-  blockCritical: boolean;
-  setBlockCritical: Dispatch<SetStateAction<boolean>>;
-  enabled: boolean;
-  loading: boolean;
-} {
-  const [preCommit, setPreCommit] = useState(true);
-  const [prePush, setPrePush] = useState(true);
-  const [blockCritical, setBlockCritical] = useState(true);
-  const [enabled, setEnabled] = useState(true);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    readGuardConfig().then((config) => {
-      if (!cancelled) {
-        setPreCommit(config.preCommit);
-        setPrePush(config.prePush);
-        setBlockCritical(config.blockOnCritical);
-        setEnabled(config.enabled);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return {
-    preCommit,
-    setPreCommit,
-    prePush,
-    setPrePush,
-    blockCritical,
-    setBlockCritical,
-    enabled,
-    loading,
-  };
-}
-
-/** 门禁配置保存：合并当前值写盘（fire-and-forget） */
-function useGuardConfigSave(cfg: {
-  enabled: boolean;
-  preCommit: boolean;
-  prePush: boolean;
-  blockOnCritical: boolean;
-}): (update: Partial<{ preCommit: boolean; prePush: boolean; blockOnCritical: boolean }>) => void {
-  return useCallback(
-    (update: Partial<{ preCommit: boolean; prePush: boolean; blockOnCritical: boolean }>) => {
-      const config = {
-        enabled: cfg.enabled,
-        preCommit: update.preCommit ?? cfg.preCommit,
-        prePush: update.prePush ?? cfg.prePush,
-        blockOnCritical: update.blockOnCritical ?? cfg.blockOnCritical,
-      };
-      void writeGuardConfig(config);
-    },
-    [cfg.enabled, cfg.preCommit, cfg.prePush, cfg.blockOnCritical],
-  );
-}
-
-function GuardConfigHeader({ t }: { t: ReturnType<typeof useT> }) {
-  return (
-    <div className="flex items-center gap-3 mb-4">
-      <h2 className="text-lg font-bold text-zh-ink">
-        {t('page.guard.config.title', { defaultValue: '门禁配置' })}
-      </h2>
-    </div>
-  );
-}
-
-function GuardConfigToggles({
-  t,
-  preCommit,
-  setPreCommit,
-  prePush,
-  setPrePush,
-  blockCritical,
-  setBlockCritical,
-  saveConfig,
-}: {
-  t: ReturnType<typeof useT>;
-  preCommit: boolean;
-  setPreCommit: Dispatch<SetStateAction<boolean>>;
-  prePush: boolean;
-  setPrePush: Dispatch<SetStateAction<boolean>>;
-  blockCritical: boolean;
-  setBlockCritical: Dispatch<SetStateAction<boolean>>;
-  saveConfig: (
-    update: Partial<{ preCommit: boolean; prePush: boolean; blockOnCritical: boolean }>,
-  ) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <ConfigRow
-        title={t('page.guard.config.preCommit', { defaultValue: '提交前检查' })}
-        desc={t('page.guard.config.preCommitDesc', {
-          defaultValue: '每次 git commit 前自动执行门禁检查',
-        })}
-        enabled={preCommit}
-        onToggle={() => {
-          const next = !preCommit;
-          setPreCommit(next);
-          saveConfig({ preCommit: next });
-        }}
-      />
-      <ConfigRow
-        title={t('page.guard.config.prePush', { defaultValue: '推送前检查' })}
-        desc={t('page.guard.config.prePushDesc', {
-          defaultValue: '每次 git push 前自动执行门禁检查',
-        })}
-        enabled={prePush}
-        onToggle={() => {
-          const next = !prePush;
-          setPrePush(next);
-          saveConfig({ prePush: next });
-        }}
-      />
-      <ConfigRow
-        title={t('page.guard.config.blockOnCritical', { defaultValue: '严重问题阻止提交' })}
-        desc={t('page.guard.config.blockOnCriticalDesc', {
-          defaultValue: '当检测到严重级别问题时阻止提交操作',
-        })}
-        enabled={blockCritical}
-        onToggle={() => {
-          const next = !blockCritical;
-          setBlockCritical(next);
-          saveConfig({ blockOnCritical: next });
-        }}
-      />
-    </div>
-  );
-}
-
-export function GuardConfigCard({
-  projectPath,
-  lastJudgedAt,
-}: {
-  projectPath?: string;
-  lastJudgedAt?: string;
-}) {
-  const t = useT();
-  const {
-    preCommit,
-    setPreCommit,
-    prePush,
-    setPrePush,
-    blockCritical,
-    setBlockCritical,
-    enabled,
-    loading,
-  } = useGuardConfigState();
-  const saveConfig = useGuardConfigSave({
-    enabled,
-    preCommit,
-    prePush,
-    blockOnCritical: blockCritical,
-  });
-
-  if (loading) {
-    return (
-      <ResultCard variant="section" className="mt-8">
-        <GuardConfigHeader t={t} />
-        <div className="text-sm text-zh-muted">
-          {t('page.guard.config.loading', { defaultValue: '加载中...' })}
-        </div>
-      </ResultCard>
-    );
-  }
-
-  return (
-    <ResultCard variant="section" className="mt-8">
-      <GuardConfigHeader t={t} />
-      {/* 钩子守护状态放进配置区：首页只留一个主按钮，状态与开关都归到设置里 */}
-      {projectPath && <GuardHooksStatus projectPath={projectPath} lastJudgedAt={lastJudgedAt} />}
-      <GuardConfigToggles
-        t={t}
-        preCommit={preCommit}
-        setPreCommit={setPreCommit}
-        prePush={prePush}
-        setPrePush={setPrePush}
-        blockCritical={blockCritical}
-        setBlockCritical={setBlockCritical}
-        saveConfig={saveConfig}
-      />
-    </ResultCard>
-  );
-}

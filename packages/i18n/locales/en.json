@@ -1280,6 +1280,7 @@
       "warningCount": "{{count}} warnings",
       "rejudge": "Re-evaluate",
       "hooks": {
+        "label": "Guard status",
         "running": "Running",
         "off": "Guard off",
         "stop": "Stop guard",

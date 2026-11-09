@@ -8,7 +8,7 @@ import { scanRunProps } from '../components/business/ScanEmptyState';
 import { type ReportStatCard } from '../components/business/ReportShell';
 import { FeatureIcon } from '../components/ui/Icons';
 import { useGuardPage, buildGuardLevels, type GuardLevelInfo } from './guard-logic';
-import { GuardLevels, GuardTable, GuardHistory, GuardConfigCard } from './guard-parts';
+import { GuardLevels, GuardTable, GuardHistory, GuardHooksStatus } from './guard-parts';
 import { useNotification } from '../contexts/NotificationContext';
 import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import type { GuardReportData, GuardReportRecordData } from '../types/electron';
@@ -172,6 +172,9 @@ function GuardReportView({
         onCopyToAi={copyToAi}
         onCopyAll={copyAllToAi}
         onReportFalsePositive={reportFalsePositive}
+        headerExtra={
+          <GuardHooksStatus projectPath={projectPath} lastJudgedAt={report.metadata.timestamp} />
+        }
       />
       <GuardHistory
         records={history}
@@ -179,7 +182,6 @@ function GuardReportView({
         onReportFalsePositive={reportFalsePositive}
         falsePositiveCount={falsePositiveCount}
       />
-      <GuardConfigCard projectPath={projectPath} lastJudgedAt={report.metadata.timestamp} />
       <div className="mt-4 text-xs text-zh-muted">
         {t('page.guard.duration', { duration: report.metadata.duration })}
       </div>

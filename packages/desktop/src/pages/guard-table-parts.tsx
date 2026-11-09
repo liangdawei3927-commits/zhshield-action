@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { GuardReportData } from '../types/electron';
 import { useT } from '../i18n';
 import { SEVERITY_LABELS, SEVERITY_COLORS, STATUS_LABELS } from './guard-logic';
@@ -79,17 +80,21 @@ export function GuardTable({
   onCopyToAi,
   onCopyAll,
   onReportFalsePositive,
+  headerExtra,
 }: {
   report: GuardReportData;
   onCopyToAi: (check: GuardReportData['checks'][number]) => void;
   onCopyAll: (checks: GuardReportData['checks'][number][]) => void;
   onReportFalsePositive: (check: GuardReportData['checks'][number]) => void;
+  /** 嵌在卡片头部的附加行（门禁页用来放守护状态，对齐备份中心设置行的做法） */
+  headerExtra?: ReactNode;
 }) {
   const t = useT();
   // skip（让位）不计入「N 项需处理」，也不进一键复制清单 —— 它没有可修的代码
   const failedChecks = report.checks.filter((c) => isActionable(c));
   return (
     <ResultCard variant="list" className="overflow-hidden">
+      {headerExtra}
       {failedChecks.length > 0 && (
         <div className="flex items-center justify-between px-5 py-3 border-b border-zh-line">
           <span className="text-xs text-zh-muted">

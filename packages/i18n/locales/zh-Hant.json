@@ -1280,6 +1280,7 @@
       "warningCount": "警告 {{count}}",
       "rejudge": "重新判定",
       "hooks": {
+        "label": "守護狀態",
         "running": "守護中",
         "off": "未開啟守護",
         "stop": "停止守護",

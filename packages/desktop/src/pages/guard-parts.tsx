@@ -103,7 +103,7 @@ export function GuardHooksStatus({
   const view = hooksStatusView({ hasGitDir, stages, loading, busy, t });
 
   return (
-    <div className="flex flex-col items-center gap-1.5" data-testid="guard-hooks-status">
+    <div className="flex flex-col items-start gap-1.5 mb-4 text-left" data-testid="guard-hooks-status">
       <button
         type="button"
         onClick={() => void toggle()}
@@ -308,7 +308,13 @@ function GuardConfigToggles({
   );
 }
 
-export function GuardConfigCard() {
+export function GuardConfigCard({
+  projectPath,
+  lastJudgedAt,
+}: {
+  projectPath?: string;
+  lastJudgedAt?: string;
+}) {
   const t = useT();
   const {
     preCommit,
@@ -341,6 +347,8 @@ export function GuardConfigCard() {
   return (
     <ResultCard variant="section" className="mt-8">
       <GuardConfigHeader t={t} />
+      {/* 钩子守护状态放进配置区：首页只留一个主按钮，状态与开关都归到设置里 */}
+      {projectPath && <GuardHooksStatus projectPath={projectPath} lastJudgedAt={lastJudgedAt} />}
       <GuardConfigToggles
         t={t}
         preCommit={preCommit}

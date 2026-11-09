@@ -154,8 +154,103 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps, AsyncS
   onTabChange: (tab: SecurityTab) => void;
   onRescan: () => void;
   onBackHome: () => void;
+  /**
+   * 本次「重新检查」的失败原因（超时/工具被杀/执行器抛错）。
+   *
+   * 失败时渲染层拿不到新报告，页面会回落到 `.zhshield/reports/security.json`
+   * 里的**上一次**结果；若不显形，用户会把那份旧结果当成「刚刚检查完成」——
+   * 2026-11-09 实测：扫描 120s 超时、页面仍显示旧报告的 100 分「优秀」。
+   */
+  scanError?: string | null;
+  /** 当前展示的报告是否来自磁盘（本会话没产出新结果） */
+  isSavedResult?: boolean;
   /** 当前分类的明细面板：由页面装配后传入（渲染位置 = 标签栏之下） */
   children?: ReactNode;
+}
+
+/** 报告结果的出处与时间：新结果 / 上次保存的旧结果 / 本次失败 三态必须可区分 */
+function SecurityResultMeta({
+  report,
+  scanError,
+  isSavedResult,
+  t,
+}: {
+  report: SecurityScanReportData;
+  scanError?: string | null;
+  isSavedResult?: boolean;
+  t: Translate;
+}) {
+  const time = report.metadata?.timestamp
+    ? new Date(report.metadata.timestamp).toLocaleString()
+    : t('page.security.result.unknownTime', { defaultValue: '时间未知' });
+
+  if (scanError) {
+    return (
+      <div className="mb-4 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+        <div className="text-sm font-medium text-danger-700">
+          {t('page.security.result.failedTitle', {
+            defaultValue: '本次检查未完成：{{error}}',
+            error: scanError,
+          })}
+        </div>
+        <div className="text-xs text-danger-500 mt-0.5">
+          {t('page.security.result.failedDetail', {
+            defaultValue: '下方显示的是 {{time}} 保存的旧结果，不代表本次扫描；修复后请重新检查。',
+            time,
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (isSavedResult) {
+    return (
+      <div className="mb-4 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
+        <div className="text-xs text-warning-700">
+          {t('page.security.result.savedOnly', {
+            defaultValue: '以下为上次保存的扫描结果（{{time}}），本次未产出新结果。',
+            time,
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 text-xs text-zh-muted">
+      {t('page.security.result.scannedAt', { defaultValue: '扫描时间：{{time}}', time })}
+    </div>
+  );
+}
+
+/**
+ * 规则通道求值账横幅：有规则没评估成 → 0 检出 ≠ 干净。
+ *
+ * 与工具级 {@link SecurityDegradedBanner} 分开：这里是「规则没能评估」
+ * （规则通道未执行 / 规则降级），不是工具不可用。混在一起会让用户按
+ * 「重装工具」去修一个其实是规则/项目前提的问题。
+ */
+function SecurityRuleChannelBanner({
+  report,
+  t,
+}: {
+  report: SecurityScanReportData;
+  t: Translate;
+}) {
+  const channel = report.ruleChannel;
+  if (!channel || (channel.ran && channel.degraded === 0)) return null;
+  return (
+    <div className="mb-4 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
+      <div className="text-xs text-warning-700">
+        {t('page.security.result.ruleChannel', {
+          defaultValue:
+            '规则通道未完全求值：{{degraded}} 条规则未能评估、{{skipped}} 条按项目前提跳过；未评估的规则不等于通过。',
+          degraded: channel.degraded,
+          skipped: channel.skipped,
+        })}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -228,6 +323,8 @@ export function SecurityReportView({
   copyAllToAi,
   copyMalwareToAi,
   copyMalwareAllToAi,
+  scanError,
+  isSavedResult,
   children,
 }: SecurityReportViewProps) {
   const t = useT();
@@ -253,6 +350,8 @@ export function SecurityReportView({
         t,
       })}
     >
+      <SecurityResultMeta report={report} scanError={scanError} isSavedResult={isSavedResult} t={t} />
+      <SecurityRuleChannelBanner report={report} t={t} />
       <SecurityDegradedBanner report={report} t={t} />
       <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
       {children}

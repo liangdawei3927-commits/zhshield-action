@@ -180,6 +180,7 @@ function useSecurityPageState(projectPath: string) {
     cancel,
     stopping,
     report,
+    scanError,
     copyToAi,
     copyAllToAi,
     copyMalwareToAi,
@@ -227,6 +228,7 @@ function useSecurityPageState(projectPath: string) {
     queuePosition,
     report,
     detailReport,
+    scanError,
     copyToAi,
     copyAllToAi,
     copyMalwareToAi,
@@ -282,6 +284,9 @@ function securityReportViewProps(
     onTabChange: state.setTab,
     onRescan: state.handleScan,
     onBackHome: () => state.setShowHome(true),
+    // 本次重扫失败 + 报告来自磁盘：必须让用户知道「看到的是旧结果」
+    scanError: state.scanError,
+    isSavedResult: state.report === null,
     copyToAi: state.copyToAi,
     copyAllToAi: state.copyAllToAi,
     copyMalwareToAi: state.copyMalwareToAi,
@@ -365,7 +370,7 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
         onCancel={state.cancel}
         stopping={state.stopping}
         onScan={state.startScan}
-        render={(empty) => <SecurityEmptyState {...empty} />}
+        render={(empty) => <SecurityEmptyState {...empty} scanError={state.scanError} />}
       />
     </DetailEntryProvider>
   );

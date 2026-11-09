@@ -62,12 +62,14 @@ function useSecurityRun(projectPath: string): {
   queuePosition?: number;
   report: SecurityScanReportData | null;
   handleScan: () => Promise<void>;
+  /** 最近一次「重新检查」的失败原因（null = 没有失败 / 已清空） */
+  scanError: string | null;
 } {
   const [report, setReport] = useState<SecurityScanReportData | null>(null);
   const runState = useDomainRunState('security', projectPath);
-  const { handleScan } = useRunWithReport(projectPath, runSecurity, setReport);
+  const { handleScan, scanError } = useRunWithReport(projectPath, runSecurity, setReport);
 
-  return { ...runState, report, handleScan };
+  return { ...runState, report, handleScan, scanError };
 }
 
 /** 漏洞发现 → vuln 域（修复动作：修补缺陷本身） */

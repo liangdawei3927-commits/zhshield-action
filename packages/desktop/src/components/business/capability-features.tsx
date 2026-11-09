@@ -91,12 +91,23 @@ export interface CapabilityPlannedItem {
  * （`zhshield capability` / `--format json`）能看到，桌面端看不到。
  *
  * 它**不是**可宣称能力：渲染层必须把它放在独立的「规划中」区，绝不能并入功能网格。
+ *
+ * ## 为什么要有 `descriptions` 覆盖
+ *
+ * 注册表的 `note` 是**写给维护者看的**（含《07》条目号、"全仓无对应实现"、
+ * "本页不得宣称"这类工艺术语）。它直接渲染会把这些内部注记暴露给用户
+ * （2026-11-09 实锤：安全页「已移交」区把 `按《07》O2 / O10…` 原样展示）。
+ * 调用方用本参数提供面向用户的说明；缺省才退回 note（CLI/文档仍可用原文）。
  */
-export function buildPlannedCapabilities(domain: DomainId): CapabilityPlannedItem[] {
+export function buildPlannedCapabilities(
+  domain: DomainId,
+  descriptions?: Readonly<Record<string, string>>,
+): CapabilityPlannedItem[] {
   return unimplementedCapabilities(domain).map((cap) => ({
     id: cap.id,
     title: cap.label,
     desc:
+      descriptions?.[cap.id] ??
       cap.note ??
       (cap.status === 'deprecated' ? '已移交其他治理域，本域不再宣称' : '规划中：尚未实现'),
     // unimplementedCapabilities 只返回非 implemented 项，此处收窄类型

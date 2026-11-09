@@ -196,7 +196,9 @@ function getCoverageGap(
   return a.status === 'unavailable' || a.status === 'skipped' || a.degraded === true;
 }
 
-export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanReportData {
+export function toSecurityScanReportData(
+  r: SecurityScanReport & { ruleChannel?: { ran: boolean; skipped: number; degraded: number } },
+): SecurityScanReportData {
   return {
     summary: {
       total: r.summary.vulnTotal,
@@ -241,6 +243,8 @@ export function toSecurityScanReportData(r: SecurityScanReport): SecurityScanRep
           skippedTools: r.skippedTools.map((s) => ({ tool: s.tool, reason: s.reason })),
         }
       : {}),
+    // 规则通道求值账：degraded>0 表示有规则没能评估（≠ 该规则通过）
+    ...(r.ruleChannel ? { ruleChannel: r.ruleChannel } : {}),
     metadata: {
       duration: 0,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),

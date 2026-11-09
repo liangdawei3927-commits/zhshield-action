@@ -237,6 +237,15 @@ export interface SecurityScanReportData {
    * 与 degraded 分离展示——重装/联网对它无效，混在一起会给出错误的恢复指引。
    */
   skippedTools?: Array<{ tool: string; reason: string }>;
+  /**
+   * SOP 规则通道的求值账：skipped = 按项目前提跳过，degraded = 规则没能评估。
+   * `degraded > 0` 时 0 检出 ≠ 干净（未检测 ≠ 通过），页面必须显形。
+   */
+  ruleChannel?: {
+    ran: boolean;
+    skipped: number;
+    degraded: number;
+  };
   findings: Array<{
     id: string;
     title: string;

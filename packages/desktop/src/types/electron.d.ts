@@ -184,6 +184,14 @@ export interface DomainScanRecordData {
   fingerprintsHash: string;
   sameAs?: string;
   coverage?: { files?: number; skipped?: number };
+  /** 本轮规则执行账（R6，仅 inspect）；缺省 = 旧记录/该域不提供 */
+  ruleCoverage?: {
+    total: number;
+    evaluated: number;
+    unavailable: number;
+    notApplicable: number;
+    complete: boolean;
+  };
   /** 明细 blob 名；null/缺省 = 本次未保存明细 */
   blob?: string | null;
   /**
@@ -338,13 +346,15 @@ export interface HealthScoreData {
     status?: 'scored' | 'not-run';
     /** true = 参考维度（techdebt）：有分但不参与总分/覆盖度/等级 */
     excludedFromOverall?: boolean;
+    /** 规则级覆盖（R6，仅 quality）：complete=false 时本维分数只是「已检测部分均分」 */
+    coverage?: { run: number; total: number; complete: boolean };
   }>;
   summary: string;
   timestamp: string;
   /** 评分算法版本（4 = 十域聚合 + 技术债参考化 + 同事实去重 + 短板等级） */
   scoreVersion?: number;
   /** 覆盖度：complete=false 时 score 只是「已检测部分均分」，不能显示 A/B/C/D */
-  coverage?: { run: number; total: number; complete: boolean };
+  coverage?: { run: number; total: number; complete: boolean; partial?: string[] };
   /** 红线封顶：本次汇总存在 critical 事实时总评被压制的原因 */
   redLine?: {
     capped: boolean;
@@ -503,6 +513,8 @@ export interface DomainScoreData {
   generatedAt: string;
   /** 上一轮检查的分数（覆盖写前从旧快照抢救；无基线时缺省） */
   previousScore?: { score: number; generatedAt: string };
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 旧快照没有规则账（覆盖未知） */
+  coverage?: { run: number; total: number; complete: boolean };
 }
 
 /**
@@ -517,7 +529,7 @@ export interface HealthOverviewData {
   overall: number;
   grade: 'A' | 'B' | 'C' | 'D';
   /** 覆盖度：计分维度里检测了几个；complete=false 时 overall 只是「已检测部分均分」 */
-  coverage: { run: number; total: number; complete: boolean };
+  coverage: { run: number; total: number; complete: boolean; partial?: string[] };
   /** 十维，一次输入组装取齐 ⇒ 十张卡同一时刻、同一口径 */
   dimensions: Array<{
     name: ScoreDimension;
@@ -533,6 +545,8 @@ export interface HealthOverviewData {
     contribution: number;
     /** true = 参考维度（techdebt），有分但不计总分 */
     excludedFromOverall: boolean;
+    /** 规则级覆盖（R6，仅 quality）；缺省 = 旧快照/该维不定义 */
+    coverage?: { run: number; total: number; complete: boolean };
   }>;
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间） */

@@ -8,7 +8,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { DomainConclusionSet } from '@zh/shared';
+import type { DimensionCoverage, DomainConclusionSet } from '@zh/shared';
 
 // ─── 诊断条目（归一化，跨 guard/inspect/refactor） ─────────────────────
 
@@ -74,6 +74,25 @@ export interface FileDiagnostics {
 // ─── 落盘报告 ─────────────────────────────────────────────────────────
 
 /**
+ * 本轮规则执行账（R6，仅 inspect 快照携带）。
+ *
+ * `complete = unavailable === 0`：只要有一条规则因工具不可用 / 引擎内部错误没跑，
+ * 该次检测就是「部分覆盖」，分数不得再叫等级/「优秀」。
+ */
+export interface RuleCoverage {
+  /** 计划评估的规则数 */
+  total: number;
+  /** 已求值 = passed + failed（含 not-applicable） */
+  evaluated: number;
+  /** 未执行 = error + skipped（工具不可用 / 引擎内部错误） */
+  unavailable: number;
+  /** 已求值但本项目没有可检对象（evaluated 的子集，不构成缺口） */
+  notApplicable: number;
+  /** unavailable === 0 */
+  complete: boolean;
+}
+
+/**
  * 按域快照附带的实时维度评分（落盘时由 @zh/scoring 统一计算，渲染层只读不算）。
  * version = 评分算法版本（scoreVersion 2 起）；跨版本快照的 previousScore 不参与对比。
  */
@@ -88,6 +107,8 @@ export interface DomainDimensionScore {
   status: 'scored' | 'not-run';
   /** 评分算法版本（v1 旧快照缺省） */
   version?: number;
+  /** 规则级覆盖（R6）：quality 维携带；旧快照缺省 = 覆盖未知 */
+  coverage?: DimensionCoverage;
 }
 
 /** 落盘的诊断报告（.zhshield/diagnostics/latest.json）：问题汇总 + 条目 + 按文件视图 */
@@ -104,6 +125,8 @@ export interface DiagnosticsReport {
   previousScore?: { score: number; generatedAt: string };
   /** 项目 ESLOC（S2 密度归一化分母；仅 inspect 快照携带，供报告中心汇总同口径复用） */
   esloc?: number;
+  /** 本轮规则执行账（仅 inspect 快照携带；旧快照缺省 = 覆盖未知，不冒充完整） */
+  ruleCoverage?: RuleCoverage;
 }
 
 /** 诊断条目的来源引擎标识 */

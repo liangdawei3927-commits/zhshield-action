@@ -1,5 +1,9 @@
 import { t } from '@zh/i18n';
-import { isReferenceDimension, type ScoreDimension } from '@zh/shared';
+import {
+  isReferenceDimension,
+  type DimensionCoverage,
+  type ScoreDimension,
+} from '@zh/shared';
 import { navItems, type NavGroup } from '../components/layout/nav-items';
 import { dimensionName } from './reports-logic';
 import { domainScoreView, type DomainScoreView } from './domain-score-logic';
@@ -64,6 +68,8 @@ export interface DimensionEntry {
   contribution?: number;
   /** true = 参考维度（techdebt），不计总分 */
   excludedFromOverall?: boolean;
+  /** 规则级覆盖（R6，仅 quality）：complete=false 表示本维内部有规则没跑 */
+  coverage?: DimensionCoverage;
 }
 
 /** 分类评分卡入参：维度数组 + 汇总时间 + 总分输入 */
@@ -163,8 +169,10 @@ export interface OverallScoreInput {
   score: number;
   /** 只统计计分维度：技术债是参考指标，不在分母里 */
   partial: { run: number; total: number };
-  /** true = 计分维度全部检测；false 时总分只是「已检测部分均分」 */
+  /** true = 计分维度全部检测且维度内部无缺口；false 时总分只是「已检测部分均分」 */
   complete: boolean;
+  /** 维度内部有规则没跑的计分类名（R6；complete=false 的子集原因） */
+  partialDimensions?: string[];
   /** 最弱计分类（用于总分卡常驻短板提示）；无计分类时为 undefined */
   weakest?: { name: ScoreDimension; score: number };
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
@@ -192,13 +200,19 @@ export function overviewRowInput(overview: {
     run.length > 0
       ? run.reduce((min, d) => (d.score < min.score ? d : min), run[0]!)
       : undefined;
+  // R6：9 类全跑 ≠ 完整总分 —— 维度内部还有规则没跑时同样只能叫「已检测部分均分」
+  const partialDimensions = run
+    .filter((d) => d.coverage?.complete === false)
+    .map((d) => d.name);
   return {
     dimensions: overview.dimensions,
     generatedAt: times.length > 0 ? new Date(Math.min(...times)).toISOString() : overview.readAt,
     overall: {
       score: overview.overall,
       partial: { run: run.length, total: scored.length },
-      complete: run.length === scored.length && scored.length > 0,
+      complete:
+        run.length === scored.length && scored.length > 0 && partialDimensions.length === 0,
+      ...(partialDimensions.length > 0 ? { partialDimensions } : {}),
       ...(weakest ? { weakest: { name: weakest.name as ScoreDimension, score: weakest.score } } : {}),
       ...(overview.redLine ? { redLine: overview.redLine } : {}),
     },

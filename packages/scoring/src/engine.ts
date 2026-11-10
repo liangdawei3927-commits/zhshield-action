@@ -91,11 +91,25 @@ export function isOverallDimension(d: DimensionScore): boolean {
   return d.status !== 'not-run' && d.excludedFromOverall !== true && !isReferenceDimension(d.name);
 }
 
-/** 覆盖度：计分维度里实际检测了几个（参考维度不计入 total） */
+/**
+ * 覆盖度：计分维度里实际检测了几个（参考维度不计入 total）。
+ *
+ * R6：`complete` 还要求**维度内部**没有缺口 —— 9 类全跑、但质量只跑了 13/20 条规则，
+ * 总分依然是「已检测部分均分」，不能出等级。`partial` 记录这些维度名，
+ * 供 UI 说明「哪个维度检测不完整」。
+ */
 export function computeCoverage(dimensionScores: readonly DimensionScore[]): ScoreCoverage {
   const scored = dimensionScores.filter((d) => !isReferenceDimension(d.name));
   const run = scored.filter((d) => d.status !== 'not-run').length;
-  return { run, total: scored.length, complete: run === scored.length };
+  const partial = scored
+    .filter((d) => d.coverage?.complete === false)
+    .map((d) => d.name);
+  return {
+    run,
+    total: scored.length,
+    complete: run === scored.length && partial.length === 0,
+    ...(partial.length > 0 ? { partial } : {}),
+  };
 }
 
 /** 加权总评：只按计分且已检测的维度归一化（spec C：未检测域禁止按满分计；techdebt 参考化） */

@@ -7,7 +7,7 @@
 
 import path from 'node:path';
 import { t } from '@zh/i18n';
-import { isReferenceDimension } from '@zh/shared';
+import { isReferenceDimension, type DimensionCoverage } from '@zh/shared';
 import { computeOverallSnapshot, computeRedLine, isOverallDimension } from '@zh/scoring';
 import type { PostScanGateReport } from '@zh/kernel';
 import { readDomainSnapshot } from '../zh-diagnostics';
@@ -123,6 +123,7 @@ export async function getDomainScoreHandler(
       issues: entry.issues,
       status: entry.status ?? 'scored',
       generatedAt: inputs.timestamps[dimension],
+      ...(entry.coverage ? { coverage: entry.coverage } : {}),
     };
   } catch (err) {
     console.warn(
@@ -169,14 +170,19 @@ export interface HealthOverviewDimension {
   contribution: number;
   /** true = 参考维度（techdebt），有分但不计总分 */
   excludedFromOverall: boolean;
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 旧快照/该维不定义 */
+  coverage?: DimensionCoverage;
 }
 
 /** 健康总览：读磁盘最新快照实时计算（不落库，浏览报告中心不会污染历史曲线） */
 export interface HealthOverviewData {
   overall: number;
   grade: 'A' | 'B' | 'C' | 'D';
-  /** 覆盖度：计分维度里检测了几个；`complete=false` 时 overall 只是「已检测部分均分」 */
-  coverage: { run: number; total: number; complete: boolean };
+  /**
+   * 覆盖度：计分维度里检测了几个；`complete=false` 时 overall 只是「已检测部分均分」。
+   * R6 起 `complete` 还要求维度内部没有缺口，`partial` 列出缺口的维度名。
+   */
+  coverage: { run: number; total: number; complete: boolean; partial?: string[] };
   dimensions: HealthOverviewDimension[];
   redLine?: { capped: boolean; cap: number; reasons: Array<{ kind: string; count: number }> };
   /** 本次读取时刻（不是域数据时间；各维时间见 dimensions[].generatedAt） */
@@ -229,6 +235,7 @@ export async function getHealthOverviewHandler(
           contribution: d.score * effectiveWeight,
           excludedFromOverall:
             d.excludedFromOverall === true || isReferenceDimension(d.name),
+          ...(d.coverage ? { coverage: d.coverage } : {}),
         };
       }),
       ...(snapshot.redLine ? { redLine: snapshot.redLine } : {}),

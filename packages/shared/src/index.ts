@@ -306,4 +306,4 @@ export {
   isReferenceDimension,
   isScoredDimension,
 } from './score-dimensions';
-export type { HealthScoreDimension, ScoreDimension } from './score-dimensions';
+export type { HealthScoreDimension, ScoreDimension, DimensionCoverage } from './score-dimensions';

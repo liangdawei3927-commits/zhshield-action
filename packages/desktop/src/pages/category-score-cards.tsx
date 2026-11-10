@@ -101,10 +101,14 @@ function OverallScoreTile({ overall, label }: { overall: OverallScoreInput; labe
     : t('page.reports.categoryScore.partialOverall');
   const badge = complete
     ? getScoreLabel(score)
-    : t('page.reports.categoryScore.coverageBadge', {
-        run: partial.run,
-        total: partial.total,
-      });
+    : overall.partialDimensions?.length
+      ? t('page.reports.categoryScore.partialDimensionBadge', {
+          count: overall.partialDimensions.length,
+        })
+      : t('page.reports.categoryScore.coverageBadge', {
+          run: partial.run,
+          total: partial.total,
+        });
   return (
     <ResultCard
       variant="tile"
@@ -159,6 +163,16 @@ function ScoreNotices({
       }),
       color: 'rgb(var(--zh-warning))',
       testId: 'partial-notice',
+    });
+  }
+  // R6：维度全跑了、但内部有规则没跑 —— 与「维度没跑」是两种缺口，分别提示
+  if (overall.partialDimensions && overall.partialDimensions.length > 0) {
+    notices.push({
+      text: t('page.reports.categoryScore.partialDimensionGap', {
+        count: overall.partialDimensions.length,
+      }),
+      color: 'rgb(var(--zh-warning))',
+      testId: 'partial-dimension-notice',
     });
   }
   if (overall.weakest) {

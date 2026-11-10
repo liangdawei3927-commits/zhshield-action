@@ -20,6 +20,14 @@ export interface DimensionScore {
    * 缺省 false（旧记录/普通维度保持兼容）。
    */
   excludedFromOverall?: boolean;
+  /**
+   * 规则级覆盖（R6，当前仅 quality 维携带）。
+   *
+   * `complete=false` 表示本维内部有规则没跑（工具不可用/引擎出错）：
+   * 分数只是「已检测部分均分」，不得再出等级。缺省 = 该维不定义规则覆盖，
+   * 或旧快照没有规则账（覆盖未知，不按 partial 处理）。
+   */
+  coverage?: ScoreCoverage;
 }
 
 /** secrets 域数据（secrets-state.json 子集）：active 为未处理密钥数 */
@@ -134,12 +142,20 @@ export interface RedLineInfo {
  * 也不能用它出 A/B/C/D 等级（见 R5 规格 §3.4）。
  */
 export interface ScoreCoverage {
-  /** 已检测的计分维度数 */
+  /** 已检测的计分维度数（维度内部：已求值的规则数） */
   run: number;
   /** 计分维度总数（当前 9；techdebt 为参考维度，不计入） */
   total: number;
-  /** run === total */
+  /**
+   * 是否可以按完整总分展示。
+   *
+   * R6 起不再只等于 `run === total`：任一计分维度内部 `coverage.complete === false`
+   * （有规则没跑）也必须为 false。否则「9 类全跑、其中质量只跑 13/20 条规则」
+   * 仍然会被当成完整总分，继续冒出 A/优秀。
+   */
   complete: boolean;
+  /** `complete=false` 的计分维度名（仅 R6 维度内部缺口；跨维未检测仍由 run/total 表达） */
+  partial?: string[];
 }
 
 /** 项目健康总分：总分 + 等级 + 各维度得分 + 趋势 + 评分算法版本 + 覆盖度 + 红线封顶信息 */

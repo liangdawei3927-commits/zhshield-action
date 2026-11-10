@@ -45,6 +45,9 @@ function HistoryRowView({
   const direction = deltaDirection(scoreDelta);
   const severityText =
     record.severityApplicable === false ? '—' : `${record.error}/${record.warning}/${record.info}`;
+  // R6：该次检查若内部有规则没跑，分数只是「已检测部分均分」，历史行必须标出来
+  const ruleCoverage = record.ruleCoverage;
+  const partial = ruleCoverage !== undefined && !ruleCoverage.complete;
 
   return (
     <tr
@@ -56,6 +59,24 @@ function HistoryRowView({
       </td>
       <td className="px-5 py-3 text-sm font-bold text-zh-ink whitespace-nowrap">
         {record.score === null ? '—' : record.score}
+        {partial && ruleCoverage && (
+          <span
+            className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium align-middle"
+            style={{
+              color: 'rgb(var(--zh-warning))',
+              background: `color-mix(in srgb, rgb(var(--zh-warning)) 12%, transparent)`,
+            }}
+            title={t('page.domainHistory.partialHint', {
+              run: ruleCoverage.evaluated,
+              total: ruleCoverage.total,
+              gaps: ruleCoverage.unavailable,
+              defaultValue: '覆盖 {{run}}/{{total}}，{{gaps}} 项未检测',
+            })}
+            data-testid={`domain-history-partial-${index}`}
+          >
+            {t('page.domainHistory.partial', { defaultValue: '部分' })}
+          </span>
+        )}
       </td>
       <td className="px-5 py-3 text-sm text-zh-ink whitespace-nowrap">{record.total}</td>
       <td

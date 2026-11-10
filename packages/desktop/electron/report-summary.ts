@@ -13,6 +13,7 @@ import { buildHealthDimensions, isPenaltyExemptRuleId, SCORE_VERSION } from '@zh
 import type { GuardCheckLike, GuardReportLike, InspectIssueLike } from '@zh/scoring';
 import type { GuardReportRecord } from '@zh/guard';
 import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics';
+import type { RuleCoverage } from './zh-diagnostics-types';
 import type { DashboardState } from './ipc/dashboard-state';
 
 /**
@@ -118,6 +119,11 @@ export interface HealthInputs {
    * quality 覆盖（R5 §3.2）。
    */
   qualityCovered: boolean;
+  /**
+   * 本轮规则执行账（R6，仅 inspect 快照携带）。
+   * 缺省 = 旧快照没有规则账（覆盖未知），不判 partial。
+   */
+  inspectRuleCoverage?: RuleCoverage;
   /** 项目 ESLOC（S2 密度归一化分母）。来自 inspect 快照落盘时算好的值，与落盘出分同口径 */
   esloc?: number;
   /** 扩展域数据（secrets/deps/techdebt/refactor/performance/garbage/sentinel/backup） */
@@ -155,6 +161,8 @@ export type QualityFastPathScore = {
   version?: number;
   generatedAt: string;
   previousScore?: { score: number; generatedAt: string };
+  /** 规则级覆盖（R6）：缺省 = 旧快照没有规则账（覆盖未知） */
+  coverage?: { run: number; total: number; complete: boolean };
 };
 
 /**
@@ -255,6 +263,9 @@ export async function assembleHealthInputs(
     // quality 维的覆盖判定只看 inspect 快照：security/deps 条目并入只是为了让它们
     // 各自的维度计分；performance 是独立计分类，不代表质量域跑过（R5 §3.2）。
     qualityCovered: inspectSnapshot !== null,
+    ...(inspectSnapshot?.ruleCoverage
+      ? { inspectRuleCoverage: inspectSnapshot.ruleCoverage }
+      : {}),
     esloc: inspectSnapshot?.esloc,
     extras,
     timestamps,

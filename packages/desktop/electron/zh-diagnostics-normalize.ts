@@ -3,7 +3,7 @@ import type { GuardReport } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
-import type { PipelineReport } from '@zh/pipeline';
+import type { PipelineReport, RuleCoverage } from '@zh/pipeline';
 import type { DiagnosticEntry, DiagnosticSeverity } from './zh-diagnostics-types';
 
 // ─── 归一化：PipelineReport → DiagnosticEntry[] ────────────────────────
@@ -119,6 +119,43 @@ export function normalizeInspectSource(
     source: 'inspect' as const,
     fingerprint: issue.fingerprint,
   }));
+}
+
+/**
+ * 从 inspect 报告提取规则执行账（R6）。
+ *
+ * 以 `evaluations` 逐条计数为准，不直接信 `summary.passed` 等汇总字段：
+ * 分档之和对不上 `total` 时，差额并入 `unavailable`（少算的规则也是没跑）。
+ * 旧版 `InspectionReport`（issues 形态）没有规则账 → 返回 undefined（覆盖未知），
+ * 绝不把「没有账」冒充成「全覆盖」。
+ */
+export function extractInspectRuleCoverage(
+  inspect: InspectionReport | RuleEngineReport,
+): RuleCoverage | undefined {
+  if (!('evaluations' in inspect)) return undefined;
+  const evaluations = inspect.evaluations ?? [];
+  let evaluated = 0;
+  let unavailable = 0;
+  let notApplicable = 0;
+  for (const evaluation of evaluations) {
+    if (evaluation.status === 'passed' || evaluation.status === 'failed') {
+      evaluated += 1;
+      if (evaluation.applicability === 'not-applicable') notApplicable += 1;
+    } else {
+      // error（引擎内部出错）与 skipped（工具不可用）都是「没跑」，不是「通过了」
+      unavailable += 1;
+    }
+  }
+  const declaredTotal = Number.isFinite(inspect.total) ? inspect.total : evaluations.length;
+  const total = Math.max(declaredTotal, evaluations.length);
+  unavailable += Math.max(0, total - evaluated - unavailable);
+  return {
+    total,
+    evaluated,
+    unavailable,
+    notApplicable,
+    complete: unavailable === 0,
+  };
 }
 
 function normalizeRuleEngine(

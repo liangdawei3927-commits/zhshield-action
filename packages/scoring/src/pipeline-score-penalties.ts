@@ -65,6 +65,17 @@ export interface InspectionReportLike {
    * quality（没巡检 ≠ 质量满分，《07》A2 / spec C）。
    */
   covered?: boolean;
+  /**
+   * 本轮规则执行账（R6；与 @zh/pipeline 的 `RuleCoverage` 同形）。
+   *
+   * 引擎层不跨包 import pipeline 类型。缺省 = 旧报告没有规则账 → 覆盖未知，
+   * 不判 partial（既不能把「没记账」冒充成「全覆盖」，也不能冒充成「部分」）。
+   */
+  ruleCoverage?: {
+    total: number;
+    evaluated: number;
+    unavailable: number;
+  };
 }
 
 /**

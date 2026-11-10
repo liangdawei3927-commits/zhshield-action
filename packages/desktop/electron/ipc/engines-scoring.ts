@@ -125,7 +125,14 @@ export function buildDimensionsFromInputs(
   return buildHealthDimensions({
     guard: inputs.guard,
     inspect: inputs.inspectIssues
-      ? { issues: inputs.inspectIssues, esloc: inputs.esloc, covered: inputs.qualityCovered }
+      ? {
+          issues: inputs.inspectIssues,
+          esloc: inputs.esloc,
+          covered: inputs.qualityCovered,
+          ...(inputs.inspectRuleCoverage
+            ? { ruleCoverage: inputs.inspectRuleCoverage }
+            : {}),
+        }
       : null,
     projectRoot: projectPath,
     profile,

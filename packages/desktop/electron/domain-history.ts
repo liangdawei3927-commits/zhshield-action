@@ -28,7 +28,7 @@
 import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { DiagnosticEntry } from './zh-diagnostics-types';
+import type { DiagnosticEntry, RuleCoverage } from './zh-diagnostics-types';
 
 /** 每域保留的摘要条数（约 10 次/天 → 20 天） */
 export const HISTORY_LIMIT = 200;
@@ -76,6 +76,8 @@ export interface DomainScanRecord {
   sameAs?: string;
   /** 扫描口径（文件数 / 跳过数），缺失表示该域不提供 */
   coverage?: { files?: number; skipped?: number };
+  /** 本轮规则执行账（R6，仅 inspect）；缺省 = 旧记录/该域不提供 */
+  ruleCoverage?: RuleCoverage;
   /** L3 明细 blob 名（不含路径与扩展名）；null = 本次未保存明细 */
   blob?: string | null;
   /**
@@ -160,6 +162,7 @@ export function buildRecordFromFingerprints(input: {
   scoreVersion?: number;
   esloc?: number;
   coverage?: { files?: number; skipped?: number };
+  ruleCoverage?: RuleCoverage;
   severityApplicable?: boolean;
 }): DomainScanRecord {
   const fingerprints = [...input.fingerprints];
@@ -181,6 +184,7 @@ export function buildRecordFromFingerprints(input: {
     fingerprintsHash,
     fingerprints,
     ...(input.coverage ? { coverage: input.coverage } : {}),
+    ...(input.ruleCoverage ? { ruleCoverage: input.ruleCoverage } : {}),
   };
 }
 
@@ -195,6 +199,7 @@ export function buildScanRecord(input: {
   scoreVersion?: number;
   esloc?: number;
   coverage?: { files?: number; skipped?: number };
+  ruleCoverage?: RuleCoverage;
 }): DomainScanRecord {
   const fingerprints = input.issues
     .map((entry) => normalizeFingerprint(entry.fingerprint, input.projectPath))
@@ -212,6 +217,7 @@ export function buildScanRecord(input: {
     ...(input.scoreVersion === undefined ? {} : { scoreVersion: input.scoreVersion }),
     ...(input.esloc === undefined ? {} : { esloc: input.esloc }),
     ...(input.coverage ? { coverage: input.coverage } : {}),
+    ...(input.ruleCoverage ? { ruleCoverage: input.ruleCoverage } : {}),
   });
 }
 

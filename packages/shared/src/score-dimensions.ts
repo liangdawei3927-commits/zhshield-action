@@ -70,3 +70,19 @@ export function isScoredDimension(value: unknown): value is ScoreDimension {
     typeof value === 'string' && (SCORED_DIMENSIONS as readonly string[]).includes(value)
   );
 }
+
+/**
+ * 规则级覆盖（R6）：某计分维本轮的规则执行率。
+ *
+ * `run` = 已求值规则数（含 not-applicable），`total` = 计划规则数。
+ * `complete=false` 表示本维内部有规则没跑：分数只是「已检测部分均分」，
+ * 不出等级；总分 `complete` 随之为 false（契约 C4）。
+ *
+ * 唯一的类型定义：pipeline 快照、评分维度、主进程返回值与渲染层共用，
+ * 不允许各写一份内联对象（会漂移成三套口径）。
+ */
+export interface DimensionCoverage {
+  run: number;
+  total: number;
+  complete: boolean;
+}

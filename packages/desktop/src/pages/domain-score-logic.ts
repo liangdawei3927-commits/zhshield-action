@@ -1,6 +1,6 @@
 import { t } from '@zh/i18n';
 import { dimensionView, scoreFreshness } from './reports-logic';
-import type { ScoreDimension } from '@zh/shared';
+import type { DimensionCoverage, ScoreDimension } from '@zh/shared';
 
 /**
  * 分类页「评分」卡的展示视图（纯函数，供 DomainScoreCard 消费）。
@@ -22,6 +22,8 @@ export interface DomainScoreView {
   ageHours: number;
   /** 上一轮检查的分数（实时快照携带对比基线时才有；用于「上次 → 本次」行） */
   previousScore?: number;
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 覆盖未知（旧快照/该维不定义） */
+  coverage?: DimensionCoverage;
 }
 
 const MUTED = 'rgb(var(--zh-muted))';
@@ -38,6 +40,8 @@ export interface DomainScoreViewParams {
   tr?: typeof t;
   /** 上一轮检查的分数（用于「上次 → 本次」行） */
   previousScore?: number;
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 覆盖未知 */
+  coverage?: DimensionCoverage;
 }
 
 /**
@@ -49,6 +53,7 @@ export function domainScoreView({
   now = Date.now(),
   tr = t,
   previousScore,
+  coverage,
 }: DomainScoreViewParams): DomainScoreView {
   if (!dim) {
     return {
@@ -77,16 +82,26 @@ export function domainScoreView({
     label: v.label,
     ageHours: f.ageHours,
     ...(typeof previousScore === 'number' ? { previousScore } : {}),
+    ...(coverage ? { coverage } : {}),
   };
 }
 
 /** 从汇总数据中取出指定维度的条目（找不到返回 undefined，交由 domainScoreView 兜底） */
 export function findDimension(
   data: {
-    dimensions: Array<{ name: string; score: number; status?: 'scored' | 'not-run' }>;
+    dimensions: Array<{
+      name: string;
+      score: number;
+      status?: 'scored' | 'not-run';
+      coverage?: DimensionCoverage;
+    }>;
   } | null,
   dimension: ScoreDimension,
-): { score: number; status?: 'scored' | 'not-run' } | undefined {
+): {
+  score: number;
+  status?: 'scored' | 'not-run';
+  coverage?: DimensionCoverage;
+} | undefined {
   return data?.dimensions.find((d) => d.name === dimension);
 }
 
@@ -124,14 +139,22 @@ export interface LiveScore {
   generatedAt: string;
   /** 上一轮检查的分数（快照覆盖写前抢救出的对比基线；旧格式快照无此字段） */
   previousScore?: { score: number; generatedAt: string };
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 旧快照没有规则账（覆盖未知） */
+  coverage?: DimensionCoverage;
 }
 
 /** pickDomainScore 的返回：喂给 domainScoreView 的维度条目 + 数据时间 */
 export interface PickedScore {
-  dim: { score: number; status?: 'scored' | 'not-run' } | undefined;
+  dim: {
+    score: number;
+    status?: 'scored' | 'not-run';
+    coverage?: DimensionCoverage;
+  } | undefined;
   generatedAt: string | undefined;
   /** 上一轮分数（仅 live 来源携带；汇总数据无轮次对比基线） */
   previousScore?: number;
+  /** 规则级覆盖（R6，仅 quality）；缺省 = 覆盖未知 */
+  coverage?: DimensionCoverage;
 }
 
 /**
@@ -146,7 +169,12 @@ export interface PickedScore {
 export function pickDomainScore(
   live: LiveScore | null,
   summary: {
-    dimensions: Array<{ name: string; score: number; status?: 'scored' | 'not-run' }>;
+    dimensions: Array<{
+      name: string;
+      score: number;
+      status?: 'scored' | 'not-run';
+      coverage?: DimensionCoverage;
+    }>;
     timestamp?: string;
   } | null,
   dimension: ScoreDimension,
@@ -158,7 +186,13 @@ export function pickDomainScore(
       ...(typeof live.previousScore?.score === 'number'
         ? { previousScore: live.previousScore.score }
         : {}),
+      ...(live.coverage ? { coverage: live.coverage } : {}),
     };
   }
-  return { dim: findDimension(summary, dimension), generatedAt: summary?.timestamp };
+  const dim = findDimension(summary, dimension);
+  return {
+    dim,
+    generatedAt: summary?.timestamp,
+    ...(dim?.coverage ? { coverage: dim.coverage } : {}),
+  };
 }

@@ -367,12 +367,23 @@ function scoreInspectBased(params: {
   const issueCount = matched.length;
   const withSecrets = applySecurityPenalty(penalty, issueCount, extras.secrets);
   const withDeps = applyDepsPenalty(withSecrets.penalty, withSecrets.issueCount, extras.deps);
+  // R6：quality 维带规则级覆盖。未检测的规则既不能当 0 分（不改分数），
+  // 也不能当满分（页面不得再出等级）——由渲染层按 coverage 改口径。
+  const coverage =
+    name === 'quality' && inspect?.ruleCoverage
+      ? {
+          run: inspect.ruleCoverage.evaluated,
+          total: inspect.ruleCoverage.total,
+          complete: inspect.ruleCoverage.unavailable === 0,
+        }
+      : undefined;
   return {
     name,
     weight,
     score: toDimensionScore(withDeps.penalty),
     issues: withDeps.issueCount,
     status: 'scored',
+    ...(coverage ? { coverage } : {}),
   };
 }
 

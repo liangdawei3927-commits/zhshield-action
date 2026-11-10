@@ -100,6 +100,30 @@ function FullDomainScore({
   );
 }
 
+type CoverageState = 'none' | 'complete' | 'partial' | 'unknown';
+
+/**
+ * 覆盖状态判定（纯函数，独立于渲染，便于把复杂度挡在组件外）。
+ *
+ * 显式入参（本次报告算出的覆盖）优先于评分链路下发的 view.coverage：
+ * 详情页手里就有完整的 checks，不必等落盘分回读。
+ * 旧快照没有规则账：quality 维标「覆盖未知」，其他维按「不适用」保持原样。
+ */
+function resolveCoverageState(
+  hasScore: boolean,
+  coverage: ScoreCardCoverage | undefined,
+  dimension: ScoreDimension,
+): CoverageState {
+  if (!hasScore) return 'none';
+  if (!coverage) return dimension === 'quality' ? 'unknown' : 'none';
+  return coverage.run < coverage.total ? 'partial' : 'complete';
+}
+
+const COVERAGE_LABEL_KEY: Record<'partial' | 'unknown', string> = {
+  partial: 'page.domainScore.partialLabel',
+  unknown: 'page.domainScore.coverageUnknown',
+};
+
 function DomainScoreBadges({
   view,
   dimension,
@@ -115,13 +139,15 @@ function DomainScoreBadges({
   /** R6：规则级覆盖；run < total 时分数语义降级为「已检测部分均分」，不显示等级 */
   coverage?: ScoreCardCoverage;
 }) {
-  // R6 Phase 1：只要本次有规则没跑，分数就只能叫「已检测部分均分」。
+  // R6：只要本次有规则没跑，分数就只能叫「已检测部分均分」。
   // 98 与「12/20 通过」并存时，98 的真实语义是「查过的 13 项里几乎没问题」，
   // 不是「项目健康 98 分」——等级与「优秀」必须让位给覆盖事实（契约 C4）。
   const hasScore = view.kind === 'scored' || view.kind === 'stale';
-  const partial = hasScore && coverage !== undefined && coverage.run < coverage.total;
-  const displayColor = partial ? 'rgb(var(--zh-warning))' : view.color;
-  const displayLabel = partial ? t('page.domainScore.partialLabel') : view.label;
+  const effectiveCoverage = coverage ?? view.coverage;
+  const coverageState = resolveCoverageState(hasScore, effectiveCoverage, dimension);
+  const degraded = coverageState === 'partial' || coverageState === 'unknown';
+  const displayColor = degraded ? 'rgb(var(--zh-warning))' : view.color;
+  const displayLabel = degraded ? t(COVERAGE_LABEL_KEY[coverageState]) : view.label;
   return (
     <>
       <div className="text-xs text-zh-muted shrink-0">{t('page.domainScore.title')}</div>
@@ -137,44 +163,70 @@ function DomainScoreBadges({
       >
         {displayLabel}
       </span>
-      {coverage && hasScore && (
+      {(coverageState === 'partial' || coverageState === 'complete') && effectiveCoverage && (
         <DomainCoverageBadge
           dimension={dimension}
-          coverage={coverage}
-          partial={partial}
+          coverage={effectiveCoverage}
+          partial={coverageState === 'partial'}
           t={t}
         />
       )}
       {showSources && view.kind !== 'no-data' && (
-        <span
-          className="text-[11px] text-zh-muted shrink-0"
-          data-testid={`domain-score-sources-${dimension}`}
-        >
-          {t('page.domainScore.sources', {
-            sources: dimensionSources(dimension).join(' + '),
-          })}
-        </span>
+        <DomainSourcesBadge dimension={dimension} t={t} />
       )}
       {typeof view.previousScore === 'number' && (
-        <span
-          className="text-xs shrink-0"
-          style={{
-            color:
-              Number(view.scoreText) > view.previousScore
-                ? 'rgb(var(--zh-success))'
-                : Number(view.scoreText) < view.previousScore
-                  ? 'rgb(var(--zh-danger))'
-                  : 'rgb(var(--zh-muted))',
-          }}
-          data-testid={`domain-score-prev-${dimension}`}
-        >
-          {t('page.domainScore.scoreDelta', {
-            prev: view.previousScore,
-            now: view.scoreText,
-          })}
-        </span>
+        <DomainPrevScoreBadge view={view} dimension={dimension} t={t} />
       )}
     </>
+  );
+}
+
+/** P1-6：完整模式的数据来源标注（inline 模式不渲染以免挤占） */
+function DomainSourcesBadge({
+  dimension,
+  t,
+}: {
+  dimension: ScoreDimension;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <span
+      className="text-[11px] text-zh-muted shrink-0"
+      data-testid={`domain-score-sources-${dimension}`}
+    >
+      {t('page.domainScore.sources', {
+        sources: dimensionSources(dimension).join(' + '),
+      })}
+    </span>
+  );
+}
+
+/** 上次 → 本次分数对比：涨绿跌红，持平中性 */
+function DomainPrevScoreBadge({
+  view,
+  dimension,
+  t,
+}: {
+  view: DomainScoreView;
+  dimension: ScoreDimension;
+  t: ReturnType<typeof useT>;
+}) {
+  const previous = view.previousScore;
+  if (typeof previous !== 'number') return null;
+  const color =
+    Number(view.scoreText) > previous
+      ? 'rgb(var(--zh-success))'
+      : Number(view.scoreText) < previous
+        ? 'rgb(var(--zh-danger))'
+        : 'rgb(var(--zh-muted))';
+  return (
+    <span
+      className="text-xs shrink-0"
+      style={{ color }}
+      data-testid={`domain-score-prev-${dimension}`}
+    >
+      {t('page.domainScore.scoreDelta', { prev: previous, now: view.scoreText })}
+    </span>
   );
 }
 

@@ -93,6 +93,17 @@ function buildDetail(ev: SerializedRuleEvaluation): string {
     if (ev.violations.length > 3) lines.push(`… 等 ${ev.violations.length} 条违规`);
     return lines.join('；');
   }
+  // R7：未检测不能退回规则描述——描述回答「这条规则查什么」，不回答「为什么没查」。
+  // 三种旁路状态各给明确口径，用户才知道是该装工具、修配置，还是接受画像裁剪。
+  if (ev.applicability === 'not-applicable') {
+    return ev.message ? `不适用：${ev.message}` : '不适用：本项目没有该规则的检测对象';
+  }
+  if (ev.status === 'skipped') {
+    return ev.message ? `未执行：${ev.message}` : '未执行：工具不可用或不在本项目适用范围内';
+  }
+  if (ev.status === 'error') {
+    return ev.message ? `执行失败：${ev.message}` : '执行失败：规则引擎内部错误';
+  }
   if (ev.message) return ev.message;
   return ev.rule.description ?? ev.rule.name;
 }
@@ -129,8 +140,27 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
   // warn 当前不产生（mapStatus 只出 pass/fail/attention/notApplicable），保留按状态统计以维持
   // total = passed + warnings + failures + notApplicable 不变量与既有 toInspectionReportData 语义对齐。
   const warningCount = checks.filter((c) => c.status === 'warn' || c.status === 'attention').length;
+  const evaluatedCount = checks.filter((c) => c.status !== 'attention').length;
+  const unavailableCount = checks.filter((c) => c.status === 'attention').length;
 
   return {
+    // R7：规则账随实时报告一起返回，与 checks 同源（同一批 evaluations 映射），
+    // 页面据此不必再从 items 反推覆盖度，历史与实时也共用同一形状。
+    ruleCoverage: {
+      total: checks.length,
+      evaluated: evaluatedCount,
+      unavailable: unavailableCount,
+      notApplicable: notApplicableCount,
+      complete: unavailableCount === 0,
+    },
+    ruleLedger: raw.evaluations.map((ev) => ({
+      ruleId: ev.rule.id,
+      name: ev.rule.name,
+      status: ev.status,
+      ...(ev.applicability ? { applicability: ev.applicability } : {}),
+      ...(ev.message ? { reason: ev.message } : {}),
+      durationMs: ev.durationMs ?? 0,
+    })),
     summary: {
       total: checks.length,
       passed: passedCount,

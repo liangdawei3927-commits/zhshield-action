@@ -238,6 +238,68 @@ describe('toInspectionReportDataFromRuleEngine — 不适用（not-applicable）
   });
 });
 
+describe('toInspectionReportDataFromRuleEngine — R7 未检测原因口径', () => {
+  const gapReport = {
+    total: 2,
+    passed: 0,
+    failed: 0,
+    errors: 1,
+    skipped: 1,
+    ok: false,
+    durationMs: 100,
+    timestamp: '2026-11-10T08:00:00.000Z',
+    evaluations: [
+      {
+        rule: { id: 'inspect.scan.semgrep', name: 'Semgrep', domain: 'inspect' },
+        status: 'skipped' as const,
+        message: 'semgrep 未安装或不在 PATH',
+      },
+      {
+        rule: { id: 'inspect.scan.eslint', name: 'ESLint', domain: 'inspect' },
+        status: 'error' as const,
+      },
+    ],
+  };
+
+  it('skipped → 「未执行」+ 工具自述原因，而不是规则描述', () => {
+    const data = toInspectionReportDataFromRuleEngine(gapReport);
+    const semgrep = data!.checks.find((c) => c.name === 'Semgrep');
+    expect(semgrep?.status).toBe('attention');
+    expect(semgrep?.detail).toContain('未执行');
+    expect(semgrep?.detail).toContain('semgrep 未安装');
+  });
+
+  it('error 无 message → 「执行失败」，不退回规则描述', () => {
+    const data = toInspectionReportDataFromRuleEngine(gapReport);
+    const eslint = data!.checks.find((c) => c.name === 'ESLint');
+    expect(eslint?.status).toBe('attention');
+    expect(eslint?.detail).toContain('执行失败');
+    expect(eslint?.detail).toContain('规则引擎内部错误');
+  });
+
+  it('ruleCoverage 随实时报告返回，attention 不计入 evaluated', () => {
+    const data = toInspectionReportDataFromRuleEngine(gapReport);
+    expect(data!.ruleCoverage).toEqual({
+      total: 2,
+      evaluated: 0,
+      unavailable: 2,
+      notApplicable: 0,
+      complete: false,
+    });
+  });
+
+  it('ruleLedger 逐条保留 ruleId / status / reason', () => {
+    const data = toInspectionReportDataFromRuleEngine(gapReport);
+    expect(data!.ruleLedger?.[0]).toMatchObject({
+      ruleId: 'inspect.scan.semgrep',
+      name: 'Semgrep',
+      status: 'skipped',
+      reason: 'semgrep 未安装或不在 PATH',
+      durationMs: 0,
+    });
+  });
+});
+
 describe('toInspectionReportDataFromRuleEngine — 项目级指标标记', () => {
   it('阈值规则（违规 file 为空）标记 projectMetric，供 AI 修复队列跳过', () => {
     const thresholdReport = {

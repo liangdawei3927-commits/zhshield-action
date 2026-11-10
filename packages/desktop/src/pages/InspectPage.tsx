@@ -168,12 +168,14 @@ function InspectReportView({
   // 不用 0 冒充（0 会读成「一项都没通过」，是谎报）。
   const isSnapshot = report.coverage === 'issues-only';
   // R6 Phase 1：规则级覆盖 —— 未检测项既不算通过也不算问题，但必须让分数改名。
-  // run 含「不适用」（规则跑了、只是本项目没有可检对象），故用 total - attention，
-  // 不能用通过数（否则 12/20 会被误写成覆盖 12/20）。
+  // R7：实时报告已自带 ruleCoverage（与 checks 同源），优先用它；旧报告/旧快照
+  // 没有该字段时再按 items 反推（run 含「不适用」，故用 total - attention）。
   const coverage =
     isSnapshot || items.length === 0
       ? undefined
-      : { run: items.length - attentionChecks.length, total: items.length };
+      : report.ruleCoverage
+        ? { run: report.ruleCoverage.evaluated, total: report.ruleCoverage.total }
+        : { run: items.length - attentionChecks.length, total: items.length };
 
   return (
     <DomainReportShell

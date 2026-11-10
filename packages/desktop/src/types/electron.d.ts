@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import type { InspectRuleReport } from '@zh/pipeline';
+
 /**
  * 同步健康度快照（主进程 SopSyncScheduler 产出）
  *
@@ -79,7 +81,7 @@ export interface GuardReportData {
 }
 
 /** @zh/inspect InspectionReport shape (serializable) */
-export interface InspectionReportData {
+export interface InspectionReportData extends InspectRuleReport {
   summary: {
     total: number;
     passed: number;

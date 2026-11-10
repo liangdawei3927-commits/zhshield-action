@@ -93,6 +93,7 @@ function buildInspectStats({
   /** 历史快照（仅问题项）：通过项未落盘，通过数未知 → 显示「—」而非 0 */
   isSnapshot?: boolean;
 }): ReportStatCard[] {
+  const issueChecks = selectIssueChecks(items);
   return [
     { key: 'total', label: t('page.inspect.total'), value: isSnapshot ? '—' : items.length },
     {
@@ -110,18 +111,23 @@ function buildInspectStats({
             ),
           }),
     },
-    {
-      key: 'issues',
-      label: t('page.inspect.issues'),
-      value: selectIssueChecks(items).length,
-      color: 'rgb(var(--zh-danger))',
-      detail: checkDetail(
-        selectIssueChecks(items),
-        copy,
-        t('page.inspect.issuesHint'),
-        { label: t('page.inspect.issues'), tone: 'fail' },
-      ),
-    },
+    // 问题分类为 0 时不渲染卡片：空卡片点开只有一行说明、没有明细，反而像故障。
+    ...(issueChecks.length > 0
+      ? [
+          {
+            key: 'issues',
+            label: t('page.inspect.issues'),
+            value: issueChecks.length,
+            color: 'rgb(var(--zh-danger))',
+            detail: checkDetail(
+              issueChecks,
+              copy,
+              t('page.inspect.issuesHint'),
+              { label: t('page.inspect.issues'), tone: 'fail' },
+            ),
+          },
+        ]
+      : []),
     ...optionalStatCard(
       attentionChecks,
       {

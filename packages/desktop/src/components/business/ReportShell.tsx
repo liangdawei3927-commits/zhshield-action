@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
 import type { ScoreDimension } from '@zh/shared';
 import { DomainScoreCard, type ScoreCardCoverage } from '../DomainScoreCard';
@@ -203,6 +203,14 @@ export function ReportShell({
 }: ReportShellProps) {
   const t = useT();
   const [expandedStat, setExpandedStat] = useState<ReportStatCard | null>(null);
+  // 分类为 0 时卡片会消失：已展开的那张必须同步清掉，否则会留下空明细面板。
+  const visibleStat =
+    expandedStat && stats?.some((s) => s.key === expandedStat.key) ? expandedStat : null;
+  useEffect(() => {
+    if (expandedStat && !stats?.some((s) => s.key === expandedStat.key)) {
+      setExpandedStat(null);
+    }
+  }, [expandedStat, stats]);
   const backHomeLabel = backHomeTitle ?? t('page.reportShell.backHome');
 
   return (
@@ -228,10 +236,10 @@ export function ReportShell({
         />
         <ReportStatsRow
           stats={stats}
-          expandedKey={expandedStat?.key ?? null}
+          expandedKey={visibleStat?.key ?? null}
           onToggle={(next) => setExpandedStat(next)}
         />
-        <ReportStatDetail stat={expandedStat} />
+        <ReportStatDetail stat={visibleStat} />
         {children}
         <DomainHistoryPanel projectPath={projectPath} domain={historyDomain} />
       </div>

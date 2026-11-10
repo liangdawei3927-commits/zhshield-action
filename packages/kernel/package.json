@@ -8,6 +8,7 @@
     "build": "tsc && node scripts/copy-sop-rules.cjs",
     "dev": "tsc --watch",
     "test": "vitest run",
+    "verify:rule-reachability": "vitest run src/__tests__/rule-reachability.test.ts",
     "test:watch": "vitest",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "lint": "eslint src --max-warnings 50"

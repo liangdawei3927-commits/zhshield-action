@@ -168,6 +168,8 @@ export async function runSecurityDomain(ctx: DomainExecutionContext): Promise<Do
       skipped: sop.skipped ?? 0,
       degraded: sop.degraded ?? 0,
     },
+    // 逐条明细：页面要能回答「哪 6 条、为什么」，只给数字等于盲修。
+    ruleLedger: sop.ledger,
   };
 
   return buildSecurityExecution(report, sop);

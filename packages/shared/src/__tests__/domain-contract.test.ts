@@ -46,6 +46,7 @@ describe('C1 单源归属（规范 §四 O1–O10）', () => {
     ['guard.scan.official.sensitive-info', 'security', 'O3 密钥/敏感信息唯一归安全'],
     ['inspect.scan.official.semgrep', 'security', 'O9 代码漏洞唯一归安全'],
     ['inspect.scan.official.dependency-audit', 'deps', 'O10 依赖审计唯一归依赖管家'],
+    ['inspect.scan.external.dependency-audit', 'deps', 'O10 依赖审计唯一归依赖管家（external 变体）'],
     ['deps.scan.official.unused-dependency', 'garbage', 'O7 未使用依赖唯一归垃圾清理'],
     ['performance.scan.official.nested-loop', 'performance', 'O4 运行时反模式归性能域'],
     ['performance.runtime.nested-loop', 'performance', 'O4 运行时反模式归性能域'],

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 1d2196a5505479cf
+// @zh-src-hash: 44595e3982f5275e
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -5859,7 +5859,8 @@ var init_zh_Hans = __esm({
           },
           groupTitle: {},
           issues: "\u95EE\u9898",
-          issuesHint: "\u8FD9\u4E9B\u68C0\u67E5\u672A\u8FBE\u6807\uFF0C\u4F1A\u62C9\u4F4E\u8BC4\u5206\uFF1B\u70B9\u5F00\u53EF\u590D\u5236\u5230 AI \u4FEE\u590D",
+          issuesHint: "\u8FD9\u4E9B\u68C0\u67E5\u672A\u8FBE\u6807\uFF0C\u4F1A\u62C9\u4F4E\u8BC4\u5206\uFF1B\u53EF\u590D\u5236\u5230 AI \u4FEE\u590D",
+          detailHintLabel: "\u8BF4\u660E",
           issuesImpact: "\u672A\u8FBE\u6807\uFF0C\u4F1A\u62C9\u4F4E\u8BC4\u5206",
           passed: "\u901A\u8FC7",
           total: "\u68C0\u67E5\u9879",
@@ -8181,7 +8182,8 @@ var init_zh_Hant = __esm({
           },
           groupTitle: {},
           issues: "\u554F\u984C",
-          issuesHint: "\u9019\u4E9B\u6AA2\u67E5\u672A\u9054\u6A19\uFF0C\u6703\u62C9\u4F4E\u8A55\u5206\uFF1B\u9EDE\u958B\u53EF\u8907\u88FD\u5230 AI \u4FEE\u5FA9",
+          issuesHint: "\u9019\u4E9B\u6AA2\u67E5\u672A\u9054\u6A19\uFF0C\u6703\u62C9\u4F4E\u8A55\u5206\uFF1B\u53EF\u8907\u88FD\u5230 AI \u4FEE\u5FA9",
+          detailHintLabel: "\u8AAA\u660E",
           issuesImpact: "\u672A\u9054\u6A19\uFF0C\u6703\u62C9\u4F4E\u8A55\u5206",
           passed: "\u901A\u904E",
           total: "\u6AA2\u67E5\u9805",
@@ -10481,7 +10483,8 @@ var init_en = __esm({
           },
           groupTitle: {},
           issues: "Issues",
-          issuesHint: "These checks failed and lower the score; open to copy them to AI for fixes",
+          issuesHint: "These checks failed and lower the score; copy them to AI for fixes",
+          detailHintLabel: "Note",
           issuesImpact: "Failed \u2014 lowers score",
           passed: "Passed",
           total: "Checks",
@@ -12792,7 +12795,8 @@ var init_ko = __esm({
           },
           groupTitle: {},
           issues: "\uBB38\uC81C",
-          issuesHint: "\uC774 \uAC80\uC0AC\uB4E4\uC740 \uBBF8\uB2EC\uB418\uC5B4 \uC810\uC218\uB97C \uB0AE\uCDA5\uB2C8\uB2E4. \uC5F4\uC5B4\uC11C AI \uC218\uC815\uC73C\uB85C \uBCF5\uC0AC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
+          issuesHint: "\uC774 \uAC80\uC0AC\uB4E4\uC740 \uBBF8\uB2EC\uB418\uC5B4 \uC810\uC218\uB97C \uB0AE\uCDA5\uB2C8\uB2E4. AI \uC218\uC815\uC73C\uB85C \uBCF5\uC0AC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
+          detailHintLabel: "\uC124\uBA85",
           issuesImpact: "\uBBF8\uB2EC \u2014 \uC810\uC218 \uD558\uB77D",
           passed: "\uD1B5\uACFC",
           total: "\uAC80\uC0AC \uD56D\uBAA9",
@@ -15103,7 +15107,8 @@ var init_ja = __esm({
           },
           groupTitle: {},
           issues: "\u554F\u984C",
-          issuesHint: "\u3053\u308C\u3089\u306E\u30C1\u30A7\u30C3\u30AF\u306F\u672A\u9054\u3067\u3001\u30B9\u30B3\u30A2\u3092\u4E0B\u3052\u307E\u3059\u3002\u958B\u3044\u3066 AI \u4FEE\u6B63\u3078\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059",
+          issuesHint: "\u3053\u308C\u3089\u306E\u30C1\u30A7\u30C3\u30AF\u306F\u672A\u9054\u3067\u3001\u30B9\u30B3\u30A2\u3092\u4E0B\u3052\u307E\u3059\u3002AI \u4FEE\u6B63\u3078\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059",
+          detailHintLabel: "\u8AAC\u660E",
           issuesImpact: "\u672A\u9054 \u2014 \u30B9\u30B3\u30A2\u304C\u4E0B\u304C\u308B",
           passed: "\u5408\u683C",
           total: "\u691C\u67FB\u9805\u76EE",
@@ -16521,6 +16526,16 @@ var init_ownership_registry = __esm({
         match: { kind: "exact", ruleId: "inspect.scan.official.dependency-audit" },
         owner: "deps",
         rationale: "O10 \u4F9D\u8D56\u5BA1\u8BA1\u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u4F53\u68C0\u6539\u53EA\u8BFB",
+        previousOwner: "inspect"
+      },
+      // external 变体：云端规则集里同一件事还有 `external.dependency-audit` 形态。
+      // 只登记 official 会漏掉它 —— 2026-11-11 实测该规则在体检域每轮必 degraded
+      // （npm-audit / trivy / grype 均未注册适配器），而按 O10 它本该归 deps，
+      // 属「规则集里的事实死代码」而非环境故障（R7）。
+      {
+        match: { kind: "exact", ruleId: "inspect.scan.external.dependency-audit" },
+        owner: "deps",
+        rationale: "O10 \u4F9D\u8D56\u5BA1\u8BA1\u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u4F53\u68C0\u4FA7\u8BA9\u4F4D\uFF0C\u4E0D\u91CD\u590D\u8BC4\u4F30",
         previousOwner: "inspect"
       },
       {
@@ -503264,11 +503279,13 @@ var init_src6 = __esm({
 // ../pipeline/src/domains/security-sop.ts
 var security_sop_exports = {};
 __export(security_sop_exports, {
+  buildRuleChannelLedger: () => buildRuleChannelLedger,
   buildSecurityExecution: () => buildSecurityExecution,
   createSecurityEventForwarder: () => createSecurityEventForwarder,
   mergeVulnerabilityFindings: () => mergeVulnerabilityFindings,
   runSecuritySopChannel: () => runSecuritySopChannel,
-  sopViolationsToFindings: () => sopViolationsToFindings
+  sopViolationsToFindings: () => sopViolationsToFindings,
+  summarizeLedger: () => summarizeLedger
 });
 function mapSeverity2(severity) {
   switch (severity) {
@@ -503304,6 +503321,29 @@ function sopViolationsToFindings(report) {
   }
   return findings;
 }
+function buildRuleChannelLedger(report) {
+  return (report.evaluations ?? []).map((evaluation) => ({
+    ruleId: evaluation.rule.id,
+    name: evaluation.rule.name,
+    status: evaluation.status,
+    ...evaluation.degraded !== void 0 ? { degraded: evaluation.degraded } : {},
+    ...evaluation.applicability ? { applicability: evaluation.applicability } : {},
+    ...evaluation.message ? { reason: evaluation.message } : {},
+    durationMs: evaluation.durationMs
+  }));
+}
+function summarizeLedger(ledger) {
+  let skipped = 0;
+  let degraded = 0;
+  for (const entry of ledger) {
+    if (entry.status === "error" || entry.degraded === true) {
+      degraded += 1;
+    } else if (entry.status === "skipped") {
+      skipped += 1;
+    }
+  }
+  return { skipped, degraded };
+}
 function fingerprintOf(f) {
   return `${f.ruleId}:${f.file}:${f.line ?? 0}`;
 }
@@ -503313,6 +503353,7 @@ async function runSecuritySopChannel(ctx) {
       vulnerabilities: [],
       skipped: 0,
       degraded: 0,
+      ledger: [],
       ran: false,
       reason: "\u672A\u63D0\u4F9B PipelineRunner\uFF0C\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u672A\u6267\u884C\uFF08\u4EC5\u542F\u53D1\u5F0F\u901A\u9053\uFF09"
     };
@@ -503322,19 +503363,21 @@ async function runSecuritySopChannel(ctx) {
     const report = await ctx.runner.runSopInspect({
       domains: ["security"]
     });
+    const ledger = buildRuleChannelLedger(report);
+    const counts = summarizeLedger(ledger);
     if (report.total === 0) {
       return {
         vulnerabilities: [],
-        skipped: report.skipped,
-        degraded: report.degraded ?? 0,
+        ...counts,
+        ledger,
         ran: false,
         reason: "\u65E0\u89C4\u5219\u53EF\u8BC4\u4F30\uFF08\u89C4\u5219\u96C6\u4E3A\u7A7A\uFF09\uFF0CSOP \u89C4\u5219\u901A\u9053\u672C\u6B21\u672A\u6267\u884C"
       };
     }
     return {
       vulnerabilities: sopViolationsToFindings(report),
-      skipped: report.skipped,
-      degraded: report.degraded ?? 0,
+      ...counts,
+      ledger,
       ran: true
     };
   } catch (err) {
@@ -503342,6 +503385,7 @@ async function runSecuritySopChannel(ctx) {
       vulnerabilities: [],
       skipped: 0,
       degraded: 0,
+      ledger: [],
       ran: false,
       reason: `\u5B89\u5168\u57DF SOP \u89C4\u5219\u901A\u9053\u5F02\u5E38\uFF1A${err instanceof Error ? err.message : String(err)}`
     };
@@ -510145,6 +510189,9 @@ function collectGuardViolations(result, rule) {
   return violations;
 }
 
+// ../kernel/src/runner/dispatch-tool-scan.ts
+init_src2();
+
 // ../kernel/src/runner/tool-audit.ts
 async function logToolExecutionAudit(auditLogger, tool, result, projectId) {
   if (!auditLogger) return;
@@ -510267,6 +510314,17 @@ async function evalToolDispatch(host, rule, instr, context) {
 function resolveToolAdapter(host, rule, instr) {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
+    const owner = resolveOwnerId(rule.id);
+    if (owner && owner !== rule.domain) {
+      return {
+        kind: "skipped",
+        result: skipEvaluation(
+          rule,
+          `\u89C4\u5219\u5F52 ${owner} \u57DF\u8D1F\u8D23\uFF08C3 \u552F\u4E00\u5F52\u5C5E\uFF09\uFF0C\u672C\u57DF\u4E0D\u91CD\u590D\u8BC4\u4F30`,
+          targetEngineOf(rule)
+        )
+      };
+    }
     return {
       kind: "skipped",
       result: skipEvaluation(
@@ -519748,7 +519806,9 @@ async function runSecurityDomain(ctx) {
       ran: sop.ran,
       skipped: sop.skipped ?? 0,
       degraded: sop.degraded ?? 0
-    }
+    },
+    // 逐条明细：页面要能回答「哪 6 条、为什么」，只给数字等于盲修。
+    ruleLedger: sop.ledger
   };
   return buildSecurityExecution2(report, sop);
 }

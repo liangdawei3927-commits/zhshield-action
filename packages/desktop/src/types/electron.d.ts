@@ -256,6 +256,20 @@ export interface SecurityScanReportData {
     skipped: number;
     degraded: number;
   };
+  /**
+   * R7：逐条规则账。只有计数时「6 条未能评估」既无法定位也无法判断该装工具还是清规则；
+   * `degraded === true` / `status === 'error'` 才是「没评估成」，`skipped` 未标 degraded
+   * 是「按项目前提跳过」——两者在页面上分桶展示，不混进同一条警示条。
+   */
+  ruleLedger?: Array<{
+    ruleId: string;
+    name: string;
+    status: 'passed' | 'failed' | 'skipped' | 'error';
+    degraded?: boolean;
+    applicability?: string;
+    reason?: string;
+    durationMs?: number;
+  }>;
   findings: Array<{
     id: string;
     title: string;

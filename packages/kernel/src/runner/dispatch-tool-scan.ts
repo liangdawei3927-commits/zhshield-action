@@ -1,3 +1,4 @@
+import { resolveOwnerId } from '@zh/shared';
 import type { Issue, ToolAdapter, ToolConfig, ToolResult, ToolScanOptions } from '@zh/shared';
 
 import type { SopRule } from '../sop/_meta/sop-types';
@@ -50,6 +51,22 @@ function resolveToolAdapter(
 ): AdapterResolution {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
+    // R7 / C3：规则归属其它域时，本域**不执行**它，也**不降级**——
+    // 降级是「本该由本域跑却没跑成」的语义；一条归 deps 的依赖审计规则在体检域
+    // 缺适配器，是**归属让位**，不是故障。标 degraded 会让每轮扫描固定产出一条
+    // 假降级，把真实降级淹成背景噪音，还会永久拉低本域覆盖率（R6 口径）。
+    // 该规则若真没跑成，由 Owner 域的报告负责留痕（C3：非 Owner 不重扫）。
+    const owner = resolveOwnerId(rule.id);
+    if (owner && owner !== rule.domain) {
+      return {
+        kind: 'skipped',
+        result: skipEvaluation(
+          rule,
+          `规则归 ${owner} 域负责（C3 唯一归属），本域不重复评估`,
+          targetEngineOf(rule),
+        ),
+      };
+    }
     return {
       kind: 'skipped',
       result: skipEvaluation(

@@ -69,6 +69,18 @@ export interface SecurityScanReportData {
   }>;
   /** 安全评分 0-100 */
   securityScore: number;
+  /** 规则通道求值账（R7）：只有计数时用户无法定位「哪条没跑、为什么」 */
+  ruleChannel?: { ran: boolean; skipped: number; degraded: number };
+  /** 逐条规则明细：页面据此分桶展示（degraded 黄 / skipped 中性） */
+  ruleLedger?: Array<{
+    ruleId: string;
+    name: string;
+    status: 'passed' | 'failed' | 'skipped' | 'error';
+    degraded?: boolean;
+    applicability?: string;
+    reason?: string;
+    durationMs?: number;
+  }>;
   metadata: { duration: number; timestamp: string };
 }
 
@@ -215,7 +227,11 @@ function getCoverageGap(
 }
 
 export function toSecurityScanReportData(
-  r: SecurityScanReport & { ruleChannel?: { ran: boolean; skipped: number; degraded: number } },
+  r: SecurityScanReport & {
+    ruleChannel?: { ran: boolean; skipped: number; degraded: number };
+    /** 逐条规则账（R7）：页面据此列出「哪条没跑、为什么」 */
+    ruleLedger?: SecurityScanReportData['ruleLedger'];
+  },
 ): SecurityScanReportData {
   return {
     summary: {
@@ -263,6 +279,8 @@ export function toSecurityScanReportData(
       : {}),
     // 规则通道求值账：degraded>0 表示有规则没能评估（≠ 该规则通过）
     ...(r.ruleChannel ? { ruleChannel: r.ruleChannel } : {}),
+    // R7：逐条明细透传 —— 只有计数时用户/维护者只能盲修（装工具还是清规则全靠猜）
+    ...(r.ruleLedger && r.ruleLedger.length > 0 ? { ruleLedger: r.ruleLedger } : {}),
     metadata: {
       duration: 0,
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),

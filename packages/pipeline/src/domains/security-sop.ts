@@ -41,13 +41,41 @@ import type { EventEmitter, GovernanceEvent } from '@zh/shared';
 
 import type { DomainExecutionContext, DomainExecution } from './types';
 
+/**
+ * 单条规则的求值账（安全页据此列出「哪条没跑、为什么」）。
+ *
+ * 与 inspect 的 `RuleLedgerEntry` **同名字段、同语义**：两域共用一套口径，
+ * 否则会出现「体检说 7 项未检测、安全说 6 条未评估，条数却对不上」的第二份事实。
+ *
+ * `degraded=true` 与 `status='error'` 才是「没评估成」；`skipped` 且未标 degraded
+ * 是「按项目前提跳过」（如本仓库无 package.json），两者必须能分开呈现。
+ */
+export interface RuleChannelLedgerEntry {
+  /** 规则 id */
+  ruleId: string;
+  /** 规则名（人可读） */
+  name: string;
+  /** 求值结果 */
+  status: 'passed' | 'failed' | 'skipped' | 'error';
+  /** 非预期跳过（工具不可用 / 适配器缺失 / 引擎出错），不置位即「既定裁剪」 */
+  degraded?: boolean;
+  /** 适用性标记（画像裁剪 / 映射型规则） */
+  applicability?: string;
+  /** 人可读原因：为什么没跑 / 跑了但没结论 */
+  reason?: string;
+  /** 耗时（ms） */
+  durationMs?: number;
+}
+
 /** 安全域 SOP 通道的结论（并入最终报告前） */
 export interface SecuritySopFindings {
   /** 代码漏洞条目（来自 semgrep 等 SOP 规则） */
   vulnerabilities: SecurityVulnerabilityFinding[];
-  /** SOP 通道的执行健康度：跳过的规则 / 降级数 */
+  /** SOP 通道的执行健康度：跳过的规则 / 降级数（由 ledger 派生，不另算一份） */
   skipped: number;
   degraded: number;
+  /** 逐条规则账：页面的「未能评估明细」直接读这里，不再只给数字 */
+  ledger: RuleChannelLedgerEntry[];
   /** SOP 通道本身是否产出了结论（false = 规则集为空或通道异常） */
   ran: boolean;
   /** 通道异常原因 */
@@ -108,6 +136,45 @@ export function sopViolationsToFindings(report: RuleEngineReport): SecurityVulne
   return findings;
 }
 
+/**
+ * 把引擎的逐条求值转成账本条目。
+ *
+ * 计数一律**从账本派生**（见 {@link summarizeLedger}），不再读 `report.skipped` /
+ * `report.degraded` 两个汇总字段 —— 否则「账 6 条、明细 9 条」这类分叉永远查不清。
+ */
+export function buildRuleChannelLedger(report: RuleEngineReport): RuleChannelLedgerEntry[] {
+  return (report.evaluations ?? []).map((evaluation) => ({
+    ruleId: evaluation.rule.id,
+    name: evaluation.rule.name,
+    status: evaluation.status,
+    ...(evaluation.degraded !== undefined ? { degraded: evaluation.degraded } : {}),
+    ...(evaluation.applicability ? { applicability: evaluation.applicability } : {}),
+    ...(evaluation.message ? { reason: evaluation.message } : {}),
+    durationMs: evaluation.durationMs,
+  }));
+}
+
+/**
+ * 从账本派生两个计数（与页面上的两个桶一一对应）：
+ *   · degraded：`degraded === true` 或 `status === 'error'` —— 没评估成
+ *   · skipped：`status === 'skipped'` 且未标 degraded —— 按项目前提跳过
+ */
+export function summarizeLedger(ledger: readonly RuleChannelLedgerEntry[]): {
+  skipped: number;
+  degraded: number;
+} {
+  let skipped = 0;
+  let degraded = 0;
+  for (const entry of ledger) {
+    if (entry.status === 'error' || entry.degraded === true) {
+      degraded += 1;
+    } else if (entry.status === 'skipped') {
+      skipped += 1;
+    }
+  }
+  return { skipped, degraded };
+}
+
 /** 两条通道的指纹（同一处问题只报一次） */
 function fingerprintOf(f: { ruleId: string; file: string; line?: number }): string {
   return `${f.ruleId}:${f.file}:${f.line ?? 0}`;
@@ -127,6 +194,7 @@ export async function runSecuritySopChannel(
       vulnerabilities: [],
       skipped: 0,
       degraded: 0,
+      ledger: [],
       ran: false,
       reason: '未提供 PipelineRunner，安全域 SOP 规则通道未执行（仅启发式通道）',
     };
@@ -138,11 +206,16 @@ export async function runSecuritySopChannel(
       domains: ['security'],
     })) as RuleEngineReport;
 
+    // 计数与明细同源：先建账本，再由账本派生 skipped / degraded，
+    // 不读 report.skipped / report.degraded 两个汇总字段（避免两份口径分叉）。
+    const ledger = buildRuleChannelLedger(report);
+    const counts = summarizeLedger(ledger);
+
     if (report.total === 0) {
       return {
         vulnerabilities: [],
-        skipped: report.skipped,
-        degraded: report.degraded ?? 0,
+        ...counts,
+        ledger,
         ran: false,
         reason: '无规则可评估（规则集为空），SOP 规则通道本次未执行',
       };
@@ -150,8 +223,8 @@ export async function runSecuritySopChannel(
 
     return {
       vulnerabilities: sopViolationsToFindings(report),
-      skipped: report.skipped,
-      degraded: report.degraded ?? 0,
+      ...counts,
+      ledger,
       ran: true,
     };
   } catch (err) {
@@ -159,6 +232,7 @@ export async function runSecuritySopChannel(
       vulnerabilities: [],
       skipped: 0,
       degraded: 0,
+      ledger: [],
       ran: false,
       reason: `安全域 SOP 规则通道异常：${err instanceof Error ? err.message : String(err)}`,
     };

@@ -80,6 +80,16 @@ export const OWNERSHIP_CLAIMS: readonly OwnershipClaim[] = [
     rationale: 'O10 依赖审计唯一归依赖管家；体检改只读',
     previousOwner: 'inspect',
   },
+  // external 变体：云端规则集里同一件事还有 `external.dependency-audit` 形态。
+  // 只登记 official 会漏掉它 —— 2026-11-11 实测该规则在体检域每轮必 degraded
+  // （npm-audit / trivy / grype 均未注册适配器），而按 O10 它本该归 deps，
+  // 属「规则集里的事实死代码」而非环境故障（R7）。
+  {
+    match: { kind: 'exact', ruleId: 'inspect.scan.external.dependency-audit' },
+    owner: 'deps',
+    rationale: 'O10 依赖审计唯一归依赖管家；体检侧让位，不重复评估',
+    previousOwner: 'inspect',
+  },
   {
     match: { kind: 'token', token: 'trivy' },
     owner: 'deps',

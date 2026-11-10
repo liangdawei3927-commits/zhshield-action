@@ -28,6 +28,7 @@ function checkDetail(
   items: InspectionReportData['checks'],
   copy: CheckCopyActions,
   hint?: string,
+  status?: { label: string; tone: string },
 ): { items: unknown[]; render: (sub: unknown[]) => ReactNode } {
   return {
     items,
@@ -37,6 +38,7 @@ function checkDetail(
         onCopyToAi={copy.copyToAi}
         onCopyAll={copy.copyAllToAi}
         headerHint={hint}
+        headerStatus={status}
       />
     ),
   };
@@ -48,7 +50,7 @@ function checkDetail(
  */
 function optionalStatCard(
   group: InspectionReportData['checks'],
-  card: { key: string; label: string; hint?: string },
+  card: { key: string; label: string; hint?: string; tone?: string },
   copy: CheckCopyActions,
 ): ReportStatCard[] {
   if (group.length === 0) return [];
@@ -58,7 +60,12 @@ function optionalStatCard(
       label: card.label,
       value: group.length,
       color: 'rgb(var(--zh-muted))',
-      detail: checkDetail(group, copy, card.hint),
+      detail: checkDetail(
+        group,
+        copy,
+        card.hint,
+        card.tone ? { label: card.label, tone: card.tone } : undefined,
+      ),
     },
   ];
 }
@@ -112,6 +119,7 @@ function buildInspectStats({
         selectIssueChecks(items),
         copy,
         t('page.inspect.issuesHint'),
+        { label: t('page.inspect.issues'), tone: 'fail' },
       ),
     },
     ...optionalStatCard(
@@ -120,6 +128,7 @@ function buildInspectStats({
         key: 'attention',
         label: t('page.inspect.attention'),
         hint: t('page.inspect.attentionHint'),
+        tone: 'attention',
       },
       copy,
     ),
@@ -130,6 +139,7 @@ function buildInspectStats({
         key: 'notApplicable',
         label: t('page.inspect.status.notApplicable'),
         hint: t('page.inspect.notApplicableHint'),
+        tone: 'notApplicable',
       },
       copy,
     ),

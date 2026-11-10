@@ -85,22 +85,43 @@ export function CheckList({
   onCopyToAi,
   onCopyAll,
   headerHint,
+  headerStatus,
 }: {
   items: InspectionReportData['checks'];
   onCopyToAi: (item: InspectionReportData['checks'][number]) => void;
   onCopyAll: (items: InspectionReportData['checks']) => void;
   /** 详情列表卡片头部的分类说明（与门禁守护状态行同位置） */
   headerHint?: string;
+  /** 卡头前置状态项：问题/未检测/不适用，颜色取对应状态 */
+  headerStatus?: { label: string; tone: string };
 }) {
   const t = useT();
+  const headerConfig = headerStatus
+    ? (STATUS_CONFIG[headerStatus.tone] ?? STATUS_CONFIG.fail)
+    : null;
   // 只有真实问题才可「复制到 AI 修复」：attention（未检测）与 notApplicable（不适用）
   // 都不是待修复项，混进来会让 AI 去「修」一个不存在的问题。
   const failedCount = items.filter((i) => isIssueStatus(i.status)).length;
   return (
     <ResultCard variant="list" className="overflow-hidden">
       {headerHint && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 border-b border-zh-line">
-          <span className="text-xs text-zh-muted">{t('page.inspect.detailHintLabel')}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 border-b border-zh-line">
+          {headerStatus && headerConfig && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+              style={{
+                background: headerConfig.bg,
+                color: headerConfig.color,
+                borderColor: headerConfig.color,
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: headerConfig.color }}
+              />
+              {headerStatus.label}
+            </span>
+          )}
           <span className="text-sm leading-5 text-zh-ink-2">{headerHint}</span>
         </div>
       )}

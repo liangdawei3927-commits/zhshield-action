@@ -127,7 +127,11 @@ function buildInspectStats({
     // 不适用单列：检测对象在本项目不存在，不计入「通过」，也不计入「未检测」。
     ...optionalStatCard(
       notApplicableChecks,
-      { key: 'notApplicable', label: t('page.inspect.status.notApplicable') },
+      {
+        key: 'notApplicable',
+        label: t('page.inspect.status.notApplicable'),
+        hint: t('page.inspect.notApplicableHint'),
+      },
       copyToAi,
       copyAllToAi,
     ),

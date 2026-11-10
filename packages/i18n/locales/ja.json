@@ -1332,7 +1332,7 @@
       },
       "groupTitle": {},
       "issues": "問題",
-      "issuesHint": "問題のみ — カード内のコピーはこれらの問題だけをコピーします",
+      "issuesHint": "これらのチェックは未達で、スコアを下げます。開いて AI 修正へコピーできます",
       "passed": "合格",
       "total": "検査項目",
       "passedCount": "{{passed}}/{{total}} 項目合格",
@@ -1347,7 +1347,8 @@
         "notApplicable": "該当なし"
       },
       "attention": "未検出",
-      "attentionHint": "以下のチェックは未実行または結論が出ていないため、合格に含まれません",
+      "attentionHint": "未実行または結論なし：採点されませんが、カバレッジが不完全なため満点とは言えません",
+      "notApplicableHint": "このプロジェクトに対象が存在しません：採点されず、100 点も妨げません",
       "errorTitle": "巡回に失敗しました",
       "errorNoReport": "巡回が有効な結果を返しませんでした。再実行するか実行ログを確認してください",
       "errorRetry": "再巡回",

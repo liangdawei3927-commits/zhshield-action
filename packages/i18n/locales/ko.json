@@ -1332,7 +1332,7 @@
       },
       "groupTitle": {},
       "issues": "문제",
-      "issuesHint": "문제 항목만 — 카드 내 복사는 이 문제들만 복사합니다",
+      "issuesHint": "이 검사들은 미달되어 점수를 낮춥니다. 열어서 AI 수정으로 복사할 수 있습니다",
       "passed": "통과",
       "total": "검사 항목",
       "passedCount": "{{passed}}/{{total}}개 항목 통과",
@@ -1347,7 +1347,8 @@
         "notApplicable": "해당 없음"
       },
       "attention": "미검출",
-      "attentionHint": "다음 검사는 실행되지 않았거나 결론이 없어 통과에 포함되지 않습니다",
+      "attentionHint": "실행되지 않았거나 결론이 없음: 점수에 포함되지 않지만 커버리지가 불완전하여 만점이 아닙니다",
+      "notApplicableHint": "이 프로젝트에 대상이 없음: 점수에 포함되지 않으며 100점을 막지 않습니다",
       "errorTitle": "점검 실패",
       "errorNoReport": "점검이 유효한 결과를 반환하지 않았습니다. 다시 실행하거나 실행 로그를 확인하세요",
       "errorRetry": "다시 점검",

@@ -28,7 +28,7 @@ function checkDetail(
   items: InspectionReportData['checks'],
   copy: CheckCopyActions,
   hint?: string,
-): { items: unknown[]; render: (sub: unknown[]) => ReactNode; hint?: string } {
+): { items: unknown[]; render: (sub: unknown[]) => ReactNode } {
   return {
     items,
     render: (sub: unknown[]) => (
@@ -36,9 +36,9 @@ function checkDetail(
         items={sub as InspectionReportData['checks']}
         onCopyToAi={copy.copyToAi}
         onCopyAll={copy.copyAllToAi}
+        headerHint={hint}
       />
     ),
-    hint,
   };
 }
 

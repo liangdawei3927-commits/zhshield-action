@@ -84,10 +84,13 @@ export function CheckList({
   items,
   onCopyToAi,
   onCopyAll,
+  headerHint,
 }: {
   items: InspectionReportData['checks'];
   onCopyToAi: (item: InspectionReportData['checks'][number]) => void;
   onCopyAll: (items: InspectionReportData['checks']) => void;
+  /** 详情列表卡片头部的分类说明（与门禁守护状态行同位置） */
+  headerHint?: string;
 }) {
   const t = useT();
   // 只有真实问题才可「复制到 AI 修复」：attention（未检测）与 notApplicable（不适用）
@@ -95,6 +98,12 @@ export function CheckList({
   const failedCount = items.filter((i) => isIssueStatus(i.status)).length;
   return (
     <ResultCard variant="list" className="overflow-hidden">
+      {headerHint && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 border-b border-zh-line">
+          <span className="text-xs text-zh-muted">{t('page.inspect.detailHintLabel')}</span>
+          <span className="text-sm leading-5 text-zh-ink-2">{headerHint}</span>
+        </div>
+      )}
       {failedCount > 0 && (
         <div className="flex items-center justify-between px-5 py-3 border-b border-zh-line">
           <span className="text-xs text-zh-muted">

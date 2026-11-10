@@ -21,7 +21,6 @@ interface InspectPageProps {
 type CheckCopyActions = {
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
-  copyMetric: (item: InspectionReportData['checks'][number]) => void;
 };
 
 /** 统计卡明细：把一批检查项交给 CheckList 渲染（通过/问题/未检测三类共用同一套交互） */
@@ -37,7 +36,6 @@ function checkDetail(
         items={sub as InspectionReportData['checks']}
         onCopyToAi={copy.copyToAi}
         onCopyAll={copy.copyAllToAi}
-        onCopyMetric={copy.copyMetric}
       />
     ),
     hint,
@@ -259,7 +257,6 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     stopping,
     copyToAi,
     copyAllToAi,
-    copyMetric,
     startInspect,
     showHome,
     scanVersion,
@@ -296,7 +293,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         stopping={stopping}
         onRescan={startInspect}
         onBackHome={backHome}
-        copy={{ copyToAi, copyAllToAi, copyMetric }}
+        copy={{ copyToAi, copyAllToAi }}
         t={t}
       />
     );

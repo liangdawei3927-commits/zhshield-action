@@ -1353,7 +1353,7 @@
       "projectMetricHint": "Project-level metric with no single-file location; copying to AI asks it to locate the hotspot function/file first, then refactor structurally.",
       "copyMetric": "Copy metric details",
       "copyMetricDone": "Copied to AI (project-level metric)",
-      "projectMetricCopyNote": "Requirements: these are project-level metrics with no single-file location. First locate the hotspot function/file in the repo (largest function/longest file), then split or refactor structurally; do not fix a single peak, and do not 'fix' it by changing the threshold.",
+      "projectMetricCopyNote": "Locate the hotspot function/file first (largest function/longest file), then split or refactor structurally; do not fix a single peak, and do not 'fix' it by changing the threshold.",
       "errorTitle": "Inspection failed",
       "errorNoReport": "The inspection returned no valid result. Try again or check the run log",
       "errorRetry": "Re-run inspection",

@@ -6,7 +6,7 @@ import { selectIssueChecks, toInspectOutcome } from './inspect-sop-mapper';
 import { toInspectionReportDataFromSnapshot } from './inspect-snapshot-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
-import { copyIssuesToAi, copyTextToClipboard } from '../utils/copyToAi';
+import { copyIssuesToAi } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
@@ -153,43 +153,24 @@ function useInspectRun(projectPath: string): DomainRunState & {
   return { ...runState, report, persisted, failure, startInspect };
 }
 
-/** 项目级指标复制文本：指标名 + 阈值 + 处理要求（告诉 AI 先定位热点再重构） */
-function buildMetricCopyText(item: InspectionReportData['checks'][number]): string {
-  return [
-    `【${t('page.inspect.source')} · ${t('page.inspect.projectMetricBadge')}】${item.name}`,
-    item.detail,
-    '',
-    t('page.inspect.projectMetricCopyNote'),
-  ].join('\n');
-}
-
 function useInspectCopyToAi(projectPath: string): {
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
-  /** 项目级指标：复制指标说明（不是文件级 AI 修复提示词） */
-  copyMetric: (item: InspectionReportData['checks'][number]) => void;
 } {
   const { toast } = useToast();
 
   const copyToAi = useCallback(
     (item: InspectionReportData['checks'][number]) => {
-      // 项目级指标（复杂度/覆盖率阈值等）没有文件位置，不能当单文件问题交给 AI：
-      // 复制出去只会换来一轮「修峰值→换峰值」的无效修复。
-      if (item.projectMetric === true) {
-        toast(
-          t('page.inspect.projectMetricHint', {
-            defaultValue:
-              '这是项目级指标（如复杂度阈值），没有具体文件位置，不能作为单文件问题交给 AI 修复；请在报告中按指标趋势治理。',
-          }),
-          'info',
-        );
-        return;
-      }
+      // 统一走原有提示词模板：项目级指标没有文件位置，就不带 location，
+      // 改用 suggestion 告诉 AI「先定位热点再结构性重构」，不再另造一套模板。
       copyIssuesToAi(projectPath, toast, [
         {
           source: t('page.inspect.source'),
           ruleId: item.id,
           message: `${item.name} — ${item.detail}`,
+          ...(item.projectMetric === true
+            ? { suggestion: t('page.inspect.projectMetricCopyNote') }
+            : {}),
           domain: 'inspect',
         },
       ]);
@@ -197,34 +178,11 @@ function useInspectCopyToAi(projectPath: string): {
     [projectPath, toast],
   );
 
-  const copyMetric = useCallback(
-    (item: InspectionReportData['checks'][number]) => {
-      const text = buildMetricCopyText(item);
-      void copyTextToClipboard(text).then(
-        (ok) =>
-          ok
-            ? toast(t('page.inspect.copyMetricDone'), 'success')
-            : toast(t('toast.copyFailed'), 'error'),
-        () => toast(t('toast.copyFailed'), 'error'),
-      );
-    },
-    [toast],
-  );
-
   const copyAllToAi = useCallback(
     (items: InspectionReportData['checks']) => {
-      // 同上：项目级指标不进批量 AI 修复队列。
-      const failed = selectIssueChecks(items.filter((item) => item.projectMetric !== true));
-      if (failed.length === 0) {
-        toast(
-          t('page.inspect.projectMetricHint', {
-            defaultValue:
-              '当前只有项目级指标（如复杂度阈值），没有文件级问题可复制给 AI；请在报告中按指标趋势治理。',
-          }),
-          'info',
-        );
-        return;
-      }
+      // 批量复制走原有模板：项目级指标也纳入，用 suggestion 代替文件位置。
+      const failed = selectIssueChecks(items);
+      if (failed.length === 0) return;
       copyIssuesToAi(
         projectPath,
         toast,
@@ -232,19 +190,23 @@ function useInspectCopyToAi(projectPath: string): {
           source: t('page.inspect.source'),
           ruleId: item.id,
           message: `${item.name} — ${item.detail}`,
+          ...(item.projectMetric === true
+            ? { suggestion: t('page.inspect.projectMetricCopyNote') }
+            : {}),
+          domain: 'inspect',
         })),
       );
     },
     [projectPath, toast],
   );
 
-  return { copyToAi, copyAllToAi, copyMetric };
+  return { copyToAi, copyAllToAi };
 }
 
 /** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
   const { report, persisted, failure, startInspect, ...runState } = useInspectRun(projectPath);
-  const { copyToAi, copyAllToAi, copyMetric } = useInspectCopyToAi(projectPath);
+  const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
   // 自动巡检带 origin='auto'：仅作为任务上的诊断元数据（首扫/每日/定时/手动
   // 触发的任务在 UI 上一视同仁），手动/自动同参任务互相复用不重复扫。
   useDailyAutoCheck(
@@ -254,14 +216,5 @@ export function useInspectPage(projectPath: string) {
     'pipeline',
   );
 
-  return {
-    ...runState,
-    report,
-    persisted,
-    failure,
-    copyToAi,
-    copyAllToAi,
-    copyMetric,
-    startInspect,
-  };
+  return { ...runState, report, persisted, failure, copyToAi, copyAllToAi, startInspect };
 }

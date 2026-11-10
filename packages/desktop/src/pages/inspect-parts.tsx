@@ -30,12 +30,10 @@ function CheckRow({
   item,
   isLast,
   onCopyToAi,
-  onCopyMetric,
 }: {
   item: InspectionReportData['checks'][number];
   isLast: boolean;
   onCopyToAi: (item: InspectionReportData['checks'][number]) => void;
-  onCopyMetric?: (item: InspectionReportData['checks'][number]) => void;
 }) {
   const t = useT();
   const config = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.fail;
@@ -60,11 +58,8 @@ function CheckRow({
         <span className="text-sm font-medium text-zh-ink-2">{item.name}</span>
         <div className="text-xs mt-0.5 text-zh-muted">{item.detail}</div>
       </div>
-      {isIssueStatus(item.status) && !projectMetric && (
+      {isIssueStatus(item.status) && (
         <CopyToAiButton onClick={() => onCopyToAi(item)} />
-      )}
-      {isIssueStatus(item.status) && projectMetric && onCopyMetric && (
-        <CopyToAiButton onClick={() => onCopyMetric(item)} />
       )}
       {isIssueStatus(item.status) && projectMetric && (
         <span
@@ -89,21 +84,15 @@ export function CheckList({
   items,
   onCopyToAi,
   onCopyAll,
-  onCopyMetric,
 }: {
   items: InspectionReportData['checks'];
   onCopyToAi: (item: InspectionReportData['checks'][number]) => void;
   onCopyAll: (items: InspectionReportData['checks']) => void;
-  /** 项目级指标：复制指标说明（可选；缺省只显示徽章） */
-  onCopyMetric?: (item: InspectionReportData['checks'][number]) => void;
 }) {
   const t = useT();
   // 只有真实问题才可「复制到 AI 修复」：attention（未检测）与 notApplicable（不适用）
   // 都不是待修复项，混进来会让 AI 去「修」一个不存在的问题。
-  // 项目级指标（复杂度阈值等）没有文件位置，不进「复制到 AI」队列，也不计入可复制项数。
-  const failedCount = items.filter(
-    (i) => isIssueStatus(i.status) && i.projectMetric !== true,
-  ).length;
+  const failedCount = items.filter((i) => isIssueStatus(i.status)).length;
   return (
     <ResultCard variant="list" className="overflow-hidden">
       {failedCount > 0 && (
@@ -120,7 +109,6 @@ export function CheckList({
           item={item}
           isLast={i === items.length - 1}
           onCopyToAi={onCopyToAi}
-          onCopyMetric={onCopyMetric}
         />
       ))}
     </ResultCard>

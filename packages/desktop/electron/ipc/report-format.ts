@@ -163,10 +163,28 @@ function buildAttentionChecks(r: InspectionReport): InspectionReportData['checks
       id: `adapter:${a.adapterId}`,
       name: a.adapterName,
       status: 'attention' as const,
-      detail: `${a.adapterName} 未检测（工具不可用或已跳过，覆盖率缺口）`,
+      detail: attentionDetail(a),
       category: undefined,
       source: a.adapterId,
     }));
+}
+
+/**
+ * 未检测的真实原因（R7）：优先透传工具自述的 `skipDetail`，其次按状态给可读口径。
+ *
+ * 旧实现统一写「工具不可用或已跳过」，把三种完全不同的处置方式糊成一句：
+ * 没装（去装）、被画像裁剪（无需处理）、工具自己拒绝执行（看原因修配置）。
+ * 用户点开「未检测」明细却看不到原因，等于数字不可行动。
+ */
+function attentionDetail(a: AdapterResult): string {
+  if (a.skipDetail) return `${a.adapterName} 未检测：${a.skipDetail}`;
+  if (a.status === 'unavailable') return `${a.adapterName} 未检测：工具不可用`;
+  if (a.status === 'skipped') {
+    return a.skipReason === 'degraded'
+      ? `${a.adapterName} 未检测：降级跳过（工具/引擎不可用）`
+      : `${a.adapterName} 未检测：已跳过`;
+  }
+  return `${a.adapterName} 未检测（覆盖率缺口）`;
 }
 
 /**

@@ -13,7 +13,10 @@ import type { ReactElement } from 'react';
 import { I18nProvider } from '../i18n';
 import { DomainScoreCard } from '../components/DomainScoreCard';
 import { overviewRowInput } from '../pages/category-score-logic';
-import { extractInspectRuleCoverage } from '../../electron/zh-diagnostics-normalize';
+import {
+  extractInspectRuleCoverage,
+  extractInspectRuleLedger,
+} from '../../electron/zh-diagnostics-normalize';
 import { buildScanRecord } from '../../electron/domain-history';
 
 vi.stubGlobal('navigator', { language: 'zh-Hans' });
@@ -39,7 +42,12 @@ const renderCard = (props: Parameters<typeof DomainScoreCard>[0]): string =>
   );
 
 function evaluation(status: string, applicability?: 'not-applicable') {
-  return { rule: { id: 'rule', name: 'rule' }, status, ...(applicability ? { applicability } : {}) };
+  return {
+    rule: { id: 'rule', name: 'rule' },
+    status,
+    durationMs: 0,
+    ...(applicability ? { applicability } : {}),
+  };
 }
 
 function ruleEngineReport(evaluations: unknown[], total?: number) {
@@ -104,6 +112,43 @@ describe('extractInspectRuleCoverage', () => {
     expect(
       extractInspectRuleCoverage({ issues: [] } as unknown as Parameters<
         typeof extractInspectRuleCoverage
+      >[0]),
+    ).toBeUndefined();
+  });
+});
+
+describe('extractInspectRuleLedger（R7 逐条明细）', () => {
+  it('保留 ruleId / name / status / reason / durationMs', () => {
+    const evaluations = [
+      evaluation('passed'),
+      { ...evaluation('failed'), message: 'cyclomaticComplexity=15 超过阈值 10', durationMs: 12 },
+      evaluation('error'),
+    ];
+    const ledger = extractInspectRuleLedger(ruleEngineReport(evaluations));
+    expect(ledger).toHaveLength(3);
+    expect(ledger?.[1]).toMatchObject({
+      ruleId: 'rule',
+      name: 'rule',
+      status: 'failed',
+      reason: 'cyclomaticComplexity=15 超过阈值 10',
+      durationMs: 12,
+    });
+  });
+
+  it('not-applicable 作为附加语义保留', () => {
+    const ledger = extractInspectRuleLedger(
+      ruleEngineReport([evaluation('passed', 'not-applicable')]),
+    );
+    expect(ledger?.[0]).toMatchObject({
+      status: 'passed',
+      applicability: 'not-applicable',
+    });
+  });
+
+  it('旧版 InspectionReport（无 evaluations）→ 明细未知', () => {
+    expect(
+      extractInspectRuleLedger({ issues: [] } as unknown as Parameters<
+        typeof extractInspectRuleLedger
       >[0]),
     ).toBeUndefined();
   });

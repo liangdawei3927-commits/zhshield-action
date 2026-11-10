@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 3650da7b5e49f5b8
+// @zh-src-hash: 936357c61fdce339
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";

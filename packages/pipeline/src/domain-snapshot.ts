@@ -93,6 +93,37 @@ export interface RuleCoverage {
 }
 
 /**
+ * 单条规则的执行明细（R7，仅 inspect 快照携带）。
+ *
+ * `ruleCoverage` 只回答「缺几条」，本结构回答「缺哪几条、为什么」：
+ * 规则 ID / 名称 / 状态 / 工具自述原因 / 耗时。它是「未检测」从计数
+ * 升级为可行动状态的落点，也是历史与单规则重跑的输入。
+ */
+export interface RuleLedgerEntry {
+  ruleId: string;
+  name: string;
+  status: 'passed' | 'failed' | 'error' | 'skipped';
+  /** not-applicable：规则跑了，但本项目没有可检对象（不构成覆盖缺口） */
+  applicability?: 'not-applicable';
+  /** 工具自述的失败/跳过原因（RuleEvaluation.message） */
+  reason?: string;
+  durationMs: number;
+}
+
+/**
+ * inspect 规则覆盖的两件套：计数账（ruleCoverage）+ 逐条明细（ruleLedger）。
+ *
+ * 快照、单域落盘与主进程汇总共用同一形状，避免三处各写一份字段（重复代码检查
+ * 会把它判成三份实现，且未来加字段必漂移）。
+ */
+export interface InspectRuleReport {
+  /** 本轮规则执行账（仅 inspect 快照携带；旧快照缺省 = 覆盖未知，不冒充完整） */
+  ruleCoverage?: RuleCoverage;
+  /** 逐条规则明细（仅 inspect；与 ruleCoverage 同源，用于「缺哪几条/为什么」） */
+  ruleLedger?: readonly RuleLedgerEntry[];
+}
+
+/**
  * 按域快照附带的实时维度评分（落盘时由 @zh/scoring 统一计算，渲染层只读不算）。
  * version = 评分算法版本（scoreVersion 2 起）；跨版本快照的 previousScore 不参与对比。
  */
@@ -112,7 +143,7 @@ export interface DomainDimensionScore {
 }
 
 /** 落盘的诊断报告（.zhshield/diagnostics/latest.json）：问题汇总 + 条目 + 按文件视图 */
-export interface DiagnosticsReport {
+export interface DiagnosticsReport extends InspectRuleReport {
   version: '1.0';
   project: { path: string; name: string };
   generatedAt: string;
@@ -125,8 +156,6 @@ export interface DiagnosticsReport {
   previousScore?: { score: number; generatedAt: string };
   /** 项目 ESLOC（S2 密度归一化分母；仅 inspect 快照携带，供报告中心汇总同口径复用） */
   esloc?: number;
-  /** 本轮规则执行账（仅 inspect 快照携带；旧快照缺省 = 覆盖未知，不冒充完整） */
-  ruleCoverage?: RuleCoverage;
 }
 
 /** 诊断条目的来源引擎标识 */

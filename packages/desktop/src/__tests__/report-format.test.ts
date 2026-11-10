@@ -159,6 +159,20 @@ describe('toInspectionReportData 覆盖率缺口显式上报', () => {
     });
   });
 
+  it('attention check carries the adapter skipDetail instead of a generic reason', () => {
+    const report = {
+      ...baseReport,
+      adapterResults: baseReport.adapterResults.map((a) =>
+        a.adapterId === 'semgrep'
+          ? { ...a, skipDetail: 'Semgrep 规则目录不存在，请先同步云脑规则' }
+          : a,
+      ),
+    };
+    const data = toInspectionReportData(report as never);
+    const semgrep = data.checks.find((c) => c.id === 'adapter:semgrep');
+    expect(semgrep?.detail).toContain('Semgrep 规则目录不存在');
+  });
+
   it('keeps pass adapterResults out of attention checks', () => {
     const data = toInspectionReportData(baseReport as never);
     expect(data.checks.filter((c) => c.name === 'ESLint' && c.status === 'attention')).toHaveLength(

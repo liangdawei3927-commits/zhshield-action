@@ -18,6 +18,8 @@ export type {
   DiagnosticsReport,
   DiagnosticSource,
   RuleCoverage,
+  RuleLedgerEntry,
+  InspectRuleReport,
 } from './domain-snapshot';
 // 执行层骨架（《07》§7.2）：FileIndex → ToolExecutor → Router
 export * from './execution';

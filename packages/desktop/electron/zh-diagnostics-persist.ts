@@ -13,10 +13,14 @@ import type {
   DiagnosticSource,
   DiagnosticsReport,
   DomainDimensionScore,
-  RuleCoverage,
+  InspectRuleReport,
 } from './zh-diagnostics-types';
 import { buildDiagnosticsReport, countSourceEsloc } from './zh-diagnostics-esloc';
-import { extractInspectRuleCoverage, normalizePipelineReport } from './zh-diagnostics-normalize';
+import {
+  extractInspectRuleCoverage,
+  extractInspectRuleLedger,
+  normalizePipelineReport,
+} from './zh-diagnostics-normalize';
 import { appendDomainHistory, buildScanRecord } from './domain-history';
 
 // ─── 落盘 ──────────────────────────────────────────────────────────────
@@ -48,7 +52,7 @@ async function writeDomainSnapshots(
   report: DiagnosticsReport,
   perSource: Map<DiagnosticSource, DiagnosticEntry[]>,
   dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
-  ruleCoverage?: RuleCoverage,
+  inspectRuleReport?: InspectRuleReport,
 ): Promise<void> {
   if (perSource.size === 0) return;
   await mkdir(join(report.project.path, '.zhshield', 'diagnostics', 'domains'), {
@@ -63,7 +67,7 @@ async function writeDomainSnapshots(
       issues,
       esloc,
       dimensionScore: dimensionScores?.[source],
-      ruleCoverage: source === 'inspect' ? ruleCoverage : undefined,
+      ...(source === 'inspect' && inspectRuleReport ? inspectRuleReport : {}),
     });
     writes.push(
       writeFile(
@@ -143,7 +147,7 @@ async function recordScanHistory({
  * 五个值同属「本次域快照的输入」，位置式传参时 `report`/`issues` 等报告形态
  * 的入参容易错位，收敛成对象后由字段名自解释。
  */
-interface DomainSnapshotInput {
+interface DomainSnapshotInput extends InspectRuleReport {
   /** 本次整体报告（提供项目信息与扫描时间） */
   report: DiagnosticsReport;
   /** 域键 */
@@ -154,8 +158,6 @@ interface DomainSnapshotInput {
   esloc: number;
   /** 该域当场出分结果（仅非 inspect 域使用；undefined = not-run，不附加） */
   dimensionScore?: DomainDimensionScore;
-  /** 本轮规则执行账（仅 inspect；undefined = 旧报告没有规则账，覆盖未知） */
-  ruleCoverage?: RuleCoverage;
 }
 
 async function buildDomainSnapshot({
@@ -165,6 +167,7 @@ async function buildDomainSnapshot({
   esloc,
   dimensionScore,
   ruleCoverage,
+  ruleLedger,
 }: DomainSnapshotInput): Promise<DiagnosticsReport> {
   const snapshot = buildDiagnosticsReport(report.project, issues, report.generatedAt);
   if (source !== 'inspect') {
@@ -174,6 +177,7 @@ async function buildDomainSnapshot({
     return snapshot;
   }
   if (ruleCoverage) snapshot.ruleCoverage = ruleCoverage;
+  if (ruleLedger) snapshot.ruleLedger = ruleLedger;
   await enrichInspectSnapshot(report, snapshot, esloc);
   return snapshot;
 }
@@ -244,7 +248,7 @@ export async function writeDiagnosticsFile(
   report: DiagnosticsReport,
   ranSources: readonly DiagnosticSource[] = [],
   dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>,
-  ruleCoverage?: RuleCoverage,
+  inspectRuleReport?: InspectRuleReport,
 ): Promise<string> {
   const dir = join(report.project.path, '.zhshield', 'diagnostics');
   const absPath = join(dir, 'latest.json');
@@ -255,7 +259,7 @@ export async function writeDiagnosticsFile(
     .then(async () => {
       await mkdir(dir, { recursive: true });
       await writeFile(absPath, payload, 'utf-8');
-      await writeDomainSnapshots(report, perSource, dimensionScores, ruleCoverage);
+      await writeDomainSnapshots(report, perSource, dimensionScores, inspectRuleReport);
     })
     .catch((err) => {
       // 自愈：单次写入失败只记 warn 复位队列，writeQueue 不永久 reject。
@@ -417,14 +421,20 @@ export async function persistDiagnostics(
   if (report.guard) ranSources.push('guard');
   if (report.inspect) ranSources.push('inspect');
   if (report.refactor) ranSources.push('refactor');
-  const ruleCoverage = report.inspect
-    ? extractInspectRuleCoverage(report.inspect)
-    : undefined;
-  return await writeDiagnosticsFile(diagnostics, ranSources, dimensionScores, ruleCoverage);
+  const ruleCoverage = report.inspect ? extractInspectRuleCoverage(report.inspect) : undefined;
+  const ruleLedger = report.inspect ? extractInspectRuleLedger(report.inspect) : undefined;
+  const inspectRuleReport: InspectRuleReport | undefined =
+    ruleCoverage || ruleLedger ? { ruleCoverage, ruleLedger } : undefined;
+  return await writeDiagnosticsFile(
+    diagnostics,
+    ranSources,
+    dimensionScores,
+    inspectRuleReport,
+  );
 }
 
 /** `persistDiagnosticsFromEntries` 的可选项（收敛位置参数，避免 5 参） */
-export interface PersistEntriesOptions {
+export interface PersistEntriesOptions extends InspectRuleReport {
   /** 各域当场出分结果；缺省 = 该域规范口径 not-run，不附加分数 */
   dimensionScores?: Partial<Record<DiagnosticSource, DomainDimensionScore>>;
   /**
@@ -436,8 +446,6 @@ export interface PersistEntriesOptions {
    * 没有时间戳可传的调用方（如密钥扫描）。
    */
   generatedAt?: unknown;
-  /** 本轮规则执行账（仅 inspect 单域扫描；缺省 = 覆盖未知） */
-  ruleCoverage?: RuleCoverage;
 }
 
 /**
@@ -462,7 +470,7 @@ export async function persistDiagnosticsFromEntries(
     diagnostics,
     ranSources,
     options?.dimensionScores,
-    options?.ruleCoverage,
+    options,
   );
 }
 

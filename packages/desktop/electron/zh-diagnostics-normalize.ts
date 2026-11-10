@@ -3,7 +3,7 @@ import type { GuardReport } from '@zh/guard';
 import type { InspectionReport } from '@zh/inspect';
 import type { RefactorReport } from '@zh/refactor';
 import type { RuleEngineReport, RuleEvaluation } from '@zh/kernel';
-import type { PipelineReport, RuleCoverage } from '@zh/pipeline';
+import type { PipelineReport, RuleCoverage, RuleLedgerEntry } from '@zh/pipeline';
 import type { DiagnosticEntry, DiagnosticSeverity } from './zh-diagnostics-types';
 
 // ─── 归一化：PipelineReport → DiagnosticEntry[] ────────────────────────
@@ -156,6 +156,27 @@ export function extractInspectRuleCoverage(
     notApplicable,
     complete: unavailable === 0,
   };
+}
+
+/**
+ * 从 inspect 报告提取逐条规则明细（R7）。
+ *
+ * 与 `extractInspectRuleCoverage` 同源：两者都按 `evaluations` 计数，
+ * 不可能出现「账 13/20、明细 20 条」的分叉。旧版 InspectionReport
+ * （issues 形态）没有 evaluations → undefined（明细未知，不伪造）。
+ */
+export function extractInspectRuleLedger(
+  inspect: InspectionReport | RuleEngineReport,
+): RuleLedgerEntry[] | undefined {
+  if (!('evaluations' in inspect)) return undefined;
+  return (inspect.evaluations ?? []).map((evaluation) => ({
+    ruleId: evaluation.rule.id,
+    name: evaluation.rule.name,
+    status: evaluation.status,
+    ...(evaluation.applicability ? { applicability: evaluation.applicability } : {}),
+    ...(evaluation.message ? { reason: evaluation.message } : {}),
+    durationMs: evaluation.durationMs,
+  }));
 }
 
 function normalizeRuleEngine(

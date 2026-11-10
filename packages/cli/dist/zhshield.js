@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 936357c61fdce339
+// @zh-src-hash: 1d2196a5505479cf
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -5859,7 +5859,8 @@ var init_zh_Hans = __esm({
           },
           groupTitle: {},
           issues: "\u95EE\u9898",
-          issuesHint: "\u4EC5\u95EE\u9898\u9879\uFF0C\u70B9\u51FB\u5361\u5185\u590D\u5236\u53EA\u4F1A\u590D\u5236\u8FD9\u4E9B\u95EE\u9898",
+          issuesHint: "\u8FD9\u4E9B\u68C0\u67E5\u672A\u8FBE\u6807\uFF0C\u4F1A\u62C9\u4F4E\u8BC4\u5206\uFF1B\u70B9\u5F00\u53EF\u590D\u5236\u5230 AI \u4FEE\u590D",
+          issuesImpact: "\u672A\u8FBE\u6807\uFF0C\u4F1A\u62C9\u4F4E\u8BC4\u5206",
           passed: "\u901A\u8FC7",
           total: "\u68C0\u67E5\u9879",
           passedCount: "{{passed}}/{{total}} \u9879\u901A\u8FC7",
@@ -5867,7 +5868,15 @@ var init_zh_Hans = __esm({
           scanning: "\u5DE1\u68C0\u4E2D...",
           source: "\u5DE1\u68C0",
           attention: "\u672A\u68C0\u6D4B",
-          attentionHint: "\u4EE5\u4E0B\u68C0\u67E5\u672A\u6267\u884C\u6216\u672A\u4EA7\u51FA\u7ED3\u8BBA\uFF0C\u4E0D\u8BA1\u5165\u901A\u8FC7",
+          attentionHint: "\u8FD9\u4E9B\u68C0\u67E5\u672A\u6267\u884C\u6216\u672A\u4EA7\u51FA\u7ED3\u8BBA\uFF1A\u4E0D\u8BA1\u5206\uFF0C\u4F46\u8986\u76D6\u4E0D\u5B8C\u6574\uFF0C\u4E0D\u80FD\u5F53\u6EE1\u5206",
+          attentionImpact: "\u672A\u6267\u884C\uFF0C\u8986\u76D6\u4E0D\u5B8C\u6574",
+          notApplicableHint: "\u68C0\u6D4B\u5BF9\u8C61\u5728\u672C\u9879\u76EE\u4E0D\u5B58\u5728\uFF1A\u4E0D\u8BA1\u5206\uFF0C\u4E5F\u4E0D\u5F71\u54CD 100 \u5206",
+          notApplicableImpact: "\u4E0D\u8BA1\u5206\uFF0C\u4E0D\u6321 100",
+          projectMetricBadge: "\u9879\u76EE\u7EA7\u6307\u6807",
+          projectMetricHint: "\u9879\u76EE\u7EA7\u6307\u6807\uFF0C\u6CA1\u6709\u5355\u6587\u4EF6\u4F4D\u7F6E\uFF1B\u590D\u5236\u5230 AI \u65F6\u4F1A\u8981\u6C42\u5148\u5B9A\u4F4D\u70ED\u70B9\u51FD\u6570/\u6587\u4EF6\uFF0C\u518D\u505A\u7ED3\u6784\u6027\u62C6\u5206\u3002",
+          copyMetric: "\u590D\u5236\u6307\u6807\u8BF4\u660E",
+          copyMetricDone: "\u5DF2\u590D\u5236\u5230 AI\uFF08\u9879\u76EE\u7EA7\u6307\u6807\uFF09",
+          projectMetricCopyNote: "\u5148\u5B9A\u4F4D\u8D85\u6807\u7684\u70ED\u70B9\u51FD\u6570/\u6587\u4EF6\uFF08\u6700\u5927\u7684\u51FD\u6570\u3001\u6700\u957F\u7684\u6587\u4EF6\uFF09\uFF0C\u518D\u505A\u7ED3\u6784\u6027\u62C6\u5206/\u91CD\u6784\uFF1B\u4E0D\u8981\u53EA\u6539\u5355\u4E2A\u5CF0\u503C\uFF0C\u4E5F\u4E0D\u8981\u901A\u8FC7\u4FEE\u6539\u9608\u503C\u6765\u300C\u4FEE\u590D\u300D\u3002",
           errorTitle: "\u4F53\u68C0\u5931\u8D25",
           errorNoReport: "\u4F53\u68C0\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C\uFF0C\u8BF7\u91CD\u8BD5\u6216\u67E5\u770B\u8FD0\u884C\u65E5\u5FD7",
           errorRetry: "\u91CD\u65B0\u4F53\u68C0",
@@ -8172,11 +8181,20 @@ var init_zh_Hant = __esm({
           },
           groupTitle: {},
           issues: "\u554F\u984C",
-          issuesHint: "\u50C5\u554F\u984C\u9805\uFF0C\u9EDE\u64CA\u5361\u5167\u8907\u88FD\u53EA\u6703\u8907\u88FD\u9019\u4E9B\u554F\u984C",
+          issuesHint: "\u9019\u4E9B\u6AA2\u67E5\u672A\u9054\u6A19\uFF0C\u6703\u62C9\u4F4E\u8A55\u5206\uFF1B\u9EDE\u958B\u53EF\u8907\u88FD\u5230 AI \u4FEE\u5FA9",
+          issuesImpact: "\u672A\u9054\u6A19\uFF0C\u6703\u62C9\u4F4E\u8A55\u5206",
           passed: "\u901A\u904E",
           total: "\u6AA2\u67E5\u9805",
           attention: "\u672A\u6AA2\u6E2C",
-          attentionHint: "\u4EE5\u4E0B\u6AA2\u67E5\u672A\u57F7\u884C\u6216\u672A\u7522\u51FA\u7D50\u8AD6\uFF0C\u4E0D\u8A08\u5165\u901A\u904E",
+          attentionHint: "\u9019\u4E9B\u6AA2\u67E5\u672A\u57F7\u884C\u6216\u672A\u7522\u51FA\u7D50\u8AD6\uFF1A\u4E0D\u8A08\u5206\uFF0C\u4F46\u8986\u84CB\u4E0D\u5B8C\u6574\uFF0C\u4E0D\u80FD\u7576\u6EFF\u5206",
+          attentionImpact: "\u672A\u57F7\u884C\uFF0C\u8986\u84CB\u4E0D\u5B8C\u6574",
+          notApplicableHint: "\u6AA2\u6E2C\u5C0D\u8C61\u5728\u672C\u5C08\u6848\u4E0D\u5B58\u5728\uFF1A\u4E0D\u8A08\u5206\uFF0C\u4E5F\u4E0D\u5F71\u97FF 100 \u5206",
+          notApplicableImpact: "\u4E0D\u8A08\u5206\uFF0C\u4E0D\u64CB 100",
+          projectMetricBadge: "\u5C08\u6848\u7D1A\u6307\u6A19",
+          projectMetricHint: "\u5C08\u6848\u7D1A\u6307\u6A19\uFF0C\u6C92\u6709\u55AE\u6A94\u4F4D\u7F6E\uFF1B\u8907\u88FD\u5230 AI \u6642\u6703\u8981\u6C42\u5148\u5B9A\u4F4D\u71B1\u9EDE\u51FD\u5F0F/\u6A94\u6848\uFF0C\u518D\u505A\u7D50\u69CB\u6027\u62C6\u5206\u3002",
+          copyMetric: "\u8907\u88FD\u6307\u6A19\u8AAA\u660E",
+          copyMetricDone: "\u5DF2\u8907\u88FD\u5230 AI\uFF08\u5C08\u6848\u7D1A\u6307\u6A19\uFF09",
+          projectMetricCopyNote: "\u8ACB\u5148\u5B9A\u4F4D\u8D85\u6A19\u7684\u71B1\u9EDE\u51FD\u5F0F/\u6A94\u6848\uFF08\u6700\u5927\u7684\u51FD\u5F0F\u3001\u6700\u9577\u7684\u6A94\u6848\uFF09\uFF0C\u518D\u505A\u7D50\u69CB\u6027\u62C6\u5206/\u91CD\u69CB\uFF1B\u4E0D\u8981\u53EA\u6539\u55AE\u4E00\u5CF0\u503C\uFF0C\u4E5F\u4E0D\u8981\u900F\u904E\u4FEE\u6539\u95BE\u503C\u4F86\u300C\u4FEE\u5FA9\u300D\u3002",
           errorTitle: "\u9AD4\u6AA2\u5931\u6557",
           errorNoReport: "\u9AD4\u6AA2\u672A\u56DE\u50B3\u6709\u6548\u7D50\u679C\uFF0C\u8ACB\u91CD\u8A66\u6216\u67E5\u770B\u57F7\u884C\u65E5\u8A8C",
           errorRetry: "\u91CD\u65B0\u9AD4\u6AA2",
@@ -10463,7 +10481,8 @@ var init_en = __esm({
           },
           groupTitle: {},
           issues: "Issues",
-          issuesHint: "Issues only \u2014 copying inside this card copies just these issues",
+          issuesHint: "These checks failed and lower the score; open to copy them to AI for fixes",
+          issuesImpact: "Failed \u2014 lowers score",
           passed: "Passed",
           total: "Checks",
           passedCount: "{{passed}}/{{total}} passed",
@@ -10478,7 +10497,15 @@ var init_en = __esm({
             notApplicable: "Not applicable"
           },
           attention: "Not detected",
-          attentionHint: "The following checks did not run or produced no conclusion; they do not count as passed",
+          attentionHint: "These checks did not run or produced no conclusion: they are not scored, but coverage is incomplete \u2014 not a full pass",
+          attentionImpact: "Not run \u2014 coverage incomplete",
+          notApplicableHint: "The target does not exist in this project: not scored and does not block 100",
+          notApplicableImpact: "No score impact",
+          projectMetricBadge: "Project-level metric",
+          projectMetricHint: "Project-level metric with no single-file location; copying to AI asks it to locate the hotspot function/file first, then refactor structurally.",
+          copyMetric: "Copy metric details",
+          copyMetricDone: "Copied to AI (project-level metric)",
+          projectMetricCopyNote: "Locate the hotspot function/file first (largest function/longest file), then split or refactor structurally; do not fix a single peak, and do not 'fix' it by changing the threshold.",
           errorTitle: "Inspection failed",
           errorNoReport: "The inspection returned no valid result. Try again or check the run log",
           errorRetry: "Re-run inspection",
@@ -12765,7 +12792,8 @@ var init_ko = __esm({
           },
           groupTitle: {},
           issues: "\uBB38\uC81C",
-          issuesHint: "\uBB38\uC81C \uD56D\uBAA9\uB9CC \u2014 \uCE74\uB4DC \uB0B4 \uBCF5\uC0AC\uB294 \uC774 \uBB38\uC81C\uB4E4\uB9CC \uBCF5\uC0AC\uD569\uB2C8\uB2E4",
+          issuesHint: "\uC774 \uAC80\uC0AC\uB4E4\uC740 \uBBF8\uB2EC\uB418\uC5B4 \uC810\uC218\uB97C \uB0AE\uCDA5\uB2C8\uB2E4. \uC5F4\uC5B4\uC11C AI \uC218\uC815\uC73C\uB85C \uBCF5\uC0AC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
+          issuesImpact: "\uBBF8\uB2EC \u2014 \uC810\uC218 \uD558\uB77D",
           passed: "\uD1B5\uACFC",
           total: "\uAC80\uC0AC \uD56D\uBAA9",
           passedCount: "{{passed}}/{{total}}\uAC1C \uD56D\uBAA9 \uD1B5\uACFC",
@@ -12780,7 +12808,15 @@ var init_ko = __esm({
             notApplicable: "\uD574\uB2F9 \uC5C6\uC74C"
           },
           attention: "\uBBF8\uAC80\uCD9C",
-          attentionHint: "\uB2E4\uC74C \uAC80\uC0AC\uB294 \uC2E4\uD589\uB418\uC9C0 \uC54A\uC558\uAC70\uB098 \uACB0\uB860\uC774 \uC5C6\uC5B4 \uD1B5\uACFC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
+          attentionHint: "\uC2E4\uD589\uB418\uC9C0 \uC54A\uC558\uAC70\uB098 \uACB0\uB860\uC774 \uC5C6\uC74C: \uC810\uC218\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC9C0\uB9CC \uCEE4\uBC84\uB9AC\uC9C0\uAC00 \uBD88\uC644\uC804\uD558\uC5EC \uB9CC\uC810\uC774 \uC544\uB2D9\uB2C8\uB2E4",
+          attentionImpact: "\uBBF8\uC2E4\uD589 \u2014 \uCEE4\uBC84\uB9AC\uC9C0 \uBD88\uC644\uC804",
+          notApplicableHint: "\uC774 \uD504\uB85C\uC81D\uD2B8\uC5D0 \uB300\uC0C1\uC774 \uC5C6\uC74C: \uC810\uC218\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC73C\uBA70 100\uC810\uC744 \uB9C9\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
+          notApplicableImpact: "\uC810\uC218 \uC5C6\uC74C\xB7100\uC810 \uC601\uD5A5 \uC5C6\uC74C",
+          projectMetricBadge: "\uD504\uB85C\uC81D\uD2B8 \uC9C0\uD45C",
+          projectMetricHint: "\uD504\uB85C\uC81D\uD2B8 \uC218\uC900 \uC9C0\uD45C\uB77C \uB2E8\uC77C \uD30C\uC77C \uC704\uCE58\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. AI\uB85C \uBCF5\uC0AC\uD558\uBA74 \uBA3C\uC800 \uD56B\uC2A4\uD31F \uD568\uC218/\uD30C\uC77C\uC744 \uCC3E\uACE0 \uAD6C\uC870\uC801\uC73C\uB85C \uBD84\uD560\xB7\uB9AC\uD329\uD130\uB9C1\uD558\uB3C4\uB85D \uC694\uCCAD\uD569\uB2C8\uB2E4.",
+          copyMetric: "\uC9C0\uD45C \uC124\uBA85 \uBCF5\uC0AC",
+          copyMetricDone: "AI\uC5D0 \uBCF5\uC0AC\uD588\uC2B5\uB2C8\uB2E4 (\uD504\uB85C\uC81D\uD2B8 \uC218\uC900 \uC9C0\uD45C)",
+          projectMetricCopyNote: "\uBA3C\uC800 \uC800\uC7A5\uC18C\uC5D0\uC11C \uAE30\uC900 \uCD08\uACFC \uD56B\uC2A4\uD31F \uD568\uC218/\uD30C\uC77C(\uAC00\uC7A5 \uD070 \uD568\uC218, \uAC00\uC7A5 \uAE34 \uD30C\uC77C)\uC744 \uCC3E\uC740 \uB4A4 \uAD6C\uC870\uC801\uC73C\uB85C \uBD84\uD560\uD558\uAC70\uB098 \uB9AC\uD329\uD130\uB9C1\uD558\uC138\uC694. \uB2E8\uC77C \uD53C\uD06C\uB9CC \uACE0\uCE58\uAC70\uB098 \uC784\uACC4\uAC12\uC744 \uBC14\uAFD4 '\uC218\uC815'\uD558\uC9C0 \uB9C8\uC138\uC694.",
           errorTitle: "\uC810\uAC80 \uC2E4\uD328",
           errorNoReport: "\uC810\uAC80\uC774 \uC720\uD6A8\uD55C \uACB0\uACFC\uB97C \uBC18\uD658\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2E4\uD589\uD558\uAC70\uB098 \uC2E4\uD589 \uB85C\uADF8\uB97C \uD655\uC778\uD558\uC138\uC694",
           errorRetry: "\uB2E4\uC2DC \uC810\uAC80",
@@ -15067,7 +15103,8 @@ var init_ja = __esm({
           },
           groupTitle: {},
           issues: "\u554F\u984C",
-          issuesHint: "\u554F\u984C\u306E\u307F \u2014 \u30AB\u30FC\u30C9\u5185\u306E\u30B3\u30D4\u30FC\u306F\u3053\u308C\u3089\u306E\u554F\u984C\u3060\u3051\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3059",
+          issuesHint: "\u3053\u308C\u3089\u306E\u30C1\u30A7\u30C3\u30AF\u306F\u672A\u9054\u3067\u3001\u30B9\u30B3\u30A2\u3092\u4E0B\u3052\u307E\u3059\u3002\u958B\u3044\u3066 AI \u4FEE\u6B63\u3078\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059",
+          issuesImpact: "\u672A\u9054 \u2014 \u30B9\u30B3\u30A2\u304C\u4E0B\u304C\u308B",
           passed: "\u5408\u683C",
           total: "\u691C\u67FB\u9805\u76EE",
           passedCount: "{{passed}}/{{total}} \u9805\u76EE\u5408\u683C",
@@ -15082,7 +15119,15 @@ var init_ja = __esm({
             notApplicable: "\u8A72\u5F53\u306A\u3057"
           },
           attention: "\u672A\u691C\u51FA",
-          attentionHint: "\u4EE5\u4E0B\u306E\u30C1\u30A7\u30C3\u30AF\u306F\u672A\u5B9F\u884C\u307E\u305F\u306F\u7D50\u8AD6\u304C\u51FA\u3066\u3044\u306A\u3044\u305F\u3081\u3001\u5408\u683C\u306B\u542B\u307E\u308C\u307E\u305B\u3093",
+          attentionHint: "\u672A\u5B9F\u884C\u307E\u305F\u306F\u7D50\u8AD6\u306A\u3057\uFF1A\u63A1\u70B9\u3055\u308C\u307E\u305B\u3093\u304C\u3001\u30AB\u30D0\u30EC\u30C3\u30B8\u304C\u4E0D\u5B8C\u5168\u306A\u305F\u3081\u6E80\u70B9\u3068\u306F\u8A00\u3048\u307E\u305B\u3093",
+          attentionImpact: "\u672A\u5B9F\u884C \u2014 \u30AB\u30D0\u30EC\u30C3\u30B8\u4E0D\u5B8C\u5168",
+          notApplicableHint: "\u3053\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306B\u5BFE\u8C61\u304C\u5B58\u5728\u3057\u307E\u305B\u3093\uFF1A\u63A1\u70B9\u3055\u308C\u305A\u3001100 \u70B9\u3082\u59A8\u3052\u307E\u305B\u3093",
+          notApplicableImpact: "\u63A1\u70B9\u306A\u3057\u30FB100\u70B9\u3092\u59A8\u3052\u306A\u3044",
+          projectMetricBadge: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u6307\u6A19",
+          projectMetricHint: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u6307\u6A19\u3067\u5358\u4E00\u30D5\u30A1\u30A4\u30EB\u306E\u4F4D\u7F6E\u304C\u3042\u308A\u307E\u305B\u3093\u3002AI \u3078\u30B3\u30D4\u30FC\u3059\u308B\u3068\u3001\u5148\u306B\u30DB\u30C3\u30C8\u30B9\u30DD\u30C3\u30C8\u95A2\u6570/\u30D5\u30A1\u30A4\u30EB\u3092\u7279\u5B9A\u3057\u3001\u69CB\u9020\u7684\u306B\u5206\u5272\u30FB\u30EA\u30D5\u30A1\u30AF\u30BF\u3059\u308B\u3088\u3046\u6307\u793A\u3057\u307E\u3059\u3002",
+          copyMetric: "\u6307\u6A19\u306E\u8AAC\u660E\u3092\u30B3\u30D4\u30FC",
+          copyMetricDone: "AI \u3078\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF08\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u6307\u6A19\uFF09",
+          projectMetricCopyNote: "\u307E\u305A\u30EA\u30DD\u30B8\u30C8\u30EA\u5185\u3067\u57FA\u6E96\u8D85\u904E\u306E\u30DB\u30C3\u30C8\u30B9\u30DD\u30C3\u30C8\u95A2\u6570/\u30D5\u30A1\u30A4\u30EB\uFF08\u6700\u5927\u306E\u95A2\u6570\u30FB\u6700\u9577\u306E\u30D5\u30A1\u30A4\u30EB\uFF09\u3092\u7279\u5B9A\u3057\u3001\u69CB\u9020\u7684\u306B\u5206\u5272\u30FB\u30EA\u30D5\u30A1\u30AF\u30BF\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u5358\u4E00\u306E\u30D4\u30FC\u30AF\u3060\u3051\u3092\u76F4\u3057\u305F\u308A\u3001\u3057\u304D\u3044\u5024\u3092\u5909\u3048\u3066\u300C\u4FEE\u6B63\u300D\u3057\u305F\u308A\u3057\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002",
           errorTitle: "\u5DE1\u56DE\u306B\u5931\u6557\u3057\u307E\u3057\u305F",
           errorNoReport: "\u5DE1\u56DE\u304C\u6709\u52B9\u306A\u7D50\u679C\u3092\u8FD4\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u518D\u5B9F\u884C\u3059\u308B\u304B\u5B9F\u884C\u30ED\u30B0\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044",
           errorRetry: "\u518D\u5DE1\u56DE",
@@ -121611,7 +121656,7 @@ var require_relative_module_resolver = __commonJS({
 var require_eslint = __commonJS({
   "../../node_modules/.pnpm/eslint@10.13.0_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/eslint/eslint.js"(exports2, module2) {
     "use strict";
-    var { existsSync: existsSync41 } = require("node:fs");
+    var { existsSync: existsSync42 } = require("node:fs");
     var fs77 = require("node:fs/promises");
     var os15 = require("node:os");
     var path82 = require("node:path");
@@ -122047,7 +122092,7 @@ var require_eslint = __commonJS({
           warningService,
           suppressionsService
         });
-        if (existsSync41(path82.resolve(processedOptions.cwd, ".eslintignore"))) {
+        if (existsSync42(path82.resolve(processedOptions.cwd, ".eslintignore"))) {
           warningService.emitESLintIgnoreWarning();
         }
       }
@@ -122216,11 +122261,11 @@ var require_eslint = __commonJS({
         if (!lintResultCache && cacheFilePath) {
           debug2("Deleting cache file at %s", cacheFilePath);
           try {
-            if (existsSync41(cacheFilePath)) {
+            if (existsSync42(cacheFilePath)) {
               await fs77.unlink(cacheFilePath);
             }
           } catch (error) {
-            if (existsSync41(cacheFilePath)) {
+            if (existsSync42(cacheFilePath)) {
               throw error;
             }
           }
@@ -122563,7 +122608,7 @@ var require_rule_tester = __commonJS({
   "../../node_modules/.pnpm/eslint@10.13.0_jiti@2.7.0_supports-color@7.2.0/node_modules/eslint/lib/rule-tester/rule-tester.js"(exports2, module2) {
     "use strict";
     var assert = require("node:assert");
-    var { existsSync: existsSync41, readFileSync: readFileSync31 } = require("node:fs");
+    var { existsSync: existsSync42, readFileSync: readFileSync31 } = require("node:fs");
     var util = require("node:util");
     var path82 = require("node:path");
     var equal = require_fast_deep_equal();
@@ -122954,7 +122999,7 @@ var require_rule_tester = __commonJS({
           testLocations = {
             root: `${sourceFile}:${sourceLine}:${sourceColumn}`
           };
-          if (existsSync41(sourceFile)) {
+          if (existsSync42(sourceFile)) {
             let content = readFileSync31(sourceFile, "utf8").split("\n").slice(sourceLine - 1);
             content[0] = content[0].slice(Math.max(0, sourceColumn - 1));
             content = content.map(
@@ -518445,6 +518490,9 @@ var MAX_FILE_BYTES = 512 * 1024;
 function isSkippedDir(name) {
   return name.startsWith(".") || SKIP_DIR_EXACT.has(name) || SKIP_DIR_PREFIX.test(name);
 }
+function isNestedRepoRoot(dir2) {
+  return fs48.existsSync(path50.join(dir2, ".git"));
+}
 var DEFAULT_MAX_FILES = 4e3;
 function createRuleMetricsProvider(repoRoot, options2 = {}) {
   const cache = /* @__PURE__ */ new Map();
@@ -518559,7 +518607,7 @@ function collectSourceFiles2(repoRoot, limit) {
     for (const entry of readDir(dir2)) {
       const full = path50.join(dir2, entry.name);
       if (entry.isDirectory()) {
-        if (!isSkippedDir(entry.name)) stack.push(full);
+        if (!isSkippedDir(entry.name) && !isNestedRepoRoot(full)) stack.push(full);
         continue;
       }
       if (!acceptSourceFile(repoRoot, full, entry.name, result.oversize)) continue;

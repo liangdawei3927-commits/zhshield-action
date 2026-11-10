@@ -73,6 +73,23 @@ function isSkippedDir(name: string): boolean {
   return name.startsWith('.') || SKIP_DIR_EXACT.has(name) || SKIP_DIR_PREFIX.test(name);
 }
 
+/**
+ * 子目录是否为**独立仓库根**（自身带 `.git`）。
+ *
+ * 口径与 `project-profile.ts` 的 `resolveEffectiveProjectRoot` 一致：目标本身
+ * 是 git 仓库时不下探 —— 子目录里的仓库是**另一个项目**（本仓
+ * `ZHCodeShield/` 与被 .gitignore 排除的 `zhihui-codeshield/` 就是这种结构）。
+ *
+ * 2026-11-10 实测：外层文档仓的复杂度告警报出 cyclomaticComplexity=15 /
+ * functionLength=80 / fileLength=530，三条峰值全部来自内层 monorepo 的源码，
+ * 而本次扫描的项目根是外层文档仓。同时内层仓库的 `.metric-baseline.json`
+ * 棘轮基线不在本目标根，存量债务被静态阈值判红 —— 告警既挂错了项目，
+ * 又绕过了基线。复杂度是「项目级」指标，跨仓库边界统计即失去意义。
+ */
+function isNestedRepoRoot(dir: string): boolean {
+  return fs.existsSync(path.join(dir, '.git'));
+}
+
 /** 默认源文件上限：超出即放弃统计（8GB 机解析上万文件会把体检拖成分钟级） */
 const DEFAULT_MAX_FILES = 4000;
 
@@ -247,7 +264,8 @@ function collectSourceFiles(repoRoot: string, limit: number): CollectResult {
     for (const entry of readDir(dir)) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!isSkippedDir(entry.name)) stack.push(full);
+        // 嵌套仓库不算本项目的源码：项目级指标跨仓库统计既挂错项目，也绕过对方基线
+        if (!isSkippedDir(entry.name) && !isNestedRepoRoot(full)) stack.push(full);
         continue;
       }
       if (!acceptSourceFile(repoRoot, full, entry.name, result.oversize)) continue;

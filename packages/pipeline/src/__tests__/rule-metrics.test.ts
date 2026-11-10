@@ -211,6 +211,33 @@ describe('createRuleMetricsProvider', () => {
       expect(result.metrics!.nestingDepth).toBe(0);
     });
 
+    it('GIVEN 目标根下嵌着另一个仓库 WHEN 采集 THEN 不统计该仓库的源码', () => {
+      // 2026-11-10 实测：外层文档仓扫描报出 cyclomaticComplexity=15 /
+      // functionLength=80 / fileLength=530，峰值全部来自被 .gitignore 排除的
+      // 内层 monorepo —— 项目级指标跨了仓库边界，告警挂错了项目。
+      writeSource('src/own.ts', 'export function small() {\n  return 1;\n}\n');
+      writeSource('nested/.git/HEAD', 'ref: refs/heads/main\n');
+      writeSource(
+        'nested/src/messy.ts',
+        'export function messy(a,b,c,d,e,f,g,h) {\n' +
+          '  if (a) { if (b) { if (c) { if (d) { return 1 } } } }\n'.repeat(3) +
+          '}\n',
+      );
+
+      const provider = createRuleMetricsProvider(repoRoot);
+      const result = provider(
+        rule({
+          id: 'inspect.scan.official.complexity',
+          content: { thresholds: { parameterCount: 5 } },
+        }),
+        { repoRoot },
+      ) as { metrics?: Record<string, number> };
+
+      // 若把嵌套仓库算进来，parameterCount 会是 8，fileLength 会取 3+10 行
+      expect(result.metrics!.parameterCount).toBe(0);
+      expect(result.metrics!.fileLength).toBe(3);
+    });
+
     it('GIVEN 存在超大源文件 WHEN 采集 THEN 整体放弃而非静默跳过', () => {
       writeSource('src/ok.ts', 'export function small() {\n  return 1;\n}\n');
       writeSource(

@@ -17,11 +17,17 @@ interface InspectPageProps {
   projectPath: string;
 }
 
+/** 三类复制动作打包：避免 checkDetail/optionalStatCard 参数列表膨胀 */
+type CheckCopyActions = {
+  copyToAi: (item: InspectionReportData['checks'][number]) => void;
+  copyAllToAi: (items: InspectionReportData['checks']) => void;
+  copyMetric: (item: InspectionReportData['checks'][number]) => void;
+};
+
 /** 统计卡明细：把一批检查项交给 CheckList 渲染（通过/问题/未检测三类共用同一套交互） */
 function checkDetail(
   items: InspectionReportData['checks'],
-  copyToAi: (item: InspectionReportData['checks'][number]) => void,
-  copyAllToAi: (items: InspectionReportData['checks']) => void,
+  copy: CheckCopyActions,
   hint?: string,
 ): { items: unknown[]; render: (sub: unknown[]) => ReactNode; hint?: string } {
   return {
@@ -29,8 +35,9 @@ function checkDetail(
     render: (sub: unknown[]) => (
       <CheckList
         items={sub as InspectionReportData['checks']}
-        onCopyToAi={copyToAi}
-        onCopyAll={copyAllToAi}
+        onCopyToAi={copy.copyToAi}
+        onCopyAll={copy.copyAllToAi}
+        onCopyMetric={copy.copyMetric}
       />
     ),
     hint,
@@ -44,8 +51,7 @@ function checkDetail(
 function optionalStatCard(
   group: InspectionReportData['checks'],
   card: { key: string; label: string; hint?: string },
-  copyToAi: (item: InspectionReportData['checks'][number]) => void,
-  copyAllToAi: (items: InspectionReportData['checks']) => void,
+  copy: CheckCopyActions,
 ): ReportStatCard[] {
   if (group.length === 0) return [];
   return [
@@ -54,7 +60,7 @@ function optionalStatCard(
       label: card.label,
       value: group.length,
       color: 'rgb(var(--zh-muted))',
-      detail: checkDetail(group, copyToAi, copyAllToAi, card.hint),
+      detail: checkDetail(group, copy, card.hint),
     },
   ];
 }
@@ -69,8 +75,7 @@ function buildInspectStats({
   passCount,
   attentionChecks,
   notApplicableChecks,
-  copyToAi,
-  copyAllToAi,
+  copy,
   t,
   isSnapshot,
 }: {
@@ -78,8 +83,7 @@ function buildInspectStats({
   passCount: number;
   attentionChecks: InspectionReportData['checks'];
   notApplicableChecks: InspectionReportData['checks'];
-  copyToAi: (item: InspectionReportData['checks'][number]) => void;
-  copyAllToAi: (items: InspectionReportData['checks']) => void;
+  copy: CheckCopyActions;
   t: Translate;
   /** 历史快照（仅问题项）：通过项未落盘，通过数未知 → 显示「—」而非 0 */
   isSnapshot?: boolean;
@@ -97,8 +101,7 @@ function buildInspectStats({
         : {
             detail: checkDetail(
               items.filter((i) => i.status === 'pass'),
-              copyToAi,
-              copyAllToAi,
+              copy,
             ),
           }),
     },
@@ -109,8 +112,7 @@ function buildInspectStats({
       color: 'rgb(var(--zh-danger))',
       detail: checkDetail(
         selectIssueChecks(items),
-        copyToAi,
-        copyAllToAi,
+        copy,
         t('page.inspect.issuesHint'),
       ),
     },
@@ -121,8 +123,7 @@ function buildInspectStats({
         label: t('page.inspect.attention'),
         hint: t('page.inspect.attentionHint'),
       },
-      copyToAi,
-      copyAllToAi,
+      copy,
     ),
     // 不适用单列：检测对象在本项目不存在，不计入「通过」，也不计入「未检测」。
     ...optionalStatCard(
@@ -132,8 +133,7 @@ function buildInspectStats({
         label: t('page.inspect.status.notApplicable'),
         hint: t('page.inspect.notApplicableHint'),
       },
-      copyToAi,
-      copyAllToAi,
+      copy,
     ),
   ];
 }
@@ -143,8 +143,7 @@ interface InspectReportViewProps extends AsyncScanActionProps {
   report: InspectionReportData;
   onRescan: () => void;
   onBackHome: () => void;
-  copyToAi: (item: InspectionReportData['checks'][number]) => void;
-  copyAllToAi: (items: InspectionReportData['checks']) => void;
+  copy: CheckCopyActions;
   t: Translate;
 }
 
@@ -158,8 +157,7 @@ function InspectReportView({
   stopping,
   onRescan,
   onBackHome,
-  copyToAi,
-  copyAllToAi,
+  copy,
   t,
 }: InspectReportViewProps) {
   const items = report.checks;
@@ -203,8 +201,7 @@ function InspectReportView({
         passCount,
         attentionChecks,
         notApplicableChecks,
-        copyToAi,
-        copyAllToAi,
+        copy,
         t,
         isSnapshot,
       })}
@@ -262,6 +259,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     stopping,
     copyToAi,
     copyAllToAi,
+    copyMetric,
     startInspect,
     showHome,
     scanVersion,
@@ -298,8 +296,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         stopping={stopping}
         onRescan={startInspect}
         onBackHome={backHome}
-        copyToAi={copyToAi}
-        copyAllToAi={copyAllToAi}
+        copy={{ copyToAi, copyAllToAi, copyMetric }}
         t={t}
       />
     );

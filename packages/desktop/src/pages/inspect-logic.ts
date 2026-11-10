@@ -6,7 +6,7 @@ import { selectIssueChecks, toInspectOutcome } from './inspect-sop-mapper';
 import { toInspectionReportDataFromSnapshot } from './inspect-snapshot-mapper';
 import type { InspectFailure } from './inspect-sop-mapper';
 import { useToast } from '../components/ui/Toast';
-import { copyIssuesToAi } from '../utils/copyToAi';
+import { copyIssuesToAi, copyTextToClipboard } from '../utils/copyToAi';
 import { useDailyAutoCheck } from '../hooks/useDailyAutoCheck';
 import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
@@ -156,6 +156,8 @@ function useInspectRun(projectPath: string): DomainRunState & {
 function useInspectCopyToAi(projectPath: string): {
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
+  /** 项目级指标：复制指标说明（不是文件级 AI 修复提示词） */
+  copyMetric: (item: InspectionReportData['checks'][number]) => void;
 } {
   const { toast } = useToast();
 
@@ -185,6 +187,20 @@ function useInspectCopyToAi(projectPath: string): {
     [projectPath, toast],
   );
 
+  const copyMetric = useCallback(
+    (item: InspectionReportData['checks'][number]) => {
+      const text = `${item.name}\n${item.detail}\n\n${t('page.inspect.projectMetricCopyNote')}`;
+      void copyTextToClipboard(text).then(
+        (ok) =>
+          ok
+            ? toast(t('page.inspect.copyMetricDone'), 'success')
+            : toast(t('toast.copyFailed'), 'error'),
+        () => toast(t('toast.copyFailed'), 'error'),
+      );
+    },
+    [toast],
+  );
+
   const copyAllToAi = useCallback(
     (items: InspectionReportData['checks']) => {
       // 同上：项目级指标不进批量 AI 修复队列。
@@ -212,13 +228,13 @@ function useInspectCopyToAi(projectPath: string): {
     [projectPath, toast],
   );
 
-  return { copyToAi, copyAllToAi };
+  return { copyToAi, copyAllToAi, copyMetric };
 }
 
 /** 巡检页全部状态与副作用：每天首次进入本页自动巡检一次、复制到 AI */
 export function useInspectPage(projectPath: string) {
   const { report, persisted, failure, startInspect, ...runState } = useInspectRun(projectPath);
-  const { copyToAi, copyAllToAi } = useInspectCopyToAi(projectPath);
+  const { copyToAi, copyAllToAi, copyMetric } = useInspectCopyToAi(projectPath);
   // 自动巡检带 origin='auto'：仅作为任务上的诊断元数据（首扫/每日/定时/手动
   // 触发的任务在 UI 上一视同仁），手动/自动同参任务互相复用不重复扫。
   useDailyAutoCheck(
@@ -228,5 +244,14 @@ export function useInspectPage(projectPath: string) {
     'pipeline',
   );
 
-  return { ...runState, report, persisted, failure, copyToAi, copyAllToAi, startInspect };
+  return {
+    ...runState,
+    report,
+    persisted,
+    failure,
+    copyToAi,
+    copyAllToAi,
+    copyMetric,
+    startInspect,
+  };
 }

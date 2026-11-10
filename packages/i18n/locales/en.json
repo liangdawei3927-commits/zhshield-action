@@ -1349,6 +1349,8 @@
       "attention": "Not detected",
       "attentionHint": "These checks did not run or produced no conclusion: they are not scored, but coverage is incomplete — not a full pass",
       "notApplicableHint": "The target does not exist in this project: not scored and does not block 100",
+      "projectMetricBadge": "Project-level metric",
+      "projectMetricHint": "This is a project-level metric (e.g., complexity threshold). It has no file location and cannot be sent to AI as a single-file fix; treat it by metric trend in the report.",
       "errorTitle": "Inspection failed",
       "errorNoReport": "The inspection returned no valid result. Try again or check the run log",
       "errorRetry": "Re-run inspection",

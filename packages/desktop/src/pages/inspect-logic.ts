@@ -189,7 +189,16 @@ function useInspectCopyToAi(projectPath: string): {
     (items: InspectionReportData['checks']) => {
       // 同上：项目级指标不进批量 AI 修复队列。
       const failed = selectIssueChecks(items.filter((item) => item.projectMetric !== true));
-      if (failed.length === 0) return;
+      if (failed.length === 0) {
+        toast(
+          t('page.inspect.projectMetricHint', {
+            defaultValue:
+              '当前只有项目级指标（如复杂度阈值），没有文件级问题可复制给 AI；请在报告中按指标趋势治理。',
+          }),
+          'info',
+        );
+        return;
+      }
       copyIssuesToAi(
         projectPath,
         toast,

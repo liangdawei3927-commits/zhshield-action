@@ -1349,6 +1349,8 @@
       "attention": "未檢測",
       "attentionHint": "這些檢查未執行或未產出結論：不計分，但覆蓋不完整，不能當滿分",
       "notApplicableHint": "檢測對象在本專案不存在：不計分，也不影響 100 分",
+      "projectMetricBadge": "專案級指標",
+      "projectMetricHint": "這是專案級指標（如複雜度閾值），沒有具體檔案位置，不能作為單檔問題交給 AI 修復；請在報告中按指標趨勢治理。",
       "errorTitle": "體檢失敗",
       "errorNoReport": "體檢未回傳有效結果，請重試或查看執行日誌",
       "errorRetry": "重新體檢",

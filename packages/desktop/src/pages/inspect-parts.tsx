@@ -38,7 +38,10 @@ export function CheckList({
   const t = useT();
   // 只有真实问题才可「复制到 AI 修复」：attention（未检测）与 notApplicable（不适用）
   // 都不是待修复项，混进来会让 AI 去「修」一个不存在的问题。
-  const failedCount = items.filter((i) => isIssueStatus(i.status)).length;
+  // 项目级指标（复杂度阈值等）没有文件位置，不进「复制到 AI」队列，也不计入可复制项数。
+  const failedCount = items.filter(
+    (i) => isIssueStatus(i.status) && i.projectMetric !== true,
+  ).length;
   return (
     <ResultCard variant="list" className="overflow-hidden">
       {failedCount > 0 && (
@@ -74,7 +77,18 @@ export function CheckList({
               <span className="text-sm font-medium text-zh-ink-2">{item.name}</span>
               <div className="text-xs mt-0.5 text-zh-muted">{item.detail}</div>
             </div>
-            {isIssueStatus(item.status) && <CopyToAiButton onClick={() => onCopyToAi(item)} />}
+            {isIssueStatus(item.status) && item.projectMetric !== true && (
+              <CopyToAiButton onClick={() => onCopyToAi(item)} />
+            )}
+            {isIssueStatus(item.status) && item.projectMetric === true && (
+              <span
+                className="text-xs px-2 py-0.5 rounded font-medium"
+                style={{ background: 'rgb(var(--zh-muted) / 0.1)', color: 'rgb(var(--zh-muted))' }}
+                title={t('page.inspect.projectMetricHint')}
+              >
+                {t('page.inspect.projectMetricBadge')}
+              </span>
+            )}
             <span
               className="text-xs px-2 py-0.5 rounded font-medium"
               style={{ background: config.bg, color: config.color }}

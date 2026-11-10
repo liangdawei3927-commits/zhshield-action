@@ -1342,6 +1342,8 @@
       "attention": "未检测",
       "attentionHint": "这些检查未执行或未产出结论：不计分，但覆盖不完整，不能当满分",
       "notApplicableHint": "检测对象在本项目不存在：不计分，也不影响 100 分",
+      "projectMetricBadge": "项目级指标",
+      "projectMetricHint": "这是项目级指标（如复杂度阈值），没有具体文件位置，不能作为单文件问题交给 AI 修复；请在报告中按指标趋势治理。",
       "errorTitle": "体检失败",
       "errorNoReport": "体检未返回有效结果，请重试或查看运行日志",
       "errorRetry": "重新体检",

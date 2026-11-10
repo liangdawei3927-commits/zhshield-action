@@ -141,14 +141,19 @@ export function extractInspectRuleCoverage(
     if (evaluation.status === 'passed' || evaluation.status === 'failed') {
       evaluated += 1;
       if (evaluation.applicability === 'not-applicable') notApplicable += 1;
+    } else if (evaluation.status === 'skipped' && evaluation.degraded !== true) {
+      // 画像裁剪 / 映射型规则：按项目前提主动跳过，不是覆盖率缺口。
+      // 只有 degraded=true（工具不可用/适配器缺失/引擎出错）才计入「没跑」。
+      // 混为一谈会把「本项目不需要 dep-cruiser/tsc」误报成 7 项未检测。
+      notApplicable += 1;
     } else {
-      // error（引擎内部出错）与 skipped（工具不可用）都是「没跑」，不是「通过了」
+      // error 与 degraded skipped 都是「没跑」，不是「通过了」
       unavailable += 1;
     }
   }
   const declaredTotal = Number.isFinite(inspect.total) ? inspect.total : evaluations.length;
   const total = Math.max(declaredTotal, evaluations.length);
-  unavailable += Math.max(0, total - evaluated - unavailable);
+  unavailable += Math.max(0, total - evaluated - unavailable - notApplicable);
   return {
     total,
     evaluated,
@@ -173,6 +178,7 @@ export function extractInspectRuleLedger(
     ruleId: evaluation.rule.id,
     name: evaluation.rule.name,
     status: evaluation.status,
+    ...(evaluation.degraded !== undefined ? { degraded: evaluation.degraded } : {}),
     ...(evaluation.applicability ? { applicability: evaluation.applicability } : {}),
     ...(evaluation.message ? { reason: evaluation.message } : {}),
     durationMs: evaluation.durationMs,

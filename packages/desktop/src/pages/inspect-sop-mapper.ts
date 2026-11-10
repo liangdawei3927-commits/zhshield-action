@@ -23,6 +23,9 @@ export interface SerializedRuleEvaluation {
     domain?: string;
   };
   status: 'passed' | 'failed' | 'error' | 'skipped';
+  /** 非预期降级跳过（工具不可用/适配器缺失）：true 才是真的「未检测」。
+   *  false 的 skipped 是画像裁剪/映射型规则 → 不适用，不是覆盖率缺口。 */
+  degraded?: boolean;
   /** 不适用标注：检测对象在本项目不存在（如无 Web 框架的 Helmet/CSRF）。
    *  存在时 status 为 passed，但不可当成「已通过」展示。 */
   applicability?: 'not-applicable';
@@ -72,6 +75,9 @@ function mapStatus(ev: SerializedRuleEvaluation): CheckStatus {
   // 不适用优先于 status：status 仍是 passed（引擎契约不新增状态），但对用户
   // 必须显示「不适用」——「没得查」与「查过且安全」是两件事。
   if (ev.applicability === 'not-applicable') return 'notApplicable';
+  // 画像裁剪 / 映射型规则：skipped 且 degraded !== true → 本项目不适用，
+  // 不是「未检测」。只有 degraded=true（工具不可用）才落 attention。
+  if (ev.status === 'skipped' && ev.degraded !== true) return 'notApplicable';
   switch (ev.status) {
     case 'passed':
       return 'pass';
@@ -97,6 +103,9 @@ function buildDetail(ev: SerializedRuleEvaluation): string {
   // 三种旁路状态各给明确口径，用户才知道是该装工具、修配置，还是接受画像裁剪。
   if (ev.applicability === 'not-applicable') {
     return ev.message ? `不适用：${ev.message}` : '不适用：本项目没有该规则的检测对象';
+  }
+  if (ev.status === 'skipped' && ev.degraded !== true) {
+    return ev.message ? `不适用：${ev.message}` : '不适用：工具不在当前项目画像范围内';
   }
   if (ev.status === 'skipped') {
     return ev.message ? `未执行：${ev.message}` : '未执行：工具不可用或不在本项目适用范围内';
@@ -140,7 +149,11 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
   // warn 当前不产生（mapStatus 只出 pass/fail/attention/notApplicable），保留按状态统计以维持
   // total = passed + warnings + failures + notApplicable 不变量与既有 toInspectionReportData 语义对齐。
   const warningCount = checks.filter((c) => c.status === 'warn' || c.status === 'attention').length;
-  const evaluatedCount = checks.filter((c) => c.status !== 'attention').length;
+  // 已求值 = 真正产出结论的规则（pass/fail/warn）；notApplicable 不算已求值，
+  // 否则 13/20 会被写成 19/20（R6 的 run 语义是「跑了且有结论」）。
+  const evaluatedCount = checks.filter(
+    (c) => c.status === 'pass' || c.status === 'fail' || c.status === 'warn',
+  ).length;
   const unavailableCount = checks.filter((c) => c.status === 'attention').length;
 
   return {
@@ -157,6 +170,7 @@ export function toInspectionReportDataFromRuleEngine(raw: unknown): InspectionRe
       ruleId: ev.rule.id,
       name: ev.rule.name,
       status: ev.status,
+      ...(ev.degraded !== undefined ? { degraded: ev.degraded } : {}),
       ...(ev.applicability ? { applicability: ev.applicability } : {}),
       ...(ev.message ? { reason: ev.message } : {}),
       durationMs: ev.durationMs ?? 0,

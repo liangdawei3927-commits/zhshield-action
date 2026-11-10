@@ -70,11 +70,12 @@ describe('toInspectionReportDataFromRuleEngine — skipped 评估不产问题条
     ],
   };
 
-  it('skipped 评估映射为 attention 检查项（保留未检测提示）', () => {
+  it('skipped 非降级（让位/画像裁剪）映射为 notApplicable，不伪造未检测', () => {
     const data = toInspectionReportDataFromRuleEngine(skippedOnlyReport);
     expect(data).not.toBeNull();
     const skipped = data!.checks.find((c) => c.name === 'TypeScript Type Consistency');
-    expect(skipped?.status).toBe('attention');
+    expect(skipped?.status).toBe('notApplicable');
+    expect(skipped?.detail).toContain('不适用');
     expect(skipped?.detail).toContain('跳过 check-list');
   });
 
@@ -252,6 +253,7 @@ describe('toInspectionReportDataFromRuleEngine — R7 未检测原因口径', ()
       {
         rule: { id: 'inspect.scan.semgrep', name: 'Semgrep', domain: 'inspect' },
         status: 'skipped' as const,
+        degraded: true,
         message: 'semgrep 未安装或不在 PATH',
       },
       {
@@ -294,8 +296,44 @@ describe('toInspectionReportDataFromRuleEngine — R7 未检测原因口径', ()
       ruleId: 'inspect.scan.semgrep',
       name: 'Semgrep',
       status: 'skipped',
+      degraded: true,
       reason: 'semgrep 未安装或不在 PATH',
       durationMs: 0,
+    });
+  });
+
+  it('skipped 未降级（画像裁剪）→ notApplicable，不是未检测', () => {
+    const scopeReport = {
+      total: 1,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 1,
+      ok: true,
+      durationMs: 0,
+      timestamp: '2026-11-10T08:00:00.000Z',
+      evaluations: [
+        {
+          rule: {
+            id: 'inspect.scan.depcruiser.circular-dependency',
+            name: '循环依赖检测',
+            domain: 'inspect',
+          },
+          status: 'skipped' as const,
+          message: '工具 dep-cruiser 不在当前项目画像 scope 内，tool-dispatch 跳过',
+        },
+      ],
+    };
+    const data = toInspectionReportDataFromRuleEngine(scopeReport);
+    const check = data!.checks[0];
+    expect(check.status).toBe('notApplicable');
+    expect(check.detail).toContain('不适用');
+    expect(data!.ruleCoverage).toEqual({
+      total: 1,
+      evaluated: 0,
+      unavailable: 0,
+      notApplicable: 1,
+      complete: true,
     });
   });
 });

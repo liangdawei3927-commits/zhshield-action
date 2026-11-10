@@ -174,7 +174,10 @@ function InspectReportView({
     isSnapshot || items.length === 0
       ? undefined
       : report.ruleCoverage
-        ? { run: report.ruleCoverage.evaluated, total: report.ruleCoverage.total }
+        ? {
+            run: report.ruleCoverage.evaluated,
+            total: Math.max(0, report.ruleCoverage.total - report.ruleCoverage.notApplicable),
+          }
         : { run: items.length - attentionChecks.length, total: items.length };
 
   return (

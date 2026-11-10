@@ -68,7 +68,7 @@ function HistoryRowView({
             }}
             title={t('page.domainHistory.partialHint', {
               run: ruleCoverage.evaluated,
-              total: ruleCoverage.total,
+              total: Math.max(0, ruleCoverage.total - ruleCoverage.notApplicable),
               gaps: ruleCoverage.unavailable,
               defaultValue: '覆盖 {{run}}/{{total}}，{{gaps}} 项未检测',
             })}

@@ -41,12 +41,17 @@ const renderCard = (props: Parameters<typeof DomainScoreCard>[0]): string =>
     ) as ReactElement,
   );
 
-function evaluation(status: string, applicability?: 'not-applicable') {
+function evaluation(
+  status: string,
+  applicability?: 'not-applicable',
+  degraded?: boolean,
+) {
   return {
     rule: { id: 'rule', name: 'rule' },
     status,
     durationMs: 0,
     ...(applicability ? { applicability } : {}),
+    ...(degraded !== undefined ? { degraded } : {}),
   };
 }
 
@@ -65,18 +70,35 @@ function ruleEngineReport(evaluations: unknown[], total?: number) {
 }
 
 describe('extractInspectRuleCoverage', () => {
-  it('12 pass + 1 fail + 2 error + 5 skipped → 已求值 13 / 未执行 7', () => {
+  it('12 pass + 1 fail + 2 error + 5 degraded skipped → 已求值 13 / 未执行 7', () => {
     const evaluations = [
       ...Array.from({ length: 12 }, () => evaluation('passed')),
       evaluation('failed'),
       ...Array.from({ length: 2 }, () => evaluation('error')),
-      ...Array.from({ length: 5 }, () => evaluation('skipped')),
+      ...Array.from({ length: 5 }, () => evaluation('skipped', undefined, true)),
     ];
     expect(extractInspectRuleCoverage(ruleEngineReport(evaluations))).toEqual({
       total: 20,
       evaluated: 13,
       unavailable: 7,
       notApplicable: 0,
+      complete: false,
+    });
+  });
+
+  it('skipped 未降级（画像裁剪/映射型）→ notApplicable，不是覆盖缺口', () => {
+    const evaluations = [
+      ...Array.from({ length: 12 }, () => evaluation('passed')),
+      evaluation('failed'),
+      ...Array.from({ length: 5 }, () => evaluation('skipped')),
+      evaluation('skipped'),
+      evaluation('skipped', undefined, true),
+    ];
+    expect(extractInspectRuleCoverage(ruleEngineReport(evaluations))).toEqual({
+      total: 20,
+      evaluated: 13,
+      unavailable: 1,
+      notApplicable: 6,
       complete: false,
     });
   });

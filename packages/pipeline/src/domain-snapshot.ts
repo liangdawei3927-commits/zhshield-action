@@ -103,6 +103,8 @@ export interface RuleLedgerEntry {
   ruleId: string;
   name: string;
   status: 'passed' | 'failed' | 'error' | 'skipped';
+  /** 非预期降级跳过：true 才是真的「未检测」；false 的 skipped 是画像裁剪/映射型规则 */
+  degraded?: boolean;
   /** not-applicable：规则跑了，但本项目没有可检对象（不构成覆盖缺口） */
   applicability?: 'not-applicable';
   /** 工具自述的失败/跳过原因（RuleEvaluation.message） */

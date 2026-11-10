@@ -5,7 +5,6 @@ import { isIssueStatus } from './inspect-sop-mapper';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
-import { CopyToAiBaseButton } from '../components/ui/CopyToAiBaseButton';
 
 export function ProgressBar({ passCount, total }: { passCount: number; total: number }) {
   const t = useT();
@@ -65,9 +64,7 @@ function CheckRow({
         <CopyToAiButton onClick={() => onCopyToAi(item)} />
       )}
       {isIssueStatus(item.status) && projectMetric && onCopyMetric && (
-        <CopyToAiBaseButton onClick={() => onCopyMetric(item)} shape="pill">
-          {t('page.inspect.copyMetric')}
-        </CopyToAiBaseButton>
+        <CopyToAiButton onClick={() => onCopyMetric(item)} />
       )}
       {isIssueStatus(item.status) && projectMetric && (
         <span

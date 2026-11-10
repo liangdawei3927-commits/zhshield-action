@@ -153,6 +153,16 @@ function useInspectRun(projectPath: string): DomainRunState & {
   return { ...runState, report, persisted, failure, startInspect };
 }
 
+/** 项目级指标复制文本：指标名 + 阈值 + 处理要求（告诉 AI 先定位热点再重构） */
+function buildMetricCopyText(item: InspectionReportData['checks'][number]): string {
+  return [
+    `【${t('page.inspect.source')} · ${t('page.inspect.projectMetricBadge')}】${item.name}`,
+    item.detail,
+    '',
+    t('page.inspect.projectMetricCopyNote'),
+  ].join('\n');
+}
+
 function useInspectCopyToAi(projectPath: string): {
   copyToAi: (item: InspectionReportData['checks'][number]) => void;
   copyAllToAi: (items: InspectionReportData['checks']) => void;
@@ -189,7 +199,7 @@ function useInspectCopyToAi(projectPath: string): {
 
   const copyMetric = useCallback(
     (item: InspectionReportData['checks'][number]) => {
-      const text = `${item.name}\n${item.detail}\n\n${t('page.inspect.projectMetricCopyNote')}`;
+      const text = buildMetricCopyText(item);
       void copyTextToClipboard(text).then(
         (ok) =>
           ok

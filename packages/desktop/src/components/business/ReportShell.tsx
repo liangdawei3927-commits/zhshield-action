@@ -13,6 +13,8 @@ export interface ReportStatCard {
   value: number | string;
   /** 数字颜色（缺省 text-zh-ink） */
   color?: string;
+  /** 卡面影响提示（可选）：直接把「这一类为什么影响 100 分」放在卡头，不必点开 */
+  hint?: string;
   detail?: {
     /** 该卡明细数据（点击卡片后展示的子集） */
     items: unknown[];
@@ -159,6 +161,9 @@ function ReportStatsRow({
             <div className="text-2xl font-bold mt-1" style={{ color: s.color }}>
               {s.value}
             </div>
+            {s.hint && (
+              <div className="text-[11px] leading-4 text-zh-muted mt-1">{s.hint}</div>
+            )}
           </ResultCard>
         );
       })}

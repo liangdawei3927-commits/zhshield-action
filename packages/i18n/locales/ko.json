@@ -876,6 +876,11 @@
       "notRunHint": "이 기능을 실행하고 요약하면 총점에 반영됩니다",
       "scoreDelta": "이전 {{prev}} → 현재 {{now}}",
       "sources": "데이터 출처: {{sources}}",
+      "partialLabel": "검사된 항목 평균",
+      "coverageBadge": "검사 범위 {{run}}/{{total}}",
+      "coverageGap": "{{count}}개 미검사",
+      "coverageFull": "검사 범위 {{total}}/{{total}}",
+      "partialHint": "이번 {{count}}개 항목을 검사하지 않아, 점수는 검사된 {{run}}개 항목만 반영합니다",
       "unit": "점"
     },
     "detail": {

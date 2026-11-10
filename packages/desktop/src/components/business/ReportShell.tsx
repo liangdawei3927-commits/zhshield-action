@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
 import type { ScoreDimension } from '@zh/shared';
-import { DomainScoreCard } from '../DomainScoreCard';
+import { DomainScoreCard, type ScoreCardCoverage } from '../DomainScoreCard';
 import { DomainHistoryPanel } from './DomainHistoryPanel';
 import { ResultCard } from '../../components/ui/ResultCard';
 
@@ -28,6 +28,8 @@ export interface ReportShellProps {
   dimension: ScoreDimension;
   /** 传给 DomainScoreCard */
   refreshKey?: unknown;
+  /** 规则级覆盖（R6）；传给缺省评分卡，run < total 时降级为「已检测部分均分」 */
+  coverage?: ScoreCardCoverage;
   /** 顶行左侧分类功能图标（调用方传入 Bounce+svg 块） */
   icon: ReactNode;
   /** 顶行标题（如 t('nav.sentinel')） */
@@ -183,6 +185,7 @@ export function ReportShell({
   projectPath,
   dimension,
   refreshKey,
+  coverage,
   icon,
   title,
   score,
@@ -212,6 +215,7 @@ export function ReportShell({
                 dimension={dimension}
                 live
                 refreshKey={refreshKey}
+                coverage={coverage}
                 inline
               />
             )

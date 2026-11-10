@@ -876,6 +876,11 @@
       "notRunHint": "この機能を実行して集計すると総合スコアに反映されます",
       "scoreDelta": "前回 {{prev}} → 今回 {{now}}",
       "sources": "データソース: {{sources}}",
+      "partialLabel": "検出済み項目の平均",
+      "coverageBadge": "カバレッジ {{run}}/{{total}}",
+      "coverageGap": "{{count}} 項目未検出",
+      "coverageFull": "カバレッジ {{total}}/{{total}}",
+      "partialHint": "今回 {{count}} 項目未検出のため、スコアは検出済みの {{run}} 項目のみが対象です",
       "unit": "点"
     },
     "detail": {

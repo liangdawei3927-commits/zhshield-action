@@ -876,6 +876,11 @@
       "notRunHint": "Run this check and summarize to count toward the total score",
       "scoreDelta": "Previous {{prev}} → Now {{now}}",
       "sources": "Sources: {{sources}}",
+      "partialLabel": "Average of checked items",
+      "coverageBadge": "Coverage {{run}}/{{total}}",
+      "coverageGap": "{{count}} not checked",
+      "coverageFull": "Coverage {{total}}/{{total}}",
+      "partialHint": "{{count}} checks were not run; the score covers only the {{run}} checked items",
       "unit": "pts"
     },
     "detail": {

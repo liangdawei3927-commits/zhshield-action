@@ -876,6 +876,11 @@
       "notRunHint": "运行本功能并汇总后计入总分",
       "scoreDelta": "上次 {{prev}} → 本次 {{now}}",
       "sources": "数据来源：{{sources}}",
+      "partialLabel": "已检测部分均分",
+      "coverageBadge": "覆盖 {{run}}/{{total}}",
+      "coverageGap": "{{count}} 项未检测",
+      "coverageFull": "覆盖 {{total}}/{{total}}",
+      "partialHint": "本次 {{count}} 项未检测，评分只基于已检测的 {{run}} 项",
       "unit": "分"
     },
     "detail": {

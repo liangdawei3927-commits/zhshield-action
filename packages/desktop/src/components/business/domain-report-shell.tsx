@@ -47,7 +47,7 @@
  * 强行参数化反而会把差异藏进配置表，读者更难看出哪个域有什么不同。
  */
 import type { ReactNode } from 'react';
-import { ReportShell, type ReportStatCard } from './ReportShell';
+import { ReportShell, type ReportShellProps, type ReportStatCard } from './ReportShell';
 import { DomainActionButton } from './DomainActionButton';
 import { NavGlyph } from './page-glyph';
 import type { ActionRunningKey } from './domain-action-text';
@@ -73,15 +73,13 @@ export type DomainActionState = {
   stopping?: boolean;
 };
 
-export interface DomainReportShellProps {
+export interface DomainReportShellProps extends Pick<ReportShellProps, 'refreshKey' | 'coverage'> {
   projectPath: string;
   /**
    * 所属分类域 —— 评分维度 / 历史域 / 顶行图标 / 按钮运行态文案都从
    * `DOMAIN_REPORT_META` 取，页面只声明「我是哪个域」。
    */
   domain: ReportDomainKey;
-  /** 评分维度刷新键（报告对象本身） */
-  refreshKey?: unknown;
   /** 自定义顶行图标（优先于域默认图标） */
   icon?: ReactNode;
   /** 顶行标题 */
@@ -117,6 +115,7 @@ export function DomainReportShell({
   projectPath,
   domain,
   refreshKey,
+  coverage,
   icon,
   title,
   actionLabel,
@@ -137,6 +136,7 @@ export function DomainReportShell({
       dimension={meta.dimension}
       historyDomain={meta.historyDomain}
       refreshKey={refreshKey}
+      coverage={coverage}
       icon={icon ?? <NavGlyph navId={domain} />}
       title={title}
       action={

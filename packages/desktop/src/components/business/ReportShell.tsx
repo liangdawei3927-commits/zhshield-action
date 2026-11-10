@@ -13,8 +13,6 @@ export interface ReportStatCard {
   value: number | string;
   /** 数字颜色（缺省 text-zh-ink） */
   color?: string;
-  /** 卡面影响提示（可选）：直接把「这一类为什么影响 100 分」放在卡头，不必点开 */
-  hint?: string;
   detail?: {
     /** 该卡明细数据（点击卡片后展示的子集） */
     items: unknown[];
@@ -161,9 +159,6 @@ function ReportStatsRow({
             <div className="text-2xl font-bold mt-1" style={{ color: s.color }}>
               {s.value}
             </div>
-            {s.hint && (
-              <div className="text-[11px] leading-4 text-zh-muted mt-1">{s.hint}</div>
-            )}
           </ResultCard>
         );
       })}
@@ -176,7 +171,11 @@ function ReportStatDetail({ stat }: { stat: ReportStatCard | null }) {
   if (!stat?.detail) return null;
   return (
     <div className="mb-6" data-testid={`report-stat-detail-${stat.key}`}>
-      {stat.detail.hint && <p className="text-xs text-zh-muted mb-3">{stat.detail.hint}</p>}
+      {stat.detail.hint && (
+        <div className="mb-3 border-l-2 border-brand-600 pl-3">
+          <p className="text-sm leading-5 text-zh-ink-2">{stat.detail.hint}</p>
+        </div>
+      )}
       {stat.detail.render(stat.detail.items)}
     </div>
   );

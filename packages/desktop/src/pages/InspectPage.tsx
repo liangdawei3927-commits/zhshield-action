@@ -48,7 +48,7 @@ function checkDetail(
  */
 function optionalStatCard(
   group: InspectionReportData['checks'],
-  card: { key: string; label: string; hint?: string; impact?: string },
+  card: { key: string; label: string; hint?: string },
   copy: CheckCopyActions,
 ): ReportStatCard[] {
   if (group.length === 0) return [];
@@ -58,7 +58,6 @@ function optionalStatCard(
       label: card.label,
       value: group.length,
       color: 'rgb(var(--zh-muted))',
-      hint: card.impact,
       detail: checkDetail(group, copy, card.hint),
     },
   ];
@@ -109,7 +108,6 @@ function buildInspectStats({
       label: t('page.inspect.issues'),
       value: selectIssueChecks(items).length,
       color: 'rgb(var(--zh-danger))',
-      hint: t('page.inspect.issuesImpact'),
       detail: checkDetail(
         selectIssueChecks(items),
         copy,
@@ -122,7 +120,6 @@ function buildInspectStats({
         key: 'attention',
         label: t('page.inspect.attention'),
         hint: t('page.inspect.attentionHint'),
-        impact: t('page.inspect.attentionImpact'),
       },
       copy,
     ),
@@ -133,7 +130,6 @@ function buildInspectStats({
         key: 'notApplicable',
         label: t('page.inspect.status.notApplicable'),
         hint: t('page.inspect.notApplicableHint'),
-        impact: t('page.inspect.notApplicableImpact'),
       },
       copy,
     ),

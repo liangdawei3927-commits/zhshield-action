@@ -66,7 +66,7 @@ export function ComplianceBaselineSection({ report }: { report: ComplianceReport
             合规基线 · {report.standard.name} {report.standard.version}
           </h3>
           <p className="mt-1 text-xs text-zh-muted">
-            只读映射：证据来自各域已落盘的结论，本页不新增扫描；未覆盖与缺证据都不计为通过。
+            只读映射：证据来自各域已落盘的结论，本页不新增扫描；未覆盖、缺证据与不适用都不计为通过。
           </p>
         </div>
         <div className="shrink-0 text-right">

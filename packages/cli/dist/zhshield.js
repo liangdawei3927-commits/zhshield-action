@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: e3d44a29134bc1b4
+// @zh-src-hash: 0463ca251e94537d
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -270,9 +270,11 @@ var init_capability_registry = __esm({
       {
         id: "security.standard",
         domain: "security",
-        label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u4E0E\u5408\u89C4\u57FA\u7EBF\u6821\u9A8C",
+        label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5",
         status: "planned",
         implementedBy: [],
+        // 合规基线已拆为 security.compliance（本页正在展示）；本项只剩「编码规范」没有实现，
+        // 标签不能再带「合规基线」，否则「本页不覆盖」清单会和页面上方的合规区自相矛盾。
         note: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5\u4ECD\u65E0\u5B9E\u73B0\uFF1B\u5408\u89C4\u57FA\u7EBF\u89C6\u56FE\u5DF2\u62C6\u4E3A\u72EC\u7ACB\u80FD\u529B security.compliance\u3002"
       },
       {

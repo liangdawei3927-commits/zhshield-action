@@ -33,7 +33,8 @@ export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelK
  * 用户在报告页读结论时同样要看得见“本页不覆盖什么”。
  */
 export const SECURITY_PLANNED_DESCRIPTIONS: Record<string, string> = {
-  'security.standard': '本页暂不检查此项，也不展示任何结论；等实现并验证后再列入功能清单。',
+  'security.standard':
+    '本页暂不检查安全编码规范；合规基线已作为独立能力在本页下方展示。',
   'security.dependency':
     '依赖漏洞已统一由「依赖管家」负责，安全中心不再重复上报；请到依赖管家查看 CVE 结果。',
 };

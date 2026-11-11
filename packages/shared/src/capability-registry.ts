@@ -223,9 +223,11 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   {
     id: 'security.standard',
     domain: 'security',
-    label: '安全编码规范与合规基线校验',
+    label: '安全编码规范检查',
     status: 'planned',
     implementedBy: [],
+    // 合规基线已拆为 security.compliance（本页正在展示）；本项只剩「编码规范」没有实现，
+    // 标签不能再带「合规基线」，否则「本页不覆盖」清单会和页面上方的合规区自相矛盾。
     note: '安全编码规范检查仍无实现；合规基线视图已拆为独立能力 security.compliance。',
   },
   {

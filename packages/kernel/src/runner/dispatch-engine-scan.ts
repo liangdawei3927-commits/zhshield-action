@@ -9,7 +9,7 @@ import type {
 import type { EngineHost } from './evaluator-host';
 import { skipEvaluation } from './evaluation-builders';
 import { toMessage, errorResult } from './dispatch-shared';
-import { evalToolDispatch } from './dispatch-tool-scan';
+import { delegatedRuleSkip, evalToolDispatch } from './dispatch-tool-scan';
 
 // ─── 派发评估：scanner-dispatch → 具名工具 / InspectEngine ──────
 
@@ -31,6 +31,67 @@ export async function evalScannerDispatch(
   return runInspectScan(host.inspectEngine, rule, context, '巡检');
 }
 
+/** 单个扫描器的执行结果（供 runScannerAdapters 汇总） */
+interface ScannerOutcome {
+  /** 该扫描器是否真的跑出结论 */
+  ran: boolean;
+  /** 该扫描器的违规明细 */
+  violations: Violation[];
+  /** 未运行时的原因（已格式化好，直接进汇总） */
+  reason?: string;
+  /** 需要立即中止整条规则的致命错误（工具崩溃） */
+  fatal?: RuleEvaluation;
+}
+
+/** 从「工具不可用: X（原因）」里取括号内原因；格式不符时原样返回 */
+function extractSkipReason(message: string | undefined, toolName: string): string {
+  const msg = message ?? '扫描器不可用';
+  const prefix = `工具不可用: ${toolName}（`;
+  return msg.startsWith(prefix) && msg.endsWith('）') ? msg.slice(prefix.length, -1) : msg;
+}
+
+/** 跑单个扫描器：把「未注册 / 崩溃 / 跳过 / 正常」收敛成 ScannerOutcome */
+async function scanWithOneScanner(
+  host: EngineHost,
+  rule: SopRule,
+  toolName: string,
+  context: RuleContext,
+): Promise<ScannerOutcome> {
+  // 未注册的扫描器不再静默跳过：计入原因汇总，避免「工具缺失 = 未检测」被误报为通过
+  if (!host.toolAdapters.has(toolName)) {
+    return { ran: false, violations: [], reason: `${toolName}(未注册工具适配器: ${toolName})` };
+  }
+  const one = await evalToolDispatch(
+    host,
+    rule,
+    {
+      type: 'tool-dispatch',
+      tool: toolName,
+      toolConfig: {},
+      conditions: {},
+      judgment: {},
+      fix: {},
+    },
+    context,
+  );
+  const violations = one.violations ?? [];
+  if (one.status === 'error' && violations.length === 0) {
+    return {
+      ran: false,
+      violations,
+      fatal: { ...one, message: one.message ?? `扫描器 ${toolName} 执行失败` },
+    };
+  }
+  if (one.status === 'skipped') {
+    return {
+      ran: false,
+      violations,
+      reason: `${toolName}(${extractSkipReason(one.message, toolName)})`,
+    };
+  }
+  return { ran: true, violations };
+}
+
 async function runScannerAdapters(
   host: EngineHost,
   rule: SopRule,
@@ -39,43 +100,21 @@ async function runScannerAdapters(
 ): Promise<RuleEvaluation | null> {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
+  // R7 / C3：归属其它域 → 让位（scanner-dispatch 与 tool-dispatch 同判据）。
+  // 2026-11-11 实测 `inspect.scan.external.dependency-audit` 走 scanners 分支，
+  // 之前只给 tool-dispatch 加了让位 → 它仍以「所有扫描器不可用」落 degraded。
+  const delegated = delegatedRuleSkip(rule);
+  if (delegated) return delegated;
+
   const violations: Violation[] = [];
   const reasons: string[] = [];
   let anyRan = false;
   for (const tool of scanners) {
-    const toolName = String(tool);
-    // 未注册的扫描器不再静默跳过：计入原因汇总，避免「工具缺失 = 未检测」被误报为通过
-    if (!host.toolAdapters.has(toolName)) {
-      reasons.push(`${toolName}(未注册工具适配器: ${toolName})`);
-      continue;
-    }
-    const one = await evalToolDispatch(
-      host,
-      rule,
-      {
-        type: 'tool-dispatch',
-        tool: toolName,
-        toolConfig: {},
-        conditions: {},
-        judgment: {},
-        fix: {},
-      },
-      context,
-    );
-    if (one.violations?.length) violations.push(...one.violations);
-    if (one.status === 'error' && !one.violations?.length) {
-      return { ...one, message: one.message ?? `扫描器 ${toolName} 执行失败` };
-    }
-    if (one.status === 'skipped') {
-      const msg = one.message ?? '扫描器不可用';
-      // 形如「工具不可用: semgrep（未安装或在 PATH 中未找到）」→ 提取括号内原因
-      const prefix = `工具不可用: ${toolName}（`;
-      const reason =
-        msg.startsWith(prefix) && msg.endsWith('）') ? msg.slice(prefix.length, -1) : msg;
-      reasons.push(`${toolName}(${reason})`);
-      continue;
-    }
-    anyRan = true;
+    const outcome = await scanWithOneScanner(host, rule, String(tool), context);
+    if (outcome.fatal) return outcome.fatal;
+    violations.push(...outcome.violations);
+    if (outcome.reason) reasons.push(outcome.reason);
+    if (outcome.ran) anyRan = true;
   }
   // 所有扫描器均未运行（未注册 / 不可用 / 被跳过）→ 显式上报 skipped 并附各工具原因
   if (!anyRan) {

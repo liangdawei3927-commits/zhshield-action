@@ -101,6 +101,33 @@ export const OWNERSHIP_CLAIMS: readonly OwnershipClaim[] = [
     rationale: 'O2 grype 的依赖扫描归依赖管家',
   },
   { match: { kind: 'token', token: 'osv' }, owner: 'deps', rationale: 'O2 OSV 归依赖管家' },
+  // 2026-11-11 实测：这几条 security 规则走 trivy 扫依赖 CVE，而 trivy/grype 的依赖扫描
+  // 已按 O2 从安全域移除 → 每轮必以「未注册工具适配器: trivy」落 degraded。按 O2 归 deps。
+  // 注意 token 匹配按 `[.:]` 切段全等：`cve` 匹配不到 `cve-matching`，必须用 exact。
+  {
+    match: { kind: 'exact', ruleId: 'security.scan.external.cve-matching' },
+    owner: 'deps',
+    rationale: 'O2 依赖 CVE 唯一归依赖管家；安全域让位',
+    previousOwner: 'security',
+  },
+  {
+    match: { kind: 'exact', ruleId: 'security.scan.external.github-advisory' },
+    owner: 'deps',
+    rationale: 'O2 依赖公告（GitHub Advisory）归依赖管家；安全域让位',
+    previousOwner: 'security',
+  },
+  {
+    match: { kind: 'exact', ruleId: 'security.scan.external.npm-audit' },
+    owner: 'deps',
+    rationale: 'O2 npm 审计归依赖管家；安全域让位',
+    previousOwner: 'security',
+  },
+  {
+    match: { kind: 'exact', ruleId: 'security.alert.external.emergency-vulnerability' },
+    owner: 'deps',
+    rationale: 'O2 紧急漏洞告警依赖依赖管家结论；安全域让位',
+    previousOwner: 'security',
+  },
 
   // ── O3 密钥：唯一归安全中心 ────────────────────────────────────────────
   {

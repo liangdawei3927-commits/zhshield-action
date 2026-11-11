@@ -148,6 +148,8 @@ export interface ToolResultInput {
   version?: string;
   /** 错误说明；按真值展开，空串与 undefined 均不写入 ToolResult.error（保持原实现语义） */
   error?: string;
+  /** 跳过原因：out-of-scope = 前置条件不满足（如无 package.json），不算降级（R7） */
+  skipReason?: ToolResult['skipReason'];
 }
 
 /**
@@ -182,6 +184,7 @@ export function buildToolResult(input: ToolResultInput): ToolResult {
       fileCount: input.fileCount ?? input.issues.length,
     },
     ...(input.error ? { error: input.error } : {}),
+    ...(input.skipReason ? { skipReason: input.skipReason } : {}),
   };
 }
 

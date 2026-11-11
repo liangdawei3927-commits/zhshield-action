@@ -43,6 +43,26 @@ export async function evalToolDispatch(
 type AdapterResolution =
   { kind: 'adapter'; adapter: ToolAdapter } | { kind: 'skipped'; result: RuleEvaluation };
 
+/**
+ * 归属让位（R7 / C3）：规则若归其它域，本域**不执行**它，也**不降级**。
+ *
+ * 降级是「本该由本域跑却没跑成」的语义；一条归 deps 的依赖审计规则在体检域
+ * 缺适配器，是**归属让位**，不是故障。标 degraded 会让每轮扫描固定产出一条
+ * 假降级，把真实降级淹成背景噪音，还会永久拉低本域覆盖率（R6 口径）。
+ * 该规则若真没跑成，由 Owner 域的报告负责留痕（C3：非 Owner 不重扫）。
+ *
+ * 两个派发入口（tool-dispatch / scanner-dispatch）共用本函数，避免两处判据分叉。
+ */
+export function delegatedRuleSkip(rule: SopRule): RuleEvaluation | null {
+  const owner = resolveOwnerId(rule.id);
+  if (!owner || owner === rule.domain) return null;
+  return skipEvaluation(
+    rule,
+    `规则归 ${owner} 域负责（C3 唯一归属），本域不重复评估`,
+    targetEngineOf(rule),
+  );
+}
+
 /** 解析工具适配器：未注册 / 接口不完整 / 画像 scope 裁剪 → 返回 skipped 结果 */
 function resolveToolAdapter(
   host: EngineHost,
@@ -51,22 +71,8 @@ function resolveToolAdapter(
 ): AdapterResolution {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    // R7 / C3：规则归属其它域时，本域**不执行**它，也**不降级**——
-    // 降级是「本该由本域跑却没跑成」的语义；一条归 deps 的依赖审计规则在体检域
-    // 缺适配器，是**归属让位**，不是故障。标 degraded 会让每轮扫描固定产出一条
-    // 假降级，把真实降级淹成背景噪音，还会永久拉低本域覆盖率（R6 口径）。
-    // 该规则若真没跑成，由 Owner 域的报告负责留痕（C3：非 Owner 不重扫）。
-    const owner = resolveOwnerId(rule.id);
-    if (owner && owner !== rule.domain) {
-      return {
-        kind: 'skipped',
-        result: skipEvaluation(
-          rule,
-          `规则归 ${owner} 域负责（C3 唯一归属），本域不重复评估`,
-          targetEngineOf(rule),
-        ),
-      };
-    }
+    const delegated = delegatedRuleSkip(rule);
+    if (delegated) return { kind: 'skipped', result: delegated };
     return {
       kind: 'skipped',
       result: skipEvaluation(
@@ -264,6 +270,10 @@ function buildToolScanResult(
   // 工具自报 error（无违规明细）= 工具故障，同上落 skipped + degraded；
   // 真检出问题（issues 非空）才走 failed，该扣的分照扣。
   const toolFailed = result.status === 'error' && result.issues.length === 0;
+  // 范围外（如扫描根无 package.json）与「工具不可用」都落 skipped，但**只有后者算降级**。
+  // 混成一桶会让文档仓库每轮固定产出两条假降级（R7 实测：depcheck 的两条未使用依赖规则）；
+  // 与 trivy 侧 `skipReason: 'out-of-scope'` 口径一致。
+  const outOfScope = result.skipReason === 'out-of-scope';
   const status: RuleEvaluation['status'] = toolFailed
     ? 'skipped'
     : result.status === 'available' && result.issues.length === 0
@@ -286,7 +296,9 @@ function buildToolScanResult(
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: new Date(),
-    ...(result.status === 'unavailable' || toolFailed ? { degraded: true as const } : {}),
+    ...((result.status === 'unavailable' && !outOfScope) || toolFailed
+      ? { degraded: true as const }
+      : {}),
   };
 }
 

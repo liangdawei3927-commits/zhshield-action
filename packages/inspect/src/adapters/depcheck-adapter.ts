@@ -93,6 +93,9 @@ export class DepcheckAdapter extends ToolCommandAdapter {
           status: 'unavailable',
           issues: [],
           start,
+          // R7：无 package.json 是**既定裁剪**（项目前提不满足），不是工具故障。
+          // 与 trivy 侧口径一致标 out-of-scope，kernel 据此落 skipped 且不置 degraded。
+          skipReason: 'out-of-scope',
           error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
         }),
       };

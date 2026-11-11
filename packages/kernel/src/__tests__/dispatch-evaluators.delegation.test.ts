@@ -61,4 +61,24 @@ describe('SopRuleEngine — R7 归属让位（缺适配器时不降级）', () =
     expect(evaluation.degraded).toBe(true);
     expect(report.degraded).toBe(1);
   });
+
+  it('scanner-dispatch 形态同样让位：scanners 全不可用但不标 degraded', async () => {
+    // 2026-11-11 实机：dependency-audit 走的是 scanners 分支，只给 tool-dispatch 加让位不够
+    registry.register(
+      makeRule({
+        id: 'inspect.scan.external.dependency-audit',
+        domain: 'inspect',
+        applicableEngines: ['inspect'],
+        content: { check: { scanners: ['npm-audit', 'trivy', 'grype'] } },
+      }),
+    );
+
+    const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'inspect' });
+    const evaluation = report.evaluations[0];
+
+    expect(evaluation.status).toBe('skipped');
+    expect(evaluation.degraded).toBeUndefined();
+    expect(evaluation.message).toContain('deps');
+    expect(report.degraded ?? 0).toBe(0);
+  });
 });

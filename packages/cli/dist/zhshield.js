@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 44595e3982f5275e
+// @zh-src-hash: abb661652b30c3b1
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -16549,6 +16549,33 @@ var init_ownership_registry = __esm({
         rationale: "O2 grype \u7684\u4F9D\u8D56\u626B\u63CF\u5F52\u4F9D\u8D56\u7BA1\u5BB6"
       },
       { match: { kind: "token", token: "osv" }, owner: "deps", rationale: "O2 OSV \u5F52\u4F9D\u8D56\u7BA1\u5BB6" },
+      // 2026-11-11 实测：这几条 security 规则走 trivy 扫依赖 CVE，而 trivy/grype 的依赖扫描
+      // 已按 O2 从安全域移除 → 每轮必以「未注册工具适配器: trivy」落 degraded。按 O2 归 deps。
+      // 注意 token 匹配按 `[.:]` 切段全等：`cve` 匹配不到 `cve-matching`，必须用 exact。
+      {
+        match: { kind: "exact", ruleId: "security.scan.external.cve-matching" },
+        owner: "deps",
+        rationale: "O2 \u4F9D\u8D56 CVE \u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u5B89\u5168\u57DF\u8BA9\u4F4D",
+        previousOwner: "security"
+      },
+      {
+        match: { kind: "exact", ruleId: "security.scan.external.github-advisory" },
+        owner: "deps",
+        rationale: "O2 \u4F9D\u8D56\u516C\u544A\uFF08GitHub Advisory\uFF09\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u5B89\u5168\u57DF\u8BA9\u4F4D",
+        previousOwner: "security"
+      },
+      {
+        match: { kind: "exact", ruleId: "security.scan.external.npm-audit" },
+        owner: "deps",
+        rationale: "O2 npm \u5BA1\u8BA1\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF1B\u5B89\u5168\u57DF\u8BA9\u4F4D",
+        previousOwner: "security"
+      },
+      {
+        match: { kind: "exact", ruleId: "security.alert.external.emergency-vulnerability" },
+        owner: "deps",
+        rationale: "O2 \u7D27\u6025\u6F0F\u6D1E\u544A\u8B66\u4F9D\u8D56\u4F9D\u8D56\u7BA1\u5BB6\u7ED3\u8BBA\uFF1B\u5B89\u5168\u57DF\u8BA9\u4F4D",
+        previousOwner: "security"
+      },
       // ── O3 密钥：唯一归安全中心 ────────────────────────────────────────────
       {
         match: { kind: "token", token: "secrets" },
@@ -510189,6 +510216,9 @@ function collectGuardViolations(result, rule) {
   return violations;
 }
 
+// ../kernel/src/runner/dispatch-engine-scan.ts
+init_src2();
+
 // ../kernel/src/runner/dispatch-tool-scan.ts
 init_src2();
 
@@ -510445,6 +510475,7 @@ function consumeToolScan(rule, instr, outcome) {
 function buildToolScanResult(rule, instr, result) {
   const violations = toolScanViolations(result, rule);
   const toolFailed = result.status === "error" && result.issues.length === 0;
+  const outOfScope = result.skipReason === "out-of-scope";
   const status = toolFailed ? "skipped" : result.status === "available" && result.issues.length === 0 ? "passed" : result.status === "unavailable" ? "skipped" : "failed";
   return {
     rule,
@@ -510455,7 +510486,7 @@ function buildToolScanResult(rule, instr, result) {
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: /* @__PURE__ */ new Date(),
-    ...result.status === "unavailable" || toolFailed ? { degraded: true } : {}
+    ...result.status === "unavailable" && !outOfScope || toolFailed ? { degraded: true } : {}
   };
 }
 function toolScanViolations(result, rule) {
@@ -510487,6 +510518,14 @@ async function evalScannerDispatch(host, rule, instr, context) {
 async function runScannerAdapters(host, rule, instr, context) {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
+  const owner = resolveOwnerId(rule.id);
+  if (owner && owner !== rule.domain) {
+    return skipEvaluation(
+      rule,
+      `\u89C4\u5219\u5F52 ${owner} \u57DF\u8D1F\u8D23\uFF08C3 \u552F\u4E00\u5F52\u5C5E\uFF09\uFF0C\u672C\u57DF\u4E0D\u91CD\u590D\u8BC4\u4F30`,
+      "inspect"
+    );
+  }
   const violations = [];
   const reasons = [];
   let anyRan = false;
@@ -511237,7 +511276,8 @@ function buildToolResult(input) {
       timestamp: /* @__PURE__ */ new Date(),
       fileCount: input.fileCount ?? input.issues.length
     },
-    ...input.error ? { error: input.error } : {}
+    ...input.error ? { error: input.error } : {},
+    ...input.skipReason ? { skipReason: input.skipReason } : {}
   };
 }
 function buildAccessScope(readPaths, excludePaths) {
@@ -517920,6 +517960,9 @@ var DepcheckAdapter = class extends ToolCommandAdapter {
           status: "unavailable",
           issues: [],
           start,
+          // R7：无 package.json 是**既定裁剪**（项目前提不满足），不是工具故障。
+          // 与 trivy 侧口径一致标 out-of-scope，kernel 据此落 skipped 且不置 degraded。
+          skipReason: "out-of-scope",
           error: `\u76EE\u6807\u76EE\u5F55\u65E0 package.json\uFF08${projectPath}\uFF09\uFF0C\u8DF3\u8FC7\u672A\u4F7F\u7528\u4F9D\u8D56\u68C0\u6D4B`
         })
       };

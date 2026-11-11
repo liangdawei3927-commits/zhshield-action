@@ -9,7 +9,7 @@ import type {
 import type { EngineHost } from './evaluator-host';
 import { skipEvaluation } from './evaluation-builders';
 import { toMessage, errorResult } from './dispatch-shared';
-import { delegatedRuleSkip, evalToolDispatch } from './dispatch-tool-scan';
+import { evalToolDispatch } from './dispatch-tool-scan';
 
 // ─── 派发评估：scanner-dispatch → 具名工具 / InspectEngine ──────
 
@@ -100,12 +100,8 @@ async function runScannerAdapters(
 ): Promise<RuleEvaluation | null> {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
-  // R7 / C3：归属其它域 → 让位（scanner-dispatch 与 tool-dispatch 同判据）。
-  // 2026-11-11 实测 `inspect.scan.external.dependency-audit` 走 scanners 分支，
-  // 之前只给 tool-dispatch 加了让位 → 它仍以「所有扫描器不可用」落 degraded。
-  const delegated = delegatedRuleSkip(rule);
-  if (delegated) return delegated;
-
+  // R7 / C3：归属让位已在规则求值入口统一处理（runner.ts），此处不再判 ——
+  // 判据只留一处，新增 dispatch 形态天然继承让位语义。
   const violations: Violation[] = [];
   const reasons: string[] = [];
   let anyRan = false;

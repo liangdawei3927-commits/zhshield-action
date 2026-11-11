@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: ca9195995f8b7e5e
+// @zh-src-hash: 5a265fb4da134294
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -510283,6 +510283,9 @@ function snapshotNote(generatedAt, now = Date.now()) {
   const stale = hours >= SNAPSHOT_STALE_HOURS ? "\uFF0C\u26A0\uFE0F \u672A\u91CD\u65B0\u68C0\u6D4B" : "";
   return `\uFF0C\u5FEB\u7167 ${local}\uFF08${age}${stale}\uFF09`;
 }
+function isGuardConclusionMode(rule, context) {
+  return rule.domain === "guard" && context.conclusions !== void 0;
+}
 function evalGuardConclusion(rule, instr, context) {
   const supplier = resolveSupplierDomain(instr.tool);
   const issues = readConclusion(context.conclusions, supplier);
@@ -510338,12 +510341,12 @@ function toViolation(rule) {
 
 // ../kernel/src/runner/dispatch-tool-scan.ts
 async function evalToolDispatch(host, rule, instr, context) {
-  if (rule.domain === "guard" && context.conclusions !== void 0) {
+  if (isGuardConclusionMode(rule, context)) {
     return evalGuardConclusion(rule, instr, context);
   }
   const resolution = resolveToolAdapter(host, rule, instr);
   if (resolution.kind === "skipped") return resolution.result;
-  const unavailable = await checkAdapterAvailability(host, resolution.adapter, rule, instr);
+  const unavailable = await checkAdapterAvailability(resolution.adapter, rule, instr);
   if (unavailable) return unavailable;
   return runToolScanWithCache({ host, adapter: resolution.adapter, rule, instr, context });
 }
@@ -510356,11 +510359,17 @@ function delegatedRuleSkip(rule) {
     targetEngineOf(rule)
   );
 }
+function delegationGate(rule, instruction, context, evalStart) {
+  if (instruction.type === "tool-dispatch" && isGuardConclusionMode(rule, context)) return null;
+  const delegated = delegatedRuleSkip(rule);
+  if (!delegated) return null;
+  delegated.durationMs = Date.now() - evalStart;
+  delegated.blocking = computeBlocking(delegated.status, rule.severity, rule.blockingThreshold);
+  return delegated;
+}
 function resolveToolAdapter(host, rule, instr) {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    const delegated = delegatedRuleSkip(rule);
-    if (delegated) return { kind: "skipped", result: delegated };
     return {
       kind: "skipped",
       result: skipEvaluation(
@@ -510394,7 +510403,7 @@ function resolveToolAdapter(host, rule, instr) {
   }
   return { kind: "adapter", adapter };
 }
-async function checkAdapterAvailability(host, adapter, rule, instr) {
+async function checkAdapterAvailability(adapter, rule, instr) {
   const available = await adapter.isAvailable();
   if (!available) {
     return skipEvaluation(
@@ -510563,8 +510572,6 @@ async function scanWithOneScanner(host, rule, toolName, context) {
 async function runScannerAdapters(host, rule, instr, context) {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
-  const delegated = delegatedRuleSkip(rule);
-  if (delegated) return delegated;
   const violations = [];
   const reasons = [];
   let anyRan = false;
@@ -510725,6 +510732,7 @@ function seedCache(cache, candidates, results) {
 function collectCandidates(rules, interpret, cache) {
   const found = [];
   for (const rule of rules) {
+    if (delegatedRuleSkip(rule)) continue;
     const instruction = interpret(rule);
     if (instruction?.type !== "tool-dispatch") continue;
     const instr = instruction;
@@ -510937,6 +510945,8 @@ var SopRuleEngine = class {
   async evaluateSingleRule(rule, context, nested) {
     const evalStart = Date.now();
     const instruction = this.interpreter.interpret(rule);
+    const delegated = delegationGate(rule, instruction, context, evalStart);
+    if (delegated) return delegated;
     const effectiveRule = resolveEffectiveRule(rule, this.consecutiveFailures, this.healthBaseline);
     try {
       const result = await this.evaluateOne(effectiveRule, instruction, context, nested);

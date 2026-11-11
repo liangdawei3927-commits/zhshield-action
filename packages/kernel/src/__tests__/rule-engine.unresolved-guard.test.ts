@@ -90,7 +90,8 @@ describe('SopRuleEngine — unresolved 规则不得判通过', () => {
   it('unresolved 规则落 degraded skipped，report.ok=false', async () => {
     registry.register(
       makeRule({
-        id: 'inspect.scan.test.unresolved',
+        // 前缀不是 inspect：跨域 id 会被归属让位短路，测不到「内容无法解释」的降级语义
+        id: 'guard.scan.internal.unresolved-content',
         domain: 'guard',
         applicableEngines: ['guard'],
         content: { check: { rules: [{ id: 'no-implicit-any', severity: 'warning' }] } },

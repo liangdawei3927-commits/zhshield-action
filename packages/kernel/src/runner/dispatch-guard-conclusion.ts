@@ -86,6 +86,11 @@ function snapshotNote(generatedAt: string, now = Date.now()): string {
 }
 
 /** 门禁纯判定入口：由 tool-dispatch 在 guard 域且已注入结论时调用 */
+export function isGuardConclusionMode(rule: SopRule, context: RuleContext): boolean {
+  return rule.domain === 'guard' && context.conclusions !== undefined;
+}
+
+/** 门禁纯判定入口：由 tool-dispatch 在 guard 域且已注入结论时调用 */
 export function evalGuardConclusion(
   rule: SopRule,
   instr: ToolDispatchInstruction,

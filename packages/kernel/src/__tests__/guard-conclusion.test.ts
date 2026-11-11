@@ -102,6 +102,35 @@ describe('门禁纯判定 — 工具调用归零、只读各域结论', () => {
     expect(eval0.message).toContain('未重新检测');
   });
 
+  it('跨域归属的 guard 阻断规则在结论模式下仍按结论判定（不让位）', async () => {
+    // 2026-11-11 归属审计发现 `guard.block.external.sensitive-info` 的 owner 是 security。
+    // 门禁在结论模式下是消费 Owner 结论的「策略闸」，不是重扫；若被归属让位短路，
+    // 门禁会静默丢掉这条跨域阻断项（这正是让位判据不能一刀切的原因）。
+    const counter = { calls: 0 };
+    const { registry, engine } = buildEngine(counter);
+    registry.register(
+      makeRule({
+        id: 'guard.block.external.sensitive-info',
+        domain: 'guard',
+        severity: 'error',
+        content: { check: { tool: 'gitleaks', severity: 'error' } },
+      }),
+    );
+
+    const report = await engine.evaluateRules({
+      repoRoot: '/tmp',
+      conclusions: {
+        security: { domain: 'security', generatedAt: new Date().toISOString(), issues: [] },
+      },
+    });
+
+    const eval0 = report.evaluations[0];
+    expect(counter.calls).toBe(0);
+    expect(eval0.status).toBe('passed');
+    expect(eval0.message).toContain('只读判定');
+    expect(eval0.message).toContain('security 域');
+  });
+
   it('新快照不打过期标（只回显距今年龄）', async () => {
     const counter = { calls: 0 };
     const { registry, engine } = buildEngine(counter);

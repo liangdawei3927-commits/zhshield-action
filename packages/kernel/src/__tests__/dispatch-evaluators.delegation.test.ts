@@ -103,4 +103,97 @@ describe('SopRuleEngine — R7 归属让位（缺适配器时不降级）', () =
     expect(evaluation.message).toContain('refactor');
     expect(report.degraded ?? 0).toBe(0);
   });
+
+  it('适配器已注册但工具不可用 → 仍按归属让位，不标 degraded', async () => {
+    // 2026-11-11 实机缺口：jscpd 适配器是注册过的，只是 PATH 里没有工具，于是走了
+    // 「可用性检查」分支 —— 那里不判归属，duplicate-code 每轮都 degraded。让位判据
+    // 收到求值入口后，这条不论适配器/工具处于什么状态都不再落降级。
+    let scanned = 0;
+    const jscpdAdapter = {
+      meta: {
+        id: 'jscpd' as const,
+        name: 'jscpd',
+        category: 'inspect' as const,
+        priority: 'P2' as const,
+        installMode: 'on-demand' as const,
+        description: '',
+        cliCommand: 'jscpd',
+        homepage: '',
+        license: '',
+      },
+      isAvailable: async () => false,
+      scan: async () => {
+        scanned += 1;
+        throw new Error('让位规则不该启动工具进程');
+      },
+    };
+    const engineWithAdapter = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'jscpd', adapter: jscpdAdapter }],
+    });
+    registry.register(
+      makeRule({
+        id: 'security.scan.internal.duplicate-code',
+        domain: 'security',
+        applicableEngines: ['security'],
+        content: { check: { tool: 'jscpd', toolConfig: {} } },
+      }),
+    );
+
+    const report = await engineWithAdapter.evaluateRules({ repoRoot: '/tmp', domain: 'security' });
+    const evaluation = report.evaluations[0];
+
+    expect(evaluation.status).toBe('skipped');
+    expect(evaluation.degraded).toBeUndefined();
+    expect(evaluation.message).toContain('refactor');
+    expect(report.degraded ?? 0).toBe(0);
+    expect(scanned).toBe(0);
+  });
+
+  it('适配器可用也不在非 Owner 域执行（归属即让位，不探测、不起进程）', async () => {
+    // C3：非 Owner 域不重扫。以前只有「缺适配器」才让位，工具装好的机器上
+    // 安全域仍会把这条重复代码规则真跑一遍 —— 结论与评分会与重构域打架。
+    let availableProbes = 0;
+    let scanned = 0;
+    const jscpdAdapter = {
+      meta: {
+        id: 'jscpd' as const,
+        name: 'jscpd',
+        category: 'inspect' as const,
+        priority: 'P2' as const,
+        installMode: 'on-demand' as const,
+        description: '',
+        cliCommand: 'jscpd',
+        homepage: '',
+        license: '',
+      },
+      isAvailable: async () => {
+        availableProbes += 1;
+        return true;
+      },
+      scan: async () => {
+        scanned += 1;
+        throw new Error('让位规则不该启动工具进程');
+      },
+    };
+    const engineWithAdapter = new SopRuleEngine(registry, {
+      toolAdapters: [{ name: 'jscpd', adapter: jscpdAdapter }],
+    });
+    registry.register(
+      makeRule({
+        id: 'security.scan.internal.duplicate-code',
+        domain: 'security',
+        applicableEngines: ['security'],
+        content: { check: { tool: 'jscpd', toolConfig: {} } },
+      }),
+    );
+
+    const report = await engineWithAdapter.evaluateRules({ repoRoot: '/tmp', domain: 'security' });
+    const evaluation = report.evaluations[0];
+
+    expect(evaluation.status).toBe('skipped');
+    expect(evaluation.degraded).toBeUndefined();
+    expect(evaluation.message).toContain('refactor');
+    expect(availableProbes).toBe(0);
+    expect(scanned).toBe(0);
+  });
 });

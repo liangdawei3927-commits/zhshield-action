@@ -32,6 +32,7 @@ import { buildEvaluatorTable } from './runner/evaluator-table';
 import { prefetchToolBatches } from './runner/prefetch-tool-batch';
 import { applyRuleMetrics } from './runner/rule-metrics-binding';
 import { aggregate, errorEvaluation, skipEvaluation } from './runner/evaluation-builders';
+import { delegationGate } from './runner/dispatch-tool-scan';
 
 /** 会回调 Guard/Inspect 引擎并可能再次进入 evaluateRules 的指令类型 */
 const ENGINE_DISPATCH_TYPES = new Set(['preset', 'scanner-dispatch', 'check-list']);
@@ -307,6 +308,9 @@ export class SopRuleEngine {
   ): Promise<RuleEvaluation> {
     const evalStart = Date.now();
     const instruction = this.interpreter.interpret(rule);
+    // C3 归属让位闸：判据唯一实现见 delegationGate（含门禁结论模式豁免）
+    const delegated = delegationGate(rule, instruction, context, evalStart);
+    if (delegated) return delegated;
     // F1-3：升级判定用本次自增前的计数值；effectiveRule 仅在 severity 实际变化时浅拷贝，registry 原对象不被修改
     const effectiveRule = resolveEffectiveRule(rule, this.consecutiveFailures, this.healthBaseline);
     try {

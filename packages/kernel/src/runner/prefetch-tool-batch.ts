@@ -23,7 +23,7 @@ import type { ContentInstruction, ToolDispatchInstruction } from '../sop/_meta/r
 import type { RuleContext } from '../sop/_meta/rule-context';
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { EngineHost } from './evaluator-host';
-import { buildToolScanOptions, toolScanCacheKey } from './dispatch-tool-scan';
+import { buildToolScanOptions, delegatedRuleSkip, toolScanCacheKey } from './dispatch-tool-scan';
 import { DEFAULT_TOOL_SCAN_TIMEOUT_MS, withToolScanHardTimeout } from './dispatch-shared';
 
 /** 只对"每条规则一次进程"的工具做批量；其余工具要么本来就一次，要么语义不适合合并 */
@@ -113,6 +113,9 @@ function collectCandidates(
 ): BatchCandidate[] {
   const found: BatchCandidate[] = [];
   for (const rule of rules) {
+    // 归属别的域的规则会由求值入口直接让位、永不消费扫描结果 —— 不为它们预取，
+    // 否则批量预取会起一个注定被丢弃的工具进程（也是「别为让位规则做可用性探测」的同一条纪律）。
+    if (delegatedRuleSkip(rule)) continue;
     const instruction = interpret(rule);
     if (instruction?.type !== 'tool-dispatch') continue;
     const instr = instruction as ToolDispatchInstruction;

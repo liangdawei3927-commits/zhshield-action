@@ -40,7 +40,9 @@ describe('SopRuleEngine — 内联评估（pattern-scan / forbidden / threshold 
 
     registry.register(
       makeRule({
-        id: 'guard.block.sensitive-info',
+        // 不叫 sensitive-info：该 token 在归属表里归 security（O3），规则 id 带上它
+        // 会被判成跨域让位。本用例验证的是内联 pattern-scan 求值，用无归属歧义的 id。
+        id: 'guard.block.internal.custom-pattern',
         domain: 'guard',
         action: 'block',
         severity: 'critical',

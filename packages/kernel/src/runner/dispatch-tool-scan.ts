@@ -17,7 +17,9 @@ import {
   targetEngineOf,
 } from './dispatch-shared';
 import { logToolExecutionAudit } from './tool-audit';
-import { evalGuardConclusion } from './dispatch-guard-conclusion';
+import { evalGuardConclusion, isGuardConclusionMode } from './dispatch-guard-conclusion';
+import { computeBlocking } from '../sop/_meta/rule-evaluation';
+import type { ContentInstruction } from '../sop/_meta/rule-evaluation';
 
 // ─── 派发评估：tool-dispatch → ToolAdapter ────────────
 
@@ -30,12 +32,12 @@ export async function evalToolDispatch(
   // 《07》O8：调用方注入结论集时，门禁进入纯判定模式 —— 不启动任何工具进程，
   // 只读供应商域（Owner）的既有结论判 pass/fail；缺结论 → skipped（C4）。
   // 未注入结论（存量调用方 / 单测）保持历史工具派发行为。
-  if (rule.domain === 'guard' && context.conclusions !== undefined) {
+  if (isGuardConclusionMode(rule, context)) {
     return evalGuardConclusion(rule, instr, context);
   }
   const resolution = resolveToolAdapter(host, rule, instr);
   if (resolution.kind === 'skipped') return resolution.result;
-  const unavailable = await checkAdapterAvailability(host, resolution.adapter, rule, instr);
+  const unavailable = await checkAdapterAvailability(resolution.adapter, rule, instr);
   if (unavailable) return unavailable;
   return runToolScanWithCache({ host, adapter: resolution.adapter, rule, instr, context });
 }
@@ -51,7 +53,10 @@ type AdapterResolution =
  * 假降级，把真实降级淹成背景噪音，还会永久拉低本域覆盖率（R6 口径）。
  * 该规则若真没跑成，由 Owner 域的报告负责留痕（C3：非 Owner 不重扫）。
  *
- * 两个派发入口（tool-dispatch / scanner-dispatch）共用本函数，避免两处判据分叉。
+ * ⚠️ 判据的**唯一调用点**是规则求值入口（runner.ts 的 evaluateSingleRule），
+ * 不在任何 dispatch 分支里判 —— 此前散在 tool-dispatch（仅缺适配器分支）与
+ * scanner-dispatch（入口）两处，导致「适配器已注册但工具不可用」形态漏判降级
+ * （2026-11-11 实机：jscpd 未安装，duplicate-code 每轮 degraded）。
  */
 export function delegatedRuleSkip(rule: SopRule): RuleEvaluation | null {
   const owner = resolveOwnerId(rule.id);
@@ -63,6 +68,36 @@ export function delegatedRuleSkip(rule: SopRule): RuleEvaluation | null {
   );
 }
 
+/**
+ * 归属让位闸（C3）：**唯一判定点**在规则求值入口（runner.ts 的 evaluateSingleRule），
+ * 由本函数实现，dispatch 层不再判归属。
+ *
+ * 为什么收敛到这里：判据此前散在 tool-dispatch（仅缺适配器分支）与 scanner-dispatch
+ * 两处，2026-11-11 连漏两次 —— scanner 形态、以及「适配器已注册但工具不可用」形态
+ * （jscpd 未安装 → security.scan.internal.duplicate-code 每轮 degraded）。收敛后
+ * 新增 dispatch 形态天然继承让位语义。
+ *
+ * 唯一例外是门禁的结论模式（O8）：guard 的 tool-dispatch 不重扫，只消费 Owner 域
+ * 的既有结论做判定 —— 这是「策略闸」而非「重扫」，若也让位，门禁会静默丢掉跨域
+ * 阻断项（实测审计清单里的 `guard.block.external.sensitive-info` 正是这种形态）。
+ *
+ * 返回 null = 不让位，交回求值流程继续执行。
+ */
+export function delegationGate(
+  rule: SopRule,
+  instruction: ContentInstruction,
+  context: RuleContext,
+  evalStart: number,
+): RuleEvaluation | null {
+  if (instruction.type === 'tool-dispatch' && isGuardConclusionMode(rule, context)) return null;
+  const delegated = delegatedRuleSkip(rule);
+  if (!delegated) return null;
+  delegated.durationMs = Date.now() - evalStart;
+  delegated.blocking = computeBlocking(delegated.status, rule.severity, rule.blockingThreshold);
+  // 连续失败计数不用记：skipped 对计数器是「不动」语义（见 adaptive-severity）
+  return delegated;
+}
+
 /** 解析工具适配器：未注册 / 接口不完整 / 画像 scope 裁剪 → 返回 skipped 结果 */
 function resolveToolAdapter(
   host: EngineHost,
@@ -71,8 +106,7 @@ function resolveToolAdapter(
 ): AdapterResolution {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    const delegated = delegatedRuleSkip(rule);
-    if (delegated) return { kind: 'skipped', result: delegated };
+    // 归属让位已在规则求值入口统一处理（runner.ts），此处不再判 —— 判据只留一处。
     return {
       kind: 'skipped',
       result: skipEvaluation(
@@ -109,7 +143,6 @@ function resolveToolAdapter(
 }
 
 async function checkAdapterAvailability(
-  host: EngineHost,
   adapter: ToolAdapter,
   rule: SopRule,
   instr: ToolDispatchInstruction,

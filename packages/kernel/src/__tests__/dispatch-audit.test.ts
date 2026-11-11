@@ -34,7 +34,10 @@ function makeFakeAdapter(resultOverrides?: Partial<ToolResult>): ToolAdapter {
 function registerDispatchRule(registry: SopRegistry, tool: string): void {
   registry.register(
     makeRule({
-      id: `guard.block.external.${tool}`,
+      // ruleId 不嵌工具名：`eslint` 这类 token 在归属表里归 inspect，规则 id 一旦带上它
+      // 就会被判成跨域让位（2026-11-11 让位判据收敛到求值入口后暴露），用例要测的是
+      // 派发审计本身，故用无归属歧义的 id。
+      id: 'guard.block.internal.dispatch-audit',
       domain: 'guard',
       action: 'block',
       severity: 'high',

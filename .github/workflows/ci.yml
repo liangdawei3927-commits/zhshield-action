@@ -135,6 +135,14 @@ jobs:
       - name: Capability closure gate (declaration vs actual)
         run: pnpm --filter zhshield-cli exec tsx src/index.ts capability
 
+      # R7 规则可达性门禁 —— 不跑扫描就判定「这条 tool-dispatch 规则有没有可能被评估」
+      #
+      # 与上面的闭环门禁互补：闭环门禁问「域路径通不通」，本门禁问「规则声明的工具
+      # 在能力表里存不存在」。判据只认 TOOL_CAPABILITIES 这一条硬事实，不猜运行时适配器
+      # （猜会造出「看起来查了、其实没效力」的假门禁）。空规则集判 INVALID，不判 PASS。
+      - name: Rule reachability gate (static)
+        run: pnpm --filter @zh/kernel verify:rule-reachability
+
       # 类型严格迁移棘轮门禁（报告 §5.2）—— 债可以变少，不能变多
       #
       # 判据：① 已迁移包不得再显式关闭严格标志；② 待迁移包数量不得超过基线；

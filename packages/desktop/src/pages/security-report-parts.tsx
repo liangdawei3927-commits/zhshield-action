@@ -18,6 +18,8 @@ import type { ReportStatCard } from '../components/business/ReportShell';
 import { SEVERITY_CONFIG } from './security-logic';
 import type { SecurityIssue } from './security-logic';
 import type { SecurityScanReportData, SecretReportData } from '../types/electron';
+import type { ComplianceReport } from '../compliance/baseline';
+import { ComplianceBaselineSection } from './compliance-parts';
 
 export type SecurityTab = 'vuln' | 'malware' | 'secrets';
 
@@ -166,6 +168,8 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps, AsyncS
   isSavedResult?: boolean;
   /** 当前分类的明细面板：由页面装配后传入（渲染位置 = 标签栏之下） */
   children?: ReactNode;
+  /** 合规基线（ASVS L1 子集）只读映射：由页面基于已落盘结论算好后传入 */
+  compliance: ComplianceReport;
 }
 
 /** 报告结果的出处与时间：新结果 / 上次保存的旧结果 / 本次失败 三态必须可区分 */
@@ -437,6 +441,7 @@ export function SecurityReportView({
   scanError,
   isSavedResult,
   children,
+  compliance,
 }: SecurityReportViewProps) {
   const t = useT();
   return (
@@ -466,6 +471,7 @@ export function SecurityReportView({
       <SecurityDegradedBanner report={report} t={t} />
       <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
       {children}
+      <ComplianceBaselineSection report={compliance} />
       <SecurityNotCovered />
     </DomainReportShell>
   );

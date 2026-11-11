@@ -65,6 +65,14 @@ const SECURITY_CAPABILITY_ICONS = {
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </FeatureIcon>
   ),
+  // 合规基线：清单 + 勾（只读映射，不是新扫描面）
+  'security.compliance': (
+    <FeatureIcon>
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <polyline points="9 14 11 16 15 12" />
+    </FeatureIcon>
+  ),
 } as const;
 
 /** 规划中/已移交项的用户可读说明：与报告页共用同一份（见 security-logic） */
@@ -102,7 +110,14 @@ export function SecurityEmptyState(props: ScanEmptyStateParams & { scanError?: s
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
       extra={props.scanError ? <SecurityScanErrorNotice error={props.scanError} /> : undefined}
-      features={buildCapabilityFeatures('security', { icons: SECURITY_CAPABILITY_ICONS })}
+      features={buildCapabilityFeatures('security', {
+        icons: SECURITY_CAPABILITY_ICONS,
+        descriptions: {
+          'security.compliance': t('page.security.feature.compliance.desc', {
+            defaultValue: '合规基线（ASVS L1 子集）：汇总各域已落盘结论的只读差距报告，不新增扫描',
+          }),
+        },
+      })}
       planned={buildPlannedCapabilities('security', SECURITY_PLANNED_DESCRIPTIONS)}
       buttonText={t('page.security.fixAll')}
       onAction={props.onScan}

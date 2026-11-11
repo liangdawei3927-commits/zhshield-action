@@ -211,12 +211,22 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
       '不依赖 SOP 规则求值；同名 SOP 规则（security.scan.malware.*）仍是 draft/trial。',
   },
   {
+    id: 'security.compliance',
+    domain: 'security',
+    label: '合规基线（ASVS L1 子集）',
+    status: 'implemented',
+    // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
+    // 它把各域已落盘结论按标准条款汇总成五态，不启动任何扫描 —— 合规是**视图**，
+    // 不是新的检测面，故证据不是 SOP 规则 id。
+    implementedBy: ['compliance-baseline'],
+  },
+  {
     id: 'security.standard',
     domain: 'security',
     label: '安全编码规范与合规基线校验',
     status: 'planned',
     implementedBy: [],
-    note: '全仓无对应实现。安全页空态不得宣称此项。',
+    note: '安全编码规范检查仍无实现；合规基线视图已拆为独立能力 security.compliance。',
   },
   {
     id: 'security.dependency',
@@ -332,16 +342,6 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
       'inspect.scan.ironnest.module-boundary',
       'inspect.scan.depcruiser.layer-boundary',
     ],
-  },
-  {
-    id: 'inspect.compliance',
-    domain: 'inspect',
-    label: '合规基线（ASVS L1 子集）',
-    status: 'implemented',
-    // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
-    // 它把各域已落盘结论按标准条款汇总成四态，不启动任何扫描 —— 合规是**视图**，
-    // 不是新的检测面，故证据不是 SOP 规则 id。
-    implementedBy: ['compliance-baseline'],
   },
 ];
 

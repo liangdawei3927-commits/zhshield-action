@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 1ca0321b2b3751bb
+// @zh-src-hash: e3d44a29134bc1b4
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -258,12 +258,22 @@ var init_capability_registry = __esm({
         note: "\u7531 @zh/security \u7684\u542F\u53D1\u5F0F\u6B63\u5219\u901A\u9053\u5B9E\u73B0\uFF08malware-scanner / injection-guard\uFF09\uFF0C\u4E0D\u4F9D\u8D56 SOP \u89C4\u5219\u6C42\u503C\uFF1B\u540C\u540D SOP \u89C4\u5219\uFF08security.scan.malware.*\uFF09\u4ECD\u662F draft/trial\u3002"
       },
       {
+        id: "security.compliance",
+        domain: "security",
+        label: "\u5408\u89C4\u57FA\u7EBF\uFF08ASVS L1 \u5B50\u96C6\uFF09",
+        status: "implemented",
+        // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
+        // 它把各域已落盘结论按标准条款汇总成五态，不启动任何扫描 —— 合规是**视图**，
+        // 不是新的检测面，故证据不是 SOP 规则 id。
+        implementedBy: ["compliance-baseline"]
+      },
+      {
         id: "security.standard",
         domain: "security",
         label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u4E0E\u5408\u89C4\u57FA\u7EBF\u6821\u9A8C",
         status: "planned",
         implementedBy: [],
-        note: "\u5168\u4ED3\u65E0\u5BF9\u5E94\u5B9E\u73B0\u3002\u5B89\u5168\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\u3002"
+        note: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5\u4ECD\u65E0\u5B9E\u73B0\uFF1B\u5408\u89C4\u57FA\u7EBF\u89C6\u56FE\u5DF2\u62C6\u4E3A\u72EC\u7ACB\u80FD\u529B security.compliance\u3002"
       },
       {
         id: "security.dependency",
@@ -369,16 +379,6 @@ var init_capability_registry = __esm({
           "inspect.scan.ironnest.module-boundary",
           "inspect.scan.depcruiser.layer-boundary"
         ]
-      },
-      {
-        id: "inspect.compliance",
-        domain: "inspect",
-        label: "\u5408\u89C4\u57FA\u7EBF\uFF08ASVS L1 \u5B50\u96C6\uFF09",
-        status: "implemented",
-        // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
-        // 它把各域已落盘结论按标准条款汇总成四态，不启动任何扫描 —— 合规是**视图**，
-        // 不是新的检测面，故证据不是 SOP 规则 id。
-        implementedBy: ["compliance-baseline"]
       }
     ];
     CAPABILITIES_BY_DOMAIN = CAPABILITY_REGISTRY.reduce((map, cap) => {

@@ -13,6 +13,7 @@ import { SecretsListCard } from './secrets-parts';
 import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
 import { NavGlyph } from '../components/business/page-glyph';
 import type { SecretReportData, SecurityScanReportData } from '../types/electron';
+import { useComplianceReport } from '../compliance/use-compliance-report';
 import {
   SecurityReportView,
   renderFindingsPanel,
@@ -167,10 +168,8 @@ function useSecurityScanEntry({
   return { scanVersion: scanVersion + secretsVersion };
 }
 
-function useSecurityPageState(projectPath: string) {
-  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
-  const [showHome, setShowHome] = useState(true);
-  const [tab, setTab] = useState<SecurityTab>('vuln');
+/** 扫描侧数据：漏洞 + 密钥两路扫描、落盘报告读回、合规基线求值 */
+function useSecurityScanData(projectPath: string, onEnterDetail: () => void) {
   const {
     loading,
     progress,
@@ -209,23 +208,18 @@ function useSecurityPageState(projectPath: string) {
     secretsReport,
     loading,
     secretsLoading,
-    onEnterDetail: () => setShowHome(false),
+    onEnterDetail,
   });
-
-  // 安全中心的主按钮只跑检查、不换页（扫完停主页还是进详情由上面按分数决定）
-  const startScan = handleScan;
-
+  // 合规基线（ASVS L1 子集）：只读消费安全域与依赖管家已落盘结论，不启动任何扫描。
+  const compliance = useComplianceReport(projectPath, detailReport);
   return {
-    showHome,
-    setShowHome,
-    scanVersion,
-    tab,
-    setTab,
     loading,
     progress,
     statusMessage,
     queued,
     queuePosition,
+    cancel,
+    stopping,
     report,
     detailReport,
     scanError,
@@ -241,9 +235,24 @@ function useSecurityPageState(projectPath: string) {
     secretsCopyToAi,
     secretsCopyAllToAi,
     handleScan,
-    startScan,
-    cancel,
-    stopping,
+    scanVersion,
+    compliance,
+  };
+}
+
+function useSecurityPageState(projectPath: string) {
+  // 打开先落在主页（与改动前一致）；历史报告只让详情按钮可见，不自动进详情
+  const [showHome, setShowHome] = useState(true);
+  const [tab, setTab] = useState<SecurityTab>('vuln');
+  const scanData = useSecurityScanData(projectPath, () => setShowHome(false));
+  return {
+    showHome,
+    setShowHome,
+    tab,
+    setTab,
+    // 安全中心的主按钮只跑检查、不换页（扫完停主页还是进详情由 useSecurityScanEntry 按分数决定）
+    startScan: scanData.handleScan,
+    ...scanData,
   };
 }
 
@@ -274,6 +283,7 @@ function securityReportViewProps(
   return {
     projectPath,
     report,
+    compliance: state.compliance,
     loading: state.loading,
     progress: state.progress,
     statusMessage: state.statusMessage,

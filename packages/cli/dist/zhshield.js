@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 063778c979646b23
+// @zh-src-hash: bc87c8dd8964ea11
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -502990,7 +502990,73 @@ function applyDepEntries(scan, rel, section, deps) {
     }
   }
 }
-var fs61, path65, SOURCE_EXTS2, HELMET_PKG, WEB_FRAMEWORK_MARKERS, CSRF_LIBS, OUTBOUND_RE, ENV_ACCESS_RE, CSRF_TOKEN_USAGE_RE, SAME_SITE_RE, ORIGIN_CHECK_RE, NON_REGISTRY_VERSION_RE, SELF_BASENAME, SecurityCheckEngine, NAME_EXEMPT_SET;
+function walkFiles(dir2, depth, out, exts) {
+  if (depth > MAX_SCAN_DEPTH2) return;
+  let entries;
+  try {
+    entries = fs61.readdirSync(dir2, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS3.has(entry.name)) continue;
+      walkFiles(path65.join(dir2, entry.name), depth + 1, out, exts);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (exts.has(entry.name) || exts.has(path65.extname(entry.name).toLowerCase())) {
+      out.push(path65.join(dir2, entry.name));
+    }
+  }
+}
+function scanSourceEvidence(target) {
+  const evidence = {
+    csrfToken: [],
+    sameSite: [],
+    originCheck: [],
+    outboundValue: [],
+    tlsVerifyDisabled: [],
+    weakTlsProtocol: []
+  };
+  const files = [];
+  walkFiles(target, 0, files, SOURCE_EXTS2);
+  for (const file of files) {
+    if (path65.basename(file, path65.extname(file)) === SELF_BASENAME) continue;
+    let content;
+    try {
+      content = fs61.readFileSync(file, "utf-8");
+    } catch {
+      continue;
+    }
+    const rel = path65.relative(target, file);
+    content.split("\n").forEach((line, idx) => {
+      const trim = line.trim();
+      if (trim.length === 0 || trim.startsWith("//")) return;
+      const hit = { file: rel, line: idx + 1, evidence: trim.slice(0, 120) };
+      if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) {
+        evidence.outboundValue.push(hit);
+      }
+      if (CSRF_TOKEN_USAGE_RE.test(line)) {
+        evidence.csrfToken.push({ ...hit });
+      }
+      if (SAME_SITE_RE.test(line)) {
+        evidence.sameSite.push({ ...hit });
+      }
+      if (ORIGIN_CHECK_RE.test(line)) {
+        evidence.originCheck.push({ ...hit });
+      }
+      if (TLS_VERIFY_DISABLED_RE.test(line)) {
+        evidence.tlsVerifyDisabled.push({ ...hit });
+      }
+      if (WEAK_TLS_PROTOCOL_RE.test(line)) {
+        evidence.weakTlsProtocol.push({ ...hit });
+      }
+    });
+  }
+  return evidence;
+}
+var fs61, path65, SOURCE_EXTS2, HELMET_PKG, WEB_FRAMEWORK_MARKERS, CSRF_LIBS, OUTBOUND_RE, ENV_ACCESS_RE, CSRF_TOKEN_USAGE_RE, SAME_SITE_RE, ORIGIN_CHECK_RE, TLS_VERIFY_DISABLED_RE, WEAK_TLS_PROTOCOL_RE, NON_REGISTRY_VERSION_RE, SELF_BASENAME, SecurityCheckEngine, NAME_EXEMPT_SET;
 var init_security_check_engine = __esm({
   "../security/src/security-check-engine.ts"() {
     "use strict";
@@ -503015,6 +503081,8 @@ var init_security_check_engine = __esm({
     CSRF_TOKEN_USAGE_RE = /csrf\s*\(\s*\{|csrfToken\s*\(|X-CSRF(?:-Token)?[:=]|csrfProtection|app\.use\s*\(\s*(?:csurf|csrf)\b/i;
     SAME_SITE_RE = /(?:sameSite\s*[:=]\s*(['"])(lax|strict|none)\1|SameSite=(Lax|Strict|None))/i;
     ORIGIN_CHECK_RE = /\.headers\.origin|\[['"]origin['"]\]|checkOrigin|allowedOrigin|verifyOrigin/i;
+    TLS_VERIFY_DISABLED_RE = /rejectUnauthorized\s*:\s*false|insecureSkipVerify\s*:\s*true|strictSSL\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*[=:]\s*(['"]?)0\1|checkServerIdentity\s*:\s*(?:async\s*)?(?:\(\s*\)|[A-Za-z_$][\w$]*)\s*=>\s*(?:undefined|null|\{\s*\})/i;
+    WEAK_TLS_PROTOCOL_RE = /(?:minVersion|maxVersion)\s*:\s*['"](?:TLSv1(?:\.(?:0|1))?|SSLv3)['"]|secureProtocol\s*:\s*['"](?:TLSv1|TLSv1_1|SSLv3|SSLv2)_method|ciphers\s*:\s*['"][^'"]*(?:RC4|3DES|DES|MD5)/i;
     NON_REGISTRY_VERSION_RE = /^(?:file:|workspace:|link:|git\+|github:|\.\.?\/)|^git\+(?:ssh|https):/;
     SELF_BASENAME = "security-check-engine";
     SecurityCheckEngine = class {
@@ -503033,7 +503101,7 @@ var init_security_check_engine = __esm({
         const items = await new InjectionGuard().scan(target);
         const threats = await scanNpmThreats(target);
         const deps = this.scanDependencies(target);
-        const source = this.scanSourceEvidence(target);
+        const source = scanSourceEvidence(target);
         return {
           results: checks.map((check) => this.evaluateCheck({ check, items, threats, deps, source }))
         };
@@ -503063,6 +503131,10 @@ var init_security_check_engine = __esm({
               source.outboundValue,
               (i) => `${i.file}:${i.line} ${i.evidence}`
             );
+          case "tls-verification-disabled":
+            return this.tlsVerdict(check, source.tlsVerifyDisabled);
+          case "weak-tls-protocol":
+            return this.tlsVerdict(check, source.weakTlsProtocol);
           case "hidden-anchor-style":
           case "zero-width-link-target":
             return this.verdict(
@@ -503156,6 +503228,21 @@ var init_security_check_engine = __esm({
         const samples = hits.slice(0, 3).map(describe3).join("; ");
         return { status: "failed", message: `${check}: \u68C0\u6D4B\u5230 ${hits.length} \u5904\u98CE\u9669\uFF08${samples}\uFF09` };
       }
+      /**
+       * TLS 源码配置判定：命中即失败；未命中**只**表示「未检出已知不安全写法」，
+       * 不表示「传输加密已合规」——运行时/部署侧配置不在源码扫描的可见范围。
+       * 该限定写进通过文案，避免 0 命中被读成已验证（C4：未检测 ≠ 通过）。
+       */
+      tlsVerdict(check, hits) {
+        if (hits.length === 0) {
+          return {
+            status: "passed",
+            message: `${check}: \u672A\u68C0\u51FA\u5DF2\u77E5\u4E0D\u5B89\u5168\u7684 TLS \u6E90\u7801\u914D\u7F6E\uFF08\u6E90\u7801\u6A21\u5F0F\u68C0\u6D4B\uFF0C\u4E0D\u8986\u76D6\u8FD0\u884C\u671F/\u90E8\u7F72\u4FA7\u914D\u7F6E\uFF09`
+          };
+        }
+        const samples = hits.slice(0, 3).map((h) => `${h.file}:${h.line} ${h.evidence}`).join("; ");
+        return { status: "failed", message: `${check}: \u68C0\u6D4B\u5230 ${hits.length} \u5904 TLS \u914D\u7F6E\u98CE\u9669\uFF08${samples}\uFF09` };
+      }
       helmetVerdict(check, deps) {
         if (!deps.hasWebFramework) {
           return {
@@ -503199,7 +503286,7 @@ var init_security_check_engine = __esm({
           localUnscopedDeps: []
         };
         const files = [];
-        this.walk(target, 0, files, /* @__PURE__ */ new Set([PACKAGE_JSON_FILE]));
+        walkFiles(target, 0, files, /* @__PURE__ */ new Set([PACKAGE_JSON_FILE]));
         for (const file of files) {
           let parsed;
           try {
@@ -503216,63 +503303,6 @@ var init_security_check_engine = __esm({
           }
         }
         return scan;
-      }
-      scanSourceEvidence(target) {
-        const evidence = {
-          csrfToken: [],
-          sameSite: [],
-          originCheck: [],
-          outboundValue: []
-        };
-        const files = [];
-        this.walk(target, 0, files, SOURCE_EXTS2);
-        for (const file of files) {
-          if (path65.basename(file, path65.extname(file)) === SELF_BASENAME) continue;
-          let content;
-          try {
-            content = fs61.readFileSync(file, "utf-8");
-          } catch {
-            continue;
-          }
-          const rel = path65.relative(target, file);
-          content.split("\n").forEach((line, idx) => {
-            const trim = line.trim();
-            if (trim.length === 0 || trim.startsWith("//")) return;
-            if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) {
-              evidence.outboundValue.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-            }
-            if (CSRF_TOKEN_USAGE_RE.test(line)) {
-              evidence.csrfToken.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-            }
-            if (SAME_SITE_RE.test(line)) {
-              evidence.sameSite.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-            }
-            if (ORIGIN_CHECK_RE.test(line)) {
-              evidence.originCheck.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-            }
-          });
-        }
-        return evidence;
-      }
-      walk(dir2, depth, out, exts) {
-        if (depth > MAX_SCAN_DEPTH2) return;
-        let entries;
-        try {
-          entries = fs61.readdirSync(dir2, { withFileTypes: true });
-        } catch {
-          return;
-        }
-        for (const entry of entries) {
-          if (entry.isDirectory()) {
-            if (SKIP_DIRS3.has(entry.name)) continue;
-            this.walk(path65.join(dir2, entry.name), depth + 1, out, exts);
-            continue;
-          }
-          if (!entry.isFile()) continue;
-          if (exts.has(entry.name) || exts.has(path65.extname(entry.name).toLowerCase())) {
-            out.push(path65.join(dir2, entry.name));
-          }
-        }
       }
     };
     NAME_EXEMPT_SET = /* @__PURE__ */ new Set(["typescript", "vite", "rollup", "tsx", "ts-node", "esbuild"]);

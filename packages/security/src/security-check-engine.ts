@@ -24,6 +24,20 @@ const CSRF_TOKEN_USAGE_RE =
 const SAME_SITE_RE = /(?:sameSite\s*[:=]\s*(['"])(lax|strict|none)\1|SameSite=(Lax|Strict|None))/i;
 const ORIGIN_CHECK_RE =
   /\.headers\.origin|\[['"]origin['"]\]|checkOrigin|allowedOrigin|verifyOrigin/i;
+/**
+ * TLS 证书校验被显式关闭 —— 连接退化为可被中间人劫持（ASVS 9.1）。
+ *
+ * 只收「明确写出关闭」的写法（rejectUnauthorized: false / NODE_TLS_REJECT_UNAUTHORIZED=0 /
+ * insecureSkipVerify / strictSSL: false / 把 checkServerIdentity 写成恒返回空值的箭头函数）。
+ * 没有显式关闭的连接不发结论：源码模式判不出「是否真的校验证书」，猜测会制造假阳性。
+ */
+const TLS_VERIFY_DISABLED_RE =
+  /rejectUnauthorized\s*:\s*false|insecureSkipVerify\s*:\s*true|strictSSL\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*[=:]\s*(['"]?)0\1|checkServerIdentity\s*:\s*(?:async\s*)?(?:\(\s*\)|[A-Za-z_$][\w$]*)\s*=>\s*(?:undefined|null|\{\s*\})/i;
+
+/** 弱 TLS/SSL 协议或弱加密套件：TLSv1.0/1.1 及更早、RC4 / 3DES / MD5（ASVS 9.1） */
+const WEAK_TLS_PROTOCOL_RE =
+  /(?:minVersion|maxVersion)\s*:\s*['"](?:TLSv1(?:\.(?:0|1))?|SSLv3)['"]|secureProtocol\s*:\s*['"](?:TLSv1|TLSv1_1|SSLv3|SSLv2)_method|ciphers\s*:\s*['"][^'"]*(?:RC4|3DES|DES|MD5)/i;
+
 /** 非注册表来源的依赖版本声明（本地文件 / workspace 协议 / git 远程）——依赖混淆的本地遮蔽面 */
 const NON_REGISTRY_VERSION_RE =
   /^(?:file:|workspace:|link:|git\+|github:|\.\.?\/)|^git\+(?:ssh|https):/;
@@ -50,6 +64,10 @@ interface SourceEvidence {
   sameSite: OutboundHit[];
   originCheck: OutboundHit[];
   outboundValue: OutboundHit[];
+  /** TLS 证书校验被关闭的源码位置 */
+  tlsVerifyDisabled: OutboundHit[];
+  /** 弱 TLS 协议 / 弱加密套件的源码位置 */
+  weakTlsProtocol: OutboundHit[];
 }
 
 /** 单条 check 的检测结论：passed / failed（命中风险）/ error（检测执行异常），
@@ -108,6 +126,77 @@ function applyDepEntries(
 }
 
 /**
+ * 递归收集被检文件（按扩展名或精确文件名）。
+ *
+ * 独立于类体：引擎按职责拆分（扫描遍历 / 结论判定 / 派发），类只留判定逻辑，
+ * 避免 SecurityCheckEngine 越过 large-class 阈值后只能靠拆类整体重排。
+ */
+function walkFiles(dir: string, depth: number, out: string[], exts: Set<string>): void {
+  if (depth > MAX_SCAN_DEPTH) return;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      walkFiles(path.join(dir, entry.name), depth + 1, out, exts);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    // PACKAGE_JSON_FILE 以精确文件名匹配；源码走扩展名匹配
+    if (exts.has(entry.name) || exts.has(path.extname(entry.name).toLowerCase())) {
+      out.push(path.join(dir, entry.name));
+    }
+  }
+}
+
+/**
+ * 源码证据扫描（CSRF / env 出站 / TLS 配置）。
+ *
+ * 纯文件读取，不依赖引擎实例状态，故放在模块级：类体职责收敛到「判定」。
+ * 排除引擎自身实现文件——其 regex 常量定义行会匹配自家模式，
+ * 把「检测器定义」误计为被检项目的证据（自匹配伪证据）。
+ */
+function scanSourceEvidence(target: string): SourceEvidence {
+  const evidence: SourceEvidence = {
+    csrfToken: [],
+    sameSite: [],
+    originCheck: [],
+    outboundValue: [],
+    tlsVerifyDisabled: [],
+    weakTlsProtocol: [],
+  };
+  const files: string[] = [];
+  walkFiles(target, 0, files, SOURCE_EXTS);
+  for (const file of files) {
+    if (path.basename(file, path.extname(file)) === SELF_BASENAME) continue;
+    let content: string;
+    try {
+      content = fs.readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+    const rel = path.relative(target, file);
+    content.split('\n').forEach((line, idx) => {
+      const trim = line.trim();
+      if (trim.length === 0 || trim.startsWith('//')) return;
+      const hit = { file: rel, line: idx + 1, evidence: trim.slice(0, 120) };
+      // 出站请求携带 env 值（fetch/axios/curl/http 命中且行内含 process.env / import.meta.env）
+      if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) { evidence.outboundValue.push(hit); }
+      if (CSRF_TOKEN_USAGE_RE.test(line)) { evidence.csrfToken.push({ ...hit }); }
+      if (SAME_SITE_RE.test(line)) { evidence.sameSite.push({ ...hit }); }
+      if (ORIGIN_CHECK_RE.test(line)) { evidence.originCheck.push({ ...hit }); }
+      if (TLS_VERIFY_DISABLED_RE.test(line)) { evidence.tlsVerifyDisabled.push({ ...hit }); }
+      if (WEAK_TLS_PROTOCOL_RE.test(line)) { evidence.weakTlsProtocol.push({ ...hit }); }
+    });
+  }
+  return evidence;
+}
+
+/**
  * SecurityCheckEngine — security 域 check-list 规则的真实检测引擎。
  *
  * 接收 { mode, target, checks, dryRun }：checks 为规则 content.checks 的语义化
@@ -149,7 +238,7 @@ export class SecurityCheckEngine {
     const deps = this.scanDependencies(target);
     // env-value-outbound-request 与 Web 框架无关，源码证据需无条件扫描；
     // csrf 三项是否适用由 csrfVerdict 内部按 hasWebFramework 自判
-    const source = this.scanSourceEvidence(target);
+    const source = scanSourceEvidence(target);
     return {
       results: checks.map((check) => this.evaluateCheck({ check, items, threats, deps, source })),
     };
@@ -182,6 +271,10 @@ export class SecurityCheckEngine {
           source.outboundValue,
           (i) => `${i.file}:${i.line} ${i.evidence}`,
         );
+      case 'tls-verification-disabled':
+        return this.tlsVerdict(check, source.tlsVerifyDisabled);
+      case 'weak-tls-protocol':
+        return this.tlsVerdict(check, source.weakTlsProtocol);
       case 'hidden-anchor-style':
       case 'zero-width-link-target':
         return this.verdict(
@@ -285,6 +378,25 @@ export class SecurityCheckEngine {
     return { status: 'failed', message: `${check}: 检测到 ${hits.length} 处风险（${samples}）` };
   }
 
+  /**
+   * TLS 源码配置判定：命中即失败；未命中**只**表示「未检出已知不安全写法」，
+   * 不表示「传输加密已合规」——运行时/部署侧配置不在源码扫描的可见范围。
+   * 该限定写进通过文案，避免 0 命中被读成已验证（C4：未检测 ≠ 通过）。
+   */
+  private tlsVerdict(check: string, hits: OutboundHit[]): SecurityCheckResult {
+    if (hits.length === 0) {
+      return {
+        status: 'passed',
+        message: `${check}: 未检出已知不安全的 TLS 源码配置（源码模式检测，不覆盖运行期/部署侧配置）`,
+      };
+    }
+    const samples = hits
+      .slice(0, 3)
+      .map((h) => `${h.file}:${h.line} ${h.evidence}`)
+      .join('; ');
+    return { status: 'failed', message: `${check}: 检测到 ${hits.length} 处 TLS 配置风险（${samples}）` };
+  }
+
   private helmetVerdict(check: string, deps: DepsScan): SecurityCheckResult {
     if (!deps.hasWebFramework) {
       // 无 Web 框架 ⇒ 响应头中间件没有装配位置，属「确知不适用」。
@@ -343,7 +455,7 @@ export class SecurityCheckEngine {
       localUnscopedDeps: [],
     };
     const files: string[] = [];
-    this.walk(target, 0, files, new Set([PACKAGE_JSON_FILE]));
+    walkFiles(target, 0, files, new Set([PACKAGE_JSON_FILE]));
     for (const file of files) {
       let parsed: unknown;
       try {
@@ -362,68 +474,6 @@ export class SecurityCheckEngine {
     return scan;
   }
 
-  private scanSourceEvidence(target: string): SourceEvidence {
-    const evidence: SourceEvidence = {
-      csrfToken: [],
-      sameSite: [],
-      originCheck: [],
-      outboundValue: [],
-    };
-    const files: string[] = [];
-    this.walk(target, 0, files, SOURCE_EXTS);
-    for (const file of files) {
-      // 排除引擎自身实现文件：其 regex 常量定义行会匹配自家模式，
-      // 把「检测器定义」误计为被检项目的防护证据（自匹配伪证据）
-      if (path.basename(file, path.extname(file)) === SELF_BASENAME) continue;
-      let content: string;
-      try {
-        content = fs.readFileSync(file, 'utf-8');
-      } catch {
-        continue;
-      }
-      const rel = path.relative(target, file);
-      content.split('\n').forEach((line, idx) => {
-        const trim = line.trim();
-        if (trim.length === 0 || trim.startsWith('//')) return;
-        // 出站请求携带 env 值（fetch/axios/curl/http 命中且行内含 process.env / import.meta.env）
-        if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) {
-          evidence.outboundValue.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-        }
-        if (CSRF_TOKEN_USAGE_RE.test(line)) {
-          evidence.csrfToken.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-        }
-        if (SAME_SITE_RE.test(line)) {
-          evidence.sameSite.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-        }
-        if (ORIGIN_CHECK_RE.test(line)) {
-          evidence.originCheck.push({ file: rel, line: idx + 1, evidence: trim.slice(0, 120) });
-        }
-      });
-    }
-    return evidence;
-  }
-
-  private walk(dir: string, depth: number, out: string[], exts: Set<string>): void {
-    if (depth > MAX_SCAN_DEPTH) return;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        if (SKIP_DIRS.has(entry.name)) continue;
-        this.walk(path.join(dir, entry.name), depth + 1, out, exts);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      // PACKAGE_JSON_FILE 以精确文件名匹配；源码走扩展名匹配
-      if (exts.has(entry.name) || exts.has(path.extname(entry.name).toLowerCase())) {
-        out.push(path.join(dir, entry.name));
-      }
-    }
-  }
 }
 
 /** 本地/git 来源但无 @scope 的标准工具包名豁免（构建工具链自身的本地固化，非依赖混淆面） */

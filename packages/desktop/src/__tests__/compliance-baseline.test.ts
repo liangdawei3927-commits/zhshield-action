@@ -17,6 +17,8 @@ import {
  *   3. 证据齐全且有失败 → fail，并指出具体规则。
  */
 
+const FULL_EVIDENCE_TIME = new Date().toISOString();
+
 const cleanSecurity = {
   ledger: [
     { ruleId: 'security.scan.semgrep.sql-injection', status: 'passed' as const },
@@ -27,12 +29,14 @@ const cleanSecurity = {
     { ruleId: 'security.scan.gitleaks.hardcoded-key', status: 'passed' as const },
   ],
   malwareTotal: 0,
+  generatedAt: FULL_EVIDENCE_TIME,
 };
 
 const cleanDeps = {
   cve: { status: 'ok' as const, findings: 0 },
   lockfile: { status: 'clean' as const },
   typosquatFindings: 0,
+  generatedAt: FULL_EVIDENCE_TIME,
 };
 
 const cleanEvidence: ComplianceEvidence = { security: cleanSecurity, deps: cleanDeps };
@@ -101,6 +105,24 @@ describe('合规基线 — 覆盖状态', () => {
     expect(report.controls.find((control) => control.id === 'DEP-CVE')?.state).toBe('no-evidence');
     expect(report.controls.find((control) => control.id === 'DEP-LOCKFILE')?.state).toBe('fail');
     expect(report.controls.find((control) => control.id === 'DEP-TYPOSQUAT')?.state).toBe('fail');
+  });
+
+  it('证据超过 24h → 打「未重新检测」标（判定结果不变）', () => {
+    const now = Date.parse('2026-11-12T00:00:00.000Z');
+    const report = evaluateComplianceBaseline(
+      {
+        security: { ...cleanSecurity, generatedAt: '2026-11-10T00:00:00.000Z' },
+        deps: { ...cleanDeps, generatedAt: '2026-11-11T23:00:00.000Z' },
+      },
+      now,
+    );
+    const injection = report.controls.find((control) => control.id === 'SEC-INJECTION');
+    const cve = report.controls.find((control) => control.id === 'DEP-CVE');
+    // 判定不变：过期不改变 pass/fail，只让「多久没验」看得见
+    expect(injection?.state).toBe('pass');
+    expect(injection?.detail).toContain('未重新检测');
+    expect(cve?.detail).toContain('证据');
+    expect(cve?.detail).not.toContain('未重新检测');
   });
 
   it('未覆盖条款永远是 uncovered，且不参与“通过”计数', () => {

@@ -154,6 +154,8 @@ export interface SecurityEvidence {
     status: 'passed' | 'failed' | 'skipped' | 'error';
   }>;
   malwareTotal: number;
+  /** 报告生成时间（ISO 8601）：过期证据必须看得见，否则旧结论会被读成本次结果 */
+  generatedAt: string;
 }
 
 export interface DepsEvidence {
@@ -162,6 +164,8 @@ export interface DepsEvidence {
   lockfile: { status: 'clean' | 'modified' | 'missing' } | null;
   /** null = 报告里没有投毒检测结果 */
   typosquatFindings: number | null;
+  /** 报告生成时间（ISO 8601）：过期证据必须看得见 */
+  generatedAt: string;
 }
 
 export interface ComplianceEvidence {
@@ -202,6 +206,7 @@ export function toSecurityEvidence(
       status: entry.status,
     })),
     malwareTotal: report.summary.malwareTotal,
+    generatedAt: report.metadata?.timestamp ?? '',
   };
 }
 
@@ -218,10 +223,34 @@ export function toDepsEvidence(
     typosquatFindings: Array.isArray(report.typosquatFindings)
       ? report.typosquatFindings.length
       : null,
+    generatedAt: report.generatedAt ?? '',
   };
 }
 
 type Evaluation = { state: ComplianceState; detail: string };
+
+/** 证据过期阈值：与门禁的快照口径一致（24h） —— 超期不改变判定，但必须打标 */
+const SNAPSHOT_STALE_HOURS = 24;
+
+/**
+ * 证据时间注解：旧报告不能被读成本次结论。
+ *
+ * 合规视图吃的是**已落盘**的各域报告，用户很可能几天前扫过一次就再没跑；
+ * 如果只显示“通过”，读起来像“刚刚验过”。所以通过/失败项一律回显报告时间与
+ * 距今时长，超过 24h 追加「未重新检测」——与门禁纯判定的 snapshotNote 同一口径。
+ */
+function evidenceNote(generatedAt: string, now: number): string {
+  if (!generatedAt) return '，未提供证据时间';
+  const ts = Date.parse(generatedAt);
+  if (!Number.isFinite(ts)) return '，证据时间无法解析';
+  const hours = (now - ts) / 3_600_000;
+  const local = new Date(ts).toLocaleString('zh-CN', { hour12: false });
+  if (hours <= 0) return `，证据 ${local}`;
+  const age =
+    hours < 1 ? `${Math.max(1, Math.round(hours * 60))} 分钟前` : `${Math.round(hours)} 小时前`;
+  const stale = hours >= SNAPSHOT_STALE_HOURS ? '，⚠️ 未重新检测' : '';
+  return `，证据 ${local}（${age}${stale}）`;
+}
 
 type ControlBase = Pick<ComplianceControlResult, 'id' | 'clause' | 'title' | 'source'>;
 
@@ -264,17 +293,24 @@ function evaluateSecurityControl(
   base: ControlBase,
   rule: Extract<ControlRule, { kind: 'security-rules' | 'security-malware' }>,
   evidence: ComplianceEvidence,
+  now: number,
 ): ComplianceControlResult {
   const security = evidence.security;
   if (!security) {
     return noEvidenceResult(base, '本次未落盘安全报告（未检测 ≠ 通过）');
   }
+  const note = evidenceNote(security.generatedAt, now);
   if (rule.kind === 'security-malware') {
-    return security.malwareTotal > 0
-      ? { ...base, state: 'fail', detail: `检出 ${security.malwareTotal} 处恶意代码特征` }
-      : { ...base, state: 'pass', detail: '未检出恶意代码特征' };
+    const state = security.malwareTotal > 0 ? 'fail' : 'pass';
+    const detail =
+      state === 'fail'
+        ? `检出 ${security.malwareTotal} 处恶意代码特征`
+        : '未检出恶意代码特征';
+    return { ...base, state, detail: `${detail}${note}` };
   }
-  return { ...base, ...evaluateSecurityRules(rule, security) };
+  const result = evaluateSecurityRules(rule, security);
+  if (result.state === 'no-evidence') return { ...base, ...result };
+  return { ...base, ...result, detail: `${result.detail}${note}` };
 }
 
 function evaluateCve(base: ControlBase, deps: DepsEvidence): ComplianceControlResult {
@@ -314,15 +350,22 @@ function evaluateDepsControl(
   base: ControlBase,
   rule: Extract<ControlRule, { kind: 'deps-cve' | 'deps-lockfile' | 'deps-typosquat' }>,
   deps: DepsEvidence,
+  now: number,
 ): ComplianceControlResult {
-  if (rule.kind === 'deps-cve') return evaluateCve(base, deps);
-  if (rule.kind === 'deps-lockfile') return evaluateLockfile(base, deps);
-  return evaluateTyposquat(base, deps);
+  const result =
+    rule.kind === 'deps-cve'
+      ? evaluateCve(base, deps)
+      : rule.kind === 'deps-lockfile'
+        ? evaluateLockfile(base, deps)
+        : evaluateTyposquat(base, deps);
+  if (result.state === 'no-evidence') return result;
+  return { ...result, detail: `${result.detail}${evidenceNote(deps.generatedAt, now)}` };
 }
 
 function evaluateControl(
   control: ComplianceControl,
   evidence: ComplianceEvidence,
+  now: number,
 ): ComplianceControlResult {
   const base: ControlBase = {
     id: control.id,
@@ -335,18 +378,21 @@ function evaluateControl(
     return { ...base, state: 'uncovered', detail: '本页尚未实现该项检查，无证据源，不计为通过' };
   }
   if (rule.kind === 'security-rules' || rule.kind === 'security-malware') {
-    return evaluateSecurityControl(base, rule, evidence);
+    return evaluateSecurityControl(base, rule, evidence, now);
   }
   const deps = evidence.deps;
   if (!deps) {
     return noEvidenceResult(base, '本次未落盘依赖报告（未检测 ≠ 通过）');
   }
-  return evaluateDepsControl(base, rule, deps);
+  return evaluateDepsControl(base, rule, deps, now);
 }
 
-/** 按条款表评估合规差距；纯函数，无副作用 */
-export function evaluateComplianceBaseline(evidence: ComplianceEvidence): ComplianceReport {
-  const controls = COMPLIANCE_CONTROLS.map((control) => evaluateControl(control, evidence));
+/** 按条款表评估合规差距；纯函数，无副作用（now 可注入以便测试过期标注） */
+export function evaluateComplianceBaseline(
+  evidence: ComplianceEvidence,
+  now: number = Date.now(),
+): ComplianceReport {
+  const controls = COMPLIANCE_CONTROLS.map((control) => evaluateControl(control, evidence, now));
   const summary = {
     pass: controls.filter((control) => control.state === 'pass').length,
     fail: controls.filter((control) => control.state === 'fail').length,

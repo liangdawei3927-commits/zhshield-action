@@ -3,9 +3,16 @@ import * as path from 'node:path';
 import { InjectionGuard } from './injection-guard';
 import { scanNpmThreats } from './npm-threat-scanner';
 import type { MalwareItem } from './types';
-import { MAX_SCAN_DEPTH, PACKAGE_JSON_FILE, SKIP_DIRS } from './scan-walk';
+import { PACKAGE_JSON_FILE } from './scan-walk';
+import { SIGNATURE_VERIFICATION_RE, scanSourceEvidence, walkFiles } from './security-config-scan';
+import type { SourceEvidence, SourceHit } from './security-config-scan';
+import { evaluateConfigCheck, makeVerdict } from './security-config-checks';
+import type { ConfigContext } from './security-config-checks';
+import type { SecurityCheckResult } from './security-check-result';
 
-const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue']);
+/** 类型从独立模块透出，保持既有 `@zh/security` 导出路径不变 */
+export type { SecurityCheckResult } from './security-check-result';
+
 const HELMET_PKG = 'helmet';
 const WEB_FRAMEWORK_MARKERS = [
   'express',
@@ -16,73 +23,63 @@ const WEB_FRAMEWORK_MARKERS = [
   'hapi',
 ];
 const CSRF_LIBS = ['csurf', '@fastify/csrf-protection', 'tiny-csrf', '@nestjs/throttler'];
-const OUTBOUND_RE =
-  /(?:fetch|axios(?:\.\w+)?|curl|https?\.(?:get|post|put|delete|request)|XMLHttpRequest|WebSocket)\s*\(?[^)\n]*(?:process\.env|import\.meta\.env)/i;
-const ENV_ACCESS_RE = /(?:process\.env|import\.meta\.env)/;
-const CSRF_TOKEN_USAGE_RE =
-  /csrf\s*\(\s*\{|csrfToken\s*\(|X-CSRF(?:-Token)?[:=]|csrfProtection|app\.use\s*\(\s*(?:csurf|csrf)\b/i;
-const SAME_SITE_RE = /(?:sameSite\s*[:=]\s*(['"])(lax|strict|none)\1|SameSite=(Lax|Strict|None))/i;
-const ORIGIN_CHECK_RE =
-  /\.headers\.origin|\[['"]origin['"]\]|checkOrigin|allowedOrigin|verifyOrigin/i;
-/**
- * TLS 证书校验被显式关闭 —— 连接退化为可被中间人劫持（ASVS 9.1）。
- *
- * 只收「明确写出关闭」的写法（rejectUnauthorized: false / NODE_TLS_REJECT_UNAUTHORIZED=0 /
- * insecureSkipVerify / strictSSL: false / 把 checkServerIdentity 写成恒返回空值的箭头函数）。
- * 没有显式关闭的连接不发结论：源码模式判不出「是否真的校验证书」，猜测会制造假阳性。
- */
-const TLS_VERIFY_DISABLED_RE =
-  /rejectUnauthorized\s*:\s*false|insecureSkipVerify\s*:\s*true|strictSSL\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*[=:]\s*(['"]?)0\1|checkServerIdentity\s*:\s*(?:async\s*)?(?:\(\s*\)|[A-Za-z_$][\w$]*)\s*=>\s*(?:undefined|null|\{\s*\})/i;
-
-/** 弱 TLS/SSL 协议或弱加密套件：TLSv1.0/1.1 及更早、RC4 / 3DES / MD5（ASVS 9.1） */
-const WEAK_TLS_PROTOCOL_RE =
-  /(?:minVersion|maxVersion)\s*:\s*['"](?:TLSv1(?:\.(?:0|1))?|SSLv3)['"]|secureProtocol\s*:\s*['"](?:TLSv1|TLSv1_1|SSLv3|SSLv2)_method|ciphers\s*:\s*['"][^'"]*(?:RC4|3DES|DES|MD5)/i;
+/** 认证/会话库：决定会话 Cookie 与密码哈希检查是否适用 */
+const AUTH_LIBS = [
+  'jsonwebtoken',
+  'jose',
+  'passport',
+  'express-session',
+  'cookie-session',
+  'next-auth',
+  'bcrypt',
+  'bcryptjs',
+  'argon2',
+  '@node-rs/argon2',
+  'lucia',
+  '@auth/core',
+  'iron-session',
+  '@nestjs/jwt',
+  '@nestjs/passport',
+  '@fastify/jwt',
+  '@fastify/session',
+  '@fastify/cookie',
+];
+const JWT_LIBS = [
+  'jsonwebtoken',
+  'jose',
+  '@nestjs/jwt',
+  '@fastify/jwt',
+  'next-auth',
+  '@auth/core',
+];
+const LOGGER_LIBS = ['winston', 'pino', 'bunyan', 'log4js'];
+const KEY_LIBS = [
+  '@aws-sdk/client-kms',
+  '@aws-sdk/client-secrets-manager',
+  'node-vault',
+  '@azure/keyvault-keys',
+  '@google-cloud/kms',
+  'keytar',
+];
 
 /** 非注册表来源的依赖版本声明（本地文件 / workspace 协议 / git 远程）——依赖混淆的本地遮蔽面 */
 const NON_REGISTRY_VERSION_RE =
   /^(?:file:|workspace:|link:|git\+|github:|\.\.?\/)|^git\+(?:ssh|https):/;
-/** 引擎自身实现文件名（无扩展名）：源码证据扫描需排除，避免 regex 定义行自匹配伪证据 */
-const SELF_BASENAME = 'security-check-engine';
 
 interface DepsScan {
   hasWebFramework: boolean;
   hasHelmet: boolean;
   hasCsrfLib: boolean;
+  hasAuthLib: boolean;
+  hasJwtLib: boolean;
+  hasLoggerLib: boolean;
+  hasKeyLib: boolean;
+  hasDependencies: boolean;
+  /** package.json scripts 里已声明依赖签名/来源校验命令 */
+  hasSignatureScript: boolean;
   evidence: string[];
   /** 未加作用域且来自本地/git 来源的依赖名（依赖混淆遮蔽面） */
   localUnscopedDeps: string[];
-}
-
-interface OutboundHit {
-  file: string;
-  line: number;
-  evidence: string;
-}
-
-interface SourceEvidence {
-  csrfToken: OutboundHit[];
-  sameSite: OutboundHit[];
-  originCheck: OutboundHit[];
-  outboundValue: OutboundHit[];
-  /** TLS 证书校验被关闭的源码位置 */
-  tlsVerifyDisabled: OutboundHit[];
-  /** 弱 TLS 协议 / 弱加密套件的源码位置 */
-  weakTlsProtocol: OutboundHit[];
-}
-
-/** 单条 check 的检测结论：passed / failed（命中风险）/ error（检测执行异常），
- *  由 SecurityCheckEngine 转为 GuardEngine 契约的 violation 列表 */
-export interface SecurityCheckResult {
-  status: 'passed' | 'failed' | 'error';
-  message?: string;
-  /**
-   * 不适用标注：检测项在本项目**确实不存在可检对象**（如未使用 Web 框架时的
-   * Helmet/CSRF 要求）。仅作为附加语义，status 仍为 passed —— 不新增顶层状态，
-   * 避免破坏既有消费方（GuardEngine 契约、SARIF、评分）的 schema。
-   *
-   * 只在「确知不适用」处设置；无法判定时不得猜测（宁可保持 passed/failed 现状）。
-   */
-  applicability?: 'not-applicable';
 }
 
 interface EvaluateCheckParams {
@@ -104,12 +101,25 @@ function applyDepEntries(
   deps: Record<string, unknown>,
 ): void {
   for (const [name, version] of Object.entries(deps)) {
+    scan.hasDependencies = true;
     if (name === HELMET_PKG) {
       scan.hasHelmet = true;
       scan.evidence.push(`${rel}[${section}]: helmet`);
     }
     if (CSRF_LIBS.includes(name)) {
       scan.hasCsrfLib = true;
+    }
+    if (AUTH_LIBS.includes(name)) {
+      scan.hasAuthLib = true;
+    }
+    if (JWT_LIBS.includes(name)) {
+      scan.hasJwtLib = true;
+    }
+    if (LOGGER_LIBS.includes(name)) {
+      scan.hasLoggerLib = true;
+    }
+    if (KEY_LIBS.includes(name)) {
+      scan.hasKeyLib = true;
     }
     if (WEB_FRAMEWORK_MARKERS.some((m) => name === m || name.startsWith(m.replace('*', '')))) {
       scan.hasWebFramework = true;
@@ -125,75 +135,43 @@ function applyDepEntries(
   }
 }
 
-/**
- * 递归收集被检文件（按扩展名或精确文件名）。
- *
- * 独立于类体：引擎按职责拆分（扫描遍历 / 结论判定 / 派发），类只留判定逻辑，
- * 避免 SecurityCheckEngine 越过 large-class 阈值后只能靠拆类整体重排。
- */
-function walkFiles(dir: string, depth: number, out: string[], exts: Set<string>): void {
-  if (depth > MAX_SCAN_DEPTH) return;
-  let entries: fs.Dirent[];
+/** 读取并解析 package.json；缺失或非法返回 null */
+function readPackageJson(file: string): Record<string, unknown> | null {
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
-    return;
+    return null;
   }
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      walkFiles(path.join(dir, entry.name), depth + 1, out, exts);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    // PACKAGE_JSON_FILE 以精确文件名匹配；源码走扩展名匹配
-    if (exts.has(entry.name) || exts.has(path.extname(entry.name).toLowerCase())) {
-      out.push(path.join(dir, entry.name));
+}
+
+/** scripts 里的签名/来源校验命令（如 `npm audit signatures`）并入扫描结论 */
+function applyScriptEntries(scan: DepsScan, parsed: Record<string, unknown>): void {
+  const scripts = parsed.scripts;
+  if (typeof scripts !== 'object' || scripts === null) return;
+  for (const command of Object.values(scripts as Record<string, unknown>)) {
+    if (typeof command === 'string' && SIGNATURE_VERIFICATION_RE.test(command)) {
+      scan.hasSignatureScript = true;
+      return;
     }
   }
 }
 
-/**
- * 源码证据扫描（CSRF / env 出站 / TLS 配置）。
- *
- * 纯文件读取，不依赖引擎实例状态，故放在模块级：类体职责收敛到「判定」。
- * 排除引擎自身实现文件——其 regex 常量定义行会匹配自家模式，
- * 把「检测器定义」误计为被检项目的证据（自匹配伪证据）。
- */
-function scanSourceEvidence(target: string): SourceEvidence {
-  const evidence: SourceEvidence = {
-    csrfToken: [],
-    sameSite: [],
-    originCheck: [],
-    outboundValue: [],
-    tlsVerifyDisabled: [],
-    weakTlsProtocol: [],
+/** 依赖清单 + 源码证据 → 配置类判定的项目形态上下文 */
+function configContext(deps: DepsScan, source: SourceEvidence): ConfigContext {
+  return {
+    hasWebFramework: deps.hasWebFramework,
+    hasHelmet: deps.hasHelmet,
+    hasAuthLib: deps.hasAuthLib,
+    hasJwtLib: deps.hasJwtLib,
+    hasLoggerLib: deps.hasLoggerLib,
+    hasKeyLib: deps.hasKeyLib,
+    hasDependencies: deps.hasDependencies,
+    hasSignatureScript: deps.hasSignatureScript,
+    hasCryptoUsage: source.cryptoUsage.length > 0,
   };
-  const files: string[] = [];
-  walkFiles(target, 0, files, SOURCE_EXTS);
-  for (const file of files) {
-    if (path.basename(file, path.extname(file)) === SELF_BASENAME) continue;
-    let content: string;
-    try {
-      content = fs.readFileSync(file, 'utf-8');
-    } catch {
-      continue;
-    }
-    const rel = path.relative(target, file);
-    content.split('\n').forEach((line, idx) => {
-      const trim = line.trim();
-      if (trim.length === 0 || trim.startsWith('//')) return;
-      const hit = { file: rel, line: idx + 1, evidence: trim.slice(0, 120) };
-      // 出站请求携带 env 值（fetch/axios/curl/http 命中且行内含 process.env / import.meta.env）
-      if (OUTBOUND_RE.test(line) && ENV_ACCESS_RE.test(line)) { evidence.outboundValue.push(hit); }
-      if (CSRF_TOKEN_USAGE_RE.test(line)) { evidence.csrfToken.push({ ...hit }); }
-      if (SAME_SITE_RE.test(line)) { evidence.sameSite.push({ ...hit }); }
-      if (ORIGIN_CHECK_RE.test(line)) { evidence.originCheck.push({ ...hit }); }
-      if (TLS_VERIFY_DISABLED_RE.test(line)) { evidence.tlsVerifyDisabled.push({ ...hit }); }
-      if (WEAK_TLS_PROTOCOL_RE.test(line)) { evidence.weakTlsProtocol.push({ ...hit }); }
-    });
-  }
-  return evidence;
 }
 
 /**
@@ -252,6 +230,12 @@ export class SecurityCheckEngine {
     if (dependency !== null) return dependency;
     const threats = this.threatDbVerdict(params);
     if (threats !== null) return threats;
+    const config = evaluateConfigCheck(
+      params.check,
+      params.source,
+      configContext(params.deps, params.source),
+    );
+    if (config !== null) return config;
     return this.guardPatternVerdict(params);
   }
 
@@ -260,13 +244,13 @@ export class SecurityCheckEngine {
     switch (check) {
       case 'env-tracked-in-scan-set':
         // InjectionGuard 的 .env 检出以 title 标识（pattern 为文件名，无法按下发名匹配）
-        return this.verdict(
+        return makeVerdict(
           check,
           items.filter((i) => i.title.startsWith("'.env'")),
           (i) => `${i.evidence}`,
         );
       case 'env-value-outbound-request':
-        return this.verdict(
+        return makeVerdict(
           check,
           source.outboundValue,
           (i) => `${i.file}:${i.line} ${i.evidence}`,
@@ -277,7 +261,7 @@ export class SecurityCheckEngine {
         return this.tlsVerdict(check, source.weakTlsProtocol);
       case 'hidden-anchor-style':
       case 'zero-width-link-target':
-        return this.verdict(
+        return makeVerdict(
           check,
           items.filter(
             (i) =>
@@ -325,20 +309,20 @@ export class SecurityCheckEngine {
     const { check, items, threats } = params;
     switch (check) {
       case 'package-name-typosquatting':
-        return this.verdict(
+        return makeVerdict(
           check,
           threats.filter((i) => i.pattern.startsWith('typosquat:')),
           (i) => `${i.evidence}`,
         );
       case 'known-malicious-packages':
-        return this.verdict(
+        return makeVerdict(
           check,
           threats.filter((i) => i.pattern === 'npm-threat-db'),
           (i) => `${i.evidence}`,
         );
       case 'suspicious-postinstall-script':
         // package.json 脚本注入由 InjectionGuard 以 type='supply-chain' 产出
-        return this.verdict(
+        return makeVerdict(
           check,
           items.filter((i) => i.type === 'supply-chain'),
           (i) => `${i.file}:${i.title}`,
@@ -361,7 +345,7 @@ export class SecurityCheckEngine {
       'force-delete',
     ]);
     if (KNOWN_PATTERNS.has(check)) {
-      return this.verdict(
+      return makeVerdict(
         check,
         items.filter((i) => i.pattern === check),
         (i) => `${i.file}:${i.line} ${i.evidence}`,
@@ -370,20 +354,12 @@ export class SecurityCheckEngine {
     return { status: 'error', message: `${check}: 未知检查项，安全引擎未实现该检测` };
   }
 
-  private verdict<T>(check: string, hits: T[], describe: (item: T) => string): SecurityCheckResult {
-    if (hits.length === 0) {
-      return { status: 'passed', message: `${check}: 未发现风险` };
-    }
-    const samples = hits.slice(0, 3).map(describe).join('; ');
-    return { status: 'failed', message: `${check}: 检测到 ${hits.length} 处风险（${samples}）` };
-  }
-
   /**
    * TLS 源码配置判定：命中即失败；未命中**只**表示「未检出已知不安全写法」，
    * 不表示「传输加密已合规」——运行时/部署侧配置不在源码扫描的可见范围。
    * 该限定写进通过文案，避免 0 命中被读成已验证（C4：未检测 ≠ 通过）。
    */
-  private tlsVerdict(check: string, hits: OutboundHit[]): SecurityCheckResult {
+  private tlsVerdict(check: string, hits: SourceHit[]): SecurityCheckResult {
     if (hits.length === 0) {
       return {
         status: 'passed',
@@ -451,25 +427,27 @@ export class SecurityCheckEngine {
       hasWebFramework: false,
       hasHelmet: false,
       hasCsrfLib: false,
+      hasAuthLib: false,
+      hasJwtLib: false,
+      hasLoggerLib: false,
+      hasKeyLib: false,
+      hasDependencies: false,
+      hasSignatureScript: false,
       evidence: [],
       localUnscopedDeps: [],
     };
     const files: string[] = [];
     walkFiles(target, 0, files, new Set([PACKAGE_JSON_FILE]));
     for (const file of files) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      } catch {
-        continue;
-      }
-      if (typeof parsed !== 'object' || parsed === null) continue;
+      const parsed = readPackageJson(file);
+      if (parsed === null) continue;
       const rel = path.relative(target, file);
       for (const section of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
-        const deps = (parsed as Record<string, unknown>)[section];
+        const deps = parsed[section];
         if (typeof deps !== 'object' || deps === null) continue;
         applyDepEntries(scan, rel, section, deps as Record<string, unknown>);
       }
+      applyScriptEntries(scan, parsed);
     }
     return scan;
   }

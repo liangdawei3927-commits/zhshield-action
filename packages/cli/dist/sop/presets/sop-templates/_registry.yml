@@ -180,6 +180,36 @@ rules:
     priority: "high"
     status: "active"
 
+  - id: "security.scan.internal.header-config"
+    file: "security/scan/vulnerability/header-config.yml"
+    adapter: "Security · 安全响应头取值（SecurityCheckEngine 源码模式）"
+    priority: "high"
+    status: "active"
+
+  - id: "security.scan.internal.auth-session"
+    file: "security/scan/vulnerability/auth-session.yml"
+    adapter: "Security · 认证与会话策略（SecurityCheckEngine 源码模式）"
+    priority: "high"
+    status: "active"
+
+  - id: "security.scan.internal.audit-log"
+    file: "security/scan/vulnerability/audit-log.yml"
+    adapter: "Security · 审计日志（SecurityCheckEngine 源码模式）"
+    priority: "medium"
+    status: "active"
+
+  - id: "security.scan.internal.key-rotation"
+    file: "security/scan/vulnerability/key-rotation.yml"
+    adapter: "Security · 密钥生命周期（SecurityCheckEngine 源码模式）"
+    priority: "medium"
+    status: "active"
+
+  - id: "security.scan.internal.supply-signature"
+    file: "security/scan/vulnerability/supply-signature.yml"
+    adapter: "Security · 供应链签名校验（SecurityCheckEngine 源码模式）"
+    priority: "medium"
+    status: "active"
+
   - id: "security.scan.gitleaks.hardcoded-key"
     file: "security/scan/vulnerability/hardcoded-key.yml"
     adapter: "Security · 硬编码密钥"

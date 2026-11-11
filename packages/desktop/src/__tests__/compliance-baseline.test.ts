@@ -29,6 +29,11 @@ const cleanSecurity = {
     { ruleId: 'security.scan.gitleaks.hardcoded-key', status: 'passed' as const },
     { ruleId: 'security.scan.external.helmet-check', status: 'passed' as const },
     { ruleId: 'security.scan.internal.tls-config', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.header-config', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.auth-session', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.audit-log', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.key-rotation', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.supply-signature', status: 'passed' as const },
   ],
   malwareTotal: 0,
   generatedAt: FULL_EVIDENCE_TIME,
@@ -44,10 +49,17 @@ const cleanDeps = {
 const cleanEvidence: ComplianceEvidence = { security: cleanSecurity, deps: cleanDeps };
 
 describe('合规基线 — 覆盖状态', () => {
-  it('证据齐全且干净：9 条证据条款通过、5 条未覆盖，绝不出现“缺证据”', () => {
+  it('证据齐全且干净：14 条证据条款全部通过，无未覆盖/缺证据/不适用', () => {
     const report = evaluateComplianceBaseline(cleanEvidence);
     expect(report.standard).toEqual(COMPLIANCE_STANDARD);
-    expect(report.summary).toEqual({ pass: 9, fail: 0, noEvidence: 0, uncovered: 5, total: 14 });
+    expect(report.summary).toEqual({
+      pass: 14,
+      fail: 0,
+      noEvidence: 0,
+      notApplicable: 0,
+      uncovered: 0,
+      total: 14,
+    });
     expect(report.controls).toHaveLength(COMPLIANCE_CONTROLS.length);
   });
 
@@ -62,18 +74,16 @@ describe('合规基线 — 覆盖状态', () => {
           'SEC-MALWARE',
           'SEC-HEADERS-MIDDLEWARE',
           'CFG-TLS',
+          'CFG-HEADERS',
+          'AUTH-SESSION',
+          'LOG-AUDIT',
+          'KEY-ROTATION',
+          'SUPPLY-SIGNATURE',
         ].includes(control.id),
       )
       .map((control) => control.state);
-    expect(securityStates).toEqual([
-      'no-evidence',
-      'no-evidence',
-      'no-evidence',
-      'no-evidence',
-      'no-evidence',
-      'no-evidence',
-    ]);
-    expect(report.summary.noEvidence).toBe(6);
+    expect(securityStates).toEqual(new Array(11).fill('no-evidence'));
+    expect(report.summary.noEvidence).toBe(11);
     expect(report.summary.pass).toBe(3); // 仅剩 3 条依赖条款有证据
   });
 
@@ -176,17 +186,29 @@ describe('合规基线 — 覆盖状态', () => {
     expect(cve?.detail).not.toContain('未重新检测');
   });
 
-  it('未覆盖条款永远是 uncovered，且不参与“通过”计数', () => {
+  it('v1 条款表已全部有证据源：无 uncovered，报告缺失时一律 no-evidence', () => {
     const report = evaluateComplianceBaseline({ security: null, deps: null });
-    const uncovered = report.controls.filter((control) => control.state === 'uncovered');
-    expect(uncovered.map((control) => control.id)).toEqual([
-      'CFG-HEADERS',
-      'AUTH-SESSION',
-      'LOG-AUDIT',
-      'KEY-ROTATION',
-      'SUPPLY-SIGNATURE',
-    ]);
+    expect(report.controls.filter((control) => control.state === 'uncovered')).toEqual([]);
     expect(report.summary.pass).toBe(0);
-    expect(report.summary.noEvidence).toBe(9);
+    expect(report.summary.noEvidence).toBe(14);
+  });
+
+  it('规则标了 not-applicable → 条款是「不适用」，不计入通过', () => {
+    const report = evaluateComplianceBaseline({
+      security: {
+        ...cleanSecurity,
+        ledger: cleanSecurity.ledger.map((entry) =>
+          entry.ruleId === 'security.scan.internal.auth-session'
+            ? { ...entry, applicability: 'not-applicable' as const }
+            : entry,
+        ),
+      },
+      deps: cleanDeps,
+    });
+    const auth = report.controls.find((control) => control.id === 'AUTH-SESSION');
+    expect(auth?.state).toBe('not-applicable');
+    expect(auth?.detail).toContain('规则不适用');
+    expect(report.summary.notApplicable).toBe(1);
+    expect(report.summary.pass).toBe(13);
   });
 });

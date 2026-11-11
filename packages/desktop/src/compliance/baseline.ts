@@ -12,17 +12,19 @@
  * `zhshield compliance` 时再上移（避免新增文件在注入副本里不同步的坑）。
  *
  * 覆盖语义（与评分口径解耦）：
- *   · pass        —— 有证据且无问题
- *   · fail        —— 有证据且存在问题
- *   · no-evidence —— 应有证据但本次没跑到/没落盘（**不得**当成通过）
- *   · uncovered   —— 本产品尚未实现该项检查（只在能力边界里告知）
+ *   · pass           —— 有证据且无问题
+ *   · fail           —— 有证据且存在问题
+ *   · no-evidence    —— 应有证据但本次没跑到/没落盘（**不得**当成通过）
+ *   · not-applicable —— 规则本身不适用于本项目（如无 Web 框架时的安全响应头），
+ *                       是「没得查」而非「查了没问题」，不计入通过
+ *   · uncovered      —— 本产品尚未实现该项检查（只在能力边界里告知）
  */
 import type { DependencyReportData, SecurityScanReportData } from '../types/electron';
 
 /** 基线标识（能力注册表 implementedBy 的证据串，勿改） */
 export const COMPLIANCE_BASELINE_ID = 'compliance-baseline';
 
-export type ComplianceState = 'pass' | 'fail' | 'no-evidence' | 'uncovered';
+export type ComplianceState = 'pass' | 'fail' | 'no-evidence' | 'not-applicable' | 'uncovered';
 
 /** 条款的证据形态：决定从哪份报告取结论 */
 type ControlRule =
@@ -122,41 +124,42 @@ export const COMPLIANCE_CONTROLS: readonly ComplianceControl[] = [
     source: '依赖管家 · 投毒检测',
     rule: { kind: 'deps-typosquat' },
   },
-  // ── 尚未实现：只告知，不产出结论（能力边界的一部分） ──────────────
   {
     id: 'CFG-HEADERS',
     clause: 'ASVS 14.4',
     title: '安全响应头取值（CSP / HSTS / X-Frame-Options）',
-    source: '暂无（中间件已安装不等于取值合规）',
-    rule: { kind: 'uncovered' },
+    source: '安全中心 · 安全响应头取值检测（源码模式）',
+    // 证据要求「装配与取值」：只有 helmet 依赖装在清单里不算——helmet-check
+    // 已由 SEC-HEADERS-MIDDLEWARE 单独承接，本条看的是装配调用与显式头配置。
+    rule: { kind: 'security-rules', ruleTokens: ['header-config'] },
   },
   {
     id: 'AUTH-SESSION',
     clause: 'ASVS 2.2',
     title: '认证与会话策略',
-    source: '暂无',
-    rule: { kind: 'uncovered' },
+    source: '安全中心 · 认证与会话策略检测（源码模式）',
+    rule: { kind: 'security-rules', ruleTokens: ['auth-session'] },
   },
   {
     id: 'LOG-AUDIT',
     clause: 'ASVS 7.1',
     title: '审计日志与告警要求',
-    source: '暂无',
-    rule: { kind: 'uncovered' },
+    source: '安全中心 · 审计日志检测（源码模式）',
+    rule: { kind: 'security-rules', ruleTokens: ['audit-log'] },
   },
   {
     id: 'KEY-ROTATION',
     clause: 'ASVS 2.10.4',
     title: '密钥生命周期与轮换',
-    source: '暂无',
-    rule: { kind: 'uncovered' },
+    source: '安全中心 · 密钥生命周期检测（源码模式）',
+    rule: { kind: 'security-rules', ruleTokens: ['key-rotation'] },
   },
   {
     id: 'SUPPLY-SIGNATURE',
     clause: 'ASVS 12.5',
     title: '供应链完整性签名校验',
-    source: '暂无',
-    rule: { kind: 'uncovered' },
+    source: '安全中心 · 供应链签名校验（源码模式）',
+    rule: { kind: 'security-rules', ruleTokens: ['supply-signature'] },
   },
 ];
 
@@ -164,6 +167,8 @@ export interface SecurityEvidence {
   ledger: ReadonlyArray<{
     ruleId: string;
     status: 'passed' | 'failed' | 'skipped' | 'error';
+    /** 'not-applicable' = 规则确实不适用于本项目（无对应检测面），不等于通过 */
+    applicability?: string;
   }>;
   malwareTotal: number;
   /** 报告生成时间（ISO 8601）：过期证据必须看得见，否则旧结论会被读成本次结果 */
@@ -202,6 +207,8 @@ export interface ComplianceReport {
     pass: number;
     fail: number;
     noEvidence: number;
+    /** 规则确实不适用于本项目：不是通过，也不是缺证据 */
+    notApplicable: number;
     uncovered: number;
     total: number;
   };
@@ -216,6 +223,7 @@ export function toSecurityEvidence(
     ledger: (report.ruleLedger ?? []).map((entry) => ({
       ruleId: entry.ruleId,
       status: entry.status,
+      ...(entry.applicability ? { applicability: entry.applicability } : {}),
     })),
     malwareTotal: report.summary.malwareTotal,
     generatedAt: report.metadata?.timestamp ?? '',
@@ -289,16 +297,28 @@ function evaluateSecurityRules(
       detail: `未通过：${failed.map((entry) => entry.ruleId).join('、')}`,
     };
   }
-  const passed = matched.filter((entry) => entry.status === 'passed');
-  if (passed.length === 0) {
+  const passed = matched.filter(
+    (entry) => entry.status === 'passed' && entry.applicability !== 'not-applicable',
+  );
+  if (passed.length > 0) {
+    return { state: 'pass', detail: `${passed.length} 条规则通过` };
+  }
+  const notApplicable = matched.filter((entry) => entry.applicability === 'not-applicable');
+  if (notApplicable.length > 0) {
+    // 「没得查」不是「查了没问题」：不计入通过，单独成态，页面可据此区分
     return {
-      state: 'no-evidence',
-      detail: `对应规则均被跳过（归属让位或缺工具）：${matched
+      state: 'not-applicable',
+      detail: `规则不适用（本项目无对应检测面）：${notApplicable
         .map((entry) => entry.ruleId)
         .join('、')}`,
     };
   }
-  return { state: 'pass', detail: `${passed.length} 条规则通过` };
+  return {
+    state: 'no-evidence',
+    detail: `对应规则均被跳过（归属让位或缺工具）：${matched
+      .map((entry) => entry.ruleId)
+      .join('、')}`,
+  };
 }
 
 function evaluateSecurityControl(
@@ -409,6 +429,7 @@ export function evaluateComplianceBaseline(
     pass: controls.filter((control) => control.state === 'pass').length,
     fail: controls.filter((control) => control.state === 'fail').length,
     noEvidence: controls.filter((control) => control.state === 'no-evidence').length,
+    notApplicable: controls.filter((control) => control.state === 'not-applicable').length,
     uncovered: controls.filter((control) => control.state === 'uncovered').length,
     total: controls.length,
   };

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: abb661652b30c3b1
+// @zh-src-hash: ee62164346784a19
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -510216,9 +510216,6 @@ function collectGuardViolations(result, rule) {
   return violations;
 }
 
-// ../kernel/src/runner/dispatch-engine-scan.ts
-init_src2();
-
 // ../kernel/src/runner/dispatch-tool-scan.ts
 init_src2();
 
@@ -510341,20 +510338,20 @@ async function evalToolDispatch(host, rule, instr, context) {
   if (unavailable) return unavailable;
   return runToolScanWithCache({ host, adapter: resolution.adapter, rule, instr, context });
 }
+function delegatedRuleSkip(rule) {
+  const owner = resolveOwnerId(rule.id);
+  if (!owner || owner === rule.domain) return null;
+  return skipEvaluation(
+    rule,
+    `\u89C4\u5219\u5F52 ${owner} \u57DF\u8D1F\u8D23\uFF08C3 \u552F\u4E00\u5F52\u5C5E\uFF09\uFF0C\u672C\u57DF\u4E0D\u91CD\u590D\u8BC4\u4F30`,
+    targetEngineOf(rule)
+  );
+}
 function resolveToolAdapter(host, rule, instr) {
   const adapter = host.toolAdapters.get(instr.tool);
   if (!adapter) {
-    const owner = resolveOwnerId(rule.id);
-    if (owner && owner !== rule.domain) {
-      return {
-        kind: "skipped",
-        result: skipEvaluation(
-          rule,
-          `\u89C4\u5219\u5F52 ${owner} \u57DF\u8D1F\u8D23\uFF08C3 \u552F\u4E00\u5F52\u5C5E\uFF09\uFF0C\u672C\u57DF\u4E0D\u91CD\u590D\u8BC4\u4F30`,
-          targetEngineOf(rule)
-        )
-      };
-    }
+    const delegated = delegatedRuleSkip(rule);
+    if (delegated) return { kind: "skipped", result: delegated };
     return {
       kind: "skipped",
       result: skipEvaluation(
@@ -510515,51 +510512,59 @@ async function evalScannerDispatch(host, rule, instr, context) {
   }
   return runInspectScan(host.inspectEngine, rule, context, "\u5DE1\u68C0");
 }
+function extractSkipReason(message, toolName) {
+  const msg = message ?? "\u626B\u63CF\u5668\u4E0D\u53EF\u7528";
+  const prefix = `\u5DE5\u5177\u4E0D\u53EF\u7528: ${toolName}\uFF08`;
+  return msg.startsWith(prefix) && msg.endsWith("\uFF09") ? msg.slice(prefix.length, -1) : msg;
+}
+async function scanWithOneScanner(host, rule, toolName, context) {
+  if (!host.toolAdapters.has(toolName)) {
+    return { ran: false, violations: [], reason: `${toolName}(\u672A\u6CE8\u518C\u5DE5\u5177\u9002\u914D\u5668: ${toolName})` };
+  }
+  const one = await evalToolDispatch(
+    host,
+    rule,
+    {
+      type: "tool-dispatch",
+      tool: toolName,
+      toolConfig: {},
+      conditions: {},
+      judgment: {},
+      fix: {}
+    },
+    context
+  );
+  const violations = one.violations ?? [];
+  if (one.status === "error" && violations.length === 0) {
+    return {
+      ran: false,
+      violations,
+      fatal: { ...one, message: one.message ?? `\u626B\u63CF\u5668 ${toolName} \u6267\u884C\u5931\u8D25` }
+    };
+  }
+  if (one.status === "skipped") {
+    return {
+      ran: false,
+      violations,
+      reason: `${toolName}(${extractSkipReason(one.message, toolName)})`
+    };
+  }
+  return { ran: true, violations };
+}
 async function runScannerAdapters(host, rule, instr, context) {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
-  const owner = resolveOwnerId(rule.id);
-  if (owner && owner !== rule.domain) {
-    return skipEvaluation(
-      rule,
-      `\u89C4\u5219\u5F52 ${owner} \u57DF\u8D1F\u8D23\uFF08C3 \u552F\u4E00\u5F52\u5C5E\uFF09\uFF0C\u672C\u57DF\u4E0D\u91CD\u590D\u8BC4\u4F30`,
-      "inspect"
-    );
-  }
+  const delegated = delegatedRuleSkip(rule);
+  if (delegated) return delegated;
   const violations = [];
   const reasons = [];
   let anyRan = false;
   for (const tool of scanners) {
-    const toolName = String(tool);
-    if (!host.toolAdapters.has(toolName)) {
-      reasons.push(`${toolName}(\u672A\u6CE8\u518C\u5DE5\u5177\u9002\u914D\u5668: ${toolName})`);
-      continue;
-    }
-    const one = await evalToolDispatch(
-      host,
-      rule,
-      {
-        type: "tool-dispatch",
-        tool: toolName,
-        toolConfig: {},
-        conditions: {},
-        judgment: {},
-        fix: {}
-      },
-      context
-    );
-    if (one.violations?.length) violations.push(...one.violations);
-    if (one.status === "error" && !one.violations?.length) {
-      return { ...one, message: one.message ?? `\u626B\u63CF\u5668 ${toolName} \u6267\u884C\u5931\u8D25` };
-    }
-    if (one.status === "skipped") {
-      const msg = one.message ?? "\u626B\u63CF\u5668\u4E0D\u53EF\u7528";
-      const prefix = `\u5DE5\u5177\u4E0D\u53EF\u7528: ${toolName}\uFF08`;
-      const reason = msg.startsWith(prefix) && msg.endsWith("\uFF09") ? msg.slice(prefix.length, -1) : msg;
-      reasons.push(`${toolName}(${reason})`);
-      continue;
-    }
-    anyRan = true;
+    const outcome = await scanWithOneScanner(host, rule, String(tool), context);
+    if (outcome.fatal) return outcome.fatal;
+    violations.push(...outcome.violations);
+    if (outcome.reason) reasons.push(outcome.reason);
+    if (outcome.ran) anyRan = true;
   }
   if (!anyRan) {
     return skipEvaluation(

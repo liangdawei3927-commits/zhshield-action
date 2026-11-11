@@ -11,6 +11,7 @@
  */
 import { t } from '@zh/i18n';
 import { serializePipelineReport } from './pipeline-protocol';
+import { toSecurityScanReportData } from './ipc/report-format';
 import { progress, send } from './pipeline-ipc';
 import { createLoadedRunner } from './pipeline-runner-factory';
 import { loadGuardConclusions } from './pipeline-sop';
@@ -42,6 +43,30 @@ function sendDomainOutcome(id: string, record: DomainRunRecord): void {
     return;
   }
   send({ type: 'error', id, error: record.reason ?? `域 ${record.domain} 未产出报告` });
+}
+
+/**
+ * 安全完整报告落盘：由 worker 在扫描结束、上报完成**之前**写。
+ *
+ * 为什么不在渲染层写：完整报告此前只在「安全页仍挂载且拿到回传结果」时由
+ * `useSavedDomainReport` 落盘。安全扫描约 3 分钟，期间切页/重挂载、或回传失败，
+ * 结果就只活在内存里；项目体检流水线路径更是从不写完整报告。后果是重启后安全页
+ * 永远退回上一次落盘的旧账（2026-11-11 实测：14:42 扫描完成，
+ * `reports/security.json` 仍是 09:39 的旧结果，6 条修复前的降级被当成「本次结果」）。
+ *
+ * 写盘失败不阻断扫描上报 —— 回看是增强能力，不能拖垮主链路。
+ */
+async function persistSecurityReport(projectPath: string, report: unknown): Promise<void> {
+  try {
+    const dir = join(projectPath, '.zhshield', 'reports');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'security.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
+  } catch (err) {
+    console.warn(
+      '[pipeline-worker] 安全报告落盘失败（扫描结果仍照常上报）:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
@@ -190,6 +215,15 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
       console.error('[pipeline-worker] 安全扫描异常:', record.reason);
       sendDomainOutcome(id, record);
       return;
+    }
+    // 先落盘再上报：页面在任务落定时会读盘刷新，写盘晚于上报会读到旧报告。
+    // 映射成页面直接渲染的 SecurityScanReportData 形状（与主进程 runSecurityHandler
+    // 的 toSecurityScanReportData 同一份实现，避免两套口径）。
+    if (record.report !== undefined) {
+      await persistSecurityReport(
+        projectPath,
+        toSecurityScanReportData(record.report as Parameters<typeof toSecurityScanReportData>[0]),
+      );
     }
     progress(id, 'done', t('pipeline.security.done'), 1.0);
     sendDomainOutcome(id, record);

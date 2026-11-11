@@ -62,6 +62,15 @@ export const OWNERSHIP_CLAIMS: readonly OwnershipClaim[] = [
     owner: 'refactor',
     rationale: 'O1 重复代码唯一归重构',
   },
+  // 2026-11-11 实测：安全域仍有一条 `duplicate-code` 规则（token 分隔后是
+  // `duplicate-code`，与上面 `duplicated-code` 拼写不同，匹配不到），
+  // jscpd 未安装时每轮以「工具不可用」落 degraded。按 O1 归重构，安全域让位。
+  {
+    match: { kind: 'exact', ruleId: 'security.scan.internal.duplicate-code' },
+    owner: 'refactor',
+    rationale: 'O1 重复代码唯一归重构；安全域让位',
+    previousOwner: 'security',
+  },
   {
     match: { kind: 'token', token: 'jscpd' },
     owner: 'refactor',

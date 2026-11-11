@@ -81,4 +81,26 @@ describe('SopRuleEngine — R7 归属让位（缺适配器时不降级）', () =
     expect(evaluation.message).toContain('deps');
     expect(report.degraded ?? 0).toBe(0);
   });
+
+  it('归 refactor 的 duplicate-code 规则在安全域 → skipped 且 degraded 不置位', async () => {
+    // 2026-11-11 实测：安全域这条规则 id 的末段是 `duplicate-code`（与归属表里的
+    // `duplicated-code` 拼写不同），jscpd 未安装时每轮必 degraded。O1 已把重复代码
+    // 唯一归重构 —— 缺工具是归属让位，不是安全域的故障。
+    registry.register(
+      makeRule({
+        id: 'security.scan.internal.duplicate-code',
+        domain: 'security',
+        applicableEngines: ['security'],
+        content: { check: { tool: 'jscpd', toolConfig: {} } },
+      }),
+    );
+
+    const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'security' });
+    const evaluation = report.evaluations[0];
+
+    expect(evaluation.status).toBe('skipped');
+    expect(evaluation.degraded).toBeUndefined();
+    expect(evaluation.message).toContain('refactor');
+    expect(report.degraded ?? 0).toBe(0);
+  });
 });

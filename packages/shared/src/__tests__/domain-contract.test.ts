@@ -43,6 +43,7 @@ describe('C1 单源归属（规范 §四 O1–O10）', () => {
 
   it.each([
     ['inspect.scan.official.duplication', 'refactor', 'O1 重复代码唯一归重构'],
+    ['security.scan.internal.duplicate-code', 'refactor', 'O1 重复代码唯一归重构（安全域让位）'],
     ['guard.scan.official.sensitive-info', 'security', 'O3 密钥/敏感信息唯一归安全'],
     ['inspect.scan.official.semgrep', 'security', 'O9 代码漏洞唯一归安全'],
     ['inspect.scan.official.dependency-audit', 'deps', 'O10 依赖审计唯一归依赖管家'],

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: ee62164346784a19
+// @zh-src-hash: ca9195995f8b7e5e
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -16510,6 +16510,15 @@ var init_ownership_registry = __esm({
         match: { kind: "token", token: "duplicated-code" },
         owner: "refactor",
         rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784"
+      },
+      // 2026-11-11 实测：安全域仍有一条 `duplicate-code` 规则（token 分隔后是
+      // `duplicate-code`，与上面 `duplicated-code` 拼写不同，匹配不到），
+      // jscpd 未安装时每轮以「工具不可用」落 degraded。按 O1 归重构，安全域让位。
+      {
+        match: { kind: "exact", ruleId: "security.scan.internal.duplicate-code" },
+        owner: "refactor",
+        rationale: "O1 \u91CD\u590D\u4EE3\u7801\u552F\u4E00\u5F52\u91CD\u6784\uFF1B\u5B89\u5168\u57DF\u8BA9\u4F4D",
+        previousOwner: "security"
       },
       {
         match: { kind: "token", token: "jscpd" },

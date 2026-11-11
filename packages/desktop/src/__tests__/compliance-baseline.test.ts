@@ -27,6 +27,7 @@ const cleanSecurity = {
     { ruleId: 'security.scan.semgrep.xss', status: 'passed' as const },
     { ruleId: 'security.scan.semgrep.csrf', status: 'passed' as const },
     { ruleId: 'security.scan.gitleaks.hardcoded-key', status: 'passed' as const },
+    { ruleId: 'security.scan.external.helmet-check', status: 'passed' as const },
   ],
   malwareTotal: 0,
   generatedAt: FULL_EVIDENCE_TIME,
@@ -42,20 +43,30 @@ const cleanDeps = {
 const cleanEvidence: ComplianceEvidence = { security: cleanSecurity, deps: cleanDeps };
 
 describe('合规基线 — 覆盖状态', () => {
-  it('证据齐全且干净：7 条证据条款通过、6 条未覆盖，绝不出现“缺证据”', () => {
+  it('证据齐全且干净：8 条证据条款通过、6 条未覆盖，绝不出现“缺证据”', () => {
     const report = evaluateComplianceBaseline(cleanEvidence);
     expect(report.standard).toEqual(COMPLIANCE_STANDARD);
-    expect(report.summary).toEqual({ pass: 7, fail: 0, noEvidence: 0, uncovered: 6, total: 13 });
+    expect(report.summary).toEqual({ pass: 8, fail: 0, noEvidence: 0, uncovered: 6, total: 14 });
     expect(report.controls).toHaveLength(COMPLIANCE_CONTROLS.length);
   });
 
   it('安全报告缺失 → 安全类条款一律 no-evidence（不得变通过）', () => {
     const report = evaluateComplianceBaseline({ security: null, deps: cleanDeps });
     const securityStates = report.controls
-      .filter((control) => ['SEC-INJECTION', 'SEC-CSRF', 'SEC-SECRETS', 'SEC-MALWARE'].includes(control.id))
+      .filter((control) =>
+        ['SEC-INJECTION', 'SEC-CSRF', 'SEC-SECRETS', 'SEC-MALWARE', 'SEC-HEADERS-MIDDLEWARE'].includes(
+          control.id,
+        ),
+      )
       .map((control) => control.state);
-    expect(securityStates).toEqual(['no-evidence', 'no-evidence', 'no-evidence', 'no-evidence']);
-    expect(report.summary.noEvidence).toBe(4);
+    expect(securityStates).toEqual([
+      'no-evidence',
+      'no-evidence',
+      'no-evidence',
+      'no-evidence',
+      'no-evidence',
+    ]);
+    expect(report.summary.noEvidence).toBe(5);
     expect(report.summary.pass).toBe(3); // 仅剩 3 条依赖条款有证据
   });
 
@@ -137,6 +148,6 @@ describe('合规基线 — 覆盖状态', () => {
       'SUPPLY-SIGNATURE',
     ]);
     expect(report.summary.pass).toBe(0);
-    expect(report.summary.noEvidence).toBe(7);
+    expect(report.summary.noEvidence).toBe(8);
   });
 });

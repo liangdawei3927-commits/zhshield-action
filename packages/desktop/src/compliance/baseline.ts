@@ -83,6 +83,15 @@ export const COMPLIANCE_CONTROLS: readonly ComplianceControl[] = [
     rule: { kind: 'security-malware' },
   },
   {
+    id: 'SEC-HEADERS-MIDDLEWARE',
+    clause: 'ASVS 14.4（代理证据）',
+    title: '安全响应头中间件（Helmet）已配置',
+    source: '安全中心 · helmet-check（依赖检测）',
+    // 证据只到「helmet 在依赖里被配置」，不到「Header 取值符合基线」——
+    // 后者仍是 CFG-HEADERS，保持未覆盖。不用代理证据冒充完整条款。
+    rule: { kind: 'security-rules', ruleTokens: ['helmet-check'] },
+  },
+  {
     id: 'DEP-CVE',
     clause: 'ASVS 12.1',
     title: '依赖漏洞（CVE / GHSA）',
@@ -107,8 +116,8 @@ export const COMPLIANCE_CONTROLS: readonly ComplianceControl[] = [
   {
     id: 'CFG-HEADERS',
     clause: 'ASVS 14.4',
-    title: '安全响应头（CSP / HSTS / X-Frame-Options）',
-    source: '暂无',
+    title: '安全响应头取值（CSP / HSTS / X-Frame-Options）',
+    source: '暂无（中间件已安装不等于取值合规）',
     rule: { kind: 'uncovered' },
   },
   {

@@ -92,6 +92,16 @@ export const COMPLIANCE_CONTROLS: readonly ComplianceControl[] = [
     rule: { kind: 'security-rules', ruleTokens: ['helmet-check'] },
   },
   {
+    id: 'CFG-TLS',
+    clause: 'ASVS 9.1',
+    title: '传输加密与 TLS 配置',
+    source: '安全中心 · TLS 配置检测（源码模式）',
+    // 证据只到「源码里没有显式关闭证书校验/弱协议/弱套件」，
+    // 不到「运行期与部署侧 TLS 已合规」—— 后者不在源码扫描可见范围，
+    // 由规则 message 的限定语与页面的证据来源文案共同说明。
+    rule: { kind: 'security-rules', ruleTokens: ['tls-config'] },
+  },
+  {
     id: 'DEP-CVE',
     clause: 'ASVS 12.1',
     title: '依赖漏洞（CVE / GHSA）',
@@ -118,13 +128,6 @@ export const COMPLIANCE_CONTROLS: readonly ComplianceControl[] = [
     clause: 'ASVS 14.4',
     title: '安全响应头取值（CSP / HSTS / X-Frame-Options）',
     source: '暂无（中间件已安装不等于取值合规）',
-    rule: { kind: 'uncovered' },
-  },
-  {
-    id: 'CFG-TLS',
-    clause: 'ASVS 9.1',
-    title: '传输加密与 TLS 配置',
-    source: '暂无',
     rule: { kind: 'uncovered' },
   },
   {

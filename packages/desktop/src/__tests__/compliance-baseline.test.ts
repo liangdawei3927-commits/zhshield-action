@@ -28,6 +28,7 @@ const cleanSecurity = {
     { ruleId: 'security.scan.semgrep.csrf', status: 'passed' as const },
     { ruleId: 'security.scan.gitleaks.hardcoded-key', status: 'passed' as const },
     { ruleId: 'security.scan.external.helmet-check', status: 'passed' as const },
+    { ruleId: 'security.scan.internal.tls-config', status: 'passed' as const },
   ],
   malwareTotal: 0,
   generatedAt: FULL_EVIDENCE_TIME,
@@ -43,10 +44,10 @@ const cleanDeps = {
 const cleanEvidence: ComplianceEvidence = { security: cleanSecurity, deps: cleanDeps };
 
 describe('合规基线 — 覆盖状态', () => {
-  it('证据齐全且干净：8 条证据条款通过、6 条未覆盖，绝不出现“缺证据”', () => {
+  it('证据齐全且干净：9 条证据条款通过、5 条未覆盖，绝不出现“缺证据”', () => {
     const report = evaluateComplianceBaseline(cleanEvidence);
     expect(report.standard).toEqual(COMPLIANCE_STANDARD);
-    expect(report.summary).toEqual({ pass: 8, fail: 0, noEvidence: 0, uncovered: 6, total: 14 });
+    expect(report.summary).toEqual({ pass: 9, fail: 0, noEvidence: 0, uncovered: 5, total: 14 });
     expect(report.controls).toHaveLength(COMPLIANCE_CONTROLS.length);
   });
 
@@ -54,9 +55,14 @@ describe('合规基线 — 覆盖状态', () => {
     const report = evaluateComplianceBaseline({ security: null, deps: cleanDeps });
     const securityStates = report.controls
       .filter((control) =>
-        ['SEC-INJECTION', 'SEC-CSRF', 'SEC-SECRETS', 'SEC-MALWARE', 'SEC-HEADERS-MIDDLEWARE'].includes(
-          control.id,
-        ),
+        [
+          'SEC-INJECTION',
+          'SEC-CSRF',
+          'SEC-SECRETS',
+          'SEC-MALWARE',
+          'SEC-HEADERS-MIDDLEWARE',
+          'CFG-TLS',
+        ].includes(control.id),
       )
       .map((control) => control.state);
     expect(securityStates).toEqual([
@@ -65,8 +71,9 @@ describe('合规基线 — 覆盖状态', () => {
       'no-evidence',
       'no-evidence',
       'no-evidence',
+      'no-evidence',
     ]);
-    expect(report.summary.noEvidence).toBe(5);
+    expect(report.summary.noEvidence).toBe(6);
     expect(report.summary.pass).toBe(3); // 仅剩 3 条依赖条款有证据
   });
 
@@ -86,6 +93,39 @@ describe('合规基线 — 覆盖状态', () => {
     expect(injection?.state).toBe('fail');
     expect(injection?.detail).toContain('security.scan.semgrep.sql-injection');
     expect(report.summary.fail).toBe(1);
+  });
+
+  it('TLS 配置规则失败 → CFG-TLS 判 fail，并回显证据时间', () => {
+    const report = evaluateComplianceBaseline({
+      security: {
+        ...cleanSecurity,
+        ledger: cleanSecurity.ledger.map((entry) =>
+          entry.ruleId === 'security.scan.internal.tls-config'
+            ? { ...entry, status: 'failed' as const }
+            : entry,
+        ),
+      },
+      deps: cleanDeps,
+    });
+    const tls = report.controls.find((control) => control.id === 'CFG-TLS');
+    expect(tls?.state).toBe('fail');
+    expect(tls?.detail).toContain('security.scan.internal.tls-config');
+    expect(tls?.detail).toContain('证据');
+  });
+
+  it('老报告没有 TLS 规则记录 → CFG-TLS 是 no-evidence（不得当成通过）', () => {
+    const report = evaluateComplianceBaseline({
+      security: {
+        ...cleanSecurity,
+        ledger: cleanSecurity.ledger.filter(
+          (entry) => entry.ruleId !== 'security.scan.internal.tls-config',
+        ),
+      },
+      deps: cleanDeps,
+    });
+    const tls = report.controls.find((control) => control.id === 'CFG-TLS');
+    expect(tls?.state).toBe('no-evidence');
+    expect(tls?.detail).toContain('未检测 ≠ 通过');
   });
 
   it('对应规则全部被跳过（归属让位/缺工具）→ no-evidence', () => {
@@ -141,13 +181,12 @@ describe('合规基线 — 覆盖状态', () => {
     const uncovered = report.controls.filter((control) => control.state === 'uncovered');
     expect(uncovered.map((control) => control.id)).toEqual([
       'CFG-HEADERS',
-      'CFG-TLS',
       'AUTH-SESSION',
       'LOG-AUDIT',
       'KEY-ROTATION',
       'SUPPLY-SIGNATURE',
     ]);
     expect(report.summary.pass).toBe(0);
-    expect(report.summary.noEvidence).toBe(8);
+    expect(report.summary.noEvidence).toBe(9);
   });
 });

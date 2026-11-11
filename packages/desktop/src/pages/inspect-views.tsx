@@ -67,6 +67,17 @@ function CodeStyleIcon() {
   );
 }
 
+/** 合规基线：清单 + 勾（只读映射，不是新扫描面） */
+function ComplianceIcon() {
+  return (
+    <FeatureIcon>
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <polyline points="9 14 11 16 15 12" />
+    </FeatureIcon>
+  );
+}
+
 /**
  * 失败态：runPipeline 后端报错是 resolve 出来的（不抛异常），此分支是失败唯一的显式信号，
  * 缺了它失败会退化成「从未体检」的空态。
@@ -146,6 +157,7 @@ export function InspectEmptyView(props: {
           'inspect.module-boundary': <ModuleBoundaryIcon />,
           'inspect.type-safety': <TypeSafetyIcon />,
           'inspect.code-style': <CodeStyleIcon />,
+          'inspect.compliance': <ComplianceIcon />,
         },
         // 说明文案沿用既有 i18n（能力名取注册表，说明保留本地化）
         descriptions: {
@@ -153,6 +165,9 @@ export function InspectEmptyView(props: {
           'inspect.module-boundary': props.t('page.inspect.feature.moduleBoundary.desc'),
           'inspect.type-safety': props.t('page.inspect.feature.typeSafety.desc'),
           'inspect.code-style': props.t('page.inspect.feature.codeStyle.desc'),
+          'inspect.compliance': props.t('page.inspect.feature.compliance.desc', {
+            defaultValue: '合规基线（ASVS L1 子集）：汇总各域已落盘结论的只读差距报告，不新增扫描',
+          }),
         },
       })}
       planned={buildPlannedCapabilities('inspect')}

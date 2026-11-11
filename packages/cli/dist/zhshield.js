@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 5a265fb4da134294
+// @zh-src-hash: 063778c979646b23
 // @zh-src-files: 429
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -369,6 +369,16 @@ var init_capability_registry = __esm({
           "inspect.scan.ironnest.module-boundary",
           "inspect.scan.depcruiser.layer-boundary"
         ]
+      },
+      {
+        id: "inspect.compliance",
+        domain: "inspect",
+        label: "\u5408\u89C4\u57FA\u7EBF\uFF08ASVS L1 \u5B50\u96C6\uFF09",
+        status: "implemented",
+        // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
+        // 它把各域已落盘结论按标准条款汇总成四态，不启动任何扫描 —— 合规是**视图**，
+        // 不是新的检测面，故证据不是 SOP 规则 id。
+        implementedBy: ["compliance-baseline"]
       }
     ];
     CAPABILITIES_BY_DOMAIN = CAPABILITY_REGISTRY.reduce((map, cap) => {

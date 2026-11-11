@@ -11,7 +11,18 @@ import { useScanResultEntry } from '../hooks/useScanResultEntry';
 import { selectIssueChecks } from './inspect-sop-mapper';
 import { ProgressBar, CheckList } from './inspect-parts';
 import { InspectFailureView, InspectEmptyView, type Translate } from './inspect-views';
-import type { InspectionReportData } from '../types/electron';
+import type {
+  DependencyReportData,
+  InspectionReportData,
+  SecurityScanReportData,
+} from '../types/electron';
+import {
+  evaluateComplianceBaseline,
+  toDepsEvidence,
+  toSecurityEvidence,
+  type ComplianceReport,
+} from '../compliance/baseline';
+import { ComplianceBaselineSection } from './compliance-parts';
 
 interface InspectPageProps {
   projectPath: string;
@@ -159,6 +170,8 @@ interface InspectReportViewProps extends AsyncScanActionProps {
   onBackHome: () => void;
   copy: CheckCopyActions;
   t: Translate;
+  /** 合规基线（ASVS L1 子集）只读映射结果 */
+  compliance: ComplianceReport;
 }
 
 /** 报告态：统计卡 + 通过进度条 */
@@ -173,6 +186,7 @@ function InspectReportView({
   onBackHome,
   copy,
   t,
+  compliance,
 }: InspectReportViewProps) {
   const items = report.checks;
   const passCount = items.filter((i) => i.status === 'pass').length;
@@ -229,6 +243,7 @@ function InspectReportView({
           : t('page.inspect.guardAlsoRan')}
       </p>
       {isSnapshot ? null : <ProgressBar passCount={passCount} total={applicableCount} />}
+      <ComplianceBaselineSection report={compliance} />
     </DomainReportShell>
   );
 }
@@ -256,7 +271,24 @@ function useInspectPageState(projectPath: string) {
   // 扫描进行中不拿旧结果顶替，保持「扫描中显示进度空态」的原行为。
   const savedReport = useSavedDomainReport(projectPath, 'inspect', page.report);
   const detailReport = page.report ?? (page.loading ? null : (savedReport ?? page.persisted));
-  return { ...page, showHome, scanVersion, detailReport, startScan, backHome, openDetail };
+  // 合规基线只读消费各域已落盘结论：安全中心的漏洞/密钥/恶意代码 + 依赖管家的 CVE/锁文件/投毒。
+  // 不启动任何扫描，也不改评分；报告缺失时条款落 no-evidence（未检测 ≠ 通过）。
+  const securitySaved = useSavedDomainReport<SecurityScanReportData>(projectPath, 'security', null);
+  const depsSaved = useSavedDomainReport<DependencyReportData>(projectPath, 'deps', null);
+  const compliance = evaluateComplianceBaseline({
+    security: toSecurityEvidence(securitySaved),
+    deps: toDepsEvidence(depsSaved),
+  });
+  return {
+    ...page,
+    showHome,
+    scanVersion,
+    detailReport,
+    compliance,
+    startScan,
+    backHome,
+    openDetail,
+  };
 }
 
 export function InspectPage({ projectPath }: InspectPageProps) {
@@ -276,6 +308,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
     startInspect,
     showHome,
     scanVersion,
+    compliance,
     startScan,
     backHome,
     openDetail,
@@ -310,6 +343,7 @@ export function InspectPage({ projectPath }: InspectPageProps) {
         onRescan={startInspect}
         onBackHome={backHome}
         copy={{ copyToAi, copyAllToAi }}
+        compliance={compliance}
         t={t}
       />
     );

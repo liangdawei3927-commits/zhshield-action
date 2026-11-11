@@ -333,6 +333,16 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
       'inspect.scan.depcruiser.layer-boundary',
     ],
   },
+  {
+    id: 'inspect.compliance',
+    domain: 'inspect',
+    label: '合规基线（ASVS L1 子集）',
+    status: 'implemented',
+    // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
+    // 它把各域已落盘结论按标准条款汇总成四态，不启动任何扫描 —— 合规是**视图**，
+    // 不是新的检测面，故证据不是 SOP 规则 id。
+    implementedBy: ['compliance-baseline'],
+  },
 ];
 
 /** 按域索引的能力清单（构建期一次性派生，不手写第二份） */

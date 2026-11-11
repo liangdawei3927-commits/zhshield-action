@@ -7,6 +7,7 @@ import {
 } from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
+import { SECURITY_PLANNED_DESCRIPTIONS } from './security-logic';
 
 /**
  * 能力图标表（按能力 id 绑定）：注册表决定**渲染哪几项**，图标只负责视觉。
@@ -66,13 +67,7 @@ const SECURITY_CAPABILITY_ICONS = {
   ),
 } as const;
 
-/** 规划中/已移交项的**用户可读**说明（注册表 note 是维护者注记，不能原样上屏） */
-const SECURITY_PLANNED_DESCRIPTIONS: Record<string, string> = {
-  'security.standard':
-    '本页暂不检查此项，也不展示任何结论；等实现并验证后再列入功能清单。',
-  'security.dependency':
-    '依赖漏洞已统一由「依赖管家」负责，安全中心不再重复上报；请到依赖管家查看 CVE 结果。',
-};
+/** 规划中/已移交项的用户可读说明：与报告页共用同一份（见 security-logic） */
 
 /** 上一次「检查」失败时不能静默：页面上还挂着旧分数，用户会以为刚查过 */
 function SecurityScanErrorNotice({ error }: { error: string }) {

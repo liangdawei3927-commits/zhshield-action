@@ -12,7 +12,7 @@
 
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
-import { FindingsPanel, MalwarePanel } from './security-parts';
+import { FindingsPanel, MalwarePanel, SecurityNotCovered } from './security-parts';
 import { DomainReportShell } from '../components/business/domain-report-shell';
 import type { ReportStatCard } from '../components/business/ReportShell';
 import { SEVERITY_CONFIG } from './security-logic';
@@ -466,6 +466,7 @@ export function SecurityReportView({
       <SecurityDegradedBanner report={report} t={t} />
       <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
       {children}
+      <SecurityNotCovered />
     </DomainReportShell>
   );
 }

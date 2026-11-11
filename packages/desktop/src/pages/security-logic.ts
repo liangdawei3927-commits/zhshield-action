@@ -26,6 +26,18 @@ export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelK
   low: { color: 'rgb(var(--zh-info))', bg: 'rgb(var(--zh-info) / 0.1)', labelKey: 'severity.low' },
 };
 
+/**
+ * 规划中/已移交项的**用户可读**说明（注册表 note 是维护者注记，不能原样上屏）。
+ *
+ * 空态与报告页共用同一份文案：能力边界不能只在「没扫过」时告知，
+ * 用户在报告页读结论时同样要看得见“本页不覆盖什么”。
+ */
+export const SECURITY_PLANNED_DESCRIPTIONS: Record<string, string> = {
+  'security.standard': '本页暂不检查此项，也不展示任何结论；等实现并验证后再列入功能清单。',
+  'security.dependency':
+    '依赖漏洞已统一由「依赖管家」负责，安全中心不再重复上报；请到依赖管家查看 CVE 结果。',
+};
+
 export const MALWARE_TYPE_LABEL: Record<string, string> = {
   'reverse-shell': 'page.security.malware.reverseShell',
   'data-exfiltration': 'page.security.malware.dataExfiltration',

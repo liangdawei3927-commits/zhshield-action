@@ -69,7 +69,7 @@ const SECURITY_CAPABILITY_ICONS = {
 /** 规划中/已移交项的**用户可读**说明（注册表 note 是维护者注记，不能原样上屏） */
 const SECURITY_PLANNED_DESCRIPTIONS: Record<string, string> = {
   'security.standard':
-    '尚无对应实现，本页暂不做该项检查，也不展示任何结论；后续版本落地后再宣称。',
+    '本页暂不检查此项，也不展示任何结论；等实现并验证后再列入功能清单。',
   'security.dependency':
     '依赖漏洞已统一由「依赖管家」负责，安全中心不再重复上报；请到依赖管家查看 CVE 结果。',
 };

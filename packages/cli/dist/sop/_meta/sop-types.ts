@@ -147,6 +147,11 @@ export interface SignedSopPackage {
   timestamp: Date; // 签名时间
   /** 签名算法；可选，缺省 = 'hmac-sha256'（旧缓存包无此字段） */
   alg?: SignedSopAlg;
+  /**
+   * 签名密钥 id（密钥轮换）：可选，缺省 = 轮换前的历史包。
+   * 参与签名原文（`hash:timestamp:keyId`），改挂到别的 keyId 会导致验签失败。
+   */
+  keyId?: string;
 }
 
 // ─── 同步结果 ────────────────────────────────────────────────

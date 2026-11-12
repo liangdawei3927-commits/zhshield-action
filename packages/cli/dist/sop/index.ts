@@ -83,7 +83,7 @@ export { SopSignatureVerifier } from './cache/sop-signature-verifier';
 
 // ─── security: 签名与加密 ───────────────────────────────────
 export { SopSigner } from './security/sop-signer';
-export type { VerifyResult, EncryptedData } from './security/sop-signer';
+export type { VerifyResult, EncryptedData, SopKeyRing } from './security/sop-signer';
 
 // ─── sync: 智汇大脑协同 ─────────────────────────────────
 export {

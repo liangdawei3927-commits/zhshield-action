@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 0c685a44f7873526
+// @zh-src-hash: 23ee2f24213bbe24
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -509015,6 +509015,10 @@ function canonicalTimestamp(timestamp) {
 function isPrivateKeyPem(key) {
   return key.includes("-----BEGIN PRIVATE KEY-----");
 }
+function signedPayload(hash, timestamp, keyId) {
+  const base = `${hash}:${canonicalTimestamp(timestamp)}`;
+  return keyId ? `${base}:${keyId}` : base;
+}
 function hmacSign(key, data) {
   return crypto2.createHmac("sha256", key).update(data).digest("hex");
 }
@@ -509029,12 +509033,12 @@ function verifyTimestamp(timestamp, windowMs) {
   }
   return { valid: true };
 }
-function signEd25519(rules, privateKey, version) {
+function signEd25519(rules, privateKey, version, keyId) {
   const sorted = rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
   const hash = crypto2.createHash("sha256").update(content).digest("hex");
   const timestamp = /* @__PURE__ */ new Date();
-  const data = `${hash}:${canonicalTimestamp(timestamp)}`;
+  const data = signedPayload(hash, timestamp, keyId);
   const key = crypto2.createPrivateKey(privateKey);
   const signature = crypto2.sign(null, Buffer.from(data, "utf-8"), key).toString("base64");
   return {
@@ -509043,7 +509047,8 @@ function signEd25519(rules, privateKey, version) {
     signature,
     hash,
     timestamp,
-    alg: "ed25519"
+    alg: "ed25519",
+    ...keyId ? { keyId } : {}
   };
 }
 function verifyEd25519(pkg, publicKey, windowMs) {
@@ -509055,7 +509060,7 @@ function verifyEd25519(pkg, publicKey, windowMs) {
   if (pkg.hash !== expectedHash) {
     return { valid: false, reason: "hash_mismatch" };
   }
-  const data = `${pkg.hash}:${canonicalTimestamp(pkg.timestamp)}`;
+  const data = signedPayload(pkg.hash, pkg.timestamp, pkg.keyId);
   try {
     const key = crypto2.createPublicKey(publicKey);
     const valid = crypto2.verify(
@@ -509069,19 +509074,20 @@ function verifyEd25519(pkg, publicKey, windowMs) {
     return { valid: false, reason: "signature_mismatch" };
   }
 }
-function signHmac(rules, secretKey, version) {
+function signHmac(rules, secretKey, version, keyId) {
   const sorted = rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
   const hash = crypto2.createHash("sha256").update(content).digest("hex");
   const timestamp = /* @__PURE__ */ new Date();
-  const signature = hmacSign(secretKey, `${hash}:${canonicalTimestamp(timestamp)}`);
+  const signature = hmacSign(secretKey, signedPayload(hash, timestamp, keyId));
   return {
     version: version ?? "0.0.0",
     rules: sorted,
     signature,
     hash,
     timestamp,
-    alg: "hmac-sha256"
+    alg: "hmac-sha256",
+    ...keyId ? { keyId } : {}
   };
 }
 function verifyHmac(pkg, secretKey, windowMs) {
@@ -509093,7 +509099,7 @@ function verifyHmac(pkg, secretKey, windowMs) {
   if (pkg.hash !== expectedHash) {
     return { valid: false, reason: "hash_mismatch" };
   }
-  const expectedSignature = hmacSign(secretKey, `${pkg.hash}:${canonicalTimestamp(pkg.timestamp)}`);
+  const expectedSignature = hmacSign(secretKey, signedPayload(pkg.hash, pkg.timestamp, pkg.keyId));
   if (pkg.signature !== expectedSignature) {
     return { valid: false, reason: "signature_mismatch" };
   }
@@ -509115,10 +509121,11 @@ var SopSigner = class _SopSigner {
    * 算法选择：显式 alg 优先；否则按 key 格式推断 —— PEM PKCS8 私钥 → Ed25519，
    * 普通字符串 → HMAC-SHA256（旧对称密钥，向后兼容）。
    */
-  static signPackage(rules, key, version, alg) {
-    const resolvedAlg = alg ?? (isPrivateKeyPem(key) ? "ed25519" : "hmac-sha256");
-    if (resolvedAlg === "ed25519") return signEd25519(rules, key, version);
-    return signHmac(rules, key, version);
+  static signPackage(rules, key, version, options2) {
+    const opts = typeof options2 === "string" ? { alg: options2 } : options2 ?? {};
+    const resolvedAlg = opts.alg ?? (isPrivateKeyPem(key) ? "ed25519" : "hmac-sha256");
+    if (resolvedAlg === "ed25519") return signEd25519(rules, key, version, opts.keyId);
+    return signHmac(rules, key, version, opts.keyId);
   }
   /**
    * 验证签名（桌面端验证）
@@ -509151,6 +509158,32 @@ var SopSigner = class _SopSigner {
    * 新代码请使用 verifyPackageWithPublicKey。
    */
   static verifyPackageWithKey(pkg, key, opts) {
+    return _SopSigner.verifyPackage(pkg, key, opts);
+  }
+  /**
+   * 用密钥环签名：以 activeKeyId 对应密钥签名，并把 keyId 写进包与签名原文。
+   *
+   * 轮换流程：往 keys 里加一个新 keyId 的密钥 → 把 activeKeyId 指向它即可；
+   * 旧 keyId 的密钥留在 keys 里，历史包继续可验；无 keyId 的老包走 legacyKey。
+   */
+  static signWithKeyRing(rules, ring, version, alg) {
+    const key = ring.keys[ring.activeKeyId];
+    if (!key) {
+      throw new Error(`SopKeyRing \u7F3A\u5C11 activeKeyId=${ring.activeKeyId} \u5BF9\u5E94\u7684\u5BC6\u94A5`);
+    }
+    const options2 = { keyId: ring.activeKeyId };
+    if (alg) options2.alg = alg;
+    return _SopSigner.signPackage(rules, key, version, options2);
+  }
+  /**
+   * 用密钥环验签：按包内 keyId 选密钥；无 keyId 的历史包回落到 legacyKey。
+   * 查不到就 fail-closed（unknown_key_id / legacy_key_missing），绝不拿别的密钥顶替。
+   */
+  static verifyWithKeyRing(pkg, ring, opts) {
+    const key = pkg.keyId ? ring.keys[pkg.keyId] : ring.legacyKey;
+    if (!key) {
+      return { valid: false, reason: pkg.keyId ? "unknown_key_id" : "legacy_key_missing" };
+    }
     return _SopSigner.verifyPackage(pkg, key, opts);
   }
   // ─── 请求签名（文档 11.2 节） ──────────────────────────────

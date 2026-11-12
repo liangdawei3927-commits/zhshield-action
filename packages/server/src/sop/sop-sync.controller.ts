@@ -77,9 +77,10 @@ export class SopSyncController {
   async getPublicKey() {
     const publicKey = this.sopService.getPublicKeyPem();
     if (!publicKey) {
-      return { publicKey: null };
+      return { publicKey: null, keyId: null };
     }
-    return { publicKey };
+    // keyId 供客户端记录/排障：包内 keyId 与它不一致时说明服务端已轮换密钥
+    return { publicKey, keyId: this.sopService.keyId };
   }
 
   /**

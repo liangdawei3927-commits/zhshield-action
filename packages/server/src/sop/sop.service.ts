@@ -24,6 +24,32 @@ import { SopContentRepository } from './sop-content.repository';
  * - 规则查询与统计
  * - 签名验证
  */
+/** signPackage 的可选项：设了 ZH_SOP_KEY_ID 才带 keyId，否则保持历史无 keyId 格式 */
+function signingOptions(keyId: string | null): { keyId: string } | undefined {
+  return keyId ? { keyId } : undefined;
+}
+
+/** 全量包构建：有私钥 → Ed25519 签名包；无私钥 → 裸 JSON（向后兼容旧客户端） */
+function buildFullPackage(params: {
+  rules: SopRule[];
+  privateKey: string | null;
+  keyId: string | null;
+  version: string;
+  compressor: SopCompressor;
+}): Promise<Buffer> | Buffer {
+  const { rules, privateKey, keyId, version, compressor } = params;
+  const payload = privateKey
+    ? JSON.stringify(SopSigner.signPackage(rules, privateKey, version, signingOptions(keyId)))
+    : JSON.stringify(rules);
+  return compressor.compress(Buffer.from(payload), CompressionFormat.Brotli);
+}
+
+/**
+ * 密钥轮换步骤（ZH_SOP_KEY_ID）：
+ * 1. 生成新密钥对；2. 服务端换用新私钥并设新的 ZH_SOP_KEY_ID；
+ * 3. 客户端同步到新包（旧缓存包验签失败会触发重新下载，fail-closed）；
+ * 4. 旧私钥在确认无旧包依赖后再销毁。
+ */
 @Injectable()
 export class SopService {
   private readonly logger = new Logger(SopService.name);
@@ -36,6 +62,11 @@ export class SopService {
   private readonly privateKey: string | null;
   /** Ed25519 公钥（PEM SPKI），由私钥派生；未配置为 null */
   private readonly publicKeyPem: string | null;
+  /**
+   * 签名密钥 id（ZH_SOP_KEY_ID）；未设置时签出无 keyId 的历史格式包。
+   * 公开只读：公钥端点要广播它，客户端据此发现「服务端已轮换密钥」。
+   */
+  readonly keyId: string | null;
 
   constructor(private readonly contentRepo: SopContentRepository) {
     const eventBus = new EventBus();
@@ -44,6 +75,7 @@ export class SopService {
     this.cacheManager = new SopCacheManager(this.registry);
     this.compressor = new SopCompressor();
 
+    this.keyId = process.env.ZH_SOP_KEY_ID?.trim() || null;
     const envKey = process.env.ZH_SOP_PRIVATE_KEY;
     if (envKey) {
       const key = crypto.createPrivateKey(envKey);
@@ -130,18 +162,13 @@ export class SopService {
   // ─── 全量包 ────────────────────────────────────────────────
 
   async getFullPackage(version: string): Promise<Buffer> {
-    const rules = this.registry.getAll();
-
-    // 如果配置了私钥，返回签名包（Ed25519）；否则返回裸 JSON（向后兼容）
-    if (this.privateKey) {
-      const signedPkg = SopSigner.signPackage(rules, this.privateKey, version);
-      const json = JSON.stringify(signedPkg);
-      return this.compressor.compress(Buffer.from(json), CompressionFormat.Brotli);
-    }
-
-    // 未配置私钥时返回裸规则数组（向后兼容旧版客户端）
-    const json = JSON.stringify(rules);
-    return this.compressor.compress(Buffer.from(json), CompressionFormat.Brotli);
+    return buildFullPackage({
+      rules: this.registry.getAll(),
+      privateKey: this.privateKey,
+      keyId: this.keyId,
+      version,
+      compressor: this.compressor,
+    });
   }
 
   // ─── 紧急更新 ──────────────────────────────────────────────
@@ -185,14 +212,19 @@ export class SopService {
     if (!this.privateKey) {
       throw new Error('ZH_SOP_PRIVATE_KEY 未配置，无法签名 SOP 规则包');
     }
-    const rules = this.registry.getAll();
-    return SopSigner.signPackage(rules, this.privateKey);
+    return SopSigner.signPackage(
+      this.registry.getAll(),
+      this.privateKey,
+      undefined,
+      signingOptions(this.keyId),
+    );
   }
 
   /** 返回 Ed25519 公钥（PEM SPKI），供桌面端验签；未配置私钥时返回 null */
   getPublicKeyPem(): string | null {
     return this.publicKeyPem;
   }
+
 
   verifyPackage(signedPkg: Parameters<typeof SopSigner.verifyPackage>[0], publicKey: string) {
     return SopSigner.verifyPackage(signedPkg, publicKey);

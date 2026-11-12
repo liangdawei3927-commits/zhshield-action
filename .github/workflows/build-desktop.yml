@@ -14,6 +14,11 @@ on:
         required: false
         type: boolean
         default: false
+      attest-provenance:
+        description: '为产物生成并校验来源证明（release 发布链路必开；普通构建不开）'
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       ref:
@@ -22,6 +27,11 @@ on:
         type: string
       require-signing:
         description: '强制签名+公证（公开发布通道必开 true；secrets 不齐直接失败）'
+        required: false
+        type: boolean
+        default: false
+      attest-provenance:
+        description: '为产物生成并校验来源证明（默认关闭）'
         required: false
         type: boolean
         default: false
@@ -37,6 +47,12 @@ jobs:
     # 单 runner 一次构建双架构：electron-builder 会在同一 run 内生成
     # 一份同时覆盖 x64/arm64 的 latest-mac.yml，避免双 job 各自产出同名清单互相覆盖
     runs-on: macos-latest
+    # 来源证明需要 OIDC 与 attestations 写权限；只有 release 调用时才会真正执行
+    # （attest-provenance=true），普通构建即使声明了这两项也不会用到
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -146,6 +162,23 @@ jobs:
           cp ../../../build-output/*.zip artifacts/ 2>/dev/null || true
           cp ../../../build-output/latest-mac.yml artifacts/ 2>/dev/null || true
           ls -la artifacts/
+
+      - name: Attest build provenance
+        if: ${{ inputs.attest-provenance }}
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: 'packages/desktop/artifacts/*'
+
+      # 生成完立刻自校验：证明文件若不可验，发布链路直接失败（不留“有证明但验不过”的产物）
+      - name: Verify build provenance (fail-closed)
+        if: ${{ inputs.attest-provenance }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in packages/desktop/artifacts/*; do
+            echo "verifying $f"
+            gh attestation verify "$f" --repo "${{ github.repository }}"
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

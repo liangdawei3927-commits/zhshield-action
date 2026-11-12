@@ -19,6 +19,8 @@ on:
 permissions:
   contents: write   # 创建 GitHub Release 需要
   packages: write   # 预留：未来发包到 GHCR
+  id-token: write       # 产物来源证明（attest-build-provenance）需要 OIDC
+  attestations: write   # 生成 provenance attestation
 
 concurrency:
   group: release-${{ github.ref }}
@@ -92,6 +94,8 @@ jobs:
     with:
       ref: ${{ inputs.tag || github.ref }}
       require-signing: true
+      # 发布通道必须带来源证明：消费者可用 `gh attestation verify` 校验产物出处
+      attest-provenance: true
     secrets: inherit
 
   # ─────────────────────────────────────────────

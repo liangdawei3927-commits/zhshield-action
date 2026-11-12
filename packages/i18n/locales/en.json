@@ -888,7 +888,8 @@
       "view": "View details"
     },
     "reportShell": {
-      "backHome": "Back to Home"
+      "backHome": "Back to Home",
+      "scannedAt": "Checked at {{time}}"
     },
     "backup": {
       "backingUp": "Backing up...",
@@ -1727,6 +1728,7 @@
       "source": "Security",
       "summary": "{{vulns}} vulnerabilities · {{malware}} malicious code",
       "tab": {
+        "compliance": "Compliance baseline",
         "malware": "Malware scan",
         "secrets": "Secret management",
         "vuln": "Vulnerability scan"

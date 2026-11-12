@@ -20,18 +20,37 @@ describe('合规基线归安全中心', () => {
     'utf-8',
   );
   const inspectPage = readFileSync(resolve(__dirname, '../pages/InspectPage.tsx'), 'utf-8');
+  const securityEmptyState = readFileSync(
+    resolve(__dirname, '../pages/security-empty-state.tsx'),
+    'utf-8',
+  );
+  const tabBar = readFileSync(resolve(__dirname, '../pages/security-tab-bar.tsx'), 'utf-8');
 
   it('安全中心是唯一的计算与渲染入口', () => {
     // 页面只经 hook 取数；求值与证据映射都收在 hook 内，页面不直接碰 baseline
     expect(securityPage).toContain('useComplianceReport(projectPath, detailReport)');
     expect(complianceHook).toContain('evaluateComplianceBaseline');
     expect(complianceHook).toContain('toSecurityEvidence(securityReport)');
-    expect(reportParts).toContain('<ComplianceBaselineSection');
+    expect(securityPage).toContain('<ComplianceBaselineSection');
+    // 合规基线已收进「合规基线」tab，不再挂在报告外壳底下
+    expect(reportParts).not.toContain('<ComplianceBaselineSection');
+    expect(tabBar).toContain("id: 'compliance'");
+    expect(tabBar).toContain('page.security.tab.compliance');
+    expect(reportParts).toContain("from './security-tab-bar'");
   });
 
-  it('主页空态把合规摘要与详情入口接上', () => {
-    expect(securityPage).toContain('compliance={state.compliance}');
-    expect(securityPage).toContain('onOpenCompliance={openDetail}');
+  it('主页空态不再渲染合规摘要，详情页保留合规基线视图', () => {
+    expect(securityPage).not.toContain('compliance={state.compliance}');
+    expect(securityPage).not.toContain('onOpenCompliance={openDetail}');
+    expect(securityEmptyState).not.toContain('ComplianceSummaryCard');
+    expect(securityPage).toContain('<ComplianceBaselineSection');
+  });
+
+  it('能力边界只在主页底部呈现，详情页不重复展示', () => {
+    // 首次进入、尚未扫描时也要能看见“本页不覆盖什么”
+    expect(securityEmptyState).toContain('planned=');
+    // 详情页不再重复展示同一份边界
+    expect(reportParts).not.toContain('<SecurityNotCovered');
   });
 
   it('项目体检不再渲染合规基线，也不消费安全域证据', () => {

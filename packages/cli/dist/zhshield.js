@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 23ee2f24213bbe24
+// @zh-src-hash: fe5b68f8f1ab3c24
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -3524,9 +3524,9 @@ var init_i18next = __esm({
         let value;
         let clonedOptions;
         const handleHasOptions = (key, inheritedOptions) => {
-          const sep13 = this.nestingOptionsSeparator;
-          if (key.indexOf(sep13) < 0) return key;
-          const c = key.split(new RegExp(`${sep13}[ ]*{`));
+          const sep14 = this.nestingOptionsSeparator;
+          if (key.indexOf(sep14) < 0) return key;
+          const c = key.split(new RegExp(`${sep14}[ ]*{`));
           let optionsString = `{${c[1]}`;
           key = c[0];
           optionsString = this.interpolate(optionsString, clonedOptions);
@@ -3543,7 +3543,7 @@ var init_i18next = __esm({
             };
           } catch (e) {
             this.logger.warn(`failed parsing options string in nesting for key ${key}`, e);
-            return `${key}${sep13}${optionsString}`;
+            return `${key}${sep14}${optionsString}`;
           }
           if (clonedOptions.defaultValue && clonedOptions.defaultValue.indexOf(this.prefix) > -1) delete clonedOptions.defaultValue;
           return key;
@@ -83293,11 +83293,11 @@ var require_Str = __commonJS({
     var capitalize;
     var camelize;
     var dasherize;
-    split = curry$(function(sep13, str) {
-      return str.split(sep13);
+    split = curry$(function(sep14, str) {
+      return str.split(sep14);
     });
-    join56 = curry$(function(sep13, xs) {
-      return xs.join(sep13);
+    join56 = curry$(function(sep14, xs) {
+      return xs.join(sep14);
     });
     lines = function(str) {
       if (!str.length) {
@@ -91477,7 +91477,7 @@ var require_posix = __commonJS({
       assertPath(path83);
       if (path83.length === 0) return ".";
     }
-    function dirname28(path83) {
+    function dirname29(path83) {
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
       }
@@ -91536,13 +91536,13 @@ var require_posix = __commonJS({
       }
       return path83.slice(startDot, end);
     }
-    function _format(sep13, pathObject) {
+    function _format(sep14, pathObject) {
       const dir2 = pathObject.dir || pathObject.root;
       const base = pathObject.base || (pathObject.name ?? "") + (pathObject.ext ?? "");
       if (!dir2) return base;
-      if (base === sep13) return dir2;
+      if (base === sep14) return dir2;
       if (dir2 === pathObject.root) return dir2 + base;
-      return dir2 + sep13 + base;
+      return dir2 + sep14 + base;
     }
     function assertArg$1(pathObject) {
       if (pathObject === null || typeof pathObject !== "object") {
@@ -91823,13 +91823,13 @@ var require_posix = __commonJS({
     function toNamespacedPath(path83) {
       return path83;
     }
-    function common$1(paths, sep13) {
+    function common$1(paths, sep14) {
       const [first = "", ...remaining] = paths;
-      const parts = first.split(sep13);
+      const parts = first.split(sep14);
       let endOfPrefix = parts.length;
       let append = "";
       for (const path83 of remaining) {
-        const compare = path83.split(sep13);
+        const compare = path83.split(sep14);
         if (compare.length <= endOfPrefix) {
           endOfPrefix = compare.length;
           append = "";
@@ -91837,12 +91837,12 @@ var require_posix = __commonJS({
         for (let i = 0; i < endOfPrefix; i++) {
           if (compare[i] !== parts[i]) {
             endOfPrefix = i;
-            append = i === 0 ? "" : sep13;
+            append = i === 0 ? "" : sep14;
             break;
           }
         }
       }
-      return parts.slice(0, endOfPrefix).join(sep13) + append;
+      return parts.slice(0, endOfPrefix).join(sep14) + append;
     }
     function common(paths) {
       return common$1(paths, SEPARATOR);
@@ -92126,7 +92126,7 @@ var require_posix = __commonJS({
     exports2.SEPARATOR_PATTERN = SEPARATOR_PATTERN;
     exports2.basename = basename7;
     exports2.common = common;
-    exports2.dirname = dirname28;
+    exports2.dirname = dirname29;
     exports2.extname = extname9;
     exports2.format = format;
     exports2.fromFileUrl = fromFileUrl;
@@ -92259,7 +92259,7 @@ var require_windows = __commonJS({
       assertPath(path83);
       if (path83.length === 0) return ".";
     }
-    function dirname28(path83) {
+    function dirname29(path83) {
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
       }
@@ -92366,13 +92366,13 @@ var require_windows = __commonJS({
       }
       return path83.slice(startDot, end);
     }
-    function _format(sep13, pathObject) {
+    function _format(sep14, pathObject) {
       const dir2 = pathObject.dir || pathObject.root;
       const base = pathObject.base || (pathObject.name ?? "") + (pathObject.ext ?? "");
       if (!dir2) return base;
-      if (base === sep13) return dir2;
+      if (base === sep14) return dir2;
       if (dir2 === pathObject.root) return dir2 + base;
-      return dir2 + sep13 + base;
+      return dir2 + sep14 + base;
     }
     function assertArg$1(pathObject) {
       if (pathObject === null || typeof pathObject !== "object") {
@@ -92895,13 +92895,13 @@ var require_windows = __commonJS({
       }
       return path83;
     }
-    function common$1(paths, sep13) {
+    function common$1(paths, sep14) {
       const [first = "", ...remaining] = paths;
-      const parts = first.split(sep13);
+      const parts = first.split(sep14);
       let endOfPrefix = parts.length;
       let append = "";
       for (const path83 of remaining) {
-        const compare = path83.split(sep13);
+        const compare = path83.split(sep14);
         if (compare.length <= endOfPrefix) {
           endOfPrefix = compare.length;
           append = "";
@@ -92909,12 +92909,12 @@ var require_windows = __commonJS({
         for (let i = 0; i < endOfPrefix; i++) {
           if (compare[i] !== parts[i]) {
             endOfPrefix = i;
-            append = i === 0 ? "" : sep13;
+            append = i === 0 ? "" : sep14;
             break;
           }
         }
       }
-      return parts.slice(0, endOfPrefix).join(sep13) + append;
+      return parts.slice(0, endOfPrefix).join(sep14) + append;
     }
     function common(paths) {
       return common$1(paths, SEPARATOR);
@@ -93199,7 +93199,7 @@ var require_windows = __commonJS({
     exports2.SEPARATOR_PATTERN = SEPARATOR_PATTERN;
     exports2.basename = basename7;
     exports2.common = common;
-    exports2.dirname = dirname28;
+    exports2.dirname = dirname29;
     exports2.extname = extname9;
     exports2.format = format;
     exports2.fromFileUrl = fromFileUrl;
@@ -176596,11 +176596,11 @@ ${lanes.join("\n")}
             if (i < rootLength) {
               return void 0;
             }
-            const sep13 = directory.lastIndexOf(directorySeparator, i - 1);
-            if (sep13 === -1) {
+            const sep14 = directory.lastIndexOf(directorySeparator, i - 1);
+            if (sep14 === -1) {
               return void 0;
             }
-            return directory.substr(0, Math.max(sep13, rootLength));
+            return directory.substr(0, Math.max(sep14, rootLength));
           }
         }
       }
@@ -343333,10 +343333,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep: sep13, value } = collItem;
+        const { start, key, sep: sep14, value } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep13?.[0],
+          next: key ?? sep14?.[0],
           offset,
           onError: onError2,
           parentIndent: bm.indent,
@@ -343350,7 +343350,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError2(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep13) {
+          if (!keyProps.anchor && !keyProps.tag && !sep14) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map.comment)
@@ -343374,7 +343374,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
           onError2(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep13 ?? [], {
+        const valueProps = resolveProps.resolveProps(sep14 ?? [], {
           indicator: "map-value-ind",
           next: value,
           offset: keyNode.range[2],
@@ -343390,7 +343390,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError2(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep13, null, valueProps, onError2);
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep14, null, valueProps, onError2);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value, onError2);
           offset = valueNode.range[2];
@@ -343481,7 +343481,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep13 = "";
+        let sep14 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -343495,13 +343495,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep13 + cb;
-              sep13 = "";
+                comment += sep14 + cb;
+              sep14 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep13 += source;
+                sep14 += source;
               hasSpace = true;
               break;
             default:
@@ -343544,18 +343544,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i = 0; i < fc.items.length; ++i) {
         const collItem = fc.items[i];
-        const { start, key, sep: sep13, value } = collItem;
+        const { start, key, sep: sep14, value } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep13?.[0],
+          next: key ?? sep14?.[0],
           offset,
           onError: onError2,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep13 && !value) {
+          if (!props.anchor && !props.tag && !sep14 && !value) {
             if (i === 0 && props.comma)
               onError2(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i < fc.items.length - 1)
@@ -343609,8 +343609,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep13 && !props.found) {
-          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep13, null, props, onError2);
+        if (!isMap && !sep14 && !props.found) {
+          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep14, null, props, onError2);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock2(value))
@@ -343622,7 +343622,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock2(key))
             onError2(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep13 ?? [], {
+          const valueProps = resolveProps.resolveProps(sep14 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value,
@@ -343633,8 +343633,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep13)
-                for (const st of sep13) {
+              if (sep14)
+                for (const st of sep14) {
                   if (st === valueProps.found)
                     break;
                   if (st.type === "newline") {
@@ -343651,7 +343651,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError2(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep13, null, valueProps, onError2) : null;
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep14, null, valueProps, onError2) : null;
           if (valueNode) {
             if (isBlock2(value))
               onError2(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -343831,7 +343831,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i + 1;
       }
       let value = "";
-      let sep13 = "";
+      let sep14 = "";
       let prevMoreIndented = false;
       for (let i = 0; i < contentStart; ++i)
         value += lines[i][0].slice(trimIndent) + "\n";
@@ -343848,24 +343848,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value += sep13 + indent.slice(trimIndent) + content;
-          sep13 = "\n";
+          value += sep14 + indent.slice(trimIndent) + content;
+          sep14 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep13 === " ")
-            sep13 = "\n";
-          else if (!prevMoreIndented && sep13 === "\n")
-            sep13 = "\n\n";
-          value += sep13 + indent.slice(trimIndent) + content;
-          sep13 = "\n";
+          if (sep14 === " ")
+            sep14 = "\n";
+          else if (!prevMoreIndented && sep14 === "\n")
+            sep14 = "\n\n";
+          value += sep14 + indent.slice(trimIndent) + content;
+          sep14 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep13 === "\n")
+          if (sep14 === "\n")
             value += "\n";
           else
-            sep13 = "\n";
+            sep14 = "\n";
         } else {
-          value += sep13 + content;
-          sep13 = " ";
+          value += sep14 + content;
+          sep14 = " ";
           prevMoreIndented = false;
         }
       }
@@ -344047,25 +344047,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match)
         return source;
       let res = match[1];
-      let sep13 = " ";
+      let sep14 = " ";
       let pos = first.lastIndex;
       line.lastIndex = pos;
       while (match = line.exec(source)) {
         if (match[1] === "") {
-          if (sep13 === "\n")
-            res += sep13;
+          if (sep14 === "\n")
+            res += sep14;
           else
-            sep13 = "\n";
+            sep14 = "\n";
         } else {
-          res += sep13 + match[1];
-          sep13 = " ";
+          res += sep14 + match[1];
+          sep14 = " ";
         }
         pos = line.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match = last.exec(source);
-      return res + sep13 + (match?.[1] ?? "");
+      return res + sep14 + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError2) {
       let res = "";
@@ -344875,14 +344875,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep: sep13, value }) {
+    function stringifyItem({ start, key, sep: sep14, value }) {
       let res = "";
       for (const st of start)
         res += st.source;
       if (key)
         res += stringifyToken(key);
-      if (sep13)
-        for (const st of sep13)
+      if (sep14)
+        for (const st of sep14)
           res += st.source;
       if (value)
         res += stringifyToken(value);
@@ -346049,18 +346049,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep13;
+          let sep14;
           if (scalar.end) {
-            sep13 = scalar.end;
-            sep13.push(this.sourceToken);
+            sep14 = scalar.end;
+            sep14.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep13 = [this.sourceToken];
+            sep14 = [this.sourceToken];
           const map = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep: sep13 }]
+            items: [{ start, key: scalar, sep: sep14 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map;
@@ -346213,15 +346213,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it2.key) && !includesToken(it2.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it2.start);
                   const key = it2.key;
-                  const sep13 = it2.sep;
-                  sep13.push(this.sourceToken);
+                  const sep14 = it2.sep;
+                  sep14.push(this.sourceToken);
                   delete it2.key;
                   delete it2.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep: sep13 }]
+                    items: [{ start: start2, key, sep: sep14 }]
                   });
                 } else if (start.length > 0) {
                   it2.sep = it2.sep.concat(start, this.sourceToken);
@@ -346415,13 +346415,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep13 = fc.end.splice(1, fc.end.length);
-            sep13.push(this.sourceToken);
+            const sep14 = fc.end.splice(1, fc.end.length);
+            sep14.push(this.sourceToken);
             const map = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep: sep13 }]
+              items: [{ start, key: fc, sep: sep14 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map;
@@ -364440,8 +364440,8 @@ var require_rule64 = __commonJS({
     function findNextSeparator(str) {
       const separators = ["&", " ", ";"];
       let minIndex = -1;
-      for (const sep13 of separators) {
-        const idx = str.indexOf(sep13);
+      for (const sep14 of separators) {
+        const idx = str.indexOf(sep14);
         if (idx !== -1 && (minIndex === -1 || idx < minIndex)) {
           minIndex = idx;
         }
@@ -429829,9 +429829,9 @@ var require_validate_version = __commonJS({
     exports2.getProjectMinVersion = getProjectMinVersion;
     var semver = __importStar(require_semver2());
     var all_in_parent_dirs_js_1 = require_all_in_parent_dirs2();
-    function isSupported(dirname28, minVersions) {
+    function isSupported(dirname29, minVersions) {
       validateVersions(minVersions);
-      return isSupportedNodeVersion(dirname28, minVersions.node);
+      return isSupportedNodeVersion(dirname29, minVersions.node);
     }
     function validateVersions(versions) {
       for (const [ref, version] of Object.entries(versions)) {
@@ -429840,11 +429840,11 @@ var require_validate_version = __commonJS({
         }
       }
     }
-    function isSupportedNodeVersion(dirname28, requiredVersion) {
+    function isSupportedNodeVersion(dirname29, requiredVersion) {
       if (!requiredVersion) {
         return true;
       }
-      const packageJsons = (0, all_in_parent_dirs_js_1.getPackageJsonManifests)(dirname28);
+      const packageJsons = (0, all_in_parent_dirs_js_1.getPackageJsonManifests)(dirname29);
       const versionRange = packageJsons.find((pj) => pj.engines?.node)?.engines?.node;
       if (!versionRange) {
         return true;
@@ -503090,24 +503090,19 @@ function scanSourceEvidence(target) {
   return evidence;
 }
 function scanWorkflowEvidence(target) {
-  const dir2 = path65.join(target, ".github", "workflows");
-  let entries;
-  try {
-    entries = fs61.readdirSync(dir2, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+  const files = [];
+  walkFiles(target, 0, files, WORKFLOW_EXTS);
   const hits = [];
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!/\.ya?ml$/i.test(entry.name)) continue;
+  for (const file of files) {
+    const rel = path65.relative(target, file);
+    const tail = path65.dirname(rel).split(path65.sep).slice(-2);
+    if (tail[0] !== ".github" || tail[1] !== "workflows") continue;
     let content;
     try {
-      content = fs61.readFileSync(path65.join(dir2, entry.name), "utf-8");
+      content = fs61.readFileSync(file, "utf-8");
     } catch {
       continue;
     }
-    const rel = path65.relative(target, path65.join(dir2, entry.name));
     content.split("\n").forEach((line, idx) => {
       if (SIGNATURE_VERIFICATION_RE.test(line)) {
         hits.push(hitOf(rel, idx + 1, line.trim()));
@@ -503116,7 +503111,7 @@ function scanWorkflowEvidence(target) {
   }
   return hits;
 }
-var fs61, path65, SOURCE_EXTS2, SELF_BASENAMES, OUTBOUND_RE, ENV_ACCESS_RE, CSRF_TOKEN_USAGE_RE, SAME_SITE_RE, ORIGIN_CHECK_RE, TLS_VERIFY_DISABLED_RE, WEAK_TLS_PROTOCOL_RE, TLS_INTEREST_RE, HELMET_CALL_RE, CSP_DISABLED_RE, CSP_CONFIGURED_RE, HSTS_DISABLED_RE, HSTS_CONFIGURED_RE, HSTS_MAX_AGE_RE, HSTS_MIN_MAX_AGE, FRAME_DISABLED_RE, FRAME_CONFIGURED_RE, COOKIE_HTTP_ONLY_RE, COOKIE_SECURE_RE, COOKIE_SAME_SITE_RE, TOKEN_EXPIRY_RE, PASSWORD_HASHING_RE, CRYPTO_USAGE_RE, AUDIT_LOG_RE, KEY_ROTATION_RE, KEY_MANAGEMENT_RE, SIGNATURE_VERIFICATION_RE, CONFIG_INTEREST_RE;
+var fs61, path65, SOURCE_EXTS2, SELF_BASENAMES, OUTBOUND_RE, ENV_ACCESS_RE, CSRF_TOKEN_USAGE_RE, SAME_SITE_RE, ORIGIN_CHECK_RE, TLS_VERIFY_DISABLED_RE, WEAK_TLS_PROTOCOL_RE, TLS_INTEREST_RE, HELMET_CALL_RE, CSP_DISABLED_RE, CSP_CONFIGURED_RE, HSTS_DISABLED_RE, HSTS_CONFIGURED_RE, HSTS_MAX_AGE_RE, HSTS_MIN_MAX_AGE, FRAME_DISABLED_RE, FRAME_CONFIGURED_RE, COOKIE_HTTP_ONLY_RE, COOKIE_SECURE_RE, COOKIE_SAME_SITE_RE, TOKEN_EXPIRY_RE, PASSWORD_HASHING_RE, CRYPTO_USAGE_RE, AUDIT_LOG_RE, KEY_ROTATION_RE, KEY_MANAGEMENT_RE, SIGNATURE_VERIFICATION_RE, CONFIG_INTEREST_RE, WORKFLOW_EXTS;
 var init_security_config_scan = __esm({
   "../security/src/security-config-scan.ts"() {
     "use strict";
@@ -503157,6 +503152,7 @@ var init_security_config_scan = __esm({
     KEY_MANAGEMENT_RE = /(?:@aws-sdk\/client-kms|@aws-sdk\/client-secrets-manager|node-vault|@azure\/keyvault|@google-cloud\/kms|keytar|vault\.|secretsManager|kms\.)/i;
     SIGNATURE_VERIFICATION_RE = /(?:npm\s+audit\s+signatures|cosign\s+verify|sigstore|slsa-verifier|gpg\s+(?:--verify|-v)|attest-build-provenance|actions\/attest|verify-attestation|npm\s+provenance)/i;
     CONFIG_INTEREST_RE = /helmet|contentSecurityPolicy|content-security-policy|strictTransportSecurity|strict-transport-security|hsts|frameguard|x-frame-options|httpOnly|secure\s*:\s*true|sameSite|expiresIn|bcrypt|argon2|scrypt|audit|logger|rotate|keyVersion|keyId|kms|vault|secretsManager|createCipheriv|generateKeyPair|createHmac/i;
+    WORKFLOW_EXTS = /* @__PURE__ */ new Set([".yml", ".yaml"]);
   }
 });
 
@@ -511011,12 +511007,17 @@ async function runScannerAdapters(host, rule, instr, context) {
   const scanners = instr.scanners ?? [];
   if (scanners.length === 0) return null;
   const violations = [];
+  const seenViolationIds = /* @__PURE__ */ new Set();
   const reasons = [];
   let anyRan = false;
   for (const tool of scanners) {
     const outcome = await scanWithOneScanner(host, rule, String(tool), context);
     if (outcome.fatal) return outcome.fatal;
-    violations.push(...outcome.violations);
+    for (const violation of outcome.violations) {
+      if (seenViolationIds.has(violation.id)) continue;
+      seenViolationIds.add(violation.id);
+      violations.push(violation);
+    }
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.ran) anyRan = true;
   }
@@ -524217,9 +524218,9 @@ async function runCapabilityCommand(runner, opts) {
 `;
     if (opts.report) {
       const { writeFileSync: writeFileSync3, mkdirSync: mkdirSync4 } = await import("node:fs");
-      const { dirname: dirname28, resolve: resolve37 } = await import("node:path");
+      const { dirname: dirname29, resolve: resolve37 } = await import("node:path");
       const abs = resolve37(opts.report);
-      mkdirSync4(dirname28(abs), { recursive: true });
+      mkdirSync4(dirname29(abs), { recursive: true });
       writeFileSync3(abs, payload, "utf-8");
       console.error(`[CLI] \u80FD\u529B\u77E9\u9635\u5DF2\u5199\u5165: ${opts.report}`);
     } else {

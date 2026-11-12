@@ -12,28 +12,21 @@
 
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
-import { FindingsPanel, MalwarePanel, SecurityNotCovered } from './security-parts';
+import { FindingsPanel, MalwarePanel } from './security-parts';
 import { DomainReportShell } from '../components/business/domain-report-shell';
 import type { ReportStatCard } from '../components/business/ReportShell';
+import { ResultCard } from '../components/ui/ResultCard';
 import { SEVERITY_CONFIG } from './security-logic';
 import type { SecurityIssue } from './security-logic';
 import type { SecurityScanReportData, SecretReportData } from '../types/electron';
-import type { ComplianceReport } from '../compliance/baseline';
-import { ComplianceBaselineSection } from './compliance-parts';
+import { SecurityTabBar, type SecurityTab, type Translate } from './security-tab-bar';
+import { SecurityResultMeta } from './security-result-meta';
 
-export type SecurityTab = 'vuln' | 'malware' | 'secrets';
-
-export type Translate = (key: string, params?: Record<string, unknown>) => string;
-
-/** 分类标签：顺序即界面顺序（漏洞 / 恶意代码 / 密钥） */
-const TABS: Array<{ id: SecurityTab; labelKey: string }> = [
-  { id: 'vuln', labelKey: 'page.security.tab.vuln' },
-  { id: 'malware', labelKey: 'page.security.tab.malware' },
-  { id: 'secrets', labelKey: 'page.security.tab.secrets' },
-];
+export type { SecurityTab, Translate } from './security-tab-bar';
 
 /** 统计卡按此顺序展开严重级别；与 SEVERITY_CONFIG 的键一一对应 */
 const SEVERITY_KEYS = ['critical', 'high', 'medium', 'low'] as const;
+type SecuritySeverity = (typeof SEVERITY_KEYS)[number];
 
 import type { AsyncScanViewProps } from './async-scan-props';
 
@@ -69,83 +62,112 @@ export function renderMalwarePanel(
   return <MalwarePanel items={items} onCopyToAi={onCopyToAi} onCopyAll={onCopyAll} />;
 }
 
-/** 报告统计卡：总数 + 各严重级别 + 恶意代码，明细复用 FindingsPanel/MalwarePanel */
-export function buildSecurityStats({
-  report,
-  copyToAi,
-  copyAllToAi,
-  copyMalwareToAi,
-  copyMalwareAllToAi,
-  t,
-}: {
-  report: SecurityScanReportData;
-  t: Translate;
-} & SecurityReportCopyProps): ReportStatCard[] {
+/** 汇总三类问题的严重度：漏洞 + 恶意代码 + 活跃密钥（密钥只计 active） */
+function collectAllSeverities(
+  report: SecurityScanReportData,
+  secretsReport?: SecretReportData | null,
+): SecuritySeverity[] {
+  const activeSecrets = (secretsReport?.findings ?? []).filter(
+    (finding) => finding.status === 'active',
+  );
   return [
-    { key: 'total', label: t('page.security.stats.total'), value: report.summary.total },
-    ...SEVERITY_KEYS.map((sev) => {
-      const items = report.findings.filter((f) => f.severity === sev);
-      return {
-        key: sev,
-        label: t(`severity.${sev}`),
-        value: report.summary[sev],
-        // 与明细徽章同源（security-logic 的 SEVERITY_CONFIG）：一处定义、两处消费，
-        // 避免统计卡与问题清单对同一严重级给出不同颜色。
-        color: SEVERITY_CONFIG[sev]?.color,
-        detail: {
-          items,
-          render: (sub: unknown[]) =>
-            renderFindingsPanel(sub as SecurityScanReportData['findings'], copyToAi, copyAllToAi),
-          hint: t('page.security.copyAllPrompt', { count: items.length }),
-        },
-      };
-    }),
+    ...report.findings.map((finding) => finding.severity),
+    ...report.malware.map((item) => item.severity),
+    ...activeSecrets
+      .map((finding) => finding.severity)
+      .filter((severity): severity is SecuritySeverity =>
+        (SEVERITY_KEYS as readonly string[]).includes(severity),
+      ),
+  ];
+}
+
+/** 严重度卡：固定一套（0 也显示），与明细徽章同色 */
+function buildSeverityCards(severities: SecuritySeverity[], t: Translate): ReportStatCard[] {
+  return SEVERITY_KEYS.map((sev) => ({
+    key: sev,
+    label: t(`severity.${sev}`),
+    value: severities.filter((severity) => severity === sev).length,
+    // 与明细徽章同源（security-logic 的 SEVERITY_CONFIG）：一处定义、两处消费
+    color: SEVERITY_CONFIG[sev]?.color,
+  }));
+}
+
+/** 规则通道状态卡：未评估 / 跳过，明细可展开逐条 */
+function buildRuleStatusCards(report: SecurityScanReportData, t: Translate): ReportStatCard[] {
+  const ledger = report.ruleLedger ?? [];
+  const { failed, skipped } = classifyRuleLedger(ledger);
+  const degradedCount = ledger.length > 0 ? failed.length : (report.ruleChannel?.degraded ?? 0);
+  const skippedCount = ledger.length > 0 ? skipped.length : (report.ruleChannel?.skipped ?? 0);
+  return [
     {
-      key: 'malware',
-      label: t('page.security.stats.malware'),
-      value: report.summary.malwareTotal,
-      // 恶意代码属最高危，与 critical 同档
-      color: 'rgb(var(--zh-danger-dark))',
-      detail: {
-        items: report.malware,
-        render: (sub: unknown[]) =>
-          renderMalwarePanel(
-            sub as SecurityScanReportData['malware'],
-            copyMalwareToAi,
-            copyMalwareAllToAi,
-          ),
-      },
+      key: 'degraded',
+      label: t('page.security.stats.degraded', { defaultValue: '未评估' }),
+      value: degradedCount,
+      color: degradedCount > 0 ? 'rgb(var(--zh-warning))' : undefined,
+      ...(failed.length > 0
+        ? {
+            detail: {
+              items: failed,
+              render: (sub: unknown[]) => (
+                <RuleLedgerList
+                  entries={sub as RuleLedgerEntry[]}
+                  tone="text-warning-600"
+                  testId="security-stat-degraded"
+                />
+              ),
+            },
+          }
+        : {}),
+    },
+    {
+      key: 'skipped',
+      label: t('page.security.stats.skipped', { defaultValue: '跳过' }),
+      value: skippedCount,
+      color: 'rgb(var(--zh-muted))',
+      ...(skipped.length > 0
+        ? {
+            detail: {
+              items: skipped,
+              render: (sub: unknown[]) => (
+                <RuleLedgerList
+                  entries={sub as RuleLedgerEntry[]}
+                  tone="text-zh-muted"
+                  testId="security-stat-skipped"
+                />
+              ),
+            },
+          }
+        : {}),
     },
   ];
 }
 
-/** 分类切换标签栏 */
-export function SecurityTabBar({
-  tab,
-  onTabChange,
+/**
+ * 报告统计卡：本次扫描的**全部问题**（漏洞 + 恶意代码 + 活跃密钥）按严重度汇总，
+ * 外加规则通道的两个状态计数（未评估 / 跳过）。
+ *
+ * 与其他分区详情页保持一致：卡片是**固定一套**（0 也显示），不随问题数增减；
+ * 规则状态在卡内可展开逐条，不再用整幅横幅压住正文。
+ */
+export function buildSecurityStats({
+  report,
+  secretsReport,
   t,
 }: {
-  tab: SecurityTab;
-  onTabChange: (tab: SecurityTab) => void;
+  report: SecurityScanReportData;
+  secretsReport?: SecretReportData | null;
   t: Translate;
-}) {
-  return (
-    <div className="flex gap-2 mb-6">
-      {TABS.map((t2) => (
-        <button
-          key={t2.id}
-          onClick={() => onTabChange(t2.id)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-colors ${
-            tab === t2.id
-              ? 'bg-danger-600 text-white'
-              : 'bg-zh-panel text-zh-ink-2 hover:bg-zh-line'
-          }`}
-        >
-          {t(t2.labelKey)}
-        </button>
-      ))}
-    </div>
-  );
+}): ReportStatCard[] {
+  const severities = collectAllSeverities(report, secretsReport);
+  return [
+    {
+      key: 'total',
+      label: t('page.security.stats.totalAll', { defaultValue: '总问题' }),
+      value: severities.length,
+    },
+    ...buildSeverityCards(severities, t),
+    ...buildRuleStatusCards(report, t),
+  ];
 }
 
 /** 报告外壳入参：密钥侧的回调已随明细面板一起留在页面，此处不再重复接一遍 */
@@ -168,63 +190,8 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps, AsyncS
   isSavedResult?: boolean;
   /** 当前分类的明细面板：由页面装配后传入（渲染位置 = 标签栏之下） */
   children?: ReactNode;
-  /** 合规基线（ASVS L1 子集）只读映射：由页面基于已落盘结论算好后传入 */
-  compliance: ComplianceReport;
-}
-
-/** 报告结果的出处与时间：新结果 / 上次保存的旧结果 / 本次失败 三态必须可区分 */
-function SecurityResultMeta({
-  report,
-  scanError,
-  isSavedResult,
-  t,
-}: {
-  report: SecurityScanReportData;
-  scanError?: string | null;
-  isSavedResult?: boolean;
-  t: Translate;
-}) {
-  const time = report.metadata?.timestamp
-    ? new Date(report.metadata.timestamp).toLocaleString()
-    : t('page.security.result.unknownTime', { defaultValue: '时间未知' });
-
-  if (scanError) {
-    return (
-      <div className="mb-4 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
-        <div className="text-sm font-medium text-danger-700">
-          {t('page.security.result.failedTitle', {
-            defaultValue: '本次检查未完成：{{error}}',
-            error: scanError,
-          })}
-        </div>
-        <div className="text-xs text-danger-500 mt-0.5">
-          {t('page.security.result.failedDetail', {
-            defaultValue: '下方显示的是 {{time}} 保存的旧结果，不代表本次扫描；修复后请重新检查。',
-            time,
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  if (isSavedResult) {
-    return (
-      <div className="mb-4 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
-        <div className="text-xs text-warning-700">
-          {t('page.security.result.savedOnly', {
-            defaultValue: '以下为上次保存的扫描结果（{{time}}），本次未产出新结果。',
-            time,
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-4 text-xs text-zh-muted">
-      {t('page.security.result.scannedAt', { defaultValue: '扫描时间：{{time}}', time })}
-    </div>
-  );
+  /** 密钥扫描报告：顶部「总问题」按三类合计，密钥只计 active */
+  secretsReport?: SecretReportData | null;
 }
 
 /**
@@ -288,7 +255,7 @@ function ChannelNotRunNotice({ t }: { t: Translate }) {
   );
 }
 
-/** 未能评估：warning 条 + 逐条原因（旧报告无明细时明确标注，不冒充完整） */
+/** 未能评估：warning 条 + 逐条原因（默认折叠，旧报告无明细时明确标注，不冒充完整） */
 function DegradedRulesNotice({
   count,
   entries,
@@ -299,12 +266,16 @@ function DegradedRulesNotice({
   t: Translate;
 }) {
   return (
-    <div className="px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
-      <div className="text-xs font-medium text-warning-700">
-        {t('page.security.result.ruleChannelDegraded', {
-          defaultValue:
-            '{{count}} 条规则未能评估——未检测不等于通过。逐条原因见下，可据此判断是缺工具、缺适配器，还是规则本身跑不成。',
+    <details className="px-4 py-2 rounded-xl bg-warning-50 border border-warning-100">
+      <summary className="cursor-pointer text-xs font-medium text-warning-700">
+        {t('page.security.result.ruleChannelDegradedSummary', {
+          defaultValue: '{{count}} 条规则未能评估——未检测不等于通过。',
           count,
+        })}
+      </summary>
+      <div className="mt-1 text-[11px] text-warning-600">
+        {t('page.security.result.ruleChannelDegradedHint', {
+          defaultValue: '逐条原因见下，可据此判断是缺工具、缺适配器，还是规则本身跑不成。',
         })}
       </div>
       {entries.length > 0 ? (
@@ -316,7 +287,7 @@ function DegradedRulesNotice({
           })}
         </div>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -331,7 +302,7 @@ function SkippedRulesNotice({
   t: Translate;
 }) {
   return (
-    <details className="px-4 py-3 rounded-xl bg-info-50 border border-info-100">
+    <details className="px-4 py-2 rounded-xl bg-info-50 border border-info-100">
       <summary className="text-xs text-info-700 cursor-pointer">
         {t('page.security.result.ruleChannelSkipped', {
           defaultValue: '{{count}} 条规则按项目前提跳过（本项目不适用，不是故障）。',
@@ -360,7 +331,7 @@ export function SecurityRuleChannelBanner({
   if (channel?.ran !== false && degradedCount === 0 && skippedCount === 0) return null;
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-3 space-y-1.5">
       {channel?.ran === false ? <ChannelNotRunNotice t={t} /> : null}
       {degradedCount > 0 ? <DegradedRulesNotice count={degradedCount} entries={failed} t={t} /> : null}
       {skippedCount > 0 ? <SkippedRulesNotice count={skippedCount} entries={skipped} t={t} /> : null}
@@ -434,22 +405,38 @@ export function SecurityReportView({
   onTabChange,
   onRescan,
   onBackHome,
-  copyToAi,
-  copyAllToAi,
-  copyMalwareToAi,
-  copyMalwareAllToAi,
+  secretsReport,
   scanError,
   isSavedResult,
   children,
-  compliance,
 }: SecurityReportViewProps) {
   const t = useT();
+  // R6/C4：把规则账换算成本次覆盖，交给评分卡——有规则没评估时不得显示「优秀」
+  const ledger = report.ruleLedger ?? [];
+  const { failed, skipped } = classifyRuleLedger(ledger);
+  // 按归属让位的规则不属于本域，不计入分母；本域该跑却没跑成的才压低覆盖
+  const total = ledger.length - skipped.length;
+  const run = Math.max(0, total - failed.length);
+  const coverage = total > 0 ? { run, total } : undefined;
+  // 检查时间放在分类标签同一行右侧：无论切到哪个 tab，都知道数据是什么时候扫的
+  const timestamp = report.metadata?.timestamp;
+  const scannedTime =
+    timestamp && !Number.isNaN(new Date(timestamp).getTime())
+      ? new Date(timestamp).toLocaleString()
+      : null;
+  // 标题先说实话：本次失败 / 上次保存 / 本次完成
+  const title = scanError
+    ? t('page.security.result.titleFailed', { defaultValue: '本次检查未完成' })
+    : isSavedResult
+      ? t('page.security.result.titleSaved', { defaultValue: '上次检查结果' })
+      : t('page.security.done');
   return (
     <DomainReportShell
       projectPath={projectPath}
       domain="security"
       refreshKey={report}
-      title={t('page.security.done')}
+      title={title}
+      coverage={coverage}
       actionLabel={t('page.security.rescan')}
       onAction={onRescan}
       loading={loading}
@@ -457,22 +444,24 @@ export function SecurityReportView({
       onCancel={onCancel}
       stopping={stopping}
       onBackHome={onBackHome}
-      stats={buildSecurityStats({
-        report,
-        copyToAi,
-        copyAllToAi,
-        copyMalwareToAi,
-        copyMalwareAllToAi,
-        t,
-      })}
+      stats={buildSecurityStats({ report, secretsReport, t })}
     >
-      <SecurityResultMeta report={report} scanError={scanError} isSavedResult={isSavedResult} t={t} />
-      <SecurityRuleChannelBanner report={report} t={t} />
+      <SecurityResultMeta report={report} scanError={scanError} t={t} />
       <SecurityDegradedBanner report={report} t={t} />
-      <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
-      {children}
-      <ComplianceBaselineSection report={compliance} />
-      <SecurityNotCovered />
+      <ResultCard variant="list" className="mb-2 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zh-line px-5 py-2">
+          <SecurityTabBar tab={tab} onTabChange={onTabChange} t={t} />
+          {scannedTime ? (
+            <span className="text-[11px] whitespace-nowrap text-zh-muted">
+              {t('page.reportShell.scannedAt', {
+                defaultValue: '检查时间 {{time}}',
+                time: scannedTime,
+              })}
+            </span>
+          ) : null}
+        </div>
+        <div className="p-4">{children}</div>
+      </ResultCard>
     </DomainReportShell>
   );
 }

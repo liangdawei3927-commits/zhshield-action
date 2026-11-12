@@ -221,5 +221,13 @@ describe('SecurityCheckEngine — 安全配置类检测', () => {
       const ok = await runCheck('supply-signature-verification');
       expect(ok.status).toBe('passed');
     });
+
+    it('内嵌独立仓库的 CI workflow 也算证据（源码可下探时 CI 不能漏扫）', async () => {
+      writeDeps({ 'left-pad': '1.0.0' });
+      write('nested/.github/workflows/release.yml', 'uses: actions/attest-build-provenance@v2');
+      const ok = await runCheck('supply-signature-verification');
+      expect(ok.status).toBe('passed');
+      expect(ok.message).toContain('nested/.github/workflows/release.yml');
+    });
   });
 });

@@ -103,12 +103,21 @@ async function runScannerAdapters(
   // R7 / C3：归属让位已在规则求值入口统一处理（runner.ts），此处不再判 ——
   // 判据只留一处，新增 dispatch 形态天然继承让位语义。
   const violations: Violation[] = [];
+  // 同一结论被多个 scanner 各读一次时只计一次：门禁结论模式下 semgrep / gitleaks
+  // 的 Owner 同为 security，两条 scanner 会拿到同一批结论条目；直接累加会让
+  // 「扫描器发现 N 个问题」虚高（2026-11-12 实测：同一条 HSTS 误报被计成 2 条）。
+  // Violation.id 由结论内容派生（ruleId/file/line/message），跨 scanner 稳定可去重。
+  const seenViolationIds = new Set<string>();
   const reasons: string[] = [];
   let anyRan = false;
   for (const tool of scanners) {
     const outcome = await scanWithOneScanner(host, rule, String(tool), context);
     if (outcome.fatal) return outcome.fatal;
-    violations.push(...outcome.violations);
+    for (const violation of outcome.violations) {
+      if (seenViolationIds.has(violation.id)) continue;
+      seenViolationIds.add(violation.id);
+      violations.push(violation);
+    }
     if (outcome.reason) reasons.push(outcome.reason);
     if (outcome.ran) anyRan = true;
   }

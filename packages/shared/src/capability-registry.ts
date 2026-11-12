@@ -224,11 +224,13 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.standard',
     domain: 'security',
     label: '安全编码规范检查',
-    status: 'planned',
+    status: 'deprecated',
     implementedBy: [],
-    // 合规基线已拆为 security.compliance（本页正在展示）；本项只剩「编码规范」没有实现，
-    // 标签不能再带「合规基线」，否则「本页不覆盖」清单会和页面上方的合规区自相矛盾。
-    note: '安全编码规范检查仍无实现；合规基线视图已拆为独立能力 security.compliance。',
+    // 代码规范检查按 C1 唯一归属属项目体检（ESLint / 类型安全）；安全侧不再单列，
+    // 安全编码规范的 ASVS 条款由合规基线 security.compliance 呈现。
+    note:
+      '代码规范检查归项目体检（ESLint / 类型安全）；安全编码规范的 ASVS 条款' +
+      '由合规基线 security.compliance 呈现，安全域不再单列。',
   },
   {
     id: 'security.dependency',

@@ -202,10 +202,11 @@ describe('能力注册表 — 按域查询', () => {
     expect(redos?.implementedBy.length).toBeGreaterThan(0);
   });
 
-  it('安全域的「规范检查」被标记为未实现、「依赖检查」被标记为已移交', () => {
+  it('安全域的「规范检查」与「依赖检查」均被标记为已移交', () => {
     const caps = CAPABILITIES_BY_DOMAIN.get('security') ?? [];
     const standard = caps.find((c) => c.id === 'security.standard');
-    expect(standard?.status).toBe('planned');
+    // 代码规范检查归项目体检；安全编码规范的条款由合规基线呈现，安全域不再单列
+    expect(standard?.status).toBe('deprecated');
     const dependency = caps.find((c) => c.id === 'security.dependency');
     expect(dependency?.status).toBe('deprecated');
   });

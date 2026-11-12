@@ -888,7 +888,8 @@
       "view": "查看詳情"
     },
     "reportShell": {
-      "backHome": "返回主頁"
+      "backHome": "返回主頁",
+      "scannedAt": "檢查時間 {{time}}"
     },
     "backup": {
       "backingUp": "備份中...",
@@ -1649,6 +1650,7 @@
       "source": "安全",
       "summary": "{{vulns}} 項漏洞 · {{malware}} 處惡意程式碼",
       "tab": {
+        "compliance": "合規基線",
         "malware": "病毒查殺",
         "vuln": "漏洞掃描",
         "secrets": "金鑰管理"

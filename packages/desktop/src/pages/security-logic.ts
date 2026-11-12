@@ -34,7 +34,7 @@ export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelK
  */
 export const SECURITY_PLANNED_DESCRIPTIONS: Record<string, string> = {
   'security.standard':
-    '本页暂不检查安全编码规范；合规基线已作为独立能力在本页下方展示。',
+    '代码规范检查归项目体检（ESLint / 类型安全）；安全编码规范的 ASVS 条款由合规基线呈现。',
   'security.dependency':
     '依赖漏洞已统一由「依赖管家」负责，安全中心不再重复上报；请到依赖管家查看 CVE 结果。',
 };

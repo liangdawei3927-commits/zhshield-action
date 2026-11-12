@@ -888,7 +888,8 @@
       "view": "詳細を見る"
     },
     "reportShell": {
-      "backHome": "ホームに戻る"
+      "backHome": "ホームに戻る",
+      "scannedAt": "チェック日時 {{time}}"
     },
     "backup": {
       "backingUp": "バックアップ中...",
@@ -1649,6 +1650,7 @@
       "source": "セキュリティ",
       "summary": "脆弱性 {{vulns}} 件 · 悪意のあるコード {{malware}} 箇所",
       "tab": {
+        "compliance": "コンプライアンス基準",
         "malware": "ウイルス駆除",
         "vuln": "脆弱性スキャン",
         "secrets": "シークレット管理"

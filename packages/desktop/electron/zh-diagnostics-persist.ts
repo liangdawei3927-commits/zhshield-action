@@ -22,6 +22,7 @@ import {
   normalizePipelineReport,
 } from './zh-diagnostics-normalize';
 import { appendDomainHistory, buildScanRecord } from './domain-history';
+import { olderSnapshotTime, scanTimeAnchor } from './zh-diagnostics-time';
 
 // ─── 落盘 ──────────────────────────────────────────────────────────────
 
@@ -383,25 +384,6 @@ function filterWhitelisted(
   );
 }
 
-/**
- * 本次扫描的时间锚点：**取报告自带时间，不取写盘时刻**。
- *
- * 一次 pipeline 结果会被多个入口同时消费（首页一键体检、报告中心、项目引导）：
- * 任务中心把并发请求合并成同一个 task，几个调用方 `await` 到的是**同一份** report，
- * 各自落盘时若都取 `new Date()`，两次写盘差几毫秒 —— 历史去重键
- * `scanId = sha16(domain|scannedAt|指纹hash)` 随之失效，同一次扫描被记成两条
- * （2026-10-30 实测 19:32:57.393 / 19:32:57.395，指纹与分数完全相同）；
- * 连带 `rescuePreviousScore` 也把「自己」当成上一轮，凭空多出一条对比基线。
- *
- * 报告的 timestamp 同一次扫描恒等 → 重复落盘自然落到 `duplicate`，
- * 且 `rescuePreviousScore` 的 `generatedAt !== report.generatedAt` 判据继续成立。
- * 跨进程（worker）传输时 Date 可能已退化成字符串，故两种形态都接住。
- */
-function scanTimeAnchor(timestamp: unknown): string {
-  const parsed = timestamp instanceof Date ? timestamp : new Date(String(timestamp ?? ''));
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
-}
-
 /** pipeline 报告一键归一化并落盘（dryRun 由调用方决定是否跳过） */
 export async function persistDiagnostics(
   projectPath: string,
@@ -523,8 +505,17 @@ export async function persistSecurityDomainEntries(
   // 展开进数组字面量即得可变数组，无需断言——此前的 as unknown as 是历史残留
   const prevIssues: readonly DiagnosticEntry[] = prev?.issues ?? [];
   const write = mergeSecurityEntries(prevIssues, entries, kind);
+  // 合并会保留另一类旧条目，而快照只有一个 generatedAt：若直接取本次扫描时间，
+  // 旧条目就会被读成「刚刚检测」。取两者中较旧的时间，让门禁的过期注解反映
+  // 快照里最旧的那部分数据（2026-11-12 实测：密钥扫描后漏洞条目仍是 14 小时前）。
+  const retainsOtherClass =
+    kind === 'vuln' ? prevIssues.some(isSecretEntry) : prevIssues.some((e) => !isSecretEntry(e));
+  const generatedAt = retainsOtherClass
+    ? olderSnapshotTime(prev?.generatedAt, options?.generatedAt)
+    : options?.generatedAt;
   return await persistDiagnosticsFromEntries(projectPath, write, ['security'], {
     dimensionScores: options?.dimensionScore ? { security: options.dimensionScore } : undefined,
-    generatedAt: options?.generatedAt,
+    generatedAt,
   });
 }
+

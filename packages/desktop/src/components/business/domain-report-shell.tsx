@@ -130,6 +130,7 @@ export function DomainReportShell({
   children,
 }: DomainReportShellProps) {
   const meta = DOMAIN_REPORT_META[domain];
+  // 安全页已在分类标签行右侧显示检查时间，顶行不再重复
   return (
     <ReportShell
       projectPath={projectPath}
@@ -152,6 +153,7 @@ export function DomainReportShell({
       }
       onBackHome={onBackHome}
       stats={stats}
+      showScannedAt={domain !== 'security'}
     >
       {children}
     </ReportShell>

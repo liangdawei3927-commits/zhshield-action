@@ -1,15 +1,10 @@
 import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
-import {
-  buildCapabilityFeatures,
-  buildPlannedCapabilities,
-} from '../components/business/capability-features';
+import { buildPlannedCapabilities } from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 import { SECURITY_PLANNED_DESCRIPTIONS } from './security-logic';
-import type { ComplianceReport } from '../compliance/baseline';
-import { ComplianceSummaryCard } from './compliance-parts';
 
 /**
  * 能力图标表（按能力 id 绑定）：注册表决定**渲染哪几项**，图标只负责视觉。
@@ -106,28 +101,44 @@ function SecurityScanErrorNotice({ error }: { error: string }) {
 export function SecurityEmptyState(
   props: ScanEmptyStateParams & {
     scanError?: string | null;
-    /** 合规基线摘要：只在已有证据时显示，首次进入不渲染空结论 */
-    compliance?: ComplianceReport;
-    onOpenCompliance?: () => void;
   },
 ) {
   const t = useT();
-  const covered = props.compliance
-    ? props.compliance.summary.pass + props.compliance.summary.fail
-    : 0;
-  const showCompliance = props.compliance !== undefined && covered > 0;
-  const extra =
-    props.scanError || showCompliance ? (
-      <>
-        {props.scanError ? <SecurityScanErrorNotice error={props.scanError} /> : null}
-        {showCompliance && props.compliance ? (
-          <ComplianceSummaryCard
-            report={props.compliance}
-            onOpen={props.onOpenCompliance}
-          />
-        ) : null}
-      </>
-    ) : undefined;
+  const extra = props.scanError ? <SecurityScanErrorNotice error={props.scanError} /> : undefined;
+  // 主页按「与详情页一致的四个视图」出卡，一行四张：
+  // 其他分类的主页也是这个密度，卡片名是分类、不是单条规则；
+  // SQL 注入 / XSS 等具体规则在详情页里看，不占主页卡位。
+  const features = [
+    {
+      icon: SECURITY_CAPABILITY_ICONS['security.vuln.sql-injection'],
+      title: t('page.security.tab.vuln', { defaultValue: '漏洞扫描' }),
+      desc: t('page.security.feature.vuln.desc', {
+        defaultValue:
+          'SQL 注入、XSS、命令注入、CSRF、路径穿越与安全配置，定位到文件行并给出修复建议',
+      }),
+    },
+    {
+      icon: SECURITY_CAPABILITY_ICONS['security.malware'],
+      title: t('page.security.tab.malware', { defaultValue: '病毒查杀' }),
+      desc: t('page.security.feature.malware.desc', {
+        defaultValue: '反弹 Shell、后门、供应链投毒等恶意代码特征',
+      }),
+    },
+    {
+      icon: SECURITY_CAPABILITY_ICONS['security.secrets'],
+      title: t('page.security.tab.secrets', { defaultValue: '密钥管理' }),
+      desc: t('page.security.feature.secrets.desc', {
+        defaultValue: '硬编码密钥检测 + 轮换/复检生命周期，值脱敏展示',
+      }),
+    },
+    {
+      icon: SECURITY_CAPABILITY_ICONS['security.compliance'],
+      title: t('page.security.tab.compliance', { defaultValue: '合规基线' }),
+      desc: t('page.security.feature.compliance.desc', {
+        defaultValue: 'ASVS L1 子集：汇总各域已落盘结论的只读差距报告，不新增扫描',
+      }),
+    },
+  ];
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
@@ -135,14 +146,7 @@ export function SecurityEmptyState(
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
       extra={extra}
-      features={buildCapabilityFeatures('security', {
-        icons: SECURITY_CAPABILITY_ICONS,
-        descriptions: {
-          'security.compliance': t('page.security.feature.compliance.desc', {
-            defaultValue: '合规基线（ASVS L1 子集）：汇总各域已落盘结论的只读差距报告，不新增扫描',
-          }),
-        },
-      })}
+      features={features}
       planned={buildPlannedCapabilities('security', SECURITY_PLANNED_DESCRIPTIONS)}
       buttonText={t('page.security.fixAll')}
       onAction={props.onScan}

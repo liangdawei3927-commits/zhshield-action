@@ -888,7 +888,8 @@
       "view": "상세 보기"
     },
     "reportShell": {
-      "backHome": "홈으로 돌아가기"
+      "backHome": "홈으로 돌아가기",
+      "scannedAt": "검사 시간 {{time}}"
     },
     "backup": {
       "backingUp": "백업 중...",
@@ -1649,6 +1650,7 @@
       "source": "보안",
       "summary": "취약점 {{vulns}}건 · 악성 코드 {{malware}}곳",
       "tab": {
+        "compliance": "컴플라이언스 기준",
         "malware": "바이러스 검사",
         "vuln": "취약점 스캔",
         "secrets": "시크릿 관리"

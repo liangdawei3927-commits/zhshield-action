@@ -271,26 +271,31 @@ export function scanSourceEvidence(target: string): SourceEvidence {
   return evidence;
 }
 
-/** `.github/workflows` 下的签名/来源校验命令（yml 不在源码扩展名内，单独扫） */
+/** workflow 文件扩展名：yml/yaml 不在 SOURCE_EXTS 内，单独遍历 */
+const WORKFLOW_EXTS = new Set(['.yml', '.yaml']);
+
+/**
+ * `.github/workflows` 下的签名/来源校验命令（yml 不在源码扩展名内，单独扫）。
+ *
+ * 递归取任意层级的 `.github/workflows`：源码与依赖扫描都会下探进内嵌的独立仓库
+ * （容器目录下探 / walkFiles 同一约定），CI 证据必须同范围——否则同一内嵌仓库会
+ * 出现「源码算数、CI 不算数」的判定分叉，把已存在的来源证明误报成缺失。
+ */
 function scanWorkflowEvidence(target: string): SourceHit[] {
-  const dir = path.join(target, '.github', 'workflows');
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+  const files: string[] = [];
+  walkFiles(target, 0, files, WORKFLOW_EXTS);
   const hits: SourceHit[] = [];
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!/\.ya?ml$/i.test(entry.name)) continue;
+  for (const file of files) {
+    const rel = path.relative(target, file);
+    // 只认「某个 .github/workflows 目录下的 yml」，排除 .github 下的其他配置
+    const tail = path.dirname(rel).split(path.sep).slice(-2);
+    if (tail[0] !== '.github' || tail[1] !== 'workflows') continue;
     let content: string;
     try {
-      content = fs.readFileSync(path.join(dir, entry.name), 'utf-8');
+      content = fs.readFileSync(file, 'utf-8');
     } catch {
       continue;
     }
-    const rel = path.relative(target, path.join(dir, entry.name));
     content.split('\n').forEach((line, idx) => {
       if (SIGNATURE_VERIFICATION_RE.test(line)) {
         hits.push(hitOf(rel, idx + 1, line.trim()));

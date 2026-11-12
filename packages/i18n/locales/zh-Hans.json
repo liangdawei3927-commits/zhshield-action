@@ -888,7 +888,8 @@
       "view": "查看详情"
     },
     "reportShell": {
-      "backHome": "返回主页"
+      "backHome": "返回主页",
+      "scannedAt": "检查时间 {{time}}"
     },
     "backup": {
       "backingUp": "备份中...",
@@ -1727,6 +1728,7 @@
       "source": "安全",
       "summary": "{{vulns}} 项漏洞 · {{malware}} 处恶意代码",
       "tab": {
+        "compliance": "合规基线",
         "malware": "病毒查杀",
         "secrets": "密钥管理",
         "vuln": "漏洞扫描"

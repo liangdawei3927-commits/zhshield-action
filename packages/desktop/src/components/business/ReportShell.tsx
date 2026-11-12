@@ -54,6 +54,11 @@ export interface ReportShellProps {
   historyDomain?: string;
   /** 外壳 className 变体 */
   containerClassName?: string;
+  /**
+   * 顶行是否显示「检查时间」小字（默认 true）。
+   * 安全页已在分类标签行右侧显示，传 false 避免同一时间出现两次。
+   */
+  showScannedAt?: boolean;
 }
 
 /** 顶行左上角返回主页按钮 */
@@ -83,17 +88,20 @@ function ReportBackHomeButton({ onBackHome, label }: { onBackHome: () => void; l
   );
 }
 
-/** 顶行：icon + 标题块（标题 + 评分）+ ml-auto 操作按钮 */
+/** 顶行：icon + 标题块（标题 + 评分）+ 检查时间 + ml-auto 操作按钮 */
 function ReportHeaderRow({
   icon,
   title,
   score,
   action,
+  scannedAtLabel,
 }: {
   icon: ReactNode;
   title: string;
   score: ReactNode;
   action: ReactNode;
+  /** 「检查时间 …」小字；无有效时间时不渲染 */
+  scannedAtLabel?: string | null;
 }) {
   return (
     <div className="flex items-center gap-4 mb-6">
@@ -102,9 +110,51 @@ function ReportHeaderRow({
         <h1 className="text-2xl font-bold text-zh-ink">{title}</h1>
         <div className="mt-2">{score}</div>
       </div>
-      <div className="ml-auto flex items-center gap-4 shrink-0">{action}</div>
+      <div className="ml-auto flex items-center gap-4 shrink-0">
+        {scannedAtLabel ? (
+          <span className="text-[11px] whitespace-nowrap text-zh-muted">{scannedAtLabel}</span>
+        ) : null}
+        {action}
+      </div>
     </div>
   );
+}
+
+/**
+ * 各域报告的时间字段不统一：`metadata.timestamp`（巡检/门禁/安全/性能）、
+ * `timestamp`（垃圾/重构/备份）、`generatedAt`（依赖/技术债）、`checkedAt`（CVE）。
+ * 取到有效日期才算数，拿不准就不显示，避免把“无效时间”画成检查时间。
+ */
+function pickScannedAt(value: unknown): Date | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as {
+    metadata?: { timestamp?: unknown };
+    timestamp?: unknown;
+    generatedAt?: unknown;
+    checkedAt?: unknown;
+  };
+  const candidate =
+    record.metadata?.timestamp ?? record.timestamp ?? record.generatedAt ?? record.checkedAt;
+  const date =
+    candidate instanceof Date
+      ? candidate
+      : typeof candidate === 'string'
+        ? new Date(candidate)
+        : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+/** 哨兵传的是事件数组：取最近一条的时间；其他域直接读报告对象 */
+function resolveScannedAt(refreshKey: unknown): Date | null {
+  if (Array.isArray(refreshKey)) {
+    let latest: Date | null = null;
+    for (const item of refreshKey) {
+      const date = pickScannedAt(item);
+      if (date && (!latest || date.getTime() > latest.getTime())) latest = date;
+    }
+    return latest;
+  }
+  return pickScannedAt(refreshKey);
 }
 
 /** 统计卡行：点击后展开 detail 明细（无 detail 的卡不响应点击） */
@@ -200,8 +250,17 @@ export function ReportShell({
   children,
   historyDomain,
   containerClassName = 'h-full w-full bg-zh-bg overflow-auto',
+  showScannedAt = true,
 }: ReportShellProps) {
   const t = useT();
+  // 检查时间放在顶行右侧、操作按钮左边：所有分类详情页同一位置
+  const scannedAt = showScannedAt ? resolveScannedAt(refreshKey) : null;
+  const scannedAtLabel = scannedAt
+    ? t('page.reportShell.scannedAt', {
+        defaultValue: '检查时间 {{time}}',
+        time: scannedAt.toLocaleString(),
+      })
+    : null;
   const [expandedStat, setExpandedStat] = useState<ReportStatCard | null>(null);
   // 分类为 0 时卡片会消失：已展开的那张必须同步清掉，否则会留下空明细面板。
   const visibleStat =
@@ -233,6 +292,7 @@ export function ReportShell({
             )
           }
           action={action}
+          scannedAtLabel={scannedAtLabel}
         />
         <ReportStatsRow
           stats={stats}

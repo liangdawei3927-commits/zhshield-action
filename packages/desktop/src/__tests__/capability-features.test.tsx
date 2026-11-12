@@ -175,9 +175,9 @@ describe('能力清单渲染 — 规划中清单（未实现，仅告知，不�
     expect(ids).toContain('performance.timer');
   });
 
-  it('安全域 planned 区分「规范检查」(planned) 与「依赖检查」(deprecated 已移交)', () => {
+  it('安全域「规范检查」与「依赖检查」均为已移交', () => {
     const byId = Object.fromEntries(buildPlannedCapabilities('security').map((p) => [p.id, p]));
-    expect(byId['security.standard']?.status).toBe('planned');
+    expect(byId['security.standard']?.status).toBe('deprecated');
     expect(byId['security.dependency']?.status).toBe('deprecated');
   });
 });

@@ -3,10 +3,8 @@ import { useT } from '../i18n';
 import {
   SEVERITY_CONFIG,
   MALWARE_TYPE_LABEL,
-  SECURITY_PLANNED_DESCRIPTIONS,
   type SecurityIssue,
 } from './security-logic';
-import { buildPlannedCapabilities } from '../components/business/capability-features';
 import { ResultCard } from '../components/ui/ResultCard';
 import { CopyToAiButton } from '../components/ui/CopyToAiButton';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
@@ -148,30 +146,3 @@ export function MalwarePanel({
   );
 }
 
-/**
- * 报告页的「本页不覆盖的能力」：读结论时也要看得见边界。
- *
- * 空态那行灰字只在「没扫过」时出现；用户在报告页读结论时更容易误以为
- * “这页查得全”。同一条能力边界（规划中 / 已移交）始终可发现，但只用两行
- * 小字，不与扫描结果抢注意力。清单由能力注册表驱动，不手写第二份。
- */
-export function SecurityNotCovered() {
-  const planned = buildPlannedCapabilities('security', SECURITY_PLANNED_DESCRIPTIONS);
-  if (planned.length === 0) return null;
-  return (
-    <section className="mt-5" data-testid="security-not-covered">
-      <p className="text-xs font-medium text-zh-muted">本页不覆盖的能力</p>
-      <ul className="mt-1.5 flex flex-col gap-1">
-        {planned.map((item) => (
-          <li key={item.id} className="flex items-start gap-2 text-[11px] text-zh-muted">
-            <span className="shrink-0 rounded bg-zh-panel px-1.5 py-0.5">
-              {item.status === 'deprecated' ? '已移交' : '规划中'}
-            </span>
-            <span className="shrink-0 font-medium text-zh-ink-2/70">{item.title}</span>
-            <span className="flex-1 min-w-0 text-zh-muted/80">{item.desc}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}

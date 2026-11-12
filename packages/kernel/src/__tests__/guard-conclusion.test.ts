@@ -131,6 +131,46 @@ describe('门禁纯判定 — 工具调用归零、只读各域结论', () => {
     expect(eval0.message).toContain('security 域');
   });
 
+  it('多个 scanner 读到同一域结论时只计一次（不虚增问题数）', async () => {
+    // 2026-11-12 实测：guard.block.external.security-scan 的 scanners 为
+    // semgrep + gitleaks，二者 Owner 都是 security；结论模式下每个 scanner 都会
+    // 读到同一条结论，直接累加会把「1 个问题」报成「2 个问题」。
+    const counter = { calls: 0 };
+    const { registry, engine } = buildEngine(counter);
+    registry.register(
+      makeRule({
+        id: 'guard.block.external.security-scan',
+        domain: 'guard',
+        severity: 'error',
+        content: { scanners: ['semgrep', 'gitleaks'] },
+      }),
+    );
+
+    const issue = {
+      ruleId: 'security.scan.internal.header-config',
+      severity: 'error' as const,
+      file: 'src/app.ts',
+      line: 63,
+      message: 'header-hsts: HSTS maxAge 低于 180 天',
+    };
+    const report = await engine.evaluateRules({
+      repoRoot: '/tmp',
+      conclusions: {
+        security: {
+          domain: 'security',
+          generatedAt: '2026-11-12T01:25:24.858Z',
+          issues: [issue],
+        },
+      },
+    });
+
+    const eval0 = report.evaluations[0];
+    expect(counter.calls).toBe(0);
+    expect(eval0.status).toBe('failed');
+    expect(eval0.violations).toHaveLength(1);
+    expect(eval0.message).toContain('1 个问题');
+  });
+
   it('新快照不打过期标（只回显距今年龄）', async () => {
     const counter = { calls: 0 };
     const { registry, engine } = buildEngine(counter);

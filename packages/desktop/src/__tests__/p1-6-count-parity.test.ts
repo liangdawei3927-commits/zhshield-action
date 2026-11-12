@@ -75,6 +75,26 @@ describe('P1-6 安全域双路合并（persistSecurityDomainEntries）', () => {
     }
   });
 
+  it('合并保留另一类旧条目时，快照时间取较旧的一份（旧结论不得伪装成刚刚检测）', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-p1-6-sec4-'));
+    const old = '2026-11-12T01:25:24.858Z';
+    const fresh = '2026-11-12T07:39:19.177Z';
+    try {
+      await persistSecurityDomainEntries(project, [vulnEntry('vuln/CVE-1')], 'vuln', {
+        generatedAt: old,
+      });
+      // 密钥扫描发生在 6 小时后，但漏洞条目仍是旧的：快照时间必须停在旧的那一份，
+      // 否则门禁会把 6 小时前（乃至更早）的漏洞结论读成「刚刚检测」。
+      await persistSecurityDomainEntries(project, [secretEntry('k1')], 'secret', {
+        generatedAt: fresh,
+      });
+      const snap = await readDomainSnapshot(project, 'security');
+      expect(snap!.generatedAt).toBe(old);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('重复写同一类：同类旧条目被覆盖，不出现双份', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-p1-6-sec3-'));
     try {

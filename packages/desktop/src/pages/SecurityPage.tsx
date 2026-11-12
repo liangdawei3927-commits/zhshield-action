@@ -14,6 +14,8 @@ import { ScanEmptyStateBranch } from '../components/business/ScanEmptyState';
 import { NavGlyph } from '../components/business/page-glyph';
 import type { SecretReportData, SecurityScanReportData } from '../types/electron';
 import { useComplianceReport } from '../compliance/use-compliance-report';
+import { ComplianceBaselineSection } from './compliance-parts';
+import type { ComplianceReport } from '../compliance/baseline';
 import {
   SecurityReportView,
   renderFindingsPanel,
@@ -30,13 +32,15 @@ interface SecurityPageProps {
 interface SecurityTabContentProps extends SecurityReportCopyProps, SecuritySecretsProps {
   report: SecurityScanReportData;
   secretsReport: SecretReportData | null;
+  compliance: ComplianceReport;
   tab: SecurityTab;
 }
 
-/** 当前分类的明细面板（漏洞 / 恶意代码 / 密钥） */
+/** 当前视图的明细面板（漏洞 / 恶意代码 / 密钥 / 合规基线） */
 function SecurityTabContent({
   report,
   secretsReport,
+  compliance,
   tab,
   copyToAi,
   copyAllToAi,
@@ -54,6 +58,9 @@ function SecurityTabContent({
   }
   if (tab === 'malware') {
     return renderMalwarePanel(report.malware, copyMalwareToAi, copyMalwareAllToAi);
+  }
+  if (tab === 'compliance') {
+    return <ComplianceBaselineSection report={compliance} />;
   }
   if (secretsReport) {
     return (
@@ -283,7 +290,8 @@ function securityReportViewProps(
   return {
     projectPath,
     report,
-    compliance: state.compliance,
+    // 顶部总览要覆盖三类：密钥只计 active（轮换中/已轮换/已忽略不算故障）
+    secretsReport: state.detailSecretsReport,
     loading: state.loading,
     progress: state.progress,
     statusMessage: state.statusMessage,
@@ -304,16 +312,18 @@ function securityReportViewProps(
   };
 }
 
-/** 报告正文：当前分类（漏洞 / 恶意代码 / 密钥）的明细面板 */
+/** 报告正文：当前视图（漏洞 / 恶意代码 / 密钥 / 合规基线）的明细面板 */
 function securityTabContent(
   state: SecurityPageState,
   report: NonNullable<SecurityPageState['detailReport']>,
   t: SecurityTranslate,
 ) {
+  const { compliance } = state;
   return (
     <SecurityTabContent
       report={report}
       secretsReport={state.detailSecretsReport}
+      compliance={compliance}
       tab={state.tab}
       copyToAi={state.copyToAi}
       copyAllToAi={state.copyAllToAi}
@@ -384,8 +394,6 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
           <SecurityEmptyState
             {...empty}
             scanError={state.scanError}
-            compliance={state.compliance}
-            onOpenCompliance={openDetail}
           />
         )}
       />

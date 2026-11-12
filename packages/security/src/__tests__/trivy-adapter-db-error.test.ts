@@ -13,12 +13,14 @@ const state = vi.hoisted(() => ({
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
-    const cb = args.at(-1) as (err: Error, result?: { stdout: string; stderr: string }) => void;
+    // 原生回调形状 `(err, stdout, stderr)`：production 的 execFileAsync 按此取值，
+    // promisify 形状会把它当 stdout 对象、stderr 覆盖成 undefined。
+    const cb = args.at(-1) as (err: Error, stdout: string, stderr: string) => void;
     const err = Object.assign(new Error(state.mockError.message || 'Command failed'), {
       code: state.mockError.code,
       stderr: state.mockError.stderr,
     });
-    cb(err, { stdout: '', stderr: state.mockError.stderr });
+    cb(err, '', state.mockError.stderr);
   }),
 }));
 

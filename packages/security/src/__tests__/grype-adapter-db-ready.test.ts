@@ -16,23 +16,21 @@ const state = vi.hoisted(() => ({
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
+    // 原生回调形状 `(err, stdout, stderr)`：production 的 execFileAsync 按此取值。
     const [, cmdArgs] = args as [string, string[]];
-    const cb = args.at(-1) as (
-      err: Error | null,
-      result?: { stdout: string; stderr: string },
-    ) => void;
+    const cb = args.at(-1) as (err: Error | null, stdout: string, stderr: string) => void;
     if (cmdArgs?.includes('status')) {
-      if (state.statusFails) cb(new Error('spawn failed'));
-      else cb(null, { stdout: state.dbStatusOutput, stderr: '' });
+      if (state.statusFails) cb(new Error('spawn failed'), '', '');
+      else cb(null, state.dbStatusOutput, '');
       return;
     }
     if (cmdArgs?.includes('update')) {
       state.dbUpdateCalls += 1;
-      cb(null, { stdout: '', stderr: '' });
+      cb(null, '', '');
       return;
     }
     state.scanCalls += 1;
-    cb(null, { stdout: JSON.stringify({ matches: [] }), stderr: '' });
+    cb(null, JSON.stringify({ matches: [] }), '');
   }),
 }));
 

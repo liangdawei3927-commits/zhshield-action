@@ -6,11 +6,10 @@ const state = vi.hoisted(() => ({ mockStdout: '', existsHighSeverity: false }));
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((...args: unknown[]) => {
-    const cb = args.at(-1) as (
-      err: Error | null,
-      result: { stdout: string; stderr: string },
-    ) => void;
-    cb(null, { stdout: state.mockStdout, stderr: '' });
+    // 原生回调形状 `(err, stdout, stderr)`：production 的 execFileAsync 按此取值，
+    // promisify 形状会让 stdout 变成对象、扫描结果被当成空输出。
+    const cb = args.at(-1) as (err: Error | null, stdout: string, stderr: string) => void;
+    cb(null, state.mockStdout, '');
   }),
 }));
 

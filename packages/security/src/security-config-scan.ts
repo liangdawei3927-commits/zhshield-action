@@ -106,8 +106,13 @@ const COOKIE_SECURE_RE = /secure\s*:\s*true/i;
 const COOKIE_SAME_SITE_RE = /sameSite\s*:\s*(?:true|['"](?:lax|strict|none)['"])/i;
 const TOKEN_EXPIRY_RE = /expiresIn\s*:/i;
 const PASSWORD_HASHING_RE = /bcrypt(?:js)?\.hash|argon2\.hash|scryptSync?\s*\(/i;
+/**
+ * 密钥材料使用：加密/解密、密钥对生成、HMAC、签名/验签。
+ * `timingSafeEqual` 刻意不计入——它只是常量时间比较（比对令牌/摘要），
+ * 不持有可轮换的密钥；计进来会把「仅做安全比较」的项目误判为需要密钥轮换。
+ */
 const CRYPTO_USAGE_RE =
-  /(?:createCipheriv|createDecipheriv|generateKeyPair|createHmac|createSign|createVerify|timingSafeEqual)\s*\(/i;
+  /(?:createCipheriv|createDecipheriv|generateKeyPair|createHmac|createSign|createVerify)\s*\(/i;
 
 const AUDIT_LOG_RE =
   /(?:auditLog|securityAudit|audit\.(?:log|record|event|write)|logSecurityEvent|logger\.(?:info|warn|error)\s*\([^)\n]*(?:auth|login|logout|permission|forbidden|unauthori[sz]ed|denied|privilege))/i;
@@ -156,6 +161,9 @@ function hitOf(rel: string, lineNo: number, trim: string): SourceHit {
 
 /** HSTS maxAge 解析：`max-age=...` / `maxAge: ...`，无值不算弱配置 */
 function isWeakHsts(line: string): boolean {
+  // 必须先确认这一行真的在配置 HSTS：Set-Cookie 的 `Max-Age=0`（删 Cookie）
+  // 也匹配 maxAge 正则，2026-11 实测在管理页登出逻辑上误报为「HSTS 有效期 0」。
+  if (!HSTS_CONFIGURED_RE.test(line)) return false;
   const match = HSTS_MAX_AGE_RE.exec(line);
   if (!match) return false;
   const seconds = Number(match[1] ?? match[2]);

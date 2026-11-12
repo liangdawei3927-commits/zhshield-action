@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 0463ca251e94537d
+// @zh-src-hash: 0c685a44f7873526
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -502998,6 +502998,7 @@ function hitOf(rel, lineNo, trim) {
   return { file: rel, line: lineNo, evidence: trim.slice(0, 120) };
 }
 function isWeakHsts(line) {
+  if (!HSTS_CONFIGURED_RE.test(line)) return false;
   const match = HSTS_MAX_AGE_RE.exec(line);
   if (!match) return false;
   const seconds = Number(match[1] ?? match[2]);
@@ -503150,7 +503151,7 @@ var init_security_config_scan = __esm({
     COOKIE_SAME_SITE_RE = /sameSite\s*:\s*(?:true|['"](?:lax|strict|none)['"])/i;
     TOKEN_EXPIRY_RE = /expiresIn\s*:/i;
     PASSWORD_HASHING_RE = /bcrypt(?:js)?\.hash|argon2\.hash|scryptSync?\s*\(/i;
-    CRYPTO_USAGE_RE = /(?:createCipheriv|createDecipheriv|generateKeyPair|createHmac|createSign|createVerify|timingSafeEqual)\s*\(/i;
+    CRYPTO_USAGE_RE = /(?:createCipheriv|createDecipheriv|generateKeyPair|createHmac|createSign|createVerify)\s*\(/i;
     AUDIT_LOG_RE = /(?:auditLog|securityAudit|audit\.(?:log|record|event|write)|logSecurityEvent|logger\.(?:info|warn|error)\s*\([^)\n]*(?:auth|login|logout|permission|forbidden|unauthori[sz]ed|denied|privilege))/i;
     KEY_ROTATION_RE = /(?:rotate(?:Key|Keys)|keyRotation|rotationInterval|keyVersion|keyId|generateDataKey|reEncrypt|rotate-secret)/i;
     KEY_MANAGEMENT_RE = /(?:@aws-sdk\/client-kms|@aws-sdk\/client-secrets-manager|node-vault|@azure\/keyvault|@google-cloud\/kms|keytar|vault\.|secretsManager|kms\.)/i;

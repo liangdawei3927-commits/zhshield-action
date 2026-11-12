@@ -92,6 +92,14 @@ describe('SecurityCheckEngine — 安全配置类检测', () => {
       expect(hsts.message).toContain('180 天');
     });
 
+    it('Set-Cookie 的 Max-Age=0 不算 HSTS 弱配置（删 Cookie ≠ 有效期 0）', async () => {
+      writeDeps({ express: '4.0.0', helmet: '7.0.0' });
+      write('src/app.ts', 'app.use(helmet());');
+      write('src/logout.ts', "res.setHeader('Set-Cookie', 'zh_admin=; HttpOnly; Max-Age=0');");
+      const hsts = await runCheck('header-hsts');
+      expect(hsts.status).toBe('passed');
+    });
+
     it('显式头配置取值达标（max-age=31536000）→ 通过', async () => {
       writeDeps({ express: '4.0.0' });
       write('src/app.ts', "res.setHeader('Strict-Transport-Security', 'max-age=31536000');");
@@ -159,6 +167,13 @@ describe('SecurityCheckEngine — 安全配置类检测', () => {
   describe('密钥生命周期', () => {
     it('项目不使用密钥材料 → not-applicable', async () => {
       writeDeps({ 'left-pad': '1.0.0' });
+      const rotation = await runCheck('key-rotation-mechanism');
+      expect(rotation.applicability).toBe('not-applicable');
+    });
+
+    it('只有 timingSafeEqual（常量时间比较）→ 不算密钥材料，判 not-applicable', async () => {
+      writeDeps({ 'left-pad': '1.0.0' });
+      write('src/token.ts', 'return crypto.timingSafeEqual(left, right);');
       const rotation = await runCheck('key-rotation-mechanism');
       expect(rotation.applicability).toBe('not-applicable');
     });

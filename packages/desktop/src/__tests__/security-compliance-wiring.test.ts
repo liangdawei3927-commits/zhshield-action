@@ -29,6 +29,11 @@ describe('合规基线归安全中心', () => {
     expect(reportParts).toContain('<ComplianceBaselineSection');
   });
 
+  it('主页空态把合规摘要与详情入口接上', () => {
+    expect(securityPage).toContain('compliance={state.compliance}');
+    expect(securityPage).toContain('onOpenCompliance={openDetail}');
+  });
+
   it('项目体检不再渲染合规基线，也不消费安全域证据', () => {
     expect(inspectPage).not.toContain('ComplianceBaselineSection');
     expect(inspectPage).not.toContain('evaluateComplianceBaseline');

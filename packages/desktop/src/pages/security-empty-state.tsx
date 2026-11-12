@@ -8,6 +8,8 @@ import {
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
 import { SECURITY_PLANNED_DESCRIPTIONS } from './security-logic';
+import type { ComplianceReport } from '../compliance/baseline';
+import { ComplianceSummaryCard } from './compliance-parts';
 
 /**
  * 能力图标表（按能力 id 绑定）：注册表决定**渲染哪几项**，图标只负责视觉。
@@ -101,15 +103,38 @@ function SecurityScanErrorNotice({ error }: { error: string }) {
 }
 
 /** 空态：引导深度扫描（props 即 ScanEmptyStateBranch 的共享契约，由 SecurityPage 展开传递） */
-export function SecurityEmptyState(props: ScanEmptyStateParams & { scanError?: string | null }) {
+export function SecurityEmptyState(
+  props: ScanEmptyStateParams & {
+    scanError?: string | null;
+    /** 合规基线摘要：只在已有证据时显示，首次进入不渲染空结论 */
+    compliance?: ComplianceReport;
+    onOpenCompliance?: () => void;
+  },
+) {
   const t = useT();
+  const covered = props.compliance
+    ? props.compliance.summary.pass + props.compliance.summary.fail
+    : 0;
+  const showCompliance = props.compliance !== undefined && covered > 0;
+  const extra =
+    props.scanError || showCompliance ? (
+      <>
+        {props.scanError ? <SecurityScanErrorNotice error={props.scanError} /> : null}
+        {showCompliance && props.compliance ? (
+          <ComplianceSummaryCard
+            report={props.compliance}
+            onOpen={props.onOpenCompliance}
+          />
+        ) : null}
+      </>
+    ) : undefined;
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
       domain="security"
       title={t('page.security.empty.title')}
       subtitle={t('page.security.empty.subtitle')}
-      extra={props.scanError ? <SecurityScanErrorNotice error={props.scanError} /> : undefined}
+      extra={extra}
       features={buildCapabilityFeatures('security', {
         icons: SECURITY_CAPABILITY_ICONS,
         descriptions: {

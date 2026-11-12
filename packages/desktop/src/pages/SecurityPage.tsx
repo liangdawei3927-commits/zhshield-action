@@ -380,7 +380,14 @@ export function SecurityPage({ projectPath }: SecurityPageProps) {
         onCancel={state.cancel}
         stopping={state.stopping}
         onScan={state.startScan}
-        render={(empty) => <SecurityEmptyState {...empty} scanError={state.scanError} />}
+        render={(empty) => (
+          <SecurityEmptyState
+            {...empty}
+            scanError={state.scanError}
+            compliance={state.compliance}
+            onOpenCompliance={openDetail}
+          />
+        )}
       />
     </DetailEntryProvider>
   );

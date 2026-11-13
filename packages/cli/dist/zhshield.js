@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: fe5b68f8f1ab3c24
+// @zh-src-hash: a692b6cf81bec3a8
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -271,11 +271,11 @@ var init_capability_registry = __esm({
         id: "security.standard",
         domain: "security",
         label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5",
-        status: "planned",
+        status: "deprecated",
         implementedBy: [],
-        // 合规基线已拆为 security.compliance（本页正在展示）；本项只剩「编码规范」没有实现，
-        // 标签不能再带「合规基线」，否则「本页不覆盖」清单会和页面上方的合规区自相矛盾。
-        note: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5\u4ECD\u65E0\u5B9E\u73B0\uFF1B\u5408\u89C4\u57FA\u7EBF\u89C6\u56FE\u5DF2\u62C6\u4E3A\u72EC\u7ACB\u80FD\u529B security.compliance\u3002"
+        // 代码规范检查按 C1 唯一归属属项目体检（ESLint / 类型安全）；安全侧不再单列，
+        // 安全编码规范的 ASVS 条款由合规基线 security.compliance 呈现。
+        note: "\u4EE3\u7801\u89C4\u8303\u68C0\u67E5\u5F52\u9879\u76EE\u4F53\u68C0\uFF08ESLint / \u7C7B\u578B\u5B89\u5168\uFF09\uFF1B\u5B89\u5168\u7F16\u7801\u89C4\u8303\u7684 ASVS \u6761\u6B3E\u7531\u5408\u89C4\u57FA\u7EBF security.compliance \u5448\u73B0\uFF0C\u5B89\u5168\u57DF\u4E0D\u518D\u5355\u5217\u3002"
       },
       {
         id: "security.dependency",
@@ -5427,7 +5427,8 @@ var init_zh_Hans = __esm({
           view: "\u67E5\u770B\u8BE6\u60C5"
         },
         reportShell: {
-          backHome: "\u8FD4\u56DE\u4E3B\u9875"
+          backHome: "\u8FD4\u56DE\u4E3B\u9875",
+          scannedAt: "\u68C0\u67E5\u65F6\u95F4 {{time}}"
         },
         backup: {
           backingUp: "\u5907\u4EFD\u4E2D...",
@@ -5728,6 +5729,9 @@ var init_zh_Hans = __esm({
           selectAll: "\u5168\u9009",
           selectedCount: "\u5DF2\u9009 {{count}} \u9879",
           skippedNotice: "{{count}} \u9879\u68C0\u6D4B\u672A\u6267\u884C\uFF0C\u7ED3\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A",
+          notDetected: "\u672A\u68C0\u6D4B",
+          notDetectedHint: "\u672C\u7EF4\u5EA6\u672A\u6267\u884C\uFF1A{{reason}}\u3002\u672A\u68C0\u6D4B \u2260 \u6CA1\u6709\u95EE\u9898\uFF0C\u4FEE\u590D\u5DE5\u5177\u6216\u91CD\u65B0\u626B\u63CF\u540E\u53EF\u83B7\u5F97\u7ED3\u679C\u3002",
+          notDetectedNoProducer: "\u672C\u57DF\u672A\u767B\u8BB0\u8986\u76D6\u8BE5\u7C7B\u578B\u7684\u68C0\u6D4B\u9879",
           source: "\u5783\u573E\u6E05\u7406",
           startScan: "\u5F00\u59CB\u626B\u63CF",
           stats: {
@@ -6266,6 +6270,7 @@ var init_zh_Hans = __esm({
           source: "\u5B89\u5168",
           summary: "{{vulns}} \u9879\u6F0F\u6D1E \xB7 {{malware}} \u5904\u6076\u610F\u4EE3\u7801",
           tab: {
+            compliance: "\u5408\u89C4\u57FA\u7EBF",
             malware: "\u75C5\u6BD2\u67E5\u6740",
             secrets: "\u5BC6\u94A5\u7BA1\u7406",
             vuln: "\u6F0F\u6D1E\u626B\u63CF"
@@ -7739,7 +7744,8 @@ var init_zh_Hant = __esm({
           view: "\u67E5\u770B\u8A73\u60C5"
         },
         reportShell: {
-          backHome: "\u8FD4\u56DE\u4E3B\u9801"
+          backHome: "\u8FD4\u56DE\u4E3B\u9801",
+          scannedAt: "\u6AA2\u67E5\u6642\u9593 {{time}}"
         },
         backup: {
           backingUp: "\u5099\u4EFD\u4E2D...",
@@ -8040,6 +8046,9 @@ var init_zh_Hant = __esm({
           selectAll: "\u5168\u9078",
           selectedCount: "\u5DF2\u9078 {{count}} \u9805",
           skippedNotice: "{{count}} \u9805\u6AA2\u6E2C\u672A\u57F7\u884C\uFF0C\u7D50\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A",
+          notDetected: "\u672A\u6AA2\u6E2C",
+          notDetectedHint: "\u672C\u7DAD\u5EA6\u672A\u57F7\u884C\uFF1A{{reason}}\u3002\u672A\u6AA2\u6E2C \u2260 \u6C92\u6709\u554F\u984C\uFF0C\u4FEE\u5FA9\u5DE5\u5177\u6216\u91CD\u65B0\u6383\u63CF\u5F8C\u53EF\u7372\u5F97\u7D50\u679C\u3002",
+          notDetectedNoProducer: "\u672C\u57DF\u672A\u767B\u8A18\u6DB5\u84CB\u8A72\u985E\u578B\u7684\u6AA2\u6E2C\u9805",
           source: "\u5783\u573E\u6E05\u7406",
           startScan: "\u958B\u59CB\u6383\u63CF",
           stats: {
@@ -8500,6 +8509,7 @@ var init_zh_Hant = __esm({
           source: "\u5B89\u5168",
           summary: "{{vulns}} \u9805\u6F0F\u6D1E \xB7 {{malware}} \u8655\u60E1\u610F\u7A0B\u5F0F\u78BC",
           tab: {
+            compliance: "\u5408\u898F\u57FA\u7DDA",
             malware: "\u75C5\u6BD2\u67E5\u6BBA",
             vuln: "\u6F0F\u6D1E\u6383\u63CF",
             secrets: "\u91D1\u9470\u7BA1\u7406"
@@ -10051,7 +10061,8 @@ var init_en = __esm({
           view: "View details"
         },
         reportShell: {
-          backHome: "Back to Home"
+          backHome: "Back to Home",
+          scannedAt: "Checked at {{time}}"
         },
         backup: {
           backingUp: "Backing up...",
@@ -10352,6 +10363,9 @@ var init_en = __esm({
           selectAll: "Select all",
           selectedCount: "{{count}} selected",
           skippedNotice: "{{count}} check(s) did not run \u2014 results may be incomplete:",
+          notDetected: "Not checked",
+          notDetectedHint: "This dimension did not run: {{reason}}. Not checked \u2260 no problems \u2014 fix the tool or rescan to get a result.",
+          notDetectedNoProducer: "No check in this domain covers this type",
           source: "Garbage cleanup",
           startScan: "Start scan",
           stats: {
@@ -10890,6 +10904,7 @@ var init_en = __esm({
           source: "Security",
           summary: "{{vulns}} vulnerabilities \xB7 {{malware}} malicious code",
           tab: {
+            compliance: "Compliance baseline",
             malware: "Malware scan",
             secrets: "Secret management",
             vuln: "Vulnerability scan"
@@ -12363,7 +12378,8 @@ var init_ko = __esm({
           view: "\uC0C1\uC138 \uBCF4\uAE30"
         },
         reportShell: {
-          backHome: "\uD648\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"
+          backHome: "\uD648\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30",
+          scannedAt: "\uAC80\uC0AC \uC2DC\uAC04 {{time}}"
         },
         backup: {
           backingUp: "\uBC31\uC5C5 \uC911...",
@@ -12664,6 +12680,9 @@ var init_ko = __esm({
           selectAll: "\uC804\uCCB4 \uC120\uD0DD",
           selectedCount: "\uC120\uD0DD\uB41C \uD56D\uBAA9 {{count}}\uAC1C",
           skippedNotice: "{{count}}\uAC1C \uAC80\uC0AC\uAC00 \uC2E4\uD589\uB418\uC9C0 \uC54A\uC544 \uACB0\uACFC\uAC00 \uBD88\uC644\uC804\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4:",
+          notDetected: "\uBBF8\uAC80\uC0AC",
+          notDetectedHint: "\uC774 \uD56D\uBAA9\uC740 \uC2E4\uD589\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4: {{reason}}. \uBBF8\uAC80\uC0AC \u2260 \uBB38\uC81C \uC5C6\uC74C \u2014 \uB3C4\uAD6C\uB97C \uBCF5\uAD6C\uD558\uAC70\uB098 \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694.",
+          notDetectedNoProducer: "\uC774 \uC601\uC5ED\uC5D0 \uC774 \uC720\uD615\uC744 \uB300\uC0C1\uC73C\uB85C \uD558\uB294 \uAC80\uC0AC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4",
           source: "\uC4F0\uB808\uAE30 \uC815\uB9AC",
           startScan: "\uC2A4\uCE94 \uC2DC\uC791",
           stats: {
@@ -13124,6 +13143,7 @@ var init_ko = __esm({
           source: "\uBCF4\uC548",
           summary: "\uCDE8\uC57D\uC810 {{vulns}}\uAC74 \xB7 \uC545\uC131 \uCF54\uB4DC {{malware}}\uACF3",
           tab: {
+            compliance: "\uCEF4\uD50C\uB77C\uC774\uC5B8\uC2A4 \uAE30\uC900",
             malware: "\uBC14\uC774\uB7EC\uC2A4 \uAC80\uC0AC",
             vuln: "\uCDE8\uC57D\uC810 \uC2A4\uCE94",
             secrets: "\uC2DC\uD06C\uB9BF \uAD00\uB9AC"
@@ -14675,7 +14695,8 @@ var init_ja = __esm({
           view: "\u8A73\u7D30\u3092\u898B\u308B"
         },
         reportShell: {
-          backHome: "\u30DB\u30FC\u30E0\u306B\u623B\u308B"
+          backHome: "\u30DB\u30FC\u30E0\u306B\u623B\u308B",
+          scannedAt: "\u30C1\u30A7\u30C3\u30AF\u65E5\u6642 {{time}}"
         },
         backup: {
           backingUp: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u4E2D...",
@@ -14976,6 +14997,9 @@ var init_ja = __esm({
           selectAll: "\u3059\u3079\u3066\u9078\u629E",
           selectedCount: "{{count}} \u9805\u76EE\u3092\u9078\u629E\u4E2D",
           skippedNotice: "{{count}} \u4EF6\u306E\u30C1\u30A7\u30C3\u30AF\u304C\u5B9F\u884C\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002\u7D50\u679C\u304C\u4E0D\u5B8C\u5168\u306A\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059:",
+          notDetected: "\u672A\u30C1\u30A7\u30C3\u30AF",
+          notDetectedHint: "\u3053\u306E\u9805\u76EE\u306F\u5B9F\u884C\u3055\u308C\u3066\u3044\u307E\u305B\u3093: {{reason}}\u3002\u672A\u30C1\u30A7\u30C3\u30AF \u2260 \u554F\u984C\u306A\u3057\u3002\u30C4\u30FC\u30EB\u3092\u4FEE\u5FA9\u3059\u308B\u304B\u518D\u30B9\u30AD\u30E3\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+          notDetectedNoProducer: "\u3053\u306E\u9818\u57DF\u306B\u306F\u3053\u306E\u7A2E\u5225\u3092\u5BFE\u8C61\u3068\u3059\u308B\u30C1\u30A7\u30C3\u30AF\u304C\u3042\u308A\u307E\u305B\u3093",
           source: "\u30B4\u30DF\u6E05\u6383",
           startScan: "\u30B9\u30AD\u30E3\u30F3\u3092\u958B\u59CB",
           stats: {
@@ -15436,6 +15460,7 @@ var init_ja = __esm({
           source: "\u30BB\u30AD\u30E5\u30EA\u30C6\u30A3",
           summary: "\u8106\u5F31\u6027 {{vulns}} \u4EF6 \xB7 \u60AA\u610F\u306E\u3042\u308B\u30B3\u30FC\u30C9 {{malware}} \u7B87\u6240",
           tab: {
+            compliance: "\u30B3\u30F3\u30D7\u30E9\u30A4\u30A2\u30F3\u30B9\u57FA\u6E96",
             malware: "\u30A6\u30A4\u30EB\u30B9\u99C6\u9664",
             vuln: "\u8106\u5F31\u6027\u30B9\u30AD\u30E3\u30F3",
             secrets: "\u30B7\u30FC\u30AF\u30EC\u30C3\u30C8\u7BA1\u7406"
@@ -496830,12 +496855,22 @@ function findDuplicatePairs(blocks, minLines) {
   }
   return dups;
 }
+function isCommentOnlyLine(line) {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*");
+}
 function collectCodeBlocks(files, minLines) {
   const blocks = [];
   for (const f of files) {
     const lines = f.sourceFile.getFullText().split("\n");
     for (let i = 0; i <= lines.length - minLines; i++) {
       const window2 = lines.slice(i, i + minLines);
+      const effectiveLines = window2.reduce(
+        (count, l) => count + (isCommentOnlyLine(l) ? 0 : 1),
+        0
+      );
+      if (effectiveLines < MIN_EFFECTIVE_LINES) continue;
       const block = window2.join("\n").trim();
       if (block.length < 20) continue;
       if (isBoilerplateWindow(window2)) continue;
@@ -496853,6 +496888,7 @@ function isImportStatementLine(line) {
   if (RE_IMPORT_FROM.test(line)) return true;
   if (RE_IMPORT_LIST_START.test(line)) return true;
   if (RE_EXPORT_FROM.test(line)) return true;
+  if (RE_EXPORT_LIST_START.test(line)) return true;
   if (RE_REQUIRE_CALL.test(line)) return true;
   if (RE_FROM_CLAUSE2.test(line)) return true;
   return RE_IMPORT_MEMBER_LINE.test(line);
@@ -496861,7 +496897,7 @@ function isBoilerplateWindow(window2) {
   const codeLines = window2.map((l) => l.trim()).filter(
     (l) => l.length > 0 && !l.startsWith("//") && !l.startsWith("/*") && !l.startsWith("*")
   );
-  if (codeLines.length === 0) return false;
+  if (codeLines.length === 0) return true;
   return codeLines.every((l) => isImportStatementLine(l) || isConfigBoilerplateLine(l));
 }
 function isConfigBoilerplateLine(line) {
@@ -496959,7 +496995,7 @@ function isMiscBoilerplate(n) {
 function normalizeCode(code) {
   return code.replace(RE_LINE_COMMENT, "").replace(RE_BLOCK_COMMENT, "").replace(RE_WHITESPACE_RUN, " ").replace(RE_PUNCTUATION_SPACING, "$1").trim().toLowerCase();
 }
-var RE_HAS_IDENTIFIER, RE_IMPORT_FROM, RE_IMPORT_LIST_START, RE_EXPORT_FROM, RE_REQUIRE_CALL, RE_FROM_CLAUSE2, RE_IMPORT_MEMBER_LINE, RE_EXPORT_DEFAULT_CALL, RE_OBJECT_FIELD_NAME, RE_STRING_KEY, RE_LONE_OPEN_BRACE, RE_ERR_INSTANCEOF, RE_SAFE_READDIR, RE_SAFE_READFILE, RE_ISARRAY_GUARD, RE_ISRECORD_FUNC, RE_SVG_VIEWBOX_FILL, RE_SVG_SIZED_TAG, RE_SVG_LINECAP_JOIN, RE_SVG_STROKE, RE_TOOL_SCAN_SIG, RE_TOOL_ISAVAILABLE, RE_TOOL_BUILDERRORRESULT_SIG, RE_TOOL_BUILDERRORRESULT_CALL, RE_TOOL_RESULT_META, RE_TOOL_STDOUT_CHECK, RE_VIOLATIONS_PUSH, RE_AUTOFIXABLE_ENDLINE, RE_PARSED_GETLINE, RE_VIOLATION_FILEPATH_LINE, RE_PROJECTID_FILE, RE_FILE_WEIGHT_PAYLOAD, RE_SUCCESS_DATA_TIMESTAMP, RE_DATA_TIMESTAMP, RE_DURATIONMS_ENGINE, RE_ENGINE_TIMESTAMP, RE_USET_SHOWHOME, RE_SHOWHOME_LOADING, RE_FORMATVIOLATION_SIG, RE_RESOLVESCANSETUP_SIG, RE_BUILDRESULT_SIG, RE_TOOLTIMEOUT_BUILDERROR, RE_GETTOOLMANAGER, RE_RULE_STATUS_RETURN, RE_SCANEMPTYSTATE_RETURN, RE_LOADING_PROGRESS_DECL, RE_CONSTRUCTOR_EVENTCENTER, RE_EXPORT_TOOLBINS, RE_RESULTCARD_SECTIONTITLE, RE_RETURN_COPY_TO_AI, RE_RETURN_LOADING_PROGRESS, RE_USE_HOOK_ARRAY, RE_TIMINGSAFEEQUAL, RE_FEATUREICON_GLYPH, RE_LINE_COMMENT, RE_BLOCK_COMMENT, RE_WHITESPACE_RUN, RE_PUNCTUATION_SPACING, MIN_DUPLICATE_NORMALIZED_LENGTH;
+var RE_HAS_IDENTIFIER, RE_IMPORT_FROM, RE_IMPORT_LIST_START, RE_EXPORT_FROM, RE_EXPORT_LIST_START, RE_REQUIRE_CALL, RE_FROM_CLAUSE2, RE_IMPORT_MEMBER_LINE, RE_EXPORT_DEFAULT_CALL, RE_OBJECT_FIELD_NAME, RE_STRING_KEY, RE_LONE_OPEN_BRACE, RE_ERR_INSTANCEOF, RE_SAFE_READDIR, RE_SAFE_READFILE, RE_ISARRAY_GUARD, RE_ISRECORD_FUNC, RE_SVG_VIEWBOX_FILL, RE_SVG_SIZED_TAG, RE_SVG_LINECAP_JOIN, RE_SVG_STROKE, RE_TOOL_SCAN_SIG, RE_TOOL_ISAVAILABLE, RE_TOOL_BUILDERRORRESULT_SIG, RE_TOOL_BUILDERRORRESULT_CALL, RE_TOOL_RESULT_META, RE_TOOL_STDOUT_CHECK, RE_VIOLATIONS_PUSH, RE_AUTOFIXABLE_ENDLINE, RE_PARSED_GETLINE, RE_VIOLATION_FILEPATH_LINE, RE_PROJECTID_FILE, RE_FILE_WEIGHT_PAYLOAD, RE_SUCCESS_DATA_TIMESTAMP, RE_DATA_TIMESTAMP, RE_DURATIONMS_ENGINE, RE_ENGINE_TIMESTAMP, RE_USET_SHOWHOME, RE_SHOWHOME_LOADING, RE_FORMATVIOLATION_SIG, RE_RESOLVESCANSETUP_SIG, RE_BUILDRESULT_SIG, RE_TOOLTIMEOUT_BUILDERROR, RE_GETTOOLMANAGER, RE_RULE_STATUS_RETURN, RE_SCANEMPTYSTATE_RETURN, RE_LOADING_PROGRESS_DECL, RE_CONSTRUCTOR_EVENTCENTER, RE_EXPORT_TOOLBINS, RE_RESULTCARD_SECTIONTITLE, RE_RETURN_COPY_TO_AI, RE_RETURN_LOADING_PROGRESS, RE_USE_HOOK_ARRAY, RE_TIMINGSAFEEQUAL, RE_FEATUREICON_GLYPH, RE_LINE_COMMENT, RE_BLOCK_COMMENT, RE_WHITESPACE_RUN, RE_PUNCTUATION_SPACING, MIN_EFFECTIVE_LINES, MIN_DUPLICATE_NORMALIZED_LENGTH;
 var init_ast_helper_duplicate = __esm({
   "../refactor/src/ast-helper-duplicate.ts"() {
     "use strict";
@@ -496967,6 +497003,7 @@ var init_ast_helper_duplicate = __esm({
     RE_IMPORT_FROM = /^import\s+.*from\s+['"]/;
     RE_IMPORT_LIST_START = /^import\s+(?:type\s+)?[({]/;
     RE_EXPORT_FROM = /^export\s+.*from\s+['"]/;
+    RE_EXPORT_LIST_START = /^export\s+(?:type\s+)?[{*]/;
     RE_REQUIRE_CALL = /^require\s*\(/;
     RE_FROM_CLAUSE2 = /^}?\s*from\s+['"]/;
     RE_IMPORT_MEMBER_LINE = /^}?\s*(?:type\s+)?[A-Za-z_$][\w$]*\s*(?:as\s+[A-Za-z_$][\w$]*)?\s*,?\s*$/;
@@ -497021,6 +497058,7 @@ var init_ast_helper_duplicate = __esm({
     RE_BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
     RE_WHITESPACE_RUN = /\s+/g;
     RE_PUNCTUATION_SPACING = /\s*([{}();,.:])\s*/g;
+    MIN_EFFECTIVE_LINES = 3;
     MIN_DUPLICATE_NORMALIZED_LENGTH = 40;
   }
 });
@@ -497699,15 +497737,31 @@ function declaredZhDeps(repoRoot, pkg) {
   pkgDepsCache.set(key, deps);
   return deps;
 }
+function classifyDuplicateShape(parsed, line, lineCount) {
+  const lines = parsed.sourceFile.getFullText().split("\n").slice(line - 1, line - 1 + lineCount).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("//") && !l.startsWith("/*") && !l.startsWith("*"));
+  if (lines.length === 0) return "logic";
+  if (/\b(?:interface|type)\s+[A-Za-z_$][\w$]*\s*[={]/.test(lines.join(" ")) || lines.every((l) => RE_MEMBER_LINE.test(l))) {
+    return "type-decl";
+  }
+  if (/new\s+(?:Set|Map)\s*[<(]|=\s*\[|:\s*\[$/.test(lines.join("\n")) || lines.filter((l) => RE_LITERAL_ITEM.test(l)).length >= 3) {
+    return "const-table";
+  }
+  if (lines.every((l) => RE_JSX_PROP.test(l) || l === "/>" || l === ">" || l === "</>")) {
+    return "jsx";
+  }
+  return "logic";
+}
 function buildDuplicateSmell(parsed, dup, config, minLines) {
   const isFirst = dup.files[0] === parsed.filePath;
   const otherFile = isFirst ? dup.files[1] : dup.files[0];
   const myLine = isFirst ? dup.lines[0] : dup.lines[1];
   const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
+  const shape = classifyDuplicateShape(parsed, myLine, dup.lineCount);
+  const advice = SHAPE_ADVICE[shape];
   return makeSmell({
     ruleId: "duplicated-code",
     severity: severityOf(config, "duplicated-code"),
-    message: `\u4EE3\u7801\u5757\u4E0E ${otherFile}:${otherLine} \u91CD\u590D\uFF0C\u5EFA\u8BAE\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570`,
+    message: `\u4EE3\u7801\u5757\u4E0E ${otherFile}:${otherLine} \u91CD\u590D\uFF0C${advice.summary}`,
     filePath: parsed.filePath,
     line: myLine,
     column: 1,
@@ -497717,8 +497771,8 @@ function buildDuplicateSmell(parsed, dup, config, minLines) {
     value: dup.lineCount,
     threshold: minLines,
     suggestion: {
-      type: "Extract Common Function",
-      description: `\u5C06\u91CD\u590D\u4EE3\u7801\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570\uFF0C\u901A\u8FC7\u53C2\u6570\u5316\u5DEE\u5F02\u70B9\u7EDF\u4E00\u8C03\u7528\u3002${landingAdvice(parsed.filePath, otherFile)}`,
+      type: advice.type,
+      description: `${advice.lead}${landingAdvice(parsed.filePath, otherFile)}`,
       priority: "medium",
       effort: "medium",
       autoFixable: false
@@ -497760,7 +497814,7 @@ function detectCallbackHell(parsed, config) {
   }
   return smells;
 }
-var fs43, path46, BLANK_LINE_BLOCK, _dupCache, _dupCacheFiles, _dupCacheMinLines, PACKAGE_PATH_RE, pkgDepsCache, DEP_SECTIONS;
+var fs43, path46, BLANK_LINE_BLOCK, _dupCache, _dupCacheFiles, _dupCacheMinLines, PACKAGE_PATH_RE, pkgDepsCache, DEP_SECTIONS, RE_MEMBER_LINE, RE_LITERAL_ITEM, RE_JSX_PROP, SHAPE_ADVICE;
 var init_structure_detectors = __esm({
   "../refactor/src/adapters/structure-detectors.ts"() {
     "use strict";
@@ -497781,6 +497835,31 @@ var init_structure_detectors = __esm({
       "peerDependencies",
       "optionalDependencies"
     ];
+    RE_MEMBER_LINE = /^(?:readonly\s+)?[A-Za-z_$][\w$]*\??\s*:\s|^[{}]$/;
+    RE_LITERAL_ITEM = /^['"`][^'"`]*['"`],?$/;
+    RE_JSX_PROP = /^[A-Za-z_$][\w$]*=\{/;
+    SHAPE_ADVICE = {
+      logic: {
+        type: "Extract Common Function",
+        summary: "\u5EFA\u8BAE\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570",
+        lead: "\u5C06\u91CD\u590D\u4EE3\u7801\u63D0\u53D6\u4E3A\u516C\u5171\u51FD\u6570\uFF0C\u901A\u8FC7\u53C2\u6570\u5316\u5DEE\u5F02\u70B9\u7EDF\u4E00\u8C03\u7528\u3002"
+      },
+      "type-decl": {
+        type: "Consolidate Shared Type",
+        summary: "\u5EFA\u8BAE\u6536\u655B\u5230\u5171\u4EAB\u7C7B\u578B\u5B9A\u4E49",
+        lead: "\u628A\u8FD9\u4EFD\u7C7B\u578B\u58F0\u660E\u6536\u655B\u5230\u5355\u4E00\u4E8B\u5B9E\u6E90\uFF08\u5171\u4EAB types \u6587\u4EF6\uFF09\u5E76\u53CC\u5411\u5F15\u7528\uFF0C\u4E0D\u8981\u5404\u5199\u4E00\u4EFD\u3002"
+      },
+      "const-table": {
+        type: "Hoist Shared Constant",
+        summary: "\u5EFA\u8BAE\u4E0A\u63D0\u4E3A\u5171\u4EAB\u5E38\u91CF",
+        lead: "\u628A\u8FD9\u4EFD\u5E38\u91CF\u8868\u4E0A\u63D0\u5230\u88AB\u53CC\u65B9\u4F9D\u8D56\u7684\u516C\u5171\u5305\uFF0C\u6539\u4E00\u5904\u5373\u4E24\u5904\u751F\u6548\uFF08\u5206\u6563\u7EF4\u62A4\u5FC5\u7136\u6F02\u79FB\uFF09\u3002"
+      },
+      jsx: {
+        type: "Extract Shared Component",
+        summary: "\u5EFA\u8BAE\u63D0\u53D6\u4E3A\u5171\u7528\u7EC4\u4EF6",
+        lead: "\u628A\u8FD9\u6BB5\u7EC4\u4EF6\u5C5E\u6027\u88C5\u914D\u6536\u655B\u4E3A\u5171\u7528\u7EC4\u4EF6\u6216\u88C5\u914D\u51FD\u6570\uFF0C\u907F\u514D\u9010\u9875\u590D\u5236\u540C\u4E00\u7EC4 props\u3002"
+      }
+    };
   }
 });
 
@@ -505806,7 +505885,8 @@ function initChecks(ruleChannelRan) {
       ruleId: FS_DETECTOR_ID,
       name: "\u6587\u4EF6\u7CFB\u7EDF\u7EA7\u5783\u573E\uFF08\u6784\u5EFA\u4EA7\u7269 / \u5783\u573E\u6587\u4EF6 / \u7A7A\u6587\u4EF6\uFF09",
       ran: true,
-      producer: "detector"
+      producer: "detector",
+      garbageTypes: ["unused-file", "build-artifact"]
     }
   ];
   if (!ruleChannelRan) {
@@ -505815,7 +505895,9 @@ function initChecks(ruleChannelRan) {
       name: "\u5783\u573E\u89C4\u5219\u901A\u9053",
       ran: false,
       producer: "sop-rule",
-      reason: "\u89C4\u5219\u901A\u9053\u672A\u6267\u884C\uFF08\u5F15\u64CE\u88C5\u914D\u6216\u89C4\u5219\u52A0\u8F7D\u5F02\u5E38\uFF09"
+      reason: "\u89C4\u5219\u901A\u9053\u672A\u6267\u884C\uFF08\u5F15\u64CE\u88C5\u914D\u6216\u89C4\u5219\u52A0\u8F7D\u5F02\u5E38\uFF09",
+      // 规则通道整体未跑：由规则判定的类型全部未检测
+      garbageTypes: [...new Set(Object.values(GARBAGE_RULE_TYPE_MAP))]
     });
   }
   return checks;
@@ -505827,11 +505909,13 @@ function collectEvaluationChecks(evaluations, items) {
     const ruleId = evaluation.rule?.id ?? "";
     const executed = evaluation.status === "passed" || evaluation.status === "failed";
     const ran = executed && evaluation.degraded !== true;
+    const garbageType = mapRuleIdToGarbageType(ruleId);
     checks.push({
       ruleId,
       name: evaluation.rule?.name || ruleId,
       ran,
       producer: "sop-rule",
+      ...garbageType ? { garbageTypes: [garbageType] } : {},
       ...ran ? {} : { reason: evaluation.message || `\u89C4\u5219\u672A\u6267\u884C\uFF08${evaluation.status}\uFF09` }
     });
     if (!ran) continue;

@@ -65,10 +65,15 @@ export function groupSmellsByRule(files: RefactorReportData['files']): SmellGrou
   }
   return Array.from(map.entries(), ([ruleId, items]) => {
     const first = items[0];
+    // 同一 ruleId 下手法可能不止一种：duplicated-code 会按重复区形态分流为
+    // 「提取公共函数 / 收敛共享类型 / 上提共享常量 / 提取共用组件」四种。
+    // 只取第一条会把整个分组标成其中一种，用户照着做会发现对不上——
+    // 多于一种手法时不展示具体手法（标题已是 i18n 分类名，足够定位）。
+    const techniques = new Set(items.map((s) => s.suggestion.type).filter(Boolean));
     return {
       ruleId,
       label: RULE_LABELS[ruleId] ?? first.suggestion.type ?? ruleId,
-      technique: first.suggestion.type,
+      technique: techniques.size === 1 ? first.suggestion.type : '',
       items: items.sort(
         (a, b) =>
           (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9) ||

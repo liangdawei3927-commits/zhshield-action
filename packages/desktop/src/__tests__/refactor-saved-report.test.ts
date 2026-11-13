@@ -104,6 +104,54 @@ describe('重构：落盘完整报告 → 分类还原', () => {
     // 页面旧写法等价于 groupSmellsByRule(undefined)：重开页面 report=null 时恒空
     expect(groupSmellsByRule([])).toEqual([]);
   });
+
+  /**
+   * duplicated-code 会按重复区形态给出四种不同手法（提取公共函数 / 收敛共享类型 /
+   * 上提共享常量 / 提取共用组件），但分组仍按 ruleId 聚合。若组标题只取第一条的
+   * 手法，整个分组会被标成其中一种——用户照着做会发现对不上真实条目。
+   */
+  it('同组手法不一致时组标题不展示具体手法（否则会标错整组）', () => {
+    const mk = (line: number, type: string) => ({
+      id: `dup-${line}`,
+      ruleId: 'duplicated-code',
+      severity: 'warning' as const,
+      message: `重复 @${line}`,
+      category: 'refactor' as const,
+      location: { filePath: 'packages/d.ts', line, column: 1 },
+      suggestion: { type, description: type },
+    });
+    const mixed = groupSmellsByRule([
+      {
+        filePath: 'packages/d.ts',
+        totalSmells: 2,
+        maintainabilityScore: 70,
+        refactorPriority: 'medium',
+        smells: [mk(10, 'Consolidate Shared Type'), mk(20, 'Hoist Shared Constant')],
+      },
+    ] as unknown as SavedReport['files']);
+    expect(mixed[0].technique).toBe('');
+
+    // 手法一致时照常展示（这条防止上面那行把技术标签一刀切掉）
+    const uniform = groupSmellsByRule([
+      {
+        filePath: 'packages/e.ts',
+        totalSmells: 2,
+        maintainabilityScore: 70,
+        refactorPriority: 'medium',
+        smells: [
+          {
+            ...mk(10, 'Extract Shared Component'),
+            location: { filePath: 'packages/e.ts', line: 10, column: 1 },
+          },
+          {
+            ...mk(20, 'Extract Shared Component'),
+            location: { filePath: 'packages/e.ts', line: 20, column: 1 },
+          },
+        ],
+      },
+    ] as unknown as SavedReport['files']);
+    expect(uniform[0].technique).toBe('Extract Shared Component');
+  });
 });
 
 describe('重构详情页接线（防退回旧写法）', () => {

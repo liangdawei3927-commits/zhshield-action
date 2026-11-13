@@ -1,17 +1,17 @@
 {
   "version": 2,
-  "generatedAt": "2026-11-05T10:39:38.200Z",
+  "generatedAt": "2026-11-13T15:34:07.262Z",
   "entries": {
     "packages/cli/src/sop-banner.ts": {
       "long-parameter-list": 1
     },
-    "packages/cli/src/sop-source.ts": {
-      "duplicated-code": 1
-    },
-    "packages/db/src/queries-lifecycle.ts": {
+    "packages/dependency/src/adapters/lockfile-verifier.ts": {
       "duplicated-code": 1
     },
     "packages/dependency/src/graph-builder-npm.ts": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/electron/ai-tool-config.ts": {
       "duplicated-code": 1
     },
     "packages/desktop/electron/garbage-input.ts": {
@@ -20,13 +20,7 @@
     "packages/desktop/electron/ipc/backup-health.ts": {
       "duplicated-code": 1
     },
-    "packages/desktop/electron/ipc/dashboard-state.ts": {
-      "duplicated-code": 1
-    },
     "packages/desktop/electron/ipc/engines-scoring-read.ts": {
-      "duplicated-code": 1
-    },
-    "packages/desktop/electron/ipc/engines-techdebt.ts": {
       "duplicated-code": 1
     },
     "packages/desktop/electron/ipc/guard-config.ts": {
@@ -44,25 +38,10 @@
     "packages/desktop/electron/zh-diagnostics-esloc.ts": {
       "duplicated-code": 1
     },
-    "packages/desktop/electron/zh-diagnostics-normalize.ts": {
-      "duplicated-code": 1
-    },
-    "packages/desktop/electron/zh-diagnostics.ts": {
-      "duplicated-code": 1
-    },
     "packages/desktop/src/App.tsx": {
       "duplicated-code": 1
     },
-    "packages/desktop/src/app-logic-projects.ts": {
-      "duplicated-code": 1
-    },
-    "packages/desktop/src/app-logic-switches.ts": {
-      "duplicated-code": 1
-    },
     "packages/desktop/src/app-logic-types.ts": {
-      "duplicated-code": 1
-    },
-    "packages/desktop/src/components/business/DomainSnapshotReport.tsx": {
       "duplicated-code": 1
     },
     "packages/desktop/src/components/business/HealthRing.tsx": {
@@ -72,6 +51,9 @@
       "duplicated-code": 1
     },
     "packages/desktop/src/components/layout/TopNav.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/components/layout/sidebar-projects.tsx": {
       "duplicated-code": 1
     },
     "packages/desktop/src/components/layout/sidebar-sections.tsx": {
@@ -95,6 +77,9 @@
     "packages/desktop/src/pages/BackupPage.tsx": {
       "duplicated-code": 1
     },
+    "packages/desktop/src/pages/SecurityPage.tsx": {
+      "duplicated-code": 1
+    },
     "packages/desktop/src/pages/dependency-parts.tsx": {
       "duplicated-code": 1
     },
@@ -105,6 +90,9 @@
       "duplicated-code": 1
     },
     "packages/desktop/src/pages/guard-history-parts.tsx": {
+      "duplicated-code": 1
+    },
+    "packages/desktop/src/pages/performance-logic.ts": {
       "duplicated-code": 1
     },
     "packages/desktop/src/pages/profile-parts.tsx": {
@@ -119,19 +107,13 @@
     "packages/desktop/src/pages/secrets-parts.tsx": {
       "duplicated-code": 1
     },
-    "packages/desktop/src/pages/security-logic.ts": {
-      "duplicated-code": 1
-    },
     "packages/desktop/vitest.config.ts": {
       "duplicated-code": 1
     },
     "packages/fingerprint/src/detector.ts": {
       "duplicated-code": 1
     },
-    "packages/fingerprint/src/detectors/content-detector.ts": {
-      "duplicated-code": 1
-    },
-    "packages/fingerprint/src/detectors/form-detector.ts": {
+    "packages/fingerprint/src/detectors/config-detector.ts": {
       "duplicated-code": 1
     },
     "packages/fingerprint/src/detectors/types.ts": {
@@ -141,9 +123,6 @@
       "duplicated-code": 1
     },
     "packages/fingerprint/src/language-map.ts": {
-      "duplicated-code": 1
-    },
-    "packages/fingerprint/src/profiler-framework.ts": {
       "duplicated-code": 1
     },
     "packages/fingerprint/src/projection.ts": {
@@ -203,19 +182,10 @@
     "packages/inspect/src/scan-report-builder.ts": {
       "duplicated-code": 1
     },
-    "packages/kernel/src/backup/events.ts": {
-      "duplicated-code": 1
-    },
-    "packages/kernel/src/backup/index.ts": {
-      "duplicated-code": 1
-    },
     "packages/kernel/src/backup/local-backup-copier.ts": {
       "duplicated-code": 1
     },
     "packages/kernel/src/backup/local-backup-restorer.ts": {
-      "duplicated-code": 1
-    },
-    "packages/kernel/src/runner/dispatch-check-list.ts": {
       "duplicated-code": 1
     },
     "packages/kernel/src/runner/evaluation-builders.ts": {
@@ -233,10 +203,13 @@
     "packages/kernel/src/sop/cache/sop-cache-maintenance.ts": {
       "duplicated-code": 1
     },
+    "packages/kernel/src/sop/cache/sop-cache-manager.ts": {
+      "duplicated-code": 1
+    },
     "packages/kernel/src/sop/cache/sop-lazy-loader.ts": {
       "duplicated-code": 1
     },
-    "packages/kernel/src/sop/index.ts": {
+    "packages/kernel/src/sop/cache/sop-sync-client.ts": {
       "duplicated-code": 1
     },
     "packages/kernel/src/sop/sync/experience-reporter.ts": {
@@ -248,9 +221,6 @@
     "packages/kernel/src/sop/sync/wisdom-brain-sync.ts": {
       "duplicated-code": 1
     },
-    "packages/performance/src/adapters/complexity-detector.ts": {
-      "duplicated-code": 1
-    },
     "packages/performance/src/adapters/tree-shaking-detector.ts": {
       "duplicated-code": 1
     },
@@ -258,12 +228,6 @@
       "duplicated-code": 1
     },
     "packages/pipeline/src/domains/deps-cve.ts": {
-      "duplicated-code": 1
-    },
-    "packages/pipeline/src/execution/file-index.ts": {
-      "deep-nesting": 1
-    },
-    "packages/pipeline/src/execution/scheduler.ts": {
       "duplicated-code": 1
     },
     "packages/pipeline/src/gate-coverage-diff.ts": {
@@ -317,9 +281,6 @@
     "packages/shared/src/domain-contract/conclusions.ts": {
       "duplicated-code": 1
     },
-    "packages/dependency/src/adapters/lockfile-verifier.ts": {
-      "duplicated-code": 2
-    },
     "packages/dependency/src/graph-builder-python.ts": {
       "duplicated-code": 2
     },
@@ -338,16 +299,16 @@
     "packages/desktop/electron/preload.ts": {
       "duplicated-code": 2
     },
-    "packages/desktop/src/components/layout/sidebar-projects.tsx": {
+    "packages/desktop/electron/zh-diagnostics-normalize.ts": {
       "duplicated-code": 2
     },
     "packages/desktop/src/components/onboarding/ProjectOnboardingPage-ui-core.tsx": {
       "duplicated-code": 2
     },
-    "packages/desktop/src/pages/ProfilePage.tsx": {
+    "packages/desktop/src/pages/SentinelPage.tsx": {
       "duplicated-code": 2
     },
-    "packages/desktop/src/pages/SentinelPage.tsx": {
+    "packages/desktop/src/pages/garbage-logic.ts": {
       "duplicated-code": 2
     },
     "packages/desktop/src/pages/tech-debt-parts-action-views.tsx": {
@@ -398,6 +359,9 @@
     "packages/server/src/sop/sop-content-admin.repository.ts": {
       "duplicated-code": 2
     },
+    "packages/dependency/src/adapters/lockfile-verifier-parsers.ts": {
+      "duplicated-code": 3
+    },
     "packages/dependency/src/adapters/project-root.ts": {
       "duplicated-code": 3
     },
@@ -410,32 +374,20 @@
     "packages/desktop/src/components/business/ScanEmptyState.tsx": {
       "duplicated-code": 3
     },
+    "packages/desktop/src/pages/ProfilePage.tsx": {
+      "duplicated-code": 3
+    },
     "packages/desktop/src/pages/RefactorPage.tsx": {
       "duplicated-code": 3
     },
     "packages/desktop/src/pages/TechDebtPage.tsx": {
       "duplicated-code": 3
     },
-    "packages/desktop/src/pages/performance-logic.ts": {
-      "duplicated-code": 3
-    },
     "packages/desktop/src/utils/copyToAi.ts": {
-      "duplicated-code": 3
-    },
-    "packages/fingerprint/src/detectors/config-detector.ts": {
-      "duplicated-code": 3
-    },
-    "packages/guard/src/adapters/security-scan-adapter.ts": {
-      "duplicated-code": 3
-    },
-    "packages/kernel/src/sop/cache/sop-sync-client.ts": {
       "duplicated-code": 3
     },
     "packages/pipeline/src/domains/executors.ts": {
       "duplicated-code": 3
-    },
-    "packages/dependency/src/adapters/lockfile-verifier-parsers.ts": {
-      "duplicated-code": 4
     },
     "packages/desktop/electron/ipc/engines-scanners.ts": {
       "duplicated-code": 4
@@ -446,11 +398,11 @@
     "packages/desktop/src/pages/dependency-cards.tsx": {
       "duplicated-code": 4
     },
-    "packages/kernel/src/sop/cache/sop-cache-manager.ts": {
+    "packages/desktop/src/pages/guard-logic.ts": {
       "duplicated-code": 4
     },
-    "packages/desktop/src/pages/dependency-logic.ts": {
-      "duplicated-code": 5
+    "packages/guard/src/adapters/security-scan-adapter.ts": {
+      "duplicated-code": 4
     },
     "packages/guard/src/adapters/eslint-check-adapter.ts": {
       "duplicated-code": 5
@@ -459,12 +411,6 @@
       "duplicated-code": 6
     },
     "packages/desktop/src/pages/PerformancePage.tsx": {
-      "duplicated-code": 6
-    },
-    "packages/desktop/src/pages/garbage-logic.ts": {
-      "duplicated-code": 6
-    },
-    "packages/desktop/src/pages/guard-logic.ts": {
       "duplicated-code": 6
     },
     "packages/inspect/src/ai-code/files.ts": {

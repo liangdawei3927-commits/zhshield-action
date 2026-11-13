@@ -154,4 +154,37 @@ describe('duplicated-code 规则双自证 golden', () => {
     console.log(`[duplicated-code golden] 双语句窗口命中数: ${dupHits}`);
     expect(dupHits).toBe(0);
   });
+
+  /**
+   * 建议文案按重复区形态分流：对类型声明说「提取为公共函数」是错误建议
+   * （类型该收敛到单一事实源），对常量表说「提取函数」也无从下手（该上提共享包）。
+   */
+  it('类型声明重复 → 提示收敛共享类型，而非提取公共函数', async () => {
+    const block = [
+      'export interface ProjectInfo {',
+      '  name: string;',
+      '  path: string;',
+      '  lastOpenedAt: string;',
+      '  pinned: boolean;',
+      '}',
+    ].join('\n');
+    const dir = mkdtempSync(path.join(tmpdir(), 'dup-shape-'));
+    try {
+      const a = path.join(dir, 'a.ts');
+      const b = path.join(dir, 'b.ts');
+      writeFileSync(a, `${block}\n\nexport const aOnly = 1;\n`, 'utf8');
+      writeFileSync(b, `${block}\n\nexport const bOnly = 2;\n`, 'utf8');
+      const engine = new RefactorEngine({ enabledRules: ['duplicated-code'] });
+      const report = await engine.analyzeFiles(dir, [a, b]);
+      const smells = report.files.flatMap((f) =>
+        f.smells.filter((s) => s.ruleId === 'duplicated-code'),
+      );
+      console.log(`[duplicated-code golden] 类型声明命中数: ${smells.length}`);
+      expect(smells.length).toBe(1);
+      expect(smells[0].message).toContain('收敛到共享类型定义');
+      expect(smells[0].suggestion.type).toBe('Consolidate Shared Type');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

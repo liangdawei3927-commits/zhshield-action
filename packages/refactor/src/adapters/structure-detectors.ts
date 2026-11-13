@@ -302,6 +302,82 @@ function declaredZhDeps(repoRoot: string, pkg: string): ReadonlySet<string> {
   return deps;
 }
 
+/**
+ * 重复区形态：决定「建议」该说什么。
+ *
+ * 此前不分形态一律提示「建议提取为公共函数」。本仓一次全量扫描的 259 个重复区里，
+ * 约 50 条是类型声明、常量名单或组件属性装配块 —— 对类型说「提取为公共函数」
+ * 是错误建议（类型该收敛到单一事实源），对常量表说「提取函数」也无从下手
+ * （该上提到共享包）。建议文案错比不报更伤信任：用户照着做会发现做不了。
+ */
+type DuplicateShape = 'logic' | 'type-decl' | 'const-table' | 'jsx';
+
+/** 接口成员行：`readonly file: string;` / `line?: number;`（含花括号收尾行） */
+const RE_MEMBER_LINE = /^(?:readonly\s+)?[A-Za-z_$][\w$]*\??\s*:\s|^[{}]$/;
+/** 字面量清单项：`'node_modules',` / `"dist",` / `'.turbo'` */
+const RE_LITERAL_ITEM = /^['"`][^'"`]*['"`],?$/;
+/** JSX 属性装配行：`onAction={onRescan}` / `progress={progress}` */
+const RE_JSX_PROP = /^[A-Za-z_$][\w$]*=\{/;
+
+function classifyDuplicateShape(
+  parsed: ParsedFile,
+  line: number,
+  lineCount: number,
+): DuplicateShape {
+  const lines = parsed.sourceFile
+    .getFullText()
+    .split('\n')
+    .slice(line - 1, line - 1 + lineCount)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('/*') && !l.startsWith('*'));
+
+  if (lines.length === 0) return 'logic';
+
+  // 类型声明：interface/type 关键字，或整窗都是「字段名: 类型」成员行
+  if (
+    /\b(?:interface|type)\s+[A-Za-z_$][\w$]*\s*[={]/.test(lines.join(' ')) ||
+    lines.every((l) => RE_MEMBER_LINE.test(l))
+  ) {
+    return 'type-decl';
+  }
+  // 常量表：Set/Map 字面量、数组字面量，或整窗都是带引号的清单项
+  if (
+    /new\s+(?:Set|Map)\s*[<(]|=\s*\[|:\s*\[$/.test(lines.join('\n')) ||
+    lines.filter((l) => RE_LITERAL_ITEM.test(l)).length >= 3
+  ) {
+    return 'const-table';
+  }
+  // 组件属性装配：整窗都是 `xxx={yyy}` 形式
+  if (lines.every((l) => RE_JSX_PROP.test(l) || l === '/>' || l === '>' || l === '</>')) {
+    return 'jsx';
+  }
+  return 'logic';
+}
+
+/** 重复区形态 → 建议标题、一句话结论与做法（标题会作为面板「手法」展示，须自解释） */
+const SHAPE_ADVICE: Record<DuplicateShape, { type: string; summary: string; lead: string }> = {
+  logic: {
+    type: 'Extract Common Function',
+    summary: '建议提取为公共函数',
+    lead: '将重复代码提取为公共函数，通过参数化差异点统一调用。',
+  },
+  'type-decl': {
+    type: 'Consolidate Shared Type',
+    summary: '建议收敛到共享类型定义',
+    lead: '把这份类型声明收敛到单一事实源（共享 types 文件）并双向引用，不要各写一份。',
+  },
+  'const-table': {
+    type: 'Hoist Shared Constant',
+    summary: '建议上提为共享常量',
+    lead: '把这份常量表上提到被双方依赖的公共包，改一处即两处生效（分散维护必然漂移）。',
+  },
+  jsx: {
+    type: 'Extract Shared Component',
+    summary: '建议提取为共用组件',
+    lead: '把这段组件属性装配收敛为共用组件或装配函数，避免逐页复制同一组 props。',
+  },
+};
+
 function buildDuplicateSmell(
   parsed: ParsedFile,
   dup: DuplicateBlock,
@@ -312,10 +388,13 @@ function buildDuplicateSmell(
   const otherFile = isFirst ? dup.files[1] : dup.files[0];
   const myLine = isFirst ? dup.lines[0] : dup.lines[1];
   const otherLine = isFirst ? dup.lines[1] : dup.lines[0];
+  const shape = classifyDuplicateShape(parsed, myLine, dup.lineCount);
+  const advice = SHAPE_ADVICE[shape];
   return makeSmell({
     ruleId: 'duplicated-code',
     severity: severityOf(config, 'duplicated-code'),
-    message: `代码块与 ${otherFile}:${otherLine} 重复，建议提取为公共函数`,
+    message: `代码块与 ${otherFile}:${otherLine} 重复，${advice.summary}`,
+
     filePath: parsed.filePath,
     line: myLine,
     column: 1,
@@ -325,8 +404,8 @@ function buildDuplicateSmell(
     value: dup.lineCount,
     threshold: minLines,
     suggestion: {
-      type: 'Extract Common Function',
-      description: `将重复代码提取为公共函数，通过参数化差异点统一调用。${landingAdvice(parsed.filePath, otherFile)}`,
+      type: advice.type,
+      description: `${advice.lead}${landingAdvice(parsed.filePath, otherFile)}`,
       priority: 'medium',
       effort: 'medium',
       autoFixable: false,

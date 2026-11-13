@@ -1190,6 +1190,9 @@
       "selectAll": "全選",
       "selectedCount": "已選 {{count}} 項",
       "skippedNotice": "{{count}} 項檢測未執行，結果可能不完整：",
+      "notDetected": "未檢測",
+      "notDetectedHint": "本維度未執行：{{reason}}。未檢測 ≠ 沒有問題，修復工具或重新掃描後可獲得結果。",
+      "notDetectedNoProducer": "本域未登記涵蓋該類型的檢測項",
       "source": "垃圾清理",
       "startScan": "開始掃描",
       "stats": {

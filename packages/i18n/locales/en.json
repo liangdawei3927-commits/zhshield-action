@@ -1190,6 +1190,9 @@
       "selectAll": "Select all",
       "selectedCount": "{{count}} selected",
       "skippedNotice": "{{count}} check(s) did not run — results may be incomplete:",
+      "notDetected": "Not checked",
+      "notDetectedHint": "This dimension did not run: {{reason}}. Not checked ≠ no problems — fix the tool or rescan to get a result.",
+      "notDetectedNoProducer": "No check in this domain covers this type",
       "source": "Garbage cleanup",
       "startScan": "Start scan",
       "stats": {

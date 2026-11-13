@@ -323,6 +323,8 @@ export interface GarbageScanReportData {
     ran: boolean;
     producer: 'detector' | 'sop-rule';
     reason?: string;
+    /** 该项覆盖的垃圾类型（页面据此把未执行维度标成「未检测」而非 0） */
+    garbageTypes?: string[];
   }>;
   /** 未真正执行的检测项数 */
   skipped: number;

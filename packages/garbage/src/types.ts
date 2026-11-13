@@ -46,6 +46,12 @@ export interface GarbageCheckStatus {
   producer: 'detector' | 'sop-rule';
   /** 未执行时的原因（工具不可用 / 报错信息） */
   reason?: string;
+  /**
+   * 该项覆盖的垃圾类型（一个检测项可能覆盖多类，如文件系统检测器覆盖无用文件/构建产物）。
+   * 页面据此把「未执行」的维度标成「未检测」——未检测 ≠ 没有垃圾，
+   * 不能按 `byType[type] ?? 0` 静默渲染成 0。
+   */
+  garbageTypes?: GarbageItem['type'][];
 }
 
 /** 垃圾清理扫描报告（页面唯一数据源，不再借用 SecurityScanReport） */

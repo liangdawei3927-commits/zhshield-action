@@ -1190,6 +1190,9 @@
       "selectAll": "全选",
       "selectedCount": "已选 {{count}} 项",
       "skippedNotice": "{{count}} 项检测未执行，结果可能不完整：",
+      "notDetected": "未检测",
+      "notDetectedHint": "本维度未执行：{{reason}}。未检测 ≠ 没有问题，修复工具或重新扫描后可获得结果。",
+      "notDetectedNoProducer": "本域未登记覆盖该类型的检测项",
       "source": "垃圾清理",
       "startScan": "开始扫描",
       "stats": {

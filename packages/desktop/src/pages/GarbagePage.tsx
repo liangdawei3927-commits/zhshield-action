@@ -10,6 +10,7 @@ import { NavGlyph } from '../components/business/page-glyph';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { useGarbagePage } from './garbage-logic';
 import { GarbageEmptyState } from './garbage-empty-state';
+import { garbageTypeStates, isGarbageTypeUndetected } from './garbage-type-logic';
 import {
   GARBAGE_TYPE_LABEL,
   formatSize,
@@ -78,30 +79,43 @@ function buildGarbageTypeCards({
    */
   const typeColor = (type: string): string =>
     type === 'unused-dependency' ? 'rgb(var(--zh-warning))' : 'rgb(var(--zh-info))';
+  const states = garbageTypeStates(report);
+  // 报告未声明任何类型归属（历史快照等）时退回旧口径，避免把全部维度误标未检测
+  const hasDeclaredTypes = states.covered.size > 0;
   return (['unused-dependency', 'unused-file', 'dead-code', 'duplicate-code'] as const).map(
-    (type) => ({
-      key: `type-${type}`,
-      label: t(GARBAGE_TYPE_LABEL[type] ?? type),
-      value: report.summary.byType[type] ?? 0,
-      color: typeColor(type),
-      detail: {
-        items: report.items.filter((i) => i.type === type),
-        render: (sub: unknown[]) => (
-          <div className="space-y-3">
-            <CopyAllToAiButton
-              className="ml-auto"
-              label={t('page.garbage.copyAllToAi')}
-              onClick={() => copyAllToAi(sub as GarbageScanReportData['items'])}
-            />
-            <GarbageList
-              items={sub as GarbageScanReportData['items']}
-              selected={selected}
-              onToggle={toggleSelect}
-            />
-          </div>
-        ),
-      },
-    }),
+    (type) => {
+      // 未检测 = 检测项跑了但没成功，或本域根本没有覆盖该类型的检测项（如重复代码已移交重构域）
+      const undetected = isGarbageTypeUndetected(states, type, hasDeclaredTypes);
+      const reasonText =
+        states.reasons.get(type)?.join('；') ?? t('page.garbage.notDetectedNoProducer');
+      return {
+        key: `type-${type}`,
+        label: t(GARBAGE_TYPE_LABEL[type] ?? type),
+        // 未检测绝不渲染成 0：0 会被读成「查过且干净」
+        value: undetected ? t('page.garbage.notDetected') : report.summary.byType[type] ?? 0,
+        color: undetected ? 'rgb(var(--zh-muted))' : typeColor(type),
+        detail: {
+          items: report.items.filter((i) => i.type === type),
+          ...(undetected
+            ? { hint: t('page.garbage.notDetectedHint', { reason: reasonText }) }
+            : {}),
+          render: (sub: unknown[]) => (
+            <div className="space-y-3">
+              <CopyAllToAiButton
+                className="ml-auto"
+                label={t('page.garbage.copyAllToAi')}
+                onClick={() => copyAllToAi(sub as GarbageScanReportData['items'])}
+              />
+              <GarbageList
+                items={sub as GarbageScanReportData['items']}
+                selected={selected}
+                onToggle={toggleSelect}
+              />
+            </div>
+          ),
+        },
+      };
+    },
   );
 }
 

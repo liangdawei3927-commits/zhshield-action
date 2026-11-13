@@ -1190,6 +1190,9 @@
       "selectAll": "すべて選択",
       "selectedCount": "{{count}} 項目を選択中",
       "skippedNotice": "{{count}} 件のチェックが実行されていません。結果が不完全な可能性があります:",
+      "notDetected": "未チェック",
+      "notDetectedHint": "この項目は実行されていません: {{reason}}。未チェック ≠ 問題なし。ツールを修復するか再スキャンしてください。",
+      "notDetectedNoProducer": "この領域にはこの種別を対象とするチェックがありません",
       "source": "ゴミ清掃",
       "startScan": "スキャンを開始",
       "stats": {

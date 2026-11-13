@@ -42,7 +42,11 @@ describe('buildGarbageReport', () => {
     expect(report.summary.byType).toEqual({ 'build-artifact': 2, 'dead-code': 1 });
     expect(report.items.map((i) => i.path)).toEqual(['dist', 'coverage', 'src/a.ts']);
     expect(report.skipped).toBe(0);
-    expect(report.checks[0]).toMatchObject({ ruleId: FS_DETECTOR_ID, ran: true });
+    expect(report.checks[0]).toMatchObject({
+      ruleId: FS_DETECTOR_ID,
+      ran: true,
+      garbageTypes: ['unused-file', 'build-artifact'],
+    });
   });
 
   it('规则 skipped / degraded 时计入 skipped 并给出原因（禁止静默当通过）', () => {
@@ -69,6 +73,8 @@ describe('buildGarbageReport', () => {
     const unusedDep = report.checks.find((c) => c.ruleId.includes('unused-dependency'));
     expect(unusedDep?.ran).toBe(false);
     expect(unusedDep?.reason).toContain('depcheck');
+    // 未执行项必须带上类型归属，页面才能据此显示「未检测」而不是 0
+    expect(unusedDep?.garbageTypes).toEqual(['unused-dependency']);
     expect(report.checks.find((c) => c.ruleId === DEAD_CODE_RULE)?.ran).toBe(false);
   });
 
@@ -102,7 +108,12 @@ describe('buildGarbageReport', () => {
   it('规则通道未执行时留痕', () => {
     const report = buildGarbageReport({ projectPath: '/p', fsItems: [], ruleChannelRan: false });
     expect(report.skipped).toBe(1);
-    expect(report.checks.some((c) => c.ruleId === 'garbage.rules')).toBe(true);
+    const channel = report.checks.find((c) => c.ruleId === 'garbage.rules');
+    expect(channel).toBeDefined();
+    // 规则通道整体未跑 → 它覆盖的规则类型全部计入未检测
+    expect(channel?.garbageTypes).toEqual(
+      expect.arrayContaining(['dead-code', 'unused-dependency']),
+    );
   });
 });
 

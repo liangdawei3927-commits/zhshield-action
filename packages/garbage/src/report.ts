@@ -11,6 +11,7 @@
  */
 import type { GarbageItem, GarbageCheckStatus, GarbageScanReport } from './types';
 import {
+  GARBAGE_RULE_TYPE_MAP,
   issuesToGarbageItems,
   mapRuleIdToGarbageType,
   type GarbageViolationLike,
@@ -74,6 +75,7 @@ function initChecks(ruleChannelRan: boolean): GarbageCheckStatus[] {
       name: '文件系统级垃圾（构建产物 / 垃圾文件 / 空文件）',
       ran: true,
       producer: 'detector',
+      garbageTypes: ['unused-file', 'build-artifact'],
     },
   ];
   if (!ruleChannelRan) {
@@ -83,6 +85,8 @@ function initChecks(ruleChannelRan: boolean): GarbageCheckStatus[] {
       ran: false,
       producer: 'sop-rule',
       reason: '规则通道未执行（引擎装配或规则加载异常）',
+      // 规则通道整体未跑：由规则判定的类型全部未检测
+      garbageTypes: [...new Set(Object.values(GARBAGE_RULE_TYPE_MAP))],
     });
   }
   return checks;
@@ -99,11 +103,13 @@ function collectEvaluationChecks(
     const ruleId = evaluation.rule?.id ?? '';
     const executed = evaluation.status === 'passed' || evaluation.status === 'failed';
     const ran = executed && evaluation.degraded !== true;
+    const garbageType = mapRuleIdToGarbageType(ruleId);
     checks.push({
       ruleId,
       name: evaluation.rule?.name || ruleId,
       ran,
       producer: 'sop-rule',
+      ...(garbageType ? { garbageTypes: [garbageType] } : {}),
       ...(ran ? {} : { reason: evaluation.message || `规则未执行（${evaluation.status}）` }),
     });
     if (!ran) continue;

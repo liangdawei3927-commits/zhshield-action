@@ -6,7 +6,7 @@ import type {
   GarbageCleanResultData,
   GarbageRestoreResultData,
 } from '../types/electron';
-import { useDomainRunState } from './domain-run-state';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { useToast } from '../components/ui/Toast';
 import { isDeletableItem } from '@zh/garbage/policy';
 import { buildAiFixPrompt, copyTextToClipboard, type AiFixIssue } from '../utils/copyToAi';
@@ -310,18 +310,7 @@ async function refreshGarbageReport(
 }
 
 /** 垃圾清理页：走垃圾清理域自有通道（文件系统检测器 + garbage 域 SOP 规则），不再借调安全引擎 */
-export function useGarbagePage(projectPath: string): {
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
+export function useGarbagePage(projectPath: string): DomainRunState & {
   report: GarbageScanReportData | null;
   selected: Set<string>;
   cleaning: boolean;

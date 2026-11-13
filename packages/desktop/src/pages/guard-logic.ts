@@ -17,7 +17,7 @@ import {
   copyTextToClipboard,
   type AiFixIssue,
 } from '../utils/copyToAi';
-import { useDomainRunState } from './domain-run-state';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { isCancelledError } from '../services/cancel-error';
 
 export const SEVERITY_LABELS: Record<string, string> = {
@@ -172,18 +172,7 @@ async function loadLatestGuardReport(projectPath: string): Promise<GuardReportDa
 }
 
 /** 门禁扫描运行：loading/进度来自任务中心，状态 + 报告 */
-function useGuardRun(projectPath: string): {
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
+function useGuardRun(projectPath: string): DomainRunState & {
   report: GuardReportData | null;
   handleScan: () => Promise<void>;
 } {

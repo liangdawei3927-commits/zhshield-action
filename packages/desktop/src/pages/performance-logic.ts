@@ -5,7 +5,7 @@ import type { ElectronAPI, PerformanceReportData } from '../types/electron';
 import { useToast } from '../components/ui/Toast';
 import { buildAiFixPrompt, copyTextToClipboard } from '../utils/copyToAi';
 import { useRunWithReport } from '../hooks/useRunWithReport';
-import { useDomainRunState } from './domain-run-state';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 
 /** preload 已暴露 openExternal（trae:// 唤起），但 ElectronAPI 类型未声明，此处补齐 */
 export type ElectronApiWithExternal = ElectronAPI & {
@@ -57,18 +57,7 @@ function toPerformanceAiIssue(issue: PerformanceReportData['issues'][number]) {
 }
 
 /** 性能扫描运行：loading/进度来自任务中心，状态 + 报告 */
-function usePerformanceRun(projectPath: string): {
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
+function usePerformanceRun(projectPath: string): DomainRunState & {
   report: PerformanceReportData | null;
   handleScan: () => Promise<void>;
 } {

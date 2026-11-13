@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { t } from '@zh/i18n';
 import { runDeps } from '../services/engineApi';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
-import { useDomainRunState } from './domain-run-state';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 import { useRunWithReport } from '../hooks/useRunWithReport';
 import type { AiFixIssue } from '../utils/copyToAi';
 import type { DependencyReportData, TyposquatFindingData } from '../types/electron';
@@ -160,18 +160,7 @@ export const ENV_SEVERITY_CONFIG: Record<string, { color: string; bg: string; la
   };
 
 /** 依赖管家运行：loading / 进度统一来自任务中心 deps 任务 */
-function useDependencyRun(projectPath: string): {
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
+function useDependencyRun(projectPath: string): DomainRunState & {
   report: DependencyReportData | null;
   handleScan: () => Promise<void>;
 } {

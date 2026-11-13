@@ -5,7 +5,7 @@ import type { SecurityScanReportData } from '../types/electron';
 import { useCopyIssuesToAi } from '../hooks/useCopyIssuesToAi';
 import { useRunWithReport } from '../hooks/useRunWithReport';
 import type { AiFixIssue } from '../utils/copyToAi';
-import { useDomainRunState } from './domain-run-state';
+import { useDomainRunState, type DomainRunState } from './domain-run-state';
 
 export const SEVERITY_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
   critical: {
@@ -61,18 +61,7 @@ export interface SecurityIssue {
 }
 
 /** 安全扫描运行：loading/进度来自任务中心，状态 + 报告 */
-function useSecurityRun(projectPath: string): {
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  /** 取消当前任务（用户点「停止」）：主进程立刻让等待方返回，UI 不等执行器收尾 */
-  cancel: () => void;
-  /** 已发出取消、等任务中心确认（按钮显示「停止中…」并禁用） */
-  stopping: boolean;
-  queued: boolean;
-  /** 排队位置（1 起；仅 queued 时有值） */
-  queuePosition?: number;
+function useSecurityRun(projectPath: string): DomainRunState & {
   report: SecurityScanReportData | null;
   handleScan: () => Promise<void>;
   /** 最近一次「重新检查」的失败原因（null = 没有失败 / 已清空） */

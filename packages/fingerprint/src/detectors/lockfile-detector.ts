@@ -4,7 +4,7 @@
 import type { Detector } from '../detector';
 import type { Signal, SignalKind } from '../types';
 import { findMarkerProjectRoot, listRootFiles } from '../fs-utils';
-import { makeSignal } from './types';
+import { makeSignal, sortSignals } from './types';
 import { parseLockfile } from './lockfile-parsers';
 
 const KIND: SignalKind = 'lockfile';
@@ -45,8 +45,6 @@ export class LockfileDetector implements Detector {
         }),
       );
     }
-    return signals.sort((a, b) =>
-      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
-    );
+    return sortSignals(signals);
   }
 }

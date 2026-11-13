@@ -3,7 +3,7 @@
 import type { Detector } from '../detector';
 import type { Signal, SignalKind, LanguageId } from '../types';
 import { walkFiles, readText } from '../fs-utils';
-import { makeSignal } from './types';
+import { makeSignal, sortSignals } from './types';
 
 const KIND: SignalKind = 'content';
 
@@ -86,8 +86,6 @@ export class ContentDetector implements Detector {
           );
       }
     }
-    return signals.sort((a, b) =>
-      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
-    );
+    return sortSignals(signals);
   }
 }

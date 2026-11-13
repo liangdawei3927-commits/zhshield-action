@@ -8,7 +8,12 @@ import { MANIFEST_RULES, LOCKFILE_MANAGERS } from '../language-map';
 import { FRAMEWORK_KEYWORDS } from '../framework-map';
 import type { FrameworkKeyword } from '../framework-map';
 import { listRootFiles, readText, relDirname, isRecord, findMarkerProjectRoot } from '../fs-utils';
-import { makeSignal, readDependencyNames, frameworkSignalsFromDeps } from './types';
+import {
+  makeSignal,
+  readDependencyNames,
+  frameworkSignalsFromDeps,
+  sortSignals,
+} from './types';
 import {
   normalizePackageName,
   extractPyprojectDeps,
@@ -138,9 +143,7 @@ export class ManifestDetector implements Detector {
       this.collectWorkspaceManifests(projectPath, root, workspacePatterns, signals);
     }
 
-    return signals.sort((a, b) =>
-      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
-    );
+    return sortSignals(signals);
   }
 
   private collectWorkspaceManifests(

@@ -4,7 +4,7 @@ import type { Detector } from '../detector';
 import type { Signal, SignalKind } from '../types';
 import { CONFIG_RULES } from '../language-map';
 import { walkFiles } from '../fs-utils';
-import { makeSignal } from './types';
+import { makeSignal, sortSignals } from './types';
 
 const KIND: SignalKind = 'config';
 
@@ -58,8 +58,6 @@ export class ConfigDetector implements Detector {
         );
       }
     }
-    return signals.sort((a, b) =>
-      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
-    );
+    return sortSignals(signals);
   }
 }

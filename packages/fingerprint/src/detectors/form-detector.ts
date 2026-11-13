@@ -6,7 +6,7 @@ import type { Signal, SignalKind } from '../types';
 import { FORM_FILE_RULES } from '../language-map';
 import { SERVER_FRAMEWORK_DEP_KEYWORDS } from '../framework-map';
 import { walkFiles, readText, findDirsMatching } from '../fs-utils';
-import { makeSignal, readManifestDepNames, conventionDirSignals } from './types';
+import { makeSignal, readManifestDepNames, conventionDirSignals, sortSignals } from './types';
 
 const KIND: SignalKind = 'form';
 
@@ -68,9 +68,7 @@ export class FormDetector implements Detector {
       this.collectDependencySignals(rel, deps, signals);
     }
     signals.push(...conventionDirSignals(projectPath, this.weight));
-    return signals.sort((a, b) =>
-      a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
-    );
+    return sortSignals(signals);
   }
 
   private collectXcodeBundleSignals(projectPath: string, signals: Signal[]): void {

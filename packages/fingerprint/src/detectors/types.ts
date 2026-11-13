@@ -36,6 +36,22 @@ export function makeSignal(params: MakeSignalParams): Signal {
   return { ruleId, kind, file, weight, payload };
 }
 
+/**
+ * 信号列表的稳定排序：先按 ruleId，再按 file。
+ *
+ * 为什么必须共享：五个探测器各自写了同一行三元嵌套比较器，产出顺序是
+ * 画像指纹的一部分（同一项目两次扫描必须逐条一致，否则 diff 噪声会掩盖真实变化）。
+ * 各写一份时，任何一处补规则（例如加了 file 次序）都会让该探测器与其他四处的
+ * 排序口径分叉，表现为「同样的输入，换个探测器聚合顺序就变」。
+ *
+ * 注意：这是**就地排序**并返回原数组（调用方一直是 `return signals.sort(...)` 的用法）。
+ */
+export function sortSignals(signals: Signal[]): Signal[] {
+  return signals.sort((a, b) =>
+    a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : a.file < b.file ? -1 : 1,
+  );
+}
+
 /** 读取 package.json 的依赖名字集合（依赖 + 开发依赖 + peer 依赖）。解析失败返回空集（空 catch 禁止 → 用返回值表达失败）。 */
 export function readDependencyNames(
   projectRoot: string,

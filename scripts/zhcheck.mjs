@@ -149,8 +149,10 @@ async function runRefactor(files, opts, projectRoot) {
   }
 
   if (!opts.json && dupSmellTotal > 0) {
-    // 每个重复区在参与的两个文件各产生 1 条 smell，故重复区数 = smell 总数 / 2
-    console.log(`zhcheck: duplicated-code 共 ${dupSmellTotal / 2} 个重复区`);
+    // 2026-10-28 起重复对只由字典序在前的文件报告一次（见 structure-detectors.ts
+    // 的 canonicalSideOf），一条 smell 就是一个重复区，不能再按 ×2 折算——旧算式
+    // 会把 274 个重复区显示成 137 个，与报告中心的计数对不上。
+    console.log(`zhcheck: duplicated-code 共 ${dupSmellTotal} 个重复区`);
   }
 
   if (opts.json) {

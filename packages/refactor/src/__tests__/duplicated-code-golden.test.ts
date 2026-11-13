@@ -86,4 +86,72 @@ describe('duplicated-code 规则双自证 golden', () => {
     console.log(`[duplicated-code golden] 干净样本命中数: ${dupHits}`);
     expect(dupHits).toBe(0);
   });
+
+  /**
+   * 三条滤波回归（2026-11-13，对应本仓 292 条重复区里 22 条的成因）：
+   * 窗口按物理行凑数时，注释/空行/import 清单都会被当成「重复代码」。
+   */
+  it('纯注释窗口：同款 JSDoc 尾巴不得判为重复', async () => {
+    const commentTail = [
+      '/**',
+      ' * 侧边栏区块组件说明（各文件首行不同）。',
+      ' *',
+      ' * 从 `sidebar-interactive.tsx` 按职责拆出（原文件超 400 行代码阈值）；',
+      ' * 对外导出仍从 `sidebar-interactive` 统一暴露，调用方无需改动。',
+      ' */',
+      '',
+      "import { SectionTitle } from './sidebar-common';",
+    ].join('\n');
+    const { dupHits, scanned } = await smellCounts({
+      'a.tsx': `${commentTail}\nexport const aOnly = 1;\n`,
+      'b.tsx': `${commentTail}\nexport const bOnly = 2;\n`,
+    });
+    expect(scanned).toBe(2);
+    console.log(`[duplicated-code golden] 纯注释窗口命中数: ${dupHits}`);
+    expect(dupHits).toBe(0);
+  });
+
+  it('多行导出清单：跨包 API 镜像的 export type 块不得判为重复', async () => {
+    const exportBlock = [
+      'export type {',
+      '  DiagnosticSeverity,',
+      '  DiagnosticEntry,',
+      '  LspDiagnostic,',
+      '  FileDiagnostics,',
+      "} from './types';",
+    ].join('\n');
+    const { dupHits, scanned } = await smellCounts({
+      'a.ts': `${exportBlock}\n\nexport const aOnly = 1;\n`,
+      'b.ts': `${exportBlock}\n\nexport const bOnly = 2;\n`,
+    });
+    expect(scanned).toBe(2);
+    console.log(`[duplicated-code golden] 导出清单命中数: ${dupHits}`);
+    expect(dupHits).toBe(0);
+  });
+
+  it('有效代码不足 3 行：只剩 import + 常量时不得判为重复', async () => {
+    const { dupHits, scanned } = await smellCounts({
+      'a.ts': [
+        "import { scorer } from './scoring';",
+        '',
+        '/** 置信度阈值：低于此值不输出框架判定 */',
+        'const CONFIDENCE_THRESHOLD = 0.6;',
+        '',
+        '/** 框架聚合器 */',
+        'export class FrameworkAggregator { run(): number { return CONFIDENCE_THRESHOLD * 2; } }',
+      ].join('\n'),
+      'b.ts': [
+        "import { scorer } from './scoring';",
+        '',
+        '/** 置信度阈值：低于此值输出 unknown 而非硬猜 */',
+        'const CONFIDENCE_THRESHOLD = 0.6;',
+        '',
+        '/** 语言聚合器 */',
+        'export class LanguageAggregator { run(): number { return 0.5; } }',
+      ].join('\n'),
+    });
+    expect(scanned).toBe(2);
+    console.log(`[duplicated-code golden] 双语句窗口命中数: ${dupHits}`);
+    expect(dupHits).toBe(0);
+  });
 });

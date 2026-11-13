@@ -24,6 +24,13 @@ const RE_IMPORT_FROM = /^import\s+.*from\s+['"]/;
 const RE_IMPORT_LIST_START = /^import\s+(?:type\s+)?[({]/;
 /** `export ... from '...'` 再导出声明行 */
 const RE_EXPORT_FROM = /^export\s+.*from\s+['"]/;
+/**
+ * 多行导出清单的开场行：`export {` / `export type {` / `export *`。
+ * 这类行的 `from` 在后续行，单行的 RE_EXPORT_FROM 匹配不到；缺了它，
+ * 跨包 API 镜像的 `export type { A, B, C … } from './types'` 会被判成重复代码
+ * （2026-11-13 实测：zh-diagnostics.ts:1 ↔ pipeline/src/index.ts:12 即此例）。
+ */
+const RE_EXPORT_LIST_START = /^export\s+(?:type\s+)?[{*]/;
 /** `require('...')` 调用行 */
 const RE_REQUIRE_CALL = /^require\s*\(/;
 /** 多行 import 列表的 `} from '...'` / `from '...'` 续行 */
@@ -293,6 +300,26 @@ function findDuplicatePairs(blocks: CodeBlock[], minLines: number): DuplicateBlo
   return dups;
 }
 
+/**
+ * 窗口内「有效代码行」的最低数量（注释行与空行不计）。
+ *
+ * 为什么不能只数物理行：窗口切在块注释中间时 `/**` 的开括号落在窗口外，
+ * normalizeCode 的块注释正则匹配不到，注释体于是被当成代码参与比较；
+ * 于是两段同款 JSDoc 尾巴（如「从 x 按职责拆出（原文件超 400 行代码阈值）」）
+ * 也能凑满 minLines 行而报成重复。2026-11-13 实测：app-logic-projects.ts:3
+ * ↔ app-logic-switches.ts:3、sidebar-projects.tsx:3 ↔ sidebar-sections.tsx:3
+ * 均为整窗注释，profiler-framework.ts:4 ↔ profiler-language.ts:5 为
+ * 5 行窗口里只剩 1 条 import + 1 条常量。这类窗口没有可提取的逻辑。
+ */
+const MIN_EFFECTIVE_LINES = 3;
+
+/** 判断一行是否属于注释（含多行块注释的中间行与收尾行），空行同样不算有效行 */
+function isCommentOnlyLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*');
+}
+
 /** 滑动窗口收集各文件的归一化代码块 */
 function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
   const blocks: CodeBlock[] = [];
@@ -301,6 +328,12 @@ function collectCodeBlocks(files: ParsedFile[], minLines: number): CodeBlock[] {
     const lines = f.sourceFile.getFullText().split('\n');
     for (let i = 0; i <= lines.length - minLines; i++) {
       const window = lines.slice(i, i + minLines);
+      // 有效代码行不足的窗口不参与比较：注释/空行凑出来的窗口不是可提取的重复
+      const effectiveLines = window.reduce(
+        (count, l) => count + (isCommentOnlyLine(l) ? 0 : 1),
+        0,
+      );
+      if (effectiveLines < MIN_EFFECTIVE_LINES) continue;
       const block = window.join('\n').trim();
       if (block.length < 20) continue;
       // 只由 import/require/export-from 或配置结构样板（如 vitest.config 的
@@ -333,6 +366,7 @@ function isImportStatementLine(line: string): boolean {
   if (RE_IMPORT_FROM.test(line)) return true;
   if (RE_IMPORT_LIST_START.test(line)) return true;
   if (RE_EXPORT_FROM.test(line)) return true;
+  if (RE_EXPORT_LIST_START.test(line)) return true;
   if (RE_REQUIRE_CALL.test(line)) return true;
   if (RE_FROM_CLAUSE.test(line)) return true;
   return RE_IMPORT_MEMBER_LINE.test(line);
@@ -345,7 +379,9 @@ function isBoilerplateWindow(window: string[]): boolean {
     .filter(
       (l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('/*') && !l.startsWith('*'),
     );
-  if (codeLines.length === 0) return false;
+  // 整窗都是注释/空行：没有可提取的代码，按样板放行（此前返回 false，
+  // 等于把「注释尾巴窗口」直接送进重复比较，是 P1 类误报的来源）
+  if (codeLines.length === 0) return true;
   return codeLines.every((l) => isImportStatementLine(l) || isConfigBoilerplateLine(l));
 }
 

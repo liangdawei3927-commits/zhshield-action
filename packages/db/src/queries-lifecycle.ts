@@ -3,8 +3,15 @@ import { getProjectByPath } from './queries-projects';
 
 // ─── 项目数据清理(R1:删项目完整归还,软删标记)───
 
-/** 随项目删除而软删的数据表（不含 experiences，见下） */
-const PROJECT_DATA_TABLES = [
+/**
+ * 随项目删除而软删的数据表（不含 experiences，见下）。
+ *
+ * 必须由 @zh/db 导出：desktop 侧的孤儿行统计（electron/ipc/e2e-observation.ts）
+ * 也要遍历同一批表。此前两处各写一份、靠注释「与 queries.ts 对齐」维持一致——
+ * 加第六张表时只改一处，清理逻辑与统计断言就会静默错位，且两包各测各的不会红。
+ * 单一事实源在这里，消费方一律 import。
+ */
+export const PROJECT_DATA_TABLES = [
   'scores',
   'scanning_results',
   'debt_actions',

@@ -10,21 +10,13 @@
 import { ipcMain } from 'electron';
 import {
   createSentinelEvent,
+  PROJECT_DATA_TABLES,
   saveDebtAction,
   saveDebtSnapshot,
   saveScanResult,
   saveScore,
 } from '@zh/db';
 import { getCachedProfileProjectPath, getDb, setCachedProfile, whenDbReady } from '../ipc-context';
-
-/** 与 queries.ts PROJECT_DATA_TABLES 对齐的 5 张表 */
-const PROJECT_DATA_TABLES = [
-  'scores',
-  'scanning_results',
-  'debt_actions',
-  'debt_snapshots',
-  'sentinel_events',
-] as const;
 
 /** 逐表统计：按 where 条件统计 5 表中该 project_id 的行数（返回 表名 → 行数） */
 function countRows(

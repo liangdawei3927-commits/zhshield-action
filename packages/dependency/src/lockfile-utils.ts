@@ -97,6 +97,63 @@ export interface PnpmImporterEntry {
   version: string;
 }
 
+/** pnpm packages 区块的键形态：`/name@version` 或 `name@version`（含 scoped 名） */
+export const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
+
+/** 本地/工作区引用的版本前缀：这类条目本就没有 registry 完整性字段 */
+export const PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
+
+/** resolution.type 中表示「本地来源」的取值 */
+export const LOCAL_RESOLUTION_TYPES: ReadonlySet<string> = new Set(['directory', 'link', 'workspace']);
+
+/** pnpm packages 区块的单条条目 */
+export interface PnpmPackageEntry {
+  /** 包名（已从键里剥掉前导 `/`） */
+  name: string;
+  /** 锁定版本（已剥离 `(peer@x)` 后缀） */
+  version: string;
+  /** 完整性字段：resolution.integrity 优先，回退顶层 integrity；两者都缺失时为 '' */
+  integrity: string;
+  /** resolution.type（缺失时为 ''），用于识别本地/工作区包 */
+  resolutionType: string;
+}
+
+/**
+ * pnpm packages 区块：逐条解析为 `{ name, version, integrity, resolutionType }`。
+ *
+ * 这段「遍历 packages → 正则拆键 → 剥 peer 后缀 → 取 resolution.integrity（回退
+ * 顶层 integrity）」在 graph-builder 的 collectPnpmIntegrity 与 lockfile-verifier 的
+ * collectPnpmPackages 里逐字重复，连键正则都各定义了一份。差异只在拿到条目之后的
+ * 策略：前者直接收集，后者要对缺失完整性的非本地包记一条失败原因。故此处只负责
+ * 「拆」，判定留给调用方。
+ *
+ * 缺失完整性统一返回 ''（而非 undefined）：与两处原实现一致 —— 原实现用
+ * `integrityValue === ''` 判缺失，且顶层 integrity 为 '' 时同样走缺失分支。
+ */
+export function readPnpmPackageEntries(lock: Record<string, unknown>): PnpmPackageEntry[] {
+  const entries: PnpmPackageEntry[] = [];
+  const packages = lock.packages;
+  if (!isRecord(packages)) return entries;
+  for (const [key, meta] of Object.entries(packages)) {
+    const m = key.match(PNPM_PACKAGE_KEY_RE);
+    if (!m) continue;
+    if (!isRecord(meta)) continue;
+    const name = m[1] ?? '';
+    const version = (m[2] ?? '').split('(')[0] ?? '';
+    if (!name || !version) continue;
+    const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
+    const integrity =
+      typeof resolution?.integrity === 'string'
+        ? resolution.integrity
+        : typeof meta.integrity === 'string'
+          ? meta.integrity
+          : '';
+    const resolutionType = typeof resolution?.type === 'string' ? resolution.type : '';
+    entries.push({ name, version, integrity, resolutionType });
+  }
+  return entries;
+}
+
 /**
  * pnpm-lock.yaml importers 区块：取根 importer（键为 '.'，缺省取首个）
  * 在指定区块中的直接依赖条目；条目 meta 非普通对象时跳过。

@@ -133,19 +133,13 @@ export function restoreGarbage(projectPath: string, batchId: string): GarbageRes
     throw new Error(`trash batch 不存在: ${batchId}`);
   }
 
-  const state: RestoreState = { restored: 0, restoredBytes: 0, failed: [] };
+  const state: GarbageRestoreResult = { restored: 0, restoredBytes: 0, failed: [] };
   restoreDirectory(batchDir, batchDir, root, state);
 
   if (state.failed.length === 0) {
     fs.rmSync(batchDir, { recursive: true, force: true });
   }
-  return { restored: state.restored, restoredBytes: state.restoredBytes, failed: state.failed };
-}
-
-interface RestoreState {
-  restored: number;
-  restoredBytes: number;
-  failed: string[];
+  return state;
 }
 
 /** batchId 必须为单个安全路径段，防止 `..` 等值经规范化逃出 trash 目录 */
@@ -161,7 +155,12 @@ function assertSafeBatchId(batchId: string): void {
   }
 }
 
-function restoreDirectory(dir: string, batchDir: string, root: string, state: RestoreState): void {
+function restoreDirectory(
+  dir: string,
+  batchDir: string,
+  root: string,
+  state: GarbageRestoreResult,
+): void {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name === 'node_modules') continue;
     restoreEntry({ entry, dir, batchDir, root, state });
@@ -173,7 +172,7 @@ interface RestoreEntryParams {
   dir: string;
   batchDir: string;
   root: string;
-  state: RestoreState;
+  state: GarbageRestoreResult;
 }
 
 function restoreEntry(params: RestoreEntryParams): void {

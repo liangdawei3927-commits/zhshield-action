@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 63362aac3517b68d
+// @zh-src-hash: 2df5349673b2c8fc
 // @zh-src-files: 434
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -502932,7 +502932,7 @@ function extractPnpmPackageNames(lock) {
   const packages = lock.packages;
   if (packages && typeof packages === "object") {
     for (const key of Object.keys(packages)) {
-      const m = key.match(PNPM_PACKAGE_KEY_RE3);
+      const m = key.match(PNPM_PACKAGE_KEY_RE2);
       const name = m?.[1];
       if (name !== void 0) names.add(name);
     }
@@ -503009,7 +503009,7 @@ function scanPackageNames(names, lockPath) {
   }
   return items;
 }
-var fs59, path64, KNOWN_MALICIOUS_PACKAGES, KNOWN_POPULAR_PACKAGES, PACKAGE_KEY_RE3, SCOPED_NAME_RE, PNPM_PACKAGE_KEY_RE3;
+var fs59, path64, KNOWN_MALICIOUS_PACKAGES, KNOWN_POPULAR_PACKAGES, PACKAGE_KEY_RE3, SCOPED_NAME_RE, PNPM_PACKAGE_KEY_RE2;
 var init_npm_threat_scanner = __esm({
   "../security/src/npm-threat-scanner.ts"() {
     "use strict";
@@ -503096,7 +503096,7 @@ var init_npm_threat_scanner = __esm({
     ]);
     PACKAGE_KEY_RE3 = /^node_modules\/(@[^/]+\/[^/]+|[^/]+)/;
     SCOPED_NAME_RE = /^@[^/]+\//;
-    PNPM_PACKAGE_KEY_RE3 = /^\/(@[^/]+\/[^/]+|[^/]+)@/;
+    PNPM_PACKAGE_KEY_RE2 = /^\/(@[^/]+\/[^/]+|[^/]+)@/;
   }
 });
 
@@ -505811,7 +505811,7 @@ function restoreGarbage(projectPath, batchId) {
   if (state2.failed.length === 0) {
     fs68.rmSync(batchDir, { recursive: true, force: true });
   }
-  return { restored: state2.restored, restoredBytes: state2.restoredBytes, failed: state2.failed };
+  return state2;
 }
 function assertSafeBatchId(batchId) {
   const unsafe = batchId === "" || batchId === "." || batchId === ".." || batchId.includes("/") || batchId.includes("\\");
@@ -512683,6 +512683,27 @@ function collectManifestRanges(data, sectionKeys) {
   }
   return declared;
 }
+var PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
+var PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
+var LOCAL_RESOLUTION_TYPES = /* @__PURE__ */ new Set(["directory", "link", "workspace"]);
+function readPnpmPackageEntries(lock) {
+  const entries = [];
+  const packages = lock.packages;
+  if (!isRecord(packages)) return entries;
+  for (const [key, meta] of Object.entries(packages)) {
+    const m = key.match(PNPM_PACKAGE_KEY_RE);
+    if (!m) continue;
+    if (!isRecord(meta)) continue;
+    const name = m[1] ?? "";
+    const version = (m[2] ?? "").split("(")[0] ?? "";
+    if (!name || !version) continue;
+    const resolution = isRecord(meta.resolution) ? meta.resolution : void 0;
+    const integrity = typeof resolution?.integrity === "string" ? resolution.integrity : typeof meta.integrity === "string" ? meta.integrity : "";
+    const resolutionType = typeof resolution?.type === "string" ? resolution.type : "";
+    entries.push({ name, version, integrity, resolutionType });
+  }
+  return entries;
+}
 function readPnpmImporterEntries(lock, sectionKeys) {
   const entries = [];
   const importers = lock.importers;
@@ -513121,9 +513142,6 @@ function parsePipfileLockFile(lockfilePath) {
 }
 
 // ../dependency/src/adapters/lockfile-verifier.ts
-var PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
-var PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
-var LOCAL_RESOLUTION_TYPES = /* @__PURE__ */ new Set(["directory", "link", "workspace"]);
 function parsePnpmLock(projectRoot, lockfilePath) {
   const failures = [];
   const { declared, locked, integrity } = emptyParsedLockfile(failures);
@@ -513140,24 +513158,15 @@ function parsePnpmLock(projectRoot, lockfilePath) {
   return { declared, locked, integrity, failures };
 }
 function collectPnpmPackages(data, locked, integrity, failures) {
-  const packages = data.packages;
-  if (!isRecord(packages)) return;
-  for (const [key, meta] of Object.entries(packages)) {
-    const m = key.match(PNPM_PACKAGE_KEY_RE);
-    if (!m) continue;
-    if (!isRecord(meta)) continue;
-    const name = m[1];
-    const version = m[2].split("(")[0];
-    if (!version) continue;
-    const resolution = isRecord(meta.resolution) ? meta.resolution : void 0;
-    const integrityValue = typeof resolution?.integrity === "string" ? resolution.integrity : typeof meta.integrity === "string" ? meta.integrity : "";
-    if (integrityValue === "") {
-      const isLocalPackage = PNPM_LOCAL_REF_PREFIX_RE.test(version) || resolution !== void 0 && typeof resolution.type === "string" && LOCAL_RESOLUTION_TYPES.has(resolution.type);
+  for (const entry of readPnpmPackageEntries(data)) {
+    const { name, version } = entry;
+    if (entry.integrity === "") {
+      const isLocalPackage = PNPM_LOCAL_REF_PREFIX_RE.test(version) || LOCAL_RESOLUTION_TYPES.has(entry.resolutionType);
       if (!isLocalPackage) {
         failures.push(`[pnpm] ${name}@${version} \u7F3A\u5C11 resolution.integrity \u5B8C\u6574\u6027\u5B57\u6BB5`);
       }
     } else {
-      integrity.set(`${name}@${version}`, integrityValue);
+      integrity.set(`${name}@${version}`, entry.integrity);
     }
   }
 }
@@ -513271,6 +513280,13 @@ function buildDiffs(declared, locked) {
 var lockfileVerifier = new LockfileVerifierImpl();
 
 // ../dependency/src/graph-builder-shared.ts
+function assembleGraph(declared, collect) {
+  const nodes = [];
+  const byId = /* @__PURE__ */ new Map();
+  const byName = /* @__PURE__ */ new Map();
+  collect({ declared, nodes, byId, byName });
+  return { nodes, edges: buildRootEdges(declared, byName), present: true };
+}
 function trustFromIntegrity(integrity) {
   return integrity ? "verified" : "unknown";
 }
@@ -513452,14 +513468,11 @@ function buildPoetryGraph(poetryLockPath, projectPath) {
   if (content === null) return { nodes: [], edges: [], present: false };
   const packages = parsePoetryLock(content);
   const declared = readPoetryDeclared(projectPath);
-  const nodes = [];
-  const byId = /* @__PURE__ */ new Map();
-  const byName = /* @__PURE__ */ new Map();
-  for (const pkg of packages) {
-    collectPoetryPackage({ pkg, declared, nodes, byId, byName });
-  }
-  const edges = buildRootEdges(declared, byName);
-  return { nodes, edges, present: true };
+  return assembleGraph(declared, (context) => {
+    for (const pkg of packages) {
+      collectPoetryPackage({ ...context, pkg });
+    }
+  });
 }
 function readPoetryDeclared(projectPath) {
   const pyprojectContent = readTextSafe(safeJoin(projectPath, "pyproject.toml"));
@@ -513575,7 +513588,6 @@ function readPackageJson(projectPath) {
   }
   return { dependencies, devDependencies };
 }
-var PNPM_PACKAGE_KEY_RE2 = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
 function collectPnpm(lock) {
   const nodes = [];
   const byId = /* @__PURE__ */ new Map();
@@ -513587,19 +513599,8 @@ function collectPnpm(lock) {
 }
 function collectPnpmIntegrity(lock) {
   const integrityById = /* @__PURE__ */ new Map();
-  const packages = lock.packages;
-  if (!isRecord(packages)) return integrityById;
-  for (const [key, meta] of Object.entries(packages)) {
-    const m = key.match(PNPM_PACKAGE_KEY_RE2);
-    if (!m) continue;
-    if (!isRecord(meta)) continue;
-    const name = m[1];
-    const version = m[2].split("(")[0];
-    if (!version) continue;
-    const id = `${name}@${version}`;
-    const resolution = isRecord(meta.resolution) ? meta.resolution : void 0;
-    const integrity = typeof resolution?.integrity === "string" ? resolution.integrity : typeof meta.integrity === "string" ? meta.integrity : void 0;
-    if (integrity) integrityById.set(id, integrity);
+  for (const entry of readPnpmPackageEntries(lock)) {
+    if (entry.integrity) integrityById.set(`${entry.name}@${entry.version}`, entry.integrity);
   }
   return integrityById;
 }
@@ -513663,13 +513664,10 @@ function buildYarnGraph(yarnLockPath, pkgJson) {
     ...pkgJson ? Object.entries(pkgJson.dependencies) : [],
     ...pkgJson ? Object.entries(pkgJson.devDependencies) : []
   ]);
-  const nodes = [];
-  const byId = /* @__PURE__ */ new Map();
-  const byName = /* @__PURE__ */ new Map();
-  collectYarnDirects({ blocks, declared, nodes, byId, byName });
-  collectYarnTransitives(blocks, nodes, byId);
-  const edges = buildRootEdges(declared, byName);
-  return { nodes, edges, present: true };
+  return assembleGraph(declared, ({ nodes, byId, ...context }) => {
+    collectYarnDirects({ ...context, blocks, nodes, byId });
+    collectYarnTransitives(blocks, nodes, byId);
+  });
 }
 function collectYarnDirects(params) {
   const { blocks, declared, nodes, byId, byName } = params;

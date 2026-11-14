@@ -26,17 +26,16 @@ import {
   type TyposquatFinding,
   type UpgradeAssessment,
 } from '@zh/dependency';
+import type { CveFinding } from './deps-cve';
 import { detectProjectProfile, type ProjectProfile } from '../project-profile';
 
-/** OSV 命中的单条依赖漏洞（与桌面端 CveFinding 同形） */
-export interface DepsCveFinding {
-  name: string;
-  version: string;
-  /** 漏洞标识（CVE/GHSA 别名），多条以「, 」连接 */
-  ids: string;
-  summary: string;
-  severity: 'critical' | 'high' | 'medium';
-}
+/**
+ * OSV 命中的单条依赖漏洞。
+ *
+ * 与 `deps-cve` 的 {@link CveFinding} 是同一份定义（两处此前各写一遍，字段与注释
+ * 都逐字相同）。保留本别名是为了不打断既有导入路径；**改字段请改 CveFinding**。
+ */
+export type DepsCveFinding = CveFinding;
 
 /**
  * CVE 检查结果。`unavailable` = 漏洞库不可达，本次**未检测**（≠ 0 漏洞，C4）。

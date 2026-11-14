@@ -15,20 +15,14 @@ import { ApiTags } from '@nestjs/swagger';
 import type { ToolPackageRow } from '@zh/db';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AdminService } from './admin.service';
+import type { SaveToolPackageInput } from '../sop/sop-tool-admin.repository';
 import { Public } from '../auth/local-only.guard';
 import { requireString, optionalString, parseStringArray } from '../request-body';
 
 const TOOL_STATUSES = new Set(['active', 'deprecated', 'disabled']);
 
 /** 解析工具包请求体：files 必须为 [{filename, content}] 数组 */
-function parseToolBody(body: Record<string, unknown>): {
-  toolId: string;
-  files: Array<{ filename: string; content: string }>;
-  languages?: string[];
-  frameworks?: string[];
-  description?: string;
-  status?: string;
-} {
+function parseToolBody(body: Record<string, unknown>): SaveToolPackageInput {
   const toolId = requireString(body.toolId, 'toolId');
   if (!Array.isArray(body.files) || body.files.length === 0) {
     throw new BadRequestException('字段 files 必须为非空数组');

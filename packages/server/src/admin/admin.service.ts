@@ -9,6 +9,7 @@ import type { SopRule } from '@zh/kernel';
 import { AdminError } from '../sop/sop-content-admin.shared';
 import { SopRuleAdminRepository } from '../sop/sop-content-admin.repository';
 import { SopToolAdminRepository } from '../sop/sop-tool-admin.repository';
+import type { SaveToolPackageInput } from '../sop/sop-tool-admin.repository';
 import { SopService } from '../sop/sop.service';
 import { ToolRuleStore } from '../sop/tool-rule-store';
 
@@ -112,14 +113,7 @@ export class AdminService {
 
   // ─── 工具包 ────────────────────────────────────────────────
 
-  async saveToolPackage(input: {
-    toolId: string;
-    files: Array<{ filename: string; content: string }>;
-    languages?: string[];
-    frameworks?: string[];
-    description?: string;
-    status?: string;
-  }): Promise<{ toolId: string; created: boolean }> {
+  async saveToolPackage(input: SaveToolPackageInput): Promise<{ toolId: string; created: boolean }> {
     try {
       const result = this.toolRepo.saveToolPackage(input);
       this.toolRuleStore.reloadFromRepository();

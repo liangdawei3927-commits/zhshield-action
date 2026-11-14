@@ -16,6 +16,9 @@ import {
   readTextSafe,
   parseYarnLock,
   readPnpmImporterEntries,
+  readPnpmPackageEntries,
+  PNPM_LOCAL_REF_PREFIX_RE,
+  LOCAL_RESOLUTION_TYPES,
   type YarnBlock,
 } from '../lockfile-utils';
 import { satisfiesVersion } from './lockfile-verifier-semver';
@@ -32,13 +35,6 @@ import {
 export { satisfiesVersion } from './lockfile-verifier-semver';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
-
-/** pnpm-lock.yaml packages 键 */
-const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
-/** pnpm 本地 workspace 引用前缀：file: / link: / workspace: */
-const PNPM_LOCAL_REF_PREFIX_RE = /^(file|link|workspace):/;
-/** pnpm 本地目录/链接类型 resolution（本地包天然无 integrity） */
-const LOCAL_RESOLUTION_TYPES = new Set(['directory', 'link', 'workspace']);
 
 /** 锁文件校验器契约：离线静态校验，不联网 */
 export interface LockfileVerifier {
@@ -103,33 +99,17 @@ function collectPnpmPackages(
   integrity: Map<string, string>,
   failures: string[],
 ): void {
-  const packages = data.packages;
-  if (!isRecord(packages)) return;
-  for (const [key, meta] of Object.entries(packages)) {
-    const m = key.match(PNPM_PACKAGE_KEY_RE);
-    if (!m) continue;
-    if (!isRecord(meta)) continue;
-    const name = m[1];
-    const version = m[2].split('(')[0];
-    if (!version) continue;
-    const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
-    const integrityValue =
-      typeof resolution?.integrity === 'string'
-        ? resolution.integrity
-        : typeof meta.integrity === 'string'
-          ? meta.integrity
-          : '';
-    if (integrityValue === '') {
+  for (const entry of readPnpmPackageEntries(data)) {
+    const { name, version } = entry;
+    if (entry.integrity === '') {
       const isLocalPackage =
         PNPM_LOCAL_REF_PREFIX_RE.test(version) ||
-        (resolution !== undefined &&
-          typeof resolution.type === 'string' &&
-          LOCAL_RESOLUTION_TYPES.has(resolution.type));
+        LOCAL_RESOLUTION_TYPES.has(entry.resolutionType);
       if (!isLocalPackage) {
         failures.push(`[pnpm] ${name}@${version} 缺少 resolution.integrity 完整性字段`);
       }
     } else {
-      integrity.set(`${name}@${version}`, integrityValue);
+      integrity.set(`${name}@${version}`, entry.integrity);
     }
   }
 }

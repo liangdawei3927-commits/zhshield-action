@@ -19,6 +19,7 @@ import {
   readTextSafe,
   parseYarnLock,
   readPnpmImporterEntries,
+  readPnpmPackageEntries,
   type YarnBlock,
 } from './lockfile-utils';
 import type {
@@ -31,8 +32,8 @@ import type {
 import { ROOT_NODE_ID } from './types';
 import { safeJoin } from '@zh/shared';
 import { satisfiesVersion } from './adapters/lockfile-verifier';
-import type { BuildResult, DirectDeps } from './graph-builder-shared';
-import { buildRootEdges, makeNode, trustFromIntegrity } from './graph-builder-shared';
+import type { BuildResult, DirectDeps, GraphBuildContext } from './graph-builder-shared';
+import { assembleGraph, makeNode, trustFromIntegrity } from './graph-builder-shared';
 import { buildNpmLockGraph } from './graph-builder-npm';
 import {
   buildPipfileGraph,
@@ -63,14 +64,6 @@ function readPackageJson(projectPath: string): DirectDeps | null {
 
 // ────────────────────────────── pnpm ──────────────────────────────
 
-/**
- * pnpm-lock.yaml packages 键（YAML 解析后无引号）：
- * - v6：/name@version 或 /@scope/name@version
- * - v9（pnpm 10/11）：name@version 或 @scope/name@version（无前导斜杠）
- * 两种格式都可能带 peer 依赖后缀 (peer@version)
- */
-const PNPM_PACKAGE_KEY_RE = /^\/?(@[^/]+\/[^/]+|[^/@]+)@(.+)$/;
-
 /** 解析 pnpm-lock.yaml v6+：importers 直接依赖 + packages 完整性哈希 */
 function collectPnpm(lock: Record<string, unknown>): {
   nodes: DependencyNode[];
@@ -88,24 +81,8 @@ function collectPnpm(lock: Record<string, unknown>): {
 /** packages 区块：/name@version → integrity */
 function collectPnpmIntegrity(lock: Record<string, unknown>): Map<string, string> {
   const integrityById = new Map<string, string>();
-  const packages = lock.packages;
-  if (!isRecord(packages)) return integrityById;
-  for (const [key, meta] of Object.entries(packages)) {
-    const m = key.match(PNPM_PACKAGE_KEY_RE);
-    if (!m) continue;
-    if (!isRecord(meta)) continue;
-    const name = m[1];
-    const version = m[2].split('(')[0];
-    if (!version) continue;
-    const id = `${name}@${version}`;
-    const resolution = isRecord(meta.resolution) ? meta.resolution : undefined;
-    const integrity =
-      typeof resolution?.integrity === 'string'
-        ? resolution.integrity
-        : typeof meta.integrity === 'string'
-          ? meta.integrity
-          : undefined;
-    if (integrity) integrityById.set(id, integrity);
+  for (const entry of readPnpmPackageEntries(lock)) {
+    if (entry.integrity) integrityById.set(`${entry.name}@${entry.version}`, entry.integrity);
   }
   return integrityById;
 }
@@ -200,27 +177,16 @@ function buildYarnGraph(yarnLockPath: string, pkgJson: DirectDeps | null): Build
     ...(pkgJson ? Object.entries(pkgJson.dependencies) : []),
     ...(pkgJson ? Object.entries(pkgJson.devDependencies) : []),
   ]);
-  const nodes: DependencyNode[] = [];
-  const byId = new Map<string, DependencyNode>();
-  const byName = new Map<string, DependencyNode>();
-  collectYarnDirects({ blocks, declared, nodes, byId, byName });
-  collectYarnTransitives(blocks, nodes, byId);
-  const edges = buildRootEdges(declared, byName);
-  return { nodes, edges, present: true };
+  return assembleGraph(declared, ({ nodes, byId, ...context }) => {
+    collectYarnDirects({ ...context, blocks, nodes, byId });
+    collectYarnTransitives(blocks, nodes, byId);
+  });
 }
 
 /** collectYarnDirects 参数对象 */
-interface CollectYarnDirectsParams {
+interface CollectYarnDirectsParams extends GraphBuildContext {
   /** yarn.lock v1 块列表 */
   readonly blocks: YarnBlock[];
-  /** package.json 声明（name → 范围） */
-  readonly declared: Map<string, string>;
-  /** 节点收集目标 */
-  readonly nodes: DependencyNode[];
-  /** 节点索引（id → node） */
-  readonly byId: Map<string, DependencyNode>;
-  /** 名称索引（name → node） */
-  readonly byName: Map<string, DependencyNode>;
 }
 
 /** 第一遍：直接依赖（声明范围精确匹配块键） */

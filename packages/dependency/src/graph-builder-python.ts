@@ -15,8 +15,8 @@ import {
 import type { DependencyEdge, DependencyNode } from './types';
 import { ROOT_NODE_ID } from './types';
 import { safeJoin } from '@zh/shared';
-import type { BuildResult } from './graph-builder-shared';
-import { buildRootEdges, makeNode } from './graph-builder-shared';
+import type { BuildResult, GraphBuildContext } from './graph-builder-shared';
+import { assembleGraph, makeNode } from './graph-builder-shared';
 
 // ────────────────────────────── 模块级正则常量（避免每次调用重编译） ──────────────────────────────
 /** 换行符拆分 */
@@ -92,14 +92,11 @@ export function buildPoetryGraph(poetryLockPath: string, projectPath: string): B
   if (content === null) return { nodes: [], edges: [], present: false };
   const packages = parsePoetryLock(content);
   const declared = readPoetryDeclared(projectPath);
-  const nodes: DependencyNode[] = [];
-  const byId = new Map<string, DependencyNode>();
-  const byName = new Map<string, DependencyNode>();
-  for (const pkg of packages) {
-    collectPoetryPackage({ pkg, declared, nodes, byId, byName });
-  }
-  const edges = buildRootEdges(declared, byName);
-  return { nodes, edges, present: true };
+  return assembleGraph(declared, (context) => {
+    for (const pkg of packages) {
+      collectPoetryPackage({ ...context, pkg });
+    }
+  });
 }
 
 /** 读取 pyproject.toml 声明（dependencies + devDependencies） */
@@ -111,17 +108,9 @@ function readPoetryDeclared(projectPath: string): Map<string, string> {
 }
 
 /** collectPoetryPackage 参数对象 */
-interface CollectPoetryPackageParams {
+interface CollectPoetryPackageParams extends GraphBuildContext {
   /** poetry.lock 包（name + version） */
   readonly pkg: { name: string; version: string };
-  /** pyproject.toml 声明（name → 范围） */
-  readonly declared: Map<string, string>;
-  /** 节点收集目标 */
-  readonly nodes: DependencyNode[];
-  /** 节点索引（id → node） */
-  readonly byId: Map<string, DependencyNode>;
-  /** 名称索引（name → node） */
-  readonly byName: Map<string, DependencyNode>;
 }
 
 /** 单个 poetry.lock 包 → 节点（直接依赖标记 + 根边） */

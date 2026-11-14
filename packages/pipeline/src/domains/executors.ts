@@ -13,6 +13,7 @@ import type { RefactorReport } from '@zh/refactor';
 import type { DomainExecutionContext, DomainExecution, DomainExecutor } from './types';
 import { loadGuardConclusions } from '../domain-snapshot';
 import { scanDeps } from './deps-scan';
+import type { SecurityVulnerabilityFinding } from './security-sop';
 
 /** 运行时域：不属于静态扫描，`runDomains` 不必为它们要求执行器 */
 export const RUNTIME_ONLY_DOMAINS: ReadonlySet<DomainId> = new Set<DomainId>([
@@ -312,15 +313,7 @@ export const DEFAULT_DOMAIN_EXECUTORS: Partial<Record<DomainId, DomainExecutor>>
  * `report-format.ts` 的 `toSecurityScanReportData`：`file: v.package`）。
  * `isDirectDependency=false` —— 这些是代码问题，不是依赖问题。
  */
-function toSecurityVulnerability(finding: {
-  ruleId: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  file: string;
-  line?: number;
-  column?: number;
-  message: string;
-  suggestion?: string;
-}): {
+function toSecurityVulnerability(finding: SecurityVulnerabilityFinding): {
   id: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
   title: string;

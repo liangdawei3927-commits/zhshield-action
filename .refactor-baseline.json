@@ -233,9 +233,6 @@
     "packages/pipeline/src/gate-coverage-diff.ts": {
       "duplicated-code": 1
     },
-    "packages/pipeline/src/rule-metrics.ts": {
-      "deep-nesting": 1
-    },
     "packages/refactor/src/adapters/adapter-types.ts": {
       "duplicated-code": 1
     },
